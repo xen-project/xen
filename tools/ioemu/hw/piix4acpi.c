@@ -98,7 +98,6 @@ static int pmtimer_load(QEMUFile *f, void *opaque, int version_id)
     qemu_get_be64s(f, &s->next_pm_time);
     qemu_get_timer(f, s->pm_timer);
     return 0;
-
 }
 
 static inline void acpi_set_irq(PCIAcpiState *s)
@@ -111,7 +110,8 @@ static inline void acpi_set_irq(PCIAcpiState *s)
 static void pm_timer_update(void *opaque)
 {
     PMTState *s = opaque;
-    s->next_pm_time += muldiv64(1, ticks_per_sec,FREQUENCE_PMTIMER);
+    s->next_pm_time = qemu_get_clock(vm_clock) +
+        muldiv64(1, ticks_per_sec,FREQUENCE_PMTIMER);
     qemu_mod_timer(s->pm_timer, s->next_pm_time);
     acpi_state->pm1_timer ++;
 
@@ -168,13 +168,13 @@ static void acpi_reset(PCIAcpiState *s)
 static void acpiPm1Status_writeb(void *opaque, uint32_t addr, uint32_t val)
 {
     PCIAcpiState *s = opaque;
-    
+
     if ((val&TMROF_STS)==TMROF_STS)
         s->pm1_status = s->pm1_status&!TMROF_STS;
 
     if ((val&GBL_STS)==GBL_STS)
-        s->pm1_status = s->pm1_status&!GBL_STS;
-
+        s->pm1_status = s->pm1_status&!GBL_STS;     
+    
 /*     printf("acpiPm1Status_writeb \n addr %x val:%x pm1_status:%x \n", addr, val,s->pm1_status); */
 }
 
@@ -305,7 +305,7 @@ static void acpiPm1Status_writew(void *opaque, uint32_t addr, uint32_t val)
         s->pm1_status = s->pm1_status&!TMROF_STS;
 
     if ((val&GBL_STS)==GBL_STS)
-        s->pm1_status = s->pm1_status&!GBL_STS;
+        s->pm1_status = s->pm1_status&!GBL_STS;     
 
 /*    printf("acpiPm1Status_writew \n addr %x val:%x pm1_status:%x \n", addr, val,s->pm1_status); */
 }
@@ -384,7 +384,7 @@ static uint32_t acpiPm1Event_readl(void *opaque, uint32_t addr)
 {
     PCIAcpiState *s = opaque;
     uint32_t val;
-
+    
     val = s->pm1_status|(s->pm1_enable<<16);
 /*    printf("acpiPm1Event_readl \n addr %x val:%x\n", addr, val);    */
 
@@ -414,7 +414,7 @@ static void acpi_map(PCIDevice *pci_dev, int region_num,
 {
     PCIAcpiState *d = (PCIAcpiState *)pci_dev;
 
-    printf("register acpi io\n");
+    printf("register acpi io \n");
 
     /* Byte access */
     register_ioport_write(addr, 1, 1, acpiPm1Status_writeb, d);
@@ -430,14 +430,14 @@ static void acpi_map(PCIDevice *pci_dev, int region_num,
     register_ioport_write(addr + 4, 1, 1, acpiPm1Control_writeb, d);
     register_ioport_read(addr + 4, 1, 1, acpiPm1Control_readb, d);
     register_ioport_write(addr + 4 + 1, 1, 1, acpiPm1ControlP1_writeb, d);
-    register_ioport_read(addr + 4 +1, 1, 1, acpiPm1ControlP1_readb, d);
+    register_ioport_read(addr + 4 +1, 1, 1, acpiPm1ControlP1_readb, d);	
 
     /* Word access */
     register_ioport_write(addr, 2, 2, acpiPm1Status_writew, d);
     register_ioport_read(addr, 2, 2, acpiPm1Status_readw, d);
 
     register_ioport_write(addr + 2, 2, 2, acpiPm1Enable_writew, d);
-    register_ioport_read(addr + 2, 2, 2, acpiPm1Enable_readw, d);
+    register_ioport_read(addr + 2, 2, 2, acpiPm1Enable_readw, d); 
 
     register_ioport_write(addr + 4, 2, 2, acpiPm1Control_writew, d);
     register_ioport_read(addr + 4, 2, 2, acpiPm1Control_readw, d);
@@ -445,10 +445,11 @@ static void acpi_map(PCIDevice *pci_dev, int region_num,
     /* DWord access */
     register_ioport_write(addr, 4, 4, acpiPm1Event_writel, d);
     register_ioport_read(addr, 4, 4, acpiPm1Event_readl, d);
-
+		
     register_ioport_write(addr + 8, 4, 4, acpiPm1Timer_writel, d);
     register_ioport_read(addr + 8, 4, 4, acpiPm1Timer_readl, d);
 }
+													
 
 /* PIIX4 acpi pci configuration space, func 3 */
 void pci_piix4_acpi_init(PCIBus *bus)
@@ -476,6 +477,8 @@ void pci_piix4_acpi_init(PCIBus *bus)
 
     pci_register_io_region((PCIDevice *)d, 4, 0x10,
                            PCI_ADDRESS_SPACE_IO, acpi_map);
-    /*pmtimer_state = pmtimer_init();*/
+
+    pmtimer_state = pmtimer_init();
+
     acpi_reset (d);
 }

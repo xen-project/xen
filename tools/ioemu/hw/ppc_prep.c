@@ -96,6 +96,14 @@ static uint32_t speaker_ioport_read(void *opaque, uint32_t addr)
     return 0;
 }
 
+static void pic_irq_request(void *opaque, int level)
+{
+    if (level)
+        cpu_interrupt(first_cpu, CPU_INTERRUPT_HARD);
+    else
+        cpu_reset_interrupt(first_cpu, CPU_INTERRUPT_HARD);
+}
+
 /* PCI intack register */
 /* Read-only register (?) */
 static void _PPC_intack_write (void *opaque, target_phys_addr_t addr, uint32_t value)
@@ -108,7 +116,7 @@ static inline uint32_t _PPC_intack_read (target_phys_addr_t addr)
     uint32_t retval = 0;
 
     if (addr == 0xBFFFFFF0)
-        retval = pic_intack_read(NULL);
+        retval = pic_intack_read(isa_pic);
        //   printf("%s: 0x%08x <= %d\n", __func__, addr, retval);
 
     return retval;
@@ -249,6 +257,8 @@ typedef struct sysctrl_t {
     uint8_t state;
     uint8_t syscontrol;
     uint8_t fake_io[2];
+    int contiguous_map;
+    int endian;
 } sysctrl_t;
 
 enum {
@@ -284,12 +294,13 @@ static void PREP_io_800_writeb (void *opaque, uint32_t addr, uint32_t val)
         /* Special port 92 */
         /* Check soft reset asked */
         if (val & 0x01) {
-            //            cpu_interrupt(cpu_single_env, CPU_INTERRUPT_RESET);
+            //            cpu_interrupt(first_cpu, CPU_INTERRUPT_RESET);
         }
         /* Check LE mode */
         if (val & 0x02) {
-            printf("Little Endian mode isn't supported (yet ?)\n");
-            abort();
+            sysctrl->endian = 1;
+        } else {
+            sysctrl->endian = 0;
         }
         break;
     case 0x0800:
@@ -320,7 +331,7 @@ static void PREP_io_800_writeb (void *opaque, uint32_t addr, uint32_t val)
         break;
     case 0x0814:
         /* L2 invalidate register */
-        //        tlb_flush(cpu_single_env, 1);
+        //        tlb_flush(first_cpu, 1);
         break;
     case 0x081C:
         /* system control register */
@@ -328,10 +339,7 @@ static void PREP_io_800_writeb (void *opaque, uint32_t addr, uint32_t val)
         break;
     case 0x0850:
         /* I/O map type register */
-        if (!(val & 0x01)) {
-            printf("No support for non-continuous I/O map mode\n");
-            abort();
-        }
+        sysctrl->contiguous_map = val & 0x01;
         break;
     default:
         printf("ERROR: unaffected IO port write: %04lx => %02x\n",
@@ -375,6 +383,9 @@ static uint32_t PREP_io_800_readb (void *opaque, uint32_t addr)
         /* Motorola base module extended feature register */
         retval = 0x39; /* No USB, CF and PCI bridge. NVRAM present */
         break;
+    case 0x0814:
+        /* L2 invalidate: don't care */
+        break;
     case 0x0818:
         /* Keylock */
         retval = 0x00;
@@ -391,7 +402,7 @@ static uint32_t PREP_io_800_readb (void *opaque, uint32_t addr)
         break;
     case 0x0850:
         /* I/O map type register */
-        retval = 0x01;
+        retval = sysctrl->contiguous_map;
         break;
     default:
         printf("ERROR: unaffected IO port: %04lx read\n", (long)addr);
@@ -402,22 +413,125 @@ static uint32_t PREP_io_800_readb (void *opaque, uint32_t addr)
     return retval;
 }
 
-extern CPUPPCState *global_env;
+static inline target_phys_addr_t prep_IO_address (sysctrl_t *sysctrl,
+                                                  target_phys_addr_t addr)
+{
+    if (sysctrl->contiguous_map == 0) {
+        /* 64 KB contiguous space for IOs */
+        addr &= 0xFFFF;
+    } else {
+        /* 8 MB non-contiguous space for IOs */
+        addr = (addr & 0x1F) | ((addr & 0x007FFF000) >> 7);
+    }
+
+    return addr;
+}
+
+static void PPC_prep_io_writeb (void *opaque, target_phys_addr_t addr,
+                                uint32_t value)
+{
+    sysctrl_t *sysctrl = opaque;
+
+    addr = prep_IO_address(sysctrl, addr);
+    cpu_outb(NULL, addr, value);
+}
+
+static uint32_t PPC_prep_io_readb (void *opaque, target_phys_addr_t addr)
+{
+    sysctrl_t *sysctrl = opaque;
+    uint32_t ret;
+
+    addr = prep_IO_address(sysctrl, addr);
+    ret = cpu_inb(NULL, addr);
+
+    return ret;
+}
+
+static void PPC_prep_io_writew (void *opaque, target_phys_addr_t addr,
+                                uint32_t value)
+{
+    sysctrl_t *sysctrl = opaque;
+
+    addr = prep_IO_address(sysctrl, addr);
+#ifdef TARGET_WORDS_BIGENDIAN
+    value = bswap16(value);
+#endif
+    PPC_IO_DPRINTF("0x%08lx => 0x%08x\n", (long)addr, value);
+    cpu_outw(NULL, addr, value);
+}
+
+static uint32_t PPC_prep_io_readw (void *opaque, target_phys_addr_t addr)
+{
+    sysctrl_t *sysctrl = opaque;
+    uint32_t ret;
+
+    addr = prep_IO_address(sysctrl, addr);
+    ret = cpu_inw(NULL, addr);
+#ifdef TARGET_WORDS_BIGENDIAN
+    ret = bswap16(ret);
+#endif
+    PPC_IO_DPRINTF("0x%08lx <= 0x%08x\n", (long)addr, ret);
+
+    return ret;
+}
+
+static void PPC_prep_io_writel (void *opaque, target_phys_addr_t addr,
+                                uint32_t value)
+{
+    sysctrl_t *sysctrl = opaque;
+
+    addr = prep_IO_address(sysctrl, addr);
+#ifdef TARGET_WORDS_BIGENDIAN
+    value = bswap32(value);
+#endif
+    PPC_IO_DPRINTF("0x%08lx => 0x%08x\n", (long)addr, value);
+    cpu_outl(NULL, addr, value);
+}
+
+static uint32_t PPC_prep_io_readl (void *opaque, target_phys_addr_t addr)
+{
+    sysctrl_t *sysctrl = opaque;
+    uint32_t ret;
+
+    addr = prep_IO_address(sysctrl, addr);
+    ret = cpu_inl(NULL, addr);
+#ifdef TARGET_WORDS_BIGENDIAN
+    ret = bswap32(ret);
+#endif
+    PPC_IO_DPRINTF("0x%08lx <= 0x%08x\n", (long)addr, ret);
+
+    return ret;
+}
+
+CPUWriteMemoryFunc *PPC_prep_io_write[] = {
+    &PPC_prep_io_writeb,
+    &PPC_prep_io_writew,
+    &PPC_prep_io_writel,
+};
+
+CPUReadMemoryFunc *PPC_prep_io_read[] = {
+    &PPC_prep_io_readb,
+    &PPC_prep_io_readw,
+    &PPC_prep_io_readl,
+};
 
 #define NVRAM_SIZE        0x2000
 
 /* PowerPC PREP hardware initialisation */
-void ppc_prep_init(int ram_size, int vga_ram_size, int boot_device,
-		   DisplayState *ds, const char **fd_filename, int snapshot,
-		   const char *kernel_filename, const char *kernel_cmdline,
-		   const char *initrd_filename)
+static void ppc_prep_init(int ram_size, int vga_ram_size, int boot_device,
+                          DisplayState *ds, const char **fd_filename, int snapshot,
+                          const char *kernel_filename, const char *kernel_cmdline,
+                          const char *initrd_filename)
 {
+    CPUState *env;
     char buf[1024];
+    SetIRQFunc *set_irq;
     m48t59_t *nvram;
     int PPC_io_memory;
-    int ret, linux_boot, i, nb_nics1;
+    int linux_boot, i, nb_nics1, bios_size;
     unsigned long bios_offset;
     uint32_t kernel_base, kernel_size, initrd_base, initrd_size;
+    ppc_def_t *def;
     PCIBus *pci_bus;
 
     sysctrl = qemu_mallocz(sizeof(sysctrl_t));
@@ -425,6 +539,23 @@ void ppc_prep_init(int ram_size, int vga_ram_size, int boot_device,
 	return;
 
     linux_boot = (kernel_filename != NULL);
+    
+    /* init CPUs */
+
+    env = cpu_init();
+    register_savevm("cpu", 0, 3, cpu_save, cpu_load, env);
+    
+    /* Register CPU as a 604 */
+    /* XXX: CPU model (or PVR) should be provided on command line */
+    //    ppc_find_by_name("604r", &def);
+    //    ppc_find_by_name("604e", &def);
+    ppc_find_by_name("604", &def);
+    if (def == NULL) {
+        cpu_abort(env, "Unable to find PowerPC CPU definition\n");
+    }
+    cpu_ppc_register(env, def);
+    /* Set time-base frequency to 100 Mhz */
+    cpu_ppc_tb_init(env, 100UL * 1000UL * 1000UL);
 
     /* allocate RAM */
     cpu_register_physical_memory(0, ram_size, IO_MEM_RAM);
@@ -432,14 +563,14 @@ void ppc_prep_init(int ram_size, int vga_ram_size, int boot_device,
     /* allocate and load BIOS */
     bios_offset = ram_size + vga_ram_size;
     snprintf(buf, sizeof(buf), "%s/%s", bios_dir, BIOS_FILENAME);
-    ret = load_image(buf, phys_ram_base + bios_offset);
-    if (ret != BIOS_SIZE) {
+    bios_size = load_image(buf, phys_ram_base + bios_offset);
+    if (bios_size < 0 || bios_size > BIOS_SIZE) {
         fprintf(stderr, "qemu: could not load PPC PREP bios '%s'\n", buf);
         exit(1);
     }
-    cpu_register_physical_memory((uint32_t)(-BIOS_SIZE), 
-                                 BIOS_SIZE, bios_offset | IO_MEM_ROM);
-    cpu_single_env->nip = 0xfffffffc;
+    bios_size = (bios_size + 0xfff) & ~0xfff;
+    cpu_register_physical_memory((uint32_t)(-bios_size), 
+                                 bios_size, bios_offset | IO_MEM_ROM);
 
     if (linux_boot) {
         kernel_base = KERNEL_LOAD_ADDR;
@@ -472,32 +603,34 @@ void ppc_prep_init(int ram_size, int vga_ram_size, int boot_device,
         initrd_size = 0;
     }
 
-    /* Register CPU as a 74x/75x */
-    cpu_ppc_register(cpu_single_env, 0x00080000);
-    /* Set time-base frequency to 100 Mhz */
-    cpu_ppc_tb_init(cpu_single_env, 100UL * 1000UL * 1000UL);
-
     isa_mem_base = 0xc0000000;
     pci_bus = pci_prep_init();
-    /* Register 64 KB of ISA IO space */
-    PPC_io_memory = cpu_register_io_memory(0, PPC_io_read, PPC_io_write, NULL);
-    cpu_register_physical_memory(0x80000000, 0x00010000, PPC_io_memory);
+    //    pci_bus = i440fx_init();
+    /* Register 8 MB of ISA IO space (needed for non-contiguous map) */
+    PPC_io_memory = cpu_register_io_memory(0, PPC_prep_io_read,
+                                           PPC_prep_io_write, sysctrl);
+    cpu_register_physical_memory(0x80000000, 0x00800000, PPC_io_memory);
 
     /* init basic PC hardware */
     vga_initialize(pci_bus, ds, phys_ram_base + ram_size, ram_size, 
-                   vga_ram_size);
+                   vga_ram_size, 0, 0);
     rtc_init(0x70, 8);
     //    openpic = openpic_init(0x00000000, 0xF0000000, 1);
-    //    pic_init(openpic);
-    pic_init();
+    isa_pic = pic_init(pic_irq_request, first_cpu);
     //    pit = pit_init(0x40, 0);
 
-    serial_init(0x3f8, 4, serial_hds[0]);
+    serial_init(&pic_set_irq_new, isa_pic, 0x3f8, 4, serial_hds[0]);
     nb_nics1 = nb_nics;
     if (nb_nics1 > NE2000_NB_MAX)
         nb_nics1 = NE2000_NB_MAX;
     for(i = 0; i < nb_nics1; i++) {
-        isa_ne2000_init(ne2000_io[i], ne2000_irq[i], &nd_table[i]);
+        if (nd_table[0].model == NULL
+            || strcmp(nd_table[0].model, "ne2k_isa") == 0) {
+            isa_ne2000_init(ne2000_io[i], ne2000_irq[i], &nd_table[i]);
+        } else {
+            fprintf(stderr, "qemu: Unsupported NIC: %s\n", nd_table[0].model);
+            exit (1);
+        }
     }
 
     for(i = 0; i < 2; i++) {
@@ -532,7 +665,7 @@ void ppc_prep_init(int ram_size, int vga_ram_size, int boot_device,
     cpu_register_physical_memory(0xFEFF0000, 0x1000, PPC_io_memory);
 #endif
 
-    nvram = m48t59_init(8, 0, 0x0074, NVRAM_SIZE);
+    nvram = m48t59_init(8, 0, 0x0074, NVRAM_SIZE, 59);
     if (nvram == NULL)
         return;
     sysctrl->nvram = nvram;
@@ -545,4 +678,13 @@ void ppc_prep_init(int ram_size, int vga_ram_size, int boot_device,
                          /* XXX: need an option to load a NVRAM image */
                          0,
                          graphic_width, graphic_height, graphic_depth);
+
+    /* Special port to get debug messages from Open-Firmware */
+    register_ioport_write(0x0F00, 4, 1, &PPC_debug_write, NULL);
 }
+
+QEMUMachine prep_machine = {
+    "prep",
+    "PowerPC PREP platform",
+    ppc_prep_init,
+};

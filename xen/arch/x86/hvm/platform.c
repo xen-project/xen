@@ -729,7 +729,7 @@ void send_mmio_req(
     ioreq_t *p;
     struct cpu_user_regs *regs;
 
-    regs = current->arch.hvm_vcpu.mmio_op.inst_decoder_regs;
+    regs = &current->arch.hvm_vcpu.io_op.io_context;
 
     vio = get_vio(v->domain, v->vcpu_id);
     if (vio == NULL) {
@@ -777,7 +777,7 @@ void send_mmio_req(
 }
 
 static void mmio_operands(int type, unsigned long gpa, struct instruction *inst,
-                          struct mmio_op *mmio_opp, struct cpu_user_regs *regs)
+                          struct hvm_io_op *mmio_opp, struct cpu_user_regs *regs)
 {
     unsigned long value = 0;
     int index, size_reg;
@@ -815,16 +815,19 @@ static void mmio_operands(int type, unsigned long gpa, struct instruction *inst,
 void handle_mmio(unsigned long va, unsigned long gpa)
 {
     unsigned long inst_addr;
-    struct mmio_op *mmio_opp;
+    struct hvm_io_op *mmio_opp;
     struct cpu_user_regs *regs;
     struct instruction mmio_inst;
     unsigned char inst[MAX_INST_LEN];
     int i, realmode, ret, inst_len;
     struct vcpu *v = current;
 
-    mmio_opp = &v->arch.hvm_vcpu.mmio_op;
+    mmio_opp = &v->arch.hvm_vcpu.io_op;
+    regs = &mmio_opp->io_context;
 
-    regs = mmio_opp->inst_decoder_regs;
+    /* Copy current guest state into io instruction state structure. */
+    memcpy(regs, guest_cpu_user_regs(), HVM_CONTEXT_STACK_BYTES);
+
     hvm_store_cpu_guest_regs(v, regs, NULL);
 
     if ((inst_len = hvm_instruction_length(v)) <= 0) {
@@ -1009,7 +1012,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
             unsigned long operand = mmio_inst.operand[0];
             value = get_reg_value(operand_size(operand),
                                   operand_index(operand), 0,
-                                  mmio_opp->inst_decoder_regs);
+                                  regs);
             /* send the request and wait for the value */
             send_mmio_req(IOREQ_TYPE_XCHG, gpa, 1,
                           mmio_inst.op_size, value, IOREQ_WRITE, 0);
@@ -1019,7 +1022,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
             unsigned long operand = mmio_inst.operand[1];
             value = get_reg_value(operand_size(operand),
                                   operand_index(operand), 0,
-                                  mmio_opp->inst_decoder_regs);
+                                  regs);
             /* send the request and wait for the value */
             send_mmio_req(IOREQ_TYPE_XCHG, gpa, 1,
                           mmio_inst.op_size, value, IOREQ_WRITE, 0);

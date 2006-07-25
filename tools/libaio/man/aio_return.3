@@ -1,0 +1,71 @@
+.TH aio_return 3 2002-09-12 "Linux 2.4" Linux AIO"
+.SH NAME
+aio_return \- Retrieve status of asynchronous I/O operation
+.SH SYNOPSYS
+.nf
+.B #include <errno.h>
+.sp
+.br 
+.B #include <aio.h>
+.sp
+.br
+.BI "ssize_t aio_return (const struct aiocb *aiocbp)"
+.fi
+.SH DESCRIPTION
+This function can be used to retrieve the return status of the operation
+carried out by the request described in the variable pointed to by
+.IR aiocbp
+.  As long as the error status of this request as returned
+by 
+.IR aio_error
+is 
+.IR EINPROGRESS
+the return of this function is
+undefined.
+
+Once the request is finished this function can be used exactly once to
+retrieve the return value.  Following calls might lead to undefined
+behavior.  
+When the sources are compiled with 
+.B "_FILE_OFFSET_BITS == 64"
+this function is in fact 
+.IR aio_return64
+since the LFS interface
+transparently replaces the normal implementation.
+.SH "RETURN VALUES"
+The return value itself is the value which would have been
+returned by the 
+.IR read
+,
+.IR write
+, or 
+.IR fsync
+call.
+.SH ERRORS
+The function can return 
+.TP
+.B ENOSYS
+if it is not implemented.
+.TP
+.B EINVAL 
+if the 
+.IR aiocbp 
+parameter does not
+refer to an asynchronous operation whose return status is not yet known.
+.SH "SEE ALSO"
+.BR aio(3),
+.BR aio_cancel(3),
+.BR aio_cancel64(3),
+.BR aio_error(3),
+.BR aio_error64(3),
+.BR aio_fsync(3),
+.BR aio_fsync64(3),
+.BR aio_init(3),
+.BR aio_read(3),
+.BR aio_read64(3),
+.BR aio_return64(3),
+.BR aio_suspend(3),
+.BR aio_suspend64(3),
+.BR aio_write(3),
+.BR aio_write64(3),
+.BR errno(3),

@@ -271,6 +271,7 @@ static void term_completion(void)
         return;
     memcpy(cmdline, term_cmd_buf, term_cmd_buf_index);
     cmdline[term_cmd_buf_index] = '\0';
+    readline_find_completion(cmdline);
     qemu_free(cmdline);
 
     /* no completion found */

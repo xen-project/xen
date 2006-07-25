@@ -7,7 +7,7 @@ SUBDIRS-y += xenstore
 SUBDIRS-y += misc
 SUBDIRS-y += examples
 SUBDIRS-y += xentrace
-SUBDIRS-$(CONFIG_X86) += xcutils
+SUBDIRS-$(CONFIG_XCUTILS) += xcutils
 SUBDIRS-y += firmware
 SUBDIRS-y += security
 SUBDIRS-y += console
@@ -16,6 +16,8 @@ SUBDIRS-y += guest-headers
 SUBDIRS-$(VTPM_TOOLS) += vtpm_manager
 SUBDIRS-$(VTPM_TOOLS) += vtpm
 SUBDIRS-y += xenstat
+SUBDIRS-y += libaio
+SUBDIRS-y += blktap
 
 # These don't cross-compile
 ifeq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
@@ -58,10 +60,13 @@ check_clean:
 
 .PHONY: ioemu ioemuinstall ioemuclean
 ifdef CONFIG_IOEMU
-ioemu ioemuinstall ioemuclean:
-	[ -f ioemu/config-host.h ] || \
-	(cd ioemu; sh ./configure --prefix=usr)
-	$(MAKE) -C ioemu $(patsubst ioemu%,%,$@)
+export IOEMU_DIR ?= ioemu
+ioemu ioemuinstall:
+	[ -f $(IOEMU_DIR)/config-host.mak ] || \
+	  (cd $(IOEMU_DIR) && sh configure --prefix=/usr)
+	$(MAKE) -C $(IOEMU_DIR) $(patsubst ioemu%,%,$@)
+ioemuclean:
+	$(MAKE) -C $(IOEMU_DIR) distclean
 else
 ioemu ioemuinstall ioemuclean:
 endif

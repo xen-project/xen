@@ -1,0 +1,90 @@
+diff -r d08c08f8fbf3 vl.c
+--- a/vl.c	Mon Jun 26 15:18:25 2006 +0100
++++ b/vl.c	Mon Jun 26 15:18:37 2006 +0100
+@@ -1535,26 +1535,65 @@ CharDriverState *qemu_chr_open_stdio(voi
+     return chr;
+ }
+ 
++int store_console_dev(int domid, char *pts)
++{
++    int xc_handle;
++    struct xs_handle *xs;
++    char *path;
++
++    xs = xs_daemon_open();
++    if (xs == NULL) {
++        fprintf(logfile, "Could not contact XenStore\n");
++        return -1;
++    }
++
++    xc_handle = xc_interface_open();
++    if (xc_handle == -1) {
++        fprintf(logfile, "xc_interface_open() error\n");
++        return -1;
++    }
++
++    path = xs_get_domain_path(xs, domid);
++    if (path == NULL) {
++        fprintf(logfile, "xs_get_domain_path() error\n");
++        return -1;
++    }
++    path = realloc(path, strlen(path) + strlen("/console/tty") + 1);
++    if (path == NULL) {
++        fprintf(logfile, "realloc error\n");
++        return -1;
++    }
++    strcat(path, "/console/tty");
++    if (!xs_write(xs, XBT_NULL, path, pts, strlen(pts))) {
++        fprintf(logfile, "xs_write for console fail");
++        return -1;
++    }
++
++    free(path);
++    xs_daemon_close(xs);
++    close(xc_handle);
++
++    return 0;
++}
++
+ #if defined(__linux__)
+ CharDriverState *qemu_chr_open_pty(void)
+ {
+     struct termios tty;
+-    char slave_name[1024];
+     int master_fd, slave_fd;
+     
+     /* Not satisfying */
+-    if (openpty(&master_fd, &slave_fd, slave_name, NULL, NULL) < 0) {
++    if (openpty(&master_fd, &slave_fd, NULL, NULL, NULL) < 0) {
+         return NULL;
+     }
+     
+-    /* Disabling local echo and line-buffered output */
+-    tcgetattr (master_fd, &tty);
+-    tty.c_lflag &= ~(ECHO|ICANON|ISIG);
+-    tty.c_cc[VMIN] = 1;
+-    tty.c_cc[VTIME] = 0;
+-    tcsetattr (master_fd, TCSAFLUSH, &tty);
+-
+-    fprintf(stderr, "char device redirected to %s\n", slave_name);
++    /* Set raw attributes on the pty. */
++    cfmakeraw(&tty);
++    tcsetattr(slave_fd, TCSAFLUSH, &tty);
++    
++    fprintf(stderr, "char device redirected to %s\n", ptsname(master_fd));
++    store_console_dev(domid, ptsname(master_fd));
++
+     return qemu_chr_open_fd(master_fd, master_fd);
+ }
+ 
+@@ -5297,7 +5336,9 @@ int main(int argc, char **argv)
+                 break;
+             case QEMU_OPTION_nographic:
+                 pstrcpy(monitor_device, sizeof(monitor_device), "stdio");
+-                pstrcpy(serial_devices[0], sizeof(serial_devices[0]), "stdio");
++                if(!strcmp(serial_devices[0], "vc"))
++                    pstrcpy(serial_devices[0], sizeof(serial_devices[0]),
++                            "stdio");
+                 nographic = 1;
+                 break;
+             case QEMU_OPTION_kernel:

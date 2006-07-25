@@ -107,13 +107,16 @@ uint32_t cpu_ppc_load_decr (CPUState *env)
 {
     ppc_tb_t *tb_env = env->tb_env;
     uint32_t decr;
+    int64_t diff;
 
-    decr = muldiv64(tb_env->decr_next - qemu_get_clock(vm_clock),
-                    tb_env->tb_freq, ticks_per_sec);
+    diff = tb_env->decr_next - qemu_get_clock(vm_clock);
+    if (diff >= 0)
+        decr = muldiv64(diff, tb_env->tb_freq, ticks_per_sec);
+    else
+        decr = -muldiv64(-diff, tb_env->tb_freq, ticks_per_sec);
 #if defined(DEBUG_TB)
     printf("%s: 0x%08x\n", __func__, decr);
 #endif
-
     return decr;
 }
 
@@ -280,61 +283,45 @@ void PPC_debug_write (void *opaque, uint32_t addr, uint32_t val)
 /* NVRAM helpers */
 void NVRAM_set_byte (m48t59_t *nvram, uint32_t addr, uint8_t value)
 {
-    m48t59_set_addr(nvram, addr);
-    m48t59_write(nvram, value);
+    m48t59_write(nvram, addr, value);
 }
 
 uint8_t NVRAM_get_byte (m48t59_t *nvram, uint32_t addr)
 {
-    m48t59_set_addr(nvram, addr);
-    return m48t59_read(nvram);
+    return m48t59_read(nvram, addr);
 }
 
 void NVRAM_set_word (m48t59_t *nvram, uint32_t addr, uint16_t value)
 {
-    m48t59_set_addr(nvram, addr);
-    m48t59_write(nvram, value >> 8);
-    m48t59_set_addr(nvram, addr + 1);
-    m48t59_write(nvram, value & 0xFF);
+    m48t59_write(nvram, addr, value >> 8);
+    m48t59_write(nvram, addr + 1, value & 0xFF);
 }
 
 uint16_t NVRAM_get_word (m48t59_t *nvram, uint32_t addr)
 {
     uint16_t tmp;
 
-    m48t59_set_addr(nvram, addr);
-    tmp = m48t59_read(nvram) << 8;
-    m48t59_set_addr(nvram, addr + 1);
-    tmp |= m48t59_read(nvram);
-
+    tmp = m48t59_read(nvram, addr) << 8;
+    tmp |= m48t59_read(nvram, addr + 1);
     return tmp;
 }
 
 void NVRAM_set_lword (m48t59_t *nvram, uint32_t addr, uint32_t value)
 {
-    m48t59_set_addr(nvram, addr);
-    m48t59_write(nvram, value >> 24);
-    m48t59_set_addr(nvram, addr + 1);
-    m48t59_write(nvram, (value >> 16) & 0xFF);
-    m48t59_set_addr(nvram, addr + 2);
-    m48t59_write(nvram, (value >> 8) & 0xFF);
-    m48t59_set_addr(nvram, addr + 3);
-    m48t59_write(nvram, value & 0xFF);
+    m48t59_write(nvram, addr, value >> 24);
+    m48t59_write(nvram, addr + 1, (value >> 16) & 0xFF);
+    m48t59_write(nvram, addr + 2, (value >> 8) & 0xFF);
+    m48t59_write(nvram, addr + 3, value & 0xFF);
 }
 
 uint32_t NVRAM_get_lword (m48t59_t *nvram, uint32_t addr)
 {
     uint32_t tmp;
 
-    m48t59_set_addr(nvram, addr);
-    tmp = m48t59_read(nvram) << 24;
-    m48t59_set_addr(nvram, addr + 1);
-    tmp |= m48t59_read(nvram) << 16;
-    m48t59_set_addr(nvram, addr + 2);
-    tmp |= m48t59_read(nvram) << 8;
-    m48t59_set_addr(nvram, addr + 3);
-    tmp |= m48t59_read(nvram);
-
+    tmp = m48t59_read(nvram, addr) << 24;
+    tmp |= m48t59_read(nvram, addr + 1) << 16;
+    tmp |= m48t59_read(nvram, addr + 2) << 8;
+    tmp |= m48t59_read(nvram, addr + 3);
     return tmp;
 }
 
@@ -344,11 +331,9 @@ void NVRAM_set_string (m48t59_t *nvram, uint32_t addr,
     int i;
 
     for (i = 0; i < max && str[i] != '\0'; i++) {
-        m48t59_set_addr(nvram, addr + i);
-        m48t59_write(nvram, str[i]);
+        m48t59_write(nvram, addr + i, str[i]);
     }
-    m48t59_set_addr(nvram, addr + max - 1);
-    m48t59_write(nvram, '\0');
+    m48t59_write(nvram, addr + max - 1, '\0');
 }
 
 int NVRAM_get_string (m48t59_t *nvram, uint8_t *dst, uint16_t addr, int max)
@@ -440,23 +425,4 @@ int PPC_NVRAM_set_params (m48t59_t *nvram, uint16_t NVRAM_size,
     NVRAM_set_word(nvram,  0xFC, crc);
 
     return 0;
- }
-
-/*****************************************************************************/
-void ppc_init (int ram_size, int vga_ram_size, int boot_device,
-	       DisplayState *ds, const char **fd_filename, int snapshot,
-	       const char *kernel_filename, const char *kernel_cmdline,
-	       const char *initrd_filename)
-{
-    if (prep_enabled) {
-        ppc_prep_init(ram_size, vga_ram_size, boot_device, ds, fd_filename,
-                      snapshot, kernel_filename, kernel_cmdline,
-                      initrd_filename);
-    } else {
-        ppc_chrp_init(ram_size, vga_ram_size, boot_device, ds, fd_filename,
-                      snapshot, kernel_filename, kernel_cmdline,
-                      initrd_filename);
-    }
-    /* Special port to get debug messages from Open-Firmware */
-    register_ioport_write(0x0F00, 4, 1, &PPC_debug_write, NULL);
 }

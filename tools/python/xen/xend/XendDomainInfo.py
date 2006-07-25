@@ -1277,14 +1277,20 @@ class XendDomainInfo:
                     cpu = [ int( cpus[v % len(cpus)] ) ]
                     xc.vcpu_setaffinity(self.domid, v, cpu)
 
+            # set domain maxmem in KiB
+            xc.domain_setmaxmem(self.domid, self.info['maxmem'] * 1024)
+
             m = self.image.getDomainMemory(self.info['memory'] * 1024)
             balloon.free(m)
-            xc.domain_setmaxmem(self.domid, m)
 
             init_reservation = self.info['memory'] * 1024
-            if os.uname()[4] == 'ia64':
-                # Workaround until ia64 properly supports ballooning.
+            if os.uname()[4] in ('ia64', 'ppc64'):
+                # Workaround for architectures that don't yet support
+                # ballooning.
                 init_reservation = m
+                # Following line from xiantao.zhang@intel.com
+                # Needed for IA64 until supports ballooning -- okay for PPC64?
+                xc.domain_setmaxmem(self.domid, m)
 
             xc.domain_memory_increase_reservation(self.domid, init_reservation,
                                                   0, 0)
@@ -1699,6 +1705,7 @@ def addControllerClass(device_class, cls):
 
 
 from xen.xend.server import blkif, netif, tpmif, pciif, iopif, irqif, usbif
+from xen.xend.server.BlktapController import BlktapController
 addControllerClass('vbd',  blkif.BlkifController)
 addControllerClass('vif',  netif.NetifController)
 addControllerClass('vtpm', tpmif.TPMifController)
@@ -1706,3 +1713,4 @@ addControllerClass('pci',  pciif.PciController)
 addControllerClass('ioports', iopif.IOPortsController)
 addControllerClass('irq',  irqif.IRQController)
 addControllerClass('usb',  usbif.UsbifController)
+addControllerClass('tap',  BlktapController)

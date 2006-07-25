@@ -188,6 +188,12 @@ int pit_get_gate(PITState *pit, int channel)
     return s->gate;
 }
 
+void pit_time_fired(struct vcpu *v, void *priv)
+{
+    PITChannelState *s = priv;
+    s->count_load_time = hvm_get_clock(v);
+}
+
 static inline void pit_load_count(PITChannelState *s, int val)
 {
     u32   period;
@@ -209,11 +215,11 @@ static inline void pit_load_count(PITChannelState *s, int val)
     switch (s->mode) {
         case 2:
             /* create periodic time */
-            s->pt = create_periodic_time (s->vcpu, period, 0, 0);
+            s->pt = create_periodic_time (s, period, 0, 0);
             break;
         case 1:
             /* create one shot time */
-            s->pt = create_periodic_time (s->vcpu, period, 0, 1);
+            s->pt = create_periodic_time (s, period, 0, 1);
 #ifdef DEBUG_PIT
             printk("HVM_PIT: create one shot time.\n");
 #endif

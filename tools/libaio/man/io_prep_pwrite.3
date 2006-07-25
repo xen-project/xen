@@ -1,0 +1,77 @@
+./" static inline void io_prep_pwrite(struct iocb *iocb, int fd, void *buf, size_t count, long long offset)
+./" {
+./" 	memset(iocb, 0, sizeof(*iocb));
+./" 	iocb->aio_fildes = fd;
+./" 	iocb->aio_lio_opcode = IO_CMD_PWRITE;
+./" 	iocb->aio_reqprio = 0;
+./" 	iocb->u.c.buf = buf;
+./" 	iocb->u.c.nbytes = count;
+./" 	iocb->u.c.offset = offset;
+./" }
+.TH io_prep_pwrite 3 2002-09-12 "Linux 2.4" Linux AIO"
+.SH NAME
+io_prep_pwrite \- Set up iocb for asynchronous writes
+.SH SYNOPSYS
+.nf
+.B #include <errno.h>
+.br
+.sp
+.B #include <libaio.h>
+.br
+.sp
+.BI "inline void io_prep_pwrite(struct iocb *iocb, int fd, void *buf, size_t count, long long offset)
+"
+.sp
+struct iocb {
+	void		*data;
+	unsigned	key;
+	short		aio_lio_opcode;
+	short		aio_reqprio;
+	int		aio_fildes;
+};
+.fi
+.SH DESCRIPTION
+io_prep_write is a convenicence function for setting up parallel writes.
+
+The first
+.TP
+.IR "iocb->u.c.nbytes = count"
+bytes of the file for which
+.TP
+.IR "iocb->aio_fildes = fd"
+is a descriptor are written from the buffer
+starting at
+.TP
+.IR "iocb->u.c.buf = buf"
+.
+.br
+Writing starts at the absolute position
+.TP
+.IR "ioc->u.c.offset = offset"
+in the file.
+.PP
+This function returns immediately . To schedule the operation, the
+function
+.IR io_submit
+must be called.
+.PP
+Simultaneous asynchronous operations using the same iocb produce
+undefined results.
+.SH "RETURN VALUES"
+None
+.SH ERRORS
+None
+.SH "SEE ALSO"
+.BR io(3),
+.BR io_cancel(3),
+.BR io_fsync(3),
+.BR io_getevents(3),
+.BR io_prep_fsync(3),
+.BR io_prep_pread(3),
+.BR io_queue_init(3),
+.BR io_queue_release(3),
+.BR io_queue_run(3),
+.BR io_queue_wait(3),
+.BR io_set_callback(3),
+.BR io_submit(3),
+.BR errno(3)

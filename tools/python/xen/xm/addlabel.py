@@ -14,59 +14,139 @@
 #============================================================================
 # Copyright (C) 2006 International Business Machines Corp.
 # Author: Reiner Sailer <sailer@us.ibm.com>
+# Author: Bryan D. Payne <bdpayne@us.ibm.com>
 #============================================================================
 
-"""Labeling a domain configuration file.
+"""Labeling a domain configuration file or a resoruce.
 """
 import sys, os
+import string
 import traceback
-
-
-from xen.util.security import ACMError, err, active_policy, label2ssidref, on, access_control_re
-
+from xen.util import dictio
+from xen.util import security
 
 def usage():
-    print "\nUsage: xm addlabel <configfile> <label> [<policy>]\n"
-    print "  This program adds an acm_label entry into the 'configfile'."
-    print "  It derives the policy from the running hypervisor if it"
-    print "  is not given (optional parameter). If the configfile is"
-    print "  already labeled, then addlabel fails.\n"
-    err("Usage")
+    print "\nUsage: xm addlabel <label> dom <configfile> [<policy>]"
+    print "       xm addlabel <label> res <resource> [<policy>]\n"
+    print "  This program adds an acm_label entry into the 'configfile'"
+    print "  for a domain or to the global resource label file for a"
+    print "  resource. It derives the policy from the running hypervisor"
+    print "  if it is not given (optional parameter). If a label already"
+    print "  exists for the given domain or resource, then addlabel fails.\n"
 
 
-def main(argv):
+def validate_config_file(configfile):
+    """Performs a simple sanity check on the configuration file passed on
+       the command line.  We basically just want to make sure that it's
+       not a domain image file so we check for a few configuration values
+       and then we are satisfied.  Returned 1 on success, otherwise 0.
+    """
+    # read in the config file
+    globs = {}
+    locs = {}
+    try:
+        execfile(configfile, globs, locs)
+    except:
+        print "Invalid configuration file."
+        return 0
+
+    # sanity check on the data from the file
+    count = 0
+    required = ['kernel', 'memory', 'name']
+    for (k, v) in locs.items():
+        if k in required:
+            count += 1
+    if count != 3:
+        print "Invalid configuration file."
+        return 0
+    else:
+        return 1
+
+
+def add_resource_label(label, resource, policyref):
+    """Adds a resource label to the global resource label file.
+    """
+    # sanity check: make sure this label can be instantiated later on
+    ssidref = security.label2ssidref(label, policyref, 'res')
+
+    # sanity check on resource name
+    (type, file) = resource.split(":")
+    if type == "phy":
+        file = "/dev/" + file
+    if not os.path.exists(file):
+        print "Invalid resource '"+resource+"'"
+        return
+
+    # see if this resource is already in the file
+    access_control = {}
+    file = security.res_label_filename
+    try:
+        access_control = dictio.dict_read("resources", file)
+    except:
+        print "Resource file not found, creating new file at:"
+        print "%s" % (file)
+
+    if access_control.has_key(resource):
+        security.err("This resource is already labeled.")
+
+    # write the data to file
+    new_entry = { resource : tuple([policyref, label]) }
+    access_control.update(new_entry)
+    dictio.dict_write(access_control, "resources", file)
+
+
+def add_domain_label(label, configfile, policyref):
+    # sanity checks: make sure this label can be instantiated later on
+    ssidref = security.label2ssidref(label, policyref, 'dom')
+
+    new_label = "access_control = ['policy=%s,label=%s']\n" % (policyref, label)
+    if not os.path.isfile(configfile):
+        security.err("Configuration file \'" + configfile + "\' not found.")
+    config_fd = open(configfile, "ra+")
+    for line in config_fd:
+        if not security.access_control_re.match(line):
+            continue
+        config_fd.close()
+        security.err("Config file \'" + configfile + "\' is already labeled.")
+    config_fd.write(new_label)
+    config_fd.close()
+
+
+def main (argv):
     try:
         policyref = None
-        if len(argv) not in [3,4]:
+        if len(argv) not in [4,5]:
             usage()
-        configfile = argv[1]
-        label = argv[2]
+            return
 
-        if len(argv) == 4:
-            policyref = argv[3]
-        elif on():
-            policyref = active_policy
+        label = argv[1]
+
+        if len(argv) == 5:
+            policyref = argv[4]
+        elif security.on():
+            policyref = security.active_policy
         else:
-            err("No active policy. Policy must be specified in command line.")
+            security.err("No active policy. Policy must be specified in command line.")
 
-        #sanity checks: make sure this label can be instantiated later on
-        ssidref = label2ssidref(label, policyref, 'dom')
+        if argv[2].lower() == "dom":
+            configfile = argv[3]
+            if configfile[0] != '/':
+                for prefix in [".", "/etc/xen"]:
+                    configfile = prefix + "/" + configfile
+                    if os.path.isfile(configfile):
+                        fd = open(configfile, "rb")
+                        break
+            if not validate_config_file(configfile):
+                usage()
+            else:
+                add_domain_label(label, configfile, policyref)
+        elif argv[2].lower() == "res":
+            resource = argv[3]
+            add_resource_label(label, resource, policyref)
+        else:
+            usage()
 
-        new_label = "access_control = ['policy=%s,label=%s']\n" % (policyref, label)
-        if not os.path.isfile(configfile):
-            err("Configuration file \'" + configfile + "\' not found.")
-        config_fd = open(configfile, "ra+")
-        for line in config_fd:
-            if not access_control_re.match(line):
-                continue
-            config_fd.close()
-            err("Config file \'" + configfile + "\' is already labeled.")
-        config_fd.write(new_label)
-        config_fd.close()
-
-    except ACMError:
-        pass
-    except:
+    except security.ACMError:
         traceback.print_exc(limit=1)
 
 

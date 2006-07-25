@@ -127,7 +127,7 @@ static void format_print(void *opaque, const char *name)
 
 void help(void)
 {
-    printf("qemu-img version " QEMU_VERSION ", Copyright (c) 2004 Fabrice Bellard\n"
+    printf("qemu-img version " QEMU_VERSION ", Copyright (c) 2004-2005 Fabrice Bellard\n"
            "usage: qemu-img command [command options]\n"
            "QEMU disk image utility\n"
            "\n"
@@ -165,7 +165,7 @@ static void get_human_readable_size(char *buf, int buf_size, int64_t size)
     int i;
 
     if (size <= 999) {
-        snprintf(buf, buf_size, "%lld", size);
+        snprintf(buf, buf_size, "%lld", (long long) size);
     } else {
         base = 1024;
         for(i = 0; i < NB_SUFFIXES; i++) {
@@ -176,7 +176,7 @@ static void get_human_readable_size(char *buf, int buf_size, int64_t size)
                 break;
             } else if (size < (1000 * base) || i == (NB_SUFFIXES - 1)) {
                 snprintf(buf, buf_size, "%lld%c", 
-                         (size + (base >> 1)) / base,
+                         (long long) ((size + (base >> 1)) / base),
                          suffixes[i]);
                 break;
             }
@@ -369,7 +369,7 @@ static int img_create(int argc, char **argv)
         printf(", backing_file=%s",
                base_filename);
     }
-    printf(", size=%lld kB\n", size / 1024);
+    printf(", size=%lld kB\n", (long long) (size / 1024));
     ret = bdrv_create(drv, filename, size / 512, base_filename, encrypted);
     if (ret < 0) {
         if (ret == -ENOTSUP) {
@@ -658,15 +658,16 @@ static int img_info(int argc, char **argv)
     get_human_readable_size(size_buf, sizeof(size_buf), total_sectors * 512);
     allocated_size = get_allocated_file_size(filename);
     if (allocated_size < 0)
-        error("Could not get file size '%s'", filename);
-    get_human_readable_size(dsize_buf, sizeof(dsize_buf), 
-                            allocated_size);
+	sprintf(dsize_buf, "unavailable");
+    else
+        get_human_readable_size(dsize_buf, sizeof(dsize_buf), 
+                                allocated_size);
     printf("image: %s\n"
            "file format: %s\n"
            "virtual size: %s (%lld bytes)\n"
            "disk size: %s\n",
            filename, fmt_name, size_buf, 
-           total_sectors * 512,
+           (long long) (total_sectors * 512),
            dsize_buf);
     if (bdrv_is_encrypted(bs))
         printf("encrypted: yes\n");

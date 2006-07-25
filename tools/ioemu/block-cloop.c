@@ -1,5 +1,5 @@
 /*
- * QEMU System Emulator block driver
+ * QEMU Block driver for CLOOP images
  * 
  * Copyright (c) 2004 Johannes E. Schindelin
  * 
@@ -32,8 +32,8 @@ typedef struct BDRVCloopState {
     uint64_t* offsets;
     uint32_t sectors_per_block;
     uint32_t current_block;
-    char* compressed_block;
-    char* uncompressed_block;
+    uint8_t *compressed_block;
+    uint8_t *uncompressed_block;
     z_stream zstream;
 } BDRVCloopState;
 
@@ -89,9 +89,9 @@ cloop_close:
     }
 
     /* initialize zlib engine */
-    if(!(s->compressed_block=(char*)malloc(max_compressed_block_size+1)))
+    if(!(s->compressed_block = malloc(max_compressed_block_size+1)))
 	goto cloop_close;
-    if(!(s->uncompressed_block=(char*)malloc(s->block_size)))
+    if(!(s->uncompressed_block = malloc(s->block_size)))
 	goto cloop_close;
     if(inflateInit(&s->zstream) != Z_OK)
 	goto cloop_close;
@@ -149,6 +149,8 @@ static void cloop_close(BlockDriverState *bs)
 {
     BDRVCloopState *s = bs->opaque;
     close(s->fd);
+    if(s->n_blocks>0)
+	free(s->offsets);
     free(s->compressed_block);
     free(s->uncompressed_block);
     inflateEnd(&s->zstream);

@@ -1,0 +1,22 @@
+LIBAIO_0.1 {
+	global:
+		io_queue_init;
+		io_queue_run;
+		io_queue_wait;
+		io_queue_release;
+		io_cancel;
+		io_submit;
+		io_getevents;
+	local:
+		*;
+
+};
+
+LIBAIO_0.4 {
+	global:
+		io_setup;
+		io_destroy;
+		io_cancel;
+		io_getevents;
+		io_queue_wait;
+} LIBAIO_0.1;

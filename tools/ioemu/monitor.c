@@ -22,6 +22,7 @@
  * THE SOFTWARE.
  */
 #include "vl.h"
+#include "disas.h"
 #include <dirent.h>
 
 //#define DEBUG
@@ -37,7 +38,8 @@
  * 'F'          filename
  * 'B'          block device name
  * 's'          string (accept optional quote)
- * 'i'          integer
+ * 'i'          32 bit integer
+ * 'l'          target long (32 or 64 bit)
  * '/'          optional gdb-like print format (like "/10x")
  *
  * '?'          optional type (for 'F', 's' and 'i')
@@ -62,13 +64,18 @@ static int term_outbuf_index;
 
 static void monitor_start_input(void);
 
+CPUState *mon_cpu = NULL;
+
 void term_flush(void)
 {
+#ifdef CONFIG_DM
+    if (term_outbuf_index > 0 && !monitor_hd) {
+        fwrite(term_outbuf, term_outbuf_index, 1, stderr);
+        term_outbuf_index = 0;
+    }
+#endif
     if (term_outbuf_index > 0) {
-	if(monitor_hd)
         qemu_chr_write(monitor_hd, term_outbuf, term_outbuf_index);
-	else
-	    fwrite(term_outbuf, term_outbuf_index, 1, stderr);
         term_outbuf_index = 0;
     }
 }
@@ -102,6 +109,17 @@ void term_printf(const char *fmt, ...)
     term_vprintf(fmt, ap);
     va_end(ap);
 }
+
+#ifndef CONFIG_DM
+static int monitor_fprintf(FILE *stream, const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    term_vprintf(fmt, ap);
+    va_end(ap);
+    return 0;
+}
+#endif /* !CONFIG_DM */
 
 static int compare_cmd(const char *name, const char *list)
 {
@@ -173,7 +191,7 @@ static void do_info(const char *item)
     if (!item)
         goto help;
     for(cmd = info_cmds; cmd->name != NULL; cmd++) {
-        if (compare_cmd(item, cmd->name))
+        if (compare_cmd(item, cmd->name)) 
             goto found;
     }
  help:
@@ -188,48 +206,449 @@ static void do_info_version(void)
   term_printf("%s\n", QEMU_VERSION);
 }
 
-static void do_info_network(void)
-{
-    int i, j;
-    NetDriverState *nd;
-
-    for(i = 0; i < nb_nics; i++) {
-        nd = &nd_table[i];
-        term_printf("%d: ifname=%s macaddr=", i, nd->ifname);
-        for(j = 0; j < 6; j++) {
-            if (j > 0)
-                term_printf(":");
-            term_printf("%02x", nd->macaddr[j]);
-        }
-        term_printf("\n");
-    }
-}
-
 static void do_info_block(void)
 {
     bdrv_info();
 }
 
+/* get the current CPU defined by the user */
+int mon_set_cpu(int cpu_index)
+{
+    CPUState *env;
+
+    for(env = first_cpu; env != NULL; env = env->next_cpu) {
+        if (env->cpu_index == cpu_index) {
+            mon_cpu = env;
+            return 0;
+        }
+    }
+    return -1;
+}
+
+CPUState *mon_get_cpu(void)
+{
+    if (!mon_cpu) {
+        mon_set_cpu(0);
+    }
+    return mon_cpu;
+}
+
+#ifndef CONFIG_DM
+static void do_info_registers(void)
+{
+    CPUState *env;
+    env = mon_get_cpu();
+    if (!env)
+        return;
+#ifdef TARGET_I386
+    cpu_dump_state(env, NULL, monitor_fprintf,
+                   X86_DUMP_FPU);
+#else
+    cpu_dump_state(env, NULL, monitor_fprintf, 
+                   0);
+#endif
+}
+
+static void do_info_cpus(void)
+{
+    CPUState *env;
+
+    /* just to set the default cpu if not already done */
+    mon_get_cpu();
+
+    for(env = first_cpu; env != NULL; env = env->next_cpu) {
+        term_printf("%c CPU #%d:", 
+                    (env == mon_cpu) ? '*' : ' ',
+                    env->cpu_index);
+#if defined(TARGET_I386)
+        term_printf(" pc=0x" TARGET_FMT_lx, env->eip + env->segs[R_CS].base);
+        if (env->hflags & HF_HALTED_MASK)
+            term_printf(" (halted)");
+#elif defined(TARGET_PPC)
+        term_printf(" nip=0x" TARGET_FMT_lx, env->nip);
+        if (env->halted)
+            term_printf(" (halted)");
+#elif defined(TARGET_SPARC)
+        term_printf(" pc=0x" TARGET_FMT_lx " npc=0x" TARGET_FMT_lx, env->pc, env->npc);
+        if (env->halted)
+            term_printf(" (halted)");
+#endif
+        term_printf("\n");
+    }
+}
+
+static void do_cpu_set(int index)
+{
+    if (mon_set_cpu(index) < 0)
+        term_printf("Invalid CPU index\n");
+}
+
+static void do_info_jit(void)
+{
+    dump_exec_info(NULL, monitor_fprintf);
+}
+#endif /* !CONFIG_DM */
+
 static void do_info_history (void)
 {
     int i;
     const char *str;
-
+    
     i = 0;
     for(;;) {
         str = readline_get_history(i);
         if (!str)
             break;
-        term_printf("%d: '%s'\n", i, str);
+	term_printf("%d: '%s'\n", i, str);
         i++;
     }
 }
 
-extern void destroy_hvm_domain(void);
 static void do_quit(void)
 {
     destroy_hvm_domain();
     exit(0);
+}
+
+static int eject_device(BlockDriverState *bs, int force)
+{
+    if (bdrv_is_inserted(bs)) {
+        if (!force) {
+            if (!bdrv_is_removable(bs)) {
+                term_printf("device is not removable\n");
+                return -1;
+            }
+            if (bdrv_is_locked(bs)) {
+                term_printf("device is locked\n");
+                return -1;
+            }
+        }
+        bdrv_close(bs);
+    }
+    return 0;
+}
+
+static void do_eject(int force, const char *filename)
+{
+    BlockDriverState *bs;
+
+    bs = bdrv_find(filename);
+    if (!bs) {
+        term_printf("device not found\n");
+        return;
+    }
+    eject_device(bs, force);
+}
+
+static void do_change(const char *device, const char *filename)
+{
+    BlockDriverState *bs;
+    int i;
+    char password[256];
+
+    bs = bdrv_find(device);
+    if (!bs) {
+        term_printf("device not found\n");
+        return;
+    }
+    if (eject_device(bs, 0) < 0)
+        return;
+    bdrv_open(bs, filename, 0);
+    if (bdrv_is_encrypted(bs)) {
+        term_printf("%s is encrypted.\n", device);
+        for(i = 0; i < 3; i++) {
+            monitor_readline("Password: ", 1, password, sizeof(password));
+            if (bdrv_set_key(bs, password) == 0)
+                break;
+            term_printf("invalid password\n");
+        }
+    }
+}
+
+static void do_screen_dump(const char *filename)
+{
+    vga_hw_screen_dump(filename);
+}
+
+static void do_log(const char *items)
+{
+    int mask;
+    
+    if (!strcmp(items, "none")) {
+        mask = 0;
+    } else {
+        mask = cpu_str_to_log_mask(items);
+        if (!mask) {
+            help_cmd("log");
+            return;
+        }
+    }
+    cpu_set_log(mask);
+}
+
+#ifndef CONFIG_DM
+static void do_savevm(const char *filename)
+{
+    if (qemu_savevm(filename) < 0)
+        term_printf("I/O error when saving VM to '%s'\n", filename);
+}
+
+static void do_loadvm(const char *filename)
+{
+    if (qemu_loadvm(filename) < 0) 
+        term_printf("I/O error when loading VM from '%s'\n", filename);
+}
+
+static void do_stop(void)
+{
+    vm_stop(EXCP_INTERRUPT);
+}
+
+static void do_cont(void)
+{
+    vm_start();
+}
+
+#ifdef CONFIG_GDBSTUB
+static void do_gdbserver(int has_port, int port)
+{
+    if (!has_port)
+        port = DEFAULT_GDBSTUB_PORT;
+    if (gdbserver_start(port) < 0) {
+        qemu_printf("Could not open gdbserver socket on port %d\n", port);
+    } else {
+        qemu_printf("Waiting gdb connection on port %d\n", port);
+    }
+}
+#endif
+
+static void term_printc(int c)
+{
+    term_printf("'");
+    switch(c) {
+    case '\'':
+        term_printf("\\'");
+        break;
+    case '\\':
+        term_printf("\\\\");
+        break;
+    case '\n':
+        term_printf("\\n");
+        break;
+    case '\r':
+        term_printf("\\r");
+        break;
+    default:
+        if (c >= 32 && c <= 126) {
+            term_printf("%c", c);
+        } else {
+            term_printf("\\x%02x", c);
+        }
+        break;
+    }
+    term_printf("'");
+}
+
+static void memory_dump(int count, int format, int wsize, 
+                        target_ulong addr, int is_physical)
+{
+    CPUState *env;
+    int nb_per_line, l, line_size, i, max_digits, len;
+    uint8_t buf[16];
+    uint64_t v;
+
+    if (format == 'i') {
+        int flags;
+        flags = 0;
+        env = mon_get_cpu();
+        if (!env && !is_physical)
+            return;
+#ifdef TARGET_I386
+        if (wsize == 2) {
+            flags = 1;
+        } else if (wsize == 4) {
+            flags = 0;
+        } else {
+            /* as default we use the current CS size */
+            flags = 0;
+            if (env) {
+#ifdef TARGET_X86_64
+                if ((env->efer & MSR_EFER_LMA) && 
+                    (env->segs[R_CS].flags & DESC_L_MASK))
+                    flags = 2;
+                else
+#endif
+                if (!(env->segs[R_CS].flags & DESC_B_MASK))
+                    flags = 1;
+            }
+        }
+#endif
+        monitor_disas(env, addr, count, is_physical, flags);
+        return;
+    }
+
+    len = wsize * count;
+    if (wsize == 1)
+        line_size = 8;
+    else
+        line_size = 16;
+    nb_per_line = line_size / wsize;
+    max_digits = 0;
+
+    switch(format) {
+    case 'o':
+        max_digits = (wsize * 8 + 2) / 3;
+        break;
+    default:
+    case 'x':
+        max_digits = (wsize * 8) / 4;
+        break;
+    case 'u':
+    case 'd':
+        max_digits = (wsize * 8 * 10 + 32) / 33;
+        break;
+    case 'c':
+        wsize = 1;
+        break;
+    }
+
+    while (len > 0) {
+        term_printf(TARGET_FMT_lx ":", addr);
+        l = len;
+        if (l > line_size)
+            l = line_size;
+        if (is_physical) {
+            cpu_physical_memory_rw(addr, buf, l, 0);
+        } else {
+            env = mon_get_cpu();
+            if (!env)
+                break;
+            cpu_memory_rw_debug(env, addr, buf, l, 0);
+        }
+        i = 0; 
+        while (i < l) {
+            switch(wsize) {
+            default:
+            case 1:
+                v = ldub_raw(buf + i);
+                break;
+            case 2:
+                v = lduw_raw(buf + i);
+                break;
+            case 4:
+                v = (uint32_t)ldl_raw(buf + i);
+                break;
+            case 8:
+                v = ldq_raw(buf + i);
+                break;
+            }
+            term_printf(" ");
+            switch(format) {
+            case 'o':
+                term_printf("%#*llo", max_digits, v);
+                break;
+            case 'x':
+                term_printf("0x%0*llx", max_digits, v);
+                break;
+            case 'u':
+                term_printf("%*llu", max_digits, v);
+                break;
+            case 'd':
+                term_printf("%*lld", max_digits, v);
+                break;
+            case 'c':
+                term_printc(v);
+                break;
+            }
+            i += wsize;
+        }
+        term_printf("\n");
+        addr += l;
+        len -= l;
+    }
+}
+
+#if TARGET_LONG_BITS == 64
+#define GET_TLONG(h, l) (((uint64_t)(h) << 32) | (l))
+#else
+#define GET_TLONG(h, l) (l)
+#endif
+
+static void do_memory_dump(int count, int format, int size, 
+                           uint32_t addrh, uint32_t addrl)
+{
+    target_long addr = GET_TLONG(addrh, addrl);
+    memory_dump(count, format, size, addr, 0);
+}
+
+static void do_physical_memory_dump(int count, int format, int size,
+                                    uint32_t addrh, uint32_t addrl)
+
+{
+    target_long addr = GET_TLONG(addrh, addrl);
+    memory_dump(count, format, size, addr, 1);
+}
+
+static void do_print(int count, int format, int size, unsigned int valh, unsigned int vall)
+{
+    target_long val = GET_TLONG(valh, vall);
+#if TARGET_LONG_BITS == 32
+    switch(format) {
+    case 'o':
+        term_printf("%#o", val);
+        break;
+    case 'x':
+        term_printf("%#x", val);
+        break;
+    case 'u':
+        term_printf("%u", val);
+        break;
+    default:
+    case 'd':
+        term_printf("%d", val);
+        break;
+    case 'c':
+        term_printc(val);
+        break;
+    }
+#else
+    switch(format) {
+    case 'o':
+        term_printf("%#llo", val);
+        break;
+    case 'x':
+        term_printf("%#llx", val);
+        break;
+    case 'u':
+        term_printf("%llu", val);
+        break;
+    default:
+    case 'd':
+        term_printf("%lld", val);
+        break;
+    case 'c':
+        term_printc(val);
+        break;
+    }
+#endif
+    term_printf("\n");
+}
+#endif /* !CONFIG_DM */
+
+static void do_sum(uint32_t start, uint32_t size)
+{
+    uint32_t addr;
+    uint8_t buf[1];
+    uint16_t sum;
+
+    sum = 0;
+    for(addr = start; addr < (start + size); addr++) {
+        cpu_physical_memory_rw(addr, buf, 1, 0);
+        /* BSD sum algorithm ('sum' Unix command) */
+        sum = (sum >> 1) | (sum << 15);
+        sum += buf[0];
+    }
+    term_printf("%05d\n", sum);
 }
 
 typedef struct {
@@ -386,95 +805,248 @@ static void do_send_key(const char *string)
     }
 }
 
-
-static int eject_device(BlockDriverState *bs, int force)
+#ifndef CONFIG_DM
+static void do_ioport_read(int count, int format, int size, int addr, int has_index, int index)
 {
-    if (bdrv_is_inserted(bs)) {
-        if (!force) {
-            if (!bdrv_is_removable(bs)) {
-                term_printf("device is not removable\n");
-                return -1;
+    uint32_t val;
+    int suffix;
+
+    if (has_index) {
+        cpu_outb(NULL, addr & 0xffff, index & 0xff);
+        addr++;
+    }
+    addr &= 0xffff;
+
+    switch(size) {
+    default:
+    case 1:
+        val = cpu_inb(NULL, addr);
+        suffix = 'b';
+        break;
+    case 2:
+        val = cpu_inw(NULL, addr);
+        suffix = 'w';
+        break;
+    case 4:
+        val = cpu_inl(NULL, addr);
+        suffix = 'l';
+        break;
+    }
+    term_printf("port%c[0x%04x] = %#0*x\n",
+                suffix, addr, size * 2, val);
+}
+
+static void do_system_reset(void)
+{
+    qemu_system_reset_request();
+}
+
+static void do_system_powerdown(void)
+{
+    qemu_system_powerdown_request();
+}
+
+#if defined(TARGET_I386)
+static void print_pte(uint32_t addr, uint32_t pte, uint32_t mask)
+{
+    term_printf("%08x: %08x %c%c%c%c%c%c%c%c\n", 
+                addr,
+                pte & mask,
+                pte & PG_GLOBAL_MASK ? 'G' : '-',
+                pte & PG_PSE_MASK ? 'P' : '-',
+                pte & PG_DIRTY_MASK ? 'D' : '-',
+                pte & PG_ACCESSED_MASK ? 'A' : '-',
+                pte & PG_PCD_MASK ? 'C' : '-',
+                pte & PG_PWT_MASK ? 'T' : '-',
+                pte & PG_USER_MASK ? 'U' : '-',
+                pte & PG_RW_MASK ? 'W' : '-');
+}
+
+static void tlb_info(void)
+{
+    CPUState *env;
+    int l1, l2;
+    uint32_t pgd, pde, pte;
+
+    env = mon_get_cpu();
+    if (!env)
+        return;
+
+    if (!(env->cr[0] & CR0_PG_MASK)) {
+        term_printf("PG disabled\n");
+        return;
+    }
+    pgd = env->cr[3] & ~0xfff;
+    for(l1 = 0; l1 < 1024; l1++) {
+        cpu_physical_memory_read(pgd + l1 * 4, (uint8_t *)&pde, 4);
+        pde = le32_to_cpu(pde);
+        if (pde & PG_PRESENT_MASK) {
+            if ((pde & PG_PSE_MASK) && (env->cr[4] & CR4_PSE_MASK)) {
+                print_pte((l1 << 22), pde, ~((1 << 20) - 1));
+            } else {
+                for(l2 = 0; l2 < 1024; l2++) {
+                    cpu_physical_memory_read((pde & ~0xfff) + l2 * 4, 
+                                             (uint8_t *)&pte, 4);
+                    pte = le32_to_cpu(pte);
+                    if (pte & PG_PRESENT_MASK) {
+                        print_pte((l1 << 22) + (l2 << 12), 
+                                  pte & ~PG_PSE_MASK, 
+                                  ~0xfff);
+                    }
+                }
             }
-            if (bdrv_is_locked(bs)) {
-                term_printf("device is locked\n");
-                return -1;
+        }
+    }
+}
+
+static void mem_print(uint32_t *pstart, int *plast_prot, 
+                      uint32_t end, int prot)
+{
+    int prot1;
+    prot1 = *plast_prot;
+    if (prot != prot1) {
+        if (*pstart != -1) {
+            term_printf("%08x-%08x %08x %c%c%c\n",
+                        *pstart, end, end - *pstart, 
+                        prot1 & PG_USER_MASK ? 'u' : '-',
+                        'r',
+                        prot1 & PG_RW_MASK ? 'w' : '-');
+        }
+        if (prot != 0)
+            *pstart = end;
+        else
+            *pstart = -1;
+        *plast_prot = prot;
+    }
+}
+
+static void mem_info(void)
+{
+    CPUState *env;
+    int l1, l2, prot, last_prot;
+    uint32_t pgd, pde, pte, start, end;
+
+    env = mon_get_cpu();
+    if (!env)
+        return;
+
+    if (!(env->cr[0] & CR0_PG_MASK)) {
+        term_printf("PG disabled\n");
+        return;
+    }
+    pgd = env->cr[3] & ~0xfff;
+    last_prot = 0;
+    start = -1;
+    for(l1 = 0; l1 < 1024; l1++) {
+        cpu_physical_memory_read(pgd + l1 * 4, (uint8_t *)&pde, 4);
+        pde = le32_to_cpu(pde);
+        end = l1 << 22;
+        if (pde & PG_PRESENT_MASK) {
+            if ((pde & PG_PSE_MASK) && (env->cr[4] & CR4_PSE_MASK)) {
+                prot = pde & (PG_USER_MASK | PG_RW_MASK | PG_PRESENT_MASK);
+                mem_print(&start, &last_prot, end, prot);
+            } else {
+                for(l2 = 0; l2 < 1024; l2++) {
+                    cpu_physical_memory_read((pde & ~0xfff) + l2 * 4, 
+                                             (uint8_t *)&pte, 4);
+                    pte = le32_to_cpu(pte);
+                    end = (l1 << 22) + (l2 << 12);
+                    if (pte & PG_PRESENT_MASK) {
+                        prot = pte & (PG_USER_MASK | PG_RW_MASK | PG_PRESENT_MASK);
+                    } else {
+                        prot = 0;
+                    }
+                    mem_print(&start, &last_prot, end, prot);
+                }
             }
+        } else {
+            prot = 0;
+            mem_print(&start, &last_prot, end, prot);
         }
-        bdrv_close(bs);
     }
-    return 0;
 }
-
-static void do_eject(int force, const char *filename)
-{
-    char cmd[1024];
-    BlockDriverState *bs;
-
-    bs = bdrv_find(filename);
-    if (!bs) {
-        term_printf("device not found\n");
-        return;
-    }
-    eject_device(bs, force);
-    sprintf(cmd, "eject %s", filename);
-    system(cmd);
-
-}
-
-static void do_change(const char *device, const char *filename)
-{
-    BlockDriverState *bs;
-#if 0
-    int i;
-    char password[256];
 #endif
+#endif /* !CONFIG_DM */
 
-    bs = bdrv_find(device);
-    if (!bs) {
-        term_printf("device not found\n");
+static void do_info_kqemu(void)
+{
+#ifdef USE_KQEMU
+    CPUState *env;
+    int val;
+    val = 0;
+    env = mon_get_cpu();
+    if (!env) {
+        term_printf("No cpu initialized yet");
         return;
     }
-    if (eject_device(bs, 0) < 0)
-        return;
-    bdrv_open(bs, filename, 0);
-#if 0
-    if (bdrv_is_encrypted(bs)) {
-        term_printf("%s is encrypted.\n", device);
-        for(i = 0; i < 3; i++) {
-            monitor_readline("Password: ", 1, password, sizeof(password));
-            if (bdrv_set_key(bs, password) == 0)
-                break;
-            term_printf("invalid password\n");
-        }
+    val = env->kqemu_enabled;
+    term_printf("kqemu support: ");
+    switch(val) {
+    default:
+    case 0:
+        term_printf("disabled\n");
+        break;
+    case 1:
+        term_printf("enabled for user code\n");
+        break;
+    case 2:
+        term_printf("enabled for user and kernel code\n");
+        break;
     }
+#else
+    term_printf("kqemu support: not compiled\n");
+#endif
+} 
+
+#ifdef CONFIG_PROFILER
+
+int64_t kqemu_time;
+int64_t qemu_time;
+int64_t kqemu_exec_count;
+int64_t dev_time;
+int64_t kqemu_ret_int_count;
+int64_t kqemu_ret_excp_count;
+int64_t kqemu_ret_intr_count;
+
+static void do_info_profile(void)
+{
+    int64_t total;
+    total = qemu_time;
+    if (total == 0)
+        total = 1;
+    term_printf("async time  %lld (%0.3f)\n",
+                dev_time, dev_time / (double)ticks_per_sec);
+    term_printf("qemu time   %lld (%0.3f)\n",
+                qemu_time, qemu_time / (double)ticks_per_sec);
+    term_printf("kqemu time  %lld (%0.3f %0.1f%%) count=%lld int=%lld excp=%lld intr=%lld\n",
+                kqemu_time, kqemu_time / (double)ticks_per_sec,
+                kqemu_time / (double)total * 100.0,
+                kqemu_exec_count,
+                kqemu_ret_int_count,
+                kqemu_ret_excp_count,
+                kqemu_ret_intr_count);
+    qemu_time = 0;
+    kqemu_time = 0;
+    kqemu_exec_count = 0;
+    dev_time = 0;
+    kqemu_ret_int_count = 0;
+    kqemu_ret_excp_count = 0;
+    kqemu_ret_intr_count = 0;
+#ifdef USE_KQEMU
+    kqemu_record_dump();
 #endif
 }
-
-static void do_screen_dump(const char *filename)
+#else
+static void do_info_profile(void)
 {
-    vga_screen_dump(filename);
+    term_printf("Internal profiler not compiled\n");
 }
-
-static void do_log(const char *items)
-{
-    int mask;
-
-    if (!strcmp(items, "none")) {
-        mask = 0;
-    } else {
-        mask = cpu_str_to_log_mask(items);
-        if (!mask) {
-            help_cmd("log");
-            return;
-        }
-    }
-    cpu_set_log(mask);
-}
+#endif
 
 static term_cmd_t term_cmds[] = {
-    { "help|?", "s?", do_help,
+    { "help|?", "s?", do_help, 
       "[cmd]", "show the help" },
-    { "commit", "", do_commit,
+    { "commit", "", do_commit, 
       "", "commit changes to the disk images (if -snapshot is used)" },
     { "info", "s?", do_info,
       "subcommand", "show various information about the system state" },
@@ -484,18 +1056,51 @@ static term_cmd_t term_cmds[] = {
       "[-f] device", "eject a removable media (use -f to force it)" },
     { "change", "BF", do_change,
       "device filename", "change a removable media" },
-    { "screendump", "F", do_screen_dump,
+    { "screendump", "F", do_screen_dump, 
       "filename", "save screen into PPM image 'filename'" },
     { "log", "s", do_log,
-      "item1[,...]", "activate logging of the specified items to '/tmp/qemu.log'" },
-    { "q|quit", "", do_quit,
-      "", "quit the emulator" },
+      "item1[,...]", "activate logging of the specified items to '/tmp/qemu.log'" }, 
+#ifndef CONFIG_DM
+    { "savevm", "F", do_savevm,
+      "filename", "save the whole virtual machine state to 'filename'" }, 
+    { "loadvm", "F", do_loadvm,
+      "filename", "restore the whole virtual machine state from 'filename'" }, 
+    { "stop", "", do_stop, 
+      "", "stop emulation", },
+    { "c|cont", "", do_cont, 
+      "", "resume emulation", },
+#ifdef CONFIG_GDBSTUB
+    { "gdbserver", "i?", do_gdbserver, 
+      "[port]", "start gdbserver session (default port=1234)", },
+#endif
+    { "x", "/l", do_memory_dump, 
+      "/fmt addr", "virtual memory dump starting at 'addr'", },
+    { "xp", "/l", do_physical_memory_dump, 
+      "/fmt addr", "physical memory dump starting at 'addr'", },
+    { "p|print", "/l", do_print, 
+      "/fmt expr", "print expression value (use $reg for CPU register access)", },
+    { "i", "/ii.", do_ioport_read, 
+      "/fmt addr", "I/O port read" },
+#endif/* !CONFIG_DM */
+
     { "sendkey", "s", do_send_key, 
       "keys", "send keys to the VM (e.g. 'sendkey ctrl-alt-f1')" },
+#ifndef CONFIG_DM
+    { "system_reset", "", do_system_reset, 
+      "", "reset the system" },
+    { "system_powerdown", "", do_system_powerdown, 
+      "", "send system power down event" },
+#endif /* !CONFIG_DM */
+    { "sum", "ii", do_sum, 
+      "addr size", "compute the checksum of a memory region" },
     { "usb_add", "s", do_usb_add,
       "device", "add USB device (e.g. 'host:bus.addr' or 'host:vendor_id:product_id')" },
     { "usb_del", "s", do_usb_del,
       "device", "remove USB device 'bus.addr'" },
+#ifndef CONFIG_DM
+    { "cpu", "i", do_cpu_set, 
+      "index", "set the default CPU" },
+#endif /* !CONFIG_DM */
     { NULL, NULL, }, 
 };
 
@@ -506,6 +1111,12 @@ static term_cmd_t info_cmds[] = {
       "", "show the network state" },
     { "block", "", do_info_block,
       "", "show the block devices" },
+#ifndef CONFIG_DM
+    { "registers", "", do_info_registers,
+      "", "show the cpu registers" },
+    { "cpus", "", do_info_cpus,
+      "", "show infos for each CPU" },
+#endif /* !CONFIG_DM */
     { "history", "", do_info_history,
       "", "show the command line history", },
     { "irq", "", irq_info,
@@ -514,14 +1125,575 @@ static term_cmd_t info_cmds[] = {
       "", "show i8259 (PIC) state", },
     { "pci", "", pci_info,
       "", "show PCI info", },
+#ifndef CONFIG_DM
+#if defined(TARGET_I386)
+    { "tlb", "", tlb_info,
+      "", "show virtual to physical memory mappings", },
+    { "mem", "", mem_info,
+      "", "show the active virtual memory mappings", },
+#endif
+    { "jit", "", do_info_jit,
+      "", "show dynamic compiler info", },
+#endif /* !CONFIG_DM */
+    { "kqemu", "", do_info_kqemu,
+      "", "show kqemu information", },
     { "usb", "", usb_info,
       "", "show guest USB devices", },
     { "usbhost", "", usb_host_info,
       "", "show host USB devices", },
+    { "profile", "", do_info_profile,
+      "", "show profiling information", },
+#ifdef CONFIG_DM
     { "hvmiopage", "", sp_info,
       "", "show HVM device model shared page info", },
+#endif /* CONFIG_DM */
     { NULL, NULL, },
 };
+
+/*******************************************************************/
+
+#ifndef CONFIG_DM
+static const char *pch;
+static jmp_buf expr_env;
+
+#define MD_TLONG 0
+#define MD_I32   1
+
+typedef struct MonitorDef {
+    const char *name;
+    int offset;
+    target_long (*get_value)(struct MonitorDef *md, int val);
+    int type;
+} MonitorDef;
+
+#if defined(TARGET_I386)
+static target_long monitor_get_pc (struct MonitorDef *md, int val)
+{
+    CPUState *env = mon_get_cpu();
+    if (!env)
+        return 0;
+    return env->eip + env->segs[R_CS].base;
+}
+#endif
+
+#if defined(TARGET_PPC)
+static target_long monitor_get_ccr (struct MonitorDef *md, int val)
+{
+    CPUState *env = mon_get_cpu();
+    unsigned int u;
+    int i;
+
+    if (!env)
+        return 0;
+
+    u = 0;
+    for (i = 0; i < 8; i++)
+	u |= env->crf[i] << (32 - (4 * i));
+
+    return u;
+}
+
+static target_long monitor_get_msr (struct MonitorDef *md, int val)
+{
+    CPUState *env = mon_get_cpu();
+    if (!env)
+        return 0;
+    return (env->msr[MSR_POW] << MSR_POW) |
+        (env->msr[MSR_ILE] << MSR_ILE) |
+        (env->msr[MSR_EE] << MSR_EE) |
+        (env->msr[MSR_PR] << MSR_PR) |
+        (env->msr[MSR_FP] << MSR_FP) |
+        (env->msr[MSR_ME] << MSR_ME) |
+        (env->msr[MSR_FE0] << MSR_FE0) |
+        (env->msr[MSR_SE] << MSR_SE) |
+        (env->msr[MSR_BE] << MSR_BE) |
+        (env->msr[MSR_FE1] << MSR_FE1) |
+        (env->msr[MSR_IP] << MSR_IP) |
+        (env->msr[MSR_IR] << MSR_IR) |
+        (env->msr[MSR_DR] << MSR_DR) |
+        (env->msr[MSR_RI] << MSR_RI) |
+        (env->msr[MSR_LE] << MSR_LE);
+}
+
+static target_long monitor_get_xer (struct MonitorDef *md, int val)
+{
+    CPUState *env = mon_get_cpu();
+    if (!env)
+        return 0;
+    return (env->xer[XER_SO] << XER_SO) |
+        (env->xer[XER_OV] << XER_OV) |
+        (env->xer[XER_CA] << XER_CA) |
+        (env->xer[XER_BC] << XER_BC);
+}
+
+static target_long monitor_get_decr (struct MonitorDef *md, int val)
+{
+    CPUState *env = mon_get_cpu();
+    if (!env)
+        return 0;
+    return cpu_ppc_load_decr(env);
+}
+
+static target_long monitor_get_tbu (struct MonitorDef *md, int val)
+{
+    CPUState *env = mon_get_cpu();
+    if (!env)
+        return 0;
+    return cpu_ppc_load_tbu(env);
+}
+
+static target_long monitor_get_tbl (struct MonitorDef *md, int val)
+{
+    CPUState *env = mon_get_cpu();
+    if (!env)
+        return 0;
+    return cpu_ppc_load_tbl(env);
+}
+#endif
+
+#if defined(TARGET_SPARC)
+#ifndef TARGET_SPARC64
+static target_long monitor_get_psr (struct MonitorDef *md, int val)
+{
+    CPUState *env = mon_get_cpu();
+    if (!env)
+        return 0;
+    return GET_PSR(env);
+}
+#endif
+
+static target_long monitor_get_reg(struct MonitorDef *md, int val)
+{
+    CPUState *env = mon_get_cpu();
+    if (!env)
+        return 0;
+    return env->regwptr[val];
+}
+#endif
+
+static MonitorDef monitor_defs[] = {
+#ifdef TARGET_I386
+
+#define SEG(name, seg) \
+    { name, offsetof(CPUState, segs[seg].selector), NULL, MD_I32 },\
+    { name ".base", offsetof(CPUState, segs[seg].base) },\
+    { name ".limit", offsetof(CPUState, segs[seg].limit), NULL, MD_I32 },
+
+    { "eax", offsetof(CPUState, regs[0]) },
+    { "ecx", offsetof(CPUState, regs[1]) },
+    { "edx", offsetof(CPUState, regs[2]) },
+    { "ebx", offsetof(CPUState, regs[3]) },
+    { "esp|sp", offsetof(CPUState, regs[4]) },
+    { "ebp|fp", offsetof(CPUState, regs[5]) },
+    { "esi", offsetof(CPUState, regs[6]) },
+    { "edi", offsetof(CPUState, regs[7]) },
+#ifdef TARGET_X86_64
+    { "r8", offsetof(CPUState, regs[8]) },
+    { "r9", offsetof(CPUState, regs[9]) },
+    { "r10", offsetof(CPUState, regs[10]) },
+    { "r11", offsetof(CPUState, regs[11]) },
+    { "r12", offsetof(CPUState, regs[12]) },
+    { "r13", offsetof(CPUState, regs[13]) },
+    { "r14", offsetof(CPUState, regs[14]) },
+    { "r15", offsetof(CPUState, regs[15]) },
+#endif
+    { "eflags", offsetof(CPUState, eflags) },
+    { "eip", offsetof(CPUState, eip) },
+    SEG("cs", R_CS)
+    SEG("ds", R_DS)
+    SEG("es", R_ES)
+    SEG("ss", R_SS)
+    SEG("fs", R_FS)
+    SEG("gs", R_GS)
+    { "pc", 0, monitor_get_pc, },
+#elif defined(TARGET_PPC)
+    { "r0", offsetof(CPUState, gpr[0]) },
+    { "r1", offsetof(CPUState, gpr[1]) },
+    { "r2", offsetof(CPUState, gpr[2]) },
+    { "r3", offsetof(CPUState, gpr[3]) },
+    { "r4", offsetof(CPUState, gpr[4]) },
+    { "r5", offsetof(CPUState, gpr[5]) },
+    { "r6", offsetof(CPUState, gpr[6]) },
+    { "r7", offsetof(CPUState, gpr[7]) },
+    { "r8", offsetof(CPUState, gpr[8]) },
+    { "r9", offsetof(CPUState, gpr[9]) },
+    { "r10", offsetof(CPUState, gpr[10]) },
+    { "r11", offsetof(CPUState, gpr[11]) },
+    { "r12", offsetof(CPUState, gpr[12]) },
+    { "r13", offsetof(CPUState, gpr[13]) },
+    { "r14", offsetof(CPUState, gpr[14]) },
+    { "r15", offsetof(CPUState, gpr[15]) },
+    { "r16", offsetof(CPUState, gpr[16]) },
+    { "r17", offsetof(CPUState, gpr[17]) },
+    { "r18", offsetof(CPUState, gpr[18]) },
+    { "r19", offsetof(CPUState, gpr[19]) },
+    { "r20", offsetof(CPUState, gpr[20]) },
+    { "r21", offsetof(CPUState, gpr[21]) },
+    { "r22", offsetof(CPUState, gpr[22]) },
+    { "r23", offsetof(CPUState, gpr[23]) },
+    { "r24", offsetof(CPUState, gpr[24]) },
+    { "r25", offsetof(CPUState, gpr[25]) },
+    { "r26", offsetof(CPUState, gpr[26]) },
+    { "r27", offsetof(CPUState, gpr[27]) },
+    { "r28", offsetof(CPUState, gpr[28]) },
+    { "r29", offsetof(CPUState, gpr[29]) },
+    { "r30", offsetof(CPUState, gpr[30]) },
+    { "r31", offsetof(CPUState, gpr[31]) },
+    { "nip|pc", offsetof(CPUState, nip) },
+    { "lr", offsetof(CPUState, lr) },
+    { "ctr", offsetof(CPUState, ctr) },
+    { "decr", 0, &monitor_get_decr, },
+    { "ccr", 0, &monitor_get_ccr, },
+    { "msr", 0, &monitor_get_msr, },
+    { "xer", 0, &monitor_get_xer, },
+    { "tbu", 0, &monitor_get_tbu, },
+    { "tbl", 0, &monitor_get_tbl, },
+    { "sdr1", offsetof(CPUState, sdr1) },
+    { "sr0", offsetof(CPUState, sr[0]) },
+    { "sr1", offsetof(CPUState, sr[1]) },
+    { "sr2", offsetof(CPUState, sr[2]) },
+    { "sr3", offsetof(CPUState, sr[3]) },
+    { "sr4", offsetof(CPUState, sr[4]) },
+    { "sr5", offsetof(CPUState, sr[5]) },
+    { "sr6", offsetof(CPUState, sr[6]) },
+    { "sr7", offsetof(CPUState, sr[7]) },
+    { "sr8", offsetof(CPUState, sr[8]) },
+    { "sr9", offsetof(CPUState, sr[9]) },
+    { "sr10", offsetof(CPUState, sr[10]) },
+    { "sr11", offsetof(CPUState, sr[11]) },
+    { "sr12", offsetof(CPUState, sr[12]) },
+    { "sr13", offsetof(CPUState, sr[13]) },
+    { "sr14", offsetof(CPUState, sr[14]) },
+    { "sr15", offsetof(CPUState, sr[15]) },
+    /* Too lazy to put BATs and SPRs ... */
+#elif defined(TARGET_SPARC)
+    { "g0", offsetof(CPUState, gregs[0]) },
+    { "g1", offsetof(CPUState, gregs[1]) },
+    { "g2", offsetof(CPUState, gregs[2]) },
+    { "g3", offsetof(CPUState, gregs[3]) },
+    { "g4", offsetof(CPUState, gregs[4]) },
+    { "g5", offsetof(CPUState, gregs[5]) },
+    { "g6", offsetof(CPUState, gregs[6]) },
+    { "g7", offsetof(CPUState, gregs[7]) },
+    { "o0", 0, monitor_get_reg },
+    { "o1", 1, monitor_get_reg },
+    { "o2", 2, monitor_get_reg },
+    { "o3", 3, monitor_get_reg },
+    { "o4", 4, monitor_get_reg },
+    { "o5", 5, monitor_get_reg },
+    { "o6", 6, monitor_get_reg },
+    { "o7", 7, monitor_get_reg },
+    { "l0", 8, monitor_get_reg },
+    { "l1", 9, monitor_get_reg },
+    { "l2", 10, monitor_get_reg },
+    { "l3", 11, monitor_get_reg },
+    { "l4", 12, monitor_get_reg },
+    { "l5", 13, monitor_get_reg },
+    { "l6", 14, monitor_get_reg },
+    { "l7", 15, monitor_get_reg },
+    { "i0", 16, monitor_get_reg },
+    { "i1", 17, monitor_get_reg },
+    { "i2", 18, monitor_get_reg },
+    { "i3", 19, monitor_get_reg },
+    { "i4", 20, monitor_get_reg },
+    { "i5", 21, monitor_get_reg },
+    { "i6", 22, monitor_get_reg },
+    { "i7", 23, monitor_get_reg },
+    { "pc", offsetof(CPUState, pc) },
+    { "npc", offsetof(CPUState, npc) },
+    { "y", offsetof(CPUState, y) },
+#ifndef TARGET_SPARC64
+    { "psr", 0, &monitor_get_psr, },
+    { "wim", offsetof(CPUState, wim) },
+#endif
+    { "tbr", offsetof(CPUState, tbr) },
+    { "fsr", offsetof(CPUState, fsr) },
+    { "f0", offsetof(CPUState, fpr[0]) },
+    { "f1", offsetof(CPUState, fpr[1]) },
+    { "f2", offsetof(CPUState, fpr[2]) },
+    { "f3", offsetof(CPUState, fpr[3]) },
+    { "f4", offsetof(CPUState, fpr[4]) },
+    { "f5", offsetof(CPUState, fpr[5]) },
+    { "f6", offsetof(CPUState, fpr[6]) },
+    { "f7", offsetof(CPUState, fpr[7]) },
+    { "f8", offsetof(CPUState, fpr[8]) },
+    { "f9", offsetof(CPUState, fpr[9]) },
+    { "f10", offsetof(CPUState, fpr[10]) },
+    { "f11", offsetof(CPUState, fpr[11]) },
+    { "f12", offsetof(CPUState, fpr[12]) },
+    { "f13", offsetof(CPUState, fpr[13]) },
+    { "f14", offsetof(CPUState, fpr[14]) },
+    { "f15", offsetof(CPUState, fpr[15]) },
+    { "f16", offsetof(CPUState, fpr[16]) },
+    { "f17", offsetof(CPUState, fpr[17]) },
+    { "f18", offsetof(CPUState, fpr[18]) },
+    { "f19", offsetof(CPUState, fpr[19]) },
+    { "f20", offsetof(CPUState, fpr[20]) },
+    { "f21", offsetof(CPUState, fpr[21]) },
+    { "f22", offsetof(CPUState, fpr[22]) },
+    { "f23", offsetof(CPUState, fpr[23]) },
+    { "f24", offsetof(CPUState, fpr[24]) },
+    { "f25", offsetof(CPUState, fpr[25]) },
+    { "f26", offsetof(CPUState, fpr[26]) },
+    { "f27", offsetof(CPUState, fpr[27]) },
+    { "f28", offsetof(CPUState, fpr[28]) },
+    { "f29", offsetof(CPUState, fpr[29]) },
+    { "f30", offsetof(CPUState, fpr[30]) },
+    { "f31", offsetof(CPUState, fpr[31]) },
+#ifdef TARGET_SPARC64
+    { "f32", offsetof(CPUState, fpr[32]) },
+    { "f34", offsetof(CPUState, fpr[34]) },
+    { "f36", offsetof(CPUState, fpr[36]) },
+    { "f38", offsetof(CPUState, fpr[38]) },
+    { "f40", offsetof(CPUState, fpr[40]) },
+    { "f42", offsetof(CPUState, fpr[42]) },
+    { "f44", offsetof(CPUState, fpr[44]) },
+    { "f46", offsetof(CPUState, fpr[46]) },
+    { "f48", offsetof(CPUState, fpr[48]) },
+    { "f50", offsetof(CPUState, fpr[50]) },
+    { "f52", offsetof(CPUState, fpr[52]) },
+    { "f54", offsetof(CPUState, fpr[54]) },
+    { "f56", offsetof(CPUState, fpr[56]) },
+    { "f58", offsetof(CPUState, fpr[58]) },
+    { "f60", offsetof(CPUState, fpr[60]) },
+    { "f62", offsetof(CPUState, fpr[62]) },
+    { "asi", offsetof(CPUState, asi) },
+    { "pstate", offsetof(CPUState, pstate) },
+    { "cansave", offsetof(CPUState, cansave) },
+    { "canrestore", offsetof(CPUState, canrestore) },
+    { "otherwin", offsetof(CPUState, otherwin) },
+    { "wstate", offsetof(CPUState, wstate) },
+    { "cleanwin", offsetof(CPUState, cleanwin) },
+    { "fprs", offsetof(CPUState, fprs) },
+#endif
+#endif
+    { NULL },
+};
+
+static void expr_error(const char *fmt) 
+{
+    term_printf(fmt);
+    term_printf("\n");
+    longjmp(expr_env, 1);
+}
+
+/* return 0 if OK, -1 if not found, -2 if no CPU defined */
+static int get_monitor_def(target_long *pval, const char *name)
+{
+    MonitorDef *md;
+    void *ptr;
+
+    for(md = monitor_defs; md->name != NULL; md++) {
+        if (compare_cmd(name, md->name)) {
+            if (md->get_value) {
+                *pval = md->get_value(md, md->offset);
+            } else {
+                CPUState *env = mon_get_cpu();
+                if (!env)
+                    return -2;
+                ptr = (uint8_t *)env + md->offset;
+                switch(md->type) {
+                case MD_I32:
+                    *pval = *(int32_t *)ptr;
+                    break;
+                case MD_TLONG:
+                    *pval = *(target_long *)ptr;
+                    break;
+                default:
+                    *pval = 0;
+                    break;
+                }
+            }
+            return 0;
+        }
+    }
+    return -1;
+}
+
+static void next(void)
+{
+    if (pch != '\0') {
+        pch++;
+        while (isspace(*pch))
+            pch++;
+    }
+}
+
+static target_long expr_sum(void);
+
+static target_long expr_unary(void)
+{
+    target_long n;
+    char *p;
+    int ret;
+
+    switch(*pch) {
+    case '+':
+        next();
+        n = expr_unary();
+        break;
+    case '-':
+        next();
+        n = -expr_unary();
+        break;
+    case '~':
+        next();
+        n = ~expr_unary();
+        break;
+    case '(':
+        next();
+        n = expr_sum();
+        if (*pch != ')') {
+            expr_error("')' expected");
+        }
+        next();
+        break;
+    case '\'':
+        pch++;
+        if (*pch == '\0')
+            expr_error("character constant expected");
+        n = *pch;
+        pch++;
+        if (*pch != '\'')
+            expr_error("missing terminating \' character");
+        next();
+        break;
+    case '$':
+        {
+            char buf[128], *q;
+            
+            pch++;
+            q = buf;
+            while ((*pch >= 'a' && *pch <= 'z') ||
+                   (*pch >= 'A' && *pch <= 'Z') ||
+                   (*pch >= '0' && *pch <= '9') ||
+                   *pch == '_' || *pch == '.') {
+                if ((q - buf) < sizeof(buf) - 1)
+                    *q++ = *pch;
+                pch++;
+            }
+            while (isspace(*pch))
+                pch++;
+            *q = 0;
+            ret = get_monitor_def(&n, buf);
+            if (ret == -1)
+                expr_error("unknown register");
+            else if (ret == -2) 
+                expr_error("no cpu defined");
+        }
+        break;
+    case '\0':
+        expr_error("unexpected end of expression");
+        n = 0;
+        break;
+    default:
+        /* XXX: 64 bit version */
+        n = strtoul(pch, &p, 0);
+        if (pch == p) {
+            expr_error("invalid char in expression");
+        }
+        pch = p;
+        while (isspace(*pch))
+            pch++;
+        break;
+    }
+    return n;
+}
+
+
+static target_long expr_prod(void)
+{
+    target_long val, val2;
+    int op;
+    
+    val = expr_unary();
+    for(;;) {
+        op = *pch;
+        if (op != '*' && op != '/' && op != '%')
+            break;
+        next();
+        val2 = expr_unary();
+        switch(op) {
+        default:
+        case '*':
+            val *= val2;
+            break;
+        case '/':
+        case '%':
+            if (val2 == 0) 
+                expr_error("division by zero");
+            if (op == '/')
+                val /= val2;
+            else
+                val %= val2;
+            break;
+        }
+    }
+    return val;
+}
+
+static target_long expr_logic(void)
+{
+    target_long val, val2;
+    int op;
+
+    val = expr_prod();
+    for(;;) {
+        op = *pch;
+        if (op != '&' && op != '|' && op != '^')
+            break;
+        next();
+        val2 = expr_prod();
+        switch(op) {
+        default:
+        case '&':
+            val &= val2;
+            break;
+        case '|':
+            val |= val2;
+            break;
+        case '^':
+            val ^= val2;
+            break;
+        }
+    }
+    return val;
+}
+
+static target_long expr_sum(void)
+{
+    target_long val, val2;
+    int op;
+
+    val = expr_logic();
+    for(;;) {
+        op = *pch;
+        if (op != '+' && op != '-')
+            break;
+        next();
+        val2 = expr_logic();
+        if (op == '+')
+            val += val2;
+        else
+            val -= val2;
+    }
+    return val;
+}
+
+static int get_expr(target_long *pval, const char **pp)
+{
+    pch = *pp;
+    if (setjmp(expr_env)) {
+        *pp = pch;
+        return -1;
+    }
+    while (isspace(*pch))
+        pch++;
+    *pval = expr_sum();
+    *pp = pch;
+    return 0;
+}
+#endif /* !CONFIG_DM */
 
 static int get_str(char *buf, int buf_size, const char **pp)
 {
@@ -588,6 +1760,11 @@ static int get_str(char *buf, int buf_size, const char **pp)
     return 0;
 }
 
+#ifndef CONFIG_DM
+static int default_fmt_format = 'x';
+static int default_fmt_size = 4;
+#endif /* !CONFIG_DM */
+
 #define MAX_ARGS 16
 
 static void monitor_handle_command(const char *cmdline)
@@ -595,6 +1772,9 @@ static void monitor_handle_command(const char *cmdline)
     const char *p, *pstart, *typestr;
     char *q;
     int c, nb_args, len, i;
+#ifndef CONFIG_DM
+    int has_arg;
+#endif /* !CONFIG_DM */
     term_cmd_t *cmd;
     char cmdname[256];
     char buf[1024];
@@ -648,8 +1828,8 @@ static void monitor_handle_command(const char *cmdline)
             {
                 int ret;
                 char *str;
-
-                while (isspace(*p))
+                
+                while (isspace(*p)) 
                     p++;
                 if (*typestr == '?') {
                     typestr++;
@@ -686,21 +1866,155 @@ static void monitor_handle_command(const char *cmdline)
                 args[nb_args++] = str;
             }
             break;
+#ifndef CONFIG_DM
+        case '/':
+            {
+                int count, format, size;
+                
+                while (isspace(*p))
+                    p++;
+                if (*p == '/') {
+                    /* format found */
+                    p++;
+                    count = 1;
+                    if (isdigit(*p)) {
+                        count = 0;
+                        while (isdigit(*p)) {
+                            count = count * 10 + (*p - '0');
+                            p++;
+                        }
+                    }
+                    size = -1;
+                    format = -1;
+                    for(;;) {
+                        switch(*p) {
+                        case 'o':
+                        case 'd':
+                        case 'u':
+                        case 'x':
+                        case 'i':
+                        case 'c':
+                            format = *p++;
+                            break;
+                        case 'b':
+                            size = 1;
+                            p++;
+                            break;
+                        case 'h':
+                            size = 2;
+                            p++;
+                            break;
+                        case 'w':
+                            size = 4;
+                            p++;
+                            break;
+                        case 'g':
+                        case 'L':
+                            size = 8;
+                            p++;
+                            break;
+                        default:
+                            goto next;
+                        }
+                    }
+                next:
+                    if (*p != '\0' && !isspace(*p)) {
+                        term_printf("invalid char in format: '%c'\n", *p);
+                        goto fail;
+                    }
+                    if (format < 0)
+                        format = default_fmt_format;
+                    if (format != 'i') {
+                        /* for 'i', not specifying a size gives -1 as size */
+                        if (size < 0)
+                            size = default_fmt_size;
+                    }
+                    default_fmt_size = size;
+                    default_fmt_format = format;
+                } else {
+                    count = 1;
+                    format = default_fmt_format;
+                    if (format != 'i') {
+                        size = default_fmt_size;
+                    } else {
+                        size = -1;
+                    }
+                }
+                if (nb_args + 3 > MAX_ARGS)
+                    goto error_args;
+                args[nb_args++] = (void*)count;
+                args[nb_args++] = (void*)format;
+                args[nb_args++] = (void*)size;
+            }
+            break;
+        case 'i':
+        case 'l':
+            {
+                target_long val;
+                while (isspace(*p)) 
+                    p++;
+                if (*typestr == '?' || *typestr == '.') {
+                    typestr++;
+                    if (*typestr == '?') {
+                        if (*p == '\0')
+                            has_arg = 0;
+                        else
+                            has_arg = 1;
+                    } else {
+                        if (*p == '.') {
+                            p++;
+                            while (isspace(*p)) 
+                                p++;
+                            has_arg = 1;
+                        } else {
+                            has_arg = 0;
+                        }
+                    }
+                    if (nb_args >= MAX_ARGS)
+                        goto error_args;
+                    args[nb_args++] = (void *)has_arg;
+                    if (!has_arg) {
+                        if (nb_args >= MAX_ARGS)
+                            goto error_args;
+                        val = -1;
+                        goto add_num;
+                    }
+                }
+                if (get_expr(&val, &p))
+                    goto fail;
+            add_num:
+                if (c == 'i') {
+                    if (nb_args >= MAX_ARGS)
+                        goto error_args;
+                    args[nb_args++] = (void *)(int)val;
+                } else {
+                    if ((nb_args + 1) >= MAX_ARGS)
+                        goto error_args;
+#if TARGET_LONG_BITS == 64
+                    args[nb_args++] = (void *)(int)((val >> 32) & 0xffffffff);
+#else
+                    args[nb_args++] = (void *)0;
+#endif
+                    args[nb_args++] = (void *)(int)(val & 0xffffffff);
+                }
+            }
+            break;
+#endif /* !CONFIG_DM */
         case '-':
             {
-                long has_option;
+                int has_option;
                 /* option */
-
+                
                 c = *typestr++;
                 if (c == '\0')
                     goto bad_type;
-                while (isspace(*p))
+                while (isspace(*p)) 
                     p++;
                 has_option = 0;
                 if (*p == '-') {
                     p++;
                     if (*p != c) {
-                        term_printf("%s: unsupported option -%c\n",
+                        term_printf("%s: unsupported option -%c\n", 
                                     cmdname, *p);
                         goto fail;
                     }
@@ -712,12 +2026,14 @@ static void monitor_handle_command(const char *cmdline)
                 args[nb_args++] = (void *)has_option;
             }
             break;
+#ifdef CONFIG_DM
         /* TODO: add more commands we need here to support hvm device model */
         case '/':
         case 'i':
+#endif /* CONFIG_DM */
         default:
         bad_type:
-            term_printf("%s: unknown type '%c',not support now.\n", cmdname, c);
+            term_printf("%s: unknown type '%c'\n", cmdname, c);
             goto fail;
         }
     }
@@ -762,6 +2078,200 @@ static void monitor_handle_command(const char *cmdline)
     return;
 }
 
+#ifndef CONFIG_DM
+static void cmd_completion(const char *name, const char *list)
+{
+    const char *p, *pstart;
+    char cmd[128];
+    int len;
+
+    p = list;
+    for(;;) {
+        pstart = p;
+        p = strchr(p, '|');
+        if (!p)
+            p = pstart + strlen(pstart);
+        len = p - pstart;
+        if (len > sizeof(cmd) - 2)
+            len = sizeof(cmd) - 2;
+        memcpy(cmd, pstart, len);
+        cmd[len] = '\0';
+        if (name[0] == '\0' || !strncmp(name, cmd, strlen(name))) {
+            add_completion(cmd);
+        }
+        if (*p == '\0')
+            break;
+        p++;
+    }
+}
+
+static void file_completion(const char *input)
+{
+    DIR *ffs;
+    struct dirent *d;
+    char path[1024];
+    char file[1024], file_prefix[1024];
+    int input_path_len;
+    const char *p;
+
+    p = strrchr(input, '/'); 
+    if (!p) {
+        input_path_len = 0;
+        pstrcpy(file_prefix, sizeof(file_prefix), input);
+        strcpy(path, ".");
+    } else {
+        input_path_len = p - input + 1;
+        memcpy(path, input, input_path_len);
+        if (input_path_len > sizeof(path) - 1)
+            input_path_len = sizeof(path) - 1;
+        path[input_path_len] = '\0';
+        pstrcpy(file_prefix, sizeof(file_prefix), p + 1);
+    }
+#ifdef DEBUG_COMPLETION
+    term_printf("input='%s' path='%s' prefix='%s'\n", input, path, file_prefix);
+#endif
+    ffs = opendir(path);
+    if (!ffs)
+        return;
+    for(;;) {
+        struct stat sb;
+        d = readdir(ffs);
+        if (!d)
+            break;
+        if (strstart(d->d_name, file_prefix, NULL)) {
+            memcpy(file, input, input_path_len);
+            strcpy(file + input_path_len, d->d_name);
+            /* stat the file to find out if it's a directory.
+             * In that case add a slash to speed up typing long paths
+             */
+            stat(file, &sb);
+            if(S_ISDIR(sb.st_mode))
+                strcat(file, "/");
+            add_completion(file);
+        }
+    }
+    closedir(ffs);
+}
+
+static void block_completion_it(void *opaque, const char *name)
+{
+    const char *input = opaque;
+
+    if (input[0] == '\0' ||
+        !strncmp(name, (char *)input, strlen(input))) {
+        add_completion(name);
+    }
+}
+
+/* NOTE: this parser is an approximate form of the real command parser */
+static void parse_cmdline(const char *cmdline,
+                         int *pnb_args, char **args)
+{
+    const char *p;
+    int nb_args, ret;
+    char buf[1024];
+
+    p = cmdline;
+    nb_args = 0;
+    for(;;) {
+        while (isspace(*p))
+            p++;
+        if (*p == '\0')
+            break;
+        if (nb_args >= MAX_ARGS)
+            break;
+        ret = get_str(buf, sizeof(buf), &p);
+        args[nb_args] = qemu_strdup(buf);
+        nb_args++;
+        if (ret < 0)
+            break;
+    }
+    *pnb_args = nb_args;
+}
+
+void readline_find_completion(const char *cmdline)
+{
+    const char *cmdname;
+    char *args[MAX_ARGS];
+    int nb_args, i, len;
+    const char *ptype, *str;
+    term_cmd_t *cmd;
+
+    parse_cmdline(cmdline, &nb_args, args);
+#ifdef DEBUG_COMPLETION
+    for(i = 0; i < nb_args; i++) {
+        term_printf("arg%d = '%s'\n", i, (char *)args[i]);
+    }
+#endif
+
+    /* if the line ends with a space, it means we want to complete the
+       next arg */
+    len = strlen(cmdline);
+    if (len > 0 && isspace(cmdline[len - 1])) {
+        if (nb_args >= MAX_ARGS)
+            return;
+        args[nb_args++] = qemu_strdup("");
+    }
+    if (nb_args <= 1) {
+        /* command completion */
+        if (nb_args == 0)
+            cmdname = "";
+        else
+            cmdname = args[0];
+        completion_index = strlen(cmdname);
+        for(cmd = term_cmds; cmd->name != NULL; cmd++) {
+            cmd_completion(cmdname, cmd->name);
+        }
+    } else {
+        /* find the command */
+        for(cmd = term_cmds; cmd->name != NULL; cmd++) {
+            if (compare_cmd(args[0], cmd->name))
+                goto found;
+        }
+        return;
+    found:
+        ptype = cmd->args_type;
+        for(i = 0; i < nb_args - 2; i++) {
+            if (*ptype != '\0') {
+                ptype++;
+                while (*ptype == '?')
+                    ptype++;
+            }
+        }
+        str = args[nb_args - 1];
+        switch(*ptype) {
+        case 'F':
+            /* file completion */
+            completion_index = strlen(str);
+            file_completion(str);
+            break;
+        case 'B':
+            /* block device name completion */
+            completion_index = strlen(str);
+            bdrv_iterate(block_completion_it, (void *)str);
+            break;
+        case 's':
+            /* XXX: more generic ? */
+            if (!strcmp(cmd->name, "info")) {
+                completion_index = strlen(str);
+                for(cmd = info_cmds; cmd->name != NULL; cmd++) {
+                    cmd_completion(str, cmd->name);
+                }
+            }
+            break;
+        default:
+            break;
+        }
+    }
+    for(i = 0; i < nb_args; i++)
+        qemu_free(args[i]);
+}
+#else
+void readline_find_completion(const char *cmdline)
+{
+}
+#endif /* !CONFIG_DM */
+
 static int term_can_read(void *opaque)
 {
     return 128;
@@ -795,4 +2305,31 @@ void monitor_init(CharDriverState *hd, int show_banner)
     }
     qemu_chr_add_read_handler(hd, term_can_read, term_read, NULL);
     monitor_start_input();
+}
+
+/* XXX: use threads ? */
+/* modal monitor readline */
+static int monitor_readline_started;
+static char *monitor_readline_buf;
+static int monitor_readline_buf_size;
+
+static void monitor_readline_cb(void *opaque, const char *input)
+{
+    pstrcpy(monitor_readline_buf, monitor_readline_buf_size, input);
+    monitor_readline_started = 0;
+}
+
+void monitor_readline(const char *prompt, int is_password,
+                      char *buf, int buf_size)
+{
+    if (is_password) {
+        qemu_chr_send_event(monitor_hd, CHR_EVENT_FOCUS);
+    }
+    readline_start(prompt, is_password, monitor_readline_cb, NULL);
+    monitor_readline_buf = buf;
+    monitor_readline_buf_size = buf_size;
+    monitor_readline_started = 1;
+    while (monitor_readline_started) {
+        main_loop_wait(10);
+    }
 }

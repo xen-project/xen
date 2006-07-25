@@ -48,6 +48,7 @@
 #define VTPM_LOG_VTSP        6
 #define VTPM_LOG_VTPM        7
 #define VTPM_LOG_VTPM_DEEP   8
+#define VTPM_LOG_VTSP_DEEP   9
 
 static char *module_names[] = { "",
                                 "CRYPTO",
@@ -57,7 +58,8 @@ static char *module_names[] = { "",
                                 "TCS",
                                 "VTSP",
                                 "VTPM",
-                                "VTPM"
+                                "VTPM",
+                                "VTSP"
                               };
 
 // Default to standard logging

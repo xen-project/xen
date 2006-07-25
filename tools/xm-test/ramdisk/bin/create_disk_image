@@ -51,20 +51,21 @@ Command creates a hvm guest disk image for xm-test.
 Usage: $0 [OPTIONS]
 
 OPTIONS:
-    -d|--dvrdir <name>       Directory where to fine network driver 
+    -d|--dvrdir <name>       Directory where to find network driver 
                              to use for disk image. 
     -i|--image <name>        Image name to create.
     -k|--kernel <name>       Kernel name to use for disk image.
+    -n|--netdrv <name>       Network driver name to use for disk image.
     -r|--rootfs <image>      Rootfs image to use for disk image.
 
-This script currently only supports the pcnet32 driver for network
-tests. If a dvrdir isn't added on the command-line, it will look
-in /lib/modules/ directory relating to the supplied kernel. If the
+This script defaults to using the 8139too.ko driver for network tests. 
+If a dvrdir isn't added on the command-line, it will look in 
+/lib/modules/ directory relating to the supplied kernel. If the
 network driver is built into the kernel, you can specify the key word
 "builtin" with the -d option and the script will continue.
 
-Note: The pcnet32 driver relies upon mii.ko. This script will look
-for that module in the same location as the pcnet32 driver, either
+Note: Many network drivers rely upon mii.ko. This script will look
+for that module in the same location as the network driver, either
 for the kernel or the location used with the -d option.
 
 EOU
@@ -94,6 +95,7 @@ function initialize_globals()
 	IMAGE="disk.img"
 	KERNEL=""
 	DRVDIR=""
+	NETDRV="8139too.ko"
 	LCONF="lilo.conf"
 	LOOPD=""    # Loop device for entire disk image
 	LOOPP=""    # Loop device for ext partition
@@ -124,6 +126,11 @@ function get_options()
 			-k|--kernel)
 				shift
 				KERNEL=${1}
+				shift
+				;;
+			-n|--netdrv)
+				shift
+				NETDRV=${1}
 				shift
 				;;
 			-r|--rootfs)
@@ -256,23 +263,23 @@ function copy_netdriver_to_image()
                                                                                 
 	mkdir "$MNT/lib/modules"
 	if [ -e "$DRVDIR" ]; then
-		if [ -e "$DRVDIR/pcnet32.ko" ]; then
+		if [ -e "$DRVDIR/$NETDRV" ]; then
 			cp $DRVDIR/mii.ko $MNT/lib/modules
-			cp $DRVDIR/pcnet32.ko $MNT/lib/modules
+			cp $DRVDIR/$NETDRV $MNT/lib/modules
 		else
-			die "Failed to find pcnet32.ko at $DRVDIR."
+			die "Failed to find $NETDRV at $DRVDIR."
 		fi
-	elif [ -e "$fdir/pcnet32.ko" ]; then
+	elif [ -e "$fdir/$NETDRV" ]; then
 		cp $fdir/mii.ko $MNT/lib/modules
-		cp $fdir/pcnet32.ko $MNT/lib/modules
+		cp $fdir/$NETDRV $MNT/lib/modules
 	else
-		die "Xm-test requires the pcnet32 driver to run."
+		die "Xm-test requires at minimum the 8139too.ko driver to run."
 	fi
 
 	# Make sure that modules will be installed
 	if [ -e "$MNT/etc/init.d/rcS" ]; then
 		echo "insmod /lib/modules/mii.ko" >> $MNT/etc/init.d/rcS
-		echo "insmod /lib/modules/pcnet32.ko" >> $MNT/etc/init.d/rcS
+		echo "insmod /lib/modules/$NETDRV" >> $MNT/etc/init.d/rcS
 	else
 		die "Failed to add insmod command to rcS file on image."
 	fi

@@ -47,6 +47,11 @@
 #define mb()
 #define rmb()
 #define wmb()
+#elif defined(__powerpc__)
+/* XXX loosen these up later */
+#define mb()   __asm__ __volatile__ ("sync" : : : "memory")
+#define rmb()  __asm__ __volatile__ ("sync" : : : "memory") /* lwsync? */
+#define wmb()  __asm__ __volatile__ ("sync" : : : "memory") /* eieio? */
 #else
 #error "Define barriers"
 #endif

@@ -159,7 +159,7 @@ typedef struct IRQ_dst_t {
     uint32_t pcsr; /* CPU sensitivity register */
     IRQ_queue_t raised;
     IRQ_queue_t servicing;
-    CPUState *env; /* Needed if we did SMP */
+    CPUState *env;
 } IRQ_dst_t;
 
 struct openpic_t {
@@ -265,7 +265,7 @@ static void IRQ_local_pipe (openpic_t *opp, int n_CPU, int n_IRQ)
     if (priority > dst->raised.priority) {
         IRQ_get_next(opp, &dst->raised);
         DPRINTF("Raise CPU IRQ\n");
-        cpu_interrupt(cpu_single_env, CPU_INTERRUPT_HARD);
+        cpu_interrupt(dst->env, CPU_INTERRUPT_HARD);
     }
 }
 
@@ -320,8 +320,9 @@ static void openpic_update_irq(openpic_t *opp, int n_IRQ)
     }
 }
 
-void openpic_set_irq(openpic_t *opp, int n_IRQ, int level)
+void openpic_set_irq(void *opaque, int n_IRQ, int level)
 {
+    openpic_t *opp = opaque;
     IRQ_src_t *src;
 
     src = &opp->src[n_IRQ];
@@ -345,7 +346,7 @@ static void openpic_reset (openpic_t *opp)
     int i;
 
     opp->glbc = 0x80000000;
-    /* Initialise controler registers */
+    /* Initialise controller registers */
     opp->frep = ((EXT_IRQ - 1) << 16) | ((MAX_CPU - 1) << 8) | VID;
     opp->veni = VENI;
     opp->spve = 0x000000FF;
@@ -531,7 +532,7 @@ static void openpic_gbl_write (void *opaque, uint32_t addr, uint32_t val)
         /* XXX: Should be able to reset any CPU */
         if (val & 1) {
             DPRINTF("Reset CPU IRQ\n");
-            //            cpu_interrupt(cpu_single_env, CPU_INTERRUPT_RESET);
+            //            cpu_interrupt(first_cpu, CPU_INTERRUPT_RESET);
         }
 	break;
 #if MAX_IPI > 0
@@ -629,7 +630,7 @@ static void openpic_timer_write (void *opaque, uint32_t addr, uint32_t val)
         break;
     case 0x10: /* TIBC */
 	if ((opp->timers[idx].ticc & 0x80000000) != 0 &&
-	    (val & 0x800000000) == 0 &&
+	    (val & 0x80000000) == 0 &&
             (opp->timers[idx].tibc & 0x80000000) != 0)
 	    opp->timers[idx].ticc &= ~0x80000000;
 	opp->timers[idx].tibc = val;
@@ -780,7 +781,7 @@ static void openpic_cpu_write (void *opaque, uint32_t addr, uint32_t val)
 	    src = &opp->src[n_IRQ];
 	    if (IPVP_PRIORITY(src->ipvp) > dst->servicing.priority) {
                 DPRINTF("Raise CPU IRQ\n");
-                cpu_interrupt(cpu_single_env, CPU_INTERRUPT_HARD);
+                cpu_interrupt(dst->env, CPU_INTERRUPT_HARD);
             }
 	}
 	break;
@@ -962,7 +963,8 @@ static void openpic_map(PCIDevice *pci_dev, int region_num,
 #endif
 }
 
-openpic_t *openpic_init (PCIBus *bus, int *pmem_index, int nb_cpus)
+openpic_t *openpic_init (PCIBus *bus, int *pmem_index, int nb_cpus,
+                         CPUPPCState **envp)
 {
     openpic_t *opp;
     uint8_t *pci_conf;
@@ -1016,6 +1018,8 @@ openpic_t *openpic_init (PCIBus *bus, int *pmem_index, int nb_cpus)
     for (; i < MAX_IRQ; i++) {
         opp->src[i].type = IRQ_INTERNAL;
     }
+    for (i = 0; i < nb_cpus; i++)
+        opp->dst[i].env = envp[i];
     openpic_reset(opp);
     if (pmem_index)
         *pmem_index = opp->mem_index;

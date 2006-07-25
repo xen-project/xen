@@ -1,0 +1,89 @@
+./" static inline void io_prep_fsync(struct iocb *iocb, int fd)
+./" {
+./" 	memset(iocb, 0, sizeof(*iocb));
+./" 	iocb->aio_fildes = fd;
+./" 	iocb->aio_lio_opcode = IO_CMD_FSYNC;
+./" 	iocb->aio_reqprio = 0;
+./" }
+.TH io_prep_fsync 3 2002-09-12 "Linux 2.4" Linux AIO"
+.SH NAME
+io_prep_fsync \- Synchronize a file's complete in-core state with that on disk
+.SH SYNOPSYS
+.nf
+.B #include <errno.h>
+.br
+.sp
+.B #include <libaio.h>
+.br
+.sp
+.BI "static inline void io_prep_fsync(struct iocb *iocb, int fd)"
+.sp
+struct iocb {
+	void		*data;
+	unsigned	key;
+	short		aio_lio_opcode;
+	short		aio_reqprio;
+	int		aio_fildes;
+};
+.sp
+.fi
+.SH DESCRIPTION
+This is an inline convenience function for setting up an iocbv for a FSYNC request.
+.br
+The file for which
+.TP 
+.IR "iocb->aio_fildes = fd" 
+is a descriptor is set up with
+the command
+.TP 
+.IR "iocb->aio_lio_opcode = IO_CMD_FSYNC:
+.
+.PP
+The io_prep_fsync() function shall set up an IO_CMD_FSYNC operation
+to asynchronously force all I/O
+operations associated with the file indicated by the file
+descriptor aio_fildes member of the iocb structure referenced by
+the iocb argument and queued at the time of the call to
+io_submit() to the synchronized I/O completion state. The function
+call shall return when the synchronization request has been
+initiated or queued to the file or device (even when the data
+cannot be synchronized immediately).
+
+All currently queued I/O operations shall be completed as if by a call
+to fsync(); that is, as defined for synchronized I/O file
+integrity completion. If the
+operation queued by io_prep_fsync() fails, then, as for fsync(),
+outstanding I/O operations are not guaranteed to have
+been completed.
+
+If io_prep_fsync() succeeds, then it is only the I/O that was queued
+at the time of the call to io_submit() that is guaranteed to be
+forced to the relevant completion state. The completion of
+subsequent I/O on the file descriptor is not guaranteed to be
+completed in a synchronized fashion.
+.PP
+This function returns immediately . To schedule the operation, the
+function
+.IR io_submit
+must be called.
+.PP
+Simultaneous asynchronous operations using the same iocb produce
+undefined results.
+.SH "RETURN VALUES"
+None
+.SH ERRORS
+None
+.SH "SEE ALSO"
+.BR io(3),
+.BR io_cancel(3),
+.BR io_fsync(3),
+.BR io_getevents(3),
+.BR io_prep_pread(3),
+.BR io_prep_pwrite(3),
+.BR io_queue_init(3),
+.BR io_queue_release(3),
+.BR io_queue_run(3),
+.BR io_queue_wait(3),
+.BR io_set_callback(3),
+.BR io_submit(3),
+.BR errno(3)

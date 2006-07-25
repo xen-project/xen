@@ -51,13 +51,14 @@ disk.img: existing
 	chmod a+x $(HVM_SCRIPT)
 	@if test ! "$(HVMKERNEL)" = "no" -a ! "$(DRVDIR)" = "no"; then \
 		$(HVM_SCRIPT) -r $(XMTEST_VER_IMG) -k $(HVMKERNEL) \
-			-d $(DRVDIR); \
+			-d $(DRVDIR) -n $(NETDRV); \
 	elif test "$(HVMKERNEL)" = "no" -a ! "$(DRVDIR)" = "no"; then \
-		$(HVM_SCRIPT) -r $(XMTEST_VER_IMG) -d $(DRVDIR); \
+		$(HVM_SCRIPT) -r $(XMTEST_VER_IMG) -d $(DRVDIR) -n $(NETDRV); \
 	elif test ! "$(HVMKERNEL)" = "no" -a "$(DRVDIR)" = "no"; then \
-		$(HVM_SCRIPT) -r $(XMTEST_VER_IMG) -k $(HVMKERNEL); \
+		$(HVM_SCRIPT) -r $(XMTEST_VER_IMG) -k $(HVMKERNEL) \
+			-n $(NETDRV); \
 	else \
-		$(HVM_SCRIPT) -r $(XMTEST_VER_IMG); \
+		$(HVM_SCRIPT) -r $(XMTEST_VER_IMG) -n $(NETDRV); \
 	fi
 
 existing:

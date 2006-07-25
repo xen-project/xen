@@ -36,10 +36,10 @@ import sys
 # constants
 NSAMPLES = 100
 NDOMAINS = 32
-IDLE_DOMAIN = 31 # idle domain's ID
+IDLE_DOMAIN = -1 # idle domain's ID
 
 # the struct strings for qos_info
-ST_DOM_INFO = "6Q4i32s"
+ST_DOM_INFO = "6Q3i2H32s"
 ST_QDATA = "%dQ" % (6*NDOMAINS + 4)
 
 # size of mmaped file
@@ -297,6 +297,7 @@ def show_livestats(cpu):
             samples = []
             doms = []
             dom_in_use = []
+            domain_id = []
 
             # read in data
             for i in range(0, NSAMPLES):
@@ -311,9 +312,13 @@ def show_livestats(cpu):
                 doms.append(dom)
 #		(last_update_time, start_time, runnable_start_time, blocked_start_time,
 #		 ns_since_boot, ns_oncpu_since_boot, runnable_at_last_update,
-#		 runnable, in_use, domid, name) = dom
+#		 runnable, in_use, domid, junk, name) = dom
 #		dom_in_use.append(in_use)
                 dom_in_use.append(dom[8])
+                domid = dom[9]
+                if domid == 32767 :
+                    domid = IDLE_DOMAIN
+                domain_id.append(domid)
                 idx += len
 #            print "dom_in_use(cpu=%d): " % cpuidx, dom_in_use
 
@@ -366,16 +371,16 @@ def show_livestats(cpu):
             if not dom_in_use[dom]:
                 continue
 
-            if h1[dom][0][1] > 0 or dom == NDOMAINS - 1:
+            if h1[dom][0][1] > 0 or domain_id[dom] == IDLE_DOMAIN:
                 # display gotten
                 row += 1 
                 col = 2
-                display_domain_id(stdscr, row, col, dom)
+                display_domain_id(stdscr, row, col, domain_id[dom])
                 col += 4
                 display(stdscr, row, col, "%s" % time_scale(h2[dom][0][0]))
                 col += 12
                 display(stdscr, row, col, "%3.2f%%" % h2[dom][0][1])
-                if dom != NDOMAINS - 1:
+                if dom != IDLE_DOMAIN:
                     cpu_10sec_usage += h2[dom][0][1]
                 col += 12
                 display(stdscr, row, col, "%s/ex" % time_scale(h2[dom][0][2]))
@@ -388,14 +393,14 @@ def show_livestats(cpu):
                 col += 18
                 display(stdscr, row, col, "Gotten")
 
-                if dom != NDOMAINS - 1:
+                if dom != IDLE_DOMAIN:
                     cpu_1sec_usage = cpu_1sec_usage + h1[dom][0][1]
     
                 # display allocated
                 if options.allocated:
                     row += 1
                     col = 2
-                    display_domain_id(stdscr, row, col, dom)
+                    display_domain_id(stdscr, row, col, domain_id[dom])
                     col += 28
                     display(stdscr, row, col, "%s/ex" % time_scale(h2[dom][1]))
                     col += 42
@@ -407,7 +412,7 @@ def show_livestats(cpu):
                 if options.blocked:
                     row += 1
                     col = 2
-                    display_domain_id(stdscr, row, col, dom)
+                    display_domain_id(stdscr, row, col, domain_id[dom])
                     col += 4
                     display(stdscr, row, col, "%s" % time_scale(h2[dom][2][0]))
                     col += 12
@@ -427,7 +432,7 @@ def show_livestats(cpu):
                 if options.waited:
                     row += 1
                     col = 2
-                    display_domain_id(stdscr, row, col, dom)
+                    display_domain_id(stdscr, row, col, domain_id[dom])
                     col += 4
                     display(stdscr, row, col, "%s" % time_scale(h2[dom][3][0]))
                     col += 12
@@ -447,7 +452,7 @@ def show_livestats(cpu):
                 if options.excount:
                     row += 1
                     col = 2
-                    display_domain_id(stdscr, row, col, dom)
+                    display_domain_id(stdscr, row, col, domain_id[dom])
                     
                     col += 28
                     display(stdscr, row, col, "%d/s" % h2[dom][4])
@@ -460,7 +465,7 @@ def show_livestats(cpu):
                 if options.iocount:
                     row += 1
                     col = 2
-                    display_domain_id(stdscr, row, col, dom)
+                    display_domain_id(stdscr, row, col, domain_id[dom])
                     col += 4
                     display(stdscr, row, col, "%d/s" % h2[dom][5][0])
                     col += 24
@@ -544,6 +549,9 @@ class Delayed(file):
             self.file.write(self.delay_data)
 	self.file.write(str)
 
+    def rename(self, name):
+        self.filename = name
+
     def flush(self):
         if  self.opened:
             self.file.flush()
@@ -567,10 +575,7 @@ def writelog():
     curr = last = time.time()
     outfiles = {}
     for dom in range(0, NDOMAINS):
-        if dom == IDLE_DOMAIN:
-            outfiles[dom] = Delayed("%s-idle.log" % options.prefix, 'w')
-        else:
-            outfiles[dom] = Delayed("%s-dom%d.log" % (options.prefix, dom), 'w')
+        outfiles[dom] = Delayed("%s-dom%d.log" % (options.prefix, dom), 'w')
         outfiles[dom].delayed_write("# passed cpu dom cpu(tot) cpu(%) cpu/ex allocated/ex blocked(tot) blocked(%) blocked/io waited(tot) waited(%) waited/ex ex/s io(tot) io/ex\n")
 
     while options.duration == 0 or interval < (options.duration * 1000):
@@ -582,6 +587,7 @@ def writelog():
             samples = []
             doms = []
             dom_in_use = []
+            domain_id = []
 
             for i in range(0, NSAMPLES):
                 len = struct.calcsize(ST_QDATA)
@@ -595,8 +601,16 @@ def writelog():
 #                doms.append(dom)
 #		(last_update_time, start_time, runnable_start_time, blocked_start_time,
 #		 ns_since_boot, ns_oncpu_since_boot, runnable_at_last_update,
-#		 runnable, in_use, domid, name) = dom
+#		 runnable, in_use, domid, junk, name) = dom
                 dom_in_use.append(dom[8])
+                domid = dom[9]
+                if domid == 32767:
+                    domid = IDLE_DOMAIN
+                domain_id.append(domid)
+                if domid == IDLE_DOMAIN:
+                    outfiles[i].rename("%s-idle.log" % options.prefix)
+                else:
+                    outfiles[i].rename("%s-dom%d.log" % (options.prefix, domid))
                 idx += len
 
             len = struct.calcsize("4i")
@@ -617,9 +631,9 @@ def writelog():
             for dom in range(0, NDOMAINS):
                 if not dom_in_use[dom]:
                     continue
-                if h1[dom][0][1] > 0 or dom == NDOMAINS - 1:
+                if h1[dom][0][1] > 0 or dom == IDLE_DOMAIN:
                     outfiles[dom].write("%.3f %d %d %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n" %
-                                     (interval, cpuidx, dom,
+                                     (interval, cpuidx, domain_id[dom],
                                      h1[dom][0][0], h1[dom][0][1], h1[dom][0][2],
                                      h1[dom][1],
                                      h1[dom][2][0], h1[dom][2][1], h1[dom][2][2],

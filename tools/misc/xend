@@ -92,6 +92,10 @@ def start_xenstored():
 def start_consoled():
     if os.fork() == 0:
         os.execvp('xenconsoled', ['xenconsoled'])
+
+def start_blktapctrl():
+    if os.fork() == 0:
+        os.execvp('blktapctrl', ['blktapctrl'])
             
 def main():
     try:
@@ -106,16 +110,19 @@ def main():
     elif sys.argv[1] == 'start':
         start_xenstored()
         start_consoled()
+	start_blktapctrl()
         return daemon.start()
     elif sys.argv[1] == 'trace_start':
         start_xenstored()
         start_consoled()
+        start_blktapctrl()
         return daemon.start(trace=1)
     elif sys.argv[1] == 'stop':
         return daemon.stop()
     elif sys.argv[1] == 'restart':
         start_xenstored()
         start_consoled()
+        start_blktapctrl()
         return daemon.stop() or daemon.start()
     elif sys.argv[1] == 'status':
         return daemon.status()

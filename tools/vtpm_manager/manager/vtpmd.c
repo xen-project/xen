@@ -51,7 +51,6 @@
 #include "log.h"
 #include "vtpm_ipc.h"
 
-
 #define TPM_EMULATOR_PATH "/usr/bin/vtpmd"
 
 #define VTPM_BE_FNAME          "/dev/vtpm"
@@ -173,7 +172,7 @@ TPM_RESULT VTPM_New_DMI_Extra(VTPM_DMI_RESOURCE *dmi_res, BYTE startup_mode) {
     } else if (pid == 0) {
       switch (startup_mode) {
       case TPM_ST_CLEAR:
-        execl (TPM_EMULATOR_PATH, "vtmpd", "clear", dmi_id_str, NULL);
+        execl (TPM_EMULATOR_PATH, "vtpmd", "clear", dmi_id_str, NULL);
         break;
       case TPM_ST_STATE:
         execl (TPM_EMULATOR_PATH, "vtpmd", "save", dmi_id_str, NULL);

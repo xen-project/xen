@@ -23,8 +23,10 @@ include $(XEN_ROOT)/Config.mk
 # Set ARCH/SUBARCH appropriately.
 override COMPILE_SUBARCH := $(XEN_COMPILE_ARCH)
 override TARGET_SUBARCH  := $(XEN_TARGET_ARCH)
-override COMPILE_ARCH    := $(patsubst x86%,x86,$(XEN_COMPILE_ARCH))
-override TARGET_ARCH     := $(patsubst x86%,x86,$(XEN_TARGET_ARCH))
+override COMPILE_ARCH    := $(shell echo $(XEN_COMPILE_ARCH) | \
+                              sed -e 's/\(x86\|powerpc\).*/\1/')
+override TARGET_ARCH     := $(shell echo $(XEN_TARGET_ARCH) | \
+                              sed -e 's/\(x86\|powerpc\).*/\1/')
 
 TARGET := $(BASEDIR)/xen
 

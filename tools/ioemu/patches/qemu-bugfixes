@@ -1,0 +1,23 @@
+diff -r d76fb4ee3e48 console.c
+--- a/console.c	Mon Jun 26 15:16:44 2006 +0100
++++ b/console.c	Mon Jun 26 15:47:43 2006 +0100
+@@ -449,7 +449,7 @@ static void text_console_resize(TextCons
+             c++;
+         }
+     }
+-    free(s->cells);
++    qemu_free(s->cells);
+     s->cells = cells;
+ }
+ 
+diff -r d76fb4ee3e48 usb-linux.c
+--- a/usb-linux.c	Mon Jun 26 15:16:44 2006 +0100
++++ b/usb-linux.c	Mon Jun 26 15:47:43 2006 +0100
+@@ -26,6 +26,7 @@
+ #if defined(__linux__)
+ #include <dirent.h>
+ #include <sys/ioctl.h>
++#define __user /* new versions of usbdevice_fs.h use this private attribute */
+ #include <linux/usbdevice_fs.h>
+ #include <linux/version.h>
+ 

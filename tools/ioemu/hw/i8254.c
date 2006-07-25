@@ -22,8 +22,6 @@
  * THE SOFTWARE.
  */
 #include "vl.h"
-#include <xenctrl.h>
-#include <xen/hvm/ioreq.h>
 
 //#define DEBUG_PIT
 
@@ -50,7 +48,6 @@ typedef struct PITChannelState {
     int64_t next_transition_time;
     QEMUTimer *irq_timer;
     int irq;
-    int hvm_channel; /* Is this accelerated by HVM ? */
 } PITChannelState;
 
 struct PITState {
@@ -61,9 +58,6 @@ static PITState pit_state;
 
 static void pit_irq_timer_update(PITChannelState *s, int64_t current_time);
 
-/* currently operate which channel for hvm use */
-int hvm_channel = -1;
-extern FILE *logfile;
 static int pit_get_count(PITChannelState *s)
 {
     uint64_t d;
@@ -215,41 +209,16 @@ int pit_get_gate(PITState *pit, int channel)
     return s->gate;
 }
 
-void pit_reset_hvm_vectors()
+int pit_get_initial_count(PITState *pit, int channel)
 {
-    extern shared_iopage_t *shared_page;
-    ioreq_t *req; 
-    int irq, i;
-    PITChannelState *s;
+    PITChannelState *s = &pit->channels[channel];
+    return s->count;
+}
 
-    irq = 0;
-
-    for(i = 0; i < 3; i++) {
-        if (pit_state.channels[i].hvm_channel)
-             break;
-    }
-    
-    if (i == 3)
-        return;
-
-    /* Assumes just one HVM accelerated channel */
-    hvm_channel = i;
-    s = &pit_state.channels[hvm_channel];
-    fprintf(logfile,
-    	"HVM_PIT:guest init pit channel %d!\n", hvm_channel);
-    req = &shared_page->vcpu_iodata[0].vp_ioreq;
-
-    req->state = STATE_IORESP_HOOK;
-    /*
-     * info passed to HV as following
-     * -- init count:16 bit, timer vec:8 bit,
-     * PIT channel(0~2):2 bit, rw mode:2 bit
-     */
-    req->u.data = s->count;
-    req->u.data |= (irq << 16);
-    req->u.data |= (hvm_channel << 24);
-    req->u.data |= ((s->rw_mode) << 26);
-    fprintf(logfile, "HVM_PIT:pass info 0x%"PRIx64" to HV!\n", req->u.data);
+int pit_get_mode(PITState *pit, int channel)
+{
+    PITChannelState *s = &pit->channels[channel];
+    return s->mode;
 }
 
 static inline void pit_load_count(PITChannelState *s, int val)
@@ -258,15 +227,7 @@ static inline void pit_load_count(PITChannelState *s, int val)
         val = 0x10000;
     s->count_load_time = qemu_get_clock(vm_clock);
     s->count = val;
-
-    /* guest init this pit channel for periodic mode. we do not update related
-     * timer so the channel never send intr from device model*/
-    if (hvm_channel != -1 && s->mode == 2) {
-        pit_reset_hvm_vectors();
-        hvm_channel = -1;
-    }
-
-/*    pit_irq_timer_update(s, s->count_load_time);*/
+    pit_irq_timer_update(s, s->count_load_time);
 }
 
 /* if already latched, do not latch again */
@@ -323,8 +284,6 @@ static void pit_ioport_write(void *opaque, uint32_t addr, uint32_t val)
         }
     } else {
         s = &pit->channels[addr];
-        s->hvm_channel = 1;
-        hvm_channel = addr;
         switch(s->write_state) {
         default:
         case RW_STATE_LSB:

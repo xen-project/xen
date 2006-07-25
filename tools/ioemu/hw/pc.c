@@ -32,14 +32,18 @@
 #define LINUX_BOOT_FILENAME "linux_boot.bin"
 
 #define KERNEL_LOAD_ADDR     0x00100000
-#define INITRD_LOAD_ADDR     0x00400000
+#define INITRD_LOAD_ADDR     0x00600000
 #define KERNEL_PARAMS_ADDR   0x00090000
 #define KERNEL_CMDLINE_ADDR  0x00099000
 
-int speaker_data_on;
-int dummy_refresh_clock;
 static fdctrl_t *floppy_controller;
 static RTCState *rtc_state;
+#ifndef CONFIG_DM
+static PITState *pit;
+#endif /* !CONFIG_DM */
+#ifndef CONFIG_DM
+static IOAPICState *ioapic;
+#endif /* !CONFIG_DM */
 static USBPort *usb_root_ports[2];
 
 static void ioport80_write(void *opaque, uint32_t addr, uint32_t data)
@@ -63,6 +67,34 @@ static void ioportF0_write(void *opaque, uint32_t addr, uint32_t data)
 uint64_t cpu_get_tsc(CPUX86State *env)
 {
     return qemu_get_clock(vm_clock);
+}
+
+#ifndef CONFIG_DM
+/* IRQ handling */
+int cpu_get_pic_interrupt(CPUState *env)
+{
+    int intno;
+
+    intno = apic_get_interrupt(env);
+    if (intno >= 0) {
+        /* set irq request if a PIC irq is still pending */
+        /* XXX: improve that */
+        pic_update_irq(isa_pic); 
+        return intno;
+    }
+    /* read the irq from the PIC */
+    intno = pic_read_irq(isa_pic);
+    return intno;
+}
+#endif /* CONFIG_DM */
+
+static void pic_irq_request(void *opaque, int level)
+{
+    CPUState *env = opaque;
+    if (level)
+        cpu_interrupt(env, CPU_INTERRUPT_HARD);
+    else
+        cpu_reset_interrupt(env, CPU_INTERRUPT_HARD);
 }
 
 /* PC cmos mappings */
@@ -168,20 +200,14 @@ static void cmos_init(uint64_t ram_size, int boot_device, BlockDriverState **hd_
     switch(boot_device) {
     case 'a':
     case 'b':
-        //rtc_set_memory(s, 0x3d, 0x01); /* floppy boot */
-        rtc_set_memory(s, 0x3d, 0x21);   /* a->c->d */
-        rtc_set_memory(s, 0x38, 0x30);
+        rtc_set_memory(s, 0x3d, 0x01); /* floppy boot */
         break;
     default:
     case 'c':
-        //rtc_set_memory(s, 0x3d, 0x02); /* hard drive boot */
-        rtc_set_memory(s, 0x3d, 0x32);   /* c->d->a */
-        rtc_set_memory(s, 0x38, 0x10);
+        rtc_set_memory(s, 0x3d, 0x02); /* hard drive boot */
         break;
     case 'd':
-        //rtc_set_memory(s, 0x3d, 0x03); /* CD-ROM boot */
-        rtc_set_memory(s, 0x3d, 0x23);   /* d->c->a */
-        rtc_set_memory(s, 0x38, 0x10);
+        rtc_set_memory(s, 0x3d, 0x03); /* CD-ROM boot */
         break;
     }
 
@@ -224,19 +250,23 @@ static void cmos_init(uint64_t ram_size, int boot_device, BlockDriverState **hd_
     val = 0;
     for (i = 0; i < 4; i++) {
         if (hd_table[i]) {
-            int cylinders, heads, sectors;
-            uint8_t translation;
-            /* NOTE: bdrv_get_geometry_hint() returns the geometry
-               that the hard disk returns. It is always such that: 1 <=
-               sects <= 63, 1 <= heads <= 16, 1 <= cylinders <=
-               16383. The BIOS geometry can be different. */
-            bdrv_get_geometry_hint(hd_table[i], &cylinders, &heads, &sectors);
-            if (cylinders <= 1024 && heads <= 16 && sectors <= 63) {
-                /* No translation. */
-                translation = 0;
+            int cylinders, heads, sectors, translation;
+            /* NOTE: bdrv_get_geometry_hint() returns the physical
+                geometry.  It is always such that: 1 <= sects <= 63, 1
+                <= heads <= 16, 1 <= cylinders <= 16383. The BIOS
+                geometry can be different if a translation is done. */
+            translation = bdrv_get_translation_hint(hd_table[i]);
+            if (translation == BIOS_ATA_TRANSLATION_AUTO) {
+                bdrv_get_geometry_hint(hd_table[i], &cylinders, &heads, &sectors);
+                if (cylinders <= 1024 && heads <= 16 && sectors <= 63) {
+                    /* No translation. */
+                    translation = 0;
+                } else {
+                    /* LBA translation. */
+                    translation = 1;
+                }
             } else {
-                /* LBA translation. */
-                translation = 1;
+                translation--;
             }
             val |= translation << (i * 2);
         }
@@ -248,26 +278,26 @@ static void cmos_init(uint64_t ram_size, int boot_device, BlockDriverState **hd_
     //    rtc_set_memory(s, 0x38, 1);
 }
 
-static void speaker_ioport_write(void *opaque, uint32_t addr, uint32_t val)
+void ioport_set_a20(int enable)
 {
-    fprintf(stderr, "speaker port should not be handled in DM!\n");
+    /* XXX: send to all CPUs ? */
+    cpu_x86_set_a20(first_cpu, enable);
 }
 
-static uint32_t speaker_ioport_read(void *opaque, uint32_t addr)
+int ioport_get_a20(void)
 {
-    fprintf(stderr, "speaker port should not be handled in DM!\n");
-    return 0;
+    return ((first_cpu->a20_mask >> 20) & 1);
 }
 
 static void ioport92_write(void *opaque, uint32_t addr, uint32_t val)
 {
-    cpu_x86_set_a20(cpu_single_env, (val >> 1) & 1);
+    ioport_set_a20((val >> 1) & 1);
     /* XXX: bit 0 is fast reset */
 }
 
 static uint32_t ioport92_read(void *opaque, uint32_t addr)
 {
-    return ((cpu_single_env->a20_mask >> 20) & 1) << 1;
+    return ioport_get_a20() << 1;
 }
 
 /***********************************************************/
@@ -363,6 +393,164 @@ int load_kernel(const char *filename, uint8_t *addr,
     return -1;
 }
 
+static void main_cpu_reset(void *opaque)
+{
+    CPUState *env = opaque;
+    cpu_reset(env);
+}
+
+/*************************************************/
+
+#ifndef CONFIG_DM
+static void putb(uint8_t **pp, int val)
+{
+    uint8_t *q;
+    q = *pp;
+    *q++ = val;
+    *pp = q;
+}
+
+static void putstr(uint8_t **pp, const char *str)
+{
+    uint8_t *q;
+    q = *pp;
+    while (*str)
+        *q++ = *str++;
+    *pp = q;
+}
+
+static void putle16(uint8_t **pp, int val)
+{
+    uint8_t *q;
+    q = *pp;
+    *q++ = val;
+    *q++ = val >> 8;
+    *pp = q;
+}
+
+static void putle32(uint8_t **pp, int val)
+{
+    uint8_t *q;
+    q = *pp;
+    *q++ = val;
+    *q++ = val >> 8;
+    *q++ = val >> 16;
+    *q++ = val >> 24;
+    *pp = q;
+}
+
+static int mpf_checksum(const uint8_t *data, int len)
+{
+    int sum, i;
+    sum = 0;
+    for(i = 0; i < len; i++)
+        sum += data[i];
+    return sum & 0xff;
+}
+
+/* Build the Multi Processor table in the BIOS. Same values as Bochs. */
+static void bios_add_mptable(uint8_t *bios_data)
+{
+    uint8_t *mp_config_table, *q, *float_pointer_struct;
+    int ioapic_id, offset, i, len;
+    
+    if (smp_cpus <= 1)
+        return;
+
+    mp_config_table = bios_data + 0xb000;
+    q = mp_config_table;
+    putstr(&q, "PCMP"); /* "PCMP signature */
+    putle16(&q, 0); /* table length (patched later) */
+    putb(&q, 4); /* spec rev */
+    putb(&q, 0); /* checksum (patched later) */
+    putstr(&q, "QEMUCPU "); /* OEM id */
+    putstr(&q, "0.1         "); /* vendor id */
+    putle32(&q, 0); /* OEM table ptr */
+    putle16(&q, 0); /* OEM table size */
+    putle16(&q, 20); /* entry count */
+    putle32(&q, 0xfee00000); /* local APIC addr */
+    putle16(&q, 0); /* ext table length */
+    putb(&q, 0); /* ext table checksum */
+    putb(&q, 0); /* reserved */
+    
+    for(i = 0; i < smp_cpus; i++) {
+        putb(&q, 0); /* entry type = processor */
+        putb(&q, i); /* APIC id */
+        putb(&q, 0x11); /* local APIC version number */
+        if (i == 0)
+            putb(&q, 3); /* cpu flags: enabled, bootstrap cpu */
+        else
+            putb(&q, 1); /* cpu flags: enabled */
+        putb(&q, 0); /* cpu signature */
+        putb(&q, 6);
+        putb(&q, 0);
+        putb(&q, 0);
+        putle16(&q, 0x201); /* feature flags */
+        putle16(&q, 0);
+
+        putle16(&q, 0); /* reserved */
+        putle16(&q, 0);
+        putle16(&q, 0);
+        putle16(&q, 0);
+    }
+
+    /* isa bus */
+    putb(&q, 1); /* entry type = bus */
+    putb(&q, 0); /* bus ID */
+    putstr(&q, "ISA   ");
+    
+    /* ioapic */
+    ioapic_id = smp_cpus;
+    putb(&q, 2); /* entry type = I/O APIC */
+    putb(&q, ioapic_id); /* apic ID */
+    putb(&q, 0x11); /* I/O APIC version number */
+    putb(&q, 1); /* enable */
+    putle32(&q, 0xfec00000); /* I/O APIC addr */
+
+    /* irqs */
+    for(i = 0; i < 16; i++) {
+        putb(&q, 3); /* entry type = I/O interrupt */
+        putb(&q, 0); /* interrupt type = vectored interrupt */
+        putb(&q, 0); /* flags: po=0, el=0 */
+        putb(&q, 0);
+        putb(&q, 0); /* source bus ID = ISA */
+        putb(&q, i); /* source bus IRQ */
+        putb(&q, ioapic_id); /* dest I/O APIC ID */
+        putb(&q, i); /* dest I/O APIC interrupt in */
+    }
+    /* patch length */
+    len = q - mp_config_table;
+    mp_config_table[4] = len;
+    mp_config_table[5] = len >> 8;
+
+    mp_config_table[7] = -mpf_checksum(mp_config_table, q - mp_config_table);
+
+    /* align to 16 */
+    offset = q - bios_data;
+    offset = (offset + 15) & ~15;
+    float_pointer_struct = bios_data + offset;
+    
+    /* floating pointer structure */
+    q = float_pointer_struct;
+    putstr(&q, "_MP_");
+    /* pointer to MP config table */
+    putle32(&q, mp_config_table - bios_data + 0x000f0000); 
+
+    putb(&q, 1); /* length in 16 byte units */
+    putb(&q, 4); /* MP spec revision */
+    putb(&q, 0); /* checksum (patched later) */
+    putb(&q, 0); /* MP feature byte 1 */
+
+    putb(&q, 0);
+    putb(&q, 0);
+    putb(&q, 0);
+    putb(&q, 0);
+    float_pointer_struct[10] = 
+        -mpf_checksum(float_pointer_struct, q - float_pointer_struct);
+}
+#endif /* !CONFIG_DM */
+
+
 static const int ide_iobase[2] = { 0x1f0, 0x170 };
 static const int ide_iobase2[2] = { 0x3f6, 0x376 };
 static const int ide_irq[2] = { 14, 15 };
@@ -375,27 +563,102 @@ static int ne2000_irq[NE2000_NB_MAX] = { 9, 10, 11, 3, 4, 5 };
 static int serial_io[MAX_SERIAL_PORTS] = { 0x3f8, 0x2f8, 0x3e8, 0x2e8 };
 static int serial_irq[MAX_SERIAL_PORTS] = { 4, 3, 4, 3 };
 
-//extern int acpi_init(unsigned int base);
-/*  PIIX4 acpi pci configuration space, func 3 */
+static int parallel_io[MAX_PARALLEL_PORTS] = { 0x378, 0x278, 0x3bc };
+static int parallel_irq[MAX_PARALLEL_PORTS] = { 7, 7, 7 };
+
+/* PIIX4 acpi pci configuration space, func 3 */
 extern void pci_piix4_acpi_init(PCIBus *bus);
+
+#ifdef HAS_AUDIO
+static void audio_init (PCIBus *pci_bus)
+{
+    struct soundhw *c;
+    int audio_enabled = 0;
+
+    for (c = soundhw; !audio_enabled && c->name; ++c) {
+        audio_enabled = c->enabled;
+    }
+
+    if (audio_enabled) {
+        AudioState *s;
+
+        s = AUD_init ();
+        if (s) {
+            for (c = soundhw; c->name; ++c) {
+                if (c->enabled) {
+                    if (c->isa) {
+                        c->init.init_isa (s);
+                    }
+                    else {
+                        if (pci_bus) {
+                            c->init.init_pci (pci_bus, s);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+#endif
+
+static void pc_init_ne2k_isa(NICInfo *nd)
+{
+    static int nb_ne2k = 0;
+
+    if (nb_ne2k == NE2000_NB_MAX)
+        return;
+    isa_ne2000_init(ne2000_io[nb_ne2k], ne2000_irq[nb_ne2k], nd);
+    nb_ne2k++;
+}
 
 #define NOBIOS 1
 
 /* PC hardware initialisation */
-void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
-             DisplayState *ds, const char **fd_filename, int snapshot,
-             const char *kernel_filename, const char *kernel_cmdline,
-             const char *initrd_filename, time_t timeoffset)
+static void pc_init1(uint64_t ram_size, int vga_ram_size, int boot_device,
+                     DisplayState *ds, const char **fd_filename, int snapshot,
+                     const char *kernel_filename, const char *kernel_cmdline,
+                     const char *initrd_filename, time_t timeoffset,
+                     int pci_enabled)
 {
-    SerialState *sp;
+#ifndef NOBIOS
     char buf[1024];
-    int ret, linux_boot, initrd_size, i, nb_nics1;
+    int ret, initrd_size;
+#endif
+    int linux_boot, i;
+#ifndef NOBIOS
+    unsigned long bios_offset, vga_bios_offset;
+    int bios_size, isa_bios_size;
+#endif /* !NOBIOS */
     PCIBus *pci_bus;
-    
+    CPUState *env;
+    NICInfo *nd;
+
     linux_boot = (kernel_filename != NULL);
 
+    /* init CPUs */
+    for(i = 0; i < smp_cpus; i++) {
+        env = cpu_init();
+#ifndef CONFIG_DM
+        if (i != 0)
+            env->hflags |= HF_HALTED_MASK;
+        if (smp_cpus > 1) {
+            /* XXX: enable it in all cases */
+            env->cpuid_features |= CPUID_APIC;
+        }
+#endif /* !CONFIG_DM */
+        register_savevm("cpu", i, 3, cpu_save, cpu_load, env);
+        qemu_register_reset(main_cpu_reset, env);
+#ifndef CONFIG_DM
+        if (pci_enabled) {
+            apic_init(env);
+        }
+#endif /* !CONFIG_DM */
+    }
+
     /* allocate RAM */
-//  cpu_register_physical_memory(0, ram_size, 0);
+#ifndef CONFIG_DM		/* HVM domain owns memory */
+    cpu_register_physical_memory(0, ram_size, 0);
+#endif
 
 #ifndef NOBIOS
     /* BIOS load */
@@ -415,6 +678,9 @@ void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
         fprintf(stderr, "qemu: could not load PC bios '%s'\n", buf);
         exit(1);
     }
+    if (bios_size == 65536) {
+        bios_add_mptable(phys_ram_base + bios_offset);
+    }
 
     /* VGA BIOS load */
     if (cirrus_vga_enabled) {
@@ -423,13 +689,15 @@ void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
         snprintf(buf, sizeof(buf), "%s/%s", bios_dir, VGABIOS_FILENAME);
     }
     ret = load_image(buf, phys_ram_base + vga_bios_offset);
-#endif 
-
-#ifndef NOBIOS
+#endif /* !NOBIOS */
+    
     /* setup basic memory access */
+#ifndef CONFIG_DM		/* HVM domain owns memory */
     cpu_register_physical_memory(0xc0000, 0x10000, 
                                  vga_bios_offset | IO_MEM_ROM);
+#endif
 
+#ifndef NOBIOS
     /* map the last 128KB of the BIOS in ISA space */
     isa_bios_size = bios_size;
     if (isa_bios_size > (128 * 1024))
@@ -446,6 +714,7 @@ void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
     
     bochs_bios_init();
 
+#ifndef CONFIG_DM
     if (linux_boot) {
         uint8_t bootsect[512];
         uint8_t old_bootsect[512];
@@ -501,6 +770,7 @@ void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
         /* loader type */
         stw_raw(phys_ram_base + KERNEL_PARAMS_ADDR + 0x210, 0x01);
     }
+#endif /* !CONFIG_DM */
 
     if (pci_enabled) {
         pci_bus = i440fx_init();
@@ -517,53 +787,73 @@ void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
     if (cirrus_vga_enabled) {
         if (pci_enabled) {
             pci_cirrus_vga_init(pci_bus, 
-                                ds, NULL, ram_size, 
+                                ds, NULL, ram_size,
                                 vga_ram_size);
         } else {
-            isa_cirrus_vga_init(ds, NULL, ram_size, 
+            isa_cirrus_vga_init(ds, NULL, ram_size,
                                 vga_ram_size);
         }
     } else {
-        vga_initialize(pci_bus, ds, NULL, ram_size, 
-                       vga_ram_size);
+        vga_initialize(pci_bus, ds, NULL, ram_size,
+                       vga_ram_size, 0, 0);
     }
 
     rtc_state = rtc_init(0x70, 8);
-    register_ioport_read(0x61, 1, 1, speaker_ioport_read, NULL);
-    register_ioport_write(0x61, 1, 1, speaker_ioport_write, NULL);
 
     register_ioport_read(0x92, 1, 1, ioport92_read, NULL);
     register_ioport_write(0x92, 1, 1, ioport92_write, NULL);
 
-    pic_init();
+#ifndef CONFIG_DM
+    if (pci_enabled) {
+        ioapic = ioapic_init();
+    }
+#endif /* !CONFIG_DM */
+    isa_pic = pic_init(pic_irq_request, first_cpu);
+#ifndef CONFIG_DM
+    pit = pit_init(0x40, 0);
+    pcspk_init(pit);
+#endif /* !CONFIG_DM */
+#ifndef CONFIG_DM
+    if (pci_enabled) {
+        pic_set_alt_irq_func(isa_pic, ioapic_set_irq, ioapic);
+    }
+#endif /* !CONFIG_DM */
 
     for(i = 0; i < MAX_SERIAL_PORTS; i++) {
         if (serial_hds[i]) {
-            sp = serial_init(serial_io[i], serial_irq[i], serial_hds[i]);
-            if (i == serial_summa_port) {
-		summa_init(sp, serial_hds[i]);
-		fprintf(stderr, "Serial port %d (COM%d) initialized for Summagraphics\n",
-			i, i+1);
-	    }
+            serial_init(&pic_set_irq_new, isa_pic,
+                        serial_io[i], serial_irq[i], serial_hds[i]);
+        }
+    }
+
+    for(i = 0; i < MAX_PARALLEL_PORTS; i++) {
+        if (parallel_hds[i]) {
+            parallel_init(parallel_io[i], parallel_irq[i], parallel_hds[i]);
+        }
+    }
+
+    for(i = 0; i < nb_nics; i++) {
+        nd = &nd_table[i];
+        if (!nd->model) {
+            if (pci_enabled) {
+                nd->model = "ne2k_pci";
+            } else {
+                nd->model = "ne2k_isa";
+            }
+        }
+        if (strcmp(nd->model, "ne2k_isa") == 0) {
+            pc_init_ne2k_isa(nd);
+        } else if (pci_enabled) {
+            pci_nic_init(pci_bus, nd);
+        } else {
+            fprintf(stderr, "qemu: Unsupported NIC: %s\n", nd->model);
+            exit(1);
         }
     }
 
     if (pci_enabled) {
-        for(i = 0; i < nb_nics; i++) {
-            if (nic_ne2000)
-                pci_ne2000_init(pci_bus, &nd_table[i]);
-            else
-                pci_pcnet_init(pci_bus, &nd_table[i]); 
-        }
         pci_piix3_ide_init(pci_bus, bs_table);
     } else {
-        nb_nics1 = nb_nics;
-        if (nb_nics1 > NE2000_NB_MAX)
-            nb_nics1 = NE2000_NB_MAX;
-        for(i = 0; i < nb_nics1; i++) {
-            isa_ne2000_init(ne2000_io[i], ne2000_irq[i], &nd_table[i]);
-        }
-
         for(i = 0; i < 2; i++) {
             isa_ide_init(ide_iobase[i], ide_iobase2[i], ide_irq[i],
                          bs_table[2 * i], bs_table[2 * i + 1]);
@@ -572,26 +862,21 @@ void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
 
     kbd_init();
     DMA_init(0);
-   
-    if (audio_enabled) {
-        AUD_init();
-#ifdef USE_SB16
-        if (sb16_enabled)
-            SB16_init();
+#ifdef HAS_AUDIO
+    audio_init(pci_enabled ? pci_bus : NULL);
 #endif
-    }
-    
 
     floppy_controller = fdctrl_init(6, 2, 0, 0x3f0, fd_table);
 
     cmos_init(ram_size, boot_device, bs_table, timeoffset);
-// using PIIX4 acpi model
-//    acpi_init(0x8000);
-    pci_piix4_acpi_init(pci_bus);
+
+    /* using PIIX4 acpi model */
+    if (pci_enabled)
+        pci_piix4_acpi_init(pci_bus);
 
     if (pci_enabled && usb_enabled) {
-	usb_uhci_init(pci_bus, usb_root_ports);
-	usb_attach(usb_root_ports[0], vm_usb_hub);
+        usb_uhci_init(pci_bus, usb_root_ports);
+        usb_attach(usb_root_ports[0], vm_usb_hub);
     }
 
     /* must be done after all PCI devices are instanciated */
@@ -599,5 +884,44 @@ void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
     if (pci_enabled) {
         pci_bios_init();
     }
-    port_e9_init();
 }
+
+static void pc_init_pci(uint64_t ram_size, int vga_ram_size, int boot_device,
+                        DisplayState *ds, const char **fd_filename, 
+                        int snapshot, 
+                        const char *kernel_filename, 
+                        const char *kernel_cmdline,
+                        const char *initrd_filename,
+                        time_t timeoffset)
+{
+    pc_init1(ram_size, vga_ram_size, boot_device,
+             ds, fd_filename, snapshot,
+             kernel_filename, kernel_cmdline,
+             initrd_filename, timeoffset, 1);
+}
+
+static void pc_init_isa(uint64_t ram_size, int vga_ram_size, int boot_device,
+                        DisplayState *ds, const char **fd_filename, 
+                        int snapshot, 
+                        const char *kernel_filename, 
+                        const char *kernel_cmdline,
+                        const char *initrd_filename,
+                        time_t timeoffset)
+{
+    pc_init1(ram_size, vga_ram_size, boot_device,
+             ds, fd_filename, snapshot,
+             kernel_filename, kernel_cmdline,
+             initrd_filename, timeoffset, 0);
+}
+
+QEMUMachine pc_machine = {
+    "pc",
+    "Standard PC",
+    pc_init_pci,
+};
+
+QEMUMachine isapc_machine = {
+    "isapc",
+    "ISA-only PC",
+    pc_init_isa,
+};

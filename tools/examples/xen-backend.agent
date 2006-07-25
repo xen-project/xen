@@ -7,6 +7,9 @@ PATH=/etc/xen/scripts:$PATH
 claim_lock xenbus_hotplug_global
 
 case "$XENBUS_TYPE" in
+  tap)
+    /etc/xen/scripts/blktap "$ACTION"
+    ;;
   vbd)
     /etc/xen/scripts/block "$ACTION"
     ;;

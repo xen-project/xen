@@ -39,6 +39,7 @@ struct BlockDriver {
     int (*bdrv_is_allocated)(BlockDriverState *bs, int64_t sector_num,
                              int nb_sectors, int *pnum);
     int (*bdrv_set_key)(BlockDriverState *bs, const char *key);
+    int (*bdrv_make_empty)(BlockDriverState *bs);
     struct BlockDriver *next;
 };
 
@@ -68,10 +69,12 @@ struct BlockDriverState {
     
     /* NOTE: the following infos are only hints for real hardware
        drivers. They are not used by the block driver */
-    int cyls, heads, secs;
+    int cyls, heads, secs, translation;
     int type;
     char device_name[32];
     BlockDriverState *next;
 };
+
+void get_tmp_filename(char *filename, int size);
 
 #endif /* BLOCK_INT_H */

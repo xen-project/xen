@@ -34,7 +34,7 @@
 
 /*
  * TODO:
- *    - add support for WRITEMASK (GR2F)
+ *    - destination write mask support not complete (bits 5..7)
  *    - optimize linear mappings
  *    - optimize bitblt functions
  */
@@ -283,6 +283,8 @@ typedef struct PCICirrusVGAState {
 
 static uint8_t rop_to_index[256];
     
+void *shared_vram;
+
 /***************************************
  *
  *  prototypes.
@@ -651,15 +653,90 @@ static int cirrus_bitblt_videotovideo_patterncopy(CirrusVGAState * s)
                                             (s->cirrus_blt_srcaddr & ~7));
 }
 
-static int cirrus_bitblt_videotovideo_copy(CirrusVGAState * s)
+static void cirrus_do_copy(CirrusVGAState *s, int dst, int src, int w, int h)
 {
+    int sx, sy;
+    int dx, dy;
+    int width, height;
+    int depth;
+    int notify = 0;
+
+    depth = s->get_bpp((VGAState *)s) / 8;
+    s->get_resolution((VGAState *)s, &width, &height);
+
+    /* extra x, y */
+    sx = (src % (width * depth)) / depth;
+    sy = (src / (width * depth));
+    dx = (dst % (width *depth)) / depth;
+    dy = (dst / (width * depth));
+
+    /* normalize width */
+    w /= depth;
+
+    /* if we're doing a backward copy, we have to adjust
+       our x/y to be the upper left corner (instead of the lower
+       right corner) */
+    if (s->cirrus_blt_dstpitch < 0) {
+	sx -= (s->cirrus_blt_width / depth) - 1;
+	dx -= (s->cirrus_blt_width / depth) - 1;
+	sy -= s->cirrus_blt_height - 1;
+	dy -= s->cirrus_blt_height - 1;
+    }
+
+    /* are we in the visible portion of memory? */
+    if (sx >= 0 && sy >= 0 && dx >= 0 && dy >= 0 &&
+	(sx + w) <= width && (sy + h) <= height &&
+	(dx + w) <= width && (dy + h) <= height) {
+	notify = 1;
+    }
+
+    /* make to sure only copy if it's a plain copy ROP */
+    if (*s->cirrus_rop != cirrus_bitblt_rop_fwd_src &&
+	*s->cirrus_rop != cirrus_bitblt_rop_bkwd_src)
+	notify = 0;
+
+    /* we have to flush all pending changes so that the copy
+       is generated at the appropriate moment in time */
+    if (notify)
+	vga_hw_update();
+
     (*s->cirrus_rop) (s, s->vram_ptr + s->cirrus_blt_dstaddr,
 		      s->vram_ptr + s->cirrus_blt_srcaddr,
 		      s->cirrus_blt_dstpitch, s->cirrus_blt_srcpitch,
 		      s->cirrus_blt_width, s->cirrus_blt_height);
-    cirrus_invalidate_region(s, s->cirrus_blt_dstaddr,
-			     s->cirrus_blt_dstpitch, s->cirrus_blt_width,
-			     s->cirrus_blt_height);
+
+    if (notify)
+	s->ds->dpy_copy(s->ds,
+			sx, sy, dx, dy,
+			s->cirrus_blt_width / depth,
+			s->cirrus_blt_height);
+
+    /* we don't have to notify the display that this portion has
+       changed since dpy_copy implies this */
+
+    if (!notify)
+	cirrus_invalidate_region(s, s->cirrus_blt_dstaddr,
+				 s->cirrus_blt_dstpitch, s->cirrus_blt_width,
+				 s->cirrus_blt_height);
+}
+
+static int cirrus_bitblt_videotovideo_copy(CirrusVGAState * s)
+{
+    if (s->ds->dpy_copy) {
+	cirrus_do_copy(s, s->cirrus_blt_dstaddr - s->start_addr,
+		       s->cirrus_blt_srcaddr - s->start_addr,
+		       s->cirrus_blt_width, s->cirrus_blt_height);
+    } else {
+	(*s->cirrus_rop) (s, s->vram_ptr + s->cirrus_blt_dstaddr,
+			  s->vram_ptr + s->cirrus_blt_srcaddr,
+			  s->cirrus_blt_dstpitch, s->cirrus_blt_srcpitch,
+			  s->cirrus_blt_width, s->cirrus_blt_height);
+
+	cirrus_invalidate_region(s, s->cirrus_blt_dstaddr,
+				 s->cirrus_blt_dstpitch, s->cirrus_blt_width,
+				 s->cirrus_blt_height);
+    }
+
     return 1;
 }
 
@@ -744,7 +821,8 @@ static int cirrus_bitblt_cputovideo(CirrusVGAState * s)
             else
                 s->cirrus_blt_srcpitch = ((w + 7) >> 3);
 	} else {
-	    s->cirrus_blt_srcpitch = s->cirrus_blt_width;
+            /* always align input size to 32 bits */
+	    s->cirrus_blt_srcpitch = (s->cirrus_blt_width + 3) & ~3;
 	}
         s->cirrus_srccounter = s->cirrus_blt_srcpitch * s->cirrus_blt_height;
     }
@@ -796,7 +874,7 @@ static void cirrus_bitblt_start(CirrusVGAState * s)
     blt_rop = s->gr[0x32];
 
 #ifdef DEBUG_BITBLT
-    printf("rop=0x%02x mode=0x%02x modeext=0x%02x w=%d h=%d dpitch=%d spicth=%d daddr=0x%08x saddr=0x%08x writemask=0x%02x\n",
+    printf("rop=0x%02x mode=0x%02x modeext=0x%02x w=%d h=%d dpitch=%d spitch=%d daddr=0x%08x saddr=0x%08x writemask=0x%02x\n",
            blt_rop, 
            s->cirrus_blt_mode,
            s->cirrus_blt_modeext,
@@ -806,7 +884,7 @@ static void cirrus_bitblt_start(CirrusVGAState * s)
            s->cirrus_blt_srcpitch,
            s->cirrus_blt_dstaddr,
            s->cirrus_blt_srcaddr,
-           s->sr[0x2f]);
+           s->gr[0x2f]);
 #endif
 
     switch (s->cirrus_blt_mode & CIRRUS_BLTMODE_PIXELWIDTHMASK) {
@@ -1048,10 +1126,10 @@ static void cirrus_update_bank_ptr(CirrusVGAState * s, unsigned bank_index)
     else
 	offset <<= 12;
 
-    if (s->vram_size <= offset)
+    if (s->real_vram_size <= offset)
 	limit = 0;
     else
-	limit = s->vram_size - offset;
+	limit = s->real_vram_size - offset;
 
     if (((s->gr[0x0b] & 0x01) == 0) && (bank_index != 0)) {
 	if (limit > 0x8000) {
@@ -1219,7 +1297,7 @@ cirrus_hook_write_sr(CirrusVGAState * s, unsigned reg_index, int reg_value)
 #endif
 	break;
     case 0x17:			// Configuration Readback and Extended Control
-	s->sr[reg_index] = reg_value;
+	s->sr[reg_index] = (s->sr[reg_index] & 0x38) | (reg_value & 0xc7);
         cirrus_update_memory_access(s);
         break;
     default:
@@ -1786,11 +1864,12 @@ static void cirrus_mem_writeb_mode4and5_8bpp(CirrusVGAState * s,
     dst = s->vram_ptr + offset;
     for (x = 0; x < 8; x++) {
 	if (val & 0x80) {
-	    *dst++ = s->cirrus_shadow_gr1;
+	    *dst = s->cirrus_shadow_gr1;
 	} else if (mode == 5) {
-	    *dst++ = s->cirrus_shadow_gr0;
+	    *dst = s->cirrus_shadow_gr0;
 	}
 	val <<= 1;
+	dst++;
     }
     cpu_physical_memory_set_dirty(s->vram_offset + offset);
     cpu_physical_memory_set_dirty(s->vram_offset + offset + 7);
@@ -1808,13 +1887,14 @@ static void cirrus_mem_writeb_mode4and5_16bpp(CirrusVGAState * s,
     dst = s->vram_ptr + offset;
     for (x = 0; x < 8; x++) {
 	if (val & 0x80) {
-	    *dst++ = s->cirrus_shadow_gr1;
-	    *dst++ = s->gr[0x11];
+	    *dst = s->cirrus_shadow_gr1;
+	    *(dst + 1) = s->gr[0x11];
 	} else if (mode == 5) {
-	    *dst++ = s->cirrus_shadow_gr0;
-	    *dst++ = s->gr[0x10];
+	    *dst = s->cirrus_shadow_gr0;
+	    *(dst + 1) = s->gr[0x10];
 	}
 	val <<= 1;
+	dst += 2;
     }
     cpu_physical_memory_set_dirty(s->vram_offset + offset);
     cpu_physical_memory_set_dirty(s->vram_offset + offset + 15);
@@ -2436,6 +2516,7 @@ static void cirrus_linear_bitblt_writel(void *opaque, target_phys_addr_t addr,
 #endif
 }
 
+
 static CPUReadMemoryFunc *cirrus_linear_bitblt_read[3] = {
     cirrus_linear_bitblt_readb,
     cirrus_linear_bitblt_readw,
@@ -2448,8 +2529,7 @@ static CPUWriteMemoryFunc *cirrus_linear_bitblt_write[3] = {
     cirrus_linear_bitblt_writel,
 };
 
-extern FILE *logfile;
-static void * set_vram_mapping(unsigned long begin, unsigned long end)
+static void *set_vram_mapping(unsigned long begin, unsigned long end)
 {
     xen_pfn_t *extent_start = NULL;
     unsigned long nr_extents;
@@ -2462,9 +2542,8 @@ static void * set_vram_mapping(unsigned long begin, unsigned long end)
     end = (end + TARGET_PAGE_SIZE -1 ) & TARGET_PAGE_MASK;
     nr_extents = (end - begin) >> TARGET_PAGE_BITS;
 
-    extent_start = malloc(sizeof(xen_pfn_t) * nr_extents );
-    if (extent_start == NULL)
-    {
+    extent_start = malloc(sizeof(xen_pfn_t) * nr_extents);
+    if (extent_start == NULL) {
         fprintf(stderr, "Failed malloc on set_vram_mapping\n");
         return NULL;
     }
@@ -2472,19 +2551,16 @@ static void * set_vram_mapping(unsigned long begin, unsigned long end)
     memset(extent_start, 0, sizeof(xen_pfn_t) * nr_extents);
 
     for (i = 0; i < nr_extents; i++)
-    {
         extent_start[i] = (begin + i * TARGET_PAGE_SIZE) >> TARGET_PAGE_BITS;
-    }
 
     set_mm_mapping(xc_handle, domid, nr_extents, 0, extent_start);
 
-    if ( (vram_pointer =  xc_map_foreign_batch(xc_handle, domid,
-                                               PROT_READ|PROT_WRITE,
-                                               extent_start,
-                                               nr_extents)) == NULL)
-    {
-        fprintf(logfile,
-          "xc_map_foreign_batch vgaram returned error %d\n", errno);
+    vram_pointer = xc_map_foreign_batch(xc_handle, domid,
+                                        PROT_READ|PROT_WRITE,
+                                        extent_start, nr_extents);
+    if (vram_pointer == NULL) {
+        fprintf(logfile, "xc_map_foreign_batch vgaram returned error %d\n",
+                errno);
         return NULL;
     }
 
@@ -2508,10 +2584,9 @@ static int unset_vram_mapping(unsigned long begin, unsigned long end)
     end = (end + TARGET_PAGE_SIZE -1 ) & TARGET_PAGE_MASK;
     nr_extents = (end - begin) >> TARGET_PAGE_BITS;
 
-    extent_start = malloc(sizeof(xen_pfn_t) * nr_extents );
+    extent_start = malloc(sizeof(xen_pfn_t) * nr_extents);
 
-    if (extent_start == NULL)
-    {
+    if (extent_start == NULL) {
         fprintf(stderr, "Failed malloc on set_mm_mapping\n");
         return -1;
     }
@@ -2528,8 +2603,6 @@ static int unset_vram_mapping(unsigned long begin, unsigned long end)
     return 0;
 }
 
-extern int vga_accelerate;
-
 /* Compute the memory access functions */
 static void cirrus_update_memory_access(CirrusVGAState *s)
 {
@@ -2542,51 +2615,45 @@ static void cirrus_update_memory_access(CirrusVGAState *s)
     } else {
 	if ((s->gr[0x0B] & 0x14) == 0x14) {
             goto generic_io;
-    } else if (s->gr[0x0B] & 0x02) {
-        goto generic_io;
-    }
+	} else if (s->gr[0x0B] & 0x02) {
+            goto generic_io;
+        }
+        
+	mode = s->gr[0x05] & 0x7;
+	if (mode < 4 || mode > 5 || ((s->gr[0x0B] & 0x4) == 0)) {
+            if (s->cirrus_lfb_addr && s->cirrus_lfb_end && !s->map_addr) {
+                void *vram_pointer, *old_vram;
 
-    mode = s->gr[0x05] & 0x7;
-    if (mode < 4 || mode > 5 || ((s->gr[0x0B] & 0x4) == 0)) {
-            if ( vga_accelerate && s->cirrus_lfb_addr && s->cirrus_lfb_end ) {
-                if (!s->map_addr) {
-                    void *vram_pointer, *old_vram;
-
-                    vram_pointer =
-                      set_vram_mapping(s->cirrus_lfb_addr ,s->cirrus_lfb_end);
-                    if (!vram_pointer) {
-                        fprintf(stderr, "NULL vram_pointer\n");
-                    } else {
-                        old_vram = vga_update_vram((VGAState *)s, vram_pointer,
-                                        VGA_RAM_SIZE);
-                        qemu_free(old_vram);
-                    }
-                    s->map_addr = s->cirrus_lfb_addr;
-                    s->map_end = s->cirrus_lfb_end;
+                vram_pointer = set_vram_mapping(s->cirrus_lfb_addr,
+                                                s->cirrus_lfb_end);
+                if (!vram_pointer)
+                    fprintf(stderr, "NULL vram_pointer\n");
+                else {
+                    old_vram = vga_update_vram((VGAState *)s, vram_pointer,
+                                               VGA_RAM_SIZE);
+                    qemu_free(old_vram);
                 }
+                s->map_addr = s->cirrus_lfb_addr;
+                s->map_end = s->cirrus_lfb_end;
             }
             s->cirrus_linear_write[0] = cirrus_linear_mem_writeb;
             s->cirrus_linear_write[1] = cirrus_linear_mem_writew;
             s->cirrus_linear_write[2] = cirrus_linear_mem_writel;
         } else {
         generic_io:
-            if (vga_accelerate && s->cirrus_lfb_addr && s->cirrus_lfb_end) {
-                if(s->map_addr) {
-                    int error;
-                    void *old_vram = NULL;
+            if (s->cirrus_lfb_addr && s->cirrus_lfb_end && s->map_addr) {
+		int error;
+                void *old_vram = NULL;
 
-                    error = unset_vram_mapping(s->cirrus_lfb_addr,
-                                           s->cirrus_lfb_end);
-                    if (!error)
-                        old_vram =
-                          vga_update_vram((VGAState *)s, NULL, VGA_RAM_SIZE);
-
-                    if (old_vram)
-                        munmap(old_vram, s->map_addr - s->map_end);
-                    s->map_addr = s->map_end = 0;
-                }
+		error = unset_vram_mapping(s->cirrus_lfb_addr,
+					   s->cirrus_lfb_end);
+		if (!error)
+		    old_vram = vga_update_vram((VGAState *)s, NULL,
+                                               VGA_RAM_SIZE);
+                if (old_vram)
+                    munmap(old_vram, s->map_addr - s->map_end);
+                s->map_addr = s->map_end = 0;
             }
-
             s->cirrus_linear_write[0] = cirrus_linear_writeb;
             s->cirrus_linear_write[1] = cirrus_linear_writew;
             s->cirrus_linear_write[2] = cirrus_linear_writel;
@@ -3112,6 +3179,10 @@ static void cirrus_init_common(CirrusVGAState * s, int device_id, int is_pci)
     }
     s->cr[0x27] = device_id;
 
+    /* Win2K seems to assume that the pattern buffer is at 0xff
+       initially ! */
+    memset(s->vram_ptr, 0xff, s->real_vram_size);
+
     s->cirrus_hidden_dac_lockindex = 5;
     s->cirrus_hidden_dac_data = 0;
 
@@ -3179,9 +3250,8 @@ static void cirrus_pci_lfb_map(PCIDevice *d, int region_num,
     s->cirrus_lfb_addr = addr;
     s->cirrus_lfb_end = addr + VGA_RAM_SIZE;
 
-    if ( vga_accelerate && s->map_addr &&
-         (s->cirrus_lfb_addr != s->map_addr) &&
-         (s->cirrus_lfb_end != s->map_end))
+    if (s->map_addr && (s->cirrus_lfb_addr != s->map_addr) &&
+        (s->cirrus_lfb_end != s->map_end))
         fprintf(logfile, "cirrus vga map change while on lfb mode\n");
 
     cpu_register_physical_memory(addr + 0x1000000, 0x400000,

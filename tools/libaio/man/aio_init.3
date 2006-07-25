@@ -1,0 +1,96 @@
+.TH  aio_init 3 2002-09-12 "Linux 2.4" Linux AIO"
+.SH NAME
+aio_init \-  How to optimize the AIO implementation
+.SH SYNOPSYS
+.nf
+.B #include <errno.h>
+.sp
+.br 
+.B #include <aio.h>
+.sp
+.br
+.BI "void aio_init (const struct aioinit *init)"
+.fi
+.SH DESCRIPTION
+
+The POSIX standard does not specify how the AIO functions are
+implemented.  They could be system calls, but it is also possible to
+emulate them at userlevel.
+
+At the point of this writing, the available implementation is a userlevel
+implementation which uses threads for handling the enqueued requests.
+While this implementation requires making some decisions about
+limitations, hard limitations are something which is best avoided
+in the GNU C library.  Therefore, the GNU C library provides a means
+for tuning the AIO implementation according to the individual use.
+
+.BI "struct aioinit"
+.PP
+This data type is used to pass the configuration or tunable parameters
+to the implementation.  The program has to initialize the members of
+this struct and pass it to the implementation using the 
+.IR aio_init
+function.
+.TP
+.B "int aio_threads"
+This member specifies the maximal number of threads which may be used
+at any one time.
+.TP
+.B "int aio_num"
+This number provides an estimate on the maximal number of simultaneously
+enqueued requests.
+.TP
+.B "int aio_locks"
+Unused.
+.TP
+.B "int aio_usedba"
+Unused.
+.TP
+.B "int aio_debug"
+Unused.
+.TP
+.B "int aio_numusers"
+Unused.
+.TP
+.B "int aio_reserved[2]"
+Unused.
+.PP
+This function must be called before any other AIO function.  Calling it
+is completely voluntary, as it is only meant to help the AIO
+implementation perform better.
+
+Before calling the 
+.IR aio_init
+, function the members of a variable of
+type 
+.IR "struct aioinit"
+must be initialized.  Then a reference to
+this variable is passed as the parameter to 
+.IR aio_init
+which itself
+may or may not pay attention to the hints.
+
+It is a extension which follows a proposal from the SGI implementation in
+.IR Irix 6
+.  It is not covered by POSIX.1b or Unix98.
+.SH "RETURN VALUES"
+The function has no return value.
+.SH ERRORS
+The function has no error cases defined.
+.SH "SEE ALSO"
+.BR aio(3),
+.BR aio_cancel(3),
+.BR aio_cancel64(3),
+.BR aio_error(3),
+.BR aio_error64(3),
+.BR aio_fsync(3),
+.BR aio_fsync64(3),
+.BR aio_read(3),
+.BR aio_read64(3),
+.BR aio_return(3),
+.BR aio_return64(3),
+.BR aio_suspend(3),
+.BR aio_suspend64(3),
+.BR aio_write(3),
+.BR aio_write64(3),
+.BR errno(3),

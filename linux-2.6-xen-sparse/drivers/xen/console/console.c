@@ -536,18 +536,27 @@ static void xencons_close(struct tty_struct *tty, struct file *filp)
 	if (DUMMY_TTY(tty))
 		return;
 
-	if (tty->count == 1) {
-		tty->closing = 1;
-		tty_wait_until_sent(tty, 0);
-		if (DRV(tty->driver)->flush_buffer != NULL)
-			DRV(tty->driver)->flush_buffer(tty);
-		if (tty->ldisc.flush_buffer != NULL)
-			tty->ldisc.flush_buffer(tty);
-		tty->closing = 0;
-		spin_lock_irqsave(&xencons_lock, flags);
-		xencons_tty = NULL;
-		spin_unlock_irqrestore(&xencons_lock, flags);
+	down(&tty_sem);
+
+	if (tty->count != 1) {
+		up(&tty_sem);
+		return;
 	}
+
+	/* Prevent other threads from re-opening this tty. */
+	set_bit(TTY_CLOSING, &tty->flags);
+	up(&tty_sem);
+
+	tty->closing = 1;
+	tty_wait_until_sent(tty, 0);
+	if (DRV(tty->driver)->flush_buffer != NULL)
+		DRV(tty->driver)->flush_buffer(tty);
+	if (tty->ldisc.flush_buffer != NULL)
+		tty->ldisc.flush_buffer(tty);
+	tty->closing = 0;
+	spin_lock_irqsave(&xencons_lock, flags);
+	xencons_tty = NULL;
+	spin_unlock_irqrestore(&xencons_lock, flags);
 }
 
 static struct tty_operations xencons_ops = {

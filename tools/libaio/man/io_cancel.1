@@ -1,0 +1,21 @@
+.\"/* sys_io_cancel:
+.\" *      Attempts to cancel an iocb previously passed to io_submit.  If
+.\" *      the operation is successfully cancelled, the resulting event is
+.\" *      copied into the memory pointed to by result without being placed
+.\" *      into the completion queue and 0 is returned.  May fail with
+.\" *      -EFAULT if any of the data structures pointed to are invalid.
+.\" *      May fail with -EINVAL if aio_context specified by ctx_id is
+.\" *      invalid.  May fail with -EAGAIN if the iocb specified was not
+.\" *      cancelled.  Will fail with -ENOSYS if not implemented.
+.\" */
+.\"
+.TH io_cancel 2 2002-09-03 "Linux 2.4" "Linux AIO"
+.SH NAME
+io_cancel \- cancel io requests
+.SH SYNOPSIS
+.B #include <errno.h>
+.br
+.B #include <libaio.h>
+.LP
+.BI "int io_submit(io_context_t " ctx ", struct iocb *" iocb ", struct io_event *" result ");"
+

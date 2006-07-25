@@ -1,0 +1,50 @@
+.TH io_queue_run 2 2002-09-03 "Linux 2.4" "Linux AIO"
+.SH NAME
+io_queue_run \- Handle completed io requests
+.SH SYNOPSIS
+.nf
+.B #include <errno.h>
+.br
+.sp
+.B #include <libaio.h>
+.br
+.sp
+.BI "int io_queue_run(io_context_t  ctx );"
+.sp
+.fi
+.SH DESCRIPTION
+.B io_queue_run
+Attempts to read  all the events events from
+the completion queue for the aio_context specified by ctx_id.
+.SH "RETURN VALUES"
+May return
+0 if no events are available.
+Will fail with -ENOSYS if not implemented.
+.SH ERRORS
+.TP
+.B EFAULT
+.I iocbs
+referenced data outside of the program's accessible address space.
+.TP
+.B EINVAL
+.I ctx 
+refers to an unitialized aio context, the iocb pointed to by
+.I iocbs 
+contains an improperly initialized iocb,
+.TP
+.B ENOSYS 
+Not implemented
+.SH "SEE ALSO"
+.BR io(3),
+.BR io_cancel(3),
+.BR io_fsync(3),
+.BR io_getevents(3),
+.BR io_prep_fsync(3),
+.BR io_prep_pread(3),
+.BR io_prep_pwrite(3),
+.BR io_queue_init(3),
+.BR io_queue_release(3),
+.BR io_queue_wait(3),
+.BR io_set_callback(3),
+.BR io_submit(3),
+.BR errno(3)

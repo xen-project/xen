@@ -24,8 +24,90 @@
 #include "vl.h"
 #include "block_int.h"
 
+#ifdef _BSD
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/ioctl.h>
+#include <sys/queue.h>
+#include <sys/disk.h>
+#endif
+
+#ifdef CONFIG_COCOA
+#include <paths.h>
+#include <sys/param.h>
+#include <IOKit/IOKitLib.h>
+#include <IOKit/IOBSD.h>
+#include <IOKit/storage/IOMediaBSDClient.h>
+#include <IOKit/storage/IOMedia.h>
+#include <IOKit/storage/IOCDMedia.h>
+//#include <IOKit/storage/IOCDTypes.h>
+#include <CoreFoundation/CoreFoundation.h>
+#endif
+
+#ifdef __sun__
+#include <sys/dkio.h>
+#endif
+
 static BlockDriverState *bdrv_first;
 static BlockDriver *first_drv;
+
+#ifdef CONFIG_COCOA
+static kern_return_t FindEjectableCDMedia( io_iterator_t *mediaIterator );
+static kern_return_t GetBSDPath( io_iterator_t mediaIterator, char *bsdPath, CFIndex maxPathSize );
+
+kern_return_t FindEjectableCDMedia( io_iterator_t *mediaIterator )
+{
+    kern_return_t       kernResult; 
+    mach_port_t     masterPort;
+    CFMutableDictionaryRef  classesToMatch;
+
+    kernResult = IOMasterPort( MACH_PORT_NULL, &masterPort );
+    if ( KERN_SUCCESS != kernResult ) {
+        printf( "IOMasterPort returned %d\n", kernResult );
+    }
+    
+    classesToMatch = IOServiceMatching( kIOCDMediaClass ); 
+    if ( classesToMatch == NULL ) {
+        printf( "IOServiceMatching returned a NULL dictionary.\n" );
+    } else {
+    CFDictionarySetValue( classesToMatch, CFSTR( kIOMediaEjectableKey ), kCFBooleanTrue );
+    }
+    kernResult = IOServiceGetMatchingServices( masterPort, classesToMatch, mediaIterator );
+    if ( KERN_SUCCESS != kernResult )
+    {
+        printf( "IOServiceGetMatchingServices returned %d\n", kernResult );
+    }
+    
+    return kernResult;
+}
+
+kern_return_t GetBSDPath( io_iterator_t mediaIterator, char *bsdPath, CFIndex maxPathSize )
+{
+    io_object_t     nextMedia;
+    kern_return_t   kernResult = KERN_FAILURE;
+    *bsdPath = '\0';
+    nextMedia = IOIteratorNext( mediaIterator );
+    if ( nextMedia )
+    {
+        CFTypeRef   bsdPathAsCFString;
+    bsdPathAsCFString = IORegistryEntryCreateCFProperty( nextMedia, CFSTR( kIOBSDNameKey ), kCFAllocatorDefault, 0 );
+        if ( bsdPathAsCFString ) {
+            size_t devPathLength;
+            strcpy( bsdPath, _PATH_DEV );
+            strcat( bsdPath, "r" );
+            devPathLength = strlen( bsdPath );
+            if ( CFStringGetCString( bsdPathAsCFString, bsdPath + devPathLength, maxPathSize - devPathLength, kCFStringEncodingASCII ) ) {
+                kernResult = KERN_SUCCESS;
+            }
+            CFRelease( bsdPathAsCFString );
+        }
+        IOObjectRelease( nextMedia );
+    }
+    
+    return kernResult;
+}
+
+#endif
 
 void bdrv_register(BlockDriver *bdrv)
 {
@@ -71,21 +153,68 @@ int bdrv_create(BlockDriver *drv,
     return drv->bdrv_create(filename, size_in_sectors, backing_file, flags);
 }
 
+#ifdef _WIN32
+void get_tmp_filename(char *filename, int size)
+{
+    char* p = strrchr(filename, '/');
+
+    if (p == NULL)
+	return;
+
+    /* XXX: find a better function */
+    tmpnam(p);
+    *p = '/';
+}
+#else
+void get_tmp_filename(char *filename, int size)
+{
+    int fd;
+    /* XXX: race condition possible */
+    pstrcpy(filename, size, "/tmp/vl.XXXXXX");
+    fd = mkstemp(filename);
+    close(fd);
+}
+#endif
+
+/* XXX: force raw format if block or character device ? It would
+   simplify the BSD case */
 static BlockDriver *find_image_format(const char *filename)
 {
     int fd, ret, score, score_max;
     BlockDriver *drv1, *drv;
-    uint8_t buf[1024];
+    uint8_t *buf;
+    size_t bufsize = 1024;
 
     fd = open(filename, O_RDONLY | O_BINARY | O_LARGEFILE);
-    if (fd < 0)
-        return NULL;
-    ret = read(fd, buf, sizeof(buf));
-    if (ret < 0) {
+    if (fd < 0) {
+        buf = NULL;
+        ret = 0;
+    } else {
+#ifdef DIOCGSECTORSIZE
+        {
+            unsigned int sectorsize = 512;
+            if (!ioctl(fd, DIOCGSECTORSIZE, &sectorsize) &&
+                sectorsize > bufsize)
+                bufsize = sectorsize;
+        }
+#endif
+#ifdef CONFIG_COCOA
+        u_int32_t   blockSize = 512;
+        if ( !ioctl( fd, DKIOCGETBLOCKSIZE, &blockSize ) && blockSize > bufsize) {
+            bufsize = blockSize;
+        }
+#endif
+        buf = qemu_malloc(bufsize);
+        if (!buf)
+            return NULL;
+        ret = read(fd, buf, bufsize);
+        if (ret < 0) {
+            close(fd);
+            qemu_free(buf);
+            return NULL;
+        }
         close(fd);
-        return NULL;
     }
-    close(fd);
     
     drv = NULL;
     score_max = 0;
@@ -96,11 +225,38 @@ static BlockDriver *find_image_format(const char *filename)
             drv = drv1;
         }
     }
+    qemu_free(buf);
     return drv;
 }
 
 int bdrv_open(BlockDriverState *bs, const char *filename, int snapshot)
 {
+#ifdef CONFIG_COCOA
+    if ( strncmp( filename, "/dev/cdrom", 10 ) == 0 ) {
+        kern_return_t kernResult;
+        io_iterator_t mediaIterator;
+        char bsdPath[ MAXPATHLEN ];
+        int fd;
+ 
+        kernResult = FindEjectableCDMedia( &mediaIterator );
+        kernResult = GetBSDPath( mediaIterator, bsdPath, sizeof( bsdPath ) );
+    
+        if ( bsdPath[ 0 ] != '\0' ) {
+            strcat(bsdPath,"s0");
+            /* some CDs don't have a partition 0 */
+            fd = open(bsdPath, O_RDONLY | O_BINARY | O_LARGEFILE);
+            if (fd < 0) {
+                bsdPath[strlen(bsdPath)-1] = '1';
+            } else {
+                close(fd);
+            }
+            filename = bsdPath;
+        }
+        
+        if ( mediaIterator )
+            IOObjectRelease( mediaIterator );
+    }
+#endif
     return bdrv_open2(bs, filename, snapshot, NULL);
 }
 
@@ -108,11 +264,41 @@ int bdrv_open2(BlockDriverState *bs, const char *filename, int snapshot,
                BlockDriver *drv)
 {
     int ret;
+    char tmp_filename[1024];
     
     bs->read_only = 0;
     bs->is_temporary = 0;
     bs->encrypted = 0;
-    
+
+    if (snapshot) {
+        BlockDriverState *bs1;
+        int64_t total_size;
+        
+        /* if snapshot, we create a temporary backing file and open it
+           instead of opening 'filename' directly */
+
+        /* if there is a backing file, use it */
+        bs1 = bdrv_new("");
+        if (!bs1) {
+            return -1;
+        }
+        if (bdrv_open(bs1, filename, 0) < 0) {
+            bdrv_delete(bs1);
+            return -1;
+        }
+        total_size = bs1->total_sectors;
+        bdrv_delete(bs1);
+        
+        get_tmp_filename(tmp_filename, sizeof(tmp_filename));
+        /* XXX: use cow for linux as it is more efficient ? */
+        if (bdrv_create(&bdrv_qcow, tmp_filename, 
+                        total_size, filename, 0) < 0) {
+            return -1;
+        }
+        filename = tmp_filename;
+        bs->is_temporary = 1;
+    }
+
     pstrcpy(bs->filename, sizeof(bs->filename), filename);
     if (!drv) {
         drv = find_image_format(filename);
@@ -218,6 +404,10 @@ int bdrv_commit(BlockDriverState *bs)
             i += n;
         }
     }
+
+    if (bs->drv->bdrv_make_empty)
+	return bs->drv->bdrv_make_empty(bs);
+
     return 0;
 }
 
@@ -268,6 +458,9 @@ int bdrv_write(BlockDriverState *bs, int64_t sector_num,
         return -1;
     if (bs->read_only)
         return -1;
+    if (sector_num == 0 && bs->boot_sector_enabled && nb_sectors > 0) {
+        memcpy(bs->boot_sector_data, buf, 512);   
+    }
     return bs->drv->bdrv_write(bs, sector_num, buf, nb_sectors);
 }
 
@@ -301,6 +494,11 @@ void bdrv_set_type_hint(BlockDriverState *bs, int type)
                       type == BDRV_TYPE_FLOPPY));
 }
 
+void bdrv_set_translation_hint(BlockDriverState *bs, int translation)
+{
+    bs->translation = translation;
+}
+
 void bdrv_get_geometry_hint(BlockDriverState *bs, 
                             int *pcyls, int *pheads, int *psecs)
 {
@@ -312,6 +510,11 @@ void bdrv_get_geometry_hint(BlockDriverState *bs,
 int bdrv_get_type_hint(BlockDriverState *bs)
 {
     return bs->type;
+}
+
+int bdrv_get_translation_hint(BlockDriverState *bs)
+{
+    return bs->translation;
 }
 
 int bdrv_is_removable(BlockDriverState *bs)
@@ -449,7 +652,6 @@ void bdrv_info(void)
     }
 }
 
-
 /**************************************************************/
 /* RAW block driver */
 
@@ -467,6 +669,13 @@ static int raw_open(BlockDriverState *bs, const char *filename)
     BDRVRawState *s = bs->opaque;
     int fd;
     int64_t size;
+#ifdef _BSD
+    struct stat sb;
+#endif
+#ifdef __sun__
+    struct dk_minfo minfo;
+    int rv;
+#endif
 
     fd = open(filename, O_RDWR | O_BINARY | O_LARGEFILE);
     if (fd < 0) {
@@ -475,7 +684,38 @@ static int raw_open(BlockDriverState *bs, const char *filename)
             return -1;
         bs->read_only = 1;
     }
-    size = lseek(fd, 0, SEEK_END);
+#ifdef _BSD
+    if (!fstat(fd, &sb) && (S_IFCHR & sb.st_mode)) {
+#ifdef DIOCGMEDIASIZE
+	if (ioctl(fd, DIOCGMEDIASIZE, (off_t *)&size))
+#endif
+#ifdef CONFIG_COCOA
+        size = LONG_LONG_MAX;
+#else
+        size = lseek(fd, 0LL, SEEK_END);
+#endif
+    } else
+#endif
+#ifdef __sun__
+    /*
+     * use the DKIOCGMEDIAINFO ioctl to read the size.
+     */
+    rv = ioctl ( fd, DKIOCGMEDIAINFO, &minfo );
+    if ( rv != -1 ) {
+        size = minfo.dki_lbsize * minfo.dki_capacity;
+    } else /* there are reports that lseek on some devices
+              fails, but irc discussion said that contingency
+              on contingency was overkill */
+#endif
+    {
+        size = lseek(fd, 0, SEEK_END);
+    }
+#ifdef _WIN32
+    /* On Windows hosts it can happen that we're unable to get file size
+       for CD-ROM raw device (it's inherent limitation of the CDFS driver). */
+    if (size == -1)
+        size = LONG_LONG_MAX;
+#endif
     bs->total_sectors = size / 512;
     s->fd = fd;
     return 0;
@@ -544,6 +784,14 @@ BlockDriver bdrv_raw = {
 void bdrv_init(void)
 {
     bdrv_register(&bdrv_raw);
+#ifndef _WIN32
+    bdrv_register(&bdrv_cow);
+#endif
     bdrv_register(&bdrv_qcow);
+    bdrv_register(&bdrv_vmdk);
     bdrv_register(&bdrv_cloop);
+    bdrv_register(&bdrv_dmg);
+    bdrv_register(&bdrv_bochs);
+    bdrv_register(&bdrv_vpc);
+    bdrv_register(&bdrv_vvfat);
 }

@@ -20,7 +20,6 @@
 
 /*
  * Main cpu loop for handling I/O requests coming from a virtual machine
- *
  * Copyright © 2004, Intel Corporation.
  * Copyright © 2005, International Business Machines Corporation.
  *
@@ -53,39 +52,96 @@
 
 #include "cpu.h"
 #include "exec-all.h"
+
+//#define DEBUG_MMU
+
+#ifdef USE_CODE_COPY
+#include <asm/ldt.h>
+#include <linux/unistd.h>
+#include <linux/version.h>
+
+_syscall3(int, modify_ldt, int, func, void *, ptr, unsigned long, bytecount)
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 66)
+#define modify_ldt_ldt_s user_desc
+#endif
+#endif /* USE_CODE_COPY */
+
 #include "vl.h"
 
-extern int domid;
-extern int vcpus;
+int domid = -1;
+int vcpus = 1;
 
-void *shared_vram;
+int xc_handle;
 
 shared_iopage_t *shared_page = NULL;
-extern int reset_requested;
 
-CPUX86State *cpu_86_init(void)
+/* the evtchn fd for polling */
+int xce_handle = -1;
+
+/* which vcpu we are serving */
+int send_vcpu = 0;
+
+CPUX86State *cpu_x86_init(void)
 {
     CPUX86State *env;
     static int inited;
+    int i, rc;
 
-    cpu_exec_init();
-
-    env = malloc(sizeof(CPUX86State));
+    env = qemu_mallocz(sizeof(CPUX86State));
     if (!env)
         return NULL;
-    memset(env, 0, sizeof(CPUX86State));
+    cpu_exec_init(env);
+
     /* init various static tables */
     if (!inited) {
         inited = 1;
+
+        cpu_single_env = env;
+
+        xce_handle = xc_evtchn_open();
+        if (xce_handle == -1) {
+            perror("open");
+            return NULL;
+        }
+
+        /* FIXME: how about if we overflow the page here? */
+        for (i = 0; i < vcpus; i++) {
+            rc = xc_evtchn_bind_interdomain(
+                xce_handle, domid, shared_page->vcpu_iodata[i].vp_eport);
+            if (rc == -1) {
+                fprintf(logfile, "bind interdomain ioctl error %d\n", errno);
+                return NULL;
+            }
+            shared_page->vcpu_iodata[i].dm_eport = rc;
+        }
     }
-    cpu_single_env = env;
-    cpu_reset(env);
+
     return env;
 }
 
-/* NOTE: must be called outside the CPU execute loop */
+/* called from main_cpu_reset */
 void cpu_reset(CPUX86State *env)
 {
+    int xcHandle;
+    int sts;
+
+    /* pause domain first, to avoid repeated reboot request*/
+    xc_domain_pause(xc_handle, domid);
+
+    xcHandle = xc_interface_open();
+    if (xcHandle < 0)
+        fprintf(logfile, "Cannot acquire xenctrl handle\n");
+    else {
+        sts = xc_domain_shutdown(xcHandle, domid, SHUTDOWN_reboot);
+        if (sts != 0)
+            fprintf(logfile,
+                    "? xc_domain_shutdown failed to issue reboot, sts %d\n",
+                    sts);
+        else
+            fprintf(logfile, "Issued domain %d reboot\n", domid);
+        xc_interface_close(xcHandle);
+    }
 }
 
 void cpu_x86_close(CPUX86State *env)
@@ -120,22 +176,16 @@ target_ulong cpu_get_phys_page_debug(CPUState *env, target_ulong addr)
         return addr;
 }
 
-//the evtchn fd for polling
-int xce_handle = -1;
-
-//which vcpu we are serving
-int send_vcpu = 0;
-
 //some functions to handle the io req packet
 void sp_info()
 {
     ioreq_t *req;
     int i;
 
-    for ( i = 0; i < vcpus; i++ ) {
+    for (i = 0; i < vcpus; i++) {
         req = &(shared_page->vcpu_iodata[i].vp_ioreq);
-        term_printf("vcpu %d: event port %d\n",
-                    i, shared_page->vcpu_iodata[i].vp_eport);
+        term_printf("vcpu %d: event port %d\n", i,
+                    shared_page->vcpu_iodata[i].vp_eport);
         term_printf("  req state: %x, pvalid: %x, addr: %"PRIx64", "
                     "data: %"PRIx64", count: %"PRIx64", size: %"PRIx64"\n",
                     req->state, req->pdata_valid, req->addr,
@@ -146,32 +196,35 @@ void sp_info()
 }
 
 //get the ioreq packets from share mem
-static ioreq_t* __cpu_get_ioreq(int vcpu)
+static ioreq_t *__cpu_get_ioreq(int vcpu)
 {
     ioreq_t *req;
 
     req = &(shared_page->vcpu_iodata[vcpu].vp_ioreq);
 
-    if ( req->state == STATE_IOREQ_READY )
+    if (req->state == STATE_IOREQ_READY) {
+        req->state = STATE_IOREQ_INPROCESS;
         return req;
+    }
 
     fprintf(logfile, "False I/O request ... in-service already: "
-                     "%x, pvalid: %x, port: %"PRIx64", "
-                     "data: %"PRIx64", count: %"PRIx64", size: %"PRIx64"\n",
-                     req->state, req->pdata_valid, req->addr,
-                     req->u.data, req->count, req->size);
+            "%x, pvalid: %x, port: %"PRIx64", "
+            "data: %"PRIx64", count: %"PRIx64", size: %"PRIx64"\n",
+            req->state, req->pdata_valid, req->addr,
+            req->u.data, req->count, req->size);
     return NULL;
 }
 
 //use poll to get the port notification
 //ioreq_vec--out,the
 //retval--the number of ioreq packet
-static ioreq_t* cpu_get_ioreq(void)
+static ioreq_t *cpu_get_ioreq(void)
 {
     int i;
     evtchn_port_t port;
 
-    if ( (port = xc_evtchn_pending(xce_handle)) != -1 ) {
+    port = xc_evtchn_pending(xce_handle);
+    if (port != -1) {
         for ( i = 0; i < vcpus; i++ )
             if ( shared_page->vcpu_iodata[i].dm_eport == port )
                 break;
@@ -181,7 +234,8 @@ static ioreq_t* cpu_get_ioreq(void)
             exit(1);
         }
 
-	xc_evtchn_unmask(xce_handle, port);
+        // unmask the wanted port again
+        xc_evtchn_unmask(xce_handle, port);
 
         //get the io packet from shared memory
         send_vcpu = i;
@@ -361,13 +415,12 @@ void cpu_ioreq_xor(CPUState *env, ioreq_t *req)
     req->u.data = tmp1;
 }
 
-void cpu_handle_ioreq(CPUState *env)
+void cpu_handle_ioreq(void *opaque)
 {
+    CPUState *env = opaque;
     ioreq_t *req = cpu_get_ioreq();
 
     if (req) {
-        req->state = STATE_IOREQ_INPROCESS;
-
         if ((!req->pdata_valid) && (req->dir == IOREQ_WRITE)) {
             if (req->size != 4)
                 req->u.data &= (1UL << (8 * req->size))-1;
@@ -400,142 +453,55 @@ void cpu_handle_ioreq(CPUState *env)
     }
 }
 
-int xc_handle;
-
-void
-destroy_hvm_domain(void)
-{
-   int xcHandle;
-   int sts;
- 
-   xcHandle = xc_interface_open();
-   if (xcHandle < 0)
-     fprintf(logfile, "Cannot acquire xenctrl handle\n");
-   else {
-     sts = xc_domain_shutdown(xcHandle, domid, SHUTDOWN_poweroff);
-     if (sts != 0)
-       fprintf(logfile, "? xc_domain_shutdown failed to issue poweroff, sts %d, errno %d\n", sts, errno);
-     else
-       fprintf(logfile, "Issued domain %d poweroff\n", domid);
-     xc_interface_close(xcHandle);
-   }
-}
-
-fd_set wakeup_rfds;
-int    highest_fds;
 int main_loop(void)
 {
-    fd_set rfds;
-    struct timeval tv;
-    extern CPUState *global_env;
     extern int vm_running;
     extern int shutdown_requested;
-    CPUState *env = global_env;
-    int retval;
+    CPUState *env = cpu_single_env;
     int evtchn_fd = xc_evtchn_fd(xce_handle);
-    extern void main_loop_wait(int);
 
-    /* Watch stdin (fd 0) to see when it has input. */
-    FD_ZERO(&wakeup_rfds);
-    FD_SET(evtchn_fd, &wakeup_rfds);
-    highest_fds = evtchn_fd;
+    qemu_set_fd_handler(evtchn_fd, cpu_handle_ioreq, NULL, env);
+
     env->send_event = 0;
 
     while (1) {
         if (vm_running) {
-            if (shutdown_requested) {
+            if (shutdown_requested)
                 break;
-            }
-            if (reset_requested){
+            if (reset_requested) {
                 qemu_system_reset();
                 reset_requested = 0;
             }
         }
 
         /* Wait up to 10 msec. */
-        tv.tv_sec = 0;
-        tv.tv_usec = 10000;
-
-        retval = select(highest_fds+1, &wakeup_rfds, NULL, NULL, &tv);
-        if (retval == -1) {
-            fprintf(logfile, "select returned error %d\n", errno);
-            return 0;
-        }
-        rfds = wakeup_rfds;
-        FD_ZERO(&wakeup_rfds);
-        FD_SET(evtchn_fd, &wakeup_rfds);
-
-        tun_receive_handler(&rfds);
-        if ( FD_ISSET(evtchn_fd, &rfds) ) {
-            cpu_handle_ioreq(env);
-        }
-        main_loop_wait(0);
+        main_loop_wait(10);
 
         if (env->send_event) {
             env->send_event = 0;
-            (void)xc_evtchn_notify(xce_handle,
-                 shared_page->vcpu_iodata[send_vcpu].dm_eport);
+            xc_evtchn_notify(xce_handle,
+                             shared_page->vcpu_iodata[send_vcpu].dm_eport);
         }
     }
     destroy_hvm_domain();
     return 0;
 }
 
-static void qemu_hvm_reset(void *unused)
+void destroy_hvm_domain(void)
 {
-   int xcHandle;
-   int sts;
-
-   /* pause domain first, to avoid repeated reboot request*/
-   xc_domain_pause(xc_handle, domid);
-
-   xcHandle = xc_interface_open();
-   if (xcHandle < 0)
-     fprintf(logfile, "Cannot acquire xenctrl handle\n");
-   else {
-     sts = xc_domain_shutdown(xcHandle, domid, SHUTDOWN_reboot);
-     if (sts != 0)
-       fprintf(logfile, "? xc_domain_shutdown failed to issue reboot, sts %d\n", sts);
-     else
-       fprintf(logfile, "Issued domain %d reboot\n", domid);
-     xc_interface_close(xcHandle);
-   }
+    int xcHandle;
+    int sts;
  
-}
-
-CPUState * cpu_init()
-{
-    CPUX86State *env;
-    int i, rc;
-
-    cpu_exec_init();
-    qemu_register_reset(qemu_hvm_reset, NULL);
-    env = malloc(sizeof(CPUX86State));
-    if (!env)
-        return NULL;
-    memset(env, 0, sizeof(CPUX86State));
-
-    cpu_single_env = env;
-
-    if (xce_handle != -1)//the evtchn has been opened by another cpu object
-        return NULL;
-
-    xce_handle = xc_evtchn_open();
-    if (xce_handle == -1) {
-        fprintf(logfile, "open evtchn device error %d\n", errno);
-        return NULL;
+    xcHandle = xc_interface_open();
+    if (xcHandle < 0)
+        fprintf(logfile, "Cannot acquire xenctrl handle\n");
+    else {
+        sts = xc_domain_shutdown(xcHandle, domid, SHUTDOWN_poweroff);
+        if (sts != 0)
+            fprintf(logfile, "? xc_domain_shutdown failed to issue poweroff, "
+                    "sts %d, errno %d\n", sts, errno);
+        else
+            fprintf(logfile, "Issued domain %d poweroff\n", domid);
+        xc_interface_close(xcHandle);
     }
-
-    /* FIXME: how about if we overflow the page here? */
-    for ( i = 0; i < vcpus; i++ ) {
-        rc = xc_evtchn_bind_interdomain(xce_handle, domid,
-            shared_page->vcpu_iodata[i].vp_eport);
-        if ( rc == -1 ) {
-            fprintf(logfile, "bind interdomain ioctl error %d\n", errno);
-            return NULL;
-        }
-        shared_page->vcpu_iodata[i].dm_eport = rc;
-    }
-
-    return env;
 }

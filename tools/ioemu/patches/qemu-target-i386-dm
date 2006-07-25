@@ -1,0 +1,1334 @@
+diff -r 9af27fed6713 Makefile.target
+--- a/Makefile.target	Wed Jun 21 17:46:33 2006 +0100
++++ b/Makefile.target	Mon Jun 26 15:59:21 2006 +0100
+@@ -57,6 +57,8 @@ QEMU_SYSTEM=qemu-fast
+ QEMU_SYSTEM=qemu-fast
+ endif
+ 
++QEMU_SYSTEM=qemu-dm
++
+ ifdef CONFIG_USER_ONLY
+ PROGS=$(QEMU_USER)
+ else
+@@ -274,6 +276,9 @@ OBJS+=gdbstub.o
+ OBJS+=gdbstub.o
+ endif
+ 
++# qemu-dm objects
++LIBOBJS=helper2.o exec-dm.o i8259-dm.o
++
+ all: $(PROGS)
+ 
+ $(QEMU_USER): $(OBJS)
+@@ -328,7 +333,7 @@ ifeq ($(TARGET_BASE_ARCH), i386)
+ ifeq ($(TARGET_BASE_ARCH), i386)
+ # Hardware support
+ VL_OBJS+= ide.o pckbd.o ps2.o vga.o $(SOUND_HW) dma.o $(AUDIODRV)
+-VL_OBJS+= fdc.o mc146818rtc.o serial.o i8259.o i8254.o pcspk.o pc.o
++VL_OBJS+= fdc.o mc146818rtc.o serial.o i8254.o pcspk.o pc.o
+ VL_OBJS+= cirrus_vga.o mixeng.o apic.o parallel.o
+ DEFINES += -DHAS_AUDIO
+ endif
+diff -r 9af27fed6713 configure
+--- a/configure	Wed Jun 21 17:46:33 2006 +0100
++++ b/configure	Mon Jun 26 15:59:21 2006 +0100
+@@ -359,6 +359,8 @@ if test -z "$target_list" ; then
+     if [ "$user" = "yes" ] ; then
+         target_list="i386-user arm-user armeb-user sparc-user ppc-user mips-user mipsel-user $target_list"
+     fi
++# the i386-dm target
++    target_list="i386-dm"
+ else
+     target_list=`echo "$target_list" | sed -e 's/,/ /g'`
+ fi
+diff -r 9af27fed6713 monitor.c
+--- a/monitor.c	Wed Jun 21 17:46:33 2006 +0100
++++ b/monitor.c	Mon Jun 26 15:59:21 2006 +0100
+@@ -1142,6 +1142,10 @@ static term_cmd_t info_cmds[] = {
+       "", "show host USB devices", },
+     { "profile", "", do_info_profile,
+       "", "show profiling information", },
++#ifdef CONFIG_DM
++    { "hvmiopage", "", sp_info,
++      "", "show HVM device model shared page info", },
++#endif /* CONFIG_DM */
+     { NULL, NULL, },
+ };
+ 
+diff -r 9af27fed6713 vl.c
+--- a/vl.c	Wed Jun 21 17:46:33 2006 +0100
++++ b/vl.c	Mon Jun 26 15:59:21 2006 +0100
+@@ -87,7 +87,7 @@
+ 
+ #include "exec-all.h"
+ 
+-#define DEFAULT_NETWORK_SCRIPT "/etc/qemu-ifup"
++#define DEFAULT_NETWORK_SCRIPT "/etc/xen/qemu-ifup"
+ 
+ //#define DEBUG_UNUSED_IOPORT
+ //#define DEBUG_IOPORT
+@@ -4382,7 +4382,7 @@ typedef struct QEMUResetEntry {
+ 
+ static QEMUResetEntry *first_reset_entry;
+ static int reset_requested;
+-static int shutdown_requested;
++int shutdown_requested;
+ static int powerdown_requested;
+ 
+ void qemu_register_reset(QEMUResetHandler *func, void *opaque)
+@@ -4534,6 +4534,7 @@ void main_loop_wait(int timeout)
+                     qemu_get_clock(rt_clock));
+ }
+ 
++#ifndef CONFIG_DM
+ static CPUState *cur_cpu;
+ 
+ int main_loop(void)
+@@ -4608,6 +4609,7 @@ int main_loop(void)
+     cpu_disable_ticks();
+     return ret;
+ }
++#endif /* !CONFIG_DM */
+ 
+ void help(void)
+ {
+diff -r 9af27fed6713 vl.h
+--- a/vl.h	Wed Jun 21 17:46:33 2006 +0100
++++ b/vl.h	Mon Jun 26 15:59:21 2006 +0100
+@@ -38,6 +38,8 @@
+ #include <fcntl.h>
+ #include <sys/stat.h>
+ #include "audio/audio.h"
++#include "xenctrl.h"
++#include "xs.h"
+ 
+ #ifndef O_LARGEFILE
+ #define O_LARGEFILE 0
+@@ -130,6 +132,11 @@ void qemu_system_powerdown(void);
+ #endif
+ 
+ void main_loop_wait(int timeout);
++
++extern FILE *logfile;
++
++extern int xc_handle;
++extern int domid;
+ 
+ extern int ram_size;
+ extern int bios_size;
+@@ -814,6 +821,7 @@ uint32_t pic_intack_read(PicState2 *s);
+ uint32_t pic_intack_read(PicState2 *s);
+ void pic_info(void);
+ void irq_info(void);
++void sp_info(void);
+ 
+ /* APIC */
+ typedef struct IOAPICState IOAPICState;
+diff -r 9af27fed6713 target-i386-dm/cpu.h
+--- /dev/null	Thu Jan 01 00:00:00 1970 +0000
++++ b/target-i386-dm/cpu.h	Mon Jun 26 15:59:21 2006 +0100
+@@ -0,0 +1,86 @@
++/*
++ * i386 virtual CPU header
++ * 
++ *  Copyright (c) 2003 Fabrice Bellard
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++#ifndef CPU_I386_H
++#define CPU_I386_H
++
++#include "config.h"
++
++#ifdef TARGET_X86_64
++#define TARGET_LONG_BITS 64
++#else
++#define TARGET_LONG_BITS 32
++#endif
++
++/* target supports implicit self modifying code */
++#define TARGET_HAS_SMC
++/* support for self modifying code even if the modified instruction is
++   close to the modifying instruction */
++#define TARGET_HAS_PRECISE_SMC
++
++#include "cpu-defs.h"
++
++#include "softfloat.h"
++
++#if defined(__i386__) && !defined(CONFIG_SOFTMMU)
++#define USE_CODE_COPY
++#endif
++
++#ifdef USE_X86LDOUBLE
++typedef floatx80 CPU86_LDouble;
++#else
++typedef float64 CPU86_LDouble;
++#endif
++
++/* Empty for now */
++typedef struct CPUX86State {
++    uint32_t a20_mask;
++
++    int interrupt_request;
++
++    CPU_COMMON
++
++    int send_event;
++} CPUX86State;
++
++CPUX86State *cpu_x86_init(void);
++int cpu_x86_exec(CPUX86State *s);
++void cpu_x86_close(CPUX86State *s);
++int cpu_get_pic_interrupt(CPUX86State *s);
++/* MSDOS compatibility mode FPU exception support */
++void cpu_set_ferr(CPUX86State *s);
++
++void cpu_x86_set_a20(CPUX86State *env, int a20_state);
++
++#ifndef IN_OP_I386
++void cpu_x86_outb(CPUX86State *env, int addr, int val);
++void cpu_x86_outw(CPUX86State *env, int addr, int val);
++void cpu_x86_outl(CPUX86State *env, int addr, int val);
++int cpu_x86_inb(CPUX86State *env, int addr);
++int cpu_x86_inw(CPUX86State *env, int addr);
++int cpu_x86_inl(CPUX86State *env, int addr);
++#endif
++
++/* helper2.c */
++int main_loop(void);
++
++#define TARGET_PAGE_BITS 12
++#include "cpu-all.h"
++
++#endif /* CPU_I386_H */
+diff -r 9af27fed6713 target-i386-dm/exec-dm.c
+--- /dev/null	Thu Jan 01 00:00:00 1970 +0000
++++ b/target-i386-dm/exec-dm.c	Mon Jun 26 15:59:21 2006 +0100
+@@ -0,0 +1,512 @@
++/*
++ *  virtual page mapping and translated block handling
++ * 
++ *  Copyright (c) 2003 Fabrice Bellard
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++#include "config.h"
++#ifdef _WIN32
++#include <windows.h>
++#else
++#include <sys/types.h>
++#include <sys/mman.h>
++#endif
++#include <stdlib.h>
++#include <stdio.h>
++#include <stdarg.h>
++#include <string.h>
++#include <errno.h>
++#include <unistd.h>
++#include <inttypes.h>
++
++#include "cpu.h"
++#include "exec-all.h"
++
++//#define DEBUG_TB_INVALIDATE
++//#define DEBUG_FLUSH
++//#define DEBUG_TLB
++
++/* make various TB consistency checks */
++//#define DEBUG_TB_CHECK 
++//#define DEBUG_TLB_CHECK 
++
++#ifndef CONFIG_DM
++/* threshold to flush the translated code buffer */
++#define CODE_GEN_BUFFER_MAX_SIZE (CODE_GEN_BUFFER_SIZE - CODE_GEN_MAX_SIZE)
++
++#define SMC_BITMAP_USE_THRESHOLD 10
++
++#define MMAP_AREA_START        0x00000000
++#define MMAP_AREA_END          0xa8000000
++
++TranslationBlock tbs[CODE_GEN_MAX_BLOCKS];
++TranslationBlock *tb_hash[CODE_GEN_HASH_SIZE];
++TranslationBlock *tb_phys_hash[CODE_GEN_PHYS_HASH_SIZE];
++int nb_tbs;
++/* any access to the tbs or the page table must use this lock */
++spinlock_t tb_lock = SPIN_LOCK_UNLOCKED;
++
++uint8_t code_gen_buffer[CODE_GEN_BUFFER_SIZE];
++uint8_t *code_gen_ptr;
++#endif /* !CONFIG_DM */
++
++uint64_t phys_ram_size;
++int phys_ram_fd;
++uint8_t *phys_ram_base;
++uint8_t *phys_ram_dirty;
++
++CPUState *first_cpu;
++/* current CPU in the current thread. It is only valid inside
++   cpu_exec() */
++CPUState *cpu_single_env; 
++
++typedef struct PageDesc {
++    /* list of TBs intersecting this ram page */
++    TranslationBlock *first_tb;
++    /* in order to optimize self modifying code, we count the number
++       of lookups we do to a given page to use a bitmap */
++    unsigned int code_write_count;
++    uint8_t *code_bitmap;
++#if defined(CONFIG_USER_ONLY)
++    unsigned long flags;
++#endif
++} PageDesc;
++
++typedef struct PhysPageDesc {
++    /* offset in host memory of the page + io_index in the low 12 bits */
++    unsigned long phys_offset;
++} PhysPageDesc;
++
++typedef struct VirtPageDesc {
++    /* physical address of code page. It is valid only if 'valid_tag'
++       matches 'virt_valid_tag' */ 
++    target_ulong phys_addr; 
++    unsigned int valid_tag;
++#if !defined(CONFIG_SOFTMMU)
++    /* original page access rights. It is valid only if 'valid_tag'
++       matches 'virt_valid_tag' */
++    unsigned int prot;
++#endif
++} VirtPageDesc;
++
++#define L2_BITS 10
++#define L1_BITS (32 - L2_BITS - TARGET_PAGE_BITS)
++
++#define L1_SIZE (1 << L1_BITS)
++#define L2_SIZE (1 << L2_BITS)
++
++unsigned long qemu_real_host_page_size;
++unsigned long qemu_host_page_bits;
++unsigned long qemu_host_page_size;
++unsigned long qemu_host_page_mask;
++
++/* io memory support */
++CPUWriteMemoryFunc *io_mem_write[IO_MEM_NB_ENTRIES][4];
++CPUReadMemoryFunc *io_mem_read[IO_MEM_NB_ENTRIES][4];
++void *io_mem_opaque[IO_MEM_NB_ENTRIES];
++static int io_mem_nb = 1;
++
++/* log support */
++char *logfilename = "/tmp/qemu.log";
++FILE *logfile;
++int loglevel;
++
++void cpu_exec_init(CPUState *env)
++{
++    CPUState **penv;
++    int cpu_index;
++
++    env->next_cpu = NULL;
++    penv = &first_cpu;
++    cpu_index = 0;
++    while (*penv != NULL) {
++        penv = (CPUState **)&(*penv)->next_cpu;
++        cpu_index++;
++    }
++    env->cpu_index = cpu_index;
++    *penv = env;
++
++    /* alloc dirty bits array */
++    phys_ram_dirty = qemu_malloc(phys_ram_size >> TARGET_PAGE_BITS);
++}
++
++/* enable or disable low levels log */
++void cpu_set_log(int log_flags)
++{
++    loglevel = log_flags;
++    if (!logfile) {
++        logfile = fopen(logfilename, "w");
++        if (!logfile) {
++            perror(logfilename);
++            _exit(1);
++        }
++#if !defined(CONFIG_SOFTMMU)
++        /* must avoid mmap() usage of glibc by setting a buffer "by hand" */
++        {
++            static uint8_t logfile_buf[4096];
++            setvbuf(logfile, logfile_buf, _IOLBF, sizeof(logfile_buf));
++        }
++#else
++        setvbuf(logfile, NULL, _IOLBF, 0);
++#endif
++        stdout = logfile;
++        stderr = logfile;
++    }
++}
++
++void cpu_set_log_filename(const char *filename)
++{
++    logfilename = strdup(filename);
++}
++
++/* mask must never be zero, except for A20 change call */
++void cpu_interrupt(CPUState *env, int mask)
++{
++    env->interrupt_request |= mask;
++}
++
++void cpu_reset_interrupt(CPUState *env, int mask)
++{
++    env->interrupt_request &= ~mask;
++}
++
++CPULogItem cpu_log_items[] = {
++    { CPU_LOG_TB_OUT_ASM, "out_asm", 
++      "show generated host assembly code for each compiled TB" },
++    { CPU_LOG_TB_IN_ASM, "in_asm",
++      "show target assembly code for each compiled TB" },
++    { CPU_LOG_TB_OP, "op", 
++      "show micro ops for each compiled TB (only usable if 'in_asm' used)" },
++#ifdef TARGET_I386
++    { CPU_LOG_TB_OP_OPT, "op_opt",
++      "show micro ops after optimization for each compiled TB" },
++#endif
++    { CPU_LOG_INT, "int",
++      "show interrupts/exceptions in short format" },
++    { CPU_LOG_EXEC, "exec",
++      "show trace before each executed TB (lots of logs)" },
++    { CPU_LOG_TB_CPU, "cpu",
++      "show CPU state before bloc translation" },
++#ifdef TARGET_I386
++    { CPU_LOG_PCALL, "pcall",
++      "show protected mode far calls/returns/exceptions" },
++#endif
++#ifdef DEBUG_IOPORT
++    { CPU_LOG_IOPORT, "ioport",
++      "show all i/o ports accesses" },
++#endif
++    { 0, NULL, NULL },
++};
++
++static int cmp1(const char *s1, int n, const char *s2)
++{
++    if (strlen(s2) != n)
++        return 0;
++    return memcmp(s1, s2, n) == 0;
++}
++      
++/* takes a comma separated list of log masks. Return 0 if error. */
++int cpu_str_to_log_mask(const char *str)
++{
++    CPULogItem *item;
++    int mask;
++    const char *p, *p1;
++
++    p = str;
++    mask = 0;
++    for(;;) {
++        p1 = strchr(p, ',');
++        if (!p1)
++            p1 = p + strlen(p);
++	if(cmp1(p,p1-p,"all")) {
++		for(item = cpu_log_items; item->mask != 0; item++) {
++			mask |= item->mask;
++		}
++	} else {
++        for(item = cpu_log_items; item->mask != 0; item++) {
++            if (cmp1(p, p1 - p, item->name))
++                goto found;
++        }
++        return 0;
++	}
++    found:
++        mask |= item->mask;
++        if (*p1 != ',')
++            break;
++        p = p1 + 1;
++    }
++    return mask;
++}
++
++void cpu_abort(CPUState *env, const char *fmt, ...)
++{
++    va_list ap;
++
++    va_start(ap, fmt);
++    fprintf(stderr, "qemu: fatal: ");
++    vfprintf(stderr, fmt, ap);
++    fprintf(stderr, "\n");
++    va_end(ap);
++    abort();
++}
++
++
++/* XXX: Simple implementation. Fix later */
++#define MAX_MMIO 32
++struct mmio_space {
++        target_phys_addr_t start;
++        unsigned long size;
++        unsigned long io_index;
++} mmio[MAX_MMIO];
++unsigned long mmio_cnt;
++
++/* register physical memory. 'size' must be a multiple of the target
++   page size. If (phys_offset & ~TARGET_PAGE_MASK) != 0, then it is an
++   io memory page */
++void cpu_register_physical_memory(target_phys_addr_t start_addr, 
++                                  unsigned long size,
++                                  unsigned long phys_offset)
++{
++    int i;
++
++    for (i = 0; i < mmio_cnt; i++) { 
++        if(mmio[i].start == start_addr) {
++            mmio[i].io_index = phys_offset;
++            mmio[i].size = size;
++            return;
++        }
++    }
++
++    if (mmio_cnt == MAX_MMIO) {
++        fprintf(logfile, "too many mmio regions\n");
++        exit(-1);
++    }
++
++    mmio[mmio_cnt].io_index = phys_offset;
++    mmio[mmio_cnt].start = start_addr;
++    mmio[mmio_cnt++].size = size;
++}
++
++/* mem_read and mem_write are arrays of functions containing the
++   function to access byte (index 0), word (index 1) and dword (index
++   2). All functions must be supplied. If io_index is non zero, the
++   corresponding io zone is modified. If it is zero, a new io zone is
++   allocated. The return value can be used with
++   cpu_register_physical_memory(). (-1) is returned if error. */
++int cpu_register_io_memory(int io_index,
++                           CPUReadMemoryFunc **mem_read,
++                           CPUWriteMemoryFunc **mem_write,
++                           void *opaque)
++{
++    int i;
++
++    if (io_index <= 0) {
++        if (io_index >= IO_MEM_NB_ENTRIES)
++            return -1;
++        io_index = io_mem_nb++;
++    } else {
++        if (io_index >= IO_MEM_NB_ENTRIES)
++            return -1;
++    }
++    
++    for(i = 0;i < 3; i++) {
++        io_mem_read[io_index][i] = mem_read[i];
++        io_mem_write[io_index][i] = mem_write[i];
++    }
++    io_mem_opaque[io_index] = opaque;
++    return io_index << IO_MEM_SHIFT;
++}
++
++CPUWriteMemoryFunc **cpu_get_io_memory_write(int io_index)
++{
++    return io_mem_write[io_index >> IO_MEM_SHIFT];
++}
++
++CPUReadMemoryFunc **cpu_get_io_memory_read(int io_index)
++{
++    return io_mem_read[io_index >> IO_MEM_SHIFT];
++}
++
++/* physical memory access (slow version, mainly for debug) */
++#if defined(CONFIG_USER_ONLY)
++void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf, 
++                            int len, int is_write)
++{
++    int l, flags;
++    target_ulong page;
++
++    while (len > 0) {
++        page = addr & TARGET_PAGE_MASK;
++        l = (page + TARGET_PAGE_SIZE) - addr;
++        if (l > len)
++            l = len;
++        flags = page_get_flags(page);
++        if (!(flags & PAGE_VALID))
++            return;
++        if (is_write) {
++            if (!(flags & PAGE_WRITE))
++                return;
++            memcpy((uint8_t *)addr, buf, len);
++        } else {
++            if (!(flags & PAGE_READ))
++                return;
++            memcpy(buf, (uint8_t *)addr, len);
++        }
++        len -= l;
++        buf += l;
++        addr += l;
++    }
++}
++#else
++
++int iomem_index(target_phys_addr_t addr)
++{
++        int i;
++
++        for (i = 0; i < mmio_cnt; i++) {
++                unsigned long start, end;
++
++                start = mmio[i].start;
++                end = mmio[i].start + mmio[i].size;
++
++                if ((addr >= start) && (addr <= end)){
++                        return (mmio[i].io_index >> IO_MEM_SHIFT) & (IO_MEM_NB_ENTRIES - 1);
++                }
++        }
++        return 0;
++}
++
++void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf, 
++                            int len, int is_write)
++{
++    int l, io_index;
++    uint8_t *ptr;
++    uint32_t val;
++    target_phys_addr_t page;
++    unsigned long pd;
++    
++    while (len > 0) {
++        page = addr & TARGET_PAGE_MASK;
++        l = (page + TARGET_PAGE_SIZE) - addr;
++        if (l > len)
++            l = len;
++	
++        pd = page;
++        io_index = iomem_index(page);
++        if (is_write) {
++            if (io_index) {
++                if (l >= 4 && ((addr & 3) == 0)) {
++                    /* 32 bit read access */
++                    val = ldl_raw(buf);
++                    io_mem_write[io_index][2](io_mem_opaque[io_index], addr, val);
++                    l = 4;
++                } else if (l >= 2 && ((addr & 1) == 0)) {
++                    /* 16 bit read access */
++                    val = lduw_raw(buf);
++                    io_mem_write[io_index][1](io_mem_opaque[io_index], addr, val);
++                    l = 2;
++                } else {
++                    /* 8 bit access */
++                    val = ldub_raw(buf);
++                    io_mem_write[io_index][0](io_mem_opaque[io_index], addr, val);
++                    l = 1;
++                }
++            } else {
++                unsigned long addr1;
++
++                addr1 = (pd & TARGET_PAGE_MASK) + (addr & ~TARGET_PAGE_MASK);
++                /* RAM case */
++                ptr = phys_ram_base + addr1;
++                memcpy(ptr, buf, l);
++            }
++        } else {
++            if (io_index) {
++                if (l >= 4 && ((addr & 3) == 0)) {
++                    /* 32 bit read access */
++                    val = io_mem_read[io_index][2](io_mem_opaque[io_index], addr);
++                    stl_raw(buf, val);
++                    l = 4;
++                } else if (l >= 2 && ((addr & 1) == 0)) {
++                    /* 16 bit read access */
++                    val = io_mem_read[io_index][1](io_mem_opaque[io_index], addr);
++                    stw_raw(buf, val);
++                    l = 2;
++                } else {
++                    /* 8 bit access */
++                    val = io_mem_read[io_index][0](io_mem_opaque[io_index], addr);
++                    stb_raw(buf, val);
++                    l = 1;
++                }
++            } else {
++                /* RAM case */
++                ptr = phys_ram_base + (pd & TARGET_PAGE_MASK) + 
++                    (addr & ~TARGET_PAGE_MASK);
++                memcpy(buf, ptr, l);
++            }
++        }
++        len -= l;
++        buf += l;
++        addr += l;
++    }
++}
++#endif
++
++/* virtual memory access for debug */
++int cpu_memory_rw_debug(CPUState *env, target_ulong addr, 
++                        uint8_t *buf, int len, int is_write)
++{
++    int l;
++    target_ulong page, phys_addr;
++
++    while (len > 0) {
++        page = addr & TARGET_PAGE_MASK;
++        phys_addr = cpu_get_phys_page_debug(env, page);
++        /* if no physical page mapped, return an error */
++        if (phys_addr == -1)
++            return -1;
++        l = (page + TARGET_PAGE_SIZE) - addr;
++        if (l > len)
++            l = len;
++        cpu_physical_memory_rw(phys_addr + (addr & ~TARGET_PAGE_MASK), 
++                               buf, l, is_write);
++        len -= l;
++        buf += l;
++        addr += l;
++    }
++    return 0;
++}
++
++void cpu_physical_memory_reset_dirty(ram_addr_t start, ram_addr_t end,
++                                     int dirty_flags)
++{
++	unsigned long length;
++	int i, mask, len;
++	uint8_t *p;
++
++	start &= TARGET_PAGE_MASK;
++	end = TARGET_PAGE_ALIGN(end);
++
++	length = end - start;
++	if (length == 0)
++		return;
++	mask = ~dirty_flags;
++	p = phys_ram_dirty + (start >> TARGET_PAGE_BITS);
++	len = length >> TARGET_PAGE_BITS;
++	for(i = 0; i < len; i++)
++		p[i] &= mask;
++
++	return;
++}
+diff -r 9af27fed6713 target-i386-dm/helper2.c
+--- /dev/null	Thu Jan 01 00:00:00 1970 +0000
++++ b/target-i386-dm/helper2.c	Mon Jun 26 15:59:21 2006 +0100
+@@ -0,0 +1,464 @@
++/*
++ *  i386 helpers (without register variable usage)
++ *
++ *  Copyright (c) 2003 Fabrice Bellard
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++
++/*
++ * Main cpu loop for handling I/O requests coming from a virtual machine
++ * Copyright © 2004, Intel Corporation.
++ * Copyright © 2005, International Business Machines Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU Lesser General Public License,
++ * version 2.1, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with this program; if not, write to the Free Software Foundation,
++ * Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 USA.
++ */
++#include <stdarg.h>
++#include <stdlib.h>
++#include <stdio.h>
++#include <string.h>
++#include <inttypes.h>
++#include <signal.h>
++#include <assert.h>
++
++#include <limits.h>
++#include <fcntl.h>
++
++#include <xenctrl.h>
++#include <xen/hvm/ioreq.h>
++
++#include "cpu.h"
++#include "exec-all.h"
++
++//#define DEBUG_MMU
++
++#ifdef USE_CODE_COPY
++#include <asm/ldt.h>
++#include <linux/unistd.h>
++#include <linux/version.h>
++
++_syscall3(int, modify_ldt, int, func, void *, ptr, unsigned long, bytecount)
++
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 66)
++#define modify_ldt_ldt_s user_desc
++#endif
++#endif /* USE_CODE_COPY */
++
++#include "vl.h"
++
++int domid = -1;
++int vcpus = 1;
++
++int xc_handle;
++
++shared_iopage_t *shared_page = NULL;
++
++/* the evtchn fd for polling */
++int xce_handle = -1;
++
++/* which vcpu we are serving */
++int send_vcpu = 0;
++
++CPUX86State *cpu_x86_init(void)
++{
++    CPUX86State *env;
++    static int inited;
++    int i, rc;
++
++    env = qemu_mallocz(sizeof(CPUX86State));
++    if (!env)
++        return NULL;
++    cpu_exec_init(env);
++
++    /* init various static tables */
++    if (!inited) {
++        inited = 1;
++
++        cpu_single_env = env;
++
++        xce_handle = xc_evtchn_open();
++        if (xce_handle == -1) {
++            perror("open");
++            return NULL;
++        }
++
++        /* FIXME: how about if we overflow the page here? */
++        for (i = 0; i < vcpus; i++) {
++            rc = xc_evtchn_bind_interdomain(
++                xce_handle, domid, shared_page->vcpu_iodata[i].vp_eport);
++            if (rc == -1) {
++                fprintf(logfile, "bind interdomain ioctl error %d\n", errno);
++                return NULL;
++            }
++            shared_page->vcpu_iodata[i].dm_eport = rc;
++        }
++    }
++
++    return env;
++}
++
++/* called from main_cpu_reset */
++void cpu_reset(CPUX86State *env)
++{
++}
++
++void cpu_x86_close(CPUX86State *env)
++{
++    free(env);
++}
++
++
++void cpu_dump_state(CPUState *env, FILE *f,
++                    int (*cpu_fprintf)(FILE *f, const char *fmt, ...),
++                    int flags)
++{
++}
++
++/***********************************************************/
++/* x86 mmu */
++/* XXX: add PGE support */
++
++void cpu_x86_set_a20(CPUX86State *env, int a20_state)
++{
++    a20_state = (a20_state != 0);
++    if (a20_state != ((env->a20_mask >> 20) & 1)) {
++#if defined(DEBUG_MMU)
++        printf("A20 update: a20=%d\n", a20_state);
++#endif
++        env->a20_mask = 0xffefffff | (a20_state << 20);
++    }
++}
++
++target_ulong cpu_get_phys_page_debug(CPUState *env, target_ulong addr)
++{
++        return addr;
++}
++
++//some functions to handle the io req packet
++void sp_info()
++{
++    ioreq_t *req;
++    int i;
++
++    for (i = 0; i < vcpus; i++) {
++        req = &(shared_page->vcpu_iodata[i].vp_ioreq);
++        term_printf("vcpu %d: event port %d\n", i,
++                    shared_page->vcpu_iodata[i].vp_eport);
++        term_printf("  req state: %x, pvalid: %x, addr: %"PRIx64", "
++                    "data: %"PRIx64", count: %"PRIx64", size: %"PRIx64"\n",
++                    req->state, req->pdata_valid, req->addr,
++                    req->u.data, req->count, req->size);
++        term_printf("  IO totally occurred on this vcpu: %"PRIx64"\n",
++                    req->io_count);
++    }
++}
++
++//get the ioreq packets from share mem
++static ioreq_t *__cpu_get_ioreq(int vcpu)
++{
++    ioreq_t *req;
++
++    req = &(shared_page->vcpu_iodata[vcpu].vp_ioreq);
++
++    if (req->state == STATE_IOREQ_READY) {
++        req->state = STATE_IOREQ_INPROCESS;
++        return req;
++    }
++
++    fprintf(logfile, "False I/O request ... in-service already: "
++            "%x, pvalid: %x, port: %"PRIx64", "
++            "data: %"PRIx64", count: %"PRIx64", size: %"PRIx64"\n",
++            req->state, req->pdata_valid, req->addr,
++            req->u.data, req->count, req->size);
++    return NULL;
++}
++
++//use poll to get the port notification
++//ioreq_vec--out,the
++//retval--the number of ioreq packet
++static ioreq_t *cpu_get_ioreq(void)
++{
++    int i;
++    evtchn_port_t port;
++
++    port = xc_evtchn_pending(xce_handle);
++    if (port != -1) {
++        for ( i = 0; i < vcpus; i++ )
++            if ( shared_page->vcpu_iodata[i].dm_eport == port )
++                break;
++
++        if ( i == vcpus ) {
++            fprintf(logfile, "Fatal error while trying to get io event!\n");
++            exit(1);
++        }
++
++        // unmask the wanted port again
++        xc_evtchn_unmask(xce_handle, port);
++
++        //get the io packet from shared memory
++        send_vcpu = i;
++        return __cpu_get_ioreq(i);
++    }
++
++    //read error or read nothing
++    return NULL;
++}
++
++unsigned long do_inp(CPUState *env, unsigned long addr, unsigned long size)
++{
++    switch(size) {
++    case 1:
++        return cpu_inb(env, addr);
++    case 2:
++        return cpu_inw(env, addr);
++    case 4:
++        return cpu_inl(env, addr);
++    default:
++        fprintf(logfile, "inp: bad size: %lx %lx\n", addr, size);
++        exit(-1);
++    }
++}
++
++void do_outp(CPUState *env, unsigned long addr,
++             unsigned long size, unsigned long val)
++{
++    switch(size) {
++    case 1:
++        return cpu_outb(env, addr, val);
++    case 2:
++        return cpu_outw(env, addr, val);
++    case 4:
++        return cpu_outl(env, addr, val);
++    default:
++        fprintf(logfile, "outp: bad size: %lx %lx\n", addr, size);
++        exit(-1);
++    }
++}
++
++extern void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
++                                   int len, int is_write);
++
++static inline void read_physical(uint64_t addr, unsigned long size, void *val)
++{
++    return cpu_physical_memory_rw((target_phys_addr_t)addr, val, size, 0);
++}
++
++static inline void write_physical(uint64_t addr, unsigned long size, void *val)
++{
++    return cpu_physical_memory_rw((target_phys_addr_t)addr, val, size, 1);
++}
++
++void cpu_ioreq_pio(CPUState *env, ioreq_t *req)
++{
++    int i, sign;
++
++    sign = req->df ? -1 : 1;
++
++    if (req->dir == IOREQ_READ) {
++        if (!req->pdata_valid) {
++            req->u.data = do_inp(env, req->addr, req->size);
++        } else {
++            unsigned long tmp;
++
++            for (i = 0; i < req->count; i++) {
++                tmp = do_inp(env, req->addr, req->size);
++                write_physical((target_phys_addr_t) req->u.pdata
++                  + (sign * i * req->size),
++                  req->size, &tmp);
++            }
++        }
++    } else if (req->dir == IOREQ_WRITE) {
++        if (!req->pdata_valid) {
++            do_outp(env, req->addr, req->size, req->u.data);
++        } else {
++            for (i = 0; i < req->count; i++) {
++                unsigned long tmp;
++
++                read_physical((target_phys_addr_t) req->u.pdata
++                  + (sign * i * req->size),
++                  req->size, &tmp);
++                do_outp(env, req->addr, req->size, tmp);
++            }
++        }
++    }
++}
++
++void cpu_ioreq_move(CPUState *env, ioreq_t *req)
++{
++    int i, sign;
++
++    sign = req->df ? -1 : 1;
++
++    if (!req->pdata_valid) {
++        if (req->dir == IOREQ_READ) {
++            for (i = 0; i < req->count; i++) {
++                read_physical(req->addr
++                  + (sign * i * req->size),
++                  req->size, &req->u.data);
++            }
++        } else if (req->dir == IOREQ_WRITE) {
++            for (i = 0; i < req->count; i++) {
++                write_physical(req->addr
++                  + (sign * i * req->size),
++                  req->size, &req->u.data);
++            }
++        }
++    } else {
++        unsigned long tmp;
++
++        if (req->dir == IOREQ_READ) {
++            for (i = 0; i < req->count; i++) {
++                read_physical(req->addr
++                  + (sign * i * req->size),
++                  req->size, &tmp);
++                write_physical((target_phys_addr_t )req->u.pdata
++                  + (sign * i * req->size),
++                  req->size, &tmp);
++            }
++        } else if (req->dir == IOREQ_WRITE) {
++            for (i = 0; i < req->count; i++) {
++                read_physical((target_phys_addr_t) req->u.pdata
++                  + (sign * i * req->size),
++                  req->size, &tmp);
++                write_physical(req->addr
++                  + (sign * i * req->size),
++                  req->size, &tmp);
++            }
++        }
++    }
++}
++
++void cpu_ioreq_and(CPUState *env, ioreq_t *req)
++{
++    unsigned long tmp1, tmp2;
++
++    if (req->pdata_valid != 0)
++        hw_error("expected scalar value");
++
++    read_physical(req->addr, req->size, &tmp1);
++    if (req->dir == IOREQ_WRITE) {
++        tmp2 = tmp1 & (unsigned long) req->u.data;
++        write_physical(req->addr, req->size, &tmp2);
++    }
++    req->u.data = tmp1;
++}
++
++void cpu_ioreq_or(CPUState *env, ioreq_t *req)
++{
++    unsigned long tmp1, tmp2;
++
++    if (req->pdata_valid != 0)
++        hw_error("expected scalar value");
++
++    read_physical(req->addr, req->size, &tmp1);
++    if (req->dir == IOREQ_WRITE) {
++        tmp2 = tmp1 | (unsigned long) req->u.data;
++        write_physical(req->addr, req->size, &tmp2);
++    }
++    req->u.data = tmp1;
++}
++
++void cpu_ioreq_xor(CPUState *env, ioreq_t *req)
++{
++    unsigned long tmp1, tmp2;
++
++    if (req->pdata_valid != 0)
++        hw_error("expected scalar value");
++
++    read_physical(req->addr, req->size, &tmp1);
++    if (req->dir == IOREQ_WRITE) {
++        tmp2 = tmp1 ^ (unsigned long) req->u.data;
++        write_physical(req->addr, req->size, &tmp2);
++    }
++    req->u.data = tmp1;
++}
++
++void cpu_handle_ioreq(void *opaque)
++{
++    CPUState *env = opaque;
++    ioreq_t *req = cpu_get_ioreq();
++
++    if (req) {
++        if ((!req->pdata_valid) && (req->dir == IOREQ_WRITE)) {
++            if (req->size != 4)
++                req->u.data &= (1UL << (8 * req->size))-1;
++        }
++
++        switch (req->type) {
++        case IOREQ_TYPE_PIO:
++            cpu_ioreq_pio(env, req);
++            break;
++        case IOREQ_TYPE_COPY:
++            cpu_ioreq_move(env, req);
++            break;
++        case IOREQ_TYPE_AND:
++            cpu_ioreq_and(env, req);
++            break;
++        case IOREQ_TYPE_OR:
++            cpu_ioreq_or(env, req);
++            break;
++        case IOREQ_TYPE_XOR:
++            cpu_ioreq_xor(env, req);
++            break;
++        default:
++            hw_error("Invalid ioreq type 0x%x\n", req->type);
++        }
++
++        /* No state change if state = STATE_IORESP_HOOK */
++        if (req->state == STATE_IOREQ_INPROCESS)
++            req->state = STATE_IORESP_READY;
++        env->send_event = 1;
++    }
++}
++
++int main_loop(void)
++{
++    extern int vm_running;
++    extern int shutdown_requested;
++    CPUState *env = cpu_single_env;
++    int evtchn_fd = xc_evtchn_fd(xce_handle);
++
++    qemu_set_fd_handler(evtchn_fd, cpu_handle_ioreq, NULL, env);
++
++    env->send_event = 0;
++
++    while (1) {
++        if (vm_running) {
++            if (shutdown_requested)
++                break;
++        }
++
++        /* Wait up to 10 msec. */
++        main_loop_wait(10);
++
++        if (env->send_event) {
++            env->send_event = 0;
++            xc_evtchn_notify(xce_handle,
++                             shared_page->vcpu_iodata[send_vcpu].dm_eport);
++        }
++    }
++    return 0;
++}
+diff -r 9af27fed6713 target-i386-dm/i8259-dm.c
+--- /dev/null	Thu Jan 01 00:00:00 1970 +0000
++++ b/target-i386-dm/i8259-dm.c	Mon Jun 26 15:59:21 2006 +0100
+@@ -0,0 +1,107 @@
++/* Xen 8259 stub for interrupt controller emulation
++ * 
++ * Copyright (c) 2003-2004 Fabrice Bellard
++ * Copyright (c) 2005      Intel corperation
++ * 
++ * Permission is hereby granted, free of charge, to any person obtaining a copy
++ * of this software and associated documentation files (the "Software"), to deal
++ * in the Software without restriction, including without limitation the rights
++ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++ * copies of the Software, and to permit persons to whom the Software is
++ * furnished to do so, subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice shall be included in
++ * all copies or substantial portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
++ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
++ * THE SOFTWARE.
++ */
++#include "vl.h"
++
++/* debug PIC */
++//#define DEBUG_PIC
++
++//#define DEBUG_IRQ_LATENCY
++//#define DEBUG_IRQ_COUNT
++
++#include "xenctrl.h"
++#include <xen/hvm/ioreq.h>
++#include <stdio.h>
++#include "cpu.h"
++#include "cpu-all.h"
++
++extern shared_iopage_t *shared_page;
++
++struct PicState2 {
++};
++
++void pic_set_irq_new(void *opaque, int irq, int level)
++{
++    /* PicState2 *s = opaque; */
++    global_iodata_t  *gio;
++    int  mask;
++
++    gio = &shared_page->sp_global;
++    mask = 1 << irq;
++    if ( gio->pic_elcr & mask ) {
++        /* level */
++       if ( level ) {
++           atomic_clear_bit(irq, &gio->pic_clear_irr);
++           atomic_set_bit(irq, &gio->pic_irr);
++           cpu_single_env->send_event = 1;
++       }
++       else {
++           atomic_clear_bit(irq, &gio->pic_irr);
++           atomic_set_bit(irq, &gio->pic_clear_irr);
++           cpu_single_env->send_event = 1;
++       }
++    }
++    else {
++       /* edge */
++       if ( level ) {
++           if ( (mask & gio->pic_last_irr) == 0 ) { 
++               atomic_set_bit(irq, &gio->pic_irr);
++               atomic_set_bit(irq, &gio->pic_last_irr);
++               cpu_single_env->send_event = 1;
++           }
++       }
++       else {
++           atomic_clear_bit(irq, &gio->pic_last_irr);
++       }
++    }
++}
++
++/* obsolete function */
++void pic_set_irq(int irq, int level)
++{
++    pic_set_irq_new(isa_pic, irq, level);
++}
++
++void irq_info(void)
++{
++    term_printf("irq statistic code not compiled.\n");
++}
++
++void pic_info(void)
++{
++    term_printf("pic_info code not compiled.\n");
++}
++
++PicState2 *pic_init(IRQRequestFunc *irq_request, void *irq_request_opaque)
++{
++    PicState2 *s;
++    s = qemu_mallocz(sizeof(PicState2));
++    if (!s)
++        return NULL;
++    return s;
++}
++
++void pic_set_alt_irq_func(PicState2 *s, SetIRQFunc *alt_irq_func,
++                          void *alt_irq_opaque)
++{
++}
+diff -r 9af27fed6713 target-i386-dm/qemu-dm.debug
+--- /dev/null	Thu Jan 01 00:00:00 1970 +0000
++++ b/target-i386-dm/qemu-dm.debug	Mon Jun 26 15:59:21 2006 +0100
+@@ -0,0 +1,5 @@
++#!/bin/sh
++
++echo $* > /tmp/args
++echo $DISPLAY >> /tmp/args
++exec /usr/lib/xen/bin/qemu-dm $*
+diff -r 9af27fed6713 target-i386-dm/qemu-ifup
+--- /dev/null	Thu Jan 01 00:00:00 1970 +0000
++++ b/target-i386-dm/qemu-ifup	Mon Jun 26 15:59:21 2006 +0100
+@@ -0,0 +1,10 @@
++#!/bin/sh
++
++#. /etc/rc.d/init.d/functions
++#ulimit -c unlimited
++
++echo -c 'config qemu network with xen bridge for '
++echo $*
++
++ifconfig $1 0.0.0.0 up
++brctl addif $2 $1

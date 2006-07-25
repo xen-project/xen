@@ -141,13 +141,18 @@ TPM_RESULT VerifyAuth( /*[IN]*/ const BYTE *outParamDigestText,
 	      (BYTE *) HMACkey, sizeof(TPM_DIGEST), (BYTE *) &hm);
     
   // Compare correct HMAC with provided one.
-  if (memcmp (&hm, &(auth->HMAC), sizeof(TPM_DIGEST)) == 0)  // 0 indicates equality
+  if (memcmp (&hm, &(auth->HMAC), sizeof(TPM_DIGEST)) == 0) { // 0 indicates equality
+    if (!auth->fContinueAuthSession) 
+      vtpmloginfo(VTPM_LOG_VTSP_DEEP, "Auth Session: 0x%x closed by TPM by fContinue=0.\n", auth->AuthHandle);
+    
     return (TPM_SUCCESS);
-  else {
+  } else {
     // If specified, reconnect the OIAP session.
     // NOTE: This only works for TCS's that never have a 0 context. 
-    if (hContext) 
+    if (hContext) {
+      vtpmloginfo(VTPM_LOG_VTSP_DEEP, "Auth Session: 0x%x closed by TPM due to failure.\n", auth->AuthHandle);
       VTSP_OIAP( hContext, auth);
+    }
     return (TPM_AUTHFAIL);
   }
 }
@@ -164,6 +169,7 @@ TPM_RESULT VTSP_OIAP(const TCS_CONTEXT_HANDLE hContext,
   memset(&auth->HMAC, 0, sizeof(TPM_DIGEST));
   auth->fContinueAuthSession = FALSE;
 
+  vtpmloginfo(VTPM_LOG_VTSP_DEEP, "Auth Session: 0x%x opened by TPM_OIAP.\n", auth->AuthHandle);
   goto egress;
   
  abort_egress:
@@ -205,7 +211,9 @@ TPM_RESULT VTSP_OSAP(const TCS_CONTEXT_HANDLE hContext,
 
   memset(&auth->HMAC, 0, sizeof(TPM_DIGEST));
   auth->fContinueAuthSession = FALSE;
-    
+   
+  vtpmloginfo(VTPM_LOG_VTSP_DEEP, "Auth Session: 0x%x opened by TPM_OSAP.\n", auth->AuthHandle);
+
   goto egress;
   
  abort_egress:
@@ -215,6 +223,23 @@ TPM_RESULT VTSP_OSAP(const TCS_CONTEXT_HANDLE hContext,
   return status;
 }
 
+
+TPM_RESULT VTSP_TerminateHandle(const TCS_CONTEXT_HANDLE hContext,
+                                const TCS_AUTH *auth) {
+
+  vtpmloginfo(VTPM_LOG_VTSP, "Terminate Handle.\n");
+  TPM_RESULT status = TPM_SUCCESS;
+  TPMTRYRETURN( TCSP_TerminateHandle(hContext, auth->AuthHandle) );
+
+  vtpmloginfo(VTPM_LOG_VTSP_DEEP, "Auth Session: 0x%x closed by TPM_TerminateHandle.\n", auth->AuthHandle);
+  goto egress;
+
+ abort_egress:
+
+ egress:
+
+  return status;
+}
 
 
 TPM_RESULT VTSP_ReadPubek(   const TCS_CONTEXT_HANDLE hContext,
@@ -728,6 +753,7 @@ TPM_RESULT VTSP_Bind(   CRYPTO_INFO *cryptoInfo,
 			buffer_t *outData)               
 {
   vtpmloginfo(VTPM_LOG_VTSP, "Binding %d bytes of data.\n", buffer_len(inData));
+  TPM_RESULT status = TPM_SUCCESS;
   TPM_BOUND_DATA boundData;
   UINT32 i;
   
@@ -756,11 +782,11 @@ TPM_RESULT VTSP_Bind(   CRYPTO_INFO *cryptoInfo,
   UINT32 out_tmp_size;
   
   // Encrypt flatBoundData
-  Crypto_RSAEnc( cryptoInfo, 
-		 flatBoundDataSize, 
-		 flatBoundData, 
-		 &out_tmp_size, 
-		 out_tmp);
+  TPMTRY(TPM_ENCRYPT_ERROR, Crypto_RSAEnc( cryptoInfo, 
+                                           flatBoundDataSize, 
+                                           flatBoundData, 
+                                           &out_tmp_size, 
+                                           out_tmp) );
   
   if (out_tmp_size > RSA_KEY_SIZE/8) {
     // The result of RSAEnc should be a fixed size based on key size.
@@ -775,7 +801,11 @@ TPM_RESULT VTSP_Bind(   CRYPTO_INFO *cryptoInfo,
     vtpmloginfomore(VTPM_LOG_TXDATA, "%2.2x ", out_tmp[i]);
   }
   vtpmloginfomore(VTPM_LOG_TXDATA, "\n");
-  
+
+  goto egress;
+  abort_egress: 
+  egress:
+ 
   // Free flatBoundData
   free(flatBoundData);
   

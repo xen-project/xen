@@ -3,89 +3,112 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 -include config-host.mak
 
-CFLAGS+=-g -fno-strict-aliasing 
+CFLAGS+=-Wall -O2 -g -fno-strict-aliasing -I.
 ifdef CONFIG_DARWIN
 CFLAGS+= -mdynamic-no-pic
-endif
-ifdef CONFIG_WIN32
-CFLAGS+=-fpack-struct 
 endif
 LDFLAGS=-g
 LIBS=
 DEFINES+=-D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE
-TOOLS=qemu-img
+TOOLS=qemu-img$(EXESUF)
 ifdef CONFIG_STATIC
 LDFLAGS+=-static
 endif
-#DOCS=qemu-doc.html qemu-tech.html qemu.1
+ifdef BUILD_DOCS
+DOCS=qemu-doc.html qemu-tech.html qemu.1 qemu-img.1
+else
+DOCS=
+endif
 
-.PHONY: all
-all: $(DOCS) HEADERS
+all: $(DOCS)
 	for d in $(TARGET_DIRS); do \
 	$(MAKE) -C $$d $@ || exit 1 ; \
         done
 
-qemu-img: qemu-img.c block.c block-cow.c block-qcow.c aes.c block-vmdk.c block-cloop.c
+qemu-img$(EXESUF): qemu-img.c block.c block-cow.c block-qcow.c aes.c block-vmdk.c block-cloop.c block-dmg.c block-bochs.c block-vpc.c block-vvfat.c
 	$(CC) -DQEMU_TOOL $(CFLAGS) $(LDFLAGS) $(DEFINES) -o $@ $^ -lz $(LIBS)
 
 dyngen$(EXESUF): dyngen.c
 	$(HOST_CC) $(CFLAGS) $(DEFINES) -o $@ $^
 
-.PHONY: clean
 clean:
 # avoid old build problems by removing potentially incorrect old files
 	rm -f config.mak config.h op-i386.h opc-i386.h gen-op-i386.h op-arm.h opc-arm.h gen-op-arm.h 
-	rm -f *.o *.a $(TOOLS) dyngen$(EXESUF) TAGS qemu.pod *~ */*~
-	#$(MAKE) -C tests clean
+	rm -f *.o *.a $(TOOLS) dyngen$(EXESUF) TAGS *.pod *~ */*~
+	$(MAKE) -C tests clean
 	for d in $(TARGET_DIRS); do \
-	$(MAKE) -C $$d $@ || exit 1 ; \
+	[ -d $$d ] && $(MAKE) -C $$d $@ || exit 0 ; \
         done
-	rm -f config-host.mak config-host.h
-	rm -f keysym_adapter_sdl.h keysym_adapter_vnc.h
 
-.PHONY: distclean
 distclean: clean
-	rm -f config-host.mak config-host.h
-	rm -f keysym_adapter_sdl.h keysym_adapter_vnc.h
+	rm -f config-host.mak config-host.h $(DOCS)
 	for d in $(TARGET_DIRS); do \
-	$(MAKE) -C $$d $@ || exit 1 ; \
+	rm -rf $$d || exit 1 ; \
         done
 
 KEYMAPS=da     en-gb  et  fr     fr-ch  is  lt  modifiers  no  pt-br  sv \
 ar      de     en-us  fi  fr-be  hr     it  lv  nl         pl  ru     th \
 common  de-ch  es     fo  fr-ca  hu     ja  mk  nl-be      pt  sl     tr
 
-.PHONY: install
-install: all 
-	mkdir -p "$(bindir)"
-	mkdir -p "$(DESTDIR)/$(datadir)"
-	mkdir -p "$(DESTDIR)/$(datadir)/keymaps"
-	install -m 644 $(addprefix keymaps/,$(KEYMAPS)) "$(DESTDIR)/$(datadir)/keymaps"
+install-doc: $(DOCS)
+	mkdir -p "$(DESTDIR)$(docdir)"
+	$(INSTALL) -m 644 qemu-doc.html  qemu-tech.html "$(DESTDIR)$(docdir)"
+ifndef CONFIG_WIN32
+	mkdir -p "$(DESTDIR)$(mandir)/man1"
+	$(INSTALL) qemu.1 qemu-img.1 "$(DESTDIR)$(mandir)/man1"
+endif
+
+install: all $(if $(BUILD_DOCS),install-doc)
+	mkdir -p "$(DESTDIR)$(bindir)"
+#	$(INSTALL) -m 755 -s $(TOOLS) "$(DESTDIR)$(bindir)"
+#	mkdir -p "$(DESTDIR)$(datadir)"
+#	for x in bios.bin vgabios.bin vgabios-cirrus.bin ppc_rom.bin \
+#			video.x proll.elf linux_boot.bin; do \
+#		$(INSTALL) -m 644 $(SRC_PATH)/pc-bios/$$x "$(DESTDIR)$(datadir)"; \
+#	done
+ifndef CONFIG_WIN32
+	mkdir -p "$(DESTDIR)$(datadir)/keymaps"
+	for x in $(KEYMAPS); do \
+		$(INSTALL) -m 644 $(SRC_PATH)/keymaps/$$x "$(DESTDIR)$(datadir)/keymaps"; \
+	done
+endif
 	for d in $(TARGET_DIRS); do \
 	$(MAKE) -C $$d $@ || exit 1 ; \
         done
 
 # various test targets
-.PHONY: test speed test2
 test speed test2: all
 	$(MAKE) -C tests $@
 
-.PHONY: TAGS
 TAGS: 
 	etags *.[ch] tests/*.[ch]
+
+cscope:
+	rm -f ./cscope.*
+	find . -name "*.[ch]" -print > ./cscope.files
+	cscope -b
 
 # documentation
 %.html: %.texi
 	texi2html -monolithic -number $<
 
+%.info: %.texi
+	makeinfo $< -o $@
+
+%.dvi: %.texi
+	texi2dvi $<
+
 qemu.1: qemu-doc.texi
-	./texi2pod.pl $< qemu.pod
+	perl -w $(SRC_PATH)/texi2pod.pl $< qemu.pod
 	pod2man --section=1 --center=" " --release=" " qemu.pod > $@
+
+qemu-img.1: qemu-img.texi
+	perl -w $(SRC_PATH)/texi2pod.pl $< qemu-img.pod
+	pod2man --section=1 --center=" " --release=" " qemu-img.pod > $@
 
 FILE=qemu-$(shell cat VERSION)
 
 # tar release (use 'make -k tar' on a checkouted tree)
-.PHONY: tar
 tar:
 	rm -rf /tmp/$(FILE)
 	cp -r . /tmp/$(FILE)
@@ -93,36 +116,34 @@ tar:
 	rm -rf /tmp/$(FILE)
 
 # generate a binary distribution
-.PHONY: tarbin
 tarbin:
-	( cd $(DESTDIR) ; tar zcvf ~/qemu-$(VERSION)-i386.tar.gz \
-	$(DESTDIR)/$(bindir)/qemu $(DESTDIR)/$(bindir)/qemu-fast \
-	$(DESTDIR)/$(bindir)/qemu-system-ppc \
-	$(DESTDIR)/$(bindir)/qemu-i386 \
-        $(DESTDIR)/$(bindir)/qemu-arm \
-        $(DESTDIR)/$(bindir)/qemu-sparc \
-        $(DESTDIR)/$(bindir)/qemu-ppc \
-	$(DESTDIR)/$(mandir)/man1/qemu.1 $(DESTDIR)/$(mandir)/man1/qemu-mkcow.1 )
+	( cd / ; tar zcvf ~/qemu-$(VERSION)-i386.tar.gz \
+	$(bindir)/qemu \
+	$(bindir)/qemu-system-ppc \
+	$(bindir)/qemu-system-sparc \
+	$(bindir)/qemu-system-x86_64 \
+	$(bindir)/qemu-system-mips \
+	$(bindir)/qemu-system-mipsel \
+	$(bindir)/qemu-system-arm \
+	$(bindir)/qemu-i386 \
+        $(bindir)/qemu-arm \
+        $(bindir)/qemu-armeb \
+        $(bindir)/qemu-sparc \
+        $(bindir)/qemu-ppc \
+        $(bindir)/qemu-mips \
+        $(bindir)/qemu-mipsel \
+        $(bindir)/qemu-img \
+	$(datadir)/bios.bin \
+	$(datadir)/vgabios.bin \
+	$(datadir)/vgabios-cirrus.bin \
+	$(datadir)/ppc_rom.bin \
+	$(datadir)/video.x \
+	$(datadir)/proll.elf \
+	$(datadir)/linux_boot.bin \
+	$(docdir)/qemu-doc.html \
+	$(docdir)/qemu-tech.html \
+	$(mandir)/man1/qemu.1 $(mandir)/man1/qemu-img.1 )
 
 ifneq ($(wildcard .depend),)
 include .depend
 endif
-
-.PHONY: HEADERS
-HEADERS:
-
-ifdef CONFIG_SDL
-HEADERS: keysym_adapter_sdl.h
-endif
-
-ifdef CONFIG_VNC
-HEADERS: keysym_adapter_vnc.h
-endif
-
-keysym_adapter_sdl.h: Makefile create_keysym_header.sh
-	sh create_keysym_header.sh sdl "$(SDL_CFLAGS)"
-
-keysym_adapter_vnc.h: Makefile create_keysym_header.sh
-	sh create_keysym_header.sh vnc "$(VNC_CFLAGS)"
-
-

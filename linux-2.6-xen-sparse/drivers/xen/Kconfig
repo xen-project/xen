@@ -33,6 +33,11 @@ config XEN_PRIVCMD
 	depends on PROC_FS
 	default y
 
+config XEN_XENBUS_DEV
+	bool
+	depends on PROC_FS
+	default y
+
 config XEN_BACKEND
         tristate "Backend driver support"
         default y
@@ -40,8 +45,59 @@ config XEN_BACKEND
           Support for backend device drivers that provide I/O services
           to other virtual machines.
 
+config XEN_BLKDEV_BACKEND
+	tristate "Block-device backend driver"
+        depends on XEN_BACKEND
+	default y
+	help
+	  The block-device backend driver allows the kernel to export its
+	  block devices to other guests via a high-performance shared-memory
+	  interface.
+
+config XEN_BLKDEV_TAP
+	tristate "Block-device tap backend driver"
+	depends on XEN_BACKEND
+	default XEN_PRIVILEGED_GUEST
+	help
+	  The block tap driver is an alternative to the block back driver 
+          and allows VM block requests to be redirected to userspace through
+          a device interface.  The tap allows user-space development of 
+          high-performance block backends, where disk images may be implemented
+          as files, in memory, or on other hosts across the network.  This 
+	  driver can safely coexist with the existing blockback driver.
+
+config XEN_NETDEV_BACKEND
+	tristate "Network-device backend driver"
+        depends on XEN_BACKEND && NET
+	default y
+	help
+	  The network-device backend driver allows the kernel to export its
+	  network devices to other guests via a high-performance shared-memory
+	  interface.
+
+config XEN_NETDEV_PIPELINED_TRANSMITTER
+	bool "Pipelined transmitter (DANGEROUS)"
+	depends on XEN_NETDEV_BACKEND
+	default n
+	help
+	  If the net backend is a dumb domain, such as a transparent Ethernet
+	  bridge with no local IP interface, it is safe to say Y here to get
+	  slightly lower network overhead.
+	  If the backend has a local IP interface; or may be doing smart things
+	  like reassembling packets to perform firewall filtering; or if you
+	  are unsure; or if you experience network hangs when this option is
+	  enabled; then you must say N here.
+
+config XEN_NETDEV_LOOPBACK
+	tristate "Network-device loopback driver"
+	depends on XEN_NETDEV_BACKEND
+	default y
+	help
+	  A two-interface loopback device to emulate a local netfront-netback
+	  connection.
+
 config XEN_PCIDEV_BACKEND
-	tristate "PCI device backend driver"
+	tristate "PCI-device backend driver"
 	depends on PCI && XEN_BACKEND
 	default XEN_PRIVILEGED_GUEST
 	help
@@ -79,50 +135,6 @@ config XEN_PCIDEV_BE_DEBUG
 	bool "PCI Backend Debugging"
 	depends on XEN_PCIDEV_BACKEND
 	default n
-
-config XEN_BLKDEV_BACKEND
-	tristate "Block-device backend driver"
-        depends on XEN_BACKEND
-	default y
-	help
-	  The block-device backend driver allows the kernel to export its
-	  block devices to other guests via a high-performance shared-memory
-	  interface.
-
-config XEN_XENBUS_DEV
-	bool
-	depends on PROC_FS
-	default y
-
-config XEN_NETDEV_BACKEND
-	tristate "Network-device backend driver"
-        depends on XEN_BACKEND && NET
-	default y
-	help
-	  The network-device backend driver allows the kernel to export its
-	  network devices to other guests via a high-performance shared-memory
-	  interface.
-
-config XEN_NETDEV_PIPELINED_TRANSMITTER
-	bool "Pipelined transmitter (DANGEROUS)"
-	depends on XEN_NETDEV_BACKEND
-	default n
-	help
-	  If the net backend is a dumb domain, such as a transparent Ethernet
-	  bridge with no local IP interface, it is safe to say Y here to get
-	  slightly lower network overhead.
-	  If the backend has a local IP interface; or may be doing smart things
-	  like reassembling packets to perform firewall filtering; or if you
-	  are unsure; or if you experience network hangs when this option is
-	  enabled; then you must say N here.
-
-config XEN_NETDEV_LOOPBACK
-	tristate "Network-device loopback driver"
-	depends on XEN_NETDEV_BACKEND
-	default y
-	help
-	  A two-interface loopback device to emulate a local netfront-netback
-	  connection.
 
 config XEN_TPMDEV_BACKEND
 	tristate "TPM-device backend driver"
@@ -183,7 +195,7 @@ config XEN_SYSFS
 	depends on SYSFS
 	default y
 	help
-		Xen hypervisor attributes will show up under /sys/hypervisor/.
+	  Xen hypervisor attributes will show up under /sys/hypervisor/.
 
 choice
 	prompt "Xen version compatibility"

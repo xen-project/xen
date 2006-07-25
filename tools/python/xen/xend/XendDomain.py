@@ -357,10 +357,15 @@ class XendDomain:
  
     def domain_unpause(self, domid):
         """Unpause domain execution."""
+
+        dominfo = self.domain_lookup_by_name_or_id_nr(domid)
+        if not dominfo:
+            raise XendInvalidDomain(str(domid))
+
+        if dominfo.getDomid() == PRIV_DOMAIN:
+            raise XendError("Cannot unpause privileged domain %s" % domid)
+
         try:
-            dominfo = self.domain_lookup_by_name_or_id_nr(domid)
-            if not dominfo:
-                raise XendInvalidDomain(str(domid))
             log.info("Domain %s (%d) unpaused.", dominfo.getName(),
                      dominfo.getDomid())
             return dominfo.unpause()
@@ -370,10 +375,15 @@ class XendDomain:
 
     def domain_pause(self, domid):
         """Pause domain execution."""
+
+        dominfo = self.domain_lookup_by_name_or_id_nr(domid)
+        if not dominfo:
+            raise XendInvalidDomain(str(domid))
+
+        if dominfo.getDomid() == PRIV_DOMAIN:
+            raise XendError("Cannot pause privileged domain %s" % domid)
+
         try:
-            dominfo = self.domain_lookup_by_name_or_id_nr(domid)
-            if not dominfo:
-                raise XendInvalidDomain(str(domid))
             log.info("Domain %s (%d) paused.", dominfo.getName(),
                      dominfo.getDomid())
             return dominfo.pause()
@@ -405,7 +415,7 @@ class XendDomain:
             raise XendInvalidDomain(str(domid))
 
         if dominfo.getDomid() == PRIV_DOMAIN:
-            raise XendError("Cannot migrate privileged domain %i" % domid)
+            raise XendError("Cannot migrate privileged domain %s" % domid)
 
         """ The following call may raise a XendError exception """
         dominfo.testMigrateDevices(True, dst)
@@ -435,7 +445,7 @@ class XendDomain:
                 raise XendInvalidDomain(str(domid))
 
             if dominfo.getDomid() == PRIV_DOMAIN:
-                raise XendError("Cannot save privileged domain %i" % domid)
+                raise XendError("Cannot save privileged domain %s" % domid)
 
             fd = os.open(dst, os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
             try:

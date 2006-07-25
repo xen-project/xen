@@ -174,9 +174,9 @@ guest_remove_page(
     {
         /* We'll make this a guest-visible error in future, so take heed! */
         DPRINTK("Dom%d freeing in-use page %lx (pseudophys %lx):"
-                " count=%x type=%lx\n",
+                " count=%lx type=%lx\n",
                 d->domain_id, mfn, get_gpfn_from_mfn(mfn),
-                page->count_info, page->u.inuse.type_info);
+                (unsigned long)page->count_info, page->u.inuse.type_info);
     }
 
     guest_physmap_remove_page(d, gmfn, mfn);

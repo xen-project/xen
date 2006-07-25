@@ -360,19 +360,19 @@ static inline void set_eflags_PF(int size, unsigned long v1,
 }
 
 static void hvm_pio_assist(struct cpu_user_regs *regs, ioreq_t *p,
-                           struct mmio_op *mmio_opp)
+                           struct hvm_io_op *pio_opp)
 {
     unsigned long old_eax;
     int sign = p->df ? -1 : 1;
 
-    if ( p->pdata_valid || (mmio_opp->flags & OVERLAP) )
+    if ( p->pdata_valid || (pio_opp->flags & OVERLAP) )
     {
-        if ( mmio_opp->flags & REPZ )
+        if ( pio_opp->flags & REPZ )
             regs->ecx -= p->count;
         if ( p->dir == IOREQ_READ )
         {
             regs->edi += sign * p->count * p->size;
-            if ( mmio_opp->flags & OVERLAP )
+            if ( pio_opp->flags & OVERLAP )
             {
                 unsigned long addr = regs->edi;
                 if (hvm_realmode(current))
@@ -409,8 +409,8 @@ static void hvm_pio_assist(struct cpu_user_regs *regs, ioreq_t *p,
     }
 }
 
-static void hvm_mmio_assist(struct vcpu *v, struct cpu_user_regs *regs,
-                            ioreq_t *p, struct mmio_op *mmio_opp)
+static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
+                            struct hvm_io_op *mmio_opp)
 {
     int sign = p->df ? -1 : 1;
     int size = -1, index = -1;
@@ -657,51 +657,51 @@ static void hvm_mmio_assist(struct vcpu *v, struct cpu_user_regs *regs,
         break;
 
     case INSTR_XCHG:
-	if (src & REGISTER) {
-		index = operand_index(src);
-		set_reg_value(size, index, 0, regs, p->u.data);
-	} else {
-		index = operand_index(dst);
-		set_reg_value(size, index, 0, regs, p->u.data);
-	}
-	break;
+        if (src & REGISTER) {
+            index = operand_index(src);
+            set_reg_value(size, index, 0, regs, p->u.data);
+        } else {
+            index = operand_index(dst);
+            set_reg_value(size, index, 0, regs, p->u.data);
+        }
+        break;
     }
-
-    hvm_load_cpu_guest_regs(v, regs);
 }
 
 void hvm_io_assist(struct vcpu *v)
 {
     vcpu_iodata_t *vio;
     ioreq_t *p;
-    struct cpu_user_regs *regs = guest_cpu_user_regs();
-    struct mmio_op *mmio_opp;
-    struct cpu_user_regs *inst_decoder_regs;
+    struct cpu_user_regs *regs;
+    struct hvm_io_op *io_opp;
 
-    mmio_opp = &v->arch.hvm_vcpu.mmio_op;
-    inst_decoder_regs = mmio_opp->inst_decoder_regs;
+    io_opp = &v->arch.hvm_vcpu.io_op;
+    regs   = &io_opp->io_context;
 
     vio = get_vio(v->domain, v->vcpu_id);
 
-    if (vio == 0) {
-        HVM_DBG_LOG(DBG_LEVEL_1,
-                    "bad shared page: %lx", (unsigned long) vio);
-        printf("bad shared page: %lx\n", (unsigned long) vio);
+    if ( vio == 0 ) {
+        printf("bad shared page: %lx\n", (unsigned long)vio);
         domain_crash_synchronous();
     }
 
     p = &vio->vp_ioreq;
 
     /* clear IO wait HVM flag */
-    if (test_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags)) {
-        if (p->state == STATE_IORESP_READY) {
+    if ( test_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags) ) {
+        if ( p->state == STATE_IORESP_READY ) {
             p->state = STATE_INVALID;
             clear_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags);
 
-            if (p->type == IOREQ_TYPE_PIO)
-                hvm_pio_assist(regs, p, mmio_opp);
-            else
-                hvm_mmio_assist(v, regs, p, mmio_opp);
+            if ( p->type == IOREQ_TYPE_PIO )
+                hvm_pio_assist(regs, p, io_opp);
+            else {
+                hvm_mmio_assist(regs, p, io_opp);
+                hvm_load_cpu_guest_regs(v, regs);
+            }
+
+            /* Copy register changes back into current guest state. */
+            memcpy(guest_cpu_user_regs(), regs, HVM_CONTEXT_STACK_BYTES);
         }
         /* else an interrupt send event raced us */
     }

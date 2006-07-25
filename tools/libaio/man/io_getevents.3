@@ -1,0 +1,79 @@
+./"/* io_getevents:
+./" *      Attempts to read at least min_nr events and up to nr events from
+./" *      the completion queue for the aio_context specified by ctx_id.  May
+./" *      fail with -EINVAL if ctx_id is invalid, if min_nr is out of range,
+./" *      if nr is out of range, if when is out of range.  May fail with
+./" *      -EFAULT if any of the memory specified to is invalid.  May return
+./" *      0 or < min_nr if no events are available and the timeout specified
+./" *      by when has elapsed, where when == NULL specifies an infinite
+./" *      timeout.  Note that the timeout pointed to by when is relative and
+./" *      will be updated if not NULL and the operation blocks.  Will fail
+./" *      with -ENOSYS if not implemented.
+./" */
+./"asmlinkage long sys_io_getevents(io_context_t ctx_id,
+./"                                 long min_nr,
+./"                                 long nr,
+./"                                 struct io_event *events,
+./"                                 struct timespec *timeout)
+./"
+.TH io_getevents 2 2002-09-03 "Linux 2.4" "Linux AIO"
+.SH NAME
+io_getevents \- Read resulting events from io requests
+.SH SYNOPSIS
+.nf
+.B #include <errno.h>
+.sp
+.br
+.B #include <libaio.h>
+.br
+.sp
+struct iocb {
+	void		*data;
+	unsigned	key;
+	short		aio_lio_opcode;
+	short		aio_reqprio;
+	int		aio_fildes;
+};
+.sp
+struct io_event {
+        unsigned        PADDED(data, __pad1);
+        unsigned        PADDED(obj,  __pad2);
+        unsigned        PADDED(res,  __pad3);
+        unsigned        PADDED(res2, __pad4);
+};
+.sp
+.BI "int io_getevents(io_context_t " ctx ",  long " nr ", struct io_event *" events "[], struct timespec *" timeout ");"
+
+.fi
+.SH DESCRIPTION
+Attempts to read  up to nr events from
+the completion queue for the aio_context specified by ctx.  
+.SH "RETURN VALUES"
+May return
+0 if no events are available and the timeout specified
+by when has elapsed, where when == NULL specifies an infinite
+timeout.  Note that the timeout pointed to by when is relative and
+will be updated if not NULL and the operation blocks.  Will fail
+with ENOSYS if not implemented.
+.SH ERRORS
+.TP
+.B EINVAL 
+if ctx_id is invalid, if min_nr is out of range,
+if nr is out of range, if when is out of range.  
+.TP
+.B EFAULT 
+if any of the memory specified to is invalid.  
+.SH "SEE ALSO"
+.BR io(3),
+.BR io_cancel(3),
+.BR io_fsync(3),
+.BR io_prep_fsync(3),
+.BR io_prep_pread(3),
+.BR io_prep_pwrite(3),
+.BR io_queue_init(3),
+.BR io_queue_release(3),
+.BR io_queue_run(3),
+.BR io_queue_wait(3),
+.BR io_set_callback(3),
+.BR io_submit(3),
+.BR errno(3)

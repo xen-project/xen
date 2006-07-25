@@ -219,7 +219,9 @@ TPM_RESULT VTPM_Init_Manager() {
 			   &vtpm_globals->keyAuth) );
   vtpm_globals->keyAuth.fContinueAuthSession = TRUE;
 
-  // If failed, create new Manager.
+  vtpm_globals->mig_keys = NULL;
+
+  // If fails, create new Manager.
   serviceStatus = VTPM_LoadManagerData();
   if (serviceStatus == TPM_IOERROR) {
     vtpmloginfo(VTPM_LOG_VTPM, "Failed to read manager file. Assuming first time initialization.\n");

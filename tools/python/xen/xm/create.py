@@ -25,6 +25,7 @@ import sys
 import socket
 import re
 import xmlrpclib
+import traceback
 
 from xen.xend import sxp
 from xen.xend import PrettyPrint
@@ -108,6 +109,12 @@ gopts.var('vncviewer', val='no|yes',
           The address of the vncviewer is passed to the domain on the kernel command
           line using 'VNC_SERVER=<host>:<port>'. The port used by vnc is 5500 + DISPLAY.
           A display value with a free port is chosen if possible.
+          Only valid when vnc=1.
+          """)
+
+gopts.var('vncconsole', val='no|yes',
+          fn=set_bool, default=None,
+          use="""Spawn a vncviewer process for the domain's graphical console.
           Only valid when vnc=1.
           """)
 
@@ -397,10 +404,6 @@ gopts.var('nographic', val='no|yes',
           fn=set_bool, default=0,
           use="Should device models use graphics?")
 
-gopts.var('ne2000', val='no|yes',
-          fn=set_bool, default=0,
-          use="Should device models use ne2000?")
-
 gopts.var('audio', val='no|yes',
           fn=set_bool, default=0,
           use="Should device models enable audio?")
@@ -408,6 +411,10 @@ gopts.var('audio', val='no|yes',
 gopts.var('vnc', val='',
           fn=set_value, default=None,
           use="""Should the device model use VNC?""")
+
+gopts.var('vncdisplay', val='',
+          fn=set_value, default=None,
+          use="""VNC display to use""")
 
 gopts.var('sdl', val='',
           fn=set_value, default=None,
@@ -478,7 +485,13 @@ def configure_disks(config_devs, vals):
     """Create the config for disks (virtual block devices).
     """
     for (uname, dev, mode, backend) in vals.disk:
-        config_vbd = ['vbd',
+
+        if uname.startswith('tap:'):
+            cls = 'tap'
+        else:
+            cls = 'vbd'
+
+        config_vbd = [cls,
                       ['uname', uname],
                       ['dev', dev ],
                       ['mode', mode ] ]
@@ -604,7 +617,7 @@ def configure_vifs(config_devs, vals):
 
         def f(k):
             if k not in ['backend', 'bridge', 'ip', 'mac', 'script', 'type',
-                         'vifname', 'rate']:
+                         'vifname', 'rate', 'model']:
                 err('Invalid vif option: ' + k)
 
             config_vif.append([k, d[k]])
@@ -618,8 +631,8 @@ def configure_hvm(config_image, vals):
     """
     args = [ 'device_model', 'pae', 'vcpus', 'cdrom', 'boot', 'fda', 'fdb',
              'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'audio',
-             'vnc', 'vncviewer', 'sdl', 'display', 'ne2000', 'acpi', 'apic',
-             'xauthority', 'usb', 'usbdevice' ]
+             'vnc', 'vncdisplay', 'vncconsole', 'sdl', 'display',
+             'acpi', 'apic', 'xauthority', 'usb', 'usbdevice' ]
     for a in args:
         if (vals.__dict__[a]):
             config_image.append([a, vals.__dict__[a]])
@@ -847,17 +860,18 @@ def preprocess_vnc(vals):
     """If vnc was specified, spawn a vncviewer in listen mode
     and pass its address to the domain on the kernel command line.
     """
-    if not (vals.vnc and vals.vncviewer) or vals.dryrun: return
-    vnc_display = choose_vnc_display()
-    if not vnc_display:
-        warn("No free vnc display")
-        return
-    print 'VNC=', vnc_display
-    vnc_port = spawn_vnc(vnc_display)
-    if vnc_port > 0:
-        vnc_host = get_host_addr()
-        vnc = 'VNC_VIEWER=%s:%d' % (vnc_host, vnc_port)
-        vals.extra = vnc + ' ' + vals.extra
+    if vals.dryrun: return
+    if vals.vncviewer:
+        vnc_display = choose_vnc_display()
+        if not vnc_display:
+            warn("No free vnc display")
+            return
+        print 'VNC=', vnc_display
+        vnc_port = spawn_vnc(vnc_display)
+        if vnc_port > 0:
+            vnc_host = get_host_addr()
+            vnc = 'VNC_VIEWER=%s:%d' % (vnc_host, vnc_port)
+            vals.extra = vnc + ' ' + vals.extra
     
 def preprocess(vals):
     if not vals.kernel and not vals.bootloader:
@@ -985,6 +999,117 @@ def parseCommandLine(argv):
     return (gopts, config)
 
 
+def check_domain_label(config, verbose):
+    """All that we need to check here is that the domain label exists and
+       is not null when security is on.  Other error conditions are
+       handled when the config file is parsed.
+    """
+    answer = 0
+    default_label = None
+    secon = 0
+    if security.on():
+        default_label = security.ssidref2label(security.NULL_SSIDREF)
+        secon = 1
+
+    # get the domain acm_label
+    dom_label = None
+    dom_name = None
+    for x in sxp.children(config):
+        if sxp.name(x) == 'security':
+            dom_label = sxp.child_value(sxp.name(sxp.child0(x)), 'label')
+        if sxp.name(x) == 'name':
+            dom_name = sxp.child0(x)
+
+    # sanity check on domain label
+    if verbose:
+        print "Checking domain:"
+    if (not secon) and (not dom_label):
+        answer = 1
+        if verbose:
+            print "   %s: PERMITTED" % (dom_name)
+    elif (secon) and (dom_label) and (dom_label != default_label):
+        answer = 1
+        if verbose:
+            print "   %s: PERMITTED" % (dom_name)
+    else:
+        print "   %s: DENIED" % (dom_name)
+        if not secon:
+            print "   --> Security off, but domain labeled"
+        else:
+            print "   --> Domain not labeled"
+        answer = 0
+
+    return answer
+
+
+def config_security_check(config, verbose):
+    """Checks each resource listed in the config to see if the active
+       policy will permit creation of a new domain using the config.
+       Returns 1 if the config passes all tests, otherwise 0.
+    """
+    answer = 1
+
+    # get the domain acm_label
+    domain_label = None
+    domain_policy = None
+    for x in sxp.children(config):
+        if sxp.name(x) == 'security':
+            domain_label = sxp.child_value(sxp.name(sxp.child0(x)), 'label')
+            domain_policy = sxp.child_value(sxp.name(sxp.child0(x)), 'policy')
+
+    # if no domain label, use default
+    if not domain_label and security.on():
+        try:
+            domain_label = security.ssidref2label(security.NULL_SSIDREF)
+        except:
+            traceback.print_exc(limit=1)
+            return 0
+        domain_policy = 'NULL'
+    elif not domain_label:
+        domain_label = ""
+        domain_policy = 'NULL'
+
+    if verbose:
+        print "Checking resources:"
+
+    # build a list of all resources in the config file
+    resources = []
+    for x in sxp.children(config):
+        if sxp.name(x) == 'device':
+            if sxp.name(sxp.child0(x)) == 'vbd':
+                resources.append(sxp.child_value(sxp.child0(x), 'uname'))
+
+    # perform a security check on each resource
+    for resource in resources:
+        try:
+            security.res_security_check(resource, domain_label)
+            if verbose:
+                print "   %s: PERMITTED" % (resource)
+
+        except security.ACMError:
+            print "   %s: DENIED" % (resource)
+            (res_label, res_policy) = security.get_res_label(resource)
+            print "   --> res:"+res_label+" ("+res_policy+")"
+            print "   --> dom:"+domain_label+" ("+domain_policy+")"
+            answer = 0
+
+    return answer
+
+
+def create_security_check(config):
+    passed = 0
+    try:
+        if check_domain_label(config, verbose=0):
+            if config_security_check(config, verbose=0):
+                passed = 1
+        else:
+            print "Checking resources: (skipped)"
+    except security.ACMError:
+        traceback.print_exc(limit=1)
+
+    return passed
+
+
 def main(argv):
     try:
         (opts, config) = parseCommandLine(argv)
@@ -997,9 +1122,12 @@ def main(argv):
     if opts.vals.dryrun:
         PrettyPrint.prettyprint(config)
     else:
-        dom = make_domain(opts, config)
-        if opts.vals.console_autoconnect:
-            console.execConsole(dom)
+        if not create_security_check(config):
+            print "Security configuration prevents domain from starting"
+        else:
+            dom = make_domain(opts, config)
+            if opts.vals.console_autoconnect:
+                console.execConsole(dom)
         
 if __name__ == '__main__':
     main(sys.argv)

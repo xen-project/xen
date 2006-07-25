@@ -1,0 +1,58 @@
+Index: ioemu/Makefile.target
+===================================================================
+--- ioemu.orig/Makefile.target	2006-07-12 11:35:01.899678766 +0100
++++ ioemu/Makefile.target	2006-07-12 11:35:02.711577049 +0100
+@@ -333,7 +333,7 @@
+ ifeq ($(TARGET_BASE_ARCH), i386)
+ # Hardware support
+ VL_OBJS+= ide.o pckbd.o ps2.o vga.o $(SOUND_HW) dma.o $(AUDIODRV)
+-VL_OBJS+= fdc.o mc146818rtc.o serial.o i8254.o pcspk.o pc.o
++VL_OBJS+= fdc.o mc146818rtc.o serial.o pc.o
+ VL_OBJS+= cirrus_vga.o mixeng.o parallel.o
+ DEFINES += -DHAS_AUDIO
+ endif
+Index: ioemu/hw/pc.c
+===================================================================
+--- ioemu.orig/hw/pc.c	2006-07-12 11:35:02.059658723 +0100
++++ ioemu/hw/pc.c	2006-07-12 11:35:02.712576924 +0100
+@@ -38,7 +38,9 @@
+ 
+ static fdctrl_t *floppy_controller;
+ static RTCState *rtc_state;
++#ifndef CONFIG_DM
+ static PITState *pit;
++#endif /* !CONFIG_DM */
+ #ifndef CONFIG_DM
+ static IOAPICState *ioapic;
+ #endif /* !CONFIG_DM */
+@@ -803,8 +805,10 @@
+     }
+ #endif /* !CONFIG_DM */
+     isa_pic = pic_init(pic_irq_request, first_cpu);
++#ifndef CONFIG_DM
+     pit = pit_init(0x40, 0);
+     pcspk_init(pit);
++#endif /* !CONFIG_DM */
+ #ifndef CONFIG_DM
+     if (pci_enabled) {
+         pic_set_alt_irq_func(isa_pic, ioapic_set_irq, ioapic);
+Index: ioemu/vl.c
+===================================================================
+--- ioemu.orig/vl.c	2006-07-12 11:35:02.649584815 +0100
++++ ioemu/vl.c	2006-07-12 11:35:02.715576548 +0100
+@@ -5033,6 +5033,7 @@
+ 
+ #ifdef HAS_AUDIO
+ struct soundhw soundhw[] = {
++#ifndef CONFIG_DM
+ #ifdef TARGET_I386
+     {
+         "pcspk",
+@@ -5042,6 +5043,7 @@
+         { .init_isa = pcspk_audio_init }
+     },
+ #endif
++#endif /* !CONFIG_DM */
+     {
+         "sb16",
+         "Creative Sound Blaster 16",

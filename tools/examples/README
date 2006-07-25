@@ -25,7 +25,6 @@ vif-common.sh       - sourced by vif-bridge
 vif-nat             - xen virtual network start/stop script in NAT mode 
 vif-route           - xen virtual network start/stop script in routed mode
 vtpm                - called by xen-backend.agent to bind/unbind vTPM devices
-vtpm-addtodb        - script for adding a vTPM instance to the vTPM table
 vtpm-common.sh      - common code for vTPM handling
 vtpm-delete         - remove an entry from the vTPM table given the
                       domain's name

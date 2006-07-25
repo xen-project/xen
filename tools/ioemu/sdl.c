@@ -25,17 +25,8 @@
 
 #include <SDL.h>
 
-/* keyboard stuff */
-#include <SDL_keysym.h>
-#include "keysym_adapter_sdl.h"
-#include "keyboard_rdesktop.c"
-
 #ifndef _WIN32
 #include <signal.h>
-#endif
-
-#if defined(__APPLE__)
-#define CONFIG_SDL_GENERIC_KBD
 #endif
 
 static SDL_Surface *screen;
@@ -45,7 +36,6 @@ static int gui_saved_grab;
 static int gui_fullscreen;
 static int gui_key_modifier_pressed;
 static int gui_keysym;
-static void* kbd_layout=0;
 static int gui_fullscreen_initial_grab;
 static int gui_grab_code = KMOD_LALT | KMOD_LCTRL;
 static uint8_t modifiers_state[256];
@@ -54,12 +44,9 @@ static SDL_Cursor *sdl_cursor_normal;
 static SDL_Cursor *sdl_cursor_hidden;
 static int absolute_enabled = 0;
 
-SDL_PixelFormat* sdl_get_format(void) {
-	return screen->format;
-}
-
 static void sdl_update(DisplayState *ds, int x, int y, int w, int h)
 {
+    //    printf("updating x=%d y=%d w=%d h=%d\n", x, y, w, h);
     SDL_UpdateRect(screen, x, y, w, h);
 }
 
@@ -70,13 +57,24 @@ static void sdl_resize(DisplayState *ds, int w, int h)
     //    printf("resizing to %d %d\n", w, h);
 
     flags = SDL_HWSURFACE|SDL_ASYNCBLIT|SDL_HWACCEL;
-    flags |= SDL_RESIZABLE;
     if (gui_fullscreen)
         flags |= SDL_FULLSCREEN;
+
     width = w;
     height = h;
+
+ again:
     screen = SDL_SetVideoMode(w, h, 0, flags);
     if (!screen) {
+        fprintf(stderr, "Could not open SDL display\n");
+        exit(1);
+    }
+    if (!screen->pixels && (flags & SDL_HWSURFACE) && (flags & SDL_FULLSCREEN)) {
+        flags &= ~SDL_HWSURFACE;
+        goto again;
+    }
+
+    if (!screen->pixels) {
         fprintf(stderr, "Could not open SDL display\n");
         exit(1);
     }
@@ -87,118 +85,26 @@ static void sdl_resize(DisplayState *ds, int w, int h)
     ds->height = h;
 }
 
-#ifdef CONFIG_SDL_GENERIC_KBD
+/* generic keyboard conversion */
 
-/* XXX: use keymap tables defined in the VNC patch because the
-   following code suppose you have a US keyboard. */
+#include "sdl_keysym.h"
+#include "keymaps.c"
 
-static const uint8_t scancodes[SDLK_LAST] = {
-    [SDLK_ESCAPE]   = 0x01,
-    [SDLK_1]        = 0x02,
-    [SDLK_2]        = 0x03,
-    [SDLK_3]        = 0x04,
-    [SDLK_4]        = 0x05,
-    [SDLK_5]        = 0x06,
-    [SDLK_6]        = 0x07,
-    [SDLK_7]        = 0x08,
-    [SDLK_8]        = 0x09,
-    [SDLK_9]        = 0x0a,
-    [SDLK_0]        = 0x0b,
-    [SDLK_MINUS]    = 0x0c,
-    [SDLK_EQUALS]   = 0x0d,
-    [SDLK_BACKSPACE]        = 0x0e,
-    [SDLK_TAB]      = 0x0f,
-    [SDLK_q]        = 0x10,
-    [SDLK_w]        = 0x11,
-    [SDLK_e]        = 0x12,
-    [SDLK_r]        = 0x13,
-    [SDLK_t]        = 0x14,
-    [SDLK_y]        = 0x15,
-    [SDLK_u]        = 0x16,
-    [SDLK_i]        = 0x17,
-    [SDLK_o]        = 0x18,
-    [SDLK_p]        = 0x19,
-    [SDLK_LEFTBRACKET]      = 0x1a,
-    [SDLK_RIGHTBRACKET]     = 0x1b,
-    [SDLK_RETURN]   = 0x1c,
-    [SDLK_LCTRL]    = 0x1d,
-    [SDLK_a]        = 0x1e,
-    [SDLK_s]        = 0x1f,
-    [SDLK_d]        = 0x20,
-    [SDLK_f]        = 0x21,
-    [SDLK_g]        = 0x22,
-    [SDLK_h]        = 0x23,
-    [SDLK_j]        = 0x24,
-    [SDLK_k]        = 0x25,
-    [SDLK_l]        = 0x26,
-    [SDLK_SEMICOLON]        = 0x27,
-    [SDLK_QUOTE]    = 0x28,
-    [SDLK_BACKQUOTE]        = 0x29,
-    [SDLK_LSHIFT]   = 0x2a,
-    [SDLK_BACKSLASH]        = 0x2b,
-    [SDLK_z]        = 0x2c,
-    [SDLK_x]        = 0x2d,
-    [SDLK_c]        = 0x2e,
-    [SDLK_v]        = 0x2f,
-    [SDLK_b]        = 0x30,
-    [SDLK_n]        = 0x31,
-    [SDLK_m]        = 0x32,
-    [SDLK_COMMA]    = 0x33,
-    [SDLK_PERIOD]   = 0x34,
-    [SDLK_SLASH]    = 0x35,
-    [SDLK_KP_MULTIPLY]      = 0x37,
-    [SDLK_LALT]     = 0x38,
-    [SDLK_SPACE]    = 0x39,
-    [SDLK_CAPSLOCK] = 0x3a,
-    [SDLK_F1]       = 0x3b,
-    [SDLK_F2]       = 0x3c,
-    [SDLK_F3]       = 0x3d,
-    [SDLK_F4]       = 0x3e,
-    [SDLK_F5]       = 0x3f,
-    [SDLK_F6]       = 0x40,
-    [SDLK_F7]       = 0x41,
-    [SDLK_F8]       = 0x42,
-    [SDLK_F9]       = 0x43,
-    [SDLK_F10]      = 0x44,
-    [SDLK_NUMLOCK]  = 0x45,
-    [SDLK_SCROLLOCK]        = 0x46,
-    [SDLK_KP7]      = 0x47,
-    [SDLK_KP8]      = 0x48,
-    [SDLK_KP9]      = 0x49,
-    [SDLK_KP_MINUS] = 0x4a,
-    [SDLK_KP4]      = 0x4b,
-    [SDLK_KP5]      = 0x4c,
-    [SDLK_KP6]      = 0x4d,
-    [SDLK_KP_PLUS]  = 0x4e,
-    [SDLK_KP1]      = 0x4f,
-    [SDLK_KP2]      = 0x50,
-    [SDLK_KP3]      = 0x51,
-    [SDLK_KP0]      = 0x52,
-    [SDLK_KP_PERIOD]        = 0x53,
-    [SDLK_PRINT]    = 0x54,
-    [SDLK_LMETA]    = 0x56,
+static kbd_layout_t *kbd_layout = NULL;
 
-    [SDLK_KP_ENTER]  = 0x9c,
-    [SDLK_KP_DIVIDE] = 0xb5,
-    
-    [SDLK_UP]       = 0xc8,
-    [SDLK_DOWN]     = 0xd0,
-    [SDLK_RIGHT]    = 0xcd,
-    [SDLK_LEFT]     = 0xcb,
-    [SDLK_INSERT]   = 0xd2,
-    [SDLK_HOME]     = 0xc7,
-    [SDLK_END]      = 0xcf,
-    [SDLK_PAGEUP]   = 0xc9,
-    [SDLK_PAGEDOWN] = 0xd1,
-    [SDLK_DELETE]   = 0xd3,
-};
-
-static uint8_t sdl_keyevent_to_keycode(const SDL_KeyboardEvent *ev)
+static uint8_t sdl_keyevent_to_keycode_generic(const SDL_KeyboardEvent *ev)
 {
-    return scancodes[ev->keysym.sym];
+    int keysym;
+    /* workaround for X11+SDL bug with AltGR */
+    keysym = ev->keysym.sym;
+    if (keysym == 0 && ev->keysym.scancode == 113)
+        keysym = SDLK_MODE;
+    return keysym2scancode(kbd_layout, keysym);
 }
 
-#elif defined(_WIN32)
+/* specific keyboard conversions from scan codes */
+
+#if defined(_WIN32)
 
 static uint8_t sdl_keyevent_to_keycode(const SDL_KeyboardEvent *ev)
 {
@@ -309,10 +215,6 @@ static void sdl_process_key(SDL_KeyboardEvent *ev)
 {
     int keycode, v;
 
-    if(kbd_layout)
-	keycode=keysym2scancode(kbd_layout, ev->keysym.sym);
-    else {
-
     if (ev->keysym.sym == SDLK_PAUSE) {
         /* specific case */
         v = 0;
@@ -324,8 +226,11 @@ static void sdl_process_key(SDL_KeyboardEvent *ev)
         return;
     }
 
-    /* XXX: not portable, but avoids complicated mappings */
-    keycode = sdl_keyevent_to_keycode(ev);
+    if (kbd_layout) {
+        keycode = sdl_keyevent_to_keycode_generic(ev);
+    } else {
+        keycode = sdl_keyevent_to_keycode(ev);
+    }
 
     switch(keycode) {
     case 0x00:
@@ -349,7 +254,6 @@ static void sdl_process_key(SDL_KeyboardEvent *ev)
         kbd_put_keycode(keycode);
         kbd_put_keycode(keycode | 0x80);
         return;
-    }
     }
 
     /* now send the key code */
@@ -405,14 +309,13 @@ static void sdl_grab_end(void)
 {
     SDL_WM_GrabInput(SDL_GRAB_OFF);
     sdl_show_cursor();
-    SDL_ShowCursor(1);
     gui_grab = 0;
     sdl_update_caption();
 }
 
-static void sdl_send_mouse_event(void)
+static void sdl_send_mouse_event(int dz)
 {
-    int dx, dy, dz, state, buttons;
+    int dx, dy, state, buttons;
     state = SDL_GetRelativeMouseState(&dx, &dy);
     buttons = 0;
     if (state & SDL_BUTTON(SDL_BUTTON_LEFT))
@@ -436,14 +339,6 @@ static void sdl_send_mouse_event(void)
 	dy = dy * 0x7FFF / height;
     }
 
-    /* XXX: test wheel */
-    dz = 0;
-#ifdef SDL_BUTTON_WHEELUP
-    if (state & SDL_BUTTON(SDL_BUTTON_WHEELUP))
-        dz--;
-    if (state & SDL_BUTTON(SDL_BUTTON_WHEELDOWN))
-        dz++;
-#endif
     kbd_mouse_event(dx, dy, dz, buttons);
 }
 
@@ -458,8 +353,8 @@ static void toggle_full_screen(DisplayState *ds)
         if (!gui_saved_grab)
             sdl_grab_end();
     }
-    vga_invalidate_display();
-    vga_update_display();
+    vga_hw_invalidate();
+    vga_hw_update();
 }
 
 static void sdl_refresh(DisplayState *ds)
@@ -472,8 +367,7 @@ static void sdl_refresh(DisplayState *ds)
         sdl_update_caption();
     }
 
-    if (is_active_console(vga_console)) 
-        vga_update_display();
+    vga_hw_update();
 
     while (SDL_PollEvent(ev)) {
         switch (ev->type) {
@@ -496,10 +390,7 @@ static void sdl_refresh(DisplayState *ds)
                         break;
                     case 0x02 ... 0x0a: /* '1' to '9' keys */ 
                         console_select(keycode - 0x02);
-                        if (is_active_console(vga_console)) {
-                            /* tell the vga console to redisplay itself */
-                            vga_invalidate_display();
-                        } else {
+                        if (!is_graphic_console()) {
                             /* display grab if going to a text console */
                             if (gui_grab)
                                 sdl_grab_end();
@@ -509,7 +400,7 @@ static void sdl_refresh(DisplayState *ds)
                     default:
                         break;
                     }
-                } else if (!is_active_console(vga_console)) {
+                } else if (!is_graphic_console()) {
                     int keysym;
                     keysym = 0;
                     if (ev->key.keysym.mod & (KMOD_LCTRL | KMOD_RCTRL)) {
@@ -564,35 +455,44 @@ static void sdl_refresh(DisplayState *ds)
                     }
                 }
             }
-            if (is_active_console(vga_console)) 
+            if (is_graphic_console()) 
                 sdl_process_key(&ev->key);
             break;
         case SDL_QUIT:
             qemu_system_shutdown_request();
             break;
         case SDL_MOUSEMOTION:
-            if (gui_grab) {
-                sdl_send_mouse_event();
+            if (gui_grab || kbd_mouse_is_absolute()) {
+                sdl_send_mouse_event(0);
             }
             break;
         case SDL_MOUSEBUTTONDOWN:
         case SDL_MOUSEBUTTONUP:
             {
                 SDL_MouseButtonEvent *bev = &ev->button;
-                if (!gui_grab) {
+                if (!gui_grab && !kbd_mouse_is_absolute()) {
                     if (ev->type == SDL_MOUSEBUTTONDOWN &&
                         (bev->state & SDL_BUTTON_LMASK)) {
                         /* start grabbing all events */
                         sdl_grab_start();
                     }
                 } else {
-                    sdl_send_mouse_event();
+                    int dz;
+                    dz = 0;
+#ifdef SDL_BUTTON_WHEELUP
+                    if (bev->button == SDL_BUTTON_WHEELUP && ev->type == SDL_MOUSEBUTTONDOWN) {
+                        dz = -1;
+                    } else if (bev->button == SDL_BUTTON_WHEELDOWN && ev->type == SDL_MOUSEBUTTONDOWN) {
+                        dz = 1;
+                    }
+#endif               
+                    sdl_send_mouse_event(dz);
                 }
             }
             break;
         case SDL_ACTIVEEVENT:
-            if (gui_grab && (ev->active.gain & SDL_ACTIVEEVENTMASK) == 0 &&
-                !gui_fullscreen_initial_grab) {
+            if (gui_grab && ev->active.state == SDL_APPINPUTFOCUS &&
+                !ev->active.gain && !gui_fullscreen_initial_grab) {
                 sdl_grab_end();
             }
             break;
@@ -612,8 +512,16 @@ void sdl_display_init(DisplayState *ds, int full_screen)
     int flags;
     uint8_t data = 0;
 
-    if(keyboard_layout)
-	    kbd_layout=init_keyboard_layout(keyboard_layout);
+#if defined(__APPLE__)
+    /* always use generic keymaps */
+    if (!keyboard_layout)
+        keyboard_layout = "en-us";
+#endif
+    if(keyboard_layout) {
+        kbd_layout = init_keyboard_layout(keyboard_layout);
+        if (!kbd_layout)
+            exit(1);
+    }
 
     flags = SDL_INIT_VIDEO | SDL_INIT_NOPARACHUTE;
     if (SDL_Init (flags)) {
@@ -632,8 +540,7 @@ void sdl_display_init(DisplayState *ds, int full_screen)
 
     sdl_resize(ds, 640, 400);
     sdl_update_caption();
-    if(repeat_key)
-        SDL_EnableKeyRepeat(250, 50);
+    SDL_EnableKeyRepeat(250, 50);
     SDL_EnableUNICODE(1);
     gui_grab = 0;
 

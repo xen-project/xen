@@ -7,9 +7,11 @@ include $(XEN_ROOT)/tools/vtpm/Rules.mk
 TPM_EMULATOR_DIR = tpm_emulator
 # Dir name for vtpm instance
 VTPM_DIR = vtpm
+ORIG_DIR = orig
 
 # Emulator tarball name
-TPM_EMULATOR_TARFILE = tpm_emulator-0.3.tar.gz
+TPM_EMULATOR_NAME = tpm_emulator-0.4
+TPM_EMULATOR_TARFILE = $(TPM_EMULATOR_NAME).tar.gz
 
 GMP_HEADER = /usr/include/gmp.h
 
@@ -17,7 +19,7 @@ GMP_HEADER = /usr/include/gmp.h
 all: build
 
 .PHONY: build
-build: $(TPM_EMULATOR_DIR) $(VTPM_DIR) build_sub
+build: $(VTPM_DIR) $(TPM_EMULATOR_DIR) build_sub
 
 .PHONY: install
 install: build
@@ -37,9 +39,8 @@ clean:
 
 .PHONY: mrproper
 mrproper:
-	rm -f $(TPM_EMULATOR_TARFILE)
-	rm -rf $(TPM_EMULATOR_DIR)
-	rm -rf $(VTPM_DIR)
+	rm -f $(TPM_EMULATOR_TARFILE) tpm_emulator.patch.old vtpm.patch.old
+	rm -rf $(TPM_EMULATOR_DIR) $(VTPM_DIR) $(ORIG_DIR)
 
 # Download Swiss emulator
 $(TPM_EMULATOR_TARFILE):
@@ -47,24 +48,38 @@ $(TPM_EMULATOR_TARFILE):
 
 # Create vtpm and TPM emulator dirs
 # apply patches for 1) used as dom0 tpm driver 2) used as vtpm device instance
-$(TPM_EMULATOR_DIR): $(TPM_EMULATOR_TARFILE) tpm_emulator.patch tpm_emulator-0.3-x86_64.patch
+$(TPM_EMULATOR_DIR): $(TPM_EMULATOR_TARFILE) tpm_emulator.patch 
 	if [ "$(BUILD_EMULATOR)" = "y" ]; then \
-		tar -xzf $(TPM_EMULATOR_TARFILE); \
 		rm -rf $(TPM_EMULATOR_DIR); \
-		mv tpm_emulator-0.3 $(TPM_EMULATOR_DIR); \
+		tar -xzf $(TPM_EMULATOR_TARFILE); \
+		mv $(TPM_EMULATOR_NAME) $(TPM_EMULATOR_DIR); \
 		cd $(TPM_EMULATOR_DIR); \
-		patch -p1 < ../tpm_emulator-0.3-x86_64.patch; \
 		patch -p1 <../tpm_emulator.patch; \
 	fi
 
-$(VTPM_DIR): $(TPM_EMULATOR_TARFILE) tpm_emulator-0.3-x86_64.patch vtpm.patch
-	tar -xzf $(TPM_EMULATOR_TARFILE);  
+$(VTPM_DIR): $(TPM_EMULATOR_TARFILE) vtpm.patch
 	rm -rf $(VTPM_DIR)
-	mv tpm_emulator-0.3 $(VTPM_DIR); 
+	tar -xzf $(TPM_EMULATOR_TARFILE);  
+	mv $(TPM_EMULATOR_NAME) $(VTPM_DIR); 
 
 	cd $(VTPM_DIR); \
-	patch -p1 < ../tpm_emulator-0.3-x86_64.patch; \
-	patch -p1 <../vtpm.patch
+	patch -p1 < ../tpm_emulator.patch; \
+	patch -p1 < ../vtpm.patch
+
+orig: $(TPM_EMULATOR_TARFILE)
+	mkdir $(ORIG_DIR);
+	cd $(ORIG_DIR); \
+	tar -xzf ../$(TPM_EMULATOR_TARFILE);
+
+updatepatches: clean orig
+	if [ "$(BUILD_EMULATOR)" = "y" ]; then \
+		find $(TPM_EMULATOR_DIR) -name "*.orig" -print | xargs rm -f; \
+		mv tpm_emulator.patch tpm_emulator.patch.old; \
+		diff -uprN orig/$(TPM_EMULATOR_NAME) $(TPM_EMULATOR_DIR) > tpm_emulator.patch || true; \
+        fi; 
+	find $(VTPM_DIR) -name "*.orig" -print | xargs rm -f; 
+	mv vtpm.patch vtpm.patch.old; 
+	diff -uprN $(TPM_EMULATOR_DIR) $(VTPM_DIR) > vtpm.patch || true;
 
 .PHONY: build_sub
 build_sub:

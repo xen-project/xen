@@ -1,136 +1,23 @@
-diff -uprN tpm_emulator-0.3-x86_64/AUTHORS tpm_emulator/AUTHORS
---- tpm_emulator-0.3-x86_64/AUTHORS	2006-08-29 15:07:21.618299064 -0700
-+++ tpm_emulator/AUTHORS	2006-08-29 15:26:17.099679656 -0700
+diff -uprN orig/tpm_emulator-0.4/AUTHORS tpm_emulator/AUTHORS
+--- orig/tpm_emulator-0.4/AUTHORS	2006-06-23 03:37:07.000000000 -0700
++++ tpm_emulator/AUTHORS	2006-07-24 14:35:35.000000000 -0700
 @@ -1,2 +1,3 @@
  Mario Strasser <mast@gmx.net>
  Heiko Stamer <stamer@gaos.org> [DAA]
 +INTEL Corp <> [Dropped to Ring3]
-diff -uprN tpm_emulator-0.3-x86_64/ChangeLog tpm_emulator/ChangeLog
---- tpm_emulator-0.3-x86_64/ChangeLog	2006-08-29 15:07:21.618299064 -0700
-+++ tpm_emulator/ChangeLog	2006-08-29 15:26:17.100679504 -0700
+diff -uprN orig/tpm_emulator-0.4/ChangeLog tpm_emulator/ChangeLog
+--- orig/tpm_emulator-0.4/ChangeLog	2006-06-23 03:37:07.000000000 -0700
++++ tpm_emulator/ChangeLog	2006-07-24 14:35:35.000000000 -0700
 @@ -1,3 +1,6 @@
-+2005-08-16 Intel Corp
++????-??-?? Intel Corp
 +	* Moved module out of kernel to run as a ring 3 app
 +
- 2005-12-24  Mario Strasser <mast@gmx.net>
- 	* tpm_transport.c, tpm_marshalling.c, tpm_structures.h:
- 		Transport session functionality added
-diff -uprN tpm_emulator-0.3-x86_64/Makefile tpm_emulator/Makefile
---- tpm_emulator-0.3-x86_64/Makefile	2006-08-29 15:08:20.532342768 -0700
-+++ tpm_emulator/Makefile	2006-08-29 15:27:39.559143912 -0700
-@@ -1,22 +1,31 @@
- # Software-Based Trusted Platform Module (TPM) Emulator for Linux
- # Copyright (C) 2004 Mario Strasser <mast@gmx.net>
-+# Copyright (C) 2006 INTEL Corp.
- #
- # $Id: Makefile 69 2005-12-13 12:55:52Z mast $
- 
--# kernel settings
--KERNEL_RELEASE := $(shell uname -r)
--KERNEL_BUILD   := /lib/modules/$(KERNEL_RELEASE)/build
--MOD_SUBDIR     := misc
- COMPILE_ARCH    ?= $(shell uname -m | sed -e s/i.86/x86_32/)
- 
- # module settings
--MODULE_NAME    := tpm_emulator
-+BIN            := tpm_emulator
- VERSION_MAJOR  := 0
- VERSION_MINOR  := 3
- VERSION_BUILD  := $(shell date +"%s")
- 
--# enable/disable DEBUG messages
--EXTRA_CFLAGS   += -Wall -DDEBUG -g  
-+# Installation program and options
-+INSTALL         = install
-+INSTALL_PROG    = $(INSTALL) -m0755
-+INSTALL_DIR     = $(INSTALL) -d -m0755
-+
-+# Xen tools installation directory
-+TOOLS_INSTALL_DIR = $(DESTDIR)/usr/bin
-+
-+CC      := gcc
-+CFLAGS  += -g -Wall $(INCLUDE) -DDEBUG
-+CFLAGS  += -I. -Itpm
-+
-+# Is the simulator running in it's own vm?
-+#CFLAGS += -DVTPM_MULTI_VM
- 
- ifeq ($(COMPILE_ARCH),x86_64)
- LIBDIR = lib64
-@@ -34,38 +43,31 @@ DIRS           := . crypto tpm 
- SRCS           := $(foreach dir, $(DIRS), $(wildcard $(src)/$(dir)/*.c))
- OBJS           := $(patsubst %.c, %.o, $(SRCS))
- SRCS           += $(foreach dir, $(DIRS), $(wildcard $(src)/$(dir)/*.h))
--DISTSRC        := ./README ./AUTHORS ./ChangeLog ./Makefile $(SRCS)
--DISTDIR        := tpm_emulator-$(VERSION_MAJOR).$(VERSION_MINOR)
- 
--obj-m               := $(MODULE_NAME).o
--$(MODULE_NAME)-objs := $(patsubst $(src)/%.o, %.o, $(OBJS)) crypto/libgmp.a
-+obj-m               := $(BIN)
-+$(BIN)-objs := $(patsubst $(src)/%.o, %.o, $(OBJS)) crypto/libgmp.a
- 
- EXTRA_CFLAGS   += -I$(src) -I$(src)/crypto -I$(src)/tpm 
- 
- # do not print "Entering directory ..."
- MAKEFLAGS      += --no-print-directory
- 
--all:	$(src)/crypto/gmp.h $(src)/crypto/libgmp.a version
--	@$(MAKE) -C $(KERNEL_BUILD) M=$(CURDIR) modules
-+all: $(BIN)
-+
-+$(BIN):	$(src)/crypto/gmp.h $(src)/crypto/libgmp.a version $(SRCS) $(OBJS)
-+	$(CC) $(CFLAGS) $(OBJS) $(src)/crypto/libgmp.a -o $(BIN)
-+
-+%.o: %.c
-+	$(CC) $(CFLAGS) -c $< -o $@
- 
--install:
--	@$(MAKE) -C $(KERNEL_BUILD) M=$(CURDIR) modules_install
--	test -d /var/tpm || mkdir /var/tpm
--	test -c /dev/tpm || mknod /dev/tpm c 10 224
--	chmod 666 /dev/tpm
--	depmod -a
-+install: $(BIN)
-+	$(INSTALL_PROG) $(BIN) $(TOOLS_INSTALL_DIR)
- 
- clean:
--	@$(MAKE) -C $(KERNEL_BUILD) M=$(CURDIR) clean
--	rm -f $(src)/crypto/gmp.h $(src)/crypto/libgmp.a
-+	rm -f $(src)/crypto/gmp.h $(src)/crypto/libgmp.a $(OBJS)
- 
--dist:	$(DISTSRC)
--	rm -rf $(DISTDIR)
--	mkdir $(DISTDIR)
--	cp --parents $(DISTSRC) $(DISTDIR)/
--	rm -f $(DISTDIR)/crypto/gmp.h 
--	tar -chzf $(DISTDIR).tar.gz $(DISTDIR)
--	rm -rf $(DISTDIR)
-+mrproper: clean
-+	rm -f $(BIN) tpm_version.h
- 
- $(src)/crypto/libgmp.a:
- 	test -f $(src)/crypto/libgmp.a || ln -s $(GMP_LIB) $(src)/crypto/libgmp.a
-diff -uprN tpm_emulator-0.3-x86_64/README tpm_emulator/README
---- tpm_emulator-0.3-x86_64/README	2006-08-29 15:07:43.530967832 -0700
-+++ tpm_emulator/README	2006-08-29 15:26:17.105678744 -0700
-@@ -13,7 +13,8 @@ $Id: README 78 2006-01-07 10:45:39Z mast
- Copyright
- --------------------------------------------------------------------------
- Copyright (C) 2004 Mario Strasser <mast@gmx.net> and Swiss Federal 
--Institute of Technology (ETH) Zurich.
-+                   Institute of Technology (ETH) Zurich.
-+Copyright (C) 2005 INTEL Corp 
-               
- This program is free software; you can redistribute it and/or modify
- it under the terms of the GNU General Public License as published by
-diff -uprN tpm_emulator-0.3-x86_64/README.1st tpm_emulator/README.1st
---- tpm_emulator-0.3-x86_64/README.1st	1969-12-31 16:00:00.000000000 -0800
-+++ tpm_emulator/README.1st	2006-08-29 15:26:17.105678744 -0700
-@@ -0,0 +1 @@
-+Note that you must manually create /tmp/tpm_in.fifo and /tmp/tpm_out.fifo for this emulator to work.
-diff -uprN tpm_emulator-0.3-x86_64/crypto/gmp_kernel_wrapper.c tpm_emulator/crypto/gmp_kernel_wrapper.c
---- tpm_emulator-0.3-x86_64/crypto/gmp_kernel_wrapper.c	2006-08-29 15:07:43.525968592 -0700
-+++ tpm_emulator/crypto/gmp_kernel_wrapper.c	2006-08-29 15:26:17.101679352 -0700
+ 2006-06-23  Mario Strasser <mast@gmx.net>
+ 	* tpm_startup.c: behaviour of ST_CLEAR and storage of
+ 		persistent data adapted
+diff -uprN orig/tpm_emulator-0.4/crypto/gmp_kernel_wrapper.c tpm_emulator/crypto/gmp_kernel_wrapper.c
+--- orig/tpm_emulator-0.4/crypto/gmp_kernel_wrapper.c	2006-06-23 03:37:07.000000000 -0700
++++ tpm_emulator/crypto/gmp_kernel_wrapper.c	2006-07-24 14:35:35.000000000 -0700
 @@ -1,5 +1,6 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -161,7 +48,7 @@ diff -uprN tpm_emulator-0.3-x86_64/crypto/gmp_kernel_wrapper.c tpm_emulator/cryp
  {
 -  void *ret  = (void*)kmalloc(size, GFP_KERNEL);
 -  if (!ret) panic(KERN_CRIT TPM_MODULE_NAME 
--    "GMP: cannot allocate memory (size=%Zu)\n", size);
+-    "GMP: cannot allocate memory (size=%u)\n", size);
 +  void *ret  = (void*)malloc(size);
 +  if (!ret) error("GMP: cannot allocate memory (size=%Zu)\n", size);
    return ret;
@@ -172,9 +59,10 @@ diff -uprN tpm_emulator-0.3-x86_64/crypto/gmp_kernel_wrapper.c tpm_emulator/cryp
  {
 -  void *ret = (void*)kmalloc(new_size, GFP_KERNEL);
 -  if (!ret) panic(KERN_CRIT TPM_MODULE_NAME "GMP: Cannot reallocate memory "
+-    "(old_size=%u new_size=%u)\n", old_size, new_size);
 +  void *ret = (void*)malloc(new_size);
 +  if (!ret) error("GMP: Cannot reallocate memory "
-     "(old_size=%Zu new_size=%Zu)\n", old_size, new_size);
++    "(old_size=%Zu new_size=%Zu)\n", old_size, new_size);
    memcpy(ret, oldptr, old_size);
 -  kfree(oldptr);
 +  free(oldptr);
@@ -190,9 +78,9 @@ diff -uprN tpm_emulator-0.3-x86_64/crypto/gmp_kernel_wrapper.c tpm_emulator/cryp
    }
  }
  
-diff -uprN tpm_emulator-0.3-x86_64/crypto/rsa.c tpm_emulator/crypto/rsa.c
---- tpm_emulator-0.3-x86_64/crypto/rsa.c	2006-08-29 15:07:21.618299064 -0700
-+++ tpm_emulator/crypto/rsa.c	2006-08-29 15:26:17.102679200 -0700
+diff -uprN orig/tpm_emulator-0.4/crypto/rsa.c tpm_emulator/crypto/rsa.c
+--- orig/tpm_emulator-0.4/crypto/rsa.c	2006-06-23 03:37:07.000000000 -0700
++++ tpm_emulator/crypto/rsa.c	2006-07-24 14:35:35.000000000 -0700
 @@ -1,5 +1,6 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -218,10 +106,10 @@ diff -uprN tpm_emulator-0.3-x86_64/crypto/rsa.c tpm_emulator/crypto/rsa.c
        sha1_final(&ctx, &msg[1]);
        if (memcmp(&msg[1], &msg[1 + SHA1_DIGEST_LENGTH], 
            SHA1_DIGEST_LENGTH) != 0) return -1;
-diff -uprN tpm_emulator-0.3-x86_64/linux_module.c tpm_emulator/linux_module.c
---- tpm_emulator-0.3-x86_64/linux_module.c	2006-08-29 15:07:43.526968440 -0700
+diff -uprN orig/tpm_emulator-0.4/linux_module.c tpm_emulator/linux_module.c
+--- orig/tpm_emulator-0.4/linux_module.c	2006-06-23 03:37:07.000000000 -0700
 +++ tpm_emulator/linux_module.c	1969-12-31 16:00:00.000000000 -0800
-@@ -1,194 +0,0 @@
+@@ -1,195 +0,0 @@
 -/* Software-Based Trusted Platform Module (TPM) Emulator for Linux 
 - * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
 - *
@@ -235,7 +123,7 @@ diff -uprN tpm_emulator-0.3-x86_64/linux_module.c tpm_emulator/linux_module.c
 - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
 - * GNU General Public License for more details.
 - *
-- * $Id: linux_module.c 76 2006-01-02 22:17:58Z hstamer $
+- * $Id: linux_module.c 91 2006-03-13 13:51:41Z mast $
 - */
 -
 -#include <linux/module.h>
@@ -273,6 +161,7 @@ diff -uprN tpm_emulator-0.3-x86_64/linux_module.c tpm_emulator/linux_module.c
 -/* module state */
 -#define STATE_IS_OPEN 0
 -static uint32_t module_state;
+-static struct timespec old_time;
 -
 -static int tpm_open(struct inode *inode, struct file *file)
 -{
@@ -296,7 +185,7 @@ diff -uprN tpm_emulator-0.3-x86_64/linux_module.c tpm_emulator/linux_module.c
 -
 -static ssize_t tpm_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 -{
--  debug("%s(%Zu)", __FUNCTION__, count);
+-  debug("%s(%d)", __FUNCTION__, count);
 -  down(&tpm_mutex);
 -  if (tpm_response.data != NULL) {
 -    count = min(count, (size_t)tpm_response.size - (size_t)*ppos);
@@ -315,7 +204,7 @@ diff -uprN tpm_emulator-0.3-x86_64/linux_module.c tpm_emulator/linux_module.c
 -
 -static ssize_t tpm_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 -{
--  debug("%s(%Zu)", __FUNCTION__, count);
+-  debug("%s(%d)", __FUNCTION__, count);
 -  down(&tpm_mutex);
 -  *ppos = 0;
 -  if (tpm_response.data != NULL) kfree(tpm_response.data);
@@ -379,7 +268,8 @@ diff -uprN tpm_emulator-0.3-x86_64/linux_module.c tpm_emulator/linux_module.c
 -  /* initialize variables */
 -  sema_init(&tpm_mutex, 1);
 -  module_state = 0;
--  tpm_response.data = NULL;    
+-  tpm_response.data = NULL;
+-  old_time = current_kernel_time();
 -  /* initialize TPM emulator */
 -  if (!strcmp(startup, "clear")) {
 -    tpm_emulator_init(1);
@@ -408,17 +298,16 @@ diff -uprN tpm_emulator-0.3-x86_64/linux_module.c tpm_emulator/linux_module.c
 -
 -uint64_t tpm_get_ticks(void)
 -{
--  static struct timespec old_time = {0, 0};
 -  struct timespec new_time = current_kernel_time();
--  uint64_t ticks = (uint64_t)(old_time.tv_sec - new_time.tv_sec) * 1000000
--                   + (old_time.tv_nsec - new_time.tv_nsec) / 1000;
+-  uint64_t ticks = (uint64_t)(new_time.tv_sec - old_time.tv_sec) * 1000000
+-                   + (new_time.tv_nsec - old_time.tv_nsec) / 1000;
 -  old_time = new_time;
 -  return (ticks > 0) ? ticks : 1;
 -}
 -
-diff -uprN tpm_emulator-0.3-x86_64/linux_module.h tpm_emulator/linux_module.h
---- tpm_emulator-0.3-x86_64/linux_module.h	2006-08-29 15:07:43.527968288 -0700
-+++ tpm_emulator/linux_module.h	2006-08-29 15:26:17.103679048 -0700
+diff -uprN orig/tpm_emulator-0.4/linux_module.h tpm_emulator/linux_module.h
+--- orig/tpm_emulator-0.4/linux_module.h	2006-06-23 03:37:07.000000000 -0700
++++ tpm_emulator/linux_module.h	2006-07-24 14:35:35.000000000 -0700
 @@ -1,5 +1,6 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -426,7 +315,7 @@ diff -uprN tpm_emulator-0.3-x86_64/linux_module.h tpm_emulator/linux_module.h
   *
   * This module is free software; you can redistribute it and/or modify
   * it under the terms of the GNU General Public License as published
-@@ -17,17 +18,22 @@
+@@ -17,54 +18,62 @@
  #ifndef _LINUX_MODULE_H_
  #define _LINUX_MODULE_H_
  
@@ -454,12 +343,15 @@ diff -uprN tpm_emulator-0.3-x86_64/linux_module.h tpm_emulator/linux_module.h
  
 +/* module settings */
 +#define min(A,B) ((A)<(B)?(A):(B))
- #ifndef STR
++#ifndef STR
  #define STR(s) __STR__(s)
  #define __STR__(s) #s
-@@ -38,35 +44,36 @@
- #define TPM_DEVICE_NAME         "tpm"
- #define TPM_MODULE_NAME 	"tpm_emulator"
++#endif
+ #include "tpm_version.h"
+ 
+ #define TPM_DEVICE_MINOR  224
+ #define TPM_DEVICE_NAME   "tpm"
+ #define TPM_MODULE_NAME   "tpm_emulator"
  
 -/* debug and log output functions */
 -
@@ -506,7 +398,7 @@ diff -uprN tpm_emulator-0.3-x86_64/linux_module.h tpm_emulator/linux_module.h
  static inline void tpm_get_random_bytes(void *buf, int nbytes)
  {
    get_random_bytes(buf, nbytes);
-@@ -86,9 +93,9 @@ uint64_t tpm_get_ticks(void);
+@@ -84,9 +93,9 @@ uint64_t tpm_get_ticks(void);
  #define CPU_TO_LE16(x) __cpu_to_le16(x)
  
  #define BE64_TO_CPU(x) __be64_to_cpu(x)
@@ -518,205 +410,242 @@ diff -uprN tpm_emulator-0.3-x86_64/linux_module.h tpm_emulator/linux_module.h
  #define BE16_TO_CPU(x) __be16_to_cpu(x)
  #define LE16_TO_CPU(x) __le16_to_cpu(x)
  
-diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_audit.c tpm_emulator/tpm/tpm_audit.c
---- tpm_emulator-0.3-x86_64/tpm/tpm_audit.c	2006-08-29 15:07:21.620298760 -0700
-+++ tpm_emulator/tpm/tpm_audit.c	2006-08-29 15:26:17.107678440 -0700
-@@ -1,6 +1,7 @@
- /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
-  * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
-  *                    Swiss Federal Institute of Technology (ETH) Zurich
-+ * Copyright (C) 2005 INTEL Corp
-  *
-  * This module is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License as published
-@@ -45,14 +46,14 @@ void tpm_audit_request(TPM_COMMAND_CODE 
-       tpmData.permanent.data.auditMonotonicCounter++;
-     }
-     /* update audit digest */
--    *((UINT16*)&buf[0])  = cpu_to_be16(TPM_TAG_AUDIT_EVENT_IN);
--    *((UINT32*)&buf[2]) = cpu_to_be32(ordinal);
-+    *((UINT16*)&buf[0])  = CPU_TO_BE16(TPM_TAG_AUDIT_EVENT_IN);
-+    *((UINT32*)&buf[2]) = CPU_TO_BE32(ordinal);
-     sha1_init(&sha1_ctx);
-     sha1_update(&sha1_ctx, req->param, req->paramSize);
-     sha1_final(&sha1_ctx, &buf[6]);
--    *((UINT16*)&buf[26])  = cpu_to_be16(TPM_TAG_COUNTER_VALUE);
-+    *((UINT16*)&buf[26])  = CPU_TO_BE16(TPM_TAG_COUNTER_VALUE);
-     memset(&buf[30], 0, 4);
--    *((UINT32*)&buf[34]) = cpu_to_be32(tpmData.permanent.data.auditMonotonicCounter);
-+    *((UINT32*)&buf[34]) = CPU_TO_BE32(tpmData.permanent.data.auditMonotonicCounter);
-     sha1_init(&sha1_ctx);
-     sha1_update(&sha1_ctx, tpmData.stany.data.auditDigest.digest, 
-       sizeof(TPM_DIGEST));
-@@ -70,15 +71,15 @@ void tpm_audit_response(TPM_COMMAND_CODE
-       && (AUDIT_STATUS[ord / 8] & (1 << (ord & 0x07)))) {
-     info("tpm_audit_response()");
-     /* update audit digest */
--    *((UINT16*)&buf[0])  = cpu_to_be16(TPM_TAG_AUDIT_EVENT_OUT);
--    *((UINT32*)&buf[2]) = cpu_to_be32(ordinal);
-+    *((UINT16*)&buf[0])  = CPU_TO_BE16(TPM_TAG_AUDIT_EVENT_OUT);
-+    *((UINT32*)&buf[2]) = CPU_TO_BE32(ordinal);
-     sha1_init(&sha1_ctx);
-     sha1_update(&sha1_ctx, rsp->param, rsp->paramSize);
-     sha1_final(&sha1_ctx, &buf[6]);
--    *((UINT16*)&buf[26])  = cpu_to_be16(TPM_TAG_COUNTER_VALUE);
-+    *((UINT16*)&buf[26])  = CPU_TO_BE16(TPM_TAG_COUNTER_VALUE);
-     memset(&buf[30], 0, 4);
--    *((UINT32*)&buf[34]) = cpu_to_be32(tpmData.permanent.data.auditMonotonicCounter);
--    *((UINT32*)&buf[34]) = cpu_to_be32(rsp->result);
-+    *((UINT32*)&buf[34]) = CPU_TO_BE32(tpmData.permanent.data.auditMonotonicCounter);
-+    *((UINT32*)&buf[34]) = CPU_TO_BE32(rsp->result);
-     sha1_init(&sha1_ctx);
-     sha1_update(&sha1_ctx, tpmData.stany.data.auditDigest.digest, 
-       sizeof(TPM_DIGEST));
-@@ -158,7 +159,7 @@ TPM_RESULT TPM_GetAuditDigestSigned(TPM_
-   }
-   memcpy(&buf[0], "\x05\x00ADIG", 6);
-   memcpy(&buf[6], antiReplay->nonce, 20);
--  *(UINT32*)&buf[26] = cpu_to_be32(buf_size - 30);
-+  *(UINT32*)&buf[26] = CPU_TO_BE32(buf_size - 30);
-   memcpy(&buf[30], auditDigest->digest, 20);
-   ptr = &buf[50];
-   len = buf_size - 50;
-@@ -198,4 +199,3 @@ TPM_RESULT TPM_SetOrdinalAuditStatus(TPM
-   }
-   return TPM_SUCCESS;
- }
+diff -uprN orig/tpm_emulator-0.4/Makefile tpm_emulator/Makefile
+--- orig/tpm_emulator-0.4/Makefile	2006-06-23 03:37:07.000000000 -0700
++++ tpm_emulator/Makefile	2006-07-24 14:35:35.000000000 -0700
+@@ -1,24 +1,40 @@
+ # Software-Based Trusted Platform Module (TPM) Emulator for Linux
+ # Copyright (C) 2004 Mario Strasser <mast@gmx.net>
++# Copyright (C) 2006 INTEL Corp.
+ #
+ # $Id: Makefile 115 2006-06-23 10:36:44Z mast $
+ 
+-# kernel settings
+-KERNEL_RELEASE := $(shell uname -r)
+-KERNEL_BUILD   := /lib/modules/$(KERNEL_RELEASE)/build
+-MOD_SUBDIR     := misc
++COMPILE_ARCH    ?= $(shell uname -m | sed -e s/i.86/x86_32/)
+ 
+ # module settings
+-MODULE_NAME    := tpm_emulator
++BIN            := tpm_emulator
+ VERSION_MAJOR  := 0
+ VERSION_MINOR  := 4
+ VERSION_BUILD  := $(shell date +"%s")
+ 
+-# enable/disable DEBUG messages
+-EXTRA_CFLAGS   += -Wall -DDEBUG -g  
++# Installation program and options
++INSTALL         = install
++INSTALL_PROG    = $(INSTALL) -m0755
++INSTALL_DIR     = $(INSTALL) -d -m0755
++
++# Xen tools installation directory
++TOOLS_INSTALL_DIR = $(DESTDIR)/usr/bin
++
++CC      := gcc
++CFLAGS  += -g -Wall $(INCLUDE) -DDEBUG
++CFLAGS  += -I. -Itpm
++
++# Is the simulator running in it's own vm?
++#CFLAGS += -DVTPM_MULTI_VM
++
++ifeq ($(COMPILE_ARCH),x86_64)
++LIBDIR = lib64
++else
++LIBDIR = lib
++endif
+ 
+ # GNU MP configuration
+-GMP_LIB        := /usr/lib/libgmp.a
++GMP_LIB        := /usr/$(LIBDIR)/libgmp.a
+ GMP_HEADER     := /usr/include/gmp.h
+ 
+ # sources and objects
+@@ -27,38 +43,32 @@ DIRS           := . crypto tpm 
+ SRCS           := $(foreach dir, $(DIRS), $(wildcard $(src)/$(dir)/*.c))
+ OBJS           := $(patsubst %.c, %.o, $(SRCS))
+ SRCS           += $(foreach dir, $(DIRS), $(wildcard $(src)/$(dir)/*.h))
+-DISTSRC        := ./README ./AUTHORS ./ChangeLog ./Makefile $(SRCS)
+-DISTDIR        := tpm_emulator-$(VERSION_MAJOR).$(VERSION_MINOR)
+ 
+-obj-m               := $(MODULE_NAME).o
+-$(MODULE_NAME)-objs := $(patsubst $(src)/%.o, %.o, $(OBJS)) crypto/libgmp.a
++obj-m               := $(BIN)
++$(BIN)-objs := $(patsubst $(src)/%.o, %.o, $(OBJS)) crypto/libgmp.a
+ 
+ EXTRA_CFLAGS   += -I$(src) -I$(src)/crypto -I$(src)/tpm 
+ 
+ # do not print "Entering directory ..."
+ MAKEFLAGS      += --no-print-directory
+ 
+-all:	$(src)/crypto/gmp.h $(src)/crypto/libgmp.a version
+-	@$(MAKE) -C $(KERNEL_BUILD) M=$(CURDIR) modules
++all: $(BIN)
+ 
+-install:
+-	@$(MAKE) -C $(KERNEL_BUILD) M=$(CURDIR) modules_install
+-	test -d /var/tpm || mkdir /var/tpm
+-	test -c /dev/tpm || mknod /dev/tpm c 10 224
+-	chmod 666 /dev/tpm
+-	depmod -a
++$(BIN):	$(src)/crypto/gmp.h $(src)/crypto/libgmp.a version $(SRCS) $(OBJS)
++	$(CC) $(CFLAGS) $(OBJS) $(src)/crypto/libgmp.a -o $(BIN)
++
++%.o: %.c
++	$(CC) $(CFLAGS) -c $< -o $@
++
++install: $(BIN)
++	$(INSTALL_PROG) $(BIN) $(TOOLS_INSTALL_DIR)
++	@if [ ! -d "/var/tpm" ]; then mkdir /var/tpm; fi
+ 
+ clean:
+-	@$(MAKE) -C $(KERNEL_BUILD) M=$(CURDIR) clean
+-	rm -f $(src)/crypto/gmp.h $(src)/crypto/libgmp.a
++	rm -f $(src)/crypto/gmp.h $(src)/crypto/libgmp.a $(OBJS)
+ 
+-dist:	$(DISTSRC)
+-	rm -rf $(DISTDIR)
+-	mkdir $(DISTDIR)
+-	cp --parents $(DISTSRC) $(DISTDIR)/
+-	rm -f $(DISTDIR)/crypto/gmp.h 
+-	tar -chzf $(DISTDIR).tar.gz $(DISTDIR)
+-	rm -rf $(DISTDIR)
++mrproper: clean
++	rm -f $(BIN) tpm_version.h
+ 
+ $(src)/crypto/libgmp.a:
+ 	test -f $(src)/crypto/libgmp.a || ln -s $(GMP_LIB) $(src)/crypto/libgmp.a
+@@ -88,4 +98,3 @@ version:
+ 	@echo "#endif /* _TPM_VERSION_H_ */" >> $(src)/tpm_version.h
+ 
+ .PHONY: all install clean dist gmp version
 -
-diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_authorization.c tpm_emulator/tpm/tpm_authorization.c
---- tpm_emulator-0.3-x86_64/tpm/tpm_authorization.c	2006-08-29 15:07:21.620298760 -0700
-+++ tpm_emulator/tpm/tpm_authorization.c	2006-08-29 15:26:17.108678288 -0700
-@@ -1,6 +1,7 @@
- /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
-  * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
-  *                    Swiss Federal Institute of Technology (ETH) Zurich
-+ * Copyright (C) 2005 INTEL Corp
-  *
-  * This module is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License as published
-@@ -279,7 +280,7 @@ TPM_RESULT tpm_verify_auth(TPM_AUTH *aut
+diff -uprN orig/tpm_emulator-0.4/README tpm_emulator/README
+--- orig/tpm_emulator-0.4/README	2006-06-23 03:37:07.000000000 -0700
++++ tpm_emulator/README	2006-07-24 14:35:35.000000000 -0700
+@@ -13,7 +13,8 @@ $Id: README 113 2006-06-18 12:38:13Z hst
+ Copyright
+ --------------------------------------------------------------------------
+ Copyright (C) 2004 Mario Strasser <mast@gmx.net> and Swiss Federal 
+-Institute of Technology (ETH) Zurich.
++                   Institute of Technology (ETH) Zurich.
++Copyright (C) 2005 INTEL Corp 
+               
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+@@ -43,6 +44,12 @@ Example:
+ GMP_LIB        := /usr/lib/libgmp.a
+ GMP_HEADER     := /usr/include/gmp.h
+ 
++GNU MP Library on 64 bit Systems
++--------------------------------------------------------------------------
++Some 64-bit kernels have problems with importing the user-space gmp 
++library (/usr/lib*/libgmp.a) into kernel space.  These kernels will require
++that the gmp library be recompiled for kernel space with -mcmodel=kernel.
++
+ Installation
+ --------------------------------------------------------------------------
+ The compilation and installation process uses the build environment for 
+diff -uprN orig/tpm_emulator-0.4/tpm/tpm_credentials.c tpm_emulator/tpm/tpm_credentials.c
+--- orig/tpm_emulator-0.4/tpm/tpm_credentials.c	2006-06-23 03:37:07.000000000 -0700
++++ tpm_emulator/tpm/tpm_credentials.c	2006-07-24 14:35:35.000000000 -0700
+@@ -47,16 +47,16 @@ int tpm_compute_pubkey_checksum(TPM_NONC
+ 
+ TPM_RESULT tpm_get_pubek(TPM_PUBKEY *pubEndorsementKey)
  {
-   hmac_ctx_t ctx;
-   TPM_SESSION_DATA *session;
--  UINT32 auth_handle = cpu_to_be32(auth->authHandle);
-+  UINT32 auth_handle = CPU_TO_BE32(auth->authHandle);
-   
-   info("tpm_verify_auth(%08x)", auth->authHandle);
-   /* get dedicated authorization or transport session */
-diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_capability.c tpm_emulator/tpm/tpm_capability.c
---- tpm_emulator-0.3-x86_64/tpm/tpm_capability.c	2006-08-29 15:07:21.620298760 -0700
-+++ tpm_emulator/tpm/tpm_capability.c	2006-08-29 15:26:17.109678136 -0700
-@@ -1,6 +1,7 @@
- /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
-  * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
-  *                    Swiss Federal Institute of Technology (ETH) Zurich
-+ * Copyright (C) 2005 INTEL Corp
-  *
-  * This module is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License as published
-@@ -406,7 +407,7 @@ TPM_RESULT TPM_GetCapability(TPM_CAPABIL
- 
-     case TPM_CAP_KEY_HANDLE:
-       debug("[TPM_CAP_KEY_HANDLE]");
--      subCapSize = cpu_to_be32(TPM_RT_KEY);
-+      subCapSize = CPU_TO_BE32(TPM_RT_KEY);
-       return cap_handle(4, (BYTE*)&subCapSize, respSize, resp);
- 
-     case TPM_CAP_CHECK_LOADED:
-@@ -480,4 +481,3 @@ TPM_RESULT TPM_GetCapability(TPM_CAPABIL
-       return TPM_BAD_MODE;
-   }
- }
--
-diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_cmd_handler.c tpm_emulator/tpm/tpm_cmd_handler.c
---- tpm_emulator-0.3-x86_64/tpm/tpm_cmd_handler.c	2006-08-29 15:07:21.621298608 -0700
-+++ tpm_emulator/tpm/tpm_cmd_handler.c	2006-08-29 15:26:17.113677528 -0700
-@@ -1,6 +1,7 @@
- /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
-  * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
-  *                    Swiss Federal Institute of Technology (ETH) Zurich
-+ * Copyright (C) 2005 INTEL Corp
-  *
-  * This module is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License as published
-@@ -73,7 +74,7 @@ void tpm_compute_in_param_digest(TPM_REQ
- {
-   sha1_ctx_t sha1;
-   UINT32 offset = tpm_get_param_offset(req->ordinal);
--  UINT32 ord = cpu_to_be32(req->ordinal);
-+  UINT32 ord = CPU_TO_BE32(req->ordinal);
- 
-   /* compute SHA1 hash */
-   if (offset <= req->paramSize) {
-@@ -89,8 +90,8 @@ void tpm_compute_in_param_digest(TPM_REQ
- void tpm_compute_out_param_digest(TPM_COMMAND_CODE ordinal, TPM_RESPONSE *rsp)
- {
-   sha1_ctx_t sha1;
--  UINT32 res = cpu_to_be32(rsp->result);
--  UINT32 ord = cpu_to_be32(ordinal);
-+  UINT32 res = CPU_TO_BE32(rsp->result);
-+  UINT32 ord = CPU_TO_BE32(ordinal);
- 
-   /* compute SHA1 hash */
-   sha1_init(&sha1);
-@@ -3123,7 +3124,7 @@ static void tpm_setup_rsp_auth(TPM_COMMA
-       hmac_update(&hmac, rsp->auth2->digest, sizeof(rsp->auth2->digest));
- #if 0
-       if (tpm_get_auth(rsp->auth2->authHandle)->type == TPM_ST_OIAP) {
--        UINT32 handle = cpu_to_be32(rsp->auth2->authHandle);
-+        UINT32 handle = CPU_TO_BE32(rsp->auth2->authHandle);
-         hmac_update(&hmac, (BYTE*)&handle, 4);
-       }
- #endif
-@@ -3138,7 +3139,7 @@ static void tpm_setup_rsp_auth(TPM_COMMA
-       hmac_update(&hmac, rsp->auth1->digest, sizeof(rsp->auth1->digest));
- #if 0
-       if (tpm_get_auth(rsp->auth1->authHandle)->type == TPM_ST_OIAP) {
--        UINT32 handle = cpu_to_be32(rsp->auth1->authHandle);
-+        UINT32 handle = CPU_TO_BE32(rsp->auth1->authHandle);
-         hmac_update(&hmac, (BYTE*)&handle, 4);
-       }
- #endif
-@@ -3221,7 +3222,9 @@ extern const char *tpm_error_to_string(T
- void tpm_execute_command(TPM_REQUEST *req, TPM_RESPONSE *rsp)
+-  UINT32 key_length;
++  size_t key_length;
+   if (!tpmData.permanent.data.endorsementKey.size) return TPM_NO_ENDORSEMENT;
+   /* setup TPM_PUBKEY structure */
+-  key_length = tpmData.permanent.data.endorsementKey.size;
+-  pubEndorsementKey->pubKey.keyLength = key_length >> 3;
++  pubEndorsementKey->pubKey.keyLength = tpmData.permanent.data.endorsementKey.size >> 3;
+   pubEndorsementKey->pubKey.key = tpm_malloc(pubEndorsementKey->pubKey.keyLength);
+   if (pubEndorsementKey->pubKey.key == NULL) return TPM_FAIL;
+   rsa_export_modulus(&tpmData.permanent.data.endorsementKey,
+-    pubEndorsementKey->pubKey.key,
+-    &pubEndorsementKey->pubKey.keyLength);
++		     pubEndorsementKey->pubKey.key,
++		     &key_length);
++  pubEndorsementKey->pubKey.keyLength = key_length;
+   pubEndorsementKey->algorithmParms.algorithmID = TPM_ALG_RSA;
+   pubEndorsementKey->algorithmParms.encScheme = TPM_ES_RSAESOAEP_SHA1_MGF1;
+   pubEndorsementKey->algorithmParms.sigScheme = TPM_SS_NONE;
+@@ -175,6 +175,7 @@ TPM_RESULT TPM_OwnerReadInternalPub(TPM_
  {
    TPM_RESULT res;
--  
-+
-+  req->tag = (BYTE) req->tag;  // FIXME: Why is this here
-+
-   /* setup authorisation as well as response tag and size */
-   memset(rsp, 0, sizeof(*rsp));
-   switch (req->tag) {
-diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_crypto.c tpm_emulator/tpm/tpm_crypto.c
---- tpm_emulator-0.3-x86_64/tpm/tpm_crypto.c	2006-08-29 15:07:43.531967680 -0700
-+++ tpm_emulator/tpm/tpm_crypto.c	2006-08-29 15:26:17.114677376 -0700
-@@ -1,6 +1,7 @@
- /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
-  * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
-  *                    Swiss Federal Institute of Technology (ETH) Zurich
-+ * Copyright (C) 2005 INTEL Corp
-  *
-  * This module is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License as published
-@@ -106,7 +107,7 @@ TPM_RESULT tpm_sign(TPM_KEY_DATA *key, T
-     /* setup TPM_SIGN_INFO structure */
-     memcpy(&buf[0], "\x05\x00SIGN", 6);
-     memcpy(&buf[6], auth->nonceOdd.nonce, 20);
--    *(UINT32*)&buf[26] = cpu_to_be32(areaToSignSize);
-+    *(UINT32*)&buf[26] = CPU_TO_BE32(areaToSignSize);
-     memcpy(&buf[30], areaToSign, areaToSignSize);
-     if (rsa_sign(&key->key, RSA_SSA_PKCS1_SHA1, 
-         buf, areaToSignSize + 30, *sig)) {
-@@ -383,4 +384,3 @@ TPM_RESULT TPM_CertifyKey2(TPM_KEY_HANDL
+   TPM_KEY_DATA *srk = &tpmData.permanent.data.srk;
++  size_t key_length;
+   info("TPM_OwnerReadInternalPub()");
+   /* verify authorization */
+   res = tpm_verify_auth(auth1, tpmData.permanent.data.ownerAuth, TPM_KH_OWNER);
+@@ -186,7 +187,8 @@ TPM_RESULT TPM_OwnerReadInternalPub(TPM_
+     publicPortion->pubKey.key = tpm_malloc(publicPortion->pubKey.keyLength);
+     if (publicPortion->pubKey.key == NULL) return TPM_FAIL;
+     rsa_export_modulus(&srk->key, publicPortion->pubKey.key, 
+-      &publicPortion->pubKey.keyLength);
++      &key_length);
++    publicPortion->pubKey.keyLength = key_length;
+     publicPortion->algorithmParms.algorithmID = TPM_ALG_RSA;
+     publicPortion->algorithmParms.encScheme = srk->encScheme;
+     publicPortion->algorithmParms.sigScheme = srk->sigScheme;
+diff -uprN orig/tpm_emulator-0.4/tpm/tpm_crypto.c tpm_emulator/tpm/tpm_crypto.c
+--- orig/tpm_emulator-0.4/tpm/tpm_crypto.c	2006-06-23 03:37:07.000000000 -0700
++++ tpm_emulator/tpm/tpm_crypto.c	2006-07-24 14:35:35.000000000 -0700
+@@ -182,7 +182,8 @@ TPM_RESULT TPM_CertifyKey(TPM_KEY_HANDLE
+   TPM_KEY_DATA *cert, *key;
+   sha1_ctx_t sha1_ctx;
+   BYTE *buf, *p;
+-  UINT32 length;
++  UINT32 length32;
++  size_t length;
+   info("TPM_CertifyKey()");
+   /* get keys */
+   cert = tpm_get_key(certHandle);
+@@ -264,14 +265,15 @@ TPM_RESULT TPM_CertifyKey(TPM_KEY_HANDLE
+   /* compute the digest of the CERTIFY_INFO[2] structure and sign it */
+   length = sizeof_TPM_CERTIFY_INFO((*certifyInfo));
+   p = buf = tpm_malloc(length);
++  length32=(UINT32) length;
+   if (buf == NULL
+-      || tpm_marshal_TPM_CERTIFY_INFO(&p, &length, certifyInfo)) {
++      || tpm_marshal_TPM_CERTIFY_INFO(&p, &length32, certifyInfo)) {
+     free_TPM_KEY_PARMS(certifyInfo->algorithmParms);
+     return TPM_FAIL;
    }
-   return TPM_SUCCESS;
- }
--
-diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_daa.c tpm_emulator/tpm/tpm_daa.c
---- tpm_emulator-0.3-x86_64/tpm/tpm_daa.c	2006-08-29 15:07:21.622298456 -0700
-+++ tpm_emulator/tpm/tpm_daa.c	2006-08-29 15:26:17.119676616 -0700
-@@ -700,14 +700,14 @@ info("tested until here");
+   length = sizeof_TPM_CERTIFY_INFO((*certifyInfo));
+   sha1_init(&sha1_ctx);
+-  sha1_update(&sha1_ctx, buf, length);
++  sha1_update(&sha1_ctx, buf, (size_t) length);
+   sha1_final(&sha1_ctx, buf);
+   res = tpm_sign(cert, auth1, FALSE, buf, SHA1_DIGEST_LENGTH, outData, outDataSize);
+   tpm_free(buf);
+@@ -292,7 +294,8 @@ TPM_RESULT TPM_CertifyKey2(TPM_KEY_HANDL
+   TPM_KEY_DATA *cert, *key;
+   sha1_ctx_t sha1_ctx;
+   BYTE *buf, *p;
+-  UINT32 length;
++  size_t length;
++  UINT32 length32;
+   info("TPM_CertifyKey2()");
+   /* get keys */
+   cert = tpm_get_key(certHandle);
+@@ -362,8 +365,9 @@ TPM_RESULT TPM_CertifyKey2(TPM_KEY_HANDL
+   /* compute the digest of the CERTIFY_INFO[2] structure and sign it */
+   length = sizeof_TPM_CERTIFY_INFO((*certifyInfo));
+   p = buf = tpm_malloc(length);
++  length32 = (UINT32) length;
+   if (buf == NULL
+-      || tpm_marshal_TPM_CERTIFY_INFO(&p, &length, certifyInfo)) {
++      || tpm_marshal_TPM_CERTIFY_INFO(&p, &length32, certifyInfo)) {
+     free_TPM_KEY_PARMS(certifyInfo->algorithmParms);
+     return TPM_FAIL;
+   }
+diff -uprN orig/tpm_emulator-0.4/tpm/tpm_daa.c tpm_emulator/tpm/tpm_daa.c
+--- orig/tpm_emulator-0.4/tpm/tpm_daa.c	2006-06-23 03:37:07.000000000 -0700
++++ tpm_emulator/tpm/tpm_daa.c	2006-07-24 14:35:35.000000000 -0700
+@@ -716,14 +716,14 @@ TPM_RESULT TPM_DAA_Join(TPM_HANDLE handl
            sizeof(session->DAA_tpmSpecific.DAA_rekey));
        sha1_update(&sha1, (BYTE*) &session->DAA_tpmSpecific.DAA_count, 
            sizeof(session->DAA_tpmSpecific.DAA_count));
@@ -733,7 +662,7 @@ diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_daa.c tpm_emulator/tpm/tpm_daa.c
        sha1_final(&sha1, scratch + SHA1_DIGEST_LENGTH);
        mpz_init(f), mpz_init(q);
        mpz_import(f, 2 * SHA1_DIGEST_LENGTH, 1, 1, 0, 0, scratch);
-@@ -787,14 +787,14 @@ info("tested until here");
+@@ -805,14 +805,14 @@ TPM_RESULT TPM_DAA_Join(TPM_HANDLE handl
            sizeof(session->DAA_tpmSpecific.DAA_rekey));
        sha1_update(&sha1, (BYTE*) &session->DAA_tpmSpecific.DAA_count, 
            sizeof(session->DAA_tpmSpecific.DAA_count));
@@ -750,7 +679,7 @@ diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_daa.c tpm_emulator/tpm/tpm_daa.c
        sha1_final(&sha1, scratch + SHA1_DIGEST_LENGTH);
        mpz_init(f), mpz_init(q);
        mpz_import(f, 2 * SHA1_DIGEST_LENGTH, 1, 1, 0, 0, scratch);
-@@ -1440,14 +1440,14 @@ info("tested until here");
+@@ -1489,14 +1489,14 @@ TPM_RESULT TPM_DAA_Join(TPM_HANDLE handl
            sizeof(session->DAA_tpmSpecific.DAA_rekey));
        sha1_update(&sha1, (BYTE*) &session->DAA_tpmSpecific.DAA_count, 
            sizeof(session->DAA_tpmSpecific.DAA_count));
@@ -767,7 +696,7 @@ diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_daa.c tpm_emulator/tpm/tpm_daa.c
        sha1_final(&sha1, scratch + SHA1_DIGEST_LENGTH);
        mpz_init(f), mpz_init(q);
        mpz_import(f, 2 * SHA1_DIGEST_LENGTH, 1, 1, 0, 0, scratch);
-@@ -1660,14 +1660,14 @@ info("tested until here");
+@@ -1712,14 +1712,14 @@ TPM_RESULT TPM_DAA_Join(TPM_HANDLE handl
            sizeof(session->DAA_tpmSpecific.DAA_rekey));
        sha1_update(&sha1, (BYTE*) &session->DAA_tpmSpecific.DAA_count, 
            sizeof(session->DAA_tpmSpecific.DAA_count));
@@ -784,7 +713,7 @@ diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_daa.c tpm_emulator/tpm/tpm_daa.c
        sha1_final(&sha1, scratch + SHA1_DIGEST_LENGTH);
        mpz_init(f), mpz_init(q);
        mpz_import(f, 2 * SHA1_DIGEST_LENGTH, 1, 1, 0, 0, scratch);
-@@ -1740,14 +1740,14 @@ info("tested until here");
+@@ -1793,14 +1793,14 @@ TPM_RESULT TPM_DAA_Join(TPM_HANDLE handl
            sizeof(session->DAA_tpmSpecific.DAA_rekey));
        sha1_update(&sha1, (BYTE*) &session->DAA_tpmSpecific.DAA_count, 
            sizeof(session->DAA_tpmSpecific.DAA_count));
@@ -801,7 +730,7 @@ diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_daa.c tpm_emulator/tpm/tpm_daa.c
        sha1_final(&sha1, scratch + SHA1_DIGEST_LENGTH);
        mpz_init(f), mpz_init(q);
        mpz_import(f, 2 * SHA1_DIGEST_LENGTH, 1, 1, 0, 0, scratch);
-@@ -2828,14 +2828,14 @@ TPM_RESULT TPM_DAA_Sign(TPM_HANDLE handl
+@@ -2918,14 +2918,14 @@ TPM_RESULT TPM_DAA_Sign(TPM_HANDLE handl
            sizeof(session->DAA_tpmSpecific.DAA_rekey));
        sha1_update(&sha1, (BYTE*) &session->DAA_tpmSpecific.DAA_count, 
            sizeof(session->DAA_tpmSpecific.DAA_count));
@@ -818,7 +747,7 @@ diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_daa.c tpm_emulator/tpm/tpm_daa.c
        sha1_final(&sha1, scratch + SHA1_DIGEST_LENGTH);
        mpz_init(f), mpz_init(q);
        mpz_import(f, 2 * SHA1_DIGEST_LENGTH, 1, 1, 0, 0, scratch);
-@@ -3050,7 +3050,7 @@ TPM_RESULT TPM_DAA_Sign(TPM_HANDLE handl
+@@ -3143,7 +3143,7 @@ TPM_RESULT TPM_DAA_Sign(TPM_HANDLE handl
          sha1_init(&sha1);
          sha1_update(&sha1, (BYTE*) &session->DAA_session.DAA_digest, 
            sizeof(session->DAA_session.DAA_digest));
@@ -827,16 +756,16 @@ diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_daa.c tpm_emulator/tpm/tpm_daa.c
          sha1_update(&sha1, inputData1, inputSize1);
          sha1_final(&sha1, (BYTE*) &session->DAA_session.DAA_digest);
        }
-@@ -3078,7 +3078,7 @@ TPM_RESULT TPM_DAA_Sign(TPM_HANDLE handl
+@@ -3172,7 +3172,7 @@ TPM_RESULT TPM_DAA_Sign(TPM_HANDLE handl
          sha1_init(&sha1);
          sha1_update(&sha1, (BYTE*) &session->DAA_session.DAA_digest, 
            sizeof(session->DAA_session.DAA_digest));
--        sha1_update(&sha1, "\x01", 1);
-+        sha1_update(&sha1, (BYTE *) "\x01", 1);
+-        sha1_update(&sha1, "\x00", 1);
++        sha1_update(&sha1, (BYTE*) "\x00", 1);
          rsa_export_modulus(&aikData->key, scratch, &size);
          sha1_update(&sha1, scratch, size);
          sha1_final(&sha1, (BYTE*) &session->DAA_session.DAA_digest);
-@@ -3134,14 +3134,14 @@ TPM_RESULT TPM_DAA_Sign(TPM_HANDLE handl
+@@ -3229,14 +3229,14 @@ TPM_RESULT TPM_DAA_Sign(TPM_HANDLE handl
            sizeof(session->DAA_tpmSpecific.DAA_rekey));
        sha1_update(&sha1, (BYTE*) &session->DAA_tpmSpecific.DAA_count, 
            sizeof(session->DAA_tpmSpecific.DAA_count));
@@ -853,7 +782,7 @@ diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_daa.c tpm_emulator/tpm/tpm_daa.c
        sha1_final(&sha1, scratch + SHA1_DIGEST_LENGTH);
        mpz_init(f), mpz_init(q);
        mpz_import(f, 2 * SHA1_DIGEST_LENGTH, 1, 1, 0, 0, scratch);
-@@ -3213,14 +3213,14 @@ TPM_RESULT TPM_DAA_Sign(TPM_HANDLE handl
+@@ -3309,14 +3309,14 @@ TPM_RESULT TPM_DAA_Sign(TPM_HANDLE handl
            sizeof(session->DAA_tpmSpecific.DAA_rekey));
        sha1_update(&sha1, (BYTE*) &session->DAA_tpmSpecific.DAA_count, 
            sizeof(session->DAA_tpmSpecific.DAA_count));
@@ -870,10 +799,27 @@ diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_daa.c tpm_emulator/tpm/tpm_daa.c
        sha1_final(&sha1, scratch + SHA1_DIGEST_LENGTH);
        mpz_init(f), mpz_init(q);
        mpz_import(f, 2 * SHA1_DIGEST_LENGTH, 1, 1, 0, 0, scratch);
-diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_data.c tpm_emulator/tpm/tpm_data.c
---- tpm_emulator-0.3-x86_64/tpm/tpm_data.c	2006-08-29 15:08:20.535342312 -0700
-+++ tpm_emulator/tpm/tpm_data.c	2006-08-29 15:26:17.121676312 -0700
-@@ -150,44 +150,43 @@ void tpm_release_data(void)
+diff -uprN orig/tpm_emulator-0.4/tpm/tpm_data.c tpm_emulator/tpm/tpm_data.c
+--- orig/tpm_emulator-0.4/tpm/tpm_data.c	2006-06-23 03:37:07.000000000 -0700
++++ tpm_emulator/tpm/tpm_data.c	2006-07-24 14:35:35.000000000 -0700
+@@ -40,6 +40,7 @@ static inline void init_pcr_attr(int pcr
+ void tpm_init_data(void)
+ {
+   /* endorsement key */
++#ifndef TPM_GENERATE_EK
+   uint8_t ek_n[] =  "\xa8\xdb\xa9\x42\xa8\xf3\xb8\x06\x85\x90\x76\x93\xad\xf7"
+     "\x74\xec\x3f\xd3\x3d\x9d\xe8\x2e\xff\x15\xed\x0e\xce\x5f\x93"
+     "\x92\xeb\xd1\x96\x2b\x72\x18\x81\x79\x12\x9d\x9c\x40\xd7\x1a"
+@@ -77,6 +78,8 @@ void tpm_init_data(void)
+     "\xd1\xc0\x8b\x5b\xa2\x2e\xa7\x15\xca\x50\x75\x10\x48\x9c\x2b"
+     "\x18\xb9\x67\x8f\x5d\x64\xc3\x28\x9f\x2f\x16\x2f\x08\xda\x47"
+     "\xec\x86\x43\x0c\x80\x99\x07\x34\x0f";
++#endif
++
+   int i;
+   /* reset all data to NULL, FALSE or 0 */
+   memset(&tpmData, 0, sizeof(tpmData));
+@@ -152,44 +155,43 @@ void tpm_release_data(void)
  
  #ifdef TPM_STORE_TO_FILE
  
@@ -939,7 +885,75 @@ diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_data.c tpm_emulator/tpm/tpm_data.c
    if (res != *data_length) {
      tpm_free(*data);
      return -1;
-@@ -278,7 +277,7 @@ int tpm_restore_permanent_data(void)
+@@ -216,23 +218,30 @@ static int read_from_file(uint8_t **data
+ int tpm_store_permanent_data(void)
+ {
+   uint8_t *buf, *ptr;
+-  size_t buf_length, len;
++  UINT32 buf_length, len;
+ 
+   /* marshal data */
+-  buf_length = len = sizeof_TPM_STCLEAR_FLAGS(tpmData.stclear.flags)
+-    + sizeof_TPM_PERMANENT_FLAGS(tpmData.permanent.flags) + 2
+-    + sizeof_TPM_PERMANENT_DATA(tpmData.permanent.data);
++  buf_length = len = 4 + sizeof_TPM_STCLEAR_FLAGS(tpmData.stclear.flags)
++    + sizeof_TPM_PERMANENT_FLAGS(tpmData.permanent.flags) 
++    + sizeof_TPM_STANY_FLAGS(tpmData.stany.flags) + 2
++    + sizeof_TPM_STCLEAR_DATA(tpmData.stclear.data) 
++    + sizeof_TPM_PERMANENT_DATA(tpmData.permanent.data)
++    + sizeof_TPM_STANY_DATA(tpmData.stany.data);
+   buf = ptr = tpm_malloc(buf_length);
+   if (buf == NULL
+       || tpm_marshal_TPM_VERSION(&ptr, &len, &tpmData.permanent.data.version)
+       || tpm_marshal_TPM_STCLEAR_FLAGS(&ptr, &len, &tpmData.stclear.flags)
+       || tpm_marshal_TPM_PERMANENT_FLAGS(&ptr, &len, &tpmData.permanent.flags)
++      || tpm_marshal_TPM_STANY_FLAGS(&ptr, &len, &tpmData.stany.flags)
+       || tpm_marshal_BOOL(&ptr, &len, tpmData.permanent.flags.selfTestSucceeded)
+       || tpm_marshal_BOOL(&ptr, &len, tpmData.permanent.flags.owned)
+-      || tpm_marshal_TPM_PERMANENT_DATA(&ptr, &len, &tpmData.permanent.data)) {
++      || tpm_marshal_TPM_STCLEAR_DATA(&ptr, &len, &tpmData.stclear.data)
++      || tpm_marshal_TPM_PERMANENT_DATA(&ptr, &len, &tpmData.permanent.data)
++      || tpm_marshal_TPM_STANY_DATA(&ptr, &len, &tpmData.stany.data)) {
+     tpm_free(buf);
+     return -1;
+   }
++
+   if (write_to_file(buf, buf_length - len)) {
+     tpm_free(buf);
+     return -1; 
+@@ -244,31 +253,36 @@ int tpm_store_permanent_data(void)
+ int tpm_restore_permanent_data(void)
+ {
+   uint8_t *buf, *ptr;
+-  size_t buf_length, len;
++  size_t buf_length;
++  UINT32 len;
+   TPM_VERSION ver;
+ 
+   /* read data */
+   if (read_from_file(&buf, &buf_length)) return -1;
+   ptr = buf;
+-  len = buf_length;
++  len = (uint32_t) buf_length;
+   /* unmarshal data */
+   if (tpm_unmarshal_TPM_VERSION(&ptr, &len, &ver)
+       || memcmp(&ver, &tpmData.permanent.data.version, sizeof(TPM_VERSION))
+       || tpm_unmarshal_TPM_STCLEAR_FLAGS(&ptr, &len, &tpmData.stclear.flags)
+       || tpm_unmarshal_TPM_PERMANENT_FLAGS(&ptr, &len, &tpmData.permanent.flags)
++      || tpm_unmarshal_TPM_STANY_FLAGS(&ptr, &len, &tpmData.stany.flags)
+       || tpm_unmarshal_BOOL(&ptr, &len, &tpmData.permanent.flags.selfTestSucceeded)
+       || tpm_unmarshal_BOOL(&ptr, &len, &tpmData.permanent.flags.owned)
+-      || tpm_unmarshal_TPM_PERMANENT_DATA(&ptr, &len, &tpmData.permanent.data)) {
++      || tpm_unmarshal_TPM_STCLEAR_DATA(&ptr, &len, &tpmData.stclear.data)
++      || tpm_unmarshal_TPM_PERMANENT_DATA(&ptr, &len, &tpmData.permanent.data)
++      || tpm_unmarshal_TPM_STANY_DATA(&ptr, &len, &tpmData.stany.data)) {
+     tpm_free(buf);
+     return -1;
+   }
++
+   tpm_free(buf);
+   return 0;
+ }
  
  int tpm_erase_permanent_data(void)
  {
@@ -948,297 +962,9 @@ diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_data.c tpm_emulator/tpm/tpm_data.c
    return res;
  }
  
-diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_data.c.orig tpm_emulator/tpm/tpm_data.c.orig
---- tpm_emulator-0.3-x86_64/tpm/tpm_data.c.orig	1969-12-31 16:00:00.000000000 -0800
-+++ tpm_emulator/tpm/tpm_data.c.orig	2006-08-29 15:26:08.469991568 -0700
-@@ -0,0 +1,284 @@
-+/* Software-Based Trusted Platform Module (TPM) Emulator for Linux
-+ * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
-+ *                    Swiss Federal Institute of Technology (ETH) Zurich
-+ *
-+ * This module is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published
-+ * by the Free Software Foundation; either version 2 of the License,
-+ * or (at your option) any later version.
-+ *
-+ * This module is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * $Id: tpm_data.c 36 2005-10-26 20:31:19Z hstamer $
-+ */
-+
-+#include "tpm_emulator.h"
-+#include "tpm_structures.h"
-+#include "tpm_marshalling.h"
-+#include "linux_module.h"
-+
-+TPM_DATA tpmData;
-+
-+BOOL tpm_get_physical_presence(void)
-+{
-+  return (tpmData.stclear.flags.physicalPresence || TRUE);
-+}
-+
-+static inline void init_pcr_attr(int pcr, BOOL reset, BYTE rl, BYTE el)
-+{
-+  int i;
-+  tpmData.permanent.data.pcrAttrib[pcr].pcrReset = reset;
-+  for (i = 0; i < TPM_NUM_LOCALITY; i++) {
-+    tpmData.permanent.data.pcrAttrib[pcr].pcrResetLocal[i] = (rl & (1 << i));
-+    tpmData.permanent.data.pcrAttrib[pcr].pcrExtendLocal[i] = (el & (1 << i));
-+  }
-+}
-+
-+void tpm_init_data(void)
-+{
-+  /* endorsement key */
-+  uint8_t ek_n[] =  "\xa8\xdb\xa9\x42\xa8\xf3\xb8\x06\x85\x90\x76\x93\xad\xf7"
-+    "\x74\xec\x3f\xd3\x3d\x9d\xe8\x2e\xff\x15\xed\x0e\xce\x5f\x93"
-+    "\x92\xeb\xd1\x96\x2b\x72\x18\x81\x79\x12\x9d\x9c\x40\xd7\x1a"
-+    "\x21\xda\x5f\x56\xe0\xc9\x48\x31\xdd\x96\xdc\xbb\x45\xc6\x8e"
-+    "\xad\x58\x23\xcb\xbe\xbb\x13\x2d\x6b\x86\xc5\x57\xf5\xdd\x48"
-+    "\xc1\x3d\xcd\x4d\xda\x81\xc4\x43\x17\xaa\x05\x40\x33\x62\x0a"
-+    "\x59\xdb\x28\xcd\xb5\x08\x31\xbb\x06\xf5\xf7\x71\xae\x21\xa8"
-+    "\xf2\x2f\x0e\x17\x80\x5d\x9c\xdf\xaa\xe9\x89\x09\x54\x65\x2b"
-+    "\x46\xfb\x9d\xb2\x00\x70\x63\x0d\x9a\x6d\x3d\x5e\x11\x78\x65"
-+    "\x90\xe6\x26\xee\x77\xbe\x08\xff\x07\x60\x5a\xcc\xf1\x0a\xbd"
-+    "\x44\x92\x6b\xca\xb6\xce\x66\xf9\x93\x40\xae\xf3\x3e\x53\x02"
-+    "\x3c\xa6\x81\xb3\xbe\xad\x6e\x6c\xa6\xf0\xeb\xdf\xe9\xa2\x83"
-+    "\x36\x0e\x52\x0d\x64\x17\xd9\xff\xa1\x74\x7c\x2b\xbc\x6a\xcc"
-+    "\xe5\x4e\xb4\x52\xd9\xec\x43\xbd\x26\x6a\x2b\x19\x19\x6e\x97"
-+    "\xb8\x1d\x9f\x7b\xe7\x32\x2d\xdd\x7c\x51\xc8\xe4\xf3\x02\xd4"
-+    "\x7c\x90\x44\xa0\x33\x72\x81\x75\xa9\x16\x27\x5c\x00\x1d\x07"
-+    "\x81\xd4\xf7\xac\xcb\xfe\xd6\x60\x03\x6f\x7a\xcc\x00\xd1\xc4"
-+    "\x85\x37";
-+  uint8_t ek_e[] = "\x01\x00\x01";
-+  uint8_t ek_p[] = "\xd7\xea\x61\x15\x8b\xa3\x71\xdf\xa8\x74\x77\xca\x88\x95"
-+    "\xd0\x76\x17\x43\x2c\xf6\x23\x27\x44\xb9\x0e\x18\x35\x7e\xe4"
-+    "\xc3\xcb\x13\x6e\xfc\x38\x02\x1e\x77\x26\x40\x9d\x17\xb2\x39"
-+    "\x9c\x7f\x5f\x98\xe6\xf2\x55\x0c\x12\x05\x4c\xb3\x51\xae\x29"
-+    "\xe7\xcd\xce\x41\x0b\x28\x4d\x97\x13\x4b\x60\xc8\xd8\x70\x81"
-+    "\xf9\x1c\x12\x44\xdf\x53\x0a\x87\x9d\x33\x92\x4a\x34\x69\xf0"
-+    "\x70\x5e\x1b\x5d\x65\xc7\x84\x90\xa2\x62\xdf\x83\x14\x10\x69"
-+    "\xe2\xa7\x18\x43\xd7\x1f\x60\xc9\x03\x8f\xd6\xa4\xce\xb2\x9d"
-+    "\x40\x37\x70\x17\x4c\xe3\x69\xd4\x59";
-+  uint8_t ek_q[] = "\xc8\x34\xd2\xd0\x7c\xfa\xdc\x68\xe2\x72\xd7\x92\xe2\x50"
-+    "\x93\xfc\xbb\x72\x55\x4d\x6b\x7a\x0c\x0b\xcf\x87\x66\x1f\x81"
-+    "\x71\xf3\x50\xcb\xaa\xe6\x43\x7e\xbe\x11\xc4\xec\x00\x53\xf4"
-+    "\x78\x13\x2b\x59\x26\x4a\x9f\x91\x61\x8f\xa7\x07\x64\x11\x5a"
-+    "\xf4\xaf\x9c\x9b\x5a\x5d\x69\x20\x17\x55\x74\xba\xd8\xe4\x59"
-+    "\x39\x1a\x0a\x7b\x4a\x30\xf0\xc8\x7f\xd9\xaf\x72\xc5\xb6\x71"
-+    "\xd1\xc0\x8b\x5b\xa2\x2e\xa7\x15\xca\x50\x75\x10\x48\x9c\x2b"
-+    "\x18\xb9\x67\x8f\x5d\x64\xc3\x28\x9f\x2f\x16\x2f\x08\xda\x47"
-+    "\xec\x86\x43\x0c\x80\x99\x07\x34\x0f";
-+  int i;
-+  /* reset all data to NULL, FALSE or 0 */
-+  memset(&tpmData, 0, sizeof(tpmData));
-+  tpmData.permanent.data.tag = TPM_TAG_PERMANENT_DATA;
-+  /* set permanent flags */
-+  tpmData.permanent.flags.tag = TPM_TAG_PERMANENT_FLAGS;
-+  tpmData.permanent.flags.disable = FALSE;
-+  tpmData.permanent.flags.deactivated = FALSE;
-+  tpmData.permanent.flags.ownership = TRUE;
-+  tpmData.permanent.flags.readPubek = TRUE;
-+  tpmData.permanent.flags.allowMaintenance = TRUE;
-+  tpmData.permanent.flags.enableRevokeEK = TRUE;
-+  /* set TPM vision */
-+  tpmData.permanent.data.version.major = 1;
-+  tpmData.permanent.data.version.minor = 2;
-+  tpmData.permanent.data.version.revMajor = VERSION_MAJOR;
-+  tpmData.permanent.data.version.revMinor = VERSION_MINOR;
-+  /* setup PCR attributes */
-+  for (i = 0; i < min(16, TPM_NUM_PCR); i++) {
-+    init_pcr_attr(i, FALSE, 0x00, 0x1f);
-+  }
-+  if (TPM_NUM_PCR >= 24) {
-+    init_pcr_attr(16, TRUE, 0x1f, 0x1f);
-+    init_pcr_attr(17, TRUE, 0x10, 0x1c);
-+    init_pcr_attr(18, TRUE, 0x10, 0x1c);
-+    init_pcr_attr(19, TRUE, 0x10, 0x0c);
-+    init_pcr_attr(20, TRUE, 0x14, 0x0e);
-+    init_pcr_attr(21, TRUE, 0x04, 0x04);
-+    init_pcr_attr(22, TRUE, 0x04, 0x04);
-+    init_pcr_attr(23, TRUE, 0x1f, 0x1f);
-+  }
-+  for (i = 24; i < TPM_NUM_PCR; i++) {
-+    init_pcr_attr(i, TRUE, 0x00, 0x00);
-+  }
-+  /* set tick type */
-+  tpmData.permanent.data.tickType = TICK_INC;
-+#ifdef TPM_GENERATE_EK
-+  /* generate a new endorsement key */
-+  rsa_generate_key(&tpmData.permanent.data.endorsementKey, 2048);
-+#else
-+  /* setup endorsement key */
-+  rsa_import_key(&tpmData.permanent.data.endorsementKey, 
-+    RSA_MSB_FIRST, ek_n, 256, ek_e, 3, ek_p, ek_q);
-+#endif
-+#ifdef TPM_GENERATE_SEED_DAA
-+  /* generate the DAA seed (cf. [TPM_Part2], v1.2 rev 85, Section 7.4) */
-+  tpm_get_random_bytes(tpmData.permanent.data.tpmDAASeed.digest, 
-+    sizeof(tpmData.permanent.data.tpmDAASeed.digest));
-+#else
-+  /* FIXME: setup DAA seed */
-+  memcpy(tpmData.permanent.data.tpmDAASeed.digest, 
-+    "\x77\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
-+    "\x00\x00\x00\x77", 20);
-+#endif
-+
-+  memcpy(tpmData.permanent.data.ekReset.nonce, "\xde\xad\xbe\xef", 4);
-+}
-+
-+void tpm_release_data(void)
-+{
-+  int i;
-+  /* release the EK, SRK as well as all other rsa keys */
-+  if (tpmData.permanent.data.endorsementKey.size > 0)
-+    rsa_release_private_key(&tpmData.permanent.data.endorsementKey);
-+  if (tpmData.permanent.data.srk.valid)
-+    rsa_release_private_key(&tpmData.permanent.data.srk.key);
-+  for (i = 0; i < TPM_MAX_KEYS; i++)
-+    if (tpmData.permanent.data.keys[i].valid)
-+      rsa_release_private_key(&tpmData.permanent.data.keys[i].key);
-+}
-+
-+#ifdef TPM_STORE_TO_FILE
-+
-+#include <linux/fs.h>
-+#include <linux/unistd.h>
-+#include <asm/uaccess.h>
-+
-+#define TPM_STORAGE_FILE "/var/tpm/tpm_emulator-1.2." STR(VERSION_MAJOR) "." STR(VERSION_MINOR) 
-+
-+static int write_to_file(uint8_t *data, size_t data_length)
-+{
-+  int res;
-+  struct file *fp;
-+  mm_segment_t old_fs = get_fs();
-+  fp = filp_open(TPM_STORAGE_FILE, O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR);
-+  if (IS_ERR(fp)) return -1;
-+  set_fs(get_ds());
-+  res = fp->f_op->write(fp, data, data_length, &fp->f_pos);
-+  set_fs(old_fs);
-+  filp_close(fp, NULL);
-+  return (res == data_length) ? 0 : -1;
-+}
-+
-+static int read_from_file(uint8_t **data, size_t *data_length)
-+{
-+  int res;
-+  struct file *fp;
-+  mm_segment_t old_fs = get_fs();
-+  fp = filp_open(TPM_STORAGE_FILE, O_RDONLY, 0);
-+  if (IS_ERR(fp)) return -1;
-+  *data_length = (size_t)fp->f_dentry->d_inode->i_size;
-+  /* *data_length = i_size_read(fp->f_dentry->d_inode); */
-+  *data = tpm_malloc(*data_length);
-+  if (*data == NULL) {
-+    filp_close(fp, NULL);
-+    return -1;
-+  }
-+  set_fs(get_ds());
-+  res = fp->f_op->read(fp, *data, *data_length, &fp->f_pos);
-+  set_fs(old_fs);
-+  filp_close(fp, NULL);
-+  if (res != *data_length) {
-+    tpm_free(*data);
-+    return -1;
-+  }
-+  return 0;
-+}
-+
-+#else
-+
-+static int write_to_file(uint8_t *data, size_t data_length)
-+{
-+  info("TPM_STORE_TO_FILE disabled, no data written");
-+  return 0;
-+}
-+
-+static int read_from_file(uint8_t **data, size_t *data_length)
-+{
-+  info("TPM_STORE_TO_FILE disabled, no data read");
-+  return 0;
-+}
-+
-+#endif /* TPM_STORE_TO_FILE */
-+
-+int tpm_store_permanent_data(void)
-+{
-+  uint8_t *buf, *ptr;
-+  UINT32 buf_length, len;
-+
-+  /* marshal data */
-+  buf_length = len = 4 + sizeof_TPM_STCLEAR_FLAGS(tpmData.stclear.flags)
-+    + sizeof_TPM_PERMANENT_FLAGS(tpmData.permanent.flags) 
-+    + sizeof_TPM_STANY_FLAGS(tpmData.stany.flags) + 2
-+    + sizeof_TPM_STCLEAR_DATA(tpmData.stclear.data) 
-+    + sizeof_TPM_PERMANENT_DATA(tpmData.permanent.data)
-+    + sizeof_TPM_STANY_DATA(tpmData.stany.data);
-+  buf = ptr = tpm_malloc(buf_length);
-+  if (buf == NULL
-+      || tpm_marshal_TPM_VERSION(&ptr, &len, &tpmData.permanent.data.version)
-+      || tpm_marshal_TPM_STCLEAR_FLAGS(&ptr, &len, &tpmData.stclear.flags)
-+      || tpm_marshal_TPM_PERMANENT_FLAGS(&ptr, &len, &tpmData.permanent.flags)
-+      || tpm_marshal_TPM_STANY_FLAGS(&ptr, &len, &tpmData.stany.flags)
-+      || tpm_marshal_BOOL(&ptr, &len, tpmData.permanent.flags.selfTestSucceeded)
-+      || tpm_marshal_BOOL(&ptr, &len, tpmData.permanent.flags.owned)
-+      || tpm_marshal_TPM_STCLEAR_DATA(&ptr, &len, &tpmData.stclear.data)
-+      || tpm_marshal_TPM_PERMANENT_DATA(&ptr, &len, &tpmData.permanent.data)
-+      || tpm_marshal_TPM_STANY_DATA(&ptr, &len, &tpmData.stany.data)) {
-+    tpm_free(buf);
-+    return -1;
-+  }
-+
-+  if (write_to_file(buf, buf_length - len)) {
-+    tpm_free(buf);
-+    return -1; 
-+  }
-+  tpm_free(buf);
-+  return 0;
-+}
-+
-+int tpm_restore_permanent_data(void)
-+{
-+  uint8_t *buf, *ptr;
-+  size_t buf_length;
-+  UINT32 len;
-+  TPM_VERSION ver;
-+
-+  /* read data */
-+  if (read_from_file(&buf, &buf_length)) return -1;
-+  ptr = buf;
-+  len = (uint32_t) buf_length;
-+  /* unmarshal data */
-+  if (tpm_unmarshal_TPM_VERSION(&ptr, &len, &ver)
-+      || memcmp(&ver, &tpmData.permanent.data.version, sizeof(TPM_VERSION))
-+      || tpm_unmarshal_TPM_STCLEAR_FLAGS(&ptr, &len, &tpmData.stclear.flags)
-+      || tpm_unmarshal_TPM_PERMANENT_FLAGS(&ptr, &len, &tpmData.permanent.flags)
-+      || tpm_unmarshal_TPM_STANY_FLAGS(&ptr, &len, &tpmData.stany.flags)
-+      || tpm_unmarshal_BOOL(&ptr, &len, &tpmData.permanent.flags.selfTestSucceeded)
-+      || tpm_unmarshal_BOOL(&ptr, &len, &tpmData.permanent.flags.owned)
-+      || tpm_unmarshal_TPM_STCLEAR_DATA(&ptr, &len, &tpmData.stclear.data)
-+      || tpm_unmarshal_TPM_PERMANENT_DATA(&ptr, &len, &tpmData.permanent.data)
-+      || tpm_unmarshal_TPM_STANY_DATA(&ptr, &len, &tpmData.stany.data)) {
-+    tpm_free(buf);
-+    return -1;
-+  }
-+
-+  tpm_free(buf);
-+  return 0;
-+}
-+
-+int tpm_erase_permanent_data(void)
-+{
-+  int res = write_to_file("", 0);
-+  return res;
-+}
-+
-diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_deprecated.c tpm_emulator/tpm/tpm_deprecated.c
---- tpm_emulator-0.3-x86_64/tpm/tpm_deprecated.c	2006-08-29 15:07:21.622298456 -0700
-+++ tpm_emulator/tpm/tpm_deprecated.c	2006-08-29 15:26:17.122676160 -0700
+diff -uprN orig/tpm_emulator-0.4/tpm/tpm_deprecated.c tpm_emulator/tpm/tpm_deprecated.c
+--- orig/tpm_emulator-0.4/tpm/tpm_deprecated.c	2006-06-23 03:37:07.000000000 -0700
++++ tpm_emulator/tpm/tpm_deprecated.c	2006-07-24 14:35:35.000000000 -0700
 @@ -1,6 +1,7 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -1265,9 +991,9 @@ diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_deprecated.c tpm_emulator/tpm/tpm_dep
                          authContextSize, &contextBlob);
    if (res != TPM_SUCCESS) return res;
    len = *authContextSize;
-diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_emulator.h tpm_emulator/tpm/tpm_emulator.h
---- tpm_emulator-0.3-x86_64/tpm/tpm_emulator.h	2006-08-29 15:07:21.648294504 -0700
-+++ tpm_emulator/tpm/tpm_emulator.h	2006-08-29 15:26:17.122676160 -0700
+diff -uprN orig/tpm_emulator-0.4/tpm/tpm_emulator.h tpm_emulator/tpm/tpm_emulator.h
+--- orig/tpm_emulator-0.4/tpm/tpm_emulator.h	2006-06-23 03:37:07.000000000 -0700
++++ tpm_emulator/tpm/tpm_emulator.h	2006-07-24 14:35:35.000000000 -0700
 @@ -1,5 +1,6 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -1285,45 +1011,476 @@ diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_emulator.h tpm_emulator/tpm/tpm_emula
  #undef  TPM_GENERATE_SEED_DAA
  
  #define TPM_MANUFACTURER 0x4554485A /* 'ETHZ' */        
-diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_integrity.c tpm_emulator/tpm/tpm_integrity.c
---- tpm_emulator-0.3-x86_64/tpm/tpm_integrity.c	2006-08-29 15:07:21.645294960 -0700
-+++ tpm_emulator/tpm/tpm_integrity.c	2006-08-29 15:26:17.123676008 -0700
-@@ -1,6 +1,7 @@
- /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
-  * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
-  *                    Swiss Federal Institute of Technology (ETH) Zurich
-+ * Copyright (C) 2005 INTEL Corp
-  *
-  * This module is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License as published
-@@ -194,4 +195,3 @@ TPM_RESULT tpm_verify_pcr(TPM_KEY_DATA *
+diff -uprN orig/tpm_emulator-0.4/tpm/tpm_marshalling.c tpm_emulator/tpm/tpm_marshalling.c
+--- orig/tpm_emulator-0.4/tpm/tpm_marshalling.c	2006-06-23 03:37:07.000000000 -0700
++++ tpm_emulator/tpm/tpm_marshalling.c	2006-07-24 14:35:35.000000000 -0700
+@@ -1312,7 +1312,7 @@ int tpm_unmarshal_TPM_STANY_FLAGS(BYTE *
+ 
+ int tpm_marshal_RSA(BYTE **ptr, UINT32 *length, rsa_private_key_t *v)
+ {
+-  UINT32 m_len, e_len, q_len;
++  size_t m_len, e_len, q_len;
+   if (*length < sizeof_RSA((*v))) return -1;
+   if (v->size > 0) {
+     rsa_export_modulus(v, &(*ptr)[6], &m_len);
+@@ -1460,6 +1460,66 @@ int tpm_unmarshal_TPM_PERMANENT_DATA(BYT
+   return 0;
+ }
+ 
++int tpm_marshal_TPM_STCLEAR_DATA(BYTE **ptr, UINT32 *length, TPM_STCLEAR_DATA *v)
++{
++  if (tpm_marshal_TPM_STRUCTURE_TAG(ptr, length, v->tag)
++    || tpm_marshal_TPM_NONCE(ptr, length, &v->contextNonceKey)
++    || tpm_marshal_TPM_COUNT_ID(ptr, length, v->countID) ) return -1;
++
++  return 0;
++}
++
++int tpm_unmarshal_TPM_STCLEAR_DATA(BYTE **ptr, UINT32 *length, TPM_STCLEAR_DATA *v)
++{
++  if (tpm_unmarshal_TPM_STRUCTURE_TAG(ptr, length, &v->tag)
++    || tpm_unmarshal_TPM_NONCE(ptr, length, &v->contextNonceKey)
++    || tpm_unmarshal_TPM_COUNT_ID(ptr, length, &v->countID) ) return -1;
++
++  return 0;
++}
++
++int tpm_marshal_TPM_STANY_DATA(BYTE **ptr, UINT32 *length, TPM_STANY_DATA *v)
++{
++  UINT32 i;
++  if (tpm_marshal_TPM_STRUCTURE_TAG(ptr, length, v->tag)
++    || tpm_marshal_TPM_NONCE(ptr, length, &v->contextNonceSession)
++    || tpm_marshal_TPM_DIGEST(ptr, length, &v->auditDigest)
++    || tpm_marshal_BOOL(ptr, length, v->auditSession)
++    || tpm_marshal_TPM_CURRENT_TICKS(ptr, length, &v->currentTicks)
++    || tpm_marshal_UINT32(ptr, length, v->contextCount)
++    || tpm_marshal_UINT32_ARRAY(ptr, length, v->contextList, TPM_MAX_SESSION_LIST)) return -1;
++  for (i = 0; i < TPM_MAX_SESSIONS; i++) {
++    if (tpm_marshal_TPM_SESSION_DATA(ptr, length, &v->sessions[i])) return -1;
++  }
++  for (i = 0; i < TPM_MAX_SESSIONS_DAA; i++) {
++    if (tpm_marshal_TPM_DAA_SESSION_DATA(ptr, length, &v->sessionsDAA[i])) return -1;
++  }
++  if (tpm_marshal_TPM_TRANSHANDLE(ptr, length, v->transExclusive)) return -1;
++
++  return 0;
++}
++
++int tpm_unmarshal_TPM_STANY_DATA(BYTE **ptr, UINT32 *length, TPM_STANY_DATA *v)
++{
++  UINT32 i;
++  if (tpm_unmarshal_TPM_STRUCTURE_TAG(ptr, length, &v->tag)
++    || tpm_unmarshal_TPM_NONCE(ptr, length, &v->contextNonceSession)
++    || tpm_unmarshal_TPM_DIGEST(ptr, length, &v->auditDigest)
++    || tpm_unmarshal_BOOL(ptr, length, &v->auditSession)
++    || tpm_unmarshal_TPM_CURRENT_TICKS(ptr, length, &v->currentTicks)
++    || tpm_unmarshal_UINT32(ptr, length, &v->contextCount)
++    || tpm_unmarshal_UINT32_ARRAY(ptr, length, v->contextList, TPM_MAX_SESSION_LIST)) return -1;
++  for (i = 0; i < TPM_MAX_SESSIONS; i++) {
++    if (tpm_unmarshal_TPM_SESSION_DATA(ptr, length, &v->sessions[i])) return -1;
++  }
++  for (i = 0; i < TPM_MAX_SESSIONS_DAA; i++) {
++    if (tpm_unmarshal_TPM_DAA_SESSION_DATA(ptr, length, &v->sessionsDAA[i])) return -1;
++  }
++  if (tpm_unmarshal_TPM_TRANSHANDLE(ptr, length, &v->transExclusive)) return -1;
++
++  return 0;
++}
++
+ int tpm_marshal_TPM_SESSION_DATA(BYTE **ptr, UINT32 *length, TPM_SESSION_DATA *v)
+ {
+   if (tpm_marshal_BYTE(ptr, length, v->type)
+diff -uprN orig/tpm_emulator-0.4/tpm/tpm_marshalling.h tpm_emulator/tpm/tpm_marshalling.h
+--- orig/tpm_emulator-0.4/tpm/tpm_marshalling.h	2006-06-23 03:37:07.000000000 -0700
++++ tpm_emulator/tpm/tpm_marshalling.h	2006-07-24 14:35:35.000000000 -0700
+@@ -432,6 +432,12 @@ int tpm_unmarshal_TPM_KEY_DATA(BYTE **pt
+ int tpm_marshal_TPM_PERMANENT_DATA(BYTE **ptr, UINT32 *length, TPM_PERMANENT_DATA *);
+ int tpm_unmarshal_TPM_PERMANENT_DATA(BYTE **ptr, UINT32 *length, TPM_PERMANENT_DATA *);
+ 
++int tpm_marshal_TPM_STCLEAR_DATA(BYTE **ptr, UINT32 *length, TPM_STCLEAR_DATA *v);
++int tpm_unmarshal_TPM_STCLEAR_DATA(BYTE **ptr, UINT32 *length, TPM_STCLEAR_DATA *v);
++
++int tpm_marshal_TPM_STANY_DATA(BYTE **ptr, UINT32 *length, TPM_STANY_DATA *v);
++int tpm_unmarshal_TPM_STANY_DATA(BYTE **ptr, UINT32 *length, TPM_STANY_DATA *v);
++
+ int tpm_marshal_TPM_SESSION_DATA(BYTE **ptr, UINT32 *length, TPM_SESSION_DATA *v);
+ int tpm_unmarshal_TPM_SESSION_DATA(BYTE **ptr, UINT32 *length, TPM_SESSION_DATA *v);
+ 
+diff -uprN orig/tpm_emulator-0.4/tpm/tpm_owner.c tpm_emulator/tpm/tpm_owner.c
+--- orig/tpm_emulator-0.4/tpm/tpm_owner.c	2006-06-23 03:37:07.000000000 -0700
++++ tpm_emulator/tpm/tpm_owner.c	2006-07-24 14:35:35.000000000 -0700
+@@ -108,7 +108,7 @@ TPM_RESULT TPM_TakeOwnership(TPM_PROTOCO
+   TPM_RESULT res;
+   rsa_private_key_t *ek = &tpmData.permanent.data.endorsementKey;
+   TPM_KEY_DATA *srk = &tpmData.permanent.data.srk;
+-  UINT32 buf_size = ek->size >> 3;
++  size_t buf_size = ek->size >> 3, key_length; 
+   BYTE buf[buf_size];
+ 
+   info("TPM_TakeOwnership()");
+@@ -173,7 +173,8 @@ TPM_RESULT TPM_TakeOwnership(TPM_PROTOCO
+     return TPM_FAIL;
    }
+   rsa_export_modulus(&srk->key, srkPub->pubKey.key,
+-    &srkPub->pubKey.keyLength);
++		     &key_length);
++  srkPub->pubKey.keyLength = (UINT32) key_length;
+   /* setup tpmProof and set state to owned */
+   tpm_get_random_bytes(tpmData.permanent.data.tpmProof.nonce, 
+     sizeof(tpmData.permanent.data.tpmProof.nonce));
+diff -uprN orig/tpm_emulator-0.4/tpm/tpm_startup.c tpm_emulator/tpm/tpm_startup.c
+--- orig/tpm_emulator-0.4/tpm/tpm_startup.c	2006-06-23 03:37:07.000000000 -0700
++++ tpm_emulator/tpm/tpm_startup.c	2006-07-24 14:35:35.000000000 -0700
+@@ -41,26 +41,29 @@ void TPM_Init(TPM_STARTUP_TYPE startupTy
+ TPM_RESULT TPM_Startup(TPM_STARTUP_TYPE startupType)
+ {
+   int i;
++  int restore_fail;
+   info("TPM_Startup(%d)", startupType);
+   if (tpmData.stany.flags.postInitialise == FALSE) return TPM_INVALID_POSTINIT;
+-  /* reset STANY_FLAGS */
+-  SET_TO_ZERO(&tpmData.stany.flags);
+-  tpmData.stany.flags.tag = TPM_TAG_STANY_FLAGS;
+-  /* reset STANY_DATA (invalidates ALL sessions) */
+-  SET_TO_ZERO(&tpmData.stany.data);
+-  tpmData.stany.data.tag = TPM_TAG_STANY_DATA;
+-  /* init session-context nonce */
+-  SET_TO_RAND(&tpmData.stany.data.contextNonceSession);
++
++  /* try and restore state to get EK, SRK, etc */
++  restore_fail = tpm_restore_permanent_data();
++
+   /* set data and flags according to the given startup type */
+   if (startupType == TPM_ST_CLEAR) {
+-    /* if available, restore permanent data */
+-    tpm_restore_permanent_data();
++    /* reset STANY_FLAGS */
++    SET_TO_ZERO(&tpmData.stany.flags);
++    tpmData.stany.flags.tag = TPM_TAG_STANY_FLAGS;
++    /* reset STANY_DATA (invalidates ALL sessions) */
++    SET_TO_ZERO(&tpmData.stany.data);
++    tpmData.stany.data.tag = TPM_TAG_STANY_DATA;
++    /* init session-context nonce */
++    SET_TO_RAND(&tpmData.stany.data.contextNonceSession);
+     /* reset PCR values */
+     for (i = 0; i < TPM_NUM_PCR; i++) {
+-      if (tpmData.permanent.data.pcrAttrib[i].pcrReset)
+-        SET_TO_ZERO(tpmData.permanent.data.pcrValue[i].digest);
++      if (!tpmData.permanent.data.pcrAttrib[i].pcrReset)
++        SET_TO_ZERO(&tpmData.permanent.data.pcrValue[i].digest);
+       else
+-        SET_TO_0xFF(tpmData.permanent.data.pcrValue[i].digest);
++        SET_TO_0xFF(&tpmData.permanent.data.pcrValue[i].digest);
+     }
+     /* reset STCLEAR_FLAGS */
+     SET_TO_ZERO(&tpmData.stclear.flags);
+@@ -79,7 +82,8 @@ TPM_RESULT TPM_Startup(TPM_STARTUP_TYPE 
+     /* init key-context nonce */
+     SET_TO_RAND(&tpmData.stclear.data.contextNonceKey);
+   } else if (startupType == TPM_ST_STATE) {
+-    if (tpm_restore_permanent_data()) {
++    /* restore must have been successful for TPM_ST_STATE */
++    if (restore_fail) {
+       error("restoring permanent data failed");
+       tpmData.permanent.data.testResult = "tpm_restore_permanent_data() failed";
+       tpmData.permanent.flags.selfTestSucceeded = FALSE;
+diff -uprN orig/tpm_emulator-0.4/tpm/tpm_storage.c tpm_emulator/tpm/tpm_storage.c
+--- orig/tpm_emulator-0.4/tpm/tpm_storage.c	2006-06-23 03:37:07.000000000 -0700
++++ tpm_emulator/tpm/tpm_storage.c	2006-07-24 14:35:35.000000000 -0700
+@@ -58,6 +58,7 @@ int encrypt_sealed_data(TPM_KEY_DATA *ke
+                         BYTE *enc, UINT32 *enc_size)
+ {
+   UINT32 len;
++  size_t enc_size32 = *enc_size;
+   BYTE *buf, *ptr;
+   rsa_public_key_t pub_key;
+   int scheme;
+@@ -72,7 +73,7 @@ int encrypt_sealed_data(TPM_KEY_DATA *ke
+   if (buf == NULL
+       || tpm_marshal_TPM_SEALED_DATA(&ptr, &len, seal)
+       || rsa_encrypt(&pub_key, scheme, buf, sizeof_TPM_SEALED_DATA((*seal)),
+-                     enc, enc_size)) {
++                     enc, &enc_size32)) {
+     tpm_free(buf);
+     rsa_release_public_key(&pub_key);
+     return -1;
+@@ -85,7 +86,8 @@ int encrypt_sealed_data(TPM_KEY_DATA *ke
+ int decrypt_sealed_data(TPM_KEY_DATA *key, BYTE *enc, UINT32 enc_size,
+                         TPM_SEALED_DATA *seal, BYTE **buf) 
+ {
+-  UINT32 len;
++  size_t len;
++  UINT32 len32;
+   BYTE *ptr;
+   int scheme;
+   switch (key->encScheme) {
+@@ -96,8 +98,12 @@ int decrypt_sealed_data(TPM_KEY_DATA *ke
+   len = enc_size;
+   *buf = ptr = tpm_malloc(len);
+   if (*buf == NULL
+-      || rsa_decrypt(&key->key, scheme, enc, enc_size, *buf, &len)
+-      || tpm_unmarshal_TPM_SEALED_DATA(&ptr, &len, seal)) {
++      || rsa_decrypt(&key->key, scheme, enc, enc_size, *buf, &len) ){
++    tpm_free(*buf);
++    return -1;
++  }
++  len32 = len;
++  if (tpm_unmarshal_TPM_SEALED_DATA(&ptr, &len32, seal)) {
+     tpm_free(*buf);
+     return -1;
+   }
+@@ -240,11 +246,12 @@ TPM_RESULT TPM_Unseal(TPM_KEY_HANDLE par
+ 
+ TPM_RESULT TPM_UnBind(TPM_KEY_HANDLE keyHandle, UINT32 inDataSize,
+                       BYTE *inData, TPM_AUTH *auth1, 
+-                      UINT32 *outDataSize, BYTE **outData)
++                      UINT32 *outDataSize32, BYTE **outData)
+ {
+   TPM_RESULT res;
+   TPM_KEY_DATA *key;
+   int scheme;
++  size_t outDataSize;
+   
+   info("TPM_UnBind()");
+   /* get key */
+@@ -262,8 +269,8 @@ TPM_RESULT TPM_UnBind(TPM_KEY_HANDLE key
+   /* the size of the input data muss be greater than zero */
+   if (inDataSize == 0) return TPM_BAD_PARAMETER;
+   /* decrypt data */
+-  *outDataSize = inDataSize;
+-  *outData = tpm_malloc(*outDataSize);
++  outDataSize = inDataSize;
++  *outData = tpm_malloc(outDataSize);
+   if (*outData == NULL) return TPM_NOSPACE;
+   switch (key->encScheme) {
+     case TPM_ES_RSAESOAEP_SHA1_MGF1: scheme = RSA_ES_OAEP_SHA1; break;
+@@ -271,20 +278,21 @@ TPM_RESULT TPM_UnBind(TPM_KEY_HANDLE key
+     default: tpm_free(*outData); return TPM_DECRYPT_ERROR;
+   }
+   if (rsa_decrypt(&key->key, scheme, inData, inDataSize, 
+-      *outData, outDataSize)) {
++      *outData, &outDataSize)) {
+     tpm_free(*outData);
+     return TPM_DECRYPT_ERROR;
+   }
+   /* verify data if it is of type TPM_BOUND_DATA */
+   if (key->encScheme == TPM_ES_RSAESOAEP_SHA1_MGF1 
+       || key->keyUsage != TPM_KEY_LEGACY) {
+-    if (*outDataSize < 5 || memcmp(*outData, "\x01\x01\00\x00\x02", 5) != 0) {
++    if (outDataSize < 5 || memcmp(*outData, "\x01\x01\00\x00\x02", 5) != 0) {
+       tpm_free(*outData);
+       return TPM_DECRYPT_ERROR;
+     }
+-    *outDataSize -= 5;
+-    memmove(*outData, &(*outData)[5], *outDataSize);
++    outDataSize -= 5;
++    memmove(*outData, &(*outData)[5], outDataSize);
+   }
++  *outDataSize32 = (UINT32) outDataSize;
    return TPM_SUCCESS;
  }
--
-diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_structures.h tpm_emulator/tpm/tpm_structures.h
---- tpm_emulator-0.3-x86_64/tpm/tpm_structures.h	2006-08-29 15:08:20.545340792 -0700
-+++ tpm_emulator/tpm/tpm_structures.h	2006-08-29 15:26:17.125675704 -0700
-@@ -1,6 +1,7 @@
- /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
-  * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
-  *                    Swiss Federal Institute of Technology (ETH) Zurich
-+ * Copyright (C) 2005 INTEL Corp
-  *
-  * This module is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License as published
-@@ -18,7 +19,7 @@
- #ifndef _TPM_STRUCTURES_H_
- #define _TPM_STRUCTURES_H_
  
--#include <linux/types.h>
-+//#include <linux/types.h>
- #include "crypto/rsa.h"
+@@ -334,12 +342,13 @@ int compute_pubkey_digest(TPM_PUBKEY *ke
+ }
+ 
+ int encrypt_private_key(TPM_KEY_DATA *key, TPM_STORE_ASYMKEY *store,
+-                        BYTE *enc, UINT32 *enc_size)
++                        BYTE *enc, UINT32 *enc_size32)
+ {
+   UINT32 len;
+   BYTE *buf, *ptr;
+   rsa_public_key_t pub_key;
+   int scheme;
++  size_t enc_size;
+   switch (key->encScheme) {
+     case TPM_ES_RSAESOAEP_SHA1_MGF1: scheme = RSA_ES_OAEP_SHA1; break;
+     case TPM_ES_RSAESPKCSv15: scheme = RSA_ES_PKCSV15; break;
+@@ -351,11 +360,12 @@ int encrypt_private_key(TPM_KEY_DATA *ke
+   if (buf == NULL
+       || tpm_marshal_TPM_STORE_ASYMKEY(&ptr, &len, store)
+       || rsa_encrypt(&pub_key, scheme, buf, sizeof_TPM_STORE_ASYMKEY((*store)),
+-                     enc, enc_size)) {
++                     enc, &enc_size)) {
+     tpm_free(buf);
+     rsa_release_public_key(&pub_key);
+     return -1;
+   }
++  *enc_size32 = (UINT32) enc_size;
+   tpm_free(buf);
+   rsa_release_public_key(&pub_key);
+   return 0;
+@@ -364,7 +374,8 @@ int encrypt_private_key(TPM_KEY_DATA *ke
+ int decrypt_private_key(TPM_KEY_DATA *key, BYTE *enc, UINT32 enc_size, 
+                         TPM_STORE_ASYMKEY *store, BYTE **buf) 
+ {
+-  UINT32 len;
++  UINT32 len32;
++  size_t len;
+   BYTE *ptr;
+   int scheme;
+   switch (key->encScheme) {
+@@ -375,8 +386,12 @@ int decrypt_private_key(TPM_KEY_DATA *ke
+   len = enc_size;
+   *buf = ptr = tpm_malloc(len);
+   if (*buf == NULL
+-      || rsa_decrypt(&key->key, scheme, enc, enc_size, *buf, &len)
+-      || tpm_unmarshal_TPM_STORE_ASYMKEY(&ptr, &len, store)) {
++      || rsa_decrypt(&key->key, scheme, enc, enc_size, *buf, &len) ) {
++    tpm_free(*buf);
++    return -1;
++  }
++  len32 = (UINT32) len;
++  if (tpm_unmarshal_TPM_STORE_ASYMKEY(&ptr, &len32, store)) {  
+     tpm_free(*buf);
+     return -1;
+   }
+@@ -394,7 +409,7 @@ TPM_RESULT TPM_CreateWrapKey(TPM_KEY_HAN
+   TPM_SESSION_DATA *session;
+   TPM_STORE_ASYMKEY store;
+   rsa_private_key_t rsa;
+-  UINT32 key_length;
++  size_t key_length;
+ 
+   info("TPM_CreateWrapKey()");
+   /* get parent key */
+@@ -450,11 +465,11 @@ TPM_RESULT TPM_CreateWrapKey(TPM_KEY_HAN
+     }
+   }
+   /* generate key and store it */
+-  key_length = keyInfo->algorithmParms.parms.rsa.keyLength;
+-  if (rsa_generate_key(&rsa, key_length)) return TPM_FAIL;
+-  wrappedKey->pubKey.keyLength = key_length >> 3;
++  if (rsa_generate_key(&rsa, keyInfo->algorithmParms.parms.rsa.keyLength)) 
++    return TPM_FAIL;
++  wrappedKey->pubKey.keyLength = keyInfo->algorithmParms.parms.rsa.keyLength >> 3;
+   wrappedKey->pubKey.key = tpm_malloc(wrappedKey->pubKey.keyLength);
+-  store.privKey.keyLength = key_length >> 4;
++  store.privKey.keyLength = keyInfo->algorithmParms.parms.rsa.keyLength >> 4;
+   store.privKey.key = tpm_malloc(store.privKey.keyLength);
+   wrappedKey->encDataSize = parent->key.size >> 3;
+   wrappedKey->encData = tpm_malloc(wrappedKey->encDataSize);
+@@ -466,9 +481,11 @@ TPM_RESULT TPM_CreateWrapKey(TPM_KEY_HAN
+     tpm_free(wrappedKey->encData);
+     return TPM_NOSPACE;
+   }
+-  rsa_export_modulus(&rsa, wrappedKey->pubKey.key, 
+-    &wrappedKey->pubKey.keyLength);
+-  rsa_export_prime1(&rsa, store.privKey.key, &store.privKey.keyLength);
++  rsa_export_modulus(&rsa, wrappedKey->pubKey.key,
++		     &key_length);
++  wrappedKey->pubKey.keyLength = (UINT32) key_length;
++  rsa_export_prime1(&rsa, store.privKey.key, &key_length);
++  store.privKey.keyLength = (UINT32) key_length;
+   rsa_release_private_key(&rsa);
+   /* compute the digest of the wrapped key (without encData) */
+   if (compute_key_digest(wrappedKey, &store.pubDataDigest)) {
+@@ -602,6 +619,7 @@ TPM_RESULT TPM_LoadKey2(TPM_KEY_HANDLE p
+ 
+ int tpm_setup_key_parms(TPM_KEY_DATA *key, TPM_KEY_PARMS *parms)
+ {
++  size_t key_length;
+   parms->algorithmID = TPM_ALG_RSA;
+   parms->encScheme = key->encScheme;
+   parms->sigScheme = key->sigScheme;
+@@ -611,7 +629,8 @@ int tpm_setup_key_parms(TPM_KEY_DATA *ke
+   parms->parms.rsa.exponent = tpm_malloc(parms->parms.rsa.exponentSize);
+   if (parms->parms.rsa.exponent == NULL) return -1;
+   rsa_export_exponent(&key->key, parms->parms.rsa.exponent,
+-    &parms->parms.rsa.exponentSize);
++    &key_length);
++  parms->parms.rsa.exponentSize = (UINT32) key_length;
+   parms->parmSize = 12 + parms->parms.rsa.exponentSize;
+   return 0;
+ }
+@@ -622,6 +641,7 @@ TPM_RESULT TPM_GetPubKey(TPM_KEY_HANDLE 
+   TPM_RESULT res;
+   TPM_KEY_DATA *key;
+   TPM_DIGEST digest;
++  size_t key_length;
+   info("TPM_GetPubKey()");
+   /* get key */
+   if (keyHandle == TPM_KH_SRK
+@@ -650,8 +670,8 @@ TPM_RESULT TPM_GetPubKey(TPM_KEY_HANDLE 
+   pubKey->pubKey.keyLength = key->key.size >> 3;
+   pubKey->pubKey.key = tpm_malloc(pubKey->pubKey.keyLength);
+   if (pubKey->pubKey.key == NULL) return TPM_NOSPACE;
+-  rsa_export_modulus(&key->key, pubKey->pubKey.key, 
+-    &pubKey->pubKey.keyLength);
++  rsa_export_modulus(&key->key, pubKey->pubKey.key, &key_length);
++  pubKey->pubKey.keyLength = (UINT32) key_length;
+   if (tpm_setup_key_parms(key, &pubKey->algorithmParms) != 0) {
+     error("TPM_GetPubKey(): tpm_setup_key_parms() failed.");
+     tpm_free(pubKey->pubKey.key);
+diff -uprN orig/tpm_emulator-0.4/tpm/tpm_structures.h tpm_emulator/tpm/tpm_structures.h
+--- orig/tpm_emulator-0.4/tpm/tpm_structures.h	2006-06-23 03:37:07.000000000 -0700
++++ tpm_emulator/tpm/tpm_structures.h	2006-07-24 14:35:35.000000000 -0700
+@@ -1958,6 +1958,7 @@ typedef struct tdTPM_DAA_ISSUER {
+   TPM_DIGEST DAA_digest_gamma;
+   BYTE DAA_generic_q[26];
+ } TPM_DAA_ISSUER;
++#define sizeof_TPM_DAA_ISSUER(s) (2 + (20 * 6) + 26 )
  
  /*
-diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_testing.c tpm_emulator/tpm/tpm_testing.c
---- tpm_emulator-0.3-x86_64/tpm/tpm_testing.c	2006-08-29 15:07:21.646294808 -0700
-+++ tpm_emulator/tpm/tpm_testing.c	2006-08-29 15:26:17.127675400 -0700
+  * TPM_DAA_TPM ([TPM_Part2], Section 22.4)
+@@ -1973,6 +1974,7 @@ typedef struct tdTPM_DAA_TPM {
+   TPM_DIGEST DAA_rekey;
+   UINT32 DAA_count;
+ } TPM_DAA_TPM;
++#define sizeof_TPM_DAA_TPM(s) (2 + (4 * 20) + 4)
+ 
+ /*
+  * TPM_DAA_CONTEXT ([TPM_Part2], Section 22.5)
+@@ -1987,6 +1989,7 @@ typedef struct tdTPM_DAA_CONTEXT {
+   BYTE DAA_scratch[256];
+   BYTE DAA_stage;
+ } TPM_DAA_CONTEXT;
++#define sizeof_TPM_DAA_CONTEXT(s) (2 + (3 * 20) + 256 + 1)
+ 
+ /*
+  * TPM_DAA_JOINDATA ([TPM_Part2], Section 22.6)
+@@ -1998,6 +2001,7 @@ typedef struct tdTPM_DAA_JOINDATA {
+   BYTE DAA_join_u1[138];
+   TPM_DIGEST DAA_digest_n0;
+ } TPM_DAA_JOINDATA;
++#define sizeof_TPM_DAA_JOINDATA(s) (1 + 1 + 20)
+ 
+ /*
+  * TPM_DAA_BLOB ([TPM_Part2], Section 22.8)
+@@ -2202,6 +2206,7 @@ typedef struct tdTPM_STCLEAR_DATA {
+   //UINT32 ownerReference;
+   //BOOL disableResetLock;
+ } TPM_STCLEAR_DATA;
++#define sizeof_TPM_STCLEAR_DATA(s) (2 + 20 + 4)
+ 
+ /*
+  * TPM_SESSION_DATA
+@@ -2238,6 +2243,11 @@ typedef struct tdTPM_DAA_SESSION_DATA {
+   TPM_DAA_JOINDATA DAA_joinSession;
+   TPM_HANDLE handle;
+ } TPM_DAA_SESSION_DATA;
++#define sizeof_TPM_DAA_SESSION_DATA(s) ( 1 \
++  + sizeof_TPM_DAA_ISSUER(s.DAA_issuerSettings) \
++  + sizeof_TPM_DAA_TPM(s.DAA_tpmSpecific) \
++  + sizeof_TPM_DAA_CONTEXT(s.DAA_session) \
++  + sizeof_TPM_DAA_JOINDATA(s.DAA_joinSession) + 4)
+ 
+ /*
+  * TPM_STANY_DATA ([TPM_Part2], Section 7.6)
+@@ -2262,6 +2272,11 @@ typedef struct tdTPM_STANY_DATA {
+   TPM_DAAHANDLE currentDAA;
+   TPM_TRANSHANDLE transExclusive;
+ } TPM_STANY_DATA;
++#define sizeof_TPM_STANY_DATA(s) (2 + 20 + 20 + 1 \
++  + sizeof_TPM_CURRENT_TICKS(s.currentTicks) \
++  + 4 + (4 * TPM_MAX_SESSION_LIST) \
++  + (sizeof_TPM_SESSION_DATA(s.sessions[0]) * TPM_MAX_SESSION_LIST) \
++  + (sizeof_TPM_DAA_SESSION_DATA(s.sessionsDAA[0]) * TPM_MAX_SESSIONS_DAA) + 4)
+ 
+ /*
+  * TPM_DATA
+diff -uprN orig/tpm_emulator-0.4/tpm/tpm_testing.c tpm_emulator/tpm/tpm_testing.c
+--- orig/tpm_emulator-0.4/tpm/tpm_testing.c	2006-06-23 03:37:07.000000000 -0700
++++ tpm_emulator/tpm/tpm_testing.c	2006-07-24 14:35:35.000000000 -0700
 @@ -1,6 +1,7 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -1439,9 +1596,9 @@ diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_testing.c tpm_emulator/tpm/tpm_testin
    rsa_private_key_t priv_key;
    rsa_public_key_t pub_key;
  
-diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_ticks.c tpm_emulator/tpm/tpm_ticks.c
---- tpm_emulator-0.3-x86_64/tpm/tpm_ticks.c	2006-08-29 15:07:21.646294808 -0700
-+++ tpm_emulator/tpm/tpm_ticks.c	2006-08-29 15:26:17.128675248 -0700
+diff -uprN orig/tpm_emulator-0.4/tpm/tpm_ticks.c tpm_emulator/tpm/tpm_ticks.c
+--- orig/tpm_emulator-0.4/tpm/tpm_ticks.c	2006-06-23 03:37:07.000000000 -0700
++++ tpm_emulator/tpm/tpm_ticks.c	2006-07-24 14:35:35.000000000 -0700
 @@ -1,6 +1,7 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -1450,7 +1607,7 @@ diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_ticks.c tpm_emulator/tpm/tpm_ticks.c
   *
   * This module is free software; you can redistribute it and/or modify
   * it under the terms of the GNU General Public License as published
-@@ -37,9 +38,7 @@ TPM_RESULT TPM_SetTickType(TPM_TICKTYPE 
+@@ -39,9 +40,7 @@ TPM_RESULT TPM_SetTickType(TPM_TICKTYPE 
  TPM_RESULT TPM_GetTicks(TPM_CURRENT_TICKS *currentTime)
  {
    info("TPM_GetTicks()");
@@ -1461,7 +1618,7 @@ diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_ticks.c tpm_emulator/tpm/tpm_ticks.c
  }
  
  TPM_RESULT TPM_TickStampBlob(TPM_KEY_HANDLE keyHandle, TPM_NONCE *antiReplay,
-@@ -47,61 +46,12 @@ TPM_RESULT TPM_TickStampBlob(TPM_KEY_HAN
+@@ -49,64 +48,11 @@ TPM_RESULT TPM_TickStampBlob(TPM_KEY_HAN
                               TPM_CURRENT_TICKS *currentTicks, 
                               UINT32 *sigSize, BYTE **sig)
  {
@@ -1493,7 +1650,7 @@ diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_ticks.c tpm_emulator/tpm/tpm_ticks.c
 -  }
 -  memcpy(&info[0], "\x05\x00TSTP", 6);
 -  memcpy(&info[6], antiReplay->nonce, 20);
--  *(UINT32*)&info[26] = cpu_to_be32(20
+-  *(UINT32*)&info[26] = CPU_TO_BE32(20
 -                        + sizeof_TPM_CURRENT_TICKS(currentTicks));
 -  memcpy(&info[30], digestToStamp->digest, sizeof(TPM_DIGEST));
 -  p = &info[30 + sizeof(TPM_DIGEST)]; 
@@ -1513,91 +1670,45 @@ diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_ticks.c tpm_emulator/tpm/tpm_ticks.c
 -  if (tpmData.stany.data.currentTicks.tag == 0) {
 -    tpmData.stany.data.currentTicks.tag = TPM_TAG_CURRENT_TICKS;
 -    tpmData.stany.data.currentTicks.currentTicks += tpm_get_ticks();
+-/* removed since v1.2 rev 94
 -    tpmData.stany.data.currentTicks.tickType = tpmData.permanent.data.tickType;
+-*/
 -    tpm_get_random_bytes(tpmData.stany.data.currentTicks.tickNonce.nonce, 
 -      sizeof(TPM_NONCE));
 -    tpmData.stany.data.currentTicks.tickRate = 1;
+-/* removed since v1.2 rev 94
 -    tpmData.stany.data.currentTicks.tickSecurity = TICK_SEC_NO_CHECK;
+-*/
 -  } else {
 -    tpmData.stany.data.currentTicks.currentTicks += tpm_get_ticks();   
 -  }
  }
-   
  
-diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_transport.c tpm_emulator/tpm/tpm_transport.c
---- tpm_emulator-0.3-x86_64/tpm/tpm_transport.c	2006-08-29 15:07:21.647294656 -0700
-+++ tpm_emulator/tpm/tpm_transport.c	2006-08-29 15:26:17.129675096 -0700
-@@ -59,7 +59,7 @@ static int decrypt_transport_auth(TPM_KE
- static void transport_log_in(TPM_COMMAND_CODE ordinal, BYTE parameters[20],
-                              BYTE pubKeyHash[20], TPM_DIGEST *transDigest)
- {
--  UINT32 tag = cpu_to_be32(TPM_TAG_TRANSPORT_LOG_IN);
-+  UINT32 tag = CPU_TO_BE32(TPM_TAG_TRANSPORT_LOG_IN);
-   BYTE *ptr, buf[sizeof_TPM_TRANSPORT_LOG_IN(x)];
-   UINT32 len = sizeof(buf);
-   sha1_ctx_t sha1;
-@@ -76,7 +76,7 @@ static void transport_log_in(TPM_COMMAND
- static void transport_log_out(TPM_CURRENT_TICKS *currentTicks, BYTE parameters[20],
-                               TPM_MODIFIER_INDICATOR locality, TPM_DIGEST *transDigest)
- {
--  UINT32 tag = cpu_to_be32(TPM_TAG_TRANSPORT_LOG_OUT);
-+  UINT32 tag = CPU_TO_BE32(TPM_TAG_TRANSPORT_LOG_OUT);
-   BYTE *ptr, buf[sizeof_TPM_TRANSPORT_LOG_OUT(x)];
-   UINT32 len = sizeof(buf);
-   sha1_ctx_t sha1;
-@@ -191,7 +191,7 @@ static void decrypt_wrapped_command(BYTE
+diff -uprN orig/tpm_emulator-0.4/tpm/tpm_transport.c tpm_emulator/tpm/tpm_transport.c
+--- orig/tpm_emulator-0.4/tpm/tpm_transport.c	2006-06-23 03:37:07.000000000 -0700
++++ tpm_emulator/tpm/tpm_transport.c	2006-07-24 14:35:35.000000000 -0700
+@@ -189,7 +189,7 @@ static void decrypt_wrapped_command(BYTE
+     sha1_init(&sha1);
+     sha1_update(&sha1, auth->nonceEven.nonce, sizeof(auth->nonceEven.nonce));
      sha1_update(&sha1, auth->nonceOdd.nonce, sizeof(auth->nonceOdd.nonce));
-     sha1_update(&sha1, "in", 2);
+-    sha1_update(&sha1, "in", 2);
++    sha1_update(&sha1, (BYTE*)"in", 2);
      sha1_update(&sha1, secret, sizeof(TPM_SECRET));
--    j = cpu_to_be32(i);
-+    j = CPU_TO_BE32(i);
+     j = CPU_TO_BE32(i);
      sha1_update(&sha1, (BYTE*)&j, 4);
-     sha1_final(&sha1, mask);
-     for (j = 0; j < sizeof(mask) && buf_len > 0; j++) { 
-@@ -213,7 +213,7 @@ static void encrypt_wrapped_command(BYTE
+@@ -211,7 +211,7 @@ static void encrypt_wrapped_command(BYTE
+     sha1_init(&sha1);
+     sha1_update(&sha1, auth->nonceEven.nonce, sizeof(auth->nonceEven.nonce));
      sha1_update(&sha1, auth->nonceOdd.nonce, sizeof(auth->nonceOdd.nonce));
-     sha1_update(&sha1, "out", 3);
+-    sha1_update(&sha1, "out", 3);
++    sha1_update(&sha1, (BYTE*)"out", 3);
      sha1_update(&sha1, secret, sizeof(TPM_SECRET));
--    j = cpu_to_be32(i);
-+    j = CPU_TO_BE32(i);
+     j = CPU_TO_BE32(i);
      sha1_update(&sha1, (BYTE*)&j, 4);
-     sha1_final(&sha1, mask);
-     for (j = 0; j < sizeof(mask) && buf_len > 0; j++) { 
-@@ -253,9 +253,9 @@ TPM_RESULT TPM_ExecuteTransport(UINT32 i
-   /* verify authorization */
-   tpm_compute_in_param_digest(&req);
-   sha1_init(&sha1);
--  res = cpu_to_be32(TPM_ORD_ExecuteTransport);
-+  res = CPU_TO_BE32(TPM_ORD_ExecuteTransport);
-   sha1_update(&sha1, (BYTE*)&res, 4);
--  res = cpu_to_be32(inWrappedCmdSize);
-+  res = CPU_TO_BE32(inWrappedCmdSize);
-   sha1_update(&sha1, (BYTE*)&res, 4);
-   sha1_update(&sha1, req.auth1.digest, sizeof(req.auth1.digest));
-   sha1_final(&sha1, auth1->digest);
-@@ -357,7 +357,7 @@ TPM_RESULT TPM_ReleaseTransportSigned(TP
-   /* setup a TPM_SIGN_INFO structure */
-   memcpy(&buf[0], "\x05\x00TRAN", 6);
-   memcpy(&buf[6], antiReplay->nonce, 20);
--  *(UINT32*)&buf[26] = cpu_to_be32(20);
-+  *(UINT32*)&buf[26] = CPU_TO_BE32(20);
-   memcpy(&buf[30], session->transInternal.transDigest.digest, 20);
-   /* sign info structure */ 
-   res = tpm_sign(key, auth1, TRUE, buf, sizeof(buf), signature, signSize);
-diff -uprN tpm_emulator-0.3-x86_64/tpm_version.h tpm_emulator/tpm_version.h
---- tpm_emulator-0.3-x86_64/tpm_version.h	2006-08-29 15:07:21.649294352 -0700
-+++ tpm_emulator/tpm_version.h	1969-12-31 16:00:00.000000000 -0800
-@@ -1,6 +0,0 @@
--#ifndef _TPM_VERSION_H_
--#define _TPM_VERSION_H_
--#define VERSION_MAJOR 0
--#define VERSION_MINOR 3
--#define VERSION_BUILD 1136893683
--#endif /* _TPM_VERSION_H_ */
-diff -uprN tpm_emulator-0.3-x86_64/tpmd.c tpm_emulator/tpmd.c
---- tpm_emulator-0.3-x86_64/tpmd.c	1969-12-31 16:00:00.000000000 -0800
-+++ tpm_emulator/tpmd.c	2006-08-29 15:26:17.130674944 -0700
-@@ -0,0 +1,141 @@
+diff -uprN orig/tpm_emulator-0.4/tpmd.c tpm_emulator/tpmd.c
+--- orig/tpm_emulator-0.4/tpmd.c	1969-12-31 16:00:00.000000000 -0800
++++ tpm_emulator/tpmd.c	2006-07-24 14:35:35.000000000 -0700
+@@ -0,0 +1,156 @@
 +/* Software-Based Trusted Platform Module (TPM) Emulator for Linux
 + * Copyright (C) 2005 INTEL Corp
 + *
@@ -1624,8 +1735,8 @@ diff -uprN tpm_emulator-0.3-x86_64/tpmd.c tpm_emulator/tpmd.c
 +
 +#include "tpm_emulator.h"
 +
-+#define TPM_RX_FNAME "/tmp/tpm_in.fifo"
-+#define TPM_TX_FNAME "/tmp/tpm_out.fifo"
++#define TPM_RX_FNAME "/var/tpm/tpm_in.fifo"
++#define TPM_TX_FNAME "/var/tpm/tpm_out.fifo"
 +
 +#define BUFFER_SIZE 2048
 +
@@ -1656,7 +1767,8 @@ diff -uprN tpm_emulator-0.3-x86_64/tpmd.c tpm_emulator/tpmd.c
 +  uint32_t out_size;
 +  int in_size, written;
 +  int i;
-+ 
++  struct stat file_info;
++
 +  int tpm_tx_fh=-1, tpm_rx_fh=-1;
 +  if (argc < 2) {
 +    printf("Usage: tpmd clear|save|deactivated\n" );
@@ -1677,6 +1789,20 @@ diff -uprN tpm_emulator-0.3-x86_64/tpmd.c tpm_emulator/tpmd.c
 +    printf("invalid startup mode '%s'; must be 'clear', "
 +      "'save' (default) or 'deactivated", argv[1]);
 +    return -1;
++  }
++
++  if ( stat(TPM_RX_FNAME, &file_info) == -1) {
++    if ( mkfifo(TPM_RX_FNAME, S_IWUSR | S_IRUSR ) ) {
++      printf("Failed to create fifo %s.\n", TPM_RX_FNAME);
++      return -1;
++    }
++  }
++
++  if ( stat(TPM_TX_FNAME, &file_info) == -1) {
++    if ( mkfifo(TPM_TX_FNAME, S_IWUSR | S_IRUSR ) ) {
++      printf("Failed to create fifo %s.\n", TPM_TX_FNAME);
++      return -1;
++    }
 +  }
 +
 +  while (1) {
@@ -1739,3 +1865,14 @@ diff -uprN tpm_emulator-0.3-x86_64/tpmd.c tpm_emulator/tpmd.c
 +  close(tpm_rx_fh);
 +
 +}
+Binary files orig/tpm_emulator-0.4/tpm_emulator and tpm_emulator/tpm_emulator differ
+diff -uprN orig/tpm_emulator-0.4/tpm_version.h tpm_emulator/tpm_version.h
+--- orig/tpm_emulator-0.4/tpm_version.h	2006-06-23 03:37:07.000000000 -0700
++++ tpm_emulator/tpm_version.h	2006-07-24 14:35:41.000000000 -0700
+@@ -2,5 +2,5 @@
+ #define _TPM_VERSION_H_
+ #define VERSION_MAJOR 0
+ #define VERSION_MINOR 4
+-#define VERSION_BUILD 1151058734
++#define VERSION_BUILD 1153776940
+ #endif /* _TPM_VERSION_H_ */

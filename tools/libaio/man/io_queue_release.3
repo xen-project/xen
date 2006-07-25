@@ -1,0 +1,48 @@
+.TH io_queue_release 2 2002-09-03 "Linux 2.4" "Linux AIO"
+.SH NAME
+io_queue_release \- Release the context associated with the userspace handle
+.SH SYNOPSIS
+.nf
+.B #include <errno.h>
+.br
+.B #include <libaio.h>
+.br
+.sp
+.BI "int io_queue_release(io_context_t ctx)"
+.sp
+.SH DESCRIPTION
+.B io_queue_release
+destroys the context associated with the userspace handle.    May cancel any outstanding
+AIOs and block on completion.
+
+.B cts.
+.SH "RETURN VALUES"
+On success,
+.B io_queue_release
+returns 0.  Otherwise, -error is return, where
+error is one of the Exxx values defined in the Errors section.
+.SH ERRORS
+.TP
+.B EINVAL
+.I ctx 
+refers to an unitialized aio context, the iocb pointed to by
+.I iocbs 
+contains an improperly initialized iocb,
+.TP
+.B ENOSYS 
+Not implemented
+.SH "SEE ALSO"
+.BR io(3),
+.BR io_cancel(3),
+.BR io_fsync(3),
+.BR io_getevents(3),
+.BR io_prep_fsync(3),
+.BR io_prep_pread(3),
+.BR io_prep_pwrite(3),
+.BR io_queue_init(3),
+.BR io_queue_run(3),
+.BR io_queue_wait(3),
+.BR io_set_callback(3),
+.BR io_submit(3),
+.BR errno(3)
+

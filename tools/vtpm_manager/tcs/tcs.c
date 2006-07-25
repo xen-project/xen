@@ -162,8 +162,7 @@ TPM_RESULT TCS_OpenContext(TCS_CONTEXT_HANDLE* hContext) { // out
   
   vtpmloginfo(VTPM_LOG_TCS, "Calling TCS_OpenContext:\n");
   
-  // hContext must point to a null memory context handle
-  if(*hContext == HANDLE_NULL) {
+  if (hContext) {
     CONTEXT_HANDLE* pContextHandle = (CONTEXT_HANDLE *) malloc(sizeof(CONTEXT_HANDLE));
     if (pContextHandle == NULL) 
       return TPM_SIZE;

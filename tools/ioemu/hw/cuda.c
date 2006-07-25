@@ -23,6 +23,8 @@
  */
 #include "vl.h"
 
+/* XXX: implement all timer modes */
+
 //#define DEBUG_CUDA
 //#define DEBUG_CUDA_PACKET
 
@@ -41,6 +43,7 @@
 #define IER_CLR		0		/* clear bits in IER */
 #define SR_INT		0x04		/* Shift register full/empty */
 #define T1_INT          0x40            /* Timer 1 interrupt */
+#define T2_INT          0x20            /* Timer 2 interrupt */
 
 /* Bits in ACR */
 #define T1MODE          0xc0            /* Timer 1 mode */
@@ -87,8 +90,12 @@
 #define CUDA_TIMER_FREQ (4700000 / 6)
 #define CUDA_ADB_POLL_FREQ 50
 
+/* CUDA returns time_t's offset from Jan 1, 1904, not 1970 */
+#define RTC_OFFSET                      2082844800
+
 typedef struct CUDATimer {
-    unsigned int latch;
+    int index; 
+    uint16_t latch;
     uint16_t counter_value; /* counter value at load time */
     int64_t load_time;
     int64_t next_irq_time;
@@ -117,8 +124,9 @@ typedef struct CUDAState {
     int data_in_index;
     int data_out_index;
 
+    SetIRQFunc *set_irq;
     int irq;
-    openpic_t *openpic;
+    void *irq_opaque;
     uint8_t autopoll;
     uint8_t data_in[128];
     uint8_t data_out[16];
@@ -137,9 +145,9 @@ static void cuda_timer_update(CUDAState *s, CUDATimer *ti,
 static void cuda_update_irq(CUDAState *s)
 {
     if (s->ifr & s->ier & (SR_INT | T1_INT)) {
-        openpic_set_irq(s->openpic, s->irq, 1);
+        s->set_irq(s->irq_opaque, s->irq, 1);
     } else {
-        openpic_set_irq(s->openpic, s->irq, 0);
+        s->set_irq(s->irq_opaque, s->irq, 0);
     }
 }
 
@@ -150,10 +158,16 @@ static unsigned int get_counter(CUDATimer *s)
 
     d = muldiv64(qemu_get_clock(vm_clock) - s->load_time, 
                  CUDA_TIMER_FREQ, ticks_per_sec);
-    if (d <= s->counter_value) {
-        counter = d;
+    if (s->index == 0) {
+        /* the timer goes down from latch to -1 (period of latch + 2) */
+        if (d <= (s->counter_value + 1)) {
+            counter = (s->counter_value - d) & 0xffff;
+        } else {
+            counter = (d - (s->counter_value + 1)) % (s->latch + 2);
+            counter = (s->latch - counter) & 0xffff; 
+        }
     } else {
-        counter = s->latch - 1 - ((d - s->counter_value) % s->latch);
+        counter = (s->counter_value - d) & 0xffff;
     }
     return counter;
 }
@@ -171,20 +185,33 @@ static void set_counter(CUDAState *s, CUDATimer *ti, unsigned int val)
 
 static int64_t get_next_irq_time(CUDATimer *s, int64_t current_time)
 {
-    int64_t d, next_time, base;
+    int64_t d, next_time;
+    unsigned int counter;
+
     /* current counter value */
     d = muldiv64(current_time - s->load_time, 
                  CUDA_TIMER_FREQ, ticks_per_sec);
-    if (d <= s->counter_value) {
-        next_time = s->counter_value + 1;
+    /* the timer goes down from latch to -1 (period of latch + 2) */
+    if (d <= (s->counter_value + 1)) {
+        counter = (s->counter_value - d) & 0xffff;
     } else {
-        base = ((d - s->counter_value) / s->latch);
-        base = (base * s->latch) + s->counter_value;
-        next_time = base + s->latch;
+        counter = (d - (s->counter_value + 1)) % (s->latch + 2);
+        counter = (s->latch - counter) & 0xffff; 
     }
+    
+    /* Note: we consider the irq is raised on 0 */
+    if (counter == 0xffff) {
+        next_time = d + s->latch + 1;
+    } else if (counter == 0) {
+        next_time = d + s->latch + 2;
+    } else {
+        next_time = d + counter;
+    }
+#if 0
 #ifdef DEBUG_CUDA
     printf("latch=%d counter=%lld delta_next=%lld\n", 
            s->latch, d, next_time - d);
+#endif
 #endif
     next_time = muldiv64(next_time, ticks_per_sec, CUDA_TIMER_FREQ) + 
         s->load_time;
@@ -242,17 +269,18 @@ static uint32_t cuda_readb(void *opaque, target_phys_addr_t addr)
         break;
     case 5:
         val = get_counter(&s->timers[0]) >> 8;
-        s->ifr &= ~T1_INT;
         cuda_update_irq(s);
         break;
     case 6:
         val = s->timers[0].latch & 0xff;
         break;
     case 7:
+        /* XXX: check this */
         val = (s->timers[0].latch >> 8) & 0xff;
         break;
     case 8:
         val = get_counter(&s->timers[1]) & 0xff;
+        s->ifr &= ~T2_INT;
         break;
     case 9:
         val = get_counter(&s->timers[1]) >> 8;
@@ -270,9 +298,11 @@ static uint32_t cuda_readb(void *opaque, target_phys_addr_t addr)
         break;
     case 13:
         val = s->ifr;
+        if (s->ifr & s->ier) 
+            val |= 0x80;
         break;
     case 14:
-        val = s->ier;
+        val = s->ier | 0x80;
         break;
     default:
     case 15:
@@ -310,12 +340,13 @@ static void cuda_writeb(void *opaque, target_phys_addr_t addr, uint32_t val)
         s->dira = val;
         break;
     case 4:
-        val = val | (get_counter(&s->timers[0]) & 0xff00);
-        set_counter(s, &s->timers[0], val);
+        s->timers[0].latch = (s->timers[0].latch & 0xff00) | val;
+        cuda_timer_update(s, &s->timers[0], qemu_get_clock(vm_clock));
         break;
     case 5:
-        val = (val << 8) |  (get_counter(&s->timers[0]) & 0xff);
-        set_counter(s, &s->timers[0], val);
+        s->timers[0].latch = (s->timers[0].latch & 0xff) | (val << 8);
+        s->ifr &= ~T1_INT;
+        set_counter(s, &s->timers[0], s->timers[0].latch);
         break;
     case 6:
         s->timers[0].latch = (s->timers[0].latch & 0xff00) | val;
@@ -323,15 +354,15 @@ static void cuda_writeb(void *opaque, target_phys_addr_t addr, uint32_t val)
         break;
     case 7:
         s->timers[0].latch = (s->timers[0].latch & 0xff) | (val << 8);
+        s->ifr &= ~T1_INT;
         cuda_timer_update(s, &s->timers[0], qemu_get_clock(vm_clock));
         break;
     case 8:
-        val = val | (get_counter(&s->timers[1]) & 0xff00);
+        s->timers[1].latch = val;
         set_counter(s, &s->timers[1], val);
         break;
     case 9:
-        val = (val << 8) |  (get_counter(&s->timers[1]) & 0xff);
-        set_counter(s, &s->timers[1], val);
+        set_counter(s, &s->timers[1], (val << 8) | s->timers[1].latch);
         break;
     case 10:
         s->sr = val;
@@ -502,8 +533,9 @@ static void cuda_receive_packet(CUDAState *s,
         cuda_send_packet_to_host(s, obuf, 2);
         break;
     case CUDA_GET_TIME:
+    case CUDA_SET_TIME:
         /* XXX: add time support ? */
-        ti = time(NULL);
+        ti = time(NULL) + RTC_OFFSET;
         obuf[0] = CUDA_PACKET;
         obuf[1] = 0;
         obuf[2] = 0;
@@ -513,7 +545,6 @@ static void cuda_receive_packet(CUDAState *s,
         obuf[6] = ti;
         cuda_send_packet_to_host(s, obuf, 7);
         break;
-    case CUDA_SET_TIME:
     case CUDA_FILE_SERVER_FLAG:
     case CUDA_SET_DEVICE_LIST:
     case CUDA_SET_AUTO_RATE:
@@ -522,6 +553,12 @@ static void cuda_receive_packet(CUDAState *s,
         obuf[1] = 0;
         cuda_send_packet_to_host(s, obuf, 2);
         break;
+    case CUDA_POWERDOWN:
+        obuf[0] = CUDA_PACKET;
+        obuf[1] = 0;
+        cuda_send_packet_to_host(s, obuf, 2);
+	qemu_system_shutdown_request();
+	break;
     default:
         break;
     }
@@ -533,7 +570,7 @@ static void cuda_receive_packet_from_host(CUDAState *s,
 #ifdef DEBUG_CUDA_PACKET
     {
         int i;
-        printf("cuda_receive_packet_to_host:\n");
+        printf("cuda_receive_packet_from_host:\n");
         for(i = 0; i < len; i++)
             printf(" %02x", data[i]);
         printf("\n");
@@ -593,19 +630,24 @@ static CPUReadMemoryFunc *cuda_read[] = {
     &cuda_readl,
 };
 
-int cuda_init(openpic_t *openpic, int irq)
+int cuda_init(SetIRQFunc *set_irq, void *irq_opaque, int irq)
 {
     CUDAState *s = &cuda_state;
     int cuda_mem_index;
 
-    s->openpic = openpic;
+    s->set_irq = set_irq;
+    s->irq_opaque = irq_opaque;
     s->irq = irq;
 
+    s->timers[0].index = 0;
     s->timers[0].timer = qemu_new_timer(vm_clock, cuda_timer1, s);
-    s->timers[0].latch = 0x10000;
+    s->timers[0].latch = 0xffff;
     set_counter(s, &s->timers[0], 0xffff);
-    s->timers[1].latch = 0x10000;
-    s->ier = T1_INT | SR_INT;
+
+    s->timers[1].index = 1;
+    s->timers[1].latch = 0;
+    //    s->ier = T1_INT | SR_INT;
+    s->ier = 0;
     set_counter(s, &s->timers[1], 0xffff);
 
     s->adb_poll_timer = qemu_new_timer(vm_clock, cuda_adb_poll, s);

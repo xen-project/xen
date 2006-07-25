@@ -261,11 +261,12 @@ void pickup_deactive_ticks(struct periodic_time *pt)
  * period: fire frequency in ns.
  */
 struct periodic_time * create_periodic_time(
-        struct vcpu *v, 
+        PITChannelState *s,
         u32 period, 
         char irq,
         char one_shot)
 {
+    struct vcpu *v = s->vcpu;
     struct periodic_time *pt = &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
     if ( pt->enabled ) {
         if ( v->vcpu_id != 0 ) {
@@ -290,6 +291,7 @@ struct periodic_time * create_periodic_time(
     pt->scheduled = NOW() + period;
     set_timer (&pt->timer,pt->scheduled);
     pt->enabled = 1;
+    pt->priv = s;
     return pt;
 }
 

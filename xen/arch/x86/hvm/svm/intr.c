@@ -70,6 +70,7 @@ interrupt_post_injection(struct vcpu * v, int vector, int type)
             pt->pending_intr_nr--;
             pt->last_plt_gtime += pt->period_cycles;
             svm_set_guest_time(v, pt->last_plt_gtime);
+            pit_time_fired(v, pt->priv);
         }
     }
 

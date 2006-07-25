@@ -26,10 +26,11 @@ CTRL_SRCS-$(CONFIG_X86) += xc_ptrace.c xc_ptrace_core.c xc_pagetab.c
 CTRL_SRCS-$(CONFIG_Linux) += xc_linux.c
 
 GUEST_SRCS-y :=
-GUEST_SRCS-y += xc_linux_build.c
 GUEST_SRCS-y += xc_load_bin.c
 GUEST_SRCS-y += xc_load_elf.c
 GUEST_SRCS-y += xg_private.c
+GUEST_SRCS-$(CONFIG_POWERPC) += xc_ppc_linux_build.c
+GUEST_SRCS-$(CONFIG_X86) += xc_linux_build.c
 GUEST_SRCS-$(CONFIG_MIGRATE) += xc_linux_restore.c xc_linux_save.c
 GUEST_SRCS-$(CONFIG_HVM) += xc_hvm_build.c
 

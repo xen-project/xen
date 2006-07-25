@@ -29,6 +29,7 @@
 #include <xen/interface/xen.h>
 #include <xen/interface/xenoprof.h>
 #include <../../../drivers/oprofile/cpu_buffer.h>
+#include <../../../drivers/oprofile/event_buffer.h>
 
 static int xenoprof_start(void);
 static void xenoprof_stop(void);
@@ -151,16 +152,27 @@ static void xenoprof_add_pc(xenoprof_buf_t *buf, int is_passive)
 static void xenoprof_handle_passive(void)
 {
 	int i, j;
-
-	for (i = 0; i < pdomains; i++)
+	int flag_domain, flag_switch = 0;
+	
+	for (i = 0; i < pdomains; i++) {
+		flag_domain = 0;
 		for (j = 0; j < passive_domains[i].nbuf; j++) {
 			xenoprof_buf_t *buf = p_xenoprof_buf[i][j];
 			if (buf->event_head == buf->event_tail)
 				continue;
-                        oprofile_add_pc(IGNORED_PC, CPU_MODE_PASSIVE_START, passive_domains[i].domain_id);
+			if (!flag_domain) {
+				if (!oprofile_add_domain_switch(passive_domains[i].
+								domain_id))
+					goto done;
+				flag_domain = 1;
+			}
 			xenoprof_add_pc(buf, 1);
-                        oprofile_add_pc(IGNORED_PC, CPU_MODE_PASSIVE_STOP, passive_domains[i].domain_id);
-		}			
+			flag_switch = 1;
+		}
+	}
+done:
+	if (flag_switch)
+		oprofile_add_domain_switch(COORDINATOR_DOMAIN);
 }
 
 static irqreturn_t 
@@ -177,6 +189,7 @@ xenoprof_ovf_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 
 	if (is_primary && !test_and_set_bit(0, &flag)) {
 		xenoprof_handle_passive();
+		smp_mb__before_clear_bit();
 		clear_bit(0, &flag);
 	}
 

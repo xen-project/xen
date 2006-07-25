@@ -68,8 +68,7 @@ TPM_RESULT Crypto_symcrypto_initkey (symkey_t * key, const buffer_t* keybits) {
   
   key->cipher = SYM_CIPHER;
   
-  status = buffer_init_copy (&key->key, keybits);
-  STATUSCHECK(status);
+  TPMTRYRETURN( buffer_init_copy (&key->key, keybits));
     
   goto egress;
   
@@ -92,8 +91,7 @@ TPM_RESULT Crypto_symcrypto_genkey (symkey_t * key) {
   
   key->cipher = SYM_CIPHER;
   
-  status = buffer_init (&key->key, EVP_CIPHER_key_length(key->cipher), NULL);
-  STATUSCHECK (status);
+  TPMTRYRETURN( buffer_init (&key->key, EVP_CIPHER_key_length(key->cipher), NULL)) ;
   
   // and generate the key material
   res = RAND_pseudo_bytes (key->key.bytes, key->key.size);
@@ -133,8 +131,7 @@ TPM_RESULT Crypto_symcrypto_encrypt (symkey_t* key,
   // make an alias into which we'll put the ciphertext
   buffer_init_alias (&cipher_alias, o_cipher, EVP_CIPHER_iv_length(key->cipher), 0);
   
-  status = ossl_symcrypto_op (key, clear, &iv, &cipher_alias, CRYPT_ENCRYPT);
-  STATUSCHECK (status);
+  TPMTRYRETURN( ossl_symcrypto_op (key, clear, &iv, &cipher_alias, CRYPT_ENCRYPT) );
 
   // set the output size correctly
   o_cipher->size += cipher_alias.size;
@@ -165,16 +162,14 @@ TPM_RESULT Crypto_symcrypto_decrypt (symkey_t* key,
   buffer_init_alias (&cipher_alias, cipher, EVP_CIPHER_iv_length(key->cipher), 0);
   
   // prepare the output buffer
-  status = buffer_init (o_clear,
+  TPMTRYRETURN( buffer_init (o_clear,
 			cipher->size
 			- EVP_CIPHER_iv_length(key->cipher)
 			+ EVP_CIPHER_block_size(key->cipher), 
-			0);
-  STATUSCHECK(status);
+			0) );
   
   // and decrypt
-  status = ossl_symcrypto_op (key, &cipher_alias, &iv, o_clear, CRYPT_DECRYPT);
-  STATUSCHECK (status);
+  TPMTRYRETURN ( ossl_symcrypto_op (key, &cipher_alias, &iv, o_clear, CRYPT_DECRYPT) );
   
   goto egress;
   

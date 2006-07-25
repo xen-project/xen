@@ -852,11 +852,11 @@ static void processing_timeout(unsigned long ptr)
 	 */
 	if (pak == packet_find_packet(&dataex.pending_pak, pak) ||
 	    pak == packet_find_packet(&dataex.current_pak, pak)) {
-		list_del(&pak->next);
 		if ((pak->flags & PACKET_FLAG_DISCARD_RESPONSE) == 0) {
 			tpm_send_fail_message(pak, pak->req_tag);
 		}
-		packet_free(pak);
+		/* discard future responses */
+		pak->flags |= PACKET_FLAG_DISCARD_RESPONSE;
 	}
 
 	write_unlock_irqrestore(&dataex.pak_lock, flags);

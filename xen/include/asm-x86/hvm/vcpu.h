@@ -29,17 +29,17 @@
 #define HVM_VCPU_INIT_SIPI_SIPI_STATE_WAIT_SIPI     1
 
 struct hvm_vcpu {
-    unsigned long   ioflags;
-    struct mmio_op  mmio_op;
-    struct vlapic   *vlapic;
-    s64             cache_tsc_offset;
-    u64             guest_time;
+    unsigned long       ioflags;
+    struct hvm_io_op    io_op;
+    struct vlapic       *vlapic;
+    s64                 cache_tsc_offset;
+    u64                 guest_time;
 
     /* For AP startup */
-    unsigned long   init_sipi_sipi_state;
+    unsigned long       init_sipi_sipi_state;
 
     /* Flags */
-    int   flag_dr_dirty;
+    int                 flag_dr_dirty;
 
     union {
         struct arch_vmx_struct vmx;
@@ -47,7 +47,9 @@ struct hvm_vcpu {
     } u;
 };
 
-#define ARCH_HVM_IO_WAIT   1       /* Waiting for I/O completion */
+#define ARCH_HVM_IO_WAIT            1   /* Waiting for I/O completion */
+
+#define HVM_CONTEXT_STACK_BYTES     (offsetof(struct cpu_user_regs, error_code))
 
 #endif /* __ASM_X86_HVM_VCPU_H__ */
 

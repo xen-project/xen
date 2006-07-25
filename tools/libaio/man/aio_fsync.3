@@ -1,0 +1,139 @@
+.TH aio_fsync 3 2002-09-12 "Linux 2.4" Linux AIO"
+.SH NAME
+aio_fsync \- Synchronize a file's complete in-core state with that on disk
+.SH SYNOPSYS
+.nf
+.B #include <errno.h>
+.sp
+.br 
+.B #include <aio.h>
+.sp
+.br
+.BI "int aio_fsync (int op, struct aiocb aiocbp)"
+.fi
+.SH DESCRIPTION
+.PP
+When dealing with asynchronous operations it is sometimes necessary to
+get into a consistent state.  This would mean for AIO that one wants to
+know whether a certain request or a group of request were processed.
+This could be done by waiting for the notification sent by the system
+after the operation terminated, but this sometimes would mean wasting
+resources (mainly computation time).  Instead POSIX.1b defines two
+functions which will help with most kinds of consistency.
+.PP
+The
+.IR aio_fsync
+and 
+.IR "aio_fsync64"
+functions are only available
+if the symbol 
+.IR "_POSIX_SYNCHRONIZED_IO"
+is defined in 
+.I unistd.h
+.
+
+Calling this function forces all I/O operations operating queued at the
+time of the function call operating on the file descriptor
+.IR "aiocbp->aio_fildes"
+into the synchronized I/O completion state .  The 
+.IR "aio_fsync"
+function returns
+immediately but the notification through the method described in
+.IR "aiocbp->aio_sigevent"
+will happen only after all requests for this
+file descriptor have terminated and the file is synchronized.  This also
+means that requests for this very same file descriptor which are queued
+after the synchronization request are not affected.
+
+If 
+.IR "op"
+is 
+.IR "O_DSYNC"
+the synchronization happens as with a call
+to 
+.IR "fdatasync"
+.  Otherwise 
+.IR "op"
+should be 
+.IR "O_SYNC"
+and
+the synchronization happens as with 
+.IR "fsync"
+.
+
+As long as the synchronization has not happened, a call to
+.IR "aio_error"
+with the reference to the object pointed to by
+.IR "aiocbp"
+returns 
+.IR "EINPROGRESS"
+.  Once the synchronization is
+done 
+.IR "aio_error"
+return 
+.IR 0
+if the synchronization was not
+successful.  Otherwise the value returned is the value to which the
+.IR "fsync"
+or 
+.IR "fdatasync"
+function would have set the
+.IR "errno"
+variable.  In this case nothing can be assumed about the
+consistency for the data written to this file descriptor.
+
+.SH "RETURN VALUES"
+The return value of this function is 
+.IR 0
+if the request was
+successfully enqueued.  Otherwise the return value is 
+.IR -1
+and
+.IR "errno".
+.SH ERRORS
+.TP
+.B EAGAIN
+The request could not be enqueued due to temporary lack of resources.
+.TP
+.B EBADF
+The file descriptor 
+.IR "aiocbp->aio_fildes"
+is not valid or not open
+for writing.
+.TP
+.B EINVAL
+The implementation does not support I/O synchronization or the 
+.IR "op"
+parameter is other than 
+.IR "O_DSYNC"
+and 
+.IR "O_SYNC"
+.
+.TP
+.B ENOSYS
+This function is not implemented.
+.PP
+When the sources are compiled with 
+.IR "_FILE_OFFSET_BITS == 64"
+ this
+function is in fact 
+.IR "aio_return64"
+since the LFS interface
+transparently replaces the normal implementation.
+.SH "SEE ALSO"
+.BR aio(3),
+.BR aio_cancel(3),
+.BR aio_cancel64(3),
+.BR aio_error(3),
+.BR aio_error64(3),
+.BR aio_fsync64(3),
+.BR aio_init(3),
+.BR aio_read(3),
+.BR aio_read64(3),
+.BR aio_return(3),
+.BR aio_return64(3),
+.BR aio_suspend(3),
+.BR aio_suspend64(3),
+.BR aio_write(3),
+.BR aio_write64(3),
+.BR errno(3),

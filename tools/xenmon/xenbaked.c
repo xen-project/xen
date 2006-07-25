@@ -95,6 +95,8 @@ int dom0_flips = 0;
 _new_qos_data *new_qos;
 _new_qos_data **cpu_qos_data;
 
+int global_cpu;
+uint64_t global_now;
 
 // array of currently running domains, indexed by cpu
 int *running = NULL;
@@ -678,7 +680,7 @@ const struct argp parser_def =
 };
 
 
-const char *argp_program_version     = "xenbaked v1.3";
+const char *argp_program_version     = "xenbaked v1.4";
 const char *argp_program_bug_address = "<rob.gardner@hp.com>";
 
 
@@ -715,16 +717,115 @@ int main(int argc, char **argv)
     return ret;
 }
 
+void qos_init_domain(int domid, int idx)
+{
+  int i;
+
+  memset(&new_qos->domain_info[idx], 0, sizeof(_domain_info));
+  new_qos->domain_info[idx].last_update_time = global_now;
+  //  runnable_start_time[idx] = 0;
+  new_qos->domain_info[idx].runnable_start_time = 0; // invalidate
+  new_qos->domain_info[idx].in_use = 1;
+  new_qos->domain_info[idx].blocked_start_time = 0;
+  new_qos->domain_info[idx].id = domid;
+  if (domid == IDLE_DOMAIN_ID)
+    sprintf(new_qos->domain_info[idx].name, "Idle Task%d", global_cpu);
+  else
+    sprintf(new_qos->domain_info[idx].name, "Domain#%d", domid);
+  
+  for (i=0; i<NSAMPLES; i++) {
+    new_qos->qdata[i].ns_gotten[idx] = 0;
+    new_qos->qdata[i].ns_allocated[idx] = 0;
+    new_qos->qdata[i].ns_waiting[idx] = 0;
+    new_qos->qdata[i].ns_blocked[idx] = 0;
+    new_qos->qdata[i].switchin_count[idx] = 0;
+    new_qos->qdata[i].io_count[idx] = 0;
+  }
+}
+
+void global_init_domain(int domid, int idx) 
+{
+  int cpu;
+  _new_qos_data *saved_qos;
+  
+  saved_qos = new_qos;
+  
+  for (cpu=0; cpu<NCPU; cpu++) {
+    new_qos = cpu_qos_data[cpu];
+    qos_init_domain(domid, idx);
+  }
+  new_qos = saved_qos;
+}
+
+
+// give index of this domain in the qos data array
+int indexof(int domid)
+{
+  int idx;
+  xc_dominfo_t dominfo[NDOMAINS];
+  int xc_handle, ndomains;
+  extern void qos_kill_thread(int domid);
+  
+  if (domid < 0) {	// shouldn't happen
+    printf("bad domain id: %d\r\n", domid);
+    return 0;
+  }
+
+  for (idx=0; idx<NDOMAINS; idx++)
+    if ( (new_qos->domain_info[idx].id == domid) && new_qos->domain_info[idx].in_use)
+      return idx;
+
+  // not found, make a new entry
+  for (idx=0; idx<NDOMAINS; idx++)
+    if (new_qos->domain_info[idx].in_use == 0) {
+      global_init_domain(domid, idx);
+      return idx;
+    }
+
+  // call domaininfo hypercall to try and garbage collect unused entries
+  xc_handle = xc_interface_open();
+  ndomains = xc_domain_getinfo(xc_handle, 0, NDOMAINS, dominfo);
+  xc_interface_close(xc_handle);
+
+  // for each domain in our data, look for it in the system dominfo structure
+  // and purge the domain's data from our state if it does not exist in the
+  // dominfo structure
+  for (idx=0; idx<NDOMAINS; idx++) {
+    int domid = new_qos->domain_info[idx].id;
+    int jdx;
+    
+    for (jdx=0; jdx<ndomains; jdx++) {
+      if (dominfo[jdx].domid == domid)
+	break;
+    }
+    if (jdx == ndomains)        // we didn't find domid in the dominfo struct
+      if (domid != IDLE_DOMAIN_ID) // exception for idle domain, which is not
+	                           // contained in dominfo
+	qos_kill_thread(domid);	// purge our stale data
+  }
+  
+  // look again for a free slot
+  for (idx=0; idx<NDOMAINS; idx++)
+    if (new_qos->domain_info[idx].in_use == 0) {
+      global_init_domain(domid, idx);
+      return idx;
+    }
+
+  // still no space found, so bail
+  fprintf(stderr, "out of space in domain table, increase NDOMAINS\r\n");
+  exit(2);
+}
+
 int domain_runnable(int domid)
 {
-    return new_qos->domain_info[ID(domid)].runnable;
+    return new_qos->domain_info[indexof(domid)].runnable;
 }
 
 
 void update_blocked_time(int domid, uint64_t now)
 {
     uint64_t t_blocked;
-    int id = ID(domid);
+    int id = indexof(domid);
 
     if (new_qos->domain_info[id].blocked_start_time != 0) {
         if (now >= new_qos->domain_info[id].blocked_start_time)
@@ -734,7 +835,7 @@ void update_blocked_time(int domid, uint64_t now)
         new_qos->qdata[new_qos->next_datapoint].ns_blocked[id] += t_blocked;
     }
 
-    if (domain_runnable(id))
+    if (domain_runnable(domid))
         new_qos->domain_info[id].blocked_start_time = 0;
     else
         new_qos->domain_info[id].blocked_start_time = now;
@@ -773,7 +874,7 @@ void qos_update_thread(int cpu, int domid, uint64_t now)
     uint64_t last_update_time, start;
     int64_t time_since_update, run_time = 0;
 
-    id = ID(domid);
+    id = indexof(domid);
 
     n = new_qos->next_datapoint;
     last_update_time = new_qos->domain_info[id].last_update_time;
@@ -851,7 +952,7 @@ void qos_update_all(uint64_t now, int cpu)
 
     for (i=0; i<NDOMAINS; i++)
         if (new_qos->domain_info[i].in_use)
-            qos_update_thread(cpu, i, now);
+            qos_update_thread(cpu, new_qos->domain_info[i].id, now); 
 }
 
 
@@ -866,69 +967,37 @@ void qos_update_thread_stats(int cpu, int domid, uint64_t now)
 }
 
 
-void qos_init_domain(int cpu, int domid, uint64_t now)
-{
-    int i, id;
-
-    id = ID(domid);
-
-    if (new_qos->domain_info[id].in_use)
-        return;
-
-
-    memset(&new_qos->domain_info[id], 0, sizeof(_domain_info));
-    new_qos->domain_info[id].last_update_time = now;
-    //  runnable_start_time[id] = 0;
-    new_qos->domain_info[id].runnable_start_time = 0; // invalidate
-    new_qos->domain_info[id].in_use = 1;
-    new_qos->domain_info[id].blocked_start_time = 0;
-    new_qos->domain_info[id].id = id;
-    if (domid == IDLE_DOMAIN_ID)
-        sprintf(new_qos->domain_info[id].name, "Idle Task%d", cpu);
-    else
-        sprintf(new_qos->domain_info[id].name, "Domain#%d", domid);
-
-    for (i=0; i<NSAMPLES; i++) {
-        new_qos->qdata[i].ns_gotten[id] = 0;
-        new_qos->qdata[i].ns_allocated[id] = 0;
-        new_qos->qdata[i].ns_waiting[id] = 0;
-        new_qos->qdata[i].ns_blocked[id] = 0;
-        new_qos->qdata[i].switchin_count[id] = 0;
-        new_qos->qdata[i].io_count[id] = 0;
-    }
-}
-
 
 // called when a new thread gets the cpu
 void qos_switch_in(int cpu, int domid, uint64_t now, unsigned long ns_alloc, unsigned long ns_waited)
 {
-    int id = ID(domid);
+    int idx = indexof(domid);
 
-    new_qos->domain_info[id].runnable = 1;
+    new_qos->domain_info[idx].runnable = 1;
     update_blocked_time(domid, now);
-    new_qos->domain_info[id].blocked_start_time = 0; // invalidate
-    new_qos->domain_info[id].runnable_start_time = 0; // invalidate
-    //runnable_start_time[id] = 0;
+    new_qos->domain_info[idx].blocked_start_time = 0; // invalidate
+    new_qos->domain_info[idx].runnable_start_time = 0; // invalidate
+    //runnable_start_time[idx] = 0;
 
-    new_qos->domain_info[id].start_time = now;
-    new_qos->qdata[new_qos->next_datapoint].switchin_count[id]++;
-    new_qos->qdata[new_qos->next_datapoint].ns_allocated[id] += ns_alloc;
-    new_qos->qdata[new_qos->next_datapoint].ns_waiting[id] += ns_waited;
+    new_qos->domain_info[idx].start_time = now;
+    new_qos->qdata[new_qos->next_datapoint].switchin_count[idx]++;
+    new_qos->qdata[new_qos->next_datapoint].ns_allocated[idx] += ns_alloc;
+    new_qos->qdata[new_qos->next_datapoint].ns_waiting[idx] += ns_waited;
     qos_update_thread_stats(cpu, domid, now);
-    set_current(cpu, id);
+    set_current(cpu, domid);
 
     // count up page flips for dom0 execution
-    if (id == 0)
+    if (domid == 0)
       dom0_flips = 0;
 }
 
 // called when the current thread is taken off the cpu
 void qos_switch_out(int cpu, int domid, uint64_t now, unsigned long gotten)
 {
-    int id = ID(domid);
+    int idx = indexof(domid);
     int n;
 
-    if (!is_current(id, cpu)) {
+    if (!is_current(domid, cpu)) {
         //    printf("switching out domain %d but it is not current. gotten=%ld\r\n", id, gotten);
     }
 
@@ -943,18 +1012,18 @@ void qos_switch_out(int cpu, int domid, uint64_t now, unsigned long gotten)
 
     n = new_qos->next_datapoint;
 #if 0
-    new_qos->qdata[n].ns_gotten[id] += gotten;
+    new_qos->qdata[n].ns_gotten[idx] += gotten;
     if (gotten > new_qos->qdata[n].ns_passed)
       printf("inconsistency #257, diff = %lld\n",
 	    gotten - new_qos->qdata[n].ns_passed );
 #endif
-    new_qos->domain_info[id].ns_oncpu_since_boot += gotten;
-    new_qos->domain_info[id].runnable_start_time = now;
+    new_qos->domain_info[idx].ns_oncpu_since_boot += gotten;
+    new_qos->domain_info[idx].runnable_start_time = now;
     //  runnable_start_time[id] = now;
-    qos_update_thread_stats(cpu, id, now);
+    qos_update_thread_stats(cpu, domid, now);
 
     // process dom0 page flips
-    if (id == 0)
+    if (domid == 0)
       if (dom0_flips == 0)
 	new_qos->qdata[n].flip_free_periods++;
 }
@@ -963,23 +1032,30 @@ void qos_switch_out(int cpu, int domid, uint64_t now, unsigned long gotten)
 // when thread is already asleep
 void qos_state_sleeping(int cpu, int domid, uint64_t now) 
 {
-    int id = ID(domid);
+    int idx;
 
-    if (!domain_runnable(id))	// double call?
+    if (!domain_runnable(domid))	// double call?
         return;
 
-    new_qos->domain_info[id].runnable = 0;
-    new_qos->domain_info[id].blocked_start_time = now;
-    new_qos->domain_info[id].runnable_start_time = 0; // invalidate
-    //  runnable_start_time[id] = 0; // invalidate
+    idx = indexof(domid);
+    new_qos->domain_info[idx].runnable = 0;
+    new_qos->domain_info[idx].blocked_start_time = now;
+    new_qos->domain_info[idx].runnable_start_time = 0; // invalidate
+    //  runnable_start_time[idx] = 0; // invalidate
     qos_update_thread_stats(cpu, domid, now);
 }
 
 
 
+// domain died, presume it's dead on all cpu's, not just mostly dead
 void qos_kill_thread(int domid)
 {
-    new_qos->domain_info[ID(domid)].in_use = 0;
+  int cpu;
+  
+  for (cpu=0; cpu<NCPU; cpu++) {
+    cpu_qos_data[cpu]->domain_info[indexof(domid)].in_use = 0;
+  }
+  
 }
 
 
@@ -987,30 +1063,33 @@ void qos_kill_thread(int domid)
 // when thread is already runnable
 void qos_state_runnable(int cpu, int domid, uint64_t now)
 {
-    int id = ID(domid);
+   int idx;
+  
 
     qos_update_thread_stats(cpu, domid, now);
 
-    if (domain_runnable(id))	// double call?
+    if (domain_runnable(domid))	// double call?
         return;
-    new_qos->domain_info[id].runnable = 1;
+
+    idx = indexof(domid);
+    new_qos->domain_info[idx].runnable = 1;
     update_blocked_time(domid, now);
 
-    new_qos->domain_info[id].blocked_start_time = 0; /* invalidate */
-    new_qos->domain_info[id].runnable_start_time = now;
+    new_qos->domain_info[idx].blocked_start_time = 0; /* invalidate */
+    new_qos->domain_info[idx].runnable_start_time = now;
     //  runnable_start_time[id] = now;
 }
 
 
 void qos_count_packets(domid_t domid, uint64_t now)
 {
-  int i, id = ID(domid);
+  int i, idx = indexof(domid);
   _new_qos_data *cpu_data;
 
   for (i=0; i<NCPU; i++) {
     cpu_data = cpu_qos_data[i];
-    if (cpu_data->domain_info[id].in_use) {
-      cpu_data->qdata[cpu_data->next_datapoint].io_count[id]++;
+    if (cpu_data->domain_info[idx].in_use) {
+      cpu_data->qdata[cpu_data->next_datapoint].io_count[idx]++;
     }
   }
 
@@ -1019,24 +1098,9 @@ void qos_count_packets(domid_t domid, uint64_t now)
 }
 
 
-int domain_ok(int cpu, int domid, uint64_t now)
-{
-    if (domid == IDLE_DOMAIN_ID)
-        domid = NDOMAINS-1;
-    if (domid < 0 || domid >= NDOMAINS) {
-        printf("bad domain id: %d\r\n", domid);
-        return 0;
-    }
-    if (new_qos->domain_info[domid].in_use == 0)
-        qos_init_domain(cpu, domid, now);
-    return 1;
-}
-
-
 void process_record(int cpu, struct t_rec *r)
 {
   uint64_t now;
-
 
   new_qos = cpu_qos_data[cpu];
 
@@ -1044,52 +1108,47 @@ void process_record(int cpu, struct t_rec *r)
 
   now = ((double)r->cycles) / (opts.cpu_freq / 1000.0);
 
+  global_now = now;
+  global_cpu = cpu;
+
   log_event(r->event);
 
   switch (r->event) {
 
   case TRC_SCHED_SWITCH_INFPREV:
     // domain data[0] just switched out and received data[1] ns of cpu time
-    if (domain_ok(cpu, r->data[0], now))
-      qos_switch_out(cpu, r->data[0], now, r->data[1]);
+    qos_switch_out(cpu, r->data[0], now, r->data[1]);
     //    printf("ns_gotten %ld\n", r->data[1]);
     break;
     
   case TRC_SCHED_SWITCH_INFNEXT:
     // domain data[0] just switched in and
     // waited data[1] ns, and was allocated data[2] ns of cpu time
-    if (domain_ok(cpu, r->data[0], now))
-      qos_switch_in(cpu, r->data[0], now, r->data[2], r->data[1]);
+    qos_switch_in(cpu, r->data[0], now, r->data[2], r->data[1]);
     break;
     
   case TRC_SCHED_DOM_ADD:
-    if (domain_ok(cpu, r->data[0], now))
-      qos_init_domain(cpu, r->data[0],  now);
+    (void) indexof(r->data[0]);
     break;
     
   case TRC_SCHED_DOM_REM:
-    if (domain_ok(cpu, r->data[0], now))
-      qos_kill_thread(r->data[0]);
+    qos_kill_thread(r->data[0]);
     break;
     
   case TRC_SCHED_SLEEP:
-    if (domain_ok(cpu, r->data[0], now))
-      qos_state_sleeping(cpu, r->data[0], now);
+    qos_state_sleeping(cpu, r->data[0], now);
     break;
     
   case TRC_SCHED_WAKE:
-    if (domain_ok(cpu, r->data[0], now))
-      qos_state_runnable(cpu, r->data[0], now);
+    qos_state_runnable(cpu, r->data[0], now);
     break;
     
   case TRC_SCHED_BLOCK:
-    if (domain_ok(cpu, r->data[0], now))
-      qos_state_sleeping(cpu, r->data[0], now);
+    qos_state_sleeping(cpu, r->data[0], now);
     break;
     
   case TRC_MEM_PAGE_GRANT_TRANSFER:
-    if (domain_ok(cpu, r->data[0], now))
-      qos_count_packets(r->data[0], now);
+    qos_count_packets(r->data[0], now);
     break;
     
   default:

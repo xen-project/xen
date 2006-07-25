@@ -56,14 +56,18 @@
 #define VTPM_PRIV_BASE      (VTPM_ORD_BASE | VTPM_PRIV_MASK)
 
 // Non-priviledged VTPM Commands (From DMI's)
-#define VTPM_ORD_SAVENVM    (VTPM_ORD_BASE + 1) // DMI Saves Secrets
-#define VTPM_ORD_LOADNVM    (VTPM_ORD_BASE + 2) // DMI Loads Secrets
-#define VTPM_ORD_TPMCOMMAND (VTPM_ORD_BASE + 3) // DMI issues HW TPM Command
+#define VTPM_ORD_SAVENVM      (VTPM_ORD_BASE + 1) // DMI Saves Secrets
+#define VTPM_ORD_LOADNVM      (VTPM_ORD_BASE + 2) // DMI Loads Secrets
+#define VTPM_ORD_TPMCOMMAND   (VTPM_ORD_BASE + 3) // DMI issues HW TPM Command
+#define VTPM_ORD_GET_MIG_KEY  (VTPM_ORD_BASE + 4) // Get manager's migration key
+#define VTPM_ORD_LOAD_MIG_KEY (VTPM_ORD_BASE + 5) // load dest migration key 
 
 // Priviledged VTPM Commands (From management console)
-#define VTPM_ORD_OPEN     (VTPM_PRIV_BASE + 1) // Creates/reopens DMI
-#define VTPM_ORD_CLOSE    (VTPM_PRIV_BASE + 2) // Closes a DMI
-#define VTPM_ORD_DELETE   (VTPM_PRIV_BASE + 3) // Permemently Deletes DMI
+#define VTPM_ORD_OPEN         (VTPM_PRIV_BASE + 1) // Creates/reopens DMI
+#define VTPM_ORD_CLOSE        (VTPM_PRIV_BASE + 2) // Closes a DMI
+#define VTPM_ORD_DELETE       (VTPM_PRIV_BASE + 3) // Permemently Deletes DMI
+#define VTPM_ORD_MIGRATE_IN   (VTPM_PRIV_BASE + 4) // Load migrated VTPM
+#define VTPM_ORD_MIGRATE_OUT  (VTPM_PRIV_BASE + 5) // migrate VTPM to dest 
 
 //************************ Return Codes ****************************
 #define VTPM_SUCCESS               0

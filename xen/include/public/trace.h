@@ -26,6 +26,7 @@
 #define TRC_VMXIO    0x00088000   /* VMX io emulation trace  */
 
 /* Trace events per class */
+#define TRC_LOST_RECORDS        (TRC_GEN + 1)
 
 #define TRC_SCHED_DOM_ADD       (TRC_SCHED +  1)
 #define TRC_SCHED_DOM_REM       (TRC_SCHED +  2)

@@ -70,11 +70,6 @@
 #define UART_LSR_OE	0x02	/* Overrun error indicator */
 #define UART_LSR_DR	0x01	/* Receiver data ready */
 
-/*
- * Size of ring buffer for characters to send to host
- */
-#define MAXCHRS	256
-
 struct SerialState {
     uint8_t divider;
     uint8_t rbr; /* receive register */
@@ -83,28 +78,22 @@ struct SerialState {
     uint8_t lcr;
     uint8_t mcr;
     uint8_t lsr; /* read only */
-    uint8_t msr;
+    uint8_t msr; /* read only */
     uint8_t scr;
     /* NOTE: this hidden state is necessary for tx irq generation as
        it can be reset while reading iir */
     int thr_ipending;
+    SetIRQFunc *set_irq;
+    void *irq_opaque;
     int irq;
-    struct cbuf {
-	    uint8_t buf[MAXCHRS];
-	    int in;
-	    int out;
-    } cbuf;
     CharDriverState *chr;
+    int last_break_enable;
+    target_ulong base;
+    int it_shift;
 };
 
 static void serial_update_irq(SerialState *s)
 {
-    if ((s->lsr & UART_LSR_DR) == 0 && s->cbuf.in != s->cbuf.out) {
-	s->rbr = s->cbuf.buf[s->cbuf.out++];
-	if (s->cbuf.out >= MAXCHRS)
-	    s->cbuf.out = 0;
-	s->lsr |= UART_LSR_DR;
-    }
     if ((s->lsr & UART_LSR_DR) && (s->ier & UART_IER_RDI)) {
         s->iir = UART_IIR_RDI;
     } else if (s->thr_ipending && (s->ier & UART_IER_THRI)) {
@@ -113,10 +102,42 @@ static void serial_update_irq(SerialState *s)
         s->iir = UART_IIR_NO_INT;
     }
     if (s->iir != UART_IIR_NO_INT) {
-        pic_set_irq(s->irq, 1);
+        s->set_irq(s->irq_opaque, s->irq, 1);
     } else {
-        pic_set_irq(s->irq, 0);
+        s->set_irq(s->irq_opaque, s->irq, 0);
     }
+}
+
+static void serial_update_parameters(SerialState *s)
+{
+    int speed, parity, data_bits, stop_bits;
+    QEMUSerialSetParams ssp;
+
+    if (s->lcr & 0x08) {
+        if (s->lcr & 0x10)
+            parity = 'E';
+        else
+            parity = 'O';
+    } else {
+            parity = 'N';
+    }
+    if (s->lcr & 0x04) 
+        stop_bits = 2;
+    else
+        stop_bits = 1;
+    data_bits = (s->lcr & 0x03) + 5;
+    if (s->divider == 0)
+        return;
+    speed = 115200 / s->divider;
+    ssp.speed = speed;
+    ssp.parity = parity;
+    ssp.data_bits = data_bits;
+    ssp.stop_bits = stop_bits;
+    qemu_chr_ioctl(s->chr, CHR_IOCTL_SERIAL_SET_PARAMS, &ssp);
+#if 0
+    printf("speed=%d parity=%c data=%d stop=%d\n", 
+           speed, parity, data_bits, stop_bits);
+#endif
 }
 
 static void serial_ioport_write(void *opaque, uint32_t addr, uint32_t val)
@@ -133,6 +154,7 @@ static void serial_ioport_write(void *opaque, uint32_t addr, uint32_t val)
     case 0:
         if (s->lcr & UART_LCR_DLAB) {
             s->divider = (s->divider & 0xff00) | val;
+            serial_update_parameters(s);
         } else {
             s->thr_ipending = 0;
             s->lsr &= ~UART_LSR_THRE;
@@ -148,6 +170,7 @@ static void serial_ioport_write(void *opaque, uint32_t addr, uint32_t val)
     case 1:
         if (s->lcr & UART_LCR_DLAB) {
             s->divider = (s->divider & 0x00ff) | (val << 8);
+            serial_update_parameters(s);
         } else {
             s->ier = val & 0x0f;
             if (s->lsr & UART_LSR_THRE) {
@@ -159,7 +182,17 @@ static void serial_ioport_write(void *opaque, uint32_t addr, uint32_t val)
     case 2:
         break;
     case 3:
-        s->lcr = val;
+        {
+            int break_enable;
+            s->lcr = val;
+            serial_update_parameters(s);
+            break_enable = (val >> 6) & 1;
+            if (break_enable != s->last_break_enable) {
+                s->last_break_enable = break_enable;
+                qemu_chr_ioctl(s->chr, CHR_IOCTL_SERIAL_SET_BREAK, 
+                               &break_enable);
+            }
+        }
         break;
     case 4:
         s->mcr = val & 0x1f;
@@ -167,7 +200,6 @@ static void serial_ioport_write(void *opaque, uint32_t addr, uint32_t val)
     case 5:
         break;
     case 6:
-        s->msr = val;
         break;
     case 7:
         s->scr = val;
@@ -236,22 +268,6 @@ static uint32_t serial_ioport_read(void *opaque, uint32_t addr)
     return ret;
 }
 
-void ser_queue(SerialState *s, unsigned char c)
-{
-    int n;
-
-    n = s->cbuf.in - s->cbuf.out;
-    if (n < 0)
-	n += MAXCHRS;
-    if (n < (MAXCHRS - 1)) {
-	s->cbuf.buf[s->cbuf.in++] = c;
-	if (s->cbuf.in >= MAXCHRS)
-	    s->cbuf.in = 0;
-	serial_update_irq(s);
-    }
-    return;
-}
-
 static int serial_can_receive(SerialState *s)
 {
     return !(s->lsr & UART_LSR_DR);
@@ -259,9 +275,6 @@ static int serial_can_receive(SerialState *s)
 
 static void serial_receive_byte(SerialState *s, int ch)
 {
-#ifdef	DEBUG_SERIAL
-    printf("serial: serial_receive_byte: ch=0x%02x\n", ch);
-#endif	// DEBUG_SERIAL
     s->rbr = ch;
     s->lsr |= UART_LSR_DR;
     serial_update_irq(s);
@@ -293,22 +306,149 @@ static void serial_event(void *opaque, int event)
         serial_receive_break(s);
 }
 
+static void serial_save(QEMUFile *f, void *opaque)
+{
+    SerialState *s = opaque;
+
+    qemu_put_8s(f,&s->divider);
+    qemu_put_8s(f,&s->rbr);
+    qemu_put_8s(f,&s->ier);
+    qemu_put_8s(f,&s->iir);
+    qemu_put_8s(f,&s->lcr);
+    qemu_put_8s(f,&s->mcr);
+    qemu_put_8s(f,&s->lsr);
+    qemu_put_8s(f,&s->msr);
+    qemu_put_8s(f,&s->scr);
+}
+
+static int serial_load(QEMUFile *f, void *opaque, int version_id)
+{
+    SerialState *s = opaque;
+
+    if(version_id != 1)
+        return -EINVAL;
+
+    qemu_get_8s(f,&s->divider);
+    qemu_get_8s(f,&s->rbr);
+    qemu_get_8s(f,&s->ier);
+    qemu_get_8s(f,&s->iir);
+    qemu_get_8s(f,&s->lcr);
+    qemu_get_8s(f,&s->mcr);
+    qemu_get_8s(f,&s->lsr);
+    qemu_get_8s(f,&s->msr);
+    qemu_get_8s(f,&s->scr);
+
+    return 0;
+}
+
 /* If fd is zero, it means that the serial device uses the console */
-SerialState *serial_init(int base, int irq, CharDriverState *chr)
+SerialState *serial_init(SetIRQFunc *set_irq, void *opaque,
+                         int base, int irq, CharDriverState *chr)
 {
     SerialState *s;
 
     s = qemu_mallocz(sizeof(SerialState));
     if (!s)
         return NULL;
-    s->cbuf.in = 0;
-    s->cbuf.out = 0;
+    s->set_irq = set_irq;
+    s->irq_opaque = opaque;
     s->irq = irq;
     s->lsr = UART_LSR_TEMT | UART_LSR_THRE;
     s->iir = UART_IIR_NO_INT;
+    s->msr = UART_MSR_DCD | UART_MSR_DSR | UART_MSR_CTS;
+
+    register_savevm("serial", base, 1, serial_save, serial_load, s);
 
     register_ioport_write(base, 8, 1, serial_ioport_write, s);
     register_ioport_read(base, 8, 1, serial_ioport_read, s);
+    s->chr = chr;
+    qemu_chr_add_read_handler(chr, serial_can_receive1, serial_receive1, s);
+    qemu_chr_add_event_handler(chr, serial_event);
+    return s;
+}
+
+/* Memory mapped interface */
+static uint32_t serial_mm_readb (void *opaque, target_phys_addr_t addr)
+{
+    SerialState *s = opaque;
+
+    return serial_ioport_read(s, (addr - s->base) >> s->it_shift) & 0xFF;
+}
+
+static void serial_mm_writeb (void *opaque,
+                              target_phys_addr_t addr, uint32_t value)
+{
+    SerialState *s = opaque;
+
+    serial_ioport_write(s, (addr - s->base) >> s->it_shift, value & 0xFF);
+}
+
+static uint32_t serial_mm_readw (void *opaque, target_phys_addr_t addr)
+{
+    SerialState *s = opaque;
+
+    return serial_ioport_read(s, (addr - s->base) >> s->it_shift) & 0xFFFF;
+}
+
+static void serial_mm_writew (void *opaque,
+                              target_phys_addr_t addr, uint32_t value)
+{
+    SerialState *s = opaque;
+
+    serial_ioport_write(s, (addr - s->base) >> s->it_shift, value & 0xFFFF);
+}
+
+static uint32_t serial_mm_readl (void *opaque, target_phys_addr_t addr)
+{
+    SerialState *s = opaque;
+
+    return serial_ioport_read(s, (addr - s->base) >> s->it_shift);
+}
+
+static void serial_mm_writel (void *opaque,
+                              target_phys_addr_t addr, uint32_t value)
+{
+    SerialState *s = opaque;
+
+    serial_ioport_write(s, (addr - s->base) >> s->it_shift, value);
+}
+
+static CPUReadMemoryFunc *serial_mm_read[] = {
+    &serial_mm_readb,
+    &serial_mm_readw,
+    &serial_mm_readl,
+};
+
+static CPUWriteMemoryFunc *serial_mm_write[] = {
+    &serial_mm_writeb,
+    &serial_mm_writew,
+    &serial_mm_writel,
+};
+
+SerialState *serial_mm_init (SetIRQFunc *set_irq, void *opaque,
+                             target_ulong base, int it_shift,
+                             int irq, CharDriverState *chr)
+{
+    SerialState *s;
+    int s_io_memory;
+
+    s = qemu_mallocz(sizeof(SerialState));
+    if (!s)
+        return NULL;
+    s->set_irq = set_irq;
+    s->irq_opaque = opaque;
+    s->irq = irq;
+    s->lsr = UART_LSR_TEMT | UART_LSR_THRE;
+    s->iir = UART_IIR_NO_INT;
+    s->msr = UART_MSR_DCD | UART_MSR_DSR | UART_MSR_CTS;
+    s->base = base;
+    s->it_shift = it_shift;
+
+    register_savevm("serial", base, 1, serial_save, serial_load, s);
+
+    s_io_memory = cpu_register_io_memory(0, serial_mm_read,
+                                         serial_mm_write, s);
+    cpu_register_physical_memory(base, 8 << it_shift, s_io_memory);
     s->chr = chr;
     qemu_chr_add_read_handler(chr, serial_can_receive1, serial_receive1, s);
     qemu_chr_add_event_handler(chr, serial_event);

@@ -54,7 +54,8 @@ static int cow_probe(const uint8_t *buf, int buf_size, const char *filename)
 {
     const struct cow_header_v2 *cow_header = (const void *)buf;
 
-    if (be32_to_cpu(cow_header->magic) == COW_MAGIC &&
+    if (buf_size >= sizeof(struct cow_header_v2) &&
+        be32_to_cpu(cow_header->magic) == COW_MAGIC &&
         be32_to_cpu(cow_header->version) == COW_VERSION) 
         return 100;
     else
@@ -124,7 +125,7 @@ static int cow_open(BlockDriverState *bs, const char *filename)
     return -1;
 }
 
-static inline void set_bit(uint8_t *bitmap, int64_t bitnum)
+static inline void cow_set_bit(uint8_t *bitmap, int64_t bitnum)
 {
     bitmap[bitnum / 8] |= (1 << (bitnum%8));
 }
@@ -198,7 +199,7 @@ static int cow_write(BlockDriverState *bs, int64_t sector_num,
     if (ret != nb_sectors * 512) 
         return -1;
     for (i = 0; i < nb_sectors; i++)
-        set_bit(s->cow_bitmap, sector_num + i);
+        cow_set_bit(s->cow_bitmap, sector_num + i);
     return 0;
 }
 

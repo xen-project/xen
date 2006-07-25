@@ -1,0 +1,187 @@
+Index: ioemu/hw/mc146818rtc.c
+===================================================================
+--- ioemu.orig/hw/mc146818rtc.c	2006-07-14 15:55:55.450963213 +0100
++++ ioemu/hw/mc146818rtc.c	2006-07-14 15:56:02.195195680 +0100
+@@ -178,10 +178,27 @@
+     }
+ }
+ 
++static void send_timeoffset_msg(time_t delta)
++{
++
++/* This routine is used to inform another entity that the
++   base time offset has changed. For instance, if you
++   were using xenstore, you might want to write to the store
++   at this point.  Or, you might use some other method.
++   Whatever you might choose, here's a hook point to implement it.
++
++   One item of note is that this delta is in addition to
++   any existing offset you might be already using. */
++
++    return;
++}
++
+ static void rtc_set_time(RTCState *s)
+ {
+     struct tm *tm = &s->current_tm;
+-
++    time_t before, after;
++    
++    before = mktime(tm);
+     tm->tm_sec = from_bcd(s, s->cmos_data[RTC_SECONDS]);
+     tm->tm_min = from_bcd(s, s->cmos_data[RTC_MINUTES]);
+     tm->tm_hour = from_bcd(s, s->cmos_data[RTC_HOURS] & 0x7f);
+@@ -193,6 +210,12 @@
+     tm->tm_mday = from_bcd(s, s->cmos_data[RTC_DAY_OF_MONTH]);
+     tm->tm_mon = from_bcd(s, s->cmos_data[RTC_MONTH]) - 1;
+     tm->tm_year = from_bcd(s, s->cmos_data[RTC_YEAR]) + 100;
++
++    /* Compute, and send, the additional time delta
++       We could compute the total time delta, but this is
++       sufficient, and simple. */
++    after = mktime(tm);
++    send_timeoffset_msg(after-before);
+ }
+ 
+ static void rtc_copy_date(RTCState *s)
+Index: ioemu/hw/pc.c
+===================================================================
+--- ioemu.orig/hw/pc.c	2006-07-14 15:56:01.774243586 +0100
++++ ioemu/hw/pc.c	2006-07-14 15:56:02.196195566 +0100
+@@ -151,7 +151,7 @@
+ }
+ 
+ /* hd_table must contain 4 block drivers */
+-static void cmos_init(uint64_t ram_size, int boot_device, BlockDriverState **hd_table)
++static void cmos_init(uint64_t ram_size, int boot_device, BlockDriverState **hd_table, time_t timeoffset)
+ {
+     RTCState *s = rtc_state;
+     int val;
+@@ -162,6 +162,7 @@
+ 
+     /* set the CMOS date */
+     time(&ti);
++    ti += timeoffset;
+     if (rtc_utc)
+         tm = gmtime(&ti);
+     else
+@@ -613,7 +614,7 @@
+ static void pc_init1(uint64_t ram_size, int vga_ram_size, int boot_device,
+                      DisplayState *ds, const char **fd_filename, int snapshot,
+                      const char *kernel_filename, const char *kernel_cmdline,
+-                     const char *initrd_filename,
++                     const char *initrd_filename, time_t timeoffset,
+                      int pci_enabled)
+ {
+ #ifndef NOBIOS
+@@ -864,7 +865,7 @@
+ 
+     floppy_controller = fdctrl_init(6, 2, 0, 0x3f0, fd_table);
+ 
+-    cmos_init(ram_size, boot_device, bs_table);
++    cmos_init(ram_size, boot_device, bs_table, timeoffset);
+ 
+     if (pci_enabled && usb_enabled) {
+         usb_uhci_init(pci_bus, usb_root_ports);
+@@ -883,12 +884,13 @@
+                         int snapshot, 
+                         const char *kernel_filename, 
+                         const char *kernel_cmdline,
+-                        const char *initrd_filename)
++                        const char *initrd_filename,
++                        time_t timeoffset)
+ {
+     pc_init1(ram_size, vga_ram_size, boot_device,
+              ds, fd_filename, snapshot,
+              kernel_filename, kernel_cmdline,
+-             initrd_filename, 1);
++             initrd_filename, timeoffset, 1);
+ }
+ 
+ static void pc_init_isa(uint64_t ram_size, int vga_ram_size, int boot_device,
+@@ -896,12 +898,13 @@
+                         int snapshot, 
+                         const char *kernel_filename, 
+                         const char *kernel_cmdline,
+-                        const char *initrd_filename)
++                        const char *initrd_filename,
++                        time_t timeoffset)
+ {
+     pc_init1(ram_size, vga_ram_size, boot_device,
+              ds, fd_filename, snapshot,
+              kernel_filename, kernel_cmdline,
+-             initrd_filename, 0);
++             initrd_filename, timeoffset, 0);
+ }
+ 
+ QEMUMachine pc_machine = {
+Index: ioemu/vl.c
+===================================================================
+--- ioemu.orig/vl.c	2006-07-14 15:56:02.010216731 +0100
++++ ioemu/vl.c	2006-07-14 15:56:02.198195338 +0100
+@@ -164,6 +164,8 @@
+ 
+ int xc_handle;
+ 
++time_t timeoffset = 0;
++
+ char domain_name[1024] = { 'H','V', 'M', 'X', 'E', 'N', '-'};
+ extern int domid;
+ 
+@@ -4799,6 +4801,7 @@
+ #endif
+            "-loadvm file    start right away with a saved state (loadvm in monitor)\n"
+ 	   "-vnc display    start a VNC server on display\n"
++           "-timeoffset     time offset (in seconds) from local time\n"
+            "\n"
+            "During emulation, the following keys are useful:\n"
+            "ctrl-alt-f      toggle full screen\n"
+@@ -4889,6 +4892,7 @@
+ 
+     QEMU_OPTION_d,
+     QEMU_OPTION_vcpus,
++    QEMU_OPTION_timeoffset,
+ };
+ 
+ typedef struct QEMUOption {
+@@ -4967,6 +4971,7 @@
+     
+     { "d", HAS_ARG, QEMU_OPTION_d },
+     { "vcpus", 1, QEMU_OPTION_vcpus },
++    { "timeoffset", HAS_ARG, QEMU_OPTION_timeoffset },
+     { NULL },
+ };
+ 
+@@ -5669,6 +5674,9 @@
+                 vcpus = atoi(optarg);
+                 fprintf(logfile, "qemu: the number of cpus is %d\n", vcpus);
+                 break;
++            case QEMU_OPTION_timeoffset:
++                timeoffset = strtol(optarg, NULL, 0);
++                break;
+             }
+         }
+     }
+@@ -5963,7 +5971,8 @@
+ 
+     machine->init(ram_size, vga_ram_size, boot_device,
+                   ds, fd_filename, snapshot,
+-                  kernel_filename, kernel_cmdline, initrd_filename);
++                  kernel_filename, kernel_cmdline, initrd_filename,
++                  timeoffset);
+ 
+     gui_timer = qemu_new_timer(rt_clock, gui_update, NULL);
+     qemu_mod_timer(gui_timer, qemu_get_clock(rt_clock));
+Index: ioemu/vl.h
+===================================================================
+--- ioemu.orig/vl.h	2006-07-14 15:56:01.779243017 +0100
++++ ioemu/vl.h	2006-07-14 15:56:02.199195224 +0100
+@@ -556,7 +556,7 @@
+                                  int boot_device,
+              DisplayState *ds, const char **fd_filename, int snapshot,
+              const char *kernel_filename, const char *kernel_cmdline,
+-             const char *initrd_filename);
++             const char *initrd_filename, time_t timeoffset);
+ 
+ typedef struct QEMUMachine {
+     const char *name;

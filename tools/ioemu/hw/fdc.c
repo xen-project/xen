@@ -21,6 +21,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+/*
+ * The controller is used in Sun4m systems in a slightly different
+ * way. There are changes in DOR register and DMA is not available.
+ */
 #include "vl.h"
 
 /********************************************************/
@@ -404,6 +408,12 @@ static uint32_t fdctrl_read (void *opaque, uint32_t reg)
     uint32_t retval;
 
     switch (reg & 0x07) {
+#ifdef TARGET_SPARC
+    case 0x00:
+	// Identify to Linux as S82078B
+	retval = fdctrl_read_statusB(fdctrl);
+	break;
+#endif
     case 0x01:
 	retval = fdctrl_read_statusB(fdctrl);
 	break;
@@ -455,6 +465,29 @@ static void fdctrl_write (void *opaque, uint32_t reg, uint32_t value)
     }
 }
 
+static uint32_t fdctrl_read_mem (void *opaque, target_phys_addr_t reg)
+{
+    return fdctrl_read(opaque, reg);
+}
+
+static void fdctrl_write_mem (void *opaque, 
+                              target_phys_addr_t reg, uint32_t value)
+{
+    fdctrl_write(opaque, reg, value);
+}
+
+static CPUReadMemoryFunc *fdctrl_mem_read[3] = {
+    fdctrl_read_mem,
+    fdctrl_read_mem,
+    fdctrl_read_mem,
+};
+
+static CPUWriteMemoryFunc *fdctrl_mem_write[3] = {
+    fdctrl_write_mem,
+    fdctrl_write_mem,
+    fdctrl_write_mem,
+};
+
 static void fd_change_cb (void *opaque)
 {
     fdrive_t *drv = opaque;
@@ -473,7 +506,7 @@ fdctrl_t *fdctrl_init (int irq_lvl, int dma_chann, int mem_mapped,
                        BlockDriverState **fds)
 {
     fdctrl_t *fdctrl;
-//    int io_mem;
+    int io_mem;
     int i;
 
     FLOPPY_DPRINTF("init controller\n");
@@ -504,11 +537,8 @@ fdctrl_t *fdctrl_init (int irq_lvl, int dma_chann, int mem_mapped,
     fdctrl_reset(fdctrl, 0);
     fdctrl->state = FD_CTRL_ACTIVE;
     if (mem_mapped) {
-        FLOPPY_ERROR("memory mapped floppy not supported by now !\n");
-#if 0
-        io_mem = cpu_register_io_memory(0, fdctrl_mem_read, fdctrl_mem_write);
-        cpu_register_physical_memory(base, 0x08, io_mem);
-#endif
+        io_mem = cpu_register_io_memory(0, fdctrl_mem_read, fdctrl_mem_write, fdctrl);
+        cpu_register_physical_memory(io_base, 0x08, io_mem);
     } else {
         register_ioport_read(io_base + 0x01, 5, 1, &fdctrl_read, fdctrl);
         register_ioport_read(io_base + 0x07, 1, 1, &fdctrl_read, fdctrl);
@@ -538,6 +568,14 @@ static void fdctrl_reset_irq (fdctrl_t *fdctrl)
 
 static void fdctrl_raise_irq (fdctrl_t *fdctrl, uint8_t status)
 {
+#ifdef TARGET_SPARC
+    // Sparc mutation
+    if (!fdctrl->dma_en) {
+	fdctrl->state &= ~FD_CTRL_BUSY;
+	fdctrl->int_status = status;
+	return;
+    }
+#endif
     if (~(fdctrl->state & FD_CTRL_INTR)) {
         pic_set_irq(fdctrl->irq_lvl, 1);
         fdctrl->state |= FD_CTRL_INTR;
@@ -941,11 +979,11 @@ static int fdctrl_transfer_handler (void *opaque, int nchan,
         len = dma_len - fdctrl->data_pos;
         if (len + rel_pos > FD_SECTOR_LEN)
             len = FD_SECTOR_LEN - rel_pos;
-        FLOPPY_DPRINTF("copy %d bytes (%d %d %d) %d pos %d %02x %02x "
-                       "(%d-0x%08x 0x%08x)\n", len, size, fdctrl->data_pos,
+        FLOPPY_DPRINTF("copy %d bytes (%d %d %d) %d pos %d %02x "
+                       "(%d-0x%08x 0x%08x)\n", len, dma_len, fdctrl->data_pos,
                        fdctrl->data_len, fdctrl->cur_drv, cur_drv->head,
                        cur_drv->track, cur_drv->sect, fd_sector(cur_drv),
-                       fd_sector(cur_drv) * 512, addr);
+                       fd_sector(cur_drv) * 512);
         if (fdctrl->data_dir != FD_DIR_WRITE ||
 	    len < FD_SECTOR_LEN || rel_pos != 0) {
             /* READ & SCAN commands and realign to a sector for WRITE */
@@ -1006,7 +1044,7 @@ static int fdctrl_transfer_handler (void *opaque, int nchan,
 	    FLOPPY_DPRINTF("seek to next sector (%d %02x %02x => %d) (%d)\n",
 			   cur_drv->head, cur_drv->track, cur_drv->sect,
 			   fd_sector(cur_drv),
-			   fdctrl->data_pos - size);
+			   fdctrl->data_pos - len);
             /* XXX: cur_drv->sect >= cur_drv->last_sect should be an
                error in fact */
             if (cur_drv->sect >= cur_drv->last_sect ||

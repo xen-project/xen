@@ -69,3 +69,4 @@ CFLAGS += -DLOGGING_MODULES="(BITMASK(VTPM_LOG_TCS)|BITMASK(VTPM_LOG_VTSP)|BITMA
 CFLAGS += -I$(XEN_ROOT)/tools/vtpm_manager/crypto
 CFLAGS += -I$(XEN_ROOT)/tools/vtpm_manager/util
 CFLAGS += -I$(XEN_ROOT)/tools/vtpm_manager/tcs
+CFLAGS += -I$(XEN_ROOT)/tools/vtpm_manager/manager

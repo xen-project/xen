@@ -73,6 +73,7 @@ static inline char *realpath(const char *path, char *resolved_path)
 #else
 
 #include "cpu.h"
+#include "gdbstub.h"
 
 #endif /* !defined(QEMU_TOOL) */
 
@@ -83,13 +84,18 @@ static inline char *realpath(const char *path, char *resolved_path)
 #define tostring(s)	#s
 #endif
 
+#ifndef MIN
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#endif
+#ifndef MAX
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
+#endif
+
 /* vl.c */
 uint64_t muldiv64(uint64_t a, uint32_t b, uint32_t c);
 
 void hw_error(const char *fmt, ...);
 
-int get_image_size(const char *filename);
-int load_image(const char *filename, uint8_t *addr);
 extern const char *bios_dir;
 
 void pstrcpy(char *buf, int buf_size, const char *str);
@@ -98,7 +104,13 @@ int strstart(const char *str, const char *val, const char **ptr);
 
 extern int vm_running;
 
+typedef struct vm_change_state_entry VMChangeStateEntry;
+typedef void VMChangeStateHandler(void *opaque, int running);
 typedef void VMStopHandler(void *opaque, int reason);
+
+VMChangeStateEntry *qemu_add_vm_change_state_handler(VMChangeStateHandler *cb,
+                                                     void *opaque);
+void qemu_del_vm_change_state_handler(VMChangeStateEntry *e);
 
 int qemu_add_vm_stop_handler(VMStopHandler *cb, void *opaque);
 void qemu_del_vm_stop_handler(VMStopHandler *cb, void *opaque);
@@ -112,26 +124,30 @@ void qemu_register_reset(QEMUResetHandler *func, void *opaque);
 void qemu_system_reset_request(void);
 void qemu_system_reset(void);
 void qemu_system_shutdown_request(void);
+void qemu_system_powerdown_request(void);
+#if !defined(TARGET_SPARC)
+// Please implement a power failure function to signal the OS
+#define qemu_system_powerdown() do{}while(0)
+#else
+void qemu_system_powerdown(void);
+#endif
+
+extern int reset_requested;
 
 void main_loop_wait(int timeout);
 
-int unset_mm_mapping(int xc_handle,
-                     uint32_t domid,
-                     unsigned long nr_pages,
-                     unsigned int address_bits,
-                     unsigned long *extent_start);
-int set_mm_mapping(int xc_handle,
-                    uint32_t domid,
-                    unsigned long nr_pages,
-                    unsigned int address_bits,
-                    unsigned long *extent_start);
+int unset_mm_mapping(int xc_handle, uint32_t domid, unsigned long nr_pages,
+                     unsigned int address_bits, unsigned long *extent_start);
+int set_mm_mapping(int xc_handle, uint32_t domid, unsigned long nr_pages,
+                   unsigned int address_bits, unsigned long *extent_start);
+
+extern void *shared_vram;
+
+extern FILE *logfile;
 
 extern int xc_handle;
 extern int domid;
-extern int audio_enabled;
-extern int sb16_enabled;
-extern int adlib_enabled;
-extern int gus_enabled;
+
 extern uint64_t ram_size;
 extern int bios_size;
 extern int rtc_utc;
@@ -139,10 +155,17 @@ extern int cirrus_vga_enabled;
 extern int graphic_width;
 extern int graphic_height;
 extern int graphic_depth;
+extern const char *keyboard_layout;
+extern int kqemu_allowed;
+extern int win2k_install_hack;
+extern int usb_enabled;
+extern int smp_cpus;
 
 /* XXX: make it dynamic */
 #if defined (TARGET_PPC)
-#define BIOS_SIZE (512 * 1024)
+#define BIOS_SIZE ((512 + 32) * 1024)
+#elif defined(TARGET_MIPS)
+#define BIOS_SIZE (128 * 1024)
 #else
 #define BIOS_SIZE ((256 + 64) * 1024)
 #endif
@@ -192,17 +215,48 @@ void kbd_put_keysym(int keysym);
 
 typedef void IOReadHandler(void *opaque, const uint8_t *buf, int size);
 typedef int IOCanRWHandler(void *opaque);
+typedef void IOHandler(void *opaque);
 
-int qemu_add_fd_read_handler(int fd, IOCanRWHandler *fd_can_read, 
-                             IOReadHandler *fd_read, void *opaque);
-int qemu_add_fd_event_read_handler(int fd, IOCanRWHandler *fd_can_read, 
-                             IOReadHandler *fd_read, void *opaque);
-void qemu_del_fd_read_handler(int fd);
+int qemu_set_fd_handler2(int fd, 
+                         IOCanRWHandler *fd_read_poll, 
+                         IOHandler *fd_read, 
+                         IOHandler *fd_write, 
+                         void *opaque);
+int qemu_set_fd_handler(int fd,
+                        IOHandler *fd_read, 
+                        IOHandler *fd_write,
+                        void *opaque);
+
+/* Polling handling */
+
+/* return TRUE if no sleep should be done afterwards */
+typedef int PollingFunc(void *opaque);
+
+int qemu_add_polling_cb(PollingFunc *func, void *opaque);
+void qemu_del_polling_cb(PollingFunc *func, void *opaque);
 
 /* character device */
 
 #define CHR_EVENT_BREAK 0 /* serial break char */
 #define CHR_EVENT_FOCUS 1 /* focus to this terminal (modal input needed) */
+
+
+
+#define CHR_IOCTL_SERIAL_SET_PARAMS   1
+typedef struct {
+    int speed;
+    int parity;
+    int data_bits;
+    int stop_bits;
+} QEMUSerialSetParams;
+
+#define CHR_IOCTL_SERIAL_SET_BREAK    2
+
+#define CHR_IOCTL_PP_READ_DATA        3
+#define CHR_IOCTL_PP_WRITE_DATA       4
+#define CHR_IOCTL_PP_READ_CONTROL     5
+#define CHR_IOCTL_PP_WRITE_CONTROL    6
+#define CHR_IOCTL_PP_READ_STATUS      7
 
 typedef void IOEventHandler(void *opaque, int event);
 
@@ -211,8 +265,10 @@ typedef struct CharDriverState {
     void (*chr_add_read_handler)(struct CharDriverState *s, 
                                  IOCanRWHandler *fd_can_read, 
                                  IOReadHandler *fd_read, void *opaque);
+    int (*chr_ioctl)(struct CharDriverState *s, int cmd, void *arg);
     IOEventHandler *chr_event;
     void (*chr_send_event)(struct CharDriverState *chr, int event);
+    void (*chr_close)(struct CharDriverState *chr);
     void *opaque;
 } CharDriverState;
 
@@ -223,16 +279,26 @@ void qemu_chr_add_read_handler(CharDriverState *s,
                                IOCanRWHandler *fd_can_read, 
                                IOReadHandler *fd_read, void *opaque);
 void qemu_chr_add_event_handler(CharDriverState *s, IOEventHandler *chr_event);
-                               
+int qemu_chr_ioctl(CharDriverState *s, int cmd, void *arg);
+
 /* consoles */
 
 typedef struct DisplayState DisplayState;
 typedef struct TextConsole TextConsole;
 
-extern TextConsole *vga_console;
+typedef void (*vga_hw_update_ptr)(void *);
+typedef void (*vga_hw_invalidate_ptr)(void *);
+typedef void (*vga_hw_screen_dump_ptr)(void *, const char *);
 
-TextConsole *graphic_console_init(DisplayState *ds);
-int is_active_console(TextConsole *s);
+TextConsole *graphic_console_init(DisplayState *ds, vga_hw_update_ptr update,
+                                  vga_hw_invalidate_ptr invalidate,
+                                  vga_hw_screen_dump_ptr screen_dump,
+                                  void *opaque);
+void vga_hw_update(void);
+void vga_hw_invalidate(void);
+void vga_hw_screen_dump(const char *filename);
+
+int is_graphic_console(void);
 CharDriverState *text_console_init(DisplayState *ds);
 void console_select(unsigned int index);
 
@@ -241,32 +307,61 @@ void console_select(unsigned int index);
 #define MAX_SERIAL_PORTS 4
 
 extern CharDriverState *serial_hds[MAX_SERIAL_PORTS];
-extern int serial_summa_port;
 
-/* network redirectors support */
+/* parallel ports */
+
+#define MAX_PARALLEL_PORTS 3
+
+extern CharDriverState *parallel_hds[MAX_PARALLEL_PORTS];
+
+/* VLANs support */
+
+typedef struct VLANClientState VLANClientState;
+
+struct VLANClientState {
+    IOReadHandler *fd_read;
+    /* Packets may still be sent if this returns zero.  It's used to
+       rate-limit the slirp code.  */
+    IOCanRWHandler *fd_can_read;
+    void *opaque;
+    struct VLANClientState *next;
+    struct VLANState *vlan;
+    char info_str[256];
+};
+
+typedef struct VLANState {
+    int id;
+    VLANClientState *first_client;
+    struct VLANState *next;
+} VLANState;
+
+VLANState *qemu_find_vlan(int id);
+VLANClientState *qemu_new_vlan_client(VLANState *vlan,
+                                      IOReadHandler *fd_read,
+                                      IOCanRWHandler *fd_can_read,
+                                      void *opaque);
+int qemu_can_send_packet(VLANClientState *vc);
+void qemu_send_packet(VLANClientState *vc, const uint8_t *buf, int size);
+void qemu_handler_true(void *opaque);
+
+void do_info_network(void);
+
+/* TAP win32 */
+int tap_win32_init(VLANState *vlan, const char *ifname);
+void tap_win32_poll(void);
+
+/* NIC info */
 
 #define MAX_NICS 8
 
-typedef struct NetDriverState {
-    int index; /* index number in QEMU */
+typedef struct NICInfo {
     uint8_t macaddr[6];
-    char ifname[16];
-    void (*send_packet)(struct NetDriverState *nd, 
-                        const uint8_t *buf, int size);
-    void (*add_read_packet)(struct NetDriverState *nd, 
-                            IOCanRWHandler *fd_can_read, 
-                            IOReadHandler *fd_read, void *opaque);
-    /* tun specific data */
-    int fd;
-    /* slirp specific data */
-} NetDriverState;
+    const char *model;
+    VLANState *vlan;
+} NICInfo;
 
 extern int nb_nics;
-extern NetDriverState nd_table[MAX_NICS];
-
-void qemu_send_packet(NetDriverState *nd, const uint8_t *buf, int size);
-void qemu_add_read_packet(NetDriverState *nd, IOCanRWHandler *fd_can_read, 
-                          IOReadHandler *fd_read, void *opaque);
+extern NICInfo nd_table[MAX_NICS];
 
 /* timers */
 
@@ -280,7 +375,7 @@ typedef void QEMUTimerCB(void *opaque);
    Hz. */
 extern QEMUClock *rt_clock;
 
-/* Rge virtual clock is only run during the emulation. It is stopped
+/* The virtual clock is only run during the emulation. It is stopped
    when the virtual machine is stopped. Virtual timers use a high
    precision clock, usually cpu cycles (use ticks_per_sec). */
 extern QEMUClock *vm_clock;
@@ -354,6 +449,18 @@ static inline void qemu_get_8s(QEMUFile *f, uint8_t *pv)
     *pv = qemu_get_byte(f);
 }
 
+#if TARGET_LONG_BITS == 64
+#define qemu_put_betl qemu_put_be64
+#define qemu_get_betl qemu_get_be64
+#define qemu_put_betls qemu_put_be64s
+#define qemu_get_betls qemu_get_be64s
+#else
+#define qemu_put_betl qemu_put_be32
+#define qemu_get_betl qemu_get_be32
+#define qemu_put_betls qemu_put_be32s
+#define qemu_get_betls qemu_get_be32s
+#endif
+
 int64_t qemu_ftell(QEMUFile *f);
 int64_t qemu_fseek(QEMUFile *f, int64_t pos, int whence);
 
@@ -371,8 +478,8 @@ int register_savevm(const char *idstr,
 void qemu_get_timer(QEMUFile *f, QEMUTimer *ts);
 void qemu_put_timer(QEMUFile *f, QEMUTimer *ts);
 
-/* port-e9.c */
-void port_e9_init(void);
+void cpu_save(QEMUFile *f, void *opaque);
+int cpu_load(QEMUFile *f, void *opaque, int version_id);
 
 /* block.c */
 typedef struct BlockDriverState BlockDriverState;
@@ -383,6 +490,10 @@ extern BlockDriver bdrv_cow;
 extern BlockDriver bdrv_qcow;
 extern BlockDriver bdrv_vmdk;
 extern BlockDriver bdrv_cloop;
+extern BlockDriver bdrv_dmg;
+extern BlockDriver bdrv_bochs;
+extern BlockDriver bdrv_vpc;
+extern BlockDriver bdrv_vvfat;
 
 void bdrv_init(void);
 BlockDriver *bdrv_find_format(const char *format_name);
@@ -406,13 +517,18 @@ void bdrv_set_boot_sector(BlockDriverState *bs, const uint8_t *data, int size);
 #define BDRV_TYPE_HD     0
 #define BDRV_TYPE_CDROM  1
 #define BDRV_TYPE_FLOPPY 2
+#define BIOS_ATA_TRANSLATION_AUTO 0
+#define BIOS_ATA_TRANSLATION_NONE 1
+#define BIOS_ATA_TRANSLATION_LBA  2
 
 void bdrv_set_geometry_hint(BlockDriverState *bs, 
                             int cyls, int heads, int secs);
 void bdrv_set_type_hint(BlockDriverState *bs, int type);
+void bdrv_set_translation_hint(BlockDriverState *bs, int translation);
 void bdrv_get_geometry_hint(BlockDriverState *bs, 
                             int *pcyls, int *pheads, int *psecs);
 int bdrv_get_type_hint(BlockDriverState *bs);
+int bdrv_get_translation_hint(BlockDriverState *bs);
 int bdrv_is_removable(BlockDriverState *bs);
 int bdrv_is_read_only(BlockDriverState *bs);
 int bdrv_is_inserted(BlockDriverState *bs);
@@ -435,6 +551,25 @@ int qcow_compress_cluster(BlockDriverState *bs, int64_t sector_num,
                           const uint8_t *buf);
 
 #ifndef QEMU_TOOL
+
+typedef void QEMUMachineInitFunc(uint64_t ram_size, int vga_ram_size, 
+                                 int boot_device,
+             DisplayState *ds, const char **fd_filename, int snapshot,
+             const char *kernel_filename, const char *kernel_cmdline,
+             const char *initrd_filename, time_t timeoffset);
+
+typedef struct QEMUMachine {
+    const char *name;
+    const char *desc;
+    QEMUMachineInitFunc *init;
+    struct QEMUMachine *next;
+} QEMUMachine;
+
+int qemu_register_machine(QEMUMachine *m);
+
+typedef void SetIRQFunc(void *opaque, int irq_num, int level);
+typedef void IRQRequestFunc(void *opaque, int level);
+
 /* ISA bus */
 
 extern target_phys_addr_t isa_mem_base;
@@ -449,8 +584,6 @@ int register_ioport_write(int start, int length, int size,
 void isa_unassign_ioport(int start, int length);
 
 /* PCI bus */
-
-extern int pci_enabled;
 
 extern target_phys_addr_t pci_mem_base;
 
@@ -519,15 +652,39 @@ void pci_bios_init(void);
 void pci_info(void);
 
 /* temporary: will be moved in platform specific file */
+void pci_set_pic(PCIBus *bus, SetIRQFunc *set_irq, void *irq_opaque);
 PCIBus *pci_prep_init(void);
-struct openpic_t;
-void pci_pmac_set_openpic(PCIBus *bus, struct openpic_t *openpic);
+PCIBus *pci_grackle_init(uint32_t base);
 PCIBus *pci_pmac_init(void);
+PCIBus *pci_apb_init(target_ulong special_base, target_ulong mem_base);
+
+void pci_nic_init(PCIBus *bus, NICInfo *nd);
 
 /* openpic.c */
 typedef struct openpic_t openpic_t;
-void openpic_set_irq (openpic_t *opp, int n_IRQ, int level);
-openpic_t *openpic_init (PCIBus *bus, int *pmem_index, int nb_cpus);
+void openpic_set_irq(void *opaque, int n_IRQ, int level);
+openpic_t *openpic_init (PCIBus *bus, int *pmem_index, int nb_cpus,
+                         CPUState **envp);
+
+/* heathrow_pic.c */
+typedef struct HeathrowPICS HeathrowPICS;
+void heathrow_pic_set_irq(void *opaque, int num, int level);
+HeathrowPICS *heathrow_pic_init(int *pmem_index);
+
+#ifdef HAS_AUDIO
+struct soundhw {
+    const char *name;
+    const char *descr;
+    int enabled;
+    int isa;
+    union {
+        int (*init_isa) (AudioState *s);
+        int (*init_pci) (PCIBus *bus, AudioState *s);
+    } init;
+};
+
+extern struct soundhw soundhw[];
+#endif
 
 /* vga.c */
 
@@ -539,9 +696,12 @@ struct DisplayState {
     int depth;
     int width;
     int height;
+    void *opaque;
+
     void (*dpy_update)(struct DisplayState *s, int x, int y, int w, int h);
     void (*dpy_resize)(struct DisplayState *s, int w, int h);
     void (*dpy_refresh)(struct DisplayState *s);
+    void (*dpy_copy)(struct DisplayState *s, int src_x, int src_y, int dst_x, int dst_y, int w, int h);
 };
 
 static inline void dpy_update(DisplayState *s, int x, int y, int w, int h)
@@ -555,14 +715,8 @@ static inline void dpy_resize(DisplayState *s, int w, int h)
 }
 
 int vga_initialize(PCIBus *bus, DisplayState *ds, uint8_t *vga_ram_base, 
-                   unsigned long vga_ram_offset, int vga_ram_size);
-void vga_update_display(void);
-void vga_invalidate_display(void);
-void vga_screen_dump(const char *filename);
-
-/* vnc.c */
-void vnc_display_init(DisplayState *ds, int useAlsoSDL,
-                      long port, const char* connect);
+                   unsigned long vga_ram_offset, int vga_ram_size,
+                   unsigned long vga_bios_offset, int vga_bios_size);
 
 /* cirrus_vga.c */
 void pci_cirrus_vga_init(PCIBus *bus, DisplayState *ds, uint8_t *vga_ram_base, 
@@ -573,6 +727,13 @@ void isa_cirrus_vga_init(DisplayState *ds, uint8_t *vga_ram_base,
 /* sdl.c */
 void sdl_display_init(DisplayState *ds, int full_screen);
 
+/* cocoa.m */
+void cocoa_display_init(DisplayState *ds, int full_screen);
+
+/* vnc.c */
+void vnc_display_init(DisplayState *ds, int display);
+int vnc_start_viewer(int port);
+
 /* ide.c */
 #define MAX_DISKS 4
 
@@ -580,19 +741,23 @@ extern BlockDriverState *bs_table[MAX_DISKS];
 
 void isa_ide_init(int iobase, int iobase2, int irq,
                   BlockDriverState *hd0, BlockDriverState *hd1);
-void pci_ide_init(PCIBus *bus, BlockDriverState **hd_table);
+void pci_cmd646_ide_init(PCIBus *bus, BlockDriverState **hd_table,
+                         int secondary_ide_enabled);
 void pci_piix3_ide_init(PCIBus *bus, BlockDriverState **hd_table);
 int pmac_ide_init (BlockDriverState **hd_table,
-                   openpic_t *openpic, int irq);
+                   SetIRQFunc *set_irq, void *irq_opaque, int irq);
+
+/* es1370.c */
+int es1370_init (PCIBus *bus, AudioState *s);
 
 /* sb16.c */
-void SB16_init (void);
+int SB16_init (AudioState *s);
 
 /* adlib.c */
-void Adlib_init (void);
+int Adlib_init (AudioState *s);
 
 /* gus.c */
-void GUS_init (void);
+int GUS_init (AudioState *s);
 
 /* dma.c */
 typedef int (*DMA_transfer_handler) (void *opaque, int nchan, int pos, int size);
@@ -620,21 +785,16 @@ int fdctrl_get_drive_type(fdctrl_t *fdctrl, int drive_num);
 
 /* ne2000.c */
 
-void isa_ne2000_init(int base, int irq, NetDriverState *nd);
-void pci_ne2000_init(PCIBus *bus, NetDriverState *nd);
+void isa_ne2000_init(int base, int irq, NICInfo *nd);
+void pci_ne2000_init(PCIBus *bus, NICInfo *nd);
 
-/* pcnet.c */
+/* rtl8139.c */
 
-extern int nic_ne2000;
-
-void pci_pcnet_init(PCIBus *bus, NetDriverState *nd);
+void pci_rtl8139_init(PCIBus *bus, NICInfo *nd);
 
 /* pckbd.c */
 
 void kbd_init(void);
-extern const char* keyboard_layout;
-extern int repeat_key;
-extern int usb_enabled;
 
 /* mc146818rtc.c */
 
@@ -647,24 +807,40 @@ void rtc_set_date(RTCState *s, const struct tm *tm);
 /* serial.c */
 
 typedef struct SerialState SerialState;
-SerialState *serial_init(int base, int irq, CharDriverState *chr);
-void ser_queue(SerialState *s, unsigned char c);
+SerialState *serial_init(SetIRQFunc *set_irq, void *opaque,
+                         int base, int irq, CharDriverState *chr);
+SerialState *serial_mm_init (SetIRQFunc *set_irq, void *opaque,
+                             target_ulong base, int it_shift,
+                             int irq, CharDriverState *chr);
 
-/* Mice */
+/* parallel.c */
 
-void summa_init(SerialState *serial, CharDriverState *chr);
-
-extern int summa_ok;
+typedef struct ParallelState ParallelState;
+ParallelState *parallel_init(int base, int irq, CharDriverState *chr);
 
 /* i8259.c */
 
+typedef struct PicState2 PicState2;
+extern PicState2 *isa_pic;
 void pic_set_irq(int irq, int level);
-void pic_init(void);
-uint32_t pic_intack_read(CPUState *env);
+void pic_set_irq_new(void *opaque, int irq, int level);
+PicState2 *pic_init(IRQRequestFunc *irq_request, void *irq_request_opaque);
+void pic_set_alt_irq_func(PicState2 *s, SetIRQFunc *alt_irq_func,
+                          void *alt_irq_opaque);
+int pic_read_irq(PicState2 *s);
+void pic_update_irq(PicState2 *s);
+uint32_t pic_intack_read(PicState2 *s);
 void pic_info(void);
 void irq_info(void);
 void sp_info(void);
-int pic_irq2vec(int irq);
+
+/* APIC */
+typedef struct IOAPICState IOAPICState;
+
+int apic_init(CPUState *env);
+int apic_get_interrupt(CPUState *env);
+IOAPICState *ioapic_init(void);
+void ioapic_set_irq(void *opaque, int vector, int level);
 
 /* i8254.c */
 
@@ -675,27 +851,32 @@ typedef struct PITState PITState;
 PITState *pit_init(int base, int irq);
 void pit_set_gate(PITState *pit, int channel, int val);
 int pit_get_gate(PITState *pit, int channel);
+int pit_get_initial_count(PITState *pit, int channel);
+int pit_get_mode(PITState *pit, int channel);
 int pit_get_out(PITState *pit, int channel, int64_t current_time);
 
+/* pcspk.c */
+void pcspk_init(PITState *);
+int pcspk_audio_init(AudioState *);
+
 /* pc.c */
-void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
-             DisplayState *ds, const char **fd_filename, int snapshot,
-             const char *kernel_filename, const char *kernel_cmdline,
-             const char *initrd_filename, time_t timeoffset);
+extern QEMUMachine pc_machine;
+extern QEMUMachine isapc_machine;
+
+void ioport_set_a20(int enable);
+int ioport_get_a20(void);
 
 /* ppc.c */
-void ppc_init (int ram_size, int vga_ram_size, int boot_device,
-	       DisplayState *ds, const char **fd_filename, int snapshot,
-	       const char *kernel_filename, const char *kernel_cmdline,
-	       const char *initrd_filename);
-void ppc_prep_init (int ram_size, int vga_ram_size, int boot_device,
-		    DisplayState *ds, const char **fd_filename, int snapshot,
-		    const char *kernel_filename, const char *kernel_cmdline,
-		    const char *initrd_filename);
-void ppc_chrp_init(int ram_size, int vga_ram_size, int boot_device,
-		   DisplayState *ds, const char **fd_filename, int snapshot,
-		   const char *kernel_filename, const char *kernel_cmdline,
-		   const char *initrd_filename);
+extern QEMUMachine prep_machine;
+extern QEMUMachine core99_machine;
+extern QEMUMachine heathrow_machine;
+
+/* mips_r4k.c */
+extern QEMUMachine mips_machine;
+
+/* shix.c */
+extern QEMUMachine shix_machine;
+
 #ifdef TARGET_PPC
 ppc_tb_t *cpu_ppc_tb_init (CPUState *env, uint32_t freq);
 #endif
@@ -703,32 +884,54 @@ void PREP_debug_write (void *opaque, uint32_t addr, uint32_t val);
 
 extern CPUWriteMemoryFunc *PPC_io_write[];
 extern CPUReadMemoryFunc *PPC_io_read[];
-extern int prep_enabled;
+void PPC_debug_write (void *opaque, uint32_t addr, uint32_t val);
 
 /* sun4m.c */
-void sun4m_init(int ram_size, int vga_ram_size, int boot_device,
-             DisplayState *ds, const char **fd_filename, int snapshot,
-             const char *kernel_filename, const char *kernel_cmdline,
-             const char *initrd_filename);
+extern QEMUMachine sun4m_machine;
+uint32_t iommu_translate(uint32_t addr);
+void pic_set_irq_cpu(int irq, int level, unsigned int cpu);
 
 /* iommu.c */
-void iommu_init(uint32_t addr);
-uint32_t iommu_translate(uint32_t addr);
+void *iommu_init(uint32_t addr);
+uint32_t iommu_translate_local(void *opaque, uint32_t addr);
 
 /* lance.c */
-void lance_init(NetDriverState *nd, int irq, uint32_t leaddr, uint32_t ledaddr);
+void lance_init(NICInfo *nd, int irq, uint32_t leaddr, uint32_t ledaddr);
 
 /* tcx.c */
-void tcx_init(DisplayState *ds, uint32_t addr);
+void tcx_init(DisplayState *ds, uint32_t addr, uint8_t *vram_base,
+	       unsigned long vram_offset, int vram_size, int width, int height);
 
-/* sched.c */
-void sched_init(uint32_t, uint32_t);
+/* slavio_intctl.c */
+void *slavio_intctl_init(void);
+void slavio_intctl_set_cpu(void *opaque, unsigned int cpu, CPUState *env);
+void slavio_pic_info(void *opaque);
+void slavio_irq_info(void *opaque);
+void slavio_pic_set_irq(void *opaque, int irq, int level);
+void slavio_pic_set_irq_cpu(void *opaque, int irq, int level, unsigned int cpu);
 
-/* magic-load.c */
-void magic_init(const char *kfn, int kloadaddr, uint32_t addr);
+/* loader.c */
+int get_image_size(const char *filename);
+int load_image(const char *filename, uint8_t *addr);
+int load_elf(const char *filename, int64_t virt_to_phys_addend, uint64_t *pentry);
+int load_aout(const char *filename, uint8_t *addr);
 
-/* timer.c */
-void timer_init(uint32_t addr, int irq);
+/* slavio_timer.c */
+void slavio_timer_init(uint32_t addr, int irq, int mode, unsigned int cpu);
+
+/* slavio_serial.c */
+SerialState *slavio_serial_init(int base, int irq, CharDriverState *chr1, CharDriverState *chr2);
+void slavio_serial_ms_kbd_init(int base, int irq);
+
+/* slavio_misc.c */
+void *slavio_misc_init(uint32_t base, int irq);
+void slavio_set_power_fail(void *opaque, int power_failing);
+
+/* esp.c */
+void esp_init(BlockDriverState **bd, int irq, uint32_t espaddr, uint32_t espdaddr);
+
+/* sun4u.c */
+extern QEMUMachine sun4u_machine;
 
 /* NVRAM helpers */
 #include "hw/m48t59.h"
@@ -794,6 +997,9 @@ void adb_mouse_init(ADBBusState *bus);
 
 /* cuda.c */
 
+extern ADBBusState adb_bus;
+int cuda_init(SetIRQFunc *set_irq, void *irq_opaque, int irq);
+
 #include "hw/usb.h"
 
 /* usb ports of the VM */
@@ -807,8 +1013,72 @@ void do_usb_add(const char *devname);
 void do_usb_del(const char *devname);
 void usb_info(void);
 
-extern ADBBusState adb_bus;
-int cuda_init(openpic_t *openpic, int irq);
+/* integratorcp.c */
+extern QEMUMachine integratorcp926_machine;
+extern QEMUMachine integratorcp1026_machine;
+
+/* versatilepb.c */
+extern QEMUMachine versatilepb_machine;
+extern QEMUMachine versatileab_machine;
+
+/* ps2.c */
+void *ps2_kbd_init(void (*update_irq)(void *, int), void *update_arg);
+void *ps2_mouse_init(void (*update_irq)(void *, int), void *update_arg);
+void ps2_write_mouse(void *, int val);
+void ps2_write_keyboard(void *, int val);
+uint32_t ps2_read_data(void *);
+void ps2_queue(void *, int b);
+void ps2_keyboard_set_translation(void *opaque, int mode);
+
+/* smc91c111.c */
+void smc91c111_init(NICInfo *, uint32_t, void *, int);
+
+/* pl110.c */
+void *pl110_init(DisplayState *ds, uint32_t base, void *pic, int irq, int);
+
+/* pl011.c */
+void pl011_init(uint32_t base, void *pic, int irq, CharDriverState *chr);
+
+/* pl050.c */
+void pl050_init(uint32_t base, void *pic, int irq, int is_mouse);
+
+/* pl080.c */
+void *pl080_init(uint32_t base, void *pic, int irq);
+
+/* pl190.c */
+void *pl190_init(uint32_t base, void *parent, int irq, int fiq);
+
+/* arm-timer.c */
+void sp804_init(uint32_t base, void *pic, int irq);
+void icp_pit_init(uint32_t base, void *pic, int irq);
+
+/* arm_boot.c */
+
+void arm_load_kernel(int ram_size, const char *kernel_filename,
+                     const char *kernel_cmdline, const char *initrd_filename,
+                     int board_id);
+
+/* sh7750.c */
+struct SH7750State;
+
+struct SH7750State *sh7750_init(CPUState * cpu);
+
+typedef struct {
+    /* The callback will be triggered if any of the designated lines change */
+    uint16_t portamask_trigger;
+    uint16_t portbmask_trigger;
+    /* Return 0 if no action was taken */
+    int (*port_change_cb) (uint16_t porta, uint16_t portb,
+			   uint16_t * periph_pdtra,
+			   uint16_t * periph_portdira,
+			   uint16_t * periph_pdtrb,
+			   uint16_t * periph_portdirb);
+} sh7750_io_device;
+
+int sh7750_register_io_device(struct SH7750State *s,
+			      sh7750_io_device * device);
+/* tc58128.c */
+int tc58128_init(struct SH7750State *s, char *zone1, char *zone2);
 
 #endif /* defined(QEMU_TOOL) */
 
@@ -819,6 +1089,8 @@ void term_vprintf(const char *fmt, va_list ap);
 void term_printf(const char *fmt, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
 void term_flush(void);
 void term_print_help(void);
+void monitor_readline(const char *prompt, int is_password,
+                      char *buf, int buf_size);
 
 /* readline.c */
 typedef void ReadLineFunc(void *opaque, const char *str);
@@ -831,13 +1103,10 @@ const char *readline_get_history(unsigned int index);
 void readline_start(const char *prompt, int is_password,
                     ReadLineFunc *readline_func, void *opaque);
 
-/* gdbstub.c */
-
-#define DEFAULT_GDBSTUB_PORT 1234
-
-int gdbserver_start(int port);
-void update_select_wakeup_events(void);
-void tun_receive_handler(fd_set *);
+void kqemu_record_dump(void);
 
 extern char domain_name[];
+
+void destroy_hvm_domain(void);
+
 #endif /* VL_H */

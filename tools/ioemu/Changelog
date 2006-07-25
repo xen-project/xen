@@ -1,3 +1,84 @@
+version 0.8.1:
+
+  - USB tablet support (Brad Campbell, Anthony Liguori)
+  - win32 host serial support (Kazu)
+  - PC speaker support (Joachim Henke)
+  - IDE LBA48 support (Jens Axboe)
+  - SSE3 support
+  - Solaris port (Ben Taylor)
+  - Preliminary SH4 target (Samuel Tardieu)
+  - VNC server (Anthony Liguori)
+  - slirp fixes (Ed Swierk et al.)
+  - USB fixes
+  - ARM Versatile Platform Baseboard emulation (Paul Brook)
+
+version 0.8.0:
+
+  - ARM system emulation: Arm Integrator/CP board with an arm1026ej-s
+    cpu (Paul Brook)
+  - SMP support
+  - Mac OS X cocoa improvements (Mike Kronenberg)
+  - Mac OS X CoreAudio driver (Mike Kronenberg)
+  - DirectSound driver (malc)
+  - ALSA audio driver (malc)
+  - new audio options: '-soundhw' and '-audio-help' (malc)
+  - ES1370 PCI audio device (malc)
+  - Initial USB support
+  - Linux host serial port access
+  - Linux host low level parallel port access
+  - New network emulation code supporting VLANs.
+  - MIPS and MIPSel User Linux emulation
+  - MIPS fixes to boot Linux (Daniel Jacobowitz)
+  - NX bit support
+  - Initial SPARC SMP support (Blue Swirl)
+  - Major overhaul of the virtual FAT driver for read/write support
+    (Johannes Schindelin)
+
+version 0.7.2:
+  
+  - x86_64 fixes (Win2000 and Linux 2.6 boot in 32 bit)
+  - merge self modifying code handling in dirty ram page mecanism.
+  - MIPS fixes (Ralf Baechle)
+  - better user net performances
+
+version 0.7.1:
+
+  - read-only Virtual FAT support (Johannes Schindelin)
+  - Windows 2000 install disk full hack (original idea from Vladimir
+    N. Oleynik)
+  - VMDK disk image creation (Filip Navara)
+  - SPARC64 progress (Blue Swirl)
+  - initial MIPS support (Jocelyn mayer)
+  - MIPS improvements (Ralf Baechle)
+  - 64 bit fixes in user networking (initial patch by Gwenole Beauchesne)
+  - IOAPIC support (Filip Navara)
+
+version 0.7.0:
+
+  - better BIOS translation and HDD geometry auto-detection
+  - user mode networking bug fix
+  - undocumented FPU ops support
+  - Cirrus VGA: support for 1280x1024x[8,15,16] modes
+  - 'pidfile' option
+  - .dmg disk image format support (Johannes Schindelin)
+  - keymaps support (initial patch by Johannes Schindelin)
+  - big endian ARM support (Lennert Buytenhek)
+  - added generic 64 bit target support
+  - x86_64 target support
+  - initial APIC support
+  - MMX/SSE/SSE2/PNI support
+  - PC parallel port support (Mark Jonckheere)
+  - initial SPARC64 support (Blue Swirl)
+  - SPARC target boots Linux (Blue Swirl)
+  - armv5te user mode support (Paul Brook)
+  - ARM VFP support (Paul Brook)
+  - ARM "Angel" semihosting syscalls (Paul Brook)
+  - user mode gdb stub support (Paul Brook)
+  - Samba 3 support
+  - initial Cocoa support (Pierre d'Herbemont)
+  - generic FPU emulation code
+  - Virtual PC read-only disk image support (Alex Beregszaszi)
+
 version 0.6.1:
 
   - Mac OS X port (Pierre d'Herbemont)

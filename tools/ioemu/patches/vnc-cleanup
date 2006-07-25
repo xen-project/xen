@@ -1,0 +1,80 @@
+diff -r c84300f3abc2 vnc.c
+--- a/vnc.c	Wed Jul 05 18:11:23 2006 +0100
++++ b/vnc.c	Thu Jul 06 14:27:28 2006 +0100
+@@ -83,13 +83,16 @@ static void vnc_dpy_update(DisplayState 
+ static void vnc_dpy_update(DisplayState *ds, int x, int y, int w, int h)
+ {
+     VncState *vs = ds->opaque;
+-    int i;
++    uint64_t mask;
+ 
+     h += y;
++    if (w != 1024)
++	mask = ((1ULL << (w / 16)) - 1) << (x / 16);
++    else
++	mask = ~(0ULL);
+ 
+     for (; y < h; y++)
+-	for (i = 0; i < w; i += 16)
+-	    vs->dirty_row[y] |= (1ULL << ((x + i) / 16));
++	vs->dirty_row[y] |= mask;
+ }
+ 
+ static void vnc_framebuffer_update(VncState *vs, int x, int y, int w, int h,
+@@ -262,6 +265,7 @@ static void vnc_update_client(void *opaq
+ static void vnc_update_client(void *opaque)
+ {
+     VncState *vs = opaque;
++    int64_t now = qemu_get_clock(rt_clock);
+ 
+     if (vs->need_update && vs->csock != -1) {
+ 	int y;
+@@ -282,7 +286,7 @@ static void vnc_update_client(void *opaq
+ 	row = vs->ds->data;
+ 	old_row = vs->old_data;
+ 
+-	for (y = 0; y < vs->height; y++) {
++	for (y = 0; y < vs->ds->height; y++) {
+ 	    if (vs->dirty_row[y] & width_mask) {
+ 		int x;
+ 		char *ptr, *old_ptr;
+@@ -307,10 +311,8 @@ static void vnc_update_client(void *opaq
+ 	    old_row += vs->ds->linesize;
+ 	}
+ 
+-	if (!has_dirty) {
+-	    qemu_mod_timer(vs->timer, qemu_get_clock(rt_clock) + VNC_REFRESH_INTERVAL);
+-	    return;
+-	}
++	if (!has_dirty)
++	    goto out;
+ 
+ 	/* Count rectangles */
+ 	n_rectangles = 0;
+@@ -348,7 +350,9 @@ static void vnc_update_client(void *opaq
+ 	vnc_flush(vs);
+ 
+     }
+-    qemu_mod_timer(vs->timer, qemu_get_clock(rt_clock) + VNC_REFRESH_INTERVAL);
++
++ out:
++    qemu_mod_timer(vs->timer, now + VNC_REFRESH_INTERVAL);
+ }
+ 
+ static void vnc_timer_init(VncState *vs)
+diff -r c84300f3abc2 vl.c
+--- a/vl.c	Wed Jul 05 18:11:23 2006 +0100
++++ b/vl.c	Thu Jul 06 14:27:28 2006 +0100
+@@ -4586,10 +4586,10 @@ void main_loop_wait(int timeout)
+         /* XXX: better handling of removal */
+         for(ioh = first_io_handler; ioh != NULL; ioh = ioh_next) {
+             ioh_next = ioh->next;
+-            if (FD_ISSET(ioh->fd, &rfds)) {
++            if (ioh->fd_read && FD_ISSET(ioh->fd, &rfds)) {
+                 ioh->fd_read(ioh->opaque);
+             }
+-            if (FD_ISSET(ioh->fd, &wfds)) {
++            if (ioh->fd_write && FD_ISSET(ioh->fd, &wfds)) {
+                 ioh->fd_write(ioh->opaque);
+             }
+         }

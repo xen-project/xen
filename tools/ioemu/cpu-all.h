@@ -109,23 +109,27 @@ static inline void tswap64s(uint64_t *s)
 #if TARGET_LONG_SIZE == 4
 #define tswapl(s) tswap32(s)
 #define tswapls(s) tswap32s((uint32_t *)(s))
+#define bswaptls(s) bswap32s(s)
 #else
 #define tswapl(s) tswap64(s)
 #define tswapls(s) tswap64s((uint64_t *)(s))
+#define bswaptls(s) bswap64s(s)
 #endif
 
-/* NOTE: arm is horrible as double 32 bit words are stored in big endian ! */
+/* NOTE: arm FPA is horrible as double 32 bit words are stored in big
+   endian ! */
 typedef union {
-    double d;
-#if !defined(WORDS_BIGENDIAN) && !defined(__arm__)
+    float64 d;
+#if defined(WORDS_BIGENDIAN) \
+    || (defined(__arm__) && !defined(__VFP_FP__) && !defined(CONFIG_SOFTFLOAT))
     struct {
-        uint32_t lower;
         uint32_t upper;
+        uint32_t lower;
     } l;
 #else
     struct {
-        uint32_t upper;
         uint32_t lower;
+        uint32_t upper;
     } l;
 #endif
     uint64_t ll;
@@ -166,17 +170,17 @@ typedef union {
  *   user   : user mode access using soft MMU
  *   kernel : kernel mode access using soft MMU
  */
-static inline int ldub_raw(void *ptr)
+static inline int ldub_p(void *ptr)
 {
     return *(uint8_t *)ptr;
 }
 
-static inline int ldsb_raw(void *ptr)
+static inline int ldsb_p(void *ptr)
 {
     return *(int8_t *)ptr;
 }
 
-static inline void stb_raw(void *ptr, int v)
+static inline void stb_p(void *ptr, int v)
 {
     *(uint8_t *)ptr = v;
 }
@@ -184,10 +188,10 @@ static inline void stb_raw(void *ptr, int v)
 /* NOTE: on arm, putting 2 in /proc/sys/debug/alignment so that the
    kernel handles unaligned load/stores may give better results, but
    it is a system wide setting : bad */
-#if !defined(TARGET_WORDS_BIGENDIAN) && (defined(WORDS_BIGENDIAN) || defined(WORDS_ALIGNED))
+#if defined(WORDS_BIGENDIAN) || defined(WORDS_ALIGNED)
 
 /* conservative code for little endian unaligned accesses */
-static inline int lduw_raw(void *ptr)
+static inline int lduw_le_p(void *ptr)
 {
 #ifdef __powerpc__
     int val;
@@ -199,7 +203,7 @@ static inline int lduw_raw(void *ptr)
 #endif
 }
 
-static inline int ldsw_raw(void *ptr)
+static inline int ldsw_le_p(void *ptr)
 {
 #ifdef __powerpc__
     int val;
@@ -211,7 +215,7 @@ static inline int ldsw_raw(void *ptr)
 #endif
 }
 
-static inline int ldl_raw(void *ptr)
+static inline int ldl_le_p(void *ptr)
 {
 #ifdef __powerpc__
     int val;
@@ -223,16 +227,16 @@ static inline int ldl_raw(void *ptr)
 #endif
 }
 
-static inline uint64_t ldq_raw(void *ptr)
+static inline uint64_t ldq_le_p(void *ptr)
 {
     uint8_t *p = ptr;
     uint32_t v1, v2;
-    v1 = ldl_raw(p);
-    v2 = ldl_raw(p + 4);
+    v1 = ldl_le_p(p);
+    v2 = ldl_le_p(p + 4);
     return v1 | ((uint64_t)v2 << 32);
 }
 
-static inline void stw_raw(void *ptr, int v)
+static inline void stw_le_p(void *ptr, int v)
 {
 #ifdef __powerpc__
     __asm__ __volatile__ ("sthbrx %1,0,%2" : "=m" (*(uint16_t *)ptr) : "r" (v), "r" (ptr));
@@ -243,7 +247,7 @@ static inline void stw_raw(void *ptr, int v)
 #endif
 }
 
-static inline void stl_raw(void *ptr, int v)
+static inline void stl_le_p(void *ptr, int v)
 {
 #ifdef __powerpc__
     __asm__ __volatile__ ("stwbrx %1,0,%2" : "=m" (*(uint32_t *)ptr) : "r" (v), "r" (ptr));
@@ -256,54 +260,114 @@ static inline void stl_raw(void *ptr, int v)
 #endif
 }
 
-static inline void stq_raw(void *ptr, uint64_t v)
+static inline void stq_le_p(void *ptr, uint64_t v)
 {
     uint8_t *p = ptr;
-    stl_raw(p, (uint32_t)v);
-    stl_raw(p + 4, v >> 32);
+    stl_le_p(p, (uint32_t)v);
+    stl_le_p(p + 4, v >> 32);
 }
 
 /* float access */
 
-static inline float ldfl_raw(void *ptr)
+static inline float32 ldfl_le_p(void *ptr)
 {
     union {
-        float f;
+        float32 f;
         uint32_t i;
     } u;
-    u.i = ldl_raw(ptr);
+    u.i = ldl_le_p(ptr);
     return u.f;
 }
 
-static inline void stfl_raw(void *ptr, float v)
+static inline void stfl_le_p(void *ptr, float32 v)
 {
     union {
-        float f;
+        float32 f;
         uint32_t i;
     } u;
     u.f = v;
-    stl_raw(ptr, u.i);
+    stl_le_p(ptr, u.i);
 }
 
-static inline double ldfq_raw(void *ptr)
+static inline float64 ldfq_le_p(void *ptr)
 {
     CPU_DoubleU u;
-    u.l.lower = ldl_raw(ptr);
-    u.l.upper = ldl_raw(ptr + 4);
+    u.l.lower = ldl_le_p(ptr);
+    u.l.upper = ldl_le_p(ptr + 4);
     return u.d;
 }
 
-static inline void stfq_raw(void *ptr, double v)
+static inline void stfq_le_p(void *ptr, float64 v)
 {
     CPU_DoubleU u;
     u.d = v;
-    stl_raw(ptr, u.l.lower);
-    stl_raw(ptr + 4, u.l.upper);
+    stl_le_p(ptr, u.l.lower);
+    stl_le_p(ptr + 4, u.l.upper);
 }
 
-#elif defined(TARGET_WORDS_BIGENDIAN) && (!defined(WORDS_BIGENDIAN) || defined(WORDS_ALIGNED))
+#else
 
-static inline int lduw_raw(void *ptr)
+static inline int lduw_le_p(void *ptr)
+{
+    return *(uint16_t *)ptr;
+}
+
+static inline int ldsw_le_p(void *ptr)
+{
+    return *(int16_t *)ptr;
+}
+
+static inline int ldl_le_p(void *ptr)
+{
+    return *(uint32_t *)ptr;
+}
+
+static inline uint64_t ldq_le_p(void *ptr)
+{
+    return *(uint64_t *)ptr;
+}
+
+static inline void stw_le_p(void *ptr, int v)
+{
+    *(uint16_t *)ptr = v;
+}
+
+static inline void stl_le_p(void *ptr, int v)
+{
+    *(uint32_t *)ptr = v;
+}
+
+static inline void stq_le_p(void *ptr, uint64_t v)
+{
+    *(uint64_t *)ptr = v;
+}
+
+/* float access */
+
+static inline float32 ldfl_le_p(void *ptr)
+{
+    return *(float32 *)ptr;
+}
+
+static inline float64 ldfq_le_p(void *ptr)
+{
+    return *(float64 *)ptr;
+}
+
+static inline void stfl_le_p(void *ptr, float32 v)
+{
+    *(float32 *)ptr = v;
+}
+
+static inline void stfq_le_p(void *ptr, float64 v)
+{
+    *(float64 *)ptr = v;
+}
+#endif
+
+#if !defined(WORDS_BIGENDIAN) || defined(WORDS_ALIGNED)
+
+static inline int lduw_be_p(void *ptr)
 {
 #if defined(__i386__)
     int val;
@@ -318,7 +382,7 @@ static inline int lduw_raw(void *ptr)
 #endif
 }
 
-static inline int ldsw_raw(void *ptr)
+static inline int ldsw_be_p(void *ptr)
 {
 #if defined(__i386__)
     int val;
@@ -333,7 +397,7 @@ static inline int ldsw_raw(void *ptr)
 #endif
 }
 
-static inline int ldl_raw(void *ptr)
+static inline int ldl_be_p(void *ptr)
 {
 #if defined(__i386__) || defined(__x86_64__)
     int val;
@@ -348,15 +412,15 @@ static inline int ldl_raw(void *ptr)
 #endif
 }
 
-static inline uint64_t ldq_raw(void *ptr)
+static inline uint64_t ldq_be_p(void *ptr)
 {
     uint32_t a,b;
-    a = ldl_raw(ptr);
-    b = ldl_raw(ptr+4);
+    a = ldl_be_p(ptr);
+    b = ldl_be_p(ptr+4);
     return (((uint64_t)a<<32)|b);
 }
 
-static inline void stw_raw(void *ptr, int v)
+static inline void stw_be_p(void *ptr, int v)
 {
 #if defined(__i386__)
     asm volatile ("xchgb %b0, %h0\n"
@@ -370,7 +434,7 @@ static inline void stw_raw(void *ptr, int v)
 #endif
 }
 
-static inline void stl_raw(void *ptr, int v)
+static inline void stl_be_p(void *ptr, int v)
 {
 #if defined(__i386__) || defined(__x86_64__)
     asm volatile ("bswap %0\n"
@@ -386,111 +450,176 @@ static inline void stl_raw(void *ptr, int v)
 #endif
 }
 
-static inline void stq_raw(void *ptr, uint64_t v)
+static inline void stq_be_p(void *ptr, uint64_t v)
 {
-    stl_raw(ptr, v >> 32);
-    stl_raw(ptr + 4, v);
+    stl_be_p(ptr, v >> 32);
+    stl_be_p(ptr + 4, v);
 }
 
 /* float access */
 
-static inline float ldfl_raw(void *ptr)
+static inline float32 ldfl_be_p(void *ptr)
 {
     union {
-        float f;
+        float32 f;
         uint32_t i;
     } u;
-    u.i = ldl_raw(ptr);
+    u.i = ldl_be_p(ptr);
     return u.f;
 }
 
-static inline void stfl_raw(void *ptr, float v)
+static inline void stfl_be_p(void *ptr, float32 v)
 {
     union {
-        float f;
+        float32 f;
         uint32_t i;
     } u;
     u.f = v;
-    stl_raw(ptr, u.i);
+    stl_be_p(ptr, u.i);
 }
 
-static inline double ldfq_raw(void *ptr)
+static inline float64 ldfq_be_p(void *ptr)
 {
     CPU_DoubleU u;
-    u.l.upper = ldl_raw(ptr);
-    u.l.lower = ldl_raw(ptr + 4);
+    u.l.upper = ldl_be_p(ptr);
+    u.l.lower = ldl_be_p(ptr + 4);
     return u.d;
 }
 
-static inline void stfq_raw(void *ptr, double v)
+static inline void stfq_be_p(void *ptr, float64 v)
 {
     CPU_DoubleU u;
     u.d = v;
-    stl_raw(ptr, u.l.upper);
-    stl_raw(ptr + 4, u.l.lower);
+    stl_be_p(ptr, u.l.upper);
+    stl_be_p(ptr + 4, u.l.lower);
 }
 
 #else
 
-static inline int lduw_raw(void *ptr)
+static inline int lduw_be_p(void *ptr)
 {
     return *(uint16_t *)ptr;
 }
 
-static inline int ldsw_raw(void *ptr)
+static inline int ldsw_be_p(void *ptr)
 {
     return *(int16_t *)ptr;
 }
 
-static inline int ldl_raw(void *ptr)
+static inline int ldl_be_p(void *ptr)
 {
     return *(uint32_t *)ptr;
 }
 
-static inline uint64_t ldq_raw(void *ptr)
+static inline uint64_t ldq_be_p(void *ptr)
 {
     return *(uint64_t *)ptr;
 }
 
-static inline void stw_raw(void *ptr, int v)
+static inline void stw_be_p(void *ptr, int v)
 {
     *(uint16_t *)ptr = v;
 }
 
-static inline void stl_raw(void *ptr, int v)
+static inline void stl_be_p(void *ptr, int v)
 {
     *(uint32_t *)ptr = v;
 }
 
-static inline void stq_raw(void *ptr, uint64_t v)
+static inline void stq_be_p(void *ptr, uint64_t v)
 {
     *(uint64_t *)ptr = v;
 }
 
 /* float access */
 
-static inline float ldfl_raw(void *ptr)
+static inline float32 ldfl_be_p(void *ptr)
 {
-    return *(float *)ptr;
+    return *(float32 *)ptr;
 }
 
-static inline double ldfq_raw(void *ptr)
+static inline float64 ldfq_be_p(void *ptr)
 {
-    return *(double *)ptr;
+    return *(float64 *)ptr;
 }
 
-static inline void stfl_raw(void *ptr, float v)
+static inline void stfl_be_p(void *ptr, float32 v)
 {
-    *(float *)ptr = v;
+    *(float32 *)ptr = v;
 }
 
-static inline void stfq_raw(void *ptr, double v)
+static inline void stfq_be_p(void *ptr, float64 v)
 {
-    *(double *)ptr = v;
+    *(float64 *)ptr = v;
 }
+
+#endif
+
+/* target CPU memory access functions */
+#if defined(TARGET_WORDS_BIGENDIAN)
+#define lduw_p(p) lduw_be_p(p)
+#define ldsw_p(p) ldsw_be_p(p)
+#define ldl_p(p) ldl_be_p(p)
+#define ldq_p(p) ldq_be_p(p)
+#define ldfl_p(p) ldfl_be_p(p)
+#define ldfq_p(p) ldfq_be_p(p)
+#define stw_p(p, v) stw_be_p(p, v)
+#define stl_p(p, v) stl_be_p(p, v)
+#define stq_p(p, v) stq_be_p(p, v)
+#define stfl_p(p, v) stfl_be_p(p, v)
+#define stfq_p(p, v) stfq_be_p(p, v)
+#else
+#define lduw_p(p) lduw_le_p(p)
+#define ldsw_p(p) ldsw_le_p(p)
+#define ldl_p(p) ldl_le_p(p)
+#define ldq_p(p) ldq_le_p(p)
+#define ldfl_p(p) ldfl_le_p(p)
+#define ldfq_p(p) ldfq_le_p(p)
+#define stw_p(p, v) stw_le_p(p, v)
+#define stl_p(p, v) stl_le_p(p, v)
+#define stq_p(p, v) stq_le_p(p, v)
+#define stfl_p(p, v) stfl_le_p(p, v)
+#define stfq_p(p, v) stfq_le_p(p, v)
 #endif
 
 /* MMU memory access macros */
+
+#if defined(CONFIG_USER_ONLY)
+/* On some host systems the guest address space is reserved on the host.
+ * This allows the guest address space to be offset to a convenient location.
+ */
+//#define GUEST_BASE 0x20000000
+#define GUEST_BASE 0
+
+/* All direct uses of g2h and h2g need to go away for usermode softmmu.  */
+#define g2h(x) ((void *)((unsigned long)(x) + GUEST_BASE))
+#define h2g(x) ((target_ulong)(x - GUEST_BASE))
+
+#define saddr(x) g2h(x)
+#define laddr(x) g2h(x)
+
+#else /* !CONFIG_USER_ONLY */
+/* NOTE: we use double casts if pointers and target_ulong have
+   different sizes */
+#define saddr(x) (uint8_t *)(long)(x)
+#define laddr(x) (uint8_t *)(long)(x)
+#endif
+
+#define ldub_raw(p) ldub_p(laddr((p)))
+#define ldsb_raw(p) ldsb_p(laddr((p)))
+#define lduw_raw(p) lduw_p(laddr((p)))
+#define ldsw_raw(p) ldsw_p(laddr((p)))
+#define ldl_raw(p) ldl_p(laddr((p)))
+#define ldq_raw(p) ldq_p(laddr((p)))
+#define ldfl_raw(p) ldfl_p(laddr((p)))
+#define ldfq_raw(p) ldfq_p(laddr((p)))
+#define stb_raw(p, v) stb_p(saddr((p)), v)
+#define stw_raw(p, v) stw_p(saddr((p)), v)
+#define stl_raw(p, v) stl_p(saddr((p)), v)
+#define stq_raw(p, v) stq_p(saddr((p)), v)
+#define stfl_raw(p, v) stfl_p(saddr((p)), v)
+#define stfq_raw(p, v) stfq_p(saddr((p)), v)
+
 
 #if defined(CONFIG_USER_ONLY) 
 
@@ -538,6 +667,7 @@ static inline void stfq_raw(void *ptr, double v)
 #define TARGET_PAGE_MASK ~(TARGET_PAGE_SIZE - 1)
 #define TARGET_PAGE_ALIGN(addr) (((addr) + TARGET_PAGE_SIZE - 1) & TARGET_PAGE_MASK)
 
+/* ??? These should be the larger of unsigned long and target_ulong.  */
 extern unsigned long qemu_real_host_page_size;
 extern unsigned long qemu_host_page_bits;
 extern unsigned long qemu_host_page_size;
@@ -556,17 +686,81 @@ extern unsigned long qemu_host_page_mask;
 #define PAGE_WRITE_ORG 0x0010 
 
 void page_dump(FILE *f);
-int page_get_flags(unsigned long address);
-void page_set_flags(unsigned long start, unsigned long end, int flags);
-void page_unprotect_range(uint8_t *data, unsigned long data_size);
+int page_get_flags(target_ulong address);
+void page_set_flags(target_ulong start, target_ulong end, int flags);
+void page_unprotect_range(target_ulong data, target_ulong data_size);
+
+#ifdef CONFIG_DM
+#define SINGLE_CPU_DEFINES
+#endif
+#ifdef SINGLE_CPU_DEFINES
+
+#if defined(TARGET_I386)
 
 #define CPUState CPUX86State
+#define cpu_init cpu_x86_init
+#define cpu_exec cpu_x86_exec
+#define cpu_gen_code cpu_x86_gen_code
+#define cpu_signal_handler cpu_x86_signal_handler
+
+#elif defined(TARGET_ARM)
+
+#define CPUState CPUARMState
+#define cpu_init cpu_arm_init
+#define cpu_exec cpu_arm_exec
+#define cpu_gen_code cpu_arm_gen_code
+#define cpu_signal_handler cpu_arm_signal_handler
+
+#elif defined(TARGET_SPARC)
+
+#define CPUState CPUSPARCState
+#define cpu_init cpu_sparc_init
+#define cpu_exec cpu_sparc_exec
+#define cpu_gen_code cpu_sparc_gen_code
+#define cpu_signal_handler cpu_sparc_signal_handler
+
+#elif defined(TARGET_PPC)
+
+#define CPUState CPUPPCState
+#define cpu_init cpu_ppc_init
+#define cpu_exec cpu_ppc_exec
+#define cpu_gen_code cpu_ppc_gen_code
+#define cpu_signal_handler cpu_ppc_signal_handler
+
+#elif defined(TARGET_MIPS)
+#define CPUState CPUMIPSState
+#define cpu_init cpu_mips_init
+#define cpu_exec cpu_mips_exec
+#define cpu_gen_code cpu_mips_gen_code
+#define cpu_signal_handler cpu_mips_signal_handler
+
+#elif defined(TARGET_SH4)
+#define CPUState CPUSH4State
+#define cpu_init cpu_sh4_init
+#define cpu_exec cpu_sh4_exec
+#define cpu_gen_code cpu_sh4_gen_code
+#define cpu_signal_handler cpu_sh4_signal_handler
+
+#else
+
+#error unsupported target CPU
+
+#endif
+
+#else /* SINGLE_CPU_DEFINES */
+
+#define CPUState CPUX86State
+#define cpu_init cpu_x86_init
+int main_loop(void);
+
+#endif /* SINGLE_CPU_DEFINES */
 
 void cpu_dump_state(CPUState *env, FILE *f, 
                     int (*cpu_fprintf)(FILE *f, const char *fmt, ...),
                     int flags);
 
 void cpu_abort(CPUState *env, const char *fmt, ...);
+extern CPUState *first_cpu;
 extern CPUState *cpu_single_env;
 extern int code_copy_enabled;
 
@@ -574,6 +768,9 @@ extern int code_copy_enabled;
 #define CPU_INTERRUPT_HARD   0x02 /* hardware interrupt pending */
 #define CPU_INTERRUPT_EXITTB 0x04 /* exit the current TB (use for x86 a20 case) */
 #define CPU_INTERRUPT_TIMER  0x08 /* internal timer exception pending */
+#define CPU_INTERRUPT_FIQ    0x10 /* Fast interrupt pending.  */
+#define CPU_INTERRUPT_HALT   0x20 /* CPU halt wanted */
+
 void cpu_interrupt(CPUState *s, int mask);
 void cpu_reset_interrupt(CPUState *env, int mask);
 
@@ -581,8 +778,6 @@ int cpu_breakpoint_insert(CPUState *env, target_ulong pc);
 int cpu_breakpoint_remove(CPUState *env, target_ulong pc);
 void cpu_single_step(CPUState *env, int enabled);
 void cpu_reset(CPUState *s);
-CPUState *cpu_init(void);
-int main_loop(void);
 
 /* Return the physical page corresponding to a virtual one. Use it
    only for debugging because no protection checks are done. Return -1
@@ -640,32 +835,8 @@ static __inline__ void atomic_clear_bit(long nr, volatile void *addr)
                 :"=m" (*(volatile long *)addr)
                 :"dIr" (nr));
 }
-#elif defined(__ia64__)
-#include "ia64_intrinsic.h"
-#define atomic_set_bit(nr, addr) ({					\
-	typeof(*addr) bit, old, new;					\
-	volatile typeof(*addr) *m;					\
-									\
-	m = (volatile typeof(*addr)*)(addr + nr / (8*sizeof(*addr)));	\
-	bit = 1 << (nr % (8*sizeof(*addr)));				\
-	do {								\
-		old = *m;						\
-		new = old | bit;					\
-	} while (cmpxchg_acq(m, old, new) != old);	\
-})
-
-#define atomic_clear_bit(nr, addr) ({					\
-	typeof(*addr) bit, old, new;					\
-	volatile typeof(*addr) *m;					\
-									\
-	m = (volatile typeof(*addr)*)(addr + nr / (8*sizeof(*addr)));	\
-	bit = ~(1 << (nr % (8*sizeof(*addr))));				\
-	do {								\
-		old = *m;						\
-		new = old & bit;					\
-	} while (cmpxchg_acq(m, old, new) != old);	\
-})
 #endif
+
 /* memory API */
 
 extern uint64_t phys_ram_size;
@@ -674,14 +845,13 @@ extern uint8_t *phys_ram_base;
 extern uint8_t *phys_ram_dirty;
 
 /* physical memory access */
-#define IO_MEM_NB_ENTRIES  256
 #define TLB_INVALID_MASK   (1 << 3)
 #define IO_MEM_SHIFT       4
+#define IO_MEM_NB_ENTRIES  (1 << (TARGET_PAGE_BITS  - IO_MEM_SHIFT))
 
 #define IO_MEM_RAM         (0 << IO_MEM_SHIFT) /* hardcoded offset */
 #define IO_MEM_ROM         (1 << IO_MEM_SHIFT) /* hardcoded offset */
 #define IO_MEM_UNASSIGNED  (2 << IO_MEM_SHIFT)
-#define IO_MEM_CODE        (3 << IO_MEM_SHIFT) /* used internally, never use directly */
 #define IO_MEM_NOTDIRTY    (4 << IO_MEM_SHIFT) /* used internally, never use directly */
 
 typedef void CPUWriteMemoryFunc(void *opaque, target_phys_addr_t addr, uint32_t value);
@@ -709,23 +879,66 @@ static inline void cpu_physical_memory_write(target_phys_addr_t addr,
 {
     cpu_physical_memory_rw(addr, (uint8_t *)buf, len, 1);
 }
+uint32_t ldub_phys(target_phys_addr_t addr);
+uint32_t lduw_phys(target_phys_addr_t addr);
+uint32_t ldl_phys(target_phys_addr_t addr);
+uint64_t ldq_phys(target_phys_addr_t addr);
+void stl_phys_notdirty(target_phys_addr_t addr, uint32_t val);
+void stb_phys(target_phys_addr_t addr, uint32_t val);
+void stw_phys(target_phys_addr_t addr, uint32_t val);
+void stl_phys(target_phys_addr_t addr, uint32_t val);
+void stq_phys(target_phys_addr_t addr, uint64_t val);
 
+void cpu_physical_memory_write_rom(target_phys_addr_t addr, 
+                                   const uint8_t *buf, int len);
 int cpu_memory_rw_debug(CPUState *env, target_ulong addr, 
                         uint8_t *buf, int len, int is_write);
 
-#define VGA_DIRTY_FLAG	0x01
+#define VGA_DIRTY_FLAG  0x01
+#define CODE_DIRTY_FLAG 0x02
 
 /* read dirty bit (return 0 or 1) */
-static inline int cpu_physical_memory_is_dirty(target_ulong addr)
+static inline int cpu_physical_memory_is_dirty(ram_addr_t addr)
 {
-    return phys_ram_dirty[addr >> TARGET_PAGE_BITS];
+    return phys_ram_dirty[addr >> TARGET_PAGE_BITS] == 0xff;
 }
 
-static inline void cpu_physical_memory_set_dirty(target_ulong addr)
+static inline int cpu_physical_memory_get_dirty(ram_addr_t addr, 
+                                                int dirty_flags)
 {
-    phys_ram_dirty[addr >> TARGET_PAGE_BITS] = 1;
+    return phys_ram_dirty[addr >> TARGET_PAGE_BITS] & dirty_flags;
 }
 
-void cpu_physical_memory_reset_dirty(target_ulong start, target_ulong end);
+static inline void cpu_physical_memory_set_dirty(ram_addr_t addr)
+{
+    phys_ram_dirty[addr >> TARGET_PAGE_BITS] = 0xff;
+}
+
+void cpu_physical_memory_reset_dirty(ram_addr_t start, ram_addr_t end,
+                                     int dirty_flags);
+void cpu_tlb_update_dirty(CPUState *env);
+
+void dump_exec_info(FILE *f,
+                    int (*cpu_fprintf)(FILE *f, const char *fmt, ...));
+
+/* profiling */
+#ifdef CONFIG_PROFILER
+static inline int64_t profile_getclock(void)
+{
+    int64_t val;
+    asm volatile ("rdtsc" : "=A" (val));
+    return val;
+}
+
+extern int64_t kqemu_time, kqemu_time_start;
+extern int64_t qemu_time, qemu_time_start;
+extern int64_t tlb_flush_time;
+extern int64_t kqemu_exec_count;
+extern int64_t dev_time;
+extern int64_t kqemu_ret_int_count;
+extern int64_t kqemu_ret_excp_count;
+extern int64_t kqemu_ret_intr_count;
+
+#endif
 
 #endif /* CPU_ALL_H */

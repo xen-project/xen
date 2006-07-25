@@ -2,6 +2,9 @@ XEN_ROOT=../..
 include $(XEN_ROOT)/tools/Rules.mk
 XEN_LIBXC          = $(XEN_ROOT)/tools/libxc
 
+MAJOR = 3.0
+MINOR = 0
+
 INSTALL         = install
 INSTALL_DATA	= $(INSTALL) -m0644
 INSTALL_PROG    = $(INSTALL) -m0755
@@ -34,7 +37,7 @@ XENSTORED_Linux = xenstored_linux.o
 XENSTORED_OBJS += $(XENSTORED_$(OS))
 
 .PHONY: all
-all: libxenstore.so xenstored $(CLIENTS) xs_tdb_dump xenstore-control xenstore-ls
+all: libxenstore.so libxenstore.a xenstored $(CLIENTS) xs_tdb_dump xenstore-control xenstore-ls
 
 test_interleaved_transactions: test_interleaved_transactions.o
 	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -L. -lxenstore -o $@
@@ -86,12 +89,20 @@ xs_test_lib.o: xs.c
 talloc_test.o: talloc.c
 	$(COMPILE.c) -o $@ $<
 
-libxenstore.so: xs.opic xs_lib.opic
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-soname -Wl,libxenstore.so -shared -o $@ $^ -lpthread
+libxenstore.so: libxenstore.so.$(MAJOR)
+	ln -sf $< $@
+libxenstore.so.$(MAJOR): libxenstore.so.$(MAJOR).$(MINOR)
+	ln -sf $< $@
+
+libxenstore.so.$(MAJOR).$(MINOR): xs.opic xs_lib.opic
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-soname -Wl,libxenstore.so.$(MAJOR) -shared -o $@ $^ -lpthread
+
+libxenstore.a: xs.o xs_lib.o
+	ar rcs libxenstore.a $^
 
 .PHONY: clean
 clean: testsuite-clean
-	rm -f *.o *.opic *.so
+	rm -f *.o *.opic *.so*
 	rm -f xenstored xs_random xs_stress xs_crashme
 	rm -f xs_test xenstored_test xs_tdb_dump xenstore-control xenstore-ls
 	rm -f $(CLIENTS)
@@ -171,7 +182,10 @@ install: all
 	$(INSTALL_PROG) xenstore-control $(DESTDIR)/usr/bin
 	$(INSTALL_PROG) xenstore-ls $(DESTDIR)/usr/bin
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/$(LIBDIR)
-	$(INSTALL_DATA) libxenstore.so $(DESTDIR)/usr/$(LIBDIR)
+	$(INSTALL_PROG) libxenstore.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)
+	ln -sf libxenstore.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)/libxenstore.so.$(MAJOR)
+	ln -sf libxenstore.so.$(MAJOR) $(DESTDIR)/usr/$(LIBDIR)/libxenstore.so
+	$(INSTALL_DATA) libxenstore.a $(DESTDIR)/usr/$(LIBDIR)
 	$(INSTALL_DATA) xs.h $(DESTDIR)/usr/include
 	$(INSTALL_DATA) xs_lib.h $(DESTDIR)/usr/include
 

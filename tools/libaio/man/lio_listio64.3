@@ -1,0 +1,39 @@
+.TH lio_listio64 3 2002-09-12 "Linux 2.4" Linux AIO"
+.SH NAME
+lio_listio64 \- List directed I/O
+.SH SYNOPSYS
+.B #include <errno.h>
+.br
+.B #include <libaio.h>
+.LP
+.BI "int lio_listio64 (int mode, struct aiocb *const list[], int nent, struct sigevent *sig)"
+.nf
+.SH DESCRIPTION
+This function is similar to the 
+.IR "code{lio_listio"
+function.  The only
+difference is that on 
+.IR "32 bit"
+machines, the file descriptor should
+be opened in the large file mode.  Internally, 
+.IR "lio_listio64"
+uses
+functionality equivalent to 
+.IR lseek64"
+to position the file descriptor correctly for the reading or
+writing, as opposed to 
+.IR "lseek"
+functionality used in
+.IR "lio_listio".
+
+When the sources are compiled with 
+.IR "_FILE_OFFSET_BITS == 64"
+, this
+function is available under the name 
+.IR "lio_listio"
+and so
+transparently replaces the interface for small files on 32 bit
+machines.
+.SH "RETURN VALUES"
+.SH ERRORS
+.SH "SEE ALSO"

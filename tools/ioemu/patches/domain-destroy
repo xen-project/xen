@@ -1,0 +1,51 @@
+diff -r e1dce5114e92 monitor.c
+--- a/monitor.c	Mon Jun 26 16:04:15 2006 +0100
++++ b/monitor.c	Mon Jun 26 16:04:26 2006 +0100
+@@ -306,6 +306,7 @@ static void do_info_history (void)
+ 
+ static void do_quit(void)
+ {
++    destroy_hvm_domain();
+     exit(0);
+ }
+ 
+diff -r e1dce5114e92 target-i386-dm/helper2.c
+--- a/target-i386-dm/helper2.c	Mon Jun 26 16:04:15 2006 +0100
++++ b/target-i386-dm/helper2.c	Mon Jun 26 16:04:26 2006 +0100
+@@ -483,5 +483,25 @@ int main_loop(void)
+                              shared_page->vcpu_iodata[send_vcpu].dm_eport);
+         }
+     }
++    destroy_hvm_domain();
+     return 0;
+ }
++
++void destroy_hvm_domain(void)
++{
++    int xcHandle;
++    int sts;
++ 
++    xcHandle = xc_interface_open();
++    if (xcHandle < 0)
++        fprintf(logfile, "Cannot acquire xenctrl handle\n");
++    else {
++        sts = xc_domain_shutdown(xcHandle, domid, SHUTDOWN_poweroff);
++        if (sts != 0)
++            fprintf(logfile, "? xc_domain_shutdown failed to issue poweroff, "
++                    "sts %d, errno %d\n", sts, errno);
++        else
++            fprintf(logfile, "Issued domain %d poweroff\n", domid);
++        xc_interface_close(xcHandle);
++    }
++}
+diff -r e1dce5114e92 vl.h
+--- a/vl.h	Mon Jun 26 16:04:15 2006 +0100
++++ b/vl.h	Mon Jun 26 16:04:26 2006 +0100
+@@ -1098,4 +1098,7 @@ void kqemu_record_dump(void);
+ void kqemu_record_dump(void);
+ 
+ extern char domain_name[];
++
++void destroy_hvm_domain(void);
++
+ #endif /* VL_H */

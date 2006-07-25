@@ -1,0 +1,63 @@
+Index: ioemu/vl.c
+===================================================================
+--- ioemu.orig/vl.c	2006-07-12 11:35:01.753697055 +0100
++++ ioemu/vl.c	2006-07-12 11:35:02.126650330 +0100
+@@ -89,6 +89,7 @@
+ #include "exec-all.h"
+ 
+ #define DEFAULT_NETWORK_SCRIPT "/etc/xen/qemu-ifup"
++#define DEFAULT_BRIDGE "xenbr0"
+ 
+ //#define DEBUG_UNUSED_IOPORT
+ //#define DEBUG_IOPORT
+@@ -2621,11 +2622,11 @@
+ #endif
+ 
+ static int net_tap_init(VLANState *vlan, const char *ifname1,
+-                        const char *setup_script)
++                        const char *setup_script, const char *bridge)
+ {
+     TAPState *s;
+     int pid, status, fd;
+-    char *args[3];
++    char *args[4];
+     char **parg;
+     char ifname[128];
+ 
+@@ -2647,6 +2648,7 @@
+                 parg = args;
+                 *parg++ = (char *)setup_script;
+                 *parg++ = ifname;
++                *parg++ = (char *)bridge;
+                 *parg++ = NULL;
+                 execv(setup_script, args);
+                 _exit(1);
+@@ -3201,6 +3203,7 @@
+     if (!strcmp(device, "tap")) {
+         char ifname[64];
+         char setup_script[1024];
++        char bridge[16];
+         int fd;
+         if (get_param_value(buf, sizeof(buf), "fd", p) > 0) {
+             fd = strtol(buf, NULL, 0);
+@@ -3212,7 +3215,10 @@
+             if (get_param_value(setup_script, sizeof(setup_script), "script", p) == 0) {
+                 pstrcpy(setup_script, sizeof(setup_script), DEFAULT_NETWORK_SCRIPT);
+             }
+-            ret = net_tap_init(vlan, ifname, setup_script);
++            if (get_param_value(bridge, sizeof(bridge), "bridge", p) == 0) {
++                pstrcpy(bridge, sizeof(bridge), DEFAULT_BRIDGE);
++            }
++            ret = net_tap_init(vlan, ifname, setup_script, bridge);
+         }
+     } else
+ #endif
+@@ -4671,7 +4677,7 @@
+            "-net tap[,vlan=n],ifname=name\n"
+            "                connect the host TAP network interface to VLAN 'n'\n"
+ #else
+-           "-net tap[,vlan=n][,fd=h][,ifname=name][,script=file]\n"
++           "-net tap[,vlan=n][,fd=h][,ifname=name][,script=file][,bridge=br]\n"
+            "                connect the host TAP network interface to VLAN 'n' and use\n"
+            "                the network script 'file' (default=%s);\n"
+            "                use 'fd=h' to connect to an already opened TAP interface\n"

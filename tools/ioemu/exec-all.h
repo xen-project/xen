@@ -28,7 +28,7 @@
 #define tostring(s)	#s
 #endif
 
-#if GCC_MAJOR < 3
+#if __GNUC__ < 3
 #define __builtin_expect(x, n) (x)
 #endif
 
@@ -55,10 +55,14 @@ struct TranslationBlock;
 
 extern uint16_t gen_opc_buf[OPC_BUF_SIZE];
 extern uint32_t gen_opparam_buf[OPPARAM_BUF_SIZE];
-extern uint32_t gen_opc_pc[OPC_BUF_SIZE];
-extern uint32_t gen_opc_npc[OPC_BUF_SIZE];
+extern long gen_labels[OPC_BUF_SIZE];
+extern int nb_gen_labels;
+extern target_ulong gen_opc_pc[OPC_BUF_SIZE];
+extern target_ulong gen_opc_npc[OPC_BUF_SIZE];
 extern uint8_t gen_opc_cc_op[OPC_BUF_SIZE];
 extern uint8_t gen_opc_instr_start[OPC_BUF_SIZE];
+extern target_ulong gen_opc_jump_pc[2];
+extern uint32_t gen_opc_hflags[OPC_BUF_SIZE];
 
 typedef void (GenOpFunc)(void);
 typedef void (GenOpFunc1)(long);
@@ -88,22 +92,27 @@ int cpu_restore_state_copy(struct TranslationBlock *tb,
                            CPUState *env, unsigned long searched_pc,
                            void *puc);
 void cpu_resume_from_signal(CPUState *env1, void *puc);
-void cpu_exec_init(void);
-int page_unprotect(unsigned long address, unsigned long pc, void *puc);
+void cpu_exec_init(CPUState *env);
+int page_unprotect(target_ulong address, unsigned long pc, void *puc);
 void tb_invalidate_phys_page_range(target_ulong start, target_ulong end, 
                                    int is_cpu_write_access);
 void tb_invalidate_page_range(target_ulong start, target_ulong end);
 void tlb_flush_page(CPUState *env, target_ulong addr);
 void tlb_flush(CPUState *env, int flush_global);
-int tlb_set_page(CPUState *env, target_ulong vaddr, 
-                 target_phys_addr_t paddr, int prot, 
-                 int is_user, int is_softmmu);
+int tlb_set_page_exec(CPUState *env, target_ulong vaddr, 
+                      target_phys_addr_t paddr, int prot, 
+                      int is_user, int is_softmmu);
+static inline int tlb_set_page(CPUState *env, target_ulong vaddr, 
+                               target_phys_addr_t paddr, int prot, 
+                               int is_user, int is_softmmu)
+{
+    if (prot & PAGE_READ)
+        prot |= PAGE_EXEC;
+    return tlb_set_page_exec(env, vaddr, paddr, prot, is_user, is_softmmu);
+}
 
 #define CODE_GEN_MAX_SIZE        65536
 #define CODE_GEN_ALIGN           16 /* must be >= of the size of a icache line */
-
-#define CODE_GEN_HASH_BITS     15
-#define CODE_GEN_HASH_SIZE     (1 << CODE_GEN_HASH_BITS)
 
 #define CODE_GEN_PHYS_HASH_BITS     15
 #define CODE_GEN_PHYS_HASH_SIZE     (1 << CODE_GEN_PHYS_HASH_BITS)
@@ -123,10 +132,12 @@ int tlb_set_page(CPUState *env, target_ulong vaddr,
 
 #if defined(__alpha__)
 #define CODE_GEN_BUFFER_SIZE     (2 * 1024 * 1024)
+#elif defined(__ia64)
+#define CODE_GEN_BUFFER_SIZE     (4 * 1024 * 1024)	/* range of addl */
 #elif defined(__powerpc__)
 #define CODE_GEN_BUFFER_SIZE     (6 * 1024 * 1024)
 #else
-#define CODE_GEN_BUFFER_SIZE     (8 * 1024 * 1024)
+#define CODE_GEN_BUFFER_SIZE     (16 * 1024 * 1024)
 #endif
 
 //#define CODE_GEN_BUFFER_SIZE     (128 * 1024)
@@ -162,7 +173,6 @@ typedef struct TranslationBlock {
 #define CF_SINGLE_INSN 0x0008 /* compile only a single instruction */
 
     uint8_t *tc_ptr;    /* pointer to the translated code */
-    struct TranslationBlock *hash_next; /* next matching tb for virtual address */
     /* next matching tb for physical address. */
     struct TranslationBlock *phys_hash_next; 
     /* first and second physical page containing code. The lower bit
@@ -186,9 +196,9 @@ typedef struct TranslationBlock {
     struct TranslationBlock *jmp_first;
 } TranslationBlock;
 
-static inline unsigned int tb_hash_func(unsigned long pc)
+static inline unsigned int tb_jmp_cache_hash_func(target_ulong pc)
 {
-    return pc & (CODE_GEN_HASH_SIZE - 1);
+    return (pc ^ (pc >> TB_JMP_CACHE_BITS)) & (TB_JMP_CACHE_SIZE - 1);
 }
 
 static inline unsigned int tb_phys_hash_func(unsigned long pc)
@@ -196,42 +206,15 @@ static inline unsigned int tb_phys_hash_func(unsigned long pc)
     return pc & (CODE_GEN_PHYS_HASH_SIZE - 1);
 }
 
-TranslationBlock *tb_alloc(unsigned long pc);
+TranslationBlock *tb_alloc(target_ulong pc);
 void tb_flush(CPUState *env);
-void tb_link(TranslationBlock *tb);
 void tb_link_phys(TranslationBlock *tb, 
                   target_ulong phys_pc, target_ulong phys_page2);
 
-extern TranslationBlock *tb_hash[CODE_GEN_HASH_SIZE];
 extern TranslationBlock *tb_phys_hash[CODE_GEN_PHYS_HASH_SIZE];
 
 extern uint8_t code_gen_buffer[CODE_GEN_BUFFER_SIZE];
 extern uint8_t *code_gen_ptr;
-
-/* find a translation block in the translation cache. If not found,
-   return NULL and the pointer to the last element of the list in pptb */
-static inline TranslationBlock *tb_find(TranslationBlock ***pptb,
-                                        target_ulong pc, 
-                                        target_ulong cs_base,
-                                        unsigned int flags)
-{
-    TranslationBlock **ptb, *tb;
-    unsigned int h;
- 
-    h = tb_hash_func(pc);
-    ptb = &tb_hash[h];
-    for(;;) {
-        tb = *ptb;
-        if (!tb)
-            break;
-        if (tb->pc == pc && tb->cs_base == cs_base && tb->flags == flags)
-            return tb;
-        ptb = &tb->hash_next;
-    }
-    *pptb = ptb;
-    return NULL;
-}
-
 
 #if defined(USE_DIRECT_JUMP)
 
@@ -310,75 +293,52 @@ TranslationBlock *tb_find_pc(unsigned long pc_ptr);
 #elif defined(__APPLE__)
 #define ASM_DATA_SECTION ".data\n"
 #define ASM_PREVIOUS_SECTION ".text\n"
-#define ASM_NAME(x) "_" #x
 #else
 #define ASM_DATA_SECTION ".section \".data\"\n"
 #define ASM_PREVIOUS_SECTION ".previous\n"
-#define ASM_NAME(x) stringify(x)
 #endif
+
+#define ASM_OP_LABEL_NAME(n, opname) \
+    ASM_NAME(__op_label) #n "." ASM_NAME(opname)
 
 #if defined(__powerpc__)
 
 /* we patch the jump instruction directly */
-#define JUMP_TB(opname, tbparam, n, eip)\
+#define GOTO_TB(opname, tbparam, n)\
 do {\
     asm volatile (ASM_DATA_SECTION\
-		  ASM_NAME(__op_label) #n "." ASM_NAME(opname) ":\n"\
+		  ASM_OP_LABEL_NAME(n, opname) ":\n"\
 		  ".long 1f\n"\
 		  ASM_PREVIOUS_SECTION \
                   "b " ASM_NAME(__op_jmp) #n "\n"\
 		  "1:\n");\
-    T0 = (long)(tbparam) + (n);\
-    EIP = eip;\
-    EXIT_TB();\
-} while (0)
-
-#define JUMP_TB2(opname, tbparam, n)\
-do {\
-    asm volatile ("b " ASM_NAME(__op_jmp) #n "\n");\
 } while (0)
 
 #elif defined(__i386__) && defined(USE_DIRECT_JUMP)
 
 /* we patch the jump instruction directly */
-#define JUMP_TB(opname, tbparam, n, eip)\
+#define GOTO_TB(opname, tbparam, n)\
 do {\
     asm volatile (".section .data\n"\
-		  ASM_NAME(__op_label) #n "." ASM_NAME(opname) ":\n"\
+		  ASM_OP_LABEL_NAME(n, opname) ":\n"\
 		  ".long 1f\n"\
 		  ASM_PREVIOUS_SECTION \
                   "jmp " ASM_NAME(__op_jmp) #n "\n"\
 		  "1:\n");\
-    T0 = (long)(tbparam) + (n);\
-    EIP = eip;\
-    EXIT_TB();\
-} while (0)
-
-#define JUMP_TB2(opname, tbparam, n)\
-do {\
-    asm volatile ("jmp " ASM_NAME(__op_jmp) #n "\n");\
 } while (0)
 
 #else
 
 /* jump to next block operations (more portable code, does not need
    cache flushing, but slower because of indirect jump) */
-#define JUMP_TB(opname, tbparam, n, eip)\
+#define GOTO_TB(opname, tbparam, n)\
 do {\
-    static void __attribute__((unused)) *__op_label ## n = &&label ## n;\
     static void __attribute__((unused)) *dummy ## n = &&dummy_label ## n;\
+    static void __attribute__((unused)) *__op_label ## n \
+        __asm__(ASM_OP_LABEL_NAME(n, opname)) = &&label ## n;\
     goto *(void *)(((TranslationBlock *)tbparam)->tb_next[n]);\
-label ## n:\
-    T0 = (long)(tbparam) + (n);\
-    EIP = eip;\
-dummy_label ## n:\
-    EXIT_TB();\
-} while (0)
-
-/* second jump to same destination 'n' */
-#define JUMP_TB2(opname, tbparam, n)\
-do {\
-    goto *(void *)(((TranslationBlock *)tbparam)->tb_next[n - 2]);\
+label ## n: ;\
+dummy_label ## n: ;\
 } while (0)
 
 #endif
@@ -408,37 +368,26 @@ static inline int testandset (int *p)
 #ifdef __i386__
 static inline int testandset (int *p)
 {
-    char ret;
-    long int readval;
+    long int readval = 0;
     
-    __asm__ __volatile__ ("lock; cmpxchgl %3, %1; sete %0"
-                          : "=q" (ret), "=m" (*p), "=a" (readval)
-                          : "r" (1), "m" (*p), "a" (0)
-                          : "memory");
-    return ret;
+    __asm__ __volatile__ ("lock; cmpxchgl %2, %0"
+                          : "+m" (*p), "+a" (readval)
+                          : "r" (1)
+                          : "cc");
+    return readval;
 }
 #endif
 
 #ifdef __x86_64__
 static inline int testandset (int *p)
 {
-    char ret;
-    int readval;
+    long int readval = 0;
     
-    __asm__ __volatile__ ("lock; cmpxchgl %3, %1; sete %0"
-                          : "=q" (ret), "=m" (*p), "=a" (readval)
-                          : "r" (1), "m" (*p), "a" (0)
-                          : "memory");
-    return ret;
-}
-#endif
-
-#ifdef __ia64__
-#include "ia64_intrinsic.h"
-static inline int testandset (int *p)
-{
-    uint32_t o = 0, n = 1;
-    return (int)cmpxchg_acq(p, o, n);
+    __asm__ __volatile__ ("lock; cmpxchgl %2, %0"
+                          : "+m" (*p), "+a" (readval)
+                          : "r" (1)
+                          : "cc");
+    return readval;
 }
 #endif
 
@@ -509,7 +458,16 @@ static inline int testandset (int *p)
                          : "=r" (ret)
                          : "m" (p)
                          : "cc","memory");
-    return ret == 0;
+    return ret;
+}
+#endif
+
+#ifdef __ia64
+#include <ia64intrin.h>
+
+static inline int testandset (int *p)
+{
+    return __sync_lock_test_and_set (p, 1);
 }
 #endif
 
@@ -551,14 +509,26 @@ extern spinlock_t tb_lock;
 
 extern int tb_invalidated_flag;
 
-#if !defined(CONFIG_USER_ONLY)
+#if !defined(CONFIG_USER_ONLY) && !defined(CONFIG_DM)
 
-void tlb_fill(unsigned long addr, int is_write, int is_user, 
+void tlb_fill(target_ulong addr, int is_write, int is_user, 
               void *retaddr);
 
 #define ACCESS_TYPE 3
 #define MEMSUFFIX _code
 #define env cpu_single_env
+
+#define DATA_SIZE 1
+#include "softmmu_header.h"
+
+#define DATA_SIZE 2
+#include "softmmu_header.h"
+
+#define DATA_SIZE 4
+#include "softmmu_header.h"
+
+#define DATA_SIZE 8
+#include "softmmu_header.h"
 
 #undef ACCESS_TYPE
 #undef MEMSUFFIX
@@ -566,7 +536,7 @@ void tlb_fill(unsigned long addr, int is_write, int is_user,
 
 #endif
 
-#if defined(CONFIG_USER_ONLY)
+#if defined(CONFIG_USER_ONLY) || defined(CONFIG_DM)
 static inline target_ulong get_phys_addr_code(CPUState *env, target_ulong addr)
 {
     return addr;
@@ -575,14 +545,61 @@ static inline target_ulong get_phys_addr_code(CPUState *env, target_ulong addr)
 /* NOTE: this function can trigger an exception */
 /* NOTE2: the returned address is not exactly the physical address: it
    is the offset relative to phys_ram_base */
-/* XXX: i386 target specific */
 static inline target_ulong get_phys_addr_code(CPUState *env, target_ulong addr)
 {
-	return addr;
+    int is_user, index, pd;
+
+    index = (addr >> TARGET_PAGE_BITS) & (CPU_TLB_SIZE - 1);
+#if defined(TARGET_I386)
+    is_user = ((env->hflags & HF_CPL_MASK) == 3);
+#elif defined (TARGET_PPC)
+    is_user = msr_pr;
+#elif defined (TARGET_MIPS)
+    is_user = ((env->hflags & MIPS_HFLAG_MODE) == MIPS_HFLAG_UM);
+#elif defined (TARGET_SPARC)
+    is_user = (env->psrs == 0);
+#elif defined (TARGET_ARM)
+    is_user = ((env->uncached_cpsr & CPSR_M) == ARM_CPU_MODE_USR);
+#elif defined (TARGET_SH4)
+    is_user = ((env->sr & SR_MD) == 0);
+#else
+#error unimplemented CPU
+#endif
+    if (__builtin_expect(env->tlb_table[is_user][index].addr_code != 
+                         (addr & TARGET_PAGE_MASK), 0)) {
+        ldub_code(addr);
+    }
+    pd = env->tlb_table[is_user][index].addr_code & ~TARGET_PAGE_MASK;
+    if (pd > IO_MEM_ROM) {
+        cpu_abort(env, "Trying to execute code outside RAM or ROM at 0x%08lx\n", addr);
+    }
+    return addr + env->tlb_table[is_user][index].addend - (unsigned long)phys_ram_base;
 }
 #endif
 
-//#define DEBUG_UNUSED_IOPORT
-//#define DEBUG_IOPORT
-#define TARGET_HVM
 
+#ifdef USE_KQEMU
+#define KQEMU_MODIFY_PAGE_MASK (0xff & ~(VGA_DIRTY_FLAG | CODE_DIRTY_FLAG))
+
+int kqemu_init(CPUState *env);
+int kqemu_cpu_exec(CPUState *env);
+void kqemu_flush_page(CPUState *env, target_ulong addr);
+void kqemu_flush(CPUState *env, int global);
+void kqemu_set_notdirty(CPUState *env, ram_addr_t ram_addr);
+void kqemu_modify_page(CPUState *env, ram_addr_t ram_addr);
+void kqemu_cpu_interrupt(CPUState *env);
+void kqemu_record_dump(void);
+
+static inline int kqemu_is_ok(CPUState *env)
+{
+    return(env->kqemu_enabled &&
+           (env->cr[0] & CR0_PE_MASK) && 
+           !(env->hflags & HF_INHIBIT_IRQ_MASK) &&
+           (env->eflags & IF_MASK) &&
+           !(env->eflags & VM_MASK) &&
+           (env->kqemu_enabled == 2 || 
+            ((env->hflags & HF_CPL_MASK) == 3 &&
+             (env->eflags & IOPL_MASK) != IOPL_MASK)));
+}
+
+#endif
