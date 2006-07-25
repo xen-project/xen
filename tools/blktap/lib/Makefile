@@ -33,7 +33,7 @@ DEPS     = .*.d
 OBJS     = $(patsubst %.c,%.o,$(SRCS))
 IBINS   :=
 
-LIB      = libblktap.a libblktap.so libblktap.so.$(MAJOR) libblktap.so.$(MAJOR).$(MINOR)
+LIB      = libblktap.a libblktap.so.$(MAJOR).$(MINOR)
 
 all: build
 
@@ -44,10 +44,12 @@ install: all
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/$(LIBDIR)
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/include
 	$(INSTALL_PROG) $(LIB) $(DESTDIR)/usr/$(LIBDIR)
+	ln -sf libblktap.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)/libblktap.so.$(MAJOR)
+	ln -sf libblktap.so.$(MAJOR) $(DESTDIR)/usr/$(LIBDIR)/libblktap.so
 	$(INSTALL_PROG) blktaplib.h $(DESTDIR)/usr/include
 
 clean:
-	rm -rf *.a *.so *.o *.rpm $(LIB) *~ $(DEPS) xen TAGS
+	rm -rf *.a *.so* *.o *.rpm $(LIB) *~ $(DEPS) xen TAGS
 
 libblktap: $(OBJS) 
 	$(CC) $(CFLAGS) -Wl,-soname -Wl,$(SONAME) -shared         \
