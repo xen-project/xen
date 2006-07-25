@@ -30,8 +30,6 @@ extern void getfpreg (unsigned long regnum, struct ia64_fpreg *fpval, struct pt_
 
 extern void setfpreg (unsigned long regnum, struct ia64_fpreg *fpval, struct pt_regs *regs);
 
-extern void panic_domain(struct pt_regs *, const char *, ...);
-
 typedef	union {
 	struct ia64_psr ia64_psr;
 	unsigned long i64;

@@ -37,7 +37,6 @@ extern void vmx_load_state(struct vcpu *v);
 extern void vmx_setup_platform(struct domain *d);
 extern void vmx_wait_io(void);
 extern void vmx_io_assist(struct vcpu *v);
-extern void panic_domain(struct pt_regs *regs, const char *fmt, ...);
 extern int ia64_hypercall (struct pt_regs *regs);
 extern void vmx_save_state(struct vcpu *v);
 extern void vmx_load_state(struct vcpu *v);
