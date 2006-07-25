@@ -1,14 +1,15 @@
 Index: ioemu/Makefile
 ===================================================================
---- ioemu.orig/Makefile	2006-07-12 10:39:09.278608692 +0100
-+++ ioemu/Makefile	2006-07-12 10:46:21.003128750 +0100
+--- ioemu.orig/Makefile	2006-07-25 14:18:33.163941149 +0100
++++ ioemu/Makefile	2006-07-25 14:24:31.695096861 +0100
 @@ -1,6 +1,9 @@
+-include config-host.mak
 +XEN_ROOT=../..
 +include $(XEN_ROOT)/tools/Rules.mk
-+
- include config-host.mak
  
 -CFLAGS=-Wall -O2 -g -fno-strict-aliasing -I.
++-include config-host.mak
++
 +CFLAGS+=-Wall -O2 -g -fno-strict-aliasing -I.
  ifdef CONFIG_DARWIN
  CFLAGS+= -mdynamic-no-pic
@@ -22,6 +23,15 @@ Index: ioemu/Makefile
  	for d in $(TARGET_DIRS); do \
  	$(MAKE) -C $$d $@ || exit 1 ; \
          done
+@@ -34,7 +37,7 @@
+ 	rm -f *.o *.a $(TOOLS) dyngen$(EXESUF) TAGS *.pod *~ */*~
+ 	$(MAKE) -C tests clean
+ 	for d in $(TARGET_DIRS); do \
+-	$(MAKE) -C $$d $@ || exit 1 ; \
++	[ -d $$d ] && $(MAKE) -C $$d $@ || exit 0 ; \
+         done
+ 
+ distclean: clean
 @@ -57,12 +60,12 @@
  
  install: all $(if $(BUILD_DOCS),install-doc)
@@ -57,8 +67,8 @@ Index: ioemu/Makefile
  FILE=qemu-$(shell cat VERSION)
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2006-07-12 10:39:09.279608582 +0100
-+++ ioemu/Makefile.target	2006-07-12 11:32:51.034101952 +0100
+--- ioemu.orig/Makefile.target	2006-07-25 14:18:33.163941149 +0100
++++ ioemu/Makefile.target	2006-07-25 14:24:17.501562050 +0100
 @@ -1,5 +1,8 @@
  include config.mak
  
@@ -130,8 +140,8 @@ Index: ioemu/Makefile.target
  include .depend
 Index: ioemu/configure
 ===================================================================
---- ioemu.orig/configure	2006-07-12 10:39:09.280608472 +0100
-+++ ioemu/configure	2006-07-12 11:32:51.034101952 +0100
+--- ioemu.orig/configure	2006-07-25 14:18:33.163941149 +0100
++++ ioemu/configure	2006-07-25 14:24:17.501562050 +0100
 @@ -18,8 +18,8 @@
  
  # default parameters

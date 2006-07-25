@@ -1,7 +1,7 @@
 XEN_ROOT=../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-include config-host.mak
+-include config-host.mak
 
 CFLAGS+=-Wall -O2 -g -fno-strict-aliasing -I.
 ifdef CONFIG_DARWIN
@@ -37,7 +37,7 @@ clean:
 	rm -f *.o *.a $(TOOLS) dyngen$(EXESUF) TAGS *.pod *~ */*~
 	$(MAKE) -C tests clean
 	for d in $(TARGET_DIRS); do \
-	$(MAKE) -C $$d $@ || exit 1 ; \
+	[ -d $$d ] && $(MAKE) -C $$d $@ || exit 0 ; \
         done
 
 distclean: clean

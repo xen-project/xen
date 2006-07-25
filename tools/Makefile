@@ -62,11 +62,11 @@ check_clean:
 ifdef CONFIG_IOEMU
 export IOEMU_DIR ?= ioemu
 ioemu ioemuinstall:
-	[ -f $(IOEMU_DIR)/config-host.h ] || \
-	(cd $(IOEMU_DIR) && sh configure --prefix=/usr)
+	[ -f $(IOEMU_DIR)/config-host.mak ] || \
+	  (cd $(IOEMU_DIR) && sh configure --prefix=/usr)
 	$(MAKE) -C $(IOEMU_DIR) $(patsubst ioemu%,%,$@)
 ioemuclean:
-	[ ! -f $(IOEMU_DIR)/config-host.h ] || $(MAKE) -C $(IOEMU_DIR) clean
+	$(MAKE) -C $(IOEMU_DIR) distclean
 else
 ioemu ioemuinstall ioemuclean:
 endif
