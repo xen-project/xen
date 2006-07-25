@@ -766,11 +766,9 @@ int indexof(int domid)
   int xc_handle, ndomains;
   extern void qos_kill_thread(int domid);
   
-  if (domid < 0 || domid >= NDOMAINS) {	// shouldn't happen
-    if (domid != IDLE_DOMAIN_ID) {
-      printf("bad domain id: %d\r\n", domid);
-      return 0;
-    }
+  if (domid < 0) {	// shouldn't happen
+    printf("bad domain id: %d\r\n", domid);
+    return 0;
   }
 
   for (idx=0; idx<NDOMAINS; idx++)
