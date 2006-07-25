@@ -116,16 +116,38 @@ void show_page_walk(unsigned long addr)
 asmlinkage void double_fault(void);
 asmlinkage void do_double_fault(struct cpu_user_regs *regs)
 {
+    unsigned int cpu, tr;
+    char taint_str[TAINT_STRING_MAX_LEN];
+
+    asm ( "str %0" : "=r" (tr) );
+    cpu = ((tr >> 3) - __FIRST_TSS_ENTRY) >> 2;
+
     watchdog_disable();
 
     console_force_unlock();
 
     /* Find information saved during fault and dump it to the console. */
-    printk("************************************\n");
-    show_registers(regs);
+    printk("*** DOUBLE FAULT: Xen-%d.%d%s    %s\n",
+           XEN_VERSION, XEN_SUBVERSION, XEN_EXTRAVERSION,
+           print_tainted(taint_str));
+    printk("CPU:    %d\nRIP:    %04x:[<%016lx>]",
+           cpu, regs->cs, regs->rip);
+    print_symbol(" %s", regs->rip);
+    printk("\nRFLAGS: %016lx\n", regs->rflags);
+    printk("rax: %016lx   rbx: %016lx   rcx: %016lx\n",
+           regs->rax, regs->rbx, regs->rcx);
+    printk("rdx: %016lx   rsi: %016lx   rdi: %016lx\n",
+           regs->rdx, regs->rsi, regs->rdi);
+    printk("rbp: %016lx   rsp: %016lx   r8:  %016lx\n",
+           regs->rbp, regs->rsp, regs->r8);
+    printk("r9:  %016lx   r10: %016lx   r11: %016lx\n",
+           regs->r9,  regs->r10, regs->r11);
+    printk("r12: %016lx   r13: %016lx   r14: %016lx\n",
+           regs->r12, regs->r13, regs->r14);
+    printk("r15: %016lx\n", regs->r15);
     show_stack_overflow(regs->rsp);
     printk("************************************\n");
-    printk("CPU%d DOUBLE FAULT -- system shutdown\n", smp_processor_id());
+    printk("CPU%d DOUBLE FAULT -- system shutdown\n", cpu);
     printk("System needs manual reset.\n");
     printk("************************************\n");
 
