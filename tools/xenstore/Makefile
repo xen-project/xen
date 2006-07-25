@@ -5,7 +5,6 @@ XEN_LIBXC          = $(XEN_ROOT)/tools/libxc
 INSTALL         = install
 INSTALL_DATA	= $(INSTALL) -m0644
 INSTALL_PROG    = $(INSTALL) -m0755
-INSTALL_LIBS    = $(INSTALL) -m0755
 INSTALL_DIR     = $(INSTALL) -d -m0755
 
 PROFILE=#-pg
@@ -175,7 +174,8 @@ install: all
 	$(INSTALL_PROG) xenstore-control $(DESTDIR)/usr/bin
 	$(INSTALL_PROG) xenstore-ls $(DESTDIR)/usr/bin
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/$(LIBDIR)
-	$(INSTALL_DATA) libxenstore.* $(DESTDIR)/usr/$(LIBDIR)
+	$(INSTALL_PROG) libxenstore.so* $(DESTDIR)/usr/$(LIBDIR)
+	$(INSTALL_DATA) libxenstore.a $(DESTDIR)/usr/$(LIBDIR)
 	$(INSTALL_DATA) xs.h $(DESTDIR)/usr/include
 	$(INSTALL_DATA) xs_lib.h $(DESTDIR)/usr/include
 
