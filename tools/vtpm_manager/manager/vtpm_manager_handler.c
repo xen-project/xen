@@ -166,7 +166,8 @@ TPM_RESULT VTPM_Manager_Handler( vtpm_ipc_handle_t *tx_ipc_h,
          (!dmi_res->connected) ) {
       vtpmhandlerlogerror(VTPM_LOG_VTPM, "Attempted access to non-existent or disconnected DMI %d. Aborting...\n", dmi);
       status = TPM_BAD_PARAMETER;
-      goto abort_with_error;
+      // We have no one to reply to, they don't exist.
+      goto abort_command;
     }
 
     if (tag == VTPM_TAG_REQ) { 

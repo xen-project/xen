@@ -105,6 +105,9 @@ TPM_RESULT close_dmi(VTPM_DMI_RESOURCE *dmi_res) {
   if (dmi_res == NULL) 
     return TPM_SUCCESS;
 
+  if (dmi_res->dmi_id == VTPM_CTL_DM) 
+    return(TPM_BAD_PARAMETER);
+
   TCS_CloseContext(dmi_res->TCSContext);
   dmi_res->connected = FALSE;
 

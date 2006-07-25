@@ -49,8 +49,8 @@ static int g_tx_fd = -1;              // the fd to the TPM
  #define TPM_TX_FNAME "/dev/tpm0"
  static int *g_rx_fdp = &g_tx_fd;
 #else
- #define TPM_TX_FNAME "/tmp/tpm_in.fifo"
- #define TPM_RX_FNAME "/tmp/tpm_out.fifo"
+ #define TPM_TX_FNAME "/var/tpm/tpm_in.fifo"
+ #define TPM_RX_FNAME "/var/tpm/tpm_out.fifo"
  static int g_rx_fd = -1;
  static int *g_rx_fdp = &g_rx_fd;              // the fd to the TPM
 #endif
