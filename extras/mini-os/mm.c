@@ -687,7 +687,7 @@ void *map_frames(unsigned long *f, unsigned long n)
     /* Find a run of n contiguous frames */
     for (x = 0; x <= 1024 - n; x += y + 1) {
         for (y = 0; y < n; y++)
-            if (demand_map_pgt[y] & _PAGE_PRESENT)
+            if (demand_map_pgt[x+y] & _PAGE_PRESENT)
                 break;
         if (y == n)
             break;
