@@ -31,6 +31,7 @@ GUEST_SRCS-y += xc_load_elf.c
 GUEST_SRCS-y += xg_private.c
 GUEST_SRCS-$(CONFIG_POWERPC) += xc_ppc_linux_build.c
 GUEST_SRCS-$(CONFIG_X86) += xc_linux_build.c
+GUEST_SRCS-$(CONFIG_IA64) += xc_linux_build.c
 GUEST_SRCS-$(CONFIG_MIGRATE) += xc_linux_restore.c xc_linux_save.c
 GUEST_SRCS-$(CONFIG_HVM) += xc_hvm_build.c
 
