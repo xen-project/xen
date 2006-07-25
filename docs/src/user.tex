@@ -1374,8 +1374,136 @@ To configure a domU to receive a PCI device:
 %% There are two possible types of privileges: IO privileges and
 %% administration privileges.
 
+\section{Support for virtual Trusted Platform Module (vTPM)}
+\label{ss:vtpm}
+
+Paravirtualized domains can be given access to a virtualized version
+of a TPM. This enables applications in these domains to use the services
+of the TPM device for example through a TSS stack
+\footnote{Trousers TSS stack: http://sourceforge.net/projects/trousers}.
+The Xen source repository provides the necessary software components to
+enable virtual TPM access. Support is provided through several
+different pieces. First, a TPM emulator has been modified to provide TPM's
+functionality for the virtual TPM subsystem. Second, a virtual TPM Manager
+coordinates the virtual TPMs efforts, manages their creation, and provides
+protected key storage using the TPM. Third, a device driver pair providing
+a TPM front- and backend is available for XenLinux to deliver TPM commands
+from the domain to the virtual TPM manager, which dispatches it to a
+software TPM. Since the TPM Manager relies on a HW TPM for protected key
+storage, therefore this subsystem requires a Linux-supported hardware TPM.
+For development purposes, a TPM emulator is available for use on non-TPM
+enabled platforms.
+
+\subsubsection{Compile-Time Setup}
+To enable access to the virtual TPM, the virtual TPM backend driver must
+be compiled for a privileged domain (e.g. domain 0). Using the XenLinux
+configuration, the necessary driver can be selected in the Xen configuration
+section. Unless the driver has been compiled into the kernel, its module
+must be activated using the following command:
+
+\begin{verbatim}
+modprobe tpmbk
+\end{verbatim}
+
+Similarly, the TPM frontend driver must be compiled for the kernel trying
+to use TPM functionality. Its driver can be selected in the kernel
+configuration section Device Driver / Character Devices / TPM Devices.
+Along with that the TPM driver for the built-in TPM must be selected.
+If the virtual TPM driver has been compiled as module, it
+must be activated using the following command:
+
+\begin{verbatim}
+modprobe tpm_xenu
+\end{verbatim}
+
+Furthermore, it is necessary to build the virtual TPM manager and software
+TPM by making changes to entries in Xen build configuration files.
+The following entry in the file Config.mk in the Xen root source
+directory must be made:
+
+\begin{verbatim}
+VTPM_TOOLS ?= y
+\end{verbatim}
+
+After a build of the Xen tree and a reboot of the machine, the TPM backend
+drive must be loaded. Once loaded, the virtual TPM manager daemon
+must be started before TPM-enabled guest domains may be launched.
+To enable being the destination of a virtual TPM Migration, the virtual TPM
+migration daemon must also be loaded.
+
+\begin{verbatim}
+vtpm_managerd
+\end{verbatim}
+\begin{verbatim}
+vtpm_migratord
+\end{verbatim}
+
+Once the VTPM manager is running, the VTPM can be accessed by loading the
+front end driver in a guest domain.
+
+\subsubsection{Development and Testing TPM Emulator}
+For development and testing on non-TPM enabled platforms, a TPM emulator
+can be used in replacement of a platform TPM. First, the entry in the file
+tools/vtpm/Rules.mk must look as follows:
+
+\begin{verbatim}
+BUILD_EMULATOR = y
+\end{verbatim}
+
+Second, the entry in the file tool/vtpm_manager/Rules.mk must be uncommented
+as follows:
+
+\begin{verbatim}
+# TCS talks to fifo's rather than /dev/tpm. TPM Emulator assumed on fifos
+CFLAGS += -DDUMMY_TPM
+\end{verbatim}
+
+Before starting the virtual TPM Manager, start the emulator by executing
+the following in dom0:
+
+\begin{verbatim}
+tpm_emulator clear
+\end{verbatim}
+
+\subsubsection{vTPM Frontend Configuration}
+To provide TPM functionality to a user domain, a line must be added to
+the virtual TPM configuration file using the following format:
+
+\begin{verbatim}
+vtpm = ['instance=<instance number>, backend=<domain id>']
+\end{verbatim}
+
+The { \it instance number} reflects the preferred virtual TPM instance
+to associate with the domain. If the selected instance is
+already associated with another domain, the system will automatically
+select the next available instance. An instance number greater than
+zero must be provided. It is possible to omit the instance
+parameter from the configuration file.
+
+The {\it domain id} provides the ID of the domain where the
+virtual TPM backend driver and virtual TPM are running in. It should
+currently always be set to '0'.
 
 
+Examples for valid vtpm entries in the configuration file are
+
+\begin{verbatim}
+ vtpm = ['instance=1, backend=0']
+\end{verbatim}
+and
+\begin{verbatim}
+ vtpm = ['backend=0'].
+\end{verbatim}
+
+\subsubsection{Using the virtual TPM}
+
+Access to TPM functionality is provided by the virtual TPM frontend driver.
+Similar to existing hardware TPM drivers, this driver provides basic TPM
+status information through the {\it sysfs} filesystem. In a Xen user domain
+the sysfs entries can be found in /sys/devices/xen/vtpm-0.
+
+Commands can be sent to the virtual TPM instance using the character
+device /dev/tpm0 (major 10, minor 224).
 
 % Chapter Storage and FileSytem Management
 \chapter{Storage and File System Management}
