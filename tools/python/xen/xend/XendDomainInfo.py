@@ -1288,6 +1288,9 @@ class XendDomainInfo:
                 # Workaround for architectures that don't yet support
                 # ballooning.
                 init_reservation = m
+                # Following line from xiantao.zhang@intel.com
+                # Needed for IA64 until supports ballooning -- okay for PPC64?
+                xc.domain_setmaxmem(self.domid, m)
 
             xc.domain_memory_increase_reservation(self.domid, init_reservation,
                                                   0, 0)
