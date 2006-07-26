@@ -236,7 +236,7 @@ static void flush_tlb_vhpt_all (struct domain *d)
 	local_flush_tlb_all ();
 }
 
-void domain_flush_destroy (struct domain *d)
+void domain_flush_tlb_vhpt(struct domain *d)
 {
 	/* Very heavy...  */
 	on_each_cpu ((void (*)(void *))flush_tlb_vhpt_all, d, 1, 1);

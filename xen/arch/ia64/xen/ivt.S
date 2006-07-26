@@ -746,7 +746,48 @@ END(dkey_miss)
 ENTRY(dirty_bit)
 	DBG_FAULT(8)
 #ifdef XEN
-	FAULT_OR_REFLECT(8)
+	mov r20=cr.ipsr
+	mov r31=pr;;
+	extr.u r20=r20,IA64_PSR_CPL0_BIT,2;;
+	mov r19=8	/* prepare to save predicates */
+	cmp.eq p6,p0=r0,r20 	/* cpl == 0?*/
+(p6)	br.sptk.few dispatch_to_fault_handler
+	/* If shadow mode is not enabled, reflect the fault.  */
+	movl r22=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET
+	;;
+	ld8 r22=[r22]
+	;;
+	add r22=IA64_VCPU_DOMAIN_OFFSET,r22
+	;;
+	/* Read domain.  */
+	ld8 r22=[r22]
+	;;
+	add r22=IA64_DOMAIN_SHADOW_BITMAP_OFFSET,r22
+	;;
+	ld8 r22=[r22]
+	;;
+	cmp.eq p6,p0=r0,r22 	/* !shadow_bitmap ?*/
+(p6)	br.dptk.many dispatch_reflection
+
+	SAVE_MIN_WITH_COVER
+	alloc r14=ar.pfs,0,0,4,0
+	mov out0=cr.ifa
+	mov out1=cr.itir
+	mov out2=cr.isr
+	adds out3=16,sp
+
+	ssm psr.ic | PSR_DEFAULT_BITS
+	;;
+	srlz.i					// guarantee that interruption collection is on
+	;;
+(p15)	ssm psr.i				// restore psr.i
+	adds r3=8,r2				// set up second base pointer
+	;;
+	SAVE_REST
+	movl r14=ia64_leave_kernel
+	;;
+	mov rp=r14
+	br.call.sptk.many b6=ia64_shadow_fault
 #else
 	/*
 	 * What we do here is to simply turn on the dirty bit in the PTE.  We need to

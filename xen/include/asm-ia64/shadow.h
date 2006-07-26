@@ -45,6 +45,24 @@ void guest_physmap_add_page(struct domain *d, unsigned long gpfn, unsigned long 
 void guest_physmap_remove_page(struct domain *d, unsigned long gpfn, unsigned long mfn);
 #endif
 
+static inline int
+shadow_mode_enabled(struct domain *d)
+{
+    return d->arch.shadow_bitmap != NULL;
+}
+
+static inline int
+shadow_mark_page_dirty(struct domain *d, unsigned long gpfn)
+{
+    if (gpfn < d->arch.shadow_bitmap_size * 8
+        && !test_and_set_bit(gpfn, d->arch.shadow_bitmap)) {
+        /* The page was not dirty.  */
+        atomic64_inc(&d->arch.shadow_dirty_count);
+        return 1;
+    } else
+        return 0;
+}
+
 #endif // _XEN_SHADOW_H
 
 /*

@@ -25,26 +25,15 @@
 #include <xen/mm.h>
 #include <xen/iocap.h>
 #include <asm/asm-xsi-offsets.h>
-#include <asm/ptrace.h>
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/processor.h>
-#include <asm/desc.h>
-#include <asm/hw_irq.h>
-#include <asm/setup.h>
-//#include <asm/mpspec.h>
-#include <xen/irq.h>
 #include <xen/event.h>
-//#include <xen/shadow.h>
 #include <xen/console.h>
 #include <xen/compile.h>
-
 #include <xen/elf.h>
-//#include <asm/page.h>
 #include <asm/pgalloc.h>
-
 #include <asm/offsets.h>  /* for IA64_THREAD_INFO_SIZE */
-
 #include <asm/vcpu.h>   /* for function declarations */
 #include <public/arch-ia64.h>
 #include <xen/domain.h>
@@ -52,13 +41,12 @@
 #include <asm/vmx_vcpu.h>
 #include <asm/vmx_vpd.h>
 #include <asm/vmx_phy_mode.h>
-#include <asm/pal.h>
 #include <asm/vhpt.h>
-#include <public/hvm/ioreq.h>
 #include <public/arch-ia64.h>
 #include <asm/tlbflush.h>
 #include <asm/regionreg.h>
 #include <asm/dom_fw.h>
+#include <asm/shadow.h>
 #include <asm/privop_stat.h>
 
 #ifndef CONFIG_XEN_IA64_DOM0_VP
@@ -388,8 +376,11 @@ void arch_domain_destroy(struct domain *d)
 	BUG_ON(d->arch.mm.pgd != NULL);
 	if (d->shared_info != NULL)
 	    free_xenheap_pages(d->shared_info, get_order_from_shift(XSI_SHIFT));
+	if (d->arch.shadow_bitmap != NULL)
+		xfree(d->arch.shadow_bitmap);
 
-	domain_flush_destroy (d);
+	/* Clear vTLB for the next domain.  */
+	domain_flush_tlb_vhpt(d);
 
 	deallocate_rid_range(d);
 }
@@ -594,6 +585,148 @@ domain_set_shared_info_va (unsigned long va)
 	return 0;
 }
 
+/* Transfer and clear the shadow bitmap in 1kB chunks for L1 cache. */
+#define SHADOW_COPY_CHUNK (1024 / sizeof (unsigned long))
+
+int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
+{
+	unsigned int op = sc->op;
+	int          rc = 0;
+	int i;
+	//struct vcpu *v;
+
+	if (unlikely(d == current->domain)) {
+		DPRINTK("Don't try to do a shadow op on yourself!\n");
+		return -EINVAL;
+	}   
+
+	domain_pause(d);
+
+	switch (op)
+	{
+	case DOM0_SHADOW_CONTROL_OP_OFF:
+		if (shadow_mode_enabled (d)) {
+			u64 *bm = d->arch.shadow_bitmap;
+
+			/* Flush vhpt and tlb to restore dirty bit usage.  */
+			domain_flush_tlb_vhpt(d);
+
+			/* Free bitmap.  */
+			d->arch.shadow_bitmap_size = 0;
+			d->arch.shadow_bitmap = NULL;
+			xfree(bm);
+		}
+		break;
+
+	case DOM0_SHADOW_CONTROL_OP_ENABLE_TEST:
+	case DOM0_SHADOW_CONTROL_OP_ENABLE_TRANSLATE:
+		rc = -EINVAL;
+		break;
+
+	case DOM0_SHADOW_CONTROL_OP_ENABLE_LOGDIRTY:
+		if (shadow_mode_enabled(d)) {
+			rc = -EINVAL;
+			break;
+		}
+
+		atomic64_set(&d->arch.shadow_fault_count, 0);
+		atomic64_set(&d->arch.shadow_dirty_count, 0);
+
+		d->arch.shadow_bitmap_size = (d->max_pages + BITS_PER_LONG-1) &
+		                             ~(BITS_PER_LONG-1);
+		d->arch.shadow_bitmap = xmalloc_array(unsigned long,
+		                   d->arch.shadow_bitmap_size / BITS_PER_LONG);
+		if (d->arch.shadow_bitmap == NULL) {
+			d->arch.shadow_bitmap_size = 0;
+			rc = -ENOMEM;
+		}
+		else {
+			memset(d->arch.shadow_bitmap, 0, 
+			       d->arch.shadow_bitmap_size / 8);
+			
+			/* Flush vhtp and tlb to enable dirty bit
+			   virtualization.  */
+			domain_flush_tlb_vhpt(d);
+		}
+		break;
+
+	case DOM0_SHADOW_CONTROL_OP_FLUSH:
+		atomic64_set(&d->arch.shadow_fault_count, 0);
+		atomic64_set(&d->arch.shadow_dirty_count, 0);
+		break;
+   
+	case DOM0_SHADOW_CONTROL_OP_CLEAN:
+	  {
+		int nbr_longs;
+
+		sc->stats.fault_count = atomic64_read(&d->arch.shadow_fault_count);
+		sc->stats.dirty_count = atomic64_read(&d->arch.shadow_dirty_count);
+
+		atomic64_set(&d->arch.shadow_fault_count, 0);
+		atomic64_set(&d->arch.shadow_dirty_count, 0);
+ 
+		if (guest_handle_is_null(sc->dirty_bitmap) ||
+		    (d->arch.shadow_bitmap == NULL)) {
+			rc = -EINVAL;
+			break;
+		}
+
+		if (sc->pages > d->arch.shadow_bitmap_size)
+			sc->pages = d->arch.shadow_bitmap_size; 
+
+		nbr_longs = (sc->pages + BITS_PER_LONG - 1) / BITS_PER_LONG;
+
+		for (i = 0; i < nbr_longs; i += SHADOW_COPY_CHUNK) {
+			int size = (nbr_longs - i) > SHADOW_COPY_CHUNK ?
+			           SHADOW_COPY_CHUNK : nbr_longs - i;
+     
+			if (copy_to_guest_offset(sc->dirty_bitmap, i,
+			                         d->arch.shadow_bitmap + i,
+			                         size)) {
+				rc = -EFAULT;
+				break;
+			}
+
+			memset(d->arch.shadow_bitmap + i,
+			       0, size * sizeof(unsigned long));
+		}
+		
+		break;
+	  }
+
+	case DOM0_SHADOW_CONTROL_OP_PEEK:
+	{
+		unsigned long size;
+
+		sc->stats.fault_count = atomic64_read(&d->arch.shadow_fault_count);
+		sc->stats.dirty_count = atomic64_read(&d->arch.shadow_dirty_count);
+
+		if (guest_handle_is_null(sc->dirty_bitmap) ||
+		    (d->arch.shadow_bitmap == NULL)) {
+			rc = -EINVAL;
+			break;
+		}
+ 
+		if (sc->pages > d->arch.shadow_bitmap_size)
+			sc->pages = d->arch.shadow_bitmap_size; 
+
+		size = (sc->pages + BITS_PER_LONG - 1) / BITS_PER_LONG;
+		if (copy_to_guest(sc->dirty_bitmap, 
+		                  d->arch.shadow_bitmap, size)) {
+			rc = -EFAULT;
+			break;
+		}
+		break;
+	}
+	default:
+		rc = -EINVAL;
+		break;
+	}
+	
+	domain_unpause(d);
+	
+	return rc;
+}
 
 // remove following line if not privifying in memory
 //#define HAVE_PRIVIFY_MEMORY

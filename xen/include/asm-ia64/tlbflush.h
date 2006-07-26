@@ -22,8 +22,8 @@ void domain_flush_vtlb_all (void);
 /* Global range-flush of vTLB.  */
 void domain_flush_vtlb_range (struct domain *d, u64 vadr, u64 addr_range);
 
-/* Final vTLB flush on every dirty cpus.  */
-void domain_flush_destroy (struct domain *d);
+/* Flush vhpt and mTLB on every dirty cpus.  */
+void domain_flush_tlb_vhpt(struct domain *d);
 
 /* Flush v-tlb on cpus set in mask for current domain.  */
 void flush_tlb_mask(cpumask_t mask);

@@ -49,6 +49,9 @@ extern unsigned long domain_set_shared_info_va (unsigned long va);
    if false, flush and invalidate caches.  */
 extern void domain_cache_flush (struct domain *d, int sync_only);
 
+/* Control the shadow mode.  */
+extern int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc);
+
 /* Cleanly crash the current domain with a message.  */
 extern void panic_domain(struct pt_regs *, const char *, ...)
      __attribute__ ((noreturn, format (printf, 2, 3)));
@@ -116,6 +119,16 @@ struct arch_domain {
     void *efi_runtime;
     /* Address of fpswa_interface_t (placed in domain memory)  */
     void *fpswa_inf;
+
+    /* Bitmap of shadow dirty bits.
+       Set iff shadow mode is enabled.  */
+    u64 *shadow_bitmap;
+    /* Length (in bits!) of shadow bitmap.  */
+    unsigned long shadow_bitmap_size;
+    /* Number of bits set in bitmap.  */
+    atomic64_t shadow_dirty_count;
+    /* Number of faults.  */
+    atomic64_t shadow_fault_count;
 
     struct last_vcpu last_vcpu[NR_CPUS];
 };

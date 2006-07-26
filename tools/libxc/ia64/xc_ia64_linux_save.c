@@ -15,8 +15,72 @@
 
 #include "xg_private.h"
 
+/*
+** Default values for important tuning parameters. Can override by passing
+** non-zero replacement values to xc_linux_save().
+**
+** XXX SMH: should consider if want to be able to override MAX_MBIT_RATE too.
+**
+*/
+#define DEF_MAX_ITERS    (4 - 1)	/* limit us to 4 times round loop  */
+#define DEF_MAX_FACTOR   3		/* never send more than 3x nr_pfns */
+
+/*
+** During (live) save/migrate, we maintain a number of bitmaps to track
+** which pages we have to send, and to skip.
+*/
+
+#define BITS_PER_LONG (sizeof(unsigned long) * 8)
+
+#define BITMAP_ENTRY(_nr,_bmap) \
+   ((unsigned long *)(_bmap))[(_nr)/BITS_PER_LONG]
+
+#define BITMAP_SHIFT(_nr) ((_nr) % BITS_PER_LONG)
+
+static inline int test_bit (int nr, volatile void * addr)
+{
+    return (BITMAP_ENTRY(nr, addr) >> BITMAP_SHIFT(nr)) & 1;
+}
+
+static inline void clear_bit (int nr, volatile void * addr)
+{
+    BITMAP_ENTRY(nr, addr) &= ~(1UL << BITMAP_SHIFT(nr));
+}
+
+static inline void set_bit ( int nr, volatile void * addr)
+{
+    BITMAP_ENTRY(nr, addr) |= (1UL << BITMAP_SHIFT(nr));
+}
+
 /* total number of pages used by the current guest */
 static unsigned long max_pfn;
+
+static int xc_ia64_shadow_control(int xc_handle,
+                                  uint32_t domid,
+                                  unsigned int sop,
+                                  unsigned long *dirty_bitmap,
+                                  unsigned long pages,
+                                  xc_shadow_control_stats_t *stats)
+{
+    if (dirty_bitmap != NULL && pages > 0) {
+        int i;
+        unsigned char *bmap = (unsigned char *)dirty_bitmap;
+        unsigned long bmap_bytes =
+            ((pages + BITS_PER_LONG - 1) & ~(BITS_PER_LONG - 1)) / 8;
+        unsigned int bmap_pages = (bmap_bytes + PAGE_SIZE - 1) / PAGE_SIZE; 
+
+        /* Touch the page so that it is in the TC.
+           FIXME: use a more reliable method.  */
+        for (i = 0 ; i < bmap_pages ; i++)
+            bmap[i * PAGE_SIZE] = 0;
+        /* Because bmap is not page aligned (allocated by malloc), be sure the
+           last page is touched.  */
+        bmap[bmap_bytes - 1] = 0;
+    }
+
+    return xc_shadow_control(xc_handle, domid, sop,
+                             dirty_bitmap, pages, stats);
+}
 
 static inline ssize_t
 write_exact(int fd, void *buf, size_t count)
@@ -77,10 +141,10 @@ xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     xc_dominfo_t info;
 
     int rc = 1;
-    unsigned long N;
 
     //int live  = (flags & XCFLAGS_LIVE);
     int debug = (flags & XCFLAGS_DEBUG);
+    int live  = (flags & XCFLAGS_LIVE);
 
     /* The new domain's shared-info frame number. */
     unsigned long shared_info_frame;
@@ -93,10 +157,38 @@ xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     /* Live mapping of shared info structure */
     shared_info_t *live_shinfo = NULL;
 
+    /* Iteration number.  */
+    int iter;
+
+    /* Number of pages sent in the last iteration (live only).  */
+    unsigned int sent_last_iter;
+
+    /* Number of pages sent (live only).  */
+    unsigned int total_sent;
+
+    /* Size of the shadow bitmap (live only).  */
+    unsigned int bitmap_size = 0;
+
+    /* True if last iteration.  */
+    int last_iter;
+
+    /* Bitmap of pages to be sent.  */
+    unsigned long *to_send = NULL;
+    /* Bitmap of pages not to be sent (because dirtied).  */
+    unsigned long *to_skip = NULL;
+
     char *mem;
 
     if (debug)
         fprintf (stderr, "xc_linux_save (ia64): started dom=%d\n", dom);
+
+    /* If no explicit control parameters given, use defaults */
+    if (!max_iters)
+        max_iters = DEF_MAX_ITERS;
+    if (!max_factor)
+        max_factor = DEF_MAX_FACTOR;
+
+    //initialize_mbit_rate();
 
     if (xc_domain_getinfo(xc_handle, dom, 1, &info) != 1) {
         ERR("Could not get domain info");
@@ -124,24 +216,9 @@ xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     max_pfn = info.max_memkb >> (PAGE_SHIFT - 10);
 
-
-    /* This is a non-live suspend. Issue the call back to get the
-       domain suspended */
-
-    if (suspend_and_state(suspend, xc_handle, io_fd, dom, &info)) {
-        ERR("Domain appears not to have suspended");
-        goto out;
-    }
-
     page_array = malloc(max_pfn * sizeof(unsigned long));
     if (page_array == NULL) {
         ERR("Could not allocate memory");
-        goto out;
-    }
-
-    if (xc_ia64_get_pfn_list(xc_handle, dom, page_array,
-                             0, max_pfn) != max_pfn) {
-        ERR("Could not get the page frame list");
         goto out;
     }
 
@@ -156,10 +233,13 @@ xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
        if the format change.
        The version is hard-coded, don't forget to change the restore code
        too!  */
-    N = 1;
-    if (!write_exact(io_fd, &N, sizeof(unsigned long))) {
-        ERR("write: version");
-        goto out;
+    {
+        unsigned long version = 1;
+
+        if (!write_exact(io_fd, &version, sizeof(unsigned long))) {
+            ERR("write: version");
+            goto out;
+        }
     }
 
     op.cmd = DOM0_DOMAIN_SETUP;
@@ -175,39 +255,165 @@ xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         goto out;
     }
 
-    /* Start writing out the saved-domain record. */
-    for (N = 0; N < max_pfn; N++) {
-        if (page_array[N] == INVALID_MFN)
-            continue;
-        if (debug)
-            fprintf (stderr, "xc_linux_save: page %lx (%lu/%lu)\n",
-                     page_array[N], N, max_pfn);
+    /* Domain is still running at this point */
+    if (live) {
 
-        if (!write_exact(io_fd, &N, sizeof(N))) {
-            ERR("write: max_pfn");
+        if (xc_ia64_shadow_control(xc_handle, dom,
+                                   DOM0_SHADOW_CONTROL_OP_ENABLE_LOGDIRTY,
+                                   NULL, 0, NULL ) < 0) {
+            ERR("Couldn't enable shadow mode");
             goto out;
         }
 
-        mem = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                   PROT_READ|PROT_WRITE, page_array[N]);
-        if (mem == NULL) {
-            ERR("cannot map page");
+        last_iter = 0;
+
+        bitmap_size = ((max_pfn + BITS_PER_LONG-1) & ~(BITS_PER_LONG-1)) / 8;
+        to_send = malloc(bitmap_size);
+        to_skip = malloc(bitmap_size);
+
+        if (!to_send || !to_skip) {
+            ERR("Couldn't allocate bitmap array");
             goto out;
         }
-        if (write(io_fd, mem, PAGE_SIZE) != PAGE_SIZE) {
-            ERR("Error when writing to state file (5)");
+
+        /* Initially all the pages must be sent.  */
+        memset(to_send, 0xff, bitmap_size);
+
+        if (mlock(to_send, bitmap_size)) {
+            ERR("Unable to mlock to_send");
             goto out;
         }
-        munmap(mem, PAGE_SIZE);
+        if (mlock(to_skip, bitmap_size)) {
+            ERR("Unable to mlock to_skip");
+            goto out;
+        }
+        
+    } else {
+
+        /* This is a non-live suspend. Issue the call back to get the
+           domain suspended */
+
+        last_iter = 1;
+
+        if (suspend_and_state(suspend, xc_handle, io_fd, dom, &info)) {
+            ERR("Domain appears not to have suspended");
+            goto out;
+        }
+
+    }
+
+    sent_last_iter = max_pfn;
+    total_sent = 0;
+
+    for (iter = 1; ; iter++) {
+        unsigned int sent_this_iter, skip_this_iter;
+        unsigned long N;
+
+        sent_this_iter = 0;
+        skip_this_iter = 0;
+
+        /* Get the pfn list, as it may change.  */
+        if (xc_ia64_get_pfn_list(xc_handle, dom, page_array,
+                                 0, max_pfn) != max_pfn) {
+            ERR("Could not get the page frame list");
+            goto out;
+        }
+
+        /* Dirtied pages won't be saved.
+           slightly wasteful to peek the whole array evey time,
+           but this is fast enough for the moment. */
+        if (!last_iter) {
+            if (xc_ia64_shadow_control(xc_handle, dom,
+                                       DOM0_SHADOW_CONTROL_OP_PEEK,
+                                       to_skip, max_pfn, NULL) != max_pfn) {
+                ERR("Error peeking shadow bitmap");
+                goto out;
+            }
+        }
+
+        /* Start writing out the saved-domain record. */
+        for (N = 0; N < max_pfn; N++) {
+            if (page_array[N] == INVALID_MFN)
+                continue;
+            if (!last_iter) {
+                if (test_bit(N, to_skip) && test_bit(N, to_send))
+                    skip_this_iter++;
+                if (test_bit(N, to_skip) || !test_bit(N, to_send))
+                    continue;
+            }
+
+            if (debug)
+                fprintf(stderr, "xc_linux_save: page %lx (%lu/%lu)\n",
+                        page_array[N], N, max_pfn);
+
+            mem = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+                                       PROT_READ|PROT_WRITE, page_array[N]);
+            if (mem == NULL) {
+                /* The page may have move.
+                   It will be remarked dirty.
+                   FIXME: to be tracked.  */
+                fprintf(stderr, "cannot map page %lx: %s\n",
+                        page_array[N], strerror (errno));
+                continue;
+            }
+
+            if (!write_exact(io_fd, &N, sizeof(N))) {
+                ERR("write: max_pfn");
+                goto out;
+            }
+
+            if (write(io_fd, mem, PAGE_SIZE) != PAGE_SIZE) {
+                ERR("Error when writing to state file (5)");
+                goto out;
+            }
+            munmap(mem, PAGE_SIZE);
+            sent_this_iter++;
+            total_sent++;
+        }
+
+        if (last_iter)
+            break;
+
+        DPRINTF(" %d: sent %d, skipped %d\n",
+                iter, sent_this_iter, skip_this_iter );
+
+        if (live) {
+            if ( /* ((sent_this_iter > sent_last_iter) && RATE_IS_MAX()) || */
+                (iter >= max_iters) || (sent_this_iter+skip_this_iter < 50) ||
+                (total_sent > max_pfn*max_factor)) {
+                DPRINTF("Start last iteration\n");
+                last_iter = 1;
+
+                if (suspend_and_state(suspend, xc_handle, io_fd, dom, &info)) {
+                    ERR("Domain appears not to have suspended");
+                    goto out;
+                }
+            }
+
+            /* Pages to be sent are pages which were dirty.  */
+            if (xc_ia64_shadow_control(xc_handle, dom,
+                                       DOM0_SHADOW_CONTROL_OP_CLEAN,
+                                       to_send, max_pfn, NULL ) != max_pfn) {
+                ERR("Error flushing shadow PT");
+                goto out;
+            }
+
+            sent_last_iter = sent_this_iter;
+
+            //print_stats(xc_handle, dom, sent_this_iter, &stats, 1);
+        }
+
     }
 
     fprintf (stderr, "All memory is saved\n");
 
     /* terminate */
-    N = INVALID_MFN;
-    if (!write_exact(io_fd, &N, sizeof(N))) {
-        ERR("Error when writing to state file (6)");
-        goto out;
+    {
+        unsigned long pfn = INVALID_MFN;
+        if (!write_exact(io_fd, &pfn, sizeof(pfn))) {
+            ERR("Error when writing to state file (6)");
+            goto out;
+        }
     }
 
     /* Send through a list of all the PFNs that were not in map at the close */
@@ -274,8 +480,16 @@ xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
  out:
 
-    free (page_array);
+    if (live) {
+        if (xc_ia64_shadow_control(xc_handle, dom, DOM0_SHADOW_CONTROL_OP_OFF,
+                                   NULL, 0, NULL ) < 0) {
+            DPRINTF("Warning - couldn't disable shadow mode");
+        }
+    }
 
+    free(page_array);
+    free(to_send);
+    free(to_skip);
     if (live_shinfo)
         munmap(live_shinfo, PAGE_SIZE);
 

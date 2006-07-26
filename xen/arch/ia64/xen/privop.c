@@ -686,7 +686,8 @@ priv_emulate(VCPU *vcpu, REGS *regs, UINT64 isr)
 		(void)vcpu_increment_iip(vcpu);
 	}
 	if (fault == IA64_ILLOP_FAULT)
-		printf("priv_emulate: priv_handle_op fails, isr=0x%lx\n",isr);
+		printf("priv_emulate: priv_handle_op fails, "
+		       "isr=0x%lx iip=%lx\n",isr, regs->cr_iip);
 	return fault;
 }
 

@@ -1,4 +1,3 @@
-
 /*
  * Miscellaneous process/domain related routines
  * 
@@ -29,6 +28,7 @@
 #include <asm/bundle.h>
 #include <asm/privop_stat.h>
 #include <asm/asm-xsi-offsets.h>
+#include <asm/shadow.h>
 
 extern void die_if_kernel(char *str, struct pt_regs *regs, long err);
 /* FIXME: where these declarations shold be there ? */
@@ -648,3 +648,92 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 	reflect_interruption(isr,regs,vector);
 }
 
+void
+ia64_shadow_fault(unsigned long ifa, unsigned long itir,
+                  unsigned long isr, struct pt_regs *regs)
+{
+	struct vcpu *v = current;
+	struct domain *d = current->domain;
+	unsigned long gpfn;
+	unsigned long pte = 0;
+	struct vhpt_lf_entry *vlfe;
+
+	/* There are 2 jobs to do:
+	   -  marking the page as dirty (the metaphysical address must be
+	      extracted to do that).
+	   -  reflecting or not the fault (the virtual Dirty bit must be
+	      extracted to decide).
+	   Unfortunatly these informations are not immediatly available!
+	*/
+
+	/* Extract the metaphysical address.
+	   Try to get it from VHPT and M2P as we need the flags.  */
+	vlfe = (struct vhpt_lf_entry *)ia64_thash(ifa);
+	pte = vlfe->page_flags;
+	if (vlfe->ti_tag == ia64_ttag(ifa)) {
+		/* The VHPT entry is valid.  */
+		gpfn = get_gpfn_from_mfn((pte & _PAGE_PPN_MASK) >> PAGE_SHIFT);
+		BUG_ON(gpfn == INVALID_M2P_ENTRY);
+	}
+	else {
+		unsigned long itir, iha;
+		IA64FAULT fault;
+
+		/* The VHPT entry is not valid.  */
+		vlfe = NULL;
+
+		/* FIXME: gives a chance to tpa, as the TC was valid.  */
+
+		fault = vcpu_translate(v, ifa, 1, &pte, &itir, &iha);
+
+		/* Try again!  */
+		if (fault != IA64_NO_FAULT) {
+			/* This will trigger a dtlb miss.  */
+			ia64_ptcl(ifa, PAGE_SHIFT << 2);
+			return;
+		}
+		gpfn = ((pte & _PAGE_PPN_MASK) >> PAGE_SHIFT);
+		if (pte & _PAGE_D)
+			pte |= _PAGE_VIRT_D;
+	}
+
+	/* Set the dirty bit in the bitmap.  */
+	shadow_mark_page_dirty (d, gpfn);
+
+	/* Update the local TC/VHPT and decides wether or not the fault should
+	   be reflected.
+	   SMP note: we almost ignore the other processors.  The shadow_bitmap
+	   has been atomically updated.  If the dirty fault happen on another
+	   processor, it will do its job.
+	*/
+
+	if (pte != 0) {
+		/* We will know how to handle the fault.  */
+
+		if (pte & _PAGE_VIRT_D) {
+			/* Rewrite VHPT entry.
+			   There is no race here because only the
+			   cpu VHPT owner can write page_flags.  */
+			if (vlfe)
+				vlfe->page_flags = pte | _PAGE_D;
+			
+			/* Purge the TC locally.
+			   It will be reloaded from the VHPT iff the
+			   VHPT entry is still valid.  */
+			ia64_ptcl(ifa, PAGE_SHIFT << 2);
+
+			atomic64_inc(&d->arch.shadow_fault_count);
+		}
+		else {
+			/* Reflect.
+			   In this case there is no need to purge.  */
+			ia64_handle_reflection(ifa, regs, isr, 0, 8);
+		}
+	}
+	else {
+		/* We don't know wether or not the fault must be
+		   reflected.  The VHPT entry is not valid.  */
+		/* FIXME: in metaphysical mode, we could do an ITC now.  */
+		ia64_ptcl(ifa, PAGE_SHIFT << 2);
+	}
+}

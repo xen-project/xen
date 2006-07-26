@@ -163,7 +163,7 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
 
 	pfn = page_array[mfn];
 
-        DPRINTF ("xc_linux_restore: page %lu/%lu at %lx\n", mfn, max_pfn, pfn);
+        //DPRINTF("xc_linux_restore: page %lu/%lu at %lx\n", mfn, max_pfn, pfn);
 
 	if (read_page(xc_handle, io_fd, dom, page_array[mfn]) < 0)
 		goto out;

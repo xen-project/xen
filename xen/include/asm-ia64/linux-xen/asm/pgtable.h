@@ -62,7 +62,12 @@
 #define _PAGE_D			(1 << _PAGE_D_BIT)	/* page dirty bit */
 #define _PAGE_PPN_MASK		(((__IA64_UL(1) << IA64_MAX_PHYS_BITS) - 1) & ~0xfffUL)
 #define _PAGE_ED		(__IA64_UL(1) << 52)	/* exception deferral */
+#ifdef XEN
+#define _PAGE_VIRT_D		(__IA64_UL(1) << 53)	/* Virtual dirty bit */
+#define _PAGE_PROTNONE		0
+#else
 #define _PAGE_PROTNONE		(__IA64_UL(1) << 63)
+#endif
 
 /* Valid only for a PTE with the present bit cleared: */
 #define _PAGE_FILE		(1 << 1)		/* see swap & file pte remarks below */

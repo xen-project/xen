@@ -65,6 +65,11 @@ void foo(void)
 	DEFINE(IA64_VCPU_DTLB_OFFSET, offsetof (struct vcpu, arch.dtlb));
 
 	BLANK();
+
+	DEFINE(IA64_DOMAIN_SHADOW_BITMAP_OFFSET, offsetof (struct domain, arch.shadow_bitmap));
+
+	BLANK();
+
 	DEFINE(IA64_CPUINFO_ITM_NEXT_OFFSET, offsetof (struct cpuinfo_ia64, itm_next));
 	DEFINE(IA64_CPUINFO_KSOFTIRQD_OFFSET, offsetof (struct cpuinfo_ia64, ksoftirqd));
 

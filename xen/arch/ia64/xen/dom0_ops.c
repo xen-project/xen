@@ -265,6 +265,20 @@ long arch_do_dom0_op(dom0_op_t *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
     }
     break;
 
+    case DOM0_SHADOW_CONTROL:
+    {
+        struct domain *d; 
+        ret = -ESRCH;
+        d = find_domain_by_id(op->u.shadow_control.domain);
+        if ( d != NULL )
+        {
+            ret = shadow_mode_control(d, &op->u.shadow_control);
+            put_domain(d);
+            copy_to_guest(u_dom0_op, op, 1);
+        } 
+    }
+    break;
+
     default:
         printf("arch_do_dom0_op: unrecognized dom0 op: %d!!!\n",op->cmd);
         ret = -ENOSYS;
