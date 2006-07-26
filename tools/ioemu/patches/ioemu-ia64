@@ -1,7 +1,7 @@
 Index: ioemu/hw/iommu.c
 ===================================================================
---- ioemu.orig/hw/iommu.c	2006-07-14 13:43:45.000000000 +0100
-+++ ioemu/hw/iommu.c	2006-07-26 13:34:50.039997837 +0100
+--- ioemu.orig/hw/iommu.c	2006-07-26 15:17:35.639762285 +0100
++++ ioemu/hw/iommu.c	2006-07-26 15:17:39.078387722 +0100
 @@ -82,7 +82,11 @@
  #define IOPTE_VALID         0x00000002 /* IOPTE is valid */
  #define IOPTE_WAZ           0x00000001 /* Write as zeros */
@@ -16,8 +16,8 @@ Index: ioemu/hw/iommu.c
  
 Index: ioemu/cpu-all.h
 ===================================================================
---- ioemu.orig/cpu-all.h	2006-07-26 13:33:45.946834283 +0100
-+++ ioemu/cpu-all.h	2006-07-26 13:34:50.038997944 +0100
+--- ioemu.orig/cpu-all.h	2006-07-26 15:17:38.728425843 +0100
++++ ioemu/cpu-all.h	2006-07-26 15:17:39.079387613 +0100
 @@ -835,6 +835,31 @@
                  :"=m" (*(volatile long *)addr)
                  :"dIr" (nr));
@@ -52,8 +52,8 @@ Index: ioemu/cpu-all.h
  /* memory API */
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-26 13:33:45.996828953 +0100
-+++ ioemu/vl.c	2006-07-26 13:34:50.044997304 +0100
+--- ioemu.orig/vl.c	2006-07-26 15:17:39.011395020 +0100
++++ ioemu/vl.c	2006-07-26 21:11:35.957492161 +0100
 @@ -5577,6 +5577,7 @@
          exit(-1);
      }
@@ -99,8 +99,8 @@ Index: ioemu/vl.c
  #ifdef CONFIG_SOFTMMU
 Index: ioemu/target-i386-dm/exec-dm.c
 ===================================================================
---- ioemu.orig/target-i386-dm/exec-dm.c	2006-07-26 13:33:45.882841107 +0100
-+++ ioemu/target-i386-dm/exec-dm.c	2006-07-26 13:34:50.040997731 +0100
+--- ioemu.orig/target-i386-dm/exec-dm.c	2006-07-26 15:17:38.283474311 +0100
++++ ioemu/target-i386-dm/exec-dm.c	2006-07-26 15:17:39.081387395 +0100
 @@ -340,6 +340,23 @@
      return io_mem_read[io_index >> IO_MEM_SHIFT];
  }
@@ -137,25 +137,9 @@ Index: ioemu/target-i386-dm/exec-dm.c
          len -= l;
 Index: ioemu/exec-all.h
 ===================================================================
---- ioemu.orig/exec-all.h	2006-07-26 13:33:45.861843346 +0100
-+++ ioemu/exec-all.h	2006-07-26 13:38:30.096491388 +0100
-@@ -391,6 +391,15 @@
- }
- #endif
- 
-+#ifdef __ia64__
-+#include "ia64_intrinsic.h"
-+static inline int testandset (int *p)
-+{
-+    uint32_t o = 0, n = 1;
-+    return (int)cmpxchg_acq(p, o, n);
-+}
-+#endif
-+
- #ifdef __s390__
- static inline int testandset (int *p)
- {
-@@ -462,12 +471,13 @@
+--- ioemu.orig/exec-all.h	2006-07-26 15:17:38.200483351 +0100
++++ ioemu/exec-all.h	2006-07-26 21:11:41.262898983 +0100
+@@ -462,12 +462,13 @@
  }
  #endif
  
@@ -174,8 +158,8 @@ Index: ioemu/exec-all.h
  
 Index: ioemu/target-i386-dm/cpu.h
 ===================================================================
---- ioemu.orig/target-i386-dm/cpu.h	2006-07-26 13:33:45.882841107 +0100
-+++ ioemu/target-i386-dm/cpu.h	2006-07-26 13:34:50.040997731 +0100
+--- ioemu.orig/target-i386-dm/cpu.h	2006-07-26 15:17:38.282474420 +0100
++++ ioemu/target-i386-dm/cpu.h	2006-07-26 15:17:39.082387287 +0100
 @@ -80,7 +80,11 @@
  /* helper2.c */
  int main_loop(void);
@@ -191,7 +175,7 @@ Index: ioemu/target-i386-dm/cpu.h
 Index: ioemu/ia64_intrinsic.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/ia64_intrinsic.h	2006-07-26 13:34:50.038997944 +0100
++++ ioemu/ia64_intrinsic.h	2006-07-26 15:17:39.083387178 +0100
 @@ -0,0 +1,276 @@
 +#ifndef IA64_INTRINSIC_H
 +#define IA64_INTRINSIC_H
