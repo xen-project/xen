@@ -10,6 +10,7 @@ qemu-hvm-banner
 xen-domain-name
 xen-domid
 xen-mm
+ioemu-ia64
 qemu-smp
 qemu-no-apic
 qemu-nobios

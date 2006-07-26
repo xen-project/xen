@@ -835,6 +835,31 @@ static __inline__ void atomic_clear_bit(long nr, volatile void *addr)
                 :"=m" (*(volatile long *)addr)
                 :"dIr" (nr));
 }
+#elif defined(__ia64__)
+#include "ia64_intrinsic.h"
+#define atomic_set_bit(nr, addr) ({					\
+	typeof(*addr) bit, old, new;					\
+	volatile typeof(*addr) *m;					\
+									\
+	m = (volatile typeof(*addr)*)(addr + nr / (8*sizeof(*addr)));	\
+	bit = 1 << (nr % (8*sizeof(*addr)));				\
+	do {								\
+		old = *m;						\
+		new = old | bit;					\
+	} while (cmpxchg_acq(m, old, new) != old);			\
+})
+
+#define atomic_clear_bit(nr, addr) ({					\
+	typeof(*addr) bit, old, new;					\
+	volatile typeof(*addr) *m;					\
+									\
+	m = (volatile typeof(*addr)*)(addr + nr / (8*sizeof(*addr)));	\
+	bit = ~(1 << (nr % (8*sizeof(*addr))));				\
+	do {								\
+		old = *m;						\
+		new = old & bit;					\
+	} while (cmpxchg_acq(m, old, new) != old);			\
+})
 #endif
 
 /* memory API */
