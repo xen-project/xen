@@ -14,6 +14,7 @@ ioemu-ia64
 qemu-smp
 qemu-no-apic
 qemu-nobios
+qemu-init-vgabios
 xen-network
 qemu-timer
 domain-reset
