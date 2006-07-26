@@ -106,10 +106,13 @@ static int init_boot_vcpu(
     memset(&ctxt.user_regs, 0x55, sizeof(ctxt.user_regs));
     ctxt.user_regs.pc = dsi->v_kernentry;
     ctxt.user_regs.msr = 0;
-    ctxt.user_regs.gprs[1] = 32<<20; /* XXX arbitrary stack address */
+    ctxt.user_regs.gprs[1] = 0; /* Linux uses its own stack */
     ctxt.user_regs.gprs[3] = dtb;
     ctxt.user_regs.gprs[4] = kaddr;
     ctxt.user_regs.gprs[5] = 0;
+    /* There is a buggy kernel that does not zero the "local_paca", so
+     * we must make sure this register is 0 */
+    ctxt.user_regs.gprs[13] = 0;
 
     VERBOSE(printf("xc_vcpu_setvcpucontext:\n"
                  "  pc 0x%"PRIx64", msr 0x016%"PRIx64"\n"
@@ -343,6 +346,8 @@ static int get_page_array(int xc_handle, int domid, xen_pfn_t **page_array)
     return 0;
 }
 
+
+
 int xc_linux_build(int xc_handle,
                    uint32_t domid,
                    const char *image_name,
@@ -385,13 +390,14 @@ int xc_linux_build(int xc_handle,
     /* XXX install initrd addr/len into device tree */
 
     dtb_addr = (16 << 20);
-    if (load_dtb(xc_handle, domid, "DomU.dtb", dtb_addr, &dsi, page_array)) {
+    if (load_dtb(xc_handle, domid, "/root/DomU.dtb", dtb_addr, &dsi, page_array)) {
         dtb_addr = 0;
     }
 
     si_addr = create_start_info(&si, store_evtchn, console_evtchn);
-    *console_mfn = si.console_mfn;
-    *store_mfn = si.store_mfn;
+    *console_mfn = page_array[si.console_mfn];
+    *store_mfn = page_array[si.store_mfn];
+    
     if (install_image(xc_handle, domid, page_array, &si, si_addr,
                 sizeof(start_info_t))) {
         rc = -1;
