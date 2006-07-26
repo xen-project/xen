@@ -35,8 +35,12 @@ void show_registers(struct cpu_user_regs *regs)
            XEN_VERSION, XEN_SUBVERSION, XEN_EXTRAVERSION);
     printk("CPU: %08x   DOMID: %08x\n",
            smp_processor_id(), current->domain->domain_id);
-    printk("pc %016lx msr %016lx\n  lr %016lx ctr %016lx\n",
-            regs->pc, regs->msr, regs->lr, regs->ctr);
+    printk("pc %016lx msr %016lx\n"
+           "lr %016lx ctr %016lx\n"
+           "srr0 %016lx srr1 %016lx\n",
+           regs->pc, regs->msr,
+           regs->lr, regs->ctr,
+           regs->srr0, regs->srr1);
     for (i=0; i<32; i+=4) {
         printk("r%02i: %016lx %016lx %016lx %016lx\n", i,
             regs->gprs[i], regs->gprs[i+1], regs->gprs[i+2], regs->gprs[i+3]);
