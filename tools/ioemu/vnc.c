@@ -32,6 +32,10 @@
 #include "vnc_keysym.h"
 #include "keymaps.c"
 
+#define XK_MISCELLANY
+#define XK_LATIN1
+#include <X11/keysymdef.h>
+
 typedef struct Buffer
 {
     size_t capacity;
@@ -64,6 +68,7 @@ struct VncState
     Buffer output;
     Buffer input;
     kbd_layout_t *kbd_layout;
+    int ctl_keys;               /* Ctrl+Alt starts calibration */
 
     VncReadEvent *read_handler;
     size_t read_handler_expect;
@@ -679,16 +684,80 @@ static void pointer_event(VncState *vs, int button_mask, int x, int y)
 
 static void do_key_event(VncState *vs, int down, uint32_t sym)
 {
-    int keycode;
+    sym &= 0xFFFF;
 
-    keycode = keysym2scancode(vs->kbd_layout, sym & 0xFFFF);
+    if (is_graphic_console()) {
+	int keycode;
 
-    if (keycode & 0x80)
-	kbd_put_keycode(0xe0);
-    if (down)
-	kbd_put_keycode(keycode & 0x7f);
-    else
-	kbd_put_keycode(keycode | 0x80);
+	keycode = keysym2scancode(vs->kbd_layout, sym);
+	if (keycode & 0x80)
+	    kbd_put_keycode(0xe0);
+	if (down)
+	    kbd_put_keycode(keycode & 0x7f);
+	else
+	    kbd_put_keycode(keycode | 0x80);
+    } else if (down) {
+	int qemu_keysym = 0;
+
+	if (sym <= 128) /* normal ascii */
+	    qemu_keysym = sym;
+	else {
+	    switch (sym) {
+	    case XK_Up: qemu_keysym = QEMU_KEY_UP; break;
+	    case XK_Down: qemu_keysym = QEMU_KEY_DOWN; break;
+	    case XK_Left: qemu_keysym = QEMU_KEY_LEFT; break;
+	    case XK_Right: qemu_keysym = QEMU_KEY_RIGHT; break;
+	    case XK_Home: qemu_keysym = QEMU_KEY_HOME; break;
+	    case XK_End: qemu_keysym = QEMU_KEY_END; break;
+	    case XK_Page_Up: qemu_keysym = QEMU_KEY_PAGEUP; break;
+	    case XK_Page_Down: qemu_keysym = QEMU_KEY_PAGEDOWN; break;
+	    case XK_BackSpace: qemu_keysym = QEMU_KEY_BACKSPACE; break;
+	    case XK_Delete: qemu_keysym = QEMU_KEY_DELETE; break;
+	    case XK_Return:
+	    case XK_Linefeed: qemu_keysym = sym; break;
+	    default: break;
+	    }
+	}
+	if (qemu_keysym != 0)
+	    kbd_put_keysym(qemu_keysym);
+    }
+
+    if (down) {
+	switch (sym) {
+	case XK_Control_L:
+	    vs->ctl_keys |= 1;
+	    break;
+
+	case XK_Alt_L:
+	    vs->ctl_keys |= 2;
+	    break;
+
+	default:
+	    break;
+	}
+    } else {
+	switch (sym) {
+	case XK_Control_L:
+	    vs->ctl_keys &= ~1;
+	    break;
+
+	case XK_Alt_L:
+	    vs->ctl_keys &= ~2;
+	    break;
+
+	case XK_1 ... XK_9:
+	    if ((vs->ctl_keys & 3) != 3)
+		break;
+
+	    console_select(sym - XK_1);
+	    if (is_graphic_console()) {
+		/* tell the vga console to redisplay itself */
+		vga_hw_invalidate();
+		vnc_dpy_update(vs->ds, 0, 0, vs->ds->width, vs->ds->height);
+	    }
+	    break;
+	}
+    }
 }
 
 static void key_event(VncState *vs, int down, uint32_t sym)

@@ -33,3 +33,4 @@ vnc-cleanup
 vnc-fixes
 vnc-start-vncviewer
 vnc-title-domain-name
+vnc-access-monitor-vt
