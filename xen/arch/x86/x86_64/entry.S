@@ -471,8 +471,10 @@ ENTRY(spurious_interrupt_bug)
 	jmp   handle_exception
 
 ENTRY(double_fault)
-        movl  $TRAP_double_fault,4(%rsp)
-        jmp   handle_exception
+        SAVE_ALL
+        movq  %rsp,%rdi
+        call  do_double_fault
+        ud2
 
 ENTRY(nmi)
         pushq $0
@@ -518,7 +520,7 @@ ENTRY(exception_table)
         .quad do_bounds
         .quad do_invalid_op
         .quad math_state_restore
-        .quad do_double_fault
+        .quad 0 # double_fault
         .quad do_coprocessor_segment_overrun
         .quad do_invalid_TSS
         .quad do_segment_not_present

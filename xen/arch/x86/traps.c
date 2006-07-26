@@ -279,11 +279,14 @@ void show_stack(struct cpu_user_regs *regs)
 void show_stack_overflow(unsigned long esp)
 {
 #ifdef MEMORY_GUARD
-    unsigned long esp_top = get_stack_bottom() & PAGE_MASK;
+    unsigned long esp_top;
     unsigned long *stack, addr;
 
-    /* Trigger overflow trace if %esp is within 100 bytes of the guard page. */
-    if ( ((esp - esp_top) > 100) && ((esp_top - esp) > 100) )
+    esp_top = (esp | (STACK_SIZE - 1)) - DEBUG_STACK_SIZE;
+
+    /* Trigger overflow trace if %esp is within 512 bytes of the guard page. */
+    if ( ((unsigned long)(esp - esp_top) > 512) &&
+         ((unsigned long)(esp_top - esp) > 512) )
         return;
 
     if ( esp < esp_top )

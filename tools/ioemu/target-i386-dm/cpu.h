@@ -80,7 +80,11 @@ int cpu_x86_inl(CPUX86State *env, int addr);
 /* helper2.c */
 int main_loop(void);
 
+#if defined(__i386__) || defined(__x86_64__)
 #define TARGET_PAGE_BITS 12
+#elif defined(__ia64__)
+#define TARGET_PAGE_BITS 14
+#endif 
 #include "cpu-all.h"
 
 #endif /* CPU_I386_H */

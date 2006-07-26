@@ -1,7 +1,8 @@
-diff -r 9af27fed6713 Makefile.target
---- a/Makefile.target	Wed Jun 21 17:46:33 2006 +0100
-+++ b/Makefile.target	Mon Jun 26 15:59:21 2006 +0100
-@@ -57,6 +57,8 @@ QEMU_SYSTEM=qemu-fast
+Index: ioemu/Makefile.target
+===================================================================
+--- ioemu.orig/Makefile.target	2006-07-26 11:45:57.572129351 +0100
++++ ioemu/Makefile.target	2006-07-26 11:45:57.589127569 +0100
+@@ -57,6 +57,8 @@
  QEMU_SYSTEM=qemu-fast
  endif
  
@@ -10,7 +11,7 @@ diff -r 9af27fed6713 Makefile.target
  ifdef CONFIG_USER_ONLY
  PROGS=$(QEMU_USER)
  else
-@@ -274,6 +276,9 @@ OBJS+=gdbstub.o
+@@ -274,6 +276,9 @@
  OBJS+=gdbstub.o
  endif
  
@@ -20,7 +21,7 @@ diff -r 9af27fed6713 Makefile.target
  all: $(PROGS)
  
  $(QEMU_USER): $(OBJS)
-@@ -328,7 +333,7 @@ ifeq ($(TARGET_BASE_ARCH), i386)
+@@ -328,7 +333,7 @@
  ifeq ($(TARGET_BASE_ARCH), i386)
  # Hardware support
  VL_OBJS+= ide.o pckbd.o ps2.o vga.o $(SOUND_HW) dma.o $(AUDIODRV)
@@ -29,10 +30,11 @@ diff -r 9af27fed6713 Makefile.target
  VL_OBJS+= cirrus_vga.o mixeng.o apic.o parallel.o
  DEFINES += -DHAS_AUDIO
  endif
-diff -r 9af27fed6713 configure
---- a/configure	Wed Jun 21 17:46:33 2006 +0100
-+++ b/configure	Mon Jun 26 15:59:21 2006 +0100
-@@ -359,6 +359,8 @@ if test -z "$target_list" ; then
+Index: ioemu/configure
+===================================================================
+--- ioemu.orig/configure	2006-07-26 11:45:57.573129246 +0100
++++ ioemu/configure	2006-07-26 11:45:57.590127464 +0100
+@@ -359,6 +359,8 @@
      if [ "$user" = "yes" ] ; then
          target_list="i386-user arm-user armeb-user sparc-user ppc-user mips-user mipsel-user $target_list"
      fi
@@ -41,10 +43,11 @@ diff -r 9af27fed6713 configure
  else
      target_list=`echo "$target_list" | sed -e 's/,/ /g'`
  fi
-diff -r 9af27fed6713 monitor.c
---- a/monitor.c	Wed Jun 21 17:46:33 2006 +0100
-+++ b/monitor.c	Mon Jun 26 15:59:21 2006 +0100
-@@ -1142,6 +1142,10 @@ static term_cmd_t info_cmds[] = {
+Index: ioemu/monitor.c
+===================================================================
+--- ioemu.orig/monitor.c	2006-07-26 11:45:57.576128931 +0100
++++ ioemu/monitor.c	2006-07-26 11:45:57.591127359 +0100
+@@ -1142,6 +1142,10 @@
        "", "show host USB devices", },
      { "profile", "", do_info_profile,
        "", "show profiling information", },
@@ -55,9 +58,10 @@ diff -r 9af27fed6713 monitor.c
      { NULL, NULL, },
  };
  
-diff -r 9af27fed6713 vl.c
---- a/vl.c	Wed Jun 21 17:46:33 2006 +0100
-+++ b/vl.c	Mon Jun 26 15:59:21 2006 +0100
+Index: ioemu/vl.c
+===================================================================
+--- ioemu.orig/vl.c	2006-07-26 11:45:57.579128617 +0100
++++ ioemu/vl.c	2006-07-26 11:45:57.593127149 +0100
 @@ -87,7 +87,7 @@
  
  #include "exec-all.h"
@@ -67,7 +71,7 @@ diff -r 9af27fed6713 vl.c
  
  //#define DEBUG_UNUSED_IOPORT
  //#define DEBUG_IOPORT
-@@ -4382,7 +4382,7 @@ typedef struct QEMUResetEntry {
+@@ -4382,7 +4382,7 @@
  
  static QEMUResetEntry *first_reset_entry;
  static int reset_requested;
@@ -76,7 +80,7 @@ diff -r 9af27fed6713 vl.c
  static int powerdown_requested;
  
  void qemu_register_reset(QEMUResetHandler *func, void *opaque)
-@@ -4534,6 +4534,7 @@ void main_loop_wait(int timeout)
+@@ -4534,6 +4534,7 @@
                      qemu_get_clock(rt_clock));
  }
  
@@ -84,7 +88,7 @@ diff -r 9af27fed6713 vl.c
  static CPUState *cur_cpu;
  
  int main_loop(void)
-@@ -4608,6 +4609,7 @@ int main_loop(void)
+@@ -4608,6 +4609,7 @@
      cpu_disable_ticks();
      return ret;
  }
@@ -92,9 +96,10 @@ diff -r 9af27fed6713 vl.c
  
  void help(void)
  {
-diff -r 9af27fed6713 vl.h
---- a/vl.h	Wed Jun 21 17:46:33 2006 +0100
-+++ b/vl.h	Mon Jun 26 15:59:21 2006 +0100
+Index: ioemu/vl.h
+===================================================================
+--- ioemu.orig/vl.h	2006-07-26 11:45:39.289045710 +0100
++++ ioemu/vl.h	2006-07-26 11:45:57.594127044 +0100
 @@ -38,6 +38,8 @@
  #include <fcntl.h>
  #include <sys/stat.h>
@@ -104,19 +109,19 @@ diff -r 9af27fed6713 vl.h
  
  #ifndef O_LARGEFILE
  #define O_LARGEFILE 0
-@@ -130,6 +132,11 @@ void qemu_system_powerdown(void);
- #endif
+@@ -131,6 +133,11 @@
  
  void main_loop_wait(int timeout);
-+
+ 
 +extern FILE *logfile;
 +
 +extern int xc_handle;
 +extern int domid;
- 
++
  extern int ram_size;
  extern int bios_size;
-@@ -814,6 +821,7 @@ uint32_t pic_intack_read(PicState2 *s);
+ extern int rtc_utc;
+@@ -814,6 +821,7 @@
  uint32_t pic_intack_read(PicState2 *s);
  void pic_info(void);
  void irq_info(void);
@@ -124,9 +129,10 @@ diff -r 9af27fed6713 vl.h
  
  /* APIC */
  typedef struct IOAPICState IOAPICState;
-diff -r 9af27fed6713 target-i386-dm/cpu.h
---- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/target-i386-dm/cpu.h	Mon Jun 26 15:59:21 2006 +0100
+Index: ioemu/target-i386-dm/cpu.h
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ ioemu/target-i386-dm/cpu.h	2006-07-26 11:45:57.594127044 +0100
 @@ -0,0 +1,86 @@
 +/*
 + * i386 virtual CPU header
@@ -214,9 +220,10 @@ diff -r 9af27fed6713 target-i386-dm/cpu.h
 +#include "cpu-all.h"
 +
 +#endif /* CPU_I386_H */
-diff -r 9af27fed6713 target-i386-dm/exec-dm.c
---- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/target-i386-dm/exec-dm.c	Mon Jun 26 15:59:21 2006 +0100
+Index: ioemu/target-i386-dm/exec-dm.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ ioemu/target-i386-dm/exec-dm.c	2006-07-26 11:46:01.059763730 +0100
 @@ -0,0 +1,512 @@
 +/*
 + *  virtual page mapping and translated block handling
@@ -602,7 +609,7 @@ diff -r 9af27fed6713 target-i386-dm/exec-dm.c
 +                start = mmio[i].start;
 +                end = mmio[i].start + mmio[i].size;
 +
-+                if ((addr >= start) && (addr <= end)){
++                if ((addr >= start) && (addr < end)){
 +                        return (mmio[i].io_index >> IO_MEM_SHIFT) & (IO_MEM_NB_ENTRIES - 1);
 +                }
 +        }
@@ -730,9 +737,10 @@ diff -r 9af27fed6713 target-i386-dm/exec-dm.c
 +
 +	return;
 +}
-diff -r 9af27fed6713 target-i386-dm/helper2.c
---- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/target-i386-dm/helper2.c	Mon Jun 26 15:59:21 2006 +0100
+Index: ioemu/target-i386-dm/helper2.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ ioemu/target-i386-dm/helper2.c	2006-07-26 11:45:57.596126835 +0100
 @@ -0,0 +1,464 @@
 +/*
 + *  i386 helpers (without register variable usage)
@@ -1198,9 +1206,10 @@ diff -r 9af27fed6713 target-i386-dm/helper2.c
 +    }
 +    return 0;
 +}
-diff -r 9af27fed6713 target-i386-dm/i8259-dm.c
---- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/target-i386-dm/i8259-dm.c	Mon Jun 26 15:59:21 2006 +0100
+Index: ioemu/target-i386-dm/i8259-dm.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ ioemu/target-i386-dm/i8259-dm.c	2006-07-26 11:45:57.596126835 +0100
 @@ -0,0 +1,107 @@
 +/* Xen 8259 stub for interrupt controller emulation
 + * 
@@ -1309,18 +1318,20 @@ diff -r 9af27fed6713 target-i386-dm/i8259-dm.c
 +                          void *alt_irq_opaque)
 +{
 +}
-diff -r 9af27fed6713 target-i386-dm/qemu-dm.debug
---- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/target-i386-dm/qemu-dm.debug	Mon Jun 26 15:59:21 2006 +0100
+Index: ioemu/target-i386-dm/qemu-dm.debug
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ ioemu/target-i386-dm/qemu-dm.debug	2006-07-26 11:45:57.596126835 +0100
 @@ -0,0 +1,5 @@
 +#!/bin/sh
 +
 +echo $* > /tmp/args
 +echo $DISPLAY >> /tmp/args
 +exec /usr/lib/xen/bin/qemu-dm $*
-diff -r 9af27fed6713 target-i386-dm/qemu-ifup
---- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/target-i386-dm/qemu-ifup	Mon Jun 26 15:59:21 2006 +0100
+Index: ioemu/target-i386-dm/qemu-ifup
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ ioemu/target-i386-dm/qemu-ifup	2006-07-26 11:45:57.597126730 +0100
 @@ -0,0 +1,10 @@
 +#!/bin/sh
 +

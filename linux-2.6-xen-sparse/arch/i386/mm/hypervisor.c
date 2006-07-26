@@ -266,6 +266,7 @@ static void contiguous_bitmap_clear(
 /* Protected by balloon_lock. */
 #define MAX_CONTIG_ORDER 9 /* 2MB */
 static unsigned long discontig_frames[1<<MAX_CONTIG_ORDER];
+static multicall_entry_t cr_mcl[1<<MAX_CONTIG_ORDER];
 
 /* Ensure multi-page extents are contiguous in machine memory. */
 int xen_create_contiguous_region(
@@ -310,12 +311,13 @@ int xen_create_contiguous_region(
 	/* 1. Zap current PTEs, remembering MFNs. */
 	for (i = 0; i < (1UL<<order); i++) {
 		in_frames[i] = pfn_to_mfn((__pa(vstart) >> PAGE_SHIFT) + i);
-		if (HYPERVISOR_update_va_mapping(vstart + (i*PAGE_SIZE),
-						 __pte_ma(0), 0))
-			BUG();
+		MULTI_update_va_mapping(cr_mcl + i, vstart + (i*PAGE_SIZE),
+					__pte_ma(0), 0);
 		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i,
 			INVALID_P2M_ENTRY);
 	}
+	if (HYPERVISOR_multicall(cr_mcl, i))
+		BUG();
 
 	/* 2. Get a new contiguous memory extent. */
 	out_frame = __pa(vstart) >> PAGE_SHIFT;
@@ -343,15 +345,16 @@ int xen_create_contiguous_region(
 	/* 3. Map the new extent in place of old pages. */
 	for (i = 0; i < (1UL<<order); i++) {
 		frame = success ? (out_frame + i) : in_frames[i];
-		if (HYPERVISOR_update_va_mapping(vstart + (i*PAGE_SIZE),
-						 pfn_pte_ma(frame,
-							    PAGE_KERNEL),
-						 0))
-			BUG();
+		MULTI_update_va_mapping(cr_mcl + i, vstart + (i*PAGE_SIZE),
+					pfn_pte_ma(frame, PAGE_KERNEL), 0);
 		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i, frame);
 	}
 
-	flush_tlb_all();
+	cr_mcl[i - 1].args[MULTI_UVMFLAGS_INDEX] = order
+						   ? UVMF_TLB_FLUSH|UVMF_ALL
+						   : UVMF_INVLPG|UVMF_ALL;
+	if (HYPERVISOR_multicall(cr_mcl, i))
+		BUG();
 
 	if (success)
 		contiguous_bitmap_set(__pa(vstart) >> PAGE_SHIFT,
@@ -402,13 +405,14 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 
 	/* 2. Zap current PTEs. */
 	for (i = 0; i < (1UL<<order); i++) {
-		if (HYPERVISOR_update_va_mapping(vstart + (i*PAGE_SIZE),
-						 __pte_ma(0), 0))
-			BUG();
+		MULTI_update_va_mapping(cr_mcl + i, vstart + (i*PAGE_SIZE),
+					__pte_ma(0), 0);
 		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i,
 			INVALID_P2M_ENTRY);
 		out_frames[i] = (__pa(vstart) >> PAGE_SHIFT) + i;
 	}
+	if (HYPERVISOR_multicall(cr_mcl, i))
+		BUG();
 
 	/* 3. Do the exchange for non-contiguous MFNs. */
 	rc = HYPERVISOR_memory_op(XENMEM_exchange, &exchange);
@@ -429,15 +433,16 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 	/* 4. Map new pages in place of old pages. */
 	for (i = 0; i < (1UL<<order); i++) {
 		frame = success ? out_frames[i] : (in_frame + i);
-		if (HYPERVISOR_update_va_mapping(vstart + (i*PAGE_SIZE),
-						 pfn_pte_ma(frame,
-							    PAGE_KERNEL),
-						 0))
-			BUG();
+		MULTI_update_va_mapping(cr_mcl + i, vstart + (i*PAGE_SIZE),
+					pfn_pte_ma(frame, PAGE_KERNEL), 0);
 		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i, frame);
 	}
 
-	flush_tlb_all();
+	cr_mcl[i - 1].args[MULTI_UVMFLAGS_INDEX] = order
+						   ? UVMF_TLB_FLUSH|UVMF_ALL
+						   : UVMF_INVLPG|UVMF_ALL;
+	if (HYPERVISOR_multicall(cr_mcl, i))
+		BUG();
 
 	balloon_unlock(flags);
 }

@@ -340,6 +340,23 @@ CPUReadMemoryFunc **cpu_get_io_memory_read(int io_index)
     return io_mem_read[io_index >> IO_MEM_SHIFT];
 }
 
+#ifdef __ia64__
+/* IA64 has seperate I/D cache, with coherence maintained by DMA controller.
+ * So to emulate right behavior that guest OS is assumed, we need to flush
+ * I/D cache here.
+ */
+static void sync_icache(unsigned long address, int len)
+{
+    int l;
+
+    for(l = 0; l < (len + 32); l += 32)
+        __ia64_fc(address + l);
+
+    ia64_sync_i();
+    ia64_srlz_i();
+}
+#endif 
+
 /* physical memory access (slow version, mainly for debug) */
 #if defined(CONFIG_USER_ONLY)
 void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf, 
@@ -382,7 +399,7 @@ int iomem_index(target_phys_addr_t addr)
                 start = mmio[i].start;
                 end = mmio[i].start + mmio[i].size;
 
-                if ((addr >= start) && (addr <= end)){
+                if ((addr >= start) && (addr < end)){
                         return (mmio[i].io_index >> IO_MEM_SHIFT) & (IO_MEM_NB_ENTRIES - 1);
                 }
         }
@@ -455,6 +472,9 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
                 ptr = phys_ram_base + (pd & TARGET_PAGE_MASK) + 
                     (addr & ~TARGET_PAGE_MASK);
                 memcpy(buf, ptr, l);
+#ifdef __ia64__
+                sync_icache((unsigned long)ptr, l);
+#endif 
             }
         }
         len -= l;

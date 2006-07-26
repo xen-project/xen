@@ -954,11 +954,21 @@ int is_graphic_console(void)
     return !active_console->text_console;
 }
 
+void set_color_table(DisplayState *ds) 
+{
+    int i, j;
+    for(j = 0; j < 2; j++) {
+	for(i = 0; i < 8; i++) {
+	    color_table[j][i] =
+		col_expand(ds, vga_get_color(ds, color_table_rgb[j][i]));
+	}
+    }
+}
+
 CharDriverState *text_console_init(DisplayState *ds)
 {
     CharDriverState *chr;
     TextConsole *s;
-    int i,j;
     static int color_inited;
 
     chr = qemu_mallocz(sizeof(CharDriverState));
@@ -976,12 +986,7 @@ CharDriverState *text_console_init(DisplayState *ds)
 
     if (!color_inited) {
         color_inited = 1;
-        for(j = 0; j < 2; j++) {
-            for(i = 0; i < 8; i++) {
-                color_table[j][i] = col_expand(s->ds, 
-                        vga_get_color(s->ds, color_table_rgb[j][i]));
-            }
-        }
+        set_color_table(ds);
     }
     s->y_displayed = 0;
     s->y_base = 0;

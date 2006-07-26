@@ -1201,6 +1201,7 @@ static struct ethtool_ops network_ethtool_ops =
 	.set_sg = xennet_set_sg,
 	.get_tso = ethtool_op_get_tso,
 	.set_tso = xennet_set_tso,
+	.get_link = ethtool_op_get_link,
 };
 
 #ifdef CONFIG_SYSFS

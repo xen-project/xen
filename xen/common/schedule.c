@@ -404,12 +404,15 @@ long do_set_timer_op(s_time_t timeout)
          * for timeouts wrapped negative, and for positive timeouts more than 
          * about 13 days in the future (2^50ns). The correct fix is to trigger 
          * an interrupt immediately (since Linux in fact has pending work to 
-         * do in this situation).
+         * do in this situation). However, older guests also set a long timeout
+         * when they have *no* pending timers at all: setting an immediate
+         * timeout in this case can burn a lot of CPU. We therefore go for a
+         * reasonable middleground of triggering a timer event in 100ms.
          */
         DPRINTK("Warning: huge timeout set by domain %d (vcpu %d):"
                 " %"PRIx64"\n",
                 v->domain->domain_id, v->vcpu_id, (uint64_t)timeout);
-        send_timer_event(v);
+        set_timer(&v->timer, NOW() + MILLISECS(100));
     }
     else
     {

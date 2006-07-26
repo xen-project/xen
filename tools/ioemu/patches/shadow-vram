@@ -1,7 +1,8 @@
-diff -r 0ef2ae12258c hw/vga.c
---- a/hw/vga.c	Mon Jun 26 16:07:22 2006 +0100
-+++ b/hw/vga.c	Tue Jun 27 09:42:44 2006 +0100
-@@ -1287,6 +1287,105 @@ void vga_invalidate_scanlines(VGAState *
+Index: ioemu/hw/vga.c
+===================================================================
+--- ioemu.orig/hw/vga.c	2006-07-26 15:17:39.821306797 +0100
++++ ioemu/hw/vga.c	2006-07-26 15:17:40.017285449 +0100
+@@ -1287,6 +1287,105 @@
      }
  }
  
@@ -107,7 +108,7 @@ diff -r 0ef2ae12258c hw/vga.c
  /* 
   * graphic modes
   */
-@@ -1381,6 +1480,11 @@ static void vga_draw_graphic(VGAState *s
+@@ -1382,6 +1481,11 @@
      printf("w=%d h=%d v=%d line_offset=%d cr[0x09]=0x%02x cr[0x17]=0x%02x linecmp=%d sr[0x01]=0x%02x\n",
             width, height, v, line_offset, s->cr[9], s->cr[0x17], s->line_compare, s->sr[0x01]);
  #endif
@@ -119,7 +120,7 @@ diff -r 0ef2ae12258c hw/vga.c
      addr1 = (s->start_addr * 4);
      bwidth = width * 4;
      y_start = -1;
-@@ -1699,6 +1803,14 @@ void vga_common_init(VGAState *s, Displa
+@@ -1830,6 +1934,14 @@
  
      vga_reset(s);
  
@@ -134,9 +135,10 @@ diff -r 0ef2ae12258c hw/vga.c
      s->vram_ptr = qemu_malloc(vga_ram_size);
      s->vram_offset = vga_ram_offset;
      s->vram_size = vga_ram_size;
-diff -r 0ef2ae12258c hw/vga_int.h
---- a/hw/vga_int.h	Mon Jun 26 16:07:22 2006 +0100
-+++ b/hw/vga_int.h	Tue Jun 27 09:42:44 2006 +0100
+Index: ioemu/hw/vga_int.h
+===================================================================
+--- ioemu.orig/hw/vga_int.h	2006-07-26 15:17:39.822306688 +0100
++++ ioemu/hw/vga_int.h	2006-07-26 15:17:40.017285449 +0100
 @@ -76,6 +76,7 @@
  
  #define VGA_STATE_COMMON                                                \

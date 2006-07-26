@@ -958,11 +958,17 @@ u64 jiffies_to_st(unsigned long j)
 	do {
 		seq = read_seqbegin(&xtime_lock);
 		delta = j - jiffies;
-		/* NB. The next check can trigger in some wrap-around cases,
-		 * but that's ok: we'll just end up with a shorter timeout. */
-		if (delta < 1)
-			delta = 1;
-		st = processed_system_time + (delta * (u64)NS_PER_TICK);
+		if (delta < 1) {
+			/* Triggers in some wrap-around cases, but that's okay:
+			 * we just end up with a shorter timeout. */
+			st = processed_system_time + NS_PER_TICK;
+		} else if (((unsigned long)delta >> (BITS_PER_LONG-3)) != 0) {
+			/* Very long timeout means there is no pending timer.
+			 * We indicate this to Xen by passing zero timeout. */
+			st = 0;
+		} else {
+			st = processed_system_time + delta * (u64)NS_PER_TICK;
+		}
 	} while (read_seqretry(&xtime_lock, seq));
 
 	return st;
@@ -989,14 +995,15 @@ static void stop_hz_timer(void)
 
 	smp_mb();
 
-	/* Leave ourselves in 'tick mode' if rcu or softirq or timer pending. */
+	/* Leave ourselves in tick mode if rcu or softirq or timer pending. */
 	if (rcu_needs_cpu(cpu) || local_softirq_pending() ||
 	    (j = next_timer_interrupt(), time_before_eq(j, jiffies))) {
 		cpu_clear(cpu, nohz_cpu_mask);
 		j = jiffies + 1;
 	}
 
-	BUG_ON(HYPERVISOR_set_timer_op(jiffies_to_st(j)) != 0);
+	if (HYPERVISOR_set_timer_op(jiffies_to_st(j)) != 0)
+		BUG();
 }
 
 static void start_hz_timer(void)

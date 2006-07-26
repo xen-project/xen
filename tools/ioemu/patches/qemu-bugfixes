@@ -1,7 +1,8 @@
-diff -r d76fb4ee3e48 console.c
---- a/console.c	Mon Jun 26 15:16:44 2006 +0100
-+++ b/console.c	Mon Jun 26 15:47:43 2006 +0100
-@@ -449,7 +449,7 @@ static void text_console_resize(TextCons
+Index: ioemu/console.c
+===================================================================
+--- ioemu.orig/console.c	2006-07-26 13:39:11.999009495 +0100
++++ ioemu/console.c	2006-07-26 14:15:19.413719225 +0100
+@@ -449,7 +449,7 @@
              c++;
          }
      }
@@ -10,9 +11,47 @@ diff -r d76fb4ee3e48 console.c
      s->cells = cells;
  }
  
-diff -r d76fb4ee3e48 usb-linux.c
---- a/usb-linux.c	Mon Jun 26 15:16:44 2006 +0100
-+++ b/usb-linux.c	Mon Jun 26 15:47:43 2006 +0100
+@@ -954,11 +954,21 @@
+     return !active_console->text_console;
+ }
+ 
++void set_color_table(DisplayState *ds) 
++{
++    int i, j;
++    for(j = 0; j < 2; j++) {
++	for(i = 0; i < 8; i++) {
++	    color_table[j][i] =
++		col_expand(ds, vga_get_color(ds, color_table_rgb[j][i]));
++	}
++    }
++}
++
+ CharDriverState *text_console_init(DisplayState *ds)
+ {
+     CharDriverState *chr;
+     TextConsole *s;
+-    int i,j;
+     static int color_inited;
+ 
+     chr = qemu_mallocz(sizeof(CharDriverState));
+@@ -976,12 +986,7 @@
+ 
+     if (!color_inited) {
+         color_inited = 1;
+-        for(j = 0; j < 2; j++) {
+-            for(i = 0; i < 8; i++) {
+-                color_table[j][i] = col_expand(s->ds, 
+-                        vga_get_color(s->ds, color_table_rgb[j][i]));
+-            }
+-        }
++        set_color_table(ds);
+     }
+     s->y_displayed = 0;
+     s->y_base = 0;
+Index: ioemu/usb-linux.c
+===================================================================
+--- ioemu.orig/usb-linux.c	2006-07-26 13:39:11.999009495 +0100
++++ ioemu/usb-linux.c	2006-07-26 13:39:16.622514851 +0100
 @@ -26,6 +26,7 @@
  #if defined(__linux__)
  #include <dirent.h>

@@ -323,12 +323,6 @@ int check_descriptor(struct desc_struct *d)
     return 0;
 }
 
-void memguard_guard_stack(void *p)
-{
-    p = (void *)((unsigned long)p + PAGE_SIZE);
-    memguard_guard_range(p, 2 * PAGE_SIZE);
-}
-
 /*
  * Local variables:
  * mode: C

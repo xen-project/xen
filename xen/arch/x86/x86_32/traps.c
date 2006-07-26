@@ -122,6 +122,7 @@ asmlinkage void do_double_fault(void)
 {
     struct tss_struct *tss = &doublefault_tss;
     unsigned int cpu = ((tss->back_link>>3)-__FIRST_TSS_ENTRY)>>1;
+    char taint_str[TAINT_STRING_MAX_LEN];
 
     watchdog_disable();
 
@@ -129,6 +130,9 @@ asmlinkage void do_double_fault(void)
 
     /* Find information saved during fault and dump it to the console. */
     tss = &init_tss[cpu];
+    printk("*** DOUBLE FAULT: Xen-%d.%d%s    %s\n",
+           XEN_VERSION, XEN_SUBVERSION, XEN_EXTRAVERSION,
+           print_tainted(taint_str));
     printk("CPU:    %d\nEIP:    %04x:[<%08x>]",
            cpu, tss->cs, tss->eip);
     print_symbol(" %s\n", tss->eip);

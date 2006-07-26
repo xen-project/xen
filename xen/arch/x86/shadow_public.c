@@ -398,7 +398,7 @@ static void alloc_monitor_pagetable(struct vcpu *v)
     unsigned long m2mfn, m3mfn;
     l2_pgentry_t *mpl2e;
     l3_pgentry_t *mpl3e;
-    struct page_info *m2mfn_info, *m3mfn_info, *page;
+    struct page_info *m2mfn_info, *m3mfn_info;
     struct domain *d = v->domain;
     int i;
 
@@ -411,40 +411,62 @@ static void alloc_monitor_pagetable(struct vcpu *v)
     mpl3e = (l3_pgentry_t *) map_domain_page_global(m3mfn);
     memset(mpl3e, 0, L3_PAGETABLE_ENTRIES * sizeof(l3_pgentry_t));
 
+    v->arch.monitor_table = pagetable_from_pfn(m3mfn);
+    v->arch.monitor_vtable = (l2_pgentry_t *) mpl3e;
+
     m2mfn_info = alloc_domheap_page(NULL);
     ASSERT( m2mfn_info );
 
     m2mfn = page_to_mfn(m2mfn_info);
     mpl2e = (l2_pgentry_t *) map_domain_page(m2mfn);
-    memset(mpl2e, 0, L2_PAGETABLE_ENTRIES * sizeof(l2_pgentry_t));
+    memset(mpl2e, 0, PAGE_SIZE);
+
+    /* Map L2 page into L3 */
+    mpl3e[L3_PAGETABLE_ENTRIES - 1] = l3e_from_pfn(m2mfn, _PAGE_PRESENT);
 
     memcpy(&mpl2e[L2_PAGETABLE_FIRST_XEN_SLOT & (L2_PAGETABLE_ENTRIES-1)],
            &idle_pg_table_l2[L2_PAGETABLE_FIRST_XEN_SLOT],
            L2_PAGETABLE_XEN_SLOTS * sizeof(l2_pgentry_t));
-    /*
-     * Map L2 page into L3
-     */
-    mpl3e[L3_PAGETABLE_ENTRIES - 1] = l3e_from_pfn(m2mfn, _PAGE_PRESENT);
-    page = l3e_get_page(mpl3e[L3_PAGETABLE_ENTRIES - 1]);
 
     for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
         mpl2e[l2_table_offset(PERDOMAIN_VIRT_START) + i] =
             l2e_from_page(
-                virt_to_page(d->arch.mm_perdomain_pt) + i, 
+                virt_to_page(d->arch.mm_perdomain_pt) + i,
                 __PAGE_HYPERVISOR);
     for ( i = 0; i < (LINEARPT_MBYTES >> (L2_PAGETABLE_SHIFT - 20)); i++ )
         mpl2e[l2_table_offset(LINEAR_PT_VIRT_START) + i] =
             (l3e_get_flags(mpl3e[i]) & _PAGE_PRESENT) ?
             l2e_from_pfn(l3e_get_pfn(mpl3e[i]), __PAGE_HYPERVISOR) :
             l2e_empty();
-    for ( i = 0; i < (MACHPHYS_MBYTES >> (L2_PAGETABLE_SHIFT - 20)); i++ )
-        mpl2e[l2_table_offset(RO_MPT_VIRT_START) + i] = l2e_empty();
-
-    v->arch.monitor_table = pagetable_from_pfn(m3mfn);
-    v->arch.monitor_vtable = (l2_pgentry_t *) mpl3e;
 
     if ( v->vcpu_id == 0 )
+    {
+        unsigned long m1mfn;
+        l1_pgentry_t *mpl1e;
+        struct page_info *m1mfn_info;
+
+        /*
+         * 2 l2 slots are allocated here, so that 4M for p2m table,
+         * with this we can guarantee PCI MMIO p2m entries, especially
+         * Cirrus VGA, can be seen by all other vcpus.
+         */
+        for ( i = 0; i < 2; i++ )
+        {
+            m1mfn_info = alloc_domheap_page(NULL);
+            ASSERT( m1mfn_info );
+
+            m1mfn = page_to_mfn(m1mfn_info);
+            mpl1e = (l1_pgentry_t *) map_domain_page(m1mfn);
+            memset(mpl1e, 0, PAGE_SIZE);
+            unmap_domain_page(mpl1e);
+
+            /* Map L1 page into L2 */
+            mpl2e[l2_table_offset(RO_MPT_VIRT_START) + i] =
+                l2e_from_pfn(m1mfn, __PAGE_HYPERVISOR);
+        }
+
         alloc_p2m_table(d);
+    }
     else
     {
         unsigned long mfn;
@@ -468,14 +490,9 @@ static void alloc_monitor_pagetable(struct vcpu *v)
 
             l2tab = map_domain_page(l3e_get_pfn(l3e));
 
-            /*
-             * Just one l2 slot is used here, so at most 2M for p2m table:
-             *      ((4K * 512)/sizeof(unsigned long)) * 4K = 2G
-             * should be OK on PAE xen, since Qemu DM can only map 1.5G VMX
-             * guest memory.
-             */
-            mpl2e[l2_table_offset(RO_MPT_VIRT_START)] =
-                l2tab[l2_table_offset(RO_MPT_VIRT_START)];
+            for ( i = 0; i < (MACHPHYS_MBYTES >> (L2_PAGETABLE_SHIFT - 20)); i++ )
+                mpl2e[l2_table_offset(RO_MPT_VIRT_START) + i] =
+                    l2tab[l2_table_offset(RO_MPT_VIRT_START) + i];
 
             unmap_domain_page(l2tab);
             unmap_domain_page(l3tab);

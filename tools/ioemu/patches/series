@@ -10,9 +10,11 @@ qemu-hvm-banner
 xen-domain-name
 xen-domid
 xen-mm
+ioemu-ia64
 qemu-smp
 qemu-no-apic
 qemu-nobios
+qemu-init-vgabios
 xen-network
 qemu-timer
 domain-reset
@@ -31,3 +33,5 @@ acpi-poweroff-support
 vnc-cleanup
 vnc-fixes
 vnc-start-vncviewer
+vnc-title-domain-name
+vnc-access-monitor-vt
