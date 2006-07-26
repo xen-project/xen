@@ -382,7 +382,7 @@ int iomem_index(target_phys_addr_t addr)
                 start = mmio[i].start;
                 end = mmio[i].start + mmio[i].size;
 
-                if ((addr >= start) && (addr <= end)){
+                if ((addr >= start) && (addr < end)){
                         return (mmio[i].io_index >> IO_MEM_SHIFT) & (IO_MEM_NB_ENTRIES - 1);
                 }
         }
