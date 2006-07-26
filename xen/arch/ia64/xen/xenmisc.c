@@ -172,7 +172,7 @@ void audit_domains_key(unsigned char key)
 void panic_domain(struct pt_regs *regs, const char *fmt, ...)
 {
 	va_list args;
-	char buf[128];
+	char buf[256];
 	struct vcpu *v = current;
 
 	printf("$$$$$ PANIC in domain %d (k6=0x%lx): ",
