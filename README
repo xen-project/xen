@@ -91,6 +91,7 @@ provided by your Linux distributor:
     * GNU Binutils
     * Development install of zlib (e.g., zlib-dev)
     * Development install of Python v2.3 or later (e.g., python-dev)
+    * Development install of curses (e.g., libncurses-dev)
     * bridge-utils package (/sbin/brctl)
     * iproute package (/sbin/ip)
     * hotplug or udev
