@@ -1,0 +1,25 @@
+Index: ioemu/vnc.c
+===================================================================
+--- ioemu.orig/vnc.c	2006-07-26 14:23:52.426074956 +0100
++++ ioemu/vnc.c	2006-07-26 14:24:15.210558295 +0100
+@@ -850,6 +850,7 @@
+ 
+ static int protocol_client_init(VncState *vs, char *data, size_t len)
+ {
++    size_t l;
+     char pad[3] = { 0, 0, 0 };
+ 
+     vs->width = vs->ds->width;
+@@ -886,8 +887,10 @@
+ 	
+     vnc_write(vs, pad, 3);           /* padding */
+ 
+-    vnc_write_u32(vs, 4);        
+-    vnc_write(vs, "QEMU", 4);
++    l = strlen(domain_name); 
++    vnc_write_u32(vs, l);        
++    vnc_write(vs, domain_name, l);
++
+     vnc_flush(vs);
+ 
+     vnc_read_when(vs, protocol_client_msg, 1);

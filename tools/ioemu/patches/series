@@ -32,3 +32,4 @@ acpi-poweroff-support
 vnc-cleanup
 vnc-fixes
 vnc-start-vncviewer
+vnc-title-domain-name
