@@ -258,6 +258,7 @@ static unsigned short late_irq_cnt = 0;
 static unsigned short saved_irq_cnt = 0;
 static int xen_slab_ready = 0;
 
+#ifdef CONFIG_SMP
 /* Dummy stub. Though we may check RESCHEDULE_VECTOR before __do_IRQ,
  * it ends up to issue several memory accesses upon percpu data and
  * thus adds unnecessary traffic to other paths.
@@ -274,6 +275,7 @@ static struct irqaction resched_irqaction = {
 	.flags =	SA_INTERRUPT,
 	.name =		"RESCHED"
 };
+#endif
 
 /*
  * This is xen version percpu irq registration, which needs bind
@@ -486,6 +488,7 @@ ia64_send_ipi (int cpu, int vector, int delivery_mode, int redirect)
         if (is_running_on_xen()) {
 		int irq = -1;
 
+#ifdef CONFIG_SMP
 		/* TODO: we need to call vcpu_up here */
 		if (unlikely(vector == ap_wakeup_vector)) {
 			extern void xen_send_ipi (int cpu, int vec);
@@ -493,6 +496,7 @@ ia64_send_ipi (int cpu, int vector, int delivery_mode, int redirect)
 			//vcpu_prepare_and_up(cpu);
 			return;
 		}
+#endif
 
 		switch(vector) {
 		case IA64_IPI_VECTOR:
