@@ -155,7 +155,10 @@ static void vnc_dpy_resize(DisplayState *ds, int w, int h)
 	exit(1);
     }
 
-    ds->depth = vs->depth * 8;
+    if (ds->depth != vs->depth * 8) {
+        ds->depth = vs->depth * 8;
+        set_color_table(ds);
+    }
     ds->width = w;
     ds->height = h;
     ds->linesize = w * vs->depth;
