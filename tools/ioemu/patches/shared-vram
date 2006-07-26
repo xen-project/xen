@@ -1,6 +1,7 @@
-diff -r 62e05863ec04 hw/cirrus_vga.c
---- a/hw/cirrus_vga.c	Mon Jun 26 15:18:40 2006 +0100
-+++ b/hw/cirrus_vga.c	Mon Jun 26 15:19:40 2006 +0100
+Index: ioemu/hw/cirrus_vga.c
+===================================================================
+--- ioemu.orig/hw/cirrus_vga.c	2006-07-26 13:18:13.906013141 +0100
++++ ioemu/hw/cirrus_vga.c	2006-07-26 13:20:34.462363443 +0100
 @@ -28,6 +28,9 @@
   */
  #include "vl.h"
@@ -11,7 +12,7 @@ diff -r 62e05863ec04 hw/cirrus_vga.c
  
  /*
   * TODO:
-@@ -231,6 +234,8 @@ typedef struct CirrusVGAState {
+@@ -231,6 +234,8 @@
      int cirrus_linear_io_addr;
      int cirrus_linear_bitblt_io_addr;
      int cirrus_mmio_io_addr;
@@ -20,7 +21,7 @@ diff -r 62e05863ec04 hw/cirrus_vga.c
      uint32_t cirrus_addr_mask;
      uint32_t linear_mmio_mask;
      uint8_t cirrus_shadow_gr0;
-@@ -267,6 +272,8 @@ typedef struct CirrusVGAState {
+@@ -267,6 +272,8 @@
      int last_hw_cursor_y_end;
      int real_vram_size; /* XXX: suppress that */
      CPUWriteMemoryFunc **cirrus_linear_write;
@@ -29,7 +30,7 @@ diff -r 62e05863ec04 hw/cirrus_vga.c
  } CirrusVGAState;
  
  typedef struct PCICirrusVGAState {
-@@ -276,6 +283,8 @@ typedef struct PCICirrusVGAState {
+@@ -276,6 +283,8 @@
  
  static uint8_t rop_to_index[256];
      
@@ -38,7 +39,7 @@ diff -r 62e05863ec04 hw/cirrus_vga.c
  /***************************************
   *
   *  prototypes.
-@@ -2520,6 +2529,80 @@ static CPUWriteMemoryFunc *cirrus_linear
+@@ -2520,6 +2529,80 @@
      cirrus_linear_bitblt_writel,
  };
  
@@ -119,7 +120,7 @@ diff -r 62e05863ec04 hw/cirrus_vga.c
  /* Compute the memory access functions */
  static void cirrus_update_memory_access(CirrusVGAState *s)
  {
-@@ -2538,11 +2621,39 @@ static void cirrus_update_memory_access(
+@@ -2538,11 +2621,39 @@
          
  	mode = s->gr[0x05] & 0x7;
  	if (mode < 4 || mode > 5 || ((s->gr[0x0B] & 0x4) == 0)) {
@@ -159,7 +160,7 @@ diff -r 62e05863ec04 hw/cirrus_vga.c
              s->cirrus_linear_write[0] = cirrus_linear_writeb;
              s->cirrus_linear_write[1] = cirrus_linear_writew;
              s->cirrus_linear_write[2] = cirrus_linear_writel;
-@@ -3136,6 +3247,13 @@ static void cirrus_pci_lfb_map(PCIDevice
+@@ -3136,6 +3247,13 @@
      /* XXX: add byte swapping apertures */
      cpu_register_physical_memory(addr, s->vram_size,
  				 s->cirrus_linear_io_addr);
@@ -173,10 +174,11 @@ diff -r 62e05863ec04 hw/cirrus_vga.c
      cpu_register_physical_memory(addr + 0x1000000, 0x400000,
  				 s->cirrus_linear_bitblt_io_addr);
  }
-diff -r 62e05863ec04 hw/pc.c
---- a/hw/pc.c	Mon Jun 26 15:18:40 2006 +0100
-+++ b/hw/pc.c	Mon Jun 26 15:19:40 2006 +0100
-@@ -783,14 +783,14 @@ static void pc_init1(uint64_t ram_size, 
+Index: ioemu/hw/pc.c
+===================================================================
+--- ioemu.orig/hw/pc.c	2006-07-26 13:20:34.396370329 +0100
++++ ioemu/hw/pc.c	2006-07-26 13:20:34.463363339 +0100
+@@ -783,14 +783,14 @@
      if (cirrus_vga_enabled) {
          if (pci_enabled) {
              pci_cirrus_vga_init(pci_bus, 
@@ -194,10 +196,11 @@ diff -r 62e05863ec04 hw/pc.c
                         vga_ram_size, 0, 0);
      }
  
-diff -r 62e05863ec04 hw/vga.c
---- a/hw/vga.c	Mon Jun 26 15:18:40 2006 +0100
-+++ b/hw/vga.c	Mon Jun 26 15:19:40 2006 +0100
-@@ -1668,6 +1668,7 @@ static void vga_map(PCIDevice *pci_dev, 
+Index: ioemu/hw/vga.c
+===================================================================
+--- ioemu.orig/hw/vga.c	2006-07-26 13:20:33.293485412 +0100
++++ ioemu/hw/vga.c	2006-07-26 13:20:34.464363234 +0100
+@@ -1669,6 +1669,7 @@
      }
  }
  
@@ -205,7 +208,7 @@ diff -r 62e05863ec04 hw/vga.c
  void vga_common_init(VGAState *s, DisplayState *ds, uint8_t *vga_ram_base, 
                       unsigned long vga_ram_offset, int vga_ram_size)
  {
-@@ -1698,7 +1699,7 @@ void vga_common_init(VGAState *s, Displa
+@@ -1699,7 +1700,7 @@
  
      vga_reset(s);
  
@@ -214,12 +217,10 @@ diff -r 62e05863ec04 hw/vga.c
      s->vram_offset = vga_ram_offset;
      s->vram_size = vga_ram_size;
      s->ds = ds;
-@@ -1808,6 +1809,31 @@ int vga_initialize(PCIBus *bus, DisplayS
- #endif
-     }
+@@ -1811,6 +1812,31 @@
      return 0;
-+}
-+
+ }
+ 
 +void *vga_update_vram(VGAState *s, void *vga_ram_base, int vga_ram_size)
 +{
 +    uint8_t *old_pointer;
@@ -243,27 +244,30 @@ diff -r 62e05863ec04 hw/vga.c
 +    s->vram_ptr = vga_ram_base;
 +
 +    return old_pointer;
- }
- 
++}
++
  /********************************************************/
-diff -r 62e05863ec04 hw/vga_int.h
---- a/hw/vga_int.h	Mon Jun 26 15:18:40 2006 +0100
-+++ b/hw/vga_int.h	Mon Jun 26 15:19:40 2006 +0100
-@@ -166,5 +166,6 @@ void vga_draw_cursor_line_32(uint8_t *d1
+ /* vga screen dump */
+ 
+Index: ioemu/hw/vga_int.h
+===================================================================
+--- ioemu.orig/hw/vga_int.h	2006-07-26 13:20:33.063509409 +0100
++++ ioemu/hw/vga_int.h	2006-07-26 13:20:34.464363234 +0100
+@@ -166,5 +166,6 @@
                               unsigned int color0, unsigned int color1,
                               unsigned int color_xor);
  
 +void *vga_update_vram(VGAState *s, void *vga_ram_base, int vga_ram_size);
  extern const uint8_t sr_mask[8];
  extern const uint8_t gr_mask[16];
-diff -r 62e05863ec04 vl.c
---- a/vl.c	Mon Jun 26 15:18:40 2006 +0100
-+++ b/vl.c	Mon Jun 26 15:19:40 2006 +0100
-@@ -5147,6 +5147,78 @@ static void select_soundhw (const char *
- #endif
+Index: ioemu/vl.c
+===================================================================
+--- ioemu.orig/vl.c	2006-07-26 13:20:34.398370121 +0100
++++ ioemu/vl.c	2006-07-26 13:20:34.466363026 +0100
+@@ -5148,6 +5148,78 @@
  
  #define MAX_NET_CLIENTS 32
-+
+ 
 +#include <xg_private.h>
 +
 +/* FIXME Flush the shadow page */
@@ -335,13 +339,15 @@ diff -r 62e05863ec04 vl.c
 +
 +    return 0;
 +}
- 
++
  int main(int argc, char **argv)
  {
-diff -r 62e05863ec04 vl.h
---- a/vl.h	Mon Jun 26 15:18:40 2006 +0100
-+++ b/vl.h	Mon Jun 26 15:19:40 2006 +0100
-@@ -136,6 +136,13 @@ extern int reset_requested;
+ #ifdef CONFIG_GDBSTUB
+Index: ioemu/vl.h
+===================================================================
+--- ioemu.orig/vl.h	2006-07-26 13:20:34.268383684 +0100
++++ ioemu/vl.h	2006-07-26 13:20:34.467362921 +0100
+@@ -136,6 +136,13 @@
  
  void main_loop_wait(int timeout);
  

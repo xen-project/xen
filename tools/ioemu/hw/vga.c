@@ -1392,7 +1392,8 @@ void check_sse2(void)
 static void vga_draw_graphic(VGAState *s, int full_update)
 {
     int y1, y, update, page_min, page_max, linesize, y_start, double_scan, mask;
-    int width, height, shift_control, line_offset, page0, page1, bwidth;
+    int width, height, shift_control, line_offset, bwidth;
+    ram_addr_t page0, page1;
     int disp_width, multi_scan, multi_run;
     uint8_t *d;
     uint32_t v, addr1, addr;
