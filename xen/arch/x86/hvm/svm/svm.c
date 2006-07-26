@@ -1766,7 +1766,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
             if ( svm_pgbit_test(v) )
             {
                 /* The guest is a 32-bit PAE guest. */
-#if CONFIG_PAGING_LEVELS >= 4
+#if CONFIG_PAGING_LEVELS >= 3
                 unsigned long mfn, old_base_mfn;
 
                 if( !shadow_set_guest_paging_levels(v->domain, PAGING_L3) )
@@ -1810,7 +1810,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
             else
             {
                 /*  The guest is a 64 bit or 32-bit PAE guest. */
-#if CONFIG_PAGING_LEVELS >= 4
+#if CONFIG_PAGING_LEVELS >= 3
                 if ( (v->domain->arch.ops != NULL) &&
                         v->domain->arch.ops->guest_paging_levels == PAGING_L2)
                 {
