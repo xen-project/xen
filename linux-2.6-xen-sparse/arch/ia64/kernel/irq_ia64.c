@@ -451,8 +451,6 @@ void __init
 init_IRQ (void)
 {
 #ifdef CONFIG_XEN
-	printk(KERN_INFO "init_IRQ called from %p\n",
-	       __builtin_return_address (0));
 	/* Maybe put into platform_irq_init later */
 	if (is_running_on_xen()) {
 		struct callback_register event = {
