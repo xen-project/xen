@@ -143,7 +143,7 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	BUG_ON(skb->dev != dev);
 
 	/* Drop the packet if the target domain has no receive buffers. */
-	if (!netif->active || 
+	if (unlikely(!netif_carrier_ok(dev)) ||
 	    (netif->rx_req_cons_peek == netif->rx.sring->req_prod) ||
 	    ((netif->rx_req_cons_peek - netif->rx.rsp_prod_pvt) ==
 	     NET_RX_RING_SIZE))
@@ -404,7 +404,8 @@ static void add_to_net_schedule_list_tail(netif_t *netif)
 		return;
 
 	spin_lock_irq(&net_schedule_list_lock);
-	if (!__on_net_schedule_list(netif) && netif->active) {
+	if (!__on_net_schedule_list(netif) &&
+	    likely(netif_carrier_ok(netif->dev))) {
 		list_add_tail(&netif->list, &net_schedule_list);
 		netif_get(netif);
 	}

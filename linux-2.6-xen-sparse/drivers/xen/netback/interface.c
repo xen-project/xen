@@ -37,9 +37,7 @@
 static void __netif_up(netif_t *netif)
 {
 	struct net_device *dev = netif->dev;
-	netif_tx_lock_bh(dev);
-	netif->active = 1;
-	netif_tx_unlock_bh(dev);
+	netif_carrier_on(dev);
 	enable_irq(netif->irq);
 	netif_schedule_work(netif);
 }
@@ -49,7 +47,7 @@ static void __netif_down(netif_t *netif)
 	struct net_device *dev = netif->dev;
 	disable_irq(netif->irq);
 	netif_tx_lock_bh(dev);
-	netif->active = 0;
+	netif_carrier_off(dev);
 	netif_tx_unlock_bh(dev);
 	netif_deschedule_work(netif);
 }
@@ -92,6 +90,8 @@ netif_t *netif_alloc(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN])
 		DPRINTK("Could not create netif: out of memory\n");
 		return ERR_PTR(-ENOMEM);
 	}
+
+	netif_carrier_off(dev);
 
 	netif = netdev_priv(dev);
 	memset(netif, 0, sizeof(*netif));
