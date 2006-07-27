@@ -286,7 +286,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
         if ( msr_content & ~(EFER_LME | EFER_LMA | EFER_NX | EFER_SCE) )
         {
             printk("trying to set reserved bit in EFER\n");
-            vmx_inject_exception(v, TRAP_gp_fault, 0);
+            vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
             return 0;
         }
 
@@ -300,7 +300,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
             {
                 printk("trying to set LME bit when "
                        "in paging mode or PAE bit is not set\n");
-                vmx_inject_exception(v, TRAP_gp_fault, 0);
+                vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
                 return 0;
             }
 
@@ -318,7 +318,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
         if ( !IS_CANO_ADDRESS(msr_content) )
         {
             HVM_DBG_LOG(DBG_LEVEL_1, "Not cano address of msr write\n");
-            vmx_inject_exception(v, TRAP_gp_fault, 0);
+            vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
             return 0;
         }
 
@@ -1438,7 +1438,7 @@ static int vmx_set_cr0(unsigned long value)
                        &v->arch.hvm_vmx.cpu_state) )
         {
             HVM_DBG_LOG(DBG_LEVEL_1, "Enable paging before PAE enabled\n");
-            vmx_inject_exception(v, TRAP_gp_fault, 0);
+            vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
         }
 
         if ( test_bit(VMX_CPU_STATE_LME_ENABLED,
@@ -1520,7 +1520,7 @@ static int vmx_set_cr0(unsigned long value)
     {
         if ( value & X86_CR0_PG ) {
             /* inject GP here */
-            vmx_inject_exception(v, TRAP_gp_fault, 0);
+            vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
             return 0;
         } else {
             /*
@@ -1764,7 +1764,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
         else
         {
             if ( test_bit(VMX_CPU_STATE_LMA_ENABLED, &v->arch.hvm_vmx.cpu_state) )
-                vmx_inject_exception(v, TRAP_gp_fault, 0);
+                vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
 
             clear_bit(VMX_CPU_STATE_PAE_ENABLED, &v->arch.hvm_vmx.cpu_state);
         }
@@ -2192,7 +2192,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
             if ( test_bit(_DOMF_debugging, &v->domain->domain_flags) )
                 domain_pause_for_debugger();
             else 
-                vmx_inject_exception(v, TRAP_int3, VMX_DELIVER_NO_ERROR_CODE);
+                vmx_reflect_exception(v);
             break;
         }
 #endif
@@ -2219,7 +2219,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
                 /*
                  * Inject #PG using Interruption-Information Fields
                  */
-                vmx_inject_exception(v, TRAP_page_fault, regs.error_code);
+                vmx_inject_hw_exception(v, TRAP_page_fault, regs.error_code);
                 v->arch.hvm_vmx.cpu_cr2 = va;
                 TRACE_3D(TRC_VMX_INT, v->domain->domain_id, TRAP_page_fault, va);
             }
@@ -2335,7 +2335,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
     case EXIT_REASON_VMON:
         /* Report invalid opcode exception when a VMX guest tries to execute 
             any of the VMX instructions */
-        vmx_inject_exception(v, TRAP_invalid_op, VMX_DELIVER_NO_ERROR_CODE);
+        vmx_inject_hw_exception(v, TRAP_invalid_op, VMX_DELIVER_NO_ERROR_CODE);
         break;
 
     default:
