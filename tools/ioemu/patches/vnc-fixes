@@ -1,8 +1,8 @@
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-26 14:29:04.481598583 +0100
-+++ ioemu/vl.c	2006-07-26 14:31:22.668325993 +0100
-@@ -6003,8 +6003,10 @@
+--- ioemu.orig/vl.c	2006-07-27 11:17:00.724138358 +0100
++++ ioemu/vl.c	2006-07-27 11:17:00.874121755 +0100
+@@ -6004,8 +6004,10 @@
                    kernel_filename, kernel_cmdline, initrd_filename,
                    timeoffset);
  
@@ -17,8 +17,8 @@ Index: ioemu/vl.c
      if (use_gdbstub) {
 Index: ioemu/vnc.c
 ===================================================================
---- ioemu.orig/vnc.c	2006-07-26 14:29:04.479598804 +0100
-+++ ioemu/vnc.c	2006-07-26 14:31:22.669325883 +0100
+--- ioemu.orig/vnc.c	2006-07-27 11:17:00.722138579 +0100
++++ ioemu/vnc.c	2006-07-27 11:17:00.875121644 +0100
 @@ -3,6 +3,7 @@
   * 
   * Copyright (C) 2006 Anthony Liguori <anthony@codemonkey.ws>
@@ -493,8 +493,8 @@ Index: ioemu/vnc.c
  }
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-07-26 14:31:22.669325883 +0100
-+++ ioemu/vl.h	2006-07-26 14:32:44.505279724 +0100
+--- ioemu.orig/vl.h	2006-07-27 11:17:00.311184072 +0100
++++ ioemu/vl.h	2006-07-27 11:17:00.875121644 +0100
 @@ -301,6 +301,7 @@
  int is_graphic_console(void);
  CharDriverState *text_console_init(DisplayState *ds);

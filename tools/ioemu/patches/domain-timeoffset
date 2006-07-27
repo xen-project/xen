@@ -1,7 +1,7 @@
 Index: ioemu/hw/mc146818rtc.c
 ===================================================================
---- ioemu.orig/hw/mc146818rtc.c	2006-07-26 15:17:35.110819901 +0100
-+++ ioemu/hw/mc146818rtc.c	2006-07-26 15:17:40.292255496 +0100
+--- ioemu.orig/hw/mc146818rtc.c	2006-07-27 11:17:18.007225084 +0100
++++ ioemu/hw/mc146818rtc.c	2006-07-27 11:17:48.250876949 +0100
 @@ -178,10 +178,27 @@
      }
  }
@@ -46,8 +46,8 @@ Index: ioemu/hw/mc146818rtc.c
  static void rtc_copy_date(RTCState *s)
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2006-07-26 15:17:39.820306906 +0100
-+++ ioemu/hw/pc.c	2006-07-26 15:17:40.293255388 +0100
+--- ioemu.orig/hw/pc.c	2006-07-27 11:17:47.993905398 +0100
++++ ioemu/hw/pc.c	2006-07-27 11:17:48.251876839 +0100
 @@ -151,7 +151,7 @@
  }
  
@@ -117,8 +117,8 @@ Index: ioemu/hw/pc.c
  QEMUMachine pc_machine = {
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-26 15:17:40.169268893 +0100
-+++ ioemu/vl.c	2006-07-26 15:17:40.296255061 +0100
+--- ioemu.orig/vl.c	2006-07-27 11:17:48.126890676 +0100
++++ ioemu/vl.c	2006-07-27 11:17:48.254876507 +0100
 @@ -164,6 +164,8 @@
  
  int xc_handle;
@@ -128,7 +128,7 @@ Index: ioemu/vl.c
  char domain_name[1024] = { 'H','V', 'M', 'X', 'E', 'N', '-'};
  extern int domid;
  
-@@ -4799,6 +4801,7 @@
+@@ -4800,6 +4802,7 @@
  #endif
             "-loadvm file    start right away with a saved state (loadvm in monitor)\n"
  	   "-vnc display    start a VNC server on display\n"
@@ -136,7 +136,7 @@ Index: ioemu/vl.c
             "\n"
             "During emulation, the following keys are useful:\n"
             "ctrl-alt-f      toggle full screen\n"
-@@ -4889,6 +4892,7 @@
+@@ -4890,6 +4893,7 @@
  
      QEMU_OPTION_d,
      QEMU_OPTION_vcpus,
@@ -144,7 +144,7 @@ Index: ioemu/vl.c
  };
  
  typedef struct QEMUOption {
-@@ -4967,6 +4971,7 @@
+@@ -4968,6 +4972,7 @@
      
      { "d", HAS_ARG, QEMU_OPTION_d },
      { "vcpus", 1, QEMU_OPTION_vcpus },
@@ -152,7 +152,7 @@ Index: ioemu/vl.c
      { NULL },
  };
  
-@@ -5669,6 +5674,9 @@
+@@ -5670,6 +5675,9 @@
                  vcpus = atoi(optarg);
                  fprintf(logfile, "qemu: the number of cpus is %d\n", vcpus);
                  break;
@@ -162,7 +162,7 @@ Index: ioemu/vl.c
              }
          }
      }
-@@ -5992,7 +6000,8 @@
+@@ -5993,7 +6001,8 @@
  
      machine->init(ram_size, vga_ram_size, boot_device,
                    ds, fd_filename, snapshot,
@@ -174,8 +174,8 @@ Index: ioemu/vl.c
      qemu_mod_timer(gui_timer, qemu_get_clock(rt_clock));
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-07-26 15:17:39.825306361 +0100
-+++ ioemu/vl.h	2006-07-26 15:17:40.297254952 +0100
+--- ioemu.orig/vl.h	2006-07-27 11:17:47.998904845 +0100
++++ ioemu/vl.h	2006-07-27 11:17:48.254876507 +0100
 @@ -556,7 +556,7 @@
                                   int boot_device,
               DisplayState *ds, const char **fd_filename, int snapshot,

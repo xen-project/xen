@@ -1,7 +1,8 @@
-diff -r c84300f3abc2 vnc.c
---- a/vnc.c	Wed Jul 05 18:11:23 2006 +0100
-+++ b/vnc.c	Thu Jul 06 14:27:28 2006 +0100
-@@ -83,13 +83,16 @@ static void vnc_dpy_update(DisplayState 
+Index: ioemu/vnc.c
+===================================================================
+--- ioemu.orig/vnc.c	2006-07-27 11:16:52.783017443 +0100
++++ ioemu/vnc.c	2006-07-27 11:17:00.722138579 +0100
+@@ -83,13 +83,16 @@
  static void vnc_dpy_update(DisplayState *ds, int x, int y, int w, int h)
  {
      VncState *vs = ds->opaque;
@@ -21,7 +22,7 @@ diff -r c84300f3abc2 vnc.c
  }
  
  static void vnc_framebuffer_update(VncState *vs, int x, int y, int w, int h,
-@@ -262,6 +265,7 @@ static void vnc_update_client(void *opaq
+@@ -262,6 +265,7 @@
  static void vnc_update_client(void *opaque)
  {
      VncState *vs = opaque;
@@ -29,7 +30,7 @@ diff -r c84300f3abc2 vnc.c
  
      if (vs->need_update && vs->csock != -1) {
  	int y;
-@@ -282,7 +286,7 @@ static void vnc_update_client(void *opaq
+@@ -282,7 +286,7 @@
  	row = vs->ds->data;
  	old_row = vs->old_data;
  
@@ -38,7 +39,7 @@ diff -r c84300f3abc2 vnc.c
  	    if (vs->dirty_row[y] & width_mask) {
  		int x;
  		char *ptr, *old_ptr;
-@@ -307,10 +311,8 @@ static void vnc_update_client(void *opaq
+@@ -307,10 +311,8 @@
  	    old_row += vs->ds->linesize;
  	}
  
@@ -51,7 +52,7 @@ diff -r c84300f3abc2 vnc.c
  
  	/* Count rectangles */
  	n_rectangles = 0;
-@@ -348,7 +350,9 @@ static void vnc_update_client(void *opaq
+@@ -348,7 +350,9 @@
  	vnc_flush(vs);
  
      }
@@ -62,10 +63,11 @@ diff -r c84300f3abc2 vnc.c
  }
  
  static void vnc_timer_init(VncState *vs)
-diff -r c84300f3abc2 vl.c
---- a/vl.c	Wed Jul 05 18:11:23 2006 +0100
-+++ b/vl.c	Thu Jul 06 14:27:28 2006 +0100
-@@ -4586,10 +4586,10 @@ void main_loop_wait(int timeout)
+Index: ioemu/vl.c
+===================================================================
+--- ioemu.orig/vl.c	2006-07-27 11:17:00.311184072 +0100
++++ ioemu/vl.c	2006-07-27 11:17:00.724138358 +0100
+@@ -4587,10 +4587,10 @@
          /* XXX: better handling of removal */
          for(ioh = first_io_handler; ioh != NULL; ioh = ioh_next) {
              ioh_next = ioh->next;

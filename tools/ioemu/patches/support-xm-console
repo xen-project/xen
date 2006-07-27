@@ -1,7 +1,8 @@
-diff -r d08c08f8fbf3 vl.c
---- a/vl.c	Mon Jun 26 15:18:25 2006 +0100
-+++ b/vl.c	Mon Jun 26 15:18:37 2006 +0100
-@@ -1535,26 +1535,65 @@ CharDriverState *qemu_chr_open_stdio(voi
+Index: ioemu/vl.c
+===================================================================
+--- ioemu.orig/vl.c	2006-07-27 11:16:59.384286681 +0100
++++ ioemu/vl.c	2006-07-27 11:16:59.614261222 +0100
+@@ -1535,26 +1535,65 @@
      return chr;
  }
  
@@ -65,19 +66,18 @@ diff -r d08c08f8fbf3 vl.c
 -    tty.c_cc[VMIN] = 1;
 -    tty.c_cc[VTIME] = 0;
 -    tcsetattr (master_fd, TCSAFLUSH, &tty);
--
--    fprintf(stderr, "char device redirected to %s\n", slave_name);
 +    /* Set raw attributes on the pty. */
 +    cfmakeraw(&tty);
 +    tcsetattr(slave_fd, TCSAFLUSH, &tty);
 +    
 +    fprintf(stderr, "char device redirected to %s\n", ptsname(master_fd));
 +    store_console_dev(domid, ptsname(master_fd));
-+
+ 
+-    fprintf(stderr, "char device redirected to %s\n", slave_name);
      return qemu_chr_open_fd(master_fd, master_fd);
  }
  
-@@ -5297,7 +5336,9 @@ int main(int argc, char **argv)
+@@ -5298,7 +5337,9 @@
                  break;
              case QEMU_OPTION_nographic:
                  pstrcpy(monitor_device, sizeof(monitor_device), "stdio");
