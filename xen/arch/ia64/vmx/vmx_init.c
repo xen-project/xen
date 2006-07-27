@@ -336,7 +336,6 @@ static const io_range_t io_ranges[] = {
 static void vmx_build_physmap_table(struct domain *d)
 {
 	unsigned long i, j, start, tmp, end, mfn;
-	struct vcpu *v = d->vcpu[0];
 	struct list_head *list_ent = d->page_list.next;
 
 	ASSERT(d->max_pages == d->tot_pages);
