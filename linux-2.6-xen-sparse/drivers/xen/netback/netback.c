@@ -99,24 +99,21 @@ static spinlock_t net_schedule_list_lock;
 #define MAX_MFN_ALLOC 64
 static unsigned long mfn_list[MAX_MFN_ALLOC];
 static unsigned int alloc_index = 0;
-static DEFINE_SPINLOCK(mfn_lock);
 
 static unsigned long alloc_mfn(void)
 {
-	unsigned long mfn = 0, flags;
+	unsigned long mfn = 0;
 	struct xen_memory_reservation reservation = {
 		.nr_extents   = MAX_MFN_ALLOC,
 		.extent_order = 0,
 		.domid        = DOMID_SELF
 	};
 	set_xen_guest_handle(reservation.extent_start, mfn_list);
-	spin_lock_irqsave(&mfn_lock, flags);
 	if ( unlikely(alloc_index == 0) )
 		alloc_index = HYPERVISOR_memory_op(
 			XENMEM_increase_reservation, &reservation);
 	if ( alloc_index != 0 )
 		mfn = mfn_list[--alloc_index];
-	spin_unlock_irqrestore(&mfn_lock, flags);
 	return mfn;
 }
 
@@ -222,9 +219,13 @@ static void net_rx_action(unsigned long unused)
 	unsigned long vdata, old_mfn, new_mfn;
 	struct sk_buff_head rxq;
 	struct sk_buff *skb;
-	u16 notify_list[NET_RX_RING_SIZE];
 	int notify_nr = 0;
 	int ret;
+	/*
+	 * Putting hundreds of bytes on the stack is considered rude.
+	 * Static works because a tasklet can only be on one CPU at any time.
+	 */
+	static u16 notify_list[NET_RX_RING_SIZE];
 
 	skb_queue_head_init(&rxq);
 

@@ -1,8 +1,8 @@
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-14 15:55:59.491503372 +0100
-+++ ioemu/vl.c	2006-07-14 15:55:59.693480386 +0100
-@@ -4697,7 +4697,7 @@
+--- ioemu.orig/vl.c	2006-07-27 11:16:57.756466882 +0100
++++ ioemu/vl.c	2006-07-27 11:16:57.828458912 +0100
+@@ -4698,7 +4698,7 @@
             "-S              freeze CPU at startup (use 'c' to start execution)\n"
             "-s              wait gdb connection to port %d\n"
             "-p port         change gdb connection port\n"
@@ -11,7 +11,7 @@ Index: ioemu/vl.c
             "-hdachs c,h,s[,t]  force hard disk 0 physical geometry and the optional BIOS\n"
             "                translation (t=none or lba) (usually qemu can guess them)\n"
             "-L path         set the directory for the BIOS and VGA BIOS\n"
-@@ -4775,7 +4775,7 @@
+@@ -4776,7 +4776,7 @@
      QEMU_OPTION_S,
      QEMU_OPTION_s,
      QEMU_OPTION_p,
@@ -20,7 +20,7 @@ Index: ioemu/vl.c
      QEMU_OPTION_hdachs,
      QEMU_OPTION_L,
  #ifdef USE_CODE_COPY
-@@ -4844,7 +4844,7 @@
+@@ -4845,7 +4845,7 @@
      { "S", 0, QEMU_OPTION_S },
      { "s", 0, QEMU_OPTION_s },
      { "p", HAS_ARG, QEMU_OPTION_p },
@@ -29,7 +29,7 @@ Index: ioemu/vl.c
      { "hdachs", HAS_ARG, QEMU_OPTION_hdachs },
      { "L", HAS_ARG, QEMU_OPTION_L },
  #ifdef USE_CODE_COPY
-@@ -5095,6 +5095,8 @@
+@@ -5096,6 +5096,8 @@
      char usb_devices[MAX_VM_USB_PORTS][128];
      int usb_devices_index;
  
@@ -38,7 +38,7 @@ Index: ioemu/vl.c
      LIST_INIT (&vm_change_state_head);
  #if !defined(CONFIG_SOFTMMU)
      /* we never want that malloc() uses mmap() */
-@@ -5144,6 +5146,11 @@
+@@ -5145,6 +5147,11 @@
      nb_nics = 0;
      /* default mac address of the first network interface */
      
@@ -50,7 +50,7 @@ Index: ioemu/vl.c
      optind = 1;
      for(;;) {
          if (optind >= argc)
-@@ -5329,7 +5336,7 @@
+@@ -5330,7 +5337,7 @@
                      exit(1);
                  }
                  break;
@@ -59,7 +59,7 @@ Index: ioemu/vl.c
                  {
                      int mask;
                      CPULogItem *item;
-@@ -5700,7 +5707,7 @@
+@@ -5701,7 +5708,7 @@
          stk.ss_flags = 0;
  
          if (sigaltstack(&stk, NULL) < 0) {

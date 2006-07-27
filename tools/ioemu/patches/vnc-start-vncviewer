@@ -1,7 +1,7 @@
 Index: ioemu/vnc.c
 ===================================================================
---- ioemu.orig/vnc.c	2006-07-26 14:33:08.166663983 +0100
-+++ ioemu/vnc.c	2006-07-26 14:33:08.225657462 +0100
+--- ioemu.orig/vnc.c	2006-07-27 11:17:00.875121644 +0100
++++ ioemu/vnc.c	2006-07-27 11:17:01.032104266 +0100
 @@ -1002,3 +1002,25 @@
  
      vnc_dpy_resize(vs->ds, 640, 400);
@@ -30,8 +30,8 @@ Index: ioemu/vnc.c
 +}
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-26 14:33:08.165664094 +0100
-+++ ioemu/vl.c	2006-07-26 14:33:08.227657240 +0100
+--- ioemu.orig/vl.c	2006-07-27 11:17:00.874121755 +0100
++++ ioemu/vl.c	2006-07-27 11:17:01.035103934 +0100
 @@ -121,6 +121,7 @@
  int bios_size;
  static DisplayState display_state;
@@ -40,7 +40,7 @@ Index: ioemu/vl.c
  const char* keyboard_layout = NULL;
  int64_t ticks_per_sec;
  int boot_device = 'c';
-@@ -4801,6 +4802,7 @@
+@@ -4802,6 +4803,7 @@
  #endif
             "-loadvm file    start right away with a saved state (loadvm in monitor)\n"
  	   "-vnc display    start a VNC server on display\n"
@@ -48,7 +48,7 @@ Index: ioemu/vl.c
             "-timeoffset     time offset (in seconds) from local time\n"
             "\n"
             "During emulation, the following keys are useful:\n"
-@@ -4889,6 +4891,7 @@
+@@ -4890,6 +4892,7 @@
      QEMU_OPTION_usbdevice,
      QEMU_OPTION_smp,
      QEMU_OPTION_vnc,
@@ -56,7 +56,7 @@ Index: ioemu/vl.c
  
      QEMU_OPTION_d,
      QEMU_OPTION_vcpus,
-@@ -4964,6 +4967,7 @@
+@@ -4965,6 +4968,7 @@
      { "usbdevice", HAS_ARG, QEMU_OPTION_usbdevice },
      { "smp", HAS_ARG, QEMU_OPTION_smp },
      { "vnc", HAS_ARG, QEMU_OPTION_vnc },
@@ -64,7 +64,7 @@ Index: ioemu/vl.c
      
      /* temporary options */
      { "usb", 0, QEMU_OPTION_usb },
-@@ -5294,6 +5298,7 @@
+@@ -5295,6 +5299,7 @@
  #endif
      snapshot = 0;
      nographic = 0;
@@ -72,7 +72,7 @@ Index: ioemu/vl.c
      kernel_filename = NULL;
      kernel_cmdline = "";
  #ifdef TARGET_PPC
-@@ -5663,6 +5668,9 @@
+@@ -5664,6 +5669,9 @@
  		    exit(1);
  		}
  		break;
@@ -82,7 +82,7 @@ Index: ioemu/vl.c
              case QEMU_OPTION_domainname:
                  strncat(domain_name, optarg, sizeof(domain_name) - 20);
                  break;
-@@ -5910,6 +5918,8 @@
+@@ -5911,6 +5919,8 @@
          dumb_display_init(ds);
      } else if (vnc_display != -1) {
  	vnc_display_init(ds, vnc_display);
@@ -93,8 +93,8 @@ Index: ioemu/vl.c
          sdl_display_init(ds, full_screen);
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-07-26 14:33:08.167663873 +0100
-+++ ioemu/vl.h	2006-07-26 14:33:08.228657130 +0100
+--- ioemu.orig/vl.h	2006-07-27 11:17:00.875121644 +0100
++++ ioemu/vl.h	2006-07-27 11:17:01.036103823 +0100
 @@ -733,6 +733,7 @@
  
  /* vnc.c */

@@ -15,12 +15,6 @@
 
 #define HVM_LOADER_ENTR_ADDR  0x00100000
 
-#define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
-#define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
-#ifdef __x86_64__
-#define L3_PROT (_PAGE_PRESENT)
-#endif
-
 #define E820MAX     128
 
 #define E820_RAM          1
@@ -41,9 +35,6 @@ struct e820entry {
     uint32_t type;
 } __attribute__((packed));
 
-#define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
-#define round_pgdown(_p)  ((_p)&PAGE_MASK)
-
 static int
 parseelfimage(
     char *elfbase, unsigned long elfsize, struct domain_setup_info *dsi);
@@ -52,7 +43,7 @@ loadelfimage(
     char *elfbase, int xch, uint32_t dom, unsigned long *parray,
     struct domain_setup_info *dsi);
 
-static unsigned char build_e820map(void *e820_page, unsigned long long mem_size)
+static void build_e820map(void *e820_page, unsigned long long mem_size)
 {
     struct e820entry *e820entry =
         (struct e820entry *)(((unsigned char *)e820_page) + E820_MAP_OFFSET);
@@ -115,7 +106,7 @@ static unsigned char build_e820map(void *e820_page, unsigned long long mem_size)
     e820entry[nr_map].type = E820_IO;
     nr_map++;
 
-    return (*(((unsigned char *)e820_page) + E820_MAP_NR_OFFSET) = nr_map);
+    *(((unsigned char *)e820_page) + E820_MAP_NR_OFFSET) = nr_map;
 }
 
 static void set_hvm_info_checksum(struct hvm_info_table *t)
@@ -186,7 +177,6 @@ static int setup_guest(int xc_handle,
 
     shared_info_t *shared_info;
     void *e820_page;
-    unsigned char e820_map_nr;
 
     struct domain_setup_info dsi;
     uint64_t v_end;
@@ -261,7 +251,7 @@ static int setup_guest(int xc_handle,
               page_array[E820_MAP_PAGE >> PAGE_SHIFT])) == 0 )
         goto error_out;
     memset(e820_page, 0, PAGE_SIZE);
-    e820_map_nr = build_e820map(e820_page, v_end);
+    build_e820map(e820_page, v_end);
     munmap(e820_page, PAGE_SIZE);
 
     /* shared_info page starts its life empty. */
@@ -311,23 +301,7 @@ static int setup_guest(int xc_handle,
     /*
      * Initial register values:
      */
-    ctxt->user_regs.ds = 0;
-    ctxt->user_regs.es = 0;
-    ctxt->user_regs.fs = 0;
-    ctxt->user_regs.gs = 0;
-    ctxt->user_regs.ss = 0;
-    ctxt->user_regs.cs = 0;
     ctxt->user_regs.eip = dsi.v_kernentry;
-    ctxt->user_regs.edx = 0;
-    ctxt->user_regs.eax = 0;
-    ctxt->user_regs.esp = 0;
-    ctxt->user_regs.ebx = 0; /* startup_32 expects this to be 0 to signal boot cpu */
-    ctxt->user_regs.ecx = 0;
-    ctxt->user_regs.esi = 0;
-    ctxt->user_regs.edi = 0;
-    ctxt->user_regs.ebp = 0;
-
-    ctxt->user_regs.eflags = 0;
 
     return 0;
 

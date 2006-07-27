@@ -1953,6 +1953,8 @@ void vga_common_init(VGAState *s, DisplayState *ds, uint8_t *vga_ram_base,
                          vga_screen_dump, s);
     /* XXX: currently needed for display */
     vga_state = s;
+
+    vga_bios_init(s);
 }
 
 

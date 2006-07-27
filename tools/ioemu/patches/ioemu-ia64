@@ -62,7 +62,7 @@ Index: ioemu/vl.c
      if (xc_get_pfn_list(xc_handle, domid, page_array, nr_pages) != nr_pages) {
          fprintf(logfile, "xc_get_pfn_list returned error %d\n", errno);
          exit(-1);
-@@ -5597,6 +5598,34 @@
+@@ -5598,6 +5599,34 @@
      fprintf(logfile, "shared page at pfn:%lx, mfn: %"PRIx64"\n", nr_pages - 1,
              (uint64_t)(page_array[nr_pages - 1]));
  

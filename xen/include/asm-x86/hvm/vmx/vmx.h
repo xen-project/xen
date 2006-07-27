@@ -143,11 +143,12 @@ extern unsigned int cpu_rev;
  */
 #define INTR_INFO_VECTOR_MASK           0xff            /* 7:0 */
 #define INTR_INFO_INTR_TYPE_MASK        0x700           /* 10:8 */
-#define INTR_INFO_DELIEVER_CODE_MASK    0x800           /* 11 */
+#define INTR_INFO_DELIVER_CODE_MASK     0x800           /* 11 */
 #define INTR_INFO_VALID_MASK            0x80000000      /* 31 */
 
 #define INTR_TYPE_EXT_INTR              (0 << 8) /* external interrupt */
-#define INTR_TYPE_EXCEPTION             (3 << 8) /* processor exception */
+#define INTR_TYPE_HW_EXCEPTION             (3 << 8) /* hardware exception */
+#define INTR_TYPE_SW_EXCEPTION             (6 << 8) /* software exception */
 
 /*
  * Exit Qualifications for MOV for Control Register Access
@@ -421,7 +422,7 @@ static inline int vmx_pgbit_test(struct vcpu *v)
 }
 
 static inline int __vmx_inject_exception(struct vcpu *v, int trap, int type, 
-                                         int error_code)
+                                         int error_code, int ilen)
 {
     unsigned long intr_fields;
 
@@ -429,22 +430,33 @@ static inline int __vmx_inject_exception(struct vcpu *v, int trap, int type,
     intr_fields = (INTR_INFO_VALID_MASK | type | trap);
     if (error_code != VMX_DELIVER_NO_ERROR_CODE) {
         __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
-        intr_fields |= INTR_INFO_DELIEVER_CODE_MASK;
+        intr_fields |= INTR_INFO_DELIVER_CODE_MASK;
      }
-    
+
+    if(ilen)
+      __vmwrite(VM_ENTRY_INSTRUCTION_LEN, ilen);
+
     __vmwrite(VM_ENTRY_INTR_INFO_FIELD, intr_fields);
     return 0;
 }
 
-static inline int vmx_inject_exception(struct vcpu *v, int trap, int error_code)
+static inline int vmx_inject_hw_exception(struct vcpu *v, int trap, int error_code)
 {
     v->arch.hvm_vmx.vector_injected = 1;
-    return __vmx_inject_exception(v, trap, INTR_TYPE_EXCEPTION, error_code);
+    return __vmx_inject_exception(v, trap, INTR_TYPE_HW_EXCEPTION,
+				  error_code, 0);
+}
+
+static inline int vmx_inject_sw_exception(struct vcpu *v, int trap, int instruction_len) {
+     v->arch.hvm_vmx.vector_injected=1;
+     return __vmx_inject_exception(v, trap, INTR_TYPE_SW_EXCEPTION,
+				   VMX_DELIVER_NO_ERROR_CODE,
+				   instruction_len);
 }
 
 static inline int vmx_inject_extint(struct vcpu *v, int trap, int error_code)
 {
-    __vmx_inject_exception(v, trap, INTR_TYPE_EXT_INTR, error_code);
+    __vmx_inject_exception(v, trap, INTR_TYPE_EXT_INTR, error_code, 0);
     __vmwrite(GUEST_INTERRUPTIBILITY_INFO, 0);
 
     return 0;
@@ -452,14 +464,14 @@ static inline int vmx_inject_extint(struct vcpu *v, int trap, int error_code)
 
 static inline int vmx_reflect_exception(struct vcpu *v)
 {
-    int error_code, vector;
+    int error_code, intr_info, vector;
 
-    __vmread(VM_EXIT_INTR_INFO, &vector);
-    if (vector & INTR_INFO_DELIEVER_CODE_MASK)
+    __vmread(VM_EXIT_INTR_INFO, &intr_info);
+    vector = intr_info & 0xff;
+    if (intr_info & INTR_INFO_DELIVER_CODE_MASK)
         __vmread(VM_EXIT_INTR_ERROR_CODE, &error_code);
     else
         error_code = VMX_DELIVER_NO_ERROR_CODE;
-    vector &= 0xff;
 
 #ifndef NDEBUG
     {
@@ -472,7 +484,19 @@ static inline int vmx_reflect_exception(struct vcpu *v)
     }
 #endif /* NDEBUG */
 
-    vmx_inject_exception(v, vector, error_code);
+    /* According to Intel Virtualization Technology Specification for
+       the IA-32 Intel Architecture (C97063-002 April 2005), section
+       2.8.3, SW_EXCEPTION should be used for #BP and #OV, and
+       HW_EXCPEPTION used for everything else.  The main difference
+       appears to be that for SW_EXCEPTION, the EIP/RIP is incremented
+       by VM_ENTER_INSTRUCTION_LEN bytes, whereas for HW_EXCEPTION, 
+       it is not.  */
+    if((intr_info & INTR_INFO_INTR_TYPE_MASK) == INTR_TYPE_SW_EXCEPTION) {
+      int ilen;
+      __vmread(VM_EXIT_INSTRUCTION_LEN, &ilen);
+      vmx_inject_sw_exception(v, vector, ilen);
+    } else
+      vmx_inject_hw_exception(v, vector, error_code);
     return 0;
 }
 

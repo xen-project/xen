@@ -1,7 +1,7 @@
 Index: ioemu/console.c
 ===================================================================
---- ioemu.orig/console.c	2006-07-26 13:39:11.999009495 +0100
-+++ ioemu/console.c	2006-07-26 14:15:19.413719225 +0100
+--- ioemu.orig/console.c	2006-07-27 11:16:53.732912290 +0100
++++ ioemu/console.c	2006-07-27 11:16:57.753467214 +0100
 @@ -449,7 +449,7 @@
              c++;
          }
@@ -50,8 +50,8 @@ Index: ioemu/console.c
      s->y_base = 0;
 Index: ioemu/usb-linux.c
 ===================================================================
---- ioemu.orig/usb-linux.c	2006-07-26 13:39:11.999009495 +0100
-+++ ioemu/usb-linux.c	2006-07-26 13:39:16.622514851 +0100
+--- ioemu.orig/usb-linux.c	2006-07-27 11:16:53.732912290 +0100
++++ ioemu/usb-linux.c	2006-07-27 11:16:57.754467103 +0100
 @@ -26,6 +26,7 @@
  #if defined(__linux__)
  #include <dirent.h>
@@ -60,3 +60,15 @@ Index: ioemu/usb-linux.c
  #include <linux/usbdevice_fs.h>
  #include <linux/version.h>
  
+Index: ioemu/vl.c
+===================================================================
+--- ioemu.orig/vl.c	2006-07-27 11:16:57.681475183 +0100
++++ ioemu/vl.c	2006-07-27 11:17:33.279534373 +0100
+@@ -3201,6 +3201,7 @@
+             if (net_tap_fd_init(vlan, fd))
+                 ret = 0;
+         } else {
++            ifname[0] = '\0';
+             get_param_value(ifname, sizeof(ifname), "ifname", p);
+             if (get_param_value(setup_script, sizeof(setup_script), "script", p) == 0) {
+                 pstrcpy(setup_script, sizeof(setup_script), DEFAULT_NETWORK_SCRIPT);

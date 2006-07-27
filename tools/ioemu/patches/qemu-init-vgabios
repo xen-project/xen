@@ -1,7 +1,7 @@
 Index: ioemu/hw/vga.c
 ===================================================================
---- ioemu.orig/hw/vga.c	2006-07-26 15:16:41.955609165 +0100
-+++ ioemu/hw/vga.c	2006-07-26 15:17:16.910802283 +0100
+--- ioemu.orig/hw/vga.c	2006-07-27 11:10:44.847738090 +0100
++++ ioemu/hw/vga.c	2006-07-27 11:11:02.008839258 +0100
 @@ -1669,6 +1669,136 @@
      }
  }
@@ -139,3 +139,12 @@ Index: ioemu/hw/vga.c
  void vga_common_init(VGAState *s, DisplayState *ds, uint8_t *vga_ram_base, 
                       unsigned long vga_ram_offset, int vga_ram_size)
  {
+@@ -1710,6 +1840,8 @@
+                          vga_screen_dump, s);
+     /* XXX: currently needed for display */
+     vga_state = s;
++
++    vga_bios_init(s);
+ }
+ 
+ 
