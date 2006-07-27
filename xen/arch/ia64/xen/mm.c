@@ -418,13 +418,13 @@ u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps,
 	u64 mask, mpaddr, pteval2;
 	u64 arflags;
 	u64 arflags2;
+	u64 maflags2;
 
 	pteval &= ((1UL << 53) - 1);// ignore [63:53] bits
 
 	// FIXME address had better be pre-validated on insert
 	mask = ~itir_mask(itir.itir);
-	mpaddr = (((pteval & ~_PAGE_ED) & _PAGE_PPN_MASK) & ~mask) |
-	         (address & mask);
+	mpaddr = ((pteval & _PAGE_PPN_MASK) & ~mask) | (address & mask);
 #ifdef CONFIG_XEN_IA64_DOM0_VP
 	if (itir.ps > PAGE_SHIFT) {
 		itir.ps = PAGE_SHIFT;
@@ -454,6 +454,8 @@ u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps,
 	}
 #endif
 	pteval2 = lookup_domain_mpa(d, mpaddr, entry);
+
+	/* Check access rights.  */
 	arflags  = pteval  & _PAGE_AR_MASK;
 	arflags2 = pteval2 & _PAGE_AR_MASK;
 	if (arflags != _PAGE_AR_R && arflags2 == _PAGE_AR_R) {
@@ -466,36 +468,53 @@ u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps,
 		        pteval2, arflags2, mpaddr);
 #endif
 		pteval = (pteval & ~_PAGE_AR_MASK) | _PAGE_AR_R;
-    }
+	}
 
-	pteval2 &= _PAGE_PPN_MASK; // ignore non-addr bits
-	pteval2 |= (pteval & _PAGE_ED);
-	pteval2 |= _PAGE_PL_2; // force PL0->2 (PL3 is unaffected)
-	pteval2 |= (pteval & ~_PAGE_PPN_MASK);
-	/*
-	 * Don't let non-dom0 domains map uncached addresses.  This can
-	 * happen when domU tries to touch i/o port space.  Also prevents
-	 * possible address aliasing issues.
-	 * WB => WB
-	 * UC, UCE, WC => WB
-	 * NaTPage => NaTPage
-	 */
-	if (d != dom0 && (pteval2 & _PAGE_MA_MASK) != _PAGE_MA_NAT)
-		pteval2 &= ~_PAGE_MA_MASK;
+	/* Check memory attribute. The switch is on the *requested* memory
+	   attribute.  */
+	maflags2 = pteval2 & _PAGE_MA_MASK;
+	switch (pteval & _PAGE_MA_MASK) {
+	case _PAGE_MA_NAT:
+		/* NaT pages are always accepted!  */                
+		break;
+	case _PAGE_MA_UC:
+	case _PAGE_MA_UCE:
+	case _PAGE_MA_WC:
+		if (maflags2 == _PAGE_MA_WB) {
+			/* Don't let domains WB-map uncached addresses.
+			   This can happen when domU tries to touch i/o
+			   port space.  Also prevents possible address
+			   aliasing issues.  */
+			printf("Warning: UC to WB for mpaddr=%lx\n", mpaddr);
+			pteval = (pteval & ~_PAGE_MA_MASK) | _PAGE_MA_WB;
+		}
+		break;
+	case _PAGE_MA_WB:
+		if (maflags2 != _PAGE_MA_WB) {
+			/* Forbid non-coherent access to coherent memory. */
+			panic_domain(NULL, "try to use WB mem attr on "
+			             "UC page, mpaddr=%lx\n", mpaddr);
+		}
+		break;
+	default:
+		panic_domain(NULL, "try to use unknown mem attribute\n");
+	}
 
-    /* If shadow mode is enabled, virtualize dirty bit.  */
-    if (shadow_mode_enabled(d) && (pteval2 & _PAGE_D)) {
-        u64 mp_page = mpaddr >> PAGE_SHIFT;
-        pteval2 |= _PAGE_VIRT_D;
+	/* If shadow mode is enabled, virtualize dirty bit.  */
+	if (shadow_mode_enabled(d) && (pteval & _PAGE_D)) {
+		u64 mp_page = mpaddr >> PAGE_SHIFT;
+		pteval |= _PAGE_VIRT_D;
 
-        /* If the page is not already dirty, don't set the dirty bit.
-           This is a small optimization!  */
-        if (mp_page < d->arch.shadow_bitmap_size * 8
-            && !test_bit(mp_page, d->arch.shadow_bitmap))
-            pteval2 = (pteval2 & ~_PAGE_D);
-    }
-
-	return pteval2;
+		/* If the page is not already dirty, don't set the dirty bit! */
+		if (mp_page < d->arch.shadow_bitmap_size * 8
+    		    && !test_bit(mp_page, d->arch.shadow_bitmap))
+    			pteval &= ~_PAGE_D;
+	}
+    
+	/* Ignore non-addr bits of pteval2 and force PL0->2
+	   (PL3 is unaffected) */
+	return (pteval & ~_PAGE_PPN_MASK) |
+	       (pteval2 & _PAGE_PPN_MASK) | _PAGE_PL_2;
 }
 
 // given a current domain metaphysical address, return the physical address
@@ -823,8 +842,19 @@ assign_new_domain0_page(struct domain *d, unsigned long mpaddr)
 #endif
 }
 
+static unsigned long
+flags_to_prot (unsigned long flags)
+{
+    unsigned long res = _PAGE_PL_2 | __DIRTY_BITS;
+
+    res |= flags & ASSIGN_readonly ? _PAGE_AR_R: _PAGE_AR_RWX;
+    res |= flags & ASSIGN_nocache ? _PAGE_MA_UC: _PAGE_MA_WB;
+    
+    return res;
+}
+
 /* map a physical address to the specified metaphysical addr */
-// flags: currently only ASSIGN_readonly
+// flags: currently only ASSIGN_readonly, ASSIGN_nocache
 // This is called by assign_domain_mmio_page().
 // So accessing to pte is racy.
 void
@@ -836,13 +866,12 @@ __assign_domain_page(struct domain *d,
     pte_t old_pte;
     pte_t new_pte;
     pte_t ret_pte;
-    unsigned long arflags = (flags & ASSIGN_readonly)? _PAGE_AR_R: _PAGE_AR_RWX;
+    unsigned long prot = flags_to_prot(flags);
 
     pte = lookup_alloc_domain_pte(d, mpaddr);
 
     old_pte = __pte(0);
-    new_pte = pfn_pte(physaddr >> PAGE_SHIFT,
-                      __pgprot(__DIRTY_BITS | _PAGE_PL_2 | arflags));
+    new_pte = pfn_pte(physaddr >> PAGE_SHIFT, __pgprot(prot));
     ret_pte = ptep_cmpxchg_rel(&d->arch.mm, mpaddr, pte, old_pte, new_pte);
     if (pte_val(ret_pte) == pte_val(old_pte))
         smp_mb();
@@ -941,7 +970,7 @@ assign_domain_mmio_page(struct domain *d,
                 __func__, __LINE__, d, mpaddr, size);
         return -EINVAL;
     }
-    assign_domain_same_page(d, mpaddr, size, ASSIGN_writable);
+    assign_domain_same_page(d, mpaddr, size, ASSIGN_writable | ASSIGN_nocache);
     return mpaddr;
 }
 
@@ -967,11 +996,12 @@ assign_domain_page_replace(struct domain *d, unsigned long mpaddr,
     volatile pte_t* pte;
     pte_t old_pte;
     pte_t npte;
-    unsigned long arflags = (flags & ASSIGN_readonly)? _PAGE_AR_R: _PAGE_AR_RWX;
+    unsigned long prot = flags_to_prot(flags);
+
     pte = lookup_alloc_domain_pte(d, mpaddr);
 
     // update pte
-    npte = pfn_pte(mfn, __pgprot(__DIRTY_BITS | _PAGE_PL_2 | arflags));
+    npte = pfn_pte(mfn, __pgprot(prot));
     old_pte = ptep_xchg(mm, mpaddr, pte, npte);
     if (pte_mem(old_pte)) {
         unsigned long old_mfn = pte_pfn(old_pte);
@@ -1013,7 +1043,7 @@ assign_domain_page_cmpxchg_rel(struct domain* d, unsigned long mpaddr,
     unsigned long old_arflags;
     pte_t old_pte;
     unsigned long new_mfn;
-    unsigned long new_arflags;
+    unsigned long new_prot;
     pte_t new_pte;
     pte_t ret_pte;
 
@@ -1029,10 +1059,9 @@ assign_domain_page_cmpxchg_rel(struct domain* d, unsigned long mpaddr,
         return -EINVAL;
     }
 
-    new_arflags = (flags & ASSIGN_readonly)? _PAGE_AR_R: _PAGE_AR_RWX;
+    new_prot = flags_to_prot(flags);
     new_mfn = page_to_mfn(new_page);
-    new_pte = pfn_pte(new_mfn,
-                      __pgprot(__DIRTY_BITS | _PAGE_PL_2 | new_arflags));
+    new_pte = pfn_pte(new_mfn, __pgprot(new_prot));
 
     // update pte
     ret_pte = ptep_cmpxchg_rel(mm, mpaddr, pte, old_pte, new_pte);
@@ -1151,6 +1180,10 @@ dom0vp_add_physmap(struct domain* d, unsigned long gpfn, unsigned long mfn,
 {
     int error = 0;
     struct domain* rd;
+
+    /* Not allowed by a domain.  */
+    if (flags & ASSIGN_nocache)
+        return -EINVAL;
 
     rd = find_domain_by_id(domid);
     if (unlikely(rd == NULL)) {

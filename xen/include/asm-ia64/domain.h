@@ -11,6 +11,7 @@
 #include <xen/list.h>
 #include <xen/cpumask.h>
 #include <asm/fpswa.h>
+#include <xen/rangeset.h>
 
 struct p2m_entry {
     volatile pte_t*     pte;
@@ -86,6 +87,9 @@ struct arch_domain {
             unsigned int is_vti : 1;
         };
     };
+
+    /* Allowed accesses to io ports.  */
+    struct rangeset *ioport_caps;
 
     /* There are two ranges of RID for a domain:
        one big range, used to virtualize domain RID,

@@ -360,6 +360,9 @@ int arch_domain_create(struct domain *d)
 	if ((d->arch.mm.pgd = pgd_alloc(&d->arch.mm)) == NULL)
 	    goto fail_nomem;
 
+	d->arch.ioport_caps = rangeset_new(d, "I/O Ports",
+	                                   RANGESETF_prettyprint_hex);
+
 	printf ("arch_domain_create: domain=%p\n", d);
 	return 0;
 
@@ -884,6 +887,8 @@ static void physdev_init_dom0(struct domain *d)
 	if (iomem_permit_access(d, 0UL, ~0UL))
 		BUG();
 	if (irqs_permit_access(d, 0, NR_IRQS-1))
+		BUG();
+	if (ioports_permit_access(d, 0, 0xffff))
 		BUG();
 }
 

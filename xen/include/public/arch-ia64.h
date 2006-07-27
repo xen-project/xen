@@ -359,6 +359,9 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 #define _ASSIGN_readonly                0
 #define ASSIGN_readonly                 (1UL << _ASSIGN_readonly)
 #define ASSIGN_writable                 (0UL << _ASSIGN_readonly) // dummy flag
+/* Internal only: memory attribute must be WC/UC/UCE.  */
+#define _ASSIGN_nocache                 1
+#define ASSIGN_nocache                  (1UL << _ASSIGN_nocache)
 
 /* This structure has the same layout of struct ia64_boot_param, defined in
    <asm/system.h>.  It is redefined here to ease use.  */

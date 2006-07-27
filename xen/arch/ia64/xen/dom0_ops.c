@@ -20,6 +20,7 @@
 #include <public/sched_ctl.h>
 #include <asm/vmx.h>
 #include <asm/dom_fw.h>
+#include <xen/iocap.h>
 
 void build_physmap_table(struct domain *d);
 
@@ -279,6 +280,29 @@ long arch_do_dom0_op(dom0_op_t *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
     }
     break;
 
+    case DOM0_IOPORT_PERMISSION:
+    {
+        struct domain *d;
+        unsigned int fp = op->u.ioport_permission.first_port;
+        unsigned int np = op->u.ioport_permission.nr_ports;
+
+        ret = -ESRCH;
+        d = find_domain_by_id(op->u.ioport_permission.domain);
+        if (unlikely(d == NULL))
+            break;
+
+        if (np == 0)
+            ret = 0;
+        else {
+            if (op->u.ioport_permission.allow_access)
+                ret = ioports_permit_access(d, fp, fp + np - 1);
+            else
+                ret = ioports_deny_access(d, fp, fp + np - 1);
+        }
+
+        put_domain(d);
+    }
+    break;
     default:
         printf("arch_do_dom0_op: unrecognized dom0 op: %d!!!\n",op->cmd);
         ret = -ENOSYS;
@@ -289,6 +313,24 @@ long arch_do_dom0_op(dom0_op_t *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
 }
 
 #ifdef CONFIG_XEN_IA64_DOM0_VP
+static unsigned long
+dom0vp_ioremap(struct domain *d, unsigned long mpaddr, unsigned long size)
+{
+    unsigned long end;
+
+    /* Linux may use a 0 size!  */
+    if (size == 0)
+        size = PAGE_SIZE;
+
+    end = PAGE_ALIGN(mpaddr + size);
+
+    if (!iomem_access_permitted(d, mpaddr >> PAGE_SHIFT,
+                                (end >> PAGE_SHIFT) - 1))
+        return -EPERM;
+
+    return assign_domain_mmio_page(d, mpaddr, size);
+}
+
 unsigned long
 do_dom0vp_op(unsigned long cmd,
              unsigned long arg0, unsigned long arg1, unsigned long arg2,
@@ -299,7 +341,7 @@ do_dom0vp_op(unsigned long cmd,
 
     switch (cmd) {
     case IA64_DOM0VP_ioremap:
-        ret = assign_domain_mmio_page(d, arg0, arg1);
+        ret = dom0vp_ioremap(d, arg0, arg1);
         break;
     case IA64_DOM0VP_phystomach:
         ret = ____lookup_domain_mpa(d, arg0 << PAGE_SHIFT);
