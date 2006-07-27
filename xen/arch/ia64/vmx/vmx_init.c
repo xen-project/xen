@@ -300,6 +300,8 @@ vmx_final_setup_guest(struct vcpu *v)
 
 	/* One more step to enable interrupt assist */
 	set_bit(ARCH_VMX_INTR_ASSIST, &v->arch.arch_vmx.flags);
+	/* Set up guest 's indicator for VTi domain*/
+	set_bit(ARCH_VMX_DOMAIN, &v->arch.arch_vmx.flags);
 }
 
 void
@@ -337,7 +339,6 @@ static void vmx_build_physmap_table(struct domain *d)
 	struct vcpu *v = d->vcpu[0];
 	struct list_head *list_ent = d->page_list.next;
 
-	ASSERT(!test_bit(ARCH_VMX_CONTIG_MEM, &v->arch.arch_vmx.flags));
 	ASSERT(d->max_pages == d->tot_pages);
 
 	/* Mark I/O ranges */
@@ -393,7 +394,6 @@ static void vmx_build_physmap_table(struct domain *d)
 	list_ent = mfn_to_page(mfn)->list.next;
 	ASSERT(list_ent == &d->page_list);
 
-	set_bit(ARCH_VMX_CONTIG_MEM, &v->arch.arch_vmx.flags);
 }
 
 void vmx_setup_platform(struct domain *d)

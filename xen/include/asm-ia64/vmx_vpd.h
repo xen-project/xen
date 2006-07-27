@@ -106,7 +106,7 @@ struct arch_vmx_struct {
 
 #define ARCH_VMX_IO_WAIT        3       /* Waiting for I/O completion */
 #define ARCH_VMX_INTR_ASSIST    4       /* Need DM's assist to issue intr */
-#define ARCH_VMX_CONTIG_MEM 	5	/* Need contiguous machine pages */
+#define ARCH_VMX_DOMAIN         5       /* Need it to indicate VTi domain */
 
 
 #define VMX_DEBUG 1
