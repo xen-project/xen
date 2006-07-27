@@ -1,5 +1,6 @@
 #ifdef XEN
 #include <asm/debugger.h>
+#include <asm/vhpt.h>
 #endif
 /*
  * arch/ia64/kernel/ivt.S
