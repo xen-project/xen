@@ -788,6 +788,8 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 		gso->u.gso.size = skb_shinfo(skb)->gso_size;
 		gso->u.gso.type = XEN_NETIF_GSO_TYPE_TCPV4;
+		gso->u.gso.pad = 0;
+		gso->u.gso.features = 0;
 
 		gso->type = XEN_NETIF_EXTRA_TYPE_GSO;
 		gso->flags = 0;
