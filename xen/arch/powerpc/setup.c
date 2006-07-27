@@ -40,6 +40,7 @@
 #include <asm/cache.h>
 #include <asm/debugger.h>
 #include <asm/delay.h>
+#include <asm/percpu.h>
 #include "exceptions.h"
 #include "of-devtree.h"
 
@@ -68,6 +69,7 @@ cpumask_t cpu_online_map; /* missing ifdef in schedule.c */
 ulong isa_io_base;
 struct ns16550_defaults ns16550;
 
+extern char __per_cpu_start[], __per_cpu_data_end[], __per_cpu_end[];
 extern void idle_loop(void);
 
 /* move us to a header file */
@@ -117,6 +119,36 @@ static void hw_probe_attn(unsigned char key, struct cpu_user_regs *regs)
     asm volatile(".long 0x00000200; nop");
 }
 
+static void percpu_init_areas(void)
+{
+    unsigned int i, data_size = __per_cpu_data_end - __per_cpu_start;
+
+    BUG_ON(data_size > PERCPU_SIZE);
+
+    for ( i = 1; i < NR_CPUS; i++ )
+        memcpy(__per_cpu_start + (i << PERCPU_SHIFT),
+               __per_cpu_start,
+               data_size);
+}
+
+static void percpu_free_unused_areas(void)
+{
+    unsigned int i, first_unused;
+
+    /* Find first unused CPU number. */
+    for ( i = 0; i < NR_CPUS; i++ )
+        if ( !cpu_online(i) )
+            break;
+    first_unused = i;
+
+    /* Check that there are no holes in cpu_online_map. */
+    for ( ; i < NR_CPUS; i++ )
+        BUG_ON(cpu_online(i));
+
+    init_xenheap_pages((ulong)__per_cpu_start + (first_unused << PERCPU_SHIFT),
+                       (ulong)__per_cpu_end);
+}
+
 static void __init start_of_day(void)
 {
     struct domain *idle_domain;
@@ -134,6 +166,8 @@ static void __init start_of_day(void)
 
     /* for some reason we need to set our own bit in the thread map */
     cpu_set(0, cpu_sibling_map[0]);
+
+    percpu_free_unused_areas();
 
     initialize_keytable();
     /* Register another key that will allow for the the Harware Probe
@@ -264,6 +298,8 @@ static void __init __start_xen(multiboot_info_t *mbi)
     /* make sure the OF devtree is good */
     ofd_walk((void *)oftree, OFD_ROOT, ofd_dump_props, OFD_DUMP_ALL);
 #endif
+
+    percpu_init_areas();
 
     /* mark all memory from modules onward as unused */
     init_boot_pages(freemem, eomem);

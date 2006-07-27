@@ -1,3 +1,7 @@
+#include <asm/config.h>
+#include <asm/page.h>
+#include <asm/percpu.h>
+
 /* Script for -z combreloc: combine and sort reloc sections */
 OUTPUT_FORMAT("elf64-powerpc", "elf64-powerpc",
 	      "elf64-powerpc")
@@ -104,6 +108,7 @@ SECTIONS
   }
 
   /* Xen addition */
+
   . = ALIGN(32);
   __setup_start = .;
   .setup.init : { *(.setup.init) }
@@ -114,6 +119,14 @@ SECTIONS
   __inithcall_start = .;
   .inithcall.text : { *(.inithcall.text) }
   __inithcall_end = .;
+
+  __per_cpu_start = .;
+  .data.percpu : { *(.data.percpu) } :text
+  __per_cpu_data_end = .;
+  . = __per_cpu_start + (NR_CPUS << PERCPU_SHIFT);
+  . = ALIGN(STACK_SIZE);
+  __per_cpu_end = .;
+
   /* end Xen addition */
 
   .data1          : { *(.data1) }
