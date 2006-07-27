@@ -170,7 +170,7 @@ guest_remove_page(
     if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
         put_page(page);
 
-    if ( unlikely((page->count_info & PGC_count_mask) != 1) )
+    if ( unlikely(!page_is_removable(page)) )
     {
         /* We'll make this a guest-visible error in future, so take heed! */
         DPRINTK("Dom%d freeing in-use page %lx (pseudophys %lx):"
