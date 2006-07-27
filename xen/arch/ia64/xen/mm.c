@@ -180,6 +180,8 @@ static void domain_page_flush(struct domain* d, unsigned long mpaddr,
                               unsigned long old_mfn, unsigned long new_mfn);
 #endif
 
+extern unsigned long ia64_iobase;
+
 static struct domain *dom_xen, *dom_io;
 
 // followings are stolen from arch_init_memory() @ xen/arch/x86/mm.c
@@ -892,6 +894,60 @@ assign_domain_page(struct domain *d,
     // because __assign_domain_page() uses set_pte_rel() which has
     // release semantics, smp_mb() isn't needed.
     __assign_domain_page(d, mpaddr, physaddr, ASSIGN_writable);
+}
+
+int
+ioports_permit_access(struct domain *d, unsigned long fp, unsigned long lp)
+{
+    int ret;
+    unsigned long off;
+    unsigned long fp_offset;
+    unsigned long lp_offset;
+
+    ret = rangeset_add_range(d->arch.ioport_caps, fp, lp);
+    if (ret != 0)
+        return ret;
+
+    fp_offset = IO_SPACE_SPARSE_ENCODING(fp) & ~PAGE_MASK;
+    lp_offset = PAGE_ALIGN(IO_SPACE_SPARSE_ENCODING(lp));
+
+    for (off = fp_offset; off <= lp_offset; off += PAGE_SIZE)
+        __assign_domain_page(d, IO_PORTS_PADDR + off,
+                             ia64_iobase + off, ASSIGN_nocache);
+
+    return 0;
+}
+
+int
+ioports_deny_access(struct domain *d, unsigned long fp, unsigned long lp)
+{
+    int ret;
+    struct mm_struct *mm = &d->arch.mm;
+    unsigned long off;
+    unsigned long fp_offset;
+    unsigned long lp_offset;
+
+    ret = rangeset_remove_range(d->arch.ioport_caps, fp, lp);
+    if (ret != 0)
+        return ret;
+
+    fp_offset = IO_SPACE_SPARSE_ENCODING(fp) & ~PAGE_MASK;
+    lp_offset = PAGE_ALIGN(IO_SPACE_SPARSE_ENCODING(lp));
+
+    for (off = fp_offset; off <= lp_offset; off += PAGE_SIZE) {
+        unsigned long mpaddr = IO_PORTS_PADDR + off;
+        volatile pte_t *pte;
+        pte_t old_pte;
+
+        pte = lookup_noalloc_domain_pte_none(d, mpaddr);
+        BUG_ON(pte == NULL);
+        BUG_ON(pte_none(*pte));
+
+        // clear pte
+        old_pte = ptep_get_and_clear(mm, mpaddr, pte);
+    }
+    domain_flush_vtlb_all();
+    return 0;
 }
 
 #ifdef CONFIG_XEN_IA64_DOM0_VP

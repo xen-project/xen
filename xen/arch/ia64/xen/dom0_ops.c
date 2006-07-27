@@ -285,6 +285,7 @@ long arch_do_dom0_op(dom0_op_t *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
         struct domain *d;
         unsigned int fp = op->u.ioport_permission.first_port;
         unsigned int np = op->u.ioport_permission.nr_ports;
+        unsigned int lp = fp + np - 1;
 
         ret = -ESRCH;
         d = find_domain_by_id(op->u.ioport_permission.domain);
@@ -295,9 +296,9 @@ long arch_do_dom0_op(dom0_op_t *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
             ret = 0;
         else {
             if (op->u.ioport_permission.allow_access)
-                ret = ioports_permit_access(d, fp, fp + np - 1);
+                ret = ioports_permit_access(d, fp, lp);
             else
-                ret = ioports_deny_access(d, fp, fp + np - 1);
+                ret = ioports_deny_access(d, fp, lp);
         }
 
         put_domain(d);

@@ -196,6 +196,10 @@ struct arch_vcpu {
 #include <asm/uaccess.h> /* for KERNEL_DS */
 #include <asm/pgtable.h>
 
+/* Guest physical address of IO ports space.  */
+#define IO_PORTS_PADDR          0x00000ffffc000000UL
+#define IO_PORTS_SIZE           0x0000000004000000UL
+
 #endif /* __ASM_DOMAIN_H__ */
 
 /*

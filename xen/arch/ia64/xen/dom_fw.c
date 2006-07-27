@@ -855,15 +855,17 @@ dom_fw_init (struct domain *d, struct ia64_boot_param *bp, char *fw_mem, int fw_
 	} else {
 #ifndef CONFIG_XEN_IA64_DOM0_VP
 	  	/* Dom0 maps legacy mmio in first MB.  */
-		MAKE_MD(EFI_LOADER_DATA,EFI_MEMORY_WB,0*MB,1*MB, 1);
-		MAKE_MD(EFI_CONVENTIONAL_MEMORY,EFI_MEMORY_WB,HYPERCALL_END,maxmem, 1);
+		MAKE_MD(EFI_LOADER_DATA, EFI_MEMORY_WB, 0*MB, 1*MB, 1);
+		MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
+			HYPERCALL_END, maxmem, 1);
 #endif
-		/* hypercall patches live here, masquerade as reserved PAL memory */
-		MAKE_MD(EFI_PAL_CODE,EFI_MEMORY_WB|EFI_MEMORY_RUNTIME,HYPERCALL_START,HYPERCALL_END, 1);
-		/* Create a dummy entry for IO ports, so that IO accesses are
-		   trapped by Xen.  */
-		MAKE_MD(EFI_MEMORY_MAPPED_IO_PORT_SPACE,EFI_MEMORY_UC,
-			0x00000ffffc000000, 0x00000fffffffffff, 1);
+		/* hypercall patches live here, masquerade as reserved
+		   PAL memory */
+		MAKE_MD(EFI_PAL_CODE, EFI_MEMORY_WB | EFI_MEMORY_RUNTIME,
+			HYPERCALL_START, HYPERCALL_END, 1);
+		/* Create an entry for IO ports.  */
+		MAKE_MD(EFI_MEMORY_MAPPED_IO_PORT_SPACE, EFI_MEMORY_UC,
+			IO_PORTS_PADDR, IO_PORTS_PADDR + IO_PORTS_SIZE, 1);
 		MAKE_MD(EFI_RESERVED_TYPE,0,0,0,0);
 	}
 
