@@ -438,6 +438,8 @@ static void alloc_monitor_pagetable(struct vcpu *v)
             (l3e_get_flags(mpl3e[i]) & _PAGE_PRESENT) ?
             l2e_from_pfn(l3e_get_pfn(mpl3e[i]), __PAGE_HYPERVISOR) :
             l2e_empty();
+    for ( i = 0; i < (MACHPHYS_MBYTES >> (L2_PAGETABLE_SHIFT - 20)); i++ )
+        mpl2e[l2_table_offset(RO_MPT_VIRT_START) + i] = l2e_empty();
 
     if ( v->vcpu_id == 0 )
     {
