@@ -187,16 +187,14 @@ MULTI_update_va_mapping(
     mcl->args[0] = va;
 #if defined(CONFIG_X86_64)
     mcl->args[1] = new_val.pte;
-    mcl->args[2] = flags;
 #elif defined(CONFIG_X86_PAE)
     mcl->args[1] = new_val.pte_low;
     mcl->args[2] = new_val.pte_high;
-    mcl->args[3] = flags;
 #else
     mcl->args[1] = new_val.pte_low;
     mcl->args[2] = 0;
-    mcl->args[3] = flags;
 #endif
+    mcl->args[MULTI_UVMFLAGS_INDEX] = flags;
 }
 
 static inline void
@@ -208,19 +206,15 @@ MULTI_update_va_mapping_otherdomain(
     mcl->args[0] = va;
 #if defined(CONFIG_X86_64)
     mcl->args[1] = new_val.pte;
-    mcl->args[2] = flags;
-    mcl->args[3] = domid;
 #elif defined(CONFIG_X86_PAE)
     mcl->args[1] = new_val.pte_low;
     mcl->args[2] = new_val.pte_high;
-    mcl->args[3] = flags;
-    mcl->args[4] = domid;
 #else
     mcl->args[1] = new_val.pte_low;
     mcl->args[2] = 0;
-    mcl->args[3] = flags;
-    mcl->args[4] = domid;
 #endif
+    mcl->args[MULTI_UVMFLAGS_INDEX] = flags;
+    mcl->args[MULTI_UVMDOMID_INDEX] = domid;
 }
 
 #endif /* __HYPERVISOR_H__ */
