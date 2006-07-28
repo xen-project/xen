@@ -15,9 +15,6 @@
 #include "conf_space.h"
 #include "conf_space_quirks.h"
 
-static int permissive = 0;
-module_param(permissive, bool, 0644);
-
 #define DEFINE_PCI_CONFIG(op,size,type) 			\
 int pciback_##op##_config_##size 				\
 (struct pci_dev *dev, int offset, type value, void *data)	\
@@ -258,7 +255,7 @@ int pciback_config_write(struct pci_dev *dev, int offset, int size, u32 value)
 		 * This means that some fields may still be read-only because
 		 * they have entries in the config_field list that intercept
 		 * the write and do nothing. */
-		if (permissive) {
+		if (dev_data->permissive) {
 			switch (size) {
 			case 1:
 				err = pci_write_config_byte(dev, offset,

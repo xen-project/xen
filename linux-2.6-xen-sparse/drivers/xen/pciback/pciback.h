@@ -44,6 +44,7 @@ struct pciback_device {
 
 struct pciback_dev_data {
 	struct list_head config_fields;
+	int permissive;
 	int warned_on_write;
 };
 

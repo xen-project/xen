@@ -739,6 +739,72 @@ static ssize_t pcistub_quirk_show(struct device_driver *drv, char *buf)
 
 DRIVER_ATTR(quirks, S_IRUSR | S_IWUSR, pcistub_quirk_show, pcistub_quirk_add);
 
+static ssize_t permissive_add(struct device_driver *drv, const char *buf,
+			      size_t count)
+{
+	int domain, bus, slot, func;
+	int err;
+	struct pcistub_device *psdev;
+	struct pciback_dev_data *dev_data;
+	err = str_to_slot(buf, &domain, &bus, &slot, &func);
+	if (err)
+		goto out;
+	psdev = pcistub_device_find(domain, bus, slot, func);
+	if (!psdev) {
+		err = -ENODEV;
+		goto out;
+	}
+	if (!psdev->dev) {
+		err = -ENODEV;
+		goto release;
+	}
+	dev_data = pci_get_drvdata(psdev->dev);
+	/* the driver data for a device should never be null at this point */
+	if (!dev_data) {
+		err = -ENXIO;
+		goto release;
+	}
+	if (!dev_data->permissive) {
+		dev_data->permissive = 1;
+		/* Let user know that what they're doing could be unsafe */
+		dev_warn(&psdev->dev->dev,
+			 "enabling permissive mode configuration space accesses!\n");
+		dev_warn(&psdev->dev->dev,
+			 "permissive mode is potentially unsafe!\n");
+	}
+      release:
+	pcistub_device_put(psdev);
+      out:
+	if (!err)
+		err = count;
+	return err;
+}
+
+static ssize_t permissive_show(struct device_driver *drv, char *buf)
+{
+	struct pcistub_device *psdev;
+	struct pciback_dev_data *dev_data;
+	size_t count = 0;
+	unsigned long flags;
+	spin_lock_irqsave(&pcistub_devices_lock, flags);
+	list_for_each_entry(psdev, &pcistub_devices, dev_list) {
+		if (count >= PAGE_SIZE)
+			break;
+		if (!psdev->dev)
+			continue;
+		dev_data = pci_get_drvdata(psdev->dev);
+		if (!dev_data || !dev_data->permissive)
+			continue;
+		count +=
+		    scnprintf(buf + count, PAGE_SIZE - count, "%s\n",
+			      pci_name(psdev->dev));
+	}
+	spin_unlock_irqrestore(&pcistub_devices_lock, flags);
+	return count;
+}
+
+DRIVER_ATTR(permissive, S_IRUSR | S_IWUSR, permissive_show, permissive_add);
+
 static int __init pcistub_init(void)
 {
 	int pos = 0;
@@ -784,6 +850,7 @@ static int __init pcistub_init(void)
 			   &driver_attr_remove_slot);
 	driver_create_file(&pciback_pci_driver.driver, &driver_attr_slots);
 	driver_create_file(&pciback_pci_driver.driver, &driver_attr_quirks);
+	driver_create_file(&pciback_pci_driver.driver, &driver_attr_permissive);
 
       out:
 	return err;
@@ -834,6 +901,7 @@ static void __exit pciback_cleanup(void)
 			   &driver_attr_remove_slot);
 	driver_remove_file(&pciback_pci_driver.driver, &driver_attr_slots);
 	driver_remove_file(&pciback_pci_driver.driver, &driver_attr_quirks);
+	driver_remove_file(&pciback_pci_driver.driver, &driver_attr_permissive);
 
 	pci_unregister_driver(&pciback_pci_driver);
 }
