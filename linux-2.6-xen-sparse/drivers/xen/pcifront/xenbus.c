@@ -7,6 +7,7 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <xen/xenbus.h>
+#include <xen/gnttab.h>
 #include "pcifront.h"
 
 #define INVALID_GRANT_REF (0)
