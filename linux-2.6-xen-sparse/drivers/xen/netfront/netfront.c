@@ -1193,19 +1193,16 @@ static void network_connect(struct net_device *dev)
 		if (!np->rx_skbs[i])
 			continue;
 
-		gnttab_grant_foreign_transfer_ref(
-			np->grant_rx_ref[i], np->xbdev->otherend_id,
-			__pa(np->rx_skbs[i]->data) >> PAGE_SHIFT);
-		RING_GET_REQUEST(&np->rx, requeue_idx)->gref =
-			np->grant_rx_ref[i];
-		RING_GET_REQUEST(&np->rx, requeue_idx)->id = requeue_idx;
+		skb = np->rx_skbs[requeue_idx] = xennet_get_rx_skb(np, i);
+		ref = np->grant_rx_ref[requeue_idx] = xennet_get_rx_ref(np, i);
 
-		if (requeue_idx < i) {
-			np->rx_skbs[requeue_idx] = np->rx_skbs[i];
-			np->grant_rx_ref[requeue_idx] = np->grant_rx_ref[i];
-			np->rx_skbs[i] = NULL;
-			np->grant_rx_ref[i] = GRANT_INVALID_REF;
-		}
+		gnttab_grant_foreign_transfer_ref(
+			ref, np->xbdev->otherend_id,
+			__pa(skb->data) >> PAGE_SHIFT);
+
+		RING_GET_REQUEST(&np->rx, requeue_idx)->gref = ref;
+		RING_GET_REQUEST(&np->rx, requeue_idx)->id   = requeue_idx;
+
 		requeue_idx++;
 	}
 
