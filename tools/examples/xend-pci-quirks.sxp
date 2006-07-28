@@ -1,0 +1,96 @@
+###############################################################################
+# Configuration file for quirky PCI devices that require write-access to 
+# parts of the configuration space.  Use this file to specific PCI device
+# IDs and the configuration space fields to which those devices must be
+# able to write.
+#
+# Length is important, so be sure to match new entries with the 
+# lengths of comparable existing entries. 
+#
+# Additions to this file take effect as soon as a new domain with a 
+# matching device is started.  However, to remove a field that was 
+# previously applied to a device you must unbind the device from 
+# pciback.
+###############################################################################
+# This is a bogus entry to show how a new device would be added to the list
+#
+# (new_quirky_dev_name
+#    (pci_ids 
+#       ('0123:4567:890A:BCEF') 
+#    )
+#
+#    (pci_config_space_fields 
+#       ('12345678:1:00000000')
+#    )
+# )
+###############################################################################
+
+(tg3
+    (pci_ids
+	# Entries are formated as follows:  
+	#     <vendor>:<device>[:<subvendor>:<subdevice>]
+        ('14e4:1644'   # Broadcom Tigon3 5700
+    	 '14e4:1645'   # Broadcom Tigon3 5701
+         '14e4:1646'   # Broadcom Tigon3 5702
+         '14e4:1647'   # Broadcom Tigon3 5703
+         '14e4:1648'   # Broadcom Tigon3 5704
+         '14e4:164d'   # Broadcom Tigon3 5702FE
+         '14e4:1653'   # Broadcom Tigon3 5705
+         '14e4:1654'   # Broadcom Tigon3 5705_2
+         '14e4:165d'   # Broadcom Tigon3 5705M
+         '14e4:165e'   # Broadcom Tigon3 5705M_2
+         '14e4:16a6'   # Broadcom Tigon3 5702X
+         '14e4:16a7'   # Broadcom Tigon3 5703X
+         '14e4:16a8'   # Broadcom Tigon3 5704S
+         '14e4:16c6'   # Broadcom Tigon3 5702A3
+         '14e4:16c7'   # Broadcom Tigon3 5703A3
+         '14e4:1696'   # Broadcom Tigon3 5782
+         '14e4:169c'   # Broadcom Tigon3 5788
+         '14e4:169d'   # Broadcom Tigon3 5789
+         '14e4:170d'   # Broadcom Tigon3 5901
+         '14e4:1649'   # Broadcom Tigon3 5704S_2
+         '14e4:166e'   # Broadcom Tigon3 5705F
+         '14e4:1658'   # Broadcom Tigon3 5720
+         '14e4:1659'   # Broadcom Tigon3 5721
+         '14e4:1676'   # Broadcom Tigon3 5750
+         '14e4:1677'   # Broadcom Tigon3 5751
+         '14e4:167c'   # Broadcom Tigon3 5750M
+         '14e4:167d'   # Broadcom Tigon3 5751M
+         '14e4:167e'   # Broadcom Tigon3 5751F
+         '14e4:1600'   # Broadcom Tigon3 5752
+         '14e4:1601'   # Broadcom Tigon3 5752M
+         '14e4:16f7'   # Broadcom Tigon3 5753
+         '14e4:16fd'   # Broadcom Tigon3 5753M
+         '14e4:16fe'   # Broadcom Tigon3 5753F
+         '14e4:1668'   # Broadcom Tigon3 5714
+         '14e4:1678'   # Broadcom Tigon3 5715
+         '14e4:166a'   # Broadcom Tigon3 5780
+         '14e4:166b'   # Broadcom Tigon3 5780S
+         '14e4:16dd'   # Broadcom Tigon3 5781
+         '1148:4400'   # Syskonnect 9DXX
+         '1148:4500'   # Syskonnect 9MXX
+         '173b:03e8'   # Altima AC1000
+         '173b:03e9'   # Altima AC1001
+         '173b:03eb'   # Altima AC1003
+         '173b:03ea'   # Altima AC9100
+         '106b:1645')  # Apple Tigon3
+    )
+
+    (pci_config_space_fields
+	# Entries are formated as follows:  
+    	#     <register>:<size>:<mask>
+    	# size is measured in bytes (1,2,4 are valid sizes)
+    	# mask is currently unused; use all zero's
+        ('00000078:4:00000000'   # TG3PCI_REG_BASE_ADDR
+         '0000007c:4:00000000'   # TG3PCI_MEM_WIN_BASE_ADDR
+         '00000080:4:00000000'   # TG3PCI_REG_DATA
+         '00000084:4:00000000'   # TG3PCI_MEM_WIN_DATA
+         '00000090:4:00000000'   # TG3PCI_MISC_LOCAL_CTRL
+         '00000068:4:00000000'   # TG3PCI_MISC_HOST_CTRL
+         '0000009C:4:00000000'   # TG3PCI_STD_RING_PROD_IDX + TG3_64BIT_REG_LOW
+         '00000098:4:00000000'   # TG3PCI_STD_RING_PROD_IDX + TG3_64BIT_REG_HIGH
+         '000000a4:4:00000000'   # TG3PCI_RCV_RET_RING_CON_IDX + TG3_64BIT_REG_LOW
+         '000000a0:4:00000000'   # TG3PCI_RCV_RET_RING_CON_IDX + TG3_64BIT_REG_HIGH
+         '00000070:4:00000000')  # TG3PCI_PCISTATE
+    )
+)

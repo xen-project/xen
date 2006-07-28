@@ -1,0 +1,27 @@
+###############################################################################
+# Configuration file for granting quiry PCI devices full write access to their 
+# configuration space.  This file should only be used when you are unable to 
+# determine the exact registers required by your device.  Even so, it should 
+# be used only temporarily.
+# 
+# SEND A MESSAGE TO xen-devel@lists.xensource.com IF YOU USE THIS FILE.
+# 
+# Using this file should NOT be necessary.  If you must use it to make some
+# device work, send a message to the above list with as much information about 
+# your device as possible so the developers can make accomodations for it.  
+# Once developers make the necessary updates you can remove the corresponding
+# entry for your device. 
+###############################################################################
+# Entries are formated as follows:  <vendor>:<device>[:<subvendor>:<subdevice>]
+# 
+# Example: Appending to an existing list
+#  
+# (unconstrained_dev_ids
+#     ('XXXX:XXXX:XXXX:XXXX'	# existing entry
+#      'YYYY:YYYY:YYYY:YYYY' 	# new entry 1
+#      'ZZZZ:ZZZZ')		# new entry 2
+# )
+###############################################################################
+(unconstrained_dev_ids
+     #('0123:4567:89AB:CDEF')
+)

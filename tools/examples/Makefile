@@ -18,6 +18,8 @@ XEN_CONFIGS += xmexample1
 XEN_CONFIGS += xmexample2
 XEN_CONFIGS += xmexample.hvm
 XEN_CONFIGS += xmexample.vti
+XEN_CONFIGS += xend-pci-quirks.sxp
+XEN_CONFIGS += xend-pci-permissive.sxp
 
 # Xen script dir and scripts to go there.
 XEN_SCRIPT_DIR = /etc/xen/scripts
