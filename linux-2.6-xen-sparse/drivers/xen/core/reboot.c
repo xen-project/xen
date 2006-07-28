@@ -19,14 +19,6 @@
 #include <xen/xencons.h>
 #include <xen/cpu_hotplug.h>
 
-#if defined(__i386__) || defined(__x86_64__)
-/*
- * Power off function, if any
- */
-void (*pm_power_off)(void);
-EXPORT_SYMBOL(pm_power_off);
-#endif
-
 extern void ctrl_alt_del(void);
 
 #define SHUTDOWN_INVALID  -1
@@ -40,6 +32,13 @@ extern void ctrl_alt_del(void);
 #define SHUTDOWN_HALT      4
 
 #if defined(__i386__) || defined(__x86_64__)
+
+/*
+ * Power off function, if any
+ */
+void (*pm_power_off)(void);
+EXPORT_SYMBOL(pm_power_off);
+
 void machine_emergency_restart(void)
 {
 	/* We really want to get pending console data out before we die. */
@@ -70,7 +69,8 @@ int reboot_thru_bios = 0;	/* for dmi_scan.c */
 EXPORT_SYMBOL(machine_restart);
 EXPORT_SYMBOL(machine_halt);
 EXPORT_SYMBOL(machine_power_off);
-#endif
+
+#endif /* defined(__i386__) || defined(__x86_64__) */
 
 /******************************************************************************
  * Stop/pickle callback handling.
@@ -82,6 +82,7 @@ static void __shutdown_handler(void *unused);
 static DECLARE_WORK(shutdown_work, __shutdown_handler, NULL);
 
 #if defined(__i386__) || defined(__x86_64__)
+
 /* Ensure we run on the idle task page tables so that we will
    switch page tables before running user space. This is needed
    on architectures with separate kernel and user page tables
@@ -98,17 +99,58 @@ static void switch_idle_mm(void)
 	current->active_mm = &init_mm;
 	mmdrop(mm);
 }
+
+static void pre_suspend(void)
+{
+	HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
+	clear_fixmap(FIX_SHARED_INFO);
+
+	xen_start_info->store_mfn = mfn_to_pfn(xen_start_info->store_mfn);
+	xen_start_info->console_mfn = mfn_to_pfn(xen_start_info->console_mfn);
+}
+
+static void post_suspend(void)
+{
+	int i, j, k, fpp;
+	extern unsigned long max_pfn;
+	extern unsigned long *pfn_to_mfn_frame_list_list;
+	extern unsigned long *pfn_to_mfn_frame_list[];
+
+	set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
+
+	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
+
+	memset(empty_zero_page, 0, PAGE_SIZE);
+
+	HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list_list =
+		virt_to_mfn(pfn_to_mfn_frame_list_list);
+
+	fpp = PAGE_SIZE/sizeof(unsigned long);
+	for (i = 0, j = 0, k = -1; i < max_pfn; i += fpp, j++) {
+		if ((j % fpp) == 0) {
+			k++;
+			pfn_to_mfn_frame_list_list[k] =
+				virt_to_mfn(pfn_to_mfn_frame_list[k]);
+			j = 0;
+		}
+		pfn_to_mfn_frame_list[k][j] =
+			virt_to_mfn(&phys_to_machine_mapping[i]);
+	}
+	HYPERVISOR_shared_info->arch.max_pfn = max_pfn;
+}
+
+#else /* !(defined(__i386__) || defined(__x86_64__)) */
+
+#define switch_idle_mm()	((void)0)
+#define mm_pin_all()		((void)0)
+#define pre_suspend()		((void)0)
+#define post_suspend()		((void)0)
+
 #endif
 
 static int __do_suspend(void *ignore)
 {
 	int err;
-#if defined(__i386__) || defined(__x86_64__)
-	int i, j, k, fpp;
-	extern unsigned long max_pfn;
-	extern unsigned long *pfn_to_mfn_frame_list_list;
-	extern unsigned long *pfn_to_mfn_frame_list[];
-#endif
 
 	extern void time_resume(void);
 
@@ -131,27 +173,13 @@ static int __do_suspend(void *ignore)
 
 	preempt_disable();
 
-#ifdef __i386__
-	kmem_cache_shrink(pgd_cache);
-#endif
-#if defined(__i386__) || defined(__x86_64__)
 	mm_pin_all();
-
-	__cli();
-#elif defined(__ia64__)
 	local_irq_disable();
-#endif
 	preempt_enable();
 
 	gnttab_suspend();
 
-#if defined(__i386__) || defined(__x86_64__)
-	HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
-	clear_fixmap(FIX_SHARED_INFO);
-
-	xen_start_info->store_mfn = mfn_to_pfn(xen_start_info->store_mfn);
-	xen_start_info->console_mfn = mfn_to_pfn(xen_start_info->console_mfn);
-#endif
+	pre_suspend();
 
 	/*
 	 * We'll stop somewhere inside this hypercall. When it returns,
@@ -161,29 +189,7 @@ static int __do_suspend(void *ignore)
 
 	shutting_down = SHUTDOWN_INVALID;
 
-#if defined(__i386__) || defined(__x86_64__)
-	set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
-
-	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
-
-	memset(empty_zero_page, 0, PAGE_SIZE);
-
-	HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list_list =
-		virt_to_mfn(pfn_to_mfn_frame_list_list);
-
-	fpp = PAGE_SIZE/sizeof(unsigned long);
-	for (i = 0, j = 0, k = -1; i < max_pfn; i += fpp, j++) {
-		if ((j % fpp) == 0) {
-			k++;
-			pfn_to_mfn_frame_list_list[k] =
-				virt_to_mfn(pfn_to_mfn_frame_list[k]);
-			j = 0;
-		}
-		pfn_to_mfn_frame_list[k][j] =
-			virt_to_mfn(&phys_to_machine_mapping[i]);
-	}
-	HYPERVISOR_shared_info->arch.max_pfn = max_pfn;
-#endif
+	post_suspend();
 
 	gnttab_resume();
 
@@ -191,13 +197,9 @@ static int __do_suspend(void *ignore)
 
 	time_resume();
 
-#if defined(__i386__) || defined(__x86_64__)
 	switch_idle_mm();
 
-	__sti();
-#elif defined(__ia64__)
 	local_irq_enable();
-#endif
 
 	xencons_resume();
 
