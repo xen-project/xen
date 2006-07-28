@@ -161,3 +161,23 @@ int evtchn_alloc_unbound(domid_t pal, evtchn_handler_t handler,
     *port = bind_evtchn(op.u.alloc_unbound.port, handler, data);
     return err;
 }
+
+/* Connect to a port so as to allow the exchange of notifications with
+   the pal. Returns the result of the hypervisor call. */
+
+int evtchn_bind_interdomain(domid_t pal, evtchn_port_t remote_port,
+			    evtchn_handler_t handler, void *data,
+			    evtchn_port_t *local_port)
+{
+    evtchn_op_t op;
+    op.cmd = EVTCHNOP_bind_interdomain;
+    op.u.bind_interdomain.remote_dom = pal;
+    op.u.bind_interdomain.remote_port = remote_port;
+    int err = HYPERVISOR_event_channel_op(&op);
+    if (err)
+		return err;
+	evtchn_port_t port = op.u.bind_interdomain.local_port;
+    clear_evtchn(port);	      /* Without, handler gets invoked now! */
+    *local_port = bind_evtchn(port, handler, data);
+    return err;
+}
