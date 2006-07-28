@@ -569,6 +569,11 @@ def xm_reboot(args):
     from xen.xm import shutdown
     shutdown.main(["shutdown", "-R"] + args)
 
+def xm_shutdown(args):
+    arg_check(args, "shutdown", 1, 4)
+    from xen.xm import shutdown
+    shutdown.main(["shutdown"] + args)
+
 def xm_pause(args):
     arg_check(args, "pause", 1)
     dom = args[0]
@@ -1109,6 +1114,7 @@ commands = {
     "restore": xm_restore,
     "save": xm_save,
     "reboot": xm_reboot,
+    "shutdown": xm_shutdown,
     "list": xm_list,
     # memory commands
     "mem-max": xm_mem_max,
@@ -1151,7 +1157,6 @@ subcommands = [
     'create',
     'migrate',
     'sysrq',
-    'shutdown',
     'labels',
     'addlabel',
     'rmlabel',
