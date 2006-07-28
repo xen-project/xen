@@ -326,6 +326,12 @@ again:
 		goto abort_transaction;
 	}
 
+	err = xenbus_printf(xbt, dev->nodename, "feature-rx-notify", "%d", 1);
+	if (err) {
+		message = "writing feature-rx-notify";
+		goto abort_transaction;
+	}
+
 	err = xenbus_transaction_end(xbt, 0);
 	if (err) {
 		if (err == -EAGAIN)
@@ -569,7 +575,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 	unsigned short id;
 	struct netfront_info *np = netdev_priv(dev);
 	struct sk_buff *skb;
-	int i, batch_target;
+	int i, batch_target, notify;
 	RING_IDX req_prod = np->rx.req_prod_pvt;
 	struct xen_memory_reservation reservation;
 	grant_ref_t ref;
@@ -682,7 +688,9 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 	/* Above is a suitable barrier to ensure backend will see requests. */
 	np->rx.req_prod_pvt = req_prod + i;
  push:
-	RING_PUSH_REQUESTS(&np->rx);
+	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&np->rx, notify);
+	if (notify)
+		notify_remote_via_irq(np->irq);
 }
 
 static void xennet_make_frags(struct sk_buff *skb, struct net_device *dev,
