@@ -137,6 +137,18 @@ gnttab_alloc_and_grant(void **map)
     return gref;
 }
 
+static const char *gnttabop_error_msgs[] = GNTTABOP_error_msgs;
+
+const char *
+gnttabop_error(int16_t status)
+{
+    status = -status;
+    if (status < 0 || status >= ARRAY_SIZE(gnttabop_error_msgs))
+	return "bad status";
+    else
+        return gnttabop_error_msgs[status];
+}
+
 void
 init_gnttab(void)
 {

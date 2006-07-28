@@ -22,20 +22,22 @@
 #include<traps.h>
 #include <xen/event_channel.h>
 
-/* prototypes */
-int do_event(u32 port, struct pt_regs *regs);
-int bind_virq( u32 virq, void (*handler)(int, struct pt_regs *, void *data),
-			   void *data);
-int bind_evtchn( u32 virq, void (*handler)(int, struct pt_regs *, void *data),
-				 void *data );
-void unbind_evtchn( u32 port );
-void init_events(void);
-void unbind_virq( u32 port );
-int evtchn_alloc_unbound(void (*handler)(int, struct pt_regs *regs,
-										 void *data),
-						 void *data);
+typedef void (*evtchn_handler_t)(evtchn_port_t, struct pt_regs *, void *);
 
-static inline int notify_remote_via_evtchn(int port)
+/* prototypes */
+int do_event(evtchn_port_t port, struct pt_regs *regs);
+int bind_virq(uint32_t virq, evtchn_handler_t handler, void *data);
+evtchn_port_t bind_evtchn(evtchn_port_t port, evtchn_handler_t handler,
+						  void *data);
+void unbind_evtchn(evtchn_port_t port);
+void init_events(void);
+int evtchn_alloc_unbound(domid_t pal, evtchn_handler_t handler,
+						 void *data, evtchn_port_t *port);
+int evtchn_bind_interdomain(domid_t pal, evtchn_port_t remote_port,
+							evtchn_handler_t handler, void *data,
+							evtchn_port_t *local_port);
+
+static inline int notify_remote_via_evtchn(evtchn_port_t port)
 {
     evtchn_op_t op;
     op.cmd = EVTCHNOP_send;
