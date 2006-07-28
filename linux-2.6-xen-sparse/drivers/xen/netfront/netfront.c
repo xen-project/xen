@@ -600,14 +600,17 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 			/* Could not allocate any skbuffs. Try again later. */
 			mod_timer(&np->rx_refill_timer,
 				  jiffies + (HZ/10));
-			return;
+			break;
 		}
 		__skb_queue_tail(&np->rx_batch, skb);
 	}
 
 	/* Is the batch large enough to be worthwhile? */
-	if (i < (np->rx_target/2))
+	if (i < (np->rx_target/2)) {
+		if (req_prod > np->rx.sring->req_prod)
+			goto push;
 		return;
+	}
 
 	/* Adjust our fill target if we risked running out of buffers. */
 	if (((req_prod - np->rx.sring->rsp_prod) < (np->rx_target / 4)) &&
@@ -678,6 +681,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 
 	/* Above is a suitable barrier to ensure backend will see requests. */
 	np->rx.req_prod_pvt = req_prod + i;
+ push:
 	RING_PUSH_REQUESTS(&np->rx);
 }
 
@@ -875,7 +879,6 @@ static void xennet_move_rx_slot(struct netfront_info *np, struct sk_buff *skb,
 	RING_GET_REQUEST(&np->rx, np->rx.req_prod_pvt)->id = new;
 	RING_GET_REQUEST(&np->rx, np->rx.req_prod_pvt)->gref = ref;
 	np->rx.req_prod_pvt++;
-	RING_PUSH_REQUESTS(&np->rx);
 }
 
 static int netif_poll(struct net_device *dev, int *pbudget)
@@ -1207,7 +1210,6 @@ static void network_connect(struct net_device *dev)
 	}
 
 	np->rx.req_prod_pvt = requeue_idx;
-	RING_PUSH_REQUESTS(&np->rx);
 
 	/*
 	 * Step 3: All public and private state should now be sane.  Get
