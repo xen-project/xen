@@ -31,8 +31,8 @@ evtchn_port_t bind_evtchn(evtchn_port_t port, evtchn_handler_t handler,
 						  void *data);
 void unbind_evtchn(evtchn_port_t port);
 void init_events(void);
-evtchn_port_t evtchn_alloc_unbound(evtchn_handler_t handler,
-								   void *data);
+int evtchn_alloc_unbound(domid_t pal, evtchn_handler_t handler,
+						 void *data, evtchn_port_t *port);
 
 static inline int notify_remote_via_evtchn(evtchn_port_t port)
 {

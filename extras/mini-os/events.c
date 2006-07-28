@@ -141,25 +141,23 @@ void default_handler(evtchn_port_t port, struct pt_regs *regs, void *ignore)
     printk("[Port %d] - event received\n", port);
 }
 
+/* Create a port available to the pal for exchanging notifications.
+   Returns the result of the hypervisor call. */
+
 /* Unfortunate confusion of terminology: the port is unbound as far
    as Xen is concerned, but we automatically bind a handler to it
    from inside mini-os. */
-evtchn_port_t evtchn_alloc_unbound(evtchn_handler_t handler, void *data)
+
+int evtchn_alloc_unbound(domid_t pal, evtchn_handler_t handler,
+						 void *data, evtchn_port_t *port)
 {
-	evtchn_port_t port;
-	evtchn_op_t op;
-	int err;
-
-	op.cmd = EVTCHNOP_alloc_unbound;
-	op.u.alloc_unbound.dom = DOMID_SELF;
-	op.u.alloc_unbound.remote_dom = 0;
-
-	err = HYPERVISOR_event_channel_op(&op);
-	if (err) {
-		printk("Failed to alloc unbound evtchn: %d.\n", err);
-		return -1;
-	}
-	port = op.u.alloc_unbound.port;
-	bind_evtchn(port, handler, data);
-	return port;
+    evtchn_op_t op;
+    op.cmd = EVTCHNOP_alloc_unbound;
+    op.u.alloc_unbound.dom = DOMID_SELF;
+    op.u.alloc_unbound.remote_dom = pal;
+    int err = HYPERVISOR_event_channel_op(&op);
+    if (err)
+		return err;
+    *port = bind_evtchn(op.u.alloc_unbound.port, handler, data);
+    return err;
 }
