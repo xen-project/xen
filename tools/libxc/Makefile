@@ -35,8 +35,7 @@ GUEST_SRCS-$(CONFIG_IA64) += xc_linux_build.c
 GUEST_SRCS-$(CONFIG_MIGRATE) += xc_linux_restore.c xc_linux_save.c
 GUEST_SRCS-$(CONFIG_HVM) += xc_hvm_build.c
 
-# This Makefile only adds files if CONFIG_IA64 is y.
-include ia64/Makefile
+-include $(XEN_TARGET_ARCH)/Makefile
 
 CFLAGS   += -Werror
 CFLAGS   += -fno-strict-aliasing

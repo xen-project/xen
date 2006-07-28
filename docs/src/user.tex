@@ -1287,8 +1287,8 @@ Section~\ref{s:configure}). Note that devices are not really hidden from the
 backend domain. The PCI Backend appears to the Linux kernel as a regular PCI
 device driver. The PCI Backend ensures that no other device driver loads
 for the devices by binding itself as the device driver for those devices.
-PCI devices are identified by hexadecimal slot/funciton numbers (on Linux,
-use \path{lspci} to determine slot/funciton numbers of your devices) and
+PCI devices are identified by hexadecimal slot/function numbers (on Linux,
+use \path{lspci} to determine slot/function numbers of your devices) and
 can be specified with or without the PCI domain: \\
 \centerline{  {\tt ({\em bus}:{\em slot}.{\em func})} example {\tt (02:1d.3)}} \\
 \centerline{  {\tt ({\em domain}:{\em bus}:{\em slot}.{\em func})} example {\tt (0000:02:1d.3)}} \\
@@ -1343,6 +1343,50 @@ Unbind a device from its driver and bind to the PCI Backend.
 
 Note that the "-n" option in the example is important as it causes echo to not
 output a new-line.
+
+\subsubsection{PCI Backend Configuration - User-space Quirks}
+Quirky devices (such as the Broadcom Tigon 3) may need write access to their
+configuration space registers.  Xen can be instructed to allow specified PCI
+devices write access to specific configuration space registers.  The policy may
+be found in:
+
+\centerline{ \path{/etc/xen/xend-pci-quirks.sxp} }
+
+The policy file is heavily commented and is intended to provide enough
+documentation for developers to extend it.
+
+\subsubsection{PCI Backend Configuration - Permissive Flag}
+If the user-space quirks approach doesn't meet your needs you may want to enable
+the permissive flag for that device.  To do so, first get the PCI domain, bus,
+slot, and function information from dom0 via \path{lspci}.  Then augment the
+user-space policy for permissive devices.  The permissive policy can be found
+in:
+
+\centerline{ \path{/etc/xen/xend-pci-permissive.sxp} }
+
+Currently, the only way to reset the permissive flag is to unbind the device
+from the PCI Backend driver.
+
+\subsubsection{PCI Backend - Checking Status}
+There two important sysfs nodes that provide a mechanism to view specifics on
+quirks and permissive devices:
+\begin{description}
+\item \path{/sys/bus/drivers/pciback/permissive} \\
+ Use \path{cat} on this file to view a list of permissive slots.
+\item \path{/sys/bus/drivers/pciback/quirks} \\
+ Use \path{cat} on this file view a hierarchical view of devices bound to the
+PCI backend, their PCI vendor/device ID, and any quirks that are associated with
+that particular slot.  
+\end{description}
+
+You may notice that every device bound to the PCI backend has 17 quirks standard 
+"quirks" regardless of \path{xend-pci-quirks.sxp}.  These default entries are
+necessary to support interactions between the PCI bus manager and the device bound
+to it.  Even non-quirky devices should have these standard entries.  
+
+In this case, preference was given to accuracy over aesthetics by choosing to
+show the standard quirks in the quirks list rather than hide them from the
+inquiring user 
 
 \subsubsection{PCI Frontend Configuration}
 To configure a domU to receive a PCI device:
