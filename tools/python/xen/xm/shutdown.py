@@ -23,8 +23,6 @@ from xen.xend.XendClient import server
 from xen.xend import sxp
 from xen.xm.opts import *
 
-DOM0_ID = '0'
-
 gopts = Opts(use="""[options] [DOM]
 
 Shutdown one or more domains gracefully.
@@ -51,14 +49,6 @@ gopts.opt('reboot', short='R',
           use='Shutdown and reboot.')
 
 def shutdown(opts, doms, mode, wait):
-    if doms == None: doms = server.xend.domains(0)
-    dom0_name = sxp.child_value(server.xend.domain(0), 'name')
-    for x in [dom0_name, DOM0_ID]:
-        if x in doms:
-            if opts.vals.all:
-                doms.remove(x)
-            else:
-                opts.err("Can't specify Domain-0")
     for d in doms:
         server.xend.domain.shutdown(d, mode)
     if wait:
@@ -86,8 +76,11 @@ def shutdown_mode(opts):
         return 'poweroff'
 
 def main_all(opts, args):
+    doms = server.xend.domains(0)
+    dom0_name = sxp.child_value(server.xend.domain(0), 'name')
+    doms.remove(dom0_name)
     mode = shutdown_mode(opts)  
-    shutdown(opts, None, mode, opts.vals.wait)
+    shutdown(opts, doms, mode, opts.vals.wait)
 
 def main_dom(opts, args):
     if len(args) == 0: opts.err('No domain parameter given')
