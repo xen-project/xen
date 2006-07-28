@@ -22,19 +22,19 @@
 #include<traps.h>
 #include <xen/event_channel.h>
 
-/* prototypes */
-int do_event(u32 port, struct pt_regs *regs);
-int bind_virq( u32 virq, void (*handler)(int, struct pt_regs *, void *data),
-			   void *data);
-int bind_evtchn( u32 virq, void (*handler)(int, struct pt_regs *, void *data),
-				 void *data );
-void unbind_evtchn( u32 port );
-void init_events(void);
-int evtchn_alloc_unbound(void (*handler)(int, struct pt_regs *regs,
-										 void *data),
-						 void *data);
+typedef void (*evtchn_handler_t)(evtchn_port_t, struct pt_regs *, void *);
 
-static inline int notify_remote_via_evtchn(int port)
+/* prototypes */
+int do_event(evtchn_port_t port, struct pt_regs *regs);
+int bind_virq(uint32_t virq, evtchn_handler_t handler, void *data);
+evtchn_port_t bind_evtchn(evtchn_port_t port, evtchn_handler_t handler,
+						  void *data);
+void unbind_evtchn(evtchn_port_t port);
+void init_events(void);
+evtchn_port_t evtchn_alloc_unbound(evtchn_handler_t handler,
+								   void *data);
+
+static inline int notify_remote_via_evtchn(evtchn_port_t port)
 {
     evtchn_op_t op;
     op.cmd = EVTCHNOP_send;

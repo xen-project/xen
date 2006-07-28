@@ -215,7 +215,7 @@ void block_domain(u32 millisecs)
 /*
  * Just a dummy 
  */
-static void timer_handler(int ev, struct pt_regs *regs, void *ign)
+static void timer_handler(evtchn_port_t ev, struct pt_regs *regs, void *ign)
 {
     static int i;
 

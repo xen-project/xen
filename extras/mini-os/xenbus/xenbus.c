@@ -112,7 +112,8 @@ static void xenbus_thread_func(void *ign)
     }
 }
 
-static void xenbus_evtchn_handler(int port, struct pt_regs *regs, void *ign)
+static void xenbus_evtchn_handler(evtchn_port_t port, struct pt_regs *regs,
+				  void *ign)
 {
     wake_up(&xb_waitq);
 }

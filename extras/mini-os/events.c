@@ -26,20 +26,20 @@
 
 /* this represents a event handler. Chaining or sharing is not allowed */
 typedef struct _ev_action_t {
-	void (*handler)(int, struct pt_regs *, void *);
+	evtchn_handler_t handler;
 	void *data;
     u32 count;
 } ev_action_t;
 
 
 static ev_action_t ev_actions[NR_EVS];
-void default_handler(int port, struct pt_regs *regs, void *data);
+void default_handler(evtchn_port_t port, struct pt_regs *regs, void *data);
 
 
 /*
  * Demux events to different handlers.
  */
-int do_event(u32 port, struct pt_regs *regs)
+int do_event(evtchn_port_t port, struct pt_regs *regs)
 {
     ev_action_t  *action;
     if (port >= NR_EVS) {
@@ -60,8 +60,8 @@ int do_event(u32 port, struct pt_regs *regs)
 
 }
 
-int bind_evtchn( u32 port, void (*handler)(int, struct pt_regs *, void *),
-				 void *data )
+evtchn_port_t bind_evtchn(evtchn_port_t port, evtchn_handler_t handler,
+						  void *data)
 {
  	if(ev_actions[port].handler != default_handler)
         printk("WARN: Handler for port %d already registered, replacing\n",
@@ -77,7 +77,7 @@ int bind_evtchn( u32 port, void (*handler)(int, struct pt_regs *, void *),
 	return port;
 }
 
-void unbind_evtchn( u32 port )
+void unbind_evtchn(evtchn_port_t port )
 {
 	if (ev_actions[port].handler == default_handler)
 		printk("WARN: No handler for port %d when unbinding\n", port);
@@ -86,8 +86,7 @@ void unbind_evtchn( u32 port )
 	ev_actions[port].data = NULL;
 }
 
-int bind_virq( u32 virq, void (*handler)(int, struct pt_regs *, void *data),
-			   void *data)
+int bind_virq(uint32_t virq, evtchn_handler_t handler, void *data)
 {
 	evtchn_op_t op;
 
@@ -137,7 +136,7 @@ void init_events(void)
     }
 }
 
-void default_handler(int port, struct pt_regs *regs, void *ignore)
+void default_handler(evtchn_port_t port, struct pt_regs *regs, void *ignore)
 {
     printk("[Port %d] - event received\n", port);
 }
@@ -145,11 +144,9 @@ void default_handler(int port, struct pt_regs *regs, void *ignore)
 /* Unfortunate confusion of terminology: the port is unbound as far
    as Xen is concerned, but we automatically bind a handler to it
    from inside mini-os. */
-int evtchn_alloc_unbound(void (*handler)(int, struct pt_regs *regs,
-										 void *data),
-						 void *data)
+evtchn_port_t evtchn_alloc_unbound(evtchn_handler_t handler, void *data)
 {
-	u32 port;
+	evtchn_port_t port;
 	evtchn_op_t op;
 	int err;
 
