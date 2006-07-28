@@ -143,15 +143,6 @@ config XEN_TPMDEV_BACKEND
 	help
 	  The TPM-device backend driver
 
-config XEN_TPMDEV_CLOSE_IF_VTPM_FAILS
-	bool "TPM backend closes upon vTPM failure"
-	depends on XEN_TPMDEV_BACKEND
-	default n
-	help
-	  The TPM backend closes the channel if the vTPM in userspace indicates
-	  a failure. The corresponding domain's channel will be closed.
-	  Say Y if you want this feature.
-
 config XEN_BLKDEV_FRONTEND
 	tristate "Block-device frontend driver"
 	depends on XEN

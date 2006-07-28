@@ -55,7 +55,6 @@ struct packet {
 
 enum {
 	PACKET_FLAG_DISCARD_RESPONSE = 1,
-	PACKET_FLAG_CHECK_RESPONSESTATUS = 2,
 };
 
 /* local variables */
@@ -201,21 +200,6 @@ static void packet_free(struct packet *pak)
 	kfree(pak);
 }
 
-static int packet_set(struct packet *pak,
-		      const unsigned char *buffer, u32 size)
-{
-	int rc = 0;
-	unsigned char *buf = kmalloc(size, GFP_KERNEL);
-
-	if (buf) {
-		pak->data_buffer = buf;
-		memcpy(buf, buffer, size);
-		pak->data_len = size;
-	} else {
-		rc = -ENOMEM;
-	}
-	return rc;
-}
 
 /*
  * Write data to the shared memory and send it to the FE.
@@ -224,29 +208,6 @@ static int packet_write(struct packet *pak,
 			const char *data, size_t size, int isuserbuffer)
 {
 	int rc = 0;
-
-	if ((pak->flags & PACKET_FLAG_CHECK_RESPONSESTATUS)) {
-#ifdef CONFIG_XEN_TPMDEV_CLOSE_IF_VTPM_FAILS
-		u32 res;
-
-		if (copy_from_buffer(&res,
-				     &data[2 + 4], sizeof (res),
-				     isuserbuffer)) {
-			return -EFAULT;
-		}
-
-		if (res != 0) {
-			/*
-			 * Close down this device. Should have the
-			 * FE notified about closure.
-			 */
-			if (!pak->tpmif) {
-				return -EFAULT;
-			}
-			pak->tpmif->status = DISCONNECTING;
-		}
-#endif
-	}
 
 	if (0 != (pak->flags & PACKET_FLAG_DISCARD_RESPONSE)) {
 		/* Don't send a respone to this packet. Just acknowledge it. */
