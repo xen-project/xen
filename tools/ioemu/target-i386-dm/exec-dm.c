@@ -64,6 +64,7 @@ uint8_t *code_gen_ptr;
 #endif /* !CONFIG_DM */
 
 uint64_t phys_ram_size;
+extern uint64_t ram_size;
 int phys_ram_fd;
 uint8_t *phys_ram_base;
 uint8_t *phys_ram_dirty;
@@ -422,7 +423,7 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
             l = len;
 	
         pd = page;
-        io_index = iomem_index(page);
+        io_index = iomem_index(addr);
         if (is_write) {
             if (io_index) {
                 if (l >= 4 && ((addr & 3) == 0)) {
@@ -467,7 +468,7 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
                     stb_raw(buf, val);
                     l = 1;
                 }
-            } else {
+            } else if (addr < ram_size) {
                 /* RAM case */
                 ptr = phys_ram_base + (pd & TARGET_PAGE_MASK) + 
                     (addr & ~TARGET_PAGE_MASK);
@@ -475,6 +476,9 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
 #ifdef __ia64__
                 sync_icache((unsigned long)ptr, l);
 #endif 
+            } else {
+                /* unreported MMIO space */
+                memset(buf, 0xff, len);
             }
         }
         len -= l;

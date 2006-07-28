@@ -1,7 +1,7 @@
 Index: ioemu/hw/iommu.c
 ===================================================================
---- ioemu.orig/hw/iommu.c	2006-07-27 11:16:53.470941290 +0100
-+++ ioemu/hw/iommu.c	2006-07-27 11:16:58.611372243 +0100
+--- ioemu.orig/hw/iommu.c	2006-07-28 09:56:58.571272016 +0100
++++ ioemu/hw/iommu.c	2006-07-28 10:02:10.171049510 +0100
 @@ -82,7 +82,11 @@
  #define IOPTE_VALID         0x00000002 /* IOPTE is valid */
  #define IOPTE_WAZ           0x00000001 /* Write as zeros */
@@ -16,8 +16,8 @@ Index: ioemu/hw/iommu.c
  
 Index: ioemu/cpu-all.h
 ===================================================================
---- ioemu.orig/cpu-all.h	2006-07-27 11:16:57.986441423 +0100
-+++ ioemu/cpu-all.h	2006-07-27 11:16:58.617371579 +0100
+--- ioemu.orig/cpu-all.h	2006-07-28 09:58:38.815935452 +0100
++++ ioemu/cpu-all.h	2006-07-28 10:02:10.171049510 +0100
 @@ -835,6 +835,31 @@
                  :"=m" (*(volatile long *)addr)
                  :"dIr" (nr));
@@ -52,8 +52,8 @@ Index: ioemu/cpu-all.h
  /* memory API */
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-27 11:16:58.450390064 +0100
-+++ ioemu/vl.c	2006-07-27 11:16:58.619371357 +0100
+--- ioemu.orig/vl.c	2006-07-28 09:58:59.672577418 +0100
++++ ioemu/vl.c	2006-07-28 10:02:10.174049171 +0100
 @@ -5578,6 +5578,7 @@
          exit(-1);
      }
@@ -99,9 +99,9 @@ Index: ioemu/vl.c
  #ifdef CONFIG_SOFTMMU
 Index: ioemu/target-i386-dm/exec-dm.c
 ===================================================================
---- ioemu.orig/target-i386-dm/exec-dm.c	2006-07-27 11:16:57.527492229 +0100
-+++ ioemu/target-i386-dm/exec-dm.c	2006-07-27 11:16:58.620371247 +0100
-@@ -340,6 +340,23 @@
+--- ioemu.orig/target-i386-dm/exec-dm.c	2006-07-28 09:58:22.882736989 +0100
++++ ioemu/target-i386-dm/exec-dm.c	2006-07-28 10:03:19.972165675 +0100
+@@ -341,6 +341,23 @@
      return io_mem_read[io_index >> IO_MEM_SHIFT];
  }
  
@@ -125,20 +125,20 @@ Index: ioemu/target-i386-dm/exec-dm.c
  /* physical memory access (slow version, mainly for debug) */
  #if defined(CONFIG_USER_ONLY)
  void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf, 
-@@ -455,6 +472,9 @@
+@@ -456,6 +473,9 @@
                  ptr = phys_ram_base + (pd & TARGET_PAGE_MASK) + 
                      (addr & ~TARGET_PAGE_MASK);
                  memcpy(buf, ptr, l);
 +#ifdef __ia64__
 +                sync_icache((unsigned long)ptr, l);
 +#endif 
-             }
-         }
-         len -= l;
+             } else {
+                 /* unreported MMIO space */
+                 memset(buf, 0xff, len);
 Index: ioemu/exec-all.h
 ===================================================================
---- ioemu.orig/exec-all.h	2006-07-27 11:16:57.446501195 +0100
-+++ ioemu/exec-all.h	2006-07-27 11:16:58.621371136 +0100
+--- ioemu.orig/exec-all.h	2006-07-28 09:56:58.572271903 +0100
++++ ioemu/exec-all.h	2006-07-28 10:02:10.175049059 +0100
 @@ -462,12 +462,13 @@
  }
  #endif
@@ -158,8 +158,8 @@ Index: ioemu/exec-all.h
  
 Index: ioemu/target-i386-dm/cpu.h
 ===================================================================
---- ioemu.orig/target-i386-dm/cpu.h	2006-07-27 11:16:57.526492340 +0100
-+++ ioemu/target-i386-dm/cpu.h	2006-07-27 11:16:58.621371136 +0100
+--- ioemu.orig/target-i386-dm/cpu.h	2006-07-28 09:56:58.572271903 +0100
++++ ioemu/target-i386-dm/cpu.h	2006-07-28 10:02:10.175049059 +0100
 @@ -80,7 +80,11 @@
  /* helper2.c */
  int main_loop(void);
@@ -175,7 +175,7 @@ Index: ioemu/target-i386-dm/cpu.h
 Index: ioemu/ia64_intrinsic.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/ia64_intrinsic.h	2006-07-27 11:16:58.621371136 +0100
++++ ioemu/ia64_intrinsic.h	2006-07-28 10:02:10.176048946 +0100
 @@ -0,0 +1,276 @@
 +#ifndef IA64_INTRINSIC_H
 +#define IA64_INTRINSIC_H
