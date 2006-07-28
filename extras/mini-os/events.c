@@ -105,11 +105,6 @@ int bind_virq( u32 virq, void (*handler)(int, struct pt_regs *, void *data),
 	return 0;
 }
 
-void unbind_virq( u32 port )
-{
-	unbind_evtchn(port);
-}
-
 #if defined(__x86_64__)
 /* Allocate 4 pages for the irqstack */
 #define STACK_PAGES 4

@@ -30,7 +30,6 @@ int bind_evtchn( u32 virq, void (*handler)(int, struct pt_regs *, void *data),
 				 void *data );
 void unbind_evtchn( u32 port );
 void init_events(void);
-void unbind_virq( u32 port );
 int evtchn_alloc_unbound(void (*handler)(int, struct pt_regs *regs,
 										 void *data),
 						 void *data);
