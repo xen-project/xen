@@ -1170,6 +1170,7 @@ static void network_connect(struct net_device *dev)
 	struct netfront_info *np = netdev_priv(dev);
 	int i, requeue_idx;
 	struct sk_buff *skb;
+	grant_ref_t ref;
 
 	xennet_set_features(dev);
 
