@@ -86,8 +86,6 @@ typedef struct netif_st {
 	struct timer_list credit_timeout;
 
 	/* Miscellaneous private stuff. */
-	enum { DISCONNECTED, DISCONNECTING, CONNECTED } status;
-	int active;
 	struct list_head list;  /* scheduling list */
 	atomic_t         refcnt;
 	struct net_device *dev;

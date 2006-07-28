@@ -36,28 +36,20 @@
 
 static void __netif_up(netif_t *netif)
 {
-	struct net_device *dev = netif->dev;
-	netif_tx_lock_bh(dev);
-	netif->active = 1;
-	netif_tx_unlock_bh(dev);
 	enable_irq(netif->irq);
 	netif_schedule_work(netif);
 }
 
 static void __netif_down(netif_t *netif)
 {
-	struct net_device *dev = netif->dev;
 	disable_irq(netif->irq);
-	netif_tx_lock_bh(dev);
-	netif->active = 0;
-	netif_tx_unlock_bh(dev);
 	netif_deschedule_work(netif);
 }
 
 static int net_open(struct net_device *dev)
 {
 	netif_t *netif = netdev_priv(dev);
-	if (netif->status == CONNECTED)
+	if (netif_carrier_ok(dev))
 		__netif_up(netif);
 	netif_start_queue(dev);
 	return 0;
@@ -67,7 +59,7 @@ static int net_close(struct net_device *dev)
 {
 	netif_t *netif = netdev_priv(dev);
 	netif_stop_queue(dev);
-	if (netif->status == CONNECTED)
+	if (netif_carrier_ok(dev))
 		__netif_down(netif);
 	return 0;
 }
@@ -93,11 +85,12 @@ netif_t *netif_alloc(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN])
 		return ERR_PTR(-ENOMEM);
 	}
 
+	netif_carrier_off(dev);
+
 	netif = netdev_priv(dev);
 	memset(netif, 0, sizeof(*netif));
 	netif->domid  = domid;
 	netif->handle = handle;
-	netif->status = DISCONNECTED;
 	atomic_set(&netif->refcnt, 1);
 	init_waitqueue_head(&netif->waiting_to_free);
 	netif->dev = dev;
@@ -256,11 +249,9 @@ int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 	netif->rx_req_cons_peek = 0;
 
 	netif_get(netif);
-	wmb(); /* Other CPUs see new state before interface is started. */
 
 	rtnl_lock();
-	netif->status = CONNECTED;
-	wmb();
+	netif_carrier_on(netif->dev);
 	if (netif_running(netif->dev))
 		__netif_up(netif);
 	rtnl_unlock();
@@ -296,20 +287,13 @@ static void netif_free(netif_t *netif)
 
 void netif_disconnect(netif_t *netif)
 {
-	switch (netif->status) {
-	case CONNECTED:
+	if (netif_carrier_ok(netif->dev)) {
 		rtnl_lock();
-		netif->status = DISCONNECTING;
-		wmb();
+		netif_carrier_off(netif->dev);
 		if (netif_running(netif->dev))
 			__netif_down(netif);
 		rtnl_unlock();
 		netif_put(netif);
-		/* fall through */
-	case DISCONNECTED:
-		netif_free(netif);
-		break;
-	default:
-		BUG();
 	}
+	netif_free(netif);
 }
