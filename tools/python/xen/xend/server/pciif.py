@@ -33,6 +33,8 @@ from xen.util.pci import PciDevice
 import resource
 import re
 
+from xen.xend.server.pciquirk import *
+
 xc = xen.lowlevel.xc.xc()
 
 #Calculate PAGE_SHIFT: number of bits to shift an address to get the page number
@@ -150,7 +152,10 @@ class PciController(DevController):
                     "bind your slot/device to the PCI backend using sysfs" \
                     )%(dev.name))
 
-        for (start, size) in dev.ioports:
+        PCIQuirk(dev.vendor, dev.device, dev.subvendor, dev.subdevice, domain, 
+                bus, slot, func)
+
+	for (start, size) in dev.ioports:
             log.debug('pci: enabling ioport 0x%x/0x%x'%(start,size))
             rc = xc.domain_ioport_permission(dom = fe_domid, first_port = start,
                     nr_ports = size, allow_access = True)

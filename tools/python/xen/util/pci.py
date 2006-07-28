@@ -16,6 +16,10 @@ SYSFS_PCI_DEVS_PATH = '/bus/pci/devices'
 SYSFS_PCI_DEV_RESOURCE_PATH = '/resource'
 SYSFS_PCI_DEV_IRQ_PATH = '/irq'
 SYSFS_PCI_DEV_DRIVER_DIR_PATH = '/driver'
+SYSFS_PCI_DEV_VENDOR_PATH = '/vendor'
+SYSFS_PCI_DEV_DEVICE_PATH = '/device'
+SYSFS_PCI_DEV_SUBVENDOR_PATH = '/subsystem_vendor'
+SYSFS_PCI_DEV_SUBDEVICE_PATH = '/subsystem_device'
 
 PCI_BAR_IO = 0x01
 PCI_BAR_IO_MASK = ~0x03
@@ -66,9 +70,12 @@ class PciDevice:
         self.iomem = []
         self.ioports = []
         self.driver = None
+        self.vendor = None
+        self.device = None
+        self.subvendor = None
+        self.subdevice = None
 
-        if not self.get_info_from_sysfs():
-            self.get_info_from_proc()
+        self.get_info_from_sysfs()
 
     def get_info_from_sysfs(self):
         try:
@@ -85,7 +92,7 @@ class PciDevice:
         try:
             resource_file = open(path,'r')
 
-            for i in range(7):
+            for i in range(PROC_PCI_NUM_RESOURCES):
                 line = resource_file.readline()
                 sline = line.split()
                 if len(sline)<3:
@@ -122,53 +129,39 @@ class PciDevice:
             raise PciDeviceParseError(('Failed to read %s: %s (%d)' %
                 (path, strerr, errno)))
 
-        return True
-        
-    def get_info_from_proc(self):
-        bus_devfn = '%02x%02x' % (self.bus,PCI_DEVFN(self.slot,self.func))
-
-        # /proc/bus/pci/devices doesn't expose domains
-        if self.domain!=0:
-            raise PciDeviceParseError("Can't yet detect resource usage by "+
-                    "devices in other domains through proc!")
-
+        path = sysfs_mnt+SYSFS_PCI_DEVS_PATH+'/'+ \
+                self.name+SYSFS_PCI_DEV_VENDOR_PATH
         try:
-            proc_pci_file = open(PROC_PCI_PATH,'r')
+            self.vendor = int(open(path,'r').readline(), 16)
         except IOError, (errno, strerr):
-            raise PciDeviceParseError(('Failed to open %s: %s (%d)' %
-                (PROC_PCI_PATH, strerr, errno)))
+            raise PciDeviceParseError(('Failed to open & read %s: %s (%d)' %
+                (path, strerr, errno)))
 
-        for line in proc_pci_file:
-            sline = line.split()
-            if len(sline)<(PROC_PCI_NUM_RESOURCES*2+3):
-                continue
+        path = sysfs_mnt+SYSFS_PCI_DEVS_PATH+'/'+ \
+                self.name+SYSFS_PCI_DEV_DEVICE_PATH
+        try:
+            self.device = int(open(path,'r').readline(), 16)
+        except IOError, (errno, strerr):
+            raise PciDeviceParseError(('Failed to open & read %s: %s (%d)' %
+                (path, strerr, errno)))
 
-            if sline[0]==bus_devfn:
-                self.dissect_proc_pci_line(sline)
-                break
-        else:
-            raise PciDeviceNotFoundError(self.domain, self.bus,
-                    self.slot, self.func)
+        path = sysfs_mnt+SYSFS_PCI_DEVS_PATH+'/'+ \
+                self.name+SYSFS_PCI_DEV_SUBVENDOR_PATH
+        try:
+            self.subvendor = int(open(path,'r').readline(), 16)
+        except IOError, (errno, strerr):
+            raise PciDeviceParseError(('Failed to open & read %s: %s (%d)' %
+                (path, strerr, errno)))
 
-    def dissect_proc_pci_line(self, sline):
-        self.irq = int(sline[2],16)
-        start_idx = 3
-        for i in range(PROC_PCI_NUM_RESOURCES):
-            flags = int(sline[start_idx+i],16)
-            size = int(sline[start_idx+i+PROC_PCI_NUM_RESOURCES],16)
-            if flags&PCI_BAR_IO:
-                start = flags&PCI_BAR_IO_MASK
-                if start!=0:
-                    self.ioports.append( (start,size) )
-            else:
-                start = flags&PCI_BAR_MEM_MASK
-                if start!=0:
-                    self.iomem.append( (start,size) )
+        path = sysfs_mnt+SYSFS_PCI_DEVS_PATH+'/'+ \
+                self.name+SYSFS_PCI_DEV_SUBDEVICE_PATH
+        try:
+            self.subdevice = int(open(path,'r').readline(), 16)
+        except IOError, (errno, strerr):
+            raise PciDeviceParseError(('Failed to open & read %s: %s (%d)' %
+                (path, strerr, errno)))
 
-        # detect driver module name
-        driver_idx = PROC_PCI_NUM_RESOURCES*2+3
-        if len(sline)>driver_idx:
-            self.driver = sline[driver_idx]
+        return True
 
     def __str__(self):
         str = "PCI Device %s\n" % (self.name)
@@ -176,7 +169,11 @@ class PciDevice:
             str = str + "IO Port 0x%02x [size=%d]\n"%(start,size)
         for (start,size) in self.iomem:
             str = str + "IO Mem 0x%02x [size=%d]\n"%(start,size)
-        str = str + "IRQ %d"%(self.irq)
+        str = str + "IRQ %d\n"%(self.irq)
+        str = str + "Vendor ID 0x%04x\n"%(self.vendor)
+        str = str + "Device ID 0x%04x\n"%(self.device)
+        str = str + "Sybsystem Vendor ID 0x%04x\n"%(self.subvendor)
+        str = str + "Subsystem Device ID 0x%04x"%(self.subdevice)
         return str
 
 def main():
