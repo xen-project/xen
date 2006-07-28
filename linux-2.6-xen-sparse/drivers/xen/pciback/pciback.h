@@ -61,6 +61,7 @@ void pciback_reset_device(struct pci_dev *pdev);
 /* Access a virtual configuration space for a PCI device */
 int pciback_config_init(void);
 int pciback_config_init_dev(struct pci_dev *dev);
+void pciback_config_free_dyn_fields(struct pci_dev *dev);
 void pciback_config_reset_dev(struct pci_dev *dev);
 void pciback_config_free_dev(struct pci_dev *dev);
 int pciback_config_read(struct pci_dev *dev, int offset, int size,

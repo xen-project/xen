@@ -33,11 +33,13 @@ typedef int (*conf_byte_read) (struct pci_dev * dev, int offset, u8 * value,
  * values.
  */
 struct config_field {
-	unsigned int     offset;
-	unsigned int     size;
-	conf_field_init  init;
+	unsigned int offset;
+	unsigned int size;
+	unsigned int mask;
+	conf_field_init init;
 	conf_field_reset reset;
-	conf_field_free  release;
+	conf_field_free release;
+	void (*clean) (struct config_field * field);
 	union {
 		struct {
 			conf_dword_write write;
@@ -52,6 +54,7 @@ struct config_field {
 			conf_byte_read read;
 		} b;
 	} u;
+	struct list_head list;
 };
 
 struct config_field_entry {

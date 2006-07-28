@@ -1,7 +1,8 @@
 /*
  * PCI Stub Driver - Grabs devices in backend to be exported later
  *
- *   Author: Ryan Wilson <hap9@epoch.ncsc.mil>
+ * Ryan Wilson <hap9@epoch.ncsc.mil>
+ * Chris Bookholt <hap10@epoch.ncsc.mil>
  */
 #include <linux/module.h>
 #include <linux/init.h>
@@ -10,6 +11,8 @@
 #include <linux/kref.h>
 #include <asm/atomic.h>
 #include "pciback.h"
+#include "conf_space.h"
+#include "conf_space_quirks.h"
 
 static char *pci_devs_to_hide = NULL;
 module_param_named(hide, pci_devs_to_hide, charp, 0444);
@@ -31,6 +34,7 @@ struct pcistub_device {
 	struct pci_dev *dev;
 	struct pciback_device *pdev;	/* non-NULL if struct pci_dev is in use */
 };
+
 /* Access to pcistub_devices & seized_devices lists and the initialize_devices
  * flag must be locked with pcistub_devices_lock
  */
@@ -76,6 +80,7 @@ static void pcistub_device_release(struct kref *kref)
 
 	/* Clean-up the device */
 	pciback_reset_device(psdev->dev);
+	pciback_config_free_dyn_fields(psdev->dev);
 	pciback_config_free_dev(psdev->dev);
 	kfree(pci_get_drvdata(psdev->dev));
 	pci_set_drvdata(psdev->dev, NULL);
@@ -93,6 +98,32 @@ static inline void pcistub_device_get(struct pcistub_device *psdev)
 static inline void pcistub_device_put(struct pcistub_device *psdev)
 {
 	kref_put(&psdev->kref, pcistub_device_release);
+}
+
+static struct pcistub_device *pcistub_device_find(int domain, int bus,
+						  int slot, int func)
+{
+	struct pcistub_device *psdev = NULL;
+	unsigned long flags;
+
+	spin_lock_irqsave(&pcistub_devices_lock, flags);
+
+	list_for_each_entry(psdev, &pcistub_devices, dev_list) {
+		if (psdev->dev != NULL
+		    && domain == pci_domain_nr(psdev->dev->bus)
+		    && bus == psdev->dev->bus->number
+		    && PCI_DEVFN(slot, func) == psdev->dev->devfn) {
+			pcistub_device_get(psdev);
+			goto out;
+		}
+	}
+
+	/* didn't find it */
+	psdev = NULL;
+
+      out:
+	spin_unlock_irqrestore(&pcistub_devices_lock, flags);
+	return psdev;
 }
 
 static struct pci_dev *pcistub_device_get_pci_dev(struct pciback_device *pdev,
@@ -180,6 +211,7 @@ void pcistub_put_pci_dev(struct pci_dev *dev)
 	 * (so it's ready for the next domain)
 	 */
 	pciback_reset_device(found_psdev->dev);
+	pciback_config_free_dyn_fields(found_psdev->dev);
 	pciback_config_reset_dev(found_psdev->dev);
 
 	spin_lock_irqsave(&found_psdev->lock, flags);
@@ -392,6 +424,8 @@ static void pcistub_remove(struct pci_dev *dev)
 
 	spin_lock_irqsave(&pcistub_devices_lock, flags);
 
+	pciback_config_quirk_release(dev);
+
 	list_for_each_entry(psdev, &pcistub_devices, dev_list) {
 		if (psdev->dev == dev) {
 			found_psdev = psdev;
@@ -471,6 +505,19 @@ static inline int str_to_slot(const char *buf, int *domain, int *bus,
 	return -EINVAL;
 }
 
+static inline int str_to_quirk(const char *buf, int *domain, int *bus, int
+			       *slot, int *func, int *reg, int *size, int *mask)
+{
+	int err;
+
+	err =
+	    sscanf(buf, " %04x:%02x:%02x.%1x-%08x:%1x:%08x", domain, bus, slot,
+		   func, reg, size, mask);
+	if (err == 7)
+		return 0;
+	return -EINVAL;
+}
+
 static int pcistub_device_id_add(int domain, int bus, int slot, int func)
 {
 	struct pcistub_device_id *pci_dev_id;
@@ -520,6 +567,46 @@ static int pcistub_device_id_remove(int domain, int bus, int slot, int func)
 	}
 	spin_unlock_irqrestore(&device_ids_lock, flags);
 
+	return err;
+}
+
+static int pcistub_reg_add(int domain, int bus, int slot, int func, int reg,
+			   int size, int mask)
+{
+	int err = 0;
+	struct pcistub_device *psdev;
+	struct pci_dev *dev;
+	struct config_field *field;
+
+	psdev = pcistub_device_find(domain, bus, slot, func);
+	if (!psdev || !psdev->dev) {
+		err = -ENODEV;
+		goto out;
+	}
+	dev = psdev->dev;
+
+	/* check for duplicate field */
+	if (pciback_field_is_dup(dev, reg))
+		goto out;
+
+	field = kzalloc(sizeof(*field), GFP_ATOMIC);
+	if (!field) {
+		err = -ENOMEM;
+		goto out;
+	}
+
+	field->offset = reg;
+	field->size = size;
+	field->mask = mask;
+	field->init = NULL;
+	field->reset = NULL;
+	field->release = NULL;
+	field->clean = pciback_config_field_free;
+
+	err = pciback_config_quirks_add_field(dev, field);
+	if (err)
+		kfree(field);
+      out:
 	return err;
 }
 
@@ -587,6 +674,71 @@ static ssize_t pcistub_slot_show(struct device_driver *drv, char *buf)
 
 DRIVER_ATTR(slots, S_IRUSR, pcistub_slot_show, NULL);
 
+static ssize_t pcistub_quirk_add(struct device_driver *drv, const char *buf,
+				 size_t count)
+{
+	int domain, bus, slot, func, reg, size, mask;
+	int err;
+
+	err = str_to_quirk(buf, &domain, &bus, &slot, &func, &reg, &size,
+			   &mask);
+	if (err)
+		goto out;
+
+	err = pcistub_reg_add(domain, bus, slot, func, reg, size, mask);
+
+      out:
+	if (!err)
+		err = count;
+	return err;
+}
+
+static ssize_t pcistub_quirk_show(struct device_driver *drv, char *buf)
+{
+	int count = 0;
+	unsigned long flags;
+	extern struct list_head pciback_quirks;
+	struct pciback_config_quirk *quirk;
+	struct pciback_dev_data *dev_data;
+	struct config_field *field;
+	struct config_field_entry *cfg_entry;
+
+	spin_lock_irqsave(&device_ids_lock, flags);
+	list_for_each_entry(quirk, &pciback_quirks, quirks_list) {
+		if (count >= PAGE_SIZE)
+			goto out;
+
+		count += scnprintf(buf + count, PAGE_SIZE - count,
+				   "%02x:%02x.%01x\n\t%04x:%04x:%04x:%04x\n",
+				   quirk->pdev->bus->number,
+				   PCI_SLOT(quirk->pdev->devfn),
+				   PCI_FUNC(quirk->pdev->devfn),
+				   quirk->devid.vendor, quirk->devid.device,
+				   quirk->devid.subvendor,
+				   quirk->devid.subdevice);
+
+		dev_data = pci_get_drvdata(quirk->pdev);
+
+		list_for_each_entry(cfg_entry, &dev_data->config_fields, list) {
+			field = cfg_entry->field;
+			if (count >= PAGE_SIZE)
+				goto out;
+
+			count += scnprintf(buf + count, PAGE_SIZE -
+					   count, "\t\t%08x:%01x:%08x\n",
+					   field->offset, field->size,
+					   field->mask);
+		}
+	}
+
+      out:
+	spin_unlock_irqrestore(&device_ids_lock, flags);
+
+	return count;
+}
+
+DRIVER_ATTR(quirks, S_IRUSR | S_IWUSR, pcistub_quirk_show, pcistub_quirk_add);
+
 static int __init pcistub_init(void)
 {
 	int pos = 0;
@@ -631,6 +783,7 @@ static int __init pcistub_init(void)
 	driver_create_file(&pciback_pci_driver.driver,
 			   &driver_attr_remove_slot);
 	driver_create_file(&pciback_pci_driver.driver, &driver_attr_slots);
+	driver_create_file(&pciback_pci_driver.driver, &driver_attr_quirks);
 
       out:
 	return err;
@@ -680,6 +833,7 @@ static void __exit pciback_cleanup(void)
 	driver_remove_file(&pciback_pci_driver.driver,
 			   &driver_attr_remove_slot);
 	driver_remove_file(&pciback_pci_driver.driver, &driver_attr_slots);
+	driver_remove_file(&pciback_pci_driver.driver, &driver_attr_quirks);
 
 	pci_unregister_driver(&pciback_pci_driver);
 }

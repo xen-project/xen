@@ -13,6 +13,7 @@
 #include <linux/pci.h>
 #include "pciback.h"
 #include "conf_space.h"
+#include "conf_space_quirks.h"
 
 static int permissive = 0;
 module_param(permissive, bool, 0644);
@@ -81,7 +82,7 @@ static int conf_space_write(struct pci_dev *dev,
 	case 4:
 		if (field->u.dw.write)
 			ret = field->u.dw.write(dev, offset, value,
-					        entry->data);
+						entry->data);
 		break;
 	}
 	return ret;
@@ -261,36 +262,56 @@ int pciback_config_write(struct pci_dev *dev, int offset, int size, u32 value)
 			switch (size) {
 			case 1:
 				err = pci_write_config_byte(dev, offset,
-							    (u8)value);
+							    (u8) value);
 				break;
 			case 2:
 				err = pci_write_config_word(dev, offset,
-							    (u16)value);
+							    (u16) value);
 				break;
 			case 4:
 				err = pci_write_config_dword(dev, offset,
-							     (u32)value);
+							     (u32) value);
 				break;
 			}
 		} else if (!dev_data->warned_on_write) {
 			dev_data->warned_on_write = 1;
-			dev_warn(&dev->dev, "Driver wrote to a read-only "
-				 "configuration space field!\n");
-			dev_warn(&dev->dev, "Write at offset 0x%x size %d\n",
-				offset, size);
-			dev_warn(&dev->dev, "This may be harmless, but if\n");
-			dev_warn(&dev->dev, "you have problems with your "
-				 "device:\n");
-			dev_warn(&dev->dev, "1) see the permissive "
-				 "attribute in sysfs.\n");
-			dev_warn(&dev->dev, "2) report problems to the "
-				 "xen-devel mailing list along\n");
-			dev_warn(&dev->dev, "   with details of your device "
-				 "obtained from lspci.\n");
+			dev_warn(&dev->dev, "Driver tried to write to a "
+				 "read-only configuration space field at offset "
+				 "0x%x, size %d. This may be harmless, but if "
+				 "you have problems with your device:\n"
+				 "1) see permissive attribute in sysfs\n"
+				 "2) report problems to the xen-devel "
+				 "mailing list along with details of your "
+				 "device obtained from lspci.\n", offset, size);
 		}
 	}
 
 	return pcibios_err_to_errno(err);
+}
+
+void pciback_config_free_dyn_fields(struct pci_dev *dev)
+{
+	struct pciback_dev_data *dev_data = pci_get_drvdata(dev);
+	struct config_field_entry *cfg_entry, *t;
+	struct config_field *field;
+
+	dev_dbg(&dev->dev,
+		"free-ing dynamically allocated virtual configuration space fields\n");
+
+	list_for_each_entry_safe(cfg_entry, t, &dev_data->config_fields, list) {
+		field = cfg_entry->field;
+
+		if (field->clean) {
+			field->clean(field);
+
+			if (cfg_entry->data)
+				kfree(cfg_entry->data);
+
+			list_del(&cfg_entry->list);
+			kfree(cfg_entry);
+		}
+
+	}
 }
 
 void pciback_config_reset_dev(struct pci_dev *dev)
@@ -337,6 +358,10 @@ int pciback_config_add_field_offset(struct pci_dev *dev,
 	struct pciback_dev_data *dev_data = pci_get_drvdata(dev);
 	struct config_field_entry *cfg_entry;
 	void *tmp;
+
+	/* silently ignore duplicate fields */
+	if (pciback_field_is_dup(dev, field->offset))
+		goto out;
 
 	cfg_entry = kmalloc(sizeof(*cfg_entry), GFP_KERNEL);
 	if (!cfg_entry) {
@@ -388,6 +413,10 @@ int pciback_config_init_dev(struct pci_dev *dev)
 		goto out;
 
 	err = pciback_config_capability_add_fields(dev);
+	if (err)
+		goto out;
+
+	err = pciback_config_quirks_init(dev);
 
       out:
 	return err;
@@ -395,9 +424,5 @@ int pciback_config_init_dev(struct pci_dev *dev)
 
 int pciback_config_init(void)
 {
-	int err;
-
-	err = pciback_config_capability_init();
-
-	return err;
+	return pciback_config_capability_init();
 }
