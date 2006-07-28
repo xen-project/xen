@@ -139,17 +139,19 @@ extern int smp_num_siblings;
 #define platform_outw	__ia64_outw
 #define platform_outl	__ia64_outl
 
-// FIXME: This just overrides a use in a typedef (not allowed in ia64,
-//  or maybe just in older gcc's?) used in timer.c but should be OK
-//  (and indeed is probably required!) elsewhere
-#undef __cacheline_aligned
-#undef ____cacheline_aligned
-#undef ____cacheline_aligned_in_smp
-#define __cacheline_aligned
+#include <xen/cache.h>
+#ifndef CONFIG_SMP
 #define __cacheline_aligned_in_smp
-#define ____cacheline_aligned
+#else
+#define __cacheline_aligned_in_smp __cacheline_aligned
+#endif
+
+#define ____cacheline_aligned __attribute__((__aligned__(SMP_CACHE_BYTES)))
+#ifndef CONFIG_SMP
 #define ____cacheline_aligned_in_smp
-#define ____cacheline_maxaligned_in_smp
+#else
+#define ____cacheline_aligned_in_smp ____cacheline_aligned
+#endif
 
 #ifndef __ASSEMBLY__
 #include "asm/types.h"	// for u64

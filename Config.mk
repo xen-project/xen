@@ -36,6 +36,8 @@ ifneq ($(debug),y)
 CFLAGS    ?= -O2 -fomit-frame-pointer
 CFLAGS    += -DNDEBUG
 else
+# Less than -O1 produces bad code and large stack frames
+CFLAGS    ?= -O1 -fno-omit-frame-pointer
 CFLAGS    += -g
 endif
 

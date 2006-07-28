@@ -71,6 +71,9 @@ void free_vm_area(struct vm_struct *area)
 	unsigned int order = get_order(area->size);
 	unsigned long i;
 
+	/* xenbus_map_ring_valloc overrides this field!  */
+	area->phys_addr = __pa(area->addr);
+
 	// This area is used for foreign page mappping.
 	// So underlying machine page may not be assigned.
 	for (i = 0; i < (1 << order); i++) {

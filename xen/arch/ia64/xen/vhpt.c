@@ -23,7 +23,7 @@ extern long running_on_sim;
 DEFINE_PER_CPU (unsigned long, vhpt_paddr);
 DEFINE_PER_CPU (unsigned long, vhpt_pend);
 
-static void vhpt_flush(void)
+void vhpt_flush(void)
 {
 	struct vhpt_lf_entry *v = __va(__ia64_per_cpu_var(vhpt_paddr));
 	int i;
@@ -129,10 +129,8 @@ void vhpt_init(void)
 }
 
 
-void vcpu_flush_vtlb_all (void)
+void vcpu_flush_vtlb_all(struct vcpu *v)
 {
-	struct vcpu *v = current;
-
 	/* First VCPU tlb.  */
 	vcpu_purge_tr_entry(&PSCBX(v,dtlb));
 	vcpu_purge_tr_entry(&PSCBX(v,itlb));
@@ -148,6 +146,11 @@ void vcpu_flush_vtlb_all (void)
 	   check this.  */
 }
 
+static void __vcpu_flush_vtlb_all(void *vcpu)
+{
+	vcpu_flush_vtlb_all((struct vcpu*)vcpu);
+}
+
 void domain_flush_vtlb_all (void)
 {
 	int cpu = smp_processor_id ();
@@ -158,12 +161,11 @@ void domain_flush_vtlb_all (void)
 			continue;
 
 		if (v->processor == cpu)
-			vcpu_flush_vtlb_all ();
+			vcpu_flush_vtlb_all(v);
 		else
-			smp_call_function_single
-				(v->processor,
-				 (void(*)(void *))vcpu_flush_vtlb_all,
-				 NULL,1,1);
+			smp_call_function_single(v->processor,
+						 __vcpu_flush_vtlb_all,
+						 v, 1, 1);
 	}
 }
 
@@ -234,7 +236,7 @@ static void flush_tlb_vhpt_all (struct domain *d)
 	local_flush_tlb_all ();
 }
 
-void domain_flush_destroy (struct domain *d)
+void domain_flush_tlb_vhpt(struct domain *d)
 {
 	/* Very heavy...  */
 	on_each_cpu ((void (*)(void *))flush_tlb_vhpt_all, d, 1, 1);

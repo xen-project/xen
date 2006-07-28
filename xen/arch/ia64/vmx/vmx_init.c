@@ -156,6 +156,7 @@ static vpd_t *alloc_vpd(void)
 	int i;
 	cpuid3_t cpuid3;
 	vpd_t *vpd;
+	mapped_regs_t *mregs;
 
 	vpd = alloc_xenheap_pages(get_order(VPD_SIZE));
 	if (!vpd) {
@@ -165,23 +166,26 @@ static vpd_t *alloc_vpd(void)
 
 	printk("vpd base: 0x%p, vpd size:%ld\n", vpd, sizeof(vpd_t));
 	memset(vpd, 0, VPD_SIZE);
+	mregs = &vpd->vpd_low;
+
 	/* CPUID init */
 	for (i = 0; i < 5; i++)
-		vpd->vcpuid[i] = ia64_get_cpuid(i);
+		mregs->vcpuid[i] = ia64_get_cpuid(i);
 
 	/* Limit the CPUID number to 5 */
-	cpuid3.value = vpd->vcpuid[3];
+	cpuid3.value = mregs->vcpuid[3];
 	cpuid3.number = 4;	/* 5 - 1 */
-	vpd->vcpuid[3] = cpuid3.value;
+	mregs->vcpuid[3] = cpuid3.value;
 
-    vpd->vac.a_from_int_cr = 1;
-    vpd->vac.a_to_int_cr = 1;
-    vpd->vac.a_from_psr = 1;
-    vpd->vac.a_from_cpuid = 1;
-    vpd->vac.a_cover = 1;
-    vpd->vac.a_bsw = 1;
-
-	vpd->vdc.d_vmsw = 1;
+	mregs->vac.a_from_int_cr = 1;
+	mregs->vac.a_to_int_cr = 1;
+	mregs->vac.a_from_psr = 1;
+	mregs->vac.a_from_cpuid = 1;
+	mregs->vac.a_cover = 1;
+	mregs->vac.a_bsw = 1;
+	mregs->vac.a_int = 1;
+       
+	mregs->vdc.d_vmsw = 1;
 
 	return vpd;
 }
@@ -201,7 +205,7 @@ static void
 vmx_create_vp(struct vcpu *v)
 {
 	u64 ret;
-	vpd_t *vpd = v->arch.privregs;
+	vpd_t *vpd = (vpd_t *)v->arch.privregs;
 	u64 ivt_base;
     extern char vmx_ia64_ivt;
 	/* ia64_ivt is function pointer, so need this tranlation */
@@ -271,13 +275,11 @@ vmx_final_setup_guest(struct vcpu *v)
 {
 	vpd_t *vpd;
 
-	free_xenheap_pages(v->arch.privregs, get_order(sizeof(mapped_regs_t)));
-
 	vpd = alloc_vpd();
 	ASSERT(vpd);
 
-	v->arch.privregs = vpd;
-	vpd->virt_env_vaddr = vm_buffer;
+	v->arch.privregs = (mapped_regs_t *)vpd;
+	vpd->vpd_low.virt_env_vaddr = vm_buffer;
 
 	/* Per-domain vTLB and vhpt implementation. Now vmx domain will stick
 	 * to this solution. Maybe it can be deferred until we know created
@@ -298,6 +300,8 @@ vmx_final_setup_guest(struct vcpu *v)
 
 	/* One more step to enable interrupt assist */
 	set_bit(ARCH_VMX_INTR_ASSIST, &v->arch.arch_vmx.flags);
+	/* Set up guest 's indicator for VTi domain*/
+	set_bit(ARCH_VMX_DOMAIN, &v->arch.arch_vmx.flags);
 }
 
 void
@@ -317,7 +321,7 @@ typedef struct io_range {
 	unsigned long type;
 } io_range_t;
 
-io_range_t io_ranges[] = {
+static const io_range_t io_ranges[] = {
 	{VGA_IO_START, VGA_IO_SIZE, GPFN_FRAME_BUFFER},
 	{MMIO_START, MMIO_SIZE, GPFN_LOW_MMIO},
 	{LEGACY_IO_START, LEGACY_IO_SIZE, GPFN_LEGACY_IO},
@@ -325,24 +329,22 @@ io_range_t io_ranges[] = {
 	{PIB_START, PIB_SIZE, GPFN_PIB},
 };
 
+/* Reseve 1 page for shared I/O and 1 page for xenstore.  */
 #define VMX_SYS_PAGES	(2 + (GFW_SIZE >> PAGE_SHIFT))
 #define VMX_CONFIG_PAGES(d) ((d)->max_pages - VMX_SYS_PAGES)
 
-int vmx_build_physmap_table(struct domain *d)
+static void vmx_build_physmap_table(struct domain *d)
 {
 	unsigned long i, j, start, tmp, end, mfn;
-	struct vcpu *v = d->vcpu[0];
 	struct list_head *list_ent = d->page_list.next;
 
-	ASSERT(!d->arch.physmap_built);
-	ASSERT(!test_bit(ARCH_VMX_CONTIG_MEM, &v->arch.arch_vmx.flags));
 	ASSERT(d->max_pages == d->tot_pages);
 
 	/* Mark I/O ranges */
 	for (i = 0; i < (sizeof(io_ranges) / sizeof(io_range_t)); i++) {
 	    for (j = io_ranges[i].start;
-		 j < io_ranges[i].start + io_ranges[i].size;
-		 j += PAGE_SIZE)
+		j < io_ranges[i].start + io_ranges[i].size;
+		j += PAGE_SIZE)
 		__assign_domain_page(d, j, io_ranges[i].type, ASSIGN_writable);
 	}
 
@@ -362,21 +364,19 @@ int vmx_build_physmap_table(struct domain *d)
 	if (unlikely(end > MMIO_START)) {
 	    start = 4 * MEM_G;
 	    end = start + (end - 3 * MEM_G);
-	    for (i = start; (i < end) &&
-		 (list_ent != &d->page_list); i += PAGE_SIZE) {
-		mfn = page_to_mfn(list_entry(
-		    list_ent, struct page_info, list));
+	    for (i = start;
+	         (i < end) && (list_ent != &d->page_list); i += PAGE_SIZE) {
+		mfn = page_to_mfn(list_entry(list_ent, struct page_info, list));
 		assign_domain_page(d, i, mfn << PAGE_SHIFT);
 		list_ent = mfn_to_page(mfn)->list.next;
 	    }
 	    ASSERT(list_ent != &d->page_list);
-        }
+	}
 	 
 	/* Map guest firmware */
 	for (i = GFW_START; (i < GFW_START + GFW_SIZE) &&
 		(list_ent != &d->page_list); i += PAGE_SIZE) {
-	    mfn = page_to_mfn(list_entry(
-		list_ent, struct page_info, list));
+	    mfn = page_to_mfn(list_entry(list_ent, struct page_info, list));
 	    assign_domain_page(d, i, mfn << PAGE_SHIFT);
 	    list_ent = mfn_to_page(mfn)->list.next;
 	}
@@ -393,23 +393,20 @@ int vmx_build_physmap_table(struct domain *d)
 	list_ent = mfn_to_page(mfn)->list.next;
 	ASSERT(list_ent == &d->page_list);
 
-	d->arch.max_pfn = end >> PAGE_SHIFT;
-	d->arch.physmap_built = 1;
-	set_bit(ARCH_VMX_CONTIG_MEM, &v->arch.arch_vmx.flags);
-	return 0;
 }
 
-void vmx_setup_platform(struct domain *d, struct vcpu_guest_context *c)
+void vmx_setup_platform(struct domain *d)
 {
 	ASSERT(d != dom0); /* only for non-privileged vti domain */
 
-	if (!d->arch.physmap_built)
-	    vmx_build_physmap_table(d);
+	vmx_build_physmap_table(d);
 
 	d->arch.vmx_platform.shared_page_va =
 		(unsigned long)__va(__gpa_to_mpa(d, IO_PAGE_START));
 	/* TEMP */
 	d->arch.vmx_platform.pib_base = 0xfee00000UL;
+
+	d->arch.sal_data = xmalloc(struct xen_sal_data);
 
 	/* Only open one port for I/O and interrupt emulation */
 	memset(&d->shared_info->evtchn_mask[0], 0xff,
@@ -430,8 +427,7 @@ void vmx_do_launch(struct vcpu *v)
 	    domain_crash_synchronous();
 	}
 
-	clear_bit(iopacket_port(v),
-		&v->domain->shared_info->evtchn_mask[0]);
+	clear_bit(iopacket_port(v), &v->domain->shared_info->evtchn_mask[0]);
 
 	vmx_load_all_rr(v);
 }

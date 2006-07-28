@@ -42,19 +42,6 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 
 typedef unsigned long xen_ulong_t;
 
-#define MAX_NR_SECTION  32  /* at most 32 memory holes */
-struct mm_section {
-    unsigned long start;  /* start of memory hole */
-    unsigned long end;    /* end of memory hole */
-};
-typedef struct mm_section mm_section_t;
-
-struct pmt_entry {
-    unsigned long mfn : 56;
-    unsigned long type: 8;
-};
-typedef struct pmt_entry pmt_entry_t;
-
 #define GPFN_MEM          (0UL << 56) /* Guest pfn is normal mem */
 #define GPFN_FRAME_BUFFER (1UL << 56) /* VGA framebuffer */
 #define GPFN_LOW_MMIO     (2UL << 56) /* Low MMIO range */
@@ -95,16 +82,6 @@ typedef struct pmt_entry pmt_entry_t;
 
 #define GFW_START        (4*MEM_G -16*MEM_M)
 #define GFW_SIZE         (16*MEM_M)
-
-/*
- * NB. This may become a 64-bit count with no shift. If this happens then the 
- * structure size will still be 8 bytes, so no other alignments will change.
- */
-struct tsc_timestamp {
-    unsigned int  tsc_bits;      /* 0: 32 bits read from the CPU's TSC. */
-    unsigned int  tsc_bitshift;  /* 4: 'tsc_bits' uses N:N+31 of TSC.   */
-}; /* 8 bytes */
-typedef struct tsc_timestamp tsc_timestamp_t;
 
 struct pt_fpreg {
     union {
@@ -185,7 +162,7 @@ struct cpu_user_regs {
     unsigned long r6;  /* preserved */
     unsigned long r7;  /* preserved */
     unsigned long eml_unat;    /* used for emulating instruction */
-    unsigned long rfi_pfs;     /* used for elulating rfi */
+    unsigned long pad0;     /* alignment pad */
 
 };
 typedef struct cpu_user_regs cpu_user_regs_t;
@@ -299,20 +276,23 @@ struct mapped_regs {
             unsigned long tmp[8]; // temp registers (e.g. for hyperprivops)
         };
     };
+};
+typedef struct mapped_regs mapped_regs_t;
+
+struct vpd {
+    struct mapped_regs vpd_low;
     unsigned long  reserved6[3456];
     unsigned long  vmm_avail[128];
     unsigned long  reserved7[4096];
 };
-typedef struct mapped_regs mapped_regs_t;
+typedef struct vpd vpd_t;
 
 struct arch_vcpu_info {
 };
 typedef struct arch_vcpu_info arch_vcpu_info_t;
 
-typedef mapped_regs_t vpd_t;
-
 struct arch_shared_info {
-    unsigned int flags;
+    /* PFN of the start_info page.  */
     unsigned long start_info_pfn;
 
     /* Interrupt vector for event channel.  */
@@ -320,30 +300,30 @@ struct arch_shared_info {
 };
 typedef struct arch_shared_info arch_shared_info_t;
 
-struct arch_initrd_info {
-    unsigned long start;
-    unsigned long size;
-};
-typedef struct arch_initrd_info arch_initrd_info_t;
-
 typedef unsigned long xen_callback_t;
 
-#define IA64_COMMAND_LINE_SIZE 512
+struct ia64_tr_entry {
+    unsigned long pte;
+    unsigned long itir;
+    unsigned long vadr;
+    unsigned long rid;
+};
+
+struct vcpu_extra_regs {
+    struct ia64_tr_entry itrs[8];
+    struct ia64_tr_entry dtrs[8];
+    unsigned long iva;
+    unsigned long dcr;
+    unsigned long event_callback_ip;
+};
+
 struct vcpu_guest_context {
-#define VGCF_FPU_VALID (1<<0)
-#define VGCF_VMX_GUEST (1<<1)
-#define VGCF_IN_KERNEL (1<<2)
+#define VGCF_EXTRA_REGS (1<<1)	/* Get/Set extra regs.  */
     unsigned long flags;       /* VGCF_* flags */
-    unsigned long pt_base;     /* PMT table base */
-    unsigned long share_io_pg; /* Shared page for I/O emulation */
-    unsigned long sys_pgnr;    /* System pages out of domain memory */
-    unsigned long vm_assist;   /* VMASST_TYPE_* bitmap, now none on IPF */
 
     struct cpu_user_regs user_regs;
-    struct mapped_regs *privregs;
-    struct arch_shared_info shared;
-    struct arch_initrd_info initrd;
-    char cmdline[IA64_COMMAND_LINE_SIZE];
+    struct vcpu_extra_regs extra_regs;
+    unsigned long privregs_pfn;
 };
 typedef struct vcpu_guest_context vcpu_guest_context_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
@@ -379,18 +359,43 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 #define _ASSIGN_readonly                0
 #define ASSIGN_readonly                 (1UL << _ASSIGN_readonly)
 #define ASSIGN_writable                 (0UL << _ASSIGN_readonly) // dummy flag
+/* Internal only: memory attribute must be WC/UC/UCE.  */
+#define _ASSIGN_nocache                 1
+#define ASSIGN_nocache                  (1UL << _ASSIGN_nocache)
+
+/* This structure has the same layout of struct ia64_boot_param, defined in
+   <asm/system.h>.  It is redefined here to ease use.  */
+struct xen_ia64_boot_param {
+	unsigned long command_line;	/* physical address of cmd line args */
+	unsigned long efi_systab;	/* physical address of EFI system table */
+	unsigned long efi_memmap;	/* physical address of EFI memory map */
+	unsigned long efi_memmap_size;	/* size of EFI memory map */
+	unsigned long efi_memdesc_size;	/* size of an EFI memory map descriptor */
+	unsigned int  efi_memdesc_version;	/* memory descriptor version */
+	struct {
+		unsigned short num_cols;	/* number of columns on console.  */
+		unsigned short num_rows;	/* number of rows on console.  */
+		unsigned short orig_x;	/* cursor's x position */
+		unsigned short orig_y;	/* cursor's y position */
+	} console_info;
+	unsigned long fpswa;		/* physical address of the fpswa interface */
+	unsigned long initrd_start;
+	unsigned long initrd_size;
+	unsigned long domain_start;	/* va where the boot time domain begins */
+	unsigned long domain_size;	/* how big is the boot domain */
+};
 
 #endif /* !__ASSEMBLY__ */
 
 /* Address of shared_info in domain virtual space.
    This is the default address, for compatibility only.  */
-#define XSI_BASE				0xf100000000000000
+#define XSI_BASE			0xf100000000000000
 
 /* Size of the shared_info area (this is not related to page size).  */
-#define XSI_LOG_SIZE			14
-#define XSI_SIZE				(1 << XSI_LOG_SIZE)
+#define XSI_SHIFT			14
+#define XSI_SIZE			(1 << XSI_SHIFT)
 /* Log size of mapped_regs area (64 KB - only 4KB is used).  */
-#define XMAPPEDREGS_LOG_SIZE	16
+#define XMAPPEDREGS_SHIFT		12
 /* Offset of XASI (Xen arch shared info) wrt XSI_BASE.  */
 #define XMAPPEDREGS_OFS			XSI_SIZE
 
@@ -418,7 +423,9 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 #define HYPERPRIVOP_GET_PMD		0x15
 #define HYPERPRIVOP_GET_EFLAG		0x16
 #define HYPERPRIVOP_SET_EFLAG		0x17
-#define HYPERPRIVOP_MAX			0x17
+#define HYPERPRIVOP_RSM_BE		0x18
+#define HYPERPRIVOP_GET_PSR		0x19
+#define HYPERPRIVOP_MAX			0x19
 
 #endif /* __HYPERVISOR_IF_IA64_H__ */
 

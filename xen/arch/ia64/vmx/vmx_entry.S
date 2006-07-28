@@ -163,24 +163,39 @@ END(ia64_leave_nested)
 
 
 
-GLOBAL_ENTRY(ia64_leave_hypervisor)
+GLOBAL_ENTRY(ia64_leave_hypervisor_prepare)
     PT_REGS_UNWIND_INFO(0)
     /*
      * work.need_resched etc. mustn't get changed by this CPU before it returns to
     ;;
      * user- or fsys-mode, hence we disable interrupts early on:
      */
+    adds r2 = PT(R4)+16,r12
+    adds r3 = PT(R5)+16,r12
+    adds r8 = PT(EML_UNAT)+16,r12
+    ;;
+    ld8 r8 = [r8]
+    ;;
+    mov ar.unat=r8
+    ;;
+    ld8.fill r4=[r2],16    //load r4
+    ld8.fill r5=[r3],16    //load r5
+    ;;
+    ld8.fill r6=[r2]    //load r6
+    ld8.fill r7=[r3]    //load r7
+    ;;
+END(ia64_leave_hypervisor_prepare)
+//fall through
+GLOBAL_ENTRY(ia64_leave_hypervisor)
+    PT_REGS_UNWIND_INFO(0)
     rsm psr.i
     ;;
     alloc loc0=ar.pfs,0,1,1,0
-    adds out0=16,r12
-    adds r7 = PT(EML_UNAT)+16,r12
     ;;
-    ld8 r7 = [r7]
+    adds out0=16,r12
     br.call.sptk.many b0=leave_hypervisor_tail
     ;;
     mov ar.pfs=loc0
-    mov ar.unat=r7
     adds r20=PT(PR)+16,r12
     ;;
     lfetch [r20],PT(CR_IPSR)-PT(PR)
@@ -245,12 +260,6 @@ GLOBAL_ENTRY(ia64_leave_hypervisor)
     ldf.fill f10=[r2],32
     ldf.fill f11=[r3],24
     ;;
-    ld8.fill r4=[r2],16    //load r4
-    ld8.fill r5=[r3],16    //load r5
-    ;;
-    ld8.fill r6=[r2]    //load r6
-    ld8.fill r7=[r3]    //load r7
-    ;;
     srlz.i          // ensure interruption collection is off
     ;;
     bsw.0
@@ -283,8 +292,8 @@ GLOBAL_ENTRY(ia64_leave_hypervisor)
     ld8 r19=[r16],PT(R3)-PT(AR_FPSR)    //load ar_fpsr
     ld8.fill r2=[r17],PT(AR_CCV)-PT(R2)    //load r2
     ;;
-    ld8.fill r3=[r16]    //load r3
-    ld8 r18=[r17],PT(RFI_PFS)-PT(AR_CCV)           //load ar_ccv
+    ld8.fill r3=[r16]	//load r3
+    ld8 r18=[r17]	//load ar_ccv
     ;;
     mov ar.fpsr=r19
     mov ar.ccv=r18
@@ -348,7 +357,6 @@ vmx_rse_clear_invalid:
     ;;
     mov ar.bspstore=r24
     ;;
-    ld8 r24=[r17]       //load rfi_pfs
     mov ar.unat=r28
     mov ar.rnat=r25
     mov ar.rsc=r26
@@ -356,10 +364,6 @@ vmx_rse_clear_invalid:
     mov cr.ipsr=r31
     mov cr.iip=r30
     mov cr.ifs=r29
-    cmp.ne p6,p0=r24,r0
-(p6)br.sptk vmx_dorfirfi
-    ;;
-vmx_dorfirfi_back:
     mov ar.pfs=r27
     adds r18=IA64_VPD_BASE_OFFSET,r21
     ;;
@@ -370,20 +374,19 @@ vmx_dorfirfi_back:
     adds r19=VPD(VPSR),r18
     ;;
     ld8 r19=[r19]        //vpsr
-//vsa_sync_write_start
     movl r20=__vsa_base
     ;;
+//vsa_sync_write_start
     ld8 r20=[r20]       // read entry point
     mov r25=r18
     ;;
+    movl r24=ia64_vmm_entry  // calculate return address
     add r16=PAL_VPS_SYNC_WRITE,r20
-    movl r24=switch_rr7  // calculate return address
     ;;
     mov b0=r16
     br.cond.sptk b0         // call the service
     ;;
 END(ia64_leave_hypervisor)
-switch_rr7:
 // fall through
 GLOBAL_ENTRY(ia64_vmm_entry)
 /*
@@ -416,23 +419,6 @@ ia64_vmm_entry_out:
     br.cond.sptk b0             // call pal service
 END(ia64_vmm_entry)
 
-//r24 rfi_pfs
-//r17 address of rfi_pfs
-GLOBAL_ENTRY(vmx_dorfirfi)
-    mov r16=ar.ec
-    movl r20 = vmx_dorfirfi_back
-	;;
-// clean rfi_pfs
-    st8 [r17]=r0
-    mov b0=r20
-// pfs.pec=ar.ec
-    dep r24 = r16, r24, 52, 6
-    ;;
-    mov ar.pfs=r24
-	;;
-    br.ret.sptk b0
-	;;
-END(vmx_dorfirfi)
 
 #ifdef XEN_DBL_MAPPING  /* will be removed */
 

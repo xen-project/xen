@@ -103,6 +103,7 @@ static void vtm_timer_fn(void *data)
     vitv = VCPU(vcpu, itv);
     if ( !ITV_IRQ_MASK(vitv) ){
         vmx_vcpu_pend_interrupt(vcpu, vitv & 0xff);
+        vcpu_unblock(vcpu);
     }
     vtm=&(vcpu->arch.arch_vmx.vtm);
     cur_itc = now_itc(vtm);
@@ -290,7 +291,7 @@ static void update_vhpi(VCPU *vcpu, int vec)
         vhpi = 16;
     }
     else {
-        vhpi = vec / 16;
+        vhpi = vec >> 4;
     }
 
     VCPU(vcpu,vhpi) = vhpi;
@@ -437,7 +438,7 @@ static int highest_inservice_irq(VCPU *vcpu)
  */
 static int is_higher_irq(int pending, int inservice)
 {
-    return ( (pending >> 4) > (inservice>>4) || 
+    return ( (pending > inservice) || 
                 ((pending != NULL_VECTOR) && (inservice == NULL_VECTOR)) );
 }
 
@@ -461,7 +462,6 @@ static int
 _xirq_masked(VCPU *vcpu, int h_pending, int h_inservice)
 {
     tpr_t    vtpr;
-    uint64_t    mmi;
     
     vtpr.val = VCPU(vcpu, tpr);
 
@@ -475,9 +475,9 @@ _xirq_masked(VCPU *vcpu, int h_pending, int h_inservice)
     if ( h_inservice == ExtINT_VECTOR ) {
         return IRQ_MASKED_BY_INSVC;
     }
-    mmi = vtpr.mmi;
+
     if ( h_pending == ExtINT_VECTOR ) {
-        if ( mmi ) {
+        if ( vtpr.mmi ) {
             // mask all external IRQ
             return IRQ_MASKED_BY_VTPR;
         }
@@ -487,7 +487,7 @@ _xirq_masked(VCPU *vcpu, int h_pending, int h_inservice)
     }
 
     if ( is_higher_irq(h_pending, h_inservice) ) {
-        if ( !mmi && is_higher_class(h_pending, vtpr.mic) ) {
+        if ( is_higher_class(h_pending, vtpr.mic + (vtpr.mmi << 4)) ) {
             return IRQ_NO_MASKED;
         }
         else {
@@ -551,8 +551,7 @@ void vmx_vcpu_pend_batch_interrupt(VCPU *vcpu, UINT64 *pend_irr)
  * it into the guest. Otherwise, we set the VHPI if vac.a_int=1 so that when 
  * the interrupt becomes unmasked, it gets injected.
  * RETURN:
- *  TRUE:   Interrupt is injected.
- *  FALSE:  Not injected but may be in VHPI when vac.a_int=1
+ *    the highest unmasked interrupt.
  *
  * Optimization: We defer setting the VHPI until the EOI time, if a higher 
  *               priority interrupt is in-service. The idea is to reduce the 
@@ -562,23 +561,26 @@ int vmx_check_pending_irq(VCPU *vcpu)
 {
     uint64_t  spsr, mask;
     int     h_pending, h_inservice;
-    int injected=0;
     uint64_t    isr;
     IA64_PSR    vpsr;
     REGS *regs=vcpu_regs(vcpu);
     local_irq_save(spsr);
     h_pending = highest_pending_irq(vcpu);
-    if ( h_pending == NULL_VECTOR ) goto chk_irq_exit;
+    if ( h_pending == NULL_VECTOR ) {
+        h_pending = SPURIOUS_VECTOR;
+        goto chk_irq_exit;
+    }
     h_inservice = highest_inservice_irq(vcpu);
 
-    vpsr.val = vmx_vcpu_get_psr(vcpu);
+    vpsr.val = VCPU(vcpu, vpsr);
     mask = irq_masked(vcpu, h_pending, h_inservice);
     if (  vpsr.i && IRQ_NO_MASKED == mask ) {
         isr = vpsr.val & IA64_PSR_RI;
         if ( !vpsr.ic )
             panic_domain(regs,"Interrupt when IC=0\n");
+        if (VCPU(vcpu, vhpi))
+            update_vhpi(vcpu, NULL_VECTOR);
         vmx_reflect_interruption(0,isr,0, 12, regs ); // EXT IRQ
-        injected = 1;
     }
     else if ( mask == IRQ_MASKED_BY_INSVC ) {
         // cann't inject VHPI
@@ -591,7 +593,7 @@ int vmx_check_pending_irq(VCPU *vcpu)
 
 chk_irq_exit:
     local_irq_restore(spsr);
-    return injected;
+    return h_pending;
 }
 
 /*
@@ -613,6 +615,20 @@ void guest_write_eoi(VCPU *vcpu)
 //    vmx_check_pending_irq(vcpu);
 }
 
+int is_unmasked_irq(VCPU *vcpu)
+{
+    int h_pending, h_inservice;
+
+    h_pending = highest_pending_irq(vcpu);
+    h_inservice = highest_inservice_irq(vcpu);
+    if ( h_pending == NULL_VECTOR || 
+        irq_masked(vcpu, h_pending, h_inservice) != IRQ_NO_MASKED ) {
+        return 0;
+    }
+    else
+        return 1;
+}
+
 uint64_t guest_read_vivr(VCPU *vcpu)
 {
     int vec, h_inservice;
@@ -629,7 +645,8 @@ uint64_t guest_read_vivr(VCPU *vcpu)
  
     VLSAPIC_INSVC(vcpu,vec>>6) |= (1UL <<(vec&63));
     VCPU(vcpu, irr[vec>>6]) &= ~(1UL <<(vec&63));
-    update_vhpi(vcpu, NULL_VECTOR);     // clear VHPI till EOI or IRR write
+    if (VCPU(vcpu, vhpi))
+        update_vhpi(vcpu, NULL_VECTOR); // clear VHPI till EOI or IRR write
     local_irq_restore(spsr);
     return (uint64_t)vec;
 }
@@ -639,7 +656,7 @@ static void generate_exirq(VCPU *vcpu)
     IA64_PSR    vpsr;
     uint64_t    isr;
     REGS *regs=vcpu_regs(vcpu);
-    vpsr.val = vmx_vcpu_get_psr(vcpu);
+    vpsr.val = VCPU(vcpu, vpsr);
     update_vhpi(vcpu, NULL_VECTOR);
     isr = vpsr.val & IA64_PSR_RI;
     if ( !vpsr.ic )
@@ -653,7 +670,7 @@ void vhpi_detection(VCPU *vcpu)
     tpr_t       vtpr;
     IA64_PSR    vpsr;
     
-    vpsr.val = vmx_vcpu_get_psr(vcpu);
+    vpsr.val = VCPU(vcpu, vpsr);
     vtpr.val = VCPU(vcpu, tpr);
 
     threshold = ((!vpsr.i) << 5) | (vtpr.mmi << 4) | vtpr.mic;

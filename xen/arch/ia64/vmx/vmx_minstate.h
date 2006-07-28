@@ -57,8 +57,8 @@
     ;;
 
 
-#define PAL_VSA_SYNC_READ_CLEANUP_PSR_PL           \
-    /* begin to call pal vps sync_read and cleanup psr.pl */     \
+#define PAL_VSA_SYNC_READ           \
+    /* begin to call pal vps sync_read */     \
     add r25=IA64_VPD_BASE_OFFSET, r21;       \
     movl r20=__vsa_base;     \
     ;;          \
@@ -68,31 +68,17 @@
     add r20=PAL_VPS_SYNC_READ,r20;  \
     ;;  \
 { .mii;  \
-    add r22=VPD(VPSR),r25;   \
+    nop 0x0;   \
     mov r24=ip;        \
     mov b0=r20;     \
     ;;      \
 };           \
 { .mmb;      \
     add r24 = 0x20, r24;    \
-    mov r16 = cr.ipsr;  /* Temp workaround since psr.ic is off */ \
+    nop 0x0;   	 \
     br.cond.sptk b0;        /*  call the service */ \
     ;;              \
 };           \
-    ld8 r17=[r22];   \
-    /* deposite ipsr bit cpl into vpd.vpsr, since epc will change */    \
-    extr.u r30=r16, IA64_PSR_CPL0_BIT, 2;   \
-    ;;      \
-    dep r17=r30, r17, IA64_PSR_CPL0_BIT, 2;   \
-    extr.u r30=r16, IA64_PSR_BE_BIT, 5;   \
-    ;;      \
-    dep r17=r30, r17, IA64_PSR_BE_BIT, 5;   \
-    extr.u r30=r16, IA64_PSR_RI_BIT, 2;   \
-    ;;      \
-    dep r17=r30, r17, IA64_PSR_RI_BIT, 2;   \
-    ;;      \
-    st8 [r22]=r17;      \
-    ;;
 
 
 
@@ -219,7 +205,7 @@
     movl r11=FPSR_DEFAULT;   /* L-unit */                           \
     movl r1=__gp;       /* establish kernel global pointer */               \
     ;;                                          \
-    PAL_VSA_SYNC_READ_CLEANUP_PSR_PL           \
+    PAL_VSA_SYNC_READ           \
     VMX_MINSTATE_END_SAVE_MIN
 
 /*
@@ -274,24 +260,27 @@
     stf.spill [r3]=f9,32;           \
     ;;                  \
     stf.spill [r2]=f10,32;         \
-    stf.spill [r3]=f11,24;         \
+    stf.spill [r3]=f11;         \
+    adds r25=PT(B7)-PT(F11),r3;     \
     ;;                  \
+    st8 [r24]=r18,16;       /* b6 */    \
+    st8 [r25]=r19,16;       /* b7 */    \
+    adds r3=PT(R5)-PT(F11),r3;     \
+    ;;                  \
+    st8 [r24]=r9;           /* ar.csd */    \
+    st8 [r25]=r10;          /* ar.ssd */    \
+    ;;
+
+#define VMX_SAVE_EXTRA               \
 .mem.offset 0,0; st8.spill [r2]=r4,16;     \
 .mem.offset 8,0; st8.spill [r3]=r5,16;     \
     ;;                  \
 .mem.offset 0,0; st8.spill [r2]=r6,16;      \
 .mem.offset 8,0; st8.spill [r3]=r7;      \
-    adds r25=PT(B7)-PT(R7),r3;     \
-    ;;                  \
-    st8 [r24]=r18,16;       /* b6 */    \
-    st8 [r25]=r19,16;       /* b7 */    \
-    ;;                  \
-    st8 [r24]=r9;           /* ar.csd */    \
-    mov r26=ar.unat;            \
-    ;;      \
-    st8 [r25]=r10;          /* ar.ssd */    \
+    ;;			\
+    mov r26=ar.unat;    \
+    ;;			\
     st8 [r2]=r26;       /* eml_unat */ \
-    ;;
 
 #define VMX_SAVE_MIN_WITH_COVER   VMX_DO_SAVE_MIN(cover, mov r30=cr.ifs,)
 #define VMX_SAVE_MIN_WITH_COVER_R19 VMX_DO_SAVE_MIN(cover, mov r30=cr.ifs, mov r15=r19)

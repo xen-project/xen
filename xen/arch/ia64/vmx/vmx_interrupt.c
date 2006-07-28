@@ -117,7 +117,7 @@ set_ifa_itir_iha (VCPU *vcpu, u64 vadr,
 {
     IA64_PSR vpsr;
     u64 value;
-    vpsr.val = vmx_vcpu_get_psr(vcpu);
+    vpsr.val = VCPU(vcpu, vpsr);
     /* Vol2, Table 8-1 */
     if ( vpsr.ic ) {
         if ( set_ifa){

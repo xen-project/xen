@@ -1,7 +1,7 @@
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-12 11:35:01.753697055 +0100
-+++ ioemu/vl.c	2006-07-12 11:35:02.126650330 +0100
+--- ioemu.orig/vl.c	2006-07-27 11:16:58.823348777 +0100
++++ ioemu/vl.c	2006-07-27 11:16:59.169310479 +0100
 @@ -89,6 +89,7 @@
  #include "exec-all.h"
  
@@ -40,7 +40,7 @@ Index: ioemu/vl.c
          int fd;
          if (get_param_value(buf, sizeof(buf), "fd", p) > 0) {
              fd = strtol(buf, NULL, 0);
-@@ -3212,7 +3215,10 @@
+@@ -3213,7 +3216,10 @@
              if (get_param_value(setup_script, sizeof(setup_script), "script", p) == 0) {
                  pstrcpy(setup_script, sizeof(setup_script), DEFAULT_NETWORK_SCRIPT);
              }
@@ -52,7 +52,7 @@ Index: ioemu/vl.c
          }
      } else
  #endif
-@@ -4671,7 +4677,7 @@
+@@ -4672,7 +4678,7 @@
             "-net tap[,vlan=n],ifname=name\n"
             "                connect the host TAP network interface to VLAN 'n'\n"
  #else

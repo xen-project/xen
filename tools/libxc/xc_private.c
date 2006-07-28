@@ -262,6 +262,7 @@ long long xc_domain_get_cpu_usage( int xc_handle, domid_t domid, int vcpu )
 }
 
 
+#ifndef __ia64__
 int xc_get_pfn_list(int xc_handle,
                     uint32_t domid,
                     xen_pfn_t *pfn_buf,
@@ -305,6 +306,7 @@ int xc_get_pfn_list(int xc_handle,
 
     return (ret < 0) ? -1 : op.u.getmemlist.num_pfns;
 }
+#endif
 
 long xc_get_tot_pages(int xc_handle, uint32_t domid)
 {

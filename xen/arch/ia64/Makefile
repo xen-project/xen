@@ -50,22 +50,22 @@ $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h: asm-xsi-offsets.s
 $(BASEDIR)/include/asm-ia64/.offsets.h.stamp:
 # Need such symbol link to make linux headers available
 	[ -e $(BASEDIR)/include/linux ] \
-	 || ln -s $(BASEDIR)/include/xen $(BASEDIR)/include/linux
+	 || ln -sf $(BASEDIR)/include/xen $(BASEDIR)/include/linux
 	[ -e $(BASEDIR)/include/asm-ia64/xen ] \
-	 || ln -s $(BASEDIR)/include/asm-ia64/linux $(BASEDIR)/include/asm-ia64/xen
+	 || ln -sf $(BASEDIR)/include/asm-ia64/linux $(BASEDIR)/include/asm-ia64/xen
 # Link to HVM files in Xen for ia64/vti
 	[ -e $(BASEDIR)/include/asm-ia64/hvm ] \
 	 || mkdir $(BASEDIR)/include/asm-ia64/hvm
 	[ -e $(BASEDIR)/include/asm-ia64/hvm/support.h ] \
-	 || ln -s ../../../include/asm-x86/hvm/support.h $(BASEDIR)/include/asm-ia64/hvm/support.h
+	 || ln -sf ../../../include/asm-x86/hvm/support.h $(BASEDIR)/include/asm-ia64/hvm/support.h
 	[ -e $(BASEDIR)/include/asm-ia64/hvm/io.h ] \
-	 || ln -s ../../../include/asm-x86/hvm/io.h $(BASEDIR)/include/asm-ia64/hvm/io.h
+	 || ln -sf ../../../include/asm-x86/hvm/io.h $(BASEDIR)/include/asm-ia64/hvm/io.h
 	[ -e $(BASEDIR)/include/asm-ia64/hvm/vpic.h ] \
-	 || ln -s ../../../include/asm-x86/hvm/vpic.h $(BASEDIR)/include/asm-ia64/hvm/vpic.h
+	 || ln -sf ../../../include/asm-x86/hvm/vpic.h $(BASEDIR)/include/asm-ia64/hvm/vpic.h
 	[ -e $(BASEDIR)/include/asm-ia64/hvm/vioapic.h ] \
-	 || ln -s ../../../include/asm-x86/hvm/vioapic.h $(BASEDIR)/include/asm-ia64/hvm/vioapic.h
+	 || ln -sf ../../../include/asm-x86/hvm/vioapic.h $(BASEDIR)/include/asm-ia64/hvm/vioapic.h
 	[ -e $(BASEDIR)/arch/ia64/vmx/hvm_vioapic.c ] \
-	 || ln -s ../../../arch/x86/hvm/vioapic.c $(BASEDIR)/arch/ia64/vmx/hvm_vioapic.c
+	 || ln -sf ../../../arch/x86/hvm/vioapic.c $(BASEDIR)/arch/ia64/vmx/hvm_vioapic.c
 
 # I'm sure a Makefile wizard would know a better way to do this
 xen.lds.s: xen/xen.lds.S

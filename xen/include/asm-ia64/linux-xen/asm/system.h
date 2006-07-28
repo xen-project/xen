@@ -19,8 +19,8 @@
 #include <asm/pal.h>
 #include <asm/percpu.h>
 
-#define GATE_ADDR		__IA64_UL_CONST(0xa000000000000000)
 #ifndef XEN
+#define GATE_ADDR		__IA64_UL_CONST(0xa000000000000000)
 /*
  * 0xa000000000000000+2*PERCPU_PAGE_SIZE
  * - 0xa000000000000000+3*PERCPU_PAGE_SIZE remain unmapped (guard page)

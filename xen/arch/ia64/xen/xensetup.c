@@ -15,6 +15,7 @@
 #include <xen/gdbstub.h>
 #include <xen/compile.h>
 #include <xen/console.h>
+#include <xen/domain.h>
 #include <xen/serial.h>
 #include <xen/trace.h>
 #include <asm/meminit.h>
@@ -25,10 +26,9 @@
 #include <linux/efi.h>
 #include <asm/iosapic.h>
 
-/* Be sure the struct shared_info fits on a page because it is mapped in
-   domain. */
-#if SHARED_INFO_SIZE > PAGE_SIZE
- #error "struct shared_info does not not fit in PAGE_SIZE"
+/* Be sure the struct shared_info size is <= XSI_SIZE.  */
+#if SHARED_INFO_SIZE > XSI_SIZE
+#error "struct shared_info bigger than XSI_SIZE"
 #endif
 
 unsigned long xenheap_phys_end, total_pages;
@@ -65,8 +65,8 @@ integer_param("maxcpus", max_cpus);
 /* xencons: if true enable xenconsole input (and irq).
    Note: you have to disable 8250 serials in domains (to avoid use of the
    same resource).  */
-static int opt_xencons = 0;
-boolean_param("xencons", opt_xencons);
+static int opt_xencons = 1;
+integer_param("xencons", opt_xencons);
 
 /* Toggle to allow non-legacy xencons UARTs to run in polling mode */
 static int opt_xencons_poll = 0;

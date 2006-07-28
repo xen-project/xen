@@ -4,7 +4,8 @@
 // TODO: Many (or perhaps most) of these should eventually be
 // static inline functions
 
-//#include "thread.h"
+#include <asm/fpu.h>
+#include <asm/tlb.h>
 #include <asm/ia64_int.h>
 #include <public/arch-ia64.h>
 typedef	unsigned long UINT64;
@@ -12,29 +13,14 @@ typedef	unsigned int UINT;
 typedef	int BOOLEAN;
 struct vcpu;
 typedef	struct vcpu VCPU;
-
 typedef cpu_user_regs_t REGS;
-
 
 /* Note: PSCB stands for Privilegied State Communication Block.  */
 #define VCPU(_v,_x)	(_v->arch.privregs->_x)
 #define PSCB(_v,_x) VCPU(_v,_x)
 #define PSCBX(_v,_x) (_v->arch._x)
 
-#define PRIVOP_ADDR_COUNT
-#ifdef PRIVOP_ADDR_COUNT
-#define _GET_IFA 0
-#define _THASH 1
-#define PRIVOP_COUNT_NINSTS 2
-#define PRIVOP_COUNT_NADDRS 30
-
-struct privop_addr_count {
-	char *instname;
-	unsigned long addr[PRIVOP_COUNT_NADDRS];
-	unsigned long count[PRIVOP_COUNT_NADDRS];
-	unsigned long overflow;
-};
-#endif
+#define SPURIOUS_VECTOR 0xf
 
 /* general registers */
 extern UINT64 vcpu_get_gr(VCPU *vcpu, unsigned long reg);
@@ -175,6 +161,11 @@ extern UINT64 vcpu_deliverable_interrupts(VCPU *vcpu);
 extern void vcpu_itc_no_srlz(VCPU *vcpu, UINT64, UINT64, UINT64, UINT64, UINT64);
 extern UINT64 vcpu_get_tmp(VCPU *, UINT64);
 extern void vcpu_set_tmp(VCPU *, UINT64, UINT64);
+
+extern IA64FAULT vcpu_set_dtr(VCPU *vcpu, u64 slot,
+                              u64 pte, u64 itir, u64 ifa, u64 rid);
+extern IA64FAULT vcpu_set_itr(VCPU *vcpu, u64 slot,
+                              u64 pte, u64 itir, u64 ifa, u64 rid);
 
 /* Initialize vcpu regs.  */
 extern void vcpu_init_regs (struct vcpu *v);

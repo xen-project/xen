@@ -1,7 +1,7 @@
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2006-07-12 11:35:01.899678766 +0100
-+++ ioemu/Makefile.target	2006-07-12 11:35:02.711577049 +0100
+--- ioemu.orig/Makefile.target	2006-07-27 11:16:58.970332506 +0100
++++ ioemu/Makefile.target	2006-07-27 11:16:59.758245283 +0100
 @@ -333,7 +333,7 @@
  ifeq ($(TARGET_BASE_ARCH), i386)
  # Hardware support
@@ -13,8 +13,8 @@ Index: ioemu/Makefile.target
  endif
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2006-07-12 11:35:02.059658723 +0100
-+++ ioemu/hw/pc.c	2006-07-12 11:35:02.712576924 +0100
+--- ioemu.orig/hw/pc.c	2006-07-27 11:16:59.036325200 +0100
++++ ioemu/hw/pc.c	2006-07-27 11:16:59.759245173 +0100
 @@ -38,7 +38,9 @@
  
  static fdctrl_t *floppy_controller;
@@ -38,9 +38,9 @@ Index: ioemu/hw/pc.c
          pic_set_alt_irq_func(isa_pic, ioapic_set_irq, ioapic);
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-12 11:35:02.649584815 +0100
-+++ ioemu/vl.c	2006-07-12 11:35:02.715576548 +0100
-@@ -5033,6 +5033,7 @@
+--- ioemu.orig/vl.c	2006-07-27 11:16:59.614261222 +0100
++++ ioemu/vl.c	2006-07-27 11:16:59.762244841 +0100
+@@ -5034,6 +5034,7 @@
  
  #ifdef HAS_AUDIO
  struct soundhw soundhw[] = {
@@ -48,7 +48,7 @@ Index: ioemu/vl.c
  #ifdef TARGET_I386
      {
          "pcspk",
-@@ -5042,6 +5043,7 @@
+@@ -5043,6 +5044,7 @@
          { .init_isa = pcspk_audio_init }
      },
  #endif

@@ -213,6 +213,11 @@ static inline int get_page_and_type(struct page_info *page,
     return rc;
 }
 
+static inline int page_is_removable(struct page_info *page)
+{
+    return ((page->count_info & PGC_count_mask) == 2);
+}
+
 #define	set_machinetophys(_mfn, _pfn) do { } while(0);
 
 #ifdef MEMORY_GUARD
@@ -429,7 +434,7 @@ extern void assign_domain_io_page(struct domain *d, unsigned long mpaddr, unsign
 struct p2m_entry;
 extern unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr, struct p2m_entry* entry);
 extern void *domain_mpa_to_imva(struct domain *d, unsigned long mpaddr);
-
+extern volatile pte_t *lookup_noalloc_domain_pte(struct domain* d, unsigned long mpaddr);
 #ifdef CONFIG_XEN_IA64_DOM0_VP
 extern unsigned long assign_domain_mmio_page(struct domain *d, unsigned long mpaddr, unsigned long size);
 extern unsigned long assign_domain_mach_page(struct domain *d, unsigned long mpaddr, unsigned long size, unsigned long flags);

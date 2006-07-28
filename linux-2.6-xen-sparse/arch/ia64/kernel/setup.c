@@ -75,6 +75,20 @@ unsigned long __per_cpu_offset[NR_CPUS];
 EXPORT_SYMBOL(__per_cpu_offset);
 #endif
 
+#ifdef CONFIG_XEN
+static int
+xen_panic_event(struct notifier_block *this, unsigned long event, void *ptr)
+{
+	HYPERVISOR_shutdown(SHUTDOWN_crash);
+	/* we're never actually going to get here... */
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block xen_panic_block = {
+	xen_panic_event, NULL, 0 /* try to go last */
+};
+#endif
+
 extern void ia64_setup_printk_clock(void);
 
 DEFINE_PER_CPU(struct cpuinfo_ia64, cpu_info);
@@ -418,8 +432,11 @@ setup_arch (char **cmdline_p)
 	unw_init();
 
 #ifdef CONFIG_XEN
-	if (is_running_on_xen())
+	if (is_running_on_xen()) {
 		setup_xen_features();
+		/* Register a call for panic conditions. */
+		notifier_chain_register(&panic_notifier_list, &xen_panic_block);
+	}
 #endif
 
 	ia64_patch_vtop((u64) __start___vtop_patchlist, (u64) __end___vtop_patchlist);
@@ -523,15 +540,14 @@ setup_arch (char **cmdline_p)
 		shared_info_t *s = HYPERVISOR_shared_info;
 
 		xen_start_info = __va(s->arch.start_info_pfn << PAGE_SHIFT);
-		xen_start_info->flags = s->arch.flags;
 
 		printk("Running on Xen! start_info_pfn=0x%lx nr_pages=%ld "
 		       "flags=0x%x\n", s->arch.start_info_pfn,
 		       xen_start_info->nr_pages, xen_start_info->flags);
 
 		/* xen_start_info isn't setup yet, get the flags manually */
-		if (s->arch.flags & SIF_INITDOMAIN) {
-			if (!(s->arch.flags & SIF_PRIVILEGED))
+		if (xen_start_info->flags & SIF_INITDOMAIN) {
+			if (!(xen_start_info->flags & SIF_PRIVILEGED))
 				panic("Xen granted us console access "
 				      "but not privileged status");
 		} else {

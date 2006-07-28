@@ -110,10 +110,8 @@ void
 physical_tlb_miss(VCPU *vcpu, u64 vadr)
 {
     u64 pte;
-    IA64_PSR vpsr;
-    vpsr.val=vmx_vcpu_get_psr(vcpu);
     pte =  vadr& _PAGE_PPN_MASK;
-    pte = pte|(vpsr.cpl<<7)|PHY_PAGE_WB;
+    pte = pte | PHY_PAGE_WB;
     thash_purge_and_insert(vcpu, pte, (PAGE_SHIFT<<2), vadr);
     return;
 }
@@ -204,23 +202,7 @@ vmx_load_all_rr(VCPU *vcpu)
 	ia64_srlz_i();
 }
 
-void
-vmx_load_rr7_and_pta(VCPU *vcpu)
-{
-	unsigned long psr;
 
-	local_irq_save(psr);
-
-	vmx_switch_rr7(vrrtomrr(vcpu,VMX(vcpu, vrr[VRN7])),
-			(void *)vcpu->domain->shared_info,
-			(void *)vcpu->arch.privregs,
-			(void *)vcpu->arch.vhpt.hash, pal_vaddr );
-	ia64_set_pta(vcpu->arch.arch_vmx.mpta);
-
-	ia64_srlz_d();
-	local_irq_restore(psr);
-	ia64_srlz_i();
-}
 
 void
 switch_to_physical_rid(VCPU *vcpu)

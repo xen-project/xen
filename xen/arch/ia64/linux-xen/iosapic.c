@@ -1155,7 +1155,7 @@ int iosapic_guest_read(unsigned long physbase, unsigned int reg, u32 *pval)
 
 int iosapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
 {
-	unsigned int id, gsi, vec, dest, high32;
+	unsigned int id, gsi, vec, xen_vec, dest, high32;
 	char rte_index;
 	struct iosapic *ios;
 	struct iosapic_intr_info *info;
@@ -1185,13 +1185,17 @@ int iosapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
 
 	/* Sanity check. Vector should be allocated before this update */
 	if ((rte_index > ios->num_rte) ||
-	    test_bit(vec, ia64_xen_vector) ||
 	    ((vec > IA64_FIRST_DEVICE_VECTOR) &&
 	     (vec < IA64_LAST_DEVICE_VECTOR) &&
 	     (!test_bit(vec - IA64_FIRST_DEVICE_VECTOR, ia64_vector_mask))))
 	    return -EINVAL;
 
 	gsi = ios->gsi_base + rte_index;
+	xen_vec = gsi_to_vector(gsi);
+	if (xen_vec >= 0 && test_bit(xen_vec, ia64_xen_vector)) {
+		printk("WARN: GSI %d in use by Xen.\n", gsi);
+		return -EINVAL;
+	}
 	info = &iosapic_intr_info[vec];
 	spin_lock_irqsave(&irq_descp(vec)->lock, flags);
 	spin_lock(&iosapic_lock);

@@ -39,6 +39,7 @@ extern void ctrl_alt_del(void);
  */
 #define SHUTDOWN_HALT      4
 
+#if defined(__i386__) || defined(__x86_64__)
 void machine_emergency_restart(void)
 {
 	/* We really want to get pending console data out before we die. */
@@ -60,10 +61,8 @@ void machine_power_off(void)
 {
 	/* We really want to get pending console data out before we die. */
 	xencons_force_flush();
-#if defined(__i386__) || defined(__x86_64__)
 	if (pm_power_off)
 		pm_power_off();
-#endif
 	HYPERVISOR_shutdown(SHUTDOWN_poweroff);
 }
 
@@ -71,7 +70,7 @@ int reboot_thru_bios = 0;	/* for dmi_scan.c */
 EXPORT_SYMBOL(machine_restart);
 EXPORT_SYMBOL(machine_halt);
 EXPORT_SYMBOL(machine_power_off);
-
+#endif
 
 /******************************************************************************
  * Stop/pickle callback handling.
@@ -82,6 +81,7 @@ static int shutting_down = SHUTDOWN_INVALID;
 static void __shutdown_handler(void *unused);
 static DECLARE_WORK(shutdown_work, __shutdown_handler, NULL);
 
+#if defined(__i386__) || defined(__x86_64__)
 /* Ensure we run on the idle task page tables so that we will
    switch page tables before running user space. This is needed
    on architectures with separate kernel and user page tables
@@ -98,25 +98,30 @@ static void switch_idle_mm(void)
 	current->active_mm = &init_mm;
 	mmdrop(mm);
 }
+#endif
 
 static int __do_suspend(void *ignore)
 {
-	int i, j, k, fpp, err;
-
+	int err;
+#if defined(__i386__) || defined(__x86_64__)
+	int i, j, k, fpp;
 	extern unsigned long max_pfn;
 	extern unsigned long *pfn_to_mfn_frame_list_list;
 	extern unsigned long *pfn_to_mfn_frame_list[];
+#endif
 
 	extern void time_resume(void);
 
 	BUG_ON(smp_processor_id() != 0);
 	BUG_ON(in_interrupt());
 
+#if defined(__i386__) || defined(__x86_64__)
 	if (xen_feature(XENFEAT_auto_translated_physmap)) {
 		printk(KERN_WARNING "Cannot suspend in "
 		       "auto_translated_physmap mode.\n");
 		return -EOPNOTSUPP;
 	}
+#endif
 
 	err = smp_suspend();
 	if (err)
@@ -129,18 +134,24 @@ static int __do_suspend(void *ignore)
 #ifdef __i386__
 	kmem_cache_shrink(pgd_cache);
 #endif
+#if defined(__i386__) || defined(__x86_64__)
 	mm_pin_all();
 
 	__cli();
+#elif defined(__ia64__)
+	local_irq_disable();
+#endif
 	preempt_enable();
 
 	gnttab_suspend();
 
+#if defined(__i386__) || defined(__x86_64__)
 	HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
 	clear_fixmap(FIX_SHARED_INFO);
 
 	xen_start_info->store_mfn = mfn_to_pfn(xen_start_info->store_mfn);
 	xen_start_info->console_mfn = mfn_to_pfn(xen_start_info->console_mfn);
+#endif
 
 	/*
 	 * We'll stop somewhere inside this hypercall. When it returns,
@@ -150,6 +161,7 @@ static int __do_suspend(void *ignore)
 
 	shutting_down = SHUTDOWN_INVALID;
 
+#if defined(__i386__) || defined(__x86_64__)
 	set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
 
 	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
@@ -171,6 +183,7 @@ static int __do_suspend(void *ignore)
 			virt_to_mfn(&phys_to_machine_mapping[i]);
 	}
 	HYPERVISOR_shared_info->arch.max_pfn = max_pfn;
+#endif
 
 	gnttab_resume();
 
@@ -178,9 +191,13 @@ static int __do_suspend(void *ignore)
 
 	time_resume();
 
+#if defined(__i386__) || defined(__x86_64__)
 	switch_idle_mm();
 
 	__sti();
+#elif defined(__ia64__)
+	local_irq_enable();
+#endif
 
 	xencons_resume();
 

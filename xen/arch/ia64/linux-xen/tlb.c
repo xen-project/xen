@@ -173,7 +173,11 @@ EXPORT_SYMBOL(flush_tlb_range);
 void __devinit
 ia64_tlb_init (void)
 {
+#ifndef XEN
 	ia64_ptce_info_t ptce_info;
+#else
+	ia64_ptce_info_t ptce_info = { 0 };
+#endif
 	unsigned long tr_pgbits;
 	long status;
 

@@ -198,7 +198,7 @@ __xen_create_contiguous_region(unsigned long vstart,
 		.nr_exchanged = 0
 	};
 
-	if (order > MAX_CONTIG_ORDER)
+	if (unlikely(order > MAX_CONTIG_ORDER))
 		return -ENOMEM;
 	
 	set_xen_guest_handle(exchange.in.extent_start, in_frames);
@@ -299,7 +299,7 @@ __xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 	if (!test_bit(start_gpfn, contiguous_bitmap))
 		return;
 
-	if (order > MAX_CONTIG_ORDER)
+	if (unlikely(order > MAX_CONTIG_ORDER))
 		return;
 
 	set_xen_guest_handle(exchange.in.extent_start, &in_frame);
@@ -547,8 +547,10 @@ xen_ia64_privcmd_entry_mmap(struct vm_area_struct* vma,
 	unsigned long gpfn;
 	unsigned long flags;
 
-	BUG_ON((addr & ~PAGE_MASK) != 0);
-	BUG_ON(mfn == INVALID_MFN);
+	if ((addr & ~PAGE_MASK) != 0 || mfn == INVALID_MFN) {
+		error = -EINVAL;
+		goto out;
+	}
 
 	if (entry->gpfn != INVALID_GPFN) {
 		error = -EBUSY;
@@ -793,3 +795,13 @@ direct_remap_pfn_range(struct vm_area_struct *vma,
 	return error;
 }
 
+
+/* Called after suspend, to resume time.  */
+void
+time_resume(void)
+{
+	extern void ia64_cpu_local_tick(void);
+
+	/* Just trigger a tick.  */
+	ia64_cpu_local_tick();
+}

@@ -518,12 +518,16 @@ DEFINE_XEN_GUEST_HANDLE(dom0_hypercall_init_t);
 #define DOM0_DOMAIN_SETUP     49
 #define _XEN_DOMAINSETUP_hvm_guest 0
 #define XEN_DOMAINSETUP_hvm_guest  (1UL<<_XEN_DOMAINSETUP_hvm_guest)
+#define _XEN_DOMAINSETUP_query 1	/* Get parameters (for save)  */
+#define XEN_DOMAINSETUP_query  (1UL<<_XEN_DOMAINSETUP_query)
 typedef struct dom0_domain_setup {
     domid_t  domain;          /* domain to be affected */
     unsigned long flags;      /* XEN_DOMAINSETUP_* */
 #ifdef __ia64__
     unsigned long bp;         /* mpaddr of boot param area */
     unsigned long maxmem;	  /* Highest memory address for MDT.  */
+    unsigned long xsi_va;     /* Xen shared_info area virtual address.  */
+    unsigned int hypercall_imm;	/* Break imm for Xen hypercalls.  */
 #endif
 } dom0_domain_setup_t;
 DEFINE_XEN_GUEST_HANDLE(dom0_domain_setup_t);

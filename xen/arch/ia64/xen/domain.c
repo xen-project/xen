@@ -25,26 +25,15 @@
 #include <xen/mm.h>
 #include <xen/iocap.h>
 #include <asm/asm-xsi-offsets.h>
-#include <asm/ptrace.h>
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/processor.h>
-#include <asm/desc.h>
-#include <asm/hw_irq.h>
-#include <asm/setup.h>
-//#include <asm/mpspec.h>
-#include <xen/irq.h>
 #include <xen/event.h>
-//#include <xen/shadow.h>
 #include <xen/console.h>
 #include <xen/compile.h>
-
 #include <xen/elf.h>
-//#include <asm/page.h>
 #include <asm/pgalloc.h>
-
 #include <asm/offsets.h>  /* for IA64_THREAD_INFO_SIZE */
-
 #include <asm/vcpu.h>   /* for function declarations */
 #include <public/arch-ia64.h>
 #include <xen/domain.h>
@@ -52,13 +41,13 @@
 #include <asm/vmx_vcpu.h>
 #include <asm/vmx_vpd.h>
 #include <asm/vmx_phy_mode.h>
-#include <asm/pal.h>
 #include <asm/vhpt.h>
-#include <public/hvm/ioreq.h>
 #include <public/arch-ia64.h>
 #include <asm/tlbflush.h>
 #include <asm/regionreg.h>
 #include <asm/dom_fw.h>
+#include <asm/shadow.h>
+#include <asm/privop_stat.h>
 
 #ifndef CONFIG_XEN_IA64_DOM0_VP
 #define CONFIG_DOMAIN0_CONTIGUOUS
@@ -79,11 +68,8 @@ extern char dom0_command_line[];
 extern void serial_input_init(void);
 static void init_switch_stack(struct vcpu *v);
 extern void vmx_do_launch(struct vcpu *);
-void build_physmap_table(struct domain *d);
 
 /* this belongs in include/asm, but there doesn't seem to be a suitable place */
-unsigned long context_switch_count = 0;
-
 extern struct vcpu *ia64_switch_to (struct vcpu *next_task);
 
 /* Address of vpsr.i (in fact evtchn_upcall_mask) of current vcpu.
@@ -92,6 +78,36 @@ DEFINE_PER_CPU(uint8_t *, current_psr_i_addr);
 DEFINE_PER_CPU(int *, current_psr_ic_addr);
 
 #include <xen/sched-if.h>
+
+static void flush_vtlb_for_context_switch(struct vcpu* vcpu)
+{
+	int cpu = smp_processor_id();
+	int last_vcpu_id = vcpu->domain->arch.last_vcpu[cpu].vcpu_id;
+	int last_processor = vcpu->arch.last_processor;
+
+	if (is_idle_domain(vcpu->domain))
+		return;
+	
+	vcpu->domain->arch.last_vcpu[cpu].vcpu_id = vcpu->vcpu_id;
+	vcpu->arch.last_processor = cpu;
+
+	if ((last_vcpu_id != vcpu->vcpu_id &&
+	     last_vcpu_id != INVALID_VCPU_ID) ||
+	    (last_vcpu_id == vcpu->vcpu_id &&
+	     last_processor != cpu &&
+	     last_processor != INVALID_PROCESSOR)) {
+
+		// if the vTLB implementation was changed,
+		// the followings must be updated either.
+		if (VMX_DOMAIN(vcpu)) {
+			// currently vTLB for vt-i domian is per vcpu.
+			// so any flushing isn't needed.
+		} else {
+			vhpt_flush();
+		}
+		local_flush_tlb_all();
+	}
+}
 
 void schedule_tail(struct vcpu *prev)
 {
@@ -111,6 +127,7 @@ void schedule_tail(struct vcpu *prev)
 		__ia64_per_cpu_var(current_psr_ic_addr) = (int *)
 		  (current->domain->arch.shared_info_va + XSI_PSR_IC_OFS);
 	}
+	flush_vtlb_for_context_switch(current);
 }
 
 void context_switch(struct vcpu *prev, struct vcpu *next)
@@ -176,6 +193,7 @@ if (!i--) { i = 1000000; printk("+"); }
 		__ia64_per_cpu_var(current_psr_ic_addr) = NULL;
         }
     }
+    flush_vtlb_for_context_switch(current);
     local_irq_restore(spsr);
     context_saved(prev);
 }
@@ -187,16 +205,14 @@ void continue_running(struct vcpu *same)
 
 static void default_idle(void)
 {
-	int cpu = smp_processor_id();
 	local_irq_disable();
-	if ( !softirq_pending(cpu))
+	if ( !softirq_pending(smp_processor_id()) )
 	        safe_halt();
 	local_irq_enable();
 }
 
 static void continue_cpu_idle_loop(void)
 {
-	int cpu = smp_processor_id();
 	for ( ; ; )
 	{
 #ifdef IA64
@@ -204,12 +220,10 @@ static void continue_cpu_idle_loop(void)
 #else
 	    irq_stat[cpu].idle_timestamp = jiffies;
 #endif
-	    while ( !softirq_pending(cpu) )
+	    while ( !softirq_pending(smp_processor_id()) )
 	        default_idle();
-	    add_preempt_count(SOFTIRQ_OFFSET);
 	    raise_softirq(SCHEDULE_SOFTIRQ);
 	    do_softirq();
-	    sub_preempt_count(SOFTIRQ_OFFSET);
 	}
 }
 
@@ -246,14 +260,15 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 	}
 
 	if (!is_idle_domain(d)) {
-	    v->arch.privregs = 
-		alloc_xenheap_pages(get_order(sizeof(mapped_regs_t)));
-	    BUG_ON(v->arch.privregs == NULL);
-	    memset(v->arch.privregs, 0, PAGE_SIZE);
-
-	    if (!vcpu_id)
-	    	memset(&d->shared_info->evtchn_mask[0], 0xff,
-		    sizeof(d->shared_info->evtchn_mask));
+	    if (!d->arch.is_vti) {
+		/* Create privregs page only if not VTi.  */
+		v->arch.privregs = 
+		    alloc_xenheap_pages(get_order(sizeof(mapped_regs_t)));
+		BUG_ON(v->arch.privregs == NULL);
+		memset(v->arch.privregs, 0, PAGE_SIZE);
+		share_xen_page_with_guest(virt_to_page(v->arch.privregs),
+		                          d, XENSHARE_writable);
+	    }
 
 	    v->arch.metaphysical_rr0 = d->arch.metaphysical_rr0;
 	    v->arch.metaphysical_rr4 = d->arch.metaphysical_rr4;
@@ -274,6 +289,7 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 	    v->arch.starting_rid = d->arch.starting_rid;
 	    v->arch.ending_rid = d->arch.ending_rid;
 	    v->arch.breakimm = d->arch.breakimm;
+	    v->arch.last_processor = INVALID_PROCESSOR;
 	}
 
 	return v;
@@ -285,7 +301,8 @@ void free_vcpu_struct(struct vcpu *v)
 		vmx_relinquish_vcpu_resources(v);
 	else {
 		if (v->arch.privregs != NULL)
-			free_xenheap_pages(v->arch.privregs, get_order(sizeof(mapped_regs_t)));
+			free_xenheap_pages(v->arch.privregs,
+			              get_order_from_shift(XMAPPEDREGS_SHIFT));
 	}
 
 	free_xenheap_pages(v, KERNEL_STACK_SIZE_ORDER);
@@ -310,16 +327,25 @@ static void init_switch_stack(struct vcpu *v)
 
 int arch_domain_create(struct domain *d)
 {
+	int i;
+	
 	// the following will eventually need to be negotiated dynamically
 	d->arch.shared_info_va = DEFAULT_SHAREDINFO_ADDR;
 	d->arch.breakimm = 0x1000;
+	for (i = 0; i < NR_CPUS; i++) {
+		d->arch.last_vcpu[i].vcpu_id = INVALID_VCPU_ID;
+	}
 
 	if (is_idle_domain(d))
 	    return 0;
 
-	if ((d->shared_info = (void *)alloc_xenheap_page()) == NULL)
+	d->shared_info = alloc_xenheap_pages(get_order_from_shift(XSI_SHIFT));
+	if (d->shared_info == NULL)
 	    goto fail_nomem;
-	memset(d->shared_info, 0, PAGE_SIZE);
+	memset(d->shared_info, 0, XSI_SIZE);
+	for (i = 0; i < XSI_SIZE; i += PAGE_SIZE)
+	    share_xen_page_with_guest(virt_to_page((char *)d->shared_info + i),
+	                              d, XENSHARE_writable);
 
 	d->max_pages = (128UL*1024*1024)/PAGE_SIZE; // 128MB default // FIXME
 	/* We may also need emulation rid for region4, though it's unlikely
@@ -328,13 +354,14 @@ int arch_domain_create(struct domain *d)
 	 */
 	if (!allocate_rid_range(d,0))
 		goto fail_nomem;
-	d->arch.sys_pgnr = 0;
 
 	memset(&d->arch.mm, 0, sizeof(d->arch.mm));
 
-	d->arch.physmap_built = 0;
 	if ((d->arch.mm.pgd = pgd_alloc(&d->arch.mm)) == NULL)
 	    goto fail_nomem;
+
+	d->arch.ioport_caps = rangeset_new(d, "I/O Ports",
+	                                   RANGESETF_prettyprint_hex);
 
 	printf ("arch_domain_create: domain=%p\n", d);
 	return 0;
@@ -343,7 +370,7 @@ fail_nomem:
 	if (d->arch.mm.pgd != NULL)
 	    pgd_free(d->arch.mm.pgd);
 	if (d->shared_info != NULL)
-	    free_xenheap_page(d->shared_info);
+	    free_xenheap_pages(d->shared_info, get_order_from_shift(XSI_SHIFT));
 	return -ENOMEM;
 }
 
@@ -351,80 +378,85 @@ void arch_domain_destroy(struct domain *d)
 {
 	BUG_ON(d->arch.mm.pgd != NULL);
 	if (d->shared_info != NULL)
-		free_xenheap_page(d->shared_info);
+	    free_xenheap_pages(d->shared_info, get_order_from_shift(XSI_SHIFT));
+	if (d->arch.shadow_bitmap != NULL)
+		xfree(d->arch.shadow_bitmap);
 
-	domain_flush_destroy (d);
+	/* Clear vTLB for the next domain.  */
+	domain_flush_tlb_vhpt(d);
 
 	deallocate_rid_range(d);
 }
 
 void arch_getdomaininfo_ctxt(struct vcpu *v, struct vcpu_guest_context *c)
 {
+	int i;
+	struct vcpu_extra_regs *er = &c->extra_regs;
+
 	c->user_regs = *vcpu_regs (v);
-	c->shared = v->domain->shared_info->arch;
+ 	c->privregs_pfn = virt_to_maddr(v->arch.privregs) >> PAGE_SHIFT;
+
+	/* Fill extra regs.  */
+	for (i = 0; i < 8; i++) {
+		er->itrs[i].pte = v->arch.itrs[i].pte.val;
+		er->itrs[i].itir = v->arch.itrs[i].itir;
+		er->itrs[i].vadr = v->arch.itrs[i].vadr;
+		er->itrs[i].rid = v->arch.itrs[i].rid;
+	}
+	for (i = 0; i < 8; i++) {
+		er->dtrs[i].pte = v->arch.dtrs[i].pte.val;
+		er->dtrs[i].itir = v->arch.dtrs[i].itir;
+		er->dtrs[i].vadr = v->arch.dtrs[i].vadr;
+		er->dtrs[i].rid = v->arch.dtrs[i].rid;
+	}
+	er->event_callback_ip = v->arch.event_callback_ip;
+	er->dcr = v->arch.dcr;
+	er->iva = v->arch.iva;
 }
 
 int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 {
 	struct pt_regs *regs = vcpu_regs (v);
 	struct domain *d = v->domain;
-	unsigned long cmdline_addr;
-
-	if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
-            return 0;
-	if (c->flags & VGCF_VMX_GUEST) {
-	    if (!vmx_enabled) {
-		printk("No VMX hardware feature for vmx domain.\n");
-		return -EINVAL;
-	    }
-
-	    if (v == d->vcpu[0])
-		vmx_setup_platform(d, c);
-
-	    vmx_final_setup_guest(v);
-	} else if (!d->arch.physmap_built)
-	    build_physmap_table(d);
-
+	
 	*regs = c->user_regs;
-	cmdline_addr = 0;
-	if (v == d->vcpu[0]) {
-	    /* Only for first vcpu.  */
-	    d->arch.sys_pgnr = c->sys_pgnr;
-	    d->arch.initrd_start = c->initrd.start;
-	    d->arch.initrd_len   = c->initrd.size;
-	    d->arch.cmdline      = c->cmdline;
-	    d->shared_info->arch = c->shared;
+ 	
+ 	if (!d->arch.is_vti) {
+ 		/* domain runs at PL2/3 */
+ 		regs->cr_ipsr |= 2UL << IA64_PSR_CPL0_BIT;
+ 		regs->ar_rsc |= (2 << 2); /* force PL2/3 */
+ 	}
 
-	    if (!VMX_DOMAIN(v)) {
-		    const char *cmdline = d->arch.cmdline;
-		    int len;
+	if (c->flags & VGCF_EXTRA_REGS) {
+		int i;
+		struct vcpu_extra_regs *er = &c->extra_regs;
 
-		    if (*cmdline == 0) {
-#define DEFAULT_CMDLINE "nomca nosmp xencons=tty0 console=tty0 root=/dev/hda1"
-			    cmdline = DEFAULT_CMDLINE;
-			    len = sizeof (DEFAULT_CMDLINE);
-			    printf("domU command line defaulted to"
-				   DEFAULT_CMDLINE "\n");
-		    }
-		    else
-			    len = IA64_COMMAND_LINE_SIZE;
-		    cmdline_addr = dom_fw_setup (d, cmdline, len);
-	    }
-
-	    /* Cache synchronization seems to be done by the linux kernel
-	       during mmap/unmap operation.  However be conservative.  */
-	    domain_cache_flush (d, 1);
-	}
-	vcpu_init_regs (v);
-	regs->r28 = cmdline_addr;
-
-	if ( c->privregs && copy_from_user(v->arch.privregs,
-			   c->privregs, sizeof(mapped_regs_t))) {
-	    printk("Bad ctxt address in arch_set_info_guest: %p\n",
-		   c->privregs);
-	    return -EFAULT;
-	}
-
+		for (i = 0; i < 8; i++) {
+			vcpu_set_itr(v, i, er->itrs[i].pte,
+			             er->itrs[i].itir,
+			             er->itrs[i].vadr,
+			             er->itrs[i].rid);
+		}
+		for (i = 0; i < 8; i++) {
+			vcpu_set_dtr(v, i,
+			             er->dtrs[i].pte,
+			             er->dtrs[i].itir,
+			             er->dtrs[i].vadr,
+			             er->dtrs[i].rid);
+		}
+		v->arch.event_callback_ip = er->event_callback_ip;
+		v->arch.dcr = er->dcr;
+		v->arch.iva = er->iva;
+  	}
+	
+  	if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+ 		return 0;
+ 	if (d->arch.is_vti)
+ 		vmx_final_setup_guest(v);
+	
+ 	/* This overrides some registers.  */
+  	vcpu_init_regs(v);
+  
 	/* Don't redo final setup */
 	set_bit(_VCPUF_initialised, &v->vcpu_flags);
 	return 0;
@@ -502,6 +534,9 @@ void domain_relinquish_resources(struct domain *d)
 
     relinquish_memory(d, &d->xenpage_list);
     relinquish_memory(d, &d->page_list);
+
+    if (d->arch.is_vti && d->arch.sal_data)
+	    xfree(d->arch.sal_data);
 }
 
 void build_physmap_table(struct domain *d)
@@ -509,7 +544,6 @@ void build_physmap_table(struct domain *d)
 	struct list_head *list_ent = d->page_list.next;
 	unsigned long mfn, i = 0;
 
-	ASSERT(!d->arch.physmap_built);
 	while(list_ent != &d->page_list) {
 	    mfn = page_to_mfn(list_entry(
 		list_ent, struct page_info, list));
@@ -518,7 +552,6 @@ void build_physmap_table(struct domain *d)
 	    i++;
 	    list_ent = mfn_to_page(mfn)->list.next;
 	}
-	d->arch.physmap_built = 1;
 }
 
 unsigned long
@@ -555,6 +588,148 @@ domain_set_shared_info_va (unsigned long va)
 	return 0;
 }
 
+/* Transfer and clear the shadow bitmap in 1kB chunks for L1 cache. */
+#define SHADOW_COPY_CHUNK (1024 / sizeof (unsigned long))
+
+int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
+{
+	unsigned int op = sc->op;
+	int          rc = 0;
+	int i;
+	//struct vcpu *v;
+
+	if (unlikely(d == current->domain)) {
+		DPRINTK("Don't try to do a shadow op on yourself!\n");
+		return -EINVAL;
+	}   
+
+	domain_pause(d);
+
+	switch (op)
+	{
+	case DOM0_SHADOW_CONTROL_OP_OFF:
+		if (shadow_mode_enabled (d)) {
+			u64 *bm = d->arch.shadow_bitmap;
+
+			/* Flush vhpt and tlb to restore dirty bit usage.  */
+			domain_flush_tlb_vhpt(d);
+
+			/* Free bitmap.  */
+			d->arch.shadow_bitmap_size = 0;
+			d->arch.shadow_bitmap = NULL;
+			xfree(bm);
+		}
+		break;
+
+	case DOM0_SHADOW_CONTROL_OP_ENABLE_TEST:
+	case DOM0_SHADOW_CONTROL_OP_ENABLE_TRANSLATE:
+		rc = -EINVAL;
+		break;
+
+	case DOM0_SHADOW_CONTROL_OP_ENABLE_LOGDIRTY:
+		if (shadow_mode_enabled(d)) {
+			rc = -EINVAL;
+			break;
+		}
+
+		atomic64_set(&d->arch.shadow_fault_count, 0);
+		atomic64_set(&d->arch.shadow_dirty_count, 0);
+
+		d->arch.shadow_bitmap_size = (d->max_pages + BITS_PER_LONG-1) &
+		                             ~(BITS_PER_LONG-1);
+		d->arch.shadow_bitmap = xmalloc_array(unsigned long,
+		                   d->arch.shadow_bitmap_size / BITS_PER_LONG);
+		if (d->arch.shadow_bitmap == NULL) {
+			d->arch.shadow_bitmap_size = 0;
+			rc = -ENOMEM;
+		}
+		else {
+			memset(d->arch.shadow_bitmap, 0, 
+			       d->arch.shadow_bitmap_size / 8);
+			
+			/* Flush vhtp and tlb to enable dirty bit
+			   virtualization.  */
+			domain_flush_tlb_vhpt(d);
+		}
+		break;
+
+	case DOM0_SHADOW_CONTROL_OP_FLUSH:
+		atomic64_set(&d->arch.shadow_fault_count, 0);
+		atomic64_set(&d->arch.shadow_dirty_count, 0);
+		break;
+   
+	case DOM0_SHADOW_CONTROL_OP_CLEAN:
+	  {
+		int nbr_longs;
+
+		sc->stats.fault_count = atomic64_read(&d->arch.shadow_fault_count);
+		sc->stats.dirty_count = atomic64_read(&d->arch.shadow_dirty_count);
+
+		atomic64_set(&d->arch.shadow_fault_count, 0);
+		atomic64_set(&d->arch.shadow_dirty_count, 0);
+ 
+		if (guest_handle_is_null(sc->dirty_bitmap) ||
+		    (d->arch.shadow_bitmap == NULL)) {
+			rc = -EINVAL;
+			break;
+		}
+
+		if (sc->pages > d->arch.shadow_bitmap_size)
+			sc->pages = d->arch.shadow_bitmap_size; 
+
+		nbr_longs = (sc->pages + BITS_PER_LONG - 1) / BITS_PER_LONG;
+
+		for (i = 0; i < nbr_longs; i += SHADOW_COPY_CHUNK) {
+			int size = (nbr_longs - i) > SHADOW_COPY_CHUNK ?
+			           SHADOW_COPY_CHUNK : nbr_longs - i;
+     
+			if (copy_to_guest_offset(sc->dirty_bitmap, i,
+			                         d->arch.shadow_bitmap + i,
+			                         size)) {
+				rc = -EFAULT;
+				break;
+			}
+
+			memset(d->arch.shadow_bitmap + i,
+			       0, size * sizeof(unsigned long));
+		}
+		
+		break;
+	  }
+
+	case DOM0_SHADOW_CONTROL_OP_PEEK:
+	{
+		unsigned long size;
+
+		sc->stats.fault_count = atomic64_read(&d->arch.shadow_fault_count);
+		sc->stats.dirty_count = atomic64_read(&d->arch.shadow_dirty_count);
+
+		if (guest_handle_is_null(sc->dirty_bitmap) ||
+		    (d->arch.shadow_bitmap == NULL)) {
+			rc = -EINVAL;
+			break;
+		}
+ 
+		if (sc->pages > d->arch.shadow_bitmap_size)
+			sc->pages = d->arch.shadow_bitmap_size; 
+
+		size = (sc->pages + BITS_PER_LONG - 1) / BITS_PER_LONG;
+		if (copy_to_guest(sc->dirty_bitmap, 
+		                  d->arch.shadow_bitmap, size)) {
+			rc = -EFAULT;
+			break;
+		}
+		break;
+	}
+	default:
+		rc = -EINVAL;
+		break;
+	}
+	
+	domain_unpause(d);
+	
+	return rc;
+}
 
 // remove following line if not privifying in memory
 //#define HAVE_PRIVIFY_MEMORY
@@ -713,6 +888,8 @@ static void physdev_init_dom0(struct domain *d)
 		BUG();
 	if (irqs_permit_access(d, 0, NR_IRQS-1))
 		BUG();
+	if (ioports_permit_access(d, 0, 0xffff))
+		BUG();
 }
 
 int construct_dom0(struct domain *d, 
@@ -733,8 +910,9 @@ int construct_dom0(struct domain *d,
 	unsigned long pkern_end;
 	unsigned long pinitrd_start = 0;
 	unsigned long pstart_info;
-	unsigned long cmdline_addr;
 	struct page_info *start_info_page;
+	unsigned long bp_mpa;
+	struct ia64_boot_param *bp;
 
 #ifdef VALIDATE_VT
 	unsigned int vmx_dom0 = 0;
@@ -884,8 +1062,6 @@ int construct_dom0(struct domain *d,
 	//if ( initrd_len != 0 )
 	//    memcpy((void *)vinitrd_start, initrd_start, initrd_len);
 
-	d->shared_info->arch.flags = SIF_INITDOMAIN|SIF_PRIVILEGED;
-
 	/* Set up start info area. */
 	d->shared_info->arch.start_info_pfn = pstart_info >> PAGE_SHIFT;
 	start_info_page = assign_new_domain_page(d, pstart_info);
@@ -895,8 +1071,7 @@ int construct_dom0(struct domain *d,
 	memset(si, 0, PAGE_SIZE);
 	sprintf(si->magic, "xen-%i.%i-ia64", XEN_VERSION, XEN_SUBVERSION);
 	si->nr_pages     = max_pages;
-
-	console_endboot();
+	si->flags = SIF_INITDOMAIN|SIF_PRIVILEGED;
 
 	printk("Dom0: 0x%lx\n", (u64)dom0);
 
@@ -910,15 +1085,38 @@ int construct_dom0(struct domain *d,
 
 	set_bit(_VCPUF_initialised, &v->vcpu_flags);
 
-	cmdline_addr = dom_fw_setup(d, dom0_command_line, COMMAND_LINE_SIZE);
+	/* Build firmware.
+	   Note: Linux kernel reserve memory used by start_info, so there is
+	   no need to remove it from MDT.  */
+	bp_mpa = pstart_info + sizeof(struct start_info);
+	dom_fw_setup(d, bp_mpa, max_pages * PAGE_SIZE);
+
+	/* Fill boot param.  */
+	strncpy((char *)si->cmd_line, dom0_command_line, sizeof(si->cmd_line));
+	si->cmd_line[sizeof(si->cmd_line)-1] = 0;
+
+	bp = (struct ia64_boot_param *)(si + 1);
+	bp->command_line = pstart_info + offsetof (start_info_t, cmd_line);
+
+	/* We assume console has reached the last line!  */
+	bp->console_info.num_cols = ia64_boot_param->console_info.num_cols;
+	bp->console_info.num_rows = ia64_boot_param->console_info.num_rows;
+	bp->console_info.orig_x = 0;
+	bp->console_info.orig_y = bp->console_info.num_rows == 0 ?
+	                          0 : bp->console_info.num_rows - 1;
+
+	bp->initrd_start = (dom0_start+dom0_size) -
+	  (PAGE_ALIGN(ia64_boot_param->initrd_size) + 4*1024*1024);
+	bp->initrd_size = ia64_boot_param->initrd_size;
 
 	vcpu_init_regs (v);
+
+	vcpu_regs(v)->r28 = bp_mpa;
 
 #ifdef CONFIG_DOMAIN0_CONTIGUOUS
 	pkern_entry += dom0_start;
 #endif
 	vcpu_regs (v)->cr_iip = pkern_entry;
-	vcpu_regs (v)->r28 = cmdline_addr;
 
 	physdev_init_dom0(d);
 

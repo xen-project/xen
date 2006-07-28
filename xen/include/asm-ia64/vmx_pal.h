@@ -74,10 +74,11 @@ ia64_pal_vp_exit_env(u64 iva)
 #define	VP_FR_PMC	1UL<<1
 #define	VP_OPCODE	1UL<<8
 #define	VP_CAUSE	1UL<<9
+#define	VP_FW_ACC	1UL<<63
 /* init vp env with initializing vm_buffer */
-#define	VP_INIT_ENV_INITALIZE  VP_INITIALIZE|VP_FR_PMC|VP_OPCODE|VP_CAUSE
+#define	VP_INIT_ENV_INITALIZE  VP_INITIALIZE|VP_FR_PMC|VP_OPCODE|VP_CAUSE|VP_FW_ACC
 /* init vp env without initializing vm_buffer */
-#define	VP_INIT_ENV  VP_FR_PMC|VP_OPCODE|VP_CAUSE
+#define	VP_INIT_ENV  VP_FR_PMC|VP_OPCODE|VP_CAUSE|VP_FW_ACC
 
 static inline s64
 ia64_pal_vp_init_env (u64 config_options, u64 pbase_addr, \

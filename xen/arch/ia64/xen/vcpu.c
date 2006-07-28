@@ -20,6 +20,8 @@
 #include <asm/privop.h>
 #include <xen/event.h>
 #include <asm/vmx_phy_mode.h>
+#include <asm/bundle.h>
+#include <asm/privop_stat.h>
 
 /* FIXME: where these declarations should be there ? */
 extern void getreg(unsigned long regnum, unsigned long *val, int *nat, struct pt_regs *regs);
@@ -27,9 +29,6 @@ extern void setreg(unsigned long regnum, unsigned long val, int nat, struct pt_r
 extern void getfpreg (unsigned long regnum, struct ia64_fpreg *fpval, struct pt_regs *regs);
 
 extern void setfpreg (unsigned long regnum, struct ia64_fpreg *fpval, struct pt_regs *regs);
-
-extern void panic_domain(struct pt_regs *, const char *, ...);
-extern IA64_BUNDLE __get_domain_bundle(UINT64);
 
 typedef	union {
 	struct ia64_psr ia64_psr;
@@ -46,24 +45,6 @@ typedef	union {
 #define	IA64_PTA_BASE_BIT	15
 #define	IA64_PTA_LFMT		(1UL << IA64_PTA_VF_BIT)
 #define	IA64_PTA_SZ(x)	(x##UL << IA64_PTA_SZ_BIT)
-
-#define STATIC
-
-#ifdef PRIVOP_ADDR_COUNT
-struct privop_addr_count privop_addr_counter[PRIVOP_COUNT_NINSTS+1] = {
-	{ "=ifa",  { 0 }, { 0 }, 0 },
-	{ "thash", { 0 }, { 0 }, 0 },
-	{ 0,       { 0 }, { 0 }, 0 }
-};
-extern void privop_count_addr(unsigned long addr, int inst);
-#define	PRIVOP_COUNT_ADDR(regs,inst) privop_count_addr(regs->cr_iip,inst)
-#else
-#define	PRIVOP_COUNT_ADDR(x,y) do {} while (0)
-#endif
-
-unsigned long dtlb_translate_count = 0;
-unsigned long tr_translate_count = 0;
-unsigned long phys_translate_count = 0;
 
 unsigned long vcpu_verbose = 0;
 
@@ -282,7 +263,6 @@ IA64FAULT vcpu_reset_psr_sm(VCPU *vcpu, UINT64 imm24)
 	return IA64_NO_FAULT;
 }
 
-#define SPURIOUS_VECTOR 0xf
 
 IA64FAULT vcpu_set_psr_dt(VCPU *vcpu)
 {
@@ -446,8 +426,6 @@ UINT64 vcpu_get_ipsr_int_state(VCPU *vcpu,UINT64 prevpsr)
 
 IA64FAULT vcpu_get_dcr(VCPU *vcpu, UINT64 *pval)
 {
-//extern unsigned long privop_trace;
-//privop_trace=0;
 //verbose("vcpu_get_dcr: called @%p\n",PSCB(vcpu,iip));
 	// Reads of cr.dcr on Xen always have the sign bit set, so
 	// a domain can differentiate whether it is running on SP or not
@@ -495,10 +473,8 @@ IA64FAULT vcpu_get_iip(VCPU *vcpu, UINT64 *pval)
 
 IA64FAULT vcpu_get_ifa(VCPU *vcpu, UINT64 *pval)
 {
-	UINT64 val = PSCB(vcpu,ifa);
-	REGS *regs = vcpu_regs(vcpu);
-	PRIVOP_COUNT_ADDR(regs,_GET_IFA);
-	*pval = val;
+	PRIVOP_COUNT_ADDR(vcpu_regs(vcpu),_GET_IFA);
+	*pval = PSCB(vcpu,ifa);
 	return (IA64_NO_FAULT);
 }
 
@@ -564,18 +540,13 @@ IA64FAULT vcpu_get_iim(VCPU *vcpu, UINT64 *pval)
 
 IA64FAULT vcpu_get_iha(VCPU *vcpu, UINT64 *pval)
 {
-	//return vcpu_thash(vcpu,PSCB(vcpu,ifa),pval);
-	UINT64 val = PSCB(vcpu,iha);
-	REGS *regs = vcpu_regs(vcpu);
-	PRIVOP_COUNT_ADDR(regs,_THASH);
-	*pval = val;
+	PRIVOP_COUNT_ADDR(vcpu_regs(vcpu),_THASH);
+	*pval = PSCB(vcpu,iha);
 	return (IA64_NO_FAULT);
 }
 
 IA64FAULT vcpu_set_dcr(VCPU *vcpu, UINT64 val)
 {
-//extern unsigned long privop_trace;
-//privop_trace=1;
 	// Reads of cr.dcr on SP always have the sign bit set, so
 	// a domain can differentiate whether it is running on SP or not
 	// Thus, writes of DCR should ignore the sign bit
@@ -1332,11 +1303,6 @@ IA64FAULT vcpu_ttag(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
 	return (IA64_ILLOP_FAULT);
 }
 
-unsigned long vhpt_translate_count = 0;
-unsigned long fast_vhpt_translate_count = 0;
-unsigned long recover_to_page_fault_count = 0;
-unsigned long recover_to_break_fault_count = 0;
-
 int warn_region0_address = 0; // FIXME later: tie to a boot parameter?
 
 /* Return TRUE iff [b1,e1] and [b2,e2] partially or fully overlaps.  */
@@ -1386,7 +1352,7 @@ vcpu_match_tr_entry_range(TR_ENTRY *trp, UINT64 rid, u64 b, u64 e)
 static TR_ENTRY*
 vcpu_tr_lookup(VCPU* vcpu, unsigned long va, UINT64 rid, BOOLEAN is_data)
 {
-	unsigned int* regions;
+	unsigned char* regions;
 	TR_ENTRY *trp;
 	int tr_max;
 	int i;
@@ -1911,13 +1877,15 @@ IA64FAULT vcpu_set_pkr(VCPU *vcpu, UINT64 reg, UINT64 val)
  VCPU translation register access routines
 **************************************************************************/
 
-static void vcpu_set_tr_entry(TR_ENTRY *trp, UINT64 pte, UINT64 itir, UINT64 ifa)
+static void
+vcpu_set_tr_entry_rid(TR_ENTRY *trp, UINT64 pte,
+                      UINT64 itir, UINT64 ifa, UINT64 rid)
 {
 	UINT64 ps;
 	union pte_flags new_pte;
 
 	trp->itir = itir;
-	trp->rid = VCPU(current,rrs[ifa>>61]) & RR_RID_MASK;
+	trp->rid = rid;
 	ps = trp->ps;
 	new_pte.val = pte;
 	if (new_pte.pl < 2) new_pte.pl = 2;
@@ -1931,29 +1899,100 @@ static void vcpu_set_tr_entry(TR_ENTRY *trp, UINT64 pte, UINT64 itir, UINT64 ifa
 	trp->pte.val = new_pte.val;
 }
 
+static inline void
+vcpu_set_tr_entry(TR_ENTRY *trp, UINT64 pte, UINT64 itir, UINT64 ifa)
+{
+	vcpu_set_tr_entry_rid(trp, pte, itir, ifa,
+			      VCPU(current, rrs[ifa>>61]) & RR_RID_MASK);
+}
+
 IA64FAULT vcpu_itr_d(VCPU *vcpu, UINT64 slot, UINT64 pte,
-		UINT64 itir, UINT64 ifa)
+                     UINT64 itir, UINT64 ifa)
 {
 	TR_ENTRY *trp;
 
 	if (slot >= NDTRS) return IA64_RSVDREG_FAULT;
+
+	vcpu_purge_tr_entry(&PSCBX(vcpu, dtlb));
+
 	trp = &PSCBX(vcpu,dtrs[slot]);
 //printf("***** itr.d: setting slot %d: ifa=%p\n",slot,ifa);
 	vcpu_set_tr_entry(trp,pte,itir,ifa);
 	vcpu_quick_region_set(PSCBX(vcpu,dtr_regions),ifa);
+
+	/*
+	 * FIXME According to spec, vhpt should be purged, but this
+	 * incurs considerable performance loss, since it is safe for
+	 * linux not to purge vhpt, vhpt purge is disabled until a
+	 * feasible way is found.
+	 *
+	 * vcpu_flush_tlb_vhpt_range(ifa & itir_mask(itir), itir_ps(itir));
+	 */
+
 	return IA64_NO_FAULT;
 }
 
 IA64FAULT vcpu_itr_i(VCPU *vcpu, UINT64 slot, UINT64 pte,
-		UINT64 itir, UINT64 ifa)
+                     UINT64 itir, UINT64 ifa)
 {
 	TR_ENTRY *trp;
 
 	if (slot >= NITRS) return IA64_RSVDREG_FAULT;
+
+	vcpu_purge_tr_entry(&PSCBX(vcpu, itlb));
+
 	trp = &PSCBX(vcpu,itrs[slot]);
 //printf("***** itr.i: setting slot %d: ifa=%p\n",slot,ifa);
 	vcpu_set_tr_entry(trp,pte,itir,ifa);
 	vcpu_quick_region_set(PSCBX(vcpu,itr_regions),ifa);
+
+	/*
+	 * FIXME According to spec, vhpt should be purged, but this
+	 * incurs considerable performance loss, since it is safe for
+	 * linux not to purge vhpt, vhpt purge is disabled until a
+	 * feasible way is found.
+	 *
+	 * vcpu_flush_tlb_vhpt_range(ifa & itir_mask(itir), itir_ps(itir));
+	 */
+
+	return IA64_NO_FAULT;
+}
+
+IA64FAULT vcpu_set_itr(VCPU *vcpu, u64 slot, u64 pte,
+                       u64 itir, u64 ifa, u64 rid)
+{
+	TR_ENTRY *trp;
+
+	if (slot >= NITRS)
+ 		return IA64_RSVDREG_FAULT;
+	trp = &PSCBX(vcpu, itrs[slot]);
+	vcpu_set_tr_entry_rid(trp, pte, itir, ifa, rid);
+
+	/* Recompute the itr_region.  */
+	vcpu->arch.itr_regions = 0;
+	for (trp = vcpu->arch.itrs; trp < &vcpu->arch.itrs[NITRS]; trp++)
+		if (trp->pte.p)
+			vcpu_quick_region_set(vcpu->arch.itr_regions,
+			                      trp->vadr);
+	return IA64_NO_FAULT;
+}
+
+IA64FAULT vcpu_set_dtr(VCPU *vcpu, u64 slot, u64 pte,
+                       u64 itir, u64 ifa, u64 rid)
+{
+	TR_ENTRY *trp;
+
+	if (slot >= NDTRS)
+		return IA64_RSVDREG_FAULT;
+	trp = &PSCBX(vcpu, dtrs[slot]);
+	vcpu_set_tr_entry_rid(trp, pte, itir, ifa, rid);
+
+	/* Recompute the dtr_region.  */
+	vcpu->arch.dtr_regions = 0;
+	for (trp = vcpu->arch.dtrs; trp < &vcpu->arch.dtrs[NDTRS]; trp++)
+		if (trp->pte.p)
+			vcpu_quick_region_set(vcpu->arch.dtr_regions,
+			                      trp->vadr);
 	return IA64_NO_FAULT;
 }
 
@@ -2021,7 +2060,7 @@ again:
 	vcpu_itc_no_srlz(vcpu,2,ifa,pteval,pte,logps);
 	if (swap_rr0) set_metaphysical_rr0();
 	if (p2m_entry_retry(&entry)) {
-		vcpu_flush_tlb_vhpt_range(ifa & ((1 << logps) - 1), logps);
+		vcpu_flush_tlb_vhpt_range(ifa, logps);
 		goto again;
 	}
 	return IA64_NO_FAULT;
@@ -2044,7 +2083,7 @@ again:
 	vcpu_itc_no_srlz(vcpu, 1,ifa,pteval,pte,logps);
 	if (swap_rr0) set_metaphysical_rr0();
 	if (p2m_entry_retry(&entry)) {
-		vcpu_flush_tlb_vhpt_range(ifa & ((1 << logps) - 1), logps);
+		vcpu_flush_tlb_vhpt_range(ifa, logps);
 		goto again;
 	}
 	return IA64_NO_FAULT;
@@ -2096,7 +2135,7 @@ IA64FAULT vcpu_ptc_e(VCPU *vcpu, UINT64 vadr)
 	// architected loop to purge the entire TLB, should use
 	//  base = stride1 = stride2 = 0, count0 = count 1 = 1
 
-	vcpu_flush_vtlb_all ();
+	vcpu_flush_vtlb_all(current);
 
 	return IA64_NO_FAULT;
 }
@@ -2177,7 +2216,6 @@ IA64FAULT vcpu_ptr_i(VCPU *vcpu,UINT64 vadr,UINT64 log_range)
 		else if (trp->pte.p)
 			vcpu_quick_region_set(vcpu->arch.itr_regions,
 					      trp->vadr);
-
 
 	vcpu_flush_tlb_vhpt_range (vadr, log_range);
 

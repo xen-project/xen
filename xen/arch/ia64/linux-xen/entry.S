@@ -652,17 +652,8 @@ GLOBAL_ENTRY(ia64_ret_from_clone)
     ld8 r16 = [r16]
     ;;
     cmp.ne p6,p7 = r16, r0
- (p6) br.cond.spnt ia64_leave_hypervisor
- (p7) br.cond.spnt ia64_leave_kernel
-    ;;
-//    adds r16 = IA64_VCPU_FLAGS_OFFSET, r13
-//    ;;
-//    ld8 r16 = [r16]
-//    ;;
-//    cmp.ne p6,p7 = r16, r0
-//	(p6) br.cond.spnt ia64_leave_hypervisor
-//	(p7) br.cond.spnt ia64_leave_kernel
-//    ;;
+ (p6) br.cond.spnt ia64_leave_hypervisor	/* VTi */
+ (p7) br.cond.spnt ia64_leave_kernel		/* !VTi */
 #else
 .ret8:
 	adds r2=TI_FLAGS+IA64_TASK_SIZE,r13
@@ -901,7 +892,7 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 #ifdef XEN
 	;;
 (pUStk) ssm psr.i
-(pUStk)    br.call.sptk.many b0=process_soft_irq
+(pUStk)    br.call.sptk.many b0=do_softirq
 (pUStk) rsm psr.i
     ;;
 	alloc loc0=ar.pfs,0,1,1,0

@@ -31,9 +31,12 @@ GUEST_SRCS-y += xc_load_elf.c
 GUEST_SRCS-y += xg_private.c
 GUEST_SRCS-$(CONFIG_POWERPC) += xc_ppc_linux_build.c
 GUEST_SRCS-$(CONFIG_X86) += xc_linux_build.c
-GUEST_SRCS-$(CONFIG_IA64) += xc_ia64_stubs.c xc_linux_build.c
+GUEST_SRCS-$(CONFIG_IA64) += xc_linux_build.c
 GUEST_SRCS-$(CONFIG_MIGRATE) += xc_linux_restore.c xc_linux_save.c
 GUEST_SRCS-$(CONFIG_HVM) += xc_hvm_build.c
+
+# This Makefile only adds files if CONFIG_IA64 is y.
+include ia64/Makefile
 
 CFLAGS   += -Werror
 CFLAGS   += -fno-strict-aliasing
@@ -99,6 +102,7 @@ TAGS:
 .PHONY: clean
 clean:
 	rm -rf *.a *.so* *.o *.opic *.rpm $(LIB) *~ $(DEPS) xen
+	rm -rf ia64/*.o ia64/*.opic
 
 .PHONY: rpm
 rpm: build

@@ -268,7 +268,7 @@ int vhpt_enabled(VCPU *vcpu, uint64_t vadr, vhpt_ref_t ref)
     PTA   vpta;
     IA64_PSR  vpsr; 
 
-    vpsr.val = vmx_vcpu_get_psr(vcpu);
+    vpsr.val = VCPU(vcpu, vpsr);
     vcpu_get_rr(vcpu, vadr, &vrr.rrval);
     vmx_vcpu_get_pta(vcpu,&vpta.val);
 
@@ -290,6 +290,7 @@ int vhpt_enabled(VCPU *vcpu, uint64_t vadr, vhpt_ref_t ref)
 
 int unimplemented_gva(VCPU *vcpu,u64 vadr)
 {
+#if 0
     int bit=vcpu->domain->arch.imp_va_msb;
     u64 ladr =(vadr<<3)>>(3+bit);
     if(!ladr||ladr==(1U<<(61-bit))-1){
@@ -297,6 +298,9 @@ int unimplemented_gva(VCPU *vcpu,u64 vadr)
     }else{
         return 1;
     }
+#else
+    return 0;
+#endif
 }
 
 
@@ -618,7 +622,7 @@ IA64FAULT vmx_vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
     visr.val=0;
     visr.ei=pt_isr.ei;
     visr.ir=pt_isr.ir;
-    vpsr.val = vmx_vcpu_get_psr(vcpu);
+    vpsr.val = VCPU(vcpu, vpsr);
     if(vpsr.ic==0){
         visr.ni=1;
     }

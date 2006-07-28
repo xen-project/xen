@@ -1,4 +1,3 @@
-
 /*
  * Miscellaneous process/domain related routines
  * 
@@ -26,7 +25,10 @@
 #include <asm/vhpt.h>
 #include <asm/debugger.h>
 #include <asm/fpswa.h>
+#include <asm/bundle.h>
+#include <asm/privop_stat.h>
 #include <asm/asm-xsi-offsets.h>
+#include <asm/shadow.h>
 
 extern void die_if_kernel(char *str, struct pt_regs *regs, long err);
 /* FIXME: where these declarations shold be there ? */
@@ -49,41 +51,7 @@ extern IA64FAULT ia64_hypercall(struct pt_regs *regs);
 
 extern void do_ssc(unsigned long ssc, struct pt_regs *regs);
 
-unsigned long slow_reflect_count[0x80] = { 0 };
-unsigned long fast_reflect_count[0x80] = { 0 };
-
 #define inc_slow_reflect_count(vec) slow_reflect_count[vec>>8]++;
-
-void zero_reflect_counts(void)
-{
-	int i;
-	for (i=0; i<0x80; i++) slow_reflect_count[i] = 0;
-	for (i=0; i<0x80; i++) fast_reflect_count[i] = 0;
-}
-
-int dump_reflect_counts(char *buf)
-{
-	int i,j,cnt;
-	char *s = buf;
-
-	s += sprintf(s,"Slow reflections by vector:\n");
-	for (i = 0, j = 0; i < 0x80; i++) {
-		if ( (cnt = slow_reflect_count[i]) != 0 ) {
-			s += sprintf(s,"0x%02x00:%10d, ",i,cnt);
-			if ((j++ & 3) == 3) s += sprintf(s,"\n");
-		}
-	}
-	if (j & 3) s += sprintf(s,"\n");
-	s += sprintf(s,"Fast reflections by vector:\n");
-	for (i = 0, j = 0; i < 0x80; i++) {
-		if ( (cnt = fast_reflect_count[i]) != 0 ) {
-			s += sprintf(s,"0x%02x00:%10d, ",i,cnt);
-			if ((j++ & 3) == 3) s += sprintf(s,"\n");
-		}
-	}
-	if (j & 3) s += sprintf(s,"\n");
-	return s - buf;
-}
 
 // should never panic domain... if it does, stack may have been overrun
 void check_bad_nested_interruption(unsigned long isr, struct pt_regs *regs, unsigned long vector)
@@ -194,7 +162,6 @@ void deliver_pending_interrupt(struct pt_regs *regs)
 			++pending_false_positive;
 	}
 }
-unsigned long lazy_cover_count = 0;
 
 static int
 handle_lazy_cover(struct vcpu *v, struct pt_regs *regs)
@@ -241,8 +208,7 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 		    p2m_entry_retry(&entry)) {
 			/* dtlb has been purged in-between.  This dtlb was
 			   matching.  Undo the work.  */
-			vcpu_flush_tlb_vhpt_range(address & ((1 << logps) - 1),
-			                          logps);
+			vcpu_flush_tlb_vhpt_range(address, logps);
 
 			// the stale entry which we inserted above
 			// may remains in tlb cache.
@@ -348,7 +314,6 @@ handle_fpu_swa (int fp_fault, struct pt_regs *regs, unsigned long isr)
 {
 	struct vcpu *v = current;
 	IA64_BUNDLE bundle;
-	IA64_BUNDLE __get_domain_bundle(UINT64);
 	unsigned long fault_ip;
 	fpswa_ret_t ret;
 
@@ -359,7 +324,12 @@ handle_fpu_swa (int fp_fault, struct pt_regs *regs, unsigned long isr)
 	 */
 	if (!fp_fault && (ia64_psr(regs)->ri == 0))
 		fault_ip -= 16;
-	bundle = __get_domain_bundle(fault_ip);
+
+	if (VMX_DOMAIN(current))
+		bundle = __vmx_get_domain_bundle(fault_ip);
+	else 
+		bundle = __get_domain_bundle(fault_ip);
+
 	if (!bundle.i64[0] && !bundle.i64[1]) {
 		printk("%s: floating-point bundle at 0x%lx not mapped\n",
 		       __FUNCTION__, fault_ip);
@@ -678,3 +648,92 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 	reflect_interruption(isr,regs,vector);
 }
 
+void
+ia64_shadow_fault(unsigned long ifa, unsigned long itir,
+                  unsigned long isr, struct pt_regs *regs)
+{
+	struct vcpu *v = current;
+	struct domain *d = current->domain;
+	unsigned long gpfn;
+	unsigned long pte = 0;
+	struct vhpt_lf_entry *vlfe;
+
+	/* There are 2 jobs to do:
+	   -  marking the page as dirty (the metaphysical address must be
+	      extracted to do that).
+	   -  reflecting or not the fault (the virtual Dirty bit must be
+	      extracted to decide).
+	   Unfortunatly these informations are not immediatly available!
+	*/
+
+	/* Extract the metaphysical address.
+	   Try to get it from VHPT and M2P as we need the flags.  */
+	vlfe = (struct vhpt_lf_entry *)ia64_thash(ifa);
+	pte = vlfe->page_flags;
+	if (vlfe->ti_tag == ia64_ttag(ifa)) {
+		/* The VHPT entry is valid.  */
+		gpfn = get_gpfn_from_mfn((pte & _PAGE_PPN_MASK) >> PAGE_SHIFT);
+		BUG_ON(gpfn == INVALID_M2P_ENTRY);
+	}
+	else {
+		unsigned long itir, iha;
+		IA64FAULT fault;
+
+		/* The VHPT entry is not valid.  */
+		vlfe = NULL;
+
+		/* FIXME: gives a chance to tpa, as the TC was valid.  */
+
+		fault = vcpu_translate(v, ifa, 1, &pte, &itir, &iha);
+
+		/* Try again!  */
+		if (fault != IA64_NO_FAULT) {
+			/* This will trigger a dtlb miss.  */
+			ia64_ptcl(ifa, PAGE_SHIFT << 2);
+			return;
+		}
+		gpfn = ((pte & _PAGE_PPN_MASK) >> PAGE_SHIFT);
+		if (pte & _PAGE_D)
+			pte |= _PAGE_VIRT_D;
+	}
+
+	/* Set the dirty bit in the bitmap.  */
+	shadow_mark_page_dirty (d, gpfn);
+
+	/* Update the local TC/VHPT and decides wether or not the fault should
+	   be reflected.
+	   SMP note: we almost ignore the other processors.  The shadow_bitmap
+	   has been atomically updated.  If the dirty fault happen on another
+	   processor, it will do its job.
+	*/
+
+	if (pte != 0) {
+		/* We will know how to handle the fault.  */
+
+		if (pte & _PAGE_VIRT_D) {
+			/* Rewrite VHPT entry.
+			   There is no race here because only the
+			   cpu VHPT owner can write page_flags.  */
+			if (vlfe)
+				vlfe->page_flags = pte | _PAGE_D;
+			
+			/* Purge the TC locally.
+			   It will be reloaded from the VHPT iff the
+			   VHPT entry is still valid.  */
+			ia64_ptcl(ifa, PAGE_SHIFT << 2);
+
+			atomic64_inc(&d->arch.shadow_fault_count);
+		}
+		else {
+			/* Reflect.
+			   In this case there is no need to purge.  */
+			ia64_handle_reflection(ifa, regs, isr, 0, 8);
+		}
+	}
+	else {
+		/* We don't know wether or not the fault must be
+		   reflected.  The VHPT entry is not valid.  */
+		/* FIXME: in metaphysical mode, we could do an ITC now.  */
+		ia64_ptcl(ifa, PAGE_SHIFT << 2);
+	}
+}

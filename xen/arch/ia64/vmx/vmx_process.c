@@ -35,7 +35,7 @@
 #include <asm/io.h>
 #include <asm/processor.h>
 #include <asm/desc.h>
-//#include <asm/ldt.h>
+#include <asm/vlsapic.h>
 #include <xen/irq.h>
 #include <xen/event.h>
 #include <asm/regionreg.h>
@@ -82,7 +82,7 @@ void vmx_reflect_interruption(UINT64 ifa,UINT64 isr,UINT64 iim,
      UINT64 vector,REGS *regs)
 {
     VCPU *vcpu = current;
-    UINT64 vpsr = vmx_vcpu_get_psr(vcpu);
+    UINT64 vpsr = VCPU(vcpu, vpsr);
     vector=vec2off[vector];
     if(!(vpsr&IA64_PSR_IC)&&(vector!=IA64_DATA_NESTED_TLB_VECTOR)){
         panic_domain(regs, "Guest nested fault vector=%lx!\n", vector);
@@ -156,7 +156,7 @@ void save_banked_regs_to_vpd(VCPU *v, REGS *regs)
     IA64_PSR vpsr;
     src=&regs->r16;
     sunat=&regs->eml_unat;
-    vpsr.val = vmx_vcpu_get_psr(v);
+    vpsr.val = VCPU(v, vpsr);
     if(vpsr.bn){
         dst = &VCPU(v, vgr[0]);
         dunat =&VCPU(v, vnat);
@@ -188,14 +188,13 @@ void leave_hypervisor_tail(struct pt_regs *regs)
     struct vcpu *v = current;
     // FIXME: Will this work properly if doing an RFI???
     if (!is_idle_domain(d) ) {	// always comes from guest
-        extern void vmx_dorfirfi(void);
-        struct pt_regs *user_regs = vcpu_regs(current);
-        if (local_softirq_pending())
-            do_softirq();
+//        struct pt_regs *user_regs = vcpu_regs(current);
+        local_irq_enable();
+        do_softirq();
         local_irq_disable();
 
-        if (user_regs != regs)
-            printk("WARNING: checking pending interrupt in nested interrupt!!!\n");
+//        if (user_regs != regs)
+//            printk("WARNING: checking pending interrupt in nested interrupt!!!\n");
 
         /* VMX Domain N has other interrupt source, saying DM  */
         if (test_bit(ARCH_VMX_INTR_ASSIST, &v->arch.arch_vmx.flags))
@@ -216,12 +215,18 @@ void leave_hypervisor_tail(struct pt_regs *regs)
 
         if ( v->arch.irq_new_pending ) {
             v->arch.irq_new_pending = 0;
+            v->arch.irq_new_condition = 0;
             vmx_check_pending_irq(v);
+            return;
         }
-//        if (VCPU(v,vac).a_bsw){
-//            save_banked_regs_to_vpd(v,regs);
-//        }
-
+        if (VCPU(v, vac).a_int) {
+            vhpi_detection(v);
+            return;
+        }
+        if (v->arch.irq_new_condition) {
+            v->arch.irq_new_condition = 0;
+            vhpi_detection(v);
+        }
     }
 }
 
@@ -248,7 +253,7 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
     check_vtlb_sanity(vtlb);
     dump_vtlb(vtlb);
 #endif
-    vpsr.val = vmx_vcpu_get_psr(v);
+    vpsr.val = VCPU(v, vpsr);
     misr.val=VMX(v,cr_isr);
 
     if(is_physical_mode(v)&&(!(vadr<<1>>62))){

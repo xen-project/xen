@@ -27,7 +27,7 @@
 #include <asm/gcc_intrin.h>
 #include <linux/interrupt.h>
 #include <asm/vmx_vcpu.h>
-#include <asm/privop.h>
+#include <asm/bundle.h>
 #include <asm/types.h>
 #include <public/hvm/ioreq.h>
 #include <asm/mm.h>
@@ -386,20 +386,16 @@ static void write_ipi (VCPU *vcpu, uint64_t addr, uint64_t value)
         struct pt_regs *targ_regs = vcpu_regs (targ);
         struct vcpu_guest_context c;
 
-        printf ("arch_boot_vcpu: %p %p\n",
-                (void *)d->arch.boot_rdv_ip,
-                (void *)d->arch.boot_rdv_r1);
         memset (&c, 0, sizeof (c));
 
-        c.flags = VGCF_VMX_GUEST;
         if (arch_set_info_guest (targ, &c) != 0) {
             printf ("arch_boot_vcpu: failure\n");
             return;
         }
         /* First or next rendez-vous: set registers.  */
         vcpu_init_regs (targ);
-        targ_regs->cr_iip = d->arch.boot_rdv_ip;
-        targ_regs->r1 = d->arch.boot_rdv_r1;
+        targ_regs->cr_iip = d->arch.sal_data->boot_rdv_ip;
+        targ_regs->r1 = d->arch.sal_data->boot_rdv_r1;
 
         if (test_and_clear_bit(_VCPUF_down,&targ->vcpu_flags)) {
             vcpu_wake(targ);
@@ -425,7 +421,6 @@ static void write_ipi (VCPU *vcpu, uint64_t addr, uint64_t value)
    dir 1: read 0:write
     inst_type 0:integer 1:floating point
  */
-extern IA64_BUNDLE __vmx_get_domain_bundle(u64 iip);
 #define SL_INTEGER  0        // store/load interger
 #define SL_FLOATING    1       // store/load floating
 

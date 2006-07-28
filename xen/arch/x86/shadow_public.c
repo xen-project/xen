@@ -438,6 +438,8 @@ static void alloc_monitor_pagetable(struct vcpu *v)
             (l3e_get_flags(mpl3e[i]) & _PAGE_PRESENT) ?
             l2e_from_pfn(l3e_get_pfn(mpl3e[i]), __PAGE_HYPERVISOR) :
             l2e_empty();
+    for ( i = 0; i < (MACHPHYS_MBYTES >> (L2_PAGETABLE_SHIFT - 20)); i++ )
+        mpl2e[l2_table_offset(RO_MPT_VIRT_START) + i] = l2e_empty();
 
     if ( v->vcpu_id == 0 )
     {
@@ -1471,8 +1473,7 @@ int _shadow_mode_refcounts(struct domain *d)
 }
 
 static int
-map_p2m_entry(pgentry_64_t *top_tab, unsigned long va,
-              unsigned long gpfn, unsigned long mfn)
+map_p2m_entry(pgentry_64_t *top_tab, unsigned long gpfn, unsigned long mfn)
 {
 #if CONFIG_PAGING_LEVELS >= 4
     pgentry_64_t l4e = { 0 };
@@ -1487,6 +1488,7 @@ map_p2m_entry(pgentry_64_t *top_tab, unsigned long va,
     l2_pgentry_t l2e = { 0 };
     l1_pgentry_t l1e = { 0 };
     struct page_info *page;
+    unsigned long va = RO_MPT_VIRT_START + (gpfn * sizeof(mfn));
 
 #if CONFIG_PAGING_LEVELS >= 4
     l4e = top_tab[l4_table_offset(va)];
@@ -1568,7 +1570,7 @@ map_p2m_entry(pgentry_64_t *top_tab, unsigned long va,
 
     unmap_domain_page(l1tab);
 
-    l0tab[gpfn & ((PAGE_SIZE / sizeof (mfn)) - 1) ] = mfn;
+    l0tab[gpfn & ((PAGE_SIZE / sizeof(mfn)) - 1)] = mfn;
 
     unmap_domain_page(l0tab);
 
@@ -1584,7 +1586,6 @@ set_p2m_entry(struct domain *d, unsigned long gpfn, unsigned long mfn,
               struct domain_mmap_cache *l1cache)
 {
     unsigned long tabmfn = pagetable_get_pfn(d->vcpu[0]->arch.monitor_table);
-    unsigned long va = RO_MPT_VIRT_START + (gpfn * sizeof(unsigned long));
     pgentry_64_t *top_tab;
     int error;
 
@@ -1593,7 +1594,7 @@ set_p2m_entry(struct domain *d, unsigned long gpfn, unsigned long mfn,
 
     top_tab = map_domain_page_with_cache(tabmfn, l2cache);
 
-    if ( !(error = map_p2m_entry(top_tab, va, gpfn, mfn)) )
+    if ( !(error = map_p2m_entry(top_tab, gpfn, mfn)) )
         domain_crash(d);
 
     unmap_domain_page_with_cache(top_tab, l2cache);
@@ -1605,10 +1606,9 @@ static int
 alloc_p2m_table(struct domain *d)
 {
     struct list_head *list_ent;
-    unsigned long va = RO_MPT_VIRT_START; /*  phys_to_machine_mapping */
     pgentry_64_t *top_tab = NULL;
-    unsigned long mfn;
-    int gpfn, error = 0;
+    unsigned long gpfn, mfn;
+    int error = 0;
 
     ASSERT( pagetable_get_pfn(d->vcpu[0]->arch.monitor_table) );
 
@@ -1624,14 +1624,13 @@ alloc_p2m_table(struct domain *d)
         page = list_entry(list_ent, struct page_info, list);
         mfn = page_to_mfn(page);
 
-        if ( !(error = map_p2m_entry(top_tab, va, gpfn, mfn)) )
+        if ( !(error = map_p2m_entry(top_tab, gpfn, mfn)) )
         {
             domain_crash(d);
             break;
         }
 
         list_ent = frame_table[mfn].list.next;
-        va += sizeof(mfn);
     }
 
     unmap_domain_page(top_tab);

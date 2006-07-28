@@ -33,3 +33,23 @@ GLOBAL_ENTRY(early_xen_setup)
 	br.ret.sptk.many rp
 	;;
 END(early_xen_setup)
+
+#include <xen/interface/xen.h>
+
+/* Stub for suspend.
+   Just force the stacked registers to be written in memory.  */	
+GLOBAL_ENTRY(HYPERVISOR_suspend)
+	alloc r20=ar.pfs,0,0,0,0
+	mov r14=2
+	mov r15=r12
+	;;
+	/* We don't want to deal with RSE.  */
+	flushrs
+	mov r2=__HYPERVISOR_sched_op
+	st4 [r12]=r14
+	;;
+	break 0x1000
+	;; 
+	mov ar.pfs=r20
+	br.ret.sptk.many b0
+END(HYPERVISOR_suspend)

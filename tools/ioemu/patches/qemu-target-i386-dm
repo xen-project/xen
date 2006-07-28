@@ -1,7 +1,7 @@
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2006-07-26 11:45:57.572129351 +0100
-+++ ioemu/Makefile.target	2006-07-26 11:45:57.589127569 +0100
+--- ioemu.orig/Makefile.target	2006-07-28 09:56:49.468301708 +0100
++++ ioemu/Makefile.target	2006-07-28 09:56:58.486281629 +0100
 @@ -57,6 +57,8 @@
  QEMU_SYSTEM=qemu-fast
  endif
@@ -32,8 +32,8 @@ Index: ioemu/Makefile.target
  endif
 Index: ioemu/configure
 ===================================================================
---- ioemu.orig/configure	2006-07-26 11:45:57.573129246 +0100
-+++ ioemu/configure	2006-07-26 11:45:57.590127464 +0100
+--- ioemu.orig/configure	2006-07-28 09:56:49.469301595 +0100
++++ ioemu/configure	2006-07-28 09:56:49.486299672 +0100
 @@ -359,6 +359,8 @@
      if [ "$user" = "yes" ] ; then
          target_list="i386-user arm-user armeb-user sparc-user ppc-user mips-user mipsel-user $target_list"
@@ -45,8 +45,8 @@ Index: ioemu/configure
  fi
 Index: ioemu/monitor.c
 ===================================================================
---- ioemu.orig/monitor.c	2006-07-26 11:45:57.576128931 +0100
-+++ ioemu/monitor.c	2006-07-26 11:45:57.591127359 +0100
+--- ioemu.orig/monitor.c	2006-07-28 09:56:49.472301255 +0100
++++ ioemu/monitor.c	2006-07-28 09:56:58.720255164 +0100
 @@ -1142,6 +1142,10 @@
        "", "show host USB devices", },
      { "profile", "", do_info_profile,
@@ -60,8 +60,8 @@ Index: ioemu/monitor.c
  
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-26 11:45:57.579128617 +0100
-+++ ioemu/vl.c	2006-07-26 11:45:57.593127149 +0100
+--- ioemu.orig/vl.c	2006-07-28 09:56:49.475300916 +0100
++++ ioemu/vl.c	2006-07-28 09:56:58.917232883 +0100
 @@ -87,7 +87,7 @@
  
  #include "exec-all.h"
@@ -98,8 +98,8 @@ Index: ioemu/vl.c
  {
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-07-26 11:45:39.289045710 +0100
-+++ ioemu/vl.h	2006-07-26 11:45:57.594127044 +0100
+--- ioemu.orig/vl.h	2006-07-28 09:56:49.281322859 +0100
++++ ioemu/vl.h	2006-07-28 09:56:58.917232883 +0100
 @@ -38,6 +38,8 @@
  #include <fcntl.h>
  #include <sys/stat.h>
@@ -132,7 +132,7 @@ Index: ioemu/vl.h
 Index: ioemu/target-i386-dm/cpu.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/cpu.h	2006-07-26 11:45:57.594127044 +0100
++++ ioemu/target-i386-dm/cpu.h	2006-07-28 09:56:58.572271903 +0100
 @@ -0,0 +1,86 @@
 +/*
 + * i386 virtual CPU header
@@ -223,8 +223,8 @@ Index: ioemu/target-i386-dm/cpu.h
 Index: ioemu/target-i386-dm/exec-dm.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/exec-dm.c	2006-07-26 11:46:01.059763730 +0100
-@@ -0,0 +1,512 @@
++++ ioemu/target-i386-dm/exec-dm.c	2006-07-28 09:58:22.882736989 +0100
+@@ -0,0 +1,516 @@
 +/*
 + *  virtual page mapping and translated block handling
 + * 
@@ -291,6 +291,7 @@ Index: ioemu/target-i386-dm/exec-dm.c
 +#endif /* !CONFIG_DM */
 +
 +uint64_t phys_ram_size;
++extern uint64_t ram_size;
 +int phys_ram_fd;
 +uint8_t *phys_ram_base;
 +uint8_t *phys_ram_dirty;
@@ -632,7 +633,7 @@ Index: ioemu/target-i386-dm/exec-dm.c
 +            l = len;
 +	
 +        pd = page;
-+        io_index = iomem_index(page);
++        io_index = iomem_index(addr);
 +        if (is_write) {
 +            if (io_index) {
 +                if (l >= 4 && ((addr & 3) == 0)) {
@@ -677,11 +678,14 @@ Index: ioemu/target-i386-dm/exec-dm.c
 +                    stb_raw(buf, val);
 +                    l = 1;
 +                }
-+            } else {
++            } else if (addr < ram_size) {
 +                /* RAM case */
 +                ptr = phys_ram_base + (pd & TARGET_PAGE_MASK) + 
 +                    (addr & ~TARGET_PAGE_MASK);
 +                memcpy(buf, ptr, l);
++            } else {
++                /* unreported MMIO space */
++                memset(buf, 0xff, len);
 +            }
 +        }
 +        len -= l;
@@ -740,7 +744,7 @@ Index: ioemu/target-i386-dm/exec-dm.c
 Index: ioemu/target-i386-dm/helper2.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/helper2.c	2006-07-26 11:45:57.596126835 +0100
++++ ioemu/target-i386-dm/helper2.c	2006-07-28 09:56:58.312301309 +0100
 @@ -0,0 +1,464 @@
 +/*
 + *  i386 helpers (without register variable usage)
@@ -1209,7 +1213,7 @@ Index: ioemu/target-i386-dm/helper2.c
 Index: ioemu/target-i386-dm/i8259-dm.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/i8259-dm.c	2006-07-26 11:45:57.596126835 +0100
++++ ioemu/target-i386-dm/i8259-dm.c	2006-07-28 09:56:49.492298993 +0100
 @@ -0,0 +1,107 @@
 +/* Xen 8259 stub for interrupt controller emulation
 + * 
@@ -1321,7 +1325,7 @@ Index: ioemu/target-i386-dm/i8259-dm.c
 Index: ioemu/target-i386-dm/qemu-dm.debug
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/qemu-dm.debug	2006-07-26 11:45:57.596126835 +0100
++++ ioemu/target-i386-dm/qemu-dm.debug	2006-07-28 09:56:49.493298880 +0100
 @@ -0,0 +1,5 @@
 +#!/bin/sh
 +
@@ -1331,7 +1335,7 @@ Index: ioemu/target-i386-dm/qemu-dm.debug
 Index: ioemu/target-i386-dm/qemu-ifup
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/qemu-ifup	2006-07-26 11:45:57.597126730 +0100
++++ ioemu/target-i386-dm/qemu-ifup	2006-07-28 09:56:49.493298880 +0100
 @@ -0,0 +1,10 @@
 +#!/bin/sh
 +

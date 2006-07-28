@@ -1,7 +1,7 @@
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2006-07-14 15:55:59.489503600 +0100
-+++ ioemu/hw/pc.c	2006-07-14 15:56:00.354405169 +0100
+--- ioemu.orig/hw/pc.c	2006-07-27 11:16:57.678475515 +0100
++++ ioemu/hw/pc.c	2006-07-27 11:16:58.447390396 +0100
 @@ -639,7 +639,9 @@
      }
  
@@ -25,8 +25,8 @@ Index: ioemu/hw/pc.c
      isa_bios_size = bios_size;
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-14 15:56:00.271414614 +0100
-+++ ioemu/vl.c	2006-07-14 15:56:00.358404714 +0100
+--- ioemu.orig/vl.c	2006-07-27 11:16:58.296407110 +0100
++++ ioemu/vl.c	2006-07-27 11:16:58.450390064 +0100
 @@ -159,6 +159,8 @@
  #define MAX_CPUS 1
  #endif
@@ -36,7 +36,7 @@ Index: ioemu/vl.c
  char domain_name[1024] = { 'H','V', 'M', 'X', 'E', 'N', '-'};
  extern int domid;
  
-@@ -5105,6 +5107,9 @@
+@@ -5106,6 +5108,9 @@
      QEMUMachine *machine;
      char usb_devices[MAX_VM_USB_PORTS][128];
      int usb_devices_index;
@@ -46,7 +46,7 @@ Index: ioemu/vl.c
  
      char qemu_dm_logfilename[64];
  
-@@ -5341,11 +5346,13 @@
+@@ -5342,11 +5347,13 @@
                  ram_size = atol(optarg) * 1024 * 1024;
                  if (ram_size <= 0)
                      help();
@@ -60,7 +60,7 @@ Index: ioemu/vl.c
                  break;
              case QEMU_OPTION_l:
                  {
-@@ -5559,6 +5566,39 @@
+@@ -5560,6 +5567,39 @@
      /* init the memory */
      phys_ram_size = ram_size + vga_ram_size + bios_size;
  
@@ -100,7 +100,7 @@ Index: ioemu/vl.c
  #ifdef CONFIG_SOFTMMU
      phys_ram_base = qemu_vmalloc(phys_ram_size);
      if (!phys_ram_base) {
-@@ -5599,6 +5639,8 @@
+@@ -5600,6 +5640,8 @@
      }
  #endif
  

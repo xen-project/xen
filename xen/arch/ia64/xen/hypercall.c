@@ -28,16 +28,11 @@
 #include <xen/domain.h>
 #include <public/callback.h>
 #include <xen/event.h>
+#include <asm/privop_stat.h>
 
 static long do_physdev_op_compat(XEN_GUEST_HANDLE(physdev_op_t) uop);
 static long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg);
 static long do_callback_op(int cmd, XEN_GUEST_HANDLE(void) arg);
-/* FIXME: where these declarations should be there ? */
-extern int dump_privop_counts_to_user(char *, int);
-extern int zero_privop_counts_to_user(char *, int);
-
-unsigned long idle_when_pending = 0;
-unsigned long pal_halt_light_count = 0;
 
 hypercall_t ia64_hypercall_table[] =
 	{
@@ -159,8 +154,8 @@ fw_hypercall_ipi (struct pt_regs *regs)
 			
 		/* First or next rendez-vous: set registers.  */
 		vcpu_init_regs (targ);
-		vcpu_regs (targ)->cr_iip = d->arch.boot_rdv_ip;
-		vcpu_regs (targ)->r1 = d->arch.boot_rdv_r1;
+		vcpu_regs (targ)->cr_iip = d->arch.sal_data->boot_rdv_ip;
+		vcpu_regs (targ)->r1 = d->arch.sal_data->boot_rdv_r1;
 		vcpu_regs (targ)->b0 = d->arch.sal_return_addr;
 
 		if (test_and_clear_bit(_VCPUF_down,
