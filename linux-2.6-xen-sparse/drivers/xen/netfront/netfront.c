@@ -99,17 +99,17 @@ struct netfront_info {
 	struct timer_list rx_refill_timer;
 
 	/*
-	 * {tx,rx}_skbs store outstanding skbuffs. The first entry in each
-	 * array is an index into a chain of free entries.
+	 * {tx,rx}_skbs store outstanding skbuffs. The first entry in tx_skbs
+	 * is an index into a chain of free entries.
 	 */
 	struct sk_buff *tx_skbs[NET_TX_RING_SIZE+1];
-	struct sk_buff *rx_skbs[NET_RX_RING_SIZE+1];
+	struct sk_buff *rx_skbs[NET_RX_RING_SIZE];
 
 #define TX_MAX_TARGET min_t(int, NET_RX_RING_SIZE, 256)
 	grant_ref_t gref_tx_head;
 	grant_ref_t grant_tx_ref[NET_TX_RING_SIZE + 1];
 	grant_ref_t gref_rx_head;
-	grant_ref_t grant_rx_ref[NET_TX_RING_SIZE + 1];
+	grant_ref_t grant_rx_ref[NET_TX_RING_SIZE];
 
 	struct xenbus_device *xbdev;
 	int tx_ring_ref;
@@ -122,7 +122,7 @@ struct netfront_info {
 };
 
 /*
- * Access macros for acquiring freeing slots in {tx,rx}_skbs[].
+ * Access macros for acquiring freeing slots in tx_skbs[].
  */
 
 static inline void add_id_to_freelist(struct sk_buff **list, unsigned short id)
@@ -136,6 +136,29 @@ static inline unsigned short get_id_from_freelist(struct sk_buff **list)
 	unsigned int id = (unsigned int)(unsigned long)list[0];
 	list[0] = list[id];
 	return id;
+}
+
+static inline int xennet_rxidx(RING_IDX idx)
+{
+	return idx & (NET_RX_RING_SIZE - 1);
+}
+
+static inline struct sk_buff *xennet_get_rx_skb(struct netfront_info *np,
+						RING_IDX ri)
+{
+	int i = xennet_rxidx(ri);
+	struct sk_buff *skb = np->rx_skbs[i];
+	np->rx_skbs[i] = NULL;
+	return skb;
+}
+
+static inline grant_ref_t xennet_get_rx_ref(struct netfront_info *np,
+					    RING_IDX ri)
+{
+	int i = xennet_rxidx(ri);
+	grant_ref_t ref = np->grant_rx_ref[i];
+	np->grant_rx_ref[i] = GRANT_INVALID_REF;
+	return ref;
 }
 
 #define DPRINTK(fmt, args...)				\
@@ -598,8 +621,9 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 
 		skb->dev = dev;
 
-		id = get_id_from_freelist(np->rx_skbs);
+		id = xennet_rxidx(req_prod + i);
 
+		BUG_ON(np->rx_skbs[id]);
 		np->rx_skbs[id] = skb;
 
 		RING_GET_REQUEST(&np->rx, req_prod + i)->id = id;
@@ -840,6 +864,19 @@ static irqreturn_t netif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 	return IRQ_HANDLED;
 }
 
+static void xennet_move_rx_slot(struct netfront_info *np, struct sk_buff *skb,
+				grant_ref_t ref)
+{
+	int new = xennet_rxidx(np->rx.req_prod_pvt);
+
+	BUG_ON(np->rx_skbs[new]);
+	np->rx_skbs[new] = skb;
+	np->grant_rx_ref[new] = ref;
+	RING_GET_REQUEST(&np->rx, np->rx.req_prod_pvt)->id = new;
+	RING_GET_REQUEST(&np->rx, np->rx.req_prod_pvt)->gref = ref;
+	np->rx.req_prod_pvt++;
+	RING_PUSH_REQUESTS(&np->rx);
+}
 
 static int netif_poll(struct net_device *dev, int *pbudget)
 {
@@ -874,12 +911,15 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 	     i++, work_done++) {
 		rx = RING_GET_RESPONSE(&np->rx, i);
 
+		skb = xennet_get_rx_skb(np, i);
+		ref = xennet_get_rx_ref(np, i);
+
 		/*
 		 * This definitely indicates a bug, either in this driver or in
 		 * the backend driver. In future this should flag the bad
 		 * situation to the system controller to reboot the backed.
 		 */
-		if ((ref = np->grant_rx_ref[rx->id]) == GRANT_INVALID_REF) {
+		if (ref == GRANT_INVALID_REF) {
 			WPRINTK("Bad rx response id %d.\n", rx->id);
 			work_done--;
 			continue;
@@ -890,21 +930,12 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 			if (net_ratelimit())
 				WPRINTK("Unfulfilled rx req (id=%d, st=%d).\n",
 					rx->id, rx->status);
-			RING_GET_REQUEST(&np->rx, np->rx.req_prod_pvt)->id =
-				rx->id;
-			RING_GET_REQUEST(&np->rx, np->rx.req_prod_pvt)->gref =
-				ref;
-			np->rx.req_prod_pvt++;
-			RING_PUSH_REQUESTS(&np->rx);
+			xennet_move_rx_slot(np, skb, ref);
 			work_done--;
 			continue;
 		}
 
 		gnttab_release_grant_reference(&np->gref_rx_head, ref);
-		np->grant_rx_ref[rx->id] = GRANT_INVALID_REF;
-
-		skb = np->rx_skbs[rx->id];
-		add_id_to_freelist(np->rx_skbs, rx->id);
 
 		/* NB. We handle skb overflow later. */
 		skb->data = skb->head + rx->offset;
@@ -1158,15 +1189,23 @@ static void network_connect(struct net_device *dev)
 	}
 
 	/* Step 2: Rebuild the RX buffer freelist and the RX ring itself. */
-	for (requeue_idx = 0, i = 1; i <= NET_RX_RING_SIZE; i++) {
-		if ((unsigned long)np->rx_skbs[i] < PAGE_OFFSET)
+	for (requeue_idx = 0, i = 0; i < NET_RX_RING_SIZE; i++) {
+		if (!np->rx_skbs[i])
 			continue;
+
 		gnttab_grant_foreign_transfer_ref(
 			np->grant_rx_ref[i], np->xbdev->otherend_id,
 			__pa(np->rx_skbs[i]->data) >> PAGE_SHIFT);
 		RING_GET_REQUEST(&np->rx, requeue_idx)->gref =
 			np->grant_rx_ref[i];
-		RING_GET_REQUEST(&np->rx, requeue_idx)->id = i;
+		RING_GET_REQUEST(&np->rx, requeue_idx)->id = requeue_idx;
+
+		if (requeue_idx < i) {
+			np->rx_skbs[requeue_idx] = np->rx_skbs[i];
+			np->grant_rx_ref[requeue_idx] = np->grant_rx_ref[i];
+			np->rx_skbs[i] = NULL;
+			np->grant_rx_ref[i] = GRANT_INVALID_REF;
+		}
 		requeue_idx++;
 	}
 
@@ -1392,8 +1431,8 @@ static struct net_device * __devinit create_netdev(int handle,
 		np->grant_tx_ref[i] = GRANT_INVALID_REF;
 	}
 
-	for (i = 0; i <= NET_RX_RING_SIZE; i++) {
-		np->rx_skbs[i] = (void *)((unsigned long) i+1);
+	for (i = 0; i < NET_RX_RING_SIZE; i++) {
+		np->rx_skbs[i] = NULL;
 		np->grant_rx_ref[i] = GRANT_INVALID_REF;
 	}
 
