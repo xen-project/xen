@@ -125,10 +125,20 @@ void do_transaction_start(struct connection *conn, struct buffered_data *in)
 {
 	struct transaction *trans, *exists;
 	char id_str[20];
+	int started;
 
 	/* We don't support nested transactions. */
 	if (conn->transaction) {
 		send_error(conn, EBUSY);
+		return;
+	}
+
+	started = 0;
+	list_for_each_entry(trans, &conn->transaction_list, list)
+		started++;
+
+	if (started > 5) {
+		send_error(conn, ENOSPC);
 		return;
 	}
 
