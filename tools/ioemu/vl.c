@@ -5792,7 +5792,7 @@ int main(int argc, char **argv)
     }
 
     if (xc_ia64_get_pfn_list(xc_handle, domid, page_array,
-                             nr_pages + (GFW_SIZE >> PAGE_SHIFT), 1)!= 1){
+                             IO_PAGE_START >> PAGE_SHIFT, 1) != 1){
         fprintf(logfile, "xc_ia64_get_pfn_list returned error %d\n", errno);
         exit(-1);
     }
@@ -5801,7 +5801,7 @@ int main(int argc, char **argv)
                                        PROT_READ|PROT_WRITE,
                                        page_array[0]);
 
-    fprintf(logfile, "shared page at pfn:%lx, mfn: %l016x\n",
+    fprintf(logfile, "shared page at pfn:%lx, mfn: %016lx\n",
             IO_PAGE_START >> PAGE_SHIFT, page_array[0]);
 #endif
 #else  /* !CONFIG_DM */
