@@ -622,6 +622,38 @@ static void print_drivers(void)
 		DPRINTF("Found driver: [%s]\n",dtypes[i]->name);
 } 
 
+/* Stevens. */
+static void daemonize(void)
+{
+	pid_t pid;
+
+	/* Separate from our parent via fork, so init inherits us. */
+	if ((pid = fork()) < 0)
+		DPRINTF("Failed to fork daemon\n");
+	if (pid != 0)
+		exit(0);
+
+	/* Session leader so ^C doesn't whack us. */
+	setsid();
+
+	/* Let session leader exit so child cannot regain CTTY */
+	if ((pid = fork()) < 0)
+		DPRINTF("Failed to fork daemon\n");
+	if (pid != 0)
+		exit(0);
+
+	/* Move off any mount points we might be in. */
+	if (chdir("/") == -1)
+		DPRINTF("Failed to chdir\n");
+
+	/* Discard our parent's old-fashioned umask prejudices. */
+	umask(0);
+
+	close(STDIN_FILENO);
+	close(STDOUT_FILENO);
+	close(STDERR_FILENO);
+}
+
 int main(int argc, char *argv[])
 {
 	char *devname;
@@ -633,6 +665,7 @@ int main(int argc, char *argv[])
 
 	__init_blkif();
 	openlog("BLKTAPCTRL", LOG_CONS|LOG_ODELAY, LOG_DAEMON);
+	daemonize();
 
 	print_drivers();
 	init_driver_list();
