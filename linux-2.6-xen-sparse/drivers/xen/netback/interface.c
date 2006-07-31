@@ -62,10 +62,34 @@ static int net_close(struct net_device *dev)
 	return 0;
 }
 
+static int netbk_change_mtu(struct net_device *dev, int mtu)
+{
+	int max = netbk_can_sg(dev) ? 65535 - ETH_HLEN : ETH_DATA_LEN;
+
+	if (mtu > max)
+		return -EINVAL;
+	dev->mtu = mtu;
+	return 0;
+}
+
+static int netbk_set_sg(struct net_device *dev, u32 data)
+{
+	if (data) {
+		netif_t *netif = netdev_priv(dev);
+
+		if (!(netif->features & NETIF_F_SG))
+			return -ENOSYS;
+	}
+
+	return ethtool_op_set_sg(dev, data);
+}
+
 static struct ethtool_ops network_ethtool_ops =
 {
 	.get_tx_csum = ethtool_op_get_tx_csum,
 	.set_tx_csum = ethtool_op_set_tx_csum,
+	.get_sg = ethtool_op_get_sg,
+	.set_sg = netbk_set_sg,
 	.get_link = ethtool_op_get_link,
 };
 
@@ -101,6 +125,7 @@ netif_t *netif_alloc(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN])
 	dev->get_stats       = netif_be_get_stats;
 	dev->open            = net_open;
 	dev->stop            = net_close;
+	dev->change_mtu	     = netbk_change_mtu;
 	dev->features        = NETIF_F_IP_CSUM;
 
 	SET_ETHTOOL_OPS(dev, &network_ethtool_ops);

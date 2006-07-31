@@ -377,6 +377,13 @@ static int connect_rings(struct backend_info *be)
 		/* Must be non-zero for pfifo_fast to work. */
 		be->netif->dev->tx_queue_len = 1;
 
+	if (xenbus_scanf(XBT_NIL, dev->otherend, "feature-sg", "%d", &val) < 0)
+		val = 0;
+	if (val) {
+		be->netif->features |= NETIF_F_SG;
+		be->netif->dev->features |= NETIF_F_SG;
+	}
+
 	/* Map the shared frame, irq etc. */
 	err = netif_map(be->netif, tx_ring_ref, rx_ring_ref, evtchn);
 	if (err) {

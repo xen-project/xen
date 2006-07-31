@@ -129,4 +129,10 @@ static inline int netbk_can_queue(struct net_device *dev)
 	return netif->can_queue;
 }
 
+static inline int netbk_can_sg(struct net_device *dev)
+{
+	netif_t *netif = netdev_priv(dev);
+	return netif->features & NETIF_F_SG;
+}
+
 #endif /* __NETIF__BACKEND__COMMON_H__ */
