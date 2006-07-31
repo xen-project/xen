@@ -47,6 +47,12 @@
 
 #define IO_SPACE_SPARSE_ENCODING(p)	((((p) >> 2) << 12) | (p & 0xfff))
 
+#ifdef XEN
+/* Offset to IO port; do not catch error.  */
+#define IO_SPACE_SPARSE_DECODING(off)	((((off) >> 12) << 2) | (off & 0x3))
+#define IO_SPACE_SPARSE_PORTS_PER_PAGE	(0x4 << (PAGE_SHIFT - 12))
+#endif
+
 struct io_space {
 	unsigned long mmio_base;	/* base in MMIO space */
 	int sparse;

@@ -908,6 +908,10 @@ ioports_permit_access(struct domain *d, unsigned long fp, unsigned long lp)
     if (ret != 0)
         return ret;
 
+    /* Domain 0 doesn't virtualize IO ports space. */
+    if (d == dom0)
+        return 0;
+
     fp_offset = IO_SPACE_SPARSE_ENCODING(fp) & ~PAGE_MASK;
     lp_offset = PAGE_ALIGN(IO_SPACE_SPARSE_ENCODING(lp));
 
@@ -915,6 +919,16 @@ ioports_permit_access(struct domain *d, unsigned long fp, unsigned long lp)
         __assign_domain_page(d, IO_PORTS_PADDR + off,
                              ia64_iobase + off, ASSIGN_nocache);
 
+    return 0;
+}
+
+static int
+ioports_has_allowed(struct domain *d, unsigned long fp, unsigned long lp)
+{
+    unsigned long i;
+    for (i = fp; i < lp; i++)
+        if (rangeset_contains_singleton(d->arch.ioport_caps, i))
+            return 1;
     return 0;
 }
 
@@ -936,8 +950,17 @@ ioports_deny_access(struct domain *d, unsigned long fp, unsigned long lp)
 
     for (off = fp_offset; off <= lp_offset; off += PAGE_SIZE) {
         unsigned long mpaddr = IO_PORTS_PADDR + off;
+        unsigned long port;
         volatile pte_t *pte;
         pte_t old_pte;
+
+        port = IO_SPACE_SPARSE_DECODING (off);
+        if (port < fp || port + IO_SPACE_SPARSE_PORTS_PER_PAGE > lp) {
+            /* Maybe this covers an allowed port.  */
+            if (ioports_has_allowed(d, port,
+                                    port + IO_SPACE_SPARSE_PORTS_PER_PAGE))
+                continue;
+        }
 
         pte = lookup_noalloc_domain_pte_none(d, mpaddr);
         BUG_ON(pte == NULL);
