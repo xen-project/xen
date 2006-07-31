@@ -128,6 +128,10 @@ typedef struct netif_rx_request netif_rx_request_t;
 #define _NETRXF_more_data      (2)
 #define  NETRXF_more_data      (1U<<_NETRXF_more_data)
 
+/* Packet to be followed by extra descriptor(s). */
+#define _NETRXF_extra_info     (3)
+#define  NETRXF_extra_info     (1U<<_NETRXF_extra_info)
+
 struct netif_rx_response {
     uint16_t id;
     uint16_t offset;       /* Offset in page of start of received packet  */

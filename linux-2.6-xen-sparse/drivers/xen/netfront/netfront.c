@@ -116,6 +116,11 @@ struct netfront_info {
 	struct mmu_update rx_mmu[NET_RX_RING_SIZE];
 };
 
+struct netfront_rx_info {
+	struct netif_rx_response rx;
+	struct netif_extra_info extras[XEN_NETIF_EXTRA_TYPE_MAX - 1];
+};
+
 /*
  * Access macros for acquiring freeing slots in tx_skbs[].
  */
@@ -332,6 +337,14 @@ again:
 		message = "writing feature-sg";
 		goto abort_transaction;
 	}
+
+#if 0 /* KAF: After the protocol is finalised. */
+	err = xenbus_printf(xbt, dev->nodename, "feature-gso-tcpv4", "%d", 1);
+	if (err) {
+		message = "writing feature-gso-tcpv4";
+		goto abort_transaction;
+	}
+#endif
 
 	err = xenbus_transaction_end(xbt, 0);
 	if (err) {
@@ -899,18 +912,65 @@ static void xennet_move_rx_slot(struct netfront_info *np, struct sk_buff *skb,
 	np->rx.req_prod_pvt++;
 }
 
+int xennet_get_extras(struct netfront_info *np,
+		      struct netif_extra_info *extras, RING_IDX rp)
+
+{
+	struct netif_extra_info *extra;
+	RING_IDX cons = np->rx.rsp_cons;
+	int err = 0;
+
+	do {
+		struct sk_buff *skb;
+		grant_ref_t ref;
+
+		if (unlikely(cons + 1 == rp)) {
+			if (net_ratelimit())
+				WPRINTK("Missing extra info\n");
+			err = -EBADR;
+			break;
+		}
+
+		extra = (struct netif_extra_info *)
+			RING_GET_RESPONSE(&np->rx, ++cons);
+
+		if (unlikely(!extra->type ||
+			     extra->type >= XEN_NETIF_EXTRA_TYPE_MAX)) {
+			if (net_ratelimit())
+				WPRINTK("Invalid extra type: %d\n",
+					extra->type);
+			err = -EINVAL;
+		} else
+			memcpy(&extras[extra->type - 1], extra, sizeof(*extra));
+
+		skb = xennet_get_rx_skb(np, cons);
+		ref = xennet_get_rx_ref(np, cons);
+		xennet_move_rx_slot(np, skb, ref);
+	} while (extra->flags & XEN_NETIF_EXTRA_FLAG_MORE);
+
+	np->rx.rsp_cons = cons;
+	return err;
+}
+
 static int xennet_get_responses(struct netfront_info *np,
-				struct netif_rx_response *rx, RING_IDX rp,
+				struct netfront_rx_info *rinfo, RING_IDX rp,
 				struct sk_buff_head *list, int count)
 {
 	struct mmu_update *mmu = np->rx_mmu + count;
 	struct multicall_entry *mcl = np->rx_mcl + count;
+	struct netif_rx_response *rx = &rinfo->rx;
+	struct netif_extra_info *extras = rinfo->extras;
 	RING_IDX cons = np->rx.rsp_cons;
 	struct sk_buff *skb = xennet_get_rx_skb(np, cons);
 	grant_ref_t ref = xennet_get_rx_ref(np, cons);
 	int max = MAX_SKB_FRAGS + (rx->status <= RX_COPY_THRESHOLD);
 	int frags = 1;
 	int err = 0;
+
+	if (rx->flags & NETRXF_extra_info) {
+		err = xennet_get_extras(np, extras, rp);
+		cons = np->rx.rsp_cons;
+	}
 
 	for (;;) {
 		unsigned long mfn;
@@ -1023,11 +1083,38 @@ static RING_IDX xennet_fill_frags(struct netfront_info *np,
 	return cons;
 }
 
+static int xennet_set_skb_gso(struct sk_buff *skb, struct netif_extra_info *gso)
+{
+	if (!gso->u.gso.size) {
+		if (net_ratelimit())
+			WPRINTK("GSO size must not be zero.\n");
+		return -EINVAL;
+	}
+
+	/* Currently only TCPv4 S.O. is supported. */
+	if (gso->u.gso.type != XEN_NETIF_GSO_TYPE_TCPV4) {
+		if (net_ratelimit())
+			WPRINTK("Bad GSO type %d.\n", gso->u.gso.type);
+		return -EINVAL;
+	}
+
+	skb_shinfo(skb)->gso_size = gso->u.gso.size;
+	skb_shinfo(skb)->gso_type = SKB_GSO_TCPV4;
+
+	/* Header must be checked, and gso_segs computed. */
+	skb_shinfo(skb)->gso_type |= SKB_GSO_DODGY;
+	skb_shinfo(skb)->gso_segs = 0;
+
+	return 0;
+}
+
 static int netif_poll(struct net_device *dev, int *pbudget)
 {
 	struct netfront_info *np = netdev_priv(dev);
 	struct sk_buff *skb;
-	struct netif_rx_response *rx;
+	struct netfront_rx_info rinfo;
+	struct netif_rx_response *rx = &rinfo.rx;
+	struct netif_extra_info *extras = rinfo.extras;
 	RING_IDX i, rp;
 	struct multicall_entry *mcl;
 	int work_done, budget, more_to_do = 1;
@@ -1058,12 +1145,14 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 	for (i = np->rx.rsp_cons, work_done = 0, pages_done = 0;
 	     (i != rp) && (work_done < budget);
 	     np->rx.rsp_cons = ++i, work_done++) {
-		rx = RING_GET_RESPONSE(&np->rx, i);
+		memcpy(rx, RING_GET_RESPONSE(&np->rx, i), sizeof(*rx));
+		memset(extras, 0, sizeof(extras));
 
-		err = xennet_get_responses(np, rx, rp, &tmpq, pages_done);
+		err = xennet_get_responses(np, &rinfo, rp, &tmpq, pages_done);
 		pages_done += skb_queue_len(&tmpq);
 
 		if (unlikely(err)) {
+err:
 			i = np->rx.rsp_cons + skb_queue_len(&tmpq) - 1;
 			work_done--;
 			while ((skb = __skb_dequeue(&tmpq)))
@@ -1073,6 +1162,16 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 		}
 
 		skb = __skb_dequeue(&tmpq);
+
+		if (extras[XEN_NETIF_EXTRA_TYPE_GSO - 1].type) {
+			struct netif_extra_info *gso;
+			gso = &extras[XEN_NETIF_EXTRA_TYPE_GSO - 1];
+
+			if (unlikely(xennet_set_skb_gso(skb, gso))) {
+				__skb_queue_head(&tmpq, skb);
+				goto err;
+			}
+		}
 
 		skb->nh.raw = (void *)skb_shinfo(skb)->frags[0].page;
 		skb->h.raw = skb->nh.raw + rx->offset;
