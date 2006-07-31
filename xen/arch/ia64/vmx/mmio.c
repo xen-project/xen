@@ -495,6 +495,21 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
 
         }
     }
+    // Floating-point spill
+    else if (inst.M9.major == 6 && inst.M9.x6 == 0x3B &&
+             inst.M9.m == 0 && inst.M9.x == 0) {
+        struct ia64_fpreg v;
+
+        inst_type = SL_FLOATING;
+        dir = IOREQ_WRITE;
+        vcpu_get_fpreg(vcpu, inst.M9.f2, &v);
+        /* Write high word.
+           FIXME: this is a kludge!  */
+        v.u.bits[1] &= 0x3ffff;
+        mmio_access(vcpu, padr + 8, &v.u.bits[1], 8, ma, IOREQ_WRITE);
+        data = v.u.bits[0];
+        size = 3;
+    }
     // Floating-point spill + Imm update
     else if(inst.M10.major==7&&inst.M10.x6==0x3B){
         struct ia64_fpreg v;
