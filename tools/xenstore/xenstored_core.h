@@ -79,6 +79,7 @@ struct connection
 	/* List of in-progress transactions. */
 	struct list_head transaction_list;
 	uint32_t next_transaction_id;
+	unsigned int transaction_started;
 
 	/* The domain I'm associated with, if any. */
 	struct domain *domain;
