@@ -51,14 +51,12 @@ static int net_open(struct net_device *dev)
 	netif_t *netif = netdev_priv(dev);
 	if (netif_carrier_ok(dev))
 		__netif_up(netif);
-	netif_start_queue(dev);
 	return 0;
 }
 
 static int net_close(struct net_device *dev)
 {
 	netif_t *netif = netdev_priv(dev);
-	netif_stop_queue(dev);
 	if (netif_carrier_ok(dev))
 		__netif_down(netif);
 	return 0;
@@ -107,8 +105,11 @@ netif_t *netif_alloc(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN])
 
 	SET_ETHTOOL_OPS(dev, &network_ethtool_ops);
 
-	/* Disable queuing. */
-	dev->tx_queue_len = 0;
+	/*
+	 * Reduce default TX queuelen so that each guest interface only
+	 * allows it to eat around 6.4MB of host memory.
+	 */
+	dev->tx_queue_len = 100;
 
 	for (i = 0; i < ETH_ALEN; i++)
 		if (be_mac[i] != 0)

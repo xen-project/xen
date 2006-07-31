@@ -136,6 +136,14 @@ static inline int is_xen_skb(struct sk_buff *skb)
 	return (cp == skbuff_cachep);
 }
 
+static inline int netbk_queue_full(netif_t *netif)
+{
+	RING_IDX peek = netif->rx_req_cons_peek;
+
+	return ((netif->rx.sring->req_prod - peek) <= 0) ||
+	       ((netif->rx.rsp_prod_pvt + NET_RX_RING_SIZE - peek) <= 0);
+}
+
 int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	netif_t *netif = netdev_priv(dev);
@@ -143,11 +151,15 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	BUG_ON(skb->dev != dev);
 
 	/* Drop the packet if the target domain has no receive buffers. */
-	if (unlikely(!netif_running(dev) || !netif_carrier_ok(dev)) ||
-	    (netif->rx_req_cons_peek == netif->rx.sring->req_prod) ||
-	    ((netif->rx_req_cons_peek - netif->rx.rsp_prod_pvt) ==
-	     NET_RX_RING_SIZE))
+	if (unlikely(!netif_running(dev) || !netif_carrier_ok(dev)))
 		goto drop;
+
+	if (unlikely(netbk_queue_full(netif))) {
+		/* Not a BUG_ON() -- misbehaving netfront can trigger this. */
+		if (netbk_can_queue(dev))
+			DPRINTK("Queue full but not stopped!\n");
+		goto drop;
+	}
 
 	/*
 	 * We do not copy the packet unless:
@@ -177,6 +189,13 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	netif->rx_req_cons_peek++;
 	netif_get(netif);
+
+	if (netbk_can_queue(dev) && netbk_queue_full(netif)) {
+		netif->rx.sring->req_event = netif->rx_req_cons_peek + 1;
+		mb(); /* request notification /then/ check & stop the queue */
+		if (netbk_queue_full(netif))
+			netif_stop_queue(dev);
+	}
 
 	skb_queue_tail(&rx_queue, skb);
 	tasklet_schedule(&net_rx_tasklet);
@@ -350,6 +369,10 @@ static void net_rx_action(unsigned long unused)
 			rx_notify[irq] = 1;
 			notify_list[notify_nr++] = irq;
 		}
+
+		if (netif_queue_stopped(netif->dev) &&
+		    !netbk_queue_full(netif))
+			netif_wake_queue(netif->dev);
 
 		netif_put(netif);
 		dev_kfree_skb(skb);
@@ -974,8 +997,13 @@ static void netif_page_release(struct page *page)
 irqreturn_t netif_be_int(int irq, void *dev_id, struct pt_regs *regs)
 {
 	netif_t *netif = dev_id;
+
 	add_to_net_schedule_list_tail(netif);
 	maybe_schedule_tx_action();
+
+	if (netif_queue_stopped(netif->dev) && !netbk_queue_full(netif))
+		netif_wake_queue(netif->dev);
+
 	return IRQ_HANDLED;
 }
 

@@ -353,6 +353,7 @@ static int connect_rings(struct backend_info *be)
 	unsigned long tx_ring_ref, rx_ring_ref;
 	unsigned int evtchn;
 	int err;
+	int val;
 
 	DPRINTK("");
 
@@ -366,6 +367,15 @@ static int connect_rings(struct backend_info *be)
 				 dev->otherend);
 		return err;
 	}
+
+	if (xenbus_scanf(XBT_NIL, dev->otherend, "feature-rx-notify", "%d",
+			 &val) < 0)
+		val = 0;
+	if (val)
+		be->netif->can_queue = 1;
+	else
+		/* Must be non-zero for pfifo_fast to work. */
+		be->netif->dev->tx_queue_len = 1;
 
 	/* Map the shared frame, irq etc. */
 	err = netif_map(be->netif, tx_ring_ref, rx_ring_ref, evtchn);
