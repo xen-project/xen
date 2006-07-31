@@ -32,6 +32,7 @@ SRCS_XML2BIN  = secpol_xml2bin.c secpol_xml2bin.h
 OBJS_XML2BIN := $(patsubst %.c,%.o,$(filter %.c,$(SRCS_XML2BIN)))
 
 ACM_INST_TOOLS    = xensec_tool xensec_xml2bin xensec_gen
+ACM_EZPOLICY      = xensec_ezpolicy
 ACM_OBJS          = $(OBJS_TOOL) $(OBJS_XML2BIN) $(OBJS_GETD)
 ACM_SCRIPTS       = python/xensec_tools/acm_getlabel
 
@@ -56,6 +57,7 @@ all: build
 install: all $(ACM_CONFIG_FILE)
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/sbin
 	$(INSTALL_PROG) -p $(ACM_INST_TOOLS) $(DESTDIR)/usr/sbin
+	$(INSTALL_PROG) -p $(ACM_EZPOLICY) $(DESTDIR)/usr/sbin
 	$(INSTALL_DIR) -p $(DESTDIR)$(ACM_CONFIG_DIR)
 	$(INSTALL_DIR) -p $(DESTDIR)$(ACM_POLICY_DIR)
 	$(INSTALL_DATA) -p policies/$(ACM_SCHEMA) $(DESTDIR)$(ACM_POLICY_DIR)
