@@ -733,7 +733,10 @@ static int __spurious_page_fault(
          (l2e_get_flags(l2e) & disallowed_flags) )
         return 0;
     if ( l2e_get_flags(l2e) & _PAGE_PSE )
-        return 1;
+    {
+        l1e = l1e_empty(); /* define before use in debug tracing */
+        goto spurious;
+    }
 
     l1t = map_domain_page(mfn);
     l1e = l1t[l1_table_offset(addr)];
@@ -742,6 +745,22 @@ static int __spurious_page_fault(
     if ( !(l1e_get_flags(l1e) & required_flags) ||
          (l1e_get_flags(l1e) & disallowed_flags) )
         return 0;
+
+ spurious:
+    DPRINTK("Spurious fault in domain %u:%u at addr %lx, e/c %04x\n",
+            current->domain->domain_id, current->vcpu_id,
+            addr, regs->error_code);
+#if CONFIG_PAGING_LEVELS >= 4
+    DPRINTK(" l4e = %"PRIpte"\n", l4e_get_intpte(l4e));
+#endif
+#if CONFIG_PAGING_LEVELS >= 3
+    DPRINTK(" l3e = %"PRIpte"\n", l3e_get_intpte(l3e));
+#endif
+    DPRINTK(" l2e = %"PRIpte"\n", l2e_get_intpte(l2e));
+    DPRINTK(" l1e = %"PRIpte"\n", l1e_get_intpte(l1e));
+#ifndef NDEBUG
+    show_registers(regs);
+#endif
     return 1;
 }
 
@@ -839,11 +858,7 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
     if ( unlikely(!guest_mode(regs)) )
     {
         if ( spurious_page_fault(addr, regs) )
-        {
-            DPRINTK("Spurious fault in domain %u:%u at addr %lx\n",
-                    current->domain->domain_id, current->vcpu_id, addr);
             return EXCRET_not_a_fault;
-        }
 
         if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
         {
