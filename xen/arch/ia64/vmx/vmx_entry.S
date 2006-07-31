@@ -197,6 +197,11 @@ GLOBAL_ENTRY(ia64_leave_hypervisor)
     ;;
     mov ar.pfs=loc0
     adds r20=PT(PR)+16,r12
+    adds r8=PT(EML_UNAT)+16,r12
+    ;;
+    ld8 r8=[r8]
+    ;;
+    mov ar.unat=r8
     ;;
     lfetch [r20],PT(CR_IPSR)-PT(PR)
     adds r2 = PT(B6)+16,r12

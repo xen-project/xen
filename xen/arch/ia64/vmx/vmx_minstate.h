@@ -269,7 +269,12 @@
     ;;                  \
     st8 [r24]=r9;           /* ar.csd */    \
     st8 [r25]=r10;          /* ar.ssd */    \
-    ;;
+    ;;		\
+    mov r18=ar.unat;    \
+    adds r19=PT(EML_UNAT)-PT(R4),r2; 	\
+    ;;			\
+    st8 [r19]=r18;       /* eml_unat */ \
+
 
 #define VMX_SAVE_EXTRA               \
 .mem.offset 0,0; st8.spill [r2]=r4,16;     \
