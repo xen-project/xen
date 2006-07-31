@@ -84,12 +84,26 @@ static int netbk_set_sg(struct net_device *dev, u32 data)
 	return ethtool_op_set_sg(dev, data);
 }
 
+static int netbk_set_tso(struct net_device *dev, u32 data)
+{
+	if (data) {
+		netif_t *netif = netdev_priv(dev);
+
+		if (!(netif->features & NETIF_F_TSO))
+			return -ENOSYS;
+	}
+
+	return ethtool_op_set_tso(dev, data);
+}
+
 static struct ethtool_ops network_ethtool_ops =
 {
 	.get_tx_csum = ethtool_op_get_tx_csum,
 	.set_tx_csum = ethtool_op_set_tx_csum,
 	.get_sg = ethtool_op_get_sg,
 	.set_sg = netbk_set_sg,
+	.get_tso = ethtool_op_get_tso,
+	.set_tso = netbk_set_tso,
 	.get_link = ethtool_op_get_link,
 };
 

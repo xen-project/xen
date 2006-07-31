@@ -50,12 +50,12 @@ static void netif_page_release(struct page *page);
 static void make_tx_response(netif_t *netif, 
 			     netif_tx_request_t *txp,
 			     s8       st);
-static int  make_rx_response(netif_t *netif, 
-			     u16      id, 
-			     s8       st,
-			     u16      offset,
-			     u16      size,
-			     u16      flags);
+static netif_rx_response_t *make_rx_response(netif_t *netif, 
+					     u16      id, 
+					     s8       st,
+					     u16      offset,
+					     u16      size,
+					     u16      flags);
 
 static void net_tx_action(unsigned long unused);
 static DECLARE_TASKLET(net_tx_tasklet, net_tx_action, 0);
@@ -225,9 +225,9 @@ static inline int netbk_queue_full(netif_t *netif)
 {
 	RING_IDX peek = netif->rx_req_cons_peek;
 
-	return ((netif->rx.sring->req_prod - peek) <= MAX_SKB_FRAGS) ||
+	return ((netif->rx.sring->req_prod - peek) <= (MAX_SKB_FRAGS + 1)) ||
 	       ((netif->rx.rsp_prod_pvt + NET_RX_RING_SIZE - peek) <=
-		MAX_SKB_FRAGS);
+		(MAX_SKB_FRAGS + 1));
 }
 
 int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
@@ -265,12 +265,13 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		skb = nskb;
 	}
 
-	netif->rx_req_cons_peek += skb_shinfo(skb)->nr_frags + 1;
+	netif->rx_req_cons_peek += skb_shinfo(skb)->nr_frags + 1 +
+				   !!skb_shinfo(skb)->gso_size;
 	netif_get(netif);
 
 	if (netbk_can_queue(dev) && netbk_queue_full(netif)) {
 		netif->rx.sring->req_event = netif->rx_req_cons_peek +
-			MAX_SKB_FRAGS + 1;
+			MAX_SKB_FRAGS + 2;
 		mb(); /* request notification /then/ check & stop the queue */
 		if (netbk_queue_full(netif))
 			netif_stop_queue(dev);
@@ -347,11 +348,16 @@ static void netbk_gop_skb(struct sk_buff *skb, struct netbk_rx_meta *meta,
 	netif_t *netif = netdev_priv(skb->dev);
 	int nr_frags = skb_shinfo(skb)->nr_frags;
 	int i;
+	int extra;
+
+	meta[count].frag.page_offset = skb_shinfo(skb)->gso_type;
+	meta[count].frag.size = skb_shinfo(skb)->gso_size;
+	extra = !!meta[count].frag.size + 1;
 
 	for (i = 0; i < nr_frags; i++) {
 		meta[++count].frag = skb_shinfo(skb)->frags[i];
 		meta[count].id = netbk_gop_frag(netif, meta[count].frag.page,
-						count, i + 1);
+						count, i + extra);
 	}
 
 	/*
@@ -361,7 +367,7 @@ static void netbk_gop_skb(struct sk_buff *skb, struct netbk_rx_meta *meta,
 	meta[count - nr_frags].id = netbk_gop_frag(netif,
 						   virt_to_page(skb->data),
 						   count - nr_frags, 0);
-	netif->rx.req_cons += nr_frags + 1;
+	netif->rx.req_cons += nr_frags + extra;
 }
 
 static inline void netbk_free_pages(int nr_frags, struct netbk_rx_meta *meta)
@@ -422,6 +428,8 @@ static void net_rx_action(unsigned long unused)
 	netif_t *netif = NULL; 
 	s8 status;
 	u16 id, irq, flags;
+	netif_rx_response_t *resp;
+	struct netif_extra_info *extra;
 	multicall_entry_t *mcl;
 	struct sk_buff_head rxq;
 	struct sk_buff *skb;
@@ -511,8 +519,33 @@ static void net_rx_action(unsigned long unused)
 		else if (skb->proto_data_valid) /* remote but checksummed? */
 			flags |= NETRXF_data_validated;
 
-		make_rx_response(netif, id, status, offset_in_page(skb->data),
-				 skb_headlen(skb), flags);
+		resp = make_rx_response(netif, id, status,
+					offset_in_page(skb->data),
+					skb_headlen(skb), flags);
+
+		extra = NULL;
+
+		if (meta[count].frag.size) {
+			struct netif_extra_info *gso =
+				(struct netif_extra_info *)
+				RING_GET_RESPONSE(&netif->rx,
+						  netif->rx.rsp_prod_pvt++);
+
+			if (extra)
+				extra->flags |= XEN_NETIF_EXTRA_FLAG_MORE;
+			else
+				resp->flags |= NETRXF_extra_info;
+
+			gso->u.gso.size = meta[count].frag.size;
+			gso->u.gso.type = XEN_NETIF_GSO_TYPE_TCPV4;
+			gso->u.gso.pad = 0;
+			gso->u.gso.features = 0;
+
+			gso->type = XEN_NETIF_EXTRA_TYPE_GSO;
+			gso->flags = 0;
+			extra = gso;
+		}
+
 		netbk_add_frag_responses(netif, status, meta + count + 1,
 					 nr_frags);
 
@@ -1190,12 +1223,12 @@ static void make_tx_response(netif_t *netif,
 #endif
 }
 
-static int make_rx_response(netif_t *netif, 
-			    u16      id, 
-			    s8       st,
-			    u16      offset,
-			    u16      size,
-			    u16      flags)
+static netif_rx_response_t *make_rx_response(netif_t *netif, 
+					     u16      id, 
+					     s8       st,
+					     u16      offset,
+					     u16      size,
+					     u16      flags)
 {
 	RING_IDX i = netif->rx.rsp_prod_pvt;
 	netif_rx_response_t *resp;
@@ -1210,7 +1243,7 @@ static int make_rx_response(netif_t *netif,
 
 	netif->rx.rsp_prod_pvt = ++i;
 
-	return 0;
+	return resp;
 }
 
 #ifdef NETBE_DEBUG_INTERRUPT

@@ -384,6 +384,16 @@ static int connect_rings(struct backend_info *be)
 		be->netif->dev->features |= NETIF_F_SG;
 	}
 
+#if 0 /* KAF: After the protocol is finalised. */
+	if (xenbus_scanf(XBT_NIL, dev->otherend, "feature-gso-tcpv4", "%d",
+			 &val) < 0)
+		val = 0;
+	if (val) {
+		be->netif->features |= NETIF_F_TSO;
+		be->netif->dev->features |= NETIF_F_TSO;
+	}
+#endif
+
 	/* Map the shared frame, irq etc. */
 	err = netif_map(be->netif, tx_ring_ref, rx_ring_ref, evtchn);
 	if (err) {
