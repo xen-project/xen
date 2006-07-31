@@ -272,7 +272,10 @@ IA64FAULT vmx_vcpu_rfi(VCPU *vcpu)
     UINT64 ifs, psr;
     REGS *regs = vcpu_regs(vcpu);
     psr = VCPU(vcpu,ipsr);
-    vcpu_bsw1(vcpu);
+    if (psr & IA64_PSR_BN)
+        vcpu_bsw1(vcpu);
+    else
+        vcpu_bsw0(vcpu);
     vmx_vcpu_set_psr(vcpu,psr);
     ifs=VCPU(vcpu,ifs);
     if(ifs>>63)
