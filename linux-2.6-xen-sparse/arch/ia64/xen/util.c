@@ -54,7 +54,7 @@ struct vm_struct *alloc_vm_area(unsigned long size)
         area->size = size;
         area->pages = NULL; //XXX
         area->nr_pages = nr_pages;
-        area->phys_addr = __pa(virt);
+        area->phys_addr = 0; 	/* xenbus_map_ring_valloc uses this field!  */
 
 	return area;
 
@@ -70,15 +70,13 @@ void free_vm_area(struct vm_struct *area)
 {
 	unsigned int order = get_order(area->size);
 	unsigned long i;
-
-	/* xenbus_map_ring_valloc overrides this field!  */
-	area->phys_addr = __pa(area->addr);
+	unsigned long phys_addr = __pa(area->addr);
 
 	// This area is used for foreign page mappping.
 	// So underlying machine page may not be assigned.
 	for (i = 0; i < (1 << order); i++) {
 		unsigned long ret;
-		unsigned long gpfn = (area->phys_addr >> PAGE_SHIFT) + i;
+		unsigned long gpfn = (phys_addr >> PAGE_SHIFT) + i;
 		struct xen_memory_reservation reservation = {
 			.nr_extents   = 1,
 			.address_bits = 0,
