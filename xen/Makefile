@@ -72,7 +72,7 @@ $(TARGET): delete-unfresh-files
 .PHONY: delete-unfresh-files
 delete-unfresh-files:
 	@if [ ! -r include/xen/compile.h -o -O include/xen/compile.h ]; then \
-		rm -f include/xen/{banner,compile}.h; \
+		rm -f include/xen/compile.h; \
 	fi
 
 # acm_policy.h contains security policy for Xen
@@ -91,7 +91,7 @@ include/xen/acm_policy.h:
 
 # compile.h contains dynamic build info. Rebuilt on every 'make' invocation.
 include/xen/compile.h: LANG=C
-include/xen/compile.h: include/xen/compile.h.in include/xen/banner.h
+include/xen/compile.h: include/xen/compile.h.in
 	@sed -e 's/@@date@@/$(shell date)/g' \
 	    -e 's/@@time@@/$(shell date +%T)/g' \
 	    -e 's/@@whoami@@/$(shell whoami)/g' \
@@ -103,11 +103,7 @@ include/xen/compile.h: include/xen/compile.h.in include/xen/banner.h
 	    -e 's/@@extraversion@@/$(XEN_EXTRAVERSION)/g' \
 	    -e 's!@@changeset@@!$(shell ((hg parents || head -n 7 ../ChangeLog || echo date: unavailable) | awk '{FS="changeset:[ ]+"}/^changeset/{CS=$$2};{FS="date:[ ]+"}/^date/{D=$$2}; END {print D, CS}') 2>/dev/null)!g' \
 	    < include/xen/compile.h.in > $@.new
-	@cat include/xen/banner.h >> $@.new
-	@mv -f $@.new $@
-
-include/xen/banner.h:
-	tools/figlet/figlet -d tools/figlet Xen $(XEN_FULLVERSION) > $@.new
+	tools/figlet/figlet -d tools/figlet Xen $(XEN_FULLVERSION) >> $@.new
 	@mv -f $@.new $@
 
 include/asm-$(TARGET_ARCH)/asm-offsets.h: arch/$(TARGET_ARCH)/asm-offsets.s

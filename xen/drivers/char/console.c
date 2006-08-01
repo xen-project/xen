@@ -8,7 +8,7 @@
 
 #include <stdarg.h>
 #include <xen/config.h>
-#include <xen/compile.h>
+#include <xen/version.h>
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
@@ -488,14 +488,14 @@ void init_console(void)
     serial_set_rx_handler(sercon_handle, serial_rx);
 
     /* HELLO WORLD --- start-of-day banner text. */
-    printk(XEN_BANNER);
+    printk(xen_banner());
     printk(" http://www.cl.cam.ac.uk/netos/xen\n");
     printk(" University of Cambridge Computer Laboratory\n\n");
     printk(" Xen version %d.%d%s (%s@%s) (%s) %s\n",
-           XEN_VERSION, XEN_SUBVERSION, XEN_EXTRAVERSION,
-           XEN_COMPILE_BY, XEN_COMPILE_DOMAIN,
-           XEN_COMPILER, XEN_COMPILE_DATE);
-    printk(" Latest ChangeSet: %s\n\n", XEN_CHANGESET);
+           xen_major_version(), xen_minor_version(), xen_extra_version(),
+           xen_compile_by(), xen_compile_domain(),
+           xen_compiler(), xen_compile_date());
+    printk(" Latest ChangeSet: %s\n\n", xen_changeset());
     set_printk_prefix("(XEN) ");
 
     if ( opt_sync_console )

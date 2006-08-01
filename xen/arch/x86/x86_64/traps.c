@@ -1,6 +1,6 @@
 
 #include <xen/config.h>
-#include <xen/compile.h>
+#include <xen/version.h>
 #include <xen/init.h>
 #include <xen/sched.h>
 #include <xen/lib.h>
@@ -45,7 +45,7 @@ void show_registers(struct cpu_user_regs *regs)
     }
 
     printk("----[ Xen-%d.%d%s    %s ]----\n",
-           XEN_VERSION, XEN_SUBVERSION, XEN_EXTRAVERSION,
+           xen_major_version(), xen_minor_version(), xen_extra_version(),
            print_tainted(taint_str));
     printk("CPU:    %d\nRIP:    %04x:[<%016lx>]",
            smp_processor_id(), fault_regs.cs, fault_regs.rip);
@@ -128,7 +128,7 @@ asmlinkage void do_double_fault(struct cpu_user_regs *regs)
 
     /* Find information saved during fault and dump it to the console. */
     printk("*** DOUBLE FAULT: Xen-%d.%d%s    %s\n",
-           XEN_VERSION, XEN_SUBVERSION, XEN_EXTRAVERSION,
+           xen_major_version(), xen_minor_version(), xen_extra_version(),
            print_tainted(taint_str));
     printk("CPU:    %d\nRIP:    %04x:[<%016lx>]",
            cpu, regs->cs, regs->rip);
