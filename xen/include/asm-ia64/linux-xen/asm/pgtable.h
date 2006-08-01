@@ -38,6 +38,9 @@
 
 #define _PAGE_P			(1 << _PAGE_P_BIT)	/* page present bit */
 #define _PAGE_MA_WB		(0x0 <<  2)	/* write back memory attribute */
+#ifdef XEN
+#define _PAGE_MA_ST		(0x1 <<  2)	/* is reserved for software use */
+#endif
 #define _PAGE_MA_UC		(0x4 <<  2)	/* uncacheable memory attribute */
 #define _PAGE_MA_UCE		(0x5 <<  2)	/* UC exported attribute */
 #define _PAGE_MA_WC		(0x6 <<  2)	/* write coalescing memory attribute */

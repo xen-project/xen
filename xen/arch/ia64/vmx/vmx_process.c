@@ -273,21 +273,24 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
 //    prepare_if_physical_mode(v);
 
     if((data=vtlb_lookup(v, vadr,type))!=0){
-//       gppa = (vadr&((1UL<<data->ps)-1))+(data->ppn>>(data->ps-12)<<data->ps);
-//       if(v->domain!=dom0&&type==DSIDE_TLB && __gpfn_is_io(v->domain,gppa>>PAGE_SHIFT)){
-        if(v->domain!=dom0 && data->io && type==DSIDE_TLB ){
-            if(data->pl >= ((regs->cr_ipsr>>IA64_PSR_CPL0_BIT)&3)){
-                gppa = (vadr&((1UL<<data->ps)-1))+(data->ppn>>(data->ps-12)<<data->ps);
-                emulate_io_inst(v, gppa, data->ma);
-            }else{
-                vcpu_set_isr(v,misr.val);
-                data_access_rights(v, vadr);
+        if (v->domain != dom0 && type == DSIDE_TLB) {
+            gppa = (vadr & ((1UL << data->ps) - 1)) +
+                   (data->ppn >> (data->ps - 12) << data->ps);
+            if (__gpfn_is_io(v->domain, gppa >> PAGE_SHIFT)) {
+                if (data->pl >= ((regs->cr_ipsr >> IA64_PSR_CPL0_BIT) & 3))
+                    emulate_io_inst(v, gppa, data->ma);
+                else {
+                    vcpu_set_isr(v, misr.val);
+                    data_access_rights(v, vadr);
+                }
+                return IA64_FAULT;
             }
-            return IA64_FAULT;
         }
-
         thash_vhpt_insert(v,data->page_flags, data->itir ,vadr);
+
     }else if(type == DSIDE_TLB){
+        if (misr.sp)
+            return vmx_handle_lds(regs);
         if(!vhpt_enabled(v, vadr, misr.rs?RSE_REF:DATA_REF)){
             if(vpsr.ic){
                 vcpu_set_isr(v, misr.val);
@@ -306,7 +309,8 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
         } else{
             vmx_vcpu_thash(v, vadr, &vhpt_adr);
             if(!guest_vhpt_lookup(vhpt_adr, &pteval)){
-                if (pteval & _PAGE_P){
+                if ((pteval & _PAGE_P) &&
+                    ((pteval & _PAGE_MA_MASK) != _PAGE_MA_ST)) {
                     vcpu_get_rr(v, vadr, &rr);
                     itir = rr&(RR_RID_MASK | RR_PS_MASK);
                     thash_purge_and_insert(v, pteval, itir , vadr);

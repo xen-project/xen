@@ -141,14 +141,18 @@ static void thash_recycle_cch(thash_cb_t *hcb, thash_data_t *hash)
 
 static void vmx_vhpt_insert(thash_cb_t *hcb, u64 pte, u64 itir, u64 ifa)
 {
-    u64 tag;
+    u64 tag ,len;
+    ia64_rr rr;
     thash_data_t *head, *cch;
     pte = pte & ~PAGE_FLAGS_RV_MASK;
-
+    rr.rrval = ia64_get_rr(ifa);
     head = (thash_data_t *)ia64_thash(ifa);
     tag = ia64_ttag(ifa);
     if( INVALID_VHPT(head) ) {
+        len = head->len;
         head->page_flags = pte;
+        head->len = len;
+        head->itir = rr.ps << 2;
         head->etag = tag;
         return;
     }
@@ -160,10 +164,9 @@ static void vmx_vhpt_insert(thash_cb_t *hcb, u64 pte, u64 itir, u64 ifa)
     else{
         cch = __alloc_chain(hcb);
     }
-    cch->page_flags=head->page_flags;
-    cch->etag=head->etag;
-    cch->next=head->next;
+    *cch = *head;
     head->page_flags=pte;
+    head->itir = rr.ps << 2;
     head->etag=tag;
     head->next = cch;
     head->len = cch->len+1;
@@ -210,7 +213,13 @@ thash_data_t * vhpt_lookup(u64 va)
 u64 guest_vhpt_lookup(u64 iha, u64 *pte)
 {
     u64 ret;
-    vhpt_lookup(iha);
+    thash_data_t * data;
+    data = vhpt_lookup(iha);
+    if (data == NULL) {
+        data = vtlb_lookup(current, iha, DSIDE_TLB);
+        if (data != NULL)
+            thash_vhpt_insert(current, data->page_flags, data->itir ,iha);
+    }
     asm volatile ("rsm psr.ic|psr.i;;"
                   "srlz.d;;"
                   "ld8.s r9=[%1];;"
@@ -231,10 +240,10 @@ u64 guest_vhpt_lookup(u64 iha, u64 *pte)
  *  purge software guest tlb
  */
 
-static void vtlb_purge(VCPU *v, u64 va, u64 ps)
+void vtlb_purge(VCPU *v, u64 va, u64 ps)
 {
     thash_cb_t *hcb = &v->arch.vtlb;
-    thash_data_t *hash_table, *prev, *next;
+    thash_data_t *cur;
     u64 start, end, size, tag, rid, def_size;
     ia64_rr vrr;
     vcpu_get_rr(v, va, &vrr.rrval);
@@ -244,23 +253,11 @@ static void vtlb_purge(VCPU *v, u64 va, u64 ps)
     end = start + size;
     def_size = PSIZE(vrr.ps);
     while(start < end){
-        hash_table = vsa_thash(hcb->pta, start, vrr.rrval, &tag);
-        if(!INVALID_TLB(hash_table)){
-            if(hash_table->etag == tag){
-                 hash_table->etag = 1UL<<63;
-            }
-            else{
-                prev=hash_table;
-                next=prev->next;
-                while(next){
-                    if(next->etag == tag){
-                        next->etag = 1UL<<63;
-                        break;
-                    }
-                    prev=next;
-                    next=next->next;
-                }
-            }
+        cur = vsa_thash(hcb->pta, start, vrr.rrval, &tag);
+        while (cur) {
+            if (cur->etag == tag)
+                 cur->etag = 1UL << 63;
+            cur = cur->next;
         }
         start += def_size;
     }
@@ -274,30 +271,23 @@ static void vtlb_purge(VCPU *v, u64 va, u64 ps)
 static void vhpt_purge(VCPU *v, u64 va, u64 ps)
 {
     //thash_cb_t *hcb = &v->arch.vhpt;
-    thash_data_t *hash_table, *prev, *next;
+    thash_data_t *cur;
     u64 start, end, size, tag;
+    ia64_rr rr;
     size = PSIZE(ps);
     start = va & (-size);
     end = start + size;
+    rr.rrval = ia64_get_rr(va);
+    size = PSIZE(rr.ps);    
     while(start < end){
-        hash_table = (thash_data_t *)ia64_thash(start);
+        cur = (thash_data_t *)ia64_thash(start);
         tag = ia64_ttag(start);
-        if(hash_table->etag == tag ){
-            hash_table->etag = 1UL<<63; 
+        while (cur) {
+            if (cur->etag == tag)
+                cur->etag = 1UL << 63; 
+            cur = cur->next;
         }
-        else{
-            prev=hash_table;
-            next=prev->next;
-            while(next){
-                if(next->etag == tag){
-                    next->etag = 1UL<<63;
-                    break; 
-                }
-                prev=next;
-                next=next->next;
-            }
-        }
-        start += PAGE_SIZE;
+        start += size;
     }
     machine_tlb_purge(va, ps);
 }
@@ -349,7 +339,7 @@ void vtlb_insert(thash_cb_t *hcb, u64 pte, u64 itir, u64 va)
     /* int flag; */
     ia64_rr vrr;
     /* u64 gppn, ppns, ppne; */
-    u64 tag;
+    u64 tag, len;
     vcpu_get_rr(current, va, &vrr.rrval);
 #ifdef VTLB_DEBUG    
     if (vrr.ps != itir_ps(itir)) {
@@ -361,7 +351,9 @@ void vtlb_insert(thash_cb_t *hcb, u64 pte, u64 itir, u64 va)
 #endif
     hash_table = vsa_thash(hcb->pta, va, vrr.rrval, &tag);
     if( INVALID_TLB(hash_table) ) {
+        len = hash_table->len;
         hash_table->page_flags = pte;
+        hash_table->len = len;
         hash_table->itir=itir;
         hash_table->etag=tag;
         return;
@@ -425,18 +417,23 @@ void thash_purge_entries(VCPU *v, u64 va, u64 ps)
 
 u64 translate_phy_pte(VCPU *v, u64 *pte, u64 itir, u64 va)
 {
-    u64 ps, addr;
+    u64 ps, ps_mask, paddr, maddr;
+//    ia64_rr rr;
     union pte_flags phy_pte;
     ps = itir_ps(itir);
+    ps_mask = ~((1UL << ps) - 1);
     phy_pte.val = *pte;
-    addr = *pte;
-    addr = ((addr & _PAGE_PPN_MASK)>>ps<<ps)|(va&((1UL<<ps)-1));
-    addr = lookup_domain_mpa(v->domain, addr, NULL);
-    if(addr & GPFN_IO_MASK){
+    paddr = *pte;
+    paddr = ((paddr & _PAGE_PPN_MASK) & ps_mask) | (va & ~ps_mask);
+    maddr = lookup_domain_mpa(v->domain, paddr, NULL);
+    if (maddr & GPFN_IO_MASK) {
         *pte |= VTLB_PTE_IO;
         return -1;
     }
-    phy_pte.ppn = addr >> ARCH_PAGE_SHIFT;
+//    rr.rrval = ia64_get_rr(va);
+//    ps = rr.ps;
+    maddr = ((maddr & _PAGE_PPN_MASK) & PAGE_MASK) | (paddr & ~PAGE_MASK);
+    phy_pte.ppn = maddr >> ARCH_PAGE_SHIFT;
     return phy_pte.val;
 }
 
@@ -449,8 +446,13 @@ void thash_purge_and_insert(VCPU *v, u64 pte, u64 itir, u64 ifa)
 {
     u64 ps;//, va;
     u64 phy_pte;
+    ia64_rr vrr;
     ps = itir_ps(itir);
-
+    vcpu_get_rr(current, ifa, &vrr.rrval);
+//    if (vrr.ps != itir_ps(itir)) {
+//        printf("not preferred ps with va: 0x%lx vrr.ps=%d ps=%ld\n",
+//               ifa, vrr.ps, itir_ps(itir));
+//    }
     if(VMX_DOMAIN(v)){
         /* Ensure WB attribute if pte is related to a normal mem page,
          * which is required by vga acceleration since qemu maps shared
@@ -460,7 +462,7 @@ void thash_purge_and_insert(VCPU *v, u64 pte, u64 itir, u64 ifa)
             pte &= ~_PAGE_MA_MASK;
 
         phy_pte = translate_phy_pte(v, &pte, itir, ifa);
-        if(ps==PAGE_SHIFT){
+        if (vrr.ps <= PAGE_SHIFT) {
             if(!(pte&VTLB_PTE_IO)){
                 vhpt_purge(v, ifa, ps);
                 vmx_vhpt_insert(&v->arch.vhpt, phy_pte, itir, ifa);

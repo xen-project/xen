@@ -110,9 +110,14 @@ void
 physical_tlb_miss(VCPU *vcpu, u64 vadr)
 {
     u64 pte;
+    ia64_rr rr;
+    rr.rrval = ia64_get_rr(vadr);
     pte =  vadr& _PAGE_PPN_MASK;
-    pte = pte | PHY_PAGE_WB;
-    thash_purge_and_insert(vcpu, pte, (PAGE_SHIFT<<2), vadr);
+    if (vadr >> 63)
+        pte = pte | PHY_PAGE_UC;
+    else
+        pte = pte | PHY_PAGE_WB;
+    thash_vhpt_insert(vcpu, pte, (rr.ps << 2), vadr);
     return;
 }
 
@@ -120,19 +125,14 @@ physical_tlb_miss(VCPU *vcpu, u64 vadr)
 void
 vmx_init_all_rr(VCPU *vcpu)
 {
-	VMX(vcpu,vrr[VRN0]) = 0x38;
-	VMX(vcpu,vrr[VRN1]) = 0x138;
-	VMX(vcpu,vrr[VRN2]) = 0x238;
-	VMX(vcpu,vrr[VRN3]) = 0x338;
-	VMX(vcpu,vrr[VRN4]) = 0x438;
-	VMX(vcpu,vrr[VRN5]) = 0x538;
-	VMX(vcpu,vrr[VRN6]) = 0x660;
-	VMX(vcpu,vrr[VRN7]) = 0x760;
-#if 0
-	VMX(vcpu,mrr5) = vrrtomrr(vcpu, 0x38);
-	VMX(vcpu,mrr6) = vrrtomrr(vcpu, 0x60);
-	VMX(vcpu,mrr7) = vrrtomrr(vcpu, 0x60);
-#endif
+	VMX(vcpu, vrr[VRN0]) = 0x38;
+	VMX(vcpu, vrr[VRN1]) = 0x38;
+	VMX(vcpu, vrr[VRN2]) = 0x38;
+	VMX(vcpu, vrr[VRN3]) = 0x38;
+	VMX(vcpu, vrr[VRN4]) = 0x38;
+	VMX(vcpu, vrr[VRN5]) = 0x38;
+	VMX(vcpu, vrr[VRN6]) = 0x38;
+	VMX(vcpu, vrr[VRN7]) = 0x738;
 }
 
 extern void * pal_vaddr;
@@ -208,18 +208,19 @@ void
 switch_to_physical_rid(VCPU *vcpu)
 {
     UINT64 psr;
-    ia64_rr phy_rr;
-
+    ia64_rr phy_rr, mrr;
 
     /* Save original virtual mode rr[0] and rr[4] */
     psr=ia64_clear_ic();
     phy_rr.rrval = vcpu->domain->arch.metaphysical_rr0;
-//    phy_rr.ps = EMUL_PHY_PAGE_SHIFT;
+    mrr.rrval = ia64_get_rr(VRN0 << VRN_SHIFT);
+    phy_rr.ps = mrr.ps;
     phy_rr.ve = 1;
     ia64_set_rr(VRN0<<VRN_SHIFT, phy_rr.rrval);
     ia64_srlz_d();
     phy_rr.rrval = vcpu->domain->arch.metaphysical_rr4;
-//    phy_rr.ps = EMUL_PHY_PAGE_SHIFT;
+    mrr.rrval = ia64_get_rr(VRN4 << VRN_SHIFT);
+    phy_rr.ps = mrr.ps;
     phy_rr.ve = 1;
     ia64_set_rr(VRN4<<VRN_SHIFT, phy_rr.rrval);
     ia64_srlz_d();
@@ -262,6 +263,8 @@ switch_mm_mode(VCPU *vcpu, IA64_PSR old_psr, IA64_PSR new_psr)
     act = mm_switch_action(old_psr, new_psr);
     switch (act) {
     case SW_V2P:
+//        printf("V -> P mode transition: (0x%lx -> 0x%lx)\n",
+//               old_psr.val, new_psr.val);
         vcpu->arch.old_rsc = regs->ar_rsc;
         switch_to_physical_rid(vcpu);
         /*
@@ -272,6 +275,8 @@ switch_mm_mode(VCPU *vcpu, IA64_PSR old_psr, IA64_PSR new_psr)
         vcpu->arch.mode_flags |= GUEST_IN_PHY;
         break;
     case SW_P2V:
+//        printf("P -> V mode transition: (0x%lx -> 0x%lx)\n",
+//               old_psr.val, new_psr.val);
         switch_to_virtual_rid(vcpu);
         /*
          * recover old mode which is saved when entering
@@ -285,8 +290,8 @@ switch_mm_mode(VCPU *vcpu, IA64_PSR old_psr, IA64_PSR new_psr)
             old_psr.val);
         break;
     case SW_NOP:
-        printf("No action required for mode transition: (0x%lx -> 0x%lx)\n",
-            old_psr.val, new_psr.val);
+//        printf("No action required for mode transition: (0x%lx -> 0x%lx)\n",
+//               old_psr.val, new_psr.val);
         break;
     default:
         /* Sanity check */

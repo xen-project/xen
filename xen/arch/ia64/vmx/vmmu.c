@@ -316,7 +316,7 @@ fetch_code(VCPU *vcpu, u64 gip, u64 *code1, u64 *code2)
     u64     gpip=0;   // guest physical IP
     u64     *vpa;
     thash_data_t    *tlb;
-    u64     mfn;
+    u64     mfn, maddr;
     struct page_info* page;
 
  again:
@@ -333,11 +333,14 @@ fetch_code(VCPU *vcpu, u64 gip, u64 *code1, u64 *code2)
     if( gpip){
         mfn = gmfn_to_mfn(vcpu->domain, gpip >>PAGE_SHIFT);
         if( mfn == INVALID_MFN )  panic_domain(vcpu_regs(vcpu),"fetch_code: invalid memory\n");
+        maddr = (mfn << PAGE_SHIFT) | (gpip & (PAGE_SIZE - 1));
     }else{
         tlb = vhpt_lookup(gip);
         if( tlb == NULL)
             panic_domain(vcpu_regs(vcpu),"No entry found in ITLB and DTLB\n");
         mfn = tlb->ppn >> (PAGE_SHIFT - ARCH_PAGE_SHIFT);
+        maddr = (tlb->ppn >> (tlb->ps - 12) << tlb->ps) |
+                (gip & (PSIZE(tlb->ps) - 1));
     }
 
     page = mfn_to_page(mfn);
@@ -349,7 +352,7 @@ fetch_code(VCPU *vcpu, u64 gip, u64 *code1, u64 *code2)
         }
         goto again;
     }
-    vpa = (u64 *)__va((mfn << PAGE_SHIFT) | (gip & (PAGE_SIZE - 1)));
+    vpa = (u64 *)__va(maddr);
 
     *code1 = *vpa++;
     *code2 = *vpa;
@@ -371,6 +374,7 @@ IA64FAULT vmx_vcpu_itc_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
         return IA64_FAULT;
     }
 #endif //VTLB_DEBUG    
+    pte &= ~PAGE_FLAGS_RV_MASK;
     thash_purge_and_insert(vcpu, pte, itir, ifa);
     return IA64_NO_FAULT;
 }
@@ -390,6 +394,7 @@ IA64FAULT vmx_vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
         return IA64_FAULT;
     }
 #endif //VTLB_DEBUG
+    pte &= ~PAGE_FLAGS_RV_MASK;
     gpfn = (pte & _PAGE_PPN_MASK)>> PAGE_SHIFT;
     if (VMX_DOMAIN(vcpu) && __gpfn_is_io(vcpu->domain, gpfn))
         pte |= VTLB_PTE_IO;
@@ -418,7 +423,8 @@ IA64FAULT vmx_vcpu_itr_i(VCPU *vcpu, u64 slot, u64 pte, u64 itir, u64 ifa)
         return IA64_FAULT;
     }
     thash_purge_entries(vcpu, va, ps);
-#endif    
+#endif
+    pte &= ~PAGE_FLAGS_RV_MASK;
     vcpu_get_rr(vcpu, va, &rid);
     rid = rid& RR_RID_MASK;
     p_itr = (thash_data_t *)&vcpu->arch.itrs[slot];
@@ -432,8 +438,8 @@ IA64FAULT vmx_vcpu_itr_d(VCPU *vcpu, u64 slot, u64 pte, u64 itir, u64 ifa)
 {
 #ifdef VTLB_DEBUG
     int index;
-    u64 gpfn;
 #endif    
+    u64 gpfn;
     u64 ps, va, rid;
     thash_data_t * p_dtr;
     ps = itir_ps(itir);
@@ -445,11 +451,12 @@ IA64FAULT vmx_vcpu_itr_d(VCPU *vcpu, u64 slot, u64 pte, u64 itir, u64 ifa)
         panic_domain(vcpu_regs(vcpu),"Tlb conflict!!");
         return IA64_FAULT;
     }
+#endif   
+    pte &= ~PAGE_FLAGS_RV_MASK;
     thash_purge_entries(vcpu, va, ps);
     gpfn = (pte & _PAGE_PPN_MASK)>> PAGE_SHIFT;
-    if(VMX_DOMAIN(vcpu) && _gpfn_is_io(vcpu->domain,gpfn))
+    if (VMX_DOMAIN(vcpu) && __gpfn_is_io(vcpu->domain, gpfn))
         pte |= VTLB_PTE_IO;
-#endif    
     vcpu_get_rr(vcpu, va, &rid);
     rid = rid& RR_RID_MASK;
     p_dtr = (thash_data_t *)&vcpu->arch.dtrs[slot];
