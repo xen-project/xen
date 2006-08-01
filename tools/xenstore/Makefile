@@ -102,7 +102,7 @@ libxenstore.a: xs.o xs_lib.o
 
 .PHONY: clean
 clean: testsuite-clean
-	rm -f *.o *.opic *.so*
+	rm -f *.a *.o *.opic *.so*
 	rm -f xenstored xs_random xs_stress xs_crashme
 	rm -f xs_test xenstored_test xs_tdb_dump xenstore-control xenstore-ls
 	rm -f $(CLIENTS)
