@@ -1388,7 +1388,7 @@ static void network_connect(struct net_device *dev)
 
 		gnttab_grant_foreign_transfer_ref(
 			ref, np->xbdev->otherend_id,
-			page_to_pfn(skb_shinfo(np->rx_skbs[i])->frags->page));
+			page_to_pfn(skb_shinfo(skb)->frags->page));
 
 		RING_GET_REQUEST(&np->rx, requeue_idx)->gref = ref;
 		RING_GET_REQUEST(&np->rx, requeue_idx)->id   = requeue_idx;
