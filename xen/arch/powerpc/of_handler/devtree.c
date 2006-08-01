@@ -203,12 +203,14 @@ ofh_finddevice(u32 nargs, u32 nrets, s32 argp[], s32 retp[], ulong b)
             /* good enuff */
             if (devspec[0] == '\0') {
                 if (*ap == -1) {
+                    *ph = -1;
                     return OF_FAILURE;
                 }
                 *ph = *ap;
             } else {
                 *ph = ofd_node_find(mem, devspec);
                 if (*ph <= 0) {
+                    *ph = -1;
                     return OF_FAILURE;
                 }
             }
