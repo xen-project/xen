@@ -77,6 +77,9 @@ struct arch_vmx_struct {
     vtime_t	    vtm;
     struct vlapic   vlapic;
     unsigned long   vrr[8];
+    /* if the corresponding bit is 1, then this page size is
+       used in this region */
+    unsigned long   psbits[8];
     unsigned long   vkr[8];
     unsigned long   cr_iipa;   /* for emulation */
     unsigned long   cr_isr;    /* for emulation */

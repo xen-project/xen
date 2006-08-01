@@ -242,26 +242,31 @@ u64 guest_vhpt_lookup(u64 iha, u64 *pte)
 
 void vtlb_purge(VCPU *v, u64 va, u64 ps)
 {
-    thash_cb_t *hcb = &v->arch.vtlb;
     thash_data_t *cur;
-    u64 start, end, size, tag, rid, def_size;
+    u64 start, end, curadr, size, psbits, tag, def_size;
     ia64_rr vrr;
+    thash_cb_t *hcb = &v->arch.vtlb;
     vcpu_get_rr(v, va, &vrr.rrval);
-    rid = vrr.rid;
+    psbits = VMX(v, psbits[(va >> 61)]);
     size = PSIZE(ps);
     start = va & (-size);
     end = start + size;
-    def_size = PSIZE(vrr.ps);
-    while(start < end){
-        cur = vsa_thash(hcb->pta, start, vrr.rrval, &tag);
-        while (cur) {
-            if (cur->etag == tag)
-                 cur->etag = 1UL << 63;
-            cur = cur->next;
+    while (psbits) {
+        curadr = start;
+        ps = __ffs(psbits);
+        psbits &= ~(1UL << ps);
+        def_size = PSIZE(ps);
+        vrr.ps = ps;
+        while (curadr < end) {
+            cur = vsa_thash(hcb->pta, curadr, vrr.rrval, &tag);
+            while (cur) {
+                if (cur->etag == tag && cur->ps == ps)
+                    cur->etag = 1UL << 63;
+                cur = cur->next;
+            }
+            curadr += def_size;
         }
-        start += def_size;
     }
-//    machine_tlb_purge(va, ps);
 }
 
 
@@ -333,14 +338,15 @@ thash_data_t *__alloc_chain(thash_cb_t *hcb)
  *  3: The caller need to make sure the new entry will not overlap
  *     with any existed entry.
  */
-void vtlb_insert(thash_cb_t *hcb, u64 pte, u64 itir, u64 va)
+void vtlb_insert(VCPU *v, u64 pte, u64 itir, u64 va)
 {
-    thash_data_t    *hash_table, *cch;
+    thash_data_t *hash_table, *cch;
     /* int flag; */
     ia64_rr vrr;
     /* u64 gppn, ppns, ppne; */
     u64 tag, len;
-    vcpu_get_rr(current, va, &vrr.rrval);
+    thash_cb_t *hcb = &v->arch.vtlb;
+    vcpu_get_rr(v, va, &vrr.rrval);
 #ifdef VTLB_DEBUG    
     if (vrr.ps != itir_ps(itir)) {
 //        machine_tlb_insert(hcb->vcpu, entry);
@@ -349,6 +355,8 @@ void vtlb_insert(thash_cb_t *hcb, u64 pte, u64 itir, u64 va)
         return;
     }
 #endif
+    vrr.ps = itir_ps(itir);
+    VMX(v, psbits[va >> 61]) |= (1UL << vrr.ps);
     hash_table = vsa_thash(hcb->pta, va, vrr.rrval, &tag);
     if( INVALID_TLB(hash_table) ) {
         len = hash_table->len;
@@ -446,9 +454,10 @@ void thash_purge_and_insert(VCPU *v, u64 pte, u64 itir, u64 ifa)
 {
     u64 ps;//, va;
     u64 phy_pte;
-    ia64_rr vrr;
+    ia64_rr vrr, mrr;
     ps = itir_ps(itir);
     vcpu_get_rr(current, ifa, &vrr.rrval);
+    mrr.rrval = ia64_get_rr(ifa);
 //    if (vrr.ps != itir_ps(itir)) {
 //        printf("not preferred ps with va: 0x%lx vrr.ps=%d ps=%ld\n",
 //               ifa, vrr.ps, itir_ps(itir));
@@ -462,30 +471,33 @@ void thash_purge_and_insert(VCPU *v, u64 pte, u64 itir, u64 ifa)
             pte &= ~_PAGE_MA_MASK;
 
         phy_pte = translate_phy_pte(v, &pte, itir, ifa);
-        if (vrr.ps <= PAGE_SHIFT) {
+        vtlb_purge(v, ifa, ps);
+        vhpt_purge(v, ifa, ps);
+        if (ps == mrr.ps) {
             if(!(pte&VTLB_PTE_IO)){
-                vhpt_purge(v, ifa, ps);
                 vmx_vhpt_insert(&v->arch.vhpt, phy_pte, itir, ifa);
             }
             else{
-                vhpt_purge(v, ifa, ps);
-                vtlb_insert(&v->arch.vtlb, pte, itir, ifa);
+                vtlb_insert(v, pte, itir, ifa);
                 vcpu_quick_region_set(PSCBX(v,tc_regions),ifa);
             }
         }
-        else{
-            vhpt_purge(v, ifa, ps);
-            vtlb_insert(&v->arch.vtlb, pte, itir, ifa);
+        else if (ps > mrr.ps) {
+            vtlb_insert(v, pte, itir, ifa);
             vcpu_quick_region_set(PSCBX(v,tc_regions),ifa);
             if(!(pte&VTLB_PTE_IO)){
                 vmx_vhpt_insert(&v->arch.vhpt, phy_pte, itir, ifa);
             }
         }
+        else {
+            // ps < mrr.ps, this is not supported
+            panic_domain(NULL, "%s: ps (%lx) < mrr.ps \n", __func__, ps);
+        }
     }
     else{
         phy_pte = translate_phy_pte(v, &pte, itir, ifa);
         if(ps!=PAGE_SHIFT){
-            vtlb_insert(&v->arch.vtlb, pte, itir, ifa);
+            vtlb_insert(v, pte, itir, ifa);
             vcpu_quick_region_set(PSCBX(v,tc_regions),ifa);
         }
         machine_tlb_purge(ifa, ps);
@@ -507,11 +519,15 @@ void thash_purge_all(VCPU *v)
     vtlb =&v->arch.vtlb;
     vhpt =&v->arch.vhpt;
 
+    for (num = 0; num < 8; num++)
+        VMX(v, psbits[num]) = 0;
+    
     head=vtlb->hash;
     num = (vtlb->hash_sz/sizeof(thash_data_t));
     do{
         head->page_flags = 0;
         head->etag = 1UL<<63;
+        head->itir = 0;
         head->next = 0;
         head++;
         num--;
@@ -543,7 +559,7 @@ void thash_purge_all(VCPU *v)
 thash_data_t *vtlb_lookup(VCPU *v, u64 va,int is_data)
 {
     thash_data_t  *cch;
-    u64     tag;
+    u64     psbits, ps, tag;
     ia64_rr vrr;
     thash_cb_t * hcb= &v->arch.vtlb;
 
@@ -552,15 +568,19 @@ thash_data_t *vtlb_lookup(VCPU *v, u64 va,int is_data)
 
     if(vcpu_quick_region_check(v->arch.tc_regions,va)==0)
         return NULL;
-    
+    psbits = VMX(v, psbits[(va >> 61)]);
     vcpu_get_rr(v,va,&vrr.rrval);
-    cch = vsa_thash( hcb->pta, va, vrr.rrval, &tag);
-
-    do{
-        if(cch->etag == tag)
-            return cch;
-        cch = cch->next;
-    }while(cch);
+    while (psbits) {
+        ps = __ffs(psbits);
+        psbits &= ~(1UL << ps);
+        vrr.ps = ps;
+        cch = vsa_thash(hcb->pta, va, vrr.rrval, &tag);
+        do {
+            if (cch->etag == tag && cch->ps == ps)
+                return cch;
+            cch = cch->next;
+        } while(cch);
+    }
     return NULL;
 }
 
