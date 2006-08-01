@@ -61,6 +61,7 @@
 #define MSG_SIZE 4096
 #define MAX_TIMEOUT 10
 #define MAX_RAND_VAL 0xFFFF
+#define MAX_ATTEMPTS 10
 
 int run = 1;
 int max_timeout = MAX_TIMEOUT;
@@ -622,50 +623,18 @@ static void print_drivers(void)
 		DPRINTF("Found driver: [%s]\n",dtypes[i]->name);
 } 
 
-/* Stevens. */
-static void daemonize(void)
-{
-	pid_t pid;
-
-	/* Separate from our parent via fork, so init inherits us. */
-	if ((pid = fork()) < 0)
-		DPRINTF("Failed to fork daemon\n");
-	if (pid != 0)
-		exit(0);
-
-	/* Session leader so ^C doesn't whack us. */
-	setsid();
-
-	/* Let session leader exit so child cannot regain CTTY */
-	if ((pid = fork()) < 0)
-		DPRINTF("Failed to fork daemon\n");
-	if (pid != 0)
-		exit(0);
-
-	/* Move off any mount points we might be in. */
-	if (chdir("/") == -1)
-		DPRINTF("Failed to chdir\n");
-
-	/* Discard our parent's old-fashioned umask prejudices. */
-	umask(0);
-
-	close(STDIN_FILENO);
-	close(STDOUT_FILENO);
-	close(STDERR_FILENO);
-}
-
 int main(int argc, char *argv[])
 {
 	char *devname;
 	tapdev_info_t *ctlinfo;
-	int tap_pfd, store_pfd, xs_fd, ret, timeout, pfd_count;
+	int tap_pfd, store_pfd, xs_fd, ret, timeout, pfd_count, count=0;
 	struct xs_handle *h;
 	struct pollfd  pfd[NUM_POLL_FDS];
 	pid_t process;
 
 	__init_blkif();
 	openlog("BLKTAPCTRL", LOG_CONS|LOG_ODELAY, LOG_DAEMON);
-	daemonize();
+	daemon(0,0);
 
 	print_drivers();
 	init_driver_list();
@@ -684,18 +653,28 @@ int main(int argc, char *argv[])
 		goto open_failed;
 	}
 
+ retry:
 	/* Set up store connection and watch. */
 	h = xs_daemon_open();
 	if (h == NULL) {
 		DPRINTF("xs_daemon_open failed -- "
 			"is xenstore running?\n");
-		goto open_failed;
+                if (count < MAX_ATTEMPTS) {
+                        count++;
+                        sleep(2);
+                        goto retry;
+                } else goto open_failed;
 	}
 	
 	ret = add_blockdevice_probe_watch(h, "Domain-0");
 	if (ret != 0) {
-		DPRINTF("adding device probewatch\n");
-		goto open_failed;
+		DPRINTF("Failed adding device probewatch\n");
+                if (count < MAX_ATTEMPTS) {
+                        count++;
+                        sleep(2);
+                        xs_daemon_close(h);
+                        goto retry;
+                } else goto open_failed;
 	}
 
 	ioctl(ctlfd, BLKTAP_IOCTL_SETMODE, BLKTAP_MODE_INTERPOSE );
@@ -724,6 +703,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	xs_daemon_close(h);
 	ioctl(ctlfd, BLKTAP_IOCTL_SETMODE, BLKTAP_MODE_PASSTHROUGH );
 	close(ctlfd);
 	closelog();
