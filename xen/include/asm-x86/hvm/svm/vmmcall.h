@@ -23,11 +23,11 @@
 #define __ASM_X86_HVM_SVM_VMMCALL_H__
 
 /* VMMCALL command fields */
-#define VMMCALL_CODE_CPL_MASK     0xC0000000
-#define VMMCALL_CODE_MBZ_MASK     0x3FFF0000
+#define VMMCALL_CODE_CPL_MASK     0x60000000
+#define VMMCALL_CODE_MBZ_MASK     0x1FFF0000
 #define VMMCALL_CODE_COMMAND_MASK 0x0000FFFF
 
-#define MAKE_VMMCALL_CODE(cpl,func) ((cpl << 30) | (func))
+#define MAKE_VMMCALL_CODE(cpl,func) ((cpl << 29) | (func) | 0x80000000)
 
 /* CPL=0 VMMCALL Requests */
 #define VMMCALL_RESET_TO_REALMODE   MAKE_VMMCALL_CODE(0,1)
@@ -38,7 +38,7 @@
 /* return the cpl required for the vmmcall cmd */
 static inline int get_vmmcall_cpl(int cmd)
 {
-    return (cmd & VMMCALL_CODE_CPL_MASK) >> 30;
+    return (cmd & VMMCALL_CODE_CPL_MASK) >> 29;
 }
 
 #endif /* __ASM_X86_HVM_SVM_VMMCALL_H__ */

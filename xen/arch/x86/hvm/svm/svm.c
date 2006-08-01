@@ -2349,33 +2349,41 @@ static int svm_do_vmmcall(struct vcpu *v, struct cpu_user_regs *regs)
     inst_len = __get_instruction_length(vmcb, INSTR_VMCALL, NULL);
     ASSERT(inst_len > 0);
 
-    /* VMMCALL sanity check */
-    if (vmcb->cpl > get_vmmcall_cpl(regs->edi))
+    if ( regs->eax & 0x80000000 )
     {
-        printf("VMMCALL CPL check failed\n");
-        return -1;
-    }
-
-    /* handle the request */
-    switch (regs->edi) 
-    {
-    case VMMCALL_RESET_TO_REALMODE:
-        if (svm_do_vmmcall_reset_to_realmode(v, regs)) 
+        /* VMMCALL sanity check */
+        if ( vmcb->cpl > get_vmmcall_cpl(regs->edi) )
         {
-            printf("svm_do_vmmcall_reset_to_realmode() failed\n");
+            printf("VMMCALL CPL check failed\n");
             return -1;
         }
-    
-        /* since we just reset the VMCB, return without adjusting the eip */
-        return 0;
-    case VMMCALL_DEBUG:
-        printf("DEBUG features not implemented yet\n");
-        break;
-    default:
-    break;
-    }
 
-    hvm_print_line(v, regs->eax); /* provides the current domain */
+        /* handle the request */
+        switch ( regs->eax )
+        {
+        case VMMCALL_RESET_TO_REALMODE:
+            if ( svm_do_vmmcall_reset_to_realmode(v, regs) )
+            {
+                printf("svm_do_vmmcall_reset_to_realmode() failed\n");
+                return -1;
+            }
+            /* since we just reset the VMCB, return without adjusting
+             * the eip */
+            return 0;
+
+        case VMMCALL_DEBUG:
+            printf("DEBUG features not implemented yet\n");
+            break;
+        default:
+            break;
+        }
+
+        hvm_print_line(v, regs->eax); /* provides the current domain */
+    }
+    else
+    {
+        hvm_do_hypercall(regs);
+    }
 
     __update_guest_eip(vmcb, inst_len);
     return 0;
