@@ -669,6 +669,28 @@ static int check_vmx_controls(u32 ctrls, u32 msr)
     return 1;
 }
 
+static void vmx_init_hypercall_page(struct domain *d, void *hypercall_page)
+{
+    char *p;
+    int i;
+
+    memset(hypercall_page, 0, PAGE_SIZE);
+
+    for ( i = 0; i < (PAGE_SIZE / 32); i++ )
+    {
+        p = (char *)(hypercall_page + (i * 32));
+        *(u8  *)(p + 0) = 0xb8; /* mov imm32, %eax */
+        *(u32 *)(p + 1) = i;
+        *(u8  *)(p + 5) = 0x0f; /* vmcall */
+        *(u8  *)(p + 6) = 0x01;
+        *(u8  *)(p + 7) = 0xc1;
+        *(u8  *)(p + 8) = 0xc3; /* ret */
+    }
+
+    /* Don't support HYPERVISOR_iret at the moment */
+    *(u16 *)(hypercall_page + (__HYPERVISOR_iret * 32)) = 0x0b0f; /* ud2 */
+}
+
 int start_vmx(void)
 {
     u32 eax, edx;
@@ -748,6 +770,8 @@ int start_vmx(void)
     hvm_funcs.get_guest_ctrl_reg = vmx_get_ctrl_reg;
 
     hvm_funcs.init_ap_context = vmx_init_ap_context;
+
+    hvm_funcs.init_hypercall_page = vmx_init_hypercall_page;
 
     hvm_enabled = 1;
 
@@ -1877,6 +1901,7 @@ static int vmx_cr_access(unsigned long exit_qualification, struct cpu_user_regs 
 static inline void vmx_do_msr_read(struct cpu_user_regs *regs)
 {
     u64 msr_content = 0;
+    u32 eax, edx;
     struct vcpu *v = current;
 
     HVM_DBG_LOG(DBG_LEVEL_1, "vmx_do_msr_read: ecx=%lx, eax=%lx, edx=%lx",
@@ -1899,8 +1924,16 @@ static inline void vmx_do_msr_read(struct cpu_user_regs *regs)
         msr_content = VLAPIC(v) ? VLAPIC(v)->apic_base_msr : 0;
         break;
     default:
-        if(long_mode_do_msr_read(regs))
+        if (long_mode_do_msr_read(regs))
             return;
+
+        if ( rdmsr_hypervisor_regs(regs->ecx, &eax, &edx) )
+        {
+            regs->eax = eax;
+            regs->edx = edx;
+            return;
+        }
+
         rdmsr_safe(regs->ecx, regs->eax, regs->edx);
         break;
     }
@@ -1942,7 +1975,8 @@ static inline void vmx_do_msr_write(struct cpu_user_regs *regs)
         vlapic_msr_set(VLAPIC(v), msr_content);
         break;
     default:
-        long_mode_do_msr_write(regs);
+        if ( !long_mode_do_msr_write(regs) )
+            wrmsr_hypervisor_regs(regs->ecx, regs->eax, regs->edx);
         break;
     }
 
@@ -2273,16 +2307,16 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         __update_guest_eip(inst_len);
         break;
     }
-#if 0 /* keep this for debugging */
     case EXIT_REASON_VMCALL:
+    {
         __get_instruction_length(inst_len);
         __vmread(GUEST_RIP, &eip);
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
 
-        hvm_print_line(v, regs.eax); /* provides the current domain */
+        hvm_do_hypercall(&regs);
         __update_guest_eip(inst_len);
         break;
-#endif
+    }
     case EXIT_REASON_CR_ACCESS:
     {
         __vmread(GUEST_RIP, &eip);
@@ -2323,7 +2357,6 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
     case EXIT_REASON_MWAIT_INSTRUCTION:
         __hvm_bug(&regs);
         break;
-    case EXIT_REASON_VMCALL:
     case EXIT_REASON_VMCLEAR:
     case EXIT_REASON_VMLAUNCH:
     case EXIT_REASON_VMPTRLD:

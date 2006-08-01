@@ -61,6 +61,8 @@ struct hvm_function_table {
 
     void (*init_ap_context)(struct vcpu_guest_context *ctxt,
                             int vcpuid, int trampoline_vector);
+
+    void (*init_hypercall_page)(struct domain *d, void *hypercall_page);
 };
 
 extern struct hvm_function_table hvm_funcs;
@@ -120,6 +122,9 @@ hvm_instruction_length(struct vcpu *v)
 {
     return hvm_funcs.instruction_length(v);
 }
+
+void hvm_hypercall_page_initialise(struct domain *d,
+                                   void *hypercall_page);
 
 static inline unsigned long
 hvm_get_guest_ctrl_reg(struct vcpu *v, unsigned int num)

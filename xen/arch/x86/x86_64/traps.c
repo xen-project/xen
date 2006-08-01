@@ -432,7 +432,7 @@ long do_set_callbacks(unsigned long event_address,
     return 0;
 }
 
-void hypercall_page_initialise(void *hypercall_page)
+static void hypercall_page_initialise_ring3_kernel(void *hypercall_page)
 {
     char *p;
     int i;
@@ -463,6 +463,14 @@ void hypercall_page_initialise(void *hypercall_page)
     *(u8  *)(p+ 4) = 0xb8;    /* mov  $__HYPERVISOR_iret,%eax */
     *(u32 *)(p+ 5) = __HYPERVISOR_iret;
     *(u16 *)(p+ 9) = 0x050f;  /* syscall */
+}
+
+void hypercall_page_initialise(struct domain *d, void *hypercall_page)
+{
+    if ( hvm_guest(d->vcpu[0]) )
+        hvm_hypercall_page_initialise(d, hypercall_page);
+    else
+        hypercall_page_initialise_ring3_kernel(hypercall_page);
 }
 
 /*

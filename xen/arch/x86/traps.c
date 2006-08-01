@@ -44,6 +44,7 @@
 #include <xen/symbols.h>
 #include <xen/iocap.h>
 #include <xen/nmi.h>
+#include <xen/version.h>
 #include <asm/shadow.h>
 #include <asm/system.h>
 #include <asm/io.h>
@@ -429,18 +430,95 @@ DO_ERROR_NOCODE(16, "fpu error", coprocessor_error)
 DO_ERROR(17, "alignment check", alignment_check)
 DO_ERROR_NOCODE(19, "simd error", simd_coprocessor_error)
 
+int rdmsr_hypervisor_regs(
+    uint32_t idx, uint32_t *eax, uint32_t *edx)
+{
+    idx -= 0x40000000;
+    if ( idx > 0 )
+        return 0;
+
+    *eax = *edx = 0;
+    return 1;
+}
+
+int wrmsr_hypervisor_regs(
+    uint32_t idx, uint32_t eax, uint32_t edx)
+{
+    struct domain *d = current->domain;
+
+    idx -= 0x40000000;
+    if ( idx > 0 )
+        return 0;
+
+    switch ( idx )
+    {
+    case 0:
+    {
+        void         *hypercall_page;
+        unsigned long mfn;
+        unsigned long gmfn = ((unsigned long)edx << 20) | (eax >> 12);
+        unsigned int  idx  = eax & 0xfff;
+
+        if ( idx > 0 )
+        {
+            DPRINTK("Dom%d: Out of range index %u to MSR %08x\n",
+                    d->domain_id, idx, 0x40000000);
+            return 0;
+        }
+
+        mfn = gmfn_to_mfn(d, gmfn);
+
+        if ( !mfn_valid(mfn) ||
+             !get_page_and_type(mfn_to_page(mfn), d, PGT_writable_page) )
+        {
+            DPRINTK("Dom%d: Bad GMFN %lx (MFN %lx) to MSR %08x\n",
+                    d->domain_id, gmfn, mfn, 0x40000000);
+            return 0;
+        }
+
+        hypercall_page = map_domain_page(mfn);
+        hypercall_page_initialise(d, hypercall_page);
+        unmap_domain_page(hypercall_page);
+
+        put_page_and_type(mfn_to_page(mfn));
+        break;
+    }
+
+    default:
+        BUG();
+    }
+
+    return 1;
+}
+
 int cpuid_hypervisor_leaves(
     uint32_t idx, uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx)
 {
-    if ( (idx < 0x40000000) || (idx > 0x40000000) )
+    idx -= 0x40000000;
+    if ( idx > 2 )
         return 0;
 
-    switch ( idx - 0x40000000 )
+    switch ( idx )
     {
     case 0:
-        *eax = 0x40000000;
-        *ebx = 0x006e6558; /* "Xen\0" */
-        *ecx = *edx = 0;
+        *eax = 0x40000002; /* Largest leaf        */
+        *ebx = 0x566e6558; /* Signature 1: "XenV" */
+        *ecx = 0x65584d4d; /* Signature 2: "MMXe" */
+        *edx = 0x4d4d566e; /* Signature 3: "nVMM" */
+        break;
+
+    case 1:
+        *eax = (xen_major_version() << 16) | xen_minor_version();
+        *ebx = 0;          /* Reserved */
+        *ecx = 0;          /* Reserved */
+        *edx = 0;          /* Reserved */
+        break;
+
+    case 2:
+        *eax = 1;          /* Number of hypercall-transfer pages */
+        *ebx = 0x40000000; /* MSR base address */
+        *ecx = 0;          /* Features 1 */
+        *edx = 0;          /* Features 2 */
         break;
 
     default:
@@ -1297,6 +1375,9 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             break;
 #endif
         default:
+            if ( wrmsr_hypervisor_regs(regs->ecx, regs->eax, regs->edx) )
+                break;
+
             if ( (rdmsr_safe(regs->ecx, l, h) != 0) ||
                  (regs->eax != l) || (regs->edx != h) )
                 DPRINTK("Domain attempted WRMSR %p from "
@@ -1328,6 +1409,12 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 goto fail;
             break;
         default:
+            if ( rdmsr_hypervisor_regs(regs->ecx, &l, &h) )
+            {
+                regs->eax = l;
+                regs->edx = h;
+                break;
+            }
             /* Everyone can read the MSR space. */
             /*DPRINTK("Domain attempted RDMSR %p.\n", _p(regs->ecx));*/
             if ( rdmsr_safe(regs->ecx, regs->eax, regs->edx) )

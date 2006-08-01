@@ -456,6 +456,28 @@ void svm_init_ap_context(struct vcpu_guest_context *ctxt,
     ctxt->flags = VGCF_HVM_GUEST;
 }
 
+static void svm_init_hypercall_page(struct domain *d, void *hypercall_page)
+{
+    char *p;
+    int i;
+
+    memset(hypercall_page, 0, PAGE_SIZE);
+
+    for ( i = 0; i < (PAGE_SIZE / 32); i++ )
+    {
+        p = (char *)(hypercall_page + (i * 32));
+        *(u8  *)(p + 0) = 0xb8; /* mov imm32, %eax */
+        *(u32 *)(p + 1) = i;
+        *(u8  *)(p + 5) = 0x0f; /* vmmcall */
+        *(u8  *)(p + 6) = 0x01;
+        *(u8  *)(p + 7) = 0xd9;
+        *(u8  *)(p + 8) = 0xc3; /* ret */
+    }
+
+    /* Don't support HYPERVISOR_iret at the moment */
+    *(u16 *)(hypercall_page + (__HYPERVISOR_iret * 32)) = 0x0b0f; /* ud2 */
+}
+
 int start_svm(void)
 {
     u32 eax, ecx, edx;
@@ -503,6 +525,8 @@ int start_svm(void)
     hvm_funcs.instruction_length = svm_instruction_length;
     hvm_funcs.get_guest_ctrl_reg = svm_get_ctrl_reg;
     hvm_funcs.init_ap_context = svm_init_ap_context;
+
+    hvm_funcs.init_hypercall_page = svm_init_hypercall_page;
 
     hvm_enabled = 1;    
 
@@ -1980,11 +2004,13 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
     return result;
 }
 
-static inline void svm_do_msr_access(struct vcpu *v, struct cpu_user_regs *regs)
+static inline void svm_do_msr_access(
+    struct vcpu *v, struct cpu_user_regs *regs)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     int  inst_len;
     u64 msr_content=0;
+    u32 eax, edx;
 
     ASSERT(vmcb);
 
@@ -2018,6 +2044,14 @@ static inline void svm_do_msr_access(struct vcpu *v, struct cpu_user_regs *regs)
         default:
             if (long_mode_do_msr_read(regs))
                 goto done;
+
+            if ( rdmsr_hypervisor_regs(regs->ecx, &eax, &edx) )
+            {
+                regs->eax = eax;
+                regs->edx = edx;
+                goto done;
+            }
+
             rdmsr_safe(regs->ecx, regs->eax, regs->edx);
             break;
         }
@@ -2047,7 +2081,8 @@ static inline void svm_do_msr_access(struct vcpu *v, struct cpu_user_regs *regs)
             vlapic_msr_set(VLAPIC(v), msr_content);
             break;
         default:
-            long_mode_do_msr_write(regs);
+            if ( !long_mode_do_msr_write(regs) )
+                wrmsr_hypervisor_regs(regs->ecx, regs->eax, regs->edx);
             break;
         }
     }

@@ -704,7 +704,7 @@ int construct_dom0(struct domain *d,
             return -1;
         }
 
-        hypercall_page_initialise((void *)hypercall_page);
+        hypercall_page_initialise(d, (void *)hypercall_page);
     }
 
     /* Copy the initial ramdisk. */

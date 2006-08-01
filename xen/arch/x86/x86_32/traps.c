@@ -490,9 +490,11 @@ static void hypercall_page_initialise_ring1_kernel(void *hypercall_page)
     *(u16 *)(p+ 6) = 0x82cd;  /* int  $0x82 */
 }
 
-void hypercall_page_initialise(void *hypercall_page)
+void hypercall_page_initialise(struct domain *d, void *hypercall_page)
 {
-    if ( supervisor_mode_kernel )
+    if ( hvm_guest(d->vcpu[0]) )
+        hvm_hypercall_page_initialise(d, hypercall_page);
+    else if ( supervisor_mode_kernel )
         hypercall_page_initialise_ring0_kernel(hypercall_page);
     else
         hypercall_page_initialise_ring1_kernel(hypercall_page);

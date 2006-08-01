@@ -148,4 +148,6 @@ extern void hvm_hooks_assist(struct vcpu *v);
 extern void hvm_print_line(struct vcpu *v, const char c);
 extern void hlt_timer_fn(void *data);
 
+void hvm_do_hypercall(struct cpu_user_regs *pregs);
+
 #endif /* __ASM_X86_HVM_SUPPORT_H__ */

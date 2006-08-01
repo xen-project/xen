@@ -27,6 +27,7 @@
 #include <xen/softirq.h>
 #include <xen/domain.h>
 #include <xen/domain_page.h>
+#include <xen/hypercall.h>
 #include <asm/current.h>
 #include <asm/io.h>
 #include <asm/shadow.h>
@@ -328,6 +329,65 @@ void hvm_print_line(struct vcpu *v, const char c)
     } else
 	pbuf[(*index)++] = c;
 }
+
+#if defined(__i386__)
+
+typedef unsigned long hvm_hypercall_t(
+    unsigned long, unsigned long, unsigned long, unsigned long, unsigned long);
+#define HYPERCALL(x) [ __HYPERVISOR_ ## x ] = (hvm_hypercall_t *) do_ ## x
+static hvm_hypercall_handler *hvm_hypercall_table[] = {
+    HYPERCALL(mmu_update),
+    HYPERCALL(memory_op),
+    HYPERCALL(multicall),
+    HYPERCALL(update_va_mapping),
+    HYPERCALL(event_channel_op_compat),
+    HYPERCALL(xen_version),
+    HYPERCALL(grant_table_op),
+    HYPERCALL(event_channel_op),
+    HYPERCALL(hvm_op)
+};
+#undef HYPERCALL
+
+void hvm_do_hypercall(struct cpu_user_regs *pregs)
+{
+    if ( ring_3(pregs) )
+    {
+        pregs->eax = -EPERM;
+        return;
+    }
+
+    if ( pregs->eax > ARRAY_SIZE(hvm_hypercall_table) ||
+         !hvm_hypercall_table[pregs->eax] )
+    {
+        DPRINTK("HVM vcpu %d:%d did a bad hypercall %d.\n",
+                current->domain->domain_id, current->vcpu_id,
+                pregs->eax);
+        pregs->eax = -ENOSYS;
+    }
+    else
+    {
+        pregs->eax = hvm_hypercall_table[pregs->eax](
+            pregs->ebx, pregs->ecx, pregs->edx, pregs->esi, pregs->edi);
+    }
+}
+
+#else /* __x86_64__ */
+
+void hvm_do_hypercall(struct cpu_user_regs *pregs)
+{
+    printk("not supported yet!\n");
+}
+
+#endif
+
+/* Initialise a hypercall transfer page for a VMX domain using
+   paravirtualised drivers. */
+void hvm_hypercall_page_initialise(struct domain *d,
+                                   void *hypercall_page)
+{
+    hvm_funcs.init_hypercall_page(d, hypercall_page);
+}
+
 
 /*
  * only called in HVM domain BSP context
