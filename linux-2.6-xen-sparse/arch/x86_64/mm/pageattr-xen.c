@@ -159,7 +159,8 @@ void _arch_exit_mmap(struct mm_struct *mm)
 
     task_unlock(tsk);
 
-    if ( mm->context.pinned && (atomic_read(&mm->mm_count) == 1) )
+    if ( mm->context.pinned && (atomic_read(&mm->mm_count) == 1) &&
+         !mm->context.has_foreign_mappings )
         mm_unpin(mm);
 }
 

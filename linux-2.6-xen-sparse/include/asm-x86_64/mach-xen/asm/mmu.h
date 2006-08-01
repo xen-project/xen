@@ -17,6 +17,7 @@ typedef struct {
 	struct semaphore sem; 
 #ifdef CONFIG_XEN
 	unsigned pinned:1;
+	unsigned has_foreign_mappings:1;
 	struct list_head unpinned;
 #endif
 } mm_context_t;
