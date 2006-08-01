@@ -221,13 +221,20 @@ static struct sk_buff *netbk_copy_skb(struct sk_buff *skb)
 	return NULL;
 }
 
+static inline int netbk_max_required_rx_slots(netif_t *netif)
+{
+	if (netif->features & (NETIF_F_SG|NETIF_F_TSO))
+		return MAX_SKB_FRAGS + 2; /* header + extra_info + frags */
+	return 1; /* all in one */
+}
+
 static inline int netbk_queue_full(netif_t *netif)
 {
-	RING_IDX peek = netif->rx_req_cons_peek;
+	RING_IDX peek   = netif->rx_req_cons_peek;
+	RING_IDX needed = netbk_max_required_rx_slots(netif);
 
-	return ((netif->rx.sring->req_prod - peek) <= (MAX_SKB_FRAGS + 1)) ||
-	       ((netif->rx.rsp_prod_pvt + NET_RX_RING_SIZE - peek) <=
-		(MAX_SKB_FRAGS + 1));
+	return ((netif->rx.sring->req_prod - peek) < needed) ||
+	       ((netif->rx.rsp_prod_pvt + NET_RX_RING_SIZE - peek) < needed);
 }
 
 int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
@@ -271,7 +278,7 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	if (netbk_can_queue(dev) && netbk_queue_full(netif)) {
 		netif->rx.sring->req_event = netif->rx_req_cons_peek +
-			MAX_SKB_FRAGS + 2;
+			netbk_max_required_rx_slots(netif);
 		mb(); /* request notification /then/ check & stop the queue */
 		if (netbk_queue_full(netif))
 			netif_stop_queue(dev);

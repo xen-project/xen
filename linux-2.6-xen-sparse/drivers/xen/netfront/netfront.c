@@ -338,13 +338,11 @@ again:
 		goto abort_transaction;
 	}
 
-#if 0 /* KAF: After the protocol is finalised. */
 	err = xenbus_printf(xbt, dev->nodename, "feature-gso-tcpv4", "%d", 1);
 	if (err) {
 		message = "writing feature-gso-tcpv4";
 		goto abort_transaction;
 	}
-#endif
 
 	err = xenbus_transaction_end(xbt, 0);
 	if (err) {
@@ -1327,9 +1325,7 @@ static int xennet_set_tso(struct net_device *dev, u32 data)
 		if (xenbus_scanf(XBT_NIL, np->xbdev->otherend,
 				 "feature-gso-tcpv4", "%d", &val) < 0)
 			val = 0;
-#if 0 /* KAF: After the protocol is finalised. */
 		if (!val)
-#endif
 			return -ENOSYS;
 	}
 

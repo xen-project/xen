@@ -101,14 +101,12 @@ static int netback_probe(struct xenbus_device *dev,
 			goto abort_transaction;
 		}
 
-#if 0 /* KAF: After the protocol is finalised. */
 		err = xenbus_printf(xbt, dev->nodename, "feature-gso-tcpv4",
 				    "%d", 1);
 		if (err) {
 			message = "writing feature-gso-tcpv4";
 			goto abort_transaction;
 		}
-#endif
 
 		err = xenbus_transaction_end(xbt, 0);
 	} while (err == -EAGAIN);
@@ -384,7 +382,6 @@ static int connect_rings(struct backend_info *be)
 		be->netif->dev->features |= NETIF_F_SG;
 	}
 
-#if 0 /* KAF: After the protocol is finalised. */
 	if (xenbus_scanf(XBT_NIL, dev->otherend, "feature-gso-tcpv4", "%d",
 			 &val) < 0)
 		val = 0;
@@ -392,7 +389,6 @@ static int connect_rings(struct backend_info *be)
 		be->netif->features |= NETIF_F_TSO;
 		be->netif->dev->features |= NETIF_F_TSO;
 	}
-#endif
 
 	/* Map the shared frame, irq etc. */
 	err = netif_map(be->netif, tx_ring_ref, rx_ring_ref, evtchn);
