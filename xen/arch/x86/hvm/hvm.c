@@ -335,7 +335,7 @@ void hvm_print_line(struct vcpu *v, const char c)
 typedef unsigned long hvm_hypercall_t(
     unsigned long, unsigned long, unsigned long, unsigned long, unsigned long);
 #define HYPERCALL(x) [ __HYPERVISOR_ ## x ] = (hvm_hypercall_t *) do_ ## x
-static hvm_hypercall_handler *hvm_hypercall_table[] = {
+static hvm_hypercall_t *hvm_hypercall_table[] = {
     HYPERCALL(mmu_update),
     HYPERCALL(memory_op),
     HYPERCALL(multicall),
@@ -343,8 +343,8 @@ static hvm_hypercall_handler *hvm_hypercall_table[] = {
     HYPERCALL(event_channel_op_compat),
     HYPERCALL(xen_version),
     HYPERCALL(grant_table_op),
-    HYPERCALL(event_channel_op),
-    HYPERCALL(hvm_op)
+    HYPERCALL(event_channel_op)
+    /*HYPERCALL(hvm_op)*/
 };
 #undef HYPERCALL
 
