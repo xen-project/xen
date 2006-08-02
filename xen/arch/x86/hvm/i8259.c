@@ -590,7 +590,7 @@ int cpu_get_pic_interrupt(struct vcpu *v, int *type)
 
     /* read the irq from the PIC */
     intno = pic_read_irq(s);
-    *type = VLAPIC_DELIV_MODE_EXT;
+    *type = APIC_DM_EXTINT;
     return intno;
 }
 
@@ -598,7 +598,7 @@ int is_pit_irq(struct vcpu *v, int irq, int type)
 {
     int pit_vec;
 
-    if (type == VLAPIC_DELIV_MODE_EXT)
+    if (type == APIC_DM_EXTINT)
         pit_vec = v->domain->arch.hvm_domain.vpic.pics[0].irq_base;
     else
         pit_vec =

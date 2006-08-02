@@ -29,7 +29,7 @@
 #ifndef NDEBUG
 #define HVM_DEBUG 1
 #else
-#define HVM_DEBUG 0
+#define HVM_DEBUG 1
 #endif
 
 #define	hvm_guest(v)	((v)->arch.guest_context.flags & VGCF_HVM_GUEST)

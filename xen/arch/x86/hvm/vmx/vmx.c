@@ -137,6 +137,8 @@ static void vmx_relinquish_guest_resources(struct domain *d)
         if ( hvm_apic_support(v->domain) && (VLAPIC(v) != NULL) )
         {
             kill_timer(&VLAPIC(v)->vlapic_timer);
+            unmap_domain_page_global(VLAPIC(v)->regs);
+            free_domheap_page(VLAPIC(v)->regs_page);
             xfree(VLAPIC(v));
         }
     }

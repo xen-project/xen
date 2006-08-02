@@ -59,6 +59,17 @@ static inline int vlapic_set_irq(struct vlapic *t, uint8_t vec, uint8_t trig)
     return vmx_vcpu_pend_interrupt(t->vcpu, vec);
 }
 
+enum ioapic_irq_destination_types {
+	dest_Fixed = 0,
+	dest_LowestPrio = 1,
+	dest_SMI = 2,
+	dest__reserved_1 = 3,
+	dest_NMI = 4,
+	dest_INIT = 5,
+	dest__reserved_2 = 6,
+	dest_ExtINT = 7
+};
+
 /* As long as we register vlsapic to ioapic controller, it's said enabled */
 #define vlapic_enabled(l) 1
 #define hvm_apic_support(d) 1
