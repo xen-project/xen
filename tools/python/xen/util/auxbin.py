@@ -21,8 +21,8 @@ LIB_64 = "/usr/lib64"
 LIB_BIN_SUFFIX = "xen/bin"
 
 ## The architectures on which the LIB_64 directory is used.  This
-# deliberately excludes ia64.
-LIB_64_ARCHS = [ 'x86_64', 'ppc64', 's390x', 'sparc64']
+# deliberately excludes ia64 and ppc64.
+LIB_64_ARCHS = [ 'x86_64', 's390x', 'sparc64']
 
 
 import os
