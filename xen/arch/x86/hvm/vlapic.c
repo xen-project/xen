@@ -210,7 +210,7 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
         if ( unlikely(vlapic == NULL || !vlapic_enabled(vlapic)) )
             break;
 
-        if ( test_and_set_bit(vector, &vlapic->irr[0]) )
+        if ( test_and_set_bit(vector, &vlapic->irr[0]) && level)
         {
             HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
               "level trig mode repeatedly for vector %d\n", vector);
@@ -922,7 +922,8 @@ int cpu_get_apic_interrupt(struct vcpu *v, int *mode)
     {
         int highest_irr = vlapic_find_highest_irr(vlapic);
 
-        if ( highest_irr != -1 && highest_irr >= vlapic->processor_priority )
+        if ( highest_irr != -1 &&
+             ( (highest_irr & 0xF0) > vlapic->processor_priority ) )
         {
             if ( highest_irr < 0x10 )
             {
@@ -952,7 +953,8 @@ int cpu_has_apic_interrupt(struct vcpu* v)
     if (vlapic && vlapic_enabled(vlapic)) {
         int highest_irr = vlapic_find_highest_irr(vlapic);
 
-        if (highest_irr != -1 && highest_irr >= vlapic->processor_priority) {
+        if ( highest_irr != -1 &&
+             ( (highest_irr & 0xF0) > vlapic->processor_priority ) ) {
             return 1;
         }
     }
