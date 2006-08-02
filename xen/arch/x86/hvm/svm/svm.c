@@ -1416,6 +1416,7 @@ static void svm_io_instruction(struct vcpu *v)
 
     /* Copy current guest state into io instruction state structure. */
     memcpy(regs, guest_cpu_user_regs(), HVM_CONTEXT_STACK_BYTES);
+    hvm_store_cpu_guest_regs(v, regs, NULL);
 
     info.bytes = vmcb->exitinfo1;
 

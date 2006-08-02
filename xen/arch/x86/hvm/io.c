@@ -695,12 +695,11 @@ void hvm_io_assist(struct vcpu *v)
 
             if ( p->type == IOREQ_TYPE_PIO )
                 hvm_pio_assist(regs, p, io_opp);
-            else {
+            else
                 hvm_mmio_assist(regs, p, io_opp);
-                hvm_load_cpu_guest_regs(v, regs);
-            }
 
             /* Copy register changes back into current guest state. */
+            hvm_load_cpu_guest_regs(v, regs);
             memcpy(guest_cpu_user_regs(), regs, HVM_CONTEXT_STACK_BYTES);
         }
         /* else an interrupt send event raced us */

@@ -1107,6 +1107,7 @@ static void vmx_io_instruction(unsigned long exit_qualification,
 
     /* Copy current guest state into io instruction state structure. */
     memcpy(regs, guest_cpu_user_regs(), HVM_CONTEXT_STACK_BYTES);
+    hvm_store_cpu_guest_regs(current, regs, NULL);
 
     __vmread(GUEST_RIP, &eip);
     __vmread(GUEST_CS_SELECTOR, &cs);
