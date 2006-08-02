@@ -78,7 +78,9 @@ help_spacer = """
 sysrq_help =   "sysrq   <DomId> <letter>         Send a sysrq to a domain"
 domid_help =   "domid <DomName>                  Converts a domain name to a domain id"
 domname_help = "domname <DomId>                  Convert a domain id to a domain name"
-vcpu_set_help = """vcpu-set <DomId> <VCPUs>         Set the number of VCPUs for a domain"""
+vcpu_set_help = """vcpu-set <DomId> <VCPUs>         Set the number of active VCPUs for a domain
+                                    within the range allowed by the domain
+                                    configuration"""
 vcpu_list_help = "vcpu-list <DomId>                List the VCPUs for a domain (or all domains)"
 vcpu_pin_help = "vcpu-pin <DomId> <VCPU> <CPUs>   Set which cpus a VCPU can use" 
 dmesg_help =   "dmesg [-c|--clear]               Read or clear Xen's message buffer"
