@@ -31,6 +31,12 @@
 
 #undef SERIALIZE
 
+unsigned int cpu_rma_order(void)
+{
+    /* XXX what about non-HV mode? */
+    return 14; /* 1<<14<<PAGE_SIZE = 64M */
+}
+
 void cpu_initialize(void)
 {
     ulong stack;
@@ -102,7 +108,6 @@ void cpu_initialize(void)
     mthid5(hid5.word);
 
     __asm__ __volatile__("isync; slbia; isync" : : : "memory");
-    
 }
 
 void cpu_init_vcpu(struct vcpu *v)

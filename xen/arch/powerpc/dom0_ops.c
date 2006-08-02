@@ -40,23 +40,40 @@ long arch_do_dom0_op(struct dom0_op *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
     long ret = 0;
 
     switch (op->cmd) {
-    case DOM0_GETMEMLIST: {
-        /* XXX 64M hackage */
-        const int memsize = (64UL<<20);
-        int domain_pfns = memsize>>12;
-        int max_pfns = op->u.getmemlist.max_pfns;
-        int domid = op->u.getmemlist.domain;
+    case DOM0_GETMEMLIST:
+    {
         int i;
+        struct domain *d = find_domain_by_id(op->u.getmemlist.domain);
+        unsigned long max_pfns = op->u.getmemlist.max_pfns;
+        xen_pfn_t mfn;
+        struct list_head *list_ent;
 
-        for (i = 0; (i < max_pfns) && (i < domain_pfns); i++) {
-            xen_pfn_t mfn = (((domid + 1) * memsize) >> 12) + i;
-            if (copy_to_guest_offset(op->u.getmemlist.buffer, i, &mfn, 1)) {
-                ret = -EFAULT;
-                break;
+        ret = -EINVAL;
+        if ( d != NULL )
+        {
+            ret = 0;
+
+            spin_lock(&d->page_alloc_lock);
+            list_ent = d->page_list.next;
+            for ( i = 0; (i < max_pfns) && (list_ent != &d->page_list); i++ )
+            {
+                mfn = page_to_mfn(list_entry(
+                    list_ent, struct page_info, list));
+                if ( copy_to_guest_offset(op->u.getmemlist.buffer,
+                                          i, &mfn, 1) )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+                list_ent = mfn_to_page(mfn)->list.next;
             }
+            spin_unlock(&d->page_alloc_lock);
+
+            op->u.getmemlist.num_pfns = i;
+            copy_to_guest(u_dom0_op, op, 1);
+            
+            put_domain(d);
         }
-        op->u.getmemlist.num_pfns = i;
-        copy_to_guest(u_dom0_op, op, 1);
     }
     break;
 
