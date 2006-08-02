@@ -450,7 +450,7 @@ u64 translate_phy_pte(VCPU *v, u64 *pte, u64 itir, u64 va)
  * Purge overlap TCs and then insert the new entry to emulate itc ops.
  *    Notes: Only TC entry can purge and insert.
  */
-void thash_purge_and_insert(VCPU *v, u64 pte, u64 itir, u64 ifa)
+void thash_purge_and_insert(VCPU *v, u64 pte, u64 itir, u64 ifa, int type)
 {
     u64 ps;//, va;
     u64 phy_pte;
@@ -490,8 +490,14 @@ void thash_purge_and_insert(VCPU *v, u64 pte, u64 itir, u64 ifa)
             }
         }
         else {
+            u64 psr;
+            phy_pte  &= ~PAGE_FLAGS_RV_MASK;
+            psr = ia64_clear_ic();
+            ia64_itc(type + 1, ifa, phy_pte, ps);
+            ia64_set_psr(psr);
+            ia64_srlz_i();
             // ps < mrr.ps, this is not supported
-            panic_domain(NULL, "%s: ps (%lx) < mrr.ps \n", __func__, ps);
+            // panic_domain(NULL, "%s: ps (%lx) < mrr.ps \n", __func__, ps);
         }
     }
     else{

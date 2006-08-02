@@ -375,7 +375,7 @@ IA64FAULT vmx_vcpu_itc_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
     }
 #endif //VTLB_DEBUG    
     pte &= ~PAGE_FLAGS_RV_MASK;
-    thash_purge_and_insert(vcpu, pte, itir, ifa);
+    thash_purge_and_insert(vcpu, pte, itir, ifa, ISIDE_TLB);
     return IA64_NO_FAULT;
 }
 
@@ -398,7 +398,7 @@ IA64FAULT vmx_vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
     gpfn = (pte & _PAGE_PPN_MASK)>> PAGE_SHIFT;
     if (VMX_DOMAIN(vcpu) && __gpfn_is_io(vcpu->domain, gpfn))
         pte |= VTLB_PTE_IO;
-    thash_purge_and_insert(vcpu, pte, itir, ifa);
+    thash_purge_and_insert(vcpu, pte, itir, ifa, DSIDE_TLB);
     return IA64_NO_FAULT;
 
 }

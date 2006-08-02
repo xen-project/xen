@@ -313,7 +313,7 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
                     ((pteval & _PAGE_MA_MASK) != _PAGE_MA_ST)) {
                     vcpu_get_rr(v, vadr, &rr);
                     itir = rr&(RR_RID_MASK | RR_PS_MASK);
-                    thash_purge_and_insert(v, pteval, itir , vadr);
+                    thash_purge_and_insert(v, pteval, itir, vadr, DSIDE_TLB);
                     return IA64_NO_FAULT;
                 }
                 if(vpsr.ic){
@@ -361,7 +361,7 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
                 if (pteval & _PAGE_P){
                     vcpu_get_rr(v, vadr, &rr);
                     itir = rr&(RR_RID_MASK | RR_PS_MASK);
-                    thash_purge_and_insert(v, pteval, itir , vadr);
+                    thash_purge_and_insert(v, pteval, itir, vadr, ISIDE_TLB);
                     return IA64_NO_FAULT;
                 }
                 if(!vpsr.ic){
