@@ -52,6 +52,31 @@ char *states[] = {
 static char *rnames[] = { "ax", "cx", "dx", "bx", "sp", "bp", "si", "di" };
 #endif /* DEBUG */
 
+#define PT_ENTRY_PRESENT 0x1
+
+static unsigned
+guest_linear_to_real(unsigned long base, unsigned off)
+{
+	unsigned int gcr3 = oldctx.cr3;
+	unsigned int l1_mfn;
+	unsigned int l0_mfn;
+
+	if (!(oldctx.cr0 & CR0_PG))
+		return base + off;
+
+	l1_mfn = ((unsigned int *)gcr3)[(base >> 22) & 0x3ff ];
+	if (!(l1_mfn & PT_ENTRY_PRESENT))
+		panic("l2 entry not present\n");
+	l1_mfn = l1_mfn & 0xfffff000 ;
+
+	l0_mfn = ((unsigned int *)l1_mfn)[(base >> 12) & 0x3ff];
+	if (!(l0_mfn & PT_ENTRY_PRESENT))
+		panic("l1 entry not present\n");
+	l0_mfn = l0_mfn & 0xfffff000;
+
+	return l0_mfn + off + (base & 0xfff);
+}
+
 static unsigned
 address(struct regs *regs, unsigned seg, unsigned off)
 {
@@ -70,7 +95,7 @@ address(struct regs *regs, unsigned seg, unsigned off)
 	    (mode == VM86_REAL_TO_PROTECTED && regs->cs == seg))
 		return ((seg & 0xFFFF) << 4) + off;
 
-	entry = ((unsigned long long *) oldctx.gdtr_base)[seg >> 3];
+	entry = ((unsigned long long *) guest_linear_to_real(oldctx.gdtr_base, 0))[seg >> 3];
 	entry_high = entry >> 32;
 	entry_low = entry & 0xFFFFFFFF;
 
@@ -94,7 +119,7 @@ void
 trace(struct regs *regs, int adjust, char *fmt, ...)
 {
 	unsigned off = regs->eip - adjust;
-        va_list ap;
+	va_list ap;
 
 	if ((traceset & (1 << mode)) &&
 	   (mode == VM86_REAL_TO_PROTECTED || mode == VM86_REAL)) {
@@ -755,7 +780,7 @@ load_seg(unsigned long sel, uint32_t *base, uint32_t *limit, union vmcs_arbytes 
 		return 1;
 	}
 
-	entry =  ((unsigned long long *) oldctx.gdtr_base)[sel >> 3];
+	entry = ((unsigned long long *) guest_linear_to_real(oldctx.gdtr_base, 0))[sel >> 3];
 
 	/* Check the P bit first */
 	if (!((entry >> (15+32)) & 0x1) && sel != 0)

@@ -109,6 +109,7 @@ int init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 
 	init_MUTEX(&mm->context.sem);
 	mm->context.size = 0;
+	mm->context.has_foreign_mappings = 0;
 	old_mm = current->mm;
 	if (old_mm && old_mm->context.size > 0) {
 		down(&old_mm->context.sem);

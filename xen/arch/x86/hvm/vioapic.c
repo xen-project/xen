@@ -197,7 +197,7 @@ static void hvm_vioapic_write_indirect(struct hvm_vioapic *s,
                     redir_content = ((redir_content >> 32) << 32) |
                                     (val & 0xffffffff);
                 s->redirtbl[redir_index].value = redir_content;
-		hvm_vioapic_update_imr(s, redir_index);
+                hvm_vioapic_update_imr(s, redir_index);
             } else  {
                 printk("hvm_vioapic_write_indirect "
                   "error register %x\n", s->ioregsel);
@@ -295,8 +295,8 @@ static int ioapic_inj_irq(hvm_vioapic_t *s,
       vector, trig_mode, delivery_mode);
 
     switch (delivery_mode) {
-    case VLAPIC_DELIV_MODE_FIXED:
-    case VLAPIC_DELIV_MODE_LPRI:
+    case dest_Fixed:
+    case dest_LowestPrio:
         if (vlapic_set_irq(target, vector, trig_mode) && (trig_mode == 1))
             printk("<ioapic_inj_irq> level interrupt happen before cleared\n");
         result = 1;
@@ -314,6 +314,7 @@ static int ioapic_inj_irq(hvm_vioapic_t *s,
 static int ioapic_match_logical_addr(hvm_vioapic_t *s, int number, uint8_t dest)
 {
     int result = 0;
+    uint32_t logical_dest = vlapic_get_reg(s->lapic_info[number], APIC_LDR);
 
     ASSERT(s && s->lapic_info[number]);
 
@@ -321,17 +322,17 @@ static int ioapic_match_logical_addr(hvm_vioapic_t *s, int number, uint8_t dest)
       "number %i dest %x\n",
       number, dest);
 
-    switch (((s->lapic_info[number]->dest_format >> 28) & 0xf)) {
-    case 0xf:
+    switch (vlapic_get_reg(s->lapic_info[number], APIC_DFR))
+    {
+    case APIC_DFR_FLAT:
         result =
-          (dest & ((s->lapic_info[number]->logical_dest >> 24) & 0xff)) != 0;
+          (dest & GET_APIC_LOGICAL_ID(logical_dest)) != 0;
         break;
-    case 0x0:
+    case APIC_DFR_CLUSTER:
         /* Should we support flat cluster mode ?*/
-        if ( ((s->lapic_info[number]->logical_dest >> 28)
+        if ( (GET_APIC_LOGICAL_ID(logical_dest) >> 4
                == ((dest >> 0x4) & 0xf)) &&
-             (((s->lapic_info[number]->logical_dest >> 24) & 0xf)
-               & (dest  & 0xf)) )
+             (logical_dest & (dest  & 0xf)) )
             result = 1;
         break;
     default:
@@ -410,7 +411,7 @@ static void ioapic_deliver(hvm_vioapic_t *s, int irqno)
     }
 
     switch (delivery_mode) {
-    case VLAPIC_DELIV_MODE_LPRI:
+    case dest_LowestPrio:
     {
         struct vlapic* target;
 
@@ -430,8 +431,8 @@ static void ioapic_deliver(hvm_vioapic_t *s, int irqno)
         break;
     }
 
-    case VLAPIC_DELIV_MODE_FIXED:
-    case VLAPIC_DELIV_MODE_EXT:
+    case dest_Fixed:
+    case dest_ExtINT:
     {
         uint8_t bit;
         for (bit = 0; bit < s->lapic_count; bit++) {
@@ -452,10 +453,10 @@ static void ioapic_deliver(hvm_vioapic_t *s, int irqno)
         break;
     }
 
-    case VLAPIC_DELIV_MODE_SMI:
-    case VLAPIC_DELIV_MODE_NMI:
-    case VLAPIC_DELIV_MODE_INIT:
-    case VLAPIC_DELIV_MODE_STARTUP:
+    case dest_SMI:
+    case dest_NMI:
+    case dest_INIT:
+    case dest__reserved_2:
     default:
         printk("Not support delivey mode %d\n", delivery_mode);
         break;

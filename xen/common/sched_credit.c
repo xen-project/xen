@@ -296,11 +296,16 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
         cpumask_raise_softirq(mask, SCHEDULE_SOFTIRQ);
 }
 
-static void
+static int
 csched_pcpu_init(int cpu)
 {
     struct csched_pcpu *spc;
     unsigned long flags;
+
+    /* Allocate per-PCPU info */
+    spc = xmalloc(struct csched_pcpu);
+    if ( spc == NULL )
+        return -1;
 
     spin_lock_irqsave(&csched_priv.lock, flags);
 
@@ -311,9 +316,6 @@ csched_pcpu_init(int cpu)
     if ( csched_priv.master >= csched_priv.ncpus )
         csched_priv.master = cpu;
 
-    /* Allocate per-PCPU info */
-    spc = xmalloc(struct csched_pcpu);
-    BUG_ON( spc == NULL );
     INIT_LIST_HEAD(&spc->runq);
     spc->runq_sort_last = csched_priv.runq_sort;
     schedule_data[cpu].sched_priv = spc;
@@ -323,6 +325,8 @@ csched_pcpu_init(int cpu)
     cpu_set(cpu, csched_priv.idlers);
 
     spin_unlock_irqrestore(&csched_priv.lock, flags);
+
+    return 0;
 }
 
 #ifndef NDEBUG
@@ -490,7 +494,10 @@ csched_vcpu_init(struct vcpu *vc)
 
     /* Allocate per-PCPU info */
     if ( unlikely(!CSCHED_PCPU(vc->processor)) )
-        csched_pcpu_init(vc->processor);
+    {
+        if ( csched_pcpu_init(vc->processor) != 0 )
+            return -1;
+    }
 
     CSCHED_VCPU_CHECK(vc);
 

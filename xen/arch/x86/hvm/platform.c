@@ -827,7 +827,6 @@ void handle_mmio(unsigned long va, unsigned long gpa)
 
     /* Copy current guest state into io instruction state structure. */
     memcpy(regs, guest_cpu_user_regs(), HVM_CONTEXT_STACK_BYTES);
-
     hvm_store_cpu_guest_regs(v, regs, NULL);
 
     if ((inst_len = hvm_instruction_length(v)) <= 0) {

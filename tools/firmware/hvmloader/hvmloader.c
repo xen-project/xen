@@ -31,7 +31,7 @@
 #define	ROMBIOS_PHYSICAL_ADDRESS	0x000F0000
 
 /* invoke SVM's paged realmode support */
-#define SVM_VMMCALL_RESET_TO_REALMODE	0x00000001
+#define SVM_VMMCALL_RESET_TO_REALMODE	0x80000001
 
 /*
  * C runtime start off
@@ -133,15 +133,15 @@ cirrus_check(void)
 	return inb(0x3C5) == 0x12;
 }
 
-int 
-vmmcall(int edi, int esi, int edx, int ecx, int ebx)
+int
+vmmcall(int function, int edi, int esi, int edx, int ecx, int ebx)
 {
         int eax;
 
         __asm__ __volatile__(
 		".byte 0x0F,0x01,0xD9"
                 : "=a" (eax)
-		: "a"(0x58454E00), /* XEN\0 key */
+		: "a"(function),
 		  "b"(ebx), "c"(ecx), "d"(edx), "D"(edi), "S"(esi)
 	);
         return eax;
@@ -200,7 +200,7 @@ main(void)
 	if (check_amd()) {
 		/* AMD implies this is SVM */
                 puts("SVM go ...\n");
-                vmmcall(SVM_VMMCALL_RESET_TO_REALMODE, 0, 0, 0, 0);
+                vmmcall(SVM_VMMCALL_RESET_TO_REALMODE, 0, 0, 0, 0, 0);
 	} else {
 		puts("Loading VMXAssist ...\n");
 		memcpy((void *)VMXASSIST_PHYSICAL_ADDRESS,

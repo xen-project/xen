@@ -55,7 +55,7 @@ extern void toggle_guest_mode(struct vcpu *);
  * Initialise a hypercall-transfer page. The given pointer must be mapped
  * in Xen virtual address space (accesses are not validated or checked).
  */
-extern void hypercall_page_initialise(void *);
+extern void hypercall_page_initialise(struct domain *d, void *);
 
 struct arch_domain
 {

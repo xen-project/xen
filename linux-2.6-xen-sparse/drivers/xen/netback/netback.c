@@ -40,17 +40,22 @@
 
 /*#define NETBE_DEBUG_INTERRUPT*/
 
+struct netbk_rx_meta {
+	skb_frag_t frag;
+	int id;
+};
+
 static void netif_idx_release(u16 pending_idx);
 static void netif_page_release(struct page *page);
 static void make_tx_response(netif_t *netif, 
 			     netif_tx_request_t *txp,
 			     s8       st);
-static int  make_rx_response(netif_t *netif, 
-			     u16      id, 
-			     s8       st,
-			     u16      offset,
-			     u16      size,
-			     u16      flags);
+static netif_rx_response_t *make_rx_response(netif_t *netif, 
+					     u16      id, 
+					     s8       st,
+					     u16      offset,
+					     u16      size,
+					     u16      flags);
 
 static void net_tx_action(unsigned long unused);
 static DECLARE_TASKLET(net_tx_tasklet, net_tx_action, 0);
@@ -100,21 +105,27 @@ static spinlock_t net_schedule_list_lock;
 static unsigned long mfn_list[MAX_MFN_ALLOC];
 static unsigned int alloc_index = 0;
 
-static unsigned long alloc_mfn(void)
+static inline unsigned long alloc_mfn(void)
 {
-	unsigned long mfn = 0;
+	return mfn_list[--alloc_index];
+}
+
+static int check_mfn(int nr)
+{
 	struct xen_memory_reservation reservation = {
-		.nr_extents   = MAX_MFN_ALLOC,
 		.extent_order = 0,
 		.domid        = DOMID_SELF
 	};
-	set_xen_guest_handle(reservation.extent_start, mfn_list);
-	if ( unlikely(alloc_index == 0) )
-		alloc_index = HYPERVISOR_memory_op(
-			XENMEM_increase_reservation, &reservation);
-	if ( alloc_index != 0 )
-		mfn = mfn_list[--alloc_index];
-	return mfn;
+
+	if (likely(alloc_index >= nr))
+		return 0;
+
+	set_xen_guest_handle(reservation.extent_start, mfn_list + alloc_index);
+	reservation.nr_extents = MAX_MFN_ALLOC - alloc_index;
+	alloc_index += HYPERVISOR_memory_op(XENMEM_increase_reservation,
+					    &reservation);
+
+	return alloc_index >= nr ? 0 : -ENOMEM;
 }
 
 static inline void maybe_schedule_tx_action(void)
@@ -136,6 +147,96 @@ static inline int is_xen_skb(struct sk_buff *skb)
 	return (cp == skbuff_cachep);
 }
 
+static struct sk_buff *netbk_copy_skb(struct sk_buff *skb)
+{
+	struct skb_shared_info *ninfo;
+	struct sk_buff *nskb;
+	unsigned long offset;
+	int ret;
+	int len;
+	int headlen;
+
+	nskb = alloc_skb(SKB_MAX_HEAD(0), GFP_ATOMIC);
+	if (unlikely(!nskb))
+		goto err;
+
+	skb_reserve(nskb, 16);
+	headlen = nskb->end - nskb->data;
+	if (headlen > skb_headlen(skb))
+		headlen = skb_headlen(skb);
+	ret = skb_copy_bits(skb, 0, __skb_put(nskb, headlen), headlen);
+	BUG_ON(ret);
+
+	ninfo = skb_shinfo(nskb);
+	ninfo->gso_size = skb_shinfo(skb)->gso_size;
+	ninfo->gso_type = skb_shinfo(skb)->gso_type;
+
+	offset = headlen;
+	len = skb->len - headlen;
+
+	nskb->len = skb->len;
+	nskb->data_len = len;
+	nskb->truesize += len;
+
+	while (len) {
+		struct page *page;
+		int copy;
+		int zero;
+
+		if (unlikely(ninfo->nr_frags >= MAX_SKB_FRAGS)) {
+			dump_stack();
+			goto err_free;
+		}
+
+		copy = len >= PAGE_SIZE ? PAGE_SIZE : len;
+		zero = len >= PAGE_SIZE ? 0 : __GFP_ZERO;
+
+		page = alloc_page(GFP_ATOMIC | zero);
+		if (unlikely(!page))
+			goto err_free;
+
+		ret = skb_copy_bits(skb, offset, page_address(page), copy);
+		BUG_ON(ret);
+
+		ninfo->frags[ninfo->nr_frags].page = page;
+		ninfo->frags[ninfo->nr_frags].page_offset = 0;
+		ninfo->frags[ninfo->nr_frags].size = copy;
+		ninfo->nr_frags++;
+
+		offset += copy;
+		len -= copy;
+	}
+
+	offset = nskb->data - skb->data;
+
+	nskb->h.raw = skb->h.raw + offset;
+	nskb->nh.raw = skb->nh.raw + offset;
+	nskb->mac.raw = skb->mac.raw + offset;
+
+	return nskb;
+
+ err_free:
+	kfree_skb(nskb);
+ err:
+	return NULL;
+}
+
+static inline int netbk_max_required_rx_slots(netif_t *netif)
+{
+	if (netif->features & (NETIF_F_SG|NETIF_F_TSO))
+		return MAX_SKB_FRAGS + 2; /* header + extra_info + frags */
+	return 1; /* all in one */
+}
+
+static inline int netbk_queue_full(netif_t *netif)
+{
+	RING_IDX peek   = netif->rx_req_cons_peek;
+	RING_IDX needed = netbk_max_required_rx_slots(netif);
+
+	return ((netif->rx.sring->req_prod - peek) < needed) ||
+	       ((netif->rx.rsp_prod_pvt + NET_RX_RING_SIZE - peek) < needed);
+}
+
 int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	netif_t *netif = netdev_priv(dev);
@@ -143,30 +244,26 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	BUG_ON(skb->dev != dev);
 
 	/* Drop the packet if the target domain has no receive buffers. */
-	if (unlikely(!netif_running(dev) || !netif_carrier_ok(dev)) ||
-	    (netif->rx_req_cons_peek == netif->rx.sring->req_prod) ||
-	    ((netif->rx_req_cons_peek - netif->rx.rsp_prod_pvt) ==
-	     NET_RX_RING_SIZE))
+	if (unlikely(!netif_running(dev) || !netif_carrier_ok(dev)))
 		goto drop;
+
+	if (unlikely(netbk_queue_full(netif))) {
+		/* Not a BUG_ON() -- misbehaving netfront can trigger this. */
+		if (netbk_can_queue(dev))
+			DPRINTK("Queue full but not stopped!\n");
+		goto drop;
+	}
 
 	/*
 	 * We do not copy the packet unless:
 	 *  1. The data is shared; or
 	 *  2. The data is not allocated from our special cache.
-	 * NB. We also couldn't cope with fragmented packets, but we won't get
-	 *     any because we not advertise the NETIF_F_SG feature.
+	 *  3. The data is fragmented.
 	 */
-	if (skb_shared(skb) || skb_cloned(skb) || !is_xen_skb(skb)) {
-		int hlen = skb->data - skb->head;
-		int ret;
-		struct sk_buff *nskb = dev_alloc_skb(hlen + skb->len);
+	if (skb_cloned(skb) || skb_is_nonlinear(skb) || !is_xen_skb(skb)) {
+		struct sk_buff *nskb = netbk_copy_skb(skb);
 		if ( unlikely(nskb == NULL) )
 			goto drop;
-		skb_reserve(nskb, hlen);
-		__skb_put(nskb, skb->len);
-		ret = skb_copy_bits(skb, -hlen, nskb->data - hlen,
-				     skb->len + hlen);
-		BUG_ON(ret);
 		/* Copy only the header fields we use in this driver. */
 		nskb->dev = skb->dev;
 		nskb->ip_summed = skb->ip_summed;
@@ -175,8 +272,17 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		skb = nskb;
 	}
 
-	netif->rx_req_cons_peek++;
+	netif->rx_req_cons_peek += skb_shinfo(skb)->nr_frags + 1 +
+				   !!skb_shinfo(skb)->gso_size;
 	netif_get(netif);
+
+	if (netbk_can_queue(dev) && netbk_queue_full(netif)) {
+		netif->rx.sring->req_event = netif->rx_req_cons_peek +
+			netbk_max_required_rx_slots(netif);
+		mb(); /* request notification /then/ check & stop the queue */
+		if (netbk_queue_full(netif))
+			netif_stop_queue(dev);
+	}
 
 	skb_queue_tail(&rx_queue, skb);
 	tasklet_schedule(&net_rx_tasklet);
@@ -208,116 +314,85 @@ int xen_network_done(void)
 }
 #endif
 
-static void net_rx_action(unsigned long unused)
+static u16 netbk_gop_frag(netif_t *netif, struct page *page, int count, int i)
 {
-	netif_t *netif = NULL; 
-	s8 status;
-	u16 size, id, irq, flags;
-	multicall_entry_t *mcl;
-	mmu_update_t *mmu;
-	gnttab_transfer_t *gop;
-	unsigned long vdata, old_mfn, new_mfn;
-	struct sk_buff_head rxq;
-	struct sk_buff *skb;
-	int notify_nr = 0;
-	int ret;
-	/*
-	 * Putting hundreds of bytes on the stack is considered rude.
-	 * Static works because a tasklet can only be on one CPU at any time.
-	 */
-	static u16 notify_list[NET_RX_RING_SIZE];
+	multicall_entry_t *mcl = rx_mcl + count;
+	mmu_update_t *mmu = rx_mmu + count;
+	gnttab_transfer_t *gop = grant_rx_op + count;
+	netif_rx_request_t *req;
+	unsigned long old_mfn, new_mfn;
 
-	skb_queue_head_init(&rxq);
-
-	mcl = rx_mcl;
-	mmu = rx_mmu;
-	gop = grant_rx_op;
-
-	while ((skb = skb_dequeue(&rx_queue)) != NULL) {
-		netif   = netdev_priv(skb->dev);
-		vdata   = (unsigned long)skb->data;
-		old_mfn = virt_to_mfn(vdata);
-
-		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
-			/* Memory squeeze? Back off for an arbitrary while. */
-			if ((new_mfn = alloc_mfn()) == 0) {
-				if ( net_ratelimit() )
-					WPRINTK("Memory squeeze in netback "
-						"driver.\n");
-				mod_timer(&net_timer, jiffies + HZ);
-				skb_queue_head(&rx_queue, skb);
-				break;
-			}
-			/*
-			 * Set the new P2M table entry before reassigning
-			 * the old data page. Heed the comment in
-			 * pgtable-2level.h:pte_page(). :-)
-			 */
-			set_phys_to_machine(
-				__pa(skb->data) >> PAGE_SHIFT,
-				new_mfn);
-
-			MULTI_update_va_mapping(mcl, vdata,
-						pfn_pte_ma(new_mfn,
-							   PAGE_KERNEL), 0);
-			mcl++;
-
-			mmu->ptr = ((maddr_t)new_mfn << PAGE_SHIFT) |
-				MMU_MACHPHYS_UPDATE;
-			mmu->val = __pa(vdata) >> PAGE_SHIFT;
-			mmu++;
-		}
-
-		gop->mfn = old_mfn;
-		gop->domid = netif->domid;
-		gop->ref = RING_GET_REQUEST(
-			&netif->rx, netif->rx.req_cons)->gref;
-		netif->rx.req_cons++;
-		gop++;
-
-		__skb_queue_tail(&rxq, skb);
-
-		/* Filled the batch queue? */
-		if ((gop - grant_rx_op) == ARRAY_SIZE(grant_rx_op))
-			break;
-	}
+	old_mfn = virt_to_mfn(page_address(page));
 
 	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
-		if (mcl == rx_mcl)
-			return;
+		new_mfn = alloc_mfn();
 
-		mcl[-1].args[MULTI_UVMFLAGS_INDEX] = UVMF_TLB_FLUSH|UVMF_ALL;
+		/*
+		 * Set the new P2M table entry before reassigning
+		 * the old data page. Heed the comment in
+		 * pgtable-2level.h:pte_page(). :-)
+		 */
+		set_phys_to_machine(page_to_pfn(page), new_mfn);
 
-		if (mmu - rx_mmu) {
-			mcl->op = __HYPERVISOR_mmu_update;
-			mcl->args[0] = (unsigned long)rx_mmu;
-			mcl->args[1] = mmu - rx_mmu;
-			mcl->args[2] = 0;
-			mcl->args[3] = DOMID_SELF;
-			mcl++;
-		}
+		MULTI_update_va_mapping(mcl, (unsigned long)page_address(page),
+					pfn_pte_ma(new_mfn, PAGE_KERNEL), 0);
 
-		ret = HYPERVISOR_multicall(rx_mcl, mcl - rx_mcl);
-		BUG_ON(ret != 0);
+		mmu->ptr = ((maddr_t)new_mfn << PAGE_SHIFT) |
+			MMU_MACHPHYS_UPDATE;
+		mmu->val = page_to_pfn(page);
 	}
 
-	ret = HYPERVISOR_grant_table_op(GNTTABOP_transfer, grant_rx_op, 
-					gop - grant_rx_op);
-	BUG_ON(ret != 0);
+	req = RING_GET_REQUEST(&netif->rx, netif->rx.req_cons + i);
+	gop->mfn = old_mfn;
+	gop->domid = netif->domid;
+	gop->ref = req->gref;
+	return req->id;
+}
 
-	mcl = rx_mcl;
-	gop = grant_rx_op;
-	while ((skb = __skb_dequeue(&rxq)) != NULL) {
-		netif   = netdev_priv(skb->dev);
-		size    = skb->tail - skb->data;
+static void netbk_gop_skb(struct sk_buff *skb, struct netbk_rx_meta *meta,
+			  int count)
+{
+	netif_t *netif = netdev_priv(skb->dev);
+	int nr_frags = skb_shinfo(skb)->nr_frags;
+	int i;
+	int extra;
 
-		atomic_set(&(skb_shinfo(skb)->dataref), 1);
-		skb_shinfo(skb)->nr_frags = 0;
-		skb_shinfo(skb)->frag_list = NULL;
+	meta[count].frag.page_offset = skb_shinfo(skb)->gso_type;
+	meta[count].frag.size = skb_shinfo(skb)->gso_size;
+	extra = !!meta[count].frag.size + 1;
 
-		netif->stats.tx_bytes += size;
-		netif->stats.tx_packets++;
+	for (i = 0; i < nr_frags; i++) {
+		meta[++count].frag = skb_shinfo(skb)->frags[i];
+		meta[count].id = netbk_gop_frag(netif, meta[count].frag.page,
+						count, i + extra);
+	}
 
+	/*
+	 * This must occur at the end to ensure that we don't trash
+	 * skb_shinfo until we're done.
+	 */
+	meta[count - nr_frags].id = netbk_gop_frag(netif,
+						   virt_to_page(skb->data),
+						   count - nr_frags, 0);
+	netif->rx.req_cons += nr_frags + extra;
+}
+
+static inline void netbk_free_pages(int nr_frags, struct netbk_rx_meta *meta)
+{
+	int i;
+
+	for (i = 0; i < nr_frags; i++)
+		put_page(meta[i].frag.page);
+}
+
+static int netbk_check_gop(int nr_frags, domid_t domid, int count)
+{
+	multicall_entry_t *mcl = rx_mcl + count;
+	gnttab_transfer_t *gop = grant_rx_op + count;
+	int status = NETIF_RSP_OKAY;
+	int i;
+
+	for (i = 0; i <= nr_frags; i++) {
 		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
 			/* The update_va_mapping() must not fail. */
 			BUG_ON(mcl->result != 0);
@@ -325,10 +400,9 @@ static void net_rx_action(unsigned long unused)
 		}
 
 		/* Check the reassignment error code. */
-		status = NETIF_RSP_OKAY;
 		if (gop->status != 0) { 
 			DPRINTK("Bad status %d from grant transfer to DOM%u\n",
-				gop->status, netif->domid);
+				gop->status, domid);
 			/*
 			 * Page no longer belongs to us unless GNTST_bad_page,
 			 * but that should be a fatal error anyway.
@@ -336,24 +410,166 @@ static void net_rx_action(unsigned long unused)
 			BUG_ON(gop->status == GNTST_bad_page);
 			status = NETIF_RSP_ERROR; 
 		}
-		irq = netif->irq;
-		id = RING_GET_REQUEST(&netif->rx, netif->rx.rsp_prod_pvt)->id;
-		flags = 0;
+		gop++;
+	}
+
+	return status;
+}
+
+static void netbk_add_frag_responses(netif_t *netif, int status,
+				     struct netbk_rx_meta *meta, int nr_frags)
+{
+	int i;
+
+	for (i = 0; i < nr_frags; i++) {
+		int id = meta[i].id;
+		int flags = (i == nr_frags - 1) ? 0 : NETRXF_more_data;
+
+		make_rx_response(netif, id, status, meta[i].frag.page_offset,
+				 meta[i].frag.size, flags);
+	}
+}
+
+static void net_rx_action(unsigned long unused)
+{
+	netif_t *netif = NULL; 
+	s8 status;
+	u16 id, irq, flags;
+	netif_rx_response_t *resp;
+	struct netif_extra_info *extra;
+	multicall_entry_t *mcl;
+	struct sk_buff_head rxq;
+	struct sk_buff *skb;
+	int notify_nr = 0;
+	int ret;
+	int nr_frags;
+	int count;
+
+	/*
+	 * Putting hundreds of bytes on the stack is considered rude.
+	 * Static works because a tasklet can only be on one CPU at any time.
+	 */
+	static u16 notify_list[NET_RX_RING_SIZE];
+	static struct netbk_rx_meta meta[NET_RX_RING_SIZE];
+
+	skb_queue_head_init(&rxq);
+
+	count = 0;
+
+	while ((skb = skb_dequeue(&rx_queue)) != NULL) {
+		nr_frags = skb_shinfo(skb)->nr_frags;
+		*(int *)skb->cb = nr_frags;
+
+		if (!xen_feature(XENFEAT_auto_translated_physmap) &&
+		    check_mfn(nr_frags + 1)) {
+			/* Memory squeeze? Back off for an arbitrary while. */
+			if ( net_ratelimit() )
+				WPRINTK("Memory squeeze in netback "
+					"driver.\n");
+			mod_timer(&net_timer, jiffies + HZ);
+			skb_queue_head(&rx_queue, skb);
+			break;
+		}
+
+		netbk_gop_skb(skb, meta, count);
+
+		count += nr_frags + 1;
+
+		__skb_queue_tail(&rxq, skb);
+
+		/* Filled the batch queue? */
+		if (count + MAX_SKB_FRAGS >= NET_RX_RING_SIZE)
+			break;
+	}
+
+	if (!count)
+		return;
+
+	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+		mcl = rx_mcl + count;
+
+		mcl[-1].args[MULTI_UVMFLAGS_INDEX] = UVMF_TLB_FLUSH|UVMF_ALL;
+
+		mcl->op = __HYPERVISOR_mmu_update;
+		mcl->args[0] = (unsigned long)rx_mmu;
+		mcl->args[1] = count;
+		mcl->args[2] = 0;
+		mcl->args[3] = DOMID_SELF;
+
+		ret = HYPERVISOR_multicall(rx_mcl, count + 1);
+		BUG_ON(ret != 0);
+	}
+
+	ret = HYPERVISOR_grant_table_op(GNTTABOP_transfer, grant_rx_op, count);
+	BUG_ON(ret != 0);
+
+	count = 0;
+	while ((skb = __skb_dequeue(&rxq)) != NULL) {
+		nr_frags = *(int *)skb->cb;
+
+		atomic_set(&(skb_shinfo(skb)->dataref), 1);
+		skb_shinfo(skb)->nr_frags = 0;
+		skb_shinfo(skb)->frag_list = NULL;
+
+		netif = netdev_priv(skb->dev);
+		netif->stats.tx_bytes += skb->len;
+		netif->stats.tx_packets++;
+
+		netbk_free_pages(nr_frags, meta + count + 1);
+		status = netbk_check_gop(nr_frags, netif->domid, count);
+
+		id = meta[count].id;
+		flags = nr_frags ? NETRXF_more_data : 0;
+
 		if (skb->ip_summed == CHECKSUM_HW) /* local packet? */
 			flags |= NETRXF_csum_blank | NETRXF_data_validated;
 		else if (skb->proto_data_valid) /* remote but checksummed? */
 			flags |= NETRXF_data_validated;
-		if (make_rx_response(netif, id, status,
-				     (unsigned long)skb->data & ~PAGE_MASK,
-				     size, flags) &&
-		    (rx_notify[irq] == 0)) {
+
+		resp = make_rx_response(netif, id, status,
+					offset_in_page(skb->data),
+					skb_headlen(skb), flags);
+
+		extra = NULL;
+
+		if (meta[count].frag.size) {
+			struct netif_extra_info *gso =
+				(struct netif_extra_info *)
+				RING_GET_RESPONSE(&netif->rx,
+						  netif->rx.rsp_prod_pvt++);
+
+			if (extra)
+				extra->flags |= XEN_NETIF_EXTRA_FLAG_MORE;
+			else
+				resp->flags |= NETRXF_extra_info;
+
+			gso->u.gso.size = meta[count].frag.size;
+			gso->u.gso.type = XEN_NETIF_GSO_TYPE_TCPV4;
+			gso->u.gso.pad = 0;
+			gso->u.gso.features = 0;
+
+			gso->type = XEN_NETIF_EXTRA_TYPE_GSO;
+			gso->flags = 0;
+			extra = gso;
+		}
+
+		netbk_add_frag_responses(netif, status, meta + count + 1,
+					 nr_frags);
+
+		RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(&netif->rx, ret);
+		irq = netif->irq;
+		if (ret && !rx_notify[irq]) {
 			rx_notify[irq] = 1;
 			notify_list[notify_nr++] = irq;
 		}
 
+		if (netif_queue_stopped(netif->dev) &&
+		    !netbk_queue_full(netif))
+			netif_wake_queue(netif->dev);
+
 		netif_put(netif);
 		dev_kfree_skb(skb);
-		gop++;
+		count += nr_frags + 1;
 	}
 
 	while (notify_nr != 0) {
@@ -974,8 +1190,13 @@ static void netif_page_release(struct page *page)
 irqreturn_t netif_be_int(int irq, void *dev_id, struct pt_regs *regs)
 {
 	netif_t *netif = dev_id;
+
 	add_to_net_schedule_list_tail(netif);
 	maybe_schedule_tx_action();
+
+	if (netif_queue_stopped(netif->dev) && !netbk_queue_full(netif))
+		netif_wake_queue(netif->dev);
+
 	return IRQ_HANDLED;
 }
 
@@ -1009,16 +1230,15 @@ static void make_tx_response(netif_t *netif,
 #endif
 }
 
-static int make_rx_response(netif_t *netif, 
-			    u16      id, 
-			    s8       st,
-			    u16      offset,
-			    u16      size,
-			    u16      flags)
+static netif_rx_response_t *make_rx_response(netif_t *netif, 
+					     u16      id, 
+					     s8       st,
+					     u16      offset,
+					     u16      size,
+					     u16      flags)
 {
 	RING_IDX i = netif->rx.rsp_prod_pvt;
 	netif_rx_response_t *resp;
-	int notify;
 
 	resp = RING_GET_RESPONSE(&netif->rx, i);
 	resp->offset     = offset;
@@ -1029,9 +1249,8 @@ static int make_rx_response(netif_t *netif,
 		resp->status = (s16)st;
 
 	netif->rx.rsp_prod_pvt = ++i;
-	RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(&netif->rx, notify);
 
-	return notify;
+	return resp;
 }
 
 #ifdef NETBE_DEBUG_INTERRUPT

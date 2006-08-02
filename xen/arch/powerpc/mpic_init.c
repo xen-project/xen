@@ -21,7 +21,6 @@
 #include <xen/config.h>
 #include <xen/init.h>
 #include <xen/lib.h>
-#include <xen/compile.h>
 #include <asm/mpic.h>
 #include "mpic_init.h"
 #include "oftree.h"

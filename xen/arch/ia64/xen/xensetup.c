@@ -13,7 +13,7 @@
 #include <xen/mm.h>
 #include <public/version.h>
 #include <xen/gdbstub.h>
-#include <xen/compile.h>
+#include <xen/version.h>
 #include <xen/console.h>
 #include <xen/domain.h>
 #include <xen/serial.h>
@@ -547,11 +547,13 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
 void arch_get_xen_caps(xen_capabilities_info_t info)
 {
     char *p=info;
+    int major = xen_major_version();
+    int minor = xen_minor_version();
 
-    p += sprintf(p,"xen-%d.%d-ia64 ", XEN_VERSION, XEN_SUBVERSION);
+    p += sprintf(p,"xen-%d.%d-ia64 ", major, minor);
 
     if (vmx_enabled)
-        p += sprintf(p,"hvm-%d.%d-ia64 ", XEN_VERSION, XEN_SUBVERSION);
+        p += sprintf(p,"hvm-%d.%d-ia64 ", major, minor);
 
     *(p-1) = 0;
 

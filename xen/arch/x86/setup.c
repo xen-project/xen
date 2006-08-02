@@ -12,7 +12,7 @@
 #include <xen/trace.h>
 #include <xen/multiboot.h>
 #include <xen/domain_page.h>
-#include <xen/compile.h>
+#include <xen/version.h>
 #include <xen/gdbstub.h>
 #include <xen/percpu.h>
 #include <public/version.h>
@@ -612,30 +612,32 @@ void __init __start_xen(multiboot_info_t *mbi)
 void arch_get_xen_caps(xen_capabilities_info_t info)
 {
     char *p = info;
+    int major = xen_major_version();
+    int minor = xen_minor_version();
 
 #if defined(CONFIG_X86_32) && !defined(CONFIG_X86_PAE)
 
-    p += sprintf(p, "xen-%d.%d-x86_32 ", XEN_VERSION, XEN_SUBVERSION);
+    p += sprintf(p, "xen-%d.%d-x86_32 ", major, minor);
     if ( hvm_enabled )
-        p += sprintf(p, "hvm-%d.%d-x86_32 ", XEN_VERSION, XEN_SUBVERSION);
+        p += sprintf(p, "hvm-%d.%d-x86_32 ", major, minor);
 
 #elif defined(CONFIG_X86_32) && defined(CONFIG_X86_PAE)
 
-    p += sprintf(p, "xen-%d.%d-x86_32p ", XEN_VERSION, XEN_SUBVERSION);
+    p += sprintf(p, "xen-%d.%d-x86_32p ", major, minor);
     if ( hvm_enabled )
     {
-        p += sprintf(p, "hvm-%d.%d-x86_32 ", XEN_VERSION, XEN_SUBVERSION);
-        p += sprintf(p, "hvm-%d.%d-x86_32p ", XEN_VERSION, XEN_SUBVERSION);
+        p += sprintf(p, "hvm-%d.%d-x86_32 ", major, minor);
+        p += sprintf(p, "hvm-%d.%d-x86_32p ", major, minor);
     }
 
 #elif defined(CONFIG_X86_64)
 
-    p += sprintf(p, "xen-%d.%d-x86_64 ", XEN_VERSION, XEN_SUBVERSION);
+    p += sprintf(p, "xen-%d.%d-x86_64 ", major, minor);
     if ( hvm_enabled )
     {
-        p += sprintf(p, "hvm-%d.%d-x86_32 ", XEN_VERSION, XEN_SUBVERSION);
-        p += sprintf(p, "hvm-%d.%d-x86_32p ", XEN_VERSION, XEN_SUBVERSION);
-        p += sprintf(p, "hvm-%d.%d-x86_64 ", XEN_VERSION, XEN_SUBVERSION);
+        p += sprintf(p, "hvm-%d.%d-x86_32 ", major, minor);
+        p += sprintf(p, "hvm-%d.%d-x86_32p ", major, minor);
+        p += sprintf(p, "hvm-%d.%d-x86_64 ", major, minor);
     }
 
 #else

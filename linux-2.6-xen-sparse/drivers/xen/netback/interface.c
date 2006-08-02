@@ -51,23 +51,59 @@ static int net_open(struct net_device *dev)
 	netif_t *netif = netdev_priv(dev);
 	if (netif_carrier_ok(dev))
 		__netif_up(netif);
-	netif_start_queue(dev);
 	return 0;
 }
 
 static int net_close(struct net_device *dev)
 {
 	netif_t *netif = netdev_priv(dev);
-	netif_stop_queue(dev);
 	if (netif_carrier_ok(dev))
 		__netif_down(netif);
 	return 0;
+}
+
+static int netbk_change_mtu(struct net_device *dev, int mtu)
+{
+	int max = netbk_can_sg(dev) ? 65535 - ETH_HLEN : ETH_DATA_LEN;
+
+	if (mtu > max)
+		return -EINVAL;
+	dev->mtu = mtu;
+	return 0;
+}
+
+static int netbk_set_sg(struct net_device *dev, u32 data)
+{
+	if (data) {
+		netif_t *netif = netdev_priv(dev);
+
+		if (!(netif->features & NETIF_F_SG))
+			return -ENOSYS;
+	}
+
+	return ethtool_op_set_sg(dev, data);
+}
+
+static int netbk_set_tso(struct net_device *dev, u32 data)
+{
+	if (data) {
+		netif_t *netif = netdev_priv(dev);
+
+		if (!(netif->features & NETIF_F_TSO))
+			return -ENOSYS;
+	}
+
+	return ethtool_op_set_tso(dev, data);
 }
 
 static struct ethtool_ops network_ethtool_ops =
 {
 	.get_tx_csum = ethtool_op_get_tx_csum,
 	.set_tx_csum = ethtool_op_set_tx_csum,
+	.get_sg = ethtool_op_get_sg,
+	.set_sg = netbk_set_sg,
+	.get_tso = ethtool_op_get_tso,
+	.set_tso = netbk_set_tso,
 	.get_link = ethtool_op_get_link,
 };
 
@@ -103,12 +139,16 @@ netif_t *netif_alloc(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN])
 	dev->get_stats       = netif_be_get_stats;
 	dev->open            = net_open;
 	dev->stop            = net_close;
+	dev->change_mtu	     = netbk_change_mtu;
 	dev->features        = NETIF_F_IP_CSUM;
 
 	SET_ETHTOOL_OPS(dev, &network_ethtool_ops);
 
-	/* Disable queuing. */
-	dev->tx_queue_len = 0;
+	/*
+	 * Reduce default TX queuelen so that each guest interface only
+	 * allows it to eat around 6.4MB of host memory.
+	 */
+	dev->tx_queue_len = 100;
 
 	for (i = 0; i < ETH_ALEN; i++)
 		if (be_mac[i] != 0)

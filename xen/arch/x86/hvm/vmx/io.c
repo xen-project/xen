@@ -81,7 +81,7 @@ interrupt_post_injection(struct vcpu * v, int vector, int type)
 
     switch(type)
     {
-    case VLAPIC_DELIV_MODE_EXT:
+    case APIC_DM_EXTINT:
         break;
 
     default:
@@ -198,16 +198,17 @@ asmlinkage void vmx_intr_assist(void)
 
     highest_vector = cpu_get_interrupt(v, &intr_type); 
     switch (intr_type) {
-    case VLAPIC_DELIV_MODE_EXT:
-    case VLAPIC_DELIV_MODE_FIXED:
-    case VLAPIC_DELIV_MODE_LPRI:
+    case APIC_DM_EXTINT:
+    case APIC_DM_FIXED:
+    case APIC_DM_LOWEST:
         vmx_inject_extint(v, highest_vector, VMX_DELIVER_NO_ERROR_CODE);
         TRACE_3D(TRC_VMX_INT, v->domain->domain_id, highest_vector, 0);
         break;
-    case VLAPIC_DELIV_MODE_SMI:
-    case VLAPIC_DELIV_MODE_NMI:
-    case VLAPIC_DELIV_MODE_INIT:
-    case VLAPIC_DELIV_MODE_STARTUP:
+
+    case APIC_DM_SMI:
+    case APIC_DM_NMI:
+    case APIC_DM_INIT:
+    case APIC_DM_STARTUP:
     default:
         printk("Unsupported interrupt type\n");
         BUG();

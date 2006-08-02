@@ -19,7 +19,7 @@
 #include <asm/sal.h>
 #include <asm/meminit.h>
 #include <asm/fpswa.h>
-#include <xen/compile.h>
+#include <xen/version.h>
 #include <xen/acpi.h>
 
 #include <asm/dom_fw.h>
@@ -353,7 +353,8 @@ dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 	strcpy(xsdt->oem_id, "XEN");
 	strcpy(xsdt->oem_table_id, "Xen/ia64");
 	strcpy(xsdt->asl_compiler_id, "XEN");
-	xsdt->asl_compiler_revision = (XEN_VERSION<<16)|(XEN_SUBVERSION);
+	xsdt->asl_compiler_revision = (xen_major_version() << 16) |
+		xen_minor_version();
 
 	xsdt->table_offset_entry[0] = dom_pa((unsigned long) fadt);
 	tables->madt_ptr = dom_pa((unsigned long) madt);
@@ -367,7 +368,8 @@ dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 	strcpy(fadt->oem_id, "XEN");
 	strcpy(fadt->oem_table_id, "Xen/ia64");
 	strcpy(fadt->asl_compiler_id, "XEN");
-	fadt->asl_compiler_revision = (XEN_VERSION<<16)|(XEN_SUBVERSION);
+	fadt->asl_compiler_revision = (xen_major_version() << 16) |
+		xen_minor_version();
 
 	strncpy(facs->signature, FACS_SIG, 4);
 	facs->version = 1;
@@ -413,7 +415,8 @@ dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 	strcpy(dsdt->oem_id, "XEN");
 	strcpy(dsdt->oem_table_id, "Xen/ia64");
 	strcpy(dsdt->asl_compiler_id, "XEN");
-	dsdt->asl_compiler_revision = (XEN_VERSION<<16)|(XEN_SUBVERSION);
+	dsdt->asl_compiler_revision = (xen_major_version() << 16) |
+		xen_minor_version();
 
 	/* Trivial namespace, avoids ACPI CA complaints */
 	tables->aml[0] = 0x10; /* Scope */
@@ -454,7 +457,8 @@ dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 	strcpy(madt->header.oem_id, "XEN");
 	strcpy(madt->header.oem_table_id, "Xen/ia64");
 	strcpy(madt->header.asl_compiler_id, "XEN");
-	madt->header.asl_compiler_revision = (XEN_VERSION<<16)|(XEN_SUBVERSION);
+	madt->header.asl_compiler_revision = (xen_major_version() << 16) |
+		xen_minor_version();
 
 	/* An LSAPIC entry describes a CPU.  */
 	for (i = 0; i < MAX_VIRT_CPUS; i++) {

@@ -29,7 +29,7 @@
 #ifndef NDEBUG
 #define HVM_DEBUG 1
 #else
-#define HVM_DEBUG 0
+#define HVM_DEBUG 1
 #endif
 
 #define	hvm_guest(v)	((v)->arch.guest_context.flags & VGCF_HVM_GUEST)
@@ -147,5 +147,7 @@ extern int hvm_io_intercept(ioreq_t *p, int type);
 extern void hvm_hooks_assist(struct vcpu *v);
 extern void hvm_print_line(struct vcpu *v, const char c);
 extern void hlt_timer_fn(void *data);
+
+void hvm_do_hypercall(struct cpu_user_regs *pregs);
 
 #endif /* __ASM_X86_HVM_SUPPORT_H__ */

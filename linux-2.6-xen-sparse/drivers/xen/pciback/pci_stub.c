@@ -232,6 +232,10 @@ static int __devinit pcistub_match_one(struct pci_dev *dev,
 		    && dev->bus->number == pdev_id->bus
 		    && dev->devfn == pdev_id->devfn)
 			return 1;
+
+		/* Sometimes topmost bridge links to itself. */
+		if (dev == dev->bus->self)
+			break;
 	}
 
 	return 0;

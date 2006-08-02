@@ -58,6 +58,9 @@ struct xenbus_dev_data {
 	/* In-progress transaction. */
 	struct list_head transactions;
 
+	/* Active watches. */
+	struct list_head watches;
+
 	/* Partial request. */
 	unsigned int len;
 	union {
@@ -70,6 +73,8 @@ struct xenbus_dev_data {
 	char read_buffer[PAGE_SIZE];
 	unsigned int read_cons, read_prod;
 	wait_queue_head_t read_waitq;
+
+	struct mutex reply_mutex;
 };
 
 static struct proc_dir_entry *xenbus_dev_intf;
@@ -100,13 +105,59 @@ static void queue_reply(struct xenbus_dev_data *u,
 {
 	int i;
 
+	mutex_lock(&u->reply_mutex);
+
 	for (i = 0; i < len; i++, u->read_prod++)
 		u->read_buffer[MASK_READ_IDX(u->read_prod)] = data[i];
 
 	BUG_ON((u->read_prod - u->read_cons) > sizeof(u->read_buffer));
 
+	mutex_unlock(&u->reply_mutex);
+
 	wake_up(&u->read_waitq);
 }
+
+struct watch_adapter
+{
+	struct list_head list;
+	struct xenbus_watch watch;
+	struct xenbus_dev_data *dev_data;
+	char *token;
+};
+
+static void free_watch_adapter (struct watch_adapter *watch)
+{
+	kfree(watch->watch.node);
+	kfree(watch->token);
+	kfree(watch);
+}
+
+static void watch_fired(struct xenbus_watch *watch,
+			const char **vec,
+			unsigned int len)
+{
+	struct watch_adapter *adap =
+            container_of(watch, struct watch_adapter, watch);
+	struct xsd_sockmsg hdr;
+	const char *path, *token;
+	int path_len, tok_len, body_len;
+
+	path = vec[XS_WATCH_PATH];
+	token = adap->token;
+
+	path_len = strlen(path) + 1;
+	tok_len = strlen(token) + 1;
+	body_len = path_len + tok_len;
+
+	hdr.type = XS_WATCH_EVENT;
+	hdr.len = body_len;
+	
+	queue_reply(adap->dev_data, (char *)&hdr, sizeof(hdr));
+	queue_reply(adap->dev_data, (char *)path, path_len);
+	queue_reply(adap->dev_data, (char *)token, tok_len);
+}
+
+static LIST_HEAD(watch_list);
 
 static ssize_t xenbus_dev_write(struct file *filp,
 				const char __user *ubuf,
@@ -116,6 +167,9 @@ static ssize_t xenbus_dev_write(struct file *filp,
 	struct xenbus_dev_transaction *trans = NULL;
 	uint32_t msg_type;
 	void *reply;
+	char *path, *token;
+	struct watch_adapter *watch, *tmp_watch;
+	int err;
 
 	if ((len + u->len) > sizeof(u->u.buffer))
 		return -EINVAL;
@@ -169,6 +223,56 @@ static ssize_t xenbus_dev_write(struct file *filp,
 		kfree(reply);
 		break;
 
+	case XS_WATCH:
+	case XS_UNWATCH:
+		path = u->u.buffer + sizeof(u->u.msg);
+		token = memchr(path, 0, u->u.msg.len);
+		if (token == NULL)
+			return -EILSEQ;
+		token++;
+
+		if (msg_type == XS_WATCH) {
+			static const char * XS_WATCH_RESP = "OK";
+			struct xsd_sockmsg hdr;
+
+			watch = kmalloc(sizeof(*watch), GFP_KERNEL);
+			watch->watch.node = kmalloc(strlen(path)+1,
+                                                    GFP_KERNEL);
+			strcpy((char *)watch->watch.node, path);
+			watch->watch.callback = watch_fired;
+			watch->token = kmalloc(strlen(token)+1, GFP_KERNEL);
+			strcpy(watch->token, token);
+			watch->dev_data = u;
+
+			err = register_xenbus_watch(&watch->watch);
+			if (err) {
+				free_watch_adapter(watch);
+				return err;
+			}
+			
+			list_add(&watch->list, &u->watches);
+
+			hdr.type = XS_WATCH;
+			hdr.len = strlen(XS_WATCH_RESP) + 1;
+			queue_reply(u, (char *)&hdr, sizeof(hdr));
+			queue_reply(u, (char *)XS_WATCH_RESP, hdr.len);
+		} else {
+			list_for_each_entry_safe(watch, tmp_watch,
+                                                 &u->watches, list) {
+				if (!strcmp(watch->token, token) &&
+				    !strcmp(watch->watch.node, path))
+					break;
+				{
+					unregister_xenbus_watch(&watch->watch);
+					list_del(&watch->list);
+					free_watch_adapter(watch);
+					break;
+				}
+			}
+		}
+
+		break;
+
 	default:
 		return -EINVAL;
 	}
@@ -191,7 +295,10 @@ static int xenbus_dev_open(struct inode *inode, struct file *filp)
 		return -ENOMEM;
 
 	INIT_LIST_HEAD(&u->transactions);
+	INIT_LIST_HEAD(&u->watches);
 	init_waitqueue_head(&u->read_waitq);
+
+	mutex_init(&u->reply_mutex);
 
 	filp->private_data = u;
 
@@ -202,11 +309,18 @@ static int xenbus_dev_release(struct inode *inode, struct file *filp)
 {
 	struct xenbus_dev_data *u = filp->private_data;
 	struct xenbus_dev_transaction *trans, *tmp;
+	struct watch_adapter *watch, *tmp_watch;
 
 	list_for_each_entry_safe(trans, tmp, &u->transactions, list) {
 		xenbus_transaction_end(trans->handle, 1);
 		list_del(&trans->list);
 		kfree(trans);
+	}
+
+	list_for_each_entry_safe(watch, tmp_watch, &u->watches, list) {
+		unregister_xenbus_watch(&watch->watch);
+		list_del(&watch->list);
+		free_watch_adapter(watch);
 	}
 
 	kfree(u);

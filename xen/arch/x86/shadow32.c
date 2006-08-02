@@ -990,10 +990,12 @@ alloc_p2m_table(struct domain *d)
 
     list_ent = d->page_list.next;
 
-    for ( gpfn = 0; list_ent != &d->page_list; gpfn++ )
+    while ( list_ent != &d->page_list )
     {
         page = list_entry(list_ent, struct page_info, list);
         mfn = page_to_mfn(page);
+
+        gpfn = get_gpfn_from_mfn(mfn);
 
         if ( !(error = map_p2m_entry(l1tab, gpfn, mfn)) )
         {
@@ -1001,7 +1003,7 @@ alloc_p2m_table(struct domain *d)
             break;
         }
 
-        list_ent = frame_table[mfn].list.next;
+        list_ent = page->list.next;
     }
 
     unmap_domain_page(l1tab);
