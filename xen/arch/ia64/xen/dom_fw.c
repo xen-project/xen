@@ -342,6 +342,7 @@ dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 	struct acpi_table_lsapic *lsapic = tables->lsapic;
 	int i;
 	int aml_len;
+	int nbr_cpus;
 
 	memset(tables, 0, sizeof(struct fake_acpi_tables));
 
@@ -452,8 +453,6 @@ dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 	/* setup MADT */
 	strncpy(madt->header.signature, APIC_SIG, 4);
 	madt->header.revision = 2;
-	madt->header.length = sizeof(struct acpi_table_madt) +
-		MAX_VIRT_CPUS * sizeof(struct acpi_table_lsapic);
 	strcpy(madt->header.oem_id, "XEN");
 	strcpy(madt->header.oem_table_id, "Xen/ia64");
 	strcpy(madt->header.asl_compiler_id, "XEN");
@@ -461,15 +460,20 @@ dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 		xen_minor_version();
 
 	/* An LSAPIC entry describes a CPU.  */
+	nbr_cpus = 0;
 	for (i = 0; i < MAX_VIRT_CPUS; i++) {
 		lsapic[i].header.type = ACPI_MADT_LSAPIC;
 		lsapic[i].header.length = sizeof(struct acpi_table_lsapic);
 		lsapic[i].acpi_id = i;
 		lsapic[i].id = i;
 		lsapic[i].eid = 0;
-		lsapic[i].flags.enabled = (d->vcpu[i] != NULL);
+		if (d->vcpu[i] != NULL) {
+			lsapic[i].flags.enabled = 1;
+			nbr_cpus++;
+		}
 	}
-
+	madt->header.length = sizeof(struct acpi_table_madt) +
+	                      nbr_cpus * sizeof(struct acpi_table_lsapic);
 	madt->header.checksum = generate_acpi_checksum(madt,
 	                                               madt->header.length);
 	return;
