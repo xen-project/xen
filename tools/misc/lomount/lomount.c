@@ -158,7 +158,7 @@ load_gpt (const char *diskimage, struct pentry *parttbl[])
 	entry_size = read_le4 (&data[84]);
 
 #ifdef DEBUG
-	fprintf(stderr, "lba entries: %lu, nbr_part: %u, entry_size: %lu\n",
+	fprintf(stderr, "lba entries: %llu, nbr_part: %u, entry_size: %lu\n",
 		entries_lba, nbr_part, entry_size);
 #endif
 	part = malloc (nbr_part * sizeof (struct pentry));
@@ -404,7 +404,7 @@ int main(int argc, char ** argv)
 	   value is off by (larger than) a value less than one. */
 	sec = 512; /* TODO: calculate real sector size */
 #ifdef DEBUG
-	printf("sec: %d\n", sec);
+	printf("sec: %llu\n", sec);
 #endif
 	if (partition > nbr_part)
 	{
@@ -421,7 +421,7 @@ int main(int argc, char ** argv)
 
 	pnum = sec * num;
 #ifdef DEBUG
-	printf("offset = %d\n", pnum);
+	printf("offset = %llu\n", pnum);
 #endif
 	snprintf(buf, sizeof(buf), "mount -oloop,offset=%lld %s %s",
 		 pnum, diskimage, argv2);
