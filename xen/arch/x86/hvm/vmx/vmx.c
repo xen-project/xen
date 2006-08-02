@@ -477,7 +477,7 @@ static void vmx_ctxt_switch_to(struct vcpu *v)
     vmx_restore_dr(v);
 }
 
-void stop_vmx(void)
+static void stop_vmx(void)
 {
     if (read_cr4() & X86_CR4_VMXE)
         __vmxoff();
@@ -562,7 +562,7 @@ static void fixup_vm86_seg_bases(struct cpu_user_regs *regs)
     BUG_ON(err);
 }
 
-void vmx_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
+static void vmx_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
 {
     vmx_vmcs_enter(v);
 
@@ -588,7 +588,7 @@ void vmx_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
     vmx_vmcs_exit(v);
 }
 
-int vmx_realmode(struct vcpu *v)
+static int vmx_realmode(struct vcpu *v)
 {
     unsigned long rflags;
 
@@ -596,7 +596,7 @@ int vmx_realmode(struct vcpu *v)
     return rflags & X86_EFLAGS_VM;
 }
 
-int vmx_instruction_length(struct vcpu *v)
+static int vmx_instruction_length(struct vcpu *v)
 {
     unsigned long inst_len;
 
@@ -605,7 +605,7 @@ int vmx_instruction_length(struct vcpu *v)
     return inst_len;
 }
 
-unsigned long vmx_get_ctrl_reg(struct vcpu *v, unsigned int num)
+static unsigned long vmx_get_ctrl_reg(struct vcpu *v, unsigned int num)
 {
     switch ( num )
     {
@@ -622,7 +622,7 @@ unsigned long vmx_get_ctrl_reg(struct vcpu *v, unsigned int num)
 }
 
 /* SMP VMX guest support */
-void vmx_init_ap_context(struct vcpu_guest_context *ctxt,
+static void vmx_init_ap_context(struct vcpu_guest_context *ctxt,
                          int vcpuid, int trampoline_vector)
 {
     int i;
@@ -667,6 +667,28 @@ static int check_vmx_controls(u32 ctrls, u32 msr)
         return 0;
     }
     return 1;
+}
+
+/* Setup HVM interfaces */
+static void vmx_setup_hvm_funcs(void)
+{
+    if ( hvm_enabled )
+        return;
+
+    hvm_funcs.disable = stop_vmx;
+
+    hvm_funcs.initialize_guest_resources = vmx_initialize_guest_resources;
+    hvm_funcs.relinquish_guest_resources = vmx_relinquish_guest_resources;
+
+    hvm_funcs.store_cpu_guest_regs = vmx_store_cpu_guest_regs;
+    hvm_funcs.load_cpu_guest_regs = vmx_load_cpu_guest_regs;
+
+    hvm_funcs.realmode = vmx_realmode;
+    hvm_funcs.paging_enabled = vmx_paging_enabled;
+    hvm_funcs.instruction_length = vmx_instruction_length;
+    hvm_funcs.get_guest_ctrl_reg = vmx_get_ctrl_reg;
+
+    hvm_funcs.init_ap_context = vmx_init_ap_context;
 }
 
 static void vmx_init_hypercall_page(struct domain *d, void *hypercall_page)
@@ -755,21 +777,7 @@ int start_vmx(void)
 
     vmx_save_init_msrs();
 
-    /* Setup HVM interfaces */
-    hvm_funcs.disable = stop_vmx;
-
-    hvm_funcs.initialize_guest_resources = vmx_initialize_guest_resources;
-    hvm_funcs.relinquish_guest_resources = vmx_relinquish_guest_resources;
-
-    hvm_funcs.store_cpu_guest_regs = vmx_store_cpu_guest_regs;
-    hvm_funcs.load_cpu_guest_regs = vmx_load_cpu_guest_regs;
-
-    hvm_funcs.realmode = vmx_realmode;
-    hvm_funcs.paging_enabled = vmx_paging_enabled;
-    hvm_funcs.instruction_length = vmx_instruction_length;
-    hvm_funcs.get_guest_ctrl_reg = vmx_get_ctrl_reg;
-
-    hvm_funcs.init_ap_context = vmx_init_ap_context;
+    vmx_setup_hvm_funcs();
 
     hvm_funcs.init_hypercall_page = vmx_init_hypercall_page;
 
