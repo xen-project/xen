@@ -1484,7 +1484,7 @@ static void svm_io_instruction(struct vcpu *v)
                     count = (addr & ~PAGE_MASK) / size;
             }
             else    
-                vmcb->rip = vmcb->exitinfo2;
+                regs->eip = vmcb->exitinfo2;
 
             send_pio_req(regs, port, count, size, addr, dir, 1);
         }
@@ -1495,7 +1495,7 @@ static void svm_io_instruction(struct vcpu *v)
          * On SVM, the RIP of the intruction following the IN/OUT is saved in
          * ExitInfo2
          */
-        vmcb->rip = vmcb->exitinfo2;
+        regs->eip = vmcb->exitinfo2;
 
         if (port == 0xe9 && dir == IOREQ_WRITE && size == 1) 
             hvm_print_line(v, regs->eax); /* guest debug output */
