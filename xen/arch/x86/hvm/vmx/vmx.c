@@ -1111,9 +1111,10 @@ static void vmx_io_instruction(unsigned long exit_qualification,
     memcpy(regs, guest_cpu_user_regs(), HVM_CONTEXT_STACK_BYTES);
     hvm_store_cpu_guest_regs(current, regs, NULL);
 
-    __vmread(GUEST_RIP, &eip);
-    __vmread(GUEST_CS_SELECTOR, &cs);
-    __vmread(GUEST_RFLAGS, &eflags);
+    eip = regs->eip;
+    cs = regs->cs;
+    eflags = regs->eflags;
+
     vm86 = eflags & X86_EFLAGS_VM ? 1 : 0;
 
     HVM_DBG_LOG(DBG_LEVEL_IO,
@@ -1165,7 +1166,7 @@ static void vmx_io_instruction(unsigned long exit_qualification,
                 else
                     count = (addr & ~PAGE_MASK) / size;
             } else
-                __update_guest_eip(inst_len);
+                regs->eip += inst_len;
 
             send_pio_req(regs, port, count, size, addr, dir, 1);
         }
@@ -1173,7 +1174,7 @@ static void vmx_io_instruction(unsigned long exit_qualification,
         if (port == 0xe9 && dir == IOREQ_WRITE && size == 1)
             hvm_print_line(current, regs->eax); /* guest debug output */
 
-        __update_guest_eip(inst_len);
+        regs->eip += inst_len;
         send_pio_req(regs, port, 1, size, regs->eax, dir, 0);
     }
 }
