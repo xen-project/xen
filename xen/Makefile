@@ -146,3 +146,15 @@ _cscope:
 .PHONY: MAP
 MAP:
 	$(NM) $(TARGET) | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
+
+.PHONY: FORCE
+FORCE:
+
+%.o %.i: %.c FORCE
+	$(MAKE) -f $(BASEDIR)/Rules.mk -C $(*D) $(@F)
+
+%.o %.s: %.S FORCE
+	$(MAKE) -f $(BASEDIR)/Rules.mk -C $(*D) $(@F)
+
+%/: FORCE
+	$(MAKE) -f $(BASEDIR)/Rules.mk -C $* built_in.o

@@ -105,3 +105,9 @@ _clean_%/: FORCE
 
 %.o: %.S $(HDRS) Makefile
 	$(CC) $(CFLAGS) $(AFLAGS) -c $< -o $@
+
+%.i: %.c $(HDRS) Makefile
+	$(CPP) $(CFLAGS) $< -o $@
+
+%.s: %.S $(HDRS) Makefile
+	$(CPP) $(CFLAGS) $(AFLAGS) $< -o $@
