@@ -60,6 +60,8 @@ static void hvm_zap_mmio_range(
 {
     unsigned long i, val = INVALID_MFN;
 
+    ASSERT(d == current->domain);
+
     for ( i = 0; i < nr_pfn; i++ )
     {
         if ( pfn + i >= 0xfffff )
@@ -69,25 +71,36 @@ static void hvm_zap_mmio_range(
     }
 }
 
-static void hvm_map_io_shared_page(struct domain *d)
+static void e820_zap_iommu_callback(struct domain *d,
+                                    struct e820entry *e,
+                                    void *ign)
+{
+    if ( e->type == E820_IO )
+        hvm_zap_mmio_range(d, e->addr >> PAGE_SHIFT, e->size >> PAGE_SHIFT);
+}
+
+static void e820_foreach(struct domain *d,
+                         void (*cb)(struct domain *d,
+                                    struct e820entry *e,
+                                    void *data),
+                         void *data)
 {
     int i;
     unsigned char e820_map_nr;
     struct e820entry *e820entry;
     unsigned char *p;
     unsigned long mfn;
-    unsigned long gpfn = 0;
 
-    local_flush_tlb_pge();
-
-    mfn = get_mfn_from_gpfn(E820_MAP_PAGE >> PAGE_SHIFT);
-    if (mfn == INVALID_MFN) {
+    mfn = gmfn_to_mfn(d, E820_MAP_PAGE >> PAGE_SHIFT);
+    if ( mfn == INVALID_MFN )
+    {
         printk("Can not find E820 memory map page for HVM domain.\n");
         domain_crash_synchronous();
     }
 
     p = map_domain_page(mfn);
-    if (p == NULL) {
+    if ( p == NULL )
+    {
         printk("Can not map E820 memory map page for HVM domain.\n");
         domain_crash_synchronous();
     }
@@ -96,36 +109,52 @@ static void hvm_map_io_shared_page(struct domain *d)
     e820entry = (struct e820entry *)(p + E820_MAP_OFFSET);
 
     for ( i = 0; i < e820_map_nr; i++ )
-    {
-        if ( e820entry[i].type == E820_SHARED_PAGE )
-            gpfn = (e820entry[i].addr >> PAGE_SHIFT);
-        if ( e820entry[i].type == E820_IO )
-            hvm_zap_mmio_range(
-                d, 
-                e820entry[i].addr >> PAGE_SHIFT,
-                e820entry[i].size >> PAGE_SHIFT);
-    }
+        cb(d, e820entry + i, data);
 
-    if ( gpfn == 0 ) {
-        printk("Can not get io request shared page"
-               " from E820 memory map for HVM domain.\n");
-        unmap_domain_page(p);
-        domain_crash_synchronous();
-    }
     unmap_domain_page(p);
+}
 
-    /* Initialise shared page */
-    mfn = get_mfn_from_gpfn(gpfn);
-    if (mfn == INVALID_MFN) {
+static void hvm_zap_iommu_pages(struct domain *d)
+{
+    e820_foreach(d, e820_zap_iommu_callback, NULL);
+}
+
+static void e820_map_io_shared_callback(struct domain *d,
+                                        struct e820entry *e,
+                                        void *data)
+{
+    unsigned long *mfn = data;
+    if ( e->type == E820_SHARED_PAGE )
+    {
+        ASSERT(*mfn == INVALID_MFN);
+        *mfn = gmfn_to_mfn(d, e->addr >> PAGE_SHIFT);
+    }
+}
+
+void hvm_map_io_shared_page(struct vcpu *v)
+{
+    unsigned long mfn = INVALID_MFN;
+    void *p;
+    struct domain *d = v->domain;
+
+    if ( d->arch.hvm_domain.shared_page_va )
+        return;
+
+    e820_foreach(d, e820_map_io_shared_callback, &mfn);
+
+    if ( mfn == INVALID_MFN )
+    {
         printk("Can not find io request shared page for HVM domain.\n");
         domain_crash_synchronous();
     }
 
     p = map_domain_page_global(mfn);
-    if (p == NULL) {
+    if ( p == NULL )
+    {
         printk("Can not map io request shared page for HVM domain.\n");
         domain_crash_synchronous();
     }
+
     d->arch.hvm_domain.shared_page_va = (unsigned long)p;
 }
 
@@ -143,7 +172,8 @@ void hvm_setup_platform(struct domain* d)
         domain_crash_synchronous();
     }
 
-    hvm_map_io_shared_page(d);
+    hvm_zap_iommu_pages(d);
+    hvm_map_io_shared_page(v);
 
     platform = &d->arch.hvm_domain;
     pic_init(&platform->vpic, pic_irq_request, &platform->interrupt_request);
@@ -155,7 +185,8 @@ void hvm_setup_platform(struct domain* d)
         hvm_vioapic_init(d);
     }
 
-    init_timer(&platform->pl_time.periodic_tm.timer, pt_timer_fn, v, v->processor);
+    init_timer(&platform->pl_time.periodic_tm.timer,
+               pt_timer_fn, v, v->processor);
     pit_init(v, cpu_khz);
 }
 
