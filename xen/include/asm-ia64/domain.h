@@ -37,6 +37,8 @@ p2m_entry_retry(struct p2m_entry* entry)
 }
 
 extern void domain_relinquish_resources(struct domain *);
+struct vcpu;
+extern void relinquish_vcpu_resources(struct vcpu *v);
 
 /* given a current domain metaphysical address, return the physical address */
 extern unsigned long translate_domain_mpaddr(unsigned long mpaddr,

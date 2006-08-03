@@ -236,6 +236,14 @@ void startup_cpu_idle_loop(void)
 	continue_cpu_idle_loop();
 }
 
+/* compile time test for get_order(sizeof(mapped_regs_t)) !=
+ * get_order_from_shift(XMAPPEDREGS_SHIFT))
+ */
+#if !(((1 << (XMAPPEDREGS_SHIFT - 1)) < MAPPED_REGS_T_SIZE) && \
+      (MAPPED_REGS_T_SIZE < (1 << (XMAPPEDREGS_SHIFT + 1))))
+# error "XMAPPEDREGS_SHIFT doesn't match sizeof(mapped_regs_t)."
+#endif
+
 struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 {
 	struct vcpu *v;
@@ -261,13 +269,17 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 
 	if (!is_idle_domain(d)) {
 	    if (!d->arch.is_vti) {
-		/* Create privregs page only if not VTi.  */
-		v->arch.privregs = 
-		    alloc_xenheap_pages(get_order(sizeof(mapped_regs_t)));
+		int order;
+		int i;
+
+		/* Create privregs page only if not VTi. */
+		order = get_order_from_shift(XMAPPEDREGS_SHIFT);
+		v->arch.privregs = alloc_xenheap_pages(order);
 		BUG_ON(v->arch.privregs == NULL);
-		memset(v->arch.privregs, 0, PAGE_SIZE);
-		share_xen_page_with_guest(virt_to_page(v->arch.privregs),
-		                          d, XENSHARE_writable);
+		memset(v->arch.privregs, 0, 1 << XMAPPEDREGS_SHIFT);
+		for (i = 0; i < (1 << order); i++)
+		    share_xen_page_with_guest(virt_to_page(v->arch.privregs) +
+		                              i, d, XENSHARE_writable);
 	    }
 
 	    v->arch.metaphysical_rr0 = d->arch.metaphysical_rr0;
@@ -295,15 +307,21 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 	return v;
 }
 
+void relinquish_vcpu_resources(struct vcpu *v)
+{
+    if (v->arch.privregs != NULL) {
+        free_xenheap_pages(v->arch.privregs,
+                           get_order_from_shift(XMAPPEDREGS_SHIFT));
+        v->arch.privregs = NULL;
+    }
+}
+
 void free_vcpu_struct(struct vcpu *v)
 {
 	if (VMX_DOMAIN(v))
 		vmx_relinquish_vcpu_resources(v);
-	else {
-		if (v->arch.privregs != NULL)
-			free_xenheap_pages(v->arch.privregs,
-			              get_order_from_shift(XMAPPEDREGS_SHIFT));
-	}
+	else
+		relinquish_vcpu_resources(v);
 
 	free_xenheap_pages(v, KERNEL_STACK_SIZE_ORDER);
 }

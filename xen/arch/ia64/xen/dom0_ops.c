@@ -122,6 +122,15 @@ long arch_do_dom0_op(dom0_op_t *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
                     ret = -EINVAL;
                     break;
                 }
+                if (!d->arch.is_vti) {
+                    struct vcpu *v;
+                    for_each_vcpu(d, v) {
+                        BUG_ON(v->arch.privregs == NULL);
+                        free_domheap_pages(virt_to_page(v->arch.privregs),
+                                      get_order_from_shift(XMAPPEDREGS_SHIFT));
+                        relinquish_vcpu_resources(v);
+                    }
+                }
                 d->arch.is_vti = 1;
                 vmx_setup_platform(d);
             }
