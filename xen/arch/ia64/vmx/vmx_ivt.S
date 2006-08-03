@@ -423,7 +423,6 @@ ENTRY(vmx_break_fault)
     mov r31=pr
     mov r19=11
     mov r30=cr.iim
-    movl r29=0x1100
     ;;
 #ifdef VTI_DEBUG
     // break 0 is already handled in vmx_ia64_handle_break.
@@ -431,9 +430,7 @@ ENTRY(vmx_break_fault)
     (p6) br.sptk vmx_fault_11
     ;;
 #endif
-    cmp.eq  p6,p7=r29,r30
-    (p6) br.dptk.few vmx_hypercall_dispatch
-    (p7) br.sptk.many vmx_dispatch_break_fault
+    br.sptk.many vmx_dispatch_break_fault
     ;;
     VMX_FAULT(11);
 END(vmx_break_fault)
@@ -1140,33 +1137,6 @@ ENTRY(vmx_dispatch_break_fault)
 END(vmx_dispatch_break_fault)
 
 
-ENTRY(vmx_hypercall_dispatch)
-    VMX_SAVE_MIN_WITH_COVER
-    ssm psr.ic
-    ;;
-    srlz.i                  // guarantee that interruption collection is on
-    ;;
-    (p15) ssm psr.i               // restore psr.i
-    adds r3=8,r2                // set up second base pointer
-    ;;
-    VMX_SAVE_REST
-    ;;
-    movl r14=ia64_leave_hypervisor
-    movl r2=hyper_call_table
-    ;;
-    mov rp=r14
-    shladd r2=r15,3,r2
-    ;;
-    ld8 r2=[r2]
-    ;;
-    mov b6=r2
-    ;;
-    br.call.sptk.many b6=b6
-    ;;
-END(vmx_hypercall_dispatch)
-
-
-
 ENTRY(vmx_dispatch_interrupt)
     VMX_SAVE_MIN_WITH_COVER_R19	// uses r31; defines r2 and r3
     ;;
@@ -1187,39 +1157,3 @@ ENTRY(vmx_dispatch_interrupt)
     add out1=16,sp		// pass pointer to pt_regs as second arg
     br.call.sptk.many b6=ia64_handle_irq
 END(vmx_dispatch_interrupt)
-
-
-
-    .rodata
-    .align 8
-    .globl hyper_call_table
-hyper_call_table:
-    data8 hyper_not_support     //hyper_set_trap_table     /*  0 */
-    data8 hyper_mmu_update
-    data8 hyper_not_support     //hyper_set_gdt
-    data8 hyper_not_support     //hyper_stack_switch
-    data8 hyper_not_support     //hyper_set_callbacks
-    data8 hyper_not_support     //hyper_fpu_taskswitch     /*  5 */
-    data8 hyper_sched_op_compat
-    data8 hyper_dom0_op
-    data8 hyper_not_support     //hyper_set_debugreg
-    data8 hyper_not_support     //hyper_get_debugreg
-    data8 hyper_not_support     //hyper_update_descriptor  /* 10 */
-    data8 hyper_not_support     //hyper_set_fast_trap
-    data8 hyper_dom_mem_op
-    data8 hyper_not_support     //hyper_multicall
-    data8 hyper_not_support     //hyper_update_va_mapping
-    data8 hyper_not_support     //hyper_set_timer_op       /* 15 */
-    data8 hyper_event_channel_op_compat
-    data8 hyper_xen_version
-    data8 hyper_not_support     //hyper_console_io
-    data8 hyper_not_support     //hyper_physdev_op
-    data8 hyper_not_support     //hyper_grant_table_op     /* 20 */
-    data8 hyper_not_support     //hyper_vm_assist
-    data8 hyper_not_support     //hyper_update_va_mapping_otherdomain
-    data8 hyper_not_support     //hyper_switch_vm86
-    data8 hyper_not_support     //hyper_boot_vcpu
-    data8 hyper_not_support     //hyper_ni_hypercall       /* 25 */
-    data8 hyper_not_support     //hyper_mmuext_op
-    data8 hyper_not_support     //tata8 hyper_lock_page
-    data8 hyper_set_shared_page
