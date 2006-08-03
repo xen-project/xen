@@ -27,7 +27,6 @@
 #define STATE_IOREQ_READY       1
 #define STATE_IOREQ_INPROCESS   2
 #define STATE_IORESP_READY      3
-#define STATE_IORESP_HOOK       4
 
 #define IOREQ_TYPE_PIO          0 /* pio */
 #define IOREQ_TYPE_COPY         1 /* mmio ops */
