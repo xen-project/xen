@@ -254,7 +254,7 @@ int cpu_get_interrupt(struct vcpu *v, int *type)
 int
 hvm_copy(void *buf, unsigned long vaddr, int size, int dir)
 {
-    unsigned long gpa, mfn;
+    unsigned long mfn;
     char *addr;
     int count;
 
@@ -263,10 +263,9 @@ hvm_copy(void *buf, unsigned long vaddr, int size, int dir)
         if (count > size)
             count = size;
 
-        if (hvm_paging_enabled(current)) {
-            gpa = gva_to_gpa(vaddr);
-            mfn = get_mfn_from_gpfn(gpa >> PAGE_SHIFT);
-        } else
+        if (hvm_paging_enabled(current))
+            mfn = gva_to_mfn(vaddr);
+        else
             mfn = get_mfn_from_gpfn(vaddr >> PAGE_SHIFT);
         if (mfn == INVALID_MFN)
             return 0;

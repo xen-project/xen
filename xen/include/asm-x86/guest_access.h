@@ -8,6 +8,8 @@
 #define __ASM_X86_GUEST_ACCESS_H__
 
 #include <asm/uaccess.h>
+#include <asm/hvm/support.h>
+#include <asm/hvm/guest_access.h>
 
 /* Is the guest handle a NULL reference? */
 #define guest_handle_is_null(hnd)        ((hnd).p == NULL)
@@ -28,6 +30,8 @@
 #define copy_to_guest_offset(hnd, off, ptr, nr) ({      \
     const typeof(ptr) _x = (hnd).p;                     \
     const typeof(ptr) _y = (ptr);                       \
+    hvm_guest(current) ?                                \
+    copy_to_user_hvm(_x+(off), _y, sizeof(*_x)*(nr)) :  \
     copy_to_user(_x+(off), _y, sizeof(*_x)*(nr));       \
 })
 
@@ -38,6 +42,8 @@
 #define copy_from_guest_offset(ptr, hnd, off, nr) ({    \
     const typeof(ptr) _x = (hnd).p;                     \
     const typeof(ptr) _y = (ptr);                       \
+    hvm_guest(current) ?                                \
+    copy_from_user_hvm(_y, _x+(off), sizeof(*_x)*(nr)) :\
     copy_from_user(_y, _x+(off), sizeof(*_x)*(nr));     \
 })
 
@@ -45,6 +51,8 @@
 #define copy_field_to_guest(hnd, ptr, field) ({         \
     const typeof(&(ptr)->field) _x = &(hnd).p->field;   \
     const typeof(&(ptr)->field) _y = &(ptr)->field;     \
+    hvm_guest(current) ?                                \
+    copy_to_user_hvm(_x, _y, sizeof(*_x)) :             \
     copy_to_user(_x, _y, sizeof(*_x));                  \
 })
 
@@ -52,6 +60,8 @@
 #define copy_field_from_guest(ptr, hnd, field) ({       \
     const typeof(&(ptr)->field) _x = &(hnd).p->field;   \
     const typeof(&(ptr)->field) _y = &(ptr)->field;     \
+    hvm_guest(current) ?                                \
+    copy_from_user_hvm(_y, _x, sizeof(*_x)) :           \
     copy_from_user(_y, _x, sizeof(*_x));                \
 })
 
@@ -60,29 +70,37 @@
  * Allows use of faster __copy_* functions.
  */
 #define guest_handle_okay(hnd, nr)                      \
-    array_access_ok((hnd).p, (nr), sizeof(*(hnd).p))
+    (hvm_guest(current) || array_access_ok((hnd).p, (nr), sizeof(*(hnd).p)))
 
 #define __copy_to_guest_offset(hnd, off, ptr, nr) ({    \
     const typeof(ptr) _x = (hnd).p;                     \
     const typeof(ptr) _y = (ptr);                       \
+    hvm_guest(current) ?                                \
+    copy_to_user_hvm(_x+(off), _y, sizeof(*_x)*(nr)) :  \
     __copy_to_user(_x+(off), _y, sizeof(*_x)*(nr));     \
 })
 
 #define __copy_from_guest_offset(ptr, hnd, off, nr) ({  \
     const typeof(ptr) _x = (hnd).p;                     \
     const typeof(ptr) _y = (ptr);                       \
+    hvm_guest(current) ?                                \
+    copy_from_user_hvm(_y, _x+(off),sizeof(*_x)*(nr)) : \
     __copy_from_user(_y, _x+(off), sizeof(*_x)*(nr));   \
 })
 
 #define __copy_field_to_guest(hnd, ptr, field) ({       \
     const typeof(&(ptr)->field) _x = &(hnd).p->field;   \
     const typeof(&(ptr)->field) _y = &(ptr)->field;     \
+    hvm_guest(current) ?                                \
+    copy_to_user_hvm(_x, _y, sizeof(*_x)) :             \
     __copy_to_user(_x, _y, sizeof(*_x));                \
 })
 
 #define __copy_field_from_guest(ptr, hnd, field) ({     \
     const typeof(&(ptr)->field) _x = &(hnd).p->field;   \
     const typeof(&(ptr)->field) _y = &(ptr)->field;     \
+    hvm_guest(current) ?                                \
+    copy_from_user_hvm(_x, _y, sizeof(*_x)) :           \
     __copy_from_user(_y, _x, sizeof(*_x));              \
 })
 

@@ -1034,6 +1034,20 @@ void handle_mmio(unsigned long va, unsigned long gpa)
     }
 }
 
+/* Note that copy_{to,from}_user_hvm don't set the A and D bits on
+   PTEs, and require the PTE to be writable even when they're only
+   trying to read from it.  The guest is expected to deal with
+   this. */
+unsigned long copy_to_user_hvm(void *to, const void *from, unsigned len)
+{
+    return !hvm_copy((void *)from, (unsigned long)to, len, HVM_COPY_OUT);
+}
+
+unsigned long copy_from_user_hvm(void *to, const void *from, unsigned len)
+{
+    return !hvm_copy(to, (unsigned long)from, len, HVM_COPY_IN);
+}
+
 /*
  * Local variables:
  * mode: C
