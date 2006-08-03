@@ -3,18 +3,6 @@
 #include <xen/lib.h>
 #include <asm/uaccess.h>
 
-unsigned long dtlb_translate_count = 0;
-unsigned long tr_translate_count = 0;
-unsigned long phys_translate_count = 0;
-unsigned long vhpt_translate_count = 0;
-unsigned long fast_vhpt_translate_count = 0;
-unsigned long recover_to_page_fault_count = 0;
-unsigned long recover_to_break_fault_count = 0;
-unsigned long idle_when_pending = 0;
-unsigned long pal_halt_light_count = 0;
-unsigned long context_switch_count = 0;
-unsigned long lazy_cover_count = 0;
-
 unsigned long slow_hyperpriv_cnt[HYPERPRIVOP_MAX+1] = { 0 };
 unsigned long fast_hyperpriv_cnt[HYPERPRIVOP_MAX+1] = { 0 };
 
@@ -235,38 +223,6 @@ static int zero_privop_counts(char *buf)
 	return s - buf;
 }
 
-static int dump_misc_stats(char *buf)
-{
-	char *s = buf;
-	s += sprintf(s,"Virtual TR translations: %ld\n",tr_translate_count);
-	s += sprintf(s,"Virtual VHPT slow translations: %ld\n",vhpt_translate_count);
-	s += sprintf(s,"Virtual VHPT fast translations: %ld\n",fast_vhpt_translate_count);
-	s += sprintf(s,"Virtual DTLB translations: %ld\n",dtlb_translate_count);
-	s += sprintf(s,"Physical translations: %ld\n",phys_translate_count);
-	s += sprintf(s,"Recoveries to page fault: %ld\n",recover_to_page_fault_count);
-	s += sprintf(s,"Recoveries to break fault: %ld\n",recover_to_break_fault_count);
-	s += sprintf(s,"Idle when pending: %ld\n",idle_when_pending);
-	s += sprintf(s,"PAL_HALT_LIGHT (no pending): %ld\n",pal_halt_light_count);
-	s += sprintf(s,"context switches: %ld\n",context_switch_count);
-	s += sprintf(s,"Lazy covers: %ld\n",lazy_cover_count);
-	return s - buf;
-}
-
-static void zero_misc_stats(void)
-{
-	dtlb_translate_count = 0;
-	tr_translate_count = 0;
-	phys_translate_count = 0;
-	vhpt_translate_count = 0;
-	fast_vhpt_translate_count = 0;
-	recover_to_page_fault_count = 0;
-	recover_to_break_fault_count = 0;
-	lazy_cover_count = 0;
-	pal_halt_light_count = 0;
-	idle_when_pending = 0;
-	context_switch_count = 0;
-}
-
 static const char * const hyperpriv_str[HYPERPRIVOP_MAX+1] = {
 	0, "rfi", "rsm.dt", "ssm.dt", "cover", "itc.d", "itc.i", "ssm.i",
 	"=ivr", "=tpr", "tpr=", "eoi", "itm=", "thash", "ptc.ga", "itr.d",
@@ -360,7 +316,6 @@ int dump_privop_counts_to_user(char __user *ubuf, int len)
 	n += dump_privop_addrs(buf + n);
 #endif
 	n += dump_vhpt_stats(buf + n);
-	n += dump_misc_stats(buf + n);
 	if (__copy_to_user(ubuf,buf,n))
 		return -1;
 	return n;
@@ -381,7 +336,6 @@ int zero_privop_counts_to_user(char __user *ubuf, int len)
 	zero_privop_addrs();
 #endif
 	zero_vhpt_stats();
-	zero_misc_stats();
 	zero_reflect_counts();
 	if (__copy_to_user(ubuf,buf,n))
 		return -1;

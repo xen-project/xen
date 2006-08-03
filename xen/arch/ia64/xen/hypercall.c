@@ -210,7 +210,7 @@ fw_hypercall (struct pt_regs *regs)
 		if (regs->r28 == PAL_HALT_LIGHT) {
 			if (vcpu_deliverable_interrupts(v) ||
 				event_pending(v)) {
-					idle_when_pending++;
+				perfc_incrc(idle_when_pending);
 				vcpu_pend_unspecified_interrupt(v);
 //printf("idle w/int#%d pending!\n",pi);
 //this shouldn't happen, but it apparently does quite a bit!  so don't
@@ -219,7 +219,7 @@ fw_hypercall (struct pt_regs *regs)
 //as deliver_pending_interrupt is called on the way out and will deliver it
 			}
 			else {
-				pal_halt_light_count++;
+				perfc_incrc(pal_halt_light);
 				do_sched_op_compat(SCHEDOP_yield, 0);
 			}
 			regs->r8 = 0;

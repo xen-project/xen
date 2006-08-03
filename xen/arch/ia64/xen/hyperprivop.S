@@ -977,8 +977,8 @@ END(fast_tlb_miss_reflect)
 
 // we get here if fast_insert fails (e.g. due to metaphysical lookup)
 ENTRY(recover_and_page_fault)
-#ifdef FAST_REFLECT_CNT
-	movl r21=recover_to_page_fault_count;;
+#ifdef PERF_COUNTERS
+	movl r21=perfcounters + RECOVER_TO_PAGE_FAULT_PERFC_OFS;;
 	ld8 r22=[r21];;
 	adds r22=1,r22;;
 	st8 [r21]=r22;;
@@ -2009,8 +2009,8 @@ END(hyper_ptc_ga)
 
 // recovery block for hyper_itc metaphysical memory lookup
 ENTRY(recover_and_dispatch_break_fault)
-#ifdef FAST_REFLECT_CNT
-	movl r21=recover_to_break_fault_count;;
+#ifdef PERF_COUNTERS
+	movl r21=perfcounters + RECOVER_TO_BREAK_FAULT_PERFC_OFS;;
 	ld8 r22=[r21];;
 	adds r22=1,r22;;
 	st8 [r21]=r22;;

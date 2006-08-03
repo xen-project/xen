@@ -136,7 +136,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     uint64_t pta;
 
     local_irq_save(spsr);
-    context_switch_count++;
+    perfc_incrc(context_switch);
 
     __ia64_save_fpu(prev->arch._thread.fph);
     __ia64_load_fpu(next->arch._thread.fph);

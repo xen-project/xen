@@ -7,24 +7,6 @@ extern int zero_privop_counts_to_user(char *, int);
 
 #define PRIVOP_ADDR_COUNT
 
-/* vcpu_translate hit with dtlb.  */
-extern unsigned long dtlb_translate_count;
-
-/* vcpu_translate hit with tr.  */
-extern unsigned long tr_translate_count;
-
-/* vcpu_translate in metaphysical mode.  */
-extern unsigned long phys_translate_count;
-
-extern unsigned long vhpt_translate_count;
-extern unsigned long fast_vhpt_translate_count;
-extern unsigned long recover_to_page_fault_count;
-extern unsigned long recover_to_break_fault_count;
-extern unsigned long idle_when_pending;
-extern unsigned long pal_halt_light_count;
-extern unsigned long context_switch_count;
-extern unsigned long lazy_cover_count;
-
 extern unsigned long slow_hyperpriv_cnt[HYPERPRIVOP_MAX+1];
 extern unsigned long fast_hyperpriv_cnt[HYPERPRIVOP_MAX+1];
 

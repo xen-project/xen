@@ -170,7 +170,7 @@ handle_lazy_cover(struct vcpu *v, struct pt_regs *regs)
 		PSCB(v,ifs) = regs->cr_ifs;
 		PSCB(v,incomplete_regframe) = 1;
 		regs->cr_ifs = 0;
-		lazy_cover_count++;
+		perfc_incrc(lazy_cover);
 		return(1); // retry same instruction with cr.ifs off
 	}
 	return(0);

@@ -211,4 +211,9 @@ void foo(void)
 	DEFINE(IA64_KR_IO_BASE_OFFSET, offsetof (cpu_kr_ia64_t, _kr[IA64_KR_IO_BASE]));
 	DEFINE(IA64_KR_CURRENT_STACK_OFFSET, offsetof (cpu_kr_ia64_t, _kr[IA64_KR_CURRENT_STACK]));
 
+#ifdef PERF_COUNTERS
+	BLANK();
+	DEFINE(RECOVER_TO_PAGE_FAULT_PERFC_OFS, offsetof (struct perfcounter, recover_to_page_fault));
+	DEFINE(RECOVER_TO_BREAK_FAULT_PERFC_OFS, offsetof (struct perfcounter, recover_to_break_fault));
+#endif
 }

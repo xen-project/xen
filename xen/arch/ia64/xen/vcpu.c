@@ -1500,7 +1500,7 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pt
 			*pteval = (address & _PAGE_PPN_MASK) | __DIRTY_BITS |
 			          _PAGE_PL_2 | _PAGE_AR_RWX;
 			*itir = PAGE_SHIFT << 2;
-			phys_translate_count++;
+			perfc_incrc(phys_translate);
 			return IA64_NO_FAULT;
 		}
 	}
@@ -1521,7 +1521,7 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pt
 		if (trp != NULL) {
 			*pteval = trp->pte.val;
 			*itir = trp->itir;
-			tr_translate_count++;
+			perfc_incrc(tr_translate);
 			return IA64_NO_FAULT;
 		}
 	}
@@ -1531,7 +1531,7 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pt
 		if (trp != NULL) {
 			*pteval = trp->pte.val;
 			*itir = trp->itir;
-			tr_translate_count++;
+			perfc_incrc(tr_translate);
 			return IA64_NO_FAULT;
 		}
 	}
@@ -1544,7 +1544,7 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pt
 	    && vcpu_match_tr_entry_no_p(trp,address,rid)) {
 		*pteval = pte.val;
 		*itir = trp->itir;
-		dtlb_translate_count++;
+		perfc_incrc(dtlb_translate);
 		return IA64_USE_TLB;
 	}
 
@@ -1582,7 +1582,7 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pt
 	/* found mapping in guest VHPT! */
 	*itir = rr & RR_PS_MASK;
 	*pteval = pte.val;
-	vhpt_translate_count++;
+	perfc_incrc(vhpt_translate);
 	return IA64_NO_FAULT;
 }
 
