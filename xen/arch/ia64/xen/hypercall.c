@@ -319,7 +319,7 @@ ia64_hypercall (struct pt_regs *regs)
 
 	/* Hypercalls are only allowed by kernel.
 	   Kernel checks memory accesses.  */
-	if (privlvl != 2) {
+	if (VMX_DOMAIN(v) ? (privlvl != 0) : (privlvl != 2)) {
 	    /* FIXME: Return a better error value ?
 	       Reflection ? Illegal operation ?  */
 	    regs->r8 = -1;
