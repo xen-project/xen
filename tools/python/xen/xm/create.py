@@ -392,10 +392,6 @@ gopts.var('isa', val='no|yes',
           fn=set_bool, default=0,
           use="Simulate an ISA only system?")
 
-gopts.var('cdrom', val='FILE',
-          fn=set_value, default='',
-          use="Path to cdrom")
-
 gopts.var('boot', val="a|b|c|d",
           fn=set_value, default='c',
           use="Default boot device")
@@ -629,7 +625,7 @@ def configure_vifs(config_devs, vals):
 def configure_hvm(config_image, vals):
     """Create the config for HVM devices.
     """
-    args = [ 'device_model', 'pae', 'vcpus', 'cdrom', 'boot', 'fda', 'fdb',
+    args = [ 'device_model', 'pae', 'vcpus', 'boot', 'fda', 'fdb',
              'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'audio',
              'vnc', 'vncdisplay', 'vncconsole', 'sdl', 'display',
              'acpi', 'apic', 'xauthority', 'usb', 'usbdevice' ]

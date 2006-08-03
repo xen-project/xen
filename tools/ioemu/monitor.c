@@ -24,6 +24,7 @@
 #include "vl.h"
 #include "disas.h"
 #include <dirent.h>
+#include "block_int.h"
 
 //#define DEBUG
 //#define DEBUG_COMPLETION
@@ -328,7 +329,7 @@ static int eject_device(BlockDriverState *bs, int force)
     return 0;
 }
 
-static void do_eject(int force, const char *filename)
+void do_eject(int force, const char *filename)
 {
     BlockDriverState *bs;
 
@@ -340,7 +341,7 @@ static void do_eject(int force, const char *filename)
     eject_device(bs, force);
 }
 
-static void do_change(const char *device, const char *filename)
+void do_change(const char *device, const char *filename)
 {
     BlockDriverState *bs;
     int i;

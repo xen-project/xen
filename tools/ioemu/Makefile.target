@@ -336,6 +336,7 @@ VL_OBJS+= ide.o pckbd.o ps2.o vga.o $(SOUND_HW) dma.o $(AUDIODRV)
 VL_OBJS+= fdc.o mc146818rtc.o serial.o pc.o
 VL_OBJS+= cirrus_vga.o mixeng.o parallel.o
 VL_OBJS+= piix4acpi.o
+VL_OBJS+= xenstore.o
 DEFINES += -DHAS_AUDIO
 endif
 ifeq ($(TARGET_BASE_ARCH), ppc)

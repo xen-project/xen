@@ -249,7 +249,7 @@ class HVMImageHandler(ImageHandler):
     # Return a list of cmd line args to the device models based on the
     # xm config file
     def parseDeviceModelArgs(self, imageConfig, deviceConfig):
-        dmargs = [ 'cdrom', 'boot', 'fda', 'fdb', 'audio',
+        dmargs = [ 'boot', 'fda', 'fdb', 'audio',
                    'localtime', 'serial', 'stdvga', 'isa', 'vcpus',
 		   'usb', 'usbdevice']
         ret = []
@@ -277,24 +277,11 @@ class HVMImageHandler(ImageHandler):
         for (name, info) in deviceConfig:
             if name == 'vbd':
                 uname = sxp.child_value(info, 'uname')
-                typedev = sxp.child_value(info, 'dev')
-                (_, vbdparam) = string.split(uname, ':', 1)
-
-                if 'file:' in uname and not os.path.isfile(vbdparam):
-                   raise VmError('Disk image does not exist: %s' % vbdparam)
-
-                if 'ioemu:' in typedev:
-                    (emtype, vbddev) = string.split(typedev, ':', 1)
-                else:
-                    emtype = 'vbd'
-                    vbddev = typedev
-                if emtype == 'vbd':
-                    continue;
-                vbddev_list = ['hda', 'hdb', 'hdc', 'hdd']
-                if vbddev not in vbddev_list:
-                    raise VmError("hvm: for qemu vbd type=file&dev=hda~hdd")
-                ret.append("-%s" % vbddev)
-                ret.append("%s" % vbdparam)
+                if 'file:' in uname:
+                    (_, vbdparam) = string.split(uname, ':', 1)
+                    if not os.path.isfile(vbdparam):
+                        raise VmError('Disk image does not exist: %s' %
+                                      vbdparam)
             if name == 'vif':
                 type = sxp.child_value(info, 'type')
                 if type != 'ioemu':

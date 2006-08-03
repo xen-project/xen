@@ -1092,6 +1092,8 @@ void term_flush(void);
 void term_print_help(void);
 void monitor_readline(const char *prompt, int is_password,
                       char *buf, int buf_size);
+void do_eject(int force, const char *filename);
+void do_change(const char *device, const char *filename);
 
 /* readline.c */
 typedef void ReadLineFunc(void *opaque, const char *str);
@@ -1103,6 +1105,13 @@ void readline_find_completion(const char *cmdline);
 const char *readline_get_history(unsigned int index);
 void readline_start(const char *prompt, int is_password,
                     ReadLineFunc *readline_func, void *opaque);
+
+/* xenstore.c */
+void xenstore_parse_domain_config(int domid);
+int xenstore_fd(void);
+void xenstore_process_event(void *opaque);
+void xenstore_check_new_media_present(int timeout);
+
 
 void kqemu_record_dump(void);
 

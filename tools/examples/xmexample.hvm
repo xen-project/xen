@@ -66,7 +66,7 @@ vif = [ 'type=ioemu, bridge=xenbr0' ]
 # and MODE is r for read-only, w for read-write.
 
 #disk = [ 'phy:hda1,hda1,r' ]
-disk = [ 'file:/var/images/min-el3-i386.img,ioemu:hda,w' ]
+disk = [ 'file:/var/images/min-el3-i386.img,hda,w', ',hdc:cdrom,r' ]
 
 #----------------------------------------------------------------------------
 # Configure the behaviour when a domain exits.  There are three 'reasons'
@@ -109,10 +109,6 @@ disk = [ 'file:/var/images/min-el3-i386.img,ioemu:hda,w' ]
 
 # New stuff
 device_model = '/usr/' + arch_libdir + '/xen/bin/qemu-dm'
-
-#-----------------------------------------------------------------------------
-# Disk image for 
-#cdrom=
 
 #-----------------------------------------------------------------------------
 # boot on floppy (a), hard disk (c) or CD-ROM (d) 

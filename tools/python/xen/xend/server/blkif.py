@@ -45,7 +45,17 @@ class BlkifController(DevController):
 
         dev = sxp.child_value(config, 'dev')
 
-        (typ, params) = string.split(uname, ':', 1)
+        if 'ioemu:' in dev:
+            (_, dev) = string.split(dev, ':', 1)
+        try:
+            (dev, dev_type) = string.split(dev, ':', 1)
+        except ValueError:
+            dev_type = "disk"
+
+        try:
+            (typ, params) = string.split(uname, ':', 1)
+        except ValueError:
+            (typ, params) = ("", "")
         back = { 'dev'    : dev,
                  'type'   : typ,
                  'params' : params,
@@ -58,13 +68,10 @@ class BlkifController(DevController):
                          'acm_ssidref': str(ssidref),
                          'acm_policy' : policy})
 
-        if 'ioemu:' in dev:
-            (dummy, dev1) = string.split(dev, ':', 1)
-            devid = blkif.blkdev_name_to_number(dev1)
-            front = {}
-        else:
-            devid = blkif.blkdev_name_to_number(dev)
-            front = { 'virtual-device' : "%i" % devid }
+        devid = blkif.blkdev_name_to_number(dev)
+        front = { 'virtual-device' : "%i" % devid,
+                  'device-type' : dev_type
+                }
 
         return (devid, back, front)
 

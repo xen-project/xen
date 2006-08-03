@@ -1279,6 +1279,7 @@ static void ide_atapi_cmd(IDEState *s)
         } else {
             ide_atapi_cmd_error(s, SENSE_NOT_READY, 
                                 ASC_MEDIUM_NOT_PRESENT);
+            xenstore_check_new_media_present(1000);
         }
         break;
     case GPCMD_MODE_SENSE_10:

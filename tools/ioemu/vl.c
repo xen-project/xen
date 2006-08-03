@@ -4709,9 +4709,11 @@ void help(void)
            "Standard options:\n"
            "-M machine      select emulated machine (-M ? for list)\n"
            "-fda/-fdb file  use 'file' as floppy disk 0/1 image\n"
+#ifndef CONFIG_DM
            "-hda/-hdb file  use 'file' as IDE hard disk 0/1 image\n"
            "-hdc/-hdd file  use 'file' as IDE hard disk 2/3 image\n"
            "-cdrom file     use 'file' as IDE cdrom image (cdrom is ide1 master)\n"
+#endif /* !CONFIG_DM */
            "-boot [a|c|d]   boot on floppy (a), hard disk (c) or CD-ROM (d)\n"
 	   "-snapshot       write to temporary files instead of disk image files\n"
            "-m megs         set virtual RAM size to megs MB [default=%d]\n"
@@ -4841,11 +4843,13 @@ enum {
     QEMU_OPTION_M,
     QEMU_OPTION_fda,
     QEMU_OPTION_fdb,
+#ifndef CONFIG_DM
     QEMU_OPTION_hda,
     QEMU_OPTION_hdb,
     QEMU_OPTION_hdc,
     QEMU_OPTION_hdd,
     QEMU_OPTION_cdrom,
+#endif /* !CONFIG_DM */
     QEMU_OPTION_boot,
     QEMU_OPTION_snapshot,
     QEMU_OPTION_m,
@@ -4911,11 +4915,13 @@ const QEMUOption qemu_options[] = {
     { "M", HAS_ARG, QEMU_OPTION_M },
     { "fda", HAS_ARG, QEMU_OPTION_fda },
     { "fdb", HAS_ARG, QEMU_OPTION_fdb },
+#ifndef CONFIG_DM
     { "hda", HAS_ARG, QEMU_OPTION_hda },
     { "hdb", HAS_ARG, QEMU_OPTION_hdb },
     { "hdc", HAS_ARG, QEMU_OPTION_hdc },
     { "hdd", HAS_ARG, QEMU_OPTION_hdd },
     { "cdrom", HAS_ARG, QEMU_OPTION_cdrom },
+#endif /* !CONFIG_DM */
     { "boot", HAS_ARG, QEMU_OPTION_boot },
     { "snapshot", 0, QEMU_OPTION_snapshot },
     { "m", HAS_ARG, QEMU_OPTION_m },
@@ -5250,10 +5256,16 @@ int main(int argc, char **argv)
 #ifdef CONFIG_GDBSTUB
     int use_gdbstub, gdbstub_port;
 #endif
-    int i, cdrom_index;
+    int i;
+#ifndef CONFIG_DM
+    int cdrom_index;
+#endif /* !CONFIG_DM */
     int snapshot, linux_boot;
     const char *initrd_filename;
-    const char *hd_filename[MAX_DISKS], *fd_filename[MAX_FD];
+#ifndef CONFIG_DM
+    const char *hd_filename[MAX_DISKS];
+#endif /* !CONFIG_DM */
+    const char *fd_filename[MAX_FD];
     const char *kernel_filename, *kernel_cmdline;
     DisplayState *ds = &display_state;
     int cyls, heads, secs, translation;
@@ -5288,8 +5300,10 @@ int main(int argc, char **argv)
     initrd_filename = NULL;
     for(i = 0; i < MAX_FD; i++)
         fd_filename[i] = NULL;
+#ifndef CONFIG_DM
     for(i = 0; i < MAX_DISKS; i++)
         hd_filename[i] = NULL;
+#endif /* !CONFIG_DM */
     ram_size = DEFAULT_RAM_SIZE * 1024 * 1024;
     vga_ram_size = VGA_RAM_SIZE;
     bios_size = BIOS_SIZE;
@@ -5302,11 +5316,13 @@ int main(int argc, char **argv)
     vncviewer = 0;
     kernel_filename = NULL;
     kernel_cmdline = "";
+#ifndef CONFIG_DM
 #ifdef TARGET_PPC
     cdrom_index = 1;
 #else
     cdrom_index = 2;
 #endif
+#endif /* !CONFIG_DM */
     cyls = heads = secs = 0;
     translation = BIOS_ATA_TRANSLATION_AUTO;
     pstrcpy(monitor_device, sizeof(monitor_device), "vc");
@@ -5339,7 +5355,11 @@ int main(int argc, char **argv)
             break;
         r = argv[optind];
         if (r[0] != '-') {
+#ifndef CONFIG_DM
             hd_filename[0] = argv[optind++];
+#else
+            help();
+#endif /* !CONFIG_DM */
         } else {
             const QEMUOption *popt;
 
@@ -5383,6 +5403,7 @@ int main(int argc, char **argv)
             case QEMU_OPTION_initrd:
                 initrd_filename = optarg;
                 break;
+#ifndef CONFIG_DM
             case QEMU_OPTION_hda:
             case QEMU_OPTION_hdb:
             case QEMU_OPTION_hdc:
@@ -5395,6 +5416,7 @@ int main(int argc, char **argv)
                         cdrom_index = -1;
                 }
                 break;
+#endif /* !CONFIG_DM */
             case QEMU_OPTION_snapshot:
                 snapshot = 1;
                 break;
@@ -5447,11 +5469,13 @@ int main(int argc, char **argv)
             case QEMU_OPTION_append:
                 kernel_cmdline = optarg;
                 break;
+#ifndef CONFIG_DM
             case QEMU_OPTION_cdrom:
                 if (cdrom_index >= 0) {
                     hd_filename[cdrom_index] = optarg;
                 }
                 break;
+#endif /* !CONFIG_DM */
             case QEMU_OPTION_boot:
                 boot_device = optarg[0];
                 if (boot_device != 'a' && 
@@ -5690,12 +5714,18 @@ int main(int argc, char **argv)
         }
     }
 
+#ifdef CONFIG_DM
+    bdrv_init();
+    xenstore_parse_domain_config(domid);
+#endif /* CONFIG_DM */
+
 #ifdef USE_KQEMU
     if (smp_cpus > 1)
         kqemu_allowed = 0;
 #endif
     linux_boot = (kernel_filename != NULL);
         
+#ifndef CONFIG_DM
     if (!linux_boot && 
         hd_filename[0] == '\0' && 
         (cdrom_index >= 0 && hd_filename[cdrom_index] == '\0') &&
@@ -5709,6 +5739,7 @@ int main(int argc, char **argv)
         else
             boot_device = 'd';
     }
+#endif /* !CONFIG_DM */
 
 #if !defined(CONFIG_SOFTMMU)
     /* must avoid mmap() usage of glibc by setting a buffer "by hand" */
@@ -5848,6 +5879,7 @@ int main(int argc, char **argv)
 
 #endif /* !CONFIG_DM */
 
+#ifndef CONFIG_DM
     /* we always create the cdrom drive, even if no disk is there */
     bdrv_init();
     if (cdrom_index >= 0) {
@@ -5874,6 +5906,7 @@ int main(int argc, char **argv)
             }
         }
     }
+#endif /* !CONFIG_DM */
 
     /* we always create at least one floppy disk */
     fd_table[0] = bdrv_new("fda");
@@ -6008,6 +6041,8 @@ int main(int argc, char **argv)
     }
 #endif
     init_timers();
+
+    qemu_set_fd_handler(xenstore_fd(), xenstore_process_event, NULL, NULL);
 
     machine->init(ram_size, vga_ram_size, boot_device,
                   ds, fd_filename, snapshot,

@@ -750,6 +750,7 @@ static int raw_write(BlockDriverState *bs, int64_t sector_num,
 static void raw_close(BlockDriverState *bs)
 {
     BDRVRawState *s = bs->opaque;
+    bs->total_sectors = 0;
     close(s->fd);
 }
 
