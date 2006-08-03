@@ -185,3 +185,31 @@ void xenstore_process_event(void *opaque)
     free(image);
     free(vec);
 }
+
+void xenstore_write_vncport(int display)
+{
+    char *buf = NULL, *path;
+    char *portstr = NULL;
+
+    if (xsh == NULL)
+	return;
+
+    path = xs_get_domain_path(xsh, domid);
+    if (path == NULL) {
+        fprintf(logfile, "xs_get_domain_path() error\n");
+        goto out;
+    }
+
+    if (pasprintf(&buf, "%s/console/vnc-port", path) == -1)
+	goto out;
+
+    if (pasprintf(&portstr, "%d", 5900 + display) == -1)
+	goto out;
+
+    if (xs_write(xsh, XBT_NULL, buf, portstr, strlen(portstr)) == 0)
+        fprintf(logfile, "xs_write() vncport failed\n");
+
+ out:
+    free(portstr);
+    free(buf);
+}

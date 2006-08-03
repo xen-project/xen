@@ -1111,6 +1111,7 @@ void xenstore_parse_domain_config(int domid);
 int xenstore_fd(void);
 void xenstore_process_event(void *opaque);
 void xenstore_check_new_media_present(int timeout);
+void xenstore_write_vncport(int vnc_display);
 
 
 void kqemu_record_dump(void);

@@ -5954,6 +5954,7 @@ int main(int argc, char **argv)
 	vnc_display_init(ds, vnc_display);
 	if (vncviewer)
 	    vnc_start_viewer(vnc_display);
+	xenstore_write_vncport(vnc_display);
     } else {
 #if defined(CONFIG_SDL)
         sdl_display_init(ds, full_screen);
