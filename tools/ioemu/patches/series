@@ -35,3 +35,4 @@ vnc-fixes
 vnc-start-vncviewer
 vnc-title-domain-name
 vnc-access-monitor-vt
+xenstore-block-device-config
