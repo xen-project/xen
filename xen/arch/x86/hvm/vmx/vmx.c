@@ -2184,11 +2184,10 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
          * (1) We can get an exception (e.g. #PG) in the guest, or
          * (2) NMI
          */
-        int error;
         unsigned int vector;
         unsigned long va;
 
-        if ((error = __vmread(VM_EXIT_INTR_INFO, &vector))
+        if (__vmread(VM_EXIT_INTR_INFO, &vector)
             || !(vector & INTR_INFO_VALID_MASK))
             __hvm_bug(&regs);
         vector &= INTR_INFO_VECTOR_MASK;
@@ -2261,7 +2260,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
                         (unsigned long)regs.ecx, (unsigned long)regs.edx,
                         (unsigned long)regs.esi, (unsigned long)regs.edi);
 
-            if (!(error = vmx_do_page_fault(va, &regs))) {
+            if (!vmx_do_page_fault(va, &regs)) {
                 /*
                  * Inject #PG using Interruption-Information Fields
                  */
