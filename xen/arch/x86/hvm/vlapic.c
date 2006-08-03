@@ -377,7 +377,7 @@ static int vlapic_check_vector(struct vlapic *vlapic,
     return 1;
 }
 
-void vlapic_ipi(struct vlapic *vlapic)
+static void vlapic_ipi(struct vlapic *vlapic)
 {
     uint32_t icr_low = vlapic_get_reg(vlapic, APIC_ICR);
     uint32_t icr_high = vlapic_get_reg(vlapic, APIC_ICR2);
