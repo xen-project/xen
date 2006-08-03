@@ -27,17 +27,15 @@
 #include <asm/hvm/vpit.h>
 #include <asm/hvm/vlapic.h>
 #include <asm/hvm/vioapic.h>
+#include <public/hvm/params.h>
 
 #define HVM_PBUF_SIZE   80
 
 struct hvm_domain {
     unsigned long          shared_page_va;
-    unsigned int           nr_vcpus;
-    unsigned int           apic_enabled;
-    unsigned int           pae_enabled;
     s64                    tsc_frequency;
     struct pl_time         pl_time;
-    
+
     struct hvm_virpic      vpic;
     struct hvm_vioapic     vioapic;
     struct hvm_io_handler  io_handler;
@@ -48,6 +46,8 @@ struct hvm_domain {
 
     int                    pbuf_index;
     char                   pbuf[HVM_PBUF_SIZE];
+
+    uint64_t               params[HVM_NR_PARAMS];
 };
 
 #endif /* __ASM_X86_HVM_DOMAIN_H__ */

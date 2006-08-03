@@ -46,6 +46,7 @@
 #include <public/sched.h>
 #include <public/hvm/ioreq.h>
 #include <public/hvm/hvm_info_table.h>
+#include <xen/guest_access.h>
 
 int hvm_enabled = 0;
 
@@ -128,61 +129,6 @@ static void hvm_map_io_shared_page(struct domain *d)
     d->arch.hvm_domain.shared_page_va = (unsigned long)p;
 }
 
-static int validate_hvm_info(struct hvm_info_table *t)
-{
-    char signature[] = "HVM INFO";
-    uint8_t *ptr = (uint8_t *)t;
-    uint8_t sum = 0;
-    int i;
-
-    /* strncmp(t->signature, "HVM INFO", 8) */
-    for ( i = 0; i < 8; i++ ) {
-        if ( signature[i] != t->signature[i] ) {
-            printk("Bad hvm info signature\n");
-            return 0;
-        }
-    }
-
-    for ( i = 0; i < t->length; i++ )
-        sum += ptr[i];
-
-    return (sum == 0);
-}
-
-static void hvm_get_info(struct domain *d)
-{
-    unsigned char *p;
-    unsigned long mfn;
-    struct hvm_info_table *t;
-
-    mfn = get_mfn_from_gpfn(HVM_INFO_PFN);
-    if ( mfn == INVALID_MFN ) {
-        printk("Can not get info page mfn for HVM domain.\n");
-        domain_crash_synchronous();
-    }
-
-    p = map_domain_page(mfn);
-    if ( p == NULL ) {
-        printk("Can not map info page for HVM domain.\n");
-        domain_crash_synchronous();
-    }
-
-    t = (struct hvm_info_table *)(p + HVM_INFO_OFFSET);
-
-    if ( validate_hvm_info(t) ) {
-        d->arch.hvm_domain.nr_vcpus = t->nr_vcpus;
-        d->arch.hvm_domain.apic_enabled = t->apic_enabled;
-        d->arch.hvm_domain.pae_enabled = t->pae_enabled;
-    } else {
-        printk("Bad hvm info table\n");
-        d->arch.hvm_domain.nr_vcpus = 1;
-        d->arch.hvm_domain.apic_enabled = 0;
-        d->arch.hvm_domain.pae_enabled = 0;
-    }
-
-    unmap_domain_page(p);
-}
-
 void hvm_setup_platform(struct domain* d)
 {
     struct hvm_domain *platform;
@@ -198,7 +144,6 @@ void hvm_setup_platform(struct domain* d)
     }
 
     hvm_map_io_shared_page(d);
-    hvm_get_info(d);
 
     platform = &d->arch.hvm_domain;
     pic_init(&platform->vpic, pic_irq_request, &platform->interrupt_request);
@@ -343,8 +288,8 @@ static hvm_hypercall_t *hvm_hypercall_table[] = {
     HYPERCALL(event_channel_op_compat),
     HYPERCALL(xen_version),
     HYPERCALL(grant_table_op),
-    HYPERCALL(event_channel_op)
-    /*HYPERCALL(hvm_op)*/
+    HYPERCALL(event_channel_op),
+    HYPERCALL(hvm_op)
 };
 #undef HYPERCALL
 
@@ -431,6 +376,65 @@ int hvm_bringup_ap(int vcpuid, int trampoline_vector)
     }
 
     xfree(ctxt);
+
+    return rc;
+}
+
+long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
+
+{
+    long rc = 0;
+
+    switch ( op )
+    {
+    case HVMOP_set_param:
+    case HVMOP_get_param:
+    {
+        struct xen_hvm_param a;
+        struct domain *d;
+
+        if ( copy_from_guest(&a, arg, 1) )
+            return -EFAULT;
+
+        if ( a.index >= HVM_NR_PARAMS )
+            return -EINVAL;
+
+        if ( a.domid == DOMID_SELF )
+        {
+            get_knownalive_domain(current->domain);
+            d = current->domain;
+        }
+        else if ( IS_PRIV(current->domain) )
+        {
+            d = find_domain_by_id(a.domid);
+            if ( !d )
+                return -ESRCH;
+        }
+        else
+        {
+            return -EPERM;
+        }
+
+        if ( op == HVMOP_set_param )
+        {
+            rc = 0;
+            d->arch.hvm_domain.params[a.index] = a.value;
+        }
+        else
+        {
+            rc = d->arch.hvm_domain.params[a.index];
+        }
+
+        put_domain(d);
+        return rc;
+    }
+
+    default:
+    {
+        DPRINTK("Bad HVM op %ld.\n", op);
+        rc = -ENOSYS;
+    }
+    }
 
     return rc;
 }

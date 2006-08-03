@@ -929,7 +929,7 @@ static void vmx_vmexit_do_cpuid(struct cpu_user_regs *regs)
 #else
             if ( v->domain->arch.ops->guest_paging_levels == PAGING_L2 )
             {
-                if ( v->domain->arch.hvm_domain.pae_enabled )
+                if ( v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
                     clear_bit(X86_FEATURE_PSE36, &edx);
                 else
                 {

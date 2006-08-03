@@ -997,7 +997,7 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb, unsigned long input,
 #else
         if ( v->domain->arch.ops->guest_paging_levels == PAGING_L2 )
         {
-            if ( !v->domain->arch.hvm_domain.pae_enabled )
+            if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
                 clear_bit(X86_FEATURE_PAE, &edx);
             clear_bit(X86_FEATURE_PSE, &edx);
             clear_bit(X86_FEATURE_PSE36, &edx);
@@ -1060,7 +1060,7 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb, unsigned long input,
 #else
         if ( v->domain->arch.ops->guest_paging_levels == PAGING_L2 )
         {
-            if ( !v->domain->arch.hvm_domain.pae_enabled )
+            if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
             {
                 clear_bit(X86_FEATURE_NX & 31, &edx);
                 clear_bit(X86_FEATURE_PAE, &edx);
