@@ -379,30 +379,35 @@ GLOBAL_ENTRY(xen_get_psr)
 	;; 
 END(xen_get_psr)
 
+	// see xen_ssm_i() in privop.h
+	// r22 = &vcpu->evtchn_mask
+	// r23 = &vpsr.ic
+	// r24 = &vcpu->pending_interruption
+	// r25 = tmp
+	// r31 = tmp
+	// p11 = tmp
+	// p14 = tmp
+#define XEN_SET_PSR_I			\
+	ld4 r31=[r22];			\
+	ld4 r25=[r24];			\
+	;;				\
+	st4 [r22]=r0;			\
+	cmp.ne.unc p14,p0=r0,r31;	\
+	;;				\
+(p14)	cmp.ne.unc p11,p0=r0,r25;	\
+	;;				\
+(p11)	st4 [r22]=r20;			\
+(p11)	st4 [r23]=r0;			\
+(p11)	XEN_HYPER_SSM_I;
+		
 GLOBAL_ENTRY(xen_ssm_i_0)
-	st4 [r22]=r20
-	ld4 r25=[r24]
-	;;
-	cmp.ne.unc p11,p0=r0, r25
-	;; 
-(p11)	st4 [r22]=r0
-(p11)	st4 [r23]=r0
-(p11)	XEN_HYPER_SSM_I
-	
+	XEN_SET_PSR_I
 	brl.cond.sptk	.vdso_ssm_i_0_ret
 	;; 
 END(xen_ssm_i_0)
 
 GLOBAL_ENTRY(xen_ssm_i_1)
-	st4 [r22]=r20
-	ld4 r25=[r24]
-	;; 
-	cmp.ne.unc p11,p0=r0, r25
-	;; 
-(p11)	st4 [r22]=r0
-(p11)	st4 [r23]=r0
-(p11)	XEN_HYPER_SSM_I
-	;;
+	XEN_SET_PSR_I
 	brl.cond.sptk	.vdso_ssm_i_1_ret
 	;; 
 END(xen_ssm_i_1)

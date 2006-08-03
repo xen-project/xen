@@ -130,7 +130,7 @@ GLOBAL_ENTRY(__kernel_syscall_via_epc)
 	// r20 = 1
 	// r22 = &vcpu->evtchn_mask
 	// r23 = &vpsr.ic
-	// r24 = vcpu->pending_interruption
+	// r24 = &vcpu->pending_interruption
 	// r25 = tmp
 	// r28 = &running_on_xen
 	// r30 = running_on_xen
