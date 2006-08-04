@@ -400,9 +400,9 @@ gopts.var('nographic', val='no|yes',
           fn=set_bool, default=0,
           use="Should device models use graphics?")
 
-gopts.var('audio', val='no|yes',
-          fn=set_bool, default=0,
-          use="Should device models enable audio?")
+gopts.var('soundhw', val='audiodev',
+          fn=set_value, default='',
+          use="Should device models enable audio device?")
 
 gopts.var('vnc', val='',
           fn=set_value, default=None,
@@ -626,7 +626,7 @@ def configure_hvm(config_image, vals):
     """Create the config for HVM devices.
     """
     args = [ 'device_model', 'pae', 'vcpus', 'boot', 'fda', 'fdb',
-             'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'audio',
+             'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'soundhw',
              'vnc', 'vncdisplay', 'vncconsole', 'sdl', 'display',
              'acpi', 'apic', 'xauthority', 'usb', 'usbdevice' ]
     for a in args:

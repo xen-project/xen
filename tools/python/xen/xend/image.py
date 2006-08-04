@@ -249,7 +249,7 @@ class HVMImageHandler(ImageHandler):
     # Return a list of cmd line args to the device models based on the
     # xm config file
     def parseDeviceModelArgs(self, imageConfig, deviceConfig):
-        dmargs = [ 'boot', 'fda', 'fdb', 'audio',
+        dmargs = [ 'boot', 'fda', 'fdb', 'soundhw',
                    'localtime', 'serial', 'stdvga', 'isa', 'vcpus',
 		   'usb', 'usbdevice']
         ret = []
@@ -258,10 +258,9 @@ class HVMImageHandler(ImageHandler):
 
             # python doesn't allow '-' in variable names
             if a == 'stdvga': a = 'std-vga'
-            if a == 'audio': a = 'enable-audio'
 
             # Handle booleans gracefully
-            if a in ['localtime', 'std-vga', 'isa', 'enable-audio', 'usb']:
+            if a in ['localtime', 'std-vga', 'isa', 'usb']:
                 if v != None: v = int(v)
                 if v: ret.append("-%s" % a)
             else:
