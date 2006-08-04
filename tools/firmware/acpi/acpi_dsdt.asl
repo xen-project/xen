@@ -16,7 +16,7 @@
 //* Place - Suite 330, Boston, MA 02111-1307 USA.
 
 //**
-//** 		DSDT for Xen with Qemu device model
+//**  DSDT for Xen with Qemu device model
 //**
 //**
 
@@ -50,21 +50,36 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
     })
 
 
-      	Name(PICD, 0)	
+    Name(PICD, 0)
 
-	Method(_PIC, 1) { 
+    Method(_PIC, 1) { 
  
-		Store(Arg0, PICD) 
-	}
+    Store(Arg0, PICD) 
+    }
     Scope (\_SB)
     {
-        Device (PCI0)
+       /* Fix HCT test for 0x400 pci memory - need to report low 640 MB mem as motherboard resource            */
+
+       Device(MEM0) {
+           Name(_HID, EISAID("PNP0C02"))
+           Name(_CRS, ResourceTemplate() {
+           QWordMemory (ResourceConsumer, PosDecode, MinFixed, MaxFixed, Cacheable, ReadWrite,
+                    0x00000000,
+                    0x00000000,
+                    0x0009ffff,
+                    0x00000000,
+                    0x000a0000)
+           }
+           )
+       }
+
+       Device (PCI0)
         {
-            Name (_HID, EisaId ("PNP0A03"))
-            Name (_UID, 0x00)
-            Name (_ADR, 0x00)
-            Name (_BBN, 0x00)
-            OperationRegion (PIRP, PCI_Config, 0x3c, 0x10)
+           Name (_HID, EisaId ("PNP0A03"))
+           Name (_UID, 0x00)
+           Name (_ADR, 0x00)
+           Name (_BBN, 0x00)
+           OperationRegion (PIRP, PCI_Config, 0x3c, 0x10)
            Field(PIRP, ByteAcc, NoLock, Preserve){        
           IRQ3,3,
           IRQ5,5,
@@ -79,7 +94,7 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
           
                Name (PRT0, ResourceTemplate ()
                 {
-					/* bus number is from 0 - 255*/
+         /* bus number is from 0 - 255*/
                     WordBusNumber (ResourceConsumer, MinFixed, MaxFixed, SubDecode,
                         0x0000,
                         0x0000,
@@ -122,7 +137,7 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
                         0x00000000,
                         0x00030000)
 
-                 /* reserve what device model consumed for PCI VGA device        */
+                /* reserve what device model consumed for PCI VGA device        */
 
                     DWordMemory (ResourceConsumer, PosDecode, MinFixed, MaxFixed, Cacheable, ReadWrite,
                         0x00000000,
@@ -146,9 +161,9 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
                 })
                 Return (PRT0)
             }
-	Name(BUFA, ResourceTemplate() {
+       Name(BUFA, ResourceTemplate() {
                 IRQ(Level, ActiveLow, Shared) {
-                        3,4,5,6,7,10,11,12,14,15}		 
+                        3,4,5,6,7,10,11,12,14,15} 
                 }) 
 
                 Name(BUFB, Buffer(){
@@ -156,7 +171,7 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
                 0x79, 0})
 
                 CreateWordField(BUFB, 0x01, IRQV)
-		
+
                 Name(BUFC, Buffer(){
                 5, 7, 10, 11
                  })
@@ -165,17 +180,17 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
                 CreateByteField(BUFC, 0x01, PIQB)
                 CreateByteField(BUFC, 0x01, PIQC)
                 CreateByteField(BUFC, 0x01, PIQD)
-                		
-		Device(LNKA)	{
-                Name(_HID, EISAID("PNP0C0F")) 	// PCI interrupt link
+                
+                Device(LNKA)    {
+                Name(_HID, EISAID("PNP0C0F")) // PCI interrupt link
                 Name(_UID, 1)
                 Method(_STA, 0) {
                                And(PIRA, 0x80, Local0)
                         If(LEqual(Local0, 0x80)) {
-                                Return(0x09)	
+                                Return(0x09)   
                                 }
                         Else {
-                                Return(0x0B)  	
+                                Return(0x0B) 
                                 }
                         }
 
@@ -189,34 +204,34 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
                 }
 
                 Method(_CRS) {
-                        And(PIRB, 0x0f, Local0)		 
-                        ShiftLeft(0x1, Local0, IRQV)	 
-                        Return(BUFB)			 
+                        And(PIRB, 0x0f, Local0) 
+                        ShiftLeft(0x1, Local0, IRQV) 
+                        Return(BUFB) 
                 } 
 
                 Method(_SRS, 1) {
-                                CreateWordField(ARG0, 0x01, IRQ1)	 
-                        FindSetRightBit(IRQ1, Local0)		 
-                        Decrement(Local0)			 
-                        Store(Local0, PIRA)			 
+                                CreateWordField(ARG0, 0x01, IRQ1) 
+                        FindSetRightBit(IRQ1, Local0) 
+                        Decrement(Local0) 
+                        Store(Local0, PIRA)
                  } // Method(_SRS)
         }
 
-        Device(LNKB)	{
-                Name(_HID, EISAID("PNP0C0F")) 	 
+        Device(LNKB){
+                Name(_HID, EISAID("PNP0C0F"))  
                 Name(_UID, 2)
                 Method(_STA, 0) {
                                And(PIRB, 0x80, Local0)
                         If(LEqual(Local0, 0x80)) {
-                                Return(0x09)	 
+                                Return(0x09) 
                                 }
                         Else {
-                                Return(0x0B)  	 
+                                Return(0x0B) 
                                 }
                         }
 
                 Method(_PRS) {
-                                Return(BUFA)			 
+                                Return(BUFA) 
                 } // Method(_PRS)
 
                 Method(_DIS) {
@@ -225,35 +240,35 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
                 }
 
                 Method(_CRS) {
-                        And(PIRB, 0x0f, Local0)		 
-                        ShiftLeft(0x1, Local0, IRQV)	 
-                        Return(BUFB)			 
+                        And(PIRB, 0x0f, Local0) 
+                        ShiftLeft(0x1, Local0, IRQV) 
+                        Return(BUFB) 
                 } // Method(_CRS)
 
                 Method(_SRS, 1) {
-                                CreateWordField(ARG0, 0x01, IRQ1)	 
-                        FindSetRightBit(IRQ1, Local0)		 
-                        Decrement(Local0)			 
-                        Store(Local0, PIRB)			 
+                        CreateWordField(ARG0, 0x01, IRQ1) 
+                        FindSetRightBit(IRQ1, Local0) 
+                        Decrement(Local0)
+                        Store(Local0, PIRB) 
                  } // Method(_SRS)
         }
 
-        Device(LNKC)	{
-                Name(_HID, EISAID("PNP0C0F")) 	// PCI interrupt link
+        Device(LNKC){
+                Name(_HID, EISAID("PNP0C0F")) // PCI interrupt link
                 Name(_UID, 3)
                 Method(_STA, 0) {
-                               And(PIRC, 0x80, Local0)
+                        And(PIRC, 0x80, Local0)
                         If(LEqual(Local0, 0x80)) {
-                                Return(0x09)	 
+                                Return(0x09) 
                         }
                         Else {
-                                Return(0x0B)  	 
+                                Return(0x0B)
                         }
                 }
 
-                Method(_PRS) {				 
-                        Return(BUFA)			 
-                } // Method(_PRS)			 
+                Method(_PRS) { 
+                        Return(BUFA)
+                } // Method(_PRS)
 
                 Method(_DIS) {
 
@@ -261,91 +276,89 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
                 }
 
                 Method(_CRS) {
-                        And(PIRC, 0x0f, Local0)		 
-                        ShiftLeft(0x1, Local0, IRQV)	 
-                        Return(BUFB)			 
+                        And(PIRC, 0x0f, Local0) 
+                        ShiftLeft(0x1, Local0, IRQV) 
+                        Return(BUFB) 
                 } // Method(_CRS)
 
                 Method(_SRS, 1) {
-                                CreateWordField(ARG0, 0x01, IRQ1)	 
-                        FindSetRightBit(IRQ1, Local0)		 
-                        Decrement(Local0)			 
-                        Store(Local0, PIRC)			 
+                                CreateWordField(ARG0, 0x01, IRQ1) 
+                        FindSetRightBit(IRQ1, Local0) 
+                        Decrement(Local0) 
+                        Store(Local0, PIRC)
                  } // Method(_SRS)
         }
 
-        Device(LNKD)	{
-                Name(_HID, EISAID("PNP0C0F")) 	 
+        Device(LNKD) {
+                Name(_HID, EISAID("PNP0C0F"))  
                 Name(_UID, 4)
                 Method(_STA, 0) {
                                And(PIRD, 0x80, Local0)
                         If(LEqual(Local0, 0x80)) {
-                                Return(0x09)	 
+                                Return(0x09) 
                         }
                         Else {
-                                Return(0x0B)  	 
+                                Return(0x0B) 
                         }
                 }
 
-                Method(_PRS) {				 
-                        Return(BUFA)			 
-                } // Method(_PRS)			 
+                Method(_PRS) { 
+                        Return(BUFA) 
+                } // Method(_PRS)
 
                 Method(_DIS) {
                                Or(PIRD, 0x80, PIRD)
                 }
 
                 Method(_CRS) {
-                        And(PIRD, 0x0f, Local0)		 
-                        ShiftLeft(0x1, Local0, IRQV)	 
-                        Return(BUFB)			 
+                        And(PIRD, 0x0f, Local0) 
+                        ShiftLeft(0x1, Local0, IRQV) 
+                        Return(BUFB) 
                 } // Method(_CRS)
 
                 Method(_SRS, 1) {
-                                CreateWordField(ARG0, 0x01, IRQ1)	 
-                        FindSetRightBit(IRQ1, Local0)		 
-                        Decrement(Local0)			 
-                        Store(Local0, PIRD)			 
+                                CreateWordField(ARG0, 0x01, IRQ1) 
+                        FindSetRightBit(IRQ1, Local0) 
+                        Decrement(Local0) 
+                        Store(Local0, PIRD) 
                  } // Method(_SRS)
         }
         Method(_PRT,0) {
-			If(PICD) {Return(PRTA)}  
-			Return (PRTP)  
-		} // end _PRT
-		
-		
-        Name(PRTP, Package(){
-                        Package(){0x0000ffff, 0, \_SB.PCI0.LNKA, 0}, 	// Slot 1, INTA
-                        Package(){0x0000ffff, 1, \_SB.PCI0.LNKB, 0}, 	// Slot 1, INTB
-                        Package(){0x0000ffff, 2, \_SB.PCI0.LNKC, 0}, 	// Slot 1, INTC
-                        Package(){0x0000ffff, 3, \_SB.PCI0.LNKD, 0}, 	// Slot 1, INTD
+               If(PICD) {Return(PRTA)}  
+               Return (PRTP)  
+               } // end _PRT
 
-                        Package(){0x0001ffff, 0, \_SB.PCI0.LNKB, 0}, 	// Slot 2, INTB
-                        Package(){0x0001ffff, 1, \_SB.PCI0.LNKC, 0}, 	// Slot 2, INTC
-                        Package(){0x0001ffff, 2, \_SB.PCI0.LNKD, 0}, 	// Slot 2, INTD
-                        Package(){0x0001ffff, 3, \_SB.PCI0.LNKA, 0}, 	// Slot 2, INTA
+        Name(PRTP, Package(){
+                        Package(){0x0000ffff, 0, \_SB.PCI0.LNKA, 0}, // Slot 1, INTA
+                        Package(){0x0000ffff, 1, \_SB.PCI0.LNKB, 0}, // Slot 1, INTB
+                        Package(){0x0000ffff, 2, \_SB.PCI0.LNKC, 0}, // Slot 1, INTC
+                        Package(){0x0000ffff, 3, \_SB.PCI0.LNKD, 0}, // Slot 1, INTD
+
+                        Package(){0x0001ffff, 0, \_SB.PCI0.LNKB, 0}, // Slot 2, INTB
+                        Package(){0x0001ffff, 1, \_SB.PCI0.LNKC, 0}, // Slot 2, INTC
+                        Package(){0x0001ffff, 2, \_SB.PCI0.LNKD, 0}, // Slot 2, INTD
+                        Package(){0x0001ffff, 3, \_SB.PCI0.LNKA, 0}, // Slot 2, INTA
                         
-                        Package(){0x0002ffff, 0, \_SB.PCI0.LNKC, 0}, 	// Slot 3, INTC
-                        Package(){0x0002ffff, 1, \_SB.PCI0.LNKD, 0}, 	// Slot 3, INTD
-                        Package(){0x0002ffff, 2, \_SB.PCI0.LNKA, 0}, 	// Slot 3, INTA
-                        Package(){0x0002ffff, 3, \_SB.PCI0.LNKB, 0}, 	// Slot 3, INTB
+                        Package(){0x0002ffff, 0, \_SB.PCI0.LNKC, 0}, // Slot 3, INTC
+                        Package(){0x0002ffff, 1, \_SB.PCI0.LNKD, 0}, // Slot 3, INTD
+                        Package(){0x0002ffff, 2, \_SB.PCI0.LNKA, 0}, // Slot 3, INTA
+                        Package(){0x0002ffff, 3, \_SB.PCI0.LNKB, 0}, // Slot 3, INTB
                         
-                        Package(){0x0003ffff, 0, \_SB.PCI0.LNKD, 0}, 	// Slot 2, INTD
-                        Package(){0x0003ffff, 1, \_SB.PCI0.LNKA, 0}, 	// Slot 2, INTA
-                        Package(){0x0003ffff, 2, \_SB.PCI0.LNKB, 0}, 	// Slot 2, INTB
-                        Package(){0x0003ffff, 3, \_SB.PCI0.LNKC, 0}, 	// Slot 2, INTC
+                        Package(){0x0003ffff, 0, \_SB.PCI0.LNKD, 0}, // Slot 2, INTD
+                        Package(){0x0003ffff, 1, \_SB.PCI0.LNKA, 0}, // Slot 2, INTA
+                        Package(){0x0003ffff, 2, \_SB.PCI0.LNKB, 0}, // Slot 2, INTB
+                        Package(){0x0003ffff, 3, \_SB.PCI0.LNKC, 0}, // Slot 2, INTC
                         
                         }
             )
-	Name(PRTA, Package(){
-                        Package(){0x0001ffff, 0, 0, 5}, 	// Device 1, INTA
+        Name(PRTA, Package(){
+                        Package(){0x0001ffff, 0, 0, 5}, // Device 1, INTA
 
-                        Package(){0x0002ffff, 0, 0, 7}, 	// Device 2, INTA
+                        Package(){0x0002ffff, 0, 0, 7},  // Device 2, INTA
                        
-                        Package(){0x0003ffff, 0, 0, 10}, 	// Device 3, INTA
+                        Package(){0x0003ffff, 0, 0, 10}, // Device 3, INTA
 
-                        Package(){0x0003ffff, 0, 0, 11}, 	// Device 4, INTA
-                                   
+                        Package(){0x0004ffff, 0, 0, 11},  // Device 4, INTA                                
                         
                         }
             )
@@ -354,22 +367,22 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
             {
                 Name (_ADR, 0x00000000) /* device id, PCI bus num, ... */
  
-		OperationRegion(PIRQ, PCI_Config, 0x60, 0x4)
+            OperationRegion(PIRQ, PCI_Config, 0x60, 0x4)
                         Scope(\) {
-                                Field (\_SB.PCI0.ISA.PIRQ, ByteAcc, NoLock, Preserve) {
+                                 Field (\_SB.PCI0.ISA.PIRQ, ByteAcc, NoLock, Preserve) {
                                         PIRA, 8,
                                         PIRB, 8,
                                         PIRC, 8,
                                         PIRD, 8
                                         }
-                                }
+                                 }
                 Device (SYSR)
                 {
                     Name (_HID, EisaId ("PNP0C02"))
                     Name (_UID, 0x01)
                     Name (CRS, ResourceTemplate ()
                     {
-						/* TODO: list hidden resources */
+               /* TODO: list hidden resources */
                         IO (Decode16, 0x0010, 0x0010, 0x00, 0x10)
                         IO (Decode16, 0x0022, 0x0022, 0x00, 0x0C)
                         IO (Decode16, 0x0030, 0x0030, 0x00, 0x10)
@@ -417,7 +430,7 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
                         IO (Decode16, 0x0089, 0x0089, 0x00, 0x03)
                         IO (Decode16, 0x008F, 0x008F, 0x00, 0x01)
                         IO (Decode16, 0x00C0, 0x00C0, 0x00, 0x20)
-						IO (Decode16, 0x0480, 0x0480, 0x00, 0x10)
+                        IO (Decode16, 0x0480, 0x0480, 0x00, 0x10)
                     })
                 }
 
