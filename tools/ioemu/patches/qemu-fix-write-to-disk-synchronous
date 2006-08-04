@@ -1,0 +1,78 @@
+Index: ioemu/block-vmdk.c
+===================================================================
+--- ioemu.orig/block-vmdk.c	2006-07-14 13:43:45.000000000 +0100
++++ ioemu/block-vmdk.c	2006-08-04 10:27:15.368803650 +0100
+@@ -96,7 +96,7 @@
+     uint32_t magic;
+     int l1_size;
+ 
+-    fd = open(filename, O_RDWR | O_BINARY | O_LARGEFILE);
++    fd = open(filename, O_RDWR | O_BINARY | O_LARGEFILE | O_SYNC);
+     if (fd < 0) {
+         fd = open(filename, O_RDONLY | O_BINARY | O_LARGEFILE);
+         if (fd < 0)
+Index: ioemu/block-qcow.c
+===================================================================
+--- ioemu.orig/block-qcow.c	2006-07-14 13:43:45.000000000 +0100
++++ ioemu/block-qcow.c	2006-08-04 10:27:15.367803766 +0100
+@@ -95,7 +95,7 @@
+     int fd, len, i, shift;
+     QCowHeader header;
+     
+-    fd = open(filename, O_RDWR | O_BINARY | O_LARGEFILE);
++    fd = open(filename, O_RDWR | O_BINARY | O_LARGEFILE | O_SYNC);
+     if (fd < 0) {
+         fd = open(filename, O_RDONLY | O_BINARY | O_LARGEFILE);
+         if (fd < 0)
+Index: ioemu/block-bochs.c
+===================================================================
+--- ioemu.orig/block-bochs.c	2006-07-14 13:43:45.000000000 +0100
++++ ioemu/block-bochs.c	2006-08-04 10:27:15.345806311 +0100
+@@ -91,7 +91,7 @@
+     int fd, i;
+     struct bochs_header bochs;
+ 
+-    fd = open(filename, O_RDWR | O_BINARY | O_LARGEFILE);
++    fd = open(filename, O_RDWR | O_BINARY | O_LARGEFILE | O_SYNC);
+     if (fd < 0) {
+         fd = open(filename, O_RDONLY | O_BINARY | O_LARGEFILE);
+         if (fd < 0)
+Index: ioemu/block.c
+===================================================================
+--- ioemu.orig/block.c	2006-08-03 19:19:39.000000000 +0100
++++ ioemu/block.c	2006-08-04 10:27:15.357804923 +0100
+@@ -677,7 +677,7 @@
+     int rv;
+ #endif
+ 
+-    fd = open(filename, O_RDWR | O_BINARY | O_LARGEFILE);
++    fd = open(filename, O_RDWR | O_BINARY | O_LARGEFILE | O_SYNC);
+     if (fd < 0) {
+         fd = open(filename, O_RDONLY | O_BINARY | O_LARGEFILE);
+         if (fd < 0)
+Index: ioemu/block-cow.c
+===================================================================
+--- ioemu.orig/block-cow.c	2006-07-14 13:43:45.000000000 +0100
++++ ioemu/block-cow.c	2006-08-04 10:27:15.366803882 +0100
+@@ -69,7 +69,7 @@
+     struct cow_header_v2 cow_header;
+     int64_t size;
+ 
+-    fd = open(filename, O_RDWR | O_BINARY | O_LARGEFILE);
++    fd = open(filename, O_RDWR | O_BINARY | O_LARGEFILE | O_SYNC);
+     if (fd < 0) {
+         fd = open(filename, O_RDONLY | O_BINARY | O_LARGEFILE);
+         if (fd < 0)
+Index: ioemu/block-cloop.c
+===================================================================
+--- ioemu.orig/block-cloop.c	2006-07-14 13:43:45.000000000 +0100
++++ ioemu/block-cloop.c	2006-08-04 10:27:15.365803997 +0100
+@@ -55,7 +55,7 @@
+     BDRVCloopState *s = bs->opaque;
+     uint32_t offsets_size,max_compressed_block_size=1,i;
+ 
+-    s->fd = open(filename, O_RDONLY | O_BINARY | O_LARGEFILE);
++    s->fd = open(filename, O_RDONLY | O_BINARY | O_LARGEFILE | O_SYNC);
+     if (s->fd < 0)
+         return -1;
+     bs->read_only = 1;
