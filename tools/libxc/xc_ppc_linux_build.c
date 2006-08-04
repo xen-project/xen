@@ -388,7 +388,7 @@ int xc_linux_build(int xc_handle,
         dtb_addr = 0;
     }
 
-    si_addr = create_start_info(&si, store_evtchn, console_evtchn);
+    si_addr = create_start_info(&si, console_evtchn, store_evtchn);
     *console_mfn = page_array[si.console_mfn];
     *store_mfn = page_array[si.store_mfn];
     
