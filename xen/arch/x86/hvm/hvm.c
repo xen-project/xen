@@ -28,6 +28,7 @@
 #include <xen/domain.h>
 #include <xen/domain_page.h>
 #include <xen/hypercall.h>
+#include <xen/guest_access.h>
 #include <asm/current.h>
 #include <asm/io.h>
 #include <asm/shadow.h>
@@ -46,7 +47,8 @@
 #include <public/sched.h>
 #include <public/hvm/ioreq.h>
 #include <public/hvm/hvm_info_table.h>
-#include <xen/guest_access.h>
+#include <public/version.h>
+#include <public/memory.h>
 
 int hvm_enabled = 0;
 
@@ -305,55 +307,139 @@ void hvm_print_line(struct vcpu *v, const char c)
 	pbuf[(*index)++] = c;
 }
 
-#if defined(__i386__)
-
 typedef unsigned long hvm_hypercall_t(
     unsigned long, unsigned long, unsigned long, unsigned long, unsigned long);
-#define HYPERCALL(x) [ __HYPERVISOR_ ## x ] = (hvm_hypercall_t *) do_ ## x
+
+#define HYPERCALL(x)                                        \
+    [ __HYPERVISOR_ ## x ] = (hvm_hypercall_t *) do_ ## x
+#define HYPERCALL_COMPAT32(x)                               \
+    [ __HYPERVISOR_ ## x ] = (hvm_hypercall_t *) do_ ## x ## _compat32
+
+#if defined(__i386__)
+
 static hvm_hypercall_t *hvm_hypercall_table[] = {
-    HYPERCALL(mmu_update),
     HYPERCALL(memory_op),
     HYPERCALL(multicall),
-    HYPERCALL(update_va_mapping),
-    HYPERCALL(event_channel_op_compat),
     HYPERCALL(xen_version),
-    HYPERCALL(grant_table_op),
     HYPERCALL(event_channel_op),
     HYPERCALL(hvm_op)
 };
-#undef HYPERCALL
 
 void hvm_do_hypercall(struct cpu_user_regs *pregs)
 {
-    if ( ring_3(pregs) )
+    if ( unlikely(ring_3(pregs)) )
     {
         pregs->eax = -EPERM;
         return;
     }
 
-    if ( pregs->eax > ARRAY_SIZE(hvm_hypercall_table) ||
-         !hvm_hypercall_table[pregs->eax] )
+    if ( (pregs->eax >= NR_hypercalls) || !hvm_hypercall_table[pregs->eax] )
     {
         DPRINTK("HVM vcpu %d:%d did a bad hypercall %d.\n",
                 current->domain->domain_id, current->vcpu_id,
                 pregs->eax);
         pregs->eax = -ENOSYS;
+        return;
     }
-    else
-    {
-        pregs->eax = hvm_hypercall_table[pregs->eax](
-            pregs->ebx, pregs->ecx, pregs->edx, pregs->esi, pregs->edi);
-    }
+
+    pregs->eax = hvm_hypercall_table[pregs->eax](
+        pregs->ebx, pregs->ecx, pregs->edx, pregs->esi, pregs->edi);
 }
 
-#else /* __x86_64__ */
+#else /* defined(__x86_64__) */
+
+static long do_memory_op_compat32(int cmd, XEN_GUEST_HANDLE(void) arg)
+{
+    extern long do_add_to_physmap(struct xen_add_to_physmap *xatp);
+    long rc;
+
+    switch ( cmd )
+    {
+    case XENMEM_add_to_physmap:
+    {
+        struct {
+            domid_t domid;
+            uint32_t space;
+            uint32_t idx;
+            uint32_t gpfn;
+        } u;
+        struct xen_add_to_physmap h;
+
+        if ( copy_from_guest(&u, arg, 1) )
+            return -EFAULT;
+
+        h.domid = u.domid;
+        h.space = u.space;
+        h.idx = u.idx;
+        h.gpfn = u.gpfn;
+
+        this_cpu(guest_handles_in_xen_space) = 1;
+        rc = do_memory_op(cmd, guest_handle_from_ptr(&h, void));
+        this_cpu(guest_handles_in_xen_space) = 0;
+
+        break;
+    }
+
+    default:
+        DPRINTK("memory_op %d.\n", cmd);
+        rc = -ENOSYS;
+        break;
+    }
+
+    return rc;
+}
+
+static hvm_hypercall_t *hvm_hypercall64_table[NR_hypercalls] = {
+    HYPERCALL(memory_op),
+    HYPERCALL(xen_version),
+    HYPERCALL(hvm_op),
+    HYPERCALL(event_channel_op)
+};
+
+static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
+    HYPERCALL_COMPAT32(memory_op),
+    HYPERCALL(xen_version),
+    HYPERCALL(hvm_op),
+    HYPERCALL(event_channel_op)
+};
 
 void hvm_do_hypercall(struct cpu_user_regs *pregs)
 {
-    printk("not supported yet!\n");
+    if ( unlikely(ring_3(pregs)) )
+    {
+        pregs->rax = -EPERM;
+        return;
+    }
+
+    pregs->rax = (uint32_t)pregs->eax; /* mask in case compat32 caller */
+    if ( (pregs->rax >= NR_hypercalls) || !hvm_hypercall64_table[pregs->rax] )
+    {
+        DPRINTK("HVM vcpu %d:%d did a bad hypercall %ld.\n",
+                current->domain->domain_id, current->vcpu_id,
+                pregs->rax);
+        pregs->rax = -ENOSYS;
+        return;
+    }
+
+    if ( current->domain->arch.ops->guest_paging_levels == PAGING_L4 )
+    {
+        pregs->rax = hvm_hypercall64_table[pregs->rax](pregs->rdi,
+                                                       pregs->rsi,
+                                                       pregs->rdx,
+                                                       pregs->r10,
+                                                       pregs->r8);
+    }
+    else
+    {
+        pregs->eax = hvm_hypercall32_table[pregs->eax]((uint32_t)pregs->ebx,
+                                                       (uint32_t)pregs->ecx,
+                                                       (uint32_t)pregs->edx,
+                                                       (uint32_t)pregs->esi,
+                                                       (uint32_t)pregs->edi);
+    }
 }
 
-#endif
+#endif /* defined(__x86_64__) */
 
 /* Initialise a hypercall transfer page for a VMX domain using
    paravirtualised drivers. */

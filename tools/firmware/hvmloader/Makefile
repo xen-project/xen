@@ -42,12 +42,15 @@ OBJCOPY  = objcopy
 CFLAGS  += $(DEFINES) -I. $(XENINC) -fno-builtin -O2 -msoft-float
 LDFLAGS  = -m32 -nostdlib -Wl,-N -Wl,-Ttext -Wl,$(LOADADDR)
 
+SRCS = hvmloader.c acpi_madt.c mp_tables.c util.c
+OBJS = $(patsubst %.c,%.o,$(SRCS))
+
 .PHONY: all
 all: hvmloader
 
-hvmloader: roms.h hvmloader.c acpi_madt.c mp_tables.c
-	$(CC) $(CFLAGS) -c hvmloader.c acpi_madt.c mp_tables.c
-	$(CC) $(LDFLAGS) -o hvmloader.tmp hvmloader.o acpi_madt.o mp_tables.o
+hvmloader: roms.h $(SRCS)
+	$(CC) $(CFLAGS) -c $(SRCS)
+	$(CC) $(LDFLAGS) -o hvmloader.tmp $(OBJS)
 	$(OBJCOPY) hvmloader.tmp hvmloader
 	rm -f hvmloader.tmp
 

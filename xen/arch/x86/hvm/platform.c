@@ -1034,17 +1034,31 @@ void handle_mmio(unsigned long va, unsigned long gpa)
     }
 }
 
+DEFINE_PER_CPU(int, guest_handles_in_xen_space);
+
 /* Note that copy_{to,from}_user_hvm don't set the A and D bits on
    PTEs, and require the PTE to be writable even when they're only
    trying to read from it.  The guest is expected to deal with
    this. */
 unsigned long copy_to_user_hvm(void *to, const void *from, unsigned len)
 {
+    if ( this_cpu(guest_handles_in_xen_space) )
+    {
+        memcpy(to, from, len);
+        return 0;
+    }
+
     return !hvm_copy((void *)from, (unsigned long)to, len, HVM_COPY_OUT);
 }
 
 unsigned long copy_from_user_hvm(void *to, const void *from, unsigned len)
 {
+    if ( this_cpu(guest_handles_in_xen_space) )
+    {
+        memcpy(to, from, len);
+        return 0;
+    }
+
     return !hvm_copy(to, (unsigned long)from, len, HVM_COPY_IN);
 }
 
