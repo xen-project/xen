@@ -36,7 +36,8 @@ struct evtchn
 #define ECS_PIRQ         4 /* Channel is bound to a physical IRQ line.       */
 #define ECS_VIRQ         5 /* Channel is bound to a virtual IRQ line.        */
 #define ECS_IPI          6 /* Channel is bound to a virtual IPI line.        */
-    u16 state;             /* ECS_* */
+    u8  state;             /* ECS_* */
+    u8  consumer_is_xen;   /* Consumed by Xen or by guest? */
     u16 notify_vcpu_id;    /* VCPU for local delivery notification */
     union {
         struct {
@@ -375,6 +376,9 @@ extern struct domain *domain_list;
  /* VCPU is paused by the hypervisor? */
 #define _VCPUF_paused          11
 #define VCPUF_paused           (1UL<<_VCPUF_paused)
+ /* VCPU is blocked awaiting an event to be consumed by Xen. */
+#define _VCPUF_blocked_in_xen  12
+#define VCPUF_blocked_in_xen   (1UL<<_VCPUF_blocked_in_xen)
 
 /*
  * Per-domain flags (domain_flags).
@@ -404,7 +408,7 @@ extern struct domain *domain_list;
 static inline int vcpu_runnable(struct vcpu *v)
 {
     return ( !(v->vcpu_flags &
-               (VCPUF_blocked|VCPUF_down|VCPUF_paused)) &&
+               (VCPUF_blocked|VCPUF_down|VCPUF_paused|VCPUF_blocked_in_xen)) &&
              !(v->domain->domain_flags &
                (DOMF_shutdown|DOMF_ctrl_pause|DOMF_paused)) );
 }

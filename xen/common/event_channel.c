@@ -333,6 +333,14 @@ static long __evtchn_close(struct domain *d1, int port1)
     }
 
     chn1 = evtchn_from_port(d1, port1);
+
+    /* Guest cannot close a Xen-attached event channel. */
+    if ( unlikely(chn1->consumer_is_xen) )
+    {
+        rc = -EINVAL;
+        goto out;
+    }
+
     switch ( chn1->state )
     {
     case ECS_FREE:
@@ -441,6 +449,7 @@ long evtchn_send(unsigned int lport)
 {
     struct evtchn *lchn, *rchn;
     struct domain *ld = current->domain, *rd;
+    struct vcpu   *rvcpu;
     int            rport, ret = 0;
 
     spin_lock(&ld->evtchn_lock);
@@ -452,13 +461,32 @@ long evtchn_send(unsigned int lport)
     }
 
     lchn = evtchn_from_port(ld, lport);
+
+    /* Guest cannot send via a Xen-attached event channel. */
+    if ( unlikely(lchn->consumer_is_xen) )
+    {
+        spin_unlock(&ld->evtchn_lock);
+        return -EINVAL;
+    }
+
     switch ( lchn->state )
     {
     case ECS_INTERDOMAIN:
         rd    = lchn->u.interdomain.remote_dom;
         rport = lchn->u.interdomain.remote_port;
         rchn  = evtchn_from_port(rd, rport);
-        evtchn_set_pending(rd->vcpu[rchn->notify_vcpu_id], rport);
+        rvcpu = rd->vcpu[rchn->notify_vcpu_id];
+        if ( rchn->consumer_is_xen )
+        {
+            /* Xen consumers need notification only if they are blocked. */
+            if ( test_and_clear_bit(_VCPUF_blocked_in_xen,
+                                    &rvcpu->vcpu_flags) )
+                vcpu_wake(rvcpu);
+        }
+        else
+        {
+            evtchn_set_pending(rvcpu, rport);
+        }
         break;
     case ECS_IPI:
         evtchn_set_pending(ld->vcpu[lchn->notify_vcpu_id], lport);
@@ -638,6 +666,14 @@ long evtchn_bind_vcpu(unsigned int port, unsigned int vcpu_id)
     }
 
     chn = evtchn_from_port(d, port);
+
+    /* Guest cannot re-bind a Xen-attached event channel. */
+    if ( unlikely(chn->consumer_is_xen) )
+    {
+        rc = -EINVAL;
+        goto out;
+    }
+
     switch ( chn->state )
     {
     case ECS_VIRQ:
@@ -804,6 +840,71 @@ long do_event_channel_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 }
 
 
+int alloc_unbound_xen_event_channel(
+    struct vcpu *local_vcpu, domid_t remote_domid)
+{
+    struct evtchn *chn;
+    struct domain *d = local_vcpu->domain;
+    int            port;
+
+    spin_lock(&d->evtchn_lock);
+
+    if ( (port = get_free_port(d)) < 0 )
+        goto out;
+    chn = evtchn_from_port(d, port);
+
+    chn->state = ECS_UNBOUND;
+    chn->consumer_is_xen = 1;
+    chn->notify_vcpu_id = local_vcpu->vcpu_id;
+    chn->u.unbound.remote_domid = remote_domid;
+
+ out:
+    spin_unlock(&d->evtchn_lock);
+
+    return port;
+}
+
+
+void free_xen_event_channel(
+    struct vcpu *local_vcpu, int port)
+{
+    struct evtchn *chn;
+    struct domain *d = local_vcpu->domain;
+
+    spin_lock(&d->evtchn_lock);
+    chn = evtchn_from_port(d, port);
+    BUG_ON(!chn->consumer_is_xen);
+    chn->consumer_is_xen = 0;
+    spin_unlock(&d->evtchn_lock);
+
+    (void)__evtchn_close(d, port);
+}
+
+
+void notify_via_xen_event_channel(int lport)
+{
+    struct evtchn *lchn, *rchn;
+    struct domain *ld = current->domain, *rd;
+    int            rport;
+
+    spin_lock(&ld->evtchn_lock);
+
+    ASSERT(port_is_valid(ld, lport));
+    lchn = evtchn_from_port(ld, lport);
+    ASSERT(lchn->consumer_is_xen);
+
+    if ( likely(lchn->state == ECS_INTERDOMAIN) )
+    {
+        rd    = lchn->u.interdomain.remote_dom;
+        rport = lchn->u.interdomain.remote_port;
+        rchn  = evtchn_from_port(rd, rport);
+        evtchn_set_pending(rd->vcpu[rchn->notify_vcpu_id], rport);
+    }
+
+    spin_unlock(&ld->evtchn_lock);
+}
+
+
 int evtchn_init(struct domain *d)
 {
     spin_lock_init(&d->evtchn_lock);
@@ -819,7 +920,10 @@ void evtchn_destroy(struct domain *d)
     int i;
 
     for ( i = 0; port_is_valid(d, i); i++ )
-            (void)__evtchn_close(d, i);
+    {
+        evtchn_from_port(d, i)->consumer_is_xen = 0;
+        (void)__evtchn_close(d, i);
+    }
 
     for ( i = 0; i < NR_EVTCHN_BUCKETS; i++ )
         xfree(d->evtchn[i]);
