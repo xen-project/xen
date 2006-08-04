@@ -5783,6 +5783,11 @@ int main(int argc, char **argv)
     /* init the memory */
     phys_ram_size = ram_size + vga_ram_size + bios_size;
 
+#if defined (__ia64__)
+    if (ram_size > MMIO_START)
+	ram_size += 1 * MEM_G; /* skip 3G-4G MMIO, LEGACY_IO_SPACE etc. */
+#endif
+
 #ifdef CONFIG_DM
 
     nr_pages = ram_size/PAGE_SIZE;
@@ -5816,22 +5821,9 @@ int main(int argc, char **argv)
             (uint64_t)(page_array[nr_pages - 1]));
 
 #elif defined(__ia64__)
-    if (xc_ia64_get_pfn_list(xc_handle, domid,
-                             page_array, 0, nr_pages) != nr_pages) {
-        fprintf(logfile, "xc_ia64_get_pfn_list returned error %d\n", errno);
-        exit(-1);
-    }
-
-    phys_ram_base = xc_map_foreign_batch(xc_handle, domid,
-                                         PROT_READ|PROT_WRITE,
-                                         page_array, nr_pages);
-    if (phys_ram_base == 0) {
-        fprintf(logfile, "xc_map_foreign_batch returned error %d\n", errno);
-        exit(-1);
-    }
-
+  
     if (xc_ia64_get_pfn_list(xc_handle, domid, page_array,
-                             IO_PAGE_START >> PAGE_SHIFT, 1) != 1){
+                             IO_PAGE_START >> PAGE_SHIFT, 1) != 1) {
         fprintf(logfile, "xc_ia64_get_pfn_list returned error %d\n", errno);
         exit(-1);
     }
@@ -5842,6 +5834,26 @@ int main(int argc, char **argv)
 
     fprintf(logfile, "shared page at pfn:%lx, mfn: %016lx\n",
             IO_PAGE_START >> PAGE_SHIFT, page_array[0]);
+
+    if (xc_ia64_get_pfn_list(xc_handle, domid,
+                             page_array, 0, nr_pages) != nr_pages) {
+        fprintf(logfile, "xc_ia64_get_pfn_list returned error %d\n", errno);
+        exit(-1);
+    }
+
+    if (ram_size > MMIO_START) {	
+	for (i = 0 ; i < MEM_G >> PAGE_SHIFT; i++)
+	    page_array[MMIO_START >> PAGE_SHIFT + i] =
+		page_array[IO_PAGE_START >> PAGE_SHIFT + 1];
+    }
+
+    phys_ram_base = xc_map_foreign_batch(xc_handle, domid,
+                                         PROT_READ|PROT_WRITE,
+                                         page_array, nr_pages);
+    if (phys_ram_base == 0) {
+        fprintf(logfile, "xc_map_foreign_batch returned error %d\n", errno);
+        exit(-1);
+    }
 #endif
 #else  /* !CONFIG_DM */
 
