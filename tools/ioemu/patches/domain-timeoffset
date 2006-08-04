@@ -1,7 +1,7 @@
 Index: ioemu/hw/mc146818rtc.c
 ===================================================================
---- ioemu.orig/hw/mc146818rtc.c	2006-08-04 10:52:55.914499631 +0100
-+++ ioemu/hw/mc146818rtc.c	2006-08-04 10:53:03.701599955 +0100
+--- ioemu.orig/hw/mc146818rtc.c	2006-08-04 10:57:22.049787220 +0100
++++ ioemu/hw/mc146818rtc.c	2006-08-04 10:57:28.677023336 +0100
 @@ -178,10 +178,27 @@
      }
  }
@@ -46,8 +46,8 @@ Index: ioemu/hw/mc146818rtc.c
  static void rtc_copy_date(RTCState *s)
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2006-08-04 10:53:03.431631144 +0100
-+++ ioemu/hw/pc.c	2006-08-04 10:53:03.701599955 +0100
+--- ioemu.orig/hw/pc.c	2006-08-04 10:57:28.406054568 +0100
++++ ioemu/hw/pc.c	2006-08-04 10:57:28.678023221 +0100
 @@ -151,7 +151,7 @@
  }
  
@@ -117,8 +117,8 @@ Index: ioemu/hw/pc.c
  QEMUMachine pc_machine = {
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-08-04 10:53:03.571614972 +0100
-+++ ioemu/vl.c	2006-08-04 10:53:03.704599608 +0100
+--- ioemu.orig/vl.c	2006-08-04 10:57:28.545038549 +0100
++++ ioemu/vl.c	2006-08-04 10:57:28.680022990 +0100
 @@ -164,6 +164,8 @@
  
  int xc_handle;
@@ -162,7 +162,7 @@ Index: ioemu/vl.c
              }
          }
      }
-@@ -6005,7 +6013,8 @@
+@@ -6007,7 +6015,8 @@
  
      machine->init(ram_size, vga_ram_size, boot_device,
                    ds, fd_filename, snapshot,
@@ -174,8 +174,8 @@ Index: ioemu/vl.c
      qemu_mod_timer(gui_timer, qemu_get_clock(rt_clock));
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-08-04 10:53:03.436630567 +0100
-+++ ioemu/vl.h	2006-08-04 10:53:03.705599493 +0100
+--- ioemu.orig/vl.h	2006-08-04 10:57:28.411053992 +0100
++++ ioemu/vl.h	2006-08-04 10:57:28.681022875 +0100
 @@ -556,7 +556,7 @@
                                   int boot_device,
               DisplayState *ds, const char **fd_filename, int snapshot,
