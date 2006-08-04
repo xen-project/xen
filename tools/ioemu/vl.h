@@ -159,6 +159,7 @@ extern const char *keyboard_layout;
 extern int kqemu_allowed;
 extern int win2k_install_hack;
 extern int usb_enabled;
+extern int acpi_enabled;
 extern int smp_cpus;
 
 /* XXX: make it dynamic */

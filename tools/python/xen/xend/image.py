@@ -251,7 +251,7 @@ class HVMImageHandler(ImageHandler):
     def parseDeviceModelArgs(self, imageConfig, deviceConfig):
         dmargs = [ 'boot', 'fda', 'fdb', 'soundhw',
                    'localtime', 'serial', 'stdvga', 'isa', 'vcpus',
-		   'usb', 'usbdevice']
+		   'acpi', 'usb', 'usbdevice']
         ret = []
         for a in dmargs:
             v = sxp.child_value(imageConfig, a)

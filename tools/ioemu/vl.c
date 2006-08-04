@@ -167,6 +167,8 @@ int xc_handle;
 
 time_t timeoffset = 0;
 
+int acpi_enabled = 0;
+
 char domain_name[1024] = { 'H','V', 'M', 'X', 'E', 'N', '-'};
 extern int domid;
 
@@ -4807,6 +4809,7 @@ void help(void)
 	   "-vnc display    start a VNC server on display\n"
            "-vncviewer      start a vncviewer process for this domain\n"
            "-timeoffset     time offset (in seconds) from local time\n"
+           "-acpi           disable or enable ACPI of HVM domain \n"
            "\n"
            "During emulation, the following keys are useful:\n"
            "ctrl-alt-f      toggle full screen\n"
@@ -4901,6 +4904,7 @@ enum {
     QEMU_OPTION_d,
     QEMU_OPTION_vcpus,
     QEMU_OPTION_timeoffset,
+    QEMU_OPTION_acpi,
 };
 
 typedef struct QEMUOption {
@@ -4983,6 +4987,7 @@ const QEMUOption qemu_options[] = {
     { "d", HAS_ARG, QEMU_OPTION_d },
     { "vcpus", 1, QEMU_OPTION_vcpus },
     { "timeoffset", HAS_ARG, QEMU_OPTION_timeoffset },
+    { "acpi", 0, QEMU_OPTION_acpi },
     { NULL },
 };
 
@@ -5709,6 +5714,9 @@ int main(int argc, char **argv)
                 break;
             case QEMU_OPTION_timeoffset:
                 timeoffset = strtol(optarg, NULL, 0);
+                break;
+            case QEMU_OPTION_acpi:
+                acpi_enabled = 1;
                 break;
             }
         }
