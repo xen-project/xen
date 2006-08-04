@@ -1,5 +1,4 @@
-#ifndef XEN_PERFC_DEFN_H
-#define XEN_PERFC_DEFN_H
+/* This file is legitimately included multiple times. */
 
 PERFCOUNTER_CPU(dtlb_translate,		"dtlb hit")
 
@@ -20,5 +19,3 @@ PERFCOUNTER_CPU(pal_halt_light,		"calls to pal_halt_light")
 PERFCOUNTER_CPU(context_switch,		"context switch")
 
 PERFCOUNTER_CPU(lazy_cover,		"lazy cover")
-
-#endif
