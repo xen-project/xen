@@ -22,34 +22,39 @@
 #define _PAGE_PL_2	(2<<7)
 
 #if 1	 // change to 0 to turn off all fast paths
-#define FAST_HYPERPRIVOPS
-#define FAST_HYPERPRIVOP_CNT
-#define FAST_REFLECT_CNT
+# define FAST_HYPERPRIVOPS
+# ifdef PERF_COUNTERS
+#  define FAST_HYPERPRIVOP_CNT
+#  define FAST_HYPERPRIVOP_PERFC(N) \
+	(perfcounters + FAST_HYPERPRIVOP_PERFC_OFS + (4 * N))
+#  define FAST_REFLECT_CNT
+# endif
+	
 //#define FAST_TICK // mostly working (unat problems) but default off for now
 //#define FAST_TLB_MISS_REFLECT	// mostly working but default off for now
-#ifdef CONFIG_XEN_IA64_DOM0_VP
-#undef FAST_ITC	//XXX CONFIG_XEN_IA64_DOM0_VP
+# ifdef CONFIG_XEN_IA64_DOM0_VP
+#  undef FAST_ITC	//XXX CONFIG_XEN_IA64_DOM0_VP
 		//    TODO fast_itc doesn't suport dom0 vp yet.
-#else
-//#define FAST_ITC	// to be reviewed
-#endif
-#define FAST_BREAK
-#ifndef CONFIG_XEN_IA64_DOM0_VP
-# define FAST_ACCESS_REFLECT
-#else
-# undef FAST_ACCESS_REFLECT //XXX CONFIG_XEN_IA64_DOM0_VP
+# else
+//#  define FAST_ITC	// to be reviewed
+# endif
+# define FAST_BREAK
+# ifndef CONFIG_XEN_IA64_DOM0_VP
+#  define FAST_ACCESS_REFLECT
+# else
+#  undef FAST_ACCESS_REFLECT //XXX CONFIG_XEN_IA64_DOM0_VP
                             //    TODO fast_access_reflect
                             //    doesn't support dom0 vp yet.
-#endif
-#define FAST_RFI
-#define FAST_SSM_I
-#define FAST_PTC_GA
-#undef RFI_TO_INTERRUPT // not working yet
+# endif
+# define FAST_RFI
+# define FAST_SSM_I
+# define FAST_PTC_GA
+# undef RFI_TO_INTERRUPT // not working yet
 #endif
 
 #ifdef CONFIG_SMP
-//#warning "FIXME: ptc.ga instruction requires spinlock for SMP"
-#undef FAST_PTC_GA
+ //#warning "FIXME: ptc.ga instruction requires spinlock for SMP"
+ #undef FAST_PTC_GA
 #endif
 
 // FIXME: turn off for now... but NaTs may crash Xen so re-enable soon!
@@ -237,10 +242,10 @@ ENTRY(hyper_ssm_i)
 	cmp.ne p7,p0=r21,r0
 (p7)	br.sptk.many dispatch_break_fault ;;
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_SSM_I);;
-	ld8 r21=[r20];;
+	movl r20=FAST_HYPERPRIVOP_PERFC(HYPERPRIVOP_SSM_I);;
+	ld4 r21=[r20];;
 	adds r21=1,r21;;
-	st8 [r20]=r21;;
+	st4 [r20]=r21;;
 #endif
 	// set shared_mem iip to instruction after HYPER_SSM_I
 	extr.u r20=r30,41,2 ;;
@@ -373,10 +378,10 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	mov rp=r29;;
 	mov cr.itm=r26;;	// ensure next tick
 #ifdef FAST_REFLECT_CNT
-	movl r20=fast_reflect_count+((0x3000>>8)*8);;
-	ld8 r21=[r20];;
+	movl r20=perfcounters+FAST_REFLECT_PERFC_OFS+((0x3000>>8)*4);;
+	ld4 r21=[r20];;
 	adds r21=1,r21;;
-	st8 [r20]=r21;;
+	st4 [r20]=r21;;
 #endif
 	// vcpu_pend_timer(current)
 	movl r18=THIS_CPU(current_psr_ic_addr)
@@ -611,12 +616,12 @@ END(fast_break_reflect)
 //	r31 == pr
 ENTRY(fast_reflect)
 #ifdef FAST_REFLECT_CNT
-	movl r22=fast_reflect_count;
-	shr r23=r20,5;;
+	movl r22=perfcounters+FAST_REFLECT_PERFC_OFS;
+	shr r23=r20,8-2;;
 	add r22=r22,r23;;
-	ld8 r21=[r22];;
+	ld4 r21=[r22];;
 	adds r21=1,r21;;
-	st8 [r22]=r21;;
+	st4 [r22]=r21;;
 #endif
 	// save iip in shared_info (DON'T POINT TO NEXT INSTRUCTION!)
 	adds r21=XSI_IIP_OFS-XSI_PSR_IC_OFS,r18 ;;
@@ -948,10 +953,10 @@ fast_tlb_no_tr_match:
 (p7)	br.cond.spnt.few page_not_present;;
 
 #ifdef FAST_REFLECT_CNT
-	movl r21=fast_vhpt_translate_count;;
-	ld8 r22=[r21];;
+	movl r21=perfcounter+FAST_VHPT_TRANSLATE_PERFC_OFS;;
+	ld4 r22=[r21];;
 	adds r22=1,r22;;
-	st8 [r21]=r22;;
+	st4 [r21]=r22;;
 #endif
 
 // prepare for fast_insert(PSCB(ifa),PSCB(itir),r16=pte)
@@ -979,9 +984,9 @@ END(fast_tlb_miss_reflect)
 ENTRY(recover_and_page_fault)
 #ifdef PERF_COUNTERS
 	movl r21=perfcounters + RECOVER_TO_PAGE_FAULT_PERFC_OFS;;
-	ld8 r22=[r21];;
+	ld4 r22=[r21];;
 	adds r22=1,r22;;
-	st8 [r21]=r22;;
+	st4 [r21]=r22;;
 #endif
 	mov b0=r29;;
 	br.cond.sptk.many page_fault;;
@@ -1083,10 +1088,10 @@ ENTRY(hyper_rfi)
 
 1:	// OK now, let's do an rfi.
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_RFI);;
-	ld8 r23=[r20];;
+	movl r20=FAST_HYPERPRIVOP_PERFC(HYPERPRIVOP_RFI);;
+	ld4 r23=[r20];;
 	adds r23=1,r23;;
-	st8 [r20]=r23;;
+	st4 [r20]=r23;;
 #endif
 #ifdef RFI_TO_INTERRUPT
 	// maybe do an immediate interrupt delivery?
@@ -1339,10 +1344,10 @@ END(rfi_with_interrupt)
 
 ENTRY(hyper_cover)
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_COVER);;
-	ld8 r21=[r20];;
+	movl r20=FAST_HYPERPRIVOP_PERFC(HYPERPRIVOP_COVER);;
+	ld4 r21=[r20];;
 	adds r21=1,r21;;
-	st8 [r20]=r21;;
+	st4 [r20]=r21;;
 #endif
 	mov r24=cr.ipsr
 	mov r25=cr.iip;;
@@ -1375,10 +1380,10 @@ END(hyper_cover)
 // return from metaphysical mode (meta=1) to virtual mode (meta=0)
 ENTRY(hyper_ssm_dt)
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_SSM_DT);;
-	ld8 r21=[r20];;
+	movl r20=FAST_HYPERPRIVOP_PERFC(HYPERPRIVOP_SSM_DT);;
+	ld4 r21=[r20];;
 	adds r21=1,r21;;
-	st8 [r20]=r21;;
+	st4 [r20]=r21;;
 #endif
 	mov r24=cr.ipsr
 	mov r25=cr.iip;;
@@ -1412,10 +1417,10 @@ END(hyper_ssm_dt)
 // go to metaphysical mode (meta=1) from virtual mode (meta=0)
 ENTRY(hyper_rsm_dt)
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_RSM_DT);;
-	ld8 r21=[r20];;
+	movl r20=FAST_HYPERPRIVOP_PERFC(HYPERPRIVOP_RSM_DT);;
+	ld4 r21=[r20];;
 	adds r21=1,r21;;
-	st8 [r20]=r21;;
+	st4 [r20]=r21;;
 #endif
 	mov r24=cr.ipsr
 	mov r25=cr.iip;;
@@ -1449,10 +1454,10 @@ END(hyper_rsm_dt)
 
 ENTRY(hyper_get_tpr)
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_GET_TPR);;
-	ld8 r21=[r20];;
+	movl r20=FAST_HYPERPRIVOP_PERFC(HYPERPRIVOP_GET_TPR);;
+	ld4 r21=[r20];;
 	adds r21=1,r21;;
-	st8 [r20]=r21;;
+	st4 [r20]=r21;;
 #endif
 	mov r24=cr.ipsr
 	mov r25=cr.iip;;
@@ -1478,10 +1483,10 @@ END(hyper_get_tpr)
 // (or accidentally missing) delivering an interrupt
 ENTRY(hyper_set_tpr)
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_SET_TPR);;
-	ld8 r21=[r20];;
+	movl r20=FAST_HYPERPRIVOP_PERFC(HYPERPRIVOP_SET_TPR);;
+	ld4 r21=[r20];;
 	adds r21=1,r21;;
-	st8 [r20]=r21;;
+	st4 [r20]=r21;;
 #endif
 	mov r24=cr.ipsr
 	mov r25=cr.iip;;
@@ -1506,10 +1511,10 @@ END(hyper_set_tpr)
 
 ENTRY(hyper_get_ivr)
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r22=fast_hyperpriv_cnt+(8*HYPERPRIVOP_GET_IVR);;
-	ld8 r21=[r22];;
+	movl r22=FAST_HYPERPRIVOP_PERFC(HYPERPRIVOP_GET_IVR);;
+	ld4 r21=[r22];;
 	adds r21=1,r21;;
-	st8 [r22]=r21;;
+	st4 [r22]=r21;;
 #endif
 	mov r8=15;;
 	// when we get to here r20=~=interrupts pending
@@ -1618,10 +1623,10 @@ ENTRY(hyper_eoi)
 	cmp.ne p7,p0=r20,r0
 (p7)	br.spnt.many dispatch_break_fault ;;
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_EOI);;
-	ld8 r21=[r20];;
+	movl r20=FAST_HYPERPRIVOP_PERFC(HYPERPRIVOP_EOI);;
+	ld4 r21=[r20];;
 	adds r21=1,r21;;
-	st8 [r20]=r21;;
+	st4 [r20]=r21;;
 #endif
 	movl r22=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
 	ld8 r22=[r22];;
@@ -1682,10 +1687,10 @@ ENTRY(hyper_set_itm)
 	cmp.ne p7,p0=r20,r0
 (p7)	br.spnt.many dispatch_break_fault ;;
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_SET_ITM);;
-	ld8 r21=[r20];;
+	movl r20=FAST_HYPERPRIVOP_PERFC(HYPERPRIVOP_SET_ITM);;
+	ld4 r21=[r20];;
 	adds r21=1,r21;;
-	st8 [r20]=r21;;
+	st4 [r20]=r21;;
 #endif
 	movl r20=THIS_CPU(cpu_info)+IA64_CPUINFO_ITM_NEXT_OFFSET;;
 	ld8 r21=[r20];;
@@ -1723,10 +1728,10 @@ END(hyper_set_itm)
 
 ENTRY(hyper_get_rr)
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_GET_RR);;
-	ld8 r21=[r20];;
+	movl r20=FAST_HYPERPRIVOP_PERFC(HYPERPRIVOP_GET_RR);;
+	ld4 r21=[r20];;
 	adds r21=1,r21;;
-	st8 [r20]=r21;;
+	st4 [r20]=r21;;
 #endif
 	extr.u r25=r8,61,3;;
 	adds r20=XSI_RR0_OFS-XSI_PSR_IC_OFS,r18 ;;
@@ -1755,10 +1760,10 @@ ENTRY(hyper_set_rr)
 	cmp.leu p7,p0=7,r25	// punt on setting rr7
 (p7)	br.spnt.many dispatch_break_fault ;;
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_SET_RR);;
-	ld8 r21=[r20];;
+	movl r20=FAST_HYPERPRIVOP_PERFC(HYPERPRIVOP_SET_RR);;
+	ld4 r21=[r20];;
 	adds r21=1,r21;;
-	st8 [r20]=r21;;
+	st4 [r20]=r21;;
 #endif
 	extr.u r26=r9,8,24	// r26 = r9.rid
 	movl r20=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
@@ -1813,10 +1818,10 @@ ENTRY(hyper_set_kr)
 	cmp.ne p7,p0=r0,r25	// if kr# > 7, go slow way
 (p7)	br.spnt.many dispatch_break_fault ;;
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_SET_KR);;
-	ld8 r21=[r20];;
+	movl r20=FAST_HYPERPRIVOP_PERFC(HYPERPRIVOP_SET_KR);;
+	ld4 r21=[r20];;
 	adds r21=1,r21;;
-	st8 [r20]=r21;;
+	st4 [r20]=r21;;
 #endif
 	adds r21=XSI_KR0_OFS-XSI_PSR_IC_OFS,r18 ;;
 	shl r20=r8,3;;
@@ -1871,10 +1876,10 @@ END(hyper_set_kr)
 //	r31 == pr
 ENTRY(hyper_thash)
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_THASH);;
-	ld8 r21=[r20];;
+	movl r20=FAST_HYPERPRIVOP_PERFC(HYPERPRIVOP_THASH);;
+	ld4 r21=[r20];;
 	adds r21=1,r21;;
-	st8 [r20]=r21;;
+	st4 [r20]=r21;;
 #endif
 	shr.u r20 = r8, 61
 	addl r25 = 1, r0
@@ -1940,10 +1945,10 @@ ENTRY(hyper_ptc_ga)
 #endif
 	// FIXME: validate not flushing Xen addresses
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_PTC_GA);;
-	ld8 r21=[r20];;
+	movl r20=FAST_HYPERPRIVOP_PERFC(HYPERPRIVOP_PTC_GA);;
+	ld4 r21=[r20];;
 	adds r21=1,r21;;
-	st8 [r20]=r21;;
+	st4 [r20]=r21;;
 #endif
 	mov r28=r8
 	extr.u r19=r9,2,6		// addr_range=1<<((r9&0xfc)>>2)
@@ -2011,9 +2016,9 @@ END(hyper_ptc_ga)
 ENTRY(recover_and_dispatch_break_fault)
 #ifdef PERF_COUNTERS
 	movl r21=perfcounters + RECOVER_TO_BREAK_FAULT_PERFC_OFS;;
-	ld8 r22=[r21];;
+	ld4 r22=[r21];;
 	adds r22=1,r22;;
-	st8 [r21]=r22;;
+	st4 [r21]=r22;;
 #endif
 	mov b0=r29 ;;
 	br.sptk.many dispatch_break_fault;;
@@ -2054,11 +2059,11 @@ hyper_itc_d:
 (p7)	br.spnt.many dispatch_break_fault ;;
 #ifdef FAST_HYPERPRIVOP_CNT
 	cmp.eq p6,p7=HYPERPRIVOP_ITC_D,r17;;
-(p6)	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_ITC_D);;
-(p7)	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_ITC_I);;
-	ld8 r21=[r20];;
+(p6)	movl r20=FAST_HYPERPRIVOP_PERFC(HYPERPRIVOP_ITC_D);;
+(p7)	movl r20=FAST_HYPERPRIVOP_PERFC(HYPERPRIVOP_ITC_I);;
+	ld4 r21=[r20];;
 	adds r21=1,r21;;
-	st8 [r20]=r21;;
+	st4 [r20]=r21;;
 #endif
 (p6)	mov r17=2;;
 (p7)	mov r17=3;;

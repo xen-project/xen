@@ -24,7 +24,6 @@
 #include <xen/init.h>
 #include <xen/types.h>
 #include <xen/lib.h>
-#include <xen/perfc.h>
 #include <xen/sched.h>
 #include <xen/spinlock.h>
 #include <xen/mm.h>
@@ -33,6 +32,7 @@
 #include <xen/shadow.h>
 #include <xen/domain_page.h>
 #include <xen/keyhandler.h>
+#include <xen/perfc.h>
 #include <asm/page.h>
 
 /*

@@ -261,11 +261,6 @@ void flush_tlb_mask(cpumask_t mask)
             (cpu, (void (*)(void *))flush_tlb_vhpt_all, NULL, 1, 1);
 }
 
-void zero_vhpt_stats(void)
-{
-	return;
-}
-
 int dump_vhpt_stats(char *buf)
 {
 	int i, cpu;

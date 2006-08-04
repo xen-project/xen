@@ -51,8 +51,6 @@ extern IA64FAULT ia64_hypercall(struct pt_regs *regs);
 
 extern void do_ssc(unsigned long ssc, struct pt_regs *regs);
 
-#define inc_slow_reflect_count(vec) slow_reflect_count[vec>>8]++;
-
 // should never panic domain... if it does, stack may have been overrun
 void check_bad_nested_interruption(unsigned long isr, struct pt_regs *regs, unsigned long vector)
 {
@@ -92,7 +90,7 @@ void reflect_interruption(unsigned long isr, struct pt_regs *regs, unsigned long
 	v->vcpu_info->evtchn_upcall_mask = 1;
 	PSCB(v,interrupt_collection_enabled) = 0;
 
-	inc_slow_reflect_count(vector);
+	perfc_incra(slow_reflect, vector >> 8);
 }
 
 static unsigned long pending_false_positive = 0;
@@ -247,7 +245,7 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 		regs->cr_ipsr = (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
 		// NOTE: nested trap must NOT pass PSCB address
 		//regs->r31 = (unsigned long) &PSCB(current);
-		inc_slow_reflect_count(fault);
+		perfc_incra(slow_reflect, fault >> 8);
 		return;
 	}
 

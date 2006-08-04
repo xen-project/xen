@@ -7,32 +7,6 @@ extern int zero_privop_counts_to_user(char *, int);
 
 #define PRIVOP_ADDR_COUNT
 
-extern unsigned long slow_hyperpriv_cnt[HYPERPRIVOP_MAX+1];
-extern unsigned long fast_hyperpriv_cnt[HYPERPRIVOP_MAX+1];
-
-extern unsigned long slow_reflect_count[0x80];
-extern unsigned long fast_reflect_count[0x80];
-
-struct privop_counters {
-	unsigned long mov_to_ar_imm;
-	unsigned long mov_to_ar_reg;
-	unsigned long mov_from_ar;
-	unsigned long ssm;
-	unsigned long rsm;
-	unsigned long rfi;
-	unsigned long bsw0;
-	unsigned long bsw1;
-	unsigned long cover;
-	unsigned long fc;
-	unsigned long cpuid;
-	unsigned long Mpriv_cnt[64];
-
-	unsigned long to_cr_cnt[128]; /* Number of mov to cr privop.  */
-	unsigned long from_cr_cnt[128]; /* Number of mov from cr privop.  */
-};
-
-extern struct privop_counters privcnt;
-
 #ifdef PRIVOP_ADDR_COUNT
 
 /* INST argument of PRIVOP_COUNT_ADDR.  */

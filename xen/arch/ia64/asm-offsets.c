@@ -215,5 +215,7 @@ void foo(void)
 	BLANK();
 	DEFINE(RECOVER_TO_PAGE_FAULT_PERFC_OFS, offsetof (struct perfcounter, recover_to_page_fault));
 	DEFINE(RECOVER_TO_BREAK_FAULT_PERFC_OFS, offsetof (struct perfcounter, recover_to_break_fault));
+	DEFINE(FAST_HYPERPRIVOP_PERFC_OFS, offsetof (struct perfcounter, fast_hyperprivop));
+	DEFINE(FAST_REFLECT_PERFC_OFS, offsetof (struct perfcounter, fast_reflect));
 #endif
 }

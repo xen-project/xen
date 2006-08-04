@@ -275,7 +275,7 @@ static IA64FAULT priv_mov_to_pmd(VCPU *vcpu, INST64 inst)
 static IA64FAULT priv_mov_to_cr(VCPU *vcpu, INST64 inst)
 {
 	UINT64 val = vcpu_get_gr(vcpu, inst.M32.r2);
-	privcnt.to_cr_cnt[inst.M32.cr3]++;
+	perfc_incra(mov_to_cr, inst.M32.cr3);
 	switch (inst.M32.cr3) {
 	    case 0: return vcpu_set_dcr(vcpu,val);
 	    case 1: return vcpu_set_itm(vcpu,val);
@@ -417,7 +417,7 @@ static IA64FAULT priv_mov_from_cr(VCPU *vcpu, INST64 inst)
 	UINT64 val;
 	IA64FAULT fault;
 
-	privcnt.from_cr_cnt[inst.M33.cr3]++;
+	perfc_incra(mov_from_cr, inst.M33.cr3);
 	switch (inst.M33.cr3) {
 	    case 0: return cr_get(dcr);
 	    case 1: return cr_get(itm);
@@ -563,15 +563,15 @@ priv_handle_op(VCPU *vcpu, REGS *regs, int privlvl)
 #endif
 			if (inst.M29.x3 != 0) break;
 			if (inst.M30.x4 == 8 && inst.M30.x2 == 2) {
-				privcnt.mov_to_ar_imm++;
+				perfc_incrc(mov_to_ar_imm);
 				return priv_mov_to_ar_imm(vcpu,inst);
 			}
 			if (inst.M44.x4 == 6) {
-				privcnt.ssm++;
+				perfc_incrc(ssm);
 				return priv_ssm(vcpu,inst);
 			}
 			if (inst.M44.x4 == 7) {
-				privcnt.rsm++;
+				perfc_incrc(rsm);
 				return priv_rsm(vcpu,inst);
 			}
 			break;
@@ -580,8 +580,9 @@ priv_handle_op(VCPU *vcpu, REGS *regs, int privlvl)
 		x6 = inst.M29.x6;
 		if (x6 == 0x2a) {
 			if (privify_en && inst.M29.r2 > 63 && inst.M29.ar3 < 8)
-				privcnt.mov_from_ar++; // privified mov from kr
-			else privcnt.mov_to_ar_reg++;
+				perfc_incrc(mov_from_ar); // privified mov from kr
+			else
+				perfc_incrc(mov_to_ar_reg);
 			return priv_mov_to_ar_reg(vcpu,inst);
 		}
 		if (inst.M29.x3 != 0) break;
@@ -593,31 +594,33 @@ priv_handle_op(VCPU *vcpu, REGS *regs, int privlvl)
 			}
 		}
 		if (privify_en && x6 == 52 && inst.M28.r3 > 63)
-			privcnt.fc++;
+			perfc_incrc(fc);
 		else if (privify_en && x6 == 16 && inst.M43.r3 > 63)
-			privcnt.cpuid++;
-		else privcnt.Mpriv_cnt[x6]++;
+			perfc_incrc(cpuid);
+		else
+			perfc_incra(misc_privop, x6);
 		return (*pfunc)(vcpu,inst);
 		break;
 	    case B:
 		if (inst.generic.major != 0) break;
 		if (inst.B8.x6 == 0x08) {
 			IA64FAULT fault;
-			privcnt.rfi++;
+			perfc_incrc(rfi);
 			fault = priv_rfi(vcpu,inst);
 			if (fault == IA64_NO_FAULT) fault = IA64_RFI_IN_PROGRESS;
 			return fault;
 		}
 		if (inst.B8.x6 == 0x0c) {
-			privcnt.bsw0++;
+			perfc_incrc(bsw0);
 			return priv_bsw0(vcpu,inst);
 		}
 		if (inst.B8.x6 == 0x0d) {
-			privcnt.bsw1++;
+			perfc_incrc(bsw1);
 			return priv_bsw1(vcpu,inst);
 		}
-		if (inst.B8.x6 == 0x0) { // break instr for privified cover
-			privcnt.cover++;
+		if (inst.B8.x6 == 0x0) {
+			// break instr for privified cover
+			perfc_incrc(cover);
 			return priv_cover(vcpu,inst);
 		}
 		break;
@@ -625,19 +628,20 @@ priv_handle_op(VCPU *vcpu, REGS *regs, int privlvl)
 		if (inst.generic.major != 0) break;
 #if 0
 		if (inst.I26.x6 == 0 && inst.I26.x3 == 0) {
-			privcnt.cover++;
+			perfc_incrc(cover);
 			return priv_cover(vcpu,inst);
 		}
 #endif
 		if (inst.I26.x3 != 0) break;  // I26.x3 == I27.x3
 		if (inst.I26.x6 == 0x2a) {
 			if (privify_en && inst.I26.r2 > 63 && inst.I26.ar3 < 8)
-				privcnt.mov_from_ar++; // privified mov from kr
-			else privcnt.mov_to_ar_reg++;
+				perfc_incrc(mov_from_ar); // privified mov from kr
+			else 
+				perfc_incrc(mov_to_ar_reg);
 			return priv_mov_to_ar_reg(vcpu,inst);
 		}
 		if (inst.I27.x6 == 0x0a) {
-			privcnt.mov_to_ar_imm++;
+			perfc_incrc(mov_to_ar_imm);
 			return priv_mov_to_ar_imm(vcpu,inst);
 		}
 		break;
@@ -705,7 +709,7 @@ ia64_hyperprivop(unsigned long iim, REGS *regs)
 		             iim, regs->cr_iip);
 		return 1;
 	}
-	slow_hyperpriv_cnt[iim]++;
+	perfc_incra(slow_hyperprivop, iim);
 	switch(iim) {
 	    case HYPERPRIVOP_RFI:
 		(void)vcpu_rfi(v);
