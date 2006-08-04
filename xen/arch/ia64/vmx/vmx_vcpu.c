@@ -202,9 +202,7 @@ IA64FAULT vmx_vcpu_set_rr(VCPU *vcpu, UINT64 reg, UINT64 val)
     newrr.rrval=val;
     if (newrr.rid >= (1 << vcpu->domain->arch.rid_bits))
         panic_domain (NULL, "use of invalid rid %x\n", newrr.rid);
-    if(oldrr.ps!=newrr.ps){
-        thash_purge_all(vcpu);
-    }
+
     VMX(vcpu,vrr[reg>>61]) = val;
     switch((u64)(reg>>61)) {
     case VRN7:

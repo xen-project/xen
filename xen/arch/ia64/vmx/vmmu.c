@@ -528,19 +528,23 @@ struct ptc_ga_args {
 
 static void ptc_ga_remote_func (void *varg)
 {
-    u64 oldrid, moldrid, mpta;
+    u64 oldrid, moldrid, mpta, oldpsbits, vadr;
     struct ptc_ga_args *args = (struct ptc_ga_args *)varg;
     VCPU *v = args->vcpu;
+    vadr = args->vadr;
 
     oldrid = VMX(v, vrr[0]);
     VMX(v, vrr[0]) = args->rid;
+    oldpsbits = VMX(v, psbits[0]);
+    VMX(v, psbits[0]) = VMX(v, psbits[REGION_NUMBER(vadr)]);
     moldrid = ia64_get_rr(0x0);
     ia64_set_rr(0x0,vrrtomrr(v,args->rid));
     mpta = ia64_get_pta();
     ia64_set_pta(v->arch.arch_vmx.mpta&(~1));
     ia64_srlz_d();
-    vmx_vcpu_ptc_l(v, args->vadr, args->ps);
+    vmx_vcpu_ptc_l(v, REGION_OFFSET(vadr), args->ps);
     VMX(v, vrr[0]) = oldrid; 
+    VMX(v, psbits[0]) = oldpsbits;
     ia64_set_rr(0x0,moldrid);
     ia64_set_pta(mpta);
     ia64_dv_serialize_data();
@@ -554,7 +558,7 @@ IA64FAULT vmx_vcpu_ptc_ga(VCPU *vcpu,UINT64 va,UINT64 ps)
     struct vcpu *v;
     struct ptc_ga_args args;
 
-    args.vadr = va<<3>>3;
+    args.vadr = va;
     vcpu_get_rr(vcpu, va, &args.rid);
     args.ps = ps;
     for_each_vcpu (d, v) {
