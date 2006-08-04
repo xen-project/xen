@@ -1,7 +1,7 @@
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2006-07-27 11:16:57.678475515 +0100
-+++ ioemu/hw/pc.c	2006-07-27 11:16:58.447390396 +0100
+--- ioemu.orig/hw/pc.c	2006-08-04 10:53:02.019794255 +0100
++++ ioemu/hw/pc.c	2006-08-04 10:54:56.876531492 +0100
 @@ -639,7 +639,9 @@
      }
  
@@ -25,8 +25,8 @@ Index: ioemu/hw/pc.c
      isa_bios_size = bios_size;
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-27 11:16:58.296407110 +0100
-+++ ioemu/vl.c	2006-07-27 11:16:58.450390064 +0100
+--- ioemu.orig/vl.c	2006-08-04 10:53:02.472741926 +0100
++++ ioemu/vl.c	2006-08-04 10:55:48.361590787 +0100
 @@ -159,6 +159,8 @@
  #define MAX_CPUS 1
  #endif
@@ -60,7 +60,7 @@ Index: ioemu/vl.c
                  break;
              case QEMU_OPTION_l:
                  {
-@@ -5560,6 +5567,39 @@
+@@ -5560,6 +5567,41 @@
      /* init the memory */
      phys_ram_size = ram_size + vga_ram_size + bios_size;
  
@@ -95,12 +95,14 @@ Index: ioemu/vl.c
 +    fprintf(logfile, "shared page at pfn:%lx, mfn: %"PRIx64"\n", nr_pages - 1,
 +            (uint64_t)(page_array[nr_pages - 1]));
 +
++    free(page_array);
++
 +#else  /* !CONFIG_DM */
 +
  #ifdef CONFIG_SOFTMMU
      phys_ram_base = qemu_vmalloc(phys_ram_size);
      if (!phys_ram_base) {
-@@ -5600,6 +5640,8 @@
+@@ -5600,6 +5642,8 @@
      }
  #endif
  
