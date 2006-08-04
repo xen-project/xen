@@ -677,7 +677,7 @@ static int raw_open(BlockDriverState *bs, const char *filename)
     int rv;
 #endif
 
-    fd = open(filename, O_RDWR | O_BINARY | O_LARGEFILE);
+    fd = open(filename, O_RDWR | O_BINARY | O_LARGEFILE | O_SYNC);
     if (fd < 0) {
         fd = open(filename, O_RDONLY | O_BINARY | O_LARGEFILE);
         if (fd < 0)

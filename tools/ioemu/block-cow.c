@@ -69,7 +69,7 @@ static int cow_open(BlockDriverState *bs, const char *filename)
     struct cow_header_v2 cow_header;
     int64_t size;
 
-    fd = open(filename, O_RDWR | O_BINARY | O_LARGEFILE);
+    fd = open(filename, O_RDWR | O_BINARY | O_LARGEFILE | O_SYNC);
     if (fd < 0) {
         fd = open(filename, O_RDONLY | O_BINARY | O_LARGEFILE);
         if (fd < 0)
