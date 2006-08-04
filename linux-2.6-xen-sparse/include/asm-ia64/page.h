@@ -223,15 +223,6 @@ get_order (unsigned long size)
 
 #define INVALID_P2M_ENTRY	(~0UL)
 
-#ifndef CONFIG_XEN_IA64_DOM0_VP
-
-#define virt_to_machine(v) __pa(v)
-#define machine_to_virt(m) __va(m)
-#define virt_to_mfn(v)	((__pa(v)) >> PAGE_SHIFT)
-#define mfn_to_virt(m)	(__va((m) << PAGE_SHIFT))
-
-#else
-
 #include <linux/kernel.h>
 #include <asm/hypervisor.h>
 #include <xen/features.h>	// to compile netback, netfront
@@ -337,7 +328,6 @@ mfn_to_local_pfn(unsigned long mfn)
 	return pfn;
 }
 
-#endif /* CONFIG_XEN_IA64_DOM0_VP */
 #endif /* CONFIG_XEN */
 #endif /* __ASSEMBLY__ */
 

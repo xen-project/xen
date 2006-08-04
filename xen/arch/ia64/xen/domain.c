@@ -49,9 +49,6 @@
 #include <asm/shadow.h>
 #include <asm/privop_stat.h>
 
-#ifndef CONFIG_XEN_IA64_DOM0_VP
-#define CONFIG_DOMAIN0_CONTIGUOUS
-#endif
 unsigned long dom0_start = -1L;
 unsigned long dom0_size = 512*1024*1024;
 unsigned long dom0_align = 64*1024*1024;
@@ -533,9 +530,7 @@ static void relinquish_memory(struct domain *d, struct list_head *list)
 
         /* Follow the list chain and /then/ potentially free the page. */
         ent = ent->next;
-#ifdef CONFIG_XEN_IA64_DOM0_VP
         BUG_ON(get_gpfn_from_mfn(page_to_mfn(page)) != INVALID_M2P_ENTRY);
-#endif
         put_page(page);
     }
 
@@ -952,11 +947,7 @@ int construct_dom0(struct domain *d,
 	alloc_end = dom0_start + dom0_size;
 	max_pages = dom0_size / PAGE_SIZE;
 	d->max_pages = max_pages;
-#ifndef CONFIG_XEN_IA64_DOM0_VP
-	d->tot_pages = d->max_pages;
-#else
 	d->tot_pages = 0;
-#endif
 	dsi.image_addr = (unsigned long)image_start;
 	dsi.image_len  = image_len;
 	rc = parseelfimage(&dsi);
@@ -1052,25 +1043,6 @@ int construct_dom0(struct domain *d,
 	for ( i = 1; i < dom0_max_vcpus; i++ )
 	    if (alloc_vcpu(d, i, i) == NULL)
 		printf ("Cannot allocate dom0 vcpu %d\n", i);
-
-#if defined(VALIDATE_VT) && !defined(CONFIG_XEN_IA64_DOM0_VP)
-	/* Construct a frame-allocation list for the initial domain, since these
-	 * pages are allocated by boot allocator and pfns are not set properly
-	 */
-	for ( mfn = (alloc_start>>PAGE_SHIFT); 
-	      mfn < (alloc_end>>PAGE_SHIFT); 
-	      mfn++ )
-	{
-            page = mfn_to_page(mfn);
-            page_set_owner(page, d);
-            page->u.inuse.type_info = 0;
-            page->count_info        = PGC_allocated | 1;
-            list_add_tail(&page->list, &d->page_list);
-
-	    /* Construct 1:1 mapping */
-	    set_gpfn_from_mfn(mfn, mfn);
-	}
-#endif
 
 	/* Copy the OS image. */
 	loaddomainelfimage(d,image_start);

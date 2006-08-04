@@ -435,7 +435,6 @@ struct p2m_entry;
 extern unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr, struct p2m_entry* entry);
 extern void *domain_mpa_to_imva(struct domain *d, unsigned long mpaddr);
 extern volatile pte_t *lookup_noalloc_domain_pte(struct domain* d, unsigned long mpaddr);
-#ifdef CONFIG_XEN_IA64_DOM0_VP
 extern unsigned long assign_domain_mmio_page(struct domain *d, unsigned long mpaddr, unsigned long size);
 extern unsigned long assign_domain_mach_page(struct domain *d, unsigned long mpaddr, unsigned long size, unsigned long flags);
 int domain_page_mapped(struct domain *d, unsigned long mpaddr);
@@ -444,7 +443,6 @@ extern unsigned long ____lookup_domain_mpa(struct domain *d, unsigned long mpadd
 extern unsigned long do_dom0vp_op(unsigned long cmd, unsigned long arg0, unsigned long arg1, unsigned long arg2, unsigned long arg3);
 extern unsigned long dom0vp_zap_physmap(struct domain *d, unsigned long gpfn, unsigned int extent_order);
 extern unsigned long dom0vp_add_physmap(struct domain* d, unsigned long gpfn, unsigned long mfn, unsigned long flags, domid_t domid);
-#endif
 
 extern volatile unsigned long *mpt_table;
 extern unsigned long gmfn_to_mfn_foreign(struct domain *d, unsigned long gpfn);
@@ -499,11 +497,7 @@ extern u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps,
 /* Arch-specific portion of memory_op hypercall. */
 #define arch_memory_op(op, arg) (-ENOSYS)
 
-#ifndef CONFIG_XEN_IA64_DOM0_VP
-#define steal_page(d, p, f)  0
-#else
 int steal_page(
     struct domain *d, struct page_info *page, unsigned int memflags);
-#endif
 
 #endif /* __ASM_IA64_MM_H__ */

@@ -3,7 +3,6 @@
 
 HAS_ACPI := y
 VALIDATE_VT	?= n
-xen_ia64_dom0_virtual_physical	?= y
 no_warns ?= n
 
 ifneq ($(COMPILE_ARCH),$(TARGET_ARCH))
@@ -35,9 +34,6 @@ CFLAGS	+= -g
 #CFLAGS  += -DVTI_DEBUG
 ifeq ($(VALIDATE_VT),y)
 CFLAGS  += -DVALIDATE_VT
-endif
-ifeq ($(xen_ia64_dom0_virtual_physical),y)
-CFLAGS	+= -DCONFIG_XEN_IA64_DOM0_VP
 endif
 ifeq ($(no_warns),y)
 CFLAGS	+= -Wa,--fatal-warnings -Werror -Wno-uninitialized

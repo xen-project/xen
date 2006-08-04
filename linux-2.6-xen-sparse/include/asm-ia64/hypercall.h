@@ -195,14 +195,6 @@ HYPERVISOR_multicall(
     return _hypercall2(int, multicall, call_list, nr_calls);
 }
 
-#ifndef CONFIG_XEN_IA64_DOM0_VP
-static inline int
-HYPERVISOR_memory_op(
-    unsigned int cmd, void *arg)
-{
-    return _hypercall2(int, memory_op, cmd, arg);
-}
-#else
 //XXX xen/ia64 copy_from_guest() is broken.
 //    This is a temporal work around until it is fixed.
 static inline int
@@ -230,7 +222,6 @@ HYPERVISOR_memory_op(
     }
     /* NOTREACHED */
 }
-#endif
 
 static inline int
 HYPERVISOR_event_channel_op(
@@ -288,12 +279,8 @@ ____HYPERVISOR_grant_table_op(
 {
     return _hypercall3(int, grant_table_op, cmd, uop, count);
 }
-#ifndef CONFIG_XEN_IA64_DOM0_VP
-#define HYPERVISOR_grant_table_op(cmd, uop, count) \
-	____HYPERVISOR_grant_table_op((cmd), (uop), (count))
-#else
+
 int HYPERVISOR_grant_table_op(unsigned int cmd, void *uop, unsigned int count);
-#endif
 
 static inline int
 HYPERVISOR_vcpu_op(
@@ -319,7 +306,6 @@ static inline void exit_idle(void) {}
 	irq_exit();				\
 })
 
-#ifdef CONFIG_XEN_IA64_DOM0_VP
 #include <linux/err.h>
 #include <asm/xen/privop.h>
 
@@ -507,11 +493,4 @@ HYPERVISOR_add_physmap(unsigned long gpfn, unsigned long mfn,
 // for balloon driver
 #define HYPERVISOR_update_va_mapping(va, new_val, flags) (0)
 
-#else
-#define HYPERVISOR_ioremap(ioaddr, size)		(ioaddr)
-#define HYPERVISOR_phystomach(gpfn)			(gpfn)
-#define HYPERVISOR_machtophys(mfn)			(mfn)
-#define HYPERVISOR_zap_physmap(gpfn, extent_order)	(0)
-#define HYPERVISOR_add_physmap(gpfn, mfn, flags)	(0)
-#endif
 #endif /* __HYPERCALL_H__ */

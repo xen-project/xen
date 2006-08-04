@@ -1299,13 +1299,8 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 			= map[i].handle;
 		pending_handle(mmap_idx, pending_idx, i/2).user   
 			= map[i+1].handle;
-#ifdef CONFIG_XEN_IA64_DOM0_NON_VP
-		pending_addrs[mmap_idx][vaddr_pagenr(pending_req, i)] =
-			(unsigned long)gnttab_map_vaddr(map[i]);
-#else
 		set_phys_to_machine(__pa(kvaddr) >> PAGE_SHIFT,
 			FOREIGN_FRAME(map[i].dev_bus_addr >> PAGE_SHIFT));
-#endif
 		offset = (uvaddr - info->vma->vm_start) >> PAGE_SHIFT;
 		pg = pfn_to_page(__pa(kvaddr) >> PAGE_SHIFT);
 		((struct page **)info->vma->vm_private_data)[offset] =

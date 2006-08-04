@@ -228,9 +228,7 @@ struct screen_info { };
 #define seq_printf(a,b...) printf(b)
 //#define CONFIG_BLK_DEV_INITRD // needed to reserve memory for domain0
 
-#ifdef CONFIG_XEN_IA64_DOM0_VP
 #define CONFIG_SHADOW	1
-#endif
 
 // xen/include/asm/config.h
 /******************************************************************************

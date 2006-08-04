@@ -2,7 +2,7 @@
 # Makefile for Xen components
 #
 
-obj-y := hypercall.o xenivt.o xenentry.o xensetup.o xenpal.o xenhpski.o
+obj-y := hypercall.o xenivt.o xenentry.o xensetup.o xenpal.o xenhpski.o \
+	 hypervisor.o pci-dma-xen.o util.o
 
-obj-$(CONFIG_XEN_IA64_DOM0_VP) += hypervisor.o pci-dma-xen.o util.o
-pci-dma-xen-$(CONFIG_XEN_IA64_DOM0_VP) := ../../i386/kernel/pci-dma-xen.o
+pci-dma-xen-y := ../../i386/kernel/pci-dma-xen.o

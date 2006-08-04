@@ -7,28 +7,11 @@
  */
 #include <linux/config.h>
 #include <asm/machvec.h>
-#ifdef CONFIG_XEN_IA64_DOM0_VP
 /* Needed for arch/i386/kernel/swiotlb.c and arch/i386/kernel/pci-dma-xen.c */
 #include <asm/hypervisor.h>
 /* Needed for arch/i386/kernel/swiotlb.c */
 #include <asm-i386/mach-xen/asm/swiotlb.h>
-#endif
 
-#ifndef CONFIG_XEN_IA64_DOM0_VP
-#define dma_alloc_coherent	platform_dma_alloc_coherent
-#define dma_alloc_noncoherent	platform_dma_alloc_coherent	/* coherent mem. is cheap */
-#define dma_free_coherent	platform_dma_free_coherent
-#define dma_free_noncoherent	platform_dma_free_coherent
-#define dma_map_single		platform_dma_map_single
-#define dma_map_sg		platform_dma_map_sg
-#define dma_unmap_single	platform_dma_unmap_single
-#define dma_unmap_sg		platform_dma_unmap_sg
-#define dma_sync_single_for_cpu	platform_dma_sync_single_for_cpu
-#define dma_sync_sg_for_cpu	platform_dma_sync_sg_for_cpu
-#define dma_sync_single_for_device platform_dma_sync_single_for_device
-#define dma_sync_sg_for_device	platform_dma_sync_sg_for_device
-#define dma_mapping_error	platform_dma_mapping_error
-#else
 int dma_map_sg(struct device *hwdev, struct scatterlist *sg, int nents,
                enum dma_data_direction direction);
 void dma_unmap_sg(struct device *hwdev, struct scatterlist *sg, int nents,
@@ -67,7 +50,6 @@ dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg, int nelems,
 		swiotlb_sync_sg_for_device(dev,sg,nelems,direction);
 	flush_write_buffers();
 }
-#endif
 
 #define dma_map_page(dev, pg, off, size, dir)				\
 	dma_map_single(dev, page_address(pg) + (off), (size), (dir))
@@ -109,7 +91,6 @@ dma_cache_sync (void *vaddr, size_t size, enum dma_data_direction dir)
 
 #define dma_is_consistent(dma_handle)	(1)	/* all we do is coherent memory... */
 
-#ifdef CONFIG_XEN_IA64_DOM0_VP
 /* arch/i386/kernel/swiotlb.o requires */
 void contiguous_bitmap_init(unsigned long end_pfn);
 
@@ -130,8 +111,5 @@ range_straddles_page_boundary(void *p, size_t size)
 	return (((((unsigned long)p & ~PAGE_MASK) + size) > PAGE_SIZE) &&
 	        !test_bit(__pa(p) >> PAGE_SHIFT, contiguous_bitmap));
 }
-#else
-#define contiguous_bitmap_init(end_pfn)	((void)end_pfn)
-#endif
 
 #endif /* _ASM_IA64_DMA_MAPPING_H */

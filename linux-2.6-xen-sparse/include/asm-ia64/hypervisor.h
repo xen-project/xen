@@ -125,11 +125,6 @@ HYPERVISOR_poll(
 
 // for drivers/xen/privcmd/privcmd.c
 #define machine_to_phys_mapping 0
-#ifndef CONFIG_XEN_IA64_DOM0_VP
-#define direct_remap_pfn_range(a,b,c,d,e,f) remap_pfn_range(a,b,c,d,e)
-#define	pfn_to_mfn(x)	(x)
-#define	mfn_to_pfn(x)	(x)
-#else
 struct vm_area_struct;
 int direct_remap_pfn_range(struct vm_area_struct *vma,
 			   unsigned long address,
@@ -140,7 +135,6 @@ int direct_remap_pfn_range(struct vm_area_struct *vma,
 struct file;
 int privcmd_mmap(struct file * file, struct vm_area_struct * vma);
 #define HAVE_ARCH_PRIVCMD_MMAP
-#endif
 
 // for drivers/xen/balloon/balloon.c
 #ifdef CONFIG_XEN_SCRUB_PAGES
@@ -152,12 +146,7 @@ int privcmd_mmap(struct file * file, struct vm_area_struct * vma);
 #define __pte_ma(_x)	((pte_t) {(_x)})
 #define phys_to_machine_mapping_valid(_x)	(1)
 #define pfn_pte_ma(_x,_y)	__pte_ma(0)
-#ifndef CONFIG_XEN_IA64_DOM0_VP //XXX
-#define set_phys_to_machine(_x,_y)	do {} while (0)
-#define xen_machphys_update(_x,_y)	do {} while (0)
-#endif
 
-#ifdef CONFIG_XEN_IA64_DOM0_VP
 int __xen_create_contiguous_region(unsigned long vstart, unsigned int order, unsigned int address_bits);
 static inline int
 xen_create_contiguous_region(unsigned long vstart,
@@ -190,11 +179,6 @@ MULTI_update_va_mapping(
 	mcl->op = __HYPERVISOR_update_va_mapping;
 	mcl->result = 0;
 }
-
-#else
-#define xen_create_contiguous_region(vstart, order, address_bits)	(0)
-#define xen_destroy_contiguous_region(vstart, order)	do {} while (0)
-#endif
 
 // for debug
 asmlinkage int xprintk(const char *fmt, ...);

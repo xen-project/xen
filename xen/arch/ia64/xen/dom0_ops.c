@@ -199,7 +199,6 @@ long arch_do_dom0_op(dom0_op_t *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
     return ret;
 }
 
-#ifdef CONFIG_XEN_IA64_DOM0_VP
 static unsigned long
 dom0vp_ioremap(struct domain *d, unsigned long mpaddr, unsigned long size)
 {
@@ -260,7 +259,6 @@ do_dom0vp_op(unsigned long cmd,
 
     return ret;
 }
-#endif
 
 /*
  * Local variables:

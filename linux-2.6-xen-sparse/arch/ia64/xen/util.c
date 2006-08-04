@@ -105,21 +105,6 @@ void unlock_vm_area(struct vm_struct *area)
 }
 EXPORT_SYMBOL_GPL(unlock_vm_area);
 
-#ifndef CONFIG_XEN_IA64_DOM0_VP
-/* We just need a range of legal va here, though finally identity
- * mapped one is instead used for gnttab mapping.
- */
-unsigned long alloc_empty_foreign_map_page_range(unsigned long pages)
-{
-	struct vm_struct *vma;
-
-	if ( (vma = get_vm_area(PAGE_SIZE * pages, VM_ALLOC)) == NULL )
-		return NULL;
-
-	return (unsigned long)vma->addr;
-}
-#endif
-
 /*
  * Local variables:
  *  c-file-style: "linux"

@@ -173,12 +173,8 @@
 #include <asm/shadow.h>
 #include <linux/efi.h>
 
-#ifndef CONFIG_XEN_IA64_DOM0_VP
-#define CONFIG_DOMAIN0_CONTIGUOUS
-#else
 static void domain_page_flush(struct domain* d, unsigned long mpaddr,
                               unsigned long old_mfn, unsigned long new_mfn);
-#endif
 
 extern unsigned long ia64_iobase;
 
@@ -268,12 +264,11 @@ relinquish_pte(struct domain* d, pte_t* pte)
         return;
     }
 
-#ifdef CONFIG_XEN_IA64_DOM0_VP
     if (page_get_owner(page) == d) {
         BUG_ON(get_gpfn_from_mfn(mfn) == INVALID_M2P_ENTRY);
         set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY);
     }
-#endif
+
     try_to_clear_PGC_allocate(d, page);
     put_page(page);
 }
@@ -397,10 +392,6 @@ gmfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
 {
 	unsigned long pte;
 
-#ifndef CONFIG_XEN_IA64_DOM0_VP
-	if (d == dom0)
-		return(gpfn);
-#endif
 	pte = lookup_domain_mpa(d,gpfn << PAGE_SHIFT, NULL);
 	if (!pte) {
 		panic("gmfn_to_mfn_foreign: bad gpfn. spinning...\n");
@@ -427,34 +418,12 @@ u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps,
 	// FIXME address had better be pre-validated on insert
 	mask = ~itir_mask(itir.itir);
 	mpaddr = ((pteval & _PAGE_PPN_MASK) & ~mask) | (address & mask);
-#ifdef CONFIG_XEN_IA64_DOM0_VP
-	if (itir.ps > PAGE_SHIFT) {
+
+	if (itir.ps > PAGE_SHIFT)
 		itir.ps = PAGE_SHIFT;
-	}
-#endif
+
 	*logps = itir.ps;
-#ifndef CONFIG_XEN_IA64_DOM0_VP
-	if (d == dom0) {
-		if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
-			/*
-			printk("translate_domain_pte: out-of-bounds dom0 mpaddr 0x%lx! itc=%lx...\n",
-				mpaddr, ia64_get_itc());
-			*/
-		}
-	}
-	else if ((mpaddr >> PAGE_SHIFT) > d->max_pages) {
-		/* Address beyond the limit.  However the grant table is
-		   also beyond the limit.  Display a message if not in the
-		   grant table.  */
-		if (mpaddr >= IA64_GRANT_TABLE_PADDR
-		    && mpaddr < (IA64_GRANT_TABLE_PADDR 
-				 + (ORDER_GRANT_FRAMES << PAGE_SHIFT)))
-			printf("translate_domain_pte: bad mpa=0x%lx (> 0x%lx),"
-			       "vadr=0x%lx,pteval=0x%lx,itir=0x%lx\n",
-			       mpaddr, (unsigned long)d->max_pages<<PAGE_SHIFT,
-			       address, pteval, itir.itir);
-	}
-#endif
+
 	pteval2 = lookup_domain_mpa(d, mpaddr, entry);
 
 	/* Check access rights.  */
@@ -525,14 +494,6 @@ unsigned long translate_domain_mpaddr(unsigned long mpaddr,
 {
 	unsigned long pteval;
 
-#ifndef CONFIG_XEN_IA64_DOM0_VP
-	if (current->domain == dom0) {
-		if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
-			printk("translate_domain_mpaddr: out-of-bounds dom0 mpaddr 0x%lx! continuing...\n",
-				mpaddr);
-		}
-	}
-#endif
 	pteval = lookup_domain_mpa(current->domain, mpaddr, entry);
 	return ((pteval & _PAGE_PPN_MASK) | (mpaddr & ~PAGE_MASK));
 }
@@ -644,7 +605,6 @@ lookup_noalloc_domain_pte(struct domain* d, unsigned long mpaddr)
     return (volatile pte_t*)pte_offset_map(pmd, mpaddr);
 }
 
-#ifdef CONFIG_XEN_IA64_DOM0_VP
 static volatile pte_t*
 lookup_noalloc_domain_pte_none(struct domain* d, unsigned long mpaddr)
 {
@@ -684,7 +644,6 @@ ____lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
         return GPFN_INV_MASK;
     return INVALID_MFN;
 }
-#endif
 
 unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr,
                                 struct p2m_entry* entry)
@@ -973,7 +932,6 @@ ioports_deny_access(struct domain *d, unsigned long fp, unsigned long lp)
     return 0;
 }
 
-#ifdef CONFIG_XEN_IA64_DOM0_VP
 static void
 assign_domain_same_page(struct domain *d,
                         unsigned long mpaddr, unsigned long size,
@@ -1563,7 +1521,6 @@ domain_page_mapped(struct domain* d, unsigned long mpaddr)
        return 1;
     return 0;
 }
-#endif
 
 /* Flush cache of domain d.  */
 void domain_cache_flush (struct domain *d, int sync_only)

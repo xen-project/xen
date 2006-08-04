@@ -32,20 +32,10 @@
 	
 //#define FAST_TICK // mostly working (unat problems) but default off for now
 //#define FAST_TLB_MISS_REFLECT	// mostly working but default off for now
-# ifdef CONFIG_XEN_IA64_DOM0_VP
-#  undef FAST_ITC	//XXX CONFIG_XEN_IA64_DOM0_VP
-		//    TODO fast_itc doesn't suport dom0 vp yet.
-# else
-//#  define FAST_ITC	// to be reviewed
-# endif
+# undef FAST_ITC	//XXX TODO fast_itc doesn't suport dom0 vp yet.
 # define FAST_BREAK
-# ifndef CONFIG_XEN_IA64_DOM0_VP
-#  define FAST_ACCESS_REFLECT
-# else
-#  undef FAST_ACCESS_REFLECT //XXX CONFIG_XEN_IA64_DOM0_VP
-                            //    TODO fast_access_reflect
+# undef FAST_ACCESS_REFLECT //XXX TODO fast_access_reflect
                             //    doesn't support dom0 vp yet.
-# endif
 # define FAST_RFI
 # define FAST_SSM_I
 # define FAST_PTC_GA

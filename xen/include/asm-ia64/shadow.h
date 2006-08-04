@@ -25,7 +25,6 @@
 
 #include <xen/config.h>
 
-#ifdef CONFIG_XEN_IA64_DOM0_VP
 #ifndef CONFIG_SHADOW
 # error "CONFIG_SHADOW must be defined"
 #endif
@@ -43,7 +42,6 @@
  */
 void guest_physmap_add_page(struct domain *d, unsigned long gpfn, unsigned long mfn);
 void guest_physmap_remove_page(struct domain *d, unsigned long gpfn, unsigned long mfn);
-#endif
 
 static inline int
 shadow_mode_enabled(struct domain *d)

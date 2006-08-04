@@ -169,12 +169,6 @@ static void dom_fpswa_hypercall_patch(struct domain *d)
 	unsigned long entry_paddr = FW_HYPERCALL_FPSWA_ENTRY_PADDR;
 	unsigned long patch_paddr = FW_HYPERCALL_FPSWA_PATCH_PADDR;
 
-#ifndef CONFIG_XEN_IA64_DOM0_VP
-	if (d == dom0) {
-		entry_paddr += dom0_start;
-		patch_paddr += dom0_start;
-	}
-#endif
 	ASSIGN_NEW_DOMAIN_PAGE_IF_DOM0(d, entry_paddr);
 	ASSIGN_NEW_DOMAIN_PAGE_IF_DOM0(d, patch_paddr);
 	entry_imva = domain_mpa_to_imva(d, entry_paddr);
@@ -190,9 +184,6 @@ static void dom_efi_hypercall_patch(struct domain *d, unsigned long paddr, unsig
 {
 	unsigned long *imva;
 
-#ifndef CONFIG_XEN_IA64_DOM0_VP
-	if (d == dom0) paddr += dom0_start;
-#endif
 	ASSIGN_NEW_DOMAIN_PAGE_IF_DOM0(d, paddr);
 	imva = domain_mpa_to_imva(d, paddr);
 	build_hypercall_bundle(imva, d->arch.breakimm, hypercall, 1);
@@ -223,12 +214,6 @@ void dom_fw_setup(struct domain *d, unsigned long bp_mpa, unsigned long maxmem)
 	struct ia64_boot_param *bp;
 
 	dom_fw_base_mpa = 0;
-#ifndef CONFIG_XEN_IA64_DOM0_VP
-	if (d == dom0) {
-		dom_fw_base_mpa += dom0_start;
-		bp_mpa += dom0_start;
-	}
-#endif
 	ASSIGN_NEW_DOMAIN_PAGE_IF_DOM0(d, dom_fw_base_mpa);
 	imva_fw_base = (unsigned long) domain_mpa_to_imva(d, dom_fw_base_mpa);
 	ASSIGN_NEW_DOMAIN_PAGE_IF_DOM0(d, bp_mpa);
@@ -483,10 +468,8 @@ dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 #define NUM_MEM_DESCS	64 //large enough
 
 struct dom0_passthrough_arg {
-#ifdef CONFIG_XEN_IA64_DOM0_VP
     struct domain*      d;
     int                 flags;
-#endif
     efi_memory_desc_t *md;
     int*                i;
 };
@@ -496,8 +479,6 @@ dom_fw_dom0_passthrough(efi_memory_desc_t *md, void *arg__)
 {
     struct dom0_passthrough_arg* arg = (struct dom0_passthrough_arg*)arg__;
     unsigned long paddr;
-
-#ifdef CONFIG_XEN_IA64_DOM0_VP
     struct domain* d = arg->d;
     u64 start = md->phys_addr;
     u64 size = md->num_pages << EFI_PAGE_SHIFT;
@@ -515,9 +496,6 @@ dom_fw_dom0_passthrough(efi_memory_desc_t *md, void *arg__)
         paddr = assign_domain_mmio_page(d, start, size);
     } else
         paddr = assign_domain_mach_page(d, start, size, arg->flags);
-#else
-    paddr = md->phys_addr;
-#endif
 
     BUG_ON(md->type != EFI_RUNTIME_SERVICES_CODE &&
            md->type != EFI_RUNTIME_SERVICES_DATA &&
@@ -630,11 +608,7 @@ dom_fw_init (struct domain *d, struct ia64_boot_param *bp, char *fw_mem, int fw_
 	unsigned char checksum = 0;
 	char *cp, *fw_vendor;
 	int num_mds, j, i = 0;
-#ifdef CONFIG_XEN_IA64_DOM0_VP
 	const unsigned long start_mpaddr = 0;
-#else
-	const unsigned long start_mpaddr = ((d==dom0)?dom0_start:0);
-#endif
 
 /* FIXME: should check size but for now we have a whole MB to play with.
    And if stealing code from fw-emu.c, watch out for new fw_vendor on the end!
@@ -800,52 +774,24 @@ dom_fw_init (struct domain *d, struct ia64_boot_param *bp, char *fw_mem, int fw_
 	        dom_pa((unsigned long)fw_mem + fw_mem_size), 1);
 
 	if (d == dom0) {
-#ifndef CONFIG_XEN_IA64_DOM0_VP
-		/*
-		 * This is a bad hack.  Dom0 may share other domains' memory
-		 * through a dom0 physical address.  Unfortunately, this
-		 * address may be used in maddr_to_page (e.g. in the loopback
-		 * driver) but when Linux initializes memory it only creates
-		 * page structs for the physical memory it knows about.  And
-		 * on ia64, only for full writeback granules.  So, we reserve
-		 * the last full granule of Xen's memory for dom0 (in
-		 * start_kernel) to ensure dom0 creates a large enough memmap
-		 */
-		unsigned long last_start = max_page << PAGE_SHIFT;
-		unsigned long last_end = last_start + IA64_GRANULE_SIZE;
-
-		/* simulate 1MB free memory at physical address zero */
-		MAKE_MD(EFI_LOADER_DATA,EFI_MEMORY_WB,0*MB,1*MB, 0);//XXX
-#endif
 		/* hypercall patches live here, masquerade as reserved PAL memory */
 		MAKE_MD(EFI_PAL_CODE,EFI_MEMORY_WB|EFI_MEMORY_RUNTIME,HYPERCALL_START,HYPERCALL_END, 0);
-
-#ifndef CONFIG_XEN_IA64_DOM0_VP
- 		MAKE_MD(EFI_CONVENTIONAL_MEMORY,EFI_MEMORY_WB,HYPERCALL_END,maxmem-IA64_GRANULE_SIZE, 0);//XXX make sure this doesn't overlap on i/o, runtime area.
-/* hack */	MAKE_MD(EFI_CONVENTIONAL_MEMORY,EFI_MEMORY_WB,last_start,last_end,1);
-#endif
 
 		/* pass through the I/O port space */
 		if (!running_on_sim) {
 			struct dom0_passthrough_arg arg;
 			arg.md = &efi_memmap[i];
 			arg.i = &i;
-#ifdef CONFIG_XEN_IA64_DOM0_VP
 			arg.d = d;
 			arg.flags = ASSIGN_writable;
-#endif
 			//XXX Is this needed?
 			efi_memmap_walk_type(EFI_RUNTIME_SERVICES_CODE,
 			                     dom_fw_dom0_passthrough, &arg);
 			// for ACPI table.
-#ifdef CONFIG_XEN_IA64_DOM0_VP
 			arg.flags = ASSIGN_readonly;
-#endif
 			efi_memmap_walk_type(EFI_RUNTIME_SERVICES_DATA,
 			                     dom_fw_dom0_passthrough, &arg);
-#ifdef CONFIG_XEN_IA64_DOM0_VP
 			arg.flags = ASSIGN_writable;
-#endif
 			efi_memmap_walk_type(EFI_ACPI_RECLAIM_MEMORY,
 			                     dom_fw_dom0_passthrough, &arg);
 			efi_memmap_walk_type(EFI_ACPI_MEMORY_NVS,
@@ -861,12 +807,6 @@ dom_fw_init (struct domain *d, struct ia64_boot_param *bp, char *fw_mem, int fw_
 		}
 		else MAKE_MD(EFI_RESERVED_TYPE,0,0,0,0);
 	} else {
-#ifndef CONFIG_XEN_IA64_DOM0_VP
-	  	/* Dom0 maps legacy mmio in first MB.  */
-		MAKE_MD(EFI_LOADER_DATA, EFI_MEMORY_WB, 0*MB, 1*MB, 1);
-		MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
-			HYPERCALL_END, maxmem, 1);
-#endif
 		/* hypercall patches live here, masquerade as reserved
 		   PAL memory */
 		MAKE_MD(EFI_PAL_CODE, EFI_MEMORY_WB | EFI_MEMORY_RUNTIME,
@@ -877,7 +817,6 @@ dom_fw_init (struct domain *d, struct ia64_boot_param *bp, char *fw_mem, int fw_
 		MAKE_MD(EFI_RESERVED_TYPE,0,0,0,0);
 	}
 
-#ifdef CONFIG_XEN_IA64_DOM0_VP
 	// simple
 	// MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
 	//         HYPERCALL_END, maxmem, 0);
@@ -920,7 +859,6 @@ dom_fw_init (struct domain *d, struct ia64_boot_param *bp, char *fw_mem, int fw_
 		if (next_start >= maxmem)
 			break;
 	}
-#endif        
 	sort(efi_memmap, i, sizeof(efi_memory_desc_t), efi_mdt_cmp, NULL);
 
 	bp->efi_systab = dom_pa((unsigned long) fw_mem);

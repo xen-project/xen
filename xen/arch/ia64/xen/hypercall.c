@@ -84,11 +84,7 @@ hypercall_t ia64_hypercall_table[] =
 	(hypercall_t)do_ni_hypercall,		/*  */                  /* 45 */
 	(hypercall_t)do_ni_hypercall,		/*  */
 	(hypercall_t)do_ni_hypercall,		/*  */
-#ifdef CONFIG_XEN_IA64_DOM0_VP
 	(hypercall_t)do_dom0vp_op,			/* dom0vp_op */
-#else
-	(hypercall_t)do_ni_hypercall,		/* arch_0 */
-#endif
 	(hypercall_t)do_ni_hypercall,		/* arch_1 */
 	(hypercall_t)do_ni_hypercall,		/* arch_2 */            /* 50 */
 	(hypercall_t)do_ni_hypercall,		/* arch_3 */

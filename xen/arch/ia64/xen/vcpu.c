@@ -2012,9 +2012,7 @@ void vcpu_itc_no_srlz(VCPU *vcpu, UINT64 IorD, UINT64 vaddr, UINT64 pte, UINT64 
 		panic_domain (NULL, "vcpu_itc_no_srlz: domain trying to use "
  			      "smaller page size!\n");
 
-#ifdef CONFIG_XEN_IA64_DOM0_VP
 	BUG_ON(logps > PAGE_SHIFT);
-#endif
 	psr = ia64_clear_ic();
 	ia64_itc(IorD,vaddr,pte,ps); // FIXME: look for bigger mappings
 	ia64_set_psr(psr);
