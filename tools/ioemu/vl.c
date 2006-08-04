@@ -5820,6 +5820,8 @@ int main(int argc, char **argv)
     fprintf(logfile, "shared page at pfn:%lx, mfn: %"PRIx64"\n", nr_pages - 1,
             (uint64_t)(page_array[nr_pages - 1]));
 
+    free(page_array);
+
 #elif defined(__ia64__)
   
     if (xc_ia64_get_pfn_list(xc_handle, domid, page_array,
