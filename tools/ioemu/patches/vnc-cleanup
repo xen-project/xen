@@ -1,7 +1,7 @@
 Index: ioemu/vnc.c
 ===================================================================
---- ioemu.orig/vnc.c	2006-07-27 11:16:52.783017443 +0100
-+++ ioemu/vnc.c	2006-07-27 11:17:00.722138579 +0100
+--- ioemu.orig/vnc.c	2006-08-04 10:42:19.575024607 +0100
++++ ioemu/vnc.c	2006-08-04 10:42:26.918176009 +0100
 @@ -83,13 +83,16 @@
  static void vnc_dpy_update(DisplayState *ds, int x, int y, int w, int h)
  {
@@ -65,9 +65,9 @@ Index: ioemu/vnc.c
  static void vnc_timer_init(VncState *vs)
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-27 11:17:00.311184072 +0100
-+++ ioemu/vl.c	2006-07-27 11:17:00.724138358 +0100
-@@ -4587,10 +4587,10 @@
+--- ioemu.orig/vl.c	2006-08-04 10:42:26.723198541 +0100
++++ ioemu/vl.c	2006-08-04 10:42:26.921175663 +0100
+@@ -4589,10 +4589,10 @@
          /* XXX: better handling of removal */
          for(ioh = first_io_handler; ioh != NULL; ioh = ioh_next) {
              ioh_next = ioh->next;
