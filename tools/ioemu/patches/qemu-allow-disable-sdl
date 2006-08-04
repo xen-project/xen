@@ -1,0 +1,28 @@
+Index: ioemu/configure
+===================================================================
+--- ioemu.orig/configure	2006-08-03 19:19:38.000000000 +0100
++++ ioemu/configure	2006-08-03 23:38:19.000000000 +0100
+@@ -226,8 +226,6 @@
+   ;;
+   --enable-cocoa) cocoa="yes" ; coreaudio="yes" ; sdl="no"
+   ;;
+-  --disable-gfx-check) check_gfx="no"
+-  ;;
+   --disable-gcc-check) check_gcc="no"
+   ;;
+   --disable-system) softmmu="no"
+@@ -736,14 +734,6 @@
+   target_user_only="yes"
+ fi
+ 
+-if test "$target_user_only" = "no" -a "$check_gfx" = "yes" \
+-        -a "$sdl" = "no" -a "$cocoa" = "no" ; then
+-    echo "ERROR: QEMU requires SDL or Cocoa for graphical output"
+-    echo "To build QEMU without graphical output configure with --disable-gfx-check"
+-    echo "Note that this will disable all output from the virtual graphics card."
+-    exit 1;
+-fi
+-
+ #echo "Creating $config_mak, $config_h and $target_dir/Makefile"
+ 
+ mkdir -p $target_dir
