@@ -1,7 +1,8 @@
-diff -r 2612be97caad Makefile.target
---- a/Makefile.target	Mon Jun 26 16:07:22 2006 +0100
-+++ b/Makefile.target	Mon Jun 26 18:38:49 2006 +0100
-@@ -335,6 +335,7 @@ VL_OBJS+= ide.o pckbd.o ps2.o vga.o $(SO
+Index: ioemu/Makefile.target
+===================================================================
+--- ioemu.orig/Makefile.target	2006-08-03 19:19:39.000000000 +0100
++++ ioemu/Makefile.target	2006-08-04 10:35:36.445703379 +0100
+@@ -335,6 +335,7 @@
  VL_OBJS+= ide.o pckbd.o ps2.o vga.o $(SOUND_HW) dma.o $(AUDIODRV)
  VL_OBJS+= fdc.o mc146818rtc.o serial.o pc.o
  VL_OBJS+= cirrus_vga.o mixeng.o parallel.o
@@ -9,10 +10,11 @@ diff -r 2612be97caad Makefile.target
  DEFINES += -DHAS_AUDIO
  endif
  ifeq ($(TARGET_BASE_ARCH), ppc)
-diff -r 2612be97caad hw/pc.c
---- a/hw/pc.c	Mon Jun 26 16:07:22 2006 +0100
-+++ b/hw/pc.c	Mon Jun 26 18:38:49 2006 +0100
-@@ -566,6 +566,9 @@ static int parallel_io[MAX_PARALLEL_PORT
+Index: ioemu/hw/pc.c
+===================================================================
+--- ioemu.orig/hw/pc.c	2006-08-03 19:19:39.000000000 +0100
++++ ioemu/hw/pc.c	2006-08-04 10:38:05.559415853 +0100
+@@ -566,6 +566,9 @@
  static int parallel_io[MAX_PARALLEL_PORTS] = { 0x378, 0x278, 0x3bc };
  static int parallel_irq[MAX_PARALLEL_PORTS] = { 7, 7, 7 };
  
@@ -22,21 +24,22 @@ diff -r 2612be97caad hw/pc.c
  #ifdef HAS_AUDIO
  static void audio_init (PCIBus *pci_bus)
  {
-@@ -867,6 +870,10 @@ static void pc_init1(uint64_t ram_size, 
+@@ -867,6 +870,10 @@
  
      cmos_init(ram_size, boot_device, bs_table, timeoffset);
  
 +    /* using PIIX4 acpi model */
-+    if (pci_enabled)
++    if (pci_enabled && acpi_enabled)
 +        pci_piix4_acpi_init(pci_bus);
 +
      if (pci_enabled && usb_enabled) {
          usb_uhci_init(pci_bus, usb_root_ports);
          usb_attach(usb_root_ports[0], vm_usb_hub);
-diff -r 2612be97caad hw/pci.c
---- a/hw/pci.c	Mon Jun 26 16:07:22 2006 +0100
-+++ b/hw/pci.c	Mon Jun 26 18:38:49 2006 +0100
-@@ -1697,7 +1697,7 @@ static uint32_t pci_bios_io_addr;
+Index: ioemu/hw/pci.c
+===================================================================
+--- ioemu.orig/hw/pci.c	2006-08-03 19:19:35.000000000 +0100
++++ ioemu/hw/pci.c	2006-08-03 19:19:39.000000000 +0100
+@@ -1697,7 +1697,7 @@
  static uint32_t pci_bios_io_addr;
  static uint32_t pci_bios_mem_addr;
  /* host irqs corresponding to PCI irqs A-D */
@@ -45,7 +48,7 @@ diff -r 2612be97caad hw/pci.c
  
  static void pci_set_io_region_addr(PCIDevice *d, int region_num, uint32_t addr)
  {
-@@ -1750,12 +1750,22 @@ static void pci_bios_init_device(PCIDevi
+@@ -1750,12 +1750,22 @@
              pci_set_io_region_addr(d, 3, 0x374);
          }
          break;
@@ -68,7 +71,7 @@ diff -r 2612be97caad hw/pci.c
      case 0x0800:
          /* PIC */
          vendor_id = pci_config_readw(d, PCI_VENDOR_ID);
-@@ -1800,6 +1810,13 @@ static void pci_bios_init_device(PCIDevi
+@@ -1800,6 +1810,13 @@
          pic_irq = pci_irqs[pin];
          pci_config_writeb(d, PCI_INTERRUPT_LINE, pic_irq);
      }
@@ -82,9 +85,10 @@ diff -r 2612be97caad hw/pci.c
  }
  
  /*
-diff -r 2612be97caad hw/piix4acpi.c
---- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/hw/piix4acpi.c	Mon Jun 26 18:38:49 2006 +0100
+Index: ioemu/hw/piix4acpi.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ ioemu/hw/piix4acpi.c	2006-08-04 10:35:36.762666604 +0100
 @@ -0,0 +1,388 @@
 +/*
 + * PIIX4 ACPI controller emulation
@@ -474,3 +478,62 @@ diff -r 2612be97caad hw/piix4acpi.c
 +
 +    acpi_reset (d);
 +}
+Index: ioemu/vl.c
+===================================================================
+--- ioemu.orig/vl.c	2006-08-04 10:35:36.697674145 +0100
++++ ioemu/vl.c	2006-08-04 10:37:38.001608828 +0100
+@@ -166,6 +166,8 @@
+ 
+ time_t timeoffset = 0;
+ 
++int acpi_enabled = 0;
++
+ char domain_name[1024] = { 'H','V', 'M', 'X', 'E', 'N', '-'};
+ extern int domid;
+ 
+@@ -4803,6 +4805,7 @@
+            "-loadvm file    start right away with a saved state (loadvm in monitor)\n"
+ 	   "-vnc display    start a VNC server on display\n"
+            "-timeoffset     time offset (in seconds) from local time\n"
++           "-acpi           disable or enable ACPI of HVM domain \n"
+            "\n"
+            "During emulation, the following keys are useful:\n"
+            "ctrl-alt-f      toggle full screen\n"
+@@ -4894,6 +4897,7 @@
+     QEMU_OPTION_d,
+     QEMU_OPTION_vcpus,
+     QEMU_OPTION_timeoffset,
++    QEMU_OPTION_acpi,
+ };
+ 
+ typedef struct QEMUOption {
+@@ -4973,6 +4977,7 @@
+     { "d", HAS_ARG, QEMU_OPTION_d },
+     { "vcpus", 1, QEMU_OPTION_vcpus },
+     { "timeoffset", HAS_ARG, QEMU_OPTION_timeoffset },
++    { "acpi", 0, QEMU_OPTION_acpi },
+     { NULL },
+ };
+ 
+@@ -5678,6 +5683,9 @@
+             case QEMU_OPTION_timeoffset:
+                 timeoffset = strtol(optarg, NULL, 0);
+                 break;
++            case QEMU_OPTION_acpi:
++                acpi_enabled = 1;
++                break;
+             }
+         }
+     }
+Index: ioemu/vl.h
+===================================================================
+--- ioemu.orig/vl.h	2006-08-04 10:35:36.629682033 +0100
++++ ioemu/vl.h	2006-08-04 10:36:21.513475699 +0100
+@@ -159,6 +159,7 @@
+ extern int kqemu_allowed;
+ extern int win2k_install_hack;
+ extern int usb_enabled;
++extern int acpi_enabled;
+ extern int smp_cpus;
+ 
+ /* XXX: make it dynamic */
