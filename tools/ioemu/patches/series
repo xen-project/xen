@@ -38,3 +38,4 @@ vnc-access-monitor-vt
 xenstore-block-device-config
 xenstore-write-vnc-port
 qemu-allow-disable-sdl
+qemu-fix-memset-args
