@@ -497,6 +497,9 @@ static int network_open(struct net_device *dev)
 	network_alloc_rx_buffers(dev);
 	np->rx.sring->rsp_event = np->rx.rsp_cons + 1;
 
+	if (RING_HAS_UNCONSUMED_RESPONSES(&np->rx))
+		netif_rx_schedule(dev);
+
 	netif_start_queue(dev);
 
 	return 0;
