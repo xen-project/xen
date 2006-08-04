@@ -64,7 +64,7 @@ typedef struct PCIAcpiState {
     uint16_t pm1_enable; /* pm1a_EVT_BLK+2 */
     uint16_t pm1_control; /* pm1a_ECNT_BLK */
     uint32_t pm1_timer; /* pmtmr_BLK */
-    uint64_t old_vmck_ticks /* using vm_clock counter */
+    uint64_t old_vmck_ticks; /* using vm_clock counter */
 } PCIAcpiState;
 
 static PCIAcpiState *acpi_state;
