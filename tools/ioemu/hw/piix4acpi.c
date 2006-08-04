@@ -24,26 +24,26 @@
  */
 
 #include "vl.h"
-#define FREQUENCE_PMTIMER  3753425
+#define FREQUENCE_PMTIMER  3579545
 /* acpi register bit define here  */
 
-/* PM1_STS 						*/
-#define TMROF_STS 	  (1 << 0)
-#define BM_STS 	  	  (1 << 4)
-#define GBL_STS 	  (1 << 5)
-#define PWRBTN_STS 	  (1 << 8)
-#define RTC_STS 	  (1 << 10)
+/* PM1_STS */
+#define TMROF_STS         (1 << 0)
+#define BM_STS            (1 << 4)
+#define GBL_STS           (1 << 5)
+#define PWRBTN_STS        (1 << 8)
+#define RTC_STS           (1 << 10)
 #define PRBTNOR_STS       (1 << 11)
-#define WAK_STS 	  (1 << 15)
-/* PM1_EN						*/
+#define WAK_STS           (1 << 15)
+/* PM1_EN */
 #define TMROF_EN          (1 << 0)
 #define GBL_EN            (1 << 5)
 #define PWRBTN_EN         (1 << 8)
-#define RTC_EN   	  (1 << 10)
-/* PM1_CNT						*/
+#define RTC_EN            (1 << 10)
+/* PM1_CNT */
 #define SCI_EN            (1 << 0)
 #define GBL_RLS           (1 << 2)
-#define SLP_EN   	  (1 << 13)
+#define SLP_EN            (1 << 13)
 
 /* Bits of PM1a register define here  */
 #define SLP_TYP_MASK    0x1C00
@@ -51,14 +51,6 @@
 
 typedef struct AcpiDeviceState AcpiDeviceState;
 AcpiDeviceState *acpi_device_table;
-
-/* Bits of PM1a register define here  */
-typedef struct PMTState {
-    uint32_t count;
-    int irq;
-    uint64_t next_pm_time;
-    QEMUTimer *pm_timer;
-}PMTState;
 
 typedef struct PM1Event_BLK {
     uint16_t pm1_status; /* pm1a_EVT_BLK */
@@ -72,83 +64,10 @@ typedef struct PCIAcpiState {
     uint16_t pm1_enable; /* pm1a_EVT_BLK+2 */
     uint16_t pm1_control; /* pm1a_ECNT_BLK */
     uint32_t pm1_timer; /* pmtmr_BLK */
+    uint64_t old_vmck_ticks /* using vm_clock counter */
 } PCIAcpiState;
 
-static PMTState *pmtimer_state;
 static PCIAcpiState *acpi_state;
-
-static void pmtimer_save(QEMUFile *f, void *opaque)
-{
-    PMTState *s = opaque;
-
-    qemu_put_be32s(f, &s->count);
-    qemu_put_be32s(f, &s->irq);
-    qemu_put_be64s(f, &s->next_pm_time);
-    qemu_put_timer(f, s->pm_timer);
-}
-
-static int pmtimer_load(QEMUFile *f, void *opaque, int version_id)
-{
-    PMTState *s = opaque;
-
-    if (version_id != 1)
-        return -EINVAL;
-    qemu_get_be32s(f, &s->count);
-    qemu_get_be32s(f, &s->irq);
-    qemu_get_be64s(f, &s->next_pm_time);
-    qemu_get_timer(f, s->pm_timer);
-    return 0;
-}
-
-static inline void acpi_set_irq(PCIAcpiState *s)
-{
-/* no real SCI event need for now, so comment the following line out */
-/*  pic_set_irq(s->irq, 1); */
-    printf("acpi_set_irq: s->irq %x \n",s->irq);
-}
-
-static void pm_timer_update(void *opaque)
-{
-    PMTState *s = opaque;
-    s->next_pm_time = qemu_get_clock(vm_clock) +
-        muldiv64(1, ticks_per_sec,FREQUENCE_PMTIMER);
-    qemu_mod_timer(s->pm_timer, s->next_pm_time);
-    acpi_state->pm1_timer ++;
-
-    /* If pm timer is zero then reset it to zero. */
-    if (acpi_state->pm1_timer >= 0x1000000) {
-/*      printf("pm_timerupdate: timer overflow: %x \n", acpi_state->pm1_timer); */
-
-        acpi_state->pm1_timer = 0;
-        acpi_state->pm1_status =   acpi_state->pm1_status | TMROF_STS;
-        /* If TMROF_EN is set then send the irq. */
-        if ((acpi_state->pm1_enable & TMROF_EN) == TMROF_EN) {
-            acpi_set_irq(acpi_state);
-            acpi_state->pm1_enable = 0x00; /* only need one time...*/
-        }
-    }
-    s->count = acpi_state->pm1_timer;
-}
-
-static PMTState *pmtimer_init(void)
-{
-    PMTState *s;
-
-    s = qemu_mallocz(sizeof(PMTState));
-    if (!s)
-        return NULL;
-
-    /* s->irq = irq;    */
-
-    s->pm_timer = qemu_new_timer(vm_clock, pm_timer_update, s);
-
-    s->count = 0;
-    s->next_pm_time = qemu_get_clock(vm_clock) + muldiv64(1, ticks_per_sec,FREQUENCE_PMTIMER) + 1;
-    qemu_mod_timer(s->pm_timer, s->next_pm_time);
-
-    register_savevm("pm timer", 1, 1, pmtimer_save, pmtimer_load, s);
-    return s;
-}
 
 static void acpi_reset(PCIAcpiState *s)
 {
@@ -162,6 +81,7 @@ static void acpi_reset(PCIAcpiState *s)
     s->pm1_enable = 0x00;    /* TMROF_EN should cleared */
     s->pm1_control = SCI_EN; /* SCI_EN */
     s->pm1_timer = 0;
+    s->old_vmck_ticks = qemu_get_clock(vm_clock);
 }
 
 /*byte access  */
@@ -173,8 +93,8 @@ static void acpiPm1Status_writeb(void *opaque, uint32_t addr, uint32_t val)
         s->pm1_status = s->pm1_status&!TMROF_STS;
 
     if ((val&GBL_STS)==GBL_STS)
-        s->pm1_status = s->pm1_status&!GBL_STS;     
-    
+        s->pm1_status = s->pm1_status&!GBL_STS;
+
 /*     printf("acpiPm1Status_writeb \n addr %x val:%x pm1_status:%x \n", addr, val,s->pm1_status); */
 }
 
@@ -193,7 +113,7 @@ static void acpiPm1StatusP1_writeb(void *opaque, uint32_t addr, uint32_t val)
 {
     PCIAcpiState *s = opaque;
 
-     s->pm1_status = (val<<8)||(s->pm1_status);
+    s->pm1_status = (val<<8)||(s->pm1_status);
 /*     printf("acpiPm1StatusP1_writeb \n addr %x val:%x\n", addr, val); */
 }
 
@@ -305,7 +225,7 @@ static void acpiPm1Status_writew(void *opaque, uint32_t addr, uint32_t val)
         s->pm1_status = s->pm1_status&!TMROF_STS;
 
     if ((val&GBL_STS)==GBL_STS)
-        s->pm1_status = s->pm1_status&!GBL_STS;     
+        s->pm1_status = s->pm1_status&!GBL_STS;
 
 /*    printf("acpiPm1Status_writew \n addr %x val:%x pm1_status:%x \n", addr, val,s->pm1_status); */
 }
@@ -384,7 +304,7 @@ static uint32_t acpiPm1Event_readl(void *opaque, uint32_t addr)
 {
     PCIAcpiState *s = opaque;
     uint32_t val;
-    
+
     val = s->pm1_status|(s->pm1_enable<<16);
 /*    printf("acpiPm1Event_readl \n addr %x val:%x\n", addr, val);    */
 
@@ -396,17 +316,21 @@ static void acpiPm1Timer_writel(void *opaque, uint32_t addr, uint32_t val)
     PCIAcpiState *s = opaque;
 
     s->pm1_timer = val;
-/*    printf("acpiPm1Timer_writel \n addr %x val:%x\n", addr, val); */
+    s->old_vmck_ticks = qemu_get_clock(vm_clock) +
+        muldiv64(val, FREQUENCE_PMTIMER, ticks_per_sec);
 }
 
 static uint32_t acpiPm1Timer_readl(void *opaque, uint32_t addr)
 {
     PCIAcpiState *s = opaque;
-    uint32_t val;
+    int64_t current_vmck_ticks = qemu_get_clock(vm_clock);
+    int64_t vmck_ticks_delta = current_vmck_ticks - s->old_vmck_ticks;
 
-    val = s->pm1_timer;
-/*    printf("acpiPm1Timer_readl \n addr %x val:%x\n", addr, val); */
-    return val;
+    if (s->old_vmck_ticks)
+        s->pm1_timer += muldiv64(vmck_ticks_delta, FREQUENCE_PMTIMER,
+                                 ticks_per_sec);
+    s->old_vmck_ticks = current_vmck_ticks;
+    return s->pm1_timer;
 }
 
 static void acpi_map(PCIDevice *pci_dev, int region_num,
@@ -414,7 +338,7 @@ static void acpi_map(PCIDevice *pci_dev, int region_num,
 {
     PCIAcpiState *d = (PCIAcpiState *)pci_dev;
 
-    printf("register acpi io \n");
+    printf("register acpi io\n");
 
     /* Byte access */
     register_ioport_write(addr, 1, 1, acpiPm1Status_writeb, d);
@@ -430,14 +354,14 @@ static void acpi_map(PCIDevice *pci_dev, int region_num,
     register_ioport_write(addr + 4, 1, 1, acpiPm1Control_writeb, d);
     register_ioport_read(addr + 4, 1, 1, acpiPm1Control_readb, d);
     register_ioport_write(addr + 4 + 1, 1, 1, acpiPm1ControlP1_writeb, d);
-    register_ioport_read(addr + 4 +1, 1, 1, acpiPm1ControlP1_readb, d);	
+    register_ioport_read(addr + 4 +1, 1, 1, acpiPm1ControlP1_readb, d);
 
     /* Word access */
     register_ioport_write(addr, 2, 2, acpiPm1Status_writew, d);
     register_ioport_read(addr, 2, 2, acpiPm1Status_readw, d);
 
     register_ioport_write(addr + 2, 2, 2, acpiPm1Enable_writew, d);
-    register_ioport_read(addr + 2, 2, 2, acpiPm1Enable_readw, d); 
+    register_ioport_read(addr + 2, 2, 2, acpiPm1Enable_readw, d);
 
     register_ioport_write(addr + 4, 2, 2, acpiPm1Control_writew, d);
     register_ioport_read(addr + 4, 2, 2, acpiPm1Control_readw, d);
@@ -445,11 +369,10 @@ static void acpi_map(PCIDevice *pci_dev, int region_num,
     /* DWord access */
     register_ioport_write(addr, 4, 4, acpiPm1Event_writel, d);
     register_ioport_read(addr, 4, 4, acpiPm1Event_readl, d);
-		
+
     register_ioport_write(addr + 8, 4, 4, acpiPm1Timer_writel, d);
     register_ioport_read(addr + 8, 4, 4, acpiPm1Timer_readl, d);
 }
-													
 
 /* PIIX4 acpi pci configuration space, func 3 */
 void pci_piix4_acpi_init(PCIBus *bus)
@@ -478,7 +401,5 @@ void pci_piix4_acpi_init(PCIBus *bus)
     pci_register_io_region((PCIDevice *)d, 4, 0x10,
                            PCI_ADDRESS_SPACE_IO, acpi_map);
 
-    pmtimer_state = pmtimer_init();
-
-    acpi_reset (d);
+    acpi_reset(d);
 }
