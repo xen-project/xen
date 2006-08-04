@@ -1,7 +1,7 @@
 Index: ioemu/vnc.c
 ===================================================================
---- ioemu.orig/vnc.c	2006-08-04 10:42:27.108154056 +0100
-+++ ioemu/vnc.c	2006-08-04 10:42:27.272135106 +0100
+--- ioemu.orig/vnc.c	2006-08-04 10:53:04.207541503 +0100
++++ ioemu/vnc.c	2006-08-04 10:53:04.370522674 +0100
 @@ -1002,3 +1002,25 @@
  
      vnc_dpy_resize(vs->ds, 640, 400);
@@ -30,8 +30,8 @@ Index: ioemu/vnc.c
 +}
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-08-04 10:42:27.107154171 +0100
-+++ ioemu/vl.c	2006-08-04 10:42:27.276134644 +0100
+--- ioemu.orig/vl.c	2006-08-04 10:53:04.206541619 +0100
++++ ioemu/vl.c	2006-08-04 10:53:04.373522328 +0100
 @@ -121,6 +121,7 @@
  int bios_size;
  static DisplayState display_state;
@@ -82,7 +82,7 @@ Index: ioemu/vl.c
              case QEMU_OPTION_domainname:
                  strncat(domain_name, optarg, sizeof(domain_name) - 20);
                  break;
-@@ -5919,6 +5927,8 @@
+@@ -5931,6 +5939,8 @@
          dumb_display_init(ds);
      } else if (vnc_display != -1) {
  	vnc_display_init(ds, vnc_display);
@@ -93,8 +93,8 @@ Index: ioemu/vl.c
          sdl_display_init(ds, full_screen);
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-08-04 10:42:27.108154056 +0100
-+++ ioemu/vl.h	2006-08-04 10:42:27.277134528 +0100
+--- ioemu.orig/vl.h	2006-08-04 10:53:04.207541503 +0100
++++ ioemu/vl.h	2006-08-04 10:53:04.374522212 +0100
 @@ -734,6 +734,7 @@
  
  /* vnc.c */
