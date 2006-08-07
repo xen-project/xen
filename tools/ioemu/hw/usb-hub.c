@@ -152,7 +152,7 @@ static const uint8_t qemu_hub_config_descriptor[] = {
 
 static const uint8_t qemu_hub_hub_descriptor[] =
 {
-	0x09,			/*  u8  bLength; */
+	0x00,			/*  u8  bLength; patched in later */
 	0x29,			/*  u8  bDescriptorType; Hub-descriptor */
 	0x00,			/*  u8  bNbrPorts; (patched later) */
 	0x0a,			/* u16  wHubCharacteristics; */
@@ -179,6 +179,9 @@ static void usb_hub_attach(USBPort *port1, USBDevice *dev)
         else
             port->wPortStatus &= ~PORT_STAT_LOW_SPEED;
         port->port.dev = dev;
+        /* send the attach message */
+        dev->handle_packet(dev, 
+                           USB_MSG_ATTACH, 0, 0, NULL, 0);
     } else {
         dev = port->port.dev;
         if (dev) {
@@ -188,6 +191,9 @@ static void usb_hub_attach(USBPort *port1, USBDevice *dev)
                 port->wPortStatus &= ~PORT_STAT_ENABLE;
                 port->wPortChange |= PORT_STAT_C_ENABLE;
             }
+            /* send the detach message */
+            dev->handle_packet(dev, 
+                               USB_MSG_DETACH, 0, 0, NULL, 0);
             port->port.dev = NULL;
         }
     }
@@ -417,6 +423,7 @@ static int usb_hub_handle_control(USBDevice *dev, int request, int value,
             }
 
             ret = sizeof(qemu_hub_hub_descriptor) + var_hub_size;
+            data[0] = ret;
             break;
         }
     default:
@@ -516,7 +523,14 @@ static int usb_hub_handle_packet(USBDevice *dev, int pid,
     return usb_generic_handle_packet(dev, pid, devaddr, devep, data, len);
 }
 
-USBDevice *usb_hub_init(USBPort **usb_ports, int nb_ports)
+static void usb_hub_handle_destroy(USBDevice *dev)
+{
+    USBHubState *s = (USBHubState *)dev;
+
+    qemu_free(s);
+}
+
+USBDevice *usb_hub_init(int nb_ports)
 {
     USBHubState *s;
     USBHubPort *port;
@@ -534,16 +548,16 @@ USBDevice *usb_hub_init(USBPort **usb_ports, int nb_ports)
     s->dev.handle_reset = usb_hub_handle_reset;
     s->dev.handle_control = usb_hub_handle_control;
     s->dev.handle_data = usb_hub_handle_data;
+    s->dev.handle_destroy = usb_hub_handle_destroy;
+
+    pstrcpy(s->dev.devname, sizeof(s->dev.devname), "QEMU USB Hub");
 
     s->nb_ports = nb_ports;
     for(i = 0; i < s->nb_ports; i++) {
         port = &s->ports[i];
+        qemu_register_usb_port(&port->port, s, i, usb_hub_attach);
         port->wPortStatus = PORT_STAT_POWER;
         port->wPortChange = 0;
-        port->port.attach = usb_hub_attach;
-        port->port.opaque = s;
-        port->port.index = i;
-        usb_ports[i] = &port->port;
     }
     return (USBDevice *)s;
 }

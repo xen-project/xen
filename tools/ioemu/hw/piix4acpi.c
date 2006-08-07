@@ -375,7 +375,7 @@ static void acpi_map(PCIDevice *pci_dev, int region_num,
 }
 
 /* PIIX4 acpi pci configuration space, func 3 */
-void pci_piix4_acpi_init(PCIBus *bus)
+void pci_piix4_acpi_init(PCIBus *bus, int devfn)
 {
     PCIAcpiState *d;
     uint8_t *pci_conf;
@@ -383,7 +383,7 @@ void pci_piix4_acpi_init(PCIBus *bus)
     /* register a function 3 of PIIX4 */
     d = (PCIAcpiState *)pci_register_device(
         bus, "PIIX4 ACPI", sizeof(PCIAcpiState),
-        ((PCIDevice *)piix3_state)->devfn + 3, NULL, NULL);
+        devfn, NULL, NULL);
 
     acpi_state = d;
     pci_conf = d->dev.config;

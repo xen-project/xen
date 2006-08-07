@@ -40,6 +40,11 @@ ifeq ($(TARGET_ARCH),arm)
     TARGET_ARCH2=armeb
   endif
 endif
+ifeq ($(TARGET_ARCH),sh4)
+  ifeq ($(TARGET_WORDS_BIGENDIAN),yes)
+    TARGET_ARCH2=sh4eb
+  endif
+endif
 ifeq ($(TARGET_ARCH),mips)
   ifneq ($(TARGET_WORDS_BIGENDIAN),yes)
     TARGET_ARCH2=mipsel
@@ -114,17 +119,24 @@ LDFLAGS+=-Wl,-T,$(SRC_PATH)/s390.ld
 endif
 
 ifeq ($(ARCH),sparc)
-CFLAGS+=-m32 -ffixed-g1 -ffixed-g2 -ffixed-g3 -ffixed-g6
+ifeq ($(CONFIG_SOLARIS),yes)
+CFLAGS+=-mcpu=ultrasparc -m32 -ffixed-g2 -ffixed-g3
+LDFLAGS+=-m32
+OP_CFLAGS=$(CFLAGS) -fno-delayed-branch -fno-omit-frame-pointer -ffixed-i0
+else
+CFLAGS+=-mcpu=ultrasparc -m32 -ffixed-g1 -ffixed-g2 -ffixed-g3 -ffixed-g6
 LDFLAGS+=-m32
 OP_CFLAGS=$(CFLAGS) -fno-delayed-branch -ffixed-i0
 HELPER_CFLAGS=$(CFLAGS) -ffixed-i0 -mflat
 # -static is used to avoid g1/g3 usage by the dynamic linker
 LDFLAGS+=-Wl,-T,$(SRC_PATH)/sparc.ld -static
 endif
+endif
 
 ifeq ($(ARCH),sparc64)
-CFLAGS+=-m64 -ffixed-g1 -ffixed-g2 -ffixed-g3 -ffixed-g6
+CFLAGS+=-mcpu=ultrasparc -m64 -ffixed-g1 -ffixed-g4 -ffixed-g5 -ffixed-g7
 LDFLAGS+=-m64
+LDFLAGS+=-Wl,-T,$(SRC_PATH)/sparc64.ld
 OP_CFLAGS=$(CFLAGS) -fno-delayed-branch -ffixed-i0
 endif
 
@@ -186,7 +198,12 @@ LDFLAGS+=-p
 main.o: CFLAGS+=-p
 endif
 
-OBJS= elfload.o main.o syscall.o mmap.o signal.o path.o osdep.o thunk.o 
+OBJS= main.o syscall.o mmap.o signal.o path.o osdep.o thunk.o \
+      elfload.o linuxload.o
+ifdef TARGET_HAS_BFLT
+OBJS+= flatload.o
+endif
+
 ifeq ($(TARGET_ARCH), i386)
 OBJS+= vm86.o
 endif
@@ -323,18 +340,23 @@ endif
 ifdef CONFIG_ADLIB
 SOUND_HW += fmopl.o adlib.o
 endif
+AUDIODRV+= wavcapture.o
+
+# SCSI layer
+VL_OBJS+= scsi-disk.o cdrom.o lsi53c895a.o
 
 # USB layer
-VL_OBJS+= usb.o usb-hub.o usb-uhci.o usb-linux.o usb-hid.o
+VL_OBJS+= usb.o usb-hub.o usb-linux.o usb-hid.o usb-ohci.o usb-msd.o
 
 # PCI network cards
-VL_OBJS+= ne2000.o rtl8139.o
+VL_OBJS+= ne2000.o rtl8139.o pcnet.o
 
 ifeq ($(TARGET_BASE_ARCH), i386)
 # Hardware support
 VL_OBJS+= ide.o pckbd.o ps2.o vga.o $(SOUND_HW) dma.o $(AUDIODRV)
 VL_OBJS+= fdc.o mc146818rtc.o serial.o pc.o
-VL_OBJS+= cirrus_vga.o mixeng.o parallel.o
+VL_OBJS+= cirrus_vga.o mixeng.o parallel.o acpi.o piix_pci.o
+VL_OBJS+= usb-uhci.o
 VL_OBJS+= piix4acpi.o
 VL_OBJS+= xenstore.o
 DEFINES += -DHAS_AUDIO
@@ -343,6 +365,7 @@ ifeq ($(TARGET_BASE_ARCH), ppc)
 VL_OBJS+= ppc.o ide.o pckbd.o ps2.o vga.o $(SOUND_HW) dma.o $(AUDIODRV)
 VL_OBJS+= mc146818rtc.o serial.o i8259.o i8254.o fdc.o m48t59.o
 VL_OBJS+= ppc_prep.o ppc_chrp.o cuda.o adb.o openpic.o heathrow_pic.o mixeng.o
+VL_OBJS+= grackle_pci.o prep_pci.o unin_pci.o
 DEFINES += -DHAS_AUDIO
 endif
 ifeq ($(TARGET_ARCH), mips)
@@ -351,7 +374,7 @@ VL_OBJS+= mips_r4k.o dma.o vga.o serial.o i8254.o i8259.o
 endif
 ifeq ($(TARGET_BASE_ARCH), sparc)
 ifeq ($(TARGET_ARCH), sparc64)
-VL_OBJS+= sun4u.o ide.o pckbd.o ps2.o vga.o
+VL_OBJS+= sun4u.o ide.o pckbd.o ps2.o vga.o apb_pci.o
 VL_OBJS+= fdc.o mc146818rtc.o serial.o m48t59.o
 VL_OBJS+= cirrus_vga.o parallel.o
 else
@@ -362,6 +385,7 @@ endif
 ifeq ($(TARGET_BASE_ARCH), arm)
 VL_OBJS+= integratorcp.o versatilepb.o ps2.o smc91c111.o arm_pic.o arm_timer.o
 VL_OBJS+= arm_boot.o pl011.o pl050.o pl080.o pl110.o pl190.o
+VL_OBJS+= versatile_pci.o
 endif
 ifeq ($(TARGET_BASE_ARCH), sh4)
 VL_OBJS+= shix.o sh7750.o sh7750_regnames.o tc58128.o
@@ -399,7 +423,7 @@ endif
 ifndef CONFIG_DARWIN
 ifndef CONFIG_WIN32
 ifndef CONFIG_SOLARIS
-VL_LIBS=-lutil
+VL_LIBS=-lutil -lrt
 endif
 endif
 endif
@@ -410,6 +434,11 @@ endif
 
 ifeq ($(ARCH),ia64)
 VL_LDFLAGS+=-Wl,-G0 -Wl,-T,$(SRC_PATH)/ia64.ld
+endif
+
+ifeq ($(ARCH),sparc64)
+VL_LDFLAGS+=-m64
+VL_LDFLAGS+=-Wl,-T,$(SRC_PATH)/sparc64.ld
 endif
 
 ifdef CONFIG_WIN32
@@ -491,6 +520,13 @@ endif
 
 loader.o: loader.c elf_ops.h
 
+acpi.o: acpi.c acpi-dsdt.hex
+
+ifdef BUILD_ACPI_TABLES
+$(SRC_PATH)/hw/acpi-dsdt.hex: acpi-dsdt.dsl
+	iasl -tc -p $@ $<
+endif
+
 ifeq ($(TARGET_ARCH), sh4)
 op.o: op.c op_mem.c cpu.h
 op_helper.o: op_helper.c exec.h cpu.h
@@ -500,6 +536,8 @@ shix.o: shix.c sh7750_regs.h sh7750_regnames.h
 sh7750_regnames.o: sh7750_regnames.c sh7750_regnames.h sh7750_regs.h
 tc58128.o: tc58128.c
 endif
+
+$(OBJS) $(LIBOBJS) $(VL_OBJS): config.h ../config-host.h
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(DEFINES) -c -o $@ $<

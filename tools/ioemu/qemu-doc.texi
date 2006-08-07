@@ -78,6 +78,7 @@ For system emulation, the following hardware targets are supported:
 @item Sun4u (64-bit Sparc processor, in progress)
 @item Malta board (32-bit MIPS processor)
 @item ARM Integrator/CP (ARM926E or 1026E processor)
+@item ARM Versatile baseboard (ARM926E)
 @end itemize
 
 For user emulation, x86, PowerPC, ARM, MIPS, and Sparc32/64 CPUs are supported.
@@ -227,6 +228,10 @@ Write to temporary files instead of disk image files. In this case,
 the raw disk image you use is not written back. You can however force
 the write back by pressing @key{C-a s} (@pxref{disk_images}). 
 
+@item -no-fd-bootchk
+Disable boot signature checking for floppy disks in Bochs BIOS. It may
+be needed to boot from old floppy disks.
+
 @item -m megs
 Set virtual RAM size to @var{megs} megabytes. Default is 128 MB.
 
@@ -245,16 +250,19 @@ with a serial console.
 @item -vnc d
 
 Normally, QEMU uses SDL to display the VGA output.  With this option,
-you can have QEMU listen on VNC display d and redirect the VGA display
-over the VNC session.  It is very useful to enable the usb tablet device
-when using this option (option @option{-usbdevice tablet}).
+you can have QEMU listen on VNC display @var{d} and redirect the VGA
+display over the VNC session.  It is very useful to enable the usb
+tablet device when using this option (option @option{-usbdevice
+tablet}). When using the VNC display, you must use the @option{-k}
+option to set the keyboard layout.
 
 @item -k language
 
 Use keyboard layout @var{language} (for example @code{fr} for
 French). This option is only needed where it is not easy to get raw PC
-keycodes (e.g. on Macs or with some X11 servers). You don't need to
-use it on PC/Linux or PC/Windows hosts.
+keycodes (e.g. on Macs, with some X11 servers or with a VNC
+display). You don't normally need to use it on PC/Linux or PC/Windows
+hosts.
 
 The available layouts are:
 @example
@@ -308,8 +316,7 @@ USB options:
 Enable the USB driver (will be the default soon)
 
 @item -usbdevice devname
-Add the USB device @var{devname}. See the monitor command
-@code{usb_add} to have more information.
+Add the USB device @var{devname}. @xref{usb_devices}.
 @end table
 
 Network options:
@@ -492,8 +499,14 @@ Debug/Expert options:
 @table @option
 
 @item -serial dev
-Redirect the virtual serial port to host device @var{dev}. Available
-devices are:
+Redirect the virtual serial port to host character device
+@var{dev}. The default device is @code{vc} in graphical mode and
+@code{stdio} in non graphical mode.
+
+This option can be used several times to simulate up to 4 serials
+ports.
+
+Available character devices are:
 @table @code
 @item vc
 Virtual console
@@ -512,13 +525,64 @@ Write output to filename. No character can be read.
 @item stdio
 [Unix only] standard input/output
 @item pipe:filename
-[Unix only] name pipe @var{filename}
-@end table
-The default device is @code{vc} in graphical mode and @code{stdio} in
-non graphical mode.
+name pipe @var{filename}
+@item COMn
+[Windows only] Use host serial port @var{n}
+@item udp:[remote_host]:remote_port[@@[src_ip]:src_port]
+This implements UDP Net Console.  When @var{remote_host} or @var{src_ip} are not specified they default to @code{0.0.0.0}.  When not using a specifed @var{src_port} a random port is automatically chosen.
 
-This option can be used several times to simulate up to 4 serials
-ports.
+If you just want a simple readonly console you can use @code{netcat} or
+@code{nc}, by starting qemu with: @code{-serial udp::4555} and nc as:
+@code{nc -u -l -p 4555}. Any time qemu writes something to that port it
+will appear in the netconsole session.
+
+If you plan to send characters back via netconsole or you want to stop
+and start qemu a lot of times, you should have qemu use the same
+source port each time by using something like @code{-serial
+udp::4555@@:4556} to qemu. Another approach is to use a patched
+version of netcat which can listen to a TCP port and send and receive
+characters via udp.  If you have a patched version of netcat which
+activates telnet remote echo and single char transfer, then you can
+use the following options to step up a netcat redirector to allow
+telnet on port 5555 to access the qemu port.
+@table @code
+@item Qemu Options:
+-serial udp::4555@@:4556
+@item netcat options:
+-u -P 4555 -L 0.0.0.0:4556 -t -p 5555 -I -T
+@item telnet options:
+localhost 5555
+@end table
+
+
+@item tcp:[host]:port[,server][,nowait]
+The TCP Net Console has two modes of operation.  It can send the serial
+I/O to a location or wait for a connection from a location.  By default
+the TCP Net Console is sent to @var{host} at the @var{port}.  If you use
+the @var{,server} option QEMU will wait for a client socket application
+to connect to the port before continuing, unless the @code{,nowait}
+option was specified. If @var{host} is omitted, 0.0.0.0 is assumed. Only
+one TCP connection at a time is accepted. You can use @code{telnet} to
+connect to the corresponding character device.
+@table @code
+@item Example to send tcp console to 192.168.0.2 port 4444
+-serial tcp:192.168.0.2:4444
+@item Example to listen and wait on port 4444 for connection
+-serial tcp::4444,server
+@item Example to not wait and listen on ip 192.168.0.100 port 4444
+-serial tcp:192.168.0.100:4444,server,nowait
+@end table
+
+@item telnet:host:port[,server][,nowait]
+The telnet protocol is used instead of raw tcp sockets.  The options
+work the same as if you had specified @code{-serial tcp}.  The
+difference is that the port acts like a telnet server or client using
+telnet option negotiation.  This will also allow you to send the
+MAGIC_SYSRQ sequence if you use a telnet that supports sending the break
+sequence.  Typically in unix telnet you do it with Control-] and then
+type "send break" followed by pressing the enter key.
+
+@end table
 
 @item -parallel dev
 Redirect the virtual parallel port to host device @var{dev} (same
@@ -552,7 +616,15 @@ images.
 
 @item -std-vga
 Simulate a standard VGA card with Bochs VBE extensions (default is
-Cirrus Logic GD5446 PCI VGA)
+Cirrus Logic GD5446 PCI VGA). If your guest OS supports the VESA 2.0
+VBE extensions (e.g. Windows XP) and if you want to use high
+resolution modes (>= 1280x1024x16) then you should use this option.
+
+@item -no-acpi
+Disable ACPI (Advanced Configuration and Power Interface) support. Use
+it if your guest OS complains about ACPI problems (PC target machine
+only).
+
 @item -loadvm file
 Start right away with a saved state (@code{loadvm} in monitor)
 @end table
@@ -669,6 +741,8 @@ show emulated PCI device
 show USB devices plugged on the virtual USB hub
 @item info usbhost
 show all USB host devices
+@item info capture
+show information about active capturing
 @end table
 
 @item q or quit
@@ -682,6 +756,23 @@ Change a removable media.
 
 @item screendump filename
 Save screen into PPM image @var{filename}.
+
+@item wavcapture filename [frequency [bits [channels]]]
+Capture audio into @var{filename}. Using sample rate @var{frequency}
+bits per sample @var{bits} and number of channels @var{channels}.
+
+Defaults:
+@itemize @minus
+@item Sample rate = 44100 Hz - CD quality
+@item Bits = 16
+@item Number of channels = 2 - Stereo
+@end itemize
+
+@item stopcapture index
+Stop capture with a given @var{index}, index can be obtained with
+@example
+info capture
+@end example
 
 @item log item1[,...]
 Activate logging of the specified items to @file{/tmp/qemu.log}.
@@ -782,10 +873,8 @@ Reset the system.
 
 @item usb_add devname
 
-Plug the USB device devname to the QEMU virtual USB hub. @var{devname}
-is either a virtual device name (for example @code{mouse}) or a host
-USB device identifier. Host USB device identifiers have the following
-syntax: @code{host:bus.addr} or @code{host:vendor_id:product_id}.
+Add the USB device @var{devname}.  For details of available devices see
+@ref{usb_devices}
 
 @item usb_del devname
 
@@ -1104,31 +1193,39 @@ Lawton for the plex86 Project (@url{www.plex86.org}).
 @node pcsys_usb
 @section USB emulation
 
-QEMU emulates a PCI UHCI USB controller and a 8 port USB hub connected
-to it. You can virtually plug to the hub virtual USB devices or real
-host USB devices (experimental, works only on Linux hosts).
+QEMU emulates a PCI UHCI USB controller. You can virtually plug
+virtual USB devices or real host USB devices (experimental, works only
+on Linux hosts).  Qemu will automatically create and connect virtual USB hubs
+as neccessary to connect multiple USB devices.
 
-@subsection Using virtual USB devices
+@menu
+* usb_devices::
+* host_usb_devices::
+@end menu
+@node usb_devices
+@subsection Connecting USB devices
 
-A virtual USB mouse device is available for testing in QEMU.
+USB devices can be connected with the @option{-usbdevice} commandline option
+or the @code{usb_add} monitor command.  Available devices are:
 
-You can try it with the following monitor commands:
+@table @var
+@item @code{mouse}
+Virtual Mouse.  This will override the PS/2 mouse emulation when activated.
+@item @code{tablet}
+Pointer device that uses abolsute coordinates (like a touchscreen).
+This means qemu is able to report the mouse position without having
+to grab the mouse.  Also overrides the PS/2 mouse emulation when activated.
+@item @code{disk:file}
+Mass storage device based on @var{file} (@pxref{disk_images})
+@item @code{host:bus.addr}
+Pass through the host device identified by @var{bus.addr}
+(Linux only)
+@item @code{host:vendor_id:product_id}
+Pass through the host device identified by @var{vendor_id:product_id}
+(Linux only)
+@end table
 
-@example
-# add the mouse device
-(qemu) usb_add mouse 
-
-# show the virtual USB devices plugged on the QEMU Virtual USB hub
-(qemu) info usb
-  Device 0.3, speed 12 Mb/s
-
-# after some time you can try to remove the mouse
-(qemu) usb_del 0.3
-@end example
-
-The option @option{-usbdevice} is similar to the monitor command
-@code{usb_add}.
-
+@node host_usb_devices
 @subsection Using host USB devices on a Linux host
 
 WARNING: this is an experimental feature. QEMU will slow down when
@@ -1215,7 +1312,7 @@ Use @code{info reg} to display all the CPU registers.
 Use @code{x/10i $eip} to display the code at the PC position.
 @item
 Use @code{set architecture i8086} to dump 16 bit code. Then use
-@code{x/10i $cs*16+*eip} to dump the code at the PC position.
+@code{x/10i $cs*16+$eip} to dump the code at the PC position.
 @end enumerate
 
 @node pcsys_os_specific
@@ -1249,6 +1346,11 @@ QEMU emulates a Cirrus Logic GD5446 Video
 card. All Windows versions starting from Windows 95 should recognize
 and use this graphic card. For optimal performances, use 16 bit color
 depth in the guest and the host OS.
+
+If you are using Windows XP as guest OS and if you want to use high
+resolution modes which the Cirrus Logic BIOS does not support (i.e. >=
+1280x1024x16), then you should use the VESA VBE virtual graphic card
+(option @option{-std-vga}).
 
 @subsubsection CPU usage reduction
 
@@ -1388,7 +1490,7 @@ More information is available at
 @node Sparc32 System emulator invocation
 @section Sparc32 System emulator invocation
 
-Use the executable @file{qemu-system-sparc} to simulate a JavaStation
+Use the executable @file{qemu-system-sparc} to simulate a SparcStation 5
 (sun4m architecture). The emulation is somewhat complete.
 
 QEMU emulates the following sun4m peripherals:
@@ -1413,13 +1515,14 @@ Floppy drive
 
 The number of peripherals is fixed in the architecture.
 
-QEMU uses the Proll, a PROM replacement available at
-@url{http://people.redhat.com/@/zaitcev/linux/}. The required
-QEMU-specific patches are included with the sources.
+Since version 0.8.2, QEMU uses OpenBIOS
+@url{http://www.openbios.org/}. OpenBIOS is a free (GPL v2) portable
+firmware implementation. The goal is to implement a 100% IEEE
+1275-1994 (referred to as Open Firmware) compliant firmware.
 
 A sample Linux 2.6 series kernel and ram disk image are available on
-the QEMU web site. Please note that currently neither Linux 2.4
-series, NetBSD, nor OpenBSD kernels work.
+the QEMU web site. Please note that currently NetBSD, OpenBSD or
+Solaris kernels don't work.
 
 @c man begin OPTIONS
 
@@ -1486,6 +1589,37 @@ ARM926E or ARM1026E CPU
 Two PL011 UARTs
 @item 
 SMC 91c111 Ethernet adapter
+@item
+PL110 LCD controller
+@item
+PL050 KMI with PS/2 keyboard and mouse.
+@end itemize
+
+The ARM Versatile baseboard is emulated with the following devices:
+
+@itemize @minus
+@item
+ARM926E CPU
+@item
+PL190 Vectored Interrupt Controller
+@item
+Four PL011 UARTs
+@item 
+SMC 91c111 Ethernet adapter
+@item
+PL110 LCD controller
+@item
+PL050 KMI with PS/2 keyboard and mouse.
+@item
+PCI host bridge.  Note the emulated PCI bridge only provides access to
+PCI memory space.  It does not provide access to PCI IO space.
+This means some devices (eg. ne2k_pci NIC) are not useable, and others
+(eg. rtl8139 NIC) are only useable when the guest drivers use the memory
+mapped control registers.
+@item
+PCI OHCI USB controller.
+@item
+LSI53C895A PCI SCSI Host Bus Adapter with hard disk and CD-ROM devices.
 @end itemize
 
 A Linux 2.6 test image is available on the QEMU web site. More
@@ -1498,6 +1632,7 @@ information is available in the QEMU mailing-list archive.
 * Quick Start::
 * Wine launch::
 * Command line options::
+* Other binaries::
 @end menu
 
 @node Quick Start
@@ -1603,6 +1738,15 @@ Activate log (logfile=/tmp/qemu.log)
 @item -p pagesize
 Act as if the host page size was 'pagesize' bytes
 @end table
+
+@node Other binaries
+@section Other binaries
+
+@command{qemu-arm} is also capable of running ARM "Angel" semihosted ELF
+binaries (as implemented by the arm-elf and arm-eabi Newlib/GDB
+configurations), and arm-uclinux bFLT format binaries.
+
+The binary format is detected automatically.
 
 @node compilation
 @chapter Compilation from the sources

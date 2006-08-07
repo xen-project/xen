@@ -116,6 +116,8 @@ struct USBDevice {
     int (*handle_packet)(USBDevice *dev, int pid, 
                          uint8_t devaddr, uint8_t devep,
                          uint8_t *data, int len);
+    void (*handle_destroy)(USBDevice *dev);
+
     int speed;
     
     /* The following fields are used by the generic USB device
@@ -127,6 +129,7 @@ struct USBDevice {
     int (*handle_data)(USBDevice *dev, int pid, uint8_t devep,
                        uint8_t *data, int len);
     uint8_t addr;
+    char devname[32];
     
     int state;
     uint8_t setup_buf[8];
@@ -137,12 +140,15 @@ struct USBDevice {
     int setup_index;
 };
 
+typedef void (*usb_attachfn)(USBPort *port, USBDevice *dev);
+
 /* USB port on which a device can be connected */
 struct USBPort {
     USBDevice *dev;
-    void (*attach)(USBPort *port, USBDevice *dev);
+    usb_attachfn attach;
     void *opaque;
     int index; /* internal port index, may be used with the opaque */
+    struct USBPort *next; /* Used internally by qemu.  */
 };
 
 void usb_attach(USBPort *port, USBDevice *dev);
@@ -152,10 +158,13 @@ int usb_generic_handle_packet(USBDevice *s, int pid,
 int set_usb_string(uint8_t *buf, const char *str);
 
 /* usb hub */
-USBDevice *usb_hub_init(USBPort **usb_ports, int nb_ports);
+USBDevice *usb_hub_init(int nb_ports);
 
 /* usb-uhci.c */
-void usb_uhci_init(PCIBus *bus, USBPort **usb_ports);
+void usb_uhci_init(PCIBus *bus, int devfn);
+
+/* usb-ohci.c */
+void usb_ohci_init(struct PCIBus *bus, int num_ports, int devfn);
 
 /* usb-linux.c */
 USBDevice *usb_host_device_open(const char *devname);
@@ -164,3 +173,6 @@ void usb_host_info(void);
 /* usb-hid.c */
 USBDevice *usb_mouse_init(void);
 USBDevice *usb_tablet_init(void);
+
+/* usb-msd.c */
+USBDevice *usb_msd_init(const char *filename);

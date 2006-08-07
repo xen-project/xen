@@ -27,8 +27,8 @@
 #define DEFAULT_BACKSCROLL 512
 #define MAX_CONSOLES 12
 
-#define RGBA(r, g, b, a) (((a) << 24) | ((r) << 16) | ((g) << 8) | (b))
-#define RGB(r, g, b) RGBA(r, g, b, 0xff)
+#define QEMU_RGBA(r, g, b, a) (((a) << 24) | ((r) << 16) | ((g) << 8) | (b))
+#define QEMU_RGB(r, g, b) QEMU_RGBA(r, g, b, 0xff)
 
 typedef struct TextAttributes {
     uint8_t fgcol:4;
@@ -52,6 +52,57 @@ enum TTYState {
     TTY_STATE_ESC,
     TTY_STATE_CSI,
 };
+
+typedef struct QEMUFIFO {
+    uint8_t *buf;
+    int buf_size;
+    int count, wptr, rptr;
+} QEMUFIFO;
+
+int qemu_fifo_write(QEMUFIFO *f, const uint8_t *buf, int len1)
+{
+    int l, len;
+
+    l = f->buf_size - f->count;
+    if (len1 > l)
+        len1 = l;
+    len = len1;
+    while (len > 0) {
+        l = f->buf_size - f->wptr;
+        if (l > len)
+            l = len;
+        memcpy(f->buf + f->wptr, buf, l);
+        f->wptr += l;
+        if (f->wptr >= f->buf_size)
+            f->wptr = 0;
+        buf += l;
+        len -= l;
+    }
+    f->count += len1;
+    return len1;
+}
+
+int qemu_fifo_read(QEMUFIFO *f, uint8_t *buf, int len1)
+{
+    int l, len;
+
+    if (len1 > f->count)
+        len1 = f->count;
+    len = len1;
+    while (len > 0) {
+        l = f->buf_size - f->rptr;
+        if (l > len)
+            l = len;
+        memcpy(buf, f->buf + f->rptr, l);
+        f->rptr += l;
+        if (f->rptr >= f->buf_size)
+            f->rptr = 0;
+        buf += l;
+        len -= l;
+    }
+    f->count -= len1;
+    return len1;
+}
 
 /* ??? This is mis-named.
    It is used for both text and graphical consoles.  */
@@ -81,8 +132,13 @@ struct TextConsole {
     int nb_esc_params;
 
     /* kbd read handler */
+    IOCanRWHandler *fd_can_read; 
     IOReadHandler *fd_read;
     void *fd_opaque;
+    /* fifo for key pressed */
+    QEMUFIFO out_fifo;
+    uint8_t out_fifo_buf[16];
+    QEMUTimer *kbd_timer;
 };
 
 static TextConsole *active_console;
@@ -274,24 +330,24 @@ enum color_names {
 
 static const uint32_t color_table_rgb[2][8] = {
     {   /* dark */
-        RGB(0x00, 0x00, 0x00),  /* black */
-        RGB(0xaa, 0x00, 0x00),  /* red */
-        RGB(0x00, 0xaa, 0x00),  /* green */
-        RGB(0xaa, 0xaa, 0x00),  /* yellow */
-        RGB(0x00, 0x00, 0xaa),  /* blue */
-        RGB(0xaa, 0x00, 0xaa),  /* magenta */
-        RGB(0x00, 0xaa, 0xaa),  /* cyan */
-        RGB(0xaa, 0xaa, 0xaa),  /* white */
+        QEMU_RGB(0x00, 0x00, 0x00),  /* black */
+        QEMU_RGB(0xaa, 0x00, 0x00),  /* red */
+        QEMU_RGB(0x00, 0xaa, 0x00),  /* green */
+        QEMU_RGB(0xaa, 0xaa, 0x00),  /* yellow */
+        QEMU_RGB(0x00, 0x00, 0xaa),  /* blue */
+        QEMU_RGB(0xaa, 0x00, 0xaa),  /* magenta */
+        QEMU_RGB(0x00, 0xaa, 0xaa),  /* cyan */
+        QEMU_RGB(0xaa, 0xaa, 0xaa),  /* white */
     },
     {   /* bright */
-        RGB(0x00, 0x00, 0x00),  /* black */
-        RGB(0xff, 0x00, 0x00),  /* red */
-        RGB(0x00, 0xff, 0x00),  /* green */
-        RGB(0xff, 0xff, 0x00),  /* yellow */
-        RGB(0x00, 0x00, 0xff),  /* blue */
-        RGB(0xff, 0x00, 0xff),  /* magenta */
-        RGB(0x00, 0xff, 0xff),  /* cyan */
-        RGB(0xff, 0xff, 0xff),  /* white */
+        QEMU_RGB(0x00, 0x00, 0x00),  /* black */
+        QEMU_RGB(0xff, 0x00, 0x00),  /* red */
+        QEMU_RGB(0x00, 0xff, 0x00),  /* green */
+        QEMU_RGB(0xff, 0xff, 0x00),  /* yellow */
+        QEMU_RGB(0x00, 0x00, 0xff),  /* blue */
+        QEMU_RGB(0xff, 0x00, 0xff),  /* magenta */
+        QEMU_RGB(0x00, 0xff, 0xff),  /* cyan */
+        QEMU_RGB(0xff, 0xff, 0xff),  /* white */
     }
 };
 
@@ -563,7 +619,6 @@ static void console_put_lf(TextConsole *s)
     TextCell *c;
     int x, y1;
 
-    s->x = 0;
     s->y++;
     if (s->y >= s->height) {
         s->y = s->height - 1;
@@ -712,15 +767,12 @@ static void console_putchar(TextConsole *s, int ch)
             console_put_lf(s);
             break;
         case '\b':  /* backspace */
-            if(s->x > 0) s->x--;
-            y1 = (s->y_base + s->y) % s->total_height;
-            c = &s->cells[y1 * s->width + s->x];
-            c->ch = ' ';
-            c->t_attrib = s->t_attrib;
-            update_xy(s, s->x, s->y);
+            if (s->x > 0) 
+                s->x--;
             break;
         case '\t':  /* tabspace */
             if (s->x + (8 - (s->x % 8)) > s->width) {
+                s->x = 0;
                 console_put_lf(s);
             } else {
                 s->x = s->x + (8 - (s->x % 8));
@@ -739,8 +791,10 @@ static void console_putchar(TextConsole *s, int ch)
             c->t_attrib = s->t_attrib;
             update_xy(s, s->x, s->y);
             s->x++;
-            if (s->x >= s->width)
+            if (s->x >= s->width) {
+                s->x = 0;
                 console_put_lf(s);
+            }
             break;
         }
         break;
@@ -835,6 +889,7 @@ static void console_chr_add_read_handler(CharDriverState *chr,
                                          IOReadHandler *fd_read, void *opaque)
 {
     TextConsole *s = chr->opaque;
+    s->fd_can_read = fd_can_read;
     s->fd_read = fd_read;
     s->fd_opaque = opaque;
 }
@@ -851,6 +906,28 @@ static void console_send_event(CharDriverState *chr, int event)
                 break;
             }
         }
+    }
+}
+
+static void kbd_send_chars(void *opaque)
+{
+    TextConsole *s = opaque;
+    int len;
+    uint8_t buf[16];
+    
+    len = s->fd_can_read(s->fd_opaque);
+    if (len > s->out_fifo.count)
+        len = s->out_fifo.count;
+    if (len > 0) {
+        if (len > sizeof(buf))
+            len = sizeof(buf);
+        qemu_fifo_read(&s->out_fifo, buf, len);
+        s->fd_read(s->fd_opaque, buf, len);
+    }
+    /* characters are pending: we send them a bit later (XXX:
+       horrible, should change char device API) */
+    if (s->out_fifo.count > 0) {
+        qemu_mod_timer(s->kbd_timer, qemu_get_clock(rt_clock) + 1);
     }
 }
 
@@ -879,25 +956,26 @@ void kbd_put_keysym(int keysym)
         console_scroll(10);
         break;
     default:
-        if (s->fd_read) {
-            /* convert the QEMU keysym to VT100 key string */
-            q = buf;
-            if (keysym >= 0xe100 && keysym <= 0xe11f) {
-                *q++ = '\033';
-                *q++ = '[';
-                c = keysym - 0xe100;
-                if (c >= 10)
-                    *q++ = '0' + (c / 10);
-                *q++ = '0' + (c % 10);
-                *q++ = '~';
-            } else if (keysym >= 0xe120 && keysym <= 0xe17f) {
-                *q++ = '\033';
-                *q++ = '[';
-                *q++ = keysym & 0xff;
-            } else {
+        /* convert the QEMU keysym to VT100 key string */
+        q = buf;
+        if (keysym >= 0xe100 && keysym <= 0xe11f) {
+            *q++ = '\033';
+            *q++ = '[';
+            c = keysym - 0xe100;
+            if (c >= 10)
+                *q++ = '0' + (c / 10);
+            *q++ = '0' + (c % 10);
+            *q++ = '~';
+        } else if (keysym >= 0xe120 && keysym <= 0xe17f) {
+            *q++ = '\033';
+            *q++ = '[';
+            *q++ = keysym & 0xff;
+        } else {
                 *q++ = keysym;
-            }
-            s->fd_read(s->fd_opaque, buf, q - buf);
+        }
+        if (s->fd_read) {
+            qemu_fifo_write(&s->out_fifo, buf, q - buf);
+            kbd_send_chars(s);
         }
         break;
     }
@@ -984,6 +1062,10 @@ CharDriverState *text_console_init(DisplayState *ds)
     chr->chr_add_read_handler = console_chr_add_read_handler;
     chr->chr_send_event = console_send_event;
 
+    s->out_fifo.buf = s->out_fifo_buf;
+    s->out_fifo.buf_size = sizeof(s->out_fifo_buf);
+    s->kbd_timer = qemu_new_timer(rt_clock, kbd_send_chars, s);
+    
     if (!color_inited) {
         color_inited = 1;
         set_color_table(ds);

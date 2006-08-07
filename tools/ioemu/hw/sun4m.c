@@ -28,8 +28,7 @@
 #define INITRD_LOAD_ADDR     0x00800000
 #define PROM_SIZE_MAX        (256 * 1024)
 #define PROM_ADDR	     0xffd00000
-#define PROM_FILENAMEB	     "proll.bin"
-#define PROM_FILENAMEE	     "proll.elf"
+#define PROM_FILENAME	     "openbios-sparc32"
 #define PHYS_JJ_EEPROM	0x71200000	/* m48t08 */
 #define PHYS_JJ_IDPROM_OFF	0x1FD8
 #define PHYS_JJ_EEPROM_SIZE	0x2000
@@ -183,6 +182,11 @@ void pic_set_irq(int irq, int level)
     slavio_pic_set_irq(slavio_intctl, irq, level);
 }
 
+void pic_set_irq_new(void *opaque, int irq, int level)
+{
+    pic_set_irq(irq, level);
+}
+
 void pic_set_irq_cpu(int irq, int level, unsigned int cpu)
 {
     slavio_pic_set_irq_cpu(slavio_intctl, irq, level, cpu);
@@ -268,12 +272,8 @@ static void sun4m_init(int ram_size, int vga_ram_size, int boot_device,
                                  (PROM_SIZE_MAX + TARGET_PAGE_SIZE - 1) & TARGET_PAGE_MASK, 
                                  prom_offset | IO_MEM_ROM);
 
-    snprintf(buf, sizeof(buf), "%s/%s", bios_dir, PROM_FILENAMEE);
+    snprintf(buf, sizeof(buf), "%s/%s", bios_dir, PROM_FILENAME);
     ret = load_elf(buf, 0, NULL);
-    if (ret < 0) {
-	snprintf(buf, sizeof(buf), "%s/%s", bios_dir, PROM_FILENAMEB);
-	ret = load_image(buf, phys_ram_base + prom_offset);
-    }
     if (ret < 0) {
 	fprintf(stderr, "qemu: could not load prom '%s'\n", 
 		buf);

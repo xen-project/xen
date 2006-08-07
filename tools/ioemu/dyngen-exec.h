@@ -35,11 +35,14 @@
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
 typedef unsigned int uint32_t;
+// Linux/Sparc64 defines uint64_t
+#if !(defined (__sparc_v9__) && defined(__linux__))
 /* XXX may be done for all 64 bits targets ? */
 #if defined (__x86_64__) || defined(__ia64)
 typedef unsigned long uint64_t;
 #else
 typedef unsigned long long uint64_t;
+#endif
 #endif
 
 /* if Solaris/__sun__, don't typedef int8_t, as it will be typedef'd
@@ -50,10 +53,13 @@ typedef signed char int8_t;
 #endif
 typedef signed short int16_t;
 typedef signed int int32_t;
+// Linux/Sparc64 defines int64_t
+#if !(defined (__sparc_v9__) && defined(__linux__))
 #if defined (__x86_64__) || defined(__ia64)
 typedef signed long int64_t;
 #else
 typedef signed long long int64_t;
+#endif
 #endif
 
 #define INT8_MIN		(-128)
@@ -121,6 +127,19 @@ extern int printf(const char *, ...);
 #define AREG3 "s2"
 #endif
 #ifdef __sparc__
+#ifdef HOST_SOLARIS
+#define AREG0 "g2"
+#define AREG1 "g3"
+#define AREG2 "g4"
+#define AREG3 "g5"
+#define AREG4 "g6"
+#else
+#ifdef __sparc_v9__
+#define AREG0 "g1"
+#define AREG1 "g4"
+#define AREG2 "g5"
+#define AREG3 "g7"
+#else
 #define AREG0 "g6"
 #define AREG1 "g1"
 #define AREG2 "g2"
@@ -133,6 +152,8 @@ extern int printf(const char *, ...);
 #define AREG9 "l5"
 #define AREG10 "l6"
 #define AREG11 "l7"
+#endif
+#endif
 #define USE_FP_CONVERT
 #endif
 #ifdef __s390__
@@ -241,10 +262,8 @@ extern int __op_jmp0, __op_jmp1, __op_jmp2, __op_jmp3;
 					  ASM_NAME(__op_gen_label) #n)
 #endif
 #ifdef __sparc__
-#define EXIT_TB() asm volatile ("jmpl %i0 + 8, %g0\n" \
-                                "nop")
-#define        GOTO_LABEL_PARAM(n) asm volatile ( \
-               "set " ASM_NAME(__op_gen_label) #n ", %g1; jmp %g1; nop")
+#define EXIT_TB() asm volatile ("jmpl %i0 + 8, %g0; nop")
+#define GOTO_LABEL_PARAM(n) asm volatile ("ba " ASM_NAME(__op_gen_label) #n ";nop")
 #endif
 #ifdef __arm__
 #define EXIT_TB() asm volatile ("b exec_loop")

@@ -89,8 +89,10 @@ void term_puts(const char *str)
         c = *str++;
         if (c == '\0')
             break;
+        if (c == '\n')
+            term_outbuf[term_outbuf_index++] = '\r';
         term_outbuf[term_outbuf_index++] = c;
-        if (term_outbuf_index >= sizeof(term_outbuf) ||
+        if (term_outbuf_index >= (sizeof(term_outbuf) - 1) ||
             c == '\n')
             term_flush();
     }
@@ -546,16 +548,16 @@ static void memory_dump(int count, int format, int wsize,
             term_printf(" ");
             switch(format) {
             case 'o':
-                term_printf("%#*llo", max_digits, v);
+                term_printf("%#*" PRIo64, max_digits, v);
                 break;
             case 'x':
-                term_printf("0x%0*llx", max_digits, v);
+                term_printf("0x%0*" PRIx64, max_digits, v);
                 break;
             case 'u':
-                term_printf("%*llu", max_digits, v);
+                term_printf("%*" PRIu64, max_digits, v);
                 break;
             case 'd':
-                term_printf("%*lld", max_digits, v);
+                term_printf("%*" PRId64, max_digits, v);
                 break;
             case 'c':
                 term_printc(v);
@@ -615,17 +617,17 @@ static void do_print(int count, int format, int size, unsigned int valh, unsigne
 #else
     switch(format) {
     case 'o':
-        term_printf("%#llo", val);
+        term_printf("%#" PRIo64, val);
         break;
     case 'x':
-        term_printf("%#llx", val);
+        term_printf("%#" PRIx64, val);
         break;
     case 'u':
-        term_printf("%llu", val);
+        term_printf("%" PRIu64, val);
         break;
     default:
     case 'd':
-        term_printf("%lld", val);
+        term_printf("%" PRId64, val);
         break;
     case 'c':
         term_printc(val);
@@ -680,6 +682,8 @@ static const KeyDef key_defs[] = {
     { 0x09, "8" },
     { 0x0a, "9" },
     { 0x0b, "0" },
+    { 0x0c, "minus" },
+    { 0x0d, "equal" },
     { 0x0e, "backspace" },
 
     { 0x0f, "tab" },
@@ -729,6 +733,24 @@ static const KeyDef key_defs[] = {
     { 0x45, "num_lock" },
     { 0x46, "scroll_lock" },
 
+    { 0xb5, "kp_divide" },
+    { 0x37, "kp_multiply" },
+    { 0x4a, "kp_substract" },
+    { 0x4e, "kp_add" },
+    { 0x9c, "kp_enter" },
+    { 0x53, "kp_decimal" },
+
+    { 0x52, "kp_0" },
+    { 0x4f, "kp_1" },
+    { 0x50, "kp_2" },
+    { 0x51, "kp_3" },
+    { 0x4b, "kp_4" },
+    { 0x4c, "kp_5" },
+    { 0x4d, "kp_6" },
+    { 0x47, "kp_7" },
+    { 0x48, "kp_8" },
+    { 0x49, "kp_9" },
+    
     { 0x56, "<" },
 
     { 0x57, "f11" },
@@ -754,10 +776,17 @@ static const KeyDef key_defs[] = {
 static int get_keycode(const char *key)
 {
     const KeyDef *p;
+    char *endp;
+    int ret;
 
     for(p = key_defs; p->name != NULL; p++) {
         if (!strcmp(key, p->name))
             return p->keycode;
+    }
+    if (strstart(key, "0x", NULL)) {
+        ret = strtoul(key, &endp, 0);
+        if (*endp == '\0' && ret >= 0x01 && ret <= 0xff)
+            return ret;
     }
     return -1;
 }
@@ -804,6 +833,26 @@ static void do_send_key(const char *string)
             kbd_put_keycode(0xe0);
         kbd_put_keycode(keycode | 0x80);
     }
+}
+
+static int mouse_button_state;
+
+static void do_mouse_move(const char *dx_str, const char *dy_str, 
+                          const char *dz_str)
+{
+    int dx, dy, dz;
+    dx = strtol(dx_str, NULL, 0);
+    dy = strtol(dy_str, NULL, 0);
+    dz = 0;
+    if (dz_str) 
+        dz = strtol(dz_str, NULL, 0);
+    kbd_mouse_event(dx, dy, dz, mouse_button_state);
+}
+
+static void do_mouse_button(int button_state)
+{
+    mouse_button_state = button_state;
+    kbd_mouse_event(0, 0, 0, mouse_button_state);
 }
 
 #ifndef CONFIG_DM
@@ -967,7 +1016,6 @@ static void mem_info(void)
     }
 }
 #endif
-#endif /* !CONFIG_DM */
 
 static void do_info_kqemu(void)
 {
@@ -998,6 +1046,7 @@ static void do_info_kqemu(void)
     term_printf("kqemu support: not compiled\n");
 #endif
 } 
+#endif /* !CONFIG_DM */
 
 #ifdef CONFIG_PROFILER
 
@@ -1015,11 +1064,11 @@ static void do_info_profile(void)
     total = qemu_time;
     if (total == 0)
         total = 1;
-    term_printf("async time  %lld (%0.3f)\n",
+    term_printf("async time  %" PRId64 " (%0.3f)\n",
                 dev_time, dev_time / (double)ticks_per_sec);
-    term_printf("qemu time   %lld (%0.3f)\n",
+    term_printf("qemu time   %" PRId64 " (%0.3f)\n",
                 qemu_time, qemu_time / (double)ticks_per_sec);
-    term_printf("kqemu time  %lld (%0.3f %0.1f%%) count=%lld int=%lld excp=%lld intr=%lld\n",
+    term_printf("kqemu time  %" PRId64 " (%0.3f %0.1f%%) count=%" PRId64 " int=%" PRId64 " excp=%" PRId64 " intr=%" PRId64 "\n",
                 kqemu_time, kqemu_time / (double)ticks_per_sec,
                 kqemu_time / (double)total * 100.0,
                 kqemu_exec_count,
@@ -1041,6 +1090,64 @@ static void do_info_profile(void)
 static void do_info_profile(void)
 {
     term_printf("Internal profiler not compiled\n");
+}
+#endif
+
+/* Capture support */
+static LIST_HEAD (capture_list_head, CaptureState) capture_head;
+
+static void do_info_capture (void)
+{
+    int i;
+    CaptureState *s;
+
+    for (s = capture_head.lh_first, i = 0; s; s = s->entries.le_next, ++i) {
+        term_printf ("[%d]: ", i);
+        s->ops.info (s->opaque);
+    }
+}
+
+static void do_stop_capture (int n)
+{
+    int i;
+    CaptureState *s;
+
+    for (s = capture_head.lh_first, i = 0; s; s = s->entries.le_next, ++i) {
+        if (i == n) {
+            s->ops.destroy (s->opaque);
+            LIST_REMOVE (s, entries);
+            qemu_free (s);
+            return;
+        }
+    }
+}
+
+#ifdef HAS_AUDIO
+int wav_start_capture (CaptureState *s, const char *path, int freq,
+                       int bits, int nchannels);
+
+static void do_wav_capture (const char *path,
+                            int has_freq, int freq,
+                            int has_bits, int bits,
+                            int has_channels, int nchannels)
+{
+    CaptureState *s;
+
+    s = qemu_mallocz (sizeof (*s));
+    if (!s) {
+        term_printf ("Not enough memory to add wave capture\n");
+        return;
+    }
+
+    freq = has_freq ? freq : 44100;
+    bits = has_bits ? bits : 16;
+    nchannels = has_channels ? nchannels : 2;
+
+    if (wav_start_capture (s, path, freq, bits, nchannels)) {
+        term_printf ("Faied to add wave capture\n");
+        qemu_free (s);
+    }
+    LIST_INSERT_HEAD (&capture_head, s, entries);
 }
 #endif
 
@@ -1102,6 +1209,17 @@ static term_cmd_t term_cmds[] = {
     { "cpu", "i", do_cpu_set, 
       "index", "set the default CPU" },
 #endif /* !CONFIG_DM */
+    { "mouse_move", "sss?", do_mouse_move, 
+      "dx dy [dz]", "send mouse move events" },
+    { "mouse_button", "i", do_mouse_button, 
+      "state", "change mouse button state (1=L, 2=M, 4=R)" },
+#ifdef HAS_AUDIO
+    { "wavcapture", "si?i?i?", do_wav_capture,
+      "path [frequency bits channels]",
+      "capture audio to a wave file (default frequency=44100 bits=16 channels=2)" },
+#endif
+     { "stopcapture", "i", do_stop_capture,
+       "capture index", "stop capture" },
     { NULL, NULL, }, 
 };
 
@@ -1135,15 +1253,17 @@ static term_cmd_t info_cmds[] = {
 #endif
     { "jit", "", do_info_jit,
       "", "show dynamic compiler info", },
-#endif /* !CONFIG_DM */
     { "kqemu", "", do_info_kqemu,
       "", "show kqemu information", },
+#endif /* !CONFIG_DM */
     { "usb", "", usb_info,
       "", "show guest USB devices", },
     { "usbhost", "", usb_host_info,
       "", "show host USB devices", },
     { "profile", "", do_info_profile,
       "", "show profiling information", },
+    { "capture", "", do_info_capture,
+      "show capture information" },
 #ifdef CONFIG_DM
     { "hvmiopage", "", sp_info,
       "", "show HVM device model shared page info", },
@@ -1588,8 +1708,11 @@ static target_long expr_unary(void)
         n = 0;
         break;
     default:
-        /* XXX: 64 bit version */
+#if TARGET_LONG_BITS == 64
+        n = strtoull(pch, &p, 0);
+#else
         n = strtoul(pch, &p, 0);
+#endif
         if (pch == p) {
             expr_error("invalid char in expression");
         }
@@ -1955,7 +2078,6 @@ static void monitor_handle_command(const char *cmdline)
                 while (isspace(*p)) 
                     p++;
                 if (*typestr == '?' || *typestr == '.') {
-                    typestr++;
                     if (*typestr == '?') {
                         if (*p == '\0')
                             has_arg = 0;
@@ -1971,6 +2093,7 @@ static void monitor_handle_command(const char *cmdline)
                             has_arg = 0;
                         }
                     }
+                    typestr++;
                     if (nb_args >= MAX_ARGS)
                         goto error_args;
                     args[nb_args++] = (void *)has_arg;
@@ -2068,6 +2191,9 @@ static void monitor_handle_command(const char *cmdline)
         break;
     case 6:
         cmd->handler(args[0], args[1], args[2], args[3], args[4], args[5]);
+        break;
+    case 7:
+        cmd->handler(args[0], args[1], args[2], args[3], args[4], args[5], args[6]);
         break;
     default:
         term_printf("unsupported number of arguments: %d\n", nb_args);
@@ -2197,6 +2323,7 @@ void readline_find_completion(const char *cmdline)
     int nb_args, i, len;
     const char *ptype, *str;
     term_cmd_t *cmd;
+    const KeyDef *key;
 
     parse_cmdline(cmdline, &nb_args, args);
 #ifdef DEBUG_COMPLETION
@@ -2257,6 +2384,11 @@ void readline_find_completion(const char *cmdline)
                 completion_index = strlen(str);
                 for(cmd = info_cmds; cmd->name != NULL; cmd++) {
                     cmd_completion(str, cmd->name);
+                }
+            } else if (!strcmp(cmd->name, "sendkey")) {
+                completion_index = strlen(str);
+                for(key = key_defs; key->name != NULL; key++) {
+                    cmd_completion(str, key->name);
                 }
             }
             break;
