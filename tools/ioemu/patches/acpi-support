@@ -1,94 +1,50 @@
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2006-08-03 19:19:39.000000000 +0100
-+++ ioemu/Makefile.target	2006-08-04 10:35:36.445703379 +0100
-@@ -335,6 +335,7 @@
- VL_OBJS+= ide.o pckbd.o ps2.o vga.o $(SOUND_HW) dma.o $(AUDIODRV)
+--- ioemu.orig/Makefile.target	2006-08-06 02:23:23.000000000 +0100
++++ ioemu/Makefile.target	2006-08-07 17:38:47.698306442 +0100
+@@ -357,6 +357,7 @@
  VL_OBJS+= fdc.o mc146818rtc.o serial.o pc.o
- VL_OBJS+= cirrus_vga.o mixeng.o parallel.o
+ VL_OBJS+= cirrus_vga.o mixeng.o parallel.o acpi.o piix_pci.o
+ VL_OBJS+= usb-uhci.o
 +VL_OBJS+= piix4acpi.o
  DEFINES += -DHAS_AUDIO
  endif
  ifeq ($(TARGET_BASE_ARCH), ppc)
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2006-08-03 19:19:39.000000000 +0100
-+++ ioemu/hw/pc.c	2006-08-04 10:38:05.559415853 +0100
-@@ -566,6 +566,9 @@
+--- ioemu.orig/hw/pc.c	2006-08-06 02:23:45.000000000 +0100
++++ ioemu/hw/pc.c	2006-08-07 17:42:00.939426374 +0100
+@@ -572,6 +572,9 @@
  static int parallel_io[MAX_PARALLEL_PORTS] = { 0x378, 0x278, 0x3bc };
  static int parallel_irq[MAX_PARALLEL_PORTS] = { 7, 7, 7 };
  
 +/* PIIX4 acpi pci configuration space, func 3 */
-+extern void pci_piix4_acpi_init(PCIBus *bus);
++extern void pci_piix4_acpi_init(PCIBus *bus, int devfn);
 +
  #ifdef HAS_AUDIO
  static void audio_init (PCIBus *pci_bus)
  {
-@@ -867,6 +870,10 @@
+@@ -874,11 +877,15 @@
  
      cmos_init(ram_size, boot_device, bs_table, timeoffset);
  
 +    /* using PIIX4 acpi model */
 +    if (pci_enabled && acpi_enabled)
-+        pci_piix4_acpi_init(pci_bus);
++        pci_piix4_acpi_init(pci_bus, piix3_devfn + 3);
 +
      if (pci_enabled && usb_enabled) {
-         usb_uhci_init(pci_bus, usb_root_ports);
-         usb_attach(usb_root_ports[0], vm_usb_hub);
-Index: ioemu/hw/pci.c
-===================================================================
---- ioemu.orig/hw/pci.c	2006-08-03 19:19:35.000000000 +0100
-+++ ioemu/hw/pci.c	2006-08-03 19:19:39.000000000 +0100
-@@ -1697,7 +1697,7 @@
- static uint32_t pci_bios_io_addr;
- static uint32_t pci_bios_mem_addr;
- /* host irqs corresponding to PCI irqs A-D */
--static uint8_t pci_irqs[4] = { 11, 9, 11, 9 };
-+static uint8_t pci_irqs[4] = { 10, 11, 10, 11 };
- 
- static void pci_set_io_region_addr(PCIDevice *d, int region_num, uint32_t addr)
- {
-@@ -1750,12 +1750,22 @@
-             pci_set_io_region_addr(d, 3, 0x374);
-         }
-         break;
-+       case 0x0680:
-+       if (vendor_id == 0x8086 && device_id == 0x7113) {
-+          // PIIX4 ACPI PM 
-+        pci_config_writew(d, 0x20, 0x0000); // NO smb bus IO enable in PIIX4
-+        pci_config_writew(d, 0x22, 0x0000); 
-+        goto default_map;
-+ 	}
-+         break;
-+
-     case 0x0300:
-         if (vendor_id != 0x1234)
-             goto default_map;
-         /* VGA: map frame buffer to default Bochs VBE address */
-         pci_set_io_region_addr(d, 0, 0xE0000000);
-         break;
-+
-     case 0x0800:
-         /* PIC */
-         vendor_id = pci_config_readw(d, PCI_VENDOR_ID);
-@@ -1800,6 +1810,13 @@
-         pic_irq = pci_irqs[pin];
-         pci_config_writeb(d, PCI_INTERRUPT_LINE, pic_irq);
+         usb_uhci_init(pci_bus, piix3_devfn + 2);
      }
-+    if (class== 0x0680&& vendor_id == 0x8086 && device_id == 0x7113) {
-+         // PIIX4 ACPI PM
-+       pci_config_writew(d, 0x20, 0x0000); // NO smb bus IO enable in PIIX4
-+       pci_config_writew(d, 0x22, 0x0000);
-+       pci_config_writew(d, 0x3c, 0x0009); // Hardcodeed IRQ9
-+       pci_config_writew(d, 0x3d, 0x0001);
-+    }
- }
  
- /*
+-    if (pci_enabled && acpi_enabled) {
++    if (pci_enabled && acpi_enabled && 0) {
+         piix4_pm_init(pci_bus, piix3_devfn + 3);
+     }
+ 
 Index: ioemu/hw/piix4acpi.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/hw/piix4acpi.c	2006-08-04 10:35:36.762666604 +0100
++++ ioemu/hw/piix4acpi.c	2006-08-07 17:41:41.932577728 +0100
 @@ -0,0 +1,388 @@
 +/*
 + * PIIX4 ACPI controller emulation
@@ -450,7 +406,7 @@ Index: ioemu/hw/piix4acpi.c
 +													
 +
 +/* PIIX4 acpi pci configuration space, func 3 */
-+void pci_piix4_acpi_init(PCIBus *bus)
++void pci_piix4_acpi_init(PCIBus *bus, int devfn)
 +{
 +    PCIAcpiState *d;
 +    uint8_t *pci_conf;
@@ -458,7 +414,7 @@ Index: ioemu/hw/piix4acpi.c
 +    /* register a function 3 of PIIX4 */
 +    d = (PCIAcpiState *)pci_register_device(
 +        bus, "PIIX4 ACPI", sizeof(PCIAcpiState),
-+        ((PCIDevice *)piix3_state)->devfn + 3, NULL, NULL);
++        devfn, NULL, NULL);
 +
 +    acpi_state = d;
 +    pci_conf = d->dev.config;
@@ -480,18 +436,18 @@ Index: ioemu/hw/piix4acpi.c
 +}
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-08-04 10:35:36.697674145 +0100
-+++ ioemu/vl.c	2006-08-04 10:37:38.001608828 +0100
-@@ -166,6 +166,8 @@
- 
- time_t timeoffset = 0;
- 
+--- ioemu.orig/vl.c	2006-08-06 02:23:45.000000000 +0100
++++ ioemu/vl.c	2006-08-07 17:41:40.613727012 +0100
+@@ -156,7 +156,7 @@
+ #else
+ #define MAX_CPUS 1
+ #endif
+-int acpi_enabled = 1;
 +int acpi_enabled = 0;
-+
- char domain_name[1024] = { 'H','V', 'M', 'X', 'E', 'N', '-'};
- extern int domid;
+ int fd_bootchk = 1;
  
-@@ -4803,6 +4805,7 @@
+ extern int vcpus;
+@@ -5341,6 +5341,7 @@
             "-loadvm file    start right away with a saved state (loadvm in monitor)\n"
  	   "-vnc display    start a VNC server on display\n"
             "-timeoffset     time offset (in seconds) from local time\n"
@@ -499,7 +455,7 @@ Index: ioemu/vl.c
             "\n"
             "During emulation, the following keys are useful:\n"
             "ctrl-alt-f      toggle full screen\n"
-@@ -4894,6 +4897,7 @@
+@@ -5426,6 +5427,7 @@
      QEMU_OPTION_d,
      QEMU_OPTION_vcpus,
      QEMU_OPTION_timeoffset,
@@ -507,7 +463,7 @@ Index: ioemu/vl.c
  };
  
  typedef struct QEMUOption {
-@@ -4973,6 +4977,7 @@
+@@ -5509,6 +5511,7 @@
      { "d", HAS_ARG, QEMU_OPTION_d },
      { "vcpus", 1, QEMU_OPTION_vcpus },
      { "timeoffset", HAS_ARG, QEMU_OPTION_timeoffset },
@@ -515,7 +471,7 @@ Index: ioemu/vl.c
      { NULL },
  };
  
-@@ -5678,6 +5683,9 @@
+@@ -6256,6 +6259,9 @@
              case QEMU_OPTION_timeoffset:
                  timeoffset = strtol(optarg, NULL, 0);
                  break;
@@ -527,9 +483,9 @@ Index: ioemu/vl.c
      }
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-08-04 10:35:36.629682033 +0100
-+++ ioemu/vl.h	2006-08-04 10:36:21.513475699 +0100
-@@ -159,6 +159,7 @@
+--- ioemu.orig/vl.h	2006-08-06 02:23:45.000000000 +0100
++++ ioemu/vl.h	2006-08-07 17:38:47.847289567 +0100
+@@ -167,6 +167,7 @@
  extern int kqemu_allowed;
  extern int win2k_install_hack;
  extern int usb_enabled;
@@ -537,3 +493,46 @@ Index: ioemu/vl.h
  extern int smp_cpus;
  
  /* XXX: make it dynamic */
+Index: ioemu/hw/piix_pci.c
+===================================================================
+--- ioemu.orig/hw/piix_pci.c	2006-08-06 02:29:41.000000000 +0100
++++ ioemu/hw/piix_pci.c	2006-08-07 17:38:57.480198468 +0100
+@@ -241,7 +241,7 @@
+ static uint32_t pci_bios_io_addr;
+ static uint32_t pci_bios_mem_addr;
+ /* host irqs corresponding to PCI irqs A-D */
+-static uint8_t pci_irqs[4] = { 11, 9, 11, 9 };
++static uint8_t pci_irqs[4] = { 10, 11, 10, 11 };
+ 
+ static void pci_config_writel(PCIDevice *d, uint32_t addr, uint32_t val)
+ {
+@@ -336,6 +336,14 @@
+             pci_set_io_region_addr(d, 3, 0x374);
+         }
+         break;
++    case 0x0680:
++        if (vendor_id == 0x8086 && device_id == 0x7113) {
++            /* PIIX4 ACPI PM */
++            pci_config_writew(d, 0x20, 0x0000); /* NO smb bus IO enable in PIIX4 */
++            pci_config_writew(d, 0x22, 0x0000);
++            goto default_map;
++        }
++        break;
+     case 0x0300:
+         if (vendor_id != 0x1234)
+             goto default_map;
+@@ -386,6 +394,14 @@
+         pic_irq = pci_irqs[pin];
+         pci_config_writeb(d, PCI_INTERRUPT_LINE, pic_irq);
+     }
++
++    if (class== 0x0680&& vendor_id == 0x8086 && device_id == 0x7113) {
++         // PIIX4 ACPI PM
++       pci_config_writew(d, 0x20, 0x0000); // NO smb bus IO enable in PIIX4
++       pci_config_writew(d, 0x22, 0x0000);
++       pci_config_writew(d, 0x3c, 0x0009); // Hardcodeed IRQ9
++       pci_config_writew(d, 0x3d, 0x0001);
++    }
+ }
+ 
+ /*

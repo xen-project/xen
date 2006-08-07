@@ -1,8 +1,8 @@
 Index: ioemu/configure
 ===================================================================
---- ioemu.orig/configure	2006-08-03 19:19:38.000000000 +0100
-+++ ioemu/configure	2006-08-03 23:38:19.000000000 +0100
-@@ -226,8 +226,6 @@
+--- ioemu.orig/configure	2006-08-06 02:15:01.771108621 +0100
++++ ioemu/configure	2006-08-06 02:42:26.213918476 +0100
+@@ -228,8 +228,6 @@
    ;;
    --enable-cocoa) cocoa="yes" ; coreaudio="yes" ; sdl="no"
    ;;
@@ -11,7 +11,7 @@ Index: ioemu/configure
    --disable-gcc-check) check_gcc="no"
    ;;
    --disable-system) softmmu="no"
-@@ -736,14 +734,6 @@
+@@ -758,14 +756,6 @@
    target_user_only="yes"
  fi
  

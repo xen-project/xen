@@ -1,7 +1,7 @@
 Index: ioemu/vnc.c
 ===================================================================
---- ioemu.orig/vnc.c	2006-07-26 14:33:57.906165040 +0100
-+++ ioemu/vnc.c	2006-07-26 14:44:09.972552689 +0100
+--- ioemu.orig/vnc.c	2006-08-07 17:44:33.084748631 +0100
++++ ioemu/vnc.c	2006-08-07 17:44:33.224733389 +0100
 @@ -32,6 +32,10 @@
  #include "vnc_keysym.h"
  #include "keymaps.c"
@@ -13,15 +13,16 @@ Index: ioemu/vnc.c
  typedef struct Buffer
  {
      size_t capacity;
-@@ -64,6 +68,7 @@
-     Buffer output;
-     Buffer input;
-     kbd_layout_t *kbd_layout;
-+    int ctl_keys;               /* Ctrl+Alt starts calibration */
+@@ -95,6 +99,8 @@
+     int visible_h;
  
-     VncReadEvent *read_handler;
-     size_t read_handler_expect;
-@@ -679,16 +684,80 @@
+     int slow_client;
++
++    int ctl_keys;               /* Ctrl+Alt starts calibration */
+ };
+ 
+ #define DIRTY_PIXEL_BITS 64
+@@ -794,16 +800,80 @@
  
  static void do_key_event(VncState *vs, int down, uint32_t sym)
  {

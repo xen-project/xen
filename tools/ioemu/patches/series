@@ -26,7 +26,6 @@ shadow-vram
 serial-non-block
 ide-hd-multithread
 domain-timeoffset
-sdl-mouse-invisible-wall
 acpi-support
 acpi-timer-support
 acpi-poweroff-support

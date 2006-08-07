@@ -1,8 +1,8 @@
 Index: ioemu/sdl.c
 ===================================================================
---- ioemu.orig/sdl.c	2006-07-27 11:16:53.590928008 +0100
-+++ ioemu/sdl.c	2006-07-27 11:16:58.124426148 +0100
-@@ -268,14 +268,14 @@
+--- ioemu.orig/sdl.c	2006-08-06 02:03:48.563137711 +0100
++++ ioemu/sdl.c	2006-08-06 02:17:16.063137816 +0100
+@@ -273,14 +273,14 @@
  static void sdl_update_caption(void)
  {
      char buf[1024];
@@ -21,18 +21,18 @@ Index: ioemu/sdl.c
  static void sdl_hide_cursor(void)
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-27 11:16:57.828458912 +0100
-+++ ioemu/vl.c	2006-07-27 11:16:58.126425927 +0100
-@@ -159,6 +159,8 @@
- #define MAX_CPUS 1
- #endif
+--- ioemu.orig/vl.c	2006-08-06 02:16:31.246133963 +0100
++++ ioemu/vl.c	2006-08-06 02:17:31.428424918 +0100
+@@ -158,6 +158,8 @@
+ int acpi_enabled = 1;
+ int fd_bootchk = 1;
  
 +char domain_name[1024] = { 'H','V', 'M', 'X', 'E', 'N', '-'};
 +
  /***********************************************************/
  /* x86 ISA bus support */
  
-@@ -4699,6 +4701,7 @@
+@@ -5235,6 +5237,7 @@
             "-s              wait gdb connection to port %d\n"
             "-p port         change gdb connection port\n"
             "-l item1,...    output log to %s (use -d ? for a list of log items)\n"
@@ -40,7 +40,7 @@ Index: ioemu/vl.c
             "-hdachs c,h,s[,t]  force hard disk 0 physical geometry and the optional BIOS\n"
             "                translation (t=none or lba) (usually qemu can guess them)\n"
             "-L path         set the directory for the BIOS and VGA BIOS\n"
-@@ -4788,6 +4791,7 @@
+@@ -5319,6 +5322,7 @@
      QEMU_OPTION_g,
      QEMU_OPTION_std_vga,
      QEMU_OPTION_monitor,
@@ -48,7 +48,7 @@ Index: ioemu/vl.c
      QEMU_OPTION_serial,
      QEMU_OPTION_parallel,
      QEMU_OPTION_loadvm,
-@@ -4861,6 +4865,7 @@
+@@ -5396,6 +5400,7 @@
      { "localtime", 0, QEMU_OPTION_localtime },
      { "std-vga", 0, QEMU_OPTION_std_vga },
      { "monitor", 1, QEMU_OPTION_monitor },
@@ -56,10 +56,10 @@ Index: ioemu/vl.c
      { "serial", 1, QEMU_OPTION_serial },
      { "parallel", 1, QEMU_OPTION_parallel },
      { "loadvm", HAS_ARG, QEMU_OPTION_loadvm },
-@@ -5484,6 +5489,9 @@
- 		    exit(1);
- 		}
- 		break;
+@@ -6062,6 +6067,9 @@
+             case QEMU_OPTION_no_acpi:
+                 acpi_enabled = 0;
+                 break;
 +            case QEMU_OPTION_domainname:
 +                strncat(domain_name, optarg, sizeof(domain_name) - 20);
 +                break;
@@ -68,9 +68,9 @@ Index: ioemu/vl.c
      }
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-07-27 11:16:57.682475072 +0100
-+++ ioemu/vl.h	2006-07-27 11:16:58.127425816 +0100
-@@ -1094,4 +1094,5 @@
+--- ioemu.orig/vl.h	2006-08-06 02:15:39.711878977 +0100
++++ ioemu/vl.h	2006-08-06 02:17:16.068137258 +0100
+@@ -1185,4 +1185,5 @@
  
  void kqemu_record_dump(void);
  

@@ -1,8 +1,8 @@
 Index: ioemu/hw/vga.c
 ===================================================================
---- ioemu.orig/hw/vga.c	2006-07-26 15:17:39.821306797 +0100
-+++ ioemu/hw/vga.c	2006-07-26 15:17:40.017285449 +0100
-@@ -1287,6 +1287,105 @@
+--- ioemu.orig/hw/vga.c	2006-08-06 02:23:29.824472464 +0100
++++ ioemu/hw/vga.c	2006-08-06 02:23:33.873021159 +0100
+@@ -1359,6 +1359,105 @@
      }
  }
  
@@ -108,7 +108,7 @@ Index: ioemu/hw/vga.c
  /* 
   * graphic modes
   */
-@@ -1382,6 +1481,11 @@
+@@ -1454,6 +1553,11 @@
      printf("w=%d h=%d v=%d line_offset=%d cr[0x09]=0x%02x cr[0x17]=0x%02x linecmp=%d sr[0x01]=0x%02x\n",
             width, height, v, line_offset, s->cr[9], s->cr[0x17], s->line_compare, s->sr[0x01]);
  #endif
@@ -120,7 +120,7 @@ Index: ioemu/hw/vga.c
      addr1 = (s->start_addr * 4);
      bwidth = width * 4;
      y_start = -1;
-@@ -1830,6 +1934,14 @@
+@@ -1889,6 +1993,14 @@
  
      vga_reset(s);
  
@@ -137,9 +137,9 @@ Index: ioemu/hw/vga.c
      s->vram_size = vga_ram_size;
 Index: ioemu/hw/vga_int.h
 ===================================================================
---- ioemu.orig/hw/vga_int.h	2006-07-26 15:17:39.822306688 +0100
-+++ ioemu/hw/vga_int.h	2006-07-26 15:17:40.017285449 +0100
-@@ -76,6 +76,7 @@
+--- ioemu.orig/hw/vga_int.h	2006-08-06 02:23:29.824472464 +0100
++++ ioemu/hw/vga_int.h	2006-08-06 02:23:33.874021048 +0100
+@@ -79,6 +79,7 @@
  
  #define VGA_STATE_COMMON                                                \
      uint8_t *vram_ptr;                                                  \

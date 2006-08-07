@@ -1,8 +1,8 @@
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-27 11:16:57.756466882 +0100
-+++ ioemu/vl.c	2006-07-27 11:16:57.828458912 +0100
-@@ -4698,7 +4698,7 @@
+--- ioemu.orig/vl.c	2006-08-06 02:15:48.550893605 +0100
++++ ioemu/vl.c	2006-08-06 02:16:31.246133963 +0100
+@@ -5234,7 +5234,7 @@
             "-S              freeze CPU at startup (use 'c' to start execution)\n"
             "-s              wait gdb connection to port %d\n"
             "-p port         change gdb connection port\n"
@@ -11,7 +11,7 @@ Index: ioemu/vl.c
             "-hdachs c,h,s[,t]  force hard disk 0 physical geometry and the optional BIOS\n"
             "                translation (t=none or lba) (usually qemu can guess them)\n"
             "-L path         set the directory for the BIOS and VGA BIOS\n"
-@@ -4776,7 +4776,7 @@
+@@ -5307,7 +5307,7 @@
      QEMU_OPTION_S,
      QEMU_OPTION_s,
      QEMU_OPTION_p,
@@ -20,7 +20,7 @@ Index: ioemu/vl.c
      QEMU_OPTION_hdachs,
      QEMU_OPTION_L,
  #ifdef USE_CODE_COPY
-@@ -4845,7 +4845,7 @@
+@@ -5380,7 +5380,7 @@
      { "S", 0, QEMU_OPTION_S },
      { "s", 0, QEMU_OPTION_s },
      { "p", HAS_ARG, QEMU_OPTION_p },
@@ -29,16 +29,16 @@ Index: ioemu/vl.c
      { "hdachs", HAS_ARG, QEMU_OPTION_hdachs },
      { "L", HAS_ARG, QEMU_OPTION_L },
  #ifdef USE_CODE_COPY
-@@ -5096,6 +5096,8 @@
-     char usb_devices[MAX_VM_USB_PORTS][128];
+@@ -5640,6 +5640,8 @@
+     char usb_devices[MAX_USB_CMDLINE][128];
      int usb_devices_index;
  
 +    char qemu_dm_logfilename[64];
 +
      LIST_INIT (&vm_change_state_head);
- #if !defined(CONFIG_SOFTMMU)
-     /* we never want that malloc() uses mmap() */
-@@ -5145,6 +5147,11 @@
+ #ifndef _WIN32
+     {
+@@ -5715,6 +5717,11 @@
      nb_nics = 0;
      /* default mac address of the first network interface */
      
@@ -50,7 +50,7 @@ Index: ioemu/vl.c
      optind = 1;
      for(;;) {
          if (optind >= argc)
-@@ -5330,7 +5337,7 @@
+@@ -5905,7 +5912,7 @@
                      exit(1);
                  }
                  break;
@@ -59,12 +59,3 @@ Index: ioemu/vl.c
                  {
                      int mask;
                      CPULogItem *item;
-@@ -5701,7 +5708,7 @@
-         stk.ss_flags = 0;
- 
-         if (sigaltstack(&stk, NULL) < 0) {
--            perror("sigaltstack");
-+            fprintf(logfile, "sigaltstack returned error %d\n", errno);
-             exit(1);
-         }
-     }

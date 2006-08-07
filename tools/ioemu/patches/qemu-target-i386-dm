@@ -1,8 +1,8 @@
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2006-07-28 09:56:49.468301708 +0100
-+++ ioemu/Makefile.target	2006-07-28 09:56:58.486281629 +0100
-@@ -57,6 +57,8 @@
+--- ioemu.orig/Makefile.target	2006-08-06 02:14:09.794902973 +0100
++++ ioemu/Makefile.target	2006-08-06 02:21:42.270461924 +0100
+@@ -62,6 +62,8 @@
  QEMU_SYSTEM=qemu-fast
  endif
  
@@ -11,7 +11,7 @@ Index: ioemu/Makefile.target
  ifdef CONFIG_USER_ONLY
  PROGS=$(QEMU_USER)
  else
-@@ -274,6 +276,9 @@
+@@ -291,6 +293,9 @@
  OBJS+=gdbstub.o
  endif
  
@@ -21,20 +21,20 @@ Index: ioemu/Makefile.target
  all: $(PROGS)
  
  $(QEMU_USER): $(OBJS)
-@@ -328,7 +333,7 @@
+@@ -349,7 +354,7 @@
  ifeq ($(TARGET_BASE_ARCH), i386)
  # Hardware support
  VL_OBJS+= ide.o pckbd.o ps2.o vga.o $(SOUND_HW) dma.o $(AUDIODRV)
 -VL_OBJS+= fdc.o mc146818rtc.o serial.o i8259.o i8254.o pcspk.o pc.o
 +VL_OBJS+= fdc.o mc146818rtc.o serial.o i8254.o pcspk.o pc.o
- VL_OBJS+= cirrus_vga.o mixeng.o apic.o parallel.o
+ VL_OBJS+= cirrus_vga.o mixeng.o apic.o parallel.o acpi.o piix_pci.o
+ VL_OBJS+= usb-uhci.o
  DEFINES += -DHAS_AUDIO
- endif
 Index: ioemu/configure
 ===================================================================
---- ioemu.orig/configure	2006-07-28 09:56:49.469301595 +0100
-+++ ioemu/configure	2006-07-28 09:56:49.486299672 +0100
-@@ -359,6 +359,8 @@
+--- ioemu.orig/configure	2006-08-06 02:14:09.795902861 +0100
++++ ioemu/configure	2006-08-06 02:15:01.771108621 +0100
+@@ -373,6 +373,8 @@
      if [ "$user" = "yes" ] ; then
          target_list="i386-user arm-user armeb-user sparc-user ppc-user mips-user mipsel-user $target_list"
      fi
@@ -45,12 +45,12 @@ Index: ioemu/configure
  fi
 Index: ioemu/monitor.c
 ===================================================================
---- ioemu.orig/monitor.c	2006-07-28 09:56:49.472301255 +0100
-+++ ioemu/monitor.c	2006-07-28 09:56:58.720255164 +0100
-@@ -1142,6 +1142,10 @@
-       "", "show host USB devices", },
-     { "profile", "", do_info_profile,
+--- ioemu.orig/monitor.c	2006-08-06 02:14:49.574468309 +0100
++++ ioemu/monitor.c	2006-08-06 02:21:16.172371202 +0100
+@@ -1262,6 +1262,10 @@
        "", "show profiling information", },
+     { "capture", "", do_info_capture,
+       "show capture information" },
 +#ifdef CONFIG_DM
 +    { "hvmiopage", "", sp_info,
 +      "", "show HVM device model shared page info", },
@@ -60,8 +60,8 @@ Index: ioemu/monitor.c
  
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-28 09:56:49.475300916 +0100
-+++ ioemu/vl.c	2006-07-28 09:56:58.917232883 +0100
+--- ioemu.orig/vl.c	2006-08-06 02:14:09.802902081 +0100
++++ ioemu/vl.c	2006-08-06 02:21:16.369349244 +0100
 @@ -87,7 +87,7 @@
  
  #include "exec-all.h"
@@ -71,7 +71,7 @@ Index: ioemu/vl.c
  
  //#define DEBUG_UNUSED_IOPORT
  //#define DEBUG_IOPORT
-@@ -4382,7 +4382,7 @@
+@@ -4918,7 +4918,7 @@
  
  static QEMUResetEntry *first_reset_entry;
  static int reset_requested;
@@ -80,7 +80,7 @@ Index: ioemu/vl.c
  static int powerdown_requested;
  
  void qemu_register_reset(QEMUResetHandler *func, void *opaque)
-@@ -4534,6 +4534,7 @@
+@@ -5067,6 +5067,7 @@
                      qemu_get_clock(rt_clock));
  }
  
@@ -88,7 +88,7 @@ Index: ioemu/vl.c
  static CPUState *cur_cpu;
  
  int main_loop(void)
-@@ -4608,6 +4609,7 @@
+@@ -5141,6 +5142,7 @@
      cpu_disable_ticks();
      return ret;
  }
@@ -98,18 +98,18 @@ Index: ioemu/vl.c
  {
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-07-28 09:56:49.281322859 +0100
-+++ ioemu/vl.h	2006-07-28 09:56:58.917232883 +0100
-@@ -38,6 +38,8 @@
+--- ioemu.orig/vl.h	2006-08-06 02:13:56.733359091 +0100
++++ ioemu/vl.h	2006-08-06 02:21:16.369349244 +0100
+@@ -37,6 +37,8 @@
+ #include <unistd.h>
  #include <fcntl.h>
  #include <sys/stat.h>
- #include "audio/audio.h"
 +#include "xenctrl.h"
 +#include "xs.h"
  
  #ifndef O_LARGEFILE
  #define O_LARGEFILE 0
-@@ -131,6 +133,11 @@
+@@ -139,6 +141,11 @@
  
  void main_loop_wait(int timeout);
  
@@ -121,7 +121,7 @@ Index: ioemu/vl.h
  extern int ram_size;
  extern int bios_size;
  extern int rtc_utc;
-@@ -814,6 +821,7 @@
+@@ -873,6 +880,7 @@
  uint32_t pic_intack_read(PicState2 *s);
  void pic_info(void);
  void irq_info(void);
@@ -132,7 +132,7 @@ Index: ioemu/vl.h
 Index: ioemu/target-i386-dm/cpu.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/cpu.h	2006-07-28 09:56:58.572271903 +0100
++++ ioemu/target-i386-dm/cpu.h	2006-08-06 02:21:16.023387810 +0100
 @@ -0,0 +1,86 @@
 +/*
 + * i386 virtual CPU header
@@ -223,7 +223,7 @@ Index: ioemu/target-i386-dm/cpu.h
 Index: ioemu/target-i386-dm/exec-dm.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/exec-dm.c	2006-07-28 09:58:22.882736989 +0100
++++ ioemu/target-i386-dm/exec-dm.c	2006-08-06 02:21:16.024387698 +0100
 @@ -0,0 +1,516 @@
 +/*
 + *  virtual page mapping and translated block handling
@@ -744,7 +744,7 @@ Index: ioemu/target-i386-dm/exec-dm.c
 Index: ioemu/target-i386-dm/helper2.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/helper2.c	2006-07-28 09:56:58.312301309 +0100
++++ ioemu/target-i386-dm/helper2.c	2006-08-06 02:21:15.779415007 +0100
 @@ -0,0 +1,464 @@
 +/*
 + *  i386 helpers (without register variable usage)
@@ -1213,7 +1213,7 @@ Index: ioemu/target-i386-dm/helper2.c
 Index: ioemu/target-i386-dm/i8259-dm.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/i8259-dm.c	2006-07-28 09:56:49.492298993 +0100
++++ ioemu/target-i386-dm/i8259-dm.c	2006-08-06 02:15:01.777107952 +0100
 @@ -0,0 +1,107 @@
 +/* Xen 8259 stub for interrupt controller emulation
 + * 
@@ -1325,7 +1325,7 @@ Index: ioemu/target-i386-dm/i8259-dm.c
 Index: ioemu/target-i386-dm/qemu-dm.debug
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/qemu-dm.debug	2006-07-28 09:56:49.493298880 +0100
++++ ioemu/target-i386-dm/qemu-dm.debug	2006-08-06 02:15:01.778107841 +0100
 @@ -0,0 +1,5 @@
 +#!/bin/sh
 +
@@ -1335,7 +1335,7 @@ Index: ioemu/target-i386-dm/qemu-dm.debug
 Index: ioemu/target-i386-dm/qemu-ifup
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/qemu-ifup	2006-07-28 09:56:49.493298880 +0100
++++ ioemu/target-i386-dm/qemu-ifup	2006-08-06 02:15:01.778107841 +0100
 @@ -0,0 +1,10 @@
 +#!/bin/sh
 +

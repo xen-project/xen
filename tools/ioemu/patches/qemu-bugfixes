@@ -1,8 +1,8 @@
 Index: ioemu/console.c
 ===================================================================
---- ioemu.orig/console.c	2006-07-27 11:16:53.732912290 +0100
-+++ ioemu/console.c	2006-07-27 11:16:57.753467214 +0100
-@@ -449,7 +449,7 @@
+--- ioemu.orig/console.c	2006-08-06 02:03:45.803444993 +0100
++++ ioemu/console.c	2006-08-06 02:15:48.546894051 +0100
+@@ -505,7 +505,7 @@
              c++;
          }
      }
@@ -11,7 +11,7 @@ Index: ioemu/console.c
      s->cells = cells;
  }
  
-@@ -954,11 +954,21 @@
+@@ -1032,11 +1032,21 @@
      return !active_console->text_console;
  }
  
@@ -34,8 +34,8 @@ Index: ioemu/console.c
      static int color_inited;
  
      chr = qemu_mallocz(sizeof(CharDriverState));
-@@ -976,12 +986,7 @@
- 
+@@ -1058,12 +1068,7 @@
+     
      if (!color_inited) {
          color_inited = 1;
 -        for(j = 0; j < 2; j++) {
@@ -48,23 +48,11 @@ Index: ioemu/console.c
      }
      s->y_displayed = 0;
      s->y_base = 0;
-Index: ioemu/usb-linux.c
-===================================================================
---- ioemu.orig/usb-linux.c	2006-07-27 11:16:53.732912290 +0100
-+++ ioemu/usb-linux.c	2006-07-27 11:16:57.754467103 +0100
-@@ -26,6 +26,7 @@
- #if defined(__linux__)
- #include <dirent.h>
- #include <sys/ioctl.h>
-+#define __user /* new versions of usbdevice_fs.h use this private attribute */
- #include <linux/usbdevice_fs.h>
- #include <linux/version.h>
- 
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-27 11:16:57.681475183 +0100
-+++ ioemu/vl.c	2006-07-27 11:17:33.279534373 +0100
-@@ -3201,6 +3201,7 @@
+--- ioemu.orig/vl.c	2006-08-06 02:15:39.711878977 +0100
++++ ioemu/vl.c	2006-08-06 02:15:48.550893605 +0100
+@@ -3671,6 +3671,7 @@
              if (net_tap_fd_init(vlan, fd))
                  ret = 0;
          } else {

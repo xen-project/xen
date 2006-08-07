@@ -1,16 +1,16 @@
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-27 11:16:58.126425927 +0100
-+++ ioemu/vl.c	2006-07-27 11:16:58.296407110 +0100
-@@ -160,6 +160,7 @@
- #endif
+--- ioemu.orig/vl.c	2006-08-06 02:17:31.428424918 +0100
++++ ioemu/vl.c	2006-08-06 02:18:12.550840673 +0100
+@@ -159,6 +159,7 @@
+ int fd_bootchk = 1;
  
  char domain_name[1024] = { 'H','V', 'M', 'X', 'E', 'N', '-'};
 +extern int domid;
  
  /***********************************************************/
  /* x86 ISA bus support */
-@@ -4701,6 +4702,7 @@
+@@ -5237,6 +5238,7 @@
             "-s              wait gdb connection to port %d\n"
             "-p port         change gdb connection port\n"
             "-l item1,...    output log to %s (use -d ? for a list of log items)\n"
@@ -18,25 +18,25 @@ Index: ioemu/vl.c
             "-domain-name    domain name that we're serving\n"
             "-hdachs c,h,s[,t]  force hard disk 0 physical geometry and the optional BIOS\n"
             "                translation (t=none or lba) (usually qemu can guess them)\n"
-@@ -4804,6 +4806,8 @@
-     QEMU_OPTION_usbdevice,
+@@ -5336,6 +5338,8 @@
      QEMU_OPTION_smp,
      QEMU_OPTION_vnc,
+     QEMU_OPTION_no_acpi,
 +
 +    QEMU_OPTION_d,
  };
  
  typedef struct QEMUOption {
-@@ -4879,6 +4883,8 @@
-     /* temporary options */
+@@ -5415,6 +5419,8 @@
      { "usb", 0, QEMU_OPTION_usb },
      { "cirrusvga", 0, QEMU_OPTION_cirrusvga },
+     { "no-acpi", 0, QEMU_OPTION_no_acpi },
 +    
 +    { "d", HAS_ARG, QEMU_OPTION_d },
      { NULL },
  };
  
-@@ -5492,6 +5498,10 @@
+@@ -6070,6 +6076,10 @@
              case QEMU_OPTION_domainname:
                  strncat(domain_name, optarg, sizeof(domain_name) - 20);
                  break;

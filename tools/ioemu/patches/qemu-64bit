@@ -1,7 +1,7 @@
 Index: ioemu/cpu-all.h
 ===================================================================
---- ioemu.orig/cpu-all.h	2006-07-26 13:19:49.515051864 +0100
-+++ ioemu/cpu-all.h	2006-07-26 13:19:49.563046860 +0100
+--- ioemu.orig/cpu-all.h	2006-08-06 02:14:09.796902750 +0100
++++ ioemu/cpu-all.h	2006-08-06 02:15:39.707879423 +0100
 @@ -822,7 +822,7 @@
  
  /* memory API */
@@ -13,9 +13,9 @@ Index: ioemu/cpu-all.h
  extern uint8_t *phys_ram_dirty;
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2006-07-26 13:19:49.516051760 +0100
-+++ ioemu/hw/pc.c	2006-07-26 13:19:49.564046755 +0100
-@@ -147,7 +147,7 @@
+--- ioemu.orig/hw/pc.c	2006-08-06 02:14:09.797902638 +0100
++++ ioemu/hw/pc.c	2006-08-06 02:15:39.708879311 +0100
+@@ -155,7 +155,7 @@
  }
  
  /* hd_table must contain 4 block drivers */
@@ -24,7 +24,7 @@ Index: ioemu/hw/pc.c
  {
      RTCState *s = rtc_state;
      int val;
-@@ -604,7 +604,7 @@
+@@ -610,7 +610,7 @@
  }
  
  /* PC hardware initialisation */
@@ -33,7 +33,7 @@ Index: ioemu/hw/pc.c
                       DisplayState *ds, const char **fd_filename, int snapshot,
                       const char *kernel_filename, const char *kernel_cmdline,
                       const char *initrd_filename,
-@@ -853,7 +853,7 @@
+@@ -882,7 +882,7 @@
      }
  }
  
@@ -42,7 +42,7 @@ Index: ioemu/hw/pc.c
                          DisplayState *ds, const char **fd_filename, 
                          int snapshot, 
                          const char *kernel_filename, 
-@@ -866,7 +866,7 @@
+@@ -895,7 +895,7 @@
               initrd_filename, 1);
  }
  
@@ -53,9 +53,9 @@ Index: ioemu/hw/pc.c
                          const char *kernel_filename, 
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-26 13:19:49.552048007 +0100
-+++ ioemu/vl.c	2006-07-26 13:19:49.566046547 +0100
-@@ -123,7 +123,7 @@
+--- ioemu.orig/vl.c	2006-08-06 02:15:31.040845624 +0100
++++ ioemu/vl.c	2006-08-06 02:15:39.711878977 +0100
+@@ -122,7 +122,7 @@
  const char* keyboard_layout = NULL;
  int64_t ticks_per_sec;
  int boot_device = 'c';
@@ -64,7 +64,7 @@ Index: ioemu/vl.c
  int pit_min_timer_count = 0;
  int nb_nics;
  NICInfo nd_table[MAX_NICS];
-@@ -5320,7 +5320,7 @@
+@@ -5895,7 +5895,7 @@
                  help();
                  break;
              case QEMU_OPTION_m:
@@ -75,9 +75,9 @@ Index: ioemu/vl.c
                  if (ram_size > PHYS_RAM_MAX_SIZE) {
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-07-26 13:19:49.552048007 +0100
-+++ ioemu/vl.h	2006-07-26 13:19:49.567046443 +0100
-@@ -138,7 +138,7 @@
+--- ioemu.orig/vl.h	2006-08-06 02:15:10.368150219 +0100
++++ ioemu/vl.h	2006-08-06 02:15:39.711878977 +0100
+@@ -146,7 +146,7 @@
  extern int xc_handle;
  extern int domid;
  
@@ -86,7 +86,7 @@ Index: ioemu/vl.h
  extern int bios_size;
  extern int rtc_utc;
  extern int cirrus_vga_enabled;
-@@ -542,7 +542,7 @@
+@@ -561,7 +561,7 @@
  
  #ifndef QEMU_TOOL
  
@@ -97,9 +97,9 @@ Index: ioemu/vl.h
               const char *kernel_filename, const char *kernel_cmdline,
 Index: ioemu/hw/vga.c
 ===================================================================
---- ioemu.orig/hw/vga.c	2006-07-26 13:19:49.549048319 +0100
-+++ ioemu/hw/vga.c	2006-07-26 13:20:17.956085603 +0100
-@@ -1293,7 +1293,8 @@
+--- ioemu.orig/hw/vga.c	2006-08-06 02:15:10.364150665 +0100
++++ ioemu/hw/vga.c	2006-08-06 02:15:39.712878866 +0100
+@@ -1365,7 +1365,8 @@
  static void vga_draw_graphic(VGAState *s, int full_update)
  {
      int y1, y, update, page_min, page_max, linesize, y_start, double_scan, mask;

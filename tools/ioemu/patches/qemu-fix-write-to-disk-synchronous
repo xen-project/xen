@@ -1,7 +1,7 @@
 Index: ioemu/block-vmdk.c
 ===================================================================
---- ioemu.orig/block-vmdk.c	2006-07-14 13:43:45.000000000 +0100
-+++ ioemu/block-vmdk.c	2006-08-04 10:27:15.368803650 +0100
+--- ioemu.orig/block-vmdk.c	2006-08-06 02:03:45.756450226 +0100
++++ ioemu/block-vmdk.c	2006-08-06 02:42:31.884286728 +0100
 @@ -96,7 +96,7 @@
      uint32_t magic;
      int l1_size;
@@ -13,8 +13,8 @@ Index: ioemu/block-vmdk.c
          if (fd < 0)
 Index: ioemu/block-qcow.c
 ===================================================================
---- ioemu.orig/block-qcow.c	2006-07-14 13:43:45.000000000 +0100
-+++ ioemu/block-qcow.c	2006-08-04 10:27:15.367803766 +0100
+--- ioemu.orig/block-qcow.c	2006-08-06 02:03:45.754450449 +0100
++++ ioemu/block-qcow.c	2006-08-06 02:42:31.885286616 +0100
 @@ -95,7 +95,7 @@
      int fd, len, i, shift;
      QCowHeader header;
@@ -26,8 +26,8 @@ Index: ioemu/block-qcow.c
          if (fd < 0)
 Index: ioemu/block-bochs.c
 ===================================================================
---- ioemu.orig/block-bochs.c	2006-07-14 13:43:45.000000000 +0100
-+++ ioemu/block-bochs.c	2006-08-04 10:27:15.345806311 +0100
+--- ioemu.orig/block-bochs.c	2006-08-06 01:55:02.225741179 +0100
++++ ioemu/block-bochs.c	2006-08-06 02:42:31.885286616 +0100
 @@ -91,7 +91,7 @@
      int fd, i;
      struct bochs_header bochs;
@@ -39,9 +39,9 @@ Index: ioemu/block-bochs.c
          if (fd < 0)
 Index: ioemu/block.c
 ===================================================================
---- ioemu.orig/block.c	2006-08-03 19:19:39.000000000 +0100
-+++ ioemu/block.c	2006-08-04 10:27:15.357804923 +0100
-@@ -677,7 +677,7 @@
+--- ioemu.orig/block.c	2006-08-06 02:42:18.880735483 +0100
++++ ioemu/block.c	2006-08-06 02:42:31.886286505 +0100
+@@ -685,7 +685,7 @@
      int rv;
  #endif
  
@@ -52,8 +52,8 @@ Index: ioemu/block.c
          if (fd < 0)
 Index: ioemu/block-cow.c
 ===================================================================
---- ioemu.orig/block-cow.c	2006-07-14 13:43:45.000000000 +0100
-+++ ioemu/block-cow.c	2006-08-04 10:27:15.366803882 +0100
+--- ioemu.orig/block-cow.c	2006-08-06 02:03:45.751450783 +0100
++++ ioemu/block-cow.c	2006-08-06 02:42:31.886286505 +0100
 @@ -69,7 +69,7 @@
      struct cow_header_v2 cow_header;
      int64_t size;
@@ -65,8 +65,8 @@ Index: ioemu/block-cow.c
          if (fd < 0)
 Index: ioemu/block-cloop.c
 ===================================================================
---- ioemu.orig/block-cloop.c	2006-07-14 13:43:45.000000000 +0100
-+++ ioemu/block-cloop.c	2006-08-04 10:27:15.365803997 +0100
+--- ioemu.orig/block-cloop.c	2006-08-06 01:55:02.226741067 +0100
++++ ioemu/block-cloop.c	2006-08-06 02:42:31.886286505 +0100
 @@ -55,7 +55,7 @@
      BDRVCloopState *s = bs->opaque;
      uint32_t offsets_size,max_compressed_block_size=1,i;

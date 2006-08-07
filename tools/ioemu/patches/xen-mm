@@ -1,8 +1,8 @@
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2006-08-04 10:53:02.019794255 +0100
-+++ ioemu/hw/pc.c	2006-08-04 10:54:56.876531492 +0100
-@@ -639,7 +639,9 @@
+--- ioemu.orig/hw/pc.c	2006-08-06 02:15:39.708879311 +0100
++++ ioemu/hw/pc.c	2006-08-06 02:18:18.875135656 +0100
+@@ -646,7 +646,9 @@
      }
  
      /* allocate RAM */
@@ -12,7 +12,7 @@ Index: ioemu/hw/pc.c
  
      /* BIOS load */
      bios_offset = ram_size + vga_ram_size;
-@@ -671,8 +673,10 @@
+@@ -678,8 +680,10 @@
      ret = load_image(buf, phys_ram_base + vga_bios_offset);
      
      /* setup basic memory access */
@@ -25,20 +25,20 @@ Index: ioemu/hw/pc.c
      isa_bios_size = bios_size;
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-08-04 10:53:02.472741926 +0100
-+++ ioemu/vl.c	2006-08-04 10:55:48.361590787 +0100
-@@ -159,6 +159,8 @@
- #define MAX_CPUS 1
- #endif
+--- ioemu.orig/vl.c	2006-08-06 02:18:12.550840673 +0100
++++ ioemu/vl.c	2006-08-06 02:18:45.608155528 +0100
+@@ -158,6 +158,8 @@
+ int acpi_enabled = 1;
+ int fd_bootchk = 1;
  
 +int xc_handle;
 +
  char domain_name[1024] = { 'H','V', 'M', 'X', 'E', 'N', '-'};
  extern int domid;
  
-@@ -5106,6 +5108,9 @@
+@@ -5650,6 +5652,9 @@
      QEMUMachine *machine;
-     char usb_devices[MAX_VM_USB_PORTS][128];
+     char usb_devices[MAX_USB_CMDLINE][128];
      int usb_devices_index;
 +    unsigned long nr_pages;
 +    xen_pfn_t *page_array;
@@ -46,7 +46,7 @@ Index: ioemu/vl.c
  
      char qemu_dm_logfilename[64];
  
-@@ -5342,11 +5347,13 @@
+@@ -5917,11 +5922,13 @@
                  ram_size = atol(optarg) * 1024 * 1024;
                  if (ram_size <= 0)
                      help();
@@ -60,7 +60,7 @@ Index: ioemu/vl.c
                  break;
              case QEMU_OPTION_l:
                  {
-@@ -5560,6 +5567,41 @@
+@@ -6133,12 +6140,49 @@
      /* init the memory */
      phys_ram_size = ram_size + vga_ram_size + bios_size;
  
@@ -99,12 +99,11 @@ Index: ioemu/vl.c
 +
 +#else  /* !CONFIG_DM */
 +
- #ifdef CONFIG_SOFTMMU
      phys_ram_base = qemu_vmalloc(phys_ram_size);
      if (!phys_ram_base) {
-@@ -5600,6 +5642,8 @@
+         fprintf(stderr, "Could not allocate physical memory\n");
+         exit(1);
      }
- #endif
  
 +#endif /* !CONFIG_DM */
 +
