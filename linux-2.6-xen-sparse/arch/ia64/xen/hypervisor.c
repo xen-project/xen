@@ -35,6 +35,7 @@ shared_info_t *HYPERVISOR_shared_info = (shared_info_t *)XSI_BASE;
 EXPORT_SYMBOL(HYPERVISOR_shared_info);
 
 start_info_t *xen_start_info;
+EXPORT_SYMBOL(xen_start_info);
 
 int running_on_xen;
 EXPORT_SYMBOL(running_on_xen);
@@ -91,6 +92,7 @@ ia64_xenmem_reservation_op(unsigned long op,
 	}
 	return ret;
 }
+EXPORT_SYMBOL(ia64_xenmem_reservation_op);
 
 //XXX same as i386, x86_64 contiguous_bitmap_set(), contiguous_bitmap_clear()
 // move those to lib/contiguous_bitmap?
@@ -379,12 +381,13 @@ HYPERVISOR_grant_table_op(unsigned int cmd, void *uop, unsigned int count)
 
 	return ____HYPERVISOR_grant_table_op(cmd, uop, count);
 }
-
+EXPORT_SYMBOL(HYPERVISOR_grant_table_op);
 
 ///////////////////////////////////////////////////////////////////////////
 // PageForeign(), SetPageForeign(), ClearPageForeign()
 
 struct address_space xen_ia64_foreign_dummy_mapping;
+EXPORT_SYMBOL(xen_ia64_foreign_dummy_mapping);
 
 ///////////////////////////////////////////////////////////////////////////
 // foreign mapping
