@@ -33,9 +33,7 @@ LIBS      += -lcrypto
 LIBS      += -lz
 LIBS      += -L$(XEN_XENSTORE) -lxenstore
 
-AIOLIBS   := -L $(LIBAIO_DIR)
-AIOLIBS   += -laio
-AIOLIBS   += -static
+AIOLIBS   := $(LIBAIO_DIR)/libaio.a
 
 BLK-OBJS  := block-aio.o 
 BLK-OBJS  += block-sync.o 
