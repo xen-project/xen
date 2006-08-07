@@ -69,5 +69,5 @@ static int __init mcheck_enable(char *str)
 	return 0;
 }
 
-__setup("nomce", mcheck_disable);
-__setup("mce", mcheck_enable);
+custom_param("nomce", mcheck_disable);
+custom_param("mce", mcheck_enable);
