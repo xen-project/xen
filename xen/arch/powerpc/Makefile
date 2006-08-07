@@ -83,6 +83,9 @@ physdev.o: ../x86/physdev.c
 
 HDRS += $(wildcard *.h)
 
+CMDLINE = "xen"
+boot_of.o: CFLAGS += -DCMDLINE="\"$(CMDLINE)\""
+
 start.o: boot/start.S
 	$(CC) $(CFLAGS) -D__ASSEMBLY__ -c $< -o $@
 
