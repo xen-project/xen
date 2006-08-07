@@ -141,7 +141,9 @@ static int read_otherend_details(struct xenbus_device *xendev,
 	}
 	if (strlen(xendev->otherend) == 0 ||
 	    !xenbus_exists(XBT_NIL, xendev->otherend, "")) {
-		xenbus_dev_fatal(xendev, -ENOENT, "missing other end from %s",
+		xenbus_dev_fatal(xendev, -ENOENT,
+				 "unable to read other end from %s.  "
+				 "missing or inaccessible.",
 				 xendev->nodename);
 		free_otherend_details(xendev);
 		return -ENOENT;

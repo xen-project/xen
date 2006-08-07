@@ -22,7 +22,7 @@
 #include <xen/lib.h>
 #include <xen/console.h>
 #include <public/xen.h>
-#include <xen/compile.h>
+#include <xen/version.h>
 #include <xen/sched.h>
 
 void show_registers(struct cpu_user_regs *regs)
@@ -32,7 +32,7 @@ void show_registers(struct cpu_user_regs *regs)
     console_start_sync();
     
     printk("----[ Xen-%d.%d%s     ]----\n",
-           XEN_VERSION, XEN_SUBVERSION, XEN_EXTRAVERSION);
+           xen_major_version(), xen_minor_version(), xen_extra_version());
     printk("CPU: %08x   DOMID: %08x\n",
            smp_processor_id(), current->domain->domain_id);
     printk("pc %016lx msr %016lx\n"

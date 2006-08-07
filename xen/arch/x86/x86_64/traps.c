@@ -1,6 +1,6 @@
 
 #include <xen/config.h>
-#include <xen/compile.h>
+#include <xen/version.h>
 #include <xen/init.h>
 #include <xen/sched.h>
 #include <xen/lib.h>
@@ -10,7 +10,7 @@
 #include <xen/symbols.h>
 #include <xen/console.h>
 #include <xen/sched.h>
-#include <xen/reboot.h>
+#include <xen/shutdown.h>
 #include <xen/nmi.h>
 #include <asm/current.h>
 #include <asm/flushtlb.h>
@@ -45,7 +45,7 @@ void show_registers(struct cpu_user_regs *regs)
     }
 
     printk("----[ Xen-%d.%d%s    %s ]----\n",
-           XEN_VERSION, XEN_SUBVERSION, XEN_EXTRAVERSION,
+           xen_major_version(), xen_minor_version(), xen_extra_version(),
            print_tainted(taint_str));
     printk("CPU:    %d\nRIP:    %04x:[<%016lx>]",
            smp_processor_id(), fault_regs.cs, fault_regs.rip);
@@ -128,7 +128,7 @@ asmlinkage void do_double_fault(struct cpu_user_regs *regs)
 
     /* Find information saved during fault and dump it to the console. */
     printk("*** DOUBLE FAULT: Xen-%d.%d%s    %s\n",
-           XEN_VERSION, XEN_SUBVERSION, XEN_EXTRAVERSION,
+           xen_major_version(), xen_minor_version(), xen_extra_version(),
            print_tainted(taint_str));
     printk("CPU:    %d\nRIP:    %04x:[<%016lx>]",
            cpu, regs->cs, regs->rip);
@@ -432,7 +432,7 @@ long do_set_callbacks(unsigned long event_address,
     return 0;
 }
 
-void hypercall_page_initialise(void *hypercall_page)
+static void hypercall_page_initialise_ring3_kernel(void *hypercall_page)
 {
     char *p;
     int i;
@@ -463,6 +463,14 @@ void hypercall_page_initialise(void *hypercall_page)
     *(u8  *)(p+ 4) = 0xb8;    /* mov  $__HYPERVISOR_iret,%eax */
     *(u32 *)(p+ 5) = __HYPERVISOR_iret;
     *(u16 *)(p+ 9) = 0x050f;  /* syscall */
+}
+
+void hypercall_page_initialise(struct domain *d, void *hypercall_page)
+{
+    if ( hvm_guest(d->vcpu[0]) )
+        hvm_hypercall_page_initialise(d, hypercall_page);
+    else
+        hypercall_page_initialise_ring3_kernel(hypercall_page);
 }
 
 /*

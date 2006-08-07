@@ -44,7 +44,6 @@ static PITState *pit;
 #ifndef CONFIG_DM
 static IOAPICState *ioapic;
 #endif /* !CONFIG_DM */
-static USBPort *usb_root_ports[2];
 
 static void ioport80_write(void *opaque, uint32_t addr, uint32_t data)
 {
@@ -63,10 +62,19 @@ static void ioportF0_write(void *opaque, uint32_t addr, uint32_t data)
 }
 
 /* TSC handling */
-
 uint64_t cpu_get_tsc(CPUX86State *env)
 {
-    return qemu_get_clock(vm_clock);
+    /* Note: when using kqemu, it is more logical to return the host TSC
+       because kqemu does not trap the RDTSC instruction for
+       performance reasons */
+#if USE_KQEMU
+    if (env->kqemu_enabled) {
+        return cpu_get_real_ticks();
+    } else 
+#endif
+    {
+        return cpu_get_ticks();
+    }
 }
 
 #ifndef CONFIG_DM
@@ -201,6 +209,8 @@ static void cmos_init(uint64_t ram_size, int boot_device, BlockDriverState **hd_
     case 'a':
     case 'b':
         rtc_set_memory(s, 0x3d, 0x01); /* floppy boot */
+        if (!fd_bootchk)
+            rtc_set_memory(s, 0x38, 0x01); /* disable signature check */
         break;
     default:
     case 'c':
@@ -272,10 +282,6 @@ static void cmos_init(uint64_t ram_size, int boot_device, BlockDriverState **hd_
         }
     }
     rtc_set_memory(s, 0x39, val);
-
-    /* Disable check of 0x55AA signature on the last two bytes of
-       first sector of disk. XXX: make it the default ? */
-    //    rtc_set_memory(s, 0x38, 1);
 }
 
 void ioport_set_a20(int enable)
@@ -567,7 +573,7 @@ static int parallel_io[MAX_PARALLEL_PORTS] = { 0x378, 0x278, 0x3bc };
 static int parallel_irq[MAX_PARALLEL_PORTS] = { 7, 7, 7 };
 
 /* PIIX4 acpi pci configuration space, func 3 */
-extern void pci_piix4_acpi_init(PCIBus *bus);
+extern void pci_piix4_acpi_init(PCIBus *bus, int devfn);
 
 #ifdef HAS_AUDIO
 static void audio_init (PCIBus *pci_bus)
@@ -630,6 +636,7 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, int boot_device,
     int bios_size, isa_bios_size;
 #endif /* !NOBIOS */
     PCIBus *pci_bus;
+    int piix3_devfn = -1;
     CPUState *env;
     NICInfo *nd;
 
@@ -774,7 +781,7 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, int boot_device,
 
     if (pci_enabled) {
         pci_bus = i440fx_init();
-        piix3_init(pci_bus);
+        piix3_devfn = piix3_init(pci_bus);
     } else {
         pci_bus = NULL;
     }
@@ -852,7 +859,7 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, int boot_device,
     }
 
     if (pci_enabled) {
-        pci_piix3_ide_init(pci_bus, bs_table);
+        pci_piix3_ide_init(pci_bus, bs_table, piix3_devfn + 1);
     } else {
         for(i = 0; i < 2; i++) {
             isa_ide_init(ide_iobase[i], ide_iobase2[i], ide_irq[i],
@@ -871,18 +878,40 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, int boot_device,
     cmos_init(ram_size, boot_device, bs_table, timeoffset);
 
     /* using PIIX4 acpi model */
-    if (pci_enabled)
-        pci_piix4_acpi_init(pci_bus);
+    if (pci_enabled && acpi_enabled)
+        pci_piix4_acpi_init(pci_bus, piix3_devfn + 3);
 
     if (pci_enabled && usb_enabled) {
-        usb_uhci_init(pci_bus, usb_root_ports);
-        usb_attach(usb_root_ports[0], vm_usb_hub);
+        usb_uhci_init(pci_bus, piix3_devfn + 2);
     }
 
+    if (pci_enabled && acpi_enabled && 0) {
+        piix4_pm_init(pci_bus, piix3_devfn + 3);
+    }
+
+#if 0
+    /* ??? Need to figure out some way for the user to
+       specify SCSI devices.  */
+    if (pci_enabled) {
+        void *scsi;
+        BlockDriverState *bdrv;
+
+        scsi = lsi_scsi_init(pci_bus, -1);
+        bdrv = bdrv_new("scsidisk");
+        bdrv_open(bdrv, "scsi_disk.img", 0);
+        lsi_scsi_attach(scsi, bdrv, -1);
+        bdrv = bdrv_new("scsicd");
+        bdrv_open(bdrv, "scsi_cd.iso", 0);
+        bdrv_set_type_hint(bdrv, BDRV_TYPE_CDROM);
+        lsi_scsi_attach(scsi, bdrv, -1);
+    }
+#endif
     /* must be done after all PCI devices are instanciated */
     /* XXX: should be done in the Bochs BIOS */
     if (pci_enabled) {
         pci_bios_init();
+        if (acpi_enabled)
+            acpi_bios_init();
     }
 }
 

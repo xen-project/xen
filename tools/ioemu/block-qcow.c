@@ -95,7 +95,7 @@ static int qcow_open(BlockDriverState *bs, const char *filename)
     int fd, len, i, shift;
     QCowHeader header;
     
-    fd = open(filename, O_RDWR | O_BINARY | O_LARGEFILE);
+    fd = open(filename, O_RDWR | O_BINARY | O_LARGEFILE | O_SYNC);
     if (fd < 0) {
         fd = open(filename, O_RDONLY | O_BINARY | O_LARGEFILE);
         if (fd < 0)
@@ -693,6 +693,12 @@ int qcow_compress_cluster(BlockDriverState *bs, int64_t sector_num,
     return 0;
 }
 
+static void qcow_flush(BlockDriverState *bs)
+{
+    BDRVQcowState *s = bs->opaque;
+    fsync(s->fd);
+}
+
 BlockDriver bdrv_qcow = {
     "qcow",
     sizeof(BDRVQcowState),
@@ -702,6 +708,7 @@ BlockDriver bdrv_qcow = {
     qcow_write,
     qcow_close,
     qcow_create,
+    qcow_flush,
     qcow_is_allocated,
     qcow_set_key,
     qcow_make_empty

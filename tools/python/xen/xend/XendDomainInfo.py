@@ -943,6 +943,8 @@ class XendDomainInfo:
     def shutdown(self, reason):
         if not reason in shutdown_reasons.values():
             raise XendError('Invalid reason: %s' % reason)
+        if self.domid == 0:
+            raise XendError("Can't specify Domain-0")
         self.storeDom("control/shutdown", reason)
 
 

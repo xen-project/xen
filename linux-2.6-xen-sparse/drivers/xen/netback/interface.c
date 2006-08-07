@@ -36,46 +36,74 @@
 
 static void __netif_up(netif_t *netif)
 {
-	struct net_device *dev = netif->dev;
-	netif_tx_lock_bh(dev);
-	netif->active = 1;
-	netif_tx_unlock_bh(dev);
 	enable_irq(netif->irq);
 	netif_schedule_work(netif);
 }
 
 static void __netif_down(netif_t *netif)
 {
-	struct net_device *dev = netif->dev;
 	disable_irq(netif->irq);
-	netif_tx_lock_bh(dev);
-	netif->active = 0;
-	netif_tx_unlock_bh(dev);
 	netif_deschedule_work(netif);
 }
 
 static int net_open(struct net_device *dev)
 {
 	netif_t *netif = netdev_priv(dev);
-	if (netif->status == CONNECTED)
+	if (netif_carrier_ok(dev))
 		__netif_up(netif);
-	netif_start_queue(dev);
 	return 0;
 }
 
 static int net_close(struct net_device *dev)
 {
 	netif_t *netif = netdev_priv(dev);
-	netif_stop_queue(dev);
-	if (netif->status == CONNECTED)
+	if (netif_carrier_ok(dev))
 		__netif_down(netif);
 	return 0;
+}
+
+static int netbk_change_mtu(struct net_device *dev, int mtu)
+{
+	int max = netbk_can_sg(dev) ? 65535 - ETH_HLEN : ETH_DATA_LEN;
+
+	if (mtu > max)
+		return -EINVAL;
+	dev->mtu = mtu;
+	return 0;
+}
+
+static int netbk_set_sg(struct net_device *dev, u32 data)
+{
+	if (data) {
+		netif_t *netif = netdev_priv(dev);
+
+		if (!(netif->features & NETIF_F_SG))
+			return -ENOSYS;
+	}
+
+	return ethtool_op_set_sg(dev, data);
+}
+
+static int netbk_set_tso(struct net_device *dev, u32 data)
+{
+	if (data) {
+		netif_t *netif = netdev_priv(dev);
+
+		if (!(netif->features & NETIF_F_TSO))
+			return -ENOSYS;
+	}
+
+	return ethtool_op_set_tso(dev, data);
 }
 
 static struct ethtool_ops network_ethtool_ops =
 {
 	.get_tx_csum = ethtool_op_get_tx_csum,
 	.set_tx_csum = ethtool_op_set_tx_csum,
+	.get_sg = ethtool_op_get_sg,
+	.set_sg = netbk_set_sg,
+	.get_tso = ethtool_op_get_tso,
+	.set_tso = netbk_set_tso,
 	.get_link = ethtool_op_get_link,
 };
 
@@ -93,11 +121,12 @@ netif_t *netif_alloc(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN])
 		return ERR_PTR(-ENOMEM);
 	}
 
+	netif_carrier_off(dev);
+
 	netif = netdev_priv(dev);
 	memset(netif, 0, sizeof(*netif));
 	netif->domid  = domid;
 	netif->handle = handle;
-	netif->status = DISCONNECTED;
 	atomic_set(&netif->refcnt, 1);
 	init_waitqueue_head(&netif->waiting_to_free);
 	netif->dev = dev;
@@ -110,12 +139,16 @@ netif_t *netif_alloc(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN])
 	dev->get_stats       = netif_be_get_stats;
 	dev->open            = net_open;
 	dev->stop            = net_close;
+	dev->change_mtu	     = netbk_change_mtu;
 	dev->features        = NETIF_F_IP_CSUM;
 
 	SET_ETHTOOL_OPS(dev, &network_ethtool_ops);
 
-	/* Disable queuing. */
-	dev->tx_queue_len = 0;
+	/*
+	 * Reduce default TX queuelen so that each guest interface only
+	 * allows it to eat around 6.4MB of host memory.
+	 */
+	dev->tx_queue_len = 100;
 
 	for (i = 0; i < ETH_ALEN; i++)
 		if (be_mac[i] != 0)
@@ -256,11 +289,9 @@ int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 	netif->rx_req_cons_peek = 0;
 
 	netif_get(netif);
-	wmb(); /* Other CPUs see new state before interface is started. */
 
 	rtnl_lock();
-	netif->status = CONNECTED;
-	wmb();
+	netif_carrier_on(netif->dev);
 	if (netif_running(netif->dev))
 		__netif_up(netif);
 	rtnl_unlock();
@@ -296,20 +327,13 @@ static void netif_free(netif_t *netif)
 
 void netif_disconnect(netif_t *netif)
 {
-	switch (netif->status) {
-	case CONNECTED:
+	if (netif_carrier_ok(netif->dev)) {
 		rtnl_lock();
-		netif->status = DISCONNECTING;
-		wmb();
+		netif_carrier_off(netif->dev);
 		if (netif_running(netif->dev))
 			__netif_down(netif);
 		rtnl_unlock();
 		netif_put(netif);
-		/* fall through */
-	case DISCONNECTED:
-		netif_free(netif);
-		break;
-	default:
-		BUG();
 	}
+	netif_free(netif);
 }

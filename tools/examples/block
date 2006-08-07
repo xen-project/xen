@@ -239,8 +239,11 @@ case "$command" in
       exit 0
     fi
 
-    p=$(xenstore_read "$XENBUS_PATH/params")
-    mode=$(xenstore_read "$XENBUS_PATH/mode")
+    if [ -n "$t" ]
+    then
+      p=$(xenstore_read "$XENBUS_PATH/params")
+      mode=$(xenstore_read "$XENBUS_PATH/mode")
+    fi
 
     case $t in 
       phy)
@@ -370,6 +373,13 @@ mount it read-write in a guest domain."
         release_lock "block"
         exit 0
 	;;
+
+      "")
+        claim_lock "block"
+        success
+        echo happy gun \"$t\" >>/tmp/block.$$
+        release_lock "block"
+	;;
     esac
     ;;
 
@@ -383,6 +393,10 @@ mount it read-write in a guest domain."
         node=$(xenstore_read "$XENBUS_PATH/node")
 	losetup -d "$node"
 	exit 0
+	;;
+
+      "")
+        exit 0
 	;;
     esac
     ;;

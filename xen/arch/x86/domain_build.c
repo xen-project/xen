@@ -15,7 +15,7 @@
 #include <xen/elf.h>
 #include <xen/kernel.h>
 #include <xen/domain.h>
-#include <xen/compile.h>
+#include <xen/version.h>
 #include <xen/iocap.h>
 #include <xen/bitops.h>
 #include <asm/regs.h>
@@ -704,7 +704,7 @@ int construct_dom0(struct domain *d,
             return -1;
         }
 
-        hypercall_page_initialise((void *)hypercall_page);
+        hypercall_page_initialise(d, (void *)hypercall_page);
     }
 
     /* Copy the initial ramdisk. */
@@ -726,7 +726,8 @@ int construct_dom0(struct domain *d,
     si->nr_pt_frames = nr_pt_pages;
     si->mfn_list     = vphysmap_start;
     sprintf(si->magic, "xen-%i.%i-x86_%d%s",
-            XEN_VERSION, XEN_SUBVERSION, BITS_PER_LONG, xen_pae ? "p" : "");
+            xen_major_version(), xen_minor_version(),
+            BITS_PER_LONG, xen_pae ? "p" : "");
 
     /* Write the phys->machine and machine->phys table entries. */
     for ( pfn = 0; pfn < d->tot_pages; pfn++ )

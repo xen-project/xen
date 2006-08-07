@@ -1,0 +1,14 @@
+/Makefile/1.1/Fri Jul 14 12:43:45 2006//Trelease_0_8_2
+/README/1.8/Sun Aug  6 01:03:54 2006//Trelease_0_8_2
+/bios.bin/1.14/Sun Aug  6 01:03:55 2006/-kb/Trelease_0_8_2
+/bios.diff/1.12/Sun Aug  6 01:03:55 2006//Trelease_0_8_2
+/linux_boot.S/1.1/Fri Jul 14 12:43:45 2006//Trelease_0_8_2
+/linux_boot.bin/1.1/Sun Aug  6 01:03:55 2006/-kb/Trelease_0_8_2
+/ohw.diff/1.2/Fri Jul 14 12:43:45 2006//Trelease_0_8_2
+/openbios-sparc32/1.1/Wed Jun 14 12:36:32 2006/-kb/Trelease_0_8_2
+/ppc_rom.bin/1.6/Sun Aug  6 01:04:00 2006/-kb/Trelease_0_8_2
+/vgabios-cirrus.bin/1.8/Sun Aug  6 01:04:00 2006/-kb/Trelease_0_8_2
+/vgabios.bin/1.8/Sun Aug  6 01:04:00 2006/-kb/Trelease_0_8_2
+/vgabios.diff/1.5/Sun Aug  6 01:04:00 2006//Trelease_0_8_2
+/video.x/1.1/Sun Aug  6 01:04:00 2006/-kb/Trelease_0_8_2
+D

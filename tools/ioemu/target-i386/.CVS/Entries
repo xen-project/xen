@@ -1,0 +1,13 @@
+/cpu.h/1.36/Wed Jul 26 12:39:11 2006//Trelease_0_8_2
+/exec.h/1.30/Sun Aug  6 01:04:03 2006//Trelease_0_8_2
+/helper.c/1.69/Sun Aug  6 01:04:03 2006//Trelease_0_8_2
+/helper2.c/1.43/Sun Aug  6 01:04:03 2006//Trelease_0_8_2
+/op.c/1.45/Sun Aug  6 01:04:03 2006//Trelease_0_8_2
+/opreg_template.h/1.3/Fri Jul 14 12:43:46 2006//Trelease_0_8_2
+/ops_mem.h/1.7/Fri Jul 14 12:43:46 2006//Trelease_0_8_2
+/ops_sse.h/1.6/Fri Jul 14 12:43:46 2006//Trelease_0_8_2
+/ops_template.h/1.10/Fri Jul 14 12:43:46 2006//Trelease_0_8_2
+/ops_template_mem.h/1.6/Fri Jul 14 12:43:46 2006//Trelease_0_8_2
+/translate-copy.c/1.7/Fri Jul 14 12:43:46 2006//Trelease_0_8_2
+/translate.c/1.59/Sun Aug  6 01:04:03 2006//Trelease_0_8_2
+D

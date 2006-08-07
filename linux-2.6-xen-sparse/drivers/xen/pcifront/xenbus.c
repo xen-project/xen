@@ -7,6 +7,7 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <xen/xenbus.h>
+#include <xen/gnttab.h>
 #include "pcifront.h"
 
 #define INVALID_GRANT_REF (0)
@@ -283,11 +284,10 @@ static struct xenbus_driver xenbus_pcifront_driver = {
 
 static int __init pcifront_init(void)
 {
-	int err = 0;
+	if (!is_running_on_xen())
+		return -ENODEV;
 
-	err = xenbus_register_frontend(&xenbus_pcifront_driver);
-
-	return err;
+	return xenbus_register_frontend(&xenbus_pcifront_driver);
 }
 
 /* Initialize after the Xen PCI Frontend Stub is initialized */

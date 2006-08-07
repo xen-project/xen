@@ -105,7 +105,7 @@ static int pcifront_bus_read(struct pci_bus *bus, unsigned int devfn,
 		.size   = size,
 	};
 	struct pcifront_sd *sd = bus->sysdata;
-	struct pcifront_device *pdev = sd->pdev;
+	struct pcifront_device *pdev = pcifront_get_pdev(sd);
 
 	if (verbose_request)
 		dev_info(&pdev->xdev->dev,
@@ -144,7 +144,7 @@ static int pcifront_bus_write(struct pci_bus *bus, unsigned int devfn,
 		.value  = val,
 	};
 	struct pcifront_sd *sd = bus->sysdata;
-	struct pcifront_device *pdev = sd->pdev;
+	struct pcifront_device *pdev = pcifront_get_pdev(sd);
 
 	if (verbose_request)
 		dev_info(&pdev->xdev->dev,
@@ -207,12 +207,13 @@ int pcifront_scan_root(struct pcifront_device *pdev,
 		err = -ENOMEM;
 		goto err_out;
 	}
-	sd->domain = domain;
-	sd->pdev = pdev;
+	pcifront_init_sd(sd, domain, pdev);
 
-	b = pci_scan_bus_parented(&pdev->xdev->dev, bus, &pcifront_bus_ops, sd);
+	b = pci_scan_bus_parented(&pdev->xdev->dev, bus,
+				  &pcifront_bus_ops, sd);
 	if (!b) {
-		dev_err(&pdev->xdev->dev, "Error creating PCI Frontend Bus!\n");
+		dev_err(&pdev->xdev->dev,
+			"Error creating PCI Frontend Bus!\n");
 		err = -ENOMEM;
 		goto err_out;
 	}

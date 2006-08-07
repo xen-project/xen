@@ -1,0 +1,20 @@
+/alsaaudio.c/1.7/Sun Aug  6 01:03:49 2006//Trelease_0_8_2
+/audio.c/1.14/Sun Aug  6 01:03:50 2006//Trelease_0_8_2
+/audio.h/1.8/Sun Aug  6 01:03:50 2006//Trelease_0_8_2
+/audio_int.h/1.10/Sun Aug  6 01:03:50 2006//Trelease_0_8_2
+/audio_template.h/1.8/Sun Aug  6 01:03:50 2006//Trelease_0_8_2
+/coreaudio.c/1.7/Sun Aug  6 01:03:50 2006//Trelease_0_8_2
+/dsound_template.h/1.4/Sun Aug  6 01:03:50 2006//Trelease_0_8_2
+/dsoundaudio.c/1.3/Sun Aug  6 01:03:50 2006//Trelease_0_8_2
+/fmodaudio.c/1.7/Sun Aug  6 01:03:50 2006//Trelease_0_8_2
+/mixeng.c/1.4/Fri Jul 14 12:43:45 2006//Trelease_0_8_2
+/mixeng.h/1.2/Fri Jul 14 12:43:45 2006//Trelease_0_8_2
+/mixeng_template.h/1.2/Fri Jul 14 12:43:45 2006//Trelease_0_8_2
+/noaudio.c/1.7/Sun Aug  6 01:03:50 2006//Trelease_0_8_2
+/ossaudio.c/1.11/Sun Aug  6 01:03:50 2006//Trelease_0_8_2
+/rate_template.h/1.3/Sun Aug  6 01:03:50 2006//Trelease_0_8_2
+/sdlaudio.c/1.8/Sun Aug  6 01:03:50 2006//Trelease_0_8_2
+/sys-queue.h/1.1/Fri Jul 14 12:43:45 2006//Trelease_0_8_2
+/wavaudio.c/1.8/Sun Aug  6 01:03:50 2006//Trelease_0_8_2
+/wavcapture.c/1.5/Sat Jul 22 17:06:44 2006//Trelease_0_8_2
+D

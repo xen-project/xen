@@ -1,10 +1,10 @@
 Index: ioemu/hw/piix4acpi.c
 ===================================================================
---- ioemu.orig/hw/piix4acpi.c	2006-07-12 11:35:03.574468946 +0100
-+++ ioemu/hw/piix4acpi.c	2006-07-12 11:35:03.631461806 +0100
+--- ioemu.orig/hw/piix4acpi.c	2006-08-06 02:30:29.288761563 +0100
++++ ioemu/hw/piix4acpi.c	2006-08-06 02:30:42.131331446 +0100
 @@ -45,6 +45,10 @@
  #define GBL_RLS           (1 << 2)
- #define SLP_EN   	  (1 << 13)
+ #define SLP_EN            (1 << 13)
  
 +/* Bits of PM1a register define here  */
 +#define SLP_TYP_MASK    0x1C00
@@ -13,7 +13,7 @@ Index: ioemu/hw/piix4acpi.c
  typedef struct AcpiDeviceState AcpiDeviceState;
  AcpiDeviceState *acpi_device_table;
  
-@@ -270,7 +274,14 @@
+@@ -190,7 +194,14 @@
      s->pm1_control = (val<<8)||(s->pm1_control);
  /*    printf("acpiPm1ControlP1_writeb \n addr %x val:%x\n", addr, val); */
  
@@ -29,7 +29,7 @@ Index: ioemu/hw/piix4acpi.c
  
  static uint32_t acpiPm1ControlP1_readb(void *opaque, uint32_t addr)
  {
-@@ -337,7 +348,14 @@
+@@ -257,7 +268,14 @@
      s->pm1_control = val;
  /*    printf("acpiPm1Control_writew \n addr %x val:%x\n", addr, val); */
  

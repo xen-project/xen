@@ -1,7 +1,8 @@
-diff -r e1dce5114e92 monitor.c
---- a/monitor.c	Mon Jun 26 16:04:15 2006 +0100
-+++ b/monitor.c	Mon Jun 26 16:04:26 2006 +0100
-@@ -306,6 +306,7 @@ static void do_info_history (void)
+Index: ioemu/monitor.c
+===================================================================
+--- ioemu.orig/monitor.c	2006-08-06 02:22:01.487319736 +0100
++++ ioemu/monitor.c	2006-08-06 02:23:02.269544103 +0100
+@@ -308,6 +308,7 @@
  
  static void do_quit(void)
  {
@@ -9,10 +10,11 @@ diff -r e1dce5114e92 monitor.c
      exit(0);
  }
  
-diff -r e1dce5114e92 target-i386-dm/helper2.c
---- a/target-i386-dm/helper2.c	Mon Jun 26 16:04:15 2006 +0100
-+++ b/target-i386-dm/helper2.c	Mon Jun 26 16:04:26 2006 +0100
-@@ -483,5 +483,25 @@ int main_loop(void)
+Index: ioemu/target-i386-dm/helper2.c
+===================================================================
+--- ioemu.orig/target-i386-dm/helper2.c	2006-08-06 02:22:59.251880493 +0100
++++ ioemu/target-i386-dm/helper2.c	2006-08-06 02:23:02.270543991 +0100
+@@ -483,5 +483,25 @@
                               shared_page->vcpu_iodata[send_vcpu].dm_eport);
          }
      }
@@ -38,10 +40,11 @@ diff -r e1dce5114e92 target-i386-dm/helper2.c
 +        xc_interface_close(xcHandle);
 +    }
 +}
-diff -r e1dce5114e92 vl.h
---- a/vl.h	Mon Jun 26 16:04:15 2006 +0100
-+++ b/vl.h	Mon Jun 26 16:04:26 2006 +0100
-@@ -1098,4 +1098,7 @@ void kqemu_record_dump(void);
+Index: ioemu/vl.h
+===================================================================
+--- ioemu.orig/vl.h	2006-08-06 02:22:59.255880047 +0100
++++ ioemu/vl.h	2006-08-06 02:23:02.271543880 +0100
+@@ -1189,4 +1189,7 @@
  void kqemu_record_dump(void);
  
  extern char domain_name[];

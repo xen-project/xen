@@ -8,7 +8,7 @@
 
 #include <stdarg.h>
 #include <xen/config.h>
-#include <xen/compile.h>
+#include <xen/version.h>
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
@@ -21,6 +21,7 @@
 #include <xen/mm.h>
 #include <xen/delay.h>
 #include <xen/guest_access.h>
+#include <xen/shutdown.h>
 #include <asm/current.h>
 #include <asm/debugger.h>
 #include <asm/io.h>
@@ -488,14 +489,14 @@ void init_console(void)
     serial_set_rx_handler(sercon_handle, serial_rx);
 
     /* HELLO WORLD --- start-of-day banner text. */
-    printk(XEN_BANNER);
+    printk(xen_banner());
     printk(" http://www.cl.cam.ac.uk/netos/xen\n");
     printk(" University of Cambridge Computer Laboratory\n\n");
     printk(" Xen version %d.%d%s (%s@%s) (%s) %s\n",
-           XEN_VERSION, XEN_SUBVERSION, XEN_EXTRAVERSION,
-           XEN_COMPILE_BY, XEN_COMPILE_DOMAIN,
-           XEN_COMPILER, XEN_COMPILE_DATE);
-    printk(" Latest ChangeSet: %s\n\n", XEN_CHANGESET);
+           xen_major_version(), xen_minor_version(), xen_extra_version(),
+           xen_compile_by(), xen_compile_domain(),
+           xen_compiler(), xen_compile_date());
+    printk(" Latest ChangeSet: %s\n\n", xen_changeset());
     set_printk_prefix("(XEN) ");
 
     if ( opt_sync_console )
@@ -730,14 +731,24 @@ void panic(const char *fmt, ...)
     printk("Panic on CPU %d:\n", smp_processor_id());
     printk(buf);
     printk("****************************************\n\n");
-    printk("Reboot in five seconds...\n");
+    if ( opt_noreboot )
+        printk("Manual reset required ('noreboot' specified)\n");
+    else
+        printk("Reboot in five seconds...\n");
     spin_unlock_irqrestore(&lock, flags);
 
     debugger_trap_immediate();
 
-    watchdog_disable();
-    mdelay(5000);
-    machine_restart(0);
+    if ( opt_noreboot )
+    {
+        machine_halt();
+    }
+    else
+    {
+        watchdog_disable();
+        mdelay(5000);
+        machine_restart(NULL);
+    }
 }
 
 void __bug(char *file, int line)

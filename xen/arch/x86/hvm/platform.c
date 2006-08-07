@@ -827,7 +827,6 @@ void handle_mmio(unsigned long va, unsigned long gpa)
 
     /* Copy current guest state into io instruction state structure. */
     memcpy(regs, guest_cpu_user_regs(), HVM_CONTEXT_STACK_BYTES);
-
     hvm_store_cpu_guest_regs(v, regs, NULL);
 
     if ((inst_len = hvm_instruction_length(v)) <= 0) {
@@ -1033,6 +1032,34 @@ void handle_mmio(unsigned long va, unsigned long gpa)
         printf("Unhandled MMIO instruction\n");
         domain_crash_synchronous();
     }
+}
+
+DEFINE_PER_CPU(int, guest_handles_in_xen_space);
+
+/* Note that copy_{to,from}_user_hvm don't set the A and D bits on
+   PTEs, and require the PTE to be writable even when they're only
+   trying to read from it.  The guest is expected to deal with
+   this. */
+unsigned long copy_to_user_hvm(void *to, const void *from, unsigned len)
+{
+    if ( this_cpu(guest_handles_in_xen_space) )
+    {
+        memcpy(to, from, len);
+        return 0;
+    }
+
+    return !hvm_copy((void *)from, (unsigned long)to, len, HVM_COPY_OUT);
+}
+
+unsigned long copy_from_user_hvm(void *to, const void *from, unsigned len)
+{
+    if ( this_cpu(guest_handles_in_xen_space) )
+    {
+        memcpy(to, from, len);
+        return 0;
+    }
+
+    return !hvm_copy(to, (unsigned long)from, len, HVM_COPY_IN);
 }
 
 /*

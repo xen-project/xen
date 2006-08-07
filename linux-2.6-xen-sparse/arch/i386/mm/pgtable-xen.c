@@ -694,6 +694,7 @@ void _arch_exit_mmap(struct mm_struct *mm)
 	task_unlock(tsk);
 
 	if (test_bit(PG_pinned, &virt_to_page(mm->pgd)->flags) &&
-	    (atomic_read(&mm->mm_count) == 1))
+	    (atomic_read(&mm->mm_count) == 1) &&
+	    !mm->context.has_foreign_mappings)
 		mm_unpin(mm);
 }

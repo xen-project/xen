@@ -1,0 +1,18 @@
+/.cvsignore/1.4/Fri Jul 14 12:43:46 2006//Trelease_0_8_2
+/Makefile/1.37/Sun Aug  6 01:04:06 2006//Trelease_0_8_2
+/hello-arm.c/1.1/Fri Jul 14 12:43:46 2006//Trelease_0_8_2
+/hello-i386.c/1.1/Fri Jul 14 12:43:46 2006//Trelease_0_8_2
+/linux-test.c/1.3/Fri Jul 14 12:43:46 2006//Trelease_0_8_2
+/pi_10.com/1.1/Sun Aug  6 01:04:06 2006/-kb/Trelease_0_8_2
+/qruncom.c/1.4/Fri Jul 14 12:43:46 2006//Trelease_0_8_2
+/runcom.c/1.3/Fri Jul 14 12:43:46 2006//Trelease_0_8_2
+/sha1.c/1.1/Fri Jul 14 12:43:46 2006//Trelease_0_8_2
+/test-i386-code16.S/1.3/Fri Jul 14 12:43:46 2006//Trelease_0_8_2
+/test-i386-muldiv.h/1.2/Fri Jul 14 12:43:46 2006//Trelease_0_8_2
+/test-i386-shift.h/1.5/Fri Jul 14 12:43:46 2006//Trelease_0_8_2
+/test-i386-vm86.S/1.1/Fri Jul 14 12:43:46 2006//Trelease_0_8_2
+/test-i386.c/1.52/Sun Aug  6 01:04:06 2006//Trelease_0_8_2
+/test-i386.h/1.2/Fri Jul 14 12:43:46 2006//Trelease_0_8_2
+/test_path.c/1.1/Fri Jul 14 12:43:46 2006//Trelease_0_8_2
+/testthread.c/1.2/Fri Jul 14 12:43:46 2006//Trelease_0_8_2
+D

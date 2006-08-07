@@ -819,7 +819,7 @@ unsigned long hypercall_create_continuation(
 #if defined(__i386__)
         regs->eax  = op;
 
-        if ( supervisor_mode_kernel )
+        if ( supervisor_mode_kernel || hvm_guest(current) )
             regs->eip &= ~31; /* re-execute entire hypercall entry stub */
         else
             regs->eip -= 2;   /* re-execute 'int 0x82' */

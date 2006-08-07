@@ -429,7 +429,7 @@ long arch_do_dom0_op(struct dom0_op *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
         ret = 0;
 
         hypercall_page = map_domain_page(mfn);
-        hypercall_page_initialise(hypercall_page);
+        hypercall_page_initialise(d, hypercall_page);
         unmap_domain_page(hypercall_page);
 
         put_page_and_type(mfn_to_page(mfn));

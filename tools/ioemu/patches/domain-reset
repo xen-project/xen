@@ -1,7 +1,7 @@
 Index: ioemu/target-i386-dm/helper2.c
 ===================================================================
---- ioemu.orig/target-i386-dm/helper2.c	2006-07-27 11:16:57.527492229 +0100
-+++ ioemu/target-i386-dm/helper2.c	2006-07-27 11:16:59.381287013 +0100
+--- ioemu.orig/target-i386-dm/helper2.c	2006-08-06 02:21:15.779415007 +0100
++++ ioemu/target-i386-dm/helper2.c	2006-08-06 02:22:59.251880493 +0100
 @@ -123,6 +123,25 @@
  /* called from main_cpu_reset */
  void cpu_reset(CPUX86State *env)
@@ -41,9 +41,9 @@ Index: ioemu/target-i386-dm/helper2.c
          /* Wait up to 10 msec. */
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-27 11:16:59.317294097 +0100
-+++ ioemu/vl.c	2006-07-27 11:16:59.384286681 +0100
-@@ -4412,7 +4412,7 @@
+--- ioemu.orig/vl.c	2006-08-06 02:22:56.618174081 +0100
++++ ioemu/vl.c	2006-08-06 02:22:59.254880158 +0100
+@@ -4948,7 +4948,7 @@
  } QEMUResetEntry;
  
  static QEMUResetEntry *first_reset_entry;
@@ -54,9 +54,9 @@ Index: ioemu/vl.c
  
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-07-27 11:16:58.127425816 +0100
-+++ ioemu/vl.h	2006-07-27 11:16:59.384286681 +0100
-@@ -122,6 +122,7 @@
+--- ioemu.orig/vl.h	2006-08-06 02:22:01.501318175 +0100
++++ ioemu/vl.h	2006-08-06 02:22:59.255880047 +0100
+@@ -130,6 +130,7 @@
  
  void qemu_register_reset(QEMUResetHandler *func, void *opaque);
  void qemu_system_reset_request(void);
@@ -64,7 +64,7 @@ Index: ioemu/vl.h
  void qemu_system_shutdown_request(void);
  void qemu_system_powerdown_request(void);
  #if !defined(TARGET_SPARC)
-@@ -131,6 +132,8 @@
+@@ -139,6 +140,8 @@
  void qemu_system_powerdown(void);
  #endif
  

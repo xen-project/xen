@@ -83,9 +83,6 @@ void vmx_io_assist(struct vcpu *v)
 
     p = &vio->vp_ioreq;
 
-    if (p->state == STATE_IORESP_HOOK)
-	panic_domain(vcpu_regs(v),"Not supported: No hook available for DM request\n");
-
     if (test_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags)) {
 	if (p->state != STATE_IORESP_READY) {
 	    /* Can't block here, for the same reason as other places to

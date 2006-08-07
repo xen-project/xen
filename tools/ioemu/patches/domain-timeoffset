@@ -1,7 +1,7 @@
 Index: ioemu/hw/mc146818rtc.c
 ===================================================================
---- ioemu.orig/hw/mc146818rtc.c	2006-07-27 11:17:18.007225084 +0100
-+++ ioemu/hw/mc146818rtc.c	2006-07-27 11:17:48.250876949 +0100
+--- ioemu.orig/hw/mc146818rtc.c	2006-08-07 17:44:43.593604340 +0100
++++ ioemu/hw/mc146818rtc.c	2006-08-07 17:44:47.594168708 +0100
 @@ -178,10 +178,27 @@
      }
  }
@@ -46,9 +46,9 @@ Index: ioemu/hw/mc146818rtc.c
  static void rtc_copy_date(RTCState *s)
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2006-07-27 11:17:47.993905398 +0100
-+++ ioemu/hw/pc.c	2006-07-27 11:17:48.251876839 +0100
-@@ -151,7 +151,7 @@
+--- ioemu.orig/hw/pc.c	2006-08-07 17:44:47.324198106 +0100
++++ ioemu/hw/pc.c	2006-08-07 17:44:54.830380715 +0100
+@@ -159,7 +159,7 @@
  }
  
  /* hd_table must contain 4 block drivers */
@@ -57,7 +57,7 @@ Index: ioemu/hw/pc.c
  {
      RTCState *s = rtc_state;
      int val;
-@@ -162,6 +162,7 @@
+@@ -170,6 +170,7 @@
  
      /* set the CMOS date */
      time(&ti);
@@ -65,7 +65,7 @@ Index: ioemu/hw/pc.c
      if (rtc_utc)
          tm = gmtime(&ti);
      else
-@@ -613,7 +614,7 @@
+@@ -619,7 +620,7 @@
  static void pc_init1(uint64_t ram_size, int vga_ram_size, int boot_device,
                       DisplayState *ds, const char **fd_filename, int snapshot,
                       const char *kernel_filename, const char *kernel_cmdline,
@@ -74,7 +74,7 @@ Index: ioemu/hw/pc.c
                       int pci_enabled)
  {
  #ifndef NOBIOS
-@@ -864,7 +865,7 @@
+@@ -871,7 +872,7 @@
  
      floppy_controller = fdctrl_init(6, 2, 0, 0x3f0, fd_table);
  
@@ -82,8 +82,8 @@ Index: ioemu/hw/pc.c
 +    cmos_init(ram_size, boot_device, bs_table, timeoffset);
  
      if (pci_enabled && usb_enabled) {
-         usb_uhci_init(pci_bus, usb_root_ports);
-@@ -883,12 +884,13 @@
+         usb_uhci_init(pci_bus, piix3_devfn + 2);
+@@ -912,12 +913,13 @@
                          int snapshot, 
                          const char *kernel_filename, 
                          const char *kernel_cmdline,
@@ -99,7 +99,7 @@ Index: ioemu/hw/pc.c
  }
  
  static void pc_init_isa(uint64_t ram_size, int vga_ram_size, int boot_device,
-@@ -896,12 +898,13 @@
+@@ -925,12 +927,13 @@
                          int snapshot, 
                          const char *kernel_filename, 
                          const char *kernel_cmdline,
@@ -117,9 +117,9 @@ Index: ioemu/hw/pc.c
  QEMUMachine pc_machine = {
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-27 11:17:48.126890676 +0100
-+++ ioemu/vl.c	2006-07-27 11:17:48.254876507 +0100
-@@ -164,6 +164,8 @@
+--- ioemu.orig/vl.c	2006-08-07 17:44:47.464182863 +0100
++++ ioemu/vl.c	2006-08-07 17:44:54.830380715 +0100
+@@ -163,6 +163,8 @@
  
  int xc_handle;
  
@@ -128,7 +128,7 @@ Index: ioemu/vl.c
  char domain_name[1024] = { 'H','V', 'M', 'X', 'E', 'N', '-'};
  extern int domid;
  
-@@ -4800,6 +4802,7 @@
+@@ -5338,6 +5340,7 @@
  #endif
             "-loadvm file    start right away with a saved state (loadvm in monitor)\n"
  	   "-vnc display    start a VNC server on display\n"
@@ -136,7 +136,7 @@ Index: ioemu/vl.c
             "\n"
             "During emulation, the following keys are useful:\n"
             "ctrl-alt-f      toggle full screen\n"
-@@ -4890,6 +4893,7 @@
+@@ -5422,6 +5425,7 @@
  
      QEMU_OPTION_d,
      QEMU_OPTION_vcpus,
@@ -144,7 +144,7 @@ Index: ioemu/vl.c
  };
  
  typedef struct QEMUOption {
-@@ -4968,6 +4972,7 @@
+@@ -5504,6 +5508,7 @@
      
      { "d", HAS_ARG, QEMU_OPTION_d },
      { "vcpus", 1, QEMU_OPTION_vcpus },
@@ -152,7 +152,7 @@ Index: ioemu/vl.c
      { NULL },
  };
  
-@@ -5670,6 +5675,9 @@
+@@ -6248,6 +6253,9 @@
                  vcpus = atoi(optarg);
                  fprintf(logfile, "qemu: the number of cpus is %d\n", vcpus);
                  break;
@@ -162,7 +162,7 @@ Index: ioemu/vl.c
              }
          }
      }
-@@ -5993,7 +6001,8 @@
+@@ -6489,7 +6497,8 @@
  
      machine->init(ram_size, vga_ram_size, boot_device,
                    ds, fd_filename, snapshot,
@@ -170,13 +170,13 @@ Index: ioemu/vl.c
 +                  kernel_filename, kernel_cmdline, initrd_filename,
 +                  timeoffset);
  
-     gui_timer = qemu_new_timer(rt_clock, gui_update, NULL);
-     qemu_mod_timer(gui_timer, qemu_get_clock(rt_clock));
+     /* init USB devices */
+     if (usb_enabled) {
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-07-27 11:17:47.998904845 +0100
-+++ ioemu/vl.h	2006-07-27 11:17:48.254876507 +0100
-@@ -556,7 +556,7 @@
+--- ioemu.orig/vl.h	2006-08-07 17:44:47.329197562 +0100
++++ ioemu/vl.h	2006-08-07 17:44:54.830380715 +0100
+@@ -575,7 +575,7 @@
                                   int boot_device,
               DisplayState *ds, const char **fd_filename, int snapshot,
               const char *kernel_filename, const char *kernel_cmdline,

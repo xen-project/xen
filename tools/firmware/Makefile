@@ -30,7 +30,7 @@ all:
 .PHONY: install
 install: all
 	[ -d $(INSTALL_DIR) ] || install -d -m0755 $(INSTALL_DIR)
-	[ ! -e $(TARGET) ] || install -m0644 $(TARGET) $(INSTALL_DIR)
+	install -m0644 $(TARGET) $(INSTALL_DIR)
 
 .PHONY: clean
 clean: 

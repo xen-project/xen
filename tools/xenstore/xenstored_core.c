@@ -80,6 +80,7 @@ static void check_store(void);
 int quota_nb_entry_per_domain = 1000;
 int quota_nb_watch_per_domain = 128;
 int quota_max_entry_size = 2048; /* 2K */
+int quota_max_transaction = 10;
 
 #ifdef TESTING
 static bool failtest = false;
@@ -1342,6 +1343,7 @@ struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 	new->write = write;
 	new->read = read;
 	new->can_write = true;
+	new->transaction_started = 0;
 	INIT_LIST_HEAD(&new->out_list);
 	INIT_LIST_HEAD(&new->watches);
 	INIT_LIST_HEAD(&new->transaction_list);
@@ -1739,6 +1741,7 @@ static void usage(void)
 "  --entry-nb <nb>     limit the number of entries per domain,\n"
 "  --entry-size <size> limit the size of entry per domain, and\n"
 "  --entry-watch <nb>  limit the number of watches per domain,\n"
+"  --transaction <nb>  limit the number of transaction allowed per domain,\n"
 "  --no-recovery       to request that no recovery should be attempted when\n"
 "                      the store is corrupted (debug only),\n"
 "  --preserve-local    to request that /local is preserved on start-up,\n"
@@ -1755,6 +1758,7 @@ static struct option options[] = {
 	{ "output-pid", 0, NULL, 'P' },
 	{ "entry-size", 1, NULL, 'S' },
 	{ "trace-file", 1, NULL, 'T' },
+	{ "transaction", 1, NULL, 't' },
 	{ "no-recovery", 0, NULL, 'R' },
 	{ "preserve-local", 0, NULL, 'L' },
 	{ "verbose", 0, NULL, 'V' },
@@ -1774,7 +1778,7 @@ int main(int argc, char *argv[])
 	const char *pidfile = NULL;
 	int evtchn_fd = -1;
 
-	while ((opt = getopt_long(argc, argv, "DE:F:HNPS:T:RLVW:", options,
+	while ((opt = getopt_long(argc, argv, "DE:F:HNPS:t:T:RLVW:", options,
 				  NULL)) != -1) {
 		switch (opt) {
 		case 'D':
@@ -1803,6 +1807,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'S':
 			quota_max_entry_size = strtol(optarg, NULL, 10);
+			break;
+		case 't':
+			quota_max_transaction = strtol(optarg, NULL, 10);
 			break;
 		case 'T':
 			tracefile = optarg;

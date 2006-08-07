@@ -456,6 +456,28 @@ void svm_init_ap_context(struct vcpu_guest_context *ctxt,
     ctxt->flags = VGCF_HVM_GUEST;
 }
 
+static void svm_init_hypercall_page(struct domain *d, void *hypercall_page)
+{
+    char *p;
+    int i;
+
+    memset(hypercall_page, 0, PAGE_SIZE);
+
+    for ( i = 0; i < (PAGE_SIZE / 32); i++ )
+    {
+        p = (char *)(hypercall_page + (i * 32));
+        *(u8  *)(p + 0) = 0xb8; /* mov imm32, %eax */
+        *(u32 *)(p + 1) = i;
+        *(u8  *)(p + 5) = 0x0f; /* vmmcall */
+        *(u8  *)(p + 6) = 0x01;
+        *(u8  *)(p + 7) = 0xd9;
+        *(u8  *)(p + 8) = 0xc3; /* ret */
+    }
+
+    /* Don't support HYPERVISOR_iret at the moment */
+    *(u16 *)(hypercall_page + (__HYPERVISOR_iret * 32)) = 0x0b0f; /* ud2 */
+}
+
 int start_svm(void)
 {
     u32 eax, ecx, edx;
@@ -503,6 +525,8 @@ int start_svm(void)
     hvm_funcs.instruction_length = svm_instruction_length;
     hvm_funcs.get_guest_ctrl_reg = svm_get_ctrl_reg;
     hvm_funcs.init_ap_context = svm_init_ap_context;
+
+    hvm_funcs.init_hypercall_page = svm_init_hypercall_page;
 
     hvm_enabled = 1;    
 
@@ -973,7 +997,7 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb, unsigned long input,
 #else
         if ( v->domain->arch.ops->guest_paging_levels == PAGING_L2 )
         {
-            if ( !v->domain->arch.hvm_domain.pae_enabled )
+            if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
                 clear_bit(X86_FEATURE_PAE, &edx);
             clear_bit(X86_FEATURE_PSE, &edx);
             clear_bit(X86_FEATURE_PSE36, &edx);
@@ -1036,7 +1060,7 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb, unsigned long input,
 #else
         if ( v->domain->arch.ops->guest_paging_levels == PAGING_L2 )
         {
-            if ( !v->domain->arch.hvm_domain.pae_enabled )
+            if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
             {
                 clear_bit(X86_FEATURE_NX & 31, &edx);
                 clear_bit(X86_FEATURE_PAE, &edx);
@@ -1392,6 +1416,7 @@ static void svm_io_instruction(struct vcpu *v)
 
     /* Copy current guest state into io instruction state structure. */
     memcpy(regs, guest_cpu_user_regs(), HVM_CONTEXT_STACK_BYTES);
+    hvm_store_cpu_guest_regs(v, regs, NULL);
 
     info.bytes = vmcb->exitinfo1;
 
@@ -1459,7 +1484,7 @@ static void svm_io_instruction(struct vcpu *v)
                     count = (addr & ~PAGE_MASK) / size;
             }
             else    
-                vmcb->rip = vmcb->exitinfo2;
+                regs->eip = vmcb->exitinfo2;
 
             send_pio_req(regs, port, count, size, addr, dir, 1);
         }
@@ -1470,7 +1495,7 @@ static void svm_io_instruction(struct vcpu *v)
          * On SVM, the RIP of the intruction following the IN/OUT is saved in
          * ExitInfo2
          */
-        vmcb->rip = vmcb->exitinfo2;
+        regs->eip = vmcb->exitinfo2;
 
         if (port == 0xe9 && dir == IOREQ_WRITE && size == 1) 
             hvm_print_line(v, regs->eax); /* guest debug output */
@@ -1980,11 +2005,13 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
     return result;
 }
 
-static inline void svm_do_msr_access(struct vcpu *v, struct cpu_user_regs *regs)
+static inline void svm_do_msr_access(
+    struct vcpu *v, struct cpu_user_regs *regs)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     int  inst_len;
     u64 msr_content=0;
+    u32 eax, edx;
 
     ASSERT(vmcb);
 
@@ -2018,6 +2045,14 @@ static inline void svm_do_msr_access(struct vcpu *v, struct cpu_user_regs *regs)
         default:
             if (long_mode_do_msr_read(regs))
                 goto done;
+
+            if ( rdmsr_hypervisor_regs(regs->ecx, &eax, &edx) )
+            {
+                regs->eax = eax;
+                regs->edx = edx;
+                goto done;
+            }
+
             rdmsr_safe(regs->ecx, regs->eax, regs->edx);
             break;
         }
@@ -2047,7 +2082,8 @@ static inline void svm_do_msr_access(struct vcpu *v, struct cpu_user_regs *regs)
             vlapic_msr_set(VLAPIC(v), msr_content);
             break;
         default:
-            long_mode_do_msr_write(regs);
+            if ( !long_mode_do_msr_write(regs) )
+                wrmsr_hypervisor_regs(regs->ecx, regs->eax, regs->edx);
             break;
         }
     }
@@ -2314,33 +2350,41 @@ static int svm_do_vmmcall(struct vcpu *v, struct cpu_user_regs *regs)
     inst_len = __get_instruction_length(vmcb, INSTR_VMCALL, NULL);
     ASSERT(inst_len > 0);
 
-    /* VMMCALL sanity check */
-    if (vmcb->cpl > get_vmmcall_cpl(regs->edi))
+    if ( regs->eax & 0x80000000 )
     {
-        printf("VMMCALL CPL check failed\n");
-        return -1;
-    }
-
-    /* handle the request */
-    switch (regs->edi) 
-    {
-    case VMMCALL_RESET_TO_REALMODE:
-        if (svm_do_vmmcall_reset_to_realmode(v, regs)) 
+        /* VMMCALL sanity check */
+        if ( vmcb->cpl > get_vmmcall_cpl(regs->edi) )
         {
-            printf("svm_do_vmmcall_reset_to_realmode() failed\n");
+            printf("VMMCALL CPL check failed\n");
             return -1;
         }
-    
-        /* since we just reset the VMCB, return without adjusting the eip */
-        return 0;
-    case VMMCALL_DEBUG:
-        printf("DEBUG features not implemented yet\n");
-        break;
-    default:
-    break;
-    }
 
-    hvm_print_line(v, regs->eax); /* provides the current domain */
+        /* handle the request */
+        switch ( regs->eax )
+        {
+        case VMMCALL_RESET_TO_REALMODE:
+            if ( svm_do_vmmcall_reset_to_realmode(v, regs) )
+            {
+                printf("svm_do_vmmcall_reset_to_realmode() failed\n");
+                return -1;
+            }
+            /* since we just reset the VMCB, return without adjusting
+             * the eip */
+            return 0;
+
+        case VMMCALL_DEBUG:
+            printf("DEBUG features not implemented yet\n");
+            break;
+        default:
+            break;
+        }
+
+        hvm_print_line(v, regs->eax); /* provides the current domain */
+    }
+    else
+    {
+        hvm_do_hypercall(regs);
+    }
 
     __update_guest_eip(vmcb, inst_len);
     return 0;

@@ -30,7 +30,7 @@
 #include <asm/processor.h>
 #include <xen/event.h>
 #include <xen/console.h>
-#include <xen/compile.h>
+#include <xen/version.h>
 #include <xen/elf.h>
 #include <asm/pgalloc.h>
 #include <asm/offsets.h>  /* for IA64_THREAD_INFO_SIZE */
@@ -1069,7 +1069,8 @@ int construct_dom0(struct domain *d,
 		panic("can't allocate start info page");
 	si = page_to_virt(start_info_page);
 	memset(si, 0, PAGE_SIZE);
-	sprintf(si->magic, "xen-%i.%i-ia64", XEN_VERSION, XEN_SUBVERSION);
+	sprintf(si->magic, "xen-%i.%i-ia64",
+		xen_major_version(), xen_minor_version());
 	si->nr_pages     = max_pages;
 	si->flags = SIF_INITDOMAIN|SIF_PRIVILEGED;
 

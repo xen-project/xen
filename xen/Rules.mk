@@ -43,7 +43,6 @@ include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
 
 # Do not depend on auto-generated header files.
 HDRS := $(subst $(BASEDIR)/include/asm-$(TARGET_ARCH)/asm-offsets.h,,$(HDRS))
-HDRS := $(subst $(BASEDIR)/include/xen/banner.h,,$(HDRS))
 HDRS := $(subst $(BASEDIR)/include/xen/compile.h,,$(HDRS))
 
 # Note that link order matters!
@@ -106,3 +105,9 @@ _clean_%/: FORCE
 
 %.o: %.S $(HDRS) Makefile
 	$(CC) $(CFLAGS) $(AFLAGS) -c $< -o $@
+
+%.i: %.c $(HDRS) Makefile
+	$(CPP) $(CFLAGS) $< -o $@
+
+%.s: %.S $(HDRS) Makefile
+	$(CPP) $(CFLAGS) $(AFLAGS) $< -o $@

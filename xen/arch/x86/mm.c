@@ -2976,13 +2976,20 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
     case XENMEM_add_to_physmap:
     {
         struct xen_add_to_physmap xatp;
-        unsigned long mfn = 0, gpfn;
+        unsigned long prev_mfn, mfn = 0, gpfn;
         struct domain *d;
 
         if ( copy_from_guest(&xatp, arg, 1) )
             return -EFAULT;
 
-        if ( (d = find_domain_by_id(xatp.domid)) == NULL )
+        if ( xatp.domid == DOMID_SELF )
+        {
+            d = current->domain;
+            get_knownalive_domain(d);
+        }
+        else if ( !IS_PRIV(current->domain) )
+            return -EPERM;
+        else if ( (d = find_domain_by_id(xatp.domid)) == NULL )
             return -ESRCH;
 
         switch ( xatp.space )
@@ -3008,8 +3015,16 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         LOCK_BIGLOCK(d);
 
         /* Remove previously mapped page if it was present. */
-        if ( mfn_valid(gmfn_to_mfn(d, xatp.gpfn)) )
-            guest_remove_page(d, xatp.gpfn);
+        prev_mfn = gmfn_to_mfn(d, xatp.gpfn);
+        if ( mfn_valid(prev_mfn) )
+        {
+            if ( IS_XEN_HEAP_FRAME(mfn_to_page(prev_mfn)) )
+                /* Xen heap frames are simply unhooked from this phys slot. */
+                guest_physmap_remove_page(d, xatp.gpfn, prev_mfn);
+            else
+                /* Normal domain memory is freed, to avoid leaking memory. */
+                guest_remove_page(d, xatp.gpfn);
+        }
 
         /* Unmap from old location, if any. */
         gpfn = get_gpfn_from_mfn(mfn);

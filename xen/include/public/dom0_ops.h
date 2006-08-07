@@ -361,17 +361,20 @@ DEFINE_XEN_GUEST_HANDLE(dom0_read_memtype_t);
 struct dom0_perfc_desc {
     char         name[80];             /* name of perf counter */
     uint32_t     nr_vals;              /* number of values for this counter */
-    uint32_t     vals[64];             /* array of values */
 };
 typedef struct dom0_perfc_desc dom0_perfc_desc_t;
 DEFINE_XEN_GUEST_HANDLE(dom0_perfc_desc_t);
+typedef uint32_t dom0_perfc_val_t;
+DEFINE_XEN_GUEST_HANDLE(dom0_perfc_val_t);
 
 struct dom0_perfccontrol {
     /* IN variables. */
     uint32_t       op;                /*  DOM0_PERFCCONTROL_OP_??? */
     /* OUT variables. */
-    uint32_t       nr_counters;       /*  number of counters */
+    uint32_t       nr_counters;       /*  number of counters description  */
+    uint32_t       nr_vals;			  /*  number of values  */
     XEN_GUEST_HANDLE(dom0_perfc_desc_t) desc; /*  counter information (or NULL) */
+    XEN_GUEST_HANDLE(dom0_perfc_val_t) val;   /*  counter values (or NULL)  */
 };
 typedef struct dom0_perfccontrol dom0_perfccontrol_t;
 DEFINE_XEN_GUEST_HANDLE(dom0_perfccontrol_t);

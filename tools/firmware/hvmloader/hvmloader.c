@@ -23,15 +23,19 @@
  */
 #include "roms.h"
 #include "../acpi/acpi2_0.h"  /* for ACPI_PHYSICAL_ADDRESS */
+#include "hypercall.h"
+#include "util.h"
+#include <xen/version.h>
 #include <xen/hvm/hvm_info_table.h>
 
 /* memory map */
+#define HYPERCALL_PHYSICAL_ADDRESS	0x00080000
 #define VGABIOS_PHYSICAL_ADDRESS	0x000C0000
 #define	VMXASSIST_PHYSICAL_ADDRESS	0x000D0000
 #define	ROMBIOS_PHYSICAL_ADDRESS	0x000F0000
 
 /* invoke SVM's paged realmode support */
-#define SVM_VMMCALL_RESET_TO_REALMODE	0x00000001
+#define SVM_VMMCALL_RESET_TO_REALMODE	0x80000001
 
 /*
  * C runtime start off
@@ -75,79 +79,28 @@ extern int acpi_madt_update(unsigned char* acpi_start);
 extern void create_mp_tables(void);
 struct hvm_info_table *get_hvm_info_table(void);
 
-static inline void
-outw(unsigned short addr, unsigned short val)
-{
-        __asm__ __volatile__ ("outw %%ax, %%dx" :: "d"(addr), "a"(val));
-}
-
-static inline void
-outb(unsigned short addr, unsigned char val)
-{
-        __asm__ __volatile__ ("outb %%al, %%dx" :: "d"(addr), "a"(val));
-}
-
-static inline unsigned char
-inb(unsigned short addr)
-{
-        unsigned char val;
-
-        __asm__ __volatile__ ("inb %w1,%0" : "=a" (val) : "Nd" (addr));
-        return val;
-}
-
-void *
-memcpy(void *dest, const void *src, unsigned n)
-{
-	int t0, t1, t2;
-
-	__asm__ __volatile__(
-		"cld\n"
-		"rep; movsl\n"
-		"testb $2,%b4\n"
-		"je 1f\n"
-		"movsw\n"
-		"1: testb $1,%b4\n"
-		"je 2f\n"
-		"movsb\n"
-		"2:"
-		: "=&c" (t0), "=&D" (t1), "=&S" (t2)
-		: "0" (n/4), "q" (n), "1" ((long) dest), "2" ((long) src)
-		: "memory"
-	);
-	return dest;
-}
-
-int
-puts(const char *s)
-{
-	while (*s)
-		outb(0xE9, *s++);
-	return 0;
-}
-
-int
+static int
 cirrus_check(void)
 {
 	outw(0x3C4, 0x9206);
 	return inb(0x3C5) == 0x12;
 }
 
-int 
-vmmcall(int edi, int esi, int edx, int ecx, int ebx)
+static int
+vmmcall(int function, int edi, int esi, int edx, int ecx, int ebx)
 {
         int eax;
 
         __asm__ __volatile__(
 		".byte 0x0F,0x01,0xD9"
                 : "=a" (eax)
-		: "a"(0x58454E00), /* XEN\0 key */
+		: "a"(function),
 		  "b"(ebx), "c"(ecx), "d"(edx), "D"(edi), "S"(esi)
 	);
         return eax;
 }
 
-int
+static int
 check_amd(void)
 {
 	char id[12];
@@ -162,12 +115,68 @@ check_amd(void)
 	return __builtin_memcmp(id, "AuthenticAMD", 12) == 0;
 }
 
+static void
+cpuid(uint32_t idx, uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx)
+{
+	__asm__ __volatile__(
+		"cpuid"
+		: "=a" (*eax), "=b" (*ebx), "=c" (*ecx), "=d" (*edx)
+		: "0" (idx) );
+}
+
+static void
+wrmsr(uint32_t idx, uint64_t v)
+{
+	__asm__ __volatile__(
+		"wrmsr"
+		: : "c" (idx), "a" ((uint32_t)v), "d" ((uint32_t)(v>>32)) );
+}
+
+static void
+init_hypercalls(void)
+{
+	uint32_t eax, ebx, ecx, edx;
+	unsigned long i;
+	char signature[13], number[13];
+	xen_extraversion_t extraversion;
+
+	cpuid(0x40000000, &eax, &ebx, &ecx, &edx);
+
+	*(uint32_t *)(signature + 0) = ebx;
+	*(uint32_t *)(signature + 4) = ecx;
+	*(uint32_t *)(signature + 8) = edx;
+	signature[12] = '\0';
+
+	if (strcmp("XenVMMXenVMM", signature) || (eax < 0x40000002)) {
+		puts("FATAL: Xen hypervisor not detected\n");
+		__asm__ __volatile__( "ud2" );
+	}
+
+	cpuid(0x40000001, &eax, &ebx, &ecx, &edx);
+
+	puts("Detected Xen v");
+	puts(itoa(number, eax >> 16));
+	puts(".");
+	puts(itoa(number, eax & 0xffff));
+
+	cpuid(0x40000002, &eax, &ebx, &ecx, &edx);
+
+	for (i = 0; i < eax; i++)
+		wrmsr(ebx, HYPERCALL_PHYSICAL_ADDRESS + (i << 12) + i);
+
+	hypercall_xen_version(XENVER_extraversion, extraversion);
+	puts(extraversion);
+	puts("\n");
+}
+
 int
 main(void)
 {
 	struct hvm_info_table *t = get_hvm_info_table();
 
 	puts("HVM Loader\n");
+
+	init_hypercalls();
 
 	puts("Loading ROMBIOS ...\n");
 	memcpy((void *)ROMBIOS_PHYSICAL_ADDRESS, rombios, sizeof(rombios));
@@ -200,7 +209,7 @@ main(void)
 	if (check_amd()) {
 		/* AMD implies this is SVM */
                 puts("SVM go ...\n");
-                vmmcall(SVM_VMMCALL_RESET_TO_REALMODE, 0, 0, 0, 0);
+                vmmcall(SVM_VMMCALL_RESET_TO_REALMODE, 0, 0, 0, 0, 0);
 	} else {
 		puts("Loading VMXAssist ...\n");
 		memcpy((void *)VMXASSIST_PHYSICAL_ADDRESS,

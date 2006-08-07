@@ -126,6 +126,8 @@ int direct_remap_pfn_range(struct vm_area_struct *vma,
 	if (domid == DOMID_SELF)
 		return -EINVAL;
 
+	vma->vm_mm->context.has_foreign_mappings = 1;
+
 	return __direct_remap_pfn_range(
 		vma->vm_mm, address, mfn, size, prot, domid);
 }

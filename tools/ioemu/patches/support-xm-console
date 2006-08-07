@@ -1,8 +1,8 @@
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-27 11:16:59.384286681 +0100
-+++ ioemu/vl.c	2006-07-27 11:16:59.614261222 +0100
-@@ -1535,26 +1535,65 @@
+--- ioemu.orig/vl.c	2006-08-06 02:22:59.254880158 +0100
++++ ioemu/vl.c	2006-08-06 02:23:05.216215627 +0100
+@@ -1536,26 +1536,65 @@
      return chr;
  }
  
@@ -77,7 +77,7 @@ Index: ioemu/vl.c
      return qemu_chr_open_fd(master_fd, master_fd);
  }
  
-@@ -5298,7 +5337,9 @@
+@@ -5868,7 +5907,9 @@
                  break;
              case QEMU_OPTION_nographic:
                  pstrcpy(monitor_device, sizeof(monitor_device), "stdio");

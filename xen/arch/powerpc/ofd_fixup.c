@@ -21,7 +21,7 @@
 #include <xen/config.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
-#include <xen/compile.h>
+#include <xen/version.h>
 #include <public/xen.h>
 #include "of-devtree.h"
 
@@ -420,7 +420,7 @@ static ofdn_t ofd_xen_props(void *m, struct domain *d, start_info_t *si)
         ofd_prop_add(m, n, "name", &path[1], sizeof (path) - 1);
 
         xl = snprintf(xen, sizeof (xen), "Xen-%d.%d%s",
-                XEN_VERSION, XEN_SUBVERSION, XEN_EXTRAVERSION);
+                xen_major_version(), xen_minor_version(), xen_extra_version());
         ASSERT(xl < sizeof (xen));
         ofd_prop_add(m, n, "version", xen, xl + 1);
 

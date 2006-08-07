@@ -1,7 +1,7 @@
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-27 11:16:58.823348777 +0100
-+++ ioemu/vl.c	2006-07-27 11:16:59.169310479 +0100
+--- ioemu.orig/vl.c	2006-08-06 02:22:01.556312045 +0100
++++ ioemu/vl.c	2006-08-06 02:22:53.925474246 +0100
 @@ -89,6 +89,7 @@
  #include "exec-all.h"
  
@@ -10,7 +10,7 @@ Index: ioemu/vl.c
  
  //#define DEBUG_UNUSED_IOPORT
  //#define DEBUG_IOPORT
-@@ -2621,11 +2622,11 @@
+@@ -3090,11 +3091,11 @@
  #endif
  
  static int net_tap_init(VLANState *vlan, const char *ifname1,
@@ -24,7 +24,7 @@ Index: ioemu/vl.c
      char **parg;
      char ifname[128];
  
-@@ -2647,6 +2648,7 @@
+@@ -3116,6 +3117,7 @@
                  parg = args;
                  *parg++ = (char *)setup_script;
                  *parg++ = ifname;
@@ -32,7 +32,7 @@ Index: ioemu/vl.c
                  *parg++ = NULL;
                  execv(setup_script, args);
                  _exit(1);
-@@ -3201,6 +3203,7 @@
+@@ -3671,6 +3673,7 @@
      if (!strcmp(device, "tap")) {
          char ifname[64];
          char setup_script[1024];
@@ -40,7 +40,7 @@ Index: ioemu/vl.c
          int fd;
          if (get_param_value(buf, sizeof(buf), "fd", p) > 0) {
              fd = strtol(buf, NULL, 0);
-@@ -3213,7 +3216,10 @@
+@@ -3683,7 +3686,10 @@
              if (get_param_value(setup_script, sizeof(setup_script), "script", p) == 0) {
                  pstrcpy(setup_script, sizeof(setup_script), DEFAULT_NETWORK_SCRIPT);
              }
@@ -52,7 +52,7 @@ Index: ioemu/vl.c
          }
      } else
  #endif
-@@ -4672,7 +4678,7 @@
+@@ -5208,7 +5214,7 @@
             "-net tap[,vlan=n],ifname=name\n"
             "                connect the host TAP network interface to VLAN 'n'\n"
  #else

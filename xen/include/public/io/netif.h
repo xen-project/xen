@@ -13,10 +13,11 @@
 #include "../grant_table.h"
 
 /*
- * Note that there is *never* any need to notify the backend when
- * enqueuing receive requests (struct netif_rx_request). Notifications
- * after enqueuing any other type of message should be conditional on
+ * Notifications after enqueuing any type of message should be conditional on
  * the appropriate req_event or rsp_event field in the shared ring.
+ * If the client sends notification for rx requests then it should specify
+ * feature 'feature-rx-notify' via xenbus. Otherwise the backend will assume
+ * that it cannot safely queue packets (as it may not be kicked to send them).
  */
 
 /*
@@ -122,6 +123,14 @@ typedef struct netif_rx_request netif_rx_request_t;
 /* Protocol checksum field is blank in the packet (hardware offload)? */
 #define _NETRXF_csum_blank     (1)
 #define  NETRXF_csum_blank     (1U<<_NETRXF_csum_blank)
+
+/* Packet continues in the next request descriptor. */
+#define _NETRXF_more_data      (2)
+#define  NETRXF_more_data      (1U<<_NETRXF_more_data)
+
+/* Packet to be followed by extra descriptor(s). */
+#define _NETRXF_extra_info     (3)
+#define  NETRXF_extra_info     (1U<<_NETRXF_extra_info)
 
 struct netif_rx_response {
     uint16_t id;

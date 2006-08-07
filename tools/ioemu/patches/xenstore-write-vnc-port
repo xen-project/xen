@@ -1,0 +1,60 @@
+Index: ioemu/xenstore.c
+===================================================================
+--- ioemu.orig/xenstore.c	2006-08-07 17:42:28.684289249 +0100
++++ ioemu/xenstore.c	2006-08-07 17:42:28.891266728 +0100
+@@ -185,3 +185,31 @@
+     free(image);
+     free(vec);
+ }
++
++void xenstore_write_vncport(int display)
++{
++    char *buf = NULL, *path;
++    char *portstr = NULL;
++
++    if (xsh == NULL)
++	return;
++
++    path = xs_get_domain_path(xsh, domid);
++    if (path == NULL) {
++        fprintf(logfile, "xs_get_domain_path() error\n");
++        goto out;
++    }
++
++    if (pasprintf(&buf, "%s/console/vnc-port", path) == -1)
++	goto out;
++
++    if (pasprintf(&portstr, "%d", 5900 + display) == -1)
++	goto out;
++
++    if (xs_write(xsh, XBT_NULL, buf, portstr, strlen(portstr)) == 0)
++        fprintf(logfile, "xs_write() vncport failed\n");
++
++ out:
++    free(portstr);
++    free(buf);
++}
+Index: ioemu/vl.c
+===================================================================
+--- ioemu.orig/vl.c	2006-08-07 17:42:28.687288922 +0100
++++ ioemu/vl.c	2006-08-07 17:42:28.894266401 +0100
+@@ -6501,6 +6501,7 @@
+ 	vnc_display_init(ds, vnc_display);
+ 	if (vncviewer)
+ 	    vnc_start_viewer(vnc_display);
++	xenstore_write_vncport(vnc_display);
+     } else {
+ #if defined(CONFIG_SDL)
+         sdl_display_init(ds, full_screen);
+Index: ioemu/vl.h
+===================================================================
+--- ioemu.orig/vl.h	2006-08-07 17:42:28.689288705 +0100
++++ ioemu/vl.h	2006-08-07 17:42:28.895266293 +0100
+@@ -1203,6 +1203,7 @@
+ int xenstore_fd(void);
+ void xenstore_process_event(void *opaque);
+ void xenstore_check_new_media_present(int timeout);
++void xenstore_write_vncport(int vnc_display);
+ 
+ 
+ void kqemu_record_dump(void);

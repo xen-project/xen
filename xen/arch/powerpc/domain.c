@@ -26,7 +26,7 @@
 #include <xen/serial.h>
 #include <xen/domain.h>
 #include <xen/console.h>
-#include <xen/reboot.h>
+#include <xen/shutdown.h>
 #include <asm/htab.h>
 #include <asm/current.h>
 #include <asm/hcalls.h>

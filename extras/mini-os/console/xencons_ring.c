@@ -53,7 +53,7 @@ int xencons_ring_send(const char *data, unsigned len)
 
 
 
-static void handle_input(int port, struct pt_regs *regs, void *ign)
+static void handle_input(evtchn_port_t port, struct pt_regs *regs, void *ign)
 {
 	struct xencons_interface *intf = xencons_interface();
 	XENCONS_RING_IDX cons, prod;

@@ -1,0 +1,467 @@
+Index: ioemu/Makefile.target
+===================================================================
+--- ioemu.orig/Makefile.target	2006-08-07 17:42:27.802386071 +0100
++++ ioemu/Makefile.target	2006-08-07 17:42:28.683289358 +0100
+@@ -358,6 +358,7 @@
+ VL_OBJS+= cirrus_vga.o mixeng.o parallel.o acpi.o piix_pci.o
+ VL_OBJS+= usb-uhci.o
+ VL_OBJS+= piix4acpi.o
++VL_OBJS+= xenstore.o
+ DEFINES += -DHAS_AUDIO
+ endif
+ ifeq ($(TARGET_BASE_ARCH), ppc)
+Index: ioemu/xenstore.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ ioemu/xenstore.c	2006-08-07 17:42:28.684289249 +0100
+@@ -0,0 +1,187 @@
++/*
++ * This file is subject to the terms and conditions of the GNU General
++ * Public License.  See the file "COPYING" in the main directory of
++ * this archive for more details.
++ *
++ * Copyright (C) 2006 Christian Limpach
++ * Copyright (C) 2006 XenSource Ltd.
++ *
++ */
++
++#include "vl.h"
++#include "block_int.h"
++
++static struct xs_handle *xsh = NULL;
++static char *hd_filename[MAX_DISKS];
++static QEMUTimer *insert_timer = NULL;
++
++static int pasprintf(char **buf, const char *fmt, ...)
++{
++    va_list ap;
++    int ret = 0;
++
++    if (*buf)
++	free(*buf);
++    va_start(ap, fmt);
++    if (vasprintf(buf, fmt, ap) == -1) {
++	buf = NULL;
++	ret = -1;
++    }
++    va_end(ap);
++    return ret;
++}
++
++static void insert_media(void *opaque)
++{
++    int i;
++
++    for (i = 0; i < MAX_DISKS; i++) {
++	if (hd_filename[i]) {
++	    do_change(bs_table[i]->device_name, hd_filename[i]);
++	    free(hd_filename[i]);
++	    hd_filename[i] = NULL;
++	}
++    }
++}
++
++void xenstore_check_new_media_present(int timeout)
++{
++
++    if (insert_timer == NULL)
++	insert_timer = qemu_new_timer(rt_clock, insert_media, NULL);
++    qemu_mod_timer(insert_timer, qemu_get_clock(rt_clock) + timeout);
++}
++
++void xenstore_parse_domain_config(int domid)
++{
++    char **e = NULL;
++    char *buf = NULL, *path;
++    char *bpath = NULL, *dev = NULL, *params = NULL, *type = NULL;
++    int i;
++    unsigned int len, num, hd_index;
++
++    for(i = 0; i < MAX_DISKS; i++)
++        hd_filename[i] = NULL;
++
++    xsh = xs_daemon_open();
++    if (xsh == NULL) {
++	fprintf(logfile, "Could not contact xenstore for domain config\n");
++	return;
++    }
++
++    path = xs_get_domain_path(xsh, domid);
++    if (path == NULL) {
++        fprintf(logfile, "xs_get_domain_path() error\n");
++        goto out;
++    }
++
++    if (pasprintf(&buf, "%s/device/vbd", path) == -1)
++	goto out;
++
++    e = xs_directory(xsh, XBT_NULL, buf, &num);
++    if (e == NULL)
++	goto out;
++
++    for (i = 0; i < num; i++) {
++	/* read the backend path */
++	if (pasprintf(&buf, "%s/device/vbd/%s/backend", path, e[i]) == -1)
++	    continue;
++	free(bpath);
++        bpath = xs_read(xsh, XBT_NULL, buf, &len);
++	if (bpath == NULL)
++	    continue;
++	/* read the name of the device */
++	if (pasprintf(&buf, "%s/dev", bpath) == -1)
++	    continue;
++	free(dev);
++	dev = xs_read(xsh, XBT_NULL, buf, &len);
++	if (dev == NULL)
++	    continue;
++	if (strncmp(dev, "hd", 2) || strlen(dev) != 3)
++	    continue;
++	hd_index = dev[2] - 'a';
++	if (hd_index > MAX_DISKS)
++	    continue;
++	/* read the type of the device */
++	if (pasprintf(&buf, "%s/device/vbd/%s/device-type", path, e[i]) == -1)
++	    continue;
++	free(type);
++	type = xs_read(xsh, XBT_NULL, buf, &len);
++	/* read params to get the patch of the image -- read it last
++	 * so that we have its path in buf when setting up the
++	 * watch */
++	if (pasprintf(&buf, "%s/params", bpath) == -1)
++	    continue;
++	free(params);
++	params = xs_read(xsh, XBT_NULL, buf, &len);
++	if (params == NULL)
++	    continue;
++	if (params[0]) {
++	    hd_filename[hd_index] = params;	/* strdup() */
++	    params = NULL;		/* don't free params on re-use */
++	}
++	bs_table[hd_index] = bdrv_new(dev);
++	/* check if it is a cdrom */
++	if (type && !strcmp(type, "cdrom")) {
++	    bdrv_set_type_hint(bs_table[hd_index], BDRV_TYPE_CDROM);
++	    xs_watch(xsh, buf, dev);
++	}
++	if (hd_filename[hd_index]) {
++            if (bdrv_open(bs_table[hd_index], hd_filename[hd_index],
++			  0 /* snapshot */) < 0)
++                fprintf(stderr, "qemu: could not open hard disk image '%s'\n",
++                        hd_filename[hd_index]);
++	}
++    }
++
++ out:
++    free(type);
++    free(params);
++    free(dev);
++    free(bpath);
++    free(buf);
++    free(path);
++    free(e);
++    return;
++}
++
++int xenstore_fd(void)
++{
++    if (xsh)
++	return xs_fileno(xsh);
++    return -1;
++}
++
++void xenstore_process_event(void *opaque)
++{
++    char **vec, *image = NULL;
++    unsigned int len, num, hd_index;
++
++    vec = xs_read_watch(xsh, &num);
++    if (!vec)
++	return;
++
++    if (strncmp(vec[XS_WATCH_TOKEN], "hd", 2) ||
++	strlen(vec[XS_WATCH_TOKEN]) != 3)
++	goto out;
++    hd_index = vec[XS_WATCH_TOKEN][2] - 'a';
++    image = xs_read(xsh, XBT_NULL, vec[XS_WATCH_PATH], &len);
++    if (image == NULL || !strcmp(image, bs_table[hd_index]->filename))
++	goto out;		/* gone or identical */
++
++    do_eject(0, vec[XS_WATCH_TOKEN]);
++    bs_table[hd_index]->filename[0] = 0;
++    if (hd_filename[hd_index]) {
++	free(hd_filename[hd_index]);
++	hd_filename[hd_index] = NULL;
++    }
++
++    if (image[0]) {
++	hd_filename[hd_index] = strdup(image);
++	xenstore_check_new_media_present(5000);
++    }
++
++ out:
++    free(image);
++    free(vec);
++}
+Index: ioemu/vl.c
+===================================================================
+--- ioemu.orig/vl.c	2006-08-07 17:42:28.393320909 +0100
++++ ioemu/vl.c	2006-08-07 17:42:28.687288922 +0100
+@@ -5242,9 +5242,11 @@
+            "Standard options:\n"
+            "-M machine      select emulated machine (-M ? for list)\n"
+            "-fda/-fdb file  use 'file' as floppy disk 0/1 image\n"
++#ifndef CONFIG_DM
+            "-hda/-hdb file  use 'file' as IDE hard disk 0/1 image\n"
+            "-hdc/-hdd file  use 'file' as IDE hard disk 2/3 image\n"
+            "-cdrom file     use 'file' as IDE cdrom image (cdrom is ide1 master)\n"
++#endif /* !CONFIG_DM */
+            "-boot [a|c|d]   boot on floppy (a), hard disk (c) or CD-ROM (d)\n"
+ 	   "-snapshot       write to temporary files instead of disk image files\n"
+ #ifdef TARGET_I386
+@@ -5370,11 +5372,13 @@
+     QEMU_OPTION_M,
+     QEMU_OPTION_fda,
+     QEMU_OPTION_fdb,
++#ifndef CONFIG_DM
+     QEMU_OPTION_hda,
+     QEMU_OPTION_hdb,
+     QEMU_OPTION_hdc,
+     QEMU_OPTION_hdd,
+     QEMU_OPTION_cdrom,
++#endif /* !CONFIG_DM */
+     QEMU_OPTION_boot,
+     QEMU_OPTION_snapshot,
+ #ifdef TARGET_I386
+@@ -5445,11 +5449,13 @@
+     { "M", HAS_ARG, QEMU_OPTION_M },
+     { "fda", HAS_ARG, QEMU_OPTION_fda },
+     { "fdb", HAS_ARG, QEMU_OPTION_fdb },
++#ifndef CONFIG_DM
+     { "hda", HAS_ARG, QEMU_OPTION_hda },
+     { "hdb", HAS_ARG, QEMU_OPTION_hdb },
+     { "hdc", HAS_ARG, QEMU_OPTION_hdc },
+     { "hdd", HAS_ARG, QEMU_OPTION_hdd },
+     { "cdrom", HAS_ARG, QEMU_OPTION_cdrom },
++#endif /* !CONFIG_DM */
+     { "boot", HAS_ARG, QEMU_OPTION_boot },
+     { "snapshot", 0, QEMU_OPTION_snapshot },
+ #ifdef TARGET_I386
+@@ -5797,10 +5803,16 @@
+ #ifdef CONFIG_GDBSTUB
+     int use_gdbstub, gdbstub_port;
+ #endif
+-    int i, cdrom_index;
++    int i;
++#ifndef CONFIG_DM
++    int cdrom_index;
++#endif /* !CONFIG_DM */
+     int snapshot, linux_boot;
+     const char *initrd_filename;
+-    const char *hd_filename[MAX_DISKS], *fd_filename[MAX_FD];
++#ifndef CONFIG_DM
++    const char *hd_filename[MAX_DISKS];
++#endif /* !CONFIG_DM */
++    const char *fd_filename[MAX_FD];
+     const char *kernel_filename, *kernel_cmdline;
+     DisplayState *ds = &display_state;
+     int cyls, heads, secs, translation;
+@@ -5861,8 +5873,10 @@
+     initrd_filename = NULL;
+     for(i = 0; i < MAX_FD; i++)
+         fd_filename[i] = NULL;
++#ifndef CONFIG_DM
+     for(i = 0; i < MAX_DISKS; i++)
+         hd_filename[i] = NULL;
++#endif /* !CONFIG_DM */
+     ram_size = DEFAULT_RAM_SIZE * 1024 * 1024;
+     vga_ram_size = VGA_RAM_SIZE;
+     bios_size = BIOS_SIZE;
+@@ -5875,11 +5889,13 @@
+     vncviewer = 0;
+     kernel_filename = NULL;
+     kernel_cmdline = "";
++#ifndef CONFIG_DM
+ #ifdef TARGET_PPC
+     cdrom_index = 1;
+ #else
+     cdrom_index = 2;
+ #endif
++#endif /* !CONFIG_DM */
+     cyls = heads = secs = 0;
+     translation = BIOS_ATA_TRANSLATION_AUTO;
+     pstrcpy(monitor_device, sizeof(monitor_device), "vc");
+@@ -5912,7 +5928,11 @@
+             break;
+         r = argv[optind];
+         if (r[0] != '-') {
++#ifndef CONFIG_DM
+             hd_filename[0] = argv[optind++];
++#else
++            help();
++#endif /* !CONFIG_DM */
+         } else {
+             const QEMUOption *popt;
+ 
+@@ -5956,6 +5976,7 @@
+             case QEMU_OPTION_initrd:
+                 initrd_filename = optarg;
+                 break;
++#ifndef CONFIG_DM
+             case QEMU_OPTION_hda:
+             case QEMU_OPTION_hdb:
+             case QEMU_OPTION_hdc:
+@@ -5968,6 +5989,7 @@
+                         cdrom_index = -1;
+                 }
+                 break;
++#endif /* !CONFIG_DM */
+             case QEMU_OPTION_snapshot:
+                 snapshot = 1;
+                 break;
+@@ -6020,11 +6042,13 @@
+             case QEMU_OPTION_append:
+                 kernel_cmdline = optarg;
+                 break;
++#ifndef CONFIG_DM
+             case QEMU_OPTION_cdrom:
+                 if (cdrom_index >= 0) {
+                     hd_filename[cdrom_index] = optarg;
+                 }
+                 break;
++#endif /* !CONFIG_DM */
+             case QEMU_OPTION_boot:
+                 boot_device = optarg[0];
+                 if (boot_device != 'a' && 
+@@ -6274,12 +6298,18 @@
+         }
+     }
+ 
++#ifdef CONFIG_DM
++    bdrv_init();
++    xenstore_parse_domain_config(domid);
++#endif /* CONFIG_DM */
++
+ #ifdef USE_KQEMU
+     if (smp_cpus > 1)
+         kqemu_allowed = 0;
+ #endif
+     linux_boot = (kernel_filename != NULL);
+         
++#ifndef CONFIG_DM
+     if (!linux_boot && 
+         hd_filename[0] == '\0' && 
+         (cdrom_index >= 0 && hd_filename[cdrom_index] == '\0') &&
+@@ -6293,6 +6323,7 @@
+         else
+             boot_device = 'd';
+     }
++#endif /* !CONFIG_DM */
+ 
+     setvbuf(stdout, NULL, _IOLBF, 0);
+     
+@@ -6407,6 +6438,7 @@
+ 
+ #endif /* !CONFIG_DM */
+ 
++#ifndef CONFIG_DM
+     /* we always create the cdrom drive, even if no disk is there */
+     bdrv_init();
+     if (cdrom_index >= 0) {
+@@ -6433,6 +6465,7 @@
+             }
+         }
+     }
++#endif /* !CONFIG_DM */
+ 
+     /* we always create at least one floppy disk */
+     fd_table[0] = bdrv_new("fda");
+@@ -6511,6 +6544,8 @@
+         }
+     }
+ 
++    qemu_set_fd_handler(xenstore_fd(), xenstore_process_event, NULL, NULL);
++
+     machine->init(ram_size, vga_ram_size, boot_device,
+                   ds, fd_filename, snapshot,
+                   kernel_filename, kernel_cmdline, initrd_filename,
+Index: ioemu/monitor.c
+===================================================================
+--- ioemu.orig/monitor.c	2006-08-07 17:42:27.132461888 +0100
++++ ioemu/monitor.c	2006-08-07 17:42:28.688288814 +0100
+@@ -24,6 +24,7 @@
+ #include "vl.h"
+ #include "disas.h"
+ #include <dirent.h>
++#include "block_int.h"
+ 
+ //#define DEBUG
+ //#define DEBUG_COMPLETION
+@@ -330,7 +331,7 @@
+     return 0;
+ }
+ 
+-static void do_eject(int force, const char *filename)
++void do_eject(int force, const char *filename)
+ {
+     BlockDriverState *bs;
+ 
+@@ -342,7 +343,7 @@
+     eject_device(bs, force);
+ }
+ 
+-static void do_change(const char *device, const char *filename)
++void do_change(const char *device, const char *filename)
+ {
+     BlockDriverState *bs;
+     int i;
+Index: ioemu/block.c
+===================================================================
+--- ioemu.orig/block.c	2006-08-07 17:42:21.704076241 +0100
++++ ioemu/block.c	2006-08-07 17:42:28.689288705 +0100
+@@ -758,6 +758,7 @@
+ static void raw_close(BlockDriverState *bs)
+ {
+     BDRVRawState *s = bs->opaque;
++    bs->total_sectors = 0;
+     close(s->fd);
+ }
+ 
+Index: ioemu/vl.h
+===================================================================
+--- ioemu.orig/vl.h	2006-08-07 17:42:28.394320800 +0100
++++ ioemu/vl.h	2006-08-07 17:42:28.689288705 +0100
+@@ -1184,6 +1184,8 @@
+ void term_print_help(void);
+ void monitor_readline(const char *prompt, int is_password,
+                       char *buf, int buf_size);
++void do_eject(int force, const char *filename);
++void do_change(const char *device, const char *filename);
+ 
+ /* readline.c */
+ typedef void ReadLineFunc(void *opaque, const char *str);
+@@ -1196,6 +1198,13 @@
+ void readline_start(const char *prompt, int is_password,
+                     ReadLineFunc *readline_func, void *opaque);
+ 
++/* xenstore.c */
++void xenstore_parse_domain_config(int domid);
++int xenstore_fd(void);
++void xenstore_process_event(void *opaque);
++void xenstore_check_new_media_present(int timeout);
++
++
+ void kqemu_record_dump(void);
+ 
+ extern char domain_name[];
+Index: ioemu/hw/ide.c
+===================================================================
+--- ioemu.orig/hw/ide.c	2006-08-07 17:42:27.552414361 +0100
++++ ioemu/hw/ide.c	2006-08-07 17:42:28.691288487 +0100
+@@ -1158,6 +1158,7 @@
+         } else {
+             ide_atapi_cmd_error(s, SENSE_NOT_READY, 
+                                 ASC_MEDIUM_NOT_PRESENT);
++            xenstore_check_new_media_present(1000);
+         }
+         break;
+     case GPCMD_MODE_SENSE_10:

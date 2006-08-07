@@ -25,7 +25,6 @@
 #include <public/hvm/vmx_assist.h>
 
 extern int start_vmx(void);
-extern void stop_vmx(void);
 extern void vmcs_dump_vcpu(void);
 extern void vmx_init_vmcs_config(void);
 

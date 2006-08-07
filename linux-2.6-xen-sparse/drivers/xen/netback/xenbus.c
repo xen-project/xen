@@ -101,14 +101,12 @@ static int netback_probe(struct xenbus_device *dev,
 			goto abort_transaction;
 		}
 
-#if 0 /* KAF: After the protocol is finalised. */
 		err = xenbus_printf(xbt, dev->nodename, "feature-gso-tcpv4",
 				    "%d", 1);
 		if (err) {
 			message = "writing feature-gso-tcpv4";
 			goto abort_transaction;
 		}
-#endif
 
 		err = xenbus_transaction_end(xbt, 0);
 	} while (err == -EAGAIN);
@@ -353,6 +351,7 @@ static int connect_rings(struct backend_info *be)
 	unsigned long tx_ring_ref, rx_ring_ref;
 	unsigned int evtchn;
 	int err;
+	int val;
 
 	DPRINTK("");
 
@@ -365,6 +364,30 @@ static int connect_rings(struct backend_info *be)
 				 "reading %s/ring-ref and event-channel",
 				 dev->otherend);
 		return err;
+	}
+
+	if (xenbus_scanf(XBT_NIL, dev->otherend, "feature-rx-notify", "%d",
+			 &val) < 0)
+		val = 0;
+	if (val)
+		be->netif->can_queue = 1;
+	else
+		/* Must be non-zero for pfifo_fast to work. */
+		be->netif->dev->tx_queue_len = 1;
+
+	if (xenbus_scanf(XBT_NIL, dev->otherend, "feature-sg", "%d", &val) < 0)
+		val = 0;
+	if (val) {
+		be->netif->features |= NETIF_F_SG;
+		be->netif->dev->features |= NETIF_F_SG;
+	}
+
+	if (xenbus_scanf(XBT_NIL, dev->otherend, "feature-gso-tcpv4", "%d",
+			 &val) < 0)
+		val = 0;
+	if (val) {
+		be->netif->features |= NETIF_F_TSO;
+		be->netif->dev->features |= NETIF_F_TSO;
 	}
 
 	/* Map the shared frame, irq etc. */

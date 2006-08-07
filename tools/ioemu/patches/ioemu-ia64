@@ -1,7 +1,7 @@
 Index: ioemu/hw/iommu.c
 ===================================================================
---- ioemu.orig/hw/iommu.c	2006-07-28 09:56:58.571272016 +0100
-+++ ioemu/hw/iommu.c	2006-07-28 10:02:10.171049510 +0100
+--- ioemu.orig/hw/iommu.c	2006-08-06 01:55:03.240628184 +0100
++++ ioemu/hw/iommu.c	2006-08-06 02:18:54.843126039 +0100
 @@ -82,7 +82,11 @@
  #define IOPTE_VALID         0x00000002 /* IOPTE is valid */
  #define IOPTE_WAZ           0x00000001 /* Write as zeros */
@@ -16,8 +16,8 @@ Index: ioemu/hw/iommu.c
  
 Index: ioemu/cpu-all.h
 ===================================================================
---- ioemu.orig/cpu-all.h	2006-07-28 09:58:38.815935452 +0100
-+++ ioemu/cpu-all.h	2006-07-28 10:02:10.171049510 +0100
+--- ioemu.orig/cpu-all.h	2006-08-06 02:17:09.392881406 +0100
++++ ioemu/cpu-all.h	2006-08-06 02:18:54.844125928 +0100
 @@ -835,6 +835,31 @@
                  :"=m" (*(volatile long *)addr)
                  :"dIr" (nr));
@@ -52,9 +52,21 @@ Index: ioemu/cpu-all.h
  /* memory API */
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-28 09:58:59.672577418 +0100
-+++ ioemu/vl.c	2006-07-28 10:02:10.174049171 +0100
-@@ -5578,6 +5578,7 @@
+--- ioemu.orig/vl.c	2006-08-06 02:18:45.608155528 +0100
++++ ioemu/vl.c	2006-08-06 02:18:54.847125593 +0100
+@@ -6140,6 +6140,11 @@
+     /* init the memory */
+     phys_ram_size = ram_size + vga_ram_size + bios_size;
+ 
++#if defined (__ia64__)
++    if (ram_size > MMIO_START)
++	ram_size += 1 * MEM_G; /* skip 3G-4G MMIO, LEGACY_IO_SPACE etc. */
++#endif
++
+ #ifdef CONFIG_DM
+ 
+     nr_pages = ram_size/PAGE_SIZE;
+@@ -6151,6 +6156,7 @@
          exit(-1);
      }
  
@@ -62,15 +74,35 @@ Index: ioemu/vl.c
      if (xc_get_pfn_list(xc_handle, domid, page_array, nr_pages) != nr_pages) {
          fprintf(logfile, "xc_get_pfn_list returned error %d\n", errno);
          exit(-1);
-@@ -5598,6 +5599,34 @@
-     fprintf(logfile, "shared page at pfn:%lx, mfn: %"PRIx64"\n", nr_pages - 1,
-             (uint64_t)(page_array[nr_pages - 1]));
+@@ -6173,6 +6179,41 @@
+ 
+     free(page_array);
  
 +#elif defined(__ia64__)
++  
++    if (xc_ia64_get_pfn_list(xc_handle, domid, page_array,
++                             IO_PAGE_START >> PAGE_SHIFT, 1) != 1) {
++        fprintf(logfile, "xc_ia64_get_pfn_list returned error %d\n", errno);
++        exit(-1);
++    }
++
++    shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
++                                       PROT_READ|PROT_WRITE,
++                                       page_array[0]);
++
++    fprintf(logfile, "shared page at pfn:%lx, mfn: %016lx\n",
++            IO_PAGE_START >> PAGE_SHIFT, page_array[0]);
++
 +    if (xc_ia64_get_pfn_list(xc_handle, domid,
 +                             page_array, 0, nr_pages) != nr_pages) {
 +        fprintf(logfile, "xc_ia64_get_pfn_list returned error %d\n", errno);
 +        exit(-1);
++    }
++
++    if (ram_size > MMIO_START) {	
++	for (i = 0 ; i < MEM_G >> PAGE_SHIFT; i++)
++	    page_array[MMIO_START >> PAGE_SHIFT + i] =
++		page_array[IO_PAGE_START >> PAGE_SHIFT + 1];
 +    }
 +
 +    phys_ram_base = xc_map_foreign_batch(xc_handle, domid,
@@ -80,27 +112,14 @@ Index: ioemu/vl.c
 +        fprintf(logfile, "xc_map_foreign_batch returned error %d\n", errno);
 +        exit(-1);
 +    }
-+
-+    if (xc_ia64_get_pfn_list(xc_handle, domid, page_array,
-+                             nr_pages + (GFW_SIZE >> PAGE_SHIFT), 1)!= 1){
-+        fprintf(logfile, "xc_ia64_get_pfn_list returned error %d\n", errno);
-+        exit(-1);
-+    }
-+
-+    shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
-+                                       PROT_READ|PROT_WRITE,
-+                                       page_array[0]);
-+
-+    fprintf(logfile, "shared page at pfn:%lx, mfn: %l016x\n",
-+            IO_PAGE_START >> PAGE_SHIFT, page_array[0]);
 +#endif
  #else  /* !CONFIG_DM */
  
- #ifdef CONFIG_SOFTMMU
+     phys_ram_base = qemu_vmalloc(phys_ram_size);
 Index: ioemu/target-i386-dm/exec-dm.c
 ===================================================================
---- ioemu.orig/target-i386-dm/exec-dm.c	2006-07-28 09:58:22.882736989 +0100
-+++ ioemu/target-i386-dm/exec-dm.c	2006-07-28 10:03:19.972165675 +0100
+--- ioemu.orig/target-i386-dm/exec-dm.c	2006-08-06 02:15:01.776108064 +0100
++++ ioemu/target-i386-dm/exec-dm.c	2006-08-06 02:18:54.848125482 +0100
 @@ -341,6 +341,23 @@
      return io_mem_read[io_index >> IO_MEM_SHIFT];
  }
@@ -137,8 +156,8 @@ Index: ioemu/target-i386-dm/exec-dm.c
                  memset(buf, 0xff, len);
 Index: ioemu/exec-all.h
 ===================================================================
---- ioemu.orig/exec-all.h	2006-07-28 09:56:58.572271903 +0100
-+++ ioemu/exec-all.h	2006-07-28 10:02:10.175049059 +0100
+--- ioemu.orig/exec-all.h	2006-08-06 02:14:09.796902750 +0100
++++ ioemu/exec-all.h	2006-08-06 02:18:54.848125482 +0100
 @@ -462,12 +462,13 @@
  }
  #endif
@@ -158,8 +177,8 @@ Index: ioemu/exec-all.h
  
 Index: ioemu/target-i386-dm/cpu.h
 ===================================================================
---- ioemu.orig/target-i386-dm/cpu.h	2006-07-28 09:56:58.572271903 +0100
-+++ ioemu/target-i386-dm/cpu.h	2006-07-28 10:02:10.175049059 +0100
+--- ioemu.orig/target-i386-dm/cpu.h	2006-08-06 02:15:01.776108064 +0100
++++ ioemu/target-i386-dm/cpu.h	2006-08-06 02:18:54.848125482 +0100
 @@ -80,7 +80,11 @@
  /* helper2.c */
  int main_loop(void);
@@ -175,7 +194,7 @@ Index: ioemu/target-i386-dm/cpu.h
 Index: ioemu/ia64_intrinsic.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/ia64_intrinsic.h	2006-07-28 10:02:10.176048946 +0100
++++ ioemu/ia64_intrinsic.h	2006-08-06 02:18:54.849125370 +0100
 @@ -0,0 +1,276 @@
 +#ifndef IA64_INTRINSIC_H
 +#define IA64_INTRINSIC_H

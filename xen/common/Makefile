@@ -16,11 +16,13 @@ obj-y += sched_bvt.o
 obj-y += sched_credit.o
 obj-y += sched_sedf.o
 obj-y += schedule.o
+obj-y += shutdown.o
 obj-y += softirq.o
 obj-y += string.o
 obj-y += symbols.o
 obj-y += trace.o
 obj-y += timer.o
+obj-y += version.o
 obj-y += vsprintf.o
 obj-y += xmalloc.o
 
@@ -28,4 +30,4 @@ obj-$(perfc)       += perfc.o
 obj-$(crash_debug) += gdbstub.o
 
 # Object file contains changeset and compiler information.
-kernel.o: $(BASEDIR)/include/xen/compile.h
+version.o: $(BASEDIR)/include/xen/compile.h

@@ -12,6 +12,9 @@ typedef struct {
 	int size;
 	struct semaphore sem;
 	void *ldt;
+#ifdef CONFIG_XEN
+	int has_foreign_mappings;
+#endif
 } mm_context_t;
 
 /* mm/memory.c:exit_mmap hook */

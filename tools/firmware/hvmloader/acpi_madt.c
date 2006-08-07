@@ -20,12 +20,10 @@
 
 #include "../acpi/acpi2_0.h"
 #include "../acpi/acpi_madt.h"
-
+#include "util.h"
 #include <xen/hvm/hvm_info_table.h>
 
 #define NULL ((void*)0)
-
-extern int puts(const char *s);
 
 static struct hvm_info_table *table = NULL;
 

@@ -4,808 +4,893 @@ RCS file: /sources/vgabios/vgabios/Makefile,v
 retrieving revision 1.17
 diff -u -w -r1.17 Makefile
 --- Makefile	6 Mar 2005 13:06:47 -0000	1.17
-+++ Makefile	25 Mar 2006 01:19:02 -0000
-@@ -17,9 +17,9 @@
- all: bios cirrus-bios
- 
- 
--bios: biossums vgabios.bin vgabios.debug.bin 
-+bios: biossums vgabios.bin #vgabios.debug.bin 
- 
--cirrus-bios: vgabios-cirrus.bin vgabios-cirrus.debug.bin
-+cirrus-bios: vgabios-cirrus.bin #vgabios-cirrus.debug.bin 
++++ Makefile	14 Jun 2006 00:51:06 -0000
+@@ -22,7 +22,7 @@
+ cirrus-bios: vgabios-cirrus.bin vgabios-cirrus.debug.bin
  
  clean:
- 	/bin/rm -f  biossums *.o *.s *.ld86 \
+-	/bin/rm -f  biossums *.o *.s *.ld86 \
++	/bin/rm -f  biossums vbetables-gen vbetables.h *.o *.s *.ld86 \
+           temp.awk.* vgabios*.orig _vgabios_* _vgabios-debug_* core vgabios*.bin vgabios*.txt $(RELEASE).bin *.bak
+ 
+ dist-clean: clean
+@@ -79,3 +79,9 @@
+ 
+ biossums: biossums.c
+ 	$(CC) -o biossums biossums.c
++
++vbetables-gen: vbetables-gen.c
++	$(CC) -o vbetables-gen vbetables-gen.c
++
++vbetables.h: vbetables-gen
++	./vbetables-gen > $@
 Index: clext.c
 ===================================================================
 RCS file: /sources/vgabios/vgabios/clext.c,v
-retrieving revision 1.9
-diff -u -w -r1.9 clext.c
---- clext.c	4 Dec 2004 15:26:17 -0000	1.9
-+++ clext.c	25 Mar 2006 01:19:03 -0000
-@@ -238,6 +238,21 @@
- 0xffff
- };
+retrieving revision 1.10
+diff -u -w -r1.10 clext.c
+--- clext.c	25 Mar 2006 10:19:15 -0000	1.10
++++ clext.c	14 Jun 2006 00:51:06 -0000
+@@ -544,6 +544,13 @@
+ cirrus_set_video_mode_extended:
+   call cirrus_switch_mode
+   pop ax ;; mode
++  test al, #0x80
++  jnz cirrus_set_video_mode_extended_1
++  push ax
++  mov ax, #0xffff ; set to 0xff to keep win 2K happy
++  call cirrus_clear_vram
++  pop ax
++cirrus_set_video_mode_extended_1:
+   and al, #0x7f
  
-+/* 1600x1200x8 */
-+unsigned short cseq_1600x1200x8[] = {
-+0x0300,0x2101,0x0f02,0x0003,0x0e04,0x1107,
-+0x760b,0x760c,0x760d,0x760e,
-+0x0412,0x0013,0x2017,
-+0x341b,0x341c,0x341d,0x341e,
-+0xffff
-+};
-+unsigned short ccrtc_1600x1200x8[] = {
-+0x2911,0xc300,0x9f01,0x9f02,0x8603,0x8304,0x9405,0x2406,0xf707,
-+0x6009,0x000c,0x000d,
-+0x0310,0xff12,0xa013,0x4014,0xff15,0x2416,0xc317,0xff18,
-+0x001a,0x221b,0x001d,
-+0xffff
-+};
+   push ds
+@@ -1011,6 +1018,13 @@
+   jnz cirrus_vesa_02h_3
+   call cirrus_enable_16k_granularity
+ cirrus_vesa_02h_3:
++  test bx, #0x8000 ;; no clear
++  jnz cirrus_vesa_02h_4
++  push ax
++  xor ax,ax
++  call cirrus_clear_vram
++  pop ax
++cirrus_vesa_02h_4:
+   pop ax
+   push ds
+ #ifdef CIRRUS_VESA3_PMINFO
+@@ -1479,6 +1493,38 @@
+   pop  bx
+   ret
  
- cirrus_mode_t cirrus_modes[] =
- {
-@@ -291,6 +306,10 @@
-    cseq_1280x1024x16,cgraph_svgacolor,ccrtc_1280x1024x16,16,
-    6,5,11,6,5,5,0,0,0},
- 
-+ {0x7b,1600,1200,8,0x00,
-+   cseq_1600x1200x8,cgraph_svgacolor,ccrtc_1600x1200x8,8,
-+   4,0,0,0,0,0,0,0,0},
++cirrus_clear_vram:
++  pusha
++  push es
++  mov si, ax
 +
-  {0xfe,0,0,0,0,cseq_vga,cgraph_vga,ccrtc_vga,0,
-    0xff,0,0,0,0,0,0,0,0},
-  {0xff,0,0,0,0,0,0,0,0,
++  call cirrus_enable_16k_granularity
++  call cirrus_extbios_85h
++  shl al, #2
++  mov bl, al
++  xor ah,ah
++cirrus_clear_vram_1:
++  mov al, #0x09
++  mov dx, #0x3ce
++  out dx, ax
++  push ax
++  mov cx, #0xa000
++  mov es, cx
++  xor di, di
++  mov ax, si
++  mov cx, #8192
++  cld
++  rep 
++      stosw
++  pop ax
++  inc ah
++  cmp ah, bl
++  jne cirrus_clear_vram_1
++
++  pop es
++  popa
++  ret
++
+ cirrus_extbios_handlers:
+   ;; 80h
+   dw cirrus_extbios_80h
+Index: vbe.c
+===================================================================
+RCS file: /sources/vgabios/vgabios/vbe.c,v
+retrieving revision 1.48
+diff -u -w -r1.48 vbe.c
+--- vbe.c	26 Dec 2005 19:50:26 -0000	1.48
++++ vbe.c	14 Jun 2006 00:51:07 -0000
+@@ -118,21 +118,114 @@
+ .word VBE_VESA_MODE_END_OF_LIST
+ #endif
+ 
++  .align 2
+ vesa_pm_start:
+   dw vesa_pm_set_window - vesa_pm_start
+-  dw vesa_pm_set_display_strt - vesa_pm_start
++  dw vesa_pm_set_display_start - vesa_pm_start
+   dw vesa_pm_unimplemented - vesa_pm_start
+-  dw 0
++  dw vesa_pm_io_ports_table - vesa_pm_start
++vesa_pm_io_ports_table:
++  dw VBE_DISPI_IOPORT_INDEX
++  dw VBE_DISPI_IOPORT_INDEX + 1
++  dw VBE_DISPI_IOPORT_DATA
++  dw VBE_DISPI_IOPORT_DATA + 1
++  dw 0xffff
++  dw 0xffff
+ 
+   USE32
+ vesa_pm_set_window:
+-  mov ax, #0x4f05
+-  int #0x10
++  cmp  bx, #0x00
++  je  vesa_pm_set_display_window1
++  mov  ax, #0x0100
++  ret
++vesa_pm_set_display_window1:
++  mov  ax, dx
++  push dx
++  push ax
++  mov  dx, # VBE_DISPI_IOPORT_INDEX
++  mov  ax, # VBE_DISPI_INDEX_BANK
++  out  dx, ax
++  pop  ax
++  mov  dx, # VBE_DISPI_IOPORT_DATA
++  out  dx, ax
++  pop  dx
++  mov  ax, #0x004f
+   ret
+ 
+ vesa_pm_set_display_start:
+-  mov ax, #0x4f07
+-  int #0x10
++  cmp  bl, #0x80
++  je   vesa_pm_set_display_start1
++  cmp  bl, #0x00
++  je   vesa_pm_set_display_start1
++  mov  ax, #0x0100
++  ret
++vesa_pm_set_display_start1:
++; convert offset to (X, Y) coordinate 
++; (would be simpler to change Bochs VBE API...)
++  push eax
++  push ecx
++  push edx
++  push esi
++  push edi
++  shl edx, #16
++  and ecx, #0xffff
++  or ecx, edx
++  shl ecx, #2
++  mov eax, ecx
++
++  push eax
++  mov  dx, # VBE_DISPI_IOPORT_INDEX
++  mov  ax, # VBE_DISPI_INDEX_VIRT_WIDTH
++  out  dx, ax
++  mov  dx, # VBE_DISPI_IOPORT_DATA
++  in   ax, dx
++  movzx ecx, ax
++
++  mov  dx, # VBE_DISPI_IOPORT_INDEX
++  mov  ax, # VBE_DISPI_INDEX_BPP
++  out  dx, ax
++  mov  dx, # VBE_DISPI_IOPORT_DATA
++  in   ax, dx
++  movzx esi, ax
++  pop  eax
++
++  add esi, #7
++  shr esi, #3
++  imul ecx, esi
++  xor edx, edx
++  div ecx
++  mov edi, eax
++  mov eax, edx
++  xor edx, edx
++  div esi
++
++  push dx
++  push ax
++  mov  dx, # VBE_DISPI_IOPORT_INDEX
++  mov  ax, # VBE_DISPI_INDEX_X_OFFSET
++  out  dx, ax
++  pop  ax
++  mov  dx, # VBE_DISPI_IOPORT_DATA
++  out  dx, ax
++  pop  dx
++
++  mov  ax, di
++  push dx
++  push ax
++  mov  dx, # VBE_DISPI_IOPORT_INDEX
++  mov  ax, # VBE_DISPI_INDEX_Y_OFFSET
++  out  dx, ax
++  pop  ax
++  mov  dx, # VBE_DISPI_IOPORT_DATA
++  out  dx, ax
++  pop  dx
++
++  pop edi
++  pop esi
++  pop edx
++  pop ecx
++  pop eax
++  mov  ax, #0x004f
+   ret
+ 
+ vesa_pm_unimplemented:
+@@ -835,6 +928,64 @@
+ ASM_END
+ 
+ 
++Bit16u vbe_biosfn_read_video_state_size()
++{
++    return 9 * 2;
++}
++
++void vbe_biosfn_save_video_state(ES, BX)
++     Bit16u ES; Bit16u BX;
++{
++    Bit16u enable, i;
++
++    outw(VBE_DISPI_IOPORT_INDEX,VBE_DISPI_INDEX_ENABLE);
++    enable = inw(VBE_DISPI_IOPORT_DATA);
++    write_word(ES, BX, enable);
++    BX += 2;
++    if (!(enable & VBE_DISPI_ENABLED)) 
++        return;
++    for(i = VBE_DISPI_INDEX_XRES; i <= VBE_DISPI_INDEX_Y_OFFSET; i++) {
++        if (i != VBE_DISPI_INDEX_ENABLE) {
++            outw(VBE_DISPI_IOPORT_INDEX, i);
++            write_word(ES, BX, inw(VBE_DISPI_IOPORT_DATA));
++            BX += 2;
++        }
++    }
++}
++
++
++void vbe_biosfn_restore_video_state(ES, BX)
++     Bit16u ES; Bit16u BX;
++{
++    Bit16u enable, i;
++
++    enable = read_word(ES, BX);
++    BX += 2;
++    
++    if (!(enable & VBE_DISPI_ENABLED)) {
++        outw(VBE_DISPI_IOPORT_INDEX,VBE_DISPI_INDEX_ENABLE);
++        outw(VBE_DISPI_IOPORT_DATA, enable);
++    } else {
++        outw(VBE_DISPI_IOPORT_INDEX, VBE_DISPI_INDEX_XRES);
++        outw(VBE_DISPI_IOPORT_DATA, read_word(ES, BX));
++        BX += 2;
++        outw(VBE_DISPI_IOPORT_INDEX, VBE_DISPI_INDEX_YRES);
++        outw(VBE_DISPI_IOPORT_DATA, read_word(ES, BX));
++        BX += 2;
++        outw(VBE_DISPI_IOPORT_INDEX, VBE_DISPI_INDEX_BPP);
++        outw(VBE_DISPI_IOPORT_DATA, read_word(ES, BX));
++        BX += 2;
++        outw(VBE_DISPI_IOPORT_INDEX,VBE_DISPI_INDEX_ENABLE);
++        outw(VBE_DISPI_IOPORT_DATA, enable);
++
++        for(i = VBE_DISPI_INDEX_BANK; i <= VBE_DISPI_INDEX_Y_OFFSET; i++) {
++            outw(VBE_DISPI_IOPORT_INDEX, i);
++            outw(VBE_DISPI_IOPORT_DATA, read_word(ES, BX));
++            BX += 2;
++        }
++    }
++}
++
+ /** Function 04h - Save/Restore State
+  * 
+  * Input:
+@@ -849,10 +1000,48 @@
+  *              BX      = Number of 64-byte blocks to hold the state buffer (if DL=00h)
+  * 
+  */
+-void vbe_biosfn_save_restore_state(AX, DL, CX, ES, BX)
++void vbe_biosfn_save_restore_state(AX, CX, DX, ES, BX)
++Bit16u *AX; Bit16u CX; Bit16u DX; Bit16u ES; Bit16u *BX;
+ {
+-}
++    Bit16u ss=get_SS();
++    Bit16u result, val;
+ 
++    result = 0x4f;
++    switch(GET_DL()) {
++    case 0x00:
++        val = biosfn_read_video_state_size2(CX);
++#ifdef DEBUG
++        printf("VGA state size=%x\n", val);
++#endif
++        if (CX & 8)
++            val += vbe_biosfn_read_video_state_size();
++        write_word(ss, BX, val);
++        break;
++    case 0x01:
++        val = read_word(ss, BX);
++        val = biosfn_save_video_state(CX, ES, val);
++#ifdef DEBUG
++        printf("VGA save_state offset=%x\n", val);
++#endif
++        if (CX & 8)
++            vbe_biosfn_save_video_state(ES, val);
++        break;
++    case 0x02:
++        val = read_word(ss, BX);
++        val = biosfn_restore_video_state(CX, ES, val);
++#ifdef DEBUG
++        printf("VGA restore_state offset=%x\n", val);
++#endif
++        if (CX & 8)
++            vbe_biosfn_restore_video_state(ES, val);
++        break;
++    default:
++        // function failed
++        result = 0x100;
++        break;
++    }
++    write_word(ss, AX, result);
++}
+ 
+ /** Function 05h - Display Window Control
+  * 
+@@ -1090,7 +1279,7 @@
+  */
+ ASM_START
+ vbe_biosfn_return_protected_mode_interface:
+-  test bx, bx
++  test bl, bl
+   jnz _fail
+   mov di, #0xc000
+   mov es, di
+Index: vbe.h
+===================================================================
+RCS file: /sources/vgabios/vgabios/vbe.h,v
+retrieving revision 1.24
+diff -u -w -r1.24 vbe.h
+--- vbe.h	9 May 2004 20:31:31 -0000	1.24
++++ vbe.h	14 Jun 2006 00:51:07 -0000
+@@ -14,7 +14,7 @@
+ void vbe_biosfn_return_controller_information(AX, ES, DI);
+ void vbe_biosfn_return_mode_information(AX, CX, ES, DI);
+ void vbe_biosfn_set_mode(AX, BX, ES, DI);
+-void vbe_biosfn_save_restore_state(AX, DL, CX, ES, BX); 
++void vbe_biosfn_save_restore_state(AX, CX, DX, ES, BX);
+ void vbe_biosfn_set_get_palette_data(AX);
+ void vbe_biosfn_return_protected_mode_interface(AX);
+ 
+@@ -151,6 +151,12 @@
+    Bit8u  Reserved[189];
+ } ModeInfoBlock;
+ 
++typedef struct ModeInfoListItem
++{
++        Bit16u                  mode;
++        ModeInfoBlockCompact    info;
++} ModeInfoListItem;
++
+ // VBE Return Status Info
+ // AL
+ #define VBE_RETURN_STATUS_SUPPORTED                      0x4F
+@@ -193,6 +199,10 @@
+ #define VBE_VESA_MODE_1280X1024X1555                     0x119
+ #define VBE_VESA_MODE_1280X1024X565                      0x11A
+ #define VBE_VESA_MODE_1280X1024X888                      0x11B
++#define VBE_VESA_MODE_1600X1200X8                        0x11C
++#define VBE_VESA_MODE_1600X1200X1555                     0x11D
++#define VBE_VESA_MODE_1600X1200X565                      0x11E
++#define VBE_VESA_MODE_1600X1200X888                      0x11F
+ 
+ // BOCHS/PLEX86 'own' mode numbers
+ #define VBE_OWN_MODE_320X200X8888                        0x140
+@@ -202,6 +212,12 @@
+ #define VBE_OWN_MODE_1024X768X8888                       0x144
+ #define VBE_OWN_MODE_1280X1024X8888                      0x145
+ #define VBE_OWN_MODE_320X200X8                           0x146
++#define VBE_OWN_MODE_1600X1200X8888                      0x147
++#define VBE_OWN_MODE_1152X864X8                          0x148
++#define VBE_OWN_MODE_1152X864X1555                       0x149
++#define VBE_OWN_MODE_1152X864X565                        0x14a
++#define VBE_OWN_MODE_1152X864X888                        0x14b
++#define VBE_OWN_MODE_1152X864X8888                       0x14c
+ 
+ #define VBE_VESA_MODE_END_OF_LIST                        0xFFFF
+ 
+@@ -259,7 +275,7 @@
+ //        like 0xE0000000
+ 
+ 
+-  #define VBE_DISPI_TOTAL_VIDEO_MEMORY_MB 4
++  #define VBE_DISPI_TOTAL_VIDEO_MEMORY_MB 8
+ 
+   #define VBE_DISPI_BANK_ADDRESS          0xA0000
+   #define VBE_DISPI_BANK_SIZE_KB          64
 Index: vgabios.c
 ===================================================================
 RCS file: /sources/vgabios/vgabios/vgabios.c,v
-retrieving revision 1.63
-diff -u -w -r1.63 vgabios.c
---- vgabios.c	26 Dec 2005 19:50:26 -0000	1.63
-+++ vgabios.c	25 Mar 2006 01:19:03 -0000
-@@ -111,6 +111,7 @@
+retrieving revision 1.64
+diff -u -w -r1.64 vgabios.c
+--- vgabios.c	25 Mar 2006 10:19:16 -0000	1.64
++++ vgabios.c	14 Jun 2006 00:51:07 -0000
+@@ -109,8 +109,8 @@
+ static void biosfn_write_string();
+ static void biosfn_read_state_info();
  static void biosfn_read_video_state_size();
- static void biosfn_save_video_state();
- static void biosfn_restore_video_state();
-+extern Bit8u video_save_pointer_table[];
+-static void biosfn_save_video_state();
+-static void biosfn_restore_video_state();
++static Bit16u biosfn_save_video_state();
++static Bit16u biosfn_restore_video_state();
+ extern Bit8u video_save_pointer_table[];
  
  // This is for compiling with gcc2 and gcc3
- #define ASM_START #asm
-@@ -459,6 +460,29 @@
- 
-   pop ds
-   ret
-+
-+_video_save_pointer_table:
-+  .word _video_param_table
-+  .word 0xc000
-+
-+  .word 0 /* XXX: fill it */
-+  .word 0
-+
-+  .word 0 /* XXX: fill it */
-+  .word 0
-+
-+  .word 0 /* XXX: fill it */
-+  .word 0
-+
-+  .word 0 /* XXX: fill it */
-+  .word 0
-+
-+  .word 0 /* XXX: fill it */
-+  .word 0
-+
-+  .word 0 /* XXX: fill it */
-+  .word 0
-+
- ASM_END
+@@ -748,12 +748,7 @@
+           vbe_biosfn_set_mode(&AX,BX,ES,DI);
+           break;
+          case 0x04:
+-          //FIXME
+-#ifdef DEBUG
+-          unimplemented();
+-#endif
+-          // function failed
+-          AX=0x100;
++          vbe_biosfn_save_restore_state(&AX, CX, DX, ES, &BX);
+           break;
+          case 0x09:
+           //FIXME
+@@ -3138,23 +3133,215 @@
+ }
  
  // --------------------------------------------------------------------------------------------
-@@ -780,8 +804,8 @@
- 
-  // Should we clear the screen ?
-  Bit8u noclearmem=mode&0x80;
-- Bit8u line,mmask,*palette;
-- Bit16u i,twidth,theight,cheight;
-+ Bit8u line,mmask,*palette,vpti;
-+ Bit16u i,twidth,theightm1,cheight;
-  Bit8u modeset_ctl,video_ctl,vga_switches;
-  Bit16u crtc_addr;
-  
-@@ -804,9 +828,10 @@
-  if(line==0xFF)
-   return;
- 
-- twidth=vga_modes[line].twidth;
-- theight=vga_modes[line].theight;
-- cheight=vga_modes[line].cheight;
-+ vpti=line_to_vpti[line];
-+ twidth=video_param_table[vpti].twidth;
-+ theightm1=video_param_table[vpti].theightm1;
-+ cheight=video_param_table[vpti].cheight;
-  
-  // Read the bios vga control
-  video_ctl=read_byte(BIOSMEM_SEG,BIOSMEM_VIDEO_CTL);
-@@ -866,21 +891,25 @@
-  inb(VGAREG_ACTL_RESET);
- 
-  // Set Attribute Ctl
-- for(i=0;i<=ACTL_MAX_REG;i++)
-+ for(i=0;i<=0x13;i++)
-   {outb(VGAREG_ACTL_ADDRESS,i);
--   outb(VGAREG_ACTL_WRITE_DATA,actl_regs[vga_modes[line].actlmodel][i]);
-+   outb(VGAREG_ACTL_WRITE_DATA,video_param_table[vpti].actl_regs[i]);
-   }
-+ outb(VGAREG_ACTL_ADDRESS,0x14);
-+ outb(VGAREG_ACTL_WRITE_DATA,0x00);
- 
-  // Set Sequencer Ctl
-- for(i=0;i<=SEQU_MAX_REG;i++)
-+ outb(VGAREG_SEQU_ADDRESS,0);
-+ outb(VGAREG_SEQU_DATA,0x03);
-+ for(i=1;i<=4;i++)
-   {outb(VGAREG_SEQU_ADDRESS,i);
--   outb(VGAREG_SEQU_DATA,sequ_regs[vga_modes[line].sequmodel][i]);
-+   outb(VGAREG_SEQU_DATA,video_param_table[vpti].sequ_regs[i - 1]);
-   }
- 
-  // Set Grafx Ctl
-- for(i=0;i<=GRDC_MAX_REG;i++)
-+ for(i=0;i<=8;i++)
-   {outb(VGAREG_GRDC_ADDRESS,i);
--   outb(VGAREG_GRDC_DATA,grdc_regs[vga_modes[line].grdcmodel][i]);
-+   outb(VGAREG_GRDC_DATA,video_param_table[vpti].grdc_regs[i]);
-   }
- 
-  // Set CRTC address VGA or MDA 
-@@ -889,13 +918,13 @@
-  // Disable CRTC write protection
-  outw(crtc_addr,0x0011);
-  // Set CRTC regs
-- for(i=0;i<=CRTC_MAX_REG;i++)
-+ for(i=0;i<=0x18;i++)
-   {outb(crtc_addr,i);
--   outb(crtc_addr+1,crtc_regs[vga_modes[line].crtcmodel][i]);
-+   outb(crtc_addr+1,video_param_table[vpti].crtc_regs[i]);
-   }
- 
-  // Set the misc register
-- outb(VGAREG_WRITE_MISC_OUTPUT,vga_modes[line].miscreg);
-+ outb(VGAREG_WRITE_MISC_OUTPUT,video_param_table[vpti].miscreg);
- 
-  // Enable video
-  outb(VGAREG_ACTL_ADDRESS,0x20);
-@@ -927,9 +956,9 @@
-  // Set the BIOS mem
-  write_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_MODE,mode);
-  write_word(BIOSMEM_SEG,BIOSMEM_NB_COLS,twidth);
-- write_word(BIOSMEM_SEG,BIOSMEM_PAGE_SIZE,vga_modes[line].slength);
-+ write_word(BIOSMEM_SEG,BIOSMEM_PAGE_SIZE,*(Bit16u *)&video_param_table[vpti].slength_l);
-  write_word(BIOSMEM_SEG,BIOSMEM_CRTC_ADDRESS,crtc_addr);
-- write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS,theight-1);
-+ write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS,theightm1);
-  write_word(BIOSMEM_SEG,BIOSMEM_CHAR_HEIGHT,cheight);
-  write_byte(BIOSMEM_SEG,BIOSMEM_VIDEO_CTL,(0x60|noclearmem));
-  write_byte(BIOSMEM_SEG,BIOSMEM_SWITCHES,0xF9);
-@@ -937,8 +966,8 @@
- 
-  // FIXME We nearly have the good tables. to be reworked
-  write_byte(BIOSMEM_SEG,BIOSMEM_DCC_INDEX,0x08);    // 8 is VGA should be ok for now
-- write_word(BIOSMEM_SEG,BIOSMEM_VS_POINTER,0x00);
-- write_word(BIOSMEM_SEG,BIOSMEM_VS_POINTER+2,0x00);
-+ write_word(BIOSMEM_SEG,BIOSMEM_VS_POINTER, video_save_pointer_table);
-+ write_word(BIOSMEM_SEG,BIOSMEM_VS_POINTER+2, 0xc000);
- 
-  // FIXME
-  write_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_MSR,0x00); // Unavailable on vanilla vga, but...
-@@ -1114,7 +1143,7 @@
-   }
-  else
-   {
--   address = page*vga_modes[line].slength;
-+   address = page * (*(Bit16u *)&video_param_table[line_to_vpti[line]].slength_l);
-   }
- 
-  // CRTC regs 0x0c and 0x0d
-@@ -1271,7 +1300,7 @@
-  else
-   {
-    // FIXME gfx mode not complete
--   cheight=vga_modes[line].cheight;
-+   cheight=video_param_table[line_to_vpti[line]].cheight;
-    switch(vga_modes[line].memmodel)
-     {
-      case PLANAR4:
-@@ -1581,7 +1610,7 @@
-  else
-   {
-    // FIXME gfx mode not complete
--   cheight=vga_modes[line].cheight;
-+   cheight=video_param_table[line_to_vpti[line]].cheight;
-    bpp=vga_modes[line].pixbits;
-    while((count-->0) && (xcurs<nbcols))
-     {
-@@ -1641,7 +1670,7 @@
-  else
-   {
-    // FIXME gfx mode not complete
--   cheight=vga_modes[line].cheight;
-+   cheight=video_param_table[line_to_vpti[line]].cheight;
-    bpp=vga_modes[line].pixbits;
-    while((count-->0) && (xcurs<nbcols))
-     {
-@@ -1949,7 +1978,7 @@
-     else
-      {
-       // FIXME gfx mode not complete
--      cheight=vga_modes[line].cheight;
-+      cheight=video_param_table[line_to_vpti[line]].cheight;
-       bpp=vga_modes[line].pixbits;
-       switch(vga_modes[line].memmodel)
-        {
-Index: vgatables.h
-===================================================================
-RCS file: /sources/vgabios/vgabios/vgatables.h,v
-retrieving revision 1.9
-diff -u -w -r1.9 vgatables.h
---- vgatables.h	21 Sep 2005 18:45:20 -0000	1.9
-+++ vgatables.h	25 Mar 2006 01:19:04 -0000
-@@ -77,7 +77,7 @@
-  * Tables of default values for each mode
-  *
-  */
--#define MODE_MAX   0x14
-+#define MODE_MAX   15
- #define TEXT       0x00
- #define GRAPH      0x01
- 
-@@ -96,126 +96,38 @@
- 
- typedef struct
- {Bit8u  svgamode;
-- Bit16u vesamode;
-  Bit8u  class;    /* TEXT, GRAPH */
-  Bit8u  memmodel; /* CTEXT,MTEXT,CGA,PL1,PL2,PL4,P8,P15,P16,P24,P32 */
-- Bit8u  nbpages; 
-  Bit8u  pixbits;
-- Bit16u swidth, sheight;
-- Bit16u twidth, theight;
-- Bit16u cwidth, cheight;
-  Bit16u sstart;
-- Bit16u slength;
-- Bit8u  miscreg;
-  Bit8u  pelmask;
-- Bit8u  crtcmodel;
-- Bit8u  actlmodel;
-- Bit8u  grdcmodel;
-- Bit8u  sequmodel;
-  Bit8u  dacmodel; /* 0 1 2 3 */
- } VGAMODES;
- 
- static VGAMODES vga_modes[MODE_MAX+1]=
--{//mode  vesa   class  model   pg bits sw   sh  tw  th  cw ch  sstart  slength misc  pelm  crtc  actl  gdc   sequ  dac
-- {0x00, 0xFFFF, TEXT,  CTEXT,   8, 4, 360, 400, 40, 25, 9, 16, 0xB800, 0x0800, 0x67, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x02},
-- {0x01, 0xFFFF, TEXT,  CTEXT,   8, 4, 360, 400, 40, 25, 9, 16, 0xB800, 0x0800, 0x67, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x02},
-- {0x02, 0xFFFF, TEXT,  CTEXT,   4, 4, 720, 400, 80, 25, 9, 16, 0xB800, 0x1000, 0x67, 0xFF, 0x01, 0x00, 0x00, 0x01, 0x02},
-- {0x03, 0xFFFF, TEXT,  CTEXT,   4, 4, 720, 400, 80, 25, 9, 16, 0xB800, 0x1000, 0x67, 0xFF, 0x01, 0x00, 0x00, 0x01, 0x02},
-- {0x04, 0xFFFF, GRAPH, CGA,     4, 2, 320, 200, 40, 25, 8, 8,  0xB800, 0x0800, 0x63, 0xFF, 0x02, 0x01, 0x01, 0x02, 0x01},
-- {0x05, 0xFFFF, GRAPH, CGA,     1, 2, 320, 200, 40, 25, 8, 8,  0xB800, 0x0800, 0x63, 0xFF, 0x02, 0x01, 0x01, 0x02, 0x01},
-- {0x06, 0xFFFF, GRAPH, CGA,     1, 1, 640, 200, 80, 25, 8, 8,  0xB800, 0x1000, 0x63, 0xFF, 0x03, 0x02, 0x02, 0x03, 0x01},
-- {0x07, 0xFFFF, TEXT,  MTEXT,   4, 4, 720, 400, 80, 25, 9, 16, 0xB000, 0x1000, 0x66, 0xFF, 0x04, 0x03, 0x03, 0x01, 0x00},
-- {0x0D, 0xFFFF, GRAPH, PLANAR4, 8, 4, 320, 200, 40, 25, 8, 8,  0xA000, 0x2000, 0x63, 0xFF, 0x05, 0x04, 0x04, 0x04, 0x01},
-- {0x0E, 0xFFFF, GRAPH, PLANAR4, 4, 4, 640, 200, 80, 25, 8, 8,  0xA000, 0x4000, 0x63, 0xFF, 0x06, 0x04, 0x04, 0x05, 0x01},
-- {0x0F, 0xFFFF, GRAPH, PLANAR1, 2, 1, 640, 350, 80, 25, 8, 14, 0xA000, 0x8000, 0xa3, 0xFF, 0x07, 0x05, 0x04, 0x05, 0x00},
-- {0x10, 0xFFFF, GRAPH, PLANAR4, 2, 4, 640, 350, 80, 25, 8, 14, 0xA000, 0x8000, 0xa3, 0xFF, 0x07, 0x06, 0x04, 0x05, 0x02},
-- {0x11, 0xFFFF, GRAPH, PLANAR1, 1, 1, 640, 480, 80, 30, 8, 16, 0xA000, 0x0000, 0xe3, 0xFF, 0x08, 0x07, 0x04, 0x05, 0x02},
-- {0x12, 0xFFFF, GRAPH, PLANAR4, 1, 4, 640, 480, 80, 30, 8, 16, 0xA000, 0x0000, 0xe3, 0xFF, 0x08, 0x06, 0x04, 0x05, 0x02},
-- {0x13, 0xFFFF, GRAPH, LINEAR8, 1, 8, 320, 200, 40, 25, 8, 8,  0xA000, 0x0000, 0x63, 0xFF, 0x09, 0x08, 0x05, 0x06, 0x03},
-- {0x6A, 0xFFFF, GRAPH, PLANAR4, 1, 4, 800, 600,100, 37, 8, 16, 0xA000, 0x0000, 0xe3, 0xFF, 0x0A, 0x06, 0x04, 0x05, 0x02}
--};
--
--/* CRTC */
--#define CRTC_MAX_REG   0x18
--#define CRTC_MAX_MODEL 0x0A
--static Bit8u crtc_access[CRTC_MAX_REG+1]=
--{        /* 00   01   02   03   04   05   06   07   08   09   0A   0B   0C   0D   0E   0F   10   11   12   13   14   15   16   17   18 */
--          0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
--};
--static Bit8u crtc_regs[CRTC_MAX_MODEL+1][CRTC_MAX_REG+1]=
--{/* Model   00   01   02   03   04   05   06   07   08   09   0A   0B   0C   0D   0E   0F   10   11   12   13   14   15   16   17   18 */
-- /* 00 */ 0x2d,0x27,0x28,0x90,0x2b,0xa0,0xbf,0x1f,0x00,0x4f,0x0d,0x0e,0x00,0x00,0x00,0x00,0x9c,0x8e,0x8f,0x14,0x1f,0x96,0xb9,0xa3,0xff,
-- /* 01 */ 0x5f,0x4f,0x50,0x82,0x55,0x81,0xbf,0x1f,0x00,0x4f,0x0d,0x0e,0x00,0x00,0x00,0x00,0x9c,0x8e,0x8f,0x28,0x1f,0x96,0xb9,0xa3,0xff,
-- /* 02 */ 0x2d,0x27,0x28,0x90,0x2b,0x80,0xbf,0x1f,0x00,0xc1,0x00,0x00,0x00,0x00,0x00,0x00,0x9c,0x8e,0x8f,0x14,0x00,0x96,0xb9,0xa2,0xff,
-- /* 03 */ 0x5f,0x4f,0x50,0x82,0x54,0x80,0xbf,0x1f,0x00,0xc1,0x00,0x00,0x00,0x00,0x00,0x00,0x9c,0x8e,0x8f,0x28,0x00,0x96,0xb9,0xc2,0xff,
-- /* 04 */ 0x5f,0x4f,0x50,0x82,0x55,0x81,0xbf,0x1f,0x00,0x4f,0x0d,0x0e,0x00,0x00,0x00,0x00,0x9c,0x8e,0x8f,0x28,0x0f,0x96,0xb9,0xa3,0xff,
-- /* 05 */ 0x2d,0x27,0x28,0x90,0x2b,0x80,0xbf,0x1f,0x00,0xc0,0x00,0x00,0x00,0x00,0x00,0x00,0x9c,0x8e,0x8f,0x14,0x00,0x96,0xb9,0xe3,0xff,
-- /* 06 */ 0x5f,0x4f,0x50,0x82,0x54,0x80,0xbf,0x1f,0x00,0xc0,0x00,0x00,0x00,0x00,0x00,0x00,0x9c,0x8e,0x8f,0x28,0x00,0x96,0xb9,0xe3,0xff,
-- /* 07 */ 0x5f,0x4f,0x50,0x82,0x54,0x80,0xbf,0x1f,0x00,0x40,0x00,0x00,0x00,0x00,0x00,0x00,0x83,0x85,0x5d,0x28,0x0f,0x63,0xba,0xe3,0xff,
-- /* 08 */ 0x5f,0x4f,0x50,0x82,0x54,0x80,0x0b,0x3e,0x00,0x40,0x00,0x00,0x00,0x00,0x00,0x00,0xea,0x8c,0xdf,0x28,0x00,0xe7,0x04,0xe3,0xff,
-- /* 09 */ 0x5f,0x4f,0x50,0x82,0x54,0x80,0xbf,0x1f,0x00,0x41,0x00,0x00,0x00,0x00,0x00,0x00,0x9c,0x8e,0x8f,0x28,0x40,0x96,0xb9,0xa3,0xff,
-- /* 0A */ 0x7f,0x63,0x63,0x83,0x6b,0x1b,0x72,0xf0,0x00,0x60,0x00,0x00,0x00,0x00,0x00,0x00,0x59,0x8d,0x57,0x32,0x00,0x57,0x73,0xe3,0xff
--};
--
--/* Attribute Controler 0x3c0 */
--#define ACTL_MAX_REG   0x14
--#define ACTL_MAX_MODEL 0x08
--
--static Bit8u actl_access[ACTL_MAX_REG+1]=
--{/*         00   01   02   03   04   05   06   07   08   09   0A   0B   OC   OD   OE   OF   10   11   12   13   14 */
--          0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
--};
--
--static Bit8u actl_regs[ACTL_MAX_MODEL+1][ACTL_MAX_REG+1]=
--{/* Model   00   01   02   03   04   05   06   07   08   09   0A   0B   OC   OD   OE   OF   10   11   12   13   14 */
-- /* 00 */ 0x00,0x01,0x02,0x03,0x04,0x05,0x14,0x07,0x38,0x39,0x3a,0x3b,0x3c,0x3d,0x3e,0x3f,0x0c,0x00,0x0f,0x08,0x00,
-- /* 01 */ 0x00,0x13,0x15,0x17,0x02,0x04,0x06,0x07,0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17,0x01,0x00,0x03,0x00,0x00,
-- /* 02 */ 0x00,0x17,0x17,0x17,0x17,0x17,0x17,0x17,0x17,0x17,0x17,0x17,0x17,0x17,0x17,0x17,0x01,0x00,0x01,0x00,0x00,
-- /* 03 */ 0x00,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x10,0x18,0x18,0x18,0x18,0x18,0x18,0x18,0x0e,0x00,0x0f,0x08,0x00,
-- /* 04 */ 0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17,0x01,0x00,0x0f,0x00,0x00,
-- /* 05 */ 0x00,0x08,0x00,0x00,0x18,0x18,0x00,0x00,0x00,0x08,0x00,0x00,0x00,0x18,0x00,0x00,0x01,0x00,0x01,0x00,0x00,
-- /* 06 */ 0x00,0x01,0x02,0x03,0x04,0x05,0x14,0x07,0x38,0x39,0x3a,0x3b,0x3c,0x3d,0x3e,0x3f,0x01,0x00,0x0f,0x00,0x00,
-- /* 07 */ 0x00,0x3f,0x00,0x3f,0x00,0x3f,0x00,0x3f,0x00,0x3f,0x00,0x3f,0x00,0x3f,0x00,0x3f,0x01,0x00,0x0f,0x00,0x00,
-- /* 08 */ 0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0a,0x0b,0x0c,0x0d,0x0e,0x0f,0x41,0x00,0x0f,0x00,0x00
--};
--
--/* Sequencer 0x3c4 */
--#define SEQU_MAX_REG   0x04
--#define SEQU_MAX_MODEL 0x06
--
--static Bit8u sequ_access[SEQU_MAX_REG+1]=
--{      /*   00   01   02   03   04 */
--          0x00,0x00,0x00,0x00,0x00
--};
--
--static Bit8u sequ_regs[SEQU_MAX_MODEL+1][SEQU_MAX_REG+1]=
--{/* Model   00   01   02   03   04 */
-- /* 00 */ 0x03,0x08,0x03,0x00,0x02,
-- /* 01 */ 0x03,0x00,0x03,0x00,0x02,
-- /* 02 */ 0x03,0x09,0x03,0x00,0x02,
-- /* 03 */ 0x03,0x01,0x01,0x00,0x06,
-- /* 04 */ 0x03,0x09,0x0f,0x00,0x06,
-- /* 05 */ 0x03,0x01,0x0f,0x00,0x06,
-- /* 06 */ 0x03,0x01,0x0f,0x00,0x0e
--};
--
--/* Graphic ctl 0x3ce */
--#define GRDC_MAX_REG   0x08
--#define GRDC_MAX_MODEL 0x05
--
--static Bit8u grdc_access[GRDC_MAX_REG+1]=
--{      /*   00   01   02   03   04   05   06   07   08 */
--          0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
--};
--
--static Bit8u grdc_regs[GRDC_MAX_MODEL+1][GRDC_MAX_REG+1]=
--{/* Model   00   01   02   03   04   05   06   07   08 */
-- /* 00 */ 0x00,0x00,0x00,0x00,0x00,0x10,0x0e,0x0f,0xff,
-- /* 01 */ 0x00,0x00,0x00,0x00,0x00,0x30,0x0f,0x0f,0xff,
-- /* 02 */ 0x00,0x00,0x00,0x00,0x00,0x00,0x0d,0x0f,0xff,
-- /* 03 */ 0x00,0x00,0x00,0x00,0x00,0x10,0x0a,0x0f,0xff,
-- /* 04 */ 0x00,0x00,0x00,0x00,0x00,0x00,0x05,0x0f,0xff,
-- /* 05 */ 0x00,0x00,0x00,0x00,0x00,0x40,0x05,0x0f,0xff 
-+{//mode  class  model bits sstart  pelm  dac
-+ {0x00, TEXT,  CTEXT,   4, 0xB800, 0xFF, 0x02},
-+ {0x01, TEXT,  CTEXT,   4, 0xB800, 0xFF, 0x02},
-+ {0x02, TEXT,  CTEXT,   4, 0xB800, 0xFF, 0x02},
-+ {0x03, TEXT,  CTEXT,   4, 0xB800, 0xFF, 0x02},
-+ {0x04, GRAPH, CGA,     2, 0xB800, 0xFF, 0x01},
-+ {0x05, GRAPH, CGA,     2, 0xB800, 0xFF, 0x01},
-+ {0x06, GRAPH, CGA,     1, 0xB800, 0xFF, 0x01},
-+ {0x07, TEXT,  MTEXT,   4, 0xB000, 0xFF, 0x00},
-+ {0x0D, GRAPH, PLANAR4, 4, 0xA000, 0xFF, 0x01},
-+ {0x0E, GRAPH, PLANAR4, 4, 0xA000, 0xFF, 0x01},
-+ {0x0F, GRAPH, PLANAR1, 1, 0xA000, 0xFF, 0x00},
-+ {0x10, GRAPH, PLANAR4, 4, 0xA000, 0xFF, 0x02},
-+ {0x11, GRAPH, PLANAR1, 1, 0xA000, 0xFF, 0x02},
-+ {0x12, GRAPH, PLANAR4, 4, 0xA000, 0xFF, 0x02},
-+ {0x13, GRAPH, LINEAR8, 8, 0xA000, 0xFF, 0x03},
-+ {0x6A, GRAPH, PLANAR4, 4, 0xA000, 0xFF, 0x02}
-+};
-+
-+/* convert index in vga_modes[] to index in video_param_table[] */
-+static Bit8u line_to_vpti[MODE_MAX+1]={
-+    0x17, 0x17, 0x18, 0x18, 0x04, 0x05, 0x06, 0x07, 
-+    0x0d, 0x0e, 0x11, 0x12, 0x1a, 0x1b, 0x1c, 0x1d,
- };
- 
- /* Default Palette */
-@@ -224,6 +136,398 @@
- static Bit8u dac_regs[DAC_MAX_MODEL+1]=
- {0x3f,0x3f,0x3f,0xff};
- 
-+/* standard BIOS Video Parameter Table */
-+typedef struct {
-+    Bit8u  twidth;
-+    Bit8u  theightm1;
-+    Bit8u  cheight;
-+    Bit8u  slength_l;
-+    Bit8u  slength_h;
-+    Bit8u  sequ_regs[4];
-+    Bit8u  miscreg;
-+    Bit8u  crtc_regs[25];
-+    Bit8u  actl_regs[20];
-+    Bit8u  grdc_regs[9];
-+} VideoParamTableEntry;
-+
-+static VideoParamTableEntry video_param_table[30] = {
-+{
-+ /* index=0x00 no mode defined */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+},
-+{
-+ /* index=0x01 no mode defined */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+},
-+{
-+ /* index=0x02 no mode defined */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+},
-+{
-+ /* index=0x03 no mode defined */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+},
-+{
-+ /* index=0x04 vga mode 0x04 */
-+ 40, 24, 8, 0x00, 0x08, /* tw, th-1, ch, slength */
-+ 0x09, 0x03, 0x00, 0x02, /* sequ_regs */
-+ 0x63, /* miscreg */
-+ 0x2d, 0x27, 0x28, 0x90, 0x2b, 0x80, 0xbf, 0x1f,
-+ 0x00, 0xc1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x9c, 0x8e, 0x8f, 0x14, 0x00, 0x96, 0xb9, 0xa2,
-+ 0xff, /* crtc_regs */
-+ 0x00, 0x13, 0x15, 0x17, 0x02, 0x04, 0x06, 0x07,
-+ 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
-+ 0x01, 0x00, 0x03, 0x00, /* actl_regs */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x30, 0x0f, 0x0f, 0xff, /* grdc_regs */
-+},
-+{
-+ /* index=0x05 vga mode 0x05 */
-+ 40, 24, 8, 0x00, 0x08, /* tw, th-1, ch, slength */
-+ 0x09, 0x03, 0x00, 0x02, /* sequ_regs */
-+ 0x63, /* miscreg */
-+ 0x2d, 0x27, 0x28, 0x90, 0x2b, 0x80, 0xbf, 0x1f,
-+ 0x00, 0xc1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x9c, 0x8e, 0x8f, 0x14, 0x00, 0x96, 0xb9, 0xa2,
-+ 0xff, /* crtc_regs */
-+ 0x00, 0x13, 0x15, 0x17, 0x02, 0x04, 0x06, 0x07,
-+ 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
-+ 0x01, 0x00, 0x03, 0x00, /* actl_regs */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x30, 0x0f, 0x0f, 0xff, /* grdc_regs */
-+},
-+{
-+ /* index=0x06 vga mode 0x06 */
-+ 80, 24, 8, 0x00, 0x10, /* tw, th-1, ch, slength */
-+ 0x01, 0x01, 0x00, 0x06, /* sequ_regs */
-+ 0x63, /* miscreg */
-+ 0x5f, 0x4f, 0x50, 0x82, 0x54, 0x80, 0xbf, 0x1f,
-+ 0x00, 0xc1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x9c, 0x8e, 0x8f, 0x28, 0x00, 0x96, 0xb9, 0xc2,
-+ 0xff, /* crtc_regs */
-+ 0x00, 0x17, 0x17, 0x17, 0x17, 0x17, 0x17, 0x17,
-+ 0x17, 0x17, 0x17, 0x17, 0x17, 0x17, 0x17, 0x17,
-+ 0x01, 0x00, 0x01, 0x00, /* actl_regs */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0d, 0x0f, 0xff, /* grdc_regs */
-+},
-+{
-+ /* index=0x07 vga mode 0x07 */
-+ 80, 24, 16, 0x00, 0x10, /* tw, th-1, ch, slength */
-+ 0x00, 0x03, 0x00, 0x02, /* sequ_regs */
-+ 0x66, /* miscreg */
-+ 0x5f, 0x4f, 0x50, 0x82, 0x55, 0x81, 0xbf, 0x1f,
-+ 0x00, 0x4f, 0x0d, 0x0e, 0x00, 0x00, 0x00, 0x00,
-+ 0x9c, 0x8e, 0x8f, 0x28, 0x0f, 0x96, 0xb9, 0xa3,
-+ 0xff, /* crtc_regs */
-+ 0x00, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
-+ 0x10, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18,
-+ 0x0e, 0x00, 0x0f, 0x08, /* actl_regs */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x0a, 0x0f, 0xff, /* grdc_regs */
-+},
-+{
-+ /* index=0x08 no mode defined */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+},
-+{
-+ /* index=0x09 no mode defined */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+},
-+{
-+ /* index=0x0a no mode defined */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+},
-+{
-+ /* index=0x0b no mode defined */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+},
-+{
-+ /* index=0x0c no mode defined */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+},
-+{
-+ /* index=0x0d vga mode 0x0d */
-+ 40, 24, 8, 0x00, 0x20, /* tw, th-1, ch, slength */
-+ 0x09, 0x0f, 0x00, 0x06, /* sequ_regs */
-+ 0x63, /* miscreg */
-+ 0x2d, 0x27, 0x28, 0x90, 0x2b, 0x80, 0xbf, 0x1f,
-+ 0x00, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x9c, 0x8e, 0x8f, 0x14, 0x00, 0x96, 0xb9, 0xe3,
-+ 0xff, /* crtc_regs */
-+ 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-+ 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
-+ 0x01, 0x00, 0x0f, 0x00, /* actl_regs */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x0f, 0xff, /* grdc_regs */
-+},
-+{
-+ /* index=0x0e vga mode 0x0e */
-+ 80, 24, 8, 0x00, 0x40, /* tw, th-1, ch, slength */
-+ 0x01, 0x0f, 0x00, 0x06, /* sequ_regs */
-+ 0x63, /* miscreg */
-+ 0x5f, 0x4f, 0x50, 0x82, 0x54, 0x80, 0xbf, 0x1f,
-+ 0x00, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x9c, 0x8e, 0x8f, 0x28, 0x00, 0x96, 0xb9, 0xe3,
-+ 0xff, /* crtc_regs */
-+ 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-+ 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
-+ 0x01, 0x00, 0x0f, 0x00, /* actl_regs */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x0f, 0xff, /* grdc_regs */
-+},
-+{
-+ /* index=0x0f no mode defined */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+},
-+{
-+ /* index=0x10 no mode defined */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+},
-+{
-+ /* index=0x11 vga mode 0x0f */
-+ 80, 24, 14, 0x00, 0x80, /* tw, th-1, ch, slength */
-+ 0x01, 0x0f, 0x00, 0x06, /* sequ_regs */
-+ 0xa3, /* miscreg */
-+ 0x5f, 0x4f, 0x50, 0x82, 0x54, 0x80, 0xbf, 0x1f,
-+ 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x83, 0x85, 0x5d, 0x28, 0x0f, 0x63, 0xba, 0xe3,
-+ 0xff, /* crtc_regs */
-+ 0x00, 0x08, 0x00, 0x00, 0x18, 0x18, 0x00, 0x00,
-+ 0x00, 0x08, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00,
-+ 0x01, 0x00, 0x01, 0x00, /* actl_regs */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x0f, 0xff, /* grdc_regs */
-+},
-+{
-+ /* index=0x12 vga mode 0x10 */
-+ 80, 24, 14, 0x00, 0x80, /* tw, th-1, ch, slength */
-+ 0x01, 0x0f, 0x00, 0x06, /* sequ_regs */
-+ 0xa3, /* miscreg */
-+ 0x5f, 0x4f, 0x50, 0x82, 0x54, 0x80, 0xbf, 0x1f,
-+ 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x83, 0x85, 0x5d, 0x28, 0x0f, 0x63, 0xba, 0xe3,
-+ 0xff, /* crtc_regs */
-+ 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x14, 0x07,
-+ 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f,
-+ 0x01, 0x00, 0x0f, 0x00, /* actl_regs */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x0f, 0xff, /* grdc_regs */
-+},
-+{
-+ /* index=0x13 no mode defined */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+},
-+{
-+ /* index=0x14 no mode defined */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+},
-+{
-+ /* index=0x15 no mode defined */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+},
-+{
-+ /* index=0x16 no mode defined */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+},
-+{
-+ /* index=0x17 vga mode 0x01 */
-+ 40, 24, 16, 0x00, 0x08, /* tw, th-1, ch, slength */
-+ 0x08, 0x03, 0x00, 0x02, /* sequ_regs */
-+ 0x67, /* miscreg */
-+ 0x2d, 0x27, 0x28, 0x90, 0x2b, 0xa0, 0xbf, 0x1f,
-+ 0x00, 0x4f, 0x0d, 0x0e, 0x00, 0x00, 0x00, 0x00,
-+ 0x9c, 0x8e, 0x8f, 0x14, 0x1f, 0x96, 0xb9, 0xa3,
-+ 0xff, /* crtc_regs */
-+ 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x14, 0x07,
-+ 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f,
-+ 0x0c, 0x00, 0x0f, 0x08, /* actl_regs */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x0e, 0x0f, 0xff, /* grdc_regs */
-+},
-+{
-+ /* index=0x18 vga mode 0x03 */
-+ 80, 24, 16, 0x00, 0x10, /* tw, th-1, ch, slength */
-+ 0x00, 0x03, 0x00, 0x02, /* sequ_regs */
-+ 0x67, /* miscreg */
-+ 0x5f, 0x4f, 0x50, 0x82, 0x55, 0x81, 0xbf, 0x1f,
-+ 0x00, 0x4f, 0x0d, 0x0e, 0x00, 0x00, 0x00, 0x00,
-+ 0x9c, 0x8e, 0x8f, 0x28, 0x1f, 0x96, 0xb9, 0xa3,
-+ 0xff, /* crtc_regs */
-+ 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x14, 0x07,
-+ 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f,
-+ 0x0c, 0x00, 0x0f, 0x08, /* actl_regs */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x0e, 0x0f, 0xff, /* grdc_regs */
-+},
-+{
-+ /* index=0x19 vga mode 0x07 */
-+ 80, 24, 16, 0x00, 0x10, /* tw, th-1, ch, slength */
-+ 0x00, 0x03, 0x00, 0x02, /* sequ_regs */
-+ 0x66, /* miscreg */
-+ 0x5f, 0x4f, 0x50, 0x82, 0x55, 0x81, 0xbf, 0x1f,
-+ 0x00, 0x4f, 0x0d, 0x0e, 0x00, 0x00, 0x00, 0x00,
-+ 0x9c, 0x8e, 0x8f, 0x28, 0x0f, 0x96, 0xb9, 0xa3,
-+ 0xff, /* crtc_regs */
-+ 0x00, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
-+ 0x10, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18,
-+ 0x0e, 0x00, 0x0f, 0x08, /* actl_regs */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x0a, 0x0f, 0xff, /* grdc_regs */
-+},
-+{
-+ /* index=0x1a vga mode 0x11 */
-+ 80, 29, 16, 0x00, 0x00, /* tw, th-1, ch, slength */
-+ 0x01, 0x0f, 0x00, 0x06, /* sequ_regs */
-+ 0xe3, /* miscreg */
-+ 0x5f, 0x4f, 0x50, 0x82, 0x54, 0x80, 0x0b, 0x3e,
-+ 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0xea, 0x8c, 0xdf, 0x28, 0x00, 0xe7, 0x04, 0xe3,
-+ 0xff, /* crtc_regs */
-+ 0x00, 0x3f, 0x00, 0x3f, 0x00, 0x3f, 0x00, 0x3f,
-+ 0x00, 0x3f, 0x00, 0x3f, 0x00, 0x3f, 0x00, 0x3f,
-+ 0x01, 0x00, 0x0f, 0x00, /* actl_regs */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x0f, 0xff, /* grdc_regs */
-+},
-+{
-+ /* index=0x1b vga mode 0x12 */
-+ 80, 29, 16, 0x00, 0x00, /* tw, th-1, ch, slength */
-+ 0x01, 0x0f, 0x00, 0x06, /* sequ_regs */
-+ 0xe3, /* miscreg */
-+ 0x5f, 0x4f, 0x50, 0x82, 0x54, 0x80, 0x0b, 0x3e,
-+ 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0xea, 0x8c, 0xdf, 0x28, 0x00, 0xe7, 0x04, 0xe3,
-+ 0xff, /* crtc_regs */
-+ 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x14, 0x07,
-+ 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f,
-+ 0x01, 0x00, 0x0f, 0x00, /* actl_regs */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x0f, 0xff, /* grdc_regs */
-+},
-+{
-+ /* index=0x1c vga mode 0x13 */
-+ 40, 24, 8, 0x00, 0x00, /* tw, th-1, ch, slength */
-+ 0x01, 0x0f, 0x00, 0x0e, /* sequ_regs */
-+ 0x63, /* miscreg */
-+ 0x5f, 0x4f, 0x50, 0x82, 0x54, 0x80, 0xbf, 0x1f,
-+ 0x00, 0x41, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x9c, 0x8e, 0x8f, 0x28, 0x40, 0x96, 0xb9, 0xa3,
-+ 0xff, /* crtc_regs */
-+ 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-+ 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
-+ 0x41, 0x00, 0x0f, 0x00, /* actl_regs */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x05, 0x0f, 0xff, /* grdc_regs */
-+},
-+{
-+ /* index=0x1d vga mode 0x6a */
-+ 100, 36, 16, 0x00, 0x00, /* tw, th-1, ch, slength */
-+ 0x01, 0x0f, 0x00, 0x06, /* sequ_regs */
-+ 0xe3, /* miscreg */
-+ 0x7f, 0x63, 0x63, 0x83, 0x6b, 0x1b, 0x72, 0xf0,
-+ 0x00, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-+ 0x59, 0x8d, 0x57, 0x32, 0x00, 0x57, 0x73, 0xe3,
-+ 0xff, /* crtc_regs */
-+ 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x14, 0x07,
-+ 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f,
-+ 0x01, 0x00, 0x0f, 0x00, /* actl_regs */
-+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x0f, 0xff, /* grdc_regs */
-+},
-+};
-+
- /* Mono */
- static Bit8u palette0[63+1][3]=
+-static void biosfn_read_video_state_size (CX,ES,BX) Bit16u CX;Bit16u ES;Bit16u BX;
++// --------------------------------------------------------------------------------------------
++static Bit16u biosfn_read_video_state_size2 (CX) 
++     Bit16u CX;
  {
+-#ifdef DEBUG
+- unimplemented();
+-#endif
++    Bit16u size;
++    size = 0;
++    if (CX & 1) {
++        size += 0x46;
++    }
++    if (CX & 2) {
++        size += (5 + 8 + 5) * 2 + 6;
++    }
++    if (CX & 4) {
++        size += 3 + 256 * 3 + 1;
+ }
+-static void biosfn_save_video_state (CX,ES,BX) Bit16u CX;Bit16u ES;Bit16u BX;
++    return size;
++}
++
++static void biosfn_read_video_state_size (CX, BX) 
++     Bit16u CX; Bit16u *BX;
+ {
+-#ifdef DEBUG
+- unimplemented();
+-#endif
++    Bit16u ss=get_SS();
++    write_word(ss, BX, biosfn_read_video_state_size2(CX));
+ }
+-static void biosfn_restore_video_state (CX,ES,BX) Bit16u CX;Bit16u ES;Bit16u BX;
++
++static Bit16u biosfn_save_video_state (CX,ES,BX) 
++     Bit16u CX;Bit16u ES;Bit16u BX;
+ {
+-#ifdef DEBUG
+- unimplemented();
+-#endif
++    Bit16u i, v, crtc_addr, ar_index;
++
++    crtc_addr = read_word(BIOSMEM_SEG, BIOSMEM_CRTC_ADDRESS);
++    if (CX & 1) {
++        write_byte(ES, BX, inb(VGAREG_SEQU_ADDRESS)); BX++;
++        write_byte(ES, BX, inb(crtc_addr)); BX++;
++        write_byte(ES, BX, inb(VGAREG_GRDC_ADDRESS)); BX++;
++        inb(VGAREG_ACTL_RESET);
++        ar_index = inb(VGAREG_ACTL_ADDRESS);
++        write_byte(ES, BX, ar_index); BX++;
++        write_byte(ES, BX, inb(VGAREG_READ_FEATURE_CTL)); BX++;
++
++        for(i=1;i<=4;i++){
++            outb(VGAREG_SEQU_ADDRESS, i);
++            write_byte(ES, BX, inb(VGAREG_SEQU_DATA)); BX++;
++        }
++        outb(VGAREG_SEQU_ADDRESS, 0);
++        write_byte(ES, BX, inb(VGAREG_SEQU_DATA)); BX++;
++
++        for(i=0;i<=0x18;i++) {
++            outb(crtc_addr,i);
++            write_byte(ES, BX, inb(crtc_addr+1)); BX++;
++        }
++
++        for(i=0;i<=0x13;i++) {
++            inb(VGAREG_ACTL_RESET);
++            outb(VGAREG_ACTL_ADDRESS, i | (ar_index & 0x20));
++            write_byte(ES, BX, inb(VGAREG_ACTL_READ_DATA)); BX++;
++        }
++        inb(VGAREG_ACTL_RESET);
++
++        for(i=0;i<=8;i++) {
++            outb(VGAREG_GRDC_ADDRESS,i);
++            write_byte(ES, BX, inb(VGAREG_GRDC_DATA)); BX++;
++        }
++
++        write_word(ES, BX, crtc_addr); BX+= 2;
++
++        /* XXX: read plane latches */
++        write_byte(ES, BX, 0); BX++;
++        write_byte(ES, BX, 0); BX++;
++        write_byte(ES, BX, 0); BX++;
++        write_byte(ES, BX, 0); BX++;
++    }
++    if (CX & 2) {
++        write_byte(ES, BX, read_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_MODE)); BX++;
++        write_word(ES, BX, read_word(BIOSMEM_SEG,BIOSMEM_NB_COLS)); BX += 2;
++        write_word(ES, BX, read_word(BIOSMEM_SEG,BIOSMEM_PAGE_SIZE)); BX += 2;
++        write_word(ES, BX, read_word(BIOSMEM_SEG,BIOSMEM_CRTC_ADDRESS)); BX += 2;
++        write_byte(ES, BX, read_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS)); BX++;
++        write_word(ES, BX, read_word(BIOSMEM_SEG,BIOSMEM_CHAR_HEIGHT)); BX += 2;
++        write_byte(ES, BX, read_byte(BIOSMEM_SEG,BIOSMEM_VIDEO_CTL)); BX++;
++        write_byte(ES, BX, read_byte(BIOSMEM_SEG,BIOSMEM_SWITCHES)); BX++;
++        write_byte(ES, BX, read_byte(BIOSMEM_SEG,BIOSMEM_MODESET_CTL)); BX++;
++        write_word(ES, BX, read_word(BIOSMEM_SEG,BIOSMEM_CURSOR_TYPE)); BX += 2;
++        for(i=0;i<8;i++) {
++            write_word(ES, BX, read_word(BIOSMEM_SEG, BIOSMEM_CURSOR_POS+2*i));
++            BX += 2;
++        }
++        write_word(ES, BX, read_word(BIOSMEM_SEG,BIOSMEM_CURRENT_START)); BX += 2;
++        write_byte(ES, BX, read_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_PAGE)); BX++;
++        /* current font */
++        write_word(ES, BX, read_word(0, 0x1f * 4)); BX += 2;
++        write_word(ES, BX, read_word(0, 0x1f * 4 + 2)); BX += 2;
++        write_word(ES, BX, read_word(0, 0x43 * 4)); BX += 2;
++        write_word(ES, BX, read_word(0, 0x43 * 4 + 2)); BX += 2;
++    }
++    if (CX & 4) {
++        /* XXX: check this */
++        write_byte(ES, BX, inb(VGAREG_DAC_STATE)); BX++; /* read/write mode dac */
++        write_byte(ES, BX, inb(VGAREG_DAC_WRITE_ADDRESS)); BX++; /* pix address */
++        write_byte(ES, BX, inb(VGAREG_PEL_MASK)); BX++;
++        // Set the whole dac always, from 0
++        outb(VGAREG_DAC_WRITE_ADDRESS,0x00);
++        for(i=0;i<256*3;i++) {
++            write_byte(ES, BX, inb(VGAREG_DAC_DATA)); BX++;
++        }
++        write_byte(ES, BX, 0); BX++; /* color select register */
++    }
++    return BX;
++}
++
++static Bit16u biosfn_restore_video_state (CX,ES,BX) 
++     Bit16u CX;Bit16u ES;Bit16u BX;
++{
++    Bit16u i, crtc_addr, v, addr1, ar_index;
++
++    if (CX & 1) {
++        // Reset Attribute Ctl flip-flop
++        inb(VGAREG_ACTL_RESET);
++
++        crtc_addr = read_word(ES, BX + 0x40);
++        addr1 = BX;
++        BX += 5;
++        
++        for(i=1;i<=4;i++){
++            outb(VGAREG_SEQU_ADDRESS, i);
++            outb(VGAREG_SEQU_DATA, read_byte(ES, BX)); BX++;
++        }
++        outb(VGAREG_SEQU_ADDRESS, 0);
++        outb(VGAREG_SEQU_DATA, read_byte(ES, BX)); BX++;
++
++        // Disable CRTC write protection
++        outw(crtc_addr,0x0011);
++        // Set CRTC regs
++        for(i=0;i<=0x18;i++) {
++            if (i != 0x11) {
++                outb(crtc_addr,i);
++                outb(crtc_addr+1, read_byte(ES, BX));
++            }
++            BX++;
++        }
++        // select crtc base address
++        v = inb(VGAREG_READ_MISC_OUTPUT) & ~0x01;
++        if (crtc_addr = 0x3d4)
++            v |= 0x01;
++        outb(VGAREG_WRITE_MISC_OUTPUT, v);
++
++        // enable write protection if needed
++        outb(crtc_addr, 0x11);
++        outb(crtc_addr+1, read_byte(ES, BX - 0x18 + 0x11));
++        
++        // Set Attribute Ctl
++        ar_index = read_byte(ES, addr1 + 0x03);
++        inb(VGAREG_ACTL_RESET);
++        for(i=0;i<=0x13;i++) {
++            outb(VGAREG_ACTL_ADDRESS, i | (ar_index & 0x20));
++            outb(VGAREG_ACTL_WRITE_DATA, read_byte(ES, BX)); BX++;
++        }
++        outb(VGAREG_ACTL_ADDRESS, ar_index);
++        inb(VGAREG_ACTL_RESET);
++        
++        for(i=0;i<=8;i++) {
++            outb(VGAREG_GRDC_ADDRESS,i);
++            outb(VGAREG_GRDC_DATA, read_byte(ES, BX)); BX++;
++        }
++        BX += 2; /* crtc_addr */
++        BX += 4; /* plane latches */
++        
++        outb(VGAREG_SEQU_ADDRESS, read_byte(ES, addr1)); addr1++;
++        outb(crtc_addr, read_byte(ES, addr1)); addr1++;
++        outb(VGAREG_GRDC_ADDRESS, read_byte(ES, addr1)); addr1++;
++        addr1++;
++        outb(crtc_addr - 0x4 + 0xa, read_byte(ES, addr1)); addr1++;
++    }
++    if (CX & 2) {
++        write_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_MODE, read_byte(ES, BX)); BX++;
++        write_word(BIOSMEM_SEG,BIOSMEM_NB_COLS, read_word(ES, BX)); BX += 2;
++        write_word(BIOSMEM_SEG,BIOSMEM_PAGE_SIZE, read_word(ES, BX)); BX += 2;
++        write_word(BIOSMEM_SEG,BIOSMEM_CRTC_ADDRESS, read_word(ES, BX)); BX += 2;
++        write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, read_byte(ES, BX)); BX++;
++        write_word(BIOSMEM_SEG,BIOSMEM_CHAR_HEIGHT, read_word(ES, BX)); BX += 2;
++        write_byte(BIOSMEM_SEG,BIOSMEM_VIDEO_CTL, read_byte(ES, BX)); BX++;
++        write_byte(BIOSMEM_SEG,BIOSMEM_SWITCHES, read_byte(ES, BX)); BX++;
++        write_byte(BIOSMEM_SEG,BIOSMEM_MODESET_CTL, read_byte(ES, BX)); BX++;
++        write_word(BIOSMEM_SEG,BIOSMEM_CURSOR_TYPE, read_word(ES, BX)); BX += 2;
++        for(i=0;i<8;i++) {
++            write_word(BIOSMEM_SEG, BIOSMEM_CURSOR_POS+2*i, read_word(ES, BX));
++            BX += 2;
++        }
++        write_word(BIOSMEM_SEG,BIOSMEM_CURRENT_START, read_word(ES, BX)); BX += 2;
++        write_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_PAGE, read_byte(ES, BX)); BX++;
++        /* current font */
++        write_word(0, 0x1f * 4, read_word(ES, BX)); BX += 2;
++        write_word(0, 0x1f * 4 + 2, read_word(ES, BX)); BX += 2;
++        write_word(0, 0x43 * 4, read_word(ES, BX)); BX += 2;
++        write_word(0, 0x43 * 4 + 2, read_word(ES, BX)); BX += 2;
++    }
++    if (CX & 4) {
++        BX++;
++        v = read_byte(ES, BX); BX++;
++        outb(VGAREG_PEL_MASK, read_byte(ES, BX)); BX++;
++        // Set the whole dac always, from 0
++        outb(VGAREG_DAC_WRITE_ADDRESS,0x00);
++        for(i=0;i<256*3;i++) {
++            outb(VGAREG_DAC_DATA, read_byte(ES, BX)); BX++;
++        }
++        BX++;
++        outb(VGAREG_DAC_WRITE_ADDRESS, v);
++    }
++    return BX;
+ }
+ 
+ // ============================================================================================
+diff -u -w vbetables-gen.c
+--- vbetables-gen.c	1970-01-01 01:00:00.000000000 +0100
++++ vbetables-gen.c	2006-06-14 00:52:18.000000000 +0200
+@@ -0,0 +1,217 @@
++/* Generate the VGABIOS VBE Tables */
++#include <stdlib.h>
++#include <stdio.h>
++
++typedef struct {
++    int width;
++    int height;
++    int depth;
++    int mode;
++} ModeInfo;
++
++ModeInfo modes[] = {
++    /* standard VESA modes */
++{ 640, 400, 8                          , 0x100},
++{ 640, 480, 8                          , 0x101},
++{ 800, 600, 4                          , 0x102},
++{ 800, 600, 8                          , 0x103},
++    //{ 1024, 768, 4                         , 0x104},
++{ 1024, 768, 8                         , 0x105},
++    //{ 1280, 1024, 4                        , 0x106},
++{ 1280, 1024, 8                        , 0x107},
++{ 320, 200, 15                       , 0x10D},
++{ 320, 200, 16                        , 0x10E},
++{ 320, 200, 24                        , 0x10F},
++{ 640, 480, 15                       , 0x110},
++{ 640, 480, 16                        , 0x111},
++{ 640, 480, 24                        , 0x112},
++{ 800, 600, 15                       , 0x113},
++{ 800, 600, 16                        , 0x114},
++{ 800, 600, 24                        , 0x115},
++{ 1024, 768, 15                      , 0x116},
++{ 1024, 768, 16                       , 0x117},
++{ 1024, 768, 24                       , 0x118},
++{ 1280, 1024, 15                     , 0x119},
++{ 1280, 1024, 16                      , 0x11A},
++{ 1280, 1024, 24                      , 0x11B},
++{ 1600, 1200, 8                        , 0x11C},
++{ 1600, 1200, 15                     , 0x11D},
++{ 1600, 1200, 16                      , 0x11E},
++{ 1600, 1200, 24                      , 0x11F},
++
++      /* BOCHS/PLE, 86 'own' mode numbers */
++{ 320, 200, 32                        , 0x140},
++{ 640, 400, 32                        , 0x141},
++{ 640, 480, 32                        , 0x142},
++{ 800, 600, 32                        , 0x143},
++{ 1024, 768, 32                       , 0x144},
++{ 1280, 1024, 32                      , 0x145},
++{ 320, 200, 8                           , 0x146},
++{ 1600, 1200, 32                      , 0x147},
++{ 1152, 864, 8                      , 0x148},
++{ 1152, 864, 15                      , 0x149},
++{ 1152, 864, 16                      , 0x14a},
++{ 1152, 864, 24                      , 0x14b},
++{ 1152, 864, 32                      , 0x14c},
++{ 0, },
++};
++
++int main(int argc, char **argv)
++{
++    const ModeInfo *pm;
++    int pitch, r_size, r_pos, g_size, g_pos, b_size, b_pos, a_size, a_pos;
++    const char *str;
++
++    printf("/* THIS FILE IS AUTOMATICALLY GENERATED - DO NOT EDIT */\n");
++    printf("static ModeInfoListItem mode_info_list[]=\n");
++    printf("{\n");
++    for(pm = modes; pm->mode != 0; pm++) {
++        printf("{ 0x%04x, /* %dx%dx%d */\n", 
++               pm->mode, pm->width, pm->height, pm->depth);
++        printf("{ /*Bit16u ModeAttributes*/ %s,\n", 
++               "VBE_MODE_ATTRIBUTE_SUPPORTED | "
++               "VBE_MODE_ATTRIBUTE_EXTENDED_INFORMATION_AVAILABLE | "
++               "VBE_MODE_ATTRIBUTE_COLOR_MODE | "
++               "VBE_MODE_ATTRIBUTE_LINEAR_FRAME_BUFFER_MODE | "
++               "VBE_MODE_ATTRIBUTE_GRAPHICS_MODE");
++           
++        printf("/*Bit8u  WinAAttributes*/ %s,\n",
++               "VBE_WINDOW_ATTRIBUTE_RELOCATABLE | "
++               "VBE_WINDOW_ATTRIBUTE_READABLE | "
++               "VBE_WINDOW_ATTRIBUTE_WRITEABLE");
++        
++        printf("/*Bit8u  WinBAttributes*/ %d,\n", 0);
++        
++        printf("/*Bit16u WinGranularity*/ %s,\n", "VBE_DISPI_BANK_SIZE_KB");
++        
++        printf("/*Bit16u WinSize*/ %s,\n", "VBE_DISPI_BANK_SIZE_KB");
++        
++        printf("/*Bit16u WinASegment*/ %s,\n", "VGAMEM_GRAPH");
++        
++        printf("/*Bit16u WinBSegment*/ 0x%04x,\n", 0);
++        
++        printf("/*Bit32u WinFuncPtr*/ %d,\n", 0);
++        
++        if (pm->depth == 4)
++            pitch = (pm->width + 7) / 8;
++        else
++            pitch = pm->width * ((pm->depth + 7) / 8);
++        printf("/*Bit16u BytesPerScanLine*/ %d,\n", pitch);
++
++        // Mandatory information for VBE 1.2 and above
++        printf("/*Bit16u XResolution*/ %d,\n", pm->width);
++        printf("/*Bit16u YResolution*/ %d,\n", pm->height);
++        printf("/*Bit8u  XCharSize*/ %d,\n", 8);
++        printf("/*Bit8u  YCharSize*/ %d,\n", 16);
++        if (pm->depth == 4) {
++            printf("/*Bit8u  NumberOfPlanes*/ %d,\n", 4);
++            printf("/*Bit8u  BitsPerPixel*/ %d,\n", pm->depth);
++        } else {
++            printf("/*Bit8u  NumberOfPlanes*/ %d,\n", 1);
++            printf("/*Bit8u  BitsPerPixel*/ %d,\n", pm->depth);
++        }
++        printf("/*Bit8u  NumberOfBanks*/ %d,\n", 
++               (pm->height * pitch + 65535) / 65536);
++
++        if (pm->depth == 4)
++            str = "VBE_MEMORYMODEL_PLANAR";
++        else if (pm->depth == 8)
++            str = "VBE_MEMORYMODEL_PACKED_PIXEL";
++        else
++            str = "VBE_MEMORYMODEL_DIRECT_COLOR";
++        printf("/*Bit8u  MemoryModel*/ %s,\n", str);
++        printf("/*Bit8u  BankSize*/ %d,\n", 0);
++        /* XXX: check */
++        printf("/*Bit8u  NumberOfImagePages*/ %d,\n", 0);
++        printf("/*Bit8u  Reserved_page*/ %d,\n", 0);
++
++        // Direct Color fields (required for direct/6 and YUV/7 memory models)
++        switch(pm->depth) {
++        case 15:
++            r_size = 5;
++            r_pos = 10;
++            g_size = 5;
++            g_pos = 5;
++            b_size = 5;
++            b_pos = 0;
++            a_size = 1;
++            a_pos = 15;
++            break;
++        case 16:
++            r_size = 5;
++            r_pos = 11;
++            g_size = 6;
++            g_pos = 5;
++            b_size = 5;
++            b_pos = 0;
++            a_size = 0;
++            a_pos = 0;
++            break;
++        case 24:
++            r_size = 8;
++            r_pos = 16;
++            g_size = 8;
++            g_pos = 8;
++            b_size = 8;
++            b_pos = 0;
++            a_size = 0;
++            a_pos = 0;
++            break;
++        case 32:
++            r_size = 8;
++            r_pos = 16;
++            g_size = 8;
++            g_pos = 8;
++            b_size = 8;
++            b_pos = 0;
++            a_size = 8;
++            a_pos = 24;
++            break;
++        default:
++            r_size = 0;
++            r_pos = 0;
++            g_size = 0;
++            g_pos = 0;
++            b_size = 0;
++            b_pos = 0;
++            a_size = 0;
++            a_pos = 0;
++            break;
++        }
++
++        printf("/*Bit8u  RedMaskSize*/ %d,\n", r_size);               
++        printf("/*Bit8u  RedFieldPosition*/ %d,\n", r_pos);          
++        printf("/*Bit8u  GreenMaskSize*/ %d,\n", g_size);             
++        printf("/*Bit8u  GreenFieldPosition*/ %d,\n", g_pos);        
++        printf("/*Bit8u  BlueMaskSize*/ %d,\n", b_size);              
++        printf("/*Bit8u  BlueFieldPosition*/ %d,\n", b_pos);         
++        printf("/*Bit8u  RsvdMaskSize*/ %d,\n", a_size);              
++        printf("/*Bit8u  RsvdFieldPosition*/ %d,\n", a_pos);         
++        printf("/*Bit8u  DirectColorModeInfo*/ %d,\n", 0);       
++
++// Mandatory information for VBE 2.0 and above
++        printf("/*Bit32u PhysBasePtr*/ %s,\n",             
++               "VBE_DISPI_LFB_PHYSICAL_ADDRESS");
++        printf("/*Bit32u OffScreenMemOffset*/ %d,\n", 0);
++        printf("/*Bit16u OffScreenMemSize*/ %d,\n", 0);
++        // Mandatory information for VBE 3.0 and above
++        printf("/*Bit16u LinBytesPerScanLine*/ %d,\n", pitch);
++        printf("/*Bit8u  BnkNumberOfPages*/ %d,\n", 0);
++        printf("/*Bit8u  LinNumberOfPages*/ %d,\n", 0);
++        printf("/*Bit8u  LinRedMaskSize*/ %d,\n", r_size);
++        printf("/*Bit8u  LinRedFieldPosition*/ %d,\n", r_pos);
++        printf("/*Bit8u  LinGreenMaskSize*/ %d,\n", g_size);
++        printf("/*Bit8u  LinGreenFieldPosition*/ %d,\n", g_pos);
++        printf("/*Bit8u  LinBlueMaskSize*/ %d,\n", b_size);
++        printf("/*Bit8u  LinBlueFieldPosition*/ %d,\n", b_pos);
++        printf("/*Bit8u  LinRsvdMaskSize*/ %d,\n", a_size);
++        printf("/*Bit8u  LinRsvdFieldPosition*/ %d,\n", a_pos);
++        printf("/*Bit32u MaxPixelClock*/ %d,\n", 0);
++        printf("} },\n");
++    }
++    printf("{ VBE_VESA_MODE_END_OF_LIST,\n");
++    printf("{ 0,\n");
++    printf("} },\n");
++    printf("};\n");
++    return 0;
++}

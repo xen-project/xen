@@ -8,7 +8,7 @@
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
-#include <xen/compile.h>
+#include <xen/version.h>
 #include <xen/sched.h>
 #include <xen/shadow.h>
 #include <xen/guest_access.h>
@@ -125,13 +125,13 @@ long do_xen_version(int cmd, XEN_GUEST_HANDLE(void) arg)
     {
     case XENVER_version:
     {
-        return (XEN_VERSION<<16) | (XEN_SUBVERSION);
+        return (xen_major_version() << 16) | xen_minor_version();
     }
 
     case XENVER_extraversion:
     {
         xen_extraversion_t extraversion;
-        safe_strcpy(extraversion, XEN_EXTRAVERSION);
+        safe_strcpy(extraversion, xen_extra_version());
         if ( copy_to_guest(arg, (char *)extraversion, sizeof(extraversion)) )
             return -EFAULT;
         return 0;
@@ -140,10 +140,10 @@ long do_xen_version(int cmd, XEN_GUEST_HANDLE(void) arg)
     case XENVER_compile_info:
     {
         struct xen_compile_info info;
-        safe_strcpy(info.compiler,       XEN_COMPILER);
-        safe_strcpy(info.compile_by,     XEN_COMPILE_BY);
-        safe_strcpy(info.compile_domain, XEN_COMPILE_DOMAIN);
-        safe_strcpy(info.compile_date,   XEN_COMPILE_DATE);
+        safe_strcpy(info.compiler,       xen_compiler());
+        safe_strcpy(info.compile_by,     xen_compile_by());
+        safe_strcpy(info.compile_domain, xen_compile_domain());
+        safe_strcpy(info.compile_date,   xen_compile_date());
         if ( copy_to_guest(arg, &info, 1) )
             return -EFAULT;
         return 0;
@@ -176,7 +176,7 @@ long do_xen_version(int cmd, XEN_GUEST_HANDLE(void) arg)
     case XENVER_changeset:
     {
         xen_changeset_info_t chgset;
-        safe_strcpy(chgset, XEN_CHANGESET);
+        safe_strcpy(chgset, xen_changeset());
         if ( copy_to_guest(arg, (char *)chgset, sizeof(chgset)) )
             return -EFAULT;
         return 0;
@@ -217,6 +217,13 @@ long do_xen_version(int cmd, XEN_GUEST_HANDLE(void) arg)
         return (!guest_handle_is_null(arg) ? -EINVAL : PAGE_SIZE);
     }
 
+    case XENVER_guest_handle:
+    {
+        if ( copy_to_guest(arg, (char *)current->domain->handle,
+                           sizeof(current->domain->handle)) )
+            return -EFAULT;
+        return 0;
+    }    
     }
 
     return -ENOSYS;

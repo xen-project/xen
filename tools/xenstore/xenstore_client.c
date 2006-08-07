@@ -60,6 +60,8 @@ usage(const char *progname)
     errx(1, "Usage: %s [-h] [-s] [-t] key [...]", progname);
 #elif defined(CLIENT_exists) || defined(CLIENT_list)
     errx(1, "Usage: %s [-h] [-s] key [...]", progname);
+#elif defined(CLIENT_chmod)
+    errx(1, "Usage: %s [-h] [-s] key <mode [modes...]>", progname);
 #endif
 }
 
@@ -78,10 +80,61 @@ do_rm(char *path, struct xs_handle *xsh, xs_transaction_t xth)
 }
 #endif
 
+#if defined(CLIENT_chmod)
+#define PATH_SEP '/'
+#define MAX_PATH_LEN 256
+
+static void
+do_chmod(char *path, struct xs_permissions *perms, int nperms, int upto,
+	 int recurse, struct xs_handle *xsh, xs_transaction_t xth)
+{
+    int ret;
+
+    if (!path[0])
+	return;
+
+    ret = xs_set_permissions(xsh, xth, path, perms, nperms);
+    if (!ret)
+	err(1, "Error occurred setting permissions on '%s'", path);
+
+    if (upto) {
+	/* apply same permissions to all parent entries: */
+	char *path_sep_ptr = strrchr(path, PATH_SEP);
+	if (!path_sep_ptr)
+	    errx(1, "Unable to locate path separator '%c' in '%s'",
+		 PATH_SEP, path);
+	
+	*path_sep_ptr = '\0'; /* truncate path */
+	
+	do_chmod(path, perms, nperms, 1, 0, xsh, xth);
+
+	*path_sep_ptr = PATH_SEP;
+    }
+
+    if (recurse) {
+	char buf[MAX_PATH_LEN];
+
+	/* apply same permissions to all child entries: */
+	unsigned int xsval_n;
+	char **xsval = xs_directory(xsh, xth, path, &xsval_n);
+
+	if (xsval) {
+	    int i;
+	    for (i = 0; i < xsval_n; i++) {
+		snprintf(buf, MAX_PATH_LEN, "%s/%s", path, xsval[i]);
+
+		do_chmod(buf, perms, nperms, 0, 1, xsh, xth);
+	    }
+
+	    free(xsval);
+	}
+    }
+}
+#endif
 
 static int
 perform(int optind, int argc, char **argv, struct xs_handle *xsh,
-        xs_transaction_t xth, int prefix, int tidy)
+        xs_transaction_t xth, int prefix, int tidy, int upto, int recurse)
 {
     while (optind < argc) {
 #if defined(CLIENT_read)
@@ -168,6 +221,41 @@ perform(int optind, int argc, char **argv, struct xs_handle *xsh,
 	}
 	free(list);
 	optind++;
+#elif defined(CLIENT_chmod)
+#define MAX_PERMS 16
+	struct xs_permissions perms[MAX_PERMS];
+	int nperms = 0;
+	/* save path pointer: */
+	char *path = argv[optind++];
+	for (; argv[optind]; optind++, nperms++)
+	{
+	    if (MAX_PERMS <= nperms)
+		errx(1, "Too many permissions specified.  "
+		     "Maximum per invocation is %d.", MAX_PERMS);
+
+	    perms[nperms].id = atoi(argv[optind]+1);
+
+	    switch (argv[optind][0])
+	    {
+	    case 'n':
+		perms[nperms].perms = XS_PERM_NONE;
+		break;
+	    case 'r':
+		perms[nperms].perms = XS_PERM_READ;
+		break;
+	    case 'w':
+		perms[nperms].perms = XS_PERM_WRITE;
+		break;
+	    case 'b':
+		perms[nperms].perms = XS_PERM_READ | XS_PERM_WRITE;
+		break;
+	    default:
+		errx(1, "Invalid permission specification: '%c'",
+		     argv[optind][0]);
+	    }
+	}
+
+	do_chmod(path, perms, nperms, upto, recurse, xsh, xth);
 #endif
     }
 
@@ -183,6 +271,8 @@ main(int argc, char **argv)
     int ret = 0, socket = 0;
     int prefix = 0;
     int tidy = 0;
+    int upto = 0;
+    int recurse = 0;
 
     while (1) {
 	int c, index = 0;
@@ -193,6 +283,9 @@ main(int argc, char **argv)
 	    {"prefix", 0, 0, 'p'},
 #elif defined(CLIENT_rm)
             {"tidy",   0, 0, 't'},
+#elif defined(CLIENT_chmod)
+	    {"upto",    0, 0, 'u'},
+	    {"recurse", 0, 0, 'r'},
 #endif
 	    {0, 0, 0, 0}
 	};
@@ -202,6 +295,8 @@ main(int argc, char **argv)
 			"p"
 #elif defined(CLIENT_rm)
                         "t"
+#elif defined(CLIENT_chmod)
+			"ur"
 #endif
 			, long_options, &index);
 	if (c == -1)
@@ -221,6 +316,13 @@ main(int argc, char **argv)
 #elif defined(CLIENT_rm)
 	case 't':
 	    tidy = 1;
+	    break;
+#elif defined(CLIENT_chmod)
+	case 'u':
+	    upto = 1;
+	    break;
+	case 'r':
+	    recurse = 1;
 	    break;
 #endif
 	}
@@ -246,7 +348,7 @@ main(int argc, char **argv)
     if (xth == XBT_NULL)
 	errx(1, "couldn't start transaction");
 
-    ret = perform(optind, argc, argv, xsh, xth, prefix, tidy);
+    ret = perform(optind, argc, argv, xsh, xth, prefix, tidy, upto, recurse);
 
     if (!xs_transaction_end(xsh, xth, ret)) {
 	if (ret == 0 && errno == EAGAIN) {

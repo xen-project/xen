@@ -66,6 +66,7 @@ struct transaction
 	struct list_head changes;
 };
 
+extern int quota_max_transaction;
 static unsigned int generation;
 
 /* Return tdb context to use for this connection. */
@@ -132,6 +133,11 @@ void do_transaction_start(struct connection *conn, struct buffered_data *in)
 		return;
 	}
 
+	if (conn->transaction_started > quota_max_transaction) {
+		send_error(conn, ENOSPC);
+		return;
+	}
+
 	/* Attach transaction to input for autofree until it's complete */
 	trans = talloc(in, struct transaction);
 	INIT_LIST_HEAD(&trans->changes);
@@ -156,6 +162,7 @@ void do_transaction_start(struct connection *conn, struct buffered_data *in)
 	list_add_tail(&trans->list, &conn->transaction_list);
 	talloc_steal(conn, trans);
 	talloc_set_destructor(trans, destroy_transaction);
+	conn->transaction_started++;
 
 	sprintf(id_str, "%u", trans->id);
 	send_reply(conn, XS_TRANSACTION_START, id_str, strlen(id_str)+1);
@@ -178,6 +185,7 @@ void do_transaction_end(struct connection *conn, const char *arg)
 
 	conn->transaction = NULL;
 	list_del(&trans->list);
+	conn->transaction_started--;
 
 	/* Attach transaction to arg for auto-cleanup */
 	talloc_steal(arg, trans);

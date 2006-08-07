@@ -22,7 +22,7 @@
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/multiboot.h>
-#include <xen/compile.h>
+#include <xen/version.h>
 #include <xen/spinlock.h>
 #include <xen/serial.h>
 #include <xen/time.h>
@@ -976,9 +976,9 @@ multiboot_info_t __init *boot_of_init(
 
     of_printf("%s\n", "---------------------------------------------------");
     of_printf("OF: Xen/PPC version %d.%d%s (%s@%s) (%s) %s\n",
-              XEN_VERSION, XEN_SUBVERSION, XEN_EXTRAVERSION,
-              XEN_COMPILE_BY, XEN_COMPILE_DOMAIN,
-              XEN_COMPILER, XEN_COMPILE_DATE);
+              xen_major_version(), xen_minor_version(), xen_extra_version(),
+              xen_compile_by(), xen_compile_domain(),
+              xen_compiler(), xen_compile_date());
 
     of_printf("%s args: 0x%lx 0x%lx 0x%lx 0x%lx 0x%lx\n"
             "boot msr: 0x%lx\n",

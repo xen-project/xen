@@ -25,7 +25,7 @@
 #include <xen/init.h>
 #include <xen/ctype.h>
 #include <xen/iocap.h>
-#include <xen/compile.h>
+#include <xen/version.h>
 #include <asm/processor.h>
 #include <asm/papr.h>
 #include "oftree.h"
@@ -153,7 +153,7 @@ int construct_dom0(struct domain *d,
     printk("xen_start_info: %p\n", si);
 
     sprintf(si->magic, "xen-%i.%i-powerpc%d%s",
-            XEN_VERSION, XEN_SUBVERSION, BITS_PER_LONG, "HV");
+            xen_major_version(), xen_minor_version(), BITS_PER_LONG, "HV");
     si->flags = SIF_PRIVILEGED | SIF_INITDOMAIN;
 
     si->shared_info = ((ulong)d->shared_info) - rma;

@@ -26,20 +26,20 @@
 
 /* this represents a event handler. Chaining or sharing is not allowed */
 typedef struct _ev_action_t {
-	void (*handler)(int, struct pt_regs *, void *);
+	evtchn_handler_t handler;
 	void *data;
     u32 count;
 } ev_action_t;
 
 
 static ev_action_t ev_actions[NR_EVS];
-void default_handler(int port, struct pt_regs *regs, void *data);
+void default_handler(evtchn_port_t port, struct pt_regs *regs, void *data);
 
 
 /*
  * Demux events to different handlers.
  */
-int do_event(u32 port, struct pt_regs *regs)
+int do_event(evtchn_port_t port, struct pt_regs *regs)
 {
     ev_action_t  *action;
     if (port >= NR_EVS) {
@@ -60,8 +60,8 @@ int do_event(u32 port, struct pt_regs *regs)
 
 }
 
-int bind_evtchn( u32 port, void (*handler)(int, struct pt_regs *, void *),
-				 void *data )
+evtchn_port_t bind_evtchn(evtchn_port_t port, evtchn_handler_t handler,
+						  void *data)
 {
  	if(ev_actions[port].handler != default_handler)
         printk("WARN: Handler for port %d already registered, replacing\n",
@@ -77,7 +77,7 @@ int bind_evtchn( u32 port, void (*handler)(int, struct pt_regs *, void *),
 	return port;
 }
 
-void unbind_evtchn( u32 port )
+void unbind_evtchn(evtchn_port_t port )
 {
 	if (ev_actions[port].handler == default_handler)
 		printk("WARN: No handler for port %d when unbinding\n", port);
@@ -86,8 +86,7 @@ void unbind_evtchn( u32 port )
 	ev_actions[port].data = NULL;
 }
 
-int bind_virq( u32 virq, void (*handler)(int, struct pt_regs *, void *data),
-			   void *data)
+int bind_virq(uint32_t virq, evtchn_handler_t handler, void *data)
 {
 	evtchn_op_t op;
 
@@ -103,11 +102,6 @@ int bind_virq( u32 virq, void (*handler)(int, struct pt_regs *, void *data),
     }
     bind_evtchn(op.u.bind_virq.port, handler, data);
 	return 0;
-}
-
-void unbind_virq( u32 port )
-{
-	unbind_evtchn(port);
 }
 
 #if defined(__x86_64__)
@@ -142,32 +136,48 @@ void init_events(void)
     }
 }
 
-void default_handler(int port, struct pt_regs *regs, void *ignore)
+void default_handler(evtchn_port_t port, struct pt_regs *regs, void *ignore)
 {
     printk("[Port %d] - event received\n", port);
 }
 
+/* Create a port available to the pal for exchanging notifications.
+   Returns the result of the hypervisor call. */
+
 /* Unfortunate confusion of terminology: the port is unbound as far
    as Xen is concerned, but we automatically bind a handler to it
    from inside mini-os. */
-int evtchn_alloc_unbound(void (*handler)(int, struct pt_regs *regs,
-										 void *data),
-						 void *data)
+
+int evtchn_alloc_unbound(domid_t pal, evtchn_handler_t handler,
+						 void *data, evtchn_port_t *port)
 {
-	u32 port;
-	evtchn_op_t op;
-	int err;
+    evtchn_op_t op;
+    op.cmd = EVTCHNOP_alloc_unbound;
+    op.u.alloc_unbound.dom = DOMID_SELF;
+    op.u.alloc_unbound.remote_dom = pal;
+    int err = HYPERVISOR_event_channel_op(&op);
+    if (err)
+		return err;
+    *port = bind_evtchn(op.u.alloc_unbound.port, handler, data);
+    return err;
+}
 
-	op.cmd = EVTCHNOP_alloc_unbound;
-	op.u.alloc_unbound.dom = DOMID_SELF;
-	op.u.alloc_unbound.remote_dom = 0;
+/* Connect to a port so as to allow the exchange of notifications with
+   the pal. Returns the result of the hypervisor call. */
 
-	err = HYPERVISOR_event_channel_op(&op);
-	if (err) {
-		printk("Failed to alloc unbound evtchn: %d.\n", err);
-		return -1;
-	}
-	port = op.u.alloc_unbound.port;
-	bind_evtchn(port, handler, data);
-	return port;
+int evtchn_bind_interdomain(domid_t pal, evtchn_port_t remote_port,
+			    evtchn_handler_t handler, void *data,
+			    evtchn_port_t *local_port)
+{
+    evtchn_op_t op;
+    op.cmd = EVTCHNOP_bind_interdomain;
+    op.u.bind_interdomain.remote_dom = pal;
+    op.u.bind_interdomain.remote_port = remote_port;
+    int err = HYPERVISOR_event_channel_op(&op);
+    if (err)
+		return err;
+	evtchn_port_t port = op.u.bind_interdomain.local_port;
+    clear_evtchn(port);	      /* Without, handler gets invoked now! */
+    *local_port = bind_evtchn(port, handler, data);
+    return err;
 }

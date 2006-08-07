@@ -1,8 +1,8 @@
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2006-07-14 15:50:41.320748096 +0100
-+++ ioemu/Makefile.target	2006-07-14 15:55:04.753733845 +0100
-@@ -285,7 +285,7 @@
+--- ioemu.orig/Makefile.target	2006-08-06 02:14:04.797460093 +0100
++++ ioemu/Makefile.target	2006-08-06 02:14:09.794902973 +0100
+@@ -302,7 +302,7 @@
  endif
  
  # must use static linking to avoid leaving stuff in virtual address space
@@ -13,8 +13,8 @@ Index: ioemu/Makefile.target
  VL_OBJS+=tap-win32.o
 Index: ioemu/configure
 ===================================================================
---- ioemu.orig/configure	2006-07-14 15:50:41.320748096 +0100
-+++ ioemu/configure	2006-07-14 15:55:04.753733845 +0100
+--- ioemu.orig/configure	2006-08-06 02:14:04.797460093 +0100
++++ ioemu/configure	2006-08-06 02:14:09.795902861 +0100
 @@ -75,8 +75,8 @@
  bigendian="no"
  mingw32="no"
@@ -26,7 +26,7 @@ Index: ioemu/configure
  adlib="no"
  oss="no"
  dsound="no"
-@@ -727,6 +727,8 @@
+@@ -749,6 +749,8 @@
  if expr $target : '.*-softmmu' > /dev/null ; then
    target_softmmu="yes"
  fi
@@ -37,8 +37,8 @@ Index: ioemu/configure
    target_user_only="yes"
 Index: ioemu/cpu-all.h
 ===================================================================
---- ioemu.orig/cpu-all.h	2006-07-14 15:50:30.488983278 +0100
-+++ ioemu/cpu-all.h	2006-07-14 15:55:04.544757636 +0100
+--- ioemu.orig/cpu-all.h	2006-08-06 02:14:04.797460093 +0100
++++ ioemu/cpu-all.h	2006-08-06 02:14:09.796902750 +0100
 @@ -690,7 +690,9 @@
  void page_set_flags(target_ulong start, target_ulong end, int flags);
  void page_unprotect_range(target_ulong data, target_ulong data_size);
@@ -64,8 +64,8 @@ Index: ioemu/cpu-all.h
  void cpu_dump_state(CPUState *env, FILE *f, 
 Index: ioemu/disas.h
 ===================================================================
---- ioemu.orig/disas.h	2006-07-14 15:50:30.489983164 +0100
-+++ ioemu/disas.h	2006-07-14 15:50:41.334746500 +0100
+--- ioemu.orig/disas.h	2006-08-06 02:14:04.797460093 +0100
++++ ioemu/disas.h	2006-08-06 02:14:09.796902750 +0100
 @@ -1,6 +1,7 @@
  #ifndef _QEMU_DISAS_H
  #define _QEMU_DISAS_H
@@ -83,8 +83,8 @@ Index: ioemu/disas.h
  #endif /* _QEMU_DISAS_H */
 Index: ioemu/exec-all.h
 ===================================================================
---- ioemu.orig/exec-all.h	2006-07-14 15:50:30.490983050 +0100
-+++ ioemu/exec-all.h	2006-07-14 15:50:41.335746386 +0100
+--- ioemu.orig/exec-all.h	2006-08-06 02:14:04.798459982 +0100
++++ ioemu/exec-all.h	2006-08-06 02:14:09.796902750 +0100
 @@ -509,7 +509,7 @@
  
  extern int tb_invalidated_flag;
@@ -105,17 +105,17 @@ Index: ioemu/exec-all.h
      return addr;
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2006-07-14 15:50:30.491982936 +0100
-+++ ioemu/hw/pc.c	2006-07-14 15:55:04.543757750 +0100
-@@ -65,6 +65,7 @@
-     return qemu_get_clock(vm_clock);
+--- ioemu.orig/hw/pc.c	2006-08-06 02:14:04.797460093 +0100
++++ ioemu/hw/pc.c	2006-08-06 02:14:09.797902638 +0100
+@@ -73,6 +73,7 @@
+     }
  }
  
 +#ifndef CONFIG_DM
  /* IRQ handling */
  int cpu_get_pic_interrupt(CPUState *env)
  {
-@@ -81,6 +82,7 @@
+@@ -89,6 +90,7 @@
      intno = pic_read_irq(isa_pic);
      return intno;
  }
@@ -123,7 +123,7 @@ Index: ioemu/hw/pc.c
  
  static void pic_irq_request(void *opaque, int level)
  {
-@@ -394,6 +396,7 @@
+@@ -400,6 +402,7 @@
  
  /*************************************************/
  
@@ -131,7 +131,7 @@ Index: ioemu/hw/pc.c
  static void putb(uint8_t **pp, int val)
  {
      uint8_t *q;
-@@ -540,6 +543,7 @@
+@@ -546,6 +549,7 @@
      float_pointer_struct[10] = 
          -mpf_checksum(float_pointer_struct, q - float_pointer_struct);
  }
@@ -139,7 +139,7 @@ Index: ioemu/hw/pc.c
  
  
  static const int ide_iobase[2] = { 0x1f0, 0x170 };
-@@ -619,12 +623,14 @@
+@@ -626,12 +630,14 @@
      /* init CPUs */
      for(i = 0; i < smp_cpus; i++) {
          env = cpu_init();
@@ -154,7 +154,7 @@ Index: ioemu/hw/pc.c
          register_savevm("cpu", i, 3, cpu_save, cpu_load, env);
          qemu_register_reset(main_cpu_reset, env);
          if (pci_enabled) {
-@@ -683,6 +689,7 @@
+@@ -690,6 +696,7 @@
      
      bochs_bios_init();
  
@@ -162,7 +162,7 @@ Index: ioemu/hw/pc.c
      if (linux_boot) {
          uint8_t bootsect[512];
          uint8_t old_bootsect[512];
-@@ -738,6 +745,7 @@
+@@ -745,6 +752,7 @@
          /* loader type */
          stw_raw(phys_ram_base + KERNEL_PARAMS_ADDR + 0x210, 0x01);
      }
@@ -170,7 +170,7 @@ Index: ioemu/hw/pc.c
  
      if (pci_enabled) {
          pci_bus = i440fx_init();
-@@ -776,9 +784,11 @@
+@@ -783,9 +791,11 @@
      isa_pic = pic_init(pic_irq_request, first_cpu);
      pit = pit_init(0x40, 0);
      pcspk_init(pit);
@@ -184,8 +184,8 @@ Index: ioemu/hw/pc.c
          if (serial_hds[i]) {
 Index: ioemu/hw/vga_int.h
 ===================================================================
---- ioemu.orig/hw/vga_int.h	2006-07-14 15:50:30.491982936 +0100
-+++ ioemu/hw/vga_int.h	2006-07-14 15:55:02.931941245 +0100
+--- ioemu.orig/hw/vga_int.h	2006-08-06 02:14:04.797460093 +0100
++++ ioemu/hw/vga_int.h	2006-08-06 02:14:09.797902638 +0100
 @@ -28,7 +28,7 @@
  #define ST01_DISP_ENABLE    0x01
  
@@ -193,12 +193,12 @@ Index: ioemu/hw/vga_int.h
 -#define CONFIG_BOCHS_VBE
 +//#define CONFIG_BOCHS_VBE
  
- #define VBE_DISPI_MAX_XRES              1024
- #define VBE_DISPI_MAX_YRES              768
+ #define VBE_DISPI_MAX_XRES              1600
+ #define VBE_DISPI_MAX_YRES              1200
 Index: ioemu/monitor.c
 ===================================================================
---- ioemu.orig/monitor.c	2006-07-14 15:50:30.493982708 +0100
-+++ ioemu/monitor.c	2006-07-14 15:55:04.754733732 +0100
+--- ioemu.orig/monitor.c	2006-08-06 02:14:04.798459982 +0100
++++ ioemu/monitor.c	2006-08-06 02:14:49.574468309 +0100
 @@ -68,6 +68,12 @@
  
  void term_flush(void)
@@ -212,7 +212,7 @@ Index: ioemu/monitor.c
      if (term_outbuf_index > 0) {
          qemu_chr_write(monitor_hd, term_outbuf, term_outbuf_index);
          term_outbuf_index = 0;
-@@ -104,6 +110,7 @@
+@@ -106,6 +112,7 @@
      va_end(ap);
  }
  
@@ -220,7 +220,7 @@ Index: ioemu/monitor.c
  static int monitor_fprintf(FILE *stream, const char *fmt, ...)
  {
      va_list ap;
-@@ -112,6 +119,7 @@
+@@ -114,6 +121,7 @@
      va_end(ap);
      return 0;
  }
@@ -228,7 +228,7 @@ Index: ioemu/monitor.c
  
  static int compare_cmd(const char *name, const char *list)
  {
-@@ -225,6 +233,7 @@
+@@ -227,6 +235,7 @@
      return mon_cpu;
  }
  
@@ -236,7 +236,7 @@ Index: ioemu/monitor.c
  static void do_info_registers(void)
  {
      CPUState *env;
-@@ -278,6 +287,7 @@
+@@ -280,6 +289,7 @@
  {
      dump_exec_info(NULL, monitor_fprintf);
  }
@@ -244,7 +244,7 @@ Index: ioemu/monitor.c
  
  static void do_info_history (void)
  {
-@@ -375,6 +385,7 @@
+@@ -377,6 +387,7 @@
      cpu_set_log(mask);
  }
  
@@ -252,7 +252,7 @@ Index: ioemu/monitor.c
  static void do_savevm(const char *filename)
  {
      if (qemu_savevm(filename) < 0)
-@@ -621,6 +632,7 @@
+@@ -623,6 +634,7 @@
  #endif
      term_printf("\n");
  }
@@ -260,23 +260,23 @@ Index: ioemu/monitor.c
  
  static void do_sum(uint32_t start, uint32_t size)
  {
-@@ -792,6 +804,7 @@
-     }
+@@ -841,6 +853,7 @@
+     kbd_mouse_event(0, 0, 0, mouse_button_state);
  }
  
 +#ifndef CONFIG_DM
  static void do_ioport_read(int count, int format, int size, int addr, int has_index, int index)
  {
      uint32_t val;
-@@ -952,6 +965,7 @@
-     }
- }
+@@ -1031,6 +1044,7 @@
+     term_printf("kqemu support: not compiled\n");
  #endif
+ } 
 +#endif /* !CONFIG_DM */
  
- static void do_info_kqemu(void)
- {
-@@ -1045,6 +1059,7 @@
+ #ifdef CONFIG_PROFILER
+ 
+@@ -1152,6 +1166,7 @@
        "filename", "save screen into PPM image 'filename'" },
      { "log", "s", do_log,
        "item1[,...]", "activate logging of the specified items to '/tmp/qemu.log'" }, 
@@ -284,7 +284,7 @@ Index: ioemu/monitor.c
      { "savevm", "F", do_savevm,
        "filename", "save the whole virtual machine state to 'filename'" }, 
      { "loadvm", "F", do_loadvm,
-@@ -1065,21 +1080,26 @@
+@@ -1172,21 +1187,26 @@
        "/fmt expr", "print expression value (use $reg for CPU register access)", },
      { "i", "/ii.", do_ioport_read, 
        "/fmt addr", "I/O port read" },
@@ -308,10 +308,10 @@ Index: ioemu/monitor.c
      { "cpu", "i", do_cpu_set, 
        "index", "set the default CPU" },
 +#endif /* !CONFIG_DM */
-     { NULL, NULL, }, 
- };
- 
-@@ -1090,10 +1110,12 @@
+     { "mouse_move", "sss?", do_mouse_move, 
+       "dx dy [dz]", "send mouse move events" },
+     { "mouse_button", "i", do_mouse_button, 
+@@ -1208,10 +1228,12 @@
        "", "show the network state" },
      { "block", "", do_info_block,
        "", "show the block devices" },
@@ -324,7 +324,7 @@ Index: ioemu/monitor.c
      { "history", "", do_info_history,
        "", "show the command line history", },
      { "irq", "", irq_info,
-@@ -1102,6 +1124,7 @@
+@@ -1220,6 +1242,7 @@
        "", "show i8259 (PIC) state", },
      { "pci", "", pci_info,
        "", "show PCI info", },
@@ -332,15 +332,15 @@ Index: ioemu/monitor.c
  #if defined(TARGET_I386)
      { "tlb", "", tlb_info,
        "", "show virtual to physical memory mappings", },
-@@ -1110,6 +1133,7 @@
- #endif
-     { "jit", "", do_info_jit,
+@@ -1230,6 +1253,7 @@
        "", "show dynamic compiler info", },
-+#endif /* !CONFIG_DM */
      { "kqemu", "", do_info_kqemu,
        "", "show kqemu information", },
++#endif /* !CONFIG_DM */
      { "usb", "", usb_info,
-@@ -1123,6 +1147,7 @@
+       "", "show guest USB devices", },
+     { "usbhost", "", usb_host_info,
+@@ -1243,6 +1267,7 @@
  
  /*******************************************************************/
  
@@ -348,7 +348,7 @@ Index: ioemu/monitor.c
  static const char *pch;
  static jmp_buf expr_env;
  
-@@ -1663,6 +1688,7 @@
+@@ -1786,6 +1811,7 @@
      *pp = pch;
      return 0;
  }
@@ -356,7 +356,7 @@ Index: ioemu/monitor.c
  
  static int get_str(char *buf, int buf_size, const char **pp)
  {
-@@ -1729,8 +1755,10 @@
+@@ -1852,8 +1878,10 @@
      return 0;
  }
  
@@ -367,7 +367,7 @@ Index: ioemu/monitor.c
  
  #define MAX_ARGS 16
  
-@@ -1738,7 +1766,10 @@
+@@ -1861,7 +1889,10 @@
  {
      const char *p, *pstart, *typestr;
      char *q;
@@ -379,7 +379,7 @@ Index: ioemu/monitor.c
      term_cmd_t *cmd;
      char cmdname[256];
      char buf[1024];
-@@ -1830,6 +1861,7 @@
+@@ -1953,6 +1984,7 @@
                  args[nb_args++] = str;
              }
              break;
@@ -387,7 +387,7 @@ Index: ioemu/monitor.c
          case '/':
              {
                  int count, format, size;
-@@ -1962,6 +1994,7 @@
+@@ -2085,6 +2117,7 @@
                  }
              }
              break;
@@ -395,7 +395,7 @@ Index: ioemu/monitor.c
          case '-':
              {
                  int has_option;
-@@ -1988,6 +2021,11 @@
+@@ -2111,6 +2144,11 @@
                  args[nb_args++] = (void *)has_option;
              }
              break;
@@ -407,7 +407,7 @@ Index: ioemu/monitor.c
          default:
          bad_type:
              term_printf("%s: unknown type '%c'\n", cmdname, c);
-@@ -2035,6 +2073,7 @@
+@@ -2161,6 +2199,7 @@
      return;
  }
  
@@ -415,7 +415,7 @@ Index: ioemu/monitor.c
  static void cmd_completion(const char *name, const char *list)
  {
      const char *p, *pstart;
-@@ -2222,6 +2261,11 @@
+@@ -2354,6 +2393,11 @@
      for(i = 0; i < nb_args; i++)
          qemu_free(args[i]);
  }
@@ -429,9 +429,9 @@ Index: ioemu/monitor.c
  {
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-14 15:50:30.496982366 +0100
-+++ ioemu/vl.c	2006-07-14 15:55:07.676401124 +0100
-@@ -423,12 +423,15 @@
+--- ioemu.orig/vl.c	2006-08-06 02:14:04.797460093 +0100
++++ ioemu/vl.c	2006-08-06 02:14:09.802902081 +0100
+@@ -422,12 +422,15 @@
  void hw_error(const char *fmt, ...)
  {
      va_list ap;
@@ -447,7 +447,7 @@ Index: ioemu/vl.c
      for(env = first_cpu; env != NULL; env = env->next_cpu) {
          fprintf(stderr, "CPU #%d:\n", env->cpu_index);
  #ifdef TARGET_I386
-@@ -437,6 +440,7 @@
+@@ -436,6 +439,7 @@
          cpu_dump_state(env, stderr, fprintf, 0);
  #endif
      }
@@ -455,7 +455,7 @@ Index: ioemu/vl.c
      va_end(ap);
      abort();
  }
-@@ -3800,6 +3804,7 @@
+@@ -4336,6 +4340,7 @@
      return ret;
  }
  
@@ -463,7 +463,7 @@ Index: ioemu/vl.c
  /***********************************************************/
  /* cpu save/restore */
  
-@@ -4234,6 +4239,25 @@
+@@ -4770,6 +4775,25 @@
      }
      return 0;
  }
@@ -489,7 +489,7 @@ Index: ioemu/vl.c
  
  /***********************************************************/
  /* machine registration */
-@@ -5481,6 +5505,7 @@
+@@ -6054,6 +6078,7 @@
      socket_init();
  #endif
  
@@ -497,7 +497,7 @@ Index: ioemu/vl.c
      /* init network clients */
      if (nb_net_clients == 0) {
          /* if no clients, we use a default config */
-@@ -5490,6 +5515,7 @@
+@@ -6063,6 +6088,7 @@
                  "user");
          nb_net_clients = 2;
      }

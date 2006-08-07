@@ -76,6 +76,10 @@ typedef struct netif_st {
 	struct vm_struct *tx_comms_area;
 	struct vm_struct *rx_comms_area;
 
+	/* Set of features that can be turned on in dev->features. */
+	int features;
+	int can_queue;
+
 	/* Allow netif_be_start_xmit() to peek ahead in the rx request ring. */
 	RING_IDX rx_req_cons_peek;
 
@@ -86,8 +90,6 @@ typedef struct netif_st {
 	struct timer_list credit_timeout;
 
 	/* Miscellaneous private stuff. */
-	enum { DISCONNECTED, DISCONNECTING, CONNECTED } status;
-	int active;
 	struct list_head list;  /* scheduling list */
 	atomic_t         refcnt;
 	struct net_device *dev;
@@ -120,5 +122,17 @@ void netif_deschedule_work(netif_t *netif);
 int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev);
 struct net_device_stats *netif_be_get_stats(struct net_device *dev);
 irqreturn_t netif_be_int(int irq, void *dev_id, struct pt_regs *regs);
+
+static inline int netbk_can_queue(struct net_device *dev)
+{
+	netif_t *netif = netdev_priv(dev);
+	return netif->can_queue;
+}
+
+static inline int netbk_can_sg(struct net_device *dev)
+{
+	netif_t *netif = netdev_priv(dev);
+	return netif->features & NETIF_F_SG;
+}
 
 #endif /* __NETIF__BACKEND__COMMON_H__ */

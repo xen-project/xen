@@ -6,12 +6,14 @@
 #include <stddef.h>
 #include <inttypes.h>
 #include "xg_private.h"
+#include "xc_private.h"
 #include "xc_elf.h"
 #include <stdlib.h>
 #include <unistd.h>
 #include <zlib.h>
 #include <xen/hvm/hvm_info_table.h>
 #include <xen/hvm/ioreq.h>
+#include <xen/hvm/params.h>
 
 #define HVM_LOADER_ENTR_ADDR  0x00100000
 
@@ -42,6 +44,30 @@ static int
 loadelfimage(
     char *elfbase, int xch, uint32_t dom, unsigned long *parray,
     struct domain_setup_info *dsi);
+
+static void xc_set_hvm_param(int handle,
+                             domid_t dom, int param, unsigned long value)
+{
+    DECLARE_HYPERCALL;
+    xen_hvm_param_t arg;
+    int rc;
+
+    hypercall.op     = __HYPERVISOR_hvm_op;
+    hypercall.arg[0] = HVMOP_set_param;
+    hypercall.arg[1] = (unsigned long)&arg;
+    arg.domid = dom;
+    arg.index = param;
+    arg.value = value;
+    if ( mlock(&arg, sizeof(arg)) != 0 )
+    {
+        PERROR("Could not lock memory for set parameter");
+        return;
+    }
+    rc = do_xen_hypercall(handle, &hypercall);
+    safe_munlock(&arg, sizeof(arg));
+    if (rc < 0)
+        PERROR("set HVM parameter failed (%d)", rc);
+}
 
 static void build_e820map(void *e820_page, unsigned long long mem_size)
 {
@@ -153,6 +179,9 @@ static int set_hvm_info(int xc_handle, uint32_t dom,
     set_hvm_info_checksum(va_hvm);
 
     munmap(va_map, PAGE_SIZE);
+
+    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_APIC_ENABLED, apic);
+    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_PAE_ENABLED, pae);
 
     return 0;
 }
@@ -286,6 +315,9 @@ static int setup_guest(int xc_handle,
     }
 
     munmap(sp, PAGE_SIZE);
+
+    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_PFN, (v_end >> PAGE_SHIFT) - 2);
+    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_EVTCHN, store_evtchn);
 
     *store_mfn = page_array[(v_end >> PAGE_SHIFT) - 2];
     if ( xc_clear_domain_page(xc_handle, dom, *store_mfn) )

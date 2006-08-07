@@ -392,10 +392,6 @@ gopts.var('isa', val='no|yes',
           fn=set_bool, default=0,
           use="Simulate an ISA only system?")
 
-gopts.var('cdrom', val='FILE',
-          fn=set_value, default='',
-          use="Path to cdrom")
-
 gopts.var('boot', val="a|b|c|d",
           fn=set_value, default='c',
           use="Default boot device")
@@ -404,9 +400,9 @@ gopts.var('nographic', val='no|yes',
           fn=set_bool, default=0,
           use="Should device models use graphics?")
 
-gopts.var('audio', val='no|yes',
-          fn=set_bool, default=0,
-          use="Should device models enable audio?")
+gopts.var('soundhw', val='audiodev',
+          fn=set_value, default='',
+          use="Should device models enable audio device?")
 
 gopts.var('vnc', val='',
           fn=set_value, default=None,
@@ -629,8 +625,8 @@ def configure_vifs(config_devs, vals):
 def configure_hvm(config_image, vals):
     """Create the config for HVM devices.
     """
-    args = [ 'device_model', 'pae', 'vcpus', 'cdrom', 'boot', 'fda', 'fdb',
-             'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'audio',
+    args = [ 'device_model', 'pae', 'vcpus', 'boot', 'fda', 'fdb',
+             'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'soundhw',
              'vnc', 'vncdisplay', 'vncconsole', 'sdl', 'display',
              'acpi', 'apic', 'xauthority', 'usb', 'usbdevice' ]
     for a in args:

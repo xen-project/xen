@@ -76,7 +76,7 @@ interrupt_post_injection(struct vcpu * v, int vector, int type)
 
     switch(type)
     {
-    case VLAPIC_DELIV_MODE_EXT:
+    case APIC_DM_EXTINT:
         break;
 
     default:
@@ -112,7 +112,7 @@ asmlinkage void svm_intr_assist(void)
     struct hvm_domain *plat=&v->domain->arch.hvm_domain; 
     struct periodic_time *pt = &plat->pl_time.periodic_tm;
     struct hvm_virpic *pic= &plat->vpic;
-    int intr_type = VLAPIC_DELIV_MODE_EXT;
+    int intr_type = APIC_DM_EXTINT;
     int intr_vector = -1;
     int re_injecting = 0;
     unsigned long rflags;
@@ -172,9 +172,9 @@ asmlinkage void svm_intr_assist(void)
     /* have we got an interrupt to inject? */
     if (intr_vector >= 0) {
         switch (intr_type) {
-        case VLAPIC_DELIV_MODE_EXT:
-        case VLAPIC_DELIV_MODE_FIXED:
-        case VLAPIC_DELIV_MODE_LPRI:
+        case APIC_DM_EXTINT:
+        case APIC_DM_FIXED:
+        case APIC_DM_LOWEST:
             /* Re-injecting a PIT interruptt? */
             if (re_injecting && 
                 is_pit_irq(v, intr_vector, intr_type)) {
@@ -185,10 +185,10 @@ asmlinkage void svm_intr_assist(void)
             svm_inject_extint(v, intr_vector, VMX_DELIVER_NO_ERROR_CODE);
             interrupt_post_injection(v, intr_vector, intr_type);
             break;
-        case VLAPIC_DELIV_MODE_SMI:
-        case VLAPIC_DELIV_MODE_NMI:
-        case VLAPIC_DELIV_MODE_INIT:
-        case VLAPIC_DELIV_MODE_STARTUP:
+        case APIC_DM_SMI:
+        case APIC_DM_NMI:
+        case APIC_DM_INIT:
+        case APIC_DM_STARTUP:
         default:
             printk("Unsupported interrupt type: %d\n", intr_type);
             BUG();

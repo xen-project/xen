@@ -66,6 +66,7 @@
 #define __HYPERVISOR_xenoprof_op          31
 #define __HYPERVISOR_event_channel_op     32
 #define __HYPERVISOR_physdev_op           33
+#define __HYPERVISOR_hvm_op               34
 
 /* Architecture-specific hypercall definitions. */
 #define __HYPERVISOR_arch_0               48
