@@ -86,6 +86,9 @@ class BlkifController(DevController):
                                                     'mode')
 
         if dev:
+            (dev_type) = self.readFrontend(devid, 'device-type')
+            if dev_type:
+                dev += ":" + dev_type
             result.append(['dev', dev])
         if typ and params:
             result.append(['uname', typ + ":" + params])

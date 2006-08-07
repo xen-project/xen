@@ -341,6 +341,8 @@ class DevController:
         else:
             raise VmError("Device %s not connected" % devid)
 
+    def readFrontend(self, devid, *args):
+        return xstransact.Read(self.frontendPath(devid), *args)
 
     def deviceIDs(self, transaction = None):
         """@return The IDs of each of the devices currently configured for
