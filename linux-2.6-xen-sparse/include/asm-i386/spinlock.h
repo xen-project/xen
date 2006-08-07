@@ -23,7 +23,7 @@
 		(*(volatile signed char *)(&(x)->slock) <= 0)
 
 #define __raw_spin_lock_string \
-	"\n1:\n" \
+	"\n1:\t" \
 	LOCK \
 	"decb %0\n\t" \
 	"jns 3f\n" \
@@ -35,7 +35,7 @@
 	"3:\n\t"
 
 #define __raw_spin_lock_string_flags \
-	"\n1:\n" \
+	"\n1:\t" \
 	LOCK \
 	"decb %0\n\t" \
 	"jns 4f\n\t" \
