@@ -8,6 +8,7 @@
 #include <xen/mm.h>
 #include <xen/guest_access.h>
 #include <public/dom0_ops.h>
+#include <asm/perfc.h>
 
 #undef  PERFCOUNTER
 #undef  PERFCOUNTER_CPU
@@ -89,9 +90,7 @@ void perfc_printall(unsigned char key)
         printk("\n");
     }
 
-#ifdef PERF_ARRAYS
-    ptwr_eip_stat_print();
-#endif
+    arch_perfc_printall();
 }
 
 void perfc_reset(unsigned char key)
@@ -130,9 +129,7 @@ void perfc_reset(unsigned char key)
         }
     }
 
-#ifdef PERF_ARRAYS
-    ptwr_eip_stat_reset();
-#endif
+    arch_perfc_reset ();
 }
 
 static dom0_perfc_desc_t perfc_d[NR_PERFCTRS];
@@ -180,6 +177,9 @@ static int perfc_copy_info(XEN_GUEST_HANDLE(dom0_perfc_desc_t) desc,
     }
     if (perfc_vals == NULL)
         return -ENOMEM;
+
+    /* Architecture may fill counters from hardware.  */
+    arch_perfc_gather();
 
     /* We gather the counts together every time. */
     for ( i = 0; i < NR_PERFCTRS; i++ )
