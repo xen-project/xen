@@ -31,7 +31,6 @@
 #include <xen/string.h>
 #include <xen/spinlock.h>
 #include <xen/errno.h>
-#include <xen/reboot.h>
 #include <xen/init.h>
 #include <xen/acpi.h>
 #include <asm/io.h>

@@ -31,7 +31,7 @@
 #include <linux/console.h>
 #include <linux/delay.h>
 #include <linux/kernel.h>
-#include <linux/reboot.h>
+#include <linux/shutdown.h>
 #include <linux/sched.h>
 #include <linux/seq_file.h>
 #include <linux/string.h>

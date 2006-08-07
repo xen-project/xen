@@ -21,6 +21,7 @@
 #include <xen/mm.h>
 #include <xen/delay.h>
 #include <xen/guest_access.h>
+#include <xen/shutdown.h>
 #include <asm/current.h>
 #include <asm/debugger.h>
 #include <asm/io.h>
@@ -730,14 +731,24 @@ void panic(const char *fmt, ...)
     printk("Panic on CPU %d:\n", smp_processor_id());
     printk(buf);
     printk("****************************************\n\n");
-    printk("Reboot in five seconds...\n");
+    if ( opt_noreboot )
+        printk("Manual reset required ('noreboot' specified)\n");
+    else
+        printk("Reboot in five seconds...\n");
     spin_unlock_irqrestore(&lock, flags);
 
     debugger_trap_immediate();
 
-    watchdog_disable();
-    mdelay(5000);
-    machine_restart(0);
+    if ( opt_noreboot )
+    {
+        machine_halt();
+    }
+    else
+    {
+        watchdog_disable();
+        mdelay(5000);
+        machine_restart(NULL);
+    }
 }
 
 void __bug(char *file, int line)

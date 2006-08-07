@@ -20,6 +20,7 @@
 #include <xen/guest_access.h>
 #include <xen/hypercall.h>
 #include <xen/delay.h>
+#include <xen/shutdown.h>
 #include <asm/debugger.h>
 #include <public/dom0_ops.h>
 #include <public/sched.h>
@@ -282,36 +283,12 @@ static __init int domain_shutdown_finaliser_init(void)
 }
 __initcall(domain_shutdown_finaliser_init);
 
-
 void domain_shutdown(struct domain *d, u8 reason)
 {
     struct vcpu *v;
 
     if ( d->domain_id == 0 )
-    {
-        extern void machine_restart(char *);
-        extern void machine_halt(void);
-
-        debugger_trap_immediate();
-
-        if ( reason == SHUTDOWN_poweroff ) 
-        {
-            printk("Domain 0 halted: halting machine.\n");
-            machine_halt();
-        }
-        else if ( reason == SHUTDOWN_crash )
-        {
-            printk("Domain 0 crashed: rebooting machine in 5 seconds.\n");
-            watchdog_disable();
-            mdelay(5000);
-            machine_restart(0);
-        }
-        else
-        {
-            printk("Domain 0 shutdown: rebooting machine.\n");
-            machine_restart(0);
-        }
-    }
+        dom0_shutdown(reason);
 
     /* Mark the domain as shutting down. */
     d->shutdown_code = reason;

@@ -9,7 +9,7 @@
 #include <xen/mm.h>
 #include <xen/irq.h>
 #include <xen/symbols.h>
-#include <xen/reboot.h>
+#include <xen/shutdown.h>
 #include <xen/nmi.h>
 #include <asm/current.h>
 #include <asm/flushtlb.h>
