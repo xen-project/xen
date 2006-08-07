@@ -136,10 +136,14 @@ void perfc_reset(unsigned char key)
 }
 
 static dom0_perfc_desc_t perfc_d[NR_PERFCTRS];
+static dom0_perfc_val_t *perfc_vals;
+static int               perfc_nbr_vals;
 static int               perfc_init = 0;
-static int perfc_copy_info(XEN_GUEST_HANDLE(dom0_perfc_desc_t) desc)
+static int perfc_copy_info(XEN_GUEST_HANDLE(dom0_perfc_desc_t) desc,
+                           XEN_GUEST_HANDLE(dom0_perfc_val_t) val)
 {
     unsigned int i, j;
+    unsigned int v = 0;
     atomic_t *counters = (atomic_t *)&perfcounters;
 
     if ( guest_handle_is_null(desc) )
@@ -169,13 +173,13 @@ static int perfc_copy_info(XEN_GUEST_HANDLE(dom0_perfc_desc_t) desc)
                 perfc_d[i].nr_vals = perfc_info[i].nr_elements;
                 break;
             }
-
-            if ( perfc_d[i].nr_vals > ARRAY_SIZE(perfc_d[i].vals) )
-                perfc_d[i].nr_vals = ARRAY_SIZE(perfc_d[i].vals);
+            perfc_nbr_vals += perfc_d[i].nr_vals;
         }
-
+        perfc_vals = xmalloc_array(dom0_perfc_val_t, perfc_nbr_vals);
         perfc_init = 1;
     }
+    if (perfc_vals == NULL)
+        return -ENOMEM;
 
     /* We gather the counts together every time. */
     for ( i = 0; i < NR_PERFCTRS; i++ )
@@ -184,26 +188,30 @@ static int perfc_copy_info(XEN_GUEST_HANDLE(dom0_perfc_desc_t) desc)
         {
         case TYPE_SINGLE:
         case TYPE_S_SINGLE:
-            perfc_d[i].vals[0] = atomic_read(&counters[0]);
+            perfc_vals[v++] = atomic_read(&counters[0]);
             counters += 1;
             break;
         case TYPE_CPU:
         case TYPE_S_CPU:
             for ( j = 0; j < perfc_d[i].nr_vals; j++ )
-                perfc_d[i].vals[j] = atomic_read(&counters[j]);
+                perfc_vals[v++] = atomic_read(&counters[j]);
             counters += NR_CPUS;
             break;
         case TYPE_ARRAY:
         case TYPE_S_ARRAY:
             for ( j = 0; j < perfc_d[i].nr_vals; j++ )
-                perfc_d[i].vals[j] = atomic_read(&counters[j]);
+                perfc_vals[v++] = atomic_read(&counters[j]);
             counters += perfc_info[i].nr_elements;
             break;
         }
     }
+    BUG_ON(v != perfc_nbr_vals);
 
-    return (copy_to_guest(desc, (dom0_perfc_desc_t *)perfc_d, NR_PERFCTRS) ?
-            -EFAULT : 0);
+    if (copy_to_guest(desc, (dom0_perfc_desc_t *)perfc_d, NR_PERFCTRS))
+        return -EFAULT;
+    if (copy_to_guest(val, perfc_vals, perfc_nbr_vals))
+        return -EFAULT;
+    return 0;
 }
 
 /* Dom0 control of perf counters */
@@ -213,20 +221,18 @@ int perfc_control(dom0_perfccontrol_t *pc)
     u32 op = pc->op;
     int rc;
 
-    pc->nr_counters = NR_PERFCTRS;
-
     spin_lock(&lock);
 
     switch ( op )
     {
     case DOM0_PERFCCONTROL_OP_RESET:
-        perfc_copy_info(pc->desc);
+        perfc_copy_info(pc->desc, pc->val);
         perfc_reset(0);
         rc = 0;
         break;
 
     case DOM0_PERFCCONTROL_OP_QUERY:
-        perfc_copy_info(pc->desc);
+        perfc_copy_info(pc->desc, pc->val);
         rc = 0;
         break;
 
@@ -236,6 +242,9 @@ int perfc_control(dom0_perfccontrol_t *pc)
     }
 
     spin_unlock(&lock);
+
+    pc->nr_counters = NR_PERFCTRS;
+    pc->nr_vals = perfc_nbr_vals;
 
     return rc;
 }

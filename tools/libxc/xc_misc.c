@@ -68,7 +68,10 @@ int xc_sched_id(int xc_handle,
 
 int xc_perfc_control(int xc_handle,
                      uint32_t opcode,
-                     xc_perfc_desc_t *desc)
+                     xc_perfc_desc_t *desc,
+                     xc_perfc_val_t *val,
+                     int *nbr_desc,
+                     int *nbr_val)
 {
     int rc;
     DECLARE_DOM0_OP;
@@ -76,10 +79,16 @@ int xc_perfc_control(int xc_handle,
     op.cmd = DOM0_PERFCCONTROL;
     op.u.perfccontrol.op   = opcode;
     set_xen_guest_handle(op.u.perfccontrol.desc, desc);
+    set_xen_guest_handle(op.u.perfccontrol.val, val);
 
     rc = do_dom0_op(xc_handle, &op);
 
-    return (rc == 0) ? op.u.perfccontrol.nr_counters : rc;
+    if (nbr_desc)
+        *nbr_desc = op.u.perfccontrol.nr_counters;
+    if (nbr_val)
+        *nbr_val = op.u.perfccontrol.nr_vals;
+
+    return rc;
 }
 
 long long xc_msr_read(int xc_handle, int cpu_mask, int msr)

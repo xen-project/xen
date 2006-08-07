@@ -22,7 +22,10 @@ int main(int argc, char *argv[])
 {
     int              i, j, xc_handle;
     xc_perfc_desc_t *pcd;
-    unsigned int     num, sum, reset = 0, full = 0;
+	xc_perfc_val_t  *pcv;
+	xc_perfc_val_t  *val;
+	int num_desc, num_val;
+    unsigned int    sum, reset = 0, full = 0;
 
     if ( argc > 1 )
     {
@@ -62,7 +65,7 @@ int main(int argc, char *argv[])
     if ( reset )
     {
         if ( xc_perfc_control(xc_handle, DOM0_PERFCCONTROL_OP_RESET,
-                              NULL) < 0 )
+                              NULL, NULL, NULL, NULL) != 0 )
         {
             fprintf(stderr, "Error reseting performance counters: %d (%s)\n",
                     errno, strerror(errno));
@@ -72,47 +75,54 @@ int main(int argc, char *argv[])
         return 0;
     }
 
+	if ( xc_perfc_control(xc_handle, DOM0_PERFCCONTROL_OP_QUERY,
+						  NULL, NULL, &num_desc, &num_val) != 0 )
+        {
+            fprintf(stderr, "Error getting number of perf counters: %d (%s)\n",
+                    errno, strerror(errno));
+            return 1;
+        }
 
-    if ( (num = xc_perfc_control(xc_handle, DOM0_PERFCCONTROL_OP_QUERY,
-                                 NULL)) < 0 )
+    pcd = malloc(sizeof(*pcd) * num_desc);
+	pcv = malloc(sizeof(*pcv) * num_val);
+
+    if ( pcd == NULL
+		 || mlock(pcd, sizeof(*pcd) * num_desc) != 0
+		 || pcv == NULL
+		 || mlock(pcd, sizeof(*pcv) * num_val) != 0)
     {
-        fprintf(stderr, "Error getting number of perf counters: %d (%s)\n",
-                errno, strerror(errno));
-        return 1;
-    }
-
-    pcd = malloc(sizeof(*pcd) * num);
-
-    if ( mlock(pcd, sizeof(*pcd) * num) != 0 )
-    {
-        fprintf(stderr, "Could not mlock descriptor buffer: %d (%s)\n",
+        fprintf(stderr, "Could not alloc or mlock buffers: %d (%s)\n",
                 errno, strerror(errno));
         exit(-1);
     }
 
-    if ( xc_perfc_control(xc_handle, DOM0_PERFCCONTROL_OP_QUERY, pcd) <= 0 )
+    if ( xc_perfc_control(xc_handle, DOM0_PERFCCONTROL_OP_QUERY,
+						  pcd, pcv, NULL, NULL) != 0 )
     {
-        fprintf(stderr, "Error getting perf counter description: %d (%s)\n",
+        fprintf(stderr, "Error getting perf counter: %d (%s)\n",
                 errno, strerror(errno));
         return 1;
     }
 
-    munlock(pcd, sizeof(*pcd) * num);
+    munlock(pcd, sizeof(*pcd) * num_desc);
+    munlock(pcv, sizeof(*pcv) * num_val);
 
-    for ( i = 0; i < num; i++ )
+	val = pcv;
+    for ( i = 0; i < num_desc; i++ )
     {
         printf ("%-35s ", pcd[i].name);
         
         sum = 0;
         for ( j = 0; j < pcd[i].nr_vals; j++ )
-            sum += pcd[i].vals[j];
+            sum += val[j];
         printf ("T=%10u ", (unsigned int)sum);
 
         if ( full || (pcd[i].nr_vals <= 4) )
             for ( j = 0; j < pcd[i].nr_vals; j++ )
-                printf(" %10u", (unsigned int)pcd[i].vals[j]);
+                printf(" %10u", (unsigned int)val[j]);
 
         printf("\n");
+		val += pcd[i].nr_vals;
     }
 
     return 0;
