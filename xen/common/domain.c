@@ -33,7 +33,7 @@ struct domain *domain_list;
 
 struct domain *dom0;
 
-struct vcpu *idle_vcpu[NR_CPUS];
+struct vcpu *idle_vcpu[NR_CPUS] __read_mostly;
 
 struct domain *alloc_domain(domid_t domid)
 {
@@ -245,15 +245,15 @@ void __domain_crash_synchronous(void)
 }
 
 
-static struct domain *domain_shuttingdown[NR_CPUS];
+static DEFINE_PER_CPU(struct domain *, domain_shuttingdown);
 
 static void domain_shutdown_finalise(void)
 {
     struct domain *d;
     struct vcpu *v;
 
-    d = domain_shuttingdown[smp_processor_id()];
-    domain_shuttingdown[smp_processor_id()] = NULL;
+    d = this_cpu(domain_shuttingdown);
+    this_cpu(domain_shuttingdown) = NULL;
 
     BUG_ON(d == NULL);
     BUG_ON(d == current->domain);
@@ -302,7 +302,7 @@ void domain_shutdown(struct domain *d, u8 reason)
         vcpu_sleep_nosync(v);
 
     get_knownalive_domain(d);
-    domain_shuttingdown[smp_processor_id()] = d;
+    this_cpu(domain_shuttingdown) = d;
     raise_softirq(DOMAIN_SHUTDOWN_FINALISE_SOFTIRQ);
 }
 

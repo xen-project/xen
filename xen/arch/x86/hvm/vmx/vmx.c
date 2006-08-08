@@ -156,7 +156,7 @@ static void vmx_relinquish_guest_resources(struct domain *d)
 
 #ifdef __x86_64__
 
-static struct vmx_msr_state percpu_msr[NR_CPUS];
+static DEFINE_PER_CPU(struct vmx_msr_state, percpu_msr);
 
 static u32 msr_data_index[VMX_MSR_COUNT] =
 {
@@ -177,7 +177,7 @@ static void vmx_save_segments(struct vcpu *v)
  */
 static void vmx_load_msrs(void)
 {
-    struct vmx_msr_state *host_state = &percpu_msr[smp_processor_id()];
+    struct vmx_msr_state *host_state = &this_cpu(percpu_msr);
     int i;
 
     while ( host_state->flags )
@@ -190,7 +190,7 @@ static void vmx_load_msrs(void)
 
 static void vmx_save_init_msrs(void)
 {
-    struct vmx_msr_state *host_state = &percpu_msr[smp_processor_id()];
+    struct vmx_msr_state *host_state = &this_cpu(percpu_msr);
     int i;
 
     for ( i = 0; i < VMX_MSR_COUNT; i++ )
@@ -279,7 +279,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     u64 msr_content = regs->eax | ((u64)regs->edx << 32);
     struct vcpu *v = current;
     struct vmx_msr_state *msr = &v->arch.hvm_vmx.msr_content;
-    struct vmx_msr_state *host_state = &percpu_msr[smp_processor_id()];
+    struct vmx_msr_state *host_state = &this_cpu(percpu_msr);
 
     HVM_DBG_LOG(DBG_LEVEL_1, "msr 0x%lx msr_content 0x%"PRIx64"\n",
                 (unsigned long)regs->ecx, msr_content);
@@ -361,7 +361,7 @@ static void vmx_restore_msrs(struct vcpu *v)
     unsigned long guest_flags ;
 
     guest_state = &v->arch.hvm_vmx.msr_content;;
-    host_state = &percpu_msr[smp_processor_id()];
+    host_state = &this_cpu(percpu_msr);
 
     wrmsrl(MSR_SHADOW_GS_BASE, guest_state->shadow_gs);
     guest_flags = guest_state->flags;

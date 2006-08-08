@@ -67,7 +67,7 @@ static struct scheduler ops;
           : (typeof(ops.fn(__VA_ARGS__)))0 )
 
 /* Per-CPU periodic timer sends an event to the currently-executing domain. */
-static struct timer t_timer[NR_CPUS]; 
+static DEFINE_PER_CPU(struct timer, t_timer);
 
 static inline void vcpu_runstate_change(
     struct vcpu *v, int new_state, s_time_t new_entry_time)
@@ -593,10 +593,9 @@ static void s_timer_fn(void *unused)
 /* Periodic tick timer: send timer event to current domain */
 static void t_timer_fn(void *unused)
 {
-    struct vcpu  *v   = current;
-    unsigned int  cpu = smp_processor_id();
+    struct vcpu *v   = current;
 
-    per_cpu(schedule_data, cpu).tick++;
+    this_cpu(schedule_data).tick++;
 
     if ( !is_idle_vcpu(v) )
     {
@@ -606,9 +605,9 @@ static void t_timer_fn(void *unused)
 
     page_scrub_schedule_work();
 
-    SCHED_OP(tick, cpu);
+    SCHED_OP(tick, smp_processor_id());
 
-    set_timer(&t_timer[cpu], NOW() + MILLISECS(10));
+    set_timer(&this_cpu(t_timer), NOW() + MILLISECS(10));
 }
 
 /* Per-VCPU timer function: sends a virtual timer interrupt. */
@@ -637,7 +636,7 @@ void __init scheduler_init(void)
     {
         spin_lock_init(&per_cpu(schedule_data, i).schedule_lock);
         init_timer(&per_cpu(schedule_data, i).s_timer, s_timer_fn, NULL, i);
-        init_timer(&t_timer[i], t_timer_fn, NULL, i);
+        init_timer(&per_cpu(t_timer, i), t_timer_fn, NULL, i);
     }
 
     for ( i = 0; schedulers[i] != NULL; i++ )

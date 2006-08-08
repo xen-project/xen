@@ -673,7 +673,7 @@ static int __init setup_dump_irqs(void)
 }
 __initcall(setup_dump_irqs);
 
-static struct timer end_irq_timer[NR_CPUS];
+static DEFINE_PER_CPU(struct timer, end_irq_timer);
 
 /*
  * force_intack: Forcibly emit all pending EOIs on each CPU every second.
@@ -682,22 +682,13 @@ static struct timer end_irq_timer[NR_CPUS];
 
 static void end_irq_timeout(void *unused)
 {
-    int cpu = smp_processor_id();
-
     local_irq_disable();
     flush_all_pending_eoi(NULL);
     local_irq_enable();
 
     on_selected_cpus(cpu_online_map, flush_ready_eoi, NULL, 1, 0);
 
-    set_timer(&end_irq_timer[cpu], NOW() + MILLISECS(1000));
-}
-
-static void __init __setup_irq_timeout(void *unused)
-{
-    int cpu = smp_processor_id();
-    init_timer(&end_irq_timer[cpu], end_irq_timeout, NULL, cpu);
-    set_timer(&end_irq_timer[cpu], NOW() + MILLISECS(1000));
+    set_timer(&this_cpu(end_irq_timer), NOW() + MILLISECS(1000));
 }
 
 static int force_intack;
@@ -705,8 +696,17 @@ boolean_param("force_intack", force_intack);
 
 static int __init setup_irq_timeout(void)
 {
-    if ( force_intack )
-        on_each_cpu(__setup_irq_timeout, NULL, 1, 1);
+    unsigned int cpu;
+
+    if ( !force_intack )
+        return 0;
+
+    for_each_online_cpu ( cpu )
+    {
+        init_timer(&per_cpu(end_irq_timer, cpu), end_irq_timeout, NULL, cpu);
+        set_timer(&per_cpu(end_irq_timer, cpu), NOW() + MILLISECS(1000));
+    }
+
     return 0;
 }
 __initcall(setup_irq_timeout);
