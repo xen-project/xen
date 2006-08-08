@@ -103,7 +103,10 @@ struct xenstat_vbd {
  * Data-collection types
  */
 /* Called to collect the information for the node and all the domains on
- * it. When called, the domain information has already been collected. */
+ * it. When called, the domain information has already been collected. 
+ * Return status is 0 if fatal error occurs, 1 for success. Collectors
+ * may prune a domain from the list if it has been deleted between the
+ * time the list was setup and the time the colector is called */
 typedef int (*xenstat_collect_func)(xenstat_node * node);
 /* Called to free the information collected by the collect function.  The free
  * function will only be called on a xenstat_node if that node includes
@@ -134,6 +137,7 @@ static void xenstat_uninit_networks(xenstat_handle * handle);
 static void xenstat_uninit_xen_version(xenstat_handle * handle);
 static void xenstat_uninit_vbds(xenstat_handle * handle);
 static char *xenstat_get_domain_name(xenstat_handle * handle, unsigned int domain_id);
+static void xenstat_prune_domain(xenstat_node *node, unsigned int entry);
 
 static xenstat_collector collectors[] = {
 	{ XENSTAT_VCPU, xenstat_collect_vcpus,
@@ -208,7 +212,7 @@ xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 	xenstat_node *node;
 	dom0_physinfo_t physinfo;
 	dom0_getdomaininfo_t domaininfo[DOMAIN_CHUNK_SIZE];
-	unsigned int num_domains, new_domains;
+	unsigned int new_domains;
 	unsigned int i;
 
 	/* Create the node */
@@ -242,15 +246,17 @@ xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 		return NULL;
 	}
 
-	num_domains = 0;
+	node->num_domains = 0;
 	do {
 		xenstat_domain *domain, *tmp;
 
 		new_domains = xc_domain_getinfolist(handle->xc_handle,
-			num_domains, DOMAIN_CHUNK_SIZE, domaininfo);
+						    node->num_domains, 
+						    DOMAIN_CHUNK_SIZE, 
+						    domaininfo);
 
 		tmp = realloc(node->domains,
-			      (num_domains + new_domains)
+			      (node->num_domains + new_domains)
 			      * sizeof(xenstat_domain));
 		if (tmp == NULL) {
 			free(node->domains);
@@ -259,12 +265,29 @@ xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 		}
 		node->domains = tmp;
 
-		domain = node->domains + num_domains;
+		domain = node->domains + node->num_domains;
+
+		/* zero out newly allocated memory in case error occurs below */
+		memset(domain, 0, new_domains * sizeof(xenstat_domain));
 
 		for (i = 0; i < new_domains; i++) {
 			/* Fill in domain using domaininfo[i] */
 			domain->id = domaininfo[i].domain;
-			domain->name = xenstat_get_domain_name(handle, domaininfo[i].domain);
+			domain->name = xenstat_get_domain_name(handle, 
+							       domain->id);
+			if (domain->name == NULL) {
+				if (errno == ENOMEM) {
+					/* fatal error */
+					xenstat_free_node(node);
+					return NULL;
+				}
+				else {
+					/* failed to get name -- this means the
+					   domain is being destroyed so simply
+					   ignore this entry */
+					continue;
+				}
+			}
 			domain->state = domaininfo[i].flags;
 			domain->cpu_ns = domaininfo[i].cpu_time;
 			domain->num_vcpus = (domaininfo[i].max_vcpu_id+1);
@@ -284,10 +307,9 @@ xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 			domain->vbds = NULL;
 
 			domain++;
+			node->num_domains++;
 		}
-		num_domains += new_domains;
 	} while (new_domains == DOMAIN_CHUNK_SIZE);
-	node->num_domains = num_domains;
 
 	/* Run all the extra data collectors requested */
 	node->flags = 0;
@@ -495,10 +517,12 @@ xenstat_vbd *xenstat_domain_vbd(xenstat_domain * domain,
 /* Collect information about VCPUs */
 static int xenstat_collect_vcpus(xenstat_node * node)
 {
-	unsigned int i, vcpu;
+	unsigned int i, vcpu, inc_index;
 
 	/* Fill in VCPU information */
-	for (i = 0; i < node->num_domains; i++) {
+	for (i = 0; i < node->num_domains; i+=inc_index) {
+		inc_index = 1; /* default is to increment to next domain */
+
 		node->domains[i].vcpus = malloc(node->domains[i].num_vcpus
 						* sizeof(xenstat_vcpu));
 		if (node->domains[i].vcpus == NULL)
@@ -509,11 +533,25 @@ static int xenstat_collect_vcpus(xenstat_node * node)
 			dom0_getvcpuinfo_t info;
 
 			if (xc_vcpu_getinfo(node->handle->xc_handle,
-				node->domains[i].id, vcpu, &info) != 0)
-				return 0;
+					    node->domains[i].id, vcpu, &info) != 0) {
+				if (errno == ENOMEM) {
+					/* fatal error */ 
+					return 0;
+				}
+				else {
+					/* domain is in transition - remove
+					   from list */
+					xenstat_prune_domain(node, i);
 
-			node->domains[i].vcpus[vcpu].online = info.online;
-			node->domains[i].vcpus[vcpu].ns = info.cpu_time;
+					/* remember not to increment index! */
+					inc_index = 0;
+					break;
+				}
+			}
+			else {
+				node->domains[i].vcpus[vcpu].online = info.online;
+				node->domains[i].vcpus[vcpu].ns = info.cpu_time;
+			}
 		}
 	}
 	return 1;
@@ -884,13 +922,30 @@ unsigned long long xenstat_vbd_wr_reqs(xenstat_vbd * vbd)
 static char *xenstat_get_domain_name(xenstat_handle *handle, unsigned int domain_id)
 {
 	char path[80];
-	char *name;
 
 	snprintf(path, sizeof(path),"/local/domain/%i/name", domain_id);
 	
-	name = xs_read(handle->xshandle, XBT_NULL, path, NULL);
-	if (name == NULL)
-		name = strdup(" ");
-
-	return name;
+	return xs_read(handle->xshandle, XBT_NULL, path, NULL);
 }	
+
+/* Remove specified entry from list of domains */
+static void xenstat_prune_domain(xenstat_node *node, unsigned int entry)
+{
+	/* nothing to do if array is empty or entry is beyond end */
+	if (node->num_domains == 0 || entry >= node->num_domains)
+		return;
+
+	/* decrement count of domains */
+	node->num_domains--;
+
+	/* shift entries following specified entry up by one */
+	if (entry < node->num_domains) {
+		xenstat_domain *domain = &node->domains[entry];
+		memmove(domain,domain+1,node->num_domains-entry);
+	}
+
+	/* zero out original last entry from node -- not
+	   strictly necessary but safer! */
+	memset(&node->domains[node->num_domains], 0, sizeof(xenstat_domain)); 
+}
+
