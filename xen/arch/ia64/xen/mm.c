@@ -881,10 +881,10 @@ ioports_deny_access(struct domain *d, unsigned long fp, unsigned long lp)
         pte_t old_pte;
 
         port = IO_SPACE_SPARSE_DECODING (off);
-        if (port < fp || port + IO_SPACE_SPARSE_PORTS_PER_PAGE > lp) {
+        if (port < fp || port + IO_SPACE_SPARSE_PORTS_PER_PAGE - 1 > lp) {
             /* Maybe this covers an allowed port.  */
             if (ioports_has_allowed(d, port,
-                                    port + IO_SPACE_SPARSE_PORTS_PER_PAGE))
+                                    port + IO_SPACE_SPARSE_PORTS_PER_PAGE - 1))
                 continue;
         }
 
