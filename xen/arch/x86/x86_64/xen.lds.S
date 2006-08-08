@@ -44,6 +44,9 @@ SECTIONS
 	CONSTRUCTORS
 	} :text
 
+  . = ALIGN(128);
+  .data.read_mostly : { *(.data.read_mostly) } :text
+
   . = ALIGN(4096);		/* Init code and data */
   __init_begin = .;
   .text.init : { *(.text.init) } :text
