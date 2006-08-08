@@ -671,28 +671,6 @@ static int check_vmx_controls(u32 ctrls, u32 msr)
     return 1;
 }
 
-/* Setup HVM interfaces */
-static void vmx_setup_hvm_funcs(void)
-{
-    if ( hvm_enabled )
-        return;
-
-    hvm_funcs.disable = stop_vmx;
-
-    hvm_funcs.initialize_guest_resources = vmx_initialize_guest_resources;
-    hvm_funcs.relinquish_guest_resources = vmx_relinquish_guest_resources;
-
-    hvm_funcs.store_cpu_guest_regs = vmx_store_cpu_guest_regs;
-    hvm_funcs.load_cpu_guest_regs = vmx_load_cpu_guest_regs;
-
-    hvm_funcs.realmode = vmx_realmode;
-    hvm_funcs.paging_enabled = vmx_paging_enabled;
-    hvm_funcs.instruction_length = vmx_instruction_length;
-    hvm_funcs.get_guest_ctrl_reg = vmx_get_ctrl_reg;
-
-    hvm_funcs.init_ap_context = vmx_init_ap_context;
-}
-
 static void vmx_init_hypercall_page(struct domain *d, void *hypercall_page)
 {
     char *p;
@@ -713,6 +691,30 @@ static void vmx_init_hypercall_page(struct domain *d, void *hypercall_page)
 
     /* Don't support HYPERVISOR_iret at the moment */
     *(u16 *)(hypercall_page + (__HYPERVISOR_iret * 32)) = 0x0b0f; /* ud2 */
+}
+
+/* Setup HVM interfaces */
+static void vmx_setup_hvm_funcs(void)
+{
+    if ( hvm_enabled )
+        return;
+
+    hvm_funcs.disable = stop_vmx;
+
+    hvm_funcs.initialize_guest_resources = vmx_initialize_guest_resources;
+    hvm_funcs.relinquish_guest_resources = vmx_relinquish_guest_resources;
+
+    hvm_funcs.store_cpu_guest_regs = vmx_store_cpu_guest_regs;
+    hvm_funcs.load_cpu_guest_regs = vmx_load_cpu_guest_regs;
+
+    hvm_funcs.realmode = vmx_realmode;
+    hvm_funcs.paging_enabled = vmx_paging_enabled;
+    hvm_funcs.instruction_length = vmx_instruction_length;
+    hvm_funcs.get_guest_ctrl_reg = vmx_get_ctrl_reg;
+
+    hvm_funcs.init_ap_context = vmx_init_ap_context;
+
+    hvm_funcs.init_hypercall_page = vmx_init_hypercall_page;
 }
 
 int start_vmx(void)
@@ -780,8 +782,6 @@ int start_vmx(void)
     vmx_save_init_msrs();
 
     vmx_setup_hvm_funcs();
-
-    hvm_funcs.init_hypercall_page = vmx_init_hypercall_page;
 
     hvm_enabled = 1;
 
