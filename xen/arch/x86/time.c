@@ -58,7 +58,7 @@ struct cpu_time {
     struct timer calibration_timer;
 } __cacheline_aligned;
 
-static struct cpu_time cpu_time[NR_CPUS];
+static DEFINE_PER_CPU(struct cpu_time, cpu_time);
 
 /*
  * Protected by platform_timer_lock, which must be acquired with interrupts
@@ -263,7 +263,7 @@ void calibrate_tsc_ap(void)
     rdtscll(t2);
 
     ticks_per_sec = (t2 - t1) * (u64)CALIBRATE_FRAC;
-    set_time_scale(&cpu_time[smp_processor_id()].tsc_scale, ticks_per_sec);
+    set_time_scale(&this_cpu(cpu_time).tsc_scale, ticks_per_sec);
 
     atomic_dec(&tsc_calibrate_gang);
 }
@@ -646,7 +646,7 @@ static unsigned long get_cmos_time(void)
 
 s_time_t get_s_time(void)
 {
-    struct cpu_time *t = &cpu_time[smp_processor_id()];
+    struct cpu_time *t = &this_cpu(cpu_time);
     u64 tsc, delta;
     s_time_t now;
 
@@ -675,7 +675,7 @@ static inline void __update_vcpu_system_time(struct vcpu *v)
     struct cpu_time       *t;
     struct vcpu_time_info *u;
 
-    t = &cpu_time[smp_processor_id()];
+    t = &this_cpu(cpu_time);
     u = &v->domain->shared_info->vcpu_info[v->vcpu_id].time;
 
     version_update_begin(&u->version);
@@ -691,7 +691,7 @@ static inline void __update_vcpu_system_time(struct vcpu *v)
 void update_vcpu_system_time(struct vcpu *v)
 {
     if ( v->domain->shared_info->vcpu_info[v->vcpu_id].time.tsc_timestamp != 
-         cpu_time[smp_processor_id()].local_tsc_stamp )
+         this_cpu(cpu_time).local_tsc_stamp )
         __update_vcpu_system_time(v);
 }
 
@@ -728,7 +728,7 @@ void do_settime(unsigned long secs, unsigned long nsecs, u64 system_time_base)
 
 static void local_time_calibration(void *unused)
 {
-    unsigned int cpu = smp_processor_id();
+    struct cpu_time *t = &this_cpu(cpu_time);
 
     /*
      * System timestamps, extrapolated from local and master oscillators,
@@ -759,9 +759,9 @@ static void local_time_calibration(void *unused)
     /* The overall calibration scale multiplier. */
     u32 calibration_mul_frac;
 
-    prev_tsc          = cpu_time[cpu].local_tsc_stamp;
-    prev_local_stime  = cpu_time[cpu].stime_local_stamp;
-    prev_master_stime = cpu_time[cpu].stime_master_stamp;
+    prev_tsc          = t->local_tsc_stamp;
+    prev_local_stime  = t->stime_local_stamp;
+    prev_master_stime = t->stime_master_stamp;
 
     /* Disable IRQs to get 'instantaneous' current timestamps. */
     local_irq_disable();
@@ -772,9 +772,9 @@ static void local_time_calibration(void *unused)
 
 #if 0
     printk("PRE%d: tsc=%lld stime=%lld master=%lld\n",
-           cpu, prev_tsc, prev_local_stime, prev_master_stime);
+           smp_processor_id(), prev_tsc, prev_local_stime, prev_master_stime);
     printk("CUR%d: tsc=%lld stime=%lld master=%lld -> %lld\n",
-           cpu, curr_tsc, curr_local_stime, curr_master_stime,
+           smp_processor_id(), curr_tsc, curr_local_stime, curr_master_stime,
            curr_master_stime - curr_local_stime);
 #endif
 
@@ -844,41 +844,41 @@ static void local_time_calibration(void *unused)
         calibration_mul_frac = mul_frac(calibration_mul_frac, error_factor);
 
 #if 0
-    printk("---%d: %08x %08x %d\n", cpu,
+    printk("---%d: %08x %08x %d\n", smp_processor_id(),
            error_factor, calibration_mul_frac, tsc_shift);
 #endif
 
     /* Record new timestamp information. */
-    cpu_time[cpu].tsc_scale.mul_frac = calibration_mul_frac;
-    cpu_time[cpu].tsc_scale.shift    = tsc_shift;
-    cpu_time[cpu].local_tsc_stamp    = curr_tsc;
-    cpu_time[cpu].stime_local_stamp  = curr_local_stime;
-    cpu_time[cpu].stime_master_stamp = curr_master_stime;
+    t->tsc_scale.mul_frac = calibration_mul_frac;
+    t->tsc_scale.shift    = tsc_shift;
+    t->local_tsc_stamp    = curr_tsc;
+    t->stime_local_stamp  = curr_local_stime;
+    t->stime_master_stamp = curr_master_stime;
 
  out:
-    set_timer(&cpu_time[cpu].calibration_timer, NOW() + EPOCH);
+    set_timer(&t->calibration_timer, NOW() + EPOCH);
 
-    if ( cpu == 0 )
+    if ( smp_processor_id() == 0 )
         platform_time_calibration();
 }
 
 void init_percpu_time(void)
 {
-    unsigned int cpu = smp_processor_id();
+    struct cpu_time *t = &this_cpu(cpu_time);
     unsigned long flags;
     s_time_t now;
 
     local_irq_save(flags);
-    rdtscll(cpu_time[cpu].local_tsc_stamp);
-    now = (cpu == 0) ? 0 : read_platform_stime();
+    rdtscll(t->local_tsc_stamp);
+    now = (smp_processor_id() == 0) ? 0 : read_platform_stime();
     local_irq_restore(flags);
 
-    cpu_time[cpu].stime_master_stamp = now;
-    cpu_time[cpu].stime_local_stamp  = now;
+    t->stime_master_stamp = now;
+    t->stime_local_stamp  = now;
 
-    init_timer(&cpu_time[cpu].calibration_timer,
-                  local_time_calibration, NULL, cpu);
-    set_timer(&cpu_time[cpu].calibration_timer, NOW() + EPOCH);
+    init_timer(&t->calibration_timer, local_time_calibration,
+               NULL, smp_processor_id());
+    set_timer(&t->calibration_timer, NOW() + EPOCH);
 }
 
 /* Late init function (after all CPUs are booted). */
@@ -904,7 +904,7 @@ void __init early_time_init(void)
 {
     u64 tmp = calibrate_boot_tsc();
 
-    set_time_scale(&cpu_time[0].tsc_scale, tmp);
+    set_time_scale(&per_cpu(cpu_time, 0).tsc_scale, tmp);
 
     do_div(tmp, 1000);
     cpu_khz = (unsigned long)tmp;
