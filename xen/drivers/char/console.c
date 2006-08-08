@@ -716,7 +716,6 @@ void panic(const char *fmt, ...)
     char buf[128];
     unsigned long flags;
     static DEFINE_SPINLOCK(lock);
-    extern void machine_restart(char *);
     
     debugtrace_dump();
 
