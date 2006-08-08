@@ -838,7 +838,7 @@ ioports_permit_access(struct domain *d, unsigned long fp, unsigned long lp)
 
     for (off = fp_offset; off <= lp_offset; off += PAGE_SIZE)
         __assign_domain_page(d, IO_PORTS_PADDR + off,
-                             ia64_iobase + off, ASSIGN_nocache);
+                             __pa(ia64_iobase) + off, ASSIGN_nocache);
 
     return 0;
 }
@@ -859,18 +859,23 @@ ioports_deny_access(struct domain *d, unsigned long fp, unsigned long lp)
     int ret;
     struct mm_struct *mm = &d->arch.mm;
     unsigned long off;
+    unsigned long io_ports_base;
     unsigned long fp_offset;
     unsigned long lp_offset;
 
     ret = rangeset_remove_range(d->arch.ioport_caps, fp, lp);
     if (ret != 0)
         return ret;
+    if (d == dom0)
+        io_ports_base = __pa(ia64_iobase);
+    else
+        io_ports_base = IO_PORTS_PADDR;
 
-    fp_offset = IO_SPACE_SPARSE_ENCODING(fp) & ~PAGE_MASK;
+    fp_offset = IO_SPACE_SPARSE_ENCODING(fp) & PAGE_MASK;
     lp_offset = PAGE_ALIGN(IO_SPACE_SPARSE_ENCODING(lp));
 
-    for (off = fp_offset; off <= lp_offset; off += PAGE_SIZE) {
-        unsigned long mpaddr = IO_PORTS_PADDR + off;
+    for (off = fp_offset; off < lp_offset; off += PAGE_SIZE) {
+        unsigned long mpaddr = io_ports_base + off;
         unsigned long port;
         volatile pte_t *pte;
         pte_t old_pte;

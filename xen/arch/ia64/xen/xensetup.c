@@ -525,8 +525,10 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
 
     init_trace_bufs();
 
-    if (opt_xencons)
+    if (opt_xencons) {
         console_endboot();
+        serial_endboot();
+    }
 
     domain0_ready = 1;
 
