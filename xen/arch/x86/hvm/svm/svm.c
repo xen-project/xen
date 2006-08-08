@@ -25,6 +25,7 @@
 #include <xen/sched.h>
 #include <xen/irq.h>
 #include <xen/softirq.h>
+#include <xen/hypercall.h>
 #include <asm/current.h>
 #include <asm/io.h>
 #include <asm/shadow.h>
@@ -2121,7 +2122,7 @@ static inline void svm_vmexit_do_hlt(struct vmcb_struct *vmcb)
         next_wakeup = next_pit;
     if ( next_wakeup != - 1 )
         set_timer(&current->arch.hvm_svm.hlt_timer, next_wakeup);
-    hvm_safe_block();
+    do_sched_op_compat(SCHEDOP_block, 0);
 }
 
 

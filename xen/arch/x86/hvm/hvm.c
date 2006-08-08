@@ -29,6 +29,7 @@
 #include <xen/domain_page.h>
 #include <xen/hypercall.h>
 #include <xen/guest_access.h>
+#include <xen/event.h>
 #include <asm/current.h>
 #include <asm/io.h>
 #include <asm/shadow.h>
@@ -159,6 +160,29 @@ void hvm_map_io_shared_page(struct vcpu *v)
 
     d->arch.hvm_domain.shared_page_va = (unsigned long)p;
 }
+
+void hvm_create_event_channels(struct vcpu *v)
+{
+    vcpu_iodata_t *p;
+    struct vcpu *o;
+
+    if ( v->vcpu_id == 0 ) {
+        /* Ugly: create event channels for every vcpu when vcpu 0
+           starts, so that they're available for ioemu to bind to. */
+        for_each_vcpu(v->domain, o) {
+            p = get_vio(v->domain, o->vcpu_id);
+            o->arch.hvm_vcpu.xen_port = p->vp_eport =
+                alloc_unbound_xen_event_channel(o, 0);
+            DPRINTK("Allocated port %d for hvm.\n", o->arch.hvm_vcpu.xen_port);
+        }
+    }
+}
+
+void hvm_release_assist_channel(struct vcpu *v)
+{
+    free_xen_event_channel(v, v->arch.hvm_vcpu.xen_port);
+}
+
 
 void hvm_setup_platform(struct domain* d)
 {

@@ -69,7 +69,6 @@ struct vcpu_iodata {
     struct ioreq         vp_ioreq;
     /* Event channel port */
     unsigned int    vp_eport;   /* VMX vcpu uses this to notify DM */
-    unsigned int    dm_eport;   /* DM uses this to notify VMX vcpu */
 };
 typedef struct vcpu_iodata vcpu_iodata_t;
 

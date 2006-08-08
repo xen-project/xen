@@ -82,6 +82,10 @@ int xce_handle = -1;
 /* which vcpu we are serving */
 int send_vcpu = 0;
 
+//the evtchn port for polling the notification,
+#define NR_CPUS 32
+evtchn_port_t ioreq_local_port[NR_CPUS];
+
 CPUX86State *cpu_x86_init(void)
 {
     CPUX86State *env;
@@ -113,7 +117,7 @@ CPUX86State *cpu_x86_init(void)
                 fprintf(logfile, "bind interdomain ioctl error %d\n", errno);
                 return NULL;
             }
-            shared_page->vcpu_iodata[i].dm_eport = rc;
+            ioreq_local_port[i] = rc;
         }
     }
 
@@ -184,8 +188,7 @@ void sp_info()
 
     for (i = 0; i < vcpus; i++) {
         req = &(shared_page->vcpu_iodata[i].vp_ioreq);
-        term_printf("vcpu %d: event port %d\n", i,
-                    shared_page->vcpu_iodata[i].vp_eport);
+        term_printf("vcpu %d: event port %d\n", i, ioreq_local_port[i]);
         term_printf("  req state: %x, pvalid: %x, addr: %"PRIx64", "
                     "data: %"PRIx64", count: %"PRIx64", size: %"PRIx64"\n",
                     req->state, req->pdata_valid, req->addr,
@@ -204,6 +207,7 @@ static ioreq_t *__cpu_get_ioreq(int vcpu)
 
     if (req->state == STATE_IOREQ_READY) {
         req->state = STATE_IOREQ_INPROCESS;
+        rmb();
         return req;
     }
 
@@ -226,7 +230,7 @@ static ioreq_t *cpu_get_ioreq(void)
     port = xc_evtchn_pending(xce_handle);
     if (port != -1) {
         for ( i = 0; i < vcpus; i++ )
-            if ( shared_page->vcpu_iodata[i].dm_eport == port )
+            if ( ioreq_local_port[i] == port )
                 break;
 
         if ( i == vcpus ) {
@@ -447,8 +451,10 @@ void cpu_handle_ioreq(void *opaque)
         }
 
         /* No state change if state = STATE_IORESP_HOOK */
-        if (req->state == STATE_IOREQ_INPROCESS)
+        if (req->state == STATE_IOREQ_INPROCESS) {
+            mb();
             req->state = STATE_IORESP_READY;
+        }
         env->send_event = 1;
     }
 }
@@ -479,8 +485,7 @@ int main_loop(void)
 
         if (env->send_event) {
             env->send_event = 0;
-            xc_evtchn_notify(xce_handle,
-                             shared_page->vcpu_iodata[send_vcpu].dm_eport);
+            xc_evtchn_notify(xce_handle, ioreq_local_port[send_vcpu]);
         }
     }
     destroy_hvm_domain();

@@ -44,11 +44,6 @@ static inline vcpu_iodata_t *get_vio(struct domain *d, unsigned long cpu)
     return &get_sp(d)->vcpu_iodata[cpu];
 }
 
-static inline int iopacket_port(struct vcpu *v)
-{
-    return get_vio(v->domain, v->vcpu_id)->vp_eport;
-}
-
 /* XXX these are really VMX specific */
 #define TYPE_MOV_TO_DR          (0 << 4)
 #define TYPE_MOV_FROM_DR        (1 << 4)
@@ -149,5 +144,7 @@ extern void hvm_print_line(struct vcpu *v, const char c);
 extern void hlt_timer_fn(void *data);
 
 void hvm_do_hypercall(struct cpu_user_regs *pregs);
+
+void hvm_prod_vcpu(struct vcpu *v);
 
 #endif /* __ASM_X86_HVM_SUPPORT_H__ */

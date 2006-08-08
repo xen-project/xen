@@ -211,7 +211,7 @@ void hlt_timer_fn(void *data)
 {
     struct vcpu *v = data;
 
-    evtchn_set_pending(v, iopacket_port(v));
+    hvm_prod_vcpu(v);
 }
 
 static __inline__ void missed_ticks(struct periodic_time *pt)

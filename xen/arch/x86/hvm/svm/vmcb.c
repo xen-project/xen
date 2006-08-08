@@ -370,18 +370,6 @@ void svm_do_launch(struct vcpu *v)
     if (v->vcpu_id == 0)
         hvm_setup_platform(v->domain);
 
-    if ( evtchn_bind_vcpu(iopacket_port(v), v->vcpu_id) < 0 )
-    {
-        printk("HVM domain bind port %d to vcpu %d failed!\n",
-               iopacket_port(v), v->vcpu_id);
-        domain_crash_synchronous();
-    }
-
-    HVM_DBG_LOG(DBG_LEVEL_1, "eport: %x", iopacket_port(v));
-
-    clear_bit(iopacket_port(v),
-              &v->domain->shared_info->evtchn_mask[0]);
-
     if (hvm_apic_support(v->domain))
         vlapic_init(v);
     init_timer(&v->arch.hvm_svm.hlt_timer,
@@ -439,10 +427,12 @@ void set_hsa_to_guest( struct arch_svm_struct *arch_svm )
 /* 
  * Resume the guest.
  */
+/* XXX svm_do_resume and vmx_do_resume are remarkably similar; could
+   they be unified? */
 void svm_do_resume(struct vcpu *v) 
 {
-    struct domain *d = v->domain;
-    struct periodic_time *pt = &d->arch.hvm_domain.pl_time.periodic_tm;
+    struct periodic_time *pt = &v->domain->arch.hvm_domain.pl_time.periodic_tm;
+    ioreq_t *p;
 
     svm_stts(v);
 
@@ -455,12 +445,16 @@ void svm_do_resume(struct vcpu *v)
         pickup_deactive_ticks(pt);
     }
 
-    if ( test_bit(iopacket_port(v), &d->shared_info->evtchn_pending[0]) ||
-         test_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags) )
-        hvm_wait_io();
-
-    /* We can't resume the guest if we're waiting on I/O */
-    ASSERT(!test_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags));
+    p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;
+    wait_on_xen_event_channel(v->arch.hvm.xen_port,
+                              p->state != STATE_IOREQ_READY &&
+                              p->state != STATE_IOREQ_INPROCESS);
+    if ( p->state == STATE_IORESP_READY )
+        hvm_io_assist(v);
+    if ( p->state != STATE_INVALID ) {
+        printf("Weird HVM iorequest state %d.\n", p->state);
+        domain_crash(v->domain);
+    }
 }
 
 void svm_launch_fail(unsigned long eflags)

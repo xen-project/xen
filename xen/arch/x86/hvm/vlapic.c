@@ -232,7 +232,7 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
               "level trig mode for vector %d\n", vector);
             set_bit(vector, vlapic->regs + APIC_TMR);
         }
-        evtchn_set_pending(v, iopacket_port(v));
+        hvm_prod_vcpu(v);
 
         result = 1;
         break;

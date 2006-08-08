@@ -294,26 +294,13 @@ static int setup_guest(int xc_handle,
         shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
     munmap(shared_info, PAGE_SIZE);
 
-    /* Populate the event channel port in the shared page */
+    /* Paranoia */
     shared_page_frame = page_array[(v_end >> PAGE_SHIFT) - 1];
     if ( (sp = (shared_iopage_t *) xc_map_foreign_range(
               xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
               shared_page_frame)) == 0 )
         goto error_out;
     memset(sp, 0, PAGE_SIZE);
-
-    /* FIXME: how about if we overflow the page here? */
-    for ( i = 0; i < vcpus; i++ ) {
-        unsigned int vp_eport;
-
-        vp_eport = xc_evtchn_alloc_unbound(xc_handle, dom, 0);
-        if ( vp_eport < 0 ) {
-            PERROR("Couldn't get unbound port from VMX guest.\n");
-            goto error_out;
-        }
-        sp->vcpu_iodata[i].vp_eport = vp_eport;
-    }
-
     munmap(sp, PAGE_SIZE);
 
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_PFN, (v_end >> PAGE_SHIFT) - 2);

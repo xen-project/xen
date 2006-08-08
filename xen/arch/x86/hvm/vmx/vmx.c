@@ -25,6 +25,7 @@
 #include <xen/irq.h>
 #include <xen/softirq.h>
 #include <xen/domain_page.h>
+#include <xen/hypercall.h>
 #include <asm/current.h>
 #include <asm/io.h>
 #include <asm/shadow.h>
@@ -141,6 +142,7 @@ static void vmx_relinquish_guest_resources(struct domain *d)
             free_domheap_page(VLAPIC(v)->regs_page);
             xfree(VLAPIC(v));
         }
+        hvm_release_assist_channel(v);
     }
 
     kill_timer(&d->arch.hvm_domain.pl_time.periodic_tm.timer);
@@ -2014,7 +2016,7 @@ void vmx_vmexit_do_hlt(void)
         next_wakeup = next_pit;
     if ( next_wakeup != - 1 ) 
         set_timer(&current->arch.hvm_vmx.hlt_timer, next_wakeup);
-    hvm_safe_block();
+    do_sched_op_compat(SCHEDOP_block, 0);
 }
 
 static inline void vmx_vmexit_do_extint(struct cpu_user_regs *regs)

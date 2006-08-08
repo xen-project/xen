@@ -77,6 +77,7 @@ hvm_disable(void)
         hvm_funcs.disable();
 }
 
+void hvm_create_event_channels(struct vcpu *v);
 void hvm_map_io_shared_page(struct vcpu *v);
 
 static inline int
@@ -85,8 +86,10 @@ hvm_initialize_guest_resources(struct vcpu *v)
     int ret = 1;
     if ( hvm_funcs.initialize_guest_resources )
         ret = hvm_funcs.initialize_guest_resources(v);
-    if ( ret == 1 )
+    if ( ret == 1 ) {
         hvm_map_io_shared_page(v);
+        hvm_create_event_channels(v);
+    }
     return ret;
 }
 
