@@ -55,7 +55,8 @@
 /*
  * Useful macros
  */
-#define CSCHED_PCPU(_c)     ((struct csched_pcpu *)schedule_data[_c].sched_priv)
+#define CSCHED_PCPU(_c)     \
+    ((struct csched_pcpu *)per_cpu(schedule_data, _c).sched_priv)
 #define CSCHED_VCPU(_vcpu)  ((struct csched_vcpu *) (_vcpu)->sched_priv)
 #define CSCHED_DOM(_dom)    ((struct csched_dom *) (_dom)->sched_priv)
 #define RUNQ(_cpu)          (&(CSCHED_PCPU(_cpu)->runq))
@@ -253,7 +254,8 @@ __runq_remove(struct csched_vcpu *svc)
 static inline void
 __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
 {
-    struct csched_vcpu * const cur = CSCHED_VCPU(schedule_data[cpu].curr);
+    struct csched_vcpu * const cur =
+        CSCHED_VCPU(per_cpu(schedule_data, cpu).curr);
     cpumask_t mask;
 
     ASSERT(cur);
@@ -318,10 +320,10 @@ csched_pcpu_init(int cpu)
 
     INIT_LIST_HEAD(&spc->runq);
     spc->runq_sort_last = csched_priv.runq_sort;
-    schedule_data[cpu].sched_priv = spc;
+    per_cpu(schedule_data, cpu).sched_priv = spc;
 
     /* Start off idling... */
-    BUG_ON( !is_idle_vcpu(schedule_data[cpu].curr) );
+    BUG_ON( !is_idle_vcpu(per_cpu(schedule_data, cpu).curr) );
     cpu_set(cpu, csched_priv.idlers);
 
     spin_unlock_irqrestore(&csched_priv.lock, flags);
@@ -533,7 +535,7 @@ csched_vcpu_sleep(struct vcpu *vc)
 
     BUG_ON( is_idle_vcpu(vc) );
 
-    if ( schedule_data[vc->processor].curr == vc )
+    if ( per_cpu(schedule_data, vc->processor).curr == vc )
         cpu_raise_softirq(vc->processor, SCHEDULE_SOFTIRQ);
     else if ( __vcpu_on_runq(svc) )
         __runq_remove(svc);
@@ -547,7 +549,7 @@ csched_vcpu_wake(struct vcpu *vc)
 
     BUG_ON( is_idle_vcpu(vc) );
 
-    if ( unlikely(schedule_data[cpu].curr == vc) )
+    if ( unlikely(per_cpu(schedule_data, cpu).curr == vc) )
     {
         CSCHED_STAT_CRANK(vcpu_wake_running);
         return;
@@ -599,7 +601,8 @@ csched_vcpu_set_affinity(struct vcpu *vc, cpumask_t *affinity)
 
             vc->processor = first_cpu(vc->cpu_affinity);
 
-            spin_unlock_irqrestore(&schedule_data[lcpu].schedule_lock, flags);
+            spin_unlock_irqrestore(&per_cpu(schedule_data, lcpu).schedule_lock,
+                                   flags);
         }
 
         vcpu_unpause(vc);
@@ -685,7 +688,7 @@ csched_runq_sort(unsigned int cpu)
 
     spc->runq_sort_last = sort_epoch;
 
-    spin_lock_irqsave(&schedule_data[cpu].schedule_lock, flags);
+    spin_lock_irqsave(&per_cpu(schedule_data, cpu).schedule_lock, flags);
 
     runq = &spc->runq;
     elem = runq->next;
@@ -710,7 +713,7 @@ csched_runq_sort(unsigned int cpu)
         elem = next;
     }
 
-    spin_unlock_irqrestore(&schedule_data[cpu].schedule_lock, flags);
+    spin_unlock_irqrestore(&per_cpu(schedule_data, cpu).schedule_lock, flags);
 }
 
 static void
@@ -900,7 +903,7 @@ csched_tick(unsigned int cpu)
      * we could distribute or at the very least cycle the duty.
      */
     if ( (csched_priv.master == cpu) &&
-         (schedule_data[cpu].tick % CSCHED_ACCT_NTICKS) == 0 )
+         (per_cpu(schedule_data, cpu).tick % CSCHED_ACCT_NTICKS) == 0 )
     {
         csched_acct();
     }
@@ -984,7 +987,7 @@ csched_load_balance(int cpu, struct csched_vcpu *snext)
          * cause a deadlock if the peer CPU is also load balancing and trying
          * to lock this CPU.
          */
-        if ( spin_trylock(&schedule_data[peer_cpu].schedule_lock) )
+        if ( spin_trylock(&per_cpu(schedule_data, peer_cpu).schedule_lock) )
         {
 
             spc = CSCHED_PCPU(peer_cpu);
@@ -998,7 +1001,7 @@ csched_load_balance(int cpu, struct csched_vcpu *snext)
                 speer = csched_runq_steal(spc, cpu, snext->pri);
             }
 
-            spin_unlock(&schedule_data[peer_cpu].schedule_lock);
+            spin_unlock(&per_cpu(schedule_data, peer_cpu).schedule_lock);
 
             /* Got one! */
             if ( speer )
@@ -1120,11 +1123,11 @@ csched_dump_pcpu(int cpu)
     runq = &spc->runq;
 
     printk(" tick=%lu, sort=%d\n",
-            schedule_data[cpu].tick,
+            per_cpu(schedule_data, cpu).tick,
             spc->runq_sort_last);
 
     /* current VCPU */
-    svc = CSCHED_VCPU(schedule_data[cpu].curr);
+    svc = CSCHED_VCPU(per_cpu(schedule_data, cpu).curr);
     if ( svc )
     {
         printk("\trun: ");

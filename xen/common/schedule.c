@@ -46,7 +46,7 @@ static void vcpu_timer_fn(void *data);
 static void poll_timer_fn(void *data);
 
 /* This is global for now so that private implementations can reach it */
-struct schedule_data schedule_data[NR_CPUS];
+DEFINE_PER_CPU(struct schedule_data, schedule_data);
 
 extern struct scheduler sched_bvt_def;
 extern struct scheduler sched_sedf_def;
@@ -73,7 +73,7 @@ static inline void vcpu_runstate_change(
     struct vcpu *v, int new_state, s_time_t new_entry_time)
 {
     ASSERT(v->runstate.state != new_state);
-    ASSERT(spin_is_locked(&schedule_data[v->processor].schedule_lock));
+    ASSERT(spin_is_locked(&per_cpu(schedule_data,v->processor).schedule_lock));
 
     v->runstate.time[v->runstate.state] +=
         new_entry_time - v->runstate.state_entry_time;
@@ -107,8 +107,8 @@ int sched_init_vcpu(struct vcpu *v)
 
     if ( is_idle_vcpu(v) )
     {
-        schedule_data[v->processor].curr = v;
-        schedule_data[v->processor].idle = v;
+        per_cpu(schedule_data, v->processor).curr = v;
+        per_cpu(schedule_data, v->processor).idle = v;
         set_bit(_VCPUF_running, &v->vcpu_flags);
     }
 
@@ -500,19 +500,21 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
  */
 static void __enter_scheduler(void)
 {
-    struct vcpu        *prev = current, *next = NULL;
-    int                 cpu = smp_processor_id();
-    s_time_t            now = NOW();
-    struct task_slice   next_slice;
-    s32                 r_time;     /* time for new dom to run */
+    struct vcpu          *prev = current, *next = NULL;
+    s_time_t              now = NOW();
+    struct schedule_data *sd;
+    struct task_slice     next_slice;
+    s32                   r_time;     /* time for new dom to run */
 
     ASSERT(!in_irq());
 
     perfc_incrc(sched_run);
 
-    spin_lock_irq(&schedule_data[cpu].schedule_lock);
+    sd = &this_cpu(schedule_data);
 
-    stop_timer(&schedule_data[cpu].s_timer);
+    spin_lock_irq(&sd->schedule_lock);
+
+    stop_timer(&sd->s_timer);
     
     /* get policy-specific decision on scheduling... */
     next_slice = ops.do_schedule(now);
@@ -520,13 +522,13 @@ static void __enter_scheduler(void)
     r_time = next_slice.time;
     next = next_slice.task;
 
-    schedule_data[cpu].curr = next;
+    sd->curr = next;
     
-    set_timer(&schedule_data[cpu].s_timer, now + r_time);
+    set_timer(&sd->s_timer, now + r_time);
 
     if ( unlikely(prev == next) )
     {
-        spin_unlock_irq(&schedule_data[cpu].schedule_lock);
+        spin_unlock_irq(&sd->schedule_lock);
         return continue_running(prev);
     }
 
@@ -552,17 +554,17 @@ static void __enter_scheduler(void)
     ASSERT(!test_bit(_VCPUF_running, &next->vcpu_flags));
     set_bit(_VCPUF_running, &next->vcpu_flags);
 
-    spin_unlock_irq(&schedule_data[cpu].schedule_lock);
+    spin_unlock_irq(&sd->schedule_lock);
 
     perfc_incrc(sched_ctx);
 
-    prev->sleep_tick = schedule_data[cpu].tick;
+    prev->sleep_tick = sd->tick;
 
     /* Ensure that the domain has an up-to-date time base. */
     if ( !is_idle_vcpu(next) )
     {
         update_vcpu_system_time(next);
-        if ( next->sleep_tick != schedule_data[cpu].tick )
+        if ( next->sleep_tick != sd->tick )
             send_timer_event(next);
     }
 
@@ -594,7 +596,7 @@ static void t_timer_fn(void *unused)
     struct vcpu  *v   = current;
     unsigned int  cpu = smp_processor_id();
 
-    schedule_data[cpu].tick++;
+    per_cpu(schedule_data, cpu).tick++;
 
     if ( !is_idle_vcpu(v) )
     {
@@ -633,8 +635,8 @@ void __init scheduler_init(void)
 
     for ( i = 0; i < NR_CPUS; i++ )
     {
-        spin_lock_init(&schedule_data[i].schedule_lock);
-        init_timer(&schedule_data[i].s_timer, s_timer_fn, NULL, i);
+        spin_lock_init(&per_cpu(schedule_data, i).schedule_lock);
+        init_timer(&per_cpu(schedule_data, i).s_timer, s_timer_fn, NULL, i);
         init_timer(&t_timer[i], t_timer_fn, NULL, i);
     }
 
@@ -676,10 +678,10 @@ void dump_runq(unsigned char key)
 
     for_each_online_cpu ( i )
     {
-        spin_lock(&schedule_data[i].schedule_lock);
+        spin_lock(&per_cpu(schedule_data, i).schedule_lock);
         printk("CPU[%02d] ", i);
-        SCHED_OP(dump_cpu_state,i);
-        spin_unlock(&schedule_data[i].schedule_lock);
+        SCHED_OP(dump_cpu_state, i);
+        spin_unlock(&per_cpu(schedule_data, i).schedule_lock);
     }
 
     local_irq_restore(flags);
