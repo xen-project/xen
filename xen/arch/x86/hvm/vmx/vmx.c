@@ -49,8 +49,8 @@
 #include <asm/hvm/vpic.h>
 #include <asm/hvm/vlapic.h>
 
-static unsigned long trace_values[NR_CPUS][5];
-#define TRACE_VMEXIT(index,value) trace_values[smp_processor_id()][index]=value
+static DEFINE_PER_CPU(unsigned long, trace_values[5]);
+#define TRACE_VMEXIT(index,value) this_cpu(trace_values)[index]=value
 
 static void vmx_ctxt_switch_from(struct vcpu *v);
 static void vmx_ctxt_switch_to(struct vcpu *v);
@@ -2400,11 +2400,11 @@ asmlinkage void vmx_load_cr2(void)
 asmlinkage void vmx_trace_vmentry (void)
 {
     TRACE_5D(TRC_VMX_VMENTRY,
-             trace_values[smp_processor_id()][0],
-             trace_values[smp_processor_id()][1],
-             trace_values[smp_processor_id()][2],
-             trace_values[smp_processor_id()][3],
-             trace_values[smp_processor_id()][4]);
+             this_cpu(trace_values)[0],
+             this_cpu(trace_values)[1],
+             this_cpu(trace_values)[2],
+             this_cpu(trace_values)[3],
+             this_cpu(trace_values)[4]);
     TRACE_VMEXIT(0,9);
     TRACE_VMEXIT(1,9);
     TRACE_VMEXIT(2,9);
