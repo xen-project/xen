@@ -260,7 +260,7 @@ class HVMImageHandler(ImageHandler):
             if a == 'stdvga': a = 'std-vga'
 
             # Handle booleans gracefully
-            if a in ['localtime', 'std-vga', 'isa', 'usb']:
+            if a in ['localtime', 'std-vga', 'isa', 'usb', 'acpi']:
                 if v != None: v = int(v)
                 if v: ret.append("-%s" % a)
             else:
