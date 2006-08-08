@@ -145,16 +145,6 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     /* Note: ia64_switch_to does not return here at vcpu initialization.  */
 
     //cpu_set(smp_processor_id(), current->domain->domain_dirty_cpumask);
-
-// leave this debug for now: it acts as a heartbeat when more than
-// one domain is active
-{
-static long cnt[16] = { 50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50};
-static int i = 100;
-int id = ((struct vcpu *)current)->domain->domain_id & 0xf;
-if (!cnt[id]--) { cnt[id] = 500000; printk("%x",id); }
-if (!i--) { i = 1000000; printk("+"); }
-}
  
     if (VMX_DOMAIN(current)){
 	vmx_load_all_rr(current);
