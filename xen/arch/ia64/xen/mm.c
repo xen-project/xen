@@ -648,21 +648,8 @@ ____lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
 unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr,
                                 struct p2m_entry* entry)
 {
-    volatile pte_t *pte;
+    volatile pte_t *pte = lookup_noalloc_domain_pte(d, mpaddr);
 
-#ifdef CONFIG_DOMAIN0_CONTIGUOUS
-    if (d == dom0) {
-        pte_t pteval;
-        if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
-            //printk("lookup_domain_mpa: bad dom0 mpaddr 0x%lx!\n",mpaddr);
-            //printk("lookup_domain_mpa: start=0x%lx,end=0x%lx!\n",dom0_start,dom0_start+dom0_size);
-        }
-        pteval = pfn_pte(mpaddr >> PAGE_SHIFT,
-            __pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX));
-        return pte_val(pteval);
-    }
-#endif
-    pte = lookup_noalloc_domain_pte(d, mpaddr);
     if (pte != NULL) {
         pte_t tmp_pte = *pte;// pte is volatile. copy the value.
         if (pte_present(tmp_pte)) {
@@ -716,27 +703,11 @@ void *domain_mpa_to_imva(struct domain *d, unsigned long mpaddr)
 static struct page_info *
 __assign_new_domain_page(struct domain *d, unsigned long mpaddr, pte_t* pte)
 {
-    struct page_info *p = NULL;
+    struct page_info *p;
     unsigned long maddr;
     int ret;
 
     BUG_ON(!pte_none(*pte));
-
-#ifdef CONFIG_DOMAIN0_CONTIGUOUS
-    if (d == dom0) {
-#if 0
-        if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
-            /* FIXME: is it true ?
-               dom0 memory is not contiguous!  */
-            panic("assign_new_domain_page: bad domain0 "
-                  "mpaddr=%lx, start=%lx, end=%lx!\n",
-                  mpaddr, dom0_start, dom0_start+dom0_size);
-        }
-#endif
-        p = mfn_to_page((mpaddr >> PAGE_SHIFT));
-        return p;
-    }
-#endif
 
     p = alloc_domheap_page(d);
     if (unlikely(!p)) {
@@ -771,25 +742,17 @@ __assign_new_domain_page(struct domain *d, unsigned long mpaddr, pte_t* pte)
 struct page_info *
 assign_new_domain_page(struct domain *d, unsigned long mpaddr)
 {
-#ifdef CONFIG_DOMAIN0_CONTIGUOUS
-    pte_t dummy_pte = __pte(0);
-    return __assign_new_domain_page(d, mpaddr, &dummy_pte);
-#else
-    struct page_info *p = NULL;
-    pte_t *pte;
+    pte_t *pte = __lookup_alloc_domain_pte(d, mpaddr);
 
-    pte = __lookup_alloc_domain_pte(d, mpaddr);
-    if (pte_none(*pte))
-        p = __assign_new_domain_page(d, mpaddr, pte);
+    if (!pte_none(*pte))
+        return NULL;
 
-    return p;
-#endif
+    return __assign_new_domain_page(d, mpaddr, pte);
 }
 
 void
 assign_new_domain0_page(struct domain *d, unsigned long mpaddr)
 {
-#ifndef CONFIG_DOMAIN0_CONTIGUOUS
     pte_t *pte;
 
     BUG_ON(d != dom0);
@@ -800,7 +763,6 @@ assign_new_domain0_page(struct domain *d, unsigned long mpaddr)
             panic("%s: can't allocate page for dom0", __func__);
         }
     }
-#endif
 }
 
 static unsigned long
@@ -1538,15 +1500,6 @@ void domain_cache_flush (struct domain *d, int sync_only)
     else
         flush_func = &flush_dcache_range;
 
-#ifdef CONFIG_DOMAIN0_CONTIGUOUS
-    if (d == dom0) {
-        /* This is not fully correct (because of hole), but it should
-           be enough for now.  */
-        (*flush_func)(__va_ul (dom0_start),
-                  __va_ul (dom0_start + dom0_size));
-        return;
-    }
-#endif
     for (i = 0; i < PTRS_PER_PGD; pgd++, i++) {
         pud_t *pud;
         if (!pgd_present(*pgd))

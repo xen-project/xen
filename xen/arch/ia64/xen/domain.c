@@ -49,7 +49,6 @@
 #include <asm/shadow.h>
 #include <asm/privop_stat.h>
 
-unsigned long dom0_start = -1L;
 unsigned long dom0_size = 512*1024*1024;
 unsigned long dom0_align = 64*1024*1024;
 
@@ -782,24 +781,6 @@ static void loaddomainelfimage(struct domain *d, unsigned long image_start)
 		elfaddr = (unsigned long) elfbase + phdr.p_offset;
 		dom_mpaddr = phdr.p_paddr;
 
-//printf("p_offset: %x, size=%x\n",elfaddr,filesz);
-#ifdef CONFIG_DOMAIN0_CONTIGUOUS
-		if (d == dom0) {
-			if (dom_mpaddr+memsz>dom0_size)
-				panic("Dom0 doesn't fit in memory space!\n");
-			dom_imva = __va_ul(dom_mpaddr + dom0_start);
-			memcpy((void *)dom_imva, (void *)elfaddr, filesz);
-			if (memsz > filesz)
-				memset((void *)dom_imva+filesz, 0,
-				       memsz-filesz);
-//FIXME: This test for code seems to find a lot more than objdump -x does
-			if (phdr.p_flags & PF_X) {
-				privify_memory(dom_imva,filesz);
-				flush_icache_range (dom_imva, dom_imva+filesz);
-			}
-		}
-		else
-#endif
 		while (memsz > 0) {
 			p = assign_new_domain_page(d,dom_mpaddr);
 			BUG_ON (unlikely(p == NULL));
@@ -864,27 +845,10 @@ void alloc_dom0(void)
 	if (running_on_sim) {
 		dom0_size = 128*1024*1024; //FIXME: Should be configurable
 	}
-#ifdef CONFIG_DOMAIN0_CONTIGUOUS
-	printf("alloc_dom0: starting (initializing %lu MB...)\n",dom0_size/(1024*1024));
- 
-	/* FIXME: The first trunk (say 256M) should always be assigned to
-	 * Dom0, since Dom0's physical == machine address for DMA purpose.
-	 * Some old version linux, like 2.4, assumes physical memory existing
-	 * in 2nd 64M space.
-	 */
-	dom0_start = alloc_boot_pages(dom0_size >> PAGE_SHIFT, dom0_align >> PAGE_SHIFT);
-	dom0_start <<= PAGE_SHIFT;
-	if (!dom0_start) {
-	  panic("alloc_dom0: can't allocate contiguous memory size=%lu\n",
-		dom0_size);
-	}
-	printf("alloc_dom0: dom0_start=0x%lx\n", dom0_start);
-#else
-	// no need to allocate pages for now
-	// pages are allocated by map_new_domain_page() via loaddomainelfimage()
-	dom0_start = 0;
-#endif
 
+	/* no need to allocate pages for now
+	 * pages are allocated by map_new_domain_page() via loaddomainelfimage()
+	 */
 }
 
 
@@ -910,7 +874,6 @@ int construct_dom0(struct domain *d,
 	               char *cmdline)
 {
 	int i, rc;
-	unsigned long alloc_start, alloc_end;
 	start_info_t *si;
 	struct vcpu *v = d->vcpu[0];
 	unsigned long max_pages;
@@ -943,8 +906,6 @@ int construct_dom0(struct domain *d,
 
 	printk("*** LOADING DOMAIN 0 ***\n");
 
-	alloc_start = dom0_start;
-	alloc_end = dom0_start + dom0_size;
 	max_pages = dom0_size / PAGE_SIZE;
 	d->max_pages = max_pages;
 	d->tot_pages = 0;
@@ -988,8 +949,7 @@ int construct_dom0(struct domain *d,
 	if(initrd_start && initrd_len){
 	    unsigned long offset;
 
-	    pinitrd_start= (dom0_start + dom0_size) -
-	                   (PAGE_ALIGN(initrd_len) + 4*1024*1024);
+	    pinitrd_start= dom0_size - (PAGE_ALIGN(initrd_len) + 4*1024*1024);
 	    if (pinitrd_start <= pstart_info)
 		panic("%s:enough memory is not assigned to dom0", __func__);
 
@@ -1095,17 +1055,14 @@ int construct_dom0(struct domain *d,
 	bp->console_info.orig_y = bp->console_info.num_rows == 0 ?
 	                          0 : bp->console_info.num_rows - 1;
 
-	bp->initrd_start = (dom0_start+dom0_size) -
-	  (PAGE_ALIGN(ia64_boot_param->initrd_size) + 4*1024*1024);
+	bp->initrd_start = dom0_size -
+	             (PAGE_ALIGN(ia64_boot_param->initrd_size) + 4*1024*1024);
 	bp->initrd_size = ia64_boot_param->initrd_size;
 
 	vcpu_init_regs (v);
 
 	vcpu_regs(v)->r28 = bp_mpa;
 
-#ifdef CONFIG_DOMAIN0_CONTIGUOUS
-	pkern_entry += dom0_start;
-#endif
 	vcpu_regs (v)->cr_iip = pkern_entry;
 
 	physdev_init_dom0(d);

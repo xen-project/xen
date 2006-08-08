@@ -28,7 +28,6 @@
 static void dom_fw_init (struct domain *d, struct ia64_boot_param *bp, char *fw_mem, int fw_mem_size, unsigned long maxmem);
 
 extern struct domain *dom0;
-extern unsigned long dom0_start;
 
 extern unsigned long running_on_sim;
 
