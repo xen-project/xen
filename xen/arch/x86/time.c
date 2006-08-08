@@ -56,7 +56,7 @@ struct cpu_time {
     s_time_t stime_master_stamp;
     struct time_scale tsc_scale;
     struct timer calibration_timer;
-} __cacheline_aligned;
+};
 
 static DEFINE_PER_CPU(struct cpu_time, cpu_time);
 

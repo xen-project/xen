@@ -5,6 +5,7 @@
 #ifndef __XEN_MULTICALL_H__
 #define __XEN_MULTICALL_H__
 
+#include <xen/percpu.h>
 #include <asm/multicall.h>
 
 #define _MCSF_in_multicall   0
@@ -14,8 +15,8 @@
 struct mc_state {
     unsigned long flags;
     struct multicall_entry call;
-} __cacheline_aligned;
+};
 
-extern struct mc_state mc_state[NR_CPUS];
+DECLARE_PER_CPU(struct mc_state, mc_state);
 
 #endif /* __XEN_MULTICALL_H__ */
