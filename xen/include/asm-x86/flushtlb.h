@@ -11,13 +11,15 @@
 #define __FLUSHTLB_H__
 
 #include <xen/config.h>
+#include <xen/percpu.h>
 #include <xen/smp.h>
+#include <xen/types.h>
 
 /* The current time as shown by the virtual TLB clock. */
 extern u32 tlbflush_clock;
 
 /* Time at which each CPU's TLB was last flushed. */
-extern u32 tlbflush_time[NR_CPUS];
+DECLARE_PER_CPU(u32, tlbflush_time);
 
 #define tlbflush_current_time() tlbflush_clock
 
@@ -47,12 +49,12 @@ static inline int NEED_FLUSH(u32 cpu_stamp, u32 lastuse_stamp)
  * Filter the given set of CPUs, removing those that definitely flushed their
  * TLB since @page_timestamp.
  */
-#define tlbflush_filter(mask, page_timestamp)                   \
-do {                                                            \
-    unsigned int cpu;                                           \
-    for_each_cpu_mask ( cpu, mask )                             \
-        if ( !NEED_FLUSH(tlbflush_time[cpu], page_timestamp) )  \
-            cpu_clear(cpu, mask);                               \
+#define tlbflush_filter(mask, page_timestamp)                           \
+do {                                                                    \
+    unsigned int cpu;                                                   \
+    for_each_cpu_mask ( cpu, mask )                                     \
+        if ( !NEED_FLUSH(per_cpu(tlbflush_time, cpu), page_timestamp) ) \
+            cpu_clear(cpu, mask);                                       \
 } while ( 0 )
 
 extern void new_tlbflush_clock_period(void);

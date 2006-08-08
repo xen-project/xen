@@ -20,7 +20,7 @@
 #endif
 
 u32 tlbflush_clock = 1U;
-u32 tlbflush_time[NR_CPUS];
+DEFINE_PER_CPU(u32, tlbflush_time);
 
 void write_cr3(unsigned long cr3)
 {
@@ -71,7 +71,7 @@ void write_cr3(unsigned long cr3)
      *         case, so really we are being ultra paranoid.
      */
 
-    tlbflush_time[smp_processor_id()] = t2;
+    this_cpu(tlbflush_time) = t2;
 
     local_irq_restore(flags);
 }

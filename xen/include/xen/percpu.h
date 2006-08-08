@@ -2,7 +2,6 @@
 #define __XEN_PERCPU_H__
 
 #include <xen/config.h>
-#include <xen/smp.h>
 #include <asm/percpu.h>
 
 /* Preferred on Xen. Also see arch-defined per_cpu(). */
