@@ -175,7 +175,6 @@ void hvm_setup_platform(struct domain* d)
     }
 
     hvm_zap_iommu_pages(d);
-    hvm_map_io_shared_page(v);
 
     platform = &d->arch.hvm_domain;
     pic_init(&platform->vpic, pic_irq_request, &platform->interrupt_request);
