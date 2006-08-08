@@ -402,9 +402,9 @@ class XendDomain:
             val = dominfo.destroy()
         else:
             try:
-                val = xc.domain_destroy(domid)
+                val = xc.domain_destroy(int(domid))
             except Exception, ex:
-                raise XendError(str(ex))
+                raise XendInvalidDomain(str(domid))
         return val       
 
     def domain_migrate(self, domid, dst, live=False, resource=0, port=0):
