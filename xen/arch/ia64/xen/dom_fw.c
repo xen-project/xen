@@ -253,10 +253,14 @@ acpi_update_lsapic (acpi_table_entry_header *header, const unsigned long end)
 		enable = 0;
 	if (lsapic->flags.enabled && enable) {
 		printk("enable lsapic entry: 0x%lx\n", (u64)lsapic);
+		lsapic->id = lsapic_nbr;
+		lsapic->eid = 0;
 		lsapic_nbr++;
 	} else if (lsapic->flags.enabled) {
 		printk("DISABLE lsapic entry: 0x%lx\n", (u64)lsapic);
 		lsapic->flags.enabled = 0;
+		lsapic->id = 0;
+		lsapic->eid = 0;
 	}
 	return 0;
 }

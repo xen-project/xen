@@ -763,12 +763,8 @@ UINT64 vcpu_deliverable_timer(VCPU *vcpu)
 
 IA64FAULT vcpu_get_lid(VCPU *vcpu, UINT64 *pval)
 {
-	/* Use real LID for domain0 until vIOSAPIC is present.
-	   Use EID=0, ID=vcpu_id for domU.  */
-	if (vcpu->domain == dom0)
-		*pval = ia64_getreg(_IA64_REG_CR_LID);
-	else
-		*pval = vcpu->vcpu_id << 24;
+	/* Use EID=0, ID=vcpu_id.  */
+	*pval = vcpu->vcpu_id << 24;
 	return IA64_NO_FAULT;
 }
 
