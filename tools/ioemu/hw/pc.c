@@ -885,9 +885,11 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, int boot_device,
         usb_uhci_init(pci_bus, piix3_devfn + 2);
     }
 
-    if (pci_enabled && acpi_enabled && 0) {
+#ifndef CONFIG_DM
+    if (pci_enabled && acpi_enabled) {
         piix4_pm_init(pci_bus, piix3_devfn + 3);
     }
+#endif /* !CONFIG_DM */
 
 #if 0
     /* ??? Need to figure out some way for the user to
@@ -910,8 +912,10 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, int boot_device,
     /* XXX: should be done in the Bochs BIOS */
     if (pci_enabled) {
         pci_bios_init();
+#ifndef CONFIG_DM
         if (acpi_enabled)
             acpi_bios_init();
+#endif /* !CONFIG_DM */
     }
 }
 
