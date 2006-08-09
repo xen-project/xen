@@ -1183,7 +1183,7 @@ static void vnc_listen_read(void *opaque)
     }
 }
 
-void vnc_display_init(DisplayState *ds, int display)
+int vnc_display_init(DisplayState *ds, int display, int find_unused)
 {
     struct sockaddr_in addr;
     int reuse_addr, ret;
@@ -1214,10 +1214,6 @@ void vnc_display_init(DisplayState *ds, int display)
 	exit(1);
     }
 
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(5900 + display);
-    memset(&addr.sin_addr, 0, sizeof(addr.sin_addr));
-
     reuse_addr = 1;
     ret = setsockopt(vs->lsock, SOL_SOCKET, SO_REUSEADDR,
 		     (const char *)&reuse_addr, sizeof(reuse_addr));
@@ -1226,7 +1222,16 @@ void vnc_display_init(DisplayState *ds, int display)
 	exit(1);
     }
 
+ retry:
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(5900 + display);
+    memset(&addr.sin_addr, 0, sizeof(addr.sin_addr));
+
     if (bind(vs->lsock, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
+	if (find_unused && errno == EADDRINUSE) {
+	    display++;
+	    goto retry;
+	}
 	fprintf(stderr, "bind() failed\n");
 	exit(1);
     }
@@ -1247,6 +1252,8 @@ void vnc_display_init(DisplayState *ds, int display)
     vs->ds->dpy_refresh = vnc_dpy_refresh;
 
     vnc_dpy_resize(vs->ds, 640, 400);
+
+    return display;
 }
 
 int vnc_start_viewer(int port)
