@@ -380,7 +380,7 @@ void pci_piix4_acpi_init(PCIBus *bus, int devfn)
     PCIAcpiState *d;
     uint8_t *pci_conf;
 
-    /* register a function 3 of PIIX4 */
+    /* register a function devfn of PIIX4 */
     d = (PCIAcpiState *)pci_register_device(
         bus, "PIIX4 ACPI", sizeof(PCIAcpiState),
         devfn, NULL, NULL);

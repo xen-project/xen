@@ -877,13 +877,13 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, int boot_device,
 
     cmos_init(ram_size, boot_device, bs_table, timeoffset);
 
-    /* using PIIX4 acpi model */
-    if (pci_enabled && acpi_enabled)
-        pci_piix4_acpi_init(pci_bus, piix3_devfn + 3);
-
     if (pci_enabled && usb_enabled) {
         usb_uhci_init(pci_bus, piix3_devfn + 2);
     }
+
+    /* using PIIX4 acpi model */
+    if (pci_enabled && acpi_enabled)
+        pci_piix4_acpi_init(pci_bus, piix3_devfn + (usb_enabled ? 3 : 2));
 
 #ifndef CONFIG_DM
     if (pci_enabled && acpi_enabled) {
