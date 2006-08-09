@@ -307,6 +307,7 @@ class HVMImageHandler(ImageHandler):
         vnc = sxp.child_value(config, 'vnc')
         vncdisplay = sxp.child_value(config, 'vncdisplay',
                                      int(self.vm.getDomid()))
+        vncunused = sxp.child_value(config, 'vncunused')
         sdl = sxp.child_value(config, 'sdl')
         ret = []
         nographic = sxp.child_value(config, 'nographic')
@@ -315,6 +316,8 @@ class HVMImageHandler(ImageHandler):
             return ret
         if vnc:
             ret = ret + ['-vnc', '%d' % vncdisplay, '-k', 'en-us']
+        if vncunused:
+            ret += ['-vncunused']
         return ret
 
     def createDeviceModel(self):

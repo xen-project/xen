@@ -121,6 +121,7 @@ int bios_size;
 static DisplayState display_state;
 int nographic;
 int vncviewer;
+int vncunused;
 const char* keyboard_layout = NULL;
 int64_t ticks_per_sec;
 int boot_device = 'c';
@@ -5344,6 +5345,7 @@ void help(void)
            "-loadvm file    start right away with a saved state (loadvm in monitor)\n"
 	   "-vnc display    start a VNC server on display\n"
            "-vncviewer      start a vncviewer process for this domain\n"
+           "-vncunused      bind the VNC server to an unused port\n"
            "-timeoffset     time offset (in seconds) from local time\n"
            "-acpi           disable or enable ACPI of HVM domain \n"
            "\n"
@@ -5435,6 +5437,7 @@ enum {
     QEMU_OPTION_timeoffset,
     QEMU_OPTION_acpi,
     QEMU_OPTION_vncviewer,
+    QEMU_OPTION_vncunused,
 };
 
 typedef struct QEMUOption {
@@ -5512,6 +5515,7 @@ const QEMUOption qemu_options[] = {
     { "smp", HAS_ARG, QEMU_OPTION_smp },
     { "vnc", HAS_ARG, QEMU_OPTION_vnc },
     { "vncviewer", 0, QEMU_OPTION_vncviewer },
+    { "vncunused", 0, QEMU_OPTION_vncunused },
     
     /* temporary options */
     { "usb", 0, QEMU_OPTION_usb },
@@ -5888,6 +5892,7 @@ int main(int argc, char **argv)
     snapshot = 0;
     nographic = 0;
     vncviewer = 0;
+    vncunused = 0;
     kernel_filename = NULL;
     kernel_cmdline = "";
 #ifndef CONFIG_DM
@@ -6295,6 +6300,11 @@ int main(int argc, char **argv)
             case QEMU_OPTION_vncviewer:
                 vncviewer++;
                 break;
+            case QEMU_OPTION_vncunused:
+                vncunused++;
+                if (vnc_display == -1)
+                    vnc_display = -2;
+                break;
             }
         }
     }
@@ -6504,7 +6514,7 @@ int main(int argc, char **argv)
     if (nographic) {
         dumb_display_init(ds);
     } else if (vnc_display != -1) {
-	vnc_display_init(ds, vnc_display);
+	vnc_display = vnc_display_init(ds, vnc_display, vncunused);
 	if (vncviewer)
 	    vnc_start_viewer(vnc_display);
 	xenstore_write_vncport(vnc_display);
