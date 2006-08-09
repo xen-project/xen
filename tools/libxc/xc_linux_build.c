@@ -1373,10 +1373,10 @@ int xc_linux_build(int xc_handle,
 
  error_out:
     free(image);
-    if ( fd >= 0 )
-        close(fd);
-    if ( initrd_info.u.file_handle )
+    if ( initrd_info.type == INITRD_file && initrd_info.u.file_handle )
         gzclose(initrd_info.u.file_handle);
+    else if ( fd >= 0 )
+        close(fd);
 
     return sts;
 }

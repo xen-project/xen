@@ -687,84 +687,17 @@ void hvm_io_assist(struct vcpu *v)
 
     p = &vio->vp_ioreq;
 
-    /* clear IO wait HVM flag */
-    if ( test_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags) ) {
-        if ( p->state == STATE_IORESP_READY ) {
-            p->state = STATE_INVALID;
-            clear_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags);
+    if ( p->state == STATE_IORESP_READY ) {
+        p->state = STATE_INVALID;
+        if ( p->type == IOREQ_TYPE_PIO )
+            hvm_pio_assist(regs, p, io_opp);
+        else
+            hvm_mmio_assist(regs, p, io_opp);
 
-            if ( p->type == IOREQ_TYPE_PIO )
-                hvm_pio_assist(regs, p, io_opp);
-            else
-                hvm_mmio_assist(regs, p, io_opp);
-
-            /* Copy register changes back into current guest state. */
-            hvm_load_cpu_guest_regs(v, regs);
-            memcpy(guest_cpu_user_regs(), regs, HVM_CONTEXT_STACK_BYTES);
-        }
-        /* else an interrupt send event raced us */
+        /* Copy register changes back into current guest state. */
+        hvm_load_cpu_guest_regs(v, regs);
+        memcpy(guest_cpu_user_regs(), regs, HVM_CONTEXT_STACK_BYTES);
     }
-}
-
-/*
- * On exit from hvm_wait_io, we're guaranteed not to be waiting on
- * I/O response from the device model.
- */
-void hvm_wait_io(void)
-{
-    struct vcpu *v = current;
-    struct domain *d = v->domain;
-    int port = iopacket_port(v);
-
-    for ( ; ; )
-    {
-        /* Clear master flag, selector flag, event flag each in turn. */
-        v->vcpu_info->evtchn_upcall_pending = 0;
-        clear_bit(port/BITS_PER_LONG, &v->vcpu_info->evtchn_pending_sel);
-        smp_mb__after_clear_bit();
-        if ( test_and_clear_bit(port, &d->shared_info->evtchn_pending[0]) )
-            hvm_io_assist(v);
-
-        /* Need to wait for I/O responses? */
-        if ( !test_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags) )
-            break;
-
-        do_sched_op_compat(SCHEDOP_block, 0);
-    }
-
-    /*
-     * Re-set the selector and master flags in case any other notifications
-     * are pending.
-     */
-    if ( d->shared_info->evtchn_pending[port/BITS_PER_LONG] )
-        set_bit(port/BITS_PER_LONG, &v->vcpu_info->evtchn_pending_sel);
-    if ( v->vcpu_info->evtchn_pending_sel )
-        v->vcpu_info->evtchn_upcall_pending = 1;
-}
-
-void hvm_safe_block(void)
-{
-    struct vcpu *v = current;
-    struct domain *d = v->domain;
-    int port = iopacket_port(v);
-
-    for ( ; ; )
-    {
-        /* Clear master flag & selector flag so we will wake from block. */
-        v->vcpu_info->evtchn_upcall_pending = 0;
-        clear_bit(port/BITS_PER_LONG, &v->vcpu_info->evtchn_pending_sel);
-        smp_mb__after_clear_bit();
-
-        /* Event pending already? */
-        if ( test_bit(port, &d->shared_info->evtchn_pending[0]) )
-            break;
-
-        do_sched_op_compat(SCHEDOP_block, 0);
-    }
-
-    /* Reflect pending event in selector and master flags. */
-    set_bit(port/BITS_PER_LONG, &v->vcpu_info->evtchn_pending_sel);
-    v->vcpu_info->evtchn_upcall_pending = 1;
 }
 
 /*

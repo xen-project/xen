@@ -1,0 +1,128 @@
+Index: ioemu/vnc.c
+===================================================================
+--- ioemu.orig/vnc.c	2006-08-09 14:44:44.721942535 +0100
++++ ioemu/vnc.c	2006-08-09 14:52:37.262165292 +0100
+@@ -1183,7 +1183,7 @@
+     }
+ }
+ 
+-void vnc_display_init(DisplayState *ds, int display)
++int vnc_display_init(DisplayState *ds, int display, int find_unused)
+ {
+     struct sockaddr_in addr;
+     int reuse_addr, ret;
+@@ -1214,10 +1214,6 @@
+ 	exit(1);
+     }
+ 
+-    addr.sin_family = AF_INET;
+-    addr.sin_port = htons(5900 + display);
+-    memset(&addr.sin_addr, 0, sizeof(addr.sin_addr));
+-
+     reuse_addr = 1;
+     ret = setsockopt(vs->lsock, SOL_SOCKET, SO_REUSEADDR,
+ 		     (const char *)&reuse_addr, sizeof(reuse_addr));
+@@ -1226,7 +1222,16 @@
+ 	exit(1);
+     }
+ 
++ retry:
++    addr.sin_family = AF_INET;
++    addr.sin_port = htons(5900 + display);
++    memset(&addr.sin_addr, 0, sizeof(addr.sin_addr));
++
+     if (bind(vs->lsock, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
++	if (find_unused && errno == EADDRINUSE) {
++	    display++;
++	    goto retry;
++	}
+ 	fprintf(stderr, "bind() failed\n");
+ 	exit(1);
+     }
+@@ -1247,6 +1252,8 @@
+     vs->ds->dpy_refresh = vnc_dpy_refresh;
+ 
+     vnc_dpy_resize(vs->ds, 640, 400);
++
++    return display;
+ }
+ 
+ int vnc_start_viewer(int port)
+Index: ioemu/vl.c
+===================================================================
+--- ioemu.orig/vl.c	2006-08-09 14:44:44.721942535 +0100
++++ ioemu/vl.c	2006-08-09 14:52:06.783905832 +0100
+@@ -121,6 +121,7 @@
+ static DisplayState display_state;
+ int nographic;
+ int vncviewer;
++int vncunused;
+ const char* keyboard_layout = NULL;
+ int64_t ticks_per_sec;
+ int boot_device = 'c';
+@@ -5342,6 +5343,7 @@
+            "-loadvm file    start right away with a saved state (loadvm in monitor)\n"
+ 	   "-vnc display    start a VNC server on display\n"
+            "-vncviewer      start a vncviewer process for this domain\n"
++           "-vncunused      bind the VNC server to an unused port\n"
+            "-timeoffset     time offset (in seconds) from local time\n"
+            "-acpi           disable or enable ACPI of HVM domain \n"
+            "\n"
+@@ -5431,6 +5433,7 @@
+     QEMU_OPTION_timeoffset,
+     QEMU_OPTION_acpi,
+     QEMU_OPTION_vncviewer,
++    QEMU_OPTION_vncunused,
+ };
+ 
+ typedef struct QEMUOption {
+@@ -5506,6 +5509,7 @@
+     { "smp", HAS_ARG, QEMU_OPTION_smp },
+     { "vnc", HAS_ARG, QEMU_OPTION_vnc },
+     { "vncviewer", 0, QEMU_OPTION_vncviewer },
++    { "vncunused", 0, QEMU_OPTION_vncunused },
+     
+     /* temporary options */
+     { "usb", 0, QEMU_OPTION_usb },
+@@ -5873,6 +5877,7 @@
+     snapshot = 0;
+     nographic = 0;
+     vncviewer = 0;
++    vncunused = 0;
+     kernel_filename = NULL;
+     kernel_cmdline = "";
+ #ifdef TARGET_PPC
+@@ -6270,6 +6275,11 @@
+             case QEMU_OPTION_vncviewer:
+                 vncviewer++;
+                 break;
++            case QEMU_OPTION_vncunused:
++                vncunused++;
++                if (vnc_display == -1)
++                    vnc_display = -2;
++                break;
+             }
+         }
+     }
+@@ -6465,7 +6475,7 @@
+     if (nographic) {
+         dumb_display_init(ds);
+     } else if (vnc_display != -1) {
+-	vnc_display_init(ds, vnc_display);
++	vnc_display = vnc_display_init(ds, vnc_display, vncunused);
+ 	if (vncviewer)
+ 	    vnc_start_viewer(vnc_display);
+     } else {
+Index: ioemu/vl.h
+===================================================================
+--- ioemu.orig/vl.h	2006-08-09 14:44:44.721942535 +0100
++++ ioemu/vl.h	2006-08-09 14:52:06.783905832 +0100
+@@ -784,7 +784,7 @@
+ void cocoa_display_init(DisplayState *ds, int full_screen);
+ 
+ /* vnc.c */
+-void vnc_display_init(DisplayState *ds, int display);
++int vnc_display_init(DisplayState *ds, int display, int find_unused);
+ int vnc_start_viewer(int port);
+ 
+ /* ide.c */

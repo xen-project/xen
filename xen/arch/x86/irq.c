@@ -160,11 +160,12 @@ typedef struct {
  * Stack of interrupts awaiting EOI on each CPU. These must be popped in
  * order, as only the current highest-priority pending irq can be EOIed.
  */
-static struct {
+struct pending_eoi {
     u8 vector; /* Vector awaiting EOI */
     u8 ready;  /* Ready for EOI now?  */
-} pending_eoi[NR_CPUS][NR_VECTORS] __cacheline_aligned;
-#define pending_eoi_sp(cpu) (pending_eoi[cpu][NR_VECTORS-1].vector)
+};
+static DEFINE_PER_CPU(struct pending_eoi, pending_eoi[NR_VECTORS]);
+#define pending_eoi_sp(p) ((p)[NR_VECTORS-1].vector)
 
 static void __do_IRQ_guest(int vector)
 {
@@ -172,7 +173,8 @@ static void __do_IRQ_guest(int vector)
     irq_desc_t         *desc = &irq_desc[vector];
     irq_guest_action_t *action = (irq_guest_action_t *)desc->action;
     struct domain      *d;
-    int                 i, sp, cpu = smp_processor_id();
+    int                 i, sp;
+    struct pending_eoi *peoi = this_cpu(pending_eoi);
 
     if ( unlikely(action->nr_guests == 0) )
     {
@@ -185,13 +187,13 @@ static void __do_IRQ_guest(int vector)
 
     if ( action->ack_type == ACKTYPE_EOI )
     {
-        sp = pending_eoi_sp(cpu);
-        ASSERT((sp == 0) || (pending_eoi[cpu][sp-1].vector < vector));
+        sp = pending_eoi_sp(peoi);
+        ASSERT((sp == 0) || (peoi[sp-1].vector < vector));
         ASSERT(sp < (NR_VECTORS-1));
-        pending_eoi[cpu][sp].vector = vector;
-        pending_eoi[cpu][sp].ready = 0;
-        pending_eoi_sp(cpu) = sp+1;
-        cpu_set(cpu, action->cpu_eoi_map);
+        peoi[sp].vector = vector;
+        peoi[sp].ready = 0;
+        pending_eoi_sp(peoi) = sp+1;
+        cpu_set(smp_processor_id(), action->cpu_eoi_map);
     }
 
     for ( i = 0; i < action->nr_guests; i++ )
@@ -207,43 +209,45 @@ static void __do_IRQ_guest(int vector)
 /* Flush all ready EOIs from the top of this CPU's pending-EOI stack. */
 static void flush_ready_eoi(void *unused)
 {
-    irq_desc_t *desc;
-    int         vector, sp, cpu = smp_processor_id();
+    struct pending_eoi *peoi = this_cpu(pending_eoi);
+    irq_desc_t         *desc;
+    int                 vector, sp;
 
     ASSERT(!local_irq_is_enabled());
 
-    sp = pending_eoi_sp(cpu);
+    sp = pending_eoi_sp(peoi);
 
-    while ( (--sp >= 0) && pending_eoi[cpu][sp].ready )
+    while ( (--sp >= 0) && peoi[sp].ready )
     {
-        vector = pending_eoi[cpu][sp].vector;
+        vector = peoi[sp].vector;
         desc = &irq_desc[vector];
         spin_lock(&desc->lock);
         desc->handler->end(vector);
         spin_unlock(&desc->lock);
     }
 
-    pending_eoi_sp(cpu) = sp+1;
+    pending_eoi_sp(peoi) = sp+1;
 }
 
 static void __set_eoi_ready(irq_desc_t *desc)
 {
     irq_guest_action_t *action = (irq_guest_action_t *)desc->action;
-    int                 vector, sp, cpu = smp_processor_id();
+    struct pending_eoi *peoi = this_cpu(pending_eoi);
+    int                 vector, sp;
 
     vector = desc - irq_desc;
 
     if ( !(desc->status & IRQ_GUEST) ||
          (action->in_flight != 0) ||
-         !cpu_test_and_clear(cpu, action->cpu_eoi_map) )
+         !cpu_test_and_clear(smp_processor_id(), action->cpu_eoi_map) )
         return;
 
-    sp = pending_eoi_sp(cpu);
+    sp = pending_eoi_sp(peoi);
     do {
         ASSERT(sp > 0);
-    } while ( pending_eoi[cpu][--sp].vector != vector );
-    ASSERT(!pending_eoi[cpu][sp].ready);
-    pending_eoi[cpu][sp].ready = 1;
+    } while ( peoi[--sp].vector != vector );
+    ASSERT(!peoi[sp].ready);
+    peoi[sp].ready = 1;
 }
 
 /* Mark specified IRQ as ready-for-EOI (if it really is) and attempt to EOI. */
@@ -269,16 +273,17 @@ static void flush_all_pending_eoi(void *unused)
 {
     irq_desc_t         *desc;
     irq_guest_action_t *action;
-    int                 i, vector, sp, cpu = smp_processor_id();
+    struct pending_eoi *peoi = this_cpu(pending_eoi);
+    int                 i, vector, sp;
 
     ASSERT(!local_irq_is_enabled());
 
-    sp = pending_eoi_sp(cpu);
+    sp = pending_eoi_sp(peoi);
     while ( --sp >= 0 )
     {
-        if ( pending_eoi[cpu][sp].ready )
+        if ( peoi[sp].ready )
             continue;
-        vector = pending_eoi[cpu][sp].vector;
+        vector = peoi[sp].vector;
         desc = &irq_desc[vector];
         spin_lock(&desc->lock);
         action = (irq_guest_action_t *)desc->action;
@@ -668,7 +673,7 @@ static int __init setup_dump_irqs(void)
 }
 __initcall(setup_dump_irqs);
 
-static struct timer end_irq_timer[NR_CPUS];
+static DEFINE_PER_CPU(struct timer, end_irq_timer);
 
 /*
  * force_intack: Forcibly emit all pending EOIs on each CPU every second.
@@ -677,22 +682,13 @@ static struct timer end_irq_timer[NR_CPUS];
 
 static void end_irq_timeout(void *unused)
 {
-    int cpu = smp_processor_id();
-
     local_irq_disable();
     flush_all_pending_eoi(NULL);
     local_irq_enable();
 
     on_selected_cpus(cpu_online_map, flush_ready_eoi, NULL, 1, 0);
 
-    set_timer(&end_irq_timer[cpu], NOW() + MILLISECS(1000));
-}
-
-static void __init __setup_irq_timeout(void *unused)
-{
-    int cpu = smp_processor_id();
-    init_timer(&end_irq_timer[cpu], end_irq_timeout, NULL, cpu);
-    set_timer(&end_irq_timer[cpu], NOW() + MILLISECS(1000));
+    set_timer(&this_cpu(end_irq_timer), NOW() + MILLISECS(1000));
 }
 
 static int force_intack;
@@ -700,8 +696,17 @@ boolean_param("force_intack", force_intack);
 
 static int __init setup_irq_timeout(void)
 {
-    if ( force_intack )
-        on_each_cpu(__setup_irq_timeout, NULL, 1, 1);
+    unsigned int cpu;
+
+    if ( !force_intack )
+        return 0;
+
+    for_each_online_cpu ( cpu )
+    {
+        init_timer(&per_cpu(end_irq_timer, cpu), end_irq_timeout, NULL, cpu);
+        set_timer(&per_cpu(end_irq_timer, cpu), NOW() + MILLISECS(1000));
+    }
+
     return 0;
 }
 __initcall(setup_irq_timeout);

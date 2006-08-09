@@ -130,6 +130,10 @@ vnc=1
 #vncdisplay=1
 
 #----------------------------------------------------------------------------
+# try to find an unused port for the VNC server, default = 1
+#vncunused=1
+
+#----------------------------------------------------------------------------
 # enable spawning vncviewer for domain's console
 # (only valid when vnc=1), default = 0
 #vncconsole=0

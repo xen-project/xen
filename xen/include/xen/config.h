@@ -50,6 +50,5 @@
 #endif /* !__ASSEMBLY__ */
 
 #define fastcall
-#define __read_mostly
 
 #endif /* __XEN_CONFIG_H__ */

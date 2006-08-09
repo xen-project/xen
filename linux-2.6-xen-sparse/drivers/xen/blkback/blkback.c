@@ -518,6 +518,19 @@ static int __init blkif_init(void)
 		return -ENODEV;
 
 	mmap_pages            = blkif_reqs * BLKIF_MAX_SEGMENTS_PER_REQUEST;
+
+#ifdef CONFIG_XEN_IA64_DOM0_NON_VP
+	extern unsigned long alloc_empty_foreign_map_page_range(
+		unsigned long pages);
+	mmap_vstart = (unsigned long)
+		alloc_empty_foreign_map_page_range(mmap_pages);
+#else /* ! ia64 */
+	page = balloon_alloc_empty_page_range(mmap_pages);
+	if (page == NULL)
+		return -ENOMEM;
+	mmap_vstart = (unsigned long)pfn_to_kaddr(page_to_pfn(page));
+#endif
+
 	pending_reqs          = kmalloc(sizeof(pending_reqs[0]) *
 					blkif_reqs, GFP_KERNEL);
 	pending_grant_handles = kmalloc(sizeof(pending_grant_handles[0]) *
@@ -534,16 +547,6 @@ static int __init blkif_init(void)
 
 	blkif_interface_init();
 	
-#ifdef CONFIG_XEN_IA64_DOM0_NON_VP
-	extern unsigned long alloc_empty_foreign_map_page_range(
-		unsigned long pages);
-	mmap_vstart = (unsigned long)
-		alloc_empty_foreign_map_page_range(mmap_pages);
-#else /* ! ia64 */
-	page = balloon_alloc_empty_page_range(mmap_pages);
-	BUG_ON(page == NULL);
-	mmap_vstart = (unsigned long)pfn_to_kaddr(page_to_pfn(page));
-#endif
 	printk("%s: reqs=%d, pages=%d, mmap_vstart=0x%lx\n",
 	       __FUNCTION__, blkif_reqs, mmap_pages, mmap_vstart);
 	BUG_ON(mmap_vstart == 0);

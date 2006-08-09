@@ -412,6 +412,11 @@ gopts.var('vncdisplay', val='',
           fn=set_value, default=None,
           use="""VNC display to use""")
 
+gopts.var('vncunused', val='',
+          fn=set_bool, default=1,
+          use="""Try to find an unused port for the VNC server.
+          Only valid when vnc=1.""")
+
 gopts.var('sdl', val='',
           fn=set_value, default=None,
           use="""Should the device model use SDL?""")
@@ -627,7 +632,7 @@ def configure_hvm(config_image, vals):
     """
     args = [ 'device_model', 'pae', 'vcpus', 'boot', 'fda', 'fdb',
              'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'soundhw',
-             'vnc', 'vncdisplay', 'vncconsole', 'sdl', 'display',
+             'vnc', 'vncdisplay', 'vncunused', 'vncconsole', 'sdl', 'display',
              'acpi', 'apic', 'xauthority', 'usb', 'usbdevice' ]
     for a in args:
         if (vals.__dict__[a]):
@@ -844,14 +849,58 @@ def choose_vnc_display():
 
 vncpid = None
 
+def daemonize(prog, args):
+    """Runs a program as a daemon with the list of arguments.  Returns the PID
+    of the daemonized program, or returns 0 on error.
+    """
+    r, w = os.pipe()
+    pid = os.fork()
+
+    if pid == 0:
+        os.close(r)
+        w = os.fdopen(w, 'w')
+        os.setsid()
+        try:
+            pid2 = os.fork()
+        except:
+            pid2 = None
+        if pid2 == 0:
+            os.chdir("/")
+            for fd in range(0, 256):
+                try:
+                    os.close(fd)
+                except:
+                    pass
+            os.open("/dev/null", os.O_RDWR)
+            os.dup2(0, 1)
+            os.dup2(0, 2)
+            os.execvp(prog, args)
+            os._exit(1)
+        else:
+            w.write(str(pid2 or 0))
+            w.close()
+            os._exit(0)
+
+    os.close(w)
+    r = os.fdopen(r)
+    daemon_pid = int(r.read())
+    r.close()
+    os.waitpid(pid, 0)
+    return daemon_pid
+
 def spawn_vnc(display):
+    """Spawns a vncviewer that listens on the specified display.  On success,
+    returns the port that the vncviewer is listening on and sets the global
+    vncpid.  On failure, returns 0.  Note that vncviewer is daemonized.
+    """
     vncargs = (["vncviewer", "-log", "*:stdout:0",
             "-listen", "%d" % (VNC_BASE_PORT + display) ])
-    global vncpid    
-    vncpid = os.spawnvp(os.P_NOWAIT, "vncviewer", vncargs)
-
+    global vncpid
+    vncpid = daemonize("vncviewer", vncargs)
+    if vncpid == 0:
+        return 0
     return VNC_BASE_PORT + display
-    
+
 def preprocess_vnc(vals):
     """If vnc was specified, spawn a vncviewer in listen mode
     and pass its address to the domain on the kernel command line.
@@ -928,7 +977,7 @@ def make_domain(opts, config):
         import signal
         if vncpid:
             os.kill(vncpid, signal.SIGKILL)
-        raise ex
+        raise
 
     dom = sxp.child_value(dominfo, 'name')
 

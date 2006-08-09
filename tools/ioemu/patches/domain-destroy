@@ -1,7 +1,7 @@
 Index: ioemu/monitor.c
 ===================================================================
---- ioemu.orig/monitor.c	2006-08-06 02:22:01.487319736 +0100
-+++ ioemu/monitor.c	2006-08-06 02:23:02.269544103 +0100
+--- ioemu.orig/monitor.c	2006-08-08 11:27:48.555190337 +0100
++++ ioemu/monitor.c	2006-08-08 11:27:53.984584612 +0100
 @@ -308,6 +308,7 @@
  
  static void do_quit(void)
@@ -12,10 +12,10 @@ Index: ioemu/monitor.c
  
 Index: ioemu/target-i386-dm/helper2.c
 ===================================================================
---- ioemu.orig/target-i386-dm/helper2.c	2006-08-06 02:22:59.251880493 +0100
-+++ ioemu/target-i386-dm/helper2.c	2006-08-06 02:23:02.270543991 +0100
-@@ -483,5 +483,25 @@
-                              shared_page->vcpu_iodata[send_vcpu].dm_eport);
+--- ioemu.orig/target-i386-dm/helper2.c	2006-08-08 11:27:53.063687351 +0100
++++ ioemu/target-i386-dm/helper2.c	2006-08-08 11:27:54.011581601 +0100
+@@ -488,5 +488,25 @@
+             xc_evtchn_notify(xce_handle, ioreq_local_port[send_vcpu]);
          }
      }
 +    destroy_hvm_domain();
@@ -42,8 +42,8 @@ Index: ioemu/target-i386-dm/helper2.c
 +}
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-08-06 02:22:59.255880047 +0100
-+++ ioemu/vl.h	2006-08-06 02:23:02.271543880 +0100
+--- ioemu.orig/vl.h	2006-08-08 11:27:53.067686905 +0100
++++ ioemu/vl.h	2006-08-08 11:27:54.061576023 +0100
 @@ -1189,4 +1189,7 @@
  void kqemu_record_dump(void);
  

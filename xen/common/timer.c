@@ -17,6 +17,7 @@
 #include <xen/softirq.h>
 #include <xen/timer.h>
 #include <xen/keyhandler.h>
+#include <xen/percpu.h>
 #include <asm/system.h>
 #include <asm/desc.h>
 
@@ -32,7 +33,7 @@ struct timers {
     struct timer  *running;
 } __cacheline_aligned;
 
-struct timers timers[NR_CPUS];
+static DEFINE_PER_CPU(struct timers, timers);
 
 extern int reprogram_timer(s_time_t timeout);
 
@@ -149,7 +150,7 @@ static int add_entry(struct timer ***pheap, struct timer *t)
 static inline void __add_timer(struct timer *timer)
 {
     int cpu = timer->cpu;
-    if ( add_entry(&timers[cpu].heap, timer) )
+    if ( add_entry(&per_cpu(timers, cpu).heap, timer) )
         cpu_raise_softirq(cpu, TIMER_SOFTIRQ);
 }
 
@@ -157,7 +158,7 @@ static inline void __add_timer(struct timer *timer)
 static inline void __stop_timer(struct timer *timer)
 {
     int cpu = timer->cpu;
-    if ( remove_entry(timers[cpu].heap, timer) )
+    if ( remove_entry(per_cpu(timers, cpu).heap, timer) )
         cpu_raise_softirq(cpu, TIMER_SOFTIRQ);
 }
 
@@ -168,10 +169,10 @@ static inline void timer_lock(struct timer *timer)
     for ( ; ; )
     {
         cpu = timer->cpu;
-        spin_lock(&timers[cpu].lock);
+        spin_lock(&per_cpu(timers, cpu).lock);
         if ( likely(timer->cpu == cpu) )
             break;
-        spin_unlock(&timers[cpu].lock);
+        spin_unlock(&per_cpu(timers, cpu).lock);
     }
 }
 
@@ -182,7 +183,7 @@ static inline void timer_lock(struct timer *timer)
 
 static inline void timer_unlock(struct timer *timer)
 {
-        spin_unlock(&timers[timer->cpu].lock);
+        spin_unlock(&per_cpu(timers, timer->cpu).lock);
 }
 
 #define timer_unlock_irq(t) \
@@ -234,20 +235,20 @@ void migrate_timer(struct timer *timer, unsigned int new_cpu)
 
         if ( old_cpu < new_cpu )
         {
-            spin_lock_irqsave(&timers[old_cpu].lock, flags);
-            spin_lock(&timers[new_cpu].lock);
+            spin_lock_irqsave(&per_cpu(timers, old_cpu).lock, flags);
+            spin_lock(&per_cpu(timers, new_cpu).lock);
         }
         else
         {
-            spin_lock_irqsave(&timers[new_cpu].lock, flags);
-            spin_lock(&timers[old_cpu].lock);
+            spin_lock_irqsave(&per_cpu(timers, new_cpu).lock, flags);
+            spin_lock(&per_cpu(timers, old_cpu).lock);
         }
 
         if ( likely(timer->cpu == old_cpu) )
              break;
 
-        spin_unlock(&timers[old_cpu].lock);
-        spin_unlock_irqrestore(&timers[new_cpu].lock, flags);
+        spin_unlock(&per_cpu(timers, old_cpu).lock);
+        spin_unlock_irqrestore(&per_cpu(timers, new_cpu).lock, flags);
     }
 
     if ( active_timer(timer) )
@@ -261,8 +262,8 @@ void migrate_timer(struct timer *timer, unsigned int new_cpu)
         timer->cpu = new_cpu;
     }
 
-    spin_unlock(&timers[old_cpu].lock);
-    spin_unlock_irqrestore(&timers[new_cpu].lock, flags);
+    spin_unlock(&per_cpu(timers, old_cpu).lock);
+    spin_unlock_irqrestore(&per_cpu(timers, new_cpu).lock, flags);
 }
 
 
@@ -271,7 +272,7 @@ void kill_timer(struct timer *timer)
     int           cpu;
     unsigned long flags;
 
-    BUG_ON(timers[smp_processor_id()].running == timer);
+    BUG_ON(this_cpu(timers).running == timer);
 
     timer_lock_irqsave(timer, flags);
 
@@ -282,23 +283,25 @@ void kill_timer(struct timer *timer)
     timer_unlock_irqrestore(timer, flags);
 
     for_each_online_cpu ( cpu )
-        while ( timers[cpu].running == timer )
+        while ( per_cpu(timers, cpu).running == timer )
             cpu_relax();
 }
 
 
 static void timer_softirq_action(void)
 {
-    int           cpu = smp_processor_id();
-    struct timer *t, **heap;
-    s_time_t      now;
-    void        (*fn)(void *);
-    void         *data;
+    struct timer  *t, **heap;
+    struct timers *ts;
+    s_time_t       now;
+    void         (*fn)(void *);
+    void          *data;
 
-    spin_lock_irq(&timers[cpu].lock);
+    ts = &this_cpu(timers);
+
+    spin_lock_irq(&ts->lock);
     
     do {
-        heap = timers[cpu].heap;
+        heap = ts->heap;
         now  = NOW();
 
         while ( (GET_HEAP_SIZE(heap) != 0) &&
@@ -306,24 +309,24 @@ static void timer_softirq_action(void)
         {
             remove_entry(heap, t);
 
-            timers[cpu].running = t;
+            ts->running = t;
 
             fn   = t->function;
             data = t->data;
 
-            spin_unlock_irq(&timers[cpu].lock);
+            spin_unlock_irq(&ts->lock);
             (*fn)(data);
-            spin_lock_irq(&timers[cpu].lock);
+            spin_lock_irq(&ts->lock);
 
             /* Heap may have grown while the lock was released. */
-            heap = timers[cpu].heap;
+            heap = ts->heap;
         }
 
-        timers[cpu].running = NULL;
+        ts->running = NULL;
     }
     while ( !reprogram_timer(GET_HEAP_SIZE(heap) ? heap[1]->expires : 0) );
 
-    spin_unlock_irq(&timers[cpu].lock);
+    spin_unlock_irq(&ts->lock);
 }
 
 
@@ -338,25 +341,28 @@ void process_pending_timers(void)
 
 static void dump_timerq(unsigned char key)
 {
-    struct timer *t;
-    unsigned long flags; 
-    s_time_t      now = NOW();
-    int           i, j;
+    struct timer  *t;
+    struct timers *ts;
+    unsigned long  flags; 
+    s_time_t       now = NOW();
+    int            i, j;
 
     printk("Dumping timer queues: NOW=0x%08X%08X\n",
            (u32)(now>>32), (u32)now); 
 
     for_each_online_cpu( i )
     {
+        ts = &per_cpu(timers, i);
+
         printk("CPU[%02d] ", i);
-        spin_lock_irqsave(&timers[i].lock, flags);
-        for ( j = 1; j <= GET_HEAP_SIZE(timers[i].heap); j++ )
+        spin_lock_irqsave(&ts->lock, flags);
+        for ( j = 1; j <= GET_HEAP_SIZE(ts->heap); j++ )
         {
-            t = timers[i].heap[j];
+            t = ts->heap[j];
             printk ("  %d : %p ex=0x%08X%08X %p\n",
                     j, t, (u32)(t->expires>>32), (u32)t->expires, t->data);
         }
-        spin_unlock_irqrestore(&timers[i].lock, flags);
+        spin_unlock_irqrestore(&ts->lock, flags);
         printk("\n");
     }
 }
@@ -378,8 +384,8 @@ void __init timer_init(void)
 
     for ( i = 0; i < NR_CPUS; i++ )
     {
-        spin_lock_init(&timers[i].lock);
-        timers[i].heap = &dummy_heap;
+        spin_lock_init(&per_cpu(timers, i).lock);
+        per_cpu(timers, i).heap = &dummy_heap;
     }
 
     register_keyhandler('a', dump_timerq, "dump timer queues");

@@ -25,6 +25,7 @@
 #include <xen/irq.h>
 #include <xen/softirq.h>
 #include <xen/domain_page.h>
+#include <xen/hypercall.h>
 #include <asm/current.h>
 #include <asm/io.h>
 #include <asm/shadow.h>
@@ -48,8 +49,8 @@
 #include <asm/hvm/vpic.h>
 #include <asm/hvm/vlapic.h>
 
-static unsigned long trace_values[NR_CPUS][5];
-#define TRACE_VMEXIT(index,value) trace_values[smp_processor_id()][index]=value
+static DEFINE_PER_CPU(unsigned long, trace_values[5]);
+#define TRACE_VMEXIT(index,value) this_cpu(trace_values)[index]=value
 
 static void vmx_ctxt_switch_from(struct vcpu *v);
 static void vmx_ctxt_switch_to(struct vcpu *v);
@@ -141,6 +142,7 @@ static void vmx_relinquish_guest_resources(struct domain *d)
             free_domheap_page(VLAPIC(v)->regs_page);
             xfree(VLAPIC(v));
         }
+        hvm_release_assist_channel(v);
     }
 
     kill_timer(&d->arch.hvm_domain.pl_time.periodic_tm.timer);
@@ -149,12 +151,15 @@ static void vmx_relinquish_guest_resources(struct domain *d)
         unmap_domain_page_global(
 	        (void *)d->arch.hvm_domain.shared_page_va);
 
+    if ( d->arch.hvm_domain.buffered_io_va )
+        unmap_domain_page_global((void *)d->arch.hvm_domain.buffered_io_va);
+
     shadow_direct_map_clean(d);
 }
 
 #ifdef __x86_64__
 
-static struct vmx_msr_state percpu_msr[NR_CPUS];
+static DEFINE_PER_CPU(struct vmx_msr_state, percpu_msr);
 
 static u32 msr_data_index[VMX_MSR_COUNT] =
 {
@@ -175,7 +180,7 @@ static void vmx_save_segments(struct vcpu *v)
  */
 static void vmx_load_msrs(void)
 {
-    struct vmx_msr_state *host_state = &percpu_msr[smp_processor_id()];
+    struct vmx_msr_state *host_state = &this_cpu(percpu_msr);
     int i;
 
     while ( host_state->flags )
@@ -188,7 +193,7 @@ static void vmx_load_msrs(void)
 
 static void vmx_save_init_msrs(void)
 {
-    struct vmx_msr_state *host_state = &percpu_msr[smp_processor_id()];
+    struct vmx_msr_state *host_state = &this_cpu(percpu_msr);
     int i;
 
     for ( i = 0; i < VMX_MSR_COUNT; i++ )
@@ -277,7 +282,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     u64 msr_content = regs->eax | ((u64)regs->edx << 32);
     struct vcpu *v = current;
     struct vmx_msr_state *msr = &v->arch.hvm_vmx.msr_content;
-    struct vmx_msr_state *host_state = &percpu_msr[smp_processor_id()];
+    struct vmx_msr_state *host_state = &this_cpu(percpu_msr);
 
     HVM_DBG_LOG(DBG_LEVEL_1, "msr 0x%lx msr_content 0x%"PRIx64"\n",
                 (unsigned long)regs->ecx, msr_content);
@@ -359,7 +364,7 @@ static void vmx_restore_msrs(struct vcpu *v)
     unsigned long guest_flags ;
 
     guest_state = &v->arch.hvm_vmx.msr_content;;
-    host_state = &percpu_msr[smp_processor_id()];
+    host_state = &this_cpu(percpu_msr);
 
     wrmsrl(MSR_SHADOW_GS_BASE, guest_state->shadow_gs);
     guest_flags = guest_state->flags;
@@ -671,28 +676,6 @@ static int check_vmx_controls(u32 ctrls, u32 msr)
     return 1;
 }
 
-/* Setup HVM interfaces */
-static void vmx_setup_hvm_funcs(void)
-{
-    if ( hvm_enabled )
-        return;
-
-    hvm_funcs.disable = stop_vmx;
-
-    hvm_funcs.initialize_guest_resources = vmx_initialize_guest_resources;
-    hvm_funcs.relinquish_guest_resources = vmx_relinquish_guest_resources;
-
-    hvm_funcs.store_cpu_guest_regs = vmx_store_cpu_guest_regs;
-    hvm_funcs.load_cpu_guest_regs = vmx_load_cpu_guest_regs;
-
-    hvm_funcs.realmode = vmx_realmode;
-    hvm_funcs.paging_enabled = vmx_paging_enabled;
-    hvm_funcs.instruction_length = vmx_instruction_length;
-    hvm_funcs.get_guest_ctrl_reg = vmx_get_ctrl_reg;
-
-    hvm_funcs.init_ap_context = vmx_init_ap_context;
-}
-
 static void vmx_init_hypercall_page(struct domain *d, void *hypercall_page)
 {
     char *p;
@@ -713,6 +696,30 @@ static void vmx_init_hypercall_page(struct domain *d, void *hypercall_page)
 
     /* Don't support HYPERVISOR_iret at the moment */
     *(u16 *)(hypercall_page + (__HYPERVISOR_iret * 32)) = 0x0b0f; /* ud2 */
+}
+
+/* Setup HVM interfaces */
+static void vmx_setup_hvm_funcs(void)
+{
+    if ( hvm_enabled )
+        return;
+
+    hvm_funcs.disable = stop_vmx;
+
+    hvm_funcs.initialize_guest_resources = vmx_initialize_guest_resources;
+    hvm_funcs.relinquish_guest_resources = vmx_relinquish_guest_resources;
+
+    hvm_funcs.store_cpu_guest_regs = vmx_store_cpu_guest_regs;
+    hvm_funcs.load_cpu_guest_regs = vmx_load_cpu_guest_regs;
+
+    hvm_funcs.realmode = vmx_realmode;
+    hvm_funcs.paging_enabled = vmx_paging_enabled;
+    hvm_funcs.instruction_length = vmx_instruction_length;
+    hvm_funcs.get_guest_ctrl_reg = vmx_get_ctrl_reg;
+
+    hvm_funcs.init_ap_context = vmx_init_ap_context;
+
+    hvm_funcs.init_hypercall_page = vmx_init_hypercall_page;
 }
 
 int start_vmx(void)
@@ -780,8 +787,6 @@ int start_vmx(void)
     vmx_save_init_msrs();
 
     vmx_setup_hvm_funcs();
-
-    hvm_funcs.init_hypercall_page = vmx_init_hypercall_page;
 
     hvm_enabled = 1;
 
@@ -2014,7 +2019,7 @@ void vmx_vmexit_do_hlt(void)
         next_wakeup = next_pit;
     if ( next_wakeup != - 1 ) 
         set_timer(&current->arch.hvm_vmx.hlt_timer, next_wakeup);
-    hvm_safe_block();
+    do_sched_op_compat(SCHEDOP_block, 0);
 }
 
 static inline void vmx_vmexit_do_extint(struct cpu_user_regs *regs)
@@ -2128,12 +2133,10 @@ void restore_cpu_user_regs(struct cpu_user_regs *regs)
 asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
 {
     unsigned int exit_reason;
-    unsigned long exit_qualification, eip, inst_len = 0;
+    unsigned long exit_qualification, rip, inst_len = 0;
     struct vcpu *v = current;
-    int error;
 
-    error = __vmread(VM_EXIT_REASON, &exit_reason);
-    BUG_ON(error);
+    __vmread(VM_EXIT_REASON, &exit_reason);
 
     perfc_incra(vmexits, exit_reason);
 
@@ -2172,11 +2175,9 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         domain_crash_synchronous();
     }
 
-    __vmread(GUEST_RIP, &eip);
     TRACE_VMEXIT(0,exit_reason);
 
-    switch ( exit_reason )
-    {
+    switch ( exit_reason ) {
     case EXIT_REASON_EXCEPTION_NMI:
     {
         /*
@@ -2187,15 +2188,15 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         unsigned int vector;
         unsigned long va;
 
-        if (__vmread(VM_EXIT_INTR_INFO, &vector)
-            || !(vector & INTR_INFO_VALID_MASK))
-            __hvm_bug(&regs);
+        if ( __vmread(VM_EXIT_INTR_INFO, &vector) ||
+             !(vector & INTR_INFO_VALID_MASK) )
+            domain_crash_synchronous();
         vector &= INTR_INFO_VECTOR_MASK;
 
         TRACE_VMEXIT(1,vector);
         perfc_incra(cause_vector, vector);
 
-        switch (vector) {
+        switch ( vector ) {
 #ifdef XEN_DEBUGGER
         case TRAP_debug:
         {
@@ -2236,7 +2237,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         {
             if ( test_bit(_DOMF_debugging, &v->domain->domain_flags) )
                 domain_pause_for_debugger();
-            else 
+            else
                 vmx_reflect_exception(v);
             break;
         }
@@ -2260,7 +2261,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
                         (unsigned long)regs.ecx, (unsigned long)regs.edx,
                         (unsigned long)regs.esi, (unsigned long)regs.edi);
 
-            if (!vmx_do_page_fault(va, &regs)) {
+            if ( !vmx_do_page_fault(va, &regs) ) {
                 /*
                  * Inject #PG using Interruption-Information Fields
                  */
@@ -2282,6 +2283,9 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
     case EXIT_REASON_EXTERNAL_INTERRUPT:
         vmx_vmexit_do_extint(&regs);
         break;
+    case EXIT_REASON_TRIPLE_FAULT:
+        domain_crash_synchronous();
+        break;
     case EXIT_REASON_PENDING_INTERRUPT:
         /*
          * Not sure exactly what the purpose of this is.  The only bits set
@@ -2296,7 +2300,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
                   v->arch.hvm_vcpu.u.vmx.exec_control);
         break;
     case EXIT_REASON_TASK_SWITCH:
-        __hvm_bug(&regs);
+        domain_crash_synchronous();
         break;
     case EXIT_REASON_CPUID:
         vmx_vmexit_do_cpuid(&regs);
@@ -2321,7 +2325,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
     case EXIT_REASON_VMCALL:
     {
         __get_instruction_length(inst_len);
-        __vmread(GUEST_RIP, &eip);
+        __vmread(GUEST_RIP, &rip);
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
 
         hvm_do_hypercall(&regs);
@@ -2330,13 +2334,13 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
     }
     case EXIT_REASON_CR_ACCESS:
     {
-        __vmread(GUEST_RIP, &eip);
+        __vmread(GUEST_RIP, &rip);
         __get_instruction_length(inst_len);
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
 
-        HVM_DBG_LOG(DBG_LEVEL_1, "eip = %lx, inst_len =%lx, exit_qualification = %lx",
-                    eip, inst_len, exit_qualification);
-        if (vmx_cr_access(exit_qualification, &regs))
+        HVM_DBG_LOG(DBG_LEVEL_1, "rip = %lx, inst_len =%lx, exit_qualification = %lx",
+                    rip, inst_len, exit_qualification);
+        if ( vmx_cr_access(exit_qualification, &regs) )
             __update_guest_eip(inst_len);
         TRACE_VMEXIT(3,regs.error_code);
         TRACE_VMEXIT(4,exit_qualification);
@@ -2360,13 +2364,14 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         __update_guest_eip(inst_len);
         break;
     case EXIT_REASON_MSR_WRITE:
-        __vmread(GUEST_RIP, &eip);
         vmx_do_msr_write(&regs);
         __get_instruction_length(inst_len);
         __update_guest_eip(inst_len);
         break;
     case EXIT_REASON_MWAIT_INSTRUCTION:
-        __hvm_bug(&regs);
+    case EXIT_REASON_MONITOR_INSTRUCTION:
+    case EXIT_REASON_PAUSE_INSTRUCTION:
+        domain_crash_synchronous();
         break;
     case EXIT_REASON_VMCLEAR:
     case EXIT_REASON_VMLAUNCH:
@@ -2375,15 +2380,15 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
     case EXIT_REASON_VMREAD:
     case EXIT_REASON_VMRESUME:
     case EXIT_REASON_VMWRITE:
-    case EXIT_REASON_VMOFF:
-    case EXIT_REASON_VMON:
-        /* Report invalid opcode exception when a VMX guest tries to execute 
+    case EXIT_REASON_VMXOFF:
+    case EXIT_REASON_VMXON:
+        /* Report invalid opcode exception when a VMX guest tries to execute
             any of the VMX instructions */
         vmx_inject_hw_exception(v, TRAP_invalid_op, VMX_DELIVER_NO_ERROR_CODE);
         break;
 
     default:
-        __hvm_bug(&regs);       /* should not happen */
+        domain_crash_synchronous();     /* should not happen */
     }
 }
 
@@ -2398,11 +2403,11 @@ asmlinkage void vmx_load_cr2(void)
 asmlinkage void vmx_trace_vmentry (void)
 {
     TRACE_5D(TRC_VMX_VMENTRY,
-             trace_values[smp_processor_id()][0],
-             trace_values[smp_processor_id()][1],
-             trace_values[smp_processor_id()][2],
-             trace_values[smp_processor_id()][3],
-             trace_values[smp_processor_id()][4]);
+             this_cpu(trace_values)[0],
+             this_cpu(trace_values)[1],
+             this_cpu(trace_values)[2],
+             this_cpu(trace_values)[3],
+             this_cpu(trace_values)[4]);
     TRACE_VMEXIT(0,9);
     TRACE_VMEXIT(1,9);
     TRACE_VMEXIT(2,9);

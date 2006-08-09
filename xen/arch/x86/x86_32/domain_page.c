@@ -73,8 +73,7 @@ void *map_domain_page(unsigned long pfn)
     if ( unlikely(cache->epoch != cache->shadow_epoch[vcpu]) )
     {
         cache->shadow_epoch[vcpu] = cache->epoch;
-        if ( NEED_FLUSH(tlbflush_time[smp_processor_id()],
-                        cache->tlbflush_timestamp) )
+        if ( NEED_FLUSH(this_cpu(tlbflush_time), cache->tlbflush_timestamp) )
         {
             perfc_incrc(domain_page_tlb_flush);
             local_flush_tlb();

@@ -563,10 +563,14 @@ struct page *balloon_alloc_empty_page_range(unsigned long nr_pages)
 		set_xen_guest_handle(reservation.extent_start, &gmfn);
 		ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation,
 					   &reservation);
+		if (ret == -ENOSYS)
+			goto err;
 		BUG_ON(ret != 1);
 	} else {
 		ret = apply_to_page_range(&init_mm, vstart, PAGE_SIZE << order,
 					  dealloc_pte_fn, NULL);
+		if (ret == -ENOSYS)
+			goto err;
 		BUG_ON(ret);
 	}
 	current_pages -= 1UL << order;
@@ -583,6 +587,11 @@ struct page *balloon_alloc_empty_page_range(unsigned long nr_pages)
 		set_page_count(page + i, 1);
 
 	return page;
+
+ err:
+	free_pages(vstart, order);
+	balloon_unlock(flags);
+	return NULL;
 }
 
 void balloon_dealloc_empty_page_range(

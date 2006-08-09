@@ -76,11 +76,19 @@ int xc_handle;
 
 shared_iopage_t *shared_page = NULL;
 
+#define BUFFER_IO_MAX_DELAY  100
+buffered_iopage_t *buffered_io_page = NULL;
+QEMUTimer *buffered_io_timer;
+
 /* the evtchn fd for polling */
 int xce_handle = -1;
 
 /* which vcpu we are serving */
 int send_vcpu = 0;
+
+//the evtchn port for polling the notification,
+#define NR_CPUS 32
+evtchn_port_t ioreq_local_port[NR_CPUS];
 
 CPUX86State *cpu_x86_init(void)
 {
@@ -113,7 +121,7 @@ CPUX86State *cpu_x86_init(void)
                 fprintf(logfile, "bind interdomain ioctl error %d\n", errno);
                 return NULL;
             }
-            shared_page->vcpu_iodata[i].dm_eport = rc;
+            ioreq_local_port[i] = rc;
         }
     }
 
@@ -184,8 +192,7 @@ void sp_info()
 
     for (i = 0; i < vcpus; i++) {
         req = &(shared_page->vcpu_iodata[i].vp_ioreq);
-        term_printf("vcpu %d: event port %d\n", i,
-                    shared_page->vcpu_iodata[i].vp_eport);
+        term_printf("vcpu %d: event port %d\n", i, ioreq_local_port[i]);
         term_printf("  req state: %x, pvalid: %x, addr: %"PRIx64", "
                     "data: %"PRIx64", count: %"PRIx64", size: %"PRIx64"\n",
                     req->state, req->pdata_valid, req->addr,
@@ -204,6 +211,7 @@ static ioreq_t *__cpu_get_ioreq(int vcpu)
 
     if (req->state == STATE_IOREQ_READY) {
         req->state = STATE_IOREQ_INPROCESS;
+        rmb();
         return req;
     }
 
@@ -226,7 +234,7 @@ static ioreq_t *cpu_get_ioreq(void)
     port = xc_evtchn_pending(xce_handle);
     if (port != -1) {
         for ( i = 0; i < vcpus; i++ )
-            if ( shared_page->vcpu_iodata[i].dm_eport == port )
+            if ( ioreq_local_port[i] == port )
                 break;
 
         if ( i == vcpus ) {
@@ -415,40 +423,74 @@ void cpu_ioreq_xor(CPUState *env, ioreq_t *req)
     req->u.data = tmp1;
 }
 
+void __handle_ioreq(CPUState *env, ioreq_t *req)
+{
+    if (!req->pdata_valid && req->dir == IOREQ_WRITE && req->size != 4)
+	req->u.data &= (1UL << (8 * req->size)) - 1;
+
+    switch (req->type) {
+    case IOREQ_TYPE_PIO:
+        cpu_ioreq_pio(env, req);
+        break;
+    case IOREQ_TYPE_COPY:
+        cpu_ioreq_move(env, req);
+        break;
+    case IOREQ_TYPE_AND:
+        cpu_ioreq_and(env, req);
+        break;
+    case IOREQ_TYPE_OR:
+        cpu_ioreq_or(env, req);
+        break;
+    case IOREQ_TYPE_XOR:
+        cpu_ioreq_xor(env, req);
+        break;
+    default:
+        hw_error("Invalid ioreq type 0x%x\n", req->type);
+    }
+}
+
+void __handle_buffered_iopage(CPUState *env)
+{
+    ioreq_t *req = NULL;
+
+    if (!buffered_io_page)
+        return;
+
+    while (buffered_io_page->read_pointer !=
+           buffered_io_page->write_pointer) {
+        req = &buffered_io_page->ioreq[buffered_io_page->read_pointer %
+				       IOREQ_BUFFER_SLOT_NUM];
+
+        __handle_ioreq(env, req);
+
+        mb();
+        buffered_io_page->read_pointer++;
+    }
+}
+
+void handle_buffered_io(void *opaque)
+{
+    CPUState *env = opaque;
+
+    __handle_buffered_iopage(env);
+    qemu_mod_timer(buffered_io_timer, BUFFER_IO_MAX_DELAY +
+		   qemu_get_clock(rt_clock));
+}
+
 void cpu_handle_ioreq(void *opaque)
 {
     CPUState *env = opaque;
     ioreq_t *req = cpu_get_ioreq();
 
+    handle_buffered_io(env);
     if (req) {
-        if ((!req->pdata_valid) && (req->dir == IOREQ_WRITE)) {
-            if (req->size != 4)
-                req->u.data &= (1UL << (8 * req->size))-1;
-        }
-
-        switch (req->type) {
-        case IOREQ_TYPE_PIO:
-            cpu_ioreq_pio(env, req);
-            break;
-        case IOREQ_TYPE_COPY:
-            cpu_ioreq_move(env, req);
-            break;
-        case IOREQ_TYPE_AND:
-            cpu_ioreq_and(env, req);
-            break;
-        case IOREQ_TYPE_OR:
-            cpu_ioreq_or(env, req);
-            break;
-        case IOREQ_TYPE_XOR:
-            cpu_ioreq_xor(env, req);
-            break;
-        default:
-            hw_error("Invalid ioreq type 0x%x\n", req->type);
-        }
+        __handle_ioreq(env, req);
 
         /* No state change if state = STATE_IORESP_HOOK */
-        if (req->state == STATE_IOREQ_INPROCESS)
+        if (req->state == STATE_IOREQ_INPROCESS) {
+            mb();
             req->state = STATE_IORESP_READY;
+        }
         env->send_event = 1;
     }
 }
@@ -459,6 +501,10 @@ int main_loop(void)
     extern int shutdown_requested;
     CPUState *env = cpu_single_env;
     int evtchn_fd = xc_evtchn_fd(xce_handle);
+
+    buffered_io_timer = qemu_new_timer(rt_clock, handle_buffered_io,
+				       cpu_single_env);
+    qemu_mod_timer(buffered_io_timer, qemu_get_clock(rt_clock));
 
     qemu_set_fd_handler(evtchn_fd, cpu_handle_ioreq, NULL, env);
 
@@ -479,8 +525,7 @@ int main_loop(void)
 
         if (env->send_event) {
             env->send_event = 0;
-            xc_evtchn_notify(xce_handle,
-                             shared_page->vcpu_iodata[send_vcpu].dm_eport);
+            xc_evtchn_notify(xce_handle, ioreq_local_port[send_vcpu]);
         }
     }
     destroy_hvm_domain();

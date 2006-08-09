@@ -12,6 +12,7 @@
 #include <xen/config.h>
 #include <xen/sched.h>
 #include <xen/smp.h>
+#include <xen/softirq.h>
 #include <asm/bitops.h>
 #include <asm/event.h>
 

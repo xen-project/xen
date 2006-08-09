@@ -25,6 +25,7 @@
 #include <xen/sched.h>
 #include <xen/irq.h>
 #include <xen/softirq.h>
+#include <xen/hypercall.h>
 #include <asm/current.h>
 #include <asm/io.h>
 #include <asm/shadow.h>
@@ -808,6 +809,9 @@ static void svm_relinquish_guest_resources(struct domain *d)
     if ( d->arch.hvm_domain.shared_page_va )
         unmap_domain_page_global(
             (void *)d->arch.hvm_domain.shared_page_va);
+
+    if ( d->arch.hvm_domain.buffered_io_va )
+        unmap_domain_page_global((void *)d->arch.hvm_domain.buffered_io_va);
 
     shadow_direct_map_clean(d);
 }
@@ -2121,7 +2125,7 @@ static inline void svm_vmexit_do_hlt(struct vmcb_struct *vmcb)
         next_wakeup = next_pit;
     if ( next_wakeup != - 1 )
         set_timer(&current->arch.hvm_svm.hlt_timer, next_wakeup);
-    hvm_safe_block();
+    do_sched_op_compat(SCHEDOP_block, 0);
 }
 
 

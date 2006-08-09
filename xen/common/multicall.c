@@ -14,13 +14,13 @@
 #include <asm/current.h>
 #include <asm/hardirq.h>
 
-struct mc_state mc_state[NR_CPUS];
+DEFINE_PER_CPU(struct mc_state, mc_state);
 
 long
 do_multicall(
     XEN_GUEST_HANDLE(multicall_entry_t) call_list, unsigned int nr_calls)
 {
-    struct mc_state *mcs = &mc_state[smp_processor_id()];
+    struct mc_state *mcs = &this_cpu(mc_state);
     unsigned int     i;
 
     if ( unlikely(__test_and_set_bit(_MCSF_in_multicall, &mcs->flags)) )

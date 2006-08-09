@@ -1,7 +1,7 @@
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2006-08-06 02:14:09.794902973 +0100
-+++ ioemu/Makefile.target	2006-08-06 02:21:42.270461924 +0100
+--- ioemu.orig/Makefile.target	2006-08-08 11:24:33.479955101 +0100
++++ ioemu/Makefile.target	2006-08-08 11:24:39.008338255 +0100
 @@ -62,6 +62,8 @@
  QEMU_SYSTEM=qemu-fast
  endif
@@ -32,8 +32,8 @@ Index: ioemu/Makefile.target
  DEFINES += -DHAS_AUDIO
 Index: ioemu/configure
 ===================================================================
---- ioemu.orig/configure	2006-08-06 02:14:09.795902861 +0100
-+++ ioemu/configure	2006-08-06 02:15:01.771108621 +0100
+--- ioemu.orig/configure	2006-08-08 11:24:33.480954990 +0100
++++ ioemu/configure	2006-08-08 11:24:38.122437102 +0100
 @@ -373,6 +373,8 @@
      if [ "$user" = "yes" ] ; then
          target_list="i386-user arm-user armeb-user sparc-user ppc-user mips-user mipsel-user $target_list"
@@ -45,8 +45,8 @@ Index: ioemu/configure
  fi
 Index: ioemu/monitor.c
 ===================================================================
---- ioemu.orig/monitor.c	2006-08-06 02:14:49.574468309 +0100
-+++ ioemu/monitor.c	2006-08-06 02:21:16.172371202 +0100
+--- ioemu.orig/monitor.c	2006-08-08 11:24:33.484954543 +0100
++++ ioemu/monitor.c	2006-08-08 11:24:39.253310921 +0100
 @@ -1262,6 +1262,10 @@
        "", "show profiling information", },
      { "capture", "", do_info_capture,
@@ -60,8 +60,8 @@ Index: ioemu/monitor.c
  
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-08-06 02:14:09.802902081 +0100
-+++ ioemu/vl.c	2006-08-06 02:21:16.369349244 +0100
+--- ioemu.orig/vl.c	2006-08-08 11:24:33.486954320 +0100
++++ ioemu/vl.c	2006-08-08 11:24:39.454288496 +0100
 @@ -87,7 +87,7 @@
  
  #include "exec-all.h"
@@ -98,8 +98,8 @@ Index: ioemu/vl.c
  {
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-08-06 02:13:56.733359091 +0100
-+++ ioemu/vl.h	2006-08-06 02:21:16.369349244 +0100
+--- ioemu.orig/vl.h	2006-08-08 11:24:31.082222636 +0100
++++ ioemu/vl.h	2006-08-08 11:24:39.454288496 +0100
 @@ -37,6 +37,8 @@
  #include <unistd.h>
  #include <fcntl.h>
@@ -132,7 +132,7 @@ Index: ioemu/vl.h
 Index: ioemu/target-i386-dm/cpu.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/cpu.h	2006-08-06 02:21:16.023387810 +0100
++++ ioemu/target-i386-dm/cpu.h	2006-08-08 11:24:39.099328102 +0100
 @@ -0,0 +1,86 @@
 +/*
 + * i386 virtual CPU header
@@ -223,7 +223,7 @@ Index: ioemu/target-i386-dm/cpu.h
 Index: ioemu/target-i386-dm/exec-dm.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/exec-dm.c	2006-08-06 02:21:16.024387698 +0100
++++ ioemu/target-i386-dm/exec-dm.c	2006-08-08 11:24:39.099328102 +0100
 @@ -0,0 +1,516 @@
 +/*
 + *  virtual page mapping and translated block handling
@@ -744,8 +744,8 @@ Index: ioemu/target-i386-dm/exec-dm.c
 Index: ioemu/target-i386-dm/helper2.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/helper2.c	2006-08-06 02:21:15.779415007 +0100
-@@ -0,0 +1,464 @@
++++ ioemu/target-i386-dm/helper2.c	2006-08-08 11:24:44.888682140 +0100
+@@ -0,0 +1,469 @@
 +/*
 + *  i386 helpers (without register variable usage)
 + *
@@ -830,6 +830,10 @@ Index: ioemu/target-i386-dm/helper2.c
 +/* which vcpu we are serving */
 +int send_vcpu = 0;
 +
++//the evtchn port for polling the notification,
++#define NR_CPUS 32
++evtchn_port_t ioreq_local_port[NR_CPUS];
++
 +CPUX86State *cpu_x86_init(void)
 +{
 +    CPUX86State *env;
@@ -861,7 +865,7 @@ Index: ioemu/target-i386-dm/helper2.c
 +                fprintf(logfile, "bind interdomain ioctl error %d\n", errno);
 +                return NULL;
 +            }
-+            shared_page->vcpu_iodata[i].dm_eport = rc;
++            ioreq_local_port[i] = rc;
 +        }
 +    }
 +
@@ -913,8 +917,7 @@ Index: ioemu/target-i386-dm/helper2.c
 +
 +    for (i = 0; i < vcpus; i++) {
 +        req = &(shared_page->vcpu_iodata[i].vp_ioreq);
-+        term_printf("vcpu %d: event port %d\n", i,
-+                    shared_page->vcpu_iodata[i].vp_eport);
++        term_printf("vcpu %d: event port %d\n", i, ioreq_local_port[i]);
 +        term_printf("  req state: %x, pvalid: %x, addr: %"PRIx64", "
 +                    "data: %"PRIx64", count: %"PRIx64", size: %"PRIx64"\n",
 +                    req->state, req->pdata_valid, req->addr,
@@ -933,6 +936,7 @@ Index: ioemu/target-i386-dm/helper2.c
 +
 +    if (req->state == STATE_IOREQ_READY) {
 +        req->state = STATE_IOREQ_INPROCESS;
++        rmb();
 +        return req;
 +    }
 +
@@ -955,7 +959,7 @@ Index: ioemu/target-i386-dm/helper2.c
 +    port = xc_evtchn_pending(xce_handle);
 +    if (port != -1) {
 +        for ( i = 0; i < vcpus; i++ )
-+            if ( shared_page->vcpu_iodata[i].dm_eport == port )
++            if ( ioreq_local_port[i] == port )
 +                break;
 +
 +        if ( i == vcpus ) {
@@ -1176,8 +1180,10 @@ Index: ioemu/target-i386-dm/helper2.c
 +        }
 +
 +        /* No state change if state = STATE_IORESP_HOOK */
-+        if (req->state == STATE_IOREQ_INPROCESS)
++        if (req->state == STATE_IOREQ_INPROCESS) {
++            mb();
 +            req->state = STATE_IORESP_READY;
++        }
 +        env->send_event = 1;
 +    }
 +}
@@ -1204,8 +1210,7 @@ Index: ioemu/target-i386-dm/helper2.c
 +
 +        if (env->send_event) {
 +            env->send_event = 0;
-+            xc_evtchn_notify(xce_handle,
-+                             shared_page->vcpu_iodata[send_vcpu].dm_eport);
++            xc_evtchn_notify(xce_handle, ioreq_local_port[send_vcpu]);
 +        }
 +    }
 +    return 0;
@@ -1213,7 +1218,7 @@ Index: ioemu/target-i386-dm/helper2.c
 Index: ioemu/target-i386-dm/i8259-dm.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/i8259-dm.c	2006-08-06 02:15:01.777107952 +0100
++++ ioemu/target-i386-dm/i8259-dm.c	2006-08-08 11:24:33.505952200 +0100
 @@ -0,0 +1,107 @@
 +/* Xen 8259 stub for interrupt controller emulation
 + * 
@@ -1325,7 +1330,7 @@ Index: ioemu/target-i386-dm/i8259-dm.c
 Index: ioemu/target-i386-dm/qemu-dm.debug
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/qemu-dm.debug	2006-08-06 02:15:01.778107841 +0100
++++ ioemu/target-i386-dm/qemu-dm.debug	2006-08-08 11:24:33.505952200 +0100
 @@ -0,0 +1,5 @@
 +#!/bin/sh
 +
@@ -1335,7 +1340,7 @@ Index: ioemu/target-i386-dm/qemu-dm.debug
 Index: ioemu/target-i386-dm/qemu-ifup
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/qemu-ifup	2006-08-06 02:15:01.778107841 +0100
++++ ioemu/target-i386-dm/qemu-ifup	2006-08-08 11:24:33.505952200 +0100
 @@ -0,0 +1,10 @@
 +#!/bin/sh
 +

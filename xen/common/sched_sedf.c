@@ -113,13 +113,14 @@ struct sedf_cpu_info {
 };
 
 #define EDOM_INFO(d)   ((struct sedf_vcpu_info *)((d)->sched_priv))
-#define CPU_INFO(cpu)  ((struct sedf_cpu_info *)schedule_data[cpu].sched_priv)
+#define CPU_INFO(cpu)  \
+    ((struct sedf_cpu_info *)per_cpu(schedule_data, cpu).sched_priv)
 #define LIST(d)        (&EDOM_INFO(d)->list)
 #define EXTRALIST(d,i) (&(EDOM_INFO(d)->extralist[i]))
 #define RUNQ(cpu)      (&CPU_INFO(cpu)->runnableq)
 #define WAITQ(cpu)     (&CPU_INFO(cpu)->waitq)
 #define EXTRAQ(cpu,i)  (&(CPU_INFO(cpu)->extraq[i]))
-#define IDLETASK(cpu)  ((struct vcpu *)schedule_data[cpu].idle)
+#define IDLETASK(cpu)  ((struct vcpu *)per_cpu(schedule_data, cpu).idle)
 
 #define PERIOD_BEGIN(inf) ((inf)->deadl_abs - (inf)->period)
 
@@ -348,11 +349,11 @@ static int sedf_init_vcpu(struct vcpu *v)
     inf->vcpu = v;
  
     /* Allocate per-CPU context if this is the first domain to be added. */
-    if ( unlikely(schedule_data[v->processor].sched_priv == NULL) )
+    if ( unlikely(per_cpu(schedule_data, v->processor).sched_priv == NULL) )
     {
-        schedule_data[v->processor].sched_priv = 
+        per_cpu(schedule_data, v->processor).sched_priv = 
             xmalloc(struct sedf_cpu_info);
-        BUG_ON(schedule_data[v->processor].sched_priv == NULL);
+        BUG_ON(per_cpu(schedule_data, v->processor).sched_priv == NULL);
         memset(CPU_INFO(v->processor), 0, sizeof(*CPU_INFO(v->processor)));
         INIT_LIST_HEAD(WAITQ(v->processor));
         INIT_LIST_HEAD(RUNQ(v->processor));
@@ -847,7 +848,7 @@ static void sedf_sleep(struct vcpu *d)
 
     EDOM_INFO(d)->status |= SEDF_ASLEEP;
  
-    if ( schedule_data[d->processor].curr == d )
+    if ( per_cpu(schedule_data, d->processor).curr == d )
     {
         cpu_raise_softirq(d->processor, SCHEDULE_SOFTIRQ);
     }
@@ -1167,9 +1168,9 @@ void sedf_wake(struct vcpu *d)
       Save approximation: Always switch to scheduler!*/
     ASSERT(d->processor >= 0);
     ASSERT(d->processor < NR_CPUS);
-    ASSERT(schedule_data[d->processor].curr);
+    ASSERT(per_cpu(schedule_data, d->processor).curr);
 
-    if ( should_switch(schedule_data[d->processor].curr, d, now) )
+    if ( should_switch(per_cpu(schedule_data, d->processor).curr, d, now) )
         cpu_raise_softirq(d->processor, SCHEDULE_SOFTIRQ);
 }
 

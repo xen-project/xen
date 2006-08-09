@@ -29,6 +29,7 @@
 #include <xen/domain_page.h>
 #include <xen/hypercall.h>
 #include <xen/guest_access.h>
+#include <xen/event.h>
 #include <asm/current.h>
 #include <asm/io.h>
 #include <asm/shadow.h>
@@ -133,15 +134,28 @@ static void e820_map_io_shared_callback(struct domain *d,
     }
 }
 
-void hvm_map_io_shared_page(struct vcpu *v)
+static void e820_map_buffered_io_callback(struct domain *d,
+                                          struct e820entry *e,
+                                          void *data)
 {
-    unsigned long mfn = INVALID_MFN;
+    unsigned long *mfn = data;
+    if ( e->type == E820_BUFFERED_IO ) {
+        ASSERT(*mfn == INVALID_MFN);
+        *mfn = gmfn_to_mfn(d, e->addr >> PAGE_SHIFT);
+    }
+}
+
+void hvm_map_io_shared_pages(struct vcpu *v)
+{
+    unsigned long mfn;
     void *p;
     struct domain *d = v->domain;
 
-    if ( d->arch.hvm_domain.shared_page_va )
+    if ( d->arch.hvm_domain.shared_page_va ||
+         d->arch.hvm_domain.buffered_io_va )
         return;
 
+    mfn = INVALID_MFN;
     e820_foreach(d, e820_map_io_shared_callback, &mfn);
 
     if ( mfn == INVALID_MFN )
@@ -158,7 +172,38 @@ void hvm_map_io_shared_page(struct vcpu *v)
     }
 
     d->arch.hvm_domain.shared_page_va = (unsigned long)p;
+
+    mfn = INVALID_MFN;
+    e820_foreach(d, e820_map_buffered_io_callback, &mfn);
+    if ( mfn != INVALID_MFN ) {
+        p = map_domain_page_global(mfn);
+        if ( p )
+            d->arch.hvm_domain.buffered_io_va = (unsigned long)p;
+    }
 }
+
+void hvm_create_event_channels(struct vcpu *v)
+{
+    vcpu_iodata_t *p;
+    struct vcpu *o;
+
+    if ( v->vcpu_id == 0 ) {
+        /* Ugly: create event channels for every vcpu when vcpu 0
+           starts, so that they're available for ioemu to bind to. */
+        for_each_vcpu(v->domain, o) {
+            p = get_vio(v->domain, o->vcpu_id);
+            o->arch.hvm_vcpu.xen_port = p->vp_eport =
+                alloc_unbound_xen_event_channel(o, 0);
+            DPRINTK("Allocated port %d for hvm.\n", o->arch.hvm_vcpu.xen_port);
+        }
+    }
+}
+
+void hvm_release_assist_channel(struct vcpu *v)
+{
+    free_xen_event_channel(v, v->arch.hvm_vcpu.xen_port);
+}
+
 
 void hvm_setup_platform(struct domain* d)
 {
@@ -175,7 +220,6 @@ void hvm_setup_platform(struct domain* d)
     }
 
     hvm_zap_iommu_pages(d);
-    hvm_map_io_shared_page(v);
 
     platform = &d->arch.hvm_domain;
     pic_init(&platform->vpic, pic_irq_request, &platform->interrupt_request);
@@ -186,6 +230,8 @@ void hvm_setup_platform(struct domain* d)
         spin_lock_init(&d->arch.hvm_domain.round_robin_lock);
         hvm_vioapic_init(d);
     }
+
+    spin_lock_init(&d->arch.hvm_domain.buffered_io_lock);
 
     init_timer(&platform->pl_time.periodic_tm.timer,
                pt_timer_fn, v, v->processor);

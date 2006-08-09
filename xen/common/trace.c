@@ -39,8 +39,8 @@ static unsigned int opt_tbuf_size = 0;
 integer_param("tbuf_size", opt_tbuf_size);
 
 /* Pointers to the meta-data objects for all system trace buffers */
-static struct t_buf *t_bufs[NR_CPUS];
-static struct t_rec *t_recs[NR_CPUS];
+static DEFINE_PER_CPU(struct t_buf *, t_bufs);
+static DEFINE_PER_CPU(struct t_rec *, t_recs);
 static int nr_recs;
 
 /* High water mark for trace buffers; */
@@ -105,9 +105,10 @@ static int alloc_trace_bufs(void)
 
     for_each_online_cpu ( i )
     {
-        buf = t_bufs[i] = (struct t_buf *)&rawbuf[i*opt_tbuf_size*PAGE_SIZE];
+        buf = per_cpu(t_bufs, i) = (struct t_buf *)
+            &rawbuf[i*opt_tbuf_size*PAGE_SIZE];
         buf->cons = buf->prod = 0;
-        t_recs[i] = (struct t_rec *)(buf + 1);
+        per_cpu(t_recs, i) = (struct t_rec *)(buf + 1);
     }
 
     t_buf_highwater = nr_recs >> 1; /* 50% high water */
@@ -186,7 +187,7 @@ int tb_control(dom0_tbufcontrol_t *tbc)
     case DOM0_TBUF_GET_INFO:
         tbc->cpu_mask   = tb_cpu_mask;
         tbc->evt_mask   = tb_event_mask;
-        tbc->buffer_mfn = opt_tbuf_size ? virt_to_mfn(t_bufs[0]) : 0UL;
+        tbc->buffer_mfn = opt_tbuf_size ? virt_to_mfn(per_cpu(t_bufs, 0)) : 0;
         tbc->size       = opt_tbuf_size * PAGE_SIZE;
         break;
     case DOM0_TBUF_SET_CPU_MASK:
@@ -258,7 +259,7 @@ void trace(u32 event, unsigned long d1, unsigned long d2,
     /* Read tb_init_done /before/ t_bufs. */
     rmb();
 
-    buf = t_bufs[smp_processor_id()];
+    buf = this_cpu(t_bufs);
 
     local_irq_save(flags);
 
@@ -272,7 +273,7 @@ void trace(u32 event, unsigned long d1, unsigned long d2,
 
     if ( unlikely(this_cpu(lost_records) != 0) )
     {
-        rec = &t_recs[smp_processor_id()][buf->prod % nr_recs];
+        rec = &this_cpu(t_recs)[buf->prod % nr_recs];
         memset(rec, 0, sizeof(*rec));
         rec->cycles  = (u64)get_cycles();
         rec->event   = TRC_LOST_RECORDS;
@@ -283,7 +284,7 @@ void trace(u32 event, unsigned long d1, unsigned long d2,
         buf->prod++;
     }
 
-    rec = &t_recs[smp_processor_id()][buf->prod % nr_recs];
+    rec = &this_cpu(t_recs)[buf->prod % nr_recs];
     rec->cycles  = (u64)get_cycles();
     rec->event   = event;
     rec->data[0] = d1;

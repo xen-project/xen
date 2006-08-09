@@ -669,6 +669,30 @@ int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip, int inst_l
     return inst_len;
 }
 
+static void hvm_send_assist_req(struct vcpu *v)
+{
+    ioreq_t *p;
+
+    p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;
+    if ( unlikely(p->state != STATE_INVALID) ) {
+        /* This indicates a bug in the device model.  Crash the
+           domain. */
+        printf("Device model set bad IO state %d.\n", p->state);
+        domain_crash(v->domain);
+        return;
+    }
+    wmb();
+    p->state = STATE_IOREQ_READY;
+    notify_via_xen_event_channel(v->arch.hvm_vcpu.xen_port);
+}
+
+
+/* Wake up a vcpu whihc is waiting for interrupts to come in */
+void hvm_prod_vcpu(struct vcpu *v)
+{
+    vcpu_unblock(v);
+}
+
 void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
                   unsigned long count, int size, long value, int dir, int pvalid)
 {
@@ -682,13 +706,10 @@ void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
         domain_crash_synchronous();
     }
 
-    if (test_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags)) {
-        printf("HVM I/O has not yet completed\n");
-        domain_crash_synchronous();
-    }
-    set_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags);
-
     p = &vio->vp_ioreq;
+    if ( p->state != STATE_INVALID )
+        printf("WARNING: send pio with something already pending (%d)?\n",
+               p->state);
     p->dir = dir;
     p->pdata_valid = pvalid;
 
@@ -714,10 +735,7 @@ void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
         return;
     }
 
-    p->state = STATE_IOREQ_READY;
-
-    evtchn_send(iopacket_port(v));
-    hvm_wait_io();
+    hvm_send_assist_req(v);
 }
 
 void send_mmio_req(
@@ -739,12 +757,9 @@ void send_mmio_req(
 
     p = &vio->vp_ioreq;
 
-    if (test_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags)) {
-        printf("HVM I/O has not yet completed\n");
-        domain_crash_synchronous();
-    }
-
-    set_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags);
+    if ( p->state != STATE_INVALID )
+        printf("WARNING: send mmio with something already pending (%d)?\n",
+               p->state);
     p->dir = dir;
     p->pdata_valid = pvalid;
 
@@ -764,16 +779,13 @@ void send_mmio_req(
     } else
         p->u.data = value;
 
-    if (hvm_mmio_intercept(p)){
+    if ( hvm_mmio_intercept(p) || hvm_buffered_io_intercept(p) ) {
         p->state = STATE_IORESP_READY;
         hvm_io_assist(v);
         return;
     }
 
-    p->state = STATE_IOREQ_READY;
-
-    evtchn_send(iopacket_port(v));
-    hvm_wait_io();
+    hvm_send_assist_req(v);
 }
 
 static void mmio_operands(int type, unsigned long gpa, struct instruction *inst,

@@ -2,7 +2,7 @@
 #
 # pygrub - simple python-based bootloader for Xen
 #
-# Copyright 2005 Red Hat, Inc.
+# Copyright 2005-2006 Red Hat, Inc.
 # Jeremy Katz <katzj@redhat.com>
 #
 # This software may be freely redistributed under the terms of the GNU
@@ -14,9 +14,10 @@
 #
 
 import os, sys, string, struct, tempfile
+import copy
 import logging
 
-import curses, _curses, curses.wrapper
+import curses, _curses, curses.wrapper, curses.textpad, curses.ascii
 import getopt
 
 sys.path = [ '/usr/lib/python' ] + sys.path
@@ -24,122 +25,387 @@ sys.path = [ '/usr/lib/python' ] + sys.path
 import grub.GrubConf
 import grub.fsys
 
-PYGRUB_VER = 0.3
-
-
-def draw_window():
-    stdscr = curses.initscr()
-    if hasattr(curses, 'use_default_colors'):
-        curses.use_default_colors()
-    try:
-        curses.curs_set(0)
-    except _curses.error:
-        pass
-
-    stdscr.addstr(1, 4, "pyGRUB  version %s" %(PYGRUB_VER,))
-
-    win = curses.newwin(10, 74, 2, 1)
-    win.box()
-    win.refresh()
-
-    stdscr.addstr(12, 5, "Use the U and D keys to select which entry is highlighted.")
-    stdscr.addstr(13, 5, "Press enter to boot the selected OS. 'e' to edit the")
-    stdscr.addstr(14, 5, "commands before booting, 'a' to modify the kernel arguments ")
-    stdscr.addstr(15, 5, "before booting, or 'c' for a command line.")
-    stdscr.addch(12, 13, curses.ACS_UARROW)
-    stdscr.addch(12, 19, curses.ACS_DARROW)
-    (y, x) = stdscr.getmaxyx()
-    stdscr.move(y - 1, x - 1)
-
-    stdscr.refresh()
-    return (stdscr, win)
-
-def fill_entries(win, cfg, selected):
-    y = 0
-
-    for i in cfg.images:
-        if (0, y) > win.getmaxyx():
-            break
-        if y == selected:
-            attr = curses.A_REVERSE
-        else:
-            attr = 0
-        win.addstr(y + 1, 2, i.title.ljust(70), attr)
-        y += 1
-    win.refresh()
-
-def select(win, line):
-    win.attron(curses.A_REVERSE)
-    win.redrawln(line + 1, 1)
-    win.refresh()
+PYGRUB_VER = 0.4
 
 def is_disk_image(file):
     fd = os.open(file, os.O_RDONLY)
     buf = os.read(fd, 512)
     os.close(fd)
 
-    if len(buf) >= 512 and struct.unpack("H", buf[0x1fe: 0x200]) == (0xaa55,):
+    if len(buf) >= 512 and \
+           struct.unpack("H", buf[0x1fe: 0x200]) == (0xaa55,):
         return True
     return False
 
 SECTOR_SIZE=512
 def get_active_offset(file):
-    """Find the offset for the start of the first active partition in the
-    disk image file."""
+    """Find the offset for the start of the first active partition "
+    "in the disk image file."""
+
     fd = os.open(file, os.O_RDONLY)
     buf = os.read(fd, 512)
     for poff in (446, 462, 478, 494): # partition offsets
         # active partition has 0x80 as the first byte
         if struct.unpack("<c", buf[poff:poff+1]) == ('\x80',):
-            return struct.unpack("<L", buf[poff+8:poff+12])[0] * SECTOR_SIZE
-    return -1
+            return struct.unpack("<L",
+                                 buf[poff+8:poff+12])[0] * SECTOR_SIZE
 
-def get_config(fn, isconfig = False):
-    if not os.access(fn, os.R_OK):
-        raise RuntimeError, "Unable to access %s" %(fn,)
+    # if there's not a partition marked as active, fall back to
+    # the first partition
+    P1 = 446
+    return struct.unpack("<L", buf[P1+8:P1+12])[0] * SECTOR_SIZE
 
-    cf = grub.GrubConf.GrubConfigFile()
+class GrubLineEditor(curses.textpad.Textbox):
+    def __init__(self, screen, startx, starty, line = ""):
+        screen.addstr(startx, starty, "> ")
+        screen.refresh()
+        win = curses.newwin(1, 74, startx, starty + 2)
+        curses.textpad.Textbox.__init__(self, win)
+        
+        self.line = list(line)
+        self.pos = len(line)
+        self.cancelled = False
+        self.show_text()
 
-    if isconfig:
-        # set the config file and parse it
-        cf.filename = fn
-        cf.parse()
-        return cf
+    def show_text(self):
+        """Show the text.  One of our advantages over standard textboxes
+        is that we can handle lines longer than the window."""
 
-    offset = 0
-    if is_disk_image(fn):
-        offset = get_active_offset(fn)
-        if offset == -1:
-            raise RuntimeError, "Unable to find active partition on disk"
+        self.win.clear()
+        if self.pos > 70:
+            if self.pos > 130:
+                off = 120
+            else:
+                off = 55
+            l = [ "<" ] + self.line[off:]
+            p = self.pos - off
+        else:
+            l = self.line[:70]
+            p = self.pos
+        self.win.addstr(0, 0, string.join(l, ("")))
+        if self.pos > 70:
+            self.win.addch(0, 0, curses.ACS_LARROW)
 
-    # open the image and read the grub config
-    fs = None
-    for fstype in grub.fsys.fstypes.values():
-        if fstype.sniff_magic(fn, offset):
-            fs = fstype.open_fs(fn, offset)
+        self.win.move(0, p)
+
+    def do_command(self, ch):
+        # we handle escape as well as moving the line around, so have
+        # to override some of the default handling
+
+        self.lastcmd = ch
+        if ch == 27: # esc
+            self.cancelled = True
+            return 0
+        elif curses.ascii.isprint(ch):
+            self.line.insert(self.pos, chr(ch))
+            self.pos += 1
+        elif ch == curses.ascii.SOH:  # ^a
+            self.pos = 0
+        elif ch in (curses.ascii.STX,curses.KEY_LEFT):
+            self.pos -= 1
+        elif ch in (curses.ascii.BS,curses.KEY_BACKSPACE):
+            if self.pos > 0:
+                self.pos -= 1
+                self.line.pop(self.pos)
+        elif ch == curses.ascii.EOT:                           # ^d
+            self.line.pop(self.pos)
+        elif ch == curses.ascii.ENQ:                           # ^e
+            self.pos = len(self.line)
+        elif ch in (curses.ascii.ACK, curses.KEY_RIGHT):
+            self.pos +=1
+        elif ch == curses.ascii.VT:                            # ^k
+            self.line = self.line[:self.pos]
+        else:
+            return curses.textpad.Textbox.do_command(self, ch)
+        self.show_text()
+        return 1
+
+    def edit(self):
+        r = curses.textpad.Textbox.edit(self)
+        if self.cancelled:
+            return None
+        return string.join(self.line, "")
+        
+
+class Grub:
+    def __init__(self, file, isconfig = False):
+        self.screen = None
+        self.entry_win = None
+        self.text_win = None
+        if file:
+            self.read_config(file, isconfig)
+
+    def draw_main_windows(self):
+        if self.screen is None: #only init stuff once
+            self.screen = curses.initscr()
+            self.screen.timeout(1000)
+            if hasattr(curses, 'use_default_colors'):
+                curses.use_default_colors()
+            try:
+                curses.curs_set(0)
+            except _curses.error:
+                pass
+            self.entry_win = curses.newwin(10, 74, 2, 1)
+            self.text_win = curses.newwin(10, 70, 12, 5)
+            
+        self.screen.clear()
+        self.screen.refresh()
+
+        # create basic grub screen with a box of entries and a textbox
+        self.screen.addstr(1, 4, "pyGRUB  version %s" %(PYGRUB_VER,))
+        self.entry_win.box()
+        self.screen.refresh()
+
+    def fill_entry_list(self):
+        self.entry_win.clear()
+        self.entry_win.box()
+        for y in range(0, len(self.cf.images)):
+            i = self.cf.images[y]
+            if (0, y) > self.entry_win.getmaxyx():
+                break
+            if y == self.selected_image:
+                attr = curses.A_REVERSE
+            else:
+                attr = 0
+            self.entry_win.addstr(y + 1, 2, i.title.ljust(70), attr)
+        self.entry_win.refresh()
+
+    def edit_entry(self, origimg):
+        def draw():
+            self.draw_main_windows()
+
+            self.text_win.addstr(0, 0, "Use the U and D keys to select which entry is highlighted.")
+            self.text_win.addstr(1, 0, "Press 'b' to boot, 'e' to edit the selected command in the")
+            self.text_win.addstr(2, 0, "boot sequence, 'c' for a command-line, 'o' to open a new line")
+            self.text_win.addstr(3, 0, "after ('O' for before) the selected line, 'd' to remove the")
+            self.text_win.addstr(4, 0, "selected line, or escape to go back to the main menu.")
+            self.text_win.addch(0, 8, curses.ACS_UARROW)
+            self.text_win.addch(0, 14, curses.ACS_DARROW)
+            (y, x) = self.text_win.getmaxyx()
+            self.text_win.move(y - 1, x - 1)
+            self.text_win.refresh()
+
+        curline = 1
+        img = copy.deepcopy(origimg)
+        while 1:
+            draw()
+            self.entry_win.clear()
+            self.entry_win.box()
+            for idx in range(1, len(img.lines)):
+                # current line should be highlighted
+                attr = 0
+                if idx == curline:
+                    attr = curses.A_REVERSE
+
+                # trim the line
+                l = img.lines[idx].ljust(70)
+                if len(l) > 70:
+                    l = l[:69] + ">"
+                    
+                self.entry_win.addstr(idx, 2, l, attr)
+            self.entry_win.refresh()
+
+            c = self.screen.getch()
+            if c in (ord('q'), 27): # 27 == esc
+                break
+            elif c == curses.KEY_UP:
+                curline -= 1
+            elif c == curses.KEY_DOWN:
+                curline += 1
+            elif c == ord('b'):
+                self.isdone = True
+                break
+            elif c == ord('e'):
+                l = self.edit_line(img.lines[curline])
+                if l is not None:
+                    img.set_from_line(l, replace = curline)
+            elif c == ord('d'):
+                img.lines.pop(curline)
+            elif c == ord('o'):
+                img.lines.insert(curline+1, "")
+                curline += 1
+            elif c == ord('O'):
+                img.lines.insert(curline, "")
+            elif c == ord('c'):
+                self.command_line_mode()
+                if self.isdone:
+                    return
+                
+            # bound at the top and bottom
+            if curline < 1:
+                curline = 1
+            elif curline >= len(img.lines):
+                curline = len(img.lines) - 1
+
+        if self.isdone:
+            origimg.reset(img.lines)
+
+    def edit_line(self, line):
+        self.screen.clear()
+        self.screen.addstr(1, 2, "[ Minimal BASH-like line editing is supported.  ")
+        self.screen.addstr(2, 2, "  ESC at any time cancels.  ENTER at any time accepts your changes. ]")
+        self.screen.refresh()
+
+        t = GrubLineEditor(self.screen, 5, 2, line)
+        ret = t.edit()
+        if ret:
+            return ret
+        return None
+
+    def command_line_mode(self):
+        self.screen.clear()
+        self.screen.addstr(1, 2, "[ Minimal BASH-like line editing is supported.  ESC at any time ")
+        self.screen.addstr(2, 2, "  exits.  Typing 'boot' will boot with your entered commands. ] ")
+        self.screen.refresh()
+
+        y = 5
+        lines = []
+        while 1:
+            t = GrubLineEditor(self.screen, y, 2)
+            ret = t.edit()
+            if ret:
+                if ret in ("quit", "return"):
+                    break
+                elif ret != "boot":
+                    y += 1
+                    lines.append(ret)
+                    continue
+
+                # if we got boot, then we want to boot the entered image 
+                img = grub.GrubConf.GrubImage(lines)
+                self.cf.add_image(img)
+                self.selected_image = len(self.cf.images) - 1
+                self.isdone = True
+                break
+
+            # else, we cancelled and should just go back
             break
 
-    if fs is not None:
-        grubfile = None
-        for f in ("/boot/grub/menu.lst", "/boot/grub/grub.conf",
-                  "/grub/menu.lst", "/grub/grub.conf"):
-            if fs.file_exist(f):
-                grubfile = f
-                break
-        if grubfile is None:
-            raise RuntimeError, "we couldn't find /boot/grub{menu.lst,grub.conf} " + \
-                                "in the image provided. halt!"
-        f = fs.open_file(grubfile)
-        buf = f.read()
-        f.close()
-        fs.close()
-        # then parse the grub config
-        cf.parse(buf)
-    else:
-        raise RuntimeError, "Unable to read filesystem" 
-    
-    return cf
+    def read_config(self, fn, isConfig = False):
+        """Read the given file to parse the config.  If isconfig, then
+        we're being given a raw config file rather than a disk image."""
+        
+        if not os.access(fn, os.R_OK):
+            raise RuntimeError, "Unable to access %s" %(fn,)
 
+        self.cf = grub.GrubConf.GrubConfigFile()
+
+        if isConfig:
+            # set the config file and parse it
+            self.cf.filename = fn
+            self.cf.parse()
+            return
+
+        offset = 0
+        if is_disk_image(fn):
+            offset = get_active_offset(fn)
+            if offset == -1:
+                raise RuntimeError, "Unable to find active partition on disk"
+
+        # open the image and read the grub config
+        fs = None
+        for fstype in grub.fsys.fstypes.values():
+            if fstype.sniff_magic(fn, offset):
+                fs = fstype.open_fs(fn, offset)
+                break
+
+        if fs is not None:
+            grubfile = None
+            for f in ("/boot/grub/menu.lst", "/boot/grub/grub.conf",
+                      "/grub/menu.lst", "/grub/grub.conf"):
+                if fs.file_exist(f):
+                    grubfile = f
+                    break
+            if grubfile is None:
+                raise RuntimeError, "we couldn't find grub config file in the image provided."
+            f = fs.open_file(grubfile)
+            buf = f.read()
+            f.close()
+            fs.close()
+            # then parse the grub config
+            self.cf.parse(buf)
+        else:
+            raise RuntimeError, "Unable to read filesystem" 
+
+    def run(self):
+        timeout = int(self.cf.timeout)
+
+        self.selected_image = self.cf.default
+        self.isdone = False
+        while not self.isdone:
+            self.run_main(timeout)
+            timeout = -1
+            
+        return self.selected_image
+
+    def run_main(self, timeout = -1):
+        def draw():
+            # set up the screen
+            self.draw_main_windows()
+            self.text_win.addstr(0, 0, "Use the U and D keys to select which entry is highlighted.")
+            self.text_win.addstr(1, 0, "Press enter to boot the selected OS. 'e' to edit the")
+            self.text_win.addstr(2, 0, "commands before booting, 'a' to modify the kernel arguments ")
+            self.text_win.addstr(3, 0, "before booting, or 'c' for a command line.")
+            self.text_win.addch(0, 8, curses.ACS_UARROW)
+            self.text_win.addch(0, 14, curses.ACS_DARROW)
+            (y, x) = self.text_win.getmaxyx()
+            self.text_win.move(y - 1, x - 1)
+            self.text_win.refresh()
+
+        # now loop until we hit the timeout or get a go from the user
+        mytime = 0
+        while (timeout == -1 or mytime < int(timeout)):
+            draw()
+            if timeout != -1 and mytime != -1: 
+                self.screen.addstr(20, 5, "Will boot selected entry in %2d seconds"
+                                   %(int(timeout) - mytime))
+            else:
+                self.screen.addstr(20, 5, " " * 80)
+
+            self.fill_entry_list()
+            c = self.screen.getch()
+            if mytime != -1:
+                mytime += 1
+
+            # handle keypresses
+            if c == ord('c'):
+                self.command_line_mode()
+                break
+            elif c == ord('a'):
+                # find the kernel line, edit it and then boot
+                img = self.cf.images[self.selected_image]
+                for line in img.lines:
+                    if line.startswith("kernel"):
+                        l = self.edit_line(line)
+                        if l is not None:
+                            img.set_from_line(l, replace = True)
+                            self.isdone = True
+                            break
+                break
+            elif c == ord('e'):
+                img = self.cf.images[self.selected_image]
+                self.edit_entry(img)
+                break
+            elif c in (curses.KEY_ENTER, ord('\n'), ord('\r')):
+                self.isdone = True
+                break
+            elif c == curses.KEY_UP:
+                mytime = -1
+                self.selected_image -= 1
+            elif c == curses.KEY_DOWN:
+                mytime = -1
+                self.selected_image += 1
+#            elif c in (ord('q'), 27): # 27 == esc
+#                self.selected_image = -1
+#                self.isdone = True
+#                break
+
+            # bound at the top and bottom
+            if self.selected_image < 0:
+                self.selected_image = 0
+            elif self.selected_image >= len(self.cf.images):
+                self.selected_image = len(self.cf.images) - 1
+        
 def get_entry_idx(cf, entry):
     # first, see if the given entry is numeric
     try:
@@ -155,63 +421,12 @@ def get_entry_idx(cf, entry):
 
     return None
 
-def main(cf = None):
-    mytime = 0
-    timeout = int(cf.timeout)
-
-    (stdscr, win) = draw_window()
-    stdscr.timeout(1000)
-    selected = cf.default
-    
-    while (timeout == -1 or mytime < int(timeout)):
-        if timeout != -1 and mytime != -1: 
-            stdscr.addstr(20, 5, "Will boot selected entry in %2d seconds"
-                          %(int(timeout) - mytime))
-        else:
-            stdscr.addstr(20, 5, " " * 80)
-            
-        fill_entries(win, cf, selected)
-        c = stdscr.getch()
-        if mytime != -1:
-            mytime += 1
-#        if c == ord('q'):
-#            selected = -1
-#            break
-        if c == ord('c'):
-            # FIXME: needs to go to command line mode
-            continue
-        elif c == ord('a'):
-            # FIXME: needs to go to append mode
-            continue
-        elif c == ord('e'):
-            # FIXME: needs to go to edit mode
-            continue
-        elif c in (curses.KEY_ENTER, ord('\n'), ord('\r')):
-            break
-        elif c == curses.KEY_UP:
-            mytime = -1
-            selected -= 1
-        elif c == curses.KEY_DOWN:
-            mytime = -1
-            selected += 1
-        else:
-            pass
-
-        # bound at the top and bottom
-        if selected < 0:
-            selected = 0
-        elif selected >= len(cf.images):
-            selected = len(cf.images) - 1
-
-    if selected >= 0:
-        return selected
-
 if __name__ == "__main__":
     sel = None
     
     def run_main(scr, *args):
         global sel
-        sel = main(cf)
+        sel = g.run()
 
     def usage():
         print >> sys.stderr, "Usage: %s [-q|--quiet] [--output=] [--entry=] <image>" %(sys.argv[0],)
@@ -253,24 +468,32 @@ if __name__ == "__main__":
     else:
         fd = os.open(output, os.O_WRONLY)
 
-    cf = get_config(file, isconfig)
+    g = Grub(file, isconfig)
     if interactive:
         curses.wrapper(run_main)
     else:
-        sel = cf.default
+        sel = g.cf.default
 
     # set the entry to boot as requested
     if entry is not None:
-        idx = get_entry_idx(cf, entry)
-        if idx is not None and idx > 0 and idx < len(cf.images):
+        idx = get_entry_idx(g.cf, entry)
+        if idx is not None and idx > 0 and idx < len(g.cf.images):
             sel = idx
 
-    img = cf.images[sel]
+    if sel == -1:
+        print "No kernel image selected!"
+        sys.exit(1)
+
+    img = g.cf.images[sel]
     print "Going to boot %s" %(img.title)
     print "  kernel: %s" %(img.kernel[1],)
     if img.initrd:
         print "  initrd: %s" %(img.initrd[1],)
 
+    if isconfig:
+        print "  args: %s" %(img.args,)
+        sys.exit(0)
+        
     offset = 0
     if is_disk_image(file):
         offset = get_active_offset(file)
@@ -288,14 +511,14 @@ if __name__ == "__main__":
         raise RuntimeError, "Unable to open filesystem"
 
     kernel = fs.open_file(img.kernel[1],).read()
-    (tfd, fn) = tempfile.mkstemp(prefix="vmlinuz.")
+    (tfd, fn) = tempfile.mkstemp(prefix="vmlinuz.", dir="/var/lib/xen")
     os.write(tfd, kernel)
     os.close(tfd)
     sxp = "linux (kernel %s)" %(fn,)
 
     if img.initrd:
         initrd = fs.open_file(img.initrd[1],).read()
-        (tfd, fn) = tempfile.mkstemp(prefix="initrd.")
+        (tfd, fn) = tempfile.mkstemp(prefix="initrd.", dir="/var/lib/xen")
         os.write(tfd, initrd)
         os.close(tfd)
         sxp += "(ramdisk %s)" %(fn,)

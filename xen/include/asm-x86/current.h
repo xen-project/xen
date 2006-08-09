@@ -8,6 +8,7 @@
 #define __X86_CURRENT_H__
 
 #include <xen/config.h>
+#include <xen/percpu.h>
 #include <public/xen.h>
 #include <asm/page.h>
 
@@ -53,7 +54,6 @@ static inline struct cpu_info *get_cpu_info(void)
 
 #define schedule_tail(vcpu) (((vcpu)->arch.schedule_tail)(vcpu))
 
-#include <xen/percpu.h>
 /*
  * Which VCPU's state is currently running on each CPU?
  * This is not necesasrily the same as 'current' as a CPU may be

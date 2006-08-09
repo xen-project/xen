@@ -19,7 +19,7 @@
 #include <public/callback.h>
 
 /* All CPUs have their own IDT to allow int80 direct trap. */
-idt_entry_t *idt_tables[NR_CPUS] = { 0 };
+idt_entry_t *idt_tables[NR_CPUS] __read_mostly;
 
 void show_registers(struct cpu_user_regs *regs)
 {

@@ -138,6 +138,11 @@ class TCPXMLRPCServer(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
 
     def _marshaled_dispatch(self, data, dispatch_method = None):
         params, method = xmlrpclib.loads(data)
+        if False:
+            # Enable this block of code to exit immediately without sending
+            # a response.  This allows you to test client-side crash handling.
+            import sys
+            sys.exit(1)
         try:
             if dispatch_method is not None:
                 response = dispatch_method(method, params)

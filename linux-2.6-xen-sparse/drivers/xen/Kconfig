@@ -117,7 +117,7 @@ config XEN_PCIDEV_BACKEND_VPCI
 	  This PCI Backend hides the true PCI topology and makes the frontend
 	  think there is a single PCI bus with only the exported devices on it.
 	  For example, a device at 03:05.0 will be re-assigned to 00:00.0. A
-	  second device at 02:1a.0 will be re-assigned to 00:01.0.
+	  second device at 02:1a.1 will be re-assigned to 00:01.1.
 
 config XEN_PCIDEV_BACKEND_PASS
 	bool "Passthrough"
@@ -128,6 +128,15 @@ config XEN_PCIDEV_BACKEND_PASS
 	  PCI devices to its driver domains. This may be required for drivers
 	  which depend on finding their hardward in certain bus/slot
 	  locations.
+
+config XEN_PCIDEV_BACKEND_SLOT
+	bool "Slot"
+	---help---
+	  This PCI Backend hides the true PCI topology and makes the frontend
+	  think there is a single PCI bus with only the exported devices on it.
+	  Contrary to the virtual PCI backend, a function becomes a new slot.
+	  For example, a device at 03:05.2 will be re-assigned to 00:00.0. A
+	  second device at 02:1a.1 will be re-assigned to 00:01.0.
 
 endchoice
 
