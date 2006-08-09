@@ -51,7 +51,8 @@ static inline void switch_mm(struct mm_struct *prev,
 	struct mmuext_op _op[2], *op = _op;
 
 	if (likely(prev != next)) {
-		BUG_ON(!test_bit(PG_pinned, &virt_to_page(next->pgd)->flags));
+		BUG_ON(!xen_feature(XENFEAT_writable_page_tables) &&
+		       !test_bit(PG_pinned, &virt_to_page(next->pgd)->flags));
 
 		/* stop flush ipis for the previous mm */
 		cpu_clear(cpu, prev->cpu_vm_mask);
