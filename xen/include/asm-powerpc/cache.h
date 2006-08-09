@@ -57,4 +57,6 @@ static __inline__ void synchronize_caches(ulong start, size_t len)
     isync();
 }
 
+#define __read_mostly
+
 #endif

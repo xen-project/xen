@@ -26,7 +26,7 @@
 #if defined(__linux__)
 #include <dirent.h>
 #include <sys/ioctl.h>
-#define __user /* new versions of usbdevice_fs.h use this private attribute */
+#include <linux/compiler.h>
 #include <linux/usbdevice_fs.h>
 #include <linux/version.h>
 
@@ -45,11 +45,13 @@ typedef int USBScanFunc(void *opaque, int bus_num, int addr, int class_id,
                         int vendor_id, int product_id, 
                         const char *product_name, int speed);
 static int usb_host_find_device(int *pbus_num, int *paddr, 
+                                char *product_name, int product_name_size,
                                 const char *devname);
 
 //#define DEBUG
 
 #define USBDEVFS_PATH "/proc/bus/usb"
+#define PRODUCT_NAME_SZ 32
 
 typedef struct USBHostDevice {
     USBDevice dev;
@@ -65,6 +67,15 @@ static void usb_host_handle_reset(USBDevice *dev)
     ioctl(s->fd, USBDEVFS_RESET);
 #endif
 } 
+
+static void usb_host_handle_destroy(USBDevice *dev)
+{
+    USBHostDevice *s = (USBHostDevice *)dev;
+
+    if (s->fd >= 0)
+        close(s->fd);
+    qemu_free(s);
+}
 
 static int usb_host_handle_control(USBDevice *dev,
                                    int request,
@@ -146,8 +157,11 @@ USBDevice *usb_host_device_open(const char *devname)
     char buf[1024];
     int descr_len, dev_descr_len, config_descr_len, nb_interfaces;
     int bus_num, addr;
+    char product_name[PRODUCT_NAME_SZ];
 
-    if (usb_host_find_device(&bus_num, &addr, devname) < 0) 
+    if (usb_host_find_device(&bus_num, &addr, 
+                             product_name, sizeof(product_name),
+                             devname) < 0) 
         return NULL;
     
     snprintf(buf, sizeof(buf), USBDEVFS_PATH "/%03d/%03d", 
@@ -231,6 +245,15 @@ USBDevice *usb_host_device_open(const char *devname)
     dev->dev.handle_reset = usb_host_handle_reset;
     dev->dev.handle_control = usb_host_handle_control;
     dev->dev.handle_data = usb_host_handle_data;
+    dev->dev.handle_destroy = usb_host_handle_destroy;
+
+    if (product_name[0] == '\0')
+        snprintf(dev->dev.devname, sizeof(dev->dev.devname),
+                 "host:%s", devname);
+    else
+        pstrcpy(dev->dev.devname, sizeof(dev->dev.devname),
+                product_name);
+
     return (USBDevice *)dev;
 }
 
@@ -338,6 +361,7 @@ typedef struct FindDeviceState {
     int product_id;
     int bus_num;
     int addr;
+    char product_name[PRODUCT_NAME_SZ];
 } FindDeviceState;
 
 static int usb_host_find_device_scan(void *opaque, int bus_num, int addr, 
@@ -346,8 +370,11 @@ static int usb_host_find_device_scan(void *opaque, int bus_num, int addr,
                                      const char *product_name, int speed)
 {
     FindDeviceState *s = opaque;
-    if (vendor_id == s->vendor_id &&
-        product_id == s->product_id) {
+    if ((vendor_id == s->vendor_id &&
+        product_id == s->product_id) ||
+        (bus_num == s->bus_num &&
+        addr == s->addr)) {
+        pstrcpy(s->product_name, PRODUCT_NAME_SZ, product_name);
         s->bus_num = bus_num;
         s->addr = addr;
         return 1;
@@ -360,6 +387,7 @@ static int usb_host_find_device_scan(void *opaque, int bus_num, int addr,
    'bus.addr' (decimal numbers) or 
    'vendor_id:product_id' (hexa numbers) */
 static int usb_host_find_device(int *pbus_num, int *paddr, 
+                                char *product_name, int product_name_size,
                                 const char *devname)
 {
     const char *p;
@@ -370,6 +398,11 @@ static int usb_host_find_device(int *pbus_num, int *paddr,
     if (p) {
         *pbus_num = strtoul(devname, NULL, 0);
         *paddr = strtoul(p + 1, NULL, 0);
+        fs.bus_num = *pbus_num;
+        fs.addr = *paddr;
+        ret = usb_host_scan(&fs, usb_host_find_device_scan);
+        if (ret)
+            pstrcpy(product_name, product_name_size, fs.product_name);
         return 0;
     }
     p = strchr(devname, ':');
@@ -380,6 +413,7 @@ static int usb_host_find_device(int *pbus_num, int *paddr,
         if (ret) {
             *pbus_num = fs.bus_num;
             *paddr = fs.addr;
+            pstrcpy(product_name, product_name_size, fs.product_name);
             return 0;
         }
     }

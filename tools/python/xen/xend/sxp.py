@@ -291,7 +291,7 @@ class Parser:
             raise ParseError(self, "unexpected EOF")
         elif '0' <= c <= '7':
             octaldigit(c)
-        elif len(self.buf):
+        elif len(self.state.buf):
             octaldone()
             self.input_char(c)
 

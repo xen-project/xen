@@ -87,4 +87,9 @@ do_nmi_op(
     unsigned int cmd,
     XEN_GUEST_HANDLE(void) arg);
 
+extern long
+do_hvm_op(
+    unsigned long op,
+    XEN_GUEST_HANDLE(void) arg);
+
 #endif /* __XEN_HYPERCALL_H__ */

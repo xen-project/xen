@@ -69,7 +69,7 @@ static int cow_open(BlockDriverState *bs, const char *filename)
     struct cow_header_v2 cow_header;
     int64_t size;
 
-    fd = open(filename, O_RDWR | O_BINARY | O_LARGEFILE);
+    fd = open(filename, O_RDWR | O_BINARY | O_LARGEFILE | O_SYNC);
     if (fd < 0) {
         fd = open(filename, O_RDONLY | O_BINARY | O_LARGEFILE);
         if (fd < 0)
@@ -250,6 +250,12 @@ static int cow_create(const char *filename, int64_t image_sectors,
     return 0;
 }
 
+static void cow_flush(BlockDriverState *bs)
+{
+    BDRVCowState *s = bs->opaque;
+    fsync(s->fd);
+}
+
 BlockDriver bdrv_cow = {
     "cow",
     sizeof(BDRVCowState),
@@ -259,6 +265,7 @@ BlockDriver bdrv_cow = {
     cow_write,
     cow_close,
     cow_create,
+    cow_flush,
     cow_is_allocated,
 };
 #endif

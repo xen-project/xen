@@ -32,7 +32,7 @@
 #include <xen/errno.h>
 #include <xen/mm.h>
 #include <xen/console.h>
-#include <xen/reboot.h>
+#include <xen/shutdown.h>
 #include <asm/regs.h>
 #include <xen/delay.h>
 #include <xen/event.h>

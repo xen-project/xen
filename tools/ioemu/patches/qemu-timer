@@ -1,8 +1,8 @@
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-12 11:35:02.126650330 +0100
-+++ ioemu/vl.c	2006-07-12 11:35:02.273631916 +0100
-@@ -861,6 +861,16 @@
+--- ioemu.orig/vl.c	2006-08-06 02:22:53.925474246 +0100
++++ ioemu/vl.c	2006-08-06 02:22:56.618174081 +0100
+@@ -824,6 +824,16 @@
      }
  }
  
@@ -19,16 +19,16 @@ Index: ioemu/vl.c
  static void timer_save(QEMUFile *f, void *opaque)
  {
      if (cpu_ticks_enabled) {
-@@ -977,6 +987,8 @@
+@@ -940,6 +950,8 @@
  
  #endif /* !defined(_WIN32) */
  
 +#endif /* !CONFIG_DM */
 +
- static void init_timers(void)
+ static void init_timer_alarm(void)
  {
-     rt_clock = qemu_new_clock(QEMU_TIMER_REALTIME);
-@@ -1011,12 +1023,15 @@
+ #ifdef _WIN32
+@@ -971,12 +983,15 @@
      pit_min_timer_count = ((uint64_t)10000 * PIT_FREQ) / 1000000;
  #else
      {
@@ -44,7 +44,7 @@ Index: ioemu/vl.c
          /* timer signal */
          sigfillset(&act.sa_mask);
         act.sa_flags = 0;
-@@ -1062,6 +1077,7 @@
+@@ -1022,6 +1037,7 @@
              pit_min_timer_count = ((uint64_t)itv.it_interval.tv_usec * 
                                     PIT_FREQ) / 1000000;
          }

@@ -20,6 +20,8 @@
 #include <xen/guest_access.h>
 #include <xen/hypercall.h>
 #include <xen/delay.h>
+#include <xen/shutdown.h>
+#include <xen/percpu.h>
 #include <asm/debugger.h>
 #include <public/dom0_ops.h>
 #include <public/sched.h>
@@ -32,7 +34,7 @@ struct domain *domain_list;
 
 struct domain *dom0;
 
-struct vcpu *idle_vcpu[NR_CPUS];
+struct vcpu *idle_vcpu[NR_CPUS] __read_mostly;
 
 struct domain *alloc_domain(domid_t domid)
 {
@@ -244,15 +246,15 @@ void __domain_crash_synchronous(void)
 }
 
 
-static struct domain *domain_shuttingdown[NR_CPUS];
+static DEFINE_PER_CPU(struct domain *, domain_shuttingdown);
 
 static void domain_shutdown_finalise(void)
 {
     struct domain *d;
     struct vcpu *v;
 
-    d = domain_shuttingdown[smp_processor_id()];
-    domain_shuttingdown[smp_processor_id()] = NULL;
+    d = this_cpu(domain_shuttingdown);
+    this_cpu(domain_shuttingdown) = NULL;
 
     BUG_ON(d == NULL);
     BUG_ON(d == current->domain);
@@ -282,36 +284,12 @@ static __init int domain_shutdown_finaliser_init(void)
 }
 __initcall(domain_shutdown_finaliser_init);
 
-
 void domain_shutdown(struct domain *d, u8 reason)
 {
     struct vcpu *v;
 
     if ( d->domain_id == 0 )
-    {
-        extern void machine_restart(char *);
-        extern void machine_halt(void);
-
-        debugger_trap_immediate();
-
-        if ( reason == SHUTDOWN_poweroff ) 
-        {
-            printk("Domain 0 halted: halting machine.\n");
-            machine_halt();
-        }
-        else if ( reason == SHUTDOWN_crash )
-        {
-            printk("Domain 0 crashed: rebooting machine in 5 seconds.\n");
-            watchdog_disable();
-            mdelay(5000);
-            machine_restart(0);
-        }
-        else
-        {
-            printk("Domain 0 shutdown: rebooting machine.\n");
-            machine_restart(0);
-        }
-    }
+        dom0_shutdown(reason);
 
     /* Mark the domain as shutting down. */
     d->shutdown_code = reason;
@@ -325,7 +303,7 @@ void domain_shutdown(struct domain *d, u8 reason)
         vcpu_sleep_nosync(v);
 
     get_knownalive_domain(d);
-    domain_shuttingdown[smp_processor_id()] = d;
+    this_cpu(domain_shuttingdown) = d;
     raise_softirq(DOMAIN_SHUTDOWN_FINALISE_SOFTIRQ);
 }
 

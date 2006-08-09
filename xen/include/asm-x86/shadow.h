@@ -1734,6 +1734,13 @@ static inline unsigned long gva_to_gpa(unsigned long gva)
     return l1e_get_paddr(gpte) + (gva & ~PAGE_MASK); 
 }
 #endif
+
+static inline unsigned long gva_to_mfn(unsigned long gva)
+{
+    unsigned long gpa = gva_to_gpa(gva);
+    return get_mfn_from_gpfn(gpa >> PAGE_SHIFT);
+}
+
 /************************************************************************/
 
 extern void __update_pagetables(struct vcpu *v);

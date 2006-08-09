@@ -37,7 +37,6 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
-#include "audio/audio.h"
 #include "xenctrl.h"
 #include "xs.h"
 
@@ -49,16 +48,24 @@
 #endif
 
 #ifdef _WIN32
+#include <windows.h>
+#define fsync _commit
 #define lseek _lseeki64
 #define ENOTSUP 4096
-/* XXX: find 64 bit version */
-#define ftruncate chsize
+extern int qemu_ftruncate64(int, int64_t);
+#define ftruncate qemu_ftruncate64
+
 
 static inline char *realpath(const char *path, char *resolved_path)
 {
     _fullpath(resolved_path, path, _MAX_PATH);
     return resolved_path;
 }
+
+#define PRId64 "I64d"
+#define PRIx64 "I64x"
+#define PRIu64 "I64u"
+#define PRIo64 "I64o"
 #endif
 
 #ifdef QEMU_TOOL
@@ -72,6 +79,7 @@ static inline char *realpath(const char *path, char *resolved_path)
 
 #else
 
+#include "audio/audio.h"
 #include "cpu.h"
 #include "gdbstub.h"
 
@@ -159,10 +167,11 @@ extern const char *keyboard_layout;
 extern int kqemu_allowed;
 extern int win2k_install_hack;
 extern int usb_enabled;
+extern int acpi_enabled;
 extern int smp_cpus;
 
 /* XXX: make it dynamic */
-#if defined (TARGET_PPC)
+#if defined (TARGET_PPC) || defined (TARGET_SPARC64)
 #define BIOS_SIZE ((512 + 32) * 1024)
 #elif defined(TARGET_MIPS)
 #define BIOS_SIZE (128 * 1024)
@@ -234,6 +243,14 @@ typedef int PollingFunc(void *opaque);
 
 int qemu_add_polling_cb(PollingFunc *func, void *opaque);
 void qemu_del_polling_cb(PollingFunc *func, void *opaque);
+
+#ifdef _WIN32
+/* Wait objects handling */
+typedef void WaitObjectFunc(void *opaque);
+
+int qemu_add_wait_object(HANDLE handle, WaitObjectFunc *func, void *opaque);
+void qemu_del_wait_object(HANDLE handle, WaitObjectFunc *func, void *opaque);
+#endif
 
 /* character device */
 
@@ -392,6 +409,7 @@ int qemu_timer_pending(QEMUTimer *ts);
 extern int64_t ticks_per_sec;
 extern int pit_min_timer_count;
 
+int64_t cpu_get_ticks(void);
 void cpu_enable_ticks(void);
 void cpu_disable_ticks(void);
 
@@ -514,6 +532,8 @@ int bdrv_write(BlockDriverState *bs, int64_t sector_num,
 void bdrv_get_geometry(BlockDriverState *bs, int64_t *nb_sectors_ptr);
 int bdrv_commit(BlockDriverState *bs);
 void bdrv_set_boot_sector(BlockDriverState *bs, const uint8_t *data, int size);
+/* Ensure contents are flushed to disk.  */
+void bdrv_flush(BlockDriverState *bs);
 
 #define BDRV_TYPE_HD     0
 #define BDRV_TYPE_CDROM  1
@@ -611,6 +631,20 @@ typedef struct PCIIORegion {
 
 #define PCI_ROM_SLOT 6
 #define PCI_NUM_REGIONS 7
+
+#define PCI_DEVICES_MAX 64
+
+#define PCI_VENDOR_ID		0x00	/* 16 bits */
+#define PCI_DEVICE_ID		0x02	/* 16 bits */
+#define PCI_COMMAND		0x04	/* 16 bits */
+#define  PCI_COMMAND_IO		0x1	/* Enable response in I/O space */
+#define  PCI_COMMAND_MEMORY	0x2	/* Enable response in Memory space */
+#define PCI_CLASS_DEVICE        0x0a    /* Device class */
+#define PCI_INTERRUPT_LINE	0x3c	/* 8 bits */
+#define PCI_INTERRUPT_PIN	0x3d	/* 8 bits */
+#define PCI_MIN_GNT		0x3e	/* 8 bits */
+#define PCI_MAX_LAT		0x3f	/* 8 bits */
+
 struct PCIDevice {
     /* PCI config space */
     uint8_t config[256];
@@ -624,6 +658,7 @@ struct PCIDevice {
     /* do not access the following fields */
     PCIConfigReadFunc *config_read;
     PCIConfigWriteFunc *config_write;
+    /* ??? This is a PC-specific hack, and should be removed.  */
     int irq_index;
 };
 
@@ -645,21 +680,37 @@ void pci_default_write_config(PCIDevice *d,
 void generic_pci_save(QEMUFile* f, void *opaque);
 int generic_pci_load(QEMUFile* f, void *opaque, int version_id);
 
-extern struct PIIX3State *piix3_state;
-
-PCIBus *i440fx_init(void);
-void piix3_init(PCIBus *bus);
-void pci_bios_init(void);
-void pci_info(void);
-
-/* temporary: will be moved in platform specific file */
-void pci_set_pic(PCIBus *bus, SetIRQFunc *set_irq, void *irq_opaque);
-PCIBus *pci_prep_init(void);
-PCIBus *pci_grackle_init(uint32_t base);
-PCIBus *pci_pmac_init(void);
-PCIBus *pci_apb_init(target_ulong special_base, target_ulong mem_base);
+typedef void (*pci_set_irq_fn)(PCIDevice *pci_dev, void *pic,
+                               int irq_num, int level);
+PCIBus *pci_register_bus(pci_set_irq_fn set_irq, void *pic, int devfn_min);
 
 void pci_nic_init(PCIBus *bus, NICInfo *nd);
+void pci_data_write(void *opaque, uint32_t addr, uint32_t val, int len);
+uint32_t pci_data_read(void *opaque, uint32_t addr, int len);
+int pci_bus_num(PCIBus *s);
+void pci_for_each_device(void (*fn)(PCIDevice *d));
+
+void pci_info(void);
+
+/* prep_pci.c */
+PCIBus *pci_prep_init(void);
+
+/* grackle_pci.c */
+PCIBus *pci_grackle_init(uint32_t base, void *pic);
+
+/* unin_pci.c */
+PCIBus *pci_pmac_init(void *pic);
+
+/* apb_pci.c */
+PCIBus *pci_apb_init(target_ulong special_base, target_ulong mem_base,
+                     void *pic);
+
+PCIBus *pci_vpb_init(void *pic);
+
+/* piix_pci.c */
+PCIBus *i440fx_init(void);
+int piix3_init(PCIBus *bus);
+void pci_bios_init(void);
 
 /* openpic.c */
 typedef struct openpic_t openpic_t;
@@ -689,12 +740,13 @@ extern struct soundhw soundhw[];
 
 /* vga.c */
 
-#define VGA_RAM_SIZE (4096 * 1024)
+#define VGA_RAM_SIZE (8192 * 1024)
 
 struct DisplayState {
     uint8_t *data;
     int linesize;
     int depth;
+    int bgr; /* BGR color order instead of RGB. Only valid for depth == 32 */
     int width;
     int height;
     void *opaque;
@@ -744,9 +796,13 @@ void isa_ide_init(int iobase, int iobase2, int irq,
                   BlockDriverState *hd0, BlockDriverState *hd1);
 void pci_cmd646_ide_init(PCIBus *bus, BlockDriverState **hd_table,
                          int secondary_ide_enabled);
-void pci_piix3_ide_init(PCIBus *bus, BlockDriverState **hd_table);
+void pci_piix3_ide_init(PCIBus *bus, BlockDriverState **hd_table, int devfn);
 int pmac_ide_init (BlockDriverState **hd_table,
                    SetIRQFunc *set_irq, void *irq_opaque, int irq);
+
+/* cdrom.c */
+int cdrom_read_toc(int nb_sectors, uint8_t *buf, int msf, int start_track);
+int cdrom_read_toc_raw(int nb_sectors, uint8_t *buf, int msf, int session_num);
 
 /* es1370.c */
 int es1370_init (PCIBus *bus, AudioState *s);
@@ -792,6 +848,10 @@ void pci_ne2000_init(PCIBus *bus, NICInfo *nd);
 /* rtl8139.c */
 
 void pci_rtl8139_init(PCIBus *bus, NICInfo *nd);
+
+/* pcnet.c */
+
+void pci_pcnet_init(PCIBus *bus, NICInfo *nd);
 
 /* pckbd.c */
 
@@ -860,9 +920,15 @@ int pit_get_out(PITState *pit, int channel, int64_t current_time);
 void pcspk_init(PITState *);
 int pcspk_audio_init(AudioState *);
 
+/* acpi.c */
+extern int acpi_enabled;
+void piix4_pm_init(PCIBus *bus, int devfn);
+void acpi_bios_init(void);
+
 /* pc.c */
 extern QEMUMachine pc_machine;
 extern QEMUMachine isapc_machine;
+extern int fd_bootchk;
 
 void ioport_set_a20(int enable);
 int ioport_get_a20(void);
@@ -1005,14 +1071,31 @@ int cuda_init(SetIRQFunc *set_irq, void *irq_opaque, int irq);
 
 /* usb ports of the VM */
 
-#define MAX_VM_USB_PORTS 8
+void qemu_register_usb_port(USBPort *port, void *opaque, int index,
+                            usb_attachfn attach);
 
-extern USBPort *vm_usb_ports[MAX_VM_USB_PORTS];
-extern USBDevice *vm_usb_hub;
+#define VM_USB_HUB_SIZE 8
 
 void do_usb_add(const char *devname);
 void do_usb_del(const char *devname);
 void usb_info(void);
+
+/* scsi-disk.c */
+typedef struct SCSIDevice SCSIDevice;
+typedef void (*scsi_completionfn)(void *, uint32_t, int);
+
+SCSIDevice *scsi_disk_init(BlockDriverState *bdrv,
+                           scsi_completionfn completion,
+                           void *opaque);
+void scsi_disk_destroy(SCSIDevice *s);
+
+int32_t scsi_send_command(SCSIDevice *s, uint32_t tag, uint8_t *buf, int lun);
+int scsi_read_data(SCSIDevice *s, uint8_t *data, uint32_t len);
+int scsi_write_data(SCSIDevice *s, uint8_t *data, uint32_t len);
+
+/* lsi53c895a.c */
+void lsi_scsi_attach(void *opaque, BlockDriverState *bd, int id);
+void *lsi_scsi_init(PCIBus *bus, int devfn);
 
 /* integratorcp.c */
 extern QEMUMachine integratorcp926_machine;
@@ -1081,6 +1164,15 @@ int sh7750_register_io_device(struct SH7750State *s,
 /* tc58128.c */
 int tc58128_init(struct SH7750State *s, char *zone1, char *zone2);
 
+/* NOR flash devices */
+typedef struct pflash_t pflash_t;
+
+pflash_t *pflash_register (target_ulong base, ram_addr_t off,
+                           BlockDriverState *bs,
+                           target_ulong sector_len, int nb_blocs, int width,
+                           uint16_t id0, uint16_t id1, 
+                           uint16_t id2, uint16_t id3);
+
 #endif /* defined(QEMU_TOOL) */
 
 /* monitor.c */
@@ -1092,6 +1184,8 @@ void term_flush(void);
 void term_print_help(void);
 void monitor_readline(const char *prompt, int is_password,
                       char *buf, int buf_size);
+void do_eject(int force, const char *filename);
+void do_change(const char *device, const char *filename);
 
 /* readline.c */
 typedef void ReadLineFunc(void *opaque, const char *str);
@@ -1103,6 +1197,14 @@ void readline_find_completion(const char *cmdline);
 const char *readline_get_history(unsigned int index);
 void readline_start(const char *prompt, int is_password,
                     ReadLineFunc *readline_func, void *opaque);
+
+/* xenstore.c */
+void xenstore_parse_domain_config(int domid);
+int xenstore_fd(void);
+void xenstore_process_event(void *opaque);
+void xenstore_check_new_media_present(int timeout);
+void xenstore_write_vncport(int vnc_display);
+
 
 void kqemu_record_dump(void);
 

@@ -10,7 +10,7 @@
 #include <xen/symbols.h>
 #include <xen/console.h>
 #include <xen/sched.h>
-#include <xen/reboot.h>
+#include <xen/shutdown.h>
 #include <xen/nmi.h>
 #include <asm/current.h>
 #include <asm/flushtlb.h>

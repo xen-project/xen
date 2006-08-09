@@ -6,12 +6,14 @@
 #include <stddef.h>
 #include <inttypes.h>
 #include "xg_private.h"
+#include "xc_private.h"
 #include "xc_elf.h"
 #include <stdlib.h>
 #include <unistd.h>
 #include <zlib.h>
 #include <xen/hvm/hvm_info_table.h>
 #include <xen/hvm/ioreq.h>
+#include <xen/hvm/params.h>
 
 #define HVM_LOADER_ENTR_ADDR  0x00100000
 
@@ -24,6 +26,7 @@
 #define E820_IO          16
 #define E820_SHARED_PAGE 17
 #define E820_XENSTORE    18
+#define E820_BUFFERED_IO 19
 
 #define E820_MAP_PAGE       0x00090000
 #define E820_MAP_NR_OFFSET  0x000001E8
@@ -42,6 +45,30 @@ static int
 loadelfimage(
     char *elfbase, int xch, uint32_t dom, unsigned long *parray,
     struct domain_setup_info *dsi);
+
+static void xc_set_hvm_param(int handle,
+                             domid_t dom, int param, unsigned long value)
+{
+    DECLARE_HYPERCALL;
+    xen_hvm_param_t arg;
+    int rc;
+
+    hypercall.op     = __HYPERVISOR_hvm_op;
+    hypercall.arg[0] = HVMOP_set_param;
+    hypercall.arg[1] = (unsigned long)&arg;
+    arg.domid = dom;
+    arg.index = param;
+    arg.value = value;
+    if ( mlock(&arg, sizeof(arg)) != 0 )
+    {
+        PERROR("Could not lock memory for set parameter");
+        return;
+    }
+    rc = do_xen_hypercall(handle, &hypercall);
+    safe_munlock(&arg, sizeof(arg));
+    if (rc < 0)
+        PERROR("set HVM parameter failed (%d)", rc);
+}
 
 static void build_e820map(void *e820_page, unsigned long long mem_size)
 {
@@ -70,7 +97,13 @@ static void build_e820map(void *e820_page, unsigned long long mem_size)
     e820entry[nr_map].type = E820_RESERVED;
     nr_map++;
 
-#define STATIC_PAGES    2       /* for ioreq_t and store_mfn */
+#define STATIC_PAGES    3
+    /* 3 static pages:
+     * - ioreq buffer.
+     * - xenstore.
+     * - shared_page.
+     */
+
     /* Most of the ram goes here */
     e820entry[nr_map].addr = 0x100000;
     e820entry[nr_map].size = mem_size - 0x100000 - STATIC_PAGES * PAGE_SIZE;
@@ -78,6 +111,12 @@ static void build_e820map(void *e820_page, unsigned long long mem_size)
     nr_map++;
 
     /* Statically allocated special pages */
+
+    /* For buffered IO requests */
+    e820entry[nr_map].addr = mem_size - 3 * PAGE_SIZE;
+    e820entry[nr_map].size = PAGE_SIZE;
+    e820entry[nr_map].type = E820_BUFFERED_IO;
+    nr_map++;
 
     /* For xenstore */
     e820entry[nr_map].addr = mem_size - 2 * PAGE_SIZE;
@@ -154,6 +193,9 @@ static int set_hvm_info(int xc_handle, uint32_t dom,
 
     munmap(va_map, PAGE_SIZE);
 
+    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_APIC_ENABLED, apic);
+    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_PAE_ENABLED, pae);
+
     return 0;
 }
 
@@ -183,6 +225,9 @@ static int setup_guest(int xc_handle,
 
     unsigned long shared_page_frame = 0;
     shared_iopage_t *sp;
+
+    unsigned long ioreq_buffer_frame = 0;
+    void *ioreq_buffer_page;
 
     memset(&dsi, 0, sizeof(struct domain_setup_info));
 
@@ -265,27 +310,30 @@ static int setup_guest(int xc_handle,
         shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
     munmap(shared_info, PAGE_SIZE);
 
-    /* Populate the event channel port in the shared page */
+    /* Paranoia */
     shared_page_frame = page_array[(v_end >> PAGE_SHIFT) - 1];
     if ( (sp = (shared_iopage_t *) xc_map_foreign_range(
               xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
               shared_page_frame)) == 0 )
         goto error_out;
     memset(sp, 0, PAGE_SIZE);
-
-    /* FIXME: how about if we overflow the page here? */
-    for ( i = 0; i < vcpus; i++ ) {
-        unsigned int vp_eport;
-
-        vp_eport = xc_evtchn_alloc_unbound(xc_handle, dom, 0);
-        if ( vp_eport < 0 ) {
-            PERROR("Couldn't get unbound port from VMX guest.\n");
-            goto error_out;
-        }
-        sp->vcpu_iodata[i].vp_eport = vp_eport;
-    }
-
     munmap(sp, PAGE_SIZE);
+
+    /* clean the buffered IO requests page */
+    ioreq_buffer_frame = page_array[(v_end >> PAGE_SHIFT) - 3];
+    ioreq_buffer_page = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+                                             PROT_READ | PROT_WRITE,
+                                             ioreq_buffer_frame);
+
+    if ( ioreq_buffer_page == NULL )
+        goto error_out;
+
+    memset(ioreq_buffer_page, 0, PAGE_SIZE);
+
+    munmap(ioreq_buffer_page, PAGE_SIZE);
+
+    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_PFN, (v_end >> PAGE_SHIFT) - 2);
+    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_EVTCHN, store_evtchn);
 
     *store_mfn = page_array[(v_end >> PAGE_SHIFT) - 2];
     if ( xc_clear_domain_page(xc_handle, dom, *store_mfn) )

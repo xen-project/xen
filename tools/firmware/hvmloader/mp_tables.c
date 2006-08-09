@@ -93,7 +93,8 @@ typedef   signed long int64_t;
 
 #define INTR_MAX_NR            16
 
-extern int puts(const char *); /* for printing */
+#include "util.h"
+
 extern int get_vcpu_nr(void);  /* for the guest's VCPU count */
 
 /*

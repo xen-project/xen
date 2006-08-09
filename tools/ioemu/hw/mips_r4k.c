@@ -60,7 +60,7 @@ static void cpu_mips_update_count (CPUState *env, uint32_t count,
 	next++;
 #if 0
     if (logfile) {
-        fprintf(logfile, "%s: 0x%08llx %08x %08x => 0x%08llx\n",
+        fprintf(logfile, "%s: 0x%08" PRIx64 " %08x %08x => 0x%08" PRIx64 "\n",
                 __func__, now, count, compare, next - now);
     }
 #endif
@@ -214,14 +214,10 @@ void mips_r4k_init (int ram_size, int vga_ram_size, int boot_device,
        run. */
     bios_offset = ram_size + vga_ram_size;
     snprintf(buf, sizeof(buf), "%s/%s", bios_dir, BIOS_FILENAME);
-    printf("%s: load BIOS '%s' size %d\n", __func__, buf, BIOS_SIZE);
     ret = load_image(buf, phys_ram_base + bios_offset);
     if (ret == BIOS_SIZE) {
 	cpu_register_physical_memory((uint32_t)(0x1fc00000),
 				     BIOS_SIZE, bios_offset | IO_MEM_ROM);
-	env->PC = 0xBFC00000;
-	if (!kernel_filename)
-	    return;
     } else {
 	/* not fatal */
         fprintf(stderr, "qemu: Warning, could not load MIPS bios '%s'\n",

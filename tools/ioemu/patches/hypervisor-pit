@@ -1,20 +1,20 @@
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2006-07-27 11:16:58.970332506 +0100
-+++ ioemu/Makefile.target	2006-07-27 11:16:59.758245283 +0100
-@@ -333,7 +333,7 @@
+--- ioemu.orig/Makefile.target	2006-08-06 02:22:26.380544784 +0100
++++ ioemu/Makefile.target	2006-08-06 02:23:23.059226607 +0100
+@@ -354,7 +354,7 @@
  ifeq ($(TARGET_BASE_ARCH), i386)
  # Hardware support
  VL_OBJS+= ide.o pckbd.o ps2.o vga.o $(SOUND_HW) dma.o $(AUDIODRV)
 -VL_OBJS+= fdc.o mc146818rtc.o serial.o i8254.o pcspk.o pc.o
 +VL_OBJS+= fdc.o mc146818rtc.o serial.o pc.o
- VL_OBJS+= cirrus_vga.o mixeng.o parallel.o
+ VL_OBJS+= cirrus_vga.o mixeng.o parallel.o acpi.o piix_pci.o
+ VL_OBJS+= usb-uhci.o
  DEFINES += -DHAS_AUDIO
- endif
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2006-07-27 11:16:59.036325200 +0100
-+++ ioemu/hw/pc.c	2006-07-27 11:16:59.759245173 +0100
+--- ioemu.orig/hw/pc.c	2006-08-06 02:22:35.588518336 +0100
++++ ioemu/hw/pc.c	2006-08-06 02:23:07.875919141 +0100
 @@ -38,7 +38,9 @@
  
  static fdctrl_t *floppy_controller;
@@ -25,7 +25,7 @@ Index: ioemu/hw/pc.c
  #ifndef CONFIG_DM
  static IOAPICState *ioapic;
  #endif /* !CONFIG_DM */
-@@ -803,8 +805,10 @@
+@@ -810,8 +812,10 @@
      }
  #endif /* !CONFIG_DM */
      isa_pic = pic_init(pic_irq_request, first_cpu);
@@ -38,9 +38,9 @@ Index: ioemu/hw/pc.c
          pic_set_alt_irq_func(isa_pic, ioapic_set_irq, ioapic);
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-27 11:16:59.614261222 +0100
-+++ ioemu/vl.c	2006-07-27 11:16:59.762244841 +0100
-@@ -5034,6 +5034,7 @@
+--- ioemu.orig/vl.c	2006-08-06 02:23:05.216215627 +0100
++++ ioemu/vl.c	2006-08-06 02:23:07.878918807 +0100
+@@ -5570,6 +5570,7 @@
  
  #ifdef HAS_AUDIO
  struct soundhw soundhw[] = {
@@ -48,7 +48,7 @@ Index: ioemu/vl.c
  #ifdef TARGET_I386
      {
          "pcspk",
-@@ -5043,6 +5044,7 @@
+@@ -5579,6 +5580,7 @@
          { .init_isa = pcspk_audio_init }
      },
  #endif

@@ -217,6 +217,13 @@ long do_xen_version(int cmd, XEN_GUEST_HANDLE(void) arg)
         return (!guest_handle_is_null(arg) ? -EINVAL : PAGE_SIZE);
     }
 
+    case XENVER_guest_handle:
+    {
+        if ( copy_to_guest(arg, (char *)current->domain->handle,
+                           sizeof(current->domain->handle)) )
+            return -EFAULT;
+        return 0;
+    }    
     }
 
     return -ENOSYS;

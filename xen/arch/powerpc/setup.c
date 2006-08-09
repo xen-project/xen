@@ -55,7 +55,7 @@ int opt_earlygdb = 0;
 boolean_param("earlygdb", opt_earlygdb);
 
 u32 tlbflush_clock = 1U;
-u32 tlbflush_time[NR_CPUS];
+DEFINE_PER_CPU(u32, tlbflush_time);
 
 unsigned int watchdog_on;
 unsigned long wait_init_idle;

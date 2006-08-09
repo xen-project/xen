@@ -1488,7 +1488,7 @@ int tlb_set_page_exec(CPUState *env, target_ulong vaddr,
     if (is_softmmu) 
 #endif
     {
-        if ((pd & ~TARGET_PAGE_MASK) > IO_MEM_ROM) {
+        if ((pd & ~TARGET_PAGE_MASK) > IO_MEM_ROM && !(pd & IO_MEM_ROMD)) {
             /* IO memory case */
             address = vaddr | pd;
             addend = paddr;
@@ -1513,9 +1513,11 @@ int tlb_set_page_exec(CPUState *env, target_ulong vaddr,
             te->addr_code = -1;
         }
         if (prot & PAGE_WRITE) {
-            if ((pd & ~TARGET_PAGE_MASK) == IO_MEM_ROM) {
-                /* ROM: access is ignored (same as unassigned) */
-                te->addr_write = vaddr | IO_MEM_ROM;
+            if ((pd & ~TARGET_PAGE_MASK) == IO_MEM_ROM || 
+                (pd & IO_MEM_ROMD)) {
+                /* write access calls the I/O callback */
+                te->addr_write = vaddr | 
+                    (pd & ~(TARGET_PAGE_MASK | IO_MEM_ROMD));
             } else if ((pd & ~TARGET_PAGE_MASK) == IO_MEM_RAM && 
                        !cpu_physical_memory_is_dirty(pd)) {
                 te->addr_write = vaddr | IO_MEM_NOTDIRTY;
@@ -1779,14 +1781,23 @@ void cpu_register_physical_memory(target_phys_addr_t start_addr,
 {
     target_phys_addr_t addr, end_addr;
     PhysPageDesc *p;
+    CPUState *env;
 
     size = (size + TARGET_PAGE_SIZE - 1) & TARGET_PAGE_MASK;
     end_addr = start_addr + size;
     for(addr = start_addr; addr != end_addr; addr += TARGET_PAGE_SIZE) {
         p = phys_page_find_alloc(addr >> TARGET_PAGE_BITS, 1);
         p->phys_offset = phys_offset;
-        if ((phys_offset & ~TARGET_PAGE_MASK) <= IO_MEM_ROM)
+        if ((phys_offset & ~TARGET_PAGE_MASK) <= IO_MEM_ROM ||
+            (phys_offset & IO_MEM_ROMD))
             phys_offset += TARGET_PAGE_SIZE;
+    }
+    
+    /* since each CPU stores ram addresses in its TLB cache, we must
+       reset the modified entries */
+    /* XXX: slow ! */
+    for(env = first_cpu; env != NULL; env = env->next_cpu) {
+        tlb_flush(env, 1);
     }
 }
 
@@ -2048,7 +2059,8 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
                 }
             }
         } else {
-            if ((pd & ~TARGET_PAGE_MASK) > IO_MEM_ROM) {
+            if ((pd & ~TARGET_PAGE_MASK) > IO_MEM_ROM && 
+                !(pd & IO_MEM_ROMD)) {
                 /* I/O case */
                 io_index = (pd >> IO_MEM_SHIFT) & (IO_MEM_NB_ENTRIES - 1);
                 if (l >= 4 && ((addr & 3) == 0)) {
@@ -2103,7 +2115,8 @@ void cpu_physical_memory_write_rom(target_phys_addr_t addr,
         }
         
         if ((pd & ~TARGET_PAGE_MASK) != IO_MEM_RAM &&
-            (pd & ~TARGET_PAGE_MASK) != IO_MEM_ROM) {
+            (pd & ~TARGET_PAGE_MASK) != IO_MEM_ROM &&
+            !(pd & IO_MEM_ROMD)) {
             /* do nothing */
         } else {
             unsigned long addr1;
@@ -2135,7 +2148,8 @@ uint32_t ldl_phys(target_phys_addr_t addr)
         pd = p->phys_offset;
     }
         
-    if ((pd & ~TARGET_PAGE_MASK) > IO_MEM_ROM) {
+    if ((pd & ~TARGET_PAGE_MASK) > IO_MEM_ROM && 
+        !(pd & IO_MEM_ROMD)) {
         /* I/O case */
         io_index = (pd >> IO_MEM_SHIFT) & (IO_MEM_NB_ENTRIES - 1);
         val = io_mem_read[io_index][2](io_mem_opaque[io_index], addr);
@@ -2164,7 +2178,8 @@ uint64_t ldq_phys(target_phys_addr_t addr)
         pd = p->phys_offset;
     }
         
-    if ((pd & ~TARGET_PAGE_MASK) > IO_MEM_ROM) {
+    if ((pd & ~TARGET_PAGE_MASK) > IO_MEM_ROM &&
+        !(pd & IO_MEM_ROMD)) {
         /* I/O case */
         io_index = (pd >> IO_MEM_SHIFT) & (IO_MEM_NB_ENTRIES - 1);
 #ifdef TARGET_WORDS_BIGENDIAN

@@ -11,19 +11,16 @@
 #include <xen/smp.h>
 #include <xen/delay.h>
 #include <xen/dmi.h>
+#include <xen/irq.h>
+#include <xen/console.h>
+#include <xen/shutdown.h>
+#include <asm/msr.h>
 #include <asm/regs.h>
 #include <asm/mc146818rtc.h>
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/processor.h>
 #include <asm/mpspec.h>
-#include <xen/irq.h>
-#include <xen/console.h>
-#include <asm/msr.h>
-
-/* opt_noreboot: If true, machine will need manual reset on error. */
-static int opt_noreboot = 0;
-boolean_param("noreboot", opt_noreboot);
 
 /* reboot_str: comma-separated list of reboot options. */
 static char __initdata reboot_str[10] = "";
@@ -203,12 +200,6 @@ static void machine_real_restart(const unsigned char *code, unsigned length)
 void machine_restart(char * __unused)
 {
     int i;
-
-    if ( opt_noreboot )
-    {
-        printk("Reboot disabled on cmdline: require manual reset\n");
-        machine_halt();
-    }
 
     watchdog_disable();
     console_start_sync();

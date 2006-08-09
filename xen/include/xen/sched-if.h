@@ -8,6 +8,8 @@
 #ifndef __XEN_SCHED_IF_H__
 #define __XEN_SCHED_IF_H__
 
+#include <xen/percpu.h>
+
 struct schedule_data {
     spinlock_t          schedule_lock;  /* spinlock protecting curr        */
     struct vcpu        *curr;           /* current task                    */
@@ -17,7 +19,7 @@ struct schedule_data {
     unsigned long       tick;           /* current periodic 'tick'         */
 } __cacheline_aligned;
 
-extern struct schedule_data schedule_data[];
+DECLARE_PER_CPU(struct schedule_data, schedule_data);
 
 static inline void vcpu_schedule_lock(struct vcpu *v)
 {
@@ -26,10 +28,10 @@ static inline void vcpu_schedule_lock(struct vcpu *v)
     for ( ; ; )
     {
         cpu = v->processor;
-        spin_lock(&schedule_data[cpu].schedule_lock);
+        spin_lock(&per_cpu(schedule_data, cpu).schedule_lock);
         if ( likely(v->processor == cpu) )
             break;
-        spin_unlock(&schedule_data[cpu].schedule_lock);
+        spin_unlock(&per_cpu(schedule_data, cpu).schedule_lock);
     }
 }
 
@@ -40,7 +42,7 @@ static inline void vcpu_schedule_lock(struct vcpu *v)
 
 static inline void vcpu_schedule_unlock(struct vcpu *v)
 {
-    spin_unlock(&schedule_data[v->processor].schedule_lock);
+    spin_unlock(&per_cpu(schedule_data, v->processor).schedule_lock);
 }
 
 #define vcpu_schedule_unlock_irq(v) \

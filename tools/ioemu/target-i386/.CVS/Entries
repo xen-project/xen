@@ -1,13 +1,13 @@
-/cpu.h/1.36/Thu May 25 18:22:39 2006//Trelease_0_8_1
-/exec.h/1.29/Thu May 25 18:22:39 2006//Trelease_0_8_1
-/helper.c/1.65/Thu May 25 18:22:39 2006//Trelease_0_8_1
-/helper2.c/1.41/Thu May 25 18:22:39 2006//Trelease_0_8_1
-/op.c/1.44/Thu May 25 18:22:39 2006//Trelease_0_8_1
-/opreg_template.h/1.3/Wed May 24 10:40:25 2006//Trelease_0_8_1
-/ops_mem.h/1.7/Thu May 25 18:22:39 2006//Trelease_0_8_1
-/ops_sse.h/1.6/Tue Apr 26 20:38:17 2005//Trelease_0_8_1
-/ops_template.h/1.10/Wed May 24 10:40:25 2006//Trelease_0_8_1
-/ops_template_mem.h/1.6/Thu May 25 18:22:39 2006//Trelease_0_8_1
-/translate-copy.c/1.7/Wed May 24 10:40:25 2006//Trelease_0_8_1
-/translate.c/1.56/Thu May 25 18:22:39 2006//Trelease_0_8_1
+/cpu.h/1.36/Wed Jul 26 12:39:11 2006//Trelease_0_8_2
+/exec.h/1.30/Sun Aug  6 01:04:03 2006//Trelease_0_8_2
+/helper.c/1.69/Sun Aug  6 01:04:03 2006//Trelease_0_8_2
+/helper2.c/1.43/Sun Aug  6 01:04:03 2006//Trelease_0_8_2
+/op.c/1.45/Sun Aug  6 01:04:03 2006//Trelease_0_8_2
+/opreg_template.h/1.3/Fri Jul 14 12:43:46 2006//Trelease_0_8_2
+/ops_mem.h/1.7/Fri Jul 14 12:43:46 2006//Trelease_0_8_2
+/ops_sse.h/1.6/Fri Jul 14 12:43:46 2006//Trelease_0_8_2
+/ops_template.h/1.10/Fri Jul 14 12:43:46 2006//Trelease_0_8_2
+/ops_template_mem.h/1.6/Fri Jul 14 12:43:46 2006//Trelease_0_8_2
+/translate-copy.c/1.7/Fri Jul 14 12:43:46 2006//Trelease_0_8_2
+/translate.c/1.59/Sun Aug  6 01:04:03 2006//Trelease_0_8_2
 D

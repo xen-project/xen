@@ -132,6 +132,9 @@ ENTRY(svm_asm_do_launch)
 ENTRY(svm_asm_do_resume)
 svm_test_all_events:
         GET_CURRENT(%ebx)
+        pushl %ebx
+        call svm_do_resume
+        addl $4, %esp
 /*test_all_events:*/
         xorl %ecx,%ecx
         notl %ecx

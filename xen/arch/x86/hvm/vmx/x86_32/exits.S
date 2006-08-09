@@ -94,6 +94,9 @@ vmx_process_softirqs:
         ALIGN
 ENTRY(vmx_asm_do_vmentry)
         GET_CURRENT(%ebx)
+        pushl %ebx
+        call vmx_do_resume
+        addl $4, %esp
         cli                             # tests must not race interrupts
 
         movl VCPU_processor(%ebx),%eax

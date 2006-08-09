@@ -568,6 +568,7 @@ ENTRY(hypercall_table)
         .quad do_xenoprof_op
         .quad do_event_channel_op
         .quad do_physdev_op
+        .quad do_hvm_op
         .rept NR_hypercalls-((.-hypercall_table)/8)
         .quad do_ni_hypercall
         .endr
@@ -607,6 +608,7 @@ ENTRY(hypercall_args_table)
         .byte 2 /* do_xenoprof_op       */
         .byte 2 /* do_event_channel_op  */
         .byte 2 /* do_physdev_op        */
+        .byte 2 /* do_hvm_op            */
         .rept NR_hypercalls-(.-hypercall_args_table)
         .byte 0 /* do_ni_hypercall      */
         .endr

@@ -147,6 +147,8 @@ ENTRY(svm_asm_do_launch)
 ENTRY(svm_asm_do_resume)
 svm_test_all_events:
 	GET_CURRENT(%rbx)
+        movq %rbx, %rdi
+        call svm_do_resume
 /*test_all_events:*/
         cli                             # tests must not race interrupts
 /*test_softirqs:*/

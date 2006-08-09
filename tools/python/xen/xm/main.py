@@ -1257,6 +1257,16 @@ def main(argv=sys.argv):
             else:
                 print  >>sys.stderr, "Error: %s" % ex.faultString
             sys.exit(1)
+        except xmlrpclib.ProtocolError, ex:
+            if ex.errcode == -1:
+                print  >>sys.stderr, (
+                    "Xend has probably crashed!  Invalid or missing HTTP "
+                    "status code.")
+            else:
+                print  >>sys.stderr, (
+                    "Xend has probably crashed!  ProtocolError(%d, %s)." %
+                    (ex.errcode, ex.errmsg))
+            sys.exit(1)
         except (ValueError, OverflowError):
             err("Invalid argument.")
             usage(argv[1])

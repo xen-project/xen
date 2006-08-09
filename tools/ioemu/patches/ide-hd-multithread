@@ -1,6 +1,7 @@
-diff -r d711aa4fa261 hw/ide.c
---- a/hw/ide.c	Fri Jun 16 10:13:37 2006 +0200
-+++ b/hw/ide.c	Fri Jun 16 10:30:28 2006 +0200
+Index: ioemu/hw/ide.c
+===================================================================
+--- ioemu.orig/hw/ide.c	2006-08-06 02:03:50.520919718 +0100
++++ ioemu/hw/ide.c	2006-08-06 02:23:41.153209614 +0100
 @@ -22,6 +22,7 @@
   * THE SOFTWARE.
   */
@@ -9,7 +10,7 @@ diff -r d711aa4fa261 hw/ide.c
  
  /* debug IDE devices */
  //#define DEBUG_IDE
-@@ -390,6 +391,48 @@ typedef struct PCIIDEState {
+@@ -390,6 +391,48 @@
      int type; /* see IDE_TYPE_xxx */
  } PCIIDEState;
  
@@ -58,7 +59,7 @@ diff -r d711aa4fa261 hw/ide.c
  static void ide_dma_start(IDEState *s, IDEDMAFunc *dma_cb);
  
  static void padstr(char *str, const char *src, int len)
-@@ -695,7 +738,9 @@ static int ide_read_dma_cb(IDEState *s,
+@@ -695,7 +738,9 @@
      }
      if (s->io_buffer_index >= s->io_buffer_size && s->nsector == 0) {
          s->status = READY_STAT | SEEK_STAT;
@@ -68,7 +69,7 @@ diff -r d711aa4fa261 hw/ide.c
  #ifdef DEBUG_IDE_ATAPI
          printf("dma status=0x%x\n", s->status);
  #endif
-@@ -795,7 +840,11 @@ static int ide_write_dma_cb(IDEState *s,
+@@ -795,7 +840,11 @@
                              qemu_get_clock(vm_clock) + (ticks_per_sec / 1000));
                  } else 
  #endif
@@ -80,7 +81,7 @@ diff -r d711aa4fa261 hw/ide.c
                  return 0;
              }
              if (n > MAX_MULT_SECTORS)
-@@ -1046,7 +1095,9 @@ static int ide_atapi_cmd_read_dma_cb(IDE
+@@ -1046,7 +1095,9 @@
      if (s->packet_transfer_size <= 0) {
          s->status = READY_STAT;
          s->nsector = (s->nsector & ~7) | ATAPI_INT_REASON_IO | ATAPI_INT_REASON_CD;
@@ -90,7 +91,7 @@ diff -r d711aa4fa261 hw/ide.c
  #ifdef DEBUG_IDE_ATAPI
          printf("dma status=0x%x\n", s->status);
  #endif
-@@ -2219,9 +2270,30 @@ static void ide_map(PCIDevice *pci_dev, 
+@@ -2103,9 +2154,30 @@
      }
  }
  
@@ -110,18 +111,18 @@ diff -r d711aa4fa261 hw/ide.c
  /* XXX: full callback usage to prepare non blocking I/Os support -
     error handling */
 +#ifdef DMA_MULTI_THREAD
- static void ide_dma_loop(BMDMAState *bm)
++static void ide_dma_loop(BMDMAState *bm)
 +{
 +    write(file_pipes[1], &bm, sizeof(bm));
 +}
 +static void dma_thread_loop(BMDMAState *bm)
 +#else  /* DMA_MULTI_THREAD */
-+static void ide_dma_loop(BMDMAState *bm)
+ static void ide_dma_loop(BMDMAState *bm)
 +#endif /* !DMA_MULTI_THREAD */
  {
      struct {
          uint32_t addr;
-@@ -2257,10 +2329,7 @@ static void ide_dma_loop(BMDMAState *bm)
+@@ -2141,10 +2213,7 @@
      }
      /* end of transfer */
   the_end:
@@ -133,7 +134,7 @@ diff -r d711aa4fa261 hw/ide.c
  }
  
  static void ide_dma_start(IDEState *s, IDEDMAFunc *dma_cb)
-@@ -2486,6 +2555,9 @@ void pci_cmd646_ide_init(PCIBus *bus, Bl
+@@ -2370,6 +2439,9 @@
                cmd646_set_irq, d, 0);
      ide_init2(&d->ide_if[2], hd_table[2], hd_table[3],
                cmd646_set_irq, d, 1);
@@ -143,7 +144,7 @@ diff -r d711aa4fa261 hw/ide.c
  }
  
  /* hd_table must contain 4 block drivers */
-@@ -2521,6 +2593,9 @@ void pci_piix3_ide_init(PCIBus *bus, Blo
+@@ -2405,6 +2477,9 @@
                pic_set_irq_new, isa_pic, 15);
      ide_init_ioport(&d->ide_if[0], 0x1f0, 0x3f6);
      ide_init_ioport(&d->ide_if[2], 0x170, 0x376);

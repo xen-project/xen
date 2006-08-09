@@ -1,7 +1,7 @@
 Index: ioemu/hw/cirrus_vga.c
 ===================================================================
---- ioemu.orig/hw/cirrus_vga.c	2006-07-27 11:16:53.059986783 +0100
-+++ ioemu/hw/cirrus_vga.c	2006-07-27 11:16:59.923227020 +0100
+--- ioemu.orig/hw/cirrus_vga.c	2006-08-06 01:55:02.822674718 +0100
++++ ioemu/hw/cirrus_vga.c	2006-08-06 02:23:29.822472686 +0100
 @@ -28,6 +28,9 @@
   */
  #include "vl.h"
@@ -176,9 +176,9 @@ Index: ioemu/hw/cirrus_vga.c
  }
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2006-07-27 11:16:59.759245173 +0100
-+++ ioemu/hw/pc.c	2006-07-27 11:16:59.924226909 +0100
-@@ -783,14 +783,14 @@
+--- ioemu.orig/hw/pc.c	2006-08-06 02:23:07.875919141 +0100
++++ ioemu/hw/pc.c	2006-08-06 02:23:29.823472575 +0100
+@@ -790,14 +790,14 @@
      if (cirrus_vga_enabled) {
          if (pci_enabled) {
              pci_cirrus_vga_init(pci_bus, 
@@ -198,9 +198,9 @@ Index: ioemu/hw/pc.c
  
 Index: ioemu/hw/vga.c
 ===================================================================
---- ioemu.orig/hw/vga.c	2006-07-27 11:16:59.103317784 +0100
-+++ ioemu/hw/vga.c	2006-07-27 11:16:59.925226798 +0100
-@@ -1799,6 +1799,7 @@
+--- ioemu.orig/hw/vga.c	2006-08-06 02:22:46.606290142 +0100
++++ ioemu/hw/vga.c	2006-08-06 02:23:29.824472464 +0100
+@@ -1858,6 +1858,7 @@
      /* TODO: add vbe support if enabled */
  }
  
@@ -208,7 +208,7 @@ Index: ioemu/hw/vga.c
  void vga_common_init(VGAState *s, DisplayState *ds, uint8_t *vga_ram_base, 
                       unsigned long vga_ram_offset, int vga_ram_size)
  {
-@@ -1829,7 +1830,7 @@
+@@ -1888,7 +1889,7 @@
  
      vga_reset(s);
  
@@ -217,7 +217,7 @@ Index: ioemu/hw/vga.c
      s->vram_offset = vga_ram_offset;
      s->vram_size = vga_ram_size;
      s->ds = ds;
-@@ -1943,6 +1944,31 @@
+@@ -2002,6 +2003,31 @@
      return 0;
  }
  
@@ -251,9 +251,9 @@ Index: ioemu/hw/vga.c
  
 Index: ioemu/hw/vga_int.h
 ===================================================================
---- ioemu.orig/hw/vga_int.h	2006-07-27 11:16:57.447501084 +0100
-+++ ioemu/hw/vga_int.h	2006-07-27 11:16:59.925226798 +0100
-@@ -166,5 +166,6 @@
+--- ioemu.orig/hw/vga_int.h	2006-08-06 02:14:09.797902638 +0100
++++ ioemu/hw/vga_int.h	2006-08-06 02:23:29.824472464 +0100
+@@ -169,5 +169,6 @@
                               unsigned int color0, unsigned int color1,
                               unsigned int color_xor);
  
@@ -262,9 +262,9 @@ Index: ioemu/hw/vga_int.h
  extern const uint8_t gr_mask[16];
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-27 11:16:59.762244841 +0100
-+++ ioemu/vl.c	2006-07-27 11:16:59.928226466 +0100
-@@ -5149,6 +5149,78 @@
+--- ioemu.orig/vl.c	2006-08-06 02:23:07.878918807 +0100
++++ ioemu/vl.c	2006-08-06 02:23:29.827472129 +0100
+@@ -5693,6 +5693,78 @@
  
  #define MAX_NET_CLIENTS 32
  
@@ -345,9 +345,9 @@ Index: ioemu/vl.c
  #ifdef CONFIG_GDBSTUB
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-07-27 11:16:59.549268417 +0100
-+++ ioemu/vl.h	2006-07-27 11:16:59.929226356 +0100
-@@ -136,6 +136,13 @@
+--- ioemu.orig/vl.h	2006-08-06 02:23:02.271543880 +0100
++++ ioemu/vl.h	2006-08-06 02:23:29.828472018 +0100
+@@ -144,6 +144,13 @@
  
  void main_loop_wait(int timeout);
  

@@ -1,8 +1,8 @@
 Index: ioemu/vnc.c
 ===================================================================
---- ioemu.orig/vnc.c	2006-07-27 11:16:52.783017443 +0100
-+++ ioemu/vnc.c	2006-07-27 11:17:00.722138579 +0100
-@@ -83,13 +83,16 @@
+--- ioemu.orig/vnc.c	2006-08-07 17:42:21.888055419 +0100
++++ ioemu/vnc.c	2006-08-07 17:42:28.001363557 +0100
+@@ -143,13 +143,16 @@
  static void vnc_dpy_update(DisplayState *ds, int x, int y, int w, int h)
  {
      VncState *vs = ds->opaque;
@@ -17,12 +17,12 @@ Index: ioemu/vnc.c
  
      for (; y < h; y++)
 -	for (i = 0; i < w; i += 16)
--	    vs->dirty_row[y] |= (1ULL << ((x + i) / 16));
+-	    vnc_set_bit(vs->dirty_row[y], (x + i) / 16);
 +	vs->dirty_row[y] |= mask;
  }
  
  static void vnc_framebuffer_update(VncState *vs, int x, int y, int w, int h,
-@@ -262,6 +265,7 @@
+@@ -373,6 +376,7 @@
  static void vnc_update_client(void *opaque)
  {
      VncState *vs = opaque;
@@ -30,16 +30,16 @@ Index: ioemu/vnc.c
  
      if (vs->need_update && vs->csock != -1) {
  	int y;
-@@ -282,7 +286,7 @@
+@@ -390,7 +394,7 @@
  	row = vs->ds->data;
  	old_row = vs->old_data;
  
 -	for (y = 0; y < vs->height; y++) {
 +	for (y = 0; y < vs->ds->height; y++) {
- 	    if (vs->dirty_row[y] & width_mask) {
+ 	    if (vnc_and_bits(vs->dirty_row[y], width_mask, VNC_DIRTY_WORDS)) {
  		int x;
  		char *ptr, *old_ptr;
-@@ -307,10 +311,8 @@
+@@ -415,10 +419,8 @@
  	    old_row += vs->ds->linesize;
  	}
  
@@ -52,7 +52,7 @@ Index: ioemu/vnc.c
  
  	/* Count rectangles */
  	n_rectangles = 0;
-@@ -348,7 +350,9 @@
+@@ -456,7 +458,9 @@
  	vnc_flush(vs);
  
      }
@@ -65,9 +65,9 @@ Index: ioemu/vnc.c
  static void vnc_timer_init(VncState *vs)
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-27 11:17:00.311184072 +0100
-+++ ioemu/vl.c	2006-07-27 11:17:00.724138358 +0100
-@@ -4587,10 +4587,10 @@
+--- ioemu.orig/vl.c	2006-08-07 17:42:27.807385506 +0100
++++ ioemu/vl.c	2006-08-07 17:42:28.004363230 +0100
+@@ -5120,10 +5120,10 @@
          /* XXX: better handling of removal */
          for(ioh = first_io_handler; ioh != NULL; ioh = ioh_next) {
              ioh_next = ioh->next;

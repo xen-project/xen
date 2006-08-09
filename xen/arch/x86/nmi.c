@@ -36,8 +36,8 @@ unsigned int nmi_watchdog = NMI_NONE;
 static unsigned int nmi_hz = HZ;
 static unsigned int nmi_perfctr_msr;	/* the MSR to reset in NMI handler */
 static unsigned int nmi_p4_cccr_val;
-static struct timer nmi_timer[NR_CPUS];
-static unsigned int nmi_timer_ticks[NR_CPUS];
+static DEFINE_PER_CPU(struct timer, nmi_timer);
+static DEFINE_PER_CPU(unsigned int, nmi_timer_ticks);
 
 /*
  * lapic_nmi_owner tracks the ownership of the lapic NMI hardware:
@@ -132,9 +132,8 @@ int __init check_nmi_watchdog (void)
 
 static void nmi_timer_fn(void *unused)
 {
-    int cpu = smp_processor_id();
-    nmi_timer_ticks[cpu]++;
-    set_timer(&nmi_timer[cpu], NOW() + MILLISECS(1000));
+    this_cpu(nmi_timer_ticks)++;
+    set_timer(&this_cpu(nmi_timer), NOW() + MILLISECS(1000));
 }
 
 static void disable_lapic_nmi_watchdog(void)
@@ -340,9 +339,8 @@ void __pminit setup_apic_nmi_watchdog(void)
     nmi_active = 1;
 }
 
-static unsigned int
-last_irq_sums [NR_CPUS],
-    alert_counter [NR_CPUS];
+static DEFINE_PER_CPU(unsigned int, last_irq_sums);
+static DEFINE_PER_CPU(unsigned int, alert_counter);
 
 static atomic_t watchdog_disable_count = ATOMIC_INIT(1);
 
@@ -366,35 +364,35 @@ void watchdog_enable(void)
      */
     for_each_online_cpu ( cpu )
     {
-        init_timer(&nmi_timer[cpu], nmi_timer_fn, NULL, cpu);
-        set_timer(&nmi_timer[cpu], NOW());
+        init_timer(&per_cpu(nmi_timer, cpu), nmi_timer_fn, NULL, cpu);
+        set_timer(&per_cpu(nmi_timer, cpu), NOW());
     }
 }
 
 void nmi_watchdog_tick(struct cpu_user_regs * regs)
 {
-    int sum, cpu = smp_processor_id();
+    unsigned int sum = this_cpu(nmi_timer_ticks);
 
-    sum = nmi_timer_ticks[cpu];
-
-    if ( (last_irq_sums[cpu] == sum) && !atomic_read(&watchdog_disable_count) )
+    if ( (this_cpu(last_irq_sums) == sum) &&
+         !atomic_read(&watchdog_disable_count) )
     {
         /*
          * Ayiee, looks like this CPU is stuck ... wait a few IRQs (5 seconds) 
          * before doing the oops ...
          */
-        alert_counter[cpu]++;
-        if ( alert_counter[cpu] == 5*nmi_hz )
+        this_cpu(alert_counter)++;
+        if ( this_cpu(alert_counter) == 5*nmi_hz )
         {
             console_force_unlock();
-            printk("Watchdog timer detects that CPU%d is stuck!\n", cpu);
+            printk("Watchdog timer detects that CPU%d is stuck!\n",
+                   smp_processor_id());
             fatal_trap(TRAP_nmi, regs);
         }
     } 
     else 
     {
-        last_irq_sums[cpu] = sum;
-        alert_counter[cpu] = 0;
+        this_cpu(last_irq_sums) = sum;
+        this_cpu(alert_counter) = 0;
     }
 
     if ( nmi_perfctr_msr )

@@ -139,20 +139,21 @@ static int mod_l2_entry(l2_pgentry_t *, l2_pgentry_t, unsigned long,
 static int mod_l1_entry(l1_pgentry_t *, l1_pgentry_t);
 
 /* Used to defer flushing of memory structures. */
-static struct {
+struct percpu_mm_info {
 #define DOP_FLUSH_TLB      (1<<0) /* Flush the local TLB.                    */
 #define DOP_FLUSH_ALL_TLBS (1<<1) /* Flush TLBs of all VCPUs of current dom. */
 #define DOP_RELOAD_LDT     (1<<2) /* Reload the LDT shadow mapping.          */
     unsigned int   deferred_ops;
     /* If non-NULL, specifies a foreign subject domain for some operations. */
     struct domain *foreign;
-} __cacheline_aligned percpu_info[NR_CPUS];
+};
+static DEFINE_PER_CPU(struct percpu_mm_info, percpu_mm_info);
 
 /*
  * Returns the current foreign domain; defaults to the currently-executing
  * domain if a foreign override hasn't been specified.
  */
-#define FOREIGNDOM (percpu_info[smp_processor_id()].foreign ?: current->domain)
+#define FOREIGNDOM (this_cpu(percpu_mm_info).foreign ?: current->domain)
 
 /* Private domain structs for DOMID_XEN and DOMID_IO. */
 static struct domain *dom_xen, *dom_io;
@@ -189,8 +190,6 @@ void arch_init_memory(void)
     extern void subarch_init_memory(void);
 
     unsigned long i, pfn, rstart_pfn, rend_pfn;
-
-    memset(percpu_info, 0, sizeof(percpu_info));
 
     /*
      * Initialise our DOMID_XEN domain.
@@ -378,7 +377,8 @@ void invalidate_shadow_ldt(struct vcpu *v)
     }
 
     /* Dispose of the (now possibly invalid) mappings from the TLB.  */
-    percpu_info[v->processor].deferred_ops |= DOP_FLUSH_TLB | DOP_RELOAD_LDT;
+    ASSERT(v->processor == smp_processor_id());
+    this_cpu(percpu_mm_info).deferred_ops |= DOP_FLUSH_TLB | DOP_RELOAD_LDT;
 }
 
 
@@ -1503,7 +1503,7 @@ void free_page_type(struct page_info *page, unsigned long type)
          * (e.g., update_va_mapping()) or we could end up modifying a page
          * that is no longer a page table (and hence screw up ref counts).
          */
-        percpu_info[smp_processor_id()].deferred_ops |= DOP_FLUSH_ALL_TLBS;
+        this_cpu(percpu_mm_info).deferred_ops |= DOP_FLUSH_ALL_TLBS;
 
         if ( unlikely(shadow_mode_enabled(owner)) )
         {
@@ -1781,7 +1781,8 @@ int new_guest_cr3(unsigned long mfn)
                 /* Failure here is unrecoverable: the VCPU has no pagetable! */
                 MEM_LOG("Fatal error while installing new baseptr %lx", mfn);
                 domain_crash(d);
-                percpu_info[v->processor].deferred_ops = 0;
+                ASSERT(v->processor == smp_processor_id());
+                this_cpu(percpu_mm_info).deferred_ops = 0;
                 return 0;
             }
         }
@@ -1817,13 +1818,14 @@ int new_guest_cr3(unsigned long mfn)
     return 1;
 }
 
-static void process_deferred_ops(unsigned int cpu)
+static void process_deferred_ops(void)
 {
     unsigned int deferred_ops;
     struct domain *d = current->domain;
+    struct percpu_mm_info *info = &this_cpu(percpu_mm_info);
 
-    deferred_ops = percpu_info[cpu].deferred_ops;
-    percpu_info[cpu].deferred_ops = 0;
+    deferred_ops = info->deferred_ops;
+    info->deferred_ops = 0;
 
     if ( deferred_ops & (DOP_FLUSH_ALL_TLBS|DOP_FLUSH_TLB) )
     {
@@ -1838,19 +1840,20 @@ static void process_deferred_ops(unsigned int cpu)
     if ( deferred_ops & DOP_RELOAD_LDT )
         (void)map_ldt_shadow_page(0);
 
-    if ( unlikely(percpu_info[cpu].foreign != NULL) )
+    if ( unlikely(info->foreign != NULL) )
     {
-        put_domain(percpu_info[cpu].foreign);
-        percpu_info[cpu].foreign = NULL;
+        put_domain(info->foreign);
+        info->foreign = NULL;
     }
 }
 
-static int set_foreigndom(unsigned int cpu, domid_t domid)
+static int set_foreigndom(domid_t domid)
 {
     struct domain *e, *d = current->domain;
+    struct percpu_mm_info *info = &this_cpu(percpu_mm_info);
     int okay = 1;
 
-    ASSERT(percpu_info[cpu].foreign == NULL);
+    ASSERT(info->foreign == NULL);
 
     if ( likely(domid == DOMID_SELF) )
         goto out;
@@ -1867,7 +1870,7 @@ static int set_foreigndom(unsigned int cpu, domid_t domid)
         {
         case DOMID_IO:
             get_knownalive_domain(dom_io);
-            percpu_info[cpu].foreign = dom_io;
+            info->foreign = dom_io;
             break;
         default:
             MEM_LOG("Dom %u cannot set foreign dom", d->domain_id);
@@ -1877,18 +1880,18 @@ static int set_foreigndom(unsigned int cpu, domid_t domid)
     }
     else
     {
-        percpu_info[cpu].foreign = e = find_domain_by_id(domid);
+        info->foreign = e = find_domain_by_id(domid);
         if ( e == NULL )
         {
             switch ( domid )
             {
             case DOMID_XEN:
                 get_knownalive_domain(dom_xen);
-                percpu_info[cpu].foreign = dom_xen;
+                info->foreign = dom_xen;
                 break;
             case DOMID_IO:
                 get_knownalive_domain(dom_io);
-                percpu_info[cpu].foreign = dom_io;
+                info->foreign = dom_io;
                 break;
             default:
                 MEM_LOG("Unknown domain '%u'", domid);
@@ -1928,7 +1931,7 @@ int do_mmuext_op(
     unsigned int foreigndom)
 {
     struct mmuext_op op;
-    int rc = 0, i = 0, okay, cpu = smp_processor_id();
+    int rc = 0, i = 0, okay;
     unsigned long mfn, type;
     unsigned int done = 0;
     struct page_info *page;
@@ -1946,7 +1949,7 @@ int do_mmuext_op(
             (void)copy_from_guest(&done, pdone, 1);
     }
 
-    if ( !set_foreigndom(cpu, foreigndom) )
+    if ( !set_foreigndom(foreigndom) )
     {
         rc = -ESRCH;
         goto out;
@@ -2042,7 +2045,7 @@ int do_mmuext_op(
         case MMUEXT_NEW_BASEPTR:
             mfn = gmfn_to_mfn(current->domain, mfn);
             okay = new_guest_cr3(mfn);
-            percpu_info[cpu].deferred_ops &= ~DOP_FLUSH_TLB;
+            this_cpu(percpu_mm_info).deferred_ops &= ~DOP_FLUSH_TLB;
             break;
         
 #ifdef __x86_64__
@@ -2065,7 +2068,7 @@ int do_mmuext_op(
 #endif
         
         case MMUEXT_TLB_FLUSH_LOCAL:
-            percpu_info[cpu].deferred_ops |= DOP_FLUSH_TLB;
+            this_cpu(percpu_mm_info).deferred_ops |= DOP_FLUSH_TLB;
             break;
     
         case MMUEXT_INVLPG_LOCAL:
@@ -2137,9 +2140,9 @@ int do_mmuext_op(
                 v->arch.guest_context.ldt_base = ptr;
                 v->arch.guest_context.ldt_ents = ents;
                 load_LDT(v);
-                percpu_info[cpu].deferred_ops &= ~DOP_RELOAD_LDT;
+                this_cpu(percpu_mm_info).deferred_ops &= ~DOP_RELOAD_LDT;
                 if ( ents != 0 )
-                    percpu_info[cpu].deferred_ops |= DOP_RELOAD_LDT;
+                    this_cpu(percpu_mm_info).deferred_ops |= DOP_RELOAD_LDT;
             }
             break;
         }
@@ -2160,7 +2163,7 @@ int do_mmuext_op(
     }
 
  out:
-    process_deferred_ops(cpu);
+    process_deferred_ops();
 
     /* Add incremental work we have done to the @done output parameter. */
     done += i;
@@ -2181,7 +2184,7 @@ int do_mmu_update(
     void *va;
     unsigned long gpfn, gmfn, mfn;
     struct page_info *page;
-    int rc = 0, okay = 1, i = 0, cpu = smp_processor_id();
+    int rc = 0, okay = 1, i = 0;
     unsigned int cmd, done = 0;
     struct vcpu *v = current;
     struct domain *d = v->domain;
@@ -2205,7 +2208,7 @@ int do_mmu_update(
     domain_mmap_cache_init(&mapcache);
     domain_mmap_cache_init(&sh_mapcache);
 
-    if ( !set_foreigndom(cpu, foreigndom) )
+    if ( !set_foreigndom(foreigndom) )
     {
         rc = -ESRCH;
         goto out;
@@ -2396,7 +2399,7 @@ int do_mmu_update(
     domain_mmap_cache_destroy(&mapcache);
     domain_mmap_cache_destroy(&sh_mapcache);
 
-    process_deferred_ops(cpu);
+    process_deferred_ops();
 
     /* Add incremental work we have done to the @done output parameter. */
     done += i;
@@ -2690,7 +2693,6 @@ int do_update_va_mapping(unsigned long va, u64 val64,
     l1_pgentry_t   val = l1e_from_intpte(val64);
     struct vcpu   *v   = current;
     struct domain *d   = v->domain;
-    unsigned int   cpu = smp_processor_id();
     unsigned long  vmask, bmap_ptr;
     cpumask_t      pmask;
     int            rc  = 0;
@@ -2713,9 +2715,10 @@ int do_update_va_mapping(unsigned long va, u64 val64,
 
     if ( likely(rc == 0) && unlikely(shadow_mode_enabled(d)) )
     {
-        if ( unlikely(percpu_info[cpu].foreign &&
+        if ( unlikely(this_cpu(percpu_mm_info).foreign &&
                       (shadow_mode_translate(d) ||
-                       shadow_mode_translate(percpu_info[cpu].foreign))) )
+                       shadow_mode_translate(
+                           this_cpu(percpu_mm_info).foreign))) )
         {
             /*
              * The foreign domain's pfn's are in a different namespace. There's
@@ -2773,7 +2776,7 @@ int do_update_va_mapping(unsigned long va, u64 val64,
         break;
     }
 
-    process_deferred_ops(cpu);
+    process_deferred_ops();
     
     UNLOCK_BIGLOCK(d);
 
@@ -2784,13 +2787,12 @@ int do_update_va_mapping_otherdomain(unsigned long va, u64 val64,
                                      unsigned long flags,
                                      domid_t domid)
 {
-    unsigned int cpu = smp_processor_id();
     int rc;
 
     if ( unlikely(!IS_PRIV(current->domain)) )
         return -EPERM;
 
-    if ( !set_foreigndom(cpu, domid) )
+    if ( !set_foreigndom(domid) )
         return -ESRCH;
 
     rc = do_update_va_mapping(va, val64, flags);
@@ -2976,13 +2978,20 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
     case XENMEM_add_to_physmap:
     {
         struct xen_add_to_physmap xatp;
-        unsigned long mfn = 0, gpfn;
+        unsigned long prev_mfn, mfn = 0, gpfn;
         struct domain *d;
 
         if ( copy_from_guest(&xatp, arg, 1) )
             return -EFAULT;
 
-        if ( (d = find_domain_by_id(xatp.domid)) == NULL )
+        if ( xatp.domid == DOMID_SELF )
+        {
+            d = current->domain;
+            get_knownalive_domain(d);
+        }
+        else if ( !IS_PRIV(current->domain) )
+            return -EPERM;
+        else if ( (d = find_domain_by_id(xatp.domid)) == NULL )
             return -ESRCH;
 
         switch ( xatp.space )
@@ -3008,8 +3017,16 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         LOCK_BIGLOCK(d);
 
         /* Remove previously mapped page if it was present. */
-        if ( mfn_valid(gmfn_to_mfn(d, xatp.gpfn)) )
-            guest_remove_page(d, xatp.gpfn);
+        prev_mfn = gmfn_to_mfn(d, xatp.gpfn);
+        if ( mfn_valid(prev_mfn) )
+        {
+            if ( IS_XEN_HEAP_FRAME(mfn_to_page(prev_mfn)) )
+                /* Xen heap frames are simply unhooked from this phys slot. */
+                guest_physmap_remove_page(d, xatp.gpfn, prev_mfn);
+            else
+                /* Normal domain memory is freed, to avoid leaking memory. */
+                guest_remove_page(d, xatp.gpfn);
+        }
 
         /* Unmap from old location, if any. */
         gpfn = get_gpfn_from_mfn(mfn);

@@ -60,7 +60,8 @@ struct bvt_cpu_info
 
 #define BVT_INFO(p)   ((struct bvt_dom_info *)(p)->sched_priv)
 #define EBVT_INFO(p)  ((struct bvt_vcpu_info *)(p)->sched_priv)
-#define CPU_INFO(cpu) ((struct bvt_cpu_info *)(schedule_data[cpu]).sched_priv)
+#define CPU_INFO(cpu) \
+    ((struct bvt_cpu_info *)(per_cpu(schedule_data, cpu).sched_priv))
 #define RUNLIST(p)    ((struct list_head *)&(EBVT_INFO(p)->run_list))
 #define RUNQUEUE(cpu) ((struct list_head *)&(CPU_INFO(cpu)->runqueue))
 #define CPU_SVT(cpu)  (CPU_INFO(cpu)->svt)
@@ -203,7 +204,8 @@ static int bvt_init_vcpu(struct vcpu *v)
     /* Allocate per-CPU context if this is the first domain to be added. */
     if ( CPU_INFO(v->processor) == NULL )
     {
-        schedule_data[v->processor].sched_priv = xmalloc(struct bvt_cpu_info);
+        per_cpu(schedule_data, v->processor).sched_priv =
+            xmalloc(struct bvt_cpu_info);
         BUG_ON(CPU_INFO(v->processor) == NULL);
         INIT_LIST_HEAD(RUNQUEUE(v->processor));
         CPU_SVT(v->processor) = 0;
@@ -251,7 +253,7 @@ static void bvt_wake(struct vcpu *v)
     /* Deal with warping here. */
     einf->evt = calc_evt(v, einf->avt);
     
-    curr = schedule_data[cpu].curr;
+    curr = per_cpu(schedule_data, cpu).curr;
     curr_evt = calc_evt(curr, calc_avt(curr, now));
     /* Calculate the time the current domain would run assuming
        the second smallest evt is of the newly woken domain */
@@ -261,14 +263,14 @@ static void bvt_wake(struct vcpu *v)
 
     if ( is_idle_vcpu(curr) || (einf->evt <= curr_evt) )
         cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
-    else if ( schedule_data[cpu].s_timer.expires > r_time )
-        set_timer(&schedule_data[cpu].s_timer, r_time);
+    else if ( per_cpu(schedule_data, cpu).s_timer.expires > r_time )
+        set_timer(&per_cpu(schedule_data, cpu).s_timer, r_time);
 }
 
 
 static void bvt_sleep(struct vcpu *v)
 {
-    if ( schedule_data[v->processor].curr == v )
+    if ( per_cpu(schedule_data, v->processor).curr == v )
         cpu_raise_softirq(v->processor, SCHEDULE_SOFTIRQ);
     else  if ( __task_on_runqueue(v) )
         __del_from_runqueue(v);
@@ -418,7 +420,7 @@ static struct task_slice bvt_do_schedule(s_time_t now)
      * *and* the task the second lowest evt.
      * this code is O(n) but we expect n to be small.
      */
-    next_einf       = EBVT_INFO(schedule_data[cpu].idle);
+    next_einf       = EBVT_INFO(per_cpu(schedule_data, cpu).idle);
     next_prime_einf  = NULL;
 
     next_evt       = ~0U;

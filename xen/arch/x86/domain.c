@@ -797,7 +797,7 @@ void sync_vcpu_execstate(struct vcpu *v)
 unsigned long hypercall_create_continuation(
     unsigned int op, const char *format, ...)
 {
-    struct mc_state *mcs = &mc_state[smp_processor_id()];
+    struct mc_state *mcs = &this_cpu(mc_state);
     struct cpu_user_regs *regs;
     const char *p = format;
     unsigned long arg;

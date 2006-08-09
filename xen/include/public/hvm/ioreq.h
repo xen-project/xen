@@ -27,7 +27,6 @@
 #define STATE_IOREQ_READY       1
 #define STATE_IOREQ_INPROCESS   2
 #define STATE_IORESP_READY      3
-#define STATE_IORESP_HOOK       4
 
 #define IOREQ_TYPE_PIO          0 /* pio */
 #define IOREQ_TYPE_COPY         1 /* mmio ops */
@@ -70,7 +69,6 @@ struct vcpu_iodata {
     struct ioreq         vp_ioreq;
     /* Event channel port */
     unsigned int    vp_eport;   /* VMX vcpu uses this to notify DM */
-    unsigned int    dm_eport;   /* DM uses this to notify VMX vcpu */
 };
 typedef struct vcpu_iodata vcpu_iodata_t;
 
@@ -79,6 +77,14 @@ struct shared_iopage {
     struct vcpu_iodata   vcpu_iodata[1];
 };
 typedef struct shared_iopage shared_iopage_t;
+
+#define IOREQ_BUFFER_SLOT_NUM     80
+struct buffered_iopage {
+    unsigned long   read_pointer;
+    unsigned long   write_pointer;
+    ioreq_t         ioreq[IOREQ_BUFFER_SLOT_NUM];
+};            /* sizeof this structure must be in one page */
+typedef struct buffered_iopage buffered_iopage_t;
 
 #endif /* _IOREQ_H_ */
 

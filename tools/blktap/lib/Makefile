@@ -35,10 +35,14 @@ IBINS   :=
 
 LIB      = libblktap.a libblktap.so.$(MAJOR).$(MINOR)
 
+.PHONY: all
 all: build
 
-build:
-	$(MAKE) libblktap
+.PHONY: build
+build: libblktap.a
+
+.PHONY: libblktap
+libblktap: libblktap.a
 
 install: all
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/$(LIBDIR)
@@ -51,13 +55,13 @@ install: all
 clean:
 	rm -rf *.a *.so* *.o *.rpm $(LIB) *~ $(DEPS) xen TAGS
 
-libblktap: $(OBJS) 
+libblktap.a: $(OBJS) 
 	$(CC) $(CFLAGS) -Wl,-soname -Wl,$(SONAME) -shared         \
 	      -L$(XEN_XENSTORE) -l xenstore                       \
 	      -o libblktap.so.$(MAJOR).$(MINOR) $^ $(LIBS)
 	ln -sf libblktap.so.$(MAJOR).$(MINOR) libblktap.so.$(MAJOR)
-	ln -sf libblktap.so.$(MAJOR) $@.so
-	ar rc libblktap.a $@.so
+	ln -sf libblktap.so.$(MAJOR) libblktap.so
+	ar rc $@ libblktap.so
 
 .PHONY: TAGS all build clean install libblktap
 

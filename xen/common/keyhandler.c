@@ -4,7 +4,7 @@
 
 #include <asm/regs.h>
 #include <xen/keyhandler.h> 
-#include <xen/reboot.h>
+#include <xen/shutdown.h>
 #include <xen/event.h>
 #include <xen/console.h>
 #include <xen/serial.h>

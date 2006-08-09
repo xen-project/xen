@@ -11,7 +11,6 @@
 #include <xen/init.h>
 #include <xen/irq.h>
 #include <xen/keyhandler.h> 
-#include <xen/reboot.h>
 #include <xen/sched.h>
 #include <xen/serial.h>
 

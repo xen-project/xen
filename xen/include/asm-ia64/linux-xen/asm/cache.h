@@ -32,4 +32,6 @@
 #endif
 #endif
 
+#define __read_mostly
+
 #endif /* _ASM_IA64_CACHE_H */

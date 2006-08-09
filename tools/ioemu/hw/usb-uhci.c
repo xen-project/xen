@@ -327,9 +327,8 @@ static void uhci_attach(USBPort *port1, USBDevice *dev)
             usb_attach(port1, NULL);
         }
         /* set connect status */
-        if (!(port->ctrl & UHCI_PORT_CCS)) {
-            port->ctrl |= UHCI_PORT_CCS | UHCI_PORT_CSC;
-        }
+        port->ctrl |= UHCI_PORT_CCS | UHCI_PORT_CSC;
+
         /* update speed */
         if (dev->speed == USB_SPEED_LOW)
             port->ctrl |= UHCI_PORT_LSDA;
@@ -341,8 +340,9 @@ static void uhci_attach(USBPort *port1, USBDevice *dev)
                            USB_MSG_ATTACH, 0, 0, NULL, 0);
     } else {
         /* set connect status */
-        if (!(port->ctrl & UHCI_PORT_CCS)) {
-            port->ctrl |= UHCI_PORT_CCS | UHCI_PORT_CSC;
+        if (port->ctrl & UHCI_PORT_CCS) {
+            port->ctrl &= ~UHCI_PORT_CCS;
+            port->ctrl |= UHCI_PORT_CSC;
         }
         /* disable port */
         if (port->ctrl & UHCI_PORT_EN) {
@@ -638,17 +638,15 @@ static void uhci_map(PCIDevice *pci_dev, int region_num,
     register_ioport_read(addr, 32, 1, uhci_ioport_readb, s);
 }
 
-void usb_uhci_init(PCIBus *bus, USBPort **usb_ports)
+void usb_uhci_init(PCIBus *bus, int devfn)
 {
     UHCIState *s;
     uint8_t *pci_conf;
-    UHCIPort *port;
     int i;
 
     s = (UHCIState *)pci_register_device(bus,
                                         "USB-UHCI", sizeof(UHCIState),
-                                        ((PCIDevice *)piix3_state)->devfn + 2, 
-                                        NULL, NULL);
+                                        devfn, NULL, NULL);
     pci_conf = s->dev.config;
     pci_conf[0x00] = 0x86;
     pci_conf[0x01] = 0x80;
@@ -663,11 +661,7 @@ void usb_uhci_init(PCIBus *bus, USBPort **usb_ports)
     pci_conf[0x60] = 0x10; // release number
     
     for(i = 0; i < NB_PORTS; i++) {
-        port = &s->ports[i];
-        port->port.opaque = s;
-        port->port.index = i;
-        port->port.attach = uhci_attach;
-        usb_ports[i] = &port->port;
+        qemu_register_usb_port(&s->ports[i].port, s, i, uhci_attach);
     }
     s->frame_timer = qemu_new_timer(vm_clock, uhci_frame_timer, s);
 

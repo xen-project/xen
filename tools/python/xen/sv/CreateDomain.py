@@ -180,6 +180,7 @@ class CreateFinish( Sheet ):
         vals.ssidref = -1
         vals.bootloader = None
         vals.usb = []
+        vals.acpi = []
         
         #setup vifs
         

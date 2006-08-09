@@ -416,13 +416,14 @@ void start_kernel(void)
 	(xenheap_phys_end-__pa(heap_start)) >> 20,
 	(xenheap_phys_end-__pa(heap_start)) >> 10);
 
+    late_setup_arch(&cmdline);
+
     scheduler_init();
     idle_vcpu[0] = (struct vcpu*) ia64_r13;
     idle_domain = domain_create(IDLE_DOMAIN_ID);
     if ( (idle_domain == NULL) || (alloc_vcpu(idle_domain, 0, 0) == NULL) )
         BUG();
 
-    late_setup_arch(&cmdline);
     alloc_dom_xen_and_dom_io();
     setup_per_cpu_areas();
     mem_init();

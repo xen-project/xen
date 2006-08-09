@@ -1,7 +1,7 @@
 #
 # GrubConf.py - Simple grub.conf parsing
 #
-# Copyright 2005 Red Hat, Inc.
+# Copyright 2005-2006 Red Hat, Inc.
 # Jeremy Katz <katzj@redhat.com>
 #
 # This software may be freely redistributed under the terms of the GNU
@@ -16,7 +16,6 @@ import os, sys
 import logging
 
 def grub_split(s, maxsplit = -1):
-    """Split a grub option screen separated with either '=' or whitespace."""
     eq = s.find('=')
     if eq == -1:
         return s.split(None, maxsplit)
@@ -31,6 +30,12 @@ def grub_split(s, maxsplit = -1):
         return s.split('=', maxsplit)
     else:
         return s.split(None, maxsplit)
+
+def grub_exact_split(s, num):
+    ret = grub_split(s, num - 1)
+    if len(ret) < num:
+        return ret + [""] * (num - len(ret))
+    return ret
 
 def get_path(s):
     """Returns a tuple of (GrubDiskPart, path) corresponding to string."""
@@ -75,25 +80,39 @@ class GrubDiskPart(object):
 
 class GrubImage(object):
     def __init__(self, lines):
-        self._root = self._initrd = self._kernel = self._args = None
-        for l in lines:
-            (com, arg) = grub_split(l, 1)
-
-            if self.commands.has_key(com):
-                if self.commands[com] is not None:
-                    exec("%s = r\"%s\"" %(self.commands[com], arg.strip()))
-                else:
-                    logging.info("Ignored image directive %s" %(com,))
-            else:
-                logging.warning("Unknown image directive %s" %(com,))
+        self.reset(lines)
 
     def __repr__(self):
         return ("title: %s\n" 
                 "  root: %s\n"
                 "  kernel: %s\n"
                 "  args: %s\n"
-                "  initrd: %s" %(self.title, self.root, self.kernel,
+                "  initrd: %s\n" %(self.title, self.root, self.kernel,
                                    self.args, self.initrd))
+
+    def reset(self, lines):
+        self._root = self._initrd = self._kernel = self._args = None
+        self.title = ""
+        self.lines = []
+        map(self.set_from_line, lines)
+
+    def set_from_line(self, line, replace = None):
+        (com, arg) = grub_exact_split(line, 2)
+
+        if self.commands.has_key(com):
+            if self.commands[com] is not None:
+                exec("%s = r\"%s\"" %(self.commands[com], arg.strip()))
+            else:
+                logging.info("Ignored image directive %s" %(com,))
+        else:
+            logging.warning("Unknown image directive %s" %(com,))
+
+        # now put the line in the list of lines
+        if replace is None:
+            self.lines.append(line)
+        else:
+            self.lines.pop(replace)
+            self.lines.insert(replace, line)
 
     def set_root(self, val):
         self._root = GrubDiskPart(val)
@@ -137,6 +156,7 @@ class GrubConfigFile(object):
         self.filename = fn
         self.images = []
         self.timeout = -1
+        self._default = 0
 
         if fn is not None:
             self.parse()
@@ -164,7 +184,7 @@ class GrubConfigFile(object):
             # new image
             if l.startswith("title"):
                 if len(img) > 0:
-                    self.images.append(GrubImage(img))
+                    self.add_image(GrubImage(img))
                 img = [l]
                 continue
                 
@@ -172,12 +192,7 @@ class GrubConfigFile(object):
                 img.append(l)
                 continue
 
-            try:
-                (com, arg) = grub_split(l, 1)
-            except ValueError:
-                com = l
-                arg = ""
-
+            (com, arg) = grub_exact_split(l, 2)
             if self.commands.has_key(com):
                 if self.commands[com] is not None:
                     exec("%s = r\"%s\"" %(self.commands[com], arg.strip()))
@@ -187,7 +202,20 @@ class GrubConfigFile(object):
                 logging.warning("Unknown directive %s" %(com,))
                 
         if len(img) > 0:
-            self.images.append(GrubImage(img))
+            self.add_image(GrubImage(img))
+
+    def set(self, line):
+        (com, arg) = grub_exact_split(line, 2)
+        if self.commands.has_key(com):
+            if self.commands[com] is not None:
+                exec("%s = r\"%s\"" %(self.commands[com], arg.strip()))
+            else:
+                logging.info("Ignored directive %s" %(com,))
+        else:
+            logging.warning("Unknown directive %s" %(com,))
+
+    def add_image(self, image):
+        self.images.append(image)
 
     def _get_default(self):
         return self._default

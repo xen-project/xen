@@ -33,6 +33,7 @@
 #include <xen/sched.h>
 #include <asm/current.h>
 #include <public/hvm/ioreq.h>
+#include <public/hvm/params.h>
 
 /* XXX remove this definition after GFW enabled */
 #define VLAPIC_NO_BIOS
@@ -57,7 +58,7 @@ static unsigned int vlapic_lvt_mask[VLAPIC_LVT_NUM] =
 
 int hvm_apic_support(struct domain *d)
 {
-    return d->arch.hvm_domain.apic_enabled;
+    return d->arch.hvm_domain.params[HVM_PARAM_APIC_ENABLED];
 }
 
 int vlapic_find_highest_irr(struct vlapic *vlapic)
@@ -231,7 +232,7 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
               "level trig mode for vector %d\n", vector);
             set_bit(vector, vlapic->regs + APIC_TMR);
         }
-        evtchn_set_pending(v, iopacket_port(v));
+        hvm_prod_vcpu(v);
 
         result = 1;
         break;
@@ -376,7 +377,7 @@ static int vlapic_check_vector(struct vlapic *vlapic,
     return 1;
 }
 
-void vlapic_ipi(struct vlapic *vlapic)
+static void vlapic_ipi(struct vlapic *vlapic)
 {
     uint32_t icr_low = vlapic_get_reg(vlapic, APIC_ICR);
     uint32_t icr_high = vlapic_get_reg(vlapic, APIC_ICR2);

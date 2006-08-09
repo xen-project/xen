@@ -1,0 +1,18 @@
+Index: ioemu/audio/audio.c
+===================================================================
+--- ioemu.orig/audio/audio.c	2006-08-06 02:03:50.013976165 +0100
++++ ioemu/audio/audio.c	2006-08-06 02:42:28.991609008 +0100
+@@ -605,11 +605,11 @@
+     }
+ 
+     if (info->sign) {
+-        memset (buf, len << info->shift, 0x00);
++        memset (buf, 0x00, len << info->shift);
+     }
+     else {
+         if (info->bits == 8) {
+-            memset (buf, len << info->shift, 0x80);
++            memset (buf, 0x80, len << info->shift);
+         }
+         else {
+             int i;

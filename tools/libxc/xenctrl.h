@@ -466,10 +466,15 @@ unsigned long xc_make_page_below_4G(int xc_handle, uint32_t domid,
                                     unsigned long mfn);
 
 typedef dom0_perfc_desc_t xc_perfc_desc_t;
-/* IMPORTANT: The caller is responsible for mlock()'ing the @desc array. */
+typedef dom0_perfc_val_t xc_perfc_val_t;
+/* IMPORTANT: The caller is responsible for mlock()'ing the @desc and @val
+   arrays. */
 int xc_perfc_control(int xc_handle,
                      uint32_t op,
-                     xc_perfc_desc_t *desc);
+                     xc_perfc_desc_t *desc,
+                     xc_perfc_val_t *val,
+                     int *nbr_desc,
+                     int *nbr_val);
 
 /* read/write msr */
 long long xc_msr_read(int xc_handle, int cpu_mask, int msr);

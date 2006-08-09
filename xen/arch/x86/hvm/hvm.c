@@ -28,6 +28,8 @@
 #include <xen/domain.h>
 #include <xen/domain_page.h>
 #include <xen/hypercall.h>
+#include <xen/guest_access.h>
+#include <xen/event.h>
 #include <asm/current.h>
 #include <asm/io.h>
 #include <asm/shadow.h>
@@ -46,6 +48,8 @@
 #include <public/sched.h>
 #include <public/hvm/ioreq.h>
 #include <public/hvm/hvm_info_table.h>
+#include <public/version.h>
+#include <public/memory.h>
 
 int hvm_enabled = 0;
 
@@ -59,6 +63,8 @@ static void hvm_zap_mmio_range(
 {
     unsigned long i, val = INVALID_MFN;
 
+    ASSERT(d == current->domain);
+
     for ( i = 0; i < nr_pfn; i++ )
     {
         if ( pfn + i >= 0xfffff )
@@ -68,25 +74,36 @@ static void hvm_zap_mmio_range(
     }
 }
 
-static void hvm_map_io_shared_page(struct domain *d)
+static void e820_zap_iommu_callback(struct domain *d,
+                                    struct e820entry *e,
+                                    void *ign)
+{
+    if ( e->type == E820_IO )
+        hvm_zap_mmio_range(d, e->addr >> PAGE_SHIFT, e->size >> PAGE_SHIFT);
+}
+
+static void e820_foreach(struct domain *d,
+                         void (*cb)(struct domain *d,
+                                    struct e820entry *e,
+                                    void *data),
+                         void *data)
 {
     int i;
     unsigned char e820_map_nr;
     struct e820entry *e820entry;
     unsigned char *p;
     unsigned long mfn;
-    unsigned long gpfn = 0;
 
-    local_flush_tlb_pge();
-
-    mfn = get_mfn_from_gpfn(E820_MAP_PAGE >> PAGE_SHIFT);
-    if (mfn == INVALID_MFN) {
+    mfn = gmfn_to_mfn(d, E820_MAP_PAGE >> PAGE_SHIFT);
+    if ( mfn == INVALID_MFN )
+    {
         printk("Can not find E820 memory map page for HVM domain.\n");
         domain_crash_synchronous();
     }
 
     p = map_domain_page(mfn);
-    if (p == NULL) {
+    if ( p == NULL )
+    {
         printk("Can not map E820 memory map page for HVM domain.\n");
         domain_crash_synchronous();
     }
@@ -95,93 +112,98 @@ static void hvm_map_io_shared_page(struct domain *d)
     e820entry = (struct e820entry *)(p + E820_MAP_OFFSET);
 
     for ( i = 0; i < e820_map_nr; i++ )
-    {
-        if ( e820entry[i].type == E820_SHARED_PAGE )
-            gpfn = (e820entry[i].addr >> PAGE_SHIFT);
-        if ( e820entry[i].type == E820_IO )
-            hvm_zap_mmio_range(
-                d, 
-                e820entry[i].addr >> PAGE_SHIFT,
-                e820entry[i].size >> PAGE_SHIFT);
-    }
+        cb(d, e820entry + i, data);
 
-    if ( gpfn == 0 ) {
-        printk("Can not get io request shared page"
-               " from E820 memory map for HVM domain.\n");
-        unmap_domain_page(p);
-        domain_crash_synchronous();
-    }
     unmap_domain_page(p);
+}
 
-    /* Initialise shared page */
-    mfn = get_mfn_from_gpfn(gpfn);
-    if (mfn == INVALID_MFN) {
+static void hvm_zap_iommu_pages(struct domain *d)
+{
+    e820_foreach(d, e820_zap_iommu_callback, NULL);
+}
+
+static void e820_map_io_shared_callback(struct domain *d,
+                                        struct e820entry *e,
+                                        void *data)
+{
+    unsigned long *mfn = data;
+    if ( e->type == E820_SHARED_PAGE )
+    {
+        ASSERT(*mfn == INVALID_MFN);
+        *mfn = gmfn_to_mfn(d, e->addr >> PAGE_SHIFT);
+    }
+}
+
+static void e820_map_buffered_io_callback(struct domain *d,
+                                          struct e820entry *e,
+                                          void *data)
+{
+    unsigned long *mfn = data;
+    if ( e->type == E820_BUFFERED_IO ) {
+        ASSERT(*mfn == INVALID_MFN);
+        *mfn = gmfn_to_mfn(d, e->addr >> PAGE_SHIFT);
+    }
+}
+
+void hvm_map_io_shared_pages(struct vcpu *v)
+{
+    unsigned long mfn;
+    void *p;
+    struct domain *d = v->domain;
+
+    if ( d->arch.hvm_domain.shared_page_va ||
+         d->arch.hvm_domain.buffered_io_va )
+        return;
+
+    mfn = INVALID_MFN;
+    e820_foreach(d, e820_map_io_shared_callback, &mfn);
+
+    if ( mfn == INVALID_MFN )
+    {
         printk("Can not find io request shared page for HVM domain.\n");
         domain_crash_synchronous();
     }
 
     p = map_domain_page_global(mfn);
-    if (p == NULL) {
+    if ( p == NULL )
+    {
         printk("Can not map io request shared page for HVM domain.\n");
         domain_crash_synchronous();
     }
+
     d->arch.hvm_domain.shared_page_va = (unsigned long)p;
+
+    mfn = INVALID_MFN;
+    e820_foreach(d, e820_map_buffered_io_callback, &mfn);
+    if ( mfn != INVALID_MFN ) {
+        p = map_domain_page_global(mfn);
+        if ( p )
+            d->arch.hvm_domain.buffered_io_va = (unsigned long)p;
+    }
 }
 
-static int validate_hvm_info(struct hvm_info_table *t)
+void hvm_create_event_channels(struct vcpu *v)
 {
-    char signature[] = "HVM INFO";
-    uint8_t *ptr = (uint8_t *)t;
-    uint8_t sum = 0;
-    int i;
+    vcpu_iodata_t *p;
+    struct vcpu *o;
 
-    /* strncmp(t->signature, "HVM INFO", 8) */
-    for ( i = 0; i < 8; i++ ) {
-        if ( signature[i] != t->signature[i] ) {
-            printk("Bad hvm info signature\n");
-            return 0;
+    if ( v->vcpu_id == 0 ) {
+        /* Ugly: create event channels for every vcpu when vcpu 0
+           starts, so that they're available for ioemu to bind to. */
+        for_each_vcpu(v->domain, o) {
+            p = get_vio(v->domain, o->vcpu_id);
+            o->arch.hvm_vcpu.xen_port = p->vp_eport =
+                alloc_unbound_xen_event_channel(o, 0);
+            DPRINTK("Allocated port %d for hvm.\n", o->arch.hvm_vcpu.xen_port);
         }
     }
-
-    for ( i = 0; i < t->length; i++ )
-        sum += ptr[i];
-
-    return (sum == 0);
 }
 
-static void hvm_get_info(struct domain *d)
+void hvm_release_assist_channel(struct vcpu *v)
 {
-    unsigned char *p;
-    unsigned long mfn;
-    struct hvm_info_table *t;
-
-    mfn = get_mfn_from_gpfn(HVM_INFO_PFN);
-    if ( mfn == INVALID_MFN ) {
-        printk("Can not get info page mfn for HVM domain.\n");
-        domain_crash_synchronous();
-    }
-
-    p = map_domain_page(mfn);
-    if ( p == NULL ) {
-        printk("Can not map info page for HVM domain.\n");
-        domain_crash_synchronous();
-    }
-
-    t = (struct hvm_info_table *)(p + HVM_INFO_OFFSET);
-
-    if ( validate_hvm_info(t) ) {
-        d->arch.hvm_domain.nr_vcpus = t->nr_vcpus;
-        d->arch.hvm_domain.apic_enabled = t->apic_enabled;
-        d->arch.hvm_domain.pae_enabled = t->pae_enabled;
-    } else {
-        printk("Bad hvm info table\n");
-        d->arch.hvm_domain.nr_vcpus = 1;
-        d->arch.hvm_domain.apic_enabled = 0;
-        d->arch.hvm_domain.pae_enabled = 0;
-    }
-
-    unmap_domain_page(p);
+    free_xen_event_channel(v, v->arch.hvm_vcpu.xen_port);
 }
+
 
 void hvm_setup_platform(struct domain* d)
 {
@@ -197,8 +219,7 @@ void hvm_setup_platform(struct domain* d)
         domain_crash_synchronous();
     }
 
-    hvm_map_io_shared_page(d);
-    hvm_get_info(d);
+    hvm_zap_iommu_pages(d);
 
     platform = &d->arch.hvm_domain;
     pic_init(&platform->vpic, pic_irq_request, &platform->interrupt_request);
@@ -210,7 +231,10 @@ void hvm_setup_platform(struct domain* d)
         hvm_vioapic_init(d);
     }
 
-    init_timer(&platform->pl_time.periodic_tm.timer, pt_timer_fn, v, v->processor);
+    spin_lock_init(&d->arch.hvm_domain.buffered_io_lock);
+
+    init_timer(&platform->pl_time.periodic_tm.timer,
+               pt_timer_fn, v, v->processor);
     pit_init(v, cpu_khz);
 }
 
@@ -278,7 +302,7 @@ int cpu_get_interrupt(struct vcpu *v, int *type)
 int
 hvm_copy(void *buf, unsigned long vaddr, int size, int dir)
 {
-    unsigned long gpa, mfn;
+    unsigned long mfn;
     char *addr;
     int count;
 
@@ -287,10 +311,9 @@ hvm_copy(void *buf, unsigned long vaddr, int size, int dir)
         if (count > size)
             count = size;
 
-        if (hvm_paging_enabled(current)) {
-            gpa = gva_to_gpa(vaddr);
-            mfn = get_mfn_from_gpfn(gpa >> PAGE_SHIFT);
-        } else
+        if (hvm_paging_enabled(current))
+            mfn = gva_to_mfn(vaddr);
+        else
             mfn = get_mfn_from_gpfn(vaddr >> PAGE_SHIFT);
         if (mfn == INVALID_MFN)
             return 0;
@@ -330,55 +353,139 @@ void hvm_print_line(struct vcpu *v, const char c)
 	pbuf[(*index)++] = c;
 }
 
-#if defined(__i386__)
-
 typedef unsigned long hvm_hypercall_t(
     unsigned long, unsigned long, unsigned long, unsigned long, unsigned long);
-#define HYPERCALL(x) [ __HYPERVISOR_ ## x ] = (hvm_hypercall_t *) do_ ## x
+
+#define HYPERCALL(x)                                        \
+    [ __HYPERVISOR_ ## x ] = (hvm_hypercall_t *) do_ ## x
+#define HYPERCALL_COMPAT32(x)                               \
+    [ __HYPERVISOR_ ## x ] = (hvm_hypercall_t *) do_ ## x ## _compat32
+
+#if defined(__i386__)
+
 static hvm_hypercall_t *hvm_hypercall_table[] = {
-    HYPERCALL(mmu_update),
     HYPERCALL(memory_op),
     HYPERCALL(multicall),
-    HYPERCALL(update_va_mapping),
-    HYPERCALL(event_channel_op_compat),
     HYPERCALL(xen_version),
-    HYPERCALL(grant_table_op),
-    HYPERCALL(event_channel_op)
-    /*HYPERCALL(hvm_op)*/
+    HYPERCALL(event_channel_op),
+    HYPERCALL(hvm_op)
 };
-#undef HYPERCALL
 
 void hvm_do_hypercall(struct cpu_user_regs *pregs)
 {
-    if ( ring_3(pregs) )
+    if ( unlikely(ring_3(pregs)) )
     {
         pregs->eax = -EPERM;
         return;
     }
 
-    if ( pregs->eax > ARRAY_SIZE(hvm_hypercall_table) ||
-         !hvm_hypercall_table[pregs->eax] )
+    if ( (pregs->eax >= NR_hypercalls) || !hvm_hypercall_table[pregs->eax] )
     {
         DPRINTK("HVM vcpu %d:%d did a bad hypercall %d.\n",
                 current->domain->domain_id, current->vcpu_id,
                 pregs->eax);
         pregs->eax = -ENOSYS;
+        return;
     }
-    else
-    {
-        pregs->eax = hvm_hypercall_table[pregs->eax](
-            pregs->ebx, pregs->ecx, pregs->edx, pregs->esi, pregs->edi);
-    }
+
+    pregs->eax = hvm_hypercall_table[pregs->eax](
+        pregs->ebx, pregs->ecx, pregs->edx, pregs->esi, pregs->edi);
 }
 
-#else /* __x86_64__ */
+#else /* defined(__x86_64__) */
+
+static long do_memory_op_compat32(int cmd, XEN_GUEST_HANDLE(void) arg)
+{
+    extern long do_add_to_physmap(struct xen_add_to_physmap *xatp);
+    long rc;
+
+    switch ( cmd )
+    {
+    case XENMEM_add_to_physmap:
+    {
+        struct {
+            domid_t domid;
+            uint32_t space;
+            uint32_t idx;
+            uint32_t gpfn;
+        } u;
+        struct xen_add_to_physmap h;
+
+        if ( copy_from_guest(&u, arg, 1) )
+            return -EFAULT;
+
+        h.domid = u.domid;
+        h.space = u.space;
+        h.idx = u.idx;
+        h.gpfn = u.gpfn;
+
+        this_cpu(guest_handles_in_xen_space) = 1;
+        rc = do_memory_op(cmd, guest_handle_from_ptr(&h, void));
+        this_cpu(guest_handles_in_xen_space) = 0;
+
+        break;
+    }
+
+    default:
+        DPRINTK("memory_op %d.\n", cmd);
+        rc = -ENOSYS;
+        break;
+    }
+
+    return rc;
+}
+
+static hvm_hypercall_t *hvm_hypercall64_table[NR_hypercalls] = {
+    HYPERCALL(memory_op),
+    HYPERCALL(xen_version),
+    HYPERCALL(hvm_op),
+    HYPERCALL(event_channel_op)
+};
+
+static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
+    HYPERCALL_COMPAT32(memory_op),
+    HYPERCALL(xen_version),
+    HYPERCALL(hvm_op),
+    HYPERCALL(event_channel_op)
+};
 
 void hvm_do_hypercall(struct cpu_user_regs *pregs)
 {
-    printk("not supported yet!\n");
+    if ( unlikely(ring_3(pregs)) )
+    {
+        pregs->rax = -EPERM;
+        return;
+    }
+
+    pregs->rax = (uint32_t)pregs->eax; /* mask in case compat32 caller */
+    if ( (pregs->rax >= NR_hypercalls) || !hvm_hypercall64_table[pregs->rax] )
+    {
+        DPRINTK("HVM vcpu %d:%d did a bad hypercall %ld.\n",
+                current->domain->domain_id, current->vcpu_id,
+                pregs->rax);
+        pregs->rax = -ENOSYS;
+        return;
+    }
+
+    if ( current->domain->arch.ops->guest_paging_levels == PAGING_L4 )
+    {
+        pregs->rax = hvm_hypercall64_table[pregs->rax](pregs->rdi,
+                                                       pregs->rsi,
+                                                       pregs->rdx,
+                                                       pregs->r10,
+                                                       pregs->r8);
+    }
+    else
+    {
+        pregs->eax = hvm_hypercall32_table[pregs->eax]((uint32_t)pregs->ebx,
+                                                       (uint32_t)pregs->ecx,
+                                                       (uint32_t)pregs->edx,
+                                                       (uint32_t)pregs->esi,
+                                                       (uint32_t)pregs->edi);
+    }
 }
 
-#endif
+#endif /* defined(__x86_64__) */
 
 /* Initialise a hypercall transfer page for a VMX domain using
    paravirtualised drivers. */
@@ -431,6 +538,65 @@ int hvm_bringup_ap(int vcpuid, int trampoline_vector)
     }
 
     xfree(ctxt);
+
+    return rc;
+}
+
+long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
+
+{
+    long rc = 0;
+
+    switch ( op )
+    {
+    case HVMOP_set_param:
+    case HVMOP_get_param:
+    {
+        struct xen_hvm_param a;
+        struct domain *d;
+
+        if ( copy_from_guest(&a, arg, 1) )
+            return -EFAULT;
+
+        if ( a.index >= HVM_NR_PARAMS )
+            return -EINVAL;
+
+        if ( a.domid == DOMID_SELF )
+        {
+            get_knownalive_domain(current->domain);
+            d = current->domain;
+        }
+        else if ( IS_PRIV(current->domain) )
+        {
+            d = find_domain_by_id(a.domid);
+            if ( !d )
+                return -ESRCH;
+        }
+        else
+        {
+            return -EPERM;
+        }
+
+        if ( op == HVMOP_set_param )
+        {
+            rc = 0;
+            d->arch.hvm_domain.params[a.index] = a.value;
+        }
+        else
+        {
+            rc = d->arch.hvm_domain.params[a.index];
+        }
+
+        put_domain(d);
+        return rc;
+    }
+
+    default:
+    {
+        DPRINTK("Bad HVM op %ld.\n", op);
+        rc = -ENOSYS;
+    }
+    }
 
     return rc;
 }

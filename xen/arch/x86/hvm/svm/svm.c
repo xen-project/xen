@@ -25,6 +25,7 @@
 #include <xen/sched.h>
 #include <xen/irq.h>
 #include <xen/softirq.h>
+#include <xen/hypercall.h>
 #include <asm/current.h>
 #include <asm/io.h>
 #include <asm/shadow.h>
@@ -809,6 +810,9 @@ static void svm_relinquish_guest_resources(struct domain *d)
         unmap_domain_page_global(
             (void *)d->arch.hvm_domain.shared_page_va);
 
+    if ( d->arch.hvm_domain.buffered_io_va )
+        unmap_domain_page_global((void *)d->arch.hvm_domain.buffered_io_va);
+
     shadow_direct_map_clean(d);
 }
 
@@ -997,7 +1001,7 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb, unsigned long input,
 #else
         if ( v->domain->arch.ops->guest_paging_levels == PAGING_L2 )
         {
-            if ( !v->domain->arch.hvm_domain.pae_enabled )
+            if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
                 clear_bit(X86_FEATURE_PAE, &edx);
             clear_bit(X86_FEATURE_PSE, &edx);
             clear_bit(X86_FEATURE_PSE36, &edx);
@@ -1060,7 +1064,7 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb, unsigned long input,
 #else
         if ( v->domain->arch.ops->guest_paging_levels == PAGING_L2 )
         {
-            if ( !v->domain->arch.hvm_domain.pae_enabled )
+            if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
             {
                 clear_bit(X86_FEATURE_NX & 31, &edx);
                 clear_bit(X86_FEATURE_PAE, &edx);
@@ -2121,7 +2125,7 @@ static inline void svm_vmexit_do_hlt(struct vmcb_struct *vmcb)
         next_wakeup = next_pit;
     if ( next_wakeup != - 1 )
         set_timer(&current->arch.hvm_svm.hlt_timer, next_wakeup);
-    hvm_safe_block();
+    do_sched_op_compat(SCHEDOP_block, 0);
 }
 
 

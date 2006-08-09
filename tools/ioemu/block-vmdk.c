@@ -96,7 +96,7 @@ static int vmdk_open(BlockDriverState *bs, const char *filename)
     uint32_t magic;
     int l1_size;
 
-    fd = open(filename, O_RDWR | O_BINARY | O_LARGEFILE);
+    fd = open(filename, O_RDWR | O_BINARY | O_LARGEFILE | O_SYNC);
     if (fd < 0) {
         fd = open(filename, O_RDONLY | O_BINARY | O_LARGEFILE);
         if (fd < 0)
@@ -426,6 +426,12 @@ static void vmdk_close(BlockDriverState *bs)
     close(s->fd);
 }
 
+static void vmdk_flush(BlockDriverState *bs)
+{
+    BDRVVmdkState *s = bs->opaque;
+    fsync(s->fd);
+}
+
 BlockDriver bdrv_vmdk = {
     "vmdk",
     sizeof(BDRVVmdkState),
@@ -435,5 +441,6 @@ BlockDriver bdrv_vmdk = {
     vmdk_write,
     vmdk_close,
     vmdk_create,
+    vmdk_flush,
     vmdk_is_allocated,
 };
