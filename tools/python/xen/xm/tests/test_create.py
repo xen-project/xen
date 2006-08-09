@@ -179,7 +179,8 @@ ne2000=0
 
                  'extra'       : ('VNC_VIEWER=%s:%d ' %
                                   (xen.xm.create.get_host_addr(),
-                                   xen.xm.create.VNC_BASE_PORT + 1)),
+                                   xen.xm.create.VNC_BASE_PORT +
+                                   xen.xm.create.choose_vnc_display())),
                  'vnc'         : 1,
                  'vncviewer'   : 1,
 
