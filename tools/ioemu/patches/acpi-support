@@ -1,7 +1,7 @@
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2006-08-06 02:23:23.000000000 +0100
-+++ ioemu/Makefile.target	2006-08-07 17:38:47.698306442 +0100
+--- ioemu.orig/Makefile.target	2006-08-09 19:54:26.055548240 +0100
++++ ioemu/Makefile.target	2006-08-09 19:59:49.537686802 +0100
 @@ -357,6 +357,7 @@
  VL_OBJS+= fdc.o mc146818rtc.o serial.o pc.o
  VL_OBJS+= cirrus_vga.o mixeng.o parallel.o acpi.o piix_pci.o
@@ -12,8 +12,8 @@ Index: ioemu/Makefile.target
  ifeq ($(TARGET_BASE_ARCH), ppc)
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2006-08-06 02:23:45.000000000 +0100
-+++ ioemu/hw/pc.c	2006-08-07 17:42:00.939426374 +0100
+--- ioemu.orig/hw/pc.c	2006-08-09 19:54:26.133539447 +0100
++++ ioemu/hw/pc.c	2006-08-09 20:04:32.767826231 +0100
 @@ -572,6 +572,9 @@
  static int parallel_io[MAX_PARALLEL_PORTS] = { 0x378, 0x278, 0x3bc };
  static int parallel_irq[MAX_PARALLEL_PORTS] = { 7, 7, 7 };
@@ -24,27 +24,37 @@ Index: ioemu/hw/pc.c
  #ifdef HAS_AUDIO
  static void audio_init (PCIBus *pci_bus)
  {
-@@ -874,11 +877,15 @@
- 
-     cmos_init(ram_size, boot_device, bs_table, timeoffset);
- 
-+    /* using PIIX4 acpi model */
-+    if (pci_enabled && acpi_enabled)
-+        pci_piix4_acpi_init(pci_bus, piix3_devfn + 3);
-+
-     if (pci_enabled && usb_enabled) {
+@@ -878,9 +881,15 @@
          usb_uhci_init(pci_bus, piix3_devfn + 2);
      }
  
--    if (pci_enabled && acpi_enabled) {
-+    if (pci_enabled && acpi_enabled && 0) {
++    /* using PIIX4 acpi model */
++    if (pci_enabled && acpi_enabled)
++        pci_piix4_acpi_init(pci_bus, piix3_devfn + (usb_enabled ? 3 : 2));
++
++#ifndef CONFIG_DM
+     if (pci_enabled && acpi_enabled) {
          piix4_pm_init(pci_bus, piix3_devfn + 3);
      }
++#endif /* !CONFIG_DM */
+ 
+ #if 0
+     /* ??? Need to figure out some way for the user to
+@@ -903,8 +912,10 @@
+     /* XXX: should be done in the Bochs BIOS */
+     if (pci_enabled) {
+         pci_bios_init();
++#ifndef CONFIG_DM
+         if (acpi_enabled)
+             acpi_bios_init();
++#endif /* !CONFIG_DM */
+     }
+ }
  
 Index: ioemu/hw/piix4acpi.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/hw/piix4acpi.c	2006-08-07 17:41:41.932577728 +0100
++++ ioemu/hw/piix4acpi.c	2006-08-09 20:00:56.118008198 +0100
 @@ -0,0 +1,388 @@
 +/*
 + * PIIX4 ACPI controller emulation
@@ -411,7 +421,7 @@ Index: ioemu/hw/piix4acpi.c
 +    PCIAcpiState *d;
 +    uint8_t *pci_conf;
 +
-+    /* register a function 3 of PIIX4 */
++    /* register a function devfn of PIIX4 */
 +    d = (PCIAcpiState *)pci_register_device(
 +        bus, "PIIX4 ACPI", sizeof(PCIAcpiState),
 +        devfn, NULL, NULL);
@@ -436,8 +446,8 @@ Index: ioemu/hw/piix4acpi.c
 +}
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-08-06 02:23:45.000000000 +0100
-+++ ioemu/vl.c	2006-08-07 17:41:40.613727012 +0100
+--- ioemu.orig/vl.c	2006-08-09 19:54:26.135539222 +0100
++++ ioemu/vl.c	2006-08-09 19:59:49.772659756 +0100
 @@ -156,7 +156,7 @@
  #else
  #define MAX_CPUS 1
@@ -483,8 +493,8 @@ Index: ioemu/vl.c
      }
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-08-06 02:23:45.000000000 +0100
-+++ ioemu/vl.h	2006-08-07 17:38:47.847289567 +0100
+--- ioemu.orig/vl.h	2006-08-09 19:54:26.136539109 +0100
++++ ioemu/vl.h	2006-08-09 19:59:49.734664129 +0100
 @@ -167,6 +167,7 @@
  extern int kqemu_allowed;
  extern int win2k_install_hack;
@@ -495,8 +505,8 @@ Index: ioemu/vl.h
  /* XXX: make it dynamic */
 Index: ioemu/hw/piix_pci.c
 ===================================================================
---- ioemu.orig/hw/piix_pci.c	2006-08-06 02:29:41.000000000 +0100
-+++ ioemu/hw/piix_pci.c	2006-08-07 17:38:57.480198468 +0100
+--- ioemu.orig/hw/piix_pci.c	2006-08-09 19:54:19.636318228 +0100
++++ ioemu/hw/piix_pci.c	2006-08-09 19:54:26.152537305 +0100
 @@ -241,7 +241,7 @@
  static uint32_t pci_bios_io_addr;
  static uint32_t pci_bios_mem_addr;
