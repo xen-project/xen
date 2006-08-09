@@ -34,6 +34,7 @@ vnc-fixes
 vnc-start-vncviewer
 vnc-title-domain-name
 vnc-access-monitor-vt
+vnc-display-find-unused
 xenstore-block-device-config
 xenstore-write-vnc-port
 qemu-allow-disable-sdl

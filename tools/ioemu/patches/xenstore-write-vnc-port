@@ -1,7 +1,7 @@
 Index: ioemu/xenstore.c
 ===================================================================
---- ioemu.orig/xenstore.c	2006-08-07 17:42:28.684289249 +0100
-+++ ioemu/xenstore.c	2006-08-07 17:42:28.891266728 +0100
+--- ioemu.orig/xenstore.c	2006-08-09 15:04:25.374528729 +0100
++++ ioemu/xenstore.c	2006-08-09 15:04:25.579509243 +0100
 @@ -185,3 +185,31 @@
      free(image);
      free(vec);
@@ -36,10 +36,10 @@ Index: ioemu/xenstore.c
 +}
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-08-07 17:42:28.687288922 +0100
-+++ ioemu/vl.c	2006-08-07 17:42:28.894266401 +0100
-@@ -6501,6 +6501,7 @@
- 	vnc_display_init(ds, vnc_display);
+--- ioemu.orig/vl.c	2006-08-09 15:04:25.377528443 +0100
++++ ioemu/vl.c	2006-08-09 15:04:25.583508863 +0100
+@@ -6511,6 +6511,7 @@
+ 	vnc_display = vnc_display_init(ds, vnc_display, vncunused);
  	if (vncviewer)
  	    vnc_start_viewer(vnc_display);
 +	xenstore_write_vncport(vnc_display);
@@ -48,8 +48,8 @@ Index: ioemu/vl.c
          sdl_display_init(ds, full_screen);
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-08-07 17:42:28.689288705 +0100
-+++ ioemu/vl.h	2006-08-07 17:42:28.895266293 +0100
+--- ioemu.orig/vl.h	2006-08-09 15:04:25.380528158 +0100
++++ ioemu/vl.h	2006-08-09 15:04:25.584508768 +0100
 @@ -1203,6 +1203,7 @@
  int xenstore_fd(void);
  void xenstore_process_event(void *opaque);
