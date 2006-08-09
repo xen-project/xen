@@ -197,7 +197,7 @@
 ^xen/xen$
 ^xen/xen-syms$
 ^xen/xen\..*$
-^xen/arch/ppc/dom0\.bin$
-^xen/arch/ppc/asm-offsets\.s$
-^xen/arch/ppc/firmware
-^xen/arch/ppc/firmware_image
+^xen/arch/powerpc/dom0\.bin$
+^xen/arch/powerpc/asm-offsets\.s$
+^xen/arch/powerpc/firmware
+^xen/arch/powerpc/firmware_image

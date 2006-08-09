@@ -73,6 +73,10 @@ unsigned long hypercall_create_continuation(unsigned int op,
 
 int arch_domain_create(struct domain *d)
 {
+    struct page_info *rma;
+    unsigned long rma_base;
+    unsigned long rma_size;
+    unsigned int rma_order;
 
     if (d->domain_id == IDLE_DOMAIN_ID) {
         d->shared_info = (void *)alloc_xenheap_page();
@@ -81,17 +85,28 @@ int arch_domain_create(struct domain *d)
         return 0;
     }
 
-    /* XXX the hackage... hardcode 64M domains */
-    d->arch.rma_base = (64<<20) * (d->domain_id + 1);
-    d->arch.rma_size = (64<<20);
+    rma_order = cpu_rma_order();
+    rma_size = 1UL << rma_order << PAGE_SHIFT;
 
-    printk("clearing RMO: 0x%lx[0x%lx]\n", d->arch.rma_base, d->arch.rma_size);
-    memset((void*)d->arch.rma_base, 0, d->arch.rma_size);
+    /* allocate the real mode area */
+    d->max_pages = 1UL << rma_order;
+    rma = alloc_domheap_pages(d, rma_order, 0);
+    if (NULL == rma)
+        return 1;
+    rma_base = page_to_maddr(rma);
+
+    BUG_ON(rma_base & (rma_size-1)); /* check alignment */
+
+    d->arch.rma_base = rma_base;
+    d->arch.rma_size = rma_size;
+
+    printk("clearing RMO: 0x%lx[0x%lx]\n", rma_base, rma_size);
+    memset((void *)rma_base, 0, rma_size);
 
     htab_alloc(d, LOG_DEFAULT_HTAB_BYTES);
 
     d->shared_info = (shared_info_t *)
-        (rma_addr(&d->arch, RMA_SHARED_INFO) + d->arch.rma_base);
+        (rma_addr(&d->arch, RMA_SHARED_INFO) + rma_base);
 
     d->arch.large_page_sizes = 1;
     d->arch.large_page_shift[0] = 24; /* 16 M for 970s */

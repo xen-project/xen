@@ -238,5 +238,5 @@ int xencomm_handle_is_null(void *ptr)
 
     desc = (struct xencomm_desc *)paddr_to_maddr((unsigned long)ptr);
 
-    return (desc->address[0] == XENCOMM_INVALID);
+    return (desc->nr_addrs == 0);
 }

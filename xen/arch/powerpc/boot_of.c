@@ -37,6 +37,10 @@ static int of_out;
 static ofdn_t boot_cpu;
 static char bootargs[256];
 
+#define COMMAND_LINE_SIZE 512
+static char builtin_cmdline[COMMAND_LINE_SIZE]
+    __attribute__((section("__builtin_cmdline"))) = CMDLINE;
+
 extern struct ns16550_defaults ns16550;
 
 #undef OF_DEBUG
@@ -449,8 +453,8 @@ static void boot_of_bootargs(multiboot_info_t *mbi)
     int rc;
 
     rc = of_getprop(bof_chosen, "bootargs", &bootargs, sizeof (bootargs));
-    if (rc == OF_FAILURE) {
-        strcpy(bootargs, "xen");
+    if (rc == OF_FAILURE || bootargs[0] == '\0') {
+        strlcpy(bootargs, builtin_cmdline, sizeof(bootargs));
     }
 
     mbi->flags |= MBI_CMDLINE;

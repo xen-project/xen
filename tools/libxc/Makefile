@@ -29,7 +29,6 @@ GUEST_SRCS-y :=
 GUEST_SRCS-y += xc_load_bin.c
 GUEST_SRCS-y += xc_load_elf.c
 GUEST_SRCS-y += xg_private.c
-GUEST_SRCS-$(CONFIG_POWERPC) += xc_ppc_linux_build.c
 GUEST_SRCS-$(CONFIG_X86) += xc_linux_build.c
 GUEST_SRCS-$(CONFIG_IA64) += xc_linux_build.c
 GUEST_SRCS-$(CONFIG_MIGRATE) += xc_linux_restore.c xc_linux_save.c
@@ -140,3 +139,4 @@ libxenguest.so.$(MAJOR).$(MINOR): $(GUEST_PIC_OBJS) libxenctrl.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-soname -Wl,libxenguest.so.$(MAJOR) -shared -o $@ $^ -lz -lxenctrl
 
 -include $(DEPS)
+

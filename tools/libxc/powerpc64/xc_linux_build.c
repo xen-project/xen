@@ -37,11 +37,6 @@
 #define MEMSIZE (64UL << 20)
 #define INITRD_ADDR (24UL << 20)
 
-int verbose;
-#define VERBOSE(stuff, ...) \
-    if (verbose) \
-        stuff __VA_ARGS__;
-
 #define ALIGN_UP(addr,size) (((addr)+((size)-1))&(~((size)-1)))
 
 #define max(x,y) ({ \
@@ -56,7 +51,7 @@ static void *load_file(const char *path, unsigned long *filesize)
     ssize_t size;
     int fd;
 
-    VERBOSE(printf("load_file(%s)\n", path));
+    DPRINTF("load_file(%s)\n", path);
 
     fd = open(path, O_RDONLY);
     if (fd < 0) {
@@ -114,7 +109,7 @@ static int init_boot_vcpu(
      * we must make sure this register is 0 */
     ctxt.user_regs.gprs[13] = 0;
 
-    VERBOSE(printf("xc_vcpu_setvcpucontext:\n"
+    DPRINTF("xc_vcpu_setvcpucontext:\n"
                  "  pc 0x%"PRIx64", msr 0x016%"PRIx64"\n"
                  "  r1-5 %016"PRIx64" %016"PRIx64" %016"PRIx64" %016"PRIx64
                  " %016"PRIx64"\n",
@@ -123,7 +118,7 @@ static int init_boot_vcpu(
                  ctxt.user_regs.gprs[2],
                  ctxt.user_regs.gprs[3],
                  ctxt.user_regs.gprs[4],
-                 ctxt.user_regs.gprs[5]));
+                 ctxt.user_regs.gprs[5]);
     rc = xc_vcpu_setcontext(xc_handle, domid, 0, &ctxt);
     if (rc < 0)
         perror("setdomaininfo");
@@ -181,8 +176,7 @@ static int load_dtb(
         goto out;
     }
 
-    VERBOSE(printf("copying device tree to 0x%lx[0x%lx]\n",
-            dtb_addr, dtb_size));
+    DPRINTF("copying device tree to 0x%lx[0x%lx]\n", dtb_addr, dtb_size);
     rc = install_image(xc_handle, domid, page_array, img, dtb_addr, dtb_size);
 
 out:
@@ -241,7 +235,7 @@ static int load_kernel(
 
     hack_kernel_img(kernel_img);
 
-    VERBOSE(printf("probe_elf\n"));
+    DPRINTF("probe_elf\n");
     rc = probe_elf(kernel_img, kernel_size, &load_funcs);
     if (rc < 0) {
         rc = -1;
@@ -249,22 +243,22 @@ static int load_kernel(
         goto out;
     }
 
-    VERBOSE(printf("parseimage\n"));
+    DPRINTF("parseimage\n");
     rc = (load_funcs.parseimage)(kernel_img, kernel_size, dsi);
     if (rc < 0) {
         rc = -1;
         goto out;
     }
 
-    VERBOSE(printf("loadimage\n"));
+    DPRINTF("loadimage\n");
     (load_funcs.loadimage)(kernel_img, kernel_size, xc_handle, domid,
             page_array, dsi);
 
-    VERBOSE(printf("  v_start     %016"PRIx64"\n", dsi->v_start));
-    VERBOSE(printf("  v_end       %016"PRIx64"\n", dsi->v_end));
-    VERBOSE(printf("  v_kernstart %016"PRIx64"\n", dsi->v_kernstart));
-    VERBOSE(printf("  v_kernend   %016"PRIx64"\n", dsi->v_kernend));
-    VERBOSE(printf("  v_kernentry %016"PRIx64"\n", dsi->v_kernentry));
+    DPRINTF("  v_start     %016"PRIx64"\n", dsi->v_start);
+    DPRINTF("  v_end       %016"PRIx64"\n", dsi->v_end);
+    DPRINTF("  v_kernstart %016"PRIx64"\n", dsi->v_kernstart);
+    DPRINTF("  v_kernend   %016"PRIx64"\n", dsi->v_kernend);
+    DPRINTF("  v_kernentry %016"PRIx64"\n", dsi->v_kernentry);
 
 out:
     free(kernel_img);
@@ -287,7 +281,7 @@ static int load_initrd(
     if (initrd_img == NULL)
         return -1;
 
-    VERBOSE(printf("copying initrd to 0x%lx[0x%lx]\n", INITRD_ADDR, *len));
+    DPRINTF("copying initrd to 0x%lx[0x%lx]\n", INITRD_ADDR, *len);
     if (install_image(xc_handle, domid, page_array, initrd_img, INITRD_ADDR,
                 *len))
         goto out;
@@ -326,9 +320,9 @@ static int get_page_array(int xc_handle, int domid, xen_pfn_t **page_array)
     int nr_pages;
     int rc;
 
-    VERBOSE(printf("xc_get_tot_pages\n"));
+    DPRINTF("xc_get_tot_pages\n");
     nr_pages = xc_get_tot_pages(xc_handle, domid);
-    VERBOSE(printf("  0x%x\n", nr_pages));
+    DPRINTF("  0x%x\n", nr_pages);
 
     *page_array = malloc(nr_pages * sizeof(xen_pfn_t));
     if (*page_array == NULL) {
@@ -336,7 +330,7 @@ static int get_page_array(int xc_handle, int domid, xen_pfn_t **page_array)
         return -1;
     }
 
-    VERBOSE(printf("xc_get_pfn_list\n"));
+    DPRINTF("xc_get_pfn_list\n");
     rc = xc_get_pfn_list(xc_handle, domid, *page_array, nr_pages);
     if (rc != nr_pages) {
         perror("Could not get the page frame list");
@@ -394,7 +388,7 @@ int xc_linux_build(int xc_handle,
         dtb_addr = 0;
     }
 
-    si_addr = create_start_info(&si, store_evtchn, console_evtchn);
+    si_addr = create_start_info(&si, console_evtchn, store_evtchn);
     *console_mfn = page_array[si.console_mfn];
     *store_mfn = page_array[si.store_mfn];
     
