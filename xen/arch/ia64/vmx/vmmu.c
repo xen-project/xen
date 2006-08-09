@@ -305,13 +305,13 @@ int unimplemented_gva(VCPU *vcpu,u64 vadr)
 
 
 /*
- * Prefetch guest bundle code.
+ * Fetch guest bundle code.
  * INPUT:
- *  code: buffer pointer to hold the read data.
- *  num:  number of dword (8byts) to read.
+ *  gip: guest ip
+ *  pbundle: used to return fetched bundle.
  */
-int
-fetch_code(VCPU *vcpu, u64 gip, u64 *code1, u64 *code2)
+unsigned long
+fetch_code(VCPU *vcpu, u64 gip, IA64_BUNDLE *pbundle)
 {
     u64     gpip=0;   // guest physical IP
     u64     *vpa;
@@ -336,8 +336,10 @@ fetch_code(VCPU *vcpu, u64 gip, u64 *code1, u64 *code2)
         maddr = (mfn << PAGE_SHIFT) | (gpip & (PAGE_SIZE - 1));
     }else{
         tlb = vhpt_lookup(gip);
-        if( tlb == NULL)
-            panic_domain(vcpu_regs(vcpu),"No entry found in ITLB and DTLB\n");
+        if (tlb == NULL) {
+            ia64_ptcl(gip, ARCH_PAGE_SHIFT << 2);
+            return IA64_RETRY;
+        }
         mfn = tlb->ppn >> (PAGE_SHIFT - ARCH_PAGE_SHIFT);
         maddr = (tlb->ppn >> (tlb->ps - 12) << tlb->ps) |
                 (gip & (PSIZE(tlb->ps) - 1));
@@ -354,10 +356,10 @@ fetch_code(VCPU *vcpu, u64 gip, u64 *code1, u64 *code2)
     }
     vpa = (u64 *)__va(maddr);
 
-    *code1 = *vpa++;
-    *code2 = *vpa;
+    pbundle->i64[0] = *vpa++;
+    pbundle->i64[1] = *vpa;
     put_page(page);
-    return 1;
+    return IA64_NO_FAULT;
 }
 
 IA64FAULT vmx_vcpu_itc_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)

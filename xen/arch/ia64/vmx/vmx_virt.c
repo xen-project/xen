@@ -1334,11 +1334,10 @@ IA64FAULT vmx_emul_mov_from_cr(VCPU *vcpu, INST64 inst)
 
 //#define  BYPASS_VMAL_OPCODE
 extern IA64_SLOT_TYPE  slot_types[0x20][3];
-IA64_BUNDLE __vmx_get_domain_bundle(u64 iip)
+unsigned long
+__vmx_get_domain_bundle(u64 iip, IA64_BUNDLE *pbundle)
 {
-	IA64_BUNDLE bundle;
-	fetch_code( current, iip, &bundle.i64[0], &bundle.i64[1]);
-	return bundle;
+	return fetch_code(current, iip, pbundle);
 }
 
 /** Emulate a privileged operation.

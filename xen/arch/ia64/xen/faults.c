@@ -323,8 +323,10 @@ handle_fpu_swa (int fp_fault, struct pt_regs *regs, unsigned long isr)
 	if (!fp_fault && (ia64_psr(regs)->ri == 0))
 		fault_ip -= 16;
 
-	if (VMX_DOMAIN(current))
-		bundle = __vmx_get_domain_bundle(fault_ip);
+	if (VMX_DOMAIN(current)) {
+		if (IA64_RETRY == __vmx_get_domain_bundle(fault_ip, &bundle))
+			return IA64_RETRY;
+	}
 	else 
 		bundle = __get_domain_bundle(fault_ip);
 
@@ -555,6 +557,7 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 	struct vcpu *v = current;
 	unsigned long check_lazy_cover = 0;
 	unsigned long psr = regs->cr_ipsr;
+	unsigned long status;
 
 	/* Following faults shouldn'g be seen from Xen itself */
 	BUG_ON (!(psr & IA64_PSR_CPL));
@@ -615,14 +618,23 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 		// FIXME: Should we handle unaligned refs in Xen??
 		vector = IA64_UNALIGNED_REF_VECTOR; break;
 	    case 32:
-		if (!(handle_fpu_swa(1, regs, isr))) {
+		status = handle_fpu_swa(1, regs, isr);
+		if (!status) {
 		    vcpu_increment_iip(v);
 		    return;
 		}
+		// fetch code fail
+		if (IA64_RETRY == status)
+			return;
 		printf("ia64_handle_reflection: handling FP fault\n");
 		vector = IA64_FP_FAULT_VECTOR; break;
 	    case 33:
-		if (!(handle_fpu_swa(0, regs, isr))) return;
+		status = handle_fpu_swa(0, regs, isr);
+		if (!status)
+			return;
+		// fetch code fail
+		if (IA64_RETRY == status)
+			return;
 		printf("ia64_handle_reflection: handling FP trap\n");
 		vector = IA64_FP_TRAP_VECTOR; break;
 	    case 34:

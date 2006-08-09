@@ -223,7 +223,7 @@ typedef union U_INST64 {
     INST64_M47 M47;	// purge translation entry
 } INST64;
 
-extern IA64_BUNDLE __vmx_get_domain_bundle(unsigned long iip);
+extern unsigned long __vmx_get_domain_bundle(unsigned long iip, IA64_BUNDLE *pbundle);
 extern IA64_BUNDLE __get_domain_bundle(unsigned long iip);
 
 #define MASK_41 ((unsigned long)0x1ffffffffff)

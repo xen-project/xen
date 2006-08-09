@@ -433,7 +433,10 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
     u64 data, value,post_update, slot1a, slot1b, temp;
     INST64 inst;
     regs=vcpu_regs(vcpu);
-    bundle = __vmx_get_domain_bundle(regs->cr_iip);
+    if (IA64_RETRY == __vmx_get_domain_bundle(regs->cr_iip, &bundle)) {
+        /* if fetch code fail, return and try again */
+        return;
+    }
     slot = ((struct ia64_psr *)&(regs->cr_ipsr))->ri;
     if (!slot) inst.inst = bundle.slot0;
     else if (slot == 1){
