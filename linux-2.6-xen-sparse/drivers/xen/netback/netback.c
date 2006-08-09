@@ -1306,7 +1306,9 @@ static int __init netback_init(void)
 	net_timer.function = net_alarm;
     
 	page = balloon_alloc_empty_page_range(MAX_PENDING_REQS);
-	BUG_ON(page == NULL);
+	if (page == NULL)
+		return -ENOMEM;
+
 	mmap_vstart = (unsigned long)pfn_to_kaddr(page_to_pfn(page));
 
 	for (i = 0; i < MAX_PENDING_REQS; i++) {
