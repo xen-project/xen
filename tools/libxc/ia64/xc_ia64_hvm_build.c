@@ -6,6 +6,7 @@
 #include <zlib.h>
 #include "xen/arch-ia64.h"
 #include <xen/hvm/ioreq.h>
+#include <xen/hvm/params.h>
 
 static int
 xc_ia64_copy_to_domain_pages(int xc_handle, uint32_t domid, void* src_page,
@@ -40,6 +41,31 @@ error_out:
     return -1;
 }
 
+static void
+xc_set_hvm_param(int handle, domid_t dom, int param, unsigned long value)
+{
+    DECLARE_HYPERCALL;
+    xen_hvm_param_t arg;
+    int rc;
+
+    hypercall.op = __HYPERVISOR_hvm_op;
+    hypercall.arg[0] = HVMOP_set_param;
+    hypercall.arg[1] = (unsigned long)&arg;
+
+    arg.domid = dom;
+    arg.index = param;
+    arg.value = value;
+
+    if (mlock(&arg, sizeof(arg)) != 0) {
+        PERROR("Could not lock memory for set parameter");
+        return;
+    }
+
+    rc = do_xen_hypercall(handle, &hypercall);
+    safe_munlock(&arg, sizeof(arg));
+    if (rc < 0)
+        PERROR("set HVM parameter failed (%d)", rc);
+}
 
 #define HOB_SIGNATURE         0x3436474953424f48        // "HOBSIG64"
 #define GFW_HOB_START         ((4UL<<30)-(14UL<<20))    // 4G - 14M
@@ -567,6 +593,10 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
         PERROR("Could not get the page frame list");
         goto error_out;
     }
+
+    xc_set_hvm_param(xc_handle, dom,
+                     HVM_PARAM_STORE_PFN, STORE_PAGE_START>>PAGE_SHIFT);
+    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_EVTCHN, store_evtchn);
 
     *store_mfn = page_array[1];
     sp = (shared_iopage_t *)xc_map_foreign_range(xc_handle, dom,
