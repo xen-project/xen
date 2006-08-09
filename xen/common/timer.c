@@ -17,6 +17,7 @@
 #include <xen/softirq.h>
 #include <xen/timer.h>
 #include <xen/keyhandler.h>
+#include <xen/percpu.h>
 #include <asm/system.h>
 #include <asm/desc.h>
 
