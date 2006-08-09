@@ -20,6 +20,7 @@
 
 #include <xen/config.h>
 #include <xen/mm.h>
+#include <xen/shadow.h>
 #include <xen/kernel.h>
 #include <xen/sched.h>
 #include <asm/misc.h>
@@ -138,4 +139,20 @@ ulong pfn2mfn(struct domain *d, long pfn, int *type)
         *type = t;
 
     return mfn;
+}
+
+void guest_physmap_add_page(
+    struct domain *d, unsigned long gpfn, unsigned long mfn)
+{
+    panic("%s\n", __func__);
+}
+void guest_physmap_remove_page(
+    struct domain *d, unsigned long gpfn, unsigned long mfn)
+{
+    panic("%s\n", __func__);
+}
+void shadow_drop_references(
+    struct domain *d, struct page_info *page)
+{
+    panic("%s\n", __func__);
 }

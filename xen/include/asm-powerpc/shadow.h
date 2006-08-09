@@ -23,7 +23,7 @@
 
 #include <xen/sched.h>
 
-#define shadow_mode_translate(_d) 1
+#define shadow_mode_translate(_d) (1)
 
 #define __translate_gpfn_to_mfn(_d, gpfn)              \
     ( (shadow_mode_translate(_d))                      \
@@ -41,5 +41,12 @@ translate_gpfn_to_mfn(struct domain *rd, unsigned long gpfn)
     trap();
     return 0;
 }
+extern void guest_physmap_add_page(
+    struct domain *d, unsigned long gpfn, unsigned long mfn);
 
+extern void guest_physmap_remove_page(
+    struct domain *d, unsigned long gpfn, unsigned long mfn);
+
+extern void shadow_drop_references(
+    struct domain *d, struct page_info *page);
 #endif
