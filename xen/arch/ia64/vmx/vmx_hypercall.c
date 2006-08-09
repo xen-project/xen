@@ -35,4 +35,50 @@
 #include <asm/dom_fw.h>
 #include <xen/domain.h>
 
-/* This file will include the hypercall code for VT-i domain, soon. */
+long
+do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
+{
+    long rc = 0;
+
+    switch (op) {
+    case HVMOP_set_param:
+    case HVMOP_get_param:
+    {
+        struct xen_hvm_param a;
+        struct domain *d;
+
+        if (copy_from_guest(&a, arg, 1))
+            return -EFAULT;
+
+        if (a.index > HVM_NR_PARAMS)
+            return -EINVAL;
+
+        if (a.domid == DOMID_SELF) {
+            get_knownalive_domain(current->domain);
+            d = current->domain;
+        }
+        else if (IS_PRIV(current->domain)) {
+            d = find_domain_by_id(a.domid);
+            if (!d)
+                return -ESRCH;
+        }
+        else
+            return -EPERM;
+
+        if (op == HVMOP_set_param) {
+            rc = 0;
+            d->arch.hvm_domain.params[a.index] = a.value;
+        }
+        else
+            rc = d->arch.hvm_domain.params[a.index];
+
+        put_domain(d);
+        return rc;
+    }
+
+    default:
+        DPRINTK("Bad HVM op %ld.\n", op);
+        rc = -ENOSYS;
+    }
+    return rc;
+}

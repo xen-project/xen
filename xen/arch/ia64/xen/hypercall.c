@@ -70,7 +70,7 @@ hypercall_t ia64_hypercall_table[] =
 	(hypercall_t)do_ni_hypercall,		/*  */
 	(hypercall_t)do_event_channel_op,
 	(hypercall_t)do_physdev_op,
-	(hypercall_t)do_ni_hypercall,		/*  */
+	(hypercall_t)do_hvm_op,			/*  */
 	(hypercall_t)do_ni_hypercall,		/*  */                  /* 35 */
 	(hypercall_t)do_ni_hypercall,		/*  */
 	(hypercall_t)do_ni_hypercall,		/*  */

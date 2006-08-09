@@ -20,6 +20,7 @@
 #define __ASM_IA64_VMX_PLATFORM_H__
 
 #include <public/xen.h>
+#include <public/hvm/params.h>
 #include <public/arch-ia64.h>
 #include <asm/hvm/vioapic.h>
 struct mmio_list;
@@ -27,6 +28,7 @@ typedef struct virtual_platform_def {
     unsigned long       shared_page_va;
     unsigned long       pib_base;
     unsigned char       xtp;
+    unsigned long       params[HVM_NR_PARAMS];
     struct mmio_list    *mmio;
     /* One IOSAPIC now... */
     struct hvm_vioapic  vioapic;
