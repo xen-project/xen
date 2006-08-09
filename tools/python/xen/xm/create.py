@@ -972,7 +972,7 @@ def make_domain(opts, config):
         import signal
         if vncpid:
             os.kill(vncpid, signal.SIGKILL)
-        raise ex
+        raise
 
     dom = sxp.child_value(dominfo, 'name')
 
