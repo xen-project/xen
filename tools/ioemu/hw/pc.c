@@ -572,9 +572,6 @@ static int serial_irq[MAX_SERIAL_PORTS] = { 4, 3, 4, 3 };
 static int parallel_io[MAX_PARALLEL_PORTS] = { 0x378, 0x278, 0x3bc };
 static int parallel_irq[MAX_PARALLEL_PORTS] = { 7, 7, 7 };
 
-/* PIIX4 acpi pci configuration space, func 3 */
-extern void pci_piix4_acpi_init(PCIBus *bus, int devfn);
-
 #ifdef HAS_AUDIO
 static void audio_init (PCIBus *pci_bus)
 {
@@ -877,13 +874,13 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, int boot_device,
 
     cmos_init(ram_size, boot_device, bs_table, timeoffset);
 
-    if (pci_enabled && usb_enabled) {
-        usb_uhci_init(pci_bus, piix3_devfn + 2);
-    }
-
     /* using PIIX4 acpi model */
     if (pci_enabled && acpi_enabled)
-        pci_piix4_acpi_init(pci_bus, piix3_devfn + (usb_enabled ? 3 : 2));
+        pci_piix4_acpi_init(pci_bus, piix3_devfn + 2);
+
+    if (pci_enabled && usb_enabled) {
+        usb_uhci_init(pci_bus, piix3_devfn + (acpi_enabled ? 3 : 2));
+    }
 
 #ifndef CONFIG_DM
     if (pci_enabled && acpi_enabled) {

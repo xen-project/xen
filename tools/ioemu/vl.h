@@ -925,6 +925,9 @@ extern int acpi_enabled;
 void piix4_pm_init(PCIBus *bus, int devfn);
 void acpi_bios_init(void);
 
+/* piix4acpi.c */
+extern void pci_piix4_acpi_init(PCIBus *bus, int devfn);
+
 /* pc.c */
 extern QEMUMachine pc_machine;
 extern QEMUMachine isapc_machine;
