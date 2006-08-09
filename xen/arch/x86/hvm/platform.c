@@ -779,7 +779,7 @@ void send_mmio_req(
     } else
         p->u.data = value;
 
-    if (hvm_mmio_intercept(p)){
+    if ( hvm_mmio_intercept(p) || hvm_buffered_io_intercept(p) ) {
         p->state = STATE_IORESP_READY;
         hvm_io_assist(v);
         return;

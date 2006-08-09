@@ -5834,6 +5834,7 @@ int main(int argc, char **argv)
     unsigned long nr_pages;
     xen_pfn_t *page_array;
     extern void *shared_page;
+    extern void *buffered_io_page;
 
     char qemu_dm_logfilename[64];
 
@@ -6378,11 +6379,16 @@ int main(int argc, char **argv)
 
     phys_ram_base = xc_map_foreign_batch(xc_handle, domid,
                                          PROT_READ|PROT_WRITE, page_array,
-                                         nr_pages - 1);
+                                         nr_pages - 3);
     if (phys_ram_base == 0) {
         fprintf(logfile, "xc_map_foreign_batch returned error %d\n", errno);
         exit(-1);
     }
+
+    /* not yet add for IA64 */
+    buffered_io_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
+                                       PROT_READ|PROT_WRITE,
+                                       page_array[nr_pages - 3]);
 
     shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
                                        PROT_READ|PROT_WRITE,

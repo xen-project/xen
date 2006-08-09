@@ -134,15 +134,28 @@ static void e820_map_io_shared_callback(struct domain *d,
     }
 }
 
-void hvm_map_io_shared_page(struct vcpu *v)
+static void e820_map_buffered_io_callback(struct domain *d,
+                                          struct e820entry *e,
+                                          void *data)
 {
-    unsigned long mfn = INVALID_MFN;
+    unsigned long *mfn = data;
+    if ( e->type == E820_BUFFERED_IO ) {
+        ASSERT(*mfn == INVALID_MFN);
+        *mfn = gmfn_to_mfn(d, e->addr >> PAGE_SHIFT);
+    }
+}
+
+void hvm_map_io_shared_pages(struct vcpu *v)
+{
+    unsigned long mfn;
     void *p;
     struct domain *d = v->domain;
 
-    if ( d->arch.hvm_domain.shared_page_va )
+    if ( d->arch.hvm_domain.shared_page_va ||
+         d->arch.hvm_domain.buffered_io_va )
         return;
 
+    mfn = INVALID_MFN;
     e820_foreach(d, e820_map_io_shared_callback, &mfn);
 
     if ( mfn == INVALID_MFN )
@@ -159,6 +172,14 @@ void hvm_map_io_shared_page(struct vcpu *v)
     }
 
     d->arch.hvm_domain.shared_page_va = (unsigned long)p;
+
+    mfn = INVALID_MFN;
+    e820_foreach(d, e820_map_buffered_io_callback, &mfn);
+    if ( mfn != INVALID_MFN ) {
+        p = map_domain_page_global(mfn);
+        if ( p )
+            d->arch.hvm_domain.buffered_io_va = (unsigned long)p;
+    }
 }
 
 void hvm_create_event_channels(struct vcpu *v)
@@ -209,6 +230,8 @@ void hvm_setup_platform(struct domain* d)
         spin_lock_init(&d->arch.hvm_domain.round_robin_lock);
         hvm_vioapic_init(d);
     }
+
+    spin_lock_init(&d->arch.hvm_domain.buffered_io_lock);
 
     init_timer(&platform->pl_time.periodic_tm.timer,
                pt_timer_fn, v, v->processor);

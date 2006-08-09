@@ -26,6 +26,7 @@
 #define E820_IO          16
 #define E820_SHARED_PAGE 17
 #define E820_XENSTORE    18
+#define E820_BUFFERED_IO 19
 
 #define E820_MAP_PAGE       0x00090000
 #define E820_MAP_NR_OFFSET  0x000001E8
@@ -96,7 +97,13 @@ static void build_e820map(void *e820_page, unsigned long long mem_size)
     e820entry[nr_map].type = E820_RESERVED;
     nr_map++;
 
-#define STATIC_PAGES    2       /* for ioreq_t and store_mfn */
+#define STATIC_PAGES    3
+    /* 3 static pages:
+     * - ioreq buffer.
+     * - xenstore.
+     * - shared_page.
+     */
+
     /* Most of the ram goes here */
     e820entry[nr_map].addr = 0x100000;
     e820entry[nr_map].size = mem_size - 0x100000 - STATIC_PAGES * PAGE_SIZE;
@@ -104,6 +111,12 @@ static void build_e820map(void *e820_page, unsigned long long mem_size)
     nr_map++;
 
     /* Statically allocated special pages */
+
+    /* For buffered IO requests */
+    e820entry[nr_map].addr = mem_size - 3 * PAGE_SIZE;
+    e820entry[nr_map].size = PAGE_SIZE;
+    e820entry[nr_map].type = E820_BUFFERED_IO;
+    nr_map++;
 
     /* For xenstore */
     e820entry[nr_map].addr = mem_size - 2 * PAGE_SIZE;
@@ -213,6 +226,9 @@ static int setup_guest(int xc_handle,
     unsigned long shared_page_frame = 0;
     shared_iopage_t *sp;
 
+    unsigned long ioreq_buffer_frame = 0;
+    void *ioreq_buffer_page;
+
     memset(&dsi, 0, sizeof(struct domain_setup_info));
 
     if ( (parseelfimage(image, image_size, &dsi)) != 0 )
@@ -302,6 +318,19 @@ static int setup_guest(int xc_handle,
         goto error_out;
     memset(sp, 0, PAGE_SIZE);
     munmap(sp, PAGE_SIZE);
+
+    /* clean the buffered IO requests page */
+    ioreq_buffer_frame = page_array[(v_end >> PAGE_SHIFT) - 3];
+    ioreq_buffer_page = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+                                             PROT_READ | PROT_WRITE,
+                                             ioreq_buffer_frame);
+
+    if ( ioreq_buffer_page == NULL )
+        goto error_out;
+
+    memset(ioreq_buffer_page, 0, PAGE_SIZE);
+
+    munmap(ioreq_buffer_page, PAGE_SIZE);
 
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_PFN, (v_end >> PAGE_SHIFT) - 2);
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_EVTCHN, store_evtchn);

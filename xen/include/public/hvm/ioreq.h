@@ -78,6 +78,14 @@ struct shared_iopage {
 };
 typedef struct shared_iopage shared_iopage_t;
 
+#define IOREQ_BUFFER_SLOT_NUM     80
+struct buffered_iopage {
+    unsigned long   read_pointer;
+    unsigned long   write_pointer;
+    ioreq_t         ioreq[IOREQ_BUFFER_SLOT_NUM];
+};            /* sizeof this structure must be in one page */
+typedef struct buffered_iopage buffered_iopage_t;
+
 #endif /* _IOREQ_H_ */
 
 /*

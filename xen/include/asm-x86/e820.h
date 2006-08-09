@@ -12,6 +12,7 @@
 #define E820_IO          16
 #define E820_SHARED_PAGE 17
 #define E820_XENSTORE    18
+#define E820_BUFFERED_IO 19
 
 #define E820_MAP_PAGE        0x00090000
 #define E820_MAP_NR_OFFSET   0x000001E8
