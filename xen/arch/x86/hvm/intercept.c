@@ -36,10 +36,24 @@ extern struct hvm_mmio_handler vioapic_mmio_handler;
 
 #define HVM_MMIO_HANDLER_NR 2
 
-struct hvm_mmio_handler *hvm_mmio_handlers[HVM_MMIO_HANDLER_NR] =
+static struct hvm_mmio_handler *hvm_mmio_handlers[HVM_MMIO_HANDLER_NR] =
 {
     &vlapic_mmio_handler,
     &vioapic_mmio_handler
+};
+
+struct hvm_buffered_io_range {
+    unsigned long start_addr;
+    unsigned long length;
+};
+
+#define HVM_BUFFERED_IO_RANGE_NR 1
+
+static struct hvm_buffered_io_range buffered_stdvga_range = {0xA0000, 0x20000};
+static struct hvm_buffered_io_range
+*hvm_buffered_io_ranges[HVM_BUFFERED_IO_RANGE_NR] =
+{
+    &buffered_stdvga_range
 };
 
 static inline void hvm_mmio_access(struct vcpu *v,
@@ -138,6 +152,56 @@ static inline void hvm_mmio_access(struct vcpu *v,
         domain_crash_synchronous();
         break;
     }
+}
+
+int hvm_buffered_io_intercept(ioreq_t *p)
+{
+    struct vcpu *v = current;
+    spinlock_t  *buffered_io_lock;
+    buffered_iopage_t *buffered_iopage =
+        (buffered_iopage_t *)(v->domain->arch.hvm_domain.buffered_io_va);
+    unsigned long tmp_write_pointer = 0;
+    int i;
+
+    /* ignore READ ioreq_t! */
+    if ( p->dir == IOREQ_READ )
+        return 0;
+
+    for ( i = 0; i < HVM_BUFFERED_IO_RANGE_NR; i++ ) {
+        if ( p->addr >= hvm_buffered_io_ranges[i]->start_addr &&
+             p->addr + p->size - 1 < hvm_buffered_io_ranges[i]->start_addr +
+                                     hvm_buffered_io_ranges[i]->length )
+            break;
+    }
+
+    if ( i == HVM_BUFFERED_IO_RANGE_NR )
+        return 0;
+
+    buffered_io_lock = &v->domain->arch.hvm_domain.buffered_io_lock;
+    spin_lock(buffered_io_lock);
+
+    if ( buffered_iopage->write_pointer - buffered_iopage->read_pointer ==
+         (unsigned long)IOREQ_BUFFER_SLOT_NUM ) {
+        /* the queue is full.
+         * send the iopacket through the normal path.
+         * NOTE: The arithimetic operation could handle the situation for
+         * write_pointer overflow.
+         */
+        spin_unlock(buffered_io_lock);
+        return 0;
+    }
+
+    tmp_write_pointer = buffered_iopage->write_pointer % IOREQ_BUFFER_SLOT_NUM;
+
+    memcpy(&buffered_iopage->ioreq[tmp_write_pointer], p, sizeof(ioreq_t));
+
+    /*make the ioreq_t visible before write_pointer*/
+    wmb();
+    buffered_iopage->write_pointer++;
+
+    spin_unlock(buffered_io_lock);
+
+    return 1;
 }
 
 int hvm_mmio_intercept(ioreq_t *p)

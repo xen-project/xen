@@ -139,6 +139,7 @@ extern int hvm_copy(void *buf, unsigned long vaddr, int size, int dir);
 extern void hvm_setup_platform(struct domain* d);
 extern int hvm_mmio_intercept(ioreq_t *p);
 extern int hvm_io_intercept(ioreq_t *p, int type);
+extern int hvm_buffered_io_intercept(ioreq_t *p);
 extern void hvm_hooks_assist(struct vcpu *v);
 extern void hvm_print_line(struct vcpu *v, const char c);
 extern void hlt_timer_fn(void *data);

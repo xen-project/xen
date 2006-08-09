@@ -76,6 +76,10 @@ int xc_handle;
 
 shared_iopage_t *shared_page = NULL;
 
+#define BUFFER_IO_MAX_DELAY  100
+buffered_iopage_t *buffered_io_page = NULL;
+QEMUTimer *buffered_io_timer;
+
 /* the evtchn fd for polling */
 int xce_handle = -1;
 
@@ -419,36 +423,68 @@ void cpu_ioreq_xor(CPUState *env, ioreq_t *req)
     req->u.data = tmp1;
 }
 
+void __handle_ioreq(CPUState *env, ioreq_t *req)
+{
+    if (!req->pdata_valid && req->dir == IOREQ_WRITE && req->size != 4)
+	req->u.data &= (1UL << (8 * req->size)) - 1;
+
+    switch (req->type) {
+    case IOREQ_TYPE_PIO:
+        cpu_ioreq_pio(env, req);
+        break;
+    case IOREQ_TYPE_COPY:
+        cpu_ioreq_move(env, req);
+        break;
+    case IOREQ_TYPE_AND:
+        cpu_ioreq_and(env, req);
+        break;
+    case IOREQ_TYPE_OR:
+        cpu_ioreq_or(env, req);
+        break;
+    case IOREQ_TYPE_XOR:
+        cpu_ioreq_xor(env, req);
+        break;
+    default:
+        hw_error("Invalid ioreq type 0x%x\n", req->type);
+    }
+}
+
+void __handle_buffered_iopage(CPUState *env)
+{
+    ioreq_t *req = NULL;
+
+    if (!buffered_io_page)
+        return;
+
+    while (buffered_io_page->read_pointer !=
+           buffered_io_page->write_pointer) {
+        req = &buffered_io_page->ioreq[buffered_io_page->read_pointer %
+				       IOREQ_BUFFER_SLOT_NUM];
+
+        __handle_ioreq(env, req);
+
+        mb();
+        buffered_io_page->read_pointer++;
+    }
+}
+
+void handle_buffered_io(void *opaque)
+{
+    CPUState *env = opaque;
+
+    __handle_buffered_iopage(env);
+    qemu_mod_timer(buffered_io_timer, BUFFER_IO_MAX_DELAY +
+		   qemu_get_clock(rt_clock));
+}
+
 void cpu_handle_ioreq(void *opaque)
 {
     CPUState *env = opaque;
     ioreq_t *req = cpu_get_ioreq();
 
+    handle_buffered_io(env);
     if (req) {
-        if ((!req->pdata_valid) && (req->dir == IOREQ_WRITE)) {
-            if (req->size != 4)
-                req->u.data &= (1UL << (8 * req->size))-1;
-        }
-
-        switch (req->type) {
-        case IOREQ_TYPE_PIO:
-            cpu_ioreq_pio(env, req);
-            break;
-        case IOREQ_TYPE_COPY:
-            cpu_ioreq_move(env, req);
-            break;
-        case IOREQ_TYPE_AND:
-            cpu_ioreq_and(env, req);
-            break;
-        case IOREQ_TYPE_OR:
-            cpu_ioreq_or(env, req);
-            break;
-        case IOREQ_TYPE_XOR:
-            cpu_ioreq_xor(env, req);
-            break;
-        default:
-            hw_error("Invalid ioreq type 0x%x\n", req->type);
-        }
+        __handle_ioreq(env, req);
 
         /* No state change if state = STATE_IORESP_HOOK */
         if (req->state == STATE_IOREQ_INPROCESS) {
@@ -465,6 +501,10 @@ int main_loop(void)
     extern int shutdown_requested;
     CPUState *env = cpu_single_env;
     int evtchn_fd = xc_evtchn_fd(xce_handle);
+
+    buffered_io_timer = qemu_new_timer(rt_clock, handle_buffered_io,
+				       cpu_single_env);
+    qemu_mod_timer(buffered_io_timer, qemu_get_clock(rt_clock));
 
     qemu_set_fd_handler(evtchn_fd, cpu_handle_ioreq, NULL, env);
 

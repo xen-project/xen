@@ -810,6 +810,9 @@ static void svm_relinquish_guest_resources(struct domain *d)
         unmap_domain_page_global(
             (void *)d->arch.hvm_domain.shared_page_va);
 
+    if ( d->arch.hvm_domain.buffered_io_va )
+        unmap_domain_page_global((void *)d->arch.hvm_domain.buffered_io_va);
+
     shadow_direct_map_clean(d);
 }
 

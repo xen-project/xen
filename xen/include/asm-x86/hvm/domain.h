@@ -33,6 +33,8 @@
 
 struct hvm_domain {
     unsigned long          shared_page_va;
+    unsigned long          buffered_io_va;
+    spinlock_t             buffered_io_lock;
     s64                    tsc_frequency;
     struct pl_time         pl_time;
 
