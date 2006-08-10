@@ -165,8 +165,8 @@ static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
 }
 
 static PyObject *pyxc_domain_setcpuweight(XcObject *self,
-					  PyObject *args,
-					  PyObject *kwds)
+                                          PyObject *args,
+                                          PyObject *kwds)
 {
     uint32_t dom;
     float cpuweight = 1;
@@ -334,29 +334,29 @@ static PyObject *pyxc_linux_build(XcObject *self,
 
     static char *kwd_list[] = { "dom", "store_evtchn",
                                 "console_evtchn", "image",
-				/* optional */
-				"ramdisk", "cmdline", "flags",
-				"features", NULL };
+                                /* optional */
+                                "ramdisk", "cmdline", "flags",
+                                "features", "arch", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiis|ssis", kwd_list,
                                       &dom, &store_evtchn,
-				      &console_evtchn, &image,
-				      /* optional */
-				      &ramdisk, &cmdline, &flags,
-				      &features) )
+                                      &console_evtchn, &image,
+                                      /* optional */
+                                      &ramdisk, &cmdline, &flags,
+                                      &features) )
         return NULL;
 
     if ( xc_linux_build(self->xc_handle, dom, image,
                         ramdisk, cmdline, features, flags,
                         store_evtchn, &store_mfn,
-			console_evtchn, &console_mfn) != 0 ) {
+                        console_evtchn, &console_mfn) != 0 ) {
         if (!errno)
              errno = EINVAL;
         return PyErr_SetFromErrno(xc_error);
     }
     return Py_BuildValue("{s:i,s:i}", 
-			 "store_mfn", store_mfn,
-			 "console_mfn", console_mfn);
+                         "store_mfn", store_mfn,
+                         "console_mfn", console_mfn);
 }
 
 static PyObject *pyxc_hvm_build(XcObject *self,
@@ -373,16 +373,16 @@ static PyObject *pyxc_hvm_build(XcObject *self,
     int apic = 0;
     unsigned long store_mfn = 0;
 
-    static char *kwd_list[] = { "dom", "store_evtchn",
-				"memsize", "image", "vcpus", "pae", "acpi", "apic",
-				NULL };
+    static char *kwd_list[] = { "dom", "store_evtchn", "memsize", "image",
+                                "vcpus", "pae", "acpi", "apic",
+                                NULL };
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiisiiii", kwd_list,
                                       &dom, &store_evtchn, &memsize,
                                       &image, &vcpus, &pae, &acpi, &apic) )
         return NULL;
 
     if ( xc_hvm_build(self->xc_handle, dom, memsize, image,
-		      vcpus, pae, acpi, apic, store_evtchn, &store_mfn) != 0 )
+                      vcpus, pae, acpi, apic, store_evtchn, &store_mfn) != 0 )
         return PyErr_SetFromErrno(xc_error);
 
     return Py_BuildValue("{s:i}", "store_mfn", store_mfn);
@@ -613,7 +613,7 @@ static PyObject *pyxc_physinfo(XcObject *self)
     {
         p+=sprintf(p,"%08x:",info.hw_cap[i]);
         if(info.hw_cap[i])
-	    q=p;
+            q=p;
     }
     if(q>cpu_cap)
         *(q-1)=0;
@@ -718,8 +718,8 @@ static PyObject *pyxc_sedf_domain_get(XcObject *self, PyObject *args)
                          "domain",    domid,
                          "period",    period,
                          "slice",     slice,
-			 "latency",   latency,
-			 "extratime", extratime,
+                         "latency",   latency,
+                         "extratime", extratime,
                          "weight",    weight);
 }
 
@@ -782,8 +782,8 @@ static PyObject *pyxc_domain_setmaxmem(XcObject *self, PyObject *args)
 }
 
 static PyObject *pyxc_domain_memory_increase_reservation(XcObject *self,
-							 PyObject *args,
-							 PyObject *kwds)
+                                                         PyObject *args,
+                                                         PyObject *kwds)
 {
     uint32_t dom;
     unsigned long mem_kb;
@@ -800,8 +800,8 @@ static PyObject *pyxc_domain_memory_increase_reservation(XcObject *self,
        know what they are doing */
     nr_extents = (mem_kb / (XC_PAGE_SIZE/1024)) >> extent_order;
     if ( xc_domain_memory_increase_reservation(self->xc_handle, dom, 
-					       nr_extents, extent_order, 
-					       address_bits, NULL) )
+                                               nr_extents, extent_order, 
+                                               address_bits, NULL) )
         return PyErr_SetFromErrno(xc_error);
     
     Py_INCREF(zero);
