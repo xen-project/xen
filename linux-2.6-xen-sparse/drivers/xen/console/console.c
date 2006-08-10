@@ -178,7 +178,7 @@ static struct tty_driver *kcons_device(struct console *c, int *index)
 
 static struct console kcons_info = {
 	.device	= kcons_device,
-	.flags	= CON_PRINTBUFFER,
+	.flags	= CON_PRINTBUFFER | CON_ENABLED,
 	.index	= -1,
 };
 
@@ -192,8 +192,6 @@ static int __init xen_console_init(void)
 		if (xc_mode == XC_DEFAULT)
 			xc_mode = XC_SERIAL;
 		kcons_info.write = kcons_write_dom0;
-		if (xc_mode == XC_SERIAL)
-			kcons_info.flags |= CON_ENABLED;
 	} else {
 		if (xc_mode == XC_DEFAULT)
 			xc_mode = XC_TTY;
