@@ -704,6 +704,218 @@ gnttab_transfer(
     return 0;
 }
 
+/* Undo __acquire_grant_for_copy.  Again, this has no effect on page
+   type and reference counts. */
+static void
+__release_grant_for_copy(
+    struct domain *rd, unsigned long gref, int readonly)
+{
+    grant_entry_t *const sha = &rd->grant_table->shared[gref];
+    struct active_grant_entry *const act = &rd->grant_table->active[gref];
+    const unsigned long r_frame = act->frame;
+
+    if ( !readonly )
+        gnttab_log_dirty(rd, r_frame);
+
+    spin_lock(&rd->grant_table->lock);
+    if ( readonly )
+        act->pin -= GNTPIN_hstr_inc;
+    else
+        act->pin -= GNTPIN_hstw_inc;
+
+    if ( !(act->pin & GNTPIN_hstw_mask) && !readonly )
+        clear_bit(_GTF_writing, &sha->flags);
+
+    if ( !act->pin )
+        clear_bit(_GTF_reading, &sha->flags);
+    spin_unlock(&rd->grant_table->lock);
+}
+
+/* Grab a frame number from a grant entry and update the flags and pin
+   count as appropriate.  Note that this does *not* update the page
+   type or reference counts. */
+static int
+__acquire_grant_for_copy(
+    struct domain *rd, unsigned long gref, int readonly,
+    unsigned long *frame)
+{
+    grant_entry_t *sha;
+    struct active_grant_entry *act;
+    s16 rc = GNTST_okay;
+    int retries = 0;
+    u16 sflags;
+    domid_t sdom;
+
+    if ( unlikely(gref >= NR_GRANT_ENTRIES) )
+        PIN_FAIL(error_out, GNTST_bad_gntref,
+                 "Bad grant reference %ld\n", gref);
+    
+    act = &rd->grant_table->active[gref];
+    sha = &rd->grant_table->shared[gref];
+
+    spin_lock(&rd->grant_table->lock);
+    
+    if ( !act->pin ||
+         (!readonly && !(act->pin & GNTPIN_hstw_mask)) )
+    {
+        sflags = sha->flags;
+        sdom = sha->domid;
+
+        for ( ; ; )
+        {
+            u32 scombo;
+            u32 prev_scombo;
+            u32 new_scombo;
+
+            if ( unlikely((sflags & GTF_type_mask) != GTF_permit_access ||
+                          sdom != current->domain->domain_id ) )
+                PIN_FAIL(unlock_out, GNTST_general_error,
+                         "Bad flags (%x) or dom (%d). (NB. expected dom %d)\n",
+                         sflags, sdom, current->domain->domain_id);
+            scombo = ((u32)sdom << 16) | (u32)sflags;
+            new_scombo = scombo | GTF_reading;
+            if ( !readonly )
+            {
+                new_scombo |= GTF_writing;
+                if ( unlikely(sflags & GTF_readonly) )
+                    PIN_FAIL(unlock_out, GNTST_general_error,
+                             "Attempt to write-pin a r/o grant entry.\n");
+            }
+            prev_scombo = cmpxchg((u32 *)&sha->flags, scombo, new_scombo);
+            if ( likely(prev_scombo == scombo) )
+                break;
+
+            if ( retries++ == 4 )
+                PIN_FAIL(unlock_out, GNTST_general_error,
+                         "Shared grant entry is unstable.\n");
+            sflags = (u16)prev_scombo;
+            sdom = (u16)(prev_scombo >> 16);
+        }
+
+        if ( !act->pin )
+        {
+            act->domid = sdom;
+            act->frame = gmfn_to_mfn(rd, sha->frame);
+        }
+    }
+    else if ( (act->pin & 0x80808080U) != 0 )
+        PIN_FAIL(unlock_out, ENOSPC,
+                 "Risk of counter overflow %08x\n", act->pin);
+
+    act->pin += readonly ? GNTPIN_hstr_inc : GNTPIN_hstw_inc;
+
+    *frame = act->frame;
+
+ unlock_out:
+    spin_unlock(&rd->grant_table->lock);
+ error_out:
+    return rc;
+}
+
+static void
+__gnttab_copy(
+    struct gnttab_copy *op)
+{
+    struct domain *sd = NULL, *dd = NULL;
+    unsigned long s_frame, d_frame;
+    void *sp, *dp;
+    s16 rc = GNTST_okay;
+    int have_d_grant = 0, have_s_grant = 0;
+
+    if ( ((op->source.offset + op->len) > PAGE_SIZE) ||
+         ((op->dest.offset + op->len) > PAGE_SIZE) )
+        PIN_FAIL(error_out, GNTST_bad_copy_arg, "copy beyond page area.\n");
+
+    if ( op->source.domid == DOMID_SELF )
+    {
+        sd = current->domain;
+        get_knownalive_domain(sd);
+    }
+    else if ( (sd = find_domain_by_id(op->source.domid)) == NULL )
+    {
+        PIN_FAIL(error_out, GNTST_bad_domain,
+                 "couldn't find %d\n", op->source.domid);
+    }
+
+    if ( op->dest.domid == DOMID_SELF )
+    {
+        dd = current->domain;
+        get_knownalive_domain(dd);
+    }
+    else if ( (dd = find_domain_by_id(op->dest.domid)) == NULL )
+    {
+        PIN_FAIL(error_out, GNTST_bad_domain,
+                 "couldn't find %d\n", op->dest.domid);
+    }
+
+    if ( op->flags & GNTCOPY_source_gref )
+    {
+        rc = __acquire_grant_for_copy(sd, op->source.u.ref, 1, &s_frame);
+        if ( rc != GNTST_okay )
+            goto error_out;
+        have_s_grant = 1;
+    }
+    else
+    {
+        s_frame = gmfn_to_mfn(sd, op->source.u.gmfn);
+    }
+    if ( !get_page(mfn_to_page(s_frame), sd) )
+        PIN_FAIL(error_out, GNTST_general_error,
+                 "could not get source frame %lx.\n", s_frame);
+
+    if ( op->flags & GNTCOPY_dest_gref )
+    {
+        rc = __acquire_grant_for_copy(dd, op->dest.u.ref, 0, &d_frame);
+        if ( rc != GNTST_okay )
+            goto error_out;
+        have_d_grant = 1;
+    }
+    else
+    {
+        d_frame = gmfn_to_mfn(sd, op->dest.u.gmfn);
+    }
+    if ( !get_page_and_type(mfn_to_page(d_frame), dd, PGT_writable_page) )
+        PIN_FAIL(error_out, GNTST_general_error,
+                 "could not get source frame %lx.\n", d_frame);
+
+    sp = map_domain_page(s_frame);
+    dp = map_domain_page(d_frame);
+
+    memcpy(dp + op->dest.offset, sp + op->source.offset, op->len);
+
+    unmap_domain_page(dp);
+    unmap_domain_page(sp);
+
+ error_out:
+    if ( have_s_grant )
+        __release_grant_for_copy(sd, op->source.u.ref, 1);
+    if ( have_d_grant )
+        __release_grant_for_copy(dd, op->dest.u.ref, 0);
+    if ( sd )
+        put_domain(sd);
+    if ( dd )
+        put_domain(dd);
+    op->status = rc;
+}
+
+static long
+gnttab_copy(
+    XEN_GUEST_HANDLE(gnttab_copy_t) uop, unsigned int count)
+{
+    int i;
+    struct gnttab_copy op;
+
+    for ( i = 0; i < count; i++ )
+    {
+        if ( unlikely(__copy_from_guest_offset(&op, uop, i, 1)) )
+            return -EFAULT;
+        __gnttab_copy(&op);
+        if ( unlikely(__copy_to_guest_offset(uop, i, &op, 1)) )
+            return -EFAULT;
+    }
+    return 0;
+}
+
 long
 do_grant_table_op(
     unsigned int cmd, XEN_GUEST_HANDLE(void) uop, unsigned int count)
@@ -752,6 +964,15 @@ do_grant_table_op(
         if ( unlikely(!guest_handle_okay(transfer, count)) )
             goto out;
         rc = gnttab_transfer(transfer, count);
+        break;
+    }
+    case GNTTABOP_copy:
+    {
+        XEN_GUEST_HANDLE(gnttab_copy_t) copy =
+            guest_handle_cast(uop, gnttab_copy_t);
+        if ( unlikely(!guest_handle_okay(copy, count)) )
+            goto out;
+        rc = gnttab_copy(copy, count);
         break;
     }
     default:

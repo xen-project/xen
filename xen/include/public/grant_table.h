@@ -249,6 +249,49 @@ struct gnttab_transfer {
 typedef struct gnttab_transfer gnttab_transfer_t;
 DEFINE_XEN_GUEST_HANDLE(gnttab_transfer_t);
 
+
+/*
+ * GNTTABOP_copy: Hypervisor based copy
+ * source and destinations can be eithers MFNs or, for foreign domains,
+ * grant references. the foreign domain has to grant read/write access
+ * in its grant table.
+ *
+ * The flags specify what type source and destinations are (either MFN
+ * or grant reference).
+ *
+ * Note that this can also be used to copy data between two domains
+ * via a third party if the source and destination domains had previously
+ * grant appropriate access to their pages to the third party.
+ *
+ * source_offset specifies an offset in the source frame, dest_offset
+ * the offset in the target frame and  len specifies the number of
+ * bytes to be copied.
+ */
+
+#define _GNTCOPY_source_gref      (0)
+#define GNTCOPY_source_gref       (1<<_GNTCOPY_source_gref)
+#define _GNTCOPY_dest_gref        (1)
+#define GNTCOPY_dest_gref         (1<<_GNTCOPY_dest_gref)
+
+#define GNTTABOP_copy                 5
+typedef struct gnttab_copy {
+    /* IN parameters. */
+    struct {
+        union {
+            grant_ref_t ref;
+            xen_pfn_t   gmfn;
+        } u;
+        domid_t  domid;
+        uint16_t offset;
+    } source, dest;
+    uint16_t      len;
+    uint16_t      flags;          /* GNTCOPY_* */
+    /* OUT parameters. */
+    int16_t       status;
+} gnttab_copy_t;
+DEFINE_XEN_GUEST_HANDLE(gnttab_copy_t);
+
+
 /*
  * Bitfield values for update_pin_status.flags.
  */
@@ -290,6 +333,7 @@ DEFINE_XEN_GUEST_HANDLE(gnttab_transfer_t);
 #define GNTST_no_device_space  (-7) /* Out of space in I/O MMU.              */
 #define GNTST_permission_denied (-8) /* Not enough privilege for operation.  */
 #define GNTST_bad_page         (-9) /* Specified page was invalid for op.    */
+#define GNTST_bad_copy_arg    (-10) /* copy arguments cross page boundary */
 
 #define GNTTABOP_error_msgs {                   \
     "okay",                                     \
@@ -301,7 +345,8 @@ DEFINE_XEN_GUEST_HANDLE(gnttab_transfer_t);
     "invalid device address",                   \
     "no spare translation slot in the I/O MMU", \
     "permission denied",                        \
-    "bad page"                                  \
+    "bad page",                                 \
+    "copy arguments cross page boundary"        \
 }
 
 #endif /* __XEN_PUBLIC_GRANT_TABLE_H__ */
