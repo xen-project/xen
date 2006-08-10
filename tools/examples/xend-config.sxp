@@ -54,7 +54,7 @@
 #  (xend-relocation-hosts-allow '^localhost$ ^.*\.example\.org$')
 #
 #(xend-relocation-hosts-allow '')
-(xend-relocation-hosts-allow '^localhost$ ^localhost\.localdomain$')
+(xend-relocation-hosts-allow '^localhost$ ^localhost\\.localdomain$')
 
 # The limit (in kilobytes) on the size of the console buffer
 #(console-limit 1024)

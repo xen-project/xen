@@ -251,7 +251,7 @@ class HVMImageHandler(ImageHandler):
     def parseDeviceModelArgs(self, imageConfig, deviceConfig):
         dmargs = [ 'boot', 'fda', 'fdb', 'soundhw',
                    'localtime', 'serial', 'stdvga', 'isa', 'vcpus',
-		   'acpi', 'usb', 'usbdevice']
+                   'acpi', 'usb', 'usbdevice']
         ret = []
         for a in dmargs:
             v = sxp.child_value(imageConfig, a)
@@ -305,9 +305,6 @@ class HVMImageHandler(ImageHandler):
     def configVNC(self, config):
         # Handle graphics library related options
         vnc = sxp.child_value(config, 'vnc')
-        vncdisplay = sxp.child_value(config, 'vncdisplay',
-                                     int(self.vm.getDomid()))
-        vncunused = sxp.child_value(config, 'vncunused')
         sdl = sxp.child_value(config, 'sdl')
         ret = []
         nographic = sxp.child_value(config, 'nographic')
@@ -315,9 +312,12 @@ class HVMImageHandler(ImageHandler):
             ret.append('-nographic')
             return ret
         if vnc:
+            vncdisplay = sxp.child_value(config, 'vncdisplay',
+                                         int(self.vm.getDomid()))
             ret = ret + ['-vnc', '%d' % vncdisplay, '-k', 'en-us']
-        if vncunused:
-            ret += ['-vncunused']
+            vncunused = sxp.child_value(config, 'vncunused')
+            if vncunused:
+                ret += ['-vncunused']
         return ret
 
     def createDeviceModel(self):
