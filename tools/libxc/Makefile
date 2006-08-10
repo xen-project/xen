@@ -99,8 +99,9 @@ TAGS:
 
 .PHONY: clean
 clean:
-	rm -rf *.a *.so* *.o *.opic *.rpm $(LIB) *~ $(DEPS) xen
-	rm -rf ia64/*.o ia64/*.opic
+	rm -rf *.rpm $(LIB) *~ $(DEPS) xen \
+            $(CTRL_LIB_OBJS) $(CTRL_PIC_OBJS) \
+            $(GUEST_LIB_OBJS) $(GUEST_PIC_OBJS)
 
 .PHONY: rpm
 rpm: build
