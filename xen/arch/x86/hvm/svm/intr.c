@@ -112,6 +112,7 @@ asmlinkage void svm_intr_assist(void)
     struct hvm_domain *plat=&v->domain->arch.hvm_domain; 
     struct periodic_time *pt = &plat->pl_time.periodic_tm;
     struct hvm_virpic *pic= &plat->vpic;
+    int callback_irq;
     int intr_type = APIC_DM_EXTINT;
     int intr_vector = -1;
     int re_injecting = 0;
@@ -156,11 +157,21 @@ asmlinkage void svm_intr_assist(void)
       if ( v->vcpu_id == 0 )
          hvm_pic_assist(v);
 
-      /* Before we deal with PIT interrupts, let's check
-         for interrupts set by the device model.
+      callback_irq = v->domain->arch.hvm_domain.params[HVM_PARAM_CALLBACK_IRQ];
+
+      /* Before we deal with PIT interrupts, let's check for
+         interrupts set by the device model or paravirtualised event
+         channel interrupts.
       */
       if ( cpu_has_pending_irq(v) ) {
            intr_vector = cpu_get_interrupt(v, &intr_type);
+      }
+      else  if ( callback_irq != 0 && local_events_need_delivery() ) {
+          /*inject para-device call back irq*/
+          v->vcpu_info->evtchn_upcall_mask = 1;
+          pic_set_irq(pic, callback_irq, 0);
+          pic_set_irq(pic, callback_irq, 1);
+          intr_vector = callback_irq;
       }
       else  if ( (v->vcpu_id == 0) && pt->enabled && pt->pending_intr_nr ) {
           pic_set_irq(pic, pt->irq, 0);

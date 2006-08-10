@@ -142,6 +142,7 @@ asmlinkage void vmx_intr_assist(void)
     struct hvm_domain *plat=&v->domain->arch.hvm_domain;
     struct periodic_time *pt = &plat->pl_time.periodic_tm;
     struct hvm_virpic *pic= &plat->vpic;
+    int callback_irq;
     unsigned int idtv_info_field;
     unsigned long inst_len;
     int    has_ext_irq;
@@ -152,6 +153,15 @@ asmlinkage void vmx_intr_assist(void)
     if ( (v->vcpu_id == 0) && pt->enabled && pt->pending_intr_nr ) {
         pic_set_irq(pic, pt->irq, 0);
         pic_set_irq(pic, pt->irq, 1);
+    }
+
+    callback_irq = v->domain->arch.hvm_domain.params[HVM_PARAM_CALLBACK_IRQ];
+    if ( callback_irq != 0 &&
+         local_events_need_delivery() ) {
+        /*inject para-device call back irq*/
+        v->vcpu_info->evtchn_upcall_mask = 1;
+        pic_set_irq(pic, callback_irq, 0);
+        pic_set_irq(pic, callback_irq, 1);
     }
 
     has_ext_irq = cpu_has_pending_irq(v);
