@@ -167,7 +167,7 @@ static void set_hvm_info_checksum(struct hvm_info_table *t)
  */
 static int set_hvm_info(int xc_handle, uint32_t dom,
                         xen_pfn_t *pfn_list, unsigned int vcpus,
-                        unsigned int pae, unsigned int acpi, unsigned int apic)
+                        unsigned int acpi, unsigned int apic)
 {
     char *va_map;
     struct hvm_info_table *va_hvm;
@@ -186,7 +186,6 @@ static int set_hvm_info(int xc_handle, uint32_t dom,
     va_hvm->length       = sizeof(struct hvm_info_table);
     va_hvm->acpi_enabled = acpi;
     va_hvm->apic_enabled = apic;
-    va_hvm->pae_enabled  = pae;
     va_hvm->nr_vcpus     = vcpus;
 
     set_hvm_info_checksum(va_hvm);
@@ -194,7 +193,6 @@ static int set_hvm_info(int xc_handle, uint32_t dom,
     munmap(va_map, PAGE_SIZE);
 
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_APIC_ENABLED, apic);
-    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_PAE_ENABLED, pae);
 
     return 0;
 }
@@ -285,11 +283,13 @@ static int setup_guest(int xc_handle,
             goto error_out;
     }
 
-    if ( set_hvm_info(xc_handle, dom, page_array, vcpus, pae, acpi, apic) )
+    if ( set_hvm_info(xc_handle, dom, page_array, vcpus, acpi, apic) )
     {
         ERROR("Couldn't set hvm info for HVM guest.\n");
         goto error_out;
     }
+
+    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_PAE_ENABLED, pae);
 
     if ( (e820_page = xc_map_foreign_range(
               xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
