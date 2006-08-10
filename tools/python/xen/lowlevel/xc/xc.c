@@ -336,7 +336,7 @@ static PyObject *pyxc_linux_build(XcObject *self,
                                 "console_evtchn", "image",
                                 /* optional */
                                 "ramdisk", "cmdline", "flags",
-                                "features", "arch", NULL };
+                                "features", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiis|ssis", kwd_list,
                                       &dom, &store_evtchn,
