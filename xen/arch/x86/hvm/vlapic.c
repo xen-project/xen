@@ -68,7 +68,7 @@ int vlapic_find_highest_irr(struct vlapic *vlapic)
      result = find_highest_bit((unsigned long *)(vlapic->regs + APIC_IRR),
                                MAX_VECTOR);
 
-     ASSERT( result == -1 || result > 16);
+     ASSERT( result == -1 || result >= 16);
 
      return result;
 }
@@ -91,7 +91,7 @@ int vlapic_find_highest_isr(struct vlapic *vlapic)
     result = find_highest_bit((unsigned long *)(vlapic->regs + APIC_ISR),
                                MAX_VECTOR);
 
-    ASSERT( result == -1 || result > 16);
+    ASSERT( result == -1 || result >= 16);
 
     return result;
 }
@@ -156,10 +156,11 @@ static int vlapic_match_dest(struct vcpu *v, struct vlapic *source,
         }
         else                /* Logical */
         {
-            uint32_t ldr = vlapic_get_reg(target, APIC_LDR);
-
+            uint32_t ldr;
             if ( target == NULL )
                 break;
+            ldr = vlapic_get_reg(target, APIC_LDR);
+            
             /* Flat mode */
             if ( vlapic_get_reg(target, APIC_DFR) == APIC_DFR_FLAT)
             {
@@ -219,14 +220,14 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
         if ( unlikely(vlapic == NULL || !vlapic_enabled(vlapic)) )
             break;
 
-        if ( test_and_set_bit(vector, vlapic->regs + APIC_IRR) )
+        if ( test_and_set_bit(vector, vlapic->regs + APIC_IRR) && trig_mode)
         {
             HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
-              "level trig mode repeatedly for vector %d\n", vector);
+                  "level trig mode repeatedly for vector %d\n", vector);
             break;
         }
 
-        if ( level )
+        if ( trig_mode )
         {
             HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
               "level trig mode for vector %d\n", vector);
@@ -248,7 +249,7 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
         break;
 
     case APIC_DM_INIT:
-        if ( level && !(trig_mode & APIC_INT_ASSERT) )     //Deassert
+        if ( trig_mode && !(level & APIC_INT_ASSERT) )     //Deassert
             printk("This hvm_vlapic is for P4, no work for De-assert init\n");
         else
         {
@@ -290,11 +291,12 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
 
     return result;
 }
+
 /*
-    This function is used by both ioapic and local APIC
-    The bitmap is for vcpu_id
+ * This function is used by both ioapic and local APIC
+ * The bitmap is for vcpu_id
  */
-struct vlapic* apic_round_robin(struct domain *d,
+struct vlapic *apic_round_robin(struct domain *d,
                                 uint8_t dest_mode,
                                 uint8_t vector,
                                 uint32_t bitmap)
@@ -321,11 +323,11 @@ struct vlapic* apic_round_robin(struct domain *d,
     /* the vcpu array is arranged according to vcpu_id */
     do
     {
-        next++;
-        if ( !d->vcpu[next] ||
-             !test_bit(_VCPUF_initialised, &d->vcpu[next]->vcpu_flags) ||
-             next == MAX_VIRT_CPUS )
+        if ( ++next == MAX_VIRT_CPUS ) 
             next = 0;
+        if ( d->vcpu[next] == NULL ||
+             !test_bit(_VCPUF_initialised, &d->vcpu[next]->vcpu_flags) )
+            continue;
 
         if ( test_bit(next, &bitmap) )
         {
@@ -384,15 +386,15 @@ static void vlapic_ipi(struct vlapic *vlapic)
 
     unsigned int dest =         GET_APIC_DEST_FIELD(icr_high);
     unsigned int short_hand =   icr_low & APIC_SHORT_MASK;
-    unsigned int trig_mode =    icr_low & APIC_INT_ASSERT;
-    unsigned int level =        icr_low & APIC_INT_LEVELTRIG;
+    unsigned int trig_mode =    icr_low & APIC_INT_LEVELTRIG;
+    unsigned int level =        icr_low & APIC_INT_ASSERT;
     unsigned int dest_mode =    icr_low & APIC_DEST_MASK;
     unsigned int delivery_mode =    icr_low & APIC_MODE_MASK;
     unsigned int vector =       icr_low & APIC_VECTOR_MASK;
 
     struct vlapic *target;
     struct vcpu *v = NULL;
-    uint32_t lpr_map;
+    uint32_t lpr_map=0;
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "icr_high 0x%x, icr_low 0x%x, "
                 "short_hand 0x%x, dest 0x%x, trig_mode 0x%x, level 0x%x, "
@@ -456,7 +458,7 @@ static uint32_t vlapic_get_tmcct(struct vlapic *vlapic)
         {
             do {
                 tmcct += vlapic_get_reg(vlapic, APIC_TMICT);
-            } while ( tmcct < 0 );
+            } while ( tmcct <= 0 );
         }
     }
 
@@ -487,6 +489,11 @@ static void vlapic_read_aligned(struct vlapic *vlapic, unsigned int offset,
 
     case APIC_TMCCT:        //Timer CCR
         *result = vlapic_get_tmcct(vlapic);
+        break;
+
+    case APIC_ESR:
+        vlapic->err_write_count = 0;
+        *result = vlapic_get_reg(vlapic, offset); 
         break;
 
     default:
@@ -522,10 +529,12 @@ static unsigned long vlapic_read(struct vcpu *v, unsigned long address,
         break;
 
     case 2:
+        ASSERT( alignment != 3 );
         result = *(unsigned short *)((unsigned char *)&tmp + alignment);
         break;
 
     case 4:
+        ASSERT( alignment == 0 );
         result = *(unsigned int *)((unsigned char *)&tmp + alignment);
         break;
 
@@ -561,7 +570,7 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
         unsigned int tmp;
         unsigned char alignment;
 
-        /* Some kernel do will access with byte/word alignment*/
+        /* Some kernels do will access with byte/word alignment */
         printk("Notice: Local APIC write with len = %lx\n",len);
         alignment = offset & 0x3;
         tmp = vlapic_read(v, offset & ~0x3, 4);
@@ -570,8 +579,8 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
             /* XXX the saddr is a tmp variable from caller, so should be ok
                But we should still change the following ref to val to
                local variable later */
-            val = (tmp & ~(0xff << alignment)) |
-                  ((val & 0xff) << alignment);
+            val = (tmp & ~(0xff << (8*alignment))) |
+                  ((val & 0xff) << (8*alignment));
             break;
 
         case 2:
@@ -581,8 +590,8 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
                 domain_crash_synchronous();
             }
 
-            val = (tmp & ~(0xffff << alignment)) |
-                  ((val & 0xffff) << alignment);
+            val = (tmp & ~(0xffff << (8*alignment))) |
+                  ((val & 0xffff) << (8*alignment));
             break;
 
         case 3:
@@ -619,11 +628,11 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
         break;
 
     case APIC_DFR:
-        vlapic_set_reg(vlapic, APIC_DFR, val);
+        vlapic_set_reg(vlapic, APIC_DFR, val | 0x0FFFFFFF);
         break;
 
     case APIC_SPIV:
-        vlapic_set_reg(vlapic, APIC_SPIV, val & 0x1ff);
+        vlapic_set_reg(vlapic, APIC_SPIV, val & 0x3ff);
 
         if ( !( val & APIC_SPIV_APIC_ENABLED) )
         {
@@ -634,7 +643,7 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
 
             for ( i = 0; i < VLAPIC_LVT_NUM; i++ )
             {
-                lvt_val = vlapic_get_reg(vlapic, APIC_LVT1 + 0x10 * i);
+                lvt_val = vlapic_get_reg(vlapic, APIC_LVTT + 0x10 * i);
                 vlapic_set_reg(vlapic, APIC_LVTT + 0x10 * i,
                                lvt_val | APIC_LVT_MASKED);
             }
@@ -753,7 +762,7 @@ static int vlapic_range(struct vcpu *v, unsigned long addr)
 
     if ( vlapic_global_enabled(vlapic) &&
          (addr >= vlapic->base_address) &&
-         (addr <= vlapic->base_address + VLOCAL_APIC_MEM_LENGTH) )
+         (addr < vlapic->base_address + VLOCAL_APIC_MEM_LENGTH) )
         return 1;
 
     return 0;
@@ -940,7 +949,7 @@ void vlapic_post_injection(struct vcpu *v, int vector, int deliver_mode)
     case APIC_DM_NMI:
     case APIC_DM_INIT:
     case APIC_DM_STARTUP:
-        vlapic->direct_intr.deliver_mode &= deliver_mode;
+        vlapic->direct_intr.deliver_mode &= (1 << (deliver_mode >> 8));
         break;
 
     default:
