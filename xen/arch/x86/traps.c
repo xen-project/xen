@@ -780,7 +780,7 @@ static int __spurious_page_fault(
     l4e = l4t[l4_table_offset(addr)];
     mfn = l4e_get_pfn(l4e);
     unmap_domain_page(l4t);
-    if ( !(l4e_get_flags(l4e) & required_flags) ||
+    if ( ((l4e_get_flags(l4e) & required_flags) != required_flags) ||
          (l4e_get_flags(l4e) & disallowed_flags) )
         return 0;
 #endif
@@ -797,7 +797,7 @@ static int __spurious_page_fault(
     if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
         return 0;
 #else
-    if ( !(l3e_get_flags(l3e) & required_flags) ||
+    if ( ((l3e_get_flags(l3e) & required_flags) != required_flags) ||
          (l3e_get_flags(l3e) & disallowed_flags) )
         return 0;
 #endif
@@ -807,7 +807,7 @@ static int __spurious_page_fault(
     l2e = l2t[l2_table_offset(addr)];
     mfn = l2e_get_pfn(l2e);
     unmap_domain_page(l2t);
-    if ( !(l2e_get_flags(l2e) & required_flags) ||
+    if ( ((l2e_get_flags(l2e) & required_flags) != required_flags) ||
          (l2e_get_flags(l2e) & disallowed_flags) )
         return 0;
     if ( l2e_get_flags(l2e) & _PAGE_PSE )
@@ -820,7 +820,7 @@ static int __spurious_page_fault(
     l1e = l1t[l1_table_offset(addr)];
     mfn = l1e_get_pfn(l1e);
     unmap_domain_page(l1t);
-    if ( !(l1e_get_flags(l1e) & required_flags) ||
+    if ( ((l1e_get_flags(l1e) & required_flags) != required_flags) ||
          (l1e_get_flags(l1e) & disallowed_flags) )
         return 0;
 
