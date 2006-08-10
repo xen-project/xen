@@ -47,7 +47,6 @@
 #endif
 #include <public/sched.h>
 #include <public/hvm/ioreq.h>
-#include <public/hvm/hvm_info_table.h>
 #include <public/version.h>
 #include <public/memory.h>
 

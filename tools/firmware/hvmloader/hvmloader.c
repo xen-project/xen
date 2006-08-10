@@ -26,7 +26,7 @@
 #include "hypercall.h"
 #include "util.h"
 #include <xen/version.h>
-#include <xen/hvm/hvm_info_table.h>
+#include <xen/hvm/params.h>
 
 /* memory map */
 #define HYPERCALL_PHYSICAL_ADDRESS	0x00080000
@@ -172,7 +172,7 @@ init_hypercalls(void)
 int
 main(void)
 {
-	struct hvm_info_table *t = get_hvm_info_table();
+	struct xen_hvm_param hvm_param;
 
 	puts("HVM Loader\n");
 
@@ -180,7 +180,10 @@ main(void)
 
 	puts("Loading ROMBIOS ...\n");
 	memcpy((void *)ROMBIOS_PHYSICAL_ADDRESS, rombios, sizeof(rombios));
-	if (t->apic_enabled)
+
+	hvm_param.domid = DOMID_SELF;
+	hvm_param.index = HVM_PARAM_APIC_ENABLED;
+	if (!hypercall_hvm_op(HVMOP_get_param, &hvm_param) && hvm_param.value)
 		create_mp_tables();
 	
 	if (cirrus_check()) {

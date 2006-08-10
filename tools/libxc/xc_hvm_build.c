@@ -185,7 +185,6 @@ static int set_hvm_info(int xc_handle, uint32_t dom,
     strncpy(va_hvm->signature, "HVM INFO", 8);
     va_hvm->length       = sizeof(struct hvm_info_table);
     va_hvm->acpi_enabled = acpi;
-    va_hvm->apic_enabled = apic;
     va_hvm->nr_vcpus     = vcpus;
 
     set_hvm_info_checksum(va_hvm);

@@ -16,7 +16,6 @@ struct hvm_info_table {
     uint32_t    length;
     uint8_t     checksum;
     uint8_t     acpi_enabled;
-    uint8_t     apic_enabled;
     uint32_t    nr_vcpus;
 };
 
