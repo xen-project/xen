@@ -609,9 +609,14 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 	 */
 	batch_target = np->rx_target - (req_prod - np->rx.rsp_cons);
 	for (i = skb_queue_len(&np->rx_batch); i < batch_target; i++) {
-		/* Allocate an skb and a page. */
-		skb = __dev_alloc_skb(RX_COPY_THRESHOLD,
-				      GFP_ATOMIC | __GFP_NOWARN);
+		/*
+		 * Allocate an skb and a page. Do not use __dev_alloc_skb as
+		 * that will allocate page-sized buffers which is not
+		 * necessary here.
+		 * 16 bytes added as necessary headroom for netif_receive_skb.
+		 */
+		skb = alloc_skb(SKB_DATA_ALIGN(RX_COPY_THRESHOLD + 16),
+				GFP_ATOMIC | __GFP_NOWARN);
 		if (unlikely(!skb))
 			goto no_skb;
 
