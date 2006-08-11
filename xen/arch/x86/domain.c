@@ -154,7 +154,7 @@ void free_vcpu_struct(struct vcpu *v)
 int arch_domain_create(struct domain *d)
 {
     l1_pgentry_t gdt_l1e;
-    int vcpuid, pdpt_order, rc;
+    int vcpuid, pdpt_order;
 #ifdef __x86_64__
     int i;
 #endif
@@ -213,9 +213,6 @@ int arch_domain_create(struct domain *d)
             goto fail_nomem;
 
         if ( (d->shared_info = alloc_xenheap_page()) == NULL )
-            goto fail_nomem;
-
-        if ( (rc = ptwr_init(d)) != 0 )
             goto fail_nomem;
 
         memset(d->shared_info, 0, PAGE_SIZE);
@@ -926,8 +923,6 @@ void domain_relinquish_resources(struct domain *d)
     unsigned long pfn;
 
     BUG_ON(!cpus_empty(d->domain_dirty_cpumask));
-
-    ptwr_destroy(d);
 
     /* Drop the in-use references to page-table bases. */
     for_each_vcpu ( d, v )

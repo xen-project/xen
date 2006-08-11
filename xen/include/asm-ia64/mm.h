@@ -500,4 +500,6 @@ extern u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps,
 int steal_page(
     struct domain *d, struct page_info *page, unsigned int memflags);
 
+#define sync_pagetable_state(d) ((void)0)
+
 #endif /* __ASM_IA64_MM_H__ */

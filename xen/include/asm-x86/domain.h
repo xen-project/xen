@@ -70,9 +70,6 @@ struct arch_domain
     struct mapcache mapcache;
 #endif
 
-    /* Writable pagetables. */
-    struct ptwr_info ptwr[2];
-
     /* I/O-port admin-specified access capabilities. */
     struct rangeset *ioport_caps;
 

@@ -1580,11 +1580,6 @@ void pgtable_quicklist_free(void *pgtable_entry)
 	free_xenheap_page(pgtable_entry);
 }
 
-void cleanup_writable_pagetable(struct domain *d)
-{
-  return;
-}
-
 void put_page_type(struct page_info *page)
 {
     u32 nx, x, y = page->u.inuse.type_info;
@@ -1692,22 +1687,6 @@ int get_page_type(struct page_info *page, u32 type)
             {
                 if ( unlikely((x & PGT_type_mask) != (type & PGT_type_mask) ) )
                 {
-                    if ( current->domain == page_get_owner(page) )
-                    {
-                        /*
-                         * This ensures functions like set_gdt() see up-to-date
-                         * type info without needing to clean up writable p.t.
-                         * state on the fast path.
-                         */
-                        LOCK_BIGLOCK(current->domain);
-                        cleanup_writable_pagetable(current->domain);
-                        y = page->u.inuse.type_info;
-                        UNLOCK_BIGLOCK(current->domain);
-                        /* Can we make progress now? */
-                        if ( ((y & PGT_type_mask) == (type & PGT_type_mask)) ||
-                             ((y & PGT_count_mask) == 0) )
-                            goto again;
-                    }
                     if ( ((x & PGT_type_mask) != PGT_l2_page_table) ||
                          ((type & PGT_type_mask) != PGT_l1_page_table) )
                         MEM_LOG("Bad type (saw %08x != exp %08x) "

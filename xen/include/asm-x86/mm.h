@@ -198,7 +198,8 @@ static inline int get_page(struct page_info *page,
              unlikely(d != _domain) )                /* Wrong owner? */
         {
             if ( !_shadow_mode_refcounts(domain) )
-                DPRINTK("Error pfn %lx: rd=%p, od=%p, caf=%08x, taf=%" PRtype_info "\n",
+                DPRINTK("Error pfn %lx: rd=%p, od=%p, caf=%08x, taf=%"
+                        PRtype_info "\n",
                         page_to_mfn(page), domain, unpickle_domptr(d),
                         x, page->u.inuse.type_info);
             return 0;
@@ -307,48 +308,11 @@ void memguard_unguard_range(void *p, unsigned long l);
 
 void memguard_guard_stack(void *p);
 
-/* Writable Pagetables */
-struct ptwr_info {
-    /* Linear address where the guest is updating the p.t. page. */
-    unsigned long l1va;
-    /* Copy of the p.t. page, taken before guest is given write access. */
-    l1_pgentry_t *page;
-    /* Index in L2 page table where this L1 p.t. is always hooked. */
-    unsigned int l2_idx; /* NB. Only used for PTWR_PT_ACTIVE. */
-    /* Info about last ptwr update batch. */
-    unsigned int prev_nr_updates;
-    /* VCPU which created writable mapping. */
-    struct vcpu *vcpu;
-    /* EIP of the original write fault (stats collection only). */
-    unsigned long eip;
-};
-
-#define PTWR_PT_ACTIVE 0
-#define PTWR_PT_INACTIVE 1
-
-#define PTWR_CLEANUP_ACTIVE 1
-#define PTWR_CLEANUP_INACTIVE 2
-
-int  ptwr_init(struct domain *);
-void ptwr_destroy(struct domain *);
-void ptwr_flush(struct domain *, const int);
 int  ptwr_do_page_fault(struct domain *, unsigned long,
                         struct cpu_user_regs *);
 int  revalidate_l1(struct domain *, l1_pgentry_t *, l1_pgentry_t *);
 
-void cleanup_writable_pagetable(struct domain *d);
-#define sync_pagetable_state(d)                                 \
-    do {                                                        \
-        LOCK_BIGLOCK(d);                                        \
-        /* Avoid racing with ptwr_destroy(). */                 \
-        if ( !test_bit(_DOMF_dying, &(d)->domain_flags) )       \
-            cleanup_writable_pagetable(d);                      \
-        UNLOCK_BIGLOCK(d);                                      \
-    } while ( 0 )
-
-#define writable_pagetable_in_sync(d)           \
-    (!((d)->arch.ptwr[PTWR_PT_ACTIVE].l1va |    \
-       (d)->arch.ptwr[PTWR_PT_INACTIVE].l1va))
+void sync_pagetable_state(struct domain *d);
 
 int audit_adjust_pgtables(struct domain *d, int dir, int noisy);
 
@@ -367,18 +331,6 @@ void audit_domains(void);
 #define _audit_domain(_d, _f) ((void)0)
 #define audit_domain(_d)      ((void)0)
 #define audit_domains()       ((void)0)
-
-#endif
-
-#ifdef PERF_ARRAYS
-
-void ptwr_eip_stat_reset(void);
-void ptwr_eip_stat_print(void);
-
-#else
-
-#define ptwr_eip_stat_reset() ((void)0)
-#define ptwr_eip_stat_print() ((void)0)
 
 #endif
 

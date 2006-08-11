@@ -35,8 +35,6 @@
 extern unsigned long xenheap_phys_end;
 #define IS_XEN_HEAP_FRAME(_pfn) (page_to_mfn(_pfn) < xenheap_phys_end)
 
-#define cleanup_writable_pagetable(_d)
-
 /*
  * Per-page-frame information.
  * 
@@ -225,5 +223,7 @@ static inline unsigned long gmfn_to_mfn(struct domain *d, unsigned long gmfn)
 
 extern int steal_page(struct domain *d, struct page_info *page,
                         unsigned int memflags);
+
+#define sync_pagetable_state(d) ((void)0)
 
 #endif

@@ -1669,10 +1669,8 @@ int get_page_type(struct page_info *page, unsigned long type)
                          *     enter a recursive loop via get_page_from_l1e()
                          *     during pagetable revalidation.
                          */
-                        LOCK_BIGLOCK(current->domain);
-                        cleanup_writable_pagetable(current->domain);
+                        sync_pagetable_state(current->domain);
                         y = page->u.inuse.type_info;
-                        UNLOCK_BIGLOCK(current->domain);
                         /* Can we make progress now? */
                         if ( ((y & PGT_type_mask) == (type & PGT_type_mask)) ||
                              ((y & PGT_count_mask) == 0) )
@@ -1749,8 +1747,6 @@ int new_guest_cr3(unsigned long mfn)
     struct domain *d = v->domain;
     int okay;
     unsigned long old_base_mfn;
-
-    ASSERT(writable_pagetable_in_sync(d));
 
     if ( shadow_mode_refcounts(d) )
     {
@@ -1940,7 +1936,7 @@ int do_mmuext_op(
 
     LOCK_BIGLOCK(d);
 
-    cleanup_writable_pagetable(d);
+    sync_pagetable_state(d);
 
     if ( unlikely(count & MMU_UPDATE_PREEMPTED) )
     {
@@ -2193,7 +2189,7 @@ int do_mmu_update(
 
     LOCK_BIGLOCK(d);
 
-    cleanup_writable_pagetable(d);
+    sync_pagetable_state(d);
 
     if ( unlikely(shadow_mode_enabled(d)) )
         check_pagetable(v, "pre-mmu"); /* debug */
@@ -2704,7 +2700,7 @@ int do_update_va_mapping(unsigned long va, u64 val64,
 
     LOCK_BIGLOCK(d);
 
-    cleanup_writable_pagetable(d);
+    sync_pagetable_state(d);
 
     if ( unlikely(shadow_mode_enabled(d)) )
         check_pagetable(v, "pre-va"); /* debug */
@@ -3102,131 +3098,6 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
  * Writable Pagetables
  */
 
-#ifdef VVERBOSE
-int ptwr_debug = 0x0;
-#define PTWR_PRINTK(_f, _a...) \
- do { if ( unlikely(ptwr_debug) ) printk( _f , ## _a ); } while ( 0 )
-#define PTWR_PRINT_WHICH (which ? 'I' : 'A')
-#else
-#define PTWR_PRINTK(_f, _a...) ((void)0)
-#endif
-
-
-#ifdef PERF_ARRAYS
-
-/**************** writeable pagetables profiling functions *****************/
-
-#define ptwr_eip_buckets        256
-
-int ptwr_eip_stat_threshold[] = {1, 10, 50, 100, L1_PAGETABLE_ENTRIES};
-
-#define ptwr_eip_stat_thresholdN (sizeof(ptwr_eip_stat_threshold)/sizeof(int))
-
-struct {
-    unsigned long eip;
-    domid_t       id;
-    u32           val[ptwr_eip_stat_thresholdN];
-} typedef ptwr_eip_stat_t;
-
-ptwr_eip_stat_t ptwr_eip_stats[ptwr_eip_buckets];
-
-static inline unsigned int ptwr_eip_stat_hash( unsigned long eip, domid_t id )
-{
-    return (((unsigned long) id) ^ eip ^ (eip>>8) ^ (eip>>16) ^ (eip>24)) % 
-        ptwr_eip_buckets;
-}
-
-static void ptwr_eip_stat_inc(u32 *n)
-{
-    unsigned int i, j;
-
-    if ( ++(*n) != 0 )
-        return;
-
-    *n = ~0;
-
-    /* Re-scale all buckets. */
-    for ( i = 0; i < ptwr_eip_buckets; i++ )
-        for ( j = 0; j < ptwr_eip_stat_thresholdN; j++ )
-            ptwr_eip_stats[i].val[j] >>= 1;
-}
-
-static void ptwr_eip_stat_update(unsigned long eip, domid_t id, int modified)
-{
-    unsigned int i, j, b;
-
-    i = b = ptwr_eip_stat_hash(eip, id);
-
-    do
-    {
-        if ( !ptwr_eip_stats[i].eip )
-        {
-            /* doesn't exist */
-            ptwr_eip_stats[i].eip = eip;
-            ptwr_eip_stats[i].id = id;
-            memset(ptwr_eip_stats[i].val,0, sizeof(ptwr_eip_stats[i].val));
-        }
-
-        if ( ptwr_eip_stats[i].eip == eip && ptwr_eip_stats[i].id == id)
-        {
-            for ( j = 0; j < ptwr_eip_stat_thresholdN; j++ )
-                if ( modified <= ptwr_eip_stat_threshold[j] )
-                    break;
-            BUG_ON(j >= ptwr_eip_stat_thresholdN);
-            ptwr_eip_stat_inc(&ptwr_eip_stats[i].val[j]);
-            return;
-        }
-
-        i = (i+1) % ptwr_eip_buckets;
-    }
-    while ( i != b );
-   
-    printk("ptwr_eip_stat: too many EIPs in use!\n");
-    
-    ptwr_eip_stat_print();
-    ptwr_eip_stat_reset();
-}
-
-void ptwr_eip_stat_reset(void)
-{
-    memset(ptwr_eip_stats, 0, sizeof(ptwr_eip_stats));
-}
-
-void ptwr_eip_stat_print(void)
-{
-    struct domain *e;
-    domid_t d;
-    unsigned int i, j;
-
-    for_each_domain( e )
-    {
-        d = e->domain_id;
-
-        for ( i = 0; i < ptwr_eip_buckets; i++ )
-        {
-            if ( !ptwr_eip_stats[i].eip || ptwr_eip_stats[i].id != d )
-                continue;
-
-            printk("D %5d  eip %p ",
-                   ptwr_eip_stats[i].id, (void *)ptwr_eip_stats[i].eip);
-
-            for ( j = 0; j < ptwr_eip_stat_thresholdN; j++ )
-                printk("<=%u %4u \t",
-                       ptwr_eip_stat_threshold[j],
-                       ptwr_eip_stats[i].val[j]);
-            printk("\n");
-        }
-    }
-}
-
-#else /* PERF_ARRAYS */
-
-#define ptwr_eip_stat_update(eip, id, modified) ((void)0)
-
-#endif
-
-/*******************************************************************/
-
 /* Re-validate a given p.t. page, given its prior snapshot */
 int revalidate_l1(
     struct domain *d, l1_pgentry_t *l1page, l1_pgentry_t *snapshot)
@@ -3277,112 +3148,6 @@ int revalidate_l1(
     return modified;
 }
 
-
-/* Flush the given writable p.t. page and write-protect it again. */
-void ptwr_flush(struct domain *d, const int which)
-{
-    unsigned long l1va;
-    l1_pgentry_t  *pl1e, pte, *ptep;
-    l2_pgentry_t  *pl2e;
-    unsigned int   modified;
-
-#ifdef CONFIG_X86_64
-    struct vcpu *v = current;
-    int user_mode = !(v->arch.flags & TF_kernel_mode);
-#endif
-
-    ASSERT(!shadow_mode_enabled(d));
-
-    if ( unlikely(d->arch.ptwr[which].vcpu != current) )
-        /* Don't use write_ptbase: it may switch to guest_user on x86/64! */
-        __write_ptbase(pagetable_get_pfn(
-            d->arch.ptwr[which].vcpu->arch.guest_table));
-    else
-        TOGGLE_MODE();
-
-    l1va = d->arch.ptwr[which].l1va;
-    ptep = (l1_pgentry_t *)&linear_pg_table[l1_linear_offset(l1va)];
-
-    /*
-     * STEP 1. Write-protect the p.t. page so no more updates can occur.
-     */
-
-    if ( unlikely(__get_user(pte.l1, &ptep->l1)) )
-    {
-        MEM_LOG("ptwr: Could not read pte at %p", ptep);
-        /*
-         * Really a bug. We could read this PTE during the initial fault,
-         * and pagetables can't have changed meantime.
-         */
-        BUG();
-    }
-    PTWR_PRINTK("[%c] disconnected_l1va at %p is %"PRIpte"\n",
-                PTWR_PRINT_WHICH, ptep, l1e_get_intpte(pte));
-    l1e_remove_flags(pte, _PAGE_RW);
-
-    /* Write-protect the p.t. page in the guest page table. */
-    if ( unlikely(__put_user(pte, ptep)) )
-    {
-        MEM_LOG("ptwr: Could not update pte at %p", ptep);
-        /*
-         * Really a bug. We could write this PTE during the initial fault,
-         * and pagetables can't have changed meantime.
-         */
-        BUG();
-    }
-
-    /* Ensure that there are no stale writable mappings in any TLB. */
-    /* NB. INVLPG is a serialising instruction: flushes pending updates. */
-    flush_tlb_one_mask(d->domain_dirty_cpumask, l1va);
-    PTWR_PRINTK("[%c] disconnected_l1va at %p now %"PRIpte"\n",
-                PTWR_PRINT_WHICH, ptep, l1e_get_intpte(pte));
-
-    /*
-     * STEP 2. Validate any modified PTEs.
-     */
-
-    if ( likely(d == current->domain) )
-    {
-        pl1e = map_domain_page(l1e_get_pfn(pte));
-        modified = revalidate_l1(d, pl1e, d->arch.ptwr[which].page);
-        unmap_domain_page(pl1e);
-        perfc_incr_histo(wpt_updates, modified, PT_UPDATES);
-        ptwr_eip_stat_update(d->arch.ptwr[which].eip, d->domain_id, modified);
-        d->arch.ptwr[which].prev_nr_updates = modified;
-    }
-    else
-    {
-        /*
-         * Must make a temporary global mapping, since we are running in the
-         * wrong address space, so no access to our own mapcache.
-         */
-        pl1e = map_domain_page_global(l1e_get_pfn(pte));
-        modified = revalidate_l1(d, pl1e, d->arch.ptwr[which].page);
-        unmap_domain_page_global(pl1e);
-    }
-
-    /*
-     * STEP 3. Reattach the L1 p.t. page into the current address space.
-     */
-
-    if ( which == PTWR_PT_ACTIVE )
-    {
-        pl2e = &__linear_l2_table[d->arch.ptwr[which].l2_idx];
-        l2e_add_flags(*pl2e, _PAGE_PRESENT); 
-    }
-
-    /*
-     * STEP 4. Final tidy-up.
-     */
-
-    d->arch.ptwr[which].l1va = 0;
-
-    if ( unlikely(d->arch.ptwr[which].vcpu != current) )
-        write_ptbase(current);
-    else 
-        TOGGLE_MODE();
-}
-
 static int ptwr_emulated_update(
     unsigned long addr,
     paddr_t old,
@@ -3390,7 +3155,7 @@ static int ptwr_emulated_update(
     unsigned int bytes,
     unsigned int do_cmpxchg)
 {
-    unsigned long pfn, l1va;
+    unsigned long pfn;
     struct page_info *page;
     l1_pgentry_t pte, ol1e, nl1e, *pl1e;
     struct domain *d = current->domain;
@@ -3427,24 +3192,6 @@ static int ptwr_emulated_update(
         old <<= (offset)*8;
         old  |= full;
     }
-
-#if 0 /* XXX KAF: I don't think this can happen. */
-    /*
-     * We must not emulate an update to a PTE that is temporarily marked
-     * writable by the batched ptwr logic, else we can corrupt page refcnts! 
-     */
-    if ( ((l1va = d->arch.ptwr[PTWR_PT_ACTIVE].l1va) != 0) &&
-         (l1_linear_offset(l1va) == l1_linear_offset(addr)) )
-        ptwr_flush(d, PTWR_PT_ACTIVE);
-    if ( ((l1va = d->arch.ptwr[PTWR_PT_INACTIVE].l1va) != 0) &&
-         (l1_linear_offset(l1va) == l1_linear_offset(addr)) )
-        ptwr_flush(d, PTWR_PT_INACTIVE);
-#else
-    BUG_ON(((l1va = d->arch.ptwr[PTWR_PT_ACTIVE].l1va) != 0) &&
-           (l1_linear_offset(l1va) == l1_linear_offset(addr)));
-    BUG_ON(((l1va = d->arch.ptwr[PTWR_PT_INACTIVE].l1va) != 0) &&
-           (l1_linear_offset(l1va) == l1_linear_offset(addr)));
-#endif
 
     /* Read the PTE that maps the page being updated. */
     if ( __copy_from_user(&pte, &linear_pg_table[l1_linear_offset(addr)],
@@ -3545,239 +3292,53 @@ static struct x86_emulate_ops ptwr_emulate_ops = {
 int ptwr_do_page_fault(struct domain *d, unsigned long addr, 
                        struct cpu_user_regs *regs)
 {
-    unsigned long    pfn;
+    unsigned long     pfn;
     struct page_info *page;
-    l1_pgentry_t    *pl1e, pte;
-    l2_pgentry_t    *pl2e, l2e;
-    int              which, flags;
-    unsigned long    l2_idx;
+    l1_pgentry_t      pte;
+    l2_pgentry_t     *pl2e, l2e;
     struct x86_emulate_ctxt emul_ctxt;
 
-    ASSERT(!shadow_mode_enabled(d));
+    LOCK_BIGLOCK(d);
 
     /*
      * Attempt to read the PTE that maps the VA being accessed. By checking for
      * PDE validity in the L2 we avoid many expensive fixups in __get_user().
-     * NB. The L2 entry cannot be detached due to existing ptwr work: the
-     * caller already checked that.
      */
     pl2e = &__linear_l2_table[l2_linear_offset(addr)];
     if ( __copy_from_user(&l2e, pl2e, sizeof(l2e)) ||
         !(l2e_get_flags(l2e) & _PAGE_PRESENT) ||
          __copy_from_user(&pte, &linear_pg_table[l1_linear_offset(addr)],
                           sizeof(pte)) )
-    {
-        return 0;
-    }
+        goto bail;
 
     pfn  = l1e_get_pfn(pte);
     page = mfn_to_page(pfn);
 
-#ifdef CONFIG_X86_64
-#define WRPT_PTE_FLAGS (_PAGE_RW | _PAGE_PRESENT | _PAGE_USER)
-#else
-#define WRPT_PTE_FLAGS (_PAGE_RW | _PAGE_PRESENT)
-#endif
-
-    /*
-     * Check the required flags for a valid wrpt mapping. If the page is
-     * already writable then we can return straight to the guest (SMP race).
-     * We decide whether or not to propagate the fault by testing for write
-     * permissions in page directories by writing back to the linear mapping.
-     */
-    if ( (flags = l1e_get_flags(pte) & WRPT_PTE_FLAGS) == WRPT_PTE_FLAGS )
-        return __put_user(
-            pte.l1, &linear_pg_table[l1_linear_offset(addr)].l1) ?
-            0 : EXCRET_not_a_fault;
-
     /* We are looking only for read-only mappings of p.t. pages. */
-    if ( ((flags | _PAGE_RW) != WRPT_PTE_FLAGS) ||
+    if ( ((l1e_get_flags(pte) & (_PAGE_PRESENT|_PAGE_RW)) != _PAGE_PRESENT) ||
          ((page->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table) ||
          ((page->u.inuse.type_info & PGT_count_mask) == 0) ||
          (page_get_owner(page) != d) )
-    {
-        return 0;
-    }
+        goto bail;
 
-#if 0 /* Leave this in as useful for debugging */ 
-    goto emulate; 
-#endif
-
-    PTWR_PRINTK("ptwr_page_fault on l1 pt at va %lx, pfn %lx, eip %lx\n",
-                addr, pfn, (unsigned long)regs->eip);
-    
-    /* Get the L2 index at which this L1 p.t. is always mapped. */
-    l2_idx = page->u.inuse.type_info & PGT_va_mask;
-    if ( unlikely(l2_idx >= PGT_va_unknown) )
-        goto emulate; /* Urk! This L1 is mapped in multiple L2 slots! */
-    l2_idx >>= PGT_va_shift;
-
-    if ( unlikely(l2_idx == l2_linear_offset(addr)) )
-        goto emulate; /* Urk! Pagetable maps itself! */
-
-    /*
-     * Is the L1 p.t. mapped into the current address space? If so we call it
-     * an ACTIVE p.t., otherwise it is INACTIVE.
-     */
-    pl2e = &__linear_l2_table[l2_idx];
-    which = PTWR_PT_INACTIVE;
-
-    if ( (__get_user(l2e.l2, &pl2e->l2) == 0) && (l2e_get_pfn(l2e) == pfn) )
-    {
-        /*
-         * Check the PRESENT bit to set ACTIVE mode.
-         * If the PRESENT bit is clear, we may be conflicting with the current 
-         * ACTIVE p.t. (it may be the same p.t. mapped at another virt addr).
-         * The ptwr_flush call below will restore the PRESENT bit.
-         */
-        if ( likely(l2e_get_flags(l2e) & _PAGE_PRESENT) ||
-             (d->arch.ptwr[PTWR_PT_ACTIVE].l1va &&
-              (l2_idx == d->arch.ptwr[PTWR_PT_ACTIVE].l2_idx)) )
-            which = PTWR_PT_ACTIVE;
-    }
-
-    /*
-     * Multi-processor guest? Then ensure that the page table is hooked into
-     * at most one L2, and also ensure that there is only one mapping of the
-     * page table itself (or there can be conflicting writable mappings from
-     * other VCPUs).
-     */
-    if ( d->vcpu[0]->next_in_list != NULL )
-    {
-        if ( /* Hooked into at most one L2 table (which this VCPU maps)? */
-             ((page->u.inuse.type_info & PGT_count_mask) != 
-              (!!(page->u.inuse.type_info & PGT_pinned) +
-               (which == PTWR_PT_ACTIVE))) ||
-             /* PTEs are mapped read-only in only one place? */
-             ((page->count_info & PGC_count_mask) !=
-              (!!(page->count_info & PGC_allocated) +       /* alloc count */
-               (page->u.inuse.type_info & PGT_count_mask) + /* type count  */
-               1)) )                                        /* map count   */
-        {
-            /* Could be conflicting writable mappings from other VCPUs. */
-            cleanup_writable_pagetable(d);
-            goto emulate;
-        }
-    }
-
-    /*
-     * We only allow one ACTIVE and one INACTIVE p.t. to be updated at a
-     * time. If there is already one, we must flush it out.
-     */
-    if ( d->arch.ptwr[which].l1va )
-        ptwr_flush(d, which);
-
-    /*
-     * If last batch made no updates then we are probably stuck. Emulate this 
-     * update to ensure we make progress.
-     */
-    if ( d->arch.ptwr[which].prev_nr_updates == 0 )
-    {
-        /* Ensure that we don't get stuck in an emulation-only rut. */
-        d->arch.ptwr[which].prev_nr_updates = 1;
-        goto emulate;
-    }
-
-    PTWR_PRINTK("[%c] batched ptwr_page_fault at va %lx, pt for %08lx, "
-                "pfn %lx\n", PTWR_PRINT_WHICH, addr,
-                l2_idx << L2_PAGETABLE_SHIFT, pfn);
-
-    /* For safety, disconnect the L1 p.t. page from current space. */
-    if ( which == PTWR_PT_ACTIVE )
-    {
-        l2e_remove_flags(l2e, _PAGE_PRESENT);
-        if ( unlikely(__copy_to_user(pl2e, &l2e, sizeof(l2e))) )
-        {
-            MEM_LOG("ptwr: Could not unhook l2e at %p", pl2e);
-            domain_crash(d);
-            return 0;
-        }
-        flush_tlb_mask(d->domain_dirty_cpumask);
-    }
-    
-    /* Temporarily map the L1 page, and make a copy of it. */
-    pl1e = map_domain_page(pfn);
-    memcpy(d->arch.ptwr[which].page, pl1e, PAGE_SIZE);
-    unmap_domain_page(pl1e);
-
-    /* Finally, make the p.t. page writable by the guest OS. */
-    l1e_add_flags(pte, _PAGE_RW);
-    if ( unlikely(__put_user(pte.l1,
-                             &linear_pg_table[l1_linear_offset(addr)].l1)) )
-    {
-        MEM_LOG("ptwr: Could not update pte at %p",
-                &linear_pg_table[l1_linear_offset(addr)]);
-        domain_crash(d);
-        return 0;
-    }
-    
-    /*
-     * Now record the writable pagetable state *after* any accesses that can
-     * cause a recursive page fault (i.e., those via the *_user() accessors).
-     * Otherwise we can enter ptwr_flush() with half-done ptwr state.
-     */
-    d->arch.ptwr[which].l1va   = addr | 1;
-    d->arch.ptwr[which].l2_idx = l2_idx;
-    d->arch.ptwr[which].vcpu   = current;
-#ifdef PERF_ARRAYS
-    d->arch.ptwr[which].eip    = regs->eip;
-#endif
-
-    return EXCRET_fault_fixed;
-
- emulate:
     emul_ctxt.regs = guest_cpu_user_regs();
     emul_ctxt.cr2  = addr;
     emul_ctxt.mode = X86EMUL_MODE_HOST;
     if ( x86_emulate_memop(&emul_ctxt, &ptwr_emulate_ops) )
-        return 0;
+        goto bail;
+
+    UNLOCK_BIGLOCK(d);
     perfc_incrc(ptwr_emulations);
     return EXCRET_fault_fixed;
-}
 
-int ptwr_init(struct domain *d)
-{
-    void *x = alloc_xenheap_page();
-    void *y = alloc_xenheap_page();
-
-    if ( (x == NULL) || (y == NULL) )
-    {
-        free_xenheap_page(x);
-        free_xenheap_page(y);
-        return -ENOMEM;
-    }
-
-    d->arch.ptwr[PTWR_PT_ACTIVE].page   = x;
-    d->arch.ptwr[PTWR_PT_INACTIVE].page = y;
-
+ bail:
+    UNLOCK_BIGLOCK(d);
     return 0;
 }
 
-void ptwr_destroy(struct domain *d)
+void sync_pagetable_state(struct domain *d)
 {
-    LOCK_BIGLOCK(d);
-    cleanup_writable_pagetable(d);
-    UNLOCK_BIGLOCK(d);
-    free_xenheap_page(d->arch.ptwr[PTWR_PT_ACTIVE].page);
-    free_xenheap_page(d->arch.ptwr[PTWR_PT_INACTIVE].page);
-}
-
-void cleanup_writable_pagetable(struct domain *d)
-{
-    if ( unlikely(!VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) )
-        return;
-
-    if ( unlikely(shadow_mode_enabled(d)) )
-    {
-        shadow_sync_all(d);
-    }
-    else
-    {
-        if ( d->arch.ptwr[PTWR_PT_ACTIVE].l1va )
-            ptwr_flush(d, PTWR_PT_ACTIVE);
-        if ( d->arch.ptwr[PTWR_PT_INACTIVE].l1va )
-            ptwr_flush(d, PTWR_PT_INACTIVE);
-    }
+    shadow_sync_all(d);
 }
 
 int map_pages_to_xen(
