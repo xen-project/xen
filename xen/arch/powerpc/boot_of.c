@@ -304,12 +304,11 @@ static int __init of_instance_to_path(int ih, char *buffer, u32 buflen)
 
 static int __init of_start_cpu(int cpu, u32 pc, u32 reg)
 {
-    int rets[1] = { OF_FAILURE };
+    int ret;
 
-    if ( of_call("start-cpu", 3, 0, rets, cpu, pc, reg) == OF_FAILURE )
-        return OF_FAILURE;
+    ret = of_call("start-cpu", 3, 0, NULL, cpu, pc, reg);
 
-    return rets[0];
+    return ret;
 }
 
 static void __init of_test(const char *of_method_name)
