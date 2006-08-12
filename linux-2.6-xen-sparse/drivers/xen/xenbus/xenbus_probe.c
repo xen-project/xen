@@ -58,6 +58,8 @@ extern struct mutex xenwatch_mutex;
 
 static struct notifier_block *xenstore_chain;
 
+static void wait_for_devices(struct xenbus_driver *xendrv);
+
 /* If something in array of ids matches this device, return it. */
 static const struct xenbus_device_id *
 match_device(const struct xenbus_device_id *arr, struct xenbus_device *dev)
@@ -408,9 +410,18 @@ static int xenbus_register_driver_common(struct xenbus_driver *drv,
 
 int xenbus_register_frontend(struct xenbus_driver *drv)
 {
+	int ret;
+
 	drv->read_otherend_details = read_backend_details;
 
-	return xenbus_register_driver_common(drv, &xenbus_frontend);
+	ret = xenbus_register_driver_common(drv, &xenbus_frontend);
+	if (ret)
+		return ret;
+
+	/* If this driver is loaded as a module wait for devices to attach. */
+	wait_for_devices(drv);
+
+	return 0;
 }
 EXPORT_SYMBOL_GPL(xenbus_register_frontend);
 
@@ -1042,6 +1053,7 @@ postcore_initcall(xenbus_probe_init);
 static int is_disconnected_device(struct device *dev, void *data)
 {
 	struct xenbus_device *xendev = to_xenbus_device(dev);
+	struct device_driver *drv = data;
 
 	/*
 	 * A device with no driver will never connect. We care only about
@@ -1050,18 +1062,27 @@ static int is_disconnected_device(struct device *dev, void *data)
 	if (!dev->driver)
 		return 0;
 
+	/* Is this search limited to a particular driver? */
+	if (drv && (dev->driver != drv))
+		return 0;
+
 	return (xendev->state != XenbusStateConnected);
 }
 
-static int exists_disconnected_device(void)
+static int exists_disconnected_device(struct device_driver *drv)
 {
-	return bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL,
+	return bus_for_each_dev(&xenbus_frontend.bus, NULL, drv,
 				is_disconnected_device);
 }
 
 static int print_device_status(struct device *dev, void *data)
 {
 	struct xenbus_device *xendev = to_xenbus_device(dev);
+	struct device_driver *drv = data;
+
+	/* Is this operation limited to a particular driver? */
+	if (drv && (dev->driver != drv))
+		return 0;
 
 	if (!dev->driver) {
 		/* Information only: is this too noisy? */
@@ -1075,6 +1096,9 @@ static int print_device_status(struct device *dev, void *data)
 
 	return 0;
 }
+
+/* We only wait for device setup after most initcalls have run. */
+static int ready_to_wait_for_devices;
 
 /*
  * On a 10 second timeout, wait for all devices currently configured.  We need
@@ -1090,20 +1114,29 @@ static int print_device_status(struct device *dev, void *data)
  * boot slightly, but of course needs tools or manual intervention to set up
  * those flags correctly.
  */
-static int __init wait_for_devices(void)
+static void wait_for_devices(struct xenbus_driver *xendrv)
 {
 	unsigned long timeout = jiffies + 10*HZ;
+	struct device_driver *drv = xendrv ? &xendrv->driver : NULL;
 
-	if (!is_running_on_xen())
-		return -ENODEV;
+	if (!ready_to_wait_for_devices || !is_running_on_xen())
+		return;
 
-	while (time_before(jiffies, timeout) && exists_disconnected_device())
+	while (exists_disconnected_device(drv)) {
+		if (time_after(jiffies, timeout))
+			break;
 		schedule_timeout_interruptible(HZ/10);
+	}
 
-	bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL,
+	bus_for_each_dev(&xenbus_frontend.bus, NULL, drv,
 			 print_device_status);
+}
 
+static int __init boot_wait_for_devices(void)
+{
+	ready_to_wait_for_devices = 1;
+	wait_for_devices(NULL);
 	return 0;
 }
 
-late_initcall(wait_for_devices);
+late_initcall(boot_wait_for_devices);
