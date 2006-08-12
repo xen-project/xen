@@ -191,6 +191,7 @@ struct arch_shared_info {
     /* Frame containing list of mfns containing list of mfns containing p2m. */
     xen_pfn_t     pfn_to_mfn_frame_list_list;
     unsigned long nmi_reason;
+    uint64_t pad[32];
 };
 typedef struct arch_shared_info arch_shared_info_t;
 

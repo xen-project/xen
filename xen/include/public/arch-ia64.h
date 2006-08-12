@@ -297,6 +297,8 @@ struct arch_shared_info {
 
     /* Interrupt vector for event channel.  */
     int evtchn_vector;
+
+    uint64_t pad[32];
 };
 typedef struct arch_shared_info arch_shared_info_t;
 

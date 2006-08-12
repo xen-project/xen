@@ -376,7 +376,11 @@ typedef struct vcpu_info vcpu_info_t;
 
 /*
  * Xen/kernel shared data -- pointer provided in start_info.
- * NB. We expect that this struct is smaller than a page.
+ *
+ * This structure is defined to be both smaller than a page, and the
+ * only data on the shared page, but may vary in actual size even within
+ * compatible Xen versions; guests should not rely on the size
+ * of this structure remaining constant.
  */
 struct shared_info {
     struct vcpu_info vcpu_info[MAX_VIRT_CPUS];

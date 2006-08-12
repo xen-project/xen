@@ -737,7 +737,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
     /* Copy saved contents of shared-info page. No checking needed. */
     page = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_WRITE, shared_info_frame);
-    memcpy(page, shared_info, sizeof(shared_info_t));
+    memcpy(page, shared_info, PAGE_SIZE);
     munmap(page, PAGE_SIZE);
 
     /* Uncanonicalise the pfn-to-mfn table frame-number list. */

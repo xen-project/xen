@@ -303,7 +303,7 @@ static int setup_guest(int xc_handle,
               xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
               shared_info_frame)) == 0 )
         goto error_out;
-    memset(shared_info, 0, sizeof(shared_info_t));
+    memset(shared_info, 0, PAGE_SIZE);
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
         shared_info->vcpu_info[i].evtchn_upcall_mask = 1;

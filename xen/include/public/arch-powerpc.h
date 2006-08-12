@@ -107,6 +107,7 @@ typedef struct vcpu_guest_context vcpu_guest_context_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 
 struct arch_shared_info {
+    uint64_t pad[32];
 };
 
 struct arch_vcpu_info {
