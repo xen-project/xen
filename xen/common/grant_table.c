@@ -724,10 +724,10 @@ __release_grant_for_copy(
         act->pin -= GNTPIN_hstw_inc;
 
     if ( !(act->pin & GNTPIN_hstw_mask) && !readonly )
-        clear_bit(_GTF_writing, &sha->flags);
+        gnttab_clear_flag(_GTF_writing, &sha->flags);
 
     if ( !act->pin )
-        clear_bit(_GTF_reading, &sha->flags);
+        gnttab_clear_flag(_GTF_reading, &sha->flags);
     spin_unlock(&rd->grant_table->lock);
 }
 
