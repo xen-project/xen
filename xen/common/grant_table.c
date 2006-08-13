@@ -30,6 +30,7 @@
 #include <xen/mm.h>
 #include <xen/trace.h>
 #include <xen/guest_access.h>
+#include <xen/domain_page.h>
 #include <acm/acm_hooks.h>
 
 #define PIN_FAIL(_lbl, _rc, _f, _a...)          \
@@ -818,7 +819,7 @@ __gnttab_copy(
 {
     struct domain *sd = NULL, *dd = NULL;
     unsigned long s_frame, d_frame;
-    void *sp, *dp;
+    char *sp, *dp;
     s16 rc = GNTST_okay;
     int have_d_grant = 0, have_s_grant = 0;
 
