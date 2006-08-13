@@ -34,13 +34,14 @@ static ulong htab_calc_sdr1(ulong htab_addr, ulong log_htab_size)
     return (htab_addr | (sdr1_htabsize & SDR1_HTABSIZE_MASK));
 }
 
-void htab_alloc(struct domain *d, int log_htab_bytes)
+void htab_alloc(struct domain *d, uint order)
 {
     ulong htab_raddr;
+    ulong log_htab_bytes = order + PAGE_SHIFT;
     ulong htab_bytes = 1UL << log_htab_bytes;
 
     /* XXX use alloc_domheap_pages instead? */
-    htab_raddr = (ulong)alloc_xenheap_pages(log_htab_bytes - PAGE_SHIFT);
+    htab_raddr = (ulong)alloc_xenheap_pages(order);
     ASSERT(htab_raddr != 0);
     /* XXX check alignment guarantees */
     ASSERT((htab_raddr & (htab_bytes-1)) == 0);

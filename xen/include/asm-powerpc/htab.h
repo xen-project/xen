@@ -26,9 +26,6 @@
 
 /***** general PowerPC architecture limits ******/
 
-#define LOG_DEFAULT_HTAB_BYTES  20
-#define DEFAULT_HTAB_BYTES      (1UL << LOG_HTAB_BYTES)
-
 /* 256KB, from PowerPC Architecture specification */
 #define HTAB_MIN_LOG_SIZE 18
 
@@ -137,6 +134,6 @@ struct domain_htab {
 };
 
 struct domain;
-extern void htab_alloc(struct domain *d, int log_htab_bytes);
+extern void htab_alloc(struct domain *d, uint order);
 extern void htab_free(struct domain *d);
 #endif

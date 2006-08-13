@@ -109,8 +109,8 @@ extern void copy_page(void *dp, void *sp)
 
 ulong pfn2mfn(struct domain *d, long pfn, int *type)
 {
-    ulong rma_base_mfn = d->arch.rma_base >> PAGE_SHIFT;
-    ulong rma_size_mfn = d->arch.rma_size >> PAGE_SHIFT;
+    ulong rma_base_mfn = page_to_mfn(d->arch.rma_page);
+    ulong rma_size_mfn = 1UL << d->arch.rma_order;
     ulong mfn;
     int t;
 

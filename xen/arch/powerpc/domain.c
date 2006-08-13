@@ -73,10 +73,9 @@ unsigned long hypercall_create_continuation(unsigned int op,
 
 int arch_domain_create(struct domain *d)
 {
-    struct page_info *rma;
     unsigned long rma_base;
     unsigned long rma_size;
-    unsigned int rma_order;
+    uint htab_order;
 
     if (d->domain_id == IDLE_DOMAIN_ID) {
         d->shared_info = (void *)alloc_xenheap_page();
@@ -85,25 +84,20 @@ int arch_domain_create(struct domain *d)
         return 0;
     }
 
-    rma_order = cpu_rma_order();
-    rma_size = 1UL << rma_order << PAGE_SHIFT;
+    d->arch.rma_order = cpu_rma_order();
+    rma_size = 1UL << d->arch.rma_order << PAGE_SHIFT;
 
     /* allocate the real mode area */
-    d->max_pages = 1UL << rma_order;
-    rma = alloc_domheap_pages(d, rma_order, 0);
-    if (NULL == rma)
+    d->max_pages = 1UL << d->arch.rma_order;
+    d->arch.rma_page = alloc_domheap_pages(d, d->arch.rma_order, 0);
+    if (NULL == d->arch.rma_page)
         return 1;
-    rma_base = page_to_maddr(rma);
+    rma_base = page_to_maddr(d->arch.rma_page);
 
     BUG_ON(rma_base & (rma_size-1)); /* check alignment */
 
-    d->arch.rma_base = rma_base;
-    d->arch.rma_size = rma_size;
-
     printk("clearing RMO: 0x%lx[0x%lx]\n", rma_base, rma_size);
     memset((void *)rma_base, 0, rma_size);
-
-    htab_alloc(d, LOG_DEFAULT_HTAB_BYTES);
 
     d->shared_info = (shared_info_t *)
         (rma_addr(&d->arch, RMA_SHARED_INFO) + rma_base);
@@ -111,12 +105,23 @@ int arch_domain_create(struct domain *d)
     d->arch.large_page_sizes = 1;
     d->arch.large_page_shift[0] = 24; /* 16 M for 970s */
 
+    /* FIXME: we need to the the maximum addressible memory for this
+     * domain to calculate this correctly. It should probably be set
+     * by the managment tools */
+    htab_order = d->arch.rma_order - 6; /* (1/64) */
+    if (test_bit(_DOMF_privileged, &d->domain_flags)) {
+        /* bump the htab size of privleged domains */
+        ++htab_order;
+    }
+    htab_alloc(d, htab_order);
+
     return 0;
 }
 
 void arch_domain_destroy(struct domain *d)
 {
-    unimplemented();
+    free_domheap_pages(d->arch.rma_page, d->arch.rma_order);
+    htab_free(d);
 }
 
 void machine_halt(void)

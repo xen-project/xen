@@ -114,8 +114,8 @@ void cpu_init_vcpu(struct vcpu *v)
 {
     struct domain *d = v->domain;
     union hid4 hid4;
-    ulong rma_base = d->arch.rma_base;
-    ulong rma_size = d->arch.rma_size;
+    ulong rma_base = page_to_maddr(d->arch.rma_page);
+    ulong rma_size = rma_size(d->arch.rma_order);
 
     hid4.word = mfhid4();
 
