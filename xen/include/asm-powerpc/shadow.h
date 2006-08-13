@@ -24,6 +24,7 @@
 #include <xen/sched.h>
 
 #define shadow_mode_translate(_d) (1)
+#define shadow_mode_refcounts(_d) (1)
 
 #define __translate_gpfn_to_mfn(_d, gpfn)              \
     ( (shadow_mode_translate(_d))                      \
@@ -49,4 +50,9 @@ extern void guest_physmap_remove_page(
 
 extern void shadow_drop_references(
     struct domain *d, struct page_info *page);
+
+static inline void mark_dirty(struct domain *d, unsigned int mfn)
+{
+    return;
+}
 #endif
