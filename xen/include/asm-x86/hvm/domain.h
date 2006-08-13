@@ -22,7 +22,6 @@
 #ifndef __ASM_X86_HVM_DOMAIN_H__
 #define __ASM_X86_HVM_DOMAIN_H__
 
-#include <asm/e820.h>
 #include <asm/hvm/vpic.h>
 #include <asm/hvm/vpit.h>
 #include <asm/hvm/vlapic.h>

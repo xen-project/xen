@@ -14,29 +14,9 @@
 #include <xen/hvm/hvm_info_table.h>
 #include <xen/hvm/ioreq.h>
 #include <xen/hvm/params.h>
+#include <xen/hvm/e820.h>
 
 #define HVM_LOADER_ENTR_ADDR  0x00100000
-
-#define E820MAX     128
-
-#define E820_RAM          1
-#define E820_RESERVED     2
-#define E820_ACPI         3
-#define E820_NVS          4
-#define E820_IO          16
-#define E820_SHARED_PAGE 17
-#define E820_XENSTORE    18
-#define E820_BUFFERED_IO 19
-
-#define E820_MAP_PAGE       0x00090000
-#define E820_MAP_NR_OFFSET  0x000001E8
-#define E820_MAP_OFFSET     0x000002D0
-
-struct e820entry {
-    uint64_t addr;
-    uint64_t size;
-    uint32_t type;
-} __attribute__((packed));
 
 static int
 parseelfimage(

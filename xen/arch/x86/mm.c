@@ -105,6 +105,7 @@
 #include <asm/io.h>
 #include <asm/ldt.h>
 #include <asm/x86_emulate.h>
+#include <asm/e820.h>
 #include <public/memory.h>
 
 #ifdef VERBOSE

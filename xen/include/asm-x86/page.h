@@ -354,7 +354,10 @@ map_pages_to_xen(
 
 #endif /* !__ASSEMBLY__ */
 
-#endif /* __I386_PAGE_H__ */
+#define PFN_DOWN(x)   ((x) >> PAGE_SHIFT)
+#define PFN_UP(x)     (((x) + PAGE_SIZE-1) >> PAGE_SHIFT)
+
+#endif /* __X86_PAGE_H__ */
 
 /*
  * Local variables:

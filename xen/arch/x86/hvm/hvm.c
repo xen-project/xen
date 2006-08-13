@@ -31,6 +31,7 @@
 #include <xen/guest_access.h>
 #include <xen/event.h>
 #include <asm/current.h>
+#include <asm/e820.h>
 #include <asm/io.h>
 #include <asm/shadow.h>
 #include <asm/regs.h>
