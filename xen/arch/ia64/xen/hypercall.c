@@ -105,6 +105,19 @@ static IA64FAULT
 xen_hypercall (struct pt_regs *regs)
 {
 	uint32_t cmd = (uint32_t)regs->r2;
+	struct vcpu *v = current;
+
+	if (cmd == __HYPERVISOR_grant_table_op) {
+		XEN_GUEST_HANDLE(void) uop;
+
+		v->arch.hypercall_param.va = regs->r15;
+		v->arch.hypercall_param.pa1 = regs->r17;
+		v->arch.hypercall_param.pa2 = regs->r18;
+		set_xen_guest_handle(uop, (void *)regs->r15);
+		regs->r8 = do_grant_table_op(regs->r14, uop, regs->r16);
+		v->arch.hypercall_param.va = 0;
+		return IA64_NO_FAULT;
+	}
 
 	if (cmd < NR_hypercalls) {
 		perfc_incra(hypercalls, cmd);

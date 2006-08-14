@@ -275,9 +275,10 @@ HYPERVISOR_physdev_op(
 //XXX __HYPERVISOR_grant_table_op is used for this hypercall constant.
 static inline int
 ____HYPERVISOR_grant_table_op(
-    unsigned int cmd, void *uop, unsigned int count)
+    unsigned int cmd, void *uop, unsigned int count,
+    unsigned long pa1, unsigned long pa2)
 {
-    return _hypercall3(int, grant_table_op, cmd, uop, count);
+    return _hypercall5(int, grant_table_op, cmd, uop, count, pa1, pa2);
 }
 
 int HYPERVISOR_grant_table_op(unsigned int cmd, void *uop, unsigned int count);
