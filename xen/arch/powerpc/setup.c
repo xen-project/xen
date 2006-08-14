@@ -214,7 +214,11 @@ static void __init __start_xen(multiboot_info_t *mbi)
     if ((mbi->flags & MBI_CMDLINE) && (mbi->cmdline != 0))
         cmdline_parse(__va((ulong)mbi->cmdline));
 
+    /* We initialise the serial devices very early so we can get debugging. */
+    ns16550.io_base = 0x3f8;
     ns16550_init(0, &ns16550);
+    ns16550.io_base = 0x2f8;
+    ns16550_init(1, &ns16550);
     serial_init_preirq();
 
     init_console();
