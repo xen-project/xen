@@ -9443,6 +9443,43 @@ rom_scan_increment:
   mov  ds, ax
   ret
 
+#ifdef HVMASSIST
+
+; Copy the SMBIOS entry point over from 0x9f000, where hvmloader left it.
+; The entry point must be somewhere in 0xf0000-0xfffff on a 16-byte boundary,
+; but the tables themeselves can be elsewhere.
+smbios_init:
+  push ax
+  push cx
+  push es
+  push ds
+  push di
+  push si
+
+  mov cx, #0x001f ; 0x1f bytes to copy
+  mov ax, #0xf000
+  mov es, ax      ; destination segment is 0xf0000
+  mov di, smbios_entry_point ; destination offset
+  mov ax, #0x9f00
+  mov ds, ax      ; source segment is 0x9f000
+  mov si, #0x0000 ; source offset is 0
+  cld
+  rep
+    movsb
+
+  pop si
+  pop di
+  pop ds
+  pop es
+  pop cx
+  pop ax
+
+  ret
+
+#endif
+
+
+
 ;; for 'C' strings and other data, insert them here with
 ;; a the following hack:
 ;; DATA_SEG_DEFS_HERE
@@ -9724,6 +9761,7 @@ post_default_ints:
 
 #ifdef HVMASSIST
   call _copy_e820_table
+  call smbios_init
 #endif
 
   call rom_scan
@@ -10538,6 +10576,13 @@ dw 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;; 704 bytes
 dw 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;; 768 bytes
 dw 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;; 832 bytes
 dw 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;; 896 bytes
+
+.align 16
+smbios_entry_point:
+db 0,0,0,0,0,0,0,0 ; 8 bytes
+db 0,0,0,0,0,0,0,0 ; 16 bytes
+db 0,0,0,0,0,0,0,0 ; 24 bytes
+db 0,0,0,0,0,0,0   ; 31 bytes
 ASM_END
 
 #else // !HVMASSIST
