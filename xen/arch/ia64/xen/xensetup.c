@@ -26,11 +26,6 @@
 #include <linux/efi.h>
 #include <asm/iosapic.h>
 
-/* Be sure the struct shared_info size is <= XSI_SIZE.  */
-#if SHARED_INFO_SIZE > XSI_SIZE
-#error "struct shared_info bigger than XSI_SIZE"
-#endif
-
 unsigned long xenheap_phys_end, total_pages;
 
 char saved_command_line[COMMAND_LINE_SIZE];
@@ -257,6 +252,9 @@ void start_kernel(void)
 #ifdef CONFIG_SMP
     int i;
 #endif
+
+    /* Be sure the struct shared_info size is <= XSI_SIZE.  */
+    BUILD_BUG_ON(sizeof(struct shared_info) > XSI_SIZE);
 
     running_on_sim = is_platform_hp_ski();
     /* Kernel may be relocated by EFI loader */

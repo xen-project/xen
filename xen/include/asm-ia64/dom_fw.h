@@ -150,13 +150,10 @@
 
 /* Hypercalls index bellow _FIRST_ARCH are reserved by Xen, while those above
    are for the architecture.
-   Note: this limit was defined by Xen/ia64 (and not by Xen).²
+   Note: this limit was defined by Xen/ia64 (and not by Xen).
      This can be renumbered safely.
 */
 #define FW_HYPERCALL_FIRST_ARCH		0x300UL
-
-/* Xen/ia64 user hypercalls.  Only used for debugging.  */
-#define FW_HYPERCALL_FIRST_USER		0xff00UL
 
 /* Interrupt vector used for os boot rendez vous.  */
 #define XEN_SAL_BOOT_RENDEZ_VEC	0xF3

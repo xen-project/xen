@@ -515,7 +515,8 @@ ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long isr, u
 		debugger_trap_fatal(0 /* don't care */, regs);
 	} 
 #endif
-	else if (iim == d->arch.breakimm) {
+	else if (iim == d->arch.breakimm &&
+	         ia64_get_cpl(regs->cr_ipsr) == 2) {
 		/* by default, do not continue */
 		v->arch.hypercall_continuation = 0;
 

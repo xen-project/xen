@@ -31,7 +31,6 @@ void foo(void)
 	DEFINE(IA64_SWITCH_STACK_SIZE, sizeof (struct switch_stack));
 	DEFINE(IA64_CPU_SIZE, sizeof (struct cpuinfo_ia64));
 	DEFINE(UNW_FRAME_INFO_SIZE, sizeof (struct unw_frame_info));
-	DEFINE(SHARED_INFO_SIZE, sizeof (struct shared_info));
 	DEFINE(MAPPED_REGS_T_SIZE, sizeof (mapped_regs_t));
 
 	BLANK();

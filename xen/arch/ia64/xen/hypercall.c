@@ -33,75 +33,81 @@ static long do_physdev_op_compat(XEN_GUEST_HANDLE(physdev_op_t) uop);
 static long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg);
 static long do_callback_op(int cmd, XEN_GUEST_HANDLE(void) arg);
 
-hypercall_t ia64_hypercall_table[] =
-	{
-	(hypercall_t)do_ni_hypercall,		/* do_set_trap_table */		/*  0 */
+const hypercall_t ia64_hypercall_table[NR_hypercalls] =
+{
+	(hypercall_t)do_ni_hypercall,		/* do_set_trap_table *//*  0 */
 	(hypercall_t)do_ni_hypercall,		/* do_mmu_update */
 	(hypercall_t)do_ni_hypercall,		/* do_set_gdt */
 	(hypercall_t)do_ni_hypercall,		/* do_stack_switch */
 	(hypercall_t)do_ni_hypercall,		/* do_set_callbacks */
-	(hypercall_t)do_ni_hypercall,		/* do_fpu_taskswitch */		/*  5 */
+	(hypercall_t)do_ni_hypercall,		/* do_fpu_taskswitch *//*  5 */
 	(hypercall_t)do_sched_op_compat,
 	(hypercall_t)do_dom0_op,
 	(hypercall_t)do_ni_hypercall,		/* do_set_debugreg */
 	(hypercall_t)do_ni_hypercall,		/* do_get_debugreg */
-	(hypercall_t)do_ni_hypercall,		/* do_update_descriptor */	/* 10 */
+	(hypercall_t)do_ni_hypercall,		/* do_update_descriptor * 10 */
 	(hypercall_t)do_ni_hypercall,		/* do_ni_hypercall */
 	(hypercall_t)do_memory_op,
 	(hypercall_t)do_multicall,
 	(hypercall_t)do_ni_hypercall,		/* do_update_va_mapping */
-	(hypercall_t)do_ni_hypercall,		/* do_set_timer_op */		/* 15 */
+	(hypercall_t)do_ni_hypercall,		/* do_set_timer_op */  /* 15 */
 	(hypercall_t)do_event_channel_op_compat,
 	(hypercall_t)do_xen_version,
 	(hypercall_t)do_console_io,
 	(hypercall_t)do_physdev_op_compat,
-	(hypercall_t)do_grant_table_op,						/* 20 */
+	(hypercall_t)do_grant_table_op,				       /* 20 */
 	(hypercall_t)do_ni_hypercall,		/* do_vm_assist */
-	(hypercall_t)do_ni_hypercall,		/* do_update_va_mapping_otherdomain */
+	(hypercall_t)do_ni_hypercall,		/* do_update_va_mapping_othe */
 	(hypercall_t)do_ni_hypercall,		/* (x86 only) */
 	(hypercall_t)do_ni_hypercall,		/* do_vcpu_op */
-	(hypercall_t)do_ni_hypercall,		/* (x86_64 only) */		/* 25 */
+	(hypercall_t)do_ni_hypercall,		/* (x86_64 only) */    /* 25 */
 	(hypercall_t)do_ni_hypercall,		/* do_mmuext_op */
 	(hypercall_t)do_ni_hypercall,		/* do_acm_op */
 	(hypercall_t)do_ni_hypercall,		/* do_nmi_op */
 	(hypercall_t)do_sched_op,
-	(hypercall_t)do_callback_op,		/*  */			/* 30 */
+	(hypercall_t)do_callback_op,		/*  */                 /* 30 */
 	(hypercall_t)do_ni_hypercall,		/*  */
 	(hypercall_t)do_event_channel_op,
 	(hypercall_t)do_physdev_op,
 	(hypercall_t)do_hvm_op,			/*  */
-	(hypercall_t)do_ni_hypercall,		/*  */                  /* 35 */
+	(hypercall_t)do_ni_hypercall,		/*  */                 /* 35 */
 	(hypercall_t)do_ni_hypercall,		/*  */
 	(hypercall_t)do_ni_hypercall,		/*  */
 	(hypercall_t)do_ni_hypercall,		/*  */
 	(hypercall_t)do_ni_hypercall,		/*  */
-	(hypercall_t)do_ni_hypercall,		/*  */                  /* 40 */
+	(hypercall_t)do_ni_hypercall,		/*  */                 /* 40 */
 	(hypercall_t)do_ni_hypercall,		/*  */
 	(hypercall_t)do_ni_hypercall,		/*  */
 	(hypercall_t)do_ni_hypercall,		/*  */
 	(hypercall_t)do_ni_hypercall,		/*  */
-	(hypercall_t)do_ni_hypercall,		/*  */                  /* 45 */
+	(hypercall_t)do_ni_hypercall,		/*  */                 /* 45 */
 	(hypercall_t)do_ni_hypercall,		/*  */
 	(hypercall_t)do_ni_hypercall,		/*  */
-	(hypercall_t)do_dom0vp_op,			/* dom0vp_op */
+	(hypercall_t)do_dom0vp_op,              /* dom0vp_op */
 	(hypercall_t)do_ni_hypercall,		/* arch_1 */
-	(hypercall_t)do_ni_hypercall,		/* arch_2 */            /* 50 */
+	(hypercall_t)do_ni_hypercall,		/* arch_2 */           /* 50 */
 	(hypercall_t)do_ni_hypercall,		/* arch_3 */
 	(hypercall_t)do_ni_hypercall,		/* arch_4 */
 	(hypercall_t)do_ni_hypercall,		/* arch_5 */
 	(hypercall_t)do_ni_hypercall,		/* arch_6 */
-	(hypercall_t)do_ni_hypercall		/* arch_7 */            /* 55 */
-	};
-
-uint32_t nr_hypercalls =
-	sizeof(ia64_hypercall_table) / sizeof(hypercall_t);
+	(hypercall_t)do_ni_hypercall,		/* arch_7 */           /* 55 */
+	(hypercall_t)do_ni_hypercall,
+	(hypercall_t)do_ni_hypercall,
+	(hypercall_t)do_ni_hypercall,
+	(hypercall_t)do_ni_hypercall,
+	(hypercall_t)do_ni_hypercall,                                  /* 60 */
+	(hypercall_t)do_ni_hypercall,
+	(hypercall_t)do_ni_hypercall,
+	(hypercall_t)do_ni_hypercall
+};
 
 static IA64FAULT
 xen_hypercall (struct pt_regs *regs)
 {
 	uint32_t cmd = (uint32_t)regs->r2;
 
-	if (cmd < nr_hypercalls)
+	if (cmd < NR_hypercalls) {
+		perfc_incra(hypercalls, cmd);
 		regs->r8 = (*ia64_hypercall_table[cmd])(
 			regs->r14,
 			regs->r15,
@@ -109,12 +115,11 @@ xen_hypercall (struct pt_regs *regs)
 			regs->r17,
 			regs->r18,
 			regs->r19);
-	else
+	} else
 		regs->r8 = -ENOSYS;
 
 	return IA64_NO_FAULT;
 }
-
 
 static void
 fw_hypercall_ipi (struct pt_regs *regs)
@@ -277,18 +282,7 @@ fw_hypercall (struct pt_regs *regs)
 IA64FAULT
 ia64_hypercall (struct pt_regs *regs)
 {
-	struct vcpu *v = current;
 	unsigned long index = regs->r2;
-	int privlvl = (regs->cr_ipsr & IA64_PSR_CPL) >> IA64_PSR_CPL0_BIT;
-
-	/* Hypercalls are only allowed by kernel.
-	   Kernel checks memory accesses.  */
-	if (VMX_DOMAIN(v) ? (privlvl != 0) : (privlvl != 2)) {
-	    /* FIXME: Return a better error value ?
-	       Reflection ? Illegal operation ?  */
-	    regs->r8 = -1;
-	    return IA64_NO_FAULT;
-	}
 
 	if (index >= FW_HYPERCALL_FIRST_ARCH)
 	    return fw_hypercall (regs);

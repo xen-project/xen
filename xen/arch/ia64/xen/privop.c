@@ -681,7 +681,7 @@ priv_emulate(VCPU *vcpu, REGS *regs, UINT64 isr)
 		return IA64_ILLOP_FAULT;
 	}
 	//if (isrcode != 1 && isrcode != 2) return 0;
-	privlvl = (ipsr & IA64_PSR_CPL) >> IA64_PSR_CPL0_BIT;
+	privlvl = ia64_get_cpl(ipsr);
 	// its OK for a privified-cover to be executed in user-land
 	fault = priv_handle_op(vcpu,regs,privlvl);
 	if ((fault == IA64_NO_FAULT) || (fault == IA64_EXTINT_VECTOR)) { // success!!

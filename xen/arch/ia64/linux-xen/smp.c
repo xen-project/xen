@@ -146,6 +146,9 @@ handle_IPI (int irq, void *dev_id, struct pt_regs *regs)
 	unsigned long *pending_ipis = &__ia64_per_cpu_var(ipi_operation);
 	unsigned long ops;
 
+#ifdef XEN
+	perfc_incrc(ipis);
+#endif
 	mb();	/* Order interrupt and bit testing. */
 	while ((ops = xchg(pending_ipis, 0)) != 0) {
 		mb();	/* Order bit clearing and data access. */
