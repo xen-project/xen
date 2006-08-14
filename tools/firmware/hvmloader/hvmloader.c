@@ -25,6 +25,7 @@
 #include "../acpi/acpi2_0.h"  /* for ACPI_PHYSICAL_ADDRESS */
 #include "hypercall.h"
 #include "util.h"
+#include "smbios.h"
 #include <xen/version.h>
 #include <xen/hvm/params.h>
 
@@ -199,6 +200,9 @@ main(void)
 			 					sizeof(acpi));
 		}
 	}
+
+	puts("Writing SMBIOS tables ...\n");
+	hvm_write_smbios_tables();
 
 	if (check_amd()) {
 		/* AMD implies this is SVM */
