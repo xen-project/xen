@@ -285,7 +285,7 @@ static int xenbus_dev_open(struct inode *inode, struct file *filp)
 {
 	struct xenbus_dev_data *u;
 
-	if (xen_start_info->store_evtchn == 0)
+	if (xen_store_evtchn == 0)
 		return -ENOENT;
 
 	nonseekable_open(inode, filp);

@@ -54,6 +54,10 @@
 
 #include "xenbus_comms.h"
 
+int xen_store_evtchn;
+struct xenstore_domain_interface *xen_store_interface;
+static unsigned long xen_store_mfn;
+
 extern struct mutex xenwatch_mutex;
 
 static struct notifier_block *xenstore_chain;
@@ -928,8 +932,7 @@ static int xsd_kva_mmap(struct file *file, struct vm_area_struct *vma)
 	if ((size > PAGE_SIZE) || (vma->vm_pgoff != 0))
 		return -EINVAL;
 
-	if (remap_pfn_range(vma, vma->vm_start,
-			    mfn_to_pfn(xen_start_info->store_mfn),
+	if (remap_pfn_range(vma, vma->vm_start, mfn_to_pfn(xen_store_mfn),
 			    size, vma->vm_page_prot))
 		return -EAGAIN;
 
@@ -941,7 +944,7 @@ static int xsd_kva_read(char *page, char **start, off_t off,
 {
 	int len;
 
-	len  = sprintf(page, "0x%p", mfn_to_virt(xen_start_info->store_mfn));
+	len  = sprintf(page, "0x%p", xen_store_interface);
 	*eof = 1;
 	return len;
 }
@@ -951,12 +954,11 @@ static int xsd_port_read(char *page, char **start, off_t off,
 {
 	int len;
 
-	len  = sprintf(page, "%d", xen_start_info->store_evtchn);
+	len  = sprintf(page, "%d", xen_store_evtchn);
 	*eof = 1;
 	return len;
 }
 #endif
-
 
 static int __init xenbus_probe_init(void)
 {
@@ -985,7 +987,7 @@ static int __init xenbus_probe_init(void)
 		if (!page)
 			return -ENOMEM;
 
-		xen_start_info->store_mfn =
+		xen_store_mfn = xen_start_info->store_mfn =
 			pfn_to_mfn(virt_to_phys((void *)page) >>
 				   PAGE_SHIFT);
 
@@ -998,7 +1000,8 @@ static int __init xenbus_probe_init(void)
 		if (err == -ENOSYS)
 			goto err;
 		BUG_ON(err);
-		xen_start_info->store_evtchn = alloc_unbound.port;
+		xen_store_evtchn = xen_start_info->store_evtchn =
+			alloc_unbound.port;
 
 #ifdef CONFIG_PROC_FS
 		/* And finally publish the above info in /proc/xen */
@@ -1014,8 +1017,13 @@ static int __init xenbus_probe_init(void)
 		if (xsd_port_intf)
 			xsd_port_intf->read_proc = xsd_port_read;
 #endif
-	} else
+	} else {
 		xenstored_ready = 1;
+		xen_store_evtchn = xen_start_info->store_evtchn;
+		xen_store_mfn = xen_start_info->store_mfn;
+	}
+
+	xen_store_interface = mfn_to_virt(xen_store_mfn);
 
 	/* Initialize the interface to xenstore. */
 	err = xs_init();
