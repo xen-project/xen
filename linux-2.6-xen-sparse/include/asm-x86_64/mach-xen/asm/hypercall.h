@@ -355,6 +355,13 @@ HYPERVISOR_nmi_op(
 	return _hypercall2(int, nmi_op, op, arg);
 }
 
+static inline unsigned long
+HYPERVISOR_hvm_op(
+    int op, void *arg)
+{
+    return _hypercall2(unsigned long, hvm_op, op, arg);
+}
+
 static inline int
 HYPERVISOR_callback_op(
 	int cmd, void *arg)
