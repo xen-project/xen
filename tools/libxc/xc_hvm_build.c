@@ -58,12 +58,12 @@ static void build_e820map(void *e820_page, unsigned long long mem_size)
 
     /* XXX: Doesn't work for > 4GB yet */
     e820entry[nr_map].addr = 0x0;
-    e820entry[nr_map].size = 0x9F800;
+    e820entry[nr_map].size = 0x9F000;
     e820entry[nr_map].type = E820_RAM;
     nr_map++;
 
-    e820entry[nr_map].addr = 0x9F800;
-    e820entry[nr_map].size = 0x800;
+    e820entry[nr_map].addr = 0x9F000;
+    e820entry[nr_map].size = 0x1000;
     e820entry[nr_map].type = E820_RESERVED;
     nr_map++;
 
