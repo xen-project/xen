@@ -942,8 +942,6 @@ do_grant_table_op(
     
     LOCK_BIGLOCK(d);
     
-    sync_pagetable_state(d);
-    
     rc = -EFAULT;
     switch ( cmd )
     {

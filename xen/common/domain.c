@@ -266,8 +266,6 @@ static void domain_shutdown_finalise(void)
         vcpu_sleep_sync(v);
     BUG_ON(!cpus_empty(d->domain_dirty_cpumask));
 
-    sync_pagetable_state(d);
-
     /* Don't set DOMF_shutdown until execution contexts are sync'ed. */
     if ( !test_and_set_bit(_DOMF_shutdown, &d->domain_flags) )
         send_guest_global_virq(dom0, VIRQ_DOM_EXC);
@@ -406,8 +404,6 @@ void domain_pause(struct domain *d)
 
     for_each_vcpu( d, v )
         vcpu_sleep_sync(v);
-
-    sync_pagetable_state(d);
 }
 
 void domain_unpause(struct domain *d)
@@ -439,8 +435,6 @@ void domain_pause_by_systemcontroller(struct domain *d)
         for_each_vcpu ( d, v )
             vcpu_sleep_sync(v);
     }
-
-    sync_pagetable_state(d);
 }
 
 void domain_unpause_by_systemcontroller(struct domain *d)

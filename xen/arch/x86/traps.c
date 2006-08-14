@@ -713,7 +713,6 @@ static int handle_gdt_ldt_mapping_fault(
     {
         /* LDT fault: Copy a mapping from the guest's LDT, if it is valid. */
         LOCK_BIGLOCK(d);
-        sync_pagetable_state(d);
         ret = map_ldt_shadow_page(offset >> PAGE_SHIFT);
         UNLOCK_BIGLOCK(d);
 
@@ -849,7 +848,6 @@ static int spurious_page_fault(
     int            is_spurious;
 
     LOCK_BIGLOCK(d);
-    sync_pagetable_state(d);
     is_spurious = __spurious_page_fault(addr, regs);
     UNLOCK_BIGLOCK(d);
 
@@ -1302,7 +1300,6 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
         case 3: /* Write CR3 */
             LOCK_BIGLOCK(v->domain);
-            sync_pagetable_state(v->domain);
             (void)new_guest_cr3(gmfn_to_mfn(v->domain, xen_cr3_to_pfn(*reg)));
             UNLOCK_BIGLOCK(v->domain);
             break;

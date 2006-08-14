@@ -224,6 +224,4 @@ static inline unsigned long gmfn_to_mfn(struct domain *d, unsigned long gmfn)
 extern int steal_page(struct domain *d, struct page_info *page,
                         unsigned int memflags);
 
-#define sync_pagetable_state(d) ((void)0)
-
 #endif

@@ -312,8 +312,6 @@ int  ptwr_do_page_fault(struct domain *, unsigned long,
                         struct cpu_user_regs *);
 int  revalidate_l1(struct domain *, l1_pgentry_t *, l1_pgentry_t *);
 
-void sync_pagetable_state(struct domain *d);
-
 int audit_adjust_pgtables(struct domain *d, int dir, int noisy);
 
 #ifndef NDEBUG

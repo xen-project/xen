@@ -1657,26 +1657,6 @@ int get_page_type(struct page_info *page, unsigned long type)
             {
                 if ( unlikely((x & PGT_type_mask) != (type & PGT_type_mask) ) )
                 {
-                    if ( (current->domain == page_get_owner(page)) &&
-                         ((x & PGT_type_mask) == PGT_writable_page) )
-                    {
-                        /*
-                         * This ensures functions like set_gdt() see up-to-date
-                         * type info without needing to clean up writable p.t.
-                         * state on the fast path. We take this path only
-                         * when the current type is writable because:
-                         *  1. It's the only type that this path can decrement.
-                         *  2. If we take this path more liberally then we can
-                         *     enter a recursive loop via get_page_from_l1e()
-                         *     during pagetable revalidation.
-                         */
-                        sync_pagetable_state(current->domain);
-                        y = page->u.inuse.type_info;
-                        /* Can we make progress now? */
-                        if ( ((y & PGT_type_mask) == (type & PGT_type_mask)) ||
-                             ((y & PGT_count_mask) == 0) )
-                            goto again;
-                    }
                     if ( ((x & PGT_type_mask) != PGT_l2_page_table) ||
                          ((type & PGT_type_mask) != PGT_l1_page_table) )
                         MEM_LOG("Bad type (saw %" PRtype_info
@@ -1937,8 +1917,6 @@ int do_mmuext_op(
 
     LOCK_BIGLOCK(d);
 
-    sync_pagetable_state(d);
-
     if ( unlikely(count & MMU_UPDATE_PREEMPTED) )
     {
         count &= ~MMU_UPDATE_PREEMPTED;
@@ -2189,8 +2167,6 @@ int do_mmu_update(
     struct domain_mmap_cache mapcache, sh_mapcache;
 
     LOCK_BIGLOCK(d);
-
-    sync_pagetable_state(d);
 
     if ( unlikely(shadow_mode_enabled(d)) )
         check_pagetable(v, "pre-mmu"); /* debug */
@@ -2700,8 +2676,6 @@ int do_update_va_mapping(unsigned long va, u64 val64,
         return -EINVAL;
 
     LOCK_BIGLOCK(d);
-
-    sync_pagetable_state(d);
 
     if ( unlikely(shadow_mode_enabled(d)) )
         check_pagetable(v, "pre-va"); /* debug */
@@ -3335,11 +3309,6 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
  bail:
     UNLOCK_BIGLOCK(d);
     return 0;
-}
-
-void sync_pagetable_state(struct domain *d)
-{
-    shadow_sync_all(d);
 }
 
 int map_pages_to_xen(
