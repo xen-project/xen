@@ -35,14 +35,13 @@
 #include <asm/pgalloc.h>
 #include <asm/offsets.h>  /* for IA64_THREAD_INFO_SIZE */
 #include <asm/vcpu.h>   /* for function declarations */
-#include <public/arch-ia64.h>
+#include <public/xen.h>
 #include <xen/domain.h>
 #include <asm/vmx.h>
 #include <asm/vmx_vcpu.h>
 #include <asm/vmx_vpd.h>
 #include <asm/vmx_phy_mode.h>
 #include <asm/vhpt.h>
-#include <public/arch-ia64.h>
 #include <asm/tlbflush.h>
 #include <asm/regionreg.h>
 #include <asm/dom_fw.h>

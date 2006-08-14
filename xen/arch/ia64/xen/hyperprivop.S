@@ -14,7 +14,7 @@
 #include <asm/system.h>
 #include <asm/debugger.h>
 #include <asm/asm-xsi-offsets.h>
-#include <public/arch-ia64.h>
+#include <public/xen.h>
 
 
 #define	_PAGE_PPN_MASK	0x0003fffffffff000 //asm/pgtable.h doesn't do assembly

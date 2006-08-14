@@ -11,7 +11,7 @@
 #include <asm/pgtable.h>
 #include <asm/vhpt.h>
 #include <asm/asm-xsi-offsets.h>
-#include <public/arch-ia64.h>
+#include <public/xen.h>
 	
 // Change rr7 to the passed value while ensuring
 // Xen is mapped into the new region.

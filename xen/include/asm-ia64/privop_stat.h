@@ -1,6 +1,7 @@
 #ifndef _XEN_UA64_PRIVOP_STAT_H
 #define _XEN_UA64_PRIVOP_STAT_H
-#include <public/arch-ia64.h>
+#include <xen/types.h>
+#include <public/xen.h>
 
 extern int dump_privop_counts_to_user(char *, int);
 extern int zero_privop_counts_to_user(char *, int);

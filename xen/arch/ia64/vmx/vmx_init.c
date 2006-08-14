@@ -41,15 +41,14 @@
 #include <asm/vmx_vcpu.h>
 #include <xen/lib.h>
 #include <asm/vmmu.h>
-#include <public/arch-ia64.h>
+#include <public/xen.h>
 #include <public/hvm/ioreq.h>
+#include <public/event_channel.h>
 #include <asm/vmx_phy_mode.h>
 #include <asm/processor.h>
 #include <asm/vmx.h>
 #include <xen/mm.h>
-#include <public/arch-ia64.h>
 #include <asm/hvm/vioapic.h>
-#include <public/event_channel.h>
 #include <xen/event.h>
 #include <asm/vlsapic.h>
 

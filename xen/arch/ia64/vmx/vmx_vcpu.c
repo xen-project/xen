@@ -24,7 +24,7 @@
  */
 
 #include <xen/sched.h>
-#include <public/arch-ia64.h>
+#include <public/xen.h>
 #include <asm/ia64_int.h>
 #include <asm/vmx_vcpu.h>
 #include <asm/regionreg.h>

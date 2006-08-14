@@ -33,7 +33,7 @@
 #include <asm/mm.h>
 #include <asm/vmx.h>
 #include <public/event_channel.h>
-#include <public/arch-ia64.h>
+#include <public/xen.h>
 #include <linux/event.h>
 #include <xen/domain.h>
 /*
