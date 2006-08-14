@@ -33,6 +33,18 @@
 #include <xen/domain_page.h>
 #include <acm/acm_hooks.h>
 
+/*
+ * The first two members of a grant entry are updated as a combined pair.
+ * The following union allows that to happen in an endian-neutral fashion.
+ */
+union grant_combo {
+    uint32_t word;
+    struct {
+        uint16_t flags;
+        domid_t  domid;
+    } shorts;
+};
+
 #define PIN_FAIL(_lbl, _rc, _f, _a...)          \
     do {                                        \
         DPRINTK( _f, ## _a );                   \
@@ -178,7 +190,7 @@ __gnttab_map_grant_ref(
          */
         for ( ; ; )
         {
-            u32 scombo, prev_scombo, new_scombo;
+            union grant_combo scombo, prev_scombo, new_scombo;
 
             if ( unlikely((sflags & GTF_type_mask) != GTF_permit_access) ||
                  unlikely(sdom != led->domain->domain_id) )
@@ -187,22 +199,25 @@ __gnttab_map_grant_ref(
                          sflags, sdom, led->domain->domain_id);
 
             /* Merge two 16-bit values into a 32-bit combined update. */
-            /* NB. Endianness! */
-            scombo = ((u32)sdom << 16) | (u32)sflags;
+            scombo.shorts.flags = sflags;
+            scombo.shorts.domid = sdom;
+            
+            new_scombo = scombo;
+            new_scombo.shorts.flags |= GTF_reading;
 
-            new_scombo = scombo | GTF_reading;
             if ( !(op->flags & GNTMAP_readonly) )
             {
-                new_scombo |= GTF_writing;
+                new_scombo.shorts.flags |= GTF_writing;
                 if ( unlikely(sflags & GTF_readonly) )
                     PIN_FAIL(unlock_out, GNTST_general_error,
                              "Attempt to write-pin a r/o grant entry.\n");
             }
 
-            prev_scombo = cmpxchg((u32 *)&sha->flags, scombo, new_scombo);
+            prev_scombo.word = cmpxchg((u32 *)&sha->flags,
+                                       scombo.word, new_scombo.word);
 
             /* Did the combined update work (did we see what we expected?). */
-            if ( likely(prev_scombo == scombo) )
+            if ( likely(prev_scombo.word == scombo.word) )
                 break;
 
             if ( retries++ == 4 )
@@ -210,9 +225,8 @@ __gnttab_map_grant_ref(
                          "Shared grant entry is unstable.\n");
 
             /* Didn't see what we expected. Split out the seen flags & dom. */
-            /* NB. Endianness! */
-            sflags = (u16)prev_scombo;
-            sdom   = (u16)(prev_scombo >> 16);
+            sflags = prev_scombo.shorts.flags;
+            sdom   = prev_scombo.shorts.domid;
         }
 
         if ( !act->pin )
@@ -533,7 +547,7 @@ gnttab_prepare_for_transfer(
     struct grant_entry *sha;
     domid_t             sdom;
     u16                 sflags;
-    u32                 scombo, prev_scombo;
+    union grant_combo   scombo, prev_scombo, tmp_scombo;
     int                 retries = 0;
 
     if ( unlikely((rgt = rd->grant_table) == NULL) ||
@@ -562,14 +576,16 @@ gnttab_prepare_for_transfer(
         }
 
         /* Merge two 16-bit values into a 32-bit combined update. */
-        /* NB. Endianness! */
-        scombo = ((u32)sdom << 16) | (u32)sflags;
+        scombo.shorts.flags = sflags;
+        scombo.shorts.domid = sdom;
 
-        prev_scombo = cmpxchg((u32 *)&sha->flags, scombo,
-                              scombo | GTF_transfer_committed);
+        tmp_scombo = scombo;
+        tmp_scombo.shorts.flags |= GTF_transfer_committed;
+        prev_scombo.word = cmpxchg((u32 *)&sha->flags,
+                                   scombo.word, tmp_scombo.word);
 
         /* Did the combined update work (did we see what we expected?). */
-        if ( likely(prev_scombo == scombo) )
+        if ( likely(prev_scombo.word == scombo.word) )
             break;
 
         if ( retries++ == 4 )
@@ -579,9 +595,8 @@ gnttab_prepare_for_transfer(
         }
 
         /* Didn't see what we expected. Split out the seen flags & dom. */
-        /* NB. Endianness! */
-        sflags = (u16)prev_scombo;
-        sdom   = (u16)(prev_scombo >> 16);
+        sflags = prev_scombo.shorts.flags;
+        sdom   = prev_scombo.shorts.domid;
     }
 
     spin_unlock(&rgt->lock);
@@ -764,33 +779,38 @@ __acquire_grant_for_copy(
 
         for ( ; ; )
         {
-            u32 scombo;
-            u32 prev_scombo;
-            u32 new_scombo;
+            union grant_combo scombo, prev_scombo, new_scombo;
 
             if ( unlikely((sflags & GTF_type_mask) != GTF_permit_access ||
                           sdom != current->domain->domain_id ) )
                 PIN_FAIL(unlock_out, GNTST_general_error,
                          "Bad flags (%x) or dom (%d). (NB. expected dom %d)\n",
                          sflags, sdom, current->domain->domain_id);
-            scombo = ((u32)sdom << 16) | (u32)sflags;
-            new_scombo = scombo | GTF_reading;
+
+            /* Merge two 16-bit values into a 32-bit combined update. */
+            scombo.shorts.flags = sflags;
+            scombo.shorts.domid = sdom;
+            
+            new_scombo = scombo;
+            new_scombo.shorts.flags |= GTF_reading;
+
             if ( !readonly )
             {
-                new_scombo |= GTF_writing;
+                new_scombo.shorts.flags |= GTF_writing;
                 if ( unlikely(sflags & GTF_readonly) )
                     PIN_FAIL(unlock_out, GNTST_general_error,
                              "Attempt to write-pin a r/o grant entry.\n");
             }
-            prev_scombo = cmpxchg((u32 *)&sha->flags, scombo, new_scombo);
-            if ( likely(prev_scombo == scombo) )
+            prev_scombo.word = cmpxchg((u32 *)&sha->flags,
+                                       scombo.word, new_scombo.word);
+            if ( likely(prev_scombo.word == scombo.word) )
                 break;
 
             if ( retries++ == 4 )
                 PIN_FAIL(unlock_out, GNTST_general_error,
                          "Shared grant entry is unstable.\n");
-            sflags = (u16)prev_scombo;
-            sdom = (u16)(prev_scombo >> 16);
+            sflags = prev_scombo.shorts.flags;
+            sdom = prev_scombo.shorts.flags;
         }
 
         if ( !act->pin )
