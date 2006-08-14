@@ -49,14 +49,3 @@ int xc_evtchn_alloc_unbound(int xc_handle,
 
     return rc;
 }
-
-
-int xc_evtchn_status(int xc_handle,
-                     uint32_t dom,
-                     evtchn_port_t port,
-                     xc_evtchn_status_t *status)
-{
-    status->dom  = (domid_t)dom;
-    status->port = port;
-    return do_evtchn_op(xc_handle, EVTCHNOP_status, status, sizeof(*status));
-}

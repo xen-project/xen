@@ -484,60 +484,6 @@ static PyObject *pyxc_evtchn_alloc_unbound(XcObject *self,
     return PyInt_FromLong(port);
 }
 
-static PyObject *pyxc_evtchn_status(XcObject *self,
-                                    PyObject *args,
-                                    PyObject *kwds)
-{
-    PyObject *dict;
-
-    uint32_t dom = DOMID_SELF;
-    int port, ret;
-    xc_evtchn_status_t status;
-
-    static char *kwd_list[] = { "port", "dom", NULL };
-
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwd_list, 
-                                      &port, &dom) )
-        return NULL;
-
-    ret = xc_evtchn_status(self->xc_handle, dom, port, &status);
-    if ( ret != 0 )
-        return PyErr_SetFromErrno(xc_error);
-
-    switch ( status.status )
-    {
-    case EVTCHNSTAT_closed:
-        dict = Py_BuildValue("{s:s}", 
-                             "status", "closed");
-        break;
-    case EVTCHNSTAT_unbound:
-        dict = Py_BuildValue("{s:s}", 
-                             "status", "unbound");
-        break;
-    case EVTCHNSTAT_interdomain:
-        dict = Py_BuildValue("{s:s,s:i,s:i}", 
-                             "status", "interdomain",
-                             "dom", status.u.interdomain.dom,
-                             "port", status.u.interdomain.port);
-        break;
-    case EVTCHNSTAT_pirq:
-        dict = Py_BuildValue("{s:s,s:i}", 
-                             "status", "pirq",
-                             "irq", status.u.pirq);
-        break;
-    case EVTCHNSTAT_virq:
-        dict = Py_BuildValue("{s:s,s:i}", 
-                             "status", "virq",
-                             "irq", status.u.virq);
-        break;
-    default:
-        dict = Py_BuildValue("{}");
-        break;
-    }
-    
-    return dict;
-}
-
 static PyObject *pyxc_physdev_pci_access_modify(XcObject *self,
                                                 PyObject *args,
                                                 PyObject *kwds)
@@ -1140,21 +1086,6 @@ static PyMethodDef pyxc_methods[] = {
       " dom        [int]: Domain whose port space to allocate from.\n"
       " remote_dom [int]: Remote domain to accept connections from.\n\n"
       "Returns: [int] Unbound event-channel port.\n" },
-
-    { "evtchn_status", 
-      (PyCFunction)pyxc_evtchn_status, 
-      METH_VARARGS | METH_KEYWORDS, "\n"
-      "Query the status of an event channel.\n"
-      " dom  [int, SELF]: Dom-id of one endpoint of the channel.\n"
-      " port [int]:       Port-id of one endpoint of the channel.\n\n"
-      "Returns: [dict] dictionary is empty on failure.\n"
-      " status [str]:  'closed', 'unbound', 'interdomain', 'pirq',"
-      " or 'virq'.\n"
-      "The following are returned if 'status' is 'interdomain':\n"
-      " dom  [int]: Dom-id of remote endpoint.\n"
-      " port [int]: Port-id of remote endpoint.\n"
-      "The following are returned if 'status' is 'pirq' or 'virq':\n"
-      " irq  [int]: IRQ number.\n" },
 
     { "physdev_pci_access_modify",
       (PyCFunction)pyxc_physdev_pci_access_modify,
