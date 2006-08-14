@@ -128,7 +128,8 @@ union ptel {
 
 struct domain_htab {
     ulong sdr1;
-    ulong log_num_ptes; /* log number of PTEs in HTAB. */
+    uint log_num_ptes;  /* log number of PTEs in HTAB. */
+    uint order;         /* order for freeing. */
     union pte *map;     /* access the htab like an array */
     ulong *shadow;      /* idx -> logical translation array */
 };

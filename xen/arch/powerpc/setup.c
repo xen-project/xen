@@ -273,11 +273,25 @@ static void __init __start_xen(multiboot_info_t *mbi)
 
     printk("System RAM: %luMB (%lukB)\n", eomem >> 20, eomem >> 10);
 
+    /* top of memory */
     max_page = PFN_DOWN(ALIGN_DOWN(eomem, PAGE_SIZE));
     total_pages = max_page;
 
-    /* skip the exception handlers */
+    /* Architecturally the first 4 pages are exception hendlers, we
+     * will also be copying down some code there */
     heap_start = init_boot_allocator(4 << PAGE_SHIFT);
+
+    /* we give the first RMA to the hypervisor */
+    xenheap_phys_end = rma_size(cpu_rma_order());
+
+    /* allow everything else to be allocated */
+    init_boot_pages(xenheap_phys_end, eomem);
+    init_frametable();
+    end_boot_allocator();
+
+    /* Add memory between the beginning of the heap and the beginning
+     * of out text */
+    init_xenheap_pages(heap_start, (ulong)_start);
 
     /* move the modules to just after _end */
     if (modules_start) {
@@ -293,26 +307,21 @@ static void __init __start_xen(multiboot_info_t *mbi)
                 modules_start + modules_size);
     }
 
+    /* the rest of the xenheap, starting at the end of modules */
+    init_xenheap_pages(freemem, xenheap_phys_end);
+
+
 #ifdef OF_DEBUG
     printk("ofdump:\n");
     /* make sure the OF devtree is good */
     ofd_walk((void *)oftree, OFD_ROOT, ofd_dump_props, OFD_DUMP_ALL);
 #endif
 
-    percpu_init_areas();
-
-    /* mark all memory from modules onward as unused */
-    init_boot_pages(freemem, eomem);
-
-    init_frametable();
-    end_boot_allocator();
-
-    /* place the heap from after the allocator bitmap to _start */
-    xenheap_phys_end = (ulong)_start;
-    init_xenheap_pages(heap_start, xenheap_phys_end);
     heap_size = xenheap_phys_end - heap_start;
 
     printk("Xen heap: %luMB (%lukB)\n", heap_size >> 20, heap_size >> 10);
+
+    percpu_init_areas();
 
     cpu_initialize();
 

@@ -107,7 +107,7 @@ extern void load_float(struct vcpu *);
 #define RMA_CONSOLE 3
 #define RMA_LAST_DOMU 3
 
-#define rma_size(rma_order) (1UL << (rma_order) << PAGE_SHIFT)
+#define rma_size(rma_order) (1UL << ((rma_order) + PAGE_SHIFT))
 
 static inline ulong rma_addr(struct arch_domain *ad, int type)
 {

@@ -154,5 +154,4 @@ void guest_physmap_remove_page(
 void shadow_drop_references(
     struct domain *d, struct page_info *page)
 {
-    panic("%s\n", __func__);
 }

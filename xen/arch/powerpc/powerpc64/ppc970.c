@@ -34,7 +34,8 @@
 unsigned int cpu_rma_order(void)
 {
     /* XXX what about non-HV mode? */
-    return 14; /* 1<<14<<PAGE_SIZE = 64M */
+    uint rma_log_size = 6 + 20; /* 64M */
+    return rma_log_size - PAGE_SHIFT;
 }
 
 void cpu_initialize(void)

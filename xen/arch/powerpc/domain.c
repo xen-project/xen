@@ -74,7 +74,7 @@ unsigned long hypercall_create_continuation(unsigned int op,
 int arch_domain_create(struct domain *d)
 {
     unsigned long rma_base;
-    unsigned long rma_size;
+    unsigned long rma_sz;
     uint htab_order;
 
     if (d->domain_id == IDLE_DOMAIN_ID) {
@@ -85,19 +85,20 @@ int arch_domain_create(struct domain *d)
     }
 
     d->arch.rma_order = cpu_rma_order();
-    rma_size = 1UL << d->arch.rma_order << PAGE_SHIFT;
+    rma_sz = rma_size(d->arch.rma_order);
 
     /* allocate the real mode area */
     d->max_pages = 1UL << d->arch.rma_order;
+    d->tot_pages = 0;
     d->arch.rma_page = alloc_domheap_pages(d, d->arch.rma_order, 0);
     if (NULL == d->arch.rma_page)
         return 1;
     rma_base = page_to_maddr(d->arch.rma_page);
 
-    BUG_ON(rma_base & (rma_size-1)); /* check alignment */
+    BUG_ON(rma_base & (rma_sz - 1)); /* check alignment */
 
-    printk("clearing RMO: 0x%lx[0x%lx]\n", rma_base, rma_size);
-    memset((void *)rma_base, 0, rma_size);
+    printk("clearing RMO: 0x%lx[0x%lx]\n", rma_base, rma_sz);
+    memset((void *)rma_base, 0, rma_sz);
 
     d->shared_info = (shared_info_t *)
         (rma_addr(&d->arch, RMA_SHARED_INFO) + rma_base);
@@ -120,7 +121,6 @@ int arch_domain_create(struct domain *d)
 
 void arch_domain_destroy(struct domain *d)
 {
-    free_domheap_pages(d->arch.rma_page, d->arch.rma_order);
     htab_free(d);
 }
 
@@ -263,7 +263,7 @@ void sync_vcpu_execstate(struct vcpu *v)
 
 void domain_relinquish_resources(struct domain *d)
 {
-    /* nothing to do? */
+    free_domheap_pages(d->arch.rma_page, d->arch.rma_order);
 }
 
 void arch_dump_domain_info(struct domain *d)
