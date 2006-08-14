@@ -68,10 +68,6 @@ static struct timer_list net_timer;
 #define MAX_PENDING_REQS 256
 
 static struct sk_buff_head rx_queue;
-static multicall_entry_t rx_mcl[NET_RX_RING_SIZE+1];
-static mmu_update_t rx_mmu[NET_RX_RING_SIZE];
-static gnttab_transfer_t grant_rx_op[NET_RX_RING_SIZE];
-static unsigned char rx_notify[NR_IRQS];
 
 static unsigned long mmap_vstart;
 #define MMAP_VADDR(_req) (mmap_vstart + ((_req) * PAGE_SIZE))
@@ -314,11 +310,23 @@ int xen_network_done(void)
 }
 #endif
 
-static u16 netbk_gop_frag(netif_t *netif, struct page *page, int count, int i)
+struct netrx_pending_operations {
+	unsigned trans_prod, trans_cons;
+	unsigned mmu_prod, mmu_cons;
+	unsigned mcl_prod, mcl_cons;
+	unsigned meta_prod, meta_cons;
+	mmu_update_t *mmu;
+	gnttab_transfer_t *trans;
+	multicall_entry_t *mcl;
+	struct netbk_rx_meta *meta;
+};
+
+static u16 netbk_gop_frag(netif_t *netif, struct page *page,
+			  int i, struct netrx_pending_operations *npo)
 {
-	multicall_entry_t *mcl = rx_mcl + count;
-	mmu_update_t *mmu = rx_mmu + count;
-	gnttab_transfer_t *gop = grant_rx_op + count;
+	mmu_update_t *mmu;
+	gnttab_transfer_t *gop;
+	multicall_entry_t *mcl;
 	netif_rx_request_t *req;
 	unsigned long old_mfn, new_mfn;
 
@@ -334,46 +342,53 @@ static u16 netbk_gop_frag(netif_t *netif, struct page *page, int count, int i)
 		 */
 		set_phys_to_machine(page_to_pfn(page), new_mfn);
 
+		mcl = npo->mcl + npo->mcl_prod++;
 		MULTI_update_va_mapping(mcl, (unsigned long)page_address(page),
 					pfn_pte_ma(new_mfn, PAGE_KERNEL), 0);
 
+		mmu = npo->mmu + npo->mmu_prod++;
 		mmu->ptr = ((maddr_t)new_mfn << PAGE_SHIFT) |
 			MMU_MACHPHYS_UPDATE;
 		mmu->val = page_to_pfn(page);
 	}
 
 	req = RING_GET_REQUEST(&netif->rx, netif->rx.req_cons + i);
+	gop = npo->trans + npo->trans_prod++;
 	gop->mfn = old_mfn;
 	gop->domid = netif->domid;
 	gop->ref = req->gref;
 	return req->id;
 }
 
-static void netbk_gop_skb(struct sk_buff *skb, struct netbk_rx_meta *meta,
-			  int count)
+static void netbk_gop_skb(struct sk_buff *skb,
+			  struct netrx_pending_operations *npo)
 {
 	netif_t *netif = netdev_priv(skb->dev);
 	int nr_frags = skb_shinfo(skb)->nr_frags;
 	int i;
 	int extra;
+	struct netbk_rx_meta *head_meta, *meta;
 
-	meta[count].frag.page_offset = skb_shinfo(skb)->gso_type;
-	meta[count].frag.size = skb_shinfo(skb)->gso_size;
-	extra = !!meta[count].frag.size + 1;
+	head_meta = npo->meta + npo->meta_prod++;
+	head_meta->frag.page_offset = skb_shinfo(skb)->gso_type;
+	head_meta->frag.size = skb_shinfo(skb)->gso_size;
+	extra = !!head_meta->frag.size + 1;
 
 	for (i = 0; i < nr_frags; i++) {
-		meta[++count].frag = skb_shinfo(skb)->frags[i];
-		meta[count].id = netbk_gop_frag(netif, meta[count].frag.page,
-						count, i + extra);
+		meta = npo->meta + npo->meta_prod++;
+		meta->frag = skb_shinfo(skb)->frags[i];
+		meta->id = netbk_gop_frag(netif, meta->frag.page,
+					  i + extra, npo);
 	}
 
 	/*
 	 * This must occur at the end to ensure that we don't trash
 	 * skb_shinfo until we're done.
 	 */
-	meta[count - nr_frags].id = netbk_gop_frag(netif,
-						   virt_to_page(skb->data),
-						   count - nr_frags, 0);
+	head_meta->id = netbk_gop_frag(netif,
+				       virt_to_page(skb->data),
+				       0,
+				       npo);
 	netif->rx.req_cons += nr_frags + extra;
 }
 
@@ -385,22 +400,28 @@ static inline void netbk_free_pages(int nr_frags, struct netbk_rx_meta *meta)
 		put_page(meta[i].frag.page);
 }
 
-static int netbk_check_gop(int nr_frags, domid_t domid, int count)
+/* This is a twin to netbk_gop_skb.  Assume that netbk_gop_skb was
+   used to set up the operations on the top of
+   netrx_pending_operations, which have since been done.  Check that
+   they didn't give any errors and advance over them. */
+static int netbk_check_gop(int nr_frags, domid_t domid, int count,
+			   struct netrx_pending_operations *npo)
 {
-	multicall_entry_t *mcl = rx_mcl + count;
-	gnttab_transfer_t *gop = grant_rx_op + count;
+	multicall_entry_t *mcl;
+	gnttab_transfer_t *gop;
 	int status = NETIF_RSP_OKAY;
 	int i;
 
 	for (i = 0; i <= nr_frags; i++) {
 		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+			mcl = npo->mcl + npo->mcl_cons++;
 			/* The update_va_mapping() must not fail. */
 			BUG_ON(mcl->result != 0);
-			mcl++;
 		}
 
+		gop = npo->trans + npo->trans_cons++;
 		/* Check the reassignment error code. */
-		if (gop->status != 0) { 
+		if (gop->status != 0) {
 			DPRINTK("Bad status %d from grant transfer to DOM%u\n",
 				gop->status, domid);
 			/*
@@ -408,9 +429,8 @@ static int netbk_check_gop(int nr_frags, domid_t domid, int count)
 			 * but that should be a fatal error anyway.
 			 */
 			BUG_ON(gop->status == GNTST_bad_page);
-			status = NETIF_RSP_ERROR; 
+			status = NETIF_RSP_ERROR;
 		}
-		gop++;
 	}
 
 	return status;
@@ -449,8 +469,18 @@ static void net_rx_action(unsigned long unused)
 	 * Putting hundreds of bytes on the stack is considered rude.
 	 * Static works because a tasklet can only be on one CPU at any time.
 	 */
+	static multicall_entry_t rx_mcl[NET_RX_RING_SIZE+3];
+	static mmu_update_t rx_mmu[NET_RX_RING_SIZE];
+	static gnttab_transfer_t grant_rx_op[NET_RX_RING_SIZE];
+	static unsigned char rx_notify[NR_IRQS];
 	static u16 notify_list[NET_RX_RING_SIZE];
 	static struct netbk_rx_meta meta[NET_RX_RING_SIZE];
+
+	struct netrx_pending_operations npo = {
+		mmu: rx_mmu,
+		trans: grant_rx_op,
+		mcl: rx_mcl,
+		meta: meta};
 
 	skb_queue_head_init(&rxq);
 
@@ -471,7 +501,7 @@ static void net_rx_action(unsigned long unused)
 			break;
 		}
 
-		netbk_gop_skb(skb, meta, count);
+		netbk_gop_skb(skb, &npo);
 
 		count += nr_frags + 1;
 
@@ -486,8 +516,11 @@ static void net_rx_action(unsigned long unused)
 		return;
 
 	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
-		mcl = rx_mcl + count;
+		BUG_ON(npo.mcl_prod == 0);
 
+		mcl = npo.mcl + npo.mcl_prod++;
+
+		BUG_ON(mcl[-1].op != __HYPERVISOR_update_va_mapping);
 		mcl[-1].args[MULTI_UVMFLAGS_INDEX] = UVMF_TLB_FLUSH|UVMF_ALL;
 
 		mcl->op = __HYPERVISOR_mmu_update;
@@ -495,13 +528,17 @@ static void net_rx_action(unsigned long unused)
 		mcl->args[1] = count;
 		mcl->args[2] = 0;
 		mcl->args[3] = DOMID_SELF;
-
-		ret = HYPERVISOR_multicall(rx_mcl, count + 1);
-		BUG_ON(ret != 0);
 	}
 
-	ret = HYPERVISOR_grant_table_op(GNTTABOP_transfer, grant_rx_op, count);
+	mcl = npo.mcl + npo.mcl_prod++;
+	mcl->op = __HYPERVISOR_grant_table_op;
+	mcl->args[0] = GNTTABOP_transfer;
+	mcl->args[1] = (unsigned long)grant_rx_op;
+	mcl->args[2] = npo.trans_prod;
+
+	ret = HYPERVISOR_multicall(npo.mcl, npo.mcl_prod);
 	BUG_ON(ret != 0);
+	BUG_ON(mcl->result != 0);
 
 	count = 0;
 	while ((skb = __skb_dequeue(&rxq)) != NULL) {
@@ -515,10 +552,11 @@ static void net_rx_action(unsigned long unused)
 		netif->stats.tx_bytes += skb->len;
 		netif->stats.tx_packets++;
 
-		netbk_free_pages(nr_frags, meta + count + 1);
-		status = netbk_check_gop(nr_frags, netif->domid, count);
+		netbk_free_pages(nr_frags, meta + npo.meta_cons + 1);
+		status = netbk_check_gop(nr_frags, netif->domid, count,
+					 &npo);
 
-		id = meta[count].id;
+		id = meta[npo.meta_cons].id;
 		flags = nr_frags ? NETRXF_more_data : 0;
 
 		if (skb->ip_summed == CHECKSUM_HW) /* local packet? */
@@ -532,7 +570,7 @@ static void net_rx_action(unsigned long unused)
 
 		extra = NULL;
 
-		if (meta[count].frag.size) {
+		if (meta[npo.meta_cons].frag.size) {
 			struct netif_extra_info *gso =
 				(struct netif_extra_info *)
 				RING_GET_RESPONSE(&netif->rx,
@@ -543,7 +581,7 @@ static void net_rx_action(unsigned long unused)
 			else
 				resp->flags |= NETRXF_extra_info;
 
-			gso->u.gso.size = meta[count].frag.size;
+			gso->u.gso.size = meta[npo.meta_cons].frag.size;
 			gso->u.gso.type = XEN_NETIF_GSO_TYPE_TCPV4;
 			gso->u.gso.pad = 0;
 			gso->u.gso.features = 0;
@@ -553,7 +591,8 @@ static void net_rx_action(unsigned long unused)
 			extra = gso;
 		}
 
-		netbk_add_frag_responses(netif, status, meta + count + 1,
+		netbk_add_frag_responses(netif, status,
+					 meta + npo.meta_cons + 1,
 					 nr_frags);
 
 		RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(&netif->rx, ret);
@@ -569,7 +608,8 @@ static void net_rx_action(unsigned long unused)
 
 		netif_put(netif);
 		dev_kfree_skb(skb);
-		count += nr_frags + 1;
+
+		npo.meta_cons += nr_frags + 1;
 	}
 
 	while (notify_nr != 0) {
