@@ -28,7 +28,6 @@
 #include <xen/domain.h>
 #include <public/callback.h>
 #include <xen/event.h>
-#include <asm/privop_stat.h>
 
 static long do_physdev_op_compat(XEN_GUEST_HANDLE(physdev_op_t) uop);
 static long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg);
@@ -275,43 +274,12 @@ fw_hypercall (struct pt_regs *regs)
 	return IA64_NO_FAULT;
 }
 
-/* opt_unsafe_hypercall: If true, unsafe debugging hypercalls are allowed.
-   These can create security hole.  */
-static int opt_unsafe_hypercall = 0;
-boolean_param("unsafe_hypercall", opt_unsafe_hypercall);
-
 IA64FAULT
 ia64_hypercall (struct pt_regs *regs)
 {
 	struct vcpu *v = current;
 	unsigned long index = regs->r2;
 	int privlvl = (regs->cr_ipsr & IA64_PSR_CPL) >> IA64_PSR_CPL0_BIT;
-
-	if (index >= FW_HYPERCALL_FIRST_USER) {
-	    /* Note: user hypercalls are not safe, since Xen doesn't
-	       check memory access privilege: Xen does not deny reading
-	       or writing to kernel memory.  */
-	    if (!opt_unsafe_hypercall) {
-		printf("user xen/ia64 hypercalls disabled\n");
-		regs->r8 = -1;
-	    }
-	    else switch (index) {
-		case 0xffff:
-			regs->r8 = dump_privop_counts_to_user(
-				(char *) vcpu_get_gr(v,32),
-				(int) vcpu_get_gr(v,33));
-			break;
-		case 0xfffe:
-			regs->r8 = zero_privop_counts_to_user(
-				(char *) vcpu_get_gr(v,32),
-				(int) vcpu_get_gr(v,33));
-			break;
-		default:
-			printf("unknown user xen/ia64 hypercall %lx\n", index);
-			regs->r8 = do_ni_hypercall();
-	    }
-	    return IA64_NO_FAULT;
-	}
 
 	/* Hypercalls are only allowed by kernel.
 	   Kernel checks memory accesses.  */

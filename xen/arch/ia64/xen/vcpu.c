@@ -473,7 +473,7 @@ IA64FAULT vcpu_get_iip(VCPU *vcpu, UINT64 *pval)
 
 IA64FAULT vcpu_get_ifa(VCPU *vcpu, UINT64 *pval)
 {
-	PRIVOP_COUNT_ADDR(vcpu_regs(vcpu),_GET_IFA);
+	PRIVOP_COUNT_ADDR(vcpu_regs(vcpu), privop_inst_get_ifa);
 	*pval = PSCB(vcpu,ifa);
 	return (IA64_NO_FAULT);
 }
@@ -540,7 +540,7 @@ IA64FAULT vcpu_get_iim(VCPU *vcpu, UINT64 *pval)
 
 IA64FAULT vcpu_get_iha(VCPU *vcpu, UINT64 *pval)
 {
-	PRIVOP_COUNT_ADDR(vcpu_regs(vcpu),_THASH);
+	PRIVOP_COUNT_ADDR(vcpu_regs(vcpu), privop_inst_thash);
 	*pval = PSCB(vcpu,iha);
 	return (IA64_NO_FAULT);
 }

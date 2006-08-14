@@ -26,7 +26,6 @@
 #include <asm/debugger.h>
 #include <asm/fpswa.h>
 #include <asm/bundle.h>
-#include <asm/privop_stat.h>
 #include <asm/asm-xsi-offsets.h>
 #include <asm/shadow.h>
 

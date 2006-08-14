@@ -37,6 +37,12 @@
 
 #define MAX_DMADOM_PFN (0x7FFFFFFFUL >> PAGE_SHIFT) /* 31 addressable bits */
 
+/* If PERFC is used, include privop maps.  */
+#ifdef PERF_COUNTERS
+#define CONFIG_PRIVOP_ADDRS
+#define PRIVOP_COUNT_NADDRS 30
+#endif
+
 #ifndef __ASSEMBLY__
 
 // can't find where this typedef was before?!?

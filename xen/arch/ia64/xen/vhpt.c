@@ -261,13 +261,12 @@ void flush_tlb_mask(cpumask_t mask)
             (cpu, (void (*)(void *))flush_tlb_vhpt_all, NULL, 1, 1);
 }
 
-int dump_vhpt_stats(char *buf)
+#ifdef PERF_COUNTERS
+void gather_vhpt_stats(void)
 {
 	int i, cpu;
-	char *s = buf;
 
-	s += sprintf(s,"VHPT usage (%ld entries):\n",
-		     (unsigned long) VHPT_NUM_ENTRIES);
+	perfc_set(vhpt_nbr_entries, VHPT_NUM_ENTRIES);
 
 	for_each_present_cpu (cpu) {
 		struct vhpt_lf_entry *v = __va(per_cpu(vhpt_paddr, cpu));
@@ -276,8 +275,7 @@ int dump_vhpt_stats(char *buf)
 		for (i = 0; i < VHPT_NUM_ENTRIES; i++, v++)
 			if (!(v->ti_tag & INVALID_TI_TAG))
 				vhpt_valid++;
-		s += sprintf(s,"  cpu %d: %ld\n", cpu, vhpt_valid);
+		perfc_seta(vhpt_valid_entries, cpu, vhpt_valid);
 	}
-
-	return s - buf;
 }
+#endif

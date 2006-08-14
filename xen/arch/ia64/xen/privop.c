@@ -13,7 +13,6 @@
 #include <asm/dom_fw.h>
 #include <asm/vhpt.h>
 #include <asm/bundle.h>
-#include <asm/privop_stat.h>
 
 long priv_verbose=0;
 unsigned long privop_trace = 0;
