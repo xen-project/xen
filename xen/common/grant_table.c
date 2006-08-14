@@ -822,10 +822,19 @@ __gnttab_copy(
     char *sp, *dp;
     s16 rc = GNTST_okay;
     int have_d_grant = 0, have_s_grant = 0;
+    int src_is_gref, dest_is_gref;
 
     if ( ((op->source.offset + op->len) > PAGE_SIZE) ||
          ((op->dest.offset + op->len) > PAGE_SIZE) )
         PIN_FAIL(error_out, GNTST_bad_copy_arg, "copy beyond page area.\n");
+
+    src_is_gref = op->flags & GNTCOPY_source_gref;
+    dest_is_gref = op->flags & GNTCOPY_dest_gref;
+
+    if ( (op->source.domid != DOMID_SELF && !src_is_gref ) ||
+         (op->dest.domid   != DOMID_SELF && !dest_is_gref)   )
+        PIN_FAIL(error_out, GNTST_permission_denied,
+                 "only allow copy-by-mfn for DOMID_SELF.\n");
 
     if ( op->source.domid == DOMID_SELF )
     {
@@ -849,7 +858,7 @@ __gnttab_copy(
                  "couldn't find %d\n", op->dest.domid);
     }
 
-    if ( op->flags & GNTCOPY_source_gref )
+    if ( src_is_gref )
     {
         rc = __acquire_grant_for_copy(sd, op->source.u.ref, 1, &s_frame);
         if ( rc != GNTST_okay )
@@ -864,7 +873,7 @@ __gnttab_copy(
         PIN_FAIL(error_out, GNTST_general_error,
                  "could not get source frame %lx.\n", s_frame);
 
-    if ( op->flags & GNTCOPY_dest_gref )
+    if ( dest_is_gref )
     {
         rc = __acquire_grant_for_copy(dd, op->dest.u.ref, 0, &d_frame);
         if ( rc != GNTST_okay )
