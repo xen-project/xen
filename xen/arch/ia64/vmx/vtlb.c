@@ -214,12 +214,22 @@ u64 guest_vhpt_lookup(u64 iha, u64 *pte)
 {
     u64 ret;
     thash_data_t * data;
+    PTA vpta;
+
     data = vhpt_lookup(iha);
     if (data == NULL) {
         data = vtlb_lookup(current, iha, DSIDE_TLB);
         if (data != NULL)
             thash_vhpt_insert(current, data->page_flags, data->itir ,iha);
     }
+
+    /* VHPT long format is not read.  */
+    vmx_vcpu_get_pta(current, &vpta.val);
+    if (vpta.vf == 1) {
+        *pte = 0;
+        return 0;
+    }
+
     asm volatile ("rsm psr.ic|psr.i;;"
                   "srlz.d;;"
                   "ld8.s r9=[%1];;"
@@ -231,7 +241,7 @@ u64 guest_vhpt_lookup(u64 iha, u64 *pte)
                   "ssm psr.ic;;"
                   "srlz.d;;"
                   "ssm psr.i;;"
-             : "=r"(ret) : "r"(iha), "r"(pte):"memory");
+                  : "=r"(ret) : "r"(iha), "r"(pte):"memory");
     return ret;
 }
 
@@ -257,7 +267,8 @@ void vtlb_purge(VCPU *v, u64 va, u64 ps)
         psbits &= ~(1UL << ps);
         def_size = PSIZE(ps);
         vrr.ps = ps;
-        while (curadr < end) {
+        /* Be careful about overflow.  */
+        while (curadr < end && curadr >= start) {
             cur = vsa_thash(hcb->pta, curadr, vrr.rrval, &tag);
             while (cur) {
                 if (cur->etag == tag && cur->ps == ps)
