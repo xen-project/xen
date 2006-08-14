@@ -318,7 +318,7 @@ static void __init probe_roms(void)
 	int	      i;
 
 	/* Nothing to do if not running in dom0. */
-	if (!(xen_start_info->flags & SIF_INITDOMAIN))
+	if (!is_initial_xendomain())
 		return;
 
 	/* video rom */
@@ -1458,7 +1458,7 @@ static void __init register_memory(void)
 	int	      i;
 
 	/* Nothing to do if not running in dom0. */
-	if (!(xen_start_info->flags & SIF_INITDOMAIN)) {
+	if (!is_initial_xendomain()) {
 		legacy_init_iomem_resources(e820.map, e820.nr_map,
 					    &code_resource, &data_resource);
 		return;
@@ -1618,7 +1618,7 @@ void __init setup_arch(char **cmdline_p)
 
 	/* Force a quick death if the kernel panics (not domain 0). */
 	extern int panic_timeout;
-	if (!panic_timeout && !(xen_start_info->flags & SIF_INITDOMAIN))
+	if (!panic_timeout && !is_initial_xendomain())
 		panic_timeout = 1;
 
 	/* Register a call for panic conditions. */
@@ -1661,7 +1661,7 @@ void __init setup_arch(char **cmdline_p)
 	}
 	bootloader_type = LOADER_TYPE;
 
-	if (xen_start_info->flags & SIF_INITDOMAIN) {
+	if (is_initial_xendomain()) {
 		/* This is drawn from a dump from vgacon:startup in
 		 * standard Linux. */
 		screen_info.orig_video_mode = 3; 
@@ -1788,7 +1788,7 @@ void __init setup_arch(char **cmdline_p)
 	}
 #endif
 
-	if (xen_start_info->flags & SIF_INITDOMAIN)
+	if (is_initial_xendomain())
 		dmi_scan_machine();
 
 #ifdef CONFIG_X86_GENERICARCH
@@ -1805,7 +1805,7 @@ void __init setup_arch(char **cmdline_p)
 #endif
 
 #ifdef CONFIG_ACPI
-	if (!(xen_start_info->flags & SIF_INITDOMAIN)) {
+	if (!is_initial_xendomain()) {
 		printk(KERN_INFO "ACPI in unprivileged domain disabled\n");
 		acpi_disabled = 1;
 		acpi_ht = 0;
@@ -1831,11 +1831,7 @@ void __init setup_arch(char **cmdline_p)
 
 	register_memory();
 
-	if (xen_start_info->flags & SIF_INITDOMAIN) {
-		if (!(xen_start_info->flags & SIF_PRIVILEGED))
-			panic("Xen granted us console access "
-			      "but not privileged status");
-
+	if (is_initial_xendomain()) {
 #ifdef CONFIG_VT
 #if defined(CONFIG_VGA_CONSOLE)
 		if (!efi_enabled ||

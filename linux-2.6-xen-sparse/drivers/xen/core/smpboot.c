@@ -294,7 +294,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		irq_ctx_init(cpu);
 
 #ifdef CONFIG_HOTPLUG_CPU
-		if (xen_start_info->flags & SIF_INITDOMAIN)
+		if (is_initial_xendomain())
 			cpu_set(cpu, cpu_present_map);
 #else
 		cpu_set(cpu, cpu_present_map);

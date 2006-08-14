@@ -59,6 +59,8 @@ extern int running_on_xen;
 extern shared_info_t *HYPERVISOR_shared_info;
 extern start_info_t *xen_start_info;
 
+#define is_initial_xendomain() (xen_start_info->flags & SIF_INITDOMAIN)
+
 void force_evtchn_callback(void);
 
 /* Turn jiffies into Xen system time. XXX Implement me. */

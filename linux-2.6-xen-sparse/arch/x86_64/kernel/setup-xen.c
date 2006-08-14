@@ -639,7 +639,7 @@ void __init setup_arch(char **cmdline_p)
 	kernel_end = 0;		/* dummy */
  	screen_info = SCREEN_INFO;
 
-	if (xen_start_info->flags & SIF_INITDOMAIN) {
+	if (is_initial_xendomain()) {
 		/* This is drawn from a dump from vgacon:startup in
 		 * standard Linux. */
 		screen_info.orig_video_mode = 3;
@@ -860,8 +860,7 @@ void __init setup_arch(char **cmdline_p)
 
 	}
 
-	if ( ! (xen_start_info->flags & SIF_INITDOMAIN))
-	{
+	if (!is_initial_xendomain()) {
 		acpi_disabled = 1;
 #ifdef  CONFIG_ACPI
 		acpi_ht = 0;
@@ -910,7 +909,7 @@ void __init setup_arch(char **cmdline_p)
 	 */
 #if defined(CONFIG_XEN_PRIVILEGED_GUEST)
 	probe_roms();
-	if (xen_start_info->flags & SIF_INITDOMAIN) {
+	if (is_initial_xendomain()) {
 		machine_e820 = alloc_bootmem_low_pages(PAGE_SIZE);
 
 		memmap.nr_entries = E820MAX;
@@ -919,7 +918,7 @@ void __init setup_arch(char **cmdline_p)
 		BUG_ON(HYPERVISOR_memory_op(XENMEM_machine_memory_map, &memmap));
 
 		e820_reserve_resources(machine_e820, memmap.nr_entries);
-	} else if (!(xen_start_info->flags & SIF_INITDOMAIN))
+	} else
 		e820_reserve_resources(e820.map, e820.nr_map);
 #elif defined(CONFIG_XEN)
 	e820_reserve_resources(e820.map, e820.nr_map);
@@ -938,7 +937,7 @@ void __init setup_arch(char **cmdline_p)
 	}
 
 #if defined(CONFIG_XEN_PRIVILEGED_GUEST)
-	if (xen_start_info->flags & SIF_INITDOMAIN) {
+	if (is_initial_xendomain()) {
 		e820_setup_gap(machine_e820, memmap.nr_entries);
 		free_bootmem(__pa(machine_e820), PAGE_SIZE);
 	}
@@ -957,11 +956,7 @@ void __init setup_arch(char **cmdline_p)
 		set_iopl.iopl = 1;
 		HYPERVISOR_physdev_op(PHYSDEVOP_set_iopl, &set_iopl);
 
-		if (xen_start_info->flags & SIF_INITDOMAIN) {
-			if (!(xen_start_info->flags & SIF_PRIVILEGED))
-				panic("Xen granted us console access "
-				      "but not privileged status");
-		       
+		if (is_initial_xendomain()) {
 #ifdef CONFIG_VT
 #if defined(CONFIG_VGA_CONSOLE)
 			conswitchp = &vga_con;

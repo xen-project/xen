@@ -178,7 +178,7 @@ static int __init mtrr_init(void)
 {
 	struct cpuinfo_x86 *c = &boot_cpu_data;
 
-	if (!(xen_start_info->flags & SIF_PRIVILEGED))
+	if (!is_initial_xendomain())
 		return -ENODEV;
 
 	if ((!cpu_has(c, X86_FEATURE_MTRR)) &&

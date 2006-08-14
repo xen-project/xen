@@ -718,9 +718,8 @@ static int __init tpmif_init(void)
 	long rc = 0;
 	struct tpm_private *tp;
 
-	if ((xen_start_info->flags & SIF_INITDOMAIN)) {
+	if (is_initial_xendomain())
 		return -EPERM;
-	}
 
 	tp = tpm_private_get();
 	if (!tp) {

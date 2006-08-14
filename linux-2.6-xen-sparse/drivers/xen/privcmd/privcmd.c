@@ -246,7 +246,7 @@ static int capabilities_read(char *page, char **start, off_t off,
 	int len = 0;
 	*page = 0;
 
-	if (xen_start_info->flags & SIF_INITDOMAIN)
+	if (is_initial_xendomain())
 		len = sprintf( page, "control_d\n" );
 
 	*eof = 1;

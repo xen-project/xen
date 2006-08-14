@@ -1818,7 +1818,7 @@ static int __init netif_init(void)
 	if (!is_running_on_xen())
 		return -ENODEV;
 
-	if (xen_start_info->flags & SIF_INITDOMAIN)
+	if (is_initial_xendomain())
 		return 0;
 
 	IPRINTK("Initialising virtual ethernet driver.\n");

@@ -245,7 +245,7 @@ void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned l
 	/*
 	 * Don't remap the low PCI/ISA area, it's always mapped..
 	 */
-	if (xen_start_info->flags & SIF_PRIVILEGED &&
+	if (is_initial_xendomain() &&
 	    phys_addr >= ISA_START_ADDRESS && last_addr < ISA_END_ADDRESS)
 		return (void __iomem *) isa_bus_to_virt(phys_addr);
 
@@ -425,7 +425,7 @@ void __init *bt_ioremap(unsigned long phys_addr, unsigned long size)
 	/*
 	 * Don't remap the low PCI/ISA area, it's always mapped..
 	 */
-	if (xen_start_info->flags & SIF_PRIVILEGED &&
+	if (is_initial_xendomain() &&
 	    phys_addr >= ISA_START_ADDRESS && last_addr < ISA_END_ADDRESS)
 		return isa_bus_to_virt(phys_addr);
 

@@ -789,7 +789,7 @@ void __init paging_init(void)
 
 	/* Setup mapping of lower 1st MB */
 	for (i = 0; i < NR_FIX_ISAMAPS; i++)
-		if (xen_start_info->flags & SIF_PRIVILEGED)
+		if (is_initial_xendomain())
 			set_fixmap(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
 		else
 			__set_fixmap(FIX_ISAMAP_BEGIN - i,
