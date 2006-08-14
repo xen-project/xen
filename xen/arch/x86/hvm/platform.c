@@ -462,7 +462,8 @@ static int hvm_decode(int realmode, unsigned char *opcode, struct instruction *i
                     return DECODE_success;
 
                 default:
-                    printf("%x, This opcode isn't handled yet!\n", *opcode);
+                    printf("%x/%x, This opcode isn't handled yet!\n",
+                           *opcode, ins_subtype);
                     return DECODE_failure;
             }
         }
