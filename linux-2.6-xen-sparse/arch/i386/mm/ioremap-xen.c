@@ -121,7 +121,7 @@ int direct_remap_pfn_range(struct vm_area_struct *vma,
 			   domid_t  domid)
 {
 	/* Same as remap_pfn_range(). */
-	vma->vm_flags |= VM_IO | VM_RESERVED;
+	vma->vm_flags |= VM_IO | VM_RESERVED | VM_PFNMAP;
 
 	if (domid == DOMID_SELF)
 		return -EINVAL;
