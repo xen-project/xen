@@ -821,7 +821,7 @@ __gnttab_copy(
     unsigned long s_frame, d_frame;
     char *sp, *dp;
     s16 rc = GNTST_okay;
-    int have_d_grant = 0, have_s_grant = 0;
+    int have_d_grant = 0, have_s_grant = 0, have_s_ref = 0;
     int src_is_gref, dest_is_gref;
 
     if ( ((op->source.offset + op->len) > PAGE_SIZE) ||
@@ -872,6 +872,7 @@ __gnttab_copy(
     if ( !get_page(mfn_to_page(s_frame), sd) )
         PIN_FAIL(error_out, GNTST_general_error,
                  "could not get source frame %lx.\n", s_frame);
+    have_s_ref = 1;
 
     if ( dest_is_gref )
     {
@@ -896,7 +897,10 @@ __gnttab_copy(
     unmap_domain_page(dp);
     unmap_domain_page(sp);
 
+    put_page_and_type(mfn_to_page(d_frame));
  error_out:
+    if ( have_s_ref )
+        put_page(mfn_to_page(s_frame));
     if ( have_s_grant )
         __release_grant_for_copy(sd, op->source.u.ref, 1);
     if ( have_d_grant )
