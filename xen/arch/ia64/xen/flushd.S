@@ -16,8 +16,9 @@
 	 *
 	 *	Flush cache.
 	 *
-	 *	Must deal with range from start to end-1 but nothing else (need to
-	 *	be careful not to touch addresses that may be unmapped).
+	 *	Must deal with range from start to end-1 but nothing else 
+	 *	(need to be careful not to touch addresses that may be 
+	 *	unmapped).
 	 *
 	 *	Note: "in0" and "in1" are preserved for debugging purposes.
 	 */
@@ -37,7 +38,8 @@ GLOBAL_ENTRY(flush_dcache_range)
 	;;
 	sub	r8=r22,r23		// number of strides - 1
 	shl	r24=r23,r20		// r24: addresses for "fc" =
-					//	"start" rounded down to stride boundary
+					//	"start" rounded down to stride 
+					//	boundary
 	.save	ar.lc,r3
 	mov	r3=ar.lc		// save ar.lc
 	;;
@@ -49,7 +51,8 @@ GLOBAL_ENTRY(flush_dcache_range)
 	 * 32 byte aligned loop, even number of (actually 2) bundles
 	 */
 .Loop:	fc	r24			// issuable on M0 only
-	add	r24=r21,r24		// we flush "stride size" bytes per iteration
+	add	r24=r21,r24		// we flush "stride size" bytes per
+					//   iteration
 	nop.i	0
 	br.cloop.sptk.few .Loop
 	;;
