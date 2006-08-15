@@ -32,6 +32,10 @@
 static char opt_console[30] = OPT_CONSOLE_STR;
 string_param("console", opt_console);
 
+/* vga: comma-separated options. */
+static char opt_vga[30] = "";
+string_param("vga", opt_vga);
+
 /* conswitch: a character pair controlling console switching. */
 /* Char 1: CTRL+<char1> is used to switch console input between Xen and DOM0 */
 /* Char 2: If this character is 'x', then do not auto-switch to DOM0 when it */
@@ -55,7 +59,8 @@ static char printk_prefix[16] = "";
 
 static int sercon_handle = -1;
 static int vgacon_enabled = 0;
-static int vgacon_keep = 0;
+static int vgacon_keep    = 0;
+static int vgacon_lines   = 25;
 static const struct font_desc *font;
 
 static DEFINE_SPINLOCK(console_lock);
@@ -66,10 +71,10 @@ static DEFINE_SPINLOCK(console_lock);
  * *******************************************************
  */
 
-/* VGA text (mode 3) definitions. */
+/* VGA text-mode definitions. */
 #define COLUMNS     80
-#define LINES       vgacon_enabled
-#define ATTRIBUTE    7
+#define LINES       vgacon_lines
+#define ATTRIBUTE   7
 #define VIDEO_SIZE  (COLUMNS * LINES * 2)
 
 /* Clear the screen and initialize VIDEO, XPOS and YPOS.  */
@@ -85,6 +90,16 @@ static void init_vga(void)
     if ( !vgacon_enabled )
         return;
 
+    for ( p = opt_vga; p != NULL; p = strchr(p, ',') )
+    {
+        if ( *p == ',' )
+            p++;
+        if ( strncmp(p, "keep", 4) == 0 )
+            vgacon_keep = 1;
+        else if ( strncmp(p, "text-80x", 8) == 0 )
+            vgacon_lines = simple_strtoul(p + 8, NULL, 10);
+    }
+
     video = setup_vga();
     if ( !video )
     {
@@ -92,7 +107,7 @@ static void init_vga(void)
         return;
     }
 
-    switch ( vgacon_enabled )
+    switch ( vgacon_lines )
     {
     case 25:
     case 30:
@@ -108,13 +123,13 @@ static void init_vga(void)
         font = &font_vga_8x8;
         break;
     default:
-        vgacon_enabled = 25;
+        vgacon_lines = 25;
         break;
     }
 
-    if ( (font != NULL) && (vga_load_font(font, vgacon_enabled) < 0) )
+    if ( (font != NULL) && (vga_load_font(font, vgacon_lines) < 0) )
     {
-        vgacon_enabled = 25;
+        vgacon_lines = 25;
         font = NULL;
     }
     
@@ -438,13 +453,7 @@ void init_console(void)
         if ( strncmp(p, "com", 3) == 0 )
             sercon_handle = serial_parse_handle(p);
         else if ( strncmp(p, "vga", 3) == 0 )
-        {
-            vgacon_enabled = p[3] < '1' || p[3] > '9'
-                             ? (p += 3, 25)
-                             : simple_strtol(p + 3, &p, 10);
-            if ( strncmp(p, "[keep]", 6) == 0 )
-                vgacon_keep = 1;
-        }
+            vgacon_enabled = 1;
     }
 
     init_vga();
