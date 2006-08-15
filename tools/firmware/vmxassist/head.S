@@ -114,8 +114,6 @@ _start:
 #ifdef TEST
 	xorl	%edx, %edx
 #endif
-	movl	%edx, booting_cpu
-	movl	%ebx, booting_vector
 
 	/* clear bss */
 	cld
@@ -124,6 +122,9 @@ _start:
 	movl	$_ebss, %ecx
 	subl	%edi, %ecx
 	rep	stosb
+
+	movl	%edx, booting_cpu
+	movl	%ebx, booting_vector
 
 	/* make sure we are in a sane world */
 	clts
