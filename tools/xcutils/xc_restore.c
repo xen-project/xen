@@ -12,6 +12,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include <xenctrl.h>
 #include <xenguest.h>
 
 int
@@ -21,17 +22,20 @@ main(int argc, char **argv)
     int ret;
     unsigned long store_mfn, console_mfn;
 
-    if (argc != 7)
+    if (argc != 6)
 	errx(1,
-	     "usage: %s xcfd iofd domid nr_pfns store_evtchn console_evtchn",
+	     "usage: %s iofd domid nr_pfns store_evtchn console_evtchn",
 	     argv[0]);
 
-    xc_fd = atoi(argv[1]);
-    io_fd = atoi(argv[2]);
-    domid = atoi(argv[3]);
-    nr_pfns = atoi(argv[4]);
-    store_evtchn = atoi(argv[5]);
-    console_evtchn = atoi(argv[6]);
+    xc_fd = xc_interface_open();
+    if (xc_fd < 0)
+        errx(1, "failed to open control interface");
+
+    io_fd = atoi(argv[1]);
+    domid = atoi(argv[2]);
+    nr_pfns = atoi(argv[3]);
+    store_evtchn = atoi(argv[4]);
+    console_evtchn = atoi(argv[5]);
 
     ret = xc_linux_restore(xc_fd, io_fd, domid, nr_pfns, store_evtchn,
 			   &store_mfn, console_evtchn, &console_mfn);
@@ -40,5 +44,8 @@ main(int argc, char **argv)
 	printf("console-mfn %li\n", console_mfn);
 	fflush(stdout);
     }
+
+    xc_interface_close(xc_fd);
+
     return ret;
 }
