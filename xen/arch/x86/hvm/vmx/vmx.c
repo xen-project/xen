@@ -811,7 +811,8 @@ int start_vmx(void)
 
     vmx_init_vmcs_config();
     
-    setup_vmcs_dump();
+    if(!smp_processor_id())
+        setup_vmcs_dump();
 
     if ( (vmcs = vmx_alloc_host_vmcs()) == NULL )
     {
