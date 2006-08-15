@@ -1744,6 +1744,7 @@ int new_guest_cr3(unsigned long mfn)
         if ( unlikely(!okay) )
         {
             /* Switch to idle pagetable: this VCPU has no active p.t. now. */
+            MEM_LOG("New baseptr %lx: slow path via idle pagetables", mfn);
             old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
             v->arch.guest_table = pagetable_null();
             update_pagetables(v);
@@ -2025,8 +2026,10 @@ int do_mmuext_op(
         
 #ifdef __x86_64__
         case MMUEXT_NEW_USER_BASEPTR:
-            okay = get_page_and_type_from_pagenr(
-                mfn, PGT_root_page_table, d);
+            okay = 1;
+            if (likely(mfn != 0))
+                okay = get_page_and_type_from_pagenr(
+                    mfn, PGT_root_page_table, d);
             if ( unlikely(!okay) )
             {
                 MEM_LOG("Error while installing new mfn %lx", mfn);
