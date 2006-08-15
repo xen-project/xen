@@ -34,7 +34,8 @@
 unsigned int cpu_rma_order(void)
 {
     /* XXX what about non-HV mode? */
-    return 14; /* 1<<14<<PAGE_SIZE = 64M */
+    uint rma_log_size = 6 + 20; /* 64M */
+    return rma_log_size - PAGE_SHIFT;
 }
 
 void cpu_initialize(void)
@@ -114,8 +115,8 @@ void cpu_init_vcpu(struct vcpu *v)
 {
     struct domain *d = v->domain;
     union hid4 hid4;
-    ulong rma_base = d->arch.rma_base;
-    ulong rma_size = d->arch.rma_size;
+    ulong rma_base = page_to_maddr(d->arch.rma_page);
+    ulong rma_size = rma_size(d->arch.rma_order);
 
     hid4.word = mfhid4();
 

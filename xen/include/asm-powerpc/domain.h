@@ -32,10 +32,11 @@
 
 struct arch_domain {
     struct domain_htab htab;
-    /* The RMO area is fixed to the domain and is accessible while the
+
+    /* The Real Mode area is fixed to the domain and is accessible while the
      * processor is in real mode */
-    ulong rma_base;
-    ulong rma_size;
+    struct page_info *rma_page;
+    uint rma_order;
 
     /* This is regular memory, only available thru translataion */
     ulong logical_base_pfn;
@@ -106,9 +107,11 @@ extern void load_float(struct vcpu *);
 #define RMA_CONSOLE 3
 #define RMA_LAST_DOMU 3
 
-static inline ulong rma_addr(struct arch_domain *d, int type)
+#define rma_size(rma_order) (1UL << ((rma_order) + PAGE_SHIFT))
+
+static inline ulong rma_addr(struct arch_domain *ad, int type)
 {
-    return d->rma_size - (type * PAGE_SIZE);
+    return rma_size(ad->rma_order) - (type * PAGE_SIZE);
 }
 
 #endif

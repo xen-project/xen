@@ -359,8 +359,8 @@ static ofdn_t ofd_memory_props(void *m, struct domain *d, ulong eoload)
     ofdn_t n = -1;
     ulong start = 0;
     static char name[] = "memory";
-    ulong mem_size = d->arch.rma_size;
-    ulong chunk_size = d->arch.rma_size;
+    ulong mem_size = rma_size(d->arch.rma_order);
+    ulong chunk_size = rma_size(d->arch.rma_order);
 
     /* Remove all old memory props */
     do {
@@ -424,12 +424,12 @@ static ofdn_t ofd_xen_props(void *m, struct domain *d, start_info_t *si)
         ASSERT(xl < sizeof (xen));
         ofd_prop_add(m, n, "version", xen, xl + 1);
 
-        val[0] = (ulong)si - d->arch.rma_base;
+        val[0] = (ulong)si - page_to_maddr(d->arch.rma_page);
         val[1] = PAGE_SIZE;
         ofd_prop_add(m, n, "start-info", val, sizeof (val));
 
         val[1] =  RMA_LAST_DOM0 * PAGE_SIZE;
-        val[0] =  d->arch.rma_size - val[1];
+        val[0] =  rma_size(d->arch.rma_order) - val[1];
         ofd_prop_add(m, n, "reserved", val, sizeof (val));
 
         n = ofd_node_add(m, n, console, sizeof (console));

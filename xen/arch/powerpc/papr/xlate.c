@@ -258,8 +258,10 @@ static void h_enter(struct cpu_user_regs *regs)
         }
     }
 
+#ifdef DEBUG
     /* If the PTEG is full then no additional values are returned. */
     printk("%s: PTEG FULL\n", __func__);
+#endif
 
     regs->gprs[3] = H_PTEG_Full;
 }

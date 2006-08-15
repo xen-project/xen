@@ -26,9 +26,6 @@
 
 /***** general PowerPC architecture limits ******/
 
-#define LOG_DEFAULT_HTAB_BYTES  20
-#define DEFAULT_HTAB_BYTES      (1UL << LOG_HTAB_BYTES)
-
 /* 256KB, from PowerPC Architecture specification */
 #define HTAB_MIN_LOG_SIZE 18
 
@@ -131,12 +128,13 @@ union ptel {
 
 struct domain_htab {
     ulong sdr1;
-    ulong log_num_ptes; /* log number of PTEs in HTAB. */
+    uint log_num_ptes;  /* log number of PTEs in HTAB. */
+    uint order;         /* order for freeing. */
     union pte *map;     /* access the htab like an array */
     ulong *shadow;      /* idx -> logical translation array */
 };
 
 struct domain;
-extern void htab_alloc(struct domain *d, int log_htab_bytes);
+extern void htab_alloc(struct domain *d, uint order);
 extern void htab_free(struct domain *d);
 #endif

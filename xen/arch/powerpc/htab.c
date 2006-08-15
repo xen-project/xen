@@ -34,36 +34,35 @@ static ulong htab_calc_sdr1(ulong htab_addr, ulong log_htab_size)
     return (htab_addr | (sdr1_htabsize & SDR1_HTABSIZE_MASK));
 }
 
-void htab_alloc(struct domain *d, int log_htab_bytes)
+void htab_alloc(struct domain *d, uint order)
 {
     ulong htab_raddr;
+    ulong log_htab_bytes = order + PAGE_SHIFT;
     ulong htab_bytes = 1UL << log_htab_bytes;
 
     /* XXX use alloc_domheap_pages instead? */
-    htab_raddr = (ulong)alloc_xenheap_pages(log_htab_bytes - PAGE_SHIFT);
+    htab_raddr = (ulong)alloc_xenheap_pages(order);
     ASSERT(htab_raddr != 0);
     /* XXX check alignment guarantees */
-    ASSERT((htab_raddr & (htab_bytes-1)) == 0);
+    ASSERT((htab_raddr & (htab_bytes - 1)) == 0);
 
     /* XXX slow. move memset out to service partition? */
     memset((void *)htab_raddr, 0, htab_bytes);
 
+    d->arch.htab.order = order;
     d->arch.htab.log_num_ptes = log_htab_bytes - LOG_PTE_SIZE;
     d->arch.htab.sdr1 = htab_calc_sdr1(htab_raddr, log_htab_bytes);
     d->arch.htab.map = (union pte *)htab_raddr;
     d->arch.htab.shadow = xmalloc_array(ulong,
                                         1UL << d->arch.htab.log_num_ptes);
     ASSERT(d->arch.htab.shadow != NULL);
-
-    printf("%s: dom%x sdr1: %lx\n", __func__, d->domain_id, d->arch.htab.sdr1);
 }
 
 void htab_free(struct domain *d)
 {
     ulong htab_raddr = GET_HTAB(d);
 
-    free_xenheap_pages((void *)htab_raddr,
-                       (1UL << d->arch.htab.log_num_ptes) << LOG_PTE_SIZE);
+    free_xenheap_pages((void *)htab_raddr, d->arch.htab.order);
     xfree(d->arch.htab.shadow);
 }
 

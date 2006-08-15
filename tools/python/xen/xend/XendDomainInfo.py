@@ -1272,12 +1272,9 @@ class XendDomainInfo:
             # repin domain vcpus if a restricted cpus list is provided
             # this is done prior to memory allocation to aide in memory
             # distribution for NUMA systems.
-            cpus = self.info['cpus']
-            if cpus is not None and len(cpus) > 0:
+            if self.info['cpus'] is not None and len(self.info['cpus']) > 0:
                 for v in range(0, self.info['max_vcpu_id']+1):
-                    # pincpu takes a list of ints
-                    cpu = [ int( cpus[v % len(cpus)] ) ]
-                    xc.vcpu_setaffinity(self.domid, v, cpu)
+                    xc.vcpu_setaffinity(self.domid, v, self.info['cpus'])
 
             # set domain maxmem in KiB
             xc.domain_setmaxmem(self.domid, self.info['maxmem'] * 1024)
