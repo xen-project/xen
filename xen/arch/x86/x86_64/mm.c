@@ -113,8 +113,9 @@ void __init paging_init(void)
             PAGE_HYPERVISOR);
         memset((void *)(RDWR_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT)), 0x55,
                1UL << L2_PAGETABLE_SHIFT);
+        /* NB. Cannot be GLOBAL as shadow_mode_translate reuses this area. */
         *l2_ro_mpt++ = l2e_from_page(
-            pg, _PAGE_GLOBAL|_PAGE_PSE|_PAGE_USER|_PAGE_PRESENT);
+            pg, /*_PAGE_GLOBAL|*/_PAGE_PSE|_PAGE_USER|_PAGE_PRESENT);
         BUG_ON(((unsigned long)l2_ro_mpt & ~PAGE_MASK) == 0);
     }
 

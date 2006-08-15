@@ -104,6 +104,7 @@ void __init paging_init(void)
             panic("Not enough memory to bootstrap Xen.\n");
         idle_pg_table_l2[l2_linear_offset(RDWR_MPT_VIRT_START) + i] =
             l2e_from_page(pg, PAGE_HYPERVISOR | _PAGE_PSE);
+        /* NB. Cannot be GLOBAL as shadow_mode_translate reuses this area. */
         idle_pg_table_l2[l2_linear_offset(RO_MPT_VIRT_START) + i] =
             l2e_from_page(pg, (__PAGE_HYPERVISOR | _PAGE_PSE) & ~_PAGE_RW);
     }
