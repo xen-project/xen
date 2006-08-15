@@ -143,6 +143,31 @@ static inline int is_xen_skb(struct sk_buff *skb)
 	return (cp == skbuff_cachep);
 }
 
+/*
+ * We can flip without copying the packet unless:
+ *  1. The data is not allocated from our special cache; or
+ *  2. The main data area is shared; or
+ *  3. One or more fragments are shared; or
+ *  4. There are chained fragments.
+ */
+static inline int is_flippable_skb(struct sk_buff *skb)
+{
+	int frag;
+
+	if (!is_xen_skb(skb) || skb_cloned(skb))
+		return 0;
+
+	for (frag = 0; frag < skb_shinfo(skb)->nr_frags; frag++) {
+		if (page_count(skb_shinfo(skb)->frags[frag].page) > 1)
+			return 0;
+	}
+
+	if (skb_shinfo(skb)->frag_list != NULL)
+		return 0;
+
+	return 1;
+}
+
 static struct sk_buff *netbk_copy_skb(struct sk_buff *skb)
 {
 	struct skb_shared_info *ninfo;
@@ -151,6 +176,8 @@ static struct sk_buff *netbk_copy_skb(struct sk_buff *skb)
 	int ret;
 	int len;
 	int headlen;
+
+	BUG_ON(skb_shinfo(skb)->frag_list != NULL);
 
 	nskb = alloc_skb(SKB_MAX_HEAD(0), GFP_ATOMIC);
 	if (unlikely(!nskb))
@@ -252,11 +279,10 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	/*
 	 * We do not copy the packet unless:
-	 *  1. The data is shared; or
+	 *  1. The data -- including any in fragments -- is shared; or
 	 *  2. The data is not allocated from our special cache.
-	 *  3. The data is fragmented.
 	 */
-	if (skb_cloned(skb) || skb_is_nonlinear(skb) || !is_xen_skb(skb)) {
+	if (!is_flippable_skb(skb)) {
 		struct sk_buff *nskb = netbk_copy_skb(skb);
 		if ( unlikely(nskb == NULL) )
 			goto drop;
