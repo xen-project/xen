@@ -21,6 +21,7 @@ import tempfile
 import types
 import logging
 import logging.handlers
+import fcntl
 
 from xen.xend.server import params
 
@@ -49,6 +50,27 @@ DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 logfilename = None
 
+class XendRotatingFileHandler(logging.handlers.RotatingFileHandler):
+
+    def __init__(self, fname, mode, maxBytes, backupCount):
+        logging.handlers.RotatingFileHandler.__init__(self, fname, mode, maxBytes, backupCount)
+        self.setCloseOnExec()
+
+    def doRollover(self):
+        logging.handlers.RotatingFileHandler.doRollover()
+        self.setCloseOnExec()
+
+    # NB yes accessing 'self.stream' violates OO encapsulation somewhat,
+    # but python logging API gives no other way to access the file handle
+    # and the entire python logging stack is already full of OO encapsulation
+    # violations. The other alternative is copy-and-paste duplicating the
+    # entire FileHandler, StreamHandler & RotatingFileHandler classes which
+    # is even worse
+    def setCloseOnExec(self):
+        flags = fcntl.fcntl(self.stream.fileno(), fcntl.F_GETFD)
+        flags |= fcntl.FD_CLOEXEC
+        fcntl.fcntl(self.stream.fileno(), fcntl.F_SETFD, flags)
+        
 
 def init(filename, level):
     """Initialise logging.  Logs to the given filename, and logs to stderr if
@@ -58,9 +80,9 @@ def init(filename, level):
     global logfilename
 
     def openFileHandler(fname):
-        return logging.handlers.RotatingFileHandler(fname, mode = 'a',
-                                                    maxBytes = MAX_BYTES,
-                                                    backupCount = BACKUP_COUNT)
+        return XendRotatingFileHandler(fname, mode = 'a',
+                                       maxBytes = MAX_BYTES,
+                                       backupCount = BACKUP_COUNT)
 
     # Rather unintuitively, getLevelName will get the number corresponding to
     # a level name, as well as getting the name corresponding to a level
