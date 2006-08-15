@@ -444,14 +444,11 @@ struct t_rec **init_rec_ptrs(struct t_buf **meta, unsigned int num)
  */
 unsigned int get_num_cpus(void)
 {
-    dom0_op_t op;
+    xc_physinfo_t physinfo;
     int xc_handle = xc_interface_open();
     int ret;
 
-    op.cmd = DOM0_PHYSINFO;
-    op.interface_version = DOM0_INTERFACE_VERSION;
-
-    ret = xc_dom0_op(xc_handle, &op);
+    ret = xc_physinfo(xc_handle, &physinfo);
 
     if ( ret != 0 )
     {
@@ -460,12 +457,12 @@ unsigned int get_num_cpus(void)
     }
 
     xc_interface_close(xc_handle);
-    opts.cpu_freq = (double)op.u.physinfo.cpu_khz/1000.0;
+    opts.cpu_freq = (double)physinfo.cpu_khz/1000.0;
 
-    return (op.u.physinfo.threads_per_core *
-            op.u.physinfo.cores_per_socket *
-            op.u.physinfo.sockets_per_node *
-            op.u.physinfo.nr_nodes);
+    return (physinfo.threads_per_core *
+            physinfo.cores_per_socket *
+            physinfo.sockets_per_node *
+            physinfo.nr_nodes);
 }
 
 
