@@ -11,7 +11,6 @@
 
 struct font_desc;
 
-int detect_vga(void);
 void *setup_vga(void);
 void vga_cursor_off(void);
 int vga_load_font(const struct font_desc *, unsigned rows);

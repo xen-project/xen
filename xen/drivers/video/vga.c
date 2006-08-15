@@ -170,59 +170,59 @@
  * generic VGA port read/write
  */
  
-static inline uint8_t vga_io_r (uint16_t port)
+static inline uint8_t vga_io_r(uint16_t port)
 {
     return inb(port);
 }
 
-static inline void vga_io_w (uint16_t port, uint8_t val)
+static inline void vga_io_w(uint16_t port, uint8_t val)
 {
     outb(val, port);
 }
 
-static inline void vga_io_w_fast (uint16_t port, uint8_t reg, uint8_t val)
+static inline void vga_io_w_fast(uint16_t port, uint8_t reg, uint8_t val)
 {
-    outw(VGA_OUT16VAL (val, reg), port);
+    outw(VGA_OUT16VAL(val, reg), port);
 }
 
-static inline uint8_t vga_mm_r (void __iomem *regbase, uint16_t port)
+static inline uint8_t vga_mm_r(void __iomem *regbase, uint16_t port)
 {
-    return readb (regbase + port);
+    return readb(regbase + port);
 }
 
-static inline void vga_mm_w (void __iomem *regbase, uint16_t port, uint8_t val)
+static inline void vga_mm_w(void __iomem *regbase, uint16_t port, uint8_t val)
 {
-    writeb (val, regbase + port);
+    writeb(val, regbase + port);
 }
 
-static inline void vga_mm_w_fast (void __iomem *regbase, uint16_t port, uint8_t reg, uint8_t val)
+static inline void vga_mm_w_fast(void __iomem *regbase, uint16_t port, uint8_t reg, uint8_t val)
 {
-    writew (VGA_OUT16VAL (val, reg), regbase + port);
+    writew(VGA_OUT16VAL(val, reg), regbase + port);
 }
 
-static inline uint8_t vga_r (void __iomem *regbase, uint16_t port)
+static inline uint8_t vga_r(void __iomem *regbase, uint16_t port)
 {
     if (regbase)
-        return vga_mm_r (regbase, port);
+        return vga_mm_r(regbase, port);
     else
-        return vga_io_r (port);
+        return vga_io_r(port);
 }
 
-static inline void vga_w (void __iomem *regbase, uint16_t port, uint8_t val)
+static inline void vga_w(void __iomem *regbase, uint16_t port, uint8_t val)
 {
     if (regbase)
-        vga_mm_w (regbase, port, val);
+        vga_mm_w(regbase, port, val);
     else
-        vga_io_w (port, val);
+        vga_io_w(port, val);
 }
 
 
-static inline void vga_w_fast (void __iomem *regbase, uint16_t port, uint8_t reg, uint8_t val)
+static inline void vga_w_fast(void __iomem *regbase, uint16_t port, uint8_t reg, uint8_t val)
 {
     if (regbase)
-        vga_mm_w_fast (regbase, port, reg, val);
+        vga_mm_w_fast(regbase, port, reg, val);
     else
-        vga_io_w_fast (port, reg, val);
+        vga_io_w_fast(port, reg, val);
 }
 
 
@@ -230,19 +230,19 @@ static inline void vga_w_fast (void __iomem *regbase, uint16_t port, uint8_t reg
  * VGA CRTC register read/write
  */
  
-static inline uint8_t vga_rcrt (void __iomem *regbase, uint8_t reg)
+static inline uint8_t vga_rcrt(void __iomem *regbase, uint8_t reg)
 {
-    vga_w (regbase, VGA_CRT_IC, reg);
-    return vga_r (regbase, VGA_CRT_DC);
+    vga_w(regbase, VGA_CRT_IC, reg);
+    return vga_r(regbase, VGA_CRT_DC);
 }
 
-static inline void vga_wcrt (void __iomem *regbase, uint8_t reg, uint8_t val)
+static inline void vga_wcrt(void __iomem *regbase, uint8_t reg, uint8_t val)
 {
 #ifdef VGA_OUTW_WRITE
-    vga_w_fast (regbase, VGA_CRT_IC, reg, val);
+    vga_w_fast(regbase, VGA_CRT_IC, reg, val);
 #else
-    vga_w (regbase, VGA_CRT_IC, reg);
-    vga_w (regbase, VGA_CRT_DC, val);
+    vga_w(regbase, VGA_CRT_IC, reg);
+    vga_w(regbase, VGA_CRT_DC, val);
 #endif /* VGA_OUTW_WRITE */
 }
 
@@ -250,19 +250,19 @@ static inline void vga_wcrt (void __iomem *regbase, uint8_t reg, uint8_t val)
  * VGA sequencer register read/write
  */
  
-static inline uint8_t vga_rseq (void __iomem *regbase, uint8_t reg)
+static inline uint8_t vga_rseq(void __iomem *regbase, uint8_t reg)
 {
-    vga_w (regbase, VGA_SEQ_I, reg);
-    return vga_r (regbase, VGA_SEQ_D);
+    vga_w(regbase, VGA_SEQ_I, reg);
+    return vga_r(regbase, VGA_SEQ_D);
 }
 
-static inline void vga_wseq (void __iomem *regbase, uint8_t reg, uint8_t val)
+static inline void vga_wseq(void __iomem *regbase, uint8_t reg, uint8_t val)
 {
 #ifdef VGA_OUTW_WRITE
-    vga_w_fast (regbase, VGA_SEQ_I, reg, val);
+    vga_w_fast(regbase, VGA_SEQ_I, reg, val);
 #else
-    vga_w (regbase, VGA_SEQ_I, reg);
-    vga_w (regbase, VGA_SEQ_D, val);
+    vga_w(regbase, VGA_SEQ_I, reg);
+    vga_w(regbase, VGA_SEQ_D, val);
 #endif /* VGA_OUTW_WRITE */
 }
 
@@ -270,19 +270,19 @@ static inline void vga_wseq (void __iomem *regbase, uint8_t reg, uint8_t val)
  * VGA graphics controller register read/write
  */
  
-static inline uint8_t vga_rgfx (void __iomem *regbase, uint8_t reg)
+static inline uint8_t vga_rgfx(void __iomem *regbase, uint8_t reg)
 {
-    vga_w (regbase, VGA_GFX_I, reg);
-    return vga_r (regbase, VGA_GFX_D);
+    vga_w(regbase, VGA_GFX_I, reg);
+    return vga_r(regbase, VGA_GFX_D);
 }
 
-static inline void vga_wgfx (void __iomem *regbase, uint8_t reg, uint8_t val)
+static inline void vga_wgfx(void __iomem *regbase, uint8_t reg, uint8_t val)
 {
 #ifdef VGA_OUTW_WRITE
-    vga_w_fast (regbase, VGA_GFX_I, reg, val);
+    vga_w_fast(regbase, VGA_GFX_I, reg, val);
 #else
-    vga_w (regbase, VGA_GFX_I, reg);
-    vga_w (regbase, VGA_GFX_D, val);
+    vga_w(regbase, VGA_GFX_I, reg);
+    vga_w(regbase, VGA_GFX_D, val);
 #endif /* VGA_OUTW_WRITE */
 }
 
@@ -290,16 +290,16 @@ static inline void vga_wgfx (void __iomem *regbase, uint8_t reg, uint8_t val)
  * VGA attribute controller register read/write
  */
  
-static inline uint8_t vga_rattr (void __iomem *regbase, uint8_t reg)
+static inline uint8_t vga_rattr(void __iomem *regbase, uint8_t reg)
 {
-    vga_w (regbase, VGA_ATT_IW, reg);
-    return vga_r (regbase, VGA_ATT_R);
+    vga_w(regbase, VGA_ATT_IW, reg);
+    return vga_r(regbase, VGA_ATT_R);
 }
 
-static inline void vga_wattr (void __iomem *regbase, uint8_t reg, uint8_t val)
+static inline void vga_wattr(void __iomem *regbase, uint8_t reg, uint8_t val)
 {
-    vga_w (regbase, VGA_ATT_IW, reg);
-    vga_w (regbase, VGA_ATT_W, val);
+    vga_w(regbase, VGA_ATT_IW, reg);
+    vga_w(regbase, VGA_ATT_W, val);
 }
 
 static int detect_video(void *video_base)
@@ -324,7 +324,7 @@ static int detect_video(void *video_base)
     return video_found;
 }
 
-int detect_vga()
+static int detect_vga(void)
 {
     /*
      * Look at a number of well-known locations. Even if video is not at
@@ -341,7 +341,7 @@ int detect_vga()
 }
 
 /* This is actually code from vgaHWRestore in an old version of XFree86 :-) */
-void *setup_vga()
+void *setup_vga(void)
 {
     /* The following VGA state was saved from a chip in text mode 3. */
     static unsigned char regs[] = {
@@ -464,10 +464,13 @@ static int vga_set_scanlines(unsigned scanlines)
 #define FONT_HEIGHT_MAX 32
 #define CHAR_MAP_SIZE (FONT_COUNT_MAX * FONT_HEIGHT_MAX)
 
-/* At least on various ATI cards I haven't been able to get the sequencer
-   to honor the change to the character map select register, thus at least
-   a way to override the slot is needed. */
-static unsigned font_slot = 2;
+/*
+ * We use font slot 0 because ATI cards do not honour changes to the
+ * character map select register. The fontslot parameter can be used to
+ * choose a non-default slot if the video card supports it and you wish to
+ * preserve the BIOS-initialised font data.
+ */
+static unsigned font_slot = 0;
 integer_param("fontslot", font_slot);
 
 int vga_load_font(const struct font_desc *font, unsigned rows)
@@ -508,15 +511,18 @@ int vga_load_font(const struct font_desc *font, unsigned rows)
     /* map start at A000:0000 */
     vga_wgfx(vgabase, VGA_GFX_MISC, 0x00);
 
-    if (font) {
+    if ( font )
+    {
         unsigned i, j;
         const uint8_t *data = font->data;
-        uint8_t *map = (uint8_t *)__va(0xA0000) + font_slot * 2 * CHAR_MAP_SIZE;
+        uint8_t *map = (uint8_t *)__va(0xA0000) + font_slot*2*CHAR_MAP_SIZE;
 
-        for (i = j = 0; i < CHAR_MAP_SIZE; ) {
-            vga_writeb(j < font->count * fontheight ? data[j++] : 0, map + i++);
-            if (!(j % fontheight))
-                while(i & (FONT_HEIGHT_MAX - 1))
+        for ( i = j = 0; i < CHAR_MAP_SIZE; )
+        {
+            vga_writeb(j < font->count * fontheight ? data[j++] : 0,
+                       map + i++);
+            if ( !(j % fontheight) )
+                while ( i & (FONT_HEIGHT_MAX - 1) )
                     vga_writeb(0, map + i++);
         }
     }
@@ -527,9 +533,9 @@ int vga_load_font(const struct font_desc *font, unsigned rows)
     vga_wseq(vgabase, VGA_SEQ_PLANE_WRITE, 0x03);
     /* odd-even addressing */
     vga_wseq(vgabase, VGA_SEQ_MEMORY_MODE, 0x03);
-    /* Character Map Select: The default font is kept in slot 0 and
-     * is never touched. Our custom font is loaded in slot 2. */
-    vga_wseq(vgabase, VGA_SEQ_CHARACTER_MAP, font ? font_slot | (font_slot << 2) : 0x00);
+    /* Character Map Select: The default font is kept in slot 0. */
+    vga_wseq(vgabase, VGA_SEQ_CHARACTER_MAP,
+             font ? font_slot | (font_slot << 2) : 0x00);
     /* clear synchronous reset */
     vga_wseq(vgabase, VGA_SEQ_RESET, 0x03);
 
@@ -545,9 +551,11 @@ int vga_load_font(const struct font_desc *font, unsigned rows)
     vga_wcrt(vgabase, VGA_CRTC_MAX_SCAN, fsr);
 
     /* Cursor shape registers */
-    fsr = (vga_rcrt(vgabase, VGA_CRTC_CURSOR_END) & 0xe0) | (fontheight - fontheight / 6);
+    fsr  = vga_rcrt(vgabase, VGA_CRTC_CURSOR_END) & 0xe0;
+    fsr |= fontheight - fontheight / 6;
     vga_wcrt(vgabase, VGA_CRTC_CURSOR_END, fsr);
-    fsr = (vga_rcrt(vgabase, VGA_CRTC_CURSOR_START) & 0xe0) | ((fsr & 0x1f) - 1);
+    fsr  = vga_rcrt(vgabase, VGA_CRTC_CURSOR_START) & 0xe0;
+    fsr |= (fsr & 0x1f) - 1;
     vga_wcrt(vgabase, VGA_CRTC_CURSOR_START, fsr);
 
     return 0;
