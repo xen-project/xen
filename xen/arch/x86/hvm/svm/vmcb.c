@@ -35,72 +35,61 @@
 #include <xen/event.h>
 #include <xen/kernel.h>
 #include <xen/domain_page.h>
+#include <xen/keyhandler.h>
 
-extern struct svm_percore_globals svm_globals[];
 extern int svm_dbg_on;
 extern int asidpool_assign_next( struct vmcb_struct *vmcb, int retire_current,
                                   int oldcore, int newcore);
-extern void set_hsa_to_guest( struct arch_svm_struct *arch_svm );
-
-#define round_pgdown(_p) ((_p)&PAGE_MASK) /* coped from domain.c */
 
 #define GUEST_SEGMENT_LIMIT 0xffffffff
 
 #define IOPM_SIZE   (12 * 1024)
 #define MSRPM_SIZE  (8  * 1024)
 
+/* VMCBs and HSAs are architecturally defined to be a 4K page each */
+#define VMCB_ORDER 0 
+#define HSA_ORDER  0 
+
+
 struct vmcb_struct *alloc_vmcb(void) 
 {
-    struct vmcb_struct *vmcb = NULL;
-    unsigned int order;
-    order = get_order_from_bytes(sizeof(struct vmcb_struct)); 
-    ASSERT(order >= 0);
-    vmcb = alloc_xenheap_pages(order);
-    ASSERT(vmcb);
+    struct vmcb_struct *vmcb = alloc_xenheap_pages(VMCB_ORDER);
 
-    if (vmcb)
-        memset(vmcb, 0, sizeof(struct vmcb_struct));
+    if (!vmcb) {
+        printk("Warning: failed to allocate vmcb.\n");
+        return NULL;
+    }
 
+    memset(vmcb, 0, (PAGE_SIZE << VMCB_ORDER));
     return vmcb;
 }
 
 
 void free_vmcb(struct vmcb_struct *vmcb)
 {
-    unsigned int order;
-
-    order = get_order_from_bytes(sizeof(struct vmcb_struct));
     ASSERT(vmcb);
-
-    if (vmcb)
-        free_xenheap_pages(vmcb, order);
+    free_xenheap_pages(vmcb, VMCB_ORDER);
 }
 
 
 struct host_save_area *alloc_host_save_area(void)
 {
-    unsigned int order = 0;
-    struct host_save_area *hsa = NULL;
+    struct host_save_area *hsa = alloc_xenheap_pages(HSA_ORDER);
 
-    hsa = alloc_xenheap_pages(order);
-    ASSERT(hsa);
+    if (!hsa) {
+        printk("Warning: failed to allocate vmcb.\n");
+        return NULL;
+    }
 
-    if (hsa)
-        memset(hsa, 0, PAGE_SIZE);
-
+    memset(hsa, 0, (PAGE_SIZE << HSA_ORDER));
     return hsa;
 }
 
 
 void free_host_save_area(struct host_save_area *hsa)
 {
-    unsigned int order;
-
-    order = get_order_from_bytes(PAGE_SIZE);
     ASSERT(hsa);
-
-    if (hsa)
-        free_xenheap_pages(hsa, order);
+    free_xenheap_pages(hsa, HSA_ORDER);
 }
 
 
@@ -187,7 +176,7 @@ static int construct_init_vmcb_guest(struct arch_svm_struct *arch_svm,
     vmcb->cs.sel = regs->cs;
     vmcb->es.sel = regs->es;
     vmcb->ss.sel = regs->ss;
-    vmcb->ds.sel = regs->ds; 
+    vmcb->ds.sel = regs->ds;
     vmcb->fs.sel = regs->fs;
     vmcb->gs.sel = regs->gs;
 
@@ -221,7 +210,7 @@ static int construct_init_vmcb_guest(struct arch_svm_struct *arch_svm,
     attrib.fields.g = 1; /* 4K pages in limit */
 
     /* Data selectors */
-    vmcb->es.attributes = attrib; 
+    vmcb->es.attributes = attrib;
     vmcb->ss.attributes = attrib;
     vmcb->ds.attributes = attrib;
     vmcb->fs.attributes = attrib;
@@ -257,7 +246,7 @@ static int construct_init_vmcb_guest(struct arch_svm_struct *arch_svm,
 
     /* CR3 is set in svm_final_setup_guest */
 
-    __asm__ __volatile__ ("mov %%cr4,%0" : "=r" (crn) :); 
+    __asm__ __volatile__ ("mov %%cr4,%0" : "=r" (crn) :);
     crn &= ~(X86_CR4_PGE | X86_CR4_PSE | X86_CR4_PAE);
     arch_svm->cpu_shadow_cr4 = crn;
     vmcb->cr4 = crn | SVM_CR4_HOST_MASK;
@@ -306,7 +295,8 @@ void destroy_vmcb(struct arch_svm_struct *arch_svm)
  * construct the vmcb.
  */
 
-int construct_vmcb(struct arch_svm_struct *arch_svm, struct cpu_user_regs *regs)
+int construct_vmcb(struct arch_svm_struct *arch_svm, 
+                   struct cpu_user_regs *regs)
 {
     int error;
     long rc=0;
@@ -320,7 +310,9 @@ int construct_vmcb(struct arch_svm_struct *arch_svm, struct cpu_user_regs *regs)
     }
 
     /* update the HSA for the current Core */
+#if 0
     set_hsa_to_guest( arch_svm );
+#endif
     arch_svm->vmcb_pa  = (u64) virt_to_maddr(arch_svm->vmcb);
 
     if ((error = construct_vmcb_controls(arch_svm))) 
@@ -359,7 +351,7 @@ void svm_do_launch(struct vcpu *v)
     ASSERT(vmcb);
 
     /* Update CR3, GDT, LDT, TR */
-    svm_stts(v);
+    hvm_stts(v);
 
     /* current core is the one we intend to perform the VMRUN on */
     v->arch.hvm_svm.launch_core = v->arch.hvm_svm.asid_core = core;
@@ -393,10 +385,8 @@ void svm_do_launch(struct vcpu *v)
         printk("%s: phys_table   = %lx\n", __func__, pt);
     }
 
-    if ( svm_paging_enabled(v) )
-        vmcb->cr3 = pagetable_get_paddr(v->arch.guest_table);
-    else
-        vmcb->cr3 = pagetable_get_paddr(v->domain->arch.phys_table);
+    /* At launch we always use the phys_table */
+    vmcb->cr3 = pagetable_get_paddr(v->domain->arch.phys_table);
 
     if (svm_dbg_on) 
     {
@@ -410,7 +400,7 @@ void svm_do_launch(struct vcpu *v)
 
     v->arch.hvm_svm.saved_irq_vector = -1;
 
-    svm_set_guest_time(v, 0);
+    hvm_set_guest_time(v, 0);
 	
     if (svm_dbg_on)
         svm_dump_vmcb(__func__, vmcb);
@@ -419,61 +409,12 @@ void svm_do_launch(struct vcpu *v)
 }
 
 
-void set_hsa_to_guest( struct arch_svm_struct *arch_svm ) 
-{
-  arch_svm->host_save_pa = svm_globals[ smp_processor_id() ].scratch_hsa_pa;
-}
 
-/* 
- * Resume the guest.
- */
-/* XXX svm_do_resume and vmx_do_resume are remarkably similar; could
-   they be unified? */
-void svm_do_resume(struct vcpu *v) 
-{
-    struct periodic_time *pt = &v->domain->arch.hvm_domain.pl_time.periodic_tm;
-    ioreq_t *p;
-
-    svm_stts(v);
-
-    /* pick up the elapsed PIT ticks and re-enable pit_timer */
-    if ( pt->enabled && pt->first_injected ) {
-        if ( v->arch.hvm_vcpu.guest_time ) {
-            svm_set_guest_time(v, v->arch.hvm_vcpu.guest_time);
-            v->arch.hvm_vcpu.guest_time = 0;
-        }
-        pickup_deactive_ticks(pt);
-    }
-
-    p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;
-    wait_on_xen_event_channel(v->arch.hvm.xen_port,
-                              p->state != STATE_IOREQ_READY &&
-                              p->state != STATE_IOREQ_INPROCESS);
-    if ( p->state == STATE_IORESP_READY )
-        hvm_io_assist(v);
-    if ( p->state != STATE_INVALID ) {
-        printf("Weird HVM iorequest state %d.\n", p->state);
-        domain_crash(v->domain);
-    }
-}
-
-void svm_launch_fail(unsigned long eflags)
-{
-    BUG();
-}
-
-
-void svm_resume_fail(unsigned long eflags)
-{
-    BUG();
-}
-
-
-void svm_dump_sel(char *name, segment_selector_t *s)
+static void svm_dump_sel(char *name, segment_selector_t *s)
 {
     printf("%s: sel=0x%04x, attr=0x%04x, limit=0x%08x, base=0x%016llx\n", 
            name, s->sel, s->attributes.bytes, s->limit,
-	   (unsigned long long)s->base);
+           (unsigned long long)s->base);
 }
 
 
@@ -483,9 +424,10 @@ void svm_dump_vmcb(const char *from, struct vmcb_struct *vmcb)
     printf("Size of VMCB = %d, address = %p\n", 
             (int) sizeof(struct vmcb_struct), vmcb);
 
-    printf("cr_intercepts = 0x%08x dr_intercepts = 0x%08x exception_intercepts "
-            "= 0x%08x\n", vmcb->cr_intercepts, vmcb->dr_intercepts, 
-            vmcb->exception_intercepts);
+    printf("cr_intercepts = 0x%08x dr_intercepts = 0x%08x "
+           "exception_intercepts = 0x%08x\n", 
+           vmcb->cr_intercepts, vmcb->dr_intercepts, 
+           vmcb->exception_intercepts);
     printf("general1_intercepts = 0x%08x general2_intercepts = 0x%08x\n", 
            vmcb->general1_intercepts, vmcb->general2_intercepts);
     printf("iopm_base_pa = %016llx msrpm_base_pa = 0x%016llx tsc_offset = "
@@ -519,7 +461,8 @@ void svm_dump_vmcb(const char *from, struct vmcb_struct *vmcb)
     printf("DR6 = 0x%016llx, DR7 = 0x%016llx\n", 
            (unsigned long long) vmcb->dr6, (unsigned long long) vmcb->dr7);
     printf("CSTAR = 0x%016llx SFMask = 0x%016llx\n",
-           (unsigned long long) vmcb->cstar, (unsigned long long) vmcb->sfmask);
+           (unsigned long long) vmcb->cstar, 
+           (unsigned long long) vmcb->sfmask);
     printf("KernGSBase = 0x%016llx PAT = 0x%016llx \n", 
            (unsigned long long) vmcb->kerngsbase,
 	   (unsigned long long) vmcb->g_pat);
@@ -535,6 +478,38 @@ void svm_dump_vmcb(const char *from, struct vmcb_struct *vmcb)
     svm_dump_sel("LDTR", &vmcb->ldtr);
     svm_dump_sel("IDTR", &vmcb->idtr);
     svm_dump_sel("TR", &vmcb->tr);
+}
+
+static void vmcb_dump(unsigned char ch)
+{
+    struct domain *d;
+    struct vcpu *v;
+    
+    printk("*********** VMCB Areas **************\n");
+    for_each_domain(d) {
+        printk("\n>>> Domain %d <<<\n", d->domain_id);
+        for_each_vcpu(d, v) {
+
+            /* 
+             * Presumably, if a domain is not an HVM guest,
+             * the very first CPU will not pass this test
+             */
+            if (!hvm_guest(v)) {
+                printk("\t\tNot HVM guest\n");
+                break;
+            }
+            printk("\tVCPU %d\n", v->vcpu_id);
+
+            svm_dump_vmcb("key_handler", v->arch.hvm_svm.vmcb);
+        }
+    }
+
+    printk("**************************************\n");
+}
+
+void setup_vmcb_dump(void)
+{
+    register_keyhandler('v', vmcb_dump, "dump AMD-V VMCBs");
 }
 
 /*

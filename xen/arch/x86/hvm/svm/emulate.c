@@ -78,7 +78,7 @@ static inline unsigned long DECODE_GPR_VALUE(struct vmcb_struct *vmcb,
     case 0x4:
         value = (unsigned long)vmcb->rsp;
     case 0x5:
-        value = regs->ebp; 
+        value = regs->ebp;
         break;
     case 0x6:
         value = regs->esi;
@@ -429,7 +429,7 @@ int __get_instruction_length_from_list(struct vmcb_struct *vmcb,
         enum instruction_index *list, unsigned int list_count, 
         u8 *guest_eip_buf, enum instruction_index *match)
 {
-    unsigned int inst_len = 0; 
+    unsigned int inst_len = 0;
     unsigned int i;
     unsigned int j;
     int found = 0;

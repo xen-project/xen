@@ -59,6 +59,14 @@ struct hvm_function_table {
     int (*instruction_length)(struct vcpu *v);
     unsigned long (*get_guest_ctrl_reg)(struct vcpu *v, unsigned int num);
 
+    /*
+     * Update specifics of the guest state:
+     * 1) TS bit in guest cr0 
+     * 2) TSC offset in guest
+     */
+    void (*stts)(struct vcpu *v); 
+    void (*set_tsc_offset)(struct vcpu *v, u64 offset); 
+
     void (*init_ap_context)(struct vcpu_guest_context *ctxt,
                             int vcpuid, int trampoline_vector);
 
@@ -141,6 +149,10 @@ hvm_get_guest_ctrl_reg(struct vcpu *v, unsigned int num)
         return hvm_funcs.get_guest_ctrl_reg(v, num);
     return 0;                   /* force to fail */
 }
+
+extern void hvm_stts(struct vcpu *v); 
+extern void hvm_set_guest_time(struct vcpu *v, u64 gtime); 
+extern void hvm_do_resume(struct vcpu *v); 
 
 static inline void
 hvm_init_ap_context(struct vcpu_guest_context *ctxt,

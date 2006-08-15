@@ -628,6 +628,45 @@ static unsigned long vmx_get_ctrl_reg(struct vcpu *v, unsigned int num)
     return 0;                   /* dummy */
 }
 
+
+
+/* Make sure that xen intercepts any FP accesses from current */
+static void vmx_stts(struct vcpu *v)
+{
+    unsigned long cr0;
+
+    /* VMX depends on operating on the current vcpu */
+    ASSERT(v == current);
+
+    /*
+     * If the guest does not have TS enabled then we must cause and handle an
+     * exception on first use of the FPU. If the guest *does* have TS enabled
+     * then this is not necessary: no FPU activity can occur until the guest
+     * clears CR0.TS, and we will initialise the FPU when that happens.
+     */
+    __vmread_vcpu(v, CR0_READ_SHADOW, &cr0);
+    if ( !(cr0 & X86_CR0_TS) )
+    {
+        __vmread_vcpu(v, GUEST_CR0, &cr0);
+        __vmwrite(GUEST_CR0, cr0 | X86_CR0_TS);
+        __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_NM);
+    }
+}
+
+
+static void vmx_set_tsc_offset(struct vcpu *v, u64 offset)
+{
+    /* VMX depends on operating on the current vcpu */
+    ASSERT(v == current);
+
+    __vmwrite(TSC_OFFSET, offset);
+#if defined (__i386__)
+    __vmwrite(TSC_OFFSET_HIGH, offset >> 32);
+#endif
+}
+
+
+
 /* SMP VMX guest support */
 static void vmx_init_ap_context(struct vcpu_guest_context *ctxt,
                          int vcpuid, int trampoline_vector)
@@ -717,6 +756,9 @@ static void vmx_setup_hvm_funcs(void)
     hvm_funcs.instruction_length = vmx_instruction_length;
     hvm_funcs.get_guest_ctrl_reg = vmx_get_ctrl_reg;
 
+    hvm_funcs.stts = vmx_stts;
+    hvm_funcs.set_tsc_offset = vmx_set_tsc_offset;
+
     hvm_funcs.init_ap_context = vmx_init_ap_context;
 
     hvm_funcs.init_hypercall_page = vmx_init_hypercall_page;
@@ -768,6 +810,8 @@ int start_vmx(void)
     set_in_cr4(X86_CR4_VMXE);
 
     vmx_init_vmcs_config();
+    
+    setup_vmcs_dump();
 
     if ( (vmcs = vmx_alloc_host_vmcs()) == NULL )
     {
@@ -916,7 +960,7 @@ static void vmx_vmexit_do_cpuid(struct cpu_user_regs *regs)
         if ( input == CPUID_LEAF_0x1 )
         {
             /* mask off reserved bits */
-            ecx &= ~VMX_VCPU_CPUID_L1_ECX_RESERVED; 
+            ecx &= ~VMX_VCPU_CPUID_L1_ECX_RESERVED;
 
             if ( !hvm_apic_support(v->domain) ||
                  !vlapic_global_enabled((VLAPIC(v))) )
@@ -930,7 +974,7 @@ static void vmx_vmexit_do_cpuid(struct cpu_user_regs *regs)
 #if CONFIG_PAGING_LEVELS < 3
             edx &= ~(bitmaskof(X86_FEATURE_PAE)  |
                      bitmaskof(X86_FEATURE_PSE)  |
-                     bitmaskof(X86_FEATURE_PSE36)); 
+                     bitmaskof(X86_FEATURE_PSE36));
 #else
             if ( v->domain->arch.ops->guest_paging_levels == PAGING_L2 )
             {
@@ -1043,6 +1087,7 @@ static void vmx_vmexit_do_invlpg(unsigned long va)
      */
     shadow_invlpg(v, va);
 }
+
 
 static int check_for_null_selector(unsigned long eip)
 {
@@ -1977,7 +2022,7 @@ static inline void vmx_do_msr_write(struct cpu_user_regs *regs)
 
     switch (regs->ecx) {
     case MSR_IA32_TIME_STAMP_COUNTER:
-        set_guest_time(v, msr_content);
+        hvm_set_guest_time(v, msr_content);
         break;
     case MSR_IA32_SYSENTER_CS:
         __vmwrite(GUEST_SYSENTER_CS, msr_content);

@@ -11,10 +11,6 @@
     __sel;                                                              \
 })
 
-/* Clear and set 'TS' bit respectively */
-#define clts() __asm__ __volatile__ ("clts")
-#define stts() write_cr0(X86_CR0_TS|read_cr0())
-
 #define wbinvd() \
 	__asm__ __volatile__ ("wbinvd": : :"memory");
 

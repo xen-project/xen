@@ -199,6 +199,55 @@ void hvm_create_event_channels(struct vcpu *v)
     }
 }
 
+
+void hvm_stts(struct vcpu *v)
+{
+    /* FPU state already dirty? Then no need to setup_fpu() lazily. */
+    if ( test_bit(_VCPUF_fpu_dirtied, &v->vcpu_flags) )
+        return;
+    
+    hvm_funcs.stts(v);
+}
+
+void hvm_set_guest_time(struct vcpu *v, u64 gtime)
+{
+    u64 host_tsc;
+   
+    rdtscll(host_tsc);
+    
+    v->arch.hvm_vcpu.cache_tsc_offset = gtime - host_tsc;
+    hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
+}
+
+void hvm_do_resume(struct vcpu *v)
+{
+    ioreq_t *p;
+    struct periodic_time *pt =
+        &v->domain->arch.hvm_domain.pl_time.periodic_tm;
+
+    hvm_stts(v);
+
+    /* pick up the elapsed PIT ticks and re-enable pit_timer */
+    if ( pt->enabled && pt->first_injected ) {
+        if ( v->arch.hvm_vcpu.guest_time ) {
+            hvm_set_guest_time(v, v->arch.hvm_vcpu.guest_time);
+            v->arch.hvm_vcpu.guest_time = 0;
+        }
+        pickup_deactive_ticks(pt);
+    }
+
+    p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;
+    wait_on_xen_event_channel(v->arch.hvm.xen_port,
+                              p->state != STATE_IOREQ_READY &&
+                              p->state != STATE_IOREQ_INPROCESS);
+    if ( p->state == STATE_IORESP_READY )
+        hvm_io_assist(v);
+    if ( p->state != STATE_INVALID ) {
+        printf("Weird HVM iorequest state %d.\n", p->state);
+        domain_crash(v->domain);
+    }
+}
+
 void hvm_release_assist_channel(struct vcpu *v)
 {
     free_xen_event_channel(v, v->arch.hvm_vcpu.xen_port);
@@ -299,8 +348,7 @@ int cpu_get_interrupt(struct vcpu *v, int *type)
 /*
  * Copy from/to guest virtual.
  */
-int
-hvm_copy(void *buf, unsigned long vaddr, int size, int dir)
+int hvm_copy(void *buf, unsigned long vaddr, int size, int dir)
 {
     unsigned long mfn;
     char *addr;

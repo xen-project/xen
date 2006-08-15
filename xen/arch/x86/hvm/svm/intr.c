@@ -42,48 +42,6 @@
  * Most of this code is copied from vmx_io.c and modified 
  * to be suitable for SVM.
  */
-#define BSP_CPU(v)    (!(v->vcpu_id))
-
-void svm_set_guest_time(struct vcpu *v, u64 gtime)
-{
-    u64    host_tsc;
-   
-    rdtscll(host_tsc);
-    
-    v->arch.hvm_vcpu.cache_tsc_offset = gtime - host_tsc;
-    v->arch.hvm_svm.vmcb->tsc_offset = v->arch.hvm_vcpu.cache_tsc_offset;
-}
-
-static inline void
-interrupt_post_injection(struct vcpu * v, int vector, int type)
-{
-    struct  periodic_time *pt = &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
-
-    if ( is_pit_irq(v, vector, type) ) {
-        if ( !pt->first_injected ) {
-            pt->pending_intr_nr = 0;
-            pt->last_plt_gtime = hvm_get_guest_time(v);
-            pt->scheduled = NOW() + pt->period;
-            set_timer(&pt->timer, pt->scheduled);
-            pt->first_injected = 1;
-        } else {
-            pt->pending_intr_nr--;
-            pt->last_plt_gtime += pt->period_cycles;
-            svm_set_guest_time(v, pt->last_plt_gtime);
-            pit_time_fired(v, pt->priv);
-        }
-    }
-
-    switch(type)
-    {
-    case APIC_DM_EXTINT:
-        break;
-
-    default:
-        vlapic_post_injection(v, vector, type);
-        break;
-    }
-}
 
 static inline int svm_inject_extint(struct vcpu *v, int trap, int error_code)
 {
@@ -109,7 +67,7 @@ asmlinkage void svm_intr_assist(void)
 {
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    struct hvm_domain *plat=&v->domain->arch.hvm_domain; 
+    struct hvm_domain *plat=&v->domain->arch.hvm_domain;
     struct periodic_time *pt = &plat->pl_time.periodic_tm;
     struct hvm_virpic *pic= &plat->vpic;
     int callback_irq;
@@ -194,7 +152,7 @@ asmlinkage void svm_intr_assist(void)
             /* let's inject this interrupt */
             TRACE_3D(TRC_VMX_INT, v->domain->domain_id, intr_vector, 0);
             svm_inject_extint(v, intr_vector, VMX_DELIVER_NO_ERROR_CODE);
-            interrupt_post_injection(v, intr_vector, intr_type);
+            hvm_interrupt_post(v, intr_vector, intr_type);
             break;
         case APIC_DM_SMI:
         case APIC_DM_NMI:

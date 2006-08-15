@@ -261,7 +261,7 @@ static void vmx_do_launch(struct vcpu *v)
 
     error |= __vmwrite(CR4_READ_SHADOW, cr4);
 
-    vmx_stts();
+    hvm_stts(v);
 
     if(hvm_apic_support(v->domain))
         vlapic_init(v);
@@ -282,7 +282,7 @@ static void vmx_do_launch(struct vcpu *v)
     v->arch.schedule_tail = arch_vmx_do_resume;
 
     /* init guest tsc to start from 0 */
-    set_guest_time(v, 0);
+    hvm_set_guest_time(v, 0);
 }
 
 /*
@@ -539,7 +539,7 @@ void arch_vmx_do_resume(struct vcpu *v)
         vmx_set_host_env(v);
     }
 
-    vmx_do_resume(v);
+    hvm_do_resume(v);
     reset_stack_and_jump(vmx_asm_do_vmentry);
 }
 
@@ -642,13 +642,11 @@ static void vmcs_dump(unsigned char ch)
     printk("**************************************\n");
 }
 
-static int __init setup_vmcs_dump(void)
+void setup_vmcs_dump(void)
 {
     register_keyhandler('v', vmcs_dump, "dump Intel's VMCS");
-    return 0;
 }
 
-__initcall(setup_vmcs_dump);
 
 /*
  * Local variables:

@@ -106,7 +106,7 @@ vmx_process_softirqs:
 ENTRY(vmx_asm_do_vmentry)
         GET_CURRENT(%rbx)
         movq %rbx, %rdi
-        call vmx_do_resume
+        call hvm_do_resume
         cli                             # tests must not race interrupts
 
         movl  VCPU_processor(%rbx),%eax

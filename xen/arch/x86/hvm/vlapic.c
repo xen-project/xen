@@ -493,7 +493,7 @@ static void vlapic_read_aligned(struct vlapic *vlapic, unsigned int offset,
 
     case APIC_ESR:
         vlapic->err_write_count = 0;
-        *result = vlapic_get_reg(vlapic, offset); 
+        *result = vlapic_get_reg(vlapic, offset);
         break;
 
     default:

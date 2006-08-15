@@ -434,8 +434,6 @@ struct vmcb_struct {
 
 struct arch_svm_struct {
     struct vmcb_struct	*vmcb;
-    void		        *host_save_area;
-    u64                 host_save_pa;
     u64                 vmcb_pa;
     u32                 *iopm;
     u32                 *msrpm;
@@ -453,12 +451,15 @@ struct arch_svm_struct {
     struct timer        hlt_timer;  /* hlt ins emulation wakeup timer */
 };
 
-struct vmcb_struct *alloc_vmcb(void);
-struct host_save_area *alloc_host_save_area(void);
-void free_vmcb(struct vmcb_struct *vmcb);
-void free_host_save_area(struct host_save_area *hsa);
-void dump_vmcb(void);
-int  construct_vmcb(struct arch_svm_struct *, struct cpu_user_regs *); 
+extern struct vmcb_struct *alloc_vmcb(void);
+extern struct host_save_area *alloc_host_save_area(void);
+extern void free_vmcb(struct vmcb_struct *vmcb);
+extern void free_host_save_area(struct host_save_area *hsa);
+
+extern int  construct_vmcb(struct arch_svm_struct *, struct cpu_user_regs *);
+extern void destroy_vmcb(struct arch_svm_struct *);
+
+extern void setup_vmcb_dump(void);
 
 #define VMCB_USE_HOST_ENV       1
 #define VMCB_USE_SEPARATE_ENV   0

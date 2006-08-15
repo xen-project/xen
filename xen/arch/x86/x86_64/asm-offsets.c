@@ -75,7 +75,6 @@ void __dummy__(void)
     BLANK();
 
     OFFSET(VCPU_svm_vmcb_pa, struct vcpu, arch.hvm_svm.vmcb_pa);
-    OFFSET(VCPU_svm_hsa_pa,  struct vcpu, arch.hvm_svm.host_save_pa);
     OFFSET(VCPU_svm_vmcb, struct vcpu, arch.hvm_svm.vmcb);
     OFFSET(VCPU_svm_vmexit_tsc, struct vcpu, arch.hvm_svm.vmexit_tsc);
     BLANK();

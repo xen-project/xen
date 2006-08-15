@@ -480,7 +480,6 @@ void pic_init(struct hvm_virpic *s, void (*irq_request)(void *, int),
     s->pics[1].elcr_mask = 0xde;
     s->irq_request = irq_request;
     s->irq_request_opaque = irq_request_opaque;
-    return; 
 }
 
 void pic_set_alt_irq_func(struct hvm_virpic *s,
@@ -568,10 +567,10 @@ static int intercept_elcr_io(ioreq_t *p)
 }
 void register_pic_io_hook (void)
 {
-    register_portio_handler(0x20, 2, intercept_pic_io); 
-    register_portio_handler(0x4d0, 1, intercept_elcr_io); 
-    register_portio_handler(0xa0, 2, intercept_pic_io); 
-    register_portio_handler(0x4d1, 1, intercept_elcr_io); 
+    register_portio_handler(0x20, 2, intercept_pic_io);
+    register_portio_handler(0x4d0, 1, intercept_elcr_io);
+    register_portio_handler(0xa0, 2, intercept_pic_io);
+    register_portio_handler(0x4d1, 1, intercept_elcr_io);
 }
 
 

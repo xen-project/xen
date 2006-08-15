@@ -395,31 +395,6 @@ static inline int __vmxon (u64 addr)
     return rc;
 }
 
-/* Make sure that xen intercepts any FP accesses from current */
-static inline void vmx_stts(void)
-{
-    unsigned long cr0;
-    struct vcpu *v = current;
-
-    /* FPU state already dirty? Then no need to setup_fpu() lazily. */
-    if ( test_bit(_VCPUF_fpu_dirtied, &v->vcpu_flags) )
-        return;
-
-    /*
-     * If the guest does not have TS enabled then we must cause and handle an
-     * exception on first use of the FPU. If the guest *does* have TS enabled
-     * then this is not necessary: no FPU activity can occur until the guest
-     * clears CR0.TS, and we will initialise the FPU when that happens.
-     */
-    __vmread_vcpu(v, CR0_READ_SHADOW, &cr0);
-    if ( !(cr0 & X86_CR0_TS) )
-    {
-        __vmread_vcpu(v, GUEST_CR0, &cr0);
-        __vmwrite(GUEST_CR0, cr0 | X86_CR0_TS);
-        __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_NM);
-    }
-}
-
 /* Works only for vcpu == current */
 static inline int vmx_paging_enabled(struct vcpu *v)
 {
