@@ -63,8 +63,12 @@ ref-%/.valid-ref: pristine-%/.valid-pristine
 	set -e
 	rm -rf $(@D)
 	cp -al $(<D) $(@D)
-	if [ -d patches/$* ] ; then \
-	    for i in patches/$*/*.patch ; do patch -d $(@D) -p1 <$$i || exit 1 ; done ; \
+	if [ -d patches/$* ] ; then                                    \
+	    echo Applying patches from patches/$*... ;                 \
+	    for i in $$(cat patches/$*/series) ; do                    \
+	        echo ... $$i ;                                         \
+	        patch -d $(@D) -p1 --quiet <patches/$*/$$i || exit 1 ; \
+	     done ;                                                    \
 	fi
 	touch $@ # update timestamp to avoid rebuild
 endif
