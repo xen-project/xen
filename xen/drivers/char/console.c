@@ -87,6 +87,8 @@ static void cls(void)
 
 static void init_vga(void)
 {
+    char *p;
+
     if ( !vgacon_enabled )
         return;
 
