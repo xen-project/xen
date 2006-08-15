@@ -24,6 +24,7 @@ import types
 from urllib import quote, unquote
 import os
 import os.path
+import fcntl
 
 from xen.xend import sxp
 from xen.xend.Args import ArgError
@@ -294,6 +295,9 @@ class HttpServer:
 
     def bind(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        flags = fcntl.fcntl(self.socket.fileno(), fcntl.F_GETFD)
+        flags |= fcntl.FD_CLOEXEC
+        fcntl.fcntl(self.socket.fileno(), fcntl.F_SETFD, flags)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.socket.bind((self.interface, self.port))
 
@@ -338,3 +342,6 @@ class UnixHttpServer(HttpServer):
         
     def bind(self):
         self.socket = unix.bind(self.path)
+        flags = fcntl.fcntl(self.socket.fileno(), fcntl.F_GETFD)
+        flags |= fcntl.FD_CLOEXEC
+        fcntl.fcntl(self.socket.fileno(), fcntl.F_SETFD, flags)
