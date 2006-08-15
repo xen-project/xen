@@ -569,8 +569,8 @@ static int setup_guest(int xc_handle,
     start_info->flags        = flags;
     start_info->store_mfn    = nr_pages - 2;
     start_info->store_evtchn = store_evtchn;
-    start_info->console_mfn   = nr_pages - 1;
-    start_info->console_evtchn = console_evtchn;
+    start_info->console.domU.mfn   = nr_pages - 1;
+    start_info->console.domU.evtchn = console_evtchn;
     start_info->nr_pages       = nr_pages; // FIXME?: nr_pages - 2 ????
 
     bp = (struct xen_ia64_boot_param *)(start_info + 1);
@@ -1047,8 +1047,8 @@ static int setup_guest(int xc_handle,
     start_info->mfn_list     = vphysmap_start;
     start_info->store_mfn    = guest_store_mfn;
     start_info->store_evtchn = store_evtchn;
-    start_info->console_mfn   = guest_console_mfn;
-    start_info->console_evtchn = console_evtchn;
+    start_info->console.domU.mfn   = guest_console_mfn;
+    start_info->console.domU.evtchn = console_evtchn;
     if ( initrd->len != 0 )
     {
         start_info->mod_start    = vinitrd_start;

@@ -154,7 +154,7 @@ static void putchar_console(int c)
     }
 }
 
-int fill_console_start_info(console_info_t *ci)
+int fill_console_start_info(struct dom0_vga_console_info *ci)
 {
     memset(ci, 0, sizeof(*ci));
 

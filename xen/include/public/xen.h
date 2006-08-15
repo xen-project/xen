@@ -9,6 +9,8 @@
 #ifndef __XEN_PUBLIC_XEN_H__
 #define __XEN_PUBLIC_XEN_H__
 
+#include "xen-compat.h"
+
 #if defined(__i386__)
 #include "arch-x86_32.h"
 #elif defined(__x86_64__)
@@ -77,6 +79,24 @@
 #define __HYPERVISOR_arch_5               53
 #define __HYPERVISOR_arch_6               54
 #define __HYPERVISOR_arch_7               55
+
+/*
+ * HYPERCALL COMPATIBILITY.
+ */
+
+/* New sched_op hypercall introduced in 0x00030101. */
+#if __XEN_INTERFACE_VERSION__ < 0x00030101
+#undef __HYPERVISOR_sched_op
+#define __HYPERVISOR_sched_op __HYPERVISOR_sched_op_compat
+#endif
+
+/* New event-channel and physdev hypercalls introduced in 0x00030202. */
+#if __XEN_INTERFACE_VERSION__ < 0x00030202
+#undef __HYPERVISOR_event_channel_op
+#define __HYPERVISOR_event_channel_op __HYPERVISOR_event_channel_op_compat
+#undef __HYPERVISOR_physdev_op
+#define __HYPERVISOR_physdev_op __HYPERVISOR_physdev_op_compat
+#endif
 
 /* 
  * VIRTUAL INTERRUPTS
@@ -467,14 +487,15 @@ struct start_info {
     xen_pfn_t store_mfn;        /* MACHINE page number of shared page.    */
     uint32_t store_evtchn;      /* Event channel for store communication. */
     union {
-        xen_pfn_t console_mfn;  /* MACHINE page number of console page.   */
-        uint32_t con_info_offs; /* Dom0 only: offset of console_info from
-                                   start_info                             */
-    };
-    union {
-        uint32_t console_evtchn;/* Event channel for console messages.    */
-        uint32_t con_info_size; /* Dom0 only: size of console_info        */
-    };
+        struct {
+            xen_pfn_t mfn;      /* MACHINE page number of console page.   */
+            uint32_t  evtchn;   /* Event channel for console page.        */
+        } domU;
+        struct {
+            uint32_t info_off;  /* Offset of console_info struct.         */
+            uint32_t info_size; /* Size of console_info struct from start.*/
+        } dom0;
+    } console;
     /* THE FOLLOWING ARE ONLY FILLED IN ON INITIAL BOOT (NOT RESUME).     */
     unsigned long pt_base;      /* VIRTUAL address of page directory.     */
     unsigned long nr_pt_frames; /* Number of bootstrap p.t. frames.       */
@@ -485,11 +506,17 @@ struct start_info {
 };
 typedef struct start_info start_info_t;
 
+/* New console union for dom0 introduced in 0x00030203. */
+#if __XEN_INTERFACE_VERSION__ < 0x00030203
+#define console_mfn    console.domU.mfn
+#define console_evtchn console.domU.evtchn
+#endif
+
 /* These flags are passed in the 'flags' field of start_info_t. */
 #define SIF_PRIVILEGED    (1<<0)  /* Is the domain privileged? */
 #define SIF_INITDOMAIN    (1<<1)  /* Is this the initial control domain? */
 
-typedef struct console_info {
+typedef struct dom0_vga_console_info {
     uint8_t video_type;
     uint8_t txt_points;
     uint16_t txt_mode;
@@ -509,7 +536,7 @@ typedef struct console_info {
     uint8_t blue_size;
     uint8_t rsvd_pos;
     uint8_t rsvd_size;
-} console_info_t;
+} dom0_vga_console_info_t;
 
 typedef uint64_t cpumap_t;
 
@@ -525,8 +552,6 @@ typedef uint8_t xen_domain_handle_t[16];
 #define mk_unsigned_long(x) x
 
 #endif /* !__ASSEMBLY__ */
-
-#include "xen-compat.h"
 
 #endif /* __XEN_PUBLIC_XEN_H__ */
 

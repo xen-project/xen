@@ -18,7 +18,7 @@ long read_console_ring(XEN_GUEST_HANDLE(char), u32 *, int);
 void init_console(void);
 void console_endboot(void);
 
-int fill_console_start_info(console_info_t *);
+int fill_console_start_info(struct dom0_vga_console_info *);
 
 void console_force_unlock(void);
 void console_force_lock(void);
