@@ -106,7 +106,8 @@ static void pre_suspend(void)
 	clear_fixmap(FIX_SHARED_INFO);
 
 	xen_start_info->store_mfn = mfn_to_pfn(xen_start_info->store_mfn);
-	xen_start_info->console_mfn = mfn_to_pfn(xen_start_info->console_mfn);
+	xen_start_info->console.domU.mfn =
+		mfn_to_pfn(xen_start_info->console.domU.mfn);
 }
 
 static void post_suspend(void)

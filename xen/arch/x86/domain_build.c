@@ -335,7 +335,9 @@ int construct_dom0(struct domain *d,
     vphysmap_start   = round_pgup(vinitrd_end);
     vphysmap_end     = vphysmap_start + (nr_pages * sizeof(unsigned long));
     vstartinfo_start = round_pgup(vphysmap_end);
-    vstartinfo_end   = vstartinfo_start + sizeof(start_info_t) + sizeof(console_info_t);
+    vstartinfo_end   = (vstartinfo_start +
+                        sizeof(struct start_info) +
+                        sizeof(struct dom0_vga_console_info));
     vpt_start        = round_pgup(vstartinfo_end);
     for ( nr_pt_pages = 2; ; nr_pt_pages++ )
     {
@@ -773,8 +775,8 @@ int construct_dom0(struct domain *d,
 
     if ( fill_console_start_info((void *)(si + 1)) )
     {
-        si->con_info_offs = sizeof(start_info_t);
-        si->con_info_size = sizeof(console_info_t);
+        si->console.dom0.info_off  = sizeof(struct start_info);
+        si->console.dom0.info_size = sizeof(struct dom0_vga_console_info);
     }
 
     /* Reinstate the caller's page tables. */

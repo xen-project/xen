@@ -288,8 +288,8 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
     start_info->flags = 0;
     *store_mfn = page_array[start_info->store_mfn];
     start_info->store_evtchn = store_evtchn;
-    *console_mfn = page_array[start_info->console_mfn];
-    start_info->console_evtchn = console_evtchn;
+    *console_mfn = page_array[start_info->console.domU.mfn];
+    start_info->console.domU.evtchn = console_evtchn;
     munmap(start_info, PAGE_SIZE);
 
     /*

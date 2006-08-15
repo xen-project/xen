@@ -52,13 +52,13 @@ static int xencons_irq;
 
 static inline struct xencons_interface *xencons_interface(void)
 {
-	return mfn_to_virt(xen_start_info->console_mfn);
+	return mfn_to_virt(xen_start_info->console.domU.mfn);
 }
 
 static inline void notify_daemon(void)
 {
 	/* Use evtchn: this is called early, before irq is set up. */
-	notify_remote_via_evtchn(xen_start_info->console_evtchn);
+	notify_remote_via_evtchn(xen_start_info->console.domU.evtchn);
 }
 
 int xencons_ring_send(const char *data, unsigned len)
@@ -116,11 +116,11 @@ int xencons_ring_init(void)
 		unbind_from_irqhandler(xencons_irq, NULL);
 	xencons_irq = 0;
 
-	if (!xen_start_info->console_evtchn)
+	if (!xen_start_info->console.domU.evtchn)
 		return 0;
 
 	err = bind_evtchn_to_irqhandler(
-		xen_start_info->console_evtchn,
+		xen_start_info->console.domU.evtchn,
 		handle_input, 0, "xencons", NULL);
 	if (err <= 0) {
 		printk(KERN_ERR "XEN console request irq failed %i\n", err);

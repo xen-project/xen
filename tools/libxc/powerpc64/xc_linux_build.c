@@ -308,8 +308,8 @@ static unsigned long create_start_info(start_info_t *si,
     si->shared_info = eomem - (PAGE_SIZE * 1);
     si->store_mfn = si->nr_pages - 2;
     si->store_evtchn = store_evtchn;
-    si->console_mfn = si->nr_pages - 3;
-    si->console_evtchn = console_evtchn;
+    si->console.domU.mfn = si->nr_pages - 3;
+    si->console.domU.evtchn = console_evtchn;
     si_addr = eomem - (PAGE_SIZE * 4);
 
     return si_addr;
