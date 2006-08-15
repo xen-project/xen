@@ -12,6 +12,7 @@
 #include <xen/smp.h>
 #include <xen/delay.h>
 #include <xen/event.h>
+#include <xen/console.h>
 #include <xen/elf.h>
 #include <xen/kernel.h>
 #include <xen/domain.h>
@@ -334,8 +335,8 @@ int construct_dom0(struct domain *d,
     vphysmap_start   = round_pgup(vinitrd_end);
     vphysmap_end     = vphysmap_start + (nr_pages * sizeof(unsigned long));
     vstartinfo_start = round_pgup(vphysmap_end);
-    vstartinfo_end   = vstartinfo_start + PAGE_SIZE;
-    vpt_start        = vstartinfo_end;
+    vstartinfo_end   = vstartinfo_start + sizeof(start_info_t) + sizeof(console_info_t);
+    vpt_start        = round_pgup(vstartinfo_end);
     for ( nr_pt_pages = 2; ; nr_pt_pages++ )
     {
         vpt_end          = vpt_start + (nr_pt_pages * PAGE_SIZE);
@@ -769,6 +770,12 @@ int construct_dom0(struct domain *d,
     memset(si->cmd_line, 0, sizeof(si->cmd_line));
     if ( cmdline != NULL )
         strncpy((char *)si->cmd_line, cmdline, sizeof(si->cmd_line)-1);
+
+    if ( fill_console_start_info((void *)(si + 1)) )
+    {
+        si->con_info_offs = sizeof(start_info_t);
+        si->con_info_size = sizeof(console_info_t);
+    }
 
     /* Reinstate the caller's page tables. */
     write_ptbase(current);

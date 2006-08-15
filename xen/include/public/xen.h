@@ -466,8 +466,15 @@ struct start_info {
     uint32_t flags;             /* SIF_xxx flags.                         */
     xen_pfn_t store_mfn;        /* MACHINE page number of shared page.    */
     uint32_t store_evtchn;      /* Event channel for store communication. */
-    xen_pfn_t console_mfn;      /* MACHINE page number of console page.   */
-    uint32_t console_evtchn;    /* Event channel for console messages.    */
+    union {
+        xen_pfn_t console_mfn;  /* MACHINE page number of console page.   */
+        uint32_t con_info_offs; /* Dom0 only: offset of console_info from
+                                   start_info                             */
+    };
+    union {
+        uint32_t console_evtchn;/* Event channel for console messages.    */
+        uint32_t con_info_size; /* Dom0 only: size of console_info        */
+    };
     /* THE FOLLOWING ARE ONLY FILLED IN ON INITIAL BOOT (NOT RESUME).     */
     unsigned long pt_base;      /* VIRTUAL address of page directory.     */
     unsigned long nr_pt_frames; /* Number of bootstrap p.t. frames.       */
@@ -481,6 +488,28 @@ typedef struct start_info start_info_t;
 /* These flags are passed in the 'flags' field of start_info_t. */
 #define SIF_PRIVILEGED    (1<<0)  /* Is the domain privileged? */
 #define SIF_INITDOMAIN    (1<<1)  /* Is this the initial control domain? */
+
+typedef struct console_info {
+    uint8_t video_type;
+    uint8_t txt_points;
+    uint16_t txt_mode;
+    uint16_t txt_x;
+    uint16_t txt_y;
+    uint16_t video_width;
+    uint16_t video_height;
+    uint16_t lfb_linelen;
+    uint16_t lfb_depth;
+    unsigned long lfb_base;
+    unsigned long lfb_size;
+    uint8_t red_pos;
+    uint8_t red_size;
+    uint8_t green_pos;
+    uint8_t green_size;
+    uint8_t blue_pos;
+    uint8_t blue_size;
+    uint8_t rsvd_pos;
+    uint8_t rsvd_size;
+} console_info_t;
 
 typedef uint64_t cpumap_t;
 
