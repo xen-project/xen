@@ -78,7 +78,10 @@ typedef struct netif_st {
 
 	/* Set of features that can be turned on in dev->features. */
 	int features;
-	int can_queue;
+
+	/* Internal feature information. */
+	int can_queue:1;	/* can queue packets for receiver? */
+	int copying_receiver:1;	/* copy packets to receiver?       */
 
 	/* Allow netif_be_start_xmit() to peek ahead in the rx request ring. */
 	RING_IDX rx_req_cons_peek;

@@ -199,6 +199,16 @@ MULTI_update_va_mapping(
 }
 
 static inline void
+MULTI_grant_table_op(multicall_entry_t *mcl, unsigned int cmd,
+		     void *uop, unsigned int count)
+{
+    mcl->op = __HYPERVISOR_grant_table_op;
+    mcl->args[0] = cmd;
+    mcl->args[1] = (unsigned long)uop;
+    mcl->args[2] = count;
+}
+
+static inline void
 MULTI_update_va_mapping_otherdomain(
     multicall_entry_t *mcl, unsigned long va,
     pte_t new_val, unsigned long flags, domid_t domid)

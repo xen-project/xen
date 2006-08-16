@@ -108,6 +108,12 @@ static int netback_probe(struct xenbus_device *dev,
 			goto abort_transaction;
 		}
 
+		err = xenbus_printf(xbt, dev->nodename, "feature-rx-copy", "%d", 1);
+		if (err) {
+			message = "writing feature-copying";
+			goto abort_transaction;
+		}
+
 		err = xenbus_transaction_end(xbt, 0);
 	} while (err == -EAGAIN);
 
@@ -349,7 +355,7 @@ static int connect_rings(struct backend_info *be)
 {
 	struct xenbus_device *dev = be->dev;
 	unsigned long tx_ring_ref, rx_ring_ref;
-	unsigned int evtchn;
+	unsigned int evtchn, copyall;
 	int err;
 	int val;
 
@@ -365,6 +371,18 @@ static int connect_rings(struct backend_info *be)
 				 dev->otherend);
 		return err;
 	}
+
+	err = xenbus_scanf(XBT_NIL, dev->otherend, "copyall", "%u", &copyall);
+	if (err == -ENOENT) {
+		err = 0;
+		copyall = 0;
+	}
+	if (err < 0) {
+		xenbus_dev_fatal(dev, err, "reading %s/copyall",
+				 dev->otherend);
+		return err;
+	}
+	be->netif->copying_receiver = !!copyall;
 
 	if (xenbus_scanf(XBT_NIL, dev->otherend, "feature-rx-notify", "%d",
 			 &val) < 0)

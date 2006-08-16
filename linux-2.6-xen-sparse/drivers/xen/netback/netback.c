@@ -43,6 +43,7 @@
 struct netbk_rx_meta {
 	skb_frag_t frag;
 	int id;
+	int copy:1;
 };
 
 static void netif_idx_release(u16 pending_idx);
@@ -71,6 +72,8 @@ static struct sk_buff_head rx_queue;
 
 static unsigned long mmap_vstart;
 #define MMAP_VADDR(_req) (mmap_vstart + ((_req) * PAGE_SIZE))
+
+static void *rx_mmap_area;
 
 #define PKT_PROT_LEN 64
 
@@ -277,12 +280,11 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		goto drop;
 	}
 
-	/*
-	 * We do not copy the packet unless:
-	 *  1. The data -- including any in fragments -- is shared; or
-	 *  2. The data is not allocated from our special cache.
-	 */
-	if (!is_flippable_skb(skb)) {
+	/* Copy the packet here if it's destined for a flipping
+	   interface but isn't flippable (e.g. extra references to
+	   data)
+	*/
+	if (!netif->copying_receiver && !is_flippable_skb(skb)) {
 		struct sk_buff *nskb = netbk_copy_skb(skb);
 		if ( unlikely(nskb == NULL) )
 			goto drop;
@@ -340,49 +342,74 @@ struct netrx_pending_operations {
 	unsigned trans_prod, trans_cons;
 	unsigned mmu_prod, mmu_cons;
 	unsigned mcl_prod, mcl_cons;
+	unsigned copy_prod, copy_cons;
 	unsigned meta_prod, meta_cons;
 	mmu_update_t *mmu;
 	gnttab_transfer_t *trans;
+	gnttab_copy_t *copy;
 	multicall_entry_t *mcl;
 	struct netbk_rx_meta *meta;
 };
 
-static u16 netbk_gop_frag(netif_t *netif, struct page *page,
-			  int i, struct netrx_pending_operations *npo)
+/* Set up the grant operations for this fragment.  If it's a flipping
+   interface, we also set up the unmap request from here. */
+static u16 netbk_gop_frag(netif_t *netif, struct netbk_rx_meta *meta,
+			  int i, struct netrx_pending_operations *npo,
+			  struct page *page, unsigned long size,
+			  unsigned long offset)
 {
 	mmu_update_t *mmu;
 	gnttab_transfer_t *gop;
+	gnttab_copy_t *copy_gop;
 	multicall_entry_t *mcl;
 	netif_rx_request_t *req;
 	unsigned long old_mfn, new_mfn;
 
 	old_mfn = virt_to_mfn(page_address(page));
 
-	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
-		new_mfn = alloc_mfn();
-
-		/*
-		 * Set the new P2M table entry before reassigning
-		 * the old data page. Heed the comment in
-		 * pgtable-2level.h:pte_page(). :-)
-		 */
-		set_phys_to_machine(page_to_pfn(page), new_mfn);
-
-		mcl = npo->mcl + npo->mcl_prod++;
-		MULTI_update_va_mapping(mcl, (unsigned long)page_address(page),
-					pfn_pte_ma(new_mfn, PAGE_KERNEL), 0);
-
-		mmu = npo->mmu + npo->mmu_prod++;
-		mmu->ptr = ((maddr_t)new_mfn << PAGE_SHIFT) |
-			MMU_MACHPHYS_UPDATE;
-		mmu->val = page_to_pfn(page);
-	}
-
 	req = RING_GET_REQUEST(&netif->rx, netif->rx.req_cons + i);
-	gop = npo->trans + npo->trans_prod++;
-	gop->mfn = old_mfn;
-	gop->domid = netif->domid;
-	gop->ref = req->gref;
+	if (netif->copying_receiver) {
+		/* The fragment needs to be copied rather than
+		   flipped. */
+		meta->copy = 1;
+		copy_gop = npo->copy + npo->copy_prod++;
+		copy_gop->source.domid = DOMID_SELF;
+		copy_gop->source.offset = offset;
+		copy_gop->source.u.gmfn = old_mfn;
+		copy_gop->dest.domid = netif->domid;
+		copy_gop->dest.offset = 0;
+		copy_gop->dest.u.ref = req->gref;
+		copy_gop->len = size;
+		copy_gop->flags = GNTCOPY_dest_gref;
+	} else {
+		meta->copy = 0;
+		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+			new_mfn = alloc_mfn();
+
+			/*
+			 * Set the new P2M table entry before
+			 * reassigning the old data page. Heed the
+			 * comment in pgtable-2level.h:pte_page(). :-)
+			 */
+			set_phys_to_machine(page_to_pfn(page), new_mfn);
+
+			mcl = npo->mcl + npo->mcl_prod++;
+			MULTI_update_va_mapping(mcl,
+					     (unsigned long)page_address(page),
+					     pfn_pte_ma(new_mfn, PAGE_KERNEL),
+					     0);
+
+			mmu = npo->mmu + npo->mmu_prod++;
+			mmu->ptr = ((maddr_t)new_mfn << PAGE_SHIFT) |
+				MMU_MACHPHYS_UPDATE;
+			mmu->val = page_to_pfn(page);
+		}
+
+		gop = npo->trans + npo->trans_prod++;
+		gop->mfn = old_mfn;
+		gop->domid = netif->domid;
+		gop->ref = req->gref;
+	}
 	return req->id;
 }
 
@@ -403,18 +430,21 @@ static void netbk_gop_skb(struct sk_buff *skb,
 	for (i = 0; i < nr_frags; i++) {
 		meta = npo->meta + npo->meta_prod++;
 		meta->frag = skb_shinfo(skb)->frags[i];
-		meta->id = netbk_gop_frag(netif, meta->frag.page,
-					  i + extra, npo);
+		meta->id = netbk_gop_frag(netif, meta, i + extra, npo,
+					  meta->frag.page,
+					  meta->frag.size,
+					  meta->frag.page_offset);
 	}
 
 	/*
 	 * This must occur at the end to ensure that we don't trash
 	 * skb_shinfo until we're done.
 	 */
-	head_meta->id = netbk_gop_frag(netif,
+	head_meta->id = netbk_gop_frag(netif, head_meta, 0, npo,
 				       virt_to_page(skb->data),
-				       0,
-				       npo);
+				       skb_headlen(skb),
+				       offset_in_page(skb->data));
+
 	netif->rx.req_cons += nr_frags + extra;
 }
 
@@ -430,32 +460,43 @@ static inline void netbk_free_pages(int nr_frags, struct netbk_rx_meta *meta)
    used to set up the operations on the top of
    netrx_pending_operations, which have since been done.  Check that
    they didn't give any errors and advance over them. */
-static int netbk_check_gop(int nr_frags, domid_t domid, int count,
+static int netbk_check_gop(int nr_frags, domid_t domid,
 			   struct netrx_pending_operations *npo)
 {
 	multicall_entry_t *mcl;
 	gnttab_transfer_t *gop;
+	gnttab_copy_t     *copy_op;
 	int status = NETIF_RSP_OKAY;
 	int i;
 
 	for (i = 0; i <= nr_frags; i++) {
-		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
-			mcl = npo->mcl + npo->mcl_cons++;
-			/* The update_va_mapping() must not fail. */
-			BUG_ON(mcl->result != 0);
-		}
+		if (npo->meta[npo->meta_cons + i].copy) {
+			copy_op = npo->copy + npo->copy_cons++;
+			if (copy_op->status != GNTST_okay) {
+				DPRINTK("Bad status %d from copy to DOM%d.\n",
+					gop->status, domid);
+				status = NETIF_RSP_ERROR;
+			}
+		} else {
+			if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+				mcl = npo->mcl + npo->mcl_cons++;
+				/* The update_va_mapping() must not fail. */
+				BUG_ON(mcl->result != 0);
+			}
 
-		gop = npo->trans + npo->trans_cons++;
-		/* Check the reassignment error code. */
-		if (gop->status != 0) {
-			DPRINTK("Bad status %d from grant transfer to DOM%u\n",
-				gop->status, domid);
-			/*
-			 * Page no longer belongs to us unless GNTST_bad_page,
-			 * but that should be a fatal error anyway.
-			 */
-			BUG_ON(gop->status == GNTST_bad_page);
-			status = NETIF_RSP_ERROR;
+			gop = npo->trans + npo->trans_cons++;
+			/* Check the reassignment error code. */
+			if (gop->status != 0) {
+				DPRINTK("Bad status %d from grant transfer to DOM%u\n",
+					gop->status, domid);
+				/*
+				 * Page no longer belongs to us unless
+				 * GNTST_bad_page, but that should be
+				 * a fatal error anyway.
+				 */
+				BUG_ON(gop->status == GNTST_bad_page);
+				status = NETIF_RSP_ERROR;
+			}
 		}
 	}
 
@@ -466,12 +507,17 @@ static void netbk_add_frag_responses(netif_t *netif, int status,
 				     struct netbk_rx_meta *meta, int nr_frags)
 {
 	int i;
+	unsigned long offset;
 
 	for (i = 0; i < nr_frags; i++) {
 		int id = meta[i].id;
 		int flags = (i == nr_frags - 1) ? 0 : NETRXF_more_data;
 
-		make_rx_response(netif, id, status, meta[i].frag.page_offset,
+		if (meta[i].copy)
+			offset = 0;
+		else
+			offset = meta[i].frag.page_offset;
+		make_rx_response(netif, id, status, offset,
 				 meta[i].frag.size, flags);
 	}
 }
@@ -482,7 +528,6 @@ static void net_rx_action(unsigned long unused)
 	s8 status;
 	u16 id, irq, flags;
 	netif_rx_response_t *resp;
-	struct netif_extra_info *extra;
 	multicall_entry_t *mcl;
 	struct sk_buff_head rxq;
 	struct sk_buff *skb;
@@ -490,6 +535,7 @@ static void net_rx_action(unsigned long unused)
 	int ret;
 	int nr_frags;
 	int count;
+	unsigned long offset;
 
 	/*
 	 * Putting hundreds of bytes on the stack is considered rude.
@@ -497,14 +543,16 @@ static void net_rx_action(unsigned long unused)
 	 */
 	static multicall_entry_t rx_mcl[NET_RX_RING_SIZE+3];
 	static mmu_update_t rx_mmu[NET_RX_RING_SIZE];
-	static gnttab_transfer_t grant_rx_op[NET_RX_RING_SIZE];
+	static gnttab_transfer_t grant_trans_op[NET_RX_RING_SIZE];
+	static gnttab_copy_t grant_copy_op[NET_RX_RING_SIZE];
 	static unsigned char rx_notify[NR_IRQS];
 	static u16 notify_list[NET_RX_RING_SIZE];
 	static struct netbk_rx_meta meta[NET_RX_RING_SIZE];
 
 	struct netrx_pending_operations npo = {
 		mmu: rx_mmu,
-		trans: grant_rx_op,
+		trans: grant_trans_op,
+		copy: grant_copy_op,
 		mcl: rx_mcl,
 		meta: meta};
 
@@ -538,12 +586,8 @@ static void net_rx_action(unsigned long unused)
 			break;
 	}
 
-	if (!count)
-		return;
-
-	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
-		BUG_ON(npo.mcl_prod == 0);
-
+	if (npo.mcl_prod &&
+	    !xen_feature(XENFEAT_auto_translated_physmap)) {
 		mcl = npo.mcl + npo.mcl_prod++;
 
 		BUG_ON(mcl[-1].op != __HYPERVISOR_update_va_mapping);
@@ -551,36 +595,63 @@ static void net_rx_action(unsigned long unused)
 
 		mcl->op = __HYPERVISOR_mmu_update;
 		mcl->args[0] = (unsigned long)rx_mmu;
-		mcl->args[1] = count;
+		mcl->args[1] = npo.mmu_prod;
 		mcl->args[2] = 0;
 		mcl->args[3] = DOMID_SELF;
 	}
 
-	mcl = npo.mcl + npo.mcl_prod++;
-	mcl->op = __HYPERVISOR_grant_table_op;
-	mcl->args[0] = GNTTABOP_transfer;
-	mcl->args[1] = (unsigned long)grant_rx_op;
-	mcl->args[2] = npo.trans_prod;
+	if (npo.trans_prod) {
+		mcl = npo.mcl + npo.mcl_prod++;
+		mcl->op = __HYPERVISOR_grant_table_op;
+		mcl->args[0] = GNTTABOP_transfer;
+		mcl->args[1] = (unsigned long)grant_trans_op;
+		mcl->args[2] = npo.trans_prod;
+	}
+
+	if (npo.copy_prod) {
+		mcl = npo.mcl + npo.mcl_prod++;
+		mcl->op = __HYPERVISOR_grant_table_op;
+		mcl->args[0] = GNTTABOP_copy;
+		mcl->args[1] = (unsigned long)grant_copy_op;
+		mcl->args[2] = npo.copy_prod;
+	}
+
+	/* Nothing to do? */
+	if (!npo.mcl_prod)
+		return;
+
+	BUG_ON(npo.copy_prod > NET_RX_RING_SIZE);
+	BUG_ON(npo.mmu_prod > NET_RX_RING_SIZE);
+	BUG_ON(npo.trans_prod > NET_RX_RING_SIZE);
+	BUG_ON(npo.mcl_prod > NET_RX_RING_SIZE+3);
+	BUG_ON(npo.meta_prod > NET_RX_RING_SIZE);
 
 	ret = HYPERVISOR_multicall(npo.mcl, npo.mcl_prod);
 	BUG_ON(ret != 0);
-	BUG_ON(mcl->result != 0);
 
-	count = 0;
 	while ((skb = __skb_dequeue(&rxq)) != NULL) {
 		nr_frags = *(int *)skb->cb;
 
-		atomic_set(&(skb_shinfo(skb)->dataref), 1);
-		skb_shinfo(skb)->nr_frags = 0;
-		skb_shinfo(skb)->frag_list = NULL;
-
 		netif = netdev_priv(skb->dev);
+		/* We can't rely on skb_release_data to release the
+		   pages used by fragments for us, since it tries to
+		   touch the pages in the fraglist.  If we're in
+		   flipping mode, that doesn't work.  In copying mode,
+		   we still have access to all of the pages, and so
+		   it's safe to let release_data deal with it. */
+		/* (Freeing the fragments is safe since we copy
+		   non-linear skbs destined for flipping interfaces) */
+		if (!netif->copying_receiver) {
+			atomic_set(&(skb_shinfo(skb)->dataref), 1);
+			skb_shinfo(skb)->frag_list = NULL;
+			skb_shinfo(skb)->nr_frags = 0;
+			netbk_free_pages(nr_frags, meta + npo.meta_cons + 1);
+		}
+
 		netif->stats.tx_bytes += skb->len;
 		netif->stats.tx_packets++;
 
-		netbk_free_pages(nr_frags, meta + npo.meta_cons + 1);
-		status = netbk_check_gop(nr_frags, netif->domid, count,
-					 &npo);
+		status = netbk_check_gop(nr_frags, netif->domid, &npo);
 
 		id = meta[npo.meta_cons].id;
 		flags = nr_frags ? NETRXF_more_data : 0;
@@ -590,11 +661,12 @@ static void net_rx_action(unsigned long unused)
 		else if (skb->proto_data_valid) /* remote but checksummed? */
 			flags |= NETRXF_data_validated;
 
-		resp = make_rx_response(netif, id, status,
-					offset_in_page(skb->data),
+		if (meta[npo.meta_cons].copy)
+			offset = 0;
+		else
+			offset = offset_in_page(skb->data);
+		resp = make_rx_response(netif, id, status, offset,
 					skb_headlen(skb), flags);
-
-		extra = NULL;
 
 		if (meta[npo.meta_cons].frag.size) {
 			struct netif_extra_info *gso =
@@ -602,10 +674,7 @@ static void net_rx_action(unsigned long unused)
 				RING_GET_RESPONSE(&netif->rx,
 						  netif->rx.rsp_prod_pvt++);
 
-			if (extra)
-				extra->flags |= XEN_NETIF_EXTRA_FLAG_MORE;
-			else
-				resp->flags |= NETRXF_extra_info;
+			resp->flags |= NETRXF_extra_info;
 
 			gso->u.gso.size = meta[npo.meta_cons].frag.size;
 			gso->u.gso.type = XEN_NETIF_GSO_TYPE_TCPV4;
@@ -614,7 +683,6 @@ static void net_rx_action(unsigned long unused)
 
 			gso->type = XEN_NETIF_EXTRA_TYPE_GSO;
 			gso->flags = 0;
-			extra = gso;
 		}
 
 		netbk_add_frag_responses(netif, status,
@@ -634,7 +702,6 @@ static void net_rx_action(unsigned long unused)
 
 		netif_put(netif);
 		dev_kfree_skb(skb);
-
 		npo.meta_cons += nr_frags + 1;
 	}
 
@@ -1253,6 +1320,12 @@ static void netif_page_release(struct page *page)
 	netif_idx_release(pending_idx);
 }
 
+static void netif_rx_page_release(struct page *page)
+{
+	/* Ready for next use. */
+	set_page_count(page, 1);
+}
+
 irqreturn_t netif_be_int(int irq, void *dev_id, struct pt_regs *regs)
 {
 	netif_t *netif = dev_id;
@@ -1381,6 +1454,16 @@ static int __init netback_init(void)
 		page = virt_to_page(MMAP_VADDR(i));
 		set_page_count(page, 1);
 		SetPageForeign(page, netif_page_release);
+	}
+
+	page = balloon_alloc_empty_page_range(NET_RX_RING_SIZE);
+	BUG_ON(page == NULL);
+	rx_mmap_area = pfn_to_kaddr(page_to_pfn(page));
+
+	for (i = 0; i < NET_RX_RING_SIZE; i++) {
+		page = virt_to_page(rx_mmap_area + (i * PAGE_SIZE));
+		set_page_count(page, 1);
+		SetPageForeign(page, netif_rx_page_release);
 	}
 
 	pending_cons = 0;
