@@ -351,6 +351,7 @@ void hvm_hlt(unsigned long rflags)
     struct periodic_time *pt = &v->domain->arch.hvm_domain.pl_time.periodic_tm;
     s_time_t next_pit = -1, next_wakeup;
 
+#if 0 /* This seems to fire at unwelcome times in Linux */
     /*
      * Detect machine shutdown.  Only do this for vcpu 0, to avoid potentially 
      * shutting down the domain early. If we halt with interrupts disabled, 
@@ -364,6 +365,7 @@ void hvm_hlt(unsigned long rflags)
         domain_shutdown(current->domain, SHUTDOWN_poweroff);
         return;
     }
+#endif /* 0 */
 
     if ( !v->vcpu_id )
         next_pit = get_scheduled(v, pt->irq, pt);
