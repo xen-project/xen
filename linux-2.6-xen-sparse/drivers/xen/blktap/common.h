@@ -49,7 +49,7 @@
 
 #define WPRINTK(fmt, args...) printk(KERN_WARNING "blk_tap: " fmt, ##args)
 
-struct backend_info; 
+struct backend_info;
 
 typedef struct blkif_st {
 	/* Unique identifier for this interface. */
@@ -62,7 +62,7 @@ typedef struct blkif_st {
 	blkif_back_ring_t blk_ring;
 	struct vm_struct *blk_ring_area;
 	/* Back pointer to the backend_info. */
-	struct backend_info *be; 
+	struct backend_info *be;
 	/* Private fields. */
 	spinlock_t       blk_ring_lock;
 	atomic_t         refcnt;

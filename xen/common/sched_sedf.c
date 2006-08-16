@@ -69,7 +69,7 @@ struct sedf_vcpu_info {
  
     /*Advaced Parameters*/
     /*Latency Scaling*/
-    s_time_t  period_orig; 
+    s_time_t  period_orig;
     s_time_t  slice_orig;
     s_time_t  latency;
  
@@ -87,7 +87,7 @@ struct sedf_vcpu_info {
     s_time_t  unblock_abs;
  
     /*scores for {util, block penalty}-weighted extratime distribution*/
-    int   score[2]; 
+    int   score[2];
     s_time_t  short_block_lost_tot;
  
     /*Statistics*/
@@ -157,7 +157,7 @@ static inline void extraq_del(struct vcpu *d, int i)
     struct list_head *list = EXTRALIST(d,i);
     ASSERT(extraq_on(d,i));
     PRINT(3, "Removing domain %i.%i from L%i extraq\n",
-          d->domain->domain_id, d->vcpu_id, i); 
+          d->domain->domain_id, d->vcpu_id, i);
     list_del(list);
     list->next = NULL;
     ASSERT(!extraq_on(d, i));
@@ -179,7 +179,7 @@ static inline void extraq_add_sort_update(struct vcpu *d, int i, int sub)
     PRINT(3, "Adding domain %i.%i (score= %i, short_pen= %"PRIi64")"
           " to L%i extraq\n",
           d->domain->domain_id, d->vcpu_id, EDOM_INFO(d)->score[i],
-          EDOM_INFO(d)->short_block_lost_tot, i); 
+          EDOM_INFO(d)->short_block_lost_tot, i);
 
     /*
      * Iterate through all elements to find our "hole" and on our way

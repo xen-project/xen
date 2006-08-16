@@ -469,7 +469,7 @@ int construct_dom0(struct domain *d,
     {
         if ( !((unsigned long)l1tab & (PAGE_SIZE-1)) )
         {
-            l1start = l1tab = (l1_pgentry_t *)mpt_alloc; 
+            l1start = l1tab = (l1_pgentry_t *)mpt_alloc;
             mpt_alloc += PAGE_SIZE;
             *l2tab = l2e_from_paddr((unsigned long)l1start, L2_PROT);
             l2tab++;
@@ -661,7 +661,7 @@ int construct_dom0(struct domain *d,
             if ( !((unsigned long)++l2tab & (PAGE_SIZE - 1)) )
             {
                 if ( !((unsigned long)++l3tab & (PAGE_SIZE - 1)) )
-                    l3start = l3tab = l4e_to_l3e(*++l4tab); 
+                    l3start = l3tab = l4e_to_l3e(*++l4tab);
                 l2start = l2tab = l3e_to_l2e(*l3tab);
             }
             l1start = l1tab = l2e_to_l1e(*l2tab);

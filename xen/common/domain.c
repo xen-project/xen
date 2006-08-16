@@ -459,7 +459,7 @@ int set_info_guest(struct domain *d, dom0_setvcpucontext_t *setvcpucontext)
     int rc = 0;
     struct vcpu_guest_context *c = NULL;
     unsigned long vcpu = setvcpucontext->vcpu;
-    struct vcpu *v; 
+    struct vcpu *v;
 
     if ( (vcpu >= MAX_VIRT_CPUS) || ((v = d->vcpu[vcpu]) == NULL) )
         return -EINVAL;

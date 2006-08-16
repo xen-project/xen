@@ -27,7 +27,7 @@
 extern int start_vmx(void);
 extern void vmcs_dump_vcpu(void);
 extern void vmx_init_vmcs_config(void);
-extern void setup_vmcs_dump(void); 
+extern void setup_vmcs_dump(void);
 
 enum {
     VMX_CPU_STATE_PAE_ENABLED=0,

@@ -1136,7 +1136,7 @@ static void shadow_audit(struct domain *d, int print)
         a = a->next;
         while ( a && (live < 9999) )
         { 
-            live++; 
+            live++;
             if ( (a->gpfn_and_flags == 0) || (a->smfn == 0) )
             {
                 printk("XXX live=%d gpfn+flags=%lx sp=%lx next=%p\n",
@@ -1144,13 +1144,13 @@ static void shadow_audit(struct domain *d, int print)
                 BUG();
             }
             ASSERT(a->smfn);
-            a = a->next; 
+            a = a->next;
         }
         ASSERT(live < 9999);
     }
 
     for ( a = d->arch.shadow_ht_free; a != NULL; a = a->next )
-        free++; 
+        free++;
 
     if ( print )
         printk("Xlive=%d free=%d\n", live, free);
@@ -1731,7 +1731,7 @@ static inline unsigned long gva_to_gpa(unsigned long gva)
     if ( !(l1e_get_flags(gpte) & _PAGE_PRESENT) )
         return 0;
 
-    return l1e_get_paddr(gpte) + (gva & ~PAGE_MASK); 
+    return l1e_get_paddr(gpte) + (gva & ~PAGE_MASK);
 }
 #endif
 

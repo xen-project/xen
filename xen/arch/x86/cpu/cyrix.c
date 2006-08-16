@@ -145,7 +145,7 @@ static void __init set_cx86_inc(void)
 	setCx86(CX86_PCR1, getCx86(CX86_PCR1) | 0x02);
 	/* PCR0 -- Performance Control */
 	/* Incrementor Margin 10 */
-	setCx86(CX86_PCR0, getCx86(CX86_PCR0) | 0x04); 
+	setCx86(CX86_PCR0, getCx86(CX86_PCR0) | 0x04);
 	setCx86(CX86_CCR3, ccr3);	/* disable MAPEN */
 }
 

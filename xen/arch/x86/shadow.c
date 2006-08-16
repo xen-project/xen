@@ -1874,7 +1874,7 @@ static int resync_all(struct domain *d, u32 stype)
                     {
                         if ( entry_get_flags(shadow_pt[i]) & _PAGE_PRESENT )
                             put_shadow_ref(entry_get_pfn(shadow_pt[i]));
-                         shadow_pt[i] = entry_empty(); 
+                         shadow_pt[i] = entry_empty();
                         continue;
                     }
 
@@ -1933,7 +1933,7 @@ static int resync_all(struct domain *d, u32 stype)
                     {
                         if ( l4e_get_flags(shadow4[i]) & _PAGE_PRESENT )
                             put_shadow_ref(l4e_get_pfn(shadow4[i]));
-                        shadow4[i] = l4e_empty(); 
+                        shadow4[i] = l4e_empty();
                         continue;
                     }
 
@@ -2007,7 +2007,7 @@ static int resync_all_levels_guest_page(struct domain *d)
 {
     int need_flush = 0;
 
-    need_flush |= resync_all(d, PGT_l1_shadow); 
+    need_flush |= resync_all(d, PGT_l1_shadow);
     if ( d->arch.ops->guest_paging_levels == PAGING_L2 &&
          shadow_mode_translate(d) )
     {
@@ -3223,7 +3223,7 @@ static unsigned long shadow_l3_table(
          * Xen private mappings. Use the va_mask part.
          */
         mfn_to_page(s2mfn)->u.inuse.type_info |= 
-            (unsigned long) 3 << PGT_score_shift; 
+            (unsigned long) 3 << PGT_score_shift;
 
         memset(spl2e, 0, 
                (L2_PAGETABLE_FIRST_XEN_SLOT & (L2_PAGETABLE_ENTRIES-1)) * sizeof(l2_pgentry_t));

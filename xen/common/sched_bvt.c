@@ -382,7 +382,7 @@ static int bvt_adjdom(
 static struct task_slice bvt_do_schedule(s_time_t now)
 {
     struct domain *d;
-    struct vcpu      *prev = current, *next = NULL, *next_prime, *ed; 
+    struct vcpu      *prev = current, *next = NULL, *next_prime, *ed;
     int                 cpu = prev->processor;
     s32                 r_time;     /* time for new dom to run */
     u32                 next_evt, next_prime_evt, min_avt;

@@ -64,9 +64,9 @@ typedef struct netif_st {
 
 	/* Physical parameters of the comms window. */
 	grant_handle_t   tx_shmem_handle;
-	grant_ref_t      tx_shmem_ref; 
+	grant_ref_t      tx_shmem_ref;
 	grant_handle_t   rx_shmem_handle;
-	grant_ref_t      rx_shmem_ref; 
+	grant_ref_t      rx_shmem_ref;
 	unsigned int     evtchn;
 	unsigned int     irq;
 

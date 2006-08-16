@@ -76,7 +76,7 @@ static unsigned long current_pages;
 static unsigned long target_pages;
 
 /* We increase/decrease in batches which fit in a page */
-static unsigned long frame_list[PAGE_SIZE / sizeof(unsigned long)]; 
+static unsigned long frame_list[PAGE_SIZE / sizeof(unsigned long)];
 
 /* VM /proc information for memory */
 extern unsigned long totalram_pages;

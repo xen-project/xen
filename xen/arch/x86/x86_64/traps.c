@@ -242,7 +242,7 @@ void __init percpu_traps_init(void)
 
     /* Skip the NMI and DF stacks. */
     stack = &stack[2048];
-    wrmsr(MSR_LSTAR, (unsigned long)stack, ((unsigned long)stack>>32)); 
+    wrmsr(MSR_LSTAR, (unsigned long)stack, ((unsigned long)stack>>32));
 
     /* movq %rsp, saversp(%rip) */
     stack[0] = 0x48;
@@ -274,7 +274,7 @@ void __init percpu_traps_init(void)
 
     /* Skip the long-mode entry trampoline. */
     stack = &stack[26];
-    wrmsr(MSR_CSTAR, (unsigned long)stack, ((unsigned long)stack>>32)); 
+    wrmsr(MSR_CSTAR, (unsigned long)stack, ((unsigned long)stack>>32));
 
     /* movq %rsp, saversp(%rip) */
     stack[0] = 0x48;

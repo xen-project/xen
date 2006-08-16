@@ -981,7 +981,7 @@ static void svm_do_general_protection_fault(struct vcpu *v,
         printf("Huh? We got a GP Fault with an invalid IDTR!\n");
         svm_dump_vmcb(__func__, vmcb);
         svm_dump_regs(__func__, regs);
-        svm_dump_inst(vmcb->rip); 
+        svm_dump_inst(vmcb->rip);
         __hvm_bug(regs);
     }
 
@@ -1267,7 +1267,7 @@ static void svm_dr_access (struct vcpu *v, unsigned int reg, unsigned int type,
     {
     case TYPE_MOV_TO_DR: 
         inst_len = __get_instruction_length(vmcb, INSTR_MOV2DR, buffer);
-        v->arch.guest_context.debugreg[reg] = *reg_p; 
+        v->arch.guest_context.debugreg[reg] = *reg_p;
         break;
     case TYPE_MOV_FROM_DR:
         inst_len = __get_instruction_length(vmcb, INSTR_MOVDR2, buffer);

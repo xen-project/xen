@@ -280,26 +280,26 @@ static always_inline unsigned int cpuid_edx(unsigned int op)
 
 static inline unsigned long read_cr0(void)
 {
-	unsigned long __cr0;
-	__asm__("mov %%cr0,%0\n\t" :"=r" (__cr0)); 
-    return __cr0; 
+    unsigned long __cr0;
+    __asm__("mov %%cr0,%0\n\t" :"=r" (__cr0));
+    return __cr0;
 } 
 
 static inline void write_cr0(unsigned long val)
 {
-	__asm__("mov %0,%%cr0": :"r" ((unsigned long)val)); 
+	__asm__("mov %0,%%cr0": :"r" ((unsigned long)val));
 }
 
 static inline unsigned long read_cr4(void)
 {
-	unsigned long __cr4;
-	__asm__("mov %%cr4,%0\n\t" :"=r" (__cr4)); 
-    return __cr4; 
+    unsigned long __cr4;
+    __asm__("mov %%cr4,%0\n\t" :"=r" (__cr4));
+    return __cr4;
 } 
     
 static inline void write_cr4(unsigned long val)
 {
-	__asm__("mov %0,%%cr4": :"r" ((unsigned long)val)); 
+	__asm__("mov %0,%%cr4": :"r" ((unsigned long)val));
 }
 
 

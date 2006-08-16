@@ -673,7 +673,7 @@ void dump_runq(unsigned char key)
 
     printk("Scheduler: %s (%s)\n", ops.name, ops.opt_name);
     SCHED_OP(dump_settings);
-    printk("NOW=0x%08X%08X\n",  (u32)(now>>32), (u32)now); 
+    printk("NOW=0x%08X%08X\n",  (u32)(now>>32), (u32)now);
 
     for_each_online_cpu ( i )
     {

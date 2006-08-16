@@ -18,8 +18,8 @@ struct mp_config_table;
 struct mpc_config_processor;
 
 struct genapic { 
-	char *name; 
-	int (*probe)(void); 
+	char *name;
+	int (*probe)(void);
 
 	/* When one of the next two hooks returns 1 the genapic
 	   is switched to this. Essentially they are additional probe 
@@ -30,13 +30,13 @@ struct genapic {
 
 	/* Interrupt delivery parameters ('physical' vs. 'logical flat'). */
 	int int_delivery_mode;
-	int int_dest_mode; 
+	int int_dest_mode;
 	void (*init_apic_ldr)(void);
 	void (*clustered_apic_check)(void);
 	cpumask_t (*target_cpus)(void);
 	unsigned int (*cpu_mask_to_apicid)(cpumask_t cpumask);
 	void (*send_IPI_mask)(cpumask_t mask, int vector);
-}; 
+};
 
 #define APICFUNC(x) .x = x
 

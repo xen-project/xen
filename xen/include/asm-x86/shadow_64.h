@@ -139,7 +139,7 @@ static inline int  table_offset_64(unsigned long va, int level)
 #endif
 #else
         case 4:
-            return PAE_SHADOW_SELF_ENTRY; 
+            return PAE_SHADOW_SELF_ENTRY;
 #endif
 #endif
         default:

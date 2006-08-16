@@ -154,7 +154,7 @@ void subarch_init_memory(void)
                  (32 + BITS_TO_LONGS(NR_CPUS)*sizeof(long)));
 
     /* M2P table is mappable read-only by privileged domains. */
-    for ( v  = RDWR_MPT_VIRT_START; 
+    for ( v  = RDWR_MPT_VIRT_START;
           v != RDWR_MPT_VIRT_END;
           v += 1 << L2_PAGETABLE_SHIFT )
     {

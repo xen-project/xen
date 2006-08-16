@@ -140,7 +140,7 @@ static inline void *__constant_c_memset(void *s, unsigned long c, size_t count)
         : "a" (c), "r" (count%BYTES_PER_LONG),
           "0" (count/BYTES_PER_LONG), "1" (s)
         : "memory" );
-    return s; 
+    return s;
 }
 
 /*

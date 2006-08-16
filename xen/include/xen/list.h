@@ -101,7 +101,7 @@ static __inline__ void list_del(struct list_head *entry)
 static __inline__ void list_del_init(struct list_head *entry)
 {
 	__list_del(entry->prev, entry->next);
-	INIT_LIST_HEAD(entry); 
+	INIT_LIST_HEAD(entry);
 }
 
 /**

@@ -194,7 +194,7 @@ static int blkback_probe(struct xenbus_device *dev,
 	}
 
 	/* setup back pointer */
-	be->blkif->be = be; 
+	be->blkif->be = be;
 
 	err = xenbus_watch_path2(dev, dev->nodename, "physical-device",
 				 &be->backend_watch, backend_changed);
@@ -287,7 +287,7 @@ static void backend_changed(struct xenbus_watch *watch,
 		}
 
 		/* We're potentially connected now */
-		update_blkif_status(be->blkif); 
+		update_blkif_status(be->blkif);
 	}
 }
 

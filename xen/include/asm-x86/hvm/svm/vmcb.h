@@ -308,7 +308,7 @@ typedef union
         u64 ev:        1;
         u64 resvd1:   19;
         u64 v:         1;
-        u64 errorcode:32; 
+        u64 errorcode:32;
     } fields;
 } __attribute__ ((packed)) eventinj_t;
 

@@ -328,7 +328,7 @@ static void xen_network_done_notify(void)
 /* 
  * Add following to poll() function in NAPI driver (Tigon3 is example):
  *  if ( xen_network_done() )
- *      tg3_enable_ints(tp); 
+ *      tg3_enable_ints(tp);
  */
 int xen_network_done(void)
 {
@@ -478,7 +478,7 @@ static void netbk_add_frag_responses(netif_t *netif, int status,
 
 static void net_rx_action(unsigned long unused)
 {
-	netif_t *netif = NULL; 
+	netif_t *netif = NULL;
 	s8 status;
 	u16 id, irq, flags;
 	netif_rx_response_t *resp;
@@ -1095,7 +1095,7 @@ static void net_tx_action(unsigned long unused)
 		if (unlikely(txreq.size < ETH_HLEN)) {
 			DPRINTK("Bad packet size: %d\n", txreq.size);
 			netbk_tx_err(netif, &txreq, i);
-			continue; 
+			continue;
 		}
 
 		/* No crossing a page as the payload mustn't fragment. */

@@ -63,7 +63,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
         /* 32b PAE */
         if ( (( mfn_to_page(mfn)->u.inuse.type_info & PGT_va_mask ) 
 	    >> PGT_va_shift) == 3 )
-            return l2_table_offset(HYPERVISOR_VIRT_START); 
+            return l2_table_offset(HYPERVISOR_VIRT_START);
         else
             return L2_PAGETABLE_ENTRIES;
 #else

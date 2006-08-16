@@ -343,12 +343,12 @@ static void dump_timerq(unsigned char key)
 {
     struct timer  *t;
     struct timers *ts;
-    unsigned long  flags; 
+    unsigned long  flags;
     s_time_t       now = NOW();
     int            i, j;
 
     printk("Dumping timer queues: NOW=0x%08X%08X\n",
-           (u32)(now>>32), (u32)now); 
+           (u32)(now>>32), (u32)now);
 
     for_each_online_cpu( i )
     {

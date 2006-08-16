@@ -152,7 +152,7 @@ static void collect_cpu_info (void *unused)
 	unsigned int val[2];
 
 	uci->sig = uci->pf = uci->rev = uci->cksum = 0;
-	uci->err = MC_NOTFOUND; 
+	uci->err = MC_NOTFOUND;
 	uci->mc = NULL;
 
 	if (c->x86_vendor != X86_VENDOR_INTEL || c->x86 < 6 ||
@@ -460,7 +460,7 @@ int microcode_update(void *buf, unsigned long len)
 	int ret;
 
 	if (len < DEFAULT_UCODE_TOTALSIZE) {
-		printk(KERN_ERR "microcode: not enough data\n"); 
+		printk(KERN_ERR "microcode: not enough data\n");
 		return -EINVAL;
 	}
 

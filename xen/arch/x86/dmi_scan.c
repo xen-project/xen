@@ -199,11 +199,11 @@ extern int acpi_force;
 static __init __attribute__((unused)) int dmi_disable_acpi(struct dmi_blacklist *d) 
 { 
 	if (!acpi_force) { 
-		printk(KERN_NOTICE "%s detected: acpi off\n",d->ident); 
+		printk(KERN_NOTICE "%s detected: acpi off\n",d->ident);
 		disable_acpi();
 	} else { 
 		printk(KERN_NOTICE 
-		       "Warning: DMI blacklist says broken, but acpi forced\n"); 
+		       "Warning: DMI blacklist says broken, but acpi forced\n");
 	}
 	return 0;
 } 
@@ -214,12 +214,12 @@ static __init __attribute__((unused)) int dmi_disable_acpi(struct dmi_blacklist 
 static __init __attribute__((unused)) int force_acpi_ht(struct dmi_blacklist *d) 
 { 
 	if (!acpi_force) { 
-		printk(KERN_NOTICE "%s detected: force use of acpi=ht\n", d->ident); 
+		printk(KERN_NOTICE "%s detected: force use of acpi=ht\n", d->ident);
 		disable_acpi();
-		acpi_ht = 1; 
+		acpi_ht = 1;
 	} else { 
 		printk(KERN_NOTICE 
-		       "Warning: acpi=force overrules DMI blacklist: acpi=ht\n"); 
+		       "Warning: acpi=force overrules DMI blacklist: acpi=ht\n");
 	}
 	return 0;
 } 

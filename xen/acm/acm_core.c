@@ -206,7 +206,7 @@ acm_setup(unsigned int *initrdidx,
     for (i = mbi->mods_count-1; i >= 1; i--)
     {
         struct acm_policy_buffer *pol;
-        char *_policy_start; 
+        char *_policy_start;
         unsigned long _policy_len;
 #if defined(__i386__)
         _policy_start = (char *)(initial_images_start + (mod[i].mod_start-mod[0].mod_start));
@@ -342,7 +342,7 @@ acm_init_domain_ssid(domid_t id, ssidref_t ssidref)
     {
         printk("%s: ERROR instantiating individual ssids for domain 0x%02x.\n",
                __func__, subj->domain_id);
-        acm_free_domain_ssid(ssid); 
+        acm_free_domain_ssid(ssid);
         put_domain(subj);
         return ACM_INIT_SSID_ERROR;
     }

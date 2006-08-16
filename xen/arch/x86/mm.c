@@ -1377,7 +1377,7 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
 #if CONFIG_PAGING_LEVELS >= 4
         if ( unlikely(!l2_backptr(&vaddr, pgentry_ptr_to_slot(pl3e), type)) ||
              unlikely(!get_page_from_l3e(nl3e, pfn, current->domain, vaddr)) )
-            return 0; 
+            return 0;
 #else
         vaddr = (((unsigned long)pl3e & ~PAGE_MASK) / sizeof(l3_pgentry_t))
             << L3_PAGETABLE_SHIFT;
@@ -2190,7 +2190,7 @@ int do_mmu_update(
         goto out;
     }
 
-    perfc_incrc(calls_to_mmu_update); 
+    perfc_incrc(calls_to_mmu_update);
     perfc_addc(num_page_updates, count);
     perfc_incr_histo(bpt_updates, count, PT_UPDATES);
 

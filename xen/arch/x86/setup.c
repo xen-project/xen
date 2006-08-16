@@ -44,7 +44,7 @@ boolean_param("nosmp", opt_nosmp);
 
 /* maxcpus: maximum number of CPUs to activate. */
 static unsigned int max_cpus = NR_CPUS;
-integer_param("maxcpus", max_cpus); 
+integer_param("maxcpus", max_cpus);
 
 /* opt_watchdog: If true, run a watchdog NMI on each processor. */
 static int opt_watchdog = 0;

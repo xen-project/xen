@@ -785,7 +785,7 @@ static int __spurious_page_fault(
 #endif
 
 #if CONFIG_PAGING_LEVELS >= 3
-    l3t  = map_domain_page(mfn); 
+    l3t  = map_domain_page(mfn);
 #ifdef CONFIG_X86_PAE
     l3t += (cr3 & 0xFE0UL) >> 3;
 #endif

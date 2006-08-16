@@ -1228,7 +1228,7 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
 
     if ( shadow_mode_refcounts(d) )
     {
-        struct list_head *list_ent; 
+        struct list_head *list_ent;
         struct page_info *page;
 
         /*
@@ -1254,7 +1254,7 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
         audit_adjust_pgtables(d, -1, 1);
 
 
-        for (list_ent = d->page_list.next; list_ent != &d->page_list; 
+        for (list_ent = d->page_list.next; list_ent != &d->page_list;
              list_ent = page->list.next) {
             
             page = list_entry(list_ent, struct page_info, list);
@@ -1343,7 +1343,7 @@ static int shadow_mode_table_op(
         }
 
         if ( sc->pages > d->arch.shadow_dirty_bitmap_size )
-            sc->pages = d->arch.shadow_dirty_bitmap_size; 
+            sc->pages = d->arch.shadow_dirty_bitmap_size;
 
 #define chunk (8*1024) /* Transfer and clear in 1kB chunks for L1 cache. */
         for ( i = 0; i < sc->pages; i += chunk )
@@ -1378,7 +1378,7 @@ static int shadow_mode_table_op(
         }
  
         if ( sc->pages > d->arch.shadow_dirty_bitmap_size )
-            sc->pages = d->arch.shadow_dirty_bitmap_size; 
+            sc->pages = d->arch.shadow_dirty_bitmap_size;
 
         if ( copy_to_guest(sc->dirty_bitmap, 
                            d->arch.shadow_dirty_bitmap,

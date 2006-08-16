@@ -174,7 +174,7 @@ static int blktap_probe(struct xenbus_device *dev,
 	}
 
 	/* setup back pointer */
-	be->blkif->be = be; 
+	be->blkif->be = be;
 	be->blkif->sectors = 0;
 
 	/* set a watch on disk info, waiting for userspace to update details*/

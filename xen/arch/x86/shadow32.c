@@ -1159,7 +1159,7 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
     int new_modes = (mode & ~d->arch.shadow_mode);
 
     if(!new_modes) /* Nothing to do - return success */
-        return 0; 
+        return 0;
 
     // can't take anything away by calling this function.
     ASSERT(!(d->arch.shadow_mode & ~mode));
@@ -1298,7 +1298,7 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
         audit_adjust_pgtables(d, -1, 1);
 
 
-        for (list_ent = d->page_list.next; list_ent != &d->page_list; 
+        for (list_ent = d->page_list.next; list_ent != &d->page_list;
              list_ent = page->list.next) {
             
             page = list_entry(list_ent, struct page_info, list);
@@ -1525,7 +1525,7 @@ static int shadow_mode_table_op(
         }
 
         if ( sc->pages > d->arch.shadow_dirty_bitmap_size )
-            sc->pages = d->arch.shadow_dirty_bitmap_size; 
+            sc->pages = d->arch.shadow_dirty_bitmap_size;
 
 #define chunk (8*1024) /* Transfer and clear in 1kB chunks for L1 cache. */
         for ( i = 0; i < sc->pages; i += chunk )
@@ -1561,7 +1561,7 @@ static int shadow_mode_table_op(
         }
  
         if ( sc->pages > d->arch.shadow_dirty_bitmap_size )
-            sc->pages = d->arch.shadow_dirty_bitmap_size; 
+            sc->pages = d->arch.shadow_dirty_bitmap_size;
 
         if ( copy_to_guest(sc->dirty_bitmap, 
                            d->arch.shadow_dirty_bitmap,
@@ -2704,7 +2704,7 @@ static int resync_all(struct domain *d, u32 stype)
 
                 __shadow_get_l2e(entry->v, entry->va, &l2e);
                 if (l2e_get_flags(l2e) & _PAGE_PRESENT) {
-                    put_shadow_ref(l2e_get_pfn(l2e)); 
+                    put_shadow_ref(l2e_get_pfn(l2e));
                     l2e = l2e_empty();
                     __shadow_set_l2e(entry->v, entry->va, l2e);
 
@@ -3579,7 +3579,7 @@ int check_l2_table(
                 ((SH_LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT) -
                  DOMAIN_ENTRIES_PER_L2_PAGETABLE) * sizeof(l2_pgentry_t)) )
     {
-        for ( i = DOMAIN_ENTRIES_PER_L2_PAGETABLE; 
+        for ( i = DOMAIN_ENTRIES_PER_L2_PAGETABLE;
               i < (SH_LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT);
               i++ )
             printk("+++ (%d) %lx %lx\n",i,

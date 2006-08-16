@@ -844,7 +844,7 @@ static int resume_dev(struct device *dev, void *data)
 			printk(KERN_WARNING
 			       "xenbus: resume %s failed: %i\n", 
 			       dev->bus_id, err);
-			return err; 
+			return err;
 		}
 	}
 
@@ -856,7 +856,7 @@ static int resume_dev(struct device *dev, void *data)
 		return err;
 	}
 
-	return 0; 
+	return 0;
 }
 
 void xenbus_suspend(void)

@@ -65,7 +65,7 @@ void __init generic_apic_probe(void)
 	for (i = 0; !changed && apic_probe[i]; i++) { 
 		if (apic_probe[i]->probe()) {
 			changed = 1;
-			genapic = apic_probe[i]; 
+			genapic = apic_probe[i];
 		} 
 	}
 	if (!changed) 

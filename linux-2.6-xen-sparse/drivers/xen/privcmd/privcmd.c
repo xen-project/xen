@@ -162,7 +162,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		privcmd_mmapbatch_t m;
 		struct vm_area_struct *vma = NULL;
 		xen_pfn_t __user *p;
-		unsigned long addr, mfn; 
+		unsigned long addr, mfn;
 		int i;
 
 		if (copy_from_user(&m, udata, sizeof(m))) {

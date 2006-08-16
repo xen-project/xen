@@ -309,10 +309,6 @@ int construct_vmcb(struct arch_svm_struct *arch_svm,
         goto err_out;
     }
 
-    /* update the HSA for the current Core */
-#if 0
-    set_hsa_to_guest( arch_svm );
-#endif
     arch_svm->vmcb_pa  = (u64) virt_to_maddr(arch_svm->vmcb);
 
     if ((error = construct_vmcb_controls(arch_svm))) 
