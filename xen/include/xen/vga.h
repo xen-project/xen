@@ -9,10 +9,16 @@
 #ifndef _XEN_VGA_H
 #define _XEN_VGA_H
 
-struct font_desc;
+#include <xen/config.h>
 
-void *setup_vga(void);
-void vga_cursor_off(void);
-int vga_load_font(const struct font_desc *, unsigned rows);
+#ifdef CONFIG_VGA
+void vga_init(void);
+void vga_endboot(void);
+void vga_putchar(int c);
+#else
+#define vga_init()     ((void)0)
+#define vga_endboot()  ((void)0)
+#define vga_putchar(c) ((void)0)
+#endif
 
 #endif /* _XEN_VGA_H */

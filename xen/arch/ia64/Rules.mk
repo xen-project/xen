@@ -2,6 +2,7 @@
 # ia64-specific definitions
 
 HAS_ACPI := y
+HAS_VGA  := y
 VALIDATE_VT	?= n
 no_warns ?= n
 

@@ -37,6 +37,8 @@
 
 #define MAX_DMADOM_PFN (0x7FFFFFFFUL >> PAGE_SHIFT) /* 31 addressable bits */
 
+#define CONFIG_VGA 1
+
 #ifndef __ASSEMBLY__
 
 // can't find where this typedef was before?!?

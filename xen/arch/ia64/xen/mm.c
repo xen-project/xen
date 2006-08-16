@@ -1746,6 +1746,11 @@ int get_page_type(struct page_info *page, u32 type)
     return 1;
 }
 
+int memory_is_conventional_ram(paddr_t p)
+{
+    return (efi_mem_type(p) == EFI_CONVENTIONAL_MEMORY);
+}
+
 /*
  * Local variables:
  * mode: C

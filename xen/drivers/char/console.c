@@ -22,7 +22,6 @@
 #include <xen/delay.h>
 #include <xen/guest_access.h>
 #include <xen/shutdown.h>
-#include <xen/font.h>
 #include <xen/vga.h>
 #include <asm/current.h>
 #include <asm/debugger.h>
@@ -31,10 +30,6 @@
 /* console: comma-separated list of console outputs. */
 static char opt_console[30] = OPT_CONSOLE_STR;
 string_param("console", opt_console);
-
-/* vga: comma-separated options. */
-static char opt_vga[30] = "";
-string_param("vga", opt_vga);
 
 /* conswitch: a character pair controlling console switching. */
 /* Char 1: CTRL+<char1> is used to switch console input between Xen and DOM0 */
@@ -47,9 +42,6 @@ string_param("conswitch", opt_conswitch);
 static int opt_sync_console;
 boolean_param("sync_console", opt_sync_console);
 
-static int xpos, ypos;
-static unsigned char *video;
-
 #define CONRING_SIZE 16384
 #define CONRING_IDX_MASK(i) ((i)&(CONRING_SIZE-1))
 static char conring[CONRING_SIZE];
@@ -58,134 +50,8 @@ static unsigned int conringc, conringp;
 static char printk_prefix[16] = "";
 
 static int sercon_handle = -1;
-static int vgacon_enabled = 0;
-static int vgacon_keep    = 0;
-static int vgacon_lines   = 25;
-static const struct font_desc *font;
 
 static DEFINE_SPINLOCK(console_lock);
-
-/*
- * *******************************************************
- * *************** OUTPUT TO VGA CONSOLE *****************
- * *******************************************************
- */
-
-/* VGA text-mode definitions. */
-#define COLUMNS     80
-#define LINES       vgacon_lines
-#define ATTRIBUTE   7
-#define VIDEO_SIZE  (COLUMNS * LINES * 2)
-
-/* Clear the screen and initialize VIDEO, XPOS and YPOS.  */
-static void cls(void)
-{
-    memset(video, 0, VIDEO_SIZE);
-    xpos = ypos = 0;
-    vga_cursor_off();
-}
-
-static void init_vga(void)
-{
-    char *p;
-
-    if ( !vgacon_enabled )
-        return;
-
-    for ( p = opt_vga; p != NULL; p = strchr(p, ',') )
-    {
-        if ( *p == ',' )
-            p++;
-        if ( strncmp(p, "keep", 4) == 0 )
-            vgacon_keep = 1;
-        else if ( strncmp(p, "text-80x", 8) == 0 )
-            vgacon_lines = simple_strtoul(p + 8, NULL, 10);
-    }
-
-    video = setup_vga();
-    if ( !video )
-    {
-        vgacon_enabled = 0;
-        return;
-    }
-
-    switch ( vgacon_lines )
-    {
-    case 25:
-    case 30:
-        font = &font_vga_8x16;
-        break;
-    case 28:
-    case 34:
-        font = &font_vga_8x14;
-        break;
-    case 43:
-    case 50:
-    case 60:
-        font = &font_vga_8x8;
-        break;
-    default:
-        vgacon_lines = 25;
-        break;
-    }
-
-    if ( (font != NULL) && (vga_load_font(font, vgacon_lines) < 0) )
-    {
-        vgacon_lines = 25;
-        font = NULL;
-    }
-    
-    cls();
-}
-
-static void put_newline(void)
-{
-    xpos = 0;
-    ypos++;
-
-    if ( ypos >= LINES )
-    {
-        ypos = LINES-1;
-        memmove((char*)video, 
-                (char*)video + 2*COLUMNS, (LINES-1)*2*COLUMNS);
-        memset((char*)video + (LINES-1)*2*COLUMNS, 0, 2*COLUMNS);
-    }
-}
-
-static void putchar_console(int c)
-{
-    if ( !vgacon_enabled )
-        return;
-
-    if ( c == '\n' )
-    {
-        put_newline();
-    }
-    else
-    {
-        if ( xpos >= COLUMNS )
-            put_newline();
-        video[(xpos + ypos * COLUMNS) * 2]     = c & 0xFF;
-        video[(xpos + ypos * COLUMNS) * 2 + 1] = ATTRIBUTE;
-        ++xpos;
-    }
-}
-
-int fill_console_start_info(struct dom0_vga_console_info *ci)
-{
-    memset(ci, 0, sizeof(*ci));
-
-    if ( !vgacon_enabled )
-        return 0;
-
-    ci->video_type   = 1;
-    ci->video_width  = COLUMNS;
-    ci->video_height = LINES;
-    ci->txt_mode     = 3;
-    ci->txt_points   = font ? font->height : 16;
-
-    return 1;
-}
 
 /*
  * ********************************************************
@@ -328,7 +194,7 @@ static long guest_console_write(XEN_GUEST_HANDLE(char) buffer, int count)
         serial_puts(sercon_handle, kbuf);
 
         for ( kptr = kbuf; *kptr != '\0'; kptr++ )
-            putchar_console(*kptr);
+            vga_putchar(*kptr);
 
         guest_handle_add_offset(buffer, kcount);
         count -= kcount;
@@ -395,7 +261,7 @@ static inline void __putstr(const char *str)
 
     while ( (c = *str++) != '\0' )
     {
-        putchar_console(c);
+        vga_putchar(c);
         putchar_console_ring(c);
     }
 }
@@ -455,10 +321,8 @@ void init_console(void)
         if ( strncmp(p, "com", 3) == 0 )
             sercon_handle = serial_parse_handle(p);
         else if ( strncmp(p, "vga", 3) == 0 )
-            vgacon_enabled = 1;
+            vga_init();
     }
-
-    init_vga();
 
     serial_set_rx_handler(sercon_handle, serial_rx);
 
@@ -510,10 +374,7 @@ void console_endboot(void)
         printk("\n");
     }
 
-    if ( !vgacon_keep )
-        vgacon_enabled = 0;
-    printk("Xen is %s VGA console.\n",
-           vgacon_keep ? "keeping" : "relinquishing");
+    vga_endboot();
 
     /*
      * If user specifies so, we fool the switch routine to redirect input

@@ -5,7 +5,7 @@
 /**********************************************/
 
 #include <xen/types.h>
-#include <xen/font.h>
+#include "font.h"
 
 #define FONTDATAMAX (256*8)
 

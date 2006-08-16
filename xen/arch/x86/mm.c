@@ -234,6 +234,21 @@ void arch_init_memory(void)
     subarch_init_memory();
 }
 
+int memory_is_conventional_ram(paddr_t p)
+{
+    int i;
+
+    for ( i = 0; i < e820.nr_map; i++ )
+    {
+        if ( (e820.map[i].type == E820_RAM) &&
+             (e820.map[i].addr <= p) &&
+             (e820.map[i].size > p) )
+            return 1;
+    }
+
+    return 0;
+}
+
 void share_xen_page_with_guest(
     struct page_info *page, struct domain *d, int readonly)
 {

@@ -864,6 +864,7 @@ int construct_dom0(struct domain *d,
 {
 	int i, rc;
 	start_info_t *si;
+	dom0_vga_console_info_t *ci;
 	struct vcpu *v = d->vcpu[0];
 	unsigned long max_pages;
 
@@ -1000,6 +1001,9 @@ int construct_dom0(struct domain *d,
 	//if ( initrd_len != 0 )
 	//    memcpy((void *)vinitrd_start, initrd_start, initrd_len);
 
+	BUILD_BUG_ON(sizeof(start_info_t) + sizeof(dom0_vga_console_info_t) +
+	             sizeof(struct ia64_boot_param) > PAGE_SIZE);
+
 	/* Set up start info area. */
 	d->shared_info->arch.start_info_pfn = pstart_info >> PAGE_SHIFT;
 	start_info_page = assign_new_domain_page(d, pstart_info);
@@ -1034,7 +1038,8 @@ int construct_dom0(struct domain *d,
 	strncpy((char *)si->cmd_line, dom0_command_line, sizeof(si->cmd_line));
 	si->cmd_line[sizeof(si->cmd_line)-1] = 0;
 
-	bp = (struct ia64_boot_param *)(si + 1);
+	bp = (struct ia64_boot_param *)((unsigned char *)si +
+	                                sizeof(start_info_t));
 	bp->command_line = pstart_info + offsetof (start_info_t, cmd_line);
 
 	/* We assume console has reached the last line!  */
@@ -1047,6 +1052,16 @@ int construct_dom0(struct domain *d,
 	bp->initrd_start = dom0_size -
 	             (PAGE_ALIGN(ia64_boot_param->initrd_size) + 4*1024*1024);
 	bp->initrd_size = ia64_boot_param->initrd_size;
+
+	ci = (dom0_vga_console_info_t *)((unsigned char *)si +
+			                 sizeof(start_info_t) +
+	                                 sizeof(struct ia64_boot_param));
+
+	if (fill_console_start_info(ci)) {
+		si->console.dom0.info_off = sizeof(start_info_t) +
+		                            sizeof(struct ia64_boot_param);
+		si->console.dom0.info_size = sizeof(dom0_vga_console_info_t);
+	}
 
 	vcpu_init_regs (v);
 

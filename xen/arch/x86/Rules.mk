@@ -2,6 +2,7 @@
 # x86-specific definitions
 
 HAS_ACPI := y
+HAS_VGA  := y
 
 #
 # If you change any of these configuration options then you must

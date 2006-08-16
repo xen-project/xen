@@ -8,13 +8,14 @@
 #include <xen/compile.h>
 #include <xen/init.h>
 #include <xen/lib.h>
+#include <xen/mm.h>
 #include <xen/errno.h>
 #include <xen/event.h>
 #include <xen/spinlock.h>
 #include <xen/console.h>
-#include <xen/font.h>
 #include <xen/vga.h>
 #include <asm/io.h>
+#include "font.h"
 
 /* Some of the code below is taken from SVGAlib.  The original,
    unmodified copyright notice for that code is below. */
@@ -159,12 +160,8 @@
  * into a single 16-bit quantity */
 #define VGA_OUT16VAL(v, r)       (((v) << 8) | (r))
 
-#if defined(__i386__) || defined(__x86_64__)
-# define vgabase 0
-# define VGA_OUTW_WRITE
-# define vga_readb(x) (*(x))
-# define vga_writeb(x,y) (*(y) = (x))
-#endif
+#define vgabase 0         /* use in/out port-access macros  */
+#define VGA_OUTW_WRITE    /* can use outw instead of 2xoutb */
 
 /*
  * generic VGA port read/write
@@ -187,17 +184,17 @@ static inline void vga_io_w_fast(uint16_t port, uint8_t reg, uint8_t val)
 
 static inline uint8_t vga_mm_r(void __iomem *regbase, uint16_t port)
 {
-    return readb(regbase + port);
+    return readb((char *)regbase + port);
 }
 
 static inline void vga_mm_w(void __iomem *regbase, uint16_t port, uint8_t val)
 {
-    writeb(val, regbase + port);
+    writeb(val, (char *)regbase + port);
 }
 
 static inline void vga_mm_w_fast(void __iomem *regbase, uint16_t port, uint8_t reg, uint8_t val)
 {
-    writew(VGA_OUT16VAL(val, reg), regbase + port);
+    writew(VGA_OUT16VAL(val, reg), (char *)regbase + port);
 }
 
 static inline uint8_t vga_r(void __iomem *regbase, uint16_t port)
@@ -324,24 +321,8 @@ static int detect_video(void *video_base)
     return video_found;
 }
 
-static int detect_vga(void)
-{
-    /*
-     * Look at a number of well-known locations. Even if video is not at
-     * 0xB8000 right now, it will appear there when we set up text mode 3.
-     * 
-     * We assume if there is any sign of a video adaptor then it is at least
-     * VGA-compatible (surely noone runs CGA, EGA, .... these days?).
-     * 
-     * These checks are basically to detect headless server boxes.
-     */
-    return (detect_video(ioremap(0xA0000, 0x1000)) || 
-            detect_video(ioremap(0xB0000, 0x1000)) || 
-            detect_video(ioremap(0xB8000, 0x1000)));
-}
-
 /* This is actually code from vgaHWRestore in an old version of XFree86 :-) */
-void *setup_vga(void)
+static void *setup_vga(void)
 {
     /* The following VGA state was saved from a chip in text mode 3. */
     static unsigned char regs[] = {
@@ -358,13 +339,11 @@ void *setup_vga(void)
         0x3b, 0x3c, 0x3d, 0x3e, 0x3f, 0x0c, 0x00, 0x0f, 0x08, 0x00
     };
 
+    char *video;
     int i, j;
 
-    if ( !detect_vga() )
-    {
-        printk("No VGA adaptor detected!\n");
-        return NULL;
-    }
+    if ( memory_is_conventional_ram(0xB8000) )
+        goto no_vga;
 
     inb(VGA_IS1_RC);
     outb(0x00, VGA_ATT_IW);
@@ -388,12 +367,19 @@ void *setup_vga(void)
     inb(VGA_IS1_RC);
     outb(0x20, VGA_ATT_IW);
 
-    return ioremap(0xB8000, 0x8000);
-}
+    video = ioremap(0xB8000, 0x8000);
 
-void vga_cursor_off(void)
-{
-    vga_wcrt(vgabase, VGA_CRTC_CURSOR_START, 0x20);
+    if ( !detect_video(video) )
+    {
+        iounmap(video);
+        goto no_vga;
+    }
+
+    return video;
+
+ no_vga:
+    printk("No VGA adaptor detected!\n");
+    return NULL;
 }
 
 static int vga_set_scanlines(unsigned scanlines)
@@ -473,7 +459,7 @@ static int vga_set_scanlines(unsigned scanlines)
 static unsigned font_slot = 0;
 integer_param("fontslot", font_slot);
 
-int vga_load_font(const struct font_desc *font, unsigned rows)
+static int vga_load_font(const struct font_desc *font, unsigned rows)
 {
     unsigned fontheight = font ? font->height : 16;
     uint8_t fsr = vga_rcrt(vgabase, VGA_CRTC_MAX_SCAN); /* Font size register */
@@ -515,16 +501,19 @@ int vga_load_font(const struct font_desc *font, unsigned rows)
     {
         unsigned i, j;
         const uint8_t *data = font->data;
-        uint8_t *map = (uint8_t *)__va(0xA0000) + font_slot*2*CHAR_MAP_SIZE;
+        uint8_t *map;
+
+        map = ioremap(0xA0000 + font_slot*2*CHAR_MAP_SIZE, CHAR_MAP_SIZE);
 
         for ( i = j = 0; i < CHAR_MAP_SIZE; )
         {
-            vga_writeb(j < font->count * fontheight ? data[j++] : 0,
-                       map + i++);
+            writeb(j < font->count * fontheight ? data[j++] : 0, map + i++);
             if ( !(j % fontheight) )
                 while ( i & (FONT_HEIGHT_MAX - 1) )
-                    vga_writeb(0, map + i++);
+                    writeb(0, map + i++);
         }
+
+        iounmap(map);
     }
 
     /* First, the sequencer, Synchronous reset */
@@ -559,4 +548,143 @@ int vga_load_font(const struct font_desc *font, unsigned rows)
     vga_wcrt(vgabase, VGA_CRTC_CURSOR_START, fsr);
 
     return 0;
+}
+
+
+/*
+ * HIGH-LEVEL INITIALISATION AND TEXT OUTPUT.
+ */
+
+static int vgacon_enabled = 0;
+static int vgacon_keep    = 0;
+static int vgacon_lines   = 25;
+static const struct font_desc *font;
+
+static int xpos, ypos;
+static unsigned char *video;
+
+/* vga: comma-separated options. */
+static char opt_vga[30] = "";
+string_param("vga", opt_vga);
+
+/* VGA text-mode definitions. */
+#define COLUMNS     80
+#define LINES       vgacon_lines
+#define ATTRIBUTE   7
+#define VIDEO_SIZE  (COLUMNS * LINES * 2)
+
+void vga_init(void)
+{
+    char *p;
+
+    for ( p = opt_vga; p != NULL; p = strchr(p, ',') )
+    {
+        if ( *p == ',' )
+            p++;
+        if ( strncmp(p, "keep", 4) == 0 )
+            vgacon_keep = 1;
+        else if ( strncmp(p, "text-80x", 8) == 0 )
+            vgacon_lines = simple_strtoul(p + 8, NULL, 10);
+    }
+
+    video = setup_vga();
+    if ( !video )
+        return;
+
+    switch ( vgacon_lines )
+    {
+    case 25:
+    case 30:
+        font = &font_vga_8x16;
+        break;
+    case 28:
+    case 34:
+        font = &font_vga_8x14;
+        break;
+    case 43:
+    case 50:
+    case 60:
+        font = &font_vga_8x8;
+        break;
+    default:
+        vgacon_lines = 25;
+        break;
+    }
+
+    if ( (font != NULL) && (vga_load_font(font, vgacon_lines) < 0) )
+    {
+        vgacon_lines = 25;
+        font = NULL;
+    }
+    
+    /* Clear the screen. */
+    memset(video, 0, VIDEO_SIZE);
+    xpos = ypos = 0;
+
+    /* Disable cursor. */
+    vga_wcrt(vgabase, VGA_CRTC_CURSOR_START, 0x20);
+
+    vgacon_enabled = 1;
+}
+
+void vga_endboot(void)
+{
+    if ( !vgacon_enabled )
+        return;
+
+    if ( !vgacon_keep )
+        vgacon_enabled = 0;
+        
+    printk("Xen is %s VGA console.\n",
+           vgacon_keep ? "keeping" : "relinquishing");
+}
+
+
+static void put_newline(void)
+{
+    xpos = 0;
+    ypos++;
+
+    if ( ypos >= LINES )
+    {
+        ypos = LINES-1;
+        memmove((char*)video, 
+                (char*)video + 2*COLUMNS, (LINES-1)*2*COLUMNS);
+        memset((char*)video + (LINES-1)*2*COLUMNS, 0, 2*COLUMNS);
+    }
+}
+
+void vga_putchar(int c)
+{
+    if ( !vgacon_enabled )
+        return;
+
+    if ( c == '\n' )
+    {
+        put_newline();
+    }
+    else
+    {
+        if ( xpos >= COLUMNS )
+            put_newline();
+        video[(xpos + ypos * COLUMNS) * 2]     = c & 0xFF;
+        video[(xpos + ypos * COLUMNS) * 2 + 1] = ATTRIBUTE;
+        ++xpos;
+    }
+}
+
+int fill_console_start_info(struct dom0_vga_console_info *ci)
+{
+    memset(ci, 0, sizeof(*ci));
+
+    if ( !vgacon_enabled )
+        return 0;
+
+    ci->video_type   = 1;
+    ci->video_width  = COLUMNS;
+    ci->video_height = LINES;
+    ci->txt_mode     = 3;
+    ci->txt_points   = font ? font->height : 16;
+
+    return 1;
 }
