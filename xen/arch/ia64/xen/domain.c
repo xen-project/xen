@@ -111,6 +111,8 @@ void schedule_tail(struct vcpu *prev)
 
 	if (VMX_DOMAIN(current)) {
 		vmx_do_launch(current);
+		migrate_timer(&current->arch.arch_vmx.vtm.vtm_timer,
+		              current->processor);
 	} else {
 		ia64_set_iva(&ia64_ivt);
         	ia64_set_pta(VHPT_ADDR | (1 << 8) | (VHPT_SIZE_LOG2 << 2) |
@@ -147,6 +149,8 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
  
     if (VMX_DOMAIN(current)){
 	vmx_load_all_rr(current);
+	migrate_timer(&current->arch.arch_vmx.vtm.vtm_timer,
+	              current->processor);
     } else {
 	struct domain *nd;
     	extern char ia64_ivt;
