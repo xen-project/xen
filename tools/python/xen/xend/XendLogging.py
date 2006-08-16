@@ -57,7 +57,7 @@ class XendRotatingFileHandler(logging.handlers.RotatingFileHandler):
         self.setCloseOnExec()
 
     def doRollover(self):
-        logging.handlers.RotatingFileHandler.doRollover()
+        logging.handlers.RotatingFileHandler.doRollover(self)
         self.setCloseOnExec()
 
     # NB yes accessing 'self.stream' violates OO encapsulation somewhat,
