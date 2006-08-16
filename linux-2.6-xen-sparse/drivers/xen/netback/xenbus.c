@@ -355,7 +355,7 @@ static int connect_rings(struct backend_info *be)
 {
 	struct xenbus_device *dev = be->dev;
 	unsigned long tx_ring_ref, rx_ring_ref;
-	unsigned int evtchn, copyall;
+	unsigned int evtchn, rx_copy;
 	int err;
 	int val;
 
@@ -372,17 +372,18 @@ static int connect_rings(struct backend_info *be)
 		return err;
 	}
 
-	err = xenbus_scanf(XBT_NIL, dev->otherend, "copyall", "%u", &copyall);
+	err = xenbus_scanf(XBT_NIL, dev->otherend, "request-rx-copy", "%u",
+			   &rx_copy);
 	if (err == -ENOENT) {
 		err = 0;
-		copyall = 0;
+		rx_copy = 0;
 	}
 	if (err < 0) {
-		xenbus_dev_fatal(dev, err, "reading %s/copyall",
+		xenbus_dev_fatal(dev, err, "reading %s/request-rx-copy",
 				 dev->otherend);
 		return err;
 	}
-	be->netif->copying_receiver = !!copyall;
+	be->netif->copying_receiver = !!rx_copy;
 
 	if (xenbus_scanf(XBT_NIL, dev->otherend, "feature-rx-notify", "%d",
 			 &val) < 0)
