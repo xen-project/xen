@@ -136,10 +136,18 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 
     __ia64_save_fpu(prev->arch._thread.fph);
     __ia64_load_fpu(next->arch._thread.fph);
-    if (VMX_DOMAIN(prev))
-	    vmx_save_state(prev);
+    if (VMX_DOMAIN(prev)) {
+	vmx_save_state(prev);
+	if (!VMX_DOMAIN(next)) {
+	    /* VMX domains can change the physical cr.dcr.
+	     * Restore default to prevent leakage. */
+	    ia64_setreg(_IA64_REG_CR_DCR, (IA64_DCR_DP | IA64_DCR_DK
+	                   | IA64_DCR_DX | IA64_DCR_DR | IA64_DCR_PP
+	                   | IA64_DCR_DA | IA64_DCR_DD | IA64_DCR_LC));
+	}
+    }
     if (VMX_DOMAIN(next))
-	    vmx_load_state(next);
+	vmx_load_state(next);
     /*ia64_psr(ia64_task_regs(next))->dfh = !ia64_is_local_fpu_owner(next);*/
     prev = ia64_switch_to(next);
 
