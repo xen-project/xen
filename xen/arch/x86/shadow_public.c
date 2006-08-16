@@ -1104,6 +1104,9 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
 {
     struct vcpu *v;
     int new_modes = (mode & ~d->arch.shadow_mode);
+#if defined(CONFIG_PAGING_LEVELS)
+    int initial_paging_levels = 3;
+#endif
 
     // Gotta be adding something to call this function.
     ASSERT(new_modes);
@@ -1112,8 +1115,10 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
     ASSERT(!(d->arch.shadow_mode & ~mode));
 
 #if defined(CONFIG_PAGING_LEVELS)
-    if(!shadow_set_guest_paging_levels(d,
-                                       CONFIG_PAGING_LEVELS)) {
+    if (  CONFIG_PAGING_LEVELS == 2 )
+        initial_paging_levels = CONFIG_PAGING_LEVELS;
+    if ( !shadow_set_guest_paging_levels(d,
+                                         initial_paging_levels) ) {
         printk("Unsupported guest paging levels\n");
         domain_crash_synchronous(); /* need to take a clean path */
     }
