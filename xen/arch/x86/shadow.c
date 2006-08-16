@@ -1315,55 +1315,6 @@ static int is_out_of_sync(struct vcpu *v, unsigned long va) /* __shadow_out_of_s
     return 0;
 }
 
-#define GPFN_TO_GPTEPAGE(_gpfn) ((_gpfn) / (PAGE_SIZE / sizeof(guest_l1_pgentry_t)))
-static inline unsigned long
-predict_writable_pte_page(struct domain *d, unsigned long gpfn)
-{
-    return __shadow_status(d, GPFN_TO_GPTEPAGE(gpfn), PGT_writable_pred);
-}
-
-static inline void
-increase_writable_pte_prediction(struct domain *d, unsigned long gpfn, unsigned long prediction)
-{
-    unsigned long score = prediction & PGT_score_mask;
-    int create = (score == 0);
-
-    // saturating addition
-    score = (score + (1u << PGT_score_shift)) & PGT_score_mask;
-    score = score ? score : PGT_score_mask;
-
-    prediction = (prediction & PGT_mfn_mask) | score;
-
-    //printk("increase gpfn=%lx pred=%lx create=%d\n", gpfn, prediction, create);
-    set_shadow_status(d, GPFN_TO_GPTEPAGE(gpfn), 0, prediction, PGT_writable_pred, 0);
-
-    if ( create )
-        perfc_incr(writable_pte_predictions);
-}
-
-static inline void
-decrease_writable_pte_prediction(struct domain *d, unsigned long gpfn, unsigned long prediction)
-{
-    unsigned long score = prediction & PGT_score_mask;
-    ASSERT(score);
-
-    // divide score by 2...  We don't like bad predictions.
-    //
-    score = (score >> 1) & PGT_score_mask;
-
-    prediction = (prediction & PGT_mfn_mask) | score;
-
-    //printk("decrease gpfn=%lx pred=%lx score=%lx\n", gpfn, prediction, score);
-
-    if ( score )
-        set_shadow_status(d, GPFN_TO_GPTEPAGE(gpfn), 0, prediction, PGT_writable_pred, 0);
-    else
-    {
-        delete_shadow_status(d, GPFN_TO_GPTEPAGE(gpfn), 0, PGT_writable_pred, 0);
-        perfc_decr(writable_pte_predictions);
-    }
-}
-
 static int fix_entry(
     struct domain *d,
     l1_pgentry_t *pt, u32 *found, int is_l1_shadow, u32 max_refs_to_find)

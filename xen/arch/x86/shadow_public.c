@@ -749,7 +749,7 @@ void free_shadow_page(unsigned long smfn)
         unsigned long mfn;
         mfn = __shadow_status(d, gpfn, PGT_fl1_shadow);
         if ( !mfn )
-            gpfn |= (1UL << 63);
+            gpfn |= PGT_high_mfn_nx;
     }
 #endif
 #if CONFIG_PAGING_LEVELS >= 3
