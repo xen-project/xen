@@ -113,6 +113,8 @@ block_detach_help = """block-detach  <DomId> <DevId>    Destroy a domain's virtu
                                     or the device name as mounted in the guest"""
 
 block_list_help = "block-list <DomId> [--long]      List virtual block devices for a domain"
+block_configure_help = """block-configure <DomId> <BackDev> <FrontDev> <Mode>
+                   [BackDomId] Change block device configuration"""
 network_attach_help = """network-attach  <DomID> [script=<script>] [ip=<ip>] [mac=<mac>]
                            [bridge=<bridge>] [backend=<backDomID>]
                                     Create a new virtual network device """
@@ -199,6 +201,7 @@ device_commands = [
     "block-attach",
     "block-detach",
     "block-list",
+    "block-configure",
     "network-attach",
     "network-detach",
     "network-list",
@@ -1055,9 +1058,8 @@ def xm_vtpm_list(args):
                    "%(be-path)-30s  "
                    % ni)
 
-def xm_block_attach(args):
-    arg_check(args, 'block-attach', 4, 5)
 
+def parse_block_configuration(args):
     dom = args[0]
 
     if args[1].startswith('tap:'):
@@ -1087,7 +1089,21 @@ def xm_block_attach(args):
         traceback.print_exc(limit=1)
         sys.exit(1)
 
+    return (dom, vbd)
+
+
+def xm_block_attach(args):
+    arg_check(args, 'block-attach', 4, 5)
+
+    (dom, vbd) = parse_block_configuration(args)
     server.xend.domain.device_create(dom, vbd)
+
+
+def xm_block_configure(args):
+    arg_check(args, 'block-configure', 4, 5)
+
+    (dom, vbd) = parse_block_configuration(args)
+    server.xend.domain.device_configure(dom, vbd)
 
 
 def xm_network_attach(args):
@@ -1201,6 +1217,7 @@ commands = {
     "block-attach": xm_block_attach,
     "block-detach": xm_block_detach,
     "block-list": xm_block_list,
+    "block-configure": xm_block_configure,
     # network
     "network-attach": xm_network_attach,
     "network-detach": xm_network_detach,

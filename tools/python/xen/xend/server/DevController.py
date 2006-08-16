@@ -206,15 +206,9 @@ class DevController:
         """
 
         devid = int(devid)
-        
-        frontpath = self.frontendPath(devid)
-        backpath = xstransact.Read(frontpath, "backend")
 
-        if backpath:
-            xstransact.Write(backpath, 'state', str(xenbusState['Closing']))
-        else:
-            raise VmError("Device %s not connected" % devid)
-           
+        self.writeBackend(devid, 'state', str(xenbusState['Closing']))
+
 
     def configurations(self):
         return map(self.configuration, self.deviceIDs())
@@ -353,6 +347,16 @@ class DevController:
             return map(lambda x: int(x.split('/')[-1]), transaction.list(fe))
         else:
             return map(int, xstransact.List(fe))
+
+
+    def writeBackend(self, devid, *args):
+        frontpath = self.frontendPath(devid)
+        backpath = xstransact.Read(frontpath, "backend")
+
+        if backpath:
+            xstransact.Write(backpath, *args)
+        else:
+            raise VmError("Device %s not connected" % devid)
 
 
 ## private:

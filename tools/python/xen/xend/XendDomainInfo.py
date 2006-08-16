@@ -1527,13 +1527,12 @@ class XendDomainInfo:
         return self.getDeviceController(dev_type).sxpr(devid)
 
 
-    def device_configure(self, dev_config, devid):
+    def device_configure(self, dev_config):
         """Configure an existing device.
         @param dev_config: device configuration
-        @param devid:      device id
         """
         deviceClass = sxp.name(dev_config)
-        self.reconfigureDevice(deviceClass, devid, dev_config)
+        self.reconfigureDevice(deviceClass, None, dev_config)
 
 
     def pause(self):
