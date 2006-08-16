@@ -26,9 +26,10 @@
 #include <xen/irq.h>
 #include <xen/softirq.h>
 #include <xen/hypercall.h>
+#include <xen/domain_page.h>
 #include <asm/current.h>
 #include <asm/io.h>
-#include <asm/shadow.h>
+#include <asm/shadow2.h>
 #include <asm/regs.h>
 #include <asm/cpufeature.h>
 #include <asm/processor.h>
@@ -43,10 +44,6 @@
 #include <asm/hvm/svm/emulate.h>
 #include <asm/hvm/svm/vmmcall.h>
 #include <asm/hvm/svm/intr.h>
-#include <asm/shadow.h>
-#if CONFIG_PAGING_LEVELS >= 3
-#include <asm/shadow_64.h>
-#endif
 #include <public/sched.h>
 
 #define SVM_EXTRA_DEBUG
@@ -414,7 +411,7 @@ static int svm_realmode(struct vcpu *v)
     return (eflags & X86_EFLAGS_VM) || !(cr0 & X86_CR0_PE);
 }
 
-static int svm_instruction_length(struct vcpu *v)
+int svm_guest_x86_mode(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     unsigned long cr0 = vmcb->cr0, eflags = vmcb->rflags, mode;
@@ -423,10 +420,20 @@ static int svm_instruction_length(struct vcpu *v)
         mode = vmcb->cs.attributes.fields.l ? 8 : 4;
     else
         mode = (eflags & X86_EFLAGS_VM) || !(cr0 & X86_CR0_PE) ? 2 : 4;
-    return svm_instrlen(guest_cpu_user_regs(), mode);
+    return mode;
 }
 
-static unsigned long svm_get_ctrl_reg(struct vcpu *v, unsigned int num)
+int svm_instruction_length(struct vcpu *v)
+{
+    return svm_instrlen(guest_cpu_user_regs(), svm_guest_x86_mode(v));
+}
+
+void svm_update_host_cr3(struct vcpu *v)
+{
+    /* SVM doesn't have a HOST_CR3 equivalent to update. */
+}
+
+unsigned long svm_get_ctrl_reg(struct vcpu *v, unsigned int num)
 {
     switch ( num )
     {
@@ -436,6 +443,8 @@ static unsigned long svm_get_ctrl_reg(struct vcpu *v, unsigned int num)
         return v->arch.hvm_svm.cpu_cr2;
     case 3:
         return v->arch.hvm_svm.cpu_cr3;
+    case 4:
+        return v->arch.hvm_svm.cpu_shadow_cr4;
     default:
         BUG();
     }
@@ -524,8 +533,6 @@ static void svm_init_hypercall_page(struct domain *d, void *hypercall_page)
     /* Don't support HYPERVISOR_iret at the moment */
     *(u16 *)(hypercall_page + (__HYPERVISOR_iret * 32)) = 0x0b0f; /* ud2 */
 }
-
-
 
 
 int svm_dbg_on = 0;
@@ -647,6 +654,11 @@ static void svm_load_cpu_guest_regs(
     svm_load_cpu_user_regs(v, regs);
 }
 
+int svm_long_mode_enabled(struct vcpu *v)
+{
+    return SVM_LONG_GUEST(v);
+}
+
 
 
 static void arch_svm_do_launch(struct vcpu *v) 
@@ -726,7 +738,6 @@ static void svm_ctxt_switch_to(struct vcpu *v)
 static void svm_final_setup_guest(struct vcpu *v)
 {
     struct domain *d = v->domain;
-    struct vcpu *vc;
 
     v->arch.schedule_tail    = arch_svm_do_launch;
     v->arch.ctxt_switch_from = svm_ctxt_switch_from;
@@ -735,9 +746,12 @@ static void svm_final_setup_guest(struct vcpu *v)
     if ( v != d->vcpu[0] )
         return;
 
-    /* Initialize monitor page table */
-    for_each_vcpu( d, vc )
-        vc->arch.monitor_table = pagetable_null();
+    if ( !shadow2_mode_external(d) )
+    {
+        DPRINTK("Can't init HVM for dom %u vcpu %u: "
+                "not in shadow2 external mode\n", d->domain_id, v->vcpu_id);
+        domain_crash(d);
+    }
 
     /* 
      * Required to do this once per domain
@@ -745,13 +759,6 @@ static void svm_final_setup_guest(struct vcpu *v)
      */
     memset(&d->shared_info->evtchn_mask[0], 0xff, 
            sizeof(d->shared_info->evtchn_mask));       
-
-    /* 
-     * Put the domain in shadow mode even though we're going to be using
-     * the shared 1:1 page table initially. It shouldn't hurt 
-     */
-    shadow_mode_enable(d, SHM_enable|SHM_refcounts|
-                       SHM_translate|SHM_external|SHM_wr_pt_pte);
 }
 
 
@@ -809,9 +816,13 @@ int start_svm(void)
 
     hvm_funcs.realmode = svm_realmode;
     hvm_funcs.paging_enabled = svm_paging_enabled;
+    hvm_funcs.long_mode_enabled = svm_long_mode_enabled;
+    hvm_funcs.guest_x86_mode = svm_guest_x86_mode;
     hvm_funcs.instruction_length = svm_instruction_length;
     hvm_funcs.get_guest_ctrl_reg = svm_get_ctrl_reg;
 
+    hvm_funcs.update_host_cr3 = svm_update_host_cr3;
+    
     hvm_funcs.stts = svm_stts;
     hvm_funcs.set_tsc_offset = svm_set_tsc_offset;
 
@@ -834,7 +845,6 @@ static void svm_relinquish_guest_resources(struct domain *d)
             continue;
 
         destroy_vmcb(&v->arch.hvm_svm);
-        free_monitor_pagetable(v);
         kill_timer(&v->arch.hvm_vcpu.hlt_timer);
         if ( hvm_apic_support(v->domain) && (VLAPIC(v) != NULL) ) 
         {
@@ -851,8 +861,6 @@ static void svm_relinquish_guest_resources(struct domain *d)
 
     if ( d->arch.hvm_domain.buffered_io_va )
         unmap_domain_page_global((void *)d->arch.hvm_domain.buffered_io_va);
-
-    shadow_direct_map_clean(d);
 }
 
 
@@ -894,7 +902,6 @@ static int svm_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
     unsigned long eip;
-    unsigned long gpa; /* FIXME: PAE */
     int result;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
@@ -907,43 +914,7 @@ static int svm_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
             va, eip, (unsigned long)regs->error_code);
 //#endif
 
-    if ( !svm_paging_enabled(v) )
-    {
-        if ( shadow_direct_map_fault(va, regs) ) 
-            return 1;
-
-        handle_mmio(va, va);
-        return 1;
-    }
-
-
-    gpa = gva_to_gpa(va);
-
-    /* Use 1:1 page table to identify MMIO address space */
-    if (mmio_space(gpa))
-    {
-        /* No support for APIC */
-        if (!hvm_apic_support(v->domain) && gpa >= 0xFEC00000)
-        { 
-            int inst_len;
-            inst_len = svm_instruction_length(v);
-            if (inst_len == -1)
-            {
-                printf("%s: INST_LEN - Unable to decode properly\n", __func__);
-                domain_crash_synchronous();
-            }
-
-            __update_guest_eip(vmcb, inst_len);
-
-            return 1;
-        }
-
-        handle_mmio(va, gpa);
-
-        return 1;
-    }
-    
-    result = shadow_fault(va, regs);
+    result = shadow2_fault(va, regs); 
 
     if( result ) {
         /* Let's make sure that the Guest TLB is flushed */
@@ -1035,19 +1006,12 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb, unsigned long input,
             clear_bit(X86_FEATURE_APIC, &edx);
         }
 
-#if CONFIG_PAGING_LEVELS < 3
-        clear_bit(X86_FEATURE_PAE, &edx);
-        clear_bit(X86_FEATURE_PSE, &edx);
-        clear_bit(X86_FEATURE_PSE36, &edx);
-#else
-        if ( v->domain->arch.ops->guest_paging_levels == PAGING_L2 )
-        {
-            if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
-                clear_bit(X86_FEATURE_PAE, &edx);
-            clear_bit(X86_FEATURE_PSE, &edx);
-            clear_bit(X86_FEATURE_PSE36, &edx);
-        }
+#if CONFIG_PAGING_LEVELS >= 3
+        if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
 #endif
+            clear_bit(X86_FEATURE_PAE, &edx);
+        clear_bit(X86_FEATURE_PSE36, &edx);
+
         /* Clear out reserved bits. */
         ecx &= ~SVM_VCPU_CPUID_L1_ECX_RESERVED;
         edx &= ~SVM_VCPU_CPUID_L1_EDX_RESERVED;
@@ -1097,23 +1061,12 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb, unsigned long input,
         clear_bit(X86_FEATURE_SYSCALL & 31, &edx);
 #endif
 
-#if CONFIG_PAGING_LEVELS < 3
-        clear_bit(X86_FEATURE_NX & 31, &edx);
-        clear_bit(X86_FEATURE_PAE, &edx);
-        clear_bit(X86_FEATURE_PSE, &edx);
-        clear_bit(X86_FEATURE_PSE36, &edx);
-#else
-        if ( v->domain->arch.ops->guest_paging_levels == PAGING_L2 )
-        {
-            if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
-            {
-                clear_bit(X86_FEATURE_NX & 31, &edx);
-                clear_bit(X86_FEATURE_PAE, &edx);
-            }
-            clear_bit(X86_FEATURE_PSE, &edx);
-            clear_bit(X86_FEATURE_PSE36, &edx);
-        }
+
+#if CONFIG_PAGING_LEVELS >= 3
+        if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
 #endif
+            clear_bit(X86_FEATURE_PAE, &edx);
+        clear_bit(X86_FEATURE_PSE36, &edx);
 
         /* Make SVM feature invisible to the guest. */
         clear_bit(X86_FEATURE_SVME & 31, &ecx);
@@ -1555,6 +1508,7 @@ static int svm_set_cr0(unsigned long value)
     unsigned long mfn;
     int paging_enabled;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    unsigned long old_base_mfn;
   
     ASSERT(vmcb);
 
@@ -1600,54 +1554,21 @@ static int svm_set_cr0(unsigned long value)
             set_bit(SVM_CPU_STATE_LMA_ENABLED,
                     &v->arch.hvm_svm.cpu_state);
             vmcb->efer |= (EFER_LMA | EFER_LME);
-            if (!shadow_set_guest_paging_levels(v->domain, PAGING_L4) )
-            {
-                printk("Unsupported guest paging levels\n");
-                domain_crash_synchronous(); /* need to take a clean path */
-            }
         }
-        else
 #endif  /* __x86_64__ */
-        {
-#if CONFIG_PAGING_LEVELS >= 3
-            /* seems it's a 32-bit or 32-bit PAE guest */
-            if ( test_bit(SVM_CPU_STATE_PAE_ENABLED,
-                        &v->arch.hvm_svm.cpu_state) )
-            {
-                /* The guest enables PAE first and then it enables PG, it is
-                 * really a PAE guest */
-                if ( !shadow_set_guest_paging_levels(v->domain, PAGING_L3) )
-                {
-                    printk("Unsupported guest paging levels\n");
-                    domain_crash_synchronous();
-                }
-            }
-            else
-            {
-                if ( !shadow_set_guest_paging_levels(v->domain, PAGING_L2) )
-                {
-                    printk("Unsupported guest paging levels\n");
-                    domain_crash_synchronous(); /* need to take a clean path */
-                }
-            }
-#endif
-        }
 
         /* Now arch.guest_table points to machine physical. */
+        old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
         v->arch.guest_table = pagetable_from_pfn(mfn);
-        update_pagetables(v);
+        if ( old_base_mfn )
+            put_page(mfn_to_page(old_base_mfn));
+        shadow2_update_paging_modes(v);
 
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx", 
                 (unsigned long) (mfn << PAGE_SHIFT));
 
+        vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3; 
         set_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
-        vmcb->cr3 = pagetable_get_paddr(v->arch.shadow_table);
-
-        /* arch->shadow_table should hold the next CR3 for shadow */
-        HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx, mfn = %lx\n", 
-                    v->arch.hvm_svm.cpu_cr3, mfn);
-
-        return 1;
     }
 
     if ( !((value & X86_CR0_PE) && (value & X86_CR0_PG)) && paging_enabled )
@@ -1667,17 +1588,16 @@ static int svm_set_cr0(unsigned long value)
             svm_inject_exception(v, TRAP_gp_fault, 1, 0);
             return 0;
         }
-
-        clear_all_shadow_status( v->domain );
+        shadow2_update_paging_modes(v);
+        vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3;
         set_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
-        vmcb->cr3 = pagetable_get_paddr(v->domain->arch.phys_table);
     }
     else if ( (value & (X86_CR0_PE | X86_CR0_PG)) == X86_CR0_PE )
     {
         /* we should take care of this kind of situation */
-        clear_all_shadow_status(v->domain);
+        shadow2_update_paging_modes(v);
+        vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3;
         set_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
-        vmcb->cr3 = pagetable_get_paddr(v->domain->arch.phys_table);
     }
 
     return 1;
@@ -1786,7 +1706,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
             mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
             if (mfn != pagetable_get_pfn(v->arch.guest_table))
                 __hvm_bug(regs);
-            shadow_sync_all(v->domain);
+            shadow2_update_cr3(v);
         }
         else 
         {
@@ -1812,14 +1732,10 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
             /*
              * arch.shadow_table should now hold the next CR3 for shadow
              */
-#if CONFIG_PAGING_LEVELS >= 3
-            if ( v->domain->arch.ops->guest_paging_levels == PAGING_L3 )
-                shadow_sync_all(v->domain);
-#endif
             v->arch.hvm_svm.cpu_cr3 = value;
-            update_pagetables(v);
+            update_cr3(v);
+            vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3; 
             HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx", value);
-            vmcb->cr3 = pagetable_get_paddr(v->arch.shadow_table);
         }
         break;
     }
@@ -1839,12 +1755,6 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
 #if CONFIG_PAGING_LEVELS >= 3
                 unsigned long mfn, old_base_mfn;
 
-                if( !shadow_set_guest_paging_levels(v->domain, PAGING_L3) )
-                {
-                    printk("Unsupported guest paging levels\n");
-                    domain_crash_synchronous(); /* need to take a clean path */
-                }
-
                 if ( !VALID_MFN(mfn = get_mfn_from_gpfn(
                                     v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT)) ||
                      !get_page(mfn_to_page(mfn), v->domain) )
@@ -1853,21 +1763,20 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
                     domain_crash_synchronous(); /* need to take a clean path */
                 }
 
-                old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-                if ( old_base_mfn )
-                    put_page(mfn_to_page(old_base_mfn));
-
                 /*
                  * Now arch.guest_table points to machine physical.
                  */
 
+                old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
                 v->arch.guest_table = pagetable_from_pfn(mfn);
-                update_pagetables(v);
+                if ( old_base_mfn )
+                    put_page(mfn_to_page(old_base_mfn));
+                shadow2_update_paging_modes(v);
 
                 HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx",
                             (unsigned long) (mfn << PAGE_SHIFT));
 
-                vmcb->cr3 = pagetable_get_paddr(v->arch.shadow_table);
+                vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3; 
 
                 /*
                  * arch->shadow_table should hold the next CR3 for shadow
@@ -1876,33 +1785,6 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
                 HVM_DBG_LOG(DBG_LEVEL_VMMU, 
                             "Update CR3 value = %lx, mfn = %lx",
                             v->arch.hvm_svm.cpu_cr3, mfn);
-#endif
-            }
-            else
-            {
-                /*  The guest is a 64 bit or 32-bit PAE guest. */
-#if CONFIG_PAGING_LEVELS >= 3
-                if ( (v->domain->arch.ops != NULL) &&
-                        v->domain->arch.ops->guest_paging_levels == PAGING_L2)
-                {
-                    /* Seems the guest first enables PAE without enabling PG,
-                     * it must enable PG after that, and it is a 32-bit PAE
-                     * guest */
-
-                    if ( !shadow_set_guest_paging_levels(v->domain, PAGING_L3))
-                    {
-                        printk("Unsupported guest paging levels\n");
-                        domain_crash_synchronous();
-                    }                   
-                }
-                else
-                {
-                    if ( !shadow_set_guest_paging_levels(v->domain, PAGING_L4))
-                    {
-                        printk("Unsupported guest paging levels\n");
-                        domain_crash_synchronous();
-                    }
-                }
 #endif
             }
         }
@@ -1926,7 +1808,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
         if ((old_cr ^ value) & (X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE))
         {
             set_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
-            shadow_sync_all(v->domain);
+            shadow2_update_paging_modes(v);
         }
         break;
     }
@@ -2267,7 +2149,7 @@ void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
 
     /* Overkill, we may not this */
     set_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
-    shadow_invlpg(v, g_vaddr);
+    shadow2_invlpg(v, g_vaddr);
 }
 
 
@@ -2638,7 +2520,7 @@ void walk_shadow_and_guest_pt(unsigned long gva)
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     unsigned long gpa;
 
-    gpa = gva_to_gpa( gva );
+    gpa = shadow2_gva_to_gpa(current, gva);
     printk( "gva = %lx, gpa=%lx, gCR3=%x\n", gva, gpa, (u32)vmcb->cr3 );
     if( !svm_paging_enabled(v) || mmio_space(gpa) )
        return;
@@ -2662,8 +2544,12 @@ void walk_shadow_and_guest_pt(unsigned long gva)
     __copy_from_user(&gpte, &linear_pg_table[ l1_linear_offset(gva) ],
                      sizeof(gpte) );
     printk( "G-PTE = %x, flags=%x\n", gpte.l1, l1e_get_flags(gpte) );
-    __copy_from_user( &spte, &phys_to_machine_mapping[ l1e_get_pfn( gpte ) ],
+
+    BUG(); // need to think about this, and convert usage of
+           // phys_to_machine_mapping to use pagetable format...
+    __copy_from_user( &spte, &phys_to_machine_mapping[ l1e_get_pfn( gpte ) ], 
                       sizeof(spte) );
+
     printk( "S-PTE = %x, flags=%x\n", spte.l1, l1e_get_flags(spte));
 }
 #endif /* SVM_WALK_GUEST_PAGES */
@@ -2704,7 +2590,8 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
 
     if (svm_dbg_on && exit_reason == VMEXIT_EXCEPTION_PF) 
     {
-        if (svm_paging_enabled(v) && !mmio_space(gva_to_gpa(vmcb->exitinfo2)))
+        if (svm_paging_enabled(v) && 
+            !mmio_space(shadow2_gva_to_gpa(current, vmcb->exitinfo2)))
         {
             printk("I%08ld,ExC=%s(%d),IP=%x:%llx,I1=%llx,I2=%llx,INT=%llx, "
                    "gpa=%llx\n", intercepts_counter,
@@ -2713,7 +2600,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
 		    (unsigned long long) vmcb->exitinfo1,
 		    (unsigned long long) vmcb->exitinfo2,
 		    (unsigned long long) vmcb->exitintinfo.bytes,
-            (unsigned long long) gva_to_gpa( vmcb->exitinfo2 ) );
+            (unsigned long long) shadow2_gva_to_gpa(current, vmcb->exitinfo2));
         }
         else 
         {
@@ -2757,7 +2644,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
         && ( ( vmcb->exitinfo2 == vmcb->rip )
         || vmcb->exitintinfo.bytes) )
     {
-       if (svm_paging_enabled(v) && !mmio_space(gva_to_gpa(vmcb->exitinfo2)))     
+       if (svm_paging_enabled(v) && !mmio_space(gva_to_gpa(vmcb->exitinfo2)))
            walk_shadow_and_guest_pt( vmcb->exitinfo2 );
     }
 #endif

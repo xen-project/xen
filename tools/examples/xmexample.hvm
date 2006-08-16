@@ -27,6 +27,10 @@ builder='hvm'
 #          and modules. Allocating less than 32MBs is not recommended.
 memory = 128
 
+# Shadow pagetable memory for the domain, in MB.
+# Should be at least 2KB per MB of domain memory, plus a few MB per vcpu.
+shadow_memory = 8
+
 # A name for your domain. All domains must have different names.
 name = "ExampleHVMDomain"
 

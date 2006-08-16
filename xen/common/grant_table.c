@@ -434,7 +434,7 @@ __gnttab_unmap_grant_ref(
 
     /* If just unmapped a writable mapping, mark as dirtied */
     if ( !(flags & GNTMAP_readonly) )
-         gnttab_log_dirty(rd, frame);
+         gnttab_mark_dirty(rd, frame);
 
     if ( ((act->pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask)) == 0) &&
          !(flags & GNTMAP_readonly) )
@@ -731,7 +731,7 @@ __release_grant_for_copy(
     const unsigned long r_frame = act->frame;
 
     if ( !readonly )
-        gnttab_log_dirty(rd, r_frame);
+        gnttab_mark_dirty(rd, r_frame);
 
     spin_lock(&rd->grant_table->lock);
     if ( readonly )

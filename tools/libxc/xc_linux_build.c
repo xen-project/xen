@@ -972,7 +972,7 @@ static int setup_guest(int xc_handle,
         /* Enable shadow translate mode */
         if ( xc_shadow_control(xc_handle, dom,
                                DOM0_SHADOW_CONTROL_OP_ENABLE_TRANSLATE,
-                               NULL, 0, NULL) < 0 )
+                               NULL, 0, NULL, 0, NULL) < 0 )
         {
             PERROR("Could not enable translation mode");
             goto error_out;

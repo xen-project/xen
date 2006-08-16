@@ -29,6 +29,7 @@
 #define HVM_VCPU_INIT_SIPI_SIPI_STATE_WAIT_SIPI     1
 
 struct hvm_vcpu {
+    unsigned long       hw_cr3;     /* value we give to HW to use */
     unsigned long       ioflags;
     struct hvm_io_op    io_op;
     struct vlapic       *vlapic;
@@ -39,6 +40,11 @@ struct hvm_vcpu {
     unsigned long       init_sipi_sipi_state;
 
     int                 xen_port;
+
+#if CONFIG_PAGING_LEVELS >= 3
+    l3_pgentry_t hvm_lowmem_l3tab[4]
+    __attribute__((__aligned__(32)));
+#endif
 
     /* Flags */
     int                 flag_dr_dirty;

@@ -277,6 +277,21 @@ void show_stack(struct cpu_user_regs *regs)
     show_trace(regs);
 }
 
+void show_xen_trace()
+{
+    struct cpu_user_regs regs;
+#ifdef __x86_64
+    __asm__("movq %%rsp,%0" : "=m" (regs.rsp));
+    __asm__("movq %%rbp,%0" : "=m" (regs.rbp));
+    __asm__("leaq 0(%%rip),%0" : "=a" (regs.rip));
+#else
+    __asm__("movl %%esp,%0" : "=m" (regs.esp));
+    __asm__("movl %%ebp,%0" : "=m" (regs.ebp));
+    __asm__("call 1f; 1: popl %0" : "=a" (regs.eip));
+#endif
+    show_trace(&regs);
+}
+
 void show_stack_overflow(unsigned long esp)
 {
 #ifdef MEMORY_GUARD
@@ -861,8 +876,8 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
 
     if ( unlikely(IN_HYPERVISOR_RANGE(addr)) )
     {
-        if ( shadow_mode_external(d) && guest_mode(regs) )
-            return shadow_fault(addr, regs);
+        if ( shadow2_mode_external(d) && guest_mode(regs) )
+            return shadow2_fault(addr, regs);
         if ( (addr >= GDT_LDT_VIRT_START) && (addr < GDT_LDT_VIRT_END) )
             return handle_gdt_ldt_mapping_fault(
                 addr - GDT_LDT_VIRT_START, regs);
@@ -873,14 +888,14 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
         return (spurious_page_fault(addr, regs) ? EXCRET_not_a_fault : 0);
     }
 
-    if ( unlikely(shadow_mode_enabled(d)) )
-        return shadow_fault(addr, regs);
-
     if ( likely(VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) &&
          guest_kernel_mode(v, regs) &&
          ((regs->error_code & (PGERR_write_access|PGERR_page_present)) ==
           (PGERR_write_access|PGERR_page_present)) )
         return ptwr_do_page_fault(d, addr, regs) ? EXCRET_fault_fixed : 0;
+
+    if ( shadow2_mode_enabled(d) )
+        return shadow2_fault(addr, regs);
 
     return 0;
 }
@@ -905,6 +920,13 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
     DEBUGGER_trap_entry(TRAP_page_fault, regs);
 
     perfc_incrc(page_faults);
+
+    if ( shadow2_mode_enabled(current->domain) )
+        debugtrace_printk("%s %s %d dom=%d eip=%p cr2=%p code=%d cs=%x\n",
+                          __func__, __FILE__, __LINE__,
+                          current->domain->domain_id,
+                          (void *)regs->eip, (void *)addr, regs->error_code,
+                          regs->cs);
 
     if ( unlikely((rc = fixup_page_fault(addr, regs)) != 0) )
         return rc;

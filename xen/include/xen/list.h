@@ -162,6 +162,16 @@ static __inline__ void list_splice(struct list_head *list, struct list_head *hea
 		pos = n, n = pos->next)
 
 /**
+ * list_for_each_backwards_safe	-	iterate backwards over a list safe against removal of list entry
+ * @pos:	the &struct list_head to use as a loop counter.
+ * @n:		another &struct list_head to use as temporary storage
+ * @head:	the head for your list.
+ */
+#define list_for_each_backwards_safe(pos, n, head) \
+	for (pos = (head)->prev, n = pos->prev; pos != (head); \
+		pos = n, n = pos->prev)
+
+/**
  * list_for_each_entry	-	iterate over list of given type
  * @pos:	the type * to use as a loop counter.
  * @head:	the head for your list.

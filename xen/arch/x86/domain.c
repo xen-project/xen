@@ -134,13 +134,6 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
     v->arch.perdomain_ptes =
         d->arch.mm_perdomain_pt + (vcpu_id << GDT_LDT_VCPU_SHIFT);
 
-    v->arch.guest_vtable  = __linear_l2_table;
-    v->arch.shadow_vtable = __shadow_linear_l2_table;
-#if defined(__x86_64__)
-    v->arch.guest_vl3table = __linear_l3_table;
-    v->arch.guest_vl4table = __linear_l4_table;
-#endif
-
     pae_l3_cache_init(&v->arch.pae_l3_cache);
 
     return v;
@@ -155,9 +148,7 @@ int arch_domain_create(struct domain *d)
 {
     l1_pgentry_t gdt_l1e;
     int vcpuid, pdpt_order;
-#ifdef __x86_64__
     int i;
-#endif
 
     pdpt_order = get_order_from_bytes(PDPT_L1_ENTRIES * sizeof(l1_pgentry_t));
     d->arch.mm_perdomain_pt = alloc_xenheap_pages(pdpt_order);
@@ -202,8 +193,12 @@ int arch_domain_create(struct domain *d)
 
 #endif /* __x86_64__ */
 
-    shadow_lock_init(d);
-    INIT_LIST_HEAD(&d->arch.free_shadow_frames);
+    shadow2_lock_init(d);
+    for ( i = 0; i <= SHADOW2_MAX_ORDER; i++ )
+        INIT_LIST_HEAD(&d->arch.shadow2_freelists[i]);
+    INIT_LIST_HEAD(&d->arch.shadow2_p2m_freelist);
+    INIT_LIST_HEAD(&d->arch.shadow2_p2m_inuse);
+    INIT_LIST_HEAD(&d->arch.shadow2_toplevel_shadows);
 
     if ( !is_idle_domain(d) )
     {
@@ -234,6 +229,8 @@ int arch_domain_create(struct domain *d)
 
 void arch_domain_destroy(struct domain *d)
 {
+    shadow2_final_teardown(d);
+
     free_xenheap_pages(
         d->arch.mm_perdomain_pt,
         get_order_from_bytes(PDPT_L1_ENTRIES * sizeof(l1_pgentry_t)));
@@ -328,14 +325,6 @@ int arch_set_info_guest(
         if ( !hvm_initialize_guest_resources(v) )
             return -EINVAL;
     }
-    else if ( shadow_mode_refcounts(d) )
-    {
-        if ( !get_page(mfn_to_page(cr3_pfn), d) )
-        {
-            destroy_gdt(v);
-            return -EINVAL;
-        }
-    }
     else
     {
         if ( !get_page_and_type(mfn_to_page(cr3_pfn), d,
@@ -344,15 +333,27 @@ int arch_set_info_guest(
             destroy_gdt(v);
             return -EINVAL;
         }
-    }
+    }    
 
-    update_pagetables(v);
+    /* Shadow2: make sure the domain has enough shadow memory to
+     * boot another vcpu */
+    if ( shadow2_mode_enabled(d) 
+         && d->arch.shadow2_total_pages < shadow2_min_acceptable_pages(d) )
+    {
+        destroy_gdt(v);
+        return -ENOMEM;
+    }
 
     if ( v->vcpu_id == 0 )
         update_domain_wallclock_time(d);
 
     /* Don't redo final setup */
     set_bit(_VCPUF_initialised, &v->vcpu_flags);
+
+    if ( shadow2_mode_enabled(d) )
+        shadow2_update_paging_modes(v);
+
+    update_cr3(v);
 
     return 0;
 }
@@ -669,7 +670,6 @@ static void __context_switch(void)
             loaddebug(&n->arch.guest_context, 6);
             loaddebug(&n->arch.guest_context, 7);
         }
-
         n->arch.ctxt_switch_to(n);
     }
 
@@ -927,29 +927,34 @@ void domain_relinquish_resources(struct domain *d)
     /* Drop the in-use references to page-table bases. */
     for_each_vcpu ( d, v )
     {
-        if ( (pfn = pagetable_get_pfn(v->arch.guest_table)) != 0 )
+        /* Drop ref to guest_table (from new_guest_cr3(), svm/vmx cr3 handling,
+         * or sh2_update_paging_modes()) */
+        pfn = pagetable_get_pfn(v->arch.guest_table);
+        if ( pfn != 0 )
         {
-            if ( !shadow_mode_refcounts(d) )
-                put_page_type(mfn_to_page(pfn));
-            put_page(mfn_to_page(pfn));
-
+            if ( shadow2_mode_refcounts(d) )
+                put_page(mfn_to_page(pfn));
+            else
+                put_page_and_type(mfn_to_page(pfn));
             v->arch.guest_table = pagetable_null();
         }
 
-        if ( (pfn = pagetable_get_pfn(v->arch.guest_table_user)) != 0 )
+#ifdef __x86_64__
+        /* Drop ref to guest_table_user (from MMUEXT_NEW_USER_BASEPTR) */
+        pfn = pagetable_get_pfn(v->arch.guest_table_user);
+        if ( pfn != 0 )
         {
-            if ( !shadow_mode_refcounts(d) )
-                put_page_type(mfn_to_page(pfn));
-            put_page(mfn_to_page(pfn));
-
+            put_page_and_type(mfn_to_page(pfn));
             v->arch.guest_table_user = pagetable_null();
         }
+#endif
     }
 
     if ( d->vcpu[0] && hvm_guest(d->vcpu[0]) )
         hvm_relinquish_guest_resources(d);
 
-    shadow_mode_disable(d);
+    /* Tear down shadow mode stuff. */
+    shadow2_teardown(d);
 
     /*
      * Relinquish GDT mappings. No need for explicit unmapping of the LDT as
@@ -964,26 +969,23 @@ void domain_relinquish_resources(struct domain *d)
 
     /* Free page used by xen oprofile buffer */
     free_xenoprof_pages(d);
-
 }
 
 void arch_dump_domain_info(struct domain *d)
 {
-    if ( shadow_mode_enabled(d) )
+    if ( shadow2_mode_enabled(d) )
     {
-        printk("    shadow mode: ");
-        if ( shadow_mode_refcounts(d) )
+        printk("    shadow2 mode: ");
+        if ( d->arch.shadow2_mode & SHM2_enable )
+            printk("enabled ");
+        if ( shadow2_mode_refcounts(d) )
             printk("refcounts ");
-        if ( shadow_mode_write_all(d) )
-            printk("write_all ");
-        if ( shadow_mode_log_dirty(d) )
+        if ( shadow2_mode_log_dirty(d) )
             printk("log_dirty ");
-        if ( shadow_mode_translate(d) )
+        if ( shadow2_mode_translate(d) )
             printk("translate ");
-        if ( shadow_mode_external(d) )
+        if ( shadow2_mode_external(d) )
             printk("external ");
-        if ( shadow_mode_wr_pt_pte(d) )
-            printk("wr_pt_pte ");
         printk("\n");
     }
 }

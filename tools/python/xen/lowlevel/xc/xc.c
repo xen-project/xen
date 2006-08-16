@@ -669,6 +669,59 @@ static PyObject *pyxc_sedf_domain_get(XcObject *self, PyObject *args)
                          "weight",    weight);
 }
 
+static PyObject *pyxc_shadow_control(PyObject *self,
+                                     PyObject *args,
+                                     PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+
+    uint32_t dom;
+    int op=0;
+
+    static char *kwd_list[] = { "dom", "op", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwd_list, 
+                                      &dom, &op) )
+        return NULL;
+    
+    if ( xc_shadow_control(xc->xc_handle, dom, op, NULL, 0, NULL, 0, NULL) 
+         < 0 )
+        return PyErr_SetFromErrno(xc_error);
+    
+    Py_INCREF(zero);
+    return zero;
+}
+
+static PyObject *pyxc_shadow_mem_control(PyObject *self,
+                                         PyObject *args,
+                                         PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+    int op;
+    uint32_t dom;
+    int mbarg = -1;
+    unsigned long mb;
+
+    static char *kwd_list[] = { "dom", "mb", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwd_list, 
+                                      &dom, &mbarg) )
+        return NULL;
+    
+    if ( mbarg < 0 ) 
+        op = DOM0_SHADOW2_CONTROL_OP_GET_ALLOCATION;
+    else 
+    {
+        mb = mbarg;
+        op = DOM0_SHADOW2_CONTROL_OP_SET_ALLOCATION;
+    }
+    if ( xc_shadow_control(xc->xc_handle, dom, op, NULL, 0, &mb, 0, NULL) < 0 )
+        return PyErr_SetFromErrno(xc_error);
+    
+    mbarg = mb;
+    return Py_BuildValue("i", mbarg);
+}
+
 static PyObject *pyxc_sched_credit_domain_set(XcObject *self,
                                               PyObject *args,
                                               PyObject *kwds)
@@ -1118,6 +1171,22 @@ static PyMethodDef pyxc_methods[] = {
       "Get information about the Xen host\n"
       "Returns [dict]: information about Xen"
       "        [None]: on failure.\n" },
+
+    { "shadow_control", 
+      (PyCFunction)pyxc_shadow_control, 
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Set parameter for shadow pagetable interface\n"
+      " dom [int]:   Identifier of domain.\n"
+      " op [int, 0]: operation\n\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "shadow_mem_control", 
+      (PyCFunction)pyxc_shadow_mem_control, 
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Set or read shadow pagetable memory use\n"
+      " dom [int]:   Identifier of domain.\n"
+      " mb [int, -1]: MB of shadow memory this domain should have.\n\n"
+      "Returns: [int] MB of shadow memory in use by this domain.\n" },
 
     { "domain_setmaxmem", 
       (PyCFunction)pyxc_domain_setmaxmem, 

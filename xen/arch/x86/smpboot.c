@@ -896,7 +896,7 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 	v = alloc_idle_vcpu(cpu);
 	BUG_ON(v == NULL);
 
-	v->arch.monitor_table = pagetable_from_paddr(__pa(idle_pg_table));
+	v->arch.cr3 = __pa(idle_pg_table);
 
 	/* start_eip had better be page-aligned! */
 	start_eip = setup_trampoline();

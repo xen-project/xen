@@ -683,8 +683,11 @@ int construct_dom0(struct domain *d,
     for ( i = 1; i < opt_dom0_max_vcpus; i++ )
         (void)alloc_vcpu(d, i, i);
 
-    /* Set up monitor table */
-    update_pagetables(v);
+    /* Set up CR3 value for write_ptbase */
+    if ( shadow2_mode_enabled(v->domain) )
+        shadow2_update_paging_modes(v);
+    else
+        update_cr3(v);
 
     /* Install the new page tables. */
     local_irq_disable();
@@ -796,10 +799,8 @@ int construct_dom0(struct domain *d,
     new_thread(v, dsi.v_kernentry, vstack_end, vstartinfo_start);
 
     if ( opt_dom0_shadow )
-    {
-        shadow_mode_enable(d, SHM_enable);
-        update_pagetables(v);
-    }
+        if ( shadow2_test_enable(d) == 0 ) 
+            shadow2_update_paging_modes(v);
 
     if ( supervisor_mode_kernel )
     {

@@ -298,6 +298,9 @@ static always_inline void __vmwrite_vcpu(
     case GUEST_CR0:
         v->arch.hvm_vmx.cpu_cr0 = value;
         break;
+    case CR4_READ_SHADOW:
+        v->arch.hvm_vmx.cpu_shadow_cr4 = value;
+        break;
     case CPU_BASED_VM_EXEC_CONTROL:
         v->arch.hvm_vmx.cpu_based_exec_control = value;
         break;
@@ -317,11 +320,14 @@ static always_inline void __vmread_vcpu(
     case GUEST_CR0:
         *value = v->arch.hvm_vmx.cpu_cr0;
         break;
+    case CR4_READ_SHADOW:
+        *value = v->arch.hvm_vmx.cpu_shadow_cr4;
+        break;
     case CPU_BASED_VM_EXEC_CONTROL:
         *value = v->arch.hvm_vmx.cpu_based_exec_control;
         break;
     default:
-        printk("__vmread_cpu: invalid field %lx\n", field);
+        printk("__vmread_vcpu: invalid field %lx\n", field);
         break;
     }
 }
@@ -342,6 +348,7 @@ static inline int __vmwrite(unsigned long field, unsigned long value)
     switch ( field ) {
     case CR0_READ_SHADOW:
     case GUEST_CR0:
+    case CR4_READ_SHADOW:
     case CPU_BASED_VM_EXEC_CONTROL:
         __vmwrite_vcpu(v, field, value);
         break;
@@ -402,6 +409,46 @@ static inline int vmx_paging_enabled(struct vcpu *v)
 
     __vmread_vcpu(v, CR0_READ_SHADOW, &cr0);
     return (cr0 & X86_CR0_PE) && (cr0 & X86_CR0_PG);
+}
+
+/* Works only for vcpu == current */
+static inline int vmx_long_mode_enabled(struct vcpu *v)
+{
+    ASSERT(v == current);
+    return VMX_LONG_GUEST(current);
+}
+
+/* Works only for vcpu == current */
+static inline int vmx_realmode(struct vcpu *v)
+{
+    unsigned long rflags;
+    ASSERT(v == current);
+
+    __vmread(GUEST_RFLAGS, &rflags);
+    return rflags & X86_EFLAGS_VM;
+}
+
+/* Works only for vcpu == current */
+static inline void vmx_update_host_cr3(struct vcpu *v)
+{
+    ASSERT(v == current);
+    __vmwrite(HOST_CR3, v->arch.cr3);
+}
+
+static inline int vmx_guest_x86_mode(struct vcpu *v)
+{
+    unsigned long cs_ar_bytes;
+    ASSERT(v == current);
+
+    if ( vmx_long_mode_enabled(v) )
+    {
+        __vmread(GUEST_CS_AR_BYTES, &cs_ar_bytes);
+        return (cs_ar_bytes & (1u<<13)) ? 8 : 4;
+    }
+    if ( vmx_realmode(v) )
+        return 2;
+    __vmread(GUEST_CS_AR_BYTES, &cs_ar_bytes);
+    return (cs_ar_bytes & (1u<<14)) ? 4 : 2;
 }
 
 static inline int vmx_pgbit_test(struct vcpu *v)

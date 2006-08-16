@@ -569,7 +569,7 @@ int console_getc(void)
 #ifndef NDEBUG
 
 /* Send output direct to console, or buffer it? */
-int debugtrace_send_to_console;
+static volatile int debugtrace_send_to_console;
 
 static char        *debugtrace_buf; /* Debug-trace buffer */
 static unsigned int debugtrace_prd; /* Producer index     */
@@ -578,16 +578,10 @@ static unsigned int debugtrace_used;
 static DEFINE_SPINLOCK(debugtrace_lock);
 integer_param("debugtrace", debugtrace_kilobytes);
 
-void debugtrace_dump(void)
+static void debugtrace_dump_worker(void)
 {
-    unsigned long flags;
-
     if ( (debugtrace_bytes == 0) || !debugtrace_used )
         return;
-
-    watchdog_disable();
-
-    spin_lock_irqsave(&debugtrace_lock, flags);
 
     printk("debugtrace_dump() starting\n");
 
@@ -602,15 +596,47 @@ void debugtrace_dump(void)
     memset(debugtrace_buf, '\0', debugtrace_bytes);
 
     printk("debugtrace_dump() finished\n");
+}
+
+void debugtrace_toggle(void)
+{
+    unsigned long flags;
+
+    watchdog_disable();
+    spin_lock_irqsave(&debugtrace_lock, flags);
+
+    // dump the buffer *before* toggling, in case the act of dumping the
+    // buffer itself causes more printk's...
+    //
+    printk("debugtrace_printk now writing to %s.\n",
+           !debugtrace_send_to_console ? "console": "buffer");
+    if ( !debugtrace_send_to_console )
+        debugtrace_dump_worker();
+
+    debugtrace_send_to_console = !debugtrace_send_to_console;
 
     spin_unlock_irqrestore(&debugtrace_lock, flags);
+    watchdog_enable();
 
+}
+
+void debugtrace_dump(void)
+{
+    unsigned long flags;
+
+    watchdog_disable();
+    spin_lock_irqsave(&debugtrace_lock, flags);
+
+    debugtrace_dump_worker();
+
+    spin_unlock_irqrestore(&debugtrace_lock, flags);
     watchdog_enable();
 }
 
 void debugtrace_printk(const char *fmt, ...)
 {
     static char    buf[1024];
+    static u32 count;
 
     va_list       args;
     char         *p;
@@ -625,8 +651,10 @@ void debugtrace_printk(const char *fmt, ...)
 
     ASSERT(debugtrace_buf[debugtrace_bytes - 1] == 0);
 
+    sprintf(buf, "%u ", ++count);
+
     va_start(args, fmt);
-    (void)vsnprintf(buf, sizeof(buf), fmt, args);
+    (void)vsnprintf(buf + strlen(buf), sizeof(buf), fmt, args);
     va_end(args);
 
     if ( debugtrace_send_to_console )

@@ -56,8 +56,15 @@ struct hvm_function_table {
      */
     int (*realmode)(struct vcpu *v);
     int (*paging_enabled)(struct vcpu *v);
+    int (*long_mode_enabled)(struct vcpu *v);
+    int (*guest_x86_mode)(struct vcpu *v);
     int (*instruction_length)(struct vcpu *v);
     unsigned long (*get_guest_ctrl_reg)(struct vcpu *v, unsigned int num);
+
+    /* 
+     * Re-set the value of CR3 that Xen runs on when handling VM exits
+     */
+    void (*update_host_cr3)(struct vcpu *v);
 
     /*
      * Update specifics of the guest state:
@@ -134,9 +141,27 @@ hvm_paging_enabled(struct vcpu *v)
 }
 
 static inline int
+hvm_long_mode_enabled(struct vcpu *v)
+{
+    return hvm_funcs.long_mode_enabled(v);
+}
+
+static inline int
+hvm_guest_x86_mode(struct vcpu *v)
+{
+    return hvm_funcs.guest_x86_mode(v);
+}
+
+static inline int
 hvm_instruction_length(struct vcpu *v)
 {
     return hvm_funcs.instruction_length(v);
+}
+
+static inline void
+hvm_update_host_cr3(struct vcpu *v)
+{
+    hvm_funcs.update_host_cr3(v);
 }
 
 void hvm_hypercall_page_initialise(struct domain *d,

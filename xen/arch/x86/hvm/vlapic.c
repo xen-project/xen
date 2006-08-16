@@ -21,7 +21,8 @@
 #include <xen/types.h>
 #include <xen/mm.h>
 #include <xen/xmalloc.h>
-#include <asm/shadow.h>
+#include <xen/shadow.h>
+#include <xen/domain_page.h>
 #include <asm/page.h>
 #include <xen/event.h>
 #include <xen/trace.h>

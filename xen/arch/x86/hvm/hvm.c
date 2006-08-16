@@ -30,6 +30,7 @@
 #include <xen/hypercall.h>
 #include <xen/guest_access.h>
 #include <xen/event.h>
+#include <xen/shadow.h>
 #include <asm/current.h>
 #include <asm/e820.h>
 #include <asm/io.h>
@@ -42,10 +43,6 @@
 #include <asm/spinlock.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
-#include <asm/shadow.h>
-#if CONFIG_PAGING_LEVELS >= 3
-#include <asm/shadow_64.h>
-#endif
 #include <public/sched.h>
 #include <public/hvm/ioreq.h>
 #include <public/version.h>
@@ -61,7 +58,7 @@ struct hvm_function_table hvm_funcs;
 static void hvm_zap_mmio_range(
     struct domain *d, unsigned long pfn, unsigned long nr_pfn)
 {
-    unsigned long i, val = INVALID_MFN;
+    unsigned long i;
 
     ASSERT(d == current->domain);
 
@@ -70,7 +67,8 @@ static void hvm_zap_mmio_range(
         if ( pfn + i >= 0xfffff )
             break;
 
-        __copy_to_user(&phys_to_machine_mapping[pfn + i], &val, sizeof (val));
+        if ( VALID_MFN(gmfn_to_mfn(d, pfn + i)) )
+            guest_remove_page(d, pfn + i);
     }
 }
 
@@ -262,11 +260,13 @@ void hvm_setup_platform(struct domain* d)
     if ( !hvm_guest(v) || (v->vcpu_id != 0) )
         return;
 
+#if 0 /* SHADOW2 does not have this */
     if ( shadow_direct_map_init(d) == 0 )
     {
         printk("Can not allocate shadow direct map for HVM domain.\n");
         domain_crash_synchronous();
     }
+#endif
 
     hvm_zap_iommu_pages(d);
 
@@ -380,6 +380,8 @@ void hvm_hlt(unsigned long rflags)
  */
 int hvm_copy(void *buf, unsigned long vaddr, int size, int dir)
 {
+    struct vcpu *v = current;
+    unsigned long gfn;
     unsigned long mfn;
     char *addr;
     int count;
@@ -389,10 +391,9 @@ int hvm_copy(void *buf, unsigned long vaddr, int size, int dir)
         if (count > size)
             count = size;
 
-        if (hvm_paging_enabled(current))
-            mfn = gva_to_mfn(vaddr);
-        else
-            mfn = get_mfn_from_gpfn(vaddr >> PAGE_SHIFT);
+        gfn = shadow2_gva_to_gfn(v, vaddr);
+        mfn = mfn_x(sh2_vcpu_gfn_to_mfn(v, gfn));
+
         if (mfn == INVALID_MFN)
             return 0;
 
@@ -545,7 +546,7 @@ void hvm_do_hypercall(struct cpu_user_regs *pregs)
         return;
     }
 
-    if ( current->domain->arch.ops->guest_paging_levels == PAGING_L4 )
+    if ( current->arch.shadow2->guest_levels == 4 )
     {
         pregs->rax = hvm_hypercall64_table[pregs->rax](pregs->rdi,
                                                        pregs->rsi,

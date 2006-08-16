@@ -116,10 +116,13 @@ enum hval_bitmaps {
 #define DBG_LEVEL_IOAPIC            (1 << 9)
 
 extern unsigned int opt_hvm_debug_level;
-#define HVM_DBG_LOG(level, _f, _a...)           \
-    if ( (level) & opt_hvm_debug_level )        \
-        printk("[HVM:%d.%d] <%s> " _f "\n",     \
-               current->domain->domain_id, current->vcpu_id, __func__, ## _a)
+#define HVM_DBG_LOG(level, _f, _a...)                                         \
+    do {                                                                      \
+        if ( (level) & opt_hvm_debug_level )                                  \
+            printk("[HVM:%d.%d] <%s> " _f "\n",                               \
+                   current->domain->domain_id, current->vcpu_id, __func__,    \
+                   ## _a);                                                    \
+    } while (0)
 #else
 #define HVM_DBG_LOG(level, _f, _a...)
 #endif

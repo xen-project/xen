@@ -241,9 +241,6 @@ static void read_clocks(unsigned char key)
 }
 
 extern void dump_runq(unsigned char key);
-#ifndef NDEBUG
-extern void audit_domains_key(unsigned char key);
-#endif
 
 #ifdef PERF_COUNTERS
 extern void perfc_printall(unsigned char key);
@@ -261,10 +258,16 @@ static void do_debug_key(unsigned char key, struct cpu_user_regs *regs)
 #ifndef NDEBUG
 static void debugtrace_key(unsigned char key)
 {
-    debugtrace_send_to_console = !debugtrace_send_to_console;
-    debugtrace_dump();
-    printk("debugtrace_printk now writing to %s.\n",
-           debugtrace_send_to_console ? "console" : "buffer");
+    debugtrace_toggle();
+}
+
+static void shadow2_audit_key(unsigned char key)
+{
+    extern int shadow2_audit_enable;
+
+    shadow2_audit_enable = !shadow2_audit_enable;
+    printk("%s shadow2_audit_enable=%d\n",
+           __func__, shadow2_audit_enable);
 }
 #endif
 
@@ -288,7 +291,7 @@ void initialize_keytable(void)
 
 #ifndef NDEBUG
     register_keyhandler(
-        'o', audit_domains_key,  "audit domains >0 EXPERIMENTAL");
+        'O', shadow2_audit_key,  "toggle shadow2 audits");
     register_keyhandler(
         'T', debugtrace_key, "toggle debugtrace to console/buffer");
 #endif
