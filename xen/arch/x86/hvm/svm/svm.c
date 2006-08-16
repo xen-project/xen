@@ -2150,14 +2150,32 @@ done:
 static inline void svm_vmexit_do_hlt(struct vmcb_struct *vmcb)
 {
     struct vcpu *v = current;
-    struct periodic_time *pt=&v->domain->arch.hvm_domain.pl_time.periodic_tm;
-    s_time_t  next_pit = -1, next_wakeup;
+    struct periodic_time *pt = 
+        &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
+    s_time_t next_pit = -1, next_wakeup;
 
     __update_guest_eip(vmcb, 1);
 
     /* check for interrupt not handled or new interrupt */
     if ( vmcb->vintr.fields.irq || cpu_has_pending_irq(v) )
        return;
+
+    /* Detect machine shutdown.  Only do this for vcpu 0, to avoid
+       potentially shutting down the domain early. */
+    if (v->vcpu_id == 0) {
+        unsigned long rflags = vmcb->rflags; 
+        /* If we halt with interrupts disabled, that's a pretty sure
+           sign that we want to shut down.  In a real processor, NMIs
+           are the only way to break out of this.  Our SVM code won't
+           deliver interrupts, but will wake it up whenever one is
+           pending... */
+        if(!(rflags & X86_EFLAGS_IF)) {
+            printk("D%d: HLT with interrupts enabled @0x%lx  Shutting down.\n",
+                   current->domain->domain_id, (unsigned long)vmcb->rip);
+            domain_shutdown(current->domain, SHUTDOWN_poweroff);
+            return;
+        }
+    }
 
     if ( !v->vcpu_id )
         next_pit = get_scheduled(v, pt->irq, pt);

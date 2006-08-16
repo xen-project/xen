@@ -2054,9 +2054,32 @@ static inline void vmx_do_msr_write(struct cpu_user_regs *regs)
  */
 void vmx_vmexit_do_hlt(void)
 {
-    struct vcpu *v=current;
-    struct periodic_time *pt = &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
-    s_time_t   next_pit=-1,next_wakeup;
+    struct vcpu *v = current;
+    struct periodic_time *pt = 
+        &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
+    s_time_t next_pit = -1, next_wakeup;
+
+
+    /* Detect machine shutdown.  Only do this for vcpu 0, to avoid
+       potentially shutting down the domain early. */
+    if (v->vcpu_id == 0) {
+        unsigned long rflags;
+        
+        __vmread(GUEST_RFLAGS, &rflags);
+        /* If we halt with interrupts disabled, that's a pretty sure
+           sign that we want to shut down.  In a real processor, NMIs
+           are the only way to break out of this.  Our VMX code won't
+           deliver interrupts, but will wake it up whenever one is
+           pending... */
+        if(!(rflags & X86_EFLAGS_IF)) {
+            unsigned long rip;
+            __vmread(GUEST_RIP, &rip);
+            printk("D%d: HLT with interrupts enabled @0x%lx  Shutting down.\n",
+                   current->domain->domain_id, rip);
+            domain_shutdown(current->domain, SHUTDOWN_poweroff);
+            return;
+        }
+    }
 
     if ( !v->vcpu_id )
         next_pit = get_scheduled(v, pt->irq, pt);
