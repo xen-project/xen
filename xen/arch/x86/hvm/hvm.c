@@ -345,6 +345,36 @@ int cpu_get_interrupt(struct vcpu *v, int *type)
     return -1;
 }
 
+void hvm_hlt(unsigned long rflags)
+{
+    struct vcpu *v = current;
+    struct periodic_time *pt = &v->domain->arch.hvm_domain.pl_time.periodic_tm;
+    s_time_t next_pit = -1, next_wakeup;
+
+    /*
+     * Detect machine shutdown.  Only do this for vcpu 0, to avoid potentially 
+     * shutting down the domain early. If we halt with interrupts disabled, 
+     * that's a pretty sure sign that we want to shut down.  In a real 
+     * processor, NMIs are the only way to break out of this.
+     */
+    if ( (v->vcpu_id == 0) && !(rflags & X86_EFLAGS_IF) )
+    {
+        printk("D%d: HLT with interrupts enabled -- shutting down.\n",
+               current->domain->domain_id);
+        domain_shutdown(current->domain, SHUTDOWN_poweroff);
+        return;
+    }
+
+    if ( !v->vcpu_id )
+        next_pit = get_scheduled(v, pt->irq, pt);
+    next_wakeup = get_apictime_scheduled(v);
+    if ( (next_pit != -1 && next_pit < next_wakeup) || next_wakeup == -1 )
+        next_wakeup = next_pit;
+    if ( next_wakeup != - 1 ) 
+        set_timer(&current->arch.hvm_vcpu.hlt_timer, next_wakeup);
+    do_sched_op_compat(SCHEDOP_block, 0);
+}
+
 /*
  * Copy from/to guest virtual.
  */

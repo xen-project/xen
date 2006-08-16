@@ -360,8 +360,7 @@ void svm_do_launch(struct vcpu *v)
 
     if (hvm_apic_support(v->domain))
         vlapic_init(v);
-    init_timer(&v->arch.hvm_svm.hlt_timer,
-				hlt_timer_fn, v, v->processor);
+    init_timer(&v->arch.hvm_vcpu.hlt_timer, hlt_timer_fn, v, v->processor);
 
     vmcb->ldtr.sel = 0;
     vmcb->ldtr.base = 0;

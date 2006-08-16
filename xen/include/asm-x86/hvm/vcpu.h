@@ -43,15 +43,18 @@ struct hvm_vcpu {
     /* Flags */
     int                 flag_dr_dirty;
 
+    /* hlt ins emulation wakeup timer */
+    struct timer        hlt_timer;
+
     union {
         struct arch_vmx_struct vmx;
         struct arch_svm_struct svm;
     } u;
 };
 
-#define ARCH_HVM_IO_WAIT            1   /* Waiting for I/O completion */
+#define ARCH_HVM_IO_WAIT         1   /* Waiting for I/O completion */
 
-#define HVM_CONTEXT_STACK_BYTES     (offsetof(struct cpu_user_regs, error_code))
+#define HVM_CONTEXT_STACK_BYTES  (offsetof(struct cpu_user_regs, error_code))
 
 #endif /* __ASM_X86_HVM_VCPU_H__ */
 

@@ -134,7 +134,7 @@ static void vmx_relinquish_guest_resources(struct domain *d)
         if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
             continue;
         free_monitor_pagetable(v);
-        kill_timer(&v->arch.hvm_vmx.hlt_timer);
+        kill_timer(&v->arch.hvm_vcpu.hlt_timer);
         if ( hvm_apic_support(v->domain) && (VLAPIC(v) != NULL) )
         {
             kill_timer(&VLAPIC(v)->vlapic_timer);
@@ -496,7 +496,7 @@ void vmx_migrate_timers(struct vcpu *v)
 
     if ( pt->enabled ) {
         migrate_timer(&pt->timer, v->processor);
-        migrate_timer(&v->arch.hvm_vmx.hlt_timer, v->processor);
+        migrate_timer(&v->arch.hvm_vcpu.hlt_timer, v->processor);
     }
     if ( hvm_apic_support(v->domain) && VLAPIC(v))
         migrate_timer(&(VLAPIC(v)->vlapic_timer), v->processor);
@@ -2049,46 +2049,11 @@ static inline void vmx_do_msr_write(struct cpu_user_regs *regs)
                 (unsigned long)regs->edx);
 }
 
-/*
- * Need to use this exit to reschedule
- */
 void vmx_vmexit_do_hlt(void)
 {
-    struct vcpu *v = current;
-    struct periodic_time *pt = 
-        &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
-    s_time_t next_pit = -1, next_wakeup;
-
-
-    /* Detect machine shutdown.  Only do this for vcpu 0, to avoid
-       potentially shutting down the domain early. */
-    if (v->vcpu_id == 0) {
-        unsigned long rflags;
-        
-        __vmread(GUEST_RFLAGS, &rflags);
-        /* If we halt with interrupts disabled, that's a pretty sure
-           sign that we want to shut down.  In a real processor, NMIs
-           are the only way to break out of this.  Our VMX code won't
-           deliver interrupts, but will wake it up whenever one is
-           pending... */
-        if(!(rflags & X86_EFLAGS_IF)) {
-            unsigned long rip;
-            __vmread(GUEST_RIP, &rip);
-            printk("D%d: HLT with interrupts enabled @0x%lx  Shutting down.\n",
-                   current->domain->domain_id, rip);
-            domain_shutdown(current->domain, SHUTDOWN_poweroff);
-            return;
-        }
-    }
-
-    if ( !v->vcpu_id )
-        next_pit = get_scheduled(v, pt->irq, pt);
-    next_wakeup = get_apictime_scheduled(v);
-    if ( (next_pit != -1 && next_pit < next_wakeup) || next_wakeup == -1 )
-        next_wakeup = next_pit;
-    if ( next_wakeup != - 1 ) 
-        set_timer(&current->arch.hvm_vmx.hlt_timer, next_wakeup);
-    do_sched_op_compat(SCHEDOP_block, 0);
+    unsigned long rflags;
+    __vmread(GUEST_RFLAGS, &rflags);
+    hvm_hlt(rflags);
 }
 
 static inline void vmx_vmexit_do_extint(struct cpu_user_regs *regs)

@@ -448,7 +448,6 @@ struct arch_svm_struct {
     unsigned long       cpu_cr2;
     unsigned long       cpu_cr3;
     unsigned long       cpu_state;
-    struct timer        hlt_timer;  /* hlt ins emulation wakeup timer */
 };
 
 extern struct vmcb_struct *alloc_vmcb(void);
