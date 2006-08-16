@@ -245,7 +245,6 @@ u64 guest_vhpt_lookup(u64 iha, u64 *pte)
     return ret;
 }
 
-
 /*
  *  purge software guest tlb
  */
@@ -253,29 +252,29 @@ u64 guest_vhpt_lookup(u64 iha, u64 *pte)
 void vtlb_purge(VCPU *v, u64 va, u64 ps)
 {
     thash_data_t *cur;
-    u64 start, end, curadr, size, psbits, tag, def_size;
+    u64 start, curadr, size, psbits, tag, rr_ps, num;
     ia64_rr vrr;
     thash_cb_t *hcb = &v->arch.vtlb;
+
     vcpu_get_rr(v, va, &vrr.rrval);
     psbits = VMX(v, psbits[(va >> 61)]);
-    size = PSIZE(ps);
-    start = va & (-size);
-    end = start + size;
+    start = va & ~((1UL << ps) - 1);
     while (psbits) {
         curadr = start;
-        ps = __ffs(psbits);
-        psbits &= ~(1UL << ps);
-        def_size = PSIZE(ps);
-        vrr.ps = ps;
-        /* Be careful about overflow.  */
-        while (curadr < end && curadr >= start) {
+        rr_ps = __ffs(psbits);
+        psbits &= ~(1UL << rr_ps);
+        num = 1UL << ((ps < rr_ps) ? 0 : (ps - rr_ps));
+        size = PSIZE(rr_ps);
+        vrr.ps = rr_ps;
+        while (num) {
             cur = vsa_thash(hcb->pta, curadr, vrr.rrval, &tag);
             while (cur) {
-                if (cur->etag == tag && cur->ps == ps)
+                if (cur->etag == tag && cur->ps == rr_ps)
                     cur->etag = 1UL << 63;
                 cur = cur->next;
             }
-            curadr += def_size;
+            curadr += size;
+            num--;
         }
     }
 }
@@ -288,14 +287,14 @@ static void vhpt_purge(VCPU *v, u64 va, u64 ps)
 {
     //thash_cb_t *hcb = &v->arch.vhpt;
     thash_data_t *cur;
-    u64 start, end, size, tag;
+    u64 start, size, tag, num;
     ia64_rr rr;
-    size = PSIZE(ps);
-    start = va & (-size);
-    end = start + size;
-    rr.rrval = ia64_get_rr(va);
-    size = PSIZE(rr.ps);    
-    while(start < end){
+    
+    start = va & ~((1UL << ps) - 1);
+    rr.rrval = ia64_get_rr(va);  
+    size = PSIZE(rr.ps);
+    num = 1UL << ((ps < rr.ps) ? 0 : (ps - rr.ps));
+    while (num) {
         cur = (thash_data_t *)ia64_thash(start);
         tag = ia64_ttag(start);
         while (cur) {
@@ -304,6 +303,7 @@ static void vhpt_purge(VCPU *v, u64 va, u64 ps)
             cur = cur->next;
         }
         start += size;
+        num--;
     }
     machine_tlb_purge(va, ps);
 }
