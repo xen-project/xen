@@ -83,6 +83,7 @@ struct netfront_info {
 
 	unsigned int handle;
 	unsigned int evtchn, irq;
+	unsigned int copying_receiver;
 
 	/* Receive-ring batched refills. */
 #define RX_MIN_TARGET 8
@@ -171,7 +172,7 @@ static inline grant_ref_t xennet_get_rx_ref(struct netfront_info *np,
 
 static int talk_to_backend(struct xenbus_device *, struct netfront_info *);
 static int setup_device(struct xenbus_device *, struct netfront_info *);
-static struct net_device *create_netdev(int, struct xenbus_device *);
+static struct net_device *create_netdev(int, int, struct xenbus_device *);
 
 static void netfront_closing(struct xenbus_device *);
 
@@ -213,6 +214,7 @@ static int __devinit netfront_probe(struct xenbus_device *dev,
 	struct net_device *netdev;
 	struct netfront_info *info;
 	unsigned int handle;
+	unsigned feature_rx_copy;
 
 	err = xenbus_scanf(XBT_NIL, dev->nodename, "handle", "%u", &handle);
 	if (err != 1) {
@@ -220,7 +222,22 @@ static int __devinit netfront_probe(struct xenbus_device *dev,
 		return err;
 	}
 
-	netdev = create_netdev(handle, dev);
+#ifndef CONFIG_XEN
+	err = xenbus_scanf(XBT_NIL, dev->otherend, "feature-rx-copy", "%u",
+			   &feature_rx_copy);
+	if (err != 1) {
+		xenbus_dev_fatal(dev, err, "reading feature-rx-copy");
+		return err;
+	}
+	if (!feature_rx_copy) {
+		xenbus_dev_fatal(dev, 0, "need a copy-capable backend");
+		return -EINVAL;
+	}
+#else
+	feature_rx_copy = 0;
+#endif
+
+	netdev = create_netdev(handle, feature_rx_copy, dev);
 	if (IS_ERR(netdev)) {
 		err = PTR_ERR(netdev);
 		xenbus_dev_fatal(dev, err, "creating netdev");
@@ -323,6 +340,13 @@ again:
 			    "event-channel", "%u", info->evtchn);
 	if (err) {
 		message = "writing event-channel";
+		goto abort_transaction;
+	}
+
+	err = xenbus_printf(xbt, dev->nodename, "request-rx-copy", "%u",
+			    info->copying_receiver);
+	if (err) {
+		message = "writing request-rx-copy";
 		goto abort_transaction;
 	}
 
@@ -597,6 +621,8 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 	grant_ref_t ref;
  	unsigned long pfn;
  	void *vaddr;
+	int nr_flips;
+	netif_rx_request_t *req;
 
 	if (unlikely(!netif_carrier_ok(dev)))
 		return;
@@ -652,7 +678,7 @@ no_skb:
 		np->rx_target = np->rx_max_target;
 
  refill:
-	for (i = 0; ; i++) {
+	for (nr_flips = i = 0; ; i++) {
 		if ((skb = __skb_dequeue(&np->rx_batch)) == NULL)
 			break;
 
@@ -663,7 +689,6 @@ no_skb:
 		BUG_ON(np->rx_skbs[id]);
 		np->rx_skbs[id] = skb;
 
-		RING_GET_REQUEST(&np->rx, req_prod + i)->id = id;
 		ref = gnttab_claim_grant_reference(&np->gref_rx_head);
 		BUG_ON((signed short)ref < 0);
 		np->grant_rx_ref[id] = ref;
@@ -671,49 +696,67 @@ no_skb:
 		pfn = page_to_pfn(skb_shinfo(skb)->frags[0].page);
 		vaddr = page_address(skb_shinfo(skb)->frags[0].page);
 
-		gnttab_grant_foreign_transfer_ref(ref,
-						  np->xbdev->otherend_id, pfn);
-		RING_GET_REQUEST(&np->rx, req_prod + i)->gref = ref;
-		np->rx_pfn_array[i] = pfn_to_mfn(pfn);
-
-		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
-			/* Remove this page before passing back to Xen. */
-			set_phys_to_machine(pfn, INVALID_P2M_ENTRY);
-			MULTI_update_va_mapping(np->rx_mcl+i,
-						(unsigned long)vaddr,
-						__pte(0), 0);
+		req = RING_GET_REQUEST(&np->rx, req_prod + i);
+		if (!np->copying_receiver) {
+			gnttab_grant_foreign_transfer_ref(ref,
+							  np->xbdev->otherend_id,
+							  pfn);
+			np->rx_pfn_array[nr_flips] = pfn_to_mfn(pfn);
+			if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+				/* Remove this page before passing
+				 * back to Xen. */
+				set_phys_to_machine(pfn, INVALID_P2M_ENTRY);
+				MULTI_update_va_mapping(np->rx_mcl+i,
+							(unsigned long)vaddr,
+							__pte(0), 0);
+			}
+		} else {
+			gnttab_grant_foreign_access_ref(ref,
+							np->xbdev->otherend_id,
+							pfn,
+							0);
 		}
+
+		req->id = id;
+		req->gref = ref;
 	}
 
-	/* Tell the ballon driver what is going on. */
-	balloon_update_driver_allowance(i);
+	if ( nr_flips != 0 ) {
+		/* Tell the ballon driver what is going on. */
+		balloon_update_driver_allowance(i);
 
-	set_xen_guest_handle(reservation.extent_start, np->rx_pfn_array);
-	reservation.nr_extents   = i;
-	reservation.extent_order = 0;
-	reservation.address_bits = 0;
-	reservation.domid        = DOMID_SELF;
+		set_xen_guest_handle(reservation.extent_start,
+				     np->rx_pfn_array);
+		reservation.nr_extents   = nr_flips;
+		reservation.extent_order = 0;
+		reservation.address_bits = 0;
+		reservation.domid        = DOMID_SELF;
 
-	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
-		/* After all PTEs have been zapped, flush the TLB. */
-		np->rx_mcl[i-1].args[MULTI_UVMFLAGS_INDEX] =
-			UVMF_TLB_FLUSH|UVMF_ALL;
+		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+			/* After all PTEs have been zapped, flush the TLB. */
+			np->rx_mcl[i-1].args[MULTI_UVMFLAGS_INDEX] =
+				UVMF_TLB_FLUSH|UVMF_ALL;
 
-		/* Give away a batch of pages. */
-		np->rx_mcl[i].op = __HYPERVISOR_memory_op;
-		np->rx_mcl[i].args[0] = XENMEM_decrease_reservation;
-		np->rx_mcl[i].args[1] = (unsigned long)&reservation;
+			/* Give away a batch of pages. */
+			np->rx_mcl[i].op = __HYPERVISOR_memory_op;
+			np->rx_mcl[i].args[0] = XENMEM_decrease_reservation;
+			np->rx_mcl[i].args[1] = (unsigned long)&reservation;
 
-		/* Zap PTEs and give away pages in one big multicall. */
-		(void)HYPERVISOR_multicall(np->rx_mcl, i+1);
+			/* Zap PTEs and give away pages in one big
+			 * multicall. */
+			(void)HYPERVISOR_multicall(np->rx_mcl, i+1);
 
-		/* Check return status of HYPERVISOR_memory_op(). */
-		if (unlikely(np->rx_mcl[i].result != i))
-			panic("Unable to reduce memory reservation\n");
-	} else
-		if (HYPERVISOR_memory_op(XENMEM_decrease_reservation,
-					 &reservation) != i)
-			panic("Unable to reduce memory reservation\n");
+			/* Check return status of HYPERVISOR_memory_op(). */
+			if (unlikely(np->rx_mcl[i].result != i))
+				panic("Unable to reduce memory reservation\n");
+		} else {
+			if (HYPERVISOR_memory_op(XENMEM_decrease_reservation,
+						 &reservation) != i)
+				panic("Unable to reduce memory reservation\n");
+		}
+	} else {
+		wmb();
+	}
 
 	/* Above is a suitable barrier to ensure backend will see requests. */
 	np->rx.req_prod_pvt = req_prod + i;
@@ -961,10 +1004,11 @@ int xennet_get_extras(struct netfront_info *np,
 
 static int xennet_get_responses(struct netfront_info *np,
 				struct netfront_rx_info *rinfo, RING_IDX rp,
-				struct sk_buff_head *list, int count)
+				struct sk_buff_head *list, int *mcl_offset_p)
 {
-	struct mmu_update *mmu = np->rx_mmu + count;
-	struct multicall_entry *mcl = np->rx_mcl + count;
+	int mcl_offset = *mcl_offset_p;
+	struct mmu_update *mmu;
+	struct multicall_entry *mcl;
 	struct netif_rx_response *rx = &rinfo->rx;
 	struct netif_extra_info *extras = rinfo->extras;
 	RING_IDX cons = np->rx.rsp_cons;
@@ -973,6 +1017,7 @@ static int xennet_get_responses(struct netfront_info *np,
 	int max = MAX_SKB_FRAGS + (rx->status <= RX_COPY_THRESHOLD);
 	int frags = 1;
 	int err = 0;
+	unsigned long ret;
 
 	if (rx->flags & NETRXF_extra_info) {
 		err = xennet_get_extras(np, extras, rp);
@@ -988,6 +1033,7 @@ static int xennet_get_responses(struct netfront_info *np,
 				WPRINTK("rx->offset: %x, size: %u\n",
 					rx->offset, rx->status);
 			err = -EINVAL;
+			goto next;
 		}
 
 		/*
@@ -1001,35 +1047,47 @@ static int xennet_get_responses(struct netfront_info *np,
 			goto next;
 		}
 
-		/* Memory pressure, insufficient buffer headroom, ... */
-		if ((mfn = gnttab_end_foreign_transfer_ref(ref)) == 0) {
-			if (net_ratelimit())
-				WPRINTK("Unfulfilled rx req (id=%d, st=%d).\n",
-					rx->id, rx->status);
-			xennet_move_rx_slot(np, skb, ref);
-			err = -ENOMEM;
-			goto next;
+		if (!np->copying_receiver) {
+			/* Memory pressure, insufficient buffer
+			 * headroom, ... */
+			if (!(mfn = gnttab_end_foreign_transfer_ref(ref))) {
+				if (net_ratelimit())
+					WPRINTK("Unfulfilled rx req (id=%d, st=%d).\n",
+						rx->id, rx->status);
+				xennet_move_rx_slot(np, skb, ref);
+				err = -ENOMEM;
+				goto next;
+			}
+
+			if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+				/* Remap the page. */
+				struct page *page =
+					skb_shinfo(skb)->frags[0].page;
+				unsigned long pfn = page_to_pfn(page);
+				void *vaddr = page_address(page);
+
+				mcl = np->rx_mcl + mcl_offset;
+				mmu = np->rx_mmu + mcl_offset;
+
+				MULTI_update_va_mapping(mcl,
+							(unsigned long)vaddr,
+							pfn_pte_ma(mfn,
+								   PAGE_KERNEL),
+							0);
+				mmu->ptr = ((maddr_t)mfn << PAGE_SHIFT)
+					| MMU_MACHPHYS_UPDATE;
+				mmu->val = pfn;
+
+				mcl_offset++;
+
+				set_phys_to_machine(pfn, mfn);
+			}
+		} else {
+			ret = gnttab_end_foreign_access_ref(ref, 0);
+			BUG_ON(!ret);
 		}
 
 		gnttab_release_grant_reference(&np->gref_rx_head, ref);
-
-		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
-			/* Remap the page. */
-			struct page *page = skb_shinfo(skb)->frags[0].page;
-			unsigned long pfn = page_to_pfn(page);
-			void *vaddr = page_address(page);
-
-			MULTI_update_va_mapping(mcl, (unsigned long)vaddr,
-						pfn_pte_ma(mfn, PAGE_KERNEL),
-						0);
-			mcl++;
-			mmu->ptr = ((maddr_t)mfn << PAGE_SHIFT)
-				| MMU_MACHPHYS_UPDATE;
-			mmu->val = pfn;
-			mmu++;
-
-			set_phys_to_machine(pfn, mfn);
-		}
 
 		__skb_queue_tail(list, skb);
 
@@ -1055,6 +1113,8 @@ next:
 			WPRINTK("Too many frags\n");
 		err = -E2BIG;
 	}
+
+	*mcl_offset_p = mcl_offset;
 
 	return err;
 }
@@ -1155,8 +1215,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 		memcpy(rx, RING_GET_RESPONSE(&np->rx, i), sizeof(*rx));
 		memset(extras, 0, sizeof(extras));
 
-		err = xennet_get_responses(np, &rinfo, rp, &tmpq, pages_done);
-		pages_done += skb_queue_len(&tmpq);
+		err = xennet_get_responses(np, &rinfo, rp, &tmpq, &pages_done);
 
 		if (unlikely(err)) {
 err:
@@ -1383,6 +1442,7 @@ static void network_connect(struct net_device *dev)
 	int i, requeue_idx;
 	struct sk_buff *skb;
 	grant_ref_t ref;
+	netif_rx_request_t *req;
 
 	xennet_set_features(dev);
 
@@ -1390,12 +1450,12 @@ static void network_connect(struct net_device *dev)
 	spin_lock(&np->rx_lock);
 
 	/*
-         * Recovery procedure:
+	 * Recovery procedure:
 	 *  NB. Freelist index entries are always going to be less than
 	 *  PAGE_OFFSET, whereas pointers to skbs will always be equal or
 	 *  greater than PAGE_OFFSET: we use this property to distinguish
 	 *  them.
-         */
+	 */
 
 	/* Step 1: Discard all pending TX packet fragments. */
 	for (requeue_idx = 0, i = 1; i <= NET_TX_RING_SIZE; i++) {
@@ -1419,13 +1479,20 @@ static void network_connect(struct net_device *dev)
 
 		skb = np->rx_skbs[requeue_idx] = xennet_get_rx_skb(np, i);
 		ref = np->grant_rx_ref[requeue_idx] = xennet_get_rx_ref(np, i);
+		req = RING_GET_REQUEST(&np->rx, requeue_idx);
 
-		gnttab_grant_foreign_transfer_ref(
-			ref, np->xbdev->otherend_id,
-			page_to_pfn(skb_shinfo(skb)->frags->page));
-
-		RING_GET_REQUEST(&np->rx, requeue_idx)->gref = ref;
-		RING_GET_REQUEST(&np->rx, requeue_idx)->id   = requeue_idx;
+		if (!np->copying_receiver) {
+			gnttab_grant_foreign_transfer_ref(
+				ref, np->xbdev->otherend_id,
+				page_to_pfn(skb_shinfo(skb)->frags->page));
+		} else {
+			gnttab_grant_foreign_access_ref(
+				ref, np->xbdev->otherend_id,
+				page_to_pfn(skb_shinfo(skb)->frags->page),
+				0);
+		}
+		req->gref = ref;
+		req->id   = requeue_idx;
 
 		requeue_idx++;
 	}
@@ -1608,13 +1675,8 @@ static void network_set_multicast_list(struct net_device *dev)
 {
 }
 
-/** Create a network device.
- * @param handle device handle
- * @param val return parameter for created device
- * @return 0 on success, error code otherwise
- */
-static struct net_device * __devinit create_netdev(int handle,
-						   struct xenbus_device *dev)
+static struct net_device * __devinit
+create_netdev(int handle, int copying_receiver, struct xenbus_device *dev)
 {
 	int i, err = 0;
 	struct net_device *netdev = NULL;
@@ -1627,9 +1689,10 @@ static struct net_device * __devinit create_netdev(int handle,
 		return ERR_PTR(-ENOMEM);
 	}
 
-	np                = netdev_priv(netdev);
-	np->handle        = handle;
-	np->xbdev         = dev;
+	np                   = netdev_priv(netdev);
+	np->handle           = handle;
+	np->xbdev            = dev;
+	np->copying_receiver = copying_receiver;
 
 	netif_carrier_off(netdev);
 
