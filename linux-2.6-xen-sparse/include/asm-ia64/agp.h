@@ -19,10 +19,21 @@
 #define flush_agp_cache()		mb()
 
 /* Convert a physical address to an address suitable for the GART. */
+#ifndef CONFIG_XEN
+#define phys_to_gart(x) (x)
+#define gart_to_phys(x) (x)
+#else
 #define phys_to_gart(x) phys_to_machine_for_dma(x)
 #define gart_to_phys(x) machine_to_phys_for_dma(x)
+#endif
 
 /* GATT allocation. Returns/accepts GATT kernel virtual address. */
+#ifndef CONFIG_XEN
+#define alloc_gatt_pages(order)		\
+	((char *)__get_free_pages(GFP_KERNEL, (order)))
+#define free_gatt_pages(table, order)	\
+	free_pages((unsigned long)(table), (order))
+#else
 #include <asm/hypervisor.h>
 static inline char*
 alloc_gatt_pages(unsigned int order)
@@ -46,5 +57,6 @@ free_gatt_pages(void* table, unsigned int order)
 	xen_destroy_contiguous_region((unsigned long)table, order);
 	free_pages((unsigned long)table, order);
 }
+#endif /* CONFIG_XEN */
 
 #endif /* _ASM_IA64_AGP_H */

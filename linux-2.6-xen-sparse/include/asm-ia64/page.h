@@ -117,6 +117,9 @@ extern unsigned long max_low_pfn;
 # define pfn_to_page(pfn)	(vmem_map + (pfn))
 #endif
 
+#ifndef CONFIG_XEN
+#define page_to_phys(page)	(page_to_pfn(page) << PAGE_SHIFT)
+#endif
 #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
 #define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
 
