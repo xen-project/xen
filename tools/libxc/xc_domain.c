@@ -213,21 +213,28 @@ int xc_shadow_control(int xc_handle,
                       unsigned int sop,
                       unsigned long *dirty_bitmap,
                       unsigned long pages,
-                      xc_shadow_control_stats_t *stats )
+                      unsigned long *mb,
+                      uint32_t mode,
+                      xc_shadow_control_stats_t *stats)
 {
     int rc;
     DECLARE_DOM0_OP;
     op.cmd = DOM0_SHADOW_CONTROL;
     op.u.shadow_control.domain = (domid_t)domid;
     op.u.shadow_control.op     = sop;
-    set_xen_guest_handle(op.u.shadow_control.dirty_bitmap, dirty_bitmap);
     op.u.shadow_control.pages  = pages;
+    op.u.shadow_control.mb     = mb ? *mb : 0;
+    op.u.shadow_control.mode   = mode;
+    set_xen_guest_handle(op.u.shadow_control.dirty_bitmap, dirty_bitmap);
 
     rc = do_dom0_op(xc_handle, &op);
 
     if ( stats )
         memcpy(stats, &op.u.shadow_control.stats,
                sizeof(xc_shadow_control_stats_t));
+    
+    if ( mb ) 
+        *mb = op.u.shadow_control.mb;
 
     return (rc == 0) ? op.u.shadow_control.pages : rc;
 }
@@ -391,7 +398,7 @@ int xc_domain_memory_populate_physmap(int xc_handle,
 
     if ( err > 0 )
     {
-        DPRINTF("Failed deallocation for dom %d: %ld pages order %d\n",
+        DPRINTF("Failed allocation for dom %d: %ld pages order %d\n",
                 domid, nr_extents, extent_order);
         errno = EBUSY;
         err = -1;

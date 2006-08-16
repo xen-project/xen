@@ -8,7 +8,6 @@ subdir-$(x86_32) += x86_32
 subdir-$(x86_64) += x86_64
 
 obj-y += apic.o
-obj-y += audit.o
 obj-y += bitops.o
 obj-y += compat.o
 obj-y += delay.o
@@ -41,12 +40,21 @@ obj-y += usercopy.o
 obj-y += x86_emulate.o
 
 ifneq ($(pae),n)
-obj-$(x86_32) += shadow.o shadow_public.o shadow_guest32.o shadow_guest32pae.o
+obj-$(x86_32) += shadow2-common.o shadow2_g2_on_s3.o shadow2_g3_on_s3.o
 else
-obj-$(x86_32) += shadow32.o
+obj-$(x86_32) += shadow2-common.o shadow2_g2_on_s2.o
 endif
 
-obj-$(x86_64) += shadow.o shadow_public.o shadow_guest32.o shadow_guest32pae.o
+obj-$(x86_64) += shadow2-common.o shadow2_g4_on_s4.o shadow2_g3_on_s3.o \
+                 shadow2_g2_on_s3.o
+
+guest_levels  = $(subst g,,$(filter g%,$(subst ., ,$(subst _, ,$(subst shadow2_,,$(1))))))
+shadow_levels = $(subst s,,$(filter s%,$(subst ., ,$(subst _, ,$(subst shadow2_,,$(1))))))
+shadow2_defns = -DGUEST_PAGING_LEVELS=$(call guest_levels,$(1)) \
+                -DSHADOW_PAGING_LEVELS=$(call shadow_levels,$(1))
+
+shadow2_%.o: shadow2.c $(HDRS) Makefile
+	$(CC) $(CFLAGS) $(call shadow2_defns,$(@F)) -c $< -o $@
 
 obj-$(crash_debug) += gdbstub.o
 

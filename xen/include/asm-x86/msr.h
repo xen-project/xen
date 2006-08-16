@@ -112,6 +112,10 @@ static inline void wrmsrl(unsigned int msr, __u64 val)
 #define MSR_IA32_VMX_EXIT_CTLS_MSR              0x483
 #define MSR_IA32_VMX_ENTRY_CTLS_MSR             0x484
 #define MSR_IA32_VMX_MISC_MSR                   0x485
+#define MSR_IA32_VMX_CR0_FIXED0                 0x486
+#define MSR_IA32_VMX_CR0_FIXED1                 0x487
+#define MSR_IA32_VMX_CR4_FIXED0                 0x488
+#define MSR_IA32_VMX_CR4_FIXED1                 0x489
 #define IA32_FEATURE_CONTROL_MSR                0x3a
 #define IA32_FEATURE_CONTROL_MSR_LOCK           0x1
 #define IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON   0x4

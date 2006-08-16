@@ -338,13 +338,13 @@ static int analysis_phase(int xc_handle, uint32_t domid, int max_pfn,
         int i;
 
         xc_shadow_control(xc_handle, domid, DOM0_SHADOW_CONTROL_OP_CLEAN,
-                          arr, max_pfn, NULL);
+                          arr, max_pfn, NULL, 0, NULL);
         DPRINTF("#Flush\n");
         for ( i = 0; i < 40; i++ ) {
             usleep(50000);
             now = llgettimeofday();
             xc_shadow_control(xc_handle, domid, DOM0_SHADOW_CONTROL_OP_PEEK,
-                              NULL, 0, &stats);
+                              NULL, 0, NULL, 0, &stats);
 
             DPRINTF("now= %lld faults= %" PRId32 " dirty= %" PRId32
                     " dirty_net= %" PRId32 " dirty_block= %" PRId32"\n",
@@ -727,7 +727,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
         if (xc_shadow_control(xc_handle, dom,
                               DOM0_SHADOW_CONTROL_OP_ENABLE_LOGDIRTY,
-                              NULL, 0, NULL ) < 0) {
+                              NULL, 0, NULL, 0, NULL) < 0) {
             ERR("Couldn't enable shadow mode");
             goto out;
         }
@@ -879,7 +879,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                but this is fast enough for the moment. */
             if (!last_iter && xc_shadow_control(
                     xc_handle, dom, DOM0_SHADOW_CONTROL_OP_PEEK,
-                    to_skip, max_pfn, NULL) != max_pfn) {
+                    to_skip, max_pfn, NULL, 0, NULL) != max_pfn) {
                 ERR("Error peeking shadow bitmap");
                 goto out;
             }
@@ -1084,8 +1084,9 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                         (unsigned long)ctxt.user_regs.edx);
             }
 
-            if (xc_shadow_control(xc_handle, dom, DOM0_SHADOW_CONTROL_OP_CLEAN,
-                                  to_send, max_pfn, &stats ) != max_pfn) {
+            if (xc_shadow_control(xc_handle, dom, 
+                                  DOM0_SHADOW_CONTROL_OP_CLEAN, to_send, 
+                                  max_pfn, NULL, 0, &stats) != max_pfn) {
                 ERR("Error flushing shadow PT");
                 goto out;
             }
@@ -1174,8 +1175,9 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
  out:
 
     if (live) {
-        if(xc_shadow_control(xc_handle, dom, DOM0_SHADOW_CONTROL_OP_OFF,
-                             NULL, 0, NULL ) < 0) {
+        if(xc_shadow_control(xc_handle, dom, 
+                             DOM0_SHADOW_CONTROL_OP_OFF,
+                             NULL, 0, NULL, 0, NULL) < 0) {
             DPRINTF("Warning - couldn't disable shadow mode");
         }
     }

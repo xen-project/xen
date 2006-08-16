@@ -87,6 +87,7 @@ struct arch_vmx_struct {
 
     unsigned long        cpu_cr0; /* copy of guest CR0 */
     unsigned long        cpu_shadow_cr0; /* copy of guest read shadow CR0 */
+    unsigned long        cpu_shadow_cr4; /* copy of guest read shadow CR4 */
     unsigned long        cpu_cr2; /* save CR2 */
     unsigned long        cpu_cr3;
     unsigned long        cpu_state;

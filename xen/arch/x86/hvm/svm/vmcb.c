@@ -380,8 +380,8 @@ void svm_do_launch(struct vcpu *v)
         printk("%s: phys_table   = %lx\n", __func__, pt);
     }
 
-    /* At launch we always use the phys_table */
-    vmcb->cr3 = pagetable_get_paddr(v->domain->arch.phys_table);
+    /* Set cr3 from hw_cr3 even when guest-visible paging is not enabled */
+    vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3; 
 
     if (svm_dbg_on) 
     {

@@ -262,6 +262,18 @@ DEFINE_XEN_GUEST_HANDLE(dom0_sched_id_t);
 #define DOM0_SHADOW_CONTROL_OP_CLEAN       11
 #define DOM0_SHADOW_CONTROL_OP_PEEK        12
 
+/* Shadow2 operations */
+#define DOM0_SHADOW2_CONTROL_OP_GET_ALLOCATION   30
+#define DOM0_SHADOW2_CONTROL_OP_SET_ALLOCATION   31
+#define DOM0_SHADOW2_CONTROL_OP_ENABLE           32
+
+/* Mode flags for Shadow2 enable op */
+#define DOM0_SHADOW2_CONTROL_FLAG_ENABLE    (1 << 0)
+#define DOM0_SHADOW2_CONTROL_FLAG_REFCOUNT  (1 << 1)
+#define DOM0_SHADOW2_CONTROL_FLAG_LOG_DIRTY (1 << 2)
+#define DOM0_SHADOW2_CONTROL_FLAG_TRANSLATE (1 << 3)
+#define DOM0_SHADOW2_CONTROL_FLAG_EXTERNAL  (1 << 4)
+
 struct dom0_shadow_control_stats {
     uint32_t fault_count;
     uint32_t dirty_count;
@@ -277,7 +289,9 @@ struct dom0_shadow_control {
     uint32_t       op;
     XEN_GUEST_HANDLE(ulong) dirty_bitmap;
     /* IN/OUT variables. */
-    uint64_t       pages;        /* size of buffer, updated with actual size */
+    uint64_t       pages;    /* size of buffer, updated with actual size */
+    uint32_t       mb;       /* Shadow2 memory allocation in MB */
+    uint32_t       mode;     /* Shadow2 mode to enable */
     /* OUT variables. */
     struct dom0_shadow_control_stats stats;
 };

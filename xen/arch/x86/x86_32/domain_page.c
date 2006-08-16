@@ -15,6 +15,7 @@
 #include <asm/current.h>
 #include <asm/flushtlb.h>
 #include <asm/hardirq.h>
+#include <asm/hvm/support.h>
 
 static inline struct vcpu *mapcache_current_vcpu(void)
 {
@@ -58,10 +59,10 @@ void *map_domain_page(unsigned long pfn)
     cache = &v->domain->arch.mapcache;
 
     hashent = &cache->vcpu_maphash[vcpu].hash[MAPHASH_HASHFN(pfn)];
-    if ( hashent->pfn == pfn )
+    if ( hashent->pfn == pfn && (idx = hashent->idx) != MAPHASHENT_NOTINUSE )
     {
-        idx = hashent->idx;
         hashent->refcnt++;
+        ASSERT(idx < MAPCACHE_ENTRIES);
         ASSERT(hashent->refcnt != 0);
         ASSERT(l1e_get_pfn(cache->l1tab[idx]) == pfn);
         goto out;
@@ -178,6 +179,30 @@ void mapcache_init(struct domain *d)
                 MAPHASHENT_NOTINUSE;
 }
 
+paddr_t mapped_domain_page_to_maddr(void *va) 
+/* Convert a pointer in a mapped domain page to a machine address. 
+ * Takes any pointer that's valid for use in unmap_domain_page() */
+{
+    unsigned int idx;
+    struct vcpu *v;
+    struct mapcache *cache;
+    unsigned long pfn;
+
+    ASSERT(!in_irq());
+
+    ASSERT((void *)MAPCACHE_VIRT_START <= va);
+    ASSERT(va < (void *)MAPCACHE_VIRT_END);
+
+    v = mapcache_current_vcpu();
+
+    cache = &v->domain->arch.mapcache;
+
+    idx = ((unsigned long)va - MAPCACHE_VIRT_START) >> PAGE_SHIFT;
+    pfn = l1e_get_pfn(cache->l1tab[idx]);
+    return ((paddr_t) pfn << PAGE_SHIFT 
+            | ((unsigned long) va & ~PAGE_MASK));
+}
+
 #define GLOBALMAP_BITS (IOREMAP_MBYTES << (20 - PAGE_SHIFT))
 static unsigned long inuse[BITS_TO_LONGS(GLOBALMAP_BITS)];
 static unsigned long garbage[BITS_TO_LONGS(GLOBALMAP_BITS)];
@@ -232,6 +257,8 @@ void unmap_domain_page_global(void *va)
     l2_pgentry_t *pl2e;
     l1_pgentry_t *pl1e;
     unsigned int idx;
+
+    ASSERT((__va >= IOREMAP_VIRT_START) && (__va <= (IOREMAP_VIRT_END - 1)));
 
     /* /First/, we zap the PTE. */
     pl2e = virt_to_xen_l2e(__va);

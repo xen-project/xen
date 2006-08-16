@@ -153,6 +153,12 @@ class ImageHandler:
                 mem_kb += 4*1024;
         return mem_kb
 
+    def getDomainShadowMemory(self, mem_kb):
+        """@return The minimum shadow memory required, in KiB, for a domain 
+        with mem_kb KiB of RAM."""
+        # PV domains don't need any shadow memory
+        return 0
+
     def buildDomain(self):
         """Build the domain. Define in subclass."""
         raise NotImplementedError()
@@ -363,6 +369,17 @@ class HVMImageHandler(ImageHandler):
             extra_mb = (2.4/1024) * (mem_kb/1024.0) + 12;
             extra_pages = int( math.ceil( extra_mb*1024 / page_kb ))
         return mem_kb + extra_pages * page_kb
+
+    def getDomainShadowMemory(self, mem_kb):
+        """@return The minimum shadow memory required, in KiB, for a domain 
+        with mem_kb KiB of RAM."""
+        if os.uname()[4] in ('ia64', 'ppc64'):
+            # Explicit shadow memory is not a concept 
+            return 0
+        else:
+            # 1MB per vcpu plus 4Kib/Mib of RAM.  This is higher than 
+            # the minimum that Xen would allocate if no value were given.
+            return 1024 * self.vm.getVCpuCount() + mem_kb / 256
 
     def register_shutdown_watch(self):
         """ add xen store watch on control/shutdown """

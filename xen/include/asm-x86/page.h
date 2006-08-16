@@ -233,26 +233,18 @@ typedef struct { u64 pfn; } pagetable_t;
      + DOMAIN_ENTRIES_PER_L4_PAGETABLE)
 #endif
 
-#define LINEAR_PT_OFFSET (LINEAR_PT_VIRT_START & VADDR_MASK)
-#define linear_l1_table                                             \
-    ((l1_pgentry_t *)(LINEAR_PT_VIRT_START))
-#define __linear_l2_table                                           \
-    ((l2_pgentry_t *)(LINEAR_PT_VIRT_START +                        \
-                     (LINEAR_PT_OFFSET >> (PAGETABLE_ORDER<<0))))
-#define __linear_l3_table                                           \
-    ((l3_pgentry_t *)(LINEAR_PT_VIRT_START +                        \
-                     (LINEAR_PT_OFFSET >> (PAGETABLE_ORDER<<0)) +   \
-                     (LINEAR_PT_OFFSET >> (PAGETABLE_ORDER<<1))))
-#define __linear_l4_table                                           \
-    ((l4_pgentry_t *)(LINEAR_PT_VIRT_START +                        \
-                     (LINEAR_PT_OFFSET >> (PAGETABLE_ORDER<<0)) +   \
-                     (LINEAR_PT_OFFSET >> (PAGETABLE_ORDER<<1)) +   \
-                     (LINEAR_PT_OFFSET >> (PAGETABLE_ORDER<<2))))
+/* Where to find each level of the linear mapping */
+#define __linear_l1_table ((l1_pgentry_t *)(LINEAR_PT_VIRT_START))
+#define __linear_l2_table \
+ ((l2_pgentry_t *)(__linear_l1_table + l1_linear_offset(LINEAR_PT_VIRT_START)))
+#define __linear_l3_table \
+ ((l3_pgentry_t *)(__linear_l2_table + l2_linear_offset(LINEAR_PT_VIRT_START)))
+#define __linear_l4_table \
+ ((l4_pgentry_t *)(__linear_l3_table + l3_linear_offset(LINEAR_PT_VIRT_START)))
 
+#define linear_l1_table __linear_l1_table
 #define linear_pg_table linear_l1_table
-#define linear_l2_table(v) ((v)->arch.guest_vtable)
-#define linear_l3_table(v) ((v)->arch.guest_vl3table)
-#define linear_l4_table(v) ((v)->arch.guest_vl4table)
+#define linear_l2_table(v) ((l2_pgentry_t *)(v)->arch.guest_vtable)
 
 #ifndef __ASSEMBLY__
 #if CONFIG_PAGING_LEVELS == 3
@@ -294,6 +286,7 @@ extern void paging_init(void);
 #define _PAGE_AVAIL1   0x400U
 #define _PAGE_AVAIL2   0x800U
 #define _PAGE_AVAIL    0xE00U
+#define _PAGE_PSE_PAT 0x1000U
 
 /*
  * Debug option: Ensure that granted mappings are not implicitly unmapped.
@@ -307,9 +300,9 @@ extern void paging_init(void);
 #endif
 
 /*
- * Disallow unused flag bits plus PAT, PSE and GLOBAL. Also disallow GNTTAB
- * if we are using it for grant-table debugging. Permit the NX bit if the
- * hardware supports it.
+ * Disallow unused flag bits plus PAT, PSE and GLOBAL.
+ * Also disallow GNTTAB if we are using it for grant-table debugging.
+ * Permit the NX bit if the hardware supports it.
  */
 #define BASE_DISALLOW_MASK ((0xFFFFF180U | _PAGE_GNTTAB) & ~_PAGE_NX)
 

@@ -44,6 +44,8 @@ typedef l4_pgentry_t root_pgentry_t;
 /* Given a virtual address, get an entry offset into a linear page table. */
 #define l1_linear_offset(_a) (((_a) & VADDR_MASK) >> L1_PAGETABLE_SHIFT)
 #define l2_linear_offset(_a) (((_a) & VADDR_MASK) >> L2_PAGETABLE_SHIFT)
+#define l3_linear_offset(_a) (((_a) & VADDR_MASK) >> L3_PAGETABLE_SHIFT)
+#define l4_linear_offset(_a) (((_a) & VADDR_MASK) >> L4_PAGETABLE_SHIFT)
 
 #define is_guest_l1_slot(_s) (1)
 #define is_guest_l2_slot(_t, _s) (1)
@@ -70,7 +72,8 @@ typedef l4_pgentry_t root_pgentry_t;
 #define put_pte_flags(x) (((intpte_t)((x) & ~0xFFF) << 40) | ((x) & 0xFFF))
 
 /* Bit 23 of a 24-bit flag mask. This corresponds to bit 63 of a pte.*/
-#define _PAGE_NX (cpu_has_nx ? (1U<<23) : 0U)
+#define _PAGE_NX_BIT (1U<<23)
+#define _PAGE_NX     (cpu_has_nx ? _PAGE_NX_BIT : 0U)
 
 #define L1_DISALLOW_MASK BASE_DISALLOW_MASK
 #define L2_DISALLOW_MASK BASE_DISALLOW_MASK

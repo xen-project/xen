@@ -158,6 +158,10 @@ gopts.var('maxmem', val='MEMORY',
           fn=set_int, default=None,
           use="Maximum domain memory in MB.")
 
+gopts.var('shadow_memory', val='MEMORY',
+          fn=set_int, default=0,
+          use="Domain shadow memory in MB.")
+
 gopts.var('cpu', val='CPU',
           fn=set_int, default=None,
           use="CPU to run the VCPU0 on.")
@@ -666,8 +670,9 @@ def make_config(vals):
             if v:
                 config.append([n, v])
 
-    map(add_conf, ['name', 'memory', 'maxmem', 'restart', 'on_poweroff',
-                   'on_reboot', 'on_crash', 'vcpus', 'features'])
+    map(add_conf, ['name', 'memory', 'maxmem', 'shadow_memory',
+                   'restart', 'on_poweroff', 'on_reboot', 'on_crash',
+                   'vcpus', 'features'])
 
     if vals.uuid is not None:
         config.append(['uuid', vals.uuid])

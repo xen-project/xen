@@ -73,42 +73,42 @@ struct arch_domain
     /* I/O-port admin-specified access capabilities. */
     struct rangeset *ioport_caps;
 
-    /* Shadow mode status and controls. */
-    struct shadow_ops *ops;
-    unsigned int shadow_mode;  /* flags to control shadow table operation */
-    unsigned int shadow_nest;  /* Recursive depth of shadow_lock() nesting */
-
-    /* shadow hashtable */
-    struct shadow_status *shadow_ht;
-    struct shadow_status *shadow_ht_free;
-    struct shadow_status *shadow_ht_extras; /* extra allocation units */
-    unsigned int shadow_extras_count;
-
-    /* shadow dirty bitmap */
-    unsigned long *shadow_dirty_bitmap;
-    unsigned int shadow_dirty_bitmap_size;  /* in pages, bit per page */
-
-    /* shadow mode stats */
-    unsigned int shadow_page_count;
-    unsigned int hl2_page_count;
-    unsigned int snapshot_page_count;
-
-    unsigned int shadow_fault_count;
-    unsigned int shadow_dirty_count;
-
-    /* full shadow mode */
-    struct out_of_sync_entry *out_of_sync; /* list of out-of-sync pages */
-    struct out_of_sync_entry *out_of_sync_free;
-    struct out_of_sync_entry *out_of_sync_extras;
-    unsigned int out_of_sync_extras_count;
-
-    struct list_head free_shadow_frames;
-
-    pagetable_t         phys_table;         /* guest 1:1 pagetable */
+    /* HVM stuff */
     struct hvm_domain   hvm_domain;
 
     /* Shadow-translated guest: Pseudophys base address of reserved area. */
     unsigned long first_reserved_pfn;
+
+    /* Shadow2 stuff */
+    u32               shadow2_mode;  /* flags to control shadow operation */
+    spinlock_t        shadow2_lock;  /* shadow2 domain lock */
+    int               shadow2_locker; /* processor which holds the lock */
+    const char       *shadow2_locker_function; /* Func that took it */
+    struct list_head  shadow2_freelists[SHADOW2_MAX_ORDER + 1]; 
+    struct list_head  shadow2_p2m_freelist;
+    struct list_head  shadow2_p2m_inuse;
+    struct list_head  shadow2_toplevel_shadows;
+    unsigned int      shadow2_total_pages;  /* number of pages allocated */
+    unsigned int      shadow2_free_pages;   /* number of pages on freelists */
+    unsigned int      shadow2_p2m_pages;    /* number of pages in p2m map */
+
+    /* Shadow2 hashtable */
+    struct shadow2_hash_entry *shadow2_hash_table;
+    struct shadow2_hash_entry *shadow2_hash_freelist;
+    struct shadow2_hash_entry *shadow2_hash_allocations;
+    int shadow2_hash_walking;  /* Some function is walking the hash table */
+
+    /* Shadow log-dirty bitmap */
+    unsigned long *shadow_dirty_bitmap;
+    unsigned int shadow_dirty_bitmap_size;  /* in pages, bit per page */
+
+    /* Shadow log-dirty mode stats */
+    unsigned int shadow_fault_count;
+    unsigned int shadow_dirty_count;
+
+    /* Shadow translated domain: P2M mapping */
+    pagetable_t phys_table;
+
 } __cacheline_aligned;
 
 #ifdef CONFIG_X86_PAE
@@ -166,25 +166,34 @@ struct arch_vcpu
      */
     l1_pgentry_t *perdomain_ptes;
 
-    pagetable_t  guest_table_user;      /* x86/64: user-space pagetable. */
-    pagetable_t  guest_table;           /* (MA) guest notion of cr3 */
-    pagetable_t  shadow_table;          /* (MA) shadow of guest */
-    pagetable_t  monitor_table;         /* (MA) used in hypervisor */
-
-    l2_pgentry_t *guest_vtable;         /* virtual address of pagetable */
-    l2_pgentry_t *shadow_vtable;        /* virtual address of shadow_table */
-    l2_pgentry_t *monitor_vtable;		/* virtual address of monitor_table */
-    l1_pgentry_t *hl2_vtable;			/* virtual address of hl2_table */
-
 #ifdef CONFIG_X86_64
-    l3_pgentry_t *guest_vl3table;
-    l4_pgentry_t *guest_vl4table;
+    pagetable_t guest_table_user;       /* (MFN) x86/64 user-space pagetable */
 #endif
+    pagetable_t guest_table;            /* (MFN) guest notion of cr3 */
+    /* guest_table holds a ref to the page, and also a type-count unless
+     * shadow refcounts are in use */
+    pagetable_t shadow_table;           /* (MFN) shadow of guest */
+    pagetable_t monitor_table;          /* (MFN) hypervisor PT (for HVM) */
+    unsigned long cr3;           	    /* (MA) value to install in HW CR3 */
 
-    unsigned long monitor_shadow_ref;
+    void *guest_vtable;                 /* virtual address of pagetable */
+    void *shadow_vtable;                /* virtual address of shadow_table */
+    root_pgentry_t *monitor_vtable;		/* virtual address of monitor_table */
 
     /* Current LDT details. */
     unsigned long shadow_ldt_mapcnt;
+
+    /* Shadow2 stuff */
+    /* -- pointers to mode-specific entry points */
+    struct shadow2_entry_points *shadow2; 
+    unsigned long last_emulated_mfn;    /* last mfn we emulated a write to */
+    u8 shadow2_propagate_fault;         /* emulated fault needs to be */
+                                        /* propagated to guest */
+#if CONFIG_PAGING_LEVELS >= 3
+    u8 shadow2_pae_flip_pending;        /* shadow update requires this PAE cpu
+                                         * to recopy/install its L3 table.
+                                         */
+#endif
 } __cacheline_aligned;
 
 /* shorthands to improve code legibility */

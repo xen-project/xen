@@ -532,8 +532,6 @@ void __init __start_xen(multiboot_info_t *mbi)
     if ( opt_watchdog ) 
         watchdog_enable();
 
-    shadow_mode_init();
-
     /* initialize access control security module */
     acm_init(&initrdidx, mbi, initial_images_start);
 

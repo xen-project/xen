@@ -26,6 +26,13 @@ extern void *map_domain_page(unsigned long pfn);
  */
 extern void unmap_domain_page(void *va);
 
+/* 
+ * Convert a VA (within a page previously mapped in the context of the
+ * currently-executing VCPU via a call to map_domain_pages()) to a machine 
+ * address 
+ */
+extern paddr_t mapped_domain_page_to_maddr(void *va);
+
 /*
  * Similar to the above calls, except the mapping is accessible in all
  * address spaces (not just within the VCPU that created the mapping). Global
@@ -98,6 +105,7 @@ domain_mmap_cache_destroy(struct domain_mmap_cache *cache)
 
 #define map_domain_page(pfn)                maddr_to_virt((pfn)<<PAGE_SHIFT)
 #define unmap_domain_page(va)               ((void)(va))
+#define mapped_domain_page_to_maddr(va)     (virt_to_maddr(va))
 
 #define map_domain_page_global(pfn)         maddr_to_virt((pfn)<<PAGE_SHIFT)
 #define unmap_domain_page_global(va)        ((void)(va))
@@ -111,5 +119,10 @@ struct domain_mmap_cache {
 #define domain_mmap_cache_destroy(c)        ((void)(c))
 
 #endif /* !CONFIG_DOMAIN_PAGE */
+
+#define HERE_I_AM \
+do { \
+    printk("HERE I AM: %s %s %d\n", __func__, __FILE__, __LINE__); \
+} while (0)
 
 #endif /* __XEN_DOMAIN_PAGE_H__ */

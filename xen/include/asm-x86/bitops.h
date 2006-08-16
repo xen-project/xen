@@ -75,6 +75,24 @@ static __inline__ void clear_bit(int nr, volatile void * addr)
 		:"=m" (ADDR)
 		:"dIr" (nr));
 }
+
+/**
+ * __clear_bit - Clears a bit in memory
+ * @nr: Bit to clear
+ * @addr: Address to start counting from
+ *
+ * Unlike clear_bit(), this function is non-atomic and may be reordered.
+ * If it's called on the same region of memory simultaneously, the effect
+ * may be that only one operation succeeds.
+ */
+static __inline__ void __clear_bit(int nr, volatile void * addr)
+{
+	__asm__(
+		"btrl %1,%0"
+		:"=m" (ADDR)
+		:"dIr" (nr));
+}
+
 #define smp_mb__before_clear_bit()	barrier()
 #define smp_mb__after_clear_bit()	barrier()
 

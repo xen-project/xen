@@ -89,15 +89,8 @@ static inline l2_pgentry_32_t l2e_from_paddr_32(paddr_t pa, unsigned int flags)
 
 #define linear_l1_table_32                                                 \
     ((l1_pgentry_32_t *)(LINEAR_PT_VIRT_START))
-#define __linear_l2_table_32                                                 \
-    ((l2_pgentry_32_t *)(LINEAR_PT_VIRT_START +                            \
-                     (LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<0))))
 
 #define linear_pg_table_32 linear_l1_table_32
-#define linear_l2_table_32(_ed) ((_ed)->arch.guest_vtable)
-
-#define va_to_l1mfn_32(_ed, _va) \
-    (l2e_get_pfn(linear_l2_table(_ed)[_va>>L2_PAGETABLE_SHIFT]))
 
 #endif /* __X86_PAGE_GUEST_H__ */
 

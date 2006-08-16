@@ -59,7 +59,8 @@ typedef l3_pgentry_t root_pgentry_t;
  *  32-bit flags = (pte[63:44],pte[11:0])
  */
 
-#define _PAGE_NX (cpu_has_nx ? (1<<31) : 0)
+#define _PAGE_NX_BIT (1U<<31)
+#define _PAGE_NX     (cpu_has_nx ? _PAGE_NX_BIT : 0)
 
 /* Extract flags into 32-bit integer, or turn 32-bit flags into a pte mask. */
 #define get_pte_flags(x) (((int)((x) >> 32) & ~0xFFF) | ((int)(x) & 0xFFF))

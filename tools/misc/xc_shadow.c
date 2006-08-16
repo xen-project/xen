@@ -60,6 +60,8 @@ int main(int argc, char *argv[])
                            mode, 
                            NULL,
                            0,
+                           NULL,
+                           0,
                            NULL) < 0 )
     {    
         fprintf(stderr, "Error reseting performance counters: %d (%s)\n",

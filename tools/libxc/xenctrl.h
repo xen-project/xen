@@ -323,6 +323,8 @@ int xc_shadow_control(int xc_handle,
                       unsigned int sop,
                       unsigned long *dirty_bitmap,
                       unsigned long pages,
+                      unsigned long *mb,
+                      uint32_t mode,
                       xc_shadow_control_stats_t *stats);
 
 int xc_bvtsched_global_set(int xc_handle,

@@ -30,6 +30,7 @@ import string
 import time
 import threading
 import os
+import math
 
 import xen.lowlevel.xc
 from xen.util import asserts
@@ -126,16 +127,17 @@ VM_CONFIG_PARAMS = [
 # don't come out of xc in the same form as they are specified in the config
 # file, so those are handled separately.
 ROUNDTRIPPING_CONFIG_ENTRIES = [
-    ('uuid',       str),
-    ('vcpus',      int),
-    ('vcpu_avail', int),
-    ('cpu_weight', float),
-    ('memory',     int),
-    ('maxmem',     int),
-    ('bootloader', str),
+    ('uuid',            str),
+    ('vcpus',           int),
+    ('vcpu_avail',      int),
+    ('cpu_weight',      float),
+    ('memory',          int),
+    ('shadow_memory',   int),
+    ('maxmem',          int),
+    ('bootloader',      str),
     ('bootloader_args', str),
-    ('features', str),
-    ('localtime', int),
+    ('features',        str),
+    ('localtime',       int),
     ]
 
 ROUNDTRIPPING_CONFIG_ENTRIES += VM_CONFIG_PARAMS
@@ -146,12 +148,13 @@ ROUNDTRIPPING_CONFIG_ENTRIES += VM_CONFIG_PARAMS
 # entries written to the store that cannot be reconfigured on-the-fly.
 #
 VM_STORE_ENTRIES = [
-    ('uuid',       str),
-    ('vcpus',      int),
-    ('vcpu_avail', int),
-    ('memory',     int),
-    ('maxmem',     int),
-    ('start_time', float),
+    ('uuid',          str),
+    ('vcpus',         int),
+    ('vcpu_avail',    int),
+    ('memory',        int),
+    ('shadow_memory', int),
+    ('maxmem',        int),
+    ('start_time',    float),
     ]
 
 VM_STORE_ENTRIES += VM_CONFIG_PARAMS
@@ -572,6 +575,7 @@ class XendDomainInfo:
             defaultInfo('vcpu_avail',   lambda: (1 << self.info['vcpus']) - 1)
 
             defaultInfo('memory',       lambda: 0)
+            defaultInfo('shadow_memory', lambda: 0)
             defaultInfo('maxmem',       lambda: 0)
             defaultInfo('bootloader',   lambda: None)
             defaultInfo('bootloader_args', lambda: None)            
@@ -1280,7 +1284,18 @@ class XendDomainInfo:
             xc.domain_setmaxmem(self.domid, self.info['maxmem'] * 1024)
 
             m = self.image.getDomainMemory(self.info['memory'] * 1024)
-            balloon.free(m)
+
+            # get the domain's shadow memory requirement
+            sm = int(math.ceil(self.image.getDomainShadowMemory(m) / 1024.0))
+            if self.info['shadow_memory'] > sm:
+                sm = self.info['shadow_memory']
+
+            # Make sure there's enough RAM available for the domain
+            balloon.free(m + sm * 1024)
+
+            # Set up the shadow memory
+            sm = xc.shadow_mem_control(self.domid, mb=sm)
+            self.info['shadow_memory'] = sm
 
             init_reservation = self.info['memory'] * 1024
             if os.uname()[4] in ('ia64', 'ppc64'):
