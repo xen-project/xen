@@ -25,7 +25,7 @@ CFLAGS  += -I $(XEN_XC)
 CFLAGS  += -I $(XEN_LIBXC)
 LDFLAGS += -L $(XEN_LIBXC)
 
-BIN = setmask xenbaked
+BIN = xentrace_setmask xenbaked
 SCRIPTS = xenmon.py
 
 .PHONY: all
@@ -35,10 +35,10 @@ all: build
 build: $(BIN)
 
 .PHONY: install
-install: xenbaked setmask
+install: build
 	[ -d $(DESTDIR)$(sbindir) ] || $(INSTALL_DIR) $(DESTDIR)$(sbindir)
 	$(INSTALL_PROG) xenbaked $(DESTDIR)$(sbindir)/xenbaked
-	$(INSTALL_PROG) setmask  $(DESTDIR)$(sbindir)/setmask
+	$(INSTALL_PROG) xentrace_setmask  $(DESTDIR)$(sbindir)/xentrace_setmask
 	$(INSTALL_PROG) xenmon.py  $(DESTDIR)$(sbindir)/xenmon.py
 
 .PHONY: clean
@@ -48,5 +48,5 @@ clean:
 
 %: %.c Makefile
 	$(CC) $(CFLAGS) $(LDFLAGS) -lxenctrl -o $@ $<
-
-
+xentrace_%: %.c Makefile
+	$(CC) $(CFLAGS) $(LDFLAGS) -lxenctrl -o $@ $<

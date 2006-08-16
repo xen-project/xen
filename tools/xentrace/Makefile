@@ -14,7 +14,7 @@ CFLAGS  += -I $(XEN_LIBXC)
 HDRS     = $(wildcard *.h)
 OBJS     = $(patsubst %.c,%.o,$(wildcard *.c))
 
-BIN      = xentrace setsize
+BIN      = xentrace xentrace_setsize
 LIBBIN   = 
 SCRIPTS  = xentrace_format
 MAN1     = $(wildcard *.1)
@@ -57,4 +57,6 @@ clean:
 	$(RM) *.a *.so *.o *.rpm $(BIN) $(LIBBIN)
 
 %: %.c $(HDRS) Makefile
+	$(CC) $(CFLAGS) -o $@ $< -L$(XEN_LIBXC) -lxenctrl
+xentrace_%: %.c $(HDRS) Makefile
 	$(CC) $(CFLAGS) -o $@ $< -L$(XEN_LIBXC) -lxenctrl

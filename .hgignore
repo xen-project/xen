@@ -151,7 +151,7 @@
 ^tools/vtpm_manager/manager/vtpm_managerd$
 ^tools/xcutils/xc_restore$
 ^tools/xcutils/xc_save$
-^tools/xenmon/setmask$
+^tools/xenmon/xentrace_setmask$
 ^tools/xenmon/xenbaked$
 ^tools/xenstat/xentop/xentop$
 ^tools/xenstore/testsuite/tmp/.*$
@@ -172,7 +172,7 @@
 ^tools/xenstore/xs_tdb_dump$
 ^tools/xenstore/xs_test$
 ^tools/xenstore/xs_watch_stress$
-^tools/xentrace/setsize$
+^tools/xentrace/xentrace_setsize$
 ^tools/xentrace/tbctl$
 ^tools/xentrace/xenctx$
 ^tools/xentrace/xentrace$
