@@ -234,6 +234,28 @@ delete_shadow2_status(struct vcpu *v, mfn_t gmfn, u32 shadow_type, mfn_t smfn)
     put_page(mfn_to_page(gmfn));
 }
 
+/**************************************************************************/
+/* CPU feature support querying */
+
+static inline int
+guest_supports_superpages(struct vcpu *v)
+{
+    /* The _PAGE_PSE bit must be honoured in HVM guests, whenever
+     * CR4.PSE is set or the guest is in PAE or long mode */
+    return (hvm_guest(v) && (GUEST_PAGING_LEVELS != 2 
+                             || (hvm_get_guest_ctrl_reg(v, 4) & X86_CR4_PSE)));
+}
+
+static inline int
+guest_supports_nx(struct vcpu *v)
+{
+    if ( !hvm_guest(v) )
+        return cpu_has_nx;
+
+    // XXX - fix this!
+    return 1;
+}
+
 
 /**************************************************************************/
 /* Functions for walking the guest page tables */
@@ -482,9 +504,11 @@ static u32 guest_set_ad_bits(struct vcpu *v,
     if ( unlikely(GUEST_PAGING_LEVELS == 3 && level == 3) )
         return flags;
 
-    /* Need the D bit as well for writes, in l1es and PSE l2es. */
+    /* Need the D bit as well for writes, in l1es and 32bit/PAE PSE l2es. */
     if ( ft == ft_demand_write  
-         && (level == 1 || (level == 2 && (flags & _PAGE_PSE))) )
+         && (level == 1 || 
+             (level == 2 && GUEST_PAGING_LEVELS < 4 
+              && (flags & _PAGE_PSE) && guest_supports_superpages(v))) )
     {
         if ( (flags & (_PAGE_DIRTY | _PAGE_ACCESSED)) 
              == (_PAGE_DIRTY | _PAGE_ACCESSED) )
@@ -709,7 +733,6 @@ sh2_propagate_flags(struct vcpu *v, mfn_t target_mfn,
     struct domain *d = v->domain;
     u32 pass_thru_flags;
     u32 sflags;
-    int lowest_level_guest_mapping;
 
     // XXX -- might want to think about PAT support for HVM guests...
 
@@ -782,10 +805,6 @@ sh2_propagate_flags(struct vcpu *v, mfn_t target_mfn,
     if ( (level > 1) && !((SHADOW_PAGING_LEVELS == 3) && (level == 3)) )
         sflags |= _PAGE_ACCESSED | _PAGE_DIRTY;
 
-    lowest_level_guest_mapping =
-        ((level == 1) ||
-         ((level == 2) && guest_supports_superpages(v) &&
-          (gflags & _PAGE_PSE)));
 
     // Set the A and D bits in the guest entry, if we need to.
     if ( guest_entry_ptr && (ft & FETCH_TYPE_DEMAND) )
@@ -798,8 +817,12 @@ sh2_propagate_flags(struct vcpu *v, mfn_t target_mfn,
                   !(gflags & _PAGE_ACCESSED)) )
         sflags &= ~_PAGE_PRESENT;
 
-    if ( unlikely(lowest_level_guest_mapping &&
-                  !(gflags & _PAGE_DIRTY)) )
+    /* D bits exist in l1es, and 32bit/PAE PSE l2es, but not 64bit PSE l2es */
+    if ( unlikely( ((level == 1) 
+                    || ((level == 2) && (GUEST_PAGING_LEVELS < 4) 
+                        && guest_supports_superpages(v) &&
+                        (gflags & _PAGE_PSE)))
+                   && !(gflags & _PAGE_DIRTY)) )
         sflags &= ~_PAGE_RW;
 
     // MMIO caching
