@@ -5,8 +5,15 @@ C=$PWD
 XEN=$C/../../xen
 XL=$C/../../linux-2.6-xen-sparse
 
+for d in $(find ${XL}/drivers/xen/ -maxdepth 1 -type d | sed -e 1d); do
+    if ! echo $d | egrep -q back; then
+        lndir $d $(basename $d) > /dev/null 2>&1
+    fi
+done
+
 ln -sf ${XL}/drivers/xen/core/gnttab.c platform-pci
 ln -sf ${XL}/drivers/xen/core/features.c platform-pci
+ln -sf ${XL}/drivers/xen/core/xen_proc.c xenbus
 
 mkdir -p include
 mkdir -p include/xen

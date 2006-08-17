@@ -45,12 +45,14 @@
 
 #include <asm/io.h>
 #include <asm/page.h>
+#include <asm/maddr.h>
 #include <asm/pgtable.h>
 #include <asm/hypervisor.h>
 #include <xen/xenbus.h>
 #include <xen/xen_proc.h>
 #include <xen/evtchn.h>
 #include <xen/features.h>
+#include <xen/hvm.h>
 
 #include "xenbus_comms.h"
 
@@ -1015,13 +1017,21 @@ static int __init xenbus_probe_init(void)
 		if (xsd_port_intf)
 			xsd_port_intf->read_proc = xsd_port_read;
 #endif
+		xen_store_interface = mfn_to_virt(xen_store_mfn);
 	} else {
 		xenstored_ready = 1;
+#ifdef CONFIG_XEN
 		xen_store_evtchn = xen_start_info->store_evtchn;
 		xen_store_mfn = xen_start_info->store_mfn;
+		xen_store_interface = mfn_to_virt(xen_store_mfn);
+#else
+		xen_store_evtchn = hvm_get_parameter(HVM_PARAM_STORE_EVTCHN);
+		xen_store_mfn = hvm_get_parameter(HVM_PARAM_STORE_PFN);
+		xen_store_interface = ioremap(xen_store_mfn << PAGE_SHIFT,
+					      PAGE_SIZE);
+#endif
 	}
 
-	xen_store_interface = mfn_to_virt(xen_store_mfn);
 
 	xenbus_dev_init();
 
