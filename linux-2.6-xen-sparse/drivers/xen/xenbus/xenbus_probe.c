@@ -962,7 +962,7 @@ static int xsd_port_read(char *page, char **start, off_t off,
 
 static int __init xenbus_probe_init(void)
 {
-	int err = 0, dom0;
+	int err = 0;
 	unsigned long page = 0;
 
 	DPRINTK("");
@@ -977,9 +977,7 @@ static int __init xenbus_probe_init(void)
 	/*
 	 * Domain0 doesn't have a store_evtchn or store_mfn yet.
 	 */
-	dom0 = (xen_start_info->store_evtchn == 0);
-
-	if (dom0) {
+	if (is_initial_xendomain()) {
 		struct evtchn_alloc_unbound alloc_unbound;
 
 		/* Allocate page. */
@@ -1037,7 +1035,7 @@ static int __init xenbus_probe_init(void)
 	device_register(&xenbus_frontend.dev);
 	device_register(&xenbus_backend.dev);
 
-	if (!dom0)
+	if (!is_initial_xendomain())
 		xenbus_probe(NULL);
 
 	return 0;
