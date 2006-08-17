@@ -900,8 +900,10 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	if (skb->ip_summed == CHECKSUM_HW) /* local packet? */
 		tx->flags |= NETTXF_csum_blank | NETTXF_data_validated;
+#ifdef CONFIG_XEN
 	if (skb->proto_data_valid) /* remote but checksummed? */
 		tx->flags |= NETTXF_data_validated;
+#endif
 
 #ifdef HAVE_GSO
 	if (skb_shinfo(skb)->gso_size) {
@@ -1312,15 +1314,14 @@ err:
 		 * Old backends do not assert data_validated but we
 		 * can infer it from csum_blank so test both flags.
 		 */
-		if (rx->flags & (NETRXF_data_validated|NETRXF_csum_blank)) {
+		if (rx->flags & (NETRXF_data_validated|NETRXF_csum_blank))
 			skb->ip_summed = CHECKSUM_UNNECESSARY;
-			skb->proto_data_valid = 1;
-		} else {
+		else
 			skb->ip_summed = CHECKSUM_NONE;
-			skb->proto_data_valid = 0;
-		}
+#ifdef CONFIG_XEN
+		skb->proto_data_valid = (skb->ip_summed != CHECKSUM_NONE);
 		skb->proto_csum_blank = !!(rx->flags & NETRXF_csum_blank);
-
+#endif
 		np->stats.rx_packets++;
 		np->stats.rx_bytes += skb->len;
 
