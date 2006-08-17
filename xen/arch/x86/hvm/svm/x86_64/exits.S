@@ -107,8 +107,7 @@ ENTRY(svm_asm_do_launch)
         movq %rax, VMCB_rax(%rcx)
         leaq root_vmcb_pa(%rip), %rax
         movl VCPU_processor(%rbx), %ecx
-        shll $3, %ecx
-        addq %rcx, %rax
+        movq (%rax,%rcx,8), %rax
         VMSAVE
 
         movq VCPU_svm_vmcb_pa(%rbx), %rax
@@ -139,10 +138,9 @@ ENTRY(svm_asm_do_launch)
         HVM_SAVE_ALL_NOSEGREGS
 
         GET_CURRENT(%rbx)
-        movl VCPU_processor(%rbx), %ecx
         leaq root_vmcb_pa(%rip), %rax
-        shll $3, %ecx
-        addq %rcx, %rax
+        movl VCPU_processor(%rbx), %ecx
+        movq (%rax,%rcx,8), %rax
         VMLOAD
 
         STGI
