@@ -46,6 +46,7 @@
 #include <xen/interface/grant_table.h>
 #include <xen/gnttab.h>
 #include <asm/hypervisor.h>
+#include <asm/maddr.h>
 
 #define BLKIF_STATE_DISCONNECTED 0
 #define BLKIF_STATE_CONNECTED    1
