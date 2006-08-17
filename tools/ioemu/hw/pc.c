@@ -823,6 +823,9 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, int boot_device,
     }
 #endif /* !CONFIG_DM */
 
+    if (pci_enabled)
+        pci_xen_platform_init(pci_bus);
+
     for(i = 0; i < MAX_SERIAL_PORTS; i++) {
         if (serial_hds[i]) {
             serial_init(&pic_set_irq_new, isa_pic,

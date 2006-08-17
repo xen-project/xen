@@ -1208,6 +1208,9 @@ void xenstore_process_event(void *opaque);
 void xenstore_check_new_media_present(int timeout);
 void xenstore_write_vncport(int vnc_display);
 
+/* xen_platform.c */
+void pci_xen_platform_init(PCIBus *bus);
+
 
 void kqemu_record_dump(void);
 
