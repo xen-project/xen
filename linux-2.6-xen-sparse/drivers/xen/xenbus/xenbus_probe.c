@@ -1023,6 +1023,8 @@ static int __init xenbus_probe_init(void)
 
 	xen_store_interface = mfn_to_virt(xen_store_mfn);
 
+	xenbus_dev_init();
+
 	/* Initialize the interface to xenstore. */
 	err = xs_init();
 	if (err) {
@@ -1054,6 +1056,8 @@ static int __init xenbus_probe_init(void)
 }
 
 postcore_initcall(xenbus_probe_init);
+
+MODULE_LICENSE("Dual BSD/GPL");
 
 
 static int is_disconnected_device(struct device *dev, void *data)
@@ -1138,6 +1142,7 @@ static void wait_for_devices(struct xenbus_driver *xendrv)
 			 print_device_status);
 }
 
+#ifndef MODULE
 static int __init boot_wait_for_devices(void)
 {
 	ready_to_wait_for_devices = 1;
@@ -1146,3 +1151,4 @@ static int __init boot_wait_for_devices(void)
 }
 
 late_initcall(boot_wait_for_devices);
+#endif

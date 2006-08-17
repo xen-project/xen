@@ -295,5 +295,6 @@ void xenbus_dev_error(struct xenbus_device *dev, int err, const char *fmt,
 void xenbus_dev_fatal(struct xenbus_device *dev, int err, const char *fmt,
 		      ...);
 
+int __init xenbus_dev_init(void);
 
 #endif /* _XEN_XENBUS_H */
