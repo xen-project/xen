@@ -700,7 +700,8 @@ static ulong find_space(u32 size, u32 align, multiboot_info_t *mbi)
     ulong eomem = ((u64)map->length_high << 32) | (u64)map->length_low;
     ulong base;
 
-    if (size == 0) return base;
+    if (size == 0)
+        return 0;
 
     if (align == 0)
         of_panic("cannot call %s() with align of 0\n", __func__);
