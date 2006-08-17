@@ -1218,6 +1218,9 @@ static void net_tx_action(unsigned long unused)
 			skb_shinfo(skb)->nr_frags++;
 			skb_shinfo(skb)->frags[0].page =
 				(void *)(unsigned long)pending_idx;
+		} else {
+			/* Discriminate from any valid pending_idx value. */
+			skb_shinfo(skb)->frags[0].page = (void *)~0UL;
 		}
 
 		__skb_queue_tail(&tx_queue, skb);
