@@ -888,11 +888,12 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
         return (spurious_page_fault(addr, regs) ? EXCRET_not_a_fault : 0);
     }
 
-    if ( likely(VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) &&
+    if ( VM_ASSIST(d, VMASST_TYPE_writable_pagetables) &&
          guest_kernel_mode(v, regs) &&
          ((regs->error_code & (PGERR_write_access|PGERR_page_present)) ==
-          (PGERR_write_access|PGERR_page_present)) )
-        return ptwr_do_page_fault(d, addr, regs) ? EXCRET_fault_fixed : 0;
+          (PGERR_write_access|PGERR_page_present)) &&
+         ptwr_do_page_fault(d, addr, regs) )
+        return EXCRET_fault_fixed;
 
     if ( shadow2_mode_enabled(d) )
         return shadow2_fault(addr, regs);
