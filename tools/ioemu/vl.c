@@ -6036,10 +6036,11 @@ int main(int argc, char **argv)
                 }
                 break;
             case QEMU_OPTION_nographic:
-                pstrcpy(monitor_device, sizeof(monitor_device), "stdio");
+                if(!strcmp(monitor_device, "vc"))
+                    pstrcpy(monitor_device, sizeof(monitor_device), "null");
                 if(!strcmp(serial_devices[0], "vc"))
                     pstrcpy(serial_devices[0], sizeof(serial_devices[0]),
-                            "stdio");
+                            "null");
                 nographic = 1;
                 break;
             case QEMU_OPTION_kernel:
