@@ -1,7 +1,7 @@
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2006-08-09 21:32:24.915816410 +0100
-+++ ioemu/Makefile.target	2006-08-09 21:32:25.500750429 +0100
+--- ioemu.orig/Makefile.target	2006-08-17 19:50:02.405870095 +0100
++++ ioemu/Makefile.target	2006-08-17 19:50:18.866050726 +0100
 @@ -358,6 +358,7 @@
  VL_OBJS+= cirrus_vga.o mixeng.o parallel.o acpi.o piix_pci.o
  VL_OBJS+= usb-uhci.o
@@ -13,7 +13,7 @@ Index: ioemu/Makefile.target
 Index: ioemu/xenstore.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/xenstore.c	2006-08-09 21:32:25.501750317 +0100
++++ ioemu/xenstore.c	2006-08-17 19:50:18.867050616 +0100
 @@ -0,0 +1,187 @@
 +/*
 + * This file is subject to the terms and conditions of the GNU General
@@ -204,8 +204,8 @@ Index: ioemu/xenstore.c
 +}
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-08-09 21:32:25.438757422 +0100
-+++ ioemu/vl.c	2006-08-09 21:32:25.504749978 +0100
+--- ioemu.orig/vl.c	2006-08-17 19:50:17.086247452 +0100
++++ ioemu/vl.c	2006-08-17 19:50:18.870050284 +0100
 @@ -5243,9 +5243,11 @@
             "Standard options:\n"
             "-M machine      select emulated machine (-M ? for list)\n"
@@ -359,7 +359,7 @@ Index: ioemu/vl.c
  
      setvbuf(stdout, NULL, _IOLBF, 0);
      
-@@ -6417,6 +6448,7 @@
+@@ -6435,6 +6466,7 @@
  
  #endif /* !CONFIG_DM */
  
@@ -367,7 +367,7 @@ Index: ioemu/vl.c
      /* we always create the cdrom drive, even if no disk is there */
      bdrv_init();
      if (cdrom_index >= 0) {
-@@ -6443,6 +6475,7 @@
+@@ -6461,6 +6493,7 @@
              }
          }
      }
@@ -375,7 +375,7 @@ Index: ioemu/vl.c
  
      /* we always create at least one floppy disk */
      fd_table[0] = bdrv_new("fda");
-@@ -6521,6 +6554,8 @@
+@@ -6539,6 +6572,8 @@
          }
      }
  
@@ -386,8 +386,8 @@ Index: ioemu/vl.c
                    kernel_filename, kernel_cmdline, initrd_filename,
 Index: ioemu/monitor.c
 ===================================================================
---- ioemu.orig/monitor.c	2006-08-09 21:32:24.238892765 +0100
-+++ ioemu/monitor.c	2006-08-09 21:32:25.505749865 +0100
+--- ioemu.orig/monitor.c	2006-08-17 19:49:44.491850141 +0100
++++ ioemu/monitor.c	2006-08-17 19:50:18.871050174 +0100
 @@ -24,6 +24,7 @@
  #include "vl.h"
  #include "disas.h"
@@ -416,8 +416,8 @@ Index: ioemu/monitor.c
      int i;
 Index: ioemu/block.c
 ===================================================================
---- ioemu.orig/block.c	2006-08-09 21:32:18.339558126 +0100
-+++ ioemu/block.c	2006-08-09 21:32:25.506749753 +0100
+--- ioemu.orig/block.c	2006-08-17 19:37:35.865578948 +0100
++++ ioemu/block.c	2006-08-17 19:50:18.872050063 +0100
 @@ -758,6 +758,7 @@
  static void raw_close(BlockDriverState *bs)
  {
@@ -428,9 +428,9 @@ Index: ioemu/block.c
  
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-08-09 21:32:25.439757309 +0100
-+++ ioemu/vl.h	2006-08-09 21:32:25.506749753 +0100
-@@ -1187,6 +1187,8 @@
+--- ioemu.orig/vl.h	2006-08-17 19:50:17.087247341 +0100
++++ ioemu/vl.h	2006-08-17 19:50:18.872050063 +0100
+@@ -1188,6 +1188,8 @@
  void term_print_help(void);
  void monitor_readline(const char *prompt, int is_password,
                        char *buf, int buf_size);
@@ -439,7 +439,7 @@ Index: ioemu/vl.h
  
  /* readline.c */
  typedef void ReadLineFunc(void *opaque, const char *str);
-@@ -1199,6 +1201,13 @@
+@@ -1200,6 +1202,13 @@
  void readline_start(const char *prompt, int is_password,
                      ReadLineFunc *readline_func, void *opaque);
  
@@ -455,8 +455,8 @@ Index: ioemu/vl.h
  extern char domain_name[];
 Index: ioemu/hw/ide.c
 ===================================================================
---- ioemu.orig/hw/ide.c	2006-08-09 21:32:24.658845396 +0100
-+++ ioemu/hw/ide.c	2006-08-09 21:32:25.508749527 +0100
+--- ioemu.orig/hw/ide.c	2006-08-17 19:49:57.830375828 +0100
++++ ioemu/hw/ide.c	2006-08-17 19:50:18.874049842 +0100
 @@ -1158,6 +1158,7 @@
          } else {
              ide_atapi_cmd_error(s, SENSE_NOT_READY, 

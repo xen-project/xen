@@ -1,7 +1,7 @@
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2006-08-06 02:22:26.380544784 +0100
-+++ ioemu/Makefile.target	2006-08-06 02:23:23.059226607 +0100
+--- ioemu.orig/Makefile.target	2006-08-17 19:49:33.813030472 +0100
++++ ioemu/Makefile.target	2006-08-17 19:49:50.228216099 +0100
 @@ -354,7 +354,7 @@
  ifeq ($(TARGET_BASE_ARCH), i386)
  # Hardware support
@@ -13,8 +13,8 @@ Index: ioemu/Makefile.target
  DEFINES += -DHAS_AUDIO
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2006-08-06 02:22:35.588518336 +0100
-+++ ioemu/hw/pc.c	2006-08-06 02:23:07.875919141 +0100
+--- ioemu.orig/hw/pc.c	2006-08-17 19:49:35.507843144 +0100
++++ ioemu/hw/pc.c	2006-08-17 19:49:50.229215988 +0100
 @@ -38,7 +38,9 @@
  
  static fdctrl_t *floppy_controller;
@@ -38,8 +38,8 @@ Index: ioemu/hw/pc.c
          pic_set_alt_irq_func(isa_pic, ioapic_set_irq, ioapic);
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-08-06 02:23:05.216215627 +0100
-+++ ioemu/vl.c	2006-08-06 02:23:07.878918807 +0100
+--- ioemu.orig/vl.c	2006-08-17 19:49:48.566399780 +0100
++++ ioemu/vl.c	2006-08-17 19:49:50.231215767 +0100
 @@ -5570,6 +5570,7 @@
  
  #ifdef HAS_AUDIO

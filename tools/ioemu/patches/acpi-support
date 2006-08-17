@@ -1,7 +1,7 @@
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2006-08-09 19:54:26.055548240 +0100
-+++ ioemu/Makefile.target	2006-08-09 21:29:37.834611244 +0100
+--- ioemu.orig/Makefile.target	2006-08-17 19:49:50.228216099 +0100
++++ ioemu/Makefile.target	2006-08-17 19:50:02.405870095 +0100
 @@ -357,6 +357,7 @@
  VL_OBJS+= fdc.o mc146818rtc.o serial.o pc.o
  VL_OBJS+= cirrus_vga.o mixeng.o parallel.o acpi.o piix_pci.o
@@ -12,8 +12,8 @@ Index: ioemu/Makefile.target
  ifeq ($(TARGET_BASE_ARCH), ppc)
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2006-08-09 19:54:26.133539447 +0100
-+++ ioemu/hw/pc.c	2006-08-09 21:30:30.188733212 +0100
+--- ioemu.orig/hw/pc.c	2006-08-17 19:49:59.312212039 +0100
++++ ioemu/hw/pc.c	2006-08-17 19:50:02.406869984 +0100
 @@ -874,13 +874,19 @@
  
      cmos_init(ram_size, boot_device, bs_table, timeoffset);
@@ -49,7 +49,7 @@ Index: ioemu/hw/pc.c
 Index: ioemu/hw/piix4acpi.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/hw/piix4acpi.c	2006-08-09 21:32:04.400129788 +0100
++++ ioemu/hw/piix4acpi.c	2006-08-17 19:50:02.407869874 +0100
 @@ -0,0 +1,388 @@
 +/*
 + * PIIX4 ACPI controller emulation
@@ -441,8 +441,8 @@ Index: ioemu/hw/piix4acpi.c
 +}
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-08-09 19:54:26.135539222 +0100
-+++ ioemu/vl.c	2006-08-09 21:29:38.067585110 +0100
+--- ioemu.orig/vl.c	2006-08-17 19:49:59.315211708 +0100
++++ ioemu/vl.c	2006-08-17 19:50:02.410869542 +0100
 @@ -156,7 +156,7 @@
  #else
  #define MAX_CPUS 1
@@ -488,9 +488,9 @@ Index: ioemu/vl.c
      }
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-08-09 19:54:26.136539109 +0100
-+++ ioemu/vl.h	2006-08-09 21:31:21.772931536 +0100
-@@ -167,6 +167,7 @@
+--- ioemu.orig/vl.h	2006-08-17 19:49:59.316211597 +0100
++++ ioemu/vl.h	2006-08-17 19:50:02.411869432 +0100
+@@ -168,6 +168,7 @@
  extern int kqemu_allowed;
  extern int win2k_install_hack;
  extern int usb_enabled;
@@ -498,7 +498,7 @@ Index: ioemu/vl.h
  extern int smp_cpus;
  
  /* XXX: make it dynamic */
-@@ -922,6 +923,9 @@
+@@ -923,6 +924,9 @@
  void piix4_pm_init(PCIBus *bus, int devfn);
  void acpi_bios_init(void);
  
@@ -510,8 +510,8 @@ Index: ioemu/vl.h
  extern QEMUMachine isapc_machine;
 Index: ioemu/hw/piix_pci.c
 ===================================================================
---- ioemu.orig/hw/piix_pci.c	2006-08-09 19:54:19.636318228 +0100
-+++ ioemu/hw/piix_pci.c	2006-08-09 19:54:26.152537305 +0100
+--- ioemu.orig/hw/piix_pci.c	2006-08-17 19:38:05.806252180 +0100
++++ ioemu/hw/piix_pci.c	2006-08-17 19:50:02.411869432 +0100
 @@ -241,7 +241,7 @@
  static uint32_t pci_bios_io_addr;
  static uint32_t pci_bios_mem_addr;

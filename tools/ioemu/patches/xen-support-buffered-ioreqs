@@ -1,38 +1,38 @@
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-08-09 15:04:25.583508863 +0100
-+++ ioemu/vl.c	2006-08-09 15:04:26.034465993 +0100
+--- ioemu.orig/vl.c	2006-08-17 19:50:22.277673633 +0100
++++ ioemu/vl.c	2006-08-17 19:55:21.878556486 +0100
 @@ -5838,6 +5838,7 @@
-     unsigned long nr_pages;
+     unsigned long nr_pages, tmp_nr_pages, shared_page_nr;
      xen_pfn_t *page_array;
      extern void *shared_page;
 +    extern void *buffered_io_page;
  
      char qemu_dm_logfilename[64];
  
-@@ -6388,12 +6389,17 @@
- 
-     phys_ram_base = xc_map_foreign_batch(xc_handle, domid,
-                                          PROT_READ|PROT_WRITE, page_array,
--                                         nr_pages - 1);
-+                                         nr_pages - 3);
-     if (phys_ram_base == 0) {
-         fprintf(logfile, "xc_map_foreign_batch returned error %d\n", errno);
-         exit(-1);
-     }
+@@ -6419,6 +6420,18 @@
+     fprintf(logfile, "shared page at pfn:%lx, mfn: %"PRIx64"\n",
+             shared_page_nr, (uint64_t)(page_array[shared_page_nr]));
  
 +    /* not yet add for IA64 */
 +    buffered_io_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
-+                                       PROT_READ|PROT_WRITE,
-+                                       page_array[nr_pages - 3]);
++                                            PROT_READ|PROT_WRITE,
++                                            page_array[shared_page_nr - 2]);
++    if (buffered_io_page == NULL) {
++        fprintf(logfile, "map buffered IO page returned error %d\n", errno);
++        exit(-1);
++    }
 +
-     shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
-                                        PROT_READ|PROT_WRITE,
-                                        page_array[nr_pages - 1]);
++    fprintf(logfile, "buffered io page at pfn:%lx, mfn: %"PRIx64"\n",
++            shared_page_nr - 2, (uint64_t)(page_array[shared_page_nr - 2]));
++
+     free(page_array);
+ 
+ #elif defined(__ia64__)
 Index: ioemu/target-i386-dm/helper2.c
 ===================================================================
---- ioemu.orig/target-i386-dm/helper2.c	2006-08-09 15:04:24.105649313 +0100
-+++ ioemu/target-i386-dm/helper2.c	2006-08-09 15:04:26.040465422 +0100
+--- ioemu.orig/target-i386-dm/helper2.c	2006-08-17 19:49:44.491850141 +0100
++++ ioemu/target-i386-dm/helper2.c	2006-08-17 19:50:41.490549986 +0100
 @@ -76,6 +76,10 @@
  
  shared_iopage_t *shared_page = NULL;

@@ -1,7 +1,7 @@
 Index: ioemu/configure
 ===================================================================
---- ioemu.orig/configure	2006-08-06 02:15:01.771108621 +0100
-+++ ioemu/configure	2006-08-06 02:42:26.213918476 +0100
+--- ioemu.orig/configure	2006-08-17 19:37:35.772589281 +0100
++++ ioemu/configure	2006-08-17 19:50:24.735401975 +0100
 @@ -228,8 +228,6 @@
    ;;
    --enable-cocoa) cocoa="yes" ; coreaudio="yes" ; sdl="no"
