@@ -456,7 +456,8 @@ static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 
 	memcpy(netdev->dev_addr, info->mac, ETH_ALEN);
 	err = bind_evtchn_to_irqhandler(info->evtchn, netif_int,
-					SA_SAMPLE_RANDOM, netdev->name, netdev);
+					SA_SAMPLE_RANDOM, netdev->name,
+					netdev);
 	if (err < 0)
 		goto fail;
 	info->irq = err;
@@ -535,11 +536,14 @@ static int network_open(struct net_device *dev)
 
 	memset(&np->stats, 0, sizeof(np->stats));
 
-	network_alloc_rx_buffers(dev);
-	np->rx.sring->rsp_event = np->rx.rsp_cons + 1;
-
-	if (RING_HAS_UNCONSUMED_RESPONSES(&np->rx))
-		netif_rx_schedule(dev);
+	spin_lock(&np->rx_lock);
+	if (netif_carrier_ok(dev)) {
+		network_alloc_rx_buffers(dev);
+		np->rx.sring->rsp_event = np->rx.rsp_cons + 1;
+		if (RING_HAS_UNCONSUMED_RESPONSES(&np->rx))
+			netif_rx_schedule(dev);
+	}
+	spin_unlock(&np->rx_lock);
 
 	netif_start_queue(dev);
 
@@ -568,8 +572,7 @@ static void network_tx_buf_gc(struct net_device *dev)
 	struct netfront_info *np = netdev_priv(dev);
 	struct sk_buff *skb;
 
-	if (unlikely(!netif_carrier_ok(dev)))
-		return;
+	BUG_ON(!netif_carrier_ok(dev));
 
 	do {
 		prod = np->tx.sring->rsp_prod;
@@ -961,12 +964,15 @@ static irqreturn_t netif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 	unsigned long flags;
 
 	spin_lock_irqsave(&np->tx_lock, flags);
-	network_tx_buf_gc(dev);
-	spin_unlock_irqrestore(&np->tx_lock, flags);
 
-	if (RING_HAS_UNCONSUMED_RESPONSES(&np->rx) &&
-	    likely(netif_running(dev)))
-		netif_rx_schedule(dev);
+	if (likely(netif_carrier_ok(dev))) {
+		network_tx_buf_gc(dev);
+		/* Under tx_lock: protects access to rx shared-ring indexes. */
+		if (RING_HAS_UNCONSUMED_RESPONSES(&np->rx))
+			netif_rx_schedule(dev);
+	}
+
+	spin_unlock_irqrestore(&np->tx_lock, flags);
 
 	return IRQ_HANDLED;
 }
