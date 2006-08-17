@@ -41,3 +41,4 @@ qemu-allow-disable-sdl
 qemu-fix-memset-args
 qemu-fix-write-to-disk-synchronous
 xen-support-buffered-ioreqs
+qemu-daemonize

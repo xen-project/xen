@@ -1,0 +1,20 @@
+Changes required because qemu-dm runs daemonized.
+
+Index: ioemu/vl.c
+===================================================================
+--- ioemu.orig/vl.c	2006-08-16 15:11:32.575865776 +0100
++++ ioemu/vl.c	2006-08-16 15:11:36.217465702 +0100
+@@ -6036,10 +6036,11 @@
+                 }
+                 break;
+             case QEMU_OPTION_nographic:
+-                pstrcpy(monitor_device, sizeof(monitor_device), "stdio");
++                if(!strcmp(monitor_device, "vc"))
++                    pstrcpy(monitor_device, sizeof(monitor_device), "null");
+                 if(!strcmp(serial_devices[0], "vc"))
+                     pstrcpy(serial_devices[0], sizeof(serial_devices[0]),
+-                            "stdio");
++                            "null");
+                 nographic = 1;
+                 break;
+             case QEMU_OPTION_kernel:
