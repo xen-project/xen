@@ -710,6 +710,7 @@ no_skb:
 							(unsigned long)vaddr,
 							__pte(0), 0);
 			}
+			nr_flips++;
 		} else {
 			gnttab_grant_foreign_access_ref(ref,
 							np->xbdev->otherend_id,
