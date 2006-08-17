@@ -5,6 +5,7 @@ C=$PWD
 XEN=$C/../../xen
 XL=$C/../../linux-2.6-xen-sparse
 
+ln -sf ${XL}/drivers/xen/core/gnttab.c platform-pci
 ln -sf ${XL}/drivers/xen/core/features.c platform-pci
 
 mkdir -p include

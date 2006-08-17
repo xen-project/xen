@@ -64,14 +64,17 @@ static int __init init_xen_info(void)
 	xatp.idx = 0;
 	xatp.space = XENMAPSPACE_shared_info;
 	xatp.gpfn = shared_info_frame;
-	BUG_ON(HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp));
+	if (HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp))
+		BUG();
+
 	shared_info_area =
 		ioremap(shared_info_frame << PAGE_SHIFT, PAGE_SIZE);
-
-	if (!shared_info_area)
+	if (shared_info_area == NULL)
 		panic("can't map shared info\n");
 
 	phys_to_machine_mapping = NULL;
+
+	gnttab_init();
 
 	return 0;
 }

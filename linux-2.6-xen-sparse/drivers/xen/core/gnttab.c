@@ -41,6 +41,8 @@
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
 #include <asm/synch_bitops.h>
+#include <asm/io.h>
+#include <xen/interface/memory.h>
 
 /* External tools reserve first few grant table entries. */
 #define NR_RESERVED_ENTRIES 8
@@ -350,6 +352,8 @@ void gnttab_cancel_free_callback(struct gnttab_free_callback *callback)
 }
 EXPORT_SYMBOL_GPL(gnttab_cancel_free_callback);
 
+#ifdef CONFIG_XEN
+
 #ifndef __ia64__
 static int map_pte_fn(pte_t *pte, struct page *pmd_page,
 		      unsigned long addr, void *data)
@@ -404,23 +408,57 @@ int gnttab_resume(void)
 	shared = __va(frames[0] << PAGE_SHIFT);
 	printk("grant table at %p\n", shared);
 #endif
+}
+
+int gnttab_suspend(void)
+{
+#ifndef __ia64__
+	apply_to_page_range(&init_mm, (unsigned long)shared,
+			    PAGE_SIZE * NR_GRANT_FRAMES,
+			    unmap_pte_fn, NULL);
+#endif
+	return 0;
+}
+
+#else /* !CONFIG_XEN */
+
+#include <platform-pci.h>
+
+int gnttab_resume(void)
+{
+	unsigned long frames;
+	struct xen_add_to_physmap xatp;
+	unsigned int i;
+
+	frames = alloc_xen_mmio(PAGE_SIZE * NR_GRANT_FRAMES);
+
+	for (i = 0; i < NR_GRANT_FRAMES; i++) {
+		xatp.domid = DOMID_SELF;
+		xatp.idx = i;
+		xatp.space = XENMAPSPACE_grant_table;
+		xatp.gpfn = (frames >> PAGE_SHIFT) + i;
+		if (HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp))
+			BUG();
+	}
+
+	shared = ioremap(frames, PAGE_SIZE * NR_GRANT_FRAMES);
+	if (shared == NULL) {
+		printk("error to ioremap gnttab share frames\n");
+		return -1;
+	}
 
 	return 0;
 }
 
 int gnttab_suspend(void)
 {
-
-#ifndef __ia64__
-	apply_to_page_range(&init_mm, (unsigned long)shared,
-			    PAGE_SIZE * NR_GRANT_FRAMES,
-			    unmap_pte_fn, NULL);
-#endif
-
+	iounmap(shared);
 	return 0;
 }
 
-static int __init gnttab_init(void)
+#endif /* !CONFIG_XEN */
+
+int __init gnttab_init(void)
 {
 	int i;
 
@@ -439,4 +477,6 @@ static int __init gnttab_init(void)
 	return 0;
 }
 
+#ifdef CONFIG_XEN
 core_initcall(gnttab_init);
+#endif

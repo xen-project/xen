@@ -36,6 +36,8 @@ static inline int set_callback_irq(int irq)
 
 unsigned long alloc_xen_mmio(unsigned long len);
 
+int gnttab_init(void);
+
 void setup_xen_features(void);
 
 irqreturn_t evtchn_interrupt(int irq, void *dev_id, struct pt_regs *regs);
