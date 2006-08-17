@@ -533,25 +533,6 @@ static inline void sh2_unpin(struct vcpu *v, mfn_t smfn)
 }
 
 /**************************************************************************/
-/* CPU feature support querying */
-
-static inline int
-guest_supports_superpages(struct vcpu *v)
-{
-    return hvm_guest(v) && (hvm_get_guest_ctrl_reg(v, 4) & X86_CR4_PSE);
-}
-
-static inline int
-guest_supports_nx(struct vcpu *v)
-{
-    if ( !hvm_guest(v) )
-        return cpu_has_nx;
-
-    // XXX - fix this!
-    return 1;
-}
-
-/**************************************************************************/
 /* Guest physmap (p2m) support */
 
 /* Read our own P2M table, checking in the linear pagetables first to be

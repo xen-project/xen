@@ -2165,9 +2165,6 @@ void sh2_remove_shadows(struct vcpu *v, mfn_t gmfn, int all)
         0  /* unused  */
     };
 
-    SHADOW2_PRINTK("d=%d, v=%d, gmfn=%05lx\n",
-                   v->domain->domain_id, v->vcpu_id, mfn_x(gmfn));
-
     ASSERT(shadow2_lock_is_acquired(v->domain));
 
     pg = mfn_to_page(gmfn);
@@ -2175,6 +2172,9 @@ void sh2_remove_shadows(struct vcpu *v, mfn_t gmfn, int all)
     /* Bale out now if the page is not shadowed */
     if ( (pg->count_info & PGC_page_table) == 0 )
         return;
+
+    SHADOW2_PRINTK("d=%d, v=%d, gmfn=%05lx\n",
+                   v->domain->domain_id, v->vcpu_id, mfn_x(gmfn));
 
     /* Search for this shadow in all appropriate shadows */
     perfc_incrc(shadow2_unshadow);
@@ -2843,7 +2843,7 @@ sh2_p2m_remove_page(struct domain *d, unsigned long gfn, unsigned long mfn)
         v = d->vcpu[0];
 
 
-    SHADOW2_PRINTK("removing gfn=%#lx mfn=%#lx\n", gfn, mfn);
+    SHADOW2_DEBUG(P2M, "removing gfn=%#lx mfn=%#lx\n", gfn, mfn);
 
     ASSERT(mfn_x(sh2_gfn_to_mfn(d, gfn)) == mfn);
     //ASSERT(sh2_mfn_to_gfn(d, mfn) == gfn);
