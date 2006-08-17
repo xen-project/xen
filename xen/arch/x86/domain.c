@@ -556,7 +556,8 @@ static void load_segments(struct vcpu *n)
             n->vcpu_info->evtchn_upcall_mask = 1;
 
         regs->entry_vector  = TRAP_syscall;
-        regs->rflags       &= 0xFFFCBEFFUL;
+        regs->rflags       &= ~(X86_EFLAGS_AC|X86_EFLAGS_VM|X86_EFLAGS_RF|
+                                X86_EFLAGS_NT|X86_EFLAGS_TF);
         regs->ss            = __GUEST_SS;
         regs->rsp           = (unsigned long)(rsp-11);
         regs->cs            = __GUEST_CS;

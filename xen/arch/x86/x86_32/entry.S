@@ -356,7 +356,8 @@ FLT25:  movl %eax,%gs:12(%esi)
         movl %eax,UREGS_gs+4(%esp)
 nvm86_3:/* Rewrite our stack frame and return to ring 1. */
         /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
-        andl $0xfffcbeff,UREGS_eflags+4(%esp)
+        andl $~(X86_EFLAGS_VM|X86_EFLAGS_RF|\
+                X86_EFLAGS_NT|X86_EFLAGS_TF),UREGS_eflags+4(%esp)
         mov  %gs,UREGS_ss+4(%esp)
         movl %esi,UREGS_esp+4(%esp)
         movzwl TRAPBOUNCE_cs(%edx),%eax
