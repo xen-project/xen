@@ -489,7 +489,7 @@ shadow2_guest_physmap_remove_page(struct domain *d, unsigned long gfn,
  */
 #define PGC_SH2_type_to_index(_type) ((_type) >> PGC_SH2_type_shift)
 #define SH2F_page_type_mask \
-    (((1u << PGC_SH2_type_to_index(PGC_SH2_max_shadow + 1u)) - 1u) - \
+    (((1u << (PGC_SH2_type_to_index(PGC_SH2_max_shadow) + 1u)) - 1u) - \
      ((1u << PGC_SH2_type_to_index(PGC_SH2_min_shadow)) - 1u))
 
 #define SH2F_L1_32   (1u << PGC_SH2_type_to_index(PGC_SH2_l1_32_shadow))
