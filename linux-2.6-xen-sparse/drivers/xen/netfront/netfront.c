@@ -64,6 +64,20 @@
 
 #define RX_COPY_THRESHOLD 256
 
+/* If we don't have GSO, fake things up so that we never try to use it. */
+#ifndef NETIF_F_GSO
+#define netif_needs_gso(dev, skb)	0
+#define dev_disable_gso_features(dev)	((void)0)
+#else
+#define HAVE_GSO			1
+static inline void dev_disable_gso_features(struct net_device *dev)
+{
+	/* Turn off all GSO bits except ROBUST. */
+	dev->features &= (1 << NETIF_F_GSO_SHIFT) - 1;
+	dev->features |= NETIF_F_GSO_ROBUST;
+}
+#endif
+
 #define GRANT_INVALID_REF	0
 
 #define NET_TX_RING_SIZE __RING_SIZE((struct netif_tx_sring *)0, PAGE_SIZE)
@@ -362,11 +376,13 @@ again:
 		goto abort_transaction;
 	}
 
+#ifdef HAVE_GSO
 	err = xenbus_printf(xbt, dev->nodename, "feature-gso-tcpv4", "%d", 1);
 	if (err) {
 		message = "writing feature-gso-tcpv4";
 		goto abort_transaction;
 	}
+#endif
 
 	err = xenbus_transaction_end(xbt, 0);
 	if (err) {
@@ -887,6 +903,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (skb->proto_data_valid) /* remote but checksummed? */
 		tx->flags |= NETTXF_data_validated;
 
+#ifdef HAVE_GSO
 	if (skb_shinfo(skb)->gso_size) {
 		struct netif_extra_info *gso = (struct netif_extra_info *)
 			RING_GET_REQUEST(&np->tx, ++i);
@@ -905,6 +922,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		gso->flags = 0;
 		extra = gso;
 	}
+#endif
 
 	np->tx.req_prod_pvt = i + 1;
 
@@ -1151,7 +1169,8 @@ static RING_IDX xennet_fill_frags(struct netfront_info *np,
 	return cons;
 }
 
-static int xennet_set_skb_gso(struct sk_buff *skb, struct netif_extra_info *gso)
+static int xennet_set_skb_gso(struct sk_buff *skb,
+			      struct netif_extra_info *gso)
 {
 	if (!gso->u.gso.size) {
 		if (net_ratelimit())
@@ -1166,6 +1185,7 @@ static int xennet_set_skb_gso(struct sk_buff *skb, struct netif_extra_info *gso)
 		return -EINVAL;
 	}
 
+#ifdef HAVE_GSO
 	skb_shinfo(skb)->gso_size = gso->u.gso.size;
 	skb_shinfo(skb)->gso_type = SKB_GSO_TCPV4;
 
@@ -1174,6 +1194,11 @@ static int xennet_set_skb_gso(struct sk_buff *skb, struct netif_extra_info *gso)
 	skb_shinfo(skb)->gso_segs = 0;
 
 	return 0;
+#else
+	if (net_ratelimit())
+		WPRINTK("GSO unsupported by this kernel.\n");
+	return -EINVAL;
+#endif
 }
 
 static int netif_poll(struct net_device *dev, int *pbudget)
@@ -1408,6 +1433,7 @@ static int xennet_set_sg(struct net_device *dev, u32 data)
 
 static int xennet_set_tso(struct net_device *dev, u32 data)
 {
+#ifdef HAVE_GSO
 	if (data) {
 		struct netfront_info *np = netdev_priv(dev);
 		int val;
@@ -1420,13 +1446,14 @@ static int xennet_set_tso(struct net_device *dev, u32 data)
 	}
 
 	return ethtool_op_set_tso(dev, data);
+#else
+	return -ENOSYS;
+#endif
 }
 
 static void xennet_set_features(struct net_device *dev)
 {
-	/* Turn off all GSO bits except ROBUST. */
-	dev->features &= (1 << NETIF_F_GSO_SHIFT) - 1;
-	dev->features |= NETIF_F_GSO_ROBUST;
+	dev_disable_gso_features(dev);
 	xennet_set_sg(dev, 0);
 
 	/* We need checksum offload to enable scatter/gather and TSO. */
