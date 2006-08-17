@@ -1,0 +1,41 @@
+#! /bin/sh
+
+C=$PWD
+
+XEN=$C/../../xen
+XL=$C/../../linux-2.6-xen-sparse
+
+ln -sf ${XL}/drivers/xen/core/features.c platform-pci
+
+mkdir -p include
+mkdir -p include/xen
+mkdir -p include/public
+mkdir -p include/asm
+
+lndir -silent ${XL}/include/xen include/xen
+ln -sf ${XEN}/include/public include/xen/interface
+
+# Need to be quite careful here: we don't want the files we link in to
+# risk overriding the native Linux ones (in particular, system.h must
+# be native and not xenolinux).
+uname=`uname -m`
+case "$uname"
+in
+"x86_64")
+	ln -sf ${XL}/include/asm-x86_64/mach-xen/asm/hypervisor.h include/asm
+	ln -sf ${XL}/include/asm-x86_64/mach-xen/asm/hypercall.h include/asm
+	ln -sf ${XL}/include/asm-x86_64/mach-xen/asm/synch_bitops.h include/asm
+	ln -sf ${XL}/include/asm-x86_64/mach-xen/asm/maddr.h include/asm
+	ln -sf ${XL}/include/asm-i386 include/asm-i386
+	;;
+i[34567]86)
+	ln -sf ${XL}/include/asm-i386/mach-xen/asm/hypervisor.h include/asm
+	ln -sf ${XL}/include/asm-i386/mach-xen/asm/hypercall.h include/asm
+	ln -sf ${XL}/include/asm-i386/mach-xen/asm/synch_bitops.h include/asm
+	ln -sf ${XL}/include/asm-i386/mach-xen/asm/maddr.h include/asm
+	;;
+*)
+	echo unknown architecture $uname
+	exit 1
+	;;
+esac
