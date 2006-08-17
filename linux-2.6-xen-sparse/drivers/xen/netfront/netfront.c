@@ -58,6 +58,7 @@
 #include <xen/interface/memory.h>
 #include <xen/balloon.h>
 #include <asm/page.h>
+#include <asm/maddr.h>
 #include <asm/uaccess.h>
 #include <xen/interface/grant_table.h>
 #include <xen/gnttab.h>
