@@ -408,6 +408,8 @@ int gnttab_resume(void)
 	shared = __va(frames[0] << PAGE_SHIFT);
 	printk("grant table at %p\n", shared);
 #endif
+
+	return 0;
 }
 
 int gnttab_suspend(void)
