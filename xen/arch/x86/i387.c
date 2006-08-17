@@ -5,7 +5,7 @@
  *
  *  Pentium III FXSR, SSE support
  *  General FPU state handling cleanups
- *	Gareth Hughes <gareth@valinux.com>, May 2000
+ *  Gareth Hughes <gareth@valinux.com>, May 2000
  */
 
 #include <xen/config.h>

@@ -396,7 +396,7 @@ void svm_do_launch(struct vcpu *v)
     v->arch.hvm_svm.saved_irq_vector = -1;
 
     hvm_set_guest_time(v, 0);
-	
+
     if (svm_dbg_on)
         svm_dump_vmcb(__func__, vmcb);
 
@@ -427,24 +427,24 @@ void svm_dump_vmcb(const char *from, struct vmcb_struct *vmcb)
            vmcb->general1_intercepts, vmcb->general2_intercepts);
     printf("iopm_base_pa = %016llx msrpm_base_pa = 0x%016llx tsc_offset = "
             "0x%016llx\n", 
-	    (unsigned long long) vmcb->iopm_base_pa,
-	    (unsigned long long) vmcb->msrpm_base_pa,
-	    (unsigned long long) vmcb->tsc_offset);
+           (unsigned long long) vmcb->iopm_base_pa,
+           (unsigned long long) vmcb->msrpm_base_pa,
+           (unsigned long long) vmcb->tsc_offset);
     printf("tlb_control = 0x%08x vintr = 0x%016llx interrupt_shadow = "
             "0x%016llx\n", vmcb->tlb_control,
-	    (unsigned long long) vmcb->vintr.bytes,
-	    (unsigned long long) vmcb->interrupt_shadow);
+           (unsigned long long) vmcb->vintr.bytes,
+           (unsigned long long) vmcb->interrupt_shadow);
     printf("exitcode = 0x%016llx exitintinfo = 0x%016llx\n", 
            (unsigned long long) vmcb->exitcode,
-	   (unsigned long long) vmcb->exitintinfo.bytes);
+           (unsigned long long) vmcb->exitintinfo.bytes);
     printf("exitinfo1 = 0x%016llx exitinfo2 = 0x%016llx \n",
            (unsigned long long) vmcb->exitinfo1,
-	   (unsigned long long) vmcb->exitinfo2);
+           (unsigned long long) vmcb->exitinfo2);
     printf("np_enable = 0x%016llx guest_asid = 0x%03x\n", 
            (unsigned long long) vmcb->np_enable, vmcb->guest_asid);
     printf("cpl = %d efer = 0x%016llx star = 0x%016llx lstar = 0x%016llx\n", 
            vmcb->cpl, (unsigned long long) vmcb->efer,
-	   (unsigned long long) vmcb->star, (unsigned long long) vmcb->lstar);
+           (unsigned long long) vmcb->star, (unsigned long long) vmcb->lstar);
     printf("CR0 = 0x%016llx CR2 = 0x%016llx\n",
            (unsigned long long) vmcb->cr0, (unsigned long long) vmcb->cr2);
     printf("CR3 = 0x%016llx CR4 = 0x%016llx\n", 
@@ -460,7 +460,7 @@ void svm_dump_vmcb(const char *from, struct vmcb_struct *vmcb)
            (unsigned long long) vmcb->sfmask);
     printf("KernGSBase = 0x%016llx PAT = 0x%016llx \n", 
            (unsigned long long) vmcb->kerngsbase,
-	   (unsigned long long) vmcb->g_pat);
+           (unsigned long long) vmcb->g_pat);
     
     /* print out all the selectors */
     svm_dump_sel("CS", &vmcb->cs);

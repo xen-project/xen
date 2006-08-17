@@ -55,7 +55,7 @@
  * domain pointer, DS, ES, FS, GS. Therefore, we effectively skip 6 registers.
  */
 
-#define NR_SKIPPED_REGS	6	/* See the above explanation */
+#define NR_SKIPPED_REGS 6 /* See the above explanation */
 #define HVM_SAVE_ALL_NOSEGREGS                                              \
         subl $(NR_SKIPPED_REGS*4), %esp;                                    \
         movl $0, 0xc(%esp);  /* XXX why do we need to force eflags==0 ?? */ \

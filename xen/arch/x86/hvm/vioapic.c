@@ -44,7 +44,7 @@
 #define IRQ0_SPECIAL_ROUTING 1
 
 #if defined(__ia64__)
-#define	opt_hvm_debug_level	opt_vmx_debug_level
+#define opt_hvm_debug_level opt_vmx_debug_level
 #endif
 
 static void ioapic_enable(hvm_vioapic_t *s, uint8_t enable)
@@ -264,7 +264,7 @@ static void hvm_vioapic_reset(hvm_vioapic_t *s)
 
     for (i = 0; i < IOAPIC_NUM_PINS; i++) {
         s->redirtbl[i].RedirForm.mask = 0x1;
-	hvm_vioapic_update_imr(s, i);
+        hvm_vioapic_update_imr(s, i);
     }
 }
 
@@ -364,7 +364,7 @@ static uint32_t ioapic_get_delivery_bitmask(hvm_vioapic_t *s,
 
     if (dest_mode == 0) { /* Physical mode */
         for (i = 0; i < s->lapic_count; i++) {
-	    if (VLAPIC_ID(s->lapic_info[i]) == dest) {
+            if (VLAPIC_ID(s->lapic_info[i]) == dest) {
                 mask = 1 << i;
                 break;
             }

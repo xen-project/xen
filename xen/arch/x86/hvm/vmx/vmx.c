@@ -146,7 +146,7 @@ static void vmx_relinquish_guest_resources(struct domain *d)
 
     if ( d->arch.hvm_domain.shared_page_va )
         unmap_domain_page_global(
-	        (void *)d->arch.hvm_domain.shared_page_va);
+            (void *)d->arch.hvm_domain.shared_page_va);
 
     if ( d->arch.hvm_domain.buffered_io_va )
         unmap_domain_page_global((void *)d->arch.hvm_domain.buffered_io_va);
@@ -595,7 +595,7 @@ static int vmx_instruction_length(struct vcpu *v)
     unsigned long inst_len;
 
     if (__vmread(VM_EXIT_INSTRUCTION_LEN, &inst_len))
-    	return 0;
+        return 0;
     return inst_len;
 }
 
@@ -1094,7 +1094,7 @@ static int check_for_null_selector(unsigned long eip)
 
 extern void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
                          unsigned long count, int size, long value,
-			 int dir, int pvalid);
+                         int dir, int pvalid);
 
 static void vmx_io_instruction(unsigned long exit_qualification,
                                unsigned long inst_len)

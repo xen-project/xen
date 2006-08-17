@@ -464,7 +464,7 @@ done_prefixes:
             case 4: insn_fetch(int32_t, 4, _regs.eip, length); break;
             }
             goto done;
-	}
+        }
         break;
     }
 

@@ -484,14 +484,14 @@ static int vga_load_font(const struct font_desc *font, unsigned rows)
     /* First, the Sequencer */
     vga_wseq(vgabase, VGA_SEQ_RESET, 0x1);
     /* CPU writes only to map 2 */
-    vga_wseq(vgabase, VGA_SEQ_PLANE_WRITE, 0x04);	
+    vga_wseq(vgabase, VGA_SEQ_PLANE_WRITE, 0x04);
     /* Sequential addressing */
-    vga_wseq(vgabase, VGA_SEQ_MEMORY_MODE, 0x07);	
+    vga_wseq(vgabase, VGA_SEQ_MEMORY_MODE, 0x07);
     /* Clear synchronous reset */
     vga_wseq(vgabase, VGA_SEQ_RESET, 0x03);
 
     /* Now, the graphics controller, select map 2 */
-    vga_wgfx(vgabase, VGA_GFX_PLANE_READ, 0x02);		
+    vga_wgfx(vgabase, VGA_GFX_PLANE_READ, 0x02);
     /* disable odd-even addressing */
     vga_wgfx(vgabase, VGA_GFX_MODE, 0x00);
     /* map start at A000:0000 */

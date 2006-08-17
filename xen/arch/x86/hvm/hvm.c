@@ -426,12 +426,12 @@ void hvm_print_line(struct vcpu *v, const char c)
 
     if (*index == HVM_PBUF_SIZE-2 || c == '\n') {
         if (*index == HVM_PBUF_SIZE-2)
-	    pbuf[(*index)++] = c;
+            pbuf[(*index)++] = c;
         pbuf[*index] = '\0';
         printk("(GUEST: %u) %s\n", v->domain->domain_id, pbuf);
-	*index = 0;
+        *index = 0;
     } else
-	pbuf[(*index)++] = c;
+        pbuf[(*index)++] = c;
 }
 
 typedef unsigned long hvm_hypercall_t(

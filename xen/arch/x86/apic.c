@@ -10,8 +10,8 @@
  *                  thanks to Eric Gilmore
  *                  and Rolf G. Tews
  *                  for testing these extensively.
- *	Maciej W. Rozycki	:	Various updates and fixes.
- *	Mikael Pettersson	:	Power Management for UP-APIC.
+ *    Maciej W. Rozycki :   Various updates and fixes.
+ *    Mikael Pettersson :   Power Management for UP-APIC.
  *    Pavel Machek and
  *    Mikael Pettersson    :    PM converted to driver model.
  */
@@ -166,7 +166,7 @@ void clear_local_APIC(void)
         apic_write_around(APIC_LVTTHMR, APIC_LVT_MASKED);
 #endif
     v = GET_APIC_VERSION(apic_read(APIC_LVR));
-    if (APIC_INTEGRATED(v)) {	/* !82489DX */
+    if (APIC_INTEGRATED(v)) {  /* !82489DX */
         if (maxlvt > 3)        /* Due to Pentium errata 3AP and 11AP. */
             apic_write(APIC_ESR, 0);
         apic_read(APIC_ESR);
@@ -878,9 +878,9 @@ int __init calibrate_APIC_clock(void)
                     ((long)(t2-t1)/LOOPS)%(1000000/HZ));
 
     apic_printk(APIC_VERBOSE, "..... host bus clock speed is "
-		"%ld.%04ld MHz.\n",
-		result/(1000000/HZ),
-		result%(1000000/HZ));
+                "%ld.%04ld MHz.\n",
+                result/(1000000/HZ),
+                result%(1000000/HZ));
 
     /* set up multipliers for accurate timer code */
     bus_freq   = result*HZ;

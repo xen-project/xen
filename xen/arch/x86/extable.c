@@ -41,8 +41,8 @@ void sort_exception_tables(void)
 
 static inline unsigned long
 search_one_table(const struct exception_table_entry *first,
-		 const struct exception_table_entry *last,
-		 unsigned long value)
+                 const struct exception_table_entry *last,
+                 unsigned long value)
 {
     const struct exception_table_entry *mid;
     long diff;

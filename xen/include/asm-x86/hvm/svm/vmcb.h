@@ -373,7 +373,7 @@ struct vmcb_struct {
     u32 guest_asid;             /* offset 0x58 */
     u8  tlb_control;            /* offset 0x5C */
     u8  res07[3];
-    vintr_t vintr;          	/* offset 0x60 */
+    vintr_t vintr;              /* offset 0x60 */
     u64 interrupt_shadow;       /* offset 0x68 */
     u64 exitcode;               /* offset 0x70 */
     u64 exitinfo1;              /* offset 0x78 */
@@ -399,9 +399,9 @@ struct vmcb_struct {
     u8 res11[3];
     u8 cpl;
     u32 res12;
-    u64 efer;               	/* offset 1024 + 0xD0 */
+    u64 efer;                   /* offset 1024 + 0xD0 */
     u64 res13[14];
-    u64 cr4;                  	/* loffset 1024 + 0x148 */
+    u64 cr4;                    /* loffset 1024 + 0x148 */
     u64 cr3;
     u64 cr0;
     u64 dr7;
@@ -433,7 +433,7 @@ struct vmcb_struct {
 
 
 struct arch_svm_struct {
-    struct vmcb_struct	*vmcb;
+    struct vmcb_struct *vmcb;
     u64                 vmcb_pa;
     u32                 *iopm;
     u32                 *msrpm;

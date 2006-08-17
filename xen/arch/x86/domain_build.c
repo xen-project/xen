@@ -119,7 +119,7 @@ static void process_dom0_ioports_disable(void)
                    "in dom0_ioports_disable, skipping\n", t);
             continue;
         }
-	
+
         if ( *u == '\0' )
             io_to = io_from;
         else if ( *u == '-' )

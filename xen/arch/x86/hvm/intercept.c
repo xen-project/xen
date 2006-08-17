@@ -284,7 +284,7 @@ static __inline__ void missed_ticks(struct periodic_time *pt)
 
     missed_ticks = NOW() - pt->scheduled;
     if ( missed_ticks > 0 ) {
-	missed_ticks = missed_ticks / (s_time_t) pt->period + 1;
+        missed_ticks = missed_ticks / (s_time_t) pt->period + 1;
         if ( missed_ticks > 1000 ) {
             /* TODO: Adjust guest time togther */
             pt->pending_intr_nr++;

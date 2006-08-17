@@ -51,7 +51,7 @@
  * (2/1)  u32 entry_vector;
  * (1/1)  u32 error_code;
  */
-#define NR_SKIPPED_REGS	6	/* See the above explanation */
+#define NR_SKIPPED_REGS 6 /* See the above explanation */
 #define HVM_SAVE_ALL_NOSEGREGS                  \
         subq $(NR_SKIPPED_REGS*8), %rsp;        \
         pushq %rdi;                             \
