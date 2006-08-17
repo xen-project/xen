@@ -5835,7 +5835,7 @@ int main(int argc, char **argv)
     QEMUMachine *machine;
     char usb_devices[MAX_USB_CMDLINE][128];
     int usb_devices_index;
-    unsigned long nr_pages;
+    unsigned long nr_pages, tmp_nr_pages, shared_page_nr;
     xen_pfn_t *page_array;
     extern void *shared_page;
     extern void *buffered_io_page;
@@ -6366,17 +6366,27 @@ int main(int argc, char **argv)
     /* init the memory */
     phys_ram_size = ram_size + vga_ram_size + bios_size;
 
-#if defined (__ia64__)
-    if (ram_size > MMIO_START)
-	ram_size += 1 * MEM_G; /* skip 3G-4G MMIO, LEGACY_IO_SPACE etc. */
-#endif
-
 #ifdef CONFIG_DM
 
-    nr_pages = ram_size/PAGE_SIZE;
     xc_handle = xc_interface_open();
 
-    page_array = (xen_pfn_t *)malloc(nr_pages * sizeof(xen_pfn_t));
+#if defined (__ia64__)
+    if (ram_size > MMIO_START)
+        ram_size += 1 * MEM_G; /* skip 3G-4G MMIO, LEGACY_IO_SPACE etc. */
+#endif
+
+    nr_pages = ram_size/PAGE_SIZE;
+    tmp_nr_pages = nr_pages;
+
+#if defined(__i386__) || defined(__x86_64__)
+    if (ram_size > HVM_BELOW_4G_RAM_END) {
+        tmp_nr_pages += HVM_BELOW_4G_MMIO_LENGTH >> PAGE_SHIFT;
+        shared_page_nr = (HVM_BELOW_4G_RAM_END >> PAGE_SHIFT) - 1;
+    } else
+        shared_page_nr = nr_pages - 1;
+#endif
+
+    page_array = (xen_pfn_t *)malloc(tmp_nr_pages * sizeof(xen_pfn_t));
     if (page_array == NULL) {
         fprintf(logfile, "malloc returned error %d\n", errno);
         exit(-1);
@@ -6388,25 +6398,40 @@ int main(int argc, char **argv)
         exit(-1);
     }
 
+    if (ram_size > HVM_BELOW_4G_RAM_END)
+        for (i = 0; i < nr_pages - (HVM_BELOW_4G_RAM_END >> PAGE_SHIFT); i++)
+            page_array[tmp_nr_pages - 1 - i] = page_array[nr_pages - 1 - i];
+
     phys_ram_base = xc_map_foreign_batch(xc_handle, domid,
                                          PROT_READ|PROT_WRITE, page_array,
-                                         nr_pages - 3);
-    if (phys_ram_base == 0) {
-        fprintf(logfile, "xc_map_foreign_batch returned error %d\n", errno);
+                                         tmp_nr_pages);
+    if (phys_ram_base == NULL) {
+        fprintf(logfile, "batch map guest memory returned error %d\n", errno);
         exit(-1);
     }
 
-    /* not yet add for IA64 */
-    buffered_io_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
-                                       PROT_READ|PROT_WRITE,
-                                       page_array[nr_pages - 3]);
-
     shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
                                        PROT_READ|PROT_WRITE,
-                                       page_array[nr_pages - 1]);
+                                       page_array[shared_page_nr]);
+    if (shared_page == NULL) {
+        fprintf(logfile, "map shared IO page returned error %d\n", errno);
+        exit(-1);
+    }
 
-    fprintf(logfile, "shared page at pfn:%lx, mfn: %"PRIx64"\n", nr_pages - 1,
-            (uint64_t)(page_array[nr_pages - 1]));
+    fprintf(logfile, "shared page at pfn:%lx, mfn: %"PRIx64"\n",
+            shared_page_nr, (uint64_t)(page_array[shared_page_nr]));
+
+    /* not yet add for IA64 */
+    buffered_io_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
+                                            PROT_READ|PROT_WRITE,
+                                            page_array[shared_page_nr - 2]);
+    if (buffered_io_page == NULL) {
+        fprintf(logfile, "map buffered IO page returned error %d\n", errno);
+        exit(-1);
+    }
+
+    fprintf(logfile, "buffered io page at pfn:%lx, mfn: %"PRIx64"\n",
+            shared_page_nr - 2, (uint64_t)(page_array[shared_page_nr - 2]));
 
     free(page_array);
 
@@ -6432,9 +6457,9 @@ int main(int argc, char **argv)
     }
 
     if (ram_size > MMIO_START) {	
-	for (i = 0 ; i < MEM_G >> PAGE_SHIFT; i++)
-	    page_array[MMIO_START >> PAGE_SHIFT + i] =
-		page_array[IO_PAGE_START >> PAGE_SHIFT + 1];
+        for (i = 0 ; i < MEM_G >> PAGE_SHIFT; i++)
+            page_array[MMIO_START >> PAGE_SHIFT + i] =
+                page_array[IO_PAGE_START >> PAGE_SHIFT + 1];
     }
 
     phys_ram_base = xc_map_foreign_batch(xc_handle, domid,

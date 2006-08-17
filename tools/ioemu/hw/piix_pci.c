@@ -415,7 +415,7 @@ void pci_bios_init(void)
     uint8_t elcr[2];
 
     pci_bios_io_addr = 0xc000;
-    pci_bios_mem_addr = 0xf0000000;
+    pci_bios_mem_addr = HVM_BELOW_4G_MMIO_START;
 
     /* activate IRQ mappings */
     elcr[0] = 0x00;

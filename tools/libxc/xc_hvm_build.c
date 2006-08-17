@@ -54,9 +54,19 @@ static void build_e820map(void *e820_page, unsigned long long mem_size)
 {
     struct e820entry *e820entry =
         (struct e820entry *)(((unsigned char *)e820_page) + E820_MAP_OFFSET);
+    unsigned long long extra_mem_size = 0;
     unsigned char nr_map = 0;
 
-    /* XXX: Doesn't work for > 4GB yet */
+    /*
+     * physical address space from HVM_BELOW_4G_RAM_END to 4G is reserved
+     * for PCI devices MMIO. So if HVM has more than HVM_BELOW_4G_RAM_END
+     * RAM, memory beyond HVM_BELOW_4G_RAM_END will go to 4G above.
+     */
+    if ( mem_size > HVM_BELOW_4G_RAM_END ) {
+        extra_mem_size = mem_size - HVM_BELOW_4G_RAM_END;
+        mem_size = HVM_BELOW_4G_RAM_END;
+    }
+
     e820entry[nr_map].addr = 0x0;
     e820entry[nr_map].size = 0x9F000;
     e820entry[nr_map].type = E820_RAM;
@@ -77,53 +87,86 @@ static void build_e820map(void *e820_page, unsigned long long mem_size)
     e820entry[nr_map].type = E820_RESERVED;
     nr_map++;
 
-#define STATIC_PAGES    3
-    /* 3 static pages:
-     * - ioreq buffer.
-     * - xenstore.
-     * - shared_page.
-     */
+/* ACPI data: 10 pages. */
+#define ACPI_DATA_PAGES     10
+/* ACPI NVS: 3 pages.   */
+#define ACPI_NVS_PAGES      3
+/* buffered io page.    */
+#define BUFFERED_IO_PAGES   1
+/* xenstore page.       */
+#define XENSTORE_PAGES      1
+/* shared io page.      */
+#define SHARED_IO_PAGES     1
+/* totally 16 static pages are reserved in E820 table */
 
     /* Most of the ram goes here */
     e820entry[nr_map].addr = 0x100000;
-    e820entry[nr_map].size = mem_size - 0x100000 - STATIC_PAGES * PAGE_SIZE;
+    e820entry[nr_map].size = mem_size - 0x100000 - PAGE_SIZE *
+                                                (ACPI_DATA_PAGES +
+                                                 ACPI_NVS_PAGES +
+                                                 BUFFERED_IO_PAGES +
+                                                 XENSTORE_PAGES +
+                                                 SHARED_IO_PAGES);
     e820entry[nr_map].type = E820_RAM;
     nr_map++;
 
     /* Statically allocated special pages */
 
+    /* For ACPI data */
+    e820entry[nr_map].addr = mem_size - PAGE_SIZE *
+                                        (ACPI_DATA_PAGES +
+                                         ACPI_NVS_PAGES +
+                                         BUFFERED_IO_PAGES +
+                                         XENSTORE_PAGES +
+                                         SHARED_IO_PAGES);
+    e820entry[nr_map].size = PAGE_SIZE * ACPI_DATA_PAGES;
+    e820entry[nr_map].type = E820_ACPI;
+    nr_map++;
+
+    /* For ACPI NVS */
+    e820entry[nr_map].addr = mem_size - PAGE_SIZE *
+                                        (ACPI_NVS_PAGES +
+                                         BUFFERED_IO_PAGES +
+                                         XENSTORE_PAGES +
+                                         SHARED_IO_PAGES);
+    e820entry[nr_map].size = PAGE_SIZE * ACPI_NVS_PAGES;
+    e820entry[nr_map].type = E820_NVS;
+    nr_map++;
+
     /* For buffered IO requests */
-    e820entry[nr_map].addr = mem_size - 3 * PAGE_SIZE;
-    e820entry[nr_map].size = PAGE_SIZE;
+    e820entry[nr_map].addr = mem_size - PAGE_SIZE *
+                                        (BUFFERED_IO_PAGES +
+                                         XENSTORE_PAGES +
+                                         SHARED_IO_PAGES);
+    e820entry[nr_map].size = PAGE_SIZE * BUFFERED_IO_PAGES;
     e820entry[nr_map].type = E820_BUFFERED_IO;
     nr_map++;
 
     /* For xenstore */
-    e820entry[nr_map].addr = mem_size - 2 * PAGE_SIZE;
-    e820entry[nr_map].size = PAGE_SIZE;
+    e820entry[nr_map].addr = mem_size - PAGE_SIZE *
+                                        (XENSTORE_PAGES +
+                                         SHARED_IO_PAGES);
+    e820entry[nr_map].size = PAGE_SIZE * XENSTORE_PAGES;
     e820entry[nr_map].type = E820_XENSTORE;
     nr_map++;
 
     /* Shared ioreq_t page */
-    e820entry[nr_map].addr = mem_size - PAGE_SIZE;
-    e820entry[nr_map].size = PAGE_SIZE;
+    e820entry[nr_map].addr = mem_size - PAGE_SIZE * SHARED_IO_PAGES;
+    e820entry[nr_map].size = PAGE_SIZE * SHARED_IO_PAGES;
     e820entry[nr_map].type = E820_SHARED_PAGE;
-    nr_map++;
-
-    e820entry[nr_map].addr = mem_size;
-    e820entry[nr_map].size = 0x3 * PAGE_SIZE;
-    e820entry[nr_map].type = E820_NVS;
-    nr_map++;
-
-    e820entry[nr_map].addr = mem_size + 0x3 * PAGE_SIZE;
-    e820entry[nr_map].size = 0xA * PAGE_SIZE;
-    e820entry[nr_map].type = E820_ACPI;
     nr_map++;
 
     e820entry[nr_map].addr = 0xFEC00000;
     e820entry[nr_map].size = 0x1400000;
     e820entry[nr_map].type = E820_IO;
     nr_map++;
+
+    if ( extra_mem_size ) {
+        e820entry[nr_map].addr = (1ULL << 32);
+        e820entry[nr_map].size = extra_mem_size;
+        e820entry[nr_map].type = E820_RAM;
+        nr_map++;
+    }
 
     *(((unsigned char *)e820_page) + E820_MAP_NR_OFFSET) = nr_map;
 }
@@ -147,7 +190,7 @@ static void set_hvm_info_checksum(struct hvm_info_table *t)
  */
 static int set_hvm_info(int xc_handle, uint32_t dom,
                         xen_pfn_t *pfn_list, unsigned int vcpus,
-                        unsigned int acpi, unsigned int apic)
+                        unsigned int acpi)
 {
     char *va_map;
     struct hvm_info_table *va_hvm;
@@ -170,8 +213,6 @@ static int set_hvm_info(int xc_handle, uint32_t dom,
     set_hvm_info_checksum(va_hvm);
 
     munmap(va_map, PAGE_SIZE);
-
-    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_APIC_ENABLED, apic);
 
     return 0;
 }
@@ -200,11 +241,7 @@ static int setup_guest(int xc_handle,
     struct domain_setup_info dsi;
     uint64_t v_end;
 
-    unsigned long shared_page_frame = 0;
-    shared_iopage_t *sp;
-
-    unsigned long ioreq_buffer_frame = 0;
-    void *ioreq_buffer_page;
+    unsigned long shared_page_nr;
 
     memset(&dsi, 0, sizeof(struct domain_setup_info));
 
@@ -256,23 +293,38 @@ static int setup_guest(int xc_handle,
     /* Write the machine->phys table entries. */
     for ( count = 0; count < nr_pages; count++ )
     {
+        unsigned long gpfn_count_skip;
+
         ptr = (unsigned long long)page_array[count] << PAGE_SHIFT;
+
+        gpfn_count_skip = 0;
+
+        /*
+         * physical address space from HVM_BELOW_4G_RAM_END to 4G is reserved
+         * for PCI devices MMIO. So if HVM has more than HVM_BELOW_4G_RAM_END
+         * RAM, memory beyond HVM_BELOW_4G_RAM_END will go to 4G above.
+         */
+        if ( count >= (HVM_BELOW_4G_RAM_END >> PAGE_SHIFT) )
+            gpfn_count_skip = HVM_BELOW_4G_MMIO_LENGTH >> PAGE_SHIFT;
+
         if ( xc_add_mmu_update(xc_handle, mmu,
-                               ptr | MMU_MACHPHYS_UPDATE, count) )
+                               ptr | MMU_MACHPHYS_UPDATE,
+                               count + gpfn_count_skip) )
             goto error_out;
     }
 
-    if ( set_hvm_info(xc_handle, dom, page_array, vcpus, acpi, apic) )
+    if ( set_hvm_info(xc_handle, dom, page_array, vcpus, acpi) )
     {
         ERROR("Couldn't set hvm info for HVM guest.\n");
         goto error_out;
     }
 
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_PAE_ENABLED, pae);
+    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_APIC_ENABLED, apic);
 
     if ( (e820_page = xc_map_foreign_range(
               xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
-              page_array[E820_MAP_PAGE >> PAGE_SHIFT])) == 0 )
+              page_array[E820_MAP_PAGE >> PAGE_SHIFT])) == NULL )
         goto error_out;
     memset(e820_page, 0, PAGE_SIZE);
     build_e820map(e820_page, v_end);
@@ -281,7 +333,7 @@ static int setup_guest(int xc_handle,
     /* shared_info page starts its life empty. */
     if ( (shared_info = xc_map_foreign_range(
               xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
-              shared_info_frame)) == 0 )
+              shared_info_frame)) == NULL )
         goto error_out;
     memset(shared_info, 0, PAGE_SIZE);
     /* Mask all upcalls... */
@@ -289,32 +341,25 @@ static int setup_guest(int xc_handle,
         shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
     munmap(shared_info, PAGE_SIZE);
 
-    /* Paranoia */
-    shared_page_frame = page_array[(v_end >> PAGE_SHIFT) - 1];
-    if ( (sp = (shared_iopage_t *) xc_map_foreign_range(
-              xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
-              shared_page_frame)) == 0 )
-        goto error_out;
-    memset(sp, 0, PAGE_SIZE);
-    munmap(sp, PAGE_SIZE);
+    if ( v_end > HVM_BELOW_4G_RAM_END )
+        shared_page_nr = (HVM_BELOW_4G_RAM_END >> PAGE_SHIFT) - 1;
+    else
+        shared_page_nr = (v_end >> PAGE_SHIFT) - 1;
 
-    /* clean the buffered IO requests page */
-    ioreq_buffer_frame = page_array[(v_end >> PAGE_SHIFT) - 3];
-    ioreq_buffer_page = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                             PROT_READ | PROT_WRITE,
-                                             ioreq_buffer_frame);
+    *store_mfn = page_array[shared_page_nr - 1];
 
-    if ( ioreq_buffer_page == NULL )
-        goto error_out;
-
-    memset(ioreq_buffer_page, 0, PAGE_SIZE);
-
-    munmap(ioreq_buffer_page, PAGE_SIZE);
-
-    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_PFN, (v_end >> PAGE_SHIFT) - 2);
+    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_PFN, *store_mfn);
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_EVTCHN, store_evtchn);
 
-    *store_mfn = page_array[(v_end >> PAGE_SHIFT) - 2];
+    /* Paranoia */
+    /* clean the shared IO requests page */
+    if ( xc_clear_domain_page(xc_handle, dom, page_array[shared_page_nr]) )
+        goto error_out;
+
+    /* clean the buffered IO requests page */
+    if ( xc_clear_domain_page(xc_handle, dom, page_array[shared_page_nr - 2]) )
+        goto error_out;
+
     if ( xc_clear_domain_page(xc_handle, dom, *store_mfn) )
         goto error_out;
 

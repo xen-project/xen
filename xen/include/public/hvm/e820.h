@@ -24,4 +24,9 @@ struct e820entry {
     uint32_t type;
 } __attribute__((packed));
 
+#define HVM_BELOW_4G_RAM_END        0xF0000000
+
+#define HVM_BELOW_4G_MMIO_START     HVM_BELOW_4G_RAM_END
+#define HVM_BELOW_4G_MMIO_LENGTH    ((1ULL << 32) - HVM_BELOW_4G_MMIO_START)
+
 #endif /* __XEN_PUBLIC_HVM_E820_H__ */
