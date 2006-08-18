@@ -3050,56 +3050,6 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
  * Writable Pagetables
  */
 
-/* Re-validate a given p.t. page, given its prior snapshot */
-int revalidate_l1(
-    struct domain *d, l1_pgentry_t *l1page, l1_pgentry_t *snapshot)
-{
-    l1_pgentry_t ol1e, nl1e;
-    int modified = 0, i;
-
-    for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
-    {
-        ol1e = snapshot[i];
-        nl1e = l1page[i];
-
-        if ( likely(l1e_get_intpte(ol1e) == l1e_get_intpte(nl1e)) )
-            continue;
-
-        /* Update number of entries modified. */
-        modified++;
-
-        /*
-         * Fast path for PTEs that have merely been write-protected
-         * (e.g., during a Unix fork()). A strict reduction in privilege.
-         */
-        if ( likely(l1e_get_intpte(ol1e) == (l1e_get_intpte(nl1e)|_PAGE_RW)) )
-        {
-            if ( likely(l1e_get_flags(nl1e) & _PAGE_PRESENT) )
-                put_page_type(mfn_to_page(l1e_get_pfn(nl1e)));
-            continue;
-        }
-
-        if ( unlikely(!get_page_from_l1e(nl1e, d)) )
-        {
-            /*
-             * Make the remaining p.t's consistent before crashing, so the
-             * reference counts are correct.
-             */
-            memcpy(&l1page[i], &snapshot[i],
-                   (L1_PAGETABLE_ENTRIES - i) * sizeof(l1_pgentry_t));
-
-            /* Crash the offending domain. */
-            MEM_LOG("ptwr: Could not revalidate l1 page");
-            domain_crash(d);
-            break;
-        }
-        
-        put_page_from_l1e(ol1e, d);
-    }
-
-    return modified;
-}
-
 static int ptwr_emulated_update(
     unsigned long addr,
     paddr_t old,
@@ -3167,10 +3117,27 @@ static int ptwr_emulated_update(
     nl1e = l1e_from_intpte(val);
     if ( unlikely(!get_page_from_l1e(nl1e, d)) )
     {
-        MEM_LOG("ptwr_emulate: could not get_page_from_l1e()");
-        return X86EMUL_UNHANDLEABLE;
+        if ( (CONFIG_PAGING_LEVELS == 3) &&
+             (bytes == 4) &&
+             !do_cmpxchg &&
+             (l1e_get_flags(nl1e) & _PAGE_PRESENT) )
+        {
+            /*
+             * If this is a half-write to a PAE PTE then we assume that the
+             * guest has simply got the two writes the wrong way round. We
+             * zap the PRESENT bit on the assumption the bottom half will be
+             * written immediately after we return to the guest.
+             */
+            MEM_LOG("ptwr_emulate: fixing up invalid PAE PTE %"PRIpte"\n",
+                    l1e_get_intpte(nl1e));
+            l1e_remove_flags(nl1e, _PAGE_PRESENT);
+        }
+        else
+        {
+            MEM_LOG("ptwr_emulate: could not get_page_from_l1e()");
+            return X86EMUL_UNHANDLEABLE;
+        }
     }
-
 
     /* Checked successfully: do the update (write or cmpxchg). */
     pl1e = map_domain_page(page_to_mfn(page));
