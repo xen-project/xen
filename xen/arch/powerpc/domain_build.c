@@ -118,13 +118,18 @@ int construct_dom0(struct domain *d,
     BUG_ON(d->domain_id != 0);
     BUG_ON(d->vcpu[0] == NULL);
 
+    if (image_len == 0)
+        panic("No Dom0 image supplied\n");
+
     cpu_init_vcpu(v);
 
     memset(&dsi, 0, sizeof(struct domain_setup_info));
     dsi.image_addr = image_start;
     dsi.image_len  = image_len;
 
+    printk("Trying Dom0 as 64bit ELF\n");
     if ((rc = parseelfimage(&dsi)) != 0) {
+        printk("Trying Dom0 as 32bit ELF\n");
         if ((rc = parseelfimage_32(&dsi)) != 0)
             return rc;
         am64 = 0;

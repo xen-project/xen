@@ -326,6 +326,9 @@ static void __init __start_xen(multiboot_info_t *mbi)
     for (i = 0; i < mbi->mods_count; i++) {
         u32 s;
 
+        if(mod[i].mod_end == mod[i].mod_start)
+            continue;
+
         s = ALIGN_DOWN(mod[i].mod_start, PAGE_SIZE);
 
         if (mod[i].mod_start > (ulong)_start &&
@@ -337,7 +340,9 @@ static void __init __start_xen(multiboot_info_t *mbi)
         if (s < freemem) 
             panic("module addresses must assend\n");
 
-        freemem = free_xenheap(freemem, s);
+        free_xenheap(freemem, s);
+        freemem = ALIGN_UP(mod[i].mod_end, PAGE_SIZE);
+        
     }
 
     /* the rest of the xenheap, starting at the end of modules */
