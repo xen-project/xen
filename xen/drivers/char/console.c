@@ -427,7 +427,7 @@ int console_getc(void)
  * **************************************************************
  */
 
-#ifndef NDEBUG
+#ifdef DEBUG_TRACE_DUMP
 
 /* Send output direct to console, or buffer it? */
 static volatile int debugtrace_send_to_console;
@@ -459,7 +459,7 @@ static void debugtrace_dump_worker(void)
     printk("debugtrace_dump() finished\n");
 }
 
-void debugtrace_toggle(void)
+static void debugtrace_toggle(void)
 {
     unsigned long flags;
 
@@ -536,6 +536,11 @@ void debugtrace_printk(const char *fmt, ...)
     spin_unlock_irqrestore(&debugtrace_lock, flags);
 }
 
+static void debugtrace_key(unsigned char key)
+{
+    debugtrace_toggle();
+}
+
 static int __init debugtrace_init(void)
 {
     int order;
@@ -556,6 +561,9 @@ static int __init debugtrace_init(void)
     memset(debugtrace_buf, '\0', bytes);
 
     debugtrace_bytes = bytes;
+
+    register_keyhandler(
+        'T', debugtrace_key, "toggle debugtrace to console/buffer");
 
     return 0;
 }

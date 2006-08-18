@@ -40,8 +40,8 @@ struct domain;
 
 void cmdline_parse(char *cmdline);
 
-#ifndef NDEBUG
-extern void debugtrace_toggle(void);
+/*#define DEBUG_TRACE_DUMP*/
+#ifdef DEBUG_TRACE_DUMP
 extern void debugtrace_dump(void);
 extern void debugtrace_printk(const char *fmt, ...);
 #else

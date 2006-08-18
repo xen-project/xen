@@ -126,11 +126,6 @@ populate_physmap(
             for ( j = 0; j < (1 << extent_order); j++ )
                 guest_physmap_add_page(d, gpfn + j, mfn + j);
         }
-        else if ( unlikely(shadow2_mode_translate(d)) )
-        {
-            for ( j = 0; j < (1 << extent_order); j++ )
-                shadow2_guest_physmap_add_page(d, gpfn + j, mfn + j);
-        }
         else
         {
             for ( j = 0; j < (1 << extent_order); j++ )
@@ -184,7 +179,7 @@ guest_remove_page(
                 (unsigned long)page->count_info, page->u.inuse.type_info);
     }
 
-    shadow2_guest_physmap_remove_page(d, gmfn, mfn);
+    guest_physmap_remove_page(d, gmfn, mfn);
 
     put_page(page);
 
@@ -255,7 +250,7 @@ translate_gpfn_list(
     if ( (d = find_domain_by_id(op.domid)) == NULL )
         return -ESRCH;
 
-    if ( !(shadow_mode_translate(d) || shadow2_mode_translate(d)) )
+    if ( !shadow_mode_translate(d) )
     {
         put_domain(d);
         return -EINVAL;

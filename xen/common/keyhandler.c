@@ -255,22 +255,6 @@ static void do_debug_key(unsigned char key, struct cpu_user_regs *regs)
                              bit. */
 }
 
-#ifndef NDEBUG
-static void debugtrace_key(unsigned char key)
-{
-    debugtrace_toggle();
-}
-
-static void shadow2_audit_key(unsigned char key)
-{
-    extern int shadow2_audit_enable;
-
-    shadow2_audit_enable = !shadow2_audit_enable;
-    printk("%s shadow2_audit_enable=%d\n",
-           __func__, shadow2_audit_enable);
-}
-#endif
-
 void initialize_keytable(void)
 {
     open_softirq(KEYPRESS_SOFTIRQ, keypress_softirq);
@@ -288,13 +272,6 @@ void initialize_keytable(void)
 
     register_keyhandler(
         't', read_clocks, "display multi-cpu clock info");
-
-#ifndef NDEBUG
-    register_keyhandler(
-        'O', shadow2_audit_key,  "toggle shadow2 audits");
-    register_keyhandler(
-        'T', debugtrace_key, "toggle debugtrace to console/buffer");
-#endif
 
 #ifdef PERF_COUNTERS
     register_keyhandler(

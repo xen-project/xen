@@ -32,6 +32,7 @@
 #include <xen/irq.h>
 #include <xen/domain_page.h>
 #include <xen/guest_access.h>
+#include <xen/keyhandler.h>
 #include <asm/event.h>
 #include <asm/page.h>
 #include <asm/current.h>
@@ -41,7 +42,22 @@
 
 #if SHADOW2_AUDIT
 int shadow2_audit_enable = 0;
-#endif
+
+static void shadow2_audit_key(unsigned char key)
+{
+    shadow2_audit_enable = !shadow2_audit_enable;
+    printk("%s shadow2_audit_enable=%d\n",
+           __func__, shadow2_audit_enable);
+}
+
+static int __init shadow2_audit_key_init(void)
+{
+    register_keyhandler(
+        'O', shadow2_audit_key,  "toggle shadow2 audits");
+    return 0;
+}
+__initcall(shadow2_audit_key_init);
+#endif /* SHADOW2_AUDIT */
 
 static void sh2_free_log_dirty_bitmap(struct domain *d);
 

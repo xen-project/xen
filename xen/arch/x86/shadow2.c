@@ -111,7 +111,7 @@ typedef enum {
     ft_demand_write = FETCH_TYPE_DEMAND | FETCH_TYPE_WRITE,
 } fetch_type_t;
 
-#ifndef NDEBUG
+#ifdef DEBUG_TRACE_DUMP
 static char *fetch_type_names[] = {
     [ft_prefetch]     "prefetch",
     [ft_demand_read]  "demand read",
