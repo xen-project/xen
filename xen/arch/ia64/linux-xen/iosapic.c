@@ -77,6 +77,8 @@
 #include <linux/list.h>
 #ifndef XEN
 #include <linux/pci.h>
+#else
+#include <xen/errno.h>
 #endif
 #include <linux/smp.h>
 #include <linux/smp_lock.h>

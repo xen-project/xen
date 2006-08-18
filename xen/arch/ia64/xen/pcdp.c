@@ -18,6 +18,7 @@
 #ifdef XEN
 #include <linux/efi.h>
 #include <linux/errno.h>
+#include <asm/io.h>
 #include <asm/iosapic.h>
 #include <asm/system.h>
 #include <acpi/acpi.h>

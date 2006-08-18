@@ -10,6 +10,7 @@
 #include <xen/lib.h>
 #include <xen/symbols.h>
 #include <xen/smp.h>
+#include <xen/sched.h>
 #include <asm/uaccess.h>
 #include <asm/processor.h>
 #include <asm/ptrace.h>
@@ -166,6 +167,7 @@ show_regs (struct pt_regs *regs)
 	printk("r26 : %016lx r27 : %016lx r28 : %016lx\n", regs->r26, regs->r27, regs->r28);
 	printk("r29 : %016lx r30 : %016lx r31 : %016lx\n", regs->r29, regs->r30, regs->r31);
 
+#ifndef XEN
 	if (user_mode(regs)) {
 		/* print the stacked registers */
 		unsigned long val, *bsp, ndirty;
@@ -180,6 +182,7 @@ show_regs (struct pt_regs *regs)
 			       ((i == sof - 1) || (i % 3) == 2) ? "\n" : " ");
 		}
 	} else
+#endif
 		show_stack(NULL, NULL);
 }
 

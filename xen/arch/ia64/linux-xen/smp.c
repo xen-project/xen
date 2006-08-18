@@ -48,6 +48,7 @@
 #include <asm/unistd.h>
 #include <asm/mca.h>
 #ifdef XEN
+#include <xen/errno.h>
 #include <asm/vhpt.h>
 #include <asm/hw_irq.h>
 #endif

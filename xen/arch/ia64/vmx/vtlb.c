@@ -23,7 +23,7 @@
 
 #include <linux/sched.h>
 #include <asm/tlb.h>
-#include <asm/mm.h>
+#include <xen/mm.h>
 #include <asm/vmx_mm_def.h>
 #include <asm/gcc_intrin.h>
 #include <linux/interrupt.h>

@@ -28,6 +28,7 @@
 #include "hpsim_ssc.h"
 #include <asm/vcpu.h>
 #include <asm/dom_fw.h>
+#include <asm/uaccess.h>
 
 extern unsigned long running_on_sim;
 

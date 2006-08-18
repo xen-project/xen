@@ -40,6 +40,10 @@
 #include <asm/pgtable.h>
 #include <asm/system.h>
 
+#ifdef XEN
+#include <xen/perfc.h>
+#endif
+
 #ifdef CONFIG_PERFMON
 # include <asm/perfmon.h>
 #endif

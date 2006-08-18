@@ -166,7 +166,8 @@
 #include <xen/sched.h>
 #include <xen/domain.h>
 #include <asm/xentypes.h>
-#include <asm/mm.h>
+#include <xen/mm.h>
+#include <xen/errno.h>
 #include <asm/pgalloc.h>
 #include <asm/vhpt.h>
 #include <asm/vcpu.h>

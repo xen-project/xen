@@ -22,6 +22,7 @@
  */
 
 #include <linux/sched.h>
+#include <xen/mm.h>
 #include <asm/tlb.h>
 #include <asm/vmx_mm_def.h>
 #include <asm/gcc_intrin.h>
@@ -30,7 +31,6 @@
 #include <asm/bundle.h>
 #include <asm/types.h>
 #include <public/hvm/ioreq.h>
-#include <asm/mm.h>
 #include <asm/vmx.h>
 #include <public/event_channel.h>
 #include <public/arch-ia64.h>

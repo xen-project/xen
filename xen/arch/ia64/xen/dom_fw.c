@@ -21,6 +21,7 @@
 #include <asm/fpswa.h>
 #include <xen/version.h>
 #include <xen/acpi.h>
+#include <xen/errno.h>
 
 #include <asm/dom_fw.h>
 #include <asm/bundle.h>

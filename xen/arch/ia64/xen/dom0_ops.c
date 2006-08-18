@@ -21,6 +21,7 @@
 #include <asm/vmx.h>
 #include <asm/dom_fw.h>
 #include <xen/iocap.h>
+#include <xen/errno.h>
 
 void build_physmap_table(struct domain *d);
 

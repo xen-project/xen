@@ -79,6 +79,7 @@
 
 #ifdef XEN
 #include <xen/symbols.h>
+#include <xen/mm.h>
 #endif
 
 #if defined(IA64_MCA_DEBUG_INFO)

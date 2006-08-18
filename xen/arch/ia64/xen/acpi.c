@@ -51,6 +51,9 @@
 #include <asm/numa.h>
 #include <asm/sal.h>
 #include <asm/hw_irq.h>
+#ifdef XEN
+#include <xen/errno.h>
+#endif
 
 #define BAD_MADT_ENTRY(entry, end) (                                        \
 		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \

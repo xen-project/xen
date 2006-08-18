@@ -2,6 +2,7 @@
 #define __ASM_IA64_MULTICALL_H__
 
 #include <public/xen.h>
+#include <xen/errno.h>
 
 typedef unsigned long (*hypercall_t)(
 			unsigned long arg0,

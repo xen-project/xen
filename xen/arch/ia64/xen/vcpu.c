@@ -8,6 +8,7 @@
 
 #include <linux/sched.h>
 #include <public/arch-ia64.h>
+#include <xen/mm.h>
 #include <asm/ia64_int.h>
 #include <asm/vcpu.h>
 #include <asm/regionreg.h>
@@ -22,6 +23,7 @@
 #include <asm/vmx_phy_mode.h>
 #include <asm/bundle.h>
 #include <asm/privop_stat.h>
+#include <asm/uaccess.h>
 
 /* FIXME: where these declarations should be there ? */
 extern void getreg(unsigned long regnum, unsigned long *val, int *nat, struct pt_regs *regs);

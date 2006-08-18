@@ -11,6 +11,7 @@
 #include <xen/hypercall.h>
 #include <xen/multicall.h>
 #include <xen/guest_access.h>
+#include <xen/mm.h>
 
 #include <linux/efi.h>	/* FOR EFI_UNIMPLEMENTED */
 #include <asm/sal.h>	/* FOR struct ia64_sal_retval */

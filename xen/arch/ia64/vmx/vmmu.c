@@ -33,6 +33,7 @@
 #include <asm/kregs.h>
 #include <asm/vcpu.h>
 #include <xen/irq.h>
+#include <xen/errno.h>
 
 /*
  * Get the machine page frame number in 16KB unit
