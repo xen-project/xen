@@ -28,6 +28,7 @@
 #include <xen/domain.h>
 #include <public/callback.h>
 #include <xen/event.h>
+#include <xen/perfc.h>
 
 static long do_physdev_op_compat(XEN_GUEST_HANDLE(physdev_op_t) uop);
 static long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg);
