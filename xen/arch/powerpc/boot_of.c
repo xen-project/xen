@@ -685,7 +685,6 @@ static int boot_of_fixup_chosen(void *mem)
 }
 
 static ulong space_base;
-static int broken_claim;
 
 /*
  * The following function is necessary because we cannot depend on all
@@ -706,14 +705,20 @@ static ulong find_space(u32 size, u32 align, multiboot_info_t *mbi)
     if (align == 0)
         of_panic("cannot call %s() with align of 0\n", __func__);
 
-    if (!broken_claim) {
-        /* just try and claim it to the FW chosen address */
-        base = of_claim(0, size, align);
-        if (base != OF_FAILURE)
-            return base;
-        of_printf("%s: Firmware does not allocate memory for you\n", __func__);
-        broken_claim = 1;
+#ifdef BROKEN_CLAIM_WORKAROUND
+    {
+        static int broken_claim;
+        if (!broken_claim) {
+            /* just try and claim it to the FW chosen address */
+            base = of_claim(0, size, align);
+            if (base != OF_FAILURE)
+                return base;
+            of_printf("%s: Firmware does not allocate memory for you\n",
+                      __func__);
+            broken_claim = 1;
+        }
     }
+#endif
 
     of_printf("%s base=0x%016lx  eomem=0x%016lx  size=0x%08x  align=0x%x\n",
                     __func__, space_base, eomem, size, align);
@@ -915,15 +920,22 @@ static void boot_of_module(ulong r3, ulong r4, multiboot_info_t *mbi)
 
     /* snapshot the tree */
     oftree = (void*)find_space(oftree_sz, PAGE_SIZE, mbi);
-    if (oftree == 0) of_panic("Could not allocate OFD tree\n");
+    if (oftree == 0)
+        of_panic("Could not allocate OFD tree\n");
 
     of_printf("creating oftree\n");
     of_test("package-to-path");
-    ofd_create(oftree, oftree_sz);
+    oftree = ofd_create(oftree, oftree_sz);
     pkg_save(oftree);
+
+    if (ofd_size(oftree) > oftree_sz)
+         of_panic("Could not fit all of native devtree\n");
 
     boot_of_fixup_refs(oftree);
     boot_of_fixup_chosen(oftree);
+
+    if (ofd_size(oftree) > oftree_sz)
+         of_panic("Could not fit all devtree fixups\n");
 
     ofd_walk(oftree, OFD_ROOT, /* add_hype_props */ NULL, 2);
 
