@@ -18,7 +18,8 @@
 
 
 #define	_PAGE_PPN_MASK	0x0003fffffffff000 //asm/pgtable.h doesn't do assembly
-#define PAGE_PHYS	0x0010000000000761 //__pgprot(__DIRTY_BITS|_PAGE_PL_2|_PAGE_AR_RWX)
+#define PAGE_PHYS	0x0010000000000761 //__pgprot(__DIRTY_BITS|
+					   //         _PAGE_PL_2|_PAGE_AR_RWX)
 #define _PAGE_PL_2	(2<<7)
 
 #if 1	 // change to 0 to turn off all fast paths
@@ -32,10 +33,10 @@
 	
 //#define FAST_TICK // mostly working (unat problems) but default off for now
 //#define FAST_TLB_MISS_REFLECT	// mostly working but default off for now
-# undef FAST_ITC	//XXX TODO fast_itc doesn't suport dom0 vp yet.
+# undef FAST_ITC		//XXX TODO fast_itc doesn't support dom0 vp yet
 # define FAST_BREAK
-# undef FAST_ACCESS_REFLECT //XXX TODO fast_access_reflect
-                            //    doesn't support dom0 vp yet.
+# undef FAST_ACCESS_REFLECT 	//XXX TODO fast_access_reflect
+                            	//    doesn't support dom0 vp yet.
 # define FAST_RFI
 # define FAST_SSM_I
 # define FAST_PTC_GA
@@ -104,79 +105,100 @@ GLOBAL_ENTRY(fast_hyperprivop)
 1:	// when we get to here r20=~=interrupts pending
 	// Check pending event indication
 (p7)	movl r20=THIS_CPU(current_psr_i_addr);;
-(p7)	ld8 r20=[r20];;
-(p7)	adds r20=-1,r20;;	/* evtchn_upcall_pending */
-(p7)	ld1 r20=[r20];;
+(p7)	ld8 r20=[r20]
+	;;
+(p7)	adds r20=-1,r20				// evtchn_upcall_pending
+	;;
+(p7)	ld1 r20=[r20]
+	;;
 
 	// HYPERPRIVOP_RFI?
 	cmp.eq p7,p6=HYPERPRIVOP_RFI,r17
-(p7)	br.sptk.many hyper_rfi;;
+(p7)	br.sptk.many hyper_rfi
+	;;
 
 	// HYPERPRIVOP_GET_IVR?
 	cmp.eq p7,p6=HYPERPRIVOP_GET_IVR,r17
-(p7)	br.sptk.many hyper_get_ivr;;
+(p7)	br.sptk.many hyper_get_ivr
+	;;
 
 	cmp.ne p7,p0=r20,r0
-(p7)	br.spnt.many dispatch_break_fault ;;
+(p7)	br.spnt.many dispatch_break_fault
+	;;
 
 	// HYPERPRIVOP_COVER?
 	cmp.eq p7,p6=HYPERPRIVOP_COVER,r17
-(p7)	br.sptk.many hyper_cover;;
+(p7)	br.sptk.many hyper_cover
+	;;
 
 	// HYPERPRIVOP_SSM_DT?
 	cmp.eq p7,p6=HYPERPRIVOP_SSM_DT,r17
-(p7)	br.sptk.many hyper_ssm_dt;;
+(p7)	br.sptk.many hyper_ssm_dt
+	;;
 
 	// HYPERPRIVOP_RSM_DT?
 	cmp.eq p7,p6=HYPERPRIVOP_RSM_DT,r17
-(p7)	br.sptk.many hyper_rsm_dt;;
+(p7)	br.sptk.many hyper_rsm_dt
+	;;
 
 	// HYPERPRIVOP_GET_TPR?
 	cmp.eq p7,p6=HYPERPRIVOP_GET_TPR,r17
-(p7)	br.sptk.many hyper_get_tpr;;
+(p7)	br.sptk.many hyper_get_tpr
+	;;
 
 	// HYPERPRIVOP_SET_TPR?
 	cmp.eq p7,p6=HYPERPRIVOP_SET_TPR,r17
-(p7)	br.sptk.many hyper_set_tpr;;
+(p7)	br.sptk.many hyper_set_tpr
+	;;
 
 	// HYPERPRIVOP_EOI?
 	cmp.eq p7,p6=HYPERPRIVOP_EOI,r17
-(p7)	br.sptk.many hyper_eoi;;
+(p7)	br.sptk.many hyper_eoi
+	;;
 
 	// HYPERPRIVOP_SET_ITM?
 	cmp.eq p7,p6=HYPERPRIVOP_SET_ITM,r17
-(p7)	br.sptk.many hyper_set_itm;;
+(p7)	br.sptk.many hyper_set_itm
+	;;
 
 	// HYPERPRIVOP_SET_RR?
 	cmp.eq p7,p6=HYPERPRIVOP_SET_RR,r17
-(p7)	br.sptk.many hyper_set_rr;;
+(p7)	br.sptk.many hyper_set_rr
+	;;
 
 	// HYPERPRIVOP_GET_RR?
 	cmp.eq p7,p6=HYPERPRIVOP_GET_RR,r17
-(p7)	br.sptk.many hyper_get_rr;;
+(p7)	br.sptk.many hyper_get_rr
+	;;
 
 	// HYPERPRIVOP_PTC_GA?
 	cmp.eq p7,p6=HYPERPRIVOP_PTC_GA,r17
-(p7)	br.sptk.many hyper_ptc_ga;;
+(p7)	br.sptk.many hyper_ptc_ga
+	;;
 
 	// HYPERPRIVOP_ITC_D?
 	cmp.eq p7,p6=HYPERPRIVOP_ITC_D,r17
-(p7)	br.sptk.many hyper_itc_d;;
+(p7)	br.sptk.many hyper_itc_d
+	;;
 
 	// HYPERPRIVOP_ITC_I?
 	cmp.eq p7,p6=HYPERPRIVOP_ITC_I,r17
-(p7)	br.sptk.many hyper_itc_i;;
+(p7)	br.sptk.many hyper_itc_i
+	;;
 
 	// HYPERPRIVOP_THASH?
 	cmp.eq p7,p6=HYPERPRIVOP_THASH,r17
-(p7)	br.sptk.many hyper_thash;;
+(p7)	br.sptk.many hyper_thash
+	;;
 
 	// HYPERPRIVOP_SET_KR?
 	cmp.eq p7,p6=HYPERPRIVOP_SET_KR,r17
-(p7)	br.sptk.many hyper_set_kr;;
+(p7)	br.sptk.many hyper_set_kr
+	;;
 
 	// if not one of the above, give up for now and do it the slow way
-	br.sptk.many dispatch_break_fault ;;
+	br.sptk.many dispatch_break_fault
+	;;
 END(fast_hyperprivop)
 
 // give up for now if: ipsr.be==1, ipsr.pp==1
@@ -701,9 +723,9 @@ ENTRY(fast_reflect)
 	.mem.offset 0,0; st8.spill [r2]=r30,16;
 	.mem.offset 8,0; st8.spill [r3]=r31,16 ;;
 #ifdef HANDLE_AR_UNAT
-	// r16~r23 are preserved regsin bank0 regs, we need to restore them,
-    // r24~r31 are scratch regs, we don't need to handle NaT bit,
-    // because OS handler must assign it before access it
+	// r16~r23 are preserved regs in bank0 regs, we need to restore them,
+	// r24~r31 are scratch regs, we don't need to handle NaT bit,
+	// because OS handler must assign it before access it
 	ld8 r16=[r2],16;
 	ld8 r17=[r3],16;;
 	ld8 r18=[r2],16;
@@ -1114,7 +1136,8 @@ just_do_rfi:
 (p7)	st4 [r18]=r19;;
 (p6)	st4 [r18]=r0;;
 	// force on psr.ic, i, dt, rt, it, bn
-	movl r20=(IA64_PSR_I|IA64_PSR_IC|IA64_PSR_DT|IA64_PSR_RT|IA64_PSR_IT|IA64_PSR_BN)
+	movl r20=(IA64_PSR_I|IA64_PSR_IC|IA64_PSR_DT|IA64_PSR_RT| \
+	          IA64_PSR_IT|IA64_PSR_BN)
 	;;
 	or r21=r21,r20
 	;;
