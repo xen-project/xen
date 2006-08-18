@@ -497,8 +497,8 @@ int ofd_dom0_fixup(struct domain *d, ulong mem, start_info_t *si, ulong eoload)
     r = ofd_prop_add(m, n, "ibm,partition-no", &did, sizeof(did));
     ASSERT( r > 0 );
 
-    const char dom0[] = "dom0";
-    r = ofd_prop_add(m, n, "ibm,partition-name", dom0, sizeof (dom0));
+    const char d0[] = "dom0";
+    r = ofd_prop_add(m, n, "ibm,partition-name", d0, sizeof (d0));
     ASSERT( r > 0 );
 
 

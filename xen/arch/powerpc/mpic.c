@@ -498,10 +498,10 @@ static void mpic_enable_irq(unsigned int irq)
 
 #ifdef CONFIG_MPIC_BROKEN_U3
 	if (mpic->flags & MPIC_BROKEN_U3) {
-		unsigned int src = irq - mpic->irq_offset;
-		if (mpic_is_ht_interrupt(mpic, src) &&
+		unsigned int bsrc = irq - mpic->irq_offset;
+		if (mpic_is_ht_interrupt(mpic, bsrc) &&
 		    (irq_desc[irq].status & IRQ_LEVEL))
-			mpic_ht_end_irq(mpic, src);
+			mpic_ht_end_irq(mpic, bsrc);
 	}
 #endif /* CONFIG_MPIC_BROKEN_U3 */
 }
