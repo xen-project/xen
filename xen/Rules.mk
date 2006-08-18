@@ -8,6 +8,9 @@ perfc       ?= n
 perfc_arrays?= n
 crash_debug ?= n
 
+XEN_ROOT=$(BASEDIR)/..
+include $(XEN_ROOT)/Config.mk
+
 # Hardcoded configuration implications and dependencies.
 # Do this is a neater way if it becomes unwieldy.
 ifeq ($(debug),y)
@@ -16,9 +19,6 @@ endif
 ifeq ($(perfc_arrays),y)
 perfc := y
 endif
-
-XEN_ROOT=$(BASEDIR)/..
-include $(XEN_ROOT)/Config.mk
 
 # Set ARCH/SUBARCH appropriately.
 override COMPILE_SUBARCH := $(XEN_COMPILE_ARCH)
