@@ -345,13 +345,13 @@ int cpu_get_interrupt(struct vcpu *v, int *type)
     return -1;
 }
 
+#include <asm/hvm/vmx/vmx.h>
 void hvm_hlt(unsigned long rflags)
 {
     struct vcpu *v = current;
     struct periodic_time *pt = &v->domain->arch.hvm_domain.pl_time.periodic_tm;
     s_time_t next_pit = -1, next_wakeup;
 
-#if 0 /* This seems to fire at unwelcome times in Linux */
     /*
      * Detect machine shutdown.  Only do this for vcpu 0, to avoid potentially 
      * shutting down the domain early. If we halt with interrupts disabled, 
@@ -360,12 +360,11 @@ void hvm_hlt(unsigned long rflags)
      */
     if ( (v->vcpu_id == 0) && !(rflags & X86_EFLAGS_IF) )
     {
-        printk("D%d: HLT with interrupts enabled -- shutting down.\n",
+        printk("D%d: HLT with interrupts disabled -- shutting down.\n",
                current->domain->domain_id);
         domain_shutdown(current->domain, SHUTDOWN_poweroff);
         return;
     }
-#endif /* 0 */
 
     if ( !v->vcpu_id )
         next_pit = get_scheduled(v, pt->irq, pt);
