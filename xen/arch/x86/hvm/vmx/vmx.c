@@ -2273,8 +2273,6 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
     case EXIT_REASON_DR_ACCESS:
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
         vmx_dr_access(exit_qualification, &regs);
-        __get_instruction_length(inst_len);
-        __update_guest_eip(inst_len);
         break;
     case EXIT_REASON_IO_INSTRUCTION:
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
