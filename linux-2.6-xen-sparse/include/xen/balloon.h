@@ -52,6 +52,8 @@ extern void
 balloon_dealloc_empty_page_range(
 	struct page *page, unsigned long nr_pages);
 
+void balloon_release_driver_page(struct page *page);
+
 /*
  * Prevent the balloon driver from changing the memory reservation during
  * a driver critical region.

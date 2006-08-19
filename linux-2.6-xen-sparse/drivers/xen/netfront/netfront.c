@@ -1397,6 +1397,85 @@ err:
 	return more_to_do;
 }
 
+static void netif_release_rx_bufs(struct netfront_info *np)
+{
+	struct mmu_update      *mmu = np->rx_mmu;
+	struct multicall_entry *mcl = np->rx_mcl;
+	struct sk_buff *skb;
+	unsigned long mfn;
+	int xfer = 0, noxfer = 0, unused = 0;
+	int id, ref;
+
+	if (np->copying_receiver) {
+		printk("%s: fix me for copying receiver.\n", __FUNCTION__);
+		return;
+	}
+
+	spin_lock(&np->rx_lock);
+
+	for (id = 0; id < NET_RX_RING_SIZE; id++) {
+		if ((ref = np->grant_rx_ref[id]) == GRANT_INVALID_REF) {
+			unused++;
+			continue;
+		}
+
+		skb = np->rx_skbs[id];
+		mfn = gnttab_end_foreign_transfer_ref(ref);
+		gnttab_release_grant_reference(&np->gref_rx_head, ref);
+		np->grant_rx_ref[id] = GRANT_INVALID_REF;
+		add_id_to_freelist(np->rx_skbs, id);
+
+		if (0 == mfn) {
+			struct page *page = skb_shinfo(skb)->frags[0].page;
+			balloon_release_driver_page(page);
+			skb_shinfo(skb)->nr_frags = 0;
+			dev_kfree_skb(skb);
+			noxfer++;
+			continue;
+		}
+
+		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+			/* Remap the page. */
+			struct page *page = skb_shinfo(skb)->frags[0].page;
+			unsigned long pfn = page_to_pfn(page);
+			void *vaddr = page_address(page);
+
+			MULTI_update_va_mapping(mcl, (unsigned long)vaddr,
+						pfn_pte_ma(mfn, PAGE_KERNEL),
+						0);
+			mcl++;
+			mmu->ptr = ((maddr_t)mfn << PAGE_SHIFT)
+				| MMU_MACHPHYS_UPDATE;
+			mmu->val = pfn;
+			mmu++;
+
+			set_phys_to_machine(pfn, mfn);
+		}
+		dev_kfree_skb(skb);
+		xfer++;
+	}
+
+	printk("%s: %d xfer, %d noxfer, %d unused\n",
+	       __FUNCTION__, xfer, noxfer, unused);
+
+	if (xfer) {
+		/* Some pages are no longer absent... */
+		balloon_update_driver_allowance(-xfer);
+
+		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+			/* Do all the remapping work and M2P updates. */
+			mcl->op = __HYPERVISOR_mmu_update;
+			mcl->args[0] = (unsigned long)np->rx_mmu;
+			mcl->args[1] = mmu - np->rx_mmu;
+			mcl->args[2] = 0;
+			mcl->args[3] = DOMID_SELF;
+			mcl++;
+			HYPERVISOR_multicall(np->rx_mcl, mcl - np->rx_mcl);
+		}
+	}
+
+	spin_unlock(&np->rx_lock);
+}
 
 static int network_close(struct net_device *dev)
 {
@@ -1553,6 +1632,7 @@ static void network_connect(struct net_device *dev)
 static void netif_uninit(struct net_device *dev)
 {
 	struct netfront_info *np = netdev_priv(dev);
+	netif_release_rx_bufs(np);
 	gnttab_free_grant_references(np->gref_tx_head);
 	gnttab_free_grant_references(np->gref_rx_head);
 }
