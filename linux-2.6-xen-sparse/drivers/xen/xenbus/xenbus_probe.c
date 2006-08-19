@@ -66,6 +66,14 @@ static struct notifier_block *xenstore_chain;
 
 static void wait_for_devices(struct xenbus_driver *xendrv);
 
+static int xenbus_probe_frontend(const char *type, const char *name);
+static int xenbus_uevent_backend(struct device *dev, char **envp,
+				 int num_envp, char *buffer, int buffer_size);
+static int xenbus_probe_backend(const char *type, const char *domid);
+
+static int xenbus_dev_probe(struct device *_dev);
+static int xenbus_dev_remove(struct device *_dev);
+
 /* If something in array of ids matches this device, return it. */
 static const struct xenbus_device_id *
 match_device(const struct xenbus_device_id *arr, struct xenbus_device *dev)
@@ -174,15 +182,16 @@ static int read_frontend_details(struct xenbus_device *xendev)
 
 
 /* Bus type for frontend drivers. */
-static int xenbus_probe_frontend(const char *type, const char *name);
 static struct xen_bus_type xenbus_frontend = {
 	.root = "device",
 	.levels = 2, 		/* device/type/<id> */
 	.get_bus_id = frontend_bus_id,
 	.probe = xenbus_probe_frontend,
 	.bus = {
-		.name  = "xen",
-		.match = xenbus_match,
+		.name     = "xen",
+		.match    = xenbus_match,
+		.probe    = xenbus_dev_probe,
+		.remove   = xenbus_dev_remove,
 	},
 	.dev = {
 		.bus_id = "xen",
@@ -227,18 +236,17 @@ static int backend_bus_id(char bus_id[BUS_ID_SIZE], const char *nodename)
 	return 0;
 }
 
-static int xenbus_uevent_backend(struct device *dev, char **envp,
-				 int num_envp, char *buffer, int buffer_size);
-static int xenbus_probe_backend(const char *type, const char *domid);
 static struct xen_bus_type xenbus_backend = {
 	.root = "backend",
 	.levels = 3, 		/* backend/type/<frontend>/<id> */
 	.get_bus_id = backend_bus_id,
 	.probe = xenbus_probe_backend,
 	.bus = {
-		.name  = "xen-backend",
-		.match = xenbus_match,
-		.uevent = xenbus_uevent_backend,
+		.name     = "xen-backend",
+		.match    = xenbus_match,
+		.probe    = xenbus_dev_probe,
+		.remove   = xenbus_dev_remove,
+		.uevent   = xenbus_uevent_backend,
 	},
 	.dev = {
 		.bus_id = "xen-backend",
@@ -405,8 +413,6 @@ static int xenbus_register_driver_common(struct xenbus_driver *drv,
 	drv->driver.name = drv->name;
 	drv->driver.bus = &bus->bus;
 	drv->driver.owner = drv->owner;
-	drv->driver.probe = xenbus_dev_probe;
-	drv->driver.remove = xenbus_dev_remove;
 
 	mutex_lock(&xenwatch_mutex);
 	ret = driver_register(&drv->driver);
