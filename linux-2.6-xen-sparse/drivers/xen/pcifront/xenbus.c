@@ -225,6 +225,7 @@ static void pcifront_backend_changed(struct xenbus_device *xdev,
 		pcifront_try_disconnect(pdev);
 		break;
 
+	case XenbusStateUnknown:
 	case XenbusStateClosed:
 		dev_warn(&xdev->dev, "backend went away!\n");
 		pcifront_try_disconnect(pdev);

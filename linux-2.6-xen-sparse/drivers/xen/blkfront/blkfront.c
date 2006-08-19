@@ -256,10 +256,10 @@ static void backend_changed(struct xenbus_device *dev,
 	DPRINTK("blkfront:backend_changed.\n");
 
 	switch (backend_state) {
-	case XenbusStateUnknown:
 	case XenbusStateInitialising:
 	case XenbusStateInitWait:
 	case XenbusStateInitialised:
+	case XenbusStateUnknown:
 	case XenbusStateClosed:
 		break;
 

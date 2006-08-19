@@ -267,12 +267,11 @@ static void tap_frontend_changed(struct xenbus_device *dev,
 		xenbus_switch_state(dev, XenbusStateClosing);
 		break;
 
+	case XenbusStateUnknown:
 	case XenbusStateClosed:
 		device_unregister(&dev->dev);
 		break;
 
-	case XenbusStateUnknown:
-	case XenbusStateInitWait:
 	default:
 		xenbus_dev_fatal(dev, -EINVAL, "saw state %d at frontend",
 				 frontend_state);

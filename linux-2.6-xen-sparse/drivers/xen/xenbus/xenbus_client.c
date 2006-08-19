@@ -274,7 +274,7 @@ enum xenbus_state xenbus_read_driver_state(const char *path)
 	enum xenbus_state result;
 	int err = xenbus_gather(XBT_NIL, path, "state", "%d", &result, NULL);
 	if (err)
-		result = XenbusStateClosed;
+		result = XenbusStateUnknown;
 
 	return result;
 }

@@ -34,7 +34,6 @@ struct backend_info
 
 	/* watch front end for changes */
 	struct xenbus_watch backend_watch;
-	enum xenbus_state frontend_state;
 };
 
 static void maybe_connect(struct backend_info *be);
@@ -143,8 +142,6 @@ static void frontend_changed(struct xenbus_device *dev,
 	struct backend_info *be = dev->dev.driver_data;
 	int err;
 
-	be->frontend_state = frontend_state;
-
 	switch (frontend_state) {
 	case XenbusStateInitialising:
 	case XenbusStateInitialised:
@@ -162,13 +159,12 @@ static void frontend_changed(struct xenbus_device *dev,
 		be->instance = -1;
 		break;
 
+	case XenbusStateUnknown:
 	case XenbusStateClosed:
 		device_unregister(&be->dev->dev);
 		tpmback_remove(dev);
 		break;
 
-	case XenbusStateUnknown:
-	case XenbusStateInitWait:
 	default:
 		xenbus_dev_fatal(dev, -EINVAL,
 				 "saw state %d at frontend",

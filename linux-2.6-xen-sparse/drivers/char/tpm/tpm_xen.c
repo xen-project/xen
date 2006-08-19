@@ -343,7 +343,6 @@ static void backend_changed(struct xenbus_device *dev,
 	case XenbusStateInitialising:
 	case XenbusStateInitWait:
 	case XenbusStateInitialised:
-	case XenbusStateUnknown:
 		break;
 
 	case XenbusStateConnected:
@@ -354,10 +353,10 @@ static void backend_changed(struct xenbus_device *dev,
 		tpmif_set_connected_state(tp, 0);
 		break;
 
+	case XenbusStateUnknown:
 	case XenbusStateClosed:
-		if (tp->is_suspended == 0) {
+		if (tp->is_suspended == 0)
 			device_unregister(&dev->dev);
-		}
 		xenbus_switch_state(dev, XenbusStateClosed);
 		break;
 	}

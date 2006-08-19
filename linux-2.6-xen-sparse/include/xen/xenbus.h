@@ -274,7 +274,7 @@ int xenbus_free_evtchn(struct xenbus_device *dev, int port);
 
 /**
  * Return the state of the driver rooted at the given store path, or
- * XenbusStateClosed if no state can be read.
+ * XenbusStateUnknown if no state can be read.
  */
 enum xenbus_state xenbus_read_driver_state(const char *path);
 
