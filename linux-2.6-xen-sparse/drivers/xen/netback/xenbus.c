@@ -234,10 +234,25 @@ static void frontend_changed(struct xenbus_device *dev,
 
 	switch (frontend_state) {
 	case XenbusStateInitialising:
+		if (dev->state == XenbusStateClosing) {
+			printk("%s: %s: prepare for reconnect\n",
+			       __FUNCTION__, dev->nodename);
+			if (be->netif) {
+				netif_disconnect(be->netif);
+				be->netif = NULL;
+			}
+			xenbus_switch_state(dev, XenbusStateInitWait);
+		}
+		break;
+
 	case XenbusStateInitialised:
 		break;
 
 	case XenbusStateConnected:
+		if (!be->netif) {
+			/* reconnect: setup be->netif */
+			backend_changed(&be->backend_watch, NULL, 0);
+		}
 		maybe_connect(be);
 		break;
 
