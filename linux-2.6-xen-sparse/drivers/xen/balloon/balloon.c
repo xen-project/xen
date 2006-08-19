@@ -440,20 +440,16 @@ static int balloon_read(char *page, char **start, off_t off,
 		"Requested target:   %8lu kB\n"
 		"Low-mem balloon:    %8lu kB\n"
 		"High-mem balloon:   %8lu kB\n"
+		"Driver pages:       %8lu kB\n"
 		"Xen hard limit:     ",
 		PAGES2KB(current_pages), PAGES2KB(target_pages), 
-		PAGES2KB(balloon_low), PAGES2KB(balloon_high));
+		PAGES2KB(balloon_low), PAGES2KB(balloon_high),
+		PAGES2KB(driver_pages));
 
-	if (hard_limit != ~0UL) {
-		len += sprintf(
-			page + len, 
-			"%8lu kB (inc. %8lu kB driver headroom)\n",
-			PAGES2KB(hard_limit), PAGES2KB(driver_pages));
-	} else {
-		len += sprintf(
-			page + len,
-			"     ??? kB\n");
-	}
+	if (hard_limit != ~0UL)
+		len += sprintf(page + len, "%8lu kB\n", PAGES2KB(hard_limit));
+	else
+		len += sprintf(page + len, "     ??? kB\n");
 
 	*eof = 1;
 	return len;
