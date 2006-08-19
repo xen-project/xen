@@ -58,7 +58,7 @@ extern shared_info_t *HYPERVISOR_shared_info;
 
 /* arch/xen/i386/kernel/setup.c */
 extern start_info_t *xen_start_info;
-#ifdef CONFIG_XEN
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
 #define is_initial_xendomain() (xen_start_info->flags & SIF_INITDOMAIN)
 #else
 #define is_initial_xendomain() 0

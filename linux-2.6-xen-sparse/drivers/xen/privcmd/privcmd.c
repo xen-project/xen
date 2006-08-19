@@ -108,13 +108,15 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 	}
 	break;
 
-#if defined(CONFIG_XEN_PRIVILEGED_GUEST)
 	case IOCTL_PRIVCMD_MMAP: {
 #define PRIVCMD_MMAP_SZ 32
 		privcmd_mmap_t mmapcmd;
 		privcmd_mmap_entry_t msg[PRIVCMD_MMAP_SZ];
 		privcmd_mmap_entry_t __user *p;
 		int i, rc;
+
+		if (!is_initial_xendomain())
+			return -EPERM;
 
 		if (copy_from_user(&mmapcmd, udata, sizeof(mmapcmd)))
 			return -EFAULT;
@@ -164,6 +166,9 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		xen_pfn_t __user *p;
 		unsigned long addr, mfn;
 		int i;
+
+		if (!is_initial_xendomain())
+			return -EPERM;
 
 		if (copy_from_user(&m, udata, sizeof(m))) {
 			ret = -EFAULT;
@@ -215,7 +220,6 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		break;
 	}
 	break;
-#endif
 
 	default:
 		ret = -EINVAL;

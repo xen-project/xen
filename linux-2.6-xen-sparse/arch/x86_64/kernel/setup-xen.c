@@ -189,7 +189,6 @@ struct resource code_resource = {
 
 #define IORESOURCE_ROM (IORESOURCE_BUSY | IORESOURCE_READONLY | IORESOURCE_MEM)
 
-#if defined(CONFIG_XEN_PRIVILEGED_GUEST) || !defined(CONFIG_XEN)
 static struct resource system_rom_resource = {
 	.name = "System ROM",
 	.start = 0xf0000,
@@ -218,19 +217,16 @@ static struct resource adapter_rom_resources[] = {
 	{ .name = "Adapter ROM", .start = 0, .end = 0,
 		.flags = IORESOURCE_ROM }
 };
-#endif
 
 #define ADAPTER_ROM_RESOURCES \
 	(sizeof adapter_rom_resources / sizeof adapter_rom_resources[0])
 
-#if defined(CONFIG_XEN_PRIVILEGED_GUEST) || !defined(CONFIG_XEN)
 static struct resource video_rom_resource = {
 	.name = "Video ROM",
 	.start = 0xc0000,
 	.end = 0xc7fff,
 	.flags = IORESOURCE_ROM,
 };
-#endif
 
 static struct resource video_ram_resource = {
 	.name = "Video RAM area",
@@ -239,7 +235,6 @@ static struct resource video_ram_resource = {
 	.flags = IORESOURCE_RAM,
 };
 
-#if defined(CONFIG_XEN_PRIVILEGED_GUEST) || !defined(CONFIG_XEN)
 #define romsignature(x) (*(unsigned short *)(x) == 0xaa55)
 
 static int __init romchecksum(unsigned char *rom, unsigned long length)
@@ -256,6 +251,12 @@ static void __init probe_roms(void)
 	unsigned long start, length, upper;
 	unsigned char *rom;
 	int	      i;
+
+#ifdef CONFIG_XEN
+	/* Nothing to do if not running in dom0. */
+	if (!is_initial_xendomain())
+		return;
+#endif
 
 	/* video rom */
 	upper = adapter_rom_resources[0].start;
@@ -315,7 +316,6 @@ static void __init probe_roms(void)
 		start = adapter_rom_resources[i++].end & ~2047UL;
 	}
 }
-#endif
 
 static __init void parse_cmdline_early (char ** cmdline_p)
 {
@@ -625,11 +625,8 @@ static void __init reserve_ebda_region(void)
 void __init setup_arch(char **cmdline_p)
 {
 	unsigned long kernel_end;
-
-#if defined(CONFIG_XEN_PRIVILEGED_GUEST)
 	struct e820entry *machine_e820;
 	struct xen_memory_map memmap;
-#endif
 
 #ifdef CONFIG_XEN
 	/* Register a call for panic conditions. */
@@ -936,8 +933,8 @@ void __init setup_arch(char **cmdline_p)
 	 * Request address space for all standard RAM and ROM resources
 	 * and also for regions reported as reserved by the e820.
 	 */
-#if defined(CONFIG_XEN_PRIVILEGED_GUEST)
 	probe_roms();
+#ifdef CONFIG_XEN
 	if (is_initial_xendomain()) {
 		machine_e820 = alloc_bootmem_low_pages(PAGE_SIZE);
 
@@ -948,13 +945,8 @@ void __init setup_arch(char **cmdline_p)
 
 		e820_reserve_resources(machine_e820, memmap.nr_entries);
 	} else
-		e820_reserve_resources(e820.map, e820.nr_map);
-#elif defined(CONFIG_XEN)
-	e820_reserve_resources(e820.map, e820.nr_map);
-#else
-	probe_roms();
-	e820_reserve_resources(e820.map, e820.nr_map);
 #endif
+	e820_reserve_resources(e820.map, e820.nr_map);
 
 	request_resource(&iomem_resource, &video_ram_resource);
 
@@ -965,12 +957,12 @@ void __init setup_arch(char **cmdline_p)
 		request_resource(&ioport_resource, &standard_io_resources[i]);
 	}
 
-#if defined(CONFIG_XEN_PRIVILEGED_GUEST)
+#ifdef CONFIG_XEN
 	if (is_initial_xendomain()) {
 		e820_setup_gap(machine_e820, memmap.nr_entries);
 		free_bootmem(__pa(machine_e820), PAGE_SIZE);
 	}
-#elif !defined(CONFIG_XEN)
+#else
 	e820_setup_gap(e820.map, e820.nr_map);
 #endif
 

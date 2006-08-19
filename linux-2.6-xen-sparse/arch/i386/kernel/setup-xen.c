@@ -184,7 +184,6 @@ static struct resource code_resource = {
 	.flags	= IORESOURCE_BUSY | IORESOURCE_MEM
 };
 
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
 static struct resource system_rom_resource = {
 	.name	= "System ROM",
 	.start	= 0xf0000,
@@ -240,7 +239,6 @@ static struct resource video_rom_resource = {
 	.end	= 0xc7fff,
 	.flags	= IORESOURCE_BUSY | IORESOURCE_READONLY | IORESOURCE_MEM
 };
-#endif
 
 static struct resource video_ram_resource = {
 	.name	= "Video RAM area",
@@ -299,7 +297,6 @@ static struct resource standard_io_resources[] = { {
 #define STANDARD_IO_RESOURCES \
 	(sizeof standard_io_resources / sizeof standard_io_resources[0])
 
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
 #define romsignature(x) (*(unsigned short *)(x) == 0xaa55)
 
 static int __init romchecksum(unsigned char *rom, unsigned long length)
@@ -317,9 +314,11 @@ static void __init probe_roms(void)
 	unsigned char *rom;
 	int	      i;
 
+#ifdef CONFIG_XEN
 	/* Nothing to do if not running in dom0. */
 	if (!is_initial_xendomain())
 		return;
+#endif
 
 	/* video rom */
 	upper = adapter_rom_resources[0].start;
@@ -379,7 +378,6 @@ static void __init probe_roms(void)
 		start = adapter_rom_resources[i++].end & ~2047UL;
 	}
 }
-#endif
 
 /*
  * Point at the empty zero page to start with. We map the real shared_info
@@ -1359,9 +1357,7 @@ legacy_init_iomem_resources(struct e820entry *e820, int nr_map,
 {
 	int i;
 
-#if defined(CONFIG_XEN_PRIVILEGED_GUEST) || !defined(CONFIG_XEN)
 	probe_roms();
-#endif
 
 	for (i = 0; i < nr_map; i++) {
 		struct resource *res;
