@@ -1018,8 +1018,10 @@ int xennet_get_extras(struct netfront_info *np,
 				WPRINTK("Invalid extra type: %d\n",
 					extra->type);
 			err = -EINVAL;
-		} else
-			memcpy(&extras[extra->type - 1], extra, sizeof(*extra));
+		} else {
+			memcpy(&extras[extra->type - 1], extra,
+			       sizeof(*extra));
+		}
 
 		skb = xennet_get_rx_skb(np, cons);
 		ref = xennet_get_rx_ref(np, cons);
@@ -1032,9 +1034,10 @@ int xennet_get_extras(struct netfront_info *np,
 
 static int xennet_get_responses(struct netfront_info *np,
 				struct netfront_rx_info *rinfo, RING_IDX rp,
-				struct sk_buff_head *list, int *mcl_offset_p)
+				struct sk_buff_head *list,
+				int *pages_flipped_p)
 {
-	int mcl_offset = *mcl_offset_p;
+	int pages_flipped = *pages_flipped_p;
 	struct mmu_update *mmu;
 	struct multicall_entry *mcl;
 	struct netif_rx_response *rx = &rinfo->rx;
@@ -1080,7 +1083,8 @@ static int xennet_get_responses(struct netfront_info *np,
 			 * headroom, ... */
 			if (!(mfn = gnttab_end_foreign_transfer_ref(ref))) {
 				if (net_ratelimit())
-					WPRINTK("Unfulfilled rx req (id=%d, st=%d).\n",
+					WPRINTK("Unfulfilled rx req "
+						"(id=%d, st=%d).\n",
 						rx->id, rx->status);
 				xennet_move_rx_slot(np, skb, ref);
 				err = -ENOMEM;
@@ -1094,8 +1098,8 @@ static int xennet_get_responses(struct netfront_info *np,
 				unsigned long pfn = page_to_pfn(page);
 				void *vaddr = page_address(page);
 
-				mcl = np->rx_mcl + mcl_offset;
-				mmu = np->rx_mmu + mcl_offset;
+				mcl = np->rx_mcl + pages_flipped;
+				mmu = np->rx_mmu + pages_flipped;
 
 				MULTI_update_va_mapping(mcl,
 							(unsigned long)vaddr,
@@ -1106,10 +1110,9 @@ static int xennet_get_responses(struct netfront_info *np,
 					| MMU_MACHPHYS_UPDATE;
 				mmu->val = pfn;
 
-				mcl_offset++;
-
 				set_phys_to_machine(pfn, mfn);
 			}
+			pages_flipped++;
 		} else {
 			ret = gnttab_end_foreign_access_ref(ref, 0);
 			BUG_ON(!ret);
@@ -1142,7 +1145,7 @@ next:
 		err = -E2BIG;
 	}
 
-	*mcl_offset_p = mcl_offset;
+	*pages_flipped_p = pages_flipped;
 
 	return err;
 }
@@ -1225,7 +1228,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 	struct sk_buff_head tmpq;
 	unsigned long flags;
 	unsigned int len;
-	int pages_done;
+	int pages_flipped = 0;
 	int err;
 
 	spin_lock(&np->rx_lock);
@@ -1244,13 +1247,14 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 	rp = np->rx.sring->rsp_prod;
 	rmb(); /* Ensure we see queued responses up to 'rp'. */
 
-	for (i = np->rx.rsp_cons, work_done = 0, pages_done = 0;
+	for (i = np->rx.rsp_cons, work_done = 0;
 	     (i != rp) && (work_done < budget);
 	     np->rx.rsp_cons = ++i, work_done++) {
 		memcpy(rx, RING_GET_RESPONSE(&np->rx, i), sizeof(*rx));
 		memset(extras, 0, sizeof(extras));
 
-		err = xennet_get_responses(np, &rinfo, rp, &tmpq, &pages_done);
+		err = xennet_get_responses(np, &rinfo, rp, &tmpq,
+					   &pages_flipped);
 
 		if (unlikely(err)) {
 err:
@@ -1335,18 +1339,21 @@ err:
 		__skb_queue_tail(&rxq, skb);
 	}
 
-	/* Some pages are no longer absent... */
-	balloon_update_driver_allowance(-pages_done);
+	if (pages_flipped) {
+		/* Some pages are no longer absent... */
+		balloon_update_driver_allowance(-pages_flipped);
 
-	/* Do all the remapping work, and M2P updates, in one big hypercall. */
-	if (likely(pages_done)) {
-		mcl = np->rx_mcl + pages_done;
-		mcl->op = __HYPERVISOR_mmu_update;
-		mcl->args[0] = (unsigned long)np->rx_mmu;
-		mcl->args[1] = pages_done;
-		mcl->args[2] = 0;
-		mcl->args[3] = DOMID_SELF;
-		(void)HYPERVISOR_multicall(np->rx_mcl, pages_done + 1);
+		/* Do all the remapping work and M2P updates. */
+		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+			mcl = np->rx_mcl + pages_flipped;
+			mcl->op = __HYPERVISOR_mmu_update;
+			mcl->args[0] = (unsigned long)np->rx_mmu;
+			mcl->args[1] = pages_flipped;
+			mcl->args[2] = 0;
+			mcl->args[3] = DOMID_SELF;
+			(void)HYPERVISOR_multicall(np->rx_mcl,
+						   pages_flipped + 1);
+		}
 	}
 
 	while ((skb = __skb_dequeue(&errq)))
