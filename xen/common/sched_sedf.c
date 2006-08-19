@@ -12,6 +12,7 @@
 #include <xen/timer.h>
 #include <xen/softirq.h>
 #include <xen/time.h>
+#include <xen/errno.h>
 
 /*verbosity settings*/
 #define SEDFLEVEL 0

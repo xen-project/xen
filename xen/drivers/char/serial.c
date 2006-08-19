@@ -12,6 +12,7 @@
 #include <xen/irq.h>
 #include <xen/keyhandler.h> 
 #include <xen/sched.h>
+#include <xen/mm.h>
 #include <xen/serial.h>
 
 static struct serial_port com[2] = {

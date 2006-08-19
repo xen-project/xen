@@ -24,6 +24,7 @@
 #include <xen/perfc.h>
 #include <xen/sched-if.h>
 #include <xen/softirq.h>
+#include <xen/errno.h>
 
 /* all per-domain BVT-specific scheduling info is stored here */
 struct bvt_vcpu_info

@@ -27,6 +27,7 @@
 #include <xen/softirq.h>
 #include <xen/trace.h>
 #include <xen/mm.h>
+#include <xen/errno.h>
 #include <xen/guest_access.h>
 #include <public/sched.h>
 #include <public/sched_ctl.h>

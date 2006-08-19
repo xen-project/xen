@@ -30,6 +30,7 @@
 #include <xen/event.h>
 #include <xen/softirq.h>
 #include <xen/init.h>
+#include <xen/mm.h>
 #include <xen/percpu.h>
 #include <asm/atomic.h>
 #include <public/dom0_ops.h>

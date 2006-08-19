@@ -8,6 +8,7 @@
  */
 
 #include <xen/sched.h>
+#include <xen/errno.h>
 #include <xen/rangeset.h>
 
 /* An inclusive range [s,e] and pointer to next range in ascending order. */

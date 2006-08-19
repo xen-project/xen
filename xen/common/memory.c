@@ -17,6 +17,7 @@
 #include <xen/shadow.h>
 #include <xen/iocap.h>
 #include <xen/guest_access.h>
+#include <xen/errno.h>
 #include <asm/current.h>
 #include <asm/hardirq.h>
 #include <public/memory.h>
