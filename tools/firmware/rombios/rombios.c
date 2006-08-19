@@ -9459,7 +9459,7 @@ smbios_init:
   mov cx, #0x001f ; 0x1f bytes to copy
   mov ax, #0xf000
   mov es, ax      ; destination segment is 0xf0000
-  mov di, smbios_entry_point ; destination offset
+  mov di, #smbios_entry_point ; destination offset
   mov ax, #0x9f00
   mov ds, ax      ; source segment is 0x9f000
   mov si, #0x0000 ; source offset is 0
