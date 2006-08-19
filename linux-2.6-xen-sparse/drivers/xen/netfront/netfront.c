@@ -1397,10 +1397,31 @@ err:
 	return more_to_do;
 }
 
+static void netif_release_tx_bufs(struct netfront_info *np)
+{
+	struct sk_buff *skb;
+	int i;
+
+	for (i = 1; i <= NET_TX_RING_SIZE; i++) {
+		if ((unsigned long)np->tx_skbs[i] < PAGE_OFFSET)
+			continue;
+
+		skb = np->tx_skbs[i];
+		gnttab_end_foreign_access_ref(
+			np->grant_tx_ref[i], GNTMAP_readonly);
+		gnttab_release_grant_reference(
+			&np->gref_tx_head, np->grant_tx_ref[i]);
+		np->grant_tx_ref[i] = GRANT_INVALID_REF;
+		add_id_to_freelist(np->tx_skbs, i);
+		dev_kfree_skb_irq(skb);
+	}
+}
+
 static void netif_release_rx_bufs(struct netfront_info *np)
 {
 	struct mmu_update      *mmu = np->rx_mmu;
 	struct multicall_entry *mcl = np->rx_mcl;
+	struct sk_buff_head free_list;
 	struct sk_buff *skb;
 	unsigned long mfn;
 	int xfer = 0, noxfer = 0, unused = 0;
@@ -1410,6 +1431,8 @@ static void netif_release_rx_bufs(struct netfront_info *np)
 		printk("%s: fix me for copying receiver.\n", __FUNCTION__);
 		return;
 	}
+
+	skb_queue_head_init(&free_list);
 
 	spin_lock(&np->rx_lock);
 
@@ -1451,7 +1474,7 @@ static void netif_release_rx_bufs(struct netfront_info *np)
 
 			set_phys_to_machine(pfn, mfn);
 		}
-		dev_kfree_skb(skb);
+		__skb_queue_tail(&free_list, skb);
 		xfer++;
 	}
 
@@ -1473,6 +1496,9 @@ static void netif_release_rx_bufs(struct netfront_info *np)
 			HYPERVISOR_multicall(np->rx_mcl, mcl - np->rx_mcl);
 		}
 	}
+
+	while ((skb = __skb_dequeue(&free_list)) != NULL)
+		dev_kfree_skb(skb);
 
 	spin_unlock(&np->rx_lock);
 }
@@ -1573,19 +1599,7 @@ static void network_connect(struct net_device *dev)
 	 */
 
 	/* Step 1: Discard all pending TX packet fragments. */
-	for (requeue_idx = 0, i = 1; i <= NET_TX_RING_SIZE; i++) {
-		if ((unsigned long)np->tx_skbs[i] < PAGE_OFFSET)
-			continue;
-
-		skb = np->tx_skbs[i];
-		gnttab_end_foreign_access_ref(
-			np->grant_tx_ref[i], GNTMAP_readonly);
-		gnttab_release_grant_reference(
-			&np->gref_tx_head, np->grant_tx_ref[i]);
-		np->grant_tx_ref[i] = GRANT_INVALID_REF;
-		add_id_to_freelist(np->tx_skbs, i);
-		dev_kfree_skb_irq(skb);
-	}
+	netif_release_tx_bufs(np);
 
 	/* Step 2: Rebuild the RX buffer freelist and the RX ring itself. */
 	for (requeue_idx = 0, i = 0; i < NET_RX_RING_SIZE; i++) {
@@ -1632,6 +1646,7 @@ static void network_connect(struct net_device *dev)
 static void netif_uninit(struct net_device *dev)
 {
 	struct netfront_info *np = netdev_priv(dev);
+	netif_release_tx_bufs(np);
 	netif_release_rx_bufs(np);
 	gnttab_free_grant_references(np->gref_tx_head);
 	gnttab_free_grant_references(np->gref_rx_head);
