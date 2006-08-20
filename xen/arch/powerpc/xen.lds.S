@@ -107,7 +107,7 @@ SECTIONS
   PROVIDE (__fini_array_end = .);
   .data           :
   {
-    *(.data .data.* .gnu.linkonce.d.*)
+    *(.data .gnu.linkonce.d.*)
     SORT(CONSTRUCTORS)
   }
 
