@@ -81,7 +81,7 @@ Index: ioemu/vl.h
 Index: ioemu/hw/pc.c
 ===================================================================
 --- ioemu.orig/hw/pc.c	2006-08-20 22:22:36.000000000 +0100
-+++ ioemu/hw/pc.c	2006-08-20 23:22:25.000000000 +0100
++++ ioemu/hw/pc.c	2006-08-20 23:27:55.000000000 +0100
 @@ -158,8 +158,23 @@
      rtc_set_memory(s, info_ofs + 8, sectors);
  }
@@ -133,7 +133,7 @@ Index: ioemu/hw/pc.c
 +    rtc_set_memory(s, 0x3d, get_bios_disk(boot_device, 0) |
 +                   (get_bios_disk(boot_device, 1) << 4));
 +    rtc_set_memory(s, 0x38, (get_bios_disk(boot_device, 2) << 4) |
-+                   (!fd_bootchk ? 0x00 : 0x01));
++                   (!fd_bootchk ? 0x01 : 0x00));
  
      /* floppy type */
  
