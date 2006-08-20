@@ -23,6 +23,7 @@
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <xen/guest_access.h>
+#include <xen/shadow.h>
 #include <public/xen.h>
 #include <public/domctl.h>
 #include <public/sysctl.h>
@@ -107,8 +108,22 @@ long arch_do_sysctl(struct xen_sysctl *sysctl,
             ret = -EFAULT;
     }
     break;
+    case DOM0_SHADOW_CONTROL:
+    {
+        struct domain *d;
+        ret = -ESRCH;
+        d = find_domain_by_id(op->u.shadow_control.domain);
+        if ( d != NULL )
+        {
+            ret = shadow_control_op(d, &op->u.shadow_control, u_dom0_op);
+            put_domain(d);
+            copy_to_guest(u_dom0_op, op, 1);
+        } 
+    }
+    break;
 
     default:
+        printk("%s: unsupported op: 0x%x\n", __func__, (op->cmd));
         ret = -ENOSYS;
         break;
     }

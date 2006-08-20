@@ -56,4 +56,8 @@ static inline void mark_dirty(struct domain *d, unsigned int mfn)
     return;
 }
 #define gnttab_mark_dirty(d, f) mark_dirty((d), (f))
+
+extern int shadow_control_op(struct domain *d, 
+                             dom0_shadow_control_t *sc,
+                             XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op);
 #endif
