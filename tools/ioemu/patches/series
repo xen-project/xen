@@ -39,8 +39,8 @@ xenstore-block-device-config
 xenstore-write-vnc-port
 qemu-allow-disable-sdl
 qemu-fix-memset-args
-qemu-fix-write-to-disk-synchronous
 xen-support-buffered-ioreqs
 qemu-daemonize
 xen-platform-device
 qemu-bootorder
+qemu-tunable-ide-write-cache
