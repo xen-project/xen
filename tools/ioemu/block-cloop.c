@@ -55,7 +55,7 @@ static int cloop_open(BlockDriverState *bs, const char *filename)
     BDRVCloopState *s = bs->opaque;
     uint32_t offsets_size,max_compressed_block_size=1,i;
 
-    s->fd = open(filename, O_RDONLY | O_BINARY | O_LARGEFILE | O_SYNC);
+    s->fd = open(filename, O_RDONLY | O_BINARY | O_LARGEFILE);
     if (s->fd < 0)
         return -1;
     bs->read_only = 1;

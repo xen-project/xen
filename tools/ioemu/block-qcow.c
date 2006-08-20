@@ -95,7 +95,7 @@ static int qcow_open(BlockDriverState *bs, const char *filename)
     int fd, len, i, shift;
     QCowHeader header;
     
-    fd = open(filename, O_RDWR | O_BINARY | O_LARGEFILE | O_SYNC);
+    fd = open(filename, O_RDWR | O_BINARY | O_LARGEFILE);
     if (fd < 0) {
         fd = open(filename, O_RDONLY | O_BINARY | O_LARGEFILE);
         if (fd < 0)

@@ -96,7 +96,7 @@ static int vmdk_open(BlockDriverState *bs, const char *filename)
     uint32_t magic;
     int l1_size;
 
-    fd = open(filename, O_RDWR | O_BINARY | O_LARGEFILE | O_SYNC);
+    fd = open(filename, O_RDWR | O_BINARY | O_LARGEFILE);
     if (fd < 0) {
         fd = open(filename, O_RDONLY | O_BINARY | O_LARGEFILE);
         if (fd < 0)
