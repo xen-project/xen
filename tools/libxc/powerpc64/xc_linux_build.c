@@ -309,7 +309,7 @@ static unsigned long create_start_info(start_info_t *si,
     si->store_evtchn = store_evtchn;
     si->console.domU.mfn = si->nr_pages - 3;
     si->console.domU.evtchn = console_evtchn;
-    si_addr = si->nr_pages - 4;
+    si_addr = (si->nr_pages - 4) << PAGE_SHIFT;
 
     return si_addr;
 }
