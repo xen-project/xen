@@ -75,7 +75,9 @@ memmap = '/usr/lib/xen/boot/mem-map.sxp'
 
 #-----------------------------------------------------------------------------
 # boot on floppy (a), hard disk (c) or CD-ROM (d) 
-#boot=[a|c|d]
+# default: hard disk, cd-rom, floppy
+#boot="cda"
+
 #-----------------------------------------------------------------------------
 #  write to temporary files instead of disk image files
 #snapshot=1

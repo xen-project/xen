@@ -575,7 +575,7 @@ int qcow_compress_cluster(BlockDriverState *bs, int64_t sector_num,
 #ifndef QEMU_TOOL
 
 typedef void QEMUMachineInitFunc(uint64_t ram_size, int vga_ram_size, 
-                                 int boot_device,
+                                 char *boot_device,
              DisplayState *ds, const char **fd_filename, int snapshot,
              const char *kernel_filename, const char *kernel_cmdline,
              const char *initrd_filename, time_t timeoffset);
@@ -1020,7 +1020,7 @@ void NVRAM_set_crc (m48t59_t *nvram, uint32_t addr,
                     uint32_t start, uint32_t count);
 int PPC_NVRAM_set_params (m48t59_t *nvram, uint16_t NVRAM_size,
                           const unsigned char *arch,
-                          uint32_t RAM_size, int boot_device,
+                          uint32_t RAM_size, char *boot_device,
                           uint32_t kernel_image, uint32_t kernel_size,
                           const char *cmdline,
                           uint32_t initrd_image, uint32_t initrd_size,

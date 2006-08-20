@@ -124,7 +124,7 @@ int vncviewer;
 int vncunused;
 const char* keyboard_layout = NULL;
 int64_t ticks_per_sec;
-int boot_device = 'c';
+char *boot_device = NULL;
 uint64_t ram_size;
 int pit_min_timer_count = 0;
 int nb_nics;
@@ -6057,14 +6057,14 @@ int main(int argc, char **argv)
                 break;
 #endif /* !CONFIG_DM */
             case QEMU_OPTION_boot:
-                boot_device = optarg[0];
-                if (boot_device != 'a' && 
+                boot_device = strdup(optarg);
+                if (strspn(boot_device, "acd"
 #ifdef TARGET_SPARC
-		    // Network boot
-		    boot_device != 'n' &&
+                           "n"
 #endif
-                    boot_device != 'c' && boot_device != 'd') {
-                    fprintf(stderr, "qemu: invalid boot device '%c'\n", boot_device);
+                        ) != strlen(boot_device)) {
+                    fprintf(stderr, "qemu: invalid boot device in '%s'\n",
+                            boot_device);
                     exit(1);
                 }
                 break;
@@ -6328,6 +6328,7 @@ int main(int argc, char **argv)
         fd_filename[0] == '\0')
         help();
     
+#if 0
     /* boot to cd by default if no hard disk */
     if (hd_filename[0] == '\0' && boot_device == 'c') {
         if (fd_filename[0] != '\0')
@@ -6335,6 +6336,7 @@ int main(int argc, char **argv)
         else
             boot_device = 'd';
     }
+#endif
 #endif /* !CONFIG_DM */
 
     setvbuf(stdout, NULL, _IOLBF, 0);
@@ -6593,6 +6595,7 @@ int main(int argc, char **argv)
                   ds, fd_filename, snapshot,
                   kernel_filename, kernel_cmdline, initrd_filename,
                   timeoffset);
+    free(boot_device);
 
     /* init USB devices */
     if (usb_enabled) {
