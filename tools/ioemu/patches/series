@@ -43,3 +43,4 @@ qemu-fix-write-to-disk-synchronous
 xen-support-buffered-ioreqs
 qemu-daemonize
 xen-platform-device
+qemu-bootorder
