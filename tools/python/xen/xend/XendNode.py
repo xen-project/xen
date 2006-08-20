@@ -46,7 +46,8 @@ class XendNode:
         return self.xc.bvtsched_global_get()
     
     def info(self):
-        return self.nodeinfo() + self.physinfo() + self.xeninfo()
+        return (self.nodeinfo() + self.physinfo() + self.xeninfo() +
+                self.xendinfo())
 
     def nodeinfo(self):
         (sys, host, rel, ver, mch) = os.uname()
@@ -99,6 +100,9 @@ class XendNode:
                       ]
 
         return [[k, info[k]] for k in ITEM_ORDER]
+
+    def xendinfo(self):
+        return [['xend_config_format',  2]]
 
 
 def instance():
