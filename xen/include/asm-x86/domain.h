@@ -57,6 +57,34 @@ extern void toggle_guest_mode(struct vcpu *);
  */
 extern void hypercall_page_initialise(struct domain *d, void *);
 
+struct shadow_domain {
+    u32               mode;  /* flags to control shadow operation */
+    spinlock_t        lock;  /* shadow2 domain lock */
+    int               locker; /* processor which holds the lock */
+    const char       *locker_function; /* Func that took it */
+    struct list_head  freelists[SHADOW2_MAX_ORDER + 1]; 
+    struct list_head  p2m_freelist;
+    struct list_head  p2m_inuse;
+    struct list_head  toplevel_shadows;
+    unsigned int      total_pages;  /* number of pages allocated */
+    unsigned int      free_pages;   /* number of pages on freelists */
+    unsigned int      p2m_pages;    /* number of pages in p2m map */
+
+    /* Shadow2 hashtable */
+    struct shadow2_hash_entry *hash_table;
+    struct shadow2_hash_entry *hash_freelist;
+    struct shadow2_hash_entry *hash_allocations;
+    int hash_walking;  /* Some function is walking the hash table */
+
+    /* Shadow log-dirty bitmap */
+    unsigned long *dirty_bitmap;
+    unsigned int dirty_bitmap_size;  /* in pages, bit per page */
+
+    /* Shadow log-dirty mode stats */
+    unsigned int fault_count;
+    unsigned int dirty_count;
+};
+
 struct arch_domain
 {
     l1_pgentry_t *mm_perdomain_pt;
@@ -79,32 +107,7 @@ struct arch_domain
     /* Shadow-translated guest: Pseudophys base address of reserved area. */
     unsigned long first_reserved_pfn;
 
-    /* Shadow2 stuff */
-    u32               shadow2_mode;  /* flags to control shadow operation */
-    spinlock_t        shadow2_lock;  /* shadow2 domain lock */
-    int               shadow2_locker; /* processor which holds the lock */
-    const char       *shadow2_locker_function; /* Func that took it */
-    struct list_head  shadow2_freelists[SHADOW2_MAX_ORDER + 1]; 
-    struct list_head  shadow2_p2m_freelist;
-    struct list_head  shadow2_p2m_inuse;
-    struct list_head  shadow2_toplevel_shadows;
-    unsigned int      shadow2_total_pages;  /* number of pages allocated */
-    unsigned int      shadow2_free_pages;   /* number of pages on freelists */
-    unsigned int      shadow2_p2m_pages;    /* number of pages in p2m map */
-
-    /* Shadow2 hashtable */
-    struct shadow2_hash_entry *shadow2_hash_table;
-    struct shadow2_hash_entry *shadow2_hash_freelist;
-    struct shadow2_hash_entry *shadow2_hash_allocations;
-    int shadow2_hash_walking;  /* Some function is walking the hash table */
-
-    /* Shadow log-dirty bitmap */
-    unsigned long *shadow_dirty_bitmap;
-    unsigned int shadow_dirty_bitmap_size;  /* in pages, bit per page */
-
-    /* Shadow log-dirty mode stats */
-    unsigned int shadow_fault_count;
-    unsigned int shadow_dirty_count;
+    struct shadow_domain shadow2;
 
     /* Shadow translated domain: P2M mapping */
     pagetable_t phys_table;
@@ -129,6 +132,21 @@ struct pae_l3_cache {
 struct pae_l3_cache { };
 #define pae_l3_cache_init(c) ((void)0)
 #endif
+
+struct shadow_vcpu {
+    /* Pointers to mode-specific entry points. */
+    struct shadow2_paging_mode *mode;
+    /* Last MFN that we emulated a write to. */
+    unsigned long last_emulated_mfn;
+    /* HVM guest: paging enabled (CR0.PG)?  */
+    unsigned int hvm_paging_enabled:1;
+    /* Emulated fault needs to be propagated to guest? */
+    unsigned int propagate_fault:1;
+#if CONFIG_PAGING_LEVELS >= 3
+    /* Shadow update requires this PAE cpu to recopy/install its L3 table. */
+    unsigned int pae_flip_pending:1;
+#endif
+};
 
 struct arch_vcpu
 {
@@ -183,17 +201,7 @@ struct arch_vcpu
     /* Current LDT details. */
     unsigned long shadow_ldt_mapcnt;
 
-    /* Shadow2 stuff */
-    /* -- pointers to mode-specific entry points */
-    struct shadow2_entry_points *shadow2; 
-    unsigned long last_emulated_mfn;    /* last mfn we emulated a write to */
-    u8 shadow2_propagate_fault;         /* emulated fault needs to be */
-                                        /* propagated to guest */
-#if CONFIG_PAGING_LEVELS >= 3
-    u8 shadow2_pae_flip_pending;        /* shadow update requires this PAE cpu
-                                         * to recopy/install its L3 table.
-                                         */
-#endif
+    struct shadow_vcpu shadow2;
 } __cacheline_aligned;
 
 /* shorthands to improve code legibility */

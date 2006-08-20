@@ -112,5 +112,5 @@ SHADOW2_INTERNAL_NAME(sh2_destroy_monitor_table, SHADOW_LEVELS, GUEST_LEVELS)
     (struct vcpu *v, mfn_t mmfn);
 #endif
 
-extern struct shadow2_entry_points 
-SHADOW2_INTERNAL_NAME(shadow2_entry, SHADOW_LEVELS, GUEST_LEVELS);
+extern struct shadow2_paging_mode 
+SHADOW2_INTERNAL_NAME(sh2_paging_mode, SHADOW_LEVELS, GUEST_LEVELS);

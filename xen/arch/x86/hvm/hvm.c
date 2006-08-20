@@ -260,14 +260,6 @@ void hvm_setup_platform(struct domain* d)
     if ( !hvm_guest(v) || (v->vcpu_id != 0) )
         return;
 
-#if 0 /* SHADOW2 does not have this */
-    if ( shadow_direct_map_init(d) == 0 )
-    {
-        printk("Can not allocate shadow direct map for HVM domain.\n");
-        domain_crash_synchronous();
-    }
-#endif
-
     hvm_zap_iommu_pages(d);
 
     platform = &d->arch.hvm_domain;
@@ -547,7 +539,7 @@ void hvm_do_hypercall(struct cpu_user_regs *pregs)
         return;
     }
 
-    if ( current->arch.shadow2->guest_levels == 4 )
+    if ( current->arch.shadow2.mode->guest_levels == 4 )
     {
         pregs->rax = hvm_hypercall64_table[pregs->rax](pregs->rdi,
                                                        pregs->rsi,

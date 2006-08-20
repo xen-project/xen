@@ -200,40 +200,40 @@ enum sh2_log_type { log_slow = 0, log_fast= 1 };
 /* Alloc and zero the logs */
 static inline void sh2_init_log(struct vcpu *v) 
 {
-    if ( unlikely(!v->arch.shadow2_action_log) ) 
-        v->arch.shadow2_action_log = xmalloc_array(sh2_log_t, 2);
-    ASSERT(v->arch.shadow2_action_log);
-    memset(v->arch.shadow2_action_log, 0, 2 * sizeof (sh2_log_t));
+    if ( unlikely(!v->arch.shadow2.action_log) ) 
+        v->arch.shadow2.action_log = xmalloc_array(sh2_log_t, 2);
+    ASSERT(v->arch.shadow2.action_log);
+    memset(v->arch.shadow2.action_log, 0, 2 * sizeof (sh2_log_t));
 }
 
 /* Log an A&D-bit update */
 static inline void sh2_log_ad(struct vcpu *v, paddr_t e, unsigned int level)
 {
-    v->arch.shadow2_action_log[v->arch.shadow2_action_index].ad[level] = e;
+    v->arch.shadow2.action_log[v->arch.shadow2.action_index].ad[level] = e;
 }
 
 /* Log an MMIO address */
 static inline void sh2_log_mmio(struct vcpu *v, paddr_t m)
 {
-    v->arch.shadow2_action_log[v->arch.shadow2_action_index].mmio = m;
+    v->arch.shadow2.action_log[v->arch.shadow2.action_index].mmio = m;
 }
 
 /* Log the result */
 static inline void sh2_log_rv(struct vcpu *v, int rv)
 {
-    v->arch.shadow2_action_log[v->arch.shadow2_action_index].rv = rv;
+    v->arch.shadow2.action_log[v->arch.shadow2.action_index].rv = rv;
 }
 
 /* Set which mode we're in */
 static inline void sh2_set_log_mode(struct vcpu *v, enum sh2_log_type t) 
 {
-    v->arch.shadow2_action_index = t;
+    v->arch.shadow2.action_index = t;
 }
 
 /* Know not to take action, because we're only checking the mechanism */
 static inline int sh2_take_no_action(struct vcpu *v) 
 {
-    return (v->arch.shadow2_action_index == log_fast);
+    return (v->arch.shadow2.action_index == log_fast);
 }
 
 #else /* Non-paranoid mode: these logs do not exist */
@@ -400,13 +400,13 @@ sh2_mfn_is_dirty(struct domain *d, mfn_t gmfn)
 {
     unsigned long pfn;
     ASSERT(shadow2_mode_log_dirty(d));
-    ASSERT(d->arch.shadow_dirty_bitmap != NULL);
+    ASSERT(d->arch.shadow2.dirty_bitmap != NULL);
 
     /* We /really/ mean PFN here, even for non-translated guests. */
     pfn = get_gpfn_from_mfn(mfn_x(gmfn));
     if ( likely(VALID_M2P(pfn))
-         && likely(pfn < d->arch.shadow_dirty_bitmap_size) 
-         && test_bit(pfn, d->arch.shadow_dirty_bitmap) )
+         && likely(pfn < d->arch.shadow2.dirty_bitmap_size) 
+         && test_bit(pfn, d->arch.shadow2.dirty_bitmap) )
         return 1;
 
     return 0;

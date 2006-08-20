@@ -43,11 +43,11 @@
  * requires VT or similar mechanisms */
 #define SHM2_external  (DOM0_SHADOW2_CONTROL_FLAG_EXTERNAL << SHM2_shift)
 
-#define shadow2_mode_enabled(_d)   ((_d)->arch.shadow2_mode)
-#define shadow2_mode_refcounts(_d) ((_d)->arch.shadow2_mode & SHM2_refcounts)
-#define shadow2_mode_log_dirty(_d) ((_d)->arch.shadow2_mode & SHM2_log_dirty)
-#define shadow2_mode_translate(_d) ((_d)->arch.shadow2_mode & SHM2_translate)
-#define shadow2_mode_external(_d)  ((_d)->arch.shadow2_mode & SHM2_external)
+#define shadow2_mode_enabled(_d)   ((_d)->arch.shadow2.mode)
+#define shadow2_mode_refcounts(_d) ((_d)->arch.shadow2.mode & SHM2_refcounts)
+#define shadow2_mode_log_dirty(_d) ((_d)->arch.shadow2.mode & SHM2_log_dirty)
+#define shadow2_mode_translate(_d) ((_d)->arch.shadow2.mode & SHM2_translate)
+#define shadow2_mode_external(_d)  ((_d)->arch.shadow2.mode & SHM2_external)
 
 /* Xen traps & emulates all reads of all page table pages:
  *not yet supported
@@ -92,34 +92,34 @@
 
 #define shadow2_lock_init(_d)                                   \
     do {                                                        \
-        spin_lock_init(&(_d)->arch.shadow2_lock);               \
-        (_d)->arch.shadow2_locker = -1;                         \
-        (_d)->arch.shadow2_locker_function = "nobody";          \
+        spin_lock_init(&(_d)->arch.shadow2.lock);               \
+        (_d)->arch.shadow2.locker = -1;                         \
+        (_d)->arch.shadow2.locker_function = "nobody";          \
     } while (0)
 
 #define shadow2_lock_is_acquired(_d)                            \
-    (current->processor == (_d)->arch.shadow2_locker)
+    (current->processor == (_d)->arch.shadow2.locker)
 
 #define shadow2_lock(_d)                                                 \
     do {                                                                 \
-        if ( unlikely((_d)->arch.shadow2_locker == current->processor) ) \
+        if ( unlikely((_d)->arch.shadow2.locker == current->processor) ) \
         {                                                                \
             printk("Error: shadow2 lock held by %s\n",                   \
-                   (_d)->arch.shadow2_locker_function);                  \
+                   (_d)->arch.shadow2.locker_function);                  \
             BUG();                                                       \
         }                                                                \
-        spin_lock(&(_d)->arch.shadow2_lock);                             \
-        ASSERT((_d)->arch.shadow2_locker == -1);                         \
-        (_d)->arch.shadow2_locker = current->processor;                  \
-        (_d)->arch.shadow2_locker_function = __func__;                   \
+        spin_lock(&(_d)->arch.shadow2.lock);                             \
+        ASSERT((_d)->arch.shadow2.locker == -1);                         \
+        (_d)->arch.shadow2.locker = current->processor;                  \
+        (_d)->arch.shadow2.locker_function = __func__;                   \
     } while (0)
 
 #define shadow2_unlock(_d)                                              \
     do {                                                                \
-        ASSERT((_d)->arch.shadow2_locker == current->processor);        \
-        (_d)->arch.shadow2_locker = -1;                                 \
-        (_d)->arch.shadow2_locker_function = "nobody";                  \
-        spin_unlock(&(_d)->arch.shadow2_lock);                          \
+        ASSERT((_d)->arch.shadow2.locker == current->processor);        \
+        (_d)->arch.shadow2.locker = -1;                                 \
+        (_d)->arch.shadow2.locker_function = "nobody";                  \
+        spin_unlock(&(_d)->arch.shadow2.lock);                          \
     } while (0)
 
 /* 
@@ -232,7 +232,7 @@ shadow2_vcpu_mode_translate(struct vcpu *v)
     // enabled.  (HVM vcpu's with paging disabled are using the p2m table as
     // its paging table, so no translation occurs in this case.)
     //
-    return v->vcpu_flags & VCPUF_shadow2_translate;
+    return v->arch.shadow2.hvm_paging_enabled;
 }
 
 
@@ -240,7 +240,7 @@ shadow2_vcpu_mode_translate(struct vcpu *v)
 /* Mode-specific entry points into the shadow code */
 
 struct x86_emulate_ctxt;
-struct shadow2_entry_points {
+struct shadow2_paging_mode {
     int           (*page_fault            )(struct vcpu *v, unsigned long va,
                                             struct cpu_user_regs *regs);
     int           (*invlpg                )(struct vcpu *v, unsigned long va);
@@ -285,8 +285,8 @@ struct shadow2_entry_points {
 
 static inline int shadow2_guest_paging_levels(struct vcpu *v)
 {
-    ASSERT(v->arch.shadow2 != NULL);
-    return v->arch.shadow2->guest_levels;
+    ASSERT(v->arch.shadow2.mode != NULL);
+    return v->arch.shadow2.mode->guest_levels;
 }
 
 /**************************************************************************/
@@ -337,7 +337,7 @@ shadow2_fault(unsigned long va, struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
     perfc_incrc(shadow2_fault);
-    return v->arch.shadow2->page_fault(v, va, regs);
+    return v->arch.shadow2.mode->page_fault(v, va, regs);
 }
 
 static inline int
@@ -346,7 +346,7 @@ shadow2_invlpg(struct vcpu *v, unsigned long va)
  * instruction should be issued on the hardware, or 0 if it's safe not
  * to do so. */
 {
-    return v->arch.shadow2->invlpg(v, va);
+    return v->arch.shadow2.mode->invlpg(v, va);
 }
 
 static inline unsigned long
@@ -354,7 +354,7 @@ shadow2_gva_to_gpa(struct vcpu *v, unsigned long va)
 /* Called to translate a guest virtual address to what the *guest*
  * pagetables would map it to. */
 {
-    return v->arch.shadow2->gva_to_gpa(v, va);
+    return v->arch.shadow2.mode->gva_to_gpa(v, va);
 }
 
 static inline unsigned long
@@ -362,7 +362,7 @@ shadow2_gva_to_gfn(struct vcpu *v, unsigned long va)
 /* Called to translate a guest virtual address to what the *guest*
  * pagetables would map it to. */
 {
-    return v->arch.shadow2->gva_to_gfn(v, va);
+    return v->arch.shadow2.mode->gva_to_gfn(v, va);
 }
 
 static inline void
@@ -371,7 +371,7 @@ shadow2_update_cr3(struct vcpu *v)
  * Called when the guest changes CR3. */
 {
     shadow2_lock(v->domain);
-    v->arch.shadow2->update_cr3(v);
+    v->arch.shadow2.mode->update_cr3(v);
     shadow2_unlock(v->domain);
 }
 
@@ -425,19 +425,20 @@ static inline void shadow2_update_paging_modes(struct vcpu *v)
 static inline void
 shadow2_detach_old_tables(struct vcpu *v)
 {
-    v->arch.shadow2->detach_old_tables(v);
+    if ( v->arch.shadow2.mode )
+        v->arch.shadow2.mode->detach_old_tables(v);
 }
 
 static inline mfn_t
 shadow2_make_monitor_table(struct vcpu *v)
 {
-    return v->arch.shadow2->make_monitor_table(v);
+    return v->arch.shadow2.mode->make_monitor_table(v);
 }
 
 static inline void
 shadow2_destroy_monitor_table(struct vcpu *v, mfn_t mmfn)
 {
-    v->arch.shadow2->destroy_monitor_table(v, mmfn);
+    v->arch.shadow2.mode->destroy_monitor_table(v, mmfn);
 }
 
 /* Validate a pagetable change from the guest and update the shadows. */
@@ -526,7 +527,7 @@ unsigned int shadow2_set_allocation(struct domain *d,
 /* Return the size of the shadow2 pool, rounded up to the nearest MB */
 static inline unsigned int shadow2_get_allocation(struct domain *d)
 {
-    unsigned int pg = d->arch.shadow2_total_pages;
+    unsigned int pg = d->arch.shadow2.total_pages;
     return ((pg >> (20 - PAGE_SHIFT))
             + ((pg & ((1 << (20 - PAGE_SHIFT)) - 1)) ? 1 : 0));
 }

@@ -507,7 +507,7 @@ struct shadow2_walk_t
 #define sh2_unhook_32b_mappings     INTERNAL_NAME(sh2_unhook_32b_mappings)
 #define sh2_unhook_pae_mappings     INTERNAL_NAME(sh2_unhook_pae_mappings)
 #define sh2_unhook_64b_mappings     INTERNAL_NAME(sh2_unhook_64b_mappings)
-#define shadow2_entry               INTERNAL_NAME(shadow2_entry)
+#define sh2_paging_mode             INTERNAL_NAME(sh2_paging_mode)
 #define sh2_detach_old_tables       INTERNAL_NAME(sh2_detach_old_tables)
 #define sh2_x86_emulate_write       INTERNAL_NAME(sh2_x86_emulate_write)
 #define sh2_x86_emulate_cmpxchg     INTERNAL_NAME(sh2_x86_emulate_cmpxchg)

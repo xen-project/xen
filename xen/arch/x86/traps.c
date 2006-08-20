@@ -923,13 +923,6 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
 
     perfc_incrc(page_faults);
 
-    if ( shadow2_mode_enabled(current->domain) )
-        debugtrace_printk("%s %s %d dom=%d eip=%p cr2=%p code=%d cs=%x\n",
-                          __func__, __FILE__, __LINE__,
-                          current->domain->domain_id,
-                          (void *)regs->eip, (void *)addr, regs->error_code,
-                          regs->cs);
-
     if ( unlikely((rc = fixup_page_fault(addr, regs)) != 0) )
         return rc;
 

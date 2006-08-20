@@ -82,7 +82,7 @@
  * mappings (ugh! PAE linear mappings) and we copy it to the low-memory
  * buffer so it fits in CR3.  Maybe we can avoid some of this recopying 
  * by using the shadow directly in some places. 
- * Also, for SMP, need to actually respond to seeing shadow2_pae_flip_pending.
+ * Also, for SMP, need to actually respond to seeing shadow2.pae_flip_pending.
  *
  * GUEST_WALK_TABLES TLB FLUSH COALESCE
  * guest_walk_tables can do up to three remote TLB flushes as it walks to
@@ -1245,7 +1245,7 @@ static int shadow_set_l3e(struct vcpu *v,
             if (info->vcpus & (1 << vcpu->vcpu_id))
             {
                 // Remember that this flip/update needs to occur.
-                vcpu->arch.shadow2_pae_flip_pending = 1;
+                vcpu->arch.shadow2.pae_flip_pending = 1;
                 flags |= SHADOW2_SET_L3PAE_RECOPY;
             }
         }
@@ -2772,7 +2772,7 @@ sh2_map_and_validate_gl1e(struct vcpu *v, mfn_t gl1mfn,
 static inline void check_for_early_unshadow(struct vcpu *v, mfn_t gmfn)
 {
 #if SHADOW2_OPTIMIZATIONS & SH2OPT_EARLY_UNSHADOW
-    if ( v->arch.last_emulated_mfn == mfn_x(gmfn) &&
+    if ( v->arch.shadow2.last_emulated_mfn == mfn_x(gmfn) &&
          sh2_mfn_is_a_page_table(gmfn) )
     {
         u32 flags = mfn_to_page(gmfn)->shadow2_flags;
@@ -2807,7 +2807,7 @@ static inline void check_for_early_unshadow(struct vcpu *v, mfn_t gmfn)
             }
         }
     }
-    v->arch.last_emulated_mfn = mfn_x(gmfn);
+    v->arch.shadow2.last_emulated_mfn = mfn_x(gmfn);
 #endif
 }
 
@@ -2815,7 +2815,7 @@ static inline void check_for_early_unshadow(struct vcpu *v, mfn_t gmfn)
 static inline void reset_early_unshadow(struct vcpu *v)
 {
 #if SHADOW2_OPTIMIZATIONS & SH2OPT_EARLY_UNSHADOW
-    v->arch.last_emulated_mfn = INVALID_MFN;
+    v->arch.shadow2.last_emulated_mfn = INVALID_MFN;
 #endif
 }
 
@@ -3000,7 +3000,7 @@ static int sh2_page_fault(struct vcpu *v,
 #endif
 
     perfc_incrc(shadow2_fault_fixed);
-    d->arch.shadow_fault_count++;
+    d->arch.shadow2.fault_count++;
     reset_early_unshadow(v);
 
  done:
@@ -3026,7 +3026,7 @@ static int sh2_page_fault(struct vcpu *v,
 
     SHADOW2_PRINTK("emulate: eip=%#lx\n", emul_regs.eip);
 
-    v->arch.shadow2_propagate_fault = 0;
+    v->arch.shadow2.propagate_fault = 0;
     if ( x86_emulate_memop(&emul_ctxt, &shadow2_emulator_ops) )
     {
         SHADOW2_PRINTK("emulator failure, unshadowing mfn %#lx\n", 
@@ -3040,7 +3040,7 @@ static int sh2_page_fault(struct vcpu *v,
          * guest to loop on the same page fault. */
         goto done;
     }
-    if ( v->arch.shadow2_propagate_fault )
+    if ( v->arch.shadow2.propagate_fault )
     {
         /* Emulation triggered another page fault */
         goto not_a_shadow_fault;
@@ -3493,7 +3493,7 @@ void sh2_pae_recopy(struct domain *d)
     
     for_each_vcpu(d, v)
     {
-        if ( !v->arch.shadow2_pae_flip_pending ) 
+        if ( !v->arch.shadow2.pae_flip_pending ) 
             continue;
 
         cpu_set(v->processor, flush_mask);
@@ -3526,7 +3526,7 @@ void sh2_pae_recopy(struct domain *d)
             }
         }
 #endif
-        v->arch.shadow2_pae_flip_pending = 0;        
+        v->arch.shadow2.pae_flip_pending = 0;        
     }
 
     flush_tlb_mask(flush_mask);
@@ -3612,7 +3612,7 @@ sh2_update_cr3(struct vcpu *v)
 #endif
 
     ASSERT(shadow2_lock_is_acquired(v->domain));
-    ASSERT(v->arch.shadow2);
+    ASSERT(v->arch.shadow2.mode);
 
     ////
     //// vcpu->arch.guest_table is already set
@@ -3713,7 +3713,7 @@ sh2_update_cr3(struct vcpu *v)
     {
         /* Pull this root shadow to the front of the list of roots. */
         list_del(&mfn_to_page(smfn)->list);
-        list_add(&mfn_to_page(smfn)->list, &d->arch.shadow2_toplevel_shadows);
+        list_add(&mfn_to_page(smfn)->list, &d->arch.shadow2.toplevel_shadows);
     }
     else
     {
@@ -3725,7 +3725,7 @@ sh2_update_cr3(struct vcpu *v)
         shadow2_prealloc(d, SHADOW2_MAX_ORDER); 
         /* Shadow the page. */
         smfn = sh2_make_shadow(v, gmfn, PGC_SH2_guest_root_type);
-        list_add(&mfn_to_page(smfn)->list, &d->arch.shadow2_toplevel_shadows);
+        list_add(&mfn_to_page(smfn)->list, &d->arch.shadow2.toplevel_shadows);
     }
     ASSERT(valid_mfn(smfn));
     v->arch.shadow_table = pagetable_from_mfn(smfn);
@@ -4082,7 +4082,7 @@ static inline void * emulate_map_dest(struct vcpu *v,
          || (!(flags & _PAGE_USER) && ring_3(ctxt->regs)) )
     {
         /* This write would have faulted even on bare metal */
-        v->arch.shadow2_propagate_fault = 1;
+        v->arch.shadow2.propagate_fault = 1;
         return NULL;
     }
     
@@ -4458,7 +4458,7 @@ int sh2_audit_l4_table(struct vcpu *v, mfn_t sl4mfn, mfn_t x)
 /**************************************************************************/
 /* Entry points into this mode of the shadow code.
  * This will all be mangled by the preprocessor to uniquify everything. */
-struct shadow2_entry_points shadow2_entry = {
+struct shadow2_paging_mode sh2_paging_mode = {
     .page_fault             = sh2_page_fault, 
     .invlpg                 = sh2_invlpg,
     .gva_to_gpa             = sh2_gva_to_gpa,

@@ -195,10 +195,10 @@ int arch_domain_create(struct domain *d)
 
     shadow2_lock_init(d);
     for ( i = 0; i <= SHADOW2_MAX_ORDER; i++ )
-        INIT_LIST_HEAD(&d->arch.shadow2_freelists[i]);
-    INIT_LIST_HEAD(&d->arch.shadow2_p2m_freelist);
-    INIT_LIST_HEAD(&d->arch.shadow2_p2m_inuse);
-    INIT_LIST_HEAD(&d->arch.shadow2_toplevel_shadows);
+        INIT_LIST_HEAD(&d->arch.shadow2.freelists[i]);
+    INIT_LIST_HEAD(&d->arch.shadow2.p2m_freelist);
+    INIT_LIST_HEAD(&d->arch.shadow2.p2m_inuse);
+    INIT_LIST_HEAD(&d->arch.shadow2.toplevel_shadows);
 
     if ( !is_idle_domain(d) )
     {
@@ -338,7 +338,7 @@ int arch_set_info_guest(
     /* Shadow2: make sure the domain has enough shadow memory to
      * boot another vcpu */
     if ( shadow2_mode_enabled(d) 
-         && d->arch.shadow2_total_pages < shadow2_min_acceptable_pages(d) )
+         && d->arch.shadow2.total_pages < shadow2_min_acceptable_pages(d) )
     {
         destroy_gdt(v);
         return -ENOMEM;
@@ -977,7 +977,7 @@ void arch_dump_domain_info(struct domain *d)
     if ( shadow2_mode_enabled(d) )
     {
         printk("    shadow2 mode: ");
-        if ( d->arch.shadow2_mode & SHM2_enable )
+        if ( d->arch.shadow2.mode & SHM2_enable )
             printk("enabled ");
         if ( shadow2_mode_refcounts(d) )
             printk("refcounts ");
