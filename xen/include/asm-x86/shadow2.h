@@ -405,8 +405,6 @@ static inline void update_cr3(struct vcpu *v)
 #endif
         cr3_mfn = pagetable_get_pfn(v->arch.guest_table);
 
-    /* Update vcpu->arch.cr3 */
-    BUG_ON(cr3_mfn == 0);
     make_cr3(v, cr3_mfn);
 }
 
