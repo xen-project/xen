@@ -25,7 +25,7 @@ extern ulong oftree;
 extern ulong oftree_len;
 
 extern int ofd_dom0_fixup(
-    struct domain *d, ulong oftree, start_info_t *si, ulong dst);
+    struct domain *d, ulong mem, start_info_t *si, ulong dst);
 
 extern int firmware_image_start[0];
 extern int firmware_image_size[0];

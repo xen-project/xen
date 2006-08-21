@@ -24,6 +24,7 @@
 #include <xen/version.h>
 #include <public/xen.h>
 #include "of-devtree.h"
+#include "oftree.h"
 
 #undef RTAS
 
@@ -440,8 +441,7 @@ static ofdn_t ofd_xen_props(void *m, struct domain *d, start_info_t *si)
     }
     return n;
 }
-extern int ofd_dom0_fixup(
-    struct domain *d, ulong oftree, start_info_t *si, ulong dst);
+
 int ofd_dom0_fixup(struct domain *d, ulong mem, start_info_t *si, ulong eoload)
 {
     void *m;
