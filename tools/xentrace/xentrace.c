@@ -55,6 +55,7 @@ typedef struct settings_st {
     unsigned long new_data_thresh;
     uint32_t evt_mask;
     uint32_t cpu_mask;
+    unsigned long tbuf_size;
 } settings_t;
 
 settings_t opts;
@@ -111,7 +112,10 @@ static void get_tbufs(unsigned long *mfn, unsigned long *size)
         exit(EXIT_FAILURE);
     }
 
-    ret = xc_tbuf_enable(xc_handle, DEFAULT_TBUF_SIZE, mfn, size);
+    if(!opts.tbuf_size)
+      opts.tbuf_size = DEFAULT_TBUF_SIZE;
+
+    ret = xc_tbuf_enable(xc_handle, opts.tbuf_size, mfn, size);
 
     if ( ret != 0 )
     {
@@ -400,6 +404,15 @@ error_t cmd_parser(int key, char *arg, struct argp_state *state)
     }
     break;
     
+    case 'S': /* set tbuf size (given in pages) */
+    {
+        char *inval;
+        setup->tbuf_size = strtol(arg, &inval, 0);
+        if ( inval == arg )
+            argp_usage(state);
+    }
+    break;
+
     case ARGP_KEY_ARG:
     {
         if ( state->arg_num == 0 )
@@ -438,6 +451,12 @@ const struct argp_option cmd_opts[] =
     { .name = "evt-mask", .key='e', .arg="e",
       .doc = 
       "set evt-mask " },
+
+    { .name = "trace-buf-size", .key='S', .arg="N",
+      .doc =
+      "Set trace buffer size in pages (default " xstr(DEFAULT_TBUF_SIZE) "). "
+      "N.B. that the trace buffer cannot be resized.  If it has "
+      "already been set this boot cycle, this argument will be ignored." },
 
     {0}
 };
