@@ -3139,14 +3139,13 @@ static int ptwr_emulated_update(
         }
     }
 
+    /* Checked successfully: do the update (write or cmpxchg). */
     pl1e = map_domain_page(page_to_mfn(page));
     pl1e = (l1_pgentry_t *)((unsigned long)pl1e + (addr & ~PAGE_MASK));
-
-    if ( shadow2_mode_enabled(d) )
-        shadow2_lock(d);
-
     if ( do_cmpxchg )
     {
+        if ( shadow2_mode_enabled(d) )
+            shadow2_lock(d);
         ol1e = l1e_from_intpte(old);
         if ( cmpxchg((intpte_t *)pl1e, old, val) != old )
         {
@@ -3156,18 +3155,17 @@ static int ptwr_emulated_update(
             put_page_from_l1e(nl1e, d);
             return X86EMUL_CMPXCHG_FAILED;
         }
+        if ( unlikely(shadow2_mode_enabled(v->domain)) )
+        {
+            shadow2_validate_guest_entry(v, _mfn(page_to_mfn(page)), pl1e);
+            shadow2_unlock(v->domain);    
+        }
     }
     else
     {
         ol1e = *pl1e;
         if ( !update_l1e(pl1e, ol1e, nl1e, page_to_mfn(page), v) )
             BUG();
-    }
-
-    if ( shadow2_mode_enabled(d) )
-    {
-        shadow2_validate_guest_entry(v, _mfn(page_to_mfn(page)), pl1e);
-        shadow2_unlock(v->domain);    
     }
 
     unmap_domain_page(pl1e);
