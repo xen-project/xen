@@ -626,12 +626,6 @@ asmlinkage int do_invalid_op(struct cpu_user_regs *regs)
             regs->eip += sizeof(sig);
             return EXCRET_fault_fixed;
         }
-        printk("%02x %02x %02x %02x %02x\n",
-               (unsigned char)sig[0],
-               (unsigned char)sig[1],
-               (unsigned char)sig[2],
-               (unsigned char)sig[3],
-               (unsigned char)sig[4]);
         DEBUGGER_trap_fatal(TRAP_invalid_op, regs);
         show_execution_state(regs);
         panic("CPU%d FATAL TRAP: vector = %d (invalid opcode)\n",
