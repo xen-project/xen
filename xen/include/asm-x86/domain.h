@@ -18,7 +18,7 @@ struct trap_bounce {
 #define MAPHASHENT_NOTINUSE ((u16)~0U)
 struct vcpu_maphash {
     struct vcpu_maphash_entry {
-        unsigned long pfn;
+        unsigned long mfn;
         uint16_t      idx;
         uint16_t      refcnt;
     } hash[MAPHASH_ENTRIES];

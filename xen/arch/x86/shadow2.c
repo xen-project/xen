@@ -2293,7 +2293,7 @@ static void sh2_destroy_l3_subshadow(struct vcpu *v,
     for ( i = 0; i < GUEST_L3_PAGETABLE_ENTRIES; i++ ) 
         if ( shadow_l3e_get_flags(sl3e[i]) & _PAGE_PRESENT ) 
             sh2_put_ref(v, shadow_l3e_get_mfn(sl3e[i]),
-                        mapped_domain_page_to_maddr(sl3e));
+                        maddr_from_mapped_domain_page(sl3e));
 }
 #endif
 

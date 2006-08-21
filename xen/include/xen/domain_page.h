@@ -18,34 +18,34 @@
  * Map a given page frame, returning the mapped virtual address. The page is
  * then accessible within the current VCPU until a corresponding unmap call.
  */
-extern void *map_domain_page(unsigned long pfn);
+void *map_domain_page(unsigned long mfn);
 
 /*
  * Pass a VA within a page previously mapped in the context of the
- * currently-executing VCPU via a call to map_domain_pages().
+ * currently-executing VCPU via a call to map_domain_page().
  */
-extern void unmap_domain_page(void *va);
-
-/* 
- * Convert a VA (within a page previously mapped in the context of the
- * currently-executing VCPU via a call to map_domain_pages()) to a machine 
- * address 
- */
-extern paddr_t mapped_domain_page_to_maddr(void *va);
+void unmap_domain_page(void *va);
 
 /*
  * Similar to the above calls, except the mapping is accessible in all
  * address spaces (not just within the VCPU that created the mapping). Global
  * mappings can also be unmapped from any context.
  */
-extern void *map_domain_page_global(unsigned long pfn);
-extern void unmap_domain_page_global(void *va);
+void *map_domain_page_global(unsigned long mfn);
+void unmap_domain_page_global(void *va);
+
+/* 
+ * Convert a VA (within a page previously mapped in the context of the
+ * currently-executing VCPU via a call to map_domain_page(), or via a
+ * previous call to map_domain_page_global()) to the mapped machine address.
+ */
+paddr_t maddr_from_mapped_domain_page(void *va);
 
 #define DMCACHE_ENTRY_VALID 1U
 #define DMCACHE_ENTRY_HELD  2U
 
 struct domain_mmap_cache {
-    unsigned long pfn;
+    unsigned long mfn;
     void         *va;
     unsigned int  flags;
 };
@@ -55,12 +55,12 @@ domain_mmap_cache_init(struct domain_mmap_cache *cache)
 {
     ASSERT(cache != NULL);
     cache->flags = 0;
-    cache->pfn = 0;
+    cache->mfn = 0;
     cache->va = NULL;
 }
 
 static inline void *
-map_domain_page_with_cache(unsigned long pfn, struct domain_mmap_cache *cache)
+map_domain_page_with_cache(unsigned long mfn, struct domain_mmap_cache *cache)
 {
     ASSERT(cache != NULL);
     BUG_ON(cache->flags & DMCACHE_ENTRY_HELD);
@@ -68,13 +68,13 @@ map_domain_page_with_cache(unsigned long pfn, struct domain_mmap_cache *cache)
     if ( likely(cache->flags & DMCACHE_ENTRY_VALID) )
     {
         cache->flags |= DMCACHE_ENTRY_HELD;
-        if ( likely(pfn == cache->pfn) )
+        if ( likely(mfn == cache->mfn) )
             goto done;
         unmap_domain_page(cache->va);
     }
 
-    cache->pfn   = pfn;
-    cache->va    = map_domain_page(pfn);
+    cache->mfn   = mfn;
+    cache->va    = map_domain_page(mfn);
     cache->flags = DMCACHE_ENTRY_HELD | DMCACHE_ENTRY_VALID;
 
  done:
@@ -103,26 +103,22 @@ domain_mmap_cache_destroy(struct domain_mmap_cache *cache)
 
 #else /* !CONFIG_DOMAIN_PAGE */
 
-#define map_domain_page(pfn)                maddr_to_virt((pfn)<<PAGE_SHIFT)
+#define map_domain_page(mfn)                maddr_to_virt((mfn)<<PAGE_SHIFT)
 #define unmap_domain_page(va)               ((void)(va))
-#define mapped_domain_page_to_maddr(va)     (virt_to_maddr(va))
 
-#define map_domain_page_global(pfn)         maddr_to_virt((pfn)<<PAGE_SHIFT)
+#define map_domain_page_global(mfn)         maddr_to_virt((mfn)<<PAGE_SHIFT)
 #define unmap_domain_page_global(va)        ((void)(va))
+
+#define maddr_from_mapped_domain_page(va)   (virt_to_maddr(va))
 
 struct domain_mmap_cache { 
 };
 
 #define domain_mmap_cache_init(c)           ((void)(c))
-#define map_domain_page_with_cache(pfn,c)   (map_domain_page(pfn))
+#define map_domain_page_with_cache(mfn,c)   (map_domain_page(mfn))
 #define unmap_domain_page_with_cache(va,c)  ((void)(va))
 #define domain_mmap_cache_destroy(c)        ((void)(c))
 
 #endif /* !CONFIG_DOMAIN_PAGE */
-
-#define HERE_I_AM \
-do { \
-    printk("HERE I AM: %s %s %d\n", __func__, __FILE__, __LINE__); \
-} while (0)
 
 #endif /* __XEN_DOMAIN_PAGE_H__ */

@@ -41,7 +41,7 @@ static inline struct vcpu *mapcache_current_vcpu(void)
     return v;
 }
 
-void *map_domain_page(unsigned long pfn)
+void *map_domain_page(unsigned long mfn)
 {
     unsigned long va;
     unsigned int idx, i, vcpu;
@@ -58,13 +58,14 @@ void *map_domain_page(unsigned long pfn)
     vcpu  = v->vcpu_id;
     cache = &v->domain->arch.mapcache;
 
-    hashent = &cache->vcpu_maphash[vcpu].hash[MAPHASH_HASHFN(pfn)];
-    if ( hashent->pfn == pfn && (idx = hashent->idx) != MAPHASHENT_NOTINUSE )
+    hashent = &cache->vcpu_maphash[vcpu].hash[MAPHASH_HASHFN(mfn)];
+    if ( hashent->mfn == mfn )
     {
+        idx = hashent->idx;
         hashent->refcnt++;
         ASSERT(idx < MAPCACHE_ENTRIES);
         ASSERT(hashent->refcnt != 0);
-        ASSERT(l1e_get_pfn(cache->l1tab[idx]) == pfn);
+        ASSERT(l1e_get_pfn(cache->l1tab[idx]) == mfn);
         goto out;
     }
 
@@ -106,7 +107,7 @@ void *map_domain_page(unsigned long pfn)
 
     spin_unlock(&cache->lock);
 
-    cache->l1tab[idx] = l1e_from_pfn(pfn, __PAGE_HYPERVISOR);
+    cache->l1tab[idx] = l1e_from_pfn(mfn, __PAGE_HYPERVISOR);
 
  out:
     va = MAPCACHE_VIRT_START + (idx << PAGE_SHIFT);
@@ -118,7 +119,7 @@ void unmap_domain_page(void *va)
     unsigned int idx;
     struct vcpu *v;
     struct mapcache *cache;
-    unsigned long pfn;
+    unsigned long mfn;
     struct vcpu_maphash_entry *hashent;
 
     ASSERT(!in_irq());
@@ -131,12 +132,12 @@ void unmap_domain_page(void *va)
     cache = &v->domain->arch.mapcache;
 
     idx = ((unsigned long)va - MAPCACHE_VIRT_START) >> PAGE_SHIFT;
-    pfn = l1e_get_pfn(cache->l1tab[idx]);
-    hashent = &cache->vcpu_maphash[v->vcpu_id].hash[MAPHASH_HASHFN(pfn)];
+    mfn = l1e_get_pfn(cache->l1tab[idx]);
+    hashent = &cache->vcpu_maphash[v->vcpu_id].hash[MAPHASH_HASHFN(mfn)];
 
     if ( hashent->idx == idx )
     {
-        ASSERT(hashent->pfn == pfn);
+        ASSERT(hashent->mfn == mfn);
         ASSERT(hashent->refcnt != 0);
         hashent->refcnt--;
     }
@@ -145,14 +146,14 @@ void unmap_domain_page(void *va)
         if ( hashent->idx != MAPHASHENT_NOTINUSE )
         {
             /* /First/, zap the PTE. */
-            ASSERT(l1e_get_pfn(cache->l1tab[hashent->idx]) == hashent->pfn);
+            ASSERT(l1e_get_pfn(cache->l1tab[hashent->idx]) == hashent->mfn);
             cache->l1tab[hashent->idx] = l1e_empty();
             /* /Second/, mark as garbage. */
             set_bit(hashent->idx, cache->garbage);
         }
 
         /* Add newly-freed mapping to the maphash. */
-        hashent->pfn = pfn;
+        hashent->mfn = mfn;
         hashent->idx = idx;
     }
     else
@@ -167,6 +168,7 @@ void unmap_domain_page(void *va)
 void mapcache_init(struct domain *d)
 {
     unsigned int i, j;
+    struct vcpu_maphash_entry *hashent;
 
     d->arch.mapcache.l1tab = d->arch.mm_perdomain_pt +
         (GDT_LDT_MBYTES << (20 - PAGE_SHIFT));
@@ -174,33 +176,14 @@ void mapcache_init(struct domain *d)
 
     /* Mark all maphash entries as not in use. */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
+    {
         for ( j = 0; j < MAPHASH_ENTRIES; j++ )
-            d->arch.mapcache.vcpu_maphash[i].hash[j].idx =
-                MAPHASHENT_NOTINUSE;
-}
-
-paddr_t mapped_domain_page_to_maddr(void *va) 
-/* Convert a pointer in a mapped domain page to a machine address. 
- * Takes any pointer that's valid for use in unmap_domain_page() */
-{
-    unsigned int idx;
-    struct vcpu *v;
-    struct mapcache *cache;
-    unsigned long pfn;
-
-    ASSERT(!in_irq());
-
-    ASSERT((void *)MAPCACHE_VIRT_START <= va);
-    ASSERT(va < (void *)MAPCACHE_VIRT_END);
-
-    v = mapcache_current_vcpu();
-
-    cache = &v->domain->arch.mapcache;
-
-    idx = ((unsigned long)va - MAPCACHE_VIRT_START) >> PAGE_SHIFT;
-    pfn = l1e_get_pfn(cache->l1tab[idx]);
-    return ((paddr_t) pfn << PAGE_SHIFT 
-            | ((unsigned long) va & ~PAGE_MASK));
+        {
+            hashent = &d->arch.mapcache.vcpu_maphash[i].hash[j];
+            hashent->mfn = ~0UL; /* never valid to map */
+            hashent->idx = MAPHASHENT_NOTINUSE;
+        }
+    }
 }
 
 #define GLOBALMAP_BITS (IOREMAP_MBYTES << (20 - PAGE_SHIFT))
@@ -209,7 +192,7 @@ static unsigned long garbage[BITS_TO_LONGS(GLOBALMAP_BITS)];
 static unsigned int inuse_cursor;
 static DEFINE_SPINLOCK(globalmap_lock);
 
-void *map_domain_page_global(unsigned long pfn)
+void *map_domain_page_global(unsigned long mfn)
 {
     l2_pgentry_t *pl2e;
     l1_pgentry_t *pl1e;
@@ -246,7 +229,7 @@ void *map_domain_page_global(unsigned long pfn)
 
     pl2e = virt_to_xen_l2e(va);
     pl1e = l2e_to_l1e(*pl2e) + l1_table_offset(va);
-    *pl1e = l1e_from_pfn(pfn, __PAGE_HYPERVISOR);
+    *pl1e = l1e_from_pfn(mfn, __PAGE_HYPERVISOR);
 
     return (void *)va;
 }
@@ -258,7 +241,7 @@ void unmap_domain_page_global(void *va)
     l1_pgentry_t *pl1e;
     unsigned int idx;
 
-    ASSERT((__va >= IOREMAP_VIRT_START) && (__va <= (IOREMAP_VIRT_END - 1)));
+    ASSERT((__va >= IOREMAP_VIRT_START) && (__va < IOREMAP_VIRT_END));
 
     /* /First/, we zap the PTE. */
     pl2e = virt_to_xen_l2e(__va);
@@ -268,4 +251,30 @@ void unmap_domain_page_global(void *va)
     /* /Second/, we add to the garbage map. */
     idx = (__va - IOREMAP_VIRT_START) >> PAGE_SHIFT;
     set_bit(idx, garbage);
+}
+
+paddr_t maddr_from_mapped_domain_page(void *va) 
+{
+    unsigned long __va = (unsigned long)va;
+    l2_pgentry_t *pl2e;
+    l1_pgentry_t *pl1e;
+    unsigned int idx;
+    struct mapcache *cache;
+    unsigned long mfn;
+
+    if ( (__va >= MAPCACHE_VIRT_START) && (__va < MAPCACHE_VIRT_END) )
+    {
+        cache = &mapcache_current_vcpu()->domain->arch.mapcache;
+        idx = ((unsigned long)va - MAPCACHE_VIRT_START) >> PAGE_SHIFT;
+        mfn = l1e_get_pfn(cache->l1tab[idx]);
+    }
+    else
+    {
+        ASSERT((__va >= IOREMAP_VIRT_START) && (__va < IOREMAP_VIRT_END));
+        pl2e = virt_to_xen_l2e(__va);
+        pl1e = l2e_to_l1e(*pl2e) + l1_table_offset(__va);
+        mfn = l1e_get_pfn(*pl1e);
+    }
+    
+    return ((paddr_t)mfn << PAGE_SHIFT) | ((unsigned long)va & ~PAGE_MASK);
 }
