@@ -241,7 +241,7 @@ void unmap_domain_page_global(void *va)
     l1_pgentry_t *pl1e;
     unsigned int idx;
 
-    ASSERT((__va >= IOREMAP_VIRT_START) && (__va < IOREMAP_VIRT_END));
+    ASSERT(__va >= IOREMAP_VIRT_START);
 
     /* /First/, we zap the PTE. */
     pl2e = virt_to_xen_l2e(__va);
@@ -270,7 +270,7 @@ paddr_t maddr_from_mapped_domain_page(void *va)
     }
     else
     {
-        ASSERT((__va >= IOREMAP_VIRT_START) && (__va < IOREMAP_VIRT_END));
+        ASSERT(__va >= IOREMAP_VIRT_START);
         pl2e = virt_to_xen_l2e(__va);
         pl1e = l2e_to_l1e(*pl2e) + l1_table_offset(__va);
         mfn = l1e_get_pfn(*pl1e);
