@@ -39,8 +39,8 @@
 #define DRV_VERSION "0.10"
 #define DRV_RELDATE "03/03/2005"
 
-char hypercall_page[PAGE_SIZE];
-EXPORT_SYMBOL(hypercall_page);
+char *hypercall_stubs;
+EXPORT_SYMBOL(hypercall_stubs);
 
 // Used to be xiaofeng.ling@intel.com
 MODULE_AUTHOR("ssmith@xensource.com");
@@ -116,10 +116,9 @@ unsigned long alloc_xen_mmio(unsigned long len)
 }
 
 /* Lifted from hvmloader.c */
-static int get_hypercall_page(void)
+static int get_hypercall_stubs(void)
 {
-	void *tmp_hypercall_page;
-	uint32_t eax, ebx, ecx, edx;
+	uint32_t eax, ebx, ecx, edx, pages, msr, order, i;
 	char signature[13];
 
 	cpuid(0x40000000, &eax, &ebx, &ecx, &edx);
@@ -128,9 +127,10 @@ static int get_hypercall_page(void)
 	*(uint32_t*)(signature + 8) = edx;
 	signature[12] = 0;
 
-	if (strcmp("XenVMMXenVMM", signature) || eax < 0x40000002) {
+	if (strcmp("XenVMMXenVMM", signature) || (eax < 0x40000002)) {
 		printk(KERN_WARNING
-		       "Detected Xen platform device but not Xen VMM? (sig %s, eax %x)\n",
+		       "Detected Xen platform device but not Xen VMM?"
+		       " (sig %s, eax %x)\n",
 		       signature, eax);
 		return -EINVAL;
 	}
@@ -139,24 +139,24 @@ static int get_hypercall_page(void)
 
 	printk(KERN_INFO "Xen version %d.%d.\n", eax >> 16, eax & 0xffff);
 
-	cpuid(0x40000002, &eax, &ebx, &ecx, &edx);
+	cpuid(0x40000002, &pages, &msr, &ecx, &edx);
 
-	if (eax != 1) {
-		printk(KERN_WARNING
-		       "This Xen version uses a %d page hypercall area,"
-		       "but these modules only support 1 page.\n",
-		       eax);
-		return -EINVAL;
-	}
+	i = pages - 1;
+	for (order = 0; i != 0; order++)
+		i >>= 1;
 
-	tmp_hypercall_page = (void *)__get_free_page(GFP_KERNEL);
-	if (!tmp_hypercall_page)
+	printk(KERN_INFO "Hypercall area is %u pages (order %u allocation)\n",
+	       pages, order);
+
+	hypercall_stubs = (void *)__get_free_pages(GFP_KERNEL, order);
+	if (hypercall_stubs == NULL)
 		return -ENOMEM;
-	memset(tmp_hypercall_page, 0xcc, PAGE_SIZE);
-	if (wrmsr_safe(ebx, virt_to_phys(tmp_hypercall_page), 0))
-		panic("Can't do wrmsr; not running on Xen?\n");
-	memcpy(hypercall_page, tmp_hypercall_page, PAGE_SIZE);
-	free_page((unsigned long)tmp_hypercall_page);
+
+	for (i = 0; i < pages; i++)
+		wrmsrl(ebx,
+		       virt_to_phys(hypercall_stubs) +	/* base address      */
+		       (i << PAGE_SHIFT) +		/* offset of page @i */
+		       i);				/* request page @i   */
 
 	return 0;
 }
@@ -201,7 +201,7 @@ static int __devinit platform_pci_init(struct pci_dev *pdev,
 	platform_mmio = mmio_addr;
 	platform_mmiolen = mmio_len;
 
-	ret = get_hypercall_page();
+	ret = get_hypercall_stubs();
 	if (ret < 0)
 		goto out;
 

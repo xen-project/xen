@@ -1577,7 +1577,7 @@ static void xennet_set_features(struct net_device *dev)
 	xennet_set_sg(dev, 0);
 
 	/* We need checksum offload to enable scatter/gather and TSO. */
-	if (!(dev->features & NETIF_F_ALL_CSUM))
+	if (!(dev->features & NETIF_F_IP_CSUM))
 		return;
 
 	if (!xennet_set_sg(dev, 1))

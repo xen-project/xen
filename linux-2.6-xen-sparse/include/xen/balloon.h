@@ -38,21 +38,23 @@
  * Inform the balloon driver that it should allow some slop for device-driver
  * memory activities.
  */
-extern void
+void
 balloon_update_driver_allowance(
 	long delta);
 
 /* Allocate an empty low-memory page range. */
-extern struct page *
+struct page *
 balloon_alloc_empty_page_range(
 	unsigned long nr_pages);
 
 /* Deallocate an empty page range, adding to the balloon. */
-extern void
+void
 balloon_dealloc_empty_page_range(
 	struct page *page, unsigned long nr_pages);
 
-void balloon_release_driver_page(struct page *page);
+void
+balloon_release_driver_page(
+	struct page *page);
 
 /*
  * Prevent the balloon driver from changing the memory reservation during

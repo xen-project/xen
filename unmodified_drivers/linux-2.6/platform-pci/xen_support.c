@@ -26,14 +26,18 @@
 #include <asm/hypervisor.h>
 #include "platform-pci.h"
 
-EXPORT_SYMBOL(xen_machphys_update);
 void xen_machphys_update(unsigned long mfn, unsigned long pfn)
 {
 	BUG();
 }
+EXPORT_SYMBOL(xen_machphys_update);
 
 void balloon_update_driver_allowance(long delta)
 {
 }
-
 EXPORT_SYMBOL(balloon_update_driver_allowance);
+
+void balloon_release_driver_page(struct page *page)
+{
+}
+EXPORT_SYMBOL(balloon_release_driver_page);

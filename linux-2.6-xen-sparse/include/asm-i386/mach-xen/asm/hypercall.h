@@ -42,11 +42,21 @@
 #define __STR(x) #x
 #define STR(x) __STR(x)
 
+#ifdef CONFIG_XEN
+#define HYPERCALL_STR(name)					\
+	"call hypercall_page + ("STR(__HYPERVISOR_##name)" * 32)"
+#else
+#define HYPERCALL_STR(name)					\
+	"mov hypercall_stubs,%%eax; "				\
+	"add $("STR(__HYPERVISOR_##name)" * 32),%%eax; "	\
+	"call *%%eax"
+#endif
+
 #define _hypercall0(type, name)			\
 ({						\
 	long __res;				\
 	asm volatile (				\
-		"call hypercall_page + ("STR(__HYPERVISOR_##name)" * 32)"\
+		HYPERCALL_STR(name)		\
 		: "=a" (__res)			\
 		:				\
 		: "memory" );			\
@@ -57,7 +67,7 @@
 ({								\
 	long __res, __ign1;					\
 	asm volatile (						\
-		"call hypercall_page + ("STR(__HYPERVISOR_##name)" * 32)"\
+		HYPERCALL_STR(name)				\
 		: "=a" (__res), "=b" (__ign1)			\
 		: "1" ((long)(a1))				\
 		: "memory" );					\
@@ -68,7 +78,7 @@
 ({								\
 	long __res, __ign1, __ign2;				\
 	asm volatile (						\
-		"call hypercall_page + ("STR(__HYPERVISOR_##name)" * 32)"\
+		HYPERCALL_STR(name)				\
 		: "=a" (__res), "=b" (__ign1), "=c" (__ign2)	\
 		: "1" ((long)(a1)), "2" ((long)(a2))		\
 		: "memory" );					\
@@ -79,7 +89,7 @@
 ({								\
 	long __res, __ign1, __ign2, __ign3;			\
 	asm volatile (						\
-		"call hypercall_page + ("STR(__HYPERVISOR_##name)" * 32)"\
+		HYPERCALL_STR(name)				\
 		: "=a" (__res), "=b" (__ign1), "=c" (__ign2), 	\
 		"=d" (__ign3)					\
 		: "1" ((long)(a1)), "2" ((long)(a2)),		\
@@ -92,7 +102,7 @@
 ({								\
 	long __res, __ign1, __ign2, __ign3, __ign4;		\
 	asm volatile (						\
-		"call hypercall_page + ("STR(__HYPERVISOR_##name)" * 32)"\
+		HYPERCALL_STR(name)				\
 		: "=a" (__res), "=b" (__ign1), "=c" (__ign2),	\
 		"=d" (__ign3), "=S" (__ign4)			\
 		: "1" ((long)(a1)), "2" ((long)(a2)),		\
@@ -105,7 +115,7 @@
 ({								\
 	long __res, __ign1, __ign2, __ign3, __ign4, __ign5;	\
 	asm volatile (						\
-		"call hypercall_page + ("STR(__HYPERVISOR_##name)" * 32)"\
+		HYPERCALL_STR(name)				\
 		: "=a" (__res), "=b" (__ign1), "=c" (__ign2),	\
 		"=d" (__ign3), "=S" (__ign4), "=D" (__ign5)	\
 		: "1" ((long)(a1)), "2" ((long)(a2)),		\
