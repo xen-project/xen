@@ -160,19 +160,29 @@ void discard_initial_images(void)
 
 extern char __per_cpu_start[], __per_cpu_data_end[], __per_cpu_end[];
 
-static void percpu_init_areas(void)
+static void __init percpu_init_areas(void)
 {
     unsigned int i, data_size = __per_cpu_data_end - __per_cpu_start;
 
     BUG_ON(data_size > PERCPU_SIZE);
 
-    for ( i = 1; i < NR_CPUS; i++ )
-        memcpy(__per_cpu_start + (i << PERCPU_SHIFT),
-               __per_cpu_start,
-               data_size);
+    for_each_cpu ( i )
+    {
+        memguard_unguard_range(__per_cpu_start + (i << PERCPU_SHIFT),
+                               1 << PERCPU_SHIFT);
+        if ( i != 0 )
+            memcpy(__per_cpu_start + (i << PERCPU_SHIFT),
+                   __per_cpu_start,
+                   data_size);
+    }
 }
 
-static void percpu_free_unused_areas(void)
+static void __init percpu_guard_areas(void)
+{
+    memguard_guard_range(__per_cpu_start, __per_cpu_end - __per_cpu_start);
+}
+
+static void __init percpu_free_unused_areas(void)
 {
     unsigned int i, first_unused;
 
@@ -186,11 +196,13 @@ static void percpu_free_unused_areas(void)
     for ( ; i < NR_CPUS; i++ )
         BUG_ON(cpu_online(i));
 
+#ifndef MEMORY_GUARD
     init_xenheap_pages(__pa(__per_cpu_start) + (first_unused << PERCPU_SHIFT),
                        __pa(__per_cpu_end));
+#endif
 }
 
-static void init_idle_domain(void)
+static void __init init_idle_domain(void)
 {
     struct domain *idle_domain;
 
@@ -259,8 +271,6 @@ void __init __start_xen(multiboot_info_t *mbi)
         printk("FATAL ERROR: Misaligned CPU0 stack.\n");
         EARLY_FAIL();
     }
-
-    percpu_init_areas();
 
     xenheap_phys_end = opt_xenheap_megabytes << 20;
 
@@ -399,6 +409,7 @@ void __init __start_xen(multiboot_info_t *mbi)
     }
 
     memguard_init();
+    percpu_guard_areas();
 
     printk("System RAM: %luMB (%lukB)\n", 
            nr_pages >> (20 - PAGE_SHIFT),
@@ -477,12 +488,14 @@ void __init __start_xen(multiboot_info_t *mbi)
     acpi_boot_table_init();
     acpi_boot_init();
 
-    if ( smp_found_config ) 
+    if ( smp_found_config )
         get_smp_config();
 
     init_apic_mappings();
 
     init_IRQ();
+
+    percpu_init_areas();
 
     init_idle_domain();
 
