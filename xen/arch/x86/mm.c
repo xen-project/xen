@@ -707,6 +707,35 @@ get_page_from_l4e(
 }
 #endif /* 4 level */
 
+#ifdef __x86_64__
+#define adjust_guest_l1e(pl1e)                                  \
+    do  {                                                       \
+        if ( likely(l1e_get_flags((pl1e)) & _PAGE_PRESENT) )    \
+            l1e_add_flags((pl1e), _PAGE_USER);                  \
+    } while ( 0 )
+
+#define adjust_guest_l2e(pl2e)                                  \
+    do {                                                        \
+        if ( likely(l2e_get_flags((pl2e)) & _PAGE_PRESENT) )    \
+            l2e_add_flags((pl2e), _PAGE_USER);                  \
+    } while ( 0 )
+
+#define adjust_guest_l3e(pl3e)                                  \
+    do {                                                        \
+        if ( likely(l3e_get_flags((pl3e)) & _PAGE_PRESENT) )    \
+            l3e_add_flags((pl3e), _PAGE_USER);                  \
+    } while ( 0 )
+
+#define adjust_guest_l4e(pl4e)                                  \
+    do {                                                        \
+        if ( likely(l4e_get_flags((pl4e)) & _PAGE_PRESENT) )    \
+            l4e_add_flags((pl4e), _PAGE_USER);                  \
+    } while ( 0 )
+#else
+#define adjust_guest_l1e(_p) ((void)0)
+#define adjust_guest_l2e(_p) ((void)0)
+#define adjust_guest_l3e(_p) ((void)0)
+#endif
 
 void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
 {
@@ -806,9 +835,13 @@ static int alloc_l1_table(struct page_info *page)
     pl1e = map_domain_page(pfn);
 
     for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
+    {
         if ( is_guest_l1_slot(i) &&
              unlikely(!get_page_from_l1e(pl1e[i], d)) )
             goto fail;
+
+        adjust_guest_l1e(pl1e[i]);
+    }
 
     unmap_domain_page(pl1e);
     return 1;
@@ -985,6 +1018,8 @@ static int alloc_l2_table(struct page_info *page, unsigned long type)
         if ( is_guest_l2_slot(type, i) &&
              unlikely(!get_page_from_l2e(pl2e[i], pfn, d, vaddr)) )
             goto fail;
+        
+        adjust_guest_l2e(pl2e[i]);
     }
 
 #if CONFIG_PAGING_LEVELS == 2
@@ -1053,6 +1088,8 @@ static int alloc_l3_table(struct page_info *page, unsigned long type)
         if ( is_guest_l3_slot(i) &&
              unlikely(!get_page_from_l3e(pl3e[i], pfn, d, vaddr)) )
             goto fail;
+        
+        adjust_guest_l3e(pl3e[i]);
     }
 
     if ( !create_pae_xen_mappings(pl3e) )
@@ -1093,6 +1130,8 @@ static int alloc_l4_table(struct page_info *page, unsigned long type)
         if ( is_guest_l4_slot(i) &&
              unlikely(!get_page_from_l4e(pl4e[i], pfn, d, vaddr)) )
             goto fail;
+
+        adjust_guest_l4e(pl4e[i]);
     }
 
     /* Xen private mappings. */
@@ -1255,6 +1294,8 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
             return 0;
         }
 
+        adjust_guest_l1e(nl1e);
+
         /* Fast path for identical mapping, r/w and presence. */
         if ( !l1e_has_changed(ol1e, nl1e, _PAGE_RW | _PAGE_PRESENT) )
             return update_l1e(pl1e, ol1e, nl1e, gl1mfn, current);
@@ -1336,6 +1377,8 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
             return 0;
         }
 
+        adjust_guest_l2e(nl2e);
+
         /* Fast path for identical mapping and presence. */
         if ( !l2e_has_changed(ol2e, nl2e, _PAGE_PRESENT))
             return UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn);
@@ -1397,6 +1440,8 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
                     l3e_get_flags(nl3e) & L3_DISALLOW_MASK);
             return 0;
         }
+
+        adjust_guest_l3e(nl3e);
 
         /* Fast path for identical mapping and presence. */
         if (!l3e_has_changed(ol3e, nl3e, _PAGE_PRESENT))
@@ -1463,6 +1508,8 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
                     l4e_get_flags(nl4e) & L4_DISALLOW_MASK);
             return 0;
         }
+
+        adjust_guest_l4e(nl4e);
 
         /* Fast path for identical mapping and presence. */
         if (!l4e_has_changed(ol4e, nl4e, _PAGE_PRESENT))
@@ -2402,7 +2449,7 @@ int do_mmu_update(
 
 
 static int create_grant_pte_mapping(
-    unsigned long pte_addr, l1_pgentry_t _nl1e, struct vcpu *v)
+    unsigned long pte_addr, l1_pgentry_t nl1e, struct vcpu *v)
 {
     int rc = GNTST_okay;
     void *va;
@@ -2413,6 +2460,8 @@ static int create_grant_pte_mapping(
     struct domain *d = v->domain;
 
     ASSERT(spin_is_locked(&d->big_lock));
+
+    adjust_guest_l1e(nl1e);
 
     gmfn = pte_addr >> PAGE_SHIFT;
     mfn = gmfn_to_mfn(d, gmfn);
@@ -2437,7 +2486,7 @@ static int create_grant_pte_mapping(
     }
 
     ol1e = *(l1_pgentry_t *)va;
-    if ( !update_l1e(va, ol1e, _nl1e, mfn, v) )
+    if ( !update_l1e(va, ol1e, nl1e, mfn, v) )
     {
         put_page_type(page);
         rc = GNTST_general_error;
@@ -2526,17 +2575,19 @@ static int destroy_grant_pte_mapping(
 
 
 static int create_grant_va_mapping(
-    unsigned long va, l1_pgentry_t _nl1e, struct vcpu *v)
+    unsigned long va, l1_pgentry_t nl1e, struct vcpu *v)
 {
     l1_pgentry_t *pl1e, ol1e;
     struct domain *d = v->domain;
     
     ASSERT(spin_is_locked(&d->big_lock));
 
+    adjust_guest_l1e(nl1e);
+
     pl1e = &linear_pg_table[l1_linear_offset(va)];
 
     if ( unlikely(__copy_from_user(&ol1e, pl1e, sizeof(ol1e)) != 0) ||
-         !update_l1e(pl1e, ol1e, _nl1e, 
+         !update_l1e(pl1e, ol1e, nl1e, 
                     l2e_get_pfn(__linear_l2_table[l2_linear_offset(va)]), v) )
         return GNTST_general_error;
 
@@ -3138,6 +3189,8 @@ static int ptwr_emulated_update(
             return X86EMUL_UNHANDLEABLE;
         }
     }
+
+    adjust_guest_l1e(nl1e);
 
     /* Checked successfully: do the update (write or cmpxchg). */
     pl1e = map_domain_page(page_to_mfn(page));
