@@ -18,8 +18,19 @@
  * Make sure you increment the interface version whenever you modify this file!
  * This makes sure that old versions of dom0 tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
+ * 
+ * Separate kernel from tools as the kernel uses a small subset of the dom0
+ * operations and so it is unnecessary to break backward compatibility so
+ * often.
  */
-#define DOM0_INTERFACE_VERSION   0x03000001
+#define DOM0_TOOLS_INTERFACE_VERSION  0x13000001
+#define DOM0_KERNEL_INTERFACE_VERSION 0x03000001
+
+#ifdef __XEN_TOOLS__
+#define DOM0_INTERFACE_VERSION DOM0_TOOLS_INTERFACE_VERSION
+#else
+#define DOM0_INTERFACE_VERSION DOM0_KERNEL_INTERFACE_VERSION
+#endif
 
 /************************************************************************/
 
@@ -253,32 +264,54 @@ DEFINE_XEN_GUEST_HANDLE(dom0_sched_id_t);
  */
 #define DOM0_SHADOW_CONTROL  25
 
+/* Disable shadow mode. */
 #define DOM0_SHADOW_CONTROL_OP_OFF         0
-#define DOM0_SHADOW_CONTROL_OP_ENABLE_TEST 1
-#define DOM0_SHADOW_CONTROL_OP_ENABLE_LOGDIRTY 2
-#define DOM0_SHADOW_CONTROL_OP_ENABLE_TRANSLATE 3
 
-#define DOM0_SHADOW_CONTROL_OP_FLUSH       10     /* table ops */
+/* Enable shadow mode (mode contains ORed DOM0_SHADOW_ENABLE_* flags). */
+#define DOM0_SHADOW_CONTROL_OP_ENABLE      32
+
+/* Log-dirty bitmap operations. */
+ /* Return the bitmap and clean internal copy for next round. */
 #define DOM0_SHADOW_CONTROL_OP_CLEAN       11
+ /* Return the bitmap but do not modify internal copy. */
 #define DOM0_SHADOW_CONTROL_OP_PEEK        12
 
-/* Shadow2 operations */
-#define DOM0_SHADOW2_CONTROL_OP_GET_ALLOCATION   30
-#define DOM0_SHADOW2_CONTROL_OP_SET_ALLOCATION   31
-#define DOM0_SHADOW2_CONTROL_OP_ENABLE           32
+/* Memory allocation accessors. */
+#define DOM0_SHADOW_CONTROL_OP_GET_ALLOCATION   30
+#define DOM0_SHADOW_CONTROL_OP_SET_ALLOCATION   31
 
-/* Mode flags for Shadow2 enable op */
-#define DOM0_SHADOW2_CONTROL_FLAG_ENABLE    (1 << 0)
-#define DOM0_SHADOW2_CONTROL_FLAG_REFCOUNT  (1 << 1)
-#define DOM0_SHADOW2_CONTROL_FLAG_LOG_DIRTY (1 << 2)
-#define DOM0_SHADOW2_CONTROL_FLAG_TRANSLATE (1 << 3)
-#define DOM0_SHADOW2_CONTROL_FLAG_EXTERNAL  (1 << 4)
+/* Legacy enable operations. */
+ /* Equiv. to ENABLE with no mode flags. */
+#define DOM0_SHADOW_CONTROL_OP_ENABLE_TEST       1
+ /* Equiv. to ENABLE with mode flag ENABLE_LOG_DIRTY. */
+#define DOM0_SHADOW_CONTROL_OP_ENABLE_LOGDIRTY   2
+ /* Equiv. to ENABLE with mode flags ENABLE_REFCOUNT and ENABLE_TRANSLATE. */
+#define DOM0_SHADOW_CONTROL_OP_ENABLE_TRANSLATE  3
+
+/* Mode flags for DOM0_SHADOW_CONTROL_OP_ENABLE. */
+ /*
+  * Shadow pagetables are refcounted: guest does not use explicit mmu
+  * operations nor write-protect its pagetables.
+  */
+#define DOM0_SHADOW_ENABLE_REFCOUNT  (1 << 1)
+ /*
+  * Log pages in a bitmap as they are dirtied.
+  * Used for live relocation to determine which pages must be re-sent.
+  */
+#define DOM0_SHADOW_ENABLE_LOG_DIRTY (1 << 2)
+ /*
+  * Automatically translate GPFNs into MFNs.
+  */
+#define DOM0_SHADOW_ENABLE_TRANSLATE (1 << 3)
+ /*
+  * Xen does not steal virtual address space from the guest.
+  * Requires HVM support.
+  */
+#define DOM0_SHADOW_ENABLE_EXTERNAL  (1 << 4)
 
 struct dom0_shadow_control_stats {
     uint32_t fault_count;
     uint32_t dirty_count;
-    uint32_t dirty_net_count;
-    uint32_t dirty_block_count;
 };
 typedef struct dom0_shadow_control_stats dom0_shadow_control_stats_t;
 DEFINE_XEN_GUEST_HANDLE(dom0_shadow_control_stats_t);
@@ -286,13 +319,17 @@ DEFINE_XEN_GUEST_HANDLE(dom0_shadow_control_stats_t);
 struct dom0_shadow_control {
     /* IN variables. */
     domid_t        domain;
-    uint32_t       op;
+    uint32_t       op;       /* DOM0_SHADOW_CONTROL_OP_* */
+
+    /* OP_ENABLE */
+    uint32_t       mode;     /* DOM0_SHADOW_ENABLE_* */
+
+    /* OP_GET_ALLOCATION / OP_SET_ALLOCATION */
+    uint32_t       mb;       /* Shadow memory allocation in MB */
+
+    /* OP_PEEK / OP_CLEAN */
     XEN_GUEST_HANDLE(ulong) dirty_bitmap;
-    /* IN/OUT variables. */
-    uint64_t       pages;    /* size of buffer, updated with actual size */
-    uint32_t       mb;       /* Shadow2 memory allocation in MB */
-    uint32_t       mode;     /* Shadow2 mode to enable */
-    /* OUT variables. */
+    uint64_t       pages;    /* Size of buffer. Updated with actual size. */
     struct dom0_shadow_control_stats stats;
 };
 typedef struct dom0_shadow_control dom0_shadow_control_t;

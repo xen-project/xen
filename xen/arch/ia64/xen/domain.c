@@ -653,11 +653,6 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
 		}
 		break;
 
-	case DOM0_SHADOW_CONTROL_OP_FLUSH:
-		atomic64_set(&d->arch.shadow_fault_count, 0);
-		atomic64_set(&d->arch.shadow_dirty_count, 0);
-		break;
-   
 	case DOM0_SHADOW_CONTROL_OP_CLEAN:
 	  {
 		int nbr_longs;

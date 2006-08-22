@@ -141,7 +141,8 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
     if ( copy_from_guest(op, u_dom0_op, 1) )
         return -EFAULT;
 
-    if ( op->interface_version != DOM0_INTERFACE_VERSION )
+    if ( (op->interface_version != DOM0_TOOLS_INTERFACE_VERSION) &&
+         (op->interface_version != DOM0_KERNEL_INTERFACE_VERSION) )
         return -EACCES;
 
     if ( acm_pre_dom0_op(op, &ssid) )

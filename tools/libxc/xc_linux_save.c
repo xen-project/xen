@@ -346,11 +346,9 @@ static int analysis_phase(int xc_handle, uint32_t domid, int max_pfn,
             xc_shadow_control(xc_handle, domid, DOM0_SHADOW_CONTROL_OP_PEEK,
                               NULL, 0, NULL, 0, &stats);
 
-            DPRINTF("now= %lld faults= %" PRId32 " dirty= %" PRId32
-                    " dirty_net= %" PRId32 " dirty_block= %" PRId32"\n",
+            DPRINTF("now= %lld faults= %"PRId32" dirty= %"PRId32"\n",
                     ((now-start)+500)/1000,
-                    stats.fault_count, stats.dirty_count,
-                    stats.dirty_net_count, stats.dirty_block_count);
+                    stats.fault_count, stats.dirty_count);
         }
     }
 
