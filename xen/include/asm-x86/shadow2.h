@@ -32,16 +32,16 @@
 
 #define SHM2_shift 10
 /* We're in one of the shadow modes */
-#define SHM2_enable    (DOM0_SHADOW2_CONTROL_FLAG_ENABLE << SHM2_shift)
+#define SHM2_enable    (1U << SHM2_shift)
 /* Refcounts based on shadow tables instead of guest tables */
-#define SHM2_refcounts (DOM0_SHADOW2_CONTROL_FLAG_REFCOUNT << SHM2_shift)
+#define SHM2_refcounts (DOM0_SHADOW_ENABLE_REFCOUNT << SHM2_shift)
 /* Enable log dirty mode */
-#define SHM2_log_dirty (DOM0_SHADOW2_CONTROL_FLAG_LOG_DIRTY << SHM2_shift)
+#define SHM2_log_dirty (DOM0_SHADOW_ENABLE_LOG_DIRTY << SHM2_shift)
 /* Xen does p2m translation, not guest */
-#define SHM2_translate (DOM0_SHADOW2_CONTROL_FLAG_TRANSLATE << SHM2_shift)
+#define SHM2_translate (DOM0_SHADOW_ENABLE_TRANSLATE << SHM2_shift)
 /* Xen does not steal address space from the domain for its own booking;
  * requires VT or similar mechanisms */
-#define SHM2_external  (DOM0_SHADOW2_CONTROL_FLAG_EXTERNAL << SHM2_shift)
+#define SHM2_external  (DOM0_SHADOW_ENABLE_EXTERNAL << SHM2_shift)
 
 #define shadow2_mode_enabled(_d)   ((_d)->arch.shadow2.mode)
 #define shadow2_mode_refcounts(_d) ((_d)->arch.shadow2.mode & SHM2_refcounts)

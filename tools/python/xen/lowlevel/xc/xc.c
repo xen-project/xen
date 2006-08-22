@@ -709,11 +709,11 @@ static PyObject *pyxc_shadow_mem_control(PyObject *self,
         return NULL;
     
     if ( mbarg < 0 ) 
-        op = DOM0_SHADOW2_CONTROL_OP_GET_ALLOCATION;
+        op = DOM0_SHADOW_CONTROL_OP_GET_ALLOCATION;
     else 
     {
         mb = mbarg;
-        op = DOM0_SHADOW2_CONTROL_OP_SET_ALLOCATION;
+        op = DOM0_SHADOW_CONTROL_OP_SET_ALLOCATION;
     }
     if ( xc_shadow_control(xc->xc_handle, dom, op, NULL, 0, &mb, 0, NULL) < 0 )
         return PyErr_SetFromErrno(xc_error);

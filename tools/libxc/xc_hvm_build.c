@@ -442,13 +442,12 @@ static int xc_hvm_build_internal(int xc_handle,
     }
 
     /* HVM domains must be put into shadow2 mode at the start of day */
-    if ( xc_shadow_control(xc_handle, domid, DOM0_SHADOW2_CONTROL_OP_ENABLE,
+    if ( xc_shadow_control(xc_handle, domid, DOM0_SHADOW_CONTROL_OP_ENABLE,
                            NULL, 0, NULL, 
-                           DOM0_SHADOW2_CONTROL_FLAG_ENABLE 
-                           | DOM0_SHADOW2_CONTROL_FLAG_REFCOUNT
-                           | DOM0_SHADOW2_CONTROL_FLAG_TRANSLATE
-                           | DOM0_SHADOW2_CONTROL_FLAG_EXTERNAL, 
-                           NULL) ) 
+                           DOM0_SHADOW_ENABLE_REFCOUNT  |
+                           DOM0_SHADOW_ENABLE_TRANSLATE |
+                           DOM0_SHADOW_ENABLE_EXTERNAL, 
+                           NULL) )
     {
         PERROR("Could not enable shadow paging for domain.\n");
         goto error_out;

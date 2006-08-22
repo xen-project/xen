@@ -2481,14 +2481,15 @@ static int shadow2_enable(struct domain *d, u32 mode)
     unsigned int old_pages;
     int rv = 0;
 
+    mode |= SHM2_enable;
+
     domain_pause(d);
     shadow2_lock(d);
 
     /* Sanity check the arguments */
-    if ( d == current->domain 
-         || shadow2_mode_enabled(d)
-         || !(mode & SHM2_enable)
-         || ((mode & SHM2_external) && !(mode & SHM2_translate)) )
+    if ( (d == current->domain) ||
+         shadow2_mode_enabled(d) ||
+         ((mode & SHM2_external) && !(mode & SHM2_translate)) )
     {
         rv = -EINVAL;
         goto out;
@@ -2957,11 +2958,7 @@ static int shadow2_log_dirty_op(struct domain *d, dom0_shadow_control_t *sc)
     domain_pause(d);
     shadow2_lock(d);
 
-    if ( sc->op == DOM0_SHADOW_CONTROL_OP_CLEAN
-         || sc->op == DOM0_SHADOW_CONTROL_OP_FLUSH ) 
-        clean = 1;
-    else 
-        ASSERT(sc->op == DOM0_SHADOW_CONTROL_OP_PEEK); 
+    clean = (sc->op == DOM0_SHADOW_CONTROL_OP_CLEAN);
 
     SHADOW2_DEBUG(LOGDIRTY, "log-dirty %s: dom %u faults=%u dirty=%u\n", 
                   (clean) ? "clean" : "peek",
@@ -3111,25 +3108,27 @@ int shadow2_control_op(struct domain *d,
 
     case DOM0_SHADOW_CONTROL_OP_ENABLE_TEST:
         return shadow2_test_enable(d);
-        
+
     case DOM0_SHADOW_CONTROL_OP_ENABLE_LOGDIRTY:
         return shadow2_log_dirty_enable(d);
-        
-    case DOM0_SHADOW_CONTROL_OP_FLUSH:
+
+    case DOM0_SHADOW_CONTROL_OP_ENABLE_TRANSLATE:
+        return shadow2_enable(d, SHM2_refcounts|SHM2_translate);
+
     case DOM0_SHADOW_CONTROL_OP_CLEAN:
     case DOM0_SHADOW_CONTROL_OP_PEEK:
         return shadow2_log_dirty_op(d, sc);
 
+    case DOM0_SHADOW_CONTROL_OP_ENABLE:
+        if ( sc->mode & DOM0_SHADOW_ENABLE_LOG_DIRTY )
+            return shadow2_log_dirty_enable(d);
+        return shadow2_enable(d, sc->mode << SHM2_shift);
 
-
-    case DOM0_SHADOW2_CONTROL_OP_ENABLE:
-        return shadow2_enable(d, sc->mode << SHM2_shift);        
-
-    case DOM0_SHADOW2_CONTROL_OP_GET_ALLOCATION:
+    case DOM0_SHADOW_CONTROL_OP_GET_ALLOCATION:
         sc->mb = shadow2_get_allocation(d);
         return 0;
-        
-    case DOM0_SHADOW2_CONTROL_OP_SET_ALLOCATION:
+
+    case DOM0_SHADOW_CONTROL_OP_SET_ALLOCATION:
         rc = shadow2_set_allocation(d, sc->mb, &preempted);
         if ( preempted )
             /* Not finished.  Set up to re-run the call. */
@@ -3139,8 +3138,7 @@ int shadow2_control_op(struct domain *d,
             /* Finished.  Return the new allocation */
             sc->mb = shadow2_get_allocation(d);
         return rc;
-        
-        
+
     default:
         SHADOW2_ERROR("Bad shadow op %u\n", sc->op);
         return -EINVAL;
