@@ -181,6 +181,21 @@ static void __init start_of_day(void)
 
     percpu_free_unused_areas();
 
+    {
+        /* FIXME: Xen assumes that an online CPU is a schedualable
+         * CPU, but we just are not there yet. Remove this fragment when
+         * scheduling processors actually works. */
+        int cpuid;
+
+        printk("WARNING!: Taking all secondary CPUs offline\n");
+
+        for_each_online_cpu(cpuid) {
+            if (cpuid == 0)
+                continue;
+            cpu_clear(cpuid, cpu_online_map);
+        }
+    }
+
     initialize_keytable();
     /* Register another key that will allow for the the Harware Probe
      * to be contacted, this works with RiscWatch probes and should
