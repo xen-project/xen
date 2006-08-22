@@ -516,9 +516,6 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
   			0) != 0)
         panic("Could not set up DOM0 guest OS\n");
 
-    /* PIN domain0 on CPU 0.  */
-    dom0->vcpu[0]->cpu_affinity = cpumask_of_cpu(0);
-
     if (!running_on_sim)  // slow on ski and pages are pre-initialized to zero
 	scrub_heap_pages();
 
