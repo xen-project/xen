@@ -17,8 +17,14 @@
 #include <linux/kernel.h>
 #include <linux/ctype.h>
 #include <linux/init.h>
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
 #include <asm/smp.h>
 #include <asm/ipi.h>
+#else
+#include <asm/apic.h>
+#include <asm/apicdef.h>
+#include <asm/genapic.h>
+#endif
 #include <xen/evtchn.h>
 
 DECLARE_PER_CPU(int, ipi_to_irq[NR_IPIS]);
@@ -112,12 +118,14 @@ static void xen_send_IPI_mask(cpumask_t cpumask, int vector)
 	local_irq_restore(flags);
 }
 
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
 static int xen_apic_id_registered(void)
 {
 	/* better be set */
 	Dprintk("%s\n", __FUNCTION__);
 	return physid_isset(smp_processor_id(), phys_cpu_present_map);
 }
+#endif
 
 static unsigned int xen_cpu_mask_to_apicid(cpumask_t cpumask)
 {
@@ -136,11 +144,15 @@ static unsigned int phys_pkg_id(int index_msb)
 
 struct genapic apic_xen =  {
 	.name = "xen",
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
 	.int_delivery_mode = dest_LowestPrio,
+#endif
 	.int_dest_mode = (APIC_DEST_LOGICAL != 0),
 	.int_delivery_dest = APIC_DEST_LOGICAL | APIC_DM_LOWEST,
 	.target_cpus = xen_target_cpus,
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
 	.apic_id_registered = xen_apic_id_registered,
+#endif
 	.init_apic_ldr = xen_init_apic_ldr,
 	.send_IPI_all = xen_send_IPI_all,
 	.send_IPI_allbutself = xen_send_IPI_allbutself,
