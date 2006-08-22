@@ -382,7 +382,7 @@ void __init timer_init(void)
     SET_HEAP_SIZE(&dummy_heap, 0);
     SET_HEAP_LIMIT(&dummy_heap, 0);
 
-    for ( i = 0; i < NR_CPUS; i++ )
+    for_each_cpu ( i )
     {
         spin_lock_init(&per_cpu(timers, i).lock);
         per_cpu(timers, i).heap = &dummy_heap;

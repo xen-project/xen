@@ -81,8 +81,6 @@ void __init paging_init(void)
     l2_pgentry_t *l2_ro_mpt;
     struct page_info *pg;
 
-    idle_vcpu[0]->arch.cr3 = __pa(idle_pg_table);
-
     /* Create user-accessible L2 directory to map the MPT for guests. */
     l3_ro_mpt = alloc_xenheap_page();
     clear_page(l3_ro_mpt);
@@ -121,7 +119,10 @@ void __init paging_init(void)
     /* Set up linear page table mapping. */
     idle_pg_table[l4_table_offset(LINEAR_PT_VIRT_START)] =
         l4e_from_paddr(__pa(idle_pg_table), __PAGE_HYPERVISOR);
+}
 
+void __init setup_idle_pagetable(void)
+{
     /* Install per-domain mappings for idle domain. */
     idle_pg_table[l4_table_offset(PERDOMAIN_VIRT_START)] =
         l4e_from_page(

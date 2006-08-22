@@ -1301,16 +1301,9 @@ static int sedf_adjust_weights(struct sched_adjdom_cmd *cmd)
 {
     struct vcpu *p;
     struct domain      *d;
-    int                 sumw[NR_CPUS];
-    s_time_t            sumt[NR_CPUS];
-    int                 cpu;
+    int                 sumw[NR_CPUS] = { 0 };
+    s_time_t            sumt[NR_CPUS] = { 0 };
  
-    for ( cpu = 0; cpu < NR_CPUS; cpu++ )
-    {
-        sumw[cpu] = 0;
-        sumt[cpu] = 0;
-    }
-
     /* Sum across all weights. */
     for_each_domain( d )
     {
