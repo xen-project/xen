@@ -292,6 +292,13 @@ HYPERVISOR_vcpu_op(
 
 extern int HYPERVISOR_suspend(unsigned long srec);
 
+static inline unsigned long
+HYPERVISOR_hvm_op(
+	int cmd, void *arg)
+{
+	return _hypercall2(unsigned long, hvm_op, cmd, arg);
+}
+
 static inline int
 HYPERVISOR_callback_op(
 	int cmd, void *arg)
