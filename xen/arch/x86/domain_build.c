@@ -701,9 +701,7 @@ int construct_dom0(struct domain *d,
     {
         p += strlen("HYPERCALL_PAGE=");
         hypercall_page = simple_strtoul(p, NULL, 16);
-        printk("(1) hypercall page is %#lx\n", hypercall_page);
         hypercall_page = dsi.v_start + (hypercall_page << PAGE_SHIFT);
-        printk("(2) hypercall page is %#lx dsi.v_start is %#lx\n", hypercall_page, dsi.v_start);
         if ( (hypercall_page < dsi.v_start) || (hypercall_page >= v_end) )
         {
             write_ptbase(current);
@@ -712,7 +710,6 @@ int construct_dom0(struct domain *d,
             return -1;
         }
 
-        printk("(3) hypercall page is %#lx\n", hypercall_page);
         hypercall_page_initialise(d, (void *)hypercall_page);
     }
 
