@@ -348,7 +348,7 @@ static int setup_guest(int xc_handle,
 
     *store_mfn = page_array[shared_page_nr - 1];
 
-    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_PFN, *store_mfn);
+    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_PFN, shared_page_nr - 1);
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_EVTCHN, store_evtchn);
 
     /* Paranoia */
