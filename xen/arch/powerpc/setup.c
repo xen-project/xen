@@ -43,9 +43,9 @@
 #include <asm/percpu.h>
 #include "exceptions.h"
 #include "of-devtree.h"
+#include "oftree.h"
 
 #define DEBUG
-unsigned long xenheap_phys_end;
 
 /* opt_noht: If true, Hyperthreading is ignored. */
 int opt_noht = 0;
@@ -220,24 +220,6 @@ void startup_cpu_idle_loop(void)
     reset_stack_and_jump(idle_loop);
 }
 
-static ulong free_xenheap(ulong start, ulong end)
-{
-    start = ALIGN_UP(start, PAGE_SIZE);
-    end = ALIGN_DOWN(end, PAGE_SIZE);
-
-    printk("%s: 0x%lx - 0x%lx\n", __func__, start, end);
-
-    if (oftree <= end && oftree >= start) {
-        printk("%s:     Go around the devtree: 0x%lx - 0x%lx\n",
-                  __func__, oftree, oftree_end);
-        init_xenheap_pages(start, ALIGN_DOWN(oftree, PAGE_SIZE));
-        init_xenheap_pages(ALIGN_UP(oftree_end, PAGE_SIZE), end);
-    } else {
-        init_xenheap_pages(start, end);
-    }
-    return ALIGN_UP(end, PAGE_SIZE);
-}
-
 static void init_parea(int cpuid)
 {
     /* Be careful not to shadow the global variable.  */
@@ -289,15 +271,8 @@ static void __init __start_xen(multiboot_info_t *mbi)
 {
     char *cmdline;
     module_t *mod = (module_t *)((ulong)mbi->mods_addr);
-    ulong heap_start;
-    ulong eomem = 0;
-    ulong heap_size = 0;
-    ulong bytes = 0;
-    ulong freemem;
     ulong dom0_start, dom0_len;
     ulong initrd_start, initrd_len;
-    
-    int i;
 
     memcpy(0, exception_vectors, exception_vectors_end - exception_vectors);
     synchronize_caches(0, exception_vectors_end - exception_vectors);
@@ -339,98 +314,13 @@ static void __init __start_xen(multiboot_info_t *mbi)
     mod[mbi->mods_count-1].mod_end = 0;
     --mbi->mods_count;
 
-    printk("Physical RAM map:\n");
-
-    /* lets find out how much memory there is */
-    while (bytes < mbi->mmap_length) {
-        u64 end;
-        u64 addr;
-        u64 size;
-
-        memory_map_t *map = (memory_map_t *)((ulong)mbi->mmap_addr + bytes);
-        addr = ((u64)map->base_addr_high << 32) | (u64)map->base_addr_low;
-        size = ((u64)map->length_high << 32) | (u64)map->length_low;
-        end = addr + size;
-
-        printk(" %016lx - %016lx (usable)\n", addr, end);
-
-        if (addr > eomem) {
-            printk("found a hole skipping remainder of memory at:\n"
-                   " %016lx and beyond\n", addr);
-            break;
-        }
-        if (end > eomem) {
-            eomem = end;
-        }
-        bytes += map->size + 4;
-    }
-
-    printk("System RAM: %luMB (%lukB)\n", eomem >> 20, eomem >> 10);
-
-    /* top of memory */
-    max_page = PFN_DOWN(ALIGN_DOWN(eomem, PAGE_SIZE));
-    total_pages = max_page;
-
-    /* Architecturally the first 4 pages are exception hendlers, we
-     * will also be copying down some code there */
-    heap_start = 4 << PAGE_SHIFT;
-    if (oftree < (ulong)_start)
-        heap_start = ALIGN_UP(oftree_end, PAGE_SIZE);
-
-    heap_start = init_boot_allocator(heap_start);
-    if (heap_start > (ulong)_start) {
-        panic("space below _start (%p) is not enough memory "
-              "for heap (0x%lx)\n", _start, heap_start);
-    }
-
-    /* we give the first RMA to the hypervisor */
-    xenheap_phys_end = rma_size(cpu_rma_order());
-
-    /* allow everything else to be allocated */
-    init_boot_pages(xenheap_phys_end, eomem);
-    init_frametable();
-    end_boot_allocator();
-
-    /* Add memory between the beginning of the heap and the beginning
-     * of out text */
-    free_xenheap(heap_start, (ulong)_start);
-    freemem = ALIGN_UP((ulong)_end, PAGE_SIZE);
-
-    for (i = 0; i < mbi->mods_count; i++) {
-        u32 s;
-
-        if(mod[i].mod_end == mod[i].mod_start)
-            continue;
-
-        s = ALIGN_DOWN(mod[i].mod_start, PAGE_SIZE);
-
-        if (mod[i].mod_start > (ulong)_start &&
-            mod[i].mod_start < (ulong)_end) {
-            /* mod was linked in */
-            continue;
-        }
-
-        if (s < freemem) 
-            panic("module addresses must assend\n");
-
-        free_xenheap(freemem, s);
-        freemem = ALIGN_UP(mod[i].mod_end, PAGE_SIZE);
-        
-    }
-
-    /* the rest of the xenheap, starting at the end of modules */
-    free_xenheap(freemem, xenheap_phys_end);
-
+    memory_init(mod, mbi->mods_count);
 
 #ifdef OF_DEBUG
     printk("ofdump:\n");
     /* make sure the OF devtree is good */
     ofd_walk((void *)oftree, OFD_ROOT, ofd_dump_props, OFD_DUMP_ALL);
 #endif
-
-    heap_size = xenheap_phys_end - heap_start;
-
-    printk("Xen heap: %luMB (%lukB)\n", heap_size >> 20, heap_size >> 10);
 
     percpu_init_areas();
 
@@ -484,10 +374,10 @@ static void __init __start_xen(multiboot_info_t *mbi)
         panic("Could not set up DOM0 guest OS\n");
     }
 
-    free_xenheap(ALIGN_UP(dom0_start, PAGE_SIZE),
+    init_xenheap_pages(ALIGN_UP(dom0_start, PAGE_SIZE),
                  ALIGN_DOWN(dom0_start + dom0_len, PAGE_SIZE));
     if (initrd_start)
-        free_xenheap(ALIGN_UP(initrd_start, PAGE_SIZE),
+        init_xenheap_pages(ALIGN_UP(initrd_start, PAGE_SIZE),
                      ALIGN_DOWN(initrd_start + initrd_len, PAGE_SIZE));
 
     init_trace_bufs();

@@ -51,7 +51,4 @@ extern ulong *__hypercall_table[];
 extern char exception_vectors[];
 extern char exception_vectors_end[];
 extern int spin_start[];
-extern int firmware_image_start[0];
-extern int firmware_image_size[0];
-
 #endif

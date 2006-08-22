@@ -23,6 +23,7 @@ obj-y += htab.o
 obj-y += iommu.o
 obj-y += irq.o
 obj-y += mambo.o
+obj-y += memory.o
 obj-y += mm.o
 obj-y += mpic.o
 obj-y += mpic_init.o
