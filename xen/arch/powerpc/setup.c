@@ -54,6 +54,14 @@ boolean_param("noht", opt_noht);
 int opt_earlygdb = 0;
 boolean_param("earlygdb", opt_earlygdb);
 
+/* opt_nosmp: If true, secondary processors are ignored. */
+static int opt_nosmp = 0;
+boolean_param("nosmp", opt_nosmp);
+
+/* maxcpus: maximum number of CPUs to activate. */
+static unsigned int max_cpus = NR_CPUS;
+integer_param("maxcpus", max_cpus);
+
 u32 tlbflush_clock = 1U;
 DEFINE_PER_CPU(u32, tlbflush_time);
 
@@ -65,6 +73,7 @@ ulong oftree_end;
 
 cpumask_t cpu_sibling_map[NR_CPUS] __read_mostly;
 cpumask_t cpu_online_map; /* missing ifdef in schedule.c */
+cpumask_t cpu_present_map;
 
 /* XXX get this from ISA node in device tree */
 ulong isa_io_base;
@@ -75,6 +84,8 @@ extern void idle_loop(void);
 
 /* move us to a header file */
 extern void initialize_keytable(void);
+
+volatile struct processor_area * volatile global_cpu_table[NR_CPUS];
 
 int is_kernel_text(unsigned long addr)
 {
@@ -210,6 +221,53 @@ static ulong free_xenheap(ulong start, ulong end)
         init_xenheap_pages(start, end);
     }
     return ALIGN_UP(end, PAGE_SIZE);
+}
+
+static void init_parea(int cpuid)
+{
+    /* Be careful not to shadow the global variable.  */
+    volatile struct processor_area *pa;
+    void *stack;
+
+    pa = xmalloc(struct processor_area);
+    if (pa == NULL)
+        panic("%s: failed to allocate parea for cpu #%d\n", __func__, cpuid);
+
+    stack = alloc_xenheap_pages(STACK_ORDER);
+    if (stack == NULL)
+        panic("%s: failed to allocate stack (order %d) for cpu #%d\n", 
+              __func__, STACK_ORDER, cpuid);
+
+    pa->whoami = cpuid;
+    pa->hyp_stack_base = (void *)((ulong)stack + STACK_SIZE);
+
+    /* This store has the effect of invoking secondary_cpu_init.  */
+    global_cpu_table[cpuid] = pa;
+    mb();
+}
+
+static int kick_secondary_cpus(int maxcpus)
+{
+    int cpuid;
+
+    for_each_present_cpu(cpuid) {
+        if (cpuid == 0)
+            continue;
+        if (cpuid >= maxcpus)
+            break;
+        init_parea(cpuid);
+        cpu_set(cpuid, cpu_online_map);
+    }
+
+    return 0;
+}
+
+/* This is the first C code that secondary processors invoke.  */
+int secondary_cpu_init(int cpuid, unsigned long r4);
+int secondary_cpu_init(int cpuid, unsigned long r4)
+{
+    cpu_initialize(cpuid);
+    while(1);
 }
 
 static void __init __start_xen(multiboot_info_t *mbi)
@@ -361,13 +419,22 @@ static void __init __start_xen(multiboot_info_t *mbi)
 
     percpu_init_areas();
 
-    cpu_initialize();
+    init_parea(0);
+    cpu_initialize(0);
 
 #ifdef CONFIG_GDB
     initialise_gdb();
     if (opt_earlygdb)
         debugger_trap_immediate();
 #endif
+
+    /* Deal with secondary processors.  */
+    if (opt_nosmp) {
+        printk("nosmp: leaving secondary processors spinning forever\n");
+    } else {
+        printk("spinning up at most %d total processors ...\n", max_cpus);
+        kick_secondary_cpus(max_cpus);
+    }
 
     start_of_day();
 
@@ -445,6 +512,8 @@ extern void arch_get_xen_caps(xen_capabilities_info_t info);
 void arch_get_xen_caps(xen_capabilities_info_t info)
 {
 }
+
+
 
 /*
  * Local variables:

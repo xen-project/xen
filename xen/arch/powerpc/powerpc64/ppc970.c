@@ -31,6 +31,8 @@
 
 #undef SERIALIZE
 
+extern volatile struct processor_area * volatile global_cpu_table[];
+
 unsigned int cpu_rma_order(void)
 {
     /* XXX what about non-HV mode? */
@@ -38,18 +40,15 @@ unsigned int cpu_rma_order(void)
     return rma_log_size - PAGE_SHIFT;
 }
 
-void cpu_initialize(void)
+void cpu_initialize(int cpuid)
 {
-    ulong stack;
+    ulong r1, r2;
+    __asm__ __volatile__ ("mr %0, 1" : "=r" (r1));
+    __asm__ __volatile__ ("mr %0, 2" : "=r" (r2));
 
-    parea = xmalloc(struct processor_area);
+    /* This is SMP safe because the compiler must use r13 for it.  */
+    parea = global_cpu_table[cpuid];
     ASSERT(parea != NULL);
-
-    stack = (ulong)alloc_xenheap_pages(STACK_ORDER);
-
-    ASSERT(stack != 0);
-    parea->hyp_stack_base = (void *)(stack + STACK_SIZE);
-    printk("stack is here: %p\n", parea->hyp_stack_base);
 
     mthsprg0((ulong)parea); /* now ready for exceptions */
 
@@ -79,7 +78,10 @@ void cpu_initialize(void)
     s |= 1UL << (63-3);     /* ser-gp */
     hid0.word |= s;
 #endif
-    printk("hid0: 0x%016lx\n", hid0.word);
+
+    printk("CPU #%d: Hello World! SP = %lx TOC = %lx HID0 = %lx\n", 
+           smp_processor_id(), r1, r2, hid0.word);
+
     mthid0(hid0.word);
 
     union hid1 hid1;

@@ -51,7 +51,7 @@ extern char __bss_start[];
 #define CONFIG_GDB 1
 #define CONFIG_SMP 1
 #define CONFIG_PCI 1
-#define NR_CPUS 1
+#define NR_CPUS 16
 
 #ifndef ELFSIZE
 #define ELFSIZE 64

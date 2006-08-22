@@ -28,6 +28,7 @@ struct gdb_state;
 
 struct processor_area
 {
+    unsigned int whoami;
     struct vcpu *cur_vcpu;
     void *hyp_stack_base;
     ulong saved_regs[2];

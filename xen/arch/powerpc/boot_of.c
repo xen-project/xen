@@ -32,6 +32,9 @@
 #include "exceptions.h"
 #include "of-devtree.h"
 
+/* Secondary processors use this for handshaking with main processor.  */
+volatile unsigned int __spin_ack;
+
 static ulong of_vec;
 static ulong of_msr;
 static int of_out;
@@ -955,7 +958,7 @@ static void boot_of_module(ulong r3, ulong r4, multiboot_info_t *mbi)
 static int __init boot_of_cpus(void)
 {
     int cpus;
-    int cpu;
+    int cpu, bootcpu, logical;
     int result;
     u32 cpu_clock[2];
 
@@ -980,10 +983,65 @@ static int __init boot_of_cpus(void)
     cpu_khz /= 1000;
     of_printf("OF: clock-frequency = %ld KHz\n", cpu_khz);
 
-    /* FIXME: should not depend on the boot CPU bring the first child */
+    /* Look up which CPU we are running on right now.  */
+    result = of_getprop(bof_chosen, "cpu", &bootcpu, sizeof (bootcpu));
+    if (result == OF_FAILURE)
+        of_panic("Failed to look up boot cpu\n");
+
     cpu = of_getpeer(cpu);
-    while (cpu > 0) {
-        of_start_cpu(cpu, (ulong)spin_start, 0);
+
+    /* We want a continuous logical cpu number space.  */
+    cpu_set(0, cpu_present_map);
+    cpu_set(0, cpu_online_map);
+
+    /* Spin up all CPUS, even if there are more than NR_CPUS, because
+     * Open Firmware has them spinning on cache lines which will
+     * eventually be scrubbed, which could lead to random CPU activation.
+     */
+    for (logical = 1; cpu > 0; logical++) {
+        unsigned int cpuid, ping, pong;
+        unsigned long now, then, timeout;
+
+        if (cpu == bootcpu) {
+            of_printf("skipping boot cpu!\n");
+            continue;
+        }
+
+        result = of_getprop(cpu, "reg", &cpuid, sizeof(cpuid));
+        if (result == OF_FAILURE)
+            of_panic("cpuid lookup failed\n");
+
+        of_printf("spinning up secondary processor #%d: ", logical);
+
+        __spin_ack = ~0x0;
+        ping = __spin_ack;
+        pong = __spin_ack;
+        of_printf("ping = 0x%x: ", ping);
+
+        mb();
+        result = of_start_cpu(cpu, (ulong)spin_start, logical);
+        if (result == OF_FAILURE)
+            of_panic("start cpu failed\n");
+
+        /* We will give the secondary processor five seconds to reply.  */
+        then = mftb();
+        timeout = then + (5 * timebase_freq);
+
+        do {
+            now = mftb();
+            if (now >= timeout) {
+                of_printf("BROKEN: ");
+                break;
+            }
+
+            mb();
+            pong = __spin_ack;
+        } while (pong == ping);
+        of_printf("pong = 0x%x\n", pong);
+
+        if (pong != ping)
+            cpu_set(logical, cpu_present_map);
+
         cpu = of_getpeer(cpu);
     }
     return 1;
@@ -1031,6 +1089,7 @@ multiboot_info_t __init *boot_of_init(
     boot_of_rtas();
 
     /* end of OF */
+    of_printf("Quiescing Open Firmware ...\n");
     of_call("quiesce", 0, 0, NULL);
 
     return &mbi;

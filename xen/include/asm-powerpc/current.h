@@ -27,7 +27,7 @@
 
 struct vcpu;
 
-register struct processor_area *parea asm("r13");
+register volatile struct processor_area *parea asm("r13");
 
 static inline struct vcpu *get_current(void)
 {
