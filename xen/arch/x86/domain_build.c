@@ -66,11 +66,15 @@ boolean_param("dom0_shadow", opt_dom0_shadow);
 static char opt_dom0_ioports_disable[200] = "";
 string_param("dom0_ioports_disable", opt_dom0_ioports_disable);
 
+#if defined(__i386__)
+/* No ring-3 access in initial leaf page tables. */
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
-#if CONFIG_PAGING_LEVELS == 3
 #define L3_PROT (_PAGE_PRESENT)
-#elif CONFIG_PAGING_LEVELS == 4
+#elif defined(__x86_64__)
+/* Allow ring-3 access in long mode as guest cannot use ring 1. */
+#define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
+#define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 #define L3_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 #define L4_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 #endif
@@ -697,7 +701,9 @@ int construct_dom0(struct domain *d,
     {
         p += strlen("HYPERCALL_PAGE=");
         hypercall_page = simple_strtoul(p, NULL, 16);
+        printk("(1) hypercall page is %#lx\n", hypercall_page);
         hypercall_page = dsi.v_start + (hypercall_page << PAGE_SHIFT);
+        printk("(2) hypercall page is %#lx dsi.v_start is %#lx\n", hypercall_page, dsi.v_start);
         if ( (hypercall_page < dsi.v_start) || (hypercall_page >= v_end) )
         {
             write_ptbase(current);
@@ -706,6 +712,7 @@ int construct_dom0(struct domain *d,
             return -1;
         }
 
+        printk("(3) hypercall page is %#lx\n", hypercall_page);
         hypercall_page_initialise(d, (void *)hypercall_page);
     }
 
