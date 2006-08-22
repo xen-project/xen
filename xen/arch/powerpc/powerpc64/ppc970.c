@@ -13,9 +13,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005
+ * Copyright (C) IBM Corp. 2005, 2006
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
+ *          Jimi Xenidis <jimix@watson.ibm.com>
  */
 
 #include <xen/config.h>
@@ -36,7 +37,7 @@ extern volatile struct processor_area * volatile global_cpu_table[];
 unsigned int cpu_rma_order(void)
 {
     /* XXX what about non-HV mode? */
-    uint rma_log_size = 6 + 20; /* 64M */
+    uint rma_log_size = 6 + 20; /* (1 << 6) == 64 */
     return rma_log_size - PAGE_SHIFT;
 }
 
