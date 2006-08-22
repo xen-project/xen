@@ -18,3 +18,5 @@ tpm_plugin_2.6.17.patch
 x86-increase-interrupt-vector-range.patch
 xen-hotplug.patch
 xenoprof-generic.patch
+x86-put-note-sections-into-a-pt_note-segment-in-vmlinux.patch
+x86_64-put-note-sections-into-a-pt_note-segment-in-vmlinux.patch

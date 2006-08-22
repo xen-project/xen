@@ -1,0 +1,40 @@
+diff -urN ref-linux-2.6.16.13/arch/x86_64/kernel/vmlinux.lds.S x86-64_elfnotes/arch/x86_64/kernel/vmlinux.lds.S
+--- ref-linux-2.6.16.13/arch/x86_64/kernel/vmlinux.lds.S	2006-05-02 22:38:44.000000000 +0100
++++ x86-64_elfnotes/arch/x86_64/kernel/vmlinux.lds.S	2006-08-22 11:39:14.000000000 +0100
+@@ -14,6 +14,11 @@
+ OUTPUT_ARCH(i386:x86-64)
+ ENTRY(phys_startup_64)
+ jiffies_64 = jiffies;
++PHDRS {
++	text PT_LOAD FLAGS(5);	/* R_E */
++	data PT_LOAD FLAGS(7);	/* RWE */
++	note PT_NOTE FLAGS(4);	/* R__ */
++}
+ SECTIONS
+ {
+   . = __START_KERNEL;
+@@ -26,7 +31,7 @@
+ 	KPROBES_TEXT
+ 	*(.fixup)
+ 	*(.gnu.warning)
+-	} = 0x9090
++	} :text = 0x9090
+   				/* out-of-line lock text */
+   .text.lock : AT(ADDR(.text.lock) - LOAD_OFFSET) { *(.text.lock) }
+ 
+@@ -43,7 +48,7 @@
+   .data : AT(ADDR(.data) - LOAD_OFFSET) {
+ 	*(.data)
+ 	CONSTRUCTORS
+-	}
++	} :data
+ 
+   _edata = .;			/* End of data section */
+ 
+@@ -201,4 +206,6 @@
+   STABS_DEBUG
+ 
+   DWARF_DEBUG
++
++  NOTES
+ }
