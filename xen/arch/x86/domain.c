@@ -125,8 +125,15 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 
     v->arch.flags = TF_kernel_mode;
 
-    v->arch.schedule_tail = is_idle_domain(d) ?
-        continue_idle_domain : continue_nonidle_domain;
+    if ( is_idle_domain(d) )
+    {
+        v->arch.schedule_tail = continue_idle_domain;
+        v->arch.cr3           = __pa(idle_pg_table);
+    }
+    else
+    {
+        v->arch.schedule_tail = continue_nonidle_domain;
+    }
 
     v->arch.ctxt_switch_from = paravirt_ctxt_switch_from;
     v->arch.ctxt_switch_to   = paravirt_ctxt_switch_to;

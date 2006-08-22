@@ -190,10 +190,26 @@ static void percpu_free_unused_areas(void)
                        __pa(__per_cpu_end));
 }
 
+static void init_idle_domain(void)
+{
+    struct domain *idle_domain;
+
+    /* Domain creation requires that scheduler structures are initialised. */
+    scheduler_init();
+
+    idle_domain = domain_create(IDLE_DOMAIN_ID);
+    if ( (idle_domain == NULL) || (alloc_vcpu(idle_domain, 0, 0) == NULL) )
+        BUG();
+
+    set_current(idle_domain->vcpu[0]);
+    idle_vcpu[0] = this_cpu(curr_vcpu) = current;
+
+    setup_idle_pagetable();
+}
+
 void __init __start_xen(multiboot_info_t *mbi)
 {
     char __cmdline[] = "", *cmdline = __cmdline;
-    struct domain *idle_domain;
     unsigned long _initrd_start = 0, _initrd_len = 0;
     unsigned int initrdidx = 1;
     module_t *mod = (module_t *)__va(mbi->mods_addr);
@@ -212,6 +228,7 @@ void __init __start_xen(multiboot_info_t *mbi)
     cmdline_parse(cmdline);
 
     set_current((struct vcpu *)0xfffff000); /* debug sanity */
+    idle_vcpu[0] = current;
     set_processor_id(0); /* needed early, for smp_processor_id() */
 
     smp_prepare_boot_cpu();
@@ -437,16 +454,6 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     early_cpu_init();
 
-    scheduler_init();
-
-    idle_domain = domain_create(IDLE_DOMAIN_ID);
-    if ( (idle_domain == NULL) || (alloc_vcpu(idle_domain, 0, 0) == NULL) )
-        BUG();
-
-    set_current(idle_domain->vcpu[0]);
-    this_cpu(curr_vcpu) = idle_domain->vcpu[0];
-    idle_vcpu[0] = current;
-
     paging_init();
 
     /* Unmap the first page of CPU0's stack. */
@@ -476,6 +483,8 @@ void __init __start_xen(multiboot_info_t *mbi)
     init_apic_mappings();
 
     init_IRQ();
+
+    init_idle_domain();
 
     trap_init();
 

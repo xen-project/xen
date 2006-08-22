@@ -75,8 +75,6 @@ void __init paging_init(void)
     printk("PAE disabled.\n");
 #endif
 
-    idle_vcpu[0]->arch.cr3 = __pa(idle_pg_table);
-
     if ( cpu_has_pge )
     {
         /* Suitable Xen mapping can be GLOBAL. */
@@ -120,8 +118,12 @@ void __init paging_init(void)
         idle_pg_table_l2[l2_linear_offset(IOREMAP_VIRT_START) + i] =
             l2e_from_page(virt_to_page(ioremap_pt), __PAGE_HYPERVISOR);
     }
+}
 
-    /* Install per-domain mappings for idle domain. */
+void __init setup_idle_pagetable(void)
+{
+    int i;
+
     for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
         idle_pg_table_l2[l2_linear_offset(PERDOMAIN_VIRT_START) + i] =
             l2e_from_page(virt_to_page(idle_vcpu[0]->domain->

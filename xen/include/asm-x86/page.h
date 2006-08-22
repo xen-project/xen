@@ -255,7 +255,8 @@ extern l2_pgentry_t   idle_pg_table_l2[ROOT_PAGETABLE_ENTRIES*L2_PAGETABLE_ENTRI
 extern root_pgentry_t idle_pg_table[ROOT_PAGETABLE_ENTRIES];
 extern l2_pgentry_t   idle_pg_table_l2[ROOT_PAGETABLE_ENTRIES];
 #endif
-extern void paging_init(void);
+void paging_init(void);
+void setup_idle_pagetable(void);
 #endif
 
 #define __pge_off()                                                     \
