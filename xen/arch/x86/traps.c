@@ -686,9 +686,9 @@ void propagate_page_fault(unsigned long addr, u16 error_code)
     v->vcpu_info->arch.cr2           = addr;
 
     /* Re-set error_code.user flag appropriately for the guest. */
-    error_code &= ~PGERR_user_mode;
+    error_code &= ~PFEC_user_mode;
     if ( !guest_kernel_mode(v, guest_cpu_user_regs()) )
-        error_code |= PGERR_user_mode;
+        error_code |= PFEC_user_mode;
 
     ti = &v->arch.guest_context.trap_ctxt[TRAP_page_fault];
     tb->flags = TBF_EXCEPTION | TBF_EXCEPTION_ERRCODE;
@@ -768,17 +768,17 @@ static int __spurious_page_fault(
     unsigned int required_flags, disallowed_flags;
 
     /* Reserved bit violations are never spurious faults. */
-    if ( regs->error_code & PGERR_reserved_bit )
+    if ( regs->error_code & PFEC_reserved_bit )
         return 0;
 
     required_flags  = _PAGE_PRESENT;
-    if ( regs->error_code & PGERR_write_access )
+    if ( regs->error_code & PFEC_write_access )
         required_flags |= _PAGE_RW;
-    if ( regs->error_code & PGERR_user_mode )
+    if ( regs->error_code & PFEC_user_mode )
         required_flags |= _PAGE_USER;
 
     disallowed_flags = 0;
-    if ( regs->error_code & PGERR_instr_fetch )
+    if ( regs->error_code & PFEC_insn_fetch )
         disallowed_flags |= _PAGE_NX;
 
     mfn = cr3 >> PAGE_SHIFT;
@@ -886,7 +886,7 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
          guest_kernel_mode(v, regs) &&
          /* Do not check if access-protection fault since the page may 
             legitimately be not present in shadow page tables */
-         ((regs->error_code & PGERR_write_access) == PGERR_write_access) &&
+         ((regs->error_code & PFEC_write_access) == PFEC_write_access) &&
          ptwr_do_page_fault(d, addr, regs) )
         return EXCRET_fault_fixed;
 
@@ -1100,7 +1100,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             if ( (rc = copy_to_user((void *)regs->edi, &data, op_bytes)) != 0 )
             {
                 propagate_page_fault(regs->edi + op_bytes - rc,
-                                     PGERR_write_access);
+                                     PFEC_write_access);
                 return EXCRET_fault_fixed;
             }
             regs->edi += (int)((regs->eflags & EF_DF) ? -op_bytes : op_bytes);
