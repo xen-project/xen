@@ -353,7 +353,7 @@ ste_dump_stats(u8 *buf, u16 buf_len)
     stats.ec_cachehit_count = htonl(atomic_read(&ste_bin_pol.ec_cachehit_count));
     stats.gt_cachehit_count = htonl(atomic_read(&ste_bin_pol.gt_cachehit_count));
 
-    if (buf_len < sizeof(struct acm_ste_stats_buffer)
+    if (buf_len < sizeof(struct acm_ste_stats_buffer))
         return -ENOMEM;
 
     memcpy(buf, &stats, sizeof(struct acm_ste_stats_buffer));
