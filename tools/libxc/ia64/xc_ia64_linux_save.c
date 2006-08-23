@@ -79,7 +79,7 @@ static int xc_ia64_shadow_control(int xc_handle,
     }
 
     return xc_shadow_control(xc_handle, domid, sop,
-                             dirty_bitmap, pages, stats);
+                             dirty_bitmap, pages, NULL, 0, stats);
 }
 
 static inline ssize_t
