@@ -341,7 +341,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 				 blkif_request_t *req,
 				 pending_req_t *pending_req)
 {
-	extern void ll_rw_block(int rw, int nr, struct buffer_head * bhs[]); 
+	extern void ll_rw_block(int rw, int nr, struct buffer_head * bhs[]);
 	int operation = (req->operation == BLKIF_OP_WRITE) ? WRITE : READ;
 	struct gnttab_map_grant_ref map[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 	struct phys_req preq;
@@ -409,7 +409,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 		DPRINTK("access denied: %s of [%llu,%llu] on dev=%04x\n", 
 			operation == READ ? "read" : "write",
 			preq.sector_number,
-			preq.sector_number + preq.nr_sects, preq.dev); 
+			preq.sector_number + preq.nr_sects, preq.dev);
 		goto fail_flush;
 	}
 

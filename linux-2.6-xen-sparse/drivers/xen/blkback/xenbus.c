@@ -194,7 +194,7 @@ static int blkback_probe(struct xenbus_device *dev,
 	}
 
 	/* setup back pointer */
-	be->blkif->be = be; 
+	be->blkif->be = be;
 
 	err = xenbus_watch_path2(dev, dev->nodename, "physical-device",
 				 &be->backend_watch, backend_changed);
@@ -287,7 +287,7 @@ static void backend_changed(struct xenbus_watch *watch,
 		}
 
 		/* We're potentially connected now */
-		update_blkif_status(be->blkif); 
+		update_blkif_status(be->blkif);
 	}
 }
 
@@ -305,6 +305,11 @@ static void frontend_changed(struct xenbus_device *dev,
 
 	switch (frontend_state) {
 	case XenbusStateInitialising:
+		if (dev->state == XenbusStateClosing) {
+			printk("%s: %s: prepare for reconnect\n",
+			       __FUNCTION__, dev->nodename);
+			xenbus_switch_state(dev, XenbusStateInitWait);
+		}
 		break;
 
 	case XenbusStateInitialised:
@@ -326,12 +331,11 @@ static void frontend_changed(struct xenbus_device *dev,
 		xenbus_switch_state(dev, XenbusStateClosing);
 		break;
 
+	case XenbusStateUnknown:
 	case XenbusStateClosed:
 		device_unregister(&dev->dev);
 		break;
 
-	case XenbusStateUnknown:
-	case XenbusStateInitWait:
 	default:
 		xenbus_dev_fatal(dev, -EINVAL, "saw state %d at frontend",
 				 frontend_state);

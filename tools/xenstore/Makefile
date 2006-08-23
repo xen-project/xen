@@ -98,7 +98,7 @@ libxenstore.so.$(MAJOR).$(MINOR): xs.opic xs_lib.opic
 	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-soname -Wl,libxenstore.so.$(MAJOR) -shared -o $@ $^ -lpthread
 
 libxenstore.a: xs.o xs_lib.o
-	ar rcs libxenstore.a $^
+	$(AR) rcs libxenstore.a $^
 
 .PHONY: clean
 clean: testsuite-clean

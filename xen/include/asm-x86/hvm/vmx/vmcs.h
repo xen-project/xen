@@ -27,6 +27,7 @@
 extern int start_vmx(void);
 extern void vmcs_dump_vcpu(void);
 extern void vmx_init_vmcs_config(void);
+extern void setup_vmcs_dump(void);
 
 enum {
     VMX_CPU_STATE_PAE_ENABLED=0,
@@ -86,13 +87,13 @@ struct arch_vmx_struct {
 
     unsigned long        cpu_cr0; /* copy of guest CR0 */
     unsigned long        cpu_shadow_cr0; /* copy of guest read shadow CR0 */
+    unsigned long        cpu_shadow_cr4; /* copy of guest read shadow CR4 */
     unsigned long        cpu_cr2; /* save CR2 */
     unsigned long        cpu_cr3;
     unsigned long        cpu_state;
     unsigned long        cpu_based_exec_control;
     struct vmx_msr_state msr_content;
     void                *io_bitmap_a, *io_bitmap_b;
-    struct timer         hlt_timer;  /* hlt ins emulation wakeup timer */
 };
 
 #define vmx_schedule_tail(next)         \

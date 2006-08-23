@@ -101,23 +101,31 @@ int xs_fileno(struct xs_handle *h)
 static int get_socket(const char *connect_to)
 {
 	struct sockaddr_un addr;
-	int sock, saved_errno;
+	int sock, saved_errno, flags;
 
 	sock = socket(PF_UNIX, SOCK_STREAM, 0);
 	if (sock < 0)
 		return -1;
 
+	if ((flags = fcntl(sock, F_GETFD)) < 0)
+		goto error;
+	flags |= FD_CLOEXEC;
+	if (fcntl(sock, F_SETFD, flags) < 0)
+		goto error;
+
 	addr.sun_family = AF_UNIX;
 	strcpy(addr.sun_path, connect_to);
 
-	if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
-		saved_errno = errno;
-		close(sock);
-		errno = saved_errno;
-		return -1;
-	}
+	if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) != 0)
+		goto error;
 
 	return sock;
+
+error:
+	saved_errno = errno;
+	close(sock);
+	errno = saved_errno;
+	return -1;
 }
 
 static int get_dev(const char *connect_to)

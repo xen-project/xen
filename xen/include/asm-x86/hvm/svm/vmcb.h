@@ -308,7 +308,7 @@ typedef union
         u64 ev:        1;
         u64 resvd1:   19;
         u64 v:         1;
-        u64 errorcode:32; 
+        u64 errorcode:32;
     } fields;
 } __attribute__ ((packed)) eventinj_t;
 
@@ -373,7 +373,7 @@ struct vmcb_struct {
     u32 guest_asid;             /* offset 0x58 */
     u8  tlb_control;            /* offset 0x5C */
     u8  res07[3];
-    vintr_t vintr;          	/* offset 0x60 */
+    vintr_t vintr;              /* offset 0x60 */
     u64 interrupt_shadow;       /* offset 0x68 */
     u64 exitcode;               /* offset 0x70 */
     u64 exitinfo1;              /* offset 0x78 */
@@ -399,9 +399,9 @@ struct vmcb_struct {
     u8 res11[3];
     u8 cpl;
     u32 res12;
-    u64 efer;               	/* offset 1024 + 0xD0 */
+    u64 efer;                   /* offset 1024 + 0xD0 */
     u64 res13[14];
-    u64 cr4;                  	/* loffset 1024 + 0x148 */
+    u64 cr4;                    /* loffset 1024 + 0x148 */
     u64 cr3;
     u64 cr0;
     u64 dr7;
@@ -433,9 +433,7 @@ struct vmcb_struct {
 
 
 struct arch_svm_struct {
-    struct vmcb_struct	*vmcb;
-    void		        *host_save_area;
-    u64                 host_save_pa;
+    struct vmcb_struct *vmcb;
     u64                 vmcb_pa;
     u32                 *iopm;
     u32                 *msrpm;
@@ -450,15 +448,17 @@ struct arch_svm_struct {
     unsigned long       cpu_cr2;
     unsigned long       cpu_cr3;
     unsigned long       cpu_state;
-    struct timer        hlt_timer;  /* hlt ins emulation wakeup timer */
 };
 
-struct vmcb_struct *alloc_vmcb(void);
-struct host_save_area *alloc_host_save_area(void);
-void free_vmcb(struct vmcb_struct *vmcb);
-void free_host_save_area(struct host_save_area *hsa);
-void dump_vmcb(void);
-int  construct_vmcb(struct arch_svm_struct *, struct cpu_user_regs *); 
+extern struct vmcb_struct *alloc_vmcb(void);
+extern struct host_save_area *alloc_host_save_area(void);
+extern void free_vmcb(struct vmcb_struct *vmcb);
+extern void free_host_save_area(struct host_save_area *hsa);
+
+extern int  construct_vmcb(struct arch_svm_struct *, struct cpu_user_regs *);
+extern void destroy_vmcb(struct arch_svm_struct *);
+
+extern void setup_vmcb_dump(void);
 
 #define VMCB_USE_HOST_ENV       1
 #define VMCB_USE_SEPARATE_ENV   0

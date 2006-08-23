@@ -264,40 +264,6 @@ static void set_eoi_ready(void *data)
     flush_ready_eoi(NULL);
 }
 
-/*
- * Forcibly flush all pending EOIs on this CPU by emulating end-of-ISR
- * notifications from guests. The caller of this function must ensure that
- * all CPUs execute flush_ready_eoi().
- */
-static void flush_all_pending_eoi(void *unused)
-{
-    irq_desc_t         *desc;
-    irq_guest_action_t *action;
-    struct pending_eoi *peoi = this_cpu(pending_eoi);
-    int                 i, vector, sp;
-
-    ASSERT(!local_irq_is_enabled());
-
-    sp = pending_eoi_sp(peoi);
-    while ( --sp >= 0 )
-    {
-        if ( peoi[sp].ready )
-            continue;
-        vector = peoi[sp].vector;
-        desc = &irq_desc[vector];
-        spin_lock(&desc->lock);
-        action = (irq_guest_action_t *)desc->action;
-        ASSERT(action->ack_type == ACKTYPE_EOI);
-        ASSERT(desc->status & IRQ_GUEST);
-        for ( i = 0; i < action->nr_guests; i++ )
-            clear_bit(vector_to_irq(vector), action->guest[i]->pirq_mask);
-        action->in_flight = 0;
-        spin_unlock(&desc->lock);
-    }
-
-    flush_ready_eoi(NULL);
-}
-
 static void __pirq_guest_eoi(struct domain *d, int irq)
 {
     irq_desc_t         *desc;
@@ -566,6 +532,10 @@ int pirq_guest_unbind(struct domain *d, int irq)
         break;
     }
 
+    /*
+     * The guest cannot re-bind to this IRQ until this function returns. So,
+     * when we have flushed this IRQ from pirq_mask, it should remain flushed.
+     */
     BUG_ON(test_bit(irq, d->pirq_mask));
 
     if ( action->nr_guests != 0 )
@@ -579,17 +549,18 @@ int pirq_guest_unbind(struct domain *d, int irq)
     desc->handler->disable(vector);
 
     /*
-     * We may have a EOI languishing anywhere in one of the per-CPU
-     * EOI stacks. Forcibly flush the stack on every CPU where this might
-     * be the case.
+     * Mark any remaining pending EOIs as ready to flush.
+     * NOTE: We will need to make this a stronger barrier if in future we allow
+     * an interrupt vectors to be re-bound to a different PIC. In that case we
+     * would need to flush all ready EOIs before returning as otherwise the
+     * desc->handler could change and we would call the wrong 'end' hook.
      */
     cpu_eoi_map = action->cpu_eoi_map;
     if ( !cpus_empty(cpu_eoi_map) )
     {
         BUG_ON(action->ack_type != ACKTYPE_EOI);
         spin_unlock_irqrestore(&desc->lock, flags);
-        on_selected_cpus(cpu_eoi_map, flush_all_pending_eoi, NULL, 1, 1);
-        on_selected_cpus(cpu_online_map, flush_ready_eoi, NULL, 1, 1);
+        on_selected_cpus(cpu_eoi_map, set_eoi_ready, desc, 1, 1);
         spin_lock_irqsave(&desc->lock, flags);
     }
 
@@ -672,41 +643,3 @@ static int __init setup_dump_irqs(void)
     return 0;
 }
 __initcall(setup_dump_irqs);
-
-static DEFINE_PER_CPU(struct timer, end_irq_timer);
-
-/*
- * force_intack: Forcibly emit all pending EOIs on each CPU every second.
- * Mainly useful for debugging or poking lazy guests ISRs.
- */
-
-static void end_irq_timeout(void *unused)
-{
-    local_irq_disable();
-    flush_all_pending_eoi(NULL);
-    local_irq_enable();
-
-    on_selected_cpus(cpu_online_map, flush_ready_eoi, NULL, 1, 0);
-
-    set_timer(&this_cpu(end_irq_timer), NOW() + MILLISECS(1000));
-}
-
-static int force_intack;
-boolean_param("force_intack", force_intack);
-
-static int __init setup_irq_timeout(void)
-{
-    unsigned int cpu;
-
-    if ( !force_intack )
-        return 0;
-
-    for_each_online_cpu ( cpu )
-    {
-        init_timer(&per_cpu(end_irq_timer, cpu), end_irq_timeout, NULL, cpu);
-        set_timer(&per_cpu(end_irq_timer, cpu), NOW() + MILLISECS(1000));
-    }
-
-    return 0;
-}
-__initcall(setup_irq_timeout);

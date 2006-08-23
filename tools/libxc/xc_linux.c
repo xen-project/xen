@@ -13,13 +13,43 @@
 
 #include <xen/memory.h>
 #include <xen/sys/evtchn.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 int xc_interface_open(void)
 {
+    int flags, saved_errno;
     int fd = open("/proc/xen/privcmd", O_RDWR);
+
     if ( fd == -1 )
+    {
         PERROR("Could not obtain handle on privileged command interface");
+        return -1;
+    }
+
+    /* Although we return the file handle as the 'xc handle' the API
+       does not specify / guarentee that this integer is in fact
+       a file handle. Thus we must take responsiblity to ensure
+       it doesn't propagate (ie leak) outside the process */
+    if ( (flags = fcntl(fd, F_GETFD)) < 0 )
+    {
+        PERROR("Could not get file handle flags");
+        goto error;
+    }
+    flags |= FD_CLOEXEC;
+    if ( fcntl(fd, F_SETFD, flags) < 0 )
+    {
+        PERROR("Could not set file handle flags");
+        goto error;
+    }
+
     return fd;
+
+ error:
+    saved_errno = errno;
+    close(fd);
+    errno = saved_errno;
+    return -1;
 }
 
 int xc_interface_close(int xc_handle)

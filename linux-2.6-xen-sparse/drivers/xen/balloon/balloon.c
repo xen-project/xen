@@ -76,7 +76,7 @@ static unsigned long current_pages;
 static unsigned long target_pages;
 
 /* We increase/decrease in batches which fit in a page */
-static unsigned long frame_list[PAGE_SIZE / sizeof(unsigned long)]; 
+static unsigned long frame_list[PAGE_SIZE / sizeof(unsigned long)];
 
 /* VM /proc information for memory */
 extern unsigned long totalram_pages;
@@ -440,20 +440,16 @@ static int balloon_read(char *page, char **start, off_t off,
 		"Requested target:   %8lu kB\n"
 		"Low-mem balloon:    %8lu kB\n"
 		"High-mem balloon:   %8lu kB\n"
+		"Driver pages:       %8lu kB\n"
 		"Xen hard limit:     ",
 		PAGES2KB(current_pages), PAGES2KB(target_pages), 
-		PAGES2KB(balloon_low), PAGES2KB(balloon_high));
+		PAGES2KB(balloon_low), PAGES2KB(balloon_high),
+		PAGES2KB(driver_pages));
 
-	if (hard_limit != ~0UL) {
-		len += sprintf(
-			page + len, 
-			"%8lu kB (inc. %8lu kB driver headroom)\n",
-			PAGES2KB(hard_limit), PAGES2KB(driver_pages));
-	} else {
-		len += sprintf(
-			page + len,
-			"     ??? kB\n");
-	}
+	if (hard_limit != ~0UL)
+		len += sprintf(page + len, "%8lu kB\n", PAGES2KB(hard_limit));
+	else
+		len += sprintf(page + len, "     ??? kB\n");
 
 	*eof = 1;
 	return len;
@@ -610,8 +606,21 @@ void balloon_dealloc_empty_page_range(
 	schedule_work(&balloon_worker);
 }
 
+void balloon_release_driver_page(struct page *page)
+{
+	unsigned long flags;
+
+	balloon_lock(flags);
+	balloon_append(page);
+	driver_pages--;
+	balloon_unlock(flags);
+
+	schedule_work(&balloon_worker);
+}
+
 EXPORT_SYMBOL_GPL(balloon_update_driver_allowance);
 EXPORT_SYMBOL_GPL(balloon_alloc_empty_page_range);
 EXPORT_SYMBOL_GPL(balloon_dealloc_empty_page_range);
+EXPORT_SYMBOL_GPL(balloon_release_driver_page);
 
 MODULE_LICENSE("Dual BSD/GPL");

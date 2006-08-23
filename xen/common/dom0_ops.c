@@ -141,7 +141,8 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
     if ( copy_from_guest(op, u_dom0_op, 1) )
         return -EFAULT;
 
-    if ( op->interface_version != DOM0_INTERFACE_VERSION )
+    if ( (op->interface_version != DOM0_TOOLS_INTERFACE_VERSION) &&
+         (op->interface_version != DOM0_KERNEL_INTERFACE_VERSION) )
         return -EACCES;
 
     if ( acm_pre_dom0_op(op, &ssid) )
@@ -566,7 +567,7 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
         ret = read_console_ring(
             op->u.readconsole.buffer, 
             &op->u.readconsole.count,
-            op->u.readconsole.clear); 
+            op->u.readconsole.clear);
         if ( copy_to_guest(u_dom0_op, op, 1) )
             ret = -EFAULT;
     }
@@ -584,7 +585,7 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
 
     case DOM0_SETDOMAINMAXMEM:
     {
-        struct domain *d; 
+        struct domain *d;
         unsigned long new_max;
 
         ret = -ESRCH;
@@ -624,7 +625,7 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
 
     case DOM0_SETDEBUGGING:
     {
-        struct domain *d; 
+        struct domain *d;
         ret = -ESRCH;
         d = find_domain_by_id(op->u.setdebugging.domain);
         if ( d != NULL )

@@ -189,7 +189,6 @@ struct resource code_resource = {
 
 #define IORESOURCE_ROM (IORESOURCE_BUSY | IORESOURCE_READONLY | IORESOURCE_MEM)
 
-#if defined(CONFIG_XEN_PRIVILEGED_GUEST) || !defined(CONFIG_XEN)
 static struct resource system_rom_resource = {
 	.name = "System ROM",
 	.start = 0xf0000,
@@ -218,19 +217,16 @@ static struct resource adapter_rom_resources[] = {
 	{ .name = "Adapter ROM", .start = 0, .end = 0,
 		.flags = IORESOURCE_ROM }
 };
-#endif
 
 #define ADAPTER_ROM_RESOURCES \
 	(sizeof adapter_rom_resources / sizeof adapter_rom_resources[0])
 
-#if defined(CONFIG_XEN_PRIVILEGED_GUEST) || !defined(CONFIG_XEN)
 static struct resource video_rom_resource = {
 	.name = "Video ROM",
 	.start = 0xc0000,
 	.end = 0xc7fff,
 	.flags = IORESOURCE_ROM,
 };
-#endif
 
 static struct resource video_ram_resource = {
 	.name = "Video RAM area",
@@ -239,7 +235,6 @@ static struct resource video_ram_resource = {
 	.flags = IORESOURCE_RAM,
 };
 
-#if defined(CONFIG_XEN_PRIVILEGED_GUEST) || !defined(CONFIG_XEN)
 #define romsignature(x) (*(unsigned short *)(x) == 0xaa55)
 
 static int __init romchecksum(unsigned char *rom, unsigned long length)
@@ -256,6 +251,12 @@ static void __init probe_roms(void)
 	unsigned long start, length, upper;
 	unsigned char *rom;
 	int	      i;
+
+#ifdef CONFIG_XEN
+	/* Nothing to do if not running in dom0. */
+	if (!is_initial_xendomain())
+		return;
+#endif
 
 	/* video rom */
 	upper = adapter_rom_resources[0].start;
@@ -315,7 +316,6 @@ static void __init probe_roms(void)
 		start = adapter_rom_resources[i++].end & ~2047UL;
 	}
 }
-#endif
 
 static __init void parse_cmdline_early (char ** cmdline_p)
 {
@@ -625,11 +625,8 @@ static void __init reserve_ebda_region(void)
 void __init setup_arch(char **cmdline_p)
 {
 	unsigned long kernel_end;
-
-#if defined(CONFIG_XEN_PRIVILEGED_GUEST)
 	struct e820entry *machine_e820;
 	struct xen_memory_map memmap;
-#endif
 
 #ifdef CONFIG_XEN
 	/* Register a call for panic conditions. */
@@ -639,7 +636,7 @@ void __init setup_arch(char **cmdline_p)
 	kernel_end = 0;		/* dummy */
  	screen_info = SCREEN_INFO;
 
-	if (xen_start_info->flags & SIF_INITDOMAIN) {
+	if (is_initial_xendomain()) {
 		/* This is drawn from a dump from vgacon:startup in
 		 * standard Linux. */
 		screen_info.orig_video_mode = 3;
@@ -648,6 +645,35 @@ void __init setup_arch(char **cmdline_p)
 		screen_info.orig_video_cols = 80;
 		screen_info.orig_video_ega_bx = 3;
 		screen_info.orig_video_points = 16;
+		if (xen_start_info->console.dom0.info_size >=
+		    sizeof(struct dom0_vga_console_info)) {
+			const struct dom0_vga_console_info *info =
+				(struct dom0_vga_console_info *)(
+					(char *)xen_start_info +
+					xen_start_info->console.dom0.info_off);
+			screen_info.orig_video_mode = info->txt_mode;
+			screen_info.orig_video_isVGA = info->video_type;
+			screen_info.orig_video_lines = info->video_height;
+			screen_info.orig_video_cols = info->video_width;
+			screen_info.orig_video_points = info->txt_points;
+			screen_info.lfb_width = info->video_width;
+			screen_info.lfb_height = info->video_height;
+			screen_info.lfb_depth = info->lfb_depth;
+			screen_info.lfb_base = info->lfb_base;
+			screen_info.lfb_size = info->lfb_size;
+			screen_info.lfb_linelength = info->lfb_linelen;
+			screen_info.red_size = info->red_size;
+			screen_info.red_pos = info->red_pos;
+			screen_info.green_size = info->green_size;
+			screen_info.green_pos = info->green_pos;
+			screen_info.blue_size = info->blue_size;
+			screen_info.blue_pos = info->blue_pos;
+			screen_info.rsvd_size = info->rsvd_size;
+			screen_info.rsvd_pos = info->rsvd_pos;
+		}
+		screen_info.orig_y = screen_info.orig_video_lines - 1;
+		xen_start_info->console.domU.mfn = 0;
+		xen_start_info->console.domU.evtchn = 0;
 	} else
 		screen_info.orig_video_isVGA = 0;
 
@@ -860,8 +886,7 @@ void __init setup_arch(char **cmdline_p)
 
 	}
 
-	if ( ! (xen_start_info->flags & SIF_INITDOMAIN))
-	{
+	if (!is_initial_xendomain()) {
 		acpi_disabled = 1;
 #ifdef  CONFIG_ACPI
 		acpi_ht = 0;
@@ -908,9 +933,9 @@ void __init setup_arch(char **cmdline_p)
 	 * Request address space for all standard RAM and ROM resources
 	 * and also for regions reported as reserved by the e820.
 	 */
-#if defined(CONFIG_XEN_PRIVILEGED_GUEST)
 	probe_roms();
-	if (xen_start_info->flags & SIF_INITDOMAIN) {
+#ifdef CONFIG_XEN
+	if (is_initial_xendomain()) {
 		machine_e820 = alloc_bootmem_low_pages(PAGE_SIZE);
 
 		memmap.nr_entries = E820MAX;
@@ -919,14 +944,9 @@ void __init setup_arch(char **cmdline_p)
 		BUG_ON(HYPERVISOR_memory_op(XENMEM_machine_memory_map, &memmap));
 
 		e820_reserve_resources(machine_e820, memmap.nr_entries);
-	} else if (!(xen_start_info->flags & SIF_INITDOMAIN))
-		e820_reserve_resources(e820.map, e820.nr_map);
-#elif defined(CONFIG_XEN)
-	e820_reserve_resources(e820.map, e820.nr_map);
-#else
-	probe_roms();
-	e820_reserve_resources(e820.map, e820.nr_map);
+	} else
 #endif
+	e820_reserve_resources(e820.map, e820.nr_map);
 
 	request_resource(&iomem_resource, &video_ram_resource);
 
@@ -937,12 +957,12 @@ void __init setup_arch(char **cmdline_p)
 		request_resource(&ioport_resource, &standard_io_resources[i]);
 	}
 
-#if defined(CONFIG_XEN_PRIVILEGED_GUEST)
-	if (xen_start_info->flags & SIF_INITDOMAIN) {
+#ifdef CONFIG_XEN
+	if (is_initial_xendomain()) {
 		e820_setup_gap(machine_e820, memmap.nr_entries);
 		free_bootmem(__pa(machine_e820), PAGE_SIZE);
 	}
-#elif !defined(CONFIG_XEN)
+#else
 	e820_setup_gap(e820.map, e820.nr_map);
 #endif
 
@@ -957,11 +977,7 @@ void __init setup_arch(char **cmdline_p)
 		set_iopl.iopl = 1;
 		HYPERVISOR_physdev_op(PHYSDEVOP_set_iopl, &set_iopl);
 
-		if (xen_start_info->flags & SIF_INITDOMAIN) {
-			if (!(xen_start_info->flags & SIF_PRIVILEGED))
-				panic("Xen granted us console access "
-				      "but not privileged status");
-		       
+		if (is_initial_xendomain()) {
 #ifdef CONFIG_VT
 #if defined(CONFIG_VGA_CONSOLE)
 			conswitchp = &vga_con;

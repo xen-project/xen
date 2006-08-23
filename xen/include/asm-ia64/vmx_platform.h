@@ -21,7 +21,6 @@
 
 #include <public/xen.h>
 #include <public/hvm/params.h>
-#include <public/arch-ia64.h>
 #include <asm/hvm/vioapic.h>
 struct mmio_list;
 typedef struct virtual_platform_def {

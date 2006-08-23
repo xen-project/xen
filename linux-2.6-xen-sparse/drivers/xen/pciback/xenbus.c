@@ -181,6 +181,7 @@ static void pciback_frontend_changed(struct xenbus_device *xdev,
 		xenbus_switch_state(xdev, XenbusStateClosing);
 		break;
 
+	case XenbusStateUnknown:
 	case XenbusStateClosed:
 		dev_dbg(&xdev->dev, "frontend is gone! unregister device\n");
 		device_unregister(&xdev->dev);

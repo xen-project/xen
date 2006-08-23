@@ -150,6 +150,7 @@ static inline int irq_masked(unsigned long eflags)
 #endif
 
 extern void handle_mmio(unsigned long, unsigned long);
+extern void hvm_interrupt_post(struct vcpu *v, int vector, int type);
 extern void hvm_io_assist(struct vcpu *v);
 extern void pic_irq_request(void *data, int level);
 extern void hvm_pic_assist(struct vcpu *v);

@@ -6,11 +6,11 @@
  *  Started by Ingo Molnar <mingo@redhat.com>
  *
  *  Fixes:
- *  Mikael Pettersson	: AMD K7 support for local APIC NMI watchdog.
- *  Mikael Pettersson	: Power Management for local APIC NMI watchdog.
- *  Mikael Pettersson	: Pentium 4 support for local APIC NMI watchdog.
+ *  Mikael Pettersson : AMD K7 support for local APIC NMI watchdog.
+ *  Mikael Pettersson : Power Management for local APIC NMI watchdog.
+ *  Mikael Pettersson : Pentium 4 support for local APIC NMI watchdog.
  *  Pavel Machek and
- *  Mikael Pettersson	: PM converted to driver model. Disable/enable API.
+ *  Mikael Pettersson : PM converted to driver model. Disable/enable API.
  */
 
 #include <xen/config.h>

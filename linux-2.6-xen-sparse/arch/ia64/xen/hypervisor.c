@@ -82,7 +82,7 @@ ia64_xenmem_reservation_op(unsigned long op,
 			//    of a non-privileged domain, 
 			if ((op == XENMEM_increase_reservation ||
 			     op == XENMEM_populate_physmap) &&
-			    !(xen_start_info->flags & SIF_PRIVILEGED) &&
+			    !is_initial_xendomain() &&
 			    reservation.extent_order > 0)
 				return ret;
 		}

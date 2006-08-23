@@ -95,10 +95,9 @@ unsigned long avail_scrub_pages(void);
 
 #include <asm/mm.h>
 
-#ifndef sync_pagetable_state
-#define sync_pagetable_state(d) ((void)0)
-#endif
-
 int guest_remove_page(struct domain *d, unsigned long gmfn);
+
+/* Returns TRUE if the memory at address @p is ordinary RAM. */
+int memory_is_conventional_ram(paddr_t p);
 
 #endif /* __XEN_MM_H__ */

@@ -86,11 +86,6 @@ typedef union RedirStatus
     } RedirForm;
 } RedirStatus;
 
-#define IOAPIC_MEM_LENGTH    0x100
-#define IOAPIC_ENABLE_MASK   0x0
-#define IOAPIC_ENABLE_FLAG   (1 << IOAPIC_ENABLE_MASK)
-#define MAX_LAPIC_NUM        32
-
 typedef struct hvm_vioapic {
     uint32_t irr;
     uint32_t isr;           /* This is used for level trigger */

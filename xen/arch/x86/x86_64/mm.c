@@ -81,9 +81,6 @@ void __init paging_init(void)
     l2_pgentry_t *l2_ro_mpt;
     struct page_info *pg;
 
-    idle_vcpu[0]->arch.monitor_table =
-        pagetable_from_paddr(__pa(idle_pg_table));
-
     /* Create user-accessible L2 directory to map the MPT for guests. */
     l3_ro_mpt = alloc_xenheap_page();
     clear_page(l3_ro_mpt);
@@ -113,15 +110,19 @@ void __init paging_init(void)
             PAGE_HYPERVISOR);
         memset((void *)(RDWR_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT)), 0x55,
                1UL << L2_PAGETABLE_SHIFT);
+        /* NB. Cannot be GLOBAL as shadow_mode_translate reuses this area. */
         *l2_ro_mpt++ = l2e_from_page(
-            pg, _PAGE_GLOBAL|_PAGE_PSE|_PAGE_USER|_PAGE_PRESENT);
+            pg, /*_PAGE_GLOBAL|*/_PAGE_PSE|_PAGE_USER|_PAGE_PRESENT);
         BUG_ON(((unsigned long)l2_ro_mpt & ~PAGE_MASK) == 0);
     }
 
     /* Set up linear page table mapping. */
     idle_pg_table[l4_table_offset(LINEAR_PT_VIRT_START)] =
         l4e_from_paddr(__pa(idle_pg_table), __PAGE_HYPERVISOR);
+}
 
+void __init setup_idle_pagetable(void)
+{
     /* Install per-domain mappings for idle domain. */
     idle_pg_table[l4_table_offset(PERDOMAIN_VIRT_START)] =
         l4e_from_page(
@@ -153,7 +154,7 @@ void subarch_init_memory(void)
                  (32 + BITS_TO_LONGS(NR_CPUS)*sizeof(long)));
 
     /* M2P table is mappable read-only by privileged domains. */
-    for ( v  = RDWR_MPT_VIRT_START; 
+    for ( v  = RDWR_MPT_VIRT_START;
           v != RDWR_MPT_VIRT_END;
           v += 1 << L2_PAGETABLE_SHIFT )
     {

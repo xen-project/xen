@@ -639,7 +639,7 @@ static int pin_2_irq(int idx, int apic, int pin)
     }
     default:
     {
-        printk(KERN_ERR "unknown bus type %d.\n",bus); 
+        printk(KERN_ERR "unknown bus type %d.\n",bus);
         irq = 0;
         break;
     }

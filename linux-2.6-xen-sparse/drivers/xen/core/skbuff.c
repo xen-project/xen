@@ -121,8 +121,7 @@ static int __init skbuff_init(void)
 	for (order = 0; order <= MAX_SKBUFF_ORDER; order++) {
 		size = PAGE_SIZE << order;
 		sprintf(name[order], "xen-skb-%lu", size);
-		if (is_running_on_xen() &&
-		    (xen_start_info->flags & SIF_PRIVILEGED))
+		if (is_running_on_xen() && is_initial_xendomain())
 			skbuff_order_cachep[order] = kmem_cache_create(
 				name[order], size, size, 0,
 				skbuff_ctor, skbuff_dtor);

@@ -305,6 +305,7 @@ typedef struct IDEState {
     PCIDevice *pci_dev;
     struct BMDMAState *bmdma;
     int drive_serial;
+    int write_cache;
     /* ide regs */
     uint8_t feature;
     uint8_t error;
@@ -789,6 +790,9 @@ static void ide_sector_write(IDEState *s)
     }
     ide_set_sector(s, sector_num + n);
     
+    if (!s->write_cache)
+        bdrv_flush(s->bs);
+    
 #ifdef TARGET_I386
     if (win2k_install_hack && ((++s->irq_count % 16) == 0)) {
         /* It seems there is a bug in the Windows 2000 installer HDD
@@ -863,6 +867,10 @@ static int ide_write_dma_cb(IDEState *s,
         transfer_size -= len;
         phys_addr += len;
     }
+    /* Ensure the data hit disk before telling the guest OS so. */
+    if (!s->write_cache)
+        bdrv_flush(s->bs);
+
     return transfer_size1 - transfer_size;
 }
 
@@ -1672,7 +1680,15 @@ static void ide_ioport_write(void *opaque, uint32_t addr, uint32_t val)
             /* XXX: valid for CDROM ? */
             switch(s->feature) {
             case 0x02: /* write cache enable */
+                s->write_cache = 1;
+                s->status = READY_STAT | SEEK_STAT;
+                ide_set_irq(s);
+                break;
             case 0x82: /* write cache disable */
+                s->write_cache = 0;
+                s->status = READY_STAT | SEEK_STAT;
+                ide_set_irq(s);
+                break;
             case 0xaa: /* read look-ahead enable */
             case 0x55: /* read look-ahead disable */
                 s->status = READY_STAT | SEEK_STAT;
@@ -2090,6 +2106,7 @@ static void ide_init2(IDEState *ide_state,
         s->irq = irq;
         s->sector_write_timer = qemu_new_timer(vm_clock, 
                                                ide_sector_write_timer_cb, s);
+        s->write_cache = 0;
         ide_reset(s);
     }
 }

@@ -14,8 +14,8 @@
 #include <asm/x86_32/uaccess.h>
 #endif
 
-unsigned long copy_to_user(void *to, const void *from, unsigned len); 
-unsigned long copy_from_user(void *to, const void *from, unsigned len); 
+unsigned long copy_to_user(void *to, const void *from, unsigned len);
+unsigned long copy_from_user(void *to, const void *from, unsigned len);
 /* Handles exceptions in both to and from, but doesn't do access_ok */
 unsigned long __copy_to_user_ll(void *to, const void *from, unsigned n);
 unsigned long __copy_from_user_ll(void *to, const void *from, unsigned n);
@@ -251,7 +251,7 @@ __copy_from_user(void *to, const void __user *from, unsigned long n)
             return ret;
         case 8:
             __get_user_size(*(u64*)to, from, 8, ret, 8);
-            return ret; 
+            return ret;
         }
     }
     return __copy_from_user_ll(to, from, n);

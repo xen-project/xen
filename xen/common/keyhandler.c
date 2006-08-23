@@ -25,8 +25,8 @@ static struct {
         irq_keyhandler_t *irq_handler;
     } u;
     unsigned int flags;
-    char         desc[STR_MAX]; 
-} key_table[KEY_MAX]; 
+    char         desc[STR_MAX];
+} key_table[KEY_MAX];
 
 #define KEYHANDLER_IRQ_CALLBACK 0x1
 
@@ -63,7 +63,7 @@ void register_keyhandler(
     key_table[key].u.handler = handler;
     key_table[key].flags     = 0;
     strncpy(key_table[key].desc, desc, STR_MAX);
-    key_table[key].desc[STR_MAX-1] = '\0'; 
+    key_table[key].desc[STR_MAX-1] = '\0';
 }
 
 void register_irq_keyhandler(
@@ -73,12 +73,12 @@ void register_irq_keyhandler(
     key_table[key].u.irq_handler = handler;
     key_table[key].flags         = KEYHANDLER_IRQ_CALLBACK;
     strncpy(key_table[key].desc, desc, STR_MAX);
-    key_table[key].desc[STR_MAX-1] = '\0'; 
+    key_table[key].desc[STR_MAX-1] = '\0';
 }
 
 static void show_handlers(unsigned char key)
 {
-    int i; 
+    int i;
     printk("'%c' pressed -> showing installed handlers\n", key);
     for ( i = 0; i < KEY_MAX; i++ ) 
         if ( key_table[i].u.handler != NULL ) 
@@ -96,7 +96,7 @@ static void dump_registers(unsigned char key, struct cpu_user_regs *regs)
 {
     unsigned int cpu;
 
-    printk("'%c' pressed -> dumping registers\n", key); 
+    printk("'%c' pressed -> dumping registers\n", key);
 
     /* Get local execution state out immediately, in case we get stuck. */
     printk("\n*** Dumping CPU%d state: ***\n", smp_processor_id());
@@ -113,8 +113,8 @@ static void dump_registers(unsigned char key, struct cpu_user_regs *regs)
 
 static void halt_machine(unsigned char key, struct cpu_user_regs *regs)
 {
-    printk("'%c' pressed -> rebooting machine\n", key); 
-    machine_restart(NULL); 
+    printk("'%c' pressed -> rebooting machine\n", key);
+    machine_restart(NULL);
 }
 
 static void cpuset_print(char *set, int size, cpumask_t mask)
@@ -133,7 +133,7 @@ static void dump_domains(unsigned char key)
     char           cpuset[100];
 
     printk("'%c' pressed -> dumping domain info (now=0x%X:%08X)\n", key,
-           (u32)(now>>32), (u32)now); 
+           (u32)(now>>32), (u32)now);
 
     read_lock(&domlist_lock);
 
@@ -241,9 +241,6 @@ static void read_clocks(unsigned char key)
 }
 
 extern void dump_runq(unsigned char key);
-#ifndef NDEBUG
-extern void audit_domains_key(unsigned char key);
-#endif
 
 #ifdef PERF_COUNTERS
 extern void perfc_printall(unsigned char key);
@@ -258,22 +255,12 @@ static void do_debug_key(unsigned char key, struct cpu_user_regs *regs)
                              bit. */
 }
 
-#ifndef NDEBUG
-static void debugtrace_key(unsigned char key)
-{
-    debugtrace_send_to_console = !debugtrace_send_to_console;
-    debugtrace_dump();
-    printk("debugtrace_printk now writing to %s.\n",
-           debugtrace_send_to_console ? "console" : "buffer");
-}
-#endif
-
 void initialize_keytable(void)
 {
     open_softirq(KEYPRESS_SOFTIRQ, keypress_softirq);
 
     register_irq_keyhandler(
-        'd', dump_registers, "dump registers"); 
+        'd', dump_registers, "dump registers");
     register_keyhandler(
         'h', show_handlers, "show this message");
     register_keyhandler(
@@ -281,23 +268,16 @@ void initialize_keytable(void)
     register_keyhandler(
         'r', dump_runq,      "dump run queues");
     register_irq_keyhandler(
-        'R', halt_machine,   "reboot machine"); 
+        'R', halt_machine,   "reboot machine");
 
     register_keyhandler(
         't', read_clocks, "display multi-cpu clock info");
 
-#ifndef NDEBUG
-    register_keyhandler(
-        'o', audit_domains_key,  "audit domains >0 EXPERIMENTAL");
-    register_keyhandler(
-        'T', debugtrace_key, "toggle debugtrace to console/buffer");
-#endif
-
 #ifdef PERF_COUNTERS
     register_keyhandler(
-        'p', perfc_printall, "print performance counters"); 
+        'p', perfc_printall, "print performance counters");
     register_keyhandler(
-        'P', perfc_reset,    "reset performance counters"); 
+        'P', perfc_reset,    "reset performance counters");
 #endif
 
     register_irq_keyhandler('%', do_debug_key,   "Trap to xendbg");

@@ -2,6 +2,7 @@
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <asm/e820.h>
+#include <asm/page.h>
 
 /* opt_mem: Limit of physical RAM. Any RAM beyond this point is ignored. */
 unsigned long long opt_mem;
@@ -30,16 +31,7 @@ static void __init add_memory_region(unsigned long long start,
     }
 } /* add_memory_region */
 
-#define E820_DEBUG	1
-
-#ifndef NDEBUG
-#define __init_unless_debugging
-#else
-#define __init_unless_debugging __init
-#endif
-
-void __init_unless_debugging
-print_e820_memory_map(struct e820entry *map, int entries)
+static void __init print_e820_memory_map(struct e820entry *map, int entries)
 {
     int i;
 

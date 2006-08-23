@@ -27,10 +27,10 @@
 #ifdef CRASH_DEBUG
 
 /* value <-> char (de)serialzers for arch specific gdb backends */
-char hex2char(unsigned long x); 
-int char2hex(unsigned char c); 
-char str2hex(const char *str); 
-unsigned long str2ulong(const char *str, unsigned long bytes); 
+char hex2char(unsigned long x);
+int char2hex(unsigned char c);
+char str2hex(const char *str);
+unsigned long str2ulong(const char *str, unsigned long bytes);
 
 struct gdb_context {
     int                 serhnd;
@@ -52,7 +52,7 @@ void gdb_write_to_packet(
     const char *buf, int count, struct gdb_context *ctx);
 void gdb_write_to_packet_hex(
     unsigned long x, int int_size, struct gdb_context *ctx);
-void gdb_send_packet(struct gdb_context *ctx); 
+void gdb_send_packet(struct gdb_context *ctx);
 void gdb_send_reply(const char *buf, struct gdb_context *ctx);
 
 /* gdb stub trap handler: entry point */

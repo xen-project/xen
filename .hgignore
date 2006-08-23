@@ -151,7 +151,7 @@
 ^tools/vtpm_manager/manager/vtpm_managerd$
 ^tools/xcutils/xc_restore$
 ^tools/xcutils/xc_save$
-^tools/xenmon/setmask$
+^tools/xenmon/xentrace_setmask$
 ^tools/xenmon/xenbaked$
 ^tools/xenstat/xentop/xentop$
 ^tools/xenstore/testsuite/tmp/.*$
@@ -172,7 +172,7 @@
 ^tools/xenstore/xs_tdb_dump$
 ^tools/xenstore/xs_test$
 ^tools/xenstore/xs_watch_stress$
-^tools/xentrace/setsize$
+^tools/xentrace/xentrace_setsize$
 ^tools/xentrace/tbctl$
 ^tools/xentrace/xenctx$
 ^tools/xentrace/xentrace$
@@ -197,7 +197,12 @@
 ^xen/xen$
 ^xen/xen-syms$
 ^xen/xen\..*$
-^xen/arch/ppc/dom0\.bin$
-^xen/arch/ppc/asm-offsets\.s$
-^xen/arch/ppc/firmware
-^xen/arch/ppc/firmware_image
+^xen/arch/powerpc/dom0\.bin$
+^xen/arch/powerpc/asm-offsets\.s$
+^xen/arch/powerpc/firmware$
+^xen/arch/powerpc/firmware_image$
+^xen/arch/powerpc/xen\.lds$
+^unmodified_drivers/linux-2.6/\.tmp_versions
+^unmodified_drivers/linux-2.6/.*\.cmd$
+^unmodified_drivers/linux-2.6/.*\.ko$
+^unmodified_drivers/linux-2.6/.*\.mod\.c$

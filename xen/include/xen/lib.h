@@ -18,7 +18,7 @@ extern void __bug(char *file, int line) __attribute__((noreturn));
 #ifndef NDEBUG
 #define ASSERT(_p)                                                      \
     do {                                                                \
-        if ( !(_p) )                                                    \
+        if ( unlikely(!(_p)) )                                          \
         {                                                               \
             printk("Assertion '%s' failed, line %d, file %s\n", #_p ,   \
                    __LINE__, __FILE__);                                 \
@@ -40,8 +40,8 @@ struct domain;
 
 void cmdline_parse(char *cmdline);
 
-#ifndef NDEBUG
-extern int debugtrace_send_to_console;
+/*#define DEBUG_TRACE_DUMP*/
+#ifdef DEBUG_TRACE_DUMP
 extern void debugtrace_dump(void);
 extern void debugtrace_printk(const char *fmt, ...);
 #else

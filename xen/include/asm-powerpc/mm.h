@@ -33,9 +33,7 @@
 #define memguard_unguard_range(_p,_l)    ((void)0)
 
 extern unsigned long xenheap_phys_end;
-#define IS_XEN_HEAP_FRAME(_pfn) (page_to_mfn(_pfn) < xenheap_phys_end)
-
-#define cleanup_writable_pagetable(_d)
+#define IS_XEN_HEAP_FRAME(_pfn) (page_to_maddr(_pfn) < xenheap_phys_end)
 
 /*
  * Per-page-frame information.

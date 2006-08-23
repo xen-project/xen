@@ -64,9 +64,9 @@ typedef struct netif_st {
 
 	/* Physical parameters of the comms window. */
 	grant_handle_t   tx_shmem_handle;
-	grant_ref_t      tx_shmem_ref; 
+	grant_ref_t      tx_shmem_ref;
 	grant_handle_t   rx_shmem_handle;
-	grant_ref_t      rx_shmem_ref; 
+	grant_ref_t      rx_shmem_ref;
 	unsigned int     evtchn;
 	unsigned int     irq;
 
@@ -78,7 +78,10 @@ typedef struct netif_st {
 
 	/* Set of features that can be turned on in dev->features. */
 	int features;
-	int can_queue;
+
+	/* Internal feature information. */
+	int can_queue:1;	/* can queue packets for receiver? */
+	int copying_receiver:1;	/* copy packets to receiver?       */
 
 	/* Allow netif_be_start_xmit() to peek ahead in the rx request ring. */
 	RING_IDX rx_req_cons_peek;

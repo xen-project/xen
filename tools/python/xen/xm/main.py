@@ -31,6 +31,7 @@ import warnings
 warnings.filterwarnings('ignore', category=FutureWarning)
 import xmlrpclib
 import traceback
+import datetime
 
 import xen.xend.XendProtocol
 
@@ -70,6 +71,7 @@ save_help =    "save <DomId> <File>              Save domain state (and config) 
 shutdown_help ="shutdown <DomId> [-w][-a][-R|-H] Shutdown a domain"
 top_help =     "top                              Monitor system and domains in real-time"
 unpause_help = "unpause <DomId>                  Unpause a paused domain"
+uptime_help  = "uptime [-s|--short] [DomId, ...] List uptime for domains"
 
 help_spacer = """
    """
@@ -111,6 +113,8 @@ block_detach_help = """block-detach  <DomId> <DevId>    Destroy a domain's virtu
                                     or the device name as mounted in the guest"""
 
 block_list_help = "block-list <DomId> [--long]      List virtual block devices for a domain"
+block_configure_help = """block-configure <DomId> <BackDev> <FrontDev> <Mode>
+                   [BackDomId] Change block device configuration"""
 network_attach_help = """network-attach  <DomID> [script=<script>] [ip=<ip>] [mac=<mac>]
                            [bridge=<bridge>] [backend=<backDomID>]
                                     Create a new virtual network device """
@@ -149,6 +153,7 @@ short_command_list = [
     "shutdown",
     "top",
     "unpause",
+    "uptime",
     "vcpu-set",
     ]
 
@@ -172,6 +177,7 @@ domain_commands = [
     "sysrq",
     "top",
     "unpause",
+    "uptime",
     "vcpu-list",
     "vcpu-pin",
     "vcpu-set",
@@ -195,6 +201,7 @@ device_commands = [
     "block-attach",
     "block-detach",
     "block-list",
+    "block-configure",
     "network-attach",
     "network-detach",
     "network-list",
@@ -412,6 +419,7 @@ def parse_doms_info(info):
         'vcpus'    : get_info('online_vcpus', int,   0),
         'state'    : get_info('state',        str,   '??'),
         'cpu_time' : get_info('cpu_time',     float, 0),
+        'up_time'  : get_info('up_time',      float, -1),
         'seclabel' : security.get_security_printlabel(info),
         }
 
@@ -818,6 +826,59 @@ def xm_console(args):
     domid = int(sxp.child_value(info, 'domid', '-1'))
     console.execConsole(domid)
 
+def xm_uptime(args):
+    short_mode = 0
+
+    try:
+        (options, params) = getopt.gnu_getopt(args, 's', ['short'])
+    except getopt.GetoptError, opterr:
+        err(opterr)
+        sys.exit(1)
+
+    for (k, v) in options:
+        if k in ['-s', '--short']:
+            short_mode = 1
+
+    doms = getDomains(params)
+
+    if short_mode == 0:
+        print 'Name                              ID Uptime'
+
+    for dom in doms:
+        d = parse_doms_info(dom)
+        if d['dom'] > 0:
+            uptime = int(round(d['up_time']))
+        else:
+            f=open('/proc/uptime', 'r')
+            upfile = f.read()
+            uptime = int(round(float(upfile.split(' ')[0])))
+            f.close()
+
+        days = int(uptime / 86400)
+        uptime -= (days * 86400)
+        hours = int(uptime / 3600)
+        uptime -= (hours * 3600)
+        minutes = int(uptime / 60)
+        uptime -= (minutes * 60)
+        seconds = uptime
+            
+        upstring = ""
+        if days > 0:
+            upstring += str(days) + " day"
+            if days > 1:
+                upstring += "s"
+            upstring += ", "
+        upstring += '%(hours)2d:%(minutes)02d' % vars()
+
+        if short_mode:
+            now = datetime.datetime.now()
+            upstring = now.strftime(" %H:%M:%S") + " up " + upstring
+            upstring += ", " + d['name'] + " (" + str(d['dom']) + ")"
+        else:
+            upstring += ':%(seconds)02d' % vars()
+            upstring = ("%(name)-32s %(dom)3d " % d) + upstring
+
+        print upstring
 
 def xm_top(args):
     arg_check(args, "top", 0)
@@ -997,9 +1058,8 @@ def xm_vtpm_list(args):
                    "%(be-path)-30s  "
                    % ni)
 
-def xm_block_attach(args):
-    arg_check(args, 'block-attach', 4, 5)
 
+def parse_block_configuration(args):
     dom = args[0]
 
     if args[1].startswith('tap:'):
@@ -1029,7 +1089,21 @@ def xm_block_attach(args):
         traceback.print_exc(limit=1)
         sys.exit(1)
 
+    return (dom, vbd)
+
+
+def xm_block_attach(args):
+    arg_check(args, 'block-attach', 4, 5)
+
+    (dom, vbd) = parse_block_configuration(args)
     server.xend.domain.device_create(dom, vbd)
+
+
+def xm_block_configure(args):
+    arg_check(args, 'block-configure', 4, 5)
+
+    (dom, vbd) = parse_block_configuration(args)
+    server.xend.domain.device_configure(dom, vbd)
 
 
 def xm_network_attach(args):
@@ -1117,6 +1191,7 @@ commands = {
     "save": xm_save,
     "reboot": xm_reboot,
     "shutdown": xm_shutdown,
+    "uptime": xm_uptime,
     "list": xm_list,
     # memory commands
     "mem-max": xm_mem_max,
@@ -1142,6 +1217,7 @@ commands = {
     "block-attach": xm_block_attach,
     "block-detach": xm_block_detach,
     "block-list": xm_block_list,
+    "block-configure": xm_block_configure,
     # network
     "network-attach": xm_network_attach,
     "network-detach": xm_network_detach,

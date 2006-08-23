@@ -225,7 +225,10 @@ APMSYM(04):
 APMSYM(05):
   cmp al, #0x05
   jne APMSYM(07)
+  pushf ; XEN
+  sti   ; XEN: OS calls us with ints disabled -- better re-enable here!
   hlt
+  popf  ; XEN
   jmp APMSYM(ok)
 
 ;-----------------

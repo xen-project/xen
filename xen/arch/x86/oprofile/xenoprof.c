@@ -255,7 +255,7 @@ int reset_active(struct domain *d)
     active_ready[ind] = 0;
     active_domains[ind] = NULL;
     activated--;
-    put_domain(d); 
+    put_domain(d);
 
     if ( activated <= 0 )
         adomains = 0;
@@ -316,7 +316,7 @@ int add_active_list (domid_t domid)
     if ( adomains >= MAX_OPROF_DOMAINS )
         return -E2BIG;
 
-    d = find_domain_by_id(domid); 
+    d = find_domain_by_id(domid);
     if ( d == NULL )
         return -EINVAL;
 
@@ -339,7 +339,7 @@ int add_passive_list(XEN_GUEST_HANDLE(void) arg)
     if ( copy_from_guest(&passive, arg, 1) )
         return -EFAULT;
 
-    d = find_domain_by_id(passive.domain_id); 
+    d = find_domain_by_id(passive.domain_id);
     if ( d == NULL )
         return -EINVAL;
 

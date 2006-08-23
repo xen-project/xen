@@ -59,7 +59,7 @@ int nmi_callback(struct cpu_user_regs *regs, int cpu)
 static void nmi_cpu_save_registers(struct op_msrs *msrs)
 {
 	unsigned int const nr_ctrs = model->num_counters;
-	unsigned int const nr_ctrls = model->num_controls; 
+	unsigned int const nr_ctrls = model->num_controls;
 	struct op_msr *counters = msrs->counters;
 	struct op_msr *controls = msrs->controls;
 	unsigned int i;
@@ -180,7 +180,7 @@ void nmi_disable_virq(void)
 static void nmi_restore_registers(struct op_msrs * msrs)
 {
 	unsigned int const nr_ctrs = model->num_counters;
-	unsigned int const nr_ctrls = model->num_controls; 
+	unsigned int const nr_ctrls = model->num_controls;
 	struct op_msr * counters = msrs->counters;
 	struct op_msr * controls = msrs->controls;
 	unsigned int i;

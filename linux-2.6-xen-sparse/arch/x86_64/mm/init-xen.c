@@ -529,7 +529,7 @@ void __init xen_init_pt(void)
 		mk_kernel_pgd(__pa_symbol(level3_kernel_pgt));
 	level3_kernel_pgt[pud_index(__START_KERNEL_map)] = 
 		__pud(__pa_symbol(level2_kernel_pgt) |
-		      _KERNPG_TABLE | _PAGE_USER);
+		      _KERNPG_TABLE);
 	memcpy((void *)level2_kernel_pgt, page, PAGE_SIZE);
 
 	early_make_page_readonly(init_level4_pgt,
@@ -578,7 +578,7 @@ void __init extend_init_mapping(unsigned long tables_space)
 			pte_page = alloc_static_page(&phys);
 			early_make_page_readonly(
 				pte_page, XENFEAT_writable_page_tables);
-			set_pmd(pmd, __pmd(phys | _KERNPG_TABLE | _PAGE_USER));
+			set_pmd(pmd, __pmd(phys | _KERNPG_TABLE));
 		} else {
 			addr = page[pmd_index(va)];
 			addr_to_page(addr, pte_page);
@@ -587,7 +587,7 @@ void __init extend_init_mapping(unsigned long tables_space)
 		if (pte_none(*pte)) {
 			new_pte = pfn_pte(
 				(va - __START_KERNEL_map) >> PAGE_SHIFT, 
-				__pgprot(_KERNPG_TABLE | _PAGE_USER));
+				__pgprot(_KERNPG_TABLE));
 			xen_l1_entry_update(pte, new_pte);
 		}
 		va += PAGE_SIZE;
@@ -789,7 +789,7 @@ void __init paging_init(void)
 
 	/* Setup mapping of lower 1st MB */
 	for (i = 0; i < NR_FIX_ISAMAPS; i++)
-		if (xen_start_info->flags & SIF_PRIVILEGED)
+		if (is_initial_xendomain())
 			set_fixmap(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
 		else
 			__set_fixmap(FIX_ISAMAP_BEGIN - i,

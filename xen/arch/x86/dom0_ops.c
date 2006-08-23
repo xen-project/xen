@@ -84,12 +84,12 @@ long arch_do_dom0_op(struct dom0_op *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
 
     case DOM0_SHADOW_CONTROL:
     {
-        struct domain *d; 
+        struct domain *d;
         ret = -ESRCH;
         d = find_domain_by_id(op->u.shadow_control.domain);
         if ( d != NULL )
         {
-            ret = shadow_mode_control(d, &op->u.shadow_control);
+            ret = shadow2_control_op(d, &op->u.shadow_control, u_dom0_op);
             put_domain(d);
             copy_to_guest(u_dom0_op, op, 1);
         } 

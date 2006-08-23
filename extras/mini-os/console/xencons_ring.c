@@ -14,13 +14,13 @@
 
 static inline struct xencons_interface *xencons_interface(void)
 {
-    return mfn_to_virt(start_info.console_mfn);
+    return mfn_to_virt(start_info.console.domU.mfn);
 }
 
 static inline void notify_daemon(void)
 {
     /* Use evtchn: this is called early, before irq is set up. */
-    notify_remote_via_evtchn(start_info.console_evtchn);
+    notify_remote_via_evtchn(start_info.console.domU.evtchn);
 }
 
 int xencons_ring_send_no_notify(const char *data, unsigned len)
@@ -80,10 +80,10 @@ int xencons_ring_init(void)
 {
 	int err;
 
-	if (!start_info.console_evtchn)
+	if (!start_info.console.domU.evtchn)
 		return 0;
 
-	err = bind_evtchn(start_info.console_evtchn, handle_input,
+	err = bind_evtchn(start_info.console.domU.evtchn, handle_input,
 			  NULL);
 	if (err <= 0) {
 		printk("XEN console request chn bind failed %i\n", err);

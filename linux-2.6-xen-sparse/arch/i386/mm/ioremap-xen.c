@@ -121,7 +121,7 @@ int direct_remap_pfn_range(struct vm_area_struct *vma,
 			   domid_t  domid)
 {
 	/* Same as remap_pfn_range(). */
-	vma->vm_flags |= VM_IO | VM_RESERVED;
+	vma->vm_flags |= VM_IO | VM_RESERVED | VM_PFNMAP;
 
 	if (domid == DOMID_SELF)
 		return -EINVAL;
@@ -245,7 +245,7 @@ void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned l
 	/*
 	 * Don't remap the low PCI/ISA area, it's always mapped..
 	 */
-	if (xen_start_info->flags & SIF_PRIVILEGED &&
+	if (is_initial_xendomain() &&
 	    phys_addr >= ISA_START_ADDRESS && last_addr < ISA_END_ADDRESS)
 		return (void __iomem *) isa_bus_to_virt(phys_addr);
 
@@ -282,9 +282,6 @@ void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned l
 	area->phys_addr = phys_addr;
 	addr = (void __iomem *) area->addr;
 	flags |= _PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED;
-#ifdef __x86_64__
-	flags |= _PAGE_USER;
-#endif
 	if (__direct_remap_pfn_range(&init_mm, (unsigned long)addr,
 				     phys_addr>>PAGE_SHIFT,
 				     size, __pgprot(flags), domid)) {
@@ -425,7 +422,7 @@ void __init *bt_ioremap(unsigned long phys_addr, unsigned long size)
 	/*
 	 * Don't remap the low PCI/ISA area, it's always mapped..
 	 */
-	if (xen_start_info->flags & SIF_PRIVILEGED &&
+	if (is_initial_xendomain() &&
 	    phys_addr >= ISA_START_ADDRESS && last_addr < ISA_END_ADDRESS)
 		return isa_bus_to_virt(phys_addr);
 

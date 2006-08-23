@@ -55,7 +55,7 @@
  * domain pointer, DS, ES, FS, GS. Therefore, we effectively skip 6 registers.
  */
 
-#define NR_SKIPPED_REGS	6	/* See the above explanation */
+#define NR_SKIPPED_REGS 6 /* See the above explanation */
 #define HVM_SAVE_ALL_NOSEGREGS                                              \
         subl $(NR_SKIPPED_REGS*4), %esp;                                    \
         movl $0, 0xc(%esp);  /* XXX why do we need to force eflags==0 ?? */ \
@@ -95,7 +95,7 @@ vmx_process_softirqs:
 ENTRY(vmx_asm_do_vmentry)
         GET_CURRENT(%ebx)
         pushl %ebx
-        call vmx_do_resume
+        call hvm_do_resume
         addl $4, %esp
         cli                             # tests must not race interrupts
 

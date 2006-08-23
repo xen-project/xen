@@ -143,6 +143,7 @@ add_to_bridge () {
 
     # Don't add $dev to $bridge if it's already on a bridge.
     if [ -e "/sys/class/net/${bridge}/brif/${dev}" ]; then
+	ip link set ${dev} up || true
 	return
     fi
     brctl addif ${bridge} ${dev}

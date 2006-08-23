@@ -84,7 +84,8 @@ void show_page_walk(unsigned long addr)
     l4e = l4t[l4_table_offset(addr)];
     mfn = l4e_get_pfn(l4e);
     pfn = get_gpfn_from_mfn(mfn);
-    printk(" L4 = %"PRIpte" %016lx\n", l4e_get_intpte(l4e), pfn);
+    printk(" L4[0x%03lx] = %"PRIpte" %016lx\n",
+           l4_table_offset(addr), l4e_get_intpte(l4e), pfn);
     if ( !(l4e_get_flags(l4e) & _PAGE_PRESENT) )
         return;
 
@@ -92,7 +93,8 @@ void show_page_walk(unsigned long addr)
     l3e = l3t[l3_table_offset(addr)];
     mfn = l3e_get_pfn(l3e);
     pfn = get_gpfn_from_mfn(mfn);
-    printk("  L3 = %"PRIpte" %016lx\n", l3e_get_intpte(l3e), pfn);
+    printk(" L3[0x%03lx] = %"PRIpte" %016lx\n",
+           l3_table_offset(addr), l3e_get_intpte(l3e), pfn);
     if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
         return;
 
@@ -100,7 +102,8 @@ void show_page_walk(unsigned long addr)
     l2e = l2t[l2_table_offset(addr)];
     mfn = l2e_get_pfn(l2e);
     pfn = get_gpfn_from_mfn(mfn);
-    printk("   L2 = %"PRIpte" %016lx %s\n", l2e_get_intpte(l2e), pfn,
+    printk(" L2[0x%03lx] = %"PRIpte" %016lx %s\n",
+           l2_table_offset(addr), l2e_get_intpte(l2e), pfn,
            (l2e_get_flags(l2e) & _PAGE_PSE) ? "(PSE)" : "");
     if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) ||
          (l2e_get_flags(l2e) & _PAGE_PSE) )
@@ -110,7 +113,8 @@ void show_page_walk(unsigned long addr)
     l1e = l1t[l1_table_offset(addr)];
     mfn = l1e_get_pfn(l1e);
     pfn = get_gpfn_from_mfn(mfn);
-    printk("    L1 = %"PRIpte" %016lx\n", l1e_get_intpte(l1e), pfn);
+    printk(" L1[0x%03lx] = %"PRIpte" %016lx\n",
+           l1_table_offset(addr), l1e_get_intpte(l1e), pfn);
 }
 
 asmlinkage void double_fault(void);
@@ -162,7 +166,7 @@ void toggle_guest_mode(struct vcpu *v)
 {
     v->arch.flags ^= TF_kernel_mode;
     __asm__ __volatile__ ( "swapgs" );
-    update_pagetables(v);
+    update_cr3(v);
     write_ptbase(v);
 }
 
@@ -242,7 +246,7 @@ void __init percpu_traps_init(void)
 
     /* Skip the NMI and DF stacks. */
     stack = &stack[2048];
-    wrmsr(MSR_LSTAR, (unsigned long)stack, ((unsigned long)stack>>32)); 
+    wrmsr(MSR_LSTAR, (unsigned long)stack, ((unsigned long)stack>>32));
 
     /* movq %rsp, saversp(%rip) */
     stack[0] = 0x48;
@@ -274,7 +278,7 @@ void __init percpu_traps_init(void)
 
     /* Skip the long-mode entry trampoline. */
     stack = &stack[26];
-    wrmsr(MSR_CSTAR, (unsigned long)stack, ((unsigned long)stack>>32)); 
+    wrmsr(MSR_CSTAR, (unsigned long)stack, ((unsigned long)stack>>32));
 
     /* movq %rsp, saversp(%rip) */
     stack[0] = 0x48;

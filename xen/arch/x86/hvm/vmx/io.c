@@ -38,57 +38,6 @@
 #include <asm/hvm/vlapic.h>
 #include <public/hvm/ioreq.h>
 
-#define BSP_CPU(v)    (!(v->vcpu_id))
-
-static inline 
-void __set_tsc_offset(u64  offset)
-{
-    __vmwrite(TSC_OFFSET, offset);
-#if defined (__i386__)
-    __vmwrite(TSC_OFFSET_HIGH, offset >> 32);
-#endif
-}
-
-void set_guest_time(struct vcpu *v, u64 gtime)
-{
-    u64    host_tsc;
-   
-    rdtscll(host_tsc);
-    
-    v->arch.hvm_vcpu.cache_tsc_offset = gtime - host_tsc;
-    __set_tsc_offset(v->arch.hvm_vcpu.cache_tsc_offset);
-}
-
-static inline void
-interrupt_post_injection(struct vcpu * v, int vector, int type)
-{
-    struct periodic_time *pt = &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
-
-    if ( is_pit_irq(v, vector, type) ) {
-        if ( !pt->first_injected ) {
-            pt->pending_intr_nr = 0;
-            pt->last_plt_gtime = hvm_get_guest_time(v);
-            pt->scheduled = NOW() + pt->period;
-            set_timer(&pt->timer, pt->scheduled);
-            pt->first_injected = 1;
-        } else {
-            pt->pending_intr_nr--;
-            pt->last_plt_gtime += pt->period_cycles;
-            set_guest_time(v, pt->last_plt_gtime);
-            pit_time_fired(v, pt->priv);
-        }
-    }
-
-    switch(type)
-    {
-    case APIC_DM_EXTINT:
-        break;
-
-    default:
-        vlapic_post_injection(v, vector, type);
-        break;
-    }
-}
 
 static inline void
 enable_irq_window(struct vcpu *v)
@@ -142,6 +91,7 @@ asmlinkage void vmx_intr_assist(void)
     struct hvm_domain *plat=&v->domain->arch.hvm_domain;
     struct periodic_time *pt = &plat->pl_time.periodic_tm;
     struct hvm_virpic *pic= &plat->vpic;
+    int callback_irq;
     unsigned int idtv_info_field;
     unsigned long inst_len;
     int    has_ext_irq;
@@ -152,6 +102,15 @@ asmlinkage void vmx_intr_assist(void)
     if ( (v->vcpu_id == 0) && pt->enabled && pt->pending_intr_nr ) {
         pic_set_irq(pic, pt->irq, 0);
         pic_set_irq(pic, pt->irq, 1);
+    }
+
+    callback_irq = v->domain->arch.hvm_domain.params[HVM_PARAM_CALLBACK_IRQ];
+    if ( callback_irq != 0 &&
+         local_events_need_delivery() ) {
+        /*inject para-device call back irq*/
+        v->vcpu_info->evtchn_upcall_mask = 1;
+        pic_set_irq(pic, callback_irq, 0);
+        pic_set_irq(pic, callback_irq, 1);
     }
 
     has_ext_irq = cpu_has_pending_irq(v);
@@ -184,7 +143,8 @@ asmlinkage void vmx_intr_assist(void)
 
     if (likely(!has_ext_irq)) return;
 
-    if (unlikely(is_interruptibility_state())) {    /* pre-cleared for emulated instruction */
+    if (unlikely(is_interruptibility_state())) {    
+        /* pre-cleared for emulated instruction */
         enable_irq_window(v);
         HVM_DBG_LOG(DBG_LEVEL_1, "interruptibility");
         return;
@@ -196,7 +156,7 @@ asmlinkage void vmx_intr_assist(void)
         return;
     }
 
-    highest_vector = cpu_get_interrupt(v, &intr_type); 
+    highest_vector = cpu_get_interrupt(v, &intr_type);
     switch (intr_type) {
     case APIC_DM_EXTINT:
     case APIC_DM_FIXED:
@@ -214,37 +174,9 @@ asmlinkage void vmx_intr_assist(void)
         BUG();
         break;
     }
-
-    interrupt_post_injection(v, highest_vector, intr_type);
+    
+    hvm_interrupt_post(v, highest_vector, intr_type);
     return;
-}
-
-void vmx_do_resume(struct vcpu *v)
-{
-    ioreq_t *p;
-    struct periodic_time *pt = &v->domain->arch.hvm_domain.pl_time.periodic_tm;
-
-    vmx_stts();
-
-    /* pick up the elapsed PIT ticks and re-enable pit_timer */
-    if ( pt->enabled && pt->first_injected ) {
-        if ( v->arch.hvm_vcpu.guest_time ) {
-            set_guest_time(v, v->arch.hvm_vcpu.guest_time);
-            v->arch.hvm_vcpu.guest_time = 0;
-        }
-        pickup_deactive_ticks(pt);
-    }
-
-    p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;
-    wait_on_xen_event_channel(v->arch.hvm.xen_port,
-                              p->state != STATE_IOREQ_READY &&
-                              p->state != STATE_IOREQ_INPROCESS);
-    if ( p->state == STATE_IORESP_READY )
-        hvm_io_assist(v);
-    if ( p->state != STATE_INVALID ) {
-        printf("Weird HVM iorequest state %d.\n", p->state);
-        domain_crash(v->domain);
-    }
 }
 
 /*

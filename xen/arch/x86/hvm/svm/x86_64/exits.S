@@ -52,8 +52,8 @@
  * (2/1)  u32 entry_vector;
  * (1/1)  u32 error_code;
  */
-#define HVM_MONITOR_RFLAGS	0x202 /* IF on */
-#define NR_SKIPPED_REGS	6	/* See the above explanation */
+#define HVM_MONITOR_RFLAGS 0x202 /* IF on */
+#define NR_SKIPPED_REGS    6     /* See the above explanation */
 #define HVM_SAVE_ALL_NOSEGREGS \
         pushq $HVM_MONITOR_RFLAGS; \
         popfq; \
@@ -105,7 +105,9 @@ ENTRY(svm_asm_do_launch)
         movq VCPU_svm_vmcb(%rbx), %rcx
         movq UREGS_rax(%rsp), %rax
         movq %rax, VMCB_rax(%rcx)
-        movq VCPU_svm_hsa_pa(%rbx), %rax
+        leaq root_vmcb_pa(%rip), %rax
+        movl VCPU_processor(%rbx), %ecx
+        movq (%rax,%rcx,8), %rax
         VMSAVE
 
         movq VCPU_svm_vmcb_pa(%rbx), %rax
@@ -133,26 +135,27 @@ ENTRY(svm_asm_do_launch)
         VMLOAD
         VMRUN
         VMSAVE
-        /* rax is the only register we're allowed to touch here... */
+        HVM_SAVE_ALL_NOSEGREGS
 
-        GET_CURRENT(%rax)
-        movq VCPU_svm_hsa_pa(%rax), %rax
+        GET_CURRENT(%rbx)
+        leaq root_vmcb_pa(%rip), %rax
+        movl VCPU_processor(%rbx), %ecx
+        movq (%rax,%rcx,8), %rax
         VMLOAD
 
-        HVM_SAVE_ALL_NOSEGREGS
         STGI
         call svm_vmexit_handler
         jmp  svm_asm_do_resume
 
 ENTRY(svm_asm_do_resume)
 svm_test_all_events:
-	GET_CURRENT(%rbx)
+        GET_CURRENT(%rbx)
         movq %rbx, %rdi
-        call svm_do_resume
+        call hvm_do_resume
 /*test_all_events:*/
         cli                             # tests must not race interrupts
 /*test_softirqs:*/
-	movl  VCPU_processor(%rbx),%eax
+        movl  VCPU_processor(%rbx),%eax
         shl   $IRQSTAT_shift, %rax
         leaq  irq_stat(%rip), %rdx
         testl $~0, (%rdx, %rax, 1)

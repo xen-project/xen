@@ -19,7 +19,7 @@ static void __init init_transmeta(struct cpuinfo_x86 *c)
 	max = cpuid_eax(0x80860000);
 	cpu_rev = 0;
 	if ( max >= 0x80860001 ) {
-		cpuid(0x80860001, &dummy, &cpu_rev, &cpu_freq, &cpu_flags); 
+		cpuid(0x80860001, &dummy, &cpu_rev, &cpu_freq, &cpu_flags);
 		if (cpu_rev != 0x02000000) {
 			printk(KERN_INFO "CPU: Processor revision %u.%u.%u.%u, %u MHz\n",
 				(cpu_rev >> 24) & 0xff,

@@ -46,6 +46,7 @@
 #include <xen/interface/grant_table.h>
 #include <xen/gnttab.h>
 #include <asm/hypervisor.h>
+#include <asm/maddr.h>
 
 #define BLKIF_STATE_DISCONNECTED 0
 #define BLKIF_STATE_CONNECTED    1
@@ -255,10 +256,10 @@ static void backend_changed(struct xenbus_device *dev,
 	DPRINTK("blkfront:backend_changed.\n");
 
 	switch (backend_state) {
-	case XenbusStateUnknown:
 	case XenbusStateInitialising:
 	case XenbusStateInitWait:
 	case XenbusStateInitialised:
+	case XenbusStateUnknown:
 	case XenbusStateClosed:
 		break;
 

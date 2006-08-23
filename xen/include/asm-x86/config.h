@@ -31,6 +31,8 @@
 #define CONFIG_ACPI 1
 #define CONFIG_ACPI_BOOT 1
 
+#define CONFIG_VGA 1
+
 #define HZ 100
 
 #define OPT_CONSOLE_STR "com1,vga"
@@ -79,9 +81,14 @@
 
 #ifndef __ASSEMBLY__
 extern unsigned long _end; /* standard ELF symbol */
-#endif /* __ASSEMBLY__ */
 
-#define FORCE_CRASH() __asm__ __volatile__ ( "ud2" )
+static inline void FORCE_CRASH(void) __attribute__((noreturn,always_inline)); 
+static inline void FORCE_CRASH(void) 
+{
+    __asm__ __volatile__ ( "ud2" );
+    while(1);
+}
+#endif /* __ASSEMBLY__ */
 
 #if defined(__x86_64__)
 
@@ -149,9 +156,14 @@ extern unsigned long _end; /* standard ELF symbol */
 /* Slot 256: read-only guest-accessible machine-to-phys translation table. */
 #define RO_MPT_VIRT_START       (PML4_ADDR(256))
 #define RO_MPT_VIRT_END         (RO_MPT_VIRT_START + PML4_ENTRY_BYTES/2)
+
+// current unused?
+#if 0
 /* Slot 257: read-only guest-accessible linear page table. */
 #define RO_LINEAR_PT_VIRT_START (PML4_ADDR(257))
 #define RO_LINEAR_PT_VIRT_END   (RO_LINEAR_PT_VIRT_START + PML4_ENTRY_BYTES)
+#endif
+
 /* Slot 258: linear page table (guest table). */
 #define LINEAR_PT_VIRT_START    (PML4_ADDR(258))
 #define LINEAR_PT_VIRT_END      (LINEAR_PT_VIRT_START + PML4_ENTRY_BYTES)
@@ -175,7 +187,7 @@ extern unsigned long _end; /* standard ELF symbol */
 #define DIRECTMAP_VIRT_START    (PML4_ADDR(262))
 #define DIRECTMAP_VIRT_END      (DIRECTMAP_VIRT_START + PML4_ENTRY_BYTES*2)
 
-#define PGT_base_page_table PGT_l4_page_table
+#define PGT_base_page_table     PGT_l4_page_table
 
 #define __HYPERVISOR_CS64 0xe010
 #define __HYPERVISOR_CS32 0xe008
@@ -274,9 +286,9 @@ extern unsigned long _end; /* standard ELF symbol */
     (L2_PAGETABLE_LAST_XEN_SLOT - L2_PAGETABLE_FIRST_XEN_SLOT + 1)
 
 #ifdef CONFIG_X86_PAE
-# define PGT_base_page_table PGT_l3_page_table
+# define PGT_base_page_table     PGT_l3_page_table
 #else
-# define PGT_base_page_table PGT_l2_page_table
+# define PGT_base_page_table     PGT_l2_page_table
 #endif
 
 #define __HYPERVISOR_CS 0xe008

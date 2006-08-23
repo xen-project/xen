@@ -41,7 +41,7 @@ static __init int probe_bigsmp(void)
 		dmi_bigsmp = 1;
 	else
 		dmi_check_system(bigsmp_dmi_table);
-	return dmi_bigsmp; 
+	return dmi_bigsmp;
 } 
 
 struct genapic apic_bigsmp = {

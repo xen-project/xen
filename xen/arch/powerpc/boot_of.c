@@ -13,7 +13,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005
+ * Copyright (C) IBM Corp. 2005, 2006
  *
  * Authors: Jimi Xenidis <jimix@watson.ibm.com>
  */
@@ -36,6 +36,10 @@ static ulong of_msr;
 static int of_out;
 static ofdn_t boot_cpu;
 static char bootargs[256];
+
+#define COMMAND_LINE_SIZE 512
+static char builtin_cmdline[COMMAND_LINE_SIZE]
+    __attribute__((section("__builtin_cmdline"))) = CMDLINE;
 
 extern struct ns16550_defaults ns16550;
 
@@ -300,12 +304,11 @@ static int __init of_instance_to_path(int ih, char *buffer, u32 buflen)
 
 static int __init of_start_cpu(int cpu, u32 pc, u32 reg)
 {
-    int rets[1] = { OF_FAILURE };
+    int ret;
 
-    if ( of_call("start-cpu", 3, 0, rets, cpu, pc, reg) == OF_FAILURE )
-        return OF_FAILURE;
+    ret = of_call("start-cpu", 3, 0, NULL, cpu, pc, reg);
 
-    return rets[0];
+    return ret;
 }
 
 static void __init of_test(const char *of_method_name)
@@ -449,8 +452,8 @@ static void boot_of_bootargs(multiboot_info_t *mbi)
     int rc;
 
     rc = of_getprop(bof_chosen, "bootargs", &bootargs, sizeof (bootargs));
-    if (rc == OF_FAILURE) {
-        strcpy(bootargs, "xen");
+    if (rc == OF_FAILURE || bootargs[0] == '\0') {
+        strlcpy(bootargs, builtin_cmdline, sizeof(bootargs));
     }
 
     mbi->flags |= MBI_CMDLINE;
@@ -756,19 +759,30 @@ static int __init boot_of_serial(void *oftree)
     if (n == OF_FAILURE) {
         of_panic("instance-to-package of /chosen/stdout: failed\n");
     }
-
-    /* prune this from the oftree */
-    rc = of_package_to_path(n, buf, sizeof(buf));
-    if (rc == OF_FAILURE) {
-        of_panic("package-to-path of /chosen/stdout: failed\n");
-    }
-    of_printf("Pruning from devtree: %s\n"
-              "  since Xen will be using it for console\n", buf);
-    rc = ofd_prune_path(oftree, buf);
-    if (rc < 0) {
-        of_panic("prune path \"%s\" failed\n", buf);
-    }
     
+    /* Prune all serial devices from the device tree, including the
+     * one pointed to by /chosen/stdout, because a guest domain can
+     * initialize them and in so doing corrupt our console output.
+     */
+    for (p = n; p > 0; p = of_getpeer(p)) {
+        char type[32];
+
+        rc = of_package_to_path(p, buf, sizeof(buf));
+        if (rc == OF_FAILURE)
+            of_panic("package-to-path failed\n");
+
+        rc = of_getprop(p, "device_type", type, sizeof (type));
+        if (rc == OF_FAILURE)
+            of_panic("fetching device type failed\n");
+
+        if (strcmp(type, "serial") != 0)
+            continue;
+
+        of_printf("pruning `%s' from devtree\n", buf);
+        rc = ofd_prune_path(oftree, buf);
+        if (rc < 0)
+            of_panic("prune of `%s' failed\n", buf);
+    }
 
     p = of_getparent(n);
     if (p == OF_FAILURE) {
@@ -795,7 +809,6 @@ static int __init boot_of_serial(void *oftree)
     if (rc == OF_FAILURE) {
         of_panic("%s: no location for serial port\n", __func__);
     }
-    ns16550.io_base = val[1];
 
     ns16550.baud = BAUD_AUTO;
     ns16550.data_bits = 8;

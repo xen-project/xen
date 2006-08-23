@@ -49,7 +49,7 @@ obj-y += elf32.o
 PPC_C_WARNINGS += -Wundef -Wmissing-prototypes -Wmissing-declarations
 CFLAGS += $(PPC_C_WARNINGS)
 
-LINK=0x3000000
+LINK=0x400000
 boot32_link_base = $(LINK)
 xen_link_offset  = 100
 xen_link_base    = $(patsubst %000,%$(xen_link_offset),$(LINK))
@@ -82,6 +82,11 @@ irq.o: ../x86/irq.c
 physdev.o: ../x86/physdev.c
 
 HDRS += $(wildcard *.h)
+
+# The first token in the arguments will be silently dropped.
+IMAGENAME = xen
+CMDLINE = ""
+boot_of.o: CFLAGS += -DCMDLINE="\"$(IMAGENAME) $(CMDLINE)\""
 
 start.o: boot/start.S
 	$(CC) $(CFLAGS) -D__ASSEMBLY__ -c $< -o $@

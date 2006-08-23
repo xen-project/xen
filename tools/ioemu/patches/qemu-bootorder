@@ -1,0 +1,166 @@
+Index: ioemu/vl.c
+===================================================================
+--- ioemu.orig/vl.c	2006-08-20 22:22:36.000000000 +0100
++++ ioemu/vl.c	2006-08-20 23:22:25.000000000 +0100
+@@ -124,7 +124,7 @@
+ int vncunused;
+ const char* keyboard_layout = NULL;
+ int64_t ticks_per_sec;
+-int boot_device = 'c';
++char *boot_device = NULL;
+ uint64_t ram_size;
+ int pit_min_timer_count = 0;
+ int nb_nics;
+@@ -6057,14 +6057,14 @@
+                 break;
+ #endif /* !CONFIG_DM */
+             case QEMU_OPTION_boot:
+-                boot_device = optarg[0];
+-                if (boot_device != 'a' && 
++                boot_device = strdup(optarg);
++                if (strspn(boot_device, "acd"
+ #ifdef TARGET_SPARC
+-		    // Network boot
+-		    boot_device != 'n' &&
++                           "n"
+ #endif
+-                    boot_device != 'c' && boot_device != 'd') {
+-                    fprintf(stderr, "qemu: invalid boot device '%c'\n", boot_device);
++                        ) != strlen(boot_device)) {
++                    fprintf(stderr, "qemu: invalid boot device in '%s'\n",
++                            boot_device);
+                     exit(1);
+                 }
+                 break;
+@@ -6328,6 +6328,7 @@
+         fd_filename[0] == '\0')
+         help();
+     
++#if 0
+     /* boot to cd by default if no hard disk */
+     if (hd_filename[0] == '\0' && boot_device == 'c') {
+         if (fd_filename[0] != '\0')
+@@ -6335,6 +6336,7 @@
+         else
+             boot_device = 'd';
+     }
++#endif
+ #endif /* !CONFIG_DM */
+ 
+     setvbuf(stdout, NULL, _IOLBF, 0);
+@@ -6593,6 +6595,7 @@
+                   ds, fd_filename, snapshot,
+                   kernel_filename, kernel_cmdline, initrd_filename,
+                   timeoffset);
++    free(boot_device);
+ 
+     /* init USB devices */
+     if (usb_enabled) {
+Index: ioemu/vl.h
+===================================================================
+--- ioemu.orig/vl.h	2006-08-20 22:22:36.000000000 +0100
++++ ioemu/vl.h	2006-08-20 23:22:25.000000000 +0100
+@@ -575,7 +575,7 @@
+ #ifndef QEMU_TOOL
+ 
+ typedef void QEMUMachineInitFunc(uint64_t ram_size, int vga_ram_size, 
+-                                 int boot_device,
++                                 char *boot_device,
+              DisplayState *ds, const char **fd_filename, int snapshot,
+              const char *kernel_filename, const char *kernel_cmdline,
+              const char *initrd_filename, time_t timeoffset);
+@@ -1020,7 +1020,7 @@
+                     uint32_t start, uint32_t count);
+ int PPC_NVRAM_set_params (m48t59_t *nvram, uint16_t NVRAM_size,
+                           const unsigned char *arch,
+-                          uint32_t RAM_size, int boot_device,
++                          uint32_t RAM_size, char *boot_device,
+                           uint32_t kernel_image, uint32_t kernel_size,
+                           const char *cmdline,
+                           uint32_t initrd_image, uint32_t initrd_size,
+Index: ioemu/hw/pc.c
+===================================================================
+--- ioemu.orig/hw/pc.c	2006-08-20 22:22:36.000000000 +0100
++++ ioemu/hw/pc.c	2006-08-20 23:27:55.000000000 +0100
+@@ -158,8 +158,23 @@
+     rtc_set_memory(s, info_ofs + 8, sectors);
+ }
+ 
++static int get_bios_disk(char *boot_device, int index) {
++
++    if (index < strlen(boot_device)) {
++        switch (boot_device[index]) {
++        case 'a':
++            return 0x01;            /* floppy */
++        case 'c':
++            return 0x02;            /* hard drive */
++        case 'd':
++            return 0x03;            /* cdrom */
++        }
++    }
++    return 0x00;                /* no device */
++}
++
+ /* hd_table must contain 4 block drivers */
+-static void cmos_init(uint64_t ram_size, int boot_device, BlockDriverState **hd_table, time_t timeoffset)
++static void cmos_init(uint64_t ram_size, char *boot_device, BlockDriverState **hd_table, time_t timeoffset)
+ {
+     RTCState *s = rtc_state;
+     int val;
+@@ -205,21 +220,14 @@
+     rtc_set_memory(s, 0x34, val);
+     rtc_set_memory(s, 0x35, val >> 8);
+     
+-    switch(boot_device) {
+-    case 'a':
+-    case 'b':
+-        rtc_set_memory(s, 0x3d, 0x01); /* floppy boot */
+-        if (!fd_bootchk)
+-            rtc_set_memory(s, 0x38, 0x01); /* disable signature check */
+-        break;
+-    default:
+-    case 'c':
+-        rtc_set_memory(s, 0x3d, 0x02); /* hard drive boot */
+-        break;
+-    case 'd':
+-        rtc_set_memory(s, 0x3d, 0x03); /* CD-ROM boot */
+-        break;
+-    }
++    if (boot_device == NULL) {
++        /* default to hd, then cd, then floppy. */
++        boot_device = "cda";
++    }
++    rtc_set_memory(s, 0x3d, get_bios_disk(boot_device, 0) |
++                   (get_bios_disk(boot_device, 1) << 4));
++    rtc_set_memory(s, 0x38, (get_bios_disk(boot_device, 2) << 4) |
++                   (!fd_bootchk ? 0x01 : 0x00));
+ 
+     /* floppy type */
+ 
+@@ -617,7 +625,7 @@
+ #define NOBIOS 1
+ 
+ /* PC hardware initialisation */
+-static void pc_init1(uint64_t ram_size, int vga_ram_size, int boot_device,
++static void pc_init1(uint64_t ram_size, int vga_ram_size, char *boot_device,
+                      DisplayState *ds, const char **fd_filename, int snapshot,
+                      const char *kernel_filename, const char *kernel_cmdline,
+                      const char *initrd_filename, time_t timeoffset,
+@@ -919,7 +927,7 @@
+     }
+ }
+ 
+-static void pc_init_pci(uint64_t ram_size, int vga_ram_size, int boot_device,
++static void pc_init_pci(uint64_t ram_size, int vga_ram_size, char *boot_device,
+                         DisplayState *ds, const char **fd_filename, 
+                         int snapshot, 
+                         const char *kernel_filename, 
+@@ -933,7 +941,7 @@
+              initrd_filename, timeoffset, 1);
+ }
+ 
+-static void pc_init_isa(uint64_t ram_size, int vga_ram_size, int boot_device,
++static void pc_init_isa(uint64_t ram_size, int vga_ram_size, char *boot_device,
+                         DisplayState *ds, const char **fd_filename, 
+                         int snapshot, 
+                         const char *kernel_filename, 

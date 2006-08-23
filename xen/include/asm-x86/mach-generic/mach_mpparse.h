@@ -12,7 +12,7 @@ static inline void mpc_oem_pci_bus(struct mpc_config_bus *m,
 {
 }
 
-int mps_oem_check(struct mp_config_table *mpc, char *oem, char *productid); 
-int acpi_madt_oem_check(char *oem_id, char *oem_table_id); 
+int mps_oem_check(struct mp_config_table *mpc, char *oem, char *productid);
+int acpi_madt_oem_check(char *oem_id, char *oem_table_id);
 
 #endif

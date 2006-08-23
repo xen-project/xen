@@ -51,7 +51,7 @@
  * (2/1)  u32 entry_vector;
  * (1/1)  u32 error_code;
  */
-#define NR_SKIPPED_REGS	6	/* See the above explanation */
+#define NR_SKIPPED_REGS 6 /* See the above explanation */
 #define HVM_SAVE_ALL_NOSEGREGS                  \
         subq $(NR_SKIPPED_REGS*8), %rsp;        \
         pushq %rdi;                             \
@@ -106,7 +106,7 @@ vmx_process_softirqs:
 ENTRY(vmx_asm_do_vmentry)
         GET_CURRENT(%rbx)
         movq %rbx, %rdi
-        call vmx_do_resume
+        call hvm_do_resume
         cli                             # tests must not race interrupts
 
         movl  VCPU_processor(%rbx),%eax

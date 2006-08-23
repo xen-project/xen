@@ -22,6 +22,7 @@ An enhanced XML-RPC client/server interface for Python.
 
 import string
 import types
+import fcntl
 
 from httplib import HTTPConnection, HTTP
 from xmlrpclib import Transport
@@ -136,6 +137,17 @@ class TCPXMLRPCServer(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
                  logRequests=1):
         SimpleXMLRPCServer.__init__(self, addr, requestHandler, logRequests)
 
+        flags = fcntl.fcntl(self.fileno(), fcntl.F_GETFD)
+        flags |= fcntl.FD_CLOEXEC
+        fcntl.fcntl(self.fileno(), fcntl.F_SETFD, flags)
+
+    def get_request(self):
+        (client, addr) = SimpleXMLRPCServer.get_request(self)
+        flags = fcntl.fcntl(client.fileno(), fcntl.F_GETFD)
+        flags |= fcntl.FD_CLOEXEC
+        fcntl.fcntl(client.fileno(), fcntl.F_SETFD, flags)
+        return (client, addr)
+                                                                                
     def _marshaled_dispatch(self, data, dispatch_method = None):
         params, method = xmlrpclib.loads(data)
         if False:

@@ -26,7 +26,7 @@
 
 #include <asm/vtm.h>
 #include <asm/vmx_platform.h>
-#include <public/arch-ia64.h>
+#include <public/xen.h>
 
 #define VPD_SHIFT	17	/* 128K requirement */
 #define VPD_SIZE	(1 << VPD_SHIFT)

@@ -46,7 +46,7 @@ struct ste_binary_policy {
     u32 max_ssidrefs;
     domaintype_t *ssidrefs;     /* [max_ssidrefs][max_types]  */
     atomic_t ec_eval_count, gt_eval_count;
-    atomic_t ec_denied_count, gt_denied_count; 
+    atomic_t ec_denied_count, gt_denied_count;
     atomic_t ec_cachehit_count, gt_cachehit_count;
 };
 

@@ -376,7 +376,7 @@ extern struct domain *domain_list;
  /* VCPU is paused by the hypervisor? */
 #define _VCPUF_paused          11
 #define VCPUF_paused           (1UL<<_VCPUF_paused)
- /* VCPU is blocked awaiting an event to be consumed by Xen. */
+/* VCPU is blocked awaiting an event to be consumed by Xen. */
 #define _VCPUF_blocked_in_xen  12
 #define VCPUF_blocked_in_xen   (1UL<<_VCPUF_blocked_in_xen)
 

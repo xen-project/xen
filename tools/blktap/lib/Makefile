@@ -61,7 +61,7 @@ libblktap.a: $(OBJS)
 	      -o libblktap.so.$(MAJOR).$(MINOR) $^ $(LIBS)
 	ln -sf libblktap.so.$(MAJOR).$(MINOR) libblktap.so.$(MAJOR)
 	ln -sf libblktap.so.$(MAJOR) libblktap.so
-	ar rc $@ libblktap.so
+	$(AR) rc $@ libblktap.so
 
 .PHONY: TAGS all build clean install libblktap
 

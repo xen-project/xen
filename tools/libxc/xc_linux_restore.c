@@ -690,8 +690,9 @@ int xc_linux_restore(int xc_handle, int io_fd,
     start_info->flags       = 0;
     *store_mfn = start_info->store_mfn       = p2m[start_info->store_mfn];
     start_info->store_evtchn                 = store_evtchn;
-    *console_mfn = start_info->console_mfn   = p2m[start_info->console_mfn];
-    start_info->console_evtchn               = console_evtchn;
+    start_info->console.domU.mfn    = p2m[start_info->console.domU.mfn];
+    start_info->console.domU.evtchn = console_evtchn;
+    *console_mfn                    = start_info->console.domU.mfn;
     munmap(start_info, PAGE_SIZE);
 
     /* Uncanonicalise each GDT frame number. */
@@ -737,7 +738,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
     /* Copy saved contents of shared-info page. No checking needed. */
     page = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_WRITE, shared_info_frame);
-    memcpy(page, shared_info, sizeof(shared_info_t));
+    memcpy(page, shared_info, PAGE_SIZE);
     munmap(page, PAGE_SIZE);
 
     /* Uncanonicalise the pfn-to-mfn table frame-number list. */

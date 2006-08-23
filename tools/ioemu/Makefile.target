@@ -359,6 +359,7 @@ VL_OBJS+= cirrus_vga.o mixeng.o parallel.o acpi.o piix_pci.o
 VL_OBJS+= usb-uhci.o
 VL_OBJS+= piix4acpi.o
 VL_OBJS+= xenstore.o
+VL_OBJS+= xen_platform.o
 DEFINES += -DHAS_AUDIO
 endif
 ifeq ($(TARGET_BASE_ARCH), ppc)

@@ -31,8 +31,6 @@ LOADADDR = 0x100000
 DEFINES  =-DDEBUG
 XENINC   =-I$(XEN_ROOT)/tools/libxc
 
-OBJECTS	 = hvmloader.o acpi_madt.o 
-
 # Disable PIE/SSP if GCC supports them. They can break us.
 CFLAGS  += $(call test-gcc-flag,$(CC),-nopie)
 CFLAGS  += $(call test-gcc-flag,$(CC),-fno-stack-protector)
@@ -42,7 +40,7 @@ OBJCOPY  = objcopy
 CFLAGS  += $(DEFINES) -I. $(XENINC) -fno-builtin -O2 -msoft-float
 LDFLAGS  = -m32 -nostdlib -Wl,-N -Wl,-Ttext -Wl,$(LOADADDR)
 
-SRCS = hvmloader.c acpi_madt.c mp_tables.c util.c
+SRCS = hvmloader.c acpi_madt.c mp_tables.c util.c smbios.c
 OBJS = $(patsubst %.c,%.o,$(SRCS))
 
 .PHONY: all
@@ -54,7 +52,7 @@ hvmloader: roms.h $(SRCS)
 	$(OBJCOPY) hvmloader.tmp hvmloader
 	rm -f hvmloader.tmp
 
-roms.h:	../rombios/BIOS-bochs-latest ../vgabios/VGABIOS-lgpl-latest.bin ../vgabios/VGABIOS-lgpl-latest.cirrus.bin ../vmxassist/vmxassist.bin
+roms.h:	../rombios/BIOS-bochs-latest ../vgabios/VGABIOS-lgpl-latest.bin ../vgabios/VGABIOS-lgpl-latest.cirrus.bin ../vmxassist/vmxassist.bin ../acpi/acpi.bin
 	sh ./mkhex rombios ../rombios/BIOS-bochs-latest > roms.h
 	sh ./mkhex vgabios_stdvga ../vgabios/VGABIOS-lgpl-latest.bin >> roms.h
 	sh ./mkhex vgabios_cirrusvga ../vgabios/VGABIOS-lgpl-latest.cirrus.bin >> roms.h
@@ -64,5 +62,5 @@ roms.h:	../rombios/BIOS-bochs-latest ../vgabios/VGABIOS-lgpl-latest.bin ../vgabi
 .PHONY: clean
 clean:
 	rm -f roms.h acpi.h
-	rm -f hvmloader hvmloader.tmp hvmloader.o $(OBJECTS)
+	rm -f hvmloader hvmloader.tmp hvmloader.o $(OBJS)
 

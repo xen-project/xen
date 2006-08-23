@@ -6,7 +6,7 @@
 #include <asm/vmx_vpd.h>
 #include <asm/vmmu.h>
 #include <asm/regionreg.h>
-#include <public/arch-ia64.h>
+#include <public/xen.h>
 #include <asm/vmx_platform.h>
 #include <xen/list.h>
 #include <xen/cpumask.h>

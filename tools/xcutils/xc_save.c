@@ -13,8 +13,8 @@
 #include <string.h>
 #include <stdio.h>
 
+#include <xenctrl.h>
 #include <xenguest.h>
-
 
 /**
  * Issue a suspend request through stdout, and receive the acknowledgement
@@ -36,16 +36,24 @@ int
 main(int argc, char **argv)
 {
     unsigned int xc_fd, io_fd, domid, maxit, max_f, flags; 
+    int ret;
 
-    if (argc != 7)
-	errx(1, "usage: %s xcfd iofd domid maxit maxf flags", argv[0]);
+    if (argc != 6)
+	errx(1, "usage: %s iofd domid maxit maxf flags", argv[0]);
 
-    xc_fd = atoi(argv[1]);
-    io_fd = atoi(argv[2]);
-    domid = atoi(argv[3]);
-    maxit = atoi(argv[4]);
-    max_f = atoi(argv[5]);
-    flags = atoi(argv[6]);
+    xc_fd = xc_interface_open();
+    if (xc_fd < 0)
+        errx(1, "failed to open control interface");
 
-    return xc_linux_save(xc_fd, io_fd, domid, maxit, max_f, flags, &suspend);
+    io_fd = atoi(argv[1]);
+    domid = atoi(argv[2]);
+    maxit = atoi(argv[3]);
+    max_f = atoi(argv[4]);
+    flags = atoi(argv[5]);
+
+    ret = xc_linux_save(xc_fd, io_fd, domid, maxit, max_f, flags, &suspend);
+
+    xc_interface_close(xc_fd);
+
+    return ret;
 }

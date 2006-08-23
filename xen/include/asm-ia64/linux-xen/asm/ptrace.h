@@ -96,7 +96,8 @@
  *
  */
 #ifdef XEN
-#include <public/arch-ia64.h>
+#include <xen/types.h>
+#include <public/xen.h>
 #define pt_regs cpu_user_regs
 
 /*  User regs at placed at the end of the vcpu area.

@@ -89,7 +89,8 @@ void show_page_walk(unsigned long addr)
     l3e = l3t[l3_table_offset(addr)];
     mfn = l3e_get_pfn(l3e);
     pfn = get_gpfn_from_mfn(mfn);
-    printk(" L3 = %"PRIpte" %08lx\n", l3e_get_intpte(l3e), pfn);
+    printk(" L3[0x%03lx] = %"PRIpte" %08lx\n",
+           l3_table_offset(addr), l3e_get_intpte(l3e), pfn);
     unmap_domain_page(l3t);
     if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
         return;
@@ -99,7 +100,8 @@ void show_page_walk(unsigned long addr)
     l2e = l2t[l2_table_offset(addr)];
     mfn = l2e_get_pfn(l2e);
     pfn = get_gpfn_from_mfn(mfn);
-    printk("  L2 = %"PRIpte" %08lx %s\n", l2e_get_intpte(l2e), pfn, 
+    printk(" L2[0x%03lx] = %"PRIpte" %08lx %s\n",
+           l2_table_offset(addr), l2e_get_intpte(l2e), pfn,
            (l2e_get_flags(l2e) & _PAGE_PSE) ? "(PSE)" : "");
     unmap_domain_page(l2t);
     if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) ||
@@ -110,7 +112,8 @@ void show_page_walk(unsigned long addr)
     l1e = l1t[l1_table_offset(addr)];
     mfn = l1e_get_pfn(l1e);
     pfn = get_gpfn_from_mfn(mfn);
-    printk("   L1 = %"PRIpte" %08lx\n", l1e_get_intpte(l1e), pfn);
+    printk(" L1[0x%03lx] = %"PRIpte" %08lx\n",
+           l1_table_offset(addr), l1e_get_intpte(l1e), pfn);
     unmap_domain_page(l1t);
 }
 

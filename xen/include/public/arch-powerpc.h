@@ -21,11 +21,6 @@
 #ifndef __XEN_PUBLIC_ARCH_PPC_64_H__
 #define __XEN_PUBLIC_ARCH_PPC_64_H__
 
-#if !(defined(__XEN__) || defined(__XEN_TOOLS__))
-/* not sure how this is supposed to get asserted */
-#define __XEN_INTERFACE_VERSION__ 0x00030202
-#endif
-
 #define __DEFINE_XEN_GUEST_HANDLE(name, type) \
     typedef struct { \
         int __pad[(sizeof (long long) - sizeof (void *)) / sizeof (int)]; \
@@ -107,6 +102,7 @@ typedef struct vcpu_guest_context vcpu_guest_context_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 
 struct arch_shared_info {
+    uint64_t pad[32];
 };
 
 struct arch_vcpu_info {

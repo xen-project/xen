@@ -73,6 +73,9 @@ unsigned long hypercall_create_continuation(unsigned int op,
 
 int arch_domain_create(struct domain *d)
 {
+    unsigned long rma_base;
+    unsigned long rma_sz;
+    uint htab_order;
 
     if (d->domain_id == IDLE_DOMAIN_ID) {
         d->shared_info = (void *)alloc_xenheap_page();
@@ -81,27 +84,44 @@ int arch_domain_create(struct domain *d)
         return 0;
     }
 
-    /* XXX the hackage... hardcode 64M domains */
-    d->arch.rma_base = (64<<20) * (d->domain_id + 1);
-    d->arch.rma_size = (64<<20);
+    d->arch.rma_order = cpu_rma_order();
+    rma_sz = rma_size(d->arch.rma_order);
 
-    printk("clearing RMO: 0x%lx[0x%lx]\n", d->arch.rma_base, d->arch.rma_size);
-    memset((void*)d->arch.rma_base, 0, d->arch.rma_size);
+    /* allocate the real mode area */
+    d->max_pages = 1UL << d->arch.rma_order;
+    d->tot_pages = 0;
+    d->arch.rma_page = alloc_domheap_pages(d, d->arch.rma_order, 0);
+    if (NULL == d->arch.rma_page)
+        return 1;
+    rma_base = page_to_maddr(d->arch.rma_page);
 
-    htab_alloc(d, LOG_DEFAULT_HTAB_BYTES);
+    BUG_ON(rma_base & (rma_sz - 1)); /* check alignment */
+
+    printk("clearing RMO: 0x%lx[0x%lx]\n", rma_base, rma_sz);
+    memset((void *)rma_base, 0, rma_sz);
 
     d->shared_info = (shared_info_t *)
-        (rma_addr(&d->arch, RMA_SHARED_INFO) + d->arch.rma_base);
+        (rma_addr(&d->arch, RMA_SHARED_INFO) + rma_base);
 
     d->arch.large_page_sizes = 1;
     d->arch.large_page_shift[0] = 24; /* 16 M for 970s */
+
+    /* FIXME: we need to the the maximum addressible memory for this
+     * domain to calculate this correctly. It should probably be set
+     * by the managment tools */
+    htab_order = d->arch.rma_order - 6; /* (1/64) */
+    if (test_bit(_DOMF_privileged, &d->domain_flags)) {
+        /* bump the htab size of privleged domains */
+        ++htab_order;
+    }
+    htab_alloc(d, htab_order);
 
     return 0;
 }
 
 void arch_domain_destroy(struct domain *d)
 {
-    unimplemented();
+    htab_free(d);
 }
 
 void machine_halt(void)
@@ -243,7 +263,7 @@ void sync_vcpu_execstate(struct vcpu *v)
 
 void domain_relinquish_resources(struct domain *d)
 {
-    /* nothing to do? */
+    free_domheap_pages(d->arch.rma_page, d->arch.rma_order);
 }
 
 void arch_dump_domain_info(struct domain *d)

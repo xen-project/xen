@@ -44,7 +44,7 @@
 #define IRQ0_SPECIAL_ROUTING 1
 
 #if defined(__ia64__)
-#define	opt_hvm_debug_level	opt_vmx_debug_level
+#define opt_hvm_debug_level opt_vmx_debug_level
 #endif
 
 static void ioapic_enable(hvm_vioapic_t *s, uint8_t enable)
@@ -79,7 +79,7 @@ static unsigned long hvm_vioapic_read_indirect(struct hvm_vioapic *s,
     switch (s->ioregsel) {
     case IOAPIC_REG_VERSION:
         result = ((((IOAPIC_NUM_PINS-1) & 0xff) << 16)
-                  | (IOAPIC_VERSION_ID & 0x0f));
+                  | (IOAPIC_VERSION_ID & 0xff));
         break;
 
 #ifndef __ia64__
@@ -89,7 +89,7 @@ static unsigned long hvm_vioapic_read_indirect(struct hvm_vioapic *s,
 
     case IOAPIC_REG_ARB_ID:
         /* XXX how arb_id used on p4? */
-        result = ((s->id & 0xf) << 24);
+        result = ((s->arb_id & 0xf) << 24);
         break;
 #endif
 
@@ -107,7 +107,7 @@ static unsigned long hvm_vioapic_read_indirect(struct hvm_vioapic *s,
                            (redir_content >> 32) & 0xffffffff :
                            redir_content & 0xffffffff;
             } else {
-                printk("upic_mem_readl:undefined ioregsel %x\n",
+                printk("apic_mem_readl:undefined ioregsel %x\n",
                         s->ioregsel);
                 domain_crash_synchronous();
             }
@@ -244,7 +244,7 @@ static int hvm_vioapic_range(struct vcpu *v, unsigned long addr)
 
     if ((s->flags & IOAPIC_ENABLE_FLAG) &&
         (addr >= s->base_address &&
-        (addr <= s->base_address + IOAPIC_MEM_LENGTH)))
+        (addr < s->base_address + IOAPIC_MEM_LENGTH)))
         return 1;
     else
         return 0;
@@ -264,7 +264,7 @@ static void hvm_vioapic_reset(hvm_vioapic_t *s)
 
     for (i = 0; i < IOAPIC_NUM_PINS; i++) {
         s->redirtbl[i].RedirForm.mask = 0x1;
-	hvm_vioapic_update_imr(s, i);
+        hvm_vioapic_update_imr(s, i);
     }
 }
 
@@ -364,7 +364,7 @@ static uint32_t ioapic_get_delivery_bitmask(hvm_vioapic_t *s,
 
     if (dest_mode == 0) { /* Physical mode */
         for (i = 0; i < s->lapic_count; i++) {
-	    if (VLAPIC_ID(s->lapic_info[i]) == dest) {
+            if (VLAPIC_ID(s->lapic_info[i]) == dest) {
                 mask = 1 << i;
                 break;
             }
@@ -427,7 +427,7 @@ static void ioapic_deliver(hvm_vioapic_t *s, int irqno)
         else
             HVM_DBG_LOG(DBG_LEVEL_IOAPIC,
               "null round robin mask %x vector %x delivery_mode %x\n",
-              deliver_bitmask, vector, deliver_bitmask);
+              deliver_bitmask, vector, dest_LowestPrio);
         break;
     }
 
@@ -568,7 +568,7 @@ static int get_redir_num(hvm_vioapic_t *s, int vector)
 
     ASSERT(s);
 
-    for(i = 0; i < IOAPIC_NUM_PINS - 1; i++) {
+    for(i = 0; i < IOAPIC_NUM_PINS; i++) {
         if (s->redirtbl[i].RedirForm.vector == vector)
             return i;
     }

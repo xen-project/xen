@@ -1090,6 +1090,9 @@ The \path{xm list} command also supports a long output format when the
 \path{-l} switch is used.  This outputs the full details of the
 running domains in \xend's SXP configuration format.
 
+If you want to know how long your domains have been running for, then 
+you can use the \verb_# xm uptime_ command.
+
 
 You can get access to the console of a particular domain using 
 the \verb_# xm console_ command  (e.g.\ \verb_# xm console myVM_). 
@@ -3126,8 +3129,8 @@ editing \path{grub.conf}.
 \item [ console=$<$specifier list$>$ ] Specify the destination for Xen
   console I/O.  This is a comma-separated list of, for example:
   \begin{description}
-  \item[ vga ] Use VGA console (only until domain 0 boots, unless {\bf
-  vga[keep] } is specified).
+  \item[ vga ] Use VGA console (until domain 0 boots, unless {\bf
+  vga=keep } is specified).
   \item[ com1 ] Use serial port com1.
   \item[ com2H ] Use serial port com2. Transmitted chars will have the
     MSB set. Received chars must have MSB set.
@@ -3138,6 +3141,12 @@ editing \path{grub.conf}.
   subsystems (e.g.\ console and debugger). Sharing is controlled by
   MSB of each transmitted/received character.  [NB. Default for this
   option is `com1,vga']
+\item [ vga=$<$options$>$ ] This is a comma-separated list of options:
+  \begin{description}
+  \item[ text-$<$mode$>$ ] Select text-mode resolution, where mode is
+  one of 80x25, 80x28, 80x30, 80x34, 80x43, 80x50, 80x60.
+  \item[ keep ] Keep the VGA console even after domain 0 boots.
+  \end{description}
 \item [ sync\_console ] Force synchronous console output. This is
   useful if you system fails unexpectedly before it has sent all
   available output to the console. In most cases Xen will

@@ -153,6 +153,12 @@ class ImageHandler:
                 mem_kb += 4*1024;
         return mem_kb
 
+    def getDomainShadowMemory(self, mem_kb):
+        """@return The minimum shadow memory required, in KiB, for a domain 
+        with mem_kb KiB of RAM."""
+        # PV domains don't need any shadow memory
+        return 0
+
     def buildDomain(self):
         """Build the domain. Define in subclass."""
         raise NotImplementedError()
@@ -251,7 +257,7 @@ class HVMImageHandler(ImageHandler):
     def parseDeviceModelArgs(self, imageConfig, deviceConfig):
         dmargs = [ 'boot', 'fda', 'fdb', 'soundhw',
                    'localtime', 'serial', 'stdvga', 'isa', 'vcpus',
-		   'acpi', 'usb', 'usbdevice']
+                   'acpi', 'usb', 'usbdevice']
         ret = []
         for a in dmargs:
             v = sxp.child_value(imageConfig, a)
@@ -305,9 +311,6 @@ class HVMImageHandler(ImageHandler):
     def configVNC(self, config):
         # Handle graphics library related options
         vnc = sxp.child_value(config, 'vnc')
-        vncdisplay = sxp.child_value(config, 'vncdisplay',
-                                     int(self.vm.getDomid()))
-        vncunused = sxp.child_value(config, 'vncunused')
         sdl = sxp.child_value(config, 'sdl')
         ret = []
         nographic = sxp.child_value(config, 'nographic')
@@ -315,9 +318,12 @@ class HVMImageHandler(ImageHandler):
             ret.append('-nographic')
             return ret
         if vnc:
+            vncdisplay = sxp.child_value(config, 'vncdisplay',
+                                         int(self.vm.getDomid()))
             ret = ret + ['-vnc', '%d' % vncdisplay, '-k', 'en-us']
-        if vncunused:
-            ret += ['-vncunused']
+            vncunused = sxp.child_value(config, 'vncunused')
+            if vncunused:
+                ret += ['-vncunused']
         return ret
 
     def createDeviceModel(self):
@@ -363,6 +369,17 @@ class HVMImageHandler(ImageHandler):
             extra_mb = (2.4/1024) * (mem_kb/1024.0) + 12;
             extra_pages = int( math.ceil( extra_mb*1024 / page_kb ))
         return mem_kb + extra_pages * page_kb
+
+    def getDomainShadowMemory(self, mem_kb):
+        """@return The minimum shadow memory required, in KiB, for a domain 
+        with mem_kb KiB of RAM."""
+        if os.uname()[4] in ('ia64', 'ppc64'):
+            # Explicit shadow memory is not a concept 
+            return 0
+        else:
+            # 1MB per vcpu plus 4Kib/Mib of RAM.  This is higher than 
+            # the minimum that Xen would allocate if no value were given.
+            return 1024 * self.vm.getVCpuCount() + mem_kb / 256
 
     def register_shutdown_watch(self):
         """ add xen store watch on control/shutdown """

@@ -34,12 +34,8 @@
 #include <asm/flushtlb.h>
 #include <xen/event.h>
 #include <xen/kernel.h>
-#include <asm/shadow.h>
 #include <xen/keyhandler.h>
-
-#if CONFIG_PAGING_LEVELS >= 3
-#include <asm/shadow_64.h>
-#endif
+#include <asm/shadow2.h>
 
 static int vmcs_size;
 static int vmcs_order;
@@ -238,7 +234,7 @@ static void vmx_set_host_env(struct vcpu *v)
 
 static void vmx_do_launch(struct vcpu *v)
 {
-/* Update CR3, GDT, LDT, TR */
+/* Update CR3, CR0, CR4, GDT, LDT, TR */
     unsigned int  error = 0;
     unsigned long cr0, cr4;
 
@@ -261,13 +257,13 @@ static void vmx_do_launch(struct vcpu *v)
 
     error |= __vmwrite(CR4_READ_SHADOW, cr4);
 
-    vmx_stts();
+    hvm_stts(v);
 
     if(hvm_apic_support(v->domain))
         vlapic_init(v);
 
     vmx_set_host_env(v);
-    init_timer(&v->arch.hvm_vmx.hlt_timer, hlt_timer_fn, v, v->processor);
+    init_timer(&v->arch.hvm_vcpu.hlt_timer, hlt_timer_fn, v, v->processor);
 
     error |= __vmwrite(GUEST_LDTR_SELECTOR, 0);
     error |= __vmwrite(GUEST_LDTR_BASE, 0);
@@ -276,13 +272,16 @@ static void vmx_do_launch(struct vcpu *v)
     error |= __vmwrite(GUEST_TR_BASE, 0);
     error |= __vmwrite(GUEST_TR_LIMIT, 0xff);
 
-    __vmwrite(GUEST_CR3, pagetable_get_paddr(v->domain->arch.phys_table));
-    __vmwrite(HOST_CR3, pagetable_get_paddr(v->arch.monitor_table));
+    shadow2_update_paging_modes(v);
+    printk("%s(): GUEST_CR3<=%08lx, HOST_CR3<=%08lx\n",
+           __func__, v->arch.hvm_vcpu.hw_cr3, v->arch.cr3);
+    __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr3);
+    __vmwrite(HOST_CR3, v->arch.cr3);
 
     v->arch.schedule_tail = arch_vmx_do_resume;
 
     /* init guest tsc to start from 0 */
-    set_guest_time(v, 0);
+    hvm_set_guest_time(v, 0);
 }
 
 /*
@@ -539,7 +538,7 @@ void arch_vmx_do_resume(struct vcpu *v)
         vmx_set_host_env(v);
     }
 
-    vmx_do_resume(v);
+    hvm_do_resume(v);
     reset_stack_and_jump(vmx_asm_do_vmentry);
 }
 
@@ -642,13 +641,11 @@ static void vmcs_dump(unsigned char ch)
     printk("**************************************\n");
 }
 
-static int __init setup_vmcs_dump(void)
+void setup_vmcs_dump(void)
 {
     register_keyhandler('v', vmcs_dump, "dump Intel's VMCS");
-    return 0;
 }
 
-__initcall(setup_vmcs_dump);
 
 /*
  * Local variables:

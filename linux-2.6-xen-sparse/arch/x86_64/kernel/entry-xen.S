@@ -271,7 +271,7 @@ sysret_careful:
 	CFI_RESTORE_STATE
 	bt $TIF_NEED_RESCHED,%edx
 	jnc sysret_signal
-        XEN_BLOCK_EVENTS(%rsi)        
+	XEN_UNBLOCK_EVENTS(%rsi)
 	pushq %rdi
 	CFI_ADJUST_CFA_OFFSET 8
 	call schedule
@@ -295,7 +295,7 @@ sysret_signal:
 1:	movl $_TIF_NEED_RESCHED,%edi
 	/* Use IRET because user could have changed frame. This
 	   works because ptregscall_common has called FIXUP_TOP_OF_STACK. */
-	cli
+	XEN_BLOCK_EVENTS(%rsi)
 	jmp int_with_check
 	
 badsys:
@@ -377,7 +377,7 @@ int_careful:
 	call schedule
 	popq %rdi
 	CFI_ADJUST_CFA_OFFSET -8
-	cli
+	XEN_BLOCK_EVENTS(%rsi)
 	jmp int_with_check
 
 	/* handle signals and tracing -- both require a full stack frame */
@@ -395,7 +395,7 @@ int_very_careful:
 	popq %rdi
 	CFI_ADJUST_CFA_OFFSET -8
 	andl $~(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT|_TIF_SINGLESTEP),%edi
-	cli
+	XEN_BLOCK_EVENTS(%rsi)
 	jmp int_restore_rest
 	
 int_signal:
@@ -407,7 +407,7 @@ int_signal:
 1:	movl $_TIF_NEED_RESCHED,%edi	
 int_restore_rest:
 	RESTORE_REST
-	cli
+	XEN_BLOCK_EVENTS(%rsi)
 	jmp int_with_check
 	CFI_ENDPROC
 		
@@ -535,8 +535,8 @@ retint_careful:
 	call  schedule
 	popq %rdi		
 	CFI_ADJUST_CFA_OFFSET	-8
-	XEN_BLOCK_EVENTS(%rsi)		
 	GET_THREAD_INFO(%rcx)
+	XEN_BLOCK_EVENTS(%rsi)		
 /*	cli */
 	jmp retint_check
 	

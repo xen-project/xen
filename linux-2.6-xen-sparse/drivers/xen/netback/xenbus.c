@@ -108,6 +108,12 @@ static int netback_probe(struct xenbus_device *dev,
 			goto abort_transaction;
 		}
 
+		err = xenbus_printf(xbt, dev->nodename, "feature-rx-copy", "%d", 1);
+		if (err) {
+			message = "writing feature-copying";
+			goto abort_transaction;
+		}
+
 		err = xenbus_transaction_end(xbt, 0);
 	} while (err == -EAGAIN);
 
@@ -228,10 +234,25 @@ static void frontend_changed(struct xenbus_device *dev,
 
 	switch (frontend_state) {
 	case XenbusStateInitialising:
+		if (dev->state == XenbusStateClosing) {
+			printk("%s: %s: prepare for reconnect\n",
+			       __FUNCTION__, dev->nodename);
+			if (be->netif) {
+				netif_disconnect(be->netif);
+				be->netif = NULL;
+			}
+			xenbus_switch_state(dev, XenbusStateInitWait);
+		}
+		break;
+
 	case XenbusStateInitialised:
 		break;
 
 	case XenbusStateConnected:
+		if (!be->netif) {
+			/* reconnect: setup be->netif */
+			backend_changed(&be->backend_watch, NULL, 0);
+		}
 		maybe_connect(be);
 		break;
 
@@ -239,14 +260,13 @@ static void frontend_changed(struct xenbus_device *dev,
 		xenbus_switch_state(dev, XenbusStateClosing);
 		break;
 
+	case XenbusStateUnknown:
 	case XenbusStateClosed:
 		if (be->netif != NULL)
 			kobject_uevent(&dev->dev.kobj, KOBJ_OFFLINE);
 		device_unregister(&dev->dev);
 		break;
 
-	case XenbusStateUnknown:
-	case XenbusStateInitWait:
 	default:
 		xenbus_dev_fatal(dev, -EINVAL, "saw state %d at frontend",
 				 frontend_state);
@@ -349,7 +369,7 @@ static int connect_rings(struct backend_info *be)
 {
 	struct xenbus_device *dev = be->dev;
 	unsigned long tx_ring_ref, rx_ring_ref;
-	unsigned int evtchn;
+	unsigned int evtchn, rx_copy;
 	int err;
 	int val;
 
@@ -365,6 +385,19 @@ static int connect_rings(struct backend_info *be)
 				 dev->otherend);
 		return err;
 	}
+
+	err = xenbus_scanf(XBT_NIL, dev->otherend, "request-rx-copy", "%u",
+			   &rx_copy);
+	if (err == -ENOENT) {
+		err = 0;
+		rx_copy = 0;
+	}
+	if (err < 0) {
+		xenbus_dev_fatal(dev, err, "reading %s/request-rx-copy",
+				 dev->otherend);
+		return err;
+	}
+	be->netif->copying_receiver = !!rx_copy;
 
 	if (xenbus_scanf(XBT_NIL, dev->otherend, "feature-rx-notify", "%d",
 			 &val) < 0)

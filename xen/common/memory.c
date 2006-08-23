@@ -17,6 +17,7 @@
 #include <xen/shadow.h>
 #include <xen/iocap.h>
 #include <xen/guest_access.h>
+#include <xen/errno.h>
 #include <asm/current.h>
 #include <asm/hardirq.h>
 #include <public/memory.h>
@@ -153,7 +154,7 @@ guest_remove_page(
     if ( unlikely(!mfn_valid(mfn)) )
     {
         DPRINTK("Domain %u page number %lx invalid\n",
-                d->domain_id, mfn);
+                d->domain_id, gmfn);
         return 0;
     }
             

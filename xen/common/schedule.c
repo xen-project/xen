@@ -27,6 +27,7 @@
 #include <xen/softirq.h>
 #include <xen/trace.h>
 #include <xen/mm.h>
+#include <xen/errno.h>
 #include <xen/guest_access.h>
 #include <public/sched.h>
 #include <public/sched_ctl.h>
@@ -632,7 +633,7 @@ void __init scheduler_init(void)
 
     open_softirq(SCHEDULE_SOFTIRQ, __enter_scheduler);
 
-    for ( i = 0; i < NR_CPUS; i++ )
+    for_each_cpu ( i )
     {
         spin_lock_init(&per_cpu(schedule_data, i).schedule_lock);
         init_timer(&per_cpu(schedule_data, i).s_timer, s_timer_fn, NULL, i);
@@ -673,7 +674,7 @@ void dump_runq(unsigned char key)
 
     printk("Scheduler: %s (%s)\n", ops.name, ops.opt_name);
     SCHED_OP(dump_settings);
-    printk("NOW=0x%08X%08X\n",  (u32)(now>>32), (u32)now); 
+    printk("NOW=0x%08X%08X\n",  (u32)(now>>32), (u32)now);
 
     for_each_online_cpu ( i )
     {

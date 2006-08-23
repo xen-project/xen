@@ -840,8 +840,7 @@ void __init xen_init_IRQ(void)
 
 #ifdef RTC_IRQ
 		/* If not domain 0, force our RTC driver to fail its probe. */
-		if ((i == RTC_IRQ) &&
-		    !(xen_start_info->flags & SIF_INITDOMAIN))
+		if ((i == RTC_IRQ) && !is_initial_xendomain())
 			continue;
 #endif
 

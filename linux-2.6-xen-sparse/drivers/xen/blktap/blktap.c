@@ -157,7 +157,7 @@ static int alloc_pending_reqs;
 typedef unsigned int PEND_RING_IDX;
 
 static inline int MASK_PEND_IDX(int i) { 
-	return (i & (MAX_PENDING_REQS-1)); 
+	return (i & (MAX_PENDING_REQS-1));
 }
 
 static inline unsigned int RTN_PEND_IDX(pending_req_t *req, int idx) {
@@ -754,7 +754,7 @@ static int req_increase(void)
 	if (!pending_reqs[mmap_alloc] || !pending_addrs[mmap_alloc]) {
 		kfree(pending_reqs[mmap_alloc]);
 		kfree(pending_addrs[mmap_alloc]);
-		WPRINTK("%s: out of memory\n", __FUNCTION__); 
+		WPRINTK("%s: out of memory\n", __FUNCTION__);
 		ret = -ENOMEM;
 		goto done;
 	}
@@ -1051,7 +1051,7 @@ static int blktap_read_ufe_ring(int idx)
 			unsigned long kvaddr, uvaddr;
 			struct page **map = info->vma->vm_private_data;
 			struct page *pg;
-			int offset; 
+			int offset;
 
 			uvaddr  = MMAP_VADDR(info->user_vstart, usr_idx, j);
 			kvaddr = MMAP_VADDR(mmap_start[mmap_idx].start, 
@@ -1063,7 +1063,7 @@ static int blktap_read_ufe_ring(int idx)
 				>> PAGE_SHIFT;
 			map[offset] = NULL;
 		}
-		fast_flush_area(pending_req, pending_idx, usr_idx, idx); 
+		fast_flush_area(pending_req, pending_idx, usr_idx, idx);
 		make_response(blkif, pending_req->id, resp->operation,
 			      resp->status);
 		info->idx_map[usr_idx] = INVALID_REQ;
@@ -1118,7 +1118,7 @@ static int do_block_io_op(blkif_t *blkif)
 			       "ring does not exist!\n");
 			print_dbug = 0; /*We only print this message once*/
 		}
-		return 1; 
+		return 1;
 	}
 
 	info = tapfds[blkif->dev_num];
@@ -1185,7 +1185,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 				 blkif_request_t *req,
 				 pending_req_t *pending_req)
 {
-	extern void ll_rw_block(int rw, int nr, struct buffer_head * bhs[]); 
+	extern void ll_rw_block(int rw, int nr, struct buffer_head * bhs[]);
 	int op, operation = (req->operation == BLKIF_OP_WRITE) ? WRITE : READ;
 	struct gnttab_map_grant_ref map[BLKIF_MAX_SEGMENTS_PER_REQUEST*2];
 	unsigned int nseg;

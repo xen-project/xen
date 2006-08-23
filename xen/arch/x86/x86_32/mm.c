@@ -75,9 +75,6 @@ void __init paging_init(void)
     printk("PAE disabled.\n");
 #endif
 
-    idle_vcpu[0]->arch.monitor_table =
-        pagetable_from_paddr(__pa(idle_pg_table));
-
     if ( cpu_has_pge )
     {
         /* Suitable Xen mapping can be GLOBAL. */
@@ -104,6 +101,7 @@ void __init paging_init(void)
             panic("Not enough memory to bootstrap Xen.\n");
         idle_pg_table_l2[l2_linear_offset(RDWR_MPT_VIRT_START) + i] =
             l2e_from_page(pg, PAGE_HYPERVISOR | _PAGE_PSE);
+        /* NB. Cannot be GLOBAL as shadow_mode_translate reuses this area. */
         idle_pg_table_l2[l2_linear_offset(RO_MPT_VIRT_START) + i] =
             l2e_from_page(pg, (__PAGE_HYPERVISOR | _PAGE_PSE) & ~_PAGE_RW);
     }
@@ -120,8 +118,12 @@ void __init paging_init(void)
         idle_pg_table_l2[l2_linear_offset(IOREMAP_VIRT_START) + i] =
             l2e_from_page(virt_to_page(ioremap_pt), __PAGE_HYPERVISOR);
     }
+}
 
-    /* Install per-domain mappings for idle domain. */
+void __init setup_idle_pagetable(void)
+{
+    int i;
+
     for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
         idle_pg_table_l2[l2_linear_offset(PERDOMAIN_VIRT_START) + i] =
             l2e_from_page(virt_to_page(idle_vcpu[0]->domain->

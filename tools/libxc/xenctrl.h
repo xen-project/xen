@@ -323,6 +323,8 @@ int xc_shadow_control(int xc_handle,
                       unsigned int sop,
                       unsigned long *dirty_bitmap,
                       unsigned long pages,
+                      unsigned long *mb,
+                      uint32_t mode,
                       xc_shadow_control_stats_t *stats);
 
 int xc_bvtsched_global_set(int xc_handle,
@@ -367,8 +369,6 @@ int xc_sched_credit_domain_get(int xc_handle,
                                uint32_t domid,
                                struct sched_credit_adjdom *sdom);
 
-typedef evtchn_status_t xc_evtchn_status_t;
-
 /*
  * EVENT CHANNEL FUNCTIONS
  */
@@ -386,11 +386,6 @@ typedef evtchn_status_t xc_evtchn_status_t;
 int xc_evtchn_alloc_unbound(int xc_handle,
                             uint32_t dom,
                             uint32_t remote_dom);
-
-int xc_evtchn_status(int xc_handle,
-                     uint32_t dom, /* may be DOMID_SELF */
-                     evtchn_port_t port,
-                     xc_evtchn_status_t *status);
 
 int xc_physdev_pci_access_modify(int xc_handle,
                                  uint32_t domid,

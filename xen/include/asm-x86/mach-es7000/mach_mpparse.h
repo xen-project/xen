@@ -32,7 +32,7 @@ static inline int es7000_check_dsdt(void)
 /* Hook from generic ACPI tables.c */
 static inline int acpi_madt_oem_check(char *oem_id, char *oem_table_id)
 {
-	unsigned long oem_addr; 
+	unsigned long oem_addr;
 	if (!find_unisys_acpi_oem_table(&oem_addr)) {
 		if (es7000_check_dsdt())
 			return parse_unisys_oem((char *)oem_addr);

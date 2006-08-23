@@ -158,8 +158,23 @@ static void cmos_init_hd(int type_ofs, int info_ofs, BlockDriverState *hd)
     rtc_set_memory(s, info_ofs + 8, sectors);
 }
 
+static int get_bios_disk(char *boot_device, int index) {
+
+    if (index < strlen(boot_device)) {
+        switch (boot_device[index]) {
+        case 'a':
+            return 0x01;            /* floppy */
+        case 'c':
+            return 0x02;            /* hard drive */
+        case 'd':
+            return 0x03;            /* cdrom */
+        }
+    }
+    return 0x00;                /* no device */
+}
+
 /* hd_table must contain 4 block drivers */
-static void cmos_init(uint64_t ram_size, int boot_device, BlockDriverState **hd_table, time_t timeoffset)
+static void cmos_init(uint64_t ram_size, char *boot_device, BlockDriverState **hd_table, time_t timeoffset)
 {
     RTCState *s = rtc_state;
     int val;
@@ -205,21 +220,14 @@ static void cmos_init(uint64_t ram_size, int boot_device, BlockDriverState **hd_
     rtc_set_memory(s, 0x34, val);
     rtc_set_memory(s, 0x35, val >> 8);
     
-    switch(boot_device) {
-    case 'a':
-    case 'b':
-        rtc_set_memory(s, 0x3d, 0x01); /* floppy boot */
-        if (!fd_bootchk)
-            rtc_set_memory(s, 0x38, 0x01); /* disable signature check */
-        break;
-    default:
-    case 'c':
-        rtc_set_memory(s, 0x3d, 0x02); /* hard drive boot */
-        break;
-    case 'd':
-        rtc_set_memory(s, 0x3d, 0x03); /* CD-ROM boot */
-        break;
+    if (boot_device == NULL) {
+        /* default to hd, then cd, then floppy. */
+        boot_device = "cda";
     }
+    rtc_set_memory(s, 0x3d, get_bios_disk(boot_device, 0) |
+                   (get_bios_disk(boot_device, 1) << 4));
+    rtc_set_memory(s, 0x38, (get_bios_disk(boot_device, 2) << 4) |
+                   (!fd_bootchk ? 0x01 : 0x00));
 
     /* floppy type */
 
@@ -572,9 +580,6 @@ static int serial_irq[MAX_SERIAL_PORTS] = { 4, 3, 4, 3 };
 static int parallel_io[MAX_PARALLEL_PORTS] = { 0x378, 0x278, 0x3bc };
 static int parallel_irq[MAX_PARALLEL_PORTS] = { 7, 7, 7 };
 
-/* PIIX4 acpi pci configuration space, func 3 */
-extern void pci_piix4_acpi_init(PCIBus *bus, int devfn);
-
 #ifdef HAS_AUDIO
 static void audio_init (PCIBus *pci_bus)
 {
@@ -620,7 +625,7 @@ static void pc_init_ne2k_isa(NICInfo *nd)
 #define NOBIOS 1
 
 /* PC hardware initialisation */
-static void pc_init1(uint64_t ram_size, int vga_ram_size, int boot_device,
+static void pc_init1(uint64_t ram_size, int vga_ram_size, char *boot_device,
                      DisplayState *ds, const char **fd_filename, int snapshot,
                      const char *kernel_filename, const char *kernel_cmdline,
                      const char *initrd_filename, time_t timeoffset,
@@ -826,6 +831,9 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, int boot_device,
     }
 #endif /* !CONFIG_DM */
 
+    if (pci_enabled)
+        pci_xen_platform_init(pci_bus);
+
     for(i = 0; i < MAX_SERIAL_PORTS; i++) {
         if (serial_hds[i]) {
             serial_init(&pic_set_irq_new, isa_pic,
@@ -879,15 +887,17 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, int boot_device,
 
     /* using PIIX4 acpi model */
     if (pci_enabled && acpi_enabled)
-        pci_piix4_acpi_init(pci_bus, piix3_devfn + 3);
+        pci_piix4_acpi_init(pci_bus, piix3_devfn + 2);
 
     if (pci_enabled && usb_enabled) {
-        usb_uhci_init(pci_bus, piix3_devfn + 2);
+        usb_uhci_init(pci_bus, piix3_devfn + (acpi_enabled ? 3 : 2));
     }
 
-    if (pci_enabled && acpi_enabled && 0) {
+#ifndef CONFIG_DM
+    if (pci_enabled && acpi_enabled) {
         piix4_pm_init(pci_bus, piix3_devfn + 3);
     }
+#endif /* !CONFIG_DM */
 
 #if 0
     /* ??? Need to figure out some way for the user to
@@ -910,12 +920,14 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, int boot_device,
     /* XXX: should be done in the Bochs BIOS */
     if (pci_enabled) {
         pci_bios_init();
+#ifndef CONFIG_DM
         if (acpi_enabled)
             acpi_bios_init();
+#endif /* !CONFIG_DM */
     }
 }
 
-static void pc_init_pci(uint64_t ram_size, int vga_ram_size, int boot_device,
+static void pc_init_pci(uint64_t ram_size, int vga_ram_size, char *boot_device,
                         DisplayState *ds, const char **fd_filename, 
                         int snapshot, 
                         const char *kernel_filename, 
@@ -929,7 +941,7 @@ static void pc_init_pci(uint64_t ram_size, int vga_ram_size, int boot_device,
              initrd_filename, timeoffset, 1);
 }
 
-static void pc_init_isa(uint64_t ram_size, int vga_ram_size, int boot_device,
+static void pc_init_isa(uint64_t ram_size, int vga_ram_size, char *boot_device,
                         DisplayState *ds, const char **fd_filename, 
                         int snapshot, 
                         const char *kernel_filename, 

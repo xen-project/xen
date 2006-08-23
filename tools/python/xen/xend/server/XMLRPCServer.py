@@ -24,6 +24,7 @@ from xen.util.xmlrpclib2 import UnixXMLRPCServer, TCPXMLRPCServer
 
 from xen.xend.XendClient import XML_RPC_SOCKET, ERROR_INVALID_DOMAIN
 from xen.xend.XendError import *
+from xen.xend.XendLogging import log
 from types import ListType
 
 def lookup(domid):
@@ -74,7 +75,8 @@ def get_log():
     finally:
         f.close()
 
-methods = ['device_create', 'destroyDevice', 'getDeviceSxprs',
+methods = ['device_create', 'device_configure', 'destroyDevice',
+           'getDeviceSxprs',
            'setMemoryTarget', 'setName', 'setVCpuCount', 'shutdown',
            'send_sysrq', 'getVCPUInfo', 'waitForDevices']
 

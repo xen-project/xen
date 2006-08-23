@@ -57,7 +57,7 @@ static inline void pic_set_irq1(PicState *s, int irq, int level)
         if (level) {
             if ((s->last_irr & mask) == 0) {
                 s->irr |= mask;
-	    }
+            }
             s->last_irr |= mask;
         } else {
             s->last_irr &= ~mask;
@@ -237,7 +237,7 @@ static void update_shared_irr(struct hvm_virpic *s, PicState *c)
     BUG_ON(!spin_is_locked(&s->lock));
 
     get_sp(current->domain)->sp_global.pic_elcr = 
-		s->pics[0].elcr | ((u16)s->pics[1].elcr << 8);
+        s->pics[0].elcr | ((u16)s->pics[1].elcr << 8);
     pl =(uint8_t*)&get_sp(current->domain)->sp_global.pic_last_irr;
     pe =(uint8_t*)&get_sp(current->domain)->sp_global.pic_elcr;
     if ( c == &s->pics[0] ) {
@@ -480,7 +480,6 @@ void pic_init(struct hvm_virpic *s, void (*irq_request)(void *, int),
     s->pics[1].elcr_mask = 0xde;
     s->irq_request = irq_request;
     s->irq_request_opaque = irq_request_opaque;
-    return; 
 }
 
 void pic_set_alt_irq_func(struct hvm_virpic *s,
@@ -551,7 +550,7 @@ static int intercept_elcr_io(ioreq_t *p)
         spin_lock_irqsave(&s->lock, flags);
         elcr_ioport_write((void*)&s->pics[p->addr&1],
                 (uint32_t) p->addr, (uint32_t)( data & 0xff));
-    	get_sp(current->domain)->sp_global.pic_elcr = 
+        get_sp(current->domain)->sp_global.pic_elcr = 
             s->pics[0].elcr | ((u16)s->pics[1].elcr << 8);
         spin_unlock_irqrestore(&s->lock, flags);
     }
@@ -568,10 +567,10 @@ static int intercept_elcr_io(ioreq_t *p)
 }
 void register_pic_io_hook (void)
 {
-    register_portio_handler(0x20, 2, intercept_pic_io); 
-    register_portio_handler(0x4d0, 1, intercept_elcr_io); 
-    register_portio_handler(0xa0, 2, intercept_pic_io); 
-    register_portio_handler(0x4d1, 1, intercept_elcr_io); 
+    register_portio_handler(0x20, 2, intercept_pic_io);
+    register_portio_handler(0x4d0, 1, intercept_elcr_io);
+    register_portio_handler(0xa0, 2, intercept_pic_io);
+    register_portio_handler(0x4d1, 1, intercept_elcr_io);
 }
 
 

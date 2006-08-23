@@ -20,6 +20,7 @@
 
 #include "../acpi/acpi2_0.h"  /* for ACPI_PHYSICAL_ADDRESS */
 #include "util.h"
+#include <stdint.h>
 
 void outw(uint16_t addr, uint16_t val)
 {
@@ -94,3 +95,82 @@ void puts(const char *s)
 	while (*s)
 		outb(0xE9, *s++);
 }
+
+char *
+strcpy(char *dest, const char *src)
+{
+	char *p = dest;
+	while (*src)
+		*p++ = *src++;
+	*p = 0;
+	return dest;
+}
+
+char *
+strncpy(char *dest, const char *src, unsigned n)
+{
+	int i = 0;
+	char *p = dest;
+
+	/* write non-NUL characters from src into dest until we run
+	   out of room in dest or encounter a NUL in src */
+	while (i < n && *src) {
+		*p++ = *src++;
+		++i;
+	}
+
+	/* pad remaining bytes of dest with NUL bytes */
+	while (i < n) {
+		*p++ = 0;
+		++i;
+	}
+
+	return dest;
+}
+
+unsigned
+strlen(const char *s)
+{
+	int i = 0;
+	while (*s++)
+		++i;
+	return i;
+}
+
+void *
+memset(void *s, int c, unsigned n)
+{
+	uint8_t b = (uint8_t) c;
+	uint8_t *p = (uint8_t *)s;
+	int i;
+	for (i = 0; i < n; ++i)
+		*p++ = b;
+	return s;
+}
+
+int
+memcmp(const void *s1, const void *s2, unsigned n)
+{
+	unsigned i;
+	uint8_t *p1 = (uint8_t *) s1;
+	uint8_t *p2 = (uint8_t *) s2;
+
+	for (i = 0; i < n; ++i) {
+		if (p1[i] < p2[i])
+			return -1;
+		else if (p1[i] > p2[i])
+			return 1;
+	}
+
+	return 0;
+}
+
+void
+cpuid(uint32_t idx, uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx)
+{
+	__asm__ __volatile__(
+		"cpuid"
+		: "=a" (*eax), "=b" (*ebx), "=c" (*ecx), "=d" (*edx)
+		: "0" (idx) );
+}
+

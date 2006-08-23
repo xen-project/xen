@@ -30,7 +30,9 @@
 #include <xen/hypercall.h>
 #include <xen/guest_access.h>
 #include <xen/event.h>
+#include <xen/shadow.h>
 #include <asm/current.h>
+#include <asm/e820.h>
 #include <asm/io.h>
 #include <asm/shadow.h>
 #include <asm/regs.h>
@@ -41,13 +43,8 @@
 #include <asm/spinlock.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
-#include <asm/shadow.h>
-#if CONFIG_PAGING_LEVELS >= 3
-#include <asm/shadow_64.h>
-#endif
 #include <public/sched.h>
 #include <public/hvm/ioreq.h>
-#include <public/hvm/hvm_info_table.h>
 #include <public/version.h>
 #include <public/memory.h>
 
@@ -61,7 +58,7 @@ struct hvm_function_table hvm_funcs;
 static void hvm_zap_mmio_range(
     struct domain *d, unsigned long pfn, unsigned long nr_pfn)
 {
-    unsigned long i, val = INVALID_MFN;
+    unsigned long i;
 
     ASSERT(d == current->domain);
 
@@ -70,7 +67,8 @@ static void hvm_zap_mmio_range(
         if ( pfn + i >= 0xfffff )
             break;
 
-        __copy_to_user(&phys_to_machine_mapping[pfn + i], &val, sizeof (val));
+        if ( VALID_MFN(gmfn_to_mfn(d, pfn + i)) )
+            guest_remove_page(d, pfn + i);
     }
 }
 
@@ -199,6 +197,55 @@ void hvm_create_event_channels(struct vcpu *v)
     }
 }
 
+
+void hvm_stts(struct vcpu *v)
+{
+    /* FPU state already dirty? Then no need to setup_fpu() lazily. */
+    if ( test_bit(_VCPUF_fpu_dirtied, &v->vcpu_flags) )
+        return;
+    
+    hvm_funcs.stts(v);
+}
+
+void hvm_set_guest_time(struct vcpu *v, u64 gtime)
+{
+    u64 host_tsc;
+   
+    rdtscll(host_tsc);
+    
+    v->arch.hvm_vcpu.cache_tsc_offset = gtime - host_tsc;
+    hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
+}
+
+void hvm_do_resume(struct vcpu *v)
+{
+    ioreq_t *p;
+    struct periodic_time *pt =
+        &v->domain->arch.hvm_domain.pl_time.periodic_tm;
+
+    hvm_stts(v);
+
+    /* pick up the elapsed PIT ticks and re-enable pit_timer */
+    if ( pt->enabled && pt->first_injected ) {
+        if ( v->arch.hvm_vcpu.guest_time ) {
+            hvm_set_guest_time(v, v->arch.hvm_vcpu.guest_time);
+            v->arch.hvm_vcpu.guest_time = 0;
+        }
+        pickup_deactive_ticks(pt);
+    }
+
+    p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;
+    wait_on_xen_event_channel(v->arch.hvm.xen_port,
+                              p->state != STATE_IOREQ_READY &&
+                              p->state != STATE_IOREQ_INPROCESS);
+    if ( p->state == STATE_IORESP_READY )
+        hvm_io_assist(v);
+    if ( p->state != STATE_INVALID ) {
+        printf("Weird HVM iorequest state %d.\n", p->state);
+        domain_crash(v->domain);
+    }
+}
+
 void hvm_release_assist_channel(struct vcpu *v)
 {
     free_xen_event_channel(v, v->arch.hvm_vcpu.xen_port);
@@ -212,12 +259,6 @@ void hvm_setup_platform(struct domain* d)
 
     if ( !hvm_guest(v) || (v->vcpu_id != 0) )
         return;
-
-    if ( shadow_direct_map_init(d) == 0 )
-    {
-        printk("Can not allocate shadow direct map for HVM domain.\n");
-        domain_crash_synchronous();
-    }
 
     hvm_zap_iommu_pages(d);
 
@@ -296,12 +337,44 @@ int cpu_get_interrupt(struct vcpu *v, int *type)
     return -1;
 }
 
+#include <asm/hvm/vmx/vmx.h>
+void hvm_hlt(unsigned long rflags)
+{
+    struct vcpu *v = current;
+    struct periodic_time *pt = &v->domain->arch.hvm_domain.pl_time.periodic_tm;
+    s_time_t next_pit = -1, next_wakeup;
+
+    /*
+     * Detect machine shutdown.  Only do this for vcpu 0, to avoid potentially 
+     * shutting down the domain early. If we halt with interrupts disabled, 
+     * that's a pretty sure sign that we want to shut down.  In a real 
+     * processor, NMIs are the only way to break out of this.
+     */
+    if ( (v->vcpu_id == 0) && !(rflags & X86_EFLAGS_IF) )
+    {
+        printk("D%d: HLT with interrupts disabled -- shutting down.\n",
+               current->domain->domain_id);
+        domain_shutdown(current->domain, SHUTDOWN_poweroff);
+        return;
+    }
+
+    if ( !v->vcpu_id )
+        next_pit = get_scheduled(v, pt->irq, pt);
+    next_wakeup = get_apictime_scheduled(v);
+    if ( (next_pit != -1 && next_pit < next_wakeup) || next_wakeup == -1 )
+        next_wakeup = next_pit;
+    if ( next_wakeup != - 1 ) 
+        set_timer(&current->arch.hvm_vcpu.hlt_timer, next_wakeup);
+    do_sched_op_compat(SCHEDOP_block, 0);
+}
+
 /*
  * Copy from/to guest virtual.
  */
-int
-hvm_copy(void *buf, unsigned long vaddr, int size, int dir)
+int hvm_copy(void *buf, unsigned long vaddr, int size, int dir)
 {
+    struct vcpu *v = current;
+    unsigned long gfn;
     unsigned long mfn;
     char *addr;
     int count;
@@ -311,10 +384,9 @@ hvm_copy(void *buf, unsigned long vaddr, int size, int dir)
         if (count > size)
             count = size;
 
-        if (hvm_paging_enabled(current))
-            mfn = gva_to_mfn(vaddr);
-        else
-            mfn = get_mfn_from_gpfn(vaddr >> PAGE_SHIFT);
+        gfn = shadow2_gva_to_gfn(v, vaddr);
+        mfn = mfn_x(sh2_vcpu_gfn_to_mfn(v, gfn));
+
         if (mfn == INVALID_MFN)
             return 0;
 
@@ -345,12 +417,12 @@ void hvm_print_line(struct vcpu *v, const char c)
 
     if (*index == HVM_PBUF_SIZE-2 || c == '\n') {
         if (*index == HVM_PBUF_SIZE-2)
-	    pbuf[(*index)++] = c;
+            pbuf[(*index)++] = c;
         pbuf[*index] = '\0';
         printk("(GUEST: %u) %s\n", v->domain->domain_id, pbuf);
-	*index = 0;
+        *index = 0;
     } else
-	pbuf[(*index)++] = c;
+        pbuf[(*index)++] = c;
 }
 
 typedef unsigned long hvm_hypercall_t(
@@ -467,7 +539,7 @@ void hvm_do_hypercall(struct cpu_user_regs *pregs)
         return;
     }
 
-    if ( current->domain->arch.ops->guest_paging_levels == PAGING_L4 )
+    if ( current->arch.shadow2.mode->guest_levels == 4 )
     {
         pregs->rax = hvm_hypercall64_table[pregs->rax](pregs->rdi,
                                                        pregs->rsi,
@@ -569,7 +641,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         else if ( IS_PRIV(current->domain) )
         {
             d = find_domain_by_id(a.domid);
-            if ( !d )
+            if ( d == NULL )
                 return -ESRCH;
         }
         else
@@ -579,22 +651,24 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
 
         if ( op == HVMOP_set_param )
         {
-            rc = 0;
             d->arch.hvm_domain.params[a.index] = a.value;
+            rc = 0;
         }
         else
         {
-            rc = d->arch.hvm_domain.params[a.index];
+            a.value = d->arch.hvm_domain.params[a.index];
+            rc = copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
         }
 
         put_domain(d);
-        return rc;
+        break;
     }
 
     default:
     {
         DPRINTK("Bad HVM op %ld.\n", op);
         rc = -ENOSYS;
+        break;
     }
     }
 

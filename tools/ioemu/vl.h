@@ -39,6 +39,7 @@
 #include <sys/stat.h>
 #include "xenctrl.h"
 #include "xs.h"
+#include <xen/hvm/e820.h>
 
 #ifndef O_LARGEFILE
 #define O_LARGEFILE 0
@@ -574,7 +575,7 @@ int qcow_compress_cluster(BlockDriverState *bs, int64_t sector_num,
 #ifndef QEMU_TOOL
 
 typedef void QEMUMachineInitFunc(uint64_t ram_size, int vga_ram_size, 
-                                 int boot_device,
+                                 char *boot_device,
              DisplayState *ds, const char **fd_filename, int snapshot,
              const char *kernel_filename, const char *kernel_cmdline,
              const char *initrd_filename, time_t timeoffset);
@@ -925,6 +926,9 @@ extern int acpi_enabled;
 void piix4_pm_init(PCIBus *bus, int devfn);
 void acpi_bios_init(void);
 
+/* piix4acpi.c */
+extern void pci_piix4_acpi_init(PCIBus *bus, int devfn);
+
 /* pc.c */
 extern QEMUMachine pc_machine;
 extern QEMUMachine isapc_machine;
@@ -1016,7 +1020,7 @@ void NVRAM_set_crc (m48t59_t *nvram, uint32_t addr,
                     uint32_t start, uint32_t count);
 int PPC_NVRAM_set_params (m48t59_t *nvram, uint16_t NVRAM_size,
                           const unsigned char *arch,
-                          uint32_t RAM_size, int boot_device,
+                          uint32_t RAM_size, char *boot_device,
                           uint32_t kernel_image, uint32_t kernel_size,
                           const char *cmdline,
                           uint32_t initrd_image, uint32_t initrd_size,
@@ -1204,6 +1208,9 @@ int xenstore_fd(void);
 void xenstore_process_event(void *opaque);
 void xenstore_check_new_media_present(int timeout);
 void xenstore_write_vncport(int vnc_display);
+
+/* xen_platform.c */
+void pci_xen_platform_init(PCIBus *bus);
 
 
 void kqemu_record_dump(void);

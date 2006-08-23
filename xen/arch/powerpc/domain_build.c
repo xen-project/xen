@@ -105,8 +105,8 @@ int construct_dom0(struct domain *d,
     struct domain_setup_info dsi;
     ulong dst;
     u64 *ofh_tree;
-    ulong rma_sz = d->arch.rma_size;
-    ulong rma = d->arch.rma_base;
+    ulong rma_sz = rma_size(d->arch.rma_order);
+    ulong rma = page_to_maddr(d->arch.rma_page);
     start_info_t *si;
     ulong eomem;
     int am64 = 1;
@@ -145,7 +145,7 @@ int construct_dom0(struct domain *d,
 
     /* By default DOM0 is allocated all available memory. */
     d->max_pages = ~0U;
-    d->tot_pages = (d->arch.rma_size >> PAGE_SHIFT);
+    d->tot_pages = 1UL << d->arch.rma_order;
 
     ASSERT( image_len < rma_sz );
 

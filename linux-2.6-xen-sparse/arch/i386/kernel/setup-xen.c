@@ -184,7 +184,6 @@ static struct resource code_resource = {
 	.flags	= IORESOURCE_BUSY | IORESOURCE_MEM
 };
 
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
 static struct resource system_rom_resource = {
 	.name	= "System ROM",
 	.start	= 0xf0000,
@@ -240,7 +239,6 @@ static struct resource video_rom_resource = {
 	.end	= 0xc7fff,
 	.flags	= IORESOURCE_BUSY | IORESOURCE_READONLY | IORESOURCE_MEM
 };
-#endif
 
 static struct resource video_ram_resource = {
 	.name	= "Video RAM area",
@@ -299,7 +297,6 @@ static struct resource standard_io_resources[] = { {
 #define STANDARD_IO_RESOURCES \
 	(sizeof standard_io_resources / sizeof standard_io_resources[0])
 
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
 #define romsignature(x) (*(unsigned short *)(x) == 0xaa55)
 
 static int __init romchecksum(unsigned char *rom, unsigned long length)
@@ -317,9 +314,11 @@ static void __init probe_roms(void)
 	unsigned char *rom;
 	int	      i;
 
+#ifdef CONFIG_XEN
 	/* Nothing to do if not running in dom0. */
-	if (!(xen_start_info->flags & SIF_INITDOMAIN))
+	if (!is_initial_xendomain())
 		return;
+#endif
 
 	/* video rom */
 	upper = adapter_rom_resources[0].start;
@@ -379,7 +378,6 @@ static void __init probe_roms(void)
 		start = adapter_rom_resources[i++].end & ~2047UL;
 	}
 }
-#endif
 
 /*
  * Point at the empty zero page to start with. We map the real shared_info
@@ -1359,9 +1357,7 @@ legacy_init_iomem_resources(struct e820entry *e820, int nr_map,
 {
 	int i;
 
-#if defined(CONFIG_XEN_PRIVILEGED_GUEST) || !defined(CONFIG_XEN)
 	probe_roms();
-#endif
 
 	for (i = 0; i < nr_map; i++) {
 		struct resource *res;
@@ -1458,7 +1454,7 @@ static void __init register_memory(void)
 	int	      i;
 
 	/* Nothing to do if not running in dom0. */
-	if (!(xen_start_info->flags & SIF_INITDOMAIN)) {
+	if (!is_initial_xendomain()) {
 		legacy_init_iomem_resources(e820.map, e820.nr_map,
 					    &code_resource, &data_resource);
 		return;
@@ -1618,7 +1614,7 @@ void __init setup_arch(char **cmdline_p)
 
 	/* Force a quick death if the kernel panics (not domain 0). */
 	extern int panic_timeout;
-	if (!panic_timeout && !(xen_start_info->flags & SIF_INITDOMAIN))
+	if (!panic_timeout && !is_initial_xendomain())
 		panic_timeout = 1;
 
 	/* Register a call for panic conditions. */
@@ -1661,7 +1657,7 @@ void __init setup_arch(char **cmdline_p)
 	}
 	bootloader_type = LOADER_TYPE;
 
-	if (xen_start_info->flags & SIF_INITDOMAIN) {
+	if (is_initial_xendomain()) {
 		/* This is drawn from a dump from vgacon:startup in
 		 * standard Linux. */
 		screen_info.orig_video_mode = 3; 
@@ -1670,6 +1666,35 @@ void __init setup_arch(char **cmdline_p)
 		screen_info.orig_video_cols = 80;
 		screen_info.orig_video_ega_bx = 3;
 		screen_info.orig_video_points = 16;
+		if (xen_start_info->console.dom0.info_size >=
+		    sizeof(struct dom0_vga_console_info)) {
+			const struct dom0_vga_console_info *info =
+				(struct dom0_vga_console_info *)(
+					(char *)xen_start_info +
+					xen_start_info->console.dom0.info_off);
+			screen_info.orig_video_mode = info->txt_mode;
+			screen_info.orig_video_isVGA = info->video_type;
+			screen_info.orig_video_lines = info->video_height;
+			screen_info.orig_video_cols = info->video_width;
+			screen_info.orig_video_points = info->txt_points;
+			screen_info.lfb_width = info->video_width;
+			screen_info.lfb_height = info->video_height;
+			screen_info.lfb_depth = info->lfb_depth;
+			screen_info.lfb_base = info->lfb_base;
+			screen_info.lfb_size = info->lfb_size;
+			screen_info.lfb_linelength = info->lfb_linelen;
+			screen_info.red_size = info->red_size;
+			screen_info.red_pos = info->red_pos;
+			screen_info.green_size = info->green_size;
+			screen_info.green_pos = info->green_pos;
+			screen_info.blue_size = info->blue_size;
+			screen_info.blue_pos = info->blue_pos;
+			screen_info.rsvd_size = info->rsvd_size;
+			screen_info.rsvd_pos = info->rsvd_pos;
+		}
+		screen_info.orig_y = screen_info.orig_video_lines - 1;
+		xen_start_info->console.domU.mfn = 0;
+		xen_start_info->console.domU.evtchn = 0;
 	} else
 		screen_info.orig_video_isVGA = 0;
 
@@ -1788,7 +1813,7 @@ void __init setup_arch(char **cmdline_p)
 	}
 #endif
 
-	if (xen_start_info->flags & SIF_INITDOMAIN)
+	if (is_initial_xendomain())
 		dmi_scan_machine();
 
 #ifdef CONFIG_X86_GENERICARCH
@@ -1805,7 +1830,7 @@ void __init setup_arch(char **cmdline_p)
 #endif
 
 #ifdef CONFIG_ACPI
-	if (!(xen_start_info->flags & SIF_INITDOMAIN)) {
+	if (!is_initial_xendomain()) {
 		printk(KERN_INFO "ACPI in unprivileged domain disabled\n");
 		acpi_disabled = 1;
 		acpi_ht = 0;
@@ -1831,11 +1856,7 @@ void __init setup_arch(char **cmdline_p)
 
 	register_memory();
 
-	if (xen_start_info->flags & SIF_INITDOMAIN) {
-		if (!(xen_start_info->flags & SIF_PRIVILEGED))
-			panic("Xen granted us console access "
-			      "but not privileged status");
-
+	if (is_initial_xendomain()) {
 #ifdef CONFIG_VT
 #if defined(CONFIG_VGA_CONSOLE)
 		if (!efi_enabled ||

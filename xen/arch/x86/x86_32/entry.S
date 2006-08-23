@@ -142,11 +142,11 @@ failsafe_callback:
         jmp   test_all_events
 .previous
 .section __pre_ex_table,"a"
-	.long FLT1,FIX1
-	.long FLT2,FIX1
-	.long FLT3,FIX1
-	.long FLT4,FIX1
-	.long FLT5,FIX5
+        .long FLT1,FIX1
+        .long FLT2,FIX1
+        .long FLT3,FIX1
+        .long FLT4,FIX1
+        .long FLT5,FIX5
 .previous
 .section __ex_table,"a"
         .long DBLFLT1,failsafe_callback
@@ -154,13 +154,13 @@ failsafe_callback:
 
         ALIGN
 restore_all_xen:
-	popl %ebx
-	popl %ecx
-	popl %edx
-	popl %esi
-	popl %edi
-	popl %ebp
-	popl %eax
+        popl %ebx
+        popl %ecx
+        popl %edx
+        popl %esi
+        popl %edi
+        popl %ebp
+        popl %eax
         addl $4,%esp
         iret
 
@@ -168,7 +168,7 @@ restore_all_xen:
 ENTRY(hypercall)
         subl $4,%esp
         FIXUP_RING0_GUEST_STACK
-	SAVE_ALL(b)
+        SAVE_ALL(b)
         sti
         GET_CURRENT(%ebx)
         cmpl  $NR_hypercalls,%eax
@@ -244,8 +244,8 @@ process_softirqs:
         sti       
         call do_softirq
         jmp  test_all_events
-	
-	ALIGN
+
+        ALIGN
 process_nmi:
         movl VCPU_nmi_addr(%ebx),%eax
         test %eax,%eax
@@ -356,7 +356,8 @@ FLT25:  movl %eax,%gs:12(%esi)
         movl %eax,UREGS_gs+4(%esp)
 nvm86_3:/* Rewrite our stack frame and return to ring 1. */
         /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
-        andl $0xfffcbeff,UREGS_eflags+4(%esp)
+        andl $~(X86_EFLAGS_VM|X86_EFLAGS_RF|\
+                X86_EFLAGS_NT|X86_EFLAGS_TF),UREGS_eflags+4(%esp)
         mov  %gs,UREGS_ss+4(%esp)
         movl %esi,UREGS_esp+4(%esp)
         movzwl TRAPBOUNCE_cs(%edx),%eax
@@ -368,13 +369,13 @@ nvm86_3:/* Rewrite our stack frame and return to ring 1. */
         movb $0,TRAPBOUNCE_flags(%edx)
         ret
 .section __ex_table,"a"
-	.long  FLT6,domain_crash_synchronous ,  FLT7,domain_crash_synchronous
+        .long  FLT6,domain_crash_synchronous ,  FLT7,domain_crash_synchronous
         .long  FLT8,domain_crash_synchronous ,  FLT9,domain_crash_synchronous
         .long FLT10,domain_crash_synchronous , FLT11,domain_crash_synchronous
         .long FLT12,domain_crash_synchronous , FLT13,domain_crash_synchronous
         .long FLT14,domain_crash_synchronous , FLT15,domain_crash_synchronous
         .long FLT16,domain_crash_synchronous , FLT17,domain_crash_synchronous
-	.long FLT18,domain_crash_synchronous , FLT19,domain_crash_synchronous
+        .long FLT18,domain_crash_synchronous , FLT19,domain_crash_synchronous
         .long FLT20,domain_crash_synchronous , FLT21,domain_crash_synchronous
         .long FLT22,domain_crash_synchronous , FLT23,domain_crash_synchronous
         .long FLT24,domain_crash_synchronous , FLT25,domain_crash_synchronous
@@ -398,8 +399,8 @@ ENTRY(ret_from_intr)
         jmp   restore_all_xen
 
 ENTRY(divide_error)
-	pushl $TRAP_divide_error<<16
-	ALIGN
+        pushl $TRAP_divide_error<<16
+        ALIGN
 handle_exception:
         FIXUP_RING0_GUEST_STACK
         SAVE_ALL_NOSEGREGS(a)
@@ -410,15 +411,15 @@ handle_exception:
         xorl  %eax,%eax
         movw  UREGS_entry_vector(%esp),%ax
         movl  %esp,%edx
-	pushl %edx			# push the cpu_user_regs pointer
-	GET_CURRENT(%ebx)
+        pushl %edx                      # push the cpu_user_regs pointer
+        GET_CURRENT(%ebx)
         PERFC_INCR(PERFC_exceptions, %eax)
-	call  *exception_table(,%eax,4)
+        call  *exception_table(,%eax,4)
         addl  $4,%esp
         movl  UREGS_eflags(%esp),%eax
         movb  UREGS_cs(%esp),%al
         testl $(3|X86_EFLAGS_VM),%eax
-	jz    restore_all_xen
+        jz    restore_all_xen
         leal  VCPU_trap_bounce(%ebx),%edx
         testb $TBF_EXCEPTION,TRAPBOUNCE_flags(%edx)
         jz    test_all_events
@@ -449,78 +450,78 @@ FATAL_exception_with_ints_disabled:
         xorl  %esi,%esi
         movw  UREGS_entry_vector(%esp),%si
         movl  %esp,%edx
-	pushl %edx			# push the cpu_user_regs pointer
+        pushl %edx                      # push the cpu_user_regs pointer
         pushl %esi                      # push the trapnr (entry vector)
         call  fatal_trap
         ud2
                                         
 ENTRY(coprocessor_error)
-	pushl $TRAP_copro_error<<16
-	jmp   handle_exception
+        pushl $TRAP_copro_error<<16
+        jmp   handle_exception
 
 ENTRY(simd_coprocessor_error)
-	pushl $TRAP_simd_error<<16
-	jmp   handle_exception
+        pushl $TRAP_simd_error<<16
+        jmp   handle_exception
 
 ENTRY(device_not_available)
-	pushl $TRAP_no_device<<16
+        pushl $TRAP_no_device<<16
         jmp   handle_exception
 
 ENTRY(debug)
-	pushl $TRAP_debug<<16
-	jmp   handle_exception
+        pushl $TRAP_debug<<16
+        jmp   handle_exception
 
 ENTRY(int3)
-	pushl $TRAP_int3<<16
-	jmp   handle_exception
+        pushl $TRAP_int3<<16
+        jmp   handle_exception
 
 ENTRY(overflow)
-	pushl $TRAP_overflow<<16
-	jmp   handle_exception
+        pushl $TRAP_overflow<<16
+        jmp   handle_exception
 
 ENTRY(bounds)
-	pushl $TRAP_bounds<<16
-	jmp   handle_exception
+        pushl $TRAP_bounds<<16
+        jmp   handle_exception
 
 ENTRY(invalid_op)
-	pushl $TRAP_invalid_op<<16
-	jmp   handle_exception
+        pushl $TRAP_invalid_op<<16
+        jmp   handle_exception
 
 ENTRY(coprocessor_segment_overrun)
-	pushl $TRAP_copro_seg<<16
-	jmp   handle_exception
+        pushl $TRAP_copro_seg<<16
+        jmp   handle_exception
 
 ENTRY(invalid_TSS)
         movw  $TRAP_invalid_tss,2(%esp)
-	jmp   handle_exception
+        jmp   handle_exception
 
 ENTRY(segment_not_present)
         movw  $TRAP_no_segment,2(%esp)
-	jmp   handle_exception
+        jmp   handle_exception
 
 ENTRY(stack_segment)
         movw  $TRAP_stack_error,2(%esp)
-	jmp   handle_exception
+        jmp   handle_exception
 
 ENTRY(general_protection)
         movw  $TRAP_gp_fault,2(%esp)
-	jmp   handle_exception
+        jmp   handle_exception
 
 ENTRY(alignment_check)
         movw  $TRAP_alignment_check,2(%esp)
-	jmp   handle_exception
+        jmp   handle_exception
 
 ENTRY(page_fault)
         movw  $TRAP_page_fault,2(%esp)
-	jmp   handle_exception
+        jmp   handle_exception
 
 ENTRY(machine_check)
         pushl $TRAP_machine_check<<16
-	jmp   handle_exception
+        jmp   handle_exception
 
 ENTRY(spurious_interrupt_bug)
         pushl $TRAP_spurious_int<<16
-	jmp   handle_exception
+        jmp   handle_exception
 
 ENTRY(nmi)
 #ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL
@@ -529,8 +530,8 @@ ENTRY(nmi)
 #else
         # Save state but do not trash the segment registers!
         # We may otherwise be unable to reload them or copy them to ring 1. 
-	pushl %eax
-	SAVE_ALL_NOSEGREGS(a)
+        pushl %eax
+        SAVE_ALL_NOSEGREGS(a)
 
         # We can only process the NMI if:
         #  A. We are the outermost Xen activation (in which case we have

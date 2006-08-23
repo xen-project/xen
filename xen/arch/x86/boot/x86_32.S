@@ -7,22 +7,22 @@
 
 #define  SECONDARY_CPU_FLAG 0xA5A5A5A5
                 
-       	.text
+        .text
 
 ENTRY(start)
 ENTRY(stext)
 ENTRY(_stext)
         jmp __start
 
-        .align	4
+        .align 4
 
 /*** MULTIBOOT HEADER ****/
         /* Magic number indicating a Multiboot header. */
-	.long	0x1BADB002
-	/* Flags to bootloader (see Multiboot spec). */
-	.long	0x00000003
-	/* Checksum: must be the negated sum of the first two fields. */
-	.long	-0x1BADB005
+        .long 0x1BADB002
+        /* Flags to bootloader (see Multiboot spec). */
+        .long 0x00000003
+        /* Checksum: must be the negated sum of the first two fields. */
+        .long -0x1BADB005
         
 not_multiboot_msg:
         .asciz "ERR: Not a Multiboot bootloader!"
@@ -57,8 +57,8 @@ __start:
         add     $(STACK_SIZE-CPUINFO_sizeof-__PAGE_OFFSET),%esp
 
         /* Reset EFLAGS (subsumes CLI and CLD). */
-	pushl	$0
-	popf
+        pushl   $0
+        popf
 
         /* Set up FPU. */
         fninit
@@ -172,7 +172,7 @@ no_execute_disable:
         je      start_secondary
 
         /* Call into main C routine. This should never return.*/
-       	call	__start_xen
+        call    __start_xen
         ud2     /* Force a panic (invalid opcode). */
 
 /* This is the default interrupt handler. */
@@ -203,19 +203,19 @@ ENTRY(stack_start)
         
         .word   0    
 idt_descr:
-        .word	256*8-1
+        .word   256*8-1
 idt:
-        .long	idt_table
+        .long   idt_table
 
         .word   0
 gdt_descr:
-        .word	LAST_RESERVED_GDT_BYTE
+        .word   LAST_RESERVED_GDT_BYTE
 gdt:
         .long   gdt_table - FIRST_RESERVED_GDT_BYTE
 
         .word   0
 nopaging_gdt_descr:
-        .word	LAST_RESERVED_GDT_BYTE
+        .word   LAST_RESERVED_GDT_BYTE
         .long   gdt_table - FIRST_RESERVED_GDT_BYTE - __PAGE_OFFSET
         
         .org 0x1000

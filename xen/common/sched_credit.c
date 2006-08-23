@@ -20,7 +20,7 @@
 #include <xen/sched-if.h>
 #include <xen/softirq.h>
 #include <asm/atomic.h>
-
+#include <xen/errno.h>
 
 /*
  * CSCHED_STATS

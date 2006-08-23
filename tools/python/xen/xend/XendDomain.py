@@ -532,6 +532,30 @@ class XendDomain:
         except Exception, ex:
             raise XendError(str(ex))
 
+    def domain_shadow_control(self, domid, op):
+        """Shadow page control."""
+        dominfo = self.domain_lookup(domid)
+        try:
+            return xc.shadow_control(dominfo.getDomid(), op)
+        except Exception, ex:
+            raise XendError(str(ex))
+
+    def domain_shadow_mem_get(self, domid):
+        """Get shadow pagetable memory allocation."""
+        dominfo = self.domain_lookup(domid)
+        try:
+            return xc.shadow_mem_control(dominfo.getDomid())
+        except Exception, ex:
+            raise XendError(str(ex))
+
+    def domain_shadow_mem_set(self, domid, mb):
+        """Set shadow pagetable memory allocation."""
+        dominfo = self.domain_lookup(domid)
+        try:
+            return xc.shadow_mem_control(dominfo.getDomid(), mb=mb)
+        except Exception, ex:
+            raise XendError(str(ex))
+
     def domain_sched_credit_get(self, domid):
         """Get credit scheduler parameters for a domain.
         """

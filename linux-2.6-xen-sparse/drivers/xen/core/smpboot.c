@@ -255,7 +255,14 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 
 	xen_smp_intr_init(0);
 
-	for_each_cpu_mask (cpu, cpu_possible_map) {
+	/* Restrict the possible_map according to max_cpus. */
+	while ((num_possible_cpus() > 1) && (num_possible_cpus() > max_cpus)) {
+		for (cpu = NR_CPUS-1; !cpu_isset(cpu, cpu_possible_map); cpu--)
+			continue;
+		cpu_clear(cpu, cpu_possible_map);
+	}
+
+	for_each_cpu (cpu) {
 		if (cpu == 0)
 			continue;
 
@@ -266,7 +273,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 #endif
 		gdt_descr->address = get_zeroed_page(GFP_KERNEL);
 		if (unlikely(!gdt_descr->address)) {
-			printk(KERN_CRIT "CPU%d failed to allocate GDT\n", cpu);
+			printk(KERN_CRIT "CPU%d failed to allocate GDT\n",
+			       cpu);
 			continue;
 		}
 		gdt_descr->size = GDT_SIZE;
@@ -294,7 +302,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		irq_ctx_init(cpu);
 
 #ifdef CONFIG_HOTPLUG_CPU
-		if (xen_start_info->flags & SIF_INITDOMAIN)
+		if (is_initial_xendomain())
 			cpu_set(cpu, cpu_present_map);
 #else
 		cpu_set(cpu, cpu_present_map);
@@ -304,12 +312,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	}
 
 	init_xenbus_allowed_cpumask();
-
-	/* Currently, Xen gives no dynamic NUMA/HT info. */
-	for (cpu = 1; cpu < NR_CPUS; cpu++) {
-		cpu_sibling_map[cpu] = cpumask_of_cpu(cpu);
-		cpu_core_map[cpu]    = cpumask_of_cpu(cpu);
-	}
 
 #ifdef CONFIG_X86_IO_APIC
 	/*

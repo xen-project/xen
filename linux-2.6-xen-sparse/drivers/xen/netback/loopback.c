@@ -218,7 +218,7 @@ static int __init make_loopback(int i)
 	return err;
 }
 
-static void __init clean_loopback(int i)
+static void __exit clean_loopback(int i)
 {
 	struct net_device *dev1, *dev2;
 	char dev_name[IFNAMSIZ];

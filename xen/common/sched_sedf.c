@@ -12,6 +12,7 @@
 #include <xen/timer.h>
 #include <xen/softirq.h>
 #include <xen/time.h>
+#include <xen/errno.h>
 
 /*verbosity settings*/
 #define SEDFLEVEL 0
@@ -69,7 +70,7 @@ struct sedf_vcpu_info {
  
     /*Advaced Parameters*/
     /*Latency Scaling*/
-    s_time_t  period_orig; 
+    s_time_t  period_orig;
     s_time_t  slice_orig;
     s_time_t  latency;
  
@@ -87,7 +88,7 @@ struct sedf_vcpu_info {
     s_time_t  unblock_abs;
  
     /*scores for {util, block penalty}-weighted extratime distribution*/
-    int   score[2]; 
+    int   score[2];
     s_time_t  short_block_lost_tot;
  
     /*Statistics*/
@@ -157,7 +158,7 @@ static inline void extraq_del(struct vcpu *d, int i)
     struct list_head *list = EXTRALIST(d,i);
     ASSERT(extraq_on(d,i));
     PRINT(3, "Removing domain %i.%i from L%i extraq\n",
-          d->domain->domain_id, d->vcpu_id, i); 
+          d->domain->domain_id, d->vcpu_id, i);
     list_del(list);
     list->next = NULL;
     ASSERT(!extraq_on(d, i));
@@ -179,7 +180,7 @@ static inline void extraq_add_sort_update(struct vcpu *d, int i, int sub)
     PRINT(3, "Adding domain %i.%i (score= %i, short_pen= %"PRIi64")"
           " to L%i extraq\n",
           d->domain->domain_id, d->vcpu_id, EDOM_INFO(d)->score[i],
-          EDOM_INFO(d)->short_block_lost_tot, i); 
+          EDOM_INFO(d)->short_block_lost_tot, i);
 
     /*
      * Iterate through all elements to find our "hole" and on our way
@@ -1300,16 +1301,9 @@ static int sedf_adjust_weights(struct sched_adjdom_cmd *cmd)
 {
     struct vcpu *p;
     struct domain      *d;
-    int                 sumw[NR_CPUS];
-    s_time_t            sumt[NR_CPUS];
-    int                 cpu;
+    int                 sumw[NR_CPUS] = { 0 };
+    s_time_t            sumt[NR_CPUS] = { 0 };
  
-    for ( cpu = 0; cpu < NR_CPUS; cpu++ )
-    {
-        sumw[cpu] = 0;
-        sumt[cpu] = 0;
-    }
-
     /* Sum across all weights. */
     for_each_domain( d )
     {

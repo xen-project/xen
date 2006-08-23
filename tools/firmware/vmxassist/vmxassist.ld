@@ -6,27 +6,27 @@ ENTRY(_start)
 
 SECTIONS
 {
+	_btext = .;
 	.text TEXTADDR : 
 	{
-		_btext = .;
 		*(.text)
 		*(.rodata)
 		*(.rodata.*)
-		_etext = .;
 	}
+	_etext = .;
 
+	_bdata = .;
 	.data :
 	{
-		_bdata = .;
 		*(.data)
-		_edata = .;
 	}
+	_edata = .;
 
+	_bbss = .;
 	.bss :
 	{
-		_bbss = .;
 		*(.bss)
-		_ebss = .;
 	}
+	_ebss = .;
 }
 

@@ -7,7 +7,8 @@
 #include <asm/fpu.h>
 #include <asm/tlb.h>
 #include <asm/ia64_int.h>
-#include <public/arch-ia64.h>
+#include <xen/types.h>
+#include <public/xen.h>
 typedef	unsigned long UINT64;
 typedef	unsigned int UINT;
 typedef	int BOOLEAN;

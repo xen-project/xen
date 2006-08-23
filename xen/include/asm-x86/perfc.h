@@ -2,21 +2,15 @@
 #define __ASM_PERFC_H__
 #include <asm/mm.h>
 
-static inline void arch_perfc_printall (void)
+static inline void arch_perfc_printall(void)
 {
-#ifdef PERF_ARRAYS
-    ptwr_eip_stat_print();
-#endif
 }
 
-static inline void arch_perfc_reset (void)
+static inline void arch_perfc_reset(void)
 {
-#ifdef PERF_ARRAYS
-    ptwr_eip_stat_reset();
-#endif
 }
 
-static inline void arch_perfc_gather (void)
+static inline void arch_perfc_gather(void)
 {
 }
 

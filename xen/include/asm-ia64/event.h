@@ -9,7 +9,7 @@
 #ifndef __ASM_EVENT_H__
 #define __ASM_EVENT_H__
 
-#include <public/arch-ia64.h>
+#include <public/xen.h>
 #include <asm/vcpu.h>
 
 static inline void vcpu_kick(struct vcpu *v)

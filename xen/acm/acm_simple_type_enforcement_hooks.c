@@ -86,10 +86,10 @@ int acm_init_ste_policy(void)
 
     /* init stats */
     atomic_set(&(ste_bin_pol.ec_eval_count), 0);
-    atomic_set(&(ste_bin_pol.ec_denied_count), 0); 
+    atomic_set(&(ste_bin_pol.ec_denied_count), 0);
     atomic_set(&(ste_bin_pol.ec_cachehit_count), 0);
     atomic_set(&(ste_bin_pol.gt_eval_count), 0);
-    atomic_set(&(ste_bin_pol.gt_denied_count), 0); 
+    atomic_set(&(ste_bin_pol.gt_denied_count), 0);
     atomic_set(&(ste_bin_pol.gt_cachehit_count), 0);
     return ACM_OK;
 }
@@ -100,7 +100,7 @@ static int
 ste_init_domain_ssid(void **ste_ssid, ssidref_t ssidref)
 {
     int i;
-    struct ste_ssid *ste_ssidp = xmalloc(struct ste_ssid); 
+    struct ste_ssid *ste_ssidp = xmalloc(struct ste_ssid);
     traceprintk("%s.\n", __func__);
 
     if (ste_ssidp == NULL)
@@ -309,7 +309,7 @@ ste_set_policy(u8 *buf, u32 buf_size)
            sizeof(domaintype_t),
            ste_buf->ste_max_ssidrefs*ste_buf->ste_max_types);
 
-    /* 2. now re-calculate sharing decisions based on running domains; 
+    /* 2. now re-calculate sharing decisions based on running domains;
      *    this can fail if new policy is conflicting with sharing of running domains 
      *    now: reject violating new policy; future: adjust sharing through revoking sharing */
     if (ste_init_state(ste_buf, (domaintype_t *)ssidrefsbuf)) {
@@ -349,11 +349,11 @@ ste_dump_stats(u8 *buf, u16 buf_len)
     stats.ec_eval_count = htonl(atomic_read(&ste_bin_pol.ec_eval_count));
     stats.gt_eval_count = htonl(atomic_read(&ste_bin_pol.gt_eval_count));
     stats.ec_denied_count = htonl(atomic_read(&ste_bin_pol.ec_denied_count));
-    stats.gt_denied_count = htonl(atomic_read(&ste_bin_pol.gt_denied_count)); 
+    stats.gt_denied_count = htonl(atomic_read(&ste_bin_pol.gt_denied_count));
     stats.ec_cachehit_count = htonl(atomic_read(&ste_bin_pol.ec_cachehit_count));
     stats.gt_cachehit_count = htonl(atomic_read(&ste_bin_pol.gt_cachehit_count));
 
-    if (buf_len < sizeof(struct acm_ste_stats_buffer))
+    if (buf_len < sizeof(struct acm_ste_stats_buffer)
         return -ENOMEM;
 
     memcpy(buf, &stats, sizeof(struct acm_ste_stats_buffer));
@@ -523,8 +523,8 @@ ste_pre_eventchannel_unbound(domid_t id1, domid_t id2) {
         cache_result(subj, obj);
         ret = ACM_ACCESS_PERMITTED;
     } else {
-        atomic_inc(&ste_bin_pol.ec_denied_count); 
-        ret = ACM_ACCESS_DENIED; 
+        atomic_inc(&ste_bin_pol.ec_denied_count);
+        ret = ACM_ACCESS_DENIED;
     }
   out:
     if (obj != NULL)
@@ -569,8 +569,8 @@ ste_pre_eventchannel_interdomain(domid_t id)
         cache_result(subj, obj);
         ret = ACM_ACCESS_PERMITTED;
     } else {
-        atomic_inc(&ste_bin_pol.ec_denied_count); 
-        ret = ACM_ACCESS_DENIED; 
+        atomic_inc(&ste_bin_pol.ec_denied_count);
+        ret = ACM_ACCESS_DENIED;
     }
  out:
     if (obj != NULL)
@@ -599,9 +599,9 @@ ste_pre_grant_map_ref (domid_t id) {
         cache_result(subj, obj);
         ret = ACM_ACCESS_PERMITTED;
     } else {
-        atomic_inc(&ste_bin_pol.gt_denied_count); 
+        atomic_inc(&ste_bin_pol.gt_denied_count);
         printkd("%s: ACCESS DENIED!\n", __func__);
-        ret = ACM_ACCESS_DENIED; 
+        ret = ACM_ACCESS_DENIED;
     }
     if (obj != NULL)
         put_domain(obj);
@@ -637,8 +637,8 @@ ste_pre_grant_setup (domid_t id) {
         cache_result(subj, obj);
         ret = ACM_ACCESS_PERMITTED;
     } else {
-        atomic_inc(&ste_bin_pol.gt_denied_count); 
-        ret = ACM_ACCESS_DENIED; 
+        atomic_inc(&ste_bin_pol.gt_denied_count);
+        ret = ACM_ACCESS_DENIED;
     }
     if (obj != NULL)
         put_domain(obj);

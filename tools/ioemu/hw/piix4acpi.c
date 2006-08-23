@@ -374,13 +374,13 @@ static void acpi_map(PCIDevice *pci_dev, int region_num,
     register_ioport_read(addr + 8, 4, 4, acpiPm1Timer_readl, d);
 }
 
-/* PIIX4 acpi pci configuration space, func 3 */
+/* PIIX4 acpi pci configuration space, func 2 */
 void pci_piix4_acpi_init(PCIBus *bus, int devfn)
 {
     PCIAcpiState *d;
     uint8_t *pci_conf;
 
-    /* register a function 3 of PIIX4 */
+    /* register a function 2 of PIIX4 */
     d = (PCIAcpiState *)pci_register_device(
         bus, "PIIX4 ACPI", sizeof(PCIAcpiState),
         devfn, NULL, NULL);

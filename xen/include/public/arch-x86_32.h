@@ -9,8 +9,33 @@
 #ifndef __XEN_PUBLIC_ARCH_X86_32_H__
 #define __XEN_PUBLIC_ARCH_X86_32_H__
 
+/*
+ * Hypercall interface:
+ *  Input:  %ebx, %ecx, %edx, %esi, %edi (arguments 1-5)
+ *  Output: %eax
+ * Access is via hypercall page (set up by guest loader or via a Xen MSR):
+ *  call hypercall_page + hypercall-number * 32
+ * Clobbered: Argument registers (e.g., 2-arg hypercall clobbers %ebx,%ecx)
+ */
+
+#if __XEN_INTERFACE_VERSION__ < 0x00030203
+/*
+ * Legacy hypercall interface:
+ * As above, except the entry sequence to the hypervisor is:
+ *  mov $hypercall-number*32,%eax ; int $0x82
+ */
+#define TRAP_INSTR "int $0x82"
+#endif
+
+
+/* Structural guest handles introduced in 0x00030201. */
+#if __XEN_INTERFACE_VERSION__ >= 0x00030201
 #define __DEFINE_XEN_GUEST_HANDLE(name, type) \
     typedef struct { type *p; } __guest_handle_ ## name
+#else
+#define __DEFINE_XEN_GUEST_HANDLE(name, type) \
+    typedef type * __guest_handle_ ## name
+#endif
 
 #define DEFINE_XEN_GUEST_HANDLE(name)   __DEFINE_XEN_GUEST_HANDLE(name, name)
 #define XEN_GUEST_HANDLE(name)          __guest_handle_ ## name
@@ -64,9 +89,6 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 #define FLAT_USER_CS    FLAT_RING3_CS
 #define FLAT_USER_DS    FLAT_RING3_DS
 #define FLAT_USER_SS    FLAT_RING3_SS
-
-/* And the trap vector is... */
-#define TRAP_INSTR "int $0x82"
 
 /*
  * Virtual addresses beyond this are not modifiable by guest OSes. The 
@@ -191,6 +213,7 @@ struct arch_shared_info {
     /* Frame containing list of mfns containing list of mfns containing p2m. */
     xen_pfn_t     pfn_to_mfn_frame_list_list;
     unsigned long nmi_reason;
+    uint64_t pad[32];
 };
 typedef struct arch_shared_info arch_shared_info_t;
 

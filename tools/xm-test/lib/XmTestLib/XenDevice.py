@@ -265,6 +265,7 @@ class XenNetDevice(XenDevice):
             self.ip = xmtest_netconf.getIP(self.domain.getName(), self.id)
 
         self.addIfconfigCmd()
+        self.config["ip"] = str(self.ip)
 
         # Setup an alias for Dom0
         self.dom0_alias_ip = xmtest_netconf.getIP("domain0", self.domain.getName())

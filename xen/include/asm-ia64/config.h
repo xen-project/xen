@@ -43,6 +43,8 @@
 #define PRIVOP_COUNT_NADDRS 30
 #endif
 
+#define CONFIG_VGA 1
+
 #ifndef __ASSEMBLY__
 
 // can't find where this typedef was before?!?

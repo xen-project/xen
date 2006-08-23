@@ -545,12 +545,7 @@ setup_arch (char **cmdline_p)
 		       "flags=0x%x\n", s->arch.start_info_pfn,
 		       xen_start_info->nr_pages, xen_start_info->flags);
 
-		/* xen_start_info isn't setup yet, get the flags manually */
-		if (xen_start_info->flags & SIF_INITDOMAIN) {
-			if (!(xen_start_info->flags & SIF_PRIVILEGED))
-				panic("Xen granted us console access "
-				      "but not privileged status");
-		} else {
+		if (!is_initial_xendomain()) {
 			extern int console_use_vt;
 			conswitchp = NULL;
 			console_use_vt = 0;

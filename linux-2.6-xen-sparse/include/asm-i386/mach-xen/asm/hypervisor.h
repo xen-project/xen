@@ -58,6 +58,11 @@ extern shared_info_t *HYPERVISOR_shared_info;
 
 /* arch/xen/i386/kernel/setup.c */
 extern start_info_t *xen_start_info;
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+#define is_initial_xendomain() (xen_start_info->flags & SIF_INITDOMAIN)
+#else
+#define is_initial_xendomain() 0
+#endif
 
 /* arch/xen/kernel/evtchn.c */
 /* Force a proper event-channel callback from Xen. */
@@ -195,6 +200,16 @@ MULTI_update_va_mapping(
     mcl->args[2] = 0;
 #endif
     mcl->args[MULTI_UVMFLAGS_INDEX] = flags;
+}
+
+static inline void
+MULTI_grant_table_op(multicall_entry_t *mcl, unsigned int cmd,
+		     void *uop, unsigned int count)
+{
+    mcl->op = __HYPERVISOR_grant_table_op;
+    mcl->args[0] = cmd;
+    mcl->args[1] = (unsigned long)uop;
+    mcl->args[2] = count;
 }
 
 static inline void

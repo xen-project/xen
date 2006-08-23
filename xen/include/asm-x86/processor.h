@@ -277,27 +277,43 @@ static always_inline unsigned int cpuid_edx(unsigned int op)
 }
 
 
-#define read_cr0() ({ \
-	unsigned long __dummy; \
-	__asm__( \
-		"mov %%cr0,%0\n\t" \
-		:"=r" (__dummy)); \
-	__dummy; \
-})
 
-#define write_cr0(x) \
-	__asm__("mov %0,%%cr0": :"r" ((unsigned long)x));
+static inline unsigned long read_cr0(void)
+{
+    unsigned long __cr0;
+    __asm__("mov %%cr0,%0\n\t" :"=r" (__cr0));
+    return __cr0;
+} 
 
-#define read_cr4() ({ \
-	unsigned long __dummy; \
-	__asm__( \
-		"mov %%cr4,%0\n\t" \
-		:"=r" (__dummy)); \
-	__dummy; \
-})
+static inline void write_cr0(unsigned long val)
+{
+	__asm__("mov %0,%%cr0": :"r" ((unsigned long)val));
+}
 
-#define write_cr4(x) \
-	__asm__("mov %0,%%cr4": :"r" ((unsigned long)x));
+static inline unsigned long read_cr4(void)
+{
+    unsigned long __cr4;
+    __asm__("mov %%cr4,%0\n\t" :"=r" (__cr4));
+    return __cr4;
+} 
+    
+static inline void write_cr4(unsigned long val)
+{
+	__asm__("mov %0,%%cr4": :"r" ((unsigned long)val));
+}
+
+
+/* Clear and set 'TS' bit respectively */
+static inline void clts(void) 
+{
+    __asm__ __volatile__ ("clts");
+}
+
+static inline void stts(void) 
+{
+    write_cr0(X86_CR0_TS|read_cr0());
+}
+
 
 /*
  * Save the cr4 feature set we're using (ie
@@ -529,6 +545,7 @@ extern always_inline void prefetchw(const void *x)
 #endif
 
 void show_stack(struct cpu_user_regs *regs);
+void show_xen_trace(void);
 void show_stack_overflow(unsigned long esp);
 void show_registers(struct cpu_user_regs *regs);
 void show_execution_state(struct cpu_user_regs *regs);

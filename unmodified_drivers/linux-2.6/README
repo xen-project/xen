@@ -1,0 +1,7 @@
+To build, run ./mkbuildtree and then
+
+make -C /path/to/kernel/source M=$PWD modules
+
+You get four modules, xen-evtchn-pci.ko, xenbus.ko, xen-vbd.ko, and
+xen-vnif.ko.  Load xen-evtchn-pci first, then xenbus, and then
+whichever of xen-vbd and xen-vnif you happen to need.

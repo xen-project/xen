@@ -13,7 +13,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
-# Copyright (C) 2005 XenSource Ltd
+# Copyright (C) 2005, 2006 XenSource Inc.
 #============================================================================
 
 
@@ -74,6 +74,23 @@ class BlkifController(DevController):
                 }
 
         return (devid, back, front)
+
+
+    def reconfigureDevice(self, _, config):
+        """@see DevController.reconfigureDevice"""
+        (devid, new_back, new_front) = self.getDeviceDetails(config)
+
+        (dev, mode) = self.readBackend(devid, 'dev', 'mode')
+        dev_type = self.readFrontend(devid, 'device-type')
+
+        if (dev_type == 'cdrom' and new_front['device-type'] == 'cdrom' and
+            dev == new_back['dev'] and mode == 'r'):
+            self.writeBackend(devid,
+                              'type', new_back['type'],
+                              'params', new_back['params'])
+        else:
+            raise VmError('Refusing to reconfigure device %s:%d to %s' %
+                          (self.deviceClass, devid, config))
 
 
     def configuration(self, devid):

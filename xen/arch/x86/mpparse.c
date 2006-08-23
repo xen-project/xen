@@ -107,7 +107,7 @@ static int __init mpf_checksum(unsigned char *mp, int len)
  * doing this ....
  */
 
-static int mpc_record; 
+static int mpc_record;
 static struct mpc_config_translation *translation_table[MAX_MPC_ENTRY] __initdata;
 
 #ifdef CONFIG_X86_NUMAQ

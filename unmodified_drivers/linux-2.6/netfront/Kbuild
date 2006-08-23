@@ -1,0 +1,4 @@
+include $(M)/overrides.mk
+
+obj-m  = xen-vnif.o
+xen-vnif-objs	:= netfront.o

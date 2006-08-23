@@ -31,6 +31,8 @@
 #ifndef __HVMLOADER_HYPERCALL_H__
 #define __HVMLOADER_HYPERCALL_H__
 
+#include <xen/xen.h>
+
 /*
  * NB. Hypercall address needs to be relative to a linkage symbol for
  * some version of ld to relocate the relative calls properly.

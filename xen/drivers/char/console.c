@@ -22,6 +22,7 @@
 #include <xen/delay.h>
 #include <xen/guest_access.h>
 #include <xen/shutdown.h>
+#include <xen/vga.h>
 #include <asm/current.h>
 #include <asm/debugger.h>
 #include <asm/io.h>
@@ -41,9 +42,6 @@ string_param("conswitch", opt_conswitch);
 static int opt_sync_console;
 boolean_param("sync_console", opt_sync_console);
 
-static int xpos, ypos;
-static unsigned char *video;
-
 #define CONRING_SIZE 16384
 #define CONRING_IDX_MASK(i) ((i)&(CONRING_SIZE-1))
 static char conring[CONRING_SIZE];
@@ -52,162 +50,8 @@ static unsigned int conringc, conringp;
 static char printk_prefix[16] = "";
 
 static int sercon_handle = -1;
-static int vgacon_enabled = 0;
 
 static DEFINE_SPINLOCK(console_lock);
-
-/*
- * *******************************************************
- * *************** OUTPUT TO VGA CONSOLE *****************
- * *******************************************************
- */
-
-/* VGA text (mode 3) definitions. */
-#define COLUMNS     80
-#define LINES       25
-#define ATTRIBUTE    7
-#define VIDEO_SIZE  (COLUMNS * LINES * 2)
-
-/* Clear the screen and initialize VIDEO, XPOS and YPOS.  */
-static void cls(void)
-{
-    memset(video, 0, VIDEO_SIZE);
-    xpos = ypos = 0;
-    outw(10+(1<<(5+8)), 0x3d4); /* cursor off */
-}
-
-static int detect_video(void *video_base)
-{
-    volatile u16 *p = (volatile u16 *)video_base;
-    u16 saved1 = p[0], saved2 = p[1];
-    int video_found = 1;
-
-    p[0] = 0xAA55;
-    p[1] = 0x55AA;
-    if ( (p[0] != 0xAA55) || (p[1] != 0x55AA) )
-        video_found = 0;
-
-    p[0] = 0x55AA;
-    p[1] = 0xAA55;
-    if ( (p[0] != 0x55AA) || (p[1] != 0xAA55) )
-        video_found = 0;
-
-    p[0] = saved1;
-    p[1] = saved2;
-
-    return video_found;
-}
-
-static int detect_vga(void)
-{
-    /*
-     * Look at a number of well-known locations. Even if video is not at
-     * 0xB8000 right now, it will appear there when we set up text mode 3.
-     * 
-     * We assume if there is any sign of a video adaptor then it is at least
-     * VGA-compatible (surely noone runs CGA, EGA, .... these days?).
-     * 
-     * These checks are basically to detect headless server boxes.
-     */
-    return (detect_video(ioremap(0xA0000, VIDEO_SIZE)) || 
-            detect_video(ioremap(0xB0000, VIDEO_SIZE)) || 
-            detect_video(ioremap(0xB8000, VIDEO_SIZE)));
-}
-
-/* This is actually code from vgaHWRestore in an old version of XFree86 :-) */
-static void init_vga(void)
-{
-    /* The following VGA state was saved from a chip in text mode 3. */
-    static unsigned char regs[] = {
-        /* Sequencer registers */
-        0x03, 0x00, 0x03, 0x00, 0x02,
-        /* CRTC registers */
-        0x5f, 0x4f, 0x50, 0x82, 0x55, 0x81, 0xbf, 0x1f, 0x00, 0x4f, 0x20,
-        0x0e, 0x00, 0x00, 0x01, 0xe0, 0x9c, 0x8e, 0x8f, 0x28, 0x1f, 0x96,
-        0xb9, 0xa3, 0xff,
-        /* Graphic registers */
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x0e, 0x00, 0xff,
-        /* Attribute registers */
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x14, 0x07, 0x38, 0x39, 0x3a,
-        0x3b, 0x3c, 0x3d, 0x3e, 0x3f, 0x0c, 0x00, 0x0f, 0x08, 0x00
-    };
-
-    int i, j = 0;
-    volatile unsigned char tmp;
-
-    if ( !vgacon_enabled )
-        return;
-
-    if ( !detect_vga() )
-    {
-        printk("No VGA adaptor detected!\n");
-        vgacon_enabled = 0;
-        return;
-    }
-
-    video = ioremap(0xB8000, VIDEO_SIZE);
-
-    tmp = inb(0x3da);
-    outb(0x00, 0x3c0);
-    
-    for ( i = 0; i < 5;  i++ )
-        outw((regs[j++] << 8) | i, 0x3c4);
-    
-    /* Ensure CRTC registers 0-7 are unlocked by clearing bit 7 of CRTC[17]. */
-    outw(((regs[5+17] & 0x7F) << 8) | 17, 0x3d4);
-    
-    for ( i = 0; i < 25; i++ ) 
-        outw((regs[j++] << 8) | i, 0x3d4);
-    
-    for ( i = 0; i < 9;  i++ )
-        outw((regs[j++] << 8) | i, 0x3ce);
-    
-    for ( i = 0; i < 21; i++ )
-    {
-        tmp = inb(0x3da);
-        outb(i, 0x3c0); 
-        outb(regs[j++], 0x3c0);
-    }
-    
-    tmp = inb(0x3da);
-    outb(0x20, 0x3c0);
-
-    cls();
-}
-
-static void put_newline(void)
-{
-    xpos = 0;
-    ypos++;
-
-    if (ypos >= LINES)
-    {
-        ypos = LINES-1;
-        memmove((char*)video, 
-                (char*)video + 2*COLUMNS, (LINES-1)*2*COLUMNS);
-        memset((char*)video + (LINES-1)*2*COLUMNS, 0, 2*COLUMNS);
-    }
-}
-
-static void putchar_console(int c)
-{
-    if ( !vgacon_enabled )
-        return;
-
-    if ( c == '\n' )
-    {
-        put_newline();
-    }
-    else
-    {
-        if ( xpos >= COLUMNS )
-            put_newline();
-        video[(xpos + ypos * COLUMNS) * 2]     = c & 0xFF;
-        video[(xpos + ypos * COLUMNS) * 2 + 1] = ATTRIBUTE;
-        ++xpos;
-    }
-}
-
 
 /*
  * ********************************************************
@@ -350,7 +194,7 @@ static long guest_console_write(XEN_GUEST_HANDLE(char) buffer, int count)
         serial_puts(sercon_handle, kbuf);
 
         for ( kptr = kbuf; *kptr != '\0'; kptr++ )
-            putchar_console(*kptr);
+            vga_putchar(*kptr);
 
         guest_handle_add_offset(buffer, kcount);
         count -= kcount;
@@ -417,7 +261,7 @@ static inline void __putstr(const char *str)
 
     while ( (c = *str++) != '\0' )
     {
-        putchar_console(c);
+        vga_putchar(c);
         putchar_console_ring(c);
     }
 }
@@ -477,14 +321,8 @@ void init_console(void)
         if ( strncmp(p, "com", 3) == 0 )
             sercon_handle = serial_parse_handle(p);
         else if ( strncmp(p, "vga", 3) == 0 )
-        {
-            vgacon_enabled = 1;
-            if ( strncmp(p+3, "[keep]", 6) == 0 )
-                vgacon_enabled++;
-        }
+            vga_init();
     }
-
-    init_vga();
 
     serial_set_rx_handler(sercon_handle, serial_rx);
 
@@ -536,12 +374,7 @@ void console_endboot(void)
         printk("\n");
     }
 
-    if ( vgacon_enabled )
-    {
-        vgacon_enabled--;
-        printk("Xen is %s VGA console.\n",
-               vgacon_enabled ? "keeping" : "relinquishing");
-    }
+    vga_endboot();
 
     /*
      * If user specifies so, we fool the switch routine to redirect input
@@ -594,10 +427,10 @@ int console_getc(void)
  * **************************************************************
  */
 
-#ifndef NDEBUG
+#ifdef DEBUG_TRACE_DUMP
 
 /* Send output direct to console, or buffer it? */
-int debugtrace_send_to_console;
+static volatile int debugtrace_send_to_console;
 
 static char        *debugtrace_buf; /* Debug-trace buffer */
 static unsigned int debugtrace_prd; /* Producer index     */
@@ -606,16 +439,10 @@ static unsigned int debugtrace_used;
 static DEFINE_SPINLOCK(debugtrace_lock);
 integer_param("debugtrace", debugtrace_kilobytes);
 
-void debugtrace_dump(void)
+static void debugtrace_dump_worker(void)
 {
-    unsigned long flags;
-
     if ( (debugtrace_bytes == 0) || !debugtrace_used )
         return;
-
-    watchdog_disable();
-
-    spin_lock_irqsave(&debugtrace_lock, flags);
 
     printk("debugtrace_dump() starting\n");
 
@@ -630,15 +457,47 @@ void debugtrace_dump(void)
     memset(debugtrace_buf, '\0', debugtrace_bytes);
 
     printk("debugtrace_dump() finished\n");
+}
+
+static void debugtrace_toggle(void)
+{
+    unsigned long flags;
+
+    watchdog_disable();
+    spin_lock_irqsave(&debugtrace_lock, flags);
+
+    // dump the buffer *before* toggling, in case the act of dumping the
+    // buffer itself causes more printk's...
+    //
+    printk("debugtrace_printk now writing to %s.\n",
+           !debugtrace_send_to_console ? "console": "buffer");
+    if ( !debugtrace_send_to_console )
+        debugtrace_dump_worker();
+
+    debugtrace_send_to_console = !debugtrace_send_to_console;
 
     spin_unlock_irqrestore(&debugtrace_lock, flags);
+    watchdog_enable();
 
+}
+
+void debugtrace_dump(void)
+{
+    unsigned long flags;
+
+    watchdog_disable();
+    spin_lock_irqsave(&debugtrace_lock, flags);
+
+    debugtrace_dump_worker();
+
+    spin_unlock_irqrestore(&debugtrace_lock, flags);
     watchdog_enable();
 }
 
 void debugtrace_printk(const char *fmt, ...)
 {
     static char    buf[1024];
+    static u32 count;
 
     va_list       args;
     char         *p;
@@ -653,8 +512,10 @@ void debugtrace_printk(const char *fmt, ...)
 
     ASSERT(debugtrace_buf[debugtrace_bytes - 1] == 0);
 
+    sprintf(buf, "%u ", ++count);
+
     va_start(args, fmt);
-    (void)vsnprintf(buf, sizeof(buf), fmt, args);
+    (void)vsnprintf(buf + strlen(buf), sizeof(buf), fmt, args);
     va_end(args);
 
     if ( debugtrace_send_to_console )
@@ -673,6 +534,11 @@ void debugtrace_printk(const char *fmt, ...)
     }
 
     spin_unlock_irqrestore(&debugtrace_lock, flags);
+}
+
+static void debugtrace_key(unsigned char key)
+{
+    debugtrace_toggle();
 }
 
 static int __init debugtrace_init(void)
@@ -695,6 +561,9 @@ static int __init debugtrace_init(void)
     memset(debugtrace_buf, '\0', bytes);
 
     debugtrace_bytes = bytes;
+
+    register_keyhandler(
+        'T', debugtrace_key, "toggle debugtrace to console/buffer");
 
     return 0;
 }

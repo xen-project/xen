@@ -71,8 +71,8 @@ struct es7000_mem_info {
 	unsigned char type;   
 	unsigned char length;
 	unsigned char resv[6];
-	unsigned long long  start; 
-	unsigned long long  size; 
+	unsigned long long  start;
+	unsigned long long  size;
 };
 
 struct es7000_oem_table {

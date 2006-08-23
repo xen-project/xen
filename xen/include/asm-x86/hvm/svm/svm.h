@@ -28,54 +28,12 @@
 #include <asm/hvm/svm/vmcb.h>
 #include <asm/i387.h>
 
-extern void asidpool_retire( struct vmcb_struct *vmcb, int core );
-
-extern void svm_asm_vmexit_handler(struct cpu_user_regs);
-extern void svm_setup_function_table(struct vcpu *v);
-
-extern int vmcb_size;
-extern unsigned int cpu_rev;
-
-extern void svm_stop(void);
-extern void svm_save_cpu_user_regs(struct vcpu *v, struct cpu_user_regs *regs);
-extern void svm_load_cpu_user_regs(struct vcpu *v, struct cpu_user_regs *regs);
-extern void svm_vmread(struct vcpu *v, int index, unsigned long *value);
-extern void svm_vmwrite(struct vcpu *v, int index, unsigned long value);
-extern void svm_final_setup_guest(struct vcpu *v); 
-extern int svm_paging_enabled(struct vcpu *v); 
+extern void asidpool_retire(struct vmcb_struct *vmcb, int core);
 extern void svm_dump_vmcb(const char *from, struct vmcb_struct *vmcb);
-extern void svm_stts(struct vcpu *v); 
 extern void svm_do_launch(struct vcpu *v);
-extern void svm_do_resume(struct vcpu *v);
-extern void svm_set_guest_time(struct vcpu *v, u64 gtime);
 extern void arch_svm_do_resume(struct vcpu *v);
-extern int load_vmcb(struct arch_svm_struct *arch_svm, u64 phys_hsa);
-/* For debugging. Remove when no longer needed. */
-extern void svm_dump_host_regs(const char *from);
 
-extern void svm_migrate_timers(struct vcpu *v);
-
-/* ASID API */
-enum {
-    ASID_AVAILABLE = 0,
-    ASID_INUSE,
-    ASID_RETIRED
-};
-#define   INITIAL_ASID      0
-#define   ASID_MAX          64
- 
-struct asid_pool {
-    spinlock_t asid_lock;
-    u32 asid[ASID_MAX];
-};
-
-struct svm_percore_globals {
-  void *hsa;
-  u64  hsa_pa;
-  void *scratch_hsa;
-  u64  scratch_hsa_pa;
-  struct asid_pool ASIDpool;
-};
+extern u64 root_vmcb_pa[NR_CPUS];
 
 #define SVM_REG_EAX (0) 
 #define SVM_REG_ECX (1) 

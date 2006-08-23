@@ -92,7 +92,7 @@ static int setup_cpu_watcher(struct notifier_block *notifier,
 		.flags = XBWF_new_thread };
 	(void)register_xenbus_watch(&cpu_watch);
 
-	if (!(xen_start_info->flags & SIF_INITDOMAIN)) {
+	if (!is_initial_xendomain()) {
 		for_each_cpu(i)
 			vcpu_hotplug(i);
 		printk(KERN_INFO "Brought up %ld CPUs\n",

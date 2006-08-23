@@ -21,7 +21,7 @@
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/mm.h>
-#include <asm/shadow.h>
+#include <xen/shadow.h>
 #include <xen/domain_page.h>
 #include <asm/page.h>
 #include <xen/event.h>
@@ -35,9 +35,6 @@
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <asm/current.h>
-#if CONFIG_PAGING_LEVELS >= 3
-#include <asm/shadow_64.h>
-#endif
 
 #define DECODE_success  1
 #define DECODE_failure  0
@@ -462,7 +459,8 @@ static int hvm_decode(int realmode, unsigned char *opcode, struct instruction *i
                     return DECODE_success;
 
                 default:
-                    printf("%x, This opcode isn't handled yet!\n", *opcode);
+                    printf("%x/%x, This opcode isn't handled yet!\n",
+                           *opcode, ins_subtype);
                     return DECODE_failure;
             }
         }
@@ -723,7 +721,7 @@ void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
 
     if (pvalid) {
         if (hvm_paging_enabled(current))
-            p->u.pdata = (void *) gva_to_gpa(value);
+            p->u.data = shadow2_gva_to_gpa(current, value);
         else
             p->u.pdata = (void *) value; /* guest VA == guest PA */
     } else
@@ -773,7 +771,7 @@ void send_mmio_req(
 
     if (pvalid) {
         if (hvm_paging_enabled(v))
-            p->u.pdata = (void *) gva_to_gpa(value);
+            p->u.data = shadow2_gva_to_gpa(v, value);
         else
             p->u.pdata = (void *) value; /* guest VA == guest PA */
     } else

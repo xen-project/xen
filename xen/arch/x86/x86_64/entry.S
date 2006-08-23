@@ -87,7 +87,7 @@ failsafe_callback:
         jmp   test_all_events
 .previous
 .section __pre_ex_table,"a"
-	.quad FLT1,FIX1
+        .quad FLT1,FIX1
 .previous
 .section __ex_table,"a"
         .quad DBLFLT1,failsafe_callback
@@ -201,7 +201,7 @@ process_softirqs:
         call do_softirq
         jmp  test_all_events
 
-	ALIGN
+        ALIGN
 /* %rbx: struct vcpu */
 process_nmi:
         movq VCPU_nmi_addr(%rbx),%rax
@@ -294,8 +294,10 @@ FLT12:  movq  %rax,8(%rsi)              # R11
 FLT13:  movq  %rax,(%rsi)               # RCX
         /* Rewrite our stack frame and return to guest-OS mode. */
         /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
+        /* Also clear AC: alignment checks shouldn't trigger in kernel mode. */
         movl  $TRAP_syscall,UREGS_entry_vector+8(%rsp)
-        andl  $0xfffcbeff,UREGS_eflags+8(%rsp)
+        andl  $~(X86_EFLAGS_AC|X86_EFLAGS_VM|X86_EFLAGS_RF|\
+                 X86_EFLAGS_NT|X86_EFLAGS_TF),UREGS_eflags+8(%rsp)
         movq  $__GUEST_SS,UREGS_ss+8(%rsp)
         movq  %rsi,UREGS_rsp+8(%rsp)
         movq  $__GUEST_CS,UREGS_cs+8(%rsp)
@@ -394,12 +396,12 @@ ENTRY(divide_error)
 ENTRY(coprocessor_error)
         pushq $0
         movl  $TRAP_copro_error,4(%rsp)
-	jmp   handle_exception
+        jmp   handle_exception
 
 ENTRY(simd_coprocessor_error)
         pushq $0
         movl  $TRAP_simd_error,4(%rsp)
-	jmp   handle_exception
+        jmp   handle_exception
 
 ENTRY(device_not_available)
         pushq $0
@@ -409,66 +411,66 @@ ENTRY(device_not_available)
 ENTRY(debug)
         pushq $0
         movl  $TRAP_debug,4(%rsp)
-	jmp   handle_exception
+        jmp   handle_exception
 
 ENTRY(int3)
         pushq $0
-	movl  $TRAP_int3,4(%rsp)
-	jmp   handle_exception
+        movl  $TRAP_int3,4(%rsp)
+        jmp   handle_exception
 
 ENTRY(overflow)
         pushq $0
-	movl  $TRAP_overflow,4(%rsp)
-	jmp   handle_exception
+        movl  $TRAP_overflow,4(%rsp)
+        jmp   handle_exception
 
 ENTRY(bounds)
         pushq $0
-	movl  $TRAP_bounds,4(%rsp)
-	jmp   handle_exception
+        movl  $TRAP_bounds,4(%rsp)
+        jmp   handle_exception
 
 ENTRY(invalid_op)
         pushq $0
-	movl  $TRAP_invalid_op,4(%rsp)
-	jmp   handle_exception
+        movl  $TRAP_invalid_op,4(%rsp)
+        jmp   handle_exception
 
 ENTRY(coprocessor_segment_overrun)
         pushq $0
-	movl  $TRAP_copro_seg,4(%rsp)
-	jmp   handle_exception
+        movl  $TRAP_copro_seg,4(%rsp)
+        jmp   handle_exception
 
 ENTRY(invalid_TSS)
         movl  $TRAP_invalid_tss,4(%rsp)
-	jmp   handle_exception
+        jmp   handle_exception
 
 ENTRY(segment_not_present)
         movl  $TRAP_no_segment,4(%rsp)
-	jmp   handle_exception
+        jmp   handle_exception
 
 ENTRY(stack_segment)
         movl  $TRAP_stack_error,4(%rsp)
-	jmp   handle_exception
+        jmp   handle_exception
 
 ENTRY(general_protection)
         movl  $TRAP_gp_fault,4(%rsp)
-	jmp   handle_exception
+        jmp   handle_exception
 
 ENTRY(alignment_check)
         movl  $TRAP_alignment_check,4(%rsp)
-	jmp   handle_exception
+        jmp   handle_exception
 
 ENTRY(page_fault)
         movl  $TRAP_page_fault,4(%rsp)
-	jmp   handle_exception
+        jmp   handle_exception
 
 ENTRY(machine_check)
         pushq $0
         movl  $TRAP_machine_check,4(%rsp)
-	jmp   handle_exception
+        jmp   handle_exception
 
 ENTRY(spurious_interrupt_bug)
         pushq $0
         movl  $TRAP_spurious_int,4(%rsp)
-	jmp   handle_exception
+        jmp   handle_exception
 
 ENTRY(double_fault)
         SAVE_ALL

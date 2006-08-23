@@ -32,7 +32,7 @@
 #define HVM_DEBUG 1
 #endif
 
-#define	hvm_guest(v)	((v)->arch.guest_context.flags & VGCF_HVM_GUEST)
+#define hvm_guest(v) ((v)->arch.guest_context.flags & VGCF_HVM_GUEST)
 
 static inline shared_iopage_t *get_sp(struct domain *d)
 {
@@ -116,10 +116,13 @@ enum hval_bitmaps {
 #define DBG_LEVEL_IOAPIC            (1 << 9)
 
 extern unsigned int opt_hvm_debug_level;
-#define HVM_DBG_LOG(level, _f, _a...)           \
-    if ( (level) & opt_hvm_debug_level )        \
-        printk("[HVM:%d.%d] <%s> " _f "\n",     \
-               current->domain->domain_id, current->vcpu_id, __func__, ## _a)
+#define HVM_DBG_LOG(level, _f, _a...)                                         \
+    do {                                                                      \
+        if ( (level) & opt_hvm_debug_level )                                  \
+            printk("[HVM:%d.%d] <%s> " _f "\n",                               \
+                   current->domain->domain_id, current->vcpu_id, __func__,    \
+                   ## _a);                                                    \
+    } while (0)
 #else
 #define HVM_DBG_LOG(level, _f, _a...)
 #endif
@@ -147,5 +150,7 @@ extern void hlt_timer_fn(void *data);
 void hvm_do_hypercall(struct cpu_user_regs *pregs);
 
 void hvm_prod_vcpu(struct vcpu *v);
+
+void hvm_hlt(unsigned long rflags);
 
 #endif /* __ASM_X86_HVM_SUPPORT_H__ */

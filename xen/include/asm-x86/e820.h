@@ -1,29 +1,9 @@
 #ifndef __E820_HEADER
 #define __E820_HEADER
 
-#include <asm/page.h>
+#include <public/hvm/e820.h>
 
 #define E820MAX	128
-
-#define E820_RAM          1
-#define E820_RESERVED     2
-#define E820_ACPI         3
-#define E820_NVS          4
-#define E820_IO          16
-#define E820_SHARED_PAGE 17
-#define E820_XENSTORE    18
-#define E820_BUFFERED_IO 19
-
-#define E820_MAP_PAGE        0x00090000
-#define E820_MAP_NR_OFFSET   0x000001E8
-#define E820_MAP_OFFSET      0x000002D0
-
-#ifndef __ASSEMBLY__
-struct e820entry {
-    u64 addr;
-    u64 size;
-    u32 type;
-} __attribute__((packed));
 
 struct e820map {
     int nr_map;
@@ -32,14 +12,5 @@ struct e820map {
 
 extern unsigned long init_e820(struct e820entry *, int *);
 extern struct e820map e820;
-
-#ifndef NDEBUG
-extern void print_e820_memory_map(struct e820entry *map, int entries);
-#endif
-
-#endif /*!__ASSEMBLY__*/
-
-#define PFN_DOWN(x)   ((x) >> PAGE_SHIFT)
-#define PFN_UP(x)     (((x) + PAGE_SIZE-1) >> PAGE_SHIFT)
 
 #endif /*__E820_HEADER*/

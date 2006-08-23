@@ -470,8 +470,7 @@ int do_settimeofday(struct timespec *tv)
 	sec = tv->tv_sec;
 	__normalize_time(&sec, &nsec);
 
-	if ((xen_start_info->flags & SIF_INITDOMAIN) &&
-	    !independent_wallclock) {
+	if (is_initial_xendomain() && !independent_wallclock) {
 		op.cmd = DOM0_SETTIME;
 		op.u.settime.secs        = sec;
 		op.u.settime.nsecs       = nsec;
@@ -502,8 +501,7 @@ static void sync_xen_wallclock(unsigned long dummy)
 	s64 nsec;
 	dom0_op_t op;
 
-	if (!ntp_synced() || independent_wallclock ||
-	    !(xen_start_info->flags & SIF_INITDOMAIN))
+	if (!ntp_synced() || independent_wallclock || !is_initial_xendomain())
 		return;
 
 	write_seqlock_irq(&xtime_lock);
@@ -532,7 +530,7 @@ static int set_rtc_mmss(unsigned long nowtime)
 
 	WARN_ON(irqs_disabled());
 
-	if (independent_wallclock || !(xen_start_info->flags & SIF_INITDOMAIN))
+	if (independent_wallclock || !is_initial_xendomain())
 		return 0;
 
 	/* gets recalled with irq locally disabled */

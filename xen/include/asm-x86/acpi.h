@@ -116,7 +116,7 @@ extern int acpi_ht;
 extern int acpi_pci_disabled;
 static inline void disable_acpi(void) 
 { 
-	acpi_disabled = 1; 
+	acpi_disabled = 1;
 	acpi_ht = 0;
 	acpi_pci_disabled = 1;
 	acpi_noirq = 1;

@@ -16,15 +16,11 @@
 /* Handy for printing out '0' prepended values at native pointer size */
 #define _p(a) ((void *) ((ulong)a))
 
-#if defined(__i386__)
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
+#if defined(__i386__)
 #define L3_PROT (_PAGE_PRESENT)
-#endif
-
-#if defined(__x86_64__)
-#define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
-#define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
+#elif defined(__x86_64__)
 #define L3_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 #define L4_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 #endif
@@ -569,8 +565,8 @@ static int setup_guest(int xc_handle,
     start_info->flags        = flags;
     start_info->store_mfn    = nr_pages - 2;
     start_info->store_evtchn = store_evtchn;
-    start_info->console_mfn   = nr_pages - 1;
-    start_info->console_evtchn = console_evtchn;
+    start_info->console.domU.mfn   = nr_pages - 1;
+    start_info->console.domU.evtchn = console_evtchn;
     start_info->nr_pages       = nr_pages; // FIXME?: nr_pages - 2 ????
 
     bp = (struct xen_ia64_boot_param *)(start_info + 1);
@@ -593,7 +589,7 @@ static int setup_guest(int xc_handle,
         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE, shared_info_frame);
     printf("shared_info = %p, err=%s frame=%lx\n",
            shared_info, strerror (errno), shared_info_frame);
-    //memset(shared_info, 0, sizeof(shared_info_t));
+    //memset(shared_info, 0, PAGE_SIZE);
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
         shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
@@ -972,7 +968,7 @@ static int setup_guest(int xc_handle,
         /* Enable shadow translate mode */
         if ( xc_shadow_control(xc_handle, dom,
                                DOM0_SHADOW_CONTROL_OP_ENABLE_TRANSLATE,
-                               NULL, 0, NULL) < 0 )
+                               NULL, 0, NULL, 0, NULL) < 0 )
         {
             PERROR("Could not enable translation mode");
             goto error_out;
@@ -1047,8 +1043,8 @@ static int setup_guest(int xc_handle,
     start_info->mfn_list     = vphysmap_start;
     start_info->store_mfn    = guest_store_mfn;
     start_info->store_evtchn = store_evtchn;
-    start_info->console_mfn   = guest_console_mfn;
-    start_info->console_evtchn = console_evtchn;
+    start_info->console.domU.mfn   = guest_console_mfn;
+    start_info->console.domU.evtchn = console_evtchn;
     if ( initrd->len != 0 )
     {
         start_info->mod_start    = vinitrd_start;
@@ -1064,7 +1060,7 @@ static int setup_guest(int xc_handle,
     /* shared_info page starts its life empty. */
     shared_info = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE, shared_info_frame);
-    memset(shared_info, 0, sizeof(shared_info_t));
+    memset(shared_info, 0, PAGE_SIZE);
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
         shared_info->vcpu_info[i].evtchn_upcall_mask = 1;

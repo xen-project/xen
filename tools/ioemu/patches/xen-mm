@@ -1,7 +1,7 @@
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2006-08-06 02:15:39.708879311 +0100
-+++ ioemu/hw/pc.c	2006-08-06 02:18:18.875135656 +0100
+--- ioemu.orig/hw/pc.c	2006-08-17 19:36:00.588166019 +0100
++++ ioemu/hw/pc.c	2006-08-17 19:37:36.704485734 +0100
 @@ -646,7 +646,9 @@
      }
  
@@ -25,8 +25,8 @@ Index: ioemu/hw/pc.c
      isa_bios_size = bios_size;
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-08-06 02:18:12.550840673 +0100
-+++ ioemu/vl.c	2006-08-06 02:18:45.608155528 +0100
+--- ioemu.orig/vl.c	2006-08-17 19:36:00.667157242 +0100
++++ ioemu/vl.c	2006-08-17 19:47:08.538087284 +0100
 @@ -158,6 +158,8 @@
  int acpi_enabled = 1;
  int fd_bootchk = 1;
@@ -40,7 +40,7 @@ Index: ioemu/vl.c
      QEMUMachine *machine;
      char usb_devices[MAX_USB_CMDLINE][128];
      int usb_devices_index;
-+    unsigned long nr_pages;
++    unsigned long nr_pages, tmp_nr_pages, shared_page_nr;
 +    xen_pfn_t *page_array;
 +    extern void *shared_page;
  
@@ -60,16 +60,26 @@ Index: ioemu/vl.c
                  break;
              case QEMU_OPTION_l:
                  {
-@@ -6133,12 +6140,49 @@
+@@ -6133,12 +6140,67 @@
      /* init the memory */
      phys_ram_size = ram_size + vga_ram_size + bios_size;
  
 +#ifdef CONFIG_DM
 +
-+    nr_pages = ram_size/PAGE_SIZE;
 +    xc_handle = xc_interface_open();
 +
-+    page_array = (xen_pfn_t *)malloc(nr_pages * sizeof(xen_pfn_t));
++    nr_pages = ram_size/PAGE_SIZE;
++    tmp_nr_pages = nr_pages;
++
++#if defined(__i386__) || defined(__x86_64__)
++    if (ram_size > HVM_BELOW_4G_RAM_END) {
++        tmp_nr_pages += HVM_BELOW_4G_MMIO_LENGTH >> PAGE_SHIFT;
++        shared_page_nr = (HVM_BELOW_4G_RAM_END >> PAGE_SHIFT) - 1;
++    } else
++        shared_page_nr = nr_pages - 1;
++#endif
++
++    page_array = (xen_pfn_t *)malloc(tmp_nr_pages * sizeof(xen_pfn_t));
 +    if (page_array == NULL) {
 +        fprintf(logfile, "malloc returned error %d\n", errno);
 +        exit(-1);
@@ -80,20 +90,28 @@ Index: ioemu/vl.c
 +        exit(-1);
 +    }
 +
++    if (ram_size > HVM_BELOW_4G_RAM_END)
++        for (i = 0; i < nr_pages - (HVM_BELOW_4G_RAM_END >> PAGE_SHIFT); i++)
++            page_array[tmp_nr_pages - 1 - i] = page_array[nr_pages - 1 - i];
++
 +    phys_ram_base = xc_map_foreign_batch(xc_handle, domid,
 +                                         PROT_READ|PROT_WRITE, page_array,
-+                                         nr_pages - 1);
-+    if (phys_ram_base == 0) {
-+        fprintf(logfile, "xc_map_foreign_batch returned error %d\n", errno);
++                                         tmp_nr_pages);
++    if (phys_ram_base == NULL) {
++        fprintf(logfile, "batch map guest memory returned error %d\n", errno);
 +        exit(-1);
 +    }
 +
 +    shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
 +                                       PROT_READ|PROT_WRITE,
-+                                       page_array[nr_pages - 1]);
++                                       page_array[shared_page_nr]);
++    if (shared_page == NULL) {
++        fprintf(logfile, "map shared IO page returned error %d\n", errno);
++        exit(-1);
++    }
 +
-+    fprintf(logfile, "shared page at pfn:%lx, mfn: %"PRIx64"\n", nr_pages - 1,
-+            (uint64_t)(page_array[nr_pages - 1]));
++    fprintf(logfile, "shared page at pfn:%lx, mfn: %"PRIx64"\n",
++            shared_page_nr, (uint64_t)(page_array[shared_page_nr]));
 +
 +    free(page_array);
 +
@@ -110,3 +128,28 @@ Index: ioemu/vl.c
      /* we always create the cdrom drive, even if no disk is there */
      bdrv_init();
      if (cdrom_index >= 0) {
+Index: ioemu/hw/piix_pci.c
+===================================================================
+--- ioemu.orig/hw/piix_pci.c	2006-08-17 19:37:36.189542951 +0100
++++ ioemu/hw/piix_pci.c	2006-08-17 19:38:05.806252180 +0100
+@@ -399,7 +399,7 @@
+     uint8_t elcr[2];
+ 
+     pci_bios_io_addr = 0xc000;
+-    pci_bios_mem_addr = 0xf0000000;
++    pci_bios_mem_addr = HVM_BELOW_4G_MMIO_START;
+ 
+     /* activate IRQ mappings */
+     elcr[0] = 0x00;
+Index: ioemu/vl.h
+===================================================================
+--- ioemu.orig/vl.h	2006-08-17 19:37:36.529505177 +0100
++++ ioemu/vl.h	2006-08-17 19:47:32.680418959 +0100
+@@ -39,6 +39,7 @@
+ #include <sys/stat.h>
+ #include "xenctrl.h"
+ #include "xs.h"
++#include <xen/hvm/e820.h>
+ 
+ #ifndef O_LARGEFILE
+ #define O_LARGEFILE 0

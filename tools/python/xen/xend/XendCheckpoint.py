@@ -78,7 +78,7 @@ def save(fd, dominfo, network, live, dst):
         # enabled. Passing "0" simply uses the defaults compiled into
         # libxenguest; see the comments and/or code in xc_linux_save() for
         # more information.
-        cmd = [xen.util.auxbin.pathTo(XC_SAVE), str(xc.handle()), str(fd),
+        cmd = [xen.util.auxbin.pathTo(XC_SAVE), str(fd),
                str(dominfo.getDomid()), "0", "0", str(int(live)) ]
         log.debug("[xc_save]: %s", string.join(cmd))
 
@@ -150,7 +150,7 @@ def restore(xd, fd):
         balloon.free(xc.pages_to_kib(nr_pfns))
 
         cmd = map(str, [xen.util.auxbin.pathTo(XC_RESTORE),
-                        xc.handle(), fd, dominfo.getDomid(), nr_pfns,
+                        fd, dominfo.getDomid(), nr_pfns,
                         store_port, console_port])
         log.debug("[xc_restore]: %s", string.join(cmd))
 

@@ -343,12 +343,12 @@ static void dump_timerq(unsigned char key)
 {
     struct timer  *t;
     struct timers *ts;
-    unsigned long  flags; 
+    unsigned long  flags;
     s_time_t       now = NOW();
     int            i, j;
 
     printk("Dumping timer queues: NOW=0x%08X%08X\n",
-           (u32)(now>>32), (u32)now); 
+           (u32)(now>>32), (u32)now);
 
     for_each_online_cpu( i )
     {
@@ -382,7 +382,7 @@ void __init timer_init(void)
     SET_HEAP_SIZE(&dummy_heap, 0);
     SET_HEAP_LIMIT(&dummy_heap, 0);
 
-    for ( i = 0; i < NR_CPUS; i++ )
+    for_each_cpu ( i )
     {
         spin_lock_init(&per_cpu(timers, i).lock);
         per_cpu(timers, i).heap = &dummy_heap;

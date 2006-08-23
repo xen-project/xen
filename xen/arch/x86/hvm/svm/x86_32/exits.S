@@ -56,8 +56,8 @@
  * domain pointer, DS, ES, FS, GS. Therefore, we effectively skip 6 registers.
  */
 
-#define HVM_MONITOR_EFLAGS	0x202 /* IF on */
-#define NR_SKIPPED_REGS	6	/* See the above explanation */
+#define HVM_MONITOR_EFLAGS 0x202 /* IF on */
+#define NR_SKIPPED_REGS    6     /* See the above explanation */
 #define HVM_SAVE_ALL_NOSEGREGS \
         pushl $HVM_MONITOR_EFLAGS; \
         popf; \
@@ -95,7 +95,8 @@ ENTRY(svm_asm_do_launch)
         movl VCPU_svm_vmcb(%ebx), %ecx
         movl 24(%esp), %eax
         movl %eax, VMCB_rax(%ecx)
-        movl VCPU_svm_hsa_pa(%ebx), %eax
+        movl VCPU_processor(%ebx), %eax
+        movl root_vmcb_pa(,%eax,8), %eax
         VMSAVE
 
         movl VCPU_svm_vmcb_pa(%ebx), %eax
@@ -119,7 +120,8 @@ ENTRY(svm_asm_do_launch)
 
         GET_CURRENT(%eax)
 
-        movl VCPU_svm_hsa_pa(%eax), %eax
+        movl VCPU_processor(%eax), %eax
+        movl root_vmcb_pa(,%eax,8), %eax
         VMLOAD
 
         HVM_SAVE_ALL_NOSEGREGS
@@ -133,7 +135,7 @@ ENTRY(svm_asm_do_resume)
 svm_test_all_events:
         GET_CURRENT(%ebx)
         pushl %ebx
-        call svm_do_resume
+        call hvm_do_resume
         addl $4, %esp
 /*test_all_events:*/
         xorl %ecx,%ecx

@@ -277,6 +277,21 @@ void show_stack(struct cpu_user_regs *regs)
     show_trace(regs);
 }
 
+void show_xen_trace()
+{
+    struct cpu_user_regs regs;
+#ifdef __x86_64
+    __asm__("movq %%rsp,%0" : "=m" (regs.rsp));
+    __asm__("movq %%rbp,%0" : "=m" (regs.rbp));
+    __asm__("leaq 0(%%rip),%0" : "=a" (regs.rip));
+#else
+    __asm__("movl %%esp,%0" : "=m" (regs.esp));
+    __asm__("movl %%ebp,%0" : "=m" (regs.ebp));
+    __asm__("call 1f; 1: popl %0" : "=a" (regs.eip));
+#endif
+    show_trace(&regs);
+}
+
 void show_stack_overflow(unsigned long esp)
 {
 #ifdef MEMORY_GUARD
@@ -611,12 +626,6 @@ asmlinkage int do_invalid_op(struct cpu_user_regs *regs)
             regs->eip += sizeof(sig);
             return EXCRET_fault_fixed;
         }
-        printk("%02x %02x %02x %02x %02x\n",
-               (unsigned char)sig[0],
-               (unsigned char)sig[1],
-               (unsigned char)sig[2],
-               (unsigned char)sig[3],
-               (unsigned char)sig[4]);
         DEBUGGER_trap_fatal(TRAP_invalid_op, regs);
         show_execution_state(regs);
         panic("CPU%d FATAL TRAP: vector = %d (invalid opcode)\n",
@@ -713,7 +722,6 @@ static int handle_gdt_ldt_mapping_fault(
     {
         /* LDT fault: Copy a mapping from the guest's LDT, if it is valid. */
         LOCK_BIGLOCK(d);
-        cleanup_writable_pagetable(d);
         ret = map_ldt_shadow_page(offset >> PAGE_SHIFT);
         UNLOCK_BIGLOCK(d);
 
@@ -780,13 +788,13 @@ static int __spurious_page_fault(
     l4e = l4t[l4_table_offset(addr)];
     mfn = l4e_get_pfn(l4e);
     unmap_domain_page(l4t);
-    if ( !(l4e_get_flags(l4e) & required_flags) ||
+    if ( ((l4e_get_flags(l4e) & required_flags) != required_flags) ||
          (l4e_get_flags(l4e) & disallowed_flags) )
         return 0;
 #endif
 
 #if CONFIG_PAGING_LEVELS >= 3
-    l3t  = map_domain_page(mfn); 
+    l3t  = map_domain_page(mfn);
 #ifdef CONFIG_X86_PAE
     l3t += (cr3 & 0xFE0UL) >> 3;
 #endif
@@ -797,7 +805,7 @@ static int __spurious_page_fault(
     if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
         return 0;
 #else
-    if ( !(l3e_get_flags(l3e) & required_flags) ||
+    if ( ((l3e_get_flags(l3e) & required_flags) != required_flags) ||
          (l3e_get_flags(l3e) & disallowed_flags) )
         return 0;
 #endif
@@ -807,7 +815,7 @@ static int __spurious_page_fault(
     l2e = l2t[l2_table_offset(addr)];
     mfn = l2e_get_pfn(l2e);
     unmap_domain_page(l2t);
-    if ( !(l2e_get_flags(l2e) & required_flags) ||
+    if ( ((l2e_get_flags(l2e) & required_flags) != required_flags) ||
          (l2e_get_flags(l2e) & disallowed_flags) )
         return 0;
     if ( l2e_get_flags(l2e) & _PAGE_PSE )
@@ -820,7 +828,7 @@ static int __spurious_page_fault(
     l1e = l1t[l1_table_offset(addr)];
     mfn = l1e_get_pfn(l1e);
     unmap_domain_page(l1t);
-    if ( !(l1e_get_flags(l1e) & required_flags) ||
+    if ( ((l1e_get_flags(l1e) & required_flags) != required_flags) ||
          (l1e_get_flags(l1e) & disallowed_flags) )
         return 0;
 
@@ -849,7 +857,6 @@ static int spurious_page_fault(
     int            is_spurious;
 
     LOCK_BIGLOCK(d);
-    cleanup_writable_pagetable(d);
     is_spurious = __spurious_page_fault(addr, regs);
     UNLOCK_BIGLOCK(d);
 
@@ -863,8 +870,8 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
 
     if ( unlikely(IN_HYPERVISOR_RANGE(addr)) )
     {
-        if ( shadow_mode_external(d) && guest_mode(regs) )
-            return shadow_fault(addr, regs);
+        if ( shadow2_mode_external(d) && guest_mode(regs) )
+            return shadow2_fault(addr, regs);
         if ( (addr >= GDT_LDT_VIRT_START) && (addr < GDT_LDT_VIRT_END) )
             return handle_gdt_ldt_mapping_fault(
                 addr - GDT_LDT_VIRT_START, regs);
@@ -875,36 +882,16 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
         return (spurious_page_fault(addr, regs) ? EXCRET_not_a_fault : 0);
     }
 
-    if ( unlikely(shadow_mode_enabled(d)) )
-        return shadow_fault(addr, regs);
+    if ( VM_ASSIST(d, VMASST_TYPE_writable_pagetables) &&
+         guest_kernel_mode(v, regs) &&
+         /* Do not check if access-protection fault since the page may 
+            legitimately be not present in shadow page tables */
+         ((regs->error_code & PGERR_write_access) == PGERR_write_access) &&
+         ptwr_do_page_fault(d, addr, regs) )
+        return EXCRET_fault_fixed;
 
-    if ( likely(VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) )
-    {
-        LOCK_BIGLOCK(d);
-        if ( unlikely(d->arch.ptwr[PTWR_PT_ACTIVE].l1va) &&
-             unlikely(l2_linear_offset(addr) ==
-                      d->arch.ptwr[PTWR_PT_ACTIVE].l2_idx) )
-        {
-            ptwr_flush(d, PTWR_PT_ACTIVE);
-            UNLOCK_BIGLOCK(d);
-            return EXCRET_fault_fixed;
-        }
-
-        /*
-         * Note it is *not* safe to check PGERR_page_present here. It can be
-         * clear, due to unhooked page table, when we would otherwise expect
-         * it to be set. We have an aversion to trusting that flag in Xen, and
-         * guests ought to be leery too.
-         */
-        if ( guest_kernel_mode(v, regs) &&
-             (regs->error_code & PGERR_write_access) &&
-             ptwr_do_page_fault(d, addr, regs) )
-        {
-            UNLOCK_BIGLOCK(d);
-            return EXCRET_fault_fixed;
-        }
-        UNLOCK_BIGLOCK(d);
-    }
+    if ( shadow2_mode_enabled(d) )
+        return shadow2_fault(addr, regs);
 
     return 0;
 }
@@ -1324,7 +1311,6 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
         case 3: /* Write CR3 */
             LOCK_BIGLOCK(v->domain);
-            cleanup_writable_pagetable(v->domain);
             (void)new_guest_cr3(gmfn_to_mfn(v->domain, xen_cr3_to_pfn(*reg)));
             UNLOCK_BIGLOCK(v->domain);
             break;

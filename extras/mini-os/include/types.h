@@ -29,7 +29,7 @@ typedef unsigned int        u32;
 #ifdef __i386__
 typedef signed long long    s64;
 typedef unsigned long long  u64;
-#elif defined(__x86_64__)
+#elif defined(__x86_64__) || defined(__ia64__)
 typedef signed long         s64;
 typedef unsigned long       u64;
 #endif
@@ -49,7 +49,7 @@ typedef struct { unsigned long pte_low; } pte_t;
 typedef struct { unsigned long pte_low, pte_high; } pte_t;
 #endif /* CONFIG_X86_PAE */
 
-#elif defined(__x86_64__)
+#elif defined(__x86_64__) || defined(__ia64__)
 typedef long                quad_t;
 typedef unsigned long       u_quad_t;
 typedef unsigned long       uintptr_t;

@@ -39,5 +39,7 @@ int xb_write(const void *data, unsigned len);
 int xb_read(void *data, unsigned len);
 int xs_input_avail(void);
 extern wait_queue_head_t xb_waitq;
+extern struct xenstore_domain_interface *xen_store_interface;
+extern int xen_store_evtchn;
 
 #endif /* _XENBUS_COMMS_H */

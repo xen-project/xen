@@ -31,6 +31,13 @@
 
 #undef SERIALIZE
 
+unsigned int cpu_rma_order(void)
+{
+    /* XXX what about non-HV mode? */
+    uint rma_log_size = 6 + 20; /* 64M */
+    return rma_log_size - PAGE_SHIFT;
+}
+
 void cpu_initialize(void)
 {
     ulong stack;
@@ -102,15 +109,14 @@ void cpu_initialize(void)
     mthid5(hid5.word);
 
     __asm__ __volatile__("isync; slbia; isync" : : : "memory");
-    
 }
 
 void cpu_init_vcpu(struct vcpu *v)
 {
     struct domain *d = v->domain;
     union hid4 hid4;
-    ulong rma_base = d->arch.rma_base;
-    ulong rma_size = d->arch.rma_size;
+    ulong rma_base = page_to_maddr(d->arch.rma_page);
+    ulong rma_size = rma_size(d->arch.rma_order);
 
     hid4.word = mfhid4();
 

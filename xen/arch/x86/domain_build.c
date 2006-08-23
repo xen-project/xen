@@ -12,6 +12,7 @@
 #include <xen/smp.h>
 #include <xen/delay.h>
 #include <xen/event.h>
+#include <xen/console.h>
 #include <xen/elf.h>
 #include <xen/kernel.h>
 #include <xen/domain.h>
@@ -118,7 +119,7 @@ static void process_dom0_ioports_disable(void)
                    "in dom0_ioports_disable, skipping\n", t);
             continue;
         }
-	
+
         if ( *u == '\0' )
             io_to = io_from;
         else if ( *u == '-' )
@@ -334,8 +335,10 @@ int construct_dom0(struct domain *d,
     vphysmap_start   = round_pgup(vinitrd_end);
     vphysmap_end     = vphysmap_start + (nr_pages * sizeof(unsigned long));
     vstartinfo_start = round_pgup(vphysmap_end);
-    vstartinfo_end   = vstartinfo_start + PAGE_SIZE;
-    vpt_start        = vstartinfo_end;
+    vstartinfo_end   = (vstartinfo_start +
+                        sizeof(struct start_info) +
+                        sizeof(struct dom0_vga_console_info));
+    vpt_start        = round_pgup(vstartinfo_end);
     for ( nr_pt_pages = 2; ; nr_pt_pages++ )
     {
         vpt_end          = vpt_start + (nr_pt_pages * PAGE_SIZE);
@@ -466,7 +469,7 @@ int construct_dom0(struct domain *d,
     {
         if ( !((unsigned long)l1tab & (PAGE_SIZE-1)) )
         {
-            l1start = l1tab = (l1_pgentry_t *)mpt_alloc; 
+            l1start = l1tab = (l1_pgentry_t *)mpt_alloc;
             mpt_alloc += PAGE_SIZE;
             *l2tab = l2e_from_paddr((unsigned long)l1start, L2_PROT);
             l2tab++;
@@ -658,7 +661,7 @@ int construct_dom0(struct domain *d,
             if ( !((unsigned long)++l2tab & (PAGE_SIZE - 1)) )
             {
                 if ( !((unsigned long)++l3tab & (PAGE_SIZE - 1)) )
-                    l3start = l3tab = l4e_to_l3e(*++l4tab); 
+                    l3start = l3tab = l4e_to_l3e(*++l4tab);
                 l2start = l2tab = l3e_to_l2e(*l3tab);
             }
             l1start = l1tab = l2e_to_l1e(*l2tab);
@@ -680,8 +683,11 @@ int construct_dom0(struct domain *d,
     for ( i = 1; i < opt_dom0_max_vcpus; i++ )
         (void)alloc_vcpu(d, i, i);
 
-    /* Set up monitor table */
-    update_pagetables(v);
+    /* Set up CR3 value for write_ptbase */
+    if ( shadow2_mode_enabled(v->domain) )
+        shadow2_update_paging_modes(v);
+    else
+        update_cr3(v);
 
     /* Install the new page tables. */
     local_irq_disable();
@@ -770,6 +776,12 @@ int construct_dom0(struct domain *d,
     if ( cmdline != NULL )
         strncpy((char *)si->cmd_line, cmdline, sizeof(si->cmd_line)-1);
 
+    if ( fill_console_start_info((void *)(si + 1)) )
+    {
+        si->console.dom0.info_off  = sizeof(struct start_info);
+        si->console.dom0.info_size = sizeof(struct dom0_vga_console_info);
+    }
+
     /* Reinstate the caller's page tables. */
     write_ptbase(current);
     local_irq_enable();
@@ -787,10 +799,8 @@ int construct_dom0(struct domain *d,
     new_thread(v, dsi.v_kernentry, vstack_end, vstartinfo_start);
 
     if ( opt_dom0_shadow )
-    {
-        shadow_mode_enable(d, SHM_enable);
-        update_pagetables(v);
-    }
+        if ( shadow2_test_enable(d) == 0 ) 
+            shadow2_update_paging_modes(v);
 
     if ( supervisor_mode_kernel )
     {

@@ -449,6 +449,9 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
                 /* RAM case */
                 ptr = phys_ram_base + addr1;
                 memcpy(ptr, buf, l);
+#ifdef __ia64__
+                sync_icache((unsigned long)ptr, l);
+#endif 
             }
         } else {
             if (io_index) {
@@ -473,9 +476,6 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
                 ptr = phys_ram_base + (pd & TARGET_PAGE_MASK) + 
                     (addr & ~TARGET_PAGE_MASK);
                 memcpy(buf, ptr, l);
-#ifdef __ia64__
-                sync_icache((unsigned long)ptr, l);
-#endif 
             } else {
                 /* unreported MMIO space */
                 memset(buf, 0xff, len);
