@@ -159,7 +159,7 @@ struct domain_setup_info
      * pickup the correct one and retain backwards compatibility.
      */
     void *__elfnote_section, *__elfnote_section_end;
-    char *__xen_guest_string;
+    const char *__xen_guest_string;
 };
 
 typedef int (*parseimagefunc)(const char *image, unsigned long image_size,

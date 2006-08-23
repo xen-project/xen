@@ -109,15 +109,13 @@ static const char *xen_guest_string(struct domain_setup_info *dsi, int type)
 {
     const char *p = xen_guest_lookup(dsi, type);
 
-    DPRINTF("found __xen_guest entry for type %#x = \"%s\"\n",
-            type, p);
-
     /*
      * We special case this since the __xen_guest_section treats the
      * mere precense of the BSD_SYMTAB string as true or false.
      */
     if ( type == XEN_ELFNOTE_BSD_SYMTAB )
         return p ? "yes" : "no";
+
     return p;
 }
 
@@ -140,9 +138,6 @@ static unsigned long long xen_guest_numeric(struct domain_setup_info *dsi,
      */
     if (type == XEN_ELFNOTE_HYPERCALL_PAGE)
         value = dsi->v_start + (value<<PAGE_SHIFT);
-
-    DPRINTF("found __xen_guest entry for type %#x = %#llx\n",
-            type, value);
 
     *defined = 1;
     return value;
@@ -177,6 +172,9 @@ static Elf_Note *xen_elfnote_lookup(struct domain_setup_info *dsi, int type)
 {
     Elf_Note *note;
 
+    if ( !dsi->__elfnote_section )
+        return NULL;
+
     for ( note = (Elf_Note *)dsi->__elfnote_section;
           note < (Elf_Note *)dsi->__elfnote_section_end;
           note = ELFNOTE_NEXT(note) )
@@ -188,7 +186,6 @@ static Elf_Note *xen_elfnote_lookup(struct domain_setup_info *dsi, int type)
             return note;
     }
 
-    DPRINTF("unable to find Xen ELF note with type %#x\n", type);
     return NULL;
 }
 
@@ -202,9 +199,6 @@ const char *xen_elfnote_string(struct domain_setup_info *dsi, int type)
     note = xen_elfnote_lookup(dsi, type);
     if ( note == NULL )
         return NULL;
-
-    DPRINTF("found Xen ELF note type %#x = \"%s\"\n",
-            type, (char *)ELFNOTE_DESC(note));
 
     return (const char *)ELFNOTE_DESC(note);
 }
@@ -297,7 +291,6 @@ static int parseelfimage(const char *image,
         shdr = (Elf_Shdr *)(image + ehdr->e_shoff + (h*ehdr->e_shentsize));
         if ( !is_xen_elfnote_section(image, shdr) )
             continue;
-        DPRINTF("found note section containing Xen entries\n");
         dsi->__elfnote_section = (void *)image + shdr->sh_offset;
         dsi->__elfnote_section_end =
             (void *)image + shdr->sh_offset + shdr->sh_size;
@@ -312,7 +305,6 @@ static int parseelfimage(const char *image,
             shdr = (Elf_Shdr *)(image + ehdr->e_shoff + (h*ehdr->e_shentsize));
             if ( is_xen_guest_section(shdr, shstrtab) )
             {
-                DPRINTF("found a legacy __xen_guest section\n");
                 dsi->__xen_guest_string = (char *)image + shdr->sh_offset;
                 break;
             }
@@ -343,16 +335,18 @@ static int parseelfimage(const char *image,
     }
     else
     {
-#ifdef __ia64__
-        dsi->__elfnote_section = NULL;
-        dsi->__xen_guest_string = "";
-#else
+#if defined(__x86_64__) || defined(__i386__)
         ERROR("Not a Xen-ELF image: "
               "No ELF notes or '__xen_guest' section found.");
         return -EINVAL;
 #endif
     }
 
+    /*
+     * If we have ELF notes then PAE=yes implies that we must support
+     * the extended cr3 syntax. Otherwise we need to find the
+     * [extended-cr3] syntax in the __xen_guest string.
+     */
     dsi->pae_kernel = PAEKERN_no;
     if ( dsi->__elfnote_section )
     {
