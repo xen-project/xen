@@ -185,7 +185,7 @@ struct domain_setup_info
     unsigned long symtab_addr;
     unsigned long symtab_len;
     /* Indicate whether it's xen specific image */
-    char *xen_section_string;
+    void *__elfnote_section, *__elfnote_section_end;
 };
 
 extern struct vcpu *idle_vcpu[NR_CPUS];

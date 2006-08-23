@@ -28,6 +28,7 @@
 #include <asm/shadow.h>
 
 #include <public/version.h>
+#include <public/elfnote.h>
 
 extern unsigned long initial_images_nrpages(void);
 extern void discard_initial_images(void);
@@ -210,8 +211,9 @@ int construct_dom0(struct domain *d,
     struct page_info *page = NULL;
     start_info_t *si;
     struct vcpu *v = d->vcpu[0];
-    char *p;
+    const char *p;
     unsigned long hypercall_page;
+    int hypercall_page_defined;
 #if defined(__i386__)
     char *image_start  = (char *)_image_start;  /* use lowmem mappings */
     char *initrd_start = (char *)_initrd_start; /* use lowmem mappings */
@@ -288,13 +290,14 @@ int construct_dom0(struct domain *d,
     if ( (rc = parseelfimage(&dsi)) != 0 )
         return rc;
 
-    if ( dsi.xen_section_string == NULL )
+    if ( dsi.__elfnote_section == NULL )
     {
-        printk("Not a Xen-ELF image: '__xen_guest' section not found.\n");
+        printk("Not a Xen-ELF image: no Xen ELF notes were found.\n");
         return -EINVAL;
     }
 
-    dom0_pae = !!strstr(dsi.xen_section_string, "PAE=yes");
+    p = xen_elfnote_string(&dsi, XEN_ELFNOTE_PAE_MODE);
+    dom0_pae = !!(p != NULL && strcmp(p, "yes") == 0);
     xen_pae  = (CONFIG_PAGING_LEVELS == 3);
     if ( dom0_pae != xen_pae )
     {
@@ -303,15 +306,14 @@ int construct_dom0(struct domain *d,
         return -EINVAL;
     }
 
-    if ( xen_pae && !!strstr(dsi.xen_section_string, "PAE=yes[extended-cr3]") )
+    if ( xen_pae )
         set_bit(VMASST_TYPE_pae_extended_cr3, &d->vm_assist);
 
-    if ( (p = strstr(dsi.xen_section_string, "FEATURES=")) != NULL )
+    if ( (p = xen_elfnote_string(&dsi, XEN_ELFNOTE_FEATURES)) != NULL )
     {
-        parse_features(
-            p + strlen("FEATURES="),
-            dom0_features_supported,
-            dom0_features_required);
+        parse_features(p,
+                       dom0_features_supported,
+                       dom0_features_required);
         printk("Domain 0 kernel supports features = { %08x }.\n",
                dom0_features_supported[0]);
         printk("Domain 0 kernel requires features = { %08x }.\n",
@@ -696,20 +698,17 @@ int construct_dom0(struct domain *d,
     /* Copy the OS image and free temporary buffer. */
     (void)loadelfimage(&dsi);
 
-    p = strstr(dsi.xen_section_string, "HYPERCALL_PAGE=");
-    if ( p != NULL )
+    hypercall_page =
+        xen_elfnote_numeric(&dsi, XEN_ELFNOTE_HYPERCALL_PAGE, &hypercall_page_defined);
+    if ( hypercall_page_defined )
     {
-        p += strlen("HYPERCALL_PAGE=");
-        hypercall_page = simple_strtoul(p, NULL, 16);
-        hypercall_page = dsi.v_start + (hypercall_page << PAGE_SHIFT);
         if ( (hypercall_page < dsi.v_start) || (hypercall_page >= v_end) )
         {
             write_ptbase(current);
             local_irq_enable();
-            printk("Invalid HYPERCALL_PAGE field in guest header.\n");
+            printk("Invalid HYPERCALL_PAGE field in ELF notes.\n");
             return -1;
         }
-
         hypercall_page_initialise(d, (void *)hypercall_page);
     }
 

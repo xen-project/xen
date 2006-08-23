@@ -529,6 +529,10 @@ struct domain_setup_info;
 extern int loadelfimage(struct domain_setup_info *);
 extern int parseelfimage(struct domain_setup_info *);
 
+extern unsigned long long xen_elfnote_numeric(struct domain_setup_info *dsi,
+					      int type, int *defined);
+extern const char *xen_elfnote_string(struct domain_setup_info *dsi, int type);
+
 #ifdef Elf_Ehdr
 extern int elf_sanity_check(Elf_Ehdr *ehdr);
 #endif
