@@ -655,11 +655,13 @@ static int setup_guest(int xc_handle,
                        uint32_t required_features[XENFEAT_NR_SUBMAPS])
 {
     xen_pfn_t *page_array = NULL;
-    unsigned long count, i, hypercall_pfn;
+    unsigned long count, i;
+    unsigned long long hypercall_page;
+    int hypercall_page_defined;
     start_info_t *start_info;
     shared_info_t *shared_info;
     xc_mmu_t *mmu = NULL;
-    char *p;
+    const char *p;
     DECLARE_DOM0_OP;
     int rc;
 
@@ -704,12 +706,9 @@ static int setup_guest(int xc_handle,
         goto error_out;
 
     /* Parse and validate kernel features. */
-    p = strstr(dsi.xen_guest_string, "FEATURES=");
-    if ( p != NULL )
+    if ( (p = xen_elfnote_string(&dsi, XEN_ELFNOTE_FEATURES)) != NULL )
     {
-        if ( !parse_features(p + strlen("FEATURES="),
-                             supported_features,
-                             required_features) )
+        if ( !parse_features(p, supported_features, required_features) )
         {
             ERROR("Failed to parse guest kernel features.");
             goto error_out;
@@ -1071,16 +1070,16 @@ static int setup_guest(int xc_handle,
     if ( xc_finish_mmu_updates(xc_handle, mmu) )
         goto error_out;
 
-    p = strstr(dsi.xen_guest_string, "HYPERCALL_PAGE=");
-    if ( p != NULL )
+    hypercall_page = xen_elfnote_numeric(&dsi, XEN_ELFNOTE_HYPERCALL_PAGE,
+                                         &hypercall_page_defined);
+    if ( hypercall_page_defined )
     {
-        p += strlen("HYPERCALL_PAGE=");
-        hypercall_pfn = strtoul(p, NULL, 16);
-        if ( hypercall_pfn >= nr_pages )
+        unsigned long long pfn = (hypercall_page - dsi.v_start) >> PAGE_SHIFT;
+        if ( pfn >= nr_pages )
             goto error_out;
         op.u.hypercall_init.domain = (domid_t)dom;
         op.u.hypercall_init.gmfn   = shadow_mode_enabled ?
-            hypercall_pfn : page_array[hypercall_pfn];
+            pfn : page_array[pfn];
         op.cmd = DOM0_HYPERCALL_INIT;
         if ( xc_dom0_op(xc_handle, &op) )
             goto error_out;

@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/types.h>
@@ -16,6 +17,7 @@
 
 #include <xen/sys/privcmd.h>
 #include <xen/memory.h>
+#include <xen/elfnote.h>
 
 /* valgrind cannot see when a hypercall has filled in some values.  For this
    reason, we must zero the dom0_op_t instance before a call, if using
@@ -149,8 +151,15 @@ struct domain_setup_info
     unsigned long symtab_addr;
     unsigned long symtab_len;
 
-    /* __xen_guest info string for convenient loader parsing. */
-    char *xen_guest_string;
+    /*
+     * Only one of __elfnote_* or __xen_guest_string will be
+     * non-NULL.
+     *
+     * You should use the xen_elfnote_* accessors below in order to
+     * pickup the correct one and retain backwards compatibility.
+     */
+    void *__elfnote_section, *__elfnote_section_end;
+    char *__xen_guest_string;
 };
 
 typedef int (*parseimagefunc)(const char *image, unsigned long image_size,
@@ -159,6 +168,21 @@ typedef int (*loadimagefunc)(const char *image, unsigned long image_size,
                              int xch,
                              uint32_t dom, xen_pfn_t *parray,
                              struct domain_setup_info *dsi);
+
+/*
+ * If an ELF note of the given type is found then the value contained
+ * in the note is returned and *defined is set to non-zero. If no such
+ * note is found then *defined is set to 0 and 0 is returned.
+ */
+extern unsigned long long xen_elfnote_numeric(struct domain_setup_info *dsi,
+					      int type, int *defined);
+
+/*
+ * If an ELF note of the given type is found then the string contained
+ * in the value is returned, otherwise NULL is returned.
+ */
+extern const char * xen_elfnote_string(struct domain_setup_info *dsi,
+				       int type);
 
 struct load_funcs
 {
