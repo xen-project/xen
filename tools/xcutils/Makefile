@@ -26,7 +26,7 @@ CFLAGS += $(INCLUDES)
 CFLAGS += -Wp,-MD,.$(@F).d
 PROG_DEP = .*.d
 
-PROGRAMS		= xc_restore xc_save
+PROGRAMS		= xc_restore xc_save readnotes
 
 LDLIBS			= -L$(XEN_LIBXC) -lxenguest -lxenctrl
 
