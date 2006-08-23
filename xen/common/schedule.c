@@ -49,11 +49,9 @@ static void poll_timer_fn(void *data);
 /* This is global for now so that private implementations can reach it */
 DEFINE_PER_CPU(struct schedule_data, schedule_data);
 
-extern struct scheduler sched_bvt_def;
 extern struct scheduler sched_sedf_def;
 extern struct scheduler sched_credit_def;
 static struct scheduler *schedulers[] = { 
-    &sched_bvt_def,
     &sched_sedf_def,
     &sched_credit_def,
     NULL

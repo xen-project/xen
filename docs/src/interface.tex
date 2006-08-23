@@ -209,8 +209,8 @@ implement timeout values when they block.
 
 Xen offers a uniform API for CPU schedulers.  It is possible to choose
 from a number of schedulers at boot and it should be easy to add more.
-The SEDF, BVT, and Credit schedulers are part of the normal Xen
-distribution.  BVT and SEDF will be going away and their use should be
+The SEDF and Credit schedulers are part of the normal Xen
+distribution.  SEDF will be going away and its use should be
 avoided once the credit scheduler has stabilized and become the default.
 The Credit scheduler provides proportional fair shares of the
 host's CPUs to the running domains. It does this while transparently

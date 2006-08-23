@@ -250,36 +250,8 @@ int xc_domain_setcpuweight(int xc_handle,
     if ( (ret = xc_sched_id(xc_handle, &sched_id)) != 0 )
         return ret;
 
-    switch ( sched_id )
-    {
-        case SCHED_BVT:
-        {
-            uint32_t mcuadv;
-            int warpback;
-            int32_t warpvalue;
-            long long warpl;
-            long long warpu;
-
-            /* Preserve all the scheduling parameters apart
-               of MCU advance. */
-            if ( (ret = xc_bvtsched_domain_get(
-                xc_handle, domid, &mcuadv,
-                &warpback, &warpvalue, &warpl, &warpu)) != 0 )
-                return ret;
-
-            /* The MCU advance is inverse of the weight.
-               Default value of the weight is 1, default mcuadv 10.
-               The scaling factor is therefore 10. */
-            if ( weight > 0 )
-                mcuadv = 10 / weight;
-
-            ret = xc_bvtsched_domain_set(xc_handle, domid, mcuadv,
-                                         warpback, warpvalue, warpl, warpu);
-            break;
-        }
-    }
-
-    return ret;
+    /* No-op. */
+    return 0;
 }
 
 int xc_domain_setmaxmem(int xc_handle,

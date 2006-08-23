@@ -102,18 +102,6 @@ class SrvDomain(SrvDir):
         val = fn(req.args, {'dom': self.dom.domid})
         return val
 
-    def op_cpu_bvt_set(self, _, req):
-        fn = FormFn(self.xd.domain_cpu_bvt_set,
-                    [['dom',       'int'],
-                     ['mcuadv',    'int'],
-                     ['warpback',  'int'],
-                     ['warpvalue', 'int'],
-                     ['warpl',     'long'],
-                     ['warpu',     'long']])
-        val = fn(req.args, {'dom': self.dom.domid})
-        return val
-    
-    
     def op_cpu_sedf_get(self, _, req):
         fn = FormFn(self.xd.domain_cpu_sedf_get,
                     [['dom', 'int']])

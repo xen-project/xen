@@ -327,28 +327,6 @@ int xc_shadow_control(int xc_handle,
                       uint32_t mode,
                       xc_shadow_control_stats_t *stats);
 
-int xc_bvtsched_global_set(int xc_handle,
-                           unsigned long ctx_allow);
-
-int xc_bvtsched_domain_set(int xc_handle,
-                           uint32_t domid,
-                           uint32_t mcuadv,
-                           int warpback,
-                           int32_t warpvalue,
-                           long long warpl,
-                           long long warpu);
-
-int xc_bvtsched_global_get(int xc_handle,
-                           unsigned long *ctx_allow);
-
-int xc_bvtsched_domain_get(int xc_handle,
-                           uint32_t domid,
-                           uint32_t *mcuadv,
-                           int *warpback,
-                           int32_t *warpvalue,
-                           long long *warpl,
-                           long long *warpu);
-
 int xc_sedf_domain_set(int xc_handle,
                        uint32_t domid,
                        uint64_t period, uint64_t slice,

@@ -511,55 +511,6 @@ FIXME: we really need a scheduler expert to write up this section.
 
 =over 4
 
-=item B<sched-bvt> I<mcuadv> I<warpback> I<warpvalue> I<warpl> I<warpu>
-
-Performs runtime adjustments to the default parameters for the
-Borrowed Virtual Time (BVT) scheduler.  For full information on the
-BVT concept, please consult the base paper listed in the B<SEE ALSO>
-section.
-
-Set Borrowed Virtual Time (BVT) scheduler parameters. There are five
-required parameters, which are given in order below.
-
-FIXME: what units are all the BVT params in?
-
-B<PARAMETERS>
-
-=over 4
-
-=item I<mcuadv>
-
-The MCU (Minimum Charging Unit) advance determines the proportional
-share of the CPU that a domain receives. It is set inversely
-proportionally to a domain's sharing weight.
-
-=item I<warpback>
-
-The amount of `virtual time' the domain is allowed to warp backwards.
-
-=item I<warpvalue>
-
-Warp value (FIXME: what does this really mean?)
-
-=item I<warpl>
-
-The warp limit is the maximum time a domain can run warped for.
-
-=item I<warpu>
-
-The unwarp requirement is the minimum time a domain must run unwarped
-for before it can warp again.
-
-=back 
-
-=item B<sched-bvt-ctxallow> I<allow>
-
-Sets the BVT scheduler's context switch allowance. 
-
-The context switch allowance is similar to the ``quantum'' in
-traditional schedulers. It is the minimum time that a scheduled domain
-will be allowed to run before being preempted.
-
 =item B<sched-sedf> I<period> I<slice> I<latency-hint> I<extratime> I<weight>
 
 Set Simple EDF (Earliest Deadline First) scheduler parameters.  This
@@ -1125,12 +1076,6 @@ their binary identifiers (ssidrefs) used inside Xen.
 =head1 SEE ALSO
 
 B<xmdomain.cfg>(5), B<xentop>(1)
-
-BVT scheduling paper: K.J. Duda and D.R. Cheriton. Borrowed Virtual
-Time (BVT) scheduling: supporting latency-sensitive threads in a
-general purpose scheduler. In proceedings of the 17th ACM SIGOPS
-Symposium on Operating Systems principles, volume 33(5) of ACM
-Operating Systems Review, pages 261-267
 
 =head1 AUTHOR
 

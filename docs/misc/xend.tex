@@ -337,14 +337,6 @@ Python client interface in {\tt xen.xend.XendClient}.
   {\tt xend\_domain\_pincpu(self, id, cpu)}\\:
   Pin a domain to a cpu.
 
-\item {\tt POST /domain/[dom] bvt\_set(mcuadv, warp, warpl, warpu)},\\
-  {\tt xend\_domain\_cpu\_bvt\_set(dom, mcuadv, warp, warpl, warpu)}:\\
-  Set BVT scheduler parameters.
-
-\item {\tt POST /domain/[dom] atropos\_set(period, slice, latency, xtratime)},\\
-  {\tt xend\_domain\_cpu\_atropos\_set(dom, period, slice, latency, xtratime)}:\\
-  Set atropos scheduler parameters.
-
 \item {\tt POST /domain/[dom] maxmem\_set(memory)},\\
   {\tt xend\_domain\_maxmem\_set(dom, memory)}:\\
   Set domain maximum memory limit.

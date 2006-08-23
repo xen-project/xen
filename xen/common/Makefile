@@ -12,7 +12,6 @@ obj-y += memory.o
 obj-y += multicall.o
 obj-y += page_alloc.o
 obj-y += rangeset.o
-obj-y += sched_bvt.o
 obj-y += sched_credit.o
 obj-y += sched_sedf.o
 obj-y += schedule.o

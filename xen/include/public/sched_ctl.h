@@ -8,7 +8,6 @@
 #define __XEN_PUBLIC_SCHED_CTL_H__
 
 /* Scheduler types. */
-#define SCHED_BVT      0
 #define SCHED_SEDF     4
 #define SCHED_CREDIT   5
 
@@ -23,11 +22,6 @@
 struct sched_ctl_cmd {
     uint32_t sched_id;
     uint32_t direction;
-    union {
-        struct bvt_ctl {
-            uint32_t ctx_allow;
-        } bvt;
-    } u;
 };
 
 struct sched_adjdom_cmd {
@@ -35,13 +29,6 @@ struct sched_adjdom_cmd {
     uint32_t direction;
     domid_t  domain;
     union {
-        struct bvt_adjdom {
-            uint32_t mcu_adv;      /* mcu advance: inverse of weight */
-            uint32_t warpback;     /* warp? */
-            int32_t  warpvalue;    /* warp value */
-            int64_t  warpl;        /* warp limit */
-            int64_t  warpu;        /* unwarp time requirement */
-        } bvt;
         struct sedf_adjdom {
             uint64_t period;
             uint64_t slice;

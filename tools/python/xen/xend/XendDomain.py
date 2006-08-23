@@ -471,34 +471,6 @@ class XendDomain:
         except Exception, ex:
             raise XendError(str(ex))
 
-    def domain_cpu_bvt_set(self, domid, mcuadv, warpback, warpvalue, warpl,
-                           warpu):
-        """Set BVT (Borrowed Virtual Time) scheduler parameters for a domain.
-        """
-        dominfo = self.domain_lookup_by_name_or_id_nr(domid)
-        if not dominfo:
-            raise XendInvalidDomain(str(domid))
-        try:
-            return xc.bvtsched_domain_set(dom=dominfo.getDomid(),
-                                          mcuadv=mcuadv,
-                                          warpback=warpback,
-                                          warpvalue=warpvalue, 
-                                          warpl=warpl, warpu=warpu)
-        except Exception, ex:
-            raise XendError(str(ex))
-
-    def domain_cpu_bvt_get(self, domid):
-        """Get BVT (Borrowed Virtual Time) scheduler parameters for a domain.
-        """
-        dominfo = self.domain_lookup_by_name_or_id_nr(domid)
-        if not dominfo:
-            raise XendInvalidDomain(str(domid))
-        try:
-            return xc.bvtsched_domain_get(dominfo.getDomid())
-        except Exception, ex:
-            raise XendError(str(ex))
-    
-    
     def domain_cpu_sedf_set(self, domid, period, slice_, latency, extratime,
                             weight):
         """Set Simple EDF scheduler parameters for a domain.

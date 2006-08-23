@@ -3179,7 +3179,7 @@ editing \path{grub.conf}.
 \item [ tbuf\_size=xxx ] Set the size of the per-cpu trace buffers, in
   pages (default 0).  
 \item [ sched=xxx ] Select the CPU scheduler Xen should use.  The
-  current possibilities are `credit' (default), `sedf', and `bvt'.
+  current possibilities are `credit' (default), and `sedf'.
 \item [ apic\_verbosity=debug,verbose ] Print more detailed
   information about local APIC and IOAPIC configuration.
 \item [ lapic ] Force use of local APIC even when left disabled by
@@ -4134,9 +4134,6 @@ as it will forward multicasts received from other machines on the subnet.
 \chapter{Glossary of Terms}
 
 \begin{description}
-
-\item[BVT] The BVT scheduler is used to give proportional fair shares
-  of the CPU to domains.
 
 \item[Domain] A domain is the execution context that contains a
   running {\bf virtual machine}.  The relationship between virtual
