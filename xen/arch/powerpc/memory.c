@@ -176,9 +176,6 @@ void memory_init(module_t *mod, int mcount)
               "for heap (0x%lx)\n", _start, heap_start);
     }
 
-    /* we give the first RMA to the hypervisor */
-    xenheap_phys_end = rma_size(cpu_rma_order());
-
     /* allow everything else to be allocated */
     total_pages = 0;
     ofd_walk_mem((void *)oftree, heap_init);

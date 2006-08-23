@@ -39,6 +39,7 @@ struct vcpu;
 struct cpu_user_regs;
 extern void show_registers(struct cpu_user_regs *);
 extern void show_execution_state(struct cpu_user_regs *);
+extern void show_backtrace(ulong sp, ulong lr, ulong pc);
 extern unsigned int cpu_rma_order(void);
 extern void cpu_initialize(int cpuid);
 extern void cpu_init_vcpu(struct vcpu *);

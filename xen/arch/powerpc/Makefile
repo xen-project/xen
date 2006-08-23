@@ -6,6 +6,7 @@ subdir-$(HAS_PPC64) += powerpc64
 subdir-y += papr
 
 obj-y += audit.o
+obj-y += backtrace.o
 obj-y += bitops.o
 obj-y += boot_of.o
 obj-y += dart.o
