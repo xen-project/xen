@@ -3,8 +3,18 @@
 #ifndef _PPC_TYPES_H
 #define _PPC_TYPES_H
 
-typedef unsigned short umode_t;
+#include <xen/config.h>
 
+#if defined(__ppc__)
+#define BYTES_PER_LONG 4
+#define BITS_PER_LONG 32
+#elif defined(__PPC64__)
+#define BYTES_PER_LONG 8
+#define BITS_PER_LONG 64
+#endif
+
+#ifndef __ASSEMBLY__
+typedef unsigned short umode_t;
 
 /*
  * __xx is ok: it doesn't pollute the POSIX namespace. Use these in the
@@ -31,8 +41,6 @@ typedef unsigned long __u64;
 #endif
 #endif
 
-#include <xen/config.h>
-
 typedef signed char s8;
 typedef unsigned char u8;
 
@@ -45,14 +53,10 @@ typedef unsigned int u32;
 #if defined(__ppc__)
 typedef signed long long s64;
 typedef unsigned long long u64;
-#define BYTES_PER_LONG 4
-#define BITS_PER_LONG 32
 typedef unsigned int size_t;
 #elif defined(__PPC64__)
 typedef signed long s64;
 typedef unsigned long u64;
-#define BYTES_PER_LONG 8
-#define BITS_PER_LONG 64
 typedef unsigned long size_t;
 #endif
 
@@ -66,4 +70,5 @@ typedef u64 dma64_addr_t;
 
 typedef unsigned short xmem_bufctl_t;
 
+#endif  /* __ASSEMBLY__ */
 #endif

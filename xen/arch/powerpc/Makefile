@@ -95,8 +95,20 @@ boot_of.o: CFLAGS += -DCMDLINE="\"$(IMAGENAME) $(CMDLINE)\""
 start.o: boot/start.S
 	$(CC) $(CFLAGS) -D__ASSEMBLY__ -c $< -o $@
 
-$(TARGET)-syms: start.o $(ALL_OBJS) xen.lds
-	$(CC) $(CFLAGS) $(OMAGIC) -Wl,-Ttext,$(xen_link_base),-T,xen.lds start.o $(ALL_OBJS) -o $@
+TARGET_OPTS = $(OMAGIC) -Wl,-Ttext,$(xen_link_base),-T,xen.lds
+TARGET_OPTS += start.o $(ALL_OBJS)
+
+.xen-syms: start.o $(ALL_OBJS) xen.lds
+	$(CC) $(CFLAGS) $(TARGET_OPTS) -o $@
+
+xen-syms.S: .xen-syms
+	$(CROSS_COMPILE)nm --synthetic -n $^ | $(BASEDIR)/tools/symbols > $@
+
+xen-syms.o: xen-syms.S
+	$(CC) $(CFLAGS) -D__ASSEMBLY__ -c $< -o $@
+
+$(TARGET)-syms: start.o $(ALL_OBJS) xen-syms.o xen.lds
+	$(CC) $(CFLAGS) $(TARGET_OPTS) xen-syms.o -o $@
 
 $(TARGET).bin: $(TARGET)-syms
 	$(CROSS_COMPILE)objcopy --output-target=binary $< $@
@@ -126,4 +138,4 @@ dom0.bin: $(DOM0_IMAGE)
 
 clean::
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C of_handler clean
-	rm -f firmware firmware_image dom0.bin
+	rm -f firmware firmware_image dom0.bin .xen-syms

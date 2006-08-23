@@ -13,6 +13,9 @@
 #include <xen/lib.h>
 #include <xen/console.h>
 #include <xen/sched.h>
+#include <xen/symbols.h>
+
+static char namebuf[KSYM_NAME_LEN+1];
 
 /* Shamelessly lifted from Linux Xmon try to keep pristene */
 #ifdef __powerpc64__
@@ -69,36 +72,32 @@ static int mread(unsigned long adrs, void *buf, int size)
 static void get_function_bounds(unsigned long pc, unsigned long *startp,
 				unsigned long *endp)
 {
-    *startp = pc;
-    *endp = pc;
+    unsigned long size, offset;
+	const char *name;
+
+    *startp = *endp = 0;
+	if (pc == 0)
+		return;
+
+    name = symbols_lookup(pc, &size, &offset, namebuf);
+    if (name != NULL) {
+			*startp = pc - offset;
+			*endp = pc - offset + size;
+    }
 }
     
 /* Print an address in numeric and symbolic form (if possible) */
 static void xmon_print_symbol(unsigned long address, const char *mid,
                               const char *after)
 {
-	char *modname;
 	const char *name = NULL;
 	unsigned long offset, size;
 
 	printf(REG, address);
-#if 0
-	if (setjmp(bus_error_jmp) == 0) {
-		catch_memory_errors = 1;
-		sync();
-		name = kallsyms_lookup(address, &size, &offset, &modname,
-				       tmpstr);
-		sync();
-		/* wait a little while to see if we get a machine check */
-		__delay(200);
-	}
 
-	catch_memory_errors = 0;
-#endif
+    name = symbols_lookup(address, &size, &offset, namebuf);
 	if (name) {
 		printf("%s%s+%#lx/%#lx", mid, name, offset, size);
-		if (modname)
-			printf(" [%s]", modname);
 	}
 	printf("%s", after);
 }

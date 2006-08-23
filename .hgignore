@@ -203,6 +203,8 @@
 ^xen/arch/powerpc/firmware$
 ^xen/arch/powerpc/firmware_image$
 ^xen/arch/powerpc/xen\.lds$
+^xen/arch/powerpc/.xen-syms$
+^xen/arch/powerpc/xen-syms.S$
 ^unmodified_drivers/linux-2.6/\.tmp_versions
 ^unmodified_drivers/linux-2.6/.*\.cmd$
 ^unmodified_drivers/linux-2.6/.*\.ko$
