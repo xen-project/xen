@@ -727,6 +727,15 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
 		}
 		break;
 	}
+	case DOM0_SHADOW_CONTROL_OP_GET_ALLOCATION:
+		sc->mb = 0;
+		break;
+	case DOM0_SHADOW_CONTROL_OP_SET_ALLOCATION:
+		if (sc->mb > 0) {
+			BUG();
+			rc = -ENOMEM;
+		}
+		break;
 	default:
 		rc = -EINVAL;
 		break;
