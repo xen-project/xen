@@ -846,6 +846,9 @@ x86_emulate_memop(
             emulate_1op("dec", dst, _regs.eflags);
             break;
         case 6: /* push */
+            /* Don't emulate if fault was on stack */
+            if ( _regs.error_code & 2 )
+                goto cannot_emulate; 
             /* 64-bit mode: PUSH always pushes a 64-bit operand. */
             if ( mode == X86EMUL_MODE_PROT64 )
             {
