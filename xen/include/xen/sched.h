@@ -179,13 +179,24 @@ struct domain_setup_info
     unsigned long v_kernstart;
     unsigned long v_kernend;
     unsigned long v_kernentry;
+#define PAEKERN_no           0
+#define PAEKERN_yes          1
+#define PAEKERN_extended_cr3 2
+    unsigned int  pae_kernel;
     /* Initialised by loader: Private. */
     unsigned long elf_paddr_offset;
     unsigned int  load_symtab;
     unsigned long symtab_addr;
     unsigned long symtab_len;
-    /* Indicate whether it's xen specific image */
+    /*
+     * Only one of __elfnote_* or __xen_guest_string will be
+     * non-NULL.
+     *
+     * You should use the xen_elfnote_* accessors below in order to
+     * pickup the correct one and retain backwards compatibility.
+     */
     void *__elfnote_section, *__elfnote_section_end;
+    char *__xen_guest_string;
 };
 
 extern struct vcpu *idle_vcpu[NR_CPUS];

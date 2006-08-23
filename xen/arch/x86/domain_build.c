@@ -290,14 +290,7 @@ int construct_dom0(struct domain *d,
     if ( (rc = parseelfimage(&dsi)) != 0 )
         return rc;
 
-    if ( dsi.__elfnote_section == NULL )
-    {
-        printk("Not a Xen-ELF image: no Xen ELF notes were found.\n");
-        return -EINVAL;
-    }
-
-    p = xen_elfnote_string(&dsi, XEN_ELFNOTE_PAE_MODE);
-    dom0_pae = !!(p != NULL && strcmp(p, "yes") == 0);
+    dom0_pae = (dsi.pae_kernel != PAEKERN_no);
     xen_pae  = (CONFIG_PAGING_LEVELS == 3);
     if ( dom0_pae != xen_pae )
     {
@@ -306,8 +299,8 @@ int construct_dom0(struct domain *d,
         return -EINVAL;
     }
 
-    if ( xen_pae )
-        set_bit(VMASST_TYPE_pae_extended_cr3, &d->vm_assist);
+    if ( xen_pae && dsi.pae_kernel == PAEKERN_extended_cr3 )
+            set_bit(VMASST_TYPE_pae_extended_cr3, &d->vm_assist);
 
     if ( (p = xen_elfnote_string(&dsi, XEN_ELFNOTE_FEATURES)) != NULL )
     {
