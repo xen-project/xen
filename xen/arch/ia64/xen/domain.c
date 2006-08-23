@@ -543,6 +543,9 @@ void domain_relinquish_resources(struct domain *d)
     // relase page traversing d->arch.mm.
     relinquish_mm(d);
 
+    if (d->vcpu[0] && VMX_DOMAIN(d->vcpu[0]))
+	    vmx_relinquish_guest_resources(d);
+
     relinquish_memory(d, &d->xenpage_list);
     relinquish_memory(d, &d->page_list);
 
