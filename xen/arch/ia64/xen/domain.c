@@ -239,6 +239,12 @@ void startup_cpu_idle_loop(void)
 # error "XMAPPEDREGS_SHIFT doesn't match sizeof(mapped_regs_t)."
 #endif
 
+void hlt_timer_fn(void *data)
+{
+	struct vcpu *v = data;
+	vcpu_unblock(v);
+}
+
 struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 {
 	struct vcpu *v;
@@ -298,6 +304,9 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 	    v->arch.breakimm = d->arch.breakimm;
 	    v->arch.last_processor = INVALID_PROCESSOR;
 	}
+	if (!VMX_DOMAIN(v)){
+		init_timer(&v->arch.hlt_timer, hlt_timer_fn, v, v->processor);
+	}
 
 	return v;
 }
@@ -309,6 +318,7 @@ void relinquish_vcpu_resources(struct vcpu *v)
                            get_order_from_shift(XMAPPEDREGS_SHIFT));
         v->arch.privregs = NULL;
     }
+    kill_timer(&v->arch.hlt_timer);
 }
 
 void free_vcpu_struct(struct vcpu *v)

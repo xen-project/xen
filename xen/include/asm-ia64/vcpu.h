@@ -4,6 +4,7 @@
 // TODO: Many (or perhaps most) of these should eventually be
 // static inline functions
 
+#include <asm/delay.h>
 #include <asm/fpu.h>
 #include <asm/tlb.h>
 #include <asm/ia64_int.h>
@@ -15,6 +16,7 @@ typedef	int BOOLEAN;
 struct vcpu;
 typedef	struct vcpu VCPU;
 typedef cpu_user_regs_t REGS;
+extern u64 cycle_to_ns(u64 cycle);
 
 /* Note: PSCB stands for Privilegied State Communication Block.  */
 #define VCPU(_v,_x)	(_v->arch.privregs->_x)
@@ -181,6 +183,21 @@ static inline UINT64
 itir_mask(UINT64 itir)
 {
     return (~((1UL << itir_ps(itir)) - 1));
+}
+
+static inline s64
+vcpu_get_next_timer_ns(VCPU *vcpu)
+{
+    s64 vcpu_get_next_timer_ns;
+    u64 d = PSCBX(vcpu, domain_itm);
+    u64 now = ia64_get_itc();
+
+    if (d > now)
+        vcpu_get_next_timer_ns = cycle_to_ns(d - now) + NOW();
+    else
+        vcpu_get_next_timer_ns = cycle_to_ns(local_cpu_data->itm_delta) + NOW();
+
+    return vcpu_get_next_timer_ns;
 }
 
 #define verbose(a...) do {if (vcpu_verbose) printf(a);} while(0)
