@@ -111,31 +111,9 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
                     WordIO (ResourceProducer, MinFixed, MaxFixed, PosDecode, EntireRange,
                         0x0000,
                         0x0D00,
-                        0x0FFF,
+                        0xFFFF,
                         0x0000,
-                        0x0300)
-
-                 /* reserve what device model consumed for IDE and acpi pci device            */
-                     WordIO (ResourceConsumer, MinFixed, MaxFixed, PosDecode, EntireRange,
-                        0x0000,
-                        0xc000,
-                        0xc01f,
-                        0x0000,
-                        0x0020)
-                 /* reserve what device model consumed for Ethernet controller pci device        */
-                     WordIO (ResourceConsumer, MinFixed, MaxFixed, PosDecode, EntireRange,
-                        0x0000,
-                        0xc020,
-                        0xc03f,
-                        0x0000,
-                        0x0010)
-
-                    DWordMemory (ResourceProducer, PosDecode, MinFixed, MaxFixed, Cacheable, ReadOnly,
-                        0x00000000,
-                        0x000c0000,
-                        0x000FFFFF,
-                        0x00000000,
-                        0x00030000)
+                        0xF300)
 
                 /* reserve what device model consumed for PCI VGA device        */
 
@@ -151,13 +129,6 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
                         0xF2000FFF,
                         0x00000000,
                         0x00001000)
-                 /* reserve what device model consumed for Ethernet controller pci device        */
-                      DWordMemory (ResourceConsumer, PosDecode, MinFixed, MaxFixed, Cacheable, ReadWrite,
-                        0x00000000,
-                        0xF2001000,
-                        0xF200101F,
-                        0x00000000,
-                        0x00000020) 
                 })
                 Return (PRT0)
             }
@@ -528,9 +499,9 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
                     })
                 }
 
-                Device (UAR2)
+                Device (LTP1)
                 {
-                    Name (_HID, EisaId ("PNP0501"))
+                    Name (_HID, EisaId ("PNP0400"))
                     Name (_UID, 0x02)
                     Method (_STA, 0, NotSerialized)
                     {
@@ -539,8 +510,8 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
 
                     Name (_CRS, ResourceTemplate()
                     {
-                        IO (Decode16, 0x02F8, 0x02F8, 0x01, 0x08)
-                        IRQNoFlags () {3}
+                        IO (Decode16, 0x0378, 0x0378, 0x08, 0x08)
+                        IRQNoFlags () {7}
                     })
                 } 
             }
