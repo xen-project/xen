@@ -148,13 +148,17 @@ static void vmx_vhpt_insert(thash_cb_t *hcb, u64 pte, u64 itir, u64 ifa)
     rr.rrval = ia64_get_rr(ifa);
     head = (thash_data_t *)ia64_thash(ifa);
     tag = ia64_ttag(ifa);
-    if( INVALID_VHPT(head) ) {
-        len = head->len;
-        head->page_flags = pte;
-        head->len = len;
-        head->itir = rr.ps << 2;
-        head->etag = tag;
-        return;
+    cch = head;
+    while (cch) {    
+        if (INVALID_VHPT(cch)) {
+            len = cch->len;
+            cch->page_flags = pte;
+            cch->len = len;
+            cch->itir = rr.ps << 2;
+            cch->etag = tag;
+            return;
+        }
+        cch = cch->next;
     }
 
     if(head->len>=MAX_CCN_DEPTH){
@@ -358,24 +362,20 @@ void vtlb_insert(VCPU *v, u64 pte, u64 itir, u64 va)
     u64 tag, len;
     thash_cb_t *hcb = &v->arch.vtlb;
     vcpu_get_rr(v, va, &vrr.rrval);
-#ifdef VTLB_DEBUG    
-    if (vrr.ps != itir_ps(itir)) {
-//        machine_tlb_insert(hcb->vcpu, entry);
-        panic_domain(NULL, "not preferred ps with va: 0x%lx vrr.ps=%d ps=%ld\n",
-             va, vrr.ps, itir_ps(itir));
-        return;
-    }
-#endif
     vrr.ps = itir_ps(itir);
     VMX(v, psbits[va >> 61]) |= (1UL << vrr.ps);
     hash_table = vsa_thash(hcb->pta, va, vrr.rrval, &tag);
-    if( INVALID_TLB(hash_table) ) {
-        len = hash_table->len;
-        hash_table->page_flags = pte;
-        hash_table->len = len;
-        hash_table->itir=itir;
-        hash_table->etag=tag;
-        return;
+    cch = hash_table;
+    while (cch) {
+        if (INVALID_TLB(cch)) {
+            len = cch->len;
+            cch->page_flags = pte;
+            cch->len = len;
+            cch->itir=itir;
+            cch->etag=tag;
+            return;
+        }
+        cch = cch->next;
     }
     if (hash_table->len>=MAX_CCN_DEPTH){
         thash_recycle_cch(hcb, hash_table);
@@ -469,10 +469,6 @@ void thash_purge_and_insert(VCPU *v, u64 pte, u64 itir, u64 ifa, int type)
     ps = itir_ps(itir);
     vcpu_get_rr(current, ifa, &vrr.rrval);
     mrr.rrval = ia64_get_rr(ifa);
-//    if (vrr.ps != itir_ps(itir)) {
-//        printf("not preferred ps with va: 0x%lx vrr.ps=%d ps=%ld\n",
-//               ifa, vrr.ps, itir_ps(itir));
-//    }
     if(VMX_DOMAIN(v)){
         /* Ensure WB attribute if pte is related to a normal mem page,
          * which is required by vga acceleration since qemu maps shared
