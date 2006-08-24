@@ -51,7 +51,7 @@
 			      "break 0x1000 ;;\n"		\
 			      "mov %0=r8 ;;\n"			\
 			      : "=r" (__res)			\
-			      : "i" (__HYPERVISOR_##name)	\
+			      : "J" (__HYPERVISOR_##name)	\
 			      : "r2","r8",			\
 			        "memory" );			\
 	(type)__res;						\
@@ -66,8 +66,8 @@
 			      "break 0x1000 ;;\n"		\
 			      "mov %0=r8 ;;\n"			\
 			      : "=r" (__res)			\
-			      : "i" (__HYPERVISOR_##name),	\
-				"r" ((unsigned long)(a1))	\
+			      : "J" (__HYPERVISOR_##name),	\
+				"rI" ((unsigned long)(a1))	\
 			      : "r14","r2","r8",		\
 				"memory" );			\
 	(type)__res;						\
@@ -83,9 +83,9 @@
 			      "break 0x1000 ;;\n"		\
 			      "mov %0=r8 ;;\n"			\
 			      : "=r" (__res)			\
-			      : "i" (__HYPERVISOR_##name),	\
-				"r" ((unsigned long)(a1)),	\
-				"r" ((unsigned long)(a2))	\
+			      : "J" (__HYPERVISOR_##name),	\
+				"rI" ((unsigned long)(a1)),	\
+				"rI" ((unsigned long)(a2))	\
 			      : "r14","r15","r2","r8",		\
 				"memory" );			\
 	(type)__res;						\
@@ -102,10 +102,10 @@
 			      "break 0x1000 ;;\n"               \
 			      "mov %0=r8 ;;\n"                  \
 			      : "=r" (__res)                    \
-			      : "i" (__HYPERVISOR_##name),      \
-				"r" ((unsigned long)(a1)),	\
-				"r" ((unsigned long)(a2)),	\
-				"r" ((unsigned long)(a3))	\
+			      : "J" (__HYPERVISOR_##name),      \
+				"rI" ((unsigned long)(a1)),     \
+				"rI" ((unsigned long)(a2)),     \
+				"rI" ((unsigned long)(a3))      \
 			      : "r14","r15","r16","r2","r8",	\
 			        "memory" );                     \
 	(type)__res;                                            \
@@ -123,11 +123,11 @@
 			      "break 0x1000 ;;\n"               \
 			      "mov %0=r8 ;;\n"                  \
 			      : "=r" (__res)                    \
-			      : "i" (__HYPERVISOR_##name),      \
-				"r" ((unsigned long)(a1)),	\
-				"r" ((unsigned long)(a2)),	\
-				"r" ((unsigned long)(a3)),	\
-				"r" ((unsigned long)(a4))       \
+			      : "J" (__HYPERVISOR_##name),      \
+				"rI" ((unsigned long)(a1)),     \
+				"rI" ((unsigned long)(a2)),     \
+				"rI" ((unsigned long)(a3)),     \
+				"rI" ((unsigned long)(a4))      \
 			      : "r14","r15","r16","r2","r8",	\
 			        "r17","memory" );               \
 	(type)__res;                                            \
@@ -146,12 +146,12 @@
 			      "break 0x1000 ;;\n"               \
 			      "mov %0=r8 ;;\n"                  \
 			      : "=r" (__res)                    \
-			      : "i" (__HYPERVISOR_##name),      \
-				"r" ((unsigned long)(a1)),	\
-				"r" ((unsigned long)(a2)),	\
-				"r" ((unsigned long)(a3)),	\
-				"r" ((unsigned long)(a4)),	\
-				"r" ((unsigned long)(a5))       \
+			      : "J" (__HYPERVISOR_##name),      \
+				"rI" ((unsigned long)(a1)),     \
+				"rI" ((unsigned long)(a2)),     \
+				"rI" ((unsigned long)(a3)),     \
+				"rI" ((unsigned long)(a4)),     \
+				"rI" ((unsigned long)(a5))      \
 			      : "r14","r15","r16","r2","r8",	\
 			        "r17","r18","memory" );         \
 	(type)__res;                                            \
@@ -317,97 +317,11 @@ static inline void exit_idle(void) {}
 #include <linux/err.h>
 #include <asm/xen/privop.h>
 
-#define _hypercall_imm1(type, name, imm, a1)			\
-({								\
-	long __res;						\
-	__asm__ __volatile__ (";;\n"				\
-			      "mov r14=%2\n"			\
-			      "mov r15=%3\n"			\
-			      "mov r2=%1\n"			\
-			      "break 0x1000 ;;\n"		\
-			      "mov %0=r8 ;;\n"			\
-			      : "=r" (__res)			\
-			      : "i" (__HYPERVISOR_##name),	\
-				"i" (imm),			\
-				"r" ((unsigned long)(a1))	\
-			      : "r14","r15","r2","r8",		\
-				"memory" );			\
-	(type)__res;						\
-})
-
-#define _hypercall_imm2(type, name, imm, a1, a2)		\
-({								\
-	long __res;						\
-	__asm__ __volatile__ (";;\n"				\
-			      "mov r14=%2\n"			\
-			      "mov r15=%3\n"			\
-			      "mov r16=%4\n"			\
-			      "mov r2=%1\n"			\
-			      "break 0x1000 ;;\n"		\
-			      "mov %0=r8 ;;\n"			\
-			      : "=r" (__res)			\
-			      : "i" (__HYPERVISOR_##name),	\
-				"i" (imm),			\
-				"r" ((unsigned long)(a1)),	\
-				"r" ((unsigned long)(a2))	\
-			      : "r14","r15","r16","r2","r8",	\
-				"memory" );			\
-	(type)__res;						\
-})
-
-#define _hypercall_imm3(type, name, imm, a1, a2, a3)		\
-({								\
-	long __res;						\
-	__asm__ __volatile__ (";;\n"				\
-			      "mov r14=%2\n"			\
-			      "mov r15=%3\n"			\
-			      "mov r16=%4\n"			\
-			      "mov r17=%5\n"			\
-			      "mov r2=%1\n"			\
-			      "break 0x1000 ;;\n"		\
-			      "mov %0=r8 ;;\n"			\
-			      : "=r" (__res)			\
-			      : "i" (__HYPERVISOR_##name),	\
-				"i" (imm),			\
-				"r" ((unsigned long)(a1)),	\
-				"r" ((unsigned long)(a2)),	\
-				"r" ((unsigned long)(a3))	\
-			      : "r14","r15","r16","r17",	\
-				"r2","r8",			\
-				"memory" );			\
-	(type)__res;						\
-})
-
-#define _hypercall_imm4(type, name, imm, a1, a2, a3, a4)	\
-({								\
-	long __res;						\
-	__asm__ __volatile__ (";;\n"				\
-			      "mov r14=%2\n"			\
-			      "mov r15=%3\n"			\
-			      "mov r16=%4\n"			\
-			      "mov r17=%5\n"			\
-			      "mov r18=%6\n"			\
-			      "mov r2=%1\n"			\
-			      "break 0x1000 ;;\n"		\
-			      "mov %0=r8 ;;\n"			\
-			      : "=r" (__res)			\
-			      : "i" (__HYPERVISOR_##name),	\
-				"i" (imm),			\
-				"r" ((unsigned long)(a1)),	\
-				"r" ((unsigned long)(a2)),	\
-				"r" ((unsigned long)(a3)),	\
-				"r" ((unsigned long)(a4))	\
-			      : "r14","r15","r16","r17","r18",	\
-				"r2","r8",			\
-				"memory" );			\
-	(type)__res;						\
-})
-
 static inline unsigned long
 __HYPERVISOR_ioremap(unsigned long ioaddr, unsigned long size)
 {
-	return _hypercall_imm2(unsigned long, ia64_dom0vp_op,
-			       IA64_DOM0VP_ioremap, ioaddr, size);
+	return _hypercall3(unsigned long, ia64_dom0vp_op,
+	                   IA64_DOM0VP_ioremap, ioaddr, size);
 }
 
 static inline unsigned long
@@ -429,8 +343,8 @@ HYPERVISOR_ioremap(unsigned long ioaddr, unsigned long size)
 static inline unsigned long
 __HYPERVISOR_phystomach(unsigned long gpfn)
 {
-	return _hypercall_imm1(unsigned long, ia64_dom0vp_op,
-			       IA64_DOM0VP_phystomach, gpfn);
+	return _hypercall2(unsigned long, ia64_dom0vp_op,
+	                   IA64_DOM0VP_phystomach, gpfn);
 }
 
 static inline unsigned long
@@ -446,8 +360,8 @@ HYPERVISOR_phystomach(unsigned long gpfn)
 static inline unsigned long
 __HYPERVISOR_machtophys(unsigned long mfn)
 {
-	return _hypercall_imm1(unsigned long, ia64_dom0vp_op,
-			       IA64_DOM0VP_machtophys, mfn);
+	return _hypercall2(unsigned long, ia64_dom0vp_op,
+	                   IA64_DOM0VP_machtophys, mfn);
 }
 
 static inline unsigned long
@@ -463,8 +377,8 @@ HYPERVISOR_machtophys(unsigned long mfn)
 static inline unsigned long
 __HYPERVISOR_zap_physmap(unsigned long gpfn, unsigned int extent_order)
 {
-	return _hypercall_imm2(unsigned long, ia64_dom0vp_op,
-			       IA64_DOM0VP_zap_physmap, gpfn, extent_order);
+	return _hypercall3(unsigned long, ia64_dom0vp_op,
+	                   IA64_DOM0VP_zap_physmap, gpfn, extent_order);
 }
 
 static inline unsigned long
@@ -481,9 +395,8 @@ static inline unsigned long
 __HYPERVISOR_add_physmap(unsigned long gpfn, unsigned long mfn,
 			 unsigned long flags, domid_t domid)
 {
-	return _hypercall_imm4(unsigned long, ia64_dom0vp_op,
-			       IA64_DOM0VP_add_physmap, gpfn, mfn, flags,
-			       domid);
+	return _hypercall5(unsigned long, ia64_dom0vp_op,
+	                   IA64_DOM0VP_add_physmap, gpfn, mfn, flags, domid);
 }
 
 static inline unsigned long
