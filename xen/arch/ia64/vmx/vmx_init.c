@@ -445,6 +445,9 @@ void vmx_setup_platform(struct domain *d)
 	memset(&d->shared_info->evtchn_mask[0], 0xff,
 	    sizeof(d->shared_info->evtchn_mask));
 
+	/* initiate spinlock for pass virq */
+	spin_lock_init(&d->arch.arch_vmx.virq_assist_lock);
+
 	/* Initialize the virtual interrupt lines */
 	vmx_virq_line_init(d);
 

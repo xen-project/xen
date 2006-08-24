@@ -73,8 +73,10 @@ void vmx_intr_assist(struct vcpu *v)
 {
 #ifdef V_IOSAPIC_READY
     /* Confirm virtual interrupt line signals, and set pending bits in vpd */
-    if(v->vcpu_id==0)
+    if (spin_trylock(&v->domain->arch.arch_vmx.virq_assist_lock)) {
         vmx_virq_line_assist(v);
+        spin_unlock(&v->domain->arch.arch_vmx.virq_assist_lock);
+    }
 #endif
     return;
 }

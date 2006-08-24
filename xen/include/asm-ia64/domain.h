@@ -137,6 +137,8 @@ struct arch_domain {
     atomic64_t shadow_fault_count;
 
     struct last_vcpu last_vcpu[NR_CPUS];
+
+    struct arch_vmx_domain arch_vmx; /* Virtual Machine Extensions */
 };
 #define INT_ENABLE_OFFSET(v) 		  \
     (sizeof(vcpu_info_t) * (v)->vcpu_id + \

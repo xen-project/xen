@@ -27,6 +27,7 @@
 #include <asm/vtm.h>
 #include <asm/vmx_platform.h>
 #include <public/xen.h>
+#include <xen/spinlock.h>
 
 #define VPD_SHIFT	17	/* 128K requirement */
 #define VPD_SIZE	(1 << VPD_SHIFT)
@@ -72,6 +73,11 @@ struct ivt_debug{
 };
 #define IVT_DEBUG_MAX 128
 #endif
+
+struct arch_vmx_domain {
+    spinlock_t virq_assist_lock; /* spinlock for pass virq */
+};
+
 struct arch_vmx_struct {
 //	vpd_t       *vpd;
     vtime_t	    vtm;
