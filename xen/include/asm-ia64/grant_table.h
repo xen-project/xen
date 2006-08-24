@@ -35,7 +35,7 @@ void guest_physmap_add_page(struct domain *d, unsigned long gpfn, unsigned long 
                           gnttab_shared_maddr((d), (t), (i)));          \
         (IA64_GRANT_TABLE_PADDR >> PAGE_SHIFT) + (i);})
 
-#define gnttab_mark_dirty(d, f) ((void)0)
+#define gnttab_mark_dirty(d, f) ((void)f)
 
 static inline void gnttab_clear_flag(unsigned long nr, uint16_t *addr)
 {
