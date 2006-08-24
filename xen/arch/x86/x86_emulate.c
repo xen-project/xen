@@ -632,14 +632,6 @@ x86_emulate_memop(
         }
         break;
     case DstMem:
-        /*
-         * We expect that the fault occurred while accessing the explicit
-         * destination memory operand. This is clearly not the case if the
-         * fault occurred on a read access (eg. POP has an *implicit* operand
-         * but we expect that the guest never uses special memory as stack).
-         */
-        if ( !(_regs.error_code & PFEC_write_access) )
-            goto cannot_emulate;
         dst.type  = OP_MEM;
         dst.ptr   = (unsigned long *)cr2;
         dst.bytes = (d & ByteOp) ? 1 : op_bytes;
@@ -684,14 +676,6 @@ x86_emulate_memop(
     case SrcMem:
         src.bytes = (d & ByteOp) ? 1 : op_bytes;
     srcmem_common:
-        /*
-         * We expect that the fault occurred while accessing the explicit
-         * source memory operand. This is clearly not the case if the fault
-         * occurred on a write access (eg. PUSH has an *implicit* operand
-         * but we expect that the guest never uses special memory as stack).
-         */
-        if ( _regs.error_code & PFEC_write_access )
-            goto cannot_emulate;
         src.type  = OP_MEM;
         src.ptr   = (unsigned long *)cr2;
         if ( (rc = ops->read_emulated((unsigned long)src.ptr, 
@@ -797,6 +781,13 @@ x86_emulate_memop(
         dst.val = src.val;
         break;
     case 0x8f: /* pop (sole member of Grp1a) */
+        /*
+         * If the faulting access was a read it means that the fault occurred
+         * when accessing the implicit stack operand. We assume the guest never
+         * uses special memory areas as stack space.
+         */
+        if ( !(_regs.error_code & PFEC_write_access) )
+            goto cannot_emulate; /* fault on stack access: bail */
         /* 64-bit mode: POP always pops a 64-bit operand. */
         if ( mode == X86EMUL_MODE_PROT64 )
             dst.bytes = 8;
@@ -874,6 +865,13 @@ x86_emulate_memop(
             emulate_1op("dec", dst, _regs.eflags);
             break;
         case 6: /* push */
+            /*
+             * If the faulting access was a write it means that the fault
+             * occurred when accessing the implicit stack operand. We assume
+             * the guest never uses special memory areas as stack space.
+             */
+            if ( _regs.error_code & PFEC_write_access )
+                goto cannot_emulate; /* fault on stack access: bail */
             /* 64-bit mode: PUSH always pushes a 64-bit operand. */
             if ( mode == X86EMUL_MODE_PROT64 )
             {
