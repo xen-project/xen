@@ -8,7 +8,6 @@ PERFCOUNTER_ARRAY(hypercalls,           "hypercalls", NR_hypercalls)
 
 PERFCOUNTER_CPU(irqs,                   "#interrupts")
 PERFCOUNTER_CPU(ipis,                   "#IPIs")
-PERFCOUNTER_CPU(irq_time,               "cycles spent in irq handler")
 
 PERFCOUNTER_CPU(sched_irq,              "sched: timer")
 PERFCOUNTER_CPU(sched_run,              "sched: runs through scheduler")
