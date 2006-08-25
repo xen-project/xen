@@ -17,18 +17,25 @@
 #define ELFNOTE_DESC(_n_) (ELFNOTE_NAME(_n_) + (((_n_)->n_namesz+3)&~3))
 #define ELFNOTE_NEXT(_n_) (ELFNOTE_DESC(_n_) + (((_n_)->n_descsz+3)&~3))
 
-#if defined(__i386__)
-typedef Elf32_Ehdr Elf_Ehdr;
+#ifndef ELFSIZE
+#include <limits.h>
+#if UINT_MAX == ULONG_MAX
+#define ELFSIZE 32
+#else
+#define ELFSIZE 64
+#endif
+#endif
+
+#if (ELFSIZE == 32)
 typedef Elf32_Nhdr Elf_Nhdr;
 typedef Elf32_Half Elf_Half;
 typedef Elf32_Word Elf_Word;
-#elif defined(__x86_64__)
-typedef Elf64_Ehdr Elf_Ehdr;
+#elif (ELFSIZE == 64)
 typedef Elf64_Nhdr Elf_Nhdr;
 typedef Elf64_Half Elf_Half;
 typedef Elf64_Word Elf_Word;
 #else
-#error "Unknown architecture"
+#error "Unknown ELFSIZE"
 #endif
 
 static void print_string_note(const char *prefix, Elf_Nhdr *note)
@@ -54,18 +61,35 @@ static void print_numeric_note(const char *prefix,Elf_Nhdr *note)
 	}
 }
 
+static inline int is_elf(void *image)
+{
+	/*
+	 * Since we are only accessing the e_ident field we can
+	 * acccess the bytes directly without needing to figure out
+	 * which version of Elf*_Ehdr structure to use.
+	 */
+	const unsigned char *hdr = image;
+	return ( hdr[EI_MAG0] == ELFMAG0 &&
+		 hdr[EI_MAG1] == ELFMAG1 &&
+		 hdr[EI_MAG2] == ELFMAG2 &&
+		 hdr[EI_MAG3] == ELFMAG3 );
+}
+
 static inline unsigned char ehdr_class(void *image)
 {
-	Elf_Ehdr *ehdr = image;
-	switch (ehdr->e_ident[EI_CLASS])
+	/*
+	 * Since we are only accessing the e_ident field we can
+	 * acccess the bytes directly without needing to figure out
+	 * which version of Elf*_Ehdr structure to use.
+	 */
+	const unsigned char *hdr = image;
+	switch (hdr[EI_CLASS])
 	{
 	case ELFCLASS32:
 	case ELFCLASS64:
-		return ehdr->e_ident[EI_CLASS];
-		break;
+		return hdr[EI_CLASS];
 	default:
-		fprintf(stderr, "Unknown ELF class %d\n",
-			ehdr->e_ident[EI_CLASS]);
+		fprintf(stderr, "Unknown ELF class %d\n", hdr[EI_CLASS]);
 		exit(1);
 	}
 }
@@ -198,7 +222,6 @@ int main(int argc, char **argv)
 	int fd,h;
 	void *image;
 	struct stat st;
-	Elf_Ehdr *ehdr;
 	Elf_Nhdr *note;
 
 	if (argc != 2)
@@ -228,11 +251,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	ehdr = image;
-	if (ehdr->e_ident[EI_MAG0] != ELFMAG0 ||
-	    ehdr->e_ident[EI_MAG1] != ELFMAG1 ||
-	    ehdr->e_ident[EI_MAG2] != ELFMAG2 ||
-	    ehdr->e_ident[EI_MAG3] != ELFMAG3)
+	if ( !is_elf(image) )
 	{
 		fprintf(stderr, "File %s is not an ELF image\n", f);
 		return 1;
