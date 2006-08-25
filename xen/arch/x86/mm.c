@@ -2264,7 +2264,6 @@ int do_mmu_update(
 
     perfc_incrc(calls_to_mmu_update);
     perfc_addc(num_page_updates, count);
-    perfc_incr_histo(bpt_updates, count, PT_UPDATES);
 
     if ( unlikely(!guest_handle_okay(ureqs, count)) )
     {
