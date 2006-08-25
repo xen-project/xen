@@ -336,6 +336,17 @@ struct vcpu_guest_context {
 typedef struct vcpu_guest_context vcpu_guest_context_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 
+// hvm_op expansion
+#define HVMOP_setup_gnttab_table        2
+#define HVMOP_setup_shared_info_page    3
+
+struct xen_hvm_setup {
+    unsigned long arg1;
+    unsigned long arg2;
+};
+typedef struct xen_hvm_setup xen_hvm_setup_t;
+DEFINE_XEN_GUEST_HANDLE(xen_hvm_setup_t);
+
 // dom0 vp op
 #define __HYPERVISOR_ia64_dom0vp_op     __HYPERVISOR_arch_0
 #define IA64_DOM0VP_ioremap             0       // map io space in machine
