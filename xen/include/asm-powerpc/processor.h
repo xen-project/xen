@@ -40,7 +40,7 @@ struct cpu_user_regs;
 extern void show_registers(struct cpu_user_regs *);
 extern void show_execution_state(struct cpu_user_regs *);
 extern void show_backtrace(ulong sp, ulong lr, ulong pc);
-extern uint cpu_rma_order(void);
+extern unsigned int cpu_default_rma_order_pages(void);
 extern uint cpu_large_page_orders(uint *sizes, uint max);
 extern void cpu_initialize(int cpuid);
 extern void cpu_init_vcpu(struct vcpu *);

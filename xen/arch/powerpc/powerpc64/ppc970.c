@@ -34,11 +34,34 @@
 
 extern volatile struct processor_area * volatile global_cpu_table[];
 
-unsigned int cpu_rma_order(void)
+struct rma_settings {
+    int order;
+    int rmlr0;
+    int rmlr12;
+};
+
+static struct rma_settings rma_orders[] = {
+    { .order = 26, .rmlr0 = 0, .rmlr12 = 3, }, /*  64 MB */
+    { .order = 27, .rmlr0 = 1, .rmlr12 = 3, }, /* 128 MB */
+    { .order = 28, .rmlr0 = 1, .rmlr12 = 0, }, /* 256 MB */
+    { .order = 30, .rmlr0 = 0, .rmlr12 = 2, }, /*   1 GB */
+    { .order = 34, .rmlr0 = 0, .rmlr12 = 1, }, /*  16 GB */
+    { .order = 38, .rmlr0 = 0, .rmlr12 = 0, }, /* 256 GB */
+};
+
+static struct rma_settings *cpu_find_rma(unsigned int order)
 {
-    /* XXX what about non-HV mode? */
-    uint rma_log_size = 6 + 20; /* (1 << 6) == 64 */
-    return rma_log_size - PAGE_SHIFT;
+    int i;
+    for (i = 0; i < ARRAY_SIZE(rma_orders); i++) {
+        if (rma_orders[i].order == order)
+            return &rma_orders[i];
+    }
+    return NULL;
+}
+
+unsigned int cpu_default_rma_order_pages(void)
+{
+    return rma_orders[0].order - PAGE_SHIFT;
 }
 
 unsigned int cpu_large_page_orders(uint *sizes, uint max)
@@ -129,45 +152,22 @@ void cpu_init_vcpu(struct vcpu *v)
 {
     struct domain *d = v->domain;
     union hid4 hid4;
-    ulong rma_base = page_to_maddr(d->arch.rma_page);
-    ulong rma_size = rma_size(d->arch.rma_order);
+    struct rma_settings *rma_settings;
 
     hid4.word = mfhid4();
 
     hid4.bits.lpes0 = 0; /* exceptions set MSR_HV=1 */
     hid4.bits.lpes1 = 1; /* RMA applies */
 
-    hid4.bits.rmor = rma_base >> 26;
+    hid4.bits.rmor = page_to_maddr(d->arch.rma_page) >> 26;
 
     hid4.bits.lpid01 = d->domain_id & 3;
     hid4.bits.lpid25 = (d->domain_id >> 2) & 0xf;
 
-    switch (rma_size) {
-        case 256ULL << 30:  /* 256 GB */
-            hid4.bits.rmlr0 = 0;
-            hid4.bits.rmlr12 = 0;
-            break;
-        case 16ULL << 30:   /* 16 GB */
-            hid4.bits.rmlr0 = 0;
-            hid4.bits.rmlr12 = 1;
-            break;
-        case 1ULL << 30:    /* 1 GB */
-            hid4.bits.rmlr0 = 0;
-            hid4.bits.rmlr12 = 2;
-            break;
-        case 64ULL << 20:   /* 64 MB */
-            hid4.bits.rmlr0 = 0;
-            hid4.bits.rmlr12 = 3;
-            break;
-        case 256ULL << 20:  /* 256 MB */
-            hid4.bits.rmlr0 = 1;
-            hid4.bits.rmlr12 = 0;
-            break;
-        case 128ULL << 20:  /* 128 MB */
-            hid4.bits.rmlr0 = 1;
-            hid4.bits.rmlr12 = 3;
-            break;
-    }
+    rma_settings = cpu_find_rma(d->arch.rma_order + PAGE_SHIFT);
+    ASSERT(rma_settings != NULL);
+    hid4.bits.rmlr0 = rma_settings->rmlr0;
+    hid4.bits.rmlr12 = rma_settings->rmlr12;
 
     v->arch.cpu.hid4.word = hid4.word;
 }

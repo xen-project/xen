@@ -296,7 +296,7 @@ static void __init __start_xen(multiboot_info_t *mbi)
 #endif
 
     /* we give the first RMA to the hypervisor */
-    xenheap_phys_end = rma_size(cpu_rma_order());
+    xenheap_phys_end = rma_size(cpu_default_rma_order_pages());
 
     /* Check that we have at least one Multiboot module. */
     if (!(mbi->flags & MBI_MODULES) || (mbi->mods_count == 0)) {

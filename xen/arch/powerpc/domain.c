@@ -86,7 +86,7 @@ int arch_domain_create(struct domain *d)
         return 0;
     }
 
-    d->arch.rma_order = cpu_rma_order();
+    d->arch.rma_order = cpu_default_rma_order_pages();
     rma_sz = rma_size(d->arch.rma_order);
 
     /* allocate the real mode area */

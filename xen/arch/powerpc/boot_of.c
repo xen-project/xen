@@ -727,7 +727,7 @@ static ulong find_space(u32 size, u32 align, multiboot_info_t *mbi)
                     __func__, space_base, eomem, size, align);
     base = ALIGN_UP(space_base, PAGE_SIZE);
 
-    while ((base + size) < rma_size(cpu_rma_order())) {
+    while ((base + size) < rma_size(cpu_default_rma_order_pages())) {
         if (of_claim(base, size, 0) != OF_FAILURE) {
             space_base = base + size;
             return base;
