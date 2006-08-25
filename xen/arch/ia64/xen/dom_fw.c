@@ -783,6 +783,8 @@ dom_fw_init(struct domain *d,
 		                     dom_fw_dom0_passthrough, &arg);
 		efi_memmap_walk_type(EFI_ACPI_MEMORY_NVS,
 		                     dom_fw_dom0_passthrough, &arg);
+		efi_memmap_walk_type(EFI_RESERVED_TYPE,
+		                     dom_fw_dom0_passthrough, &arg);
 		efi_memmap_walk_type(EFI_MEMORY_MAPPED_IO,
 		                     dom_fw_dom0_passthrough, &arg);
 		efi_memmap_walk_type(EFI_MEMORY_MAPPED_IO_PORT_SPACE,
