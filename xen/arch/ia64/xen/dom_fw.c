@@ -26,24 +26,25 @@
 #include <asm/dom_fw.h>
 #include <asm/bundle.h>
 
-static void dom_fw_init (struct domain *d, struct ia64_boot_param *bp, char *fw_mem, int fw_mem_size, unsigned long maxmem);
-
-extern struct domain *dom0;
+#define ONE_MB (1UL << 20)
 
 extern unsigned long running_on_sim;
 
+/* Base of FW tables.  */
+static const unsigned long dom_fw_base_mpa = FW_HYPERCALL_END_PADDR;
+static unsigned long dom_fw_end_mpa;
+
 /* Note: two domains cannot be created simulteanously!  */
-static unsigned long dom_fw_base_mpa = -1;
 static unsigned long imva_fw_base = -1;
 
 #define FW_VENDOR "X\0e\0n\0/\0i\0a\0\066\0\064\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 
-#define MAKE_MD(typ, attr, start, end, abs) 				\
+#define MAKE_MD(typ, attr, start, end) 					\
 	do {								\
-		md = efi_memmap + i++;					\
+		md = tables->efi_memmap + i++;				\
 		md->type = typ;						\
 		md->pad = 0;						\
-		md->phys_addr = abs ? start : start_mpaddr + start;	\
+		md->phys_addr = start;					\
 		md->virt_addr = 0;					\
 		md->num_pages = (end - start) >> EFI_PAGE_SHIFT;	\
 		md->attribute = attr;					\
@@ -53,8 +54,8 @@ static unsigned long imva_fw_base = -1;
 	do {								\
 		dom_efi_hypercall_patch(d, FW_HYPERCALL_##call##_PADDR,	\
 		                        FW_HYPERCALL_##call);		\
-		tgt = dom_pa((unsigned long) pfn);			\
-		*pfn++ = FW_HYPERCALL_##call##_PADDR + start_mpaddr;	\
+		tables->efi_runtime.tgt = dom_pa((unsigned long) pfn);  \
+		*pfn++ = FW_HYPERCALL_##call##_PADDR;			\
 		*pfn++ = 0;						\
 	} while (0)
 
@@ -63,7 +64,7 @@ static unsigned long imva_fw_base = -1;
 static unsigned long
 dom_pa(unsigned long imva)
 {
-	if (dom_fw_base_mpa == -1 || imva_fw_base == -1) {
+	if (imva_fw_base == -1) {
 		printf("dom_pa: uninitialized! (spinning...)\n");
 		while(1);
 	}
@@ -78,12 +79,12 @@ dom_pa(unsigned long imva)
 // allocate a page for fw
 // build_physmap_table() which is called by new_thread()
 // does for domU.
-#define ASSIGN_NEW_DOMAIN_PAGE_IF_DOM0(d, mpaddr)   \
-    do {                                            \
-        if ((d) == dom0) {                          \
-            assign_new_domain0_page((d), (mpaddr)); \
-        }                                           \
-    } while (0)
+static inline void
+assign_new_domain_page_if_dom0(struct domain *d, unsigned long mpaddr)
+{
+        if (d == dom0)
+            assign_new_domain0_page(d, mpaddr);
+}
 
 /**************************************************************************
 Hypercall bundle creation
@@ -105,8 +106,8 @@ static void build_hypercall_bundle(UINT64 *imva, UINT64 brkimm, UINT64 hypnum, U
 	slot1.inst = 0;
 	slot1.qp = 0; slot1.x6 = 0; slot1.x3 = 0; slot1.major = 0x0;
 	slot1.imm20 = brkimm; slot1.i = brkimm >> 20;
-	// if ret slot2: br.ret.sptk.many rp
-	// else slot2: br.cond.sptk.many rp
+	// if ret slot2:  br.ret.sptk.many rp
+	// else   slot2:  br.cond.sptk.many rp
 	slot2.inst = 0; slot2.qp = 0; slot2.p = 1; slot2.b2 = 0;
 	slot2.wh = 0; slot2.d = 0; slot2.major = 0x0;
 	if (ret) {
@@ -169,14 +170,15 @@ static void dom_fpswa_hypercall_patch(struct domain *d)
 	unsigned long entry_paddr = FW_HYPERCALL_FPSWA_ENTRY_PADDR;
 	unsigned long patch_paddr = FW_HYPERCALL_FPSWA_PATCH_PADDR;
 
-	ASSIGN_NEW_DOMAIN_PAGE_IF_DOM0(d, entry_paddr);
-	ASSIGN_NEW_DOMAIN_PAGE_IF_DOM0(d, patch_paddr);
+	assign_new_domain_page_if_dom0(d, entry_paddr);
+	assign_new_domain_page_if_dom0(d, patch_paddr);
 	entry_imva = domain_mpa_to_imva(d, entry_paddr);
 	patch_imva = domain_mpa_to_imva(d, patch_paddr);
 
 	*entry_imva++ = patch_paddr;
 	*entry_imva   = 0;
-	build_hypercall_bundle(patch_imva, d->arch.breakimm, FW_HYPERCALL_FPSWA, 1);
+	build_hypercall_bundle(patch_imva, d->arch.breakimm,
+	                       FW_HYPERCALL_FPSWA, 1);
 }
 
 // builds a hypercall bundle at domain physical address
@@ -184,7 +186,7 @@ static void dom_efi_hypercall_patch(struct domain *d, unsigned long paddr, unsig
 {
 	unsigned long *imva;
 
-	ASSIGN_NEW_DOMAIN_PAGE_IF_DOM0(d, paddr);
+	assign_new_domain_page_if_dom0(d, paddr);
 	imva = domain_mpa_to_imva(d, paddr);
 	build_hypercall_bundle(imva, d->arch.breakimm, hypercall, 1);
 }
@@ -194,7 +196,7 @@ static void dom_fw_hypercall_patch(struct domain *d, unsigned long paddr, unsign
 {
 	unsigned long *imva;
 
-	ASSIGN_NEW_DOMAIN_PAGE_IF_DOM0(d, paddr);
+	assign_new_domain_page_if_dom0(d, paddr);
 	imva = domain_mpa_to_imva(d, paddr);
 	build_hypercall_bundle(imva, d->arch.breakimm, hypercall, ret);
 }
@@ -203,36 +205,28 @@ static void dom_fw_pal_hypercall_patch(struct domain *d, unsigned long paddr)
 {
 	unsigned long *imva;
 
-	ASSIGN_NEW_DOMAIN_PAGE_IF_DOM0(d, paddr);
+	assign_new_domain_page_if_dom0(d, paddr);
 	imva = domain_mpa_to_imva(d, paddr);
-	build_pal_hypercall_bundles(imva, d->arch.breakimm, FW_HYPERCALL_PAL_CALL);
+	build_pal_hypercall_bundles(imva, d->arch.breakimm,
+	                            FW_HYPERCALL_PAL_CALL);
 }
-
-
-void dom_fw_setup(struct domain *d, unsigned long bp_mpa, unsigned long maxmem)
-{
-	struct ia64_boot_param *bp;
-
-	dom_fw_base_mpa = 0;
-	ASSIGN_NEW_DOMAIN_PAGE_IF_DOM0(d, dom_fw_base_mpa);
-	imva_fw_base = (unsigned long) domain_mpa_to_imva(d, dom_fw_base_mpa);
-	ASSIGN_NEW_DOMAIN_PAGE_IF_DOM0(d, bp_mpa);
-	bp = domain_mpa_to_imva(d, bp_mpa);
-	dom_fw_init(d, bp, (char *) imva_fw_base, PAGE_SIZE, maxmem);
-}
-
 
 /* the following heavily leveraged from linux/arch/ia64/hp/sim/fw-emu.c */
-
-#define NFUNCPTRS 20
 
 static inline void
 print_md(efi_memory_desc_t *md)
 {
-	printk("domain mem: type=%2u, attr=0x%016lx, range=[0x%016lx-0x%016lx) (%luMB)\n",
-		md->type, md->attribute, md->phys_addr,
-		md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT),
-		md->num_pages >> (20 - EFI_PAGE_SHIFT));
+	u64 size;
+	
+	printk("dom mem: type=%2u, attr=0x%016lx, range=[0x%016lx-0x%016lx) ",
+	       md->type, md->attribute, md->phys_addr,
+	       md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT));
+
+	size = md->num_pages << EFI_PAGE_SHIFT;
+	if (size > ONE_MB)
+		printf ("(%luMB)\n", size >> 20);
+	else
+		printf ("(%luKB)\n", size >> 10);
 }
 
 static u32 lsapic_nbr;
@@ -468,9 +462,6 @@ dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 	return;
 }
 
-#define NUM_EFI_SYS_TABLES 6
-#define NUM_MEM_DESCS	64 //large enough
-
 struct dom0_passthrough_arg {
     struct domain*      d;
     int                 flags;
@@ -530,23 +521,16 @@ static int
 dom_fw_dom0_lowmem(efi_memory_desc_t *md, void *arg__)
 {
     struct dom0_passthrough_arg* arg = (struct dom0_passthrough_arg*)arg__;
-    u64 end = min(HYPERCALL_START,
-                  md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT));
+    u64 end = min(ONE_MB, md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT));
 
     BUG_ON(md->type != EFI_CONVENTIONAL_MEMORY);
 
-    /* avoid hypercall area */
-    if (md->phys_addr >= HYPERCALL_START)
-        return 0;
-
-    /* avoid firmware base area */
-    if (md->phys_addr < dom_pa(imva_fw_base))
-        end = min(end, dom_pa(imva_fw_base));
-    else if (md->phys_addr < dom_pa(imva_fw_base + PAGE_SIZE)) {
-        if (end < dom_pa(imva_fw_base + PAGE_SIZE))
-            return 0;
-        md->phys_addr = dom_pa(imva_fw_base + PAGE_SIZE);
-    }
+    /* Avoid firmware and hypercall area.
+       We know they are 0-based.  */
+    if (end < dom_fw_end_mpa || md->phys_addr >= ONE_MB)
+	return 0;
+    if (md->phys_addr < dom_fw_end_mpa)
+        md->phys_addr = dom_fw_end_mpa;
 
     arg->md->type = md->type;
     arg->md->pad = 0;
@@ -558,22 +542,6 @@ dom_fw_dom0_lowmem(efi_memory_desc_t *md, void *arg__)
     (*arg->i)++;
     arg->md++;
 
-    /* if firmware area spliced the md, add the upper part here */
-    if (end == dom_pa(imva_fw_base)) {
-        end = min(HYPERCALL_START,
-                  md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT));
-	if (end > dom_pa(imva_fw_base + PAGE_SIZE)) {
-            arg->md->type = md->type;
-            arg->md->pad = 0;
-            arg->md->phys_addr = dom_pa(imva_fw_base + PAGE_SIZE);
-            arg->md->virt_addr = 0;
-            arg->md->num_pages = (end - arg->md->phys_addr) >> EFI_PAGE_SHIFT;
-            arg->md->attribute = md->attribute;
-
-            (*arg->i)++;
-            arg->md++;
-        }
-    }
     return 0;
 }
 
@@ -596,296 +564,291 @@ efi_mdt_cmp(const void *a, const void *b)
 	return 0;
 }
 
+#define NFUNCPTRS 16
+#define NUM_EFI_SYS_TABLES 6
+#define NUM_MEM_DESCS 64 //large enough
+
+struct fw_tables {
+	efi_system_table_t efi_systab;
+	efi_runtime_services_t efi_runtime;
+	efi_config_table_t efi_tables[NUM_EFI_SYS_TABLES];
+
+	struct ia64_sal_systab sal_systab;
+	struct ia64_sal_desc_entry_point sal_ed;
+	struct ia64_sal_desc_ap_wakeup sal_wakeup;
+	/* End of SAL descriptors.  Do not forget to update checkum bound.  */
+
+	fpswa_interface_t fpswa_inf;
+	efi_memory_desc_t efi_memmap[NUM_MEM_DESCS];
+	unsigned long func_ptrs[2*NFUNCPTRS];
+ 	struct xen_sal_data sal_data;
+	unsigned char fw_vendor[sizeof(FW_VENDOR)];
+
+	struct fake_acpi_tables acpi_tables;
+};
+	
 static void
-dom_fw_init (struct domain *d, struct ia64_boot_param *bp, char *fw_mem, int fw_mem_size, unsigned long maxmem)
+dom_fw_init(struct domain *d,
+            struct ia64_boot_param *bp,
+            struct fw_tables *tables,
+            unsigned long maxmem)
 {
-	efi_system_table_t *efi_systab;
-	efi_runtime_services_t *efi_runtime;
-	efi_config_table_t *efi_tables;
-	struct ia64_sal_systab *sal_systab;
-	struct ia64_sal_desc_entry_point *sal_ed;
-	struct ia64_sal_desc_ap_wakeup *sal_wakeup;
-	fpswa_interface_t *fpswa_inf;
-	efi_memory_desc_t *efi_memmap, *md;
- 	struct xen_sal_data *sal_data;
+	efi_memory_desc_t *md;
 	unsigned long *pfn;
-	unsigned char checksum = 0;
-	char *cp, *fw_vendor;
-	int num_mds, j, i = 0;
-	const unsigned long start_mpaddr = 0;
+	unsigned char checksum;
+	char *cp;
+	int num_mds, i;
 
-/* FIXME: should check size but for now we have a whole MB to play with.
-   And if stealing code from fw-emu.c, watch out for new fw_vendor on the end!
-	if (fw_mem_size < sizeof(fw_mem_proto)) {
-		printf("sys_fw_init: insufficient space for fw_mem\n");
-		return 0;
-	}
-*/
-	memset(fw_mem, 0, fw_mem_size);
-
-	cp = fw_mem;
-	efi_systab  = (void *) cp; cp += sizeof(*efi_systab);
-	efi_runtime = (void *) cp; cp += sizeof(*efi_runtime);
-	efi_tables  = (void *) cp; cp += NUM_EFI_SYS_TABLES * sizeof(*efi_tables);
-	sal_systab  = (void *) cp; cp += sizeof(*sal_systab);
-	sal_ed      = (void *) cp; cp += sizeof(*sal_ed);
-	sal_wakeup  = (void *) cp; cp += sizeof(*sal_wakeup);
-	fpswa_inf   = (void *) cp; cp += sizeof(*fpswa_inf);
-	efi_memmap  = (void *) cp; cp += NUM_MEM_DESCS*sizeof(*efi_memmap);
-	pfn         = (void *) cp; cp += NFUNCPTRS * 2 * sizeof(pfn);
-	sal_data    = (void *) cp; cp += sizeof(*sal_data);
+	memset(tables, 0, sizeof(struct fw_tables));
 
 	/* Initialise for EFI_SET_VIRTUAL_ADDRESS_MAP emulation */
-	d->arch.efi_runtime = efi_runtime;
-	d->arch.fpswa_inf   = fpswa_inf;
-	d->arch.sal_data    = sal_data;
+	d->arch.efi_runtime = &tables->efi_runtime;
+	d->arch.fpswa_inf   = &tables->fpswa_inf;
+	d->arch.sal_data    = &tables->sal_data;
 
-	memset(efi_systab, 0, sizeof(efi_systab));
-	efi_systab->hdr.signature = EFI_SYSTEM_TABLE_SIGNATURE;
-	efi_systab->hdr.revision  = EFI_SYSTEM_TABLE_REVISION;
-	efi_systab->hdr.headersize = sizeof(efi_systab->hdr);
-	fw_vendor = cp;
-	cp += sizeof(FW_VENDOR) + (8-((unsigned long)cp & 7)); // round to 64-bit boundary
+	/* EFI systab.  */
+	tables->efi_systab.hdr.signature = EFI_SYSTEM_TABLE_SIGNATURE;
+	tables->efi_systab.hdr.revision  = EFI_SYSTEM_TABLE_REVISION;
+	tables->efi_systab.hdr.headersize = sizeof(tables->efi_systab.hdr);
 
-	memcpy(fw_vendor,FW_VENDOR,sizeof(FW_VENDOR));
-	efi_systab->fw_vendor = dom_pa((unsigned long) fw_vendor);
-	efi_systab->fw_revision = 1;
-	efi_systab->runtime = (void *) dom_pa((unsigned long) efi_runtime);
-	efi_systab->nr_tables = NUM_EFI_SYS_TABLES;
-	efi_systab->tables = dom_pa((unsigned long) efi_tables);
+	memcpy(tables->fw_vendor,FW_VENDOR,sizeof(FW_VENDOR));
+	tables->efi_systab.fw_vendor =
+	                             dom_pa((unsigned long)tables->fw_vendor);
+	tables->efi_systab.fw_revision = 1;
+	tables->efi_systab.runtime =
+	                 (void *)dom_pa((unsigned long)&tables->efi_runtime);
+	tables->efi_systab.nr_tables = NUM_EFI_SYS_TABLES;
+	tables->efi_systab.tables = dom_pa((unsigned long)tables->efi_tables);
 
-	efi_runtime->hdr.signature = EFI_RUNTIME_SERVICES_SIGNATURE;
-	efi_runtime->hdr.revision = EFI_RUNTIME_SERVICES_REVISION;
-	efi_runtime->hdr.headersize = sizeof(efi_runtime->hdr);
+	/* EFI runtime.  */
+	tables->efi_runtime.hdr.signature = EFI_RUNTIME_SERVICES_SIGNATURE;
+	tables->efi_runtime.hdr.revision = EFI_RUNTIME_SERVICES_REVISION;
+	tables->efi_runtime.hdr.headersize = sizeof(tables->efi_runtime.hdr);
 
-	EFI_HYPERCALL_PATCH(efi_runtime->get_time,EFI_GET_TIME);
-	EFI_HYPERCALL_PATCH(efi_runtime->set_time,EFI_SET_TIME);
-	EFI_HYPERCALL_PATCH(efi_runtime->get_wakeup_time,EFI_GET_WAKEUP_TIME);
-	EFI_HYPERCALL_PATCH(efi_runtime->set_wakeup_time,EFI_SET_WAKEUP_TIME);
-	EFI_HYPERCALL_PATCH(efi_runtime->set_virtual_address_map,EFI_SET_VIRTUAL_ADDRESS_MAP);
-	EFI_HYPERCALL_PATCH(efi_runtime->get_variable,EFI_GET_VARIABLE);
-	EFI_HYPERCALL_PATCH(efi_runtime->get_next_variable,EFI_GET_NEXT_VARIABLE);
-	EFI_HYPERCALL_PATCH(efi_runtime->set_variable,EFI_SET_VARIABLE);
-	EFI_HYPERCALL_PATCH(efi_runtime->get_next_high_mono_count,EFI_GET_NEXT_HIGH_MONO_COUNT);
-	EFI_HYPERCALL_PATCH(efi_runtime->reset_system,EFI_RESET_SYSTEM);
+	pfn = tables->func_ptrs;
+	EFI_HYPERCALL_PATCH(get_time,EFI_GET_TIME);
+	EFI_HYPERCALL_PATCH(set_time,EFI_SET_TIME);
+	EFI_HYPERCALL_PATCH(get_wakeup_time,EFI_GET_WAKEUP_TIME);
+	EFI_HYPERCALL_PATCH(set_wakeup_time,EFI_SET_WAKEUP_TIME);
+	EFI_HYPERCALL_PATCH(set_virtual_address_map,
+	                    EFI_SET_VIRTUAL_ADDRESS_MAP);
+	EFI_HYPERCALL_PATCH(get_variable,EFI_GET_VARIABLE);
+	EFI_HYPERCALL_PATCH(get_next_variable,EFI_GET_NEXT_VARIABLE);
+	EFI_HYPERCALL_PATCH(set_variable,EFI_SET_VARIABLE);
+	EFI_HYPERCALL_PATCH(get_next_high_mono_count,
+	                    EFI_GET_NEXT_HIGH_MONO_COUNT);
+	EFI_HYPERCALL_PATCH(reset_system,EFI_RESET_SYSTEM);
 
-	efi_tables[0].guid = SAL_SYSTEM_TABLE_GUID;
-	efi_tables[0].table = dom_pa((unsigned long) sal_systab);
+	/* System tables.  */
+	tables->efi_tables[0].guid = SAL_SYSTEM_TABLE_GUID;
+	tables->efi_tables[0].table =
+	                           dom_pa((unsigned long)&tables->sal_systab);
 	for (i = 1; i < NUM_EFI_SYS_TABLES; i++) {
-		efi_tables[i].guid = NULL_GUID;
-		efi_tables[i].table = 0;
+		tables->efi_tables[i].guid = NULL_GUID;
+		tables->efi_tables[i].table = 0;
 	}
+	i = 1;
 	if (d == dom0) {
 		printf("Domain0 EFI passthrough:");
-		i = 1;
 		if (efi.mps) {
-			efi_tables[i].guid = MPS_TABLE_GUID;
-			efi_tables[i].table = __pa(efi.mps);
-			printf(" MPS=0x%lx",efi_tables[i].table);
+			tables->efi_tables[i].guid = MPS_TABLE_GUID;
+			tables->efi_tables[i].table = __pa(efi.mps);
+			printf(" MPS=0x%lx",tables->efi_tables[i].table);
 			i++;
 		}
 
 		touch_acpi_table();
 
 		if (efi.acpi20) {
-			efi_tables[i].guid = ACPI_20_TABLE_GUID;
-			efi_tables[i].table = __pa(efi.acpi20);
-			printf(" ACPI 2.0=0x%lx",efi_tables[i].table);
+			tables->efi_tables[i].guid = ACPI_20_TABLE_GUID;
+			tables->efi_tables[i].table = __pa(efi.acpi20);
+			printf(" ACPI 2.0=0x%lx",tables->efi_tables[i].table);
 			i++;
 		}
 		if (efi.acpi) {
-			efi_tables[i].guid = ACPI_TABLE_GUID;
-			efi_tables[i].table = __pa(efi.acpi);
-			printf(" ACPI=0x%lx",efi_tables[i].table);
+			tables->efi_tables[i].guid = ACPI_TABLE_GUID;
+			tables->efi_tables[i].table = __pa(efi.acpi);
+			printf(" ACPI=0x%lx",tables->efi_tables[i].table);
 			i++;
 		}
 		if (efi.smbios) {
-			efi_tables[i].guid = SMBIOS_TABLE_GUID;
-			efi_tables[i].table = __pa(efi.smbios);
-			printf(" SMBIOS=0x%lx",efi_tables[i].table);
+			tables->efi_tables[i].guid = SMBIOS_TABLE_GUID;
+			tables->efi_tables[i].table = __pa(efi.smbios);
+			printf(" SMBIOS=0x%lx",tables->efi_tables[i].table);
 			i++;
 		}
 		if (efi.hcdp) {
-			efi_tables[i].guid = HCDP_TABLE_GUID;
-			efi_tables[i].table = __pa(efi.hcdp);
-			printf(" HCDP=0x%lx",efi_tables[i].table);
+			tables->efi_tables[i].guid = HCDP_TABLE_GUID;
+			tables->efi_tables[i].table = __pa(efi.hcdp);
+			printf(" HCDP=0x%lx",tables->efi_tables[i].table);
 			i++;
 		}
 		printf("\n");
 	} else {
 		printf("DomainU EFI build up:");
-		i = 1;
 
-		if ((unsigned long)fw_mem + fw_mem_size - (unsigned long)cp >=
-		    sizeof(struct fake_acpi_tables)) {
-			struct fake_acpi_tables *acpi_tables;
+		dom_fw_fake_acpi(d, &tables->acpi_tables);
 
-			acpi_tables = (void *)cp;
-			cp += sizeof(struct fake_acpi_tables);
-			dom_fw_fake_acpi(d, acpi_tables);
-
-			efi_tables[i].guid = ACPI_20_TABLE_GUID;
-			efi_tables[i].table = dom_pa((unsigned long) acpi_tables);
-			printf(" ACPI 2.0=0x%lx",efi_tables[i].table);
-			i++;
-		}
+		tables->efi_tables[i].guid = ACPI_20_TABLE_GUID;
+		tables->efi_tables[i].table =
+		                  dom_pa((unsigned long) &tables->acpi_tables);
+		printf(" ACPI 2.0=0x%lx",tables->efi_tables[i].table);
+		i++;
 		printf("\n");
 	}
 
 	/* fill in the SAL system table: */
-	memcpy(sal_systab->signature, "SST_", 4);
-	sal_systab->size = sizeof(*sal_systab);
-	sal_systab->sal_rev_minor = 1;
-	sal_systab->sal_rev_major = 0;
-	sal_systab->entry_count = 2;
+	memcpy(tables->sal_systab.signature, "SST_", 4);
+	tables->sal_systab.size = sizeof(tables->sal_systab);
+	tables->sal_systab.sal_rev_minor = 1;
+	tables->sal_systab.sal_rev_major = 0;
+	tables->sal_systab.entry_count = 2;
 
-	strcpy((char *)sal_systab->oem_id, "Xen/ia64");
-	strcpy((char *)sal_systab->product_id, "Xen/ia64");
+	strcpy((char *)tables->sal_systab.oem_id, "Xen/ia64");
+	strcpy((char *)tables->sal_systab.product_id, "Xen/ia64");
 
 	/* fill in an entry point: */
-	sal_ed->type = SAL_DESC_ENTRY_POINT;
-	sal_ed->pal_proc = FW_HYPERCALL_PAL_CALL_PADDR + start_mpaddr;
-	dom_fw_pal_hypercall_patch (d, sal_ed->pal_proc);
-	sal_ed->sal_proc = FW_HYPERCALL_SAL_CALL_PADDR + start_mpaddr;
-	dom_fw_hypercall_patch (d, sal_ed->sal_proc, FW_HYPERCALL_SAL_CALL, 1);
-	sal_ed->gp = 0;  // will be ignored
+	tables->sal_ed.type = SAL_DESC_ENTRY_POINT;
+	tables->sal_ed.pal_proc = FW_HYPERCALL_PAL_CALL_PADDR;
+	dom_fw_pal_hypercall_patch(d, tables->sal_ed.pal_proc);
+	tables->sal_ed.sal_proc = FW_HYPERCALL_SAL_CALL_PADDR;
+	dom_fw_hypercall_patch(d, tables->sal_ed.sal_proc,
+	                       FW_HYPERCALL_SAL_CALL, 1);
+	tables->sal_ed.gp = 0;  /* will be ignored */
 
 	/* Fill an AP wakeup descriptor.  */
-	sal_wakeup->type = SAL_DESC_AP_WAKEUP;
-	sal_wakeup->mechanism = IA64_SAL_AP_EXTERNAL_INT;
-	sal_wakeup->vector = XEN_SAL_BOOT_RENDEZ_VEC;
+	tables->sal_wakeup.type = SAL_DESC_AP_WAKEUP;
+	tables->sal_wakeup.mechanism = IA64_SAL_AP_EXTERNAL_INT;
+	tables->sal_wakeup.vector = XEN_SAL_BOOT_RENDEZ_VEC;
 
 	/* Compute checksum.  */
-	for (cp = (char *) sal_systab; cp < (char *) efi_memmap; ++cp)
+	checksum = 0;
+	for (cp = (char *)&tables->sal_systab;
+	     cp < (char *)&tables->fpswa_inf;
+	     ++cp)
 		checksum += *cp;
-	sal_systab->checksum = -checksum;
+	tables->sal_systab.checksum = -checksum;
 
 	/* SAL return point.  */
-	d->arch.sal_return_addr = FW_HYPERCALL_SAL_RETURN_PADDR + start_mpaddr;
+	d->arch.sal_return_addr = FW_HYPERCALL_SAL_RETURN_PADDR;
 	dom_fw_hypercall_patch (d, d->arch.sal_return_addr,
 				FW_HYPERCALL_SAL_RETURN, 0);
 
 	/* Fill in the FPSWA interface: */
-	fpswa_inf->revision = fpswa_interface->revision;
+	tables->fpswa_inf.revision = fpswa_interface->revision;
 	dom_fpswa_hypercall_patch(d);
-	fpswa_inf->fpswa = (void *) FW_HYPERCALL_FPSWA_ENTRY_PADDR + start_mpaddr;
+	tables->fpswa_inf.fpswa = (void *)FW_HYPERCALL_FPSWA_ENTRY_PADDR;
 
 	i = 0; /* Used by MAKE_MD */
 
-	/* Create dom0/domu md entry for fw_mem area */
-	MAKE_MD(EFI_ACPI_RECLAIM_MEMORY, EFI_MEMORY_WB | EFI_MEMORY_RUNTIME,
-	        dom_pa((unsigned long)fw_mem),
-	        dom_pa((unsigned long)fw_mem + fw_mem_size), 1);
+	/* hypercall patches live here, masquerade as reserved PAL memory */
+	MAKE_MD(EFI_PAL_CODE,EFI_MEMORY_WB|EFI_MEMORY_RUNTIME,
+	        FW_HYPERCALL_BASE_PADDR, FW_HYPERCALL_END_PADDR);
 
-	if (d == dom0) {
-		/* hypercall patches live here, masquerade as reserved PAL memory */
-		MAKE_MD(EFI_PAL_CODE,EFI_MEMORY_WB|EFI_MEMORY_RUNTIME,HYPERCALL_START,HYPERCALL_END, 0);
+	/* Create dom0/domu md entry for fw tables area */
+	MAKE_MD(EFI_RUNTIME_SERVICES_DATA, EFI_MEMORY_WB | EFI_MEMORY_RUNTIME,
+	        dom_fw_base_mpa, dom_fw_end_mpa);
 
-		/* pass through the I/O port space */
-		if (!running_on_sim) {
-			struct dom0_passthrough_arg arg;
-			arg.md = &efi_memmap[i];
-			arg.i = &i;
-			arg.d = d;
-			arg.flags = ASSIGN_writable;
-			//XXX Is this needed?
-			efi_memmap_walk_type(EFI_RUNTIME_SERVICES_CODE,
-			                     dom_fw_dom0_passthrough, &arg);
-			// for ACPI table.
-			arg.flags = ASSIGN_readonly;
-			efi_memmap_walk_type(EFI_RUNTIME_SERVICES_DATA,
-			                     dom_fw_dom0_passthrough, &arg);
-			arg.flags = ASSIGN_writable;
-			efi_memmap_walk_type(EFI_ACPI_RECLAIM_MEMORY,
-			                     dom_fw_dom0_passthrough, &arg);
-			efi_memmap_walk_type(EFI_ACPI_MEMORY_NVS,
-			                     dom_fw_dom0_passthrough, &arg);
-			efi_memmap_walk_type(EFI_RESERVED_TYPE,
-			                     dom_fw_dom0_passthrough, &arg);
-			efi_memmap_walk_type(EFI_MEMORY_MAPPED_IO,
-			                     dom_fw_dom0_passthrough, &arg);
-			efi_memmap_walk_type(EFI_MEMORY_MAPPED_IO_PORT_SPACE,
-			                     dom_fw_dom0_passthrough, &arg);
-			efi_memmap_walk_type(EFI_CONVENTIONAL_MEMORY,
-			                     dom_fw_dom0_lowmem, &arg);
-		}
-		else MAKE_MD(EFI_RESERVED_TYPE,0,0,0,0);
-	} else {
-		/* hypercall patches live here, masquerade as reserved
-		   PAL memory */
-		MAKE_MD(EFI_PAL_CODE, EFI_MEMORY_WB | EFI_MEMORY_RUNTIME,
-			HYPERCALL_START, HYPERCALL_END, 1);
+	if (d != dom0 || running_on_sim) {
+		/* Memory.  */
+		MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
+		        dom_fw_end_mpa, maxmem);
+		
 		/* Create an entry for IO ports.  */
 		MAKE_MD(EFI_MEMORY_MAPPED_IO_PORT_SPACE, EFI_MEMORY_UC,
-			IO_PORTS_PADDR, IO_PORTS_PADDR + IO_PORTS_SIZE, 1);
-		MAKE_MD(EFI_RESERVED_TYPE,0,0,0,0);
+		        IO_PORTS_PADDR, IO_PORTS_PADDR + IO_PORTS_SIZE);
+
+		num_mds = i;
 	}
-
-	// simple
-	// MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
-	//         HYPERCALL_END, maxmem, 0);
-	// is not good. Check overlap.
-	sort(efi_memmap, i, sizeof(efi_memory_desc_t),
-	     efi_mdt_cmp, NULL);
-
-	// find gap and fill it with conventional memory
-	num_mds = i;
-	for (j = 0; j < num_mds; j++) {
-		unsigned long end;
-		unsigned long next_start;
-
-		md = &efi_memmap[j];
-		end = md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT);
-
-		next_start = maxmem;
-		if (j + 1 < num_mds) {
-			efi_memory_desc_t* next_md = &efi_memmap[j + 1];
-			next_start = next_md->phys_addr;
-			BUG_ON(end > next_start);
-			if (end == next_md->phys_addr)
-				continue;
-		}
-
-		// clip the range and align to PAGE_SIZE
-		// Avoid "legacy" low memory addresses and the
-		// HYPERCALL patch area.      
-		if (end < HYPERCALL_END)
-			end = HYPERCALL_END;
-		if (next_start > maxmem)
-			next_start = maxmem;
-		end = PAGE_ALIGN(end);
-		next_start = next_start & PAGE_MASK;
-		if (end >= next_start)
-			continue;
-
-		MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
-		        end, next_start, 0);
-		if (next_start >= maxmem)
-			break;
-	}
-	sort(efi_memmap, i, sizeof(efi_memory_desc_t), efi_mdt_cmp, NULL);
-
-	bp->efi_systab = dom_pa((unsigned long) fw_mem);
-	bp->efi_memmap = dom_pa((unsigned long) efi_memmap);
-	BUG_ON(i > NUM_MEM_DESCS);
-	bp->efi_memmap_size = i * sizeof(efi_memory_desc_t);
-	bp->efi_memdesc_size = sizeof(efi_memory_desc_t);
-	bp->efi_memdesc_version = EFI_MEMDESC_VERSION;
-	bp->command_line = 0;
-	bp->console_info.num_cols = 80;
-	bp->console_info.num_rows = 25;
-	bp->console_info.orig_x = 0;
-	bp->console_info.orig_y = 24;
-	bp->fpswa = dom_pa((unsigned long) fpswa_inf);
-	if (d == dom0) {
-		int j;
+	else {
+		/* pass through the I/O port space */
+		struct dom0_passthrough_arg arg;
 		u64 addr;
+		int j;
+
+		/* Fill from real entries.  */
+		arg.md = &tables->efi_memmap[i];
+		arg.i = &i;
+		arg.d = d;
+		arg.flags = ASSIGN_writable;
+		//XXX Is this needed?
+		efi_memmap_walk_type(EFI_RUNTIME_SERVICES_CODE,
+		                     dom_fw_dom0_passthrough, &arg);
+		// for ACPI table.
+		arg.flags = ASSIGN_readonly;
+		efi_memmap_walk_type(EFI_RUNTIME_SERVICES_DATA,
+		                     dom_fw_dom0_passthrough, &arg);
+		arg.flags = ASSIGN_writable;
+		efi_memmap_walk_type(EFI_ACPI_RECLAIM_MEMORY,
+		                     dom_fw_dom0_passthrough, &arg);
+		efi_memmap_walk_type(EFI_ACPI_MEMORY_NVS,
+		                     dom_fw_dom0_passthrough, &arg);
+		efi_memmap_walk_type(EFI_MEMORY_MAPPED_IO,
+		                     dom_fw_dom0_passthrough, &arg);
+		efi_memmap_walk_type(EFI_MEMORY_MAPPED_IO_PORT_SPACE,
+		                     dom_fw_dom0_passthrough, &arg);
+		efi_memmap_walk_type(EFI_CONVENTIONAL_MEMORY,
+		                     dom_fw_dom0_lowmem, &arg);
+		num_mds = i;
+
+		sort(tables->efi_memmap, num_mds, sizeof(efi_memory_desc_t),
+		     efi_mdt_cmp, NULL);
+
+		// find gaps and fill them with conventional memory
+		for (j = 0; j < num_mds; j++) {
+			unsigned long end;
+			unsigned long next_start;
+
+			md = &tables->efi_memmap[j];
+			end = md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT);
+
+			if (j + 1 < num_mds) {
+				efi_memory_desc_t* next_md;
+				next_md = &tables->efi_memmap[j+1];
+				next_start = next_md->phys_addr;
+				
+				/* Have just been sorted.  */
+				BUG_ON(end > next_start);
+				
+				/* No room for memory!  */
+				if (end == next_start)
+					continue;
+				
+				if (next_start > maxmem)
+					next_start = maxmem;
+			}
+			else
+				next_start = maxmem;
+			
+			/* Avoid "legacy" low memory addresses and
+			   the HYPERCALL area.  */
+			if (end < ONE_MB)
+				end = ONE_MB;
+						      
+			// clip the range and align to PAGE_SIZE
+			next_start = next_start & PAGE_MASK;
+			end = PAGE_ALIGN(end);
+			
+			/* No room for memory.  */
+			if (end >= next_start)
+				continue;
+
+			MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
+			        end, next_start);
+
+			if (next_start >= maxmem)
+				break;
+		}
+		num_mds = i;
+		BUG_ON(num_mds > NUM_MEM_DESCS);
+		sort(tables->efi_memmap, num_mds, sizeof(efi_memory_desc_t),
+		     efi_mdt_cmp, NULL);
 
 		// dom0 doesn't need build_physmap_table()
 		// see arch_set_info_guest()
 		// instead we allocate pages manually.
-		for (j = 0; j < i; j++) {
-			md = &efi_memmap[j];
+		for (i = 0; i < num_mds; i++) {
+			md = &tables->efi_memmap[i];
 			if (md->phys_addr > maxmem)
 				break;
 
@@ -898,18 +861,20 @@ dom_fw_init (struct domain *d, struct ia64_boot_param *bp, char *fw_mem, int fw_
 
 				if (end == start) {
 					// md->num_pages = 0 is allowed.
-					end += PAGE_SIZE;
+					continue;
 				}
 				if (end > (max_page << PAGE_SHIFT))
 					end = (max_page << PAGE_SHIFT);
 
-				for (addr = start; addr < end; addr += PAGE_SIZE) {
+				for (addr = start;
+				     addr < end;
+				     addr += PAGE_SIZE) {
 					assign_new_domain0_page(d, addr);
 				}
 			}
 		}
 		// Map low-memory holes & unmapped MMIO for legacy drivers
-		for (addr = 0; addr < 1*MB; addr += PAGE_SIZE) {
+		for (addr = 0; addr < ONE_MB; addr += PAGE_SIZE) {
 			if (domain_page_mapped(d, addr))
 				continue;
 					
@@ -917,8 +882,41 @@ dom_fw_init (struct domain *d, struct ia64_boot_param *bp, char *fw_mem, int fw_
 				assign_domain_mmio_page(d, addr, PAGE_SIZE);
 		}
 	}
-	for (i = 0 ; i < bp->efi_memmap_size/sizeof(efi_memory_desc_t) ; i++) {
-		md = efi_memmap + i;
-		print_md(md);
-	}
+
+	/* Display memmap.  */
+	for (i = 0 ; i < num_mds; i++)
+		print_md(&tables->efi_memmap[i]);
+
+	/* Fill boot_param  */
+	bp->efi_systab = dom_pa((unsigned long)&tables->efi_systab);
+	bp->efi_memmap = dom_pa((unsigned long)tables->efi_memmap);
+	bp->efi_memmap_size = num_mds * sizeof(efi_memory_desc_t);
+	bp->efi_memdesc_size = sizeof(efi_memory_desc_t);
+	bp->efi_memdesc_version = EFI_MEMDESC_VERSION;
+	bp->command_line = 0;
+	bp->console_info.num_cols = 80;
+	bp->console_info.num_rows = 25;
+	bp->console_info.orig_x = 0;
+	bp->console_info.orig_y = 24;
+	bp->fpswa = dom_pa((unsigned long) &tables->fpswa_inf);
+}
+
+void dom_fw_setup(struct domain *d, unsigned long bp_mpa, unsigned long maxmem)
+{
+	struct ia64_boot_param *bp;
+
+	/* Note: 4KB < size < 8KB.  */
+	BUILD_BUG_ON(sizeof(struct fw_tables) > PAGE_SIZE);
+
+	dom_fw_end_mpa = PAGE_ALIGN(dom_fw_base_mpa + sizeof(struct fw_tables));
+
+	/* Create page for hypercalls.  */
+	assign_new_domain_page_if_dom0(d, dom_fw_base_mpa);
+	imva_fw_base = (unsigned long)domain_mpa_to_imva(d, dom_fw_base_mpa);
+
+	/* Create page for boot_param.  */
+	assign_new_domain_page_if_dom0(d, bp_mpa);
+	bp = domain_mpa_to_imva(d, bp_mpa);
+
+	dom_fw_init(d, bp, (struct fw_tables *)imva_fw_base, maxmem);
 }
