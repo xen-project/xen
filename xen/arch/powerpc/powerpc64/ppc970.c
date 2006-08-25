@@ -41,6 +41,17 @@ unsigned int cpu_rma_order(void)
     return rma_log_size - PAGE_SHIFT;
 }
 
+unsigned int cpu_large_page_orders(uint *sizes, uint max)
+{
+    uint lp_log_size = 4 + 20; /* (1 << 4) == 16M */
+    if (max < 1)
+        return 0;
+
+    sizes[0] = lp_log_size - PAGE_SHIFT;
+
+    return 1;
+}    
+
 void cpu_initialize(int cpuid)
 {
     ulong r1, r2;

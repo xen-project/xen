@@ -34,17 +34,21 @@ extern int parseelfimage_32(struct domain_setup_info *dsi);
 extern int loadelfimage_32(struct domain_setup_info *dsi);
 
 /* opt_dom0_mem: memory allocated to domain 0. */
-static unsigned int opt_dom0_mem;
+static unsigned int dom0_nrpages;
 static void parse_dom0_mem(char *s)
 {
-    unsigned long long bytes = parse_size_and_unit(s);
-    /* If no unit is specified we default to kB units, not bytes. */
-    if (isdigit(s[strlen(s)-1]))
-        opt_dom0_mem = (unsigned int)bytes;
-    else
-        opt_dom0_mem = (unsigned int)(bytes >> 10);
+    unsigned long long bytes;
+
+    bytes = parse_size_and_unit(s);
+    dom0_nrpages = bytes >> PAGE_SHIFT;
 }
 custom_param("dom0_mem", parse_dom0_mem);
+
+static unsigned int opt_dom0_max_vcpus;
+integer_param("dom0_max_vcpus", opt_dom0_max_vcpus);
+
+static unsigned int opt_dom0_shadow;
+boolean_param("dom0_shadow", opt_dom0_shadow);
 
 int elf_sanity_check(Elf_Ehdr *ehdr)
 {
@@ -146,8 +150,14 @@ int construct_dom0(struct domain *d,
 
     /* By default DOM0 is allocated all available memory. */
     d->max_pages = ~0U;
-    d->tot_pages = 1UL << d->arch.rma_order;
 
+    if (dom0_nrpages == 0) {
+        dom0_nrpages = 1UL << d->arch.rma_order;
+    }
+
+    d->tot_pages = dom0_nrpages;
+    ASSERT(d->tot_pages > 0);
+    
     ASSERT( image_len < rma_sz );
 
     si = (start_info_t *)(rma_addr(&d->arch, RMA_START_INFO) + rma);
@@ -161,10 +171,6 @@ int construct_dom0(struct domain *d,
     printk("shared_info: 0x%lx,%p\n", si->shared_info, d->shared_info);
 
     eomem = si->shared_info;
-
-    /* allow dom0 to access all of system RAM */
-    d->arch.logical_base_pfn = 128 << (20 - PAGE_SHIFT); /* 128 MB */
-    d->arch.logical_end_pfn = max_page;
 
     /* number of pages accessible */
     si->nr_pages = rma_sz >> PAGE_SHIFT;

@@ -27,6 +27,7 @@
 #include <xen/domain.h>
 #include <xen/console.h>
 #include <xen/shutdown.h>
+#include <xen/mm.h>
 #include <asm/htab.h>
 #include <asm/current.h>
 #include <asm/hcalls.h>
@@ -76,6 +77,7 @@ int arch_domain_create(struct domain *d)
     unsigned long rma_base;
     unsigned long rma_sz;
     uint htab_order;
+    uint nr_pages;
 
     if (d->domain_id == IDLE_DOMAIN_ID) {
         d->shared_info = (void *)alloc_xenheap_page();
@@ -88,11 +90,13 @@ int arch_domain_create(struct domain *d)
     rma_sz = rma_size(d->arch.rma_order);
 
     /* allocate the real mode area */
-    d->max_pages = 1UL << d->arch.rma_order;
+    nr_pages =  1UL << d->arch.rma_order;
+    d->max_pages = nr_pages;
     d->tot_pages = 0;
     d->arch.rma_page = alloc_domheap_pages(d, d->arch.rma_order, 0);
     if (NULL == d->arch.rma_page)
         return 1;
+
     rma_base = page_to_maddr(d->arch.rma_page);
 
     BUG_ON(rma_base & (rma_sz - 1)); /* check alignment */
@@ -103,8 +107,8 @@ int arch_domain_create(struct domain *d)
     d->shared_info = (shared_info_t *)
         (rma_addr(&d->arch, RMA_SHARED_INFO) + rma_base);
 
-    d->arch.large_page_sizes = 1;
-    d->arch.large_page_shift[0] = 24; /* 16 M for 970s */
+    d->arch.large_page_sizes = cpu_large_page_orders(
+        d->arch.large_page_order, ARRAY_SIZE(d->arch.large_page_order));
 
     /* FIXME: we need to the the maximum addressible memory for this
      * domain to calculate this correctly. It should probably be set

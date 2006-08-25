@@ -52,17 +52,14 @@ int iommu_put(u32 buid, ulong ioba, union tce tce)
 
         pfn = tce.tce_bits.tce_rpn;
         mfn = pfn2mfn(d, pfn, &mtype);
-        if (mtype != 0) {
-            panic("we don't do non-RMO memory yet\n");
-        }
-
+        if (mfn > 0) {
 #ifdef DEBUG
-        printk("%s: ioba=0x%lx pfn=0x%lx mfn=0x%lx\n", __func__,
-               ioba, pfn, mfn);
+            printk("%s: ioba=0x%lx pfn=0x%lx mfn=0x%lx\n", __func__,
+                   ioba, pfn, mfn);
 #endif
-        tce.tce_bits.tce_rpn = mfn;
-
-        return iommu_phbs[buid].iommu_put(ioba, tce);
+            tce.tce_bits.tce_rpn = mfn;
+            return iommu_phbs[buid].iommu_put(ioba, tce);
+        }
     }
     return -1;
 }

@@ -154,13 +154,13 @@ static void h_enter(struct cpu_user_regs *regs)
         }
 
         /* get correct pgshift value */
-        pgshift = d->arch.large_page_shift[lp_size];
+        pgshift = d->arch.large_page_order[lp_size] + PAGE_SHIFT;
     }
 
     /* get the correct logical RPN in terms of 4K pages need to mask
      * off lp bits and unused arpn bits if this is a large page */
 
-    lpn = ~0ULL << (pgshift - 12);
+    lpn = ~0ULL << (pgshift - PAGE_SHIFT);
     lpn = pte.bits.rpn & lpn;
 
     rpn = pfn2mfn(d, lpn, &mtype);
