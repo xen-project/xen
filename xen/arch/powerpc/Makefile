@@ -101,8 +101,15 @@ TARGET_OPTS += start.o $(ALL_OBJS)
 .xen-syms: start.o $(ALL_OBJS) xen.lds
 	$(CC) $(CFLAGS) $(TARGET_OPTS) -o $@
 
+NM=$(CROSS_COMPILE)nm
+new_nm := $(shell if $(NM) --help 2>&1 | grep -- '--synthetic' > /dev/null; then echo y; else echo n; fi)
+
+ifeq ($(new_nm),y)
+NM		:= $(NM) --synthetic
+endif
+
 xen-syms.S: .xen-syms
-	$(CROSS_COMPILE)nm --synthetic -n $^ | $(BASEDIR)/tools/symbols > $@
+	$(NM) -n $^ | $(BASEDIR)/tools/symbols > $@
 
 xen-syms.o: xen-syms.S
 	$(CC) $(CFLAGS) -D__ASSEMBLY__ -c $< -o $@
