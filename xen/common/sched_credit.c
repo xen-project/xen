@@ -619,14 +619,14 @@ csched_dom_cntl(
     struct csched_dom * const sdom = CSCHED_DOM(d);
     unsigned long flags;
 
-    if ( op->cmd == XEN_DOMCTL_SCHEDOP_putinfo )
+    if ( op->cmd == XEN_DOMCTL_SCHEDOP_getinfo )
     {
         op->u.credit.weight = sdom->weight;
         op->u.credit.cap = sdom->cap;
     }
     else
     {
-        ASSERT(op->cmd == XEN_DOMCTL_SCHEDOP_getinfo);
+        ASSERT(op->cmd == XEN_DOMCTL_SCHEDOP_putinfo);
 
         spin_lock_irqsave(&csched_priv.lock, flags);
 
