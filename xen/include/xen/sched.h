@@ -7,7 +7,7 @@
 #include <xen/spinlock.h>
 #include <xen/smp.h>
 #include <public/xen.h>
-#include <public/dom0_ops.h>
+#include <public/domctl.h>
 #include <public/vcpu.h>
 #include <xen/time.h>
 #include <xen/timer.h>
@@ -243,7 +243,7 @@ extern int construct_dom0(
     unsigned long image_start, unsigned long image_len, 
     unsigned long initrd_start, unsigned long initrd_len,
     char *cmdline);
-extern int set_info_guest(struct domain *d, dom0_setvcpucontext_t *);
+extern int set_info_guest(struct domain *d, xen_domctl_vcpucontext_t *);
 
 struct domain *find_domain_by_id(domid_t dom);
 extern void domain_destroy(struct domain *d);
@@ -282,8 +282,7 @@ void scheduler_init(void);
 void schedulers_start(void);
 int  sched_init_vcpu(struct vcpu *);
 void sched_destroy_domain(struct domain *);
-long sched_ctl(struct sched_ctl_cmd *);
-long sched_adjdom(struct sched_adjdom_cmd *);
+long sched_adjust(struct domain *, struct xen_domctl_scheduler_op *);
 int  sched_id(void);
 void vcpu_wake(struct vcpu *d);
 void vcpu_sleep_nosync(struct vcpu *d);

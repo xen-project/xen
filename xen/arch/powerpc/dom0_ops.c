@@ -24,10 +24,8 @@
 #include <xen/sched.h>
 #include <xen/guest_access.h>
 #include <public/xen.h>
-#include <public/dom0_ops.h>
-
-extern void arch_getdomaininfo_ctxt(struct vcpu *v, vcpu_guest_context_t *c);
-extern long arch_do_dom0_op(struct dom0_op *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op);
+#include <public/domctl.h>
+#include <public/sysctl.h>
 
 void arch_getdomaininfo_ctxt(struct vcpu *v, vcpu_guest_context_t *c)
 { 
@@ -35,16 +33,17 @@ void arch_getdomaininfo_ctxt(struct vcpu *v, vcpu_guest_context_t *c)
     /* XXX fill in rest of vcpu_guest_context_t */
 }
 
-long arch_do_dom0_op(struct dom0_op *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
+long arch_do_domctl(struct xen_domctl *domctl,
+                    XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 {
     long ret = 0;
 
-    switch (op->cmd) {
-    case DOM0_GETMEMLIST:
+    switch (domctl->cmd) {
+    case XEN_DOMCTL_getmemlist:
     {
         int i;
-        struct domain *d = find_domain_by_id(op->u.getmemlist.domain);
-        unsigned long max_pfns = op->u.getmemlist.max_pfns;
+        struct domain *d = find_domain_by_id(domctl->domain);
+        unsigned long max_pfns = domctl->u.getmemlist.max_pfns;
         xen_pfn_t mfn;
         struct list_head *list_ent;
 
@@ -59,7 +58,7 @@ long arch_do_dom0_op(struct dom0_op *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
             {
                 mfn = page_to_mfn(list_entry(
                     list_ent, struct page_info, list));
-                if ( copy_to_guest_offset(op->u.getmemlist.buffer,
+                if ( copy_to_guest_offset(domctl->u.getmemlist.buffer,
                                           i, &mfn, 1) )
                 {
                     ret = -EFAULT;
@@ -69,17 +68,31 @@ long arch_do_dom0_op(struct dom0_op *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
             }
             spin_unlock(&d->page_alloc_lock);
 
-            op->u.getmemlist.num_pfns = i;
-            copy_to_guest(u_dom0_op, op, 1);
+            domctl->u.getmemlist.num_pfns = i;
+            copy_to_guest(u_domctl, domctl, 1);
             
             put_domain(d);
         }
     }
     break;
 
-    case DOM0_PHYSINFO:
+    default:
+        ret = -ENOSYS;
+        break;
+    }
+
+    return ret;
+}
+
+long arch_do_sysctl(struct xen_sysctl *sysctl,
+                    XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
+{
+    long ret = 0;
+
+    switch (sysctl->cmd) {
+    case XEN_SYSCTL_physinfo:
     {
-        dom0_physinfo_t *pi = &op->u.physinfo;
+        xen_sysctl_physinfo_t *pi = &sysctl->u.physinfo;
 
         pi->threads_per_core = 1;
         pi->cores_per_socket = 1;
@@ -90,7 +103,7 @@ long arch_do_dom0_op(struct dom0_op *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
         pi->cpu_khz          = cpu_khz;
         memset(pi->hw_cap, 0, sizeof(pi->hw_cap));
         ret = 0;
-        if ( copy_to_guest(u_dom0_op, op, 1) )
+        if ( copy_to_guest(u_sysctl, sysctl, 1) )
             ret = -EFAULT;
     }
     break;
@@ -102,3 +115,4 @@ long arch_do_dom0_op(struct dom0_op *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
 
     return ret;
 }
+

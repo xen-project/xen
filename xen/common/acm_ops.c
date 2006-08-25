@@ -26,7 +26,6 @@
 #include <xen/trace.h>
 #include <xen/console.h>
 #include <xen/guest_access.h>
-#include <public/sched_ctl.h>
 #include <acm/acm_hooks.h>
 
 #ifndef ACM_SECURITY

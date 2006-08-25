@@ -61,7 +61,7 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
                  unsigned long *store_mfn, unsigned int console_evtchn,
                  unsigned long *console_mfn)
 {
-    DECLARE_DOM0_OP;
+    DECLARE_DOMCTL;
     int rc = 1, i;
     unsigned long mfn, pfn;
     unsigned long ver;
@@ -94,19 +94,19 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
     }
 
     if (mlock(&ctxt, sizeof(ctxt))) {
-        /* needed for build dom0 op, but might as well do early */
+        /* needed for build domctl, but might as well do early */
         ERR("Unable to mlock ctxt");
         return 1;
     }
 
     /* Get the domain's shared-info frame. */
-    op.cmd = DOM0_GETDOMAININFO;
-    op.u.getdomaininfo.domain = (domid_t)dom;
-    if (xc_dom0_op(xc_handle, &op) < 0) {
+    domctl.cmd = XEN_DOMCTL_getdomaininfo;
+    domctl.domain = (domid_t)dom;
+    if (xc_domctl(xc_handle, &domctl) < 0) {
         ERR("Could not get information on new domain");
         goto out;
     }
-    shared_info_frame = op.u.getdomaininfo.shared_info_frame;
+    shared_info_frame = domctl.u.getdomaininfo.shared_info_frame;
 
     if (xc_domain_setmaxmem(xc_handle, dom, PFN_TO_KB(max_pfn)) != 0) {
         errno = ENOMEM;
@@ -122,20 +122,20 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
 
     DPRINTF("Increased domain reservation by %ld KB\n", PFN_TO_KB(max_pfn));
 
-    if (!read_exact(io_fd, &op.u.domain_setup, sizeof(op.u.domain_setup))) {
+    if (!read_exact(io_fd, &domctl.u.arch_setup, sizeof(domctl.u.arch_setup))) {
         ERR("read: domain setup");
         goto out;
     }
 
     /* Build firmware (will be overwritten).  */
-    op.u.domain_setup.domain = (domid_t)dom;
-    op.u.domain_setup.flags &= ~XEN_DOMAINSETUP_query;
-    op.u.domain_setup.bp = ((nr_pfns - 3) << PAGE_SHIFT)
+    domctl.domain = (domid_t)dom;
+    domctl.u.arch_setup.flags &= ~XEN_DOMAINSETUP_query;
+    domctl.u.arch_setup.bp = ((nr_pfns - 3) << PAGE_SHIFT)
                            + sizeof (start_info_t);
-    op.u.domain_setup.maxmem = (nr_pfns - 3) << PAGE_SHIFT;
+    domctl.u.arch_setup.maxmem = (nr_pfns - 3) << PAGE_SHIFT;
     
-    op.cmd = DOM0_DOMAIN_SETUP;
-    if (xc_dom0_op(xc_handle, &op))
+    domctl.cmd = XEN_DOMCTL_arch_setup;
+    if (xc_domctl(xc_handle, &domctl))
         goto out;
 
     /* Get pages.  */
@@ -226,22 +226,22 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
     }
 
     /* First to initialize.  */
-    op.cmd = DOM0_SETVCPUCONTEXT;
-    op.u.setvcpucontext.domain = (domid_t)dom;
-    op.u.setvcpucontext.vcpu   = 0;
-    set_xen_guest_handle(op.u.setvcpucontext.ctxt, &ctxt);
-    if (xc_dom0_op(xc_handle, &op) != 0) {
+    domctl.cmd = XEN_DOMCTL_setvcpucontext;
+    domctl.domain = (domid_t)dom;
+    domctl.u.vcpucontext.vcpu   = 0;
+    set_xen_guest_handle(domctl.u.vcpucontext.ctxt, &ctxt);
+    if (xc_domctl(xc_handle, &domctl) != 0) {
 	    ERR("Couldn't set vcpu context");
 	    goto out;
     }
 
     /* Second to set registers...  */
     ctxt.flags = VGCF_EXTRA_REGS;
-    op.cmd = DOM0_SETVCPUCONTEXT;
-    op.u.setvcpucontext.domain = (domid_t)dom;
-    op.u.setvcpucontext.vcpu   = 0;
-    set_xen_guest_handle(op.u.setvcpucontext.ctxt, &ctxt);
-    if (xc_dom0_op(xc_handle, &op) != 0) {
+    domctl.cmd = XEN_DOMCTL_setvcpucontext;
+    domctl.domain = (domid_t)dom;
+    domctl.u.vcpucontext.vcpu   = 0;
+    set_xen_guest_handle(domctl.u.vcpucontext.ctxt, &ctxt);
+    if (xc_domctl(xc_handle, &domctl) != 0) {
 	    ERR("Couldn't set vcpu context");
 	    goto out;
     }

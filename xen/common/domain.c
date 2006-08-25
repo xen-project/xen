@@ -23,7 +23,6 @@
 #include <xen/shutdown.h>
 #include <xen/percpu.h>
 #include <asm/debugger.h>
-#include <public/dom0_ops.h>
 #include <public/sched.h>
 #include <public/vcpu.h>
 
@@ -454,11 +453,12 @@ void domain_unpause_by_systemcontroller(struct domain *d)
  * of domains other than domain 0. ie. the domains that are being built by 
  * the userspace dom0 domain builder.
  */
-int set_info_guest(struct domain *d, dom0_setvcpucontext_t *setvcpucontext)
+int set_info_guest(struct domain *d,
+                   xen_domctl_vcpucontext_t *vcpucontext)
 {
     int rc = 0;
     struct vcpu_guest_context *c = NULL;
-    unsigned long vcpu = setvcpucontext->vcpu;
+    unsigned long vcpu = vcpucontext->vcpu;
     struct vcpu *v;
 
     if ( (vcpu >= MAX_VIRT_CPUS) || ((v = d->vcpu[vcpu]) == NULL) )
@@ -470,7 +470,7 @@ int set_info_guest(struct domain *d, dom0_setvcpucontext_t *setvcpucontext)
     domain_pause(d);
 
     rc = -EFAULT;
-    if ( copy_from_guest(c, setvcpucontext->ctxt, 1) == 0 )
+    if ( copy_from_guest(c, vcpucontext->ctxt, 1) == 0 )
         rc = arch_set_info_guest(v, c);
 
     domain_unpause(d);

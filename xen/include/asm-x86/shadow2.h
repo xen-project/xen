@@ -23,7 +23,7 @@
 #ifndef _XEN_SHADOW2_H
 #define _XEN_SHADOW2_H
 
-#include <public/dom0_ops.h> 
+#include <public/domctl.h> 
 #include <xen/sched.h>
 #include <xen/perfc.h>
 #include <asm/flushtlb.h>
@@ -34,14 +34,14 @@
 /* We're in one of the shadow modes */
 #define SHM2_enable    (1U << SHM2_shift)
 /* Refcounts based on shadow tables instead of guest tables */
-#define SHM2_refcounts (DOM0_SHADOW_ENABLE_REFCOUNT << SHM2_shift)
+#define SHM2_refcounts (XEN_DOMCTL_SHADOW_ENABLE_REFCOUNT << SHM2_shift)
 /* Enable log dirty mode */
-#define SHM2_log_dirty (DOM0_SHADOW_ENABLE_LOG_DIRTY << SHM2_shift)
+#define SHM2_log_dirty (XEN_DOMCTL_SHADOW_ENABLE_LOG_DIRTY << SHM2_shift)
 /* Xen does p2m translation, not guest */
-#define SHM2_translate (DOM0_SHADOW_ENABLE_TRANSLATE << SHM2_shift)
+#define SHM2_translate (XEN_DOMCTL_SHADOW_ENABLE_TRANSLATE << SHM2_shift)
 /* Xen does not steal address space from the domain for its own booking;
  * requires VT or similar mechanisms */
-#define SHM2_external  (DOM0_SHADOW_ENABLE_EXTERNAL << SHM2_shift)
+#define SHM2_external  (XEN_DOMCTL_SHADOW_ENABLE_EXTERNAL << SHM2_shift)
 
 #define shadow2_mode_enabled(_d)   ((_d)->arch.shadow2.mode)
 #define shadow2_mode_refcounts(_d) ((_d)->arch.shadow2.mode & SHM2_refcounts)
@@ -297,9 +297,9 @@ int shadow2_test_enable(struct domain *d);
 
 /* Handler for shadow control ops: enabling and disabling shadow modes, 
  * and log-dirty bitmap ops all happen through here. */
-int shadow2_control_op(struct domain *d, 
-                       dom0_shadow_control_t *sc,
-                       XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op);
+int shadow2_domctl(struct domain *d, 
+                   xen_domctl_shadow_op_t *sc,
+                   XEN_GUEST_HANDLE(xen_domctl_t) u_domctl);
 
 /* Call when destroying a domain */
 void shadow2_teardown(struct domain *d);

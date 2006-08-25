@@ -141,7 +141,7 @@ static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
 {
     uint32_t dom;
     int vcpu = 0, i;
-    cpumap_t cpumap = ~0ULL;
+    uint64_t  cpumap = ~0ULL;
     PyObject *cpulist = NULL;
 
     static char *kwd_list[] = { "dom", "vcpu", "cpumap", NULL };
@@ -154,7 +154,7 @@ static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
     {
         cpumap = 0ULL;
         for ( i = 0; i < PyList_Size(cpulist); i++ ) 
-            cpumap |= (cpumap_t)1 << PyInt_AsLong(PyList_GetItem(cpulist, i));
+            cpumap |= (uint64_t)1 << PyInt_AsLong(PyList_GetItem(cpulist, i));
     }
   
     if ( xc_vcpu_setaffinity(self->xc_handle, dom, vcpu, cpumap) != 0 )
@@ -289,7 +289,7 @@ static PyObject *pyxc_vcpu_getinfo(XcObject *self,
     uint32_t dom, vcpu = 0;
     xc_vcpuinfo_t info;
     int rc, i;
-    cpumap_t cpumap;
+    uint64_t cpumap;
 
     static char *kwd_list[] = { "dom", "vcpu", NULL };
     
@@ -300,6 +300,9 @@ static PyObject *pyxc_vcpu_getinfo(XcObject *self,
     rc = xc_vcpu_getinfo(self->xc_handle, dom, vcpu, &info);
     if ( rc < 0 )
         return PyErr_SetFromErrno(xc_error);
+    rc = xc_vcpu_getaffinity(self->xc_handle, dom, vcpu, &cpumap);
+    if ( rc < 0 )
+        return PyErr_SetFromErrno(xc_error);
 
     info_dict = Py_BuildValue("{s:i,s:i,s:i,s:L,s:i}",
                               "online",   info.online,
@@ -308,7 +311,6 @@ static PyObject *pyxc_vcpu_getinfo(XcObject *self,
                               "cpu_time", info.cpu_time,
                               "cpu",      info.cpu);
 
-    cpumap = info.cpumap;
     cpulist = PyList_New(0);
     for ( i = 0; cpumap != 0; i++ )
     {
@@ -632,11 +634,11 @@ static PyObject *pyxc_shadow_mem_control(PyObject *self,
         return NULL;
     
     if ( mbarg < 0 ) 
-        op = DOM0_SHADOW_CONTROL_OP_GET_ALLOCATION;
+        op = XEN_DOMCTL_SHADOW_OP_GET_ALLOCATION;
     else 
     {
         mb = mbarg;
-        op = DOM0_SHADOW_CONTROL_OP_SET_ALLOCATION;
+        op = XEN_DOMCTL_SHADOW_OP_SET_ALLOCATION;
     }
     if ( xc_shadow_control(xc->xc_handle, dom, op, NULL, 0, &mb, 0, NULL) < 0 )
         return PyErr_SetFromErrno(xc_error);
@@ -654,7 +656,7 @@ static PyObject *pyxc_sched_credit_domain_set(XcObject *self,
     uint16_t cap;
     static char *kwd_list[] = { "dom", "weight", "cap", NULL };
     static char kwd_type[] = "I|HH";
-    struct sched_credit_adjdom sdom;
+    struct xen_domctl_sched_credit sdom;
     
     weight = 0;
     cap = (uint16_t)~0U;
@@ -675,7 +677,7 @@ static PyObject *pyxc_sched_credit_domain_set(XcObject *self,
 static PyObject *pyxc_sched_credit_domain_get(XcObject *self, PyObject *args)
 {
     uint32_t domid;
-    struct sched_credit_adjdom sdom;
+    struct xen_domctl_sched_credit sdom;
     
     if( !PyArg_ParseTuple(args, "I", &domid) )
         return NULL;

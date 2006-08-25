@@ -53,7 +53,7 @@ extern unsigned long domain_set_shared_info_va (unsigned long va);
 extern void domain_cache_flush (struct domain *d, int sync_only);
 
 /* Control the shadow mode.  */
-extern int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc);
+extern int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc);
 
 /* Cleanly crash the current domain with a message.  */
 extern void panic_domain(struct pt_regs *, const char *, ...)

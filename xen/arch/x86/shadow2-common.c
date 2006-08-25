@@ -2951,14 +2951,15 @@ void shadow2_convert_to_log_dirty(struct vcpu *v, mfn_t smfn)
 
 /* Read a domain's log-dirty bitmap and stats.  
  * If the operation is a CLEAN, clear the bitmap and stats as well. */
-static int shadow2_log_dirty_op(struct domain *d, dom0_shadow_control_t *sc)
-{    
+static int shadow2_log_dirty_op(
+    struct domain *d, struct xen_domctl_shadow_op *sc)
+{
     int i, rv = 0, clean = 0;
 
     domain_pause(d);
     shadow2_lock(d);
 
-    clean = (sc->op == DOM0_SHADOW_CONTROL_OP_CLEAN);
+    clean = (sc->op == XEN_DOMCTL_SHADOW_OP_CLEAN);
 
     SHADOW2_DEBUG(LOGDIRTY, "log-dirty %s: dom %u faults=%u dirty=%u\n", 
                   (clean) ? "clean" : "peek",
@@ -3081,11 +3082,11 @@ void sh2_do_mark_dirty(struct domain *d, mfn_t gmfn)
 
 
 /**************************************************************************/
-/* Shadow-control DOM0_OP dispatcher */
+/* Shadow-control XEN_DOMCTL dispatcher */
 
-int shadow2_control_op(struct domain *d, 
-                       dom0_shadow_control_t *sc,
-                       XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
+int shadow2_domctl(struct domain *d, 
+                   xen_domctl_shadow_op_t *sc,
+                   XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 {
     int rc, preempted = 0;
 
@@ -3097,7 +3098,7 @@ int shadow2_control_op(struct domain *d,
 
     switch ( sc->op )
     {
-    case DOM0_SHADOW_CONTROL_OP_OFF:
+    case XEN_DOMCTL_SHADOW_OP_OFF:
         if ( shadow2_mode_log_dirty(d) )
             if ( (rc = shadow2_log_dirty_disable(d)) != 0 ) 
                 return rc;
@@ -3106,34 +3107,34 @@ int shadow2_control_op(struct domain *d,
                 return rc;
         return 0;
 
-    case DOM0_SHADOW_CONTROL_OP_ENABLE_TEST:
+    case XEN_DOMCTL_SHADOW_OP_ENABLE_TEST:
         return shadow2_test_enable(d);
 
-    case DOM0_SHADOW_CONTROL_OP_ENABLE_LOGDIRTY:
+    case XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY:
         return shadow2_log_dirty_enable(d);
 
-    case DOM0_SHADOW_CONTROL_OP_ENABLE_TRANSLATE:
+    case XEN_DOMCTL_SHADOW_OP_ENABLE_TRANSLATE:
         return shadow2_enable(d, SHM2_refcounts|SHM2_translate);
 
-    case DOM0_SHADOW_CONTROL_OP_CLEAN:
-    case DOM0_SHADOW_CONTROL_OP_PEEK:
+    case XEN_DOMCTL_SHADOW_OP_CLEAN:
+    case XEN_DOMCTL_SHADOW_OP_PEEK:
         return shadow2_log_dirty_op(d, sc);
 
-    case DOM0_SHADOW_CONTROL_OP_ENABLE:
-        if ( sc->mode & DOM0_SHADOW_ENABLE_LOG_DIRTY )
+    case XEN_DOMCTL_SHADOW_OP_ENABLE:
+        if ( sc->mode & XEN_DOMCTL_SHADOW_ENABLE_LOG_DIRTY )
             return shadow2_log_dirty_enable(d);
         return shadow2_enable(d, sc->mode << SHM2_shift);
 
-    case DOM0_SHADOW_CONTROL_OP_GET_ALLOCATION:
+    case XEN_DOMCTL_SHADOW_OP_GET_ALLOCATION:
         sc->mb = shadow2_get_allocation(d);
         return 0;
 
-    case DOM0_SHADOW_CONTROL_OP_SET_ALLOCATION:
+    case XEN_DOMCTL_SHADOW_OP_SET_ALLOCATION:
         rc = shadow2_set_allocation(d, sc->mb, &preempted);
         if ( preempted )
             /* Not finished.  Set up to re-run the call. */
             rc = hypercall_create_continuation(
-                __HYPERVISOR_dom0_op, "h", u_dom0_op);
+                __HYPERVISOR_domctl, "h", u_domctl);
         else 
             /* Finished.  Return the new allocation */
             sc->mb = shadow2_get_allocation(d);

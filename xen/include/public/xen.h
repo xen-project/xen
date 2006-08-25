@@ -34,7 +34,7 @@
 #define __HYPERVISOR_set_callbacks         4
 #define __HYPERVISOR_fpu_taskswitch        5
 #define __HYPERVISOR_sched_op_compat       6 /* compat since 0x00030101 */
-#define __HYPERVISOR_dom0_op               7
+#define __HYPERVISOR_platform_op           7
 #define __HYPERVISOR_set_debugreg          8
 #define __HYPERVISOR_get_debugreg          9
 #define __HYPERVISOR_update_descriptor    10
@@ -61,6 +61,8 @@
 #define __HYPERVISOR_event_channel_op     32
 #define __HYPERVISOR_physdev_op           33
 #define __HYPERVISOR_hvm_op               34
+#define __HYPERVISOR_sysctl               35
+#define __HYPERVISOR_domctl               36
 
 /* Architecture-specific hypercall definitions. */
 #define __HYPERVISOR_arch_0               48
@@ -88,6 +90,11 @@
 #define __HYPERVISOR_event_channel_op __HYPERVISOR_event_channel_op_compat
 #undef __HYPERVISOR_physdev_op
 #define __HYPERVISOR_physdev_op __HYPERVISOR_physdev_op_compat
+#endif
+
+/* New platform_op hypercall introduced in 0x00030204. */
+#if __XEN_INTERFACE_VERSION__ < 0x00030204
+#define __HYPERVISOR_dom0_op __HYPERVISOR_platform_op
 #endif
 
 /* 
@@ -530,13 +537,16 @@ typedef struct dom0_vga_console_info {
     uint8_t rsvd_size;
 } dom0_vga_console_info_t;
 
-typedef uint64_t cpumap_t;
-
 typedef uint8_t xen_domain_handle_t[16];
 
 /* Turn a plain number into a C unsigned long constant. */
 #define __mk_unsigned_long(x) x ## UL
 #define mk_unsigned_long(x) __mk_unsigned_long(x)
+
+DEFINE_XEN_GUEST_HANDLE(uint8_t);
+DEFINE_XEN_GUEST_HANDLE(uint16_t);
+DEFINE_XEN_GUEST_HANDLE(uint32_t);
+DEFINE_XEN_GUEST_HANDLE(uint64_t);
 
 #else /* __ASSEMBLY__ */
 

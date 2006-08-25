@@ -9,7 +9,9 @@
 #include <xen/types.h>
 #include <xen/time.h>
 #include <public/xen.h>
-#include <public/dom0_ops.h>
+#include <public/domctl.h>
+#include <public/sysctl.h>
+#include <public/platform.h>
 #include <public/acm_ops.h>
 #include <public/event_channel.h>
 #include <asm/hypercall.h>
@@ -29,8 +31,16 @@ do_sched_op(
     XEN_GUEST_HANDLE(void) arg);
 
 extern long
-do_dom0_op(
-    XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op);
+do_domctl(
+    XEN_GUEST_HANDLE(xen_domctl_t) u_domctl);
+
+extern long
+do_sysctl(
+    XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl);
+
+extern long
+do_platform_op(
+    XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op);
 
 extern long
 do_memory_op(

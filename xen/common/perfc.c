@@ -7,7 +7,6 @@
 #include <xen/spinlock.h>
 #include <xen/mm.h>
 #include <xen/guest_access.h>
-#include <public/dom0_ops.h>
 #include <asm/perfc.h>
 
 #undef  PERFCOUNTER
@@ -218,20 +217,19 @@ static int perfc_copy_info(XEN_GUEST_HANDLE(dom0_perfc_desc_t) desc,
 int perfc_control(dom0_perfccontrol_t *pc)
 {
     static DEFINE_SPINLOCK(lock);
-    u32 op = pc->op;
     int rc;
 
     spin_lock(&lock);
 
-    switch ( op )
+    switch ( pc->cmd )
     {
-    case DOM0_PERFCCONTROL_OP_RESET:
+    case XEN_SYSCTL_PERFCOP_reset:
         perfc_copy_info(pc->desc, pc->val);
         perfc_reset(0);
         rc = 0;
         break;
 
-    case DOM0_PERFCCONTROL_OP_QUERY:
+    case XEN_SYSCTL_PERFCOP_query:
         perfc_copy_info(pc->desc, pc->val);
         rc = 0;
         break;

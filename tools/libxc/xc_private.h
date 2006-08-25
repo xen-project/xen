@@ -18,14 +18,16 @@
 #include <xen/sys/privcmd.h>
 
 /* valgrind cannot see when a hypercall has filled in some values.  For this
-   reason, we must zero the privcmd_hypercall_t or dom0_op_t instance before a
-   call, if using valgrind.  */
+   reason, we must zero the privcmd_hypercall_t or domctl/sysctl instance
+   before a call, if using valgrind.  */
 #ifdef VALGRIND
 #define DECLARE_HYPERCALL privcmd_hypercall_t hypercall = { 0 }
-#define DECLARE_DOM0_OP dom0_op_t op = { 0 }
+#define DECLARE_DOMCTL struct xen_domctl domctl = { 0 }
+#define DECLARE_SYSCTL struct xen_sysctl sysctl = { 0 }
 #else
 #define DECLARE_HYPERCALL privcmd_hypercall_t hypercall
-#define DECLARE_DOM0_OP dom0_op_t op
+#define DECLARE_DOMCTL struct xen_domctl domctl
+#define DECLARE_SYSCTL struct xen_sysctl sysctl
 #endif
 
 #define PAGE_SHIFT              XC_PAGE_SHIFT
@@ -94,17 +96,17 @@ static inline int do_xen_version(int xc_handle, int cmd, void *dest)
     return do_xen_hypercall(xc_handle, &hypercall);
 }
 
-static inline int do_dom0_op(int xc_handle, dom0_op_t *op)
+static inline int do_domctl(int xc_handle, struct xen_domctl *domctl)
 {
     int ret = -1;
     DECLARE_HYPERCALL;
 
-    op->interface_version = DOM0_INTERFACE_VERSION;
+    domctl->interface_version = XEN_DOMCTL_INTERFACE_VERSION;
 
-    hypercall.op     = __HYPERVISOR_dom0_op;
-    hypercall.arg[0] = (unsigned long)op;
+    hypercall.op     = __HYPERVISOR_domctl;
+    hypercall.arg[0] = (unsigned long)domctl;
 
-    if ( mlock(op, sizeof(*op)) != 0 )
+    if ( mlock(domctl, sizeof(*domctl)) != 0 )
     {
         PERROR("Could not lock memory for Xen hypercall");
         goto out1;
@@ -113,11 +115,40 @@ static inline int do_dom0_op(int xc_handle, dom0_op_t *op)
     if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
     {
         if ( errno == EACCES )
-            DPRINTF("Dom0 operation failed -- need to"
+            DPRINTF("domctl operation failed -- need to"
                     " rebuild the user-space tool set?\n");
     }
 
-    safe_munlock(op, sizeof(*op));
+    safe_munlock(domctl, sizeof(*domctl));
+
+ out1:
+    return ret;
+}
+
+static inline int do_sysctl(int xc_handle, struct xen_sysctl *sysctl)
+{
+    int ret = -1;
+    DECLARE_HYPERCALL;
+
+    sysctl->interface_version = XEN_SYSCTL_INTERFACE_VERSION;
+
+    hypercall.op     = __HYPERVISOR_sysctl;
+    hypercall.arg[0] = (unsigned long)sysctl;
+
+    if ( mlock(sysctl, sizeof(*sysctl)) != 0 )
+    {
+        PERROR("Could not lock memory for Xen hypercall");
+        goto out1;
+    }
+
+    if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
+    {
+        if ( errno == EACCES )
+            DPRINTF("sysctl operation failed -- need to"
+                    " rebuild the user-space tool set?\n");
+    }
+
+    safe_munlock(sysctl, sizeof(*sysctl));
 
  out1:
     return ret;

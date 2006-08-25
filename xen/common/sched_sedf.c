@@ -8,7 +8,6 @@
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <xen/sched-if.h>
-#include <public/sched_ctl.h>
 #include <xen/timer.h>
 #include <xen/softirq.h>
 #include <xen/time.h>
@@ -1297,7 +1296,7 @@ static void sedf_dump_cpu_state(int i)
 
 
 /* Adjusts periods and slices of the domains accordingly to their weights. */
-static int sedf_adjust_weights(struct sched_adjdom_cmd *cmd)
+static int sedf_adjust_weights(struct xen_domctl_scheduler_op *cmd)
 {
     struct vcpu *p;
     struct domain      *d;
@@ -1352,29 +1351,29 @@ static int sedf_adjust_weights(struct sched_adjdom_cmd *cmd)
 
 
 /* set or fetch domain scheduling parameters */
-static int sedf_adjdom(struct domain *p, struct sched_adjdom_cmd *cmd)
+static int sedf_adjust(struct domain *p, struct xen_domctl_scheduler_op *op)
 {
     struct vcpu *v;
 
-    PRINT(2,"sedf_adjdom was called, domain-id %i new period %"PRIu64" "
+    PRINT(2,"sedf_adjust was called, domain-id %i new period %"PRIu64" "
           "new slice %"PRIu64"\nlatency %"PRIu64" extra:%s\n",
-          p->domain_id, cmd->u.sedf.period, cmd->u.sedf.slice,
-          cmd->u.sedf.latency, (cmd->u.sedf.extratime)?"yes":"no");
+          p->domain_id, op->u.sedf.period, op->u.sedf.slice,
+          op->u.sedf.latency, (op->u.sedf.extratime)?"yes":"no");
 
-    if ( cmd->direction == SCHED_INFO_PUT )
+    if ( op->cmd == XEN_DOMCTL_SCHEDOP_putinfo )
     {
         /* Check for sane parameters. */
-        if ( !cmd->u.sedf.period && !cmd->u.sedf.weight )
+        if ( !op->u.sedf.period && !op->u.sedf.weight )
             return -EINVAL;
-        if ( cmd->u.sedf.weight )
+        if ( op->u.sedf.weight )
         {
-            if ( (cmd->u.sedf.extratime & EXTRA_AWARE) &&
-                 (!cmd->u.sedf.period) )
+            if ( (op->u.sedf.extratime & EXTRA_AWARE) &&
+                 (!op->u.sedf.period) )
             {
                 /* Weight-driven domains with extratime only. */
                 for_each_vcpu ( p, v )
                 {
-                    EDOM_INFO(v)->extraweight = cmd->u.sedf.weight;
+                    EDOM_INFO(v)->extraweight = op->u.sedf.weight;
                     EDOM_INFO(v)->weight = 0;
                     EDOM_INFO(v)->slice = 0;
                     EDOM_INFO(v)->period = WEIGHT_PERIOD;
@@ -1384,7 +1383,7 @@ static int sedf_adjdom(struct domain *p, struct sched_adjdom_cmd *cmd)
             {
                 /* Weight-driven domains with real-time execution. */
                 for_each_vcpu ( p, v )
-                    EDOM_INFO(v)->weight = cmd->u.sedf.weight;
+                    EDOM_INFO(v)->weight = op->u.sedf.weight;
             }
         }
         else
@@ -1396,51 +1395,51 @@ static int sedf_adjdom(struct domain *p, struct sched_adjdom_cmd *cmd)
                  * Sanity checking: note that disabling extra weight requires
                  * that we set a non-zero slice.
                  */
-                if ( (cmd->u.sedf.period > PERIOD_MAX) ||
-                     (cmd->u.sedf.period < PERIOD_MIN) ||
-                     (cmd->u.sedf.slice  > cmd->u.sedf.period) ||
-                     (cmd->u.sedf.slice  < SLICE_MIN) )
+                if ( (op->u.sedf.period > PERIOD_MAX) ||
+                     (op->u.sedf.period < PERIOD_MIN) ||
+                     (op->u.sedf.slice  > op->u.sedf.period) ||
+                     (op->u.sedf.slice  < SLICE_MIN) )
                     return -EINVAL;
                 EDOM_INFO(v)->weight = 0;
                 EDOM_INFO(v)->extraweight = 0;
                 EDOM_INFO(v)->period_orig = 
-                    EDOM_INFO(v)->period  = cmd->u.sedf.period;
+                    EDOM_INFO(v)->period  = op->u.sedf.period;
                 EDOM_INFO(v)->slice_orig  = 
-                    EDOM_INFO(v)->slice   = cmd->u.sedf.slice;
+                    EDOM_INFO(v)->slice   = op->u.sedf.slice;
             }
         }
 
-        if ( sedf_adjust_weights(cmd) )
+        if ( sedf_adjust_weights(op) )
             return -EINVAL;
 
         for_each_vcpu ( p, v )
         {
             EDOM_INFO(v)->status  = 
                 (EDOM_INFO(v)->status &
-                 ~EXTRA_AWARE) | (cmd->u.sedf.extratime & EXTRA_AWARE);
-            EDOM_INFO(v)->latency = cmd->u.sedf.latency;
+                 ~EXTRA_AWARE) | (op->u.sedf.extratime & EXTRA_AWARE);
+            EDOM_INFO(v)->latency = op->u.sedf.latency;
             extraq_check(v);
         }
     }
-    else if ( cmd->direction == SCHED_INFO_GET )
+    else if ( op->cmd == XEN_DOMCTL_SCHEDOP_getinfo )
     {
         if ( p->vcpu[0] == NULL )
             return -EINVAL;
-        cmd->u.sedf.period    = EDOM_INFO(p->vcpu[0])->period;
-        cmd->u.sedf.slice     = EDOM_INFO(p->vcpu[0])->slice;
-        cmd->u.sedf.extratime = EDOM_INFO(p->vcpu[0])->status & EXTRA_AWARE;
-        cmd->u.sedf.latency   = EDOM_INFO(p->vcpu[0])->latency;
-        cmd->u.sedf.weight    = EDOM_INFO(p->vcpu[0])->weight;
+        op->u.sedf.period    = EDOM_INFO(p->vcpu[0])->period;
+        op->u.sedf.slice     = EDOM_INFO(p->vcpu[0])->slice;
+        op->u.sedf.extratime = EDOM_INFO(p->vcpu[0])->status & EXTRA_AWARE;
+        op->u.sedf.latency   = EDOM_INFO(p->vcpu[0])->latency;
+        op->u.sedf.weight    = EDOM_INFO(p->vcpu[0])->weight;
     }
 
-    PRINT(2,"sedf_adjdom_finished\n");
+    PRINT(2,"sedf_adjust_finished\n");
     return 0;
 }
 
 struct scheduler sched_sedf_def = {
     .name     = "Simple EDF Scheduler",
     .opt_name = "sedf",
-    .sched_id = SCHED_SEDF,
+    .sched_id = XEN_SCHEDULER_SEDF,
     
     .init_vcpu      = sedf_init_vcpu,
     .destroy_domain = sedf_destroy_domain,
@@ -1449,7 +1448,7 @@ struct scheduler sched_sedf_def = {
     .dump_cpu_state = sedf_dump_cpu_state,
     .sleep          = sedf_sleep,
     .wake           = sedf_wake,
-    .adjdom         = sedf_adjdom,
+    .adjust         = sedf_adjust,
     .set_affinity   = sedf_set_affinity
 };
 

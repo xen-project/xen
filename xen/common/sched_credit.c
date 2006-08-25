@@ -614,34 +614,34 @@ csched_vcpu_set_affinity(struct vcpu *vc, cpumask_t *affinity)
 static int
 csched_dom_cntl(
     struct domain *d,
-    struct sched_adjdom_cmd *cmd)
+    struct xen_domctl_scheduler_op *op)
 {
     struct csched_dom * const sdom = CSCHED_DOM(d);
     unsigned long flags;
 
-    if ( cmd->direction == SCHED_INFO_GET )
+    if ( op->cmd == XEN_DOMCTL_SCHEDOP_putinfo )
     {
-        cmd->u.credit.weight = sdom->weight;
-        cmd->u.credit.cap = sdom->cap;
+        op->u.credit.weight = sdom->weight;
+        op->u.credit.cap = sdom->cap;
     }
     else
     {
-        ASSERT( cmd->direction == SCHED_INFO_PUT );
+        ASSERT(op->cmd == XEN_DOMCTL_SCHEDOP_getinfo);
 
         spin_lock_irqsave(&csched_priv.lock, flags);
 
-        if ( cmd->u.credit.weight != 0 )
+        if ( op->u.credit.weight != 0 )
         {
             if ( !list_empty(&sdom->active_sdom_elem) )
             {
                 csched_priv.weight -= sdom->weight;
-                csched_priv.weight += cmd->u.credit.weight;
+                csched_priv.weight += op->u.credit.weight;
             }
-            sdom->weight = cmd->u.credit.weight;
+            sdom->weight = op->u.credit.weight;
         }
 
-        if ( cmd->u.credit.cap != (uint16_t)~0U )
-            sdom->cap = cmd->u.credit.cap;
+        if ( op->u.credit.cap != (uint16_t)~0U )
+            sdom->cap = op->u.credit.cap;
 
         spin_unlock_irqrestore(&csched_priv.lock, flags);
     }
@@ -1215,7 +1215,7 @@ csched_init(void)
 struct scheduler sched_credit_def = {
     .name           = "SMP Credit Scheduler",
     .opt_name       = "credit",
-    .sched_id       = SCHED_CREDIT,
+    .sched_id       = XEN_SCHEDULER_CREDIT,
 
     .init_vcpu      = csched_vcpu_init,
     .destroy_domain = csched_dom_destroy,
@@ -1225,7 +1225,7 @@ struct scheduler sched_credit_def = {
 
     .set_affinity   = csched_vcpu_set_affinity,
 
-    .adjdom         = csched_dom_cntl,
+    .adjust         = csched_dom_cntl,
 
     .tick           = csched_tick,
     .do_schedule    = csched_schedule,

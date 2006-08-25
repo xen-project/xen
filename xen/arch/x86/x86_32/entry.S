@@ -630,7 +630,7 @@ ENTRY(hypercall_table)
         .long do_set_callbacks
         .long do_fpu_taskswitch     /*  5 */
         .long do_arch_sched_op_compat
-        .long do_dom0_op
+        .long do_platform_op
         .long do_set_debugreg
         .long do_get_debugreg
         .long do_update_descriptor  /* 10 */
@@ -657,7 +657,9 @@ ENTRY(hypercall_table)
         .long do_xenoprof_op
         .long do_event_channel_op
         .long do_physdev_op
-        .long do_hvm_op             /* 34 */
+        .long do_hvm_op
+        .long do_sysctl             /* 35 */
+        .long do_domctl
         .rept NR_hypercalls-((.-hypercall_table)/4)
         .long do_ni_hypercall
         .endr
@@ -670,7 +672,7 @@ ENTRY(hypercall_args_table)
         .byte 4 /* do_set_callbacks     */
         .byte 1 /* do_fpu_taskswitch    */  /*  5 */
         .byte 2 /* do_arch_sched_op_compat */
-        .byte 1 /* do_dom0_op           */
+        .byte 1 /* do_platform_op       */
         .byte 2 /* do_set_debugreg      */
         .byte 1 /* do_get_debugreg      */
         .byte 4 /* do_update_descriptor */  /* 10 */
@@ -697,7 +699,9 @@ ENTRY(hypercall_args_table)
         .byte 2 /* do_xenoprof_op       */
         .byte 2 /* do_event_channel_op  */
         .byte 2 /* do_physdev_op        */
-        .byte 2 /* do_hvm_op            */  /* 34 */
+        .byte 2 /* do_hvm_op            */
+        .byte 1 /* do_sysctl            */  /* 35 */
+        .byte 1 /* do_domctl            */
         .rept NR_hypercalls-(.-hypercall_args_table)
         .byte 0 /* do_ni_hypercall      */
         .endr

@@ -54,15 +54,6 @@ curvcpuid()
 
 }
 
-
-#define DOMFLAGS_DYING     (1<<0) /* Domain is scheduled to die.             */
-#define DOMFLAGS_SHUTDOWN  (1<<2) /* The guest OS has shut down.             */
-#define DOMFLAGS_PAUSED    (1<<3) /* Currently paused by control software.   */
-#define DOMFLAGS_BLOCKED   (1<<4) /* Currently blocked pending an event.     */
-#define DOMFLAGS_RUNNING   (1<<5) /* Domain is currently running.            */
-
-
-
 struct inferior_list all_processes;
 static int current_domid;
 static int expect_signal = 0;

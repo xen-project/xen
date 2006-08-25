@@ -64,7 +64,7 @@ int main(int argc, char *argv[])
     
     if ( reset )
     {
-        if ( xc_perfc_control(xc_handle, DOM0_PERFCCONTROL_OP_RESET,
+        if ( xc_perfc_control(xc_handle, XEN_SYSCTL_PERFCOP_reset,
                               NULL, NULL, NULL, NULL) != 0 )
         {
             fprintf(stderr, "Error reseting performance counters: %d (%s)\n",
@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-	if ( xc_perfc_control(xc_handle, DOM0_PERFCCONTROL_OP_QUERY,
+	if ( xc_perfc_control(xc_handle, XEN_SYSCTL_PERFCOP_query,
 						  NULL, NULL, &num_desc, &num_val) != 0 )
         {
             fprintf(stderr, "Error getting number of perf counters: %d (%s)\n",
@@ -96,7 +96,7 @@ int main(int argc, char *argv[])
         exit(-1);
     }
 
-    if ( xc_perfc_control(xc_handle, DOM0_PERFCCONTROL_OP_QUERY,
+    if ( xc_perfc_control(xc_handle, XEN_SYSCTL_PERFCOP_query,
 						  pcd, pcv, NULL, NULL) != 0 )
     {
         fprintf(stderr, "Error getting perf counter: %d (%s)\n",

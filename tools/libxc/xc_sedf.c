@@ -10,37 +10,50 @@
 
 #include "xc_private.h"
 
-int xc_sedf_domain_set(int xc_handle,
-                          uint32_t domid, uint64_t period, uint64_t slice,uint64_t latency, uint16_t extratime,uint16_t weight)
+int xc_sedf_domain_set(
+    int xc_handle,
+    uint32_t domid,
+    uint64_t period,
+    uint64_t slice,
+    uint64_t latency,
+    uint16_t extratime,
+    uint16_t weight)
 {
-    DECLARE_DOM0_OP;
-    struct sedf_adjdom *p = &op.u.adjustdom.u.sedf;
+    DECLARE_DOMCTL;
+    struct xen_domctl_sched_sedf *p = &domctl.u.scheduler_op.u.sedf;
 
-    op.cmd = DOM0_ADJUSTDOM;
-    op.u.adjustdom.domain  = (domid_t)domid;
-    op.u.adjustdom.sched_id = SCHED_SEDF;
-    op.u.adjustdom.direction = SCHED_INFO_PUT;
+    domctl.cmd = XEN_DOMCTL_scheduler_op;
+    domctl.domain  = (domid_t)domid;
+    domctl.u.scheduler_op.sched_id = XEN_SCHEDULER_SEDF;
+    domctl.u.scheduler_op.cmd = XEN_DOMCTL_SCHEDOP_putinfo;
 
     p->period    = period;
     p->slice     = slice;
     p->latency   = latency;
     p->extratime = extratime;
     p->weight    = weight;
-    return do_dom0_op(xc_handle, &op);
+    return do_domctl(xc_handle, &domctl);
 }
 
-int xc_sedf_domain_get(int xc_handle, uint32_t domid, uint64_t *period, uint64_t *slice, uint64_t* latency, uint16_t* extratime, uint16_t* weight)
+int xc_sedf_domain_get(
+    int xc_handle,
+    uint32_t domid,
+    uint64_t *period,
+    uint64_t *slice,
+    uint64_t *latency,
+    uint16_t *extratime,
+    uint16_t *weight)
 {
-    DECLARE_DOM0_OP;
+    DECLARE_DOMCTL;
     int ret;
-    struct sedf_adjdom *p = &op.u.adjustdom.u.sedf;
+    struct xen_domctl_sched_sedf *p = &domctl.u.scheduler_op.u.sedf;
 
-    op.cmd = DOM0_ADJUSTDOM;
-    op.u.adjustdom.domain = (domid_t)domid;
-    op.u.adjustdom.sched_id = SCHED_SEDF;
-    op.u.adjustdom.direction = SCHED_INFO_GET;
+    domctl.cmd = XEN_DOMCTL_scheduler_op;
+    domctl.domain = (domid_t)domid;
+    domctl.u.scheduler_op.sched_id = XEN_SCHEDULER_SEDF;
+    domctl.u.scheduler_op.cmd = XEN_DOMCTL_SCHEDOP_getinfo;
 
-    ret = do_dom0_op(xc_handle, &op);
+    ret = do_domctl(xc_handle, &domctl);
 
     *period    = p->period;
     *slice     = p->slice;

@@ -19,15 +19,6 @@
 #include <xen/memory.h>
 #include <xen/elfnote.h>
 
-/* valgrind cannot see when a hypercall has filled in some values.  For this
-   reason, we must zero the dom0_op_t instance before a call, if using
-   valgrind.  */
-#ifdef VALGRIND
-#define DECLARE_DOM0_OP dom0_op_t op = { 0 }
-#else
-#define DECLARE_DOM0_OP dom0_op_t op
-#endif
-
 #ifndef ELFSIZE
 #include <limits.h>
 #if UINT_MAX == ULONG_MAX

@@ -16,15 +16,13 @@
  *
  * Access to the trace buffers is via a dom0 hypervisor op and analysis of
  * trace buffer contents can then be performed using a userland tool.
- *
- * See also common/trace.c and the dom0 op in include/public/dom0_ops.h
  */
 
 #ifndef __XEN_TRACE_H__
 #define __XEN_TRACE_H__
 
 #include <xen/config.h>
-#include <public/dom0_ops.h>
+#include <public/sysctl.h>
 #include <public/trace.h>
 
 extern int tb_init_done;
@@ -33,7 +31,7 @@ extern int tb_init_done;
 void init_trace_bufs(void);
 
 /* used to retrieve the physical address of the trace buffers */
-int tb_control(dom0_tbufcontrol_t *tbc);
+int tb_control(struct xen_sysctl_tbuf_op *tbc);
 
 void trace(u32 event, unsigned long d1, unsigned long d2,
            unsigned long d3, unsigned long d4, unsigned long d5);

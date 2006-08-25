@@ -13,11 +13,11 @@
 #include <stdint.h>
 #include <sys/ptrace.h>
 #include <xen/xen.h>
-#include <xen/dom0_ops.h>
+#include <xen/domctl.h>
+#include <xen/sysctl.h>
 #include <xen/version.h>
 #include <xen/event_channel.h>
 #include <xen/sched.h>
-#include <xen/sched_ctl.h>
 #include <xen/memory.h>
 #include <xen/acm.h>
 #include <xen/acm_ops.h>
@@ -139,7 +139,7 @@ typedef struct {
     xen_domain_handle_t handle;
 } xc_dominfo_t;
 
-typedef dom0_getdomaininfo_t xc_domaininfo_t;
+typedef xen_domctl_getdomaininfo_t xc_domaininfo_t;
 int xc_domain_create(int xc_handle,
                      uint32_t ssidref,
                      xen_domain_handle_t handle,
@@ -231,7 +231,11 @@ int xc_domain_shutdown(int xc_handle,
 int xc_vcpu_setaffinity(int xc_handle,
                         uint32_t domid,
                         int vcpu,
-                        cpumap_t cpumap);
+                        uint64_t cpumap);
+int xc_vcpu_getaffinity(int xc_handle,
+                        uint32_t domid,
+                        int vcpu,
+                        uint64_t *cpumap);
 
 /**
  * This function will return information about one or more domains. It is
@@ -301,7 +305,7 @@ int xc_vcpu_getcontext(int xc_handle,
                                uint32_t vcpu,
                                vcpu_guest_context_t *ctxt);
 
-typedef dom0_getvcpuinfo_t xc_vcpuinfo_t;
+typedef xen_domctl_getvcpuinfo_t xc_vcpuinfo_t;
 int xc_vcpu_getinfo(int xc_handle,
                     uint32_t domid,
                     uint32_t vcpu,
@@ -317,7 +321,7 @@ long long xc_domain_get_cpu_usage(int xc_handle,
 int xc_domain_sethandle(int xc_handle, uint32_t domid,
                         xen_domain_handle_t handle);
 
-typedef dom0_shadow_control_stats_t xc_shadow_control_stats_t;
+typedef xen_domctl_shadow_op_stats_t xc_shadow_op_stats_t;
 int xc_shadow_control(int xc_handle,
                       uint32_t domid,
                       unsigned int sop,
@@ -325,7 +329,7 @@ int xc_shadow_control(int xc_handle,
                       unsigned long pages,
                       unsigned long *mb,
                       uint32_t mode,
-                      xc_shadow_control_stats_t *stats);
+                      xc_shadow_op_stats_t *stats);
 
 int xc_sedf_domain_set(int xc_handle,
                        uint32_t domid,
@@ -341,11 +345,11 @@ int xc_sedf_domain_get(int xc_handle,
 
 int xc_sched_credit_domain_set(int xc_handle,
                                uint32_t domid,
-                               struct sched_credit_adjdom *sdom);
+                               struct xen_domctl_sched_credit *sdom);
 
 int xc_sched_credit_domain_get(int xc_handle,
                                uint32_t domid,
-                               struct sched_credit_adjdom *sdom);
+                               struct xen_domctl_sched_credit *sdom);
 
 /*
  * EVENT CHANNEL FUNCTIONS
@@ -377,7 +381,7 @@ int xc_readconsolering(int xc_handle,
                        unsigned int *pnr_chars,
                        int clear);
 
-typedef dom0_physinfo_t xc_physinfo_t;
+typedef xen_sysctl_physinfo_t xc_physinfo_t;
 int xc_physinfo(int xc_handle,
                 xc_physinfo_t *info);
 
@@ -438,8 +442,8 @@ int xc_domain_iomem_permission(int xc_handle,
 unsigned long xc_make_page_below_4G(int xc_handle, uint32_t domid,
                                     unsigned long mfn);
 
-typedef dom0_perfc_desc_t xc_perfc_desc_t;
-typedef dom0_perfc_val_t xc_perfc_val_t;
+typedef xen_sysctl_perfc_desc_t xc_perfc_desc_t;
+typedef xen_sysctl_perfc_val_t xc_perfc_val_t;
 /* IMPORTANT: The caller is responsible for mlock()'ing the @desc and @val
    arrays. */
 int xc_perfc_control(int xc_handle,
@@ -561,8 +565,8 @@ int xc_tbuf_set_cpu_mask(int xc_handle, uint32_t mask);
 
 int xc_tbuf_set_evt_mask(int xc_handle, uint32_t mask);
 
-/* Execute a privileged dom0 operation. */
-int xc_dom0_op(int xc_handle, dom0_op_t *op);
+int xc_domctl(int xc_handle, struct xen_domctl *domctl);
+int xc_sysctl(int xc_handle, struct xen_sysctl *sysctl);
 
 int xc_version(int xc_handle, int cmd, void *arg);
 

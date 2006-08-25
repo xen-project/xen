@@ -15,16 +15,16 @@ int xc_domain_create(int xc_handle,
                      uint32_t *pdomid)
 {
     int err;
-    DECLARE_DOM0_OP;
+    DECLARE_DOMCTL;
 
-    op.cmd = DOM0_CREATEDOMAIN;
-    op.u.createdomain.domain = (domid_t)*pdomid;
-    op.u.createdomain.ssidref = ssidref;
-    memcpy(op.u.createdomain.handle, handle, sizeof(xen_domain_handle_t));
-    if ( (err = do_dom0_op(xc_handle, &op)) != 0 )
+    domctl.cmd = XEN_DOMCTL_createdomain;
+    domctl.domain = (domid_t)*pdomid;
+    domctl.u.createdomain.ssidref = ssidref;
+    memcpy(domctl.u.createdomain.handle, handle, sizeof(xen_domain_handle_t));
+    if ( (err = do_domctl(xc_handle, &domctl)) != 0 )
         return err;
 
-    *pdomid = (uint16_t)op.u.createdomain.domain;
+    *pdomid = (uint16_t)domctl.domain;
     return 0;
 }
 
@@ -32,30 +32,30 @@ int xc_domain_create(int xc_handle,
 int xc_domain_pause(int xc_handle,
                     uint32_t domid)
 {
-    DECLARE_DOM0_OP;
-    op.cmd = DOM0_PAUSEDOMAIN;
-    op.u.pausedomain.domain = (domid_t)domid;
-    return do_dom0_op(xc_handle, &op);
+    DECLARE_DOMCTL;
+    domctl.cmd = XEN_DOMCTL_pausedomain;
+    domctl.domain = (domid_t)domid;
+    return do_domctl(xc_handle, &domctl);
 }
 
 
 int xc_domain_unpause(int xc_handle,
                       uint32_t domid)
 {
-    DECLARE_DOM0_OP;
-    op.cmd = DOM0_UNPAUSEDOMAIN;
-    op.u.unpausedomain.domain = (domid_t)domid;
-    return do_dom0_op(xc_handle, &op);
+    DECLARE_DOMCTL;
+    domctl.cmd = XEN_DOMCTL_unpausedomain;
+    domctl.domain = (domid_t)domid;
+    return do_domctl(xc_handle, &domctl);
 }
 
 
 int xc_domain_destroy(int xc_handle,
                       uint32_t domid)
 {
-    DECLARE_DOM0_OP;
-    op.cmd = DOM0_DESTROYDOMAIN;
-    op.u.destroydomain.domain = (domid_t)domid;
-    return do_dom0_op(xc_handle, &op);
+    DECLARE_DOMCTL;
+    domctl.cmd = XEN_DOMCTL_destroydomain;
+    domctl.domain = (domid_t)domid;
+    return do_domctl(xc_handle, &domctl);
 }
 
 int xc_domain_shutdown(int xc_handle,
@@ -90,14 +90,62 @@ int xc_domain_shutdown(int xc_handle,
 int xc_vcpu_setaffinity(int xc_handle,
                         uint32_t domid,
                         int vcpu,
-                        cpumap_t cpumap)
+                        uint64_t cpumap)
 {
-    DECLARE_DOM0_OP;
-    op.cmd = DOM0_SETVCPUAFFINITY;
-    op.u.setvcpuaffinity.domain  = (domid_t)domid;
-    op.u.setvcpuaffinity.vcpu    = vcpu;
-    op.u.setvcpuaffinity.cpumap  = cpumap;
-    return do_dom0_op(xc_handle, &op);
+    DECLARE_DOMCTL;
+    int ret = -1;
+
+    domctl.cmd = XEN_DOMCTL_setvcpuaffinity;
+    domctl.domain = (domid_t)domid;
+    domctl.u.vcpuaffinity.vcpu    = vcpu;
+
+    set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap.bitmap,
+                         (uint8_t *)&cpumap);
+    domctl.u.vcpuaffinity.cpumap.nr_cpus = sizeof(cpumap) * 8;
+    
+    if ( mlock(&cpumap, sizeof(cpumap)) != 0 )
+    {
+        PERROR("Could not lock memory for Xen hypercall");
+        goto out;
+    }
+
+    ret = do_domctl(xc_handle, &domctl);
+
+    safe_munlock(&cpumap, sizeof(cpumap));
+
+ out:
+    return ret;
+}
+
+
+int xc_vcpu_getaffinity(int xc_handle,
+                        uint32_t domid,
+                        int vcpu,
+                        uint64_t *cpumap)
+{
+    DECLARE_DOMCTL;
+    int ret = -1;
+
+    domctl.cmd = XEN_DOMCTL_getvcpuaffinity;
+    domctl.domain = (domid_t)domid;
+    domctl.u.vcpuaffinity.vcpu = vcpu;
+
+    set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap.bitmap,
+                         (uint8_t *)cpumap);
+    domctl.u.vcpuaffinity.cpumap.nr_cpus = sizeof(*cpumap) * 8;
+    
+    if ( mlock(cpumap, sizeof(*cpumap)) != 0 )
+    {
+        PERROR("Could not lock memory for Xen hypercall");
+        goto out;
+    }
+
+    ret = do_domctl(xc_handle, &domctl);
+
+    safe_munlock(cpumap, sizeof(*cpumap));
+
+ out:
+    return ret;
 }
 
 
@@ -108,27 +156,27 @@ int xc_domain_getinfo(int xc_handle,
 {
     unsigned int nr_doms;
     uint32_t next_domid = first_domid;
-    DECLARE_DOM0_OP;
+    DECLARE_DOMCTL;
     int rc = 0;
 
     memset(info, 0, max_doms*sizeof(xc_dominfo_t));
 
     for ( nr_doms = 0; nr_doms < max_doms; nr_doms++ )
     {
-        op.cmd = DOM0_GETDOMAININFO;
-        op.u.getdomaininfo.domain = (domid_t)next_domid;
-        if ( (rc = do_dom0_op(xc_handle, &op)) < 0 )
+        domctl.cmd = XEN_DOMCTL_getdomaininfo;
+        domctl.domain = (domid_t)next_domid;
+        if ( (rc = do_domctl(xc_handle, &domctl)) < 0 )
             break;
-        info->domid      = (uint16_t)op.u.getdomaininfo.domain;
+        info->domid      = (uint16_t)domctl.domain;
 
-        info->dying    = !!(op.u.getdomaininfo.flags & DOMFLAGS_DYING);
-        info->shutdown = !!(op.u.getdomaininfo.flags & DOMFLAGS_SHUTDOWN);
-        info->paused   = !!(op.u.getdomaininfo.flags & DOMFLAGS_PAUSED);
-        info->blocked  = !!(op.u.getdomaininfo.flags & DOMFLAGS_BLOCKED);
-        info->running  = !!(op.u.getdomaininfo.flags & DOMFLAGS_RUNNING);
+        info->dying    = !!(domctl.u.getdomaininfo.flags & DOMFLAGS_DYING);
+        info->shutdown = !!(domctl.u.getdomaininfo.flags & DOMFLAGS_SHUTDOWN);
+        info->paused   = !!(domctl.u.getdomaininfo.flags & DOMFLAGS_PAUSED);
+        info->blocked  = !!(domctl.u.getdomaininfo.flags & DOMFLAGS_BLOCKED);
+        info->running  = !!(domctl.u.getdomaininfo.flags & DOMFLAGS_RUNNING);
 
         info->shutdown_reason =
-            (op.u.getdomaininfo.flags>>DOMFLAGS_SHUTDOWNSHIFT) &
+            (domctl.u.getdomaininfo.flags>>DOMFLAGS_SHUTDOWNSHIFT) &
             DOMFLAGS_SHUTDOWNMASK;
 
         if ( info->shutdown && (info->shutdown_reason == SHUTDOWN_crash) )
@@ -137,18 +185,18 @@ int xc_domain_getinfo(int xc_handle,
             info->crashed  = 1;
         }
 
-        info->ssidref  = op.u.getdomaininfo.ssidref;
-        info->nr_pages = op.u.getdomaininfo.tot_pages;
-        info->max_memkb = op.u.getdomaininfo.max_pages << (PAGE_SHIFT - 10);
-        info->shared_info_frame = op.u.getdomaininfo.shared_info_frame;
-        info->cpu_time = op.u.getdomaininfo.cpu_time;
-        info->nr_online_vcpus = op.u.getdomaininfo.nr_online_vcpus;
-        info->max_vcpu_id = op.u.getdomaininfo.max_vcpu_id;
+        info->ssidref  = domctl.u.getdomaininfo.ssidref;
+        info->nr_pages = domctl.u.getdomaininfo.tot_pages;
+        info->max_memkb = domctl.u.getdomaininfo.max_pages << (PAGE_SHIFT-10);
+        info->shared_info_frame = domctl.u.getdomaininfo.shared_info_frame;
+        info->cpu_time = domctl.u.getdomaininfo.cpu_time;
+        info->nr_online_vcpus = domctl.u.getdomaininfo.nr_online_vcpus;
+        info->max_vcpu_id = domctl.u.getdomaininfo.max_vcpu_id;
 
-        memcpy(info->handle, op.u.getdomaininfo.handle,
+        memcpy(info->handle, domctl.u.getdomaininfo.handle,
                sizeof(xen_domain_handle_t));
 
-        next_domid = (uint16_t)op.u.getdomaininfo.domain + 1;
+        next_domid = (uint16_t)domctl.domain + 1;
         info++;
     }
 
@@ -163,20 +211,20 @@ int xc_domain_getinfolist(int xc_handle,
                           xc_domaininfo_t *info)
 {
     int ret = 0;
-    DECLARE_DOM0_OP;
+    DECLARE_SYSCTL;
 
     if ( mlock(info, max_domains*sizeof(xc_domaininfo_t)) != 0 )
         return -1;
 
-    op.cmd = DOM0_GETDOMAININFOLIST;
-    op.u.getdomaininfolist.first_domain = first_domain;
-    op.u.getdomaininfolist.max_domains  = max_domains;
-    set_xen_guest_handle(op.u.getdomaininfolist.buffer, info);
+    sysctl.cmd = XEN_SYSCTL_getdomaininfolist;
+    sysctl.u.getdomaininfolist.first_domain = first_domain;
+    sysctl.u.getdomaininfolist.max_domains  = max_domains;
+    set_xen_guest_handle(sysctl.u.getdomaininfolist.buffer, info);
 
-    if ( xc_dom0_op(xc_handle, &op) < 0 )
+    if ( xc_sysctl(xc_handle, &sysctl) < 0 )
         ret = -1;
     else
-        ret = op.u.getdomaininfolist.num_domains;
+        ret = sysctl.u.getdomaininfolist.num_domains;
 
     if ( munlock(info, max_domains*sizeof(xc_domaininfo_t)) != 0 )
         ret = -1;
@@ -190,17 +238,17 @@ int xc_vcpu_getcontext(int xc_handle,
                                vcpu_guest_context_t *ctxt)
 {
     int rc;
-    DECLARE_DOM0_OP;
+    DECLARE_DOMCTL;
 
-    op.cmd = DOM0_GETVCPUCONTEXT;
-    op.u.getvcpucontext.domain = (domid_t)domid;
-    op.u.getvcpucontext.vcpu   = (uint16_t)vcpu;
-    set_xen_guest_handle(op.u.getvcpucontext.ctxt, ctxt);
+    domctl.cmd = XEN_DOMCTL_getvcpucontext;
+    domctl.domain = (domid_t)domid;
+    domctl.u.vcpucontext.vcpu   = (uint16_t)vcpu;
+    set_xen_guest_handle(domctl.u.vcpucontext.ctxt, ctxt);
 
     if ( (rc = mlock(ctxt, sizeof(*ctxt))) != 0 )
         return rc;
 
-    rc = do_dom0_op(xc_handle, &op);
+    rc = do_domctl(xc_handle, &domctl);
 
     safe_munlock(ctxt, sizeof(*ctxt));
 
@@ -215,28 +263,28 @@ int xc_shadow_control(int xc_handle,
                       unsigned long pages,
                       unsigned long *mb,
                       uint32_t mode,
-                      xc_shadow_control_stats_t *stats)
+                      xc_shadow_op_stats_t *stats)
 {
     int rc;
-    DECLARE_DOM0_OP;
-    op.cmd = DOM0_SHADOW_CONTROL;
-    op.u.shadow_control.domain = (domid_t)domid;
-    op.u.shadow_control.op     = sop;
-    op.u.shadow_control.pages  = pages;
-    op.u.shadow_control.mb     = mb ? *mb : 0;
-    op.u.shadow_control.mode   = mode;
-    set_xen_guest_handle(op.u.shadow_control.dirty_bitmap, dirty_bitmap);
+    DECLARE_DOMCTL;
+    domctl.cmd = XEN_DOMCTL_shadow_op;
+    domctl.domain = (domid_t)domid;
+    domctl.u.shadow_op.op     = sop;
+    domctl.u.shadow_op.pages  = pages;
+    domctl.u.shadow_op.mb     = mb ? *mb : 0;
+    domctl.u.shadow_op.mode   = mode;
+    set_xen_guest_handle(domctl.u.shadow_op.dirty_bitmap, dirty_bitmap);
 
-    rc = do_dom0_op(xc_handle, &op);
+    rc = do_domctl(xc_handle, &domctl);
 
     if ( stats )
-        memcpy(stats, &op.u.shadow_control.stats,
-               sizeof(xc_shadow_control_stats_t));
+        memcpy(stats, &domctl.u.shadow_op.stats,
+               sizeof(xc_shadow_op_stats_t));
     
     if ( mb ) 
-        *mb = op.u.shadow_control.mb;
+        *mb = domctl.u.shadow_op.mb;
 
-    return (rc == 0) ? op.u.shadow_control.pages : rc;
+    return (rc == 0) ? domctl.u.shadow_op.pages : rc;
 }
 
 int xc_domain_setcpuweight(int xc_handle,
@@ -258,22 +306,22 @@ int xc_domain_setmaxmem(int xc_handle,
                         uint32_t domid,
                         unsigned int max_memkb)
 {
-    DECLARE_DOM0_OP;
-    op.cmd = DOM0_SETDOMAINMAXMEM;
-    op.u.setdomainmaxmem.domain = (domid_t)domid;
-    op.u.setdomainmaxmem.max_memkb = max_memkb;
-    return do_dom0_op(xc_handle, &op);
+    DECLARE_DOMCTL;
+    domctl.cmd = XEN_DOMCTL_max_mem;
+    domctl.domain = (domid_t)domid;
+    domctl.u.max_mem.max_memkb = max_memkb;
+    return do_domctl(xc_handle, &domctl);
 }
 
 int xc_domain_set_time_offset(int xc_handle,
                               uint32_t domid,
                               int32_t time_offset_seconds)
 {
-    DECLARE_DOM0_OP;
-    op.cmd = DOM0_SETTIMEOFFSET;
-    op.u.settimeoffset.domain = (domid_t)domid;
-    op.u.settimeoffset.time_offset_seconds = time_offset_seconds;
-    return do_dom0_op(xc_handle, &op);
+    DECLARE_DOMCTL;
+    domctl.cmd = XEN_DOMCTL_settimeoffset;
+    domctl.domain = (domid_t)domid;
+    domctl.u.settimeoffset.time_offset_seconds = time_offset_seconds;
+    return do_domctl(xc_handle, &domctl);
 }
 
 int xc_domain_memory_increase_reservation(int xc_handle,
@@ -397,21 +445,22 @@ int xc_domain_translate_gpfn_list(int xc_handle,
 
 int xc_domain_max_vcpus(int xc_handle, uint32_t domid, unsigned int max)
 {
-    DECLARE_DOM0_OP;
-    op.cmd = DOM0_MAX_VCPUS;
-    op.u.max_vcpus.domain = (domid_t)domid;
-    op.u.max_vcpus.max    = max;
-    return do_dom0_op(xc_handle, &op);
+    DECLARE_DOMCTL;
+    domctl.cmd = XEN_DOMCTL_max_vcpus;
+    domctl.domain = (domid_t)domid;
+    domctl.u.max_vcpus.max    = max;
+    return do_domctl(xc_handle, &domctl);
 }
 
 int xc_domain_sethandle(int xc_handle, uint32_t domid,
                         xen_domain_handle_t handle)
 {
-    DECLARE_DOM0_OP;
-    op.cmd = DOM0_SETDOMAINHANDLE;
-    op.u.setdomainhandle.domain = (domid_t)domid;
-    memcpy(op.u.setdomainhandle.handle, handle, sizeof(xen_domain_handle_t));
-    return do_dom0_op(xc_handle, &op);
+    DECLARE_DOMCTL;
+    domctl.cmd = XEN_DOMCTL_setdomainhandle;
+    domctl.domain = (domid_t)domid;
+    memcpy(domctl.u.setdomainhandle.handle, handle,
+           sizeof(xen_domain_handle_t));
+    return do_domctl(xc_handle, &domctl);
 }
 
 int xc_vcpu_getinfo(int xc_handle,
@@ -420,14 +469,15 @@ int xc_vcpu_getinfo(int xc_handle,
                     xc_vcpuinfo_t *info)
 {
     int rc;
-    DECLARE_DOM0_OP;
-    op.cmd = DOM0_GETVCPUINFO;
-    op.u.getvcpuinfo.domain = (domid_t)domid;
-    op.u.getvcpuinfo.vcpu   = (uint16_t)vcpu;
+    DECLARE_DOMCTL;
 
-    rc = do_dom0_op(xc_handle, &op);
+    domctl.cmd = XEN_DOMCTL_getvcpuinfo;
+    domctl.domain = (domid_t)domid;
+    domctl.u.getvcpuinfo.vcpu   = (uint16_t)vcpu;
 
-    memcpy(info, &op.u.getvcpuinfo, sizeof(*info));
+    rc = do_domctl(xc_handle, &domctl);
+
+    memcpy(info, &domctl.u.getvcpuinfo, sizeof(*info));
 
     return rc;
 }
@@ -438,15 +488,15 @@ int xc_domain_ioport_permission(int xc_handle,
                                 uint32_t nr_ports,
                                 uint32_t allow_access)
 {
-    DECLARE_DOM0_OP;
+    DECLARE_DOMCTL;
 
-    op.cmd = DOM0_IOPORT_PERMISSION;
-    op.u.ioport_permission.domain = (domid_t)domid;
-    op.u.ioport_permission.first_port = first_port;
-    op.u.ioport_permission.nr_ports = nr_ports;
-    op.u.ioport_permission.allow_access = allow_access;
+    domctl.cmd = XEN_DOMCTL_ioport_permission;
+    domctl.domain = (domid_t)domid;
+    domctl.u.ioport_permission.first_port = first_port;
+    domctl.u.ioport_permission.nr_ports = nr_ports;
+    domctl.u.ioport_permission.allow_access = allow_access;
 
-    return do_dom0_op(xc_handle, &op);
+    return do_domctl(xc_handle, &domctl);
 }
 
 int xc_vcpu_setcontext(int xc_handle,
@@ -454,18 +504,18 @@ int xc_vcpu_setcontext(int xc_handle,
                        uint32_t vcpu,
                        vcpu_guest_context_t *ctxt)
 {
-    dom0_op_t op;
+    DECLARE_DOMCTL;
     int rc;
 
-    op.cmd = DOM0_SETVCPUCONTEXT;
-    op.u.setvcpucontext.domain = domid;
-    op.u.setvcpucontext.vcpu = vcpu;
-    set_xen_guest_handle(op.u.setvcpucontext.ctxt, ctxt);
+    domctl.cmd = XEN_DOMCTL_setvcpucontext;
+    domctl.domain = domid;
+    domctl.u.vcpucontext.vcpu = vcpu;
+    set_xen_guest_handle(domctl.u.vcpucontext.ctxt, ctxt);
 
     if ( (rc = mlock(ctxt, sizeof(*ctxt))) != 0 )
         return rc;
 
-    rc = do_dom0_op(xc_handle, &op);
+    rc = do_domctl(xc_handle, &domctl);
 
     safe_munlock(ctxt, sizeof(*ctxt));
 
@@ -478,14 +528,14 @@ int xc_domain_irq_permission(int xc_handle,
                              uint8_t pirq,
                              uint8_t allow_access)
 {
-    dom0_op_t op;
+    DECLARE_DOMCTL;
 
-    op.cmd = DOM0_IRQ_PERMISSION;
-    op.u.irq_permission.domain = domid;
-    op.u.irq_permission.pirq = pirq;
-    op.u.irq_permission.allow_access = allow_access;
+    domctl.cmd = XEN_DOMCTL_irq_permission;
+    domctl.domain = domid;
+    domctl.u.irq_permission.pirq = pirq;
+    domctl.u.irq_permission.allow_access = allow_access;
 
-    return do_dom0_op(xc_handle, &op);
+    return do_domctl(xc_handle, &domctl);
 }
 
 int xc_domain_iomem_permission(int xc_handle,
@@ -494,15 +544,15 @@ int xc_domain_iomem_permission(int xc_handle,
                                unsigned long nr_mfns,
                                uint8_t allow_access)
 {
-    dom0_op_t op;
+    DECLARE_DOMCTL;
 
-    op.cmd = DOM0_IOMEM_PERMISSION;
-    op.u.iomem_permission.domain = domid;
-    op.u.iomem_permission.first_mfn = first_mfn;
-    op.u.iomem_permission.nr_mfns = nr_mfns;
-    op.u.iomem_permission.allow_access = allow_access;
+    domctl.cmd = XEN_DOMCTL_iomem_permission;
+    domctl.domain = domid;
+    domctl.u.iomem_permission.first_mfn = first_mfn;
+    domctl.u.iomem_permission.nr_mfns = nr_mfns;
+    domctl.u.iomem_permission.allow_access = allow_access;
 
-    return do_dom0_op(xc_handle, &op);
+    return do_domctl(xc_handle, &domctl);
 }
 
 /*

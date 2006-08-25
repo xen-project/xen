@@ -30,7 +30,6 @@
 #include <xen/errno.h>
 #include <xen/guest_access.h>
 #include <public/sched.h>
-#include <public/sched_ctl.h>
 
 extern void arch_getdomaininfo_ctxt(struct vcpu *,
                                     struct vcpu_guest_context *);
@@ -427,31 +426,15 @@ int sched_id(void)
     return ops.sched_id;
 }
 
-long sched_ctl(struct sched_ctl_cmd *cmd)
-{
-    if ( cmd->sched_id != ops.sched_id )
-        return -EINVAL;
-
-    SCHED_OP(control, cmd);
-    TRACE_0D(TRC_SCHED_CTL);
-    return 0;
-}
-
-
 /* Adjust scheduling parameter for a given domain. */
-long sched_adjdom(struct sched_adjdom_cmd *cmd)
+long sched_adjust(struct domain *d, struct xen_domctl_scheduler_op *op)
 {
-    struct domain *d;
     struct vcpu *v;
     
-    if ( (cmd->sched_id != ops.sched_id) ||
-         ((cmd->direction != SCHED_INFO_PUT) &&
-          (cmd->direction != SCHED_INFO_GET)) )
+    if ( (op->sched_id != ops.sched_id) ||
+         ((op->cmd != XEN_DOMCTL_SCHEDOP_putinfo) &&
+          (op->cmd != XEN_DOMCTL_SCHEDOP_getinfo)) )
         return -EINVAL;
-
-    d = find_domain_by_id(cmd->domain);
-    if ( d == NULL )
-        return -ESRCH;
 
     /*
      * Most VCPUs we can simply pause. If we are adjusting this VCPU then
@@ -475,7 +458,7 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
     if ( d == current->domain )
         vcpu_schedule_lock_irq(current);
 
-    SCHED_OP(adjdom, d, cmd);
+    SCHED_OP(adjust, d, op);
     TRACE_1D(TRC_SCHED_ADJDOM, d->domain_id);
 
     if ( d == current->domain )
@@ -486,8 +469,6 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
         if ( v != current )
             vcpu_unpause(v);
     }
-
-    put_domain(d);
 
     return 0;
 }

@@ -210,8 +210,8 @@ xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 {
 #define DOMAIN_CHUNK_SIZE 256
 	xenstat_node *node;
-	dom0_physinfo_t physinfo;
-	dom0_getdomaininfo_t domaininfo[DOMAIN_CHUNK_SIZE];
+	xc_physinfo_t physinfo;
+	xc_domaininfo_t domaininfo[DOMAIN_CHUNK_SIZE];
 	unsigned int new_domains;
 	unsigned int i;
 
@@ -530,7 +530,7 @@ static int xenstat_collect_vcpus(xenstat_node * node)
 	
 		for (vcpu = 0; vcpu < node->domains[i].num_vcpus; vcpu++) {
 			/* FIXME: need to be using a more efficient mechanism*/
-			dom0_getvcpuinfo_t info;
+			xc_vcpuinfo_t info;
 
 			if (xc_vcpu_getinfo(node->handle->xc_handle,
 					    node->domains[i].id, vcpu, &info) != 0) {

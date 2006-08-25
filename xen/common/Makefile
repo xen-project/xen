@@ -1,6 +1,6 @@
 obj-y += acm_ops.o
 obj-y += bitmap.o
-obj-y += dom0_ops.o
+obj-y += domctl.o
 obj-y += domain.o
 obj-y += elf.o
 obj-y += event_channel.o
@@ -19,6 +19,7 @@ obj-y += shutdown.o
 obj-y += softirq.o
 obj-y += string.o
 obj-y += symbols.o
+obj-y += sysctl.o
 obj-y += trace.o
 obj-y += timer.o
 obj-y += version.o

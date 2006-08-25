@@ -14,9 +14,6 @@
  * The trace buffer code is designed to allow debugging traces of Xen to be
  * generated on UP / SMP machines.  Each trace entry is timestamped so that
  * it's possible to reconstruct a chronological record of trace events.
- *
- * See also include/xen/trace.h and the dom0 op in
- * include/public/dom0_ops.h
  */
 
 #include <xen/config.h>
@@ -33,7 +30,7 @@
 #include <xen/mm.h>
 #include <xen/percpu.h>
 #include <asm/atomic.h>
-#include <public/dom0_ops.h>
+#include <public/sysctl.h>
 
 /* opt_tbuf_size: trace buffer size (in pages) */
 static unsigned int opt_tbuf_size = 0;
@@ -56,7 +53,7 @@ static DEFINE_PER_CPU(unsigned long, lost_records);
 int tb_init_done;
 
 /* which CPUs tracing is enabled on */
-static unsigned long tb_cpu_mask = (~0UL);
+static cpumask_t tb_cpu_mask = CPU_MASK_ALL;
 
 /* which tracing events are enabled */
 static u32 tb_event_mask = TRC_ALL;
@@ -171,43 +168,41 @@ void init_trace_bufs(void)
     }
 }
 
-
 /**
- * tb_control - DOM0 operations on trace buffers.
- * @tbc: a pointer to a dom0_tbufcontrol_t to be filled out
+ * tb_control - sysctl operations on trace buffers.
+ * @tbc: a pointer to a xen_sysctl_tbuf_op_t to be filled out
  */
-int tb_control(dom0_tbufcontrol_t *tbc)
+int tb_control(xen_sysctl_tbuf_op_t *tbc)
 {
     static DEFINE_SPINLOCK(lock);
     int rc = 0;
 
     spin_lock(&lock);
 
-    switch ( tbc->op )
+    switch ( tbc->cmd )
     {
-    case DOM0_TBUF_GET_INFO:
-        tbc->cpu_mask   = tb_cpu_mask;
+    case XEN_SYSCTL_TBUFOP_get_info:
         tbc->evt_mask   = tb_event_mask;
         tbc->buffer_mfn = opt_tbuf_size ? virt_to_mfn(per_cpu(t_bufs, 0)) : 0;
         tbc->size       = opt_tbuf_size * PAGE_SIZE;
         break;
-    case DOM0_TBUF_SET_CPU_MASK:
-        tb_cpu_mask = tbc->cpu_mask;
+    case XEN_SYSCTL_TBUFOP_set_cpu_mask:
+        cpumask_to_xenctl_cpumap(&tbc->cpu_mask, &tb_cpu_mask);
         break;
-    case DOM0_TBUF_SET_EVT_MASK:
+    case XEN_SYSCTL_TBUFOP_set_evt_mask:
         tb_event_mask = tbc->evt_mask;
         break;
-    case DOM0_TBUF_SET_SIZE:
+    case XEN_SYSCTL_TBUFOP_set_size:
         rc = !tb_init_done ? tb_set_size(tbc->size) : -EINVAL;
         break;
-    case DOM0_TBUF_ENABLE:
+    case XEN_SYSCTL_TBUFOP_enable:
         /* Enable trace buffers. Check buffers are already allocated. */
         if ( opt_tbuf_size == 0 ) 
             rc = -EINVAL;
         else
             tb_init_done = 1;
         break;
-    case DOM0_TBUF_DISABLE:
+    case XEN_SYSCTL_TBUFOP_disable:
         /*
          * Disable trace buffers. Just stops new records from being written,
          * does not deallocate any memory.
@@ -254,7 +249,7 @@ void trace(u32 event, unsigned long d1, unsigned long d2,
                 & ((event >> TRC_SUBCLS_SHIFT) & 0xf )) == 0 )
         return;
 
-    if ( (tb_cpu_mask & (1UL << smp_processor_id())) == 0 )
+    if ( !cpu_isset(smp_processor_id(), tb_cpu_mask) )
         return;
 
     /* Read tb_init_done /before/ t_bufs. */

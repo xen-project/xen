@@ -27,7 +27,6 @@
 #include <sys/types.h>
 #include <inttypes.h>
 
-#include <xen/dom0_ops.h>
 #include <xen/memory.h>
 #include <xc_private.h>
 #include <xg_private.h>

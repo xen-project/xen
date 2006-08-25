@@ -1,9 +1,9 @@
 /******************************************************************************
- * dom0_ops.c
+ * domctl.c
  * 
- * Process command requests from domain-0 guest OS.
+ * Domain management operations. For use by node control stack.
  * 
- * Copyright (c) 2002, K A Fraser
+ * Copyright (c) 2002-2006, K A Fraser
  */
 
 #include <xen/config.h>
@@ -19,14 +19,51 @@
 #include <xen/iocap.h>
 #include <xen/guest_access.h>
 #include <asm/current.h>
-#include <public/dom0_ops.h>
-#include <public/sched_ctl.h>
+#include <public/domctl.h>
 #include <acm/acm_hooks.h>
 
-extern long arch_do_dom0_op(
-    struct dom0_op *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op);
+extern long arch_do_domctl(
+    struct xen_domctl *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl);
 extern void arch_getdomaininfo_ctxt(
     struct vcpu *, struct vcpu_guest_context *);
+
+void cpumask_to_xenctl_cpumap(
+    struct xenctl_cpumap *xenctl_cpumap, cpumask_t *cpumask)
+{
+    unsigned int guest_bytes, copy_bytes, i;
+    uint8_t zero = 0;
+
+    if ( guest_handle_is_null(xenctl_cpumap->bitmap) )
+        return;
+
+    guest_bytes = (xenctl_cpumap->nr_cpus + 7) / 8;
+    copy_bytes  = min_t(unsigned int, guest_bytes, (NR_CPUS + 7) / 8);
+
+    copy_to_guest(xenctl_cpumap->bitmap,
+                  (uint8_t *)cpus_addr(*cpumask),
+                  copy_bytes);
+
+    for ( i = copy_bytes; i < guest_bytes; i++ )
+        copy_to_guest_offset(xenctl_cpumap->bitmap, i, &zero, 1);
+}
+
+void xenctl_cpumap_to_cpumask(
+    cpumask_t *cpumask, struct xenctl_cpumap *xenctl_cpumap)
+{
+    unsigned int guest_bytes, copy_bytes;
+
+    guest_bytes = (xenctl_cpumap->nr_cpus + 7) / 8;
+    copy_bytes  = min_t(unsigned int, guest_bytes, (NR_CPUS + 7) / 8);
+
+    cpus_clear(*cpumask);
+
+    if ( guest_handle_is_null(xenctl_cpumap->bitmap) )
+        return;
+
+    copy_from_guest((uint8_t *)cpus_addr(*cpumask),
+                    xenctl_cpumap->bitmap,
+                    copy_bytes);
+}
 
 static inline int is_free_domid(domid_t dom)
 {
@@ -42,7 +79,7 @@ static inline int is_free_domid(domid_t dom)
     return 0;
 }
 
-static void getdomaininfo(struct domain *d, dom0_getdomaininfo_t *info)
+void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
 {
     struct vcpu   *v;
     u64 cpu_time = 0;
@@ -128,46 +165,45 @@ static unsigned int default_vcpu0_location(void)
     return cpu;
 }
 
-long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
+long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 {
     long ret = 0;
-    struct dom0_op curop, *op = &curop;
+    struct xen_domctl curop, *op = &curop;
     void *ssid = NULL; /* save security ptr between pre and post/fail hooks */
-    static DEFINE_SPINLOCK(dom0_lock);
+    static DEFINE_SPINLOCK(domctl_lock);
 
     if ( !IS_PRIV(current->domain) )
         return -EPERM;
 
-    if ( copy_from_guest(op, u_dom0_op, 1) )
+    if ( copy_from_guest(op, u_domctl, 1) )
         return -EFAULT;
 
-    if ( (op->interface_version != DOM0_TOOLS_INTERFACE_VERSION) &&
-         (op->interface_version != DOM0_KERNEL_INTERFACE_VERSION) )
+    if ( op->interface_version != XEN_DOMCTL_INTERFACE_VERSION )
         return -EACCES;
 
-    if ( acm_pre_dom0_op(op, &ssid) )
+    if ( acm_pre_domctl(op, &ssid) )
         return -EPERM;
 
-    spin_lock(&dom0_lock);
+    spin_lock(&domctl_lock);
 
     switch ( op->cmd )
     {
 
-    case DOM0_SETVCPUCONTEXT:
+    case XEN_DOMCTL_setvcpucontext:
     {
-        struct domain *d = find_domain_by_id(op->u.setvcpucontext.domain);
+        struct domain *d = find_domain_by_id(op->domain);
         ret = -ESRCH;
         if ( d != NULL )
         {
-            ret = set_info_guest(d, &op->u.setvcpucontext);
+            ret = set_info_guest(d, &op->u.vcpucontext);
             put_domain(d);
         }
     }
     break;
 
-    case DOM0_PAUSEDOMAIN:
+    case XEN_DOMCTL_pausedomain:
     {
-        struct domain *d = find_domain_by_id(op->u.pausedomain.domain);
+        struct domain *d = find_domain_by_id(op->domain);
         ret = -ESRCH;
         if ( d != NULL )
         {
@@ -182,9 +218,9 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
     }
     break;
 
-    case DOM0_UNPAUSEDOMAIN:
+    case XEN_DOMCTL_unpausedomain:
     {
-        struct domain *d = find_domain_by_id(op->u.unpausedomain.domain);
+        struct domain *d = find_domain_by_id(op->domain);
         ret = -ESRCH;
         if ( d != NULL )
         {
@@ -200,7 +236,7 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
     }
     break;
 
-    case DOM0_CREATEDOMAIN:
+    case XEN_DOMCTL_createdomain:
     {
         struct domain *d;
         domid_t        dom;
@@ -213,7 +249,7 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
         if ( supervisor_mode_kernel )
             return -EINVAL;
 
-        dom = op->u.createdomain.domain;
+        dom = op->domain;
         if ( (dom > 0) && (dom < DOMID_FIRST_RESERVED) )
         {
             ret = -EINVAL;
@@ -246,13 +282,13 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
 
         ret = 0;
 
-        op->u.createdomain.domain = d->domain_id;
-        if ( copy_to_guest(u_dom0_op, op, 1) )
+        op->domain = d->domain_id;
+        if ( copy_to_guest(u_domctl, op, 1) )
             ret = -EFAULT;
     }
     break;
 
-    case DOM0_MAX_VCPUS:
+    case XEN_DOMCTL_max_vcpus:
     {
         struct domain *d;
         unsigned int i, max = op->u.max_vcpus.max, cpu;
@@ -262,7 +298,7 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
             break;
 
         ret = -ESRCH;
-        if ( (d = find_domain_by_id(op->u.max_vcpus.domain)) == NULL )
+        if ( (d = find_domain_by_id(op->domain)) == NULL )
             break;
 
         /* Needed, for example, to ensure writable p.t. state is synced. */
@@ -295,9 +331,9 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
     }
     break;
 
-    case DOM0_DESTROYDOMAIN:
+    case XEN_DOMCTL_destroydomain:
     {
-        struct domain *d = find_domain_by_id(op->u.destroydomain.domain);
+        struct domain *d = find_domain_by_id(op->domain);
         ret = -ESRCH;
         if ( d != NULL )
         {
@@ -312,9 +348,10 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
     }
     break;
 
-    case DOM0_SETVCPUAFFINITY:
+    case XEN_DOMCTL_setvcpuaffinity:
+    case XEN_DOMCTL_getvcpuaffinity:
     {
-        domid_t dom = op->u.setvcpuaffinity.domain;
+        domid_t dom = op->domain;
         struct domain *d = find_domain_by_id(dom);
         struct vcpu *v;
         cpumask_t new_affinity;
@@ -325,15 +362,15 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
             break;
         }
         
-        if ( (op->u.setvcpuaffinity.vcpu >= MAX_VIRT_CPUS) ||
-             !d->vcpu[op->u.setvcpuaffinity.vcpu] )
+        if ( (op->u.vcpuaffinity.vcpu >= MAX_VIRT_CPUS) ||
+             !d->vcpu[op->u.vcpuaffinity.vcpu] )
         {
             ret = -EINVAL;
             put_domain(d);
             break;
         }
 
-        v = d->vcpu[op->u.setvcpuaffinity.vcpu];
+        v = d->vcpu[op->u.vcpuaffinity.vcpu];
         if ( v == NULL )
         {
             ret = -ESRCH;
@@ -341,47 +378,51 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
             break;
         }
 
-        if ( v == current )
+        if ( op->cmd == XEN_DOMCTL_setvcpuaffinity )
         {
-            ret = -EINVAL;
-            put_domain(d);
-            break;
+            if ( v == current )
+            {
+                ret = -EINVAL;
+                put_domain(d);
+                break;
+            }
+
+            xenctl_cpumap_to_cpumask(
+                &new_affinity, &op->u.vcpuaffinity.cpumap);
+            ret = vcpu_set_affinity(v, &new_affinity);
         }
-
-        new_affinity = v->cpu_affinity;
-        memcpy(cpus_addr(new_affinity),
-               &op->u.setvcpuaffinity.cpumap,
-               min((int)(BITS_TO_LONGS(NR_CPUS) * sizeof(long)),
-                   (int)sizeof(op->u.setvcpuaffinity.cpumap)));
-
-        ret = vcpu_set_affinity(v, &new_affinity);
+        else
+        {
+            cpumask_to_xenctl_cpumap(
+                &op->u.vcpuaffinity.cpumap, &v->cpu_affinity);
+        }
 
         put_domain(d);
     }
     break;
 
-    case DOM0_SCHEDCTL:
+    case XEN_DOMCTL_scheduler_op:
     {
-        ret = sched_ctl(&op->u.schedctl);
-        if ( copy_to_guest(u_dom0_op, op, 1) )
+        struct domain *d;
+
+        ret = -ESRCH;
+        if ( (d = find_domain_by_id(op->domain)) == NULL )
+            break;
+
+        ret = sched_adjust(d, &op->u.scheduler_op);
+        if ( copy_to_guest(u_domctl, op, 1) )
             ret = -EFAULT;
+
+        put_domain(d);
     }
     break;
 
-    case DOM0_ADJUSTDOM:
-    {
-        ret = sched_adjdom(&op->u.adjustdom);
-        if ( copy_to_guest(u_dom0_op, op, 1) )
-            ret = -EFAULT;
-    }
-    break;
-
-    case DOM0_GETDOMAININFO:
+    case XEN_DOMCTL_getdomaininfo:
     { 
         struct domain *d;
         domid_t dom;
 
-        dom = op->u.getdomaininfo.domain;
+        dom = op->domain;
         if ( dom == DOMID_SELF )
             dom = current->domain->domain_id;
 
@@ -404,75 +445,30 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
 
         getdomaininfo(d, &op->u.getdomaininfo);
 
-        if ( copy_to_guest(u_dom0_op, op, 1) )
+        op->domain = op->u.getdomaininfo.domain;
+        if ( copy_to_guest(u_domctl, op, 1) )
             ret = -EFAULT;
 
         put_domain(d);
     }
     break;
 
-    case DOM0_GETDOMAININFOLIST:
-    { 
-        struct domain *d;
-        dom0_getdomaininfo_t info;
-        u32 num_domains = 0;
-
-        read_lock(&domlist_lock);
-
-        for_each_domain ( d )
-        {
-            if ( d->domain_id < op->u.getdomaininfolist.first_domain )
-                continue;
-            if ( num_domains == op->u.getdomaininfolist.max_domains )
-                break;
-            if ( (d == NULL) || !get_domain(d) )
-            {
-                ret = -ESRCH;
-                break;
-            }
-
-            getdomaininfo(d, &info);
-
-            put_domain(d);
-
-            if ( copy_to_guest_offset(op->u.getdomaininfolist.buffer,
-                                      num_domains, &info, 1) )
-            {
-                ret = -EFAULT;
-                break;
-            }
-            
-            num_domains++;
-        }
-        
-        read_unlock(&domlist_lock);
-        
-        if ( ret != 0 )
-            break;
-        
-        op->u.getdomaininfolist.num_domains = num_domains;
-
-        if ( copy_to_guest(u_dom0_op, op, 1) )
-            ret = -EFAULT;
-    }
-    break;
-
-    case DOM0_GETVCPUCONTEXT:
+    case XEN_DOMCTL_getvcpucontext:
     { 
         struct vcpu_guest_context *c;
         struct domain             *d;
         struct vcpu               *v;
 
         ret = -ESRCH;
-        if ( (d = find_domain_by_id(op->u.getvcpucontext.domain)) == NULL )
+        if ( (d = find_domain_by_id(op->domain)) == NULL )
             break;
 
         ret = -EINVAL;
-        if ( op->u.getvcpucontext.vcpu >= MAX_VIRT_CPUS )
+        if ( op->u.vcpucontext.vcpu >= MAX_VIRT_CPUS )
             goto getvcpucontext_out;
 
         ret = -ESRCH;
-        if ( (v = d->vcpu[op->u.getvcpucontext.vcpu]) == NULL )
+        if ( (v = d->vcpu[op->u.vcpucontext.vcpu]) == NULL )
             goto getvcpucontext_out;
 
         ret = -ENODATA;
@@ -492,12 +488,12 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
         if ( v != current )
             vcpu_unpause(v);
 
-        if ( copy_to_guest(op->u.getvcpucontext.ctxt, c, 1) )
+        if ( copy_to_guest(op->u.vcpucontext.ctxt, c, 1) )
             ret = -EFAULT;
 
         xfree(c);
 
-        if ( copy_to_guest(u_dom0_op, op, 1) )
+        if ( copy_to_guest(u_domctl, op, 1) )
             ret = -EFAULT;
 
     getvcpucontext_out:
@@ -505,14 +501,14 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
     }
     break;
 
-    case DOM0_GETVCPUINFO:
+    case XEN_DOMCTL_getvcpuinfo:
     { 
         struct domain *d;
         struct vcpu   *v;
         struct vcpu_runstate_info runstate;
 
         ret = -ESRCH;
-        if ( (d = find_domain_by_id(op->u.getvcpuinfo.domain)) == NULL )
+        if ( (d = find_domain_by_id(op->domain)) == NULL )
             break;
 
         ret = -EINVAL;
@@ -530,14 +526,9 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
         op->u.getvcpuinfo.running  = test_bit(_VCPUF_running, &v->vcpu_flags);
         op->u.getvcpuinfo.cpu_time = runstate.time[RUNSTATE_running];
         op->u.getvcpuinfo.cpu      = v->processor;
-        op->u.getvcpuinfo.cpumap   = 0;
-        memcpy(&op->u.getvcpuinfo.cpumap,
-               cpus_addr(v->cpu_affinity),
-               min((int)(BITS_TO_LONGS(NR_CPUS) * sizeof(long)),
-                   (int)sizeof(op->u.getvcpuinfo.cpumap)));
         ret = 0;
 
-        if ( copy_to_guest(u_dom0_op, op, 1) )
+        if ( copy_to_guest(u_domctl, op, 1) )
             ret = -EFAULT;
 
     getvcpuinfo_out:
@@ -545,56 +536,18 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
     }
     break;
 
-    case DOM0_SETTIME:
-    {
-        do_settime(op->u.settime.secs, 
-                   op->u.settime.nsecs, 
-                   op->u.settime.system_time);
-        ret = 0;
-    }
-    break;
-
-    case DOM0_TBUFCONTROL:
-    {
-        ret = tb_control(&op->u.tbufcontrol);
-        if ( copy_to_guest(u_dom0_op, op, 1) )
-            ret = -EFAULT;
-    }
-    break;
-    
-    case DOM0_READCONSOLE:
-    {
-        ret = read_console_ring(
-            op->u.readconsole.buffer, 
-            &op->u.readconsole.count,
-            op->u.readconsole.clear);
-        if ( copy_to_guest(u_dom0_op, op, 1) )
-            ret = -EFAULT;
-    }
-    break;
-
-    case DOM0_SCHED_ID:
-    {
-        op->u.sched_id.sched_id = sched_id();
-        if ( copy_to_guest(u_dom0_op, op, 1) )
-            ret = -EFAULT;
-        else
-            ret = 0;
-    }
-    break;
-
-    case DOM0_SETDOMAINMAXMEM:
+    case XEN_DOMCTL_max_mem:
     {
         struct domain *d;
         unsigned long new_max;
 
         ret = -ESRCH;
-        d = find_domain_by_id(op->u.setdomainmaxmem.domain);
+        d = find_domain_by_id(op->domain);
         if ( d == NULL )
             break;
 
         ret = -EINVAL;
-        new_max = op->u.setdomainmaxmem.max_memkb >> (PAGE_SHIFT-10);
+        new_max = op->u.max_mem.max_memkb >> (PAGE_SHIFT-10);
 
         spin_lock(&d->page_alloc_lock);
         if ( new_max >= d->tot_pages )
@@ -608,11 +561,11 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
     }
     break;
 
-    case DOM0_SETDOMAINHANDLE:
+    case XEN_DOMCTL_setdomainhandle:
     {
         struct domain *d;
         ret = -ESRCH;
-        d = find_domain_by_id(op->u.setdomainhandle.domain);
+        d = find_domain_by_id(op->domain);
         if ( d != NULL )
         {
             memcpy(d->handle, op->u.setdomainhandle.handle,
@@ -623,11 +576,11 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
     }
     break;
 
-    case DOM0_SETDEBUGGING:
+    case XEN_DOMCTL_setdebugging:
     {
         struct domain *d;
         ret = -ESRCH;
-        d = find_domain_by_id(op->u.setdebugging.domain);
+        d = find_domain_by_id(op->domain);
         if ( d != NULL )
         {
             if ( op->u.setdebugging.enable )
@@ -640,7 +593,7 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
     }
     break;
 
-    case DOM0_IRQ_PERMISSION:
+    case XEN_DOMCTL_irq_permission:
     {
         struct domain *d;
         unsigned int pirq = op->u.irq_permission.pirq;
@@ -650,7 +603,7 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
             break;
 
         ret = -ESRCH;
-        d = find_domain_by_id(op->u.irq_permission.domain);
+        d = find_domain_by_id(op->domain);
         if ( d == NULL )
             break;
 
@@ -663,7 +616,7 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
     }
     break;
 
-    case DOM0_IOMEM_PERMISSION:
+    case XEN_DOMCTL_iomem_permission:
     {
         struct domain *d;
         unsigned long mfn = op->u.iomem_permission.first_mfn;
@@ -674,7 +627,7 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
             break;
 
         ret = -ESRCH;
-        d = find_domain_by_id(op->u.iomem_permission.domain);
+        d = find_domain_by_id(op->domain);
         if ( d == NULL )
             break;
 
@@ -687,23 +640,12 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
     }
     break;
 
-#ifdef PERF_COUNTERS
-    case DOM0_PERFCCONTROL:
-    {
-        extern int perfc_control(dom0_perfccontrol_t *);
-        ret = perfc_control(&op->u.perfccontrol);
-        if ( copy_to_guest(u_dom0_op, op, 1) )
-            ret = -EFAULT;
-    }
-    break;
-#endif
-
-    case DOM0_SETTIMEOFFSET:
+    case XEN_DOMCTL_settimeoffset:
     {
         struct domain *d;
 
         ret = -ESRCH;
-        d = find_domain_by_id(op->u.settimeoffset.domain);
+        d = find_domain_by_id(op->domain);
         if ( d != NULL )
         {
             d->time_offset_seconds = op->u.settimeoffset.time_offset_seconds;
@@ -714,16 +656,16 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
     break;
 
     default:
-        ret = arch_do_dom0_op(op, u_dom0_op);
+        ret = arch_do_domctl(op, u_domctl);
         break;
     }
 
-    spin_unlock(&dom0_lock);
+    spin_unlock(&domctl_lock);
 
-    if (!ret)
-        acm_post_dom0_op(op, &ssid);
+    if ( ret == 0 )
+        acm_post_domctl(op, &ssid);
     else
-        acm_fail_dom0_op(op, &ssid);
+        acm_fail_domctl(op, &ssid);
 
     return ret;
 }

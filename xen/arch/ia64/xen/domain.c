@@ -591,7 +591,7 @@ domain_set_shared_info_va (unsigned long va)
 /* Transfer and clear the shadow bitmap in 1kB chunks for L1 cache. */
 #define SHADOW_COPY_CHUNK (1024 / sizeof (unsigned long))
 
-int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
+int shadow_mode_control(struct domain *d, xen_domctl_shadow_ops_t *sc)
 {
 	unsigned int op = sc->op;
 	int          rc = 0;
@@ -607,7 +607,7 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
 
 	switch (op)
 	{
-	case DOM0_SHADOW_CONTROL_OP_OFF:
+	case XEN_DOMCTL_SHADOW_OP_OFF:
 		if (shadow_mode_enabled (d)) {
 			u64 *bm = d->arch.shadow_bitmap;
 
@@ -621,12 +621,12 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
 		}
 		break;
 
-	case DOM0_SHADOW_CONTROL_OP_ENABLE_TEST:
-	case DOM0_SHADOW_CONTROL_OP_ENABLE_TRANSLATE:
+	case XEN_DOMCTL_SHADOW_OP_ENABLE_TEST:
+	case XEN_DOMCTL_SHADOW_OP_ENABLE_TRANSLATE:
 		rc = -EINVAL;
 		break;
 
-	case DOM0_SHADOW_CONTROL_OP_ENABLE_LOGDIRTY:
+	case XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY:
 		if (shadow_mode_enabled(d)) {
 			rc = -EINVAL;
 			break;
@@ -653,7 +653,7 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
 		}
 		break;
 
-	case DOM0_SHADOW_CONTROL_OP_CLEAN:
+	case XEN_DOMCTL_SHADOW_OP_CLEAN:
 	  {
 		int nbr_longs;
 
@@ -692,7 +692,7 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
 		break;
 	  }
 
-	case DOM0_SHADOW_CONTROL_OP_PEEK:
+	case XEN_DOMCTL_SHADOW_OP_PEEK:
 	{
 		unsigned long size;
 
