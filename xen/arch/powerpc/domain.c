@@ -76,8 +76,9 @@ int arch_domain_create(struct domain *d)
 {
     unsigned long rma_base;
     unsigned long rma_sz;
-    uint htab_order;
-    uint nr_pages;
+    uint rma_order_pages;
+    uint htab_order_pages;
+    int rc;
 
     if (d->domain_id == IDLE_DOMAIN_ID) {
         d->shared_info = (void *)alloc_xenheap_page();
@@ -86,23 +87,16 @@ int arch_domain_create(struct domain *d)
         return 0;
     }
 
-    d->arch.rma_order = cpu_default_rma_order_pages();
-    rma_sz = rma_size(d->arch.rma_order);
-
     /* allocate the real mode area */
-    nr_pages =  1UL << d->arch.rma_order;
-    d->max_pages = nr_pages;
+    rma_order_pages = cpu_default_rma_order_pages();
+    d->max_pages = 1UL << rma_order_pages;
     d->tot_pages = 0;
-    d->arch.rma_page = alloc_domheap_pages(d, d->arch.rma_order, 0);
-    if (NULL == d->arch.rma_page)
-        return 1;
 
+    rc = allocate_rma(d, rma_order_pages);
+    if (rc)
+        return rc;
     rma_base = page_to_maddr(d->arch.rma_page);
-
-    BUG_ON(rma_base & (rma_sz - 1)); /* check alignment */
-
-    printk("clearing RMO: 0x%lx[0x%lx]\n", rma_base, rma_sz);
-    memset((void *)rma_base, 0, rma_sz);
+    rma_sz = rma_size(rma_order_pages);
 
     d->shared_info = (shared_info_t *)
         (rma_addr(&d->arch, RMA_SHARED_INFO) + rma_base);
@@ -113,12 +107,12 @@ int arch_domain_create(struct domain *d)
     /* FIXME: we need to the the maximum addressible memory for this
      * domain to calculate this correctly. It should probably be set
      * by the managment tools */
-    htab_order = d->arch.rma_order - 6; /* (1/64) */
+    htab_order_pages = rma_order_pages - 6; /* (1/64) */
     if (test_bit(_DOMF_privileged, &d->domain_flags)) {
         /* bump the htab size of privleged domains */
-        ++htab_order;
+        ++htab_order_pages;
     }
-    htab_alloc(d, htab_order);
+    htab_alloc(d, htab_order_pages);
 
     return 0;
 }

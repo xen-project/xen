@@ -239,6 +239,29 @@ static int mfn_in_hole(ulong mfn)
     return 0;
 }
 
+int allocate_rma(struct domain *d, unsigned int order_pages)
+{
+    ulong rma_base;
+    ulong rma_sz = rma_size(order_pages);
+
+    d->arch.rma_page = alloc_domheap_pages(d, order_pages, 0);
+    if (d->arch.rma_page == NULL) {
+        DPRINTK("Could not allocate order_pages=%d RMA for domain %u\n",
+                order_pages, d->domain_id);
+        return -ENOMEM;
+    }
+    d->arch.rma_order = order_pages;
+
+    rma_base = page_to_maddr(d->arch.rma_page);
+    BUG_ON(rma_base & (rma_sz - 1)); /* check alignment */
+
+    /* XXX */
+    printk("clearing RMA: 0x%lx[0x%lx]\n", rma_base, rma_sz);
+    memset((void *)rma_base, 0, rma_sz);
+
+    return 0;
+}
+
 ulong pfn2mfn(struct domain *d, long pfn, int *type)
 {
     ulong rma_base_mfn = page_to_mfn(d->arch.rma_page);
