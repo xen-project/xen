@@ -73,9 +73,8 @@ struct scheduler {
 
     struct task_slice (*do_schedule) (s_time_t);
 
-    int          (*control)        (struct sched_ctl_cmd *);
-    int          (*adjdom)         (struct domain *,
-                                    struct sched_adjdom_cmd *);
+    int          (*adjust)         (struct domain *,
+                                    struct xen_domctl_scheduler_op *);
     void         (*dump_settings)  (void);
     void         (*dump_cpu_state) (int);
 };

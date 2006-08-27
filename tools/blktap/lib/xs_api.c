@@ -180,8 +180,7 @@ char *get_dom_domid(struct xs_handle *h, const char *name)
 	
 	e = xs_directory(h, xth, "/local/domain", &num);
 	
-	i = 0;
-	while (i < num) {
+	for (i = 0; (i < num) && (domid == NULL); i++) {
 		asprintf(&path, "/local/domain/%s/name", e[i]);
 		val = xs_read(h, xth, path, &len);
 		free(path);
@@ -192,12 +191,9 @@ char *get_dom_domid(struct xs_handle *h, const char *name)
 			/* match! */
 			asprintf(&path, "/local/domain/%s/domid", e[i]);
 			domid = xs_read(h, xth, path, &len);
-			free(val);
 			free(path);
-			break;
 		}
 		free(val);
-		i++;
 	}
 	xs_transaction_end(h, xth, 0);
 	

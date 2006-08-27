@@ -9,7 +9,6 @@
 #define _XEN_PUBLIC_ACM_H
 
 #include "xen.h"
-#include "sched_ctl.h"
 
 /* if ACM_DEBUG defined, all hooks should
  * print a short trace message (comment it out

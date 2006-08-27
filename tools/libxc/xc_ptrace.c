@@ -41,8 +41,8 @@ static char *ptrace_names[] = {
 static int                      current_domid = -1;
 static int                      current_isfile;
 
-static cpumap_t                 online_cpumap;
-static cpumap_t                 regs_valid;
+static uint64_t                 online_cpumap;
+static uint64_t                 regs_valid;
 static vcpu_guest_context_t     ctxt[MAX_VIRT_CPUS];
 
 extern int ffsll(long long int);
@@ -111,7 +111,8 @@ paging_enabled(vcpu_guest_context_t *v)
  */
 
 static int
-get_online_cpumap(int xc_handle, dom0_getdomaininfo_t *d, cpumap_t *cpumap)
+get_online_cpumap(int xc_handle, struct xen_domctl_getdomaininfo *d,
+                  uint64_t *cpumap)
 {
     int i, online, retval;
 
@@ -133,9 +134,9 @@ get_online_cpumap(int xc_handle, dom0_getdomaininfo_t *d, cpumap_t *cpumap)
  */
 
 static void
-online_vcpus_changed(cpumap_t cpumap)
+online_vcpus_changed(uint64_t cpumap)
 {
-    cpumap_t changed_cpumap = cpumap ^ online_cpumap;
+    uint64_t changed_cpumap = cpumap ^ online_cpumap;
     int index;
 
     while ( (index = ffsll(changed_cpumap)) ) {
@@ -418,25 +419,25 @@ __xc_waitdomain(
     int *status,
     int options)
 {
-    DECLARE_DOM0_OP;
+    DECLARE_DOMCTL;
     int retval;
     struct timespec ts;
-    cpumap_t cpumap;
+    uint64_t cpumap;
 
     ts.tv_sec = 0;
     ts.tv_nsec = 10*1000*1000;
 
-    op.cmd = DOM0_GETDOMAININFO;
-    op.u.getdomaininfo.domain = domain;
+    domctl.cmd = XEN_DOMCTL_getdomaininfo;
+    domctl.domain = domain;
 
  retry:
-    retval = do_dom0_op(xc_handle, &op);
-    if ( retval || (op.u.getdomaininfo.domain != domain) )
+    retval = do_domctl(xc_handle, &domctl);
+    if ( retval || (domctl.domain != domain) )
     {
         IPRINTF("getdomaininfo failed\n");
         goto done;
     }
-    *status = op.u.getdomaininfo.flags;
+    *status = domctl.u.getdomaininfo.flags;
 
     if ( options & WNOHANG )
         goto done;
@@ -447,13 +448,13 @@ __xc_waitdomain(
         goto done;
     }
 
-    if ( !(op.u.getdomaininfo.flags & DOMFLAGS_PAUSED) )
+    if ( !(domctl.u.getdomaininfo.flags & DOMFLAGS_PAUSED) )
     {
         nanosleep(&ts,NULL);
         goto retry;
     }
  done:
-    if (get_online_cpumap(xc_handle, &op.u.getdomaininfo, &cpumap))
+    if (get_online_cpumap(xc_handle, &domctl.u.getdomaininfo, &cpumap))
         IPRINTF("get_online_cpumap failed\n");
     if (online_cpumap != cpumap)
         online_vcpus_changed(cpumap);
@@ -470,11 +471,11 @@ xc_ptrace(
     long eaddr,
     long edata)
 {
-    DECLARE_DOM0_OP;
+    DECLARE_DOMCTL;
     struct gdb_regs pt;
     long            retval = 0;
     unsigned long  *guest_va;
-    cpumap_t        cpumap;
+    uint64_t        cpumap;
     int             cpu, index;
     void           *addr = (char *)eaddr;
     void           *data = (char *)edata;
@@ -535,7 +536,7 @@ xc_ptrace(
         SET_XC_REGS(((struct gdb_regs *)data), ctxt[cpu].user_regs);
         if ((retval = xc_vcpu_setcontext(xc_handle, current_domid, cpu,
                                 &ctxt[cpu])))
-            goto out_error_dom0;
+            goto out_error_domctl;
         break;
 
     case PTRACE_SINGLESTEP:
@@ -547,7 +548,7 @@ xc_ptrace(
         ctxt[cpu].user_regs.eflags |= PSL_T;
         if ((retval = xc_vcpu_setcontext(xc_handle, current_domid, cpu,
                                 &ctxt[cpu])))
-            goto out_error_dom0;
+            goto out_error_domctl;
         /* FALLTHROUGH */
 
     case PTRACE_CONT:
@@ -566,22 +567,22 @@ xc_ptrace(
                     ctxt[cpu].user_regs.eflags &= ~PSL_T;
                     if ((retval = xc_vcpu_setcontext(xc_handle, current_domid,
                                                 cpu, &ctxt[cpu])))
-                        goto out_error_dom0;
+                        goto out_error_domctl;
                 }
             }
         }
         if ( request == PTRACE_DETACH )
         {
-            op.cmd = DOM0_SETDEBUGGING;
-            op.u.setdebugging.domain = current_domid;
-            op.u.setdebugging.enable = 0;
-            if ((retval = do_dom0_op(xc_handle, &op)))
-                goto out_error_dom0;
+            domctl.cmd = XEN_DOMCTL_setdebugging;
+            domctl.domain = current_domid;
+            domctl.u.setdebugging.enable = 0;
+            if ((retval = do_domctl(xc_handle, &domctl)))
+                goto out_error_domctl;
         }
         regs_valid = 0;
         if ((retval = xc_domain_unpause(xc_handle, current_domid > 0 ?
                                 current_domid : -current_domid)))
-            goto out_error_dom0;
+            goto out_error_domctl;
         break;
 
     case PTRACE_ATTACH:
@@ -589,22 +590,22 @@ xc_ptrace(
         current_isfile = (int)edata;
         if (current_isfile)
             break;
-        op.cmd = DOM0_GETDOMAININFO;
-        op.u.getdomaininfo.domain = current_domid;
-        retval = do_dom0_op(xc_handle, &op);
-        if ( retval || (op.u.getdomaininfo.domain != current_domid) )
-            goto out_error_dom0;
-        if ( op.u.getdomaininfo.flags & DOMFLAGS_PAUSED )
+        domctl.cmd = XEN_DOMCTL_getdomaininfo;
+        domctl.domain = current_domid;
+        retval = do_domctl(xc_handle, &domctl);
+        if ( retval || (domctl.domain != current_domid) )
+            goto out_error_domctl;
+        if ( domctl.u.getdomaininfo.flags & DOMFLAGS_PAUSED )
             IPRINTF("domain currently paused\n");
         else if ((retval = xc_domain_pause(xc_handle, current_domid)))
-            goto out_error_dom0;
-        op.cmd = DOM0_SETDEBUGGING;
-        op.u.setdebugging.domain = current_domid;
-        op.u.setdebugging.enable = 1;
-        if ((retval = do_dom0_op(xc_handle, &op)))
-            goto out_error_dom0;
+            goto out_error_domctl;
+        domctl.cmd = XEN_DOMCTL_setdebugging;
+        domctl.domain = current_domid;
+        domctl.u.setdebugging.enable = 1;
+        if ((retval = do_domctl(xc_handle, &domctl)))
+            goto out_error_domctl;
 
-        if (get_online_cpumap(xc_handle, &op.u.getdomaininfo, &cpumap))
+        if (get_online_cpumap(xc_handle, &domctl.u.getdomaininfo, &cpumap))
             IPRINTF("get_online_cpumap failed\n");
         if (online_cpumap != cpumap)
             online_vcpus_changed(cpumap);
@@ -625,8 +626,8 @@ xc_ptrace(
 
     return retval;
 
- out_error_dom0:
-    perror("dom0 op failed");
+ out_error_domctl:
+    perror("domctl failed");
  out_error:
     errno = EINVAL;
     return retval;

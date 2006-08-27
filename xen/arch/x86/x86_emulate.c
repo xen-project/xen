@@ -21,6 +21,11 @@
 #endif
 #include <asm-x86/x86_emulate.h>
 
+#ifndef PFEC_write_access
+#define PFEC_write_access (1U<<1)
+#define PFEC_insn_fetch   (1U<<4)
+#endif
+
 /*
  * Opcode effective-address decode tables.
  * Note that we only emulate instructions that have at least one memory
@@ -444,6 +449,13 @@ x86_emulate_memop(
     /* Shadow copy of register state. Committed on successful emulation. */
     struct cpu_user_regs _regs = *ctxt->regs;
 
+    /*
+     * We do not emulate faults on instruction fetch. We assume that the
+     * guest never executes out of a special memory area.
+     */
+    if ( _regs.error_code & PFEC_insn_fetch )
+        return -1;
+
     switch ( mode )
     {
     case X86EMUL_MODE_REAL:
@@ -769,6 +781,13 @@ x86_emulate_memop(
         dst.val = src.val;
         break;
     case 0x8f: /* pop (sole member of Grp1a) */
+        /*
+         * If the faulting access was a read it means that the fault occurred
+         * when accessing the implicit stack operand. We assume the guest never
+         * uses special memory areas as stack space.
+         */
+        if ( !(_regs.error_code & PFEC_write_access) )
+            goto cannot_emulate; /* fault on stack access: bail */
         /* 64-bit mode: POP always pops a 64-bit operand. */
         if ( mode == X86EMUL_MODE_PROT64 )
             dst.bytes = 8;
@@ -846,6 +865,13 @@ x86_emulate_memop(
             emulate_1op("dec", dst, _regs.eflags);
             break;
         case 6: /* push */
+            /*
+             * If the faulting access was a write it means that the fault
+             * occurred when accessing the implicit stack operand. We assume
+             * the guest never uses special memory areas as stack space.
+             */
+            if ( _regs.error_code & PFEC_write_access )
+                goto cannot_emulate; /* fault on stack access: bail */
             /* 64-bit mode: PUSH always pushes a 64-bit operand. */
             if ( mode == X86EMUL_MODE_PROT64 )
             {
@@ -920,7 +946,7 @@ x86_emulate_memop(
     case 0xa4 ... 0xa5: /* movs */
         dst.type  = OP_MEM;
         dst.bytes = (d & ByteOp) ? 1 : op_bytes;
-        if ( _regs.error_code & 2 )
+        if ( _regs.error_code & PFEC_write_access )
         {
             /* Write fault: destination is special memory. */
             dst.ptr = (unsigned long *)cr2;
@@ -1162,7 +1188,7 @@ x86_emulate_write_std(
 
     if ( (rc = copy_to_user((void *)addr, (void *)&val, bytes)) != 0 )
     {
-        propagate_page_fault(addr + bytes - rc, PGERR_write_access);
+        propagate_page_fault(addr + bytes - rc, PFEC_write_access);
         return X86EMUL_PROPAGATE_FAULT;
     }
 

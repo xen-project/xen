@@ -40,15 +40,14 @@ typedef struct { int counter; } atomic_t;
 
 int main(int argc, char * argv[])
 {
-
-    dom0_op_t op; 
+    struct xen_sysctl sysctl;
     int ret;
 
     int xc_handle = xc_interface_open();
-    op.cmd = DOM0_TBUFCONTROL;
-    op.interface_version = DOM0_INTERFACE_VERSION;
-    op.u.tbufcontrol.op  = DOM0_TBUF_GET_INFO;
-    ret = xc_dom0_op(xc_handle, &op);
+    sysctl.cmd = XEN_SYSCTL_tbuf_op;
+    sysctl.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
+    sysctl.u.tbuf_op.cmd  = XEN_SYSCTL_TBUFOP_get_info;
+    ret = xc_sysctl(xc_handle, &sysctl);
     if ( ret != 0 )
     {
         perror("Failure to get event mask from Xen");
@@ -56,26 +55,26 @@ int main(int argc, char * argv[])
     }
     else
     {
-        printf("Current event mask: 0x%.8x\n", op.u.tbufcontrol.evt_mask);
+        printf("Current event mask: 0x%.8x\n", sysctl.u.tbuf_op.evt_mask);
     }
 
-    op.cmd = DOM0_TBUFCONTROL;
-    op.interface_version = DOM0_INTERFACE_VERSION;
-    op.u.tbufcontrol.op  = DOM0_TBUF_SET_EVT_MASK;
-    op.u.tbufcontrol.evt_mask = XENMON;
+    sysctl.cmd = XEN_SYSCTL_tbuf_op;
+    sysctl.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
+    sysctl.u.tbuf_op.cmd  = XEN_SYSCTL_TBUFOP_set_evt_mask;
+    sysctl.u.tbuf_op.evt_mask = XENMON;
 
-    ret = xc_dom0_op(xc_handle, &op);
-    printf("Setting mask to 0x%.8x\n", op.u.tbufcontrol.evt_mask);
+    ret = xc_sysctl(xc_handle, &sysctl);
+    printf("Setting mask to 0x%.8x\n", sysctl.u.tbuf_op.evt_mask);
     if ( ret != 0 )
     {
         perror("Failure to get scheduler ID from Xen");
         exit(1);
     }
 
-    op.cmd = DOM0_TBUFCONTROL;
-    op.interface_version = DOM0_INTERFACE_VERSION;
-    op.u.tbufcontrol.op  = DOM0_TBUF_GET_INFO;
-    ret = xc_dom0_op(xc_handle, &op);
+    sysctl.cmd = XEN_SYSCTL_tbuf_op;
+    sysctl.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
+    sysctl.u.tbuf_op.cmd  = XEN_SYSCTL_TBUFOP_get_info;
+    ret = xc_sysctl(xc_handle, &sysctl);
     if ( ret != 0 )
     {
         perror("Failure to get event mask from Xen");
@@ -83,7 +82,7 @@ int main(int argc, char * argv[])
     }
     else
     {
-        printf("Current event mask: 0x%.8x\n", op.u.tbufcontrol.evt_mask);
+        printf("Current event mask: 0x%.8x\n", sysctl.u.tbuf_op.evt_mask);
     }
     xc_interface_close(xc_handle);
     return 0;

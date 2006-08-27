@@ -18,49 +18,49 @@
 
 static int tbuf_enable(int xc_handle, int enable)
 {
-    DECLARE_DOM0_OP;
+    DECLARE_SYSCTL;
 
-    op.cmd = DOM0_TBUFCONTROL;
-    op.interface_version = DOM0_INTERFACE_VERSION;
+    sysctl.cmd = XEN_SYSCTL_tbuf_op;
+    sysctl.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
     if (enable)
-        op.u.tbufcontrol.op  = DOM0_TBUF_ENABLE;
+        sysctl.u.tbuf_op.cmd  = XEN_SYSCTL_TBUFOP_enable;
     else
-        op.u.tbufcontrol.op  = DOM0_TBUF_DISABLE;
+        sysctl.u.tbuf_op.cmd  = XEN_SYSCTL_TBUFOP_disable;
 
-    return xc_dom0_op(xc_handle, &op);
+    return xc_sysctl(xc_handle, &sysctl);
 }
 
 int xc_tbuf_set_size(int xc_handle, unsigned long size)
 {
-    DECLARE_DOM0_OP;
+    DECLARE_SYSCTL;
 
-    op.cmd = DOM0_TBUFCONTROL;
-    op.interface_version = DOM0_INTERFACE_VERSION;
-    op.u.tbufcontrol.op  = DOM0_TBUF_SET_SIZE;
-    op.u.tbufcontrol.size = size;
+    sysctl.cmd = XEN_SYSCTL_tbuf_op;
+    sysctl.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
+    sysctl.u.tbuf_op.cmd  = XEN_SYSCTL_TBUFOP_set_size;
+    sysctl.u.tbuf_op.size = size;
 
-    return xc_dom0_op(xc_handle, &op);
+    return xc_sysctl(xc_handle, &sysctl);
 }
 
 int xc_tbuf_get_size(int xc_handle, unsigned long *size)
 {
     int rc;
-    DECLARE_DOM0_OP;
+    DECLARE_SYSCTL;
 
-    op.cmd = DOM0_TBUFCONTROL;
-    op.interface_version = DOM0_INTERFACE_VERSION;
-    op.u.tbufcontrol.op  = DOM0_TBUF_GET_INFO;
+    sysctl.cmd = XEN_SYSCTL_tbuf_op;
+    sysctl.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
+    sysctl.u.tbuf_op.cmd  = XEN_SYSCTL_TBUFOP_get_info;
 
-    rc = xc_dom0_op(xc_handle, &op);
+    rc = xc_sysctl(xc_handle, &sysctl);
     if (rc == 0)
-        *size = op.u.tbufcontrol.size;
+        *size = sysctl.u.tbuf_op.size;
     return rc;
 }
 
 int xc_tbuf_enable(int xc_handle, size_t cnt, unsigned long *mfn,
                    unsigned long *size)
 {
-    DECLARE_DOM0_OP;
+    DECLARE_SYSCTL;
     int rc;
 
     /*
@@ -73,15 +73,15 @@ int xc_tbuf_enable(int xc_handle, size_t cnt, unsigned long *mfn,
     if ( tbuf_enable(xc_handle, 1) != 0 )
         return -1;
 
-    op.cmd = DOM0_TBUFCONTROL;
-    op.interface_version = DOM0_INTERFACE_VERSION;
-    op.u.tbufcontrol.op  = DOM0_TBUF_GET_INFO;
+    sysctl.cmd = XEN_SYSCTL_tbuf_op;
+    sysctl.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
+    sysctl.u.tbuf_op.cmd  = XEN_SYSCTL_TBUFOP_get_info;
 
-    rc = xc_dom0_op(xc_handle, &op);
+    rc = xc_sysctl(xc_handle, &sysctl);
     if ( rc == 0 )
     {
-        *size = op.u.tbufcontrol.size;
-        *mfn = op.u.tbufcontrol.buffer_mfn;
+        *size = sysctl.u.tbuf_op.size;
+        *mfn = sysctl.u.tbuf_op.buffer_mfn;
     }
 
     return 0;
@@ -94,25 +94,39 @@ int xc_tbuf_disable(int xc_handle)
 
 int xc_tbuf_set_cpu_mask(int xc_handle, uint32_t mask)
 {
-    DECLARE_DOM0_OP;
+    DECLARE_SYSCTL;
+    int ret = -1;
 
-    op.cmd = DOM0_TBUFCONTROL;
-    op.interface_version = DOM0_INTERFACE_VERSION;
-    op.u.tbufcontrol.op  = DOM0_TBUF_SET_CPU_MASK;
-    op.u.tbufcontrol.cpu_mask = mask;
+    sysctl.cmd = XEN_SYSCTL_tbuf_op;
+    sysctl.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
+    sysctl.u.tbuf_op.cmd  = XEN_SYSCTL_TBUFOP_set_cpu_mask;
 
-    return do_dom0_op(xc_handle, &op);
+    set_xen_guest_handle(sysctl.u.tbuf_op.cpu_mask.bitmap, (uint8_t *)&mask);
+    sysctl.u.tbuf_op.cpu_mask.nr_cpus = sizeof(mask) * 8;
+
+    if ( mlock(&mask, sizeof(mask)) != 0 )
+    {
+        PERROR("Could not lock memory for Xen hypercall");
+        goto out;
+    }
+
+    ret = do_sysctl(xc_handle, &sysctl);
+
+    safe_munlock(&mask, sizeof(mask));
+
+ out:
+    return ret;
 }
 
 int xc_tbuf_set_evt_mask(int xc_handle, uint32_t mask)
 {
-    DECLARE_DOM0_OP;
+    DECLARE_SYSCTL;
 
-    op.cmd = DOM0_TBUFCONTROL;
-    op.interface_version = DOM0_INTERFACE_VERSION;
-    op.u.tbufcontrol.op  = DOM0_TBUF_SET_EVT_MASK;
-    op.u.tbufcontrol.evt_mask = mask;
+    sysctl.cmd = XEN_SYSCTL_tbuf_op;
+    sysctl.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
+    sysctl.u.tbuf_op.cmd  = XEN_SYSCTL_TBUFOP_set_evt_mask;
+    sysctl.u.tbuf_op.evt_mask = mask;
 
-    return do_dom0_op(xc_handle, &op);
+    return do_sysctl(xc_handle, &sysctl);
 }
 

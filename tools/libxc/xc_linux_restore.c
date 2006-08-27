@@ -107,7 +107,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
                      unsigned int store_evtchn, unsigned long *store_mfn,
                      unsigned int console_evtchn, unsigned long *console_mfn)
 {
-    DECLARE_DOM0_OP;
+    DECLARE_DOMCTL;
     int rc = 1, i, n, pae_extended_cr3 = 0;
     unsigned long mfn, pfn;
     unsigned int prev_pc, this_pc;
@@ -163,7 +163,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
     }
 
     if (mlock(&ctxt, sizeof(ctxt))) {
-        /* needed for build dom0 op, but might as well do early */
+        /* needed for build domctl, but might as well do early */
         ERR("Unable to mlock ctxt");
         return 1;
     }
@@ -257,13 +257,13 @@ int xc_linux_restore(int xc_handle, int io_fd,
     }
 
     /* Get the domain's shared-info frame. */
-    op.cmd = DOM0_GETDOMAININFO;
-    op.u.getdomaininfo.domain = (domid_t)dom;
-    if (xc_dom0_op(xc_handle, &op) < 0) {
+    domctl.cmd = XEN_DOMCTL_getdomaininfo;
+    domctl.domain = (domid_t)dom;
+    if (xc_domctl(xc_handle, &domctl) < 0) {
         ERR("Could not get information on new domain");
         goto out;
     }
-    shared_info_frame = op.u.getdomaininfo.shared_info_frame;
+    shared_info_frame = domctl.u.getdomaininfo.shared_info_frame;
 
     if(xc_domain_setmaxmem(xc_handle, dom, PFN_TO_KB(max_pfn)) != 0) {
         errno = ENOMEM;
@@ -337,17 +337,22 @@ int xc_linux_restore(int xc_handle, int io_fd,
             goto out;
         }
 
-        for (i = 0; i < j; i++) {
+        for ( i = 0; i < j; i++ )
+        {
+            unsigned long pfn, pagetype;
+            pfn      = region_pfn_type[i] & ~XEN_DOMCTL_PFINFO_LTAB_MASK;
+            pagetype = region_pfn_type[i] &  XEN_DOMCTL_PFINFO_LTAB_MASK;
 
-            if ((region_pfn_type[i] & LTAB_MASK) == XTAB)
+            if ( pagetype == XEN_DOMCTL_PFINFO_XTAB)
                 region_mfn[i] = 0; /* we know map will fail, but don't care */
             else
-                region_mfn[i] = p2m[region_pfn_type[i] & ~LTAB_MASK];
-
+                region_mfn[i] = p2m[pfn];
         }
 
-        if (!(region_base = xc_map_foreign_batch(
-                  xc_handle, dom, PROT_WRITE, region_mfn, j))) {
+        region_base = xc_map_foreign_batch(
+            xc_handle, dom, PROT_WRITE, region_mfn, j);
+        if ( region_base == NULL )
+        {
             ERR("map batch failed");
             goto out;
         }
@@ -357,14 +362,15 @@ int xc_linux_restore(int xc_handle, int io_fd,
             void *page;
             unsigned long pagetype;
 
-            pfn      = region_pfn_type[i] & ~LTAB_MASK;
-            pagetype = region_pfn_type[i] & LTAB_MASK;
+            pfn      = region_pfn_type[i] & ~XEN_DOMCTL_PFINFO_LTAB_MASK;
+            pagetype = region_pfn_type[i] &  XEN_DOMCTL_PFINFO_LTAB_MASK;
 
-            if (pagetype == XTAB)
+            if ( pagetype == XEN_DOMCTL_PFINFO_XTAB )
                 /* a bogus/unmapped page: skip it */
                 continue;
 
-            if (pfn > max_pfn) {
+            if ( pfn > max_pfn )
+            {
                 ERR("pfn out of range");
                 goto out;
             }
@@ -381,10 +387,11 @@ int xc_linux_restore(int xc_handle, int io_fd,
                 goto out;
             }
 
-            pagetype &= LTABTYPE_MASK;
+            pagetype &= XEN_DOMCTL_PFINFO_LTABTYPE_MASK;
 
-            if(pagetype >= L1TAB && pagetype <= L4TAB) {
-
+            if ( (pagetype >= XEN_DOMCTL_PFINFO_L1TAB) && 
+                 (pagetype <= XEN_DOMCTL_PFINFO_L4TAB) )
+            {
                 /*
                 ** A page table page - need to 'uncanonicalize' it, i.e.
                 ** replace all the references to pfns with the corresponding
@@ -396,7 +403,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
                 */
                 if ((pt_levels != 3) ||
                     pae_extended_cr3 ||
-                    (pagetype != L1TAB)) {
+                    (pagetype != XEN_DOMCTL_PFINFO_L1TAB)) {
 
                     if (!uncanonicalize_pagetable(pagetype, page)) {
                         /*
@@ -412,8 +419,9 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
                 }
 
-            } else if(pagetype != NOTAB) {
-
+            }
+            else if ( pagetype != XEN_DOMCTL_PFINFO_NOTAB )
+            {
                 ERR("Bogus page type %lx page table is out of range: "
                     "i=%d max_pfn=%lu", pagetype, i, max_pfn);
                 goto out;
@@ -484,10 +492,12 @@ int xc_linux_restore(int xc_handle, int io_fd,
         int j, k;
 
         /* First pass: find all L3TABs current in > 4G mfns and get new mfns */
-        for (i = 0; i < max_pfn; i++) {
-
-            if (((pfn_type[i] & LTABTYPE_MASK)==L3TAB) && (p2m[i]>0xfffffUL)) {
-
+        for ( i = 0; i < max_pfn; i++ )
+        {
+            if ( ((pfn_type[i] & XEN_DOMCTL_PFINFO_LTABTYPE_MASK) ==
+                  XEN_DOMCTL_PFINFO_L3TAB) &&
+                 (p2m[i] > 0xfffffUL) )
+            {
                 unsigned long new_mfn;
                 uint64_t l3ptes[4];
                 uint64_t *l3tab;
@@ -530,9 +540,11 @@ int xc_linux_restore(int xc_handle, int io_fd,
         /* Second pass: find all L1TABs and uncanonicalize them */
         j = 0;
 
-        for(i = 0; i < max_pfn; i++) {
-
-            if (((pfn_type[i] & LTABTYPE_MASK)==L1TAB)) {
+        for ( i = 0; i < max_pfn; i++ )
+        {
+            if ( ((pfn_type[i] & XEN_DOMCTL_PFINFO_LTABTYPE_MASK) ==
+                  XEN_DOMCTL_PFINFO_L1TAB) )
+            {
                 region_mfn[j] = p2m[i];
                 j++;
             }
@@ -547,7 +559,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
                 }
 
                 for(k = 0; k < j; k++) {
-                    if(!uncanonicalize_pagetable(L1TAB,
+                    if(!uncanonicalize_pagetable(XEN_DOMCTL_PFINFO_L1TAB,
                                                  region_base + k*PAGE_SIZE)) {
                         ERR("failed uncanonicalize pt!");
                         goto out;
@@ -570,26 +582,26 @@ int xc_linux_restore(int xc_handle, int io_fd,
      * will barf when doing the type-checking.
      */
     nr_pins = 0;
-    for (i = 0; i < max_pfn; i++) {
-
-        if ( (pfn_type[i] & LPINTAB) == 0 )
+    for ( i = 0; i < max_pfn; i++ )
+    {
+        if ( (pfn_type[i] & XEN_DOMCTL_PFINFO_LPINTAB) == 0 )
             continue;
 
-        switch (pfn_type[i]) {
-
-        case (L1TAB|LPINTAB):
+        switch ( pfn_type[i] & XEN_DOMCTL_PFINFO_LTABTYPE_MASK )
+        {
+        case XEN_DOMCTL_PFINFO_L1TAB:
             pin[nr_pins].cmd = MMUEXT_PIN_L1_TABLE;
             break;
 
-        case (L2TAB|LPINTAB):
+        case XEN_DOMCTL_PFINFO_L2TAB:
             pin[nr_pins].cmd = MMUEXT_PIN_L2_TABLE;
             break;
 
-        case (L3TAB|LPINTAB):
+        case XEN_DOMCTL_PFINFO_L3TAB:
             pin[nr_pins].cmd = MMUEXT_PIN_L3_TABLE;
             break;
 
-        case (L4TAB|LPINTAB):
+        case XEN_DOMCTL_PFINFO_L4TAB:
             pin[nr_pins].cmd = MMUEXT_PIN_L4_TABLE;
             break;
 
@@ -678,7 +690,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
     /* Uncanonicalise the suspend-record frame number and poke resume rec. */
     pfn = ctxt.user_regs.edx;
-    if ((pfn >= max_pfn) || (pfn_type[pfn] != NOTAB)) {
+    if ((pfn >= max_pfn) || (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB)) {
         ERR("Suspend record frame number is bad");
         goto out;
     }
@@ -703,7 +715,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
     for (i = 0; i < ctxt.gdt_ents; i += 512) {
         pfn = ctxt.gdt_frames[i];
-        if ((pfn >= max_pfn) || (pfn_type[pfn] != NOTAB)) {
+        if ((pfn >= max_pfn) || (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB)) {
             ERR("GDT frame number is bad");
             goto out;
         }
@@ -719,11 +731,11 @@ int xc_linux_restore(int xc_handle, int io_fd,
         goto out;
     }
 
-    if ( (pfn_type[pfn] & LTABTYPE_MASK) !=
-         ((unsigned long)pt_levels<<LTAB_SHIFT) ) {
+    if ( (pfn_type[pfn] & XEN_DOMCTL_PFINFO_LTABTYPE_MASK) !=
+         ((unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT) ) {
         ERR("PT base is bad. pfn=%lu nr=%lu type=%08lx %08lx",
             pfn, max_pfn, pfn_type[pfn],
-            (unsigned long)pt_levels<<LTAB_SHIFT);
+            (unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT);
         goto out;
     }
 
@@ -744,7 +756,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
     /* Uncanonicalise the pfn-to-mfn table frame-number list. */
     for (i = 0; i < P2M_FL_ENTRIES; i++) {
         pfn = p2m_frame_list[i];
-        if ((pfn >= max_pfn) || (pfn_type[pfn] != NOTAB)) {
+        if ((pfn >= max_pfn) || (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB)) {
             ERR("PFN-to-MFN frame number is bad");
             goto out;
         }
@@ -797,11 +809,11 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
     DPRINTF("Domain ready to be built.\n");
 
-    op.cmd = DOM0_SETVCPUCONTEXT;
-    op.u.setvcpucontext.domain = (domid_t)dom;
-    op.u.setvcpucontext.vcpu   = 0;
-    set_xen_guest_handle(op.u.setvcpucontext.ctxt, &ctxt);
-    rc = xc_dom0_op(xc_handle, &op);
+    domctl.cmd = XEN_DOMCTL_setvcpucontext;
+    domctl.domain = (domid_t)dom;
+    domctl.u.vcpucontext.vcpu   = 0;
+    set_xen_guest_handle(domctl.u.vcpucontext.ctxt, &ctxt);
+    rc = xc_domctl(xc_handle, &domctl);
 
     if (rc != 0) {
         ERR("Couldn't build the domain");

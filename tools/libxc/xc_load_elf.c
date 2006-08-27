@@ -5,6 +5,7 @@
 #include "xg_private.h"
 #include "xc_elf.h"
 #include <stdlib.h>
+#include <inttypes.h>
 
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
@@ -65,17 +66,187 @@ static inline int is_loadable_phdr(Elf_Phdr *phdr)
             ((phdr->p_flags & (PF_W|PF_X)) != 0));
 }
 
+/*
+ * Fallback for kernels containing only the legacy __xen_guest string
+ * and no ELF notes.
+ */
+static int is_xen_guest_section(Elf_Shdr *shdr, const char *shstrtab)
+{
+    return strcmp(&shstrtab[shdr->sh_name], "__xen_guest") == 0;
+}
+
+static const char *xen_guest_lookup(struct domain_setup_info *dsi, int type)
+{
+    const char *xenguest_fallbacks[] = {
+        [XEN_ELFNOTE_ENTRY] = "VIRT_ENTRY=",
+        [XEN_ELFNOTE_HYPERCALL_PAGE] = "HYPERCALL_PAGE=",
+        [XEN_ELFNOTE_VIRT_BASE] = "VIRT_BASE=",
+        [XEN_ELFNOTE_PADDR_OFFSET] = "ELF_PADDR_OFFSET=",
+        [XEN_ELFNOTE_XEN_VERSION] = "XEN_VER=",
+        [XEN_ELFNOTE_GUEST_OS] = "GUEST_OS=",
+        [XEN_ELFNOTE_GUEST_VERSION] = "GUEST_VER=",
+        [XEN_ELFNOTE_LOADER] = "LOADER=",
+        [XEN_ELFNOTE_PAE_MODE] = "PAE=",
+        [XEN_ELFNOTE_FEATURES] = "FEATURES=",
+        [XEN_ELFNOTE_BSD_SYMTAB] = "BSD_SYMTAB=",
+    };
+    const char *fallback;
+    const char *p;
+
+    if ( !dsi->__xen_guest_string )
+        return NULL;
+
+    if ( type > sizeof(xenguest_fallbacks) )
+        return NULL;
+
+    if ( (fallback = xenguest_fallbacks[type]) == NULL )
+        return NULL;
+
+    if ( (p = strstr(dsi->__xen_guest_string,fallback)) == NULL )
+        return NULL;
+
+    return p + strlen(fallback);
+}
+
+static const char *xen_guest_string(struct domain_setup_info *dsi, int type)
+{
+    const char *p = xen_guest_lookup(dsi, type);
+
+    /*
+     * We special case this since the __xen_guest_section treats the
+     * mere precense of the BSD_SYMTAB string as true or false.
+     */
+    if ( type == XEN_ELFNOTE_BSD_SYMTAB )
+        return p ? "yes" : "no";
+
+    return p;
+}
+
+static unsigned long long xen_guest_numeric(struct domain_setup_info *dsi,
+                                                   int type, int *defined)
+{
+    const char *p = xen_guest_lookup(dsi, type);
+    unsigned long long value;
+
+    if ( p == NULL )
+        return 0;
+
+    errno = 0;
+    value = strtoull(p, NULL, 0);
+    if ( errno < 0 )
+        return 0;
+
+    /* We special case this since __xen_guest_section contains a PFN
+     * for this field not a virtual address.
+     */
+    if (type == XEN_ELFNOTE_HYPERCALL_PAGE)
+        value = dsi->v_start + (value<<PAGE_SHIFT);
+
+    *defined = 1;
+    return value;
+}
+
+/*
+ * Interface to the Xen ELF notes.
+ */
+#define ELFNOTE_NAME(_n_)   ((void*)(_n_) + sizeof(*(_n_)))
+#define ELFNOTE_DESC(_n_)   (ELFNOTE_NAME(_n_) + (((_n_)->namesz+3)&~3))
+#define ELFNOTE_NEXT(_n_)   (ELFNOTE_DESC(_n_) + (((_n_)->descsz+3)&~3))
+
+static int is_xen_elfnote_section(const char *image, Elf_Shdr *shdr)
+{
+    Elf_Note *note;
+
+    if ( shdr->sh_type != SHT_NOTE )
+        return 0;
+
+    for ( note = (Elf_Note *)(image + shdr->sh_offset);
+          note < (Elf_Note *)(image + shdr->sh_offset + shdr->sh_size);
+          note = ELFNOTE_NEXT(note) )
+    {
+        if ( !strncmp(ELFNOTE_NAME(note), "Xen", 4) )
+            return 1;
+    }
+
+    return 0;
+}
+
+static Elf_Note *xen_elfnote_lookup(struct domain_setup_info *dsi, int type)
+{
+    Elf_Note *note;
+
+    if ( !dsi->__elfnote_section )
+        return NULL;
+
+    for ( note = (Elf_Note *)dsi->__elfnote_section;
+          note < (Elf_Note *)dsi->__elfnote_section_end;
+          note = ELFNOTE_NEXT(note) )
+    {
+        if ( strncmp(ELFNOTE_NAME(note), "Xen", 4) )
+            continue;
+
+        if ( note->type == type )
+            return note;
+    }
+
+    return NULL;
+}
+
+const char *xen_elfnote_string(struct domain_setup_info *dsi, int type)
+{
+    Elf_Note *note;
+
+    if ( !dsi->__elfnote_section )
+        return xen_guest_string(dsi, type);
+
+    note = xen_elfnote_lookup(dsi, type);
+    if ( note == NULL )
+        return NULL;
+
+    return (const char *)ELFNOTE_DESC(note);
+}
+
+unsigned long long xen_elfnote_numeric(struct domain_setup_info *dsi,
+                                       int type, int *defined)
+{
+    Elf_Note *note;
+
+    *defined = 0;
+
+    if ( !dsi->__elfnote_section )
+        return xen_guest_numeric(dsi, type, defined);
+
+    note = xen_elfnote_lookup(dsi, type);
+    if ( note == NULL )
+    {
+        return 0;
+    }
+
+    switch ( note->descsz )
+    {
+    case 4:
+        *defined = 1;
+        return *(uint32_t*)ELFNOTE_DESC(note);
+    case 8:
+        *defined = 1;
+        return *(uint64_t*)ELFNOTE_DESC(note);
+    default:
+        ERROR("elfnotes: unknown data size %#x for numeric type note %#x\n",
+              note->descsz, type);
+        return 0;
+    }
+}
+
 static int parseelfimage(const char *image,
-                         unsigned long elfsize,
+                         unsigned long image_len,
                          struct domain_setup_info *dsi)
 {
     Elf_Ehdr *ehdr = (Elf_Ehdr *)image;
     Elf_Phdr *phdr;
     Elf_Shdr *shdr;
-    Elf_Addr kernstart = ~0, kernend = 0, vaddr, virt_base, elf_pa_off;
-    const char *shstrtab;
-    char *guestinfo=NULL, *p;
-    int h, virt_base_defined, elf_pa_off_defined;
+    Elf_Addr kernstart = ~0, kernend = 0, vaddr, virt_entry;
+    const char *shstrtab, *p;
+    int h, virt_base_defined, elf_pa_off_defined, virt_entry_defined;
 
     if ( !IS_ELF(*ehdr) )
     {
@@ -92,13 +263,13 @@ static int parseelfimage(const char *image,
         return -EINVAL;
     }
 
-    if ( (ehdr->e_phoff + (ehdr->e_phnum * ehdr->e_phentsize)) > elfsize )
+    if ( (ehdr->e_phoff + (ehdr->e_phnum*ehdr->e_phentsize)) > image_len )
     {
         ERROR("ELF program headers extend beyond end of image.");
         return -EINVAL;
     }
 
-    if ( (ehdr->e_shoff + (ehdr->e_shnum * ehdr->e_shentsize)) > elfsize )
+    if ( (ehdr->e_shoff + (ehdr->e_shnum*ehdr->e_shentsize)) > image_len )
     {
         ERROR("ELF section headers extend beyond end of image.");
         return -EINVAL;
@@ -114,69 +285,119 @@ static int parseelfimage(const char *image,
                         (ehdr->e_shstrndx*ehdr->e_shentsize));
     shstrtab = image + shdr->sh_offset;
 
-    /* Find the special '__xen_guest' section and check its contents. */
+    dsi->__elfnote_section = NULL;
+    dsi->__xen_guest_string = NULL;
+
+    /* Look for .notes segment containing at least one Xen note */
     for ( h = 0; h < ehdr->e_shnum; h++ )
     {
         shdr = (Elf_Shdr *)(image + ehdr->e_shoff + (h*ehdr->e_shentsize));
-        if ( strcmp(&shstrtab[shdr->sh_name], "__xen_guest") != 0 )
+        if ( !is_xen_elfnote_section(image, shdr) )
             continue;
-
-        guestinfo = (char *)image + shdr->sh_offset;
-
-        if ( (strstr(guestinfo, "LOADER=generic") == NULL) &&
-             (strstr(guestinfo, "GUEST_OS=linux") == NULL) )
-        {
-            ERROR("Will only load images built for the generic loader "
-                  "or Linux images");
-            ERROR("Actually saw: '%s'", guestinfo);
-            return -EINVAL;
-        }
-
-        if ( (strstr(guestinfo, "XEN_VER=xen-3.0") == NULL) )
-        {
-            ERROR("Will only load images built for Xen v3.0");
-            ERROR("Actually saw: '%s'", guestinfo);
-            return -EINVAL;
-        }
-
-        dsi->pae_kernel = PAEKERN_no;
-        p = strstr(guestinfo, "PAE=yes");
-        if ( p != NULL )
-        {
-            dsi->pae_kernel = PAEKERN_yes;
-            if ( !strncmp(p+7, "[extended-cr3]", 14) )
-                dsi->pae_kernel = PAEKERN_extended_cr3;
-        }
-
+        dsi->__elfnote_section = (void *)image + shdr->sh_offset;
+        dsi->__elfnote_section_end =
+            (void *)image + shdr->sh_offset + shdr->sh_size;
         break;
     }
 
-    if ( guestinfo == NULL )
+    /* Fall back to looking for the special '__xen_guest' section. */
+    if ( dsi->__elfnote_section == NULL )
     {
-#ifdef __ia64__
-        guestinfo = "";
-#else
-        ERROR("Not a Xen-ELF image: '__xen_guest' section not found.");
+        for ( h = 0; h < ehdr->e_shnum; h++ )
+        {
+            shdr = (Elf_Shdr *)(image + ehdr->e_shoff + (h*ehdr->e_shentsize));
+            if ( is_xen_guest_section(shdr, shstrtab) )
+            {
+                dsi->__xen_guest_string = (char *)image + shdr->sh_offset;
+                break;
+            }
+        }
+    }
+
+    /* Check the contents of the Xen notes or guest string. */
+    if ( dsi->__elfnote_section || dsi->__xen_guest_string )
+    {
+        const char *loader = xen_elfnote_string(dsi, XEN_ELFNOTE_LOADER);
+        const char *guest_os = xen_elfnote_string(dsi, XEN_ELFNOTE_GUEST_OS);
+        const char *xen_version =
+            xen_elfnote_string(dsi, XEN_ELFNOTE_XEN_VERSION);
+
+        if ( ( loader == NULL || strncmp(loader, "generic", 7) ) &&
+             ( guest_os == NULL || strncmp(guest_os, "linux", 5) ) )
+        {
+            ERROR("Will only load images built for the generic loader "
+                  "or Linux images");
+            return -EINVAL;
+        }
+
+        if ( xen_version == NULL || strncmp(xen_version, "xen-3.0", 7) )
+        {
+            ERROR("Will only load images built for Xen v3.0");
+            return -EINVAL;
+        }
+    }
+    else
+    {
+#if defined(__x86_64__) || defined(__i386__)
+        ERROR("Not a Xen-ELF image: "
+              "No ELF notes or '__xen_guest' section found.");
         return -EINVAL;
 #endif
     }
 
-    dsi->xen_guest_string = guestinfo;
+    /*
+     * If we have ELF notes then PAE=yes implies that we must support
+     * the extended cr3 syntax. Otherwise we need to find the
+     * [extended-cr3] syntax in the __xen_guest string.
+     */
+    dsi->pae_kernel = PAEKERN_no;
+    if ( dsi->__elfnote_section )
+    {
+        p = xen_elfnote_string(dsi, XEN_ELFNOTE_PAE_MODE);
+        if ( p != NULL && strncmp(p, "yes", 3) == 0 )
+            dsi->pae_kernel = PAEKERN_extended_cr3;
 
-    /* Initial guess for virt_base is 0 if it is not explicitly defined. */
-    p = strstr(guestinfo, "VIRT_BASE=");
-    virt_base_defined = (p != NULL);
-    virt_base = virt_base_defined ? strtoull(p+10, &p, 0) : 0;
+    }
+    else
+    {
+        p = xen_guest_lookup(dsi, XEN_ELFNOTE_PAE_MODE);
+        if ( p != NULL && strncmp(p, "yes", 3) == 0 )
+        {
+            dsi->pae_kernel = PAEKERN_yes;
+            if ( !strncmp(p+4, "[extended-cr3]", 14) )
+                dsi->pae_kernel = PAEKERN_extended_cr3;
+        }
+    }
 
-    /* Initial guess for elf_pa_off is virt_base if not explicitly defined. */
-    p = strstr(guestinfo, "ELF_PADDR_OFFSET=");
-    elf_pa_off_defined = (p != NULL);
-    elf_pa_off = elf_pa_off_defined ? strtoull(p+17, &p, 0) : virt_base;
+    /* Initial guess for v_start is 0 if it is not explicitly defined. */
+    dsi->v_start =
+        xen_elfnote_numeric(dsi, XEN_ELFNOTE_VIRT_BASE, &virt_base_defined);
+    if ( !virt_base_defined )
+        dsi->v_start = 0;
+
+    /*
+     * If we are using the legacy __xen_guest section then elf_pa_off
+     * defaults to v_start in order to maintain compatibility with
+     * older hypervisors which set padd in the ELF header to
+     * virt_base.
+     *
+     * If we are using the modern ELF notes interface then the default
+     * is 0.
+     */
+    dsi->elf_paddr_offset =
+        xen_elfnote_numeric(dsi, XEN_ELFNOTE_PADDR_OFFSET, &elf_pa_off_defined);
+    if ( !elf_pa_off_defined )
+    {
+        if ( dsi->__elfnote_section )
+            dsi->elf_paddr_offset = 0;
+        else
+            dsi->elf_paddr_offset = dsi->v_start;
+    }
 
     if ( elf_pa_off_defined && !virt_base_defined )
     {
-        ERROR("Neither ELF_PADDR_OFFSET nor VIRT_BASE found in __xen_guest"
-              " section.");
+        ERROR("Neither ELF_PADDR_OFFSET nor VIRT_BASE found in ELF "
+              " notes or __xen_guest section.");
         return -EINVAL;
     }
 
@@ -185,7 +406,7 @@ static int parseelfimage(const char *image,
         phdr = (Elf_Phdr *)(image + ehdr->e_phoff + (h*ehdr->e_phentsize));
         if ( !is_loadable_phdr(phdr) )
             continue;
-        vaddr = phdr->p_paddr - elf_pa_off + virt_base;
+        vaddr = phdr->p_paddr - dsi->elf_paddr_offset + dsi->v_start;
         if ( (vaddr + phdr->p_memsz) < vaddr )
         {
             ERROR("ELF program header %d is too large.", h);
@@ -198,17 +419,12 @@ static int parseelfimage(const char *image,
             kernend = vaddr + phdr->p_memsz;
     }
 
-    /*
-     * Legacy compatibility and images with no __xen_guest section: assume
-     * header addresses are virtual addresses, and that guest memory should be
-     * mapped starting at kernel load address.
-     */
-    dsi->v_start          = virt_base_defined  ? virt_base  : kernstart;
-    dsi->elf_paddr_offset = elf_pa_off_defined ? elf_pa_off : dsi->v_start;
-
     dsi->v_kernentry = ehdr->e_entry;
-    if ( (p = strstr(guestinfo, "VIRT_ENTRY=")) != NULL )
-        dsi->v_kernentry = strtoull(p+11, &p, 0);
+
+    virt_entry =
+        xen_elfnote_numeric(dsi, XEN_ELFNOTE_ENTRY, &virt_entry_defined);
+    if ( virt_entry_defined )
+        dsi->v_kernentry = virt_entry;
 
     if ( (kernstart > kernend) ||
          (dsi->v_kernentry < kernstart) ||
@@ -219,7 +435,8 @@ static int parseelfimage(const char *image,
         return -EINVAL;
     }
 
-    if ( (p = strstr(guestinfo, "BSD_SYMTAB")) != NULL )
+    p = xen_elfnote_string(dsi, XEN_ELFNOTE_BSD_SYMTAB);
+    if ( p != NULL && strncmp(p, "yes", 3) == 0 )
         dsi->load_symtab = 1;
 
     dsi->v_kernstart = kernstart;

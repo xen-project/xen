@@ -2893,7 +2893,7 @@ static int sh2_page_fault(struct vcpu *v,
     // i.e. ring 3.  Such errors are not caused or dealt with by the shadow
     // code.
     //
-    if ( (regs->error_code & X86_PFEC_SUPERVISOR_FAULT) &&
+    if ( (regs->error_code & PFEC_user_mode) &&
          !(accumulated_gflags & _PAGE_USER) )
     {
         /* illegal user-mode access to supervisor-only page */
@@ -2903,7 +2903,7 @@ static int sh2_page_fault(struct vcpu *v,
 
     // Was it a write fault?
     //
-    if ( regs->error_code & X86_PFEC_WRITE_FAULT )
+    if ( regs->error_code & PFEC_write_access )
     {
         if ( unlikely(!(accumulated_gflags & _PAGE_RW)) )
         {
@@ -2917,7 +2917,7 @@ static int sh2_page_fault(struct vcpu *v,
         // marked "do not execute".  Such errors are not caused or dealt with
         // by the shadow code.
         //
-        if ( regs->error_code & X86_PFEC_INSN_FETCH_FAULT )
+        if ( regs->error_code & PFEC_insn_fetch )
         {
             if ( accumulated_gflags & _PAGE_NX_BIT )
             {
@@ -2960,8 +2960,8 @@ static int sh2_page_fault(struct vcpu *v,
      * for the shadow entry, since we might promote a page here. */
     // XXX -- this code will need to change somewhat if/when the shadow code
     // can directly map superpages...
-    ft = ((regs->error_code & X86_PFEC_WRITE_FAULT) 
-          ? ft_demand_write : ft_demand_read);
+    ft = ((regs->error_code & PFEC_write_access) ?
+          ft_demand_write : ft_demand_read);
     ptr_sl1e = shadow_get_and_create_l1e(v, &gw, &sl1mfn, ft);
     ASSERT(ptr_sl1e);
 

@@ -28,7 +28,7 @@
 #include <xen/multiboot.h>
 #include <public/acm.h>
 #include <acm/acm_core.h>
-#include <public/dom0_ops.h>
+#include <public/domctl.h>
 #include <public/event_channel.h>
 #include <asm/current.h>
 
@@ -129,11 +129,11 @@ extern struct acm_operations *acm_secondary_ops;
 
 #ifndef ACM_SECURITY
 
-static inline int acm_pre_dom0_op(struct dom0_op *op, void **ssid) 
+static inline int acm_pre_domctl(struct xen_domctl *op, void **ssid) 
 { return 0; }
-static inline void acm_post_dom0_op(struct dom0_op *op, void *ssid) 
+static inline void acm_post_domctl(struct xen_domctl *op, void *ssid) 
 { return; }
-static inline void acm_fail_dom0_op(struct dom0_op *op, void *ssid) 
+static inline void acm_fail_domctl(struct xen_domctl *op, void *ssid) 
 { return; }
 static inline int acm_pre_eventchannel_unbound(domid_t id1, domid_t id2)
 { return 0; }
@@ -225,23 +225,23 @@ static inline int acm_pre_eventchannel_interdomain(domid_t id)
         return ACM_ACCESS_PERMITTED;
 }
 
-static inline int acm_pre_dom0_op(struct dom0_op *op, void **ssid) 
+static inline int acm_pre_domctl(struct xen_domctl *op, void **ssid) 
 {
     int ret = -EACCES;
     struct domain *d;
 
     switch(op->cmd) {
-    case DOM0_CREATEDOMAIN:
+    case XEN_DOMCTL_createdomain:
         ret = acm_pre_domain_create(
             current->domain->ssid, op->u.createdomain.ssidref);
         break;
-    case DOM0_DESTROYDOMAIN:
+    case XEN_DOMCTL_destroydomain:
         if (*ssid != NULL) {
             printkd("%s: Warning. Overlapping destruction.\n", 
                     __func__);
             return -EACCES;
         }
-        d = find_domain_by_id(op->u.destroydomain.domain);
+        d = find_domain_by_id(op->domain);
         if (d != NULL) {
             *ssid = d->ssid; /* save for post destroy when d is gone */
             if (*ssid == NULL) {
@@ -262,23 +262,23 @@ static inline int acm_pre_dom0_op(struct dom0_op *op, void **ssid)
     return ret;
 }
 
-static inline void acm_post_dom0_op(struct dom0_op *op, void **ssid)
+static inline void acm_post_domctl(struct xen_domctl *op, void **ssid)
 {
     switch(op->cmd) {
-    case DOM0_CREATEDOMAIN:
+    case XEN_DOMCTL_createdomain:
         /* initialialize shared sHype security labels for new domain */
         acm_init_domain_ssid(
-            op->u.createdomain.domain, op->u.createdomain.ssidref);
+            op->domain, op->u.createdomain.ssidref);
         acm_post_domain_create(
-            op->u.createdomain.domain, op->u.createdomain.ssidref);
+            op->domain, op->u.createdomain.ssidref);
         break;
-    case DOM0_DESTROYDOMAIN:
+    case XEN_DOMCTL_destroydomain:
         if (*ssid == NULL) {
             printkd("%s: ERROR. SSID unset.\n",
                     __func__);
             break;
         }
-        acm_post_domain_destroy(*ssid, op->u.destroydomain.domain);
+        acm_post_domain_destroy(*ssid, op->domain);
         /* free security ssid for the destroyed domain (also if null policy */
         acm_free_domain_ssid((struct acm_ssid_domain *)(*ssid));
         *ssid = NULL;
@@ -286,14 +286,14 @@ static inline void acm_post_dom0_op(struct dom0_op *op, void **ssid)
     }
 }
 
-static inline void acm_fail_dom0_op(struct dom0_op *op, void **ssid)
+static inline void acm_fail_domctl(struct xen_domctl *op, void **ssid)
 {
     switch(op->cmd) {
-    case DOM0_CREATEDOMAIN:
+    case XEN_DOMCTL_createdomain:
         acm_fail_domain_create(
             current->domain->ssid, op->u.createdomain.ssidref);
         break;
-    case DOM0_DESTROYDOMAIN:
+    case XEN_DOMCTL_destroydomain:
         /*  we don't handle domain destroy failure but at least free the ssid */
         if (*ssid == NULL) {
             printkd("%s: ERROR. SSID unset.\n",

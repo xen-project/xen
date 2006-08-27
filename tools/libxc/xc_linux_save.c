@@ -271,7 +271,7 @@ static inline ssize_t write_exact(int fd, void *buf, size_t count)
 
 
 static int print_stats(int xc_handle, uint32_t domid, int pages_sent,
-                       xc_shadow_control_stats_t *stats, int print)
+                       xc_shadow_op_stats_t *stats, int print)
 {
     static struct timeval wall_last;
     static long long      d0_cpu_last;
@@ -329,7 +329,7 @@ static int analysis_phase(int xc_handle, uint32_t domid, int max_pfn,
                           unsigned long *arr, int runs)
 {
     long long start, now;
-    xc_shadow_control_stats_t stats;
+    xc_shadow_op_stats_t stats;
     int j;
 
     start = llgettimeofday();
@@ -337,13 +337,13 @@ static int analysis_phase(int xc_handle, uint32_t domid, int max_pfn,
     for (j = 0; j < runs; j++) {
         int i;
 
-        xc_shadow_control(xc_handle, domid, DOM0_SHADOW_CONTROL_OP_CLEAN,
+        xc_shadow_control(xc_handle, domid, XEN_DOMCTL_SHADOW_OP_CLEAN,
                           arr, max_pfn, NULL, 0, NULL);
         DPRINTF("#Flush\n");
         for ( i = 0; i < 40; i++ ) {
             usleep(50000);
             now = llgettimeofday();
-            xc_shadow_control(xc_handle, domid, DOM0_SHADOW_CONTROL_OP_PEEK,
+            xc_shadow_control(xc_handle, domid, XEN_DOMCTL_SHADOW_OP_PEEK,
                               NULL, 0, NULL, 0, &stats);
 
             DPRINTF("now= %lld faults= %"PRId32" dirty= %"PRId32"\n",
@@ -427,10 +427,10 @@ int canonicalize_pagetable(unsigned long type, unsigned long pfn,
     */
     xen_start = xen_end = pte_last = PAGE_SIZE / ((pt_levels == 2)? 4 : 8);
 
-    if (pt_levels == 2 && type == L2TAB)
+    if (pt_levels == 2 && type == XEN_DOMCTL_PFINFO_L2TAB)
         xen_start = (hvirt_start >> L2_PAGETABLE_SHIFT);
 
-    if (pt_levels == 3 && type == L3TAB)
+    if (pt_levels == 3 && type == XEN_DOMCTL_PFINFO_L3TAB)
         xen_start = L3_PAGETABLE_ENTRIES_PAE;
 
     /*
@@ -439,7 +439,7 @@ int canonicalize_pagetable(unsigned long type, unsigned long pfn,
     ** Xen always ensures is present in that L2. Guests must ensure
     ** that this check will fail for other L2s.
     */
-    if (pt_levels == 3 && type == L2TAB) {
+    if (pt_levels == 3 && type == XEN_DOMCTL_PFINFO_L2TAB) {
 
 /* XXX index of the L2 entry in PAE mode which holds the guest LPT */
 #define PAE_GLPT_L2ENTRY (495)
@@ -449,7 +449,7 @@ int canonicalize_pagetable(unsigned long type, unsigned long pfn,
             xen_start = (hvirt_start >> L2_PAGETABLE_SHIFT_PAE) & 0x1ff;
     }
 
-    if (pt_levels == 4 && type == L4TAB) {
+    if (pt_levels == 4 && type == XEN_DOMCTL_PFINFO_L4TAB) {
         /*
         ** XXX SMH: should compute these from hvirt_start (which we have)
         ** and hvirt_end (which we don't)
@@ -603,7 +603,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
        - to fixup by sending at the end if not already resent; */
     unsigned long *to_send = NULL, *to_skip = NULL, *to_fix = NULL;
 
-    xc_shadow_control_stats_t stats;
+    xc_shadow_op_stats_t stats;
 
     unsigned long needed_to_fix = 0;
     unsigned long total_sent    = 0;
@@ -724,7 +724,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     if (live) {
 
         if (xc_shadow_control(xc_handle, dom,
-                              DOM0_SHADOW_CONTROL_OP_ENABLE_LOGDIRTY,
+                              XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY,
                               NULL, 0, NULL, 0, NULL) < 0) {
             ERR("Couldn't enable shadow mode");
             goto out;
@@ -781,8 +781,8 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     analysis_phase(xc_handle, dom, max_pfn, to_skip, 0);
 
     /* We want zeroed memory so use calloc rather than malloc. */
-    pfn_type  = calloc(MAX_BATCH_SIZE, sizeof(unsigned long));
-    pfn_batch = calloc(MAX_BATCH_SIZE, sizeof(unsigned long));
+    pfn_type  = calloc(MAX_BATCH_SIZE, sizeof(*pfn_type));
+    pfn_batch = calloc(MAX_BATCH_SIZE, sizeof(*pfn_batch));
 
     if ((pfn_type == NULL) || (pfn_batch == NULL)) {
         ERR("failed to alloc memory for pfn_type and/or pfn_batch arrays");
@@ -790,11 +790,10 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         goto out;
     }
 
-    if (mlock(pfn_type, MAX_BATCH_SIZE * sizeof(unsigned long))) {
+    if (mlock(pfn_type, MAX_BATCH_SIZE * sizeof(*pfn_type))) {
         ERR("Unable to mlock");
         goto out;
     }
-
 
     /*
      * Quick belt and braces sanity check.
@@ -876,7 +875,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             /* slightly wasteful to peek the whole array evey time,
                but this is fast enough for the moment. */
             if (!last_iter && xc_shadow_control(
-                    xc_handle, dom, DOM0_SHADOW_CONTROL_OP_PEEK,
+                    xc_handle, dom, XEN_DOMCTL_SHADOW_OP_PEEK,
                     to_skip, max_pfn, NULL, 0, NULL) != max_pfn) {
                 ERR("Error peeking shadow bitmap");
                 goto out;
@@ -930,7 +929,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 if(last_iter && test_bit(n, to_fix) && !test_bit(n, to_send)) {
                     needed_to_fix++;
                     DPRINTF("Fix! iter %d, pfn %x. mfn %lx\n",
-                            iter,n,pfn_type[batch]);
+                            iter, n, pfn_type[batch]);
                 }
 
                 clear_bit(n, to_fix);
@@ -952,9 +951,12 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 goto out;
             }
 
-            for (j = 0; j < batch; j++) {
+            for ( j = 0; j < batch; j++ )
+            {
 
-                if ((pfn_type[j] & LTAB_MASK) == XTAB) {
+                if ( (pfn_type[j] & XEN_DOMCTL_PFINFO_LTAB_MASK) ==
+                     XEN_DOMCTL_PFINFO_XTAB )
+                {
                     DPRINTF("type fail: page %i mfn %08lx\n", j, pfn_type[j]);
                     continue;
                 }
@@ -963,13 +965,16 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                     DPRINTF("%d pfn= %08lx mfn= %08lx [mfn]= %08lx"
                             " sum= %08lx\n",
                             iter,
-                            (pfn_type[j] & LTAB_MASK) | pfn_batch[j],
+                            (pfn_type[j] & XEN_DOMCTL_PFINFO_LTAB_MASK) |
+                            pfn_batch[j],
                             pfn_type[j],
-                            mfn_to_pfn(pfn_type[j]&(~LTAB_MASK)),
+                            mfn_to_pfn(pfn_type[j] &
+                                       ~XEN_DOMCTL_PFINFO_LTAB_MASK),
                             csum_page(region_base + (PAGE_SIZE*j)));
 
                 /* canonicalise mfn->pfn */
-                pfn_type[j] = (pfn_type[j] & LTAB_MASK) | pfn_batch[j];
+                pfn_type[j] = (pfn_type[j] & XEN_DOMCTL_PFINFO_LTAB_MASK) |
+                    pfn_batch[j];
             }
 
             if(!write_exact(io_fd, &batch, sizeof(unsigned int))) {
@@ -983,21 +988,23 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             }
 
             /* entering this loop, pfn_type is now in pfns (Not mfns) */
-            for (j = 0; j < batch; j++) {
+            for ( j = 0; j < batch; j++ )
+            {
+                unsigned long pfn, pagetype;
+                void *spage = (char *)region_base + (PAGE_SIZE*j);
 
-                unsigned long pfn      = pfn_type[j] & ~LTAB_MASK;
-                unsigned long pagetype = pfn_type[j] & LTAB_MASK;
-                void *spage            = (void *) region_base + (PAGE_SIZE*j);
-
+                pfn      = pfn_type[j] & ~XEN_DOMCTL_PFINFO_LTAB_MASK;
+                pagetype = pfn_type[j] &  XEN_DOMCTL_PFINFO_LTAB_MASK;
 
                 /* write out pages in batch */
-                if (pagetype == XTAB)
+                if ( pagetype == XEN_DOMCTL_PFINFO_XTAB )
                     continue;
 
-                pagetype &= LTABTYPE_MASK;
+                pagetype &= XEN_DOMCTL_PFINFO_LTABTYPE_MASK;
 
-                if (pagetype >= L1TAB && pagetype <= L4TAB) {
-
+                if ( (pagetype >= XEN_DOMCTL_PFINFO_L1TAB) &&
+                     (pagetype <= XEN_DOMCTL_PFINFO_L4TAB) )
+                {
                     /* We have a pagetable page: need to rewrite it. */
                     race = 
                         canonicalize_pagetable(pagetype, pfn, spage, page); 
@@ -1083,7 +1090,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             }
 
             if (xc_shadow_control(xc_handle, dom, 
-                                  DOM0_SHADOW_CONTROL_OP_CLEAN, to_send, 
+                                  XEN_DOMCTL_SHADOW_OP_CLEAN, to_send, 
                                   max_pfn, NULL, 0, &stats) != max_pfn) {
                 ERR("Error flushing shadow PT");
                 goto out;
@@ -1174,7 +1181,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     if (live) {
         if(xc_shadow_control(xc_handle, dom, 
-                             DOM0_SHADOW_CONTROL_OP_OFF,
+                             XEN_DOMCTL_SHADOW_OP_OFF,
                              NULL, 0, NULL, 0, NULL) < 0) {
             DPRINTF("Warning - couldn't disable shadow mode");
         }

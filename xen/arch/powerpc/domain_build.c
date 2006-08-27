@@ -137,10 +137,6 @@ int construct_dom0(struct domain *d,
     dsi.v_kernend = RM_MASK(dsi.v_kernend, 42);
     dsi.v_kernentry = RM_MASK(dsi.v_kernentry, 42);
 
-    if (dsi.xen_section_string == NULL) {
-        printk("Not a Xen-ELF image: '__xen_guest' section not found.\n");
-        return -EINVAL;
-    }
     printk("*** LOADING DOMAIN 0 ***\n");
 
     /* By default DOM0 is allocated all available memory. */

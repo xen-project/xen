@@ -24,7 +24,6 @@ all: build
 .PHONY: build
 build: $(TARGETS)
 	$(MAKE) -C miniterm
-	$(MAKE) -C cpuperf
 ifeq ($(CONFIG_MBOOTPACK),y)
 	$(MAKE) -C mbootpack
 endif
@@ -36,7 +35,6 @@ install: build
 	[ -d $(DESTDIR)/usr/sbin ] || $(INSTALL_DIR) $(DESTDIR)/usr/sbin
 	$(INSTALL_PROG) $(INSTALL_BIN) $(DESTDIR)/usr/bin
 	$(INSTALL_PROG) $(INSTALL_SBIN) $(DESTDIR)/usr/sbin
-	$(MAKE) -C cpuperf install
 	$(MAKE) -C lomount install
 #       No sense in installing miniterm on the Xen box.
 #	$(MAKE) -C miniterm install
@@ -47,7 +45,6 @@ install: build
 clean:
 	$(RM) *.o $(TARGETS) *~
 	$(MAKE) -C miniterm clean
-	$(MAKE) -C cpuperf clean
 	$(MAKE) -C mbootpack clean
 	$(MAKE) -C lomount clean
 

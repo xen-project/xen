@@ -12,20 +12,20 @@ int xc_readconsolering(int xc_handle,
                        int clear)
 {
     int ret;
-    DECLARE_DOM0_OP;
+    DECLARE_SYSCTL;
     char *buffer = *pbuffer;
     unsigned int nr_chars = *pnr_chars;
 
-    op.cmd = DOM0_READCONSOLE;
-    set_xen_guest_handle(op.u.readconsole.buffer, buffer);
-    op.u.readconsole.count  = nr_chars;
-    op.u.readconsole.clear  = clear;
+    sysctl.cmd = XEN_SYSCTL_readconsole;
+    set_xen_guest_handle(sysctl.u.readconsole.buffer, buffer);
+    sysctl.u.readconsole.count  = nr_chars;
+    sysctl.u.readconsole.clear  = clear;
 
     if ( (ret = mlock(buffer, nr_chars)) != 0 )
         return ret;
 
-    if ( (ret = do_dom0_op(xc_handle, &op)) == 0 )
-        *pnr_chars = op.u.readconsole.count;
+    if ( (ret = do_sysctl(xc_handle, &sysctl)) == 0 )
+        *pnr_chars = sysctl.u.readconsole.count;
 
     safe_munlock(buffer, nr_chars);
 
@@ -36,15 +36,14 @@ int xc_physinfo(int xc_handle,
                 xc_physinfo_t *put_info)
 {
     int ret;
-    DECLARE_DOM0_OP;
+    DECLARE_SYSCTL;
 
-    op.cmd = DOM0_PHYSINFO;
-    op.interface_version = DOM0_INTERFACE_VERSION;
+    sysctl.cmd = XEN_SYSCTL_physinfo;
 
-    if ( (ret = do_dom0_op(xc_handle, &op)) != 0 )
+    if ( (ret = do_sysctl(xc_handle, &sysctl)) != 0 )
         return ret;
 
-    memcpy(put_info, &op.u.physinfo, sizeof(*put_info));
+    memcpy(put_info, &sysctl.u.physinfo, sizeof(*put_info));
 
     return 0;
 }
@@ -53,15 +52,14 @@ int xc_sched_id(int xc_handle,
                 int *sched_id)
 {
     int ret;
-    DECLARE_DOM0_OP;
+    DECLARE_SYSCTL;
 
-    op.cmd = DOM0_SCHED_ID;
-    op.interface_version = DOM0_INTERFACE_VERSION;
+    sysctl.cmd = XEN_SYSCTL_sched_id;
 
-    if ( (ret = do_dom0_op(xc_handle, &op)) != 0 )
+    if ( (ret = do_sysctl(xc_handle, &sysctl)) != 0 )
         return ret;
 
-    *sched_id = op.u.sched_id.sched_id;
+    *sched_id = sysctl.u.sched_id.sched_id;
 
     return 0;
 }
@@ -74,56 +72,22 @@ int xc_perfc_control(int xc_handle,
                      int *nbr_val)
 {
     int rc;
-    DECLARE_DOM0_OP;
+    DECLARE_SYSCTL;
 
-    op.cmd = DOM0_PERFCCONTROL;
-    op.u.perfccontrol.op   = opcode;
-    set_xen_guest_handle(op.u.perfccontrol.desc, desc);
-    set_xen_guest_handle(op.u.perfccontrol.val, val);
+    sysctl.cmd = XEN_SYSCTL_perfc_op;
+    sysctl.u.perfc_op.cmd = opcode;
+    set_xen_guest_handle(sysctl.u.perfc_op.desc, desc);
+    set_xen_guest_handle(sysctl.u.perfc_op.val, val);
 
-    rc = do_dom0_op(xc_handle, &op);
+    rc = do_sysctl(xc_handle, &sysctl);
 
     if (nbr_desc)
-        *nbr_desc = op.u.perfccontrol.nr_counters;
+        *nbr_desc = sysctl.u.perfc_op.nr_counters;
     if (nbr_val)
-        *nbr_val = op.u.perfccontrol.nr_vals;
+        *nbr_val = sysctl.u.perfc_op.nr_vals;
 
     return rc;
 }
-
-long long xc_msr_read(int xc_handle, int cpu_mask, int msr)
-{
-    int rc;
-    DECLARE_DOM0_OP;
-
-    op.cmd = DOM0_MSR;
-    op.u.msr.write = 0;
-    op.u.msr.msr = msr;
-    op.u.msr.cpu_mask = cpu_mask;
-
-    rc = do_dom0_op(xc_handle, &op);
-
-    return (((unsigned long long)op.u.msr.out2)<<32) | op.u.msr.out1 ;
-}
-
-int xc_msr_write(int xc_handle, int cpu_mask, int msr, unsigned int low,
-                  unsigned int high)
-{
-    int rc;
-    DECLARE_DOM0_OP;
-
-    op.cmd = DOM0_MSR;
-    op.u.msr.write = 1;
-    op.u.msr.msr = msr;
-    op.u.msr.cpu_mask = cpu_mask;
-    op.u.msr.in1 = low;
-    op.u.msr.in2 = high;
-
-    rc = do_dom0_op(xc_handle, &op);
-
-    return rc;
-}
-
 
 /*
  * Local variables:

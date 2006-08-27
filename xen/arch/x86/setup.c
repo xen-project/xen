@@ -15,6 +15,7 @@
 #include <xen/version.h>
 #include <xen/gdbstub.h>
 #include <xen/percpu.h>
+#include <xen/hypercall.h>
 #include <public/version.h>
 #include <asm/bitops.h>
 #include <asm/smp.h>
@@ -416,9 +417,13 @@ void __init __start_xen(multiboot_info_t *mbi)
            nr_pages << (PAGE_SHIFT - 10));
     total_pages = nr_pages;
 
-    /* Sanity check for unwanted bloat of dom0_op structure. */
-    BUILD_BUG_ON(sizeof(((struct dom0_op *)0)->u) !=
-                 sizeof(((struct dom0_op *)0)->u.pad));
+    /* Sanity check for unwanted bloat of certain hypercall structures. */
+    BUILD_BUG_ON(sizeof(((struct xen_platform_op *)0)->u) !=
+                 sizeof(((struct xen_platform_op *)0)->u.pad));
+    BUILD_BUG_ON(sizeof(((struct xen_domctl *)0)->u) !=
+                 sizeof(((struct xen_domctl *)0)->u.pad));
+    BUILD_BUG_ON(sizeof(((struct xen_sysctl *)0)->u) !=
+                 sizeof(((struct xen_sysctl *)0)->u.pad));
 
     BUILD_BUG_ON(sizeof(start_info_t) > PAGE_SIZE);
     BUILD_BUG_ON(sizeof(shared_info_t) > PAGE_SIZE);

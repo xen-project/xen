@@ -89,10 +89,6 @@ dmesg_help =   "dmesg [-c|--clear]               Read or clear Xen's message buf
 info_help =    "info                             Get information about the xen host"
 rename_help =  "rename <DomId> <New Name>        Rename a domain"
 log_help =     "log                              Print the xend log"
-sched_bvt_help = """sched-bvt <Parameters>           Set Borrowed Virtual Time scheduler
-                                    parameters"""
-sched_bvt_ctxallow_help = """sched-bvt-ctxallow <Allow>       Set the BVT scheduler context switch
-                                    allowance"""
 sched_sedf_help = "sched-sedf [DOM] [OPTIONS]       Show|Set simple EDF parameters\n" + \
 "              -p, --period          Relative deadline(ms).\n\
               -s, --slice           Worst-case execution time(ms)\n\
@@ -192,8 +188,6 @@ host_commands = [
 
 scheduler_commands = [
     "sched-credit",
-    "sched-bvt",
-    "sched-bvt-ctxallow",
     "sched-sedf",
     ]
 
@@ -671,18 +665,6 @@ def xm_domname(args):
 
     dom = server.xend.domain(name)
     print sxp.child_value(dom, 'name')
-
-def xm_sched_bvt(args):
-    arg_check(args, "sched-bvt", 6)
-    dom = args[0]
-    v = map(long, args[1:6])
-    server.xend.domain.cpu_bvt_set(dom, *v)
-
-def xm_sched_bvt_ctxallow(args):
-    arg_check(args, "sched-bvt-ctxallow", 1)
-
-    slice = int(args[0])
-    server.xend.node.cpu_bvt_slice_set(slice)
 
 def xm_sched_sedf(args):
     def ns_to_ms(val):
@@ -1209,8 +1191,6 @@ commands = {
     "log": xm_log,
     "serve": xm_serve,
     # scheduler
-    "sched-bvt": xm_sched_bvt,
-    "sched-bvt-ctxallow": xm_sched_bvt_ctxallow,
     "sched-sedf": xm_sched_sedf,
     "sched-credit": xm_sched_credit,
     # block

@@ -15,36 +15,36 @@ int
 xc_sched_credit_domain_set(
     int xc_handle,
     uint32_t domid,
-    struct sched_credit_adjdom *sdom)
+    struct xen_domctl_sched_credit *sdom)
 {
-    DECLARE_DOM0_OP;
+    DECLARE_DOMCTL;
 
-    op.cmd = DOM0_ADJUSTDOM;    
-    op.u.adjustdom.domain = (domid_t) domid;
-    op.u.adjustdom.sched_id = SCHED_CREDIT;
-    op.u.adjustdom.direction = SCHED_INFO_PUT;
-    op.u.adjustdom.u.credit = *sdom;
+    domctl.cmd = XEN_DOMCTL_scheduler_op;
+    domctl.domain = (domid_t) domid;
+    domctl.u.scheduler_op.sched_id = XEN_SCHEDULER_CREDIT;
+    domctl.u.scheduler_op.cmd = XEN_DOMCTL_SCHEDOP_putinfo;
+    domctl.u.scheduler_op.u.credit = *sdom;
 
-    return do_dom0_op(xc_handle, &op);
+    return do_domctl(xc_handle, &domctl);
 }
 
 int
 xc_sched_credit_domain_get(
     int xc_handle,
     uint32_t domid,
-    struct sched_credit_adjdom *sdom)
+    struct xen_domctl_sched_credit *sdom)
 {
-    DECLARE_DOM0_OP;
+    DECLARE_DOMCTL;
     int err;
 
-    op.cmd = DOM0_ADJUSTDOM;    
-    op.u.adjustdom.domain = (domid_t) domid;
-    op.u.adjustdom.sched_id = SCHED_CREDIT;
-    op.u.adjustdom.direction = SCHED_INFO_GET;
+    domctl.cmd = XEN_DOMCTL_scheduler_op;
+    domctl.domain = (domid_t) domid;
+    domctl.u.scheduler_op.sched_id = XEN_SCHEDULER_CREDIT;
+    domctl.u.scheduler_op.cmd = XEN_DOMCTL_SCHEDOP_getinfo;
 
-    err = do_dom0_op(xc_handle, &op);
+    err = do_domctl(xc_handle, &domctl);
     if ( err == 0 )
-        *sdom = op.u.adjustdom.u.credit;
+        *sdom = domctl.u.scheduler_op.u.credit;
 
     return err;
 }

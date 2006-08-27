@@ -10,14 +10,14 @@
 #include <xen/types.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
-#include <public/dom0_ops.h>
+#include <public/domctl.h>
+#include <public/sysctl.h>
 #include <xen/sched.h>
 #include <xen/event.h>
 #include <asm/pdb.h>
 #include <xen/trace.h>
 #include <xen/console.h>
 #include <xen/guest_access.h>
-#include <public/sched_ctl.h>
 #include <asm/vmx.h>
 #include <asm/dom_fw.h>
 #include <xen/iocap.h>
@@ -26,7 +26,8 @@
 void build_physmap_table(struct domain *d);
 
 extern unsigned long total_pages;
-long arch_do_dom0_op(dom0_op_t *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
+
+long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 {
     long ret = 0;
 
@@ -35,10 +36,10 @@ long arch_do_dom0_op(dom0_op_t *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
 
     switch ( op->cmd )
     {
-    case DOM0_GETMEMLIST:
+    case XEN_DOMCTL_getmemlist:
     {
         unsigned long i;
-        struct domain *d = find_domain_by_id(op->u.getmemlist.domain);
+        struct domain *d = find_domain_by_id(op->domain);
         unsigned long start_page = op->u.getmemlist.max_pfns >> 32;
         unsigned long nr_pages = op->u.getmemlist.max_pfns & 0xffffffff;
         unsigned long mfn;
@@ -64,39 +65,17 @@ long arch_do_dom0_op(dom0_op_t *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
         }
 
         op->u.getmemlist.num_pfns = i;
-        if (copy_to_guest(u_dom0_op, op, 1))
+        if (copy_to_guest(u_domctl, op, 1))
             ret = -EFAULT;
 
         put_domain(d);
     }
     break;
 
-    case DOM0_PHYSINFO:
+    case XEN_DOMCTL_arch_setup:
     {
-        dom0_physinfo_t *pi = &op->u.physinfo;
-
-        pi->threads_per_core =
-            cpus_weight(cpu_sibling_map[0]);
-        pi->cores_per_socket =
-            cpus_weight(cpu_core_map[0]) / pi->threads_per_core;
-        pi->sockets_per_node = 
-            num_online_cpus() / cpus_weight(cpu_core_map[0]);
-        pi->nr_nodes         = 1;
-        pi->total_pages      = total_pages; 
-        pi->free_pages       = avail_domheap_pages();
-        pi->cpu_khz          = local_cpu_data->proc_freq / 1000;
-        memset(pi->hw_cap, 0, sizeof(pi->hw_cap));
-        //memcpy(pi->hw_cap, boot_cpu_data.x86_capability, NCAPINTS*4);
-        ret = 0;
-        if ( copy_to_guest(u_dom0_op, op, 1) )
-            ret = -EFAULT;
-    }
-    break;
-
-    case DOM0_DOMAIN_SETUP:
-    {
-        dom0_domain_setup_t *ds = &op->u.domain_setup;
-        struct domain *d = find_domain_by_id(ds->domain);
+        xen_domctl_arch_setup_t *ds = &op->u.arch_setup;
+        struct domain *d = find_domain_by_id(op->domain);
 
         if ( d == NULL) {
             ret = -EINVAL;
@@ -113,7 +92,7 @@ long arch_do_dom0_op(dom0_op_t *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
             ds->xsi_va = d->arch.shared_info_va;
             ds->hypercall_imm = d->arch.breakimm;
             /* Copy back.  */
-            if ( copy_to_guest(u_dom0_op, op, 1) )
+            if ( copy_to_guest(u_domctl, op, 1) )
                 ret = -EFAULT;
         }
         else {
@@ -153,21 +132,21 @@ long arch_do_dom0_op(dom0_op_t *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
     }
     break;
 
-    case DOM0_SHADOW_CONTROL:
+    case XEN_DOMCTL_shadow_op:
     {
         struct domain *d; 
         ret = -ESRCH;
-        d = find_domain_by_id(op->u.shadow_control.domain);
+        d = find_domain_by_id(op->domain);
         if ( d != NULL )
         {
-            ret = shadow_mode_control(d, &op->u.shadow_control);
+            ret = shadow_mode_control(d, &op->u.shadow_op);
             put_domain(d);
-            copy_to_guest(u_dom0_op, op, 1);
+            copy_to_guest(u_domctl, op, 1);
         } 
     }
     break;
 
-    case DOM0_IOPORT_PERMISSION:
+    case XEN_DOMCTL_ioport_permission:
     {
         struct domain *d;
         unsigned int fp = op->u.ioport_permission.first_port;
@@ -175,7 +154,7 @@ long arch_do_dom0_op(dom0_op_t *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
         unsigned int lp = fp + np - 1;
 
         ret = -ESRCH;
-        d = find_domain_by_id(op->u.ioport_permission.domain);
+        d = find_domain_by_id(op->domain);
         if (unlikely(d == NULL))
             break;
 
@@ -192,7 +171,47 @@ long arch_do_dom0_op(dom0_op_t *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
     }
     break;
     default:
-        printf("arch_do_dom0_op: unrecognized dom0 op: %d!!!\n",op->cmd);
+        printf("arch_do_domctl: unrecognized domctl: %d!!!\n",op->cmd);
+        ret = -ENOSYS;
+
+    }
+
+    return ret;
+}
+
+long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
+{
+    long ret = 0;
+
+    if ( !IS_PRIV(current->domain) )
+        return -EPERM;
+
+    switch ( op->cmd )
+    {
+    case XEN_SYSCTL_physinfo:
+    {
+        xen_sysctl_physinfo_t *pi = &op->u.physinfo;
+
+        pi->threads_per_core =
+            cpus_weight(cpu_sibling_map[0]);
+        pi->cores_per_socket =
+            cpus_weight(cpu_core_map[0]) / pi->threads_per_core;
+        pi->sockets_per_node = 
+            num_online_cpus() / cpus_weight(cpu_core_map[0]);
+        pi->nr_nodes         = 1;
+        pi->total_pages      = total_pages; 
+        pi->free_pages       = avail_domheap_pages();
+        pi->cpu_khz          = local_cpu_data->proc_freq / 1000;
+        memset(pi->hw_cap, 0, sizeof(pi->hw_cap));
+        //memcpy(pi->hw_cap, boot_cpu_data.x86_capability, NCAPINTS*4);
+        ret = 0;
+        if ( copy_to_guest(u_sysctl, op, 1) )
+            ret = -EFAULT;
+    }
+    break;
+
+    default:
+        printf("arch_do_sysctl: unrecognized sysctl: %d!!!\n",op->cmd);
         ret = -ENOSYS;
 
     }

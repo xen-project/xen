@@ -395,7 +395,7 @@ static int xc_hvm_build_internal(int xc_handle,
                                  unsigned int store_evtchn,
                                  unsigned long *store_mfn)
 {
-    dom0_op_t launch_op, op;
+    struct xen_domctl launch_domctl, domctl;
     int rc, i;
     vcpu_guest_context_t st_ctxt, *ctxt = &st_ctxt;
     unsigned long nr_pages;
@@ -432,21 +432,21 @@ static int xc_hvm_build_internal(int xc_handle,
         return 1;
     }
 
-    op.cmd = DOM0_GETDOMAININFO;
-    op.u.getdomaininfo.domain = (domid_t)domid;
-    if ( (xc_dom0_op(xc_handle, &op) < 0) ||
-         ((uint16_t)op.u.getdomaininfo.domain != domid) )
+    domctl.cmd = XEN_DOMCTL_getdomaininfo;
+    domctl.domain = (domid_t)domid;
+    if ( (xc_domctl(xc_handle, &domctl) < 0) ||
+         ((uint16_t)domctl.domain != domid) )
     {
         PERROR("Could not get info on domain");
         goto error_out;
     }
 
     /* HVM domains must be put into shadow2 mode at the start of day */
-    if ( xc_shadow_control(xc_handle, domid, DOM0_SHADOW_CONTROL_OP_ENABLE,
+    if ( xc_shadow_control(xc_handle, domid, XEN_DOMCTL_SHADOW_OP_ENABLE,
                            NULL, 0, NULL, 
-                           DOM0_SHADOW_ENABLE_REFCOUNT  |
-                           DOM0_SHADOW_ENABLE_TRANSLATE |
-                           DOM0_SHADOW_ENABLE_EXTERNAL, 
+                           XEN_DOMCTL_SHADOW_ENABLE_REFCOUNT  |
+                           XEN_DOMCTL_SHADOW_ENABLE_TRANSLATE |
+                           XEN_DOMCTL_SHADOW_ENABLE_EXTERNAL, 
                            NULL) )
     {
         PERROR("Could not enable shadow paging for domain.\n");
@@ -457,7 +457,7 @@ static int xc_hvm_build_internal(int xc_handle,
 
     ctxt->flags = VGCF_HVM_GUEST;
     if ( setup_guest(xc_handle, domid, memsize, image, image_size, nr_pages,
-                     ctxt, op.u.getdomaininfo.shared_info_frame,
+                     ctxt, domctl.u.getdomaininfo.shared_info_frame,
                      vcpus, pae, acpi, apic, store_evtchn, store_mfn) < 0)
     {
         ERROR("Error constructing guest OS");
@@ -495,14 +495,14 @@ static int xc_hvm_build_internal(int xc_handle,
     ctxt->syscall_callback_eip  = 0;
 #endif
 
-    memset( &launch_op, 0, sizeof(launch_op) );
+    memset(&launch_domctl, 0, sizeof(launch_domctl));
 
-    launch_op.u.setvcpucontext.domain = (domid_t)domid;
-    launch_op.u.setvcpucontext.vcpu   = 0;
-    set_xen_guest_handle(launch_op.u.setvcpucontext.ctxt, ctxt);
+    launch_domctl.domain = (domid_t)domid;
+    launch_domctl.u.vcpucontext.vcpu   = 0;
+    set_xen_guest_handle(launch_domctl.u.vcpucontext.ctxt, ctxt);
 
-    launch_op.cmd = DOM0_SETVCPUCONTEXT;
-    rc = xc_dom0_op(xc_handle, &launch_op);
+    launch_domctl.cmd = XEN_DOMCTL_setvcpucontext;
+    rc = xc_domctl(xc_handle, &launch_domctl);
 
     return rc;
 

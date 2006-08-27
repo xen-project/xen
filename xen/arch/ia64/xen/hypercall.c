@@ -19,7 +19,8 @@
 
 #include <asm/vcpu.h>
 #include <asm/dom_fw.h>
-#include <public/dom0_ops.h>
+#include <public/domctl.h>
+#include <public/sysctl.h>
 #include <public/event_channel.h>
 #include <public/memory.h>
 #include <public/sched.h>
@@ -44,7 +45,7 @@ const hypercall_t ia64_hypercall_table[NR_hypercalls] =
 	(hypercall_t)do_ni_hypercall,		/* do_set_callbacks */
 	(hypercall_t)do_ni_hypercall,		/* do_fpu_taskswitch *//*  5 */
 	(hypercall_t)do_sched_op_compat,
-	(hypercall_t)do_dom0_op,
+	(hypercall_t)do_ni_hypercall,
 	(hypercall_t)do_ni_hypercall,		/* do_set_debugreg */
 	(hypercall_t)do_ni_hypercall,		/* do_get_debugreg */
 	(hypercall_t)do_ni_hypercall,		/* do_update_descriptor * 10 */
@@ -72,8 +73,8 @@ const hypercall_t ia64_hypercall_table[NR_hypercalls] =
 	(hypercall_t)do_event_channel_op,
 	(hypercall_t)do_physdev_op,
 	(hypercall_t)do_hvm_op,			/*  */
-	(hypercall_t)do_ni_hypercall,		/*  */                 /* 35 */
-	(hypercall_t)do_ni_hypercall,		/*  */
+	(hypercall_t)do_sysctl,			/*  */                  /* 35 */
+	(hypercall_t)do_domctl,			/*  */
 	(hypercall_t)do_ni_hypercall,		/*  */
 	(hypercall_t)do_ni_hypercall,		/*  */
 	(hypercall_t)do_ni_hypercall,		/*  */

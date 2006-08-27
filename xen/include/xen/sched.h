@@ -7,7 +7,7 @@
 #include <xen/spinlock.h>
 #include <xen/smp.h>
 #include <public/xen.h>
-#include <public/dom0_ops.h>
+#include <public/domctl.h>
 #include <public/vcpu.h>
 #include <xen/time.h>
 #include <xen/timer.h>
@@ -179,13 +179,24 @@ struct domain_setup_info
     unsigned long v_kernstart;
     unsigned long v_kernend;
     unsigned long v_kernentry;
+#define PAEKERN_no           0
+#define PAEKERN_yes          1
+#define PAEKERN_extended_cr3 2
+    unsigned int  pae_kernel;
     /* Initialised by loader: Private. */
     unsigned long elf_paddr_offset;
     unsigned int  load_symtab;
     unsigned long symtab_addr;
     unsigned long symtab_len;
-    /* Indicate whether it's xen specific image */
-    char *xen_section_string;
+    /*
+     * Only one of __elfnote_* or __xen_guest_string will be
+     * non-NULL.
+     *
+     * You should use the xen_elfnote_* accessors below in order to
+     * pickup the correct one and retain backwards compatibility.
+     */
+    void *__elfnote_section, *__elfnote_section_end;
+    char *__xen_guest_string;
 };
 
 extern struct vcpu *idle_vcpu[NR_CPUS];
@@ -232,7 +243,7 @@ extern int construct_dom0(
     unsigned long image_start, unsigned long image_len, 
     unsigned long initrd_start, unsigned long initrd_len,
     char *cmdline);
-extern int set_info_guest(struct domain *d, dom0_setvcpucontext_t *);
+extern int set_info_guest(struct domain *d, xen_domctl_vcpucontext_t *);
 
 struct domain *find_domain_by_id(domid_t dom);
 extern void domain_destroy(struct domain *d);
@@ -271,8 +282,7 @@ void scheduler_init(void);
 void schedulers_start(void);
 int  sched_init_vcpu(struct vcpu *);
 void sched_destroy_domain(struct domain *);
-long sched_ctl(struct sched_ctl_cmd *);
-long sched_adjdom(struct sched_adjdom_cmd *);
+long sched_adjust(struct domain *, struct xen_domctl_scheduler_op *);
 int  sched_id(void);
 void vcpu_wake(struct vcpu *d);
 void vcpu_sleep_nosync(struct vcpu *d);

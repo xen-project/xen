@@ -39,12 +39,6 @@ class SrvNode(SrvDir):
         val = self.xn.reboot()
         return val
 
-    def op_cpu_bvt_slice_set(self, _, req):
-        fn = FormFn(self.xn.cpu_bvt_slice_set,
-                    [['ctx_allow', 'int']])
-        val = fn(req.args, {})
-        return val
-    
     def render_POST(self, req):
         return self.perform(req)
 

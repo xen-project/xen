@@ -461,19 +461,6 @@ struct shadow2_walk_t
     mfn_t l1mfn;                /* MFN that the level 1 entry is in */
 };
 
-
-/* X86 error code bits:
- * These bits certainly ought to be defined somewhere other than here,
- * but until that place is determined, here they sit.
- *
- * "PFEC" == "Page Fault Error Code"
- */
-#define X86_PFEC_PRESENT            1  /* 0 == page was not present */
-#define X86_PFEC_WRITE_FAULT        2  /* 0 == reading, 1 == writing */
-#define X86_PFEC_SUPERVISOR_FAULT   4  /* 0 == supervisor-mode, 1 == user */
-#define X86_PFEC_RESERVED_BIT_FAULT 8  /* 1 == reserved bits set in pte */
-#define X86_PFEC_INSN_FETCH_FAULT  16  /* 0 == normal, 1 == instr'n fetch */
-
 /* macros for dealing with the naming of the internal function names of the
  * shadow code's external entry points.
  */

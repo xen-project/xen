@@ -29,6 +29,7 @@
 
 #define DEFINE_XEN_GUEST_HANDLE(name) __DEFINE_XEN_GUEST_HANDLE(name, name)
 #define XEN_GUEST_HANDLE(name)        __guest_handle_ ## name
+#define XEN_GUEST_HANDLE_64(name)     __guest_handle_ ## name
 #define set_xen_guest_handle(hnd, val) \
     do { \
         if (sizeof ((hnd).__pad)) \
@@ -41,6 +42,8 @@
 #endif
 
 #ifndef __ASSEMBLY__
+typedef uint64_t uint64_aligned_t;
+
 /* Guest handles for primitive C types. */
 __DEFINE_XEN_GUEST_HANDLE(uchar, unsigned char);
 __DEFINE_XEN_GUEST_HANDLE(uint,  unsigned int);

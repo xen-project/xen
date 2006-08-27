@@ -474,7 +474,7 @@ static int setup_guest(int xc_handle,
     struct xen_ia64_boot_param *bp;
     shared_info_t *shared_info;
     int i;
-    DECLARE_DOM0_OP;
+    DECLARE_DOMCTL;
     int rc;
 
     rc = probeimageformat(image, image_size, &load_funcs);
@@ -494,14 +494,13 @@ static int setup_guest(int xc_handle,
     start_info_mpa = (nr_pages - 3) << PAGE_SHIFT;
 
     /* Build firmware.  */
-    memset(&op.u.domain_setup, 0, sizeof(op.u.domain_setup));
-    op.u.domain_setup.flags = 0;
-    op.u.domain_setup.domain = (domid_t)dom;
-    op.u.domain_setup.bp = start_info_mpa + sizeof (start_info_t);
-    op.u.domain_setup.maxmem = (nr_pages - 3) << PAGE_SHIFT;
-    
-    op.cmd = DOM0_DOMAIN_SETUP;
-    if ( xc_dom0_op(xc_handle, &op) )
+    memset(&domctl.u.arch_setup, 0, sizeof(domctl.u.arch_setup));
+    domctl.u.arch_setup.flags = 0;
+    domctl.u.arch_setup.bp = start_info_mpa + sizeof (start_info_t);
+    domctl.u.arch_setup.maxmem = (nr_pages - 3) << PAGE_SHIFT;
+    domctl.cmd = XEN_DOMCTL_arch_setup;
+    domctl.domain = (domid_t)dom;
+    if ( xc_domctl(xc_handle, &domctl) )
         goto error_out;
 
     start_page = dsi.v_start >> PAGE_SHIFT;
@@ -655,12 +654,14 @@ static int setup_guest(int xc_handle,
                        uint32_t required_features[XENFEAT_NR_SUBMAPS])
 {
     xen_pfn_t *page_array = NULL;
-    unsigned long count, i, hypercall_pfn;
+    unsigned long count, i;
+    unsigned long long hypercall_page;
+    int hypercall_page_defined;
     start_info_t *start_info;
     shared_info_t *shared_info;
     xc_mmu_t *mmu = NULL;
-    char *p;
-    DECLARE_DOM0_OP;
+    const char *p;
+    DECLARE_DOMCTL;
     int rc;
 
     unsigned long nr_pt_pages;
@@ -704,12 +705,9 @@ static int setup_guest(int xc_handle,
         goto error_out;
 
     /* Parse and validate kernel features. */
-    p = strstr(dsi.xen_guest_string, "FEATURES=");
-    if ( p != NULL )
+    if ( (p = xen_elfnote_string(&dsi, XEN_ELFNOTE_FEATURES)) != NULL )
     {
-        if ( !parse_features(p + strlen("FEATURES="),
-                             supported_features,
-                             required_features) )
+        if ( !parse_features(p, supported_features, required_features) )
         {
             ERROR("Failed to parse guest kernel features.");
             goto error_out;
@@ -967,7 +965,7 @@ static int setup_guest(int xc_handle,
 
         /* Enable shadow translate mode */
         if ( xc_shadow_control(xc_handle, dom,
-                               DOM0_SHADOW_CONTROL_OP_ENABLE_TRANSLATE,
+                               XEN_DOMCTL_SHADOW_OP_ENABLE_TRANSLATE,
                                NULL, 0, NULL, 0, NULL) < 0 )
         {
             PERROR("Could not enable translation mode");
@@ -1071,18 +1069,18 @@ static int setup_guest(int xc_handle,
     if ( xc_finish_mmu_updates(xc_handle, mmu) )
         goto error_out;
 
-    p = strstr(dsi.xen_guest_string, "HYPERCALL_PAGE=");
-    if ( p != NULL )
+    hypercall_page = xen_elfnote_numeric(&dsi, XEN_ELFNOTE_HYPERCALL_PAGE,
+                                         &hypercall_page_defined);
+    if ( hypercall_page_defined )
     {
-        p += strlen("HYPERCALL_PAGE=");
-        hypercall_pfn = strtoul(p, NULL, 16);
-        if ( hypercall_pfn >= nr_pages )
+        unsigned long long pfn = (hypercall_page - dsi.v_start) >> PAGE_SHIFT;
+        if ( pfn >= nr_pages )
             goto error_out;
-        op.u.hypercall_init.domain = (domid_t)dom;
-        op.u.hypercall_init.gmfn   = shadow_mode_enabled ?
-            hypercall_pfn : page_array[hypercall_pfn];
-        op.cmd = DOM0_HYPERCALL_INIT;
-        if ( xc_dom0_op(xc_handle, &op) )
+        domctl.domain = (domid_t)dom;
+        domctl.u.hypercall_init.gmfn   = shadow_mode_enabled ?
+            pfn : page_array[pfn];
+        domctl.cmd = XEN_DOMCTL_hypercall_init;
+        if ( xc_domctl(xc_handle, &domctl) )
             goto error_out;
     }
 
@@ -1115,8 +1113,8 @@ static int xc_linux_build_internal(int xc_handle,
                                    unsigned int console_evtchn,
                                    unsigned long *console_mfn)
 {
-    dom0_op_t launch_op;
-    DECLARE_DOM0_OP;
+    struct xen_domctl launch_domctl;
+    DECLARE_DOMCTL;
     int rc, i;
     vcpu_guest_context_t st_ctxt, *ctxt = &st_ctxt;
     unsigned long nr_pages;
@@ -1148,10 +1146,10 @@ static int xc_linux_build_internal(int xc_handle,
         return 1;
     }
 
-    op.cmd = DOM0_GETDOMAININFO;
-    op.u.getdomaininfo.domain = (domid_t)domid;
-    if ( (xc_dom0_op(xc_handle, &op) < 0) ||
-         ((uint16_t)op.u.getdomaininfo.domain != domid) )
+    domctl.cmd = XEN_DOMCTL_getdomaininfo;
+    domctl.domain = (domid_t)domid;
+    if ( (xc_domctl(xc_handle, &domctl) < 0) ||
+         ((uint16_t)domctl.domain != domid) )
     {
         PERROR("Could not get info on domain");
         goto error_out;
@@ -1164,7 +1162,7 @@ static int xc_linux_build_internal(int xc_handle,
                      nr_pages,
                      &vstartinfo_start, &vkern_entry,
                      &vstack_start, ctxt, cmdline,
-                     op.u.getdomaininfo.shared_info_frame,
+                     domctl.u.getdomaininfo.shared_info_frame,
                      flags, store_evtchn, store_mfn,
                      console_evtchn, console_mfn,
                      features_bitmap) < 0 )
@@ -1240,14 +1238,14 @@ static int xc_linux_build_internal(int xc_handle,
 #endif
 #endif /* x86 */
 
-    memset( &launch_op, 0, sizeof(launch_op) );
+    memset( &launch_domctl, 0, sizeof(launch_domctl) );
 
-    launch_op.u.setvcpucontext.domain = (domid_t)domid;
-    launch_op.u.setvcpucontext.vcpu   = 0;
-    set_xen_guest_handle(launch_op.u.setvcpucontext.ctxt, ctxt);
+    launch_domctl.domain = (domid_t)domid;
+    launch_domctl.u.vcpucontext.vcpu   = 0;
+    set_xen_guest_handle(launch_domctl.u.vcpucontext.ctxt, ctxt);
 
-    launch_op.cmd = DOM0_SETVCPUCONTEXT;
-    rc = xc_dom0_op(xc_handle, &launch_op);
+    launch_domctl.cmd = XEN_DOMCTL_setvcpucontext;
+    rc = xc_domctl(xc_handle, &launch_domctl);
 
     return rc;
 

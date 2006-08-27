@@ -60,7 +60,7 @@ static int xc_ia64_shadow_control(int xc_handle,
                                   unsigned int sop,
                                   unsigned long *dirty_bitmap,
                                   unsigned long pages,
-                                  xc_shadow_control_stats_t *stats)
+                                  xc_shadow_op_stats_t *stats)
 {
     if (dirty_bitmap != NULL && pages > 0) {
         int i;
@@ -137,7 +137,7 @@ int
 xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
               uint32_t max_factor, uint32_t flags, int (*suspend)(int))
 {
-    DECLARE_DOM0_OP;
+    DECLARE_DOMCTL;
     xc_dominfo_t info;
 
     int rc = 1;
@@ -242,15 +242,15 @@ xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         }
     }
 
-    op.cmd = DOM0_DOMAIN_SETUP;
-    op.u.domain_setup.domain = (domid_t)dom;
-    op.u.domain_setup.flags = XEN_DOMAINSETUP_query;
-    if (xc_dom0_op(xc_handle, &op) < 0) {
+    domctl.cmd = XEN_DOMCTL_arch_setup;
+    domctl.domain = (domid_t)dom;
+    domctl.u.arch_setup.flags = XEN_DOMAINSETUP_query;
+    if (xc_domctl(xc_handle, &domctl) < 0) {
         ERR("Could not get domain setup");
         goto out;
     }
-    op.u.domain_setup.domain = 0;
-    if (!write_exact(io_fd, &op.u.domain_setup, sizeof(op.u.domain_setup))) {
+    if (!write_exact(io_fd, &domctl.u.arch_setup,
+                     sizeof(domctl.u.arch_setup))) {
         ERR("write: domain setup");
         goto out;
     }
@@ -259,7 +259,7 @@ xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     if (live) {
 
         if (xc_ia64_shadow_control(xc_handle, dom,
-                                   DOM0_SHADOW_CONTROL_OP_ENABLE_LOGDIRTY,
+                                   XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY,
                                    NULL, 0, NULL ) < 0) {
             ERR("Couldn't enable shadow mode");
             goto out;
@@ -324,7 +324,7 @@ xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
            but this is fast enough for the moment. */
         if (!last_iter) {
             if (xc_ia64_shadow_control(xc_handle, dom,
-                                       DOM0_SHADOW_CONTROL_OP_PEEK,
+                                       XEN_DOMCTL_SHADOW_OP_PEEK,
                                        to_skip, max_pfn, NULL) != max_pfn) {
                 ERR("Error peeking shadow bitmap");
                 goto out;
@@ -392,7 +392,7 @@ xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
             /* Pages to be sent are pages which were dirty.  */
             if (xc_ia64_shadow_control(xc_handle, dom,
-                                       DOM0_SHADOW_CONTROL_OP_CLEAN,
+                                       XEN_DOMCTL_SHADOW_OP_CLEAN,
                                        to_send, max_pfn, NULL ) != max_pfn) {
                 ERR("Error flushing shadow PT");
                 goto out;
@@ -481,7 +481,7 @@ xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
  out:
 
     if (live) {
-        if (xc_ia64_shadow_control(xc_handle, dom, DOM0_SHADOW_CONTROL_OP_OFF,
+        if (xc_ia64_shadow_control(xc_handle, dom, XEN_DOMCTL_SHADOW_OP_OFF,
                                    NULL, 0, NULL ) < 0) {
             DPRINTF("Warning - couldn't disable shadow mode");
         }

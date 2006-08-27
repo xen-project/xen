@@ -11,12 +11,12 @@
 int xc_get_pfn_type_batch(int xc_handle,
                           uint32_t dom, int num, unsigned long *arr)
 {
-    DECLARE_DOM0_OP;
-    op.cmd = DOM0_GETPAGEFRAMEINFO2;
-    op.u.getpageframeinfo2.domain = (domid_t)dom;
-    op.u.getpageframeinfo2.num    = num;
-    set_xen_guest_handle(op.u.getpageframeinfo2.array, arr);
-    return do_dom0_op(xc_handle, &op);
+    DECLARE_DOMCTL;
+    domctl.cmd = XEN_DOMCTL_getpageframeinfo2;
+    domctl.domain = (domid_t)dom;
+    domctl.u.getpageframeinfo2.num    = num;
+    set_xen_guest_handle(domctl.u.getpageframeinfo2.array, arr);
+    return do_domctl(xc_handle, &domctl);
 }
 
 #define GETPFN_ERR (~0U)
@@ -24,16 +24,16 @@ unsigned int get_pfn_type(int xc_handle,
                           unsigned long mfn,
                           uint32_t dom)
 {
-    DECLARE_DOM0_OP;
-    op.cmd = DOM0_GETPAGEFRAMEINFO;
-    op.u.getpageframeinfo.gmfn   = mfn;
-    op.u.getpageframeinfo.domain = (domid_t)dom;
-    if ( do_dom0_op(xc_handle, &op) < 0 )
+    DECLARE_DOMCTL;
+    domctl.cmd = XEN_DOMCTL_getpageframeinfo;
+    domctl.u.getpageframeinfo.gmfn   = mfn;
+    domctl.domain = (domid_t)dom;
+    if ( do_domctl(xc_handle, &domctl) < 0 )
     {
         PERROR("Unexpected failure when getting page frame info!");
         return GETPFN_ERR;
     }
-    return op.u.getpageframeinfo.type;
+    return domctl.u.getpageframeinfo.type;
 }
 
 int xc_mmuext_op(
@@ -248,17 +248,17 @@ int xc_memory_op(int xc_handle,
 
 long long xc_domain_get_cpu_usage( int xc_handle, domid_t domid, int vcpu )
 {
-    DECLARE_DOM0_OP;
+    DECLARE_DOMCTL;
 
-    op.cmd = DOM0_GETVCPUINFO;
-    op.u.getvcpuinfo.domain = (domid_t)domid;
-    op.u.getvcpuinfo.vcpu   = (uint16_t)vcpu;
-    if ( (do_dom0_op(xc_handle, &op) < 0) )
+    domctl.cmd = XEN_DOMCTL_getvcpuinfo;
+    domctl.domain = (domid_t)domid;
+    domctl.u.getvcpuinfo.vcpu   = (uint16_t)vcpu;
+    if ( (do_domctl(xc_handle, &domctl) < 0) )
     {
         PERROR("Could not get info on domain");
         return -1;
     }
-    return op.u.getvcpuinfo.cpu_time;
+    return domctl.u.getvcpuinfo.cpu_time;
 }
 
 
@@ -268,12 +268,12 @@ int xc_get_pfn_list(int xc_handle,
                     xen_pfn_t *pfn_buf,
                     unsigned long max_pfns)
 {
-    DECLARE_DOM0_OP;
+    DECLARE_DOMCTL;
     int ret;
-    op.cmd = DOM0_GETMEMLIST;
-    op.u.getmemlist.domain   = (domid_t)domid;
-    op.u.getmemlist.max_pfns = max_pfns;
-    set_xen_guest_handle(op.u.getmemlist.buffer, pfn_buf);
+    domctl.cmd = XEN_DOMCTL_getmemlist;
+    domctl.domain   = (domid_t)domid;
+    domctl.u.getmemlist.max_pfns = max_pfns;
+    set_xen_guest_handle(domctl.u.getmemlist.buffer, pfn_buf);
 
 #ifdef VALGRIND
     memset(pfn_buf, 0, max_pfns * sizeof(xen_pfn_t));
@@ -285,7 +285,7 @@ int xc_get_pfn_list(int xc_handle,
         return -1;
     }
 
-    ret = do_dom0_op(xc_handle, &op);
+    ret = do_domctl(xc_handle, &domctl);
 
     safe_munlock(pfn_buf, max_pfns * sizeof(xen_pfn_t));
 
@@ -294,7 +294,7 @@ int xc_get_pfn_list(int xc_handle,
     DPRINTF(("Ret for xc_get_pfn_list is %d\n", ret));
     if (ret >= 0) {
         int i, j;
-        for (i = 0; i < op.u.getmemlist.num_pfns; i += 16) {
+        for (i = 0; i < domctl.u.getmemlist.num_pfns; i += 16) {
             DPRINTF("0x%x: ", i);
             for (j = 0; j < 16; j++)
                 DPRINTF("0x%lx ", pfn_buf[i + j]);
@@ -304,17 +304,17 @@ int xc_get_pfn_list(int xc_handle,
 #endif
 #endif
 
-    return (ret < 0) ? -1 : op.u.getmemlist.num_pfns;
+    return (ret < 0) ? -1 : domctl.u.getmemlist.num_pfns;
 }
 #endif
 
 long xc_get_tot_pages(int xc_handle, uint32_t domid)
 {
-    DECLARE_DOM0_OP;
-    op.cmd = DOM0_GETDOMAININFO;
-    op.u.getdomaininfo.domain = (domid_t)domid;
-    return (do_dom0_op(xc_handle, &op) < 0) ?
-        -1 : op.u.getdomaininfo.tot_pages;
+    DECLARE_DOMCTL;
+    domctl.cmd = XEN_DOMCTL_getdomaininfo;
+    domctl.domain = (domid_t)domid;
+    return (do_domctl(xc_handle, &domctl) < 0) ?
+        -1 : domctl.u.getdomaininfo.tot_pages;
 }
 
 int xc_copy_to_domain_page(int xc_handle,
@@ -386,9 +386,14 @@ void xc_map_memcpy(unsigned long dst, const char *src, unsigned long size,
     }
 }
 
-int xc_dom0_op(int xc_handle, dom0_op_t *op)
+int xc_domctl(int xc_handle, struct xen_domctl *domctl)
 {
-    return do_dom0_op(xc_handle, op);
+    return do_domctl(xc_handle, domctl);
+}
+
+int xc_sysctl(int xc_handle, struct xen_sysctl *sysctl)
+{
+    return do_sysctl(xc_handle, sysctl);
 }
 
 int xc_version(int xc_handle, int cmd, void *arg)

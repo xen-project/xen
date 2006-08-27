@@ -554,7 +554,7 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
     unsigned long page_array[2];
     shared_iopage_t *sp;
     unsigned long dom_memsize = (memsize << 20);
-    DECLARE_DOM0_OP;
+    DECLARE_DOMCTL;
 
     if ((image_size > 12 * MEM_M) || (image_size & (PAGE_SIZE - 1))) {
         PERROR("Guest firmware size is incorrect [%ld]?", image_size);
@@ -562,13 +562,12 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
     }
 
     /* This will creates the physmap.  */
-    op.u.domain_setup.flags = XEN_DOMAINSETUP_hvm_guest;
-    op.u.domain_setup.domain = (domid_t)dom;
-    op.u.domain_setup.bp = 0;
-    op.u.domain_setup.maxmem = 0;
-    
-    op.cmd = DOM0_DOMAIN_SETUP;
-    if (xc_dom0_op(xc_handle, &op))
+    domctl.u.arch_setup.flags = XEN_DOMAINSETUP_hvm_guest;
+    domctl.u.arch_setup.bp = 0;
+    domctl.u.arch_setup.maxmem = 0;
+    domctl.cmd = XEN_DOMCTL_arch_setup;
+    domctl.domain = (domid_t)dom;
+    if (xc_domctl(xc_handle, &domctl))
         goto error_out;
 
     /* Load guest firmware */
@@ -618,7 +617,7 @@ xc_hvm_build(int xc_handle, uint32_t domid, int memsize,
              unsigned int acpi, unsigned int apic, unsigned int store_evtchn,
              unsigned long *store_mfn)
 {
-    dom0_op_t launch_op, op;
+    struct xen_domctl launch_domctl, domctl;
     int rc;
     vcpu_guest_context_t st_ctxt, *ctxt = &st_ctxt;
     char *image = NULL;
@@ -644,10 +643,10 @@ xc_hvm_build(int xc_handle, uint32_t domid, int memsize,
         return 1;
     }
 
-    op.cmd = DOM0_GETDOMAININFO;
-    op.u.getdomaininfo.domain = (domid_t)domid;
-    if (do_dom0_op(xc_handle, &op) < 0 ||
-        (uint16_t)op.u.getdomaininfo.domain != domid) {
+    domctl.cmd = XEN_DOMCTL_getdomaininfo;
+    domctl.domain = (domid_t)domid;
+    if (do_domctl(xc_handle, &domctl) < 0 ||
+        (uint16_t)domctl.domain != domid) {
         PERROR("Could not get info on domain");
         goto error_out;
     }
@@ -664,14 +663,14 @@ xc_hvm_build(int xc_handle, uint32_t domid, int memsize,
 
     ctxt->user_regs.cr_iip = 0x80000000ffffffb0UL;
 
-    memset(&launch_op, 0, sizeof(launch_op));
+    memset(&launch_domctl, 0, sizeof(launch_domctl));
 
-    launch_op.u.setvcpucontext.domain = (domid_t)domid;
-    launch_op.u.setvcpucontext.vcpu = 0;
-    set_xen_guest_handle(launch_op.u.setvcpucontext.ctxt, ctxt);
+    launch_domctl.domain = (domid_t)domid;
+    launch_domctl.u.vcpucontext.vcpu = 0;
+    set_xen_guest_handle(launch_domctl.u.vcpucontext.ctxt, ctxt);
 
-    launch_op.cmd = DOM0_SETVCPUCONTEXT;
-    rc = do_dom0_op(xc_handle, &launch_op);
+    launch_domctl.cmd = XEN_DOMCTL_setvcpucontext;
+    rc = do_domctl(xc_handle, &launch_domctl);
     return rc;
 
 error_out:

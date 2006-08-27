@@ -11,7 +11,6 @@ XEN_ROOT = ../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 CTRL_SRCS-y       :=
-CTRL_SRCS-y       += xc_bvtsched.c
 CTRL_SRCS-y       += xc_core.c
 CTRL_SRCS-y       += xc_domain.c
 CTRL_SRCS-y       += xc_evtchn.c

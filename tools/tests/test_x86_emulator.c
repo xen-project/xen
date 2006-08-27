@@ -15,6 +15,8 @@ typedef int64_t            s64;
 #include <asm-x86/x86_emulate.h>
 #include <sys/mman.h>
 
+#define PFEC_write_access (1U<<1)
+
 static int read_any(
     unsigned long addr,
     unsigned long *val,
@@ -105,6 +107,7 @@ int main(int argc, char **argv)
     regs.eflags = 0x200;
     regs.eip    = (unsigned long)&instr[0];
     regs.ecx    = 0x12345678;
+    regs.error_code = PFEC_write_access;
     ctxt.cr2    = (unsigned long)res;
     *res        = 0x7FFFFFFF;
     rc = x86_emulate_memop(&ctxt, &emulops);
@@ -125,6 +128,7 @@ int main(int argc, char **argv)
     regs.ecx    = 0x12345678UL;
 #endif
     ctxt.cr2    = (unsigned long)res;
+    regs.error_code = 0;
     rc = x86_emulate_memop(&ctxt, &emulops);
     if ( (rc != 0) || 
          (*res != 0x92345677) || 
@@ -139,6 +143,7 @@ int main(int argc, char **argv)
     regs.eip    = (unsigned long)&instr[0];
     regs.ecx    = ~0UL;
     ctxt.cr2    = (unsigned long)res;
+    regs.error_code = 0;
     rc = x86_emulate_memop(&ctxt, &emulops);
     if ( (rc != 0) || 
          (*res != 0x92345677) || 
@@ -154,6 +159,7 @@ int main(int argc, char **argv)
     regs.eax    = 0x92345677UL;
     regs.ecx    = 0xAA;
     ctxt.cr2    = (unsigned long)res;
+    regs.error_code = PFEC_write_access;
     rc = x86_emulate_memop(&ctxt, &emulops);
     if ( (rc != 0) || 
          (*res != 0x923456AA) || 
@@ -170,6 +176,7 @@ int main(int argc, char **argv)
     regs.eax    = 0xAABBCC77UL;
     regs.ecx    = 0xFF;
     ctxt.cr2    = (unsigned long)res;
+    regs.error_code = PFEC_write_access;
     rc = x86_emulate_memop(&ctxt, &emulops);
     if ( (rc != 0) || 
          (*res != 0x923456AA) || 
@@ -186,6 +193,7 @@ int main(int argc, char **argv)
     regs.eip    = (unsigned long)&instr[0];
     regs.ecx    = 0x12345678;
     ctxt.cr2    = (unsigned long)res;
+    regs.error_code = PFEC_write_access;
     rc = x86_emulate_memop(&ctxt, &emulops);
     if ( (rc != 0) || 
          (*res != 0x12345678) || 
@@ -203,6 +211,7 @@ int main(int argc, char **argv)
     regs.eax    = 0x923456AAUL;
     regs.ecx    = 0xDDEEFF00L;
     ctxt.cr2    = (unsigned long)res;
+    regs.error_code = PFEC_write_access;
     rc = x86_emulate_memop(&ctxt, &emulops);
     if ( (rc != 0) || 
          (*res != 0xDDEEFF00) || 
@@ -240,6 +249,7 @@ int main(int argc, char **argv)
     regs.eip    = (unsigned long)&instr[0];
     regs.edi    = (unsigned long)res;
     ctxt.cr2    = regs.edi;
+    regs.error_code = PFEC_write_access;
     rc = x86_emulate_memop(&ctxt, &emulops);
     if ( (rc != 0) || 
          (*res != 0x2233445D) ||
@@ -261,6 +271,7 @@ int main(int argc, char **argv)
     regs.eip    = (unsigned long)&instr[0];
     regs.edi    = (unsigned long)res;
     ctxt.cr2    = regs.edi;
+    regs.error_code = PFEC_write_access;
     rc = x86_emulate_memop(&ctxt, &emulops);
     if ( (rc != 0) || 
          (res[0] != 0x9999AAAA) ||
@@ -275,6 +286,7 @@ int main(int argc, char **argv)
     regs.eip    = (unsigned long)&instr[0];
     regs.edi    = (unsigned long)res;
     ctxt.cr2    = regs.edi;
+    regs.error_code = PFEC_write_access;
     rc = x86_emulate_memop(&ctxt, &emulops);
     if ( (rc != 0) || 
          (res[0] != 0x9999AAAA) ||
@@ -292,6 +304,7 @@ int main(int argc, char **argv)
     regs.ecx    = 0x12345678;
     ctxt.cr2    = (unsigned long)res;
     *res        = 0x82;
+    regs.error_code = 0;
     rc = x86_emulate_memop(&ctxt, &emulops);
     if ( (rc != 0) ||
          (*res != 0x82) ||
@@ -307,6 +320,7 @@ int main(int argc, char **argv)
     regs.ecx    = 0x12345678;
     ctxt.cr2    = (unsigned long)res;
     *res        = 0x1234aa82;
+    regs.error_code = 0;
     rc = x86_emulate_memop(&ctxt, &emulops);
     if ( (rc != 0) ||
          (*res != 0x1234aa82) ||

@@ -33,7 +33,7 @@ int
 xc_ia64_get_pfn_list(int xc_handle, uint32_t domid, xen_pfn_t *pfn_buf,
                      unsigned int start_page, unsigned int nr_pages)
 {
-    dom0_op_t op;
+    struct xen_domctl domctl;
     int num_pfns,ret;
     unsigned int __start_page, __nr_pages;
     unsigned long max_pfns;
@@ -45,11 +45,11 @@ xc_ia64_get_pfn_list(int xc_handle, uint32_t domid, xen_pfn_t *pfn_buf,
   
     while (__nr_pages) {
         max_pfns = ((unsigned long)__start_page << 32) | __nr_pages;
-        op.cmd = DOM0_GETMEMLIST;
-        op.u.getmemlist.domain   = (domid_t)domid;
-        op.u.getmemlist.max_pfns = max_pfns;
-        op.u.getmemlist.num_pfns = 0;
-        set_xen_guest_handle(op.u.getmemlist.buffer, __pfn_buf);
+        domctl.cmd = XEN_DOMCTL_getmemlist;
+        domctl.domain   = (domid_t)domid;
+        domctl.u.getmemlist.max_pfns = max_pfns;
+        domctl.u.getmemlist.num_pfns = 0;
+        set_xen_guest_handle(domctl.u.getmemlist.buffer, __pfn_buf);
 
         if ((max_pfns != -1UL)
             && mlock(__pfn_buf, __nr_pages * sizeof(xen_pfn_t)) != 0) {
@@ -57,7 +57,7 @@ xc_ia64_get_pfn_list(int xc_handle, uint32_t domid, xen_pfn_t *pfn_buf,
             return -1;
         }
 
-        ret = do_dom0_op(xc_handle, &op);
+        ret = do_domctl(xc_handle, &domctl);
 
         if (max_pfns != -1UL)
             (void)munlock(__pfn_buf, __nr_pages * sizeof(xen_pfn_t));
@@ -65,7 +65,7 @@ xc_ia64_get_pfn_list(int xc_handle, uint32_t domid, xen_pfn_t *pfn_buf,
         if (max_pfns == -1UL)
             return 0;
         
-        num_pfns = op.u.getmemlist.num_pfns;
+        num_pfns = domctl.u.getmemlist.num_pfns;
         __start_page += num_pfns;
         __nr_pages -= num_pfns;
         __pfn_buf += num_pfns;
@@ -89,10 +89,10 @@ xc_get_pfn_list(int xc_handle, uint32_t domid, xen_pfn_t *pfn_buf,
 long
 xc_get_max_pages(int xc_handle, uint32_t domid)
 {
-    dom0_op_t op;
-    op.cmd = DOM0_GETDOMAININFO;
-    op.u.getdomaininfo.domain = (domid_t)domid;
-    return (do_dom0_op(xc_handle, &op) < 0) ? -1 : op.u.getdomaininfo.max_pages;
+    struct xen_domctl domctl;
+    domctl.cmd = XEN_DOMCTL_getdomaininfo;
+    domctl.domain = (domid_t)domid;
+    return (do_domctl(xc_handle, &domctl) < 0) ? -1 : domctl.u.getdomaininfo.max_pages;
 }
 
 /*

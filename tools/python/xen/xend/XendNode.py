@@ -39,12 +39,6 @@ class XendNode:
     def notify(self, _):
         return 0
     
-    def cpu_bvt_slice_set(self, ctx_allow):
-        return self.xc.bvtsched_global_set(ctx_allow)
-
-    def cpu_bvt_slice_get(self):
-        return self.xc.bvtsched_global_get()
-    
     def info(self):
         return (self.nodeinfo() + self.physinfo() + self.xeninfo() +
                 self.xendinfo())

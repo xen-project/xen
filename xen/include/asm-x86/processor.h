@@ -130,11 +130,11 @@
 #define TF_kernel_mode         (1<<_TF_kernel_mode)
 
 /* #PF error code values. */
-#define PGERR_page_present   (1U<<0)
-#define PGERR_write_access   (1U<<1)
-#define PGERR_user_mode      (1U<<2)
-#define PGERR_reserved_bit   (1U<<3)
-#define PGERR_instr_fetch    (1U<<4)
+#define PFEC_page_present   (1U<<0)
+#define PFEC_write_access   (1U<<1)
+#define PFEC_user_mode      (1U<<2)
+#define PFEC_reserved_bit   (1U<<3)
+#define PFEC_insn_fetch     (1U<<4)
 
 #ifndef __ASSEMBLY__
 
