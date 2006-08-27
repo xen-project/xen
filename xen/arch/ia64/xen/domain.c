@@ -615,7 +615,7 @@ domain_set_shared_info_va (unsigned long va)
 /* Transfer and clear the shadow bitmap in 1kB chunks for L1 cache. */
 #define SHADOW_COPY_CHUNK (1024 / sizeof (unsigned long))
 
-int shadow_mode_control(struct domain *d, xen_domctl_shadow_ops_t *sc)
+int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc)
 {
 	unsigned int op = sc->op;
 	int          rc = 0;
@@ -740,10 +740,10 @@ int shadow_mode_control(struct domain *d, xen_domctl_shadow_ops_t *sc)
 		}
 		break;
 	}
-	case DOM0_SHADOW_CONTROL_OP_GET_ALLOCATION:
+	case XEN_DOMCTL_SHADOW_OP_GET_ALLOCATION:
 		sc->mb = 0;
 		break;
-	case DOM0_SHADOW_CONTROL_OP_SET_ALLOCATION:
+	case XEN_DOMCTL_SHADOW_OP_SET_ALLOCATION:
 		if (sc->mb > 0) {
 			BUG();
 			rc = -ENOMEM;
