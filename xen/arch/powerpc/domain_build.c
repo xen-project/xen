@@ -30,6 +30,8 @@
 #include <asm/papr.h>
 #include "oftree.h"
 
+#define log2(x) ffz(~(x))
+
 extern int parseelfimage_32(struct domain_setup_info *dsi);
 extern int loadelfimage_32(struct domain_setup_info *dsi);
 
@@ -109,8 +111,10 @@ int construct_dom0(struct domain *d,
     struct domain_setup_info dsi;
     ulong dst;
     u64 *ofh_tree;
+    uint rma_nrpages = 1 << d->arch.rma_order;
     ulong rma_sz = rma_size(d->arch.rma_order);
     ulong rma = page_to_maddr(d->arch.rma_page);
+    uint htab_order;
     start_info_t *si;
     ulong eomem;
     int am64 = 1;
@@ -151,13 +155,36 @@ int construct_dom0(struct domain *d,
     /* By default DOM0 is allocated all available memory. */
     d->max_pages = ~0U;
 
+    /* default is the max(1/16th of memory, CONFIG_MIN_DOM0_PAGES) */
     if (dom0_nrpages == 0) {
-        dom0_nrpages = 1UL << d->arch.rma_order;
+        dom0_nrpages = total_pages >> 4;
+
+        if (dom0_nrpages < CONFIG_MIN_DOM0_PAGES)
+            dom0_nrpages = CONFIG_MIN_DOM0_PAGES;
     }
+
+    /* make sure we are at least as big as the RMA */
+    if (dom0_nrpages < rma_nrpages)
+        dom0_nrpages = rma_nrpages;
+    else
+        dom0_nrpages = allocate_extents(d, dom0_nrpages, rma_nrpages);
 
     d->tot_pages = dom0_nrpages;
     ASSERT(d->tot_pages > 0);
     
+    htab_order = log2(d->tot_pages) - 6;
+    if (d->arch.htab.order > 0) {
+        /* we incorrectly allocate this too early so lets adjust if
+         * necessary */
+        printk("WARNING: htab allocated to early\n");
+        if (d->arch.htab.order < htab_order) {
+            printk("WARNING: htab reallocated for more memory: 0x%x\n",
+                htab_order);
+            htab_free(d);
+            htab_alloc(d, htab_order);
+        }
+    }
+
     ASSERT( image_len < rma_sz );
 
     si = (start_info_t *)(rma_addr(&d->arch, RMA_START_INFO) + rma);
@@ -276,7 +303,7 @@ int construct_dom0(struct domain *d,
 
     printk("DOM: pc = 0x%lx, r2 = 0x%lx\n", pc, r2);
 
-    ofd_dom0_fixup(d, *ofh_tree + rma, si, dst - rma);
+    ofd_dom0_fixup(d, *ofh_tree + rma, si);
 
     set_bit(_VCPUF_initialised, &v->vcpu_flags);
 

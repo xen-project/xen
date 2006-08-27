@@ -47,6 +47,8 @@ extern char __bss_start[];
 /* this should be per processor, but for now */
 #define CACHE_LINE_SIZE 128
 
+/* 256M - 64M of Xen space seems like a nice number */
+#define CONFIG_MIN_DOM0_PAGES (192 << (20 - PAGE_SHIFT))
 #define CONFIG_SHADOW 1
 #define CONFIG_GDB 1
 #define CONFIG_SMP 1

@@ -49,6 +49,10 @@ static struct rma_settings rma_orders[] = {
     { .order = 38, .rmlr0 = 0, .rmlr12 = 0, }, /* 256 GB */
 };
 
+static uint log_large_page_sizes[] = {
+    4 + 20, /* (1 << 4) == 16M */
+};
+
 static struct rma_settings *cpu_find_rma(unsigned int order)
 {
     int i;
@@ -66,14 +70,20 @@ unsigned int cpu_default_rma_order_pages(void)
 
 unsigned int cpu_large_page_orders(uint *sizes, uint max)
 {
-    uint lp_log_size = 4 + 20; /* (1 << 4) == 16M */
-    if (max < 1)
-        return 0;
+    uint i = 0;
 
-    sizes[0] = lp_log_size - PAGE_SHIFT;
+    while (i < max && i < ARRAY_SIZE(log_large_page_sizes)) {
+        sizes[i] = log_large_page_sizes[i] - PAGE_SHIFT;
+        ++i;
+    }
 
-    return 1;
-}    
+    return i;
+}
+
+unsigned int cpu_extent_order(void)
+{
+    return log_large_page_sizes[0] - PAGE_SHIFT;
+}
 
 void cpu_initialize(int cpuid)
 {

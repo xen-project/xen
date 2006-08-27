@@ -259,6 +259,8 @@ static inline unsigned long gmfn_to_mfn(struct domain *d, unsigned long gmfn)
 #define mfn_to_gmfn(_d, mfn) (mfn)
 
 extern int allocate_rma(struct domain *d, unsigned int order_pages);
+extern uint allocate_extents(struct domain *d, uint nrpages, uint rma_nrpages);
+extern void free_extents(struct domain *d);
 
 extern int steal_page(struct domain *d, struct page_info *page,
                         unsigned int memflags);

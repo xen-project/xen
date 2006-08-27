@@ -114,6 +114,8 @@ int arch_domain_create(struct domain *d)
     }
     htab_alloc(d, htab_order_pages);
 
+    INIT_LIST_HEAD(&d->arch.extent_list);
+
     return 0;
 }
 
@@ -262,6 +264,7 @@ void sync_vcpu_execstate(struct vcpu *v)
 void domain_relinquish_resources(struct domain *d)
 {
     free_domheap_pages(d->arch.rma_page, d->arch.rma_order);
+    free_extents(d);
 }
 
 void arch_dump_domain_info(struct domain *d)

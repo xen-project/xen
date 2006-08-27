@@ -64,8 +64,7 @@ static void set_max_page(struct membuf *mb, uint entries)
     }
 }
 
-/* mark all memory from modules onward as unused, skipping hole(s),
- * and returning size of hole(s) */
+/* mark all memory from modules onward as unused */
 static void heap_init(struct membuf *mb, uint entries)
 {
     int i;

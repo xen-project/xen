@@ -38,6 +38,9 @@ struct arch_domain {
     struct page_info *rma_page;
     uint rma_order;
 
+    /* list of extents beyond RMA */
+    struct list_head extent_list;
+
     /* I/O-port access bitmap mask. */
     u8 *iobmp_mask;       /* Address of IO bitmap mask, or NULL.      */
 

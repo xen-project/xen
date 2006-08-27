@@ -239,6 +239,69 @@ static int mfn_in_hole(ulong mfn)
     return 0;
 }
 
+static uint add_extent(struct domain *d, struct page_info *pg, uint order)
+{
+    struct page_extents *pe;
+
+    pe = xmalloc(struct page_extents);
+    if (pe == NULL)
+        return 0;
+
+    pe->pg = pg;
+    pe->order = order;
+    pe->pfn = page_to_mfn(pg);
+
+    list_add_tail(&pe->pe_list, &d->arch.extent_list);
+
+    return pe->pfn;
+}
+
+void free_extents(struct domain *d)
+{
+    /* we just need to free the memory behind list */
+    struct list_head *list;
+    struct list_head *ent;
+    struct list_head *next;
+
+    list = &d->arch.extent_list;
+    ent = list->next;
+
+    while (ent != list) {
+        next = ent->next;
+        xfree(ent);
+        ent = next;
+    }
+}
+
+uint allocate_extents(struct domain *d, uint nrpages, uint rma_nrpages)
+{
+    uint ext_order;
+    uint ext_nrpages;
+    uint total_nrpages;
+    struct page_info *pg;
+
+    ext_order = cpu_extent_order();
+    ext_nrpages = 1 << ext_order;
+
+    total_nrpages = rma_nrpages;
+
+    /* We only allocate in nr_extsz chunks so if you are not divisible
+     * you get more than you asked for */
+    while (total_nrpages < nrpages) {
+        pg = alloc_domheap_pages(d, ext_order, 0);
+        if (pg == NULL)
+            return total_nrpages;
+
+        if (add_extent(d, pg, ext_order) == 0) {
+            free_domheap_pages(pg, ext_order);
+            return total_nrpages;
+        }
+        total_nrpages += ext_nrpages;
+    }
+
+    return total_nrpages;
+}
+        
 int allocate_rma(struct domain *d, unsigned int order_pages)
 {
     ulong rma_base;
@@ -266,6 +329,7 @@ ulong pfn2mfn(struct domain *d, long pfn, int *type)
 {
     ulong rma_base_mfn = page_to_mfn(d->arch.rma_page);
     ulong rma_size_mfn = 1UL << d->arch.rma_order;
+    struct page_extents *pe;
 
     if (pfn < rma_size_mfn) {
         if (type)
@@ -278,6 +342,17 @@ ulong pfn2mfn(struct domain *d, long pfn, int *type)
         if (type)
             *type = PFN_TYPE_IO;
         return pfn;
+    }
+
+    /* quick tests first */
+    list_for_each_entry (pe, &d->arch.extent_list, pe_list) {
+        uint end_pfn = pe->pfn + (1 << pe->order);
+
+        if (pfn >= pe->pfn && pfn < end_pfn) {
+            if (type)
+                *type = PFN_TYPE_LOGICAL;
+            return page_to_mfn(pe->pg) + (pfn - pe->pfn);
+        }
     }
 
     /* This hack allows dom0 to map all memory, necessary to
