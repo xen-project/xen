@@ -93,6 +93,9 @@ static const char *xen_guest_lookup(struct domain_setup_info *dsi, int type)
     const char *fallback;
     const char *p;
 
+    if ( !dsi->__xen_guest_string )
+        return NULL;
+
     if ( type > sizeof(xenguest_fallbacks) )
         return NULL;
 
