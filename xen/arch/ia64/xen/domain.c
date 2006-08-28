@@ -1123,13 +1123,15 @@ void machine_restart(char * __unused)
 	while(1);
 }
 
+extern void cpu_halt(void);
+
 void machine_halt(void)
 {
 	console_start_sync();
 	if (running_on_sim)
 		printf ("machine_halt called.  spinning...\n");
 	else
-		(*efi.reset_system)(EFI_RESET_SHUTDOWN,0,0,NULL);
+		cpu_halt();
 	while(1);
 }
 

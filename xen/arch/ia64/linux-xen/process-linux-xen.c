@@ -810,6 +810,7 @@ get_wchan (struct task_struct *p)
 	} while (count++ < 16);
 	return 0;
 }
+#endif // !XEN
 
 void
 cpu_halt (void)
@@ -834,6 +835,7 @@ cpu_halt (void)
 		ia64_pal_halt(min_power_state);
 }
 
+#ifndef XEN
 void
 machine_restart (char *restart_cmd)
 {
