@@ -426,7 +426,7 @@ efi_emulate_get_variable(
 	unsigned long attr_addr, unsigned long data_size_addr,
 	unsigned long data_addr, IA64FAULT *fault)
 {
-	unsigned long name, vendor, attr, data_size, data;
+	unsigned long name, vendor, attr = 0, data_size, data;
 	struct page_info *name_page = NULL, *vendor_page = NULL,
 	                 *attr_page = NULL, *data_size_page = NULL,
 	                 *data_page = NULL;
