@@ -214,7 +214,7 @@ a sequence of s-expressions. The configuration parameters are:
 Configuration scripts ({\it e.g.} for network-script) are looked for in {\tt /etc/xen}
 unless their name begins with '/'.
 
-Xend sends its log output to {\tt /var/log/xend.log}. This is a rotating logfile,
+Xend sends its log output to {\tt /var/log/xen/xend.log}. This is a rotating logfile,
 and logs are moved onto {\tt xend.log.1} {\it etc.} as they get large. Old logs may
 be deleted.
 
@@ -411,7 +411,7 @@ allows access to some debugging functions:
 \end{itemize}
 
 When tracing is on xend logs all functions calls and exceptions to
-{\tt /var/log/xend.trace}.
+{\tt /var/log/xen/xend.trace}.
 
 \begin{thebibliography}{99}
 

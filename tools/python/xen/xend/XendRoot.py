@@ -52,7 +52,7 @@ class XendRoot:
     block_script_dir = "/etc/xen/scripts"
 
     """Default path to the log file. """
-    logfile_default = "/var/log/xend.log"
+    logfile_default = "/var/log/xen/xend.log"
 
     """Default level of information to be logged."""
     loglevel_default = 'DEBUG'

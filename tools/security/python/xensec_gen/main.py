@@ -34,7 +34,7 @@ import CGIHTTPServer
 
 gHttpPort = 7777
 gHttpDir  = '/var/lib/xensec_gen'
-gLogFile  = '/var/log/xensec_gen.log'
+gLogFile  = '/var/log/xen/xensec_gen.log'
 gUser     = 'nobody'
 gGroup    = 'nobody'
 

@@ -11,7 +11,7 @@
 # Commented out entries show the default for that entry, unless otherwise
 # specified.
 
-#(logfile /var/log/xend.log)
+#(logfile /var/log/xen/xend.log)
 #(loglevel DEBUG)
 
 #(xend-http-server no)
