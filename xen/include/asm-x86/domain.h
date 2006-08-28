@@ -59,10 +59,10 @@ extern void hypercall_page_initialise(struct domain *d, void *);
 
 struct shadow_domain {
     u32               mode;  /* flags to control shadow operation */
-    spinlock_t        lock;  /* shadow2 domain lock */
+    spinlock_t        lock;  /* shadow domain lock */
     int               locker; /* processor which holds the lock */
     const char       *locker_function; /* Func that took it */
-    struct list_head  freelists[SHADOW2_MAX_ORDER + 1]; 
+    struct list_head  freelists[SHADOW_MAX_ORDER + 1]; 
     struct list_head  p2m_freelist;
     struct list_head  p2m_inuse;
     struct list_head  toplevel_shadows;
@@ -70,10 +70,10 @@ struct shadow_domain {
     unsigned int      free_pages;   /* number of pages on freelists */
     unsigned int      p2m_pages;    /* number of pages in p2m map */
 
-    /* Shadow2 hashtable */
-    struct shadow2_hash_entry *hash_table;
-    struct shadow2_hash_entry *hash_freelist;
-    struct shadow2_hash_entry *hash_allocations;
+    /* Shadow hashtable */
+    struct shadow_hash_entry *hash_table;
+    struct shadow_hash_entry *hash_freelist;
+    struct shadow_hash_entry *hash_allocations;
     int hash_walking;  /* Some function is walking the hash table */
 
     /* Shadow log-dirty bitmap */
@@ -107,7 +107,7 @@ struct arch_domain
     /* Shadow-translated guest: Pseudophys base address of reserved area. */
     unsigned long first_reserved_pfn;
 
-    struct shadow_domain shadow2;
+    struct shadow_domain shadow;
 
     /* Shadow translated domain: P2M mapping */
     pagetable_t phys_table;
@@ -135,7 +135,7 @@ struct pae_l3_cache { };
 
 struct shadow_vcpu {
     /* Pointers to mode-specific entry points. */
-    struct shadow2_paging_mode *mode;
+    struct shadow_paging_mode *mode;
     /* Last MFN that we emulated a write to. */
     unsigned long last_emulated_mfn;
     /* HVM guest: paging enabled (CR0.PG)?  */
@@ -201,7 +201,7 @@ struct arch_vcpu
     /* Current LDT details. */
     unsigned long shadow_ldt_mapcnt;
 
-    struct shadow_vcpu shadow2;
+    struct shadow_vcpu shadow;
 } __cacheline_aligned;
 
 /* shorthands to improve code legibility */

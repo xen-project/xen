@@ -200,12 +200,12 @@ int arch_domain_create(struct domain *d)
 
 #endif /* __x86_64__ */
 
-    shadow2_lock_init(d);
-    for ( i = 0; i <= SHADOW2_MAX_ORDER; i++ )
-        INIT_LIST_HEAD(&d->arch.shadow2.freelists[i]);
-    INIT_LIST_HEAD(&d->arch.shadow2.p2m_freelist);
-    INIT_LIST_HEAD(&d->arch.shadow2.p2m_inuse);
-    INIT_LIST_HEAD(&d->arch.shadow2.toplevel_shadows);
+    shadow_lock_init(d);
+    for ( i = 0; i <= SHADOW_MAX_ORDER; i++ )
+        INIT_LIST_HEAD(&d->arch.shadow.freelists[i]);
+    INIT_LIST_HEAD(&d->arch.shadow.p2m_freelist);
+    INIT_LIST_HEAD(&d->arch.shadow.p2m_inuse);
+    INIT_LIST_HEAD(&d->arch.shadow.toplevel_shadows);
 
     if ( !is_idle_domain(d) )
     {
@@ -236,7 +236,7 @@ int arch_domain_create(struct domain *d)
 
 void arch_domain_destroy(struct domain *d)
 {
-    shadow2_final_teardown(d);
+    shadow_final_teardown(d);
 
     free_xenheap_pages(
         d->arch.mm_perdomain_pt,
@@ -342,10 +342,10 @@ int arch_set_info_guest(
         }
     }    
 
-    /* Shadow2: make sure the domain has enough shadow memory to
+    /* Shadow: make sure the domain has enough shadow memory to
      * boot another vcpu */
-    if ( shadow2_mode_enabled(d) 
-         && d->arch.shadow2.total_pages < shadow2_min_acceptable_pages(d) )
+    if ( shadow_mode_enabled(d) 
+         && d->arch.shadow.total_pages < shadow_min_acceptable_pages(d) )
     {
         destroy_gdt(v);
         return -ENOMEM;
@@ -357,8 +357,8 @@ int arch_set_info_guest(
     /* Don't redo final setup */
     set_bit(_VCPUF_initialised, &v->vcpu_flags);
 
-    if ( shadow2_mode_enabled(d) )
-        shadow2_update_paging_modes(v);
+    if ( shadow_mode_enabled(d) )
+        shadow_update_paging_modes(v);
 
     update_cr3(v);
 
@@ -936,11 +936,11 @@ void domain_relinquish_resources(struct domain *d)
     for_each_vcpu ( d, v )
     {
         /* Drop ref to guest_table (from new_guest_cr3(), svm/vmx cr3 handling,
-         * or sh2_update_paging_modes()) */
+         * or sh_update_paging_modes()) */
         pfn = pagetable_get_pfn(v->arch.guest_table);
         if ( pfn != 0 )
         {
-            if ( shadow2_mode_refcounts(d) )
+            if ( shadow_mode_refcounts(d) )
                 put_page(mfn_to_page(pfn));
             else
                 put_page_and_type(mfn_to_page(pfn));
@@ -962,7 +962,7 @@ void domain_relinquish_resources(struct domain *d)
         hvm_relinquish_guest_resources(d);
 
     /* Tear down shadow mode stuff. */
-    shadow2_teardown(d);
+    shadow_teardown(d);
 
     /*
      * Relinquish GDT mappings. No need for explicit unmapping of the LDT as
@@ -981,18 +981,18 @@ void domain_relinquish_resources(struct domain *d)
 
 void arch_dump_domain_info(struct domain *d)
 {
-    if ( shadow2_mode_enabled(d) )
+    if ( shadow_mode_enabled(d) )
     {
-        printk("    shadow2 mode: ");
-        if ( d->arch.shadow2.mode & SHM2_enable )
+        printk("    shadow mode: ");
+        if ( d->arch.shadow.mode & SHM2_enable )
             printk("enabled ");
-        if ( shadow2_mode_refcounts(d) )
+        if ( shadow_mode_refcounts(d) )
             printk("refcounts ");
-        if ( shadow2_mode_log_dirty(d) )
+        if ( shadow_mode_log_dirty(d) )
             printk("log_dirty ");
-        if ( shadow2_mode_translate(d) )
+        if ( shadow_mode_translate(d) )
             printk("translate ");
-        if ( shadow2_mode_external(d) )
+        if ( shadow_mode_external(d) )
             printk("external ");
         printk("\n");
     }

@@ -40,7 +40,7 @@
 #include <asm/hvm/vmx/vmx.h>
 #include <asm/hvm/vmx/vmcs.h>
 #include <asm/hvm/vmx/cpu.h>
-#include <asm/shadow2.h>
+#include <asm/shadow.h>
 #include <public/sched.h>
 #include <public/hvm/ioreq.h>
 #include <asm/hvm/vpic.h>
@@ -66,10 +66,10 @@ static int vmx_initialize_guest_resources(struct vcpu *v)
     if ( v->vcpu_id != 0 )
         return 1;
 
-    if ( !shadow2_mode_external(d) )
+    if ( !shadow_mode_external(d) )
     {
         DPRINTK("Can't init HVM for dom %u vcpu %u: "
-                "not in shadow2 external mode\n", 
+                "not in shadow external mode\n", 
                 d->domain_id, v->vcpu_id);
         domain_crash(d);
     }
@@ -865,7 +865,7 @@ static int vmx_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
     }
 #endif
 
-    result = shadow2_fault(va, regs);
+    result = shadow_fault(va, regs);
 
     TRACE_VMEXIT (2,result);
 #if 0
@@ -1039,7 +1039,7 @@ static void vmx_vmexit_do_invlpg(unsigned long va)
      * We do the safest things first, then try to update the shadow
      * copying from guest
      */
-    shadow2_invlpg(v, va);
+    shadow_invlpg(v, va);
 }
 
 
@@ -1301,7 +1301,7 @@ vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
 
  skip_cr3:
 
-    shadow2_update_paging_modes(v);
+    shadow_update_paging_modes(v);
     if (!vmx_paging_enabled(v))
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "switching to vmxassist. use phys table");
     else
@@ -1504,7 +1504,7 @@ static int vmx_set_cr0(unsigned long value)
         v->arch.guest_table = pagetable_from_pfn(mfn);
         if (old_base_mfn)
             put_page(mfn_to_page(old_base_mfn));
-        shadow2_update_paging_modes(v);
+        shadow_update_paging_modes(v);
 
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx",
                     (unsigned long) (mfn << PAGE_SHIFT));
@@ -1577,7 +1577,7 @@ static int vmx_set_cr0(unsigned long value)
     else if ( (value & (X86_CR0_PE | X86_CR0_PG)) == X86_CR0_PE )
     {
         __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr3);
-        shadow2_update_paging_modes(v);
+        shadow_update_paging_modes(v);
     }
 
     return 1;
@@ -1662,7 +1662,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
             mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
             if (mfn != pagetable_get_pfn(v->arch.guest_table))
                 __hvm_bug(regs);
-            shadow2_update_cr3(v);
+            shadow_update_cr3(v);
         } else {
             /*
              * If different, make a shadow. Check if the PDBR is valid
@@ -1755,7 +1755,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
          * all TLB entries except global entries.
          */
         if ( (old_cr ^ value) & (X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE) )
-            shadow2_update_paging_modes(v);
+            shadow_update_paging_modes(v);
         break;
     }
     default:

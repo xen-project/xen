@@ -721,7 +721,7 @@ void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
 
     if (pvalid) {
         if (hvm_paging_enabled(current))
-            p->u.data = shadow2_gva_to_gpa(current, value);
+            p->u.data = shadow_gva_to_gpa(current, value);
         else
             p->u.pdata = (void *) value; /* guest VA == guest PA */
     } else
@@ -771,7 +771,7 @@ void send_mmio_req(
 
     if (pvalid) {
         if (hvm_paging_enabled(v))
-            p->u.data = shadow2_gva_to_gpa(v, value);
+            p->u.data = shadow_gva_to_gpa(v, value);
         else
             p->u.pdata = (void *) value; /* guest VA == guest PA */
     } else

@@ -441,7 +441,7 @@ static int xc_hvm_build_internal(int xc_handle,
         goto error_out;
     }
 
-    /* HVM domains must be put into shadow2 mode at the start of day */
+    /* HVM domains must be put into shadow mode at the start of day */
     if ( xc_shadow_control(xc_handle, domid, XEN_DOMCTL_SHADOW_OP_ENABLE,
                            NULL, 0, NULL, 
                            XEN_DOMCTL_SHADOW_ENABLE_REFCOUNT  |

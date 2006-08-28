@@ -39,7 +39,7 @@ long arch_do_domctl(
         d = find_domain_by_id(domctl->domain);
         if ( d != NULL )
         {
-            ret = shadow2_domctl(d, &domctl->u.shadow_op, u_domctl);
+            ret = shadow_domctl(d, &domctl->u.shadow_op, u_domctl);
             put_domain(d);
             copy_to_guest(u_domctl, domctl, 1);
         } 
