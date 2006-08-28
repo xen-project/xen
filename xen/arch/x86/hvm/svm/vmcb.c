@@ -121,7 +121,7 @@ static int construct_vmcb_controls(struct arch_svm_struct *arch_svm)
         GENERAL2_INTERCEPT_SKINIT | GENERAL2_INTERCEPT_RDTSCP;
 
     /* read or write all debug registers 0 - 15 */
-    vmcb->dr_intercepts = 0;
+    vmcb->dr_intercepts = DR_INTERCEPT_ALL_WRITES;
 
     /* RD/WR all control registers 0 - 15, but not read CR2 */
     vmcb->cr_intercepts = ~(CR_INTERCEPT_CR2_READ | CR_INTERCEPT_CR2_WRITE);

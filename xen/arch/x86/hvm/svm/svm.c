@@ -403,6 +403,50 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     return 1;
 }
 
+
+#define loaddebug(_v,_reg) \
+    __asm__ __volatile__ ("mov %0,%%db" #_reg : : "r" ((_v)->debugreg[_reg]))
+#define savedebug(_v,_reg) \
+    __asm__ __volatile__ ("mov %%db" #_reg ",%0" : : "r" ((_v)->debugreg[_reg]))
+
+
+static inline void svm_save_dr(struct vcpu *v)
+{
+    if (v->arch.hvm_vcpu.flag_dr_dirty)
+    {
+        /* clear the DR dirty flag and re-enable intercepts for DR accesses */ 
+        v->arch.hvm_vcpu.flag_dr_dirty = 0;
+        v->arch.hvm_svm.vmcb->dr_intercepts = DR_INTERCEPT_ALL_WRITES;
+
+        savedebug(&v->arch.guest_context, 0);    
+        savedebug(&v->arch.guest_context, 1);    
+        savedebug(&v->arch.guest_context, 2);    
+        savedebug(&v->arch.guest_context, 3);    
+    }
+}
+
+
+static inline void __restore_debug_registers(struct vcpu *v)
+{
+    loaddebug(&v->arch.guest_context, 0);
+    loaddebug(&v->arch.guest_context, 1);
+    loaddebug(&v->arch.guest_context, 2);
+    loaddebug(&v->arch.guest_context, 3);
+}
+
+
+static inline void svm_restore_dr(struct vcpu *v)
+{
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+
+    if (!vmcb)
+        return;
+
+    if (unlikely(vmcb->dr7 & 0xFF))
+        __restore_debug_registers(v);
+}
+
+
 static int svm_realmode(struct vcpu *v)
 {
     unsigned long cr0 = v->arch.hvm_svm.cpu_shadow_cr0;
@@ -717,6 +761,7 @@ static void svm_freeze_time(struct vcpu *v)
 static void svm_ctxt_switch_from(struct vcpu *v)
 {
     svm_freeze_time(v);
+    svm_save_dr(v);
 }
 
 static void svm_ctxt_switch_to(struct vcpu *v)
@@ -732,6 +777,7 @@ static void svm_ctxt_switch_to(struct vcpu *v)
     set_segment_register(es, 0);
     set_segment_register(ss, 0);
 #endif
+    svm_restore_dr(v);
 }
 
 
@@ -1183,55 +1229,16 @@ static inline void set_reg(unsigned int gpreg, unsigned long value,
 }
                            
 
-static void svm_dr_access (struct vcpu *v, unsigned int reg, unsigned int type,
-                           struct cpu_user_regs *regs)
+static void svm_dr_access(struct vcpu *v, struct cpu_user_regs *regs)
 {
-    unsigned long *reg_p = 0;
-    unsigned int gpreg = 0;
-    unsigned long eip;
-    int inst_len;
-    int index;
-    struct vmcb_struct *vmcb;
-    u8 buffer[MAX_INST_LEN];
-    u8 prefix = 0;
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    vmcb = v->arch.hvm_svm.vmcb;
-    
-    ASSERT(vmcb);
+    v->arch.hvm_vcpu.flag_dr_dirty = 1;
 
-    eip = vmcb->rip;
-    inst_copy_from_guest(buffer, svm_rip2pointer(vmcb), sizeof(buffer));
-    index = skip_prefix_bytes(buffer, sizeof(buffer));
-    
-    ASSERT(buffer[index+0] == 0x0f && (buffer[index+1] & 0xFD) == 0x21);
+    __restore_debug_registers(v);
 
-    if (index > 0 && (buffer[index-1] & 0xF0) == 0x40)
-        prefix = buffer[index-1];
-
-    gpreg = decode_src_reg(prefix, buffer[index + 2]);
-    ASSERT(reg == decode_dest_reg(prefix, buffer[index + 2]));
-
-    HVM_DBG_LOG(DBG_LEVEL_1, "svm_dr_access : eip=%lx, reg=%d, gpreg = %x",
-                eip, reg, gpreg);
-
-    reg_p = get_reg_p(gpreg, regs, vmcb);
-        
-    switch (type) 
-    {
-    case TYPE_MOV_TO_DR: 
-        inst_len = __get_instruction_length(vmcb, INSTR_MOV2DR, buffer);
-        v->arch.guest_context.debugreg[reg] = *reg_p;
-        break;
-    case TYPE_MOV_FROM_DR:
-        inst_len = __get_instruction_length(vmcb, INSTR_MOVDR2, buffer);
-        *reg_p = v->arch.guest_context.debugreg[reg];
-        break;
-    default:
-        __hvm_bug(regs);
-        break;
-    }
-    ASSERT(inst_len > 0);
-    __update_guest_eip(vmcb, inst_len);
+    /* allow the guest full access to the debug registers */
+    vmcb->dr_intercepts = 0;
 }
 
 
@@ -2862,53 +2869,9 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
     case VMEXIT_CR8_WRITE:
         svm_cr_access(v, 8, TYPE_MOV_TO_CR, &regs);
         break;
-
-    case VMEXIT_DR0_READ:
-        svm_dr_access(v, 0, TYPE_MOV_FROM_DR, &regs);
-        break;
-
-    case VMEXIT_DR1_READ:
-        svm_dr_access(v, 1, TYPE_MOV_FROM_DR, &regs);
-        break;
-
-    case VMEXIT_DR2_READ:
-        svm_dr_access(v, 2, TYPE_MOV_FROM_DR, &regs);
-        break;
-
-    case VMEXIT_DR3_READ:
-        svm_dr_access(v, 3, TYPE_MOV_FROM_DR, &regs);
-        break;
-
-    case VMEXIT_DR6_READ:
-        svm_dr_access(v, 6, TYPE_MOV_FROM_DR, &regs);
-        break;
-
-    case VMEXIT_DR7_READ:
-        svm_dr_access(v, 7, TYPE_MOV_FROM_DR, &regs);
-        break;
-
-    case VMEXIT_DR0_WRITE:
-        svm_dr_access(v, 0, TYPE_MOV_TO_DR, &regs);
-        break;
-
-    case VMEXIT_DR1_WRITE:
-        svm_dr_access(v, 1, TYPE_MOV_TO_DR, &regs);
-        break;
-
-    case VMEXIT_DR2_WRITE:
-        svm_dr_access(v, 2, TYPE_MOV_TO_DR, &regs);
-        break;
-
-    case VMEXIT_DR3_WRITE:
-        svm_dr_access(v, 3, TYPE_MOV_TO_DR, &regs);
-        break;
-
-    case VMEXIT_DR6_WRITE:
-        svm_dr_access(v, 6, TYPE_MOV_TO_DR, &regs);
-        break;
-
-    case VMEXIT_DR7_WRITE:
-        svm_dr_access(v, 7, TYPE_MOV_TO_DR, &regs);
+	
+    case VMEXIT_DR0_WRITE ... VMEXIT_DR7_WRITE:
+        svm_dr_access(v, &regs);
         break;
 
     case VMEXIT_IOIO:
