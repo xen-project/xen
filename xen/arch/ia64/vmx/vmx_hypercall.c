@@ -75,7 +75,7 @@ vmx_gnttab_setup_table(unsigned long frame_pa, unsigned long nr_frames)
     o_grant_shared = (unsigned long)d->grant_table->shared;
     d->grant_table->shared = (struct grant_entry *)pgaddr;
 
-    /* Copy existing grant table shared into new page */
+    /* Copy existing grant table into new page */
     if (o_grant_shared) {
         memcpy((void *)d->grant_table->shared,
                (void *)o_grant_shared, PAGE_SIZE * nr_frames);
