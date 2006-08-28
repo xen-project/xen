@@ -384,8 +384,8 @@ int hvm_copy(void *buf, unsigned long vaddr, int size, int dir)
         if (count > size)
             count = size;
 
-        gfn = shadow2_gva_to_gfn(v, vaddr);
-        mfn = mfn_x(sh2_vcpu_gfn_to_mfn(v, gfn));
+        gfn = shadow_gva_to_gfn(v, vaddr);
+        mfn = mfn_x(sh_vcpu_gfn_to_mfn(v, gfn));
 
         if (mfn == INVALID_MFN)
             return 0;
@@ -539,7 +539,7 @@ void hvm_do_hypercall(struct cpu_user_regs *pregs)
         return;
     }
 
-    if ( current->arch.shadow2.mode->guest_levels == 4 )
+    if ( current->arch.shadow.mode->guest_levels == 4 )
     {
         pregs->rax = hvm_hypercall64_table[pregs->rax](pregs->rdi,
                                                        pregs->rsi,

@@ -44,34 +44,18 @@ then
   }
 elif ! which ifup >/dev/null 2>/dev/null
 then
-  if [ -e /etc/conf.d/net ]
-  then
-    preiftransfer()
-    {
-      true
-    }
-    ifup()
-    {
-      /etc/init.d/net.$1 start
-    }
-    ifdown()
-    {
-      /etc/init.d/net.$1 stop
-    }
-  else
-    preiftransfer()
-    {
-      true
-    }
-    ifup()
-    {
-      false
-    }
-    ifdown()
-    {
-      false
-    }
-  fi
+  preiftransfer()
+  {
+    true
+  }
+  ifup()
+  {
+    false
+  }
+  ifdown()
+  {
+    false
+  }
 else
   preiftransfer()
   {

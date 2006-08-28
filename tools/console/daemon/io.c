@@ -584,16 +584,14 @@ void handle_io(void)
 			    FD_ISSET(xc_evtchn_fd(d->xce_handle), &readfds))
 				handle_ring_read(d);
 
-			if (d->tty_fd != -1) {
-				if (FD_ISSET(d->tty_fd, &readfds))
-					handle_tty_read(d);
+			if (d->tty_fd != -1 && FD_ISSET(d->tty_fd, &readfds))
+				handle_tty_read(d);
 
-				if (FD_ISSET(d->tty_fd, &writefds))
-					handle_tty_write(d);
+			if (d->tty_fd != -1 && FD_ISSET(d->tty_fd, &writefds))
+				handle_tty_write(d);
 
-				if (d->is_dead)
-					cleanup_domain(d);
-			}
+			if (d->is_dead)
+				cleanup_domain(d);
 		}
 	} while (ret > -1);
 }

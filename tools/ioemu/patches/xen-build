@@ -1,7 +1,7 @@
 Index: ioemu/Makefile
 ===================================================================
---- ioemu.orig/Makefile	2006-08-06 02:03:44.915543858 +0100
-+++ ioemu/Makefile	2006-08-06 02:11:33.461331417 +0100
+--- ioemu.orig/Makefile	2006-08-28 20:19:23.000000000 +0100
++++ ioemu/Makefile	2006-08-28 20:20:08.000000000 +0100
 @@ -1,11 +1,14 @@
  # Makefile for QEMU.
  
@@ -60,6 +60,15 @@ Index: ioemu/Makefile
  ifndef CONFIG_WIN32
  	mkdir -p "$(DESTDIR)$(datadir)/keymaps"
  	for x in $(KEYMAPS); do \
+@@ -89,7 +94,7 @@
+ 	$(MAKE) -C tests $@
+ 
+ TAGS: 
+-	etags *.[ch] tests/*.[ch]
++	etags *.[ch] target-i386-dm/*.[ch] hw/*.[ch]
+ 
+ cscope:
+ 	rm -f ./cscope.*
 @@ -107,11 +112,11 @@
  	texi2dvi $<
  
@@ -76,8 +85,8 @@ Index: ioemu/Makefile
  info: qemu-doc.info qemu-tech.info
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2006-08-06 02:03:44.922543079 +0100
-+++ ioemu/Makefile.target	2006-08-06 02:09:22.320951557 +0100
+--- ioemu.orig/Makefile.target	2006-08-28 20:19:23.000000000 +0100
++++ ioemu/Makefile.target	2006-08-28 20:19:47.000000000 +0100
 @@ -1,5 +1,8 @@
  include config.mak
  
@@ -149,8 +158,8 @@ Index: ioemu/Makefile.target
  include .depend
 Index: ioemu/configure
 ===================================================================
---- ioemu.orig/configure	2006-08-06 02:03:45.783447220 +0100
-+++ ioemu/configure	2006-08-06 02:09:41.076860544 +0100
+--- ioemu.orig/configure	2006-08-28 20:19:23.000000000 +0100
++++ ioemu/configure	2006-08-28 20:19:47.000000000 +0100
 @@ -18,8 +18,8 @@
  
  # default parameters

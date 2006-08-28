@@ -870,8 +870,8 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
 
     if ( unlikely(IN_HYPERVISOR_RANGE(addr)) )
     {
-        if ( shadow2_mode_external(d) && guest_mode(regs) )
-            return shadow2_fault(addr, regs);
+        if ( shadow_mode_external(d) && guest_mode(regs) )
+            return shadow_fault(addr, regs);
         if ( (addr >= GDT_LDT_VIRT_START) && (addr < GDT_LDT_VIRT_END) )
             return handle_gdt_ldt_mapping_fault(
                 addr - GDT_LDT_VIRT_START, regs);
@@ -890,8 +890,8 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
          ptwr_do_page_fault(d, addr, regs) )
         return EXCRET_fault_fixed;
 
-    if ( shadow2_mode_enabled(d) )
-        return shadow2_fault(addr, regs);
+    if ( shadow_mode_enabled(d) )
+        return shadow_fault(addr, regs);
 
     return 0;
 }

@@ -39,6 +39,7 @@ install: check
 	done
 	$(MAKE) ioemuinstall
 	$(INSTALL_DIR) -p $(DESTDIR)/var/xen/dump
+	$(INSTALL_DIR) -p $(DESTDIR)/var/log/xen
 
 .PHONY: clean
 clean: check_clean

@@ -1,5 +1,5 @@
 /******************************************************************************
- * include/asm-x86/shadow2-types.h
+ * arch/x86/mm/shadow/types.h
  * 
  * Parts of this code are Copyright (c) 2006 by XenSource Inc.
  * Parts of this code are Copyright (c) 2006 by Michael A Fetterman
@@ -20,8 +20,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef _XEN_SHADOW2_TYPES_H
-#define _XEN_SHADOW2_TYPES_H
+#ifndef _XEN_SHADOW_TYPES_H
+#define _XEN_SHADOW_TYPES_H
 
 // Map a shadow page
 static inline void *
@@ -34,14 +34,14 @@ map_shadow_page(mfn_t smfn)
     //        presumably using the reverse map hint in the page_info of this
     //        smfn, rather than calling map_domain_page()?
     //
-    return sh2_map_domain_page(smfn);
+    return sh_map_domain_page(smfn);
 }
 
 // matching unmap for map_shadow_page()
 static inline void
 unmap_shadow_page(void *p)
 {
-    sh2_unmap_domain_page(p);
+    sh_unmap_domain_page(p);
 }
 
 /* 
@@ -188,52 +188,52 @@ static inline shadow_l4e_t shadow_l4e_from_mfn(mfn_t mfn, u32 flags)
  * guests, the shadow doesn't have a linear-map self-entry so we must use 
  * the monitor-table's linear-map entry N-1 times and then the shadow-map 
  * entry once. */
-#define __sh2_linear_l1_table ((shadow_l1e_t *)(SH_LINEAR_PT_VIRT_START))
-#define __sh2_linear_l2_table ((shadow_l2e_t *)                               \
-    (__sh2_linear_l1_table + shadow_l1_linear_offset(SH_LINEAR_PT_VIRT_START)))
+#define __sh_linear_l1_table ((shadow_l1e_t *)(SH_LINEAR_PT_VIRT_START))
+#define __sh_linear_l2_table ((shadow_l2e_t *)                               \
+    (__sh_linear_l1_table + shadow_l1_linear_offset(SH_LINEAR_PT_VIRT_START)))
 
 // shadow linear L3 and L4 tables only exist in 4 level paging...
 #if SHADOW_PAGING_LEVELS == 4
-#define __sh2_linear_l3_table ((shadow_l3e_t *)                               \
-    (__sh2_linear_l2_table + shadow_l2_linear_offset(SH_LINEAR_PT_VIRT_START)))
-#define __sh2_linear_l4_table ((shadow_l4e_t *)                               \
-    (__sh2_linear_l3_table + shadow_l3_linear_offset(SH_LINEAR_PT_VIRT_START)))
+#define __sh_linear_l3_table ((shadow_l3e_t *)                               \
+    (__sh_linear_l2_table + shadow_l2_linear_offset(SH_LINEAR_PT_VIRT_START)))
+#define __sh_linear_l4_table ((shadow_l4e_t *)                               \
+    (__sh_linear_l3_table + shadow_l3_linear_offset(SH_LINEAR_PT_VIRT_START)))
 #endif
 
-#define sh2_linear_l1_table(v) ({ \
+#define sh_linear_l1_table(v) ({ \
     ASSERT(current == (v)); \
-    __sh2_linear_l1_table; \
+    __sh_linear_l1_table; \
 })
 
-#define sh2_linear_l2_table(v) ({ \
+#define sh_linear_l2_table(v) ({ \
     ASSERT(current == (v)); \
     ((shadow_l2e_t *) \
-     (hvm_guest(v) ? __linear_l1_table : __sh2_linear_l1_table) + \
+     (hvm_guest(v) ? __linear_l1_table : __sh_linear_l1_table) + \
      shadow_l1_linear_offset(SH_LINEAR_PT_VIRT_START)); \
 })
 
 // shadow linear L3 and L4 tables only exist in 4 level paging...
 #if SHADOW_PAGING_LEVELS == 4
-#define sh2_linear_l3_table(v) ({ \
+#define sh_linear_l3_table(v) ({ \
     ASSERT(current == (v)); \
     ((shadow_l3e_t *) \
-     (hvm_guest(v) ? __linear_l2_table : __sh2_linear_l2_table) + \
+     (hvm_guest(v) ? __linear_l2_table : __sh_linear_l2_table) + \
       shadow_l2_linear_offset(SH_LINEAR_PT_VIRT_START)); \
 })
 
 // we use l4_pgentry_t instead of shadow_l4e_t below because shadow_l4e_t is
 // not defined for when xen_levels==4 & shadow_levels==3...
-#define sh2_linear_l4_table(v) ({ \
+#define sh_linear_l4_table(v) ({ \
     ASSERT(current == (v)); \
     ((l4_pgentry_t *) \
-     (hvm_guest(v) ? __linear_l3_table : __sh2_linear_l3_table) + \
+     (hvm_guest(v) ? __linear_l3_table : __sh_linear_l3_table) + \
       shadow_l3_linear_offset(SH_LINEAR_PT_VIRT_START)); \
 })
 #endif
 
 #if GUEST_PAGING_LEVELS == 2
 
-#include <asm/page-guest32.h>
+#include "page-guest32.h"
 
 #define GUEST_L1_PAGETABLE_ENTRIES     1024
 #define GUEST_L2_PAGETABLE_ENTRIES     1024
@@ -243,7 +243,7 @@ static inline shadow_l4e_t shadow_l4e_from_mfn(mfn_t mfn, u32 flags)
 /* Type of the guest's frame numbers */
 TYPE_SAFE(u32,gfn)
 #define INVALID_GFN ((u32)(-1u))
-#define SH2_PRI_gfn "05x"
+#define SH_PRI_gfn "05x"
 
 /* Types of the guest's page tables */
 typedef l1_pgentry_32_t guest_l1e_t;
@@ -279,9 +279,9 @@ static inline guest_l2e_t guest_l2e_from_gfn(gfn_t gfn, u32 flags)
 #define guest_l2_table_offset(a) l2_table_offset_32(a)
 
 /* The shadow types needed for the various levels. */
-#define PGC_SH2_l1_shadow  PGC_SH2_l1_32_shadow
-#define PGC_SH2_l2_shadow  PGC_SH2_l2_32_shadow
-#define PGC_SH2_fl1_shadow PGC_SH2_fl1_32_shadow
+#define PGC_SH_l1_shadow  PGC_SH_l1_32_shadow
+#define PGC_SH_l2_shadow  PGC_SH_l2_32_shadow
+#define PGC_SH_fl1_shadow PGC_SH_fl1_32_shadow
 
 #else /* GUEST_PAGING_LEVELS != 2 */
 
@@ -306,7 +306,7 @@ static inline guest_l2e_t guest_l2e_from_gfn(gfn_t gfn, u32 flags)
 /* Type of the guest's frame numbers */
 TYPE_SAFE(unsigned long,gfn)
 #define INVALID_GFN ((unsigned long)(-1ul))
-#define SH2_PRI_gfn "05lx"
+#define SH_PRI_gfn "05lx"
 
 /* Types of the guest's page tables */
 typedef l1_pgentry_t guest_l1e_t;
@@ -379,17 +379,17 @@ static inline guest_l4e_t guest_l4e_from_gfn(gfn_t gfn, u32 flags)
 
 /* The shadow types needed for the various levels. */
 #if GUEST_PAGING_LEVELS == 3
-#define PGC_SH2_l1_shadow  PGC_SH2_l1_pae_shadow
-#define PGC_SH2_fl1_shadow PGC_SH2_fl1_pae_shadow
-#define PGC_SH2_l2_shadow  PGC_SH2_l2_pae_shadow
-#define PGC_SH2_l2h_shadow PGC_SH2_l2h_pae_shadow
-#define PGC_SH2_l3_shadow  PGC_SH2_l3_pae_shadow
+#define PGC_SH_l1_shadow  PGC_SH_l1_pae_shadow
+#define PGC_SH_fl1_shadow PGC_SH_fl1_pae_shadow
+#define PGC_SH_l2_shadow  PGC_SH_l2_pae_shadow
+#define PGC_SH_l2h_shadow PGC_SH_l2h_pae_shadow
+#define PGC_SH_l3_shadow  PGC_SH_l3_pae_shadow
 #else
-#define PGC_SH2_l1_shadow  PGC_SH2_l1_64_shadow
-#define PGC_SH2_fl1_shadow PGC_SH2_fl1_64_shadow
-#define PGC_SH2_l2_shadow  PGC_SH2_l2_64_shadow
-#define PGC_SH2_l3_shadow  PGC_SH2_l3_64_shadow
-#define PGC_SH2_l4_shadow  PGC_SH2_l4_64_shadow
+#define PGC_SH_l1_shadow  PGC_SH_l1_64_shadow
+#define PGC_SH_fl1_shadow PGC_SH_fl1_64_shadow
+#define PGC_SH_l2_shadow  PGC_SH_l2_64_shadow
+#define PGC_SH_l3_shadow  PGC_SH_l3_64_shadow
+#define PGC_SH_l4_shadow  PGC_SH_l4_64_shadow
 #endif
 
 #endif /* GUEST_PAGING_LEVELS != 2 */
@@ -403,24 +403,24 @@ valid_gfn(gfn_t m)
 }
 
 #if GUEST_PAGING_LEVELS == 2
-#define PGC_SH2_guest_root_type PGC_SH2_l2_32_shadow
+#define PGC_SH_guest_root_type PGC_SH_l2_32_shadow
 #elif GUEST_PAGING_LEVELS == 3
-#define PGC_SH2_guest_root_type PGC_SH2_l3_pae_shadow
+#define PGC_SH_guest_root_type PGC_SH_l3_pae_shadow
 #else
-#define PGC_SH2_guest_root_type PGC_SH2_l4_64_shadow
+#define PGC_SH_guest_root_type PGC_SH_l4_64_shadow
 #endif
 
 /* Translation between mfns and gfns */
 static inline mfn_t
 vcpu_gfn_to_mfn(struct vcpu *v, gfn_t gfn)
 {
-    return sh2_vcpu_gfn_to_mfn(v, gfn_x(gfn));
+    return sh_vcpu_gfn_to_mfn(v, gfn_x(gfn));
 } 
 
 static inline gfn_t
 mfn_to_gfn(struct domain *d, mfn_t mfn)
 {
-    return _gfn(sh2_mfn_to_gfn(d, mfn));
+    return _gfn(sh_mfn_to_gfn(d, mfn));
 }
 
 static inline paddr_t
@@ -438,8 +438,8 @@ gfn_to_paddr(gfn_t gfn)
  * The "Effective l1e" field is used when there isn't an l1e to point to, 
  * but we have fabricated an l1e for propagation to the shadow (e.g., 
  * for splintering guest superpages into many shadow l1 entries).  */
-typedef struct shadow2_walk_t walk_t;
-struct shadow2_walk_t 
+typedef struct shadow_walk_t walk_t;
+struct shadow_walk_t 
 {
     unsigned long va;           /* Address we were looking for */
 #if GUEST_PAGING_LEVELS >= 3
@@ -465,55 +465,55 @@ struct shadow2_walk_t
  * shadow code's external entry points.
  */
 #define INTERNAL_NAME(name) \
-    SHADOW2_INTERNAL_NAME(name, SHADOW_PAGING_LEVELS, GUEST_PAGING_LEVELS)
+    SHADOW_INTERNAL_NAME(name, SHADOW_PAGING_LEVELS, GUEST_PAGING_LEVELS)
 
 /* macros for renaming the primary entry points, so that they are more
  * easily distinguished from a debugger
  */
-#define sh2_page_fault              INTERNAL_NAME(sh2_page_fault)
-#define sh2_invlpg                  INTERNAL_NAME(sh2_invlpg)
-#define sh2_gva_to_gpa              INTERNAL_NAME(sh2_gva_to_gpa)
-#define sh2_gva_to_gfn              INTERNAL_NAME(sh2_gva_to_gfn)
-#define sh2_update_cr3              INTERNAL_NAME(sh2_update_cr3)
-#define sh2_remove_write_access     INTERNAL_NAME(sh2_remove_write_access)
-#define sh2_remove_all_mappings     INTERNAL_NAME(sh2_remove_all_mappings)
-#define sh2_remove_l1_shadow        INTERNAL_NAME(sh2_remove_l1_shadow)
-#define sh2_remove_l2_shadow        INTERNAL_NAME(sh2_remove_l2_shadow)
-#define sh2_remove_l3_shadow        INTERNAL_NAME(sh2_remove_l3_shadow)
-#define sh2_map_and_validate_gl4e   INTERNAL_NAME(sh2_map_and_validate_gl4e)
-#define sh2_map_and_validate_gl3e   INTERNAL_NAME(sh2_map_and_validate_gl3e)
-#define sh2_map_and_validate_gl2e   INTERNAL_NAME(sh2_map_and_validate_gl2e)
-#define sh2_map_and_validate_gl2he  INTERNAL_NAME(sh2_map_and_validate_gl2he)
-#define sh2_map_and_validate_gl1e   INTERNAL_NAME(sh2_map_and_validate_gl1e)
-#define sh2_destroy_l4_shadow       INTERNAL_NAME(sh2_destroy_l4_shadow)
-#define sh2_destroy_l3_shadow       INTERNAL_NAME(sh2_destroy_l3_shadow)
-#define sh2_destroy_l3_subshadow    INTERNAL_NAME(sh2_destroy_l3_subshadow)
-#define sh2_unpin_all_l3_subshadows INTERNAL_NAME(sh2_unpin_all_l3_subshadows)
-#define sh2_destroy_l2_shadow       INTERNAL_NAME(sh2_destroy_l2_shadow)
-#define sh2_destroy_l1_shadow       INTERNAL_NAME(sh2_destroy_l1_shadow)
-#define sh2_unhook_32b_mappings     INTERNAL_NAME(sh2_unhook_32b_mappings)
-#define sh2_unhook_pae_mappings     INTERNAL_NAME(sh2_unhook_pae_mappings)
-#define sh2_unhook_64b_mappings     INTERNAL_NAME(sh2_unhook_64b_mappings)
-#define sh2_paging_mode             INTERNAL_NAME(sh2_paging_mode)
-#define sh2_detach_old_tables       INTERNAL_NAME(sh2_detach_old_tables)
-#define sh2_x86_emulate_write       INTERNAL_NAME(sh2_x86_emulate_write)
-#define sh2_x86_emulate_cmpxchg     INTERNAL_NAME(sh2_x86_emulate_cmpxchg)
-#define sh2_x86_emulate_cmpxchg8b   INTERNAL_NAME(sh2_x86_emulate_cmpxchg8b)
-#define sh2_audit_l1_table          INTERNAL_NAME(sh2_audit_l1_table)
-#define sh2_audit_fl1_table         INTERNAL_NAME(sh2_audit_fl1_table)
-#define sh2_audit_l2_table          INTERNAL_NAME(sh2_audit_l2_table)
-#define sh2_audit_l3_table          INTERNAL_NAME(sh2_audit_l3_table)
-#define sh2_audit_l4_table          INTERNAL_NAME(sh2_audit_l4_table)
-#define sh2_guess_wrmap             INTERNAL_NAME(sh2_guess_wrmap)
-#define sh2_clear_shadow_entry      INTERNAL_NAME(sh2_clear_shadow_entry)
+#define sh_page_fault              INTERNAL_NAME(sh_page_fault)
+#define sh_invlpg                  INTERNAL_NAME(sh_invlpg)
+#define sh_gva_to_gpa              INTERNAL_NAME(sh_gva_to_gpa)
+#define sh_gva_to_gfn              INTERNAL_NAME(sh_gva_to_gfn)
+#define sh_update_cr3              INTERNAL_NAME(sh_update_cr3)
+#define sh_remove_write_access     INTERNAL_NAME(sh_remove_write_access)
+#define sh_remove_all_mappings     INTERNAL_NAME(sh_remove_all_mappings)
+#define sh_remove_l1_shadow        INTERNAL_NAME(sh_remove_l1_shadow)
+#define sh_remove_l2_shadow        INTERNAL_NAME(sh_remove_l2_shadow)
+#define sh_remove_l3_shadow        INTERNAL_NAME(sh_remove_l3_shadow)
+#define sh_map_and_validate_gl4e   INTERNAL_NAME(sh_map_and_validate_gl4e)
+#define sh_map_and_validate_gl3e   INTERNAL_NAME(sh_map_and_validate_gl3e)
+#define sh_map_and_validate_gl2e   INTERNAL_NAME(sh_map_and_validate_gl2e)
+#define sh_map_and_validate_gl2he  INTERNAL_NAME(sh_map_and_validate_gl2he)
+#define sh_map_and_validate_gl1e   INTERNAL_NAME(sh_map_and_validate_gl1e)
+#define sh_destroy_l4_shadow       INTERNAL_NAME(sh_destroy_l4_shadow)
+#define sh_destroy_l3_shadow       INTERNAL_NAME(sh_destroy_l3_shadow)
+#define sh_destroy_l3_subshadow    INTERNAL_NAME(sh_destroy_l3_subshadow)
+#define sh_unpin_all_l3_subshadows INTERNAL_NAME(sh_unpin_all_l3_subshadows)
+#define sh_destroy_l2_shadow       INTERNAL_NAME(sh_destroy_l2_shadow)
+#define sh_destroy_l1_shadow       INTERNAL_NAME(sh_destroy_l1_shadow)
+#define sh_unhook_32b_mappings     INTERNAL_NAME(sh_unhook_32b_mappings)
+#define sh_unhook_pae_mappings     INTERNAL_NAME(sh_unhook_pae_mappings)
+#define sh_unhook_64b_mappings     INTERNAL_NAME(sh_unhook_64b_mappings)
+#define sh_paging_mode             INTERNAL_NAME(sh_paging_mode)
+#define sh_detach_old_tables       INTERNAL_NAME(sh_detach_old_tables)
+#define sh_x86_emulate_write       INTERNAL_NAME(sh_x86_emulate_write)
+#define sh_x86_emulate_cmpxchg     INTERNAL_NAME(sh_x86_emulate_cmpxchg)
+#define sh_x86_emulate_cmpxchg8b   INTERNAL_NAME(sh_x86_emulate_cmpxchg8b)
+#define sh_audit_l1_table          INTERNAL_NAME(sh_audit_l1_table)
+#define sh_audit_fl1_table         INTERNAL_NAME(sh_audit_fl1_table)
+#define sh_audit_l2_table          INTERNAL_NAME(sh_audit_l2_table)
+#define sh_audit_l3_table          INTERNAL_NAME(sh_audit_l3_table)
+#define sh_audit_l4_table          INTERNAL_NAME(sh_audit_l4_table)
+#define sh_guess_wrmap             INTERNAL_NAME(sh_guess_wrmap)
+#define sh_clear_shadow_entry      INTERNAL_NAME(sh_clear_shadow_entry)
 
-/* sh2_make_monitor_table only depends on the number of shadow levels */
-#define sh2_make_monitor_table                          \
-        SHADOW2_INTERNAL_NAME(sh2_make_monitor_table,   \
+/* sh_make_monitor_table only depends on the number of shadow levels */
+#define sh_make_monitor_table                          \
+        SHADOW_INTERNAL_NAME(sh_make_monitor_table,   \
                               SHADOW_PAGING_LEVELS,     \
                               SHADOW_PAGING_LEVELS)
-#define sh2_destroy_monitor_table                               \
-        SHADOW2_INTERNAL_NAME(sh2_destroy_monitor_table,        \
+#define sh_destroy_monitor_table                               \
+        SHADOW_INTERNAL_NAME(sh_destroy_monitor_table,        \
                               SHADOW_PAGING_LEVELS,             \
                               SHADOW_PAGING_LEVELS)
 
@@ -537,22 +537,22 @@ struct pae_l3_bookkeeping {
 #define sl3p_to_info(_ptr) ((struct pae_l3_bookkeeping *)         \
                             (((unsigned long)(_ptr) & ~31) + 32))
 
-static void sh2_destroy_l3_subshadow(struct vcpu *v, 
+static void sh_destroy_l3_subshadow(struct vcpu *v, 
                                      shadow_l3e_t *sl3e);
 
 /* Increment a subshadow ref
  * Called with a pointer to the subshadow, and the mfn of the
  * *first* page of the overall shadow. */
-static inline void sh2_get_ref_l3_subshadow(shadow_l3e_t *sl3e, mfn_t smfn)
+static inline void sh_get_ref_l3_subshadow(shadow_l3e_t *sl3e, mfn_t smfn)
 {
     struct pae_l3_bookkeeping *bk = sl3p_to_info(sl3e);
 
     /* First ref to the subshadow takes a ref to the full shadow */
     if ( bk->refcount == 0 ) 
-        sh2_get_ref(smfn, 0);
+        sh_get_ref(smfn, 0);
     if ( unlikely(++(bk->refcount) == 0) )
     {
-        SHADOW2_PRINTK("shadow l3 subshadow ref overflow, smfn=%" SH2_PRI_mfn " sh=%p\n", 
+        SHADOW_PRINTK("shadow l3 subshadow ref overflow, smfn=%" SH_PRI_mfn " sh=%p\n", 
                        mfn_x(smfn), sl3e);
         domain_crash_synchronous();
     }
@@ -563,7 +563,7 @@ static inline void sh2_get_ref_l3_subshadow(shadow_l3e_t *sl3e, mfn_t smfn)
  * *first* page of the overall shadow.  Calling this may cause the 
  * entire shadow to disappear, so the caller must immediately unmap 
  * the pointer after calling. */ 
-static inline void sh2_put_ref_l3_subshadow(struct vcpu *v, 
+static inline void sh_put_ref_l3_subshadow(struct vcpu *v, 
                                             shadow_l3e_t *sl3e,
                                             mfn_t smfn)
 {
@@ -575,16 +575,16 @@ static inline void sh2_put_ref_l3_subshadow(struct vcpu *v,
     if ( --(bk->refcount) == 0 )
     {
         /* Need to destroy this subshadow */
-        sh2_destroy_l3_subshadow(v, sl3e);
+        sh_destroy_l3_subshadow(v, sl3e);
         /* Last ref to the subshadow had a ref to the full shadow */
-        sh2_put_ref(v, smfn, 0);
+        sh_put_ref(v, smfn, 0);
     }
 }
 
 /* Pin a subshadow 
  * Called with a pointer to the subshadow, and the mfn of the
  * *first* page of the overall shadow. */
-static inline void sh2_pin_l3_subshadow(shadow_l3e_t *sl3e, mfn_t smfn)
+static inline void sh_pin_l3_subshadow(shadow_l3e_t *sl3e, mfn_t smfn)
 {
     struct pae_l3_bookkeeping *bk = sl3p_to_info(sl3e);
 
@@ -597,7 +597,7 @@ static inline void sh2_pin_l3_subshadow(shadow_l3e_t *sl3e, mfn_t smfn)
     if ( !bk->pinned )
     {
         bk->pinned = 1;
-        sh2_get_ref_l3_subshadow(sl3e, smfn);
+        sh_get_ref_l3_subshadow(sl3e, smfn);
     }
 }
 
@@ -606,7 +606,7 @@ static inline void sh2_pin_l3_subshadow(shadow_l3e_t *sl3e, mfn_t smfn)
  * *first* page of the overall shadow.  Calling this may cause the 
  * entire shadow to disappear, so the caller must immediately unmap 
  * the pointer after calling. */ 
-static inline void sh2_unpin_l3_subshadow(struct vcpu *v, 
+static inline void sh_unpin_l3_subshadow(struct vcpu *v, 
                                           shadow_l3e_t *sl3e,
                                           mfn_t smfn)
 {
@@ -621,7 +621,7 @@ static inline void sh2_unpin_l3_subshadow(struct vcpu *v,
     if ( bk->pinned )
     {
         bk->pinned = 0;
-        sh2_put_ref_l3_subshadow(v, sl3e, smfn);
+        sh_put_ref_l3_subshadow(v, sl3e, smfn);
     }
 }
 
@@ -632,22 +632,22 @@ static inline void sh2_unpin_l3_subshadow(struct vcpu *v,
 #endif
 
 #if SHADOW_PAGING_LEVELS == 2
-#define SH2_PRI_pte "08x"
+#define SH_PRI_pte "08x"
 #else /* SHADOW_PAGING_LEVELS >= 3 */
 #ifndef __x86_64__
-#define SH2_PRI_pte "016llx"
+#define SH_PRI_pte "016llx"
 #else
-#define SH2_PRI_pte "016lx"
+#define SH_PRI_pte "016lx"
 #endif
 #endif /* SHADOW_PAGING_LEVELS >= 3 */
 
 #if GUEST_PAGING_LEVELS == 2
-#define SH2_PRI_gpte "08x"
+#define SH_PRI_gpte "08x"
 #else /* GUEST_PAGING_LEVELS >= 3 */
 #ifndef __x86_64__
-#define SH2_PRI_gpte "016llx"
+#define SH_PRI_gpte "016llx"
 #else
-#define SH2_PRI_gpte "016lx"
+#define SH_PRI_gpte "016lx"
 #endif
 #endif /* GUEST_PAGING_LEVELS >= 3 */
 
@@ -680,7 +680,7 @@ accumulate_guest_flags(walk_t *gw)
     return accumulated_flags;
 }
 
-#endif /* _XEN_SHADOW2_TYPES_H */
+#endif /* _XEN_SHADOW_TYPES_H */
 
 /*
  * Local variables:

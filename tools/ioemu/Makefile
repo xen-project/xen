@@ -94,7 +94,7 @@ test speed test2: all
 	$(MAKE) -C tests $@
 
 TAGS: 
-	etags *.[ch] tests/*.[ch]
+	etags *.[ch] target-i386-dm/*.[ch] hw/*.[ch]
 
 cscope:
 	rm -f ./cscope.*

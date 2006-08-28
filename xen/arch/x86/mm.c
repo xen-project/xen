@@ -454,12 +454,12 @@ int map_ldt_shadow_page(unsigned int off)
 
     res = get_page_and_type(mfn_to_page(mfn), d, PGT_ldt_page);
 
-    if ( !res && unlikely(shadow2_mode_refcounts(d)) )
+    if ( !res && unlikely(shadow_mode_refcounts(d)) )
     {
-        shadow2_lock(d);
-        shadow2_remove_write_access(d->vcpu[0], _mfn(mfn), 0, 0);
+        shadow_lock(d);
+        shadow_remove_write_access(d->vcpu[0], _mfn(mfn), 0, 0);
         res = get_page_and_type(mfn_to_page(mfn), d, PGT_ldt_page);
-        shadow2_unlock(d);
+        shadow_unlock(d);
     }
 
     if ( unlikely(!res) )
@@ -527,7 +527,7 @@ get_linear_pagetable(
     struct page_info *page;
     unsigned long pfn;
 
-    ASSERT( !shadow2_mode_refcounts(d) );
+    ASSERT( !shadow_mode_refcounts(d) );
 
     if ( (root_get_flags(re) & _PAGE_RW) )
     {
@@ -602,12 +602,12 @@ get_page_from_l1e(
         d = dom_io;
     }
 
-    /* Foreign mappings into guests in shadow2 external mode don't
+    /* Foreign mappings into guests in shadow external mode don't
      * contribute to writeable mapping refcounts.  (This allows the
      * qemu-dm helper process in dom0 to map the domain's memory without
      * messing up the count of "real" writable mappings.) */
     okay = (((l1e_get_flags(l1e) & _PAGE_RW) && 
-             !(unlikely(shadow2_mode_external(d) && (d != current->domain))))
+             !(unlikely(shadow_mode_external(d) && (d != current->domain))))
             ? get_page_and_type(page, d, PGT_writable_page)
             : get_page(page, d));
     if ( !okay )
@@ -771,9 +771,9 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
     }
 
     /* Remember we didn't take a type-count of foreign writable mappings
-     * to shadow2 external domains */
+     * to shadow external domains */
     if ( (l1e_get_flags(l1e) & _PAGE_RW) && 
-         !(unlikely((e != d) && shadow2_mode_external(e))) )
+         !(unlikely((e != d) && shadow_mode_external(e))) )
     {
         put_page_and_type(page);
     }
@@ -830,7 +830,7 @@ static int alloc_l1_table(struct page_info *page)
     l1_pgentry_t  *pl1e;
     int            i;
 
-    ASSERT(!shadow2_mode_refcounts(d));
+    ASSERT(!shadow_mode_refcounts(d));
 
     pl1e = map_domain_page(pfn);
 
@@ -883,7 +883,7 @@ static int create_pae_xen_mappings(l3_pgentry_t *pl3e)
      *     a. alloc_l3_table() calls this function and this check will fail
      *     b. mod_l3_entry() disallows updates to slot 3 in an existing table
      *
-     * XXX -- this needs revisiting for shadow2_mode_refcount()==true...
+     * XXX -- this needs revisiting for shadow_mode_refcount()==true...
      */
     page = l3e_get_page(l3e3);
     BUG_ON(page->u.inuse.type_info & PGT_pinned);
@@ -1007,7 +1007,7 @@ static int alloc_l2_table(struct page_info *page, unsigned long type)
     l2_pgentry_t  *pl2e;
     int            i;
 
-    ASSERT(!shadow2_mode_refcounts(d));
+    ASSERT(!shadow_mode_refcounts(d));
     
     pl2e = map_domain_page(pfn);
 
@@ -1059,7 +1059,7 @@ static int alloc_l3_table(struct page_info *page, unsigned long type)
     l3_pgentry_t  *pl3e;
     int            i;
 
-    ASSERT(!shadow2_mode_refcounts(d));
+    ASSERT(!shadow_mode_refcounts(d));
 
 #ifdef CONFIG_X86_PAE
     /*
@@ -1120,7 +1120,7 @@ static int alloc_l4_table(struct page_info *page, unsigned long type)
     unsigned long vaddr;
     int            i;
 
-    ASSERT(!shadow2_mode_refcounts(d));
+    ASSERT(!shadow_mode_refcounts(d));
 
     for ( i = 0; i < L4_PAGETABLE_ENTRIES; i++ )
     {
@@ -1234,8 +1234,8 @@ static inline int update_l1e(l1_pgentry_t *pl1e,
                              struct vcpu *v)
 {
     int rv = 1;
-    if ( unlikely(shadow2_mode_enabled(v->domain)) )
-        shadow2_lock(v->domain);
+    if ( unlikely(shadow_mode_enabled(v->domain)) )
+        shadow_lock(v->domain);
 #ifndef PTE_UPDATE_WITH_CMPXCHG
     rv = (!__copy_to_user(pl1e, &nl1e, sizeof(nl1e)));
 #else
@@ -1266,10 +1266,10 @@ static inline int update_l1e(l1_pgentry_t *pl1e,
         }
     }
 #endif
-    if ( unlikely(shadow2_mode_enabled(v->domain)) )
+    if ( unlikely(shadow_mode_enabled(v->domain)) )
     {
-        shadow2_validate_guest_entry(v, _mfn(gl1mfn), pl1e);
-        shadow2_unlock(v->domain);    
+        shadow_validate_guest_entry(v, _mfn(gl1mfn), pl1e);
+        shadow_unlock(v->domain);    
     }
     return rv;
 }
@@ -1339,13 +1339,13 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
 #endif
 #define UPDATE_ENTRY(_t,_p,_o,_n,_m)  ({                            \
     int rv;                                                         \
-    if ( unlikely(shadow2_mode_enabled(current->domain)) )          \
-        shadow2_lock(current->domain);                              \
+    if ( unlikely(shadow_mode_enabled(current->domain)) )          \
+        shadow_lock(current->domain);                              \
     rv = _UPDATE_ENTRY(_t, _p, _o, _n);                             \
-    if ( unlikely(shadow2_mode_enabled(current->domain)) )          \
+    if ( unlikely(shadow_mode_enabled(current->domain)) )          \
     {                                                               \
-        shadow2_validate_guest_entry(current, _mfn(_m), (_p));      \
-        shadow2_unlock(current->domain);                            \
+        shadow_validate_guest_entry(current, _mfn(_m), (_p));      \
+        shadow_unlock(current->domain);                            \
     }                                                               \
     rv;                                                             \
 })
@@ -1581,21 +1581,21 @@ void free_page_type(struct page_info *page, unsigned long type)
          */
         this_cpu(percpu_mm_info).deferred_ops |= DOP_FLUSH_ALL_TLBS;
 
-        if ( unlikely(shadow2_mode_enabled(owner)
-                 && !shadow2_lock_is_acquired(owner)) )
+        if ( unlikely(shadow_mode_enabled(owner)
+                 && !shadow_lock_is_acquired(owner)) )
         {
             /* Raw page tables are rewritten during save/restore. */
-            if ( !shadow2_mode_translate(owner) )
+            if ( !shadow_mode_translate(owner) )
                 mark_dirty(owner, page_to_mfn(page));
 
-            if ( shadow2_mode_refcounts(owner) )
+            if ( shadow_mode_refcounts(owner) )
                 return;
 
             gmfn = mfn_to_gmfn(owner, page_to_mfn(page));
             ASSERT(VALID_M2P(gmfn));
-            shadow2_lock(owner);
-            shadow2_remove_all_shadows(owner->vcpu[0], _mfn(gmfn));
-            shadow2_unlock(owner);
+            shadow_lock(owner);
+            shadow_remove_all_shadows(owner->vcpu[0], _mfn(gmfn));
+            shadow_unlock(owner);
         }
     }
 
@@ -1760,7 +1760,7 @@ int get_page_type(struct page_info *page, unsigned long type)
 #endif
                     /* Fixme: add code to propagate va_unknown to subtables. */
                     if ( ((type & PGT_type_mask) >= PGT_l2_page_table) &&
-                         !shadow2_mode_refcounts(page_get_owner(page)) )
+                         !shadow_mode_refcounts(page_get_owner(page)) )
                         return 0;
                     /* This table is possibly mapped at multiple locations. */
                     nx &= ~PGT_va_mask;
@@ -1810,7 +1810,7 @@ int new_guest_cr3(unsigned long mfn)
     if ( hvm_guest(v) && !hvm_paging_enabled(v) )
         domain_crash_synchronous();
 
-    if ( shadow2_mode_refcounts(d) )
+    if ( shadow_mode_refcounts(d) )
     {
         okay = get_page_from_pagenr(mfn, d);
         if ( unlikely(!okay) )
@@ -1858,7 +1858,7 @@ int new_guest_cr3(unsigned long mfn)
 
     if ( likely(old_base_mfn != 0) )
     {
-        if ( shadow2_mode_refcounts(d) )
+        if ( shadow_mode_refcounts(d) )
             put_page(mfn_to_page(old_base_mfn));
         else
             put_page_and_type(mfn_to_page(old_base_mfn));
@@ -2043,7 +2043,7 @@ int do_mmuext_op(
             type = PGT_root_page_table;
 
         pin_page:
-            if ( shadow2_mode_refcounts(FOREIGNDOM) )
+            if ( shadow_mode_refcounts(FOREIGNDOM) )
                 break;
 
             okay = get_page_and_type_from_pagenr(mfn, type, FOREIGNDOM);
@@ -2065,7 +2065,7 @@ int do_mmuext_op(
             break;
 
         case MMUEXT_UNPIN_TABLE:
-            if ( shadow2_mode_refcounts(d) )
+            if ( shadow_mode_refcounts(d) )
                 break;
 
             if ( unlikely(!(okay = get_page_from_pagenr(mfn, d))) )
@@ -2078,11 +2078,11 @@ int do_mmuext_op(
             {
                 put_page_and_type(page);
                 put_page(page);
-                if ( shadow2_mode_enabled(d) )
+                if ( shadow_mode_enabled(d) )
                 {
-                    shadow2_lock(d);
-                    shadow2_remove_all_shadows(v, _mfn(mfn));
-                    shadow2_unlock(d);
+                    shadow_lock(d);
+                    shadow_remove_all_shadows(v, _mfn(mfn));
+                    shadow_unlock(d);
                 }
             }
             else
@@ -2125,8 +2125,8 @@ int do_mmuext_op(
             break;
     
         case MMUEXT_INVLPG_LOCAL:
-            if ( !shadow2_mode_enabled(d) 
-                 || shadow2_invlpg(v, op.arg1.linear_addr) != 0 )
+            if ( !shadow_mode_enabled(d) 
+                 || shadow_invlpg(v, op.arg1.linear_addr) != 0 )
                 local_flush_tlb_one(op.arg1.linear_addr);
             break;
 
@@ -2173,7 +2173,7 @@ int do_mmuext_op(
             unsigned long ptr  = op.arg1.linear_addr;
             unsigned long ents = op.arg2.nr_ents;
 
-            if ( shadow2_mode_external(d) )
+            if ( shadow_mode_external(d) )
             {
                 MEM_LOG("ignoring SET_LDT hypercall from external "
                         "domain %u", d->domain_id);
@@ -2319,7 +2319,7 @@ int do_mmu_update(
             case PGT_l3_page_table:
             case PGT_l4_page_table:
             {
-                if ( shadow2_mode_refcounts(d) )
+                if ( shadow_mode_refcounts(d) )
                 {
                     DPRINTK("mmu update on shadow-refcounted domain!");
                     break;
@@ -2372,16 +2372,16 @@ int do_mmu_update(
                 if ( unlikely(!get_page_type(page, PGT_writable_page)) )
                     break;
 
-                if ( unlikely(shadow2_mode_enabled(d)) )
-                    shadow2_lock(d);
+                if ( unlikely(shadow_mode_enabled(d)) )
+                    shadow_lock(d);
 
                 *(intpte_t *)va = req.val;
                 okay = 1;
 
-                if ( unlikely(shadow2_mode_enabled(d)) )
+                if ( unlikely(shadow_mode_enabled(d)) )
                 {
-                    shadow2_validate_guest_entry(v, _mfn(mfn), va);
-                    shadow2_unlock(d);
+                    shadow_validate_guest_entry(v, _mfn(mfn), va);
+                    shadow_unlock(d);
                 }
 
                 put_page_type(page);
@@ -2405,8 +2405,8 @@ int do_mmu_update(
                 break;
             }
 
-            if ( shadow2_mode_translate(FOREIGNDOM) )
-                shadow2_guest_physmap_add_page(FOREIGNDOM, gpfn, mfn);
+            if ( shadow_mode_translate(FOREIGNDOM) )
+                shadow_guest_physmap_add_page(FOREIGNDOM, gpfn, mfn);
             else 
                 set_gpfn_from_mfn(mfn, gpfn);
             okay = 1;
@@ -2492,7 +2492,7 @@ static int create_grant_pte_mapping(
         goto failed;
     } 
 
-    if ( !shadow2_mode_refcounts(d) )
+    if ( !shadow_mode_refcounts(d) )
         put_page_from_l1e(ol1e, d);
 
     put_page_type(page);
@@ -2590,7 +2590,7 @@ static int create_grant_va_mapping(
                     l2e_get_pfn(__linear_l2_table[l2_linear_offset(va)]), v) )
         return GNTST_general_error;
 
-    if ( !shadow2_mode_refcounts(d) )
+    if ( !shadow_mode_refcounts(d) )
         put_page_from_l1e(ol1e, d);
 
     return GNTST_okay;
@@ -2714,10 +2714,10 @@ int do_update_va_mapping(unsigned long va, u64 val64,
 
     perfc_incrc(calls_to_update_va);
 
-    if ( unlikely(!__addr_ok(va) && !shadow2_mode_external(d)) )
+    if ( unlikely(!__addr_ok(va) && !shadow_mode_external(d)) )
         return -EINVAL;
 
-    if ( unlikely(shadow2_mode_refcounts(d)) )
+    if ( unlikely(shadow_mode_refcounts(d)) )
     {
         DPRINTK("Grant op on a shadow-refcounted domain\n");
         return -EINVAL; 
@@ -2725,11 +2725,11 @@ int do_update_va_mapping(unsigned long va, u64 val64,
 
     LOCK_BIGLOCK(d);
 
-    if ( likely(rc == 0) && unlikely(shadow2_mode_enabled(d)) )
+    if ( likely(rc == 0) && unlikely(shadow_mode_enabled(d)) )
     {
         if ( unlikely(this_cpu(percpu_mm_info).foreign &&
-                      (shadow2_mode_translate(d) ||
-                       shadow2_mode_translate(
+                      (shadow_mode_translate(d) ||
+                       shadow_mode_translate(
                            this_cpu(percpu_mm_info).foreign))) )
         {
             /*
@@ -2770,8 +2770,8 @@ int do_update_va_mapping(unsigned long va, u64 val64,
         switch ( (bmap_ptr = flags & ~UVMF_FLUSHTYPE_MASK) )
         {
         case UVMF_LOCAL:
-            if ( !shadow2_mode_enabled(d) 
-                 || (shadow2_invlpg(current, va) != 0) ) 
+            if ( !shadow_mode_enabled(d) 
+                 || (shadow_invlpg(current, va) != 0) ) 
                 local_flush_tlb_one(va);
             break;
         case UVMF_ALL:
@@ -3006,7 +3006,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
             break;
         }
 
-        if ( !shadow2_mode_translate(d) || (mfn == 0) )
+        if ( !shadow_mode_translate(d) || (mfn == 0) )
         {
             put_domain(d);
             return -EINVAL;
@@ -3196,21 +3196,21 @@ static int ptwr_emulated_update(
     pl1e = (l1_pgentry_t *)((unsigned long)pl1e + (addr & ~PAGE_MASK));
     if ( do_cmpxchg )
     {
-        if ( shadow2_mode_enabled(d) )
-            shadow2_lock(d);
+        if ( shadow_mode_enabled(d) )
+            shadow_lock(d);
         ol1e = l1e_from_intpte(old);
         if ( cmpxchg((intpte_t *)pl1e, old, val) != old )
         {
-            if ( shadow2_mode_enabled(d) )
-                shadow2_unlock(d);
+            if ( shadow_mode_enabled(d) )
+                shadow_unlock(d);
             unmap_domain_page(pl1e);
             put_page_from_l1e(nl1e, d);
             return X86EMUL_CMPXCHG_FAILED;
         }
-        if ( unlikely(shadow2_mode_enabled(v->domain)) )
+        if ( unlikely(shadow_mode_enabled(v->domain)) )
         {
-            shadow2_validate_guest_entry(v, _mfn(page_to_mfn(page)), pl1e);
-            shadow2_unlock(v->domain);    
+            shadow_validate_guest_entry(v, _mfn(page_to_mfn(page)), pl1e);
+            shadow_unlock(v->domain);    
         }
     }
     else

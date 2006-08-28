@@ -2,6 +2,7 @@ subdir-y += acpi
 subdir-y += cpu
 subdir-y += genapic
 subdir-y += hvm
+subdir-y += mm
 subdir-y += oprofile
 
 subdir-$(x86_32) += x86_32
@@ -41,23 +42,6 @@ obj-y += traps.o
 obj-y += usercopy.o
 obj-y += x86_emulate.o
 
-ifneq ($(pae),n)
-obj-$(x86_32) += shadow2-common.o shadow2_g2_on_s3.o shadow2_g3_on_s3.o
-else
-obj-$(x86_32) += shadow2-common.o shadow2_g2_on_s2.o
-endif
-
-obj-$(x86_64) += shadow2-common.o shadow2_g4_on_s4.o shadow2_g3_on_s3.o \
-                 shadow2_g2_on_s3.o
-
-guest_levels  = $(subst g,,$(filter g%,$(subst ., ,$(subst _, ,$(subst shadow2_,,$(1))))))
-shadow_levels = $(subst s,,$(filter s%,$(subst ., ,$(subst _, ,$(subst shadow2_,,$(1))))))
-shadow2_defns = -DGUEST_PAGING_LEVELS=$(call guest_levels,$(1)) \
-                -DSHADOW_PAGING_LEVELS=$(call shadow_levels,$(1))
-
-shadow2_%.o: shadow2.c $(HDRS) Makefile
-	$(CC) $(CFLAGS) $(call shadow2_defns,$(@F)) -c $< -o $@
-
 obj-$(crash_debug) += gdbstub.o
 
 $(TARGET): $(TARGET)-syms boot/mkelf32
@@ -85,9 +69,6 @@ xen.lds: $(TARGET_SUBARCH)/xen.lds.S $(HDRS)
 
 boot/mkelf32: boot/mkelf32.c
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
-
-shadow_guest32.o: shadow.c
-shadow_guest32pae.o: shadow.c
 
 .PHONY: clean
 clean::

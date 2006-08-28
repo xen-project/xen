@@ -679,8 +679,8 @@ int construct_dom0(struct domain *d,
         (void)alloc_vcpu(d, i, i);
 
     /* Set up CR3 value for write_ptbase */
-    if ( shadow2_mode_enabled(v->domain) )
-        shadow2_update_paging_modes(v);
+    if ( shadow_mode_enabled(v->domain) )
+        shadow_update_paging_modes(v);
     else
         update_cr3(v);
 
@@ -791,8 +791,8 @@ int construct_dom0(struct domain *d,
     new_thread(v, dsi.v_kernentry, vstack_end, vstartinfo_start);
 
     if ( opt_dom0_shadow )
-        if ( shadow2_test_enable(d) == 0 ) 
-            shadow2_update_paging_modes(v);
+        if ( shadow_test_enable(d) == 0 ) 
+            shadow_update_paging_modes(v);
 
     if ( supervisor_mode_kernel )
     {

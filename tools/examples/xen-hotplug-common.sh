@@ -21,7 +21,7 @@ dir=$(dirname "$0")
 . "$dir/xen-script-common.sh"
 . "$dir/locking.sh"
 
-exec 2>>/var/log/xen-hotplug.log
+exec 2>>/var/log/xen/xen-hotplug.log
 
 export PATH="/sbin:/bin:/usr/bin:/usr/sbin:$PATH"
 export LANG="POSIX"

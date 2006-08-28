@@ -4,7 +4,7 @@
  * A simplified event channel for para-drivers in unmodified linux
  *
  * Copyright (c) 2002-2005, K A Fraser
- * Copyright (c) 2005, <xiaofeng.ling@intel.com>
+ * Copyright (c) 2005, Intel Corporation <xiaofeng.ling@intel.com>
  *
  * This file may be distributed separately from the Linux kernel, or
  * incorporated into other software packages, subject to the following license:

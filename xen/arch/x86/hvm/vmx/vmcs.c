@@ -35,7 +35,7 @@
 #include <xen/event.h>
 #include <xen/kernel.h>
 #include <xen/keyhandler.h>
-#include <asm/shadow2.h>
+#include <asm/shadow.h>
 
 static int vmcs_size;
 static int vmcs_order;
@@ -272,7 +272,7 @@ static void vmx_do_launch(struct vcpu *v)
     error |= __vmwrite(GUEST_TR_BASE, 0);
     error |= __vmwrite(GUEST_TR_LIMIT, 0xff);
 
-    shadow2_update_paging_modes(v);
+    shadow_update_paging_modes(v);
     printk("%s(): GUEST_CR3<=%08lx, HOST_CR3<=%08lx\n",
            __func__, v->arch.hvm_vcpu.hw_cr3, v->arch.cr3);
     __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr3);

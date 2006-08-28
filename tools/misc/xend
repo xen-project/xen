@@ -86,7 +86,7 @@ def start_xenstored():
     XENSTORED_TRACE = os.getenv("XENSTORED_TRACE")
     cmd = "xenstored --pid-file /var/run/xenstore.pid"
     if XENSTORED_TRACE:
-        cmd += " -T /var/log/xenstored-trace.log"
+        cmd += " -T /var/log/xen/xenstored-trace.log"
     s,o = commands.getstatusoutput(cmd)
 
 def start_consoled():

@@ -25,6 +25,16 @@ void *memcpy(void *dest, const void *src, unsigned n);
 void *memset(void *s, int c, unsigned n);
 char *itoa(char *a, unsigned int i);
 
+/* convert a byte to two lowercase hex digits, with no terminating NUL 
+   character.  digits[] must have at least two elements. */
+void byte_to_hex(char *digits, uint8_t byte);
+
+/* Convert an array of 16 unsigned bytes to a DCE/OSF formatted UUID
+   string.
+
+   Pre-condition: sizeof(dest) >= 37 */
+void uuid_to_string(char *dest, uint8_t *uuid);
+
 /* Debug output */
 void puts(const char *s);
 

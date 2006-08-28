@@ -116,8 +116,10 @@ smbios_table_size(uint32_t vcpus, const char *xen_version,
 
 	/* type 0: "Xen", xen_version, and release_date */
 	size += strlen("Xen") + strlen(xen_version) + 2;
-	/* type 1: "Xen", xen_version, "HVM domU" */
-	size += strlen("Xen") + strlen("HVM domU") + strlen(xen_version) + 3;
+	/* type 1: "Xen", xen_version, "HVM domU", UUID as string for 
+                   serial number */
+	size += strlen("Xen") + strlen("HVM domU") + strlen(xen_version) +
+			36 + 4;
 	/* type 3: "Xen" */
 	size += strlen("Xen") + 1;
 	/* type 4: socket designation ("CPU n"), processor_manufacturer */
@@ -371,6 +373,7 @@ static void *
 smbios_type_1_init(void *start, const char *xen_version, 
 		   uint8_t uuid[16])
 {
+	char uuid_str[37];
 	struct smbios_type_1 *p = (struct smbios_type_1 *)start;
 	p->header.type = 1;
 	p->header.length = sizeof(struct smbios_type_1);
@@ -379,7 +382,7 @@ smbios_type_1_init(void *start, const char *xen_version,
 	p->manufacturer_str = 1;
 	p->product_name_str = 2;
 	p->version_str = 3;
-	p->serial_number_str = 0;
+	p->serial_number_str = 4;
     
 	memcpy(p->uuid, uuid, 16);
 
@@ -395,6 +398,9 @@ smbios_type_1_init(void *start, const char *xen_version,
 	start += strlen("HVM domU") + 1;
 	strcpy((char *)start, xen_version);
 	start += strlen(xen_version) + 1;
+	uuid_to_string(uuid_str, uuid);	
+	strcpy((char *)start, uuid_str);
+	start += strlen(uuid_str) + 1;
 	*((uint8_t *)start) = 0;
     
 	return start+1; 

@@ -1,7 +1,7 @@
 /******************************************************************************
- * arch/x86/shadow2-private.h
+ * arch/x86/mm/shadow/private.h
  *
- * Shadow2 code that is private, and does not need to be multiply compiled.
+ * Shadow code that is private, and does not need to be multiply compiled.
  * Parts of this code are Copyright (c) 2006 by XenSource Inc.
  * Parts of this code are Copyright (c) 2006 by Michael A Fetterman
  * Parts based on earlier work by Michael A Fetterman, Ian Pratt et al.
@@ -21,8 +21,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef _XEN_SHADOW2_PRIVATE_H
-#define _XEN_SHADOW2_PRIVATE_H
+#ifndef _XEN_SHADOW_PRIVATE_H
+#define _XEN_SHADOW_PRIVATE_H
 
 // In order to override the definition of mfn_to_page, we make sure page.h has
 // been included...
@@ -140,40 +140,40 @@
 /******************************************************************************
  * Debug and error-message output
  */
-#define SHADOW2_PRINTK(_f, _a...)                                     \
-    debugtrace_printk("sh2: %s(): " _f, __func__, ##_a)
-#define SHADOW2_ERROR(_f, _a...)                                      \
-    printk("sh2 error: %s(): " _f, __func__, ##_a)
-#define SHADOW2_DEBUG(flag, _f, _a...)                                \
+#define SHADOW_PRINTK(_f, _a...)                                     \
+    debugtrace_printk("sh: %s(): " _f, __func__, ##_a)
+#define SHADOW_ERROR(_f, _a...)                                      \
+    printk("sh error: %s(): " _f, __func__, ##_a)
+#define SHADOW_DEBUG(flag, _f, _a...)                                \
     do {                                                              \
-        if (SHADOW2_DEBUG_ ## flag)                                   \
-            debugtrace_printk("sh2debug: %s(): " _f, __func__, ##_a); \
+        if (SHADOW_DEBUG_ ## flag)                                   \
+            debugtrace_printk("shdebug: %s(): " _f, __func__, ##_a); \
     } while (0)
 
-// The flags for use with SHADOW2_DEBUG:
-#define SHADOW2_DEBUG_PROPAGATE         0
-#define SHADOW2_DEBUG_MAKE_SHADOW       0
-#define SHADOW2_DEBUG_DESTROY_SHADOW    0
-#define SHADOW2_DEBUG_P2M               0
-#define SHADOW2_DEBUG_A_AND_D           0
-#define SHADOW2_DEBUG_EMULATE           0
-#define SHADOW2_DEBUG_LOGDIRTY          1
+// The flags for use with SHADOW_DEBUG:
+#define SHADOW_DEBUG_PROPAGATE         0
+#define SHADOW_DEBUG_MAKE_SHADOW       0
+#define SHADOW_DEBUG_DESTROY_SHADOW    0
+#define SHADOW_DEBUG_P2M               0
+#define SHADOW_DEBUG_A_AND_D           0
+#define SHADOW_DEBUG_EMULATE           0
+#define SHADOW_DEBUG_LOGDIRTY          1
 
 
 /******************************************************************************
  * Auditing routines 
  */
 
-#if SHADOW2_AUDIT & SHADOW2_AUDIT_ENTRIES_FULL
-extern void shadow2_audit_tables(struct vcpu *v);
+#if SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES_FULL
+extern void shadow_audit_tables(struct vcpu *v);
 #else
-#define shadow2_audit_tables(_v) do {} while(0)
+#define shadow_audit_tables(_v) do {} while(0)
 #endif
 
-#if SHADOW2_AUDIT & SHADOW2_AUDIT_P2M
-extern void shadow2_audit_p2m(struct domain *d);
+#if SHADOW_AUDIT & SHADOW_AUDIT_P2M
+extern void shadow_audit_p2m(struct domain *d);
 #else
-#define shadow2_audit_p2m(_d) do {} while(0)
+#define shadow_audit_p2m(_d) do {} while(0)
 #endif
 
 
@@ -185,82 +185,82 @@ extern void shadow2_audit_p2m(struct domain *d);
  * path fills in another.  When the fault handler finishes, the 
  * two are compared */
 
-#ifdef SHADOW2_OPTIMIZATION_PARANOIA
+#ifdef SHADOW_OPTIMIZATION_PARANOIA
 
-typedef struct shadow2_action_log sh2_log_t;
-struct shadow2_action_log {
+typedef struct shadow_action_log sh_log_t;
+struct shadow_action_log {
     paddr_t ad[CONFIG_PAGING_LEVELS];  /* A & D bits propagated here */
     paddr_t mmio;                      /* Address of an mmio operation */
     int rv;                            /* Result of the fault handler */
 };
 
 /* There are two logs, one for the fast path, one for the normal path */
-enum sh2_log_type { log_slow = 0, log_fast= 1 };
+enum sh_log_type { log_slow = 0, log_fast= 1 };
 
 /* Alloc and zero the logs */
-static inline void sh2_init_log(struct vcpu *v) 
+static inline void sh_init_log(struct vcpu *v) 
 {
-    if ( unlikely(!v->arch.shadow2.action_log) ) 
-        v->arch.shadow2.action_log = xmalloc_array(sh2_log_t, 2);
-    ASSERT(v->arch.shadow2.action_log);
-    memset(v->arch.shadow2.action_log, 0, 2 * sizeof (sh2_log_t));
+    if ( unlikely(!v->arch.shadow.action_log) ) 
+        v->arch.shadow.action_log = xmalloc_array(sh_log_t, 2);
+    ASSERT(v->arch.shadow.action_log);
+    memset(v->arch.shadow.action_log, 0, 2 * sizeof (sh_log_t));
 }
 
 /* Log an A&D-bit update */
-static inline void sh2_log_ad(struct vcpu *v, paddr_t e, unsigned int level)
+static inline void sh_log_ad(struct vcpu *v, paddr_t e, unsigned int level)
 {
-    v->arch.shadow2.action_log[v->arch.shadow2.action_index].ad[level] = e;
+    v->arch.shadow.action_log[v->arch.shadow.action_index].ad[level] = e;
 }
 
 /* Log an MMIO address */
-static inline void sh2_log_mmio(struct vcpu *v, paddr_t m)
+static inline void sh_log_mmio(struct vcpu *v, paddr_t m)
 {
-    v->arch.shadow2.action_log[v->arch.shadow2.action_index].mmio = m;
+    v->arch.shadow.action_log[v->arch.shadow.action_index].mmio = m;
 }
 
 /* Log the result */
-static inline void sh2_log_rv(struct vcpu *v, int rv)
+static inline void sh_log_rv(struct vcpu *v, int rv)
 {
-    v->arch.shadow2.action_log[v->arch.shadow2.action_index].rv = rv;
+    v->arch.shadow.action_log[v->arch.shadow.action_index].rv = rv;
 }
 
 /* Set which mode we're in */
-static inline void sh2_set_log_mode(struct vcpu *v, enum sh2_log_type t) 
+static inline void sh_set_log_mode(struct vcpu *v, enum sh_log_type t) 
 {
-    v->arch.shadow2.action_index = t;
+    v->arch.shadow.action_index = t;
 }
 
 /* Know not to take action, because we're only checking the mechanism */
-static inline int sh2_take_no_action(struct vcpu *v) 
+static inline int sh_take_no_action(struct vcpu *v) 
 {
-    return (v->arch.shadow2.action_index == log_fast);
+    return (v->arch.shadow.action_index == log_fast);
 }
 
 #else /* Non-paranoid mode: these logs do not exist */
 
-#define sh2_init_log(_v) do { (void)(_v); } while(0)
-#define sh2_set_log_mode(_v,_t) do { (void)(_v); } while(0)
-#define sh2_log_ad(_v,_e,_l) do { (void)(_v),(void)(_e),(void)(_l); } while (0)
-#define sh2_log_mmio(_v,_m) do { (void)(_v),(void)(_m); } while (0)
-#define sh2_log_rv(_v,_r) do { (void)(_v),(void)(_r); } while (0)
-#define sh2_take_no_action(_v) (((void)(_v)), 0)
+#define sh_init_log(_v) do { (void)(_v); } while(0)
+#define sh_set_log_mode(_v,_t) do { (void)(_v); } while(0)
+#define sh_log_ad(_v,_e,_l) do { (void)(_v),(void)(_e),(void)(_l); } while (0)
+#define sh_log_mmio(_v,_m) do { (void)(_v),(void)(_m); } while (0)
+#define sh_log_rv(_v,_r) do { (void)(_v),(void)(_r); } while (0)
+#define sh_take_no_action(_v) (((void)(_v)), 0)
 
-#endif /* SHADOW2_OPTIMIZATION_PARANOIA */
+#endif /* SHADOW_OPTIMIZATION_PARANOIA */
 
 
 /******************************************************************************
  * Macro for dealing with the naming of the internal names of the
  * shadow code's external entry points.
  */
-#define SHADOW2_INTERNAL_NAME_HIDDEN(name, shadow_levels, guest_levels) \
+#define SHADOW_INTERNAL_NAME_HIDDEN(name, shadow_levels, guest_levels) \
     name ## __shadow_ ## shadow_levels ## _guest_ ## guest_levels
-#define SHADOW2_INTERNAL_NAME(name, shadow_levels, guest_levels) \
-    SHADOW2_INTERNAL_NAME_HIDDEN(name, shadow_levels, guest_levels)
+#define SHADOW_INTERNAL_NAME(name, shadow_levels, guest_levels) \
+    SHADOW_INTERNAL_NAME_HIDDEN(name, shadow_levels, guest_levels)
 
 #if CONFIG_PAGING_LEVELS == 2
 #define GUEST_LEVELS  2
 #define SHADOW_LEVELS 2
-#include <asm/shadow2-multi.h>
+#include "multi.h"
 #undef GUEST_LEVELS
 #undef SHADOW_LEVELS
 #endif /* CONFIG_PAGING_LEVELS == 2 */
@@ -268,13 +268,13 @@ static inline int sh2_take_no_action(struct vcpu *v)
 #if CONFIG_PAGING_LEVELS == 3
 #define GUEST_LEVELS  2
 #define SHADOW_LEVELS 3
-#include <asm/shadow2-multi.h>
+#include "multi.h"
 #undef GUEST_LEVELS
 #undef SHADOW_LEVELS
 
 #define GUEST_LEVELS  3
 #define SHADOW_LEVELS 3
-#include <asm/shadow2-multi.h>
+#include "multi.h"
 #undef GUEST_LEVELS
 #undef SHADOW_LEVELS
 #endif /* CONFIG_PAGING_LEVELS == 3 */
@@ -282,25 +282,25 @@ static inline int sh2_take_no_action(struct vcpu *v)
 #if CONFIG_PAGING_LEVELS == 4
 #define GUEST_LEVELS  2
 #define SHADOW_LEVELS 3
-#include <asm/shadow2-multi.h>
+#include "multi.h"
 #undef GUEST_LEVELS
 #undef SHADOW_LEVELS
 
 #define GUEST_LEVELS  3
 #define SHADOW_LEVELS 3
-#include <asm/shadow2-multi.h>
+#include "multi.h"
 #undef GUEST_LEVELS
 #undef SHADOW_LEVELS
 
 #define GUEST_LEVELS  3
 #define SHADOW_LEVELS 4
-#include <asm/shadow2-multi.h>
+#include "multi.h"
 #undef GUEST_LEVELS
 #undef SHADOW_LEVELS
 
 #define GUEST_LEVELS  4
 #define SHADOW_LEVELS 4
-#include <asm/shadow2-multi.h>
+#include "multi.h"
 #undef GUEST_LEVELS
 #undef SHADOW_LEVELS
 #endif /* CONFIG_PAGING_LEVELS == 4 */
@@ -311,39 +311,39 @@ static inline int sh2_take_no_action(struct vcpu *v)
  */
 
 /* x86 emulator support */
-extern struct x86_emulate_ops shadow2_emulator_ops;
+extern struct x86_emulate_ops shadow_emulator_ops;
 
 /* Hash table functions */
-mfn_t shadow2_hash_lookup(struct vcpu *v, unsigned long n, u8 t);
-void  shadow2_hash_insert(struct vcpu *v, unsigned long n, u8 t, mfn_t smfn);
-void  shadow2_hash_delete(struct vcpu *v, unsigned long n, u8 t, mfn_t smfn);
+mfn_t shadow_hash_lookup(struct vcpu *v, unsigned long n, u8 t);
+void  shadow_hash_insert(struct vcpu *v, unsigned long n, u8 t, mfn_t smfn);
+void  shadow_hash_delete(struct vcpu *v, unsigned long n, u8 t, mfn_t smfn);
 
 /* shadow promotion */
-void shadow2_promote(struct vcpu *v, mfn_t gmfn, u32 type);
-void shadow2_demote(struct vcpu *v, mfn_t gmfn, u32 type);
+void shadow_promote(struct vcpu *v, mfn_t gmfn, u32 type);
+void shadow_demote(struct vcpu *v, mfn_t gmfn, u32 type);
 
 /* Shadow page allocation functions */
-void  shadow2_prealloc(struct domain *d, unsigned int order);
-mfn_t shadow2_alloc(struct domain *d, 
+void  shadow_prealloc(struct domain *d, unsigned int order);
+mfn_t shadow_alloc(struct domain *d, 
                     u32 shadow_type,
                     unsigned long backpointer);
-void  shadow2_free(struct domain *d, mfn_t smfn);
+void  shadow_free(struct domain *d, mfn_t smfn);
 
 /* Function to convert a shadow to log-dirty */
-void shadow2_convert_to_log_dirty(struct vcpu *v, mfn_t smfn);
+void shadow_convert_to_log_dirty(struct vcpu *v, mfn_t smfn);
 
 /* Dispatcher function: call the per-mode function that will unhook the
  * non-Xen mappings in this top-level shadow mfn */
-void shadow2_unhook_mappings(struct vcpu *v, mfn_t smfn);
+void shadow_unhook_mappings(struct vcpu *v, mfn_t smfn);
 
 /* Re-sync copies of PAE shadow L3 tables if they have been changed */
-void sh2_pae_recopy(struct domain *d);
+void sh_pae_recopy(struct domain *d);
 
 /* Install the xen mappings in various flavours of shadow */
-void sh2_install_xen_entries_in_l4(struct vcpu *v, mfn_t gl4mfn, mfn_t sl4mfn);
-void sh2_install_xen_entries_in_l2h(struct vcpu *v, mfn_t sl2hmfn);
-void sh2_install_xen_entries_in_l3(struct vcpu *v, mfn_t gl3mfn, mfn_t sl3mfn);
-void sh2_install_xen_entries_in_l2(struct vcpu *v, mfn_t gl2mfn, mfn_t sl2mfn);
+void sh_install_xen_entries_in_l4(struct vcpu *v, mfn_t gl4mfn, mfn_t sl4mfn);
+void sh_install_xen_entries_in_l2h(struct vcpu *v, mfn_t sl2hmfn);
+void sh_install_xen_entries_in_l3(struct vcpu *v, mfn_t gl3mfn, mfn_t sl3mfn);
+void sh_install_xen_entries_in_l2(struct vcpu *v, mfn_t gl2mfn, mfn_t sl2mfn);
 
 
 /******************************************************************************
@@ -367,53 +367,53 @@ void sh2_install_xen_entries_in_l2(struct vcpu *v, mfn_t gl2mfn, mfn_t sl2mfn);
 
 // Provide mfn_t-aware versions of common xen functions
 static inline void *
-sh2_map_domain_page(mfn_t mfn)
+sh_map_domain_page(mfn_t mfn)
 {
     /* XXX Using the monitor-table as a map will happen here  */
     return map_domain_page(mfn_x(mfn));
 }
 
 static inline void 
-sh2_unmap_domain_page(void *p) 
+sh_unmap_domain_page(void *p) 
 {
     /* XXX Using the monitor-table as a map will happen here  */
     unmap_domain_page(p);
 }
 
 static inline void *
-sh2_map_domain_page_global(mfn_t mfn)
+sh_map_domain_page_global(mfn_t mfn)
 {
     /* XXX Using the monitor-table as a map will happen here  */
     return map_domain_page_global(mfn_x(mfn));
 }
 
 static inline void 
-sh2_unmap_domain_page_global(void *p) 
+sh_unmap_domain_page_global(void *p) 
 {
     /* XXX Using the monitor-table as a map will happen here  */
     unmap_domain_page_global(p);
 }
 
 static inline int
-sh2_mfn_is_dirty(struct domain *d, mfn_t gmfn)
+sh_mfn_is_dirty(struct domain *d, mfn_t gmfn)
 /* Is this guest page dirty?  Call only in log-dirty mode. */
 {
     unsigned long pfn;
-    ASSERT(shadow2_mode_log_dirty(d));
-    ASSERT(d->arch.shadow2.dirty_bitmap != NULL);
+    ASSERT(shadow_mode_log_dirty(d));
+    ASSERT(d->arch.shadow.dirty_bitmap != NULL);
 
     /* We /really/ mean PFN here, even for non-translated guests. */
     pfn = get_gpfn_from_mfn(mfn_x(gmfn));
     if ( likely(VALID_M2P(pfn))
-         && likely(pfn < d->arch.shadow2.dirty_bitmap_size) 
-         && test_bit(pfn, d->arch.shadow2.dirty_bitmap) )
+         && likely(pfn < d->arch.shadow.dirty_bitmap_size) 
+         && test_bit(pfn, d->arch.shadow.dirty_bitmap) )
         return 1;
 
     return 0;
 }
 
 static inline int
-sh2_mfn_is_a_page_table(mfn_t gmfn)
+sh_mfn_is_a_page_table(mfn_t gmfn)
 {
     struct page_info *page = mfn_to_page(gmfn);
     struct domain *owner;
@@ -423,7 +423,7 @@ sh2_mfn_is_a_page_table(mfn_t gmfn)
         return 0;
 
     owner = page_get_owner(page);
-    if ( owner && shadow2_mode_refcounts(owner) 
+    if ( owner && shadow_mode_refcounts(owner) 
          && (page->count_info & PGC_page_table) )
         return 1; 
 
@@ -433,33 +433,33 @@ sh2_mfn_is_a_page_table(mfn_t gmfn)
 
 
 /**************************************************************************/
-/* Shadow-page refcounting. See comment in shadow2-common.c about the  
+/* Shadow-page refcounting. See comment in shadow-common.c about the  
  * use of struct page_info fields for shadow pages */
 
-void sh2_destroy_shadow(struct vcpu *v, mfn_t smfn);
+void sh_destroy_shadow(struct vcpu *v, mfn_t smfn);
 
 /* Increase the refcount of a shadow page.  Arguments are the mfn to refcount, 
  * and the physical address of the shadow entry that holds the ref (or zero
  * if the ref is held by something else) */
-static inline void sh2_get_ref(mfn_t smfn, paddr_t entry_pa)
+static inline void sh_get_ref(mfn_t smfn, paddr_t entry_pa)
 {
     u32 x, nx;
     struct page_info *page = mfn_to_page(smfn);
 
     ASSERT(mfn_valid(smfn));
 
-    x = page->count_info & PGC_SH2_count_mask;
+    x = page->count_info & PGC_SH_count_mask;
     nx = x + 1;
 
-    if ( unlikely(nx & ~PGC_SH2_count_mask) )
+    if ( unlikely(nx & ~PGC_SH_count_mask) )
     {
-        SHADOW2_PRINTK("shadow ref overflow, gmfn=%" PRtype_info " smfn=%lx\n",
+        SHADOW_PRINTK("shadow ref overflow, gmfn=%" PRtype_info " smfn=%lx\n",
                        page->u.inuse.type_info, mfn_x(smfn));
         domain_crash_synchronous();
     }
     
     /* Guarded by the shadow lock, so no need for atomic update */
-    page->count_info &= ~PGC_SH2_count_mask;
+    page->count_info &= ~PGC_SH_count_mask;
     page->count_info |= nx;
 
     /* We remember the first shadow entry that points to each shadow. */
@@ -470,7 +470,7 @@ static inline void sh2_get_ref(mfn_t smfn, paddr_t entry_pa)
 
 /* Decrease the refcount of a shadow page.  As for get_ref, takes the
  * physical address of the shadow entry that held this reference. */
-static inline void sh2_put_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
+static inline void sh_put_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
 {
     u32 x, nx;
     struct page_info *page = mfn_to_page(smfn);
@@ -482,53 +482,53 @@ static inline void sh2_put_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
     if ( entry_pa != 0 && page->up == entry_pa ) 
         page->up = 0;
 
-    x = page->count_info & PGC_SH2_count_mask;
+    x = page->count_info & PGC_SH_count_mask;
     nx = x - 1;
 
     if ( unlikely(x == 0) ) 
     {
-        SHADOW2_PRINTK("shadow ref underflow, smfn=%lx oc=%08x t=%" 
+        SHADOW_PRINTK("shadow ref underflow, smfn=%lx oc=%08x t=%" 
                        PRtype_info "\n",
                        mfn_x(smfn),
-                       page->count_info & PGC_SH2_count_mask,
+                       page->count_info & PGC_SH_count_mask,
                        page->u.inuse.type_info);
         domain_crash_synchronous();
     }
 
     /* Guarded by the shadow lock, so no need for atomic update */
-    page->count_info &= ~PGC_SH2_count_mask;
+    page->count_info &= ~PGC_SH_count_mask;
     page->count_info |= nx;
 
     if ( unlikely(nx == 0) ) 
-        sh2_destroy_shadow(v, smfn);
+        sh_destroy_shadow(v, smfn);
 }
 
 
 /* Pin a shadow page: take an extra refcount and set the pin bit. */
-static inline void sh2_pin(mfn_t smfn)
+static inline void sh_pin(mfn_t smfn)
 {
     struct page_info *page;
     
     ASSERT(mfn_valid(smfn));
     page = mfn_to_page(smfn);
-    if ( !(page->count_info & PGC_SH2_pinned) ) 
+    if ( !(page->count_info & PGC_SH_pinned) ) 
     {
-        sh2_get_ref(smfn, 0);
-        page->count_info |= PGC_SH2_pinned;
+        sh_get_ref(smfn, 0);
+        page->count_info |= PGC_SH_pinned;
     }
 }
 
 /* Unpin a shadow page: unset the pin bit and release the extra ref. */
-static inline void sh2_unpin(struct vcpu *v, mfn_t smfn)
+static inline void sh_unpin(struct vcpu *v, mfn_t smfn)
 {
     struct page_info *page;
     
     ASSERT(mfn_valid(smfn));
     page = mfn_to_page(smfn);
-    if ( page->count_info & PGC_SH2_pinned )
+    if ( page->count_info & PGC_SH_pinned )
     {
-        page->count_info &= ~PGC_SH2_pinned;
-        sh2_put_ref(v, smfn, 0);
+        page->count_info &= ~PGC_SH_pinned;
+        sh_put_ref(v, smfn, 0);
     }
 }
 
@@ -551,7 +551,7 @@ vcpu_gfn_to_mfn_nofault(struct vcpu *v, unsigned long gfn)
     l1_pgentry_t *l1e;
 
     ASSERT(current == v);
-    if ( !shadow2_vcpu_mode_translate(v) )
+    if ( !shadow_vcpu_mode_translate(v) )
         return _mfn(gfn);
 
 #if CONFIG_PAGING_LEVELS > 2
@@ -561,7 +561,7 @@ vcpu_gfn_to_mfn_nofault(struct vcpu *v, unsigned long gfn)
 #endif
     
     /* Walk the linear pagetables.  Note that this is *not* the same as 
-     * the walk in sh2_gfn_to_mfn_foreign, which is walking the p2m map */
+     * the walk in sh_gfn_to_mfn_foreign, which is walking the p2m map */
 #if CONFIG_PAGING_LEVELS >= 4
     l4e = __linear_l4_table + l4_linear_offset(entry_addr);
     if ( !(l4e_get_flags(*l4e) & _PAGE_PRESENT) ) return _mfn(INVALID_MFN);
@@ -581,7 +581,7 @@ vcpu_gfn_to_mfn_nofault(struct vcpu *v, unsigned long gfn)
 }
 
 
-#endif /* _XEN_SHADOW2_PRIVATE_H */
+#endif /* _XEN_SHADOW_PRIVATE_H */
 
 /*
  * Local variables:

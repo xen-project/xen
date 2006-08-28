@@ -29,7 +29,7 @@
 #include <xen/domain_page.h>
 #include <asm/current.h>
 #include <asm/io.h>
-#include <asm/shadow2.h>
+#include <asm/shadow.h>
 #include <asm/regs.h>
 #include <asm/cpufeature.h>
 #include <asm/processor.h>
@@ -403,6 +403,50 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     return 1;
 }
 
+
+#define loaddebug(_v,_reg) \
+    __asm__ __volatile__ ("mov %0,%%db" #_reg : : "r" ((_v)->debugreg[_reg]))
+#define savedebug(_v,_reg) \
+    __asm__ __volatile__ ("mov %%db" #_reg ",%0" : : "r" ((_v)->debugreg[_reg]))
+
+
+static inline void svm_save_dr(struct vcpu *v)
+{
+    if (v->arch.hvm_vcpu.flag_dr_dirty)
+    {
+        /* clear the DR dirty flag and re-enable intercepts for DR accesses */ 
+        v->arch.hvm_vcpu.flag_dr_dirty = 0;
+        v->arch.hvm_svm.vmcb->dr_intercepts = DR_INTERCEPT_ALL_WRITES;
+
+        savedebug(&v->arch.guest_context, 0);    
+        savedebug(&v->arch.guest_context, 1);    
+        savedebug(&v->arch.guest_context, 2);    
+        savedebug(&v->arch.guest_context, 3);    
+    }
+}
+
+
+static inline void __restore_debug_registers(struct vcpu *v)
+{
+    loaddebug(&v->arch.guest_context, 0);
+    loaddebug(&v->arch.guest_context, 1);
+    loaddebug(&v->arch.guest_context, 2);
+    loaddebug(&v->arch.guest_context, 3);
+}
+
+
+static inline void svm_restore_dr(struct vcpu *v)
+{
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+
+    if (!vmcb)
+        return;
+
+    if (unlikely(vmcb->dr7 & 0xFF))
+        __restore_debug_registers(v);
+}
+
+
 static int svm_realmode(struct vcpu *v)
 {
     unsigned long cr0 = v->arch.hvm_svm.cpu_shadow_cr0;
@@ -717,6 +761,7 @@ static void svm_freeze_time(struct vcpu *v)
 static void svm_ctxt_switch_from(struct vcpu *v)
 {
     svm_freeze_time(v);
+    svm_save_dr(v);
 }
 
 static void svm_ctxt_switch_to(struct vcpu *v)
@@ -732,6 +777,7 @@ static void svm_ctxt_switch_to(struct vcpu *v)
     set_segment_register(es, 0);
     set_segment_register(ss, 0);
 #endif
+    svm_restore_dr(v);
 }
 
 
@@ -746,10 +792,10 @@ static void svm_final_setup_guest(struct vcpu *v)
     if ( v != d->vcpu[0] )
         return;
 
-    if ( !shadow2_mode_external(d) )
+    if ( !shadow_mode_external(d) )
     {
         DPRINTK("Can't init HVM for dom %u vcpu %u: "
-                "not in shadow2 external mode\n", d->domain_id, v->vcpu_id);
+                "not in shadow external mode\n", d->domain_id, v->vcpu_id);
         domain_crash(d);
     }
 
@@ -914,7 +960,7 @@ static int svm_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
                 va, eip, (unsigned long)regs->error_code);
 //#endif
 
-    result = shadow2_fault(va, regs); 
+    result = shadow_fault(va, regs); 
 
     if( result ) {
         /* Let's make sure that the Guest TLB is flushed */
@@ -1183,55 +1229,16 @@ static inline void set_reg(unsigned int gpreg, unsigned long value,
 }
                            
 
-static void svm_dr_access (struct vcpu *v, unsigned int reg, unsigned int type,
-                           struct cpu_user_regs *regs)
+static void svm_dr_access(struct vcpu *v, struct cpu_user_regs *regs)
 {
-    unsigned long *reg_p = 0;
-    unsigned int gpreg = 0;
-    unsigned long eip;
-    int inst_len;
-    int index;
-    struct vmcb_struct *vmcb;
-    u8 buffer[MAX_INST_LEN];
-    u8 prefix = 0;
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    vmcb = v->arch.hvm_svm.vmcb;
-    
-    ASSERT(vmcb);
+    v->arch.hvm_vcpu.flag_dr_dirty = 1;
 
-    eip = vmcb->rip;
-    inst_copy_from_guest(buffer, svm_rip2pointer(vmcb), sizeof(buffer));
-    index = skip_prefix_bytes(buffer, sizeof(buffer));
-    
-    ASSERT(buffer[index+0] == 0x0f && (buffer[index+1] & 0xFD) == 0x21);
+    __restore_debug_registers(v);
 
-    if (index > 0 && (buffer[index-1] & 0xF0) == 0x40)
-        prefix = buffer[index-1];
-
-    gpreg = decode_src_reg(prefix, buffer[index + 2]);
-    ASSERT(reg == decode_dest_reg(prefix, buffer[index + 2]));
-
-    HVM_DBG_LOG(DBG_LEVEL_1, "svm_dr_access : eip=%lx, reg=%d, gpreg = %x",
-                eip, reg, gpreg);
-
-    reg_p = get_reg_p(gpreg, regs, vmcb);
-        
-    switch (type) 
-    {
-    case TYPE_MOV_TO_DR: 
-        inst_len = __get_instruction_length(vmcb, INSTR_MOV2DR, buffer);
-        v->arch.guest_context.debugreg[reg] = *reg_p;
-        break;
-    case TYPE_MOV_FROM_DR:
-        inst_len = __get_instruction_length(vmcb, INSTR_MOVDR2, buffer);
-        *reg_p = v->arch.guest_context.debugreg[reg];
-        break;
-    default:
-        __hvm_bug(regs);
-        break;
-    }
-    ASSERT(inst_len > 0);
-    __update_guest_eip(vmcb, inst_len);
+    /* allow the guest full access to the debug registers */
+    vmcb->dr_intercepts = 0;
 }
 
 
@@ -1562,7 +1569,7 @@ static int svm_set_cr0(unsigned long value)
         v->arch.guest_table = pagetable_from_pfn(mfn);
         if ( old_base_mfn )
             put_page(mfn_to_page(old_base_mfn));
-        shadow2_update_paging_modes(v);
+        shadow_update_paging_modes(v);
 
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx", 
                     (unsigned long) (mfn << PAGE_SHIFT));
@@ -1588,14 +1595,14 @@ static int svm_set_cr0(unsigned long value)
             svm_inject_exception(v, TRAP_gp_fault, 1, 0);
             return 0;
         }
-        shadow2_update_paging_modes(v);
+        shadow_update_paging_modes(v);
         vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3;
         set_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
     }
     else if ( (value & (X86_CR0_PE | X86_CR0_PG)) == X86_CR0_PE )
     {
         /* we should take care of this kind of situation */
-        shadow2_update_paging_modes(v);
+        shadow_update_paging_modes(v);
         vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3;
         set_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
     }
@@ -1706,7 +1713,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
             mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
             if (mfn != pagetable_get_pfn(v->arch.guest_table))
                 __hvm_bug(regs);
-            shadow2_update_cr3(v);
+            shadow_update_cr3(v);
         }
         else 
         {
@@ -1771,7 +1778,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
                 v->arch.guest_table = pagetable_from_pfn(mfn);
                 if ( old_base_mfn )
                     put_page(mfn_to_page(old_base_mfn));
-                shadow2_update_paging_modes(v);
+                shadow_update_paging_modes(v);
 
                 HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx",
                             (unsigned long) (mfn << PAGE_SHIFT));
@@ -1808,7 +1815,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
         if ((old_cr ^ value) & (X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE))
         {
             set_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
-            shadow2_update_paging_modes(v);
+            shadow_update_paging_modes(v);
         }
         break;
     }
@@ -2149,7 +2156,7 @@ void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
 
     /* Overkill, we may not this */
     set_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
-    shadow2_invlpg(v, g_vaddr);
+    shadow_invlpg(v, g_vaddr);
 }
 
 
@@ -2520,7 +2527,7 @@ void walk_shadow_and_guest_pt(unsigned long gva)
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     unsigned long gpa;
 
-    gpa = shadow2_gva_to_gpa(current, gva);
+    gpa = shadow_gva_to_gpa(current, gva);
     printk( "gva = %lx, gpa=%lx, gCR3=%x\n", gva, gpa, (u32)vmcb->cr3 );
     if( !svm_paging_enabled(v) || mmio_space(gpa) )
         return;
@@ -2591,7 +2598,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
         if (svm_dbg_on && exit_reason == VMEXIT_EXCEPTION_PF) 
         {
             if (svm_paging_enabled(v) && 
-                !mmio_space(shadow2_gva_to_gpa(current, vmcb->exitinfo2)))
+                !mmio_space(shadow_gva_to_gpa(current, vmcb->exitinfo2)))
             {
                 printk("I%08ld,ExC=%s(%d),IP=%x:%llx,"
                        "I1=%llx,I2=%llx,INT=%llx, "
@@ -2601,7 +2608,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
                        (unsigned long long) vmcb->exitinfo1,
                        (unsigned long long) vmcb->exitinfo2,
                        (unsigned long long) vmcb->exitintinfo.bytes,
-                       (unsigned long long) shadow2_gva_to_gpa(current, vmcb->exitinfo2));
+                       (unsigned long long) shadow_gva_to_gpa(current, vmcb->exitinfo2));
             }
             else 
             {
@@ -2862,53 +2869,9 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
     case VMEXIT_CR8_WRITE:
         svm_cr_access(v, 8, TYPE_MOV_TO_CR, &regs);
         break;
-
-    case VMEXIT_DR0_READ:
-        svm_dr_access(v, 0, TYPE_MOV_FROM_DR, &regs);
-        break;
-
-    case VMEXIT_DR1_READ:
-        svm_dr_access(v, 1, TYPE_MOV_FROM_DR, &regs);
-        break;
-
-    case VMEXIT_DR2_READ:
-        svm_dr_access(v, 2, TYPE_MOV_FROM_DR, &regs);
-        break;
-
-    case VMEXIT_DR3_READ:
-        svm_dr_access(v, 3, TYPE_MOV_FROM_DR, &regs);
-        break;
-
-    case VMEXIT_DR6_READ:
-        svm_dr_access(v, 6, TYPE_MOV_FROM_DR, &regs);
-        break;
-
-    case VMEXIT_DR7_READ:
-        svm_dr_access(v, 7, TYPE_MOV_FROM_DR, &regs);
-        break;
-
-    case VMEXIT_DR0_WRITE:
-        svm_dr_access(v, 0, TYPE_MOV_TO_DR, &regs);
-        break;
-
-    case VMEXIT_DR1_WRITE:
-        svm_dr_access(v, 1, TYPE_MOV_TO_DR, &regs);
-        break;
-
-    case VMEXIT_DR2_WRITE:
-        svm_dr_access(v, 2, TYPE_MOV_TO_DR, &regs);
-        break;
-
-    case VMEXIT_DR3_WRITE:
-        svm_dr_access(v, 3, TYPE_MOV_TO_DR, &regs);
-        break;
-
-    case VMEXIT_DR6_WRITE:
-        svm_dr_access(v, 6, TYPE_MOV_TO_DR, &regs);
-        break;
-
-    case VMEXIT_DR7_WRITE:
-        svm_dr_access(v, 7, TYPE_MOV_TO_DR, &regs);
+	
+    case VMEXIT_DR0_WRITE ... VMEXIT_DR7_WRITE:
+        svm_dr_access(v, &regs);
         break;
 
     case VMEXIT_IOIO:

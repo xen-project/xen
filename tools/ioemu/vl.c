@@ -5924,7 +5924,7 @@ int main(int argc, char **argv)
     /* default mac address of the first network interface */
     
     /* init debug */
-    sprintf(qemu_dm_logfilename, "/var/log/qemu-dm.%d.log", getpid());
+    sprintf(qemu_dm_logfilename, "/var/log/xen/qemu-dm.%d.log", getpid());
     cpu_set_log_filename(qemu_dm_logfilename);
     cpu_set_log(0);
     
