@@ -659,6 +659,8 @@ void usb_uhci_init(PCIBus *bus, int devfn)
     pci_conf[0x0e] = 0x00; // header_type
     pci_conf[0x3d] = 4; // interrupt pin 3
     pci_conf[0x60] = 0x10; // release number
+    pci_conf[0x2c] = pci_conf[0x00]; // same as Vendor ID
+    pci_conf[0x2d] = pci_conf[0x01];
     
     for(i = 0; i < NB_PORTS; i++) {
         qemu_register_usb_port(&s->ports[i].port, s, i, uhci_attach);

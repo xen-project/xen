@@ -3423,6 +3423,8 @@ void pci_rtl8139_init(PCIBus *bus, NICInfo *nd)
     pci_conf[0x0e] = 0x00; /* header_type */
     pci_conf[0x3d] = 1;    /* interrupt pin 0 */
     pci_conf[0x34] = 0xdc;
+    pci_conf[0x2c] = pci_conf[0x00]; // same as Vendor ID
+    pci_conf[0x2d] = pci_conf[0x01];
 
     s = &d->rtl8139;
 

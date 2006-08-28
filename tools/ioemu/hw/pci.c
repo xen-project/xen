@@ -286,6 +286,7 @@ void pci_default_write_config(PCIDevice *d,
             case 0x0b:
             case 0x0e:
             case 0x10 ... 0x27: /* base */
+            case 0x2c ... 0x2f: /* subsystem vendor id, subsystem id */
             case 0x30 ... 0x33: /* rom */
             case 0x3d:
                 can_write = 0;
@@ -318,6 +319,18 @@ void pci_default_write_config(PCIDevice *d,
             break;
         }
         if (can_write) {
+            if( addr == 0x05 ) {
+                /* In Command Register, bits 15:11 are reserved */
+                val &= 0x07; 
+            } else if ( addr == 0x06 ) {
+                /* In Status Register, bits 6, 2:0 are reserved, */
+                /* and bits 7,5,4,3 are read only */
+                val = d->config[addr];
+            } else if ( addr == 0x07 ) {
+                /* In Status Register, bits 10,9 are reserved, */
+                val = (val & ~0x06) | (d->config[addr] & 0x06);
+            }
+
             d->config[addr] = val;
         }
         addr++;
