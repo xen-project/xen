@@ -61,7 +61,8 @@ static int
 vmx_gnttab_setup_table(unsigned long frame_pa, unsigned long nr_frames)
 {
     struct domain *d = current->domain;
-    unsigned long o_grant_shared, pgaddr;
+    struct grant_entry *pgaddr;
+    unsigned long o_grant_shared;
 
     if ((nr_frames != NR_GRANT_FRAMES) || (frame_pa & (PAGE_SIZE - 1))) {
         return -EINVAL;
@@ -73,7 +74,7 @@ vmx_gnttab_setup_table(unsigned long frame_pa, unsigned long nr_frames)
     }
 
     o_grant_shared = (unsigned long)d->grant_table->shared;
-    d->grant_table->shared = (struct grant_entry *)pgaddr;
+    d->grant_table->shared = pgaddr;
 
     /* Copy existing grant table into new page */
     if (o_grant_shared) {
@@ -92,10 +93,11 @@ vmx_setup_shared_info_page(unsigned long gpa)
 {
     VCPU *vcpu = current;
     struct domain *d = vcpu->domain;
-    unsigned long o_info, pgaddr;
+    unsigned long o_info;
+    shared_info_t *pgaddr;
     struct vcpu *v;
 
-    if (gpa & (PAGE_SIZE - 1)) {
+    if (gpa & ~PAGE_MASK) {
         return -EINVAL;
     }
 
@@ -105,7 +107,7 @@ vmx_setup_shared_info_page(unsigned long gpa)
     }
 
     o_info = (u64)d->shared_info;
-    d->shared_info = (shared_info_t *)pgaddr;
+    d->shared_info = pgaddr;
 
     /* Copy existing shared info into new page */
     if (o_info) {
