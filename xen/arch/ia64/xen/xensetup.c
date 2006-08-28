@@ -287,6 +287,7 @@ void start_kernel(void)
         ia64_boot_param->initrd_size = 0;
     }
 
+    printk("Xen command line: %s\n", saved_command_line);
     /* xenheap should be in same TR-covered range with xen image */
     xenheap_phys_end = xen_pstart + xenheap_size;
     printk("xen image pstart: 0x%lx, xenheap pend: 0x%lx\n",
