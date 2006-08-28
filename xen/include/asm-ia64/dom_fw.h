@@ -7,6 +7,11 @@
 
 #include <linux/efi.h>
 
+/* Portion of guest physical memory space reserved for PAL/SAL/EFI/ACPI
+   data and code.  */
+#define FW_BASE_PADDR		0x0000UL
+#define FW_END_PADDR		0x3000UL
+
 /* This is used to determined the portion of a domain's metaphysical memory
    space reserved for the hypercall patch table. */
 /* Map:
@@ -19,6 +24,15 @@
 #define	FW_HYPERCALL_BASE_PADDR 0x0000UL
 #define	FW_HYPERCALL_END_PADDR  0X1000UL
 #define	FW_HYPERCALL_PADDR(index) (FW_HYPERCALL_BASE_PADDR + (16UL * index))
+
+/* Base and end guest physical address of ACPI tables.  */
+#define FW_ACPI_BASE_PADDR	0x1000UL
+#define FW_ACPI_END_PADDR	0x2000UL
+
+/* Base and end guest physical address of EFI and SAL (non-ACPI) tables.  */
+#define FW_TABLES_BASE_PADDR	0x2000UL
+#define FW_TABLES_END_PADDR	0x3000UL
+
 
 /* Hypercalls number have a low part and a high part.
    The high part is the class (xen/pal/sal/efi).  */

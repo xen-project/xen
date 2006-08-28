@@ -172,7 +172,7 @@ fw_hypercall_ipi (struct pt_regs *regs)
 		vcpu_init_regs (targ);
 		vcpu_regs (targ)->cr_iip = d->arch.sal_data->boot_rdv_ip;
 		vcpu_regs (targ)->r1 = d->arch.sal_data->boot_rdv_r1;
-		vcpu_regs (targ)->b0 = d->arch.sal_return_addr;
+		vcpu_regs (targ)->b0 = FW_HYPERCALL_SAL_RETURN_PADDR;
 
 		if (test_and_clear_bit(_VCPUF_down,
 				       &targ->vcpu_flags)) {

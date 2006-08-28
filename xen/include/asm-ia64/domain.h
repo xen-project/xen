@@ -118,8 +118,6 @@ struct arch_domain {
  
     /* Address of SAL emulator data  */
     struct xen_sal_data *sal_data;
-    /* SAL return point.  */
-    unsigned long sal_return_addr;
 
     /* Address of efi_runtime_services_t (placed in domain memory)  */
     void *efi_runtime;
