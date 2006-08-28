@@ -2543,6 +2543,16 @@ static int validate_gl3e(struct vcpu *v, void *new_ge, mfn_t sl3mfn, void *se)
 
     perfc_incrc(shadow_validate_gl3e_calls);
 
+#if (SHADOW_PAGING_LEVELS == 3) && (GUEST_PAGING_LEVELS == 3)
+    {
+        /* If we've updated a subshadow which is unreferenced then 
+           we don't care what value is being written - bail. */
+        struct pae_l3_bookkeeping *info = sl3p_to_info(se); 
+        if(!info->refcount)
+            return result; 
+    }
+#endif
+
     if ( guest_l3e_get_flags(*new_gl3e) & _PAGE_PRESENT )
     {
         gfn_t gl2gfn = guest_l3e_get_gfn(*new_gl3e);
@@ -2634,7 +2644,7 @@ static int validate_gl1e(struct vcpu *v, void *new_ge, mfn_t sl1mfn, void *se)
 
 
 /**************************************************************************/
-/* Functions which translate and install a the shadows of arbitrary guest 
+/* Functions which translate and install the shadows of arbitrary guest 
  * entries that we have just seen the guest write. */
 
 
@@ -2934,7 +2944,7 @@ static int sh_page_fault(struct vcpu *v,
              && shadow_vcpu_mode_translate(v) 
              && mmio_space(gfn_to_paddr(gfn)) );
 
-    /* For MMIO, the shadow holds the *gfn*; for normal accesses, if holds 
+    /* For MMIO, the shadow holds the *gfn*; for normal accesses, it holds 
      * the equivalent mfn. */
     if ( mmio ) 
         gmfn = _mfn(gfn_x(gfn));
