@@ -315,7 +315,9 @@ static inline void exit_idle(void) {}
 })
 
 #include <linux/err.h>
+#ifdef CONFIG_XEN
 #include <asm/xen/privop.h>
+#endif /* CONFIG_XEN */
 
 static inline unsigned long
 __HYPERVISOR_ioremap(unsigned long ioaddr, unsigned long size)
