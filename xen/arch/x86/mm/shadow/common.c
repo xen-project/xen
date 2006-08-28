@@ -397,22 +397,14 @@ shadow_validate_guest_pt_write(struct vcpu *v, mfn_t gmfn,
     ASSERT(shadow_lock_is_acquired(v->domain));
     rc = __shadow_validate_guest_entry(v, gmfn, entry, size);
     if ( rc & SHADOW_SET_FLUSH )
-    {
-        // Flush everyone except the local processor, which will flush when it
-        // re-enters the HVM guest.
-        //
-        cpumask_t mask = d->domain_dirty_cpumask;
-        cpu_clear(v->processor, mask);
-        flush_tlb_mask(mask);
-    }
+        /* Need to flush TLBs to pick up shadow PT changes */
+        flush_tlb_mask(d->domain_dirty_cpumask);
     if ( rc & SHADOW_SET_ERROR ) 
     {
         /* This page is probably not a pagetable any more: tear it out of the 
          * shadows, along with any tables that reference it */
         shadow_remove_all_shadows_and_parents(v, gmfn);
     }
-    /* We ignore the other bits: since we are about to change CR3 on
-     * VMENTER we don't need to do any extra TLB flushes. */ 
 }
 
 
