@@ -46,7 +46,7 @@ static ulong htab_alloc(struct domain *d, uint order)
 
     if (order < 6)
         order = 6;              /* architectural minimum is 2^18 */
-    if (order < 34)
+    if (order > 34)
         order = 34;             /* architectural minimum is 2^46 */
 
     htab_raddr = (ulong)alloc_xenheap_pages(order);
