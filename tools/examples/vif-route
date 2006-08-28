@@ -30,10 +30,12 @@ case "$command" in
         ifconfig ${vif} ${main_ip} netmask 255.255.255.255 up
         echo 1 >/proc/sys/net/ipv4/conf/${vif}/proxy_arp
         ipcmd='add'
+        cmdprefix=''
         ;;
     offline)
-        ifdown ${vif}
+        do_without_error ifdown ${vif}
         ipcmd='del'
+        cmdprefix='do_without_error'
         ;;
 esac
 
@@ -41,7 +43,7 @@ if [ "${ip}" ] ; then
     # If we've been given a list of IP addresses, then add routes from dom0 to
     # the guest using those addresses.
     for addr in ${ip} ; do
-      ip route ${ipcmd} ${addr} dev ${vif} src ${main_ip}
+      ${cmdprefix} ip route ${ipcmd} ${addr} dev ${vif} src ${main_ip}
     done 
 fi
 
