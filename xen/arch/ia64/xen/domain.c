@@ -400,8 +400,16 @@ fail_nomem:
 void arch_domain_destroy(struct domain *d)
 {
 	BUG_ON(d->arch.mm.pgd != NULL);
-	if (d->shared_info != NULL)
-	    free_xenheap_pages(d->shared_info, get_order_from_shift(XSI_SHIFT));
+	if (d->shared_info != NULL) {
+		/* If this domain is domVTi, the shared_info page may
+		 * be replaced with domheap. Then the shared_info page
+		 * frees in relinquish_mm().
+		 */
+		if (IS_XEN_HEAP_FRAME(virt_to_page(d->shared_info))) {
+			free_xenheap_pages(d->shared_info,
+			                   get_order_from_shift(XSI_SHIFT));
+		}
+	}
 	if (d->arch.shadow_bitmap != NULL)
 		xfree(d->arch.shadow_bitmap);
 
