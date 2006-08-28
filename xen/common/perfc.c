@@ -7,6 +7,7 @@
 #include <xen/spinlock.h>
 #include <xen/mm.h>
 #include <xen/guest_access.h>
+#include <public/sysctl.h>
 #include <asm/perfc.h>
 
 #undef  PERFCOUNTER
@@ -131,12 +132,12 @@ void perfc_reset(unsigned char key)
     arch_perfc_reset ();
 }
 
-static dom0_perfc_desc_t perfc_d[NR_PERFCTRS];
-static dom0_perfc_val_t *perfc_vals;
+static xen_sysctl_perfc_desc_t perfc_d[NR_PERFCTRS];
+static xen_sysctl_perfc_val_t *perfc_vals;
 static int               perfc_nbr_vals;
 static int               perfc_init = 0;
-static int perfc_copy_info(XEN_GUEST_HANDLE(dom0_perfc_desc_t) desc,
-                           XEN_GUEST_HANDLE(dom0_perfc_val_t) val)
+static int perfc_copy_info(XEN_GUEST_HANDLE_64(xen_sysctl_perfc_desc_t) desc,
+                           XEN_GUEST_HANDLE_64(xen_sysctl_perfc_val_t) val)
 {
     unsigned int i, j;
     unsigned int v = 0;
@@ -171,7 +172,7 @@ static int perfc_copy_info(XEN_GUEST_HANDLE(dom0_perfc_desc_t) desc,
             }
             perfc_nbr_vals += perfc_d[i].nr_vals;
         }
-        perfc_vals = xmalloc_array(dom0_perfc_val_t, perfc_nbr_vals);
+        perfc_vals = xmalloc_array(xen_sysctl_perfc_val_t, perfc_nbr_vals);
         perfc_init = 1;
     }
     if (perfc_vals == NULL)
@@ -206,7 +207,7 @@ static int perfc_copy_info(XEN_GUEST_HANDLE(dom0_perfc_desc_t) desc,
     }
     BUG_ON(v != perfc_nbr_vals);
 
-    if (copy_to_guest(desc, (dom0_perfc_desc_t *)perfc_d, NR_PERFCTRS))
+    if (copy_to_guest(desc, (xen_sysctl_perfc_desc_t *)perfc_d, NR_PERFCTRS))
         return -EFAULT;
     if (copy_to_guest(val, perfc_vals, perfc_nbr_vals))
         return -EFAULT;
@@ -214,7 +215,7 @@ static int perfc_copy_info(XEN_GUEST_HANDLE(dom0_perfc_desc_t) desc,
 }
 
 /* Dom0 control of perf counters */
-int perfc_control(dom0_perfccontrol_t *pc)
+int perfc_control(xen_sysctl_perfc_op_t *pc)
 {
     static DEFINE_SPINLOCK(lock);
     int rc;
