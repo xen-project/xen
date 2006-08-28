@@ -27,6 +27,7 @@
 #include <xen/domain.h>
 #include <xen/console.h>
 #include <xen/shutdown.h>
+#include <xen/shadow.h>
 #include <xen/mm.h>
 #include <asm/htab.h>
 #include <asm/current.h>
@@ -77,7 +78,6 @@ int arch_domain_create(struct domain *d)
     unsigned long rma_base;
     unsigned long rma_sz;
     uint rma_order_pages;
-    uint htab_order_pages;
     int rc;
 
     if (d->domain_id == IDLE_DOMAIN_ID) {
@@ -104,16 +104,6 @@ int arch_domain_create(struct domain *d)
     d->arch.large_page_sizes = cpu_large_page_orders(
         d->arch.large_page_order, ARRAY_SIZE(d->arch.large_page_order));
 
-    /* FIXME: we need to the the maximum addressible memory for this
-     * domain to calculate this correctly. It should probably be set
-     * by the managment tools */
-    htab_order_pages = rma_order_pages - 6; /* (1/64) */
-    if (test_bit(_DOMF_privileged, &d->domain_flags)) {
-        /* bump the htab size of privleged domains */
-        ++htab_order_pages;
-    }
-    htab_alloc(d, htab_order_pages);
-
     INIT_LIST_HEAD(&d->arch.extent_list);
 
     return 0;
@@ -121,7 +111,7 @@ int arch_domain_create(struct domain *d)
 
 void arch_domain_destroy(struct domain *d)
 {
-    htab_free(d);
+    shadow_teardown(d);
 }
 
 void machine_halt(void)
@@ -162,6 +152,16 @@ void free_vcpu_struct(struct vcpu *v)
 int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_t *c)
 { 
     memcpy(&v->arch.ctxt, &c->user_regs, sizeof(c->user_regs));
+
+    printf("Domain[%d].%d: initializing\n",
+           v->domain->domain_id, v->vcpu_id);
+
+    if (v->domain->arch.htab.order == 0)
+        panic("Page table never allocated for Domain: %d\n",
+              v->domain->domain_id);
+    if (v->domain->arch.rma_order == 0)
+        panic("RMA never allocated for Domain: %d\n",
+              v->domain->domain_id);
 
     set_bit(_VCPUF_initialised, &v->vcpu_flags);
 
@@ -253,12 +253,13 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 void continue_running(struct vcpu *same)
 {
     /* nothing to do */
+    return;
 }
 
 void sync_vcpu_execstate(struct vcpu *v)
 {
-    /* XXX for now, for domain destruction, make this non-fatal */
-    printf("%s: called\n", __func__);
+    /* do nothing */
+    return;
 }
 
 void domain_relinquish_resources(struct domain *d)

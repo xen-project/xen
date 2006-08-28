@@ -25,12 +25,11 @@
 #include <xen/init.h>
 #include <xen/ctype.h>
 #include <xen/iocap.h>
+#include <xen/shadow.h>
 #include <xen/version.h>
 #include <asm/processor.h>
 #include <asm/papr.h>
 #include "oftree.h"
-
-#define log2(x) ffz(~(x))
 
 extern int parseelfimage_32(struct domain_setup_info *dsi);
 extern int loadelfimage_32(struct domain_setup_info *dsi);
@@ -114,10 +113,10 @@ int construct_dom0(struct domain *d,
     uint rma_nrpages = 1 << d->arch.rma_order;
     ulong rma_sz = rma_size(d->arch.rma_order);
     ulong rma = page_to_maddr(d->arch.rma_page);
-    uint htab_order;
     start_info_t *si;
     ulong eomem;
     int am64 = 1;
+    int preempt = 0;
     ulong msr;
     ulong pc;
     ulong r2;
@@ -170,20 +169,19 @@ int construct_dom0(struct domain *d,
         dom0_nrpages = allocate_extents(d, dom0_nrpages, rma_nrpages);
 
     d->tot_pages = dom0_nrpages;
-    ASSERT(d->tot_pages > 0);
-    
-    htab_order = log2(d->tot_pages) - 6;
-    if (d->arch.htab.order > 0) {
-        /* we incorrectly allocate this too early so lets adjust if
-         * necessary */
-        printk("WARNING: htab allocated to early\n");
-        if (d->arch.htab.order < htab_order) {
-            printk("WARNING: htab reallocated for more memory: 0x%x\n",
-                htab_order);
-            htab_free(d);
-            htab_alloc(d, htab_order);
-        }
+    ASSERT(d->tot_pages >= rma_nrpages);
+
+    if (opt_dom0_shadow == 0) {
+        /* 1/64 of memory  */
+        opt_dom0_shadow = (d->tot_pages >> 6) >> (20 - PAGE_SHIFT);
     }
+
+    do {
+        shadow_set_allocation(d, opt_dom0_shadow, &preempt);
+    } while (preempt);
+    if (shadow_get_allocation(d) == 0)
+        panic("shadow allocation failed 0x%x < 0x%x\n",
+              shadow_get_allocation(d), opt_dom0_shadow);
 
     ASSERT( image_len < rma_sz );
 

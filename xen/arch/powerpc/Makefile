@@ -20,7 +20,6 @@ obj-y += exceptions.o
 obj-y += external.o
 obj-y += float.o
 obj-y += hcalls.o
-obj-y += htab.o
 obj-y += iommu.o
 obj-y += irq.o
 obj-y += mambo.o
