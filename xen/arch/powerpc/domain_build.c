@@ -163,12 +163,10 @@ int construct_dom0(struct domain *d,
     }
 
     /* make sure we are at least as big as the RMA */
-    if (dom0_nrpages < rma_nrpages)
-        dom0_nrpages = rma_nrpages;
-    else
+    if (dom0_nrpages > rma_nrpages)
         dom0_nrpages = allocate_extents(d, dom0_nrpages, rma_nrpages);
 
-    d->tot_pages = dom0_nrpages;
+    ASSERT(d->tot_pages == dom0_nrpages);
     ASSERT(d->tot_pages >= rma_nrpages);
 
     if (opt_dom0_shadow == 0) {
