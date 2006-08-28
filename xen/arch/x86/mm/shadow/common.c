@@ -1898,16 +1898,16 @@ int shadow_remove_write_access(struct vcpu *v, mfn_t gmfn,
         } while (0)
 
         
-        /* Linux lowmem: first 1GB is mapped 1-to-1 above 0xC0000000 */
-        if ( v == current 
-             && (gfn = sh_mfn_to_gfn(v->domain, gmfn)) < 0x40000000 )
-            GUESS(0xC0000000 + (gfn << PAGE_SHIFT), 4);
-
         if ( v->arch.shadow.mode->guest_levels == 2 )
         {
             if ( level == 1 )
                 /* 32bit non-PAE w2k3: linear map at 0xC0000000 */
                 GUESS(0xC0000000UL + (fault_addr >> 10), 1);
+
+            /* Linux lowmem: first 896MB is mapped 1-to-1 above 0xC0000000 */
+            if ((gfn = sh_mfn_to_gfn(v->domain, gmfn)) < 0x38000 ) 
+                GUESS(0xC0000000UL + (gfn << PAGE_SHIFT), 4);
+
         }
 #if CONFIG_PAGING_LEVELS >= 3
         else if ( v->arch.shadow.mode->guest_levels == 3 )
@@ -1918,6 +1918,10 @@ int shadow_remove_write_access(struct vcpu *v, mfn_t gmfn,
             case 1: GUESS(0xC0000000UL + (fault_addr >> 9), 2); break;
             case 2: GUESS(0xC0600000UL + (fault_addr >> 18), 2); break;
             }
+
+            /* Linux lowmem: first 896MB is mapped 1-to-1 above 0xC0000000 */
+            if ((gfn = sh_mfn_to_gfn(v->domain, gmfn)) < 0x38000 ) 
+                GUESS(0xC0000000UL + (gfn << PAGE_SHIFT), 4);
         }
 #if CONFIG_PAGING_LEVELS >= 4
         else if ( v->arch.shadow.mode->guest_levels == 4 )
@@ -1929,6 +1933,10 @@ int shadow_remove_write_access(struct vcpu *v, mfn_t gmfn,
             case 2: GUESS(0x70380000000UL + (fault_addr >> 18), 3); break;
             case 3: GUESS(0x70381C00000UL + (fault_addr >> 27), 3); break;
             }
+
+            /* Linux direct map at 0xffff810000000000 */
+            gfn = sh_mfn_to_gfn(v->domain, gmfn); 
+            GUESS(0xffff810000000000UL + (gfn << PAGE_SHIFT), 4); 
         }
 #endif /* CONFIG_PAGING_LEVELS >= 4 */
 #endif /* CONFIG_PAGING_LEVELS >= 3 */
@@ -2185,7 +2193,7 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int all)
 
     pg = mfn_to_page(gmfn);
 
-    /* Bale out now if the page is not shadowed */
+    /* Bail out now if the page is not shadowed */
     if ( (pg->count_info & PGC_page_table) == 0 )
         return;
 
