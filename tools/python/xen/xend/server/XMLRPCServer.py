@@ -78,7 +78,8 @@ def get_log():
 methods = ['device_create', 'device_configure', 'destroyDevice',
            'getDeviceSxprs',
            'setMemoryTarget', 'setName', 'setVCpuCount', 'shutdown',
-           'send_sysrq', 'getVCPUInfo', 'waitForDevices']
+           'send_sysrq', 'getVCPUInfo', 'waitForDevices',
+           'getRestartCount']
 
 exclude = ['domain_create', 'domain_restore']
 

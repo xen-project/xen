@@ -48,21 +48,48 @@ gopts.opt('reboot', short='R',
           fn=set_true, default=0,
           use='Shutdown and reboot.')
 
-def shutdown(opts, doms, mode, wait):
-    for d in doms:
-        server.xend.domain.shutdown(d, mode)
-    if wait:
-        while doms:
-            alive = server.xend.domains(0)
-            dead = []
-            for d in doms:
-                if d in alive: continue
-                dead.append(d)
-            for d in dead:
-                opts.info("Domain %s terminated" % d)
+def wait_reboot(opts, doms, rcs):
+    while doms:
+        alive = server.xend.domains(0)
+        reboot = []
+        for d in doms:
+            if d in alive:
+                rc = server.xend.domain.getRestartCount(d)
+                if rc == rcs[d]: continue
+                reboot.append(d)
+            else:
+                opts.info("Domain %s destroyed for failed in rebooting" % d)
                 doms.remove(d)
-            time.sleep(1)
-        opts.info("All domains terminated")
+        for d in reboot:
+            opts.info("Domain %s rebooted" % d)
+            doms.remove(d)
+        time.sleep(1)
+    opts.info("All domains rebooted")
+
+def wait_shutdown(opts, doms):
+    while doms:
+        alive = server.xend.domains(0)
+        dead = []
+        for d in doms:
+            if d in alive: continue
+            dead.append(d)
+        for d in dead:
+            opts.info("Domain %s terminated" % d)
+            doms.remove(d)
+        time.sleep(1)
+    opts.info("All domains terminated")
+
+def shutdown(opts, doms, mode, wait):
+    rcs = {}
+    for d in doms:
+        rcs[d] = server.xend.domain.getRestartCount(d)
+        server.xend.domain.shutdown(d, mode)
+
+    if wait:
+        if mode == 'reboot':
+            wait_reboot(opts, doms, rcs)
+        else:
+            wait_shutdown(opts, doms)
 
 def shutdown_mode(opts):
     if opts.vals.halt and opts.vals.reboot:

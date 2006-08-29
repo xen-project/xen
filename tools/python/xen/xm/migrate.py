@@ -57,7 +57,8 @@ def main(argv):
         opts.usage()
         return
     if len(args) != 2:
-        opts.err('Invalid arguments: ' + str(args))
+        opts.usage()
+        sys.exit(1)
     dom = args[0]
     dst = args[1]
     server.xend.domain.migrate(dom, dst, opts.vals.live, opts.vals.resource, opts.vals.port)
