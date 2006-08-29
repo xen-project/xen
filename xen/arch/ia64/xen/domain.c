@@ -122,6 +122,7 @@ void schedule_tail(struct vcpu *prev)
 		  shared_info->vcpu_info[current->vcpu_id].evtchn_upcall_mask;
 		__ia64_per_cpu_var(current_psr_ic_addr) = (int *)
 		  (current->domain->arch.shared_info_va + XSI_PSR_IC_OFS);
+		migrate_timer(&current->arch.hlt_timer, current->processor);
 	}
 	flush_vtlb_for_context_switch(current);
 }
@@ -305,7 +306,8 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 	    v->arch.last_processor = INVALID_PROCESSOR;
 	}
 	if (!VMX_DOMAIN(v)){
-		init_timer(&v->arch.hlt_timer, hlt_timer_fn, v, v->processor);
+		init_timer(&v->arch.hlt_timer, hlt_timer_fn, v,
+		           first_cpu(cpu_online_map));
 	}
 
 	return v;
