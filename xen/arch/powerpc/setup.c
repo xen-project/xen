@@ -61,6 +61,7 @@ unsigned int watchdog_on;
 unsigned long wait_init_idle;
 ulong oftree;
 ulong oftree_len;
+ulong oftree_end;
 
 cpumask_t cpu_sibling_map[NR_CPUS] __read_mostly;
 cpumask_t cpu_online_map; /* missing ifdef in schedule.c */
@@ -193,17 +194,37 @@ void startup_cpu_idle_loop(void)
     reset_stack_and_jump(idle_loop);
 }
 
+static ulong free_xenheap(ulong start, ulong end)
+{
+    start = ALIGN_UP(start, PAGE_SIZE);
+    end = ALIGN_DOWN(end, PAGE_SIZE);
+
+    printk("%s: 0x%lx - 0x%lx\n", __func__, start, end);
+
+    if (oftree <= end && oftree >= start) {
+        printk("%s:     Go around the devtree: 0x%lx - 0x%lx\n",
+                  __func__, oftree, oftree_end);
+        init_xenheap_pages(start, ALIGN_DOWN(oftree, PAGE_SIZE));
+        init_xenheap_pages(ALIGN_UP(oftree_end, PAGE_SIZE), end);
+    } else {
+        init_xenheap_pages(start, end);
+    }
+    return ALIGN_UP(end, PAGE_SIZE);
+}
+
 static void __init __start_xen(multiboot_info_t *mbi)
 {
     char *cmdline;
     module_t *mod = (module_t *)((ulong)mbi->mods_addr);
     ulong heap_start;
-    ulong modules_start, modules_size;
     ulong eomem = 0;
     ulong heap_size = 0;
     ulong bytes = 0;
-    ulong freemem = (ulong)_end;
-    ulong oftree_end;
+    ulong freemem;
+    ulong dom0_start, dom0_len;
+    ulong initrd_start, initrd_len;
+    
+    int i;
 
     memcpy(0, exception_vectors, exception_vectors_end - exception_vectors);
     synchronize_caches(0, exception_vectors_end - exception_vectors);
@@ -234,10 +255,6 @@ static void __init __start_xen(multiboot_info_t *mbi)
     if (!(mbi->flags & MBI_MEMMAP)) {
         panic("FATAL ERROR: Bootloader provided no memory information.\n");
     }
-
-    /* mark the begining of images */
-    modules_start = mod[0].mod_start;
-    modules_size = mod[mbi->mods_count-1].mod_end - mod[0].mod_start;
 
     /* OF dev tree is the last module */
     oftree = mod[mbi->mods_count-1].mod_start;
@@ -283,7 +300,15 @@ static void __init __start_xen(multiboot_info_t *mbi)
 
     /* Architecturally the first 4 pages are exception hendlers, we
      * will also be copying down some code there */
-    heap_start = init_boot_allocator(4 << PAGE_SHIFT);
+    heap_start = 4 << PAGE_SHIFT;
+    if (oftree < (ulong)_start)
+        heap_start = ALIGN_UP(oftree_end, PAGE_SIZE);
+
+    heap_start = init_boot_allocator(heap_start);
+    if (heap_start > (ulong)_start) {
+        panic("space below _start (%p) is not enough memory "
+              "for heap (0x%lx)\n", _start, heap_start);
+    }
 
     /* we give the first RMA to the hypervisor */
     xenheap_phys_end = rma_size(cpu_rma_order());
@@ -295,24 +320,28 @@ static void __init __start_xen(multiboot_info_t *mbi)
 
     /* Add memory between the beginning of the heap and the beginning
      * of out text */
-    init_xenheap_pages(heap_start, (ulong)_start);
+    free_xenheap(heap_start, (ulong)_start);
+    freemem = ALIGN_UP((ulong)_end, PAGE_SIZE);
 
-    /* move the modules to just after _end */
-    if (modules_start) {
-        printk("modules at: %016lx - %016lx\n", modules_start,
-                modules_start + modules_size);
-        freemem = ALIGN_UP(freemem, PAGE_SIZE);
-        memmove((void *)freemem, (void *)modules_start, modules_size);
+    for (i = 0; i < mbi->mods_count; i++) {
+        u32 s;
 
-        oftree -= modules_start - freemem;
-        modules_start = freemem;
-        freemem += modules_size;
-        printk("  moved to: %016lx - %016lx\n", modules_start,
-                modules_start + modules_size);
+        s = ALIGN_DOWN(mod[i].mod_start, PAGE_SIZE);
+
+        if (mod[i].mod_start > (ulong)_start &&
+            mod[i].mod_start < (ulong)_end) {
+            /* mod was linked in */
+            continue;
+        }
+
+        if (s < freemem) 
+            panic("module addresses must assend\n");
+
+        freemem = free_xenheap(freemem, s);
     }
 
     /* the rest of the xenheap, starting at the end of modules */
-    init_xenheap_pages(freemem, xenheap_phys_end);
+    free_xenheap(freemem, xenheap_phys_end);
 
 
 #ifdef OF_DEBUG
@@ -353,22 +382,26 @@ static void __init __start_xen(multiboot_info_t *mbi)
     /* Scrub RAM that is still free and so may go to an unprivileged domain. */
     scrub_heap_pages();
 
-    /*
-     * We're going to setup domain0 using the module(s) that we
-     * stashed safely above our heap. The second module, if present,
-     * is an initrd ramdisk.  The last module is the OF devtree.
-     */
-    if (construct_dom0(dom0,
-                       modules_start, 
-                       mod[0].mod_end-mod[0].mod_start,
-                       (mbi->mods_count == 1) ? 0 :
-                       modules_start + 
-                       (mod[1].mod_start-mod[0].mod_start),
-                       (mbi->mods_count == 1) ? 0 :
-                       mod[mbi->mods_count-1].mod_end - mod[1].mod_start,
+    dom0_start = mod[0].mod_start;
+    dom0_len = mod[0].mod_end - mod[0].mod_start;
+    if (mbi->mods_count > 1) {
+        initrd_start = mod[1].mod_start;
+        initrd_len = mod[1].mod_end - mod[1].mod_start;
+    } else {
+        initrd_start = 0;
+        initrd_len = 0;
+    }
+    if (construct_dom0(dom0, dom0_start, dom0_len,
+                       initrd_start, initrd_len,
                        cmdline) != 0) {
         panic("Could not set up DOM0 guest OS\n");
     }
+
+    free_xenheap(ALIGN_UP(dom0_start, PAGE_SIZE),
+                 ALIGN_DOWN(dom0_start + dom0_len, PAGE_SIZE));
+    if (initrd_start)
+        free_xenheap(ALIGN_UP(initrd_start, PAGE_SIZE),
+                     ALIGN_DOWN(initrd_start + initrd_len, PAGE_SIZE));
 
     init_trace_bufs();
 
