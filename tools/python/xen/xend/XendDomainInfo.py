@@ -703,6 +703,9 @@ class XendDomainInfo:
                 if security[idx][0] == 'ssidref':
                     to_store['security/ssidref'] = str(security[idx][1])
 
+        if not self.readVm('xend/restart_count'):
+            to_store['xend/restart_count'] = str(0)
+
         log.debug("Storing VM details: %s", to_store)
 
         self.writeVm(to_store)
@@ -823,6 +826,9 @@ class XendDomainInfo:
 
     def setResume(self, state):
         self.info['resume'] = state
+
+    def getRestartCount(self):
+        return self.readVm('xend/restart_count')
 
     def refreshShutdown(self, xeninfo = None):
         # If set at the end of this method, a restart is required, with the
@@ -1615,6 +1621,9 @@ class XendDomainInfo:
             try:
                 new_dom = XendDomain.instance().domain_create(config)
                 new_dom.unpause()
+                rst_cnt = self.readVm('xend/restart_count')
+                rst_cnt = int(rst_cnt) + 1
+                self.writeVm('xend/restart_count', str(rst_cnt))
                 new_dom.removeVm(RESTART_IN_PROGRESS)
             except:
                 if new_dom:
