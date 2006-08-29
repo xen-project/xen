@@ -52,7 +52,7 @@
  */
 #define REQUEST_ASYNC_FD 1
 
-#define MAX_AIO_REQS (MAX_REQUESTS * MAX_SEGMENTS_PER_REQ * 8)
+#define MAX_AIO_REQS (MAX_REQUESTS * MAX_SEGMENTS_PER_REQ)
 
 struct pending_aio {
 	td_callback_t cb;
@@ -146,7 +146,7 @@ int tdaio_open (struct td_state *s, const char *name)
 	struct tdaio_state *prv = (struct tdaio_state *)s->private;
 	s->private = prv;
 
-	DPRINTF("XXX: block-aio open('%s')", name);
+	DPRINTF("block-aio open('%s')", name);
 	/* Initialize AIO */
 	prv->iocb_free_count = MAX_AIO_REQS;
 	prv->iocb_queued     = 0;
@@ -156,9 +156,18 @@ int tdaio_open (struct td_state *s, const char *name)
 
 	if (prv->poll_fd < 0) {
 		ret = prv->poll_fd;
-		DPRINTF("Couldn't get fd for AIO poll support.  This is "
-			"probably because your kernel does not have the "
-			"aio-poll patch applied.\n");
+                if (ret == -EAGAIN) {
+                        DPRINTF("Couldn't setup AIO context.  If you are "
+                                "trying to concurrently use a large number "
+                                "of blktap-based disks, you may need to "
+                                "increase the system-wide aio request limit. "
+                                "(e.g. 'echo echo 1048576 > /proc/sys/"
+                                "aio-max-nr')\n");
+                } else {
+                        DPRINTF("Couldn't get fd for AIO poll support.  This "
+                                "is probably because your kernel does not "
+                                "have the aio-poll patch applied.\n");
+                }
 		goto done;
 	}
 
