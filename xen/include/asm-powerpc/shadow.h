@@ -13,7 +13,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005
+ * Copyright (C) IBM Corp. 2005, 2006
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
  */
@@ -55,4 +55,5 @@ static inline void mark_dirty(struct domain *d, unsigned int mfn)
 {
     return;
 }
+#define gnttab_mark_dirty(d, f) mark_dirty((d), (f))
 #endif
