@@ -1121,7 +1121,7 @@ sh_gfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
 
 
 #if CONFIG_PAGING_LEVELS > 2
-    if ( gpfn > (RO_MPT_VIRT_END - RO_MPT_VIRT_START) / sizeof(l1_pgentry_t) ) 
+    if ( gpfn >= (RO_MPT_VIRT_END-RO_MPT_VIRT_START) / sizeof(l1_pgentry_t) ) 
         /* This pfn is higher than the p2m map can hold */
         return _mfn(INVALID_MFN);
 #endif

@@ -555,7 +555,7 @@ vcpu_gfn_to_mfn_nofault(struct vcpu *v, unsigned long gfn)
         return _mfn(gfn);
 
 #if CONFIG_PAGING_LEVELS > 2
-    if ( gfn > (RO_MPT_VIRT_END - RO_MPT_VIRT_START) / sizeof(l1_pgentry_t) ) 
+    if ( gfn >= (RO_MPT_VIRT_END - RO_MPT_VIRT_START) / sizeof(l1_pgentry_t) ) 
         /* This pfn is higher than the p2m map can hold */
         return _mfn(INVALID_MFN);
 #endif
