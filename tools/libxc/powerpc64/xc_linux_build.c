@@ -309,7 +309,7 @@ static unsigned long create_start_info(start_info_t *si,
     si->store_evtchn = store_evtchn;
     si->console.domU.mfn = si->nr_pages - 3;
     si->console.domU.evtchn = console_evtchn;
-    si_addr = eomem - (PAGE_SIZE * 4);
+    si_addr = si->nr_pages - 4;
 
     return si_addr;
 }
@@ -388,7 +388,7 @@ int xc_linux_build(int xc_handle,
     }
 
     si_addr = create_start_info(&si, console_evtchn, store_evtchn);
-    *console_mfn = page_array[si.console_mfn];
+    *console_mfn = page_array[si.console.domU.mfn];
     *store_mfn = page_array[si.store_mfn];
     
     if (install_image(xc_handle, domid, page_array, &si, si_addr,
