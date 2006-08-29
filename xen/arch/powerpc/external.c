@@ -175,8 +175,7 @@ void init_IRQ(void)
 
 void ack_APIC_irq(void)
 {
-    printk("%s: EOI the whole MPIC?\n", __func__);
-    for (;;);
+    panic("%s: EOI the whole MPIC?\n", __func__);
 }
 
 void ack_bad_irq(unsigned int irq)
