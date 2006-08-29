@@ -397,22 +397,14 @@ shadow_validate_guest_pt_write(struct vcpu *v, mfn_t gmfn,
     ASSERT(shadow_lock_is_acquired(v->domain));
     rc = __shadow_validate_guest_entry(v, gmfn, entry, size);
     if ( rc & SHADOW_SET_FLUSH )
-    {
-        // Flush everyone except the local processor, which will flush when it
-        // re-enters the HVM guest.
-        //
-        cpumask_t mask = d->domain_dirty_cpumask;
-        cpu_clear(v->processor, mask);
-        flush_tlb_mask(mask);
-    }
+        /* Need to flush TLBs to pick up shadow PT changes */
+        flush_tlb_mask(d->domain_dirty_cpumask);
     if ( rc & SHADOW_SET_ERROR ) 
     {
         /* This page is probably not a pagetable any more: tear it out of the 
          * shadows, along with any tables that reference it */
         shadow_remove_all_shadows_and_parents(v, gmfn);
     }
-    /* We ignore the other bits: since we are about to change CR3 on
-     * VMENTER we don't need to do any extra TLB flushes. */ 
 }
 
 
@@ -1129,7 +1121,7 @@ sh_gfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
 
 
 #if CONFIG_PAGING_LEVELS > 2
-    if ( gpfn > (RO_MPT_VIRT_END - RO_MPT_VIRT_START) / sizeof(l1_pgentry_t) ) 
+    if ( gpfn >= (RO_MPT_VIRT_END-RO_MPT_VIRT_START) / sizeof(l1_pgentry_t) ) 
         /* This pfn is higher than the p2m map can hold */
         return _mfn(INVALID_MFN);
 #endif
@@ -1898,16 +1890,16 @@ int shadow_remove_write_access(struct vcpu *v, mfn_t gmfn,
         } while (0)
 
         
-        /* Linux lowmem: first 1GB is mapped 1-to-1 above 0xC0000000 */
-        if ( v == current 
-             && (gfn = sh_mfn_to_gfn(v->domain, gmfn)) < 0x40000000 )
-            GUESS(0xC0000000 + (gfn << PAGE_SHIFT), 4);
-
         if ( v->arch.shadow.mode->guest_levels == 2 )
         {
             if ( level == 1 )
                 /* 32bit non-PAE w2k3: linear map at 0xC0000000 */
                 GUESS(0xC0000000UL + (fault_addr >> 10), 1);
+
+            /* Linux lowmem: first 896MB is mapped 1-to-1 above 0xC0000000 */
+            if ((gfn = sh_mfn_to_gfn(v->domain, gmfn)) < 0x38000 ) 
+                GUESS(0xC0000000UL + (gfn << PAGE_SHIFT), 4);
+
         }
 #if CONFIG_PAGING_LEVELS >= 3
         else if ( v->arch.shadow.mode->guest_levels == 3 )
@@ -1918,6 +1910,10 @@ int shadow_remove_write_access(struct vcpu *v, mfn_t gmfn,
             case 1: GUESS(0xC0000000UL + (fault_addr >> 9), 2); break;
             case 2: GUESS(0xC0600000UL + (fault_addr >> 18), 2); break;
             }
+
+            /* Linux lowmem: first 896MB is mapped 1-to-1 above 0xC0000000 */
+            if ((gfn = sh_mfn_to_gfn(v->domain, gmfn)) < 0x38000 ) 
+                GUESS(0xC0000000UL + (gfn << PAGE_SHIFT), 4);
         }
 #if CONFIG_PAGING_LEVELS >= 4
         else if ( v->arch.shadow.mode->guest_levels == 4 )
@@ -1929,6 +1925,10 @@ int shadow_remove_write_access(struct vcpu *v, mfn_t gmfn,
             case 2: GUESS(0x70380000000UL + (fault_addr >> 18), 3); break;
             case 3: GUESS(0x70381C00000UL + (fault_addr >> 27), 3); break;
             }
+
+            /* Linux direct map at 0xffff810000000000 */
+            gfn = sh_mfn_to_gfn(v->domain, gmfn); 
+            GUESS(0xffff810000000000UL + (gfn << PAGE_SHIFT), 4); 
         }
 #endif /* CONFIG_PAGING_LEVELS >= 4 */
 #endif /* CONFIG_PAGING_LEVELS >= 3 */
@@ -2185,7 +2185,7 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int all)
 
     pg = mfn_to_page(gmfn);
 
-    /* Bale out now if the page is not shadowed */
+    /* Bail out now if the page is not shadowed */
     if ( (pg->count_info & PGC_page_table) == 0 )
         return;
 
