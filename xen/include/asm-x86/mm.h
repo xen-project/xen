@@ -368,7 +368,7 @@ static inline unsigned long get_mfn_from_gpfn(unsigned long pfn)
     int ret;
 
 #if CONFIG_PAGING_LEVELS > 2
-    if ( pfn > (RO_MPT_VIRT_END - RO_MPT_VIRT_START) / sizeof (l1_pgentry_t) ) 
+    if ( pfn >= (RO_MPT_VIRT_END - RO_MPT_VIRT_START) / sizeof(l1_pgentry_t) ) 
         /* This pfn is higher than the p2m map can hold */
         return INVALID_MFN;
 #endif
