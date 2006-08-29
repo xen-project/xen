@@ -182,7 +182,7 @@ static int init_aio_state(struct td_state *bs)
                                 "trying to concurrently use a large number "
                                 "of blktap-based disks, you may need to "
                                 "increase the system-wide aio request limit. "
-                                "(e.g. 'echo echo 1048576 > /proc/sys/"
+                                "(e.g. 'echo echo 1048576 > /proc/sys/fs/"
                                 "aio-max-nr')\n");
                 } else {
                         DPRINTF("Couldn't get fd for AIO poll support.  This "

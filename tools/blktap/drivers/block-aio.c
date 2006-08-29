@@ -161,7 +161,7 @@ int tdaio_open (struct td_state *s, const char *name)
                                 "trying to concurrently use a large number "
                                 "of blktap-based disks, you may need to "
                                 "increase the system-wide aio request limit. "
-                                "(e.g. 'echo echo 1048576 > /proc/sys/"
+                                "(e.g. 'echo echo 1048576 > /proc/sys/fs/"
                                 "aio-max-nr')\n");
                 } else {
                         DPRINTF("Couldn't get fd for AIO poll support.  This "
