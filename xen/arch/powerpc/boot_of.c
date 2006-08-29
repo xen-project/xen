@@ -993,6 +993,7 @@ static int __init boot_of_cpus(void)
     /* We want a continuous logical cpu number space.  */
     cpu_set(0, cpu_present_map);
     cpu_set(0, cpu_online_map);
+    cpu_set(0, cpu_possible_map);
 
     /* Spin up all CPUS, even if there are more than NR_CPUS, because
      * Open Firmware has them spinning on cache lines which will
@@ -1039,8 +1040,10 @@ static int __init boot_of_cpus(void)
         } while (pong == ping);
         of_printf("pong = 0x%x\n", pong);
 
-        if (pong != ping)
+        if (pong != ping) {
             cpu_set(logical, cpu_present_map);
+            cpu_set(logical, cpu_possible_map);
+        }
 
         cpu = of_getpeer(cpu);
     }

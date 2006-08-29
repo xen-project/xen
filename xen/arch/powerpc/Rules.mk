@@ -4,7 +4,7 @@ CC := $(CROSS_COMPILE)gcc
 LD := $(CROSS_COMPILE)ld
 
 # These are goodess that applies to all source.
-C_WARNINGS := -Wpointer-arith -Wredundant-decls
+C_WARNINGS := -Wredundant-decls
 
 # _no_ common code can have packed data structures or we are in touble.
 C_WARNINGS += -Wpacked

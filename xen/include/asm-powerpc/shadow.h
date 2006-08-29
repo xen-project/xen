@@ -57,14 +57,14 @@ static inline void mark_dirty(struct domain *d, unsigned int mfn)
 }
 #define gnttab_mark_dirty(d, f) mark_dirty((d), (f))
 
-extern int shadow_control_op(struct domain *d, 
-                             dom0_shadow_control_t *sc,
-                             XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op);
+extern int shadow_domctl(struct domain *d, 
+                   xen_domctl_shadow_op_t *sc,
+                   XEN_GUEST_HANDLE(xen_domctl_t) u_domctl);
 extern unsigned int shadow_teardown(struct domain *d);
 extern unsigned int shadow_set_allocation(
     struct domain *d, unsigned int megabytes, int *preempted);
 
-/* Return the size of the shadow2 pool, rounded up to the nearest MB */
+/* Return the size of the shadow pool, rounded up to the nearest MB */
 static inline unsigned int shadow_get_allocation(struct domain *d)
 {
     return (1ULL << (d->arch.htab.order + PAGE_SHIFT)) >> 20;

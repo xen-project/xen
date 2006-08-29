@@ -74,6 +74,7 @@ ulong oftree_end;
 cpumask_t cpu_sibling_map[NR_CPUS] __read_mostly;
 cpumask_t cpu_online_map; /* missing ifdef in schedule.c */
 cpumask_t cpu_present_map;
+cpumask_t cpu_possible_map;
 
 /* XXX get this from ISA node in device tree */
 ulong isa_io_base;
@@ -254,6 +255,7 @@ static int kick_secondary_cpus(int maxcpus)
             break;
         init_parea(cpuid);
         cpu_set(cpuid, cpu_online_map);
+        cpu_set(cpuid, cpu_possible_map);
     }
 
     return 0;

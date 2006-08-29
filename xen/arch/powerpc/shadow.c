@@ -21,7 +21,6 @@
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/shadow.h>
-#include <public/dom0_ops.h>
 
 static ulong htab_calc_sdr1(ulong htab_addr, ulong log_htab_size)
 {
@@ -116,9 +115,9 @@ unsigned int shadow_set_allocation(struct domain *d,
     return rc;
 }
 
-int shadow_control_op(struct domain *d, 
-                      dom0_shadow_control_t *sc,
-                      XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
+int shadow_domctl(struct domain *d, 
+				  xen_domctl_shadow_op_t *sc,
+				  XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 {
     if ( unlikely(d == current->domain) )
     {
@@ -128,15 +127,15 @@ int shadow_control_op(struct domain *d,
 
     switch ( sc->op )
     {
-    case DOM0_SHADOW_CONTROL_OP_OFF:
+    case XEN_DOMCTL_SHADOW_OP_OFF:
          DPRINTK("Shadow is mandatory!\n");
          return -EINVAL;
 
-    case DOM0_SHADOW2_CONTROL_OP_GET_ALLOCATION:
+    case XEN_DOMCTL_SHADOW_OP_GET_ALLOCATION:
         sc->mb = shadow_get_allocation(d);
         return 0;
 
-    case DOM0_SHADOW2_CONTROL_OP_SET_ALLOCATION: {
+    case XEN_DOMCTL_SHADOW_OP_SET_ALLOCATION: {
         int rc;
         int preempted = 0;
 
@@ -145,7 +144,7 @@ int shadow_control_op(struct domain *d,
         if (preempted)
             /* Not finished.  Set up to re-run the call. */
             rc = hypercall_create_continuation(
-                __HYPERVISOR_dom0_op, "h", u_dom0_op);
+                __HYPERVISOR_domctl, "h", u_domctl);
         else 
             /* Finished.  Return the new allocation */
             sc->mb = shadow_get_allocation(d);
