@@ -255,7 +255,7 @@ int convert_dev_name_to_num(char *name) {
         free(p_plx);
         free(alpha);
         
-	return 0;
+	return ret;
 }
 
 /**
