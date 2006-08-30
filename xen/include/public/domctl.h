@@ -73,7 +73,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_getdomaininfo_t);
 struct xen_domctl_getmemlist {
     /* IN variables. */
     uint64_t max_pfns;
-    XEN_GUEST_HANDLE_64(ulong) buffer;
+    XEN_GUEST_HANDLE_64(xen_pfn_t) buffer;
     /* OUT variables. */
     uint64_t num_pfns;
 };
