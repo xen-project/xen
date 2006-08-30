@@ -204,7 +204,7 @@ char *get_dom_domid(struct xs_handle *h, const char *name)
 int convert_dev_name_to_num(char *name) {
 	char *p_sd, *p_hd, *p_xvd, *p_plx, *p, *alpha,*ptr;
 	int majors[10] = {3,22,33,34,56,57,88,89,90,91};
-	int maj,i;
+	int maj,i,ret = 0;
 
 	asprintf(&p_sd,"/dev/sd");
 	asprintf(&p_hd,"/dev/hd");
@@ -221,7 +221,7 @@ int convert_dev_name_to_num(char *name) {
 			*ptr++;
 		}
 		*p++;
-		return BASE_DEV_VAL + (16*i) + atoi(p);
+		ret = BASE_DEV_VAL + (16*i) + atoi(p);
 	} else if (strstr(name, p_hd) != NULL) {
 		p = name + strlen(p_hd);
 		for (i = 0, ptr = alpha; i < strlen(alpha); i++) {
@@ -229,7 +229,7 @@ int convert_dev_name_to_num(char *name) {
 			*ptr++;
 		}
 		*p++;
-		return (majors[i/2]*256) + atoi(p);
+		ret = (majors[i/2]*256) + atoi(p);
 
 	} else if (strstr(name, p_xvd) != NULL) {
 		p = name + strlen(p_xvd);
@@ -238,17 +238,24 @@ int convert_dev_name_to_num(char *name) {
 			*ptr++;
 		}
 		*p++;
-		return (202*256) + (16*i) + atoi(p);
+		ret = (202*256) + (16*i) + atoi(p);
 
 	} else if (strstr(name, p_plx) != NULL) {
 		p = name + strlen(p_plx);
-		return atoi(p);
+		ret = atoi(p);
 
 	} else {
 		DPRINTF("Unknown device type, setting to default.\n");
-		return BASE_DEV_VAL;
+		ret = BASE_DEV_VAL;
 	}
-	return 0;
+
+        free(p_sd);
+        free(p_hd);
+        free(p_xvd);
+        free(p_plx);
+        free(alpha);
+        
+	return ret;
 }
 
 /**

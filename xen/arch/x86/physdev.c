@@ -96,10 +96,11 @@ long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         if ( !IS_PRIV(current->domain) )
             break;
 
+        irq = irq_op.irq;
         ret = -EINVAL;
-        if ( (irq = irq_op.irq) >= NR_IRQS )
+        if ( (irq < 0) || (irq >= NR_IRQS) )
             break;
-        
+
         irq_op.vector = assign_irq_vector(irq);
         ret = copy_to_guest(arg, &irq_op, 1) ? -EFAULT : 0;
         break;
