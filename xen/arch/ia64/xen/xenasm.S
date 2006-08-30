@@ -31,7 +31,7 @@
 //  loc0=rp, loc1=ar.pfs, loc2=percpu_paddr, loc3=psr, loc4=ar.rse
 //  loc5=pal_vaddr, loc6=xen_paddr, loc7=shared_archinfo_paddr,
 GLOBAL_ENTRY(ia64_new_rr7)
-	// not sure this unwind statement is correct...
+	// FIXME? not sure this unwind statement is correct...
 	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(1)
 	alloc loc1 = ar.pfs, 5, 8, 0, 0
 	movl loc2=PERCPU_ADDR
@@ -162,7 +162,7 @@ GLOBAL_ENTRY(ia64_new_rr7)
 	dep r25=0,loc5,60,4		// convert pal vaddr to paddr
 	;;
 	ptr.i	loc5,r23
-	or r25=r25,r26		// construct PA | page properties
+	or r25=r25,r26			// construct PA | page properties
 	mov cr.itir=r23
 	mov cr.ifa=loc5
 	;;
@@ -191,10 +191,10 @@ GLOBAL_ENTRY(ia64_prepare_handle_privop)
 	 */
 	mov r16=r0
 	DO_SAVE_SWITCH_STACK
-	br.call.sptk.many rp=ia64_handle_privop		// stack frame setup in ivt
+	br.call.sptk.many rp=ia64_handle_privop	// stack frame setup in ivt
 .ret22:	.body
 	DO_LOAD_SWITCH_STACK
-	br.cond.sptk.many rp				// goes to ia64_leave_kernel
+	br.cond.sptk.many rp			// goes to ia64_leave_kernel
 END(ia64_prepare_handle_privop)
 
 GLOBAL_ENTRY(ia64_prepare_handle_break)
@@ -217,7 +217,7 @@ GLOBAL_ENTRY(ia64_prepare_handle_reflection)
 	 */
 	mov r16=r0
 	DO_SAVE_SWITCH_STACK
-	br.call.sptk.many rp=ia64_handle_reflection	// stack frame setup in ivt
+	br.call.sptk.many rp=ia64_handle_reflection // stack frame setup in ivt
 .ret24:	.body
 	DO_LOAD_SWITCH_STACK
 	br.cond.sptk.many rp			// goes to ia64_leave_kernel
@@ -301,7 +301,7 @@ static:	cmp.eq p7,p8=6,r32		/* PAL_PTCE_INFO */
 (p8)	br.cond.sptk.few 1f
 #if 0
 	mov r9=ar.lc
-	movl r8=524288			/* flush 512k million cache lines (16MB) */
+	movl r8=524288		/* flush 512k million cache lines (16MB) */
 	;;
 	mov ar.lc=r8
 	movl r8=0xe000000000000000
@@ -319,7 +319,9 @@ static:	cmp.eq p7,p8=6,r32		/* PAL_PTCE_INFO */
 1:	cmp.eq p7,p8=15,r32		/* PAL_PERF_MON_INFO */
 (p8)	br.cond.sptk.few 1f
 	mov r8=0			/* status = 0 */
-	movl r9 =0x08122f04		/* generic=4 width=47 retired=8 cycles=18 */
+	movl r9 =0x08122f04		/* generic=4 width=47 retired=8 
+					 * cycles=18
+					 */
 	mov r10=0			/* reserved */
 	mov r11=0			/* reserved */
 	mov r16=0xffff			/* implemented PMC */
@@ -361,8 +363,8 @@ stacked:
 END(pal_emulator_static)
 
 //  These instructions are copied in the domains.
-//  This is the virtual PAL, which simply does an hypercall.
-//  The size is 2 bunldes (32 Bytes).  It handles both static and stacked
+//  This is the virtual PAL, which simply does a hypercall.
+//  The size is 2 bundles (32 Bytes).  It handles both static and stacked
 //    convention.
 //  If you modify this code, you have to modify dom_fw.h (for the size) and
 //   dom_fw_pal_hypercall_patch.
@@ -376,7 +378,7 @@ GLOBAL_ENTRY(pal_call_stub)
 	}
 	{
 	 .mbb
-	break 0x1000	//  Hypercall vector (Value is patched).
+	break 0x1000		//  Hypercall vector (Value is patched).
 (p7)	br.cond.sptk.few rp
 (p8)	br.ret.sptk.few rp
 	}

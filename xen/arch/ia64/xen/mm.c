@@ -166,7 +166,8 @@
 #include <xen/sched.h>
 #include <xen/domain.h>
 #include <asm/xentypes.h>
-#include <asm/mm.h>
+#include <xen/mm.h>
+#include <xen/errno.h>
 #include <asm/pgalloc.h>
 #include <asm/vhpt.h>
 #include <asm/vcpu.h>
@@ -948,8 +949,6 @@ efi_mmio(unsigned long physaddr, unsigned long size)
                 return 1;
             }
 
-            DPRINTK("%s:%d physaddr 0x%lx size = 0x%lx\n",
-                    __func__, __LINE__, physaddr, size);
             return 0;
         }
 
@@ -970,8 +969,10 @@ assign_domain_mmio_page(struct domain *d,
                 __func__, d, mpaddr, size);
     }
     if (!efi_mmio(mpaddr, size)) {
+#ifndef NDEBUG
         DPRINTK("%s:%d domain %p mpaddr 0x%lx size = 0x%lx\n",
                 __func__, __LINE__, d, mpaddr, size);
+#endif
         return -EINVAL;
     }
     assign_domain_same_page(d, mpaddr, size, ASSIGN_writable | ASSIGN_nocache);

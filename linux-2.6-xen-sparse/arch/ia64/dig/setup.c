@@ -69,7 +69,7 @@ dig_setup (char **cmdline_p)
 	screen_info.orig_video_isVGA = 1;	/* XXX fake */
 	screen_info.orig_video_ega_bx = 3;	/* XXX fake */
 #ifdef CONFIG_XEN
-	if (!is_running_on_xen())
+	if (!is_running_on_xen() || !is_initial_xendomain())
 		return;
 
 	if (xen_start_info->console.dom0.info_size >=

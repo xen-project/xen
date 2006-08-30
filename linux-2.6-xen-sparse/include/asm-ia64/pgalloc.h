@@ -126,7 +126,11 @@ static inline void pmd_free(pmd_t * pmd)
 static inline void
 pmd_populate(struct mm_struct *mm, pmd_t * pmd_entry, struct page *pte)
 {
+#ifndef CONFIG_XEN
+	pmd_val(*pmd_entry) = page_to_phys(pte);
+#else
 	pmd_val(*pmd_entry) = page_to_pseudophys(pte);
+#endif
 }
 
 static inline void

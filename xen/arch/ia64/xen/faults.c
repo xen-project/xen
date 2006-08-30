@@ -13,6 +13,8 @@
 #include <xen/smp.h>
 #include <asm/ptrace.h>
 #include <xen/delay.h>
+#include <xen/perfc.h>
+#include <xen/mm.h>
 
 #include <asm/system.h>
 #include <asm/processor.h>
@@ -26,9 +28,9 @@
 #include <asm/debugger.h>
 #include <asm/fpswa.h>
 #include <asm/bundle.h>
-#include <asm/privop_stat.h>
 #include <asm/asm-xsi-offsets.h>
 #include <asm/shadow.h>
+#include <asm/uaccess.h>
 
 extern void die_if_kernel(char *str, struct pt_regs *regs, long err);
 /* FIXME: where these declarations shold be there ? */
@@ -516,7 +518,8 @@ ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long isr, u
 		debugger_trap_fatal(0 /* don't care */, regs);
 	} 
 #endif
-	else if (iim == d->arch.breakimm) {
+	else if (iim == d->arch.breakimm &&
+	         ia64_get_cpl(regs->cr_ipsr) == 2) {
 		/* by default, do not continue */
 		v->arch.hypercall_continuation = 0;
 

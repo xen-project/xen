@@ -59,21 +59,23 @@ do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         }
         else if (IS_PRIV(current->domain)) {
             d = find_domain_by_id(a.domid);
-            if (!d)
+            if (d == NULL)
                 return -ESRCH;
         }
         else
             return -EPERM;
 
         if (op == HVMOP_set_param) {
-            rc = 0;
             d->arch.hvm_domain.params[a.index] = a.value;
+            rc = 0;
         }
-        else
-            rc = d->arch.hvm_domain.params[a.index];
+        else {
+            a.value = d->arch.hvm_domain.params[a.index];
+            rc = copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
+        }
 
         put_domain(d);
-        return rc;
+        break;
     }
 
     default:

@@ -109,6 +109,7 @@ void
 xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long new_itm, old_itc;
+	int f_setitm = 0;
 
 #if 0
 #define HEARTBEAT_FREQ 16	// period in seconds
@@ -129,11 +130,12 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 			vcpu_pend_timer(current);
 			// ensure another timer interrupt happens even if domain doesn't
 			vcpu_set_next_timer(current);
+			f_setitm = 1;
 		}
 
 	new_itm = local_cpu_data->itm_next;
 
-	if (!VMX_DOMAIN(current) && !time_after(ia64_get_itc(), new_itm))
+	if (f_setitm && !time_after(ia64_get_itc(), new_itm)) 
 		return;
 
 	while (1) {

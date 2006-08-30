@@ -553,7 +553,6 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
 {
     unsigned long page_array[2];
     shared_iopage_t *sp;
-    int i;
     unsigned long dom_memsize = (memsize << 20);
     DECLARE_DOMCTL;
 
@@ -604,18 +603,6 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
         goto error_out;
 
     memset(sp, 0, PAGE_SIZE);
-
-    for (i = 0; i < vcpus; i++) {
-        uint32_t vp_eport;
-
-        vp_eport = xc_evtchn_alloc_unbound(xc_handle, dom, 0);
-        if (vp_eport < 0) {
-            DPRINTF("Couldn't get unbound port from VMX guest.\n");
-            goto error_out;
-        }
-        sp->vcpu_iodata[i].vp_eport = vp_eport;
-    }
-
     munmap(sp, PAGE_SIZE);
 
     return 0;

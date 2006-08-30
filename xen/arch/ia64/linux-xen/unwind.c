@@ -33,6 +33,7 @@
 #include <xen/sched.h>
 #include <xen/xmalloc.h>
 #include <xen/spinlock.h>
+#include <xen/errno.h>
 
 // work around
 #ifdef CONFIG_SMP
@@ -2315,6 +2316,7 @@ unw_init (void)
 			  __start_unwind, __end_unwind);
 }
 
+#ifndef XEN
 /*
  * DEPRECATED DEPRECATED DEPRECATED DEPRECATED DEPRECATED DEPRECATED DEPRECATED
  *
@@ -2353,3 +2355,4 @@ sys_getunwind (void __user *buf, size_t buf_size)
 			return -EFAULT;
 	return unw.gate_table_size;
 }
+#endif

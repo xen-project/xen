@@ -8,6 +8,7 @@
 
 #include <linux/sched.h>
 #include <public/xen.h>
+#include <xen/mm.h>
 #include <asm/ia64_int.h>
 #include <asm/vcpu.h>
 #include <asm/regionreg.h>
@@ -22,6 +23,7 @@
 #include <asm/vmx_phy_mode.h>
 #include <asm/bundle.h>
 #include <asm/privop_stat.h>
+#include <asm/uaccess.h>
 
 /* FIXME: where these declarations should be there ? */
 extern void getreg(unsigned long regnum, unsigned long *val, int *nat, struct pt_regs *regs);
@@ -473,7 +475,7 @@ IA64FAULT vcpu_get_iip(VCPU *vcpu, UINT64 *pval)
 
 IA64FAULT vcpu_get_ifa(VCPU *vcpu, UINT64 *pval)
 {
-	PRIVOP_COUNT_ADDR(vcpu_regs(vcpu),_GET_IFA);
+	PRIVOP_COUNT_ADDR(vcpu_regs(vcpu), privop_inst_get_ifa);
 	*pval = PSCB(vcpu,ifa);
 	return (IA64_NO_FAULT);
 }
@@ -540,7 +542,7 @@ IA64FAULT vcpu_get_iim(VCPU *vcpu, UINT64 *pval)
 
 IA64FAULT vcpu_get_iha(VCPU *vcpu, UINT64 *pval)
 {
-	PRIVOP_COUNT_ADDR(vcpu_regs(vcpu),_THASH);
+	PRIVOP_COUNT_ADDR(vcpu_regs(vcpu), privop_inst_thash);
 	*pval = PSCB(vcpu,iha);
 	return (IA64_NO_FAULT);
 }
@@ -2214,4 +2216,29 @@ IA64FAULT vcpu_ptr_i(VCPU *vcpu,UINT64 vadr,UINT64 log_range)
 	vcpu_flush_tlb_vhpt_range (vadr, log_range);
 
 	return IA64_NO_FAULT;
+}
+
+int ia64_map_hypercall_param(void)
+{
+	struct vcpu *v = current;
+	struct domain *d = current->domain;
+	u64 vaddr = v->arch.hypercall_param.va & PAGE_MASK;
+	volatile pte_t* pte;
+
+	if (v->arch.hypercall_param.va == 0)
+		return FALSE;
+	pte = lookup_noalloc_domain_pte(d, v->arch.hypercall_param.pa1);
+	if (!pte || !pte_present(*pte))
+		return FALSE;
+	vcpu_itc_no_srlz(v, 2, vaddr, pte_val(*pte), -1UL, PAGE_SHIFT);
+	if (v->arch.hypercall_param.pa2) {
+		vaddr += PAGE_SIZE;
+		pte = lookup_noalloc_domain_pte(d, v->arch.hypercall_param.pa2);
+		if (pte && pte_present(*pte)) {
+			vcpu_itc_no_srlz(v, 2, vaddr, pte_val(*pte),
+			                 -1UL, PAGE_SHIFT);
+		}
+	}
+	ia64_srlz_d();
+	return TRUE;
 }

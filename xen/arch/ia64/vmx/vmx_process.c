@@ -186,6 +186,7 @@ void leave_hypervisor_tail(struct pt_regs *regs)
 {
     struct domain *d = current->domain;
     struct vcpu *v = current;
+    int callback_irq;
     // FIXME: Will this work properly if doing an RFI???
     if (!is_idle_domain(d) ) {	// always comes from guest
 //        struct pt_regs *user_regs = vcpu_regs(current);
@@ -212,6 +213,13 @@ void leave_hypervisor_tail(struct pt_regs *regs)
 //           VCPU(v, irr[0]) |= 1UL << 0x10;
 //           v->arch.irq_new_pending = 1;
 //       }
+
+        callback_irq = d->arch.hvm_domain.params[HVM_PARAM_CALLBACK_IRQ];
+        if (callback_irq != 0 && local_events_need_delivery()) {
+            /*inject para-device call back irq*/
+            v->vcpu_info->evtchn_upcall_mask = 1;
+            vmx_vcpu_pend_interrupt(v, callback_irq);
+        }
 
         if ( v->arch.irq_new_pending ) {
             v->arch.irq_new_pending = 0;

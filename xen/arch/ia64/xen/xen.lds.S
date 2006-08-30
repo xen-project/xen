@@ -169,7 +169,9 @@ SECTIONS
 	  *(.data.gate)
 	  __stop_gate_section = .;
 	}
-  . = ALIGN(PAGE_SIZE);		/* make sure the gate page doesn't expose kernel data */
+  . = ALIGN(PAGE_SIZE);		/* make sure the gate page doesn't expose
+  				 * kernel data
+				 */
 
   .data.cacheline_aligned : AT(ADDR(.data.cacheline_aligned) - LOAD_OFFSET)
         { *(.data.cacheline_aligned) }
@@ -184,7 +186,9 @@ SECTIONS
 		*(.data.percpu)
 		__per_cpu_end = .;
 	}
-  . = __phys_per_cpu_start + PERCPU_PAGE_SIZE;	/* ensure percpu data fits into percpu page size */
+  . = __phys_per_cpu_start + PERCPU_PAGE_SIZE;	/* ensure percpu data fits
+  					         * into percpu page size
+						 */
 
   data : { } :data
   .data : AT(ADDR(.data) - LOAD_OFFSET)

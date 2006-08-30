@@ -35,7 +35,6 @@ extern void vmx_final_setup_guest(struct vcpu *v);
 extern void vmx_save_state(struct vcpu *v);
 extern void vmx_load_state(struct vcpu *v);
 extern void vmx_setup_platform(struct domain *d);
-extern void vmx_wait_io(void);
 extern void vmx_io_assist(struct vcpu *v);
 extern int ia64_hypercall (struct pt_regs *regs);
 extern void vmx_save_state(struct vcpu *v);
@@ -53,17 +52,14 @@ extern void inject_guest_interruption(struct vcpu *vcpu, u64 vec);
 extern void vmx_intr_assist(struct vcpu *v);
 extern void set_illegal_op_isr (struct vcpu *vcpu);
 extern void illegal_op (struct vcpu *vcpu);
+extern void vmx_relinquish_guest_resources(struct domain *d);
 extern void vmx_relinquish_vcpu_resources(struct vcpu *v);
 extern void vmx_die_if_kernel(char *str, struct pt_regs *regs, long err);
+extern void vmx_send_assist_req(struct vcpu *v);
 
 static inline vcpu_iodata_t *get_vio(struct domain *d, unsigned long cpu)
 {
     return &((shared_iopage_t *)d->arch.vmx_platform.shared_page_va)->vcpu_iodata[cpu];
-}
-
-static inline int iopacket_port(struct vcpu *v)
-{
-    return get_vio(v->domain, v->vcpu_id)->vp_eport;
 }
 
 static inline shared_iopage_t *get_sp(struct domain *d)

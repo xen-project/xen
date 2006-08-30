@@ -195,7 +195,8 @@ vmx_load_all_rr(VCPU *vcpu)
 			(void *)vcpu->domain->shared_info,
 			(void *)vcpu->arch.privregs,
 			(void *)vcpu->arch.vhpt.hash, pal_vaddr );
-	ia64_set_pta(vcpu->arch.arch_vmx.mpta);
+	ia64_set_pta(VMX(vcpu, mpta));
+	ia64_set_dcr(VMX(vcpu, mdcr));
 
 	ia64_srlz_d();
 	ia64_set_psr(psr);

@@ -717,6 +717,14 @@ prefetchw (const void *x)
 
 extern unsigned long boot_option_idle_override;
 
+#ifdef XEN
+static inline unsigned int
+ia64_get_cpl(unsigned long psr)
+{
+  return (psr & IA64_PSR_CPL) >> IA64_PSR_CPL0_BIT;
+}
+#endif
+
 #endif /* !__ASSEMBLY__ */
 
 #endif /* _ASM_IA64_PROCESSOR_H */

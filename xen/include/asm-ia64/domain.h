@@ -118,8 +118,6 @@ struct arch_domain {
  
     /* Address of SAL emulator data  */
     struct xen_sal_data *sal_data;
-    /* SAL return point.  */
-    unsigned long sal_return_addr;
 
     /* Address of efi_runtime_services_t (placed in domain memory)  */
     void *efi_runtime;
@@ -137,10 +135,18 @@ struct arch_domain {
     atomic64_t shadow_fault_count;
 
     struct last_vcpu last_vcpu[NR_CPUS];
+
+    struct arch_vmx_domain arch_vmx; /* Virtual Machine Extensions */
 };
 #define INT_ENABLE_OFFSET(v) 		  \
     (sizeof(vcpu_info_t) * (v)->vcpu_id + \
     offsetof(vcpu_info_t, evtchn_upcall_mask))
+
+struct hypercall_param {
+    unsigned long va;
+    unsigned long pa1;
+    unsigned long pa2;
+};
 
 struct arch_vcpu {
     /* Save the state of vcpu.
@@ -185,10 +191,14 @@ struct arch_vcpu {
     char irq_new_pending;
     char irq_new_condition;    // vpsr.i/vtpr change, check for pending VHPI
     char hypercall_continuation;
+
+    struct hypercall_param hypercall_param;  // used to remap a hypercall param
+
     //for phycial  emulation
     unsigned long old_rsc;
     int mode_flags;
     fpswa_ret_t fpswa_ret;	/* save return values of FPSWA emulation */
+    struct timer hlt_timer;
     struct arch_vmx_struct arch_vmx; /* Virtual Machine Extensions */
 
 #define INVALID_PROCESSOR       INT_MAX

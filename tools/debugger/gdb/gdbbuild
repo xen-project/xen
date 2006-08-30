@@ -18,7 +18,7 @@ cd gdb-6.2.1-linux-i386-xen
 if [ "$MAKE" ]; then
     $MAKE
 elif which gmake ; then
-    gmake -j4
+    gmake -j4 CFLAGS=-D__XEN_TOOLS__
 else
-    make -j4
+    make -j4 CFLAGS=-D__XEN_TOOLS__
 fi

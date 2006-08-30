@@ -37,11 +37,9 @@ name = "ExampleVTIDomain"
 
 # Optionally define mac and/or bridge for the network interfaces.
 # Random MACs are assigned if not given.
-#vif = [ 'type=ioemu, mac=00:16:3e:00:00:11, bridge=xenbr0' ]
+#vif = [ 'type=ioemu, mac=00:16:3e:00:00:11, bridge=xenbr0, model=ne2k_pci' ]
 # type=ioemu specify the NIC is an ioemu device not netfront
 vif = [ 'type=ioemu, bridge=xenbr0' ]
-# for multiple NICs in device model, 3 in this example
-#vif = [ 'type=ioemu, bridge=xenbr0', 'type=ioemu', 'type=ioemu']
 
 #----------------------------------------------------------------------------
 # Define the disk devices you want the domain to have access to, and
@@ -51,7 +49,7 @@ vif = [ 'type=ioemu, bridge=xenbr0' ]
 # and MODE is r for read-only, w for read-write.
 
 #disk = [ 'phy:hda1,hda1,r' ]
-disk = [ 'file:/var/images/xenia64.img,ioemu:hda,w' ]
+disk = [ 'file:/var/images/xenia64.img,hda,w', ',hdc:cdrom,r' ]
 
 #----------------------------------------------------------------------------
 # Set according to whether you want the domain restarted when it exits.
@@ -65,13 +63,6 @@ disk = [ 'file:/var/images/xenia64.img,ioemu:hda,w' ]
 
 # New stuff
 device_model = '/usr/' + arch_libdir + '/xen/bin/qemu-dm'
-
-# Advanced users only. Don't touch if you don't know what you're doing
-memmap = '/usr/lib/xen/boot/mem-map.sxp'
-
-#-----------------------------------------------------------------------------
-# Disk image for 
-#cdrom=
 
 #-----------------------------------------------------------------------------
 # boot on floppy (a), hard disk (c) or CD-ROM (d) 
@@ -91,8 +82,17 @@ sdl=1
 vnc=0
 
 #----------------------------------------------------------------------------
-# enable spawning vncviewer(only valid when vnc=1), default = 1
-vncviewer=0
+# set VNC display number, default = domid
+#vncdisplay=1
+
+#----------------------------------------------------------------------------
+# try to find an unused port for the VNC server, default = 1
+#vncunused=1
+
+#----------------------------------------------------------------------------
+# enable spawning vncviewer for domain's console
+# (only valid when vnc=1), default = 0
+#vncconsole=0
 
 #----------------------------------------------------------------------------
 # no graphics, use serial port
@@ -108,14 +108,12 @@ stdvga=0
 serial='pty'
 
 #-----------------------------------------------------------------------------
-#   enable audio support
-#enable-audio=1
-
+#   enable sound card support, [sb16|es1370|all|..,..], default none
+#soundhw='sb16'
 
 #-----------------------------------------------------------------------------
 #    set the real time clock to local time [default=0 i.e. set to utc]
 #localtime=1
-
 
 #-----------------------------------------------------------------------------
 #    start in full screen

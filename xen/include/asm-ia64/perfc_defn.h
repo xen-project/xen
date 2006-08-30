@@ -40,3 +40,20 @@ PERFCOUNTER_ARRAY(fast_hyperprivop,   "fast hyperprivops", HYPERPRIVOP_MAX + 1)
 
 PERFCOUNTER_ARRAY(slow_reflect,       "slow reflection", 0x80)
 PERFCOUNTER_ARRAY(fast_reflect,       "fast reflection", 0x80)
+
+PERFSTATUS(vhpt_nbr_entries,          "nbr of entries per VHPT")
+PERFSTATUS_CPU(vhpt_valid_entries,    "nbr of valid entries in VHPT")
+
+#ifdef CONFIG_PRIVOP_ADDRS
+#ifndef PERFPRIVOPADDR
+#define PERFPRIVOPADDR(name) \
+PERFSTATUS_ARRAY(privop_addr_##name##_addr, "privop-addrs addr " #name, \
+                 PRIVOP_COUNT_NADDRS) \
+PERFSTATUS_ARRAY(privop_addr_##name##_count, "privop-addrs count " #name, \
+                 PRIVOP_COUNT_NADDRS) \
+PERFSTATUS(privop_addr_##name##_overflow, "privop-addrs overflow " #name)
+#endif
+
+PERFPRIVOPADDR(get_ifa)
+PERFPRIVOPADDR(thash)
+#endif

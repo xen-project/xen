@@ -239,12 +239,13 @@ vmx_vcpu_set_dcr(VCPU *vcpu, u64 val)
 {
     u64 mdcr, mask;
     VCPU(vcpu,dcr)=val;
-    /* All vDCR bits will go to mDCR, except for be/pp bit */
+    /* All vDCR bits will go to mDCR, except for be/pp/dm bits */
     mdcr = ia64_get_dcr();
-    mask = IA64_DCR_BE | IA64_DCR_PP;
+    /* Machine dcr.dm masked to handle guest ld.s on tr mapped page */
+    mask = IA64_DCR_BE | IA64_DCR_PP | IA64_DCR_DM;
     mdcr = ( mdcr & mask ) | ( val & (~mask) );
     ia64_set_dcr( mdcr);
-
+    VMX(vcpu, mdcr) = mdcr;
     return IA64_NO_FAULT;
 }
 

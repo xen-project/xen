@@ -28,6 +28,7 @@
 #include "hpsim_ssc.h"
 #include <asm/vcpu.h>
 #include <asm/dom_fw.h>
+#include <asm/uaccess.h>
 
 extern unsigned long running_on_sim;
 
@@ -420,6 +421,141 @@ efi_emulate_get_time(
 }
 
 static efi_status_t
+efi_emulate_get_variable(
+	unsigned long name_addr, unsigned long vendor_addr,
+	unsigned long attr_addr, unsigned long data_size_addr,
+	unsigned long data_addr, IA64FAULT *fault)
+{
+	unsigned long name, vendor, attr = 0, data_size, data;
+	struct page_info *name_page = NULL, *vendor_page = NULL,
+	                 *attr_page = NULL, *data_size_page = NULL,
+	                 *data_page = NULL;
+	efi_status_t status = 0;
+
+	if (current->domain != dom0)
+		return EFI_UNSUPPORTED;
+
+	name = efi_translate_domain_addr(name_addr, fault, &name_page);
+	if (*fault != IA64_NO_FAULT)
+		goto errout;
+	vendor = efi_translate_domain_addr(vendor_addr, fault, &vendor_page);
+	if (*fault != IA64_NO_FAULT)
+		goto errout;
+	data_size = efi_translate_domain_addr(data_size_addr, fault,
+	                                      &data_size_page);
+	if (*fault != IA64_NO_FAULT)
+		goto errout;
+	data = efi_translate_domain_addr(data_addr, fault, &data_page);
+	if (*fault != IA64_NO_FAULT)
+		goto errout;
+	if (attr_addr) {
+		attr = efi_translate_domain_addr(attr_addr, fault, &attr_page);
+		if (*fault != IA64_NO_FAULT)
+			goto errout;
+	}
+
+	status = (*efi.get_variable)((efi_char16_t *)name,
+	                             (efi_guid_t *)vendor,
+	                             (u32 *)attr,
+	                             (unsigned long *)data_size,
+	                             (void *)data);
+
+errout:
+	if (name_page != NULL)
+		put_page(name_page);
+	if (vendor_page != NULL)
+		put_page(vendor_page);
+	if (attr_page != NULL)
+		put_page(attr_page);
+	if (data_size_page != NULL)
+		put_page(data_size_page);
+	if (data_page != NULL)
+		put_page(data_page);
+
+	return status;
+}
+
+static efi_status_t
+efi_emulate_get_next_variable(
+	unsigned long name_size_addr, unsigned long name_addr,
+	unsigned long vendor_addr, IA64FAULT *fault)
+{
+	unsigned long name_size, name, vendor;
+	struct page_info *name_size_page = NULL, *name_page = NULL,
+	                 *vendor_page = NULL;
+	efi_status_t status = 0;
+
+	if (current->domain != dom0)
+		return EFI_UNSUPPORTED;
+
+	name_size = efi_translate_domain_addr(name_size_addr, fault,
+	                                      &name_size_page);
+	if (*fault != IA64_NO_FAULT)
+		goto errout;
+	name = efi_translate_domain_addr(name_addr, fault, &name_page);
+	if (*fault != IA64_NO_FAULT)
+		goto errout;
+	vendor = efi_translate_domain_addr(vendor_addr, fault, &vendor_page);
+	if (*fault != IA64_NO_FAULT)
+		goto errout;
+
+	status = (*efi.get_next_variable)((unsigned long *)name_size,
+	                                  (efi_char16_t *)name,
+	                                  (efi_guid_t *)vendor);
+
+errout:
+	if (name_size_page != NULL)
+		put_page(name_size_page);
+	if (name_page != NULL)
+		put_page(name_page);
+	if (vendor_page != NULL)
+		put_page(vendor_page);
+
+	return status;
+}
+
+static efi_status_t
+efi_emulate_set_variable(
+	unsigned long name_addr, unsigned long vendor_addr, 
+	unsigned long attr, unsigned long data_size, 
+	unsigned long data_addr, IA64FAULT *fault)
+{
+	unsigned long name, vendor, data;
+	struct page_info *name_page = NULL, *vendor_page = NULL,
+	                 *data_page = NULL;
+	efi_status_t status = 0;
+
+	if (current->domain != dom0)
+		return EFI_UNSUPPORTED;
+
+	name = efi_translate_domain_addr(name_addr, fault, &name_page);
+	if (*fault != IA64_NO_FAULT)
+		goto errout;
+	vendor = efi_translate_domain_addr(vendor_addr, fault, &vendor_page);
+	if (*fault != IA64_NO_FAULT)
+		goto errout;
+	data = efi_translate_domain_addr(data_addr, fault, &data_page);
+	if (*fault != IA64_NO_FAULT)
+		goto errout;
+
+	status = (*efi.set_variable)((efi_char16_t *)name,
+	                             (efi_guid_t *)vendor,
+	                             attr,
+	                             data_size,
+	                             (void *)data);
+
+errout:
+	if (name_page != NULL)
+		put_page(name_page);
+	if (vendor_page != NULL)
+		put_page(vendor_page);
+	if (data_page != NULL)
+		put_page(data_page);
+
+	return status;
+}
+
+static efi_status_t
 efi_emulate_set_virtual_address_map(
 	unsigned long memory_map_size, unsigned long descriptor_size,
 	u32 descriptor_version, efi_memory_desc_t *virtual_map)
@@ -527,6 +663,31 @@ efi_emulator (struct pt_regs *regs, IA64FAULT *fault)
 				vcpu_get_gr(v,33),
 				fault);
 		break;
+	    case FW_HYPERCALL_EFI_GET_VARIABLE:
+		status = efi_emulate_get_variable (
+				vcpu_get_gr(v,32),
+				vcpu_get_gr(v,33),
+				vcpu_get_gr(v,34),
+				vcpu_get_gr(v,35),
+				vcpu_get_gr(v,36),
+				fault);
+		break;
+	    case FW_HYPERCALL_EFI_GET_NEXT_VARIABLE:
+		status = efi_emulate_get_next_variable (
+				vcpu_get_gr(v,32),
+				vcpu_get_gr(v,33),
+				vcpu_get_gr(v,34),
+				fault);
+		break;
+	    case FW_HYPERCALL_EFI_SET_VARIABLE:
+		status = efi_emulate_set_variable (
+				vcpu_get_gr(v,32),
+				vcpu_get_gr(v,33),
+				vcpu_get_gr(v,34),
+				vcpu_get_gr(v,35),
+				vcpu_get_gr(v,36),
+				fault);
+		break;
 	    case FW_HYPERCALL_EFI_SET_VIRTUAL_ADDRESS_MAP:
 		status = efi_emulate_set_virtual_address_map (
 				vcpu_get_gr(v,32),
@@ -538,10 +699,6 @@ efi_emulator (struct pt_regs *regs, IA64FAULT *fault)
 	    case FW_HYPERCALL_EFI_GET_WAKEUP_TIME:
 	    case FW_HYPERCALL_EFI_SET_WAKEUP_TIME:
 		// FIXME: need fixes in efi.h from 2.6.9
-	    case FW_HYPERCALL_EFI_GET_VARIABLE:
-		// FIXME: need fixes in efi.h from 2.6.9
-	    case FW_HYPERCALL_EFI_GET_NEXT_VARIABLE:
-	    case FW_HYPERCALL_EFI_SET_VARIABLE:
 	    case FW_HYPERCALL_EFI_GET_NEXT_HIGH_MONO_COUNT:
 		// FIXME: need fixes in efi.h from 2.6.9
 		status = EFI_UNSUPPORTED;

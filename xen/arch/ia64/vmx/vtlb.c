@@ -23,7 +23,7 @@
 
 #include <linux/sched.h>
 #include <asm/tlb.h>
-#include <asm/mm.h>
+#include <xen/mm.h>
 #include <asm/vmx_mm_def.h>
 #include <asm/gcc_intrin.h>
 #include <linux/interrupt.h>
@@ -148,13 +148,17 @@ static void vmx_vhpt_insert(thash_cb_t *hcb, u64 pte, u64 itir, u64 ifa)
     rr.rrval = ia64_get_rr(ifa);
     head = (thash_data_t *)ia64_thash(ifa);
     tag = ia64_ttag(ifa);
-    if( INVALID_VHPT(head) ) {
-        len = head->len;
-        head->page_flags = pte;
-        head->len = len;
-        head->itir = rr.ps << 2;
-        head->etag = tag;
-        return;
+    cch = head;
+    while (cch) {    
+        if (INVALID_VHPT(cch)) {
+            len = cch->len;
+            cch->page_flags = pte;
+            cch->len = len;
+            cch->itir = rr.ps << 2;
+            cch->etag = tag;
+            return;
+        }
+        cch = cch->next;
     }
 
     if(head->len>=MAX_CCN_DEPTH){
@@ -214,12 +218,22 @@ u64 guest_vhpt_lookup(u64 iha, u64 *pte)
 {
     u64 ret;
     thash_data_t * data;
+    PTA vpta;
+
     data = vhpt_lookup(iha);
     if (data == NULL) {
         data = vtlb_lookup(current, iha, DSIDE_TLB);
         if (data != NULL)
             thash_vhpt_insert(current, data->page_flags, data->itir ,iha);
     }
+
+    /* VHPT long format is not read.  */
+    vmx_vcpu_get_pta(current, &vpta.val);
+    if (vpta.vf == 1) {
+        *pte = 0;
+        return 0;
+    }
+
     asm volatile ("rsm psr.ic|psr.i;;"
                   "srlz.d;;"
                   "ld8.s r9=[%1];;"
@@ -231,10 +245,9 @@ u64 guest_vhpt_lookup(u64 iha, u64 *pte)
                   "ssm psr.ic;;"
                   "srlz.d;;"
                   "ssm psr.i;;"
-             : "=r"(ret) : "r"(iha), "r"(pte):"memory");
+                  : "=r"(ret) : "r"(iha), "r"(pte):"memory");
     return ret;
 }
-
 
 /*
  *  purge software guest tlb
@@ -243,28 +256,29 @@ u64 guest_vhpt_lookup(u64 iha, u64 *pte)
 void vtlb_purge(VCPU *v, u64 va, u64 ps)
 {
     thash_data_t *cur;
-    u64 start, end, curadr, size, psbits, tag, def_size;
+    u64 start, curadr, size, psbits, tag, rr_ps, num;
     ia64_rr vrr;
     thash_cb_t *hcb = &v->arch.vtlb;
+
     vcpu_get_rr(v, va, &vrr.rrval);
     psbits = VMX(v, psbits[(va >> 61)]);
-    size = PSIZE(ps);
-    start = va & (-size);
-    end = start + size;
+    start = va & ~((1UL << ps) - 1);
     while (psbits) {
         curadr = start;
-        ps = __ffs(psbits);
-        psbits &= ~(1UL << ps);
-        def_size = PSIZE(ps);
-        vrr.ps = ps;
-        while (curadr < end) {
+        rr_ps = __ffs(psbits);
+        psbits &= ~(1UL << rr_ps);
+        num = 1UL << ((ps < rr_ps) ? 0 : (ps - rr_ps));
+        size = PSIZE(rr_ps);
+        vrr.ps = rr_ps;
+        while (num) {
             cur = vsa_thash(hcb->pta, curadr, vrr.rrval, &tag);
             while (cur) {
-                if (cur->etag == tag && cur->ps == ps)
+                if (cur->etag == tag && cur->ps == rr_ps)
                     cur->etag = 1UL << 63;
                 cur = cur->next;
             }
-            curadr += def_size;
+            curadr += size;
+            num--;
         }
     }
 }
@@ -277,14 +291,14 @@ static void vhpt_purge(VCPU *v, u64 va, u64 ps)
 {
     //thash_cb_t *hcb = &v->arch.vhpt;
     thash_data_t *cur;
-    u64 start, end, size, tag;
+    u64 start, size, tag, num;
     ia64_rr rr;
-    size = PSIZE(ps);
-    start = va & (-size);
-    end = start + size;
-    rr.rrval = ia64_get_rr(va);
-    size = PSIZE(rr.ps);    
-    while(start < end){
+    
+    start = va & ~((1UL << ps) - 1);
+    rr.rrval = ia64_get_rr(va);  
+    size = PSIZE(rr.ps);
+    num = 1UL << ((ps < rr.ps) ? 0 : (ps - rr.ps));
+    while (num) {
         cur = (thash_data_t *)ia64_thash(start);
         tag = ia64_ttag(start);
         while (cur) {
@@ -293,6 +307,7 @@ static void vhpt_purge(VCPU *v, u64 va, u64 ps)
             cur = cur->next;
         }
         start += size;
+        num--;
     }
     machine_tlb_purge(va, ps);
 }
@@ -347,24 +362,20 @@ void vtlb_insert(VCPU *v, u64 pte, u64 itir, u64 va)
     u64 tag, len;
     thash_cb_t *hcb = &v->arch.vtlb;
     vcpu_get_rr(v, va, &vrr.rrval);
-#ifdef VTLB_DEBUG    
-    if (vrr.ps != itir_ps(itir)) {
-//        machine_tlb_insert(hcb->vcpu, entry);
-        panic_domain(NULL, "not preferred ps with va: 0x%lx vrr.ps=%d ps=%ld\n",
-             va, vrr.ps, itir_ps(itir));
-        return;
-    }
-#endif
     vrr.ps = itir_ps(itir);
     VMX(v, psbits[va >> 61]) |= (1UL << vrr.ps);
     hash_table = vsa_thash(hcb->pta, va, vrr.rrval, &tag);
-    if( INVALID_TLB(hash_table) ) {
-        len = hash_table->len;
-        hash_table->page_flags = pte;
-        hash_table->len = len;
-        hash_table->itir=itir;
-        hash_table->etag=tag;
-        return;
+    cch = hash_table;
+    while (cch) {
+        if (INVALID_TLB(cch)) {
+            len = cch->len;
+            cch->page_flags = pte;
+            cch->len = len;
+            cch->itir=itir;
+            cch->etag=tag;
+            return;
+        }
+        cch = cch->next;
     }
     if (hash_table->len>=MAX_CCN_DEPTH){
         thash_recycle_cch(hcb, hash_table);
@@ -458,10 +469,6 @@ void thash_purge_and_insert(VCPU *v, u64 pte, u64 itir, u64 ifa, int type)
     ps = itir_ps(itir);
     vcpu_get_rr(current, ifa, &vrr.rrval);
     mrr.rrval = ia64_get_rr(ifa);
-//    if (vrr.ps != itir_ps(itir)) {
-//        printf("not preferred ps with va: 0x%lx vrr.ps=%d ps=%ld\n",
-//               ifa, vrr.ps, itir_ps(itir));
-//    }
     if(VMX_DOMAIN(v)){
         /* Ensure WB attribute if pte is related to a normal mem page,
          * which is required by vga acceleration since qemu maps shared

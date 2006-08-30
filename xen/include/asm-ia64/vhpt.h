@@ -32,7 +32,7 @@ struct vhpt_lf_entry {
 #define INVALID_TI_TAG 0x8000000000000000L
 
 extern void vhpt_init (void);
-extern int dump_vhpt_stats(char *buf);
+extern void gather_vhpt_stats(void);
 extern void vhpt_multiple_insert(unsigned long vaddr, unsigned long pte,
 				 unsigned long logps);
 extern void vhpt_insert (unsigned long vadr, unsigned long pte,

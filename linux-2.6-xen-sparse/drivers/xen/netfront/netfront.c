@@ -193,6 +193,7 @@ static void netfront_closing(struct xenbus_device *);
 
 static void end_access(int, void *);
 static void netif_disconnect_backend(struct netfront_info *);
+static int open_netdev(struct netfront_info *);
 static void close_netdev(struct netfront_info *);
 static void netif_free(struct netfront_info *);
 
@@ -263,15 +264,22 @@ static int __devinit netfront_probe(struct xenbus_device *dev,
 	dev->dev.driver_data = info;
 
 	err = talk_to_backend(dev, info);
-	if (err) {
-		xennet_sysfs_delif(info->netdev);
-		unregister_netdev(netdev);
-		free_netdev(netdev);
-		dev->dev.driver_data = NULL;
-		return err;
-	}
+	if (err)
+		goto fail_backend;
+
+	err = open_netdev(info);
+	if (err)
+		goto fail_open;
 
 	return 0;
+
+ fail_open:
+	xennet_sysfs_delif(info->netdev);
+	unregister_netdev(netdev);
+ fail_backend:
+	free_netdev(netdev);
+	dev->dev.driver_data = NULL;
+	return err;
 }
 
 
@@ -1887,27 +1895,9 @@ create_netdev(int handle, int copying_receiver, struct xenbus_device *dev)
 	SET_MODULE_OWNER(netdev);
 	SET_NETDEV_DEV(netdev, &dev->dev);
 
-	err = register_netdev(netdev);
-	if (err) {
-		printk(KERN_WARNING "%s> register_netdev err=%d\n",
-		       __FUNCTION__, err);
-		goto exit_free_rx;
-	}
-
-	err = xennet_sysfs_addif(netdev);
-	if (err) {
-		/* This can be non-fatal: it only means no tuning parameters */
-		printk(KERN_WARNING "%s> add sysfs failed err=%d\n",
-		       __FUNCTION__, err);
-	}
-
 	np->netdev = netdev;
-
 	return netdev;
 
-
- exit_free_rx:
-	gnttab_free_grant_references(np->gref_rx_head);
  exit_free_tx:
 	gnttab_free_grant_references(np->gref_tx_head);
  exit:
@@ -1966,6 +1956,26 @@ static int __devexit netfront_remove(struct xenbus_device *dev)
 	return 0;
 }
 
+
+static int open_netdev(struct netfront_info *info)
+{
+	int err;
+	
+	err = register_netdev(info->netdev);
+	if (err) {
+		printk(KERN_WARNING "%s: register_netdev err=%d\n",
+		       __FUNCTION__, err);
+		return err;
+	}
+
+	err = xennet_sysfs_addif(info->netdev);
+	if (err) {
+		/* This can be non-fatal: it only means no tuning parameters */
+		printk(KERN_WARNING "%s: add sysfs failed err=%d\n",
+		       __FUNCTION__, err);
+	}
+	return 0;
+}
 
 static void close_netdev(struct netfront_info *info)
 {

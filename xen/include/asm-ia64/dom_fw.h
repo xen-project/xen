@@ -7,19 +7,32 @@
 
 #include <linux/efi.h>
 
-#ifndef MB
-#define MB (1024*1024)
-#endif
+/* Portion of guest physical memory space reserved for PAL/SAL/EFI/ACPI
+   data and code.  */
+#define FW_BASE_PADDR		0x0000UL
+#define FW_END_PADDR		0x3000UL
 
 /* This is used to determined the portion of a domain's metaphysical memory
    space reserved for the hypercall patch table. */
-//FIXME: experiment with smaller sizes
-#define HYPERCALL_START	1UL*MB
-#define HYPERCALL_END	2UL*MB
-
-#define FW_HYPERCALL_BASE_PADDR HYPERCALL_START
-#define	FW_HYPERCALL_END_PADDR HYPERCALL_END
+/* Map:
+   Index           Addr
+   0x0000-0x000f   0x0000-0x00ff  : unused
+   0x0010-0x001f   0x0100-0x01ff  : EFI
+   0x0080-0x008f   0x0800-0x08ff  : PAL/SAL
+   0x0090-0x009f   0x0900-0x09ff  : FPSWA
+*/
+#define	FW_HYPERCALL_BASE_PADDR 0x0000UL
+#define	FW_HYPERCALL_END_PADDR  0X1000UL
 #define	FW_HYPERCALL_PADDR(index) (FW_HYPERCALL_BASE_PADDR + (16UL * index))
+
+/* Base and end guest physical address of ACPI tables.  */
+#define FW_ACPI_BASE_PADDR	0x1000UL
+#define FW_ACPI_END_PADDR	0x2000UL
+
+/* Base and end guest physical address of EFI and SAL (non-ACPI) tables.  */
+#define FW_TABLES_BASE_PADDR	0x2000UL
+#define FW_TABLES_END_PADDR	0x3000UL
+
 
 /* Hypercalls number have a low part and a high part.
    The high part is the class (xen/pal/sal/efi).  */
@@ -91,16 +104,16 @@
  */
 
 /* these are indexes into the runtime services table */
-#define FW_HYPERCALL_EFI_GET_TIME_INDEX			0UL
-#define FW_HYPERCALL_EFI_SET_TIME_INDEX			1UL
-#define FW_HYPERCALL_EFI_GET_WAKEUP_TIME_INDEX		2UL
-#define FW_HYPERCALL_EFI_SET_WAKEUP_TIME_INDEX		3UL
-#define FW_HYPERCALL_EFI_SET_VIRTUAL_ADDRESS_MAP_INDEX	4UL
-#define FW_HYPERCALL_EFI_GET_VARIABLE_INDEX		5UL
-#define FW_HYPERCALL_EFI_GET_NEXT_VARIABLE_INDEX	6UL
-#define FW_HYPERCALL_EFI_SET_VARIABLE_INDEX		7UL
-#define FW_HYPERCALL_EFI_GET_NEXT_HIGH_MONO_COUNT_INDEX	8UL
-#define FW_HYPERCALL_EFI_RESET_SYSTEM_INDEX		9UL
+#define FW_HYPERCALL_EFI_GET_TIME_INDEX			0x10UL
+#define FW_HYPERCALL_EFI_SET_TIME_INDEX			0x11UL
+#define FW_HYPERCALL_EFI_GET_WAKEUP_TIME_INDEX		0x12UL
+#define FW_HYPERCALL_EFI_SET_WAKEUP_TIME_INDEX		0x13UL
+#define FW_HYPERCALL_EFI_SET_VIRTUAL_ADDRESS_MAP_INDEX	0x14UL
+#define FW_HYPERCALL_EFI_GET_VARIABLE_INDEX		0x15UL
+#define FW_HYPERCALL_EFI_GET_NEXT_VARIABLE_INDEX	0x16UL
+#define FW_HYPERCALL_EFI_SET_VARIABLE_INDEX		0x17UL
+#define FW_HYPERCALL_EFI_GET_NEXT_HIGH_MONO_COUNT_INDEX	0x18UL
+#define FW_HYPERCALL_EFI_RESET_SYSTEM_INDEX		0x19UL
 
 /* these are hypercall numbers */
 #define FW_HYPERCALL_EFI_CALL				0x300UL
@@ -150,13 +163,10 @@
 
 /* Hypercalls index bellow _FIRST_ARCH are reserved by Xen, while those above
    are for the architecture.
-   Note: this limit was defined by Xen/ia64 (and not by Xen).²
+   Note: this limit was defined by Xen/ia64 (and not by Xen).
      This can be renumbered safely.
 */
 #define FW_HYPERCALL_FIRST_ARCH		0x300UL
-
-/* Xen/ia64 user hypercalls.  Only used for debugging.  */
-#define FW_HYPERCALL_FIRST_USER		0xff00UL
 
 /* Interrupt vector used for os boot rendez vous.  */
 #define XEN_SAL_BOOT_RENDEZ_VEC	0xF3

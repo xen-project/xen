@@ -97,6 +97,11 @@ extern int valid_mmap_phys_addr_range (unsigned long addr, size_t *count);
  * The following two macros are deprecated and scheduled for removal.
  * Please use the PCI-DMA interface defined in <asm/pci.h> instead.
  */
+#ifndef CONFIG_XEN
+#define bus_to_virt	phys_to_virt
+#define virt_to_bus	virt_to_phys
+#define page_to_bus	page_to_phys
+#else
 #define bus_to_virt(bus)	\
 	phys_to_virt(machine_to_phys_for_dma(bus))
 #define virt_to_bus(virt)	\
@@ -124,6 +129,7 @@ extern int valid_mmap_phys_addr_range (unsigned long addr, size_t *count);
 	(((bvec_to_bus((vec1)) + (vec1)->bv_len) == bvec_to_bus((vec2))) && \
 	 ((bvec_to_pseudophys((vec1)) + (vec1)->bv_len) ==		\
 	  bvec_to_pseudophys((vec2))))
+#endif /* CONFIG_XEN */
 
 # endif /* KERNEL */
 

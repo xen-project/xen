@@ -40,7 +40,6 @@
 #include <asm/smp.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
-#include <asm/uaccess.h>
 #include <asm/pgalloc.h>
 #include <asm/delay.h>
 #include <xen/irq.h>
@@ -235,9 +234,6 @@ int setup_vector(unsigned int irq, struct irqaction * new)
 	unsigned long flags;
 	struct irqaction *old, **p;
 	irq_desc_t *desc = irq_descp(irq);
-
-	printf ("setup_vector(%d): handler=%p, flags=%x\n",
-		irq, desc->handler, desc->status);
 
 	/*
 	 * The following block of code has to be executed atomically

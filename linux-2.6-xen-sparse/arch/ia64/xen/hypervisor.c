@@ -371,6 +371,8 @@ gnttab_map_grant_ref_pre(struct gnttab_map_grant_ref *uop)
 int
 HYPERVISOR_grant_table_op(unsigned int cmd, void *uop, unsigned int count)
 {
+	__u64 va1, va2, pa1, pa2;
+
 	if (cmd == GNTTABOP_map_grant_ref) {
 		unsigned int i;
 		for (i = 0; i < count; i++) {
@@ -378,8 +380,29 @@ HYPERVISOR_grant_table_op(unsigned int cmd, void *uop, unsigned int count)
 				(struct gnttab_map_grant_ref*)uop + i);
 		}
 	}
-
-	return ____HYPERVISOR_grant_table_op(cmd, uop, count);
+	va1 = (__u64)uop & PAGE_MASK;
+	pa1 = pa2 = 0;
+	if ((REGION_NUMBER(va1) == 5) &&
+	    ((va1 - KERNEL_START) >= KERNEL_TR_PAGE_SIZE)) {
+		pa1 = ia64_tpa(va1);
+		if (cmd <= GNTTABOP_transfer) {
+			static uint32_t uop_size[GNTTABOP_transfer + 1] = {
+				sizeof(struct gnttab_map_grant_ref),
+				sizeof(struct gnttab_unmap_grant_ref),
+				sizeof(struct gnttab_setup_table),
+				sizeof(struct gnttab_dump_table),
+				sizeof(struct gnttab_transfer),
+			};
+			va2 = (__u64)uop + (uop_size[cmd] * count) - 1;
+			va2 &= PAGE_MASK;
+			if (va1 != va2) {
+				/* maximum size of uop is 2pages */
+				BUG_ON(va2 > va1 + PAGE_SIZE);
+				pa2 = ia64_tpa(va2);
+			}
+		}
+	}
+	return ____HYPERVISOR_grant_table_op(cmd, uop, count, pa1, pa2);
 }
 EXPORT_SYMBOL(HYPERVISOR_grant_table_op);
 

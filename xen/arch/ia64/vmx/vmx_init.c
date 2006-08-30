@@ -206,7 +206,7 @@ vmx_create_vp(struct vcpu *v)
 	u64 ret;
 	vpd_t *vpd = (vpd_t *)v->arch.privregs;
 	u64 ivt_base;
-    extern char vmx_ia64_ivt;
+	extern char vmx_ia64_ivt;
 	/* ia64_ivt is function pointer, so need this tranlation */
 	ivt_base = (u64) &vmx_ia64_ivt;
 	printk("ivt_base: 0x%lx\n", ivt_base);
@@ -265,6 +265,29 @@ vmx_load_state(struct vcpu *v)
 	 * anchored in vcpu */
 }
 
+static void vmx_create_event_channels(struct vcpu *v)
+{
+	vcpu_iodata_t *p;
+	struct vcpu *o;
+
+	if (v->vcpu_id == 0) {
+		/* Ugly: create event channels for every vcpu when vcpu 0
+		   starts, so that they're available for ioemu to bind to. */
+		for_each_vcpu(v->domain, o) {
+			p = get_vio(v->domain, o->vcpu_id);
+			o->arch.arch_vmx.xen_port = p->vp_eport =
+			                alloc_unbound_xen_event_channel(o, 0);
+			DPRINTK("Allocated port %d for hvm.\n",
+			        o->arch.arch_vmx.xen_port);
+		}
+	}
+}
+
+static void vmx_release_assist_channel(struct vcpu *v)
+{
+	free_xen_event_channel(v, v->arch.arch_vmx.xen_port);
+}
+
 /*
  * Initialize VMX envirenment for guest. Only the 1st vp/vcpu
  * is registered here.
@@ -286,6 +309,8 @@ vmx_final_setup_guest(struct vcpu *v)
 #ifndef HASH_VHPT     
         init_domain_tlb(v);
 #endif
+	vmx_create_event_channels(v);
+
 	/* v->arch.schedule_tail = arch_vmx_do_launch; */
 	vmx_create_vp(v);
 
@@ -301,6 +326,15 @@ vmx_final_setup_guest(struct vcpu *v)
 	set_bit(ARCH_VMX_INTR_ASSIST, &v->arch.arch_vmx.flags);
 	/* Set up guest 's indicator for VTi domain*/
 	set_bit(ARCH_VMX_DOMAIN, &v->arch.arch_vmx.flags);
+}
+
+void
+vmx_relinquish_guest_resources(struct domain *d)
+{
+	struct vcpu *v;
+
+	for_each_vcpu(d, v)
+		vmx_release_assist_channel(v);
 }
 
 void
@@ -411,6 +445,9 @@ void vmx_setup_platform(struct domain *d)
 	memset(&d->shared_info->evtchn_mask[0], 0xff,
 	    sizeof(d->shared_info->evtchn_mask));
 
+	/* initiate spinlock for pass virq */
+	spin_lock_init(&d->arch.arch_vmx.virq_assist_lock);
+
 	/* Initialize the virtual interrupt lines */
 	vmx_virq_line_init(d);
 
@@ -420,13 +457,5 @@ void vmx_setup_platform(struct domain *d)
 
 void vmx_do_launch(struct vcpu *v)
 {
-	if (evtchn_bind_vcpu(iopacket_port(v), v->vcpu_id) < 0) {
-	    printk("VMX domain bind port %d to vcpu %d failed!\n",
-		iopacket_port(v), v->vcpu_id);
-	    domain_crash_synchronous();
-	}
-
-	clear_bit(iopacket_port(v), &v->domain->shared_info->evtchn_mask[0]);
-
 	vmx_load_all_rr(v);
 }

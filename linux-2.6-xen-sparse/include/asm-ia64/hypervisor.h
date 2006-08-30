@@ -33,7 +33,7 @@
 #ifndef __HYPERVISOR_H__
 #define __HYPERVISOR_H__
 
-#ifndef CONFIG_XEN
+#if !defined(CONFIG_XEN) && !defined(CONFIG_VMX_GUEST)
 #define is_running_on_xen()			(0)
 #define HYPERVISOR_ioremap(offset, size)	(offset)
 #else
@@ -41,7 +41,7 @@ extern int running_on_xen;
 #define is_running_on_xen()			(running_on_xen)
 #endif
 
-#ifdef CONFIG_XEN
+#if defined(CONFIG_XEN) || defined(CONFIG_VMX_GUEST)
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
@@ -59,10 +59,9 @@ extern int running_on_xen;
 extern shared_info_t *HYPERVISOR_shared_info;
 extern start_info_t *xen_start_info;
 
-#define is_initial_xendomain() (xen_start_info->flags & SIF_INITDOMAIN)
-
 void force_evtchn_callback(void);
 
+#ifndef CONFIG_VMX_GUEST
 /* Turn jiffies into Xen system time. XXX Implement me. */
 #define jiffies_to_st(j)	0
 
@@ -145,10 +144,14 @@ int privcmd_mmap(struct file * file, struct vm_area_struct * vma);
 #define scrub_pages(_p,_n) ((void)0)
 #endif
 #define	pte_mfn(_x)	pte_pfn(_x)
-#define __pte_ma(_x)	((pte_t) {(_x)})
 #define phys_to_machine_mapping_valid(_x)	(1)
-#define pfn_pte_ma(_x,_y)	__pte_ma(0)
 
+#endif /* !CONFIG_VMX_GUEST */
+
+#define __pte_ma(_x)	((pte_t) {(_x)})        /* unmodified use */
+#define pfn_pte_ma(_x,_y)	__pte_ma(0)     /* unmodified use */
+
+#ifndef CONFIG_VMX_GUEST
 int __xen_create_contiguous_region(unsigned long vstart, unsigned int order, unsigned int address_bits);
 static inline int
 xen_create_contiguous_region(unsigned long vstart,
@@ -170,6 +173,8 @@ xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 		__xen_destroy_contiguous_region(vstart, order);
 }
 
+#endif /* !CONFIG_VMX_GUEST */
+
 // for netfront.c, netback.c
 #define MULTI_UVMFLAGS_INDEX 0 //XXX any value
 
@@ -182,10 +187,27 @@ MULTI_update_va_mapping(
 	mcl->result = 0;
 }
 
+static inline void
+MULTI_grant_table_op(multicall_entry_t *mcl, unsigned int cmd,
+	void *uop, unsigned int count)
+{
+	mcl->op = __HYPERVISOR_grant_table_op;
+	mcl->args[0] = cmd;
+	mcl->args[1] = (unsigned long)uop;
+	mcl->args[2] = count;
+}
+
 // for debug
 asmlinkage int xprintk(const char *fmt, ...);
 #define xprintd(fmt, ...)	xprintk("%s:%d " fmt, __func__, __LINE__, \
 					##__VA_ARGS__)
-#endif /* CONFIG_XEN */
+
+#endif /* CONFIG_XEN || CONFIG_VMX_GUEST */
+
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+#define is_initial_xendomain() (xen_start_info->flags & SIF_INITDOMAIN)
+#else
+#define is_initial_xendomain() 0
+#endif
 
 #endif /* __HYPERVISOR_H__ */

@@ -1,26 +1,55 @@
-#include <asm/privop_stat.h>
-#include <asm/vhpt.h>
 #include <xen/lib.h>
-#include <asm/uaccess.h>
+#include <public/xen.h>
+#include <xen/perfc.h>
+#include <asm/atomic.h>
+#include <asm/privop_stat.h>
 
-#ifdef PRIVOP_ADDR_COUNT
-#define PRIVOP_COUNT_NINSTS 2
-#define PRIVOP_COUNT_NADDRS 30
+#ifdef CONFIG_PRIVOP_ADDRS
 
 struct privop_addr_count {
-	const char *instname;
 	unsigned long addr[PRIVOP_COUNT_NADDRS];
-	unsigned long count[PRIVOP_COUNT_NADDRS];
-	unsigned long overflow;
+	unsigned int count[PRIVOP_COUNT_NADDRS];
+	unsigned int overflow;
+	atomic_t *perfc_addr;
+	atomic_t *perfc_count;
+	atomic_t *perfc_overflow;
 };
 
+#undef  PERFCOUNTER
+#define PERFCOUNTER(var, name)
 
-static struct privop_addr_count privop_addr_counter[PRIVOP_COUNT_NINSTS] = {
-	[_GET_IFA] = { "=ifa",  { 0 }, { 0 }, 0 },
-	[_THASH] = { "thash", { 0 }, { 0 }, 0 }
+#undef  PERFCOUNTER_CPU
+#define PERFCOUNTER_CPU(var, name)
+
+#undef  PERFCOUNTER_ARRAY
+#define PERFCOUNTER_ARRAY(var, name, size)
+
+#undef  PERFSTATUS
+#define PERFSTATUS(var, name)
+
+#undef  PERFSTATUS_CPU
+#define PERFSTATUS_CPU(var, name)
+
+#undef  PERFSTATUS_ARRAY
+#define PERFSTATUS_ARRAY(var, name, size)
+
+#undef PERFPRIVOPADDR
+#define PERFPRIVOPADDR(name)                        \
+    {                                               \
+        { 0 }, { 0 }, 0,                            \
+        perfcounters.privop_addr_##name##_addr,     \
+        perfcounters.privop_addr_##name##_count,    \
+        perfcounters.privop_addr_##name##_overflow  \
+    },
+
+static struct privop_addr_count privop_addr_counter[] = {
+#include <asm/perfc_defn.h>
 };
 
-void privop_count_addr(unsigned long iip, int inst)
+#define PRIVOP_COUNT_NINSTS \
+        (sizeof(privop_addr_counter) / sizeof(privop_addr_counter[0]))
+
+void privop_count_addr(unsigned long iip, enum privop_inst inst)
 {
 	struct privop_addr_count *v = &privop_addr_counter[inst];
 	int i;
@@ -41,29 +70,28 @@ void privop_count_addr(unsigned long iip, int inst)
 	v->overflow++;;
 }
 
-static int dump_privop_addrs(char *buf)
+void gather_privop_addrs(void)
 {
 	int i, j;
-	char *s = buf;
-	s += sprintf(s, "Privop addresses:\n");
+	atomic_t *v;
 	for (i = 0; i < PRIVOP_COUNT_NINSTS; i++) {
-		struct privop_addr_count *v = &privop_addr_counter[i];
-		s += sprintf(s, "%s:\n", v->instname);
-		for (j = 0; j < PRIVOP_COUNT_NADDRS; j++) {
-			if (!v->addr[j])
-				break;
-			s += sprintf(s, " at 0x%lx #%ld\n",
-			             v->addr[j], v->count[j]);
-		}
-		if (v->overflow) 
-			s += sprintf(s, " other #%ld\n", v->overflow);
+		/* Note: addresses are truncated!  */
+		v = privop_addr_counter[i].perfc_addr;
+		for (j = 0; j < PRIVOP_COUNT_NADDRS; j++)
+			atomic_set(&v[j], privop_addr_counter[i].addr[j]);
+
+		v = privop_addr_counter[i].perfc_count;
+		for (j = 0; j < PRIVOP_COUNT_NADDRS; j++)
+			atomic_set(&v[j], privop_addr_counter[i].count[j]);
+		
+		atomic_set(privop_addr_counter[i].perfc_overflow,
+		           privop_addr_counter[i].overflow);
 	}
-	return s - buf;
 }
 
-static void zero_privop_addrs(void)
+void reset_privop_addrs(void)
 {
-	int i,j;
+	int i, j;
 	for (i = 0; i < PRIVOP_COUNT_NINSTS; i++) {
 		struct privop_addr_count *v = &privop_addr_counter[i];
 		for (j = 0; j < PRIVOP_COUNT_NADDRS; j++)
@@ -119,30 +147,3 @@ static const char * const hyperpriv_str[HYPERPRIVOP_MAX+1] = {
 	"=rr", "rr=", "kr=", "fc", "=cpuid", "=pmd", "=ar.eflg", "ar.eflg="
 };
 #endif
-
-#define TMPBUFLEN 8*1024
-int dump_privop_counts_to_user(char __user *ubuf, int len)
-{
-	char buf[TMPBUFLEN];
-	int n;
-
-	if (len < TMPBUFLEN)
-		return -1;
-
-	n = 0;
-#ifdef PRIVOP_ADDR_COUNT
-	n += dump_privop_addrs(buf + n);
-#endif
-	n += dump_vhpt_stats(buf + n);
-	if (__copy_to_user(ubuf,buf,n))
-		return -1;
-	return n;
-}
-
-int zero_privop_counts_to_user(char __user *ubuf, int len)
-{
-#ifdef PRIVOP_ADDR_COUNT
-	zero_privop_addrs();
-#endif
-	return 0;
-}
