@@ -1494,7 +1494,7 @@ class XendDomainInfo:
             if rc != 0:
                 raise XendError("Device of type '%s' refuses migration." % n)
 
-        def testDeviceComplete(self):
+    def testDeviceComplete(self):
         """ For Block IO migration safety we must ensure that
         the device has shutdown correctly, i.e. all blocks are
         flushed to disk
