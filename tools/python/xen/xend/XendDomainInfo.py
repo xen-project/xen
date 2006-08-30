@@ -30,7 +30,6 @@ import string
 import time
 import threading
 import os
-import math
 
 import xen.lowlevel.xc
 from xen.util import asserts
@@ -703,6 +702,9 @@ class XendDomainInfo:
                 if security[idx][0] == 'ssidref':
                     to_store['security/ssidref'] = str(security[idx][1])
 
+        if not self.readVm('xend/restart_count'):
+            to_store['xend/restart_count'] = str(0)
+
         log.debug("Storing VM details: %s", to_store)
 
         self.writeVm(to_store)
@@ -823,6 +825,9 @@ class XendDomainInfo:
 
     def setResume(self, state):
         self.info['resume'] = state
+
+    def getRestartCount(self):
+        return self.readVm('xend/restart_count')
 
     def refreshShutdown(self, xeninfo = None):
         # If set at the end of this method, a restart is required, with the
@@ -1280,34 +1285,28 @@ class XendDomainInfo:
                 for v in range(0, self.info['max_vcpu_id']+1):
                     xc.vcpu_setaffinity(self.domid, v, self.info['cpus'])
 
-            # set domain maxmem in KiB
-            xc.domain_setmaxmem(self.domid, self.info['maxmem'] * 1024)
+            # set memory limit
+            maxmem = self.image.getRequiredMemory(self.info['maxmem'] * 1024)
+            xc.domain_setmaxmem(self.domid, maxmem)
 
-            m = self.image.getDomainMemory(self.info['memory'] * 1024)
+            mem_kb = self.image.getRequiredMemory(self.info['memory'] * 1024)
 
             # get the domain's shadow memory requirement
-            sm = int(math.ceil(self.image.getDomainShadowMemory(m) / 1024.0))
-            if self.info['shadow_memory'] > sm:
-                sm = self.info['shadow_memory']
+            shadow_kb = self.image.getRequiredShadowMemory(mem_kb)
+            shadow_kb_req = self.info['shadow_memory'] * 1024
+            if shadow_kb_req > shadow_kb:
+                shadow_kb = shadow_kb_req
+            shadow_mb = (shadow_kb + 1023) / 1024
 
             # Make sure there's enough RAM available for the domain
-            balloon.free(m + sm * 1024)
+            balloon.free(mem_kb + shadow_mb * 1024)
 
             # Set up the shadow memory
-            sm = xc.shadow_mem_control(self.domid, mb=sm)
-            self.info['shadow_memory'] = sm
+            shadow_cur = xc.shadow_mem_control(self.domid, shadow_mb)
+            self.info['shadow_memory'] = shadow_cur
 
-            init_reservation = self.info['memory'] * 1024
-            if os.uname()[4] in ('ia64', 'ppc64'):
-                # Workaround for architectures that don't yet support
-                # ballooning.
-                init_reservation = m
-                # Following line from xiantao.zhang@intel.com
-                # Needed for IA64 until supports ballooning -- okay for PPC64?
-                xc.domain_setmaxmem(self.domid, m)
-
-            xc.domain_memory_increase_reservation(self.domid, init_reservation,
-                                                  0, 0)
+            # initial memory allocation
+            xc.domain_memory_increase_reservation(self.domid, mem_kb, 0, 0)
 
             self.createChannels()
 
@@ -1495,6 +1494,21 @@ class XendDomainInfo:
             if rc != 0:
                 raise XendError("Device of type '%s' refuses migration." % n)
 
+    def testDeviceComplete(self):
+        """ For Block IO migration safety we must ensure that
+        the device has shutdown correctly, i.e. all blocks are
+        flushed to disk
+        """
+        while True:
+            test = 0
+            for i in self.getDeviceController('vbd').deviceIDs():
+                test = 1
+                log.info("Dev %s still active, looping...", i)
+                time.sleep(0.1)
+                
+            if test == 0:
+                break
+
     def migrateDevices(self, network, dst, step, domName=''):
         """Notify the devices about migration
         """
@@ -1615,6 +1629,9 @@ class XendDomainInfo:
             try:
                 new_dom = XendDomain.instance().domain_create(config)
                 new_dom.unpause()
+                rst_cnt = self.readVm('xend/restart_count')
+                rst_cnt = int(rst_cnt) + 1
+                self.writeVm('xend/restart_count', str(rst_cnt))
                 new_dom.removeVm(RESTART_IN_PROGRESS)
             except:
                 if new_dom:

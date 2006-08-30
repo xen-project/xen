@@ -51,7 +51,7 @@
 /******AIO DEFINES******/
 #define REQUEST_ASYNC_FD 1
 #define MAX_QCOW_IDS  0xFFFF
-#define MAX_AIO_REQS (MAX_REQUESTS * MAX_SEGMENTS_PER_REQ * 8)
+#define MAX_AIO_REQS (MAX_REQUESTS * MAX_SEGMENTS_PER_REQ)
 
 struct pending_aio {
         td_callback_t cb;
@@ -176,10 +176,21 @@ static int init_aio_state(struct td_state *bs)
         s->aio_ctx = (io_context_t) REQUEST_ASYNC_FD;   
         s->poll_fd = io_setup(MAX_AIO_REQS, &s->aio_ctx);
 
-        if (s->poll_fd < 0) {
-                DPRINTF("Retrieving Async poll fd failed\n");
+	if (s->poll_fd < 0) {
+                if (s->poll_fd == -EAGAIN) {
+                        DPRINTF("Couldn't setup AIO context.  If you are "
+                                "trying to concurrently use a large number "
+                                "of blktap-based disks, you may need to "
+                                "increase the system-wide aio request limit. "
+                                "(e.g. 'echo echo 1048576 > /proc/sys/fs/"
+                                "aio-max-nr')\n");
+                } else {
+                        DPRINTF("Couldn't get fd for AIO poll support.  This "
+                                "is probably because your kernel does not "
+                                "have the aio-poll patch applied.\n");
+                }
 		goto fail;
-        }
+	}
 
         for (i=0;i<MAX_AIO_REQS;i++)
                 s->iocb_free[i] = &s->iocb_list[i];
