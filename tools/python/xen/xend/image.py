@@ -305,7 +305,7 @@ class HVMImageHandler(ImageHandler):
         for (name, info) in deviceConfig:
             if name == 'vbd':
                 uname = sxp.child_value(info, 'uname')
-                if 'file:' in uname:
+                if uname is not None and 'file:' in uname:
                     (_, vbdparam) = string.split(uname, ':', 1)
                     if not os.path.isfile(vbdparam):
                         raise VmError('Disk image does not exist: %s' %

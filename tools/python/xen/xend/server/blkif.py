@@ -52,10 +52,18 @@ class BlkifController(DevController):
         except ValueError:
             dev_type = "disk"
 
-        try:
-            (typ, params) = string.split(uname, ':', 1)
-        except ValueError:
-            (typ, params) = ("", "")
+        if uname is None:
+            if dev_type == 'cdrom':
+                (typ, params) = ("", "")
+            else:
+                raise VmError(
+                    'Block device must have physical details specified')
+        else:
+            try:
+                (typ, params) = string.split(uname, ':', 1)
+            except ValueError:
+                (typ, params) = ("", "")
+
         back = { 'dev'    : dev,
                  'type'   : typ,
                  'params' : params,
