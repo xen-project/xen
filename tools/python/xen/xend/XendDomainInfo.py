@@ -1296,13 +1296,13 @@ class XendDomainInfo:
             shadow_kb_req = self.info['shadow_memory'] * 1024
             if shadow_kb_req > shadow_kb:
                 shadow_kb = shadow_kb_req
+            shadow_mb = (shadow_kb + 1023) / 1024
 
             # Make sure there's enough RAM available for the domain
-            balloon.free(mem_kb + shadow_kb)
+            balloon.free(mem_kb + shadow_mb * 1024)
 
             # Set up the shadow memory
-            shadow_cur = xc.shadow_mem_control(self.domid,
-                                               (shadow_kb + 1023) / 1024)
+            shadow_cur = xc.shadow_mem_control(self.domid, shadow_mb)
             self.info['shadow_memory'] = shadow_cur
 
             # initial memory allocation
