@@ -1301,7 +1301,8 @@ class XendDomainInfo:
             balloon.free(mem_kb + shadow_kb)
 
             # Set up the shadow memory
-            shadow_cur = xc.shadow_mem_control(self.domid, shadow_kb * 1024)
+            shadow_cur = xc.shadow_mem_control(self.domid,
+                                               (shadow_kb + 1023) / 1024)
             self.info['shadow_memory'] = shadow_cur
 
             # initial memory allocation
