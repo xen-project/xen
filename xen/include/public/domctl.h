@@ -16,7 +16,7 @@
 
 #include "xen.h"
 
-#define XEN_DOMCTL_INTERFACE_VERSION 0x00000001
+#define XEN_DOMCTL_INTERFACE_VERSION 0x00000002
 
 #define uint64_t uint64_aligned_t
 
@@ -72,7 +72,10 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_getdomaininfo_t);
 #define XEN_DOMCTL_getmemlist         6
 struct xen_domctl_getmemlist {
     /* IN variables. */
+    /* Max entries to write to output buffer. */
     uint64_t max_pfns;
+    /* Start index in guest's page list. */
+    uint64_t start_pfn;
     XEN_GUEST_HANDLE_64(xen_pfn_t) buffer;
     /* OUT variables. */
     uint64_t num_pfns;

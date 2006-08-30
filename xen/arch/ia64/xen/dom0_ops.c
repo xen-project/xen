@@ -39,8 +39,8 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     {
         unsigned long i;
         struct domain *d = find_domain_by_id(op->domain);
-        unsigned long start_page = op->u.getmemlist.max_pfns >> 32;
-        unsigned long nr_pages = op->u.getmemlist.max_pfns & 0xffffffff;
+        unsigned long start_page = op->u.getmemlist.start_pfn;
+        unsigned long nr_pages = op->u.getmemlist.max_pfns;
         unsigned long mfn;
 
         if ( d == NULL ) {

@@ -36,7 +36,6 @@ xc_ia64_get_pfn_list(int xc_handle, uint32_t domid, xen_pfn_t *pfn_buf,
     struct xen_domctl domctl;
     int num_pfns,ret;
     unsigned int __start_page, __nr_pages;
-    unsigned long max_pfns;
     xen_pfn_t *__pfn_buf;
 
     __start_page = start_page;
@@ -44,27 +43,22 @@ xc_ia64_get_pfn_list(int xc_handle, uint32_t domid, xen_pfn_t *pfn_buf,
     __pfn_buf = pfn_buf;
   
     while (__nr_pages) {
-        max_pfns = ((unsigned long)__start_page << 32) | __nr_pages;
         domctl.cmd = XEN_DOMCTL_getmemlist;
-        domctl.domain   = (domid_t)domid;
-        domctl.u.getmemlist.max_pfns = max_pfns;
+        domctl.domain = (domid_t)domid;
+        domctl.u.getmemlist.max_pfns = __nr_pages;
+        domctl.u.getmemlist.start_pfn =__start_page;
         domctl.u.getmemlist.num_pfns = 0;
         set_xen_guest_handle(domctl.u.getmemlist.buffer, __pfn_buf);
 
-        if ((max_pfns != -1UL)
-            && mlock(__pfn_buf, __nr_pages * sizeof(xen_pfn_t)) != 0) {
+        if (mlock(__pfn_buf, __nr_pages * sizeof(xen_pfn_t)) != 0) {
             PERROR("Could not lock pfn list buffer");
             return -1;
         }
 
         ret = do_domctl(xc_handle, &domctl);
 
-        if (max_pfns != -1UL)
-            (void)munlock(__pfn_buf, __nr_pages * sizeof(xen_pfn_t));
+        (void)munlock(__pfn_buf, __nr_pages * sizeof(xen_pfn_t));
 
-        if (max_pfns == -1UL)
-            return 0;
-        
         num_pfns = domctl.u.getmemlist.num_pfns;
         __start_page += num_pfns;
         __nr_pages -= num_pfns;
