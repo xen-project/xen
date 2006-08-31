@@ -451,7 +451,6 @@ extern u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps,
 
 #define INVALID_M2P_ENTRY        (~0UL)
 #define VALID_M2P(_e)            (!((_e) & (1UL<<63)))
-#define IS_INVALID_M2P_ENTRY(_e) (!VALID_M2P(_e))
 
 #define set_gpfn_from_mfn(mfn, pfn) (machine_to_phys_mapping[(mfn)] = (pfn))
 #define get_gpfn_from_mfn(mfn)      (machine_to_phys_mapping[(mfn)])
