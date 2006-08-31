@@ -73,6 +73,7 @@ static int xenbus_probe_backend(const char *type, const char *domid);
 
 static int xenbus_dev_probe(struct device *_dev);
 static int xenbus_dev_remove(struct device *_dev);
+static void xenbus_dev_shutdown(struct device *_dev);
 
 /* If something in array of ids matches this device, return it. */
 static const struct xenbus_device_id *
@@ -192,6 +193,7 @@ static struct xen_bus_type xenbus_frontend = {
 		.match    = xenbus_match,
 		.probe    = xenbus_dev_probe,
 		.remove   = xenbus_dev_remove,
+		.shutdown = xenbus_dev_shutdown,
 	},
 	.dev = {
 		.bus_id = "xen",
@@ -246,6 +248,7 @@ static struct xen_bus_type xenbus_backend = {
 		.match    = xenbus_match,
 		.probe    = xenbus_dev_probe,
 		.remove   = xenbus_dev_remove,
+//		.shutdown = xenbus_dev_shutdown,
 		.uevent   = xenbus_uevent_backend,
 	},
 	.dev = {
@@ -349,7 +352,7 @@ static int xenbus_dev_probe(struct device *_dev)
 	const struct xenbus_device_id *id;
 	int err;
 
-	DPRINTK("");
+	DPRINTK("%s", dev->nodename);
 
 	if (!drv->probe) {
 		err = -ENODEV;
@@ -394,7 +397,7 @@ static int xenbus_dev_remove(struct device *_dev)
 	struct xenbus_device *dev = to_xenbus_device(_dev);
 	struct xenbus_driver *drv = to_xenbus_driver(_dev->driver);
 
-	DPRINTK("");
+	DPRINTK("%s", dev->nodename);
 
 	free_otherend_watch(dev);
 	free_otherend_details(dev);
@@ -404,6 +407,27 @@ static int xenbus_dev_remove(struct device *_dev)
 
 	xenbus_switch_state(dev, XenbusStateClosed);
 	return 0;
+}
+
+static void xenbus_dev_shutdown(struct device *_dev)
+{
+	struct xenbus_device *dev = to_xenbus_device(_dev);
+	unsigned long timeout = 5*HZ;
+
+	DPRINTK("%s", dev->nodename);
+
+	get_device(&dev->dev);
+	if (dev->state != XenbusStateConnected) {
+		printk("%s: %s: %s != Connected, skipping\n", __FUNCTION__,
+		       dev->nodename, xenbus_strstate(dev->state));
+		goto out;
+	}
+	xenbus_switch_state(dev, XenbusStateClosing);
+	timeout = wait_for_completion_timeout(&dev->down, timeout);
+	if (!timeout)
+		printk("%s: %s timeout closing device\n", __FUNCTION__, dev->nodename);
+ out:
+	put_device(&dev->dev);
 }
 
 static int xenbus_register_driver_common(struct xenbus_driver *drv,
@@ -588,6 +612,7 @@ static int xenbus_probe_node(struct xen_bus_type *bus,
 	tmpstring += strlen(tmpstring) + 1;
 	strcpy(tmpstring, type);
 	xendev->devicetype = tmpstring;
+	init_completion(&xendev->down);
 
 	xendev->dev.parent = &bus->dev;
 	xendev->dev.bus = &bus->bus;

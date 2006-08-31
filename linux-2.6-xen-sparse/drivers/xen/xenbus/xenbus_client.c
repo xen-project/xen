@@ -138,6 +138,13 @@ int xenbus_switch_state(struct xenbus_device *dev, enum xenbus_state state)
 }
 EXPORT_SYMBOL_GPL(xenbus_switch_state);
 
+int xenbus_frontend_closed(struct xenbus_device *dev)
+{
+	xenbus_switch_state(dev, XenbusStateClosed);
+	complete(&dev->down);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(xenbus_frontend_closed);
 
 /**
  * Return the path to the error node for the given device, or NULL on failure.

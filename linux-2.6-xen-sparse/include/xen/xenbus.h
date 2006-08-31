@@ -37,6 +37,7 @@
 #include <linux/device.h>
 #include <linux/notifier.h>
 #include <linux/mutex.h>
+#include <linux/completion.h>
 #include <xen/interface/xen.h>
 #include <xen/interface/grant_table.h>
 #include <xen/interface/io/xenbus.h>
@@ -74,6 +75,7 @@ struct xenbus_device {
 	struct xenbus_watch otherend_watch;
 	struct device dev;
 	enum xenbus_state state;
+	struct completion down;
 };
 
 static inline struct xenbus_device *to_xenbus_device(struct device *dev)
@@ -299,5 +301,6 @@ int __init xenbus_dev_init(void);
 
 char *xenbus_strstate(enum xenbus_state state);
 int xenbus_dev_is_online(struct xenbus_device *dev);
+int xenbus_frontend_closed(struct xenbus_device *dev);
 
 #endif /* _XEN_XENBUS_H */
