@@ -300,13 +300,6 @@ void setup_idle_pagetable(void);
 #define _PAGE_GNTTAB   0
 #endif
 
-/*
- * Disallow unused flag bits plus PAT, PSE and GLOBAL.
- * Also disallow GNTTAB if we are using it for grant-table debugging.
- * Permit the NX bit if the hardware supports it.
- */
-#define BASE_DISALLOW_MASK ((0xFFFFF180U | _PAGE_GNTTAB) & ~_PAGE_NX)
-
 #define __PAGE_HYPERVISOR \
     (_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED)
 #define __PAGE_HYPERVISOR_NOCACHE \
