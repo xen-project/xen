@@ -135,20 +135,25 @@ int tap_blkif_map(blkif_t *blkif, unsigned long shared_page,
 	return 0;
 }
 
+void tap_blkif_unmap(blkif_t *blkif)
+{
+	if (blkif->irq) {
+		unbind_from_irqhandler(blkif->irq, blkif);
+		blkif->irq = 0;
+	}
+	if (blkif->blk_ring.sring) {
+		unmap_frontend_page(blkif);
+		free_vm_area(blkif->blk_ring_area);
+		blkif->blk_ring.sring = NULL;
+	}
+}
+
 void tap_blkif_free(blkif_t *blkif)
 {
 	atomic_dec(&blkif->refcnt);
 	wait_event(blkif->waiting_to_free, atomic_read(&blkif->refcnt) == 0);
 
-	/* Already disconnected? */
-	if (blkif->irq)
-		unbind_from_irqhandler(blkif->irq, blkif);
-
-	if (blkif->blk_ring.sring) {
-		unmap_frontend_page(blkif);
-		free_vm_area(blkif->blk_ring_area);
-	}
-
+	tap_blkif_unmap(blkif);
 	kmem_cache_free(blkif_cachep, blkif);
 }
 

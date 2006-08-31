@@ -91,6 +91,7 @@ blkif_t *tap_alloc_blkif(domid_t domid);
 void tap_blkif_free(blkif_t *blkif);
 int tap_blkif_map(blkif_t *blkif, unsigned long shared_page, 
 		  unsigned int evtchn);
+void tap_blkif_unmap(blkif_t *blkif);
 
 #define blkif_get(_b) (atomic_inc(&(_b)->refcnt))
 #define blkif_put(_b)					\

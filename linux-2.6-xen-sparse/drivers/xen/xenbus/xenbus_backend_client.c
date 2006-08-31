@@ -132,4 +132,16 @@ int xenbus_unmap_ring(struct xenbus_device *dev,
 }
 EXPORT_SYMBOL_GPL(xenbus_unmap_ring);
 
+int xenbus_dev_is_online(struct xenbus_device *dev)
+{
+	int rc, val;
+
+	rc = xenbus_scanf(XBT_NIL, dev->nodename, "online", "%d", &val);
+	if (rc != 1)
+		val = 0; /* no online node present */
+
+	return val;
+}
+EXPORT_SYMBOL_GPL(xenbus_dev_is_online);
+
 MODULE_LICENSE("Dual BSD/GPL");
