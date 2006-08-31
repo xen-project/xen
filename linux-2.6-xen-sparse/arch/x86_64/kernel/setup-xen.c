@@ -944,9 +944,10 @@ void __init setup_arch(char **cmdline_p)
 		BUG_ON(HYPERVISOR_memory_op(XENMEM_machine_memory_map, &memmap));
 
 		e820_reserve_resources(machine_e820, memmap.nr_entries);
-	} else
-#endif
+	}
+#else
 	e820_reserve_resources(e820.map, e820.nr_map);
+#endif
 
 	request_resource(&iomem_resource, &video_ram_resource);
 
