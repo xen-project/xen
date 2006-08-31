@@ -46,6 +46,8 @@
 #include <asm/hvm/vpic.h>
 #include <asm/hvm/vlapic.h>
 
+extern uint32_t vlapic_update_ppr(struct vlapic *vlapic);
+
 static DEFINE_PER_CPU(unsigned long, trace_values[5]);
 #define TRACE_VMEXIT(index,value) this_cpu(trace_values)[index]=value
 
@@ -1613,6 +1615,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
     unsigned long value;
     unsigned long old_cr;
     struct vcpu *v = current;
+    struct vlapic *vlapic = VLAPIC(v);
 
     switch ( gp ) {
     CASE_GET_REG(EAX, eax);
@@ -1756,6 +1759,12 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
             shadow_update_paging_modes(v);
         break;
     }
+    case 8:
+    {
+        vlapic_set_reg(vlapic, APIC_TASKPRI, ((value & 0x0F) << 4));
+        vlapic_update_ppr(vlapic);
+        break;
+    }
     default:
         printk("invalid cr: %d\n", gp);
         __hvm_bug(regs);
@@ -1769,13 +1778,20 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
  */
 static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
 {
-    unsigned long value;
+    unsigned long value = 0;
     struct vcpu *v = current;
+    struct vlapic *vlapic = VLAPIC(v);
 
-    if ( cr != 3 )
+    if ( cr != 3 && cr != 8)
         __hvm_bug(regs);
 
-    value = (unsigned long) v->arch.hvm_vmx.cpu_cr3;
+    if ( cr == 3 )
+        value = (unsigned long) v->arch.hvm_vmx.cpu_cr3;
+    else if ( cr == 8 )
+    {
+        value = (unsigned long)vlapic_get_reg(vlapic, APIC_TASKPRI);
+        value = (value & 0xF0) >> 4;
+    }
 
     switch ( gp ) {
     CASE_SET_REG(EAX, eax);
