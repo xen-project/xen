@@ -676,7 +676,7 @@ static inline void __update_vcpu_system_time(struct vcpu *v)
     struct vcpu_time_info *u;
 
     t = &this_cpu(cpu_time);
-    u = &v->domain->shared_info->vcpu_info[v->vcpu_id].time;
+    u = &v->vcpu_info->time;
 
     version_update_begin(&u->version);
 
@@ -690,7 +690,7 @@ static inline void __update_vcpu_system_time(struct vcpu *v)
 
 void update_vcpu_system_time(struct vcpu *v)
 {
-    if ( v->domain->shared_info->vcpu_info[v->vcpu_id].time.tsc_timestamp != 
+    if ( v->vcpu_info->time.tsc_timestamp !=
          this_cpu(cpu_time).local_tsc_stamp )
         __update_vcpu_system_time(v);
 }
