@@ -2793,9 +2793,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
         break;
 
     case VMEXIT_INTR:
-        raise_softirq(SCHEDULE_SOFTIRQ);
         break;
-
 
     case VMEXIT_INVD:
         svm_vmexit_do_invd(vmcb);
