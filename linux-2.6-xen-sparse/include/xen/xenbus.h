@@ -297,4 +297,6 @@ void xenbus_dev_fatal(struct xenbus_device *dev, int err, const char *fmt,
 
 int __init xenbus_dev_init(void);
 
+char *xenbus_strstate(enum xenbus_state state);
+
 #endif /* _XEN_XENBUS_H */

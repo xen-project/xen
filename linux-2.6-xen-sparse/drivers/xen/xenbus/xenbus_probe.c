@@ -316,8 +316,9 @@ static void otherend_changed(struct xenbus_watch *watch,
 
 	state = xenbus_read_driver_state(dev->otherend);
 
-	DPRINTK("state is %d, %s, %s",
-		state, dev->otherend_watch.node, vec[XS_WATCH_PATH]);
+	DPRINTK("state is %d (%s), %s, %s", state, xenbus_strstate(state),
+		dev->otherend_watch.node, vec[XS_WATCH_PATH]);
+
 	if (drv->otherend_changed)
 		drv->otherend_changed(dev, state);
 }

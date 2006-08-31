@@ -41,6 +41,20 @@ extern char *kasprintf(const char *fmt, ...);
 #define DPRINTK(fmt, args...) \
     pr_debug("xenbus_client (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
 
+char *xenbus_strstate(enum xenbus_state state)
+{
+	static char *name[] = {
+		[ XenbusStateUnknown      ] = "Unknown",
+		[ XenbusStateInitialising ] = "Initialising",
+		[ XenbusStateInitWait     ] = "InitWait",
+		[ XenbusStateInitialised  ] = "Initialised",
+		[ XenbusStateConnected    ] = "Connected",
+		[ XenbusStateClosing      ] = "Closing",
+		[ XenbusStateClosed	  ] = "Closed",
+	};
+	return (state < ARRAY_SIZE(name)) ? name[state] : "INVALID";
+}
+
 int xenbus_watch_path(struct xenbus_device *dev, const char *path,
 		      struct xenbus_watch *watch,
 		      void (*callback)(struct xenbus_watch *,
