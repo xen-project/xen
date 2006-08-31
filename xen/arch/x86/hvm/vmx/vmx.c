@@ -953,8 +953,6 @@ static void vmx_vmexit_do_cpuid(struct cpu_user_regs *regs)
                      bitmaskof(X86_FEATURE_MWAIT) );
 
             edx &= ~( bitmaskof(X86_FEATURE_HT)   |
-                     bitmaskof(X86_FEATURE_MCA)   |
-                     bitmaskof(X86_FEATURE_MCE)   |
                      bitmaskof(X86_FEATURE_ACPI)  |
                      bitmaskof(X86_FEATURE_ACC) );
         }
