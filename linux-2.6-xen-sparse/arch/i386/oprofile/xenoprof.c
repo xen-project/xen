@@ -34,8 +34,6 @@
 static int xenoprof_start(void);
 static void xenoprof_stop(void);
 
-void * vm_map_xen_pages(unsigned long maddr, int vm_size, pgprot_t prot);
-
 static int xenoprof_enabled = 0;
 static unsigned int num_events = 0;
 static int is_primary = 0;
@@ -373,9 +371,9 @@ static int xenoprof_set_passive(int * p_domains,
 {
 	int ret;
 	int i, j;
-	int vm_size;
 	int npages;
 	struct xenoprof_buf *buf;
+	struct vm_struct *area;
 	pgprot_t prot = __pgprot(_KERNPG_TABLE);
 
 	if (!is_primary)
@@ -391,19 +389,29 @@ static int xenoprof_set_passive(int * p_domains,
 	for (i = 0; i < pdoms; i++) {
 		passive_domains[i].domain_id = p_domains[i];
 		passive_domains[i].max_samples = 2048;
-		ret = HYPERVISOR_xenoprof_op(XENOPROF_set_passive, &passive_domains[i]);
+		ret = HYPERVISOR_xenoprof_op(XENOPROF_set_passive,
+					     &passive_domains[i]);
 		if (ret)
-			return ret;
+			goto out;
 
 		npages = (passive_domains[i].bufsize * passive_domains[i].nbuf - 1) / PAGE_SIZE + 1;
-		vm_size = npages * PAGE_SIZE;
 
-		p_shared_buffer[i] = (char *)vm_map_xen_pages(passive_domains[i].buf_maddr,
-							      vm_size, prot);
-		if (!p_shared_buffer[i]) {
+		area = get_vm_area(npages * PAGE_SIZE, VM_IOREMAP);
+		if (area == NULL) {
 			ret = -ENOMEM;
 			goto out;
 		}
+
+		ret = direct_kernel_remap_pfn_range(
+			(unsigned long)area->addr,
+			passive_domains[i].buf_maddr >> PAGE_SHIFT,
+			npages * PAGE_SIZE, prot, DOMID_SELF);
+		if (ret) {
+			vunmap(area->addr);
+			goto out;
+		}
+
+		p_shared_buffer[i] = area->addr;
 
 		for (j = 0; j < passive_domains[i].nbuf; j++) {
 			buf = (struct xenoprof_buf *)
@@ -473,11 +481,9 @@ static int using_xenoprof;
 int __init oprofile_arch_init(struct oprofile_operations * ops)
 {
 	struct xenoprof_init init;
-	struct xenoprof_buf * buf;
-	int vm_size;
-	int npages;
-	int ret;
-	int i;
+	struct xenoprof_buf *buf;
+	int npages, ret, i;
+	struct vm_struct *area;
 
 	init.max_samples = 16;
 	ret = HYPERVISOR_xenoprof_op(XENOPROF_init, &init);
@@ -495,14 +501,23 @@ int __init oprofile_arch_init(struct oprofile_operations * ops)
 			num_events = OP_MAX_COUNTER;
 
 		npages = (init.bufsize * nbuf - 1) / PAGE_SIZE + 1;
-		vm_size = npages * PAGE_SIZE;
 
-		shared_buffer = (char *)vm_map_xen_pages(init.buf_maddr,
-							 vm_size, prot);
-		if (!shared_buffer) {
+		area = get_vm_area(npages * PAGE_SIZE, VM_IOREMAP);
+		if (area == NULL) {
 			ret = -ENOMEM;
 			goto out;
 		}
+
+		ret = direct_kernel_remap_pfn_range(
+			(unsigned long)area->addr,
+			init.buf_maddr >> PAGE_SHIFT,
+			npages * PAGE_SIZE, prot, DOMID_SELF);
+		if (ret) {
+			vunmap(area->addr);
+			goto out;
+		}
+
+		shared_buffer = area->addr;
 
 		for (i=0; i< nbuf; i++) {
 			buf = (struct xenoprof_buf*) 
