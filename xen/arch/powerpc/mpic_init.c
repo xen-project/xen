@@ -27,6 +27,8 @@
 #include "of-devtree.h"
 
 #undef DEBUG
+#define CONFIG_SHARE_MPIC
+
 #ifdef DEBUG
 #define DBG(fmt...) printk(fmt)
 #else
@@ -319,7 +321,42 @@ static int find_mpic(void)
     return rc;
 }
 
+#ifdef CONFIG_SHARE_MPIC
 static struct hw_interrupt_type hc_irq;
+
+static struct hw_interrupt_type *share_mpic(
+    struct hw_interrupt_type *mpic_irq,
+    struct hw_interrupt_type *xen_irq)
+{
+    hc_irq.startup = mpic_irq->startup;
+    mpic_irq->startup = xen_irq->startup;
+
+    hc_irq.enable = mpic_irq->enable;
+    mpic_irq->enable = xen_irq->enable;
+
+    hc_irq.disable = mpic_irq->disable;
+    mpic_irq->disable = xen_irq->disable;
+
+    hc_irq.shutdown = mpic_irq->shutdown;
+    mpic_irq->shutdown = xen_irq->shutdown;
+
+    hc_irq.ack = mpic_irq->ack;
+    mpic_irq->ack = xen_irq->ack;
+
+    hc_irq.end = mpic_irq->end;
+    mpic_irq->end = xen_irq->end;
+
+    hc_irq.set_affinity = mpic_irq->set_affinity;
+    mpic_irq->set_affinity = xen_irq->set_affinity;
+
+    return &hc_irq;
+}
+
+#else  /* CONFIG_SHARE_MPIC */
+
+#define share_mpic(M,X) (M)
+
+#endif
 
 struct hw_interrupt_type *xen_mpic_init(struct hw_interrupt_type *xen_irq)
 {
@@ -329,6 +366,7 @@ struct hw_interrupt_type *xen_mpic_init(struct hw_interrupt_type *xen_irq)
     unsigned int ipi_offset;
     unsigned char *senses;
     unsigned int senses_count;
+    struct hw_interrupt_type *hit;
 
     printk("%s: start\n", __func__);
 
@@ -356,29 +394,10 @@ struct hw_interrupt_type *xen_mpic_init(struct hw_interrupt_type *xen_irq)
     BUG_ON(mpic == NULL);
     mpic_init(mpic);
 
-    hc_irq.startup = mpic->hc_irq.startup;
-    mpic->hc_irq.startup = xen_irq->startup;
-
-    hc_irq.enable = mpic->hc_irq.enable;
-    mpic->hc_irq.enable = xen_irq->enable;
-
-    hc_irq.disable = mpic->hc_irq.disable;
-    mpic->hc_irq.disable = xen_irq->disable;
-
-    hc_irq.shutdown = mpic->hc_irq.shutdown;
-    mpic->hc_irq.shutdown = xen_irq->shutdown;
-
-    hc_irq.ack = mpic->hc_irq.ack;
-    mpic->hc_irq.ack = xen_irq->ack;
-
-    hc_irq.end = mpic->hc_irq.end;
-    mpic->hc_irq.end = xen_irq->end;
-
-    hc_irq.set_affinity = mpic->hc_irq.set_affinity;
-    mpic->hc_irq.set_affinity = xen_irq->set_affinity;
+    hit = share_mpic(&mpic->hc_irq, xen_irq);
 
     printk("%s: success\n", __func__);
-    return &hc_irq;
+    return hit;
 }
 
 int xen_mpic_get_irq(struct cpu_user_regs *regs)
