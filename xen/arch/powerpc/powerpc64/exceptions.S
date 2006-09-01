@@ -115,6 +115,9 @@ LOAD_GPRS "(\from+1)", \to, \uregs
     mfspr r0, SPRN_HSPRG1
     std r0, UREGS_r13(r1)           /* save R13 from HSPRG1 */
 
+    /* Blow away any reservation according to 970 errata after saving CR */
+    stdcx. r1, 0, r1
+
     /* done with processor_area; re-enable MSR:RI */ 
     mfmsr r0
     ori r0, r0, MSR_RI@l
