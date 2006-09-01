@@ -344,6 +344,10 @@ static void __init __start_xen(multiboot_info_t *mbi)
     if (NULL == alloc_vcpu(dom0, 0, 0))
         panic("Error creating domain 0 vcpu 0\n");
 
+    /* The Interrupt Controller will route everything to CPU 0 so we
+     * need to make sure Dom0's vVCPU 0 is pinned to the CPU */
+    dom0->vcpu[0]->cpu_affinity = cpumask_of_cpu(0);
+
     set_bit(_DOMF_privileged, &dom0->domain_flags);
     /* post-create hooks sets security label */
     acm_post_domain0_create(dom0->domain_id);
