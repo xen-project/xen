@@ -339,7 +339,6 @@ void show_execution_state(struct cpu_user_regs *regs)
 asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs)
 {
     int cpu = smp_processor_id();
-    unsigned long cr2;
     static char *trapstr[] = { 
         "divide error", "debug", "nmi", "bkpt", "overflow", "bounds", 
         "invalid opcode", "device not available", "double fault", 
@@ -356,7 +355,7 @@ asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs)
 
     if ( trapnr == TRAP_page_fault )
     {
-        __asm__ __volatile__ ("mov %%cr2,%0" : "=r" (cr2) : );
+        unsigned long cr2 = read_cr2();
         printk("Faulting linear address: %p\n", _p(cr2));
         show_page_walk(cr2);
     }
@@ -911,7 +910,7 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
 
     ASSERT(!in_irq());
 
-    __asm__ __volatile__ ("mov %%cr2,%0" : "=r" (addr) : );
+    addr = read_cr2();
 
     DEBUGGER_trap_entry(TRAP_page_fault, regs);
 

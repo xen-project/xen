@@ -290,6 +290,13 @@ static inline void write_cr0(unsigned long val)
 	__asm__("mov %0,%%cr0": :"r" ((unsigned long)val));
 }
 
+static inline unsigned long read_cr2(void)
+{
+    unsigned long __cr2;
+    __asm__("mov %%cr2,%0\n\t" :"=r" (__cr2));
+    return __cr2;
+}
+
 static inline unsigned long read_cr4(void)
 {
     unsigned long __cr4;

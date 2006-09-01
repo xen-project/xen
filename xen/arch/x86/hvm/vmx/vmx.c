@@ -520,6 +520,7 @@ static void vmx_store_cpu_guest_regs(
     if ( crs != NULL )
     {
         __vmread(CR0_READ_SHADOW, &crs[0]);
+        crs[2] = v->arch.hvm_vmx.cpu_cr2;
         __vmread(GUEST_CR3, &crs[3]);
         __vmread(CR4_READ_SHADOW, &crs[4]);
     }

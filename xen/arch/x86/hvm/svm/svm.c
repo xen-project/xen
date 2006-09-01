@@ -243,6 +243,7 @@ static void svm_store_cpu_guest_regs(
     {
         /* Returning the guest's regs */
         crs[0] = v->arch.hvm_svm.cpu_shadow_cr0;
+        crs[2] = v->arch.hvm_svm.cpu_cr2;
         crs[3] = v->arch.hvm_svm.cpu_cr3;
         crs[4] = v->arch.hvm_svm.cpu_shadow_cr4;
     }

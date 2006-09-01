@@ -35,20 +35,26 @@ void show_registers(struct cpu_user_regs *regs)
     }
     else
     {
-        context = guest_mode(regs) ? "guest" : "hypervisor";
-
         if ( !guest_mode(regs) )
         {
+            context = "hypervisor";
             fault_regs.esp = (unsigned long)&regs->esp;
             fault_regs.ss = read_segment_register(ss);
             fault_regs.ds = read_segment_register(ds);
             fault_regs.es = read_segment_register(es);
             fault_regs.fs = read_segment_register(fs);
             fault_regs.gs = read_segment_register(gs);
+            fault_crs[2] = read_cr2();
+        }
+        else
+        {
+            context = "guest";
+            fault_crs[2] = current->vcpu_info->arch.cr2;
         }
 
         fault_crs[0] = read_cr0();
         fault_crs[3] = read_cr3();
+        fault_crs[4] = read_cr4();
     }
 
     printk("----[ Xen-%d.%d%s    %s ]----\n",
@@ -63,7 +69,8 @@ void show_registers(struct cpu_user_regs *regs)
            fault_regs.eax, fault_regs.ebx, fault_regs.ecx, fault_regs.edx);
     printk("esi: %08x   edi: %08x   ebp: %08x   esp: %08x\n",
            fault_regs.esi, fault_regs.edi, fault_regs.ebp, fault_regs.esp);
-    printk("cr0: %08lx   cr3: %08lx\n", fault_crs[0], fault_crs[3]);
+    printk("cr0: %08lx   cr4: %08lx   cr3: %08lx   cr2: %08lx\n",
+           fault_crs[0], fault_crs[4], fault_crs[3], fault_crs[2]);
     printk("ds: %04x   es: %04x   fs: %04x   gs: %04x   "
            "ss: %04x   cs: %04x\n",
            fault_regs.ds, fault_regs.es, fault_regs.fs,
