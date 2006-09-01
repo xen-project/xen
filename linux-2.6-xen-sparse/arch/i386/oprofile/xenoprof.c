@@ -26,6 +26,7 @@
 #include <xen/evtchn.h>
 #include "op_counter.h"
 
+#include <xen/driver_util.h>
 #include <xen/interface/xen.h>
 #include <xen/interface/xenoprof.h>
 #include <../../../drivers/oprofile/cpu_buffer.h>
@@ -396,7 +397,7 @@ static int xenoprof_set_passive(int * p_domains,
 
 		npages = (passive_domains[i].bufsize * passive_domains[i].nbuf - 1) / PAGE_SIZE + 1;
 
-		area = get_vm_area(npages * PAGE_SIZE, VM_IOREMAP);
+		area = alloc_vm_area(npages * PAGE_SIZE);
 		if (area == NULL) {
 			ret = -ENOMEM;
 			goto out;
@@ -502,7 +503,7 @@ int __init oprofile_arch_init(struct oprofile_operations * ops)
 
 		npages = (init.bufsize * nbuf - 1) / PAGE_SIZE + 1;
 
-		area = get_vm_area(npages * PAGE_SIZE, VM_IOREMAP);
+		area = alloc_vm_area(npages * PAGE_SIZE);
 		if (area == NULL) {
 			ret = -ENOMEM;
 			goto out;
