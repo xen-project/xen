@@ -26,10 +26,14 @@
 #include <xen/spinlock.h>
 #include <xen/serial.h>
 #include <xen/time.h>
+#include <xen/sched.h>
 #include <asm/page.h>
 #include <asm/io.h>
 #include "exceptions.h"
 #include "of-devtree.h"
+
+/* Secondary processors use this for handshaking with main processor.  */
+volatile unsigned int __spin_ack;
 
 static ulong of_vec;
 static ulong of_msr;
@@ -322,17 +326,18 @@ static void __init of_test(const char *of_method_name)
     }
 }
 
-static int __init of_claim(void * virt, u32 size)
+static int __init of_claim(u32 virt, u32 size, u32 align)
 {
     int rets[1] = { OF_FAILURE };
     
-    of_call("claim", 3, 1, rets, virt, size, 0/*align*/);
+    of_call("claim", 3, 1, rets, virt, size, align);
     if (rets[0] == OF_FAILURE) {
-        DBG("%s 0x%p 0x%08x -> FAIL\n", __func__, virt, size);
+        DBG("%s 0x%08x 0x%08x  0x%08x -> FAIL\n", __func__, virt, size, align);
         return OF_FAILURE;
     }
 
-    DBG("%s 0x%p 0x%08x -> 0x%x\n", __func__, virt, size, rets[0]);
+    DBG("%s 0x%08x 0x%08x  0x%08x -> 0x%08x\n", __func__, virt, size, align,
+        rets[0]);
     return rets[0];
 }
 
@@ -683,32 +688,53 @@ static int boot_of_fixup_chosen(void *mem)
 }
 
 static ulong space_base;
-static ulong find_space(u32 size, ulong align, multiboot_info_t *mbi)
+
+/*
+ * The following function is necessary because we cannot depend on all
+ * FW to actually allocate us any space, so we look for it _hoping_
+ * that at least is will fail if we try to claim something that
+ * belongs to FW.  This hope does not seem to be true on some version
+ * of PIBS.
+ */
+static ulong find_space(u32 size, u32 align, multiboot_info_t *mbi)
 {
     memory_map_t *map = (memory_map_t *)((ulong)mbi->mmap_addr);
     ulong eomem = ((u64)map->length_high << 32) | (u64)map->length_low;
     ulong base;
 
-    of_printf("%s base=0x%016lx  eomem=0x%016lx  size=0x%08x  align=0x%lx\n",
+    if (size == 0)
+        return 0;
+
+    if (align == 0)
+        of_panic("cannot call %s() with align of 0\n", __func__);
+
+#ifdef BROKEN_CLAIM_WORKAROUND
+    {
+        static int broken_claim;
+        if (!broken_claim) {
+            /* just try and claim it to the FW chosen address */
+            base = of_claim(0, size, align);
+            if (base != OF_FAILURE)
+                return base;
+            of_printf("%s: Firmware does not allocate memory for you\n",
+                      __func__);
+            broken_claim = 1;
+        }
+    }
+#endif
+
+    of_printf("%s base=0x%016lx  eomem=0x%016lx  size=0x%08x  align=0x%x\n",
                     __func__, space_base, eomem, size, align);
     base = ALIGN_UP(space_base, PAGE_SIZE);
-    if ((base + size) >= 0x4000000) return 0;
-    if (base + size > eomem) of_panic("not enough RAM\n");
 
-    if (size == 0) return base;
-    if (of_claim((void*)base, size) != OF_FAILURE) {
-        space_base = base + size;
-        return base;
-    } else {
-        for(base += 0x100000; (base+size) < 0x4000000; base += 0x100000) {
-            of_printf("Trying 0x%016lx\n", base);
-            if (of_claim((void*)base, size) != OF_FAILURE) {
-                space_base = base + size;
-                return base;
-            }
+    while ((base + size) < rma_size(cpu_default_rma_order_pages())) {
+        if (of_claim(base, size, 0) != OF_FAILURE) {
+            space_base = base + size;
+            return base;
         }
-        return 0;
+        base += (PAGE_SIZE >  align) ? PAGE_SIZE : align;
     }
+    of_panic("Cannot find memory in the RMA\n");
 }
 
 /* PIBS Version 1.05.0000 04/26/2005 has an incorrect /ht/isa/ranges
@@ -834,9 +860,8 @@ static void boot_of_module(ulong r3, ulong r4, multiboot_info_t *mbi)
     static module_t mods[3];
     void *oftree;
     ulong oftree_sz = 48 * PAGE_SIZE;
-    char *mod0_start;
+    ulong mod0_start;
     ulong mod0_size;
-    ulong mod0;
     static const char sepr[] = " -- ";
     extern char dom0_start[] __attribute__ ((weak));
     extern char dom0_size[] __attribute__ ((weak));
@@ -844,59 +869,48 @@ static void boot_of_module(ulong r3, ulong r4, multiboot_info_t *mbi)
 
     if ((r3 > 0) && (r4 > 0)) {
         /* was it handed to us in registers ? */
-        mod0_start = (void *)r3;
+        mod0_start = r3;
         mod0_size = r4;
+            of_printf("%s: Dom0 was loaded and found using r3/r4:"
+                      "0x%lx[size 0x%lx]\n",
+                      __func__, mod0_start, mod0_size);
     } else {
         /* see if it is in the boot params */
         p = strstr((char *)((ulong)mbi->cmdline), "dom0_start=");
         if ( p != NULL) {
             p += 11;
-            mod0_start = (char *)simple_strtoul(p, NULL, 0);
+            mod0_start = simple_strtoul(p, NULL, 0);
 
             p = strstr((char *)((ulong)mbi->cmdline), "dom0_size=");
             p += 10;
             mod0_size = simple_strtoul(p, NULL, 0);
-
-            of_printf("mod0: %o %c %c %c\n",
-                      mod0_start[0],
-                      mod0_start[1],
-                      mod0_start[2],
-                      mod0_start[3]);
-
+            of_printf("%s: Dom0 was loaded and found using cmdline:"
+                      "0x%lx[size 0x%lx]\n",
+                      __func__, mod0_start, mod0_size);
         } else if ( ((ulong)dom0_start != 0) && ((ulong)dom0_size != 0) ) {
             /* was it linked in ? */
         
-            mod0_start = dom0_start;
+            mod0_start = (ulong)dom0_start;
             mod0_size = (ulong)dom0_size;
-            of_printf("%s: linked in module copied after _end "
-                      "(start 0x%p size 0x%lx)\n",
+            of_printf("%s: Dom0 is linked in: 0x%lx[size 0x%lx]\n",
                       __func__, mod0_start, mod0_size);
         } else {
-            mod0_start = _end;
+            mod0_start = (ulong)_end;
             mod0_size = 0;
+            of_printf("%s: FYI Dom0 is unknown, will be caught later\n",
+                      __func__);
         }
+    }
+
+    if (mod0_size > 0) {
+        const char *c = (const char *)mod0_start;
+
+        of_printf("mod0: %o %c %c %c\n", c[0], c[1], c[2], c[3]);
     }
 
     space_base = (ulong)_end;
-    mod0 = find_space(mod0_size, PAGE_SIZE, mbi);
-
-    /* three cases
-     * 1) mod0_size is not 0 and the image can be copied
-     * 2) mod0_size is not 0 and the image cannot be copied
-     * 3) mod0_size is 0
-     */
-    if (mod0_size > 0) {
-        if (mod0 != 0) {
-            memcpy((void *)mod0, mod0_start, mod0_size);
-            mods[0].mod_start = mod0;
-            mods[0].mod_end = mod0 + mod0_size;
-        } else {
-            of_panic("No space to copy mod0\n");
-        }
-    } else {
-        mods[0].mod_start = mod0;
-        mods[0].mod_end = mod0;
-    }
+    mods[0].mod_start = mod0_start;
+    mods[0].mod_end = mod0_start + mod0_size;
 
     of_printf("%s: mod[0] @ 0x%016x[0x%x]\n", __func__,
               mods[0].mod_start, mods[0].mod_end);
@@ -909,15 +923,22 @@ static void boot_of_module(ulong r3, ulong r4, multiboot_info_t *mbi)
 
     /* snapshot the tree */
     oftree = (void*)find_space(oftree_sz, PAGE_SIZE, mbi);
-    if (oftree == 0) of_panic("Could not allocate OFD tree\n");
+    if (oftree == 0)
+        of_panic("Could not allocate OFD tree\n");
 
     of_printf("creating oftree\n");
     of_test("package-to-path");
-    ofd_create(oftree, oftree_sz);
+    oftree = ofd_create(oftree, oftree_sz);
     pkg_save(oftree);
+
+    if (ofd_size(oftree) > oftree_sz)
+         of_panic("Could not fit all of native devtree\n");
 
     boot_of_fixup_refs(oftree);
     boot_of_fixup_chosen(oftree);
+
+    if (ofd_size(oftree) > oftree_sz)
+         of_panic("Could not fit all devtree fixups\n");
 
     ofd_walk(oftree, OFD_ROOT, /* add_hype_props */ NULL, 2);
 
@@ -937,7 +958,7 @@ static void boot_of_module(ulong r3, ulong r4, multiboot_info_t *mbi)
 static int __init boot_of_cpus(void)
 {
     int cpus;
-    int cpu;
+    int cpu, bootcpu, logical;
     int result;
     u32 cpu_clock[2];
 
@@ -962,10 +983,68 @@ static int __init boot_of_cpus(void)
     cpu_khz /= 1000;
     of_printf("OF: clock-frequency = %ld KHz\n", cpu_khz);
 
-    /* FIXME: should not depend on the boot CPU bring the first child */
+    /* Look up which CPU we are running on right now.  */
+    result = of_getprop(bof_chosen, "cpu", &bootcpu, sizeof (bootcpu));
+    if (result == OF_FAILURE)
+        of_panic("Failed to look up boot cpu\n");
+
     cpu = of_getpeer(cpu);
-    while (cpu > 0) {
-        of_start_cpu(cpu, (ulong)spin_start, 0);
+
+    /* We want a continuous logical cpu number space.  */
+    cpu_set(0, cpu_present_map);
+    cpu_set(0, cpu_online_map);
+    cpu_set(0, cpu_possible_map);
+
+    /* Spin up all CPUS, even if there are more than NR_CPUS, because
+     * Open Firmware has them spinning on cache lines which will
+     * eventually be scrubbed, which could lead to random CPU activation.
+     */
+    for (logical = 1; cpu > 0; logical++) {
+        unsigned int cpuid, ping, pong;
+        unsigned long now, then, timeout;
+
+        if (cpu == bootcpu) {
+            of_printf("skipping boot cpu!\n");
+            continue;
+        }
+
+        result = of_getprop(cpu, "reg", &cpuid, sizeof(cpuid));
+        if (result == OF_FAILURE)
+            of_panic("cpuid lookup failed\n");
+
+        of_printf("spinning up secondary processor #%d: ", logical);
+
+        __spin_ack = ~0x0;
+        ping = __spin_ack;
+        pong = __spin_ack;
+        of_printf("ping = 0x%x: ", ping);
+
+        mb();
+        result = of_start_cpu(cpu, (ulong)spin_start, logical);
+        if (result == OF_FAILURE)
+            of_panic("start cpu failed\n");
+
+        /* We will give the secondary processor five seconds to reply.  */
+        then = mftb();
+        timeout = then + (5 * timebase_freq);
+
+        do {
+            now = mftb();
+            if (now >= timeout) {
+                of_printf("BROKEN: ");
+                break;
+            }
+
+            mb();
+            pong = __spin_ack;
+        } while (pong == ping);
+        of_printf("pong = 0x%x\n", pong);
+
+        if (pong != ping) {
+            cpu_set(logical, cpu_present_map);
+            cpu_set(logical, cpu_possible_map);
+        }
+
         cpu = of_getpeer(cpu);
     }
     return 1;
@@ -1013,6 +1092,7 @@ multiboot_info_t __init *boot_of_init(
     boot_of_rtas();
 
     /* end of OF */
+    of_printf("Quiescing Open Firmware ...\n");
     of_call("quiesce", 0, 0, NULL);
 
     return &mbi;

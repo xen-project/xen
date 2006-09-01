@@ -114,8 +114,8 @@ typedef struct domid_translate {
 } domid_translate_t ;
 
 
-domid_translate_t  translate_domid[MAX_TAP_DEV];
-tap_blkif_t *tapfds[MAX_TAP_DEV];
+static domid_translate_t  translate_domid[MAX_TAP_DEV];
+static tap_blkif_t *tapfds[MAX_TAP_DEV];
 
 static int __init set_blkif_reqs(char *str)
 {
@@ -1118,7 +1118,7 @@ static int do_block_io_op(blkif_t *blkif)
 			       "ring does not exist!\n");
 			print_dbug = 0; /*We only print this message once*/
 		}
-		return 1;
+		return 0;
 	}
 
 	info = tapfds[blkif->dev_num];
@@ -1127,7 +1127,7 @@ static int do_block_io_op(blkif_t *blkif)
 			WPRINTK("Can't get UE info!\n");
 			print_dbug = 0;
 		}
-		return 1;
+		return 0;
 	}
 
 	while (rc != rp) {

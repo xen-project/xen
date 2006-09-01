@@ -22,15 +22,6 @@
 #define ISA_START_ADDRESS	0x0
 #define ISA_END_ADDRESS		0x100000
 
-#if 0 /* not PAE safe */
-/* These hacky macros avoid phys->machine translations. */
-#define __direct_pte(x) ((pte_t) { (x) } )
-#define __direct_mk_pte(page_nr,pgprot) \
-  __direct_pte(((page_nr) << PAGE_SHIFT) | pgprot_val(pgprot))
-#define direct_mk_pte_phys(physpage, pgprot) \
-  __direct_mk_pte((physpage) >> PAGE_SHIFT, pgprot)
-#endif
-
 static int direct_remap_area_pte_fn(pte_t *pte, 
 				    struct page *pmd_page,
 				    unsigned long address, 
@@ -66,17 +57,16 @@ static int __direct_remap_pfn_range(struct mm_struct *mm,
 
 	for (i = 0; i < size; i += PAGE_SIZE) {
 		if ((v - u) == (PAGE_SIZE / sizeof(mmu_update_t))) {
-			/* Fill in the PTE pointers. */
+			/* Flush a full batch after filling in the PTE ptrs. */
 			rc = apply_to_page_range(mm, start_address, 
 						 address - start_address,
 						 direct_remap_area_pte_fn, &w);
 			if (rc)
 				goto out;
-			w = u;
 			rc = -EFAULT;
 			if (HYPERVISOR_mmu_update(u, v - u, NULL, domid) < 0)
 				goto out;
-			v = u;
+			v = w = u;
 			start_address = address;
 		}
 
@@ -92,7 +82,7 @@ static int __direct_remap_pfn_range(struct mm_struct *mm,
 	}
 
 	if (v != u) {
-		/* get the ptep's filled in */
+		/* Final batch. */
 		rc = apply_to_page_range(mm, start_address,
 					 address - start_address,
 					 direct_remap_area_pte_fn, &w);
@@ -178,32 +168,6 @@ int touch_pte_range(struct mm_struct *mm,
 } 
 
 EXPORT_SYMBOL(touch_pte_range);
-
-void *vm_map_xen_pages (unsigned long maddr, int vm_size, pgprot_t prot)
-{
-	int error;
-       
-	struct vm_struct *vma;
-	vma = get_vm_area (vm_size, VM_IOREMAP);
-      
-	if (vma == NULL) {
-		printk ("ioremap.c,vm_map_xen_pages(): "
-			"Failed to get VMA area\n");
-		return NULL;
-	}
-
-	error = direct_kernel_remap_pfn_range((unsigned long) vma->addr,
-					      maddr >> PAGE_SHIFT, vm_size,
-					      prot, DOMID_SELF );
-	if (error == 0) {
-		return vma->addr;
-	} else {
-		printk ("ioremap.c,vm_map_xen_pages(): "
-			"Failed to map xen shared pages into kernel space\n");
-		return NULL;
-	}
-}
-EXPORT_SYMBOL(vm_map_xen_pages);
 
 /*
  * Does @address reside within a non-highmem page that is local to this virtual

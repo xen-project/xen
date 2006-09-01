@@ -55,10 +55,10 @@ static void u3_inv_all(void)
         dc.reg.dc_invtlb = 1;
         out_32(dart_ctl_reg, dc.dc_word);
 
-    do {
-        dc.dc_word = in_32(dart_ctl_reg);
-        r++;
-    } while ((dc.reg.dc_invtlb == 1) && (r < (1 << l)));
+        do {
+            dc.dc_word = in_32(dart_ctl_reg);
+            r++;
+        } while ((dc.reg.dc_invtlb == 1) && (r < (1 << l)));
 
         if (r == (1 << l)) {
             if (l < 4) {

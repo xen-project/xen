@@ -47,7 +47,7 @@ static void h_put_tce(struct cpu_user_regs *regs)
         regs->gprs[3] = H_Success;
     }
 }
-    
+
 static void h_get_tce(struct cpu_user_regs *regs)
 {
     u32 liobn = regs->gprs[4];
@@ -57,7 +57,7 @@ static void h_get_tce(struct cpu_user_regs *regs)
     printk("%s: liobn: 0x%x ioba: 0x%lx \n", __func__, liobn, ioba);
 #endif
     regs->gprs[3] = H_Function;
-    for(;;) ;
+    BUG();
 }
 
 static void h_stuff_tce(struct cpu_user_regs *regs)
@@ -76,7 +76,7 @@ static void h_stuff_tce(struct cpu_user_regs *regs)
             count);
 #endif
     regs->gprs[3] = H_Function;
-    for(;;);
+    BUG();
 }
    
 __init_papr_hcall(H_PUT_TCE, h_put_tce);

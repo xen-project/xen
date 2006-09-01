@@ -23,16 +23,20 @@
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <xen/guest_access.h>
+#include <xen/shadow.h>
 #include <public/xen.h>
 #include <public/domctl.h>
 #include <public/sysctl.h>
 
+void arch_getdomaininfo_ctxt(struct vcpu *, vcpu_guest_context_t *);
 void arch_getdomaininfo_ctxt(struct vcpu *v, vcpu_guest_context_t *c)
 { 
     memcpy(&c->user_regs, &v->arch.ctxt, sizeof(struct cpu_user_regs));
     /* XXX fill in rest of vcpu_guest_context_t */
 }
 
+long arch_do_domctl(struct xen_domctl *domctl,
+                    XEN_GUEST_HANDLE(xen_domctl_t) u_domctl);
 long arch_do_domctl(struct xen_domctl *domctl,
                     XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 {
@@ -75,6 +79,19 @@ long arch_do_domctl(struct xen_domctl *domctl,
         }
     }
     break;
+    case XEN_DOMCTL_shadow_op:
+    {
+        struct domain *d;
+        ret = -ESRCH;
+        d = find_domain_by_id(domctl->domain);
+        if ( d != NULL )
+        {
+            ret = shadow_domctl(d, &domctl->u.shadow_op, u_domctl);
+            put_domain(d);
+            copy_to_guest(u_domctl, domctl, 1);
+        } 
+    }
+    break;
 
     default:
         ret = -ENOSYS;
@@ -84,6 +101,8 @@ long arch_do_domctl(struct xen_domctl *domctl,
     return ret;
 }
 
+long arch_do_sysctl(struct xen_sysctl *sysctl,
+                    XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl);
 long arch_do_sysctl(struct xen_sysctl *sysctl,
                     XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 {
@@ -109,6 +128,7 @@ long arch_do_sysctl(struct xen_sysctl *sysctl,
     break;
 
     default:
+        printk("%s: unsupported sysctl: 0x%x\n", __func__, (sysctl->cmd));
         ret = -ENOSYS;
         break;
     }

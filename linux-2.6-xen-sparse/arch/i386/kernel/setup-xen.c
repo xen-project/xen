@@ -1380,8 +1380,10 @@ legacy_init_iomem_resources(struct e820entry *e820, int nr_map,
 			 *  so we try it repeatedly and let the resource manager
 			 *  test it.
 			 */
+#ifndef CONFIG_XEN
 			request_resource(res, code_resource);
 			request_resource(res, data_resource);
+#endif
 #ifdef CONFIG_KEXEC
 			request_resource(res, &crashk_res);
 #endif
@@ -1454,11 +1456,8 @@ static void __init register_memory(void)
 	int	      i;
 
 	/* Nothing to do if not running in dom0. */
-	if (!is_initial_xendomain()) {
-		legacy_init_iomem_resources(e820.map, e820.nr_map,
-					    &code_resource, &data_resource);
+	if (!is_initial_xendomain())
 		return;
-	}
 
 #ifdef CONFIG_XEN
 	machine_e820 = alloc_bootmem_low_pages(PAGE_SIZE);

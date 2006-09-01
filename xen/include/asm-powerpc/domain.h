@@ -38,15 +38,14 @@ struct arch_domain {
     struct page_info *rma_page;
     uint rma_order;
 
-    /* This is regular memory, only available thru translataion */
-    ulong logical_base_pfn;
-    ulong logical_end_pfn;
+    /* list of extents beyond RMA */
+    struct list_head extent_list;
 
     /* I/O-port access bitmap mask. */
     u8 *iobmp_mask;       /* Address of IO bitmap mask, or NULL.      */
 
     uint large_page_sizes;
-    char large_page_shift[4];
+    uint large_page_order[4];
 } __cacheline_aligned;
 
 struct slb_entry {

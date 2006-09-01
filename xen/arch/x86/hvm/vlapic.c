@@ -919,6 +919,20 @@ int cpu_has_apic_interrupt(struct vcpu* v)
     return 0;
 }
 
+/* check to see if there is pending interrupt  */
+int cpu_has_pending_irq(struct vcpu *v)
+{
+    struct hvm_domain *plat = &v->domain->arch.hvm_domain;
+
+    /* APIC */
+    if ( cpu_has_apic_interrupt(v) ) return 1;
+    
+    /* PIC */
+    if ( !vlapic_accept_pic_intr(v) ) return 0;
+
+    return plat->interrupt_request;
+}
+
 void vlapic_post_injection(struct vcpu *v, int vector, int deliver_mode)
 {
     struct vlapic *vlapic = VLAPIC(v);

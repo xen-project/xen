@@ -82,6 +82,8 @@ void program_exception(struct cpu_user_regs *regs, unsigned long cookie)
     show_registers(regs);
     printk("dar 0x%016lx, dsisr 0x%08x\n", mfdar(), mfdsisr());
     printk("hid4 0x%016lx\n", regs->hid4);
+    printk("---[ backtrace ]---\n");
+    show_backtrace(regs->gprs[1], regs->lr, regs->pc);
     panic("%s: 0x%lx\n", __func__, cookie);
 #endif /* CRASH_DEBUG */
 }

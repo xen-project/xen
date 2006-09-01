@@ -24,6 +24,7 @@
 #include <public/xen.h>
 #include <xen/list.h>
 #include <xen/types.h>
+#include <xen/mm.h>
 #include <asm/misc.h>
 #include <asm/system.h>
 #include <asm/flushtlb.h>
@@ -33,7 +34,6 @@
 #define memguard_unguard_range(_p,_l)    ((void)0)
 
 extern unsigned long xenheap_phys_end;
-#define IS_XEN_HEAP_FRAME(_pfn) (page_to_maddr(_pfn) < xenheap_phys_end)
 
 /*
  * Per-page-frame information.
@@ -43,7 +43,6 @@ extern unsigned long xenheap_phys_end;
  *  2. Provide a PFN_ORDER() macro for accessing the order of a free page.
  */
 #define PFN_ORDER(_pfn) ((_pfn)->u.free.order)
-#define PRtype_info "016lx"
 
 /* XXX copy-and-paste job; re-examine me */
 struct page_info
@@ -63,7 +62,7 @@ struct page_info
         /* Page is in use: ((count_info & PGC_count_mask) != 0). */
         struct {
             /* Owner of this page (NULL if page is anonymous). */
-            struct domain *_domain;
+            u32 _domain;
             /* Type reference count and various PGT_xxx flags and fields. */
             unsigned long type_info;
         } inuse;
@@ -80,80 +79,132 @@ struct page_info
 
 };
 
+struct page_extents {
+    /* Each frame can be threaded onto a doubly-linked list. */
+    struct list_head pe_list;
+
+    /* page extent */
+    struct page_info *pg;
+    uint order;
+    ulong pfn;
+};
+
  /* The following page types are MUTUALLY EXCLUSIVE. */
 #define PGT_none            (0<<29) /* no special uses of this page */
-#define PGT_l1_page_table   (1<<29) /* using this page as an L1 page table? */
-#define PGT_l2_page_table   (2<<29) /* using this page as an L2 page table? */
-#define PGT_l3_page_table   (3<<29) /* using this page as an L3 page table? */
-#define PGT_l4_page_table   (4<<29) /* using this page as an L4 page table? */
-#define PGT_gdt_page        (5<<29) /* using this page in a GDT? */
-#define PGT_ldt_page        (6<<29) /* using this page in an LDT? */
+#define PGT_RMA             (1<<29) /* This page is an RMA page? */
 #define PGT_writable_page   (7<<29) /* has writable mappings of this page? */
 #define PGT_type_mask       (7<<29) /* Bits 29-31. */
- /* Has this page been validated for use as its current type? */
-#define _PGT_validated      28
-#define PGT_validated       (1U<<_PGT_validated)
+
  /* Owning guest has pinned this page to its current type? */
-#define _PGT_pinned         27
+#define _PGT_pinned         28
 #define PGT_pinned          (1U<<_PGT_pinned)
- /* The 10 most significant bits of virt address if this is a page table. */
-#define PGT_va_shift        17
-#define PGT_va_mask         (((1U<<10)-1)<<PGT_va_shift)
+ /* Has this page been validated for use as its current type? */
+#define _PGT_validated      27
+#define PGT_validated       (1U<<_PGT_validated)
+
+ /* The 27 most significant bits of virt address if this is a page table. */
+#define PGT_va_shift        32
+#define PGT_va_mask         ((unsigned long)((1U<<28)-1)<<PGT_va_shift)
  /* Is the back pointer still mutable (i.e. not fixed yet)? */
-#define PGT_va_mutable      (((1U<<10)-1)<<PGT_va_shift)
+#define PGT_va_mutable      ((unsigned long)((1U<<28)-1)<<PGT_va_shift)
  /* Is the back pointer unknown (e.g., p.t. is mapped at multiple VAs)? */
-#define PGT_va_unknown      (((1U<<10)-2)<<PGT_va_shift)
- /* 17-bit count of uses of this frame as its current type. */
-#define PGT_count_mask      ((1U<<17)-1)
+#define PGT_va_unknown      ((unsigned long)((1U<<28)-2)<<PGT_va_shift)
+
+ /* 16-bit count of uses of this frame as its current type. */
+#define PGT_count_mask      ((1U<<16)-1)
 
  /* Cleared when the owning guest 'frees' this page. */
 #define _PGC_allocated      31
 #define PGC_allocated       (1U<<_PGC_allocated)
- /* 31-bit count of references to this frame. */
-#define PGC_count_mask      ((1U<<31)-1)
+ /* Set on a *guest* page to mark it out-of-sync with its shadow */
+#define _PGC_out_of_sync     30
+#define PGC_out_of_sync     (1U<<_PGC_out_of_sync)
+ /* Set when is using a page as a page table */
+#define _PGC_page_table      29
+#define PGC_page_table      (1U<<_PGC_page_table)
+ /* 29-bit count of references to this frame. */
+#define PGC_count_mask      ((1U<<29)-1)
+
+#define IS_XEN_HEAP_FRAME(_pfn) (page_to_maddr(_pfn) < xenheap_phys_end)
+
+static inline struct domain *unpickle_domptr(u32 _domain)
+{ return ((_domain == 0) || (_domain & 1)) ? NULL : __va(_domain); }
+
+static inline u32 pickle_domptr(struct domain *domain)
+{ return (domain == NULL) ? 0 : (u32)__pa(domain); }
+
+#define PRtype_info "016lx"/* should only be used for printk's */
+
+#define page_get_owner(_p)    (unpickle_domptr((_p)->u.inuse._domain))
+#define page_set_owner(_p,_d) ((_p)->u.inuse._domain = pickle_domptr(_d))
+
+extern struct page_info *frame_table;
+extern unsigned long max_page;
+extern unsigned long total_pages;
+void init_frametable(void);
 
 static inline void put_page(struct page_info *page)
 {
-#if 0
-    int count;
+    u32 nx, x, y = page->count_info;
 
-    count = atomic_dec_return(&page->count_info);
+    do {
+        x  = y;
+        nx = x - 1;
+    }
+    while ( unlikely((y = cmpxchg(&page->count_info, x, nx)) != x) );
 
-    if ( unlikely((count & PGC_count_mask) == 0) )
+    if ( unlikely((nx & PGC_count_mask) == 0) ) {
+        panic("about to free page\n");
         free_domheap_page(page);
-#else
-    trap();
-#endif
+    }
 }
 
 static inline int get_page(struct page_info *page,
                            struct domain *domain)
 {
-#if 0
-    int count;
+    u32 x, nx, y = page->count_info;
+    u32 d, nd = page->u.inuse._domain;
+    u32 _domain = pickle_domptr(domain);
 
-    count = atomic_inc_return(&page->count_info);
-
-    if (((count & PGC_count_mask) == 0) ||      /* Count overflow? */
-            ((count & PGC_count_mask) == 1) ||  /* Wasn't allocated? */
-            ((page->domain != domain)))         /* Wrong owner? */
-    {
-        atomic_dec(&page->count_info);
-        return 0;
+    do {
+        x  = y;
+        nx = x + 1;
+        d  = nd;
+        if ( unlikely((x & PGC_count_mask) == 0) ||  /* Not allocated? */
+             unlikely((nx & PGC_count_mask) == 0) || /* Count overflow? */
+             unlikely(d != _domain) )                /* Wrong owner? */
+        {
+            return 0;
+        }
+        y = cmpxchg(&page->count_info, x, nx);
     }
+    while ( unlikely(y != x) );
 
-#else
-    trap();
-#endif
     return 1;
+}
+
+extern void put_page_type(struct page_info *page);
+extern int  get_page_type(struct page_info *page, unsigned long type);
+
+static inline void put_page_and_type(struct page_info *page)
+{
+    put_page_type(page);
+    put_page(page);
 }
 
 static inline int get_page_and_type(struct page_info *page,
                                     struct domain *domain,
-                                    u32 type)
+                                    unsigned long type)
 {
-    trap();
-    return 1;
+    int rc = get_page(page, domain);
+
+    if ( likely(rc) && unlikely(!get_page_type(page, type)) )
+    {
+        put_page(page);
+        rc = 0;
+    }
+
+    return rc;
 }
 
 static inline int page_is_removable(struct page_info *page)
@@ -161,16 +212,9 @@ static inline int page_is_removable(struct page_info *page)
     return ((page->count_info & PGC_count_mask) == 1);
 }
 
-int get_page_type(struct page_info *page, u32 type);
-
 #define set_machinetophys(_mfn, _pfn) (trap(), 0)
 
 extern void synchronise_pagetables(unsigned long cpu_mask);
-
-static inline void put_page_and_type(struct page_info *page)
-{
-    trap();
-}
 
 /* XXX don't know what this is for */
 typedef struct {
@@ -179,17 +223,10 @@ typedef struct {
 } vm_assist_info_t;
 extern vm_assist_info_t vm_assist_info[];
 
-#define page_get_owner(_p)    ((_p)->u.inuse._domain)
-#define page_set_owner(_p,_d) ((_p)->u.inuse._domain = _d)
-
 #define share_xen_page_with_guest(p, d, r) do { } while (0)
 #define share_xen_page_with_privileged_guests(p, r) do { } while (0)
 
-extern struct page_info *frame_table;
 extern unsigned long frame_table_size;
-extern unsigned long max_page;
-extern unsigned long total_pages;
-void init_frametable(void);
 
 /* hope that accesses to this will fail spectacularly */
 #define machine_to_phys_mapping ((u32 *)-1UL)
@@ -199,12 +236,12 @@ extern int update_grant_va_mapping(unsigned long va,
                                    struct domain *,
                                    struct vcpu *);
 
-extern void put_page_type(struct page_info *page);
+#define PFN_TYPE_RMA 1
+#define PFN_TYPE_LOGICAL 2
+#define PFN_TYPE_IO 3
+#define PFN_TYPE_REMOTE 4
 
-#define PFN_TYPE_RMA 0
-#define PFN_TYPE_LOGICAL 1
-#define PFN_TYPE_IO 2
-extern ulong pfn2mfn(struct domain *d, long mfn, int *type);
+extern ulong pfn2mfn(struct domain *d, long pfn, int *type);
 
 /* Arch-specific portion of memory_op hypercall. */
 long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg);
@@ -220,6 +257,10 @@ static inline unsigned long gmfn_to_mfn(struct domain *d, unsigned long gmfn)
 }
 
 #define mfn_to_gmfn(_d, mfn) (mfn)
+
+extern int allocate_rma(struct domain *d, unsigned int order_pages);
+extern uint allocate_extents(struct domain *d, uint nrpages, uint rma_nrpages);
+extern void free_extents(struct domain *d);
 
 extern int steal_page(struct domain *d, struct page_info *page,
                         unsigned int memflags);

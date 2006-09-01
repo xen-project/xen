@@ -43,9 +43,9 @@
 #include <asm/percpu.h>
 #include "exceptions.h"
 #include "of-devtree.h"
+#include "oftree.h"
 
 #define DEBUG
-unsigned long xenheap_phys_end;
 
 /* opt_noht: If true, Hyperthreading is ignored. */
 int opt_noht = 0;
@@ -54,6 +54,14 @@ boolean_param("noht", opt_noht);
 int opt_earlygdb = 0;
 boolean_param("earlygdb", opt_earlygdb);
 
+/* opt_nosmp: If true, secondary processors are ignored. */
+static int opt_nosmp = 0;
+boolean_param("nosmp", opt_nosmp);
+
+/* maxcpus: maximum number of CPUs to activate. */
+static unsigned int max_cpus = NR_CPUS;
+integer_param("maxcpus", max_cpus);
+
 u32 tlbflush_clock = 1U;
 DEFINE_PER_CPU(u32, tlbflush_time);
 
@@ -61,9 +69,12 @@ unsigned int watchdog_on;
 unsigned long wait_init_idle;
 ulong oftree;
 ulong oftree_len;
+ulong oftree_end;
 
 cpumask_t cpu_sibling_map[NR_CPUS] __read_mostly;
 cpumask_t cpu_online_map; /* missing ifdef in schedule.c */
+cpumask_t cpu_present_map;
+cpumask_t cpu_possible_map;
 
 /* XXX get this from ISA node in device tree */
 ulong isa_io_base;
@@ -74,6 +85,8 @@ extern void idle_loop(void);
 
 /* move us to a header file */
 extern void initialize_keytable(void);
+
+volatile struct processor_area * volatile global_cpu_table[NR_CPUS];
 
 int is_kernel_text(unsigned long addr)
 {
@@ -169,6 +182,21 @@ static void __init start_of_day(void)
 
     percpu_free_unused_areas();
 
+    {
+        /* FIXME: Xen assumes that an online CPU is a schedualable
+         * CPU, but we just are not there yet. Remove this fragment when
+         * scheduling processors actually works. */
+        int cpuid;
+
+        printk("WARNING!: Taking all secondary CPUs offline\n");
+
+        for_each_online_cpu(cpuid) {
+            if (cpuid == 0)
+                continue;
+            cpu_clear(cpuid, cpu_online_map);
+        }
+    }
+
     initialize_keytable();
     /* Register another key that will allow for the the Harware Probe
      * to be contacted, this works with RiscWatch probes and should
@@ -193,17 +221,60 @@ void startup_cpu_idle_loop(void)
     reset_stack_and_jump(idle_loop);
 }
 
+static void init_parea(int cpuid)
+{
+    /* Be careful not to shadow the global variable.  */
+    volatile struct processor_area *pa;
+    void *stack;
+
+    pa = xmalloc(struct processor_area);
+    if (pa == NULL)
+        panic("%s: failed to allocate parea for cpu #%d\n", __func__, cpuid);
+
+    stack = alloc_xenheap_pages(STACK_ORDER);
+    if (stack == NULL)
+        panic("%s: failed to allocate stack (order %d) for cpu #%d\n", 
+              __func__, STACK_ORDER, cpuid);
+
+    pa->whoami = cpuid;
+    pa->hyp_stack_base = (void *)((ulong)stack + STACK_SIZE);
+
+    /* This store has the effect of invoking secondary_cpu_init.  */
+    global_cpu_table[cpuid] = pa;
+    mb();
+}
+
+static int kick_secondary_cpus(int maxcpus)
+{
+    int cpuid;
+
+    for_each_present_cpu(cpuid) {
+        if (cpuid == 0)
+            continue;
+        if (cpuid >= maxcpus)
+            break;
+        init_parea(cpuid);
+        cpu_set(cpuid, cpu_online_map);
+        cpu_set(cpuid, cpu_possible_map);
+    }
+
+    return 0;
+}
+
+/* This is the first C code that secondary processors invoke.  */
+int secondary_cpu_init(int cpuid, unsigned long r4);
+int secondary_cpu_init(int cpuid, unsigned long r4)
+{
+    cpu_initialize(cpuid);
+    while(1);
+}
+
 static void __init __start_xen(multiboot_info_t *mbi)
 {
     char *cmdline;
     module_t *mod = (module_t *)((ulong)mbi->mods_addr);
-    ulong heap_start;
-    ulong modules_start, modules_size;
-    ulong eomem = 0;
-    ulong heap_size = 0;
-    ulong bytes = 0;
-    ulong freemem = (ulong)_end;
-    ulong oftree_end;
+    ulong dom0_start, dom0_len;
+    ulong initrd_start, initrd_len;
 
     memcpy(0, exception_vectors, exception_vectors_end - exception_vectors);
     synchronize_caches(0, exception_vectors_end - exception_vectors);
@@ -226,6 +297,9 @@ static void __init __start_xen(multiboot_info_t *mbi)
     console_start_sync();
 #endif
 
+    /* we give the first RMA to the hypervisor */
+    xenheap_phys_end = rma_size(cpu_default_rma_order_pages());
+
     /* Check that we have at least one Multiboot module. */
     if (!(mbi->flags & MBI_MODULES) || (mbi->mods_count == 0)) {
         panic("FATAL ERROR: Require at least one Multiboot module.\n");
@@ -234,10 +308,6 @@ static void __init __start_xen(multiboot_info_t *mbi)
     if (!(mbi->flags & MBI_MEMMAP)) {
         panic("FATAL ERROR: Bootloader provided no memory information.\n");
     }
-
-    /* mark the begining of images */
-    modules_start = mod[0].mod_start;
-    modules_size = mod[mbi->mods_count-1].mod_end - mod[0].mod_start;
 
     /* OF dev tree is the last module */
     oftree = mod[mbi->mods_count-1].mod_start;
@@ -249,71 +319,7 @@ static void __init __start_xen(multiboot_info_t *mbi)
     mod[mbi->mods_count-1].mod_end = 0;
     --mbi->mods_count;
 
-    printk("Physical RAM map:\n");
-
-    /* lets find out how much memory there is */
-    while (bytes < mbi->mmap_length) {
-        u64 end;
-        u64 addr;
-        u64 size;
-
-        memory_map_t *map = (memory_map_t *)((ulong)mbi->mmap_addr + bytes);
-        addr = ((u64)map->base_addr_high << 32) | (u64)map->base_addr_low;
-        size = ((u64)map->length_high << 32) | (u64)map->length_low;
-        end = addr + size;
-
-        printk(" %016lx - %016lx (usable)\n", addr, end);
-
-        if (addr > eomem) {
-            printk("found a hole skipping remainder of memory at:\n"
-                   " %016lx and beyond\n", addr);
-            break;
-        }
-        if (end > eomem) {
-            eomem = end;
-        }
-        bytes += map->size + 4;
-    }
-
-    printk("System RAM: %luMB (%lukB)\n", eomem >> 20, eomem >> 10);
-
-    /* top of memory */
-    max_page = PFN_DOWN(ALIGN_DOWN(eomem, PAGE_SIZE));
-    total_pages = max_page;
-
-    /* Architecturally the first 4 pages are exception hendlers, we
-     * will also be copying down some code there */
-    heap_start = init_boot_allocator(4 << PAGE_SHIFT);
-
-    /* we give the first RMA to the hypervisor */
-    xenheap_phys_end = rma_size(cpu_rma_order());
-
-    /* allow everything else to be allocated */
-    init_boot_pages(xenheap_phys_end, eomem);
-    init_frametable();
-    end_boot_allocator();
-
-    /* Add memory between the beginning of the heap and the beginning
-     * of out text */
-    init_xenheap_pages(heap_start, (ulong)_start);
-
-    /* move the modules to just after _end */
-    if (modules_start) {
-        printk("modules at: %016lx - %016lx\n", modules_start,
-                modules_start + modules_size);
-        freemem = ALIGN_UP(freemem, PAGE_SIZE);
-        memmove((void *)freemem, (void *)modules_start, modules_size);
-
-        oftree -= modules_start - freemem;
-        modules_start = freemem;
-        freemem += modules_size;
-        printk("  moved to: %016lx - %016lx\n", modules_start,
-                modules_start + modules_size);
-    }
-
-    /* the rest of the xenheap, starting at the end of modules */
-    init_xenheap_pages(freemem, xenheap_phys_end);
-
+    memory_init(mod, mbi->mods_count);
 
 #ifdef OF_DEBUG
     printk("ofdump:\n");
@@ -321,19 +327,24 @@ static void __init __start_xen(multiboot_info_t *mbi)
     ofd_walk((void *)oftree, OFD_ROOT, ofd_dump_props, OFD_DUMP_ALL);
 #endif
 
-    heap_size = xenheap_phys_end - heap_start;
-
-    printk("Xen heap: %luMB (%lukB)\n", heap_size >> 20, heap_size >> 10);
-
     percpu_init_areas();
 
-    cpu_initialize();
+    init_parea(0);
+    cpu_initialize(0);
 
 #ifdef CONFIG_GDB
     initialise_gdb();
     if (opt_earlygdb)
         debugger_trap_immediate();
 #endif
+
+    /* Deal with secondary processors.  */
+    if (opt_nosmp) {
+        printk("nosmp: leaving secondary processors spinning forever\n");
+    } else {
+        printk("spinning up at most %d total processors ...\n", max_cpus);
+        kick_secondary_cpus(max_cpus);
+    }
 
     start_of_day();
 
@@ -353,22 +364,26 @@ static void __init __start_xen(multiboot_info_t *mbi)
     /* Scrub RAM that is still free and so may go to an unprivileged domain. */
     scrub_heap_pages();
 
-    /*
-     * We're going to setup domain0 using the module(s) that we
-     * stashed safely above our heap. The second module, if present,
-     * is an initrd ramdisk.  The last module is the OF devtree.
-     */
-    if (construct_dom0(dom0,
-                       modules_start, 
-                       mod[0].mod_end-mod[0].mod_start,
-                       (mbi->mods_count == 1) ? 0 :
-                       modules_start + 
-                       (mod[1].mod_start-mod[0].mod_start),
-                       (mbi->mods_count == 1) ? 0 :
-                       mod[mbi->mods_count-1].mod_end - mod[1].mod_start,
+    dom0_start = mod[0].mod_start;
+    dom0_len = mod[0].mod_end - mod[0].mod_start;
+    if (mbi->mods_count > 1) {
+        initrd_start = mod[1].mod_start;
+        initrd_len = mod[1].mod_end - mod[1].mod_start;
+    } else {
+        initrd_start = 0;
+        initrd_len = 0;
+    }
+    if (construct_dom0(dom0, dom0_start, dom0_len,
+                       initrd_start, initrd_len,
                        cmdline) != 0) {
         panic("Could not set up DOM0 guest OS\n");
     }
+
+    init_xenheap_pages(ALIGN_UP(dom0_start, PAGE_SIZE),
+                 ALIGN_DOWN(dom0_start + dom0_len, PAGE_SIZE));
+    if (initrd_start)
+        init_xenheap_pages(ALIGN_UP(initrd_start, PAGE_SIZE),
+                     ALIGN_DOWN(initrd_start + initrd_len, PAGE_SIZE));
 
     init_trace_bufs();
 
@@ -407,6 +422,8 @@ extern void arch_get_xen_caps(xen_capabilities_info_t info);
 void arch_get_xen_caps(xen_capabilities_info_t info)
 {
 }
+
+
 
 /*
  * Local variables:

@@ -110,6 +110,7 @@ static void unmap_disk(struct td_state *s)
 	free(s->fd_entry);
 	free(s->blkif);
 	free(s->ring_info);
+        free(s->private);
 	free(s);
 
 	return;

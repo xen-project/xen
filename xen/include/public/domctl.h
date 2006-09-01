@@ -16,12 +16,10 @@
 
 #include "xen.h"
 
-#define XEN_DOMCTL_INTERFACE_VERSION 0x00000001
-
-#define uint64_t uint64_aligned_t
+#define XEN_DOMCTL_INTERFACE_VERSION 0x00000003
 
 struct xenctl_cpumap {
-    XEN_GUEST_HANDLE_64(uint8_t) bitmap;
+    XEN_GUEST_HANDLE(uint8_t) bitmap;
     uint32_t nr_cpus;
 };
 
@@ -72,8 +70,11 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_getdomaininfo_t);
 #define XEN_DOMCTL_getmemlist         6
 struct xen_domctl_getmemlist {
     /* IN variables. */
+    /* Max entries to write to output buffer. */
     uint64_t max_pfns;
-    XEN_GUEST_HANDLE_64(ulong) buffer;
+    /* Start index in guest's page list. */
+    uint64_t start_pfn;
+    XEN_GUEST_HANDLE(xen_pfn_t) buffer;
     /* OUT variables. */
     uint64_t num_pfns;
 };
@@ -110,7 +111,7 @@ struct xen_domctl_getpageframeinfo2 {
     /* IN variables. */
     uint64_t num;
     /* IN/OUT variables. */
-    XEN_GUEST_HANDLE_64(ulong) array;
+    XEN_GUEST_HANDLE(ulong) array;
 };
 typedef struct xen_domctl_getpageframeinfo2 xen_domctl_getpageframeinfo2_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_getpageframeinfo2_t);
@@ -184,7 +185,7 @@ struct xen_domctl_shadow_op {
     uint32_t       mb;       /* Shadow memory allocation in MB */
 
     /* OP_PEEK / OP_CLEAN */
-    XEN_GUEST_HANDLE_64(ulong) dirty_bitmap;
+    XEN_GUEST_HANDLE(ulong) dirty_bitmap;
     uint64_t       pages;    /* Size of buffer. Updated with actual size. */
     struct xen_domctl_shadow_op_stats stats;
 };
@@ -204,8 +205,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_max_mem_t);
 #define XEN_DOMCTL_setvcpucontext    12
 #define XEN_DOMCTL_getvcpucontext    13
 struct xen_domctl_vcpucontext {
-    uint32_t              vcpu;                     /* IN */
-    XEN_GUEST_HANDLE_64(vcpu_guest_context_t) ctxt; /* IN/OUT */
+    uint32_t              vcpu;                  /* IN */
+    XEN_GUEST_HANDLE(vcpu_guest_context_t) ctxt; /* IN/OUT */
 };
 typedef struct xen_domctl_vcpucontext xen_domctl_vcpucontext_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_vcpucontext_t);
@@ -377,8 +378,6 @@ struct xen_domctl {
 };
 typedef struct xen_domctl xen_domctl_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_t);
-
-#undef uint64_t
 
 #endif /* __XEN_PUBLIC_DOMCTL_H__ */
 

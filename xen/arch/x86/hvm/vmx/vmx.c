@@ -46,6 +46,8 @@
 #include <asm/hvm/vpic.h>
 #include <asm/hvm/vlapic.h>
 
+extern uint32_t vlapic_update_ppr(struct vlapic *vlapic);
+
 static DEFINE_PER_CPU(unsigned long, trace_values[5]);
 #define TRACE_VMEXIT(index,value) this_cpu(trace_values)[index]=value
 
@@ -518,6 +520,7 @@ static void vmx_store_cpu_guest_regs(
     if ( crs != NULL )
     {
         __vmread(CR0_READ_SHADOW, &crs[0]);
+        crs[2] = v->arch.hvm_vmx.cpu_cr2;
         __vmread(GUEST_CR3, &crs[3]);
         __vmread(CR4_READ_SHADOW, &crs[4]);
     }
@@ -953,8 +956,6 @@ static void vmx_vmexit_do_cpuid(struct cpu_user_regs *regs)
                      bitmaskof(X86_FEATURE_MWAIT) );
 
             edx &= ~( bitmaskof(X86_FEATURE_HT)   |
-                     bitmaskof(X86_FEATURE_MCA)   |
-                     bitmaskof(X86_FEATURE_MCE)   |
                      bitmaskof(X86_FEATURE_ACPI)  |
                      bitmaskof(X86_FEATURE_ACC) );
         }
@@ -1615,6 +1616,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
     unsigned long value;
     unsigned long old_cr;
     struct vcpu *v = current;
+    struct vlapic *vlapic = VLAPIC(v);
 
     switch ( gp ) {
     CASE_GET_REG(EAX, eax);
@@ -1758,6 +1760,12 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
             shadow_update_paging_modes(v);
         break;
     }
+    case 8:
+    {
+        vlapic_set_reg(vlapic, APIC_TASKPRI, ((value & 0x0F) << 4));
+        vlapic_update_ppr(vlapic);
+        break;
+    }
     default:
         printk("invalid cr: %d\n", gp);
         __hvm_bug(regs);
@@ -1771,13 +1779,20 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
  */
 static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
 {
-    unsigned long value;
+    unsigned long value = 0;
     struct vcpu *v = current;
+    struct vlapic *vlapic = VLAPIC(v);
 
-    if ( cr != 3 )
+    if ( cr != 3 && cr != 8)
         __hvm_bug(regs);
 
-    value = (unsigned long) v->arch.hvm_vmx.cpu_cr3;
+    if ( cr == 3 )
+        value = (unsigned long) v->arch.hvm_vmx.cpu_cr3;
+    else if ( cr == 8 )
+    {
+        value = (unsigned long)vlapic_get_reg(vlapic, APIC_TASKPRI);
+        value = (value & 0xF0) >> 4;
+    }
 
     switch ( gp ) {
     CASE_SET_REG(EAX, eax);
@@ -1888,7 +1903,7 @@ static inline void vmx_do_msr_read(struct cpu_user_regs *regs)
         }
 
         rdmsr_safe(regs->ecx, regs->eax, regs->edx);
-        break;
+        return;
     }
 
     regs->eax = msr_content & 0xFFFFFFFF;

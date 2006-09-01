@@ -27,6 +27,8 @@ from xen.xend.XendError import VmError
 from xen.xend.XendLogging import log
 from xen.xend.server.netif import randomMAC
 from xen.xend.xenstore.xswatch import xswatch
+from xen.xend import arch
+from xen.xend import FlatDeviceTree
 
 
 xc = xen.lowlevel.xc.xc()
@@ -141,19 +143,10 @@ class ImageHandler:
             raise VmError('Building domain failed: ostype=%s dom=%d err=%s'
                           % (self.ostype, self.vm.getDomid(), str(result)))
 
-
-    def getDomainMemory(self, mem_kb):
-        """@return The memory required, in KiB, by the domain to store the
-        given amount, also in KiB."""
-        if os.uname()[4] != 'ia64':
-            # A little extra because auto-ballooning is broken w.r.t. HVM
-            # guests. Also, slack is necessary for live migration since that
-            # uses shadow page tables.
-            if 'hvm' in xc.xeninfo()['xen_caps']:
-                mem_kb += 4*1024;
+    def getRequiredMemory(self, mem_kb):
         return mem_kb
 
-    def getDomainShadowMemory(self, mem_kb):
+    def getRequiredShadowMemory(self, mem_kb):
         """@return The minimum shadow memory required, in KiB, for a domain 
         with mem_kb KiB of RAM."""
         # PV domains don't need any shadow memory
@@ -197,9 +190,39 @@ class LinuxImageHandler(ImageHandler):
                               ramdisk        = self.ramdisk,
                               features       = self.vm.getFeatures())
 
-class HVMImageHandler(ImageHandler):
+class PPC_LinuxImageHandler(LinuxImageHandler):
 
-    ostype = "hvm"
+    ostype = "linux"
+
+    def configure(self, imageConfig, deviceConfig):
+        LinuxImageHandler.configure(self, imageConfig, deviceConfig)
+        self.imageConfig = imageConfig
+
+    def buildDomain(self):
+        store_evtchn = self.vm.getStorePort()
+        console_evtchn = self.vm.getConsolePort()
+
+        log.debug("dom            = %d", self.vm.getDomid())
+        log.debug("image          = %s", self.kernel)
+        log.debug("store_evtchn   = %d", store_evtchn)
+        log.debug("console_evtchn = %d", console_evtchn)
+        log.debug("cmdline        = %s", self.cmdline)
+        log.debug("ramdisk        = %s", self.ramdisk)
+        log.debug("vcpus          = %d", self.vm.getVCpuCount())
+        log.debug("features       = %s", self.vm.getFeatures())
+
+        devtree = FlatDeviceTree.build(self)
+
+        return xc.linux_build(dom            = self.vm.getDomid(),
+                              image          = self.kernel,
+                              store_evtchn   = store_evtchn,
+                              console_evtchn = console_evtchn,
+                              cmdline        = self.cmdline,
+                              ramdisk        = self.ramdisk,
+                              features       = self.vm.getFeatures(),
+                              arch_args      = devtree.to_bin())
+
+class HVMImageHandler(ImageHandler):
 
     def configure(self, imageConfig, deviceConfig):
         ImageHandler.configure(self, imageConfig, deviceConfig)
@@ -282,7 +305,7 @@ class HVMImageHandler(ImageHandler):
         for (name, info) in deviceConfig:
             if name == 'vbd':
                 uname = sxp.child_value(info, 'uname')
-                if 'file:' in uname:
+                if uname is not None and 'file:' in uname:
                     (_, vbdparam) = string.split(uname, ':', 1)
                     if not os.path.isfile(vbdparam):
                         raise VmError('Disk image does not exist: %s' %
@@ -355,32 +378,6 @@ class HVMImageHandler(ImageHandler):
         os.waitpid(self.pid, 0)
         self.pid = 0
 
-    def getDomainMemory(self, mem_kb):
-        """@see ImageHandler.getDomainMemory"""
-        if os.uname()[4] == 'ia64':
-            page_kb = 16
-            # ROM size for guest firmware, ioreq page and xenstore page
-            extra_pages = 1024 + 2
-        else:
-            page_kb = 4
-            # This was derived emperically:
-            #   2.4 MB overhead per 1024 MB RAM + 8 MB constant
-            #   + 4 to avoid low-memory condition
-            extra_mb = (2.4/1024) * (mem_kb/1024.0) + 12;
-            extra_pages = int( math.ceil( extra_mb*1024 / page_kb ))
-        return mem_kb + extra_pages * page_kb
-
-    def getDomainShadowMemory(self, mem_kb):
-        """@return The minimum shadow memory required, in KiB, for a domain 
-        with mem_kb KiB of RAM."""
-        if os.uname()[4] in ('ia64', 'ppc64'):
-            # Explicit shadow memory is not a concept 
-            return 0
-        else:
-            # 1MB per vcpu plus 4Kib/Mib of RAM.  This is higher than 
-            # the minimum that Xen would allocate if no value were given.
-            return 1024 * self.vm.getVCpuCount() + mem_kb / 256
-
     def register_shutdown_watch(self):
         """ add xen store watch on control/shutdown """
         self.shutdownWatch = xswatch(self.vm.dompath + "/control/shutdown", \
@@ -417,15 +414,51 @@ class HVMImageHandler(ImageHandler):
 
         return 1 # Keep watching
 
-"""Table of image handler classes for virtual machine images.  Indexed by
-image type.
-"""
-imageHandlerClasses = {}
+class IA64_HVM_ImageHandler(HVMImageHandler):
 
+    ostype = "hvm"
 
-for h in LinuxImageHandler, HVMImageHandler:
-    imageHandlerClasses[h.ostype] = h
+    def getRequiredMemory(self, mem_kb):
+        page_kb = 16
+        # ROM size for guest firmware, ioreq page and xenstore page
+        extra_pages = 1024 + 2
+        return mem_kb + extra_pages * page_kb
 
+    def getRequiredShadowMemory(self, mem_kb):
+        # Explicit shadow memory is not a concept 
+        return 0
+
+class X86_HVM_ImageHandler(HVMImageHandler):
+
+    ostype = "hvm"
+
+    def getRequiredMemory(self, mem_kb):
+        page_kb = 4
+        # This was derived emperically:
+        #   2.4 MB overhead per 1024 MB RAM + 8 MB constant
+        #   + 4 to avoid low-memory condition
+        extra_mb = (2.4/1024) * (mem_kb/1024.0) + 12;
+        extra_pages = int( math.ceil( extra_mb*1024 / page_kb ))
+        return mem_kb + extra_pages * page_kb
+
+    def getRequiredShadowMemory(self, mem_kb):
+        # 1MB per vcpu plus 4Kib/Mib of RAM.  This is higher than 
+        # the minimum that Xen would allocate if no value were given.
+        return 1024 * self.vm.getVCpuCount() + mem_kb / 256
+
+_handlers = {
+    "powerpc": {
+        "linux": PPC_LinuxImageHandler,
+    },
+    "ia64": {
+        "linux": LinuxImageHandler,
+        "hvm": IA64_HVM_ImageHandler,
+    },
+    "x86": {
+        "linux": LinuxImageHandler,
+        "hvm": X86_HVM_ImageHandler,
+    },
+}
 
 def findImageHandlerClass(image):
     """Find the image handler class for an image config.
@@ -433,10 +466,10 @@ def findImageHandlerClass(image):
     @param image config
     @return ImageHandler subclass or None
     """
-    ty = sxp.name(image)
-    if ty is None:
+    type = sxp.name(image)
+    if type is None:
         raise VmError('missing image type')
-    imageClass = imageHandlerClasses.get(ty)
-    if imageClass is None:
-        raise VmError('unknown image type: ' + ty)
-    return imageClass
+    try:
+        return _handlers[arch.type][type]
+    except KeyError:
+        raise VmError('unknown image type: ' + type)

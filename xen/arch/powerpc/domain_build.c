@@ -25,6 +25,7 @@
 #include <xen/init.h>
 #include <xen/ctype.h>
 #include <xen/iocap.h>
+#include <xen/shadow.h>
 #include <xen/version.h>
 #include <asm/processor.h>
 #include <asm/papr.h>
@@ -34,17 +35,21 @@ extern int parseelfimage_32(struct domain_setup_info *dsi);
 extern int loadelfimage_32(struct domain_setup_info *dsi);
 
 /* opt_dom0_mem: memory allocated to domain 0. */
-static unsigned int opt_dom0_mem;
+static unsigned int dom0_nrpages;
 static void parse_dom0_mem(char *s)
 {
-    unsigned long long bytes = parse_size_and_unit(s);
-    /* If no unit is specified we default to kB units, not bytes. */
-    if (isdigit(s[strlen(s)-1]))
-        opt_dom0_mem = (unsigned int)bytes;
-    else
-        opt_dom0_mem = (unsigned int)(bytes >> 10);
+    unsigned long long bytes;
+
+    bytes = parse_size_and_unit(s);
+    dom0_nrpages = bytes >> PAGE_SHIFT;
 }
 custom_param("dom0_mem", parse_dom0_mem);
+
+static unsigned int opt_dom0_max_vcpus;
+integer_param("dom0_max_vcpus", opt_dom0_max_vcpus);
+
+static unsigned int opt_dom0_shadow;
+boolean_param("dom0_shadow", opt_dom0_shadow);
 
 int elf_sanity_check(Elf_Ehdr *ehdr)
 {
@@ -105,11 +110,13 @@ int construct_dom0(struct domain *d,
     struct domain_setup_info dsi;
     ulong dst;
     u64 *ofh_tree;
+    uint rma_nrpages = 1 << d->arch.rma_order;
     ulong rma_sz = rma_size(d->arch.rma_order);
     ulong rma = page_to_maddr(d->arch.rma_page);
     start_info_t *si;
     ulong eomem;
     int am64 = 1;
+    int preempt = 0;
     ulong msr;
     ulong pc;
     ulong r2;
@@ -118,13 +125,18 @@ int construct_dom0(struct domain *d,
     BUG_ON(d->domain_id != 0);
     BUG_ON(d->vcpu[0] == NULL);
 
+    if (image_len == 0)
+        panic("No Dom0 image supplied\n");
+
     cpu_init_vcpu(v);
 
     memset(&dsi, 0, sizeof(struct domain_setup_info));
     dsi.image_addr = image_start;
     dsi.image_len  = image_len;
 
+    printk("Trying Dom0 as 64bit ELF\n");
     if ((rc = parseelfimage(&dsi)) != 0) {
+        printk("Trying Dom0 as 32bit ELF\n");
         if ((rc = parseelfimage_32(&dsi)) != 0)
             return rc;
         am64 = 0;
@@ -141,7 +153,33 @@ int construct_dom0(struct domain *d,
 
     /* By default DOM0 is allocated all available memory. */
     d->max_pages = ~0U;
-    d->tot_pages = 1UL << d->arch.rma_order;
+
+    /* default is the max(1/16th of memory, CONFIG_MIN_DOM0_PAGES) */
+    if (dom0_nrpages == 0) {
+        dom0_nrpages = total_pages >> 4;
+
+        if (dom0_nrpages < CONFIG_MIN_DOM0_PAGES)
+            dom0_nrpages = CONFIG_MIN_DOM0_PAGES;
+    }
+
+    /* make sure we are at least as big as the RMA */
+    if (dom0_nrpages > rma_nrpages)
+        dom0_nrpages = allocate_extents(d, dom0_nrpages, rma_nrpages);
+
+    ASSERT(d->tot_pages == dom0_nrpages);
+    ASSERT(d->tot_pages >= rma_nrpages);
+
+    if (opt_dom0_shadow == 0) {
+        /* 1/64 of memory  */
+        opt_dom0_shadow = (d->tot_pages >> 6) >> (20 - PAGE_SHIFT);
+    }
+
+    do {
+        shadow_set_allocation(d, opt_dom0_shadow, &preempt);
+    } while (preempt);
+    if (shadow_get_allocation(d) == 0)
+        panic("shadow allocation failed 0x%x < 0x%x\n",
+              shadow_get_allocation(d), opt_dom0_shadow);
 
     ASSERT( image_len < rma_sz );
 
@@ -156,10 +194,6 @@ int construct_dom0(struct domain *d,
     printk("shared_info: 0x%lx,%p\n", si->shared_info, d->shared_info);
 
     eomem = si->shared_info;
-
-    /* allow dom0 to access all of system RAM */
-    d->arch.logical_base_pfn = 128 << (20 - PAGE_SHIFT); /* 128 MB */
-    d->arch.logical_end_pfn = max_page;
 
     /* number of pages accessible */
     si->nr_pages = rma_sz >> PAGE_SHIFT;
@@ -265,7 +299,7 @@ int construct_dom0(struct domain *d,
 
     printk("DOM: pc = 0x%lx, r2 = 0x%lx\n", pc, r2);
 
-    ofd_dom0_fixup(d, *ofh_tree + rma, si, dst - rma);
+    ofd_dom0_fixup(d, *ofh_tree + rma, si);
 
     set_bit(_VCPUF_initialised, &v->vcpu_flags);
 

@@ -6,6 +6,7 @@ subdir-$(HAS_PPC64) += powerpc64
 subdir-y += papr
 
 obj-y += audit.o
+obj-y += backtrace.o
 obj-y += bitops.o
 obj-y += boot_of.o
 obj-y += dart.o
@@ -19,19 +20,21 @@ obj-y += exceptions.o
 obj-y += external.o
 obj-y += float.o
 obj-y += hcalls.o
-obj-y += htab.o
 obj-y += iommu.o
 obj-y += irq.o
 obj-y += mambo.o
+obj-y += memory.o
 obj-y += mm.o
 obj-y += mpic.o
 obj-y += mpic_init.o
 obj-y += of-devtree.o
 obj-y += of-devwalk.o
 obj-y += ofd_fixup.o
+obj-y += ofd_fixup_memory.o
 obj-y += physdev.o
 obj-y += rtas.o
 obj-y += setup.o
+obj-y += shadow.o
 obj-y += smp.o
 obj-y += time.o
 obj-y += usercopy.o
@@ -47,6 +50,7 @@ obj-y += elf32.o
 # These are extra warnings like for the arch/ppc directory but may not
 # allow the rest of the tree to build.
 PPC_C_WARNINGS += -Wundef -Wmissing-prototypes -Wmissing-declarations
+PPC_C_WARNINGS += -Wshadow
 CFLAGS += $(PPC_C_WARNINGS)
 
 LINK=0x400000
@@ -91,8 +95,27 @@ boot_of.o: CFLAGS += -DCMDLINE="\"$(IMAGENAME) $(CMDLINE)\""
 start.o: boot/start.S
 	$(CC) $(CFLAGS) -D__ASSEMBLY__ -c $< -o $@
 
-$(TARGET)-syms: start.o $(ALL_OBJS) xen.lds
-	$(CC) $(CFLAGS) $(OMAGIC) -Wl,-Ttext,$(xen_link_base),-T,xen.lds start.o $(ALL_OBJS) -o $@
+TARGET_OPTS = $(OMAGIC) -Wl,-Ttext,$(xen_link_base),-T,xen.lds
+TARGET_OPTS += start.o $(ALL_OBJS)
+
+.xen-syms: start.o $(ALL_OBJS) xen.lds
+	$(CC) $(CFLAGS) $(TARGET_OPTS) -o $@
+
+NM=$(CROSS_COMPILE)nm
+new_nm := $(shell if $(NM) --help 2>&1 | grep -- '--synthetic' > /dev/null; then echo y; else echo n; fi)
+
+ifeq ($(new_nm),y)
+NM		:= $(NM) --synthetic
+endif
+
+xen-syms.S: .xen-syms
+	$(NM) -n $^ | $(BASEDIR)/tools/symbols > $@
+
+xen-syms.o: xen-syms.S
+	$(CC) $(CFLAGS) -D__ASSEMBLY__ -c $< -o $@
+
+$(TARGET)-syms: start.o $(ALL_OBJS) xen-syms.o xen.lds
+	$(CC) $(CFLAGS) $(TARGET_OPTS) xen-syms.o -o $@
 
 $(TARGET).bin: $(TARGET)-syms
 	$(CROSS_COMPILE)objcopy --output-target=binary $< $@
@@ -122,4 +145,4 @@ dom0.bin: $(DOM0_IMAGE)
 
 clean::
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C of_handler clean
-	rm -f firmware firmware_image dom0.bin
+	rm -f firmware firmware_image dom0.bin .xen-syms

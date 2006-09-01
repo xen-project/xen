@@ -255,8 +255,10 @@ void __init e820_reserve_resources(struct e820entry *e820, int nr_map)
 			 *  so we try it repeatedly and let the resource manager
 			 *  test it.
 			 */
+#ifndef CONFIG_XEN
 			request_resource(res, &code_resource);
 			request_resource(res, &data_resource);
+#endif
 #ifdef CONFIG_KEXEC
 			request_resource(res, &crashk_res);
 #endif

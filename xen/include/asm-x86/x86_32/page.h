@@ -26,6 +26,15 @@ extern unsigned int PAGE_HYPERVISOR_NOCACHE;
 #define GRANT_PTE_FLAGS \
     (_PAGE_PRESENT|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_GNTTAB)
 
+/*
+ * Disallow unused flag bits plus PAT, PSE and GLOBAL.
+ * Permit the NX bit if the hardware supports it.
+ */
+#define BASE_DISALLOW_MASK (0xFFFFF180U & ~_PAGE_NX)
+
+#define L1_DISALLOW_MASK (BASE_DISALLOW_MASK | _PAGE_GNTTAB)
+#define L2_DISALLOW_MASK (BASE_DISALLOW_MASK)
+
 #endif /* __X86_32_PAGE_H__ */
 
 /*

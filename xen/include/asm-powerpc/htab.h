@@ -133,8 +133,4 @@ struct domain_htab {
     union pte *map;     /* access the htab like an array */
     ulong *shadow;      /* idx -> logical translation array */
 };
-
-struct domain;
-extern void htab_alloc(struct domain *d, uint order);
-extern void htab_free(struct domain *d);
 #endif

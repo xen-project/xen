@@ -10,11 +10,15 @@ ENTRY(_start)
 SEARCH_DIR("=/usr/local/lib64"); SEARCH_DIR("=/lib64"); SEARCH_DIR("=/usr/lib64"); SEARCH_DIR("=/usr/local/lib"); SEARCH_DIR("=/lib"); SEARCH_DIR("=/usr/lib");
 /* Do we need any of these for elf?
    __DYNAMIC = 0;    */
+PHDRS
+{
+  text PT_LOAD FILEHDR PHDRS;
+}   
 SECTIONS
 {
   /* Read-only sections, merged into text segment: */
   PROVIDE (__executable_start = 0x10000000); . = 0x10000000 + SIZEOF_HEADERS;
-  .interp         : { *(.interp) }
+  .interp         : { *(.interp) } :text
   .hash           : { *(.hash) }
   .dynsym         : { *(.dynsym) }
   .dynstr         : { *(.dynstr) }
@@ -103,7 +107,7 @@ SECTIONS
   PROVIDE (__fini_array_end = .);
   .data           :
   {
-    *(.data .data.* .gnu.linkonce.d.*)
+    *(.data .gnu.linkonce.d.*)
     SORT(CONSTRUCTORS)
   }
 
@@ -121,7 +125,7 @@ SECTIONS
   __inithcall_end = .;
 
   __per_cpu_start = .;
-  .data.percpu : { *(.data.percpu) } :text
+  .data.percpu : { *(.data.percpu) }
   __per_cpu_data_end = .;
   . = __per_cpu_start + (NR_CPUS << PERCPU_SHIFT);
   . = ALIGN(STACK_SIZE);

@@ -13,7 +13,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005
+ * Copyright (C) IBM Corp. 2005, 2006
  *
  * Authors: Jimi Xenidis <jimix@watson.ibm.com>
  */
@@ -24,6 +24,7 @@
 #include <xen/version.h>
 #include <public/xen.h>
 #include "of-devtree.h"
+#include "oftree.h"
 
 #undef RTAS
 
@@ -316,91 +317,6 @@ static ofdn_t ofd_rtas_props(void *m)
 }
 #endif
 
-struct mem_reg {
-    u64 addr;
-    u64 sz;
-};
-
-static ofdn_t ofd_memory_chunk_create(void *m, ofdn_t p,
-        const char *ppath,
-        const char *name,
-        const char *dt,
-        ulong start, ulong size)
-{
-    struct mem_reg reg;
-    char path[128];
-    ulong l;
-    u32 v;
-    ofdn_t n;
-    ulong nl = strlen(name) + 1;
-    ulong dtl = strlen(dt) + 1;
-
-    l = snprintf(path, sizeof (path), "%s/%s@%lx", ppath, name, start);
-    n = ofd_node_add(m, p, path, l + 1);
-    ofd_prop_add(m, n, "name", name, nl);
-
-    v = 1;
-    ofd_prop_add(m, n, "#address-cells", &v, sizeof (v));
-    v = 0;
-    ofd_prop_add(m, n, "#size-cells", &v, sizeof (v));
-
-    ofd_prop_add(m, n, "device_type", dt, dtl);
-
-    /* physical addresses usable without regard to OF */
-    reg.addr = start;
-    reg.sz = size;
-    ofd_prop_add(m, n, "reg", &reg, sizeof (reg));
-
-    return n;
-}
-
-static ofdn_t ofd_memory_props(void *m, struct domain *d, ulong eoload)
-{
-    ofdn_t n = -1;
-    ulong start = 0;
-    static char name[] = "memory";
-    ulong mem_size = rma_size(d->arch.rma_order);
-    ulong chunk_size = rma_size(d->arch.rma_order);
-
-    /* Remove all old memory props */
-    do {
-        ofdn_t old;
-
-        old = ofd_node_find_by_prop(m, OFD_ROOT, "device_type",
-                                    name, sizeof(name));
-        if (old <= 0) break;
-
-        ofd_node_prune(m, old);
-    } while (1);
-
-    while (start < mem_size) {
-        ulong size = (mem_size < chunk_size) ? mem_size : chunk_size;
-
-        n = ofd_memory_chunk_create(m, OFD_ROOT, "", "memory", "memory",
-                start, size);
-
-        if (start == 0) {
-            /* We are processing the first and RMA chunk */
-
-            /* free list of physical addresses available after OF and
-             * client program have been accounted for */
-            struct mem_reg avail[] = {
-                /* 0 til OF @ 32MiB - 16KiB stack */
-                { .addr = 0, .sz = ((32 << 20) - (16 << 10)) },
-                /* end of loaded material to the end the chunk - 1 page */
-                { .addr = eoload, .sz = chunk_size - eoload - PAGE_SIZE },
-                /* the last page is reserved for xen_start_info */
-            };
-            ofd_prop_add(m, n, "available", &avail,
-                    sizeof (avail));
-        }
-
-        start += size;
-        mem_size -= size;
-    }
-    return n;
-}
-
 static ofdn_t ofd_xen_props(void *m, struct domain *d, start_info_t *si)
 {
     ofdn_t n;
@@ -440,9 +356,8 @@ static ofdn_t ofd_xen_props(void *m, struct domain *d, start_info_t *si)
     }
     return n;
 }
-extern int ofd_dom0_fixup(
-    struct domain *d, ulong oftree, start_info_t *si, ulong dst);
-int ofd_dom0_fixup(struct domain *d, ulong mem, start_info_t *si, ulong eoload)
+
+int ofd_dom0_fixup(struct domain *d, ulong mem, start_info_t *si)
 {
     void *m;
     const ofdn_t n = OFD_ROOT;
@@ -470,8 +385,8 @@ int ofd_dom0_fixup(struct domain *d, ulong mem, start_info_t *si, ulong eoload)
     printk("Add /chosen props\n");
     ofd_chosen_props(m, (char *)si->cmd_line);
 
-    printk("fix /memory@0 props\n");
-    ofd_memory_props(m, d, eoload);
+    printk("fix /memory props\n");
+    ofd_memory_props(m, d);
 
     printk("fix /xen props\n");
     ofd_xen_props(m, d, si);
@@ -497,8 +412,8 @@ int ofd_dom0_fixup(struct domain *d, ulong mem, start_info_t *si, ulong eoload)
     r = ofd_prop_add(m, n, "ibm,partition-no", &did, sizeof(did));
     ASSERT( r > 0 );
 
-    const char dom0[] = "dom0";
-    r = ofd_prop_add(m, n, "ibm,partition-name", dom0, sizeof (dom0));
+    const char d0[] = "dom0";
+    r = ofd_prop_add(m, n, "ibm,partition-name", d0, sizeof (d0));
     ASSERT( r > 0 );
 
 

@@ -27,7 +27,7 @@
 
 struct vcpu;
 
-register struct processor_area *parea asm("r13");
+register volatile struct processor_area *parea asm("r13");
 
 static inline struct vcpu *get_current(void)
 {
@@ -66,7 +66,7 @@ static inline struct cpu_user_regs *guest_cpu_user_regs(void)
 
 static inline void reset_stack_and_jump(void (*f)(void))
 {
-    void _reset_stack_and_jump(void (*f)(void), struct cpu_user_regs *regs);
+    void _reset_stack_and_jump(void (*)(void), struct cpu_user_regs *);
     struct cpu_user_regs *regs = guest_cpu_user_regs();
 
 #ifdef TRACK_RESUME

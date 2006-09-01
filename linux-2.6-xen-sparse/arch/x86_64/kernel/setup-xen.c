@@ -846,7 +846,7 @@ void __init setup_arch(char **cmdline_p)
 
 		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
 			/* Make sure we have a large enough P->M table. */
-			phys_to_machine_mapping = alloc_bootmem(
+			phys_to_machine_mapping = alloc_bootmem_pages(
 				end_pfn * sizeof(unsigned long));
 			memset(phys_to_machine_mapping, ~0,
 			       end_pfn * sizeof(unsigned long));
@@ -863,7 +863,7 @@ void __init setup_arch(char **cmdline_p)
 			 * list of frames that make up the p2m table. Used by
                          * save/restore.
 			 */
-			pfn_to_mfn_frame_list_list = alloc_bootmem(PAGE_SIZE);
+			pfn_to_mfn_frame_list_list = alloc_bootmem_pages(PAGE_SIZE);
 			HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list_list =
 				virt_to_mfn(pfn_to_mfn_frame_list_list);
 
@@ -873,7 +873,7 @@ void __init setup_arch(char **cmdline_p)
 					k++;
 					BUG_ON(k>=fpp);
 					pfn_to_mfn_frame_list[k] =
-						alloc_bootmem(PAGE_SIZE);
+						alloc_bootmem_pages(PAGE_SIZE);
 					pfn_to_mfn_frame_list_list[k] =
 						virt_to_mfn(pfn_to_mfn_frame_list[k]);
 					j=0;
@@ -944,9 +944,10 @@ void __init setup_arch(char **cmdline_p)
 		BUG_ON(HYPERVISOR_memory_op(XENMEM_machine_memory_map, &memmap));
 
 		e820_reserve_resources(machine_e820, memmap.nr_entries);
-	} else
-#endif
+	}
+#else
 	e820_reserve_resources(e820.map, e820.nr_map);
+#endif
 
 	request_resource(&iomem_resource, &video_ram_resource);
 

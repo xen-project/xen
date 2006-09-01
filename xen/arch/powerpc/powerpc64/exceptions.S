@@ -514,6 +514,43 @@ _GLOBAL(sleep)
     mtmsrd r3
     blr
 
+/* The primary processor issues a firmware call to spin us up at this
+ * address, passing our CPU number in r3.  We only need a function
+ * entry point instead of a descriptor since this is never called from
+ * C code.
+ */	
     .globl spin_start
 spin_start:
+    /* Write our processor number as an acknowledgment that we're alive.  */
+    LOADADDR(r14, __spin_ack)
+    stw r3, 0(r14)
+    sync
+    /* If NR_CPUS is too small, we should just spin forever.  */
+    LOADADDR(r15, NR_CPUS)
+    cmpd r3, r15
+    blt 2f	
+    b .
+    /* Find our index in the array of processor_area struct pointers.  */
+2:  LOADADDR(r14, global_cpu_table)
+    muli r15, r3, 8
+    add r14, r14, r15
+    /* Spin until the pointer for our processor goes valid.  */
+1:  ld r15, 0(r14)
+    cmpldi r15, 0
+    beq 1b
+    /* Dereference the pointer and load our stack pointer.  */
+    isync
+    ld r1, PAREA_stack(r15)
+    li r14, STACK_FRAME_OVERHEAD
+    sub r1, r1, r14
+    /* Load up the TOC and entry point for the C function to be called.  */
+    LOADADDR(r14, secondary_cpu_init)
+    ld r2, 8(r14)
+    ld r11, 0(r14)
+    mtctr r11
+    /* Warning: why do we need this synchronizing instruction on 970FX?  */
+    isync
+    /* Jump into C code now.  */
+    bctrl
+    nop
     b .

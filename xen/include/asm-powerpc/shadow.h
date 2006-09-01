@@ -13,7 +13,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005
+ * Copyright (C) IBM Corp. 2005, 2006
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
  */
@@ -54,5 +54,19 @@ extern void shadow_drop_references(
 static inline void mark_dirty(struct domain *d, unsigned int mfn)
 {
     return;
+}
+#define gnttab_mark_dirty(d, f) mark_dirty((d), (f))
+
+extern int shadow_domctl(struct domain *d, 
+                   xen_domctl_shadow_op_t *sc,
+                   XEN_GUEST_HANDLE(xen_domctl_t) u_domctl);
+extern unsigned int shadow_teardown(struct domain *d);
+extern unsigned int shadow_set_allocation(
+    struct domain *d, unsigned int megabytes, int *preempted);
+
+/* Return the size of the shadow pool, rounded up to the nearest MB */
+static inline unsigned int shadow_get_allocation(struct domain *d)
+{
+    return (1ULL << (d->arch.htab.order + PAGE_SHIFT)) >> 20;
 }
 #endif

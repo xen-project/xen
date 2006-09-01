@@ -30,12 +30,6 @@
 #include <asm/papr.h>
 #include <asm/hcalls.h>
 
-static void not_yet(struct cpu_user_regs *regs)
-{
-    printk("not implemented yet: 0x%lx\n", regs->gprs[3]);
-    for (;;);
-}
-
 #ifdef USE_PTE_INSERT
 static inline void pte_insert(union pte volatile *pte,
         ulong vsid, ulong rpn, ulong lrpn)
@@ -160,13 +154,13 @@ static void h_enter(struct cpu_user_regs *regs)
         }
 
         /* get correct pgshift value */
-        pgshift = d->arch.large_page_shift[lp_size];
+        pgshift = d->arch.large_page_order[lp_size] + PAGE_SHIFT;
     }
 
     /* get the correct logical RPN in terms of 4K pages need to mask
      * off lp bits and unused arpn bits if this is a large page */
 
-    lpn = ~0ULL << (pgshift - 12);
+    lpn = ~0ULL << (pgshift - PAGE_SHIFT);
     lpn = pte.bits.rpn & lpn;
 
     rpn = pfn2mfn(d, lpn, &mtype);
@@ -493,8 +487,42 @@ static void h_remove(struct cpu_user_regs *regs)
     pte_tlbie(&lpte, ptex);
 }
 
+static void h_read(struct cpu_user_regs *regs)
+{
+    ulong flags = regs->gprs[4];
+    ulong ptex = regs->gprs[5];
+    struct vcpu *v = get_current();
+    struct domain *d = v->domain;
+    struct domain_htab *htab = &d->arch.htab;
+    union pte volatile *pte;
+
+	if (flags & H_READ_4)
+        ptex &= ~0x3UL;
+
+    if (ptex > (1UL << htab->log_num_ptes)) {
+        regs->gprs[3] = H_Parameter;
+        printk("%s: bad ptex: 0x%lx\n", __func__, ptex);
+        return;
+    }
+    pte = &htab->map[ptex];
+    regs->gprs[4] = pte[0].words.vsid;
+    regs->gprs[5] = pte[0].words.rpn;
+
+    if (!(flags & H_READ_4)) {
+        /* dump another 3 PTEs */
+        regs->gprs[6] = pte[1].words.vsid;
+        regs->gprs[7] = pte[1].words.rpn;
+        regs->gprs[8] = pte[2].words.vsid;
+        regs->gprs[9] = pte[2].words.rpn;
+        regs->gprs[10] = pte[3].words.vsid;
+        regs->gprs[11] = pte[3].words.rpn;
+    }
+
+    regs->gprs[3] = H_Success;
+}
+
 __init_papr_hcall(H_ENTER, h_enter);
-__init_papr_hcall(H_READ, not_yet);
+__init_papr_hcall(H_READ, h_read);
 __init_papr_hcall(H_REMOVE, h_remove);
 __init_papr_hcall(H_CLEAR_MOD, h_clear_mod);
 __init_papr_hcall(H_CLEAR_REF, h_clear_ref);

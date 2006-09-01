@@ -207,6 +207,9 @@ class DevController:
 
         devid = int(devid)
 
+        # Modify online status /before/ updating state (latter is watched by
+        # drivers, so this ordering avoids a race).
+        self.writeBackend(devid, 'online', "0")
         self.writeBackend(devid, 'state', str(xenbusState['Closing']))
 
 
@@ -406,7 +409,8 @@ class DevController:
             'domain' : self.vm.getName(),
             'frontend' : frontpath,
             'frontend-id' : "%i" % self.vm.getDomid(),
-            'state' : str(xenbusState['Initialising'])
+            'state' : str(xenbusState['Initialising']),
+            'online' : "1"
             })
 
         return (backpath, frontpath)
