@@ -1903,7 +1903,7 @@ static inline void vmx_do_msr_read(struct cpu_user_regs *regs)
         }
 
         rdmsr_safe(regs->ecx, regs->eax, regs->edx);
-        break;
+        return;
     }
 
     regs->eax = msr_content & 0xFFFFFFFF;
