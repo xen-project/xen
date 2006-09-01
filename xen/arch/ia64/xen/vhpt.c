@@ -14,6 +14,7 @@
 #include <asm/page.h>
 #include <asm/vhpt.h>
 #include <asm/vcpu.h>
+#include <asm/vmmu.h>
 
 /* Defined in tlb.c  */
 extern void ia64_global_tlb_purge(UINT64 start, UINT64 end, UINT64 nbits);
@@ -131,15 +132,25 @@ void vhpt_init(void)
 
 void vcpu_flush_vtlb_all(struct vcpu *v)
 {
-	/* First VCPU tlb.  */
-	vcpu_purge_tr_entry(&PSCBX(v,dtlb));
-	vcpu_purge_tr_entry(&PSCBX(v,itlb));
+	if (VMX_DOMAIN(v)) {
+		/* This code may be call for remapping shared_info and
+		   grant_table share page from guest_physmap_remove_page()
+		   in arch_memory_op() XENMEM_add_to_physmap to realize
+		   PV-on-HVM feature. */
+		/* Purge vTLB for VT-i domain */
+		thash_purge_all(v);
+	}
+	else {
+		/* First VCPU tlb.  */
+		vcpu_purge_tr_entry(&PSCBX(v,dtlb));
+		vcpu_purge_tr_entry(&PSCBX(v,itlb));
 
-	/* Then VHPT.  */
-	vhpt_flush ();
+		/* Then VHPT.  */
+		vhpt_flush();
 
-	/* Then mTLB.  */
-	local_flush_tlb_all ();
+		/* Then mTLB.  */
+		local_flush_tlb_all();
+	}
 
 	/* We could clear bit in d->domain_dirty_cpumask only if domain d in
 	   not running on this processor.  There is currently no easy way to

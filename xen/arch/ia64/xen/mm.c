@@ -173,6 +173,9 @@
 #include <asm/vcpu.h>
 #include <asm/shadow.h>
 #include <linux/efi.h>
+#include <xen/guest_access.h>
+#include <asm/page.h>
+#include <public/memory.h>
 
 static void domain_page_flush(struct domain* d, unsigned long mpaddr,
                               unsigned long old_mfn, unsigned long new_mfn);
@@ -1750,6 +1753,83 @@ int get_page_type(struct page_info *page, u32 type)
 int memory_is_conventional_ram(paddr_t p)
 {
     return (efi_mem_type(p) == EFI_CONVENTIONAL_MEMORY);
+}
+
+
+long
+arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
+{
+    switch (op) {
+    case XENMEM_add_to_physmap:
+    {
+        struct xen_add_to_physmap xatp;
+        unsigned long prev_mfn, mfn = 0, gpfn;
+        struct domain *d;
+
+        if (copy_from_guest(&xatp, arg, 1))
+            return -EFAULT;
+
+        if (xatp.domid == DOMID_SELF) {
+            d = current->domain;
+            get_knownalive_domain(d);
+        }
+        else if (!IS_PRIV(current->domain))
+            return -EPERM;
+        else if ((d = find_domain_by_id(xatp.domid)) == NULL)
+            return -ESRCH;
+
+        /* This hypercall is used for VT-i domain only */
+        if (!VMX_DOMAIN(d->vcpu[0])) {
+            put_domain(d);
+            return -ENOSYS;
+        }
+
+        switch (xatp.space) {
+        case XENMAPSPACE_shared_info:
+            if (xatp.idx == 0)
+                mfn = virt_to_mfn(d->shared_info);
+            break;
+        case XENMAPSPACE_grant_table:
+            if (xatp.idx < NR_GRANT_FRAMES)
+                mfn = virt_to_mfn(d->grant_table->shared) + xatp.idx;
+            break;
+        default:
+            break;
+        }
+
+        LOCK_BIGLOCK(d);
+
+        /* Remove previously mapped page if it was present. */
+        prev_mfn = gmfn_to_mfn(d, xatp.gpfn);
+        if (prev_mfn && mfn_valid(prev_mfn)) {
+            if (IS_XEN_HEAP_FRAME(mfn_to_page(prev_mfn)))
+                /* Xen heap frames are simply unhooked from this phys slot. */
+                guest_physmap_remove_page(d, xatp.gpfn, prev_mfn);
+            else
+                /* Normal domain memory is freed, to avoid leaking memory. */
+                guest_remove_page(d, xatp.gpfn);
+        }
+
+        /* Unmap from old location, if any. */
+        gpfn = get_gpfn_from_mfn(mfn);
+        if (gpfn != INVALID_M2P_ENTRY)
+            guest_physmap_remove_page(d, gpfn, mfn);
+
+        /* Map at new location. */
+        guest_physmap_add_page(d, xatp.gpfn, mfn);
+
+        UNLOCK_BIGLOCK(d);
+        
+        put_domain(d);
+
+        break;
+    }
+
+    default:
+        return -ENOSYS;
+    }
+
+    return 0;
 }
 
 /*
