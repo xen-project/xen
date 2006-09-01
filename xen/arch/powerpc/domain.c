@@ -29,11 +29,10 @@
 #include <xen/shutdown.h>
 #include <xen/shadow.h>
 #include <xen/mm.h>
+#include <xen/softirq.h>
 #include <asm/htab.h>
 #include <asm/current.h>
 #include <asm/hcalls.h>
-
-extern void idle_loop(void);
 
 #define next_arg(fmt, args) ({                                              \
     unsigned long __arg;                                                    \
@@ -47,6 +46,7 @@ extern void idle_loop(void);
     }                                                                       \
     __arg;                                                                  \
 })
+extern void idle_loop(void);
 
 unsigned long hypercall_create_continuation(unsigned int op,
         const char *format, ...)
@@ -179,7 +179,6 @@ void dump_pageframe_info(struct domain *d)
     }
 }
 
-
 void context_switch(struct vcpu *prev, struct vcpu *next)
 {
     struct cpu_user_regs *stack_regs = guest_cpu_user_regs();
@@ -252,4 +251,31 @@ void domain_relinquish_resources(struct domain *d)
 
 void arch_dump_domain_info(struct domain *d)
 {
+}
+
+extern void sleep(void);
+static void safe_halt(void)
+{
+    int cpu = smp_processor_id();
+
+    while (!softirq_pending(cpu))
+        sleep();
+}
+
+static void default_idle(void)
+{
+    local_irq_disable();
+    if ( !softirq_pending(smp_processor_id()) )
+        safe_halt();
+    else
+        local_irq_enable();
+}
+
+void idle_loop(void)
+{
+    for ( ; ; ) {
+        page_scrub_schedule_work();
+        default_idle();
+        do_softirq();
+    }
 }

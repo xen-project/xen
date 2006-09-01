@@ -82,7 +82,6 @@ ulong isa_io_base;
 struct ns16550_defaults ns16550;
 
 extern char __per_cpu_start[], __per_cpu_data_end[], __per_cpu_end[];
-extern void idle_loop(void);
 
 /* move us to a header file */
 extern void initialize_keytable(void);
@@ -100,21 +99,6 @@ int is_kernel_text(unsigned long addr)
 unsigned long kernel_text_end(void)
 {
     return (unsigned long) &_etext;
-}
-
-void idle_loop(void)
-{
-    int cpu = smp_processor_id();
-
-    for ( ; ; )
-    {
-        while (!softirq_pending(cpu)) {
-            void sleep(void);
-            page_scrub_schedule_work();
-            sleep();
-        }
-        do_softirq();
-    }
 }
 
 static void __init do_initcalls(void)
@@ -209,6 +193,8 @@ static void __init start_of_day(void)
     do_initcalls();
     schedulers_start();
 }
+
+extern void idle_loop(void);
 
 void startup_cpu_idle_loop(void)
 {
