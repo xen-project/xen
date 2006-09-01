@@ -21,11 +21,24 @@
 
 #include <public/callback.h>
 
+static void print_xen_info(void)
+{
+    char taint_str[TAINT_STRING_MAX_LEN];
+    char debug = 'n';
+
+#ifndef NDEBUG
+    debug = 'y';
+#endif
+
+    printk("----[ Xen-%d.%d%s  x86_64  debug=%c  %s ]----\n",
+           xen_major_version(), xen_minor_version(), xen_extra_version(),
+           debug, print_tainted(taint_str));
+}
+
 void show_registers(struct cpu_user_regs *regs)
 {
     struct cpu_user_regs fault_regs = *regs;
     unsigned long fault_crs[8];
-    char taint_str[TAINT_STRING_MAX_LEN];
     const char *context;
 
     if ( hvm_guest(current) && guest_mode(regs) )
@@ -55,9 +68,7 @@ void show_registers(struct cpu_user_regs *regs)
         fault_regs.gs = read_segment_register(gs);
     }
 
-    printk("----[ Xen-%d.%d%s    %s ]----\n",
-           xen_major_version(), xen_minor_version(), xen_extra_version(),
-           print_tainted(taint_str));
+    print_xen_info();
     printk("CPU:    %d\nRIP:    %04x:[<%016lx>]",
            smp_processor_id(), fault_regs.cs, fault_regs.rip);
     if ( !guest_mode(regs) )
@@ -133,7 +144,6 @@ asmlinkage void double_fault(void);
 asmlinkage void do_double_fault(struct cpu_user_regs *regs)
 {
     unsigned int cpu, tr;
-    char taint_str[TAINT_STRING_MAX_LEN];
 
     asm ( "str %0" : "=r" (tr) );
     cpu = ((tr >> 3) - __FIRST_TSS_ENTRY) >> 2;
@@ -143,9 +153,8 @@ asmlinkage void do_double_fault(struct cpu_user_regs *regs)
     console_force_unlock();
 
     /* Find information saved during fault and dump it to the console. */
-    printk("*** DOUBLE FAULT: Xen-%d.%d%s    %s\n",
-           xen_major_version(), xen_minor_version(), xen_extra_version(),
-           print_tainted(taint_str));
+    printk("*** DOUBLE FAULT ***\n");
+    print_xen_info();
     printk("CPU:    %d\nRIP:    %04x:[<%016lx>]",
            cpu, regs->cs, regs->rip);
     print_symbol(" %s", regs->rip);

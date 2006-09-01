@@ -21,11 +21,28 @@
 /* All CPUs have their own IDT to allow int80 direct trap. */
 idt_entry_t *idt_tables[NR_CPUS] __read_mostly;
 
+static void print_xen_info(void)
+{
+    char taint_str[TAINT_STRING_MAX_LEN];
+    char debug = 'n', *arch = "x86_32";
+
+#ifndef NDEBUG
+    debug = 'y';
+#endif
+
+#ifdef CONFIG_X86_PAE
+    arch = "x86_32p";
+#endif
+
+    printk("----[ Xen-%d.%d%s  %s  debug=%c  %s ]----\n",
+           xen_major_version(), xen_minor_version(), xen_extra_version(),
+           arch, debug, print_tainted(taint_str));
+}
+
 void show_registers(struct cpu_user_regs *regs)
 {
     struct cpu_user_regs fault_regs = *regs;
     unsigned long fault_crs[8];
-    char taint_str[TAINT_STRING_MAX_LEN];
     const char *context;
 
     if ( hvm_guest(current) && guest_mode(regs) )
@@ -57,9 +74,7 @@ void show_registers(struct cpu_user_regs *regs)
         fault_crs[4] = read_cr4();
     }
 
-    printk("----[ Xen-%d.%d%s    %s ]----\n",
-           xen_major_version(), xen_minor_version(), xen_extra_version(),
-           print_tainted(taint_str));
+    print_xen_info();
     printk("CPU:    %d\nEIP:    %04x:[<%08x>]",
            smp_processor_id(), fault_regs.cs, fault_regs.eip);
     if ( !guest_mode(regs) )
@@ -132,7 +147,6 @@ asmlinkage void do_double_fault(void)
 {
     struct tss_struct *tss = &doublefault_tss;
     unsigned int cpu = ((tss->back_link>>3)-__FIRST_TSS_ENTRY)>>1;
-    char taint_str[TAINT_STRING_MAX_LEN];
 
     watchdog_disable();
 
@@ -140,9 +154,8 @@ asmlinkage void do_double_fault(void)
 
     /* Find information saved during fault and dump it to the console. */
     tss = &init_tss[cpu];
-    printk("*** DOUBLE FAULT: Xen-%d.%d%s    %s\n",
-           xen_major_version(), xen_minor_version(), xen_extra_version(),
-           print_tainted(taint_str));
+    printk("*** DOUBLE FAULT ***\n");
+    print_xen_info();
     printk("CPU:    %d\nEIP:    %04x:[<%08x>]",
            cpu, tss->cs, tss->eip);
     print_symbol(" %s\n", tss->eip);
