@@ -55,7 +55,10 @@ void load_sprs(struct vcpu *v)
     /* adjust the DEC value to account for cycles while not
      * running this OS */
     timebase_delta = mftb() - v->arch.timebase;
-    v->arch.dec -= timebase_delta;
+    if (timebase_delta > v->arch.dec)
+        v->arch.dec = 0;
+    else
+        v->arch.dec -= timebase_delta;
 }
 
 /* XXX evaluate all isyncs in segment code */
