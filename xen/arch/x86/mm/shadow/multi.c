@@ -1792,8 +1792,10 @@ void sh_install_xen_entries_in_l2h(struct vcpu *v,
         for ( i = 0; i < MACHPHYS_MBYTES>>1; i++ )
         {
             sl2e[shadow_l2_table_offset(RO_MPT_VIRT_START) + i] =
-                shadow_l2e_from_mfn(_mfn(l3e_get_pfn(p2m[i])),
-                                    __PAGE_HYPERVISOR);
+                (l3e_get_flags(p2m[i]) & _PAGE_PRESENT)
+                ? shadow_l2e_from_mfn(_mfn(l3e_get_pfn(p2m[i])),
+                                      __PAGE_HYPERVISOR)
+                : shadow_l2e_empty();
         }
         sh_unmap_domain_page(p2m);
     }
