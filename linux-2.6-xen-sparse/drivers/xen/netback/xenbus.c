@@ -427,6 +427,14 @@ static int connect_rings(struct backend_info *be)
 		be->netif->dev->features |= NETIF_F_TSO;
 	}
 
+	if (xenbus_scanf(XBT_NIL, dev->otherend, "feature-no-csum-offload",
+			 "%d", &val) < 0)
+		val = 0;
+	if (val) {
+		be->netif->features &= ~NETIF_F_IP_CSUM;
+		be->netif->dev->features &= ~NETIF_F_IP_CSUM;
+	}
+
 	/* Map the shared frame, irq etc. */
 	err = netif_map(be->netif, tx_ring_ref, rx_ring_ref, evtchn);
 	if (err) {
