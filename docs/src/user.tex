@@ -1654,26 +1654,58 @@ Now unmount (this is important!):
 
 In the configuration file set:
 \begin{quote}
-  \verb_disk = ['file:/full/path/to/vm1disk,sda1,w']_
+  \verb_disk = ['tap:aio:/full/path/to/vm1disk,sda1,w']_
 \end{quote}
 
 As the virtual machine writes to its `disk', the sparse file will be
 filled in and consume more space up to the original 2GB.
 
-{\bf Note that file-backed VBDs may not be appropriate for backing
-  I/O-intensive domains.}  File-backed VBDs are known to experience
+{\em{Note:}} Users that have worked with file-backed VBDs on Xen in previous
+versions will be interested to know that this support is not provided through
+the blktap driver instead of the loopback driver.  This change results in
+file-based block devices that are higher-performance, more scalable, and which
+provide better safety properties for VBD data.  All that is required to update
+your existing file-backed VM configurations is to change VBD configuration
+lines from:
+\begin{quote}
+  \verb_disk = ['file:/full/path/to/vm1disk,sda1,w']_
+\end{quote}
+to:
+\begin{quote}
+  \verb_disk = ['tap:aio:/full/path/to/vm1disk,sda1,w']_
+\end{quote}
+
+
+\subsection{Loopback-mounted file-backed VBDs (deprecated)}
+
+{\em{{\bf{Note:}} Loopback mounted VBDs have now been replaced with
+    blktap-based support for raw image files, as described above.  This
+    section remains to detail a configuration that was used by older Xen
+    versions.}}
+
+Raw image file-backed VBDs amy also be attached to VMs using the 
+Linux loopback driver.  The only required change to the raw file 
+instructions above are to specify the configuration entry as:
+\begin{quote}
+  \verb_disk = ['file:/full/path/to/vm1disk,sda1,w']_
+\end{quote}
+
+{\bf Note that loopback file-backed VBDs may not be appropriate for backing
+  I/O-intensive domains.}  This approach is known to experience
 substantial slowdowns under heavy I/O workloads, due to the I/O
 handling by the loopback block device used to support file-backed VBDs
-in dom0.  Better I/O performance can be achieved by using either
-LVM-backed VBDs (Section~\ref{s:using-lvm-backed-vbds}) or physical
-devices as VBDs (Section~\ref{s:exporting-physical-devices-as-vbds}).
+in dom0.  Loopbach support remains for old Xen installations, and users
+are strongly encouraged to use the blktap-based file support (using 
+``{\tt{tap:aio}}'' as described above).
 
-Linux supports a maximum of eight file-backed VBDs across all domains
-by default.  This limit can be statically increased by using the
-\emph{max\_loop} module parameter if CONFIG\_BLK\_DEV\_LOOP is
-compiled as a module in the dom0 kernel, or by using the
-\emph{max\_loop=n} boot option if CONFIG\_BLK\_DEV\_LOOP is compiled
-directly into the dom0 kernel.
+Additionally, Linux supports a maximum of eight loopback file-backed 
+VBDs across all domains by default.  This limit can be statically 
+increased by using the \emph{max\_loop} module parameter if 
+CONFIG\_BLK\_DEV\_LOOP is compiled as a module in the dom0 kernel, or 
+by using the \emph{max\_loop=n} boot option if CONFIG\_BLK\_DEV\_LOOP 
+is compiled directly into the dom0 kernel.  Again, users are encouraged
+to use the blktap-based file support described above which scales to much 
+larger number of active VBDs.
 
 
 \section{Using LVM-backed VBDs}
