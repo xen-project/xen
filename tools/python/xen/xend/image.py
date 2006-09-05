@@ -448,6 +448,10 @@ class X86_HVM_ImageHandler(HVMImageHandler):
     ostype = "hvm"
 
     def getRequiredAvailableMemory(self, mem_kb):
+        # Add 8 MiB overhead for QEMU's video RAM.
+        return self.getRequiredInitialReservation(mem_kb) + 8192
+
+    def getRequiredInitialReservation(self, mem_kb):
         page_kb = 4
         # This was derived emperically:
         #   2.4 MB overhead per 1024 MB RAM
@@ -456,14 +460,10 @@ class X86_HVM_ImageHandler(HVMImageHandler):
         extra_pages = int( math.ceil( extra_mb*1024 / page_kb ))
         return mem_kb + extra_pages * page_kb
 
-    def getRequiredInitialReservation(self, mem_kb):
-        # Add 8 MiB overhead for QEMU's video RAM.
-        return self.getRequiredAvailableMemory(mem_kb) + 8192
-
     def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
         # The given value is the configured value -- we need to include the
-        # overhead due to getRequiredMemory.
-        maxmem_kb = self.getRequiredMemory(maxmem_kb)
+        # overhead due to getRequiredInitialReservation.
+        maxmem_kb = self.getRequiredInitialReservation(maxmem_kb)
 
         # 1MB per vcpu plus 4Kib/Mib of RAM.  This is higher than 
         # the minimum that Xen would allocate if no value were given.
