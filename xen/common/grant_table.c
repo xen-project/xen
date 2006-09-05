@@ -175,12 +175,13 @@ __gnttab_map_grant_ref(
 
     spin_lock(&rd->grant_table->lock);
 
+    sdom = sha->domid;
+
     if ( !act->pin ||
          (!(op->flags & GNTMAP_readonly) &&
           !(act->pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask))) )
     {
         sflags = sha->flags;
-        sdom   = sha->domid;
 
         /*
          * This loop attempts to set the access (reading/writing) flags
@@ -235,6 +236,10 @@ __gnttab_map_grant_ref(
             act->frame = gmfn_to_mfn(rd, sha->frame);
         }
     }
+    else if ( unlikely(sdom != ld->domain_id) )
+        PIN_FAIL(unlock_out, GNTST_general_error,
+                 "Bad domain (%d). (NB. expected dom %d)\n",
+                 sdom, ld->domain_id);
     else if ( (act->pin & 0x80808080U) != 0 )
         PIN_FAIL(unlock_out, ENOSPC,
                  "Risk of counter overflow %08x\n", act->pin);
@@ -771,11 +776,12 @@ __acquire_grant_for_copy(
 
     spin_lock(&rd->grant_table->lock);
     
+    sdom = sha->domid;
+
     if ( !act->pin ||
          (!readonly && !(act->pin & GNTPIN_hstw_mask)) )
     {
         sflags = sha->flags;
-        sdom = sha->domid;
 
         for ( ; ; )
         {
@@ -819,6 +825,10 @@ __acquire_grant_for_copy(
             act->frame = gmfn_to_mfn(rd, sha->frame);
         }
     }
+    else if ( unlikely(sdom != current->domain->domain_id) )
+        PIN_FAIL(unlock_out, GNTST_general_error,
+                 "Bad domain (%d). (NB. expected dom %d)\n",
+                 sdom, current->domain->domain_id);
     else if ( (act->pin & 0x80808080U) != 0 )
         PIN_FAIL(unlock_out, ENOSPC,
                  "Risk of counter overflow %08x\n", act->pin);
