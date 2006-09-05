@@ -153,7 +153,7 @@ static int get_hypercall_stubs(void)
 		return -ENOMEM;
 
 	for (i = 0; i < pages; i++)
-		wrmsrl(ebx,
+		wrmsrl(msr,
 		       virt_to_phys(hypercall_stubs) +	/* base address      */
 		       (i << PAGE_SHIFT) +		/* offset of page @i */
 		       i);				/* request page @i   */
