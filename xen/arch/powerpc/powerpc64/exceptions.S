@@ -116,12 +116,8 @@ LOAD_GPRS "(\from+1)", \to, \uregs
     std r0, UREGS_r13(r1)           /* save R13 from HSPRG1 */
 
     /* Blow away any reservation according to 970 errata after saving CR */
-    stdcx. r1, 0, r1
-
-    /* done with processor_area; re-enable MSR:RI */ 
-    mfmsr r0
-    ori r0, r0, MSR_RI@l
-    mtmsrd r0
+    ldx r0, 0, r1
+    stdcx. r0, 0, r1
 
     /* save CTR and use it to jump */
     mfctr r0
@@ -147,6 +143,13 @@ LOAD_GPRS "(\from+1)", \to, \uregs
     li r0, -1 /* we clobbered the OS's SRR0/SRR1 to get here. */
     std r0, UREGS_srr0(\uregs)
     std r0, UREGS_srr1(\uregs)
+
+    /* done with processor_area; re-enable MSR:RI */ 
+    mfmsr r0
+    ori r0, r0, MSR_RI@l
+    mtmsrd r0
+
+
 .endm
 
 /* For exceptions that use HSRR0/1 (preserving the OS's SRR0/1). */
@@ -167,6 +170,12 @@ LOAD_GPRS "(\from+1)", \to, \uregs
     std r0, UREGS_srr0(\uregs)
     mfspr r0, SPRN_SRR1
     std r0, UREGS_srr1(\uregs)
+
+    /* done with processor_area; re-enable MSR:RI */ 
+    mfmsr r0
+    ori r0, r0, MSR_RI@l
+    mtmsrd r0
+
 .endm
 
 /* Hypervisor exception handling code; copied to physical address zero. */
@@ -374,6 +383,7 @@ ex_hcall_continued:
     mfmsr r14
     ori r14, r14, MSR_EE
     xori r15, r14, MSR_EE
+
 hcall_test_all_events:
     mtmsrd r15, 1                       /* disable interrupts */
     ld r3, PAREA_vcpu(r13)
