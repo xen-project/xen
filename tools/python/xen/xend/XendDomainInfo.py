@@ -1285,28 +1285,37 @@ class XendDomainInfo:
                 for v in range(0, self.info['max_vcpu_id']+1):
                     xc.vcpu_setaffinity(self.domid, v, self.info['cpus'])
 
+            # Use architecture- and image-specific calculations to determine
+            # the various headrooms necessary, given the raw configured
+            # values.
+            # reservation, maxmem, memory, and shadow are all in KiB.
+            reservation = self.image.getRequiredInitialReservation(
+                self.info['memory'] * 1024)
+            maxmem = self.image.getRequiredAvailableMemory(
+                self.info['maxmem'] * 1024)
+            memory = self.image.getRequiredAvailableMemory(
+                self.info['memory'] * 1024)
+            shadow = self.image.getRequiredShadowMemory(
+                self.info['shadow_memory'] * 1024,
+                self.info['maxmem'] * 1024)
+
+            # Round shadow up to a multiple of a MiB, as shadow_mem_control
+            # takes MiB and we must not round down and end up under-providing.
+            shadow = ((shadow + 1023) / 1024) * 1024
+
             # set memory limit
-            maxmem = self.image.getRequiredMemory(self.info['maxmem'] * 1024)
             xc.domain_setmaxmem(self.domid, maxmem)
 
-            mem_kb = self.image.getRequiredMemory(self.info['memory'] * 1024)
-
-            # get the domain's shadow memory requirement
-            shadow_kb = self.image.getRequiredShadowMemory(mem_kb)
-            shadow_kb_req = self.info['shadow_memory'] * 1024
-            if shadow_kb_req > shadow_kb:
-                shadow_kb = shadow_kb_req
-            shadow_mb = (shadow_kb + 1023) / 1024
-
             # Make sure there's enough RAM available for the domain
-            balloon.free(mem_kb + shadow_mb * 1024)
+            balloon.free(memory + shadow)
 
             # Set up the shadow memory
-            shadow_cur = xc.shadow_mem_control(self.domid, shadow_mb)
+            shadow_cur = xc.shadow_mem_control(self.domid, shadow / 1024)
             self.info['shadow_memory'] = shadow_cur
 
-            # initial memory allocation
-            xc.domain_memory_increase_reservation(self.domid, mem_kb, 0, 0)
+            # initial memory reservation
+            xc.domain_memory_increase_reservation(self.domid, reservation, 0,
+                                                  0)
 
             self.createChannels()
 
