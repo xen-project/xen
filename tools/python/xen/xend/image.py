@@ -143,12 +143,27 @@ class ImageHandler:
             raise VmError('Building domain failed: ostype=%s dom=%d err=%s'
                           % (self.ostype, self.vm.getDomid(), str(result)))
 
-    def getRequiredMemory(self, mem_kb):
+    def getRequiredAvailableMemory(self, mem_kb):
+        """@param mem_kb The configured maxmem or memory, in KiB.
+        @return The corresponding required amount of memory for the domain,
+        also in KiB.  This is normally the given mem_kb, but architecture- or
+        image-specific code may override this to add headroom where
+        necessary."""
         return mem_kb
 
-    def getRequiredShadowMemory(self, mem_kb):
-        """@return The minimum shadow memory required, in KiB, for a domain 
-        with mem_kb KiB of RAM."""
+    def getRequiredInitialReservation(self, mem_kb):
+        """@param mem_kb The configured memory, in KiB.
+        @return The corresponding required amount of memory to be free, also
+        in KiB. This is normally the same as getRequiredAvailableMemory, but
+        architecture- or image-specific code may override this to
+        add headroom where necessary."""
+        return self.getRequiredAvailableMemory(mem_kb)
+
+    def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
+        """@param shadow_mem_kb The configured shadow memory, in KiB.
+        @param maxmem_kb The configured maxmem, in KiB.
+        @return The corresponding required amount of shadow memory, also in
+        KiB."""
         # PV domains don't need any shadow memory
         return 0
 
@@ -418,7 +433,7 @@ class IA64_HVM_ImageHandler(HVMImageHandler):
 
     ostype = "hvm"
 
-    def getRequiredMemory(self, mem_kb):
+    def getRequiredAvailableMemory(self, mem_kb):
         page_kb = 16
         # ROM size for guest firmware, ioreq page and xenstore page
         extra_pages = 1024 + 2
@@ -432,19 +447,29 @@ class X86_HVM_ImageHandler(HVMImageHandler):
 
     ostype = "hvm"
 
-    def getRequiredMemory(self, mem_kb):
+    def getRequiredAvailableMemory(self, mem_kb):
         page_kb = 4
         # This was derived emperically:
-        #   2.4 MB overhead per 1024 MB RAM + 8 MB constant
+        #   2.4 MB overhead per 1024 MB RAM
         #   + 4 to avoid low-memory condition
-        extra_mb = (2.4/1024) * (mem_kb/1024.0) + 12;
+        extra_mb = (2.4/1024) * (mem_kb/1024.0) + 4;
         extra_pages = int( math.ceil( extra_mb*1024 / page_kb ))
         return mem_kb + extra_pages * page_kb
 
-    def getRequiredShadowMemory(self, mem_kb):
+    def getRequiredInitialReservation(self, mem_kb):
+        # Add 8 MiB overhead for QEMU's video RAM.
+        return self.getRequiredAvailableMemory(mem_kb) + 8192
+
+    def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
+        # The given value is the configured value -- we need to include the
+        # overhead due to getRequiredMemory.
+        maxmem_kb = self.getRequiredMemory(maxmem_kb)
+
         # 1MB per vcpu plus 4Kib/Mib of RAM.  This is higher than 
         # the minimum that Xen would allocate if no value were given.
-        return 1024 * self.vm.getVCpuCount() + mem_kb / 256
+        return max(1024 * self.vm.getVCpuCount() + maxmem_kb / 256,
+                   shadow_mem_kb)
+
 
 _handlers = {
     "powerpc": {
