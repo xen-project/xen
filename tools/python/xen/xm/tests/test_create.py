@@ -51,6 +51,7 @@ class test_create(unittest.TestCase):
                  'path'      : '.:/etc/xen',
                  'builder'   : 'linux',
                  'nics'      : -1,
+                 'vncunused' : 1,
                  'xauthority': xen.xm.create.get_xauthority(),
                  })
 
@@ -101,6 +102,7 @@ on_crash    = 'destroy'
                  'path'        : '.:/etc/xen',
                  'builder'     : 'linux',
 
+                 'vncunused'   : 1,
                  'xauthority'  : xen.xm.create.get_xauthority(),
                })
 
@@ -140,6 +142,7 @@ cpu_weight = 0.75
                  'builder'    : 'linux',
                  'nics'       : -1,
 
+                 'vncunused'   : 1,
                  'xauthority' : xen.xm.create.get_xauthority(),
                  })
             
@@ -182,6 +185,7 @@ ne2000=0
                                    xen.xm.create.VNC_BASE_PORT +
                                    xen.xm.create.choose_vnc_display())),
                  'vnc'         : 1,
+                 'vncunused'   : 1,
                  'vncviewer'   : 1,
 
                  'xm_file'     : fname,
