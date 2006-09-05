@@ -48,6 +48,9 @@ else
 	function vtpm_migrate() {
 		echo "Error: vTPM migration accross machines not implemented."
 	}
+	function vtpm_migrate_local() {
+		echo "Error: local vTPM migration not supported"
+	}
 	function vtpm_migrate_recover() {
 		true
 	}
@@ -353,6 +356,8 @@ function vtpm_migration_step() {
 	local res=$(vtpm_isLocalAddress $1)
 	if [ "$res" == "0" ]; then
 		vtpm_migrate $1 $2 $3
+	else
+		vtpm_migrate_local
 	fi
 }
 
