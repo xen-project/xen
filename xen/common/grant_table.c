@@ -184,8 +184,7 @@ __gnttab_map_grant_ref(
          (!(op->flags & GNTMAP_readonly) &&
           !(act->pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask))) )
     {
-        scombo.shorts.flags = sha->flags;
-        scombo.shorts.domid = sha->domid;
+        scombo.word = *(u32 *)&sha->flags;
 
         /*
          * This loop attempts to set the access (reading/writing) flags
@@ -556,8 +555,7 @@ gnttab_prepare_for_transfer(
 
     sha = &rgt->shared[ref];
     
-    scombo.shorts.flags = sha->flags;
-    scombo.shorts.domid = sha->domid;
+    scombo.word = *(u32 *)&sha->flags;
 
     for ( ; ; )
     {
@@ -774,8 +772,7 @@ __acquire_grant_for_copy(
     if ( !act->pin ||
          (!readonly && !(act->pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask))) )
     {
-        scombo.shorts.flags = sha->flags;
-        scombo.shorts.domid = sha->domid;
+        scombo.word = *(u32 *)&sha->flags;
 
         for ( ; ; )
         {
