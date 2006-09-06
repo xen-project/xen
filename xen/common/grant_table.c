@@ -156,7 +156,10 @@ __gnttab_map_grant_ref(
 
         memcpy(new_mt, lgt->maptrack, PAGE_SIZE << lgt->maptrack_order);
         for ( i = lgt->maptrack_limit; i < (lgt->maptrack_limit << 1); i++ )
+        {
             new_mt[i].ref = i+1;
+            new_mt[i].flags = 0;
+        }
 
         free_xenheap_pages(lgt->maptrack, lgt->maptrack_order);
         lgt->maptrack          = new_mt;
