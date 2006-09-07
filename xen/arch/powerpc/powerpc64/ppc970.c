@@ -17,6 +17,7 @@
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
  *          Jimi Xenidis <jimix@watson.ibm.com>
+ *          Amos Waterland  <apw@us.ibm.com>
  */
 
 #include <xen/config.h>
@@ -30,6 +31,7 @@
 #include <asm/powerpc64/processor.h>
 #include <asm/powerpc64/ppc970-hid.h>
 
+#undef DEBUG
 #undef SERIALIZE
 
 struct rma_settings {
@@ -190,7 +192,7 @@ void cpu_initialize(int cpuid)
     hid5.bits.DCBZ32_ill = 0; /* make dzbz 32byte illeagal */
     mthid5(hid5.word);
 
-#ifdef DUMP_HIDS
+#ifdef DEBUG
     printk("hid0 0x%016lx\n"
            "hid1 0x%016lx\n"
            "hid4 0x%016lx\n"
@@ -237,4 +239,74 @@ void save_cpu_sprs(struct vcpu *v)
 void load_cpu_sprs(struct vcpu *v)
 {
     mthid4(v->arch.cpu.hid4.word);
+}
+
+int cpu_machinecheck(struct cpu_user_regs *regs)
+{
+    int recover = 0;
+    u32 dsisr = mfdsisr();
+
+    if (regs->msr & MCK_SRR1_RI)
+        recover = 1;
+
+    printk("MACHINE CHECK: %s Recoverable\n", recover ? "IS": "NOT");
+    printk("SRR1: 0x%016lx\n", regs->msr);
+    if (regs->msr & MCK_SRR1_INSN_FETCH_UNIT)
+        printk("42: Exception caused by Instruction Fetch Unit (IFU) "
+               "detection of a hardware uncorrectable error (UE).\n");
+
+    if (regs->msr & MCK_SRR1_LOAD_STORE)
+        printk("43: Exception caused by load/store detection of error "
+               "(see DSISR)\n");
+
+    switch (regs->msr & MCK_SRR1_CAUSE_MASK) {
+    case MCK_SRR1_CAUSE_SLB_PAR:
+        printk("0b01: Exception caused by an SLB parity error detected "
+               "while translating an instruction fetch address.\n");
+        break;
+    case MCK_SRR1_CAUSE_TLB_PAR:
+        printk("0b10: Exception caused by a TLB parity error detected "
+               "while translating an instruction fetch address.\n");
+        break;
+    case MCK_SRR1_CAUSE_UE:
+        printk("0b11: Exception caused by a hardware uncorrectable "
+               "error (UE) detected while doing a reload of an "
+               "instruction-fetch TLB tablewalk.\n");
+        break;
+    default:
+        break;
+    }
+
+    printk("\nDSIDR: 0x%08x\n", dsisr);
+    if (dsisr & MCK_DSISR_UE)
+        printk("16: Exception caused by a UE deferred error "
+               "(DAR is undefined).\n");
+    
+    if (dsisr & MCK_DSISR_UE_TABLE_WALK)
+        printk("17: Exception caused by a UE deferred error "
+               "during a tablewalk (D-side).\n"); 
+
+    if (dsisr & MCK_DSISR_L1_DCACHE_PAR)
+        printk("18: Exception was caused by a software recoverable "
+               "parity error in the L1 D-cache.\n");
+
+    if (dsisr & MCK_DSISR_L1_DCACHE_TAG_PAR)
+        printk("19: Exception was caused by a software recoverable "
+               "parity error in the L1 D-cache tag.\n");
+
+    if (dsisr & MCK_DSISR_D_ERAT_PAR)
+        printk("20: Exception was caused by a software recoverable parity "
+               "error in the D-ERAT.\n");
+        
+    if (dsisr & MCK_DSISR_TLB_PAR)
+        printk("21: Exception was caused by a software recoverable parity "
+               "error in the TLB.\n");
+
+    if (dsisr & MCK_DSISR_SLB_PAR)
+        printk("23: Exception was caused by an SLB parity error (may not be "
+               "recoverable). This condition could occur if the "
+               "effective segment ID (ESID) fields of two or more SLB "
+               "entries contain the same value.");
+
+    return 0; /* for now lets not recover; */
 }

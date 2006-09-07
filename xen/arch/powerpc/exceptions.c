@@ -25,6 +25,7 @@
 #include <xen/serial.h>
 #include <xen/gdbstub.h>
 #include <asm/time.h>
+#include <asm/processor.h>
 
 #undef DEBUG
 
@@ -54,6 +55,8 @@ void do_dec(struct cpu_user_regs *regs)
 
 void program_exception(struct cpu_user_regs *regs, unsigned long cookie)
 {
+    int recover = 0;
+
 #ifdef CRASH_DEBUG
     __trap_to_gdb(regs, cookie);
 #else /* CRASH_DEBUG */
@@ -62,6 +65,11 @@ void program_exception(struct cpu_user_regs *regs, unsigned long cookie)
     printk("hid4 0x%016lx\n", regs->hid4);
     printk("---[ backtrace ]---\n");
     show_backtrace(regs->gprs[1], regs->lr, regs->pc);
-    panic("%s: 0x%lx\n", __func__, cookie);
+
+    if (cookie == 0x200)
+        recover = cpu_machinecheck(regs);
+
+    if (!recover)
+        panic("%s: 0x%lx\n", __func__, cookie);
 #endif /* CRASH_DEBUG */
 }

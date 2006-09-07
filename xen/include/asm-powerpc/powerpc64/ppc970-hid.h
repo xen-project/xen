@@ -141,4 +141,21 @@ union hid5 {
     ulong word;
 };
 
+#define MCK_SRR1_INSN_FETCH_UNIT    0x0000000000200000 /* 42 */
+#define MCK_SRR1_LOAD_STORE         0x0000000000100000 /* 43 */
+#define MCK_SRR1_CAUSE_MASK         0x00000000000c0000 /* 44:45 */
+#define MCK_SRR1_CAUSE_NONE         0x0000000000000000 /* 0b00 */
+#define MCK_SRR1_CAUSE_SLB_PAR      0x0000000000040000 /* 0b01 */
+#define MCK_SRR1_CAUSE_TLB_PAR      0x0000000000080000 /* 0b10 */
+#define MCK_SRR1_CAUSE_UE           0x00000000000c0000 /* 0b11 */
+#define MCK_SRR1_RI                 MSR_RI
+
+#define MCK_DSISR_UE                0x00008000 /* 16 */
+#define MCK_DSISR_UE_TABLE_WALK     0x00004000 /* 17 */
+#define MCK_DSISR_L1_DCACHE_PAR     0x00002000 /* 18 */
+#define MCK_DSISR_L1_DCACHE_TAG_PAR 0x00001000 /* 19 */
+#define MCK_DSISR_D_ERAT_PAR        0x00000800 /* 20 */
+#define MCK_DSISR_TLB_PAR           0x00000400 /* 21 */
+#define MCK_DSISR_SLB_PAR           0x00000100 /* 23 */
+
 #endif
