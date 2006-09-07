@@ -50,6 +50,8 @@ extern void cpu_init_vcpu(struct vcpu *);
 extern int cpu_io_mfn(ulong mfn);
 extern void save_cpu_sprs(struct vcpu *);
 extern void load_cpu_sprs(struct vcpu *);
+extern void flush_segments(void);
+extern void dump_segments(int valid);
 
 /* XXX this could also land us in GDB */
 #define dump_execution_state() BUG()

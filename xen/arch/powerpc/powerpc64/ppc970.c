@@ -202,8 +202,10 @@ void cpu_initialize(int cpuid)
 
     mthior(cpu0_hior);
 
-    /* for good luck */
-    __asm__ __volatile__("isync; slbia; isync" : : : "memory");
+#ifdef DEBUG
+    dump_segments(1);
+#endif
+    flush_segments();
 }
 
 void cpu_init_vcpu(struct vcpu *v)

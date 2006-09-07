@@ -63,24 +63,31 @@ void load_sprs(struct vcpu *v)
 
 /* XXX evaluate all isyncs in segment code */
 
-static void flush_slb(struct vcpu *v)
+void flush_segments(void)
 {
-    struct slb_entry *slb0 = &v->arch.slb_entries[0];
+    struct slb_entry slb0;
+    ulong zero = 0;
 
-    slbia();
+    __asm__ __volatile__(
+        "slbmfev %0,%2\n"
+        "slbmfee %1,%2\n"
+        :"=&r"(slb0.slb_vsid), "=&r"(slb0.slb_esid)
+        :"r"(zero)
+        :"memory");
 
     /* we manually have to invalidate SLB[0] since slbia doesn't. */
     /* XXX name magic constants! */
-    if (slb0->slb_esid & (1 << (63 - 36))) {
+    if (slb0.slb_esid & SLB_ESID_VALID) {
         ulong rb;
         ulong class;
 
-        class = (slb0->slb_vsid >> (63 - 56)) & 1ULL;
-        rb = slb0->slb_esid & (~0ULL << (63 - 35));
-        rb |= class << (63 - 36);
+        class = !!(slb0.slb_vsid & SLB_ESID_CLASS);
+        rb = slb0.slb_esid & SLB_ESID_MASK;
+        rb |= class << SLBIE_CLASS_LOG;
 
         slbie(rb);
     }
+    slbia();
 }
 
 void save_segments(struct vcpu *v)
@@ -111,7 +118,7 @@ void save_segments(struct vcpu *v)
 #endif
     }
 
-    flush_slb(v);
+    flush_segments();
 }
 
 void load_segments(struct vcpu *v)
@@ -126,7 +133,8 @@ void load_segments(struct vcpu *v)
 
         /* FIXME: should we bother to restore invalid entries */
         /* stuff in the index here */
-        esid |= i & ((0x1UL << (63 - 52 + 1)) - 1);
+        esid &= ~SLBMTE_ENTRY_MASK;
+        esid |= i;
 
         __asm__ __volatile__(
                 "isync\n"
@@ -142,5 +150,29 @@ void load_segments(struct vcpu *v)
                     __func__, v->domain->domain_id, i, vsid, esid);
         }
 #endif
+    }
+}
+
+void dump_segments(int valid)
+{
+    int i;
+
+    printk("Dump %s SLB entries:\n", valid ? "VALID" : "ALL");
+
+    /* save all extra SLBs */
+    for (i = 0; i < NUM_SLB_ENTRIES; i++) {
+        ulong vsid;
+        ulong esid;
+
+        __asm__ __volatile__(
+                "slbmfev %0,%2\n"
+                "slbmfee %1,%2\n"
+                :"=&r"(vsid), "=&r"(esid)
+                :"r"(i)
+                :"memory");
+
+        if (valid && !(esid & SLB_ESID_VALID))
+            continue;
+        printf("S%02d: 0x%016lx 0x%016lx\n", i, vsid, esid);
     }
 }
