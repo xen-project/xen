@@ -16,7 +16,7 @@
  * Copyright (C) IBM Corp. 2005, 2006
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
- *          Hollis Blanchard <jimix@watson.ibm.com>
+ *          Jimi Xenidis <jimix@watson.ibm.com>
  */
 
 #ifndef _ASM_TIME_H_
@@ -52,6 +52,13 @@ static inline u64 get_timebase(void)
     s = ((ulong)up << 32) | lo;
 #endif
     return s;
+}
+
+static inline void set_timebase(unsigned upper, unsigned lower)
+{
+    mttbl(0);
+    mttbu(upper);
+    mttbl(lower);
 }
 
 typedef u64 cycles_t;

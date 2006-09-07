@@ -16,6 +16,8 @@
  * Copyright (C) IBM Corp. 2005, 2006
  *
  * Authors: Jimi Xenidis <jimix@watson.ibm.com>
+ *          Amos Waterland <apw@us.ibm.com>
+ *          Hollis Blanchard <hollisb@us.ibm.com>
  */
 
 #include <xen/config.h>
@@ -242,16 +244,22 @@ static int kick_secondary_cpus(int maxcpus)
             break;
         init_parea(cpuid);
         cpu_set(cpuid, cpu_online_map);
+        smp_generic_give_timebase();
+
+        /* wait for it */
+        while (!cpu_online(cpuid))
+            cpu_relax();
     }
 
     return 0;
 }
 
 /* This is the first C code that secondary processors invoke.  */
-int secondary_cpu_init(int cpuid, unsigned long r4);
 int secondary_cpu_init(int cpuid, unsigned long r4)
 {
     cpu_initialize(cpuid);
+    smp_generic_take_timebase();
+    cpu_set(cpuid, cpu_online_map);
     while(1);
 }
 

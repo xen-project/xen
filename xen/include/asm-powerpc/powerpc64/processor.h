@@ -91,10 +91,21 @@ static inline unsigned long mftb(void)
     return tb;
 }
 
+static inline void mttbl(unsigned low)
+{
+    __asm__ __volatile__ ("mtspr %0, %1" : : "i"(SPRN_TBWL), "r" (low));
+}
+
+static inline void mttbu(unsigned upper)
+{
+    __asm__ __volatile__ ("mtspr %0, %1" : : "i"(SPRN_TBWU), "r" (upper));
+}
+
 static inline void mthdec(unsigned ticks)
 {
     __asm__ __volatile__ ("mtspr %0, %1" : : "i"(SPRN_HDEC), "r" (ticks));
 }
+
 static inline unsigned int mfhdec(void)
 {
     unsigned int val;

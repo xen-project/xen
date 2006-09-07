@@ -23,6 +23,7 @@
 
 #include <xen/types.h>
 #include <xen/cpumask.h>
+#include <xen/init.h>
 #include <asm/current.h>
 extern int smp_num_siblings;
 
@@ -32,5 +33,6 @@ extern int smp_num_siblings;
 #define hard_smp_processor_id() raw_smp_processor_id()
 extern cpumask_t cpu_sibling_map[];
 extern cpumask_t cpu_core_map[];
-
+extern void __devinit smp_generic_take_timebase(void);
+extern void __devinit smp_generic_give_timebase(void);
 #endif

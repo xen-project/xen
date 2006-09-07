@@ -36,6 +36,7 @@ obj-y += rtas.o
 obj-y += setup.o
 obj-y += shadow.o
 obj-y += smp.o
+obj-y += smp-tbsync.o
 obj-y += time.o
 obj-y += usercopy.o
 
