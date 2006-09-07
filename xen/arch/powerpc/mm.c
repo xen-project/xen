@@ -229,16 +229,6 @@ extern void copy_page(void *dp, void *sp)
     }
 }
 
-static int mfn_in_hole(ulong mfn)
-{
-    /* totally cheating */
-    if (mfn >= (0xf0000000UL >> PAGE_SHIFT) &&
-        mfn < (((1UL << 32) - 1) >> PAGE_SHIFT))
-        return 1;
-
-    return 0;
-}
-
 static uint add_extent(struct domain *d, struct page_info *pg, uint order)
 {
     struct page_extents *pe;
@@ -339,7 +329,7 @@ int allocate_rma(struct domain *d, unsigned int order)
     return 0;
 }
 
-ulong pfn2mfn(struct domain *d, long pfn, int *type)
+ulong pfn2mfn(struct domain *d, ulong pfn, int *type)
 {
     ulong rma_base_mfn = page_to_mfn(d->arch.rma_page);
     ulong rma_size_mfn = 1UL << d->arch.rma_order;
@@ -356,7 +346,7 @@ ulong pfn2mfn(struct domain *d, long pfn, int *type)
     }
 
     if (test_bit(_DOMF_privileged, &d->domain_flags) &&
-        mfn_in_hole(pfn)) {
+        cpu_io_mfn(pfn)) {
         if (type)
             *type = PFN_TYPE_IO;
         return pfn;
@@ -374,7 +364,8 @@ ulong pfn2mfn(struct domain *d, long pfn, int *type)
 
     /* This hack allows dom0 to map all memory, necessary to
      * initialize domU state. */
-    if (test_bit(_DOMF_privileged, &d->domain_flags)) {
+    if (test_bit(_DOMF_privileged, &d->domain_flags) &&
+        pfn < max_page) {
         if (type)
             *type = PFN_TYPE_REMOTE;
         return pfn;

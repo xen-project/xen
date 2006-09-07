@@ -56,15 +56,21 @@ static unsigned long paddr_to_maddr(unsigned long paddr)
     case PFN_TYPE_RMA:
     case PFN_TYPE_LOGICAL:
         break;
+
     case PFN_TYPE_REMOTE:
+        /* I don't think this should ever happen, but I suppose it
+         * could be possible */
         printk("%s: Dom:%d paddr: 0x%lx type: REMOTE\n",
                __func__, d->domain_id, paddr);
         WARN();
         break;
+
+    case PFN_TYPE_IO:
     default:
-        panic("%s: Dom:%d paddr: 0x%lx bad type:0x%x\n",
+        printk("%s: Dom:%d paddr: 0x%lx bad type: 0x%x\n",
                __func__, d->domain_id, paddr, mtype);
-        break;
+        WARN();
+        return 0;
     }
     pa <<= PAGE_SHIFT;
     pa |= offset;

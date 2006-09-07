@@ -241,7 +241,7 @@ extern int update_grant_va_mapping(unsigned long va,
 #define PFN_TYPE_IO 3
 #define PFN_TYPE_REMOTE 4
 
-extern ulong pfn2mfn(struct domain *d, long pfn, int *type);
+extern ulong pfn2mfn(struct domain *d, ulong pfn, int *type);
 
 /* Arch-specific portion of memory_op hypercall. */
 long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg);

@@ -46,6 +46,7 @@ extern int cpu_rma_valid(unsigned int log);
 extern uint cpu_large_page_orders(uint *sizes, uint max);
 extern void cpu_initialize(int cpuid);
 extern void cpu_init_vcpu(struct vcpu *);
+extern int cpu_io_mfn(ulong mfn);
 extern void save_cpu_sprs(struct vcpu *);
 extern void load_cpu_sprs(struct vcpu *);
 

@@ -88,6 +88,19 @@ unsigned int cpu_extent_order(void)
     return log_large_page_sizes[0] - PAGE_SHIFT;
 }
 
+
+/* This is more a platform thing than a CPU thing, but we only have
+ * one platform now */
+int cpu_io_mfn(ulong mfn)
+{
+    /* totally cheating */
+    if (mfn >= (2UL << (30 - PAGE_SHIFT)) && /* 2GiB */
+        mfn < (4UL << (30 - PAGE_SHIFT)))    /* 4GiB */
+        return 1;
+
+    return 0;
+}
+
 static u64 cpu0_hids[6];
 static u64 cpu0_hior;
 
