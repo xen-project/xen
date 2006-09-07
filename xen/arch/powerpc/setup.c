@@ -43,6 +43,7 @@
 #include <asm/debugger.h>
 #include <asm/delay.h>
 #include <asm/percpu.h>
+#include <asm/io.h>
 #include "exceptions.h"
 #include "of-devtree.h"
 #include "oftree.h"
@@ -79,7 +80,7 @@ cpumask_t cpu_present_map;
 cpumask_t cpu_possible_map;
 
 /* XXX get this from ISA node in device tree */
-void *vgabase;
+char *vgabase;
 ulong isa_io_base;
 struct ns16550_defaults ns16550;
 
