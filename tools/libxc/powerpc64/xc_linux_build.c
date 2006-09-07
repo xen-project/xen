@@ -33,7 +33,8 @@
 #include <xg_private.h>
 #include <xenctrl.h>
 
-#include "ft_build.h"
+#include "flatdevtree_env.h"
+#include "flatdevtree.h"
 
 #define INITRD_ADDR (24UL << 20)
 #define DEVTREE_ADDR (16UL << 20)
@@ -164,64 +165,63 @@ static int load_devtree(
     xen_pfn_t *page_array,
     void *devtree,
     unsigned long devtree_addr,
-    unsigned long initrd_base,
+    uint64_t initrd_base,
     unsigned long initrd_len,
     start_info_t *si,
     unsigned long si_addr)
 {
     uint32_t start_info[4] = {0, si_addr, 0, 0x1000};
     struct boot_param_header *header;
-    uint64_t *prop;
+    void *chosen;
+    void *xen;
+    uint64_t initrd_end = initrd_base + initrd_len;
     unsigned int devtree_size;
-    unsigned int proplen;
     int rc = 0;
+
+    DPRINTF("adding initrd props\n");
+
+    chosen = ft_find_node(devtree, "/chosen");
+    if (chosen == NULL) {
+        DPRINTF("couldn't find /chosen\n");
+        return -1;
+    }
+
+    xen = ft_find_node(devtree, "/xen");
+    if (xen == NULL) {
+        DPRINTF("couldn't find /xen\n");
+        return -1;
+    }
+
+    /* initrd-start */
+    rc = ft_set_prop(&devtree, chosen, "linux,initrd-start",
+            &initrd_base, sizeof(initrd_base));
+    if (rc < 0) {
+        DPRINTF("couldn't set /chosen/linux,initrd-start\n");
+        return rc;
+    }
+
+    /* initrd-end */
+    rc = ft_set_prop(&devtree, chosen, "linux,initrd-end",
+            &initrd_end, sizeof(initrd_end));
+    if (rc < 0) {
+        DPRINTF("couldn't set /chosen/linux,initrd-end\n");
+        return rc;
+    }
+
+    /* start-info (XXX being removed soon) */
+    rc = ft_set_prop(&devtree, xen, "start-info",
+            start_info, sizeof(start_info));
+    if (rc < 0) {
+        DPRINTF("couldn't set /xen/start-info\n");
+        return rc;
+    }
 
     header = devtree;
     devtree_size = header->totalsize;
 
-    DPRINTF("adding initrd props\n");
-
-	/* initrd-start */
-    prop = ft_get_prop(devtree, "/chosen/linux,initrd-start", &proplen);
-    if (prop == NULL) {
-        DPRINTF("couldn't find linux,initrd-start\n");
-        return -1;
-    }
-    if (proplen != sizeof(*prop)) {
-        DPRINTF("couldn't set linux,initrd-start (size %d)\n", proplen);
-        return -1;
-    }
-    *prop = initrd_base;
-
-	/* initrd-end */
-    prop = ft_get_prop(devtree, "/chosen/linux,initrd-end", &proplen);
-    if (prop == NULL) {
-        DPRINTF("couldn't find linux,initrd-end\n");
-        return -1;
-    }
-    if (proplen != sizeof(*prop)) {
-        DPRINTF("couldn't set linux,initrd-end (size %d)\n", proplen);
-        return -1;
-    }
-    *prop = initrd_base + initrd_len;
-
-	/* start-info (XXX being removed soon) */
-    prop = ft_get_prop(devtree, "/xen/start-info", &proplen);
-    if (prop == NULL) {
-        DPRINTF("couldn't find /xen/start-info\n");
-        return -1;
-    }
-    if (proplen != sizeof(start_info)) {
-        DPRINTF("couldn't set /xen/start-info (size %d)\n", proplen);
-        return -1;
-    }
-    memcpy(prop, start_info, proplen);
-
     DPRINTF("copying device tree to 0x%lx[0x%x]\n", DEVTREE_ADDR, devtree_size);
-    rc = install_image(xc_handle, domid, page_array, devtree, DEVTREE_ADDR,
+    return install_image(xc_handle, domid, page_array, devtree, DEVTREE_ADDR,
                        devtree_size);
-
-    return rc;
 }
 
 unsigned long spin_list[] = {
