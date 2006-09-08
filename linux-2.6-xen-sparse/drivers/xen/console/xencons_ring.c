@@ -126,7 +126,7 @@ int xencons_ring_init(void)
 		handle_input, 0, "xencons", NULL);
 	if (irq < 0) {
 		printk(KERN_ERR "XEN console request irq failed %i\n", irq);
-		return err;
+		return irq;
 	}
 
 	xencons_irq = irq;
