@@ -84,6 +84,13 @@ static inline void nop(void) {
 }
 #define cpu_relax() nop()
 
+static inline unsigned int mfpir(void)
+{
+    unsigned int pir;
+    __asm__ __volatile__ ("mfspr %0, %1" : "=r" (pir): "i"(SPRN_PIR));
+    return pir;
+}
+
 static inline unsigned int mftbu(void)
 {
     unsigned int tbu;

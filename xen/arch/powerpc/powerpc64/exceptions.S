@@ -1,27 +1,30 @@
 /*
- * Copyright (C) 2005 Jimi Xenidis <jimix@watson.ibm.com>, IBM Corporation
- *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+ * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
+ * Copyright (C) IBM Corp. 2005, 2006
+ *
+ * Authors: Jimi Xenidis <jimix@watson.ibm.com>
+ *          Hollis Blanchard <hollisb@us.ibm.com>
  */
-
+ 
 #include <asm/config.h>
 #include <asm/asm-offsets.h>
 #include <asm/reg_defs.h>
 #include <asm/msr.h>
 #include <asm/processor.h>
+#include <asm/percpu.h>
 
 .macro SAVE_GPR regno uregs
 std \regno, (UREGS_gprs + GPR_WIDTH * \regno)(\uregs)
@@ -190,6 +193,14 @@ zero:
     li r0, 0x0 /* exception vector for GDB stub */
     bctr
 
+    /* The following byte array is where any per-CPU state flags 
+     * that can be be used across interrupts.  Currently it is only used
+     * to track Cache Inhibited Mode when a Machine Check occurs. */
+     /* NOTE: This array is indexed by PIR NOT CPUID */
+    . = MCK_CPU_STAT_BASE
+    .space NR_CPUS
+    . = MCK_GOOD_HID4
+    .quad 0        
     . = 0x100 # System Reset
 ex_reset:
     /* XXX thread initialization */
@@ -200,8 +211,19 @@ ex_reset:
 
     . = 0x200 # Machine Check
 ex_machcheck:
+    /* Restore HID4 to a known state early, we do not recover from
+     * machine check yet, but when we do we shoul dbe able to restore
+     * HID4 to it proper value */
+    mtspr SPRN_HSPRG1, r13
+    ld r13, MCK_GOOD_HID4(0)
+    sync
+    mtspr SPRN_HID4, r13
+    isync
+    /* Hopefully we don't have to worry about the ERAT */
+    mfspr r13, SPRN_HSPRG1
+    /* and now back to our regularly schedualed program */
     GET_STACK r13 SPRN_SRR1
-    EXCEPTION_HEAD r13 ex_program_continued
+    EXCEPTION_HEAD r13 ex_machcheck_continued
     li r0, 0x200 /* exception vector for GDB stub */
     bctr
 
@@ -336,6 +358,10 @@ exception_vectors_end:
     HRFID
     b .                         /* prevent speculative icache fetch */
 .endm
+
+/* Not a whole lot just yet */
+ex_machcheck_continued:
+
 
 /* We enter with the exception number in r0. The EXCEPTION_SAVE_STATE macro
  * clobbers r0 though, so we have to move it around a little bit. Not ideal,

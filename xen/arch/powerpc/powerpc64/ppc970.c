@@ -103,19 +103,28 @@ int cpu_io_mfn(ulong mfn)
     return 0;
 }
 
+#ifdef DEBUG
+static void scom_init(void)
+{
+    write_scom(SCOM_AMCS_AND_MASK, 0);
+    
+    printk("scom MCKE: 0x%016lx\n", read_scom(SCOM_CMCE));
+    write_scom(SCOM_CMCE, ~0UL);
+    printk("scom MCKE: 0x%016lx\n", read_scom(SCOM_CMCE));
+}
+#else
+#define scom_init()
+#endif
+
 static u64 cpu0_hids[6];
 static u64 cpu0_hior;
 
 void cpu_initialize(int cpuid)
 {
-    ulong r1, r2;
     union hid0 hid0;
     union hid1 hid1;
     union hid4 hid4;
     union hid5 hid5;
-
-    __asm__ __volatile__ ("mr %0, 1" : "=r" (r1));
-    __asm__ __volatile__ ("mr %0, 2" : "=r" (r2));
 
     if (cpuid == 0) {
         /* we can assume that these are sane to start with.  We
@@ -139,6 +148,19 @@ void cpu_initialize(int cpuid)
 
     mthsprg0((ulong)parea); /* now ready for exceptions */
 
+    printk("CPU[PIR:%u IPI:%u Logical:%u] Hello World!\n",
+           mfpir(), raw_smp_processor_id(), smp_processor_id());
+
+#ifdef DEBUG
+    {
+        ulong r1, r2;
+
+        asm volatile ("mr %0, 1" : "=r" (r1));
+        asm volatile ("mr %0, 2" : "=r" (r2));
+        printk("  SP = %lx TOC = %lx\n",  r1, r2);
+    }
+#endif
+
     /* Set decrementers for 1 second to keep them out of the way during
      * intialization. */
     /* XXX make tickless */
@@ -147,11 +169,12 @@ void cpu_initialize(int cpuid)
 
     hid0.bits.nap = 1;      /* NAP */
     hid0.bits.dpm = 1;      /* Dynamic Power Management */
-    hid0.bits.nhr = 0;      /* ! Not Hard Reset */
+    hid0.bits.nhr = 1;      /* Not Hard Reset */
     hid0.bits.hdice_en = 1; /* enable HDEC */
     hid0.bits.en_therm = 0; /* ! Enable ext thermal ints */
     /* onlu debug Xen should do this */
-    hid0.bits.en_attn = 1; /* Enable attn instruction */
+    hid0.bits.en_attn = 1;  /* Enable attn instruction */
+    hid0.bits.en_mck = 1;   /* Enable external machine check interrupts */
 
 #ifdef SERIALIZE
     hid0.bits.one_ppc = 1;
@@ -161,9 +184,6 @@ void cpu_initialize(int cpuid)
     hid0.bits.do_single = 1;
     hid0.bits.ser-gp = 1;
 #endif
-
-    printk("CPU #%d: Hello World! SP = %lx TOC = %lx HID0 = %lx\n", 
-           smp_processor_id(), r1, r2, hid0.word);
 
     mthid0(hid0.word);
 
@@ -188,6 +208,7 @@ void cpu_initialize(int cpuid)
     hid4.bits.lg_pg_dis = 0;    /* make sure we enable large pages */
     mthid4(hid4.word);
 
+    hid5.bits.DC_mck = 1; /* Machine check enabled for dcache errors */
     hid5.bits.DCBZ_size = 0; /* make dcbz size 32 bytes */
     hid5.bits.DCBZ32_ill = 0; /* make dzbz 32byte illeagal */
     mthid5(hid5.word);
@@ -200,12 +221,27 @@ void cpu_initialize(int cpuid)
            mfhid0(), mfhid1(), mfhid4(), mfhid5());
 #endif
 
+    /* Make sure firmware has not left this dirty */
     mthior(cpu0_hior);
 
+    /* some machine check goodness */
+    /* save this for checkstop processing */
+    if (cpuid == 0)
+        *mck_good_hid4 = hid4.word;
+
+    if (mfpir() > NR_CPUS)
+        panic("we do not expect a processor to have a PIR (%u) "
+              "to be larger that NR_CPUS(%u)\n",
+              mfpir(), NR_CPUS);
+
+    scom_init();
+
+    /* initialize the SLB */
 #ifdef DEBUG
     dump_segments(1);
 #endif
     flush_segments();
+    local_flush_tlb();
 }
 
 void cpu_init_vcpu(struct vcpu *v)
@@ -252,6 +288,9 @@ int cpu_machinecheck(struct cpu_user_regs *regs)
         recover = 1;
 
     printk("MACHINE CHECK: %s Recoverable\n", recover ? "IS": "NOT");
+    if (mck_cpu_stats[mfpir()] != 0)
+        printk("While in CI IO\n");
+
     printk("SRR1: 0x%016lx\n", regs->msr);
     if (regs->msr & MCK_SRR1_INSN_FETCH_UNIT)
         printk("42: Exception caused by Instruction Fetch Unit (IFU) "
