@@ -50,18 +50,18 @@ static int __xencomm_init(struct xencomm_desc *desc, void *buffer,
 static void *__xencomm_alloc_mini(void *area, int arealen)
 {
     unsigned long base = (unsigned long)area;
-    unsigned int pageoffset;
+    unsigned int left_in_page;
 
-    pageoffset = base % PAGE_SIZE;
+    left_in_page = PAGE_SIZE - base % PAGE_SIZE;
 
     /* we probably fit right at the front of area */
-    if ((PAGE_SIZE - pageoffset) >= sizeof(struct xencomm_mini)) {
+    if (left_in_page >= sizeof(struct xencomm_mini)) {
         return area;
     }
 
     /* if not, see if area is big enough to advance to the next page */
-    if ((arealen - pageoffset) >= sizeof(struct xencomm_mini))
-        return (void *)(base + pageoffset);
+    if ((arealen - left_in_page) >= sizeof(struct xencomm_mini))
+        return (void *)(base + left_in_page);
 
     /* area was too small */
     return NULL;
