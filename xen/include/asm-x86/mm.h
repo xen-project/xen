@@ -75,19 +75,6 @@ struct page_info
 #define PGT_gdt_page        (5U<<29) /* using this page in a GDT? */
 #define PGT_ldt_page        (6U<<29) /* using this page in an LDT? */
 #define PGT_writable_page   (7U<<29) /* has writable mappings of this page? */
-
-#ifndef SHADOW
-#define PGT_l1_shadow       PGT_l1_page_table
-#define PGT_l2_shadow       PGT_l2_page_table
-#define PGT_l3_shadow       PGT_l3_page_table
-#define PGT_l4_shadow       PGT_l4_page_table
-#define PGT_hl2_shadow      (5U<<29)
-#define PGT_snapshot        (6U<<29)
-#define PGT_writable_pred   (7U<<29) /* predicted gpfn with writable ref */
-
-#define PGT_fl1_shadow      (5U<<29)
-#endif
-
 #define PGT_type_mask       (7U<<29) /* Bits 29-31. */
 
  /* Owning guest has pinned this page to its current type? */
@@ -96,43 +83,12 @@ struct page_info
  /* Has this page been validated for use as its current type? */
 #define _PGT_validated      27
 #define PGT_validated       (1U<<_PGT_validated)
-#if defined(__i386__)
- /* The 11 most significant bits of virt address if this is a page table. */
-#define PGT_va_shift        16
-#define PGT_va_mask         (((1U<<11)-1)<<PGT_va_shift)
- /* Is the back pointer still mutable (i.e. not fixed yet)? */
-#define PGT_va_mutable      (((1U<<11)-1)<<PGT_va_shift)
- /* Is the back pointer unknown (e.g., p.t. is mapped at multiple VAs)? */
-#define PGT_va_unknown      (((1U<<11)-2)<<PGT_va_shift)
-#elif defined(__x86_64__)
- /* The 27 most significant bits of virt address if this is a page table. */
-#define PGT_va_shift        32
-#define PGT_va_mask         ((unsigned long)((1U<<28)-1)<<PGT_va_shift)
- /* Is the back pointer still mutable (i.e. not fixed yet)? */
-#define PGT_va_mutable      ((unsigned long)((1U<<28)-1)<<PGT_va_shift)
- /* Is the back pointer unknown (e.g., p.t. is mapped at multiple VAs)? */
-#define PGT_va_unknown      ((unsigned long)((1U<<28)-2)<<PGT_va_shift)
-#endif
+ /* PAE only: is this an L2 page directory containing Xen-private mappings? */
+#define _PGT_pae_xen_l2     26
+#define PGT_pae_xen_l2      (1U<<_PGT_pae_xen_l2)
 
  /* 16-bit count of uses of this frame as its current type. */
 #define PGT_count_mask      ((1U<<16)-1)
-
-#ifndef SHADOW
-#ifdef __x86_64__
-#define PGT_high_mfn_shift  52
-#define PGT_high_mfn_mask   (0xfffUL << PGT_high_mfn_shift)
-#define PGT_mfn_mask        (((1U<<27)-1) | PGT_high_mfn_mask)
-#define PGT_high_mfn_nx     (0x800UL << PGT_high_mfn_shift)
-#else
- /* 23-bit mfn mask for shadow types: good for up to 32GB RAM. */
-#define PGT_mfn_mask        ((1U<<23)-1)
- /* NX for PAE xen is not supported yet */
-#define PGT_high_mfn_nx     (1ULL << 63)
-
-#define PGT_score_shift     23
-#define PGT_score_mask      (((1U<<4)-1)<<PGT_score_shift)
-#endif
-#endif /* SHADOW */
 
  /* Cleared when the owning guest 'frees' this page. */
 #define _PGC_allocated      31

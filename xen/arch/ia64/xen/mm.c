@@ -1624,13 +1624,6 @@ void put_page_type(struct page_info *page)
                 nx &= ~PGT_validated;
             }
         }
-        else if ( unlikely(((nx & (PGT_pinned | PGT_count_mask)) ==
-                            (PGT_pinned | 1)) &&
-                           ((nx & PGT_type_mask) != PGT_writable_page)) )
-        {
-            /* Page is now only pinned. Make the back pointer mutable again. */
-            nx |= PGT_va_mutable;
-        }
     }
     while ( unlikely((y = cmpxchg_rel(&page->u.inuse.type_info, x, nx)) != x) );
 }
@@ -1639,6 +1632,8 @@ void put_page_type(struct page_info *page)
 int get_page_type(struct page_info *page, u32 type)
 {
     u32 nx, x, y = page->u.inuse.type_info;
+
+    ASSERT(!(type & ~PGT_type_mask));
 
  again:
     do {
@@ -1651,29 +1646,25 @@ int get_page_type(struct page_info *page, u32 type)
         }
         else if ( unlikely((x & PGT_count_mask) == 0) )
         {
-            if ( (x & (PGT_type_mask|PGT_va_mask)) != type )
+            if ( (x & PGT_type_mask) != type )
             {
-                if ( (x & PGT_type_mask) != (type & PGT_type_mask) )
-                {
-                    /*
-                     * On type change we check to flush stale TLB
-                     * entries. This may be unnecessary (e.g., page
-                     * was GDT/LDT) but those circumstances should be
-                     * very rare.
-                     */
-                    cpumask_t mask =
-                        page_get_owner(page)->domain_dirty_cpumask;
-                    tlbflush_filter(mask, page->tlbflush_timestamp);
+                /*
+                 * On type change we check to flush stale TLB entries. This 
+                 * may be unnecessary (e.g., page was GDT/LDT) but those 
+                 * circumstances should be very rare.
+                 */
+                cpumask_t mask =
+                    page_get_owner(page)->domain_dirty_cpumask;
+                tlbflush_filter(mask, page->tlbflush_timestamp);
 
-                    if ( unlikely(!cpus_empty(mask)) )
-                    {
-                        perfc_incrc(need_flush_tlb_flush);
-                        flush_tlb_mask(mask);
-                    }
+                if ( unlikely(!cpus_empty(mask)) )
+                {
+                    perfc_incrc(need_flush_tlb_flush);
+                    flush_tlb_mask(mask);
                 }
 
                 /* We lose existing type, back pointer, and validity. */
-                nx &= ~(PGT_type_mask | PGT_va_mask | PGT_validated);
+                nx &= ~(PGT_type_mask | PGT_validated);
                 nx |= type;
 
                 /* No special validation needed for writable pages. */
@@ -1682,46 +1673,22 @@ int get_page_type(struct page_info *page, u32 type)
                     nx |= PGT_validated;
             }
         }
-        else
+        else if ( unlikely((x & PGT_type_mask) != type) )
         {
-            if ( unlikely((x & (PGT_type_mask|PGT_va_mask)) != type) )
-            {
-                if ( unlikely((x & PGT_type_mask) != (type & PGT_type_mask) ) )
-                {
-                    if ( ((x & PGT_type_mask) != PGT_l2_page_table) ||
-                         ((type & PGT_type_mask) != PGT_l1_page_table) )
-                        MEM_LOG("Bad type (saw %08x != exp %08x) "
-                                "for mfn %016lx (pfn %016lx)",
-                                x, type, page_to_mfn(page),
-                                get_gpfn_from_mfn(page_to_mfn(page)));
-                    return 0;
-                }
-                else if ( (x & PGT_va_mask) == PGT_va_mutable )
-                {
-                    /* The va backpointer is mutable, hence we update it. */
-                    nx &= ~PGT_va_mask;
-                    nx |= type; /* we know the actual type is correct */
-                }
-                else if ( ((type & PGT_va_mask) != PGT_va_mutable) &&
-                          ((type & PGT_va_mask) != (x & PGT_va_mask)) )
-                {
-#ifdef CONFIG_X86_PAE
-                    /* We use backptr as extra typing. Cannot be unknown. */
-                    if ( (type & PGT_type_mask) == PGT_l2_page_table )
-                        return 0;
-#endif
-                    /* This table is possibly mapped at multiple locations. */
-                    nx &= ~PGT_va_mask;
-                    nx |= PGT_va_unknown;
-                }
-            }
-            if ( unlikely(!(x & PGT_validated)) )
-            {
-                /* Someone else is updating validation of this page. Wait... */
-                while ( (y = page->u.inuse.type_info) == x )
-                    cpu_relax();
-                goto again;
-            }
+            if ( ((x & PGT_type_mask) != PGT_l2_page_table) ||
+                 (type != PGT_l1_page_table) )
+                MEM_LOG("Bad type (saw %08x != exp %08x) "
+                        "for mfn %016lx (pfn %016lx)",
+                        x, type, page_to_mfn(page),
+                        get_gpfn_from_mfn(page_to_mfn(page)));
+            return 0;
+        }
+        else if ( unlikely(!(x & PGT_validated)) )
+        {
+            /* Someone else is updating validation of this page. Wait... */
+            while ( (y = page->u.inuse.type_info) == x )
+                cpu_relax();
+            goto again;
         }
     }
     while ( unlikely((y = cmpxchg_acq(&page->u.inuse.type_info, x, nx)) != x) );

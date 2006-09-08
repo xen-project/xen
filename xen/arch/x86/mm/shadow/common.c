@@ -21,8 +21,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#define SHADOW 1
-
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/mm.h>
@@ -225,7 +223,6 @@ struct x86_emulate_ops shadow_emulator_ops = {
     .cmpxchg8b_emulated = sh_x86_emulate_cmpxchg8b_emulated,
 };
 
-
 /**************************************************************************/
 /* Code for "promoting" a guest page to the point where the shadow code is
  * willing to let it be treated as a guest page table.  This generally
@@ -235,7 +232,6 @@ struct x86_emulate_ops shadow_emulator_ops = {
 void shadow_promote(struct vcpu *v, mfn_t gmfn, u32 type)
 {
     struct page_info *page = mfn_to_page(gmfn);
-    unsigned long type_info;
 
     ASSERT(valid_mfn(gmfn));
 
@@ -251,10 +247,8 @@ void shadow_promote(struct vcpu *v, mfn_t gmfn, u32 type)
         // vcpu or not, or even what kind of type we get; we just want the type
         // count to be > 0.
         //
-        do {
-            type_info =
-                page->u.inuse.type_info & (PGT_type_mask | PGT_va_mask);
-        } while ( !get_page_type(page, type_info) );
+        while ( !get_page_type(page, page->u.inuse.type_info & PGT_type_mask) )
+            continue;
 
         // Now that the type ref is non-zero, we can safely use the
         // shadow_flags.
