@@ -55,11 +55,11 @@ void do_dec(struct cpu_user_regs *regs)
 
 void program_exception(struct cpu_user_regs *regs, unsigned long cookie)
 {
-    int recover = 0;
-
 #ifdef CRASH_DEBUG
     __trap_to_gdb(regs, cookie);
 #else /* CRASH_DEBUG */
+    int recover = 0;
+
     show_registers(regs);
     printk("dar 0x%016lx, dsisr 0x%08x\n", mfdar(), mfdsisr());
     printk("hid4 0x%016lx\n", regs->hid4);
