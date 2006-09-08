@@ -17,6 +17,7 @@
  * Place - Suite 330, Boston, MA 02111-1307 USA.
  *
  */
+
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -25,6 +26,8 @@
 #include <linux/init.h>
 #include <linux/version.h>
 #include <linux/interrupt.h>
+#include <linux/vmalloc.h>
+#include <linux/mm.h>
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -46,7 +49,6 @@ EXPORT_SYMBOL(hypercall_stubs);
 MODULE_AUTHOR("ssmith@xensource.com");
 MODULE_DESCRIPTION("Xen platform PCI device");
 MODULE_LICENSE("GPL");
-
 
 unsigned long *phys_to_machine_mapping;
 EXPORT_SYMBOL(phys_to_machine_mapping);
@@ -118,7 +120,7 @@ unsigned long alloc_xen_mmio(unsigned long len)
 /* Lifted from hvmloader.c */
 static int get_hypercall_stubs(void)
 {
-	uint32_t eax, ebx, ecx, edx, pages, msr, order, i;
+	uint32_t eax, ebx, ecx, edx, pages, msr, i;
 	char signature[13];
 
 	cpuid(0x40000000, &eax, &ebx, &ecx, &edx);
@@ -141,22 +143,22 @@ static int get_hypercall_stubs(void)
 
 	cpuid(0x40000002, &pages, &msr, &ecx, &edx);
 
-	i = pages - 1;
-	for (order = 0; i != 0; order++)
-		i >>= 1;
+	printk(KERN_INFO "Hypercall area is %u pages.\n", pages);
 
-	printk(KERN_INFO "Hypercall area is %u pages (order %u allocation)\n",
-	       pages, order);
-
-	hypercall_stubs = (void *)__get_free_pages(GFP_KERNEL, order);
+	/* Use __vmalloc() because vmalloc_exec() is not an exported symbol. */
+	/* PAGE_KERNEL_EXEC also is not exported, hence we use PAGE_KERNEL. */
+	/* hypercall_stubs = vmalloc_exec(pages * PAGE_SIZE); */
+	hypercall_stubs = __vmalloc(pages * PAGE_SIZE,
+				    GFP_KERNEL | __GFP_HIGHMEM,
+				    __pgprot(__PAGE_KERNEL & ~_PAGE_NX));
 	if (hypercall_stubs == NULL)
 		return -ENOMEM;
 
-	for (i = 0; i < pages; i++)
-		wrmsrl(msr,
-		       virt_to_phys(hypercall_stubs) +	/* base address      */
-		       (i << PAGE_SHIFT) +		/* offset of page @i */
-		       i);				/* request page @i   */
+	for (i = 0; i < pages; i++) {
+		unsigned long pfn;
+		pfn = vmalloc_to_pfn((char *)hypercall_stubs + i*PAGE_SIZE);
+		wrmsrl(msr, ((u64)pfn << PAGE_SHIFT) + i);
+	}
 
 	return 0;
 }
