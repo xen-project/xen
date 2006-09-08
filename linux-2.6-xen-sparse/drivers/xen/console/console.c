@@ -182,17 +182,18 @@ static struct console kcons_info = {
 	.index	= -1,
 };
 
-#define __RETCODE 0
 static int __init xen_console_init(void)
 {
 	if (!is_running_on_xen())
-		return __RETCODE;
+		goto out;
 
 	if (is_initial_xendomain()) {
 		if (xc_mode == XC_DEFAULT)
 			xc_mode = XC_SERIAL;
 		kcons_info.write = kcons_write_dom0;
 	} else {
+		if (!xen_start_info->console.domU.evtchn)
+			goto out;
 		if (xc_mode == XC_DEFAULT)
 			xc_mode = XC_TTY;
 		kcons_info.write = kcons_write;
@@ -212,14 +213,15 @@ static int __init xen_console_init(void)
 		break;
 
 	default:
-		return __RETCODE;
+		goto out;
 	}
 
 	wbuf = alloc_bootmem(wbuf_size);
 
 	register_console(&kcons_info);
 
-	return __RETCODE;
+ out:
+	return 0;
 }
 console_initcall(xen_console_init);
 
@@ -247,7 +249,9 @@ void xencons_force_flush(void)
 	int sz;
 
 	/* Emergency console is synchronous, so there's nothing to flush. */
-	if (is_initial_xendomain())
+	if (!is_running_on_xen() ||
+	    is_initial_xendomain() ||
+	    !xen_start_info->console.domU.evtchn)
 		return;
 
 	/* Spin until console data is flushed through to the daemon. */
@@ -582,7 +586,11 @@ static int __init xencons_init(void)
 	if (xc_mode == XC_OFF)
 		return 0;
 
-	xencons_ring_init();
+	if (!is_initial_xendomain()) {
+		rc = xencons_ring_init();
+		if (rc)
+			return rc;
+	}
 
 	xencons_driver = alloc_tty_driver((xc_mode == XC_SERIAL) ?
 					  1 : MAX_NR_CONSOLES);

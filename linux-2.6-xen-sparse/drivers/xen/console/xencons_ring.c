@@ -110,24 +110,26 @@ static irqreturn_t handle_input(int irq, void *unused, struct pt_regs *regs)
 
 int xencons_ring_init(void)
 {
-	int err;
+	int irq;
 
 	if (xencons_irq)
 		unbind_from_irqhandler(xencons_irq, NULL);
 	xencons_irq = 0;
 
-	if (!xen_start_info->console.domU.evtchn)
-		return 0;
+	if (!is_running_on_xen() ||
+	    is_initial_xendomain() ||
+	    !xen_start_info->console.domU.evtchn)
+		return -ENODEV;
 
-	err = bind_evtchn_to_irqhandler(
+	irq = bind_evtchn_to_irqhandler(
 		xen_start_info->console.domU.evtchn,
 		handle_input, 0, "xencons", NULL);
-	if (err <= 0) {
-		printk(KERN_ERR "XEN console request irq failed %i\n", err);
+	if (irq < 0) {
+		printk(KERN_ERR "XEN console request irq failed %i\n", irq);
 		return err;
 	}
 
-	xencons_irq = err;
+	xencons_irq = irq;
 
 	/* In case we have in-flight data after save/restore... */
 	notify_daemon();
