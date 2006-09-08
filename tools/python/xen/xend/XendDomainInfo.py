@@ -49,6 +49,7 @@ from xen.xend.xenstore.xstransact import xstransact, complete
 from xen.xend.xenstore.xsutil import GetDomainPath, IntroduceDomain
 from xen.xend.xenstore.xswatch import xswatch
 
+from xen.xend import arch
 
 """Shutdown code for poweroff."""
 DOMAIN_POWEROFF = 0
@@ -1502,6 +1503,19 @@ class XendDomainInfo:
             self.image.createDeviceModel()
 
     ## public:
+
+    def checkLiveMigrateMemory(self):
+        """ Make sure there's enough memory to migrate this domain """
+        overhead_kb = 0
+        if arch.type == "x86":
+            # 1MB per vcpu plus 4Kib/Mib of RAM.  This is higher than 
+            # the minimum that Xen would allocate if no value were given.
+            overhead_kb = self.info['vcpus'] * 1024 + self.info['maxmem'] * 4
+            overhead_kb = ((overhead_kb + 1023) / 1024) * 1024
+            # The domain might already have some shadow memory
+            overhead_kb -= xc.shadow_mem_control(self.domid) * 1024
+        if overhead_kb > 0:
+            balloon.free(overhead_kb)
 
     def testMigrateDevices(self, network, dst):
         """ Notify all device about intention of migration
