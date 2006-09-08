@@ -244,7 +244,6 @@ static int kick_secondary_cpus(int maxcpus)
         if (cpuid >= maxcpus)
             break;
         init_parea(cpuid);
-        cpu_set(cpuid, cpu_online_map);
         smp_generic_give_timebase();
 
         /* wait for it */
