@@ -1,5 +1,3 @@
-diff --git a/arch/x86_64/kernel/vmlinux.lds.S b/arch/x86_64/kernel/vmlinux.lds.S
-index 7c4de31..ef418b3 100644
 --- a/arch/x86_64/kernel/vmlinux.lds.S
 +++ b/arch/x86_64/kernel/vmlinux.lds.S
 @@ -13,6 +13,12 @@ OUTPUT_FORMAT("elf64-x86-64", "elf64-x86
@@ -24,7 +22,7 @@ index 7c4de31..ef418b3 100644
    				/* out-of-line lock text */
    .text.lock : AT(ADDR(.text.lock) - LOAD_OFFSET) { *(.text.lock) }
  
-@@ -57,7 +63,7 @@ #endif
+@@ -57,17 +63,10 @@ #endif
    .data : AT(ADDR(.data) - LOAD_OFFSET) {
  	*(.data)
  	CONSTRUCTORS
@@ -33,7 +31,17 @@ index 7c4de31..ef418b3 100644
  
    _edata = .;			/* End of data section */
  
-@@ -89,7 +95,7 @@ #define VVIRT_OFFSET (VSYSCALL_ADDR - VS
+-  __bss_start = .;		/* BSS */
+-  .bss : AT(ADDR(.bss) - LOAD_OFFSET) {
+-	*(.bss.page_aligned)	
+-	*(.bss)
+-	}
+-  __bss_stop = .;
+-
+   . = ALIGN(PAGE_SIZE);
+   . = ALIGN(CONFIG_X86_L1_CACHE_BYTES);
+   .data.cacheline_aligned : AT(ADDR(.data.cacheline_aligned) - LOAD_OFFSET) {
+@@ -89,7 +88,7 @@ #define VVIRT_OFFSET (VSYSCALL_ADDR - VS
  #define VVIRT(x) (ADDR(x) - VVIRT_OFFSET)
  
    . = VSYSCALL_ADDR;
@@ -42,7 +50,7 @@ index 7c4de31..ef418b3 100644
    __vsyscall_0 = VSYSCALL_VIRT_ADDR;
  
    . = ALIGN(CONFIG_X86_L1_CACHE_BYTES);
-@@ -132,7 +138,7 @@ #undef VVIRT
+@@ -132,7 +131,7 @@ #undef VVIRT
    . = ALIGN(8192);		/* init_task */
    .data.init_task : AT(ADDR(.data.init_task) - LOAD_OFFSET) {
  	*(.data.init_task)
@@ -51,7 +59,22 @@ index 7c4de31..ef418b3 100644
  
    . = ALIGN(4096);
    .data.page_aligned : AT(ADDR(.data.page_aligned) - LOAD_OFFSET) {
-@@ -235,4 +241,6 @@ #endif
+@@ -222,6 +221,14 @@ SECTIONS
+   . = ALIGN(4096);
+   __nosave_end = .;
+ 
++  __bss_start = .;		/* BSS */
++  . = ALIGN(4096);
++  .bss : AT(ADDR(.bss) - LOAD_OFFSET) {
++	*(.bss.page_aligned)
++	*(.bss)
++	}
++  __bss_stop = .;
++
+   _end = . ;
+ 
+   /* Sections to be discarded */
+@@ -235,4 +242,6 @@ #endif
    STABS_DEBUG
  
    DWARF_DEBUG
