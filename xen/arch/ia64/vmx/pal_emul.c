@@ -389,6 +389,7 @@ pal_emul(VCPU *vcpu) {
 
 	vcpu_get_gr_nat(vcpu,28,&gr28);  //bank1
 
+	perfc_incrc(vmx_pal_emul);
 	switch (gr28) {
 		case PAL_CACHE_FLUSH:
 			result = pal_cache_flush(vcpu);

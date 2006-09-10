@@ -211,6 +211,7 @@ fw_hypercall (struct pt_regs *regs)
 	IA64FAULT fault; 
 	unsigned long index = regs->r2 & FW_HYPERCALL_NUM_MASK_HIGH;
 
+	perfc_incra(fw_hypercall, index >> 8);
 	switch (index) {
 	    case FW_HYPERCALL_PAL_CALL:
 		//printf("*** PAL hypercall: index=%d\n",regs->r28);
