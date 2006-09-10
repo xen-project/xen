@@ -205,8 +205,12 @@ ____HYPERVISOR_memory_op(
 }
 
 #include <xen/interface/memory.h>
+#ifdef CONFIG_VMX_GUEST
+# define ia64_xenmem_reservation_op(op, xmr) (0)
+#else
 int ia64_xenmem_reservation_op(unsigned long op,
 		   struct xen_memory_reservation* reservation__);
+#endif
 static inline int
 HYPERVISOR_memory_op(
     unsigned int cmd, void *arg)
