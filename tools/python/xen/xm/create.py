@@ -1169,6 +1169,9 @@ def main(argv):
     if not opts:
         return
 
+    if type(config) == str:
+            config = sxp.parse(file(config))[0]
+
     if opts.vals.dryrun:
         PrettyPrint.prettyprint(config)
     else:
