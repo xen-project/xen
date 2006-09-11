@@ -87,6 +87,12 @@ void put_page_type(struct page_info *page)
             /* Record TLB information for flush later. */
             page->tlbflush_timestamp = tlbflush_current_time();
         }
+        else if ( unlikely((nx & (PGT_pinned|PGT_type_mask|PGT_count_mask)) == 
+                           (PGT_pinned | 1)) )
+        {
+            /* Page is now only pinned. Make the back pointer mutable again. */
+            nx |= PGT_va_mutable;
+        }
     }
     while ( unlikely((y = cmpxchg(&page->u.inuse.type_info, x, nx)) != x) );
 }
@@ -95,8 +101,6 @@ void put_page_type(struct page_info *page)
 int get_page_type(struct page_info *page, unsigned long type)
 {
     unsigned long nx, x, y = page->u.inuse.type_info;
-
-    ASSERT(!(type & ~PGT_type_mask));
 
  again:
     do {
@@ -109,25 +113,29 @@ int get_page_type(struct page_info *page, unsigned long type)
         }
         else if ( unlikely((x & PGT_count_mask) == 0) )
         {
-            if ( (x & PGT_type_mask) != type )
+            if ( (x & (PGT_type_mask|PGT_va_mask)) != type )
             {
-                /*
-                 * On type change we check to flush stale TLB entries. This 
-                 * may be unnecessary (e.g., page was GDT/LDT) but those 
-                 * circumstances should be very rare.
-                 */
-                cpumask_t mask =
-                    page_get_owner(page)->domain_dirty_cpumask;
-                tlbflush_filter(mask, page->tlbflush_timestamp);
-
-                if ( unlikely(!cpus_empty(mask)) )
+                if ( (x & PGT_type_mask) != (type & PGT_type_mask) )
                 {
-                    perfc_incrc(need_flush_tlb_flush);
-                    flush_tlb_mask(mask);
+                    /*
+                     * On type change we check to flush stale TLB
+                     * entries. This may be unnecessary (e.g., page
+                     * was GDT/LDT) but those circumstances should be
+                     * very rare.
+                     */
+                    cpumask_t mask =
+                        page_get_owner(page)->domain_dirty_cpumask;
+                    tlbflush_filter(mask, page->tlbflush_timestamp);
+
+                    if ( unlikely(!cpus_empty(mask)) )
+                    {
+                        perfc_incrc(need_flush_tlb_flush);
+                        flush_tlb_mask(mask);
+                    }
                 }
 
                 /* We lose existing type, back pointer, and validity. */
-                nx &= ~(PGT_type_mask | PGT_validated);
+                nx &= ~(PGT_type_mask | PGT_va_mask | PGT_validated);
                 nx |= type;
 
                 /* No special validation needed for writable pages. */
@@ -136,16 +144,36 @@ int get_page_type(struct page_info *page, unsigned long type)
                     nx |= PGT_validated;
             }
         }
-        else if ( unlikely((x & PGT_type_mask) != type) )
+        else
         {
-            return 0;
-        }
-        if ( unlikely(!(x & PGT_validated)) )
-        {
-            /* Someone else is updating validation of this page. Wait... */
-            while ( (y = page->u.inuse.type_info) == x )
-                cpu_relax();
-            goto again;
+            if ( unlikely((x & (PGT_type_mask|PGT_va_mask)) != type) )
+            {
+                if ( unlikely((x & PGT_type_mask) != (type & PGT_type_mask) ) )
+                {
+                    return 0;
+                }
+                else if ( (x & PGT_va_mask) == PGT_va_mutable )
+                {
+                    /* The va backpointer is mutable, hence we update it. */
+                    nx &= ~PGT_va_mask;
+                    nx |= type; /* we know the actual type is correct */
+                }
+                else if ( (type & PGT_va_mask) != PGT_va_mutable )
+                {
+                    ASSERT((type & PGT_va_mask) != (x & PGT_va_mask));
+
+                    /* This table is possibly mapped at multiple locations. */
+                    nx &= ~PGT_va_mask;
+                    nx |= PGT_va_unknown;
+                }
+            }
+            if ( unlikely(!(x & PGT_validated)) )
+            {
+                /* Someone else is updating validation of this page. Wait... */
+                while ( (y = page->u.inuse.type_info) == x )
+                    cpu_relax();
+                goto again;
+            }
         }
     }
     while ( unlikely((y = cmpxchg(&page->u.inuse.type_info, x, nx)) != x) );

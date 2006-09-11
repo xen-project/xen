@@ -102,6 +102,14 @@ struct page_extents {
 #define _PGT_validated      27
 #define PGT_validated       (1U<<_PGT_validated)
 
+ /* The 27 most significant bits of virt address if this is a page table. */
+#define PGT_va_shift        32
+#define PGT_va_mask         ((unsigned long)((1U<<28)-1)<<PGT_va_shift)
+ /* Is the back pointer still mutable (i.e. not fixed yet)? */
+#define PGT_va_mutable      ((unsigned long)((1U<<28)-1)<<PGT_va_shift)
+ /* Is the back pointer unknown (e.g., p.t. is mapped at multiple VAs)? */
+#define PGT_va_unknown      ((unsigned long)((1U<<28)-2)<<PGT_va_shift)
+
  /* 16-bit count of uses of this frame as its current type. */
 #define PGT_count_mask      ((1U<<16)-1)
 
