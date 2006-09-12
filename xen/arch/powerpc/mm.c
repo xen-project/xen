@@ -299,7 +299,7 @@ int allocate_rma(struct domain *d, unsigned int order)
     ulong rma_sz;
 
     if (d->arch.rma_page)
-        free_domheap_pages(d->arch.rma_page, d->arch.rma_order);
+        return -EINVAL;
 
     d->arch.rma_page = alloc_domheap_pages(d, order, 0);
     if (d->arch.rma_page == NULL) {
@@ -329,50 +329,74 @@ int allocate_rma(struct domain *d, unsigned int order)
     return 0;
 }
 
+void free_rma(struct domain *d)
+{
+    if (d->arch.rma_page) {
+        free_domheap_pages(d->arch.rma_page, d->arch.rma_order);
+    }
+}
+
 ulong pfn2mfn(struct domain *d, ulong pfn, int *type)
 {
     ulong rma_base_mfn = page_to_mfn(d->arch.rma_page);
     ulong rma_size_mfn = 1UL << d->arch.rma_order;
     struct page_extents *pe;
-
-    if (type)
-        *type = PFN_TYPE_NONE;
+    ulong mfn = INVALID_MFN;
+    int t = PFN_TYPE_NONE;
 
     /* quick tests first */
-    if (pfn < rma_size_mfn) {
-        if (type)
-            *type = PFN_TYPE_RMA;
-        return pfn + rma_base_mfn;
-    }
-
     if (test_bit(_DOMF_privileged, &d->domain_flags) &&
         cpu_io_mfn(pfn)) {
-        if (type)
-            *type = PFN_TYPE_IO;
-        return pfn;
+        t = PFN_TYPE_IO;
+        mfn = pfn;
+    } else {
+        if (pfn < rma_size_mfn) {
+            t = PFN_TYPE_RMA;
+            mfn = pfn + rma_base_mfn;
+        } else {
+            list_for_each_entry (pe, &d->arch.extent_list, pe_list) {
+                uint end_pfn = pe->pfn + (1 << pe->order);
+
+                if (pfn >= pe->pfn && pfn < end_pfn) {
+                    t = PFN_TYPE_LOGICAL;
+                    mfn = page_to_mfn(pe->pg) + (pfn - pe->pfn);
+                    break;
+                }
+            }
+        }
+        BUG_ON(t != PFN_TYPE_NONE && page_get_owner(mfn_to_page(mfn)) != d);
     }
 
-    list_for_each_entry (pe, &d->arch.extent_list, pe_list) {
-        uint end_pfn = pe->pfn + (1 << pe->order);
+    if (t == PFN_TYPE_NONE) {
+        /* This hack allows dom0 to map all memory, necessary to
+         * initialize domU state. */
+        if (test_bit(_DOMF_privileged, &d->domain_flags) &&
+            mfn_valid(pfn)) {
+            struct page_info *pg;
 
-        if (pfn >= pe->pfn && pfn < end_pfn) {
-            if (type)
-                *type = PFN_TYPE_LOGICAL;
-            return page_to_mfn(pe->pg) + (pfn - pe->pfn);
+            /* page better be allocated to some domain but not the caller */
+            pg = mfn_to_page(pfn);
+            if (!(pg->count_info & PGC_allocated))
+                panic("Foreign page: 0x%lx is not owned by any domain\n",
+                      mfn);
+            if (page_get_owner(pg) == d)
+                panic("Foreign page: 0x%lx is owned by this domain\n",
+                      mfn);
+                
+            t = PFN_TYPE_FOREIGN;
+            mfn = pfn;
         }
     }
 
-    /* This hack allows dom0 to map all memory, necessary to
-     * initialize domU state. */
-    if (test_bit(_DOMF_privileged, &d->domain_flags) &&
-        pfn < max_page) {
-        if (type)
-            *type = PFN_TYPE_REMOTE;
-        return pfn;
+    if (mfn == INVALID_MFN) {
+        printk("%s: Dom[%d] pfn 0x%lx is not a valid page\n",
+               __func__, d->domain_id, pfn);
     }
 
-    BUG();
-    return INVALID_MFN;
+    if (type)
+        *type = t;
+
+    return mfn;
 }
 
 void guest_physmap_add_page(

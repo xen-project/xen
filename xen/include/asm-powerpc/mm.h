@@ -154,7 +154,7 @@ static inline void put_page(struct page_info *page)
     while ( unlikely((y = cmpxchg(&page->count_info, x, nx)) != x) );
 
     if ( unlikely((nx & PGC_count_mask) == 0) ) {
-        panic("about to free page\n");
+        panic("about to free page: 0x%lx\n", page_to_mfn(page));
         free_domheap_page(page);
     }
 }
@@ -239,7 +239,7 @@ extern int update_grant_va_mapping(unsigned long va,
 #define PFN_TYPE_RMA 1
 #define PFN_TYPE_LOGICAL 2
 #define PFN_TYPE_IO 3
-#define PFN_TYPE_REMOTE 4
+#define PFN_TYPE_FOREIGN 4
 
 extern ulong pfn2mfn(struct domain *d, ulong pfn, int *type);
 
@@ -259,6 +259,7 @@ static inline unsigned long gmfn_to_mfn(struct domain *d, unsigned long gmfn)
 #define mfn_to_gmfn(_d, mfn) (mfn)
 
 extern int allocate_rma(struct domain *d, unsigned int order_pages);
+extern void free_rma(struct domain *d);
 extern uint allocate_extents(struct domain *d, uint nrpages, uint rma_nrpages);
 extern void free_extents(struct domain *d);
 

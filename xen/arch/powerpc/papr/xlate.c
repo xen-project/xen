@@ -118,8 +118,8 @@ static void h_enter(struct cpu_user_regs *regs)
     int pgshift = PAGE_SHIFT;
     ulong idx;
     int limit = 0;                /* how many PTEs to examine in the PTEG */
-    ulong lpn;
-    ulong rpn;
+    ulong pfn;
+    ulong mfn;
     struct vcpu *v = get_current();
     struct domain *d = v->domain;
     int mtype;
@@ -160,11 +160,11 @@ static void h_enter(struct cpu_user_regs *regs)
     /* get the correct logical RPN in terms of 4K pages need to mask
      * off lp bits and unused arpn bits if this is a large page */
 
-    lpn = ~0ULL << (pgshift - PAGE_SHIFT);
-    lpn = pte.bits.rpn & lpn;
+    pfn = ~0ULL << (pgshift - PAGE_SHIFT);
+    pfn = pte.bits.rpn & pfn;
 
-    rpn = pfn2mfn(d, lpn, &mtype);
-    if (rpn == INVALID_MFN) {
+    mfn = pfn2mfn(d, pfn, &mtype);
+    if (mfn == INVALID_MFN) {
         regs->gprs[3] =  H_Parameter;
         return;
     }
@@ -173,8 +173,8 @@ static void h_enter(struct cpu_user_regs *regs)
         /* only a privilaged dom can access outside IO space */
         if ( !test_bit(_DOMF_privileged, &d->domain_flags) ) {
             regs->gprs[3] =  H_Privilege;
-            printk("%s: unprivileged access to logical page: 0x%lx\n",
-                   __func__, lpn);
+            printk("%s: unprivileged access to physical page: 0x%lx\n",
+                   __func__, pfn);
             return;
         }
 
@@ -192,7 +192,7 @@ static void h_enter(struct cpu_user_regs *regs)
         }
     }
     /* fixup the RPN field of our local PTE copy */
-    pte.bits.rpn = rpn | lp_bits;
+    pte.bits.rpn = mfn | lp_bits;
 
     /* clear reserved bits in high word */
     pte.bits.lock = 0x0;
@@ -211,12 +211,12 @@ static void h_enter(struct cpu_user_regs *regs)
 
         /* data manipulations should be done prior to the pte insertion. */
     if ( flags & H_ZERO_PAGE ) {
-        memset((void *)(rpn << PAGE_SHIFT), 0, 1UL << pgshift);
+        memset((void *)(mfn << PAGE_SHIFT), 0, 1UL << pgshift);
     }
 
     if ( flags & H_ICACHE_INVALIDATE ) {
         ulong k;
-        ulong addr = rpn << PAGE_SHIFT;
+        ulong addr = mfn << PAGE_SHIFT;
 
         for (k = 0; k < (1UL << pgshift); k += L1_CACHE_BYTES) {
             dcbst(addr + k);
@@ -229,7 +229,7 @@ static void h_enter(struct cpu_user_regs *regs)
 
     if ( flags & H_ICACHE_SYNCHRONIZE ) {
         ulong k;
-        ulong addr = rpn << PAGE_SHIFT;
+        ulong addr = mfn << PAGE_SHIFT;
         for (k = 0; k < (1UL << pgshift); k += L1_CACHE_BYTES) {
             icbi(addr + k);
             sync();
@@ -251,6 +251,26 @@ static void h_enter(struct cpu_user_regs *regs)
 
             regs->gprs[3] = H_Success;
             regs->gprs[4] = idx;
+
+            
+            switch (mtype) {
+            case PFN_TYPE_IO:
+                break;
+            case PFN_TYPE_FOREIGN:
+            {
+                struct page_info *pg = mfn_to_page(mfn);
+                struct domain *f = page_get_owner(pg);
+
+                BUG_ON(f == d);
+                get_domain(f);
+            }
+                break;
+            case PFN_TYPE_RMA:
+            case PFN_TYPE_LOGICAL:
+                break;
+            default:
+                BUG();
+            }
 
             return;
         }
@@ -480,9 +500,21 @@ static void h_remove(struct cpu_user_regs *regs)
 
     /* XXX - I'm very skeptical of doing ANYTHING if not bits.v */
     /* XXX - I think the spec should be questioned in this case (MFM) */
-    if (pte->bits.v == 0) {
+    if (lpte.bits.v == 0) {
         printk("%s: removing invalid entry\n", __func__);
     }
+
+    if (lpte.bits.v) {
+        ulong mfn = lpte.bits.rpn;
+        if (!cpu_io_mfn(mfn)) {
+            struct page_info *pg = mfn_to_page(mfn);
+            struct domain *f = page_get_owner(pg);
+
+            if (f != d)
+                put_domain(f);
+        }
+    }
+
     asm volatile("eieio; std %1, 0(%0); ptesync"
             :
             : "b" (pte), "r" (0)

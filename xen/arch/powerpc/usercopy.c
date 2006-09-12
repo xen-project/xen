@@ -57,10 +57,10 @@ static unsigned long paddr_to_maddr(unsigned long paddr)
     case PFN_TYPE_LOGICAL:
         break;
 
-    case PFN_TYPE_REMOTE:
+    case PFN_TYPE_FOREIGN:
         /* I don't think this should ever happen, but I suppose it
          * could be possible */
-        printk("%s: Dom:%d paddr: 0x%lx type: REMOTE\n",
+        printk("%s: Dom:%d paddr: 0x%lx type: FOREIGN\n",
                __func__, d->domain_id, paddr);
         WARN();
         break;

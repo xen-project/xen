@@ -244,8 +244,7 @@ void sync_vcpu_execstate(struct vcpu *v)
 
 void domain_relinquish_resources(struct domain *d)
 {
-    if (d->arch.rma_page)
-        free_domheap_pages(d->arch.rma_page, d->arch.rma_order);
+    free_rma(d);
     free_extents(d);
 }
 
