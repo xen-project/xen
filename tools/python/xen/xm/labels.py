@@ -70,10 +70,12 @@ def main(argv):
         labels.sort()
         for label in labels:
             print label
+
     except ACMError:
-        pass
+        sys.exit(-1)
     except:
         traceback.print_exc(limit=1)
+        sys.exit(-1)
 
 
 if __name__ == '__main__':
