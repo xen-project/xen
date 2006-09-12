@@ -75,6 +75,7 @@ void deliver_ee(struct cpu_user_regs *regs)
 void do_external(struct cpu_user_regs *regs)
 {
     int vec;
+    static unsigned spur_count;
 
     BUG_ON(!(regs->msr & MSR_EE));
     BUG_ON(mfmsr() & MSR_EE);
@@ -87,6 +88,14 @@ void do_external(struct cpu_user_regs *regs)
         do_IRQ(regs);
 
         BUG_ON(mfmsr() & MSR_EE);
+        spur_count = 0;
+    } else {
+        ++spur_count;
+        if (spur_count > 100)
+            panic("Too many (%d) spurrious interrupts in a row\n"
+                  "  Known problem, please halt and let machine idle/cool "
+                  "  then reboot\n",
+                  100);
     }
 }
 
