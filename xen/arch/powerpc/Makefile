@@ -13,7 +13,7 @@ obj-y += dart.o
 obj-y += dart_u3.o
 obj-y += dart_u4.o
 obj-y += delay.o
-obj-y += dom0_ops.o
+obj-y += domctl.o
 obj-y += domain_build.o
 obj-y += domain.o
 obj-y += exceptions.o
@@ -37,6 +37,7 @@ obj-y += setup.o
 obj-y += shadow.o
 obj-y += smp.o
 obj-y += smp-tbsync.o
+obj-y += sysctl.o
 obj-y += time.o
 obj-y += usercopy.o
 

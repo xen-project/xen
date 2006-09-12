@@ -116,39 +116,3 @@ long arch_do_domctl(struct xen_domctl *domctl,
 
     return ret;
 }
-
-long arch_do_sysctl(struct xen_sysctl *sysctl,
-                    XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl);
-long arch_do_sysctl(struct xen_sysctl *sysctl,
-                    XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
-{
-    long ret = 0;
-
-    switch (sysctl->cmd) {
-    case XEN_SYSCTL_physinfo:
-    {
-        xen_sysctl_physinfo_t *pi = &sysctl->u.physinfo;
-
-        pi->threads_per_core = 1;
-        pi->cores_per_socket = 1;
-        pi->sockets_per_node = 1;
-        pi->nr_nodes         = 1;
-        pi->total_pages      = total_pages;
-        pi->free_pages       = avail_domheap_pages();
-        pi->cpu_khz          = cpu_khz;
-        memset(pi->hw_cap, 0, sizeof(pi->hw_cap));
-        ret = 0;
-        if ( copy_to_guest(u_sysctl, sysctl, 1) )
-            ret = -EFAULT;
-    }
-    break;
-
-    default:
-        printk("%s: unsupported sysctl: 0x%x\n", __func__, (sysctl->cmd));
-        ret = -ENOSYS;
-        break;
-    }
-
-    return ret;
-}
-
