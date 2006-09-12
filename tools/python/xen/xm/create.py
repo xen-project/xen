@@ -1155,7 +1155,7 @@ def create_security_check(config):
         else:
             print "Checking resources: (skipped)"
     except security.ACMError:
-        traceback.print_exc(limit=1)
+        sys.exit(-1)
 
     return passed
 
@@ -1176,7 +1176,7 @@ def main(argv):
         PrettyPrint.prettyprint(config)
     else:
         if not create_security_check(config):
-            print "Security configuration prevents domain from starting"
+            err("Security configuration prevents domain from starting.")
         else:
             dom = make_domain(opts, config)
             if opts.vals.console_autoconnect:
