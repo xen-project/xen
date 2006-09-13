@@ -263,6 +263,7 @@ static void h_enter(struct cpu_user_regs *regs)
 
                 BUG_ON(f == d);
                 get_domain(f);
+                get_page(pg, f);
             }
                 break;
             case PFN_TYPE_RMA:
@@ -510,8 +511,10 @@ static void h_remove(struct cpu_user_regs *regs)
             struct page_info *pg = mfn_to_page(mfn);
             struct domain *f = page_get_owner(pg);
 
-            if (f != d)
+            if (f != d) {
                 put_domain(f);
+                put_page(pg);
+            }
         }
     }
 

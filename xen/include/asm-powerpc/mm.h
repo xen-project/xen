@@ -154,7 +154,6 @@ static inline void put_page(struct page_info *page)
     while ( unlikely((y = cmpxchg(&page->count_info, x, nx)) != x) );
 
     if ( unlikely((nx & PGC_count_mask) == 0) ) {
-        panic("about to free page: 0x%lx\n", page_to_mfn(page));
         free_domheap_page(page);
     }
 }
@@ -259,7 +258,6 @@ static inline unsigned long gmfn_to_mfn(struct domain *d, unsigned long gmfn)
 #define mfn_to_gmfn(_d, mfn) (mfn)
 
 extern int allocate_rma(struct domain *d, unsigned int order_pages);
-extern void free_rma(struct domain *d);
 extern uint allocate_extents(struct domain *d, uint nrpages, uint rma_nrpages);
 extern void free_extents(struct domain *d);
 

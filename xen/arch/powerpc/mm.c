@@ -329,13 +329,6 @@ int allocate_rma(struct domain *d, unsigned int order)
     return 0;
 }
 
-void free_rma(struct domain *d)
-{
-    if (d->arch.rma_page) {
-        free_domheap_pages(d->arch.rma_page, d->arch.rma_order);
-    }
-}
-
 ulong pfn2mfn(struct domain *d, ulong pfn, int *type)
 {
     ulong rma_base_mfn = page_to_mfn(d->arch.rma_page);

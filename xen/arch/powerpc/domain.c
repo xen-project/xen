@@ -242,10 +242,44 @@ void sync_vcpu_execstate(struct vcpu *v)
     return;
 }
 
+static void relinquish_memory(struct domain *d, struct list_head *list)
+{
+    struct list_head *ent;
+    struct page_info  *page;
+
+    /* Use a recursive lock, as we may enter 'free_domheap_page'. */
+    spin_lock_recursive(&d->page_alloc_lock);
+
+    ent = list->next;
+    while ( ent != list )
+    {
+        page = list_entry(ent, struct page_info, list);
+
+        /* Grab a reference to the page so it won't disappear from under us. */
+        if ( unlikely(!get_page(page, d)) )
+        {
+            /* Couldn't get a reference -- someone is freeing this page. */
+            ent = ent->next;
+            continue;
+        }
+        if ( test_and_clear_bit(_PGT_pinned, &page->u.inuse.type_info) )
+            put_page_and_type(page);
+
+        if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
+            put_page(page);
+
+        /* Follow the list chain and /then/ potentially free the page. */
+        ent = ent->next;
+        put_page(page);
+    }
+    spin_unlock_recursive(&d->page_alloc_lock);
+}
+
 void domain_relinquish_resources(struct domain *d)
 {
-    free_rma(d);
+    relinquish_memory(d, &d->page_list);
     free_extents(d);
+    return;
 }
 
 void arch_dump_domain_info(struct domain *d)
