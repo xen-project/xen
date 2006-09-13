@@ -1003,7 +1003,21 @@ static inline int admin_io_okay(
 }
 
 /* Check admin limits. Silently fail the access if it is disallowed. */
-#define inb_user(_p, _d, _r) (admin_io_okay(_p, 1, _d, _r) ? inb(_p) : ~0)
+static inline unsigned char inb_user(
+    unsigned int port, struct vcpu *v, struct cpu_user_regs *regs)
+{
+    /*
+     * Allow read access to port 0x61. Bit 4 oscillates with period 30us, and
+     * so it is often used for timing loops in BIOS code. This hack can go
+     * away when we have separate read/write permission rangesets.
+     * Note that we could emulate bit 4 instead of directly reading port 0x61,
+     * but there's not really a good reason to do so.
+     */
+    if ( admin_io_okay(port, 1, v, regs) || (port == 0x61) )
+        return inb(port);
+    return ~0;
+}
+//#define inb_user(_p, _d, _r) (admin_io_okay(_p, 1, _d, _r) ? inb(_p) : ~0)
 #define inw_user(_p, _d, _r) (admin_io_okay(_p, 2, _d, _r) ? inw(_p) : ~0)
 #define inl_user(_p, _d, _r) (admin_io_okay(_p, 4, _d, _r) ? inl(_p) : ~0)
 #define outb_user(_v, _p, _d, _r) \
