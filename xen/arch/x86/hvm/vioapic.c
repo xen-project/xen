@@ -362,21 +362,35 @@ static uint32_t ioapic_get_delivery_bitmask(hvm_vioapic_t *s,
 
     ASSERT(s);
 
-    if (dest_mode == 0) { /* Physical mode */
-        for (i = 0; i < s->lapic_count; i++) {
-            if (VLAPIC_ID(s->lapic_info[i]) == dest) {
+    if ( dest_mode == 0 )
+    {
+        /* Physical mode. */
+        for ( i = 0; i < s->lapic_count; i++ )
+        {
+            if ( VLAPIC_ID(s->lapic_info[i]) == dest )
+            {
                 mask = 1 << i;
                 break;
             }
         }
-    } else {
-        /* logical destination. call match_logical_addr for each APIC. */
-        if (dest != 0) {
-            for (i=0; i< s->lapic_count; i++) {
+
+        /* Broadcast. */
+        if ( dest == 0xFF )
+        {
+            for ( i = 0; i < s->lapic_count; i++ )
+                mask |= ( 1 << i );
+        }
+    }
+    else
+    {
+        /* Logical destination. Call match_logical_addr for each APIC. */
+        if ( dest != 0 )
+        {
+            for ( i = 0; i < s->lapic_count; i++ )
+            {
                 if ( s->lapic_info[i] &&
-                     ioapic_match_logical_addr(s, i, dest) ) {
+                     ioapic_match_logical_addr(s, i, dest) )
                     mask |= (1<<i);
-                }
             }
         }
     }
