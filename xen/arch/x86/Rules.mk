@@ -42,6 +42,9 @@ endif
 ifeq ($(TARGET_SUBARCH),x86_64)
 CFLAGS  += -mno-red-zone -fpic -fno-reorder-blocks
 CFLAGS  += -fno-asynchronous-unwind-tables
+# -fvisibility=hidden reduces -fpic cost, if it's available
+CFLAGS  += $(shell $(CC) -v --help 2>&1 | grep " -fvisibility=" | \
+             grep -q hidden && echo "-fvisibility=hidden")
 LDFLAGS += -m elf_x86_64
 x86_32 := n
 x86_64 := y
