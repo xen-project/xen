@@ -117,6 +117,7 @@ unsigned long alloc_xen_mmio(unsigned long len)
 	return addr;
 }
 
+#ifndef __ia64__
 /* Lifted from hvmloader.c */
 static int get_hypercall_stubs(void)
 {
@@ -162,6 +163,9 @@ static int get_hypercall_stubs(void)
 
 	return 0;
 }
+#else /* __ia64__ */
+#define get_hypercall_stubs()	(0)
+#endif
 
 static int __devinit platform_pci_init(struct pci_dev *pdev,
 				       const struct pci_device_id *ent)
@@ -207,7 +211,6 @@ static int __devinit platform_pci_init(struct pci_dev *pdev,
 	if (ret < 0)
 		goto out;
 
-	
 	if ((ret = init_xen_info()))
 		goto out;
 
