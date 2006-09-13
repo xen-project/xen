@@ -437,54 +437,59 @@ void xenoprof_log_event(
 int xenoprof_op_init(XEN_GUEST_HANDLE(void) arg)
 {
     struct xenoprof_init xenoprof_init;
-    int is_primary, num_events;
-    struct domain *d = current->domain;
     int ret;
 
     if ( copy_from_guest(&xenoprof_init, arg, 1) )
         return -EFAULT;
 
-    ret = nmi_init(&num_events, 
-                   &is_primary, 
-                   xenoprof_init.cpu_type);
-    if ( ret < 0 )
-        goto err;
+    if ( (ret = nmi_init(&xenoprof_init.num_events, 
+                         &xenoprof_init.is_primary, 
+                         xenoprof_init.cpu_type)) )
+        return ret;
 
-    if ( is_primary )
+    if ( copy_to_guest(arg, &xenoprof_init, 1) )
+        return -EFAULT;
+
+    if ( xenoprof_init.is_primary )
         primary_profiler = current->domain;
 
+    return 0;
+}
+
+int xenoprof_op_get_buffer(XEN_GUEST_HANDLE(void) arg)
+{
+    struct xenoprof_get_buffer xenoprof_get_buffer;
+    struct domain *d = current->domain;
+    int ret;
+
+    if ( copy_from_guest(&xenoprof_get_buffer, arg, 1) )
+        return -EFAULT;
+
     /*
-     * We allocate xenoprof struct and buffers only at first time xenoprof_init
+     * We allocate xenoprof struct and buffers only at first time xenoprof_get_buffer
      * is called. Memory is then kept until domain is destroyed.
      */
     if ( (d->xenoprof == NULL) &&
-         ((ret = alloc_xenoprof_struct(d, xenoprof_init.max_samples, 0)) < 0) )
-        goto err;
+         ((ret = alloc_xenoprof_struct(d, xenoprof_get_buffer.max_samples, 0)) < 0) )
+        return ret;
 
     xenoprof_reset_buf(d);
 
     d->xenoprof->domain_type  = XENOPROF_DOMAIN_IGNORED;
     d->xenoprof->domain_ready = 0;
-    d->xenoprof->is_primary = is_primary;
-
-    xenoprof_init.is_primary = is_primary;
-    xenoprof_init.num_events = num_events;
-    xenoprof_init.nbuf = d->xenoprof->nbuf;
-    xenoprof_init.bufsize = d->xenoprof->bufsize;
-    xenoprof_init.buf_maddr = __pa(d->xenoprof->rawbuf);
-
-    if ( copy_to_guest(arg, &xenoprof_init, 1) )
-    {
-        ret = -EFAULT;
-        goto err;
-    }
-
-    return ret;
-
- err:
     if ( primary_profiler == current->domain )
-        primary_profiler = NULL;
-    return ret;
+        d->xenoprof->is_primary = 1;
+    else
+        d->xenoprof->is_primary = 0;
+        
+    xenoprof_get_buffer.nbuf = d->xenoprof->nbuf;
+    xenoprof_get_buffer.bufsize = d->xenoprof->bufsize;
+    xenoprof_get_buffer.buf_maddr = __pa(d->xenoprof->rawbuf);
+
+    if ( copy_to_guest(arg, &xenoprof_get_buffer, 1) )
+        return -EFAULT;
+
+    return 0;
 }
 
 #define PRIV_OP(op) ( (op == XENOPROF_set_active)       \
@@ -510,6 +515,10 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
     {
     case XENOPROF_init:
         ret = xenoprof_op_init(arg);
+        break;
+
+    case XENOPROF_get_buffer:
+        ret = xenoprof_op_get_buffer(arg);
         break;
 
     case XENOPROF_reset_active_list:
