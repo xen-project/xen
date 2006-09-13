@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -e
+
 [ "$GDB_MIRROR" ] || GDB_MIRROR="ftp://ftp.gnu.org/gnu/gdb/"
 
 rm -rf gdb-6.2.1 gdb-6.2.1-linux-i386-xen
