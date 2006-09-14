@@ -987,35 +987,37 @@ csched_load_balance(int cpu, struct csched_vcpu *snext)
          * cause a deadlock if the peer CPU is also load balancing and trying
          * to lock this CPU.
          */
-        if ( spin_trylock(&per_cpu(schedule_data, peer_cpu).schedule_lock) )
+        if ( !spin_trylock(&per_cpu(schedule_data, peer_cpu).schedule_lock) )
         {
+            CSCHED_STAT_CRANK(steal_trylock_failed);
+            continue;
+        }
 
-            spc = CSCHED_PCPU(peer_cpu);
-            if ( unlikely(spc == NULL) )
-            {
-                CSCHED_STAT_CRANK(steal_peer_down);
-                speer = NULL;
-            }
-            else
-            {
-                speer = csched_runq_steal(spc, cpu, snext->pri);
-            }
-
-            spin_unlock(&per_cpu(schedule_data, peer_cpu).schedule_lock);
-
-            /* Got one! */
-            if ( speer )
-            {
-                CSCHED_STAT_CRANK(vcpu_migrate);
-                return speer;
-            }
+        spc = CSCHED_PCPU(peer_cpu);
+        if ( unlikely(spc == NULL) )
+        {
+            CSCHED_STAT_CRANK(steal_peer_down);
+            speer = NULL;
+        }
+        else if ( is_idle_vcpu(per_cpu(schedule_data, peer_cpu).curr) )
+        {
+            speer = NULL;
         }
         else
         {
-            CSCHED_STAT_CRANK(steal_trylock_failed);
+            /* Try to steal work from an online non-idle CPU. */
+            speer = csched_runq_steal(spc, cpu, snext->pri);
+        }
+
+        spin_unlock(&per_cpu(schedule_data, peer_cpu).schedule_lock);
+
+        /* Got one? */
+        if ( speer )
+        {
+            CSCHED_STAT_CRANK(vcpu_migrate);
+            return speer;
         }
     }
-
 
     /* Failed to find more important work */
     __runq_remove(snext);
