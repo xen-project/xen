@@ -57,6 +57,9 @@ console_help = "console <DomId>                  Attach to domain DomId's consol
 create_help =  """create [-c] <ConfigFile>
                [Name=Value]..       Create a domain based on Config File"""
 destroy_help = "destroy <DomId>                  Terminate a domain immediately"
+dump_core_help =   """dump-core [-L|--live][-C|--crash]
+            <DomId> [FileName]      Dump core of the specified domain"""
+
 help_help =    "help                             Display this message"
 list_help =    "list [--long] [DomId, ...]       List information about domains"
 list_label_help = "list [--label] [DomId, ...]      List information about domains including their labels"
@@ -138,6 +141,7 @@ short_command_list = [
     "console",
     "create",
     "destroy",
+    "dump-core",
     "help",
     "list",
     "mem-set",
@@ -159,6 +163,7 @@ domain_commands = [
     "destroy",
     "domid",
     "domname",
+    "dump-core",
     "list",
     "list_label",
     "mem-max",
@@ -589,6 +594,43 @@ def xm_unpause(args):
     dom = args[0]
 
     server.xend.domain.unpause(dom)
+
+def xm_dump_core(args):
+    arg_check(args, "dump-core",1,3)
+    live = False
+    crash = False
+    import getopt
+    (options, params) = getopt.gnu_getopt(args, 'LC', ['live','crash'])
+
+    for (k, v) in options:
+        if k in ['-L', '--live']:
+            live = True
+        if k in ['-C', '--crash']:
+            crash = True
+
+    if len(params) == 0 or len(params) > 2:
+        err("invalid number of parameters")
+        usage("dump-core")
+
+    dom = params[0]
+    if len(params) == 2:
+        filename = os.path.abspath(params[1])
+    else:
+        filename = None
+
+    if not live:
+        server.xend.domain.pause(dom)
+
+    try:
+        print "dumping core of domain:%s ..." % str(dom)
+        server.xend.domain.dump(dom, filename, live, crash)
+    finally:
+        if not live:
+            server.xend.domain.unpause(dom)
+
+    if crash:
+        print "destroying domain:%s ..." % str(dom)
+        server.xend.domain.destroy(dom)
 
 def xm_rename(args):
     arg_check(args, "rename", 2)
@@ -1168,6 +1210,7 @@ commands = {
     "destroy": xm_destroy,
     "domid": xm_domid,
     "domname": xm_domname,
+    "dump-core": xm_dump_core,
     "rename": xm_rename,
     "restore": xm_restore,
     "save": xm_save,

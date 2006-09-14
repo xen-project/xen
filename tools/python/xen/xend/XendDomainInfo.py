@@ -977,11 +977,12 @@ class XendDomainInfo:
         self.restart(True)
 
 
-    def dumpCore(self):
+    def dumpCore(self,corefile=None):
         """Create a core dump for this domain.  Nothrow guarantee."""
         
         try:
-            corefile = "/var/xen/dump/%s.%s.core" % (self.info['name'],
+            if not corefile:
+                corefile = "/var/xen/dump/%s.%s.core" % (self.info['name'],
                                                      self.domid)
             xc.domain_dumpcore(self.domid, corefile)
 
