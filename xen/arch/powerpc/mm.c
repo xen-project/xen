@@ -209,16 +209,6 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
     return -ENOSYS;
 }
 
-void clear_page(void *page)
-{
-    if (on_mambo()) {
-        extern void *mambo_memset(void *,int ,__kernel_size_t);
-        mambo_memset(page, 0, PAGE_SIZE);
-    } else {
-        memset(page, 0, PAGE_SIZE);
-    }
-}
-
 extern void copy_page(void *dp, void *sp)
 {
     if (on_mambo()) {
