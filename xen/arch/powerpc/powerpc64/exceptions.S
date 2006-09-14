@@ -118,7 +118,11 @@ LOAD_GPRS "(\from+1)", \to, \uregs
     mfspr r0, SPRN_HSPRG1
     std r0, UREGS_r13(r1)           /* save R13 from HSPRG1 */
 
-    /* Blow away any reservation according to 970 errata after saving CR */
+    /* Only _one_ larx is allowed at a time.  Any future use will be
+     * rejected until the earlier one (if any) completes.  Since we
+     * may have interrupted a larx in the Domain, or Xen we need to
+     * clear any larx that may currently exist.  We could probably
+     * skip which for hcalls */
     ldx r0, 0, r1
     stdcx. r0, 0, r1
 
