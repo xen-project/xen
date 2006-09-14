@@ -136,4 +136,20 @@ extern ofdn_t ofd_node_find_next(void *mem, ofdn_t n);
 extern ofdn_t ofd_node_find_prev(void *mem, ofdn_t n);
 extern void ofd_init(int (*write)(const char *, size_t len));
 
+static inline int ofd_strstr(const char *s, int len, const char *str)
+{
+    int l = strlen(str);
+    do {
+        int n;
+
+        if (len >= l && strstr(s, str))
+            return 1;
+
+        n = strnlen(s, len) + 1;
+        len -= strnlen(s, len) + 1;
+        s += n;
+    } while (len > 0);
+    return 0;
+}
+
 #endif /* _OF_DEVTREE_H */

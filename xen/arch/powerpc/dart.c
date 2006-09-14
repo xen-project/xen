@@ -207,16 +207,17 @@ static int find_dart(struct dart_info *di)
     if (rc <= 0)
         return -1;
 
-    di->di_base = DART_DEF_BASE;
-
-    if (strstr(compat, "u3")) {
-        di->di_model = DART_U3;
-    } else if (strstr(compat, "u4")) {
+    if (ofd_strstr(compat, rc, "u4"))
         di->di_model = DART_U4;
-    } else {
+    else if (ofd_strstr(compat, rc, "u3"))
+        di->di_model = DART_U3;
+    else {
         DBG("%s: not a U3 or U4\n", __func__);
         return -1;
     }
+        
+    di->di_base = DART_DEF_BASE;
+
     /* FIXME: this should actually be the HT reg value */
     di->di_window.dw_liobn = 0;
     di->di_window.dw_base_hi = 0;
