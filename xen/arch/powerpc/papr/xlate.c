@@ -123,6 +123,9 @@ static void h_enter(struct cpu_user_regs *regs)
     struct vcpu *v = get_current();
     struct domain *d = v->domain;
     int mtype;
+    struct page_info *pg = NULL;
+    struct domain *f = NULL;
+
 
     htab = &d->arch.htab;
     if (ptex > (1UL << htab->log_num_ptes)) {
@@ -203,15 +206,39 @@ static void h_enter(struct cpu_user_regs *regs)
     pte.bits.ts = 0x0;
     pte.bits.res2 = 0x0;
 
+    if (mtype == PFN_TYPE_FOREIGN) {
+        pg = mfn_to_page(mfn);
+        f = page_get_owner(pg);
+        
+        BUG_ON(f == d);
+
+        if (unlikely(!get_domain(f))) {
+            regs->gprs[3] = H_Rescinded;
+            return;
+        }
+        if (unlikely(!get_page(pg, f))) {
+            put_domain(f);
+            regs->gprs[3] = H_Rescinded;
+            return;
+        }
+    }
+
     if ( !(flags & H_EXACT) ) {
         /* PTEG (not specific PTE); clear 3 lowest bits */
         ptex &= ~0x7UL;
         limit = 7;
     }
 
-        /* data manipulations should be done prior to the pte insertion. */
+    /* data manipulations should be done prior to the pte insertion. */
     if ( flags & H_ZERO_PAGE ) {
-        memset((void *)(mfn << PAGE_SHIFT), 0, 1UL << pgshift);
+        ulong pg = mfn << PAGE_SHIFT;
+        ulong pgs = 1UL << pgshift;
+
+        while (pgs > 0) {
+            clear_page((void *)pg);
+            pg += PAGE_SIZE;
+            --pgs;
+        }
     }
 
     if ( flags & H_ICACHE_INVALIDATE ) {
@@ -252,27 +279,6 @@ static void h_enter(struct cpu_user_regs *regs)
             regs->gprs[3] = H_Success;
             regs->gprs[4] = idx;
 
-            
-            switch (mtype) {
-            case PFN_TYPE_IO:
-                break;
-            case PFN_TYPE_FOREIGN:
-            {
-                struct page_info *pg = mfn_to_page(mfn);
-                struct domain *f = page_get_owner(pg);
-
-                BUG_ON(f == d);
-                get_domain(f);
-                get_page(pg, f);
-            }
-                break;
-            case PFN_TYPE_RMA:
-            case PFN_TYPE_LOGICAL:
-                break;
-            default:
-                BUG();
-            }
-
             return;
         }
     }
@@ -281,6 +287,12 @@ static void h_enter(struct cpu_user_regs *regs)
     /* If the PTEG is full then no additional values are returned. */
     printk("%s: PTEG FULL\n", __func__);
 #endif
+
+    if (pg != NULL)
+        put_page(pg);
+
+    if (f != NULL)
+        put_domain(f);
 
     regs->gprs[3] = H_PTEG_Full;
 }

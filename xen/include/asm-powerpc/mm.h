@@ -122,8 +122,11 @@ struct page_extents {
  /* Set when is using a page as a page table */
 #define _PGC_page_table      29
 #define PGC_page_table      (1U<<_PGC_page_table)
+/* Set when using page for RMA */
+#define _PGC_page_RMA      28
+#define PGC_page_RMA      (1U<<_PGC_page_RMA)
  /* 29-bit count of references to this frame. */
-#define PGC_count_mask      ((1U<<29)-1)
+#define PGC_count_mask      ((1U<<28)-1)
 
 #define IS_XEN_HEAP_FRAME(_pfn) (page_to_maddr(_pfn) < xenheap_phys_end)
 
@@ -142,6 +145,7 @@ extern struct page_info *frame_table;
 extern unsigned long max_page;
 extern unsigned long total_pages;
 void init_frametable(void);
+void free_rma_check(struct page_info *page);
 
 static inline void put_page(struct page_info *page)
 {
@@ -154,6 +158,8 @@ static inline void put_page(struct page_info *page)
     while ( unlikely((y = cmpxchg(&page->count_info, x, nx)) != x) );
 
     if ( unlikely((nx & PGC_count_mask) == 0) ) {
+        /* RMA pages can only be released while the domain is dying */
+        free_rma_check(page);
         free_domheap_page(page);
     }
 }

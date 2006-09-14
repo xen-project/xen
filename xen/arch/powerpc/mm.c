@@ -287,6 +287,7 @@ int allocate_rma(struct domain *d, unsigned int order)
     struct vcpu *v;
     ulong rma_base;
     ulong rma_sz;
+    int i;
 
     if (d->arch.rma_page)
         return -EINVAL;
@@ -301,11 +302,17 @@ int allocate_rma(struct domain *d, unsigned int order)
 
     rma_base = page_to_maddr(d->arch.rma_page);
     rma_sz = rma_size(d->arch.rma_order);
+
     BUG_ON(rma_base & (rma_sz - 1)); /* check alignment */
 
-    /* XXX shouldn't be needed */
-    printk("clearing RMA: 0x%lx[0x%lx]\n", rma_base, rma_sz);
-    memset((void *)rma_base, 0, rma_sz);
+    printk("allocated RMA for Dom[%d]: 0x%lx[0x%lx]\n",
+           d->domain_id, rma_base, rma_sz);
+
+    for (i = 0; i < (1 << d->arch.rma_order); i++ ) {
+        /* Add in any extra CPUs that need flushing because of this page. */
+        d->arch.rma_page[i].count_info |= PGC_page_RMA;
+        clear_page((void *)page_to_maddr(&d->arch.rma_page[i]));
+    }
 
     d->shared_info = (shared_info_t *)
         (rma_addr(&d->arch, RMA_SHARED_INFO) + rma_base);
@@ -318,6 +325,13 @@ int allocate_rma(struct domain *d, unsigned int order)
 
     return 0;
 }
+void free_rma_check(struct page_info *page)
+{
+    if (test_bit(_PGC_page_RMA, &page->count_info) &&
+        !test_bit(_DOMF_dying, &page_get_owner(page)->domain_flags))
+        panic("Attempt to free an RMA page: 0x%lx\n", page_to_mfn(page));
+}
+
 
 ulong pfn2mfn(struct domain *d, ulong pfn, int *type)
 {
