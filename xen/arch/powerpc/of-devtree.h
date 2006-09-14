@@ -22,6 +22,7 @@
 #define _OF_DEVTREE_H
 
 #include <xen/types.h>
+#include <xen/string.h>
 #include <public/xen.h>
 
 enum {
