@@ -24,8 +24,9 @@ def main(argv):
         return
         
     # no options for the moment
-    if len(args) < 1: opts.err('Missing domain')
-    if len(args) < 2: opts.err('Missing sysrq character')
+    if len(args) != 2:
+        opts.usage()
+        sys.exit(1)
     dom = args[0]
     req = ord(args[1][0])
     server.xend.domain.send_sysrq(dom, req)
