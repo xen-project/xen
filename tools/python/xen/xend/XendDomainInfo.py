@@ -982,11 +982,14 @@ class XendDomainInfo:
         
         try:
             if not corefile:
-                corefile = "/var/xen/dump/%s.%s.core" % (self.info['name'],
-                                                     self.domid)
+                this_time = time.strftime("%Y-%m%d-%H%M.%S", time.localtime())
+                corefile = "/var/xen/dump/%s-%s.%s.core" % (this_time,
+                                  self.info['name'], self.domid)
             xc.domain_dumpcore(self.domid, corefile)
 
         except:
+            corefile_incomp = corefile+'-incomplete'
+            os.rename(corefile, corefile_incomp)
             log.exception("XendDomainInfo.dumpCore failed: id = %s name = %s",
                           self.domid, self.info['name'])
 
