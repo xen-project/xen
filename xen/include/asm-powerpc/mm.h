@@ -229,8 +229,6 @@ extern vm_assist_info_t vm_assist_info[];
 #define share_xen_page_with_guest(p, d, r) do { } while (0)
 #define share_xen_page_with_privileged_guests(p, r) do { } while (0)
 
-extern unsigned long frame_table_size;
-
 /* hope that accesses to this will fail spectacularly */
 #define machine_to_phys_mapping ((u32 *)-1UL)
 

@@ -39,7 +39,6 @@
 
 /* Frame table and its size in pages. */
 struct page_info *frame_table;
-unsigned long frame_table_size;
 unsigned long max_page;
 unsigned long total_pages;
 
@@ -190,17 +189,20 @@ int get_page_type(struct page_info *page, unsigned long type)
 void __init init_frametable(void)
 {
     unsigned long p;
+    unsigned long nr_pages;
+    int i;
 
-    frame_table_size = PFN_UP(max_page * sizeof(struct page_info));
+    nr_pages = PFN_UP(max_page * sizeof(struct page_info));
+    nr_pages = min(nr_pages, (4UL << (20 - PAGE_SHIFT)));
+    
 
-    p = alloc_boot_pages(min(frame_table_size, 4UL << 20), 1);
+    p = alloc_boot_pages(nr_pages, 1);
     if (p == 0)
         panic("Not enough memory for frame table\n");
 
     frame_table = (struct page_info *)(p << PAGE_SHIFT);
-    frame_table_size = (frame_table_size + PAGE_SIZE - 1) & PAGE_MASK;
-
-    memset(frame_table, 0, frame_table_size);
+    for (i = 0; i < nr_pages; i += 1)
+        clear_page((void *)((p + i) << PAGE_SHIFT));
 }
 
 long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
