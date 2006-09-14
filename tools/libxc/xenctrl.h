@@ -166,7 +166,7 @@ int xc_domain_dumpcore(int xc_handle,
  * and passes an opaque object for the use of the function and
  * created by the caller of xc_domain_dumpcore_via_callback.
  */
-typedef int (dumpcore_rtn_t)(void *arg, char *buffer, unsigned int length);
+typedef int (dumpcore_rtn_t)(int fd, char *buffer, unsigned int length);
 
 int xc_domain_dumpcore_via_callback(int xc_handle,
                                     uint32_t domid,
