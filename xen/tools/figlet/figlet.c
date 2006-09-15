@@ -1448,8 +1448,9 @@ inchr c;
       }
     else {
       for (k=0;k<smushamount;k++) {
-        outputline[row][outlinelen-smushamount+k] =
-          smushem(outputline[row][outlinelen-smushamount+k],currchar[row][k]);
+        if (outlinelen-smushamount+k >= 0)
+          outputline[row][outlinelen-smushamount+k] =
+            smushem(outputline[row][outlinelen-smushamount+k],currchar[row][k]);
         }
       strcat(outputline[row],currchar[row]+smushamount);
       }
