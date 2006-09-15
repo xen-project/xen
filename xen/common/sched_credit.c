@@ -290,6 +290,7 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
         {
             CSCHED_STAT_CRANK(tickle_idlers_some);
             cpus_or(mask, mask, csched_priv.idlers);
+            cpus_and(mask, mask, new->vcpu->cpu_affinity);
         }
     }
 
@@ -1001,6 +1002,7 @@ csched_load_balance(int cpu, struct csched_vcpu *snext)
         }
         else if ( is_idle_vcpu(per_cpu(schedule_data, peer_cpu).curr) )
         {
+            CSCHED_STAT_CRANK(steal_peer_idle);
             speer = NULL;
         }
         else
