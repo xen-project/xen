@@ -86,6 +86,7 @@ STATE_DOM_OK       = 1
 STATE_DOM_SHUTDOWN = 2
 
 SHUTDOWN_TIMEOUT = 30.0
+MIGRATE_TIMEOUT = 30.0
 
 ZOMBIE_PREFIX = 'Zombie-'
 
@@ -1535,14 +1536,19 @@ class XendDomainInfo:
         the device has shutdown correctly, i.e. all blocks are
         flushed to disk
         """
+        start = time.time()
         while True:
             test = 0
+            diff = time.time() - start
             for i in self.getDeviceController('vbd').deviceIDs():
                 test = 1
                 log.info("Dev %s still active, looping...", i)
                 time.sleep(0.1)
                 
             if test == 0:
+                break
+            if diff >= MIGRATE_TIMEOUT:
+                log.info("Dev still active but hit max loop timeout")
                 break
 
     def migrateDevices(self, network, dst, step, domName=''):
