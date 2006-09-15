@@ -24,6 +24,7 @@
 #include <xen/sched.h>
 #include <xen/serial.h>
 #include <xen/gdbstub.h>
+#include <xen/console.h>
 #include <asm/time.h>
 #include <asm/processor.h>
 
@@ -60,6 +61,8 @@ void program_exception(struct cpu_user_regs *regs, unsigned long cookie)
 #else /* CRASH_DEBUG */
     int recover = 0;
 
+    console_start_sync();
+
     show_registers(regs);
     printk("dar 0x%016lx, dsisr 0x%08x\n", mfdar(), mfdsisr());
     printk("hid4 0x%016lx\n", regs->hid4);
@@ -71,5 +74,7 @@ void program_exception(struct cpu_user_regs *regs, unsigned long cookie)
 
     if (!recover)
         panic("%s: 0x%lx\n", __func__, cookie);
+
+    console_end_sync();
 #endif /* CRASH_DEBUG */
 }
