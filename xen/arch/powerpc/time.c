@@ -60,7 +60,7 @@ int reprogram_timer(s_time_t timeout)
     s_time_t expire;
 
     if (timeout == 0) {
-        expire = 0;
+        expire = INT_MAX;
     } else {
         s_time_t now;
 
