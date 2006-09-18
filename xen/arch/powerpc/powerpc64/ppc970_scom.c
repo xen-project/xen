@@ -21,6 +21,7 @@
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/lib.h>
+#include <xen/console.h>
 
 #define SPRN_SCOMC 276
 #define SPRN_SCOMD 277
@@ -55,7 +56,8 @@ union scomc {
         ulong addr:           16;
         ulong RW:              1;
         ulong _reserved_49_55: 7;
-        ulong _reserved_56_57: 2;
+        ulong _reserved_56:    1;
+        ulong proto_error:     1;
         ulong addr_error:      1;
         ulong iface_error:     1;
         ulong disabled:        1;
@@ -90,7 +92,7 @@ static inline void write_scom(ulong addr, ulong val)
 
     c.word = 0;
     c.bits.addr = addr;
-    c.bits.RW = 0;
+    c.bits.RW = 1;
 
     mtscomd(val);
     mtscomc(c.word);
@@ -103,14 +105,13 @@ static inline void write_scom(ulong addr, ulong val)
 #define SCOM_AMCS_AND_MASK 0x022700
 #define SCOM_AMCS_OR_MASK  0x022800
 #define SCOM_CMCE          0x030901
+#define SCOM_PMCR          0x400801
 
 void cpu_scom_init(void)
 {
-#ifdef not_yet    
-    write_scom(SCOM_AMCS_AND_MASK, 0);
-    
-    printk("scom MCKE: 0x%016lx\n", read_scom(SCOM_CMCE));
-    write_scom(SCOM_CMCE, ~0UL);
-    printk("scom MCKE: 0x%016lx\n", read_scom(SCOM_CMCE));
+#ifdef not_yet
+    console_start_sync();
+    printk("scom PMCR: 0x%016lx\n", read_scom(SCOM_PMCR));
+    console_end_sync();
 #endif
 }

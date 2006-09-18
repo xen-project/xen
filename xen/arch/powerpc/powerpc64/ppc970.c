@@ -168,7 +168,7 @@ void cpu_initialize(int cpuid)
     hid0.bits.nhr = 1;      /* Not Hard Reset */
     hid0.bits.hdice_en = 1; /* enable HDEC */
     hid0.bits.en_therm = 0; /* ! Enable ext thermal ints */
-    /* onlu debug Xen should do this */
+    /* only debug Xen should activate ATTN */
     hid0.bits.en_attn = 1;  /* Enable attn instruction */
     hid0.bits.en_mck = 1;   /* Enable external machine check interrupts */
 

@@ -66,7 +66,7 @@ int cpu_machinecheck(struct cpu_user_regs *regs)
     switch (regs->msr & MCK_SRR1_CAUSE_MASK) {
     case 0:
         printk("0b00: Likely caused by an asynchronous machine check,\n"
-               "see SCOM Asynchronous Machine Check Register\n");
+               "      see SCOM Asynchronous Machine Check Register\n");
         break;
     case MCK_SRR1_CAUSE_SLB_PAR:
         printk("0b01: Exception caused by an SLB parity error detected\n"
