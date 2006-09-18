@@ -65,6 +65,7 @@
 #include <xen/interface/physdev.h>
 #include <xen/interface/memory.h>
 #include <xen/features.h>
+#include <xen/xencons.h>
 #include "setup_arch_pre.h"
 #include <bios_ebda.h>
 
@@ -1665,33 +1666,15 @@ void __init setup_arch(char **cmdline_p)
 		screen_info.orig_video_cols = 80;
 		screen_info.orig_video_ega_bx = 3;
 		screen_info.orig_video_points = 16;
+		screen_info.orig_y = screen_info.orig_video_lines - 1;
 		if (xen_start_info->console.dom0.info_size >=
 		    sizeof(struct dom0_vga_console_info)) {
 			const struct dom0_vga_console_info *info =
 				(struct dom0_vga_console_info *)(
 					(char *)xen_start_info +
 					xen_start_info->console.dom0.info_off);
-			screen_info.orig_video_mode = info->txt_mode;
-			screen_info.orig_video_isVGA = info->video_type;
-			screen_info.orig_video_lines = info->video_height;
-			screen_info.orig_video_cols = info->video_width;
-			screen_info.orig_video_points = info->txt_points;
-			screen_info.lfb_width = info->video_width;
-			screen_info.lfb_height = info->video_height;
-			screen_info.lfb_depth = info->lfb_depth;
-			screen_info.lfb_base = info->lfb_base;
-			screen_info.lfb_size = info->lfb_size;
-			screen_info.lfb_linelength = info->lfb_linelen;
-			screen_info.red_size = info->red_size;
-			screen_info.red_pos = info->red_pos;
-			screen_info.green_size = info->green_size;
-			screen_info.green_pos = info->green_pos;
-			screen_info.blue_size = info->blue_size;
-			screen_info.blue_pos = info->blue_pos;
-			screen_info.rsvd_size = info->rsvd_size;
-			screen_info.rsvd_pos = info->rsvd_pos;
+			dom0_init_screen_info(info);
 		}
-		screen_info.orig_y = screen_info.orig_video_lines - 1;
 		xen_start_info->console.domU.mfn = 0;
 		xen_start_info->console.domU.evtchn = 0;
 	} else

@@ -680,11 +680,12 @@ int fill_console_start_info(struct dom0_vga_console_info *ci)
     if ( !vgacon_enabled )
         return 0;
 
-    ci->video_type   = 1;
-    ci->video_width  = COLUMNS;
-    ci->video_height = LINES;
-    ci->txt_mode     = 3;
-    ci->txt_points   = font ? font->height : 16;
+    ci->video_type = XEN_VGATYPE_TEXT_MODE_3;
+    ci->u.text_mode_3.rows     = LINES;
+    ci->u.text_mode_3.columns  = COLUMNS;
+    ci->u.text_mode_3.cursor_x = 0;
+    ci->u.text_mode_3.cursor_y = LINES - 1;
+    ci->u.text_mode_3.font_height = font ? font->height : 16;
 
     return 1;
 }
