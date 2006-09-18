@@ -84,6 +84,7 @@ class SrvBase(resource.Resource):
             try:
                 return op_method(op, req)
             except Exception, exn:
+                req.setResponseCode(http.INTERNAL_SERVER_ERROR, "Request failed: " + op)
                 log.exception("Request %s failed.", op)
                 if req.useSxp():
                     return ['xend.err', str(exn)]

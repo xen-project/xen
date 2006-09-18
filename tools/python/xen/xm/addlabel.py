@@ -20,8 +20,6 @@
 """Labeling a domain configuration file or a resoruce.
 """
 import sys, os
-import string
-import traceback
 from xen.util import dictio
 from xen.util import security
 
@@ -33,6 +31,7 @@ def usage():
     print "  resource. It derives the policy from the running hypervisor"
     print "  if it is not given (optional parameter). If a label already"
     print "  exists for the given domain or resource, then addlabel fails.\n"
+    security.err("Usage")
 
 
 def validate_config_file(configfile):
@@ -134,7 +133,6 @@ def main (argv):
                 for prefix in [".", "/etc/xen"]:
                     configfile = prefix + "/" + configfile
                     if os.path.isfile(configfile):
-                        fd = open(configfile, "rb")
                         break
             if not validate_config_file(configfile):
                 usage()
@@ -147,7 +145,7 @@ def main (argv):
             usage()
 
     except security.ACMError:
-        traceback.print_exc(limit=1)
+        sys.exit(-1)
 
 
 if __name__ == '__main__':

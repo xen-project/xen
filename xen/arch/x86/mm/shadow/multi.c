@@ -1792,8 +1792,10 @@ void sh_install_xen_entries_in_l2h(struct vcpu *v,
         for ( i = 0; i < MACHPHYS_MBYTES>>1; i++ )
         {
             sl2e[shadow_l2_table_offset(RO_MPT_VIRT_START) + i] =
-                shadow_l2e_from_mfn(_mfn(l3e_get_pfn(p2m[i])),
-                                    __PAGE_HYPERVISOR);
+                (l3e_get_flags(p2m[i]) & _PAGE_PRESENT)
+                ? shadow_l2e_from_mfn(_mfn(l3e_get_pfn(p2m[i])),
+                                      __PAGE_HYPERVISOR)
+                : shadow_l2e_empty();
         }
         sh_unmap_domain_page(p2m);
     }
@@ -2861,11 +2863,11 @@ static int sh_page_fault(struct vcpu *v,
     //      bunch of 4K maps.
     //
 
+    shadow_lock(d);
+
     SHADOW_PRINTK("d:v=%u:%u va=%#lx err=%u\n",
                    v->domain->domain_id, v->vcpu_id, va, regs->error_code);
     
-    shadow_lock(d);
-
     shadow_audit_tables(v);
                    
     if ( guest_walk_tables(v, va, &gw, 1) != 0 )
@@ -3291,12 +3293,6 @@ sh_update_linear_entries(struct vcpu *v)
         {
             ml3e = __linear_l3_table;
             l3mfn = _mfn(l4e_get_pfn(__linear_l4_table[0]));
-#if GUEST_PAGING_LEVELS == 2
-            /* Shadow l3 tables are made up by update_cr3 */
-            sl3e = v->arch.hvm_vcpu.hvm_lowmem_l3tab;
-#else
-            sl3e = v->arch.shadow_vtable;
-#endif
         }
         else 
         {   
@@ -3306,13 +3302,15 @@ sh_update_linear_entries(struct vcpu *v)
             l3mfn = _mfn(l4e_get_pfn(ml4e[0]));
             ml3e = sh_map_domain_page(l3mfn);
             sh_unmap_domain_page(ml4e);
-#if GUEST_PAGING_LEVELS == 2
-            /* Shadow l3 tables are made up by update_cr3 */
-            sl3e = v->arch.hvm_vcpu.hvm_lowmem_l3tab;
-#else
-            sl3e = sh_map_domain_page(pagetable_get_mfn(v->arch.shadow_table));
-#endif
         }
+
+#if GUEST_PAGING_LEVELS == 2
+        /* Shadow l3 tables are made up by update_cr3 */
+        sl3e = v->arch.hvm_vcpu.hvm_lowmem_l3tab;
+#else
+        /* Always safe to use shadow_vtable, because it's globally mapped */
+        sl3e = v->arch.shadow_vtable;
+#endif
 
         for ( i = 0; i < SHADOW_L3_PAGETABLE_ENTRIES; i++ )
         {
@@ -3324,12 +3322,7 @@ sh_update_linear_entries(struct vcpu *v)
         }
 
         if ( v != current ) 
-        {
             sh_unmap_domain_page(ml3e);
-#if GUEST_PAGING_LEVELS != 2
-            sh_unmap_domain_page(sl3e);
-#endif
-        }
     }
 
 #elif CONFIG_PAGING_LEVELS == 3
@@ -3361,31 +3354,10 @@ sh_update_linear_entries(struct vcpu *v)
         
 #else /* GUEST_PAGING_LEVELS == 3 */
         
-        /* Use local vcpu's mappings if we can; otherwise make new mappings */
-        if ( v == current ) 
-        {
-            shadow_l3e = v->arch.shadow_vtable;
-            if ( !shadow_mode_external(d) )
-                guest_l3e = v->arch.guest_vtable;
-        }
-        else 
-        {
-            mfn_t smfn;
-            int idx;
-            
-            /* Map the shadow l3 */
-            smfn = pagetable_get_mfn(v->arch.shadow_table);
-            idx = shadow_l3_index(&smfn, guest_index(v->arch.shadow_vtable));
-            shadow_l3e = sh_map_domain_page(smfn);
-            shadow_l3e += idx;
-            if ( !shadow_mode_external(d) )
-            {
-                /* Also the guest l3 */
-                mfn_t gmfn = pagetable_get_mfn(v->arch.guest_table); 
-                guest_l3e = sh_map_domain_page(gmfn);
-                guest_l3e += guest_index(v->arch.guest_vtable);
-            }
-        }
+        /* Always safe to use *_vtable, because they're globally mapped */
+        shadow_l3e = v->arch.shadow_vtable;
+        guest_l3e = v->arch.guest_vtable;
+
 #endif /* GUEST_PAGING_LEVELS */
         
         /* Choose where to write the entries, using linear maps if possible */
@@ -3443,14 +3415,6 @@ sh_update_linear_entries(struct vcpu *v)
         if ( v != current || !shadow_mode_external(d) )
             sh_unmap_domain_page(l2e);
         
-#if GUEST_PAGING_LEVELS == 3
-        if ( v != current) 
-        {
-            sh_unmap_domain_page(shadow_l3e);
-            if ( !shadow_mode_external(d) )
-                sh_unmap_domain_page(guest_l3e);
-        }
-#endif
     }
 
 #elif CONFIG_PAGING_LEVELS == 2
@@ -3601,7 +3565,7 @@ sh_detach_old_tables(struct vcpu *v)
          v->arch.shadow_vtable )
     {
         // Q: why does this need to use (un)map_domain_page_*global* ?
-        //
+        /* A: so sh_update_linear_entries can operate on other vcpus */
         sh_unmap_domain_page_global(v->arch.shadow_vtable);
         v->arch.shadow_vtable = NULL;
     }

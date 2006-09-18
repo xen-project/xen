@@ -652,6 +652,23 @@ static int hvm_decode(int realmode, unsigned char *opcode, struct instruction *i
         instr->operand[1] = mk_operand(instr->op_size, 0, 0, MEMORY);
         return DECODE_success;
 
+    case 0xBA:
+        if (((opcode[1] >> 3) & 7) == 4) /* BT $imm8, m16/32/64 */
+        {
+            instr->instr = INSTR_BT;
+            GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+            instr->immediate =
+                    (signed char)get_immediate(realmode, opcode+1, BYTE);
+            instr->operand[0] = mk_operand(BYTE, 0, 0, IMMEDIATE);
+            instr->operand[1] = mk_operand(instr->op_size, 0, 0, MEMORY);
+            return DECODE_success;
+        }
+        else
+        {
+            printf("0f %x, This opcode subtype isn't handled yet\n", *opcode);
+            return DECODE_failure;
+        }
+
     default:
         printf("0f %x, This opcode isn't handled yet\n", *opcode);
         return DECODE_failure;
@@ -1002,10 +1019,17 @@ void handle_mmio(unsigned long va, unsigned long gpa)
             mmio_opp->operand[0] = mmio_inst.operand[0]; /* bit offset */
             mmio_opp->operand[1] = mmio_inst.operand[1]; /* bit base */
 
-            index = operand_index(mmio_inst.operand[0]);
-            size = operand_size(mmio_inst.operand[0]);
-            value = get_reg_value(size, index, 0, regs);
-
+            if ( mmio_inst.operand[0] & REGISTER )
+            { 
+                index = operand_index(mmio_inst.operand[0]);
+                size = operand_size(mmio_inst.operand[0]);
+                value = get_reg_value(size, index, 0, regs);
+            }
+            else if ( mmio_inst.operand[0] & IMMEDIATE )
+            {
+                mmio_opp->immediate = mmio_inst.immediate;
+                value = mmio_inst.immediate;
+            } 
             send_mmio_req(IOREQ_TYPE_COPY, gpa + (value >> 5), 1,
                           mmio_inst.op_size, 0, IOREQ_READ, 0);
             break;

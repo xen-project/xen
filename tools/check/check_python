@@ -7,4 +7,4 @@ function error {
     exit 1
 }
 
-python -V 2>&1 | cut -d ' ' -f 2 | grep -q -E '^2.2|^2.3|^2.4' || error
+python -V 2>&1 | cut -d ' ' -f 2 | grep -q '^2.[2345]' || error

@@ -64,10 +64,14 @@ class BlkifController(DevController):
             except ValueError:
                 (typ, params) = ("", "")
 
+        mode = sxp.child_value(config, 'mode', 'r')
+        if mode not in ('r', 'w', 'w!'):
+            raise VmError('Invalid mode')
+
         back = { 'dev'    : dev,
                  'type'   : typ,
                  'params' : params,
-                 'mode'   : sxp.child_value(config, 'mode', 'r')
+                 'mode'   : mode
                }
 
         if security.on():

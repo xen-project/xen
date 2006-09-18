@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -e
+
 [ "$GDB_MIRROR" ] || GDB_MIRROR="ftp://ftp.gnu.org/gnu/gdb/"
 
 rm -rf gdb-6.2.1 gdb-6.2.1-linux-i386-xen
@@ -18,7 +20,7 @@ cd gdb-6.2.1-linux-i386-xen
 if [ "$MAKE" ]; then
     $MAKE
 elif which gmake ; then
-    gmake -j4 CFLAGS=-D__XEN_TOOLS__
+    gmake -j4
 else
-    make -j4 CFLAGS=-D__XEN_TOOLS__
+    make -j4
 fi

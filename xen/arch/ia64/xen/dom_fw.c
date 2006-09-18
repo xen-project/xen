@@ -816,9 +816,12 @@ dom_fw_init(struct domain *d,
 	                       FW_HYPERCALL_SAL_RETURN, 0, hypercalls_imva);
 
 	/* Fill in the FPSWA interface: */
-	tables->fpswa_inf.revision = fpswa_interface->revision;
-	dom_fpswa_hypercall_patch(d, hypercalls_imva);
-	tables->fpswa_inf.fpswa = (void *)FW_HYPERCALL_FPSWA_ENTRY_PADDR;
+	if (fpswa_interface) {
+		tables->fpswa_inf.revision = fpswa_interface->revision;
+		dom_fpswa_hypercall_patch(d, hypercalls_imva);
+		tables->fpswa_inf.fpswa = 
+		                       (void *)FW_HYPERCALL_FPSWA_ENTRY_PADDR;
+	}
 
 	i = 0; /* Used by MAKE_MD */
 
@@ -867,7 +870,8 @@ dom_fw_init(struct domain *d,
 	bp->console_info.num_rows = 25;
 	bp->console_info.orig_x = 0;
 	bp->console_info.orig_y = 24;
-	bp->fpswa = FW_FIELD_MPA(fpswa_inf);
+	if (fpswa_interface)
+		bp->fpswa = FW_FIELD_MPA(fpswa_inf);
 }
 
 void dom_fw_setup(struct domain *d, unsigned long bp_mpa, unsigned long maxmem)

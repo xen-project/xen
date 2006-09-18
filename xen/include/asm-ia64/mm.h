@@ -451,7 +451,6 @@ extern u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps,
 
 #define INVALID_M2P_ENTRY        (~0UL)
 #define VALID_M2P(_e)            (!((_e) & (1UL<<63)))
-#define IS_INVALID_M2P_ENTRY(_e) (!VALID_M2P(_e))
 
 #define set_gpfn_from_mfn(mfn, pfn) (machine_to_phys_mapping[(mfn)] = (pfn))
 #define get_gpfn_from_mfn(mfn)      (machine_to_phys_mapping[(mfn)])
@@ -495,7 +494,7 @@ extern u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps,
     ((gmfn_to_mfn((_d),(gpa)>>PAGE_SHIFT)<<PAGE_SHIFT)|((gpa)&~PAGE_MASK))
 
 /* Arch-specific portion of memory_op hypercall. */
-#define arch_memory_op(op, arg) (-ENOSYS)
+long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg);
 
 int steal_page(
     struct domain *d, struct page_info *page, unsigned int memflags);

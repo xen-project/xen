@@ -237,6 +237,25 @@ static uint32_t gen_cksum(char *ptr, int len)
 	return ret;
 }
 
+static int get_filesize(char *filename, uint64_t *size, struct stat *st)
+{
+	int blockfd;
+
+	/*Set to the backing file size*/
+	if(S_ISBLK(st->st_mode)) {
+		blockfd = open(filename, O_RDONLY);
+		if (blockfd < 0)
+			return -1;
+		if (ioctl(blockfd,BLKGETSIZE,size)!=0) {
+			printf("Unable to get Block device size\n");
+			close(blockfd);
+			return -1;
+		}
+		close(blockfd);
+	} else *size = (st->st_size >> SECTOR_SHIFT);	
+	return 0;
+}
+
 static int qcow_set_key(struct td_state *bs, const char *key)
 {
 	struct tdqcow_state *s = (struct tdqcow_state *)bs->private;
@@ -1204,12 +1223,14 @@ int qcow_create(const char *filename, uint64_t total_size,
 			header_size += backing_filename_len;
 			
 			/*Set to the backing file size*/
-			size = (st.st_size >> SECTOR_SHIFT);
+			if(get_filesize(backing_filename, &size, &st)) {
+				return -1;
+			}
 			DPRINTF("Backing file size detected: %lld sectors" 
 				"(total %lld [%lld MB])\n", 
-				(long long)total_size, 
-				(long long)(total_size << SECTOR_SHIFT), 
-				(long long)(total_size >> 11));
+				(long long)size, 
+				(long long)(size << SECTOR_SHIFT), 
+				(long long)(size >> 11));
 		} else {
 			backing_file = NULL;
 			DPRINTF("Setting file size: %lld (total %lld)\n", 

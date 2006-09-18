@@ -37,9 +37,10 @@ def main(argv):
         make_policy(argv[1])
 
     except ACMError:
-        pass
+        sys.exit(-1)
     except:
         traceback.print_exc(limit=1)
+        sys.exit(-1)
 
 
 

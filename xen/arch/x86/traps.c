@@ -339,7 +339,6 @@ void show_execution_state(struct cpu_user_regs *regs)
 asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs)
 {
     int cpu = smp_processor_id();
-    unsigned long cr2;
     static char *trapstr[] = { 
         "divide error", "debug", "nmi", "bkpt", "overflow", "bounds", 
         "invalid opcode", "device not available", "double fault", 
@@ -356,7 +355,7 @@ asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs)
 
     if ( trapnr == TRAP_page_fault )
     {
-        __asm__ __volatile__ ("mov %%cr2,%0" : "=r" (cr2) : );
+        unsigned long cr2 = read_cr2();
         printk("Faulting linear address: %p\n", _p(cr2));
         show_page_walk(cr2);
     }
@@ -911,7 +910,7 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
 
     ASSERT(!in_irq());
 
-    __asm__ __volatile__ ("mov %%cr2,%0" : "=r" (addr) : );
+    addr = read_cr2();
 
     DEBUGGER_trap_entry(TRAP_page_fault, regs);
 
@@ -1004,7 +1003,21 @@ static inline int admin_io_okay(
 }
 
 /* Check admin limits. Silently fail the access if it is disallowed. */
-#define inb_user(_p, _d, _r) (admin_io_okay(_p, 1, _d, _r) ? inb(_p) : ~0)
+static inline unsigned char inb_user(
+    unsigned int port, struct vcpu *v, struct cpu_user_regs *regs)
+{
+    /*
+     * Allow read access to port 0x61. Bit 4 oscillates with period 30us, and
+     * so it is often used for timing loops in BIOS code. This hack can go
+     * away when we have separate read/write permission rangesets.
+     * Note that we could emulate bit 4 instead of directly reading port 0x61,
+     * but there's not really a good reason to do so.
+     */
+    if ( admin_io_okay(port, 1, v, regs) || (port == 0x61) )
+        return inb(port);
+    return ~0;
+}
+//#define inb_user(_p, _d, _r) (admin_io_okay(_p, 1, _d, _r) ? inb(_p) : ~0)
 #define inw_user(_p, _d, _r) (admin_io_okay(_p, 2, _d, _r) ? inw(_p) : ~0)
 #define inl_user(_p, _d, _r) (admin_io_okay(_p, 4, _d, _r) ? inl(_p) : ~0)
 #define outb_user(_v, _p, _d, _r) \

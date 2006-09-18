@@ -184,3 +184,6 @@ function vtpm_migrate_recover() {
  echo "Error: Recovery not supported yet" 
 }
 
+function vtpm_migrate_local() {
+ echo "Error: local vTPM migration not supported"
+}

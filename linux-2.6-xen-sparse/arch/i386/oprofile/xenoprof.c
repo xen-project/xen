@@ -26,15 +26,16 @@
 #include <xen/evtchn.h>
 #include "op_counter.h"
 
+#include <xen/driver_util.h>
 #include <xen/interface/xen.h>
 #include <xen/interface/xenoprof.h>
 #include <../../../drivers/oprofile/cpu_buffer.h>
 #include <../../../drivers/oprofile/event_buffer.h>
 
+#define MAX_XENOPROF_SAMPLES 16
+
 static int xenoprof_start(void);
 static void xenoprof_stop(void);
-
-void * vm_map_xen_pages(unsigned long maddr, int vm_size, pgprot_t prot);
 
 static int xenoprof_enabled = 0;
 static unsigned int num_events = 0;
@@ -44,7 +45,7 @@ static int active_defined;
 /* sample buffers shared with Xen */
 xenoprof_buf_t * xenoprof_buf[MAX_VIRT_CPUS];
 /* Shared buffer area */
-char * shared_buffer;
+char * shared_buffer = NULL;
 /* Number of buffers in shared area (one per VCPU) */
 int nbuf;
 /* Mappings of VIRQ_XENOPROF to irq number (per cpu) */
@@ -234,13 +235,57 @@ static int bind_virq(void)
 }
 
 
+static int map_xenoprof_buffer(int max_samples)
+{
+	struct xenoprof_get_buffer get_buffer;
+	struct xenoprof_buf *buf;
+	int npages, ret, i;
+	struct vm_struct *area;
+
+	if ( shared_buffer )
+		return 0;
+
+	get_buffer.max_samples = max_samples;
+
+	if ( (ret = HYPERVISOR_xenoprof_op(XENOPROF_get_buffer, &get_buffer)) )
+		return ret;
+
+	nbuf = get_buffer.nbuf;
+	npages = (get_buffer.bufsize * nbuf - 1) / PAGE_SIZE + 1;
+
+	area = alloc_vm_area(npages * PAGE_SIZE);
+	if (area == NULL)
+		return -ENOMEM;
+
+	if ( (ret = direct_kernel_remap_pfn_range(
+		      (unsigned long)area->addr,
+		      get_buffer.buf_maddr >> PAGE_SHIFT,
+		      npages * PAGE_SIZE, __pgprot(_KERNPG_TABLE), DOMID_SELF)) ) {
+		vunmap(area->addr);
+		return ret;
+	}
+
+	shared_buffer = area->addr;
+	for (i=0; i< nbuf; i++) {
+		buf = (struct xenoprof_buf*) 
+			&shared_buffer[i * get_buffer.bufsize];
+		BUG_ON(buf->vcpu_id >= MAX_VIRT_CPUS);
+		xenoprof_buf[buf->vcpu_id] = buf;
+	}
+
+	return 0;
+}
+
+
 static int xenoprof_setup(void)
 {
 	int ret;
 	int i;
 
-	ret = bind_virq();
-	if (ret)
+	if ( (ret = map_xenoprof_buffer(MAX_XENOPROF_SAMPLES)) )
+		return ret;
+
+	if ( (ret = bind_virq()) )
 		return ret;
 
 	if (is_primary) {
@@ -373,9 +418,9 @@ static int xenoprof_set_passive(int * p_domains,
 {
 	int ret;
 	int i, j;
-	int vm_size;
 	int npages;
 	struct xenoprof_buf *buf;
+	struct vm_struct *area;
 	pgprot_t prot = __pgprot(_KERNPG_TABLE);
 
 	if (!is_primary)
@@ -391,19 +436,29 @@ static int xenoprof_set_passive(int * p_domains,
 	for (i = 0; i < pdoms; i++) {
 		passive_domains[i].domain_id = p_domains[i];
 		passive_domains[i].max_samples = 2048;
-		ret = HYPERVISOR_xenoprof_op(XENOPROF_set_passive, &passive_domains[i]);
+		ret = HYPERVISOR_xenoprof_op(XENOPROF_set_passive,
+					     &passive_domains[i]);
 		if (ret)
-			return ret;
+			goto out;
 
 		npages = (passive_domains[i].bufsize * passive_domains[i].nbuf - 1) / PAGE_SIZE + 1;
-		vm_size = npages * PAGE_SIZE;
 
-		p_shared_buffer[i] = (char *)vm_map_xen_pages(passive_domains[i].buf_maddr,
-							      vm_size, prot);
-		if (!p_shared_buffer[i]) {
+		area = alloc_vm_area(npages * PAGE_SIZE);
+		if (area == NULL) {
 			ret = -ENOMEM;
 			goto out;
 		}
+
+		ret = direct_kernel_remap_pfn_range(
+			(unsigned long)area->addr,
+			passive_domains[i].buf_maddr >> PAGE_SHIFT,
+			npages * PAGE_SIZE, prot, DOMID_SELF);
+		if (ret) {
+			vunmap(area->addr);
+			goto out;
+		}
+
+		p_shared_buffer[i] = area->addr;
 
 		for (j = 0; j < passive_domains[i].nbuf; j++) {
 			buf = (struct xenoprof_buf *)
@@ -473,43 +528,18 @@ static int using_xenoprof;
 int __init oprofile_arch_init(struct oprofile_operations * ops)
 {
 	struct xenoprof_init init;
-	struct xenoprof_buf * buf;
-	int vm_size;
-	int npages;
-	int ret;
-	int i;
+	int ret, i;
 
-	init.max_samples = 16;
 	ret = HYPERVISOR_xenoprof_op(XENOPROF_init, &init);
 
 	if (!ret) {
-		pgprot_t prot = __pgprot(_KERNPG_TABLE);
-
 		num_events = init.num_events;
 		is_primary = init.is_primary;
-		nbuf = init.nbuf;
 
 		/* just in case - make sure we do not overflow event list 
-                   (i.e. counter_config list) */
+		   (i.e. counter_config list) */
 		if (num_events > OP_MAX_COUNTER)
 			num_events = OP_MAX_COUNTER;
-
-		npages = (init.bufsize * nbuf - 1) / PAGE_SIZE + 1;
-		vm_size = npages * PAGE_SIZE;
-
-		shared_buffer = (char *)vm_map_xen_pages(init.buf_maddr,
-							 vm_size, prot);
-		if (!shared_buffer) {
-			ret = -ENOMEM;
-			goto out;
-		}
-
-		for (i=0; i< nbuf; i++) {
-			buf = (struct xenoprof_buf*) 
-				&shared_buffer[i * init.bufsize];
-			BUG_ON(buf->vcpu_id >= MAX_VIRT_CPUS);
-			xenoprof_buf[buf->vcpu_id] = buf;
-		}
 
 		/*  cpu_type is detected by Xen */
 		cpu_type[XENOPROF_CPU_TYPE_SIZE-1] = 0;
@@ -525,7 +555,6 @@ int __init oprofile_arch_init(struct oprofile_operations * ops)
 
 		active_defined = 0;
 	}
- out:
 	printk(KERN_INFO "oprofile_arch_init: ret %d, events %d, "
 	       "is_primary %d\n", ret, num_events, is_primary);
 	return ret;

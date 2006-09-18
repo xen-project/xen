@@ -432,7 +432,6 @@ bug report.
 Sample xen domain info looks as follows (lines wrapped manually to
 make the man page more readable):
 
- system                 : Linux
  host                   : talon
  release                : 2.6.12.6-xen0
  version                : #1 Mon Nov 14 14:26:26 EST 2005
@@ -444,13 +443,14 @@ make the man page more readable):
  threads_per_core       : 1
  cpu_mhz                : 696
  hw_caps                : 0383fbff:00000000:00000000:00000040
- memory                 : 767
+ total_memory           : 767
  free_memory            : 37
  xen_major              : 3
  xen_minor              : 0
  xen_extra              : -devel
  xen_caps               : xen-3.0-x86_32
- xen_params             : virt_start=0xfc000000
+ xen_pagesize           : 4096
+ platform_params        : virt_start=0xfc000000
  xen_changeset          : Mon Nov 14 18:13:38 2005 +0100 
                           7793:090e44133d40
  cc_compiler            : gcc version 3.4.3 (Mandrakelinux 
@@ -458,6 +458,7 @@ make the man page more readable):
  cc_compile_by          : sdague
  cc_compile_domain      : (none)
  cc_compile_date        : Mon Nov 14 14:16:48 EST 2005
+ xend_config_format     : 2
 
 B<FIELDS>
 

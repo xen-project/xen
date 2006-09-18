@@ -79,22 +79,22 @@ asmlinkage void svm_intr_assist(void)
     ASSERT(vmcb);
 
     /* Check if an Injection is active */
-       /* Previous Interrupt delivery caused this Intercept? */
-       if (vmcb->exitintinfo.fields.v && (vmcb->exitintinfo.fields.type == 0)) {
-           v->arch.hvm_svm.saved_irq_vector = vmcb->exitintinfo.fields.vector;
+    /* Previous Interrupt delivery caused this Intercept? */
+    if (vmcb->exitintinfo.fields.v && (vmcb->exitintinfo.fields.type == 0)) {
+        v->arch.hvm_svm.saved_irq_vector = vmcb->exitintinfo.fields.vector;
 //           printk("Injecting PF#: saving IRQ from ExitInfo\n");
-           vmcb->exitintinfo.bytes = 0;
-           re_injecting = 1;
-       }
+        vmcb->exitintinfo.bytes = 0;
+        re_injecting = 1;
+    }
 
     /* Guest's interrputs masked? */
     rflags = vmcb->rflags;
     if (irq_masked(rflags)) {
         HVM_DBG_LOG(DBG_LEVEL_1, "Guest IRQs masked: rflags: %lx", rflags);
-       /* bail out, we won't be injecting an interrupt this time */
-       return;
+        /* bail out, we won't be injecting an interrupt this time */
+        return;
     }
-  
+    
     /* Previous interrupt still pending? */
     if (vmcb->vintr.fields.irq) {
 //        printk("Re-injecting IRQ from Vintr\n");
@@ -115,27 +115,24 @@ asmlinkage void svm_intr_assist(void)
       if ( v->vcpu_id == 0 )
          hvm_pic_assist(v);
 
-      callback_irq = v->domain->arch.hvm_domain.params[HVM_PARAM_CALLBACK_IRQ];
 
-      /* Before we deal with PIT interrupts, let's check for
-         interrupts set by the device model or paravirtualised event
-         channel interrupts.
-      */
-      if ( cpu_has_pending_irq(v) ) {
-           intr_vector = cpu_get_interrupt(v, &intr_type);
+      if ( (v->vcpu_id == 0) && pt->enabled && pt->pending_intr_nr ) {
+          pic_set_irq(pic, pt->irq, 0);
+          pic_set_irq(pic, pt->irq, 1);
       }
-      else  if ( callback_irq != 0 && local_events_need_delivery() ) {
+
+      callback_irq = v->domain->arch.hvm_domain.params[HVM_PARAM_CALLBACK_IRQ];
+      if ( callback_irq != 0 &&
+           local_events_need_delivery() ) {
           /*inject para-device call back irq*/
           v->vcpu_info->evtchn_upcall_mask = 1;
           pic_set_irq(pic, callback_irq, 0);
           pic_set_irq(pic, callback_irq, 1);
-          intr_vector = callback_irq;
       }
-      else  if ( (v->vcpu_id == 0) && pt->enabled && pt->pending_intr_nr ) {
-          pic_set_irq(pic, pt->irq, 0);
-          pic_set_irq(pic, pt->irq, 1);
+
+      if ( cpu_has_pending_irq(v) )
           intr_vector = cpu_get_interrupt(v, &intr_type);
-      }
+
     }
 
     /* have we got an interrupt to inject? */

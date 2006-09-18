@@ -247,6 +247,11 @@ static void tap_frontend_changed(struct xenbus_device *dev,
 
 	switch (frontend_state) {
 	case XenbusStateInitialising:
+		if (dev->state == XenbusStateClosed) {
+			printk("%s: %s: prepare for reconnect\n",
+			       __FUNCTION__, dev->nodename);
+			xenbus_switch_state(dev, XenbusStateInitWait);
+		}
 		break;
 
 	case XenbusStateInitialised:
@@ -264,11 +269,20 @@ static void tap_frontend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateClosing:
+		if (be->blkif->xenblkd) {
+			kthread_stop(be->blkif->xenblkd);
+			be->blkif->xenblkd = NULL;
+		}
+		tap_blkif_unmap(be->blkif);
 		xenbus_switch_state(dev, XenbusStateClosing);
 		break;
 
-	case XenbusStateUnknown:
 	case XenbusStateClosed:
+		xenbus_switch_state(dev, XenbusStateClosed);
+		if (xenbus_dev_is_online(dev))
+			break;
+		/* fall through if not online */
+	case XenbusStateUnknown:
 		device_unregister(&dev->dev);
 		break;
 

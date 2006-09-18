@@ -68,19 +68,6 @@ static inline int is_interruptibility_state(void)
     return interruptibility;
 }
 
-/* check to see if there is pending interrupt  */
-int cpu_has_pending_irq(struct vcpu *v)
-{
-    struct hvm_domain *plat = &v->domain->arch.hvm_domain;
-
-    /* APIC */
-    if ( cpu_has_apic_interrupt(v) ) return 1;
-    
-    /* PIC */
-    if ( !vlapic_accept_pic_intr(v) ) return 0;
-
-    return plat->interrupt_request;
-}
 
 asmlinkage void vmx_intr_assist(void)
 {

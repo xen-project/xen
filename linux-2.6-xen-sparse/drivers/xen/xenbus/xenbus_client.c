@@ -41,6 +41,20 @@ extern char *kasprintf(const char *fmt, ...);
 #define DPRINTK(fmt, args...) \
     pr_debug("xenbus_client (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
 
+char *xenbus_strstate(enum xenbus_state state)
+{
+	static char *name[] = {
+		[ XenbusStateUnknown      ] = "Unknown",
+		[ XenbusStateInitialising ] = "Initialising",
+		[ XenbusStateInitWait     ] = "InitWait",
+		[ XenbusStateInitialised  ] = "Initialised",
+		[ XenbusStateConnected    ] = "Connected",
+		[ XenbusStateClosing      ] = "Closing",
+		[ XenbusStateClosed	  ] = "Closed",
+	};
+	return (state < ARRAY_SIZE(name)) ? name[state] : "INVALID";
+}
+
 int xenbus_watch_path(struct xenbus_device *dev, const char *path,
 		      struct xenbus_watch *watch,
 		      void (*callback)(struct xenbus_watch *,
@@ -124,6 +138,13 @@ int xenbus_switch_state(struct xenbus_device *dev, enum xenbus_state state)
 }
 EXPORT_SYMBOL_GPL(xenbus_switch_state);
 
+int xenbus_frontend_closed(struct xenbus_device *dev)
+{
+	xenbus_switch_state(dev, XenbusStateClosed);
+	complete(&dev->down);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(xenbus_frontend_closed);
 
 /**
  * Return the path to the error node for the given device, or NULL on failure.

@@ -70,7 +70,7 @@ def determine_kernelversion(user_specified):
                 within_xen_title = 0
                 within_xen_entry = 0
     if len(version_list) > 1:
-        err("Cannot decide between entries for kernels: " + version_list)
+        err("Cannot decide between entries for kernels %s" % version_list)
     elif len(version_list) == 0:
         err("Cannot find a boot entry candidate (please create a Xen boot entry first).")
     else:
@@ -87,7 +87,6 @@ def insert_policy(boot_file, kernel_version, policy_name):
     within_xen_entry = 0
     insert_at_end_of_entry = 0
     path_prefix = ''
-    done = False
     (tmp_fd, tmp_grub) = tempfile.mkstemp()
     #follow symlink since menue.lst might be linked to grub.conf
     if stat.S_ISLNK(os.lstat(boot_file)[stat.ST_MODE]):
@@ -175,9 +174,10 @@ def main(argv):
         print "Boot entry created and \'%s\' copied to /boot" % (policy + ".bin")
 
     except ACMError:
-        pass
+        sys.exit(-1)
     except:
         traceback.print_exc(limit=1)
+        sys.exit(-1)
 
 
 

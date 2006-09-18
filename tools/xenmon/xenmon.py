@@ -672,6 +672,9 @@ def main():
 
     parser = setup_cmdline_parser()
     (options, args) = parser.parse_args()
+    if options.mspersample < 0:
+        parser.error("option --ms_per_sample: invalid negative value: '%d'" %
+                     options.mspersample)
     
     start_xenbaked()
     if options.live:

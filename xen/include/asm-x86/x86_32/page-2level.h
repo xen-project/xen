@@ -53,7 +53,4 @@ typedef l2_pgentry_t root_pgentry_t;
 #define get_pte_flags(x) ((int)(x) & 0xFFF)
 #define put_pte_flags(x) ((intpte_t)((x) & 0xFFF))
 
-#define L1_DISALLOW_MASK BASE_DISALLOW_MASK
-#define L2_DISALLOW_MASK BASE_DISALLOW_MASK
-
 #endif /* __X86_32_PAGE_2LEVEL_H__ */

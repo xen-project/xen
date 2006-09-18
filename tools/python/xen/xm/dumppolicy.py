@@ -18,7 +18,6 @@
 """Display currently enforced policy (low-level hypervisor representation).
 """
 import sys
-import traceback
 from xen.util.security import ACMError, err, dump_policy
 
 
@@ -31,12 +30,13 @@ def usage():
 
 def main(argv):
     try:
+        if len(argv) != 1:
+            usage()
+
         dump_policy()
 
     except ACMError:
-        pass
-    except:
-        traceback.print_exc(limit=1)
+        sys.exit(-1)
 
 
 if __name__ == '__main__':

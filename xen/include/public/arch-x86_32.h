@@ -28,14 +28,7 @@
 #endif
 
 /* Structural guest handles introduced in 0x00030201. */
-#if (defined(__XEN__) || defined(__XEN_TOOLS__)) && !defined(__ASSEMBLY__)
-typedef uint64_t __attribute__((aligned(8))) uint64_aligned_t;
-#define __DEFINE_XEN_GUEST_HANDLE(name, type)                   \
-    typedef struct { type *p; }                                 \
-        __guest_handle_ ## name;                                \
-    typedef struct { union { type *p; uint64_aligned_t q; }; }  \
-        __guest_handle_64_ ## name
-#elif __XEN_INTERFACE_VERSION__ >= 0x00030201
+#if __XEN_INTERFACE_VERSION__ >= 0x00030201
 #define __DEFINE_XEN_GUEST_HANDLE(name, type) \
     typedef struct { type *p; } __guest_handle_ ## name
 #else
@@ -45,15 +38,9 @@ typedef uint64_t __attribute__((aligned(8))) uint64_aligned_t;
 
 #define DEFINE_XEN_GUEST_HANDLE(name)   __DEFINE_XEN_GUEST_HANDLE(name, name)
 #define XEN_GUEST_HANDLE(name)          __guest_handle_ ## name
-#define XEN_GUEST_HANDLE_64(name)       __guest_handle_64_ ## name
+#define set_xen_guest_handle(hnd, val)  do { (hnd).p = val; } while (0)
 #ifdef __XEN_TOOLS__
 #define get_xen_guest_handle(val, hnd)  do { val = (hnd).p; } while (0)
-#define set_xen_guest_handle(hnd, val)                      \
-    do { if ( sizeof(hnd) == 8 ) *(uint64_t *)&(hnd) = 0;   \
-         (hnd).p = val;                                     \
-    } while ( 0 )
-#else
-#define set_xen_guest_handle(hnd, val)  do { (hnd).p = val; } while (0)
 #endif
 
 #ifndef __ASSEMBLY__

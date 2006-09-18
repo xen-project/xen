@@ -28,6 +28,8 @@
 #define XENOPROF_disable_virq       11
 #define XENOPROF_release_counters   12
 #define XENOPROF_shutdown           13
+#define XENOPROF_get_buffer         14
+#define XENOPROF_last_op            14
 
 #define MAX_OPROF_EVENTS    32
 #define MAX_OPROF_DOMAINS   25	
@@ -56,16 +58,21 @@ typedef struct xenoprof_buf xenoprof_buf_t;
 DEFINE_XEN_GUEST_HANDLE(xenoprof_buf_t);
 
 struct xenoprof_init {
-    int32_t  max_samples;
     int32_t  num_events;
     int32_t  is_primary;
-    int32_t  nbuf;
-    int32_t  bufsize;
-    uint64_t buf_maddr;
     char cpu_type[XENOPROF_CPU_TYPE_SIZE];
 };
 typedef struct xenoprof_init xenoprof_init_t;
 DEFINE_XEN_GUEST_HANDLE(xenoprof_init_t);
+
+struct xenoprof_get_buffer {
+    int32_t  max_samples;
+    int32_t  nbuf;
+    int32_t  bufsize;
+    uint64_t buf_maddr;
+};
+typedef struct xenoprof_get_buffer xenoprof_get_buffer_t;
+DEFINE_XEN_GUEST_HANDLE(xenoprof_get_buffer_t);
 
 struct xenoprof_counter {
     uint32_t ind;

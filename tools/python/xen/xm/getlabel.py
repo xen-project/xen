@@ -19,8 +19,6 @@
 """Show the label for a domain or resoruce.
 """
 import sys, os, re
-import string
-import traceback
 from xen.util import dictio
 from xen.util import security
 
@@ -28,6 +26,7 @@ def usage():
     print "\nUsage: xm getlabel dom <configfile>"
     print "       xm getlabel res <resource>\n"
     print "  This program shows the label for a domain or resource.\n"
+    security.err("Usage")
 
 
 def get_resource_label(resource):
@@ -38,8 +37,7 @@ def get_resource_label(resource):
     try:
         access_control = dictio.dict_read("resources", file)
     except:
-        print "Resource label file not found"
-        return
+        security.err("Resource label file not found")
 
     # get the entry and print label
     if access_control.has_key(resource):
@@ -47,7 +45,7 @@ def get_resource_label(resource):
         label = access_control[resource][1]
         print "policy="+policy+",label="+label
     else:
-        print "Resource not labeled"
+        security.err("Resource not labeled")
 
 
 def get_domain_label(configfile):
@@ -63,8 +61,7 @@ def get_domain_label(configfile):
                 fd = open(file, "rb")
                 break
     if not fd:
-        print "Configuration file '"+configfile+"' not found."
-        return
+        security.err("Configuration file '"+configfile+"' not found.")
 
     # read in the domain config file, finding the label line
     ac_entry_re = re.compile("^access_control\s*=.*", re.IGNORECASE)
@@ -82,8 +79,7 @@ def get_domain_label(configfile):
 
     # send error message if we didn't find anything
     if acline == "":
-        print "Label does not exist in domain configuration file."
-        return
+        security.err("Domain not labeled")
 
     # print out the label
     (title, data) = acline.split("=", 1)
@@ -94,19 +90,21 @@ def get_domain_label(configfile):
 
 
 def main (argv):
-    if len(argv) != 3:
-        usage()
-        return
+    try:
+        if len(argv) != 3:
+            usage()
 
-    if argv[1].lower() == "dom":
-        configfile = argv[2]
-        get_domain_label(configfile)
-    elif argv[1].lower() == "res":
-        resource = argv[2]
-        get_resource_label(resource)
-    else:
-        usage()
+        if argv[1].lower() == "dom":
+            configfile = argv[2]
+            get_domain_label(configfile)
+        elif argv[1].lower() == "res":
+            resource = argv[2]
+            get_resource_label(resource)
+        else:
+            usage()
 
+    except security.ACMError:
+        sys.exit(-1)
 
 if __name__ == '__main__':
     main(sys.argv)

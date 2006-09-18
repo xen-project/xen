@@ -220,7 +220,8 @@ int main(int argc, char **argv)
 	   user friendly, we'll bail out here since no data will ever show
 	   up on domain-0. */
 	if (domid == 0) {
-		err(errno, "Could not read tty from store");
+		fprintf(stderr, "Can't specify Domain-0\n");
+		exit(EINVAL);
 	}
 
 	/* Wait a little bit for tty to appear.  There is a race

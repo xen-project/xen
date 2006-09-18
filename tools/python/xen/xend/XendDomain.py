@@ -420,6 +420,10 @@ class XendDomain:
         """ The following call may raise a XendError exception """
         dominfo.testMigrateDevices(True, dst)
 
+        if live:
+            """ Make sure there's memory free for enabling shadow mode """
+            dominfo.checkLiveMigrateMemory()
+
         if port == 0:
             port = xroot.get_xend_relocation_port()
         try:

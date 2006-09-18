@@ -516,12 +516,6 @@ config XEN_BALLOON
 config XEN_SKBUFF
 	default y
 
-config XEN_NETDEV_BACKEND
-	default y
-
-config XEN_NETDEV_FRONTEND
-	default y
-
 config XEN_DEVMEM
 	default n
 

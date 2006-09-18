@@ -228,13 +228,13 @@ static void frontend_changed(struct xenbus_device *dev,
 {
 	struct backend_info *be = dev->dev.driver_data;
 
-	DPRINTK("");
+	DPRINTK("%s", xenbus_strstate(frontend_state));
 
 	be->frontend_state = frontend_state;
 
 	switch (frontend_state) {
 	case XenbusStateInitialising:
-		if (dev->state == XenbusStateClosing) {
+		if (dev->state == XenbusStateClosed) {
 			printk("%s: %s: prepare for reconnect\n",
 			       __FUNCTION__, dev->nodename);
 			if (be->netif) {
@@ -260,8 +260,12 @@ static void frontend_changed(struct xenbus_device *dev,
 		xenbus_switch_state(dev, XenbusStateClosing);
 		break;
 
-	case XenbusStateUnknown:
 	case XenbusStateClosed:
+		xenbus_switch_state(dev, XenbusStateClosed);
+		if (xenbus_dev_is_online(dev))
+			break;
+		/* fall through if not online */
+	case XenbusStateUnknown:
 		if (be->netif != NULL)
 			kobject_uevent(&dev->dev.kobj, KOBJ_OFFLINE);
 		device_unregister(&dev->dev);
@@ -421,6 +425,14 @@ static int connect_rings(struct backend_info *be)
 	if (val) {
 		be->netif->features |= NETIF_F_TSO;
 		be->netif->dev->features |= NETIF_F_TSO;
+	}
+
+	if (xenbus_scanf(XBT_NIL, dev->otherend, "feature-no-csum-offload",
+			 "%d", &val) < 0)
+		val = 0;
+	if (val) {
+		be->netif->features &= ~NETIF_F_IP_CSUM;
+		be->netif->dev->features &= ~NETIF_F_IP_CSUM;
 	}
 
 	/* Map the shared frame, irq etc. */

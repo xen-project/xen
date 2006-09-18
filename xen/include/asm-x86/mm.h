@@ -338,7 +338,6 @@ int check_descriptor(struct desc_struct *d);
 #define machine_to_phys_mapping  ((unsigned long *)RDWR_MPT_VIRT_START)
 #define INVALID_M2P_ENTRY        (~0UL)
 #define VALID_M2P(_e)            (!((_e) & (1UL<<(BITS_PER_LONG-1))))
-#define IS_INVALID_M2P_ENTRY(_e) (!VALID_M2P(_e))
 
 #define set_gpfn_from_mfn(mfn, pfn) (machine_to_phys_mapping[(mfn)] = (pfn))
 #define get_gpfn_from_mfn(mfn)      (machine_to_phys_mapping[(mfn)])

@@ -395,28 +395,124 @@ efi_emulate_get_time(
 	unsigned long tv_addr, unsigned long tc_addr,
 	IA64FAULT *fault)
 {
-	unsigned long tv = 0, tc = 0;
+	unsigned long tv, tc = 0;
 	struct page_info *tv_page = NULL;
 	struct page_info *tc_page = NULL;
-	efi_status_t status;
+	efi_status_t status = 0;
 
 	//printf("efi_get_time(%016lx,%016lx) called\n", tv_addr, tc_addr);
 	tv = efi_translate_domain_addr(tv_addr, fault, &tv_page);
 	if (*fault != IA64_NO_FAULT)
-		return 0;
+		goto errout;
 	if (tc_addr) {
 		tc = efi_translate_domain_addr(tc_addr, fault, &tc_page);
-		if (*fault != IA64_NO_FAULT) {
-			put_page(tv_page);
-			return 0;
-		}
+		if (*fault != IA64_NO_FAULT)
+			goto errout;
 	}
+
 	//printf("efi_get_time(%016lx,%016lx) translated to xen virtual address\n", tv, tc);
 	status = (*efi.get_time)((efi_time_t *) tv, (efi_time_cap_t *) tc);
 	//printf("efi_get_time returns %lx\n", status);
+
+errout:
 	if (tc_page != NULL)
 		put_page(tc_page);
-	put_page(tv_page);
+	if (tv_page != NULL)
+		put_page(tv_page);
+
+	return status;
+}
+
+static efi_status_t
+efi_emulate_set_time(
+	unsigned long tv_addr, IA64FAULT *fault)
+{
+	unsigned long tv;
+	struct page_info *tv_page = NULL;
+	efi_status_t status = 0;
+
+	if (current->domain != dom0)
+		return EFI_UNSUPPORTED;
+
+	tv = efi_translate_domain_addr(tv_addr, fault, &tv_page);
+	if (*fault != IA64_NO_FAULT)
+		goto errout;
+
+	status = (*efi.set_time)((efi_time_t *)tv);
+
+errout:
+	if (tv_page != NULL)
+		put_page(tv_page);
+
+	return status;
+}
+
+static efi_status_t
+efi_emulate_get_wakeup_time(
+	unsigned long e_addr, unsigned long p_addr,
+	unsigned long tv_addr, IA64FAULT *fault)
+{
+	unsigned long enabled, pending, tv;
+	struct page_info *e_page = NULL, *p_page = NULL,
+	                 *tv_page = NULL;
+	efi_status_t status = 0;
+
+	if (current->domain != dom0)
+		return EFI_UNSUPPORTED;
+
+	if (!e_addr || !p_addr || !tv_addr)
+		return EFI_INVALID_PARAMETER;
+
+	enabled = efi_translate_domain_addr(e_addr, fault, &e_page);
+	if (*fault != IA64_NO_FAULT)
+		goto errout;
+	pending = efi_translate_domain_addr(p_addr, fault, &p_page);
+	if (*fault != IA64_NO_FAULT)
+		goto errout;
+	tv = efi_translate_domain_addr(tv_addr, fault, &tv_page);
+	if (*fault != IA64_NO_FAULT)
+		goto errout;
+
+	status = (*efi.get_wakeup_time)((efi_bool_t *)enabled,
+	                                (efi_bool_t *)pending,
+	                                (efi_time_t *)tv);
+
+errout:
+	if (e_page != NULL)
+		put_page(e_page);
+	if (p_page != NULL)
+		put_page(p_page);
+	if (tv_page != NULL)
+		put_page(tv_page);
+
+	return status;
+}
+
+static efi_status_t
+efi_emulate_set_wakeup_time(
+	unsigned long enabled, unsigned long tv_addr,
+	IA64FAULT *fault)
+{
+	unsigned long tv = 0;
+	struct page_info *tv_page = NULL;
+	efi_status_t status = 0;
+
+	if (current->domain != dom0)
+		return EFI_UNSUPPORTED;
+
+	if (tv_addr) {
+		tv = efi_translate_domain_addr(tv_addr, fault, &tv_page);
+		if (*fault != IA64_NO_FAULT)
+			goto errout;
+	}
+
+	status = (*efi.set_wakeup_time)((efi_bool_t)enabled,
+	                                (efi_time_t *)tv);
+
+errout:
+	if (tv_page != NULL)
+		put_page(tv_page);
+
 	return status;
 }
 
@@ -663,6 +759,24 @@ efi_emulator (struct pt_regs *regs, IA64FAULT *fault)
 				vcpu_get_gr(v,33),
 				fault);
 		break;
+	    case FW_HYPERCALL_EFI_SET_TIME:
+		status = efi_emulate_set_time (
+				vcpu_get_gr(v,32),
+				fault);
+		break;
+	    case FW_HYPERCALL_EFI_GET_WAKEUP_TIME:
+		status = efi_emulate_get_wakeup_time (
+				vcpu_get_gr(v,32),
+				vcpu_get_gr(v,33),
+				vcpu_get_gr(v,34),
+				fault);
+		break;
+	    case FW_HYPERCALL_EFI_SET_WAKEUP_TIME:
+		status = efi_emulate_set_wakeup_time (
+				vcpu_get_gr(v,32),
+				vcpu_get_gr(v,33),
+				fault);
+		break;
 	    case FW_HYPERCALL_EFI_GET_VARIABLE:
 		status = efi_emulate_get_variable (
 				vcpu_get_gr(v,32),
@@ -695,10 +809,6 @@ efi_emulator (struct pt_regs *regs, IA64FAULT *fault)
  				(u32) vcpu_get_gr(v,34),
 				(efi_memory_desc_t *) vcpu_get_gr(v,35));
 		break;
-	    case FW_HYPERCALL_EFI_SET_TIME:
-	    case FW_HYPERCALL_EFI_GET_WAKEUP_TIME:
-	    case FW_HYPERCALL_EFI_SET_WAKEUP_TIME:
-		// FIXME: need fixes in efi.h from 2.6.9
 	    case FW_HYPERCALL_EFI_GET_NEXT_HIGH_MONO_COUNT:
 		// FIXME: need fixes in efi.h from 2.6.9
 		status = EFI_UNSUPPORTED;

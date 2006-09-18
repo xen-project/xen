@@ -9,6 +9,11 @@
 #ifndef XENCTRL_H
 #define XENCTRL_H
 
+/* Tell the Xen public headers we are a user-space tools build. */
+#ifndef __XEN_TOOLS__
+#define __XEN_TOOLS__ 1
+#endif
+
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/ptrace.h>

@@ -90,10 +90,9 @@ include/xen/acm_policy.h:
 	  echo "#endif") >$@
 
 # compile.h contains dynamic build info. Rebuilt on every 'make' invocation.
-include/xen/compile.h: LANG=C
 include/xen/compile.h: include/xen/compile.h.in
-	@sed -e 's/@@date@@/$(shell date)/g' \
-	    -e 's/@@time@@/$(shell date +%T)/g' \
+	@sed -e 's/@@date@@/$(shell LC_ALL=C date)/g' \
+	    -e 's/@@time@@/$(shell LC_ALL=C date +%T)/g' \
 	    -e 's/@@whoami@@/$(shell whoami)/g' \
 	    -e 's/@@domain@@/$(shell ([ -x /bin/dnsdomainname ] && /bin/dnsdomainname) || ([ -x /bin/domainname ] && /bin/domainname || echo [unknown]))/g' \
 	    -e 's/@@hostname@@/$(shell hostname)/g' \

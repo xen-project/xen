@@ -35,6 +35,11 @@
 #define offsetof(a,b) ((unsigned long)&(((a *)0)->b))
 #endif
 
+#if defined(__x86_64__) && (__GNUC__ > 3)
+/* Results in more efficient PIC code (no indirections through GOT or PLT). */
+#pragma GCC visibility push(hidden)
+#endif
+
 /* This macro obfuscates arithmetic on a variable address so that gcc
    shouldn't recognize the original var, and make assumptions about it */
 /*

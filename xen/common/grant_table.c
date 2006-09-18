@@ -90,11 +90,8 @@ __gnttab_map_grant_ref(
     unsigned long  frame = 0;
     int            rc = GNTST_okay;
     struct active_grant_entry *act;
-
-    /* Entry details from @rd's shared grant table. */
     grant_entry_t *sha;
-    domid_t        sdom;
-    u16            sflags;
+    union grant_combo scombo, prev_scombo, new_scombo;
 
     /*
      * We bound the number of times we retry CMPXCHG on memory locations that
@@ -159,7 +156,10 @@ __gnttab_map_grant_ref(
 
         memcpy(new_mt, lgt->maptrack, PAGE_SIZE << lgt->maptrack_order);
         for ( i = lgt->maptrack_limit; i < (lgt->maptrack_limit << 1); i++ )
+        {
             new_mt[i].ref = i+1;
+            new_mt[i].flags = 0;
+        }
 
         free_xenheap_pages(lgt->maptrack, lgt->maptrack_order);
         lgt->maptrack          = new_mt;
@@ -175,12 +175,19 @@ __gnttab_map_grant_ref(
 
     spin_lock(&rd->grant_table->lock);
 
+    /* If already pinned, check the active domid and avoid refcnt overflow. */
+    if ( act->pin &&
+         ((act->domid != ld->domain_id) ||
+          (act->pin & 0x80808080U) != 0) )
+        PIN_FAIL(unlock_out, GNTST_general_error,
+                 "Bad domain (%d != %d), or risk of counter overflow %08x\n",
+                 act->domid, ld->domain_id, act->pin);
+
     if ( !act->pin ||
          (!(op->flags & GNTMAP_readonly) &&
           !(act->pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask))) )
     {
-        sflags = sha->flags;
-        sdom   = sha->domid;
+        scombo.word = *(u32 *)&sha->flags;
 
         /*
          * This loop attempts to set the access (reading/writing) flags
@@ -190,33 +197,29 @@ __gnttab_map_grant_ref(
          */
         for ( ; ; )
         {
-            union grant_combo scombo, prev_scombo, new_scombo;
+            /* If not already pinned, check the grant domid and type. */
+            if ( !act->pin &&
+                 (((scombo.shorts.flags & GTF_type_mask) !=
+                   GTF_permit_access) ||
+                  (scombo.shorts.domid != ld->domain_id)) )
+                 PIN_FAIL(unlock_out, GNTST_general_error,
+                          "Bad flags (%x) or dom (%d). (expected dom %d)\n",
+                          scombo.shorts.flags, scombo.shorts.domid,
+                          ld->domain_id);
 
-            if ( unlikely((sflags & GTF_type_mask) != GTF_permit_access) ||
-                 unlikely(sdom != led->domain->domain_id) )
-                PIN_FAIL(unlock_out, GNTST_general_error,
-                         "Bad flags (%x) or dom (%d). (NB. expected dom %d)\n",
-                         sflags, sdom, led->domain->domain_id);
-
-            /* Merge two 16-bit values into a 32-bit combined update. */
-            scombo.shorts.flags = sflags;
-            scombo.shorts.domid = sdom;
-            
             new_scombo = scombo;
             new_scombo.shorts.flags |= GTF_reading;
 
             if ( !(op->flags & GNTMAP_readonly) )
             {
                 new_scombo.shorts.flags |= GTF_writing;
-                if ( unlikely(sflags & GTF_readonly) )
+                if ( unlikely(scombo.shorts.flags & GTF_readonly) )
                     PIN_FAIL(unlock_out, GNTST_general_error,
                              "Attempt to write-pin a r/o grant entry.\n");
             }
 
             prev_scombo.word = cmpxchg((u32 *)&sha->flags,
                                        scombo.word, new_scombo.word);
-
-            /* Did the combined update work (did we see what we expected?). */
             if ( likely(prev_scombo.word == scombo.word) )
                 break;
 
@@ -224,20 +227,15 @@ __gnttab_map_grant_ref(
                 PIN_FAIL(unlock_out, GNTST_general_error,
                          "Shared grant entry is unstable.\n");
 
-            /* Didn't see what we expected. Split out the seen flags & dom. */
-            sflags = prev_scombo.shorts.flags;
-            sdom   = prev_scombo.shorts.domid;
+            scombo = prev_scombo;
         }
 
         if ( !act->pin )
         {
-            act->domid = sdom;
+            act->domid = scombo.shorts.domid;
             act->frame = gmfn_to_mfn(rd, sha->frame);
         }
     }
-    else if ( (act->pin & 0x80808080U) != 0 )
-        PIN_FAIL(unlock_out, ENOSPC,
-                 "Risk of counter overflow %08x\n", act->pin);
 
     if ( op->flags & GNTMAP_device_map )
         act->pin += (op->flags & GNTMAP_readonly) ?
@@ -545,9 +543,7 @@ gnttab_prepare_for_transfer(
 {
     struct grant_table *rgt;
     struct grant_entry *sha;
-    domid_t             sdom;
-    u16                 sflags;
-    union grant_combo   scombo, prev_scombo, tmp_scombo;
+    union grant_combo   scombo, prev_scombo, new_scombo;
     int                 retries = 0;
 
     if ( unlikely((rgt = rd->grant_table) == NULL) ||
@@ -562,29 +558,24 @@ gnttab_prepare_for_transfer(
 
     sha = &rgt->shared[ref];
     
-    sflags = sha->flags;
-    sdom   = sha->domid;
+    scombo.word = *(u32 *)&sha->flags;
 
     for ( ; ; )
     {
-        if ( unlikely(sflags != GTF_accept_transfer) ||
-             unlikely(sdom != ld->domain_id) )
+        if ( unlikely(scombo.shorts.flags != GTF_accept_transfer) ||
+             unlikely(scombo.shorts.domid != ld->domain_id) )
         {
             DPRINTK("Bad flags (%x) or dom (%d). (NB. expected dom %d)\n",
-                    sflags, sdom, ld->domain_id);
+                    scombo.shorts.flags, scombo.shorts.domid,
+                    ld->domain_id);
             goto fail;
         }
 
-        /* Merge two 16-bit values into a 32-bit combined update. */
-        scombo.shorts.flags = sflags;
-        scombo.shorts.domid = sdom;
+        new_scombo = scombo;
+        new_scombo.shorts.flags |= GTF_transfer_committed;
 
-        tmp_scombo = scombo;
-        tmp_scombo.shorts.flags |= GTF_transfer_committed;
         prev_scombo.word = cmpxchg((u32 *)&sha->flags,
-                                   scombo.word, tmp_scombo.word);
-
-        /* Did the combined update work (did we see what we expected?). */
+                                   scombo.word, new_scombo.word);
         if ( likely(prev_scombo.word == scombo.word) )
             break;
 
@@ -594,9 +585,7 @@ gnttab_prepare_for_transfer(
             goto fail;
         }
 
-        /* Didn't see what we expected. Split out the seen flags & dom. */
-        sflags = prev_scombo.shorts.flags;
-        sdom   = prev_scombo.shorts.domid;
+        scombo = prev_scombo;
     }
 
     spin_unlock(&rgt->lock);
@@ -734,16 +723,21 @@ __release_grant_for_copy(
         gnttab_mark_dirty(rd, r_frame);
 
     spin_lock(&rd->grant_table->lock);
-    if ( readonly )
-        act->pin -= GNTPIN_hstr_inc;
-    else
-        act->pin -= GNTPIN_hstw_inc;
 
-    if ( !(act->pin & GNTPIN_hstw_mask) && !readonly )
-        gnttab_clear_flag(_GTF_writing, &sha->flags);
+    if ( readonly )
+    {
+        act->pin -= GNTPIN_hstr_inc;
+    }
+    else
+    {
+        act->pin -= GNTPIN_hstw_inc;
+        if ( !(act->pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask)) )
+            gnttab_clear_flag(_GTF_writing, &sha->flags);
+    }
 
     if ( !act->pin )
         gnttab_clear_flag(_GTF_reading, &sha->flags);
+
     spin_unlock(&rd->grant_table->lock);
 }
 
@@ -759,8 +753,7 @@ __acquire_grant_for_copy(
     struct active_grant_entry *act;
     s16 rc = GNTST_okay;
     int retries = 0;
-    u16 sflags;
-    domid_t sdom;
+    union grant_combo scombo, prev_scombo, new_scombo;
 
     if ( unlikely(gref >= NR_GRANT_ENTRIES) )
         PIN_FAIL(error_out, GNTST_bad_gntref,
@@ -771,36 +764,42 @@ __acquire_grant_for_copy(
 
     spin_lock(&rd->grant_table->lock);
     
+    /* If already pinned, check the active domid and avoid refcnt overflow. */
+    if ( act->pin &&
+         ((act->domid != current->domain->domain_id) ||
+          (act->pin & 0x80808080U) != 0) )
+        PIN_FAIL(unlock_out, GNTST_general_error,
+                 "Bad domain (%d != %d), or risk of counter overflow %08x\n",
+                 act->domid, current->domain->domain_id, act->pin);
+
     if ( !act->pin ||
-         (!readonly && !(act->pin & GNTPIN_hstw_mask)) )
+         (!readonly && !(act->pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask))) )
     {
-        sflags = sha->flags;
-        sdom = sha->domid;
+        scombo.word = *(u32 *)&sha->flags;
 
         for ( ; ; )
         {
-            union grant_combo scombo, prev_scombo, new_scombo;
+            /* If not already pinned, check the grant domid and type. */
+            if ( !act->pin &&
+                 (((scombo.shorts.flags & GTF_type_mask) !=
+                   GTF_permit_access) ||
+                  (scombo.shorts.domid != current->domain->domain_id)) )
+                 PIN_FAIL(unlock_out, GNTST_general_error,
+                          "Bad flags (%x) or dom (%d). (expected dom %d)\n",
+                          scombo.shorts.flags, scombo.shorts.domid,
+                          current->domain->domain_id);
 
-            if ( unlikely((sflags & GTF_type_mask) != GTF_permit_access ||
-                          sdom != current->domain->domain_id ) )
-                PIN_FAIL(unlock_out, GNTST_general_error,
-                         "Bad flags (%x) or dom (%d). (NB. expected dom %d)\n",
-                         sflags, sdom, current->domain->domain_id);
-
-            /* Merge two 16-bit values into a 32-bit combined update. */
-            scombo.shorts.flags = sflags;
-            scombo.shorts.domid = sdom;
-            
             new_scombo = scombo;
             new_scombo.shorts.flags |= GTF_reading;
 
             if ( !readonly )
             {
                 new_scombo.shorts.flags |= GTF_writing;
-                if ( unlikely(sflags & GTF_readonly) )
+                if ( unlikely(scombo.shorts.flags & GTF_readonly) )
                     PIN_FAIL(unlock_out, GNTST_general_error,
                              "Attempt to write-pin a r/o grant entry.\n");
             }
+
             prev_scombo.word = cmpxchg((u32 *)&sha->flags,
                                        scombo.word, new_scombo.word);
             if ( likely(prev_scombo.word == scombo.word) )
@@ -809,19 +808,16 @@ __acquire_grant_for_copy(
             if ( retries++ == 4 )
                 PIN_FAIL(unlock_out, GNTST_general_error,
                          "Shared grant entry is unstable.\n");
-            sflags = prev_scombo.shorts.flags;
-            sdom = prev_scombo.shorts.flags;
+
+            scombo = prev_scombo;
         }
 
         if ( !act->pin )
         {
-            act->domid = sdom;
+            act->domid = scombo.shorts.domid;
             act->frame = gmfn_to_mfn(rd, sha->frame);
         }
     }
-    else if ( (act->pin & 0x80808080U) != 0 )
-        PIN_FAIL(unlock_out, ENOSPC,
-                 "Risk of counter overflow %08x\n", act->pin);
 
     act->pin += readonly ? GNTPIN_hstr_inc : GNTPIN_hstw_inc;
 

@@ -213,6 +213,7 @@ static void mmio_access(VCPU *vcpu, u64 src_pa, u64 *dest, size_t s, int ma, int
     iot=__gpfn_is_io(vcpu->domain, src_pa>>PAGE_SHIFT);
     v_plat = vmx_vcpu_get_plat(vcpu);
 
+    perfc_incra(vmx_mmio_access, iot >> 56);
     switch (iot) {
     case GPFN_PIB:
         if(!dir)

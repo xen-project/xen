@@ -127,18 +127,15 @@ void sig_handler(int sig)
 static inline int LOCAL_FD_SET(fd_set *readfds)
 {
 	fd_list_entry_t *ptr;
-	int i;
 
 	ptr = fd_start;
 	while (ptr != NULL) {
 		if (ptr->tap_fd) {
 			FD_SET(ptr->tap_fd, readfds);
-			for (i = 0; i < MAX_IOFD; i++) {
-				if (ptr->io_fd[i]) 
-					FD_SET(ptr->io_fd[i], readfds);
-				maxfds = (ptr->io_fd[i] > maxfds ? 
-					  ptr->io_fd[i]: maxfds);
-			}
+			if (ptr->io_fd[READ]) 
+				FD_SET(ptr->io_fd[READ], readfds);
+			maxfds = (ptr->io_fd[READ] > maxfds ? 
+					ptr->io_fd[READ]: maxfds);
 			maxfds = (ptr->tap_fd > maxfds ? ptr->tap_fd: maxfds);
 		}
 		ptr = ptr->next;
@@ -580,7 +577,7 @@ static void get_io_request(struct td_state *s)
 
 int main(int argc, char *argv[])
 {
-	int len, msglen, ret, i;
+	int len, msglen, ret;
 	char *p, *buf;
 	fd_set readfds, writefds;
 	struct timeval timeout;
@@ -633,16 +630,14 @@ int main(int argc, char *argv[])
 			     (fd_set *) 0, &timeout);
 
 		if (ret > 0) 
-                {
+		{
 			ptr = fd_start;
 			while (ptr != NULL) {
 				if (FD_ISSET(ptr->tap_fd, &readfds)) 
 					get_io_request(ptr->s);
-				for (i = 0; i < MAX_IOFD; i++) {
-					if (ptr->io_fd[i] && 
-					   FD_ISSET(ptr->io_fd[i], &readfds)) 
-						io_done(ptr->s, i);
-				}
+				if (ptr->io_fd[READ] && 
+						FD_ISSET(ptr->io_fd[READ], &readfds)) 
+					io_done(ptr->s, READ);
 
 				ptr = ptr->next;
 			}

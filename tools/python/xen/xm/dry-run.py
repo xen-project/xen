@@ -18,6 +18,7 @@
 
 """Tests the security settings for a domain and its resources.
 """
+import sys
 from xen.util import security
 from xen.xm import create
 from xen.xend import sxp
@@ -28,14 +29,14 @@ def usage():
     print "to see if the domain created by the configfile can access"
     print "the resources.  The status of each resource is listed"
     print "individually along with the final security decision.\n"
+    security.err("Usage")
 
 
 def main (argv):
-    if len(argv) != 2:
-        usage()
-        return
-
     try:
+        if len(argv) != 2:
+            usage()
+
         passed = 0
         (opts, config) = create.parseCommandLine(argv)
         if create.check_domain_label(config, verbose=1):
@@ -48,8 +49,10 @@ def main (argv):
             print "Dry Run: PASSED"
         else:
             print "Dry Run: FAILED"
+            sys.exit(-1)
+
     except security.ACMError:
-        pass
+        sys.exit(-1)
 
 
 if __name__ == '__main__':

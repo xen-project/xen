@@ -18,8 +18,7 @@
 
 """List the resource label information from the global resource label file
 """
-import sys, os
-import string
+import sys
 from xen.util import dictio
 from xen.util import security
 
@@ -27,6 +26,7 @@ def usage():
     print "\nUsage: xm resource\n"
     print "  This program lists information for each resource in the"
     print "  global resource label file\n"
+    security.err("Usage")
 
 
 def print_resource_data(access_control):
@@ -41,14 +41,19 @@ def print_resource_data(access_control):
 
 def main (argv):
     try:
-        file = security.res_label_filename
-        access_control = dictio.dict_read("resources", file)
-    except:
-        print "Resource file not found."
-        return
+        if len(argv) != 1:
+            usage()
 
-    print_resource_data(access_control)
+        try:
+            file = security.res_label_filename
+            access_control = dictio.dict_read("resources", file)
+        except:
+            security.err("Error reading resource file.")
 
+        print_resource_data(access_control)
+
+    except security.ACMError:
+        sys.exit(-1)
 
 if __name__ == '__main__':
     main(sys.argv)

@@ -84,7 +84,9 @@ dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg, int nelems,
 #define dma_sync_single_range_for_device(dev, dma_handle, offset, size, dir)	\
 	dma_sync_single_for_device(dev, dma_handle, size, dir)
 
+#ifndef CONFIG_XEN
 #define dma_supported		platform_dma_supported
+#endif
 
 static inline int
 dma_set_mask (struct device *dev, u64 mask)

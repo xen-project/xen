@@ -1,5 +1,5 @@
 from xen.xend.XendLogging import log
-from xen.xend.XendError import XendError
+from xen.xend.XendError import XendError, VmError
 import sys
 import os.path
 from xen.xend.sxp import *

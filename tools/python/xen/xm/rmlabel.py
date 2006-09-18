@@ -19,8 +19,6 @@
 """Remove a label from a domain configuration file or a resoruce.
 """
 import sys, os, re
-import string
-import traceback
 from xen.util import dictio
 from xen.util import security
 
@@ -31,6 +29,7 @@ def usage():
     print "  for a domain or from the global resource label file for a"
     print "  resource. If the label does not exist for the given domain or"
     print "  resource, then rmlabel fails.\n"
+    security.err("Usage")
 
 
 def rm_resource_label(resource):
@@ -48,7 +47,7 @@ def rm_resource_label(resource):
         del access_control[resource]
         dictio.dict_write(access_control, "resources", file)
     else:
-        security.err("Label does not exist in resource label file.")
+        security.err("Resource not labeled.")
 
 
 def rm_domain_label(configfile):
@@ -85,7 +84,7 @@ def rm_domain_label(configfile):
 
     # send error message if we didn't find anything to remove
     if not removed:
-        security.err("Label does not exist in domain configuration file.")
+        security.err("Domain not labeled.")
 
     # write the data back out to the file
     fd = open(file, "wb")
@@ -97,7 +96,6 @@ def main (argv):
     try:
         if len(argv) != 3:
             usage()
-            return
 
         if argv[1].lower() == "dom":
             configfile = argv[2]
@@ -109,7 +107,7 @@ def main (argv):
             usage()
 
     except security.ACMError:
-        traceback.print_exc(limit=1)
+        sys.exit(-1)
 
 
 if __name__ == '__main__':

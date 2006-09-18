@@ -21,11 +21,28 @@
 /* All CPUs have their own IDT to allow int80 direct trap. */
 idt_entry_t *idt_tables[NR_CPUS] __read_mostly;
 
+static void print_xen_info(void)
+{
+    char taint_str[TAINT_STRING_MAX_LEN];
+    char debug = 'n', *arch = "x86_32";
+
+#ifndef NDEBUG
+    debug = 'y';
+#endif
+
+#ifdef CONFIG_X86_PAE
+    arch = "x86_32p";
+#endif
+
+    printk("----[ Xen-%d.%d%s  %s  debug=%c  %s ]----\n",
+           xen_major_version(), xen_minor_version(), xen_extra_version(),
+           arch, debug, print_tainted(taint_str));
+}
+
 void show_registers(struct cpu_user_regs *regs)
 {
     struct cpu_user_regs fault_regs = *regs;
     unsigned long fault_crs[8];
-    char taint_str[TAINT_STRING_MAX_LEN];
     const char *context;
 
     if ( hvm_guest(current) && guest_mode(regs) )
@@ -35,25 +52,29 @@ void show_registers(struct cpu_user_regs *regs)
     }
     else
     {
-        context = guest_mode(regs) ? "guest" : "hypervisor";
-
         if ( !guest_mode(regs) )
         {
+            context = "hypervisor";
             fault_regs.esp = (unsigned long)&regs->esp;
             fault_regs.ss = read_segment_register(ss);
             fault_regs.ds = read_segment_register(ds);
             fault_regs.es = read_segment_register(es);
             fault_regs.fs = read_segment_register(fs);
             fault_regs.gs = read_segment_register(gs);
+            fault_crs[2] = read_cr2();
+        }
+        else
+        {
+            context = "guest";
+            fault_crs[2] = current->vcpu_info->arch.cr2;
         }
 
         fault_crs[0] = read_cr0();
         fault_crs[3] = read_cr3();
+        fault_crs[4] = read_cr4();
     }
 
-    printk("----[ Xen-%d.%d%s    %s ]----\n",
-           xen_major_version(), xen_minor_version(), xen_extra_version(),
-           print_tainted(taint_str));
+    print_xen_info();
     printk("CPU:    %d\nEIP:    %04x:[<%08x>]",
            smp_processor_id(), fault_regs.cs, fault_regs.eip);
     if ( !guest_mode(regs) )
@@ -63,7 +84,8 @@ void show_registers(struct cpu_user_regs *regs)
            fault_regs.eax, fault_regs.ebx, fault_regs.ecx, fault_regs.edx);
     printk("esi: %08x   edi: %08x   ebp: %08x   esp: %08x\n",
            fault_regs.esi, fault_regs.edi, fault_regs.ebp, fault_regs.esp);
-    printk("cr0: %08lx   cr3: %08lx\n", fault_crs[0], fault_crs[3]);
+    printk("cr0: %08lx   cr4: %08lx   cr3: %08lx   cr2: %08lx\n",
+           fault_crs[0], fault_crs[4], fault_crs[3], fault_crs[2]);
     printk("ds: %04x   es: %04x   fs: %04x   gs: %04x   "
            "ss: %04x   cs: %04x\n",
            fault_regs.ds, fault_regs.es, fault_regs.fs,
@@ -125,7 +147,6 @@ asmlinkage void do_double_fault(void)
 {
     struct tss_struct *tss = &doublefault_tss;
     unsigned int cpu = ((tss->back_link>>3)-__FIRST_TSS_ENTRY)>>1;
-    char taint_str[TAINT_STRING_MAX_LEN];
 
     watchdog_disable();
 
@@ -133,9 +154,8 @@ asmlinkage void do_double_fault(void)
 
     /* Find information saved during fault and dump it to the console. */
     tss = &init_tss[cpu];
-    printk("*** DOUBLE FAULT: Xen-%d.%d%s    %s\n",
-           xen_major_version(), xen_minor_version(), xen_extra_version(),
-           print_tainted(taint_str));
+    printk("*** DOUBLE FAULT ***\n");
+    print_xen_info();
     printk("CPU:    %d\nEIP:    %04x:[<%08x>]",
            cpu, tss->cs, tss->eip);
     print_symbol(" %s\n", tss->eip);

@@ -49,6 +49,7 @@ from xen.xend.xenstore.xstransact import xstransact, complete
 from xen.xend.xenstore.xsutil import GetDomainPath, IntroduceDomain
 from xen.xend.xenstore.xswatch import xswatch
 
+from xen.xend import arch
 
 """Shutdown code for poweroff."""
 DOMAIN_POWEROFF = 0
@@ -1087,6 +1088,15 @@ class XendDomainInfo:
     ## public:
 
     def destroyDevice(self, deviceClass, devid):
+	if type(devid) is str:
+	    devicePath = '%s/device/%s' % (self.dompath, deviceClass)
+	    for entry in xstransact.List(devicePath):
+		backend = xstransact.Read('%s/%s' % (devicePath, entry), "backend")
+		devName = xstransact.Read(backend, "dev")
+		if devName == devid:
+		    # We found the integer matching our devid, use it instead
+		    devid = entry
+        	    break
         return self.getDeviceController(deviceClass).destroyDevice(devid)
 
 
@@ -1285,28 +1295,37 @@ class XendDomainInfo:
                 for v in range(0, self.info['max_vcpu_id']+1):
                     xc.vcpu_setaffinity(self.domid, v, self.info['cpus'])
 
+            # Use architecture- and image-specific calculations to determine
+            # the various headrooms necessary, given the raw configured
+            # values.
+            # reservation, maxmem, memory, and shadow are all in KiB.
+            reservation = self.image.getRequiredInitialReservation(
+                self.info['memory'] * 1024)
+            maxmem = self.image.getRequiredAvailableMemory(
+                self.info['maxmem'] * 1024)
+            memory = self.image.getRequiredAvailableMemory(
+                self.info['memory'] * 1024)
+            shadow = self.image.getRequiredShadowMemory(
+                self.info['shadow_memory'] * 1024,
+                self.info['maxmem'] * 1024)
+
+            # Round shadow up to a multiple of a MiB, as shadow_mem_control
+            # takes MiB and we must not round down and end up under-providing.
+            shadow = ((shadow + 1023) / 1024) * 1024
+
             # set memory limit
-            maxmem = self.image.getRequiredMemory(self.info['maxmem'] * 1024)
             xc.domain_setmaxmem(self.domid, maxmem)
 
-            mem_kb = self.image.getRequiredMemory(self.info['memory'] * 1024)
-
-            # get the domain's shadow memory requirement
-            shadow_kb = self.image.getRequiredShadowMemory(mem_kb)
-            shadow_kb_req = self.info['shadow_memory'] * 1024
-            if shadow_kb_req > shadow_kb:
-                shadow_kb = shadow_kb_req
-            shadow_mb = (shadow_kb + 1023) / 1024
-
             # Make sure there's enough RAM available for the domain
-            balloon.free(mem_kb + shadow_mb * 1024)
+            balloon.free(memory + shadow)
 
             # Set up the shadow memory
-            shadow_cur = xc.shadow_mem_control(self.domid, shadow_mb)
+            shadow_cur = xc.shadow_mem_control(self.domid, shadow / 1024)
             self.info['shadow_memory'] = shadow_cur
 
-            # initial memory allocation
-            xc.domain_memory_increase_reservation(self.domid, mem_kb, 0, 0)
+            # initial memory reservation
+            xc.domain_memory_increase_reservation(self.domid, reservation, 0,
+                                                  0)
 
             self.createChannels()
 
@@ -1484,6 +1503,19 @@ class XendDomainInfo:
             self.image.createDeviceModel()
 
     ## public:
+
+    def checkLiveMigrateMemory(self):
+        """ Make sure there's enough memory to migrate this domain """
+        overhead_kb = 0
+        if arch.type == "x86":
+            # 1MB per vcpu plus 4Kib/Mib of RAM.  This is higher than 
+            # the minimum that Xen would allocate if no value were given.
+            overhead_kb = self.info['vcpus'] * 1024 + self.info['maxmem'] * 4
+            overhead_kb = ((overhead_kb + 1023) / 1024) * 1024
+            # The domain might already have some shadow memory
+            overhead_kb -= xc.shadow_mem_control(self.domid) * 1024
+        if overhead_kb > 0:
+            balloon.free(overhead_kb)
 
     def testMigrateDevices(self, network, dst):
         """ Notify all device about intention of migration

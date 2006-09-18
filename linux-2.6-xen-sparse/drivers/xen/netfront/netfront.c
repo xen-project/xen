@@ -486,7 +486,7 @@ static void backend_changed(struct xenbus_device *dev,
 	struct netfront_info *np = dev->dev.driver_data;
 	struct net_device *netdev = np->netdev;
 
-	DPRINTK("\n");
+	DPRINTK("%s\n", xenbus_strstate(backend_state));
 
 	switch (backend_state) {
 	case XenbusStateInitialising:
@@ -1936,11 +1936,10 @@ static void netfront_closing(struct xenbus_device *dev)
 {
 	struct netfront_info *info = dev->dev.driver_data;
 
-	DPRINTK("netfront_closing: %s removed\n", dev->nodename);
+	DPRINTK("%s\n", dev->nodename);
 
 	close_netdev(info);
-
-	xenbus_switch_state(dev, XenbusStateClosed);
+	xenbus_frontend_closed(dev);
 }
 
 
