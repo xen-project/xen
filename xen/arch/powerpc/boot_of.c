@@ -957,8 +957,9 @@ static void boot_of_module(ulong r3, ulong r4, multiboot_info_t *mbi)
 
 static int __init boot_of_cpus(void)
 {
-    int cpus_node;
-    int cpu_node, bootcpu_node, logical;
+    int cpus_node, cpu_node;
+    int bootcpu_instance, bootcpu_node;
+    int logical;
     int result;
     s32 cpuid;
     u32 cpu_clock[2];
@@ -967,9 +968,13 @@ static int __init boot_of_cpus(void)
     /* Look up which CPU we are running on right now and get all info
      * from there */
     result = of_getprop(bof_chosen, "cpu",
-                        &bootcpu_node, sizeof (bootcpu_node));
+                        &bootcpu_instance, sizeof (bootcpu_instance));
     if (result == OF_FAILURE)
-        of_panic("Failed to look up boot cpu\n");
+        of_panic("Failed to look up boot cpu instance\n");
+
+    bootcpu_node = of_instance_to_package(bootcpu_instance);
+    if (result == OF_FAILURE)
+        of_panic("Failed to look up boot cpu package\n");
 
     cpu_node = bootcpu_node;
 
