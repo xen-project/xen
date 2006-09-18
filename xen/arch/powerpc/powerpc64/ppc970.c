@@ -145,7 +145,7 @@ void cpu_initialize(int cpuid)
     mthsprg0((ulong)parea); /* now ready for exceptions */
 
     printk("CPU[PIR:%u IPI:%u Logical:%u] Hello World!\n",
-           mfpir(), raw_smp_processor_id(), smp_processor_id());
+           mfpir(), hard_smp_processor_id(), smp_processor_id());
 
 #ifdef DEBUG
     {

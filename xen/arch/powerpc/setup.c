@@ -74,6 +74,7 @@ ulong oftree;
 ulong oftree_len;
 ulong oftree_end;
 
+uint cpu_hard_id[NR_CPUS] __initdata;
 cpumask_t cpu_sibling_map[NR_CPUS] __read_mostly;
 cpumask_t cpu_online_map; /* missing ifdef in schedule.c */
 cpumask_t cpu_present_map;
@@ -227,6 +228,7 @@ static void init_parea(int cpuid)
               __func__, STACK_ORDER, cpuid);
 
     pa->whoami = cpuid;
+    pa->hard_id = cpu_hard_id[cpuid];
     pa->hyp_stack_base = (void *)((ulong)stack + STACK_SIZE);
 
     /* This store has the effect of invoking secondary_cpu_init.  */

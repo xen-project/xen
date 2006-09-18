@@ -38,7 +38,7 @@ struct domain;
 struct vcpu;
 struct cpu_user_regs;
 extern int cpu_machinecheck(struct cpu_user_regs *);
-extern int cpu_scom_init(void);
+extern void cpu_scom_init(void);
 extern void show_registers(struct cpu_user_regs *);
 extern void show_execution_state(struct cpu_user_regs *);
 extern void show_backtrace(ulong sp, ulong lr, ulong pc);
