@@ -510,15 +510,13 @@ int construct_dom0(struct domain *d,
         case 1 ... 4:
             page->u.inuse.type_info &= ~PGT_type_mask;
             page->u.inuse.type_info |= PGT_l2_page_table;
-            page->u.inuse.type_info |=
-                (count-1) << PGT_va_shift;
+            if ( count == 4 )
+                page->u.inuse.type_info |= PGT_pae_xen_l2;
             get_page(page, d); /* an extra ref because of readable mapping */
             break;
         default:
             page->u.inuse.type_info &= ~PGT_type_mask;
             page->u.inuse.type_info |= PGT_l1_page_table;
-            page->u.inuse.type_info |= 
-                ((dsi.v_start>>L2_PAGETABLE_SHIFT)+(count-5))<<PGT_va_shift;
             get_page(page, d); /* an extra ref because of readable mapping */
             break;
         }
@@ -544,8 +542,6 @@ int construct_dom0(struct domain *d,
         {
             page->u.inuse.type_info &= ~PGT_type_mask;
             page->u.inuse.type_info |= PGT_l1_page_table;
-            page->u.inuse.type_info |= 
-                ((dsi.v_start>>L2_PAGETABLE_SHIFT)+(count-1))<<PGT_va_shift;
 
             /*
              * No longer writable: decrement the type_count.
