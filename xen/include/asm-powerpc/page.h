@@ -73,19 +73,19 @@ typedef struct { unsigned long l1_lo; } l1_pgentry_t;
 
 static __inline__ void clear_page(void *addr)
 {
-	unsigned long lines, line_size;
+    unsigned long lines, line_size;
 
-	line_size = cpu_caches.dline_size;
-	lines = cpu_caches.dlines_per_page;
+    line_size = cpu_caches.dline_size;
+    lines = cpu_caches.dlines_per_page;
 
-	__asm__ __volatile__(
-	"mtctr	%1	# clear_page\n\
-1:      dcbz	0,%0\n\
-	add	%0,%0,%3\n\
-	bdnz+	1b"
+    __asm__ __volatile__(
+    "mtctr  %1      # clear_page\n\
+1:  dcbz    0,%0\n\
+    add     %0,%0,%3\n\
+    bdnz+   1b"
     : "=r" (addr)
     : "r" (lines), "0" (addr), "r" (line_size)
-	: "ctr", "memory");
+    : "ctr", "memory");
 }
 
 extern void copy_page(void *dp, void *sp);

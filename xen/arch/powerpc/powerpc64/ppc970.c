@@ -35,11 +35,11 @@
 #undef SERIALIZE
 
 struct cpu_caches cpu_caches = {
-	.dline_size = 0x80,
-	.log_dline_size = 7,
+    .dline_size = 0x80,
+    .log_dline_size = 7,
     .dlines_per_page = PAGE_SIZE >> 7,
-	.iline_size = 0x80,
-	.log_iline_size = 7,
+    .iline_size = 0x80,
+    .log_iline_size = 7,
     .ilines_per_page = PAGE_SIZE >> 7,
 };
 
