@@ -19,10 +19,10 @@
  */
 
 #include <xen/config.h>
-#include <asm/misc.h>
+#include <xen/lib.h>
 
 extern void __cmpxchg_called_with_bad_pointer(void);
 void __cmpxchg_called_with_bad_pointer(void)
 {
-    trap();
+    BUG();
 }

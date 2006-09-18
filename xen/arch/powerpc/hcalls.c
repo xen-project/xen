@@ -112,9 +112,8 @@ static void do_ni_papr_hypercall(struct cpu_user_regs *regs)
 {
     struct vcpu *v = get_current();
 
-    printk("unsupported hcall 0x%lx was called by dom0x%x\n",
+    printk("unsupported PAPR hcall 0x%lx was called by dom0x%x\n",
             regs->gprs[3], v->domain->domain_id);
-    debugger_trap_immediate();
 
     regs->gprs[3] = H_Parameter;
 }

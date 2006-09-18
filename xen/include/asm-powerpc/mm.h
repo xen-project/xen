@@ -212,8 +212,6 @@ static inline int page_is_removable(struct page_info *page)
     return ((page->count_info & PGC_count_mask) == 1);
 }
 
-#define set_machinetophys(_mfn, _pfn) (trap(), 0)
-
 extern void synchronise_pagetables(unsigned long cpu_mask);
 
 /* XXX don't know what this is for */
@@ -236,6 +234,8 @@ extern int update_grant_va_mapping(unsigned long va,
                                    struct domain *,
                                    struct vcpu *);
 
+#define INVALID_MFN (~0UL)
+#define PFN_TYPE_NONE 0
 #define PFN_TYPE_RMA 1
 #define PFN_TYPE_LOGICAL 2
 #define PFN_TYPE_IO 3

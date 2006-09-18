@@ -28,6 +28,8 @@
 
 #undef RTAS
 
+ofdn_t ofd_boot_cpu;
+
 #ifdef PAPR_VTERM
 static ofdn_t ofd_vdevice_vty(void *m, ofdn_t p, struct domain *d)
 {
@@ -172,24 +174,21 @@ static ofdn_t ofd_cpus_props(void *m, struct domain *d)
 #endif
 
     c = ofd_node_find_by_prop(m, n, "device_type", cpu, sizeof (cpu));
+    if (ofd_boot_cpu == -1)
+        ofd_boot_cpu = c;
     while (c > 0) {
-        ibm_pft_size[1] = d->arch.htab.log_num_ptes + LOG_PTE_SIZE;
-        ofd_prop_add(m, c, "ibm,pft-size",
-                     ibm_pft_size, sizeof (ibm_pft_size));
+        /* Since we are not MP yet we prune all but the booting cpu */
+        if (c == ofd_boot_cpu) {
+            ibm_pft_size[1] = d->arch.htab.log_num_ptes + LOG_PTE_SIZE;
+            ofd_prop_add(m, c, "ibm,pft-size",
+                         ibm_pft_size, sizeof (ibm_pft_size));
 
-        /* FIXME: Check the the "l2-cache" property who's
-         * contents is an orphaned phandle? */
-        c = ofd_node_find_next(m, c);
-
-        /* Since we are not MP yet we can prune the rest of the CPUs */
-        while (c > 0) {
-            ofdn_t nc;
-
-            nc = ofd_node_find_next(m, c);
+            /* FIXME: Check the the "l2-cache" property who's
+             * contents is an orphaned phandle? */
+        } else
             ofd_node_prune(m, c);
 
-            c = nc;
-        }
+        c = ofd_node_find_next(m, c);
     }
 
     return n;

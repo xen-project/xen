@@ -27,14 +27,16 @@
 #include <sys/types.h>
 #include <inttypes.h>
 
+#include <xen/xen.h>
 #include <xen/memory.h>
 #include <xc_private.h>
 #include <xg_private.h>
 #include <xenctrl.h>
 
-/* XXX 64M hack */
-#define MEMSIZE (64UL << 20)
+#include "ft_build.h"
+
 #define INITRD_ADDR (24UL << 20)
+#define DEVTREE_ADDR (16UL << 20)
 
 #define ALIGN_UP(addr,size) (((addr)+((size)-1))&(~((size)-1)))
 
@@ -91,8 +93,8 @@ static int init_boot_vcpu(
     int xc_handle,
     int domid,
     struct domain_setup_info *dsi,
-    unsigned long dtb,
-    unsigned long kaddr)
+    unsigned long devtree_addr,
+    unsigned long kern_addr)
 {
     vcpu_guest_context_t ctxt;
     int rc;
@@ -101,15 +103,15 @@ static int init_boot_vcpu(
     ctxt.user_regs.pc = dsi->v_kernentry;
     ctxt.user_regs.msr = 0;
     ctxt.user_regs.gprs[1] = 0; /* Linux uses its own stack */
-    ctxt.user_regs.gprs[3] = dtb;
-    ctxt.user_regs.gprs[4] = kaddr;
+    ctxt.user_regs.gprs[3] = devtree_addr;
+    ctxt.user_regs.gprs[4] = kern_addr;
     ctxt.user_regs.gprs[5] = 0;
     /* There is a buggy kernel that does not zero the "local_paca", so
      * we must make sure this register is 0 */
     ctxt.user_regs.gprs[13] = 0;
 
     DPRINTF("xc_vcpu_setvcpucontext:\n"
-                 "  pc 0x%"PRIx64", msr 0x016%"PRIx64"\n"
+                 "  pc 0x%016"PRIx64", msr 0x%016"PRIx64"\n"
                  "  r1-5 %016"PRIx64" %016"PRIx64" %016"PRIx64" %016"PRIx64
                  " %016"PRIx64"\n",
                  ctxt.user_regs.pc, ctxt.user_regs.msr,
@@ -156,30 +158,69 @@ static int install_image(
     return rc;
 }
 
-/* XXX be more flexible about placement in memory */
-static int load_dtb(
+static int load_devtree(
     int xc_handle,
     int domid,
-    const char *dtb_path,
-    unsigned long dtb_addr,
-    struct domain_setup_info *dsi,
-    xen_pfn_t *page_array)
+    xen_pfn_t *page_array,
+    void *devtree,
+    unsigned long devtree_addr,
+    unsigned long initrd_base,
+    unsigned long initrd_len,
+    start_info_t *si,
+    unsigned long si_addr)
 {
-    uint8_t *img;
-    unsigned long dtb_size;
+    uint32_t start_info[4] = {0, si_addr, 0, 0x1000};
+    struct boot_param_header *header;
+    uint64_t *prop;
+    unsigned int devtree_size;
+    unsigned int proplen;
     int rc = 0;
 
-    img = load_file(dtb_path, &dtb_size);
-    if (img == NULL) {
-        rc = -1;
-        goto out;
+    header = devtree;
+    devtree_size = header->totalsize;
+
+    DPRINTF("adding initrd props\n");
+
+	/* initrd-start */
+    prop = ft_get_prop(devtree, "/chosen/linux,initrd-start", &proplen);
+    if (prop == NULL) {
+        DPRINTF("couldn't find linux,initrd-start\n");
+        return -1;
     }
+    if (proplen != sizeof(*prop)) {
+        DPRINTF("couldn't set linux,initrd-start (size %d)\n", proplen);
+        return -1;
+    }
+    *prop = initrd_base;
 
-    DPRINTF("copying device tree to 0x%lx[0x%lx]\n", dtb_addr, dtb_size);
-    rc = install_image(xc_handle, domid, page_array, img, dtb_addr, dtb_size);
+	/* initrd-end */
+    prop = ft_get_prop(devtree, "/chosen/linux,initrd-end", &proplen);
+    if (prop == NULL) {
+        DPRINTF("couldn't find linux,initrd-end\n");
+        return -1;
+    }
+    if (proplen != sizeof(*prop)) {
+        DPRINTF("couldn't set linux,initrd-end (size %d)\n", proplen);
+        return -1;
+    }
+    *prop = initrd_base + initrd_len;
 
-out:
-    free(img);
+	/* start-info (XXX being removed soon) */
+    prop = ft_get_prop(devtree, "/xen/start-info", &proplen);
+    if (prop == NULL) {
+        DPRINTF("couldn't find /xen/start-info\n");
+        return -1;
+    }
+    if (proplen != sizeof(start_info)) {
+        DPRINTF("couldn't set /xen/start-info (size %d)\n", proplen);
+        return -1;
+    }
+    memcpy(prop, start_info, proplen);
+
+    DPRINTF("copying device tree to 0x%lx[0x%x]\n", DEVTREE_ADDR, devtree_size);
+    rc = install_image(xc_handle, domid, page_array, devtree, DEVTREE_ADDR,
+                       devtree_size);
+
     return rc;
 }
 
@@ -294,17 +335,16 @@ out:
 }
 
 static unsigned long create_start_info(start_info_t *si,
-        unsigned int console_evtchn, unsigned int store_evtchn)
+        unsigned int console_evtchn, unsigned int store_evtchn,
+        unsigned long nr_pages)
 {
-    unsigned long eomem;
     unsigned long si_addr;
 
     memset(si, 0, sizeof(*si));
     snprintf(si->magic, sizeof(si->magic), "xen-%d.%d-powerpc64HV", 3, 0);
 
-    eomem = MEMSIZE;
-    si->nr_pages = eomem >> PAGE_SHIFT;
-    si->shared_info = eomem - (PAGE_SIZE * 1);
+    si->nr_pages = nr_pages;
+    si->shared_info = (nr_pages - 1) << PAGE_SHIFT;
     si->store_mfn = si->nr_pages - 2;
     si->store_evtchn = store_evtchn;
     si->console.domU.mfn = si->nr_pages - 3;
@@ -314,29 +354,34 @@ static unsigned long create_start_info(start_info_t *si,
     return si_addr;
 }
 
-static int get_page_array(int xc_handle, int domid, xen_pfn_t **page_array)
+static int get_page_array(int xc_handle, int domid, xen_pfn_t **page_array,
+                          unsigned long *nr_pages)
 {
-    int nr_pages;
     int rc;
 
     DPRINTF("xc_get_tot_pages\n");
-    nr_pages = xc_get_tot_pages(xc_handle, domid);
-    DPRINTF("  0x%x\n", nr_pages);
+    *nr_pages = xc_get_tot_pages(xc_handle, domid);
+    DPRINTF("  0x%lx\n", *nr_pages);
 
-    *page_array = malloc(nr_pages * sizeof(xen_pfn_t));
+    *page_array = malloc(*nr_pages * sizeof(xen_pfn_t));
     if (*page_array == NULL) {
         perror("malloc");
         return -1;
     }
 
     DPRINTF("xc_get_pfn_list\n");
-    rc = xc_get_pfn_list(xc_handle, domid, *page_array, nr_pages);
-    if (rc != nr_pages) {
+    rc = xc_get_pfn_list(xc_handle, domid, *page_array, *nr_pages);
+    if (rc != *nr_pages) {
         perror("Could not get the page frame list");
         return -1;
     }
 
     return 0;
+}
+
+static void free_page_array(xen_pfn_t *page_array)
+{
+    free(page_array);
 }
 
 
@@ -351,57 +396,70 @@ int xc_linux_build(int xc_handle,
                    unsigned int store_evtchn,
                    unsigned long *store_mfn,
                    unsigned int console_evtchn,
-                   unsigned long *console_mfn)
+                   unsigned long *console_mfn,
+                   void *devtree)
 {
+    start_info_t si;
     struct domain_setup_info dsi;
     xen_pfn_t *page_array = NULL;
+    unsigned long nr_pages;
+    unsigned long devtree_addr = 0;
     unsigned long kern_addr;
-    unsigned long dtb_addr;
-    unsigned long si_addr;
     unsigned long initrd_base = 0;
     unsigned long initrd_len = 0;
-    start_info_t si;
+    unsigned long si_addr;
     int rc = 0;
 
-    if (get_page_array(xc_handle, domid, &page_array)) {
+    DPRINTF("%s\n", __func__);
+
+    if (get_page_array(xc_handle, domid, &page_array, &nr_pages)) {
         rc = -1;
         goto out;
     }
 
+    DPRINTF("loading image '%s'\n", image_name);
     if (load_kernel(xc_handle, domid, image_name, &dsi, page_array)) {
         rc = -1;
         goto out;
     }
     kern_addr = 0;
 
-    if (initrd_name && initrd_name[0] != '\0' &&
-        load_initrd(xc_handle, domid, page_array, initrd_name, &initrd_base,
-                &initrd_len)) {
-        rc = -1;
-        goto out;
-    }
-    /* XXX install initrd addr/len into device tree */
-
-    dtb_addr = (16 << 20);
-    if (load_dtb(xc_handle, domid, "/root/DomU.dtb", dtb_addr, &dsi, page_array)) {
-        dtb_addr = 0;
+    if (initrd_name && initrd_name[0] != '\0') {
+        DPRINTF("loading initrd '%s'\n", initrd_name);
+        if (load_initrd(xc_handle, domid, page_array, initrd_name,
+                &initrd_base, &initrd_len)) {
+            rc = -1;
+            goto out;
+        }
     }
 
-    si_addr = create_start_info(&si, console_evtchn, store_evtchn);
+    /* start_info stuff: about to be removed  */
+    si_addr = create_start_info(&si, console_evtchn, store_evtchn, nr_pages);
     *console_mfn = page_array[si.console.domU.mfn];
     *store_mfn = page_array[si.store_mfn];
-    
     if (install_image(xc_handle, domid, page_array, &si, si_addr,
                 sizeof(start_info_t))) {
         rc = -1;
         goto out;
     }
 
-    if (init_boot_vcpu(xc_handle, domid, &dsi, dtb_addr, kern_addr)) {
+    if (devtree) {
+        DPRINTF("loading flattened device tree\n");
+        devtree_addr = DEVTREE_ADDR;
+        if (load_devtree(xc_handle, domid, page_array, devtree, devtree_addr,
+                     initrd_base, initrd_len, &si, si_addr)) {
+            DPRINTF("couldn't load flattened device tree.\n");
+            rc = -1;
+            goto out;
+        }
+    }
+
+    if (init_boot_vcpu(xc_handle, domid, &dsi, devtree_addr, kern_addr)) {
         rc = -1;
         goto out;
     }
 
 out:
+    free_page_array(page_array);
     return rc;
 }

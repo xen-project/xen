@@ -301,26 +301,40 @@ uint allocate_extents(struct domain *d, uint nrpages, uint rma_nrpages)
 
     return total_nrpages;
 }
-        
-int allocate_rma(struct domain *d, unsigned int order_pages)
-{
-    ulong rma_base;
-    ulong rma_sz = rma_size(order_pages);
 
-    d->arch.rma_page = alloc_domheap_pages(d, order_pages, 0);
+int allocate_rma(struct domain *d, unsigned int order)
+{
+    struct vcpu *v;
+    ulong rma_base;
+    ulong rma_sz;
+
+    if (d->arch.rma_page)
+        free_domheap_pages(d->arch.rma_page, d->arch.rma_order);
+
+    d->arch.rma_page = alloc_domheap_pages(d, order, 0);
     if (d->arch.rma_page == NULL) {
-        DPRINTK("Could not allocate order_pages=%d RMA for domain %u\n",
-                order_pages, d->domain_id);
+        DPRINTK("Could not allocate order=%d RMA for domain %u\n",
+                order, d->domain_id);
         return -ENOMEM;
     }
-    d->arch.rma_order = order_pages;
+    d->arch.rma_order = order;
 
     rma_base = page_to_maddr(d->arch.rma_page);
+    rma_sz = rma_size(d->arch.rma_order);
     BUG_ON(rma_base & (rma_sz - 1)); /* check alignment */
 
-    /* XXX */
+    /* XXX shouldn't be needed */
     printk("clearing RMA: 0x%lx[0x%lx]\n", rma_base, rma_sz);
     memset((void *)rma_base, 0, rma_sz);
+
+    d->shared_info = (shared_info_t *)
+        (rma_addr(&d->arch, RMA_SHARED_INFO) + rma_base);
+
+    /* if there are already running vcpus, adjust v->vcpu_info */
+    /* XXX untested */
+    for_each_vcpu(d, v) {
+        v->vcpu_info = &d->shared_info->vcpu_info[v->vcpu_id];
+    }
 
     return 0;
 }
@@ -331,6 +345,10 @@ ulong pfn2mfn(struct domain *d, long pfn, int *type)
     ulong rma_size_mfn = 1UL << d->arch.rma_order;
     struct page_extents *pe;
 
+    if (type)
+        *type = PFN_TYPE_NONE;
+
+    /* quick tests first */
     if (pfn < rma_size_mfn) {
         if (type)
             *type = PFN_TYPE_RMA;
@@ -344,7 +362,6 @@ ulong pfn2mfn(struct domain *d, long pfn, int *type)
         return pfn;
     }
 
-    /* quick tests first */
     list_for_each_entry (pe, &d->arch.extent_list, pe_list) {
         uint end_pfn = pe->pfn + (1 << pe->order);
 
@@ -364,7 +381,7 @@ ulong pfn2mfn(struct domain *d, long pfn, int *type)
     }
 
     BUG();
-    return 0;
+    return INVALID_MFN;
 }
 
 void guest_physmap_add_page(

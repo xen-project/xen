@@ -26,22 +26,11 @@
 #define shadow_mode_translate(_d) (1)
 #define shadow_mode_refcounts(_d) (1)
 
-#define __translate_gpfn_to_mfn(_d, gpfn)              \
-    ( (shadow_mode_translate(_d))                      \
-      ? translate_gpfn_to_mfn(_d, gpfn)                \
-      : (gpfn) )
-
 #define __mfn_to_gpfn(_d, mfn)                         \
     ( (shadow_mode_translate(_d))                      \
       ? machine_to_phys_mapping[(mfn)]                 \
       : (mfn) )
 
-static inline unsigned long
-translate_gpfn_to_mfn(struct domain *rd, unsigned long gpfn)
-{
-    trap();
-    return 0;
-}
 extern void guest_physmap_add_page(
     struct domain *d, unsigned long gpfn, unsigned long mfn);
 
@@ -64,7 +53,7 @@ extern unsigned int shadow_teardown(struct domain *d);
 extern unsigned int shadow_set_allocation(
     struct domain *d, unsigned int megabytes, int *preempted);
 
-/* Return the size of the shadow pool, rounded up to the nearest MB */
+/* Return the size of the shadow2 pool, rounded up to the nearest MB */
 static inline unsigned int shadow_get_allocation(struct domain *d)
 {
     return (1ULL << (d->arch.htab.order + PAGE_SHIFT)) >> 20;

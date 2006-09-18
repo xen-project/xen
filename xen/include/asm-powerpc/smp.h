@@ -27,7 +27,7 @@
 extern int smp_num_siblings;
 
 /* revisit when we support SMP */
-#define get_hard_smp_processor_id(i) i
+#define get_hard_smp_processor_id(i) (global_cpu_table[i]->whoami)
 #define raw_smp_processor_id() (parea->whoami)
 #define hard_smp_processor_id() raw_smp_processor_id()
 extern cpumask_t cpu_sibling_map[];

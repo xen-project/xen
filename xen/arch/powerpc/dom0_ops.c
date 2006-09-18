@@ -27,6 +27,7 @@
 #include <public/xen.h>
 #include <public/domctl.h>
 #include <public/sysctl.h>
+#include <asm/processor.h>
 
 void arch_getdomaininfo_ctxt(struct vcpu *, vcpu_guest_context_t *);
 void arch_getdomaininfo_ctxt(struct vcpu *v, vcpu_guest_context_t *c)
@@ -90,6 +91,22 @@ long arch_do_domctl(struct xen_domctl *domctl,
             put_domain(d);
             copy_to_guest(u_domctl, domctl, 1);
         } 
+    }
+    break;
+    case XEN_DOMCTL_real_mode_area:
+    {
+        struct domain *d;
+        unsigned int log = domctl->u.real_mode_area.log;
+
+        d = find_domain_by_id(domctl->domain);
+        if (d == NULL)
+            return -ESRCH;
+
+        if (!cpu_rma_valid(log))
+            return -EINVAL;
+
+        ret = allocate_rma(d, log - PAGE_SHIFT);
+        put_domain(d);
     }
     break;
 

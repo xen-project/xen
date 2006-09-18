@@ -40,6 +40,8 @@ extern ulong isa_io_base;
 #define readb(port) in_8((void *)(port))
 #define writeb(val, port) out_8((void *)(port), val)
 
+extern char *vgabase;
+#define vga_writeb(val, port) out_8((void *)((ulong)(port) + vgabase), val)
 
 extern u8 in_8(const volatile u8 *addr);
 extern void out_8(volatile u8 *addr, int val);

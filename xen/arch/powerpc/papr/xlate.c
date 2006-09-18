@@ -164,6 +164,10 @@ static void h_enter(struct cpu_user_regs *regs)
     lpn = pte.bits.rpn & lpn;
 
     rpn = pfn2mfn(d, lpn, &mtype);
+    if (rpn == INVALID_MFN) {
+        regs->gprs[3] =  H_Parameter;
+        return;
+    }
 
     if (mtype == PFN_TYPE_IO) {
         /* only a privilaged dom can access outside IO space */

@@ -32,21 +32,19 @@
 
 #undef SERIALIZE
 
-extern volatile struct processor_area * volatile global_cpu_table[];
-
 struct rma_settings {
     int order;
-    int rmlr0;
-    int rmlr12;
+    int rmlr_0;
+    int rmlr_1_2;
 };
 
 static struct rma_settings rma_orders[] = {
-    { .order = 26, .rmlr0 = 0, .rmlr12 = 3, }, /*  64 MB */
-    { .order = 27, .rmlr0 = 1, .rmlr12 = 3, }, /* 128 MB */
-    { .order = 28, .rmlr0 = 1, .rmlr12 = 0, }, /* 256 MB */
-    { .order = 30, .rmlr0 = 0, .rmlr12 = 2, }, /*   1 GB */
-    { .order = 34, .rmlr0 = 0, .rmlr12 = 1, }, /*  16 GB */
-    { .order = 38, .rmlr0 = 0, .rmlr12 = 0, }, /* 256 GB */
+    { .order = 26, .rmlr_0 = 0, .rmlr_1_2 = 3, }, /*  64 MB */
+    { .order = 27, .rmlr_0 = 1, .rmlr_1_2 = 3, }, /* 128 MB */
+    { .order = 28, .rmlr_0 = 1, .rmlr_1_2 = 0, }, /* 256 MB */
+    { .order = 30, .rmlr_0 = 0, .rmlr_1_2 = 2, }, /*   1 GB */
+    { .order = 34, .rmlr_0 = 0, .rmlr_1_2 = 1, }, /*  16 GB */
+    { .order = 38, .rmlr_0 = 0, .rmlr_1_2 = 0, }, /* 256 GB */
 };
 
 static uint log_large_page_sizes[] = {
@@ -68,6 +66,11 @@ unsigned int cpu_default_rma_order_pages(void)
     return rma_orders[0].order - PAGE_SHIFT;
 }
 
+int cpu_rma_valid(unsigned int log)
+{
+    return cpu_find_rma(log) != NULL;
+}
+
 unsigned int cpu_large_page_orders(uint *sizes, uint max)
 {
     uint i = 0;
@@ -85,11 +88,35 @@ unsigned int cpu_extent_order(void)
     return log_large_page_sizes[0] - PAGE_SHIFT;
 }
 
+static u64 cpu0_hids[6];
+static u64 cpu0_hior;
+
 void cpu_initialize(int cpuid)
 {
     ulong r1, r2;
+    union hid0 hid0;
+    union hid1 hid1;
+    union hid4 hid4;
+    union hid5 hid5;
+
     __asm__ __volatile__ ("mr %0, 1" : "=r" (r1));
     __asm__ __volatile__ ("mr %0, 2" : "=r" (r2));
+
+    if (cpuid == 0) {
+        /* we can assume that these are sane to start with.  We
+         * _do_not_ store the results in case we want to mess with them
+         * on a per-cpu basis later. */
+        cpu0_hids[0] = mfhid0();
+        cpu0_hids[1] = mfhid1();
+        cpu0_hids[4] = mfhid4();
+        cpu0_hids[5] = mfhid5();
+        cpu0_hior = 0;
+    }
+
+    hid0.word = cpu0_hids[0];
+    hid1.word = cpu0_hids[1];
+    hid4.word = cpu0_hids[4];
+    hid5.word = cpu0_hids[5];
 
     /* This is SMP safe because the compiler must use r13 for it.  */
     parea = global_cpu_table[cpuid];
@@ -103,25 +130,21 @@ void cpu_initialize(int cpuid)
     mtdec(timebase_freq);
     mthdec(timebase_freq);
 
-    union hid0 hid0;
+    hid0.bits.nap = 1;      /* NAP */
+    hid0.bits.dpm = 1;      /* Dynamic Power Management */
+    hid0.bits.nhr = 0;      /* ! Not Hard Reset */
+    hid0.bits.hdice_en = 1; /* enable HDEC */
+    hid0.bits.en_therm = 0; /* ! Enable ext thermal ints */
+    /* onlu debug Xen should do this */
+    hid0.bits.en_attn = 1; /* Enable attn instruction */
 
-    hid0.word = mfhid0();
-    hid0.bits.nap = 1;
-    hid0.bits.dpm = 1;
-    hid0.bits.nhr = 1;
-    hid0.bits.hdice = 1; /* enable HDEC */
-    hid0.bits.eb_therm = 1;
-    hid0.bits.en_attn = 1;
 #ifdef SERIALIZE
-    ulong s = 0;
-
-    s |= 1UL << (63-0);     /* one_ppc */
-    s |= 1UL << (63-2);     /* isync_sc */
-    s |= 1UL << (63-16);     /* inorder */
+    hid0.bits.one_ppc = 1;
+    hid0.bits.isync_sc = 1;
+    hid0.bits.inorder = 1;
     /* may not want these */
-    s |= 1UL << (63-1);     /* do_single */
-    s |= 1UL << (63-3);     /* ser-gp */
-    hid0.word |= s;
+    hid0.bits.do_single = 1;
+    hid0.bits.ser-gp = 1;
 #endif
 
     printk("CPU #%d: Hello World! SP = %lx TOC = %lx HID0 = %lx\n", 
@@ -129,32 +152,42 @@ void cpu_initialize(int cpuid)
 
     mthid0(hid0.word);
 
-    union hid1 hid1;
+    hid1.bits.bht_pm = 7; /* branch history table prediction mode */
+    hid1.bits.en_ls = 1; /* enable link stack */
 
-    hid1.word = mfhid1();
-    hid1.bits.bht_pm = 7;
-    hid1.bits.en_ls = 1;
+    hid1.bits.en_cc = 1; /* enable count cache */
+    hid1.bits.en_ic = 1; /* enable inst cache */
 
-    hid1.bits.en_cc = 1;
-    hid1.bits.en_ic = 1;
+    hid1.bits.pf_mode = 2; /* prefetch mode */
 
-    hid1.bits.pf_mode = 2;
+    hid1.bits.en_if_cach = 1; /* i-fetch cacheability control */
+    hid1.bits.en_ic_rec = 1; /* i-cache parity error recovery */
+    hid1.bits.en_id_rec = 1; /* i-dir parity error recovery */
+    hid1.bits.en_er_rec = 1; /* i-ERAT parity error recovery */
 
-    hid1.bits.en_if_cach = 1;
-    hid1.bits.en_ic_rec = 1;
-    hid1.bits.en_id_rec = 1;
-    hid1.bits.en_er_rec = 1;
-
-    hid1.bits.en_sp_itw = 1;
+    hid1.bits.en_sp_itw = 1; /* En speculative tablewalks */
     mthid1(hid1.word);
 
-    union hid5 hid5;
+    /* no changes to hid4 but we want to make sure that secondaries
+     * are sane */
+    hid4.bits.lg_pg_dis = 0;    /* make sure we enable large pages */
+    mthid4(hid4.word);
 
-    hid5.word = mfhid5();
-    hid5.bits.DCBZ_size = 0;
-    hid5.bits.DCBZ32_ill = 0;
+    hid5.bits.DCBZ_size = 0; /* make dcbz size 32 bytes */
+    hid5.bits.DCBZ32_ill = 0; /* make dzbz 32byte illeagal */
     mthid5(hid5.word);
 
+#ifdef DUMP_HIDS
+    printk("hid0 0x%016lx\n"
+           "hid1 0x%016lx\n"
+           "hid4 0x%016lx\n"
+           "hid5 0x%016lx\n",
+           mfhid0(), mfhid1(), mfhid4(), mfhid5());
+#endif
+
+    mthior(cpu0_hior);
+
+    /* for good luck */
     __asm__ __volatile__("isync; slbia; isync" : : : "memory");
 }
 
@@ -166,18 +199,18 @@ void cpu_init_vcpu(struct vcpu *v)
 
     hid4.word = mfhid4();
 
-    hid4.bits.lpes0 = 0; /* exceptions set MSR_HV=1 */
-    hid4.bits.lpes1 = 1; /* RMA applies */
+    hid4.bits.lpes_0 = 0; /* external exceptions set MSR_HV=1 */
+    hid4.bits.lpes_1 = 1; /* RMA applies */
 
-    hid4.bits.rmor = page_to_maddr(d->arch.rma_page) >> 26;
+    hid4.bits.rmor_0_15 = page_to_maddr(d->arch.rma_page) >> 26;
 
-    hid4.bits.lpid01 = d->domain_id & 3;
-    hid4.bits.lpid25 = (d->domain_id >> 2) & 0xf;
+    hid4.bits.lpid_0_1 = d->domain_id & 3;
+    hid4.bits.lpid_2_5 = (d->domain_id >> 2) & 0xf;
 
     rma_settings = cpu_find_rma(d->arch.rma_order + PAGE_SHIFT);
     ASSERT(rma_settings != NULL);
-    hid4.bits.rmlr0 = rma_settings->rmlr0;
-    hid4.bits.rmlr12 = rma_settings->rmlr12;
+    hid4.bits.rmlr_0 = rma_settings->rmlr_0;
+    hid4.bits.rmlr_1_2 = rma_settings->rmlr_1_2;
 
     v->arch.cpu.hid4.word = hid4.word;
 }

@@ -35,9 +35,6 @@ DECLARE_PER_CPU(u32, tlbflush_time);
 
 static inline int NEED_FLUSH(u32 cpu_stamp, u32 lastuse_stamp)
 {
-#if 0
-    trap();
-#endif
     return 0;
 }
 

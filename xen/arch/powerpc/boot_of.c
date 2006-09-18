@@ -31,6 +31,7 @@
 #include <asm/io.h>
 #include "exceptions.h"
 #include "of-devtree.h"
+#include "oftree.h"
 
 /* Secondary processors use this for handshaking with main processor.  */
 volatile unsigned int __spin_ack;
@@ -38,7 +39,6 @@ volatile unsigned int __spin_ack;
 static ulong of_vec;
 static ulong of_msr;
 static int of_out;
-static ofdn_t boot_cpu;
 static char bootargs[256];
 
 #define COMMAND_LINE_SIZE 512
@@ -669,7 +669,7 @@ static int boot_of_fixup_chosen(void *mem)
             dn = ofd_node_find(mem, ofpath);
             if (dn <= 0) of_panic("no node for: %s\n", ofpath);
 
-            boot_cpu = dn;
+            ofd_boot_cpu = dn;
             val = dn;
 
             dn = ofd_node_find(mem, "/chosen");
@@ -681,7 +681,7 @@ static int boot_of_fixup_chosen(void *mem)
         } else {
             of_printf("*** can't find path to booting cpu, "
                     "SMP is disabled\n");
-            boot_cpu = -1;
+            ofd_boot_cpu = -1;
         }
     }
     return rc;
@@ -773,7 +773,7 @@ static void __init boot_of_fix_maple(void)
     }
 }
     
-static int __init boot_of_serial(void *oftree)
+static int __init boot_of_serial(void *oft)
 {
     int n;
     int p;
@@ -805,7 +805,7 @@ static int __init boot_of_serial(void *oftree)
             continue;
 
         of_printf("pruning `%s' from devtree\n", buf);
-        rc = ofd_prune_path(oftree, buf);
+        rc = ofd_prune_path(oft, buf);
         if (rc < 0)
             of_panic("prune of `%s' failed\n", buf);
     }
@@ -858,8 +858,8 @@ static int __init boot_of_serial(void *oftree)
 static void boot_of_module(ulong r3, ulong r4, multiboot_info_t *mbi)
 {
     static module_t mods[3];
-    void *oftree;
-    ulong oftree_sz = 48 * PAGE_SIZE;
+    void *oft;
+    ulong oft_sz = 48 * PAGE_SIZE;
     ulong mod0_start;
     ulong mod0_size;
     static const char sepr[] = " -- ";
@@ -922,28 +922,28 @@ static void boot_of_module(ulong r3, ulong r4, multiboot_info_t *mbi)
     }
 
     /* snapshot the tree */
-    oftree = (void*)find_space(oftree_sz, PAGE_SIZE, mbi);
-    if (oftree == 0)
+    oft = (void*)find_space(oft_sz, PAGE_SIZE, mbi);
+    if (oft == 0)
         of_panic("Could not allocate OFD tree\n");
 
-    of_printf("creating oftree\n");
+    of_printf("creating oft\n");
     of_test("package-to-path");
-    oftree = ofd_create(oftree, oftree_sz);
-    pkg_save(oftree);
+    oft = ofd_create(oft, oft_sz);
+    pkg_save(oft);
 
-    if (ofd_size(oftree) > oftree_sz)
+    if (ofd_size(oft) > oft_sz)
          of_panic("Could not fit all of native devtree\n");
 
-    boot_of_fixup_refs(oftree);
-    boot_of_fixup_chosen(oftree);
+    boot_of_fixup_refs(oft);
+    boot_of_fixup_chosen(oft);
 
-    if (ofd_size(oftree) > oftree_sz)
+    if (ofd_size(oft) > oft_sz)
          of_panic("Could not fit all devtree fixups\n");
 
-    ofd_walk(oftree, OFD_ROOT, /* add_hype_props */ NULL, 2);
+    ofd_walk(oft, OFD_ROOT, /* add_hype_props */ NULL, 2);
 
-    mods[1].mod_start = (ulong)oftree;
-    mods[1].mod_end = mods[1].mod_start + oftree_sz;
+    mods[1].mod_start = (ulong)oft;
+    mods[1].mod_end = mods[1].mod_start + oft_sz;
     of_printf("%s: mod[1] @ 0x%016x[0x%x]\n", __func__,
               mods[1].mod_start, mods[1].mod_end);
 
@@ -952,7 +952,7 @@ static void boot_of_module(ulong r3, ulong r4, multiboot_info_t *mbi)
     mbi->mods_count = 2;
     mbi->mods_addr = (u32)mods;
 
-    boot_of_serial(oftree);
+    boot_of_serial(oft);
 }
 
 static int __init boot_of_cpus(void)

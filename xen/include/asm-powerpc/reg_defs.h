@@ -154,6 +154,7 @@
 #define SPRN_HSPRG0 304
 #define SPRN_HSPRG1 305
 #define SPRN_HDEC   310
+#define SPRN_HIOR   311
 #define SPRN_RMOR   312
 #define SPRN_HRMOR  313
 #define SPRN_HSRR0  314

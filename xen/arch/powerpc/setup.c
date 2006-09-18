@@ -77,6 +77,7 @@ cpumask_t cpu_present_map;
 cpumask_t cpu_possible_map;
 
 /* XXX get this from ISA node in device tree */
+void *vgabase;
 ulong isa_io_base;
 struct ns16550_defaults ns16550;
 
@@ -255,7 +256,6 @@ static int kick_secondary_cpus(int maxcpus)
             break;
         init_parea(cpuid);
         cpu_set(cpuid, cpu_online_map);
-        cpu_set(cpuid, cpu_possible_map);
     }
 
     return 0;
@@ -339,7 +339,7 @@ static void __init __start_xen(multiboot_info_t *mbi)
 #endif
 
     /* Deal with secondary processors.  */
-    if (opt_nosmp) {
+    if (opt_nosmp || ofd_boot_cpu == -1) {
         printk("nosmp: leaving secondary processors spinning forever\n");
     } else {
         printk("spinning up at most %d total processors ...\n", max_cpus);
@@ -350,8 +350,13 @@ static void __init __start_xen(multiboot_info_t *mbi)
 
     /* Create initial domain 0. */
     dom0 = domain_create(0);
-    if ((dom0 == NULL) || (alloc_vcpu(dom0, 0, 0) == NULL))
+    if (dom0 == NULL)
         panic("Error creating domain 0\n");
+    dom0->max_pages = ~0U;
+    if (0 > allocate_rma(dom0, cpu_default_rma_order_pages()))
+        panic("Error allocating domain 0 RMA\n");
+    if (NULL == alloc_vcpu(dom0, 0, 0))
+        panic("Error creating domain 0 vcpu 0\n");
 
     set_bit(_DOMF_privileged, &dom0->domain_flags);
     /* post-create hooks sets security label */

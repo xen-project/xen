@@ -75,31 +75,12 @@ unsigned long hypercall_create_continuation(unsigned int op,
 
 int arch_domain_create(struct domain *d)
 {
-    unsigned long rma_base;
-    unsigned long rma_sz;
-    uint rma_order_pages;
-    int rc;
-
     if (d->domain_id == IDLE_DOMAIN_ID) {
         d->shared_info = (void *)alloc_xenheap_page();
         clear_page(d->shared_info);
 
         return 0;
     }
-
-    /* allocate the real mode area */
-    rma_order_pages = cpu_default_rma_order_pages();
-    d->max_pages = 1UL << rma_order_pages;
-    d->tot_pages = 0;
-
-    rc = allocate_rma(d, rma_order_pages);
-    if (rc)
-        return rc;
-    rma_base = page_to_maddr(d->arch.rma_page);
-    rma_sz = rma_size(rma_order_pages);
-
-    d->shared_info = (shared_info_t *)
-        (rma_addr(&d->arch, RMA_SHARED_INFO) + rma_base);
 
     d->arch.large_page_sizes = cpu_large_page_orders(
         d->arch.large_page_order, ARRAY_SIZE(d->arch.large_page_order));
@@ -264,7 +245,8 @@ void sync_vcpu_execstate(struct vcpu *v)
 
 void domain_relinquish_resources(struct domain *d)
 {
-    free_domheap_pages(d->arch.rma_page, d->arch.rma_order);
+    if (d->arch.rma_page)
+        free_domheap_pages(d->arch.rma_page, d->arch.rma_order);
     free_extents(d);
 }
 
