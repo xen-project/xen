@@ -982,7 +982,6 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
  * Cycle through the processors sending APIC IPIs to boot each.
  */
 
-static int boot_cpu_logical_apicid;
 /* Where the IO area was mapped on multiquad, always 0 otherwise */
 void *xquad_portio;
 #ifdef CONFIG_X86_NUMAQ
@@ -1004,7 +1003,6 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	print_cpu_info(&cpu_data[0]);
 
 	boot_cpu_physical_apicid = GET_APIC_ID(apic_read(APIC_ID));
-	boot_cpu_logical_apicid = logical_smp_processor_id();
 	x86_cpu_to_apicid[0] = boot_cpu_physical_apicid;
 
 	/*current_thread_info()->cpu = 0;*/

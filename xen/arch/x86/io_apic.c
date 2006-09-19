@@ -1143,7 +1143,8 @@ static void __init setup_ioapic_ids_from_mpc(void)
      * Don't check I/O APIC IDs for xAPIC systems. They have
      * no meaning without the serial APIC bus.
      */
-    if (!(boot_cpu_data.x86_vendor == X86_VENDOR_INTEL && boot_cpu_data.x86 < 15))
+    if (!(boot_cpu_data.x86_vendor == X86_VENDOR_INTEL)
+        || APIC_XAPIC(apic_version[boot_cpu_physical_apicid]))
         return;
 
     /*
@@ -1639,6 +1640,8 @@ static inline void unlock_ExtINT_logic(void)
     spin_unlock_irqrestore(&ioapic_lock, flags);
 }
 
+int timer_uses_ioapic_pin_0;
+
 /*
  * This code may look a bit paranoid, but it's supposed to cooperate with
  * a wide range of boards and BIOS bugs.  Fortunately only the timer IRQ
@@ -1677,6 +1680,9 @@ static inline void check_timer(void)
     apic1 = find_isa_irq_apic(0, mp_INT);
     pin2  = ioapic_i8259.pin;
     apic2 = ioapic_i8259.apic;
+
+    if (pin1 == 0)
+        timer_uses_ioapic_pin_0 = 1;
 
     printk(KERN_INFO "..TIMER: vector=0x%02X apic1=%d pin1=%d apic2=%d pin2=%d\n",
            vector, apic1, pin1, apic2, pin2);

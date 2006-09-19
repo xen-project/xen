@@ -1,5 +1,5 @@
 /*
- *      based on linux-2.6.11/arch/i386/kernel/apic.c
+ *      based on linux-2.6.17.13/arch/i386/kernel/apic.c
  *
  *  Local APIC handling, local APIC timers
  *
@@ -50,6 +50,18 @@ int apic_verbosity;
 
 static void apic_pm_activate(void);
 
+int modern_apic(void)
+{
+    unsigned int lvr, version;
+    /* AMD systems use old APIC versions, so check the CPU */
+    if (boot_cpu_data.x86_vendor == X86_VENDOR_AMD &&
+        boot_cpu_data.x86 >= 0xf)
+        return 1;
+    lvr = apic_read(APIC_LVR);
+    version = GET_APIC_VERSION(lvr);
+    return version >= 0x14;
+}
+
 /*
  * 'what should we do if we get a hw irq event on an illegal vector'.
  * each architecture has to answer this themselves.
@@ -64,8 +76,10 @@ void ack_bad_irq(unsigned int irq)
      * holds up an irq slot - in excessive cases (when multiple
      * unexpected vectors occur) that might lock up the APIC
      * completely.
+     * But only ack when the APIC is enabled -AK
      */
-    ack_APIC_irq();
+    if (cpu_has_apic)
+        ack_APIC_irq();
 }
 
 void __init apic_intr_init(void)
@@ -91,12 +105,21 @@ int using_apic_timer = 0;
 
 static int enabled_via_apicbase;
 
+void enable_NMI_through_LVT0 (void * dummy)
+{
+    unsigned int v, ver;
+
+    ver = apic_read(APIC_LVR);
+    ver = GET_APIC_VERSION(ver);
+    v = APIC_DM_NMI;			/* unmask and set to NMI */
+    if (!APIC_INTEGRATED(ver))		/* 82489DX */
+        v |= APIC_LVT_LEVEL_TRIGGER;
+    apic_write_around(APIC_LVT0, v);
+}
+
 int get_physical_broadcast(void)
 {
-    unsigned int lvr, version;
-    lvr = apic_read(APIC_LVR);
-    version = GET_APIC_VERSION(lvr);
-    if (!APIC_INTEGRATED(version) || version >= 0x14)
+    if (modern_apic())
         return 0xff;
     else
         return 0xf;
@@ -323,9 +346,9 @@ int __init verify_local_APIC(void)
 
 void __init sync_Arb_IDs(void)
 {
-    /* Unsupported on P4 - see Intel Dev. Manual Vol. 3, Ch. 8.6.1 */
-    unsigned int ver = GET_APIC_VERSION(apic_read(APIC_LVR));
-    if (ver >= 0x14)    /* P4 or higher */
+    /* Unsupported on P4 - see Intel Dev. Manual Vol. 3, Ch. 8.6.1
+       And not needed on AMD */
+    if (modern_apic())
         return;
     /*
      * Wait for idle.
@@ -389,6 +412,7 @@ void __init init_bsp_APIC(void)
 void __devinit setup_local_APIC(void)
 {
     unsigned long oldvalue, value, ver, maxlvt;
+    int i, j;
 
     /* Pound the ESR really hard over the head with a big hammer - mbligh */
     if (esr_disable) {
@@ -424,6 +448,25 @@ void __devinit setup_local_APIC(void)
     value = apic_read(APIC_TASKPRI);
     value &= ~APIC_TPRI_MASK;
     apic_write_around(APIC_TASKPRI, value);
+
+    /*
+     * After a crash, we no longer service the interrupts and a pending
+     * interrupt from previous kernel might still have ISR bit set.
+     *
+     * Most probably by now CPU has serviced that pending interrupt and
+     * it might not have done the ack_APIC_irq() because it thought,
+     * interrupt came from i8259 as ExtInt. LAPIC did not get EOI so it
+     * does not clear the ISR bit and cpu thinks it has already serivced
+     * the interrupt. Hence a vector might get locked. It was noticed
+     * for timer irq (vector 0x31). Issue an extra EOI to clear ISR.
+     */
+    for (i = APIC_ISR_NR - 1; i >= 0; i--) {
+        value = apic_read(APIC_ISR + i*0x10);
+        for (j = 31; j >= 0; j--) {
+            if (value & (1<<j))
+                ack_APIC_irq();
+        }
+    }
 
     /*
      * Now that we are all set up, enable the APIC
@@ -534,6 +577,29 @@ void __devinit setup_local_APIC(void)
     if (nmi_watchdog == NMI_LOCAL_APIC)
         setup_apic_nmi_watchdog();
     apic_pm_activate();
+}
+
+/*
+ * If Linux enabled the LAPIC against the BIOS default
+ * disable it down before re-entering the BIOS on shutdown.
+ * Otherwise the BIOS may get confused and not power-off.
+ * Additionally clear all LVT entries before disable_local_APIC
+ * for the case where Linux didn't enable the LAPIC.
+ */
+void lapic_shutdown(void)
+{
+    unsigned long flags;
+
+    if (!cpu_has_apic)
+        return;
+
+    local_irq_save(flags);
+    clear_local_APIC();
+
+    if (enabled_via_apicbase)
+        disable_local_APIC();
+
+    local_irq_restore(flags);
 }
 
 static void apic_pm_activate(void) { }
@@ -1086,6 +1152,7 @@ int __init APIC_init_uniprocessor (void)
     if (!cpu_has_apic && APIC_INTEGRATED(apic_version[boot_cpu_physical_apicid])) {
         printk(KERN_ERR "BIOS bug, local APIC #%d not detected!...\n",
                boot_cpu_physical_apicid);
+        clear_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
         return -1;
     }
 
@@ -1093,6 +1160,14 @@ int __init APIC_init_uniprocessor (void)
 
     connect_bsp_APIC();
 
+    /*
+     * Hack: In case of kdump, after a crash, kernel might be booting
+     * on a cpu with non-zero lapic id. But boot_cpu_physical_apicid
+     * might be zero if read from MP tables. Get it from LAPIC.
+     */
+#ifdef CONFIG_CRASH_DUMP
+    boot_cpu_physical_apicid = GET_APIC_ID(apic_read(APIC_ID));
+#endif
     phys_cpu_present_map = physid_mask_of_physid(boot_cpu_physical_apicid);
 
     setup_local_APIC();
