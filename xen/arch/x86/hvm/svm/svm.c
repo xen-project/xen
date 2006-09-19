@@ -56,6 +56,7 @@
 extern void do_nmi(struct cpu_user_regs *, unsigned long);
 extern int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip,
                                 int inst_len);
+ extern uint32_t vlapic_update_ppr(struct vlapic *vlapic);
 extern asmlinkage void do_IRQ(struct cpu_user_regs *);
 extern void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
                          unsigned long count, int size, long value, int dir, int pvalid);
@@ -896,8 +897,11 @@ static void svm_relinquish_guest_resources(struct domain *d)
         if ( hvm_apic_support(v->domain) && (VLAPIC(v) != NULL) ) 
         {
             kill_timer( &(VLAPIC(v)->vlapic_timer) );
+            unmap_domain_page_global(VLAPIC(v)->regs);
+            free_domheap_page(VLAPIC(v)->regs_page);
             xfree(VLAPIC(v));
         }
+        hvm_release_assist_channel(v);
     }
 
     kill_timer(&d->arch.hvm_domain.pl_time.periodic_tm.timer);
@@ -1599,6 +1603,7 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
 {
     unsigned long value = 0;
     struct vcpu *v = current;
+    struct vlapic *vlapic = VLAPIC(v);
     struct vmcb_struct *vmcb;
 
     vmcb = v->arch.hvm_svm.vmcb;
@@ -1625,11 +1630,8 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
             printk( "CR4 read=%lx\n", value );
         break;
     case 8:
-#if 0
-        value = vmcb->m_cr8;
-#else
-        ASSERT(0);
-#endif
+        value = (unsigned long)vlapic_get_reg(vlapic, APIC_TASKPRI);
+        value = (value & 0xF0) >> 4;
         break;
         
     default:
@@ -1656,6 +1658,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
     unsigned long value;
     unsigned long old_cr;
     struct vcpu *v = current;
+    struct vlapic *vlapic = VLAPIC(v);
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
     ASSERT(vmcb);
@@ -1799,6 +1802,13 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
             set_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
             shadow_update_paging_modes(v);
         }
+        break;
+    }
+
+    case 8:
+    {
+        vlapic_set_reg(vlapic, APIC_TASKPRI, ((value & 0x0F) << 4));
+        vlapic_update_ppr(vlapic);
         break;
     }
 
