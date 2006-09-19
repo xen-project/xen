@@ -1,6 +1,6 @@
-diff -urp a/drivers/net/bnx2.c b/drivers/net/bnx2.c
---- a/drivers/net/bnx2.c	2006-07-25 14:41:00.905507519 +0100
-+++ b/drivers/net/bnx2.c	2006-07-25 14:36:00.288561400 +0100
+diff -pruN ../orig-linux-2.6.16.29/drivers/net/bnx2.c ./drivers/net/bnx2.c
+--- ../orig-linux-2.6.16.29/drivers/net/bnx2.c	2006-09-19 13:59:20.000000000 +0100
++++ ./drivers/net/bnx2.c	2006-09-19 13:59:46.000000000 +0100
 @@ -1593,7 +1593,7 @@ bnx2_tx_int(struct bnx2 *bp)
  		skb = tx_buf->skb;
  #ifdef BCM_TSO 
@@ -10,9 +10,9 @@ diff -urp a/drivers/net/bnx2.c b/drivers/net/bnx2.c
  			u16 last_idx, last_ring_idx;
  
  			last_idx = sw_cons +
-diff -urp a/drivers/net/chelsio/sge.c b/drivers/net/chelsio/sge.c
---- a/drivers/net/chelsio/sge.c	2006-07-25 14:41:00.908507183 +0100
-+++ b/drivers/net/chelsio/sge.c	2006-07-25 14:36:00.291561087 +0100
+diff -pruN ../orig-linux-2.6.16.29/drivers/net/chelsio/sge.c ./drivers/net/chelsio/sge.c
+--- ../orig-linux-2.6.16.29/drivers/net/chelsio/sge.c	2006-09-19 13:59:20.000000000 +0100
++++ ./drivers/net/chelsio/sge.c	2006-09-19 13:59:46.000000000 +0100
 @@ -1419,7 +1419,7 @@ int t1_start_xmit(struct sk_buff *skb, s
  	struct cpl_tx_pkt *cpl;
  
@@ -22,9 +22,9 @@ diff -urp a/drivers/net/chelsio/sge.c b/drivers/net/chelsio/sge.c
  		int eth_type;
  		struct cpl_tx_pkt_lso *hdr;
  
-diff -urp a/drivers/net/e1000/e1000_main.c b/drivers/net/e1000/e1000_main.c
---- a/drivers/net/e1000/e1000_main.c	2006-07-25 14:41:00.910506958 +0100
-+++ b/drivers/net/e1000/e1000_main.c	2006-07-25 14:36:00.293560878 +0100
+diff -pruN ../orig-linux-2.6.16.29/drivers/net/e1000/e1000_main.c ./drivers/net/e1000/e1000_main.c
+--- ../orig-linux-2.6.16.29/drivers/net/e1000/e1000_main.c	2006-09-19 13:59:20.000000000 +0100
++++ ./drivers/net/e1000/e1000_main.c	2006-09-19 13:59:46.000000000 +0100
 @@ -2526,7 +2526,7 @@ e1000_tso(struct e1000_adapter *adapter,
  	uint8_t ipcss, ipcso, tucss, tucso, hdr_len;
  	int err;
@@ -53,9 +53,9 @@ diff -urp a/drivers/net/e1000/e1000_main.c b/drivers/net/e1000/e1000_main.c
  		count++;
  #endif
  
-diff -urp a/drivers/net/forcedeth.c b/drivers/net/forcedeth.c
---- a/drivers/net/forcedeth.c	2006-07-25 14:41:00.912506734 +0100
-+++ b/drivers/net/forcedeth.c	2006-07-25 14:36:00.295560669 +0100
+diff -pruN ../orig-linux-2.6.16.29/drivers/net/forcedeth.c ./drivers/net/forcedeth.c
+--- ../orig-linux-2.6.16.29/drivers/net/forcedeth.c	2006-09-19 13:59:20.000000000 +0100
++++ ./drivers/net/forcedeth.c	2006-09-19 13:59:46.000000000 +0100
 @@ -1105,7 +1105,7 @@ static int nv_start_xmit(struct sk_buff 
  	np->tx_skbuff[nr] = skb;
  
@@ -65,9 +65,9 @@ diff -urp a/drivers/net/forcedeth.c b/drivers/net/forcedeth.c
  		tx_flags_extra = NV_TX2_TSO | (skb_shinfo(skb)->gso_size << NV_TX2_TSO_SHIFT);
  	else
  #endif
-diff -urp a/drivers/net/ixgb/ixgb_main.c b/drivers/net/ixgb/ixgb_main.c
---- a/drivers/net/ixgb/ixgb_main.c	2006-07-25 14:41:00.915506397 +0100
-+++ b/drivers/net/ixgb/ixgb_main.c	2006-07-25 14:36:00.298560355 +0100
+diff -pruN ../orig-linux-2.6.16.29/drivers/net/ixgb/ixgb_main.c ./drivers/net/ixgb/ixgb_main.c
+--- ../orig-linux-2.6.16.29/drivers/net/ixgb/ixgb_main.c	2006-09-19 13:59:20.000000000 +0100
++++ ./drivers/net/ixgb/ixgb_main.c	2006-09-19 13:59:46.000000000 +0100
 @@ -1163,7 +1163,7 @@ ixgb_tso(struct ixgb_adapter *adapter, s
  	uint16_t ipcse, tucse, mss;
  	int err;
@@ -77,9 +77,9 @@ diff -urp a/drivers/net/ixgb/ixgb_main.c b/drivers/net/ixgb/ixgb_main.c
  		if (skb_header_cloned(skb)) {
  			err = pskb_expand_head(skb, 0, 0, GFP_ATOMIC);
  			if (err)
-diff -urp a/drivers/net/loopback.c b/drivers/net/loopback.c
---- a/drivers/net/loopback.c	2006-07-25 14:41:00.915506397 +0100
-+++ b/drivers/net/loopback.c	2006-07-25 14:36:00.298560355 +0100
+diff -pruN ../orig-linux-2.6.16.29/drivers/net/loopback.c ./drivers/net/loopback.c
+--- ../orig-linux-2.6.16.29/drivers/net/loopback.c	2006-09-19 13:59:20.000000000 +0100
++++ ./drivers/net/loopback.c	2006-09-19 13:59:46.000000000 +0100
 @@ -139,7 +139,7 @@ static int loopback_xmit(struct sk_buff 
  #endif
  
@@ -89,9 +89,9 @@ diff -urp a/drivers/net/loopback.c b/drivers/net/loopback.c
  		BUG_ON(skb->protocol != htons(ETH_P_IP));
  		BUG_ON(skb->nh.iph->protocol != IPPROTO_TCP);
  
-diff -urp a/drivers/net/sky2.c b/drivers/net/sky2.c
---- a/drivers/net/sky2.c	2006-07-25 14:41:00.924505388 +0100
-+++ b/drivers/net/sky2.c	2006-07-25 14:36:00.306559519 +0100
+diff -pruN ../orig-linux-2.6.16.29/drivers/net/sky2.c ./drivers/net/sky2.c
+--- ../orig-linux-2.6.16.29/drivers/net/sky2.c	2006-09-19 13:59:20.000000000 +0100
++++ ./drivers/net/sky2.c	2006-09-19 13:59:46.000000000 +0100
 @@ -1125,7 +1125,7 @@ static unsigned tx_le_req(const struct s
  	count = sizeof(dma_addr_t) / sizeof(u32);
  	count += skb_shinfo(skb)->nr_frags * count;
@@ -101,9 +101,9 @@ diff -urp a/drivers/net/sky2.c b/drivers/net/sky2.c
  		++count;
  
  	if (skb->ip_summed == CHECKSUM_HW)
-diff -urp a/drivers/net/typhoon.c b/drivers/net/typhoon.c
---- a/drivers/net/typhoon.c	2006-07-25 14:41:00.931504603 +0100
-+++ b/drivers/net/typhoon.c	2006-07-25 14:36:00.314558683 +0100
+diff -pruN ../orig-linux-2.6.16.29/drivers/net/typhoon.c ./drivers/net/typhoon.c
+--- ../orig-linux-2.6.16.29/drivers/net/typhoon.c	2006-09-19 13:59:20.000000000 +0100
++++ ./drivers/net/typhoon.c	2006-09-19 13:59:46.000000000 +0100
 @@ -805,7 +805,7 @@ typhoon_start_tx(struct sk_buff *skb, st
  	 * If problems develop with TSO, check this first.
  	 */
@@ -122,9 +122,9 @@ diff -urp a/drivers/net/typhoon.c b/drivers/net/typhoon.c
  		first_txd->processFlags |= TYPHOON_TX_PF_TCP_SEGMENT;
  		first_txd->numDesc++;
  
-diff -urp a/drivers/s390/net/qeth_main.c b/drivers/s390/net/qeth_main.c
---- a/drivers/s390/net/qeth_main.c	2006-07-25 14:41:00.939503705 +0100
-+++ b/drivers/s390/net/qeth_main.c	2006-07-25 14:36:00.321557952 +0100
+diff -pruN ../orig-linux-2.6.16.29/drivers/s390/net/qeth_main.c ./drivers/s390/net/qeth_main.c
+--- ../orig-linux-2.6.16.29/drivers/s390/net/qeth_main.c	2006-09-19 13:59:20.000000000 +0100
++++ ./drivers/s390/net/qeth_main.c	2006-09-19 13:59:46.000000000 +0100
 @@ -4454,7 +4454,7 @@ qeth_send_packet(struct qeth_card *card,
  	queue = card->qdio.out_qs
  		[qeth_get_priority_queue(card, skb, ipv, cast_type)];
@@ -144,9 +144,9 @@ diff -urp a/drivers/s390/net/qeth_main.c b/drivers/s390/net/qeth_main.c
  			card->perf_stats.large_send_bytes += skb->len;
  			card->perf_stats.large_send_cnt++;
  		}
-diff -urp a/include/linux/netdevice.h b/include/linux/netdevice.h
---- a/include/linux/netdevice.h	2006-07-25 14:41:00.940503593 +0100
-+++ b/include/linux/netdevice.h	2006-07-25 14:36:00.323557743 +0100
+diff -pruN ../orig-linux-2.6.16.29/include/linux/netdevice.h ./include/linux/netdevice.h
+--- ../orig-linux-2.6.16.29/include/linux/netdevice.h	2006-09-19 13:59:20.000000000 +0100
++++ ./include/linux/netdevice.h	2006-09-19 13:59:46.000000000 +0100
 @@ -541,6 +541,7 @@ struct packet_type {
  					 struct net_device *);
  	struct sk_buff		*(*gso_segment)(struct sk_buff *skb,
@@ -174,9 +174,9 @@ diff -urp a/include/linux/netdevice.h b/include/linux/netdevice.h
  }
  
  #endif /* __KERNEL__ */
-diff -urp a/include/linux/skbuff.h b/include/linux/skbuff.h
---- a/include/linux/skbuff.h	2006-07-25 14:41:00.941503481 +0100
-+++ b/include/linux/skbuff.h	2006-07-25 14:36:00.323557743 +0100
+diff -pruN ../orig-linux-2.6.16.29/include/linux/skbuff.h ./include/linux/skbuff.h
+--- ../orig-linux-2.6.16.29/include/linux/skbuff.h	2006-09-19 13:59:20.000000000 +0100
++++ ./include/linux/skbuff.h	2006-09-19 13:59:46.000000000 +0100
 @@ -1403,5 +1403,10 @@ static inline void nf_bridge_get(struct 
  static inline void nf_reset(struct sk_buff *skb) {}
  #endif /* CONFIG_NETFILTER */
@@ -188,9 +188,9 @@ diff -urp a/include/linux/skbuff.h b/include/linux/skbuff.h
 +
  #endif	/* __KERNEL__ */
  #endif	/* _LINUX_SKBUFF_H */
-diff -urp a/include/net/protocol.h b/include/net/protocol.h
---- a/include/net/protocol.h	2006-07-25 14:41:00.942503369 +0100
-+++ b/include/net/protocol.h	2006-07-25 14:36:00.324557639 +0100
+diff -pruN ../orig-linux-2.6.16.29/include/net/protocol.h ./include/net/protocol.h
+--- ../orig-linux-2.6.16.29/include/net/protocol.h	2006-09-19 13:59:20.000000000 +0100
++++ ./include/net/protocol.h	2006-09-19 13:59:46.000000000 +0100
 @@ -37,6 +37,7 @@
  struct net_protocol {
  	int			(*handler)(struct sk_buff *skb);
@@ -199,9 +199,9 @@ diff -urp a/include/net/protocol.h b/include/net/protocol.h
  	struct sk_buff	       *(*gso_segment)(struct sk_buff *skb,
  					       int features);
  	int			no_policy;
-diff -urp a/include/net/tcp.h b/include/net/tcp.h
---- a/include/net/tcp.h	2006-07-25 14:41:00.943503256 +0100
-+++ b/include/net/tcp.h	2006-07-25 14:36:00.325557534 +0100
+diff -pruN ../orig-linux-2.6.16.29/include/net/tcp.h ./include/net/tcp.h
+--- ../orig-linux-2.6.16.29/include/net/tcp.h	2006-09-19 13:59:20.000000000 +0100
++++ ./include/net/tcp.h	2006-09-19 13:59:46.000000000 +0100
 @@ -1063,6 +1063,7 @@ extern struct request_sock_ops tcp_reque
  
  extern int tcp_v4_destroy_sock(struct sock *sk);
@@ -210,9 +210,9 @@ diff -urp a/include/net/tcp.h b/include/net/tcp.h
  extern struct sk_buff *tcp_tso_segment(struct sk_buff *skb, int features);
  
  #ifdef CONFIG_PROC_FS
-diff -urp a/net/bridge/br_forward.c b/net/bridge/br_forward.c
---- a/net/bridge/br_forward.c	2006-07-25 14:41:00.944503144 +0100
-+++ b/net/bridge/br_forward.c	2006-07-25 14:36:00.326557430 +0100
+diff -pruN ../orig-linux-2.6.16.29/net/bridge/br_forward.c ./net/bridge/br_forward.c
+--- ../orig-linux-2.6.16.29/net/bridge/br_forward.c	2006-09-19 13:59:20.000000000 +0100
++++ ./net/bridge/br_forward.c	2006-09-19 13:59:46.000000000 +0100
 @@ -32,7 +32,7 @@ static inline int should_deliver(const s
  int br_dev_queue_push_xmit(struct sk_buff *skb)
  {
@@ -222,9 +222,9 @@ diff -urp a/net/bridge/br_forward.c b/net/bridge/br_forward.c
  		kfree_skb(skb);
  	else {
  #ifdef CONFIG_BRIDGE_NETFILTER
-diff -urp a/net/bridge/br_netfilter.c b/net/bridge/br_netfilter.c
---- a/net/bridge/br_netfilter.c	2006-07-25 14:41:00.945503032 +0100
-+++ b/net/bridge/br_netfilter.c	2006-07-25 14:36:00.327557325 +0100
+diff -pruN ../orig-linux-2.6.16.29/net/bridge/br_netfilter.c ./net/bridge/br_netfilter.c
+--- ../orig-linux-2.6.16.29/net/bridge/br_netfilter.c	2006-09-19 13:59:20.000000000 +0100
++++ ./net/bridge/br_netfilter.c	2006-09-19 13:59:46.000000000 +0100
 @@ -743,7 +743,7 @@ static int br_nf_dev_queue_xmit(struct s
  {
  	if (skb->protocol == htons(ETH_P_IP) &&
@@ -234,9 +234,9 @@ diff -urp a/net/bridge/br_netfilter.c b/net/bridge/br_netfilter.c
  		return ip_fragment(skb, br_dev_queue_push_xmit);
  	else
  		return br_dev_queue_push_xmit(skb);
-diff -urp a/net/core/dev.c b/net/core/dev.c
---- a/net/core/dev.c	2006-07-25 14:41:00.947502808 +0100
-+++ b/net/core/dev.c	2006-07-25 14:36:00.329557116 +0100
+diff -pruN ../orig-linux-2.6.16.29/net/core/dev.c ./net/core/dev.c
+--- ../orig-linux-2.6.16.29/net/core/dev.c	2006-09-19 13:59:20.000000000 +0100
++++ ./net/core/dev.c	2006-09-19 13:59:46.000000000 +0100
 @@ -1083,9 +1083,17 @@ int skb_checksum_help(struct sk_buff *sk
  	unsigned int csum;
  	int ret = 0, offset = skb->h.raw - skb->data;
@@ -304,9 +304,9 @@ diff -urp a/net/core/dev.c b/net/core/dev.c
  			segs = ptype->gso_segment(skb, features);
  			break;
  		}
-diff -urp a/net/ipv4/af_inet.c b/net/ipv4/af_inet.c
---- a/net/ipv4/af_inet.c	2006-07-25 14:41:00.952502247 +0100
-+++ b/net/ipv4/af_inet.c	2006-07-25 14:36:00.334556594 +0100
+diff -pruN ../orig-linux-2.6.16.29/net/ipv4/af_inet.c ./net/ipv4/af_inet.c
+--- ../orig-linux-2.6.16.29/net/ipv4/af_inet.c	2006-09-19 13:59:20.000000000 +0100
++++ ./net/ipv4/af_inet.c	2006-09-19 13:59:46.000000000 +0100
 @@ -1085,6 +1085,40 @@ int inet_sk_rebuild_header(struct sock *
  
  EXPORT_SYMBOL(inet_sk_rebuild_header);
@@ -364,9 +364,9 @@ diff -urp a/net/ipv4/af_inet.c b/net/ipv4/af_inet.c
  	.gso_segment = inet_gso_segment,
  };
  
-diff -urp a/net/ipv4/ip_output.c b/net/ipv4/ip_output.c
---- a/net/ipv4/ip_output.c	2006-07-25 14:41:00.953502135 +0100
-+++ b/net/ipv4/ip_output.c	2006-07-25 14:36:00.335556489 +0100
+diff -pruN ../orig-linux-2.6.16.29/net/ipv4/ip_output.c ./net/ipv4/ip_output.c
+--- ../orig-linux-2.6.16.29/net/ipv4/ip_output.c	2006-09-19 13:59:20.000000000 +0100
++++ ./net/ipv4/ip_output.c	2006-09-19 13:59:46.000000000 +0100
 @@ -210,7 +210,7 @@ static inline int ip_finish_output(struc
  		return dst_output(skb);
  	}
@@ -385,9 +385,9 @@ diff -urp a/net/ipv4/ip_output.c b/net/ipv4/ip_output.c
  			len = size;
  		else {
  
-diff -urp a/net/ipv4/tcp_ipv4.c b/net/ipv4/tcp_ipv4.c
---- a/net/ipv4/tcp_ipv4.c	2006-07-25 14:39:15.985080788 +0100
-+++ b/net/ipv4/tcp_ipv4.c	2006-07-25 14:36:00.339556071 +0100
+diff -pruN ../orig-linux-2.6.16.29/net/ipv4/tcp_ipv4.c ./net/ipv4/tcp_ipv4.c
+--- ../orig-linux-2.6.16.29/net/ipv4/tcp_ipv4.c	2006-09-12 19:02:10.000000000 +0100
++++ ./net/ipv4/tcp_ipv4.c	2006-09-19 13:59:46.000000000 +0100
 @@ -495,6 +495,24 @@ void tcp_v4_send_check(struct sock *sk, 
  	}
  }
@@ -413,10 +413,10 @@ diff -urp a/net/ipv4/tcp_ipv4.c b/net/ipv4/tcp_ipv4.c
  /*
   *	This routine will send an RST to the other tcp.
   *
-diff -urp a/net/ipv4/xfrm4_output.c b/net/ipv4/xfrm4_output.c
---- a/net/ipv4/xfrm4_output.c	2006-07-25 14:41:00.958501574 +0100
-+++ b/net/ipv4/xfrm4_output.c	2006-07-25 14:36:00.341555862 +0100
-@@ -189,7 +189,7 @@ static int xfrm4_output_finish(struct sk
+diff -pruN ../orig-linux-2.6.16.29/net/ipv4/xfrm4_output.c ./net/ipv4/xfrm4_output.c
+--- ../orig-linux-2.6.16.29/net/ipv4/xfrm4_output.c	2006-09-19 13:59:20.000000000 +0100
++++ ./net/ipv4/xfrm4_output.c	2006-09-19 13:59:46.000000000 +0100
+@@ -195,7 +195,7 @@ static int xfrm4_output_finish(struct sk
  	}
  #endif
  
@@ -425,9 +425,9 @@ diff -urp a/net/ipv4/xfrm4_output.c b/net/ipv4/xfrm4_output.c
  		return xfrm4_output_finish2(skb);
  
  	skb->protocol = htons(ETH_P_IP);
-diff -urp a/net/ipv6/ip6_output.c b/net/ipv6/ip6_output.c
---- a/net/ipv6/ip6_output.c	2006-07-25 14:41:00.959501461 +0100
-+++ b/net/ipv6/ip6_output.c	2006-07-25 14:36:00.341555862 +0100
+diff -pruN ../orig-linux-2.6.16.29/net/ipv6/ip6_output.c ./net/ipv6/ip6_output.c
+--- ../orig-linux-2.6.16.29/net/ipv6/ip6_output.c	2006-09-19 13:59:20.000000000 +0100
++++ ./net/ipv6/ip6_output.c	2006-09-19 13:59:46.000000000 +0100
 @@ -147,7 +147,7 @@ static int ip6_output2(struct sk_buff *s
  
  int ip6_output(struct sk_buff *skb)
@@ -437,9 +437,9 @@ diff -urp a/net/ipv6/ip6_output.c b/net/ipv6/ip6_output.c
  				dst_allfrag(skb->dst))
  		return ip6_fragment(skb, ip6_output2);
  	else
-diff -urp a/net/ipv6/xfrm6_output.c b/net/ipv6/xfrm6_output.c
---- a/net/ipv6/xfrm6_output.c	2006-07-25 14:41:00.960501349 +0100
-+++ b/net/ipv6/xfrm6_output.c	2006-07-25 14:36:00.342555758 +0100
+diff -pruN ../orig-linux-2.6.16.29/net/ipv6/xfrm6_output.c ./net/ipv6/xfrm6_output.c
+--- ../orig-linux-2.6.16.29/net/ipv6/xfrm6_output.c	2006-09-19 13:59:20.000000000 +0100
++++ ./net/ipv6/xfrm6_output.c	2006-09-19 13:59:46.000000000 +0100
 @@ -179,7 +179,7 @@ static int xfrm6_output_finish(struct sk
  {
  	struct sk_buff *segs;

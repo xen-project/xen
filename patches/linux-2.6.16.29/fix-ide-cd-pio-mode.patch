@@ -1,7 +1,7 @@
-diff -ru ../pristine-linux-2.6.16.13/drivers/ide/ide-lib.c ./drivers/ide/ide-lib.c
---- ../pristine-linux-2.6.16.13/drivers/ide/ide-lib.c	2006-05-02 22:38:44.000000000 +0100
-+++ ./drivers/ide/ide-lib.c	2006-05-24 18:37:05.000000000 +0100
-@@ -410,10 +410,10 @@
+diff -pruN ../orig-linux-2.6.16.29/drivers/ide/ide-lib.c ./drivers/ide/ide-lib.c
+--- ../orig-linux-2.6.16.29/drivers/ide/ide-lib.c	2006-09-12 19:02:10.000000000 +0100
++++ ./drivers/ide/ide-lib.c	2006-09-19 13:59:03.000000000 +0100
+@@ -410,10 +410,10 @@ void ide_toggle_bounce(ide_drive_t *driv
  {
  	u64 addr = BLK_BOUNCE_HIGH;	/* dma64_addr_t */
  

@@ -1,6 +1,7 @@
---- a/arch/x86_64/kernel/vmlinux.lds.S
-+++ b/arch/x86_64/kernel/vmlinux.lds.S
-@@ -13,6 +13,12 @@ OUTPUT_FORMAT("elf64-x86-64", "elf64-x86
+diff -pruN ../orig-linux-2.6.16.29/arch/x86_64/kernel/vmlinux.lds.S ./arch/x86_64/kernel/vmlinux.lds.S
+--- ../orig-linux-2.6.16.29/arch/x86_64/kernel/vmlinux.lds.S	2006-09-12 19:02:10.000000000 +0100
++++ ./arch/x86_64/kernel/vmlinux.lds.S	2006-09-19 14:06:15.000000000 +0100
+@@ -14,6 +14,12 @@ OUTPUT_FORMAT("elf64-x86-64", "elf64-x86
  OUTPUT_ARCH(i386:x86-64)
  ENTRY(phys_startup_64)
  jiffies_64 = jiffies;
@@ -13,7 +14,7 @@
  SECTIONS
  {
    . = __START_KERNEL;
-@@ -31,7 +37,7 @@ SECTIONS
+@@ -26,7 +32,7 @@ SECTIONS
  	KPROBES_TEXT
  	*(.fixup)
  	*(.gnu.warning)
@@ -22,7 +23,7 @@
    				/* out-of-line lock text */
    .text.lock : AT(ADDR(.text.lock) - LOAD_OFFSET) { *(.text.lock) }
  
-@@ -57,17 +63,10 @@ #endif
+@@ -43,17 +49,10 @@ SECTIONS
    .data : AT(ADDR(.data) - LOAD_OFFSET) {
  	*(.data)
  	CONSTRUCTORS
@@ -41,7 +42,7 @@
    . = ALIGN(PAGE_SIZE);
    . = ALIGN(CONFIG_X86_L1_CACHE_BYTES);
    .data.cacheline_aligned : AT(ADDR(.data.cacheline_aligned) - LOAD_OFFSET) {
-@@ -89,7 +88,7 @@ #define VVIRT_OFFSET (VSYSCALL_ADDR - VS
+@@ -75,7 +74,7 @@ SECTIONS
  #define VVIRT(x) (ADDR(x) - VVIRT_OFFSET)
  
    . = VSYSCALL_ADDR;
@@ -50,7 +51,7 @@
    __vsyscall_0 = VSYSCALL_VIRT_ADDR;
  
    . = ALIGN(CONFIG_X86_L1_CACHE_BYTES);
-@@ -132,7 +131,7 @@ #undef VVIRT
+@@ -118,7 +117,7 @@ SECTIONS
    . = ALIGN(8192);		/* init_task */
    .data.init_task : AT(ADDR(.data.init_task) - LOAD_OFFSET) {
  	*(.data.init_task)
@@ -59,7 +60,7 @@
  
    . = ALIGN(4096);
    .data.page_aligned : AT(ADDR(.data.page_aligned) - LOAD_OFFSET) {
-@@ -222,6 +221,14 @@ SECTIONS
+@@ -188,6 +187,14 @@ SECTIONS
    . = ALIGN(4096);
    __nosave_end = .;
  
@@ -74,7 +75,7 @@
    _end = . ;
  
    /* Sections to be discarded */
-@@ -235,4 +242,6 @@ #endif
+@@ -201,4 +208,6 @@ SECTIONS
    STABS_DEBUG
  
    DWARF_DEBUG

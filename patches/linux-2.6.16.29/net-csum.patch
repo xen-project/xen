@@ -1,6 +1,6 @@
-diff -pruN ../pristine-linux-2.6.16.13/net/ipv4/netfilter/ip_nat_proto_tcp.c ./net/ipv4/netfilter/ip_nat_proto_tcp.c
---- ../pristine-linux-2.6.16.13/net/ipv4/netfilter/ip_nat_proto_tcp.c	2006-05-02 22:38:44.000000000 +0100
-+++ ./net/ipv4/netfilter/ip_nat_proto_tcp.c	2006-05-16 13:28:19.000000000 +0100
+diff -pruN ../orig-linux-2.6.16.29/net/ipv4/netfilter/ip_nat_proto_tcp.c ./net/ipv4/netfilter/ip_nat_proto_tcp.c
+--- ../orig-linux-2.6.16.29/net/ipv4/netfilter/ip_nat_proto_tcp.c	2006-09-12 19:02:10.000000000 +0100
++++ ./net/ipv4/netfilter/ip_nat_proto_tcp.c	2006-09-19 13:59:15.000000000 +0100
 @@ -129,7 +129,12 @@ tcp_manip_pkt(struct sk_buff **pskb,
  	if (hdrsize < sizeof(*hdr))
  		return 1;
@@ -15,9 +15,9 @@ diff -pruN ../pristine-linux-2.6.16.13/net/ipv4/netfilter/ip_nat_proto_tcp.c ./n
  					ip_nat_cheat_check(oldport ^ 0xFFFF,
  							   newport,
  							   hdr->check));
-diff -pruN ../pristine-linux-2.6.16.13/net/ipv4/netfilter/ip_nat_proto_udp.c ./net/ipv4/netfilter/ip_nat_proto_udp.c
---- ../pristine-linux-2.6.16.13/net/ipv4/netfilter/ip_nat_proto_udp.c	2006-05-02 22:38:44.000000000 +0100
-+++ ./net/ipv4/netfilter/ip_nat_proto_udp.c	2006-05-16 13:30:14.000000000 +0100
+diff -pruN ../orig-linux-2.6.16.29/net/ipv4/netfilter/ip_nat_proto_udp.c ./net/ipv4/netfilter/ip_nat_proto_udp.c
+--- ../orig-linux-2.6.16.29/net/ipv4/netfilter/ip_nat_proto_udp.c	2006-09-12 19:02:10.000000000 +0100
++++ ./net/ipv4/netfilter/ip_nat_proto_udp.c	2006-09-19 13:59:15.000000000 +0100
 @@ -113,11 +113,17 @@ udp_manip_pkt(struct sk_buff **pskb,
  		newport = tuple->dst.u.udp.port;
  		portptr = &hdr->dest;
@@ -38,9 +38,9 @@ diff -pruN ../pristine-linux-2.6.16.13/net/ipv4/netfilter/ip_nat_proto_udp.c ./n
  	*portptr = newport;
  	return 1;
  }
-diff -pruN ../pristine-linux-2.6.16.13/net/ipv4/xfrm4_output.c ./net/ipv4/xfrm4_output.c
---- ../pristine-linux-2.6.16.13/net/ipv4/xfrm4_output.c	2006-05-02 22:38:44.000000000 +0100
-+++ ./net/ipv4/xfrm4_output.c	2006-05-04 17:41:37.000000000 +0100
+diff -pruN ../orig-linux-2.6.16.29/net/ipv4/xfrm4_output.c ./net/ipv4/xfrm4_output.c
+--- ../orig-linux-2.6.16.29/net/ipv4/xfrm4_output.c	2006-09-12 19:02:10.000000000 +0100
++++ ./net/ipv4/xfrm4_output.c	2006-09-19 13:59:15.000000000 +0100
 @@ -17,6 +17,8 @@
  #include <net/xfrm.h>
  #include <net/icmp.h>

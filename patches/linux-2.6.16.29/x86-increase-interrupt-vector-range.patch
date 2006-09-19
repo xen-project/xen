@@ -1,6 +1,6 @@
-diff -pruN ../pristine-linux-2.6.16.13/arch/i386/kernel/entry.S ./arch/i386/kernel/entry.S
---- ../pristine-linux-2.6.16.13/arch/i386/kernel/entry.S	2006-05-02 22:38:44.000000000 +0100
-+++ ./arch/i386/kernel/entry.S	2006-05-04 17:41:49.000000000 +0100
+diff -pruN ../orig-linux-2.6.16.29/arch/i386/kernel/entry.S ./arch/i386/kernel/entry.S
+--- ../orig-linux-2.6.16.29/arch/i386/kernel/entry.S	2006-09-19 14:05:44.000000000 +0100
++++ ./arch/i386/kernel/entry.S	2006-09-19 14:05:56.000000000 +0100
 @@ -406,7 +406,7 @@ vector=0
  ENTRY(irq_entries_start)
  .rept NR_IRQS
@@ -19,9 +19,9 @@ diff -pruN ../pristine-linux-2.6.16.13/arch/i386/kernel/entry.S ./arch/i386/kern
  	SAVE_ALL			\
  	movl %esp,%eax;			\
  	call smp_/**/name;		\
-diff -pruN ../pristine-linux-2.6.16.13/arch/i386/kernel/irq.c ./arch/i386/kernel/irq.c
---- ../pristine-linux-2.6.16.13/arch/i386/kernel/irq.c	2006-05-02 22:38:44.000000000 +0100
-+++ ./arch/i386/kernel/irq.c	2006-05-04 17:41:49.000000000 +0100
+diff -pruN ../orig-linux-2.6.16.29/arch/i386/kernel/irq.c ./arch/i386/kernel/irq.c
+--- ../orig-linux-2.6.16.29/arch/i386/kernel/irq.c	2006-09-12 19:02:10.000000000 +0100
++++ ./arch/i386/kernel/irq.c	2006-09-19 14:05:56.000000000 +0100
 @@ -53,8 +53,8 @@ static union irq_ctx *softirq_ctx[NR_CPU
   */
  fastcall unsigned int do_IRQ(struct pt_regs *regs)
@@ -33,10 +33,10 @@ diff -pruN ../pristine-linux-2.6.16.13/arch/i386/kernel/irq.c ./arch/i386/kernel
  #ifdef CONFIG_4KSTACKS
  	union irq_ctx *curctx, *irqctx;
  	u32 *isp;
-diff -pruN ../pristine-linux-2.6.16.13/arch/x86_64/kernel/entry.S ./arch/x86_64/kernel/entry.S
---- ../pristine-linux-2.6.16.13/arch/x86_64/kernel/entry.S	2006-05-02 22:38:44.000000000 +0100
-+++ ./arch/x86_64/kernel/entry.S	2006-05-04 17:41:49.000000000 +0100
-@@ -601,7 +601,7 @@ retint_kernel:	
+diff -pruN ../orig-linux-2.6.16.29/arch/x86_64/kernel/entry.S ./arch/x86_64/kernel/entry.S
+--- ../orig-linux-2.6.16.29/arch/x86_64/kernel/entry.S	2006-09-12 19:02:10.000000000 +0100
++++ ./arch/x86_64/kernel/entry.S	2006-09-19 14:05:56.000000000 +0100
+@@ -596,7 +596,7 @@ retint_kernel:	
   */		
  	.macro apicinterrupt num,func
  	INTR_FRAME
@@ -45,9 +45,9 @@ diff -pruN ../pristine-linux-2.6.16.13/arch/x86_64/kernel/entry.S ./arch/x86_64/
  	CFI_ADJUST_CFA_OFFSET 8
  	interrupt \func
  	jmp ret_from_intr
-diff -pruN ../pristine-linux-2.6.16.13/arch/x86_64/kernel/irq.c ./arch/x86_64/kernel/irq.c
---- ../pristine-linux-2.6.16.13/arch/x86_64/kernel/irq.c	2006-05-02 22:38:44.000000000 +0100
-+++ ./arch/x86_64/kernel/irq.c	2006-05-04 17:41:49.000000000 +0100
+diff -pruN ../orig-linux-2.6.16.29/arch/x86_64/kernel/irq.c ./arch/x86_64/kernel/irq.c
+--- ../orig-linux-2.6.16.29/arch/x86_64/kernel/irq.c	2006-09-12 19:02:10.000000000 +0100
++++ ./arch/x86_64/kernel/irq.c	2006-09-19 14:05:56.000000000 +0100
 @@ -96,8 +96,8 @@ skip:
   */
  asmlinkage unsigned int do_IRQ(struct pt_regs *regs)
@@ -59,9 +59,9 @@ diff -pruN ../pristine-linux-2.6.16.13/arch/x86_64/kernel/irq.c ./arch/x86_64/ke
  
  	exit_idle();
  	irq_enter();
-diff -pruN ../pristine-linux-2.6.16.13/arch/x86_64/kernel/smp.c ./arch/x86_64/kernel/smp.c
---- ../pristine-linux-2.6.16.13/arch/x86_64/kernel/smp.c	2006-05-02 22:38:44.000000000 +0100
-+++ ./arch/x86_64/kernel/smp.c	2006-05-04 17:41:49.000000000 +0100
+diff -pruN ../orig-linux-2.6.16.29/arch/x86_64/kernel/smp.c ./arch/x86_64/kernel/smp.c
+--- ../orig-linux-2.6.16.29/arch/x86_64/kernel/smp.c	2006-09-12 19:02:10.000000000 +0100
++++ ./arch/x86_64/kernel/smp.c	2006-09-19 14:05:56.000000000 +0100
 @@ -135,10 +135,10 @@ asmlinkage void smp_invalidate_interrupt
  
  	cpu = smp_processor_id();
@@ -75,9 +75,9 @@ diff -pruN ../pristine-linux-2.6.16.13/arch/x86_64/kernel/smp.c ./arch/x86_64/ke
  	f = &per_cpu(flush_state, sender);
  
  	if (!cpu_isset(cpu, f->flush_cpumask))
-diff -pruN ../pristine-linux-2.6.16.13/include/asm-x86_64/hw_irq.h ./include/asm-x86_64/hw_irq.h
---- ../pristine-linux-2.6.16.13/include/asm-x86_64/hw_irq.h	2006-05-02 22:38:44.000000000 +0100
-+++ ./include/asm-x86_64/hw_irq.h	2006-05-04 17:41:49.000000000 +0100
+diff -pruN ../orig-linux-2.6.16.29/include/asm-x86_64/hw_irq.h ./include/asm-x86_64/hw_irq.h
+--- ../orig-linux-2.6.16.29/include/asm-x86_64/hw_irq.h	2006-09-12 19:02:10.000000000 +0100
++++ ./include/asm-x86_64/hw_irq.h	2006-09-19 14:05:56.000000000 +0100
 @@ -127,7 +127,7 @@ asmlinkage void IRQ_NAME(nr); \
  __asm__( \
  "\n.p2align\n" \

@@ -1,6 +1,6 @@
-diff -urp a/include/linux/netdevice.h b/include/linux/netdevice.h
---- a/include/linux/netdevice.h	2006-07-25 15:16:39.314333975 +0100
-+++ b/include/linux/netdevice.h	2006-07-25 15:19:37.298320799 +0100
+diff -pruN ../orig-linux-2.6.16.29/include/linux/netdevice.h ./include/linux/netdevice.h
+--- ../orig-linux-2.6.16.29/include/linux/netdevice.h	2006-09-19 13:59:46.000000000 +0100
++++ ./include/linux/netdevice.h	2006-09-19 14:05:28.000000000 +0100
 @@ -930,10 +930,10 @@ static inline void netif_tx_lock_bh(stru
  
  static inline int netif_tx_trylock(struct net_device *dev)

@@ -1,6 +1,6 @@
-diff -pruN ../pristine-linux-2.6.16-rc5/fs/aio.c ./fs/aio.c
---- ../pristine-linux-2.6.16-rc5/fs/aio.c	2006-03-14 14:10:10.827401387 +0000
-+++ ./fs/aio.c	2006-03-16 09:57:53.898316582 +0000
+diff -pruN ../orig-linux-2.6.16.29/fs/aio.c ./fs/aio.c
+--- ../orig-linux-2.6.16.29/fs/aio.c	2006-09-12 19:02:10.000000000 +0100
++++ ./fs/aio.c	2006-09-19 13:58:49.000000000 +0100
 @@ -34,6 +34,11 @@
  #include <asm/uaccess.h>
  #include <asm/mmu_context.h>
@@ -184,10 +184,9 @@ diff -pruN ../pristine-linux-2.6.16-rc5/fs/aio.c ./fs/aio.c
  
  		get_ioctx(ioctx); /* io_destroy() expects us to hold a ref */
  		io_destroy(ioctx);
-
-diff -pruN ../pristine-linux-2.6.16-rc5/fs/eventpoll.c ./fs/eventpoll.c
---- ../pristine-linux-2.6.16-rc5/fs/eventpoll.c	2006-01-03 03:21:10.000000000 +0000
-+++ ./fs/eventpoll.c	2006-03-16 10:04:35.469956167 +0000
+diff -pruN ../orig-linux-2.6.16.29/fs/eventpoll.c ./fs/eventpoll.c
+--- ../orig-linux-2.6.16.29/fs/eventpoll.c	2006-09-12 19:02:10.000000000 +0100
++++ ./fs/eventpoll.c	2006-09-19 13:58:49.000000000 +0100
 @@ -235,8 +235,6 @@ struct ep_pqueue {
  
  static void ep_poll_safewake_init(struct poll_safewake *psw);
@@ -262,10 +261,9 @@ diff -pruN ../pristine-linux-2.6.16-rc5/fs/eventpoll.c ./fs/eventpoll.c
  
  	/*
  	 * Mark the inode dirty from the very beginning,
-
-diff -pruN ../pristine-linux-2.6.16-rc5/include/linux/aio.h ./include/linux/aio.h
---- ../pristine-linux-2.6.16-rc5/include/linux/aio.h	2006-03-14 14:10:21.597916731 +0000
-+++ ./include/linux/aio.h	2006-03-16 10:05:39.848833028 +0000
+diff -pruN ../orig-linux-2.6.16.29/include/linux/aio.h ./include/linux/aio.h
+--- ../orig-linux-2.6.16.29/include/linux/aio.h	2006-09-12 19:02:10.000000000 +0100
++++ ./include/linux/aio.h	2006-09-19 13:58:49.000000000 +0100
 @@ -191,6 +191,11 @@ struct kioctx {
  	struct aio_ring_info	ring_info;
  
@@ -278,10 +276,9 @@ diff -pruN ../pristine-linux-2.6.16-rc5/include/linux/aio.h ./include/linux/aio.
  };
  
  /* prototypes */
-
-diff -pruN ../pristine-linux-2.6.16-rc5/include/linux/eventpoll.h ./include/linux/eventpoll.h
---- ../pristine-linux-2.6.16-rc5/include/linux/eventpoll.h	2006-01-03 03:21:10.000000000 +0000
-+++ ./include/linux/eventpoll.h	2006-03-16 10:08:51.577809317 +0000
+diff -pruN ../orig-linux-2.6.16.29/include/linux/eventpoll.h ./include/linux/eventpoll.h
+--- ../orig-linux-2.6.16.29/include/linux/eventpoll.h	2006-09-12 19:02:10.000000000 +0100
++++ ./include/linux/eventpoll.h	2006-09-19 13:58:49.000000000 +0100
 @@ -86,6 +86,12 @@ static inline void eventpoll_release(str
  }
  

@@ -1,8 +1,6 @@
-508c578140642a641bb9b888369719c510ae2a00
-diff --git a/net/core/dev.c b/net/core/dev.c
-index e814a89..240773b 100644
---- a/net/core/dev.c
-+++ b/net/core/dev.c
+diff -pruN ../orig-linux-2.6.16.29/net/core/dev.c ./net/core/dev.c
+--- ../orig-linux-2.6.16.29/net/core/dev.c	2006-09-19 13:59:46.000000000 +0100
++++ ./net/core/dev.c	2006-09-19 14:05:32.000000000 +0100
 @@ -1087,11 +1087,6 @@ int skb_checksum_help(struct sk_buff *sk
  		goto out_set_summed;
  

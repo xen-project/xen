@@ -1,6 +1,6 @@
-diff -pruN ../pristine-linux-2.6.16.13/drivers/char/tpm/tpm_atmel.c ./drivers/char/tpm/tpm_atmel.c
---- ../pristine-linux-2.6.16.13/drivers/char/tpm/tpm_atmel.c	2006-06-26 18:05:03.000000000 -0400
-+++ ./drivers/char/tpm/tpm_atmel.c	2006-06-26 18:16:33.000000000 -0400
+diff -pruN ../orig-linux-2.6.16.29/drivers/char/tpm/tpm_atmel.c ./drivers/char/tpm/tpm_atmel.c
+--- ../orig-linux-2.6.16.29/drivers/char/tpm/tpm_atmel.c	2006-09-12 19:02:10.000000000 +0100
++++ ./drivers/char/tpm/tpm_atmel.c	2006-09-19 14:05:52.000000000 +0100
 @@ -47,12 +47,12 @@ static int tpm_atml_recv(struct tpm_chip
  		return -EIO;
  
@@ -151,9 +151,9 @@ diff -pruN ../pristine-linux-2.6.16.13/drivers/char/tpm/tpm_atmel.c ./drivers/ch
  err_unreg_drv:
  	driver_unregister(&atml_drv);
  	return rc;
-diff -pruN ../pristine-linux-2.6.16.13/drivers/char/tpm/tpm_atmel.h ./drivers/char/tpm/tpm_atmel.h
---- ../pristine-linux-2.6.16.13/drivers/char/tpm/tpm_atmel.h	2006-06-26 18:05:03.000000000 -0400
-+++ ./drivers/char/tpm/tpm_atmel.h	2006-06-26 18:16:33.000000000 -0400
+diff -pruN ../orig-linux-2.6.16.29/drivers/char/tpm/tpm_atmel.h ./drivers/char/tpm/tpm_atmel.h
+--- ../orig-linux-2.6.16.29/drivers/char/tpm/tpm_atmel.h	2006-09-12 19:02:10.000000000 +0100
++++ ./drivers/char/tpm/tpm_atmel.h	2006-09-19 14:05:52.000000000 +0100
 @@ -28,13 +28,12 @@
  #define atmel_request_region request_mem_region
  #define atmel_release_region release_mem_region
@@ -214,9 +214,9 @@ diff -pruN ../pristine-linux-2.6.16.13/drivers/char/tpm/tpm_atmel.h ./drivers/ch
 +	return ioport_map(*base, *region_size);
  }
  #endif
-diff -pruN ../pristine-linux-2.6.16.13/drivers/char/tpm/tpm_bios.c ./drivers/char/tpm/tpm_bios.c
---- ../pristine-linux-2.6.16.13/drivers/char/tpm/tpm_bios.c	2006-06-26 18:05:03.000000000 -0400
-+++ ./drivers/char/tpm/tpm_bios.c	2006-06-26 18:16:33.000000000 -0400
+diff -pruN ../orig-linux-2.6.16.29/drivers/char/tpm/tpm_bios.c ./drivers/char/tpm/tpm_bios.c
+--- ../orig-linux-2.6.16.29/drivers/char/tpm/tpm_bios.c	2006-09-12 19:02:10.000000000 +0100
++++ ./drivers/char/tpm/tpm_bios.c	2006-09-19 14:05:52.000000000 +0100
 @@ -29,6 +29,11 @@
  #define MAX_TEXT_EVENT		1000	/* Max event string length */
  #define ACPI_TCPA_SIG		"TCPA"	/* 0x41504354 /'TCPA' */
@@ -469,9 +469,9 @@ diff -pruN ../pristine-linux-2.6.16.13/drivers/char/tpm/tpm_bios.c ./drivers/cha
  	return 0;
  }
  
-diff -pruN ../pristine-linux-2.6.16.13/drivers/char/tpm/tpm_infineon.c ./drivers/char/tpm/tpm_infineon.c
---- ../pristine-linux-2.6.16.13/drivers/char/tpm/tpm_infineon.c	2006-06-26 18:05:03.000000000 -0400
-+++ ./drivers/char/tpm/tpm_infineon.c	2006-06-26 18:16:33.000000000 -0400
+diff -pruN ../orig-linux-2.6.16.29/drivers/char/tpm/tpm_infineon.c ./drivers/char/tpm/tpm_infineon.c
+--- ../orig-linux-2.6.16.29/drivers/char/tpm/tpm_infineon.c	2006-09-12 19:02:10.000000000 +0100
++++ ./drivers/char/tpm/tpm_infineon.c	2006-09-19 14:05:52.000000000 +0100
 @@ -15,6 +15,7 @@
   * License.
   */
@@ -684,9 +684,9 @@ diff -pruN ../pristine-linux-2.6.16.13/drivers/char/tpm/tpm_infineon.c ./drivers
 -MODULE_VERSION("1.7");
 +MODULE_VERSION("1.8");
  MODULE_LICENSE("GPL");
-diff -pruN ../pristine-linux-2.6.16.13/drivers/char/tpm/tpm_nsc.c ./drivers/char/tpm/tpm_nsc.c
---- ../pristine-linux-2.6.16.13/drivers/char/tpm/tpm_nsc.c	2006-06-26 18:05:03.000000000 -0400
-+++ ./drivers/char/tpm/tpm_nsc.c	2006-06-26 18:16:33.000000000 -0400
+diff -pruN ../orig-linux-2.6.16.29/drivers/char/tpm/tpm_nsc.c ./drivers/char/tpm/tpm_nsc.c
+--- ../orig-linux-2.6.16.29/drivers/char/tpm/tpm_nsc.c	2006-09-12 19:02:10.000000000 +0100
++++ ./drivers/char/tpm/tpm_nsc.c	2006-09-19 14:05:52.000000000 +0100
 @@ -71,7 +71,7 @@ static int wait_for_stat(struct tpm_chip
  	unsigned long stop;
  
@@ -874,9 +874,9 @@ diff -pruN ../pristine-linux-2.6.16.13/drivers/char/tpm/tpm_nsc.c ./drivers/char
  err_unreg_dev:
  	platform_device_unregister(pdev);
  err_free_dev:
-diff -pruN ../pristine-linux-2.6.16.13/drivers/char/tpm/tpm_tis.c ./drivers/char/tpm/tpm_tis.c
---- ../pristine-linux-2.6.16.13/drivers/char/tpm/tpm_tis.c	1969-12-31 19:00:00.000000000 -0500
-+++ ./drivers/char/tpm/tpm_tis.c	2006-06-26 18:16:33.000000000 -0400
+diff -pruN ../orig-linux-2.6.16.29/drivers/char/tpm/tpm_tis.c ./drivers/char/tpm/tpm_tis.c
+--- ../orig-linux-2.6.16.29/drivers/char/tpm/tpm_tis.c	1970-01-01 01:00:00.000000000 +0100
++++ ./drivers/char/tpm/tpm_tis.c	2006-09-19 14:05:52.000000000 +0100
 @@ -0,0 +1,665 @@
 +/*
 + * Copyright (C) 2005, 2006 IBM Corporation
@@ -1543,4 +1543,3 @@ diff -pruN ../pristine-linux-2.6.16.13/drivers/char/tpm/tpm_tis.c ./drivers/char
 +MODULE_DESCRIPTION("TPM Driver");
 +MODULE_VERSION("2.0");
 +MODULE_LICENSE("GPL");
-

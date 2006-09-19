@@ -1,6 +1,6 @@
-diff -urp a/net/ipv4/tcp.c b/net/ipv4/tcp.c
---- a/net/ipv4/tcp.c	2006-07-25 14:42:53.194910626 +0100
-+++ b/net/ipv4/tcp.c	2006-07-25 14:41:00.955501910 +0100
+diff -pruN ../orig-linux-2.6.16.29/net/ipv4/tcp.c ./net/ipv4/tcp.c
+--- ../orig-linux-2.6.16.29/net/ipv4/tcp.c	2006-09-19 13:59:20.000000000 +0100
++++ ./net/ipv4/tcp.c	2006-09-19 13:59:42.000000000 +0100
 @@ -2042,13 +2042,19 @@ struct sk_buff *tcp_tso_segment(struct s
  	if (!pskb_may_pull(skb, thlen))
  		goto out;

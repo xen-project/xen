@@ -1,7 +1,6 @@
-
-diff -r 4b7cd997c08f include/linux/elfnote.h
---- a/include/linux/elfnote.h	Wed Aug 23 11:48:46 2006 +0100
-+++ b/include/linux/elfnote.h	Wed Aug 23 12:44:27 2006 +0100
+diff -pruN ../orig-linux-2.6.16.29/include/linux/elfnote.h ./include/linux/elfnote.h
+--- ../orig-linux-2.6.16.29/include/linux/elfnote.h	2006-09-19 14:06:10.000000000 +0100
++++ ./include/linux/elfnote.h	2006-09-19 14:06:20.000000000 +0100
 @@ -31,22 +31,24 @@
  /*
   * Generate a structure with the same shape as Elf{32,64}_Nhdr (which
