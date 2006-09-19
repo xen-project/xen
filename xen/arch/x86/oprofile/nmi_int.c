@@ -269,8 +269,12 @@ static int __init p4_init(char * cpu_type)
 { 
 	__u8 cpu_model = current_cpu_data.x86_model;
 
-	if ((cpu_model > 6) || (cpu_model == 5))
+	if ((cpu_model > 6) || (cpu_model == 5)) {
+		printk("xenoprof: Initialization failed. "
+		       "Intel processor model %d for pentium 4 family is not "
+		       "supported\n", cpu_model);
 		return 0;
+	}
 
 #ifndef CONFIG_SMP
 	strncpy (cpu_type, "i386/p4", XENOPROF_CPU_TYPE_SIZE - 1);
@@ -301,8 +305,12 @@ static int __init ppro_init(char *cpu_type)
 {
 	__u8 cpu_model = current_cpu_data.x86_model;
 
-	if (cpu_model > 0xd)
+	if (cpu_model > 0xd) {
+		printk("xenoprof: Initialization failed. "
+		       "Intel processor model %d for P6 class family is not "
+		       "supported\n", cpu_model);
 		return 0;
+	}
 
 	if (cpu_model == 9) {
 		strncpy (cpu_type, "i386/p6_mobile", XENOPROF_CPU_TYPE_SIZE - 1);
@@ -324,8 +332,10 @@ int nmi_init(int *num_events, int *is_primary, char *cpu_type)
 	__u8 family = current_cpu_data.x86;
 	int prim = 0;
  
-	if (!cpu_has_apic)
+	if (!cpu_has_apic) {
+		printk("xenoprof: Initialization failed. No apic.\n");
 		return -ENODEV;
+	}
 
 	if (primary_profiler == NULL) {
 		/* For now, only dom0 can be the primary profiler */
@@ -344,6 +354,9 @@ int nmi_init(int *num_events, int *is_primary, char *cpu_type)
 
 			switch (family) {
 			default:
+				printk("xenoprof: Initialization failed. "
+				       "AMD processor family %d is not "
+				       "supported\n", family);
 				return -ENODEV;
 			case 6:
 				model = &op_athlon_spec;
@@ -375,11 +388,17 @@ int nmi_init(int *num_events, int *is_primary, char *cpu_type)
 					break;
 
 				default:
+				printk("xenoprof: Initialization failed. "
+				       "Intel processor family %d is not "
+				       "supported\n", family);
 					return -ENODEV;
 			}
 			break;
 
 		default:
+			printk("xenoprof: Initialization failed. "
+			       "Unsupported processor. Unknown vendor %d\n",
+				vendor);
 			return -ENODEV;
 	}
 

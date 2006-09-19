@@ -35,8 +35,6 @@
 //   space for both PV and HVM guests.
 //
 
-#define SHADOW 1
-
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/mm.h>

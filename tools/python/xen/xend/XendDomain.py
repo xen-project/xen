@@ -390,6 +390,22 @@ class XendDomain:
         except Exception, ex:
             raise XendError(str(ex))
 
+    def domain_dump(self, domid, filename, live, crash):
+        """Dump domain core."""
+
+        dominfo = self.domain_lookup_by_name_or_id_nr(domid)
+        if not dominfo:
+            raise XendInvalidDomain(str(domid))
+
+        if dominfo.getDomid() == PRIV_DOMAIN:
+            raise XendError("Cannot dump core for privileged domain %s" % domid)
+
+        try:
+            log.info("Domain core dump requested for domain %s (%d) live=%d crash=%d.",
+                     dominfo.getName(), dominfo.getDomid(), live, crash)
+            return dominfo.dumpCore(filename)
+        except Exception, ex:
+            raise XendError(str(ex))
 
     def domain_destroy(self, domid):
         """Terminate domain immediately."""

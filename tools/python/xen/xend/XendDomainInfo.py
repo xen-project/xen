@@ -86,6 +86,7 @@ STATE_DOM_OK       = 1
 STATE_DOM_SHUTDOWN = 2
 
 SHUTDOWN_TIMEOUT = 30.0
+MIGRATE_TIMEOUT = 30.0
 
 ZOMBIE_PREFIX = 'Zombie-'
 
@@ -977,15 +978,19 @@ class XendDomainInfo:
         self.restart(True)
 
 
-    def dumpCore(self):
+    def dumpCore(self,corefile=None):
         """Create a core dump for this domain.  Nothrow guarantee."""
         
         try:
-            corefile = "/var/xen/dump/%s.%s.core" % (self.info['name'],
-                                                     self.domid)
+            if not corefile:
+                this_time = time.strftime("%Y-%m%d-%H%M.%S", time.localtime())
+                corefile = "/var/xen/dump/%s-%s.%s.core" % (this_time,
+                                  self.info['name'], self.domid)
             xc.domain_dumpcore(self.domid, corefile)
 
         except:
+            corefile_incomp = corefile+'-incomplete'
+            os.rename(corefile, corefile_incomp)
             log.exception("XendDomainInfo.dumpCore failed: id = %s name = %s",
                           self.domid, self.info['name'])
 
@@ -1531,14 +1536,19 @@ class XendDomainInfo:
         the device has shutdown correctly, i.e. all blocks are
         flushed to disk
         """
+        start = time.time()
         while True:
             test = 0
+            diff = time.time() - start
             for i in self.getDeviceController('vbd').deviceIDs():
                 test = 1
                 log.info("Dev %s still active, looping...", i)
                 time.sleep(0.1)
                 
             if test == 0:
+                break
+            if diff >= MIGRATE_TIMEOUT:
+                log.info("Dev still active but hit max loop timeout")
                 break
 
     def migrateDevices(self, network, dst, step, domName=''):

@@ -340,10 +340,6 @@ class HVMImageHandler(ImageHandler):
                            (nics, mac, model))
                 ret.append("-net")
                 ret.append("tap,vlan=%d,bridge=%s" % (nics, bridge))
-            if name == 'vtpm':
-                instance = sxp.child_value(info, 'pref_instance')
-                ret.append("-instance")
-                ret.append("%s" % instance)
         return ret
 
     def configVNC(self, config):

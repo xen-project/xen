@@ -1,6 +1,9 @@
 #ifndef __ASM_XENCONS_H__
 #define __ASM_XENCONS_H__
 
+struct dom0_vga_console_info;
+void dom0_init_screen_info(const struct dom0_vga_console_info *info);
+
 void xencons_force_flush(void);
 void xencons_resume(void);
 

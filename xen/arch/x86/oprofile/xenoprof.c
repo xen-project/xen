@@ -492,19 +492,23 @@ int xenoprof_op_get_buffer(XEN_GUEST_HANDLE(void) arg)
     return 0;
 }
 
-#define PRIV_OP(op) ( (op == XENOPROF_set_active)       \
-                   || (op == XENOPROF_reserve_counters) \
-                   || (op == XENOPROF_setup_events)     \
-                   || (op == XENOPROF_start)            \
-                   || (op == XENOPROF_stop)             \
-                   || (op == XENOPROF_release_counters) \
-                   || (op == XENOPROF_shutdown))
-
+#define NONPRIV_OP(op) ( (op == XENOPROF_init)          \
+                      || (op == XENOPROF_enable_virq)   \
+                      || (op == XENOPROF_disable_virq)  \
+                      || (op == XENOPROF_get_buffer))
+ 
 int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
 {
     int ret = 0;
+    
+    if ( (op < 0) || (op>XENOPROF_last_op) )
+    {
+        printk("xenoprof: invalid operation %d for domain %d\n",
+               op, current->domain->domain_id);
+        return -EINVAL;
+    }
 
-    if ( PRIV_OP(op) && (current->domain != primary_profiler) )
+    if ( !NONPRIV_OP(op) && (current->domain != primary_profiler) )
     {
         printk("xenoprof: dom %d denied privileged operation %d\n",
                current->domain->domain_id, op);

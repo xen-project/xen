@@ -52,7 +52,7 @@ class TPMifController(DevController):
         if inst == -1:
             inst = int(sxp.child_value(config, 'instance' , '0'))
 
-        log.info("The domain has a TPM with instance %d and devid %d.",
+        log.info("The domain has a TPM with pref. instance %d and devid %d.",
                  inst, devid)
         back  = { 'pref_instance' : "%i" % inst,
                   'resume'        : "%s" % (self.vm.getResume()) }
