@@ -694,11 +694,30 @@ get_page_from_l4e(
 #endif /* 4 level */
 
 #ifdef __x86_64__
+
+#ifdef USER_MAPPINGS_ARE_GLOBAL
+#define adjust_guest_l1e(pl1e)                                               \
+    do {                                                                     \
+        if ( likely(l1e_get_flags((pl1e)) & _PAGE_PRESENT) )                 \
+        {                                                                    \
+            /* _PAGE_GUEST_KERNEL page cannot have the Global bit set. */    \
+            if ( (l1e_get_flags((pl1e)) & (_PAGE_GUEST_KERNEL|_PAGE_GLOBAL)) \
+                 == (_PAGE_GUEST_KERNEL|_PAGE_GLOBAL) )                      \
+                MEM_LOG("Global bit is set to kernel page %lx",              \
+                        l1e_get_pfn((pl1e)));                                \
+            if ( !(l1e_get_flags((pl1e)) & _PAGE_USER) )                     \
+                l1e_add_flags((pl1e), (_PAGE_GUEST_KERNEL|_PAGE_USER));      \
+            if ( !(l1e_get_flags((pl1e)) & _PAGE_GUEST_KERNEL) )             \
+                l1e_add_flags((pl1e), (_PAGE_GLOBAL|_PAGE_USER));            \
+        }                                                                    \
+    } while ( 0 )
+#else
 #define adjust_guest_l1e(pl1e)                                  \
-    do  {                                                       \
+    do {                                                        \
         if ( likely(l1e_get_flags((pl1e)) & _PAGE_PRESENT) )    \
             l1e_add_flags((pl1e), _PAGE_USER);                  \
     } while ( 0 )
+#endif
 
 #define adjust_guest_l2e(pl2e)                                  \
     do {                                                        \
@@ -717,10 +736,13 @@ get_page_from_l4e(
         if ( likely(l4e_get_flags((pl4e)) & _PAGE_PRESENT) )    \
             l4e_add_flags((pl4e), _PAGE_USER);                  \
     } while ( 0 )
-#else
+
+#else /* !defined(__x86_64__) */
+
 #define adjust_guest_l1e(_p) ((void)0)
 #define adjust_guest_l2e(_p) ((void)0)
 #define adjust_guest_l3e(_p) ((void)0)
+
 #endif
 
 void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)

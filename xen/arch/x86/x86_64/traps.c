@@ -15,6 +15,7 @@
 #include <asm/current.h>
 #include <asm/flushtlb.h>
 #include <asm/msr.h>
+#include <asm/page.h>
 #include <asm/shadow.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
@@ -188,7 +189,12 @@ void toggle_guest_mode(struct vcpu *v)
     v->arch.flags ^= TF_kernel_mode;
     __asm__ __volatile__ ( "swapgs" );
     update_cr3(v);
+#ifdef USER_MAPPINGS_ARE_GLOBAL
+    /* Don't flush user global mappings from the TLB. Don't tick TLB clock. */
+    __asm__ __volatile__ ( "mov %0, %%cr3" : : "r" (v->arch.cr3) : "memory" );
+#else
     write_ptbase(v);
+#endif
 }
 
 unsigned long do_iret(void)

@@ -71,11 +71,8 @@ static inline unsigned long read_cr3(void)
 /* Write pagetable base and implicitly tick the tlbflush clock. */
 extern void write_cr3(unsigned long cr3);
 
-#define local_flush_tlb()                                         \
-    do {                                                          \
-        unsigned long cr3 = read_cr3();                           \
-        write_cr3(cr3);                                           \
-    } while ( 0 )
+/* Flush guest mappings from the TLB and implicitly tick the tlbflush clock. */
+extern void local_flush_tlb(void);
 
 #define local_flush_tlb_pge()                                     \
     do {                                                          \

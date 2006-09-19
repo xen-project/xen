@@ -74,10 +74,11 @@ string_param("dom0_ioports_disable", opt_dom0_ioports_disable);
 #define L3_PROT (_PAGE_PRESENT)
 #elif defined(__x86_64__)
 /* Allow ring-3 access in long mode as guest cannot use ring 1. */
-#define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
-#define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
-#define L3_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
-#define L4_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
+#define BASE_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
+#define L1_PROT (BASE_PROT|_PAGE_GUEST_KERNEL)
+#define L2_PROT (BASE_PROT|_PAGE_DIRTY)
+#define L3_PROT (BASE_PROT|_PAGE_DIRTY)
+#define L4_PROT (BASE_PROT|_PAGE_DIRTY)
 #endif
 
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
