@@ -22,6 +22,7 @@
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/processor.h>
+#include <public/hvm/e820.h>
 
 long arch_do_domctl(
     struct xen_domctl *domctl,
@@ -213,7 +214,7 @@ long arch_do_domctl(
         int i;
         struct domain *d = find_domain_by_id(domctl->domain);
         unsigned long max_pfns = domctl->u.getmemlist.max_pfns;
-        unsigned long mfn;
+        unsigned long mfn, gmfn;
         struct list_head *list_ent;
 
         ret = -EINVAL;
@@ -222,19 +223,48 @@ long arch_do_domctl(
             ret = 0;
 
             spin_lock(&d->page_alloc_lock);
-            list_ent = d->page_list.next;
-            for ( i = 0; (i < max_pfns) && (list_ent != &d->page_list); i++ )
+
+            if ( hvm_guest(d->vcpu[0]) && shadow_mode_translate(d) )
             {
-                mfn = page_to_mfn(list_entry(
-                    list_ent, struct page_info, list));
-                if ( copy_to_guest_offset(domctl->u.getmemlist.buffer,
-                                          i, &mfn, 1) )
+                /* HVM domain: scan P2M to get guaranteed physmap order. */
+                for ( i = 0, gmfn = 0;
+                      (i < max_pfns) && (i < d->tot_pages); 
+                      i++, gmfn++ )
                 {
-                    ret = -EFAULT;
-                    break;
+                    if ( unlikely(i == (HVM_BELOW_4G_MMIO_START>>PAGE_SHIFT)) )
+                    {
+                        /* skip MMIO range */
+                        gmfn += HVM_BELOW_4G_MMIO_LENGTH >> PAGE_SHIFT;
+                    }
+                    mfn = gmfn_to_mfn(d, gmfn);
+                    if ( copy_to_guest_offset(domctl->u.getmemlist.buffer,
+                                              i, &mfn, 1) )
+                    {
+                        ret = -EFAULT;
+                        break;
+                    }
                 }
-                list_ent = mfn_to_page(mfn)->list.next;
             }
+            else 
+            {        
+                /* Other guests: return in order of ownership list. */
+                list_ent = d->page_list.next;
+                for ( i = 0;
+                      (i < max_pfns) && (list_ent != &d->page_list);
+                      i++ )
+                {
+                    mfn = page_to_mfn(list_entry(
+                        list_ent, struct page_info, list));
+                    if ( copy_to_guest_offset(domctl->u.getmemlist.buffer,
+                                              i, &mfn, 1) )
+                    {
+                        ret = -EFAULT;
+                        break;
+                    }
+                    list_ent = mfn_to_page(mfn)->list.next;
+                }
+            }
+            
             spin_unlock(&d->page_alloc_lock);
 
             domctl->u.getmemlist.num_pfns = i;
