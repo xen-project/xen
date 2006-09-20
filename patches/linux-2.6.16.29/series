@@ -10,6 +10,7 @@ net-gso-1-check-dodgy.patch
 net-gso-2-checksum-fix.patch
 net-gso-3-fix-errorcheck.patch
 net-gso-4-kill-warnon.patch
+pci-mmconfig-fix-from-2.6.17.patch
 pmd-shared.patch
 rcu_needs_cpu.patch
 rename-TSS_sysenter_esp0-SYSENTER_stack_esp0.patch
