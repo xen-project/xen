@@ -1622,8 +1622,7 @@ void put_page_type(struct page_info *page)
             if (shadow_lock_is_acquired(owner))  /* this is a shadow page */
                 return;
 
-            if (!shadow_mode_translate(owner))
-                mark_dirty(owner, page_to_mfn(page));
+            mark_dirty(owner, page_to_mfn(page));
         }
     }
 }
@@ -1985,8 +1984,7 @@ int do_mmuext_op(
                 break;
             }
 
-            if ( shadow_mode_enabled(d) )
-                mark_dirty(d, mfn);
+            mark_dirty(d, mfn);
            
             break;
 
@@ -2005,7 +2003,12 @@ int do_mmuext_op(
                 put_page_and_type(page);
                 put_page(page);
                 if ( shadow_mode_enabled(d) )
+                {
+                    shadow_lock(d);
+                    shadow_remove_all_shadows(v, _mfn(mfn));
+                    shadow_unlock(d);
                     mark_dirty(d, mfn);
+                }
             }
             else
             {
