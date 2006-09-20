@@ -198,7 +198,7 @@ ENTRY(hypercall)
         /* Deliberately corrupt parameter regs used by this hypercall. */
         addl  $24,%esp     # Shadow parameters
         popl  %ecx         # Shadow EIP
-        cmpl  %ecx,UREGS_eip(%esp)
+        cmpl  %ecx,UREGS_eip+4(%esp)
         popl  %ecx         # Shadow hypercall index
         jne   skip_clobber # If EIP has changed then don't clobber
         movzb hypercall_args_table(,%ecx,1),%ecx
