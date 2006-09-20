@@ -325,12 +325,17 @@ void shadow_final_teardown(struct domain *d);
 void sh_do_mark_dirty(struct domain *d, mfn_t gmfn);
 static inline void mark_dirty(struct domain *d, unsigned long gmfn)
 {
-    if ( shadow_mode_log_dirty(d) )
-    {
+    int caller_locked;
+
+    if ( unlikely(d == NULL) || likely(!shadow_mode_log_dirty(d)) )
+        return;
+
+    caller_locked = shadow_lock_is_acquired(d);
+    if ( !caller_locked )
         shadow_lock(d);
-        sh_do_mark_dirty(d, _mfn(gmfn));
+    sh_do_mark_dirty(d, _mfn(gmfn));
+    if ( !caller_locked )
         shadow_unlock(d);
-    }
 }
 
 /* Internal version, for when the shadow lock is already held */

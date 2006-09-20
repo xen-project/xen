@@ -1490,24 +1490,26 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
 
 int alloc_page_type(struct page_info *page, unsigned long type)
 {
-    struct domain *owner = page_get_owner(page);
-
-    if ( owner != NULL )
-        mark_dirty(owner, page_to_mfn(page));
+    int rc;
 
     switch ( type & PGT_type_mask )
     {
     case PGT_l1_page_table:
-        return alloc_l1_table(page);
+        rc = alloc_l1_table(page);
+        break;
     case PGT_l2_page_table:
-        return alloc_l2_table(page, type);
+        rc = alloc_l2_table(page, type);
+        break;
     case PGT_l3_page_table:
-        return alloc_l3_table(page);
+        rc = alloc_l3_table(page);
+        break;
     case PGT_l4_page_table:
-        return alloc_l4_table(page);
+        rc = alloc_l4_table(page);
+        break;
     case PGT_gdt_page:
     case PGT_ldt_page:
-        return alloc_segdesc_page(page);
+        rc = alloc_segdesc_page(page);
+        break;
     default:
         printk("Bad type in alloc_page_type %lx t=%" PRtype_info " c=%x\n", 
                type, page->u.inuse.type_info,
@@ -1515,7 +1517,15 @@ int alloc_page_type(struct page_info *page, unsigned long type)
         BUG();
     }
 
-    return 0;
+    /*
+     * A page is dirtied when its type count becomes non-zero.
+     * It is safe to mark dirty here because any PTE modifications in
+     * alloc_l?_table have now happened. The caller has already set the type
+     * and incremented the reference count.
+     */
+    mark_dirty(page_get_owner(page), page_to_mfn(page));
+
+    return rc;
 }
 
 
@@ -1615,16 +1625,13 @@ void put_page_type(struct page_info *page)
     }
     while ( unlikely((y = cmpxchg(&page->u.inuse.type_info, x, nx)) != x) );
 
-    if( likely(owner != NULL) )
-    {
-        if (shadow_mode_enabled(owner))
-        {
-            if (shadow_lock_is_acquired(owner))  /* this is a shadow page */
-                return;
-
-            mark_dirty(owner, page_to_mfn(page));
-        }
-    }
+    /*
+     * A page is dirtied when its type count becomes zero.
+     * We cannot set the dirty flag earlier than this because we must wait
+     * until the type count has been zeroed by the CMPXCHG above.
+     */
+    if ( unlikely((nx & PGT_count_mask) == 0) )
+        mark_dirty(owner, page_to_mfn(page));
 }
 
 
@@ -1984,6 +1991,7 @@ int do_mmuext_op(
                 break;
             }
 
+            /* A page is dirtied when its pin status is set. */
             mark_dirty(d, mfn);
            
             break;
@@ -2006,8 +2014,9 @@ int do_mmuext_op(
                 {
                     shadow_lock(d);
                     shadow_remove_all_shadows(v, _mfn(mfn));
+                    /* A page is dirtied when its pin status is cleared. */
+                    sh_mark_dirty(d, _mfn(mfn));
                     shadow_unlock(d);
-                    mark_dirty(d, mfn);
                 }
             }
             else
