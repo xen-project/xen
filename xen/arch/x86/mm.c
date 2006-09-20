@@ -1536,10 +1536,6 @@ void free_page_type(struct page_info *page, unsigned long type)
         if ( unlikely(shadow_mode_enabled(owner)
                  && !shadow_lock_is_acquired(owner)) )
         {
-            /* Raw page tables are rewritten during save/restore. */
-            if ( !shadow_mode_translate(owner) )
-                mark_dirty(owner, page_to_mfn(page));
-
             if ( shadow_mode_refcounts(owner) )
                 return;
 
@@ -1584,6 +1580,7 @@ void free_page_type(struct page_info *page, unsigned long type)
 void put_page_type(struct page_info *page)
 {
     unsigned long nx, x, y = page->u.inuse.type_info;
+    struct domain *owner = page_get_owner(page);
 
  again:
     do {
@@ -1617,6 +1614,18 @@ void put_page_type(struct page_info *page)
         }
     }
     while ( unlikely((y = cmpxchg(&page->u.inuse.type_info, x, nx)) != x) );
+
+    if( likely(owner != NULL) )
+    {
+        if (shadow_mode_enabled(owner))
+        {
+            if (shadow_lock_is_acquired(owner))  /* this is a shadow page */
+                return;
+
+            if (!shadow_mode_translate(owner))
+                mark_dirty(owner, page_to_mfn(page));
+        }
+    }
 }
 
 
@@ -1975,7 +1984,10 @@ int do_mmuext_op(
                 okay = 0;
                 break;
             }
-            
+
+            if ( shadow_mode_enabled(d) )
+                mark_dirty(d, mfn);
+           
             break;
 
         case MMUEXT_UNPIN_TABLE:
@@ -1993,11 +2005,7 @@ int do_mmuext_op(
                 put_page_and_type(page);
                 put_page(page);
                 if ( shadow_mode_enabled(d) )
-                {
-                    shadow_lock(d);
-                    shadow_remove_all_shadows(v, _mfn(mfn));
-                    shadow_unlock(d);
-                }
+                    mark_dirty(d, mfn);
             }
             else
             {
