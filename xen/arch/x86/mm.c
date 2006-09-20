@@ -1490,26 +1490,19 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
 
 int alloc_page_type(struct page_info *page, unsigned long type)
 {
-    int rc;
-
     switch ( type & PGT_type_mask )
     {
     case PGT_l1_page_table:
-        rc = alloc_l1_table(page);
-        break;
+        return alloc_l1_table(page);
     case PGT_l2_page_table:
-        rc = alloc_l2_table(page, type);
-        break;
+        return alloc_l2_table(page, type);
     case PGT_l3_page_table:
-        rc = alloc_l3_table(page);
-        break;
+        return alloc_l3_table(page);
     case PGT_l4_page_table:
-        rc = alloc_l4_table(page);
-        break;
+        return alloc_l4_table(page);
     case PGT_gdt_page:
     case PGT_ldt_page:
-        rc = alloc_segdesc_page(page);
-        break;
+        return alloc_segdesc_page(page);
     default:
         printk("Bad type in alloc_page_type %lx t=%" PRtype_info " c=%x\n", 
                type, page->u.inuse.type_info,
@@ -1517,15 +1510,7 @@ int alloc_page_type(struct page_info *page, unsigned long type)
         BUG();
     }
 
-    /*
-     * A page is dirtied when its type count becomes non-zero.
-     * It is safe to mark dirty here because any PTE modifications in
-     * alloc_l?_table have now happened. The caller has already set the type
-     * and incremented the reference count.
-     */
-    mark_dirty(page_get_owner(page), page_to_mfn(page));
-
-    return rc;
+    return 0;
 }
 
 
@@ -1625,11 +1610,11 @@ void put_page_type(struct page_info *page)
     while ( unlikely((y = cmpxchg(&page->u.inuse.type_info, x, nx)) != x) );
 
     /*
-     * A page is dirtied when its type count becomes zero.
+     * A page table is dirtied when its type count becomes zero.
      * We cannot set the dirty flag earlier than this because we must wait
      * until the type count has been zeroed by the CMPXCHG above.
      */
-    if ( unlikely((nx & PGT_count_mask) == 0) )
+    if ( unlikely((nx & (PGT_validated|PGT_count_mask)) == 0) )
         mark_dirty(page_get_owner(page), page_to_mfn(page));
 }
 
@@ -1716,6 +1701,13 @@ int get_page_type(struct page_info *page, unsigned long type)
 
         /* Noone else is updating simultaneously. */
         __set_bit(_PGT_validated, &page->u.inuse.type_info);
+
+        /*
+         * A page table is dirtied when its type count becomes non-zero. It is
+         * safe to mark dirty here because any PTE modifications in
+         * alloc_page_type() have now happened.
+         */
+        mark_dirty(page_get_owner(page), page_to_mfn(page));
     }
 
     return 1;
