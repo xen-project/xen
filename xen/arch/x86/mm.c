@@ -1590,7 +1590,6 @@ void free_page_type(struct page_info *page, unsigned long type)
 void put_page_type(struct page_info *page)
 {
     unsigned long nx, x, y = page->u.inuse.type_info;
-    struct domain *owner = page_get_owner(page);
 
  again:
     do {
@@ -1631,7 +1630,7 @@ void put_page_type(struct page_info *page)
      * until the type count has been zeroed by the CMPXCHG above.
      */
     if ( unlikely((nx & PGT_count_mask) == 0) )
-        mark_dirty(owner, page_to_mfn(page));
+        mark_dirty(page_get_owner(page), page_to_mfn(page));
 }
 
 
