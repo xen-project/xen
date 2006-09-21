@@ -3,8 +3,8 @@ will come later.
 
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2006-08-17 19:50:18.866050726 +0100
-+++ ioemu/Makefile.target	2006-08-17 19:55:35.776020218 +0100
+--- ioemu.orig/Makefile.target	2006-09-21 11:30:11.000000000 +0100
++++ ioemu/Makefile.target	2006-09-21 11:30:12.000000000 +0100
 @@ -359,6 +359,7 @@
  VL_OBJS+= usb-uhci.o
  VL_OBJS+= piix4acpi.o
@@ -15,8 +15,8 @@ Index: ioemu/Makefile.target
  ifeq ($(TARGET_BASE_ARCH), ppc)
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2006-08-17 19:50:02.406869984 +0100
-+++ ioemu/hw/pc.c	2006-08-17 19:55:35.777020107 +0100
+--- ioemu.orig/hw/pc.c	2006-09-21 11:30:11.000000000 +0100
++++ ioemu/hw/pc.c	2006-09-21 11:31:14.000000000 +0100
 @@ -823,6 +823,9 @@
      }
  #endif /* !CONFIG_DM */
@@ -30,7 +30,7 @@ Index: ioemu/hw/pc.c
 Index: ioemu/hw/xen_platform.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/hw/xen_platform.c	2006-08-17 19:55:35.777020107 +0100
++++ ioemu/hw/xen_platform.c	2006-09-21 11:31:26.000000000 +0100
 @@ -0,0 +1,138 @@
 +/*
 + * XEN platform fake pci device, formerly known as the event channel device
@@ -150,10 +150,10 @@ Index: ioemu/hw/xen_platform.c
 +    d = pci_register_device(bus, "xen-platform", sizeof(PCIDevice), -1, NULL,
 +			    NULL);
 +    pch = (struct pci_config_header *)d->config;
-+    pch->vendor_id = 0xfffd;
-+    pch->device_id = 0x0101;
++    pch->vendor_id = 0x5853;
++    pch->device_id = 0x0001;
 +    pch->command = 3; /* IO and memory access */
-+    pch->revision = 0;
++    pch->revision = 1;
 +    pch->api = 0;
 +    pch->subclass = 0x80; /* Other */
 +    pch->class = 0xff; /* Unclassified device class */
@@ -172,8 +172,8 @@ Index: ioemu/hw/xen_platform.c
 +}
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-08-17 19:50:22.278673522 +0100
-+++ ioemu/vl.h	2006-08-17 19:55:35.778019997 +0100
+--- ioemu.orig/vl.h	2006-09-21 11:30:11.000000000 +0100
++++ ioemu/vl.h	2006-09-21 11:31:14.000000000 +0100
 @@ -1209,6 +1209,9 @@
  void xenstore_check_new_media_present(int timeout);
  void xenstore_write_vncport(int vnc_display);
