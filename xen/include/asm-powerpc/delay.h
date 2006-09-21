@@ -13,16 +13,29 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005
+ * Copyright (C) IBM Corp. 2005, 2006
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
+ *          Jimi Xenidis <jimix@watson.ibm.com>
  */
 
 #ifndef _ASM_DELAY_H_
 #define _ASM_DELAY_H_
 
+#include <asm/time.h>
+
 extern unsigned long ticks_per_usec; 
 #define __udelay udelay
-extern void udelay(unsigned long usecs);
+static inline void udelay(unsigned long usecs)
+{
+    unsigned long ticks = usecs * ticks_per_usec;
+    unsigned long s;
+    unsigned long e;
 
+    s = get_timebase();
+    do {
+        asm volatile("or 1,1,1"); /* also puts the thread to low priority */
+        e = get_timebase();
+    } while ((e-s) < ticks);
+}
 #endif

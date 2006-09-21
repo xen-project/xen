@@ -12,7 +12,6 @@ obj-y += boot_of.o
 obj-y += dart.o
 obj-y += dart_u3.o
 obj-y += dart_u4.o
-obj-y += delay.o
 obj-y += domctl.o
 obj-y += domain_build.o
 obj-y += domain.o
