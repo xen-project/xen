@@ -144,6 +144,9 @@ struct sys_desc_table_struct {
 
 struct edid_info edid_info;
 struct e820map e820;
+#ifdef CONFIG_XEN
+struct e820map machine_e820;
+#endif
 
 extern int root_mountflags;
 
@@ -626,7 +629,6 @@ static void __init reserve_ebda_region(void)
 void __init setup_arch(char **cmdline_p)
 {
 	unsigned long kernel_end;
-	struct e820entry *machine_e820;
 	struct xen_memory_map memmap;
 
 #ifdef CONFIG_XEN
@@ -919,14 +921,14 @@ void __init setup_arch(char **cmdline_p)
 	probe_roms();
 #ifdef CONFIG_XEN
 	if (is_initial_xendomain()) {
-		machine_e820 = alloc_bootmem_low_pages(PAGE_SIZE);
-
 		memmap.nr_entries = E820MAX;
-		set_xen_guest_handle(memmap.buffer, machine_e820);
+		set_xen_guest_handle(memmap.buffer, machine_e820.map);
 
-		BUG_ON(HYPERVISOR_memory_op(XENMEM_machine_memory_map, &memmap));
+		if (HYPERVISOR_memory_op(XENMEM_machine_memory_map, &memmap))
+			BUG();
+		machine_e820.nr_map = memmap.nr_entries;
 
-		e820_reserve_resources(machine_e820, memmap.nr_entries);
+		e820_reserve_resources(machine_e820.map, machine_e820.nr_map);
 	}
 #else
 	e820_reserve_resources(e820.map, e820.nr_map);
@@ -942,10 +944,8 @@ void __init setup_arch(char **cmdline_p)
 	}
 
 #ifdef CONFIG_XEN
-	if (is_initial_xendomain()) {
-		e820_setup_gap(machine_e820, memmap.nr_entries);
-		free_bootmem(__pa(machine_e820), PAGE_SIZE);
-	}
+	if (is_initial_xendomain())
+		e820_setup_gap(machine_e820.map, machine_e820.nr_map);
 #else
 	e820_setup_gap(e820.map, e820.nr_map);
 #endif

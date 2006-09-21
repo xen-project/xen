@@ -156,6 +156,9 @@ struct ist_info ist_info;
 EXPORT_SYMBOL(ist_info);
 #endif
 struct e820map e820;
+#ifdef CONFIG_XEN
+struct e820map machine_e820;
+#endif
 
 extern void early_cpu_init(void);
 extern void generic_apic_probe(char *);
@@ -1451,7 +1454,6 @@ e820_setup_gap(struct e820entry *e820, int nr_map)
 static void __init register_memory(void)
 {
 #ifdef CONFIG_XEN
-	struct e820entry *machine_e820;
 	struct xen_memory_map memmap;
 #endif
 	int	      i;
@@ -1461,14 +1463,14 @@ static void __init register_memory(void)
 		return;
 
 #ifdef CONFIG_XEN
-	machine_e820 = alloc_bootmem_low_pages(PAGE_SIZE);
-
 	memmap.nr_entries = E820MAX;
-	set_xen_guest_handle(memmap.buffer, machine_e820);
+	set_xen_guest_handle(memmap.buffer, machine_e820.map);
 
-	BUG_ON(HYPERVISOR_memory_op(XENMEM_machine_memory_map, &memmap));
+	if (HYPERVISOR_memory_op(XENMEM_machine_memory_map, &memmap))
+		BUG();
+	machine_e820.nr_map = memmap.nr_entries;
 
-	legacy_init_iomem_resources(machine_e820, memmap.nr_entries,
+	legacy_init_iomem_resources(machine_e820.map, machine_e820.nr_map,
 				    &code_resource, &data_resource);
 #else
 	if (efi_enabled)
@@ -1486,8 +1488,7 @@ static void __init register_memory(void)
 		request_resource(&ioport_resource, &standard_io_resources[i]);
 
 #ifdef CONFIG_XEN
-	e820_setup_gap(machine_e820, memmap.nr_entries);
-	free_bootmem(__pa(machine_e820), PAGE_SIZE);
+	e820_setup_gap(machine_e820.map, machine_e820.nr_map);
 #else
 	e820_setup_gap(e820.map, e820.nr_map);
 #endif
