@@ -34,7 +34,6 @@ static inline void udelay(unsigned long usecs)
 
     s = get_timebase();
     do {
-        asm volatile("or 1,1,1"); /* also puts the thread to low priority */
         e = get_timebase();
     } while ((e-s) < ticks);
 }
