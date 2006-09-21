@@ -1,6 +1,6 @@
 diff -pruN ../orig-linux-2.6.16.29/arch/i386/pci/mmconfig.c ./arch/i386/pci/mmconfig.c
 --- ../orig-linux-2.6.16.29/arch/i386/pci/mmconfig.c	2006-09-12 19:02:10.000000000 +0100
-+++ ./arch/i386/pci/mmconfig.c	2006-09-20 11:55:32.000000000 +0100
++++ ./arch/i386/pci/mmconfig.c	2006-09-21 09:35:27.000000000 +0100
 @@ -12,14 +12,22 @@
  #include <linux/pci.h>
  #include <linux/init.h>
@@ -48,7 +48,7 @@ diff -pruN ../orig-linux-2.6.16.29/arch/i386/pci/mmconfig.c ./arch/i386/pci/mmco
  
  	base = get_base_addr(seg, bus, devfn);
  	if (!base)
-@@ -146,30 +156,62 @@ static struct pci_raw_ops pci_mmcfg = {
+@@ -146,30 +156,66 @@ static struct pci_raw_ops pci_mmcfg = {
     Normally this can be expressed in the MCFG by not listing them
     and assigning suitable _SEGs, but this isn't implemented in some BIOS.
     Instead try to discover all devices on bus 0 that are unreachable using MM
@@ -92,6 +92,10 @@ diff -pruN ../orig-linux-2.6.16.29/arch/i386/pci/mmconfig.c ./arch/i386/pci/mmco
 -		pci_conf1_read(0, 0, PCI_DEVFN(i, 0), 0, 4, &val1);
 -		if (val1 == 0xffffffff)
 +/* NB. Ripped from arch/i386/kernel/setup.c for this Xen bugfix patch. */
++#ifdef CONFIG_XEN
++extern struct e820map machine_e820;
++#define e820 machine_e820
++#endif
 +static int __init
 +e820_all_mapped(unsigned long s, unsigned long e, unsigned type)
 +{
@@ -128,7 +132,7 @@ diff -pruN ../orig-linux-2.6.16.29/arch/i386/pci/mmconfig.c ./arch/i386/pci/mmco
  }
  
  static int __init pci_mmcfg_init(void)
-@@ -183,6 +225,15 @@ static int __init pci_mmcfg_init(void)
+@@ -183,6 +229,15 @@ static int __init pci_mmcfg_init(void)
  	    (pci_mmcfg_config[0].base_address == 0))
  		goto out;
  
@@ -146,7 +150,7 @@ diff -pruN ../orig-linux-2.6.16.29/arch/i386/pci/mmconfig.c ./arch/i386/pci/mmco
  	pci_probe = (pci_probe & ~PCI_PROBE_MASK) | PCI_PROBE_MMCONF;
 diff -pruN ../orig-linux-2.6.16.29/arch/x86_64/pci/mmconfig.c ./arch/x86_64/pci/mmconfig.c
 --- ../orig-linux-2.6.16.29/arch/x86_64/pci/mmconfig.c	2006-09-12 19:02:10.000000000 +0100
-+++ ./arch/x86_64/pci/mmconfig.c	2006-09-20 11:55:41.000000000 +0100
++++ ./arch/x86_64/pci/mmconfig.c	2006-09-21 09:35:40.000000000 +0100
 @@ -9,11 +9,19 @@
  #include <linux/init.h>
  #include <linux/acpi.h>
@@ -191,7 +195,7 @@ diff -pruN ../orig-linux-2.6.16.29/arch/x86_64/pci/mmconfig.c ./arch/x86_64/pci/
  
  	addr = pci_dev_base(seg, bus, devfn);
  	if (!addr)
-@@ -129,23 +140,52 @@ static struct pci_raw_ops pci_mmcfg = {
+@@ -129,23 +140,56 @@ static struct pci_raw_ops pci_mmcfg = {
     Normally this can be expressed in the MCFG by not listing them
     and assigning suitable _SEGs, but this isn't implemented in some BIOS.
     Instead try to discover all devices on bus 0 that are unreachable using MM
@@ -228,6 +232,10 @@ diff -pruN ../orig-linux-2.6.16.29/arch/x86_64/pci/mmconfig.c ./arch/x86_64/pci/
 -		pci_conf1_read(0, 0, PCI_DEVFN(i,0), 0, 4, &val1);
 -		if (val1 == 0xffffffff)
 +/* NB. Ripped from arch/x86_64/kernel/e820.c for this Xen bugfix patch. */
++#ifdef CONFIG_XEN
++extern struct e820map machine_e820;
++#define e820 machine_e820
++#endif
 +static int __init e820_all_mapped(unsigned long start, unsigned long end, unsigned type)
 +{
 +	int i;
@@ -256,7 +264,7 @@ diff -pruN ../orig-linux-2.6.16.29/arch/x86_64/pci/mmconfig.c ./arch/x86_64/pci/
  }
  
  static int __init pci_mmcfg_init(void)
-@@ -161,6 +201,15 @@ static int __init pci_mmcfg_init(void)
+@@ -161,6 +205,15 @@ static int __init pci_mmcfg_init(void)
  	    (pci_mmcfg_config[0].base_address == 0))
  		return 0;
  
@@ -272,7 +280,7 @@ diff -pruN ../orig-linux-2.6.16.29/arch/x86_64/pci/mmconfig.c ./arch/x86_64/pci/
  	/* RED-PEN i386 doesn't do _nocache right now */
  	pci_mmcfg_virt = kmalloc(sizeof(*pci_mmcfg_virt) * pci_mmcfg_config_num, GFP_KERNEL);
  	if (pci_mmcfg_virt == NULL) {
-@@ -169,7 +218,8 @@ static int __init pci_mmcfg_init(void)
+@@ -169,7 +222,8 @@ static int __init pci_mmcfg_init(void)
  	}
  	for (i = 0; i < pci_mmcfg_config_num; ++i) {
  		pci_mmcfg_virt[i].cfg = &pci_mmcfg_config[i];
