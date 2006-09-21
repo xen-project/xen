@@ -36,6 +36,7 @@ vnc-start-vncviewer
 vnc-title-domain-name
 vnc-access-monitor-vt
 vnc-display-find-unused
+vnc-backoff-screen-scan
 xenstore-block-device-config
 xenstore-write-vnc-port
 qemu-allow-disable-sdl

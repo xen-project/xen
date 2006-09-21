@@ -1,8 +1,8 @@
 Index: ioemu/vnc.c
 ===================================================================
---- ioemu.orig/vnc.c	2006-09-21 19:10:45.000000000 +0100
-+++ ioemu/vnc.c	2006-09-21 19:10:53.000000000 +0100
-@@ -1173,3 +1173,25 @@
+--- ioemu.orig/vnc.c	2006-09-21 19:26:38.000000000 +0100
++++ ioemu/vnc.c	2006-09-21 19:29:58.000000000 +0100
+@@ -1174,3 +1174,25 @@
  
      vnc_dpy_resize(vs->ds, 640, 400);
  }
@@ -20,7 +20,7 @@ Index: ioemu/vnc.c
 +	exit(1);
 +
 +    case 0:	/* child */
-+	execlp("vncviewer", "vncviewer", s, 0);
++	execlp("vncviewer", "vncviewer", s, NULL);
 +	fprintf(stderr, "vncviewer execlp failed\n");
 +	exit(1);
 +
@@ -30,8 +30,8 @@ Index: ioemu/vnc.c
 +}
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-09-21 19:08:38.000000000 +0100
-+++ ioemu/vl.c	2006-09-21 19:10:53.000000000 +0100
+--- ioemu.orig/vl.c	2006-09-21 19:26:24.000000000 +0100
++++ ioemu/vl.c	2006-09-21 19:29:50.000000000 +0100
 @@ -120,6 +120,7 @@
  int bios_size;
  static DisplayState display_state;
@@ -93,8 +93,8 @@ Index: ioemu/vl.c
          sdl_display_init(ds, full_screen);
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-09-21 19:08:38.000000000 +0100
-+++ ioemu/vl.h	2006-09-21 19:10:53.000000000 +0100
+--- ioemu.orig/vl.h	2006-09-21 19:26:24.000000000 +0100
++++ ioemu/vl.h	2006-09-21 19:29:50.000000000 +0100
 @@ -786,6 +786,7 @@
  
  /* vnc.c */
