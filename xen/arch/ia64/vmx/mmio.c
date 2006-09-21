@@ -428,7 +428,7 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
     IA64_BUNDLE bundle;
     int slot, dir=0, inst_type;
     size_t size;
-    u64 data, value,post_update, slot1a, slot1b, temp;
+    u64 data, post_update, slot1a, slot1b, temp;
     INST64 inst;
     regs=vcpu_regs(vcpu);
     if (IA64_RETRY == __vmx_get_domain_bundle(regs->cr_iip, &bundle)) {
@@ -454,7 +454,6 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
             vcpu_get_gr_nat(vcpu,inst.M4.r2,&data);
         }else if((inst.M1.x6>>2)<0xb){   //  read
             dir=IOREQ_READ;
-            vcpu_get_gr_nat(vcpu,inst.M1.r1,&value);
         }
     }
     // Integer Load + Reg update
@@ -462,7 +461,6 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
         inst_type = SL_INTEGER;
         dir = IOREQ_READ;     //write
         size = (inst.M2.x6&0x3);
-        vcpu_get_gr_nat(vcpu,inst.M2.r1,&value);
         vcpu_get_gr_nat(vcpu,inst.M2.r3,&temp);
         vcpu_get_gr_nat(vcpu,inst.M2.r2,&post_update);
         temp += post_update;
@@ -485,7 +483,6 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
 
         }else if((inst.M3.x6>>2)<0xb){   //  read
             dir=IOREQ_READ;
-            vcpu_get_gr_nat(vcpu,inst.M3.r1,&value);
             vcpu_get_gr_nat(vcpu,inst.M3.r3,&temp);
             post_update = (inst.M3.i<<7)+inst.M3.imm7;
             if(inst.M3.s)
@@ -597,13 +594,6 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
         mmio_access(vcpu, padr, &data, size, ma, dir);
     }else{
         mmio_access(vcpu, padr, &data, size, ma, dir);
-        if(size==1)
-            data = (value & 0xffffffffffffff00U) | (data & 0xffU);
-        else if(size==2)
-            data = (value & 0xffffffffffff0000U) | (data & 0xffffU);
-        else if(size==4)
-            data = (value & 0xffffffff00000000U) | (data & 0xffffffffU);
-
         if(inst_type==SL_INTEGER){       //gp
             vcpu_set_gr(vcpu,inst.M1.r1,data,0);
         }else{
