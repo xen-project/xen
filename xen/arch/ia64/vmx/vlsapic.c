@@ -298,7 +298,7 @@ static void update_vhpi(VCPU *vcpu, int vec)
     // TODO: Add support for XENO
     if ( VCPU(vcpu,vac).a_int ) {
         ia64_call_vsa ( PAL_VPS_SET_PENDING_INTERRUPT, 
-                (uint64_t) &(vcpu->arch.privregs), 0, 0,0,0,0,0);
+                (uint64_t)vcpu->arch.privregs, 0, 0, 0, 0, 0, 0);
     }
 }
 
@@ -683,9 +683,5 @@ void vhpi_detection(VCPU *vcpu)
 
 void vmx_vexirq(VCPU *vcpu)
 {
-    static  uint64_t  vexirq_count=0;
-
-    vexirq_count ++;
-    printk("Virtual ex-irq %ld\n", vexirq_count);
     generate_exirq (vcpu);
 }
