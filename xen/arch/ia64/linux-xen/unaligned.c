@@ -304,7 +304,7 @@ set_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long val, unsigned
 	unsigned long *bsp, *bspstore, *addr, *rnat_addr;
 	unsigned long *kbs = (void *) current + IA64_RBS_OFFSET;
 	unsigned long nat_mask;
-    unsigned long old_rsc,new_rsc;
+	unsigned long old_rsc, new_rsc, psr;
 	unsigned long rnat;
 	long sof = (regs->cr_ifs) & 0x7f;
 	long sor = 8 * ((regs->cr_ifs >> 14) & 0xf);
@@ -321,16 +321,17 @@ set_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long val, unsigned
 		ridx = rotate_reg(sor, rrb_gr, ridx);
 
     old_rsc=ia64_get_rsc();
-    new_rsc=old_rsc&(~0x3);
+    /* put RSC to lazy mode, and set loadrs 0 */
+    new_rsc = old_rsc & (~0x3fff0003);
     ia64_set_rsc(new_rsc);
+    bsp = kbs + (regs->loadrs >> 19); /* 16 + 3 */
 
-    bspstore = (unsigned long*)ia64_get_bspstore();
-    bsp =kbs + (regs->loadrs >> 19);//16+3
-
-	addr = ia64_rse_skip_regs(bsp, -sof + ridx);
+    addr = ia64_rse_skip_regs(bsp, -sof + ridx);
     nat_mask = 1UL << ia64_rse_slot_num(addr);
-	rnat_addr = ia64_rse_rnat_addr(addr);
-
+    rnat_addr = ia64_rse_rnat_addr(addr);
+    
+    local_irq_save(psr); 
+    bspstore = (unsigned long*)ia64_get_bspstore();
     if(addr >= bspstore){
 
         ia64_flushrs ();
@@ -358,6 +359,7 @@ set_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long val, unsigned
         ia64_set_bspstore (bspstore);
         ia64_set_rnat(rnat);
     }
+    local_irq_restore(psr);
     ia64_set_rsc(old_rsc);
 }
 
