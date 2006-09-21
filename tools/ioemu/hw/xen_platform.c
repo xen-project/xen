@@ -116,10 +116,10 @@ void pci_xen_platform_init(PCIBus *bus)
     d = pci_register_device(bus, "xen-platform", sizeof(PCIDevice), -1, NULL,
 			    NULL);
     pch = (struct pci_config_header *)d->config;
-    pch->vendor_id = 0xfffd;
-    pch->device_id = 0x0101;
+    pch->vendor_id = 0x5853;
+    pch->device_id = 0x0001;
     pch->command = 3; /* IO and memory access */
-    pch->revision = 0;
+    pch->revision = 1;
     pch->api = 0;
     pch->subclass = 0x80; /* Other */
     pch->class = 0xff; /* Unclassified device class */
