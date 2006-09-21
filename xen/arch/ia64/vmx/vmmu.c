@@ -456,7 +456,15 @@ IA64FAULT vmx_vcpu_itr_d(VCPU *vcpu, u64 slot, u64 pte, u64 itir, u64 ifa)
     }
 #endif   
     pte &= ~PAGE_FLAGS_RV_MASK;
-    thash_purge_entries(vcpu, va, ps);
+
+    /* This is a bad workaround
+       In Linux, region 7 use 16M pagesize and is identity mapped.
+       VHPT page size is 16K in XEN.  If purge VHPT while guest insert 16M,
+       it will iteratively purge VHPT 1024 times, which makes XEN/IPF very
+       slow.  XEN doesn't purge VHPT
+    */   
+    if (ps != _PAGE_SIZE_16M)
+        thash_purge_entries(vcpu, va, ps);
     gpfn = (pte & _PAGE_PPN_MASK)>> PAGE_SHIFT;
     if (VMX_DOMAIN(vcpu) && __gpfn_is_io(vcpu->domain, gpfn))
         pte |= VTLB_PTE_IO;
