@@ -29,6 +29,7 @@ domain-timeoffset
 acpi-support
 acpi-timer-support
 acpi-poweroff-support
+fix-vga-scanning-code-overflow
 vnc-cleanup
 vnc-fixes
 vnc-start-vncviewer
