@@ -822,11 +822,6 @@ def xm_sched_credit(args):
     if weight is None and cap is None:
         print server.xend.domain.sched_credit_get(domain)
     else:
-        if weight is None:
-            weight = int(0)
-        if cap is None:
-            cap = int(~0)
-
         err = server.xend.domain.sched_credit_set(domain, weight, cap)
         if err != 0:
             print err
