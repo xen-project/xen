@@ -356,37 +356,20 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         struct vcpu *v;
         cpumask_t new_affinity;
 
+        ret = -ESRCH;
         if ( d == NULL )
-        {
-            ret = -ESRCH;            
             break;
-        }
-        
-        if ( (op->u.vcpuaffinity.vcpu >= MAX_VIRT_CPUS) ||
-             !d->vcpu[op->u.vcpuaffinity.vcpu] )
-        {
-            ret = -EINVAL;
-            put_domain(d);
-            break;
-        }
 
-        v = d->vcpu[op->u.vcpuaffinity.vcpu];
-        if ( v == NULL )
-        {
-            ret = -ESRCH;
-            put_domain(d);
-            break;
-        }
+        ret = -EINVAL;
+        if ( op->u.vcpuaffinity.vcpu >= MAX_VIRT_CPUS )
+            goto vcpuaffinity_out;
+
+        ret = -ESRCH;
+        if ( (v = d->vcpu[op->u.vcpuaffinity.vcpu]) == NULL )
+            goto vcpuaffinity_out;
 
         if ( op->cmd == XEN_DOMCTL_setvcpuaffinity )
         {
-            if ( v == current )
-            {
-                ret = -EINVAL;
-                put_domain(d);
-                break;
-            }
-
             xenctl_cpumap_to_cpumask(
                 &new_affinity, &op->u.vcpuaffinity.cpumap);
             ret = vcpu_set_affinity(v, &new_affinity);
@@ -395,8 +378,10 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         {
             cpumask_to_xenctl_cpumap(
                 &op->u.vcpuaffinity.cpumap, &v->cpu_affinity);
+            ret = 0;
         }
 
+    vcpuaffinity_out:
         put_domain(d);
     }
     break;

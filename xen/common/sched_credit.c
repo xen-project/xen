@@ -572,47 +572,6 @@ csched_vcpu_wake(struct vcpu *vc)
 }
 
 static int
-csched_vcpu_set_affinity(struct vcpu *vc, cpumask_t *affinity)
-{
-    unsigned long flags;
-    int lcpu;
-
-    if ( vc == current )
-    {
-        /* No locking needed but also can't move on the spot... */
-        if ( !cpu_isset(vc->processor, *affinity) )
-            return -EBUSY;
-
-        vc->cpu_affinity = *affinity;
-    }
-    else
-    {
-        /* Pause, modify, and unpause. */
-        vcpu_pause(vc);
-
-        vc->cpu_affinity = *affinity;
-        if ( !cpu_isset(vc->processor, vc->cpu_affinity) )
-        {
-            /*
-             * We must grab the scheduler lock for the CPU currently owning
-             * this VCPU before changing its ownership.
-             */
-            vcpu_schedule_lock_irqsave(vc, flags);
-            lcpu = vc->processor;
-
-            vc->processor = first_cpu(vc->cpu_affinity);
-
-            spin_unlock_irqrestore(&per_cpu(schedule_data, lcpu).schedule_lock,
-                                   flags);
-        }
-
-        vcpu_unpause(vc);
-    }
-
-    return 0;
-}
-
-static int
 csched_dom_cntl(
     struct domain *d,
     struct xen_domctl_scheduler_op *op)
@@ -1226,8 +1185,6 @@ struct scheduler sched_credit_def = {
 
     .sleep          = csched_vcpu_sleep,
     .wake           = csched_vcpu_wake,
-
-    .set_affinity   = csched_vcpu_set_affinity,
 
     .adjust         = csched_dom_cntl,
 

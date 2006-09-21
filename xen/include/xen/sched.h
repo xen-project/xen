@@ -312,7 +312,7 @@ extern void context_switch(
  * saved to memory. Alternatively, if implementing lazy context switching,
  * ensure that invoking sync_vcpu_execstate() will switch and commit @prev.
  */
-#define context_saved(prev) (clear_bit(_VCPUF_running, &(prev)->vcpu_flags))
+extern void context_saved(struct vcpu *prev);
 
 /* Called by the scheduler to continue running the current VCPU. */
 extern void continue_running(
@@ -386,9 +386,12 @@ extern struct domain *domain_list;
  /* VCPU is paused by the hypervisor? */
 #define _VCPUF_paused          11
 #define VCPUF_paused           (1UL<<_VCPUF_paused)
-/* VCPU is blocked awaiting an event to be consumed by Xen. */
+ /* VCPU is blocked awaiting an event to be consumed by Xen. */
 #define _VCPUF_blocked_in_xen  12
 #define VCPUF_blocked_in_xen   (1UL<<_VCPUF_blocked_in_xen)
+ /* VCPU affinity has changed: migrating to a new CPU. */
+#define _VCPUF_migrating       13
+#define VCPUF_migrating        (1UL<<_VCPUF_migrating)
 
 /*
  * Per-domain flags (domain_flags).
@@ -418,9 +421,15 @@ extern struct domain *domain_list;
 static inline int vcpu_runnable(struct vcpu *v)
 {
     return ( !(v->vcpu_flags &
-               (VCPUF_blocked|VCPUF_down|VCPUF_paused|VCPUF_blocked_in_xen)) &&
+               ( VCPUF_blocked |
+                 VCPUF_down |
+                 VCPUF_paused |
+                 VCPUF_blocked_in_xen |
+                 VCPUF_migrating )) &&
              !(v->domain->domain_flags &
-               (DOMF_shutdown|DOMF_ctrl_pause|DOMF_paused)) );
+               ( DOMF_shutdown |
+                 DOMF_ctrl_pause |
+                 DOMF_paused )));
 }
 
 void vcpu_pause(struct vcpu *v);
