@@ -725,6 +725,12 @@ void qemu_del_timer(QEMUTimer *ts)
     }
 }
 
+void qemu_advance_timer(QEMUTimer *ts, int64_t expire_time)
+{
+    if (ts->expire_time > expire_time)
+	qemu_mod_timer(ts, expire_time);
+}
+
 /* modify the current timer so that it will be fired when current_time
    >= expire_time. The corresponding callback will be called. */
 void qemu_mod_timer(QEMUTimer *ts, int64_t expire_time)
