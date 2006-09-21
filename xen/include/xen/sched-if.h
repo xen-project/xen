@@ -69,8 +69,6 @@ struct scheduler {
     void         (*sleep)          (struct vcpu *);
     void         (*wake)           (struct vcpu *);
 
-    int          (*set_affinity)   (struct vcpu *, cpumask_t *);
-
     struct task_slice (*do_schedule) (s_time_t);
 
     int          (*adjust)         (struct domain *,
