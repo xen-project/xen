@@ -44,4 +44,4 @@ qemu-daemonize
 xen-platform-device
 qemu-bootorder
 qemu-tunable-ide-write-cache
-qemu-pci -p3
+qemu-pci 

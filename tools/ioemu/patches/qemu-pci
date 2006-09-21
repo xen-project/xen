@@ -1,7 +1,8 @@
-diff -r d5eb5205ff35 tools/ioemu/hw/pci.c
---- a/tools/ioemu/hw/pci.c	Thu Aug 24 16:25:49 2006 +0100
-+++ b/tools/ioemu/hw/pci.c	Fri Aug 25 11:00:03 2006 +0800
-@@ -286,6 +286,7 @@ void pci_default_write_config(PCIDevice 
+Index: ioemu/hw/pci.c
+===================================================================
+--- ioemu.orig/hw/pci.c	2006-09-21 11:31:14.000000000 +0100
++++ ioemu/hw/pci.c	2006-09-21 11:31:32.000000000 +0100
+@@ -286,6 +286,7 @@
              case 0x0b:
              case 0x0e:
              case 0x10 ... 0x27: /* base */
@@ -9,7 +10,7 @@ diff -r d5eb5205ff35 tools/ioemu/hw/pci.c
              case 0x30 ... 0x33: /* rom */
              case 0x3d:
                  can_write = 0;
-@@ -318,6 +319,18 @@ void pci_default_write_config(PCIDevice 
+@@ -318,6 +319,18 @@
              break;
          }
          if (can_write) {
@@ -28,10 +29,11 @@ diff -r d5eb5205ff35 tools/ioemu/hw/pci.c
              d->config[addr] = val;
          }
          addr++;
-diff -r d5eb5205ff35 tools/ioemu/hw/rtl8139.c
---- a/tools/ioemu/hw/rtl8139.c	Thu Aug 24 16:25:49 2006 +0100
-+++ b/tools/ioemu/hw/rtl8139.c	Fri Aug 25 11:00:03 2006 +0800
-@@ -3423,6 +3423,8 @@ void pci_rtl8139_init(PCIBus *bus, NICIn
+Index: ioemu/hw/rtl8139.c
+===================================================================
+--- ioemu.orig/hw/rtl8139.c	2006-09-21 11:31:14.000000000 +0100
++++ ioemu/hw/rtl8139.c	2006-09-21 11:31:32.000000000 +0100
+@@ -3423,6 +3423,8 @@
      pci_conf[0x0e] = 0x00; /* header_type */
      pci_conf[0x3d] = 1;    /* interrupt pin 0 */
      pci_conf[0x34] = 0xdc;
@@ -40,10 +42,11 @@ diff -r d5eb5205ff35 tools/ioemu/hw/rtl8139.c
  
      s = &d->rtl8139;
  
-diff -r d5eb5205ff35 tools/ioemu/hw/usb-uhci.c
---- a/tools/ioemu/hw/usb-uhci.c	Thu Aug 24 16:25:49 2006 +0100
-+++ b/tools/ioemu/hw/usb-uhci.c	Fri Aug 25 11:00:03 2006 +0800
-@@ -659,6 +659,8 @@ void usb_uhci_init(PCIBus *bus, int devf
+Index: ioemu/hw/usb-uhci.c
+===================================================================
+--- ioemu.orig/hw/usb-uhci.c	2006-09-21 11:31:14.000000000 +0100
++++ ioemu/hw/usb-uhci.c	2006-09-21 11:31:32.000000000 +0100
+@@ -659,6 +659,8 @@
      pci_conf[0x0e] = 0x00; // header_type
      pci_conf[0x3d] = 4; // interrupt pin 3
      pci_conf[0x60] = 0x10; // release number
