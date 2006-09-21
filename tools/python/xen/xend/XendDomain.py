@@ -560,13 +560,23 @@ class XendDomain:
         except Exception, ex:
             raise XendError(str(ex))
     
-    def domain_sched_credit_set(self, domid, weight, cap):
+    def domain_sched_credit_set(self, domid, weight = None, cap = None):
         """Set credit scheduler parameters for a domain.
         """
         dominfo = self.domain_lookup_by_name_or_id_nr(domid)
         if not dominfo:
             raise XendInvalidDomain(str(domid))
         try:
+            if weight is None:
+                weight = int(0)
+            elif weight < 1 or weight > 65535:
+                raise XendError("weight is out of range")
+
+            if cap is None:
+                cap = int(~0)
+            elif cap < 0 or cap > dominfo.getVCpuCount() * 100:
+                raise XendError("cap is out of range")
+
             return xc.sched_credit_domain_set(dominfo.getDomid(), weight, cap)
         except Exception, ex:
             raise XendError(str(ex))
