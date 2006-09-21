@@ -1,8 +1,8 @@
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-08-17 19:50:22.277673633 +0100
-+++ ioemu/vl.c	2006-08-17 19:55:21.878556486 +0100
-@@ -5838,6 +5838,7 @@
+--- ioemu.orig/vl.c	2006-09-21 19:33:32.000000000 +0100
++++ ioemu/vl.c	2006-09-21 19:33:32.000000000 +0100
+@@ -5844,6 +5844,7 @@
      unsigned long nr_pages, tmp_nr_pages, shared_page_nr;
      xen_pfn_t *page_array;
      extern void *shared_page;
@@ -10,7 +10,7 @@ Index: ioemu/vl.c
  
      char qemu_dm_logfilename[64];
  
-@@ -6419,6 +6420,18 @@
+@@ -6425,6 +6426,18 @@
      fprintf(logfile, "shared page at pfn:%lx, mfn: %"PRIx64"\n",
              shared_page_nr, (uint64_t)(page_array[shared_page_nr]));
  
@@ -31,8 +31,8 @@ Index: ioemu/vl.c
  #elif defined(__ia64__)
 Index: ioemu/target-i386-dm/helper2.c
 ===================================================================
---- ioemu.orig/target-i386-dm/helper2.c	2006-08-17 19:49:44.491850141 +0100
-+++ ioemu/target-i386-dm/helper2.c	2006-08-17 19:50:41.490549986 +0100
+--- ioemu.orig/target-i386-dm/helper2.c	2006-09-21 19:33:30.000000000 +0100
++++ ioemu/target-i386-dm/helper2.c	2006-09-21 19:33:32.000000000 +0100
 @@ -76,6 +76,10 @@
  
  shared_iopage_t *shared_page = NULL;
