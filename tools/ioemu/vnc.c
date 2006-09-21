@@ -457,6 +457,8 @@ static void _vnc_update_client(void *opaque)
 	int maxx, maxy;
 	int tile_bytes = vs->depth * DP2X(vs, 1);
 
+	qemu_mod_timer(vs->timer, now + VNC_REFRESH_INTERVAL);
+
 	if (vs->width != DP2X(vs, DIRTY_PIXEL_BITS))
 	    width_mask = (1ULL << X2DP_UP(vs, vs->ds->width)) - 1;
 	else
@@ -496,7 +498,7 @@ static void _vnc_update_client(void *opaque)
 
 	if (!vs->has_update || vs->visible_y >= vs->ds->height ||
 	    vs->visible_x >= vs->ds->width)
-	    goto out;
+	    return;
 
 	/* Count rectangles */
 	n_rectangles = 0;
@@ -547,9 +549,6 @@ static void _vnc_update_client(void *opaque)
 	vs->slow_client = 0;
     } else
 	vs->slow_client = 1;
-
- out:
-    qemu_mod_timer(vs->timer, now + VNC_REFRESH_INTERVAL);
 }
 
 static void vnc_update_client(void *opaque)
@@ -562,10 +561,8 @@ static void vnc_update_client(void *opaque)
 
 static void vnc_timer_init(VncState *vs)
 {
-    if (vs->timer == NULL) {
+    if (vs->timer == NULL)
 	vs->timer = qemu_new_timer(rt_clock, vnc_update_client, vs);
-	qemu_mod_timer(vs->timer, qemu_get_clock(rt_clock));
-    }
 }
 
 static void vnc_dpy_refresh(DisplayState *ds)
@@ -902,6 +899,8 @@ static void framebuffer_update_request(VncState *vs, int incremental,
     vs->visible_y = y_position;
     vs->visible_w = w;
     vs->visible_h = h;
+
+    qemu_mod_timer(vs->timer, qemu_get_clock(rt_clock));
 }
 
 static void set_encodings(VncState *vs, int32_t *encodings, size_t n_encodings)
