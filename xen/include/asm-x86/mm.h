@@ -51,18 +51,19 @@ struct page_info
     } u;
 
     union {
-        /* Timestamp from 'TLB clock', used to reduce need for safety
-         * flushes.  Only valid on a) free pages, and b) guest pages with a
-         * zero type count. */
+        /*
+         * Timestamp from 'TLB clock', used to avoid extra safety flushes.
+         * Only valid for: a) free pages, and b) pages with zero type count
+         * (except page table pages when the guest is in shadow mode).
+         */
         u32 tlbflush_timestamp;
 
-        /* Only used on guest pages with a shadow.
-         * Guest pages with a shadow must have a non-zero type count, so this
-         * does not conflict with the tlbflush timestamp. */
+        /*
+         * Guest pages with a shadow. This does not conflict with
+         * tlbflush_timestamp since page table pages are explicitly not
+         * tracked for TLB-flush avoidance when a guest runs in shadow mode.
+         */
         u32 shadow_flags;
-
-        // XXX -- we expect to add another field here, to be used for min/max
-        // purposes, which is only used for shadow pages.
     };
 };
 

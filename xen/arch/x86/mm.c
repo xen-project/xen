@@ -1490,6 +1490,12 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
 
 int alloc_page_type(struct page_info *page, unsigned long type)
 {
+    struct domain *owner = page_get_owner(page);
+
+    /* A page table is dirtied when its type count becomes non-zero. */
+    if ( likely(owner != NULL) )
+        mark_dirty(owner, page_to_mfn(page));
+
     switch ( type & PGT_type_mask )
     {
     case PGT_l1_page_table:
@@ -1528,9 +1534,11 @@ void free_page_type(struct page_info *page, unsigned long type)
          */
         this_cpu(percpu_mm_info).deferred_ops |= DOP_FLUSH_ALL_TLBS;
 
-        if ( unlikely(shadow_mode_enabled(owner)
-                 && !shadow_lock_is_acquired(owner)) )
+        if ( unlikely(shadow_mode_enabled(owner)) )
         {
+            /* A page table is dirtied when its type count becomes zero. */
+            mark_dirty(owner, page_to_mfn(page));
+
             if ( shadow_mode_refcounts(owner) )
                 return;
 
@@ -1603,19 +1611,19 @@ void put_page_type(struct page_info *page)
                 nx &= ~PGT_validated;
             }
 
-            /* Record TLB information for flush later. */
-            page->tlbflush_timestamp = tlbflush_current_time();
+            /*
+             * Record TLB information for flush later. We do not stamp page
+             * tables when running in shadow mode:
+             *  1. Pointless, since it's the shadow pt's which must be tracked.
+             *  2. Shadow mode reuses this field for shadowed page tables to
+             *     store flags info -- we don't want to conflict with that.
+             */
+            if ( !shadow_mode_enabled(page_get_owner(page)) ||
+                 ((nx & PGT_type_mask) == PGT_writable_page) )
+                page->tlbflush_timestamp = tlbflush_current_time();
         }
     }
     while ( unlikely((y = cmpxchg(&page->u.inuse.type_info, x, nx)) != x) );
-
-    /*
-     * A page table is dirtied when its type count becomes zero.
-     * We cannot set the dirty flag earlier than this because we must wait
-     * until the type count has been zeroed by the CMPXCHG above.
-     */
-    if ( unlikely((nx & (PGT_validated|PGT_count_mask)) == 0) )
-        mark_dirty(page_get_owner(page), page_to_mfn(page));
 }
 
 
@@ -1648,7 +1656,10 @@ int get_page_type(struct page_info *page, unsigned long type)
                     page_get_owner(page)->domain_dirty_cpumask;
                 tlbflush_filter(mask, page->tlbflush_timestamp);
 
-                if ( unlikely(!cpus_empty(mask)) )
+                if ( unlikely(!cpus_empty(mask)) &&
+                     /* Shadow mode: track only writable pages. */
+                     (!shadow_mode_enabled(page_get_owner(page)) ||
+                      ((nx & PGT_type_mask) == PGT_writable_page)) )
                 {
                     perfc_incrc(need_flush_tlb_flush);
                     flush_tlb_mask(mask);
@@ -1701,13 +1712,6 @@ int get_page_type(struct page_info *page, unsigned long type)
 
         /* Noone else is updating simultaneously. */
         __set_bit(_PGT_validated, &page->u.inuse.type_info);
-
-        /*
-         * A page table is dirtied when its type count becomes non-zero. It is
-         * safe to mark dirty here because any PTE modifications in
-         * alloc_page_type() have now happened.
-         */
-        mark_dirty(page_get_owner(page), page_to_mfn(page));
     }
 
     return 1;
@@ -2001,14 +2005,8 @@ int do_mmuext_op(
             {
                 put_page_and_type(page);
                 put_page(page);
-                if ( shadow_mode_enabled(d) )
-                {
-                    shadow_lock(d);
-                    shadow_remove_all_shadows(v, _mfn(mfn));
-                    /* A page is dirtied when its pin status is cleared. */
-                    sh_mark_dirty(d, _mfn(mfn));
-                    shadow_unlock(d);
-                }
+                /* A page is dirtied when its pin status is cleared. */
+                mark_dirty(d, mfn);
             }
             else
             {

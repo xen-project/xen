@@ -232,32 +232,15 @@ struct x86_emulate_ops shadow_emulator_ops = {
 void shadow_promote(struct vcpu *v, mfn_t gmfn, u32 type)
 {
     struct page_info *page = mfn_to_page(gmfn);
-    unsigned long type_info;
 
     ASSERT(valid_mfn(gmfn));
 
     /* We should never try to promote a gmfn that has writeable mappings */
     ASSERT(shadow_remove_write_access(v, gmfn, 0, 0) == 0);
 
-    // Is the page already shadowed?
+    /* Is the page already shadowed? */
     if ( !test_and_set_bit(_PGC_page_table, &page->count_info) )
-    {
-        // No prior shadow exists...
-
-        // Grab a type-ref.  We don't really care if we are racing with another
-        // vcpu or not, or even what kind of type we get; we just want the type
-        // count to be > 0.
-        //
-        do {
-            type_info = page->u.inuse.type_info &
-                (PGT_type_mask | PGT_pae_xen_l2);
-        } while ( !get_page_type(page, type_info) );
-
-        // Now that the type ref is non-zero, we can safely use the
-        // shadow_flags.
-        //
         page->shadow_flags = 0;
-    }
 
     ASSERT(!test_bit(type >> PGC_SH_type_shift, &page->shadow_flags));
     set_bit(type >> PGC_SH_type_shift, &page->shadow_flags);
@@ -273,13 +256,7 @@ void shadow_demote(struct vcpu *v, mfn_t gmfn, u32 type)
     clear_bit(type >> PGC_SH_type_shift, &page->shadow_flags);
 
     if ( (page->shadow_flags & SHF_page_type_mask) == 0 )
-    {
-        // release the extra type ref
-        put_page_type(page);
-
-        // clear the is-a-page-table bit.
         clear_bit(_PGC_page_table, &page->count_info);
-    }
 }
 
 /**************************************************************************/
