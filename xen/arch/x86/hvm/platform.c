@@ -416,6 +416,11 @@ static int hvm_decode(int realmode, unsigned char *opcode, struct instruction *i
         GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
         return reg_mem(instr->op_size, opcode, instr, rex);
 
+    case 0x3A: /* cmp r8, r8/m8 */
+        instr->instr = INSTR_CMP;
+        GET_OP_SIZE_FOR_BYTE(instr->op_size);
+        return reg_mem(instr->op_size, opcode, instr, rex);
+
     case 0x3B: /* cmp m32/16, r32/16 */
         instr->instr = INSTR_CMP;
         GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
@@ -470,6 +475,11 @@ static int hvm_decode(int realmode, unsigned char *opcode, struct instruction *i
         instr->op_size = BYTE;
         GET_OP_SIZE_FOR_BYTE(size_reg);
         return mem_reg(size_reg, opcode, instr, rex);
+
+    case 0x85: /* text m16/32, r16/32 */
+        instr->instr = INSTR_TEST;
+        GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+        return mem_reg(instr->op_size, opcode, instr, rex);
 
     case 0x87:  /* xchg {r/m16|r/m32}, {m/r16|m/r32} */
         instr->instr = INSTR_XCHG;
