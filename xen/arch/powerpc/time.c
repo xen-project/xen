@@ -93,5 +93,4 @@ void do_settime(unsigned long secs, unsigned long usecs, u64 system_time_base)
 
 void update_vcpu_system_time(struct vcpu *v)
 {
-    unimplemented();
 }

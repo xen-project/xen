@@ -32,16 +32,21 @@ void __flush_tlb_mask(cpumask_t mask, unsigned long addr)
     unimplemented();
 }
 
-void smp_send_event_check_mask(cpumask_t cpu_mask)
+void smp_send_event_check_mask(cpumask_t mask)
 {
-    unimplemented();
+    cpu_clear(smp_processor_id(), mask);
+    if (!cpus_empty(mask))
+        unimplemented();
 }
 
-int smp_call_function(void (*func) (void *info), void *info, int unused,
+
+int smp_call_function(void (*func) (void *info), void *info, int retry,
         int wait)
 {
-    unimplemented();
-    return 0;
+    cpumask_t allbutself = cpu_online_map;
+    cpu_clear(smp_processor_id(), allbutself);
+
+    return on_selected_cpus(allbutself, func, info, retry, wait);
 }
 
 void smp_send_stop(void)
@@ -56,5 +61,6 @@ int on_selected_cpus(
     int retry,
     int wait)
 {
+    unimplemented();
     return 0;
 }

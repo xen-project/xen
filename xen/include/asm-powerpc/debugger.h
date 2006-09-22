@@ -41,6 +41,13 @@ static inline void debugger_trap_immediate(void)
     __builtin_trap();
 }
 
+static inline void unimplemented(void)
+{
+#ifdef VERBOSE
+    dump_execution_state();
+#endif
+}
+
 static inline void show_execution_state(struct cpu_user_regs *regs)
 {
     show_registers(regs);
@@ -49,7 +56,6 @@ static inline void show_execution_state(struct cpu_user_regs *regs)
 extern void __warn(char *file, int line);
 #define WARN() __warn(__FILE__, __LINE__)
 #define WARN_ON(_p) do { if (_p) WARN(); } while ( 0 )
-#define unimplemented() WARN()
 
 #define FORCE_CRASH() debugger_trap_immediate()
 
