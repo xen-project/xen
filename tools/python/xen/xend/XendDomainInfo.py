@@ -1098,15 +1098,16 @@ class XendDomainInfo:
     ## public:
 
     def destroyDevice(self, deviceClass, devid):
-	if type(devid) is str:
-	    devicePath = '%s/device/%s' % (self.dompath, deviceClass)
-	    for entry in xstransact.List(devicePath):
-		backend = xstransact.Read('%s/%s' % (devicePath, entry), "backend")
-		devName = xstransact.Read(backend, "dev")
-		if devName == devid:
-		    # We found the integer matching our devid, use it instead
-		    devid = entry
-        	    break
+        if type(devid) is str:
+            devicePath = '%s/device/%s' % (self.dompath, deviceClass)
+            for entry in xstransact.List(devicePath):
+                backend = xstransact.Read('%s/%s' % (devicePath, entry),
+                                          "backend")
+                devName = xstransact.Read(backend, "dev")
+                if devName == devid:
+                    # We found the integer matching our devid, use it instead
+                    devid = entry
+                    break
         return self.getDeviceController(deviceClass).destroyDevice(devid)
 
 
