@@ -988,14 +988,18 @@ class XendDomainInfo:
                 this_time = time.strftime("%Y-%m%d-%H%M.%S", time.localtime())
                 corefile = "/var/xen/dump/%s-%s.%s.core" % (this_time,
                                   self.info['name'], self.domid)
+                
+            if os.path.isdir(corefile):
+                raise XendError("Cannot dump core in a directory: %s" %
+                                corefile)
+            
             xc.domain_dumpcore(self.domid, corefile)
-
-        except:
+        except RuntimeError, ex:
             corefile_incomp = corefile+'-incomplete'
             os.rename(corefile, corefile_incomp)
             log.exception("XendDomainInfo.dumpCore failed: id = %s name = %s",
                           self.domid, self.info['name'])
-
+            raise XendError("Failed to dump core: %s" %  str(ex))
 
     ## public:
 
