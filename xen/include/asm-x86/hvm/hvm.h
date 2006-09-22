@@ -57,6 +57,7 @@ struct hvm_function_table {
     int (*realmode)(struct vcpu *v);
     int (*paging_enabled)(struct vcpu *v);
     int (*long_mode_enabled)(struct vcpu *v);
+    int (*pae_enabled)(struct vcpu *v);
     int (*guest_x86_mode)(struct vcpu *v);
     int (*instruction_length)(struct vcpu *v);
     unsigned long (*get_guest_ctrl_reg)(struct vcpu *v, unsigned int num);
@@ -144,6 +145,12 @@ static inline int
 hvm_long_mode_enabled(struct vcpu *v)
 {
     return hvm_funcs.long_mode_enabled(v);
+}
+
+ static inline int
+hvm_pae_enabled(struct vcpu *v)
+{
+    return hvm_funcs.pae_enabled(v);
 }
 
 static inline int

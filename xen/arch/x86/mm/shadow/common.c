@@ -2343,7 +2343,7 @@ void sh_update_paging_modes(struct vcpu *v)
             }
             else
 #endif
-                if ( hvm_get_guest_ctrl_reg(v, 4) & X86_CR4_PAE )
+                if ( hvm_pae_enabled(v) )
                 {
 #if CONFIG_PAGING_LEVELS >= 3
                     // 32-bit PAE mode guest...
