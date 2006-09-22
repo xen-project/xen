@@ -271,7 +271,10 @@ static void pic_reset(void *opaque)
     s->rotate_on_auto_eoi = 0;
     s->special_fully_nested_mode = 0;
     s->init4 = 0;
-    s->elcr = 0;
+
+    /* Initialise to level triggered mode, since Linux assumes that in
+       a few places and it doesn't appear to break anything. */
+    s->elcr = 0xff & s->elcr_mask;
 }
 
 /* Caller must hold vpic lock */
