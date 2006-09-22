@@ -596,6 +596,8 @@ class XendDomainInfo:
             if self.info['memory'] == 0:
                 if self.infoIsSet('mem_kb'):
                     self.info['memory'] = (self.info['mem_kb'] + 1023) / 1024
+            if self.info['memory'] <= 0:
+                raise VmError('Invalid memory size')
 
             if self.info['maxmem'] < self.info['memory']:
                 self.info['maxmem'] = self.info['memory']
@@ -1001,6 +1003,9 @@ class XendDomainInfo:
         """Set the memory target of this domain.
         @param target In MiB.
         """
+        if target <= 0:
+            raise XendError('Invalid memory size')
+        
         log.debug("Setting memory target of domain %s (%d) to %d MiB.",
                   self.info['name'], self.domid, target)
         
