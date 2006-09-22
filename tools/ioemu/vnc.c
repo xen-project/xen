@@ -401,6 +401,9 @@ static void vnc_copy(DisplayState *ds, int src_x, int src_y, int dst_x, int dst_
 	(dst_y + h) > (vs->visible_y + vs->visible_h))
 	updating_client = 0;
 
+    if (updating_client)
+	_vnc_update_client(vs);
+
     if (dst_y > src_y) {
 	y = h - 1;
 	pitch = -pitch;
