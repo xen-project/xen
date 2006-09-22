@@ -24,6 +24,7 @@
 #include <xen/console.h>
 #include <xen/errno.h>
 #include <asm/delay.h>
+#include "scom.h"
 
 #define SPRN_SCOMC 276
 #define SPRN_SCOMD 277
@@ -48,7 +49,7 @@ union scomc {
 };
 
 
-static inline int read_scom(uint addr, ulong *d)
+int cpu_scom_read(uint addr, ulong *d)
 {
     union scomc c;
     ulong flags;
@@ -56,9 +57,9 @@ static inline int read_scom(uint addr, ulong *d)
     /* drop the low 8bits (including parity) */
     addr >>= 8;
 
-    /* these give iface errors because the address is ambiguous after
-     * the above bit dropping */
-    BUG_ON(addr == 0x8000);
+    /* these give iface errors because the addresses are not software
+     * accessible */
+    BUG_ON(addr & 0x8000);
 
     for (;;) {
         c.word = 0;
@@ -100,7 +101,7 @@ static inline int read_scom(uint addr, ulong *d)
     }
 }
 
-static inline int write_scom(uint addr, ulong d)
+int cpu_scom_write(uint addr, ulong d)
 {
     union scomc c;
     ulong flags;
@@ -108,9 +109,9 @@ static inline int write_scom(uint addr, ulong d)
     /* drop the low 8bits (including parity) */
     addr >>= 8;
 
-    /* these give iface errors because the address is ambiguous after
-     * the above bit dropping */
-    BUG_ON(addr == 0x8000);
+    /* these give iface errors because the addresses are not software
+     * accessible */
+    BUG_ON(addr & 0x8000);
 
     for (;;) {
         c.word = 0;
@@ -150,25 +151,21 @@ static inline int write_scom(uint addr, ulong d)
     }
 }
 
-/* SCOMC addresses are 16bit but we are given 24 bits in the
- * books. The low oerder 8 bits are some kinda parity thin and should
- * be ignored */
-#define SCOM_AMCS_REG      0x022601
-#define SCOM_AMCS_AND_MASK 0x022700
-#define SCOM_AMCS_OR_MASK  0x022800
-#define SCOM_CMCE          0x030901
-#define SCOM_PMCR          0x400801
-#define SCOM_PTSR          0x408001
-
-/* cannot access these since only top 16bits are considered */
-#define SCOM_STATUS        0x800003
-
 void cpu_scom_init(void)
 {
     ulong val;
     console_start_sync();
-    if (!read_scom(SCOM_PTSR, &val))
+    if (!cpu_scom_read(SCOM_PTSR, &val))
         printk("SCOM PTSR: 0x%016lx\n", val);
 
     console_end_sync();
 }
+
+void cpu_scom_AMCR(void)
+{
+    ulong val;
+
+    cpu_scom_read(SCOM_AMC_REG, &val);
+    printk("SCOM AMCR: 0x%016lx\n", val);
+}
+
