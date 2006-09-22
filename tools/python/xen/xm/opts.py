@@ -24,6 +24,46 @@ import os.path
 import sys
 import types
 
+def wrap(text, width = 70):
+    """ Really basic textwrap. Useful because textwrap is not available
+    for Python 2.2, and textwrap.wrap ignores newlines in Python 2.3+.
+    """
+    import string
+    
+    if len(text) < width:
+        return [text]
+    
+    lines = []
+    for line in text.split('\n'):
+        line = line.strip()
+        if len(line) < width:
+            lines.append(line)
+            continue
+        
+        pos = 0
+        while pos <= len(line):
+            wline = line[pos:pos+width].strip()
+            if len(wline) < 2:
+                break
+            
+            if wline[-1] in tuple(string.punctuation):
+                pos += width
+            else:
+                lastword = wline.split()[-1]
+                wline = wline[:-len(lastword)]
+                pos += width - len(lastword)
+            lines.append(wline)
+                
+    return lines
+
+class OptionError(Exception):
+    """Denotes an error in option parsing."""
+    def __init__(self, message, usage = ''):
+        self.message = message
+        self.usage = usage
+    def __str__(self):
+        return self.message
+
 class Opt:
     """An individual option.
     """
@@ -72,7 +112,21 @@ class Opt:
     def __repr__(self):
         return self.name + '=' + str(self.specified_val)
 
-    __str__ = __repr__
+    def __str__(self):
+        """ Formats the option into:
+        '-k, --key     description'
+        """
+        PARAM_WIDTH = 20
+        if self.val:
+            keys = ', '.join(['%s=%s' % (k, self.val) for k in self.optkeys])
+        else:
+            keys = ', '.join(self.optkeys)
+        desc = wrap(self.use, 55)
+        if len(keys) > PARAM_WIDTH:
+            desc = [''] + desc
+            
+        wrapped = ('\n' + ' ' * (PARAM_WIDTH + 1)).join(desc)
+        return keys.ljust(PARAM_WIDTH + 1) + wrapped
 
     def set(self, value):
         """Set the option value.
@@ -243,7 +297,19 @@ class Opts:
     def __repr__(self):
         return '\n'.join(map(str, self.options))
 
-    __str__ = __repr__
+    def __str__(self):
+        options = [s for s in self.options if s.optkeys[0][0] == '-']
+        optvals = [s for s in self.options if s.optkeys[0][0] != '-']
+        output = ''
+        if options:
+            output += '\nOptions:\n\n'
+            output += '\n'.join([str(o) for o in options])
+            output += '\n'
+        if optvals:
+            output += '\nValues:\n\n'
+            output += '\n'.join([str(o) for o in optvals])
+            output += '\n'
+        return output
 
     def opt(self, name, **args):
         """Add an option.
@@ -338,14 +404,14 @@ class Opts:
                                               self.short_opts(),
                                               self.long_opts())
             except getopt.GetoptError, err:
-                self.err(str(err))
+                raise OptionError(str(err), self.use)
+            #self.err(str(err))
                 
             for (k, v) in xvals:
                 for opt in self.options:
                     if opt.specify(k, v): break
                 else:
-                    print >>sys.stderr, "Error: Unknown option:", k
-                    self.usage()
+                    raise OptionError('Unknown option: %s' % k, self.use)
 
             if not args:
                 break
@@ -390,10 +456,10 @@ class Opts:
     def usage(self):
         print 'Usage: ', self.argv[0], self.use or 'OPTIONS'
         print
-        for opt in self.options:
-            opt.show()
-            print
         if self.options:
+            for opt in self.options:
+                opt.show()
+                print
             print
 
     def var_usage(self):
@@ -427,7 +493,9 @@ class Opts:
                 self.load(p, help)
                 break
         else:
-            self.err('Cannot open config file "%s"' % self.vals.defconfig)
+            raise OptionError('Unable to open config file: %s' % \
+                              self.vals.defconfig,
+                              self.use)
 
     def load(self, defconfig, help):
         """Load a defconfig file. Local variables in the file
@@ -478,9 +546,9 @@ def set_false(opt, k, v):
 def set_bool(opt, k, v):
     """Set a boolean option.
     """
-    if v in ['yes']:
+    if v in ('yes', 'y'):
         opt.set(1)
-    elif v in ['no']:
+    elif v in ('no', 'n'):
         opt.set(0)
     else:
         opt.opts.err('Invalid value:' +v)

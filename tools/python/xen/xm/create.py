@@ -25,7 +25,6 @@ import sys
 import socket
 import re
 import xmlrpclib
-import traceback
 
 from xen.xend import sxp
 from xen.xend import PrettyPrint
@@ -65,35 +64,36 @@ gopts.opt('quiet', short='q',
 
 gopts.opt('path', val='PATH',
           fn=set_value, default='.:/etc/xen',
-          use="""Search path for configuration scripts.
-         The value of PATH is a colon-separated directory list.""")
+          use="Search path for configuration scripts. "
+          "The value of PATH is a colon-separated directory list.")
 
 gopts.opt('defconfig', short='f', val='FILE',
           fn=set_value, default='xmdefconfig',
-          use="""Use the given Python configuration script.
-          The configuration script is loaded after arguments have been processed.
-          Each command-line option sets a configuration variable named after
-          its long option name, and these variables are placed in the
-          environment of the script before it is loaded.
-          Variables for options that may be repeated have list values.
-          Other variables can be set using VAR=VAL on the command line.
-        
-          After the script is loaded, option values that were not set on the
-          command line are replaced by the values set in the script.""")
+          use="Use the given Python configuration script."
+          "The configuration script is loaded after arguments have been "
+          "processed. Each command-line option sets a configuration "
+          "variable named after its long option name, and these "
+          "variables are placed in the environment of the script before "
+          "it is loaded. Variables for options that may be repeated have "
+          "list values. Other variables can be set using VAR=VAL on the "
+          "command line. "     
+          "After the script is loaded, option values that were not set "
+          "on the command line are replaced by the values set in the script.")
 
 gopts.default('defconfig')
 
 gopts.opt('config', short='F', val='FILE',
           fn=set_value, default=None,
-          use="""Domain configuration to use (SXP).
-          SXP is the underlying configuration format used by Xen.
-          SXP configurations can be hand-written or generated from Python configuration
-          scripts, using the -n (dryrun) option to print the configuration.""")
+          use="Domain configuration to use (SXP).\n"
+          "SXP is the underlying configuration format used by Xen.\n"
+          "SXP configurations can be hand-written or generated from Python "
+          "configuration scripts, using the -n (dryrun) option to print\n"
+          "the configuration.")
 
 gopts.opt('dryrun', short='n',
           fn=set_true, default=0,
-          use="""Dry run - print the configuration but don't create the domain.
-          Loads the configuration script, creates the SXP configuration and prints it.""")
+          use="Dry run - prints the resulting configuration in SXP but "
+          "does not create the domain.")
 
 gopts.opt('paused', short='p',
           fn=set_true, default=0,
@@ -105,18 +105,16 @@ gopts.opt('console_autoconnect', short='c',
 
 gopts.var('vncviewer', val='no|yes',
           fn=set_bool, default=None,
-          use="""Spawn a vncviewer listening for a vnc server in the domain.
-          The address of the vncviewer is passed to the domain on the kernel command
-          line using 'VNC_SERVER=<host>:<port>'. The port used by vnc is 5500 + DISPLAY.
-          A display value with a free port is chosen if possible.
-          Only valid when vnc=1.
-          """)
+           use="Spawn a vncviewer listening for a vnc server in the domain.\n"
+           "The address of the vncviewer is passed to the domain on the "
+           "kernel command line using 'VNC_SERVER=<host>:<port>'. The port "
+           "used by vnc is 5500 + DISPLAY. A display value with a free port "
+           "is chosen if possible.\nOnly valid when vnc=1.")
 
 gopts.var('vncconsole', val='no|yes',
           fn=set_bool, default=None,
-          use="""Spawn a vncviewer process for the domain's graphical console.
-          Only valid when vnc=1.
-          """)
+          use="Spawn a vncviewer process for the domain's graphical console.\n"
+          "Only valid when vnc=1.")
 
 gopts.var('name', val='NAME',
           fn=set_value, default=None,
@@ -440,7 +438,6 @@ gopts.var('uuid', val='',
           addresses for virtual network interfaces.  This must be a unique 
           value across the entire cluster.""")
 
-
 def err(msg):
     """Print an error to stderr and exit.
     """
@@ -490,7 +487,6 @@ def configure_disks(config_devs, vals):
     """Create the config for disks (virtual block devices).
     """
     for (uname, dev, mode, backend) in vals.disk:
-
         if uname.startswith('tap:'):
             cls = 'tap'
         else:
@@ -851,7 +847,6 @@ def choose_vnc_display():
         if port in ports: continue
         return d
     return None
-
 vncpid = None
 
 def daemonize(prog, args):
@@ -885,7 +880,6 @@ def daemonize(prog, args):
             w.write(str(pid2 or 0))
             w.close()
             os._exit(0)
-
     os.close(w)
     r = os.fdopen(r)
     daemon_pid = int(r.read())
@@ -904,6 +898,7 @@ def spawn_vnc(display):
     vncpid = daemonize("vncviewer", vncargs)
     if vncpid == 0:
         return 0
+
     return VNC_BASE_PORT + display
 
 def preprocess_vnc(vals):
@@ -1091,7 +1086,6 @@ def check_domain_label(config, verbose):
 
     return answer
 
-
 def config_security_check(config, verbose):
     """Checks each resource listed in the config to see if the active
        policy will permit creation of a new domain using the config.
@@ -1145,7 +1139,6 @@ def config_security_check(config, verbose):
 
     return answer
 
-
 def create_security_check(config):
     passed = 0
     try:
@@ -1158,7 +1151,9 @@ def create_security_check(config):
         sys.exit(-1)
 
     return passed
-
+  
+def help():
+    return str(gopts)
 
 def main(argv):
     try:
@@ -1176,11 +1171,11 @@ def main(argv):
         PrettyPrint.prettyprint(config)
     else:
         if not create_security_check(config):
-            err("Security configuration prevents domain from starting.")
+            raise OptionError('Security Configuration prevents domain from starting')
         else:
             dom = make_domain(opts, config)
             if opts.vals.console_autoconnect:
-                console.execConsole(dom)
-        
+                console.execConsole(dom)        
+             
 if __name__ == '__main__':
     main(sys.argv)

@@ -21,15 +21,17 @@
 import sys, os, re
 from xen.util import dictio
 from xen.util import security
+from xen.xm.opts import OptionError
 
-def usage():
-    print "\nUsage: xm rmlabel dom <configfile>"
-    print "       xm rmlabel res <resource>\n"
-    print "  This program removes an acm_label entry from the 'configfile'"
-    print "  for a domain or from the global resource label file for a"
-    print "  resource. If the label does not exist for the given domain or"
-    print "  resource, then rmlabel fails.\n"
-    security.err("Usage")
+def help():
+    return """
+    Example: xm rmlabel dom <configfile>
+             xm rmlabel res <resource>
+
+    This program removes an acm_label entry from the 'configfile'
+    for a domain or from the global resource label file for a
+    resource. If the label does not exist for the given domain or
+    resource, then rmlabel fails."""
 
 
 def rm_resource_label(resource):
@@ -93,22 +95,22 @@ def rm_domain_label(configfile):
 
 
 def main (argv):
-    try:
-        if len(argv) != 3:
-            usage()
 
+    if len(argv) != 3:
+        raise OptionError('Requires 2 arguments')
+    
+    if argv[1].lower() not in ('dom', 'res'):
+        raise OptionError('Unrecognised type argument: %s' % argv[1])
+
+    try:
         if argv[1].lower() == "dom":
             configfile = argv[2]
             rm_domain_label(configfile)
         elif argv[1].lower() == "res":
             resource = argv[2]
             rm_resource_label(resource)
-        else:
-            usage()
-
     except security.ACMError:
         sys.exit(-1)
-
 
 if __name__ == '__main__':
     main(sys.argv)

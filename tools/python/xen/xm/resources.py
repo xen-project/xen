@@ -21,13 +21,12 @@
 import sys
 from xen.util import dictio
 from xen.util import security
+from xen.xm.opts import OptionError
 
-def usage():
-    print "\nUsage: xm resource\n"
-    print "  This program lists information for each resource in the"
-    print "  global resource label file\n"
-    security.err("Usage")
-
+def help():
+    return """Usage: xm resource
+    This program lists information for each resource in the
+    global resource label file."""
 
 def print_resource_data(access_control):
     """Prints out a resource dictionary to stdout
@@ -38,11 +37,16 @@ def print_resource_data(access_control):
         print "    policy: "+policy
         print "    label:  "+label
 
-
 def main (argv):
+    if len(argv) > 1:
+        raise OptionError("No arguments required")
+    
     try:
-        if len(argv) != 1:
-            usage()
+        filename = security.res_label_filename
+        access_control = dictio.dict_read("resources", filename)
+    except:
+        print "Resource file not found."
+        return
 
         try:
             file = security.res_label_filename
@@ -51,9 +55,6 @@ def main (argv):
             security.err("Error reading resource file.")
 
         print_resource_data(access_control)
-
-    except security.ACMError:
-        sys.exit(-1)
 
 if __name__ == '__main__':
     main(sys.argv)

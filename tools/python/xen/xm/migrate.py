@@ -46,19 +46,17 @@ gopts.opt('resource', short='r', val='MBIT',
           fn=set_int, default=0,
           use="Set level of resource usage for migration.")
 
-def help(argv):
-    gopts.argv = argv
-    gopts.usage()
+def help():
+    return str(gopts)
     
 def main(argv):
     opts = gopts
     args = opts.parse(argv)
-    if opts.vals.help:
-        opts.usage()
-        return
+    
     if len(args) != 2:
-        opts.usage()
-        sys.exit(1)
+        raise OptionError('Invalid number of arguments')
+
     dom = args[0]
     dst = args[1]
-    server.xend.domain.migrate(dom, dst, opts.vals.live, opts.vals.resource, opts.vals.port)
+    server.xend.domain.migrate(dom, dst, opts.vals.live, opts.vals.resource,
+                               opts.vals.port)
