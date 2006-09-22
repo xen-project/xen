@@ -181,9 +181,6 @@ void init_frametable(void);
 int alloc_page_type(struct page_info *page, unsigned long type);
 void free_page_type(struct page_info *page, unsigned long type);
 extern void invalidate_shadow_ldt(struct vcpu *d);
-extern int shadow_remove_all_write_access(
-    struct domain *d, unsigned long gmfn, unsigned long mfn);
-extern u32 shadow_remove_all_access( struct domain *d, unsigned long gmfn);
 extern int _shadow_mode_refcounts(struct domain *d);
 
 static inline void put_page(struct page_info *page)

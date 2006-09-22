@@ -596,6 +596,8 @@ class XendDomainInfo:
             if self.info['memory'] == 0:
                 if self.infoIsSet('mem_kb'):
                     self.info['memory'] = (self.info['mem_kb'] + 1023) / 1024
+            if self.info['memory'] <= 0:
+                raise VmError('Invalid memory size')
 
             if self.info['maxmem'] < self.info['memory']:
                 self.info['maxmem'] = self.info['memory']
@@ -986,14 +988,18 @@ class XendDomainInfo:
                 this_time = time.strftime("%Y-%m%d-%H%M.%S", time.localtime())
                 corefile = "/var/xen/dump/%s-%s.%s.core" % (this_time,
                                   self.info['name'], self.domid)
+                
+            if os.path.isdir(corefile):
+                raise XendError("Cannot dump core in a directory: %s" %
+                                corefile)
+            
             xc.domain_dumpcore(self.domid, corefile)
-
-        except:
+        except RuntimeError, ex:
             corefile_incomp = corefile+'-incomplete'
             os.rename(corefile, corefile_incomp)
             log.exception("XendDomainInfo.dumpCore failed: id = %s name = %s",
                           self.domid, self.info['name'])
-
+            raise XendError("Failed to dump core: %s" %  str(ex))
 
     ## public:
 
@@ -1001,6 +1007,9 @@ class XendDomainInfo:
         """Set the memory target of this domain.
         @param target In MiB.
         """
+        if target <= 0:
+            raise XendError('Invalid memory size')
+        
         log.debug("Setting memory target of domain %s (%d) to %d MiB.",
                   self.info['name'], self.domid, target)
         
@@ -1093,15 +1102,16 @@ class XendDomainInfo:
     ## public:
 
     def destroyDevice(self, deviceClass, devid):
-	if type(devid) is str:
-	    devicePath = '%s/device/%s' % (self.dompath, deviceClass)
-	    for entry in xstransact.List(devicePath):
-		backend = xstransact.Read('%s/%s' % (devicePath, entry), "backend")
-		devName = xstransact.Read(backend, "dev")
-		if devName == devid:
-		    # We found the integer matching our devid, use it instead
-		    devid = entry
-        	    break
+        if type(devid) is str:
+            devicePath = '%s/device/%s' % (self.dompath, deviceClass)
+            for entry in xstransact.List(devicePath):
+                backend = xstransact.Read('%s/%s' % (devicePath, entry),
+                                          "backend")
+                devName = xstransact.Read(backend, "dev")
+                if devName == devid:
+                    # We found the integer matching our devid, use it instead
+                    devid = entry
+                    break
         return self.getDeviceController(deviceClass).destroyDevice(devid)
 
 

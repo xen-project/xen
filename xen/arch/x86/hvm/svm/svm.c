@@ -259,6 +259,17 @@ static int svm_paging_enabled(struct vcpu *v)
     return (cr0 & X86_CR0_PE) && (cr0 & X86_CR0_PG);
 }
 
+static int svm_pae_enabled(struct vcpu *v)
+{
+    unsigned long cr4;
+
+    if(!svm_paging_enabled(v))
+        return 0;
+
+    cr4 = v->arch.hvm_svm.cpu_shadow_cr4;
+
+    return (cr4 & X86_CR4_PAE);
+}
 
 #define IS_CANO_ADDRESS(add) 1
 
@@ -865,6 +876,7 @@ int start_svm(void)
     hvm_funcs.realmode = svm_realmode;
     hvm_funcs.paging_enabled = svm_paging_enabled;
     hvm_funcs.long_mode_enabled = svm_long_mode_enabled;
+    hvm_funcs.pae_enabled = svm_pae_enabled;
     hvm_funcs.guest_x86_mode = svm_guest_x86_mode;
     hvm_funcs.instruction_length = svm_instruction_length;
     hvm_funcs.get_guest_ctrl_reg = svm_get_ctrl_reg;
@@ -1847,12 +1859,12 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
        where the prefix lives later on */
     index = skip_prefix_bytes(buffer, sizeof(buffer));
     
-    if (type == TYPE_MOV_TO_CR) 
+    if ( type == TYPE_MOV_TO_CR )
     {
         inst_len = __get_instruction_length_from_list(
             vmcb, list_a, ARR_SIZE(list_a), &buffer[index], &match);
     }
-    else
+    else /* type == TYPE_MOV_FROM_CR */
     {
         inst_len = __get_instruction_length_from_list(
             vmcb, list_b, ARR_SIZE(list_b), &buffer[index], &match);

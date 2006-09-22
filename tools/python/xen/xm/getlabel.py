@@ -21,13 +21,13 @@
 import sys, os, re
 from xen.util import dictio
 from xen.util import security
+from xen.xm.opts import OptionError
 
-def usage():
-    print "\nUsage: xm getlabel dom <configfile>"
-    print "       xm getlabel res <resource>\n"
-    print "  This program shows the label for a domain or resource.\n"
-    security.err("Usage")
-
+def help():
+    return """
+    Usage: xm getlabel dom <configfile>"
+           xm getlabel res <resource>\n"
+    This program shows the label for a domain or resource."""
 
 def get_resource_label(resource):
     """Gets the resource label
@@ -90,21 +90,17 @@ def get_domain_label(configfile):
 
 
 def main (argv):
-    try:
-        if len(argv) != 3:
-            usage()
+    if len(argv) != 3:
+        raise OptionError('Requires 2 arguments')
 
-        if argv[1].lower() == "dom":
-            configfile = argv[2]
-            get_domain_label(configfile)
-        elif argv[1].lower() == "res":
-            resource = argv[2]
-            get_resource_label(resource)
-        else:
-            usage()
-
-    except security.ACMError:
-        sys.exit(-1)
+    if argv[1].lower() == "dom":
+        configfile = argv[2]
+        get_domain_label(configfile)
+    elif argv[1].lower() == "res":
+        resource = argv[2]
+        get_resource_label(resource)
+    else:
+        raise OptionError('First subcommand argument must be "dom" or "res"')
 
 if __name__ == '__main__':
     main(sys.argv)

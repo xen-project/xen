@@ -21,12 +21,10 @@ import sys
 from xen.util.security import ACMError, err, dump_policy
 
 
-def usage():
-    print "\nUsage: xm dumppolicy\n"
-    print " Retrieve and print currently enforced"
-    print " hypervisor policy information (low-level).\n"
-    err("Usage")
-
+def help():
+    return """
+    Retrieve and print currently enforced hypervisor policy information
+    (low-level)."""
 
 def main(argv):
     try:
@@ -34,7 +32,6 @@ def main(argv):
             usage()
 
         dump_policy()
-
     except ACMError:
         sys.exit(-1)
 
