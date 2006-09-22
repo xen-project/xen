@@ -469,7 +469,7 @@ static inline void __vmx_inject_exception(struct vcpu *v, int trap, int type,
     if ( error_code != VMX_DELIVER_NO_ERROR_CODE ) {
         __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
         intr_fields |= INTR_INFO_DELIVER_CODE_MASK;
-     }
+    }
 
     if ( ilen )
       __vmwrite(VM_ENTRY_INSTRUCTION_LEN, ilen);
@@ -497,42 +497,6 @@ static inline void vmx_inject_extint(struct vcpu *v, int trap, int error_code)
 {
     __vmx_inject_exception(v, trap, INTR_TYPE_EXT_INTR, error_code, 0);
     __vmwrite(GUEST_INTERRUPTIBILITY_INFO, 0);
-}
-
-static inline void vmx_reflect_exception(struct vcpu *v)
-{
-    int error_code, intr_info, vector;
-
-    __vmread(VM_EXIT_INTR_INFO, &intr_info);
-    vector = intr_info & 0xff;
-    if ( intr_info & INTR_INFO_DELIVER_CODE_MASK )
-        __vmread(VM_EXIT_INTR_ERROR_CODE, &error_code);
-    else
-        error_code = VMX_DELIVER_NO_ERROR_CODE;
-
-#ifndef NDEBUG
-    {
-        unsigned long rip;
-
-        __vmread(GUEST_RIP, &rip);
-        HVM_DBG_LOG(DBG_LEVEL_1, "rip = %lx, error_code = %x",
-                    rip, error_code);
-    }
-#endif /* NDEBUG */
-
-    /* According to Intel Virtualization Technology Specification for
-       the IA-32 Intel Architecture (C97063-002 April 2005), section
-       2.8.3, SW_EXCEPTION should be used for #BP and #OV, and
-       HW_EXCPEPTION used for everything else.  The main difference
-       appears to be that for SW_EXCEPTION, the EIP/RIP is incremented
-       by VM_ENTER_INSTRUCTION_LEN bytes, whereas for HW_EXCEPTION,
-       it is not.  */
-    if ( (intr_info & INTR_INFO_INTR_TYPE_MASK) == INTR_TYPE_SW_EXCEPTION ) {
-        int ilen;
-        __vmread(VM_EXIT_INSTRUCTION_LEN, &ilen);
-        vmx_inject_sw_exception(v, vector, ilen);
-    } else
-        vmx_inject_hw_exception(v, vector, error_code);
 }
 
 #endif /* __ASM_X86_HVM_VMX_VMX_H__ */
