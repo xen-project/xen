@@ -1010,6 +1010,12 @@ def xm_uptime(args):
 
         print upstring
 
+def xm_sysrq(args):
+    arg_check(args, "sysrq", 2)
+    dom = args[0]
+    req = args[1]
+    server.xend.domain.send_sysrq(dom, req)    
+
 def xm_top(args):
     arg_check(args, "top", 0)
 
@@ -1318,6 +1324,7 @@ commands = {
     "restore": xm_restore,
     "save": xm_save,
     "shutdown": xm_shutdown,
+    "sysrq": xm_sysrq,
     "uptime": xm_uptime,
     "list": xm_list,
     # memory commands
@@ -1359,7 +1366,6 @@ commands = {
 IMPORTED_COMMANDS = [
     'create',
     'migrate',
-    'sysrq',
     'labels',
     'addlabel',
     'cfgbootpolicy',
