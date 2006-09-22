@@ -1137,6 +1137,8 @@ static int protocol_client_init(VncState *vs, char *data, size_t len)
     size_t l;
     char pad[3] = { 0, 0, 0 };
 
+    vga_hw_update();
+
     vs->width = vs->ds->width;
     vs->height = vs->ds->height;
     vnc_write_u16(vs, vs->ds->width);
