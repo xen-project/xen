@@ -418,6 +418,12 @@ static inline int vmx_long_mode_enabled(struct vcpu *v)
     return VMX_LONG_GUEST(current);
 }
 
+static inline int vmx_pae_enabled(struct vcpu *v)
+{
+    ASSERT(v == current);
+    return VMX_PAE_GUEST(current);
+}
+
 /* Works only for vcpu == current */
 static inline int vmx_realmode(struct vcpu *v)
 {

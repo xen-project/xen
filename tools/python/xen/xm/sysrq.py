@@ -19,14 +19,12 @@ gopts.opt('help', short='h',
 def main(argv):
     opts = gopts
     args = opts.parse(argv)
-    if opts.vals.help:
-        opts.usage()
-        return
-        
-    # no options for the moment
-    if len(args) != 2:
-        opts.usage()
-        sys.exit(1)
+
+    if len(args) < 1:
+        raise OptionError('Missing domain argument')
+    if len(args) < 2:
+        raise OptionError('Missing sysrq character')
+
     dom = args[0]
     req = ord(args[1][0])
     server.xend.domain.send_sysrq(dom, req)

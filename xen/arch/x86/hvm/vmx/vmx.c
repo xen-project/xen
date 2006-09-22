@@ -746,6 +746,7 @@ static void vmx_setup_hvm_funcs(void)
     hvm_funcs.realmode = vmx_realmode;
     hvm_funcs.paging_enabled = vmx_paging_enabled;
     hvm_funcs.long_mode_enabled = vmx_long_mode_enabled;
+    hvm_funcs.pae_enabled = vmx_pae_enabled;
     hvm_funcs.guest_x86_mode = vmx_guest_x86_mode;
     hvm_funcs.instruction_length = vmx_instruction_length;
     hvm_funcs.get_guest_ctrl_reg = vmx_get_ctrl_reg;

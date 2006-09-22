@@ -19,19 +19,23 @@
 
 """Labeling a domain configuration file or a resoruce.
 """
-import sys, os
+import os
+import sys
+
 from xen.util import dictio
 from xen.util import security
+from xen.xm.opts import OptionError
 
-def usage():
-    print "\nUsage: xm addlabel <label> dom <configfile> [<policy>]"
-    print "       xm addlabel <label> res <resource> [<policy>]\n"
-    print "  This program adds an acm_label entry into the 'configfile'"
-    print "  for a domain or to the global resource label file for a"
-    print "  resource. It derives the policy from the running hypervisor"
-    print "  if it is not given (optional parameter). If a label already"
-    print "  exists for the given domain or resource, then addlabel fails.\n"
-    security.err("Usage")
+def help():
+    return """
+    Format: xm addlabel <label> dom <configfile> [<policy>]
+            xm addlabel <label> res <resource> [<policy>]
+    
+    This program adds an acm_label entry into the 'configfile'
+    for a domain or to the global resource label file for a
+    resource. It derives the policy from the running hypervisor
+    if it is not given (optional parameter). If a label already
+    exists for the given domain or resource, then addlabel fails."""
 
 
 def validate_config_file(configfile):
@@ -114,9 +118,8 @@ def add_domain_label(label, configfile, policyref):
 def main (argv):
     try:
         policyref = None
-        if len(argv) not in [4,5]:
-            usage()
-            return
+        if len(argv) not in (4, 5):
+            raise OptionError('Needs either 2 or 3 arguments')
 
         label = argv[1]
 
@@ -135,20 +138,20 @@ def main (argv):
                     if os.path.isfile(configfile):
                         break
             if not validate_config_file(configfile):
-                usage()
+                raise OptionError('Invalid config file')
             else:
                 add_domain_label(label, configfile, policyref)
         elif argv[2].lower() == "res":
             resource = argv[3]
             add_resource_label(label, resource, policyref)
         else:
-            usage()
-
+            raise OptionError('Need to specify either "dom" or "res" as object to add label to.')
+            
     except security.ACMError:
         sys.exit(-1)
 
-
 if __name__ == '__main__':
     main(sys.argv)
+    
 
 

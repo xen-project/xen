@@ -36,6 +36,7 @@
 #define CR4_VME		(1 << 0)
 #define CR4_PVI		(1 << 1)
 #define CR4_PSE		(1 << 4)
+#define CR4_PAE		(1 << 5)
 
 #define EFLAGS_ZF	(1 << 6)
 #define EFLAGS_TF	(1 << 8)

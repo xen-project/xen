@@ -39,6 +39,9 @@ enum {
 #define VMX_LONG_GUEST(ed)    \
   (test_bit(VMX_CPU_STATE_LMA_ENABLED, &ed->arch.hvm_vmx.cpu_state))
 
+#define VMX_PAE_GUEST(ed)       \
+  (test_bit(VMX_CPU_STATE_PAE_ENABLED, &ed->arch.hvm_vmx.cpu_state))
+
 struct vmcs_struct {
     u32 vmcs_revision_id;
     unsigned char data [0]; /* vmcs size is read from MSR */
