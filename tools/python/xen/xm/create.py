@@ -56,7 +56,8 @@ gopts.opt('help', short='h',
 
 gopts.opt('help_config',
           fn=set_true, default=0,
-          use="Print help for the configuration script.")
+          use="Print the available configuration variables (vars) for the "
+          "configuration script.")
 
 gopts.opt('quiet', short='q',
           fn=set_true, default=0,
@@ -87,7 +88,7 @@ gopts.opt('config', short='F', val='FILE',
           use="Domain configuration to use (SXP).\n"
           "SXP is the underlying configuration format used by Xen.\n"
           "SXP configurations can be hand-written or generated from Python "
-          "configuration scripts, using the -n (dryrun) option to print\n"
+          "configuration scripts, using the -n (dryrun) option to print "
           "the configuration.")
 
 gopts.opt('dryrun', short='n',
@@ -1014,11 +1015,10 @@ def get_xauthority():
 def parseCommandLine(argv):
     gopts.reset()
     args = gopts.parse(argv)
-    if gopts.vals.help:
-        gopts.usage()
+
     if gopts.vals.help or gopts.vals.help_config:
-        gopts.load_defconfig(help=1)
-    if gopts.vals.help or gopts.vals.help_config:
+        if gopts.vals.help_config:
+            print gopts.val_usage()
         return (None, None)
 
     if not gopts.vals.display:

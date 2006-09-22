@@ -24,36 +24,32 @@ import os.path
 import sys
 import types
 
+def _line_wrap(text, width = 70):
+    lines = []
+    current_line = ''
+    words = text.strip().split()
+    while words:
+        word = words.pop(0)
+        if len(current_line) + len(word) + 1 < width:
+            current_line += word + ' '
+        else:
+            lines.append(current_line.strip())
+            current_line = word + ' '
+            
+    if current_line:
+        lines.append(current_line.strip())
+    return lines
+
 def wrap(text, width = 70):
     """ Really basic textwrap. Useful because textwrap is not available
     for Python 2.2, and textwrap.wrap ignores newlines in Python 2.3+.
     """
-    import string
-    
     if len(text) < width:
         return [text]
     
     lines = []
     for line in text.split('\n'):
-        line = line.strip()
-        if len(line) < width:
-            lines.append(line)
-            continue
-        
-        pos = 0
-        while pos <= len(line):
-            wline = line[pos:pos+width].strip()
-            if len(wline) < 2:
-                break
-            
-            if wline[-1] in tuple(string.punctuation):
-                pos += width
-            else:
-                lastword = wline.split()[-1]
-                wline = wline[:-len(lastword)]
-                pos += width - len(lastword)
-            lines.append(wline)
-                
+        lines += _line_wrap(line, width)
     return lines
 
 class OptionError(Exception):
@@ -299,18 +295,22 @@ class Opts:
 
     def __str__(self):
         options = [s for s in self.options if s.optkeys[0][0] == '-']
-        optvals = [s for s in self.options if s.optkeys[0][0] != '-']
         output = ''
         if options:
             output += '\nOptions:\n\n'
             output += '\n'.join([str(o) for o in options])
             output += '\n'
+        return output
+
+    def val_usage(self):
+        optvals = [s for s in self.options if s.optkeys[0][0] != '-']
+        output = ''
         if optvals:
             output += '\nValues:\n\n'
             output += '\n'.join([str(o) for o in optvals])
             output += '\n'
         return output
-
+    
     def opt(self, name, **args):
         """Add an option.
 
