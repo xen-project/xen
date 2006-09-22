@@ -32,8 +32,9 @@ def help():
     individually along with the final security decision."""
 
 def main (argv):
-    if len(argv) != 2:
-        raise OptionError('Invalid number of arguments')
+    try:
+        if len(argv) != 2:
+            raise OptionError('Invalid number of arguments')
 
         passed = 0
         (opts, config) = create.parseCommandLine(argv)
@@ -42,7 +43,7 @@ def main (argv):
                 passed = 1
         else:
             print "Checking resources: (skipped)"
-
+                
         if passed:
             print "Dry Run: PASSED"
         else:
