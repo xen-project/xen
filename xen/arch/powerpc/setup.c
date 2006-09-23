@@ -87,9 +87,6 @@ struct ns16550_defaults ns16550;
 
 extern char __per_cpu_start[], __per_cpu_data_end[], __per_cpu_end[];
 
-/* move us to a header file */
-extern void initialize_keytable(void);
-
 volatile struct processor_area * volatile global_cpu_table[NR_CPUS];
 
 int is_kernel_text(unsigned long addr)
