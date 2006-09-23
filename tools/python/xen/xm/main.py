@@ -701,22 +701,21 @@ def xm_unpause(args):
     server.xend.domain.unpause(dom)
 
 def xm_dump_core(args):
-    arg_check(args, "dump-core",1,3)
     live = False
     crash = False
-    import getopt
-    (options, params) = getopt.gnu_getopt(args, 'LC', ['live','crash'])
+    try:
+        (options, params) = getopt.gnu_getopt(args, 'LC', ['live','crash'])
+        for (k, v) in options:
+            if k in ('-L', '--live'):
+                live = True
+            if k in ('-C', '--crash'):
+                crash = True
 
-    for (k, v) in options:
-        if k in ['-L', '--live']:
-            live = True
-        if k in ['-C', '--crash']:
-            crash = True
-
-    if len(params) == 0 or len(params) > 2:
-        err("invalid number of parameters")
-        usage("dump-core")
-
+        if len(params) not in (1, 2):
+            raise OptionError("Expects 1 or 2 argument(s)")
+    except getopt.GetoptError, e:
+        raise OptionError(str(e))
+    
     dom = params[0]
     if len(params) == 2:
         filename = os.path.abspath(params[1])
@@ -727,14 +726,14 @@ def xm_dump_core(args):
         server.xend.domain.pause(dom)
 
     try:
-        print "dumping core of domain:%s ..." % str(dom)
+        print "Dumping core of domain: %s ..." % str(dom)
         server.xend.domain.dump(dom, filename, live, crash)
     finally:
         if not live:
             server.xend.domain.unpause(dom)
 
     if crash:
-        print "destroying domain:%s ..." % str(dom)
+        print "Destroying domain: %s ..." % str(dom)
         server.xend.domain.destroy(dom)
 
 def xm_rename(args):
