@@ -946,9 +946,11 @@ void vlapic_post_injection(struct vcpu *v, int vector, int deliver_mode)
 
         if ( vector == vlapic_lvt_vector(vlapic, APIC_LVTT) )
         {
-            vlapic->intr_pending_count[vector]--;
             if ( vlapic->intr_pending_count[vector] > 0 )
+            {
+                vlapic->intr_pending_count[vector]--;
                 vlapic_test_and_set_vector(vector, vlapic->regs + APIC_IRR);
+            }
         }
         break;
 
