@@ -128,9 +128,27 @@ static void etherip_tunnel_close(Tunnel *tunnel){
 }
 
 
+static inline int skb_make_headroom(struct sk_buff **pskb, struct sk_buff *skb, int head_n){
+    int err = 0;
+    dprintf("> skb=%p headroom=%d head_n=%d\n", skb, skb_headroom(skb), head_n);
+    if(head_n > skb_headroom(skb) || skb_cloned(skb) || skb_shared(skb)){
+        // Expand header the way GRE does.
+        struct sk_buff *new_skb = skb_realloc_headroom(skb, head_n + 16);
+        if(!new_skb){
+            err = -ENOMEM;
+            goto exit;
+        }
+        kfree_skb(skb);
+        *pskb = new_skb;
+    } else {
+        *pskb = skb;
+    }
+  exit:
+    return err;
+}
+    
 /** Send a packet via an etherip tunnel.
- * Adds etherip header, new ip header, new ethernet header around
- * ethernet frame.
+ * Adds etherip header and new ip header around ethernet frame.
  *
  * @param tunnel tunnel
  * @param skb packet
@@ -150,7 +168,7 @@ static int etherip_tunnel_send(Tunnel *tunnel, struct sk_buff *skb){
     if(etherip_in_udp){
         head_n += vnet_n + udp_n;
     }
-    err = skb_make_room(&skb, skb, head_n, 0);
+    err = skb_make_headroom(&skb, skb, head_n);
     if(err) goto exit;
 
     // Null the pointer as we are pushing a new IP header.
@@ -218,6 +236,20 @@ TunnelType *etherip_tunnel_type = &_etherip_tunnel_type;
 int etherip_tunnel_create(VnetId *vnet, VarpAddr *addr, Tunnel *base, Tunnel **tunnel){
     return Tunnel_create(etherip_tunnel_type, vnet, addr, base, tunnel);
 }
+
+#if defined(__KERNEL__) && defined(CONFIG_BRIDGE_NETFILTER)
+/** We need our own copy of this as it is no longer exported from the bridge module.
+ */
+static inline void _nf_bridge_save_header(struct sk_buff *skb){
+    int header_size = 16;
+    
+    // Were using this modified to use h_proto instead of skb->protocol.
+    if(skb->protocol == htons(ETH_P_8021Q)){
+        header_size = 18;
+    }
+    memcpy(skb->nf_bridge->data, skb->data - header_size, header_size);
+}
+#endif
 
 /** Do etherip receive processing.
  * Strips the etherip header to extract the ethernet frame, sets
@@ -320,10 +352,9 @@ int etherip_protocol_recv(struct sk_buff *skb){
     skb->dst = NULL;
     nf_reset(skb);
 #ifdef CONFIG_BRIDGE_NETFILTER
-    // Stop the eth header being clobbered by nf_bridge_maybe_copy_header().
-    // Were using this modified to use h_proto instead of skb->protocol.
     if(skb->nf_bridge){
-        nf_bridge_save_header(skb);
+        // Stop the eth header being clobbered by nf_bridge_maybe_copy_header().
+        _nf_bridge_save_header(skb);
     }
 #endif
 #endif // __KERNEL__

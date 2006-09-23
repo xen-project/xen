@@ -30,6 +30,8 @@ LIB_OBJS := $(LIB_SRCS:.c=.o)
 PIC_OBJS := $(LIB_SRCS:.c=.opic)
 
 CFLAGS   += -Werror -fno-strict-aliasing
+CFLAGS   += -O3
+#CFLAGS   += -g
 
 # Get gcc to generate the dependencies for us.
 CFLAGS   += -Wp,-MD,.$(@F).d

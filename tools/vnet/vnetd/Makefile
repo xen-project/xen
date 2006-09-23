@@ -24,7 +24,8 @@ all: vnetd
 
 #----------------------------------------------------------------------------
 
-include $(XEN_ROOT)/tools/Rules.mk
+# Comment out when outside xen.
+#include $(XEN_ROOT)/tools/Rules.mk
 
 VNETD_INSTALL_DIR = /usr/sbin
 
@@ -43,6 +44,7 @@ CPPFLAGS += -D USE_GC
 CPPFLAGS += -D __ARCH_I386_ATOMIC__
 
 #----------------------------------------------------------------------------
+CFLAGS += -O3
 CFLAGS += $(INCLUDES) $(LIBS)
 
 LDFLAGS += $(LIBS)

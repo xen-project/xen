@@ -139,12 +139,15 @@
 ^tools/security/secpol_tool$
 ^tools/security/xen/.*$
 ^tools/tests/test_x86_emulator$
+^tools/vnet/Make.local$
+^tools/vnet/build/.*$
 ^tools/vnet/gc$
 ^tools/vnet/gc.*/.*$
 ^tools/vnet/vnet-module/.*\.ko$
 ^tools/vnet/vnet-module/\..*\.cmd$
 ^tools/vnet/vnet-module/\.tmp_versions/.*$
 ^tools/vnet/vnet-module/vnet_module\.mod\..*$
+^tools/vnet/vnetd/vnetd$
 ^tools/vtpm/tpm_emulator-.*\.tar\.gz$
 ^tools/vtpm/tpm_emulator/.*$
 ^tools/vtpm/vtpm/.*$
