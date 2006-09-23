@@ -26,4 +26,13 @@ void console_force_lock(void);
 void console_start_sync(void);
 void console_end_sync(void);
 
+/*
+ * Steal output from the console. Returns +ve identifier, else -ve error.
+ * Takes the handle of the serial line to steal, and steal callback function.
+ */
+int console_steal(int handle, void (*fn)(const char *));
+
+/* Give back stolen console. Takes the identifier returned by console_steal. */
+void console_giveback(int id);
+
 #endif /* __CONSOLE_H__ */

@@ -33,7 +33,8 @@ char str2hex(const char *str);
 unsigned long str2ulong(const char *str, unsigned long bytes);
 
 struct gdb_context {
-    int                 serhnd;
+    int                 serhnd;           /* handle on our serial line */
+    int                 console_steal_id; /* handle on stolen console */
     int                 currently_attached:1;
     atomic_t            running;
     unsigned long       connected;

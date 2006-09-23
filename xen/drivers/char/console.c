@@ -116,6 +116,34 @@ long read_console_ring(XEN_GUEST_HANDLE(char) str, u32 *pcount, int clear)
 static char serial_rx_ring[SERIAL_RX_SIZE];
 static unsigned int serial_rx_cons, serial_rx_prod;
 
+static void (*serial_steal_fn)(const char *);
+
+int console_steal(int handle, void (*fn)(const char *))
+{
+    if ( (handle == -1) || (handle != sercon_handle) )
+        return 0;
+
+    if ( serial_steal_fn == NULL )
+        return -EBUSY;
+
+    serial_steal_fn = fn;
+    return 1;
+}
+
+void console_giveback(int id)
+{
+    if ( id == 1 )
+        serial_steal_fn = NULL;
+}
+
+static void sercon_puts(const char *s)
+{
+    if ( serial_steal_fn != NULL )
+        (*serial_steal_fn)(s);
+    else
+        serial_puts(sercon_handle, s);
+}
+
 /* CTRL-<switch_char> switches input direction between Xen and DOM0. */
 #define SWITCH_CODE (opt_conswitch[0]-'a'+1)
 static int xen_rx = 1; /* FALSE => serial input passed to domain 0. */
@@ -191,7 +219,7 @@ static long guest_console_write(XEN_GUEST_HANDLE(char) buffer, int count)
             return -EFAULT;
         kbuf[kcount] = '\0';
 
-        serial_puts(sercon_handle, kbuf);
+        sercon_puts(kbuf);
 
         for ( kptr = kbuf; *kptr != '\0'; kptr++ )
             vga_putchar(*kptr);
@@ -257,7 +285,7 @@ static inline void __putstr(const char *str)
 {
     int c;
 
-    serial_puts(sercon_handle, str);
+    sercon_puts(str);
 
     while ( (c = *str++) != '\0' )
     {
@@ -448,11 +476,11 @@ static void debugtrace_dump_worker(void)
 
     /* Print oldest portion of the ring. */
     ASSERT(debugtrace_buf[debugtrace_bytes - 1] == 0);
-    serial_puts(sercon_handle, &debugtrace_buf[debugtrace_prd]);
+    sercon_puts(&debugtrace_buf[debugtrace_prd]);
 
     /* Print youngest portion of the ring. */
     debugtrace_buf[debugtrace_prd] = '\0';
-    serial_puts(sercon_handle, &debugtrace_buf[0]);
+    sercon_puts(&debugtrace_buf[0]);
 
     memset(debugtrace_buf, '\0', debugtrace_bytes);
 
