@@ -123,19 +123,29 @@ include/asm-$(TARGET_ARCH)/asm-offsets.h: arch/$(TARGET_ARCH)/asm-offsets.s
 
 SUBDIRS = acm arch/$(TARGET_ARCH) common drivers 
 define all_sources
-    ( find include/asm-$(TARGET_ARCH) -name SCCS -prune -o -name '*.h' -print; \
-      find include -type d -name SCCS -prune -o \( -name "asm-*" -o \
-            -name config \) -prune -o -name '*.h' -print; \
-      find $(SUBDIRS) -name SCCS -prune -o -name '*.[chS]' -print )
+    ( find include/asm-$(TARGET_ARCH) -name '*.h' -print; \
+      find include -name 'asm-*' -prune -o -name '*.h' -print; \
+      find $(SUBDIRS) -name '*.[chS]' -print )
+endef
+
+define set_exuberant_flags
+    exuberant_flags=`$1 --version 2>/dev/null | grep -iq exuberant && \
+	echo "-I __initdata,__exitdata,__acquires,__releases \
+	    -I EXPORT_SYMBOL,EXPORT_SYMBOL_GPL \
+	    --extra=+f --c-kinds=+px"`
 endef
 
 .PHONY: _TAGS
 _TAGS: 
-	rm -f TAGS && $(all_sources) | xargs etags -a
+	rm -f TAGS; \
+	$(call set_exuberant_flags,etags); \
+	$(all_sources) | xargs etags $$exuberant_flags -a
 
 .PHONY: _tags
 _tags: 
-	rm -f TAGS && $(all_sources) | xargs ctags -a
+	rm -f tags; \
+	$(call set_exuberant_flags,ctags); \
+	$(all_sources) | xargs ctags $$exuberant_flags -a
 
 .PHONY: _cscope
 _cscope:
