@@ -56,6 +56,7 @@
 extern void do_nmi(struct cpu_user_regs *, unsigned long);
 extern int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip,
                                 int inst_len);
+ extern uint32_t vlapic_update_ppr(struct vlapic *vlapic);
 extern asmlinkage void do_IRQ(struct cpu_user_regs *);
 extern void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
                          unsigned long count, int size, long value, int dir, int pvalid);
@@ -258,6 +259,17 @@ static int svm_paging_enabled(struct vcpu *v)
     return (cr0 & X86_CR0_PE) && (cr0 & X86_CR0_PG);
 }
 
+static int svm_pae_enabled(struct vcpu *v)
+{
+    unsigned long cr4;
+
+    if(!svm_paging_enabled(v))
+        return 0;
+
+    cr4 = v->arch.hvm_svm.cpu_shadow_cr4;
+
+    return (cr4 & X86_CR4_PAE);
+}
 
 #define IS_CANO_ADDRESS(add) 1
 
@@ -864,6 +876,7 @@ int start_svm(void)
     hvm_funcs.realmode = svm_realmode;
     hvm_funcs.paging_enabled = svm_paging_enabled;
     hvm_funcs.long_mode_enabled = svm_long_mode_enabled;
+    hvm_funcs.pae_enabled = svm_pae_enabled;
     hvm_funcs.guest_x86_mode = svm_guest_x86_mode;
     hvm_funcs.instruction_length = svm_instruction_length;
     hvm_funcs.get_guest_ctrl_reg = svm_get_ctrl_reg;
@@ -896,8 +909,11 @@ static void svm_relinquish_guest_resources(struct domain *d)
         if ( hvm_apic_support(v->domain) && (VLAPIC(v) != NULL) ) 
         {
             kill_timer( &(VLAPIC(v)->vlapic_timer) );
+            unmap_domain_page_global(VLAPIC(v)->regs);
+            free_domheap_page(VLAPIC(v)->regs_page);
             xfree(VLAPIC(v));
         }
+        hvm_release_assist_channel(v);
     }
 
     kill_timer(&d->arch.hvm_domain.pl_time.periodic_tm.timer);
@@ -1041,95 +1057,76 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb, unsigned long input,
                 (unsigned long)regs->ecx, (unsigned long)regs->edx,
                 (unsigned long)regs->esi, (unsigned long)regs->edi);
 
-    cpuid(input, &eax, &ebx, &ecx, &edx);
-
-    if (input == 0x00000001)
+    if ( !cpuid_hypervisor_leaves(input, &eax, &ebx, &ecx, &edx) )
     {
-        if ( !hvm_apic_support(v->domain) ||
-             !vlapic_global_enabled((VLAPIC(v))) )
+        cpuid(input, &eax, &ebx, &ecx, &edx);       
+        if (input == 0x00000001 || input == 0x80000001 )
         {
-            /* Since the apic is disabled, avoid any confusion 
-               about SMP cpus being available */
-            clear_bit(X86_FEATURE_APIC, &edx);
-        }
-
+            if ( !hvm_apic_support(v->domain) ||
+                 !vlapic_global_enabled((VLAPIC(v))) )
+            {
+                /* Since the apic is disabled, avoid any confusion 
+                   about SMP cpus being available */
+                clear_bit(X86_FEATURE_APIC, &edx);
+            }
 #if CONFIG_PAGING_LEVELS >= 3
-        if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
+            if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
 #endif
-            clear_bit(X86_FEATURE_PAE, &edx);
-        clear_bit(X86_FEATURE_PSE36, &edx);
+            {
+                clear_bit(X86_FEATURE_PAE, &edx);
+                if (input == 0x80000001 )
+                   clear_bit(X86_FEATURE_NX & 31, &edx);
+            }
+            clear_bit(X86_FEATURE_PSE36, &edx);
+            /* Disable machine check architecture */
+            clear_bit(X86_FEATURE_MCA, &edx);
+            clear_bit(X86_FEATURE_MCE, &edx);
+            if (input == 0x00000001 )
+            {
+                /* Clear out reserved bits. */
+                ecx &= ~SVM_VCPU_CPUID_L1_ECX_RESERVED;
+                edx &= ~SVM_VCPU_CPUID_L1_EDX_RESERVED;
 
-        /* Clear out reserved bits. */
-        ecx &= ~SVM_VCPU_CPUID_L1_ECX_RESERVED;
-        edx &= ~SVM_VCPU_CPUID_L1_EDX_RESERVED;
+                clear_bit(X86_FEATURE_MWAIT & 31, &ecx);
 
-        clear_bit(X86_FEATURE_MWAIT & 31, &ecx);
-
-        /* Guest should only see one logical processor.
-         * See details on page 23 of AMD CPUID Specification. 
-         */
-        clear_bit(X86_FEATURE_HT, &edx);  /* clear the hyperthread bit */
-        ebx &= 0xFF00FFFF;  /* clear the logical processor count when HTT=0 */
-        ebx |= 0x00010000;  /* set to 1 just for precaution */
-
-        /* Disable machine check architecture */
-        clear_bit(X86_FEATURE_MCA, &edx);
-        clear_bit(X86_FEATURE_MCE, &edx);
-    }
-    else if ( (input > 0x00000005) && (input < 0x80000000) )
-    {
-        if ( !cpuid_hypervisor_leaves(input, &eax, &ebx, &ecx, &edx) )
-            eax = ebx = ecx = edx = 0;
-    }
-    else if ( input == 0x80000001 )
-    {
-        /* We duplicate some CPUID_00000001 code because many bits of 
-           CPUID_80000001_EDX overlaps with CPUID_00000001_EDX. */
-
-        if ( !hvm_apic_support(v->domain) ||
-             !vlapic_global_enabled((VLAPIC(v))) )
-        {
-            /* Since the apic is disabled, avoid any confusion 
-               about SMP cpus being available */
-            clear_bit(X86_FEATURE_APIC, &edx);
-        }
-
-        /* Clear the Cmp_Legacy bit 
-         * This bit is supposed to be zero when HTT = 0.
-         * See details on page 23 of AMD CPUID Specification. 
-         */
-        clear_bit(X86_FEATURE_CMP_LEGACY & 31, &ecx);
-
+                /* Guest should only see one logical processor.
+                 * See details on page 23 of AMD CPUID Specification. 
+                 */
+                clear_bit(X86_FEATURE_HT, &edx);  /* clear the hyperthread bit */
+                ebx &= 0xFF00FFFF;  /* clear the logical processor count when HTT=0 */
+                ebx |= 0x00010000;  /* set to 1 just for precaution */
+            }
+            else
+            {
+                /* Clear the Cmp_Legacy bit 
+                 * This bit is supposed to be zero when HTT = 0.
+                 * See details on page 23 of AMD CPUID Specification. 
+                 */
+                clear_bit(X86_FEATURE_CMP_LEGACY & 31, &ecx);
+                /* Make SVM feature invisible to the guest. */
+                clear_bit(X86_FEATURE_SVME & 31, &ecx);
 #ifdef __i386__
-        /* Mask feature for Intel ia32e or AMD long mode. */
-        clear_bit(X86_FEATURE_LAHF_LM & 31, &ecx);
+                /* Mask feature for Intel ia32e or AMD long mode. */
+                clear_bit(X86_FEATURE_LAHF_LM & 31, &ecx);
 
-        clear_bit(X86_FEATURE_LM & 31, &edx);
-        clear_bit(X86_FEATURE_SYSCALL & 31, &edx);
+                clear_bit(X86_FEATURE_LM & 31, &edx);
+                clear_bit(X86_FEATURE_SYSCALL & 31, &edx);
 #endif
-
-
-#if CONFIG_PAGING_LEVELS >= 3
-        if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
-#endif
-            clear_bit(X86_FEATURE_PAE, &edx);
-        clear_bit(X86_FEATURE_PSE36, &edx);
-
-        /* Make SVM feature invisible to the guest. */
-        clear_bit(X86_FEATURE_SVME & 31, &ecx);
-
-        /* So far, we do not support 3DNow for the guest. */
-        clear_bit(X86_FEATURE_3DNOW & 31, &edx);
-        clear_bit(X86_FEATURE_3DNOWEXT & 31, &edx);
-    }
-    else if ( ( input == 0x80000007 ) || ( input == 0x8000000A  ) )
-    {
-        /* Mask out features of power management and SVM extension. */
-        eax = ebx = ecx = edx = 0;
-    }
-    else if ( input == 0x80000008 )
-    {
-        ecx &= 0xFFFFFF00; /* Make sure Number of CPU core is 1 when HTT=0 */
+                /* So far, we do not support 3DNow for the guest. */
+                clear_bit(X86_FEATURE_3DNOW & 31, &edx);
+                clear_bit(X86_FEATURE_3DNOWEXT & 31, &edx);
+            }
+        }
+        else if ( ( input == 0x80000007 ) || ( input == 0x8000000A  ) )
+        {
+            /* Mask out features of power management and SVM extension. */
+            eax = ebx = ecx = edx = 0;
+        }
+        else if ( input == 0x80000008 )
+        {
+            /* Make sure Number of CPU core is 1 when HTT=0 */
+            ecx &= 0xFFFFFF00; 
+        }
     }
 
     regs->eax = (unsigned long)eax;
@@ -1618,6 +1615,7 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
 {
     unsigned long value = 0;
     struct vcpu *v = current;
+    struct vlapic *vlapic = VLAPIC(v);
     struct vmcb_struct *vmcb;
 
     vmcb = v->arch.hvm_svm.vmcb;
@@ -1644,11 +1642,8 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
             printk( "CR4 read=%lx\n", value );
         break;
     case 8:
-#if 0
-        value = vmcb->m_cr8;
-#else
-        ASSERT(0);
-#endif
+        value = (unsigned long)vlapic_get_reg(vlapic, APIC_TASKPRI);
+        value = (value & 0xF0) >> 4;
         break;
         
     default:
@@ -1675,6 +1670,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
     unsigned long value;
     unsigned long old_cr;
     struct vcpu *v = current;
+    struct vlapic *vlapic = VLAPIC(v);
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
     ASSERT(vmcb);
@@ -1821,6 +1817,13 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
         break;
     }
 
+    case 8:
+    {
+        vlapic_set_reg(vlapic, APIC_TASKPRI, ((value & 0x0F) << 4));
+        vlapic_update_ppr(vlapic);
+        break;
+    }
+
     default:
         printk("invalid cr: %d\n", cr);
         __hvm_bug(regs);
@@ -1856,12 +1859,12 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
        where the prefix lives later on */
     index = skip_prefix_bytes(buffer, sizeof(buffer));
     
-    if (type == TYPE_MOV_TO_CR) 
+    if ( type == TYPE_MOV_TO_CR )
     {
         inst_len = __get_instruction_length_from_list(
             vmcb, list_a, ARR_SIZE(list_a), &buffer[index], &match);
     }
-    else
+    else /* type == TYPE_MOV_FROM_CR */
     {
         inst_len = __get_instruction_length_from_list(
             vmcb, list_b, ARR_SIZE(list_b), &buffer[index], &match);

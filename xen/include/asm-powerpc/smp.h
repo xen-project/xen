@@ -23,14 +23,16 @@
 
 #include <xen/types.h>
 #include <xen/cpumask.h>
+#include <xen/init.h>
 #include <asm/current.h>
 extern int smp_num_siblings;
 
 /* revisit when we support SMP */
-#define get_hard_smp_processor_id(i) i
 #define raw_smp_processor_id() (parea->whoami)
-#define hard_smp_processor_id() raw_smp_processor_id()
+#define get_hard_smp_processor_id(i) (global_cpu_table[i]->hard_id)
+#define hard_smp_processor_id() (parea->hard_id)
 extern cpumask_t cpu_sibling_map[];
 extern cpumask_t cpu_core_map[];
-
+extern void __devinit smp_generic_take_timebase(void);
+extern void __devinit smp_generic_give_timebase(void);
 #endif

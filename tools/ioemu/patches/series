@@ -29,12 +29,14 @@ domain-timeoffset
 acpi-support
 acpi-timer-support
 acpi-poweroff-support
+fix-vga-scanning-code-overflow
 vnc-cleanup
 vnc-fixes
 vnc-start-vncviewer
 vnc-title-domain-name
 vnc-access-monitor-vt
 vnc-display-find-unused
+vnc-backoff-screen-scan
 xenstore-block-device-config
 xenstore-write-vnc-port
 qemu-allow-disable-sdl
@@ -44,4 +46,4 @@ qemu-daemonize
 xen-platform-device
 qemu-bootorder
 qemu-tunable-ide-write-cache
-qemu-pci -p3
+qemu-pci 

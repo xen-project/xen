@@ -293,12 +293,14 @@ static bool watch_domain(struct domain *dom, bool watch)
 	bool success;
 
 	sprintf(domid_str, "dom%u", dom->domid);
-	if (watch)
+	if (watch) {
 		success = xs_watch(xs, dom->conspath, domid_str);
-	else
+		if (success)
+			domain_create_ring(dom);
+	} else {
 		success = xs_unwatch(xs, dom->conspath, domid_str);
-	if (success)
-		domain_create_ring(dom);
+	}
+
 	return success;
 }
 

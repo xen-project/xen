@@ -93,6 +93,21 @@ typedef l4_pgentry_t root_pgentry_t;
 #define GRANT_PTE_FLAGS \
     (_PAGE_PRESENT|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_GNTTAB|_PAGE_USER)
 
+#define USER_MAPPINGS_ARE_GLOBAL
+#ifdef USER_MAPPINGS_ARE_GLOBAL
+/*
+ * Bit 12 of a 24-bit flag mask. This corresponds to bit 52 of a pte.
+ * This is needed to distinguish between user and kernel PTEs since _PAGE_USER
+ * is asserted for both.
+ */
+#define _PAGE_GUEST_KERNEL (1U<<12)
+/* Global bit is allowed to be set on L1 PTEs. Intended for user mappings. */
+#undef L1_DISALLOW_MASK
+#define L1_DISALLOW_MASK ((BASE_DISALLOW_MASK | _PAGE_GNTTAB) & ~_PAGE_GLOBAL)
+#else
+#define _PAGE_GUEST_KERNEL 0
+#endif
+
 #endif /* __X86_64_PAGE_H__ */
 
 /*

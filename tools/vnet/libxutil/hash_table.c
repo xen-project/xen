@@ -116,7 +116,7 @@ acceptable.  Do NOT use for cryptographic purposes.
 --------------------------------------------------------------------
 */
 
-ub4 hash(const ub1 *k, ub4 length, ub4 initval)
+static inline ub4 _hash(const ub1 *k, ub4 length, ub4 initval)
 //register ub1 *k;        /* the key */
 //register ub4  length;   /* the length of the key */
 //register ub4  initval;    /* the previous hash, or an arbitrary value */
@@ -160,6 +160,11 @@ ub4 hash(const ub1 *k, ub4 length, ub4 initval)
    /*-------------------------------------------- report the result */
    return c;
 }
+
+ub4 hash(const ub1 *k, ub4 length, ub4 initval){
+    return _hash(k, length, initval);
+}
+
 /*============================================================================*/
 
 /** Get the bucket for a hashcode in a hash table.
@@ -381,6 +386,9 @@ inline HTEntry * HashTable_find_entry(HashTable *table, Hashcode hashcode,
  * @return 1 if equal, 0 otherwise
  */
 inline int HashTable_key_equal(HashTable *table, void *key1, void *key2){
+    if(table->key_size){
+        return memcmp(key1, key2, table->key_size) == 0;
+    }
     return (table->key_equal_fn ? table->key_equal_fn(key1, key2) : key1 == key2);
 }
 
@@ -393,6 +401,9 @@ inline int HashTable_key_equal(HashTable *table, void *key1, void *key2){
  * @return hashcode
  */
 inline Hashcode HashTable_key_hash(HashTable *table, void *key){
+    if(table->key_size){
+        return _hash(key, table->key_size, 0);
+    }
     return (table->key_hash_fn 
             ? table->key_hash_fn(key)
             : hash_hvoid(0, &key, sizeof(key)));

@@ -1,23 +1,27 @@
 /*
- * Copyright (C) 2005 Hollis Blanchard <hollisb@us.ibm.com>, IBM Corporation
- *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+ * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ *
+ * Copyright (C) IBM Corp. 2005, 2006
+ *
+ * Authors: Jimi Xenidis <jimix@watson.ibm.com>
+ *          Hollis Blanchard <hollisb@us.ibm.com>
  */
 
 #include <asm/config.h>
 #include <asm/processor.h>
+#include <asm/percpu.h>
 
 /* Xen runs in real mode (i.e. untranslated, MMU disabled). This avoids TLB
  * flushes and also makes it easy to access all domains' memory. However, on
@@ -54,6 +58,12 @@
 	sync
 	mtspr SPRN_HID4, r5
 	isync
+
+	/* Mark the processor as "in CI mode" */
+	mfspr r5, SPRN_PIR
+	li r6, MCK_CPU_STAT_CI
+	stb r6, MCK_CPU_STAT_BASE(r5)
+	sync
 .endm
 
 .macro ENABLE_DCACHE addr
@@ -63,6 +73,12 @@
 	mtspr SPRN_HID4, r9
 	isync
 
+	/* Mark the processor as "out of CI mode" */
+	mfspr r5, SPRN_PIR
+	li r6, 0
+	stb r6, MCK_CPU_STAT_BASE(r5)
+	sync
+	
 	/* re-enable interrupts */
 	mtmsr r8
 .endm

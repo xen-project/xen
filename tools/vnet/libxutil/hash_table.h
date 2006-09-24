@@ -96,6 +96,7 @@ struct HashTable {
     int buckets_n;
     /** Number of entries in the table. */
     int entry_count;
+    unsigned long key_size;
     /** Function to free keys and values in entries. */
     TableFreeFn *entry_free_fn;
     /** Function to hash keys. */

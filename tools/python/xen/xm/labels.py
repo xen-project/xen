@@ -23,49 +23,46 @@ import traceback
 import string
 from xen.util.security import ACMError, err, list_labels, active_policy
 from xen.util.security import vm_label_re, res_label_re, all_label_re
+from xen.xm.opts import OptionError
 
-def usage():
-    print "\nUsage: xm labels [<policy>] [<type=dom|res|any>]\n"
-    print " Prints labels of the specified type (default is dom)"
-    print " that are defined in policy (default is current"
-    print " hypervisor policy).\n"
-    err("Usage")
 
+def help():
+    return """
+    Prints labels of the specified type (default is dom)
+    that are defined in policy (default is current hypervisor policy)."""
 
 def main(argv):
-    try:
-        policy = None
-        type = None
-        for i in argv[1:]:
-            i_s = string.split(i, '=')
-            if len(i_s) > 1:
-                if (i_s[0] == 'type') and (len(i_s) == 2):
-                    if not type:
-                        type = i_s[1]
-                    else:
-                        usage()
-                else:
-                    usage()
-            else:
-                if not policy:
-                    policy = i
-                else:
-                    usage()
+    policy = None
+    ptype = None
+    for arg in argv[1:]:
+        key_val = arg.split('=')
+        if len(key_val) == 2 and key_val[0] == 'type':
+            if ptype:
+                raise OptionError('type is definied twice')
+            ptype = key_val[1].lower()
 
-        if not policy:
-            policy = active_policy
-            if active_policy in ['NULL', 'INACTIVE', 'DEFAULT']:
-                err("No policy active. Please specify the <policy> parameter.")
-
-        if not type or (type in ['DOM', 'dom']):
-            condition = vm_label_re
-        elif type in ['RES', 'res']:
-            condition = res_label_re
-        elif type in ['ANY', 'any']:
-            condition = all_label_re
+        elif len(key_val) == 1:
+            if policy:
+                raise OptionError('policy is defined twice')
+            policy = arg
         else:
-            err("Unknown label type \'" + type + "\'")
+            raise OptionError('Unrecognised option: %s' % arg)
 
+    if not policy:
+        policy = active_policy
+        if active_policy in ['NULL', 'INACTIVE', 'DEFAULT']:
+            raise OptionError('No policy active, you must specify a <policy>')
+
+    if not ptype or ptype == 'dom':
+        condition = vm_label_re
+    elif ptype == 'res':
+        condition = res_label_re
+    elif ptype == 'any':
+        condition = all_label_re
+    else:
+        err("Unknown label type \'" + ptype + "\'")
+
+    try:
         labels = list_labels(policy, condition)
         labels.sort()
         for label in labels:
@@ -74,9 +71,7 @@ def main(argv):
     except ACMError:
         sys.exit(-1)
     except:
-        traceback.print_exc(limit=1)
-        sys.exit(-1)
-
+        traceback.print_exc(limit = 1)
 
 if __name__ == '__main__':
     main(sys.argv)

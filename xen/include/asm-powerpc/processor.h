@@ -37,19 +37,29 @@
 struct domain;
 struct vcpu;
 struct cpu_user_regs;
+extern int cpu_machinecheck(struct cpu_user_regs *);
+extern void cpu_scom_init(void);
 extern void show_registers(struct cpu_user_regs *);
 extern void show_execution_state(struct cpu_user_regs *);
 extern void show_backtrace(ulong sp, ulong lr, ulong pc);
 extern unsigned int cpu_extent_order(void);
 extern unsigned int cpu_default_rma_order_pages(void);
+extern int cpu_rma_valid(unsigned int log);
 extern uint cpu_large_page_orders(uint *sizes, uint max);
 extern void cpu_initialize(int cpuid);
 extern void cpu_init_vcpu(struct vcpu *);
+extern int cpu_io_mfn(ulong mfn);
 extern void save_cpu_sprs(struct vcpu *);
 extern void load_cpu_sprs(struct vcpu *);
+extern void flush_segments(void);
+extern void dump_segments(int valid);
 
 /* XXX this could also land us in GDB */
-#define dump_execution_state() trap()
+#define dump_execution_state() BUG()
+
+extern void __warn(char *file, int line);
+#define WARN() __warn(__FILE__, __LINE__)
+#define WARN_ON(_p) do { if (_p) WARN(); } while ( 0 )
 
 #define ARCH_HAS_PREFETCH
 static inline void prefetch(const void *x) {;}
@@ -74,6 +84,13 @@ static inline void nop(void) {
     __asm__ __volatile__ ("nop");
 }
 #define cpu_relax() nop()
+
+static inline unsigned int mfpir(void)
+{
+    unsigned int pir;
+    __asm__ __volatile__ ("mfspr %0, %1" : "=r" (pir): "i"(SPRN_PIR));
+    return pir;
+}
 
 static inline unsigned int mftbu(void)
 {

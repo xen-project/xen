@@ -120,7 +120,6 @@ def main(argv):
     opts = gopts
     args = opts.parse(argv)
     if opts.vals.help:
-        opts.usage()
         return
     if opts.vals.all:
         main_all(opts, args)

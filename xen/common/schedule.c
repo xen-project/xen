@@ -181,15 +181,56 @@ void vcpu_wake(struct vcpu *v)
     TRACE_2D(TRC_SCHED_WAKE, v->domain->domain_id, v->vcpu_id);
 }
 
+static void vcpu_migrate(struct vcpu *v)
+{
+    cpumask_t online_affinity;
+    unsigned long flags;
+    int old_cpu;
+
+    vcpu_schedule_lock_irqsave(v, flags);
+
+    if ( test_bit(_VCPUF_running, &v->vcpu_flags) ||
+         !test_and_clear_bit(_VCPUF_migrating, &v->vcpu_flags) )
+    {
+        vcpu_schedule_unlock_irqrestore(v, flags);
+        return;
+    }
+
+    /* Switch to new CPU, then unlock old CPU. */
+    old_cpu = v->processor;
+    cpus_and(online_affinity, v->cpu_affinity, cpu_online_map);
+    v->processor = first_cpu(online_affinity);
+    spin_unlock_irqrestore(
+        &per_cpu(schedule_data, old_cpu).schedule_lock, flags);
+
+    /* Wake on new CPU. */
+    vcpu_wake(v);
+}
+
 int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity)
 {
     cpumask_t online_affinity;
+    unsigned long flags;
 
     cpus_and(online_affinity, *affinity, cpu_online_map);
     if ( cpus_empty(online_affinity) )
         return -EINVAL;
 
-    return SCHED_OP(set_affinity, v, affinity);
+    vcpu_schedule_lock_irqsave(v, flags);
+
+    v->cpu_affinity = *affinity;
+    if ( !cpu_isset(v->processor, v->cpu_affinity) )
+        set_bit(_VCPUF_migrating, &v->vcpu_flags);
+
+    vcpu_schedule_unlock_irqrestore(v, flags);
+
+    if ( test_bit(_VCPUF_migrating, &v->vcpu_flags) )
+    {
+        vcpu_sleep_nosync(v);
+        vcpu_migrate(v);
+    }
+
+    return 0;
 }
 
 /* Block the currently-executing domain until a pertinent event occurs. */
@@ -555,6 +596,13 @@ static void __enter_scheduler(void)
     context_switch(prev, next);
 }
 
+void context_saved(struct vcpu *prev)
+{
+    clear_bit(_VCPUF_running, &prev->vcpu_flags);
+
+    if ( unlikely(test_bit(_VCPUF_migrating, &prev->vcpu_flags)) )
+        vcpu_migrate(prev);
+}
 
 /****************************************************************************
  * Timers: the scheduler utilises a number of timers

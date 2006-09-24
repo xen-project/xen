@@ -91,10 +91,21 @@ static inline unsigned long mftb(void)
     return tb;
 }
 
+static inline void mttbl(unsigned low)
+{
+    __asm__ __volatile__ ("mtspr %0, %1" : : "i"(SPRN_TBWL), "r" (low));
+}
+
+static inline void mttbu(unsigned upper)
+{
+    __asm__ __volatile__ ("mtspr %0, %1" : : "i"(SPRN_TBWU), "r" (upper));
+}
+
 static inline void mthdec(unsigned ticks)
 {
     __asm__ __volatile__ ("mtspr %0, %1" : : "i"(SPRN_HDEC), "r" (ticks));
 }
+
 static inline unsigned int mfhdec(void)
 {
     unsigned int val;
@@ -138,6 +149,11 @@ static inline void mthid0(ulong val)
     __asm__ __volatile__ (
             "sync\n"
             "mtspr %0, %1\n"
+            "mfspr %1, %0\n"
+            "mfspr %1, %0\n"
+            "mfspr %1, %0\n"
+            "mfspr %1, %0\n"
+            "mfspr %1, %0\n"
             "isync\n"
             : : "i"(SPRN_HID0), "r"(val));
 }
@@ -152,6 +168,7 @@ static inline void mthid1(ulong val)
 {
     __asm__ __volatile__ (
             "sync\n"
+            "mtspr %0, %1\n"
             "mtspr %0, %1\n"
             "isync\n"
             : : "i"(SPRN_HID1), "r"(val));
@@ -187,6 +204,24 @@ static inline void mthid5(ulong val)
             "mtspr %0, %1\n"
             "isync\n"
             : : "i"(SPRN_HID5), "r"(val));
+}
+
+static inline void mthrmor(ulong val)
+{
+    __asm__ __volatile__ (
+            "sync\n"
+            "mtspr %0, %1\n"
+            "isync\n"
+            : : "i"(SPRN_HRMOR), "r"(val));
+}
+
+static inline void mthior(ulong val)
+{
+    __asm__ __volatile__ (
+            "sync\n"
+            "mtspr %0, %1\n"
+            "isync\n"
+            : : "i"(SPRN_HIOR), "r"(val));
 }
 
 #endif /* __ASSEMBLY__ */

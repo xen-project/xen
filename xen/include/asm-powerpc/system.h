@@ -22,10 +22,10 @@
 #define _ASM_SYSTEM_H_
 
 #include <xen/config.h>
+#include <xen/lib.h>
 #include <asm/memory.h>
 #include <asm/time.h>
 #include <asm/processor.h>
-#include <asm/misc.h>
 #include <asm/msr.h>
 
 #define xchg(ptr,v) ((__typeof__(*(ptr)))__xchg((unsigned long)(v),(ptr),sizeof(*(ptr))))
@@ -139,7 +139,7 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
 {
     switch (size) {
     case 2:
-        trap(); return 0; /* XXX implement __cmpxchg_u16 ? */
+        BUG(); return 0; /* XXX implement __cmpxchg_u16 ? */
     case 4:
         return __cmpxchg_u32(ptr, old, new);
     case 8:

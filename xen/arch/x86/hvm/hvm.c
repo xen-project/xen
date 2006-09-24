@@ -337,7 +337,6 @@ int cpu_get_interrupt(struct vcpu *v, int *type)
     return -1;
 }
 
-#include <asm/hvm/vmx/vmx.h>
 void hvm_hlt(unsigned long rflags)
 {
     struct vcpu *v = current;

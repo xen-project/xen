@@ -1,4 +1,3 @@
-
 #include <xen/config.h>
 #include <xen/init.h>
 #include <xen/lib.h>
@@ -16,6 +15,7 @@
 #include <xen/gdbstub.h>
 #include <xen/percpu.h>
 #include <xen/hypercall.h>
+#include <xen/keyhandler.h>
 #include <public/version.h>
 #include <asm/bitops.h>
 #include <asm/smp.h>
@@ -81,7 +81,6 @@ extern void arch_init_memory(void);
 extern void init_IRQ(void);
 extern void trap_init(void);
 extern void early_time_init(void);
-extern void initialize_keytable(void);
 extern void early_cpu_init(void);
 
 struct tss_struct init_tss[NR_CPUS];

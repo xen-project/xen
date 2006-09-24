@@ -44,9 +44,6 @@ extern char __bss_start[];
 #define ALIGN_UP(addr,size) (((addr)+((size)-1))&(~((size)-1)))
 #define ALIGN_DOWN(addr,size) ((addr)&(~((size)-1)))
 
-/* this should be per processor, but for now */
-#define CACHE_LINE_SIZE 128
-
 /* 256M - 64M of Xen space seems like a nice number */
 #define CONFIG_MIN_DOM0_PAGES (192 << (20 - PAGE_SHIFT))
 #define CONFIG_SHADOW 1

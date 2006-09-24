@@ -21,10 +21,12 @@
 #ifndef _OFTREE_H
 #define _OFTREE_H
 #include <xen/multiboot.h>
+#include "of-devtree.h"
 
 extern ulong oftree;
 extern ulong oftree_len;
 extern ulong oftree_end;
+extern ofdn_t ofd_boot_cpu;
 
 extern int ofd_dom0_fixup(struct domain *d, ulong mem, start_info_t *si);
 extern void ofd_memory_props(void *m, struct domain *d);

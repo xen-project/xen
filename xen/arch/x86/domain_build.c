@@ -74,10 +74,11 @@ string_param("dom0_ioports_disable", opt_dom0_ioports_disable);
 #define L3_PROT (_PAGE_PRESENT)
 #elif defined(__x86_64__)
 /* Allow ring-3 access in long mode as guest cannot use ring 1. */
-#define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
-#define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
-#define L3_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
-#define L4_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
+#define BASE_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
+#define L1_PROT (BASE_PROT|_PAGE_GUEST_KERNEL)
+#define L2_PROT (BASE_PROT|_PAGE_DIRTY)
+#define L3_PROT (BASE_PROT|_PAGE_DIRTY)
+#define L4_PROT (BASE_PROT|_PAGE_DIRTY)
 #endif
 
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
@@ -510,15 +511,13 @@ int construct_dom0(struct domain *d,
         case 1 ... 4:
             page->u.inuse.type_info &= ~PGT_type_mask;
             page->u.inuse.type_info |= PGT_l2_page_table;
-            page->u.inuse.type_info |=
-                (count-1) << PGT_va_shift;
+            if ( count == 4 )
+                page->u.inuse.type_info |= PGT_pae_xen_l2;
             get_page(page, d); /* an extra ref because of readable mapping */
             break;
         default:
             page->u.inuse.type_info &= ~PGT_type_mask;
             page->u.inuse.type_info |= PGT_l1_page_table;
-            page->u.inuse.type_info |= 
-                ((dsi.v_start>>L2_PAGETABLE_SHIFT)+(count-5))<<PGT_va_shift;
             get_page(page, d); /* an extra ref because of readable mapping */
             break;
         }
@@ -544,8 +543,6 @@ int construct_dom0(struct domain *d,
         {
             page->u.inuse.type_info &= ~PGT_type_mask;
             page->u.inuse.type_info |= PGT_l1_page_table;
-            page->u.inuse.type_info |= 
-                ((dsi.v_start>>L2_PAGETABLE_SHIFT)+(count-1))<<PGT_va_shift;
 
             /*
              * No longer writable: decrement the type_count.

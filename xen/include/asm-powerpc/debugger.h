@@ -36,8 +36,23 @@ static inline int debugger_trap_fatal(
 
 #else /* CRASH_DEBUG */
 
-#define debugger_trap_fatal(_v, _r) (0)
-#define debugger_trap_immediate() ((void)0)
+static inline int debugger_trap_fatal(
+    unsigned int vector, struct cpu_user_regs *regs)
+{
+    show_backtrace(regs->gprs[1], regs->lr, regs->pc);
+    return vector;
+}
+
+static inline void debugger_trap_immediate(void)
+{
+    ulong sp;
+    ulong lr;
+
+    sp = (ulong)__builtin_frame_address(0);
+    lr = (ulong)__builtin_return_address(0);
+
+    show_backtrace(sp, lr, lr);
+}
 
 #endif /* CRASH_DEBUG */
 

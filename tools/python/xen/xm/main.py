@@ -22,28 +22,27 @@
 """Grand unified management application for Xen.
 """
 import os
-import os.path
 import sys
 import re
 import getopt
 import socket
-import warnings
-warnings.filterwarnings('ignore', category=FutureWarning)
+import traceback
 import xmlrpclib
 import traceback
 import datetime
+from select import select
 
-import xen.xend.XendProtocol
+import warnings
+warnings.filterwarnings('ignore', category=FutureWarning)
 
 from xen.xend import PrettyPrint
 from xen.xend import sxp
-from xen.xm.opts import *
-
-import console
-import xen.xend.XendClient
+from xen.xend import XendClient
 from xen.xend.XendClient import server
+
+from xen.xm.opts import OptionError, Opts, wrap, set_true
+from xen.xm import console
 from xen.util import security
-from select import select
 
 # getopt.gnu_getopt is better, but only exists in Python 2.3+.  Use
 # getopt.getopt if gnu_getopt is not available.  This will mean that options
@@ -51,93 +50,152 @@ from select import select
 if not hasattr(getopt, 'gnu_getopt'):
     getopt.gnu_getopt = getopt.getopt
 
+# General help message
 
-# Strings for shorthelp
-console_help = "console <DomId>                  Attach to domain DomId's console."
-create_help =  """create [-c] <ConfigFile>
-               [Name=Value]..       Create a domain based on Config File"""
-destroy_help = "destroy <DomId>                  Terminate a domain immediately"
-help_help =    "help                             Display this message"
-list_help =    "list [--long] [DomId, ...]       List information about domains"
-list_label_help = "list [--label] [DomId, ...]      List information about domains including their labels"
+USAGE_HELP = "Usage: xm <subcommand> [args]\n\n" \
+             "Control, list, and manipulate Xen guest instances.\n"
 
-mem_max_help = "mem-max <DomId> <Mem>            Set maximum memory reservation for a domain"
-mem_set_help = "mem-set <DomId> <Mem>            Adjust the current memory usage for a domain"
-migrate_help = "migrate <DomId> <Host>           Migrate a domain to another machine"
-pause_help =   "pause <DomId>                    Pause execution of a domain"
-reboot_help =  "reboot <DomId> [-w][-a]          Reboot a domain"
-restore_help = "restore <File>                   Create a domain from a saved state file"
-save_help =    "save <DomId> <File>              Save domain state (and config) to file"
-shutdown_help ="shutdown <DomId> [-w][-a][-R|-H] Shutdown a domain"
-top_help =     "top                              Monitor system and domains in real-time"
-unpause_help = "unpause <DomId>                  Unpause a paused domain"
-uptime_help  = "uptime [-s|--short] [DomId, ...] List uptime for domains"
+USAGE_FOOTER = '<Domain> can either be the Domain Name or Id.\n' \
+               'For more help on \'xm\' see the xm(1) man page.\n' \
+               'For more help on \'xm create\' see the xmdomain.cfg(5) '\
+               ' man page.\n'
 
-help_spacer = """
-   """
+# Help strings are indexed by subcommand name in this way:
+# 'subcommand': (argstring, description)
 
-# Strings for longhelp
-sysrq_help =   "sysrq   <DomId> <letter>         Send a sysrq to a domain"
-domid_help =   "domid <DomName>                  Converts a domain name to a domain id"
-domname_help = "domname <DomId>                  Convert a domain id to a domain name"
-vcpu_set_help = """vcpu-set <DomId> <VCPUs>         Set the number of active VCPUs for a domain
-                                    within the range allowed by the domain
-                                    configuration"""
-vcpu_list_help = "vcpu-list <DomId>                List the VCPUs for a domain (or all domains)"
-vcpu_pin_help = "vcpu-pin <DomId> <VCPU> <CPUs>   Set which cpus a VCPU can use" 
-dmesg_help =   "dmesg [-c|--clear]               Read or clear Xen's message buffer"
-info_help =    "info                             Get information about the xen host"
-rename_help =  "rename <DomId> <New Name>        Rename a domain"
-log_help =     "log                              Print the xend log"
-sched_sedf_help = "sched-sedf [DOM] [OPTIONS]       Show|Set simple EDF parameters\n" + \
-"              -p, --period          Relative deadline(ms).\n\
-              -s, --slice           Worst-case execution time(ms)\n\
-                                    (slice < period).\n\
-              -l, --latency         scaled period(ms) in case the domain\n\
-                                    is doing heavy I/O.\n\
-              -e, --extra           flag (0/1) which controls whether the\n\
-                                    domain can run in extra-time\n\
-              -w, --weight          mutually exclusive with period/slice and\n\
-                                    specifies another way of setting a domain's\n\
-                                    cpu period/slice."
+SUBCOMMAND_HELP = {
+    # common commands
+    
+    'console'     : ('<Domain>',
+                     'Attach to <Domain>\'s console.'),
+    'create'      : ('<ConfigFile> [options] [vars]',
+                     'Create a domain based on <ConfigFile>.'),
+    'destroy'     : ('<Domain>',
+                     'Terminate a domain immediately.'),
+    'help'        : ('', 'Display this message.'),
+    'list'        : ('[options] [Domain, ...]',
+                     'List information about all/some domains.'),
+    'mem-max'     : ('<Domain> <Mem>',
+                     'Set the maximum amount reservation for a domain.'),
+    'mem-set'     : ('<Domain> <Mem>',
+                     'Set the current memory usage for a domain.'),
+    'migrate'     : ('<Domain> <Host>',
+                     'Migrate a domain to another machine.'),
+    'pause'       : ('<Domain>', 'Pause execution of a domain.'),
+    'reboot'      : ('<Domain> [-wa]', 'Reboot a domain.'),
+    'restore'     : ('<CheckpointFile>',
+                     'Restore a domain from a saved state.'),
+    'save'        : ('<Domain> <CheckpointFile>',
+                     'Save a domain state to restore later.'),
+    'shutdown'    : ('<Domain> [-waRH]', 'Shutdown a domain.'),
+    'top'         : ('', 'Monitor a host and the domains in real time.'),
+    'unpause'     : ('<Domain>', 'Unpause a paused domain.'),
+    'uptime'      : ('[-s] <Domain>', 'Print uptime for a domain.'),
 
-sched_credit_help = "sched-credit                           Set or get credit scheduler parameters"
-block_attach_help = """block-attach <DomId> <BackDev> <FrontDev> <Mode>
-                [BackDomId]         Create a new virtual block device"""
-block_detach_help = """block-detach  <DomId> <DevId>    Destroy a domain's virtual block device,
-                                    where <DevId> may either be the device ID
-                                    or the device name as mounted in the guest"""
+    # less used commands
 
-block_list_help = "block-list <DomId> [--long]      List virtual block devices for a domain"
-block_configure_help = """block-configure <DomId> <BackDev> <FrontDev> <Mode>
-                   [BackDomId] Change block device configuration"""
-network_attach_help = """network-attach  <DomID> [script=<script>] [ip=<ip>] [mac=<mac>]
-                           [bridge=<bridge>] [backend=<backDomID>]
-                                    Create a new virtual network device """
-network_detach_help = """network-detach  <DomId> <DevId>  Destroy a domain's virtual network
-                                    device, where <DevId> is the device ID."""
+    'dmesg'       : ('[-c|--clear]',
+                     'Read and/or clear Xend\'s message buffer.'),
+    'domid'       : ('<DomainName>', 'Convert a domain name to domain id.'),
+    'domname'     : ('<DomId>', 'Convert a domain id to domain name.'),
+    'dump-core'   : ('[-L|--live] [-C|--crash] <Domain> [Filename]',
+                     'Dump core for a specific domain.'),
+    'info'        : ('', 'Get information about Xen host.'),
+    'log'         : ('', 'Print Xend log'),
+    'rename'      : ('<Domain> <NewDomainName>', 'Rename a domain.'),
+    'sched-sedf'  : ('<Domain> [options]', 'Get/set EDF parameters.'),
+    'sched-credit': ('-d <Domain> [-w[=WEIGHT]|-c[=CAP]]',
+                     'Get/set credit scheduler parameters.'),
+    'sysrq'       : ('<Domain> <letter>', 'Send a sysrq to a domain.'),
+    'vcpu-list'   : ('[<Domain>]',
+                     'List the VCPUs for a domain or all domains.'),
+    'vcpu-pin'    : ('<Domain> <VCPU> <CPUs>',
+                     'Set which CPUs a VCPU can use.'),
+    'vcpu-set'    : ('<Domain> <vCPUs>',
+                     'Set the number of active VCPUs for allowed for the'
+                     ' domain.'),
 
-network_list_help = "network-list <DomId> [--long]    List virtual network interfaces for a domain"
-vnet_list_help = "vnet-list [-l|--long]            list vnets"
-vnet_create_help = "vnet-create <config>             create a vnet from a config file"
-vnet_delete_help = "vnet-delete <vnetid>             delete a vnet"
-vtpm_list_help = "vtpm-list <DomId> [--long]       list virtual TPM devices"
-addlabel_help =  "addlabel <label> dom <configfile> Add security label to domain\n            <label> res <resource>   or resource"
-rmlabel_help =  "rmlabel dom <configfile>         Remove security label from domain\n           res <resource>           or resource"
-getlabel_help =  "getlabel dom <configfile>        Show security label for domain\n            res <resource>          or resource"
-dry_run_help =  "dry-run <configfile>             Tests if domain can access its resources"
-resources_help =  "resources                        Show info for each labeled resource"
-cfgbootpolicy_help = "cfgbootpolicy <policy>           Add policy to boot configuration "
-dumppolicy_help = "dumppolicy                       Print hypervisor ACM state information"
-loadpolicy_help = "loadpolicy <policy>              Load binary policy into hypervisor"
-makepolicy_help = "makepolicy <policy>              Build policy and create .bin/.map files"
-labels_help     = "labels [policy] [type=DOM|..]    List <type> labels for (active) policy."
-serve_help      = "serve                            Proxy Xend XML-RPC over stdio"
+    # device commands
 
-short_command_list = [
+    'block-attach'  :  ('<Domain> <BackDev> <FrontDev> <Mode>',
+                        'Create a new virtual block device.'),
+    'block-configure': ('<Domain> <BackDev> <FrontDev> <Mode> [BackDomId]',
+                        'Change block device configuration'),
+    'block-detach'  :  ('<Domain> <DevId>',
+                        'Destroy a domain\'s virtual block device.'),
+    'block-list'    :  ('<Domain> [--long]',
+                        'List virtual block devices for a domain.'),
+    'network-attach':  ('<Domain> [--script=<script>] [--ip=<ip>] '
+                        '[--mac=<mac>]',
+                        'Create a new virtual network device.'),
+    'network-detach':  ('<Domain> <DevId>',
+                        'Destroy a domain\'s virtual network device.'),
+    'network-list'  :  ('<Domain> [--long]',
+                        'List virtual network interfaces for a domain.'),
+    'vnet-create'   :  ('<ConfigFile>','Create a vnet from ConfigFile.'),
+    'vnet-delete'   :  ('<VnetId>', 'Delete a Vnet.'),
+    'vnet-list'     :  ('[-l|--long]', 'List Vnets.'),
+    'vtpm-list'     :  ('<Domain> [--long]', 'List virtual TPM devices.'),
+
+    # security
+
+    'addlabel'      :  ('<label> {dom <ConfigFile>|res <resource>} [<policy>]',
+                        'Add security label to domain.'),
+    'rmlabel'       :  ('{dom <ConfigFile>|res <Resource>}',
+                        'Remove a security label from domain.'),
+    'getlabel'      :  ('{dom <ConfigFile>|res <Resource>}',
+                        'Show security label for domain or resource.'),
+    'dry-run'       :  ('<ConfigFile>',
+                        'Test if a domain can access its resources.'),
+    'resources'     :  ('', 'Show info for each labeled resource.'),
+    'cfgbootpolicy' :  ('<policy> [kernelversion]',
+                        'Add policy to boot configuration.'),
+    'dumppolicy'    :  ('', 'Print hypervisor ACM state information.'),
+    'loadpolicy'    :  ('<policy.bin>', 'Load binary policy into hypervisor.'),
+    'makepolicy'    :  ('<policy>', 'Build policy and create .bin/.map '
+                        'files.'),
+    'labels'        :  ('[policy] [type=dom|res|any]',
+                        'List <type> labels for (active) policy.'),
+    'serve'         :  ('', 'Proxy Xend XMLRPC over stdio.'),
+}
+
+SUBCOMMAND_OPTIONS = {
+    'sched-sedf': (
+       ('-p [MS]', '--period[=MS]', 'Relative deadline(ms)'),
+       ('-s [MS]', '--slice[=MS]' ,
+        'Worst-case execution time(ms). (slice < period)'),
+       ('-l [MS]', '--latency[=MS]',
+        'Scaled period (ms) when domain performs heavy I/O'),
+       ('-e [FLAG]', '--extra[=FLAG]',
+        'Flag (0 or 1) controls if domain can run in extra time.'),
+       ('-w [FLOAT]', '--weight[=FLOAT]',
+        'CPU Period/slice (do not set with --period/--slice)'),
+    ),
+    'sched-credit': (
+       ('-d DOMAIN', '--domain=DOMAIN', 'Domain to modify'),
+       ('-w WEIGHT', '--weight=WEIGHT', 'Weight (int)'),
+       ('-c CAP',    '--cap=CAP',       'Cap (int)'),
+    ),
+    'list': (
+       ('-l', '--long', 'Output all VM details in SXP'),
+       ('', '--label',  'Include security labels'),
+    ),
+    'dmesg': (
+       ('-c', '--clear', 'Clear dmesg buffer'),
+    ),
+    'vnet-list': (
+       ('-l', '--long', 'List Vnets as SXP'),
+    ),
+    'network-list': (
+       ('-l', '--long', 'List resources as SXP'),
+    ),
+}
+
+common_commands = [
     "console",
     "create",
     "destroy",
+    "dump-core",
     "help",
     "list",
     "mem-set",
@@ -159,8 +217,8 @@ domain_commands = [
     "destroy",
     "domid",
     "domname",
+    "dump-core",
     "list",
-    "list_label",
     "mem-max",
     "mem-set",
     "migrate",
@@ -218,67 +276,105 @@ acm_commands = [
     "makepolicy",
     "loadpolicy",
     "cfgbootpolicy",
-    "dumppolicy"
+    "dumppolicy",
     ]
 
 all_commands = (domain_commands + host_commands + scheduler_commands +
                 device_commands + vnet_commands + acm_commands)
 
+####################################################################
+#
+#  Help/usage printing functions
+#
+####################################################################
 
-def commandToHelp(cmd):
-    return eval(cmd.replace("-", "_") + "_help")
+def cmdHelp(cmd):
+    """Print help for a specific subcommand."""
+    
+    try:
+        args, desc = SUBCOMMAND_HELP[cmd]
+    except KeyError:
+        shortHelp()
+        return
+    
+    print 'Usage: xm %s %s' % (cmd, args)
+    print
+    print desc
+    
+    try:
+        # If options help message is defined, print this.
+        for shortopt, longopt, desc in SUBCOMMAND_OPTIONS[cmd]:
+            if shortopt and longopt:
+                optdesc = '%s, %s' % (shortopt, longopt)
+            elif shortopt:
+                optdesc = shortopt
+            elif longopt:
+                optdesc = longopt
 
+            wrapped_desc = wrap(desc, 43)   
+            print '  %-30s %-43s' % (optdesc, wrapped_desc[0])
+            for line in wrapped_desc[1:]:
+                print ' ' * 33 + line
+        print
+    except KeyError:
+        # if the command is an external module, we grab usage help
+        # from the module itself.
+        if cmd in IMPORTED_COMMANDS:
+            try:
+                cmd_module =  __import__(cmd, globals(), locals(), 'xen.xm')
+                cmd_usage = getattr(cmd_module, "help", None)
+                if cmd_usage:
+                    print cmd_usage()
+            except ImportError:
+                pass
+        
+def shortHelp():
+    """Print out generic help when xm is called without subcommand."""
+    
+    print USAGE_HELP
+    print 'Common \'xm\' commands:\n'
+    
+    for command in common_commands:
+        try:
+            args, desc = SUBCOMMAND_HELP[command]
+        except KeyError:
+            continue
+        wrapped_desc = wrap(desc, 50)
+        print ' %-20s %-50s' % (command, wrapped_desc[0])
+        for line in wrapped_desc[1:]:
+            print ' ' * 22 + line
 
-shorthelp = """Usage: xm <subcommand> [args]
-    Control, list, and manipulate Xen guest instances
+    print
+    print USAGE_FOOTER
+    print 'For a complete list of subcommands run \'xm help\'.'
+    
+def longHelp():
+    """Print out full help when xm is called with xm --help or xm help"""
+    
+    print USAGE_HELP
+    print 'xm full list of subcommands:\n'
+    
+    for command in all_commands:
+        try:
+            args, desc = SUBCOMMAND_HELP[command]
+        except KeyError:
+            continue
 
-xm common subcommands:
-   """  + help_spacer.join(map(commandToHelp, short_command_list))  + """
+        wrapped_desc = wrap(desc, 50)
+        print ' %-20s %-50s' % (command, wrapped_desc[0])
+        for line in wrapped_desc[1:]:
+            print ' ' * 22 + line        
 
-<DomName> can be substituted for <DomId> in xm subcommands.
+    print
+    print USAGE_FOOTER        
 
-For a complete list of subcommands run 'xm help --long'
-For more help on xm see the xm(1) man page
-For more help on xm create, see the xmdomain.cfg(5) man page"""
-
-longhelp = """Usage: xm <subcommand> [args]
-    Control, list, and manipulate Xen guest instances
-
-xm full list of subcommands:
-
-  Domain Commands:
-   """ + help_spacer.join(map(commandToHelp,  domain_commands)) + """
-
-  Xen Host Commands:
-   """ + help_spacer.join(map(commandToHelp,  host_commands)) + """
-
-  Scheduler Commands:
-   """ + help_spacer.join(map(commandToHelp,  scheduler_commands)) + """
-
-  Virtual Device Commands:
-   """  + help_spacer.join(map(commandToHelp, device_commands)) + """
-
-  Vnet commands:
-   """ + help_spacer.join(map(commandToHelp,  vnet_commands)) + """
-
-  Access Control commands:
-   """ + help_spacer.join(map(commandToHelp,  acm_commands)) + """
-
-<DomName> can be substituted for <DomId> in xm subcommands.
-
-For a short list of subcommands run 'xm help'
-For more help on xm see the xm(1) man page
-For more help on xm create, see the xmdomain.cfg(5) man page"""
-
-# array for xm help <command>
-help = {
-    "--long": longhelp
-    }
-
-for command in all_commands:
-    # create is handled specially
-    if (command != 'create'):
-        help[command] = commandToHelp(command)
+def usage(cmd = None):
+    """ Print help usage information and exits """
+    if cmd:
+        cmdHelp(cmd)
+    else:
+        shortHelp()
+    sys.exit(1)
 
 
 ####################################################################
@@ -293,7 +389,7 @@ def arg_check(args, name, lo, hi = -1):
     if hi == -1:
         if n != lo:
             err("'xm %s' requires %d argument%s.\n" % (name, lo,
-                                                       lo > 1 and 's' or ''))
+                                                       lo == 1 and '' or 's'))
             usage(name)
     else:
         if n < lo or n > hi:
@@ -340,14 +436,19 @@ def err(msg):
 def xm_save(args):
     arg_check(args, "save", 2)
 
-    dom = args[0] # TODO: should check if this exists
+    try:
+        dominfo = parse_doms_info(server.xend.domain(args[0]))
+    except xmlrpclib.Fault, ex:
+        raise ex
+    
+    domid = dominfo['domid']
     savefile = os.path.abspath(args[1])
 
     if not os.access(os.path.dirname(savefile), os.W_OK):
         err("xm save: Unable to create file %s" % savefile)
         sys.exit(1)
     
-    server.xend.domain.save(dom, savefile)
+    server.xend.domain.save(domid, savefile)
     
 def xm_restore(args):
     arg_check(args, "restore", 1)
@@ -361,9 +462,9 @@ def xm_restore(args):
     server.xend.domain.restore(savefile)
 
 
-def getDomains(domain_names):
+def getDomains(domain_names, full = 0):
     if domain_names:
-        return map(server.xend.domain, domain_names)
+        return [server.xend.domain(dom) for dom in domain_names]
     else:
         return server.xend.domains(1)
 
@@ -373,9 +474,11 @@ def xm_list(args):
     show_vcpus = 0
     show_labels = 0
     try:
-        (options, params) = getopt.gnu_getopt(args, 'lv', ['long','vcpus','label'])
+        (options, params) = getopt.gnu_getopt(args, 'lv',
+                                              ['long','vcpus','label'])
     except getopt.GetoptError, opterr:
         err(opterr)
+        usage('list')
         sys.exit(1)
     
     for (k, v) in options:
@@ -392,7 +495,7 @@ def xm_list(args):
         xm_vcpu_list(params)
         return
 
-    doms = getDomains(params)
+    doms = getDomains(params, use_long)
 
     if use_long:
         map(PrettyPrint.prettyprint, doms)
@@ -407,7 +510,7 @@ def parse_doms_info(info):
         return t(sxp.child_value(info, n, d))
     
     return {
-        'dom'      : get_info('domid',        int,   -1),
+        'domid'    : get_info('domid',        int,   -1),
         'name'     : get_info('name',         str,   '??'),
         'mem'      : get_info('memory',       int,   0),
         'vcpus'    : get_info('online_vcpus', int,   0),
@@ -423,7 +526,7 @@ def parse_sedf_info(info):
         return t(sxp.child_value(info, n, d))
 
     return {
-        'dom'      : get_info('domain',        int,   -1),
+        'domid'    : get_info('domid',         int,   -1),
         'period'   : get_info('period',        int,   -1),
         'slice'    : get_info('slice',         int,   -1),
         'latency'  : get_info('latency',       int,   -1),
@@ -431,34 +534,40 @@ def parse_sedf_info(info):
         'weight'   : get_info('weight',        int,   -1),
         }
 
-
 def xm_brief_list(doms):
-    print 'Name                              ID Mem(MiB) VCPUs State  Time(s)'
+    print '%-40s %3s %8s %5s %5s %9s' % \
+          ('Name', 'ID', 'Mem(MiB)', 'VCPUs', 'State', 'Time(s)')
+    
+    format = "%(name)-40s %(domid)3d %(mem)8d %(vcpus)5d %(state)5s " \
+             "%(cpu_time)8.1f"
+    
     for dom in doms:
         d = parse_doms_info(dom)
-        print ("%(name)-32s %(dom)3d %(mem)8d %(vcpus)5d %(state)5s %(cpu_time)7.1f" % d)
-
+        print format % d
 
 def xm_label_list(doms):
+    print '%-32s %3s %8s %5s %5s %9s %-8s' % \
+          ('Name', 'ID', 'Mem(MiB)', 'VCPUs', 'State', 'Time(s)', 'Label')
+    
     output = []
-    print 'Name                              ID Mem(MiB) VCPUs State  Time(s)  Label'
+    format = '%(name)-32s %(domid)3d %(mem)8d %(vcpus)5d %(state)5s ' \
+             '%(cpu_time)8.1f %(seclabel)9s'
+    
     for dom in doms:
         d = parse_doms_info(dom)
-        l = "%(name)-32s %(dom)3d %(mem)8d %(vcpus)5d %(state)5s %(cpu_time)7.1f  " % d
         if security.active_policy not in ['INACTIVE', 'NULL', 'DEFAULT']:
-            if d['seclabel']:
-                line = (l, d['seclabel'])
-            else:
-                line = (l, "ERROR")
+            if not d['seclabel']:
+                d['seclabel'] = 'ERROR'
         elif security.active_policy in ['DEFAULT']:
-            line = (l, "DEFAULT")
+            d['seclabel'] = 'DEFAULT'
         else:
-            line = (l, "INACTIVE")
-        output.append(line)
+            d['seclabel'] = 'INACTIVE'
+        output.append((format % d, d['seclabel']))
+        
     #sort by labels
     output.sort(lambda x,y: cmp( x[1].lower(), y[1].lower()))
-    for l in output:
-        print l[0] + l[1]
+    for line, label in output:
+        print line
 
 
 def xm_vcpu_list(args):
@@ -469,7 +578,11 @@ def xm_vcpu_list(args):
         doms = server.xend.domains(False)
         dominfo = map(server.xend.domain.getVCPUInfo, doms)
 
-    print 'Name                              ID  VCPU  CPU  State  Time(s)  CPU Affinity'
+    print '%-32s %3s %5s %5s %5s %9s %s' % \
+          ('Name', 'ID', 'VCPUs', 'CPU', 'State', 'Time(s)', 'CPU Affinity')
+
+    format = '%(name)-32s %(domid)3d %(number)5d %(c)5s %(s)5s ' \
+             ' %(cpu_time)8.1f %(cpumap)s'
 
     for dom in dominfo:
         def get_info(n):
@@ -563,10 +676,7 @@ def xm_vcpu_list(args):
                 c = "-"
                 s = "--p"
 
-            print (
-                "%(name)-32s %(domid)3d  %(number)4d  %(c)3s   %(s)-3s   %(cpu_time)7.1f  %(cpumap)s" %
-                locals())
-
+            print format % locals()
 
 def xm_reboot(args):
     arg_check(args, "reboot", 1, 3)
@@ -590,32 +700,68 @@ def xm_unpause(args):
 
     server.xend.domain.unpause(dom)
 
+def xm_dump_core(args):
+    live = False
+    crash = False
+    try:
+        (options, params) = getopt.gnu_getopt(args, 'LC', ['live','crash'])
+        for (k, v) in options:
+            if k in ('-L', '--live'):
+                live = True
+            if k in ('-C', '--crash'):
+                crash = True
+
+        if len(params) not in (1, 2):
+            raise OptionError("Expects 1 or 2 argument(s)")
+    except getopt.GetoptError, e:
+        raise OptionError(str(e))
+    
+    dom = params[0]
+    if len(params) == 2:
+        filename = os.path.abspath(params[1])
+    else:
+        filename = None
+
+    if not live:
+        server.xend.domain.pause(dom)
+
+    try:
+        print "Dumping core of domain: %s ..." % str(dom)
+        server.xend.domain.dump(dom, filename, live, crash)
+    finally:
+        if not live:
+            server.xend.domain.unpause(dom)
+
+    if crash:
+        print "Destroying domain: %s ..." % str(dom)
+        server.xend.domain.destroy(dom)
+
 def xm_rename(args):
     arg_check(args, "rename", 2)
-
+        
     server.xend.domain.setName(args[0], args[1])
 
-def xm_subcommand(command, args):
+def xm_importcommand(command, args):
     cmd = __import__(command, globals(), locals(), 'xen.xm')
     cmd.main([command] + args)
 
 
 #############################################################
 
-def cpu_make_map(cpulist):
-    cpus = []
-    for c in cpulist.split(','):
-        if c.find('-') != -1:
-            (x,y) = c.split('-')
-            for i in range(int(x),int(y)+1):
-                cpus.append(int(i))
-        else:
-            cpus.append(int(c))
-    cpus.sort()
-    return cpus
-
 def xm_vcpu_pin(args):
     arg_check(args, "vcpu-pin", 3)
+
+    def cpu_make_map(cpulist):
+        cpus = []
+        for c in cpulist.split(','):
+            if c.find('-') != -1:
+                (x,y) = c.split('-')
+                for i in range(int(x),int(y)+1):
+                    cpus.append(int(i))
+            else:
+                cpus.append(int(c))
+        cpus.sort()
+        return cpus
 
     dom  = args[0]
     vcpu = int(args[1])
@@ -677,11 +823,12 @@ def xm_sched_sedf(args):
         info['period']  = ns_to_ms(info['period'])
         info['slice']   = ns_to_ms(info['slice'])
         info['latency'] = ns_to_ms(info['latency'])
-        print( ("%(name)-32s %(dom)3d %(period)9.1f %(slice)9.1f" +
+        print( ("%(name)-32s %(domid)3d %(period)9.1f %(slice)9.1f" +
                 " %(latency)7.1f %(extratime)6d %(weight)6d") % info)
 
     def domid_match(domid, info):
-        return domid is None or domid == info['name'] or domid == str(info['dom'])
+        return domid is None or domid == info['name'] or \
+               domid == str(info['domid'])
 
     # we want to just display current info if no parameters are passed
     if len(args) == 0:
@@ -715,20 +862,25 @@ def xm_sched_sedf(args):
         elif k in ['-w', '--weight']:
             opts['weight'] = v
 
-    # print header if we aren't setting any parameters
-    if len(opts.keys()) == 0:
-        print '%-33s %-2s %-4s %-4s %-7s %-5s %-6s'%('Name','ID','Period(ms)',
-                                                     'Slice(ms)', 'Lat(ms)',
-                                                     'Extra','Weight')
-
     doms = filter(lambda x : domid_match(domid, x),
                         [parse_doms_info(dom) for dom in getDomains("")])
+
+    # print header if we aren't setting any parameters
+    if len(opts.keys()) == 0:
+        print '%-33s %-2s %-4s %-4s %-7s %-5s %-6s' % \
+              ('Name','ID','Period(ms)', 'Slice(ms)', 'Lat(ms)',
+               'Extra','Weight')
+    
     for d in doms:
         # fetch current values so as not to clobber them
-        sedf_info = \
-            parse_sedf_info(server.xend.domain.cpu_sedf_get(d['dom']))
-        sedf_info['name'] = d['name']
+        try:
+            sedf_raw = server.xend.domain.cpu_sedf_get(d['domid'])
+        except xmlrpclib.Fault:
+            # domain does not support sched-sedf?
+            sedf_raw = {}
 
+        sedf_info = parse_sedf_info(sedf_raw)
+        sedf_info['name'] = d['name']
         # update values in case of call to set
         if len(opts.keys()) > 0:
             for k in opts.keys():
@@ -738,7 +890,7 @@ def xm_sched_sedf(args):
             v = map(int, [sedf_info['period'], sedf_info['slice'],
                           sedf_info['latency'],sedf_info['extratime'], 
                           sedf_info['weight']])
-            rv = server.xend.domain.cpu_sedf_set(d['dom'], *v)
+            rv = server.xend.domain.cpu_sedf_set(d['domid'], *v)
             if int(rv) != 0:
                 err("Failed to set sedf parameters (rv=%d)."%(rv))
 
@@ -747,17 +899,14 @@ def xm_sched_sedf(args):
             print_sedf(sedf_info)
 
 def xm_sched_credit(args):
-    usage_msg = """sched-credit:     Set or get credit scheduler parameters
- Usage:
-
-        sched-credit -d domain [-w weight] [-c cap]
-    """
+    """Get/Set options for Credit Scheduler."""
+    
     try:
-        opts, args = getopt.getopt(args[0:], "d:w:c:",
+        opts, params = getopt.getopt(args, "d:w:c:",
             ["domain=", "weight=", "cap="])
-    except getopt.GetoptError:
-        # print help information and exit:
-        print usage_msg
+    except getopt.GetoptError, opterr:
+        err(opterr)
+        usage('sched-credit')
         sys.exit(1)
 
     domain = None
@@ -774,20 +923,16 @@ def xm_sched_credit(args):
 
     if domain is None:
         # place holder for system-wide scheduler parameters
-        print usage_msg
+        err("No domain given.")
+        usage('sched-credit')
         sys.exit(1)
 
     if weight is None and cap is None:
         print server.xend.domain.sched_credit_get(domain)
     else:
-        if weight is None:
-            weight = int(0)
-        if cap is None:
-            cap = int(~0)
-
-        err = server.xend.domain.sched_credit_set(domain, weight, cap)
-        if err != 0:
-            print err
+        result = server.xend.domain.sched_credit_set(domain, weight, cap)
+        if result != 0:
+            err(str(result))
 
 def xm_info(args):
     arg_check(args, "info", 0)
@@ -806,6 +951,8 @@ def xm_console(args):
     dom = args[0]
     info = server.xend.domain(dom)
     domid = int(sxp.child_value(info, 'domid', '-1'))
+    if domid == -1:
+        raise Exception("Domain is not started")
     console.execConsole(domid)
 
 def xm_uptime(args):
@@ -862,6 +1009,12 @@ def xm_uptime(args):
 
         print upstring
 
+def xm_sysrq(args):
+    arg_check(args, "sysrq", 2)
+    dom = args[0]
+    req = args[1]
+    server.xend.domain.send_sysrq(dom, req)    
+
 def xm_top(args):
     arg_check(args, "top", 0)
 
@@ -883,8 +1036,11 @@ its contents if the [-c|--clear] flag is specified.
     myargs = args
     myargs.insert(0, 'dmesg')
     gopts.parse(myargs)
-    if not (1 <= len(myargs) <= 2):
+    
+    if len(myargs) not in (1, 2):
         err('Invalid arguments: ' + str(myargs))
+        usage('dmesg')
+        sys.exit(1)
 
     if not gopts.vals.clear:
         print server.xend.node.dmesg.info()
@@ -902,7 +1058,7 @@ def xm_serve(args):
     from fcntl import fcntl, F_SETFL
     
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    s.connect(xen.xend.XendClient.XML_RPC_SOCKET)
+    s.connect(XendClient.XML_RPC_SOCKET)
     fcntl(sys.stdin, F_SETFL, os.O_NONBLOCK)
 
     while True:
@@ -1048,7 +1204,7 @@ def parse_block_configuration(args):
         cls = 'tap'
     else:
         cls = 'vbd'
-        
+
     vbd = [cls,
            ['uname', args[1]],
            ['dev',   args[2]],
@@ -1057,19 +1213,12 @@ def parse_block_configuration(args):
         vbd.append(['backend', args[4]])
 
     # verify that policy permits attaching this resource
-    try:
-        if security.on():
-            dominfo = server.xend.domain(dom)
-            label = security.get_security_printlabel(dominfo)
-        else:
-            label = None
+    if security.on():
+        dominfo = server.xend.domain(dom)
+        label = security.get_security_printlabel(dominfo)
+    else:
+        label = None
         security.res_security_check(args[1], label)
-    except security.ACMError, e:
-        print e.value
-        sys.exit(1)
-    except:
-        traceback.print_exc(limit=1)
-        sys.exit(1)
 
     return (dom, vbd)
 
@@ -1168,11 +1317,13 @@ commands = {
     "destroy": xm_destroy,
     "domid": xm_domid,
     "domname": xm_domname,
+    "dump-core": xm_dump_core,
+    "reboot": xm_reboot,    
     "rename": xm_rename,
     "restore": xm_restore,
     "save": xm_save,
-    "reboot": xm_reboot,
     "shutdown": xm_shutdown,
+    "sysrq": xm_sysrq,
     "uptime": xm_uptime,
     "list": xm_list,
     # memory commands
@@ -1211,24 +1362,23 @@ commands = {
     }
 
 ## The commands supported by a separate argument parser in xend.xm.
-subcommands = [
+IMPORTED_COMMANDS = [
     'create',
     'migrate',
-    'sysrq',
     'labels',
     'addlabel',
-    'rmlabel',
-    'getlabel',
-    'dry-run',
-    'resources',
     'cfgbootpolicy',
     'makepolicy',
     'loadpolicy',
     'dumppolicy'
+    'rmlabel',
+    'getlabel',
+    'dry-run',
+    'resources',
     ]
 
-for c in subcommands:
-    commands[c] = eval('lambda args: xm_subcommand("%s", args)' % c)
+for c in IMPORTED_COMMANDS:
+    commands[c] = eval('lambda args: xm_importcommand("%s", args)' % c)
 
 aliases = {
     "balloon": "mem-set",
@@ -1246,11 +1396,18 @@ def xm_lookup_cmd(cmd):
     elif aliases.has_key(cmd):
         deprecated(cmd,aliases[cmd])
         return commands[aliases[cmd]]
+    elif cmd == 'help':
+        longHelp()
+        sys.exit(0)
     else:
-        if len( cmd ) > 1:
-            matched_commands = filter( lambda (command, func): command[ 0:len(cmd) ] == cmd, commands.iteritems() )
-            if len( matched_commands ) == 1:
-		        return matched_commands[0][1]
+        # simulate getopt's prefix matching behaviour
+        if len(cmd) > 1:
+            same_prefix_cmds = [commands[c] for c in commands.keys() \
+                                if c[:len(cmd)] == cmd]
+            # only execute if there is only 1 match
+            if len(same_prefix_cmds) == 1:
+                return same_prefix_cmds[0]
+            
         err('Sub Command %s not found!' % cmd)
         usage()
 
@@ -1258,27 +1415,17 @@ def deprecated(old,new):
     print >>sys.stderr, (
         "Command %s is deprecated.  Please use xm %s instead." % (old, new))
 
-def usage(cmd=None):
-    if cmd == 'create':
-        mycmd = xm_lookup_cmd(cmd)
-        mycmd( ['--help'] )
-        sys.exit(1)
-    if help.has_key(cmd):
-        print "   " + help[cmd]
-    else:
-        print shorthelp
-    sys.exit(1)
-
 def main(argv=sys.argv):
     if len(argv) < 2:
         usage()
-    
-    if re.compile('-*help').match(argv[1]):
-	if len(argv) > 2:
-	    usage(argv[2])
-	else:
-	    usage()
-	sys.exit(0)
+
+    # intercept --help and output our own help
+    if '--help' in argv[1:]:
+        if '--help' == argv[1]:
+            longHelp()
+        else:
+            usage(argv[1])
+        sys.exit(0)
 
     cmd = xm_lookup_cmd(argv[1])
 
@@ -1291,9 +1438,9 @@ def main(argv=sys.argv):
                 usage()
         except socket.error, ex:
             if os.geteuid() != 0:
-                err("Most commands need root access.  Please try again as root.")
+                err("Most commands need root access. Please try again as root.")
             else:
-                err("Error connecting to xend: %s.  Is xend running?" % ex[1])
+                err("Unable to connect to xend: %s. Is xend running?" % ex[1])
             sys.exit(1)
         except KeyboardInterrupt:
             print "Interrupted."
@@ -1302,16 +1449,16 @@ def main(argv=sys.argv):
             if os.geteuid() != 0:
                 err("Most commands need root access.  Please try again as root.")
             else:
-                err("Error connecting to xend: %s." % ex[1])
+                err("Unable to connect to xend: %s." % ex[1])
             sys.exit(1)
         except SystemExit:
             sys.exit(1)
         except xmlrpclib.Fault, ex:
-            if ex.faultCode == xen.xend.XendClient.ERROR_INVALID_DOMAIN:
-                print  >>sys.stderr, (
-                    "Error: the domain '%s' does not exist." % ex.faultString)
+            if ex.faultCode == XendClient.ERROR_INVALID_DOMAIN:
+                err("Domain '%s' does not exist." % ex.faultString)
             else:
-                print  >>sys.stderr, "Error: %s" % ex.faultString
+                err(ex.faultString)
+            usage(argv[1])
             sys.exit(1)
         except xmlrpclib.ProtocolError, ex:
             if ex.errcode == -1:
@@ -1326,6 +1473,10 @@ def main(argv=sys.argv):
         except (ValueError, OverflowError):
             err("Invalid argument.")
             usage(argv[1])
+        except OptionError, e:
+            err(str(e))
+            usage(argv[1])
+            print e.usage()
         except:
             print "Unexpected error:", sys.exc_info()[0]
             print

@@ -1,7 +1,7 @@
 Index: ioemu/vnc.c
 ===================================================================
---- ioemu.orig/vnc.c	2006-08-17 19:37:36.091553839 +0100
-+++ ioemu/vnc.c	2006-08-17 19:50:10.313996001 +0100
+--- ioemu.orig/vnc.c	2006-09-21 18:54:22.000000000 +0100
++++ ioemu/vnc.c	2006-09-21 19:05:39.000000000 +0100
 @@ -143,13 +143,16 @@
  static void vnc_dpy_update(DisplayState *ds, int x, int y, int w, int h)
  {
@@ -30,7 +30,16 @@ Index: ioemu/vnc.c
  
      if (vs->need_update && vs->csock != -1) {
  	int y;
-@@ -390,7 +394,7 @@
+@@ -383,6 +387,8 @@
+ 	int saved_offset;
+ 	int has_dirty = 0;
+ 
++	qemu_mod_timer(vs->timer, now + VNC_REFRESH_INTERVAL);
++
+         vnc_set_bits(width_mask, (vs->width / 16), VNC_DIRTY_WORDS);
+ 
+ 	/* Walk through the dirty map and eliminate tiles that
+@@ -390,7 +396,7 @@
  	row = vs->ds->data;
  	old_row = vs->old_data;
  
@@ -39,34 +48,50 @@ Index: ioemu/vnc.c
  	    if (vnc_and_bits(vs->dirty_row[y], width_mask, VNC_DIRTY_WORDS)) {
  		int x;
  		char *ptr, *old_ptr;
-@@ -415,10 +419,8 @@
+@@ -415,10 +421,8 @@
  	    old_row += vs->ds->linesize;
  	}
  
 -	if (!has_dirty) {
 -	    qemu_mod_timer(vs->timer, qemu_get_clock(rt_clock) + VNC_REFRESH_INTERVAL);
--	    return;
--	}
 +	if (!has_dirty)
-+	    goto out;
+ 	    return;
+-	}
  
  	/* Count rectangles */
  	n_rectangles = 0;
-@@ -456,7 +458,9 @@
+@@ -454,17 +458,13 @@
+ 	vs->output.buffer[saved_offset] = (n_rectangles >> 8) & 0xFF;
+ 	vs->output.buffer[saved_offset + 1] = n_rectangles & 0xFF;
  	vnc_flush(vs);
- 
+-
      }
 -    qemu_mod_timer(vs->timer, qemu_get_clock(rt_clock) + VNC_REFRESH_INTERVAL);
-+
-+ out:
-+    qemu_mod_timer(vs->timer, now + VNC_REFRESH_INTERVAL);
  }
  
  static void vnc_timer_init(VncState *vs)
+ {
+-    if (vs->timer == NULL) {
++    if (vs->timer == NULL)
+ 	vs->timer = qemu_new_timer(rt_clock, vnc_update_client, vs);
+-	qemu_mod_timer(vs->timer, qemu_get_clock(rt_clock));
+-    }
+ }
+ 
+ static void vnc_dpy_refresh(DisplayState *ds)
+@@ -736,6 +736,8 @@
+ 	    old_row += vs->ds->linesize;
+ 	}
+     }
++
++    qemu_mod_timer(vs->timer, qemu_get_clock(rt_clock));
+ }
+ 
+ static void set_encodings(VncState *vs, int32_t *encodings, size_t n_encodings)
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-08-17 19:50:02.410869542 +0100
-+++ ioemu/vl.c	2006-08-17 19:50:10.316995669 +0100
+--- ioemu.orig/vl.c	2006-09-21 18:55:38.000000000 +0100
++++ ioemu/vl.c	2006-09-21 19:00:48.000000000 +0100
 @@ -5120,10 +5120,10 @@
          /* XXX: better handling of removal */
          for(ioh = first_io_handler; ioh != NULL; ioh = ioh_next) {

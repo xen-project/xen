@@ -90,10 +90,9 @@ include/xen/acm_policy.h:
 	  echo "#endif") >$@
 
 # compile.h contains dynamic build info. Rebuilt on every 'make' invocation.
-include/xen/compile.h: LANG=C
 include/xen/compile.h: include/xen/compile.h.in
-	@sed -e 's/@@date@@/$(shell date)/g' \
-	    -e 's/@@time@@/$(shell date +%T)/g' \
+	@sed -e 's/@@date@@/$(shell LC_ALL=C date)/g' \
+	    -e 's/@@time@@/$(shell LC_ALL=C date +%T)/g' \
 	    -e 's/@@whoami@@/$(shell whoami)/g' \
 	    -e 's/@@domain@@/$(shell ([ -x /bin/dnsdomainname ] && /bin/dnsdomainname) || ([ -x /bin/domainname ] && /bin/domainname || echo [unknown]))/g' \
 	    -e 's/@@hostname@@/$(shell hostname)/g' \
@@ -124,19 +123,29 @@ include/asm-$(TARGET_ARCH)/asm-offsets.h: arch/$(TARGET_ARCH)/asm-offsets.s
 
 SUBDIRS = acm arch/$(TARGET_ARCH) common drivers 
 define all_sources
-    ( find include/asm-$(TARGET_ARCH) -name SCCS -prune -o -name '*.h' -print; \
-      find include -type d -name SCCS -prune -o \( -name "asm-*" -o \
-            -name config \) -prune -o -name '*.h' -print; \
-      find $(SUBDIRS) -name SCCS -prune -o -name '*.[chS]' -print )
+    ( find include/asm-$(TARGET_ARCH) -name '*.h' -print; \
+      find include -name 'asm-*' -prune -o -name '*.h' -print; \
+      find $(SUBDIRS) -name '*.[chS]' -print )
+endef
+
+define set_exuberant_flags
+    exuberant_flags=`$1 --version 2>/dev/null | grep -iq exuberant && \
+	echo "-I __initdata,__exitdata,__acquires,__releases \
+	    -I EXPORT_SYMBOL,EXPORT_SYMBOL_GPL \
+	    --extra=+f --c-kinds=+px"`
 endef
 
 .PHONY: _TAGS
 _TAGS: 
-	rm -f TAGS && $(all_sources) | xargs etags -a
+	rm -f TAGS; \
+	$(call set_exuberant_flags,etags); \
+	$(all_sources) | xargs etags $$exuberant_flags -a
 
 .PHONY: _tags
 _tags: 
-	rm -f TAGS && $(all_sources) | xargs ctags -a
+	rm -f tags; \
+	$(call set_exuberant_flags,ctags); \
+	$(all_sources) | xargs ctags $$exuberant_flags -a
 
 .PHONY: _cscope
 _cscope:

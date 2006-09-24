@@ -38,7 +38,6 @@ extern unsigned long domain0_ready;
 int find_max_pfn (unsigned long, unsigned long, void *);
 
 /* FIXME: which header these declarations should be there ? */
-extern void initialize_keytable(void);
 extern long is_platform_hp_ski(void);
 extern void early_setup_arch(char **);
 extern void late_setup_arch(char **);

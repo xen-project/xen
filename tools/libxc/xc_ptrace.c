@@ -611,17 +611,12 @@ xc_ptrace(
             online_vcpus_changed(cpumap);
         break;
 
-    case PTRACE_SETFPREGS:
-    case PTRACE_SETFPXREGS:
-    case PTRACE_PEEKUSER:
-    case PTRACE_POKEUSER:
-    case PTRACE_SYSCALL:
-    case PTRACE_KILL:
-        goto out_unsupported; /* XXX not yet supported */
-
     case PTRACE_TRACEME:
         IPRINTF("PTRACE_TRACEME is an invalid request under Xen\n");
         goto out_error;
+
+    default:
+        goto out_unsupported; /* XXX not yet supported */
     }
 
     return retval;

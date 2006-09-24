@@ -31,6 +31,7 @@
 #include <asm/io.h>
 #include "exceptions.h"
 #include "of-devtree.h"
+#include "oftree.h"
 
 /* Secondary processors use this for handshaking with main processor.  */
 volatile unsigned int __spin_ack;
@@ -38,7 +39,6 @@ volatile unsigned int __spin_ack;
 static ulong of_vec;
 static ulong of_msr;
 static int of_out;
-static ofdn_t boot_cpu;
 static char bootargs[256];
 
 #define COMMAND_LINE_SIZE 512
@@ -669,7 +669,7 @@ static int boot_of_fixup_chosen(void *mem)
             dn = ofd_node_find(mem, ofpath);
             if (dn <= 0) of_panic("no node for: %s\n", ofpath);
 
-            boot_cpu = dn;
+            ofd_boot_cpu = dn;
             val = dn;
 
             dn = ofd_node_find(mem, "/chosen");
@@ -681,7 +681,7 @@ static int boot_of_fixup_chosen(void *mem)
         } else {
             of_printf("*** can't find path to booting cpu, "
                     "SMP is disabled\n");
-            boot_cpu = -1;
+            ofd_boot_cpu = -1;
         }
     }
     return rc;
@@ -773,7 +773,7 @@ static void __init boot_of_fix_maple(void)
     }
 }
     
-static int __init boot_of_serial(void *oftree)
+static int __init boot_of_serial(void *oft)
 {
     int n;
     int p;
@@ -805,7 +805,7 @@ static int __init boot_of_serial(void *oftree)
             continue;
 
         of_printf("pruning `%s' from devtree\n", buf);
-        rc = ofd_prune_path(oftree, buf);
+        rc = ofd_prune_path(oft, buf);
         if (rc < 0)
             of_panic("prune of `%s' failed\n", buf);
     }
@@ -858,8 +858,8 @@ static int __init boot_of_serial(void *oftree)
 static void boot_of_module(ulong r3, ulong r4, multiboot_info_t *mbi)
 {
     static module_t mods[3];
-    void *oftree;
-    ulong oftree_sz = 48 * PAGE_SIZE;
+    void *oft;
+    ulong oft_sz = 48 * PAGE_SIZE;
     ulong mod0_start;
     ulong mod0_size;
     static const char sepr[] = " -- ";
@@ -922,28 +922,28 @@ static void boot_of_module(ulong r3, ulong r4, multiboot_info_t *mbi)
     }
 
     /* snapshot the tree */
-    oftree = (void*)find_space(oftree_sz, PAGE_SIZE, mbi);
-    if (oftree == 0)
+    oft = (void*)find_space(oft_sz, PAGE_SIZE, mbi);
+    if (oft == 0)
         of_panic("Could not allocate OFD tree\n");
 
-    of_printf("creating oftree\n");
+    of_printf("creating oft\n");
     of_test("package-to-path");
-    oftree = ofd_create(oftree, oftree_sz);
-    pkg_save(oftree);
+    oft = ofd_create(oft, oft_sz);
+    pkg_save(oft);
 
-    if (ofd_size(oftree) > oftree_sz)
+    if (ofd_size(oft) > oft_sz)
          of_panic("Could not fit all of native devtree\n");
 
-    boot_of_fixup_refs(oftree);
-    boot_of_fixup_chosen(oftree);
+    boot_of_fixup_refs(oft);
+    boot_of_fixup_chosen(oft);
 
-    if (ofd_size(oftree) > oftree_sz)
+    if (ofd_size(oft) > oft_sz)
          of_panic("Could not fit all devtree fixups\n");
 
-    ofd_walk(oftree, OFD_ROOT, /* add_hype_props */ NULL, 2);
+    ofd_walk(oft, OFD_ROOT, /* add_hype_props */ NULL, 2);
 
-    mods[1].mod_start = (ulong)oftree;
-    mods[1].mod_end = mods[1].mod_start + oftree_sz;
+    mods[1].mod_start = (ulong)oft;
+    mods[1].mod_end = mods[1].mod_start + oft_sz;
     of_printf("%s: mod[1] @ 0x%016x[0x%x]\n", __func__,
               mods[1].mod_start, mods[1].mod_end);
 
@@ -952,26 +952,36 @@ static void boot_of_module(ulong r3, ulong r4, multiboot_info_t *mbi)
     mbi->mods_count = 2;
     mbi->mods_addr = (u32)mods;
 
-    boot_of_serial(oftree);
+    boot_of_serial(oft);
 }
 
 static int __init boot_of_cpus(void)
 {
-    int cpus;
-    int cpu, bootcpu, logical;
+    int cpus_node;
+    int cpu_node, bootcpu_node, logical;
     int result;
+    s32 cpuid;
     u32 cpu_clock[2];
+    extern uint cpu_hard_id[NR_CPUS];
 
-    cpus = of_finddevice("/cpus");
-    cpu = of_getchild(cpus);
-    result = of_getprop(cpu, "timebase-frequency", &timebase_freq,
+    /* Look up which CPU we are running on right now and get all info
+     * from there */
+    result = of_getprop(bof_chosen, "cpu",
+                        &bootcpu_node, sizeof (bootcpu_node));
+    if (result == OF_FAILURE)
+        of_panic("Failed to look up boot cpu\n");
+
+    cpu_node = bootcpu_node;
+
+    result = of_getprop(cpu_node, "timebase-frequency", &timebase_freq,
             sizeof(timebase_freq));
     if (result == OF_FAILURE) {
         of_panic("Couldn't get timebase frequency!\n");
     }
     of_printf("OF: timebase-frequency = %d Hz\n", timebase_freq);
 
-    result = of_getprop(cpu, "clock-frequency", &cpu_clock, sizeof(cpu_clock));
+    result = of_getprop(cpu_node, "clock-frequency",
+                        &cpu_clock, sizeof(cpu_clock));
     if (result == OF_FAILURE || (result !=4 && result != 8)) {
         of_panic("Couldn't get clock frequency!\n");
     }
@@ -983,69 +993,79 @@ static int __init boot_of_cpus(void)
     cpu_khz /= 1000;
     of_printf("OF: clock-frequency = %ld KHz\n", cpu_khz);
 
-    /* Look up which CPU we are running on right now.  */
-    result = of_getprop(bof_chosen, "cpu", &bootcpu, sizeof (bootcpu));
-    if (result == OF_FAILURE)
-        of_panic("Failed to look up boot cpu\n");
-
-    cpu = of_getpeer(cpu);
-
-    /* We want a continuous logical cpu number space.  */
+    /* We want a continuous logical cpu number space and we'll make
+     * the booting CPU logical 0.  */
     cpu_set(0, cpu_present_map);
     cpu_set(0, cpu_online_map);
     cpu_set(0, cpu_possible_map);
 
-    /* Spin up all CPUS, even if there are more than NR_CPUS, because
-     * Open Firmware has them spinning on cache lines which will
-     * eventually be scrubbed, which could lead to random CPU activation.
+    result = of_getprop(cpu_node, "reg", &cpuid, sizeof(cpuid));
+    cpu_hard_id[0] = cpuid;
+
+    /* Spin up all CPUS, even if there are more than NR_CPUS or we are
+     * runnign nosmp, because Open Firmware has them spinning on cache
+     * lines which will eventually be scrubbed, which could lead to
+     * random CPU activation.
      */
-    for (logical = 1; cpu > 0; logical++) {
-        unsigned int cpuid, ping, pong;
+
+    /* Find the base of the multi-CPU package node */
+    cpus_node = of_finddevice("/cpus");
+    if (cpus_node <= 0) {
+        of_printf("Single Processor System\n");
+        return 1;
+    }
+    /* Start with the first child */
+    cpu_node = of_getchild(cpus_node);
+
+    for (logical = 1; cpu_node > 0; logical++) {
+        unsigned int ping, pong;
         unsigned long now, then, timeout;
+        
+        if (cpu_node == bootcpu_node) {
+            /* same CPU as boot CPU shich we have already made 0 so
+             * reduce the logical count */
+            --logical;
+        } else {
+            result = of_getprop(cpu_node, "reg", &cpuid, sizeof(cpuid));
+            if (result == OF_FAILURE)
+                of_panic("cpuid lookup failed\n");
 
-        if (cpu == bootcpu) {
-            of_printf("skipping boot cpu!\n");
-            continue;
-        }
+            cpu_hard_id[logical] = cpuid;
 
-        result = of_getprop(cpu, "reg", &cpuid, sizeof(cpuid));
-        if (result == OF_FAILURE)
-            of_panic("cpuid lookup failed\n");
+            of_printf("spinning up secondary processor #%d: ", logical);
 
-        of_printf("spinning up secondary processor #%d: ", logical);
-
-        __spin_ack = ~0x0;
-        ping = __spin_ack;
-        pong = __spin_ack;
-        of_printf("ping = 0x%x: ", ping);
-
-        mb();
-        result = of_start_cpu(cpu, (ulong)spin_start, logical);
-        if (result == OF_FAILURE)
-            of_panic("start cpu failed\n");
-
-        /* We will give the secondary processor five seconds to reply.  */
-        then = mftb();
-        timeout = then + (5 * timebase_freq);
-
-        do {
-            now = mftb();
-            if (now >= timeout) {
-                of_printf("BROKEN: ");
-                break;
-            }
+            __spin_ack = ~0x0;
+            ping = __spin_ack;
+            pong = __spin_ack;
+            of_printf("ping = 0x%x: ", ping);
 
             mb();
-            pong = __spin_ack;
-        } while (pong == ping);
-        of_printf("pong = 0x%x\n", pong);
+            result = of_start_cpu(cpu_node, (ulong)spin_start, logical);
+            if (result == OF_FAILURE)
+                of_panic("start cpu failed\n");
 
-        if (pong != ping) {
-            cpu_set(logical, cpu_present_map);
-            cpu_set(logical, cpu_possible_map);
+            /* We will give the secondary processor five seconds to reply.  */
+            then = mftb();
+            timeout = then + (5 * timebase_freq);
+
+            do {
+                now = mftb();
+                if (now >= timeout) {
+                    of_printf("BROKEN: ");
+                    break;
+                }
+
+                mb();
+                pong = __spin_ack;
+            } while (pong == ping);
+            of_printf("pong = 0x%x\n", pong);
+
+            if (pong != ping) {
+                cpu_set(logical, cpu_present_map);
+                cpu_set(logical, cpu_possible_map);
+            }
         }
-
-        cpu = of_getpeer(cpu);
+        cpu_node = of_getpeer(cpu_node);
     }
     return 1;
 }

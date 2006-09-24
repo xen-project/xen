@@ -675,6 +675,11 @@ def main():
     if options.mspersample < 0:
         parser.error("option --ms_per_sample: invalid negative value: '%d'" %
                      options.mspersample)
+    # If --ms_per_sample= is too large, no data may be logged.
+    if not options.live and options.duration != 0 and \
+       options.mspersample > options.duration * 1000:
+        parser.error("option --ms_per_sample: too large (> %d ms)" %
+                     (options.duration * 1000))
     
     start_xenbaked()
     if options.live:

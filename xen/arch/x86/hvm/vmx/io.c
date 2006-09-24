@@ -108,11 +108,17 @@ asmlinkage void vmx_intr_assist(void)
         return;
     }
 
+    /* This could be moved earlier in the VMX resume sequence. */
     __vmread(IDT_VECTORING_INFO_FIELD, &idtv_info_field);
     if (unlikely(idtv_info_field & INTR_INFO_VALID_MASK)) {
         __vmwrite(VM_ENTRY_INTR_INFO_FIELD, idtv_info_field);
 
-        __vmread(VM_EXIT_INSTRUCTION_LEN, &inst_len);
+        /*
+         * Safe: the length will only be interpreted for software exceptions
+         * and interrupts. If we get here then delivery of some event caused a
+         * fault, and this always results in defined VM_EXIT_INSTRUCTION_LEN.
+         */
+        __vmread(VM_EXIT_INSTRUCTION_LEN, &inst_len); /* Safe */
         __vmwrite(VM_ENTRY_INSTRUCTION_LEN, inst_len);
 
         if (unlikely(idtv_info_field & 0x800)) { /* valid error code */

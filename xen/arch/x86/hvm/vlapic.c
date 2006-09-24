@@ -66,12 +66,10 @@ int vlapic_find_highest_irr(struct vlapic *vlapic)
 {
     int result;
 
-     result = find_highest_bit((unsigned long *)(vlapic->regs + APIC_IRR),
-                               MAX_VECTOR);
+    result = vlapic_find_highest_vector(vlapic->regs + APIC_IRR);
+    ASSERT((result == -1) || (result >= 16));
 
-     ASSERT( result == -1 || result >= 16);
-
-     return result;
+    return result;
 }
 
 s_time_t get_apictime_scheduled(struct vcpu *v)
@@ -89,10 +87,8 @@ int vlapic_find_highest_isr(struct vlapic *vlapic)
 {
     int result;
 
-    result = find_highest_bit((unsigned long *)(vlapic->regs + APIC_ISR),
-                               MAX_VECTOR);
-
-    ASSERT( result == -1 || result >= 16);
+    result = vlapic_find_highest_vector(vlapic->regs + APIC_ISR);
+    ASSERT((result == -1) || (result >= 16));
 
     return result;
 }
@@ -221,7 +217,8 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
         if ( unlikely(vlapic == NULL || !vlapic_enabled(vlapic)) )
             break;
 
-        if ( test_and_set_bit(vector, vlapic->regs + APIC_IRR) && trig_mode)
+        if ( vlapic_test_and_set_vector(vector, vlapic->regs + APIC_IRR) &&
+             trig_mode)
         {
             HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
                   "level trig mode repeatedly for vector %d\n", vector);
@@ -232,7 +229,7 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
         {
             HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
               "level trig mode for vector %d\n", vector);
-            set_bit(vector, vlapic->regs + APIC_TMR);
+            vlapic_set_vector(vector, vlapic->regs + APIC_TMR);
         }
         hvm_prod_vcpu(v);
 
@@ -358,10 +355,10 @@ void vlapic_EOI_set(struct vlapic *vlapic)
     if ( vector == -1 )
         return ;
 
-    clear_bit(vector, vlapic->regs + APIC_ISR);
+    vlapic_clear_vector(vector, vlapic->regs + APIC_ISR);
     vlapic_update_ppr(vlapic);
 
-    if ( test_and_clear_bit(vector, vlapic->regs + APIC_TMR) )
+    if ( vlapic_test_and_clear_vector(vector, vlapic->regs + APIC_TMR) )
         ioapic_update_EOI(vlapic->domain, vector);
 }
 
@@ -816,7 +813,7 @@ void vlapic_timer_fn(void *data)
 
     vlapic->timer_last_update = now;
 
-    if ( test_and_set_bit(timer_vector, vlapic->regs + APIC_IRR ))
+    if ( vlapic_test_and_set_vector(timer_vector, vlapic->regs + APIC_IRR) )
         vlapic->intr_pending_count[timer_vector]++;
 
     if ( vlapic_lvtt_period(vlapic) )
@@ -893,7 +890,7 @@ int cpu_get_apic_interrupt(struct vcpu *v, int *mode)
                 HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
                             "Sending an illegal vector 0x%x.", highest_irr);
 
-                set_bit(err_vector, vlapic->regs + APIC_IRR);
+                vlapic_set_vector(err_vector, vlapic->regs + APIC_IRR);
                 highest_irr = err_vector;
             }
 
@@ -943,15 +940,17 @@ void vlapic_post_injection(struct vcpu *v, int vector, int deliver_mode)
     switch ( deliver_mode ) {
     case APIC_DM_FIXED:
     case APIC_DM_LOWEST:
-        set_bit(vector, vlapic->regs + APIC_ISR);
-        clear_bit(vector, vlapic->regs + APIC_IRR);
+        vlapic_set_vector(vector, vlapic->regs + APIC_ISR);
+        vlapic_clear_vector(vector, vlapic->regs + APIC_IRR);
         vlapic_update_ppr(vlapic);
 
         if ( vector == vlapic_lvt_vector(vlapic, APIC_LVTT) )
         {
-            vlapic->intr_pending_count[vector]--;
             if ( vlapic->intr_pending_count[vector] > 0 )
-                test_and_set_bit(vector, vlapic->regs + APIC_IRR);
+            {
+                vlapic->intr_pending_count[vector]--;
+                vlapic_test_and_set_vector(vector, vlapic->regs + APIC_IRR);
+            }
         }
         break;
 

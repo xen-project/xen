@@ -16,6 +16,8 @@
  * Copyright (C) IBM Corp. 2005, 2006
  *
  * Authors: Jimi Xenidis <jimix@watson.ibm.com>
+ *          Amos Waterland <apw@us.ibm.com>
+ *          Hollis Blanchard <hollisb@us.ibm.com>
  */
 
 #include <xen/config.h>
@@ -41,6 +43,7 @@
 #include <asm/debugger.h>
 #include <asm/delay.h>
 #include <asm/percpu.h>
+#include <asm/io.h>
 #include "exceptions.h"
 #include "of-devtree.h"
 #include "oftree.h"
@@ -71,20 +74,18 @@ ulong oftree;
 ulong oftree_len;
 ulong oftree_end;
 
+uint cpu_hard_id[NR_CPUS] __initdata;
 cpumask_t cpu_sibling_map[NR_CPUS] __read_mostly;
 cpumask_t cpu_online_map; /* missing ifdef in schedule.c */
 cpumask_t cpu_present_map;
 cpumask_t cpu_possible_map;
 
 /* XXX get this from ISA node in device tree */
+char *vgabase;
 ulong isa_io_base;
 struct ns16550_defaults ns16550;
 
 extern char __per_cpu_start[], __per_cpu_data_end[], __per_cpu_end[];
-extern void idle_loop(void);
-
-/* move us to a header file */
-extern void initialize_keytable(void);
 
 volatile struct processor_area * volatile global_cpu_table[NR_CPUS];
 
@@ -99,21 +100,6 @@ int is_kernel_text(unsigned long addr)
 unsigned long kernel_text_end(void)
 {
     return (unsigned long) &_etext;
-}
-
-void idle_loop(void)
-{
-    int cpu = smp_processor_id();
-
-    for ( ; ; )
-    {
-        while (!softirq_pending(cpu)) {
-            void sleep(void);
-            page_scrub_schedule_work();
-            sleep();
-        }
-        do_softirq();
-    }
 }
 
 static void __init do_initcalls(void)
@@ -209,6 +195,8 @@ static void __init start_of_day(void)
     schedulers_start();
 }
 
+extern void idle_loop(void);
+
 void startup_cpu_idle_loop(void)
 {
     struct vcpu *v = current;
@@ -237,6 +225,7 @@ static void init_parea(int cpuid)
               __func__, STACK_ORDER, cpuid);
 
     pa->whoami = cpuid;
+    pa->hard_id = cpu_hard_id[cpuid];
     pa->hyp_stack_base = (void *)((ulong)stack + STACK_SIZE);
 
     /* This store has the effect of invoking secondary_cpu_init.  */
@@ -254,18 +243,22 @@ static int kick_secondary_cpus(int maxcpus)
         if (cpuid >= maxcpus)
             break;
         init_parea(cpuid);
-        cpu_set(cpuid, cpu_online_map);
-        cpu_set(cpuid, cpu_possible_map);
+        smp_generic_give_timebase();
+
+        /* wait for it */
+        while (!cpu_online(cpuid))
+            cpu_relax();
     }
 
     return 0;
 }
 
 /* This is the first C code that secondary processors invoke.  */
-int secondary_cpu_init(int cpuid, unsigned long r4);
 int secondary_cpu_init(int cpuid, unsigned long r4)
 {
     cpu_initialize(cpuid);
+    smp_generic_take_timebase();
+    cpu_set(cpuid, cpu_online_map);
     while(1);
 }
 
@@ -339,7 +332,7 @@ static void __init __start_xen(multiboot_info_t *mbi)
 #endif
 
     /* Deal with secondary processors.  */
-    if (opt_nosmp) {
+    if (opt_nosmp || ofd_boot_cpu == -1) {
         printk("nosmp: leaving secondary processors spinning forever\n");
     } else {
         printk("spinning up at most %d total processors ...\n", max_cpus);
@@ -350,8 +343,17 @@ static void __init __start_xen(multiboot_info_t *mbi)
 
     /* Create initial domain 0. */
     dom0 = domain_create(0);
-    if ((dom0 == NULL) || (alloc_vcpu(dom0, 0, 0) == NULL))
+    if (dom0 == NULL)
         panic("Error creating domain 0\n");
+    dom0->max_pages = ~0U;
+    if (0 > allocate_rma(dom0, cpu_default_rma_order_pages()))
+        panic("Error allocating domain 0 RMA\n");
+    if (NULL == alloc_vcpu(dom0, 0, 0))
+        panic("Error creating domain 0 vcpu 0\n");
+
+    /* The Interrupt Controller will route everything to CPU 0 so we
+     * need to make sure Dom0's vVCPU 0 is pinned to the CPU */
+    dom0->vcpu[0]->cpu_affinity = cpumask_of_cpu(0);
 
     set_bit(_DOMF_privileged, &dom0->domain_flags);
     /* post-create hooks sets security label */

@@ -118,11 +118,14 @@ static void h_enter(struct cpu_user_regs *regs)
     int pgshift = PAGE_SHIFT;
     ulong idx;
     int limit = 0;                /* how many PTEs to examine in the PTEG */
-    ulong lpn;
-    ulong rpn;
+    ulong pfn;
+    ulong mfn;
     struct vcpu *v = get_current();
     struct domain *d = v->domain;
     int mtype;
+    struct page_info *pg = NULL;
+    struct domain *f = NULL;
+
 
     htab = &d->arch.htab;
     if (ptex > (1UL << htab->log_num_ptes)) {
@@ -160,17 +163,21 @@ static void h_enter(struct cpu_user_regs *regs)
     /* get the correct logical RPN in terms of 4K pages need to mask
      * off lp bits and unused arpn bits if this is a large page */
 
-    lpn = ~0ULL << (pgshift - PAGE_SHIFT);
-    lpn = pte.bits.rpn & lpn;
+    pfn = ~0ULL << (pgshift - PAGE_SHIFT);
+    pfn = pte.bits.rpn & pfn;
 
-    rpn = pfn2mfn(d, lpn, &mtype);
+    mfn = pfn2mfn(d, pfn, &mtype);
+    if (mfn == INVALID_MFN) {
+        regs->gprs[3] =  H_Parameter;
+        return;
+    }
 
     if (mtype == PFN_TYPE_IO) {
         /* only a privilaged dom can access outside IO space */
         if ( !test_bit(_DOMF_privileged, &d->domain_flags) ) {
             regs->gprs[3] =  H_Privilege;
-            printk("%s: unprivileged access to logical page: 0x%lx\n",
-                   __func__, lpn);
+            printk("%s: unprivileged access to physical page: 0x%lx\n",
+                   __func__, pfn);
             return;
         }
 
@@ -188,7 +195,7 @@ static void h_enter(struct cpu_user_regs *regs)
         }
     }
     /* fixup the RPN field of our local PTE copy */
-    pte.bits.rpn = rpn | lp_bits;
+    pte.bits.rpn = mfn | lp_bits;
 
     /* clear reserved bits in high word */
     pte.bits.lock = 0x0;
@@ -199,20 +206,44 @@ static void h_enter(struct cpu_user_regs *regs)
     pte.bits.ts = 0x0;
     pte.bits.res2 = 0x0;
 
+    if (mtype == PFN_TYPE_FOREIGN) {
+        pg = mfn_to_page(mfn);
+        f = page_get_owner(pg);
+        
+        BUG_ON(f == d);
+
+        if (unlikely(!get_domain(f))) {
+            regs->gprs[3] = H_Rescinded;
+            return;
+        }
+        if (unlikely(!get_page(pg, f))) {
+            put_domain(f);
+            regs->gprs[3] = H_Rescinded;
+            return;
+        }
+    }
+
     if ( !(flags & H_EXACT) ) {
         /* PTEG (not specific PTE); clear 3 lowest bits */
         ptex &= ~0x7UL;
         limit = 7;
     }
 
-        /* data manipulations should be done prior to the pte insertion. */
+    /* data manipulations should be done prior to the pte insertion. */
     if ( flags & H_ZERO_PAGE ) {
-        memset((void *)(rpn << PAGE_SHIFT), 0, 1UL << pgshift);
+        ulong pg = mfn << PAGE_SHIFT;
+        ulong pgs = 1UL << pgshift;
+
+        while (pgs > 0) {
+            clear_page((void *)pg);
+            pg += PAGE_SIZE;
+            --pgs;
+        }
     }
 
     if ( flags & H_ICACHE_INVALIDATE ) {
         ulong k;
-        ulong addr = rpn << PAGE_SHIFT;
+        ulong addr = mfn << PAGE_SHIFT;
 
         for (k = 0; k < (1UL << pgshift); k += L1_CACHE_BYTES) {
             dcbst(addr + k);
@@ -225,7 +256,7 @@ static void h_enter(struct cpu_user_regs *regs)
 
     if ( flags & H_ICACHE_SYNCHRONIZE ) {
         ulong k;
-        ulong addr = rpn << PAGE_SHIFT;
+        ulong addr = mfn << PAGE_SHIFT;
         for (k = 0; k < (1UL << pgshift); k += L1_CACHE_BYTES) {
             icbi(addr + k);
             sync();
@@ -256,6 +287,12 @@ static void h_enter(struct cpu_user_regs *regs)
     /* If the PTEG is full then no additional values are returned. */
     printk("%s: PTEG FULL\n", __func__);
 #endif
+
+    if (pg != NULL)
+        put_page(pg);
+
+    if (f != NULL)
+        put_domain(f);
 
     regs->gprs[3] = H_PTEG_Full;
 }
@@ -476,9 +513,23 @@ static void h_remove(struct cpu_user_regs *regs)
 
     /* XXX - I'm very skeptical of doing ANYTHING if not bits.v */
     /* XXX - I think the spec should be questioned in this case (MFM) */
-    if (pte->bits.v == 0) {
+    if (lpte.bits.v == 0) {
         printk("%s: removing invalid entry\n", __func__);
     }
+
+    if (lpte.bits.v) {
+        ulong mfn = lpte.bits.rpn;
+        if (!cpu_io_mfn(mfn)) {
+            struct page_info *pg = mfn_to_page(mfn);
+            struct domain *f = page_get_owner(pg);
+
+            if (f != d) {
+                put_domain(f);
+                put_page(pg);
+            }
+        }
+    }
+
     asm volatile("eieio; std %1, 0(%0); ptesync"
             :
             : "b" (pte), "r" (0)

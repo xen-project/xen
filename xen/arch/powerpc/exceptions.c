@@ -16,6 +16,7 @@
  * Copyright (C) IBM Corp. 2005, 2006
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
+ *          Jimi Xenidis <jimix@watson.ibm.com>
  */
 
 #include <xen/config.h>
@@ -23,11 +24,11 @@
 #include <xen/sched.h>
 #include <xen/serial.h>
 #include <xen/gdbstub.h>
-#include <public/xen.h>
+#include <xen/console.h>
 #include <asm/time.h>
+#include <asm/processor.h>
 
 #undef DEBUG
-#define HDEC_PREEMPT
 
 extern ulong ppc_do_softirq(ulong orig_msr);
 extern void do_timer(struct cpu_user_regs *regs);
@@ -38,31 +39,10 @@ int hdec_sample = 0;
 
 void do_timer(struct cpu_user_regs *regs)
 {
-    /* XXX this is just here to keep HDEC from firing until
-     * reprogram_ac_timer() sets the proper next-tick time */
-    mthdec(timebase_freq);
-
-#ifdef HDEC_PREEMPT
+    /* Set HDEC high so it stops firing and can be reprogrammed by
+     * set_preempt() */
+    mthdec(INT_MAX);
     raise_softirq(TIMER_SOFTIRQ);
-#endif
-#ifdef DEBUG
-    {
-        int d;
-        if (regs->msr & MSR_HV) {
-            d = -1;
-        } else {
-            d = get_current()->domain->domain_id;
-        }
-        extern char serial_getc_nb(int handle);
-        if (0 && serial_getc_nb(0) > 0) {
-            printk("H: pc: 0x%lx lr: 0x%lx \n", regs->pc, regs->lr);
-        }
-        if (hdec_sample)  {
-            printk("H: pc: 0x%lx lr: 0x%lx \n", regs->pc, regs->lr);
-            hdec_sample = 0;
-        }
-    }
-#endif
 }
 
 void do_dec(struct cpu_user_regs *regs)
@@ -79,11 +59,22 @@ void program_exception(struct cpu_user_regs *regs, unsigned long cookie)
 #ifdef CRASH_DEBUG
     __trap_to_gdb(regs, cookie);
 #else /* CRASH_DEBUG */
+    int recover = 0;
+
+    console_start_sync();
+
     show_registers(regs);
     printk("dar 0x%016lx, dsisr 0x%08x\n", mfdar(), mfdsisr());
     printk("hid4 0x%016lx\n", regs->hid4);
     printk("---[ backtrace ]---\n");
     show_backtrace(regs->gprs[1], regs->lr, regs->pc);
-    panic("%s: 0x%lx\n", __func__, cookie);
+
+    if (cookie == 0x200)
+        recover = cpu_machinecheck(regs);
+
+    if (!recover)
+        panic("%s: 0x%lx\n", __func__, cookie);
+
+    console_end_sync();
 #endif /* CRASH_DEBUG */
 }

@@ -94,15 +94,14 @@ extern int __get_instruction_length_from_list(struct vmcb_struct *vmcb,
 static inline int __get_instruction_length(struct vmcb_struct *vmcb, 
         enum instruction_index instr, u8 *guest_eip_buf)
 {
-    return __get_instruction_length_from_list(vmcb, &instr, 1, guest_eip_buf, 
-            NULL);
+    return __get_instruction_length_from_list(
+        vmcb, &instr, 1, guest_eip_buf, NULL);
 }
 
 
 static inline unsigned int is_prefix(u8 opc)
 {
-    switch(opc)
-    {
+    switch ( opc ) {
     case 0x66:
     case 0x67:
     case 0x2E:
@@ -115,22 +114,7 @@ static inline unsigned int is_prefix(u8 opc)
     case 0xF3:
     case 0xF2:
 #if __x86_64__
-    case 0x40:
-    case 0x41:
-    case 0x42:
-    case 0x43:
-    case 0x44:
-    case 0x45:
-    case 0x46:
-    case 0x47:
-    case 0x48:
-    case 0x49:
-    case 0x4a:
-    case 0x4b:
-    case 0x4c:
-    case 0x4d:
-    case 0x4e:
-    case 0x4f:
+    case 0x40 ... 0x4f:
 #endif /* __x86_64__ */
         return 1;
     }
@@ -141,15 +125,15 @@ static inline unsigned int is_prefix(u8 opc)
 static inline int skip_prefix_bytes(u8 *buf, size_t size)
 {
     int index;
-    for (index = 0; index < size && is_prefix(buf[index]); index ++)  
-        /* do nothing */ ;
+    for ( index = 0; index < size && is_prefix(buf[index]); index++ )
+        continue;
     return index;
 }
 
 
 
-static void inline __update_guest_eip(struct vmcb_struct *vmcb, 
-        int inst_len) 
+static void inline __update_guest_eip(
+    struct vmcb_struct *vmcb, int inst_len) 
 {
     ASSERT(inst_len > 0);
     vmcb->rip += inst_len;

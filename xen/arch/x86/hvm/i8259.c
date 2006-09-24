@@ -35,12 +35,11 @@
 #include <asm/current.h>
 
 /* set irq level. If an edge is detected, then the IRR is set to 1 */
-/* Caller must hold vpic lock */
 static inline void pic_set_irq1(PicState *s, int irq, int level)
 {
     int mask;
 
-    BUG_ON(!spin_is_locked(&s->pics_state->lock));
+    ASSERT(spin_is_locked(&s->pics_state->lock));
 
     mask = 1 << irq;
     if (s->elcr & mask) {
@@ -55,9 +54,8 @@ static inline void pic_set_irq1(PicState *s, int irq, int level)
     } else {
         /* edge triggered */
         if (level) {
-            if ((s->last_irr & mask) == 0) {
+            if ((s->last_irr & mask) == 0)
                 s->irr |= mask;
-            }
             s->last_irr |= mask;
         } else {
             s->last_irr &= ~mask;
@@ -67,12 +65,11 @@ static inline void pic_set_irq1(PicState *s, int irq, int level)
 
 /* return the highest priority found in mask (highest = smallest
    number). Return 8 if no irq */
-/* Caller must hold vpic lock */
 static inline int get_priority(PicState *s, int mask)
 {
     int priority;
 
-    BUG_ON(!spin_is_locked(&s->pics_state->lock));
+    ASSERT(spin_is_locked(&s->pics_state->lock));
 
     if (mask == 0)
         return 8;
@@ -83,12 +80,11 @@ static inline int get_priority(PicState *s, int mask)
 }
 
 /* return the pic wanted interrupt. return -1 if none */
-/* Caller must hold vpic lock */
 static int pic_get_irq(PicState *s)
 {
     int mask, cur_priority, priority;
 
-    BUG_ON(!spin_is_locked(&s->pics_state->lock));
+    ASSERT(spin_is_locked(&s->pics_state->lock));
 
     mask = s->irr & ~s->imr;
     priority = get_priority(s, mask);
@@ -112,12 +108,11 @@ static int pic_get_irq(PicState *s)
 /* raise irq to CPU if necessary. must be called every time the active
    irq may change */
 /* XXX: should not export it, but it is needed for an APIC kludge */
-/* Caller must hold vpic lock */
 void pic_update_irq(struct hvm_virpic *s)
 {
     int irq2, irq;
 
-    BUG_ON(!spin_is_locked(&s->lock));
+    ASSERT(spin_is_locked(&s->lock));
 
     /* first look at slave pic */
     irq2 = pic_get_irq(&s->pics[1]);
@@ -179,10 +174,9 @@ void pic_set_irq(struct hvm_virpic *isa_pic, int irq, int level)
 }
 
 /* acknowledge interrupt 'irq' */
-/* Caller must hold vpic lock */
 static inline void pic_intack(PicState *s, int irq)
 {
-    BUG_ON(!spin_is_locked(&s->pics_state->lock));
+    ASSERT(spin_is_locked(&s->pics_state->lock));
 
     if (s->auto_eoi) {
         if (s->rotate_on_auto_eoi)
@@ -219,7 +213,6 @@ int pic_read_irq(struct hvm_virpic *s)
         }
     } else {
         /* spurious IRQ on host controller */
-        printk("spurious IRQ irq got=%d\n",irq);
         irq = 7;
         intno = s->pics[0].irq_base + irq;
     }
@@ -229,12 +222,11 @@ int pic_read_irq(struct hvm_virpic *s)
     return intno;
 }
 
-/* Caller must hold vpic lock */
 static void update_shared_irr(struct hvm_virpic *s, PicState *c)
 {
     uint8_t *pl, *pe;
 
-    BUG_ON(!spin_is_locked(&s->lock));
+    ASSERT(spin_is_locked(&s->lock));
 
     get_sp(current->domain)->sp_global.pic_elcr = 
         s->pics[0].elcr | ((u16)s->pics[1].elcr << 8);
@@ -250,12 +242,11 @@ static void update_shared_irr(struct hvm_virpic *s, PicState *c)
     }
 }
 
-/* Caller must hold vpic lock */
 static void pic_reset(void *opaque)
 {
     PicState *s = opaque;
 
-    BUG_ON(!spin_is_locked(&s->pics_state->lock));
+    ASSERT(spin_is_locked(&s->pics_state->lock));
 
     s->last_irr = 0;
     s->irr = 0;
@@ -271,16 +262,15 @@ static void pic_reset(void *opaque)
     s->rotate_on_auto_eoi = 0;
     s->special_fully_nested_mode = 0;
     s->init4 = 0;
-    s->elcr = 0;
+    /* Note: ELCR is not reset */
 }
 
-/* Caller must hold vpic lock */
 static void pic_ioport_write(void *opaque, uint32_t addr, uint32_t val)
 {
     PicState *s = opaque;
     int priority, cmd, irq;
 
-    BUG_ON(!spin_is_locked(&s->pics_state->lock));
+    ASSERT(spin_is_locked(&s->pics_state->lock));
 
     addr &= 1;
     if (addr == 0) {
@@ -368,12 +358,11 @@ static void pic_ioport_write(void *opaque, uint32_t addr, uint32_t val)
     }
 }
 
-/* Caller must hold vpic lock */
 static uint32_t pic_poll_read (PicState *s, uint32_t addr1)
 {
     int ret;
 
-    BUG_ON(!spin_is_locked(&s->pics_state->lock));
+    ASSERT(spin_is_locked(&s->pics_state->lock));
 
     ret = pic_get_irq(s);
     if (ret >= 0) {
@@ -393,14 +382,13 @@ static uint32_t pic_poll_read (PicState *s, uint32_t addr1)
     return ret;
 }
 
-/* Caller must hold vpic lock */
 static uint32_t pic_ioport_read(void *opaque, uint32_t addr1)
 {
     PicState *s = opaque;
     unsigned int addr;
     int ret;
 
-    BUG_ON(!spin_is_locked(&s->pics_state->lock));
+    ASSERT(spin_is_locked(&s->pics_state->lock));
 
     addr = addr1;
     addr &= 1;
@@ -439,11 +427,10 @@ uint32_t pic_intack_read(struct hvm_virpic *s)
 }
 
 static void elcr_ioport_write(void *opaque, uint32_t addr, uint32_t val)
-/* Caller must hold vpic lock */
 {
     PicState *s = opaque;
 
-    BUG_ON(!spin_is_locked(&s->pics_state->lock));
+    ASSERT(spin_is_locked(&s->pics_state->lock));
 
     s->elcr = val & s->elcr_mask;
 }
@@ -455,10 +442,9 @@ static uint32_t elcr_ioport_read(void *opaque, uint32_t addr1)
 }
 
 /* XXX: add generic master/slave system */
-/* Caller must hold vpic lock */
 static void pic_init1(int io_addr, int elcr_addr, PicState *s)
 {
-    BUG_ON(!spin_is_locked(&s->pics_state->lock));
+    ASSERT(spin_is_locked(&s->pics_state->lock));
 
     pic_reset(s);
 }

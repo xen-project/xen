@@ -370,6 +370,7 @@ int vnet_forward_init(void){
         err = -ENOMEM;
         goto exit;
     }
+    vnet_peer_table->key_size = sizeof(struct VarpAddr);
     vnet_peer_table->key_equal_fn = peer_key_equal_fn;
     vnet_peer_table->key_hash_fn = peer_key_hash_fn;
     vnet_peer_table->entry_free_fn = peer_entry_free_fn;

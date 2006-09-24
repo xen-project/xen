@@ -51,4 +51,5 @@ extern ulong *__hypercall_table[];
 extern char exception_vectors[];
 extern char exception_vectors_end[];
 extern int spin_start[];
+extern int secondary_cpu_init(int cpuid, unsigned long r4);
 #endif

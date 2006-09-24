@@ -25,7 +25,7 @@ extern unsigned long xencomm_copy_to_guest(void *to, const void *from,
         unsigned int len, unsigned int skip); 
 extern unsigned long xencomm_copy_from_guest(void *to, const void *from,
         unsigned int len, unsigned int skip); 
-extern void xencomm_add_offset(void *handle, unsigned int bytes);
+extern int xencomm_add_offset(void *handle, unsigned int bytes);
 extern int xencomm_handle_is_null(void *ptr);
 
 

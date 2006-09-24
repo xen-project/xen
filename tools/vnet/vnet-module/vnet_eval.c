@@ -188,7 +188,7 @@ int eval_vnet_add(Sxpr exp, IOStream *out, void *data){
     if(err) goto exit;
     child_string(exp, ovnetif, &device);
     if(!device){
-        snprintf(dev, IFNAMSIZ-1, "vnif%04x", ntohs(vnet.u.vnet16[7]));
+        snprintf(dev, IFNAMSIZ-1, "vnif%04x", ntohs(vnet.u.vnet16[VNETID_SIZE16 - 1]));
         device = dev;
     }
     csecurity = sxpr_child_value(exp, osecurity, intern("none"));

@@ -65,6 +65,7 @@
 #include <xen/interface/physdev.h>
 #include <xen/interface/memory.h>
 #include <xen/features.h>
+#include <xen/xencons.h>
 #include "setup_arch_pre.h"
 #include <bios_ebda.h>
 
@@ -155,6 +156,9 @@ struct ist_info ist_info;
 EXPORT_SYMBOL(ist_info);
 #endif
 struct e820map e820;
+#ifdef CONFIG_XEN
+struct e820map machine_e820;
+#endif
 
 extern void early_cpu_init(void);
 extern void generic_apic_probe(char *);
@@ -1450,7 +1454,6 @@ e820_setup_gap(struct e820entry *e820, int nr_map)
 static void __init register_memory(void)
 {
 #ifdef CONFIG_XEN
-	struct e820entry *machine_e820;
 	struct xen_memory_map memmap;
 #endif
 	int	      i;
@@ -1460,14 +1463,14 @@ static void __init register_memory(void)
 		return;
 
 #ifdef CONFIG_XEN
-	machine_e820 = alloc_bootmem_low_pages(PAGE_SIZE);
-
 	memmap.nr_entries = E820MAX;
-	set_xen_guest_handle(memmap.buffer, machine_e820);
+	set_xen_guest_handle(memmap.buffer, machine_e820.map);
 
-	BUG_ON(HYPERVISOR_memory_op(XENMEM_machine_memory_map, &memmap));
+	if (HYPERVISOR_memory_op(XENMEM_machine_memory_map, &memmap))
+		BUG();
+	machine_e820.nr_map = memmap.nr_entries;
 
-	legacy_init_iomem_resources(machine_e820, memmap.nr_entries,
+	legacy_init_iomem_resources(machine_e820.map, machine_e820.nr_map,
 				    &code_resource, &data_resource);
 #else
 	if (efi_enabled)
@@ -1485,8 +1488,7 @@ static void __init register_memory(void)
 		request_resource(&ioport_resource, &standard_io_resources[i]);
 
 #ifdef CONFIG_XEN
-	e820_setup_gap(machine_e820, memmap.nr_entries);
-	free_bootmem(__pa(machine_e820), PAGE_SIZE);
+	e820_setup_gap(machine_e820.map, machine_e820.nr_map);
 #else
 	e820_setup_gap(e820.map, e820.nr_map);
 #endif
@@ -1665,33 +1667,15 @@ void __init setup_arch(char **cmdline_p)
 		screen_info.orig_video_cols = 80;
 		screen_info.orig_video_ega_bx = 3;
 		screen_info.orig_video_points = 16;
+		screen_info.orig_y = screen_info.orig_video_lines - 1;
 		if (xen_start_info->console.dom0.info_size >=
 		    sizeof(struct dom0_vga_console_info)) {
 			const struct dom0_vga_console_info *info =
 				(struct dom0_vga_console_info *)(
 					(char *)xen_start_info +
 					xen_start_info->console.dom0.info_off);
-			screen_info.orig_video_mode = info->txt_mode;
-			screen_info.orig_video_isVGA = info->video_type;
-			screen_info.orig_video_lines = info->video_height;
-			screen_info.orig_video_cols = info->video_width;
-			screen_info.orig_video_points = info->txt_points;
-			screen_info.lfb_width = info->video_width;
-			screen_info.lfb_height = info->video_height;
-			screen_info.lfb_depth = info->lfb_depth;
-			screen_info.lfb_base = info->lfb_base;
-			screen_info.lfb_size = info->lfb_size;
-			screen_info.lfb_linelength = info->lfb_linelen;
-			screen_info.red_size = info->red_size;
-			screen_info.red_pos = info->red_pos;
-			screen_info.green_size = info->green_size;
-			screen_info.green_pos = info->green_pos;
-			screen_info.blue_size = info->blue_size;
-			screen_info.blue_pos = info->blue_pos;
-			screen_info.rsvd_size = info->rsvd_size;
-			screen_info.rsvd_pos = info->rsvd_pos;
+			dom0_init_screen_info(info);
 		}
-		screen_info.orig_y = screen_info.orig_video_lines - 1;
 		xen_start_info->console.domU.mfn = 0;
 		xen_start_info->console.domU.evtchn = 0;
 	} else

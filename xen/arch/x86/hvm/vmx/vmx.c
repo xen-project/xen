@@ -597,7 +597,7 @@ static int vmx_instruction_length(struct vcpu *v)
 {
     unsigned long inst_len;
 
-    if (__vmread(VM_EXIT_INSTRUCTION_LEN, &inst_len))
+    if ( __vmread(VM_EXIT_INSTRUCTION_LEN, &inst_len) ) /* XXX Unsafe XXX */
         return 0;
     return inst_len;
 }
@@ -746,6 +746,7 @@ static void vmx_setup_hvm_funcs(void)
     hvm_funcs.realmode = vmx_realmode;
     hvm_funcs.paging_enabled = vmx_paging_enabled;
     hvm_funcs.long_mode_enabled = vmx_long_mode_enabled;
+    hvm_funcs.pae_enabled = vmx_pae_enabled;
     hvm_funcs.guest_x86_mode = vmx_guest_x86_mode;
     hvm_funcs.instruction_length = vmx_instruction_length;
     hvm_funcs.get_guest_ctrl_reg = vmx_get_ctrl_reg;
@@ -836,11 +837,16 @@ int start_vmx(void)
 
 /*
  * Not all cases receive valid value in the VM-exit instruction length field.
+ * Callers must know what they're doing!
  */
-#define __get_instruction_length(len) \
-    __vmread(VM_EXIT_INSTRUCTION_LEN, &(len)); \
-     if ((len) < 1 || (len) > 15) \
-        __hvm_bug(&regs);
+static int __get_instruction_length(void)
+{
+    int len;
+    __vmread(VM_EXIT_INSTRUCTION_LEN, &len); /* Safe: callers audited */
+    if ( (len < 1) || (len > 15) )
+        __hvm_bug(guest_cpu_user_regs());
+    return len;
+}
 
 static void inline __update_guest_eip(unsigned long inst_len)
 {
@@ -1051,15 +1057,18 @@ static int check_for_null_selector(unsigned long eip)
     int i, inst_len;
     int inst_copy_from_guest(unsigned char *, unsigned long, int);
 
-    __vmread(VM_EXIT_INSTRUCTION_LEN, &inst_len);
+    inst_len = __get_instruction_length(); /* Safe: INS/OUTS */
     memset(inst, 0, MAX_INST_LEN);
-    if (inst_copy_from_guest(inst, eip, inst_len) != inst_len) {
+    if ( inst_copy_from_guest(inst, eip, inst_len) != inst_len )
+    {
         printf("check_for_null_selector: get guest instruction failed\n");
         domain_crash_synchronous();
     }
 
-    for (i = 0; i < inst_len; i++) {
-        switch (inst[i]) {
+    for ( i = 0; i < inst_len; i++ )
+    {
+        switch ( inst[i] )
+        {
         case 0xf3: /* REPZ */
         case 0xf2: /* REPNZ */
         case 0xf0: /* LOCK */
@@ -1184,15 +1193,14 @@ static void vmx_io_instruction(unsigned long exit_qualification,
     }
 }
 
-int
-vmx_world_save(struct vcpu *v, struct vmx_assist_context *c)
+static int vmx_world_save(struct vcpu *v, struct vmx_assist_context *c)
 {
-    unsigned long inst_len;
     int error = 0;
 
-    error |= __vmread(VM_EXIT_INSTRUCTION_LEN, &inst_len);
+    /* NB. Skip transition instruction. */
     error |= __vmread(GUEST_RIP, &c->eip);
-    c->eip += inst_len; /* skip transition instruction */
+    c->eip += __get_instruction_length(); /* Safe: MOV Cn, LMSW, CLTS */
+
     error |= __vmread(GUEST_RSP, &c->esp);
     error |= __vmread(GUEST_RFLAGS, &c->eflags);
 
@@ -1249,8 +1257,7 @@ vmx_world_save(struct vcpu *v, struct vmx_assist_context *c)
     return !error;
 }
 
-int
-vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
+static int vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
 {
     unsigned long mfn, old_cr4, old_base_mfn;
     int error = 0;
@@ -1364,8 +1371,7 @@ vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
 
 enum { VMX_ASSIST_INVOKE = 0, VMX_ASSIST_RESTORE };
 
-int
-vmx_assist(struct vcpu *v, int mode)
+static int vmx_assist(struct vcpu *v, int mode)
 {
     struct vmx_assist_context c;
     u32 magic;
@@ -1408,8 +1414,8 @@ vmx_assist(struct vcpu *v, int mode)
         break;
 
         /*
-         * Restore the VMXASSIST_OLD_CONTEXT that was saved by VMX_ASSIST_INVOKE
-         * above.
+         * Restore the VMXASSIST_OLD_CONTEXT that was saved by
+         * VMX_ASSIST_INVOKE above.
          */
     case VMX_ASSIST_RESTORE:
         /* save the old context */
@@ -1552,7 +1558,8 @@ static int vmx_set_cr0(unsigned long value)
             }
         }
 
-        if ( vmx_assist(v, VMX_ASSIST_INVOKE) ) {
+        if ( vmx_assist(v, VMX_ASSIST_INVOKE) )
+        {
             set_bit(VMX_CPU_STATE_ASSIST_ENABLED, &v->arch.hvm_vmx.cpu_state);
             __vmread(GUEST_RIP, &eip);
             HVM_DBG_LOG(DBG_LEVEL_1,
@@ -1815,7 +1822,8 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
     HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR%d, value = %lx", cr, value);
 }
 
-static int vmx_cr_access(unsigned long exit_qualification, struct cpu_user_regs *regs)
+static int vmx_cr_access(unsigned long exit_qualification,
+                         struct cpu_user_regs *regs)
 {
     unsigned int gp, cr;
     unsigned long value;
@@ -2069,6 +2077,47 @@ void restore_cpu_user_regs(struct cpu_user_regs *regs)
 }
 #endif
 
+static void vmx_reflect_exception(struct vcpu *v)
+{
+    int error_code, intr_info, vector;
+
+    __vmread(VM_EXIT_INTR_INFO, &intr_info);
+    vector = intr_info & 0xff;
+    if ( intr_info & INTR_INFO_DELIVER_CODE_MASK )
+        __vmread(VM_EXIT_INTR_ERROR_CODE, &error_code);
+    else
+        error_code = VMX_DELIVER_NO_ERROR_CODE;
+
+#ifndef NDEBUG
+    {
+        unsigned long rip;
+
+        __vmread(GUEST_RIP, &rip);
+        HVM_DBG_LOG(DBG_LEVEL_1, "rip = %lx, error_code = %x",
+                    rip, error_code);
+    }
+#endif /* NDEBUG */
+
+    /*
+     * According to Intel Virtualization Technology Specification for
+     * the IA-32 Intel Architecture (C97063-002 April 2005), section
+     * 2.8.3, SW_EXCEPTION should be used for #BP and #OV, and
+     * HW_EXCEPTION used for everything else.  The main difference
+     * appears to be that for SW_EXCEPTION, the EIP/RIP is incremented
+     * by VM_ENTER_INSTRUCTION_LEN bytes, whereas for HW_EXCEPTION,
+     * it is not.
+     */
+    if ( (intr_info & INTR_INFO_INTR_TYPE_MASK) == INTR_TYPE_SW_EXCEPTION )
+    {
+        int ilen = __get_instruction_length(); /* Safe: software exception */
+        vmx_inject_sw_exception(v, vector, ilen);
+    }
+    else
+    {
+        vmx_inject_hw_exception(v, vector, error_code);
+    }
+}
+
 asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
 {
     unsigned int exit_reason;
@@ -2116,7 +2165,8 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
 
     TRACE_VMEXIT(0,exit_reason);
 
-    switch ( exit_reason ) {
+    switch ( exit_reason )
+    {
     case EXIT_REASON_EXCEPTION_NMI:
     {
         /*
@@ -2242,43 +2292,38 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         domain_crash_synchronous();
         break;
     case EXIT_REASON_CPUID:
-        vmx_vmexit_do_cpuid(&regs);
-        __get_instruction_length(inst_len);
+        inst_len = __get_instruction_length(); /* Safe: CPUID */
         __update_guest_eip(inst_len);
+        vmx_vmexit_do_cpuid(&regs);
         break;
     case EXIT_REASON_HLT:
-        __get_instruction_length(inst_len);
+        inst_len = __get_instruction_length(); /* Safe: HLT */
         __update_guest_eip(inst_len);
         vmx_vmexit_do_hlt();
         break;
     case EXIT_REASON_INVLPG:
     {
-        unsigned long   va;
-
+        unsigned long va;
+        inst_len = __get_instruction_length(); /* Safe: INVLPG */
+        __update_guest_eip(inst_len);
         __vmread(EXIT_QUALIFICATION, &va);
         vmx_vmexit_do_invlpg(va);
-        __get_instruction_length(inst_len);
-        __update_guest_eip(inst_len);
         break;
     }
     case EXIT_REASON_VMCALL:
     {
-        __get_instruction_length(inst_len);
+        inst_len = __get_instruction_length(); /* Safe: VMCALL */
+        __update_guest_eip(inst_len);
         __vmread(GUEST_RIP, &rip);
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
-
         hvm_do_hypercall(&regs);
-        __update_guest_eip(inst_len);
         break;
     }
     case EXIT_REASON_CR_ACCESS:
     {
         __vmread(GUEST_RIP, &rip);
-        __get_instruction_length(inst_len);
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
-
-        HVM_DBG_LOG(DBG_LEVEL_1, "rip = %lx, inst_len =%lx, exit_qualification = %lx",
-                    rip, inst_len, exit_qualification);
+        inst_len = __get_instruction_length(); /* Safe: MOV Cn, LMSW, CLTS */
         if ( vmx_cr_access(exit_qualification, &regs) )
             __update_guest_eip(inst_len);
         TRACE_VMEXIT(3,regs.error_code);
@@ -2291,19 +2336,19 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         break;
     case EXIT_REASON_IO_INSTRUCTION:
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
-        __get_instruction_length(inst_len);
+        inst_len = __get_instruction_length(); /* Safe: IN, INS, OUT, OUTS */
         vmx_io_instruction(exit_qualification, inst_len);
         TRACE_VMEXIT(4,exit_qualification);
         break;
     case EXIT_REASON_MSR_READ:
-        __get_instruction_length(inst_len);
-        vmx_do_msr_read(&regs);
+        inst_len = __get_instruction_length(); /* Safe: RDMSR */
         __update_guest_eip(inst_len);
+        vmx_do_msr_read(&regs);
         break;
     case EXIT_REASON_MSR_WRITE:
-        vmx_do_msr_write(&regs);
-        __get_instruction_length(inst_len);
+        inst_len = __get_instruction_length(); /* Safe: WRMSR */
         __update_guest_eip(inst_len);
+        vmx_do_msr_write(&regs);
         break;
     case EXIT_REASON_MWAIT_INSTRUCTION:
     case EXIT_REASON_MONITOR_INSTRUCTION:

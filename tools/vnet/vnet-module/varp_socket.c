@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+ * Copyright (C) 2004, 2005, 2006 Mike Wray <mike.wray@hp.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by the 
@@ -36,7 +36,7 @@
 
 /* Get macros needed to define system calls as functions in the kernel. */
 #define __KERNEL_SYSCALLS__
-static int errno;
+int errno=0;
 #include <linux/unistd.h>
 
 #define MODULE_NAME "VARP"
@@ -73,7 +73,13 @@ static inline _syscall3(int, fcntl,
 
 /* Replicate the user-space socket API.
  * The parts we need anyway.
+ *
+ * Some architectures use socketcall() to multiplex the socket-related calls,
+ * but others define individual syscalls instead.
+ * Architectures using socketcall() define __ARCH_WANT_SYS_SOCKETCALL.
  */
+
+#ifdef __ARCH_WANT_SYS_SOCKETCALL
 
 /* Define the socketcall() syscall.
  * Multiplexes all the socket-related calls.
@@ -179,6 +185,66 @@ int getsockname(int fd, struct sockaddr *usockaddr, int *usockaddr_len){
     args[2] = (unsigned long)usockaddr_len;
     return socketcall(SYS_GETSOCKNAME, args);
 }
+
+#else /* !__ARCH_WANT_SYS_SOCKETCALL */
+
+/* No socketcall - define the individual syscalls. */
+
+static inline _syscall3(int, socket,
+                        int, family,
+                        int, type,
+                        int, protocol);
+
+static inline _syscall3(int, bind,
+                        int, fd,
+                        struct sockaddr *, umyaddr,
+                        int, addrlen);
+
+static inline _syscall3(int, connect,
+                        int, fd,
+                        struct sockaddr *, uservaddr,
+                        int, addrlen);
+
+static inline _syscall6(int, sendto,
+                        int, fd,
+                        void *, buff,
+                        size_t, len,
+                        unsigned, flags,
+                        struct sockaddr *, addr,
+                        int, addr_len);
+
+static inline _syscall6(int, recvfrom,
+                        int, fd,
+                        void *, ubuf,
+                        size_t, size,
+                        unsigned, flags,
+                        struct sockaddr *, addr,
+                        int *, addr_len);
+
+static inline _syscall5(int, setsockopt,
+                        int, fd,
+                        int, level,
+                        int, optname,
+                        void *, optval,
+                        int, optlen);
+
+static inline _syscall5(int, getsockopt,
+                        int, fd,
+                        int, level,
+                        int, optname,
+                        void *, optval,
+                        int *, optlen);
+
+static inline _syscall2(int, shutdown,
+                        int, fd,
+                        int, how);
+
+static inline _syscall3(int, getsockname,
+                        int, fd,
+                        struct sockaddr *, usockaddr,
+                        int *, usockaddr_len);
+
+#endif /* __ARCH_WANT_SYS_SOCKETCALL */
 
 /*============================================================================*/
 /** Socket flags. */
@@ -418,9 +484,7 @@ int varp_ucast_open(uint32_t addr, u16 port, int *val){
  * an error.
  */
 static int handle_varp_skb(struct sk_buff *skb){
-    static int count = 0;
     int err = 0;
-    count++;
     switch(skb->pkt_type){
     case PACKET_BROADCAST:
     case PACKET_MULTICAST:

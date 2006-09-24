@@ -22,20 +22,19 @@ import sys
 from xen.util import security
 from xen.xm import create
 from xen.xend import sxp
+from xen.xm.opts import OptionError
 
-def usage():
-    print "\nUsage: xm dry-run <configfile>\n"
-    print "This program checks each resource listed in the configfile"
-    print "to see if the domain created by the configfile can access"
-    print "the resources.  The status of each resource is listed"
-    print "individually along with the final security decision.\n"
-    security.err("Usage")
-
+def help():
+    return """
+    This program checks each resource listed in the configfile
+    to see if the domain created by the configfile can access
+    the resources.  The status of each resource is listed
+    individually along with the final security decision."""
 
 def main (argv):
     try:
         if len(argv) != 2:
-            usage()
+            raise OptionError('Invalid number of arguments')
 
         passed = 0
         (opts, config) = create.parseCommandLine(argv)
@@ -44,7 +43,7 @@ def main (argv):
                 passed = 1
         else:
             print "Checking resources: (skipped)"
-
+                
         if passed:
             print "Dry Run: PASSED"
         else:

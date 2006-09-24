@@ -26,6 +26,7 @@ class ReiserFileSystemType(FileSystemType):
         fd = os.open(fn, os.O_RDONLY)
         os.lseek(fd, 0x10000, 0)
         buf = os.read(fd, 0x40)
+        os.close(fd)
         if len(buf) == 0x40 and (buf[0x34:0x3B] in [FSMAGIC2, FSMAGIC3]) :
             return True
         return False

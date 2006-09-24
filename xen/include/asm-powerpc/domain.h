@@ -52,6 +52,11 @@ struct slb_entry {
     ulong slb_vsid;
     ulong slb_esid;
 };
+#define SLB_ESID_VALID (1ULL << (63 - 36))
+#define SLB_ESID_CLASS (1ULL << (63 - 56))
+#define SLB_ESID_MASK  (~0ULL << (63 - 35))
+#define SLBIE_CLASS_LOG (63-36)
+#define SLBMTE_ENTRY_MASK ((0x1UL << (63 - 52 + 1)) - 1)
 
 struct xencomm;
 

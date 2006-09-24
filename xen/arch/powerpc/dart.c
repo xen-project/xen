@@ -114,7 +114,7 @@ static void dart_fill(ulong index, int perm, ulong rpg, ulong num_pg)
         ++rpg;
         if (i == num_pg) break;
 
-        if (((ulong)&entry[i]) % CACHE_LINE_SIZE == 0) {
+        if ((((ulong)&entry[i]) % cpu_caches.dline_size) == 0) {
             last_flush = (ulong)&entry[i - 1];
             dcbst(last_flush);
         }
@@ -134,7 +134,7 @@ static void dart_clear(ulong index, ulong num_pg)
         ++i;
         if (i == num_pg) break;
 
-        if (((ulong)&entry[i]) % CACHE_LINE_SIZE == 0) {
+        if ((((ulong)&entry[i]) % cpu_caches.dline_size) == 0) {
             last_flush = (ulong)&entry[i - 1];
             dcbst(last_flush);
         }
@@ -207,16 +207,17 @@ static int find_dart(struct dart_info *di)
     if (rc <= 0)
         return -1;
 
-    di->di_base = DART_DEF_BASE;
-
-    if (strstr(compat, "u3")) {
-        di->di_model = DART_U3;
-    } else if (strstr(compat, "u4")) {
+    if (ofd_strstr(compat, rc, "u4"))
         di->di_model = DART_U4;
-    } else {
+    else if (ofd_strstr(compat, rc, "u3"))
+        di->di_model = DART_U3;
+    else {
         DBG("%s: not a U3 or U4\n", __func__);
         return -1;
     }
+        
+    di->di_base = DART_DEF_BASE;
+
     /* FIXME: this should actually be the HT reg value */
     di->di_window.dw_liobn = 0;
     di->di_window.dw_base_hi = 0;
@@ -263,7 +264,7 @@ static int init_dart(void)
     /* Linux uses a dummy page, filling "empty" DART entries with a
        reference to this page to capture stray DMA's */
     dummy_page = (ulong)alloc_xenheap_pages(1);
-    memset((void *)dummy_page, 0, PAGE_SIZE);
+    clear_page((void *)dummy_page);
     dummy_page >>= PAGE_SHIFT;
 
     printk("Initializing DART 0x%lx: tbl: %p[0x%lx] entries: 0x%lx\n",

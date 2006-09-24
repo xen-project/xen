@@ -52,7 +52,7 @@ int iommu_put(u32 buid, ulong ioba, union tce tce)
 
         pfn = tce.tce_bits.tce_rpn;
         mfn = pfn2mfn(d, pfn, &mtype);
-        if (mfn > 0) {
+        if (mfn != INVALID_MFN) {
 #ifdef DEBUG
             printk("%s: ioba=0x%lx pfn=0x%lx mfn=0x%lx\n", __func__,
                    ioba, pfn, mfn);

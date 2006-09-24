@@ -23,12 +23,28 @@
 #include <asm/msr.h>
 #include <public/hvm/ioreq.h>
 
-static __inline__ int find_highest_bit(unsigned long *data, int nr_bits)
+#define MAX_VECTOR      256
+
+#define VEC_POS(v) ((v)%32)
+#define REG_POS(v) (((v)/32)* 0x10)
+#define vlapic_test_and_set_vector(vec, bitmap)                 \
+    test_and_set_bit(VEC_POS(vec), (bitmap) + REG_POS(vec))
+#define vlapic_test_and_clear_vector(vec, bitmap)               \
+    test_and_clear_bit(VEC_POS(vec), (bitmap) + REG_POS(vec))
+#define vlapic_set_vector(vec, bitmap)                          \
+    set_bit(VEC_POS(vec), (bitmap) + REG_POS(vec))
+#define vlapic_clear_vector(vec, bitmap)                        \
+    clear_bit(VEC_POS(vec), (bitmap) + REG_POS(vec))
+
+static inline int vlapic_find_highest_vector(u32 *bitmap)
 {
-    int length = BITS_TO_LONGS(nr_bits);
-    while ( length && !data[--length] )
+    int word_offset = MAX_VECTOR / 32;
+
+    /* Work backwards through the bitmap (first 32-bit word in every four). */
+    while ( (word_offset != 0) && (bitmap[(--word_offset)*4] == 0) )
         continue;
-    return (fls(data[length]) - 1) + (length * BITS_PER_LONG);
+
+    return (fls(bitmap[word_offset*4]) - 1) + (word_offset * 32);
 }
 
 #define VLAPIC(v)                       (v->arch.hvm_vcpu.vlapic)
@@ -83,8 +99,6 @@ typedef struct direct_intr_info {
     int source[6];
 } direct_intr_info_t;
 
-#define MAX_VECTOR      256
-
 struct vlapic {
     uint32_t           status;
     uint32_t           vcpu_id;
@@ -108,9 +122,9 @@ static inline int vlapic_set_irq(struct vlapic *vlapic,
 {
     int ret;
 
-    ret = test_and_set_bit(vec, vlapic->regs + APIC_IRR);
+    ret = vlapic_test_and_set_vector(vec, vlapic->regs + APIC_IRR);
     if ( trig )
-        set_bit(vec, vlapic->regs + APIC_TMR);
+        vlapic_set_vector(vec, vlapic->regs + APIC_TMR);
 
     /* We may need to wake up target vcpu, besides set pending bit here */
     return ret;

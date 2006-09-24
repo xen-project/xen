@@ -61,6 +61,11 @@ extern shared_info_t *HYPERVISOR_shared_info;
 
 void trap_init(void);
 
+void arch_init(start_info_t *si);
+void arch_print_info(void);
+
+
+
 
 
 /* 

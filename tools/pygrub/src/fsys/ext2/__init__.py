@@ -23,7 +23,7 @@ class Ext2FileSystemType(FileSystemType):
         fd = os.open(fn, os.O_RDONLY)
         os.lseek(fd, offset, 0)
         buf = os.read(fd, 2048)
-        
+        os.close(fd)        
         if len(buf) > 1082 and \
                struct.unpack("<H", buf[1080:1082]) == (0xef53,):
             return True

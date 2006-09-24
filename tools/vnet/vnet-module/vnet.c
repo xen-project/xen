@@ -318,6 +318,7 @@ int vnet_table_init(void){
         err = -ENOMEM;
         goto exit;
     }
+    vnet_table->key_size = sizeof(VnetId);
     vnet_table->key_equal_fn = vnet_key_equal_fn;
     vnet_table->key_hash_fn = vnet_key_hash_fn;
     vnet_table->entry_free_fn = vnet_entry_free_fn;
@@ -431,14 +432,14 @@ inline int _skb_xmit(struct sk_buff *skb, uint32_t saddr){
 
     ip_send_check(skb->nh.iph);
 
-    if(1){
+#if 1
         // Output to skb destination. Will use ip_output(), which fragments.
         // Slightly slower than neigh_compat_output() (marginal - 1%).
         err = dst_output(skb); 
-    } else {
+#else
         // Sends direct to device via dev_queue_xmit(). No fragmentation?
         err = neigh_compat_output(skb);
-    }
+#endif
 
 #if 0
     if(needs_frags){
@@ -447,6 +448,7 @@ inline int _skb_xmit(struct sk_buff *skb, uint32_t saddr){
         err = ip_finish_output(skb);
     }
 #endif
+
   exit:
     dprintf("< err=%d\n", err);
     return err;
@@ -691,7 +693,12 @@ module_init(vnet_module_init);
 module_exit(vnet_module_exit);
 MODULE_LICENSE("GPL");
 
+#ifdef MODULE_PARM
 MODULE_PARM(vnet_encaps, "s");
+#else
+module_param(vnet_encaps, charp, 0644);
+#endif
+
 MODULE_PARM_DESC(vnet_encaps, "Vnet encapsulation: etherip or udp.");
 
 #endif

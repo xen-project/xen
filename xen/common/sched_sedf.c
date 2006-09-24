@@ -1175,20 +1175,6 @@ void sedf_wake(struct vcpu *d)
 }
 
 
-static int sedf_set_affinity(struct vcpu *v, cpumask_t *affinity)
-{
-    if ( v == current )
-        return cpu_isset(v->processor, *affinity) ? 0 : -EBUSY;
-
-    vcpu_pause(v);
-    v->cpu_affinity = *affinity;
-    v->processor = first_cpu(v->cpu_affinity);
-    vcpu_unpause(v);
-
-    return 0;
-}
-
-
 /* Print a lot of useful information about a domains in the system */
 static void sedf_dump_domain(struct vcpu *d)
 {
@@ -1449,7 +1435,6 @@ struct scheduler sched_sedf_def = {
     .sleep          = sedf_sleep,
     .wake           = sedf_wake,
     .adjust         = sedf_adjust,
-    .set_affinity   = sedf_set_affinity
 };
 
 /*

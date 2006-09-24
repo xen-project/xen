@@ -117,6 +117,7 @@ unsigned long alloc_xen_mmio(unsigned long len)
 	return addr;
 }
 
+#ifndef __ia64__
 /* Lifted from hvmloader.c */
 static int get_hypercall_stubs(void)
 {
@@ -162,6 +163,9 @@ static int get_hypercall_stubs(void)
 
 	return 0;
 }
+#else /* __ia64__ */
+#define get_hypercall_stubs()	(0)
+#endif
 
 static int __devinit platform_pci_init(struct pci_dev *pdev,
 				       const struct pci_device_id *ent)
@@ -207,7 +211,6 @@ static int __devinit platform_pci_init(struct pci_dev *pdev,
 	if (ret < 0)
 		goto out;
 
-	
 	if ((ret = init_xen_info()))
 		goto out;
 
@@ -228,11 +231,13 @@ static int __devinit platform_pci_init(struct pci_dev *pdev,
 	return ret;
 }
 
-#define XEN_PLATFORM_VENDOR_ID 0xfffd
-#define XEN_PLATFORM_DEVICE_ID 0x0101
+#define XEN_PLATFORM_VENDOR_ID 0x5853
+#define XEN_PLATFORM_DEVICE_ID 0x0001
 static struct pci_device_id platform_pci_tbl[] __devinitdata = {
 	{XEN_PLATFORM_VENDOR_ID, XEN_PLATFORM_DEVICE_ID,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	/* Continue to recognise the old ID for now */
+	{0xfffd, 0x0101, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0,}
 };
 

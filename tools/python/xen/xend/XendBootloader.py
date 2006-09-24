@@ -15,6 +15,7 @@
 import os, select, errno
 import random
 import sxp
+import shlex
 
 from XendLogging import log
 from XendError import VmError
@@ -49,7 +50,7 @@ def bootloader(blexec, disk, quiet = 0, blargs = None, imgcfg = None):
             args.append("-q")
         args.append("--output=%s" %(fifo,))
         if blargs is not None:
-            args.extend(blargs.split())
+            args.extend(shlex.split(blargs))
         args.append(disk)
 
         try:

@@ -29,11 +29,10 @@
 #include <xen/shutdown.h>
 #include <xen/shadow.h>
 #include <xen/mm.h>
+#include <xen/softirq.h>
 #include <asm/htab.h>
 #include <asm/current.h>
 #include <asm/hcalls.h>
-
-extern void idle_loop(void);
 
 #define next_arg(fmt, args) ({                                              \
     unsigned long __arg;                                                    \
@@ -47,6 +46,7 @@ extern void idle_loop(void);
     }                                                                       \
     __arg;                                                                  \
 })
+extern void idle_loop(void);
 
 unsigned long hypercall_create_continuation(unsigned int op,
         const char *format, ...)
@@ -75,31 +75,12 @@ unsigned long hypercall_create_continuation(unsigned int op,
 
 int arch_domain_create(struct domain *d)
 {
-    unsigned long rma_base;
-    unsigned long rma_sz;
-    uint rma_order_pages;
-    int rc;
-
     if (d->domain_id == IDLE_DOMAIN_ID) {
         d->shared_info = (void *)alloc_xenheap_page();
         clear_page(d->shared_info);
 
         return 0;
     }
-
-    /* allocate the real mode area */
-    rma_order_pages = cpu_default_rma_order_pages();
-    d->max_pages = 1UL << rma_order_pages;
-    d->tot_pages = 0;
-
-    rc = allocate_rma(d, rma_order_pages);
-    if (rc)
-        return rc;
-    rma_base = page_to_maddr(d->arch.rma_page);
-    rma_sz = rma_size(rma_order_pages);
-
-    d->shared_info = (shared_info_t *)
-        (rma_addr(&d->arch, RMA_SHARED_INFO) + rma_base);
 
     d->arch.large_page_sizes = cpu_large_page_orders(
         d->arch.large_page_order, ARRAY_SIZE(d->arch.large_page_order));
@@ -198,7 +179,6 @@ void dump_pageframe_info(struct domain *d)
     }
 }
 
-
 void context_switch(struct vcpu *prev, struct vcpu *next)
 {
     struct cpu_user_regs *stack_regs = guest_cpu_user_regs();
@@ -262,12 +242,73 @@ void sync_vcpu_execstate(struct vcpu *v)
     return;
 }
 
+static void relinquish_memory(struct domain *d, struct list_head *list)
+{
+    struct list_head *ent;
+    struct page_info  *page;
+
+    /* Use a recursive lock, as we may enter 'free_domheap_page'. */
+    spin_lock_recursive(&d->page_alloc_lock);
+
+    ent = list->next;
+    while ( ent != list )
+    {
+        page = list_entry(ent, struct page_info, list);
+
+        /* Grab a reference to the page so it won't disappear from under us. */
+        if ( unlikely(!get_page(page, d)) )
+        {
+            /* Couldn't get a reference -- someone is freeing this page. */
+            ent = ent->next;
+            continue;
+        }
+        if ( test_and_clear_bit(_PGT_pinned, &page->u.inuse.type_info) )
+            put_page_and_type(page);
+
+        if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
+            put_page(page);
+
+        /* Follow the list chain and /then/ potentially free the page. */
+        ent = ent->next;
+        put_page(page);
+    }
+    spin_unlock_recursive(&d->page_alloc_lock);
+}
+
 void domain_relinquish_resources(struct domain *d)
 {
-    free_domheap_pages(d->arch.rma_page, d->arch.rma_order);
+    relinquish_memory(d, &d->page_list);
     free_extents(d);
+    return;
 }
 
 void arch_dump_domain_info(struct domain *d)
 {
+}
+
+extern void sleep(void);
+static void safe_halt(void)
+{
+    int cpu = smp_processor_id();
+
+    while (!softirq_pending(cpu))
+        sleep();
+}
+
+static void default_idle(void)
+{
+    local_irq_disable();
+    if ( !softirq_pending(smp_processor_id()) )
+        safe_halt();
+    else
+        local_irq_enable();
+}
+
+void idle_loop(void)
+{
+    for ( ; ; ) {
+        page_scrub_schedule_work();
+        default_idle();
+        do_softirq();
+    }
 }

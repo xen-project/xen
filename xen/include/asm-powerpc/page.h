@@ -29,6 +29,7 @@
 
 #include <xen/config.h>
 #include <asm/misc.h>
+#include <asm/cache.h>
 
 #define PFN_DOWN(x)   ((x) >> PAGE_SHIFT)
 #define PFN_UP(x)     (((x) + PAGE_SIZE-1) >> PAGE_SHIFT)
@@ -70,7 +71,23 @@ typedef struct { unsigned long l1_lo; } l1_pgentry_t;
 #define pfn_to_paddr(pfn)   ((paddr_t)(pfn) << PAGE_SHIFT)
 #define paddr_to_pfn(pa)    ((unsigned long)((pa) >> PAGE_SHIFT))
 
-extern void clear_page(void *p);
+static __inline__ void clear_page(void *addr)
+{
+    unsigned long lines, line_size;
+
+    line_size = cpu_caches.dline_size;
+    lines = cpu_caches.dlines_per_page;
+
+    __asm__ __volatile__(
+    "mtctr  %1      # clear_page\n\
+1:  dcbz    0,%0\n\
+    add     %0,%0,%3\n\
+    bdnz+   1b"
+    : "=r" (addr)
+    : "r" (lines), "0" (addr), "r" (line_size)
+    : "ctr", "memory");
+}
+
 extern void copy_page(void *dp, void *sp);
 
 #define linear_pg_table linear_l1_table

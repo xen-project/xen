@@ -78,7 +78,7 @@ void __init paging_init(void)
 {
     unsigned long i, mpt_size;
     l3_pgentry_t *l3_ro_mpt;
-    l2_pgentry_t *l2_ro_mpt;
+    l2_pgentry_t *l2_ro_mpt = NULL;
     struct page_info *pg;
 
     /* Create user-accessible L2 directory to map the MPT for guests. */
@@ -87,12 +87,6 @@ void __init paging_init(void)
     idle_pg_table[l4_table_offset(RO_MPT_VIRT_START)] =
         l4e_from_page(
             virt_to_page(l3_ro_mpt), __PAGE_HYPERVISOR | _PAGE_USER);
-    l2_ro_mpt = alloc_xenheap_page();
-    clear_page(l2_ro_mpt);
-    l3_ro_mpt[l3_table_offset(RO_MPT_VIRT_START)] =
-        l3e_from_page(
-            virt_to_page(l2_ro_mpt), __PAGE_HYPERVISOR | _PAGE_USER);
-    l2_ro_mpt += l2_table_offset(RO_MPT_VIRT_START);
 
     /*
      * Allocate and map the machine-to-phys table.
@@ -110,10 +104,20 @@ void __init paging_init(void)
             PAGE_HYPERVISOR);
         memset((void *)(RDWR_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT)), 0x55,
                1UL << L2_PAGETABLE_SHIFT);
+        if ( !((unsigned long)l2_ro_mpt & ~PAGE_MASK) )
+        {
+            unsigned long va = RO_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT);
+
+            l2_ro_mpt = alloc_xenheap_page();
+            clear_page(l2_ro_mpt);
+            l3_ro_mpt[l3_table_offset(va)] =
+                l3e_from_page(
+                    virt_to_page(l2_ro_mpt), __PAGE_HYPERVISOR | _PAGE_USER);
+            l2_ro_mpt += l2_table_offset(va);
+        }
         /* NB. Cannot be GLOBAL as shadow_mode_translate reuses this area. */
         *l2_ro_mpt++ = l2e_from_page(
             pg, /*_PAGE_GLOBAL|*/_PAGE_PSE|_PAGE_USER|_PAGE_PRESENT);
-        BUG_ON(((unsigned long)l2_ro_mpt & ~PAGE_MASK) == 0);
     }
 
     /* Set up linear page table mapping. */

@@ -39,49 +39,6 @@
 #include <xen/features.h>
 #include <xen/version.h>
 
-/*
- * Shared page for communicating with the hypervisor.
- * Events flags go here, for example.
- */
-shared_info_t *HYPERVISOR_shared_info;
-
-/*
- * This structure contains start-of-day info, such as pagetable base pointer,
- * address of the shared_info structure, and things like that.
- */
-union start_info_union start_info_union;
-
-/*
- * Just allocate the kernel stack here. SS:ESP is set up to point here
- * in head.S.
- */
-char stack[8192];
-
-
-/* Assembler interface fns in entry.S. */
-void hypervisor_callback(void);
-void failsafe_callback(void);
-
-extern char shared_info[PAGE_SIZE];
-
-#if !defined(CONFIG_X86_PAE)
-#define __pte(x) ((pte_t) { (x) } )
-#else
-#define __pte(x) ({ unsigned long long _x = (x);        \
-    ((pte_t) {(unsigned long)(_x), (unsigned long)(_x>>32)}); })
-#endif
-
-static shared_info_t *map_shared_info(unsigned long pa)
-{
-    if ( HYPERVISOR_update_va_mapping(
-        (unsigned long)shared_info, __pte(pa | 7), UVMF_INVLPG) )
-    {
-        printk("Failed to map shared_info!!\n");
-        do_exit();
-    }
-    return (shared_info_t *)shared_info;
-}
-
 
 u8 xen_features[XENFEAT_NR_SUBMAPS * 32];
 
@@ -126,27 +83,8 @@ void start_kernel(start_info_t *si)
 
     (void)HYPERVISOR_console_io(CONSOLEIO_write, strlen(hello), hello);
 
-    /* Copy the start_info struct to a globally-accessible area. */
-    /* WARN: don't do printk before here, it uses information from
-       shared_info. Use xprintk instead. */
-    memcpy(&start_info, si, sizeof(*si));
-    
-    /* set up minimal memory infos */
-    phys_to_machine_mapping = (unsigned long *)start_info.mfn_list;
+    arch_init(si);
 
-    /* Grab the shared_info pointer and put it in a safe place. */
-    HYPERVISOR_shared_info = map_shared_info(start_info.shared_info);
-
-    /* Set up event and failsafe callback addresses. */
-#ifdef __i386__
-    HYPERVISOR_set_callbacks(
-        __KERNEL_CS, (unsigned long)hypervisor_callback,
-        __KERNEL_CS, (unsigned long)failsafe_callback);
-#else
-    HYPERVISOR_set_callbacks(
-        (unsigned long)hypervisor_callback,
-        (unsigned long)failsafe_callback, 0);
-#endif
     trap_init();
 
     /* ENABLE EVENT DELIVERY. This is disabled at start of day. */
@@ -163,7 +101,8 @@ void start_kernel(start_info_t *si)
     printk("  flags:      0x%x\n",  (unsigned int)si->flags);
     printk("  cmd_line:   %s\n",  
            si->cmd_line ? (const char *)si->cmd_line : "NULL");
-    printk("  stack:      %p-%p\n", stack, stack + 8192);
+
+    arch_print_info();
 
     setup_xen_features();
 

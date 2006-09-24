@@ -21,8 +21,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#define SHADOW 1
-
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/mm.h>
@@ -225,7 +223,6 @@ struct x86_emulate_ops shadow_emulator_ops = {
     .cmpxchg8b_emulated = sh_x86_emulate_cmpxchg8b_emulated,
 };
 
-
 /**************************************************************************/
 /* Code for "promoting" a guest page to the point where the shadow code is
  * willing to let it be treated as a guest page table.  This generally
@@ -235,32 +232,15 @@ struct x86_emulate_ops shadow_emulator_ops = {
 void shadow_promote(struct vcpu *v, mfn_t gmfn, u32 type)
 {
     struct page_info *page = mfn_to_page(gmfn);
-    unsigned long type_info;
 
     ASSERT(valid_mfn(gmfn));
 
     /* We should never try to promote a gmfn that has writeable mappings */
     ASSERT(shadow_remove_write_access(v, gmfn, 0, 0) == 0);
 
-    // Is the page already shadowed?
+    /* Is the page already shadowed? */
     if ( !test_and_set_bit(_PGC_page_table, &page->count_info) )
-    {
-        // No prior shadow exists...
-
-        // Grab a type-ref.  We don't really care if we are racing with another
-        // vcpu or not, or even what kind of type we get; we just want the type
-        // count to be > 0.
-        //
-        do {
-            type_info =
-                page->u.inuse.type_info & (PGT_type_mask | PGT_va_mask);
-        } while ( !get_page_type(page, type_info) );
-
-        // Now that the type ref is non-zero, we can safely use the
-        // shadow_flags.
-        //
         page->shadow_flags = 0;
-    }
 
     ASSERT(!test_bit(type >> PGC_SH_type_shift, &page->shadow_flags));
     set_bit(type >> PGC_SH_type_shift, &page->shadow_flags);
@@ -276,13 +256,7 @@ void shadow_demote(struct vcpu *v, mfn_t gmfn, u32 type)
     clear_bit(type >> PGC_SH_type_shift, &page->shadow_flags);
 
     if ( (page->shadow_flags & SHF_page_type_mask) == 0 )
-    {
-        // release the extra type ref
-        put_page_type(page);
-
-        // clear the is-a-page-table bit.
         clear_bit(_PGC_page_table, &page->count_info);
-    }
 }
 
 /**************************************************************************/
@@ -2369,7 +2343,7 @@ void sh_update_paging_modes(struct vcpu *v)
             }
             else
 #endif
-                if ( hvm_get_guest_ctrl_reg(v, 4) & X86_CR4_PAE )
+                if ( hvm_pae_enabled(v) )
                 {
 #if CONFIG_PAGING_LEVELS >= 3
                     // 32-bit PAE mode guest...

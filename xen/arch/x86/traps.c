@@ -1003,7 +1003,21 @@ static inline int admin_io_okay(
 }
 
 /* Check admin limits. Silently fail the access if it is disallowed. */
-#define inb_user(_p, _d, _r) (admin_io_okay(_p, 1, _d, _r) ? inb(_p) : ~0)
+static inline unsigned char inb_user(
+    unsigned int port, struct vcpu *v, struct cpu_user_regs *regs)
+{
+    /*
+     * Allow read access to port 0x61. Bit 4 oscillates with period 30us, and
+     * so it is often used for timing loops in BIOS code. This hack can go
+     * away when we have separate read/write permission rangesets.
+     * Note that we could emulate bit 4 instead of directly reading port 0x61,
+     * but there's not really a good reason to do so.
+     */
+    if ( admin_io_okay(port, 1, v, regs) || (port == 0x61) )
+        return inb(port);
+    return ~0;
+}
+//#define inb_user(_p, _d, _r) (admin_io_okay(_p, 1, _d, _r) ? inb(_p) : ~0)
 #define inw_user(_p, _d, _r) (admin_io_okay(_p, 2, _d, _r) ? inw(_p) : ~0)
 #define inl_user(_p, _d, _r) (admin_io_okay(_p, 4, _d, _r) ? inl(_p) : ~0)
 #define outb_user(_v, _p, _d, _r) \
@@ -1014,9 +1028,11 @@ static inline int admin_io_okay(
     (admin_io_okay(_p, 4, _d, _r) ? outl(_v, _p) : ((void)0))
 
 /* Instruction fetch with error handling. */
-#define insn_fetch(_type, _size, _ptr)                                      \
-({  unsigned long _rc, _x;                                                  \
-    if ( (_rc = copy_from_user(&_x, (_type *)eip, sizeof(_type))) != 0 )    \
+#define insn_fetch(_type, _size, cs, eip)                                   \
+({  unsigned long _rc, _x, _ptr = eip;                                      \
+    if ( vm86_mode(regs) )                                                  \
+        _ptr += cs << 4;                                                    \
+    if ( (_rc = copy_from_user(&_x, (_type *)_ptr, sizeof(_type))) != 0 )   \
     {                                                                       \
         propagate_page_fault(eip + sizeof(_type) - _rc, 0);                 \
         return EXCRET_fault_fixed;                                          \
@@ -1026,7 +1042,7 @@ static inline int admin_io_okay(
 static int emulate_privileged_op(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
-    unsigned long *reg, eip = regs->eip, res;
+    unsigned long *reg, eip = regs->eip, cs = regs->cs, res;
     u8 opcode, modrm_reg = 0, modrm_rm = 0, rep_prefix = 0;
     unsigned int port, i, op_bytes = 4, data, rc;
     u32 l, h;
@@ -1034,7 +1050,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     /* Legacy prefixes. */
     for ( i = 0; i < 8; i++ )
     {
-        switch ( opcode = insn_fetch(u8, 1, eip) )
+        switch ( opcode = insn_fetch(u8, 1, cs, eip) )
         {
         case 0x66: /* operand-size override */
             op_bytes ^= 6; /* switch between 2/4 bytes */
@@ -1066,7 +1082,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         modrm_rm  = (opcode & 1) << 3;  /* REX.B */
 
         /* REX.W and REX.X do not need to be decoded. */
-        opcode = insn_fetch(u8, 1, eip);
+        opcode = insn_fetch(u8, 1, cs, eip);
     }
 #endif
     
@@ -1148,7 +1164,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     case 0xe4: /* IN imm8,%al */
         op_bytes = 1;
     case 0xe5: /* IN imm8,%eax */
-        port = insn_fetch(u8, 1, eip);
+        port = insn_fetch(u8, 1, cs, eip);
     exec_in:
         if ( !guest_io_okay(port, op_bytes, v, regs) )
             goto fail;
@@ -1177,7 +1193,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     case 0xe6: /* OUT %al,imm8 */
         op_bytes = 1;
     case 0xe7: /* OUT %eax,imm8 */
-        port = insn_fetch(u8, 1, eip);
+        port = insn_fetch(u8, 1, cs, eip);
     exec_out:
         if ( !guest_io_okay(port, op_bytes, v, regs) )
             goto fail;
@@ -1226,7 +1242,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         goto fail;
 
     /* Privileged (ring 0) instructions. */
-    opcode = insn_fetch(u8, 1, eip);
+    opcode = insn_fetch(u8, 1, cs, eip);
     switch ( opcode )
     {
     case 0x06: /* CLTS */
@@ -1244,7 +1260,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         break;
 
     case 0x20: /* MOV CR?,<reg> */
-        opcode = insn_fetch(u8, 1, eip);
+        opcode = insn_fetch(u8, 1, cs, eip);
         modrm_reg |= (opcode >> 3) & 7;
         modrm_rm  |= (opcode >> 0) & 7;
         reg = decode_register(modrm_rm, regs, 0);
@@ -1278,7 +1294,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         break;
 
     case 0x21: /* MOV DR?,<reg> */
-        opcode = insn_fetch(u8, 1, eip);
+        opcode = insn_fetch(u8, 1, cs, eip);
         modrm_reg |= (opcode >> 3) & 7;
         modrm_rm  |= (opcode >> 0) & 7;
         reg = decode_register(modrm_rm, regs, 0);
@@ -1288,7 +1304,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         break;
 
     case 0x22: /* MOV <reg>,CR? */
-        opcode = insn_fetch(u8, 1, eip);
+        opcode = insn_fetch(u8, 1, cs, eip);
         modrm_reg |= (opcode >> 3) & 7;
         modrm_rm  |= (opcode >> 0) & 7;
         reg = decode_register(modrm_rm, regs, 0);
@@ -1328,7 +1344,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         break;
 
     case 0x23: /* MOV <reg>,DR? */
-        opcode = insn_fetch(u8, 1, eip);
+        opcode = insn_fetch(u8, 1, cs, eip);
         modrm_reg |= (opcode >> 3) & 7;
         modrm_rm  |= (opcode >> 0) & 7;
         reg = decode_register(modrm_rm, regs, 0);

@@ -366,6 +366,7 @@ int vif_init(void){
         goto exit;
     }
     vif_table->entry_free_fn = vif_entry_free_fn;
+    vif_table->key_size = sizeof(VifKey);
     vif_table->key_hash_fn   = vif_key_hash_fn;
     vif_table->key_equal_fn  = vif_key_equal_fn;
 

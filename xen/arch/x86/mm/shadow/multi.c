@@ -35,8 +35,6 @@
 //   space for both PV and HVM guests.
 //
 
-#define SHADOW 1
-
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/mm.h>
@@ -3039,7 +3037,14 @@ static int sh_page_fault(struct vcpu *v,
     SHADOW_PRINTK("emulate: eip=%#lx\n", emul_regs.eip);
 
     v->arch.shadow.propagate_fault = 0;
-    if ( x86_emulate_memop(&emul_ctxt, &shadow_emulator_ops) )
+
+    /*
+     * We do not emulate user writes. Instead we use them as a hint that the
+     * page is no longer a page table. This behaviour differs from native, but
+     * it seems very unlikely that any OS grants user access to page tables.
+     */
+    if ( (regs->error_code & PFEC_user_mode) ||
+         x86_emulate_memop(&emul_ctxt, &shadow_emulator_ops) )
     {
         SHADOW_PRINTK("emulator failure, unshadowing mfn %#lx\n", 
                        mfn_x(gmfn));
@@ -3052,11 +3057,10 @@ static int sh_page_fault(struct vcpu *v,
          * guest to loop on the same page fault. */
         goto done;
     }
+
+    /* Emulation triggered another page fault? */
     if ( v->arch.shadow.propagate_fault )
-    {
-        /* Emulation triggered another page fault */
         goto not_a_shadow_fault;
-    }
 
     /* Emulator has changed the user registers: write back */
     if ( hvm_guest(v) )

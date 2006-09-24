@@ -52,29 +52,74 @@ char *states[] = {
 static char *rnames[] = { "ax", "cx", "dx", "bx", "sp", "bp", "si", "di" };
 #endif /* DEBUG */
 
+#define PDE_PS           (1 << 7)
 #define PT_ENTRY_PRESENT 0x1
 
+/* We only support access to <=4G physical memory due to 1:1 mapping */
 static unsigned
-guest_linear_to_real(unsigned long base, unsigned off)
+guest_linear_to_real(uint32_t base)
 {
-	unsigned int gcr3 = oldctx.cr3;
-	unsigned int l1_mfn;
-	unsigned int l0_mfn;
+	uint32_t gcr3 = oldctx.cr3;
+	uint64_t l2_mfn;
+	uint64_t l1_mfn;
+	uint64_t l0_mfn;
 
 	if (!(oldctx.cr0 & CR0_PG))
-		return base + off;
+		return base;
 
-	l1_mfn = ((unsigned int *)gcr3)[(base >> 22) & 0x3ff ];
-	if (!(l1_mfn & PT_ENTRY_PRESENT))
-		panic("l2 entry not present\n");
-	l1_mfn = l1_mfn & 0xfffff000 ;
+	if (!(oldctx.cr4 & CR4_PAE)) {
+		l1_mfn = ((uint32_t *)gcr3)[(base >> 22) & 0x3ff];
 
-	l0_mfn = ((unsigned int *)l1_mfn)[(base >> 12) & 0x3ff];
-	if (!(l0_mfn & PT_ENTRY_PRESENT))
-		panic("l1 entry not present\n");
-	l0_mfn = l0_mfn & 0xfffff000;
+		if (oldctx.cr4 & CR4_PSE || l1_mfn & PDE_PS) {
+                        /* 1 level page table */
+			l0_mfn = l1_mfn;
+			if (!(l0_mfn & PT_ENTRY_PRESENT))
+				panic("l1 entry not present\n");
 
-	return l0_mfn + off + (base & 0xfff);
+			l0_mfn &= 0xffc00000;
+			return l0_mfn + (base & 0x3fffff);
+		}
+
+		if (!(l1_mfn & PT_ENTRY_PRESENT))
+			panic("l2 entry not present\n");
+
+		l1_mfn &= 0xfffff000;
+		l0_mfn = ((uint32_t *)l1_mfn)[(base >> 12) & 0x3ff];
+		if (!(l0_mfn & PT_ENTRY_PRESENT))
+			panic("l1 entry not present\n");
+		l0_mfn &= 0xfffff000;
+
+		return l0_mfn + (base & 0xfff);
+	} else if (oldctx.cr4 & CR4_PAE && !(oldctx.cr4 & CR4_PSE)) {
+		l2_mfn = ((uint64_t *)gcr3)[(base >> 30) & 0x3];
+		if (!(l2_mfn & PT_ENTRY_PRESENT))
+			panic("l3 entry not present\n");
+		l2_mfn &= 0x3fffff000ULL;
+
+		l1_mfn = ((uint64_t *)l2_mfn)[(base >> 21) & 0x1ff];
+		if (!(l1_mfn & PT_ENTRY_PRESENT))
+			panic("l2 entry not present\n");
+		l1_mfn &= 0x3fffff000ULL;
+
+		l0_mfn = ((uint64_t *)l1_mfn)[(base >> 12) & 0x1ff];
+		if (!(l0_mfn & PT_ENTRY_PRESENT))
+			panic("l1 entry not present\n");
+		l0_mfn &= 0x3fffff000ULL;
+
+		return l0_mfn + (base & 0xfff);
+	} else { /* oldctx.cr4 & CR4_PAE && oldctx.cr4 & CR4_PSE */
+		l1_mfn = ((uint64_t *)gcr3)[(base >> 30) & 0x3];
+		if (!(l1_mfn & PT_ENTRY_PRESENT))
+			panic("l2 entry not present\n");
+		l1_mfn &= 0x3fffff000ULL;
+
+		l0_mfn = ((uint64_t *)l1_mfn)[(base >> 21) & 0x1ff];
+		if (!(l0_mfn & PT_ENTRY_PRESENT))
+			panic("l1 entry not present\n");
+		l0_mfn &= 0x3ffe00000ULL;
+
+		return l0_mfn + (base & 0x1fffff);
+	}
 }
 
 static unsigned
@@ -95,7 +140,8 @@ address(struct regs *regs, unsigned seg, unsigned off)
 	    (mode == VM86_REAL_TO_PROTECTED && regs->cs == seg))
 		return ((seg & 0xFFFF) << 4) + off;
 
-	entry = ((unsigned long long *) guest_linear_to_real(oldctx.gdtr_base, 0))[seg >> 3];
+	entry = ((unsigned long long *)
+                 guest_linear_to_real(oldctx.gdtr_base))[seg >> 3];
 	entry_high = entry >> 32;
 	entry_low = entry & 0xFFFFFFFF;
 
@@ -780,7 +826,8 @@ load_seg(unsigned long sel, uint32_t *base, uint32_t *limit, union vmcs_arbytes 
 		return 1;
 	}
 
-	entry = ((unsigned long long *) guest_linear_to_real(oldctx.gdtr_base, 0))[sel >> 3];
+	entry = ((unsigned long long *)
+                 guest_linear_to_real(oldctx.gdtr_base))[sel >> 3];
 
 	/* Check the P bit first */
 	if (!((entry >> (15+32)) & 0x1) && sel != 0)

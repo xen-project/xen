@@ -18,9 +18,7 @@
 
 XENCONSOLE = "xenconsole"
 
-
 import xen.util.auxbin
-
 
 def execConsole(domid):
     xen.util.auxbin.execute(XENCONSOLE, [str(domid)])

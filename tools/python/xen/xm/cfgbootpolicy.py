@@ -28,20 +28,17 @@ from xen.util.security import ACMError, err
 from xen.util.security import policy_dir_prefix, boot_filename, xen_title_re
 from xen.util.security import any_title_re, xen_kernel_re, kernel_ver_re, any_module_re
 from xen.util.security import empty_line_re, binary_name_re, policy_name_re
+from xen.xm.opts import OptionError
 
-
-def usage():
-    print "\nUsage: xm cfgbootpolicy <policy> [<kernelversion>]\n"
-    print "  Adds a 'module' line to the Xen grub.conf entry"
-    print "  so that xen boots into a specific access control"
-    print "  policy. If kernelversion is not given, then this"
-    print "  script tries to determine it by looking for a grub"
-    print "  entry with a line kernel xen.* If there are multiple"
-    print "  Xen entries, then it must be called with an explicit"
-    print "  version (it will fail otherwise).\n"
-    err("Usage")
-
-
+def help():
+    return """
+    Adds a 'module' line to the Xen grub.conf entry
+    so that xen boots into a specific access control
+    policy. If kernelversion is not given, then this
+    script tries to determine it by looking for a grub
+    entry with a line kernel xen.* If there are multiple
+    Xen entries, then it must be called with an explicit
+    version (it will fail otherwise).\n"""
 
 def determine_kernelversion(user_specified):
     within_xen_title = 0
@@ -152,7 +149,7 @@ def main(argv):
             policy = argv[1]
             user_kver = argv[2]
         else:
-            usage()
+            raise OptionError('Invalid number of arguments')
 
         if not policy_name_re.match(policy):
             err("Illegal policy name \'" + policy + "\'")

@@ -78,7 +78,6 @@ unsigned int shadow_set_allocation(struct domain *d,
                                     unsigned int megabytes,
                                     int *preempted)
 {
-    unsigned int rc;
     uint pages;
     uint p;
     uint order;
@@ -91,7 +90,7 @@ unsigned int shadow_set_allocation(struct domain *d,
     if (megabytes == 0) {
         /* old management tools */
         megabytes = 1;          /* 1/64th of 64M */
-        printk("%s: Fix management tools to set and get shadow/htab values\n"
+        printk("%s: WARNING!!: Update your managment tools\n"
                "    using %d MiB htab\n",
                __func__, megabytes);
     }
@@ -112,7 +111,7 @@ unsigned int shadow_set_allocation(struct domain *d,
     for (p = 0; p < (1 << order); p++)
         clear_page((void *)(addr + (p << PAGE_SHIFT)));
 
-    return rc;
+    return 0;
 }
 
 int shadow_domctl(struct domain *d, 

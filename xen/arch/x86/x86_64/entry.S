@@ -152,7 +152,7 @@ ENTRY(syscall_enter)
 #ifndef NDEBUG
         /* Deliberately corrupt parameter regs used by this hypercall. */
         popq  %r10         # Shadow RIP
-        cmpq  %r10,UREGS_rip(%rsp)
+        cmpq  %r10,UREGS_rip+8(%rsp)
         popq  %rcx         # Shadow hypercall index
         jne   skip_clobber /* If RIP has changed then don't clobber. */
         leaq  hypercall_args_table(%rip),%r10

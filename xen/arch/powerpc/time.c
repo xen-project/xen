@@ -34,40 +34,6 @@ ulong ticks_per_usec;
 unsigned long cpu_khz;
 unsigned int timebase_freq;
 
-u64 get_timebase(void)
-{
-    u64 s;
-
-#ifdef __PPC64__
-    s = mftb();
-#else
-    do {
-        unsigned up;
-        unsigned lo;
-        unsigned up2;
-
-        up = mftbu();
-        lo = mftbl();
-        up2 = mftbu();
-    } while (up1 != up2);
-    s = ((ulong)up << 32) | lo;
-#endif
-    return s;
-}
-
-static ulong ns_to_tb(ulong ns)
-{
-    return (ns * timebase_freq) / 1000000000ULL;
-}
-
-static ulong tb_to_ns(ulong tb)
-{
-    return tb * (1000000000ULL / timebase_freq);
-}
-
-/*
- * Return nanoseconds from time of boot
- */
 s_time_t get_s_time(void)
 {
     return tb_to_ns(get_timebase());
@@ -94,7 +60,7 @@ int reprogram_timer(s_time_t timeout)
     s_time_t expire;
 
     if (timeout == 0) {
-        expire = 0;
+        expire = INT_MAX;
     } else {
         s_time_t now;
 

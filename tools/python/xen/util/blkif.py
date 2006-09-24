@@ -7,7 +7,7 @@ from xen.xend.XendLogging import log
 def expand_dev_name(name):
     if not name:
         return name
-    if re.match( '^/dev/', name ):
+    if re.match( '^/', name ):
         return name
     else:
         return '/dev/' + name
@@ -65,7 +65,7 @@ def blkdev_uname_to_file(uname):
     fn = None
     if uname.find(":") != -1:
         (typ, fn) = uname.split(":")
-        if typ == "phy" and not fn.startswith("/dev/"):
+        if typ == "phy" and not fn.startswith("/"):
             fn = "/dev/%s" %(fn,)
     return fn
 

@@ -47,14 +47,30 @@ static unsigned long paddr_to_maddr(unsigned long paddr)
     pfn = pa >> PAGE_SHIFT;
 
     pa = pfn2mfn(d, pfn, &mtype);
+    if (pa == INVALID_MFN) {
+        printk("%s: Dom:%d bad paddr: 0x%lx\n",
+               __func__, d->domain_id, paddr);
+        return 0;
+    }
     switch (mtype) {
-        case PFN_TYPE_RMA:
-        case PFN_TYPE_LOGICAL:
-            break;
-        default:
-            panic("%s: called with bad memory address type: 0x%lx\n",
-                    __func__, paddr);
-            break;
+    case PFN_TYPE_RMA:
+    case PFN_TYPE_LOGICAL:
+        break;
+
+    case PFN_TYPE_FOREIGN:
+        /* I don't think this should ever happen, but I suppose it
+         * could be possible */
+        printk("%s: Dom:%d paddr: 0x%lx type: FOREIGN\n",
+               __func__, d->domain_id, paddr);
+        WARN();
+        break;
+
+    case PFN_TYPE_IO:
+    default:
+        printk("%s: Dom:%d paddr: 0x%lx bad type: 0x%x\n",
+               __func__, d->domain_id, paddr, mtype);
+        WARN();
+        return 0;
     }
     pa <<= PAGE_SHIFT;
     pa |= offset;
@@ -85,6 +101,9 @@ xencomm_copy_from_guest(void *to, const void *from, unsigned int n,
 
     /* first we need to access the descriptor */
     desc = (struct xencomm_desc *)paddr_to_maddr((unsigned long)from);
+    if (desc == NULL)
+        return n;
+
     if (desc->magic != XENCOMM_MAGIC) {
         printk("%s: error: %p magic was 0x%x\n",
                __func__, desc, desc->magic);
@@ -117,6 +136,9 @@ xencomm_copy_from_guest(void *to, const void *from, unsigned int n,
             unsigned int bytes = min(chunksz, n - to_pos);
 
             src_maddr = paddr_to_maddr(src_paddr + chunk_skip);
+            if (src_maddr == 0)
+                return n - to_pos;
+
             if (xencomm_debug)
                 printk("%lx[%d] -> %lx\n", src_maddr, bytes, dest);
             memcpy((void *)dest, (void *)src_maddr, bytes);
@@ -153,6 +175,9 @@ xencomm_copy_to_guest(void *to, const void *from, unsigned int n,
 
     /* first we need to access the descriptor */
     desc = (struct xencomm_desc *)paddr_to_maddr((unsigned long)to);
+    if (desc == NULL)
+        return n;
+
     if (desc->magic != XENCOMM_MAGIC) {
         printk("%s error: %p magic was 0x%x\n", __func__, desc, desc->magic);
         return n;
@@ -184,6 +209,9 @@ xencomm_copy_to_guest(void *to, const void *from, unsigned int n,
             unsigned int bytes = min(chunksz, n - from_pos);
 
             dest_maddr = paddr_to_maddr(dest_paddr + chunk_skip);
+            if (dest_maddr == 0)
+                return -1;
+
             if (xencomm_debug)
                 printk("%lx[%d] -> %lx\n", source, bytes, dest_maddr);
             memcpy((void *)dest_maddr, (void *)source, bytes);
@@ -199,16 +227,19 @@ xencomm_copy_to_guest(void *to, const void *from, unsigned int n,
 
 /* Offset page addresses in 'handle' to skip 'bytes' bytes. Set completely
  * exhausted pages to XENCOMM_INVALID. */
-void xencomm_add_offset(void *handle, unsigned int bytes)
+int xencomm_add_offset(void *handle, unsigned int bytes)
 {
     struct xencomm_desc *desc;
     int i = 0;
 
     /* first we need to access the descriptor */
     desc = (struct xencomm_desc *)paddr_to_maddr((unsigned long)handle);
+    if (desc == NULL)
+        return -1;
+
     if (desc->magic != XENCOMM_MAGIC) {
         printk("%s error: %p magic was 0x%x\n", __func__, desc, desc->magic);
-        return;
+        return -1;
     }
 
     /* iterate through the descriptor incrementing addresses */
@@ -230,6 +261,7 @@ void xencomm_add_offset(void *handle, unsigned int bytes)
         }
         bytes -= chunk_skip;
     }
+    return 0;
 }
 
 int xencomm_handle_is_null(void *ptr)
@@ -237,6 +269,9 @@ int xencomm_handle_is_null(void *ptr)
     struct xencomm_desc *desc;
 
     desc = (struct xencomm_desc *)paddr_to_maddr((unsigned long)ptr);
+    if (desc == NULL)
+        return 1;
 
     return (desc->nr_addrs == 0);
 }
+
