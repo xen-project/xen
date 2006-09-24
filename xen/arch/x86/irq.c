@@ -351,6 +351,9 @@ int pirq_acktype(int irq)
 
     desc = &irq_desc[vector];
 
+    if ( desc->handler == &no_irq_type )
+        return ACKTYPE_NONE;
+
     /*
      * Edge-triggered IO-APIC and LAPIC interrupts need no final
      * acknowledgement: we ACK early during interrupt processing.
