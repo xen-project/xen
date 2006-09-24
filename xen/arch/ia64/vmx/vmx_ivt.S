@@ -772,12 +772,20 @@ ENTRY(vmx_single_step_trap)
     VMX_REFLECT(36)
 END(vmx_single_step_trap)
 
+    .global vmx_virtualization_fault_back
     .org vmx_ia64_ivt+0x6100
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6100 Entry 37 (size 16 bundles) Virtualization Fault
 ENTRY(vmx_virtualization_fault)
 //    VMX_DBG_FAULT(37)
     mov r31=pr
+    ;;
+    cmp.eq p6,p0=EVENT_MOV_FROM_AR,r24
+    cmp.eq p7,p0=EVENT_MOV_FROM_RR,r24
+    (p6) br.dptk.many asm_mov_from_ar
+    (p7) br.dptk.many asm_mov_from_rr
+    ;;
+vmx_virtualization_fault_back:
     mov r19=37
     adds r16 = IA64_VCPU_CAUSE_OFFSET,r21
     adds r17 = IA64_VCPU_OPCODE_OFFSET,r21

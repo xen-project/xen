@@ -1,0 +1,518 @@
+/*
+ * arch/ia64/vmx/optvfault.S
+ * optimize virtualization fault handler
+ *
+ * Copyright (C) 2006 Intel Co
+ *	Xuefei Xu (Anthony Xu) <anthony.xu@intel.com>
+ */
+
+#include <linux/config.h>
+#include <asm/asmmacro.h>
+#include <asm/kregs.h>
+#include <asm/offsets.h>
+#include <asm/percpu.h>
+#include <asm/processor.h>
+#include <asm/vmx_vpd.h>
+#include <asm/vmx_pal_vsa.h>
+#include <asm/asm-offsets.h>
+
+#define ACCE_MOV_FROM_AR
+#define ACCE_MOV_FROM_RR
+
+//mov r1=ar3
+GLOBAL_ENTRY(asm_mov_from_ar)
+#ifndef ACCE_MOV_FROM_AR
+    br.many vmx_vitualization_fault_back
+#endif
+    add r18=VCPU_VTM_OFFSET_OFS,r21
+    mov r19=ar.itc
+    extr.u r17=r25,6,7
+    ;;
+    ld8 r18=[r18]
+    movl r20=asm_mov_to_reg
+    ;;
+    adds r30=vmx_resume_to_guest-asm_mov_to_reg,r20
+    shladd r17=r17,4,r20
+    mov r24=b0
+    ;;
+    add r19=r19,r18
+    mov b0=r17
+    br.sptk.few b0
+    ;;
+END(asm_mov_from_ar)
+
+
+// mov r1=rr[r3]
+GLOBAL_ENTRY(asm_mov_from_rr)
+#ifndef ACCE_MOV_FROM_RR
+    br.many vmx_vitualization_fault_back
+#endif
+    extr.u r16=r25,20,7
+    extr.u r17=r25,6,7
+    movl r20=asm_mov_from_reg
+    ;;
+    adds r30=asm_mov_from_rr_back_1-asm_mov_from_reg,r20
+    shladd r16=r16,4,r20
+    mov r24=b0
+    ;;
+    add r27=VCPU_VRR0_OFS,r21
+    mov b0=r16
+    br.many b0
+    ;;   
+asm_mov_from_rr_back_1:  
+    adds r30=vmx_resume_to_guest-asm_mov_from_reg,r20
+    adds r22=asm_mov_to_reg-asm_mov_from_reg,r20
+    shr.u r26=r19,61
+    ;;
+    shladd r17=r17,4,r22
+    shladd r27=r26,3,r27
+    ;;
+    ld8 r19=[r27]
+    mov b0=r17
+    br.many b0
+END(asm_mov_from_rr)
+
+
+#define MOV_TO_REG0	\
+{;			\
+    nop.b 0x0;		\
+    nop.b 0x0;		\
+    nop.b 0x0;		\
+    ;;			\
+};
+
+
+#define MOV_TO_REG(n)	\
+{;			\
+    mov r##n##=r19;	\
+    mov b0=r30;		\
+    br.sptk.many b0;	\
+    ;;			\
+};
+
+
+#define MOV_FROM_REG(n)	\
+{;			\
+    mov r19=r##n##;	\
+    mov b0=r30;		\
+    br.sptk.many b0;	\
+    ;;			\
+};
+
+
+#define MOV_TO_BANK0_REG(n)			\
+ENTRY_MIN_ALIGN(asm_mov_to_bank0_reg##n##);	\
+{;						\
+    mov r26=r2;					\
+    mov r2=r19;					\
+    bsw.1;					\
+    ;;						\
+};						\
+{;						\
+    mov r##n##=r2;				\
+    nop.b 0x0;					\
+    bsw.0;					\
+    ;;						\
+};						\
+{;						\
+    mov r2=r26;					\
+    mov b0=r30;					\
+    br.sptk.many b0;				\
+    ;;						\
+};						\
+END(asm_mov_to_bank0_reg##n##)
+
+
+#define MOV_FROM_BANK0_REG(n)			\
+ENTRY_MIN_ALIGN(asm_mov_from_bank0_reg##n##);	\
+{;						\
+    mov r26=r2;					\
+    nop.b 0x0;					\
+    bsw.1;					\
+    ;;						\
+};						\
+{;						\
+    mov r2=r##n##;				\
+    nop.b 0x0;					\
+    bsw.0;					\
+    ;;						\
+};						\
+{;						\
+    mov r19=r2;					\
+    mov r2=r26;					\
+    mov b0=r30;					\
+};						\
+{;						\
+    nop.b 0x0;					\
+    nop.b 0x0;					\
+    br.sptk.many b0;				\
+    ;;						\
+};						\
+END(asm_mov_from_bank0_reg##n##)
+
+
+#define JMP_TO_MOV_TO_BANK0_REG(n)		\
+{;						\
+    nop.b 0x0;					\
+    nop.b 0x0;					\
+    br.sptk.many asm_mov_to_bank0_reg##n##;	\
+    ;;						\
+}    
+
+
+#define JMP_TO_MOV_FROM_BANK0_REG(n)		\
+{;						\
+    nop.b 0x0;					\
+    nop.b 0x0;					\
+    br.sptk.many asm_mov_from_bank0_reg##n##;	\
+    ;;						\
+}
+
+
+MOV_FROM_BANK0_REG(16)
+MOV_FROM_BANK0_REG(17)
+MOV_FROM_BANK0_REG(18)
+MOV_FROM_BANK0_REG(19)
+MOV_FROM_BANK0_REG(20)
+MOV_FROM_BANK0_REG(21)
+MOV_FROM_BANK0_REG(22)
+MOV_FROM_BANK0_REG(23)
+MOV_FROM_BANK0_REG(24)
+MOV_FROM_BANK0_REG(25)
+MOV_FROM_BANK0_REG(26)
+MOV_FROM_BANK0_REG(27)
+MOV_FROM_BANK0_REG(28)
+MOV_FROM_BANK0_REG(29)
+MOV_FROM_BANK0_REG(30)
+MOV_FROM_BANK0_REG(31)
+
+
+// mov from reg table
+ENTRY(asm_mov_from_reg)
+    MOV_FROM_REG(0)
+    MOV_FROM_REG(1)
+    MOV_FROM_REG(2)
+    MOV_FROM_REG(3)
+    MOV_FROM_REG(4)
+    MOV_FROM_REG(5)
+    MOV_FROM_REG(6)
+    MOV_FROM_REG(7)
+    MOV_FROM_REG(8)
+    MOV_FROM_REG(9)
+    MOV_FROM_REG(10)
+    MOV_FROM_REG(11)
+    MOV_FROM_REG(12)
+    MOV_FROM_REG(13)
+    MOV_FROM_REG(14)
+    MOV_FROM_REG(15)
+    JMP_TO_MOV_FROM_BANK0_REG(16)
+    JMP_TO_MOV_FROM_BANK0_REG(17)
+    JMP_TO_MOV_FROM_BANK0_REG(18)
+    JMP_TO_MOV_FROM_BANK0_REG(19)
+    JMP_TO_MOV_FROM_BANK0_REG(20)
+    JMP_TO_MOV_FROM_BANK0_REG(21)
+    JMP_TO_MOV_FROM_BANK0_REG(22)
+    JMP_TO_MOV_FROM_BANK0_REG(23)
+    JMP_TO_MOV_FROM_BANK0_REG(24)
+    JMP_TO_MOV_FROM_BANK0_REG(25)
+    JMP_TO_MOV_FROM_BANK0_REG(26)
+    JMP_TO_MOV_FROM_BANK0_REG(27)
+    JMP_TO_MOV_FROM_BANK0_REG(28)
+    JMP_TO_MOV_FROM_BANK0_REG(29)
+    JMP_TO_MOV_FROM_BANK0_REG(30)
+    JMP_TO_MOV_FROM_BANK0_REG(31)
+    MOV_FROM_REG(32)
+    MOV_FROM_REG(33)
+    MOV_FROM_REG(34)
+    MOV_FROM_REG(35)
+    MOV_FROM_REG(36)
+    MOV_FROM_REG(37)
+    MOV_FROM_REG(38)
+    MOV_FROM_REG(39)
+    MOV_FROM_REG(40)
+    MOV_FROM_REG(41)
+    MOV_FROM_REG(42)
+    MOV_FROM_REG(43)
+    MOV_FROM_REG(44)
+    MOV_FROM_REG(45)
+    MOV_FROM_REG(46)
+    MOV_FROM_REG(47)
+    MOV_FROM_REG(48)
+    MOV_FROM_REG(49)
+    MOV_FROM_REG(50)
+    MOV_FROM_REG(51)
+    MOV_FROM_REG(52)
+    MOV_FROM_REG(53)
+    MOV_FROM_REG(54)
+    MOV_FROM_REG(55)
+    MOV_FROM_REG(56)
+    MOV_FROM_REG(57)
+    MOV_FROM_REG(58)
+    MOV_FROM_REG(59)
+    MOV_FROM_REG(60)
+    MOV_FROM_REG(61)
+    MOV_FROM_REG(62)
+    MOV_FROM_REG(63)
+    MOV_FROM_REG(64)
+    MOV_FROM_REG(65)
+    MOV_FROM_REG(66)
+    MOV_FROM_REG(67)
+    MOV_FROM_REG(68)
+    MOV_FROM_REG(69)
+    MOV_FROM_REG(70)
+    MOV_FROM_REG(71)
+    MOV_FROM_REG(72)
+    MOV_FROM_REG(73)
+    MOV_FROM_REG(74)
+    MOV_FROM_REG(75)
+    MOV_FROM_REG(76)
+    MOV_FROM_REG(77)
+    MOV_FROM_REG(78)
+    MOV_FROM_REG(79)
+    MOV_FROM_REG(80)
+    MOV_FROM_REG(81)
+    MOV_FROM_REG(82)
+    MOV_FROM_REG(83)
+    MOV_FROM_REG(84)
+    MOV_FROM_REG(85)
+    MOV_FROM_REG(86)
+    MOV_FROM_REG(87)
+    MOV_FROM_REG(88)
+    MOV_FROM_REG(89)
+    MOV_FROM_REG(90)
+    MOV_FROM_REG(91)
+    MOV_FROM_REG(92)
+    MOV_FROM_REG(93)
+    MOV_FROM_REG(94)
+    MOV_FROM_REG(95)
+    MOV_FROM_REG(96)
+    MOV_FROM_REG(97)
+    MOV_FROM_REG(98)
+    MOV_FROM_REG(99)
+    MOV_FROM_REG(100)
+    MOV_FROM_REG(101)
+    MOV_FROM_REG(102)
+    MOV_FROM_REG(103)
+    MOV_FROM_REG(104)
+    MOV_FROM_REG(105)
+    MOV_FROM_REG(106)
+    MOV_FROM_REG(107)
+    MOV_FROM_REG(108)
+    MOV_FROM_REG(109)
+    MOV_FROM_REG(110)
+    MOV_FROM_REG(111)
+    MOV_FROM_REG(112)
+    MOV_FROM_REG(113)
+    MOV_FROM_REG(114)
+    MOV_FROM_REG(115)
+    MOV_FROM_REG(116)
+    MOV_FROM_REG(117)
+    MOV_FROM_REG(118)
+    MOV_FROM_REG(119)
+    MOV_FROM_REG(120)
+    MOV_FROM_REG(121)
+    MOV_FROM_REG(122)
+    MOV_FROM_REG(123)
+    MOV_FROM_REG(124)
+    MOV_FROM_REG(125)
+    MOV_FROM_REG(126)
+    MOV_FROM_REG(127)
+END(asm_mov_from_reg)
+
+
+/* must be in bank 0
+ * parameter:
+ * r31: pr
+ * r24: b0
+ */
+ENTRY(vmx_resume_to_guest)
+    mov r16=cr.ipsr
+    movl r20=__vsa_base
+    ;;
+    ld8 r20=[r20]
+    adds r19=IA64_VPD_BASE_OFFSET,r21
+    ;;
+    ld8 r25=[r19]
+    extr.u r17=r16,IA64_PSR_RI_BIT,2
+    tbit.nz p6,p7=r16,IA64_PSR_RI_BIT+1
+    ;;	
+    (p6) mov r18=cr.iip
+    (p6) mov r17=r0
+    ;;    
+    (p6) add r18=0x10,r18
+    (p7) add r17=1,r17
+    ;;		
+    (p6) mov cr.iip=r18
+    dep r16=r17,r16,IA64_PSR_RI_BIT,2
+    ;;
+    mov cr.ipsr=r16
+    mov r17=cr.isr
+    adds r19= VPD_VPSR_START_OFFSET,r25
+    ld8 r26=[r25]
+    add r29=PAL_VPS_RESUME_NORMAL,r20
+    add r28=PAL_VPS_RESUME_HANDLER,r20
+    ;;
+    ld8 r19=[r19]
+    mov b0=r29
+    cmp.ne p6,p7 = r0,r0
+    ;;
+    tbit.nz.or.andcm p6,p7 = r19,IA64_PSR_IC_BIT		// p1=vpsr.ic
+    tbit.nz.or.andcm p6,p7 = r17,IA64_ISR_IR_BIT		//p1=cr.isr.ir
+    ;;
+    (p6) mov b0=r29
+    (p7) mov b0=r28
+    mov pr=r31,-2
+    br.sptk.many b0             // call pal service
+    ;;
+END(vmx_resume_to_guest)
+
+
+MOV_TO_BANK0_REG(16)
+MOV_TO_BANK0_REG(17)
+MOV_TO_BANK0_REG(18)
+MOV_TO_BANK0_REG(19)
+MOV_TO_BANK0_REG(20)
+MOV_TO_BANK0_REG(21)
+MOV_TO_BANK0_REG(22)
+MOV_TO_BANK0_REG(23)
+MOV_TO_BANK0_REG(24)
+MOV_TO_BANK0_REG(25)
+MOV_TO_BANK0_REG(26)
+MOV_TO_BANK0_REG(27)
+MOV_TO_BANK0_REG(28)
+MOV_TO_BANK0_REG(29)
+MOV_TO_BANK0_REG(30)
+MOV_TO_BANK0_REG(31)
+
+
+// mov to reg table
+ENTRY(asm_mov_to_reg)
+    MOV_TO_REG0
+    MOV_TO_REG(1)
+    MOV_TO_REG(2)
+    MOV_TO_REG(3)
+    MOV_TO_REG(4)
+    MOV_TO_REG(5)
+    MOV_TO_REG(6)
+    MOV_TO_REG(7)
+    MOV_TO_REG(8)
+    MOV_TO_REG(9)
+    MOV_TO_REG(10)
+    MOV_TO_REG(11)
+    MOV_TO_REG(12)
+    MOV_TO_REG(13)
+    MOV_TO_REG(14)
+    MOV_TO_REG(15)
+    JMP_TO_MOV_TO_BANK0_REG(16)
+    JMP_TO_MOV_TO_BANK0_REG(17)
+    JMP_TO_MOV_TO_BANK0_REG(18)
+    JMP_TO_MOV_TO_BANK0_REG(19)
+    JMP_TO_MOV_TO_BANK0_REG(20)
+    JMP_TO_MOV_TO_BANK0_REG(21)
+    JMP_TO_MOV_TO_BANK0_REG(22)
+    JMP_TO_MOV_TO_BANK0_REG(23)
+    JMP_TO_MOV_TO_BANK0_REG(24)
+    JMP_TO_MOV_TO_BANK0_REG(25)
+    JMP_TO_MOV_TO_BANK0_REG(26)
+    JMP_TO_MOV_TO_BANK0_REG(27)
+    JMP_TO_MOV_TO_BANK0_REG(28)
+    JMP_TO_MOV_TO_BANK0_REG(29)
+    JMP_TO_MOV_TO_BANK0_REG(30)
+    JMP_TO_MOV_TO_BANK0_REG(31)
+    MOV_TO_REG(32)
+    MOV_TO_REG(33)
+    MOV_TO_REG(34)
+    MOV_TO_REG(35)
+    MOV_TO_REG(36)
+    MOV_TO_REG(37)
+    MOV_TO_REG(38)
+    MOV_TO_REG(39)
+    MOV_TO_REG(40)
+    MOV_TO_REG(41)
+    MOV_TO_REG(42)
+    MOV_TO_REG(43)
+    MOV_TO_REG(44)
+    MOV_TO_REG(45)
+    MOV_TO_REG(46)
+    MOV_TO_REG(47)
+    MOV_TO_REG(48)
+    MOV_TO_REG(49)
+    MOV_TO_REG(50)
+    MOV_TO_REG(51)
+    MOV_TO_REG(52)
+    MOV_TO_REG(53)
+    MOV_TO_REG(54)
+    MOV_TO_REG(55)
+    MOV_TO_REG(56)
+    MOV_TO_REG(57)
+    MOV_TO_REG(58)
+    MOV_TO_REG(59)
+    MOV_TO_REG(60)
+    MOV_TO_REG(61)
+    MOV_TO_REG(62)
+    MOV_TO_REG(63)
+    MOV_TO_REG(64)
+    MOV_TO_REG(65)
+    MOV_TO_REG(66)
+    MOV_TO_REG(67)
+    MOV_TO_REG(68)
+    MOV_TO_REG(69)
+    MOV_TO_REG(70)
+    MOV_TO_REG(71)
+    MOV_TO_REG(72)
+    MOV_TO_REG(73)
+    MOV_TO_REG(74)
+    MOV_TO_REG(75)
+    MOV_TO_REG(76)
+    MOV_TO_REG(77)
+    MOV_TO_REG(78)
+    MOV_TO_REG(79)
+    MOV_TO_REG(80)
+    MOV_TO_REG(81)
+    MOV_TO_REG(82)
+    MOV_TO_REG(83)
+    MOV_TO_REG(84)
+    MOV_TO_REG(85)
+    MOV_TO_REG(86)
+    MOV_TO_REG(87)
+    MOV_TO_REG(88)
+    MOV_TO_REG(89)
+    MOV_TO_REG(90)
+    MOV_TO_REG(91)
+    MOV_TO_REG(92)
+    MOV_TO_REG(93)
+    MOV_TO_REG(94)
+    MOV_TO_REG(95)
+    MOV_TO_REG(96)
+    MOV_TO_REG(97)
+    MOV_TO_REG(98)
+    MOV_TO_REG(99)
+    MOV_TO_REG(100)
+    MOV_TO_REG(101)
+    MOV_TO_REG(102)
+    MOV_TO_REG(103)
+    MOV_TO_REG(104)
+    MOV_TO_REG(105)
+    MOV_TO_REG(106)
+    MOV_TO_REG(107)
+    MOV_TO_REG(108)
+    MOV_TO_REG(109)
+    MOV_TO_REG(110)
+    MOV_TO_REG(111)
+    MOV_TO_REG(112)
+    MOV_TO_REG(113)
+    MOV_TO_REG(114)
+    MOV_TO_REG(115)
+    MOV_TO_REG(116)
+    MOV_TO_REG(117)
+    MOV_TO_REG(118)
+    MOV_TO_REG(119)
+    MOV_TO_REG(120)
+    MOV_TO_REG(121)
+    MOV_TO_REG(122)
+    MOV_TO_REG(123)
+    MOV_TO_REG(124)
+    MOV_TO_REG(125)
+    MOV_TO_REG(126)
+    MOV_TO_REG(127)
+END(asm_mov_to_reg)

@@ -37,6 +37,8 @@ void foo(void)
 	DEFINE(IA64_MCA_CPU_INIT_STACK_OFFSET, offsetof (struct ia64_mca_cpu, init_stack));
 
 	BLANK();
+	DEFINE(VCPU_VTM_OFFSET_OFS, offsetof(struct vcpu, arch.arch_vmx.vtm.vtm_offset));
+	DEFINE(VCPU_VRR0_OFS, offsetof(struct vcpu, arch.arch_vmx.vrr[0]));
 #ifdef   VTI_DEBUG
 	DEFINE(IVT_CUR_OFS, offsetof(struct vcpu, arch.arch_vmx.ivt_current));
 	DEFINE(IVT_DBG_OFS, offsetof(struct vcpu, arch.arch_vmx.ivt_debug));
