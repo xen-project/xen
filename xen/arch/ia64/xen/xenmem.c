@@ -17,10 +17,19 @@
 #include <linux/efi.h>
 #include <asm/pgalloc.h>
 
-extern pgd_t frametable_pg_dir[];
+extern unsigned long frametable_pg_dir[];
 
-#define frametable_pgd_offset(addr) \
-	(frametable_pg_dir + (((addr) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1)))
+#define FRAMETABLE_PGD_OFFSET(ADDR) \
+	(frametable_pg_dir + (((ADDR) >> PGDIR_SHIFT) & \
+	((1UL << (PAGE_SHIFT - 3)) - 1)))
+
+#define FRAMETABLE_PMD_OFFSET(PGD, ADDR) \
+	__va((unsigned long *)(PGD) + (((ADDR) >> PMD_SHIFT) & \
+	((1UL << (PAGE_SHIFT - 3)) - 1)))
+
+#define FRAMETABLE_PTE_OFFSET(PMD, ADDR) \
+	(pte_t *)__va((unsigned long *)(PMD) + (((ADDR) >> PAGE_SHIFT) & \
+	((1UL << (PAGE_SHIFT - 3)) - 1)))
 
 static unsigned long table_size;
 static int opt_contig_mem = 0;
@@ -72,7 +81,7 @@ paging_init (void)
 
 #ifdef CONFIG_VIRTUAL_FRAME_TABLE
 
-static inline void *
+static unsigned long
 alloc_dir_page(void)
 {
 	unsigned long mfn = alloc_boot_pages(1, 1);
@@ -82,7 +91,7 @@ alloc_dir_page(void)
 	++table_size;
 	dir = mfn << PAGE_SHIFT;
 	memset(__va(dir), 0, PAGE_SIZE);
-	return (void *)dir;
+	return dir;
 }
 
 static inline unsigned long
@@ -100,15 +109,33 @@ alloc_table_page(unsigned long fill)
 	return mfn;
 }
 
+static void
+create_page_table(unsigned long start_page, unsigned long end_page,
+                  unsigned long fill)
+{
+	unsigned long address;
+	unsigned long *dir;
+	pte_t *pteptr;
+
+	for (address = start_page; address < end_page; address += PAGE_SIZE) {
+		dir = FRAMETABLE_PGD_OFFSET(address);
+		if (!*dir)
+			*dir = alloc_dir_page();
+		dir = FRAMETABLE_PMD_OFFSET(*dir, address);
+		if (!*dir)
+			*dir = alloc_dir_page();
+		pteptr = FRAMETABLE_PTE_OFFSET(*dir, address);
+		if (pte_none(*pteptr))
+			set_pte(pteptr, pfn_pte(alloc_table_page(fill),
+			                        PAGE_KERNEL));
+	}
+}
+
 static int
 create_frametable_page_table (u64 start, u64 end, void *arg)
 {
-	unsigned long address, start_page, end_page;
 	struct page_info *map_start, *map_end;
-	pgd_t *pgd;
-	pud_t *pud;
-	pmd_t *pmd;
-	pte_t *pte;
+	unsigned long start_page, end_page;
 
 	map_start = frame_table + (__pa(start) >> PAGE_SHIFT);
 	map_end   = frame_table + (__pa(end) >> PAGE_SHIFT);
@@ -116,23 +143,7 @@ create_frametable_page_table (u64 start, u64 end, void *arg)
 	start_page = (unsigned long) map_start & PAGE_MASK;
 	end_page = PAGE_ALIGN((unsigned long) map_end);
 
-	for (address = start_page; address < end_page; address += PAGE_SIZE) {
-		pgd = frametable_pgd_offset(address);
-		if (pgd_none(*pgd))
-			pgd_populate(NULL, pgd, alloc_dir_page());
-		pud = pud_offset(pgd, address);
-
-		if (pud_none(*pud))
-			pud_populate(NULL, pud, alloc_dir_page());
-		pmd = pmd_offset(pud, address);
-
-		if (pmd_none(*pmd))
-			pmd_populate_kernel(NULL, pmd, alloc_dir_page());
-		pte = pte_offset_kernel(pmd, address);
-
-		if (pte_none(*pte))
-			set_pte(pte, pfn_pte(alloc_table_page(0), PAGE_KERNEL));
-	}
+	create_page_table(start_page, end_page, 0L);
 	return 0;
 }
 
@@ -140,11 +151,7 @@ static int
 create_mpttable_page_table (u64 start, u64 end, void *arg)
 {
 	unsigned long map_start, map_end;
-	unsigned long address, start_page, end_page;
-	pgd_t *pgd;
-	pud_t *pud;
-	pmd_t *pmd;
-	pte_t *pte;
+	unsigned long start_page, end_page;
 
 	map_start = (unsigned long)(mpt_table + (__pa(start) >> PAGE_SHIFT));
 	map_end   = (unsigned long)(mpt_table + (__pa(end) >> PAGE_SHIFT));
@@ -152,23 +159,7 @@ create_mpttable_page_table (u64 start, u64 end, void *arg)
 	start_page = map_start & PAGE_MASK;
 	end_page = PAGE_ALIGN(map_end);
 
-	for (address = start_page; address < end_page; address += PAGE_SIZE) {
-		pgd = frametable_pgd_offset(address);
-		if (pgd_none(*pgd))
-			pgd_populate(NULL, pgd, alloc_dir_page());
-		pud = pud_offset(pgd, address);
-
-		if (pud_none(*pud))
-			pud_populate(NULL, pud, alloc_dir_page());
-		pmd = pmd_offset(pud, address);
-
-		if (pmd_none(*pmd))
-			pmd_populate_kernel(NULL, pmd, alloc_dir_page());
-		pte = pte_offset_kernel(pmd, address);
-
-		if (pte_none(*pte))
-			set_pte(pte, pfn_pte(alloc_table_page(INVALID_M2P_ENTRY), PAGE_KERNEL));
-	}
+	create_page_table(start_page, end_page, INVALID_M2P_ENTRY);
 	return 0;
 }
 
