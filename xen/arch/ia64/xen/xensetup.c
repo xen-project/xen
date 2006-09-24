@@ -25,6 +25,7 @@
 #include <asm/vmx.h>
 #include <linux/efi.h>
 #include <asm/iosapic.h>
+#include <xen/keyhandler.h>
 
 unsigned long xenheap_phys_end, total_pages;
 
