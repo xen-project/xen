@@ -117,10 +117,14 @@ struct page_info
 #define IS_XEN_HEAP_FRAME(_pfn) ((page_to_maddr(_pfn) < xenheap_phys_end) \
 				 && (page_to_maddr(_pfn) >= xen_pstart))
 
-static inline struct domain *unpickle_domptr(u32 _d)
-{ return (_d == 0) ? NULL : __va(_d); }
+extern void *xen_heap_start;
+#define __pickle(a)	((unsigned long)a - (unsigned long)xen_heap_start)
+#define __unpickle(a)	(void *)(a + xen_heap_start)
+
+static inline struct domain *unpickle_domptr(u64 _d)
+{ return (_d == 0) ? NULL : __unpickle(_d); }
 static inline u32 pickle_domptr(struct domain *_d)
-{ return (_d == NULL) ? 0 : (u32)__pa(_d); }
+{ return (_d == NULL) ? 0 : (u32)__pickle(_d); }
 
 #define page_get_owner(_p)	(unpickle_domptr((_p)->u.inuse._domain))
 #define page_set_owner(_p, _d)	((_p)->u.inuse._domain = pickle_domptr(_d))

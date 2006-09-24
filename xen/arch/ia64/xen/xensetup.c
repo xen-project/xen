@@ -84,6 +84,7 @@ unsigned int opt_xenheap_megabytes = XENHEAP_DEFAULT_MB;
 unsigned long xenheap_size = XENHEAP_DEFAULT_SIZE;
 extern long running_on_sim;
 unsigned long xen_pstart;
+void *xen_heap_start;
 
 static int
 xen_count_pages(u64 start, u64 end, void *arg)
@@ -245,7 +246,6 @@ md_overlaps(efi_memory_desc_t *md, unsigned long phys_addr)
 void start_kernel(void)
 {
     char *cmdline;
-    void *heap_start;
     unsigned long nr_pages;
     unsigned long dom0_memory_start, dom0_memory_size;
     unsigned long dom0_initrd_start, dom0_initrd_size;
@@ -392,10 +392,10 @@ void start_kernel(void)
     printf("find_memory: efi_memmap_walk returns max_page=%lx\n",max_page);
     efi_print();
 
-    heap_start = memguard_init(ia64_imva(&_end));
-    printf("Before heap_start: %p\n", heap_start);
-    heap_start = __va(init_boot_allocator(__pa(heap_start)));
-    printf("After heap_start: %p\n", heap_start);
+    xen_heap_start = memguard_init(ia64_imva(&_end));
+    printf("Before xen_heap_start: %p\n", xen_heap_start);
+    xen_heap_start = __va(init_boot_allocator(__pa(xen_heap_start)));
+    printf("After xen_heap_start: %p\n", xen_heap_start);
 
     efi_memmap_walk(filter_rsvd_memory, init_boot_pages);
     efi_memmap_walk(xen_count_pages, &nr_pages);
@@ -413,10 +413,10 @@ void start_kernel(void)
 
     end_boot_allocator();
 
-    init_xenheap_pages(__pa(heap_start), xenheap_phys_end);
+    init_xenheap_pages(__pa(xen_heap_start), xenheap_phys_end);
     printk("Xen heap: %luMB (%lukB)\n",
-	(xenheap_phys_end-__pa(heap_start)) >> 20,
-	(xenheap_phys_end-__pa(heap_start)) >> 10);
+	(xenheap_phys_end-__pa(xen_heap_start)) >> 20,
+	(xenheap_phys_end-__pa(xen_heap_start)) >> 10);
 
     late_setup_arch(&cmdline);
 
