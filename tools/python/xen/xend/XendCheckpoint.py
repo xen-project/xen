@@ -161,8 +161,8 @@ def restore(xd, fd):
         if handler.store_mfn is None or handler.console_mfn is None:
             raise XendError('Could not read store/console MFN')
 
-        #Block until src closes connection
-        os.read(fd, 1)
+        os.read(fd, 1)           # Wait for source to close connection
+        dominfo.waitForDevices() # Wait for backends to set up
         dominfo.unpause()
         
         dominfo.completeRestore(handler.store_mfn, handler.console_mfn)
