@@ -221,17 +221,17 @@ nopaging_gdt_descr:
         .align PAGE_SIZE, 0
 /* NB. Rings != 0 get access up to MACH2PHYS_VIRT_END. This allows access to */
 /*     the machine->physical mapping table. Ring 0 can access all memory.    */
-#define LIMIT(d) (((d) << 16)                                           \
-                  | (((MACH2PHYS_VIRT_END - 1) >> 12) & 0xffff)         \
-                  | (((MACH2PHYS_VIRT_END - 1) << 20) & (0xf << 48)))
+#define GUEST_DESC(d)                                                   \
+        .long ((MACH2PHYS_VIRT_END - 1) >> 12) & 0xffff,                \
+              ((MACH2PHYS_VIRT_END - 1) >> 12) & (0xf << 16) | (d)
 ENTRY(gdt_table)
         .quad 0x0000000000000000     /* unused */
         .quad 0x00cf9a000000ffff     /* 0xe008 ring 0 4.00GB code at 0x0 */
         .quad 0x00cf92000000ffff     /* 0xe010 ring 0 4.00GB data at 0x0 */
-        .quad LIMIT(0x00c0ba000000)  /* 0xe019 ring 1 3.xxGB code at 0x0 */
-        .quad LIMIT(0x00c0b2000000)  /* 0xe021 ring 1 3.xxGB data at 0x0 */
-        .quad LIMIT(0x00c0fa000000)  /* 0xe02b ring 3 3.xxGB code at 0x0 */
-        .quad LIMIT(0x00c0f2000000)  /* 0xe033 ring 3 3.xxGB data at 0x0 */
+        GUEST_DESC(0x00c0ba00)       /* 0xe019 ring 1 3.xxGB code at 0x0 */
+        GUEST_DESC(0x00c0b200)       /* 0xe021 ring 1 3.xxGB data at 0x0 */
+        GUEST_DESC(0x00c0fa00)       /* 0xe02b ring 3 3.xxGB code at 0x0 */
+        GUEST_DESC(0x00c0f200)       /* 0xe033 ring 3 3.xxGB data at 0x0 */
         .quad 0x0000000000000000     /* unused                           */
         .fill 2*NR_CPUS,8,0          /* space for TSS and LDT per CPU    */
 
