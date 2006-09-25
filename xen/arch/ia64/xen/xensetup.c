@@ -48,10 +48,6 @@ extern void mem_init(void);
 extern void init_IRQ(void);
 extern void trap_init(void);
 
-/* opt_dom0_vcpus_pin: If true, dom0 VCPUs are pinned. */
-unsigned int opt_dom0_vcpus_pin = 0;
-boolean_param("dom0_vcpus_pin", opt_dom0_vcpus_pin);
-
 /* opt_nosmp: If true, secondary processors are ignored. */
 static int opt_nosmp = 0;
 boolean_param("nosmp", opt_nosmp);
@@ -519,10 +515,6 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
                         dom0_initrd_start,dom0_initrd_size,
   			0) != 0)
         panic("Could not set up DOM0 guest OS\n");
-
-    /* PIN domain0 VCPU 0 on CPU 0. */
-    if (opt_dom0_vcpus_pin)
-        dom0->vcpu[0]->cpu_affinity = cpumask_of_cpu(0);
 
     if (!running_on_sim)  // slow on ski and pages are pre-initialized to zero
 	scrub_heap_pages();

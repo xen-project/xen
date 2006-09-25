@@ -54,7 +54,6 @@ unsigned long dom0_align = 64*1024*1024;
 static unsigned int dom0_max_vcpus = 1;
 integer_param("dom0_max_vcpus", dom0_max_vcpus); 
 
-extern int opt_dom0_vcpus_pin;
 extern unsigned long running_on_sim;
 
 extern char dom0_command_line[];
@@ -1021,12 +1020,9 @@ int construct_dom0(struct domain *d,
 	    dom0_max_vcpus = MAX_VIRT_CPUS;
 	
 	printf ("Dom0 max_vcpus=%d\n", dom0_max_vcpus);
-	for ( i = 1; i < dom0_max_vcpus; i++ ) {
+	for ( i = 1; i < dom0_max_vcpus; i++ )
 	    if (alloc_vcpu(d, i, i) == NULL)
 		printf ("Cannot allocate dom0 vcpu %d\n", i);
-	    else if (opt_dom0_vcpus_pin)
-		d->vcpu[i]->cpu_affinity = cpumask_of_cpu(i);
-	}
 
 	/* Copy the OS image. */
 	loaddomainelfimage(d,image_start);

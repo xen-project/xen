@@ -37,6 +37,11 @@ extern void arch_getdomaininfo_ctxt(struct vcpu *,
 static char opt_sched[10] = "credit";
 string_param("sched", opt_sched);
 
+/* opt_dom0_vcpus_pin: If true, dom0 VCPUs are pinned. */
+static unsigned int opt_dom0_vcpus_pin;
+boolean_param("dom0_vcpus_pin", opt_dom0_vcpus_pin);
+
+
 #define TIME_SLOP      (s32)MICROSECS(50)     /* allow time to slip a bit */
 
 /* Various timer handlers. */
@@ -97,18 +102,37 @@ void vcpu_runstate_get(struct vcpu *v, struct vcpu_runstate_info *runstate)
     }
 }
 
-int sched_init_vcpu(struct vcpu *v) 
+int sched_init_vcpu(struct vcpu *v, unsigned int processor) 
 {
+    const struct domain * const d = v->domain;
+
+    /* Initialize processor and affinity settings. */
+    v->processor = processor;
+
+    if ( is_idle_domain(d) || (d->domain_id == 0 && opt_dom0_vcpus_pin) )
+    {
+        /*
+         * The idler and potentially dom0 VCPUs are pinned onto their
+         * respective physical CPUs.
+         */
+        v->cpu_affinity = cpumask_of_cpu(processor);
+
+        /* The idle VCPUs takes over their CPUs on creation... */
+        if ( is_idle_domain(d) )
+        {
+            per_cpu(schedule_data, v->processor).curr = v;
+            per_cpu(schedule_data, v->processor).idle = v;
+            set_bit(_VCPUF_running, &v->vcpu_flags);
+        }
+    }
+    else
+    {
+        v->cpu_affinity = CPU_MASK_ALL;
+    }
+
     /* Initialise the per-domain timers. */
     init_timer(&v->timer, vcpu_timer_fn, v, v->processor);
     init_timer(&v->poll_timer, poll_timer_fn, v, v->processor);
-
-    if ( is_idle_vcpu(v) )
-    {
-        per_cpu(schedule_data, v->processor).curr = v;
-        per_cpu(schedule_data, v->processor).idle = v;
-        set_bit(_VCPUF_running, &v->vcpu_flags);
-    }
 
     TRACE_2D(TRC_SCHED_DOM_ADD, v->domain->domain_id, v->vcpu_id);
 
@@ -211,6 +235,9 @@ int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity)
 {
     cpumask_t online_affinity;
     unsigned long flags;
+
+    if ( v->domain->domain_id == 0 && opt_dom0_vcpus_pin )
+        return -EINVAL;
 
     cpus_and(online_affinity, *affinity, cpu_online_map);
     if ( cpus_empty(online_affinity) )
