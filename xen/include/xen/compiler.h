@@ -35,7 +35,7 @@
 #define offsetof(a,b) ((unsigned long)&(((a *)0)->b))
 #endif
 
-#if defined(__x86_64__) && (__GNUC__ > 3)
+#ifdef GCC_HAS_VISIBILITY_ATTRIBUTE
 /* Results in more efficient PIC code (no indirections through GOT or PLT). */
 #pragma GCC visibility push(hidden)
 #endif
