@@ -684,21 +684,6 @@ static void vmx_init_ap_context(struct vcpu_guest_context *ctxt,
 
 void do_nmi(struct cpu_user_regs *);
 
-static int check_vmx_controls(u32 ctrls, u32 msr)
-{
-    u32 vmx_msr_low, vmx_msr_high;
-
-    rdmsr(msr, vmx_msr_low, vmx_msr_high);
-    if ( (ctrls < vmx_msr_low) || (ctrls > vmx_msr_high) )
-    {
-        printk("Insufficient VMX capability 0x%x, "
-               "msr=0x%x,low=0x%8x,high=0x%x\n",
-               ctrls, msr, vmx_msr_low, vmx_msr_high);
-        return 0;
-    }
-    return 1;
-}
-
 static void vmx_init_hypercall_page(struct domain *d, void *hypercall_page)
 {
     char *p;
@@ -791,7 +776,7 @@ int start_vmx(void)
      */
     boot_cpu_data.x86_capability[4] = cpuid_ecx(1);
 
-    if (!(test_bit(X86_FEATURE_VMXE, &boot_cpu_data.x86_capability)))
+    if ( !test_bit(X86_FEATURE_VMXE, &boot_cpu_data.x86_capability) )
         return 0;
 
     rdmsr(IA32_FEATURE_CONTROL_MSR, eax, edx);
@@ -811,24 +796,11 @@ int start_vmx(void)
               IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON, 0);
     }
 
-    if ( !check_vmx_controls(MONITOR_PIN_BASED_EXEC_CONTROLS,
-                             MSR_IA32_VMX_PINBASED_CTLS_MSR) )
-        return 0;
-    if ( !check_vmx_controls(MONITOR_CPU_BASED_EXEC_CONTROLS,
-                             MSR_IA32_VMX_PROCBASED_CTLS_MSR) )
-        return 0;
-    if ( !check_vmx_controls(MONITOR_VM_EXIT_CONTROLS,
-                             MSR_IA32_VMX_EXIT_CTLS_MSR) )
-        return 0;
-    if ( !check_vmx_controls(MONITOR_VM_ENTRY_CONTROLS,
-                             MSR_IA32_VMX_ENTRY_CTLS_MSR) )
-        return 0;
-
     set_in_cr4(X86_CR4_VMXE);
 
     vmx_init_vmcs_config();
-    
-    if(!smp_processor_id())
+
+    if ( smp_processor_id() == 0 )
         setup_vmcs_dump();
 
     if ( (vmcs = vmx_alloc_host_vmcs()) == NULL )
@@ -1519,7 +1491,7 @@ static int vmx_set_cr0(unsigned long value)
                     &v->arch.hvm_vmx.cpu_state);
 
             __vmread(VM_ENTRY_CONTROLS, &vm_entry_value);
-            vm_entry_value |= VM_ENTRY_CONTROLS_IA32E_MODE;
+            vm_entry_value |= VM_ENTRY_IA32E_MODE;
             __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
         }
 #endif
@@ -1573,7 +1545,7 @@ static int vmx_set_cr0(unsigned long value)
                 clear_bit(VMX_CPU_STATE_LMA_ENABLED,
                           &v->arch.hvm_vmx.cpu_state);
                 __vmread(VM_ENTRY_CONTROLS, &vm_entry_value);
-                vm_entry_value &= ~VM_ENTRY_CONTROLS_IA32E_MODE;
+                vm_entry_value &= ~VM_ENTRY_IA32E_MODE;
                 __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
             }
         }
@@ -2296,15 +2268,8 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         domain_crash_synchronous();
         break;
     case EXIT_REASON_PENDING_INTERRUPT:
-        /*
-         * Not sure exactly what the purpose of this is.  The only bits set
-         * and cleared at this point are CPU_BASED_VIRTUAL_INTR_PENDING.
-         * (in io.c:{enable,disable}_irq_window().  So presumably we want to
-         * set it to the original value...
-         */
+        /* Disable the interrupt window. */
         v->arch.hvm_vcpu.u.vmx.exec_control &= ~CPU_BASED_VIRTUAL_INTR_PENDING;
-        v->arch.hvm_vcpu.u.vmx.exec_control |=
-            (MONITOR_CPU_BASED_EXEC_CONTROLS & CPU_BASED_VIRTUAL_INTR_PENDING);
         __vmwrite(CPU_BASED_VM_EXEC_CONTROL,
                   v->arch.hvm_vcpu.u.vmx.exec_control);
         break;
