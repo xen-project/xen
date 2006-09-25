@@ -218,28 +218,24 @@ nopaging_gdt_descr:
         .word   LAST_RESERVED_GDT_BYTE
         .long   gdt_table - FIRST_RESERVED_GDT_BYTE - __PAGE_OFFSET
         
-        .org 0x1000
-/* NB. Rings != 0 get access up to 0xFC400000. This allows access to the */
-/*     machine->physical mapping table. Ring 0 can access all memory.    */
+        .align PAGE_SIZE, 0
+/* NB. Rings != 0 get access up to MACH2PHYS_VIRT_END. This allows access to */
+/*     the machine->physical mapping table. Ring 0 can access all memory.    */
+#define LIMIT(d) (((d) << 16)                                           \
+                  | (((MACH2PHYS_VIRT_END - 1) >> 12) & 0xffff)         \
+                  | (((MACH2PHYS_VIRT_END - 1) << 20) & (0xf << 48)))
 ENTRY(gdt_table)
         .quad 0x0000000000000000     /* unused */
         .quad 0x00cf9a000000ffff     /* 0xe008 ring 0 4.00GB code at 0x0 */
         .quad 0x00cf92000000ffff     /* 0xe010 ring 0 4.00GB data at 0x0 */
-#ifdef CONFIG_X86_PAE
-        .quad 0x00cfba00000067ff
-        .quad 0x00cfb200000067ff
-        .quad 0x00cffa00000067ff
-        .quad 0x00cff200000067ff
-#else
-        .quad 0x00cfba000000c3ff     /* 0xe019 ring 1 3.95GB code at 0x0 */
-        .quad 0x00cfb2000000c3ff     /* 0xe021 ring 1 3.95GB data at 0x0 */
-        .quad 0x00cffa000000c3ff     /* 0xe02b ring 3 3.95GB code at 0x0 */
-        .quad 0x00cff2000000c3ff     /* 0xe033 ring 3 3.95GB data at 0x0 */
-#endif
+        .quad LIMIT(0x00c0ba000000)  /* 0xe019 ring 1 3.xxGB code at 0x0 */
+        .quad LIMIT(0x00c0b2000000)  /* 0xe021 ring 1 3.xxGB data at 0x0 */
+        .quad LIMIT(0x00c0fa000000)  /* 0xe02b ring 3 3.xxGB code at 0x0 */
+        .quad LIMIT(0x00c0f2000000)  /* 0xe033 ring 3 3.xxGB data at 0x0 */
         .quad 0x0000000000000000     /* unused                           */
         .fill 2*NR_CPUS,8,0          /* space for TSS and LDT per CPU    */
 
-        .org 0x2000
+        .align PAGE_SIZE, 0
 
 #ifdef CONFIG_X86_PAE
 ENTRY(idle_pg_table)
