@@ -44,6 +44,7 @@
 #include <asm/hvm/svm/emulate.h>
 #include <asm/hvm/svm/vmmcall.h>
 #include <asm/hvm/svm/intr.h>
+#include <asm/x86_emulate.h>
 #include <public/sched.h>
 
 #define SVM_EXTRA_DEBUG
@@ -60,7 +61,6 @@ extern int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip,
 extern asmlinkage void do_IRQ(struct cpu_user_regs *);
 extern void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
                          unsigned long count, int size, long value, int dir, int pvalid);
-extern int svm_instrlen(struct cpu_user_regs *regs, int mode);
 extern void svm_dump_inst(unsigned long eip);
 extern int svm_dbg_on;
 void svm_dump_regs(const char *from, struct cpu_user_regs *regs);
@@ -468,21 +468,19 @@ static int svm_realmode(struct vcpu *v)
     return (eflags & X86_EFLAGS_VM) || !(cr0 & X86_CR0_PE);
 }
 
-int svm_guest_x86_mode(struct vcpu *v)
+static int svm_guest_x86_mode(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    unsigned long cr0 = vmcb->cr0, eflags = vmcb->rflags, mode;
-    /* check which operating mode the guest is running */
-    if( vmcb->efer & EFER_LMA )
-        mode = vmcb->cs.attributes.fields.l ? 8 : 4;
-    else
-        mode = (eflags & X86_EFLAGS_VM) || !(cr0 & X86_CR0_PE) ? 2 : 4;
-    return mode;
-}
 
-int svm_instruction_length(struct vcpu *v)
-{
-    return svm_instrlen(guest_cpu_user_regs(), svm_guest_x86_mode(v));
+    if ( vmcb->efer & EFER_LMA )
+        return (vmcb->cs.attributes.fields.l ?
+                X86EMUL_MODE_PROT64 : X86EMUL_MODE_PROT32);
+
+    if ( svm_realmode(v) )
+        return X86EMUL_MODE_REAL;
+
+    return (vmcb->cs.attributes.fields.db ?
+            X86EMUL_MODE_PROT32 : X86EMUL_MODE_PROT16);
 }
 
 void svm_update_host_cr3(struct vcpu *v)
@@ -878,7 +876,6 @@ int start_svm(void)
     hvm_funcs.long_mode_enabled = svm_long_mode_enabled;
     hvm_funcs.pae_enabled = svm_pae_enabled;
     hvm_funcs.guest_x86_mode = svm_guest_x86_mode;
-    hvm_funcs.instruction_length = svm_instruction_length;
     hvm_funcs.get_guest_ctrl_reg = svm_get_ctrl_reg;
 
     hvm_funcs.update_host_cr3 = svm_update_host_cr3;

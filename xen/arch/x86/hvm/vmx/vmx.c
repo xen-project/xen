@@ -45,6 +45,7 @@
 #include <public/hvm/ioreq.h>
 #include <asm/hvm/vpic.h>
 #include <asm/hvm/vlapic.h>
+#include <asm/x86_emulate.h>
 
 extern uint32_t vlapic_update_ppr(struct vlapic *vlapic);
 
@@ -593,15 +594,6 @@ static void vmx_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
     vmx_vmcs_exit(v);
 }
 
-static int vmx_instruction_length(struct vcpu *v)
-{
-    unsigned long inst_len;
-
-    if ( __vmread(VM_EXIT_INSTRUCTION_LEN, &inst_len) ) /* XXX Unsafe XXX */
-        return 0;
-    return inst_len;
-}
-
 static unsigned long vmx_get_ctrl_reg(struct vcpu *v, unsigned int num)
 {
     switch ( num )
@@ -729,6 +721,35 @@ static void vmx_init_hypercall_page(struct domain *d, void *hypercall_page)
     *(u16 *)(hypercall_page + (__HYPERVISOR_iret * 32)) = 0x0b0f; /* ud2 */
 }
 
+static int vmx_realmode(struct vcpu *v)
+{
+    unsigned long rflags;
+
+    ASSERT(v == current);
+
+    __vmread(GUEST_RFLAGS, &rflags);
+    return rflags & X86_EFLAGS_VM;
+}
+
+static int vmx_guest_x86_mode(struct vcpu *v)
+{
+    unsigned long cs_ar_bytes;
+
+    ASSERT(v == current);
+
+    __vmread(GUEST_CS_AR_BYTES, &cs_ar_bytes);
+
+    if ( vmx_long_mode_enabled(v) )
+        return ((cs_ar_bytes & (1u<<13)) ?
+                X86EMUL_MODE_PROT64 : X86EMUL_MODE_PROT32);
+
+    if ( vmx_realmode(v) )
+        return X86EMUL_MODE_REAL;
+
+    return ((cs_ar_bytes & (1u<<14)) ?
+            X86EMUL_MODE_PROT32 : X86EMUL_MODE_PROT16);
+}
+
 /* Setup HVM interfaces */
 static void vmx_setup_hvm_funcs(void)
 {
@@ -748,7 +769,6 @@ static void vmx_setup_hvm_funcs(void)
     hvm_funcs.long_mode_enabled = vmx_long_mode_enabled;
     hvm_funcs.pae_enabled = vmx_pae_enabled;
     hvm_funcs.guest_x86_mode = vmx_guest_x86_mode;
-    hvm_funcs.instruction_length = vmx_instruction_length;
     hvm_funcs.get_guest_ctrl_reg = vmx_get_ctrl_reg;
 
     hvm_funcs.update_host_cr3 = vmx_update_host_cr3;

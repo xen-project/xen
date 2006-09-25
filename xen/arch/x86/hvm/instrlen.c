@@ -10,25 +10,22 @@
  */
 
 /*
- * TODO: the way in which we use svm_instrlen is very inefficient as is now
- * stands.  It will be worth while to return the actual instruction buffer
+ * TODO: The way in which we use hvm_instruction_length is very inefficient as
+ * it now stands. It will be worthwhile to return the actual instruction buffer
  * along with the instruction length since one of the reasons we are getting
  * the instruction length is to know how many instruction bytes we need to
  * fetch.
  */
 
 #include <xen/config.h>
-#include <xen/types.h>
-#include <xen/lib.h>
+#include <xen/sched.h>
 #include <xen/mm.h>
 #include <asm/regs.h>
-#define DPRINTF DPRINTK
 #include <asm-x86/x86_emulate.h>
 
 /* read from guest memory */
 extern int inst_copy_from_guest(unsigned char *buf, unsigned long eip,
         int length);
-extern void svm_dump_inst(unsigned long eip);
 
 /*
  * Opcode effective-address decode tables.
@@ -203,27 +200,26 @@ static uint8_t twobyte_table[256] = {
  * @_type:   u8, u16, u32, s8, s16, or s32
  * @_size:   1, 2, or 4 bytes
  * @_eip:    address to fetch from guest memory
- * @_length: updated! increments the current instruction length counter by _size
+ * @_length: increments the current instruction length counter by _size
  *
- * INTERNAL this is used internally by svm_instrlen to fetch the next byte,
+ * This is used internally by hvm_instruction_length to fetch the next byte,
  * word, or dword from guest memory at location _eip.  we currently use a local
  * unsigned long as the storage buffer since the most bytes we're gonna get
  * is limited to 4.
  */
-#define insn_fetch(_type, _size, _eip, _length) \
-({  unsigned long _x; \
-        if ((rc = inst_copy_from_guest((unsigned char *)(&(_x)), \
-                (unsigned long)(_eip), _size)) \
-                    != _size) \
-        goto done; \
-    (_eip) += (_size); \
-    (_length) += (_size); \
-    (_type)_x; \
+#define insn_fetch(_type, _size, _eip, _length)                         \
+({  unsigned long _x;                                                   \
+        if ((rc = inst_copy_from_guest((unsigned char *)(&(_x)),        \
+                (unsigned long)(_eip), _size))                          \
+                    != _size)                                           \
+        goto done;                                                      \
+    (_eip) += (_size);                                                  \
+    (_length) += (_size);                                               \
+    (_type)_x;                                                          \
 })
 
-
 /**
- * svn_instrlen - returns the current instructions length
+ * hvm_instruction_length - returns the current instructions length
  *
  * @regs: guest register state
  * @mode: guest operating mode
@@ -231,7 +227,7 @@ static uint8_t twobyte_table[256] = {
  * EXTERNAL this routine calculates the length of the current instruction
  * pointed to by eip.  The guest state is _not_ changed by this routine.
  */
-int svm_instrlen(struct cpu_user_regs *regs, int mode)
+int hvm_instruction_length(struct cpu_user_regs *regs, int mode)
 {
     uint8_t b, d, twobyte = 0, rex_prefix = 0;
     uint8_t modrm, modrm_mod = 0, modrm_reg = 0, modrm_rm = 0;
@@ -345,7 +341,7 @@ done_prefixes:
 
         if ( modrm_mod == 3 )
         {
-            DPRINTF("Cannot parse ModRM.mod == 3.\n");
+            DPRINTK("Cannot parse ModRM.mod == 3.\n");
             goto cannot_emulate;
         }
 
@@ -472,8 +468,7 @@ done:
     return length;
 
 cannot_emulate:
-    DPRINTF("Cannot emulate %02x at address %lx (eip %lx, mode %d)\n",
+    DPRINTK("Cannot emulate %02x at address %lx (eip %lx, mode %d)\n",
             b, (unsigned long)_regs.eip, (unsigned long)regs->eip, mode);
-    svm_dump_inst(_regs.eip);
     return -1;
 }

@@ -425,36 +425,10 @@ static inline int vmx_pae_enabled(struct vcpu *v)
 }
 
 /* Works only for vcpu == current */
-static inline int vmx_realmode(struct vcpu *v)
-{
-    unsigned long rflags;
-    ASSERT(v == current);
-
-    __vmread(GUEST_RFLAGS, &rflags);
-    return rflags & X86_EFLAGS_VM;
-}
-
-/* Works only for vcpu == current */
 static inline void vmx_update_host_cr3(struct vcpu *v)
 {
     ASSERT(v == current);
     __vmwrite(HOST_CR3, v->arch.cr3);
-}
-
-static inline int vmx_guest_x86_mode(struct vcpu *v)
-{
-    unsigned long cs_ar_bytes;
-    ASSERT(v == current);
-
-    if ( vmx_long_mode_enabled(v) )
-    {
-        __vmread(GUEST_CS_AR_BYTES, &cs_ar_bytes);
-        return (cs_ar_bytes & (1u<<13)) ? 8 : 4;
-    }
-    if ( vmx_realmode(v) )
-        return 2;
-    __vmread(GUEST_CS_AR_BYTES, &cs_ar_bytes);
-    return (cs_ar_bytes & (1u<<14)) ? 4 : 2;
 }
 
 static inline int vmx_pgbit_test(struct vcpu *v)

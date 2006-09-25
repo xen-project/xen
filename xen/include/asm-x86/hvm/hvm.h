@@ -51,15 +51,13 @@ struct hvm_function_table {
      * Examine specifics of the guest state:
      * 1) determine whether the guest is in real or vm8086 mode,
      * 2) determine whether paging is enabled,
-     * 3) return the length of the instruction that caused an exit.
-     * 4) return the current guest control-register value
+     * 3) return the current guest control-register value
      */
     int (*realmode)(struct vcpu *v);
     int (*paging_enabled)(struct vcpu *v);
     int (*long_mode_enabled)(struct vcpu *v);
     int (*pae_enabled)(struct vcpu *v);
     int (*guest_x86_mode)(struct vcpu *v);
-    int (*instruction_length)(struct vcpu *v);
     unsigned long (*get_guest_ctrl_reg)(struct vcpu *v, unsigned int num);
 
     /* 
@@ -159,11 +157,7 @@ hvm_guest_x86_mode(struct vcpu *v)
     return hvm_funcs.guest_x86_mode(v);
 }
 
-static inline int
-hvm_instruction_length(struct vcpu *v)
-{
-    return hvm_funcs.instruction_length(v);
-}
+int hvm_instruction_length(struct cpu_user_regs *regs, int mode);
 
 static inline void
 hvm_update_host_cr3(struct vcpu *v)
@@ -182,9 +176,9 @@ hvm_get_guest_ctrl_reg(struct vcpu *v, unsigned int num)
     return 0;                   /* force to fail */
 }
 
-extern void hvm_stts(struct vcpu *v);
-extern void hvm_set_guest_time(struct vcpu *v, u64 gtime);
-extern void hvm_do_resume(struct vcpu *v);
+void hvm_stts(struct vcpu *v);
+void hvm_set_guest_time(struct vcpu *v, u64 gtime);
+void hvm_do_resume(struct vcpu *v);
 
 static inline void
 hvm_init_ap_context(struct vcpu_guest_context *ctxt,
@@ -193,6 +187,6 @@ hvm_init_ap_context(struct vcpu_guest_context *ctxt,
     return hvm_funcs.init_ap_context(ctxt, vcpuid, trampoline_vector);
 }
 
-extern int hvm_bringup_ap(int vcpuid, int trampoline_vector);
+int hvm_bringup_ap(int vcpuid, int trampoline_vector);
 
 #endif /* __ASM_X86_HVM_HVM_H__ */
