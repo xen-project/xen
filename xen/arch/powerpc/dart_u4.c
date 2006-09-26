@@ -19,6 +19,7 @@
  */
 
 #undef DEBUG
+#define INVALIDATE_ALL
 
 #include <xen/config.h>
 #include <xen/types.h>
@@ -123,8 +124,13 @@ static void u4_inv_all(void)
 
 static void u4_inv_entry(ulong pgn)
 {
+#ifdef INVALIDATE_ALL
+    return u4_inv_all();
+#else
     union dart_ctl dc;
     ulong retries = 0;
+
+    return u4_inv_all();
 
     dc.dc_word = in_32(&dart->d_dartcntl.dc_word);
     dc.dc_bits.dc_ilpn = pgn;
@@ -139,6 +145,7 @@ static void u4_inv_entry(ulong pgn)
         if (retries > 1000000)
             panic("WAY! too long\n");
     } while (dc.dc_bits.dc_ione != 0);
+#endif
 }
 
 static struct dart_ops u4_ops = {
