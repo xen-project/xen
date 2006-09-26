@@ -60,8 +60,8 @@ union dart_entry {
     u32 de_word;
     struct {
         u32 de_v:1;             /* valid */
-        u32 de_rp:1;             /* read protected*/
-        u32 de_wp:1;             /* write protected*/
+        u32 de_rp:1;             /* read protected */
+        u32 de_wp:1;             /* write protected */
         u32 _de_res:5;
         u32 de_ppn:24;         /* 24 bit Physical Page Number
                                  * representing address [28:51] */
@@ -98,7 +98,6 @@ static u32 dart_encode(int perm, ulong rpn)
     if (perm & DART_WRITE) {
         e.de_bits.de_wp = 0;
     }
-
     return e.de_word;
 }
 
@@ -263,7 +262,7 @@ static int init_dart(void)
 
     /* Linux uses a dummy page, filling "empty" DART entries with a
        reference to this page to capture stray DMA's */
-    dummy_page = (ulong)alloc_xenheap_pages(1);
+    dummy_page = (ulong)alloc_xenheap_pages(0);
     clear_page((void *)dummy_page);
     dummy_page >>= PAGE_SHIFT;
 
