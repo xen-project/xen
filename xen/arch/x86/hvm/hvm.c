@@ -337,6 +337,33 @@ int cpu_get_interrupt(struct vcpu *v, int *type)
     return -1;
 }
 
+static void hvm_vcpu_down(void)
+{
+    struct vcpu *v = current;
+    struct domain *d = v->domain;
+    int online_count = 0;
+
+    DPRINTK("DOM%d/VCPU%d: going offline.\n", d->domain_id, v->vcpu_id);
+
+    /* Doesn't halt us immediately, but we'll never return to guest context. */
+    set_bit(_VCPUF_down, &v->vcpu_flags);
+    vcpu_sleep_nosync(v);
+
+    /* Any other VCPUs online? ... */
+    LOCK_BIGLOCK(d);
+    for_each_vcpu ( d, v )
+        if ( !test_bit(_VCPUF_down, &v->vcpu_flags) )
+            online_count++;
+    UNLOCK_BIGLOCK(d);
+
+    /* ... Shut down the domain if not. */
+    if ( online_count == 0 )
+    {
+        DPRINTK("DOM%d: all CPUs offline -- powering off.\n", d->domain_id);
+        domain_shutdown(d, SHUTDOWN_poweroff);
+    }
+}
+
 void hvm_hlt(unsigned long rflags)
 {
     struct vcpu *v = current;
@@ -344,18 +371,12 @@ void hvm_hlt(unsigned long rflags)
     s_time_t next_pit = -1, next_wakeup;
 
     /*
-     * Detect machine shutdown.  Only do this for vcpu 0, to avoid potentially 
-     * shutting down the domain early. If we halt with interrupts disabled, 
-     * that's a pretty sure sign that we want to shut down.  In a real 
-     * processor, NMIs are the only way to break out of this.
+     * If we halt with interrupts disabled, that's a pretty sure sign that we
+     * want to shut down. In a real processor, NMIs are the only way to break
+     * out of this.
      */
-    if ( (v->vcpu_id == 0) && !(rflags & X86_EFLAGS_IF) )
-    {
-        printk("D%d: HLT with interrupts disabled -- shutting down.\n",
-               current->domain->domain_id);
-        domain_shutdown(current->domain, SHUTDOWN_poweroff);
-        return;
-    }
+    if ( unlikely(!(rflags & X86_EFLAGS_IF)) )
+        return hvm_vcpu_down();
 
     if ( !v->vcpu_id )
         next_pit = get_scheduled(v, pt->irq, pt);
@@ -578,17 +599,20 @@ int hvm_bringup_ap(int vcpuid, int trampoline_vector)
     struct vcpu_guest_context *ctxt;
     int rc = 0;
 
-    /* current must be HVM domain BSP */
-    if ( !(hvm_guest(bsp) && bsp->vcpu_id == 0) ) {
-        printk("Not calling hvm_bringup_ap from BSP context.\n");
+    BUG_ON(!hvm_guest(bsp));
+
+    if ( bsp->vcpu_id != 0 )
+    {
+        DPRINTK("Not calling hvm_bringup_ap from BSP context.\n");
         domain_crash_synchronous();
     }
 
     if ( (v = d->vcpu[vcpuid]) == NULL )
         return -ENOENT;
 
-    if ( (ctxt = xmalloc(struct vcpu_guest_context)) == NULL ) {
-        printk("Failed to allocate memory in hvm_bringup_ap.\n");
+    if ( (ctxt = xmalloc(struct vcpu_guest_context)) == NULL )
+    {
+        DPRINTK("Failed to allocate memory in hvm_bringup_ap.\n");
         return -ENOMEM;
     }
 
@@ -601,12 +625,14 @@ int hvm_bringup_ap(int vcpuid, int trampoline_vector)
     UNLOCK_BIGLOCK(d);
 
     if ( rc != 0 )
-        printk("AP %d bringup failed in boot_vcpu %x.\n", vcpuid, rc);
-    else {
-        if ( test_and_clear_bit(_VCPUF_down, &d->vcpu[vcpuid]->vcpu_flags) )
-            vcpu_wake(d->vcpu[vcpuid]);
-        printk("AP %d bringup suceeded.\n", vcpuid);
+    {
+        DPRINTK("AP %d bringup failed in boot_vcpu %x.\n", vcpuid, rc);
+        return rc;
     }
+
+    if ( test_and_clear_bit(_VCPUF_down, &d->vcpu[vcpuid]->vcpu_flags) )
+        vcpu_wake(d->vcpu[vcpuid]);
+    DPRINTK("AP %d bringup suceeded.\n", vcpuid);
 
     xfree(ctxt);
 
