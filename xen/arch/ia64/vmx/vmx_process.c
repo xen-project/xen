@@ -81,6 +81,7 @@ static UINT64 vec2off[68] = {0x0,0x400,0x800,0xc00,0x1000, 0x1400,0x1800,
 void vmx_reflect_interruption(UINT64 ifa,UINT64 isr,UINT64 iim,
      UINT64 vector,REGS *regs)
 {
+    UINT64 status;
     VCPU *vcpu = current;
     UINT64 vpsr = VCPU(vcpu, vpsr);
     vector=vec2off[vector];
@@ -89,13 +90,23 @@ void vmx_reflect_interruption(UINT64 ifa,UINT64 isr,UINT64 iim,
     }
     else{ // handle fpswa emulation
         // fp fault
-        if(vector == IA64_FP_FAULT_VECTOR && !handle_fpu_swa(1, regs, isr)){
-            vmx_vcpu_increment_iip(vcpu);
-            return;
+        if (vector == IA64_FP_FAULT_VECTOR) {
+            status = handle_fpu_swa(1, regs, isr);
+            if (!status) {
+                vmx_vcpu_increment_iip(vcpu);
+                return;
+            } else if (IA64_RETRY == status)
+                return;
         }
         //fp trap
-        else if(vector == IA64_FP_TRAP_VECTOR && !handle_fpu_swa(0, regs, isr)){
-            return; 
+        else if (vector == IA64_FP_TRAP_VECTOR) {
+            status = handle_fpu_swa(0, regs, isr);
+            if (!status)
+                return;
+            else if (IA64_RETRY == status) {
+                vmx_vcpu_decrement_iip(vcpu);
+                return;
+            }
         }
     }
     VCPU(vcpu,isr)=isr;

@@ -172,6 +172,21 @@ IA64FAULT vmx_vcpu_increment_iip(VCPU *vcpu)
 }
 
 
+IA64FAULT vmx_vcpu_decrement_iip(VCPU *vcpu)
+{
+    REGS *regs = vcpu_regs(vcpu);
+    IA64_PSR *ipsr = (IA64_PSR *)&regs->cr_ipsr;
+    
+    if (ipsr->ri == 0) {
+        ipsr->ri = 2;
+        regs->cr_iip -= 16;
+    } else {
+        ipsr->ri--;
+    }
+    return (IA64_NO_FAULT);
+}
+
+
 IA64FAULT vmx_vcpu_cover(VCPU *vcpu)
 {
     REGS *regs = vcpu_regs(vcpu);

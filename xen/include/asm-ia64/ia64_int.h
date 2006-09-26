@@ -36,7 +36,9 @@
 #define	IA64_NO_FAULT		0x0000
 #define IA64_FAULT		        0x0001
 #define	IA64_RFI_IN_PROGRESS	0x0002
-#define IA64_RETRY              0x0003
+// To avoid conflicting with return value of handle_fpu_swa()
+// set IA64_RETRY to -0x000f 
+#define IA64_RETRY		(-0x000f)
 #define IA64_FORCED_IFA         0x0004
 #define IA64_USE_TLB		0x0005
 #define	IA64_ILLOP_FAULT	(IA64_GENEX_VECTOR | 0x00)
