@@ -727,7 +727,7 @@ void qemu_del_timer(QEMUTimer *ts)
 
 void qemu_advance_timer(QEMUTimer *ts, int64_t expire_time)
 {
-    if (ts->expire_time > expire_time)
+    if (ts->expire_time > expire_time || !qemu_timer_pending(ts))
 	qemu_mod_timer(ts, expire_time);
 }
 
