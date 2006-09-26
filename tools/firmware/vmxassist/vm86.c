@@ -95,7 +95,7 @@ guest_linear_to_real(uint32_t base)
 		if (!(l1_mfn & PT_ENTRY_PRESENT))
 			panic("l2 entry not present\n");
 
-		if ((oldctx.cr4 & CR4_PSE) && (l1_mfn & PDE_PS)) {
+		if (l1_mfn & PDE_PS) { /* CR4.PSE is ignored in PAE mode */
 			l0_mfn = l1_mfn & 0x3ffe00000ULL;
 			return l0_mfn + (base & 0x1fffff);
 		}
