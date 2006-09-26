@@ -759,12 +759,16 @@ def xm_vcpu_pin(args):
                 for i in range(int(x),int(y)+1):
                     cpus.append(int(i))
             else:
-                cpus.append(int(c))
+                # remove this element from the list
+                if c[0] == '^':
+                    cpus = [x for x in cpus if x != int(c[1:])]
+                else:
+                    cpus.append(int(c))
         cpus.sort()
         return cpus
 
     dom  = args[0]
-    vcpu = int(args[1])
+    vcpu = args[1]
     cpumap = cpu_make_map(args[2])
     
     server.xend.domain.pincpu(dom, vcpu, cpumap)

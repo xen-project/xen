@@ -393,7 +393,9 @@ specified, VCPU information for all domains will be provided.
 
 =item B<vcpu-pin> I<domain-id> I<vcpu> I<cpus>
 
-Pins the the VCPU to only run on the specific CPUs.  
+Pins the the VCPU to only run on the specific CPUs.  The keyword
+I<all> can be used to apply the I<cpus> list to all VCPUs in the
+domain.
 
 Normally VCPUs can float between available CPUs whenever Xen deems a
 different run state is appropriate.  Pinning can be used to restrict
