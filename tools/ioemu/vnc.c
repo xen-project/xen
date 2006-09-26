@@ -26,6 +26,7 @@
 
 #include "vl.h"
 #include "qemu_socket.h"
+#include <assert.h>
 
 /* The refresh interval starts at BASE.  If we scan the buffer and
    find no change, we increase by INC, up to MAX.  If the mouse moves
@@ -728,8 +729,10 @@ static void vnc_client_read(void *opaque)
 	    memmove(vs->input.buffer, vs->input.buffer + len,
 		    vs->input.offset - len);
 	    vs->input.offset -= len;
-	} else
+	} else {
+	    assert(ret > vs->read_handler_expect);
 	    vs->read_handler_expect = ret;
+	}
     }
 }
 
@@ -1076,8 +1079,12 @@ static int protocol_client_msg(VncState *vs, char *data, size_t len)
 	if (len == 1)
 	    return 4;
 
-	if (len == 4)
-	    return 4 + (read_u16(data, 2) * 4);
+	if (len == 4) {
+	    uint16_t v;
+	    v = read_u16(data, 2);
+	    if (v)
+		return 4 + v * 4;
+	}
 
 	limit = read_u16(data, 2);
 	for (i = 0; i < limit; i++) {
@@ -1117,8 +1124,12 @@ static int protocol_client_msg(VncState *vs, char *data, size_t len)
 	if (len == 1)
 	    return 8;
 
-	if (len == 8)
-	    return 8 + read_u32(data, 4);
+	if (len == 8) {
+	    uint32_t v;
+	    v = read_u32(data, 4);
+	    if (v)
+		return 8 + 4;
+	}
 
 	client_cut_text(vs, read_u32(data, 4), data + 8);
 	break;
