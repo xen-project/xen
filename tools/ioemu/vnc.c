@@ -581,12 +581,16 @@ static void _vnc_update_client(void *opaque)
 	       interested (e.g. minimised) it'll ignore this, and we
 	       can stop scanning the buffer until it sends another
 	       update request. */
-	    /* Note that there are bugs in xvncviewer which prevent
-	       this from actually working.  Leave the code in place
-	       for correct clients. */
+	    /* It turns out that there's a bug in realvncviewer 4.1.2
+	       which means that if you send a proper null update (with
+	       no update rectangles), it gets a bit out of sync and
+	       never sends any further requests, regardless of whether
+	       it needs one or not.  Fix this by sending a single 1x1
+	       update rectangle instead. */
 	    vnc_write_u8(vs, 0);
 	    vnc_write_u8(vs, 0);
-	    vnc_write_u16(vs, 0);
+	    vnc_write_u16(vs, 1);
+	    send_framebuffer_update(vs, 0, 0, 1, 1);
 	    vnc_flush(vs);
 	    vs->last_update_time = now;
 	    return;
