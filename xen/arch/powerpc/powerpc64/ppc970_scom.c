@@ -24,7 +24,10 @@
 #include <xen/console.h>
 #include <xen/errno.h>
 #include <asm/delay.h>
+#include <asm/processor.h>
 #include "scom.h"
+
+#undef CONFIG_SCOM
 
 #define SPRN_SCOMC 276
 #define SPRN_SCOMD 277
@@ -153,19 +156,29 @@ int cpu_scom_write(uint addr, ulong d)
 
 void cpu_scom_init(void)
 {
+#ifdef CONFIG_SCOM
     ulong val;
-    console_start_sync();
-    if (!cpu_scom_read(SCOM_PTSR, &val))
-        printk("SCOM PTSR: 0x%016lx\n", val);
+    if (PVR_REV(mfpvr()) == 0x0300) {
+        /* these address are only good for 970FX */
+        console_start_sync();
+        if (!cpu_scom_read(SCOM_PTSR, &val))
+            printk("SCOM PTSR: 0x%016lx\n", val);
 
-    console_end_sync();
+        console_end_sync();
+    }
+#endif
 }
 
 void cpu_scom_AMCR(void)
 {
+#ifdef CONFIG_SCOM
     ulong val;
 
-    cpu_scom_read(SCOM_AMC_REG, &val);
-    printk("SCOM AMCR: 0x%016lx\n", val);
+    if (PVR_REV(mfpvr()) == 0x0300) {
+        /* these address are only good for 970FX */
+        cpu_scom_read(SCOM_AMC_REG, &val);
+        printk("SCOM AMCR: 0x%016lx\n", val);
+    }
+#endif
 }
 
