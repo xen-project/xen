@@ -1374,7 +1374,7 @@ IMPORTED_COMMANDS = [
     'cfgbootpolicy',
     'makepolicy',
     'loadpolicy',
-    'dumppolicy'
+    'dumppolicy',
     'rmlabel',
     'getlabel',
     'dry-run',
