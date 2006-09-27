@@ -506,14 +506,13 @@ gdbstub_console_puts(const char *str)
 int 
 __trap_to_gdb(struct cpu_user_regs *regs, unsigned long cookie)
 {
-    int resume = 0;
-    int r;
+    int rc = 0;
     unsigned long flags;
 
     if ( gdb_ctx->serhnd < 0 )
     {
         dbg_printk("Debugger not ready yet.\n");
-        return 0;
+        return -EBUSY;
     }
 
     /* We rely on our caller to ensure we're only on one processor
@@ -532,7 +531,7 @@ __trap_to_gdb(struct cpu_user_regs *regs, unsigned long cookie)
     {
         printk("WARNING WARNING WARNING: Avoiding recursive gdb.\n");
         atomic_inc(&gdb_ctx->running);
-        return 0;
+        return -EBUSY;
     }
 
     if ( !gdb_ctx->connected )
@@ -565,19 +564,14 @@ __trap_to_gdb(struct cpu_user_regs *regs, unsigned long cookie)
         gdb_cmd_signum(gdb_ctx);
     }
 
-    while ( resume == 0 )
-    {
-        r = receive_command(gdb_ctx);
-        if ( r < 0 )
+    do {
+        if ( receive_command(gdb_ctx) < 0 )
         {
-            dbg_printk("GDB disappeared, trying to resume Xen...\n");
-            resume = 1;
+            dbg_printk("Error in GDB session...\n");
+            rc = -EIO;
+            break;
         }
-        else
-        {
-            resume = process_command(regs, gdb_ctx);
-        }
-    }
+    } while ( process_command(regs, gdb_ctx) == 0 );
 
     gdb_arch_exit(regs);
     console_end_sync();
@@ -586,7 +580,7 @@ __trap_to_gdb(struct cpu_user_regs *regs, unsigned long cookie)
 
     local_irq_restore(flags);
 
-    return 0;
+    return rc;
 }
 
 void
