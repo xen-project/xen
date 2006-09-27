@@ -368,12 +368,13 @@ do{ __asm__ __volatile__ (                                              \
 #endif /* __i386__ */
 
 /* Fetch next part of the instruction being emulated. */
-#define insn_fetch(_type, _size, _eip)                                  \
-({ unsigned long _x;                                                    \
-   rc = ops->read_std((unsigned long)(_eip), &_x, (_size), ctxt);       \
+#define insn_fetch(_type, _size)                                        \
+({ unsigned long _x, _ptr = _regs.eip;                                  \
+   if ( mode == X86EMUL_MODE_REAL ) _ptr += _regs.cs << 4;              \
+   rc = ops->read_std(_ptr, &_x, (_size), ctxt);                        \
    if ( rc != 0 )                                                       \
        goto done;                                                       \
-   (_eip) += (_size);                                                   \
+   _regs.eip += (_size);                                                \
    (_type)_x;                                                           \
 })
 
@@ -478,7 +479,7 @@ x86_emulate_memop(
     /* Legacy prefixes. */
     for ( i = 0; i < 8; i++ )
     {
-        switch ( b = insn_fetch(uint8_t, 1, _regs.eip) )
+        switch ( b = insn_fetch(uint8_t, 1) )
         {
         case 0x66: /* operand-size override */
             op_bytes ^= 6;      /* switch between 2/4 bytes */
@@ -529,7 +530,7 @@ x86_emulate_memop(
             op_bytes = 8;          /* REX.W */
         modrm_reg = (b & 4) << 1;  /* REX.R */
         /* REX.B and REX.X do not need to be decoded. */
-        b = insn_fetch(uint8_t, 1, _regs.eip);
+        b = insn_fetch(uint8_t, 1);
     }
 
     /* Opcode byte(s). */
@@ -540,7 +541,7 @@ x86_emulate_memop(
         if ( b == 0x0f )
         {
             twobyte = 1;
-            b = insn_fetch(uint8_t, 1, _regs.eip);
+            b = insn_fetch(uint8_t, 1);
             d = twobyte_table[b];
         }
 
@@ -552,7 +553,7 @@ x86_emulate_memop(
     /* ModRM and SIB bytes. */
     if ( d & ModRM )
     {
-        modrm = insn_fetch(uint8_t, 1, _regs.eip);
+        modrm = insn_fetch(uint8_t, 1);
         modrm_mod |= (modrm & 0xc0) >> 6;
         modrm_reg |= (modrm & 0x38) >> 3;
         modrm_rm  |= (modrm & 0x07);
@@ -587,19 +588,19 @@ x86_emulate_memop(
             {
             case 0:
                 if ( (modrm_rm == 4) && 
-                     (((sib = insn_fetch(uint8_t, 1, _regs.eip)) & 7) == 5) )
+                     (((sib = insn_fetch(uint8_t, 1)) & 7) == 5) )
                     _regs.eip += 4; /* skip disp32 specified by SIB.base */
                 else if ( modrm_rm == 5 )
                     _regs.eip += 4; /* skip disp32 */
                 break;
             case 1:
                 if ( modrm_rm == 4 )
-                    sib = insn_fetch(uint8_t, 1, _regs.eip);
+                    sib = insn_fetch(uint8_t, 1);
                 _regs.eip += 1; /* skip disp8 */
                 break;
             case 2:
                 if ( modrm_rm == 4 )
-                    sib = insn_fetch(uint8_t, 1, _regs.eip);
+                    sib = insn_fetch(uint8_t, 1);
                 _regs.eip += 4; /* skip disp32 */
                 break;
             }
@@ -691,16 +692,16 @@ x86_emulate_memop(
         /* NB. Immediates are sign-extended as necessary. */
         switch ( src.bytes )
         {
-        case 1: src.val = insn_fetch(int8_t,  1, _regs.eip); break;
-        case 2: src.val = insn_fetch(int16_t, 2, _regs.eip); break;
-        case 4: src.val = insn_fetch(int32_t, 4, _regs.eip); break;
+        case 1: src.val = insn_fetch(int8_t,  1); break;
+        case 2: src.val = insn_fetch(int16_t, 2); break;
+        case 4: src.val = insn_fetch(int32_t, 4); break;
         }
         break;
     case SrcImmByte:
         src.type  = OP_IMM;
         src.ptr   = (unsigned long *)_regs.eip;
         src.bytes = 1;
-        src.val   = insn_fetch(int8_t,  1, _regs.eip);
+        src.val   = insn_fetch(int8_t,  1);
         break;
     }
 
@@ -840,9 +841,9 @@ x86_emulate_memop(
             if ( src.bytes == 8 ) src.bytes = 4;
             switch ( src.bytes )
             {
-            case 1: src.val = insn_fetch(int8_t,  1, _regs.eip); break;
-            case 2: src.val = insn_fetch(int16_t, 2, _regs.eip); break;
-            case 4: src.val = insn_fetch(int32_t, 4, _regs.eip); break;
+            case 1: src.val = insn_fetch(int8_t,  1); break;
+            case 2: src.val = insn_fetch(int16_t, 2); break;
+            case 4: src.val = insn_fetch(int32_t, 4); break;
             }
             goto test;
         case 2: /* not */

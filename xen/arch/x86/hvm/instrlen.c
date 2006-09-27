@@ -196,26 +196,17 @@ static uint8_t twobyte_table[256] = {
 
 /* 
  * insn_fetch - fetch the next 1 to 4 bytes from instruction stream 
- * 
  * @_type:   u8, u16, u32, s8, s16, or s32
  * @_size:   1, 2, or 4 bytes
- * @_eip:    address to fetch from guest memory
- * @_length: increments the current instruction length counter by _size
- *
- * This is used internally by hvm_instruction_length to fetch the next byte,
- * word, or dword from guest memory at location _eip.  we currently use a local
- * unsigned long as the storage buffer since the most bytes we're gonna get
- * is limited to 4.
  */
-#define insn_fetch(_type, _size, _eip, _length)                         \
-({  unsigned long _x;                                                   \
-        if ((rc = inst_copy_from_guest((unsigned char *)(&(_x)),        \
-                (unsigned long)(_eip), _size))                          \
-                    != _size)                                           \
-        goto done;                                                      \
-    (_eip) += (_size);                                                  \
-    (_length) += (_size);                                               \
-    (_type)_x;                                                          \
+#define insn_fetch(_type, _size)                                        \
+({ unsigned long _x, _ptr = _regs.eip;                                  \
+   if ( mode == X86EMUL_MODE_REAL ) _ptr += _regs.cs << 4;              \
+   rc = inst_copy_from_guest((unsigned char *)(&(_x)), _ptr, _size);    \
+   if ( rc != _size ) goto done;                                        \
+   _regs.eip += (_size);                                                \
+   length += (_size);                                                   \
+   (_type)_x;                                                           \
 })
 
 /**
@@ -231,17 +222,13 @@ int hvm_instruction_length(struct cpu_user_regs *regs, int mode)
 {
     uint8_t b, d, twobyte = 0, rex_prefix = 0;
     uint8_t modrm, modrm_mod = 0, modrm_reg = 0, modrm_rm = 0;
-    unsigned int op_bytes, ad_bytes, lock_prefix = 0, rep_prefix = 0, i;
+    unsigned int op_bytes, ad_bytes, i;
     int rc = 0;
     int length = 0;
     unsigned int tmp;
 
     /* Shadow copy of register state. Committed on successful emulation. */
     struct cpu_user_regs _regs = *regs;
-
-    /* include CS for 16-bit modes */
-    if (mode == X86EMUL_MODE_REAL || mode == X86EMUL_MODE_PROT16)
-        _regs.eip += (_regs.cs << 4);
 
     switch ( mode )
     {
@@ -265,7 +252,7 @@ int hvm_instruction_length(struct cpu_user_regs *regs, int mode)
     /* Legacy prefixes. */
     for ( i = 0; i < 8; i++ )
     {
-        switch ( b = insn_fetch(uint8_t, 1, _regs.eip, length) )
+        switch ( b = insn_fetch(uint8_t, 1) )
         {
         case 0x66: /* operand-size override */
             op_bytes ^= 6;      /* switch between 2/4 bytes */
@@ -282,13 +269,8 @@ int hvm_instruction_length(struct cpu_user_regs *regs, int mode)
         case 0x64: /* FS override */
         case 0x65: /* GS override */
         case 0x36: /* SS override */
-            break;
         case 0xf0: /* LOCK */
-            lock_prefix = 1;
-            break;
         case 0xf3: /* REP/REPE/REPZ */
-            rep_prefix = 1;
-            break;
         case 0xf2: /* REPNE/REPNZ */
             break;
         default:
@@ -296,12 +278,6 @@ int hvm_instruction_length(struct cpu_user_regs *regs, int mode)
         }
     }
 done_prefixes:
-
-    /* Note quite the same as 80386 real mode, but hopefully good enough. */
-    if ( (mode == X86EMUL_MODE_REAL) && (ad_bytes != 2) ) {
-        printf("sonofabitch!! we don't support 32-bit addresses in realmode\n");
-        goto cannot_emulate;
-    }
 
     /* REX prefix. */
     if ( (mode == X86EMUL_MODE_PROT64) && ((b & 0xf0) == 0x40) )
@@ -311,7 +287,7 @@ done_prefixes:
             op_bytes = 8;          /* REX.W */
         modrm_reg = (b & 4) << 1;  /* REX.R */
         /* REX.B and REX.X do not need to be decoded. */
-        b = insn_fetch(uint8_t, 1, _regs.eip, length);
+        b = insn_fetch(uint8_t, 1);
     }
 
     /* Opcode byte(s). */
@@ -322,7 +298,7 @@ done_prefixes:
         if ( b == 0x0f )
         {
             twobyte = 1;
-            b = insn_fetch(uint8_t, 1, _regs.eip, length);
+            b = insn_fetch(uint8_t, 1);
             d = twobyte_table[b];
         }
 
@@ -334,7 +310,7 @@ done_prefixes:
     /* ModRM and SIB bytes. */
     if ( d & ModRM )
     {
-        modrm = insn_fetch(uint8_t, 1, _regs.eip, length);
+        modrm = insn_fetch(uint8_t, 1);
         modrm_mod |= (modrm & 0xc0) >> 6;
         modrm_reg |= (modrm & 0x38) >> 3;
         modrm_rm  |= (modrm & 0x07);
@@ -374,7 +350,7 @@ done_prefixes:
             {
             case 0:
                 if ( (modrm_rm == 4) && 
-                     (((insn_fetch(uint8_t, 1, _regs.eip, length)) & 7) 
+                     (((insn_fetch(uint8_t, 1)) & 7) 
                         == 5) )
                 {
                     length += 4;
@@ -389,7 +365,7 @@ done_prefixes:
             case 1:
                 if ( modrm_rm == 4 )
                 {
-                    insn_fetch(uint8_t, 1, _regs.eip, length);
+                    insn_fetch(uint8_t, 1);
                 }
                 length += 1;
                 _regs.eip += 1; /* skip disp8 */
@@ -397,7 +373,7 @@ done_prefixes:
             case 2:
                 if ( modrm_rm == 4 )
                 {
-                    insn_fetch(uint8_t, 1, _regs.eip, length);
+                    insn_fetch(uint8_t, 1);
                 }
                 length += 4;
                 _regs.eip += 4; /* skip disp32 */
@@ -423,13 +399,13 @@ done_prefixes:
         /* NB. Immediates are sign-extended as necessary. */
         switch ( tmp )
         {
-        case 1: insn_fetch(int8_t,  1, _regs.eip, length); break;
-        case 2: insn_fetch(int16_t, 2, _regs.eip, length); break;
-        case 4: insn_fetch(int32_t, 4, _regs.eip, length); break;
+        case 1: insn_fetch(int8_t,  1); break;
+        case 2: insn_fetch(int16_t, 2); break;
+        case 4: insn_fetch(int32_t, 4); break;
         }
         break;
     case SrcImmByte:
-        insn_fetch(int8_t,  1, _regs.eip, length);
+        insn_fetch(int8_t,  1);
         break;
     }
 
@@ -455,9 +431,9 @@ done_prefixes:
             if ( tmp == 8 ) tmp = 4;
             switch ( tmp )
             {
-            case 1: insn_fetch(int8_t,  1, _regs.eip, length); break;
-            case 2: insn_fetch(int16_t, 2, _regs.eip, length); break;
-            case 4: insn_fetch(int32_t, 4, _regs.eip, length); break;
+            case 1: insn_fetch(int8_t,  1); break;
+            case 2: insn_fetch(int16_t, 2); break;
+            case 4: insn_fetch(int32_t, 4); break;
             }
             goto done;
         }
