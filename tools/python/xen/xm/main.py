@@ -979,7 +979,7 @@ def xm_uptime(args):
 
     for dom in doms:
         d = parse_doms_info(dom)
-        if d['dom'] > 0:
+        if d['domid'] > 0:
             uptime = int(round(d['up_time']))
         else:
             f=open('/proc/uptime', 'r')
@@ -1006,10 +1006,10 @@ def xm_uptime(args):
         if short_mode:
             now = datetime.datetime.now()
             upstring = now.strftime(" %H:%M:%S") + " up " + upstring
-            upstring += ", " + d['name'] + " (" + str(d['dom']) + ")"
+            upstring += ", " + d['name'] + " (" + str(d['domid']) + ")"
         else:
             upstring += ':%(seconds)02d' % vars()
-            upstring = ("%(name)-32s %(dom)3d " % d) + upstring
+            upstring = ("%(name)-32s %(domid)3d " % d) + upstring
 
         print upstring
 
