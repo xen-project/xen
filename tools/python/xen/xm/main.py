@@ -526,7 +526,7 @@ def parse_sedf_info(info):
         return t(sxp.child_value(info, n, d))
 
     return {
-        'domid'    : get_info('domid',         int,   -1),
+        'domid'    : get_info('domain',        int,   -1),
         'period'   : get_info('period',        int,   -1),
         'slice'    : get_info('slice',         int,   -1),
         'latency'  : get_info('latency',       int,   -1),
