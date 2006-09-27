@@ -290,7 +290,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
         /* offending reserved bit will cause #GP */
         if ( msr_content & ~(EFER_LME | EFER_LMA | EFER_NX | EFER_SCE) )
         {
-            printk("Trying to set reserved bit in EFER: %016llx\n",
+            printk("Trying to set reserved bit in EFER: %"PRIx64"\n",
                    msr_content);
             vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
             return 0;
