@@ -22,6 +22,9 @@
  * THE SOFTWARE.
  */
 #include "vl.h"
+#include <sys/time.h>
+#include <time.h>
+#include <assert.h>
 
 //#define DEBUG_SERIAL
 
@@ -140,6 +143,67 @@ static void serial_update_parameters(SerialState *s)
 #endif
 }
 
+/* Rate limit serial requests so that e.g. grub on a serial console
+   doesn't kill dom0.  Simple token bucket.  If we get some actual
+   data from the user, instantly refil the bucket. */
+
+/* How long it takes to generate a token, in microseconds. */
+#define TOKEN_PERIOD 1000
+/* Maximum and initial size of token bucket */
+#define TOKENS_MAX 100000
+
+static int tokens_avail;
+
+static void serial_get_token(void)
+{
+    static struct timeval last_refil_time;
+    static int started;
+
+    assert(tokens_avail >= 0);
+    if (!tokens_avail) {
+	struct timeval delta, now;
+	int generated;
+
+	if (!started) {
+	    gettimeofday(&last_refil_time, NULL);
+	    tokens_avail = TOKENS_MAX;
+	    started = 1;
+	    return;
+	}
+    retry:
+	gettimeofday(&now, NULL);
+	delta.tv_sec = now.tv_sec - last_refil_time.tv_sec;
+	delta.tv_usec = now.tv_usec - last_refil_time.tv_usec;
+	if (delta.tv_usec < 0) {
+	    delta.tv_usec += 1000000;
+	    delta.tv_sec--;
+	}
+	assert(delta.tv_usec >= 0 && delta.tv_sec >= 0);
+	if (delta.tv_usec < TOKEN_PERIOD) {
+	    struct timespec ts;
+	    /* Wait until at least one token is available. */
+	    ts.tv_sec = TOKEN_PERIOD / 1000000;
+	    ts.tv_nsec = (TOKEN_PERIOD % 1000000) * 1000;
+	    while (nanosleep(&ts, &ts) < 0 && errno == EINTR)
+		;
+	    goto retry;
+	}
+	generated = (delta.tv_sec * 1000000) / TOKEN_PERIOD;
+	generated +=
+	    ((delta.tv_sec * 1000000) % TOKEN_PERIOD + delta.tv_usec) / TOKEN_PERIOD;
+	assert(generated > 0);
+
+	last_refil_time.tv_usec += (generated * TOKEN_PERIOD) % 1000000;
+	last_refil_time.tv_sec  += last_refil_time.tv_usec / 1000000;
+	last_refil_time.tv_usec %= 1000000;
+	last_refil_time.tv_sec  += (generated * TOKEN_PERIOD) / 1000000;
+	if (generated > TOKENS_MAX)
+	    generated = TOKENS_MAX;
+	tokens_avail = generated;
+    }
+    tokens_avail--;
+}
+
 static void serial_ioport_write(void *opaque, uint32_t addr, uint32_t val)
 {
     SerialState *s = opaque;
@@ -245,9 +309,11 @@ static uint32_t serial_ioport_read(void *opaque, uint32_t addr)
         ret = s->mcr;
         break;
     case 5:
+	serial_get_token();
         ret = s->lsr;
         break;
     case 6:
+	serial_get_token();
         if (s->mcr & UART_MCR_LOOP) {
             /* in loopback, the modem output pins are connected to the
                inputs */
@@ -296,12 +362,14 @@ static int serial_can_receive1(void *opaque)
 static void serial_receive1(void *opaque, const uint8_t *buf, int size)
 {
     SerialState *s = opaque;
+    tokens_avail = TOKENS_MAX;
     serial_receive_byte(s, buf[0]);
 }
 
 static void serial_event(void *opaque, int event)
 {
     SerialState *s = opaque;
+    tokens_avail = TOKENS_MAX;
     if (event == CHR_EVENT_BREAK)
         serial_receive_break(s);
 }

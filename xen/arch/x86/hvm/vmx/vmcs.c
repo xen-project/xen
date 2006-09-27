@@ -37,36 +37,119 @@
 #include <xen/keyhandler.h>
 #include <asm/shadow.h>
 
-static int vmcs_size;
-static int vmcs_order;
+/* Basic flags for Pin-based VM-execution controls. */
+#define MONITOR_PIN_BASED_EXEC_CONTROLS                 \
+    ( PIN_BASED_EXT_INTR_MASK |                         \
+      PIN_BASED_NMI_EXITING )
+
+/* Basic flags for CPU-based VM-execution controls. */
+#ifdef __x86_64__
+#define MONITOR_CPU_BASED_EXEC_CONTROLS_SUBARCH         \
+    ( CPU_BASED_CR8_LOAD_EXITING |                      \
+      CPU_BASED_CR8_STORE_EXITING )
+#else
+#define MONITOR_CPU_BASED_EXEC_CONTROLS_SUBARCH 0
+#endif
+#define MONITOR_CPU_BASED_EXEC_CONTROLS                 \
+    ( MONITOR_CPU_BASED_EXEC_CONTROLS_SUBARCH |         \
+      CPU_BASED_HLT_EXITING |                           \
+      CPU_BASED_INVDPG_EXITING |                        \
+      CPU_BASED_MWAIT_EXITING |                         \
+      CPU_BASED_MOV_DR_EXITING |                        \
+      CPU_BASED_ACTIVATE_IO_BITMAP |                    \
+      CPU_BASED_USE_TSC_OFFSETING )
+
+/* Basic flags for VM-Exit controls. */
+#ifdef __x86_64__
+#define MONITOR_VM_EXIT_CONTROLS_SUBARCH VM_EXIT_IA32E_MODE
+#else
+#define MONITOR_VM_EXIT_CONTROLS_SUBARCH 0
+#endif
+#define MONITOR_VM_EXIT_CONTROLS                        \
+    ( MONITOR_VM_EXIT_CONTROLS_SUBARCH |                \
+      VM_EXIT_ACK_INTR_ON_EXIT )
+
+/* Basic flags for VM-Entry controls. */
+#define MONITOR_VM_ENTRY_CONTROLS                       0x00000000
+
+/* Dynamic (run-time adjusted) execution control flags. */
+static u32 vmx_pin_based_exec_control;
+static u32 vmx_cpu_based_exec_control;
+static u32 vmx_vmexit_control;
+static u32 vmx_vmentry_control;
+
 static u32 vmcs_revision_id;
+
+static u32 adjust_vmx_controls(u32 ctrls, u32 msr)
+{
+    u32 vmx_msr_low, vmx_msr_high;
+
+    rdmsr(msr, vmx_msr_low, vmx_msr_high);
+
+    /* Bit == 0 means must be zero. */
+    BUG_ON(ctrls & ~vmx_msr_high);
+
+    /* Bit == 1 means must be one. */
+    ctrls |= vmx_msr_low;
+
+    return ctrls;
+}
 
 void vmx_init_vmcs_config(void)
 {
     u32 vmx_msr_low, vmx_msr_high;
+    u32 _vmx_pin_based_exec_control;
+    u32 _vmx_cpu_based_exec_control;
+    u32 _vmx_vmexit_control;
+    u32 _vmx_vmentry_control;
 
-    if ( vmcs_size )
-        return;
+    _vmx_pin_based_exec_control =
+        adjust_vmx_controls(MONITOR_PIN_BASED_EXEC_CONTROLS,
+                            MSR_IA32_VMX_PINBASED_CTLS_MSR);
+    _vmx_cpu_based_exec_control =
+        adjust_vmx_controls(MONITOR_CPU_BASED_EXEC_CONTROLS,
+                            MSR_IA32_VMX_PROCBASED_CTLS_MSR);
+    _vmx_vmexit_control =
+        adjust_vmx_controls(MONITOR_VM_EXIT_CONTROLS,
+                            MSR_IA32_VMX_EXIT_CTLS_MSR);
+    _vmx_vmentry_control =
+        adjust_vmx_controls(MONITOR_VM_ENTRY_CONTROLS,
+                            MSR_IA32_VMX_ENTRY_CTLS_MSR);
 
     rdmsr(MSR_IA32_VMX_BASIC_MSR, vmx_msr_low, vmx_msr_high);
 
-    vmcs_revision_id = vmx_msr_low;
+    if ( smp_processor_id() == 0 )
+    {
+        vmcs_revision_id = vmx_msr_low;
+        vmx_pin_based_exec_control = _vmx_pin_based_exec_control;
+        vmx_cpu_based_exec_control = _vmx_cpu_based_exec_control;
+        vmx_vmexit_control         = _vmx_vmexit_control;
+        vmx_vmentry_control        = _vmx_vmentry_control;
+    }
+    else
+    {
+        BUG_ON(vmcs_revision_id != vmx_msr_low);
+        BUG_ON(vmx_pin_based_exec_control != _vmx_pin_based_exec_control);
+        BUG_ON(vmx_cpu_based_exec_control != _vmx_cpu_based_exec_control);
+        BUG_ON(vmx_vmexit_control != _vmx_vmexit_control);
+        BUG_ON(vmx_vmentry_control != _vmx_vmentry_control);
+    }
 
-    vmcs_size  = vmx_msr_high & 0x1fff;
-    vmcs_order = get_order_from_bytes(vmcs_size);
+    /* IA-32 SDM Vol 3B: VMCS size is never greater than 4kB. */
+    BUG_ON((vmx_msr_high & 0x1fff) > PAGE_SIZE);
 }
 
 static struct vmcs_struct *vmx_alloc_vmcs(void)
 {
     struct vmcs_struct *vmcs;
 
-    if ( (vmcs = alloc_xenheap_pages(vmcs_order)) == NULL )
+    if ( (vmcs = alloc_xenheap_page()) == NULL )
     {
         DPRINTK("Failed to allocate VMCS.\n");
         return NULL;
     }
 
-    memset(vmcs, 0, vmcs_size); /* don't remove this */
+    memset(vmcs, 0, PAGE_SIZE);
     vmcs->vmcs_revision_id = vmcs_revision_id;
 
     return vmcs;
@@ -74,7 +157,7 @@ static struct vmcs_struct *vmx_alloc_vmcs(void)
 
 static void vmx_free_vmcs(struct vmcs_struct *vmcs)
 {
-    free_xenheap_pages(vmcs, vmcs_order);
+    free_xenheap_page(vmcs);
 }
 
 static void __vmx_clear_vmcs(void *info)
@@ -156,12 +239,11 @@ static inline int construct_vmcs_controls(struct arch_vmx_struct *arch_vmx)
 {
     int error = 0;
 
-    error |= __vmwrite(PIN_BASED_VM_EXEC_CONTROL,
-                       MONITOR_PIN_BASED_EXEC_CONTROLS);
+    error |= __vmwrite(PIN_BASED_VM_EXEC_CONTROL, vmx_pin_based_exec_control);
 
-    error |= __vmwrite(VM_EXIT_CONTROLS, MONITOR_VM_EXIT_CONTROLS);
+    error |= __vmwrite(VM_EXIT_CONTROLS, vmx_vmexit_control);
 
-    error |= __vmwrite(VM_ENTRY_CONTROLS, MONITOR_VM_ENTRY_CONTROLS);
+    error |= __vmwrite(VM_ENTRY_CONTROLS, vmx_vmentry_control);
 
     error |= __vmwrite(IO_BITMAP_A, virt_to_maddr(arch_vmx->io_bitmap_a));
     error |= __vmwrite(IO_BITMAP_B, virt_to_maddr(arch_vmx->io_bitmap_b));
@@ -246,9 +328,8 @@ static void vmx_do_launch(struct vcpu *v)
     error |= __vmwrite(GUEST_CR0, cr0);
     cr0 &= ~X86_CR0_PG;
     error |= __vmwrite(CR0_READ_SHADOW, cr0);
-    error |= __vmwrite(CPU_BASED_VM_EXEC_CONTROL,
-                       MONITOR_CPU_BASED_EXEC_CONTROLS);
-    v->arch.hvm_vcpu.u.vmx.exec_control = MONITOR_CPU_BASED_EXEC_CONTROLS;
+    error |= __vmwrite(CPU_BASED_VM_EXEC_CONTROL, vmx_cpu_based_exec_control);
+    v->arch.hvm_vcpu.u.vmx.exec_control = vmx_cpu_based_exec_control;
 
     __asm__ __volatile__ ("mov %%cr4,%0" : "=r" (cr4) : );
 
@@ -297,21 +378,21 @@ static inline int construct_init_vmcs_guest(cpu_user_regs_t *regs)
     /* MSR */
     error |= __vmwrite(VM_EXIT_MSR_LOAD_ADDR, 0);
     error |= __vmwrite(VM_EXIT_MSR_STORE_ADDR, 0);
-
     error |= __vmwrite(VM_EXIT_MSR_STORE_COUNT, 0);
     error |= __vmwrite(VM_EXIT_MSR_LOAD_COUNT, 0);
     error |= __vmwrite(VM_ENTRY_MSR_LOAD_COUNT, 0);
-    /* interrupt */
+
     error |= __vmwrite(VM_ENTRY_INTR_INFO_FIELD, 0);
-    /* mask */
-    error |= __vmwrite(CR0_GUEST_HOST_MASK, -1UL);
-    error |= __vmwrite(CR4_GUEST_HOST_MASK, -1UL);
+
+    error |= __vmwrite(CR0_GUEST_HOST_MASK, ~0UL);
+    error |= __vmwrite(CR4_GUEST_HOST_MASK, ~0UL);
 
     error |= __vmwrite(PAGE_FAULT_ERROR_CODE_MASK, 0);
     error |= __vmwrite(PAGE_FAULT_ERROR_CODE_MATCH, 0);
 
-    /* TSC */
     error |= __vmwrite(CR3_TARGET_COUNT, 0);
+
+    error |= __vmwrite(GUEST_ACTIVITY_STATE, 0);
 
     /* Guest Selectors */
     error |= __vmwrite(GUEST_ES_SELECTOR, GUEST_LAUNCH_DS);

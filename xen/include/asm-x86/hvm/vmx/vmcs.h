@@ -132,12 +132,16 @@ extern int vmcs_version;
 #define CPU_BASED_ACTIVATE_IO_BITMAP    0x02000000
 #define CPU_BASED_MONITOR_EXITING       0x20000000
 #define CPU_BASED_PAUSE_EXITING         0x40000000
-#define PIN_BASED_EXT_INTR_MASK 0x1
-#define PIN_BASED_NMI_EXITING   0x8
 
+#define PIN_BASED_EXT_INTR_MASK         0x00000001
+#define PIN_BASED_NMI_EXITING           0x00000008
+
+#define VM_EXIT_IA32E_MODE              0x00000200
 #define VM_EXIT_ACK_INTR_ON_EXIT        0x00008000
-#define VM_EXIT_HOST_ADD_SPACE_SIZE     0x00000200
 
+#define VM_ENTRY_IA32E_MODE             0x00000200
+#define VM_ENTRY_SMM                    0x00000400
+#define VM_ENTRY_DEACT_DUAL_MONITOR     0x00000800
 
 /* VMCS Encordings */
 enum vmcs_field {
@@ -217,6 +221,7 @@ enum vmcs_field {
     GUEST_LDTR_AR_BYTES             = 0x00004820,
     GUEST_TR_AR_BYTES               = 0x00004822,
     GUEST_INTERRUPTIBILITY_INFO     = 0x00004824,
+    GUEST_ACTIVITY_STATE            = 0x00004826,
     GUEST_SYSENTER_CS               = 0x0000482A,
     HOST_IA32_SYSENTER_CS           = 0x00004c00,
     CR0_GUEST_HOST_MASK             = 0x00006000,

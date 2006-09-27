@@ -26,6 +26,7 @@
 
 #include "vl.h"
 #include "qemu_socket.h"
+#include <assert.h>
 
 /* The refresh interval starts at BASE.  If we scan the buffer and
    find no change, we increase by INC, up to MAX.  If the mouse moves
@@ -580,12 +581,16 @@ static void _vnc_update_client(void *opaque)
 	       interested (e.g. minimised) it'll ignore this, and we
 	       can stop scanning the buffer until it sends another
 	       update request. */
-	    /* Note that there are bugs in xvncviewer which prevent
-	       this from actually working.  Leave the code in place
-	       for correct clients. */
+	    /* It turns out that there's a bug in realvncviewer 4.1.2
+	       which means that if you send a proper null update (with
+	       no update rectangles), it gets a bit out of sync and
+	       never sends any further requests, regardless of whether
+	       it needs one or not.  Fix this by sending a single 1x1
+	       update rectangle instead. */
 	    vnc_write_u8(vs, 0);
 	    vnc_write_u8(vs, 0);
-	    vnc_write_u16(vs, 0);
+	    vnc_write_u16(vs, 1);
+	    send_framebuffer_update(vs, 0, 0, 1, 1);
 	    vnc_flush(vs);
 	    vs->last_update_time = now;
 	    return;
@@ -728,8 +733,10 @@ static void vnc_client_read(void *opaque)
 	    memmove(vs->input.buffer, vs->input.buffer + len,
 		    vs->input.offset - len);
 	    vs->input.offset -= len;
-	} else
+	} else {
+	    assert(ret > vs->read_handler_expect);
 	    vs->read_handler_expect = ret;
+	}
     }
 }
 
@@ -1076,8 +1083,12 @@ static int protocol_client_msg(VncState *vs, char *data, size_t len)
 	if (len == 1)
 	    return 4;
 
-	if (len == 4)
-	    return 4 + (read_u16(data, 2) * 4);
+	if (len == 4) {
+	    uint16_t v;
+	    v = read_u16(data, 2);
+	    if (v)
+		return 4 + v * 4;
+	}
 
 	limit = read_u16(data, 2);
 	for (i = 0; i < limit; i++) {
@@ -1117,8 +1128,12 @@ static int protocol_client_msg(VncState *vs, char *data, size_t len)
 	if (len == 1)
 	    return 8;
 
-	if (len == 8)
-	    return 8 + read_u32(data, 4);
+	if (len == 8) {
+	    uint32_t v;
+	    v = read_u32(data, 4);
+	    if (v)
+		return 8 + v;
+	}
 
 	client_cut_text(vs, read_u32(data, 4), data + 8);
 	break;

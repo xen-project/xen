@@ -52,7 +52,7 @@ static inline long __get_reg_value(unsigned long reg, int size)
     case QUAD:
         return (long)(reg);
     default:
-        printf("Error: (__get_reg_value) Invalid reg size\n");
+        printk("Error: (__get_reg_value) Invalid reg size\n");
         domain_crash_synchronous();
     }
 }
@@ -78,7 +78,7 @@ long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs)
         case 7: /* %bh */
             return (char)((regs->rbx & 0xFF00) >> 8);
         default:
-            printf("Error: (get_reg_value) Invalid index value\n");
+            printk("Error: (get_reg_value) Invalid index value\n");
             domain_crash_synchronous();
         }
         /* NOTREACHED */
@@ -102,7 +102,7 @@ long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs)
     case 14: return __get_reg_value(regs->r14, size);
     case 15: return __get_reg_value(regs->r15, size);
     default:
-        printf("Error: (get_reg_value) Invalid index value\n");
+        printk("Error: (get_reg_value) Invalid index value\n");
         domain_crash_synchronous();
     }
 }
@@ -115,7 +115,7 @@ static inline long __get_reg_value(unsigned long reg, int size)
     case LONG:
         return (int)(reg & 0xFFFFFFFF);
     default:
-        printf("Error: (__get_reg_value) Invalid reg size\n");
+        printk("Error: (__get_reg_value) Invalid reg size\n");
         domain_crash_synchronous();
     }
 }
@@ -141,7 +141,7 @@ long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs)
         case 7: /* %bh */
             return (char)((regs->ebx & 0xFF00) >> 8);
         default:
-            printf("Error: (get_reg_value) Invalid index value\n");
+            printk("Error: (get_reg_value) Invalid index value\n");
             domain_crash_synchronous();
         }
     }
@@ -156,7 +156,7 @@ long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs)
     case 6: return __get_reg_value(regs->esi, size);
     case 7: return __get_reg_value(regs->edi, size);
     default:
-        printf("Error: (get_reg_value) Invalid index value\n");
+        printk("Error: (get_reg_value) Invalid index value\n");
         domain_crash_synchronous();
     }
 }
@@ -464,7 +464,7 @@ static int hvm_decode(int realmode, unsigned char *opcode, struct instruction *i
                     return DECODE_success;
 
                 default:
-                    printf("%x/%x, This opcode isn't handled yet!\n",
+                    printk("%x/%x, This opcode isn't handled yet!\n",
                            *opcode, ins_subtype);
                     return DECODE_failure;
             }
@@ -614,7 +614,7 @@ static int hvm_decode(int realmode, unsigned char *opcode, struct instruction *i
         break;
 
     default:
-        printf("%x, This opcode isn't handled yet!\n", *opcode);
+        printk("%x, This opcode isn't handled yet!\n", *opcode);
         return DECODE_failure;
     }
 
@@ -675,12 +675,12 @@ static int hvm_decode(int realmode, unsigned char *opcode, struct instruction *i
         }
         else
         {
-            printf("0f %x, This opcode subtype isn't handled yet\n", *opcode);
+            printk("0f %x, This opcode subtype isn't handled yet\n", *opcode);
             return DECODE_failure;
         }
 
     default:
-        printf("0f %x, This opcode isn't handled yet\n", *opcode);
+        printk("0f %x, This opcode isn't handled yet\n", *opcode);
         return DECODE_failure;
     }
 }
@@ -702,7 +702,7 @@ static void hvm_send_assist_req(struct vcpu *v)
     if ( unlikely(p->state != STATE_INVALID) ) {
         /* This indicates a bug in the device model.  Crash the
            domain. */
-        printf("Device model set bad IO state %d.\n", p->state);
+        printk("Device model set bad IO state %d.\n", p->state);
         domain_crash(v->domain);
         return;
     }
@@ -733,7 +733,7 @@ void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
 
     p = &vio->vp_ioreq;
     if ( p->state != STATE_INVALID )
-        printf("WARNING: send pio with something already pending (%d)?\n",
+        printk("WARNING: send pio with something already pending (%d)?\n",
                p->state);
     p->dir = dir;
     p->pdata_valid = pvalid;
@@ -776,14 +776,14 @@ void send_mmio_req(
 
     vio = get_vio(v->domain, v->vcpu_id);
     if (vio == NULL) {
-        printf("bad shared page\n");
+        printk("bad shared page\n");
         domain_crash_synchronous();
     }
 
     p = &vio->vp_ioreq;
 
     if ( p->state != STATE_INVALID )
-        printf("WARNING: send mmio with something already pending (%d)?\n",
+        printk("WARNING: send mmio with something already pending (%d)?\n",
                p->state);
     p->dir = dir;
     p->pdata_valid = pvalid;
@@ -841,7 +841,7 @@ static void mmio_operands(int type, unsigned long gpa, struct instruction *inst,
         else
             send_mmio_req(type, gpa, 1, inst->op_size, 0, IOREQ_READ, 0);
     } else {
-        printf("mmio_operands: invalid operand\n");
+        printk("mmio_operands: invalid operand\n");
         domain_crash_synchronous();
     }
 }
@@ -866,8 +866,10 @@ void handle_mmio(unsigned long va, unsigned long gpa)
     memcpy(regs, guest_cpu_user_regs(), HVM_CONTEXT_STACK_BYTES);
     hvm_store_cpu_guest_regs(v, regs, NULL);
 
-    if ((inst_len = hvm_instruction_length(v)) <= 0) {
-        printf("handle_mmio: failed to get instruction length\n");
+    inst_len = hvm_instruction_length(regs, hvm_guest_x86_mode(v));
+    if ( inst_len <= 0 )
+    {
+        printk("handle_mmio: failed to get instruction length\n");
         domain_crash_synchronous();
     }
 
@@ -880,19 +882,19 @@ void handle_mmio(unsigned long va, unsigned long gpa)
     memset(inst, 0, MAX_INST_LEN);
     ret = inst_copy_from_guest(inst, inst_addr, inst_len);
     if (ret != inst_len) {
-        printf("handle_mmio: failed to copy instruction\n");
+        printk("handle_mmio: failed to copy instruction\n");
         domain_crash_synchronous();
     }
 
     init_instruction(&mmio_inst);
 
     if (hvm_decode(realmode, inst, &mmio_inst) == DECODE_failure) {
-        printf("handle_mmio: failed to decode instruction\n");
-        printf("mmio opcode: va 0x%lx, gpa 0x%lx, len %d:",
+        printk("handle_mmio: failed to decode instruction\n");
+        printk("mmio opcode: va 0x%lx, gpa 0x%lx, len %d:",
                va, gpa, inst_len);
         for (i = 0; i < inst_len; i++)
-            printf(" %02x", inst[i] & 0xFF);
-        printf("\n");
+            printk(" %02x", inst[i] & 0xFF);
+        printk("\n");
         domain_crash_synchronous();
     }
 
@@ -1073,7 +1075,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
         break;
 
     default:
-        printf("Unhandled MMIO instruction\n");
+        printk("Unhandled MMIO instruction\n");
         domain_crash_synchronous();
     }
 }

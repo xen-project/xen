@@ -82,12 +82,8 @@ struct vcpu *alloc_vcpu(
 
     v->domain = d;
     v->vcpu_id = vcpu_id;
-    v->processor = cpu_id;
     v->vcpu_info = &d->shared_info->vcpu_info[vcpu_id];
     spin_lock_init(&v->pause_lock);
-
-    v->cpu_affinity = is_idle_domain(d) ?
-        cpumask_of_cpu(cpu_id) : CPU_MASK_ALL;
 
     v->runstate.state = is_idle_vcpu(v) ? RUNSTATE_running : RUNSTATE_offline;
     v->runstate.state_entry_time = NOW();
@@ -95,7 +91,7 @@ struct vcpu *alloc_vcpu(
     if ( (vcpu_id != 0) && !is_idle_domain(d) )
         set_bit(_VCPUF_down, &v->vcpu_flags);
 
-    if ( sched_init_vcpu(v) < 0 )
+    if ( sched_init_vcpu(v, cpu_id) < 0 )
     {
         free_vcpu_struct(v);
         return NULL;

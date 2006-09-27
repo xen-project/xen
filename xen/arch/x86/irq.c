@@ -351,11 +351,15 @@ int pirq_acktype(int irq)
 
     desc = &irq_desc[vector];
 
+    if ( desc->handler == &no_irq_type )
+        return ACKTYPE_NONE;
+
     /*
-     * Edge-triggered IO-APIC interrupts need no final acknowledgement:
-     * we ACK early during interrupt processing.
+     * Edge-triggered IO-APIC and LAPIC interrupts need no final
+     * acknowledgement: we ACK early during interrupt processing.
      */
-    if ( !strcmp(desc->handler->typename, "IO-APIC-edge") )
+    if ( !strcmp(desc->handler->typename, "IO-APIC-edge") ||
+         !strcmp(desc->handler->typename, "local-APIC-edge") )
         return ACKTYPE_NONE;
 
     /*
@@ -376,7 +380,9 @@ int pirq_acktype(int irq)
         return ACKTYPE_NONE; /* edge-triggered => no final EOI */
     }
 
+    printk("Unknown PIC type '%s' for IRQ %d\n", desc->handler->typename, irq);
     BUG();
+
     return 0;
 }
 

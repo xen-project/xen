@@ -272,6 +272,13 @@ void __init __start_xen(multiboot_info_t *mbi)
         EARLY_FAIL();
     }
 
+    /*
+     * Since there are some stubs getting built on the stacks which use
+     * direct calls/jumps, the heap must be confined to the lower 2G so
+     * that those branches can reach their targets.
+     */
+    if ( opt_xenheap_megabytes > 2048 )
+        opt_xenheap_megabytes = 2048;
     xenheap_phys_end = opt_xenheap_megabytes << 20;
 
     if ( mbi->flags & MBI_MEMMAP )

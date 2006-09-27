@@ -3208,6 +3208,8 @@ editing \path{grub.conf}.
   respectively; if no suffix is specified, the parameter defaults to
   kilobytes. In previous versions of Xen, suffixes were not supported
   and the value is always interpreted as kilobytes.
+\item [ dom0\_vcpus\_pin ] Pins domain 0 VCPUs on their respective
+  physical CPUS (default=false).
 \item [ tbuf\_size=xxx ] Set the size of the per-cpu trace buffers, in
   pages (default 0).  
 \item [ sched=xxx ] Select the CPU scheduler Xen should use.  The

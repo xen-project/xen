@@ -280,7 +280,7 @@ void new_thread(struct vcpu *d,
 #define set_current_state(_s) do { current->state = (_s); } while (0)
 void scheduler_init(void);
 void schedulers_start(void);
-int  sched_init_vcpu(struct vcpu *);
+int  sched_init_vcpu(struct vcpu *v, unsigned int processor);
 void sched_destroy_domain(struct domain *);
 long sched_adjust(struct domain *, struct xen_domctl_scheduler_op *);
 int  sched_id(void);

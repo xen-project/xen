@@ -487,10 +487,19 @@ class XendDomain:
         if not dominfo:
             raise XendInvalidDomain(str(domid))
 
-        try:
-            return xc.vcpu_setaffinity(dominfo.getDomid(), vcpu, cpumap)
-        except Exception, ex:
-            raise XendError(str(ex))
+        # if vcpu is keyword 'all', apply the cpumap to all vcpus
+        vcpus = [ vcpu ]
+        if str(vcpu).lower() == "all":
+            vcpus = range(0, int(dominfo.getVCpuCount()))
+       
+        # set the same cpumask for all vcpus
+        rc = 0
+        for v in vcpus:
+            try:
+                rc = xc.vcpu_setaffinity(dominfo.getDomid(), int(v), cpumap)
+            except Exception, ex:
+                raise XendError(str(ex))
+        return rc
 
     def domain_cpu_sedf_set(self, domid, period, slice_, latency, extratime,
                             weight):

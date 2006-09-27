@@ -447,6 +447,10 @@ static void pic_init1(int io_addr, int elcr_addr, PicState *s)
     ASSERT(spin_is_locked(&s->pics_state->lock));
 
     pic_reset(s);
+
+    /* XXX We set the ELCR to level triggered here, but that should
+       really be done by the BIOS, and only for PCI IRQs. */
+    s->elcr = 0xff & s->elcr_mask;
 }
 
 void pic_init(struct hvm_virpic *s, void (*irq_request)(void *, int),
@@ -458,12 +462,12 @@ void pic_init(struct hvm_virpic *s, void (*irq_request)(void *, int),
     spin_lock_init(&s->lock);
     s->pics[0].pics_state = s;
     s->pics[1].pics_state = s;
+    s->pics[0].elcr_mask = 0xf8;
+    s->pics[1].elcr_mask = 0xde;
     spin_lock_irqsave(&s->lock, flags);
     pic_init1(0x20, 0x4d0, &s->pics[0]);
     pic_init1(0xa0, 0x4d1, &s->pics[1]);
     spin_unlock_irqrestore(&s->lock, flags);
-    s->pics[0].elcr_mask = 0xf8;
-    s->pics[1].elcr_mask = 0xde;
     s->irq_request = irq_request;
     s->irq_request_opaque = irq_request_opaque;
 }

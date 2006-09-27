@@ -53,6 +53,8 @@
 static char opt_gdb[30] = "none";
 string_param("gdb", opt_gdb);
 
+static void gdbstub_console_puts(const char *str);
+
 /* value <-> char (de)serialzers */
 char
 hex2char(unsigned long x)
@@ -360,7 +362,6 @@ gdb_cmd_write_mem(unsigned long addr, unsigned long length,
 static void
 gdbstub_attach(struct gdb_context *ctx)
 {
-    static void gdbstub_console_puts(const char *str);
     if ( ctx->currently_attached )
         return;    
     ctx->currently_attached = 1;

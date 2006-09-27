@@ -69,28 +69,23 @@ guest_linear_to_real(uint32_t base)
 
 	if (!(oldctx.cr4 & CR4_PAE)) {
 		l1_mfn = ((uint32_t *)gcr3)[(base >> 22) & 0x3ff];
-
-		if (oldctx.cr4 & CR4_PSE || l1_mfn & PDE_PS) {
-                        /* 1 level page table */
-			l0_mfn = l1_mfn;
-			if (!(l0_mfn & PT_ENTRY_PRESENT))
-				panic("l1 entry not present\n");
-
-			l0_mfn &= 0xffc00000;
-			return l0_mfn + (base & 0x3fffff);
-		}
-
 		if (!(l1_mfn & PT_ENTRY_PRESENT))
 			panic("l2 entry not present\n");
 
+		if ((oldctx.cr4 & CR4_PSE) && (l1_mfn & PDE_PS)) {
+			l0_mfn = l1_mfn & 0xffc00000;
+			return l0_mfn + (base & 0x3fffff);
+		}
+
 		l1_mfn &= 0xfffff000;
+
 		l0_mfn = ((uint32_t *)l1_mfn)[(base >> 12) & 0x3ff];
 		if (!(l0_mfn & PT_ENTRY_PRESENT))
 			panic("l1 entry not present\n");
 		l0_mfn &= 0xfffff000;
 
 		return l0_mfn + (base & 0xfff);
-	} else if (oldctx.cr4 & CR4_PAE && !(oldctx.cr4 & CR4_PSE)) {
+	} else {
 		l2_mfn = ((uint64_t *)gcr3)[(base >> 30) & 0x3];
 		if (!(l2_mfn & PT_ENTRY_PRESENT))
 			panic("l3 entry not present\n");
@@ -99,6 +94,12 @@ guest_linear_to_real(uint32_t base)
 		l1_mfn = ((uint64_t *)l2_mfn)[(base >> 21) & 0x1ff];
 		if (!(l1_mfn & PT_ENTRY_PRESENT))
 			panic("l2 entry not present\n");
+
+		if (l1_mfn & PDE_PS) { /* CR4.PSE is ignored in PAE mode */
+			l0_mfn = l1_mfn & 0x3ffe00000ULL;
+			return l0_mfn + (base & 0x1fffff);
+		}
+
 		l1_mfn &= 0x3fffff000ULL;
 
 		l0_mfn = ((uint64_t *)l1_mfn)[(base >> 12) & 0x1ff];
@@ -107,18 +108,6 @@ guest_linear_to_real(uint32_t base)
 		l0_mfn &= 0x3fffff000ULL;
 
 		return l0_mfn + (base & 0xfff);
-	} else { /* oldctx.cr4 & CR4_PAE && oldctx.cr4 & CR4_PSE */
-		l1_mfn = ((uint64_t *)gcr3)[(base >> 30) & 0x3];
-		if (!(l1_mfn & PT_ENTRY_PRESENT))
-			panic("l2 entry not present\n");
-		l1_mfn &= 0x3fffff000ULL;
-
-		l0_mfn = ((uint64_t *)l1_mfn)[(base >> 21) & 0x1ff];
-		if (!(l0_mfn & PT_ENTRY_PRESENT))
-			panic("l1 entry not present\n");
-		l0_mfn &= 0x3ffe00000ULL;
-
-		return l0_mfn + (base & 0x1fffff);
 	}
 }
 
