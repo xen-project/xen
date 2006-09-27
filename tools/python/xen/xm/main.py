@@ -1423,13 +1423,14 @@ def main(argv=sys.argv):
     if len(argv) < 2:
         usage()
 
-    # intercept --help and output our own help
-    if '--help' in argv[1:]:
-        if '--help' == argv[1]:
-            longHelp()
-        else:
-            usage(argv[1])
-        sys.exit(0)
+    # intercept --help(-h) and output our own help
+    for help in ['--help', '-h']:
+        if help in argv[1:]:
+            if help == argv[1]:
+                longHelp()
+            else:
+                usage(argv[1])
+            sys.exit(0)
 
     cmd = xm_lookup_cmd(argv[1])
 
