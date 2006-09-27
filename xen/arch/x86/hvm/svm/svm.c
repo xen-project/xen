@@ -282,7 +282,7 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
     switch (regs->ecx)
     {
     case MSR_EFER:
-        msr_content = vmcb->efer;      
+        msr_content = vmcb->efer;
         msr_content &= ~EFER_SVME;
         break;
 
@@ -320,14 +320,14 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
     HVM_DBG_LOG(DBG_LEVEL_2, "mode_do_msr_read: msr_content: %"PRIx64"\n", 
                 msr_content);
 
-    regs->eax = msr_content & 0xffffffff;
-    regs->edx = msr_content >> 32;
+    regs->eax = (u32)(msr_content >>  0);
+    regs->edx = (u32)(msr_content >> 32);
     return 1;
 }
 
 static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 {
-    u64 msr_content = regs->eax | ((u64)regs->edx << 32);
+    u64 msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
     struct vcpu *vc = current;
     struct vmcb_struct *vmcb = vc->arch.hvm_svm.vmcb;
 
@@ -342,7 +342,8 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
         /* offending reserved bit will cause #GP */
         if ( msr_content & ~(EFER_LME | EFER_LMA | EFER_NX | EFER_SCE) )
         {
-            printk("trying to set reserved bit in EFER\n");
+            printk("Trying to set reserved bit in EFER: %016llx\n",
+                   msr_content);
             svm_inject_exception(vc, TRAP_gp_fault, 1, 0);
             return 0;
         }
@@ -355,7 +356,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
                  !test_bit(SVM_CPU_STATE_PAE_ENABLED,
                            &vc->arch.hvm_svm.cpu_state) )
             {
-                printk("trying to set LME bit when "
+                printk("Trying to set LME bit when "
                        "in paging mode or PAE bit is not set\n");
                 svm_inject_exception(vc, TRAP_gp_fault, 1, 0);
                 return 0;
@@ -1997,7 +1998,7 @@ static inline void svm_do_msr_access(
     else
     {
         inst_len = __get_instruction_length(vmcb, INSTR_WRMSR, NULL);
-        msr_content = (regs->eax & 0xFFFFFFFF) | ((u64)regs->edx << 32);
+        msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
 
         switch (regs->ecx)
         {

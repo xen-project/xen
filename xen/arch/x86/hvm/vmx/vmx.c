@@ -269,15 +269,15 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
 
     HVM_DBG_LOG(DBG_LEVEL_2, "msr_content: 0x%"PRIx64, msr_content);
 
-    regs->eax = msr_content & 0xffffffff;
-    regs->edx = msr_content >> 32;
+    regs->eax = (u32)(msr_content >>  0);
+    regs->edx = (u32)(msr_content >> 32);
 
     return 1;
 }
 
 static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 {
-    u64 msr_content = regs->eax | ((u64)regs->edx << 32);
+    u64 msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
     struct vcpu *v = current;
     struct vmx_msr_state *msr = &v->arch.hvm_vmx.msr_content;
     struct vmx_msr_state *host_state = &this_cpu(percpu_msr);
@@ -290,7 +290,8 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
         /* offending reserved bit will cause #GP */
         if ( msr_content & ~(EFER_LME | EFER_LMA | EFER_NX | EFER_SCE) )
         {
-            printk("trying to set reserved bit in EFER\n");
+            printk("Trying to set reserved bit in EFER: %016llx\n",
+                   msr_content);
             vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
             return 0;
         }
@@ -303,7 +304,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
                  !test_bit(VMX_CPU_STATE_PAE_ENABLED,
                            &v->arch.hvm_vmx.cpu_state) )
             {
-                printk("trying to set LME bit when "
+                printk("Trying to set LME bit when "
                        "in paging mode or PAE bit is not set\n");
                 vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
                 return 0;
@@ -1924,7 +1925,7 @@ static inline void vmx_do_msr_write(struct cpu_user_regs *regs)
                 (unsigned long)regs->ecx, (unsigned long)regs->eax,
                 (unsigned long)regs->edx);
 
-    msr_content = (regs->eax & 0xFFFFFFFF) | ((u64)regs->edx << 32);
+    msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
 
     switch (regs->ecx) {
     case MSR_IA32_TIME_STAMP_COUNTER:
