@@ -68,7 +68,7 @@ guest_linear_to_real(uint32_t base)
 		return base;
 
 	if (!(oldctx.cr4 & CR4_PAE)) {
-		l1_mfn = ((uint32_t *)gcr3)[(base >> 22) & 0x3ff];
+		l1_mfn = ((uint32_t *)(long)gcr3)[(base >> 22) & 0x3ff];
 		if (!(l1_mfn & PT_ENTRY_PRESENT))
 			panic("l2 entry not present\n");
 
@@ -79,19 +79,19 @@ guest_linear_to_real(uint32_t base)
 
 		l1_mfn &= 0xfffff000;
 
-		l0_mfn = ((uint32_t *)l1_mfn)[(base >> 12) & 0x3ff];
+		l0_mfn = ((uint32_t *)(long)l1_mfn)[(base >> 12) & 0x3ff];
 		if (!(l0_mfn & PT_ENTRY_PRESENT))
 			panic("l1 entry not present\n");
 		l0_mfn &= 0xfffff000;
 
 		return l0_mfn + (base & 0xfff);
 	} else {
-		l2_mfn = ((uint64_t *)gcr3)[(base >> 30) & 0x3];
+		l2_mfn = ((uint64_t *)(long)gcr3)[(base >> 30) & 0x3];
 		if (!(l2_mfn & PT_ENTRY_PRESENT))
 			panic("l3 entry not present\n");
 		l2_mfn &= 0x3fffff000ULL;
 
-		l1_mfn = ((uint64_t *)l2_mfn)[(base >> 21) & 0x1ff];
+		l1_mfn = ((uint64_t *)(long)l2_mfn)[(base >> 21) & 0x1ff];
 		if (!(l1_mfn & PT_ENTRY_PRESENT))
 			panic("l2 entry not present\n");
 
@@ -102,7 +102,7 @@ guest_linear_to_real(uint32_t base)
 
 		l1_mfn &= 0x3fffff000ULL;
 
-		l0_mfn = ((uint64_t *)l1_mfn)[(base >> 12) & 0x1ff];
+		l0_mfn = ((uint64_t *)(long)l1_mfn)[(base >> 12) & 0x1ff];
 		if (!(l0_mfn & PT_ENTRY_PRESENT))
 			panic("l1 entry not present\n");
 		l0_mfn &= 0x3fffff000ULL;
