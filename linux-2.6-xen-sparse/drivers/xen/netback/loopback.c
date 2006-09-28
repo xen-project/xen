@@ -241,7 +241,7 @@ static int __init loopback_init(void)
 	int i, err = 0;
 
 	if (nloopbacks == -1)
-		nloopbacks = is_initial_xendomain() ? 8 : 0;
+		nloopbacks = is_initial_xendomain() ? 4 : 0;
 
 	for (i = 0; i < nloopbacks; i++)
 		if ((err = make_loopback(i)) != 0)
