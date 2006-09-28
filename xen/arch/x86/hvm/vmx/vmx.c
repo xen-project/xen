@@ -2111,7 +2111,7 @@ static void vmx_reflect_exception(struct vcpu *v)
     }
 }
 
-asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
+asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 {
     unsigned int exit_reason;
     unsigned long exit_qualification, rip, inst_len = 0;
@@ -2182,16 +2182,16 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
 #ifdef XEN_DEBUGGER
         case TRAP_debug:
         {
-            save_cpu_user_regs(&regs);
-            pdb_handle_exception(1, &regs, 1);
-            restore_cpu_user_regs(&regs);
+            save_cpu_user_regs(regs);
+            pdb_handle_exception(1, regs, 1);
+            restore_cpu_user_regs(regs);
             break;
         }
         case TRAP_int3:
         {
-            save_cpu_user_regs(&regs);
-            pdb_handle_exception(3, &regs, 1);
-            restore_cpu_user_regs(&regs);
+            save_cpu_user_regs(regs);
+            pdb_handle_exception(3, regs, 1);
+            restore_cpu_user_regs(regs);
             break;
         }
 #else
@@ -2201,7 +2201,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
 
             if ( test_bit(_DOMF_debugging, &v->domain->domain_flags) )
             {
-                store_cpu_user_regs(&regs);
+                store_cpu_user_regs(regs);
                 domain_pause_for_debugger();
                 __vm_clear_bit(GUEST_PENDING_DBG_EXCEPTIONS,
                                PENDING_DEBUG_EXC_BS);
@@ -2232,29 +2232,29 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         case TRAP_page_fault:
         {
             __vmread(EXIT_QUALIFICATION, &va);
-            __vmread(VM_EXIT_INTR_ERROR_CODE, &regs.error_code);
+            __vmread(VM_EXIT_INTR_ERROR_CODE, &regs->error_code);
 
-            TRACE_VMEXIT(3,regs.error_code);
-            TRACE_VMEXIT(4,va);
+            TRACE_VMEXIT(3, regs->error_code);
+            TRACE_VMEXIT(4, va);
 
             HVM_DBG_LOG(DBG_LEVEL_VMMU,
                         "eax=%lx, ebx=%lx, ecx=%lx, edx=%lx, esi=%lx, edi=%lx",
-                        (unsigned long)regs.eax, (unsigned long)regs.ebx,
-                        (unsigned long)regs.ecx, (unsigned long)regs.edx,
-                        (unsigned long)regs.esi, (unsigned long)regs.edi);
+                        (unsigned long)regs->eax, (unsigned long)regs->ebx,
+                        (unsigned long)regs->ecx, (unsigned long)regs->edx,
+                        (unsigned long)regs->esi, (unsigned long)regs->edi);
 
-            if ( !vmx_do_page_fault(va, &regs) ) {
-                /*
-                 * Inject #PG using Interruption-Information Fields
-                 */
-                vmx_inject_hw_exception(v, TRAP_page_fault, regs.error_code);
+            if ( !vmx_do_page_fault(va, regs) )
+            {
+                /* Inject #PG using Interruption-Information Fields. */
+                vmx_inject_hw_exception(v, TRAP_page_fault, regs->error_code);
                 v->arch.hvm_vmx.cpu_cr2 = va;
-                TRACE_3D(TRC_VMX_INT, v->domain->domain_id, TRAP_page_fault, va);
+                TRACE_3D(TRC_VMX_INT, v->domain->domain_id,
+                         TRAP_page_fault, va);
             }
             break;
         }
         case TRAP_nmi:
-            do_nmi(&regs);
+            do_nmi(regs);
             break;
         default:
             vmx_reflect_exception(v);
@@ -2263,7 +2263,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         break;
     }
     case EXIT_REASON_EXTERNAL_INTERRUPT:
-        vmx_vmexit_do_extint(&regs);
+        vmx_vmexit_do_extint(regs);
         break;
     case EXIT_REASON_TRIPLE_FAULT:
         domain_crash_synchronous();
@@ -2280,7 +2280,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
     case EXIT_REASON_CPUID:
         inst_len = __get_instruction_length(); /* Safe: CPUID */
         __update_guest_eip(inst_len);
-        vmx_vmexit_do_cpuid(&regs);
+        vmx_vmexit_do_cpuid(regs);
         break;
     case EXIT_REASON_HLT:
         inst_len = __get_instruction_length(); /* Safe: HLT */
@@ -2302,7 +2302,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         __update_guest_eip(inst_len);
         __vmread(GUEST_RIP, &rip);
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
-        hvm_do_hypercall(&regs);
+        hvm_do_hypercall(regs);
         break;
     }
     case EXIT_REASON_CR_ACCESS:
@@ -2310,15 +2310,15 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         __vmread(GUEST_RIP, &rip);
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
         inst_len = __get_instruction_length(); /* Safe: MOV Cn, LMSW, CLTS */
-        if ( vmx_cr_access(exit_qualification, &regs) )
+        if ( vmx_cr_access(exit_qualification, regs) )
             __update_guest_eip(inst_len);
-        TRACE_VMEXIT(3,regs.error_code);
-        TRACE_VMEXIT(4,exit_qualification);
+        TRACE_VMEXIT(3, regs->error_code);
+        TRACE_VMEXIT(4, exit_qualification);
         break;
     }
     case EXIT_REASON_DR_ACCESS:
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
-        vmx_dr_access(exit_qualification, &regs);
+        vmx_dr_access(exit_qualification, regs);
         break;
     case EXIT_REASON_IO_INSTRUCTION:
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
@@ -2329,12 +2329,12 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
     case EXIT_REASON_MSR_READ:
         inst_len = __get_instruction_length(); /* Safe: RDMSR */
         __update_guest_eip(inst_len);
-        vmx_do_msr_read(&regs);
+        vmx_do_msr_read(regs);
         break;
     case EXIT_REASON_MSR_WRITE:
         inst_len = __get_instruction_length(); /* Safe: WRMSR */
         __update_guest_eip(inst_len);
-        vmx_do_msr_write(&regs);
+        vmx_do_msr_write(regs);
         break;
     case EXIT_REASON_MWAIT_INSTRUCTION:
     case EXIT_REASON_MONITOR_INSTRUCTION:

@@ -144,6 +144,7 @@ ENTRY(svm_asm_do_launch)
         VMLOAD
 
         STGI
+        movq %rsp,%rdi
         call svm_vmexit_handler
         jmp  svm_asm_do_resume
 

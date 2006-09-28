@@ -118,7 +118,7 @@ enum hval_bitmaps {
 extern unsigned int opt_hvm_debug_level;
 #define HVM_DBG_LOG(level, _f, _a...)                                         \
     do {                                                                      \
-        if ( (level) & opt_hvm_debug_level )                                  \
+        if ( unlikely((level) & opt_hvm_debug_level) )                        \
             printk("[HVM:%d.%d] <%s> " _f "\n",                               \
                    current->domain->domain_id, current->vcpu_id, __func__,    \
                    ## _a);                                                    \

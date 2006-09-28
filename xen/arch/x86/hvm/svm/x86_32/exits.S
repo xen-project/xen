@@ -126,7 +126,10 @@ ENTRY(svm_asm_do_launch)
 
         HVM_SAVE_ALL_NOSEGREGS
         STGI
+        movl %esp,%eax
+        push %eax
         call svm_vmexit_handler
+        addl $4,%esp
         jmp  svm_asm_do_resume
 
         ALIGN
