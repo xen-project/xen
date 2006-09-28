@@ -102,17 +102,11 @@ typedef struct tap_blkif {
 	blkif_t *blkif;               /*Associate blkif with tapdev          */
 } tap_blkif_t;
 
-/*Private data struct associated with the inode*/
-typedef struct private_info {
-	int idx;
-} private_info_t;
-
 /*Data struct handed back to userspace for tapdisk device to VBD mapping*/
 typedef struct domid_translate {
 	unsigned short domid;
 	unsigned short busid;
 } domid_translate_t ;
-
 
 static domid_translate_t  translate_domid[MAX_TAP_DEV];
 static tap_blkif_t *tapfds[MAX_TAP_DEV];
@@ -200,7 +194,7 @@ static struct grant_handle_pair
     + (_i)])
 
 
-static int blktap_read_ufe_ring(int idx); /*local prototypes*/
+static int blktap_read_ufe_ring(tap_blkif_t *info); /*local prototypes*/
 
 #define BLKTAP_MINOR 0  /*/dev/xen/blktap resides at device number
 			  major=254, minor numbers begin at 0            */ 
@@ -264,7 +258,8 @@ static inline int GET_NEXT_REQ(unsigned long *idx_map)
 {
 	int i;
 	for (i = 0; i < MAX_PENDING_REQS; i++)
-		if (idx_map[i] == INVALID_REQ) return i;
+		if (idx_map[i] == INVALID_REQ)
+			return i;
 
 	return INVALID_REQ;
 }
@@ -369,9 +364,8 @@ void signal_tapdisk(int idx)
 	info = tapfds[idx];
 	if ( (idx > 0) && (idx < MAX_TAP_DEV) && (info->pid > 0) ) {
 		ptask = find_task_by_pid(info->pid);
-		if (ptask) { 
+		if (ptask)
 			info->status = CLEANSHUTDOWN;
- 		}
 	}
 	info->blkif = NULL;
 	return;
@@ -382,7 +376,6 @@ static int blktap_open(struct inode *inode, struct file *filp)
 	blkif_sring_t *sring;
 	int idx = iminor(inode) - BLKTAP_MINOR;
 	tap_blkif_t *info;
-	private_info_t *prv;
 	int i;
 	
 	if (tapfds[idx] == NULL) {
@@ -410,9 +403,7 @@ static int blktap_open(struct inode *inode, struct file *filp)
 	SHARED_RING_INIT(sring);
 	FRONT_RING_INIT(&info->ufe_ring, sring, PAGE_SIZE);
 	
-	prv = kzalloc(sizeof(private_info_t),GFP_KERNEL);
-	prv->idx = idx;
-	filp->private_data = prv;
+	filp->private_data = info;
 	info->vma = NULL;
 
 	info->idx_map = kmalloc(sizeof(unsigned long) * MAX_PENDING_REQS, 
@@ -433,17 +424,16 @@ static int blktap_open(struct inode *inode, struct file *filp)
 
 static int blktap_release(struct inode *inode, struct file *filp)
 {
-	int idx = iminor(inode) - BLKTAP_MINOR;
-	tap_blkif_t *info;
+	tap_blkif_t *info = filp->private_data;
 	
-	if (tapfds[idx] == NULL) {
+	/* can this ever happen? - sdr */
+	if (!info) {
 		WPRINTK("Trying to free device that doesn't exist "
-		       "[/dev/xen/blktap%d]\n",idx);
+		       "[/dev/xen/blktap%d]\n",iminor(inode) - BLKTAP_MINOR);
 		return -1;
 	}
-	info = tapfds[idx];
 	info->dev_inuse = 0;
-	DPRINTK("Freeing device [/dev/xen/blktap%d]\n",idx);
+	DPRINTK("Freeing device [/dev/xen/blktap%d]\n",info->minor);
 
 	/* Free the ring page. */
 	ClearPageReserved(virt_to_page(info->ufe_ring.sring));
@@ -457,8 +447,6 @@ static int blktap_release(struct inode *inode, struct file *filp)
 		info->vma = NULL;
 	}
 	
-	if (filp->private_data) kfree(filp->private_data);
-
 	if ( (info->status != CLEANSHUTDOWN) && (info->blkif != NULL) ) {
 		kthread_stop(info->blkif->xenblkd);
 		info->blkif->xenblkd = NULL;
@@ -491,16 +479,12 @@ static int blktap_mmap(struct file *filp, struct vm_area_struct *vma)
 	int size;
 	struct page **map;
 	int i;
-	private_info_t *prv;
-	tap_blkif_t *info;
+	tap_blkif_t *info = filp->private_data;
 
-	/*Retrieve the dev info*/
-	prv = (private_info_t *)filp->private_data;
-	if (prv == NULL) {
+	if (info == NULL) {
 		WPRINTK("blktap: mmap, retrieving idx failed\n");
 		return -ENOMEM;
 	}
-	info = tapfds[prv->idx];
 	
 	vma->vm_flags |= VM_RESERVED;
 	vma->vm_ops = &blktap_vm_ops;
@@ -556,20 +540,17 @@ static int blktap_mmap(struct file *filp, struct vm_area_struct *vma)
 static int blktap_ioctl(struct inode *inode, struct file *filp,
                         unsigned int cmd, unsigned long arg)
 {
-	int idx = iminor(inode) - BLKTAP_MINOR;
+	tap_blkif_t *info = filp->private_data;
+
 	switch(cmd) {
 	case BLKTAP_IOCTL_KICK_FE: 
 	{
 		/* There are fe messages to process. */
-		return blktap_read_ufe_ring(idx);
+		return blktap_read_ufe_ring(info);
 	}
 	case BLKTAP_IOCTL_SETMODE:
 	{
-		tap_blkif_t *info = tapfds[idx];
-		
-		if ( (idx > 0) && (idx < MAX_TAP_DEV) 
-		     && (tapfds[idx] != NULL) ) 
-		{
+		if (info) {
 			if (BLKTAP_MODE_VALID(arg)) {
 				info->mode = arg;
 				/* XXX: may need to flush rings here. */
@@ -582,11 +563,7 @@ static int blktap_ioctl(struct inode *inode, struct file *filp,
 	}
 	case BLKTAP_IOCTL_PRINT_IDXS:
         {
-		tap_blkif_t *info = tapfds[idx];
-		
-		if ( (idx > 0) && (idx < MAX_TAP_DEV) 
-		     && (tapfds[idx] != NULL) ) 
-		{
+		if (info) {
 			printk("User Rings: \n-----------\n");
 			printk("UF: rsp_cons: %2d, req_prod_prv: %2d "
 				"| req_prod: %2d, rsp_prod: %2d\n",
@@ -599,11 +576,7 @@ static int blktap_ioctl(struct inode *inode, struct file *filp,
         }
 	case BLKTAP_IOCTL_SENDPID:
 	{
-		tap_blkif_t *info = tapfds[idx];
-		
-		if ( (idx > 0) && (idx < MAX_TAP_DEV) 
-		     && (tapfds[idx] != NULL) ) 
-		{
+		if (info) {
 			info->pid = (pid_t)arg;
 			DPRINTK("blktap: pid received %d\n", 
 			       info->pid);
@@ -631,9 +604,12 @@ static int blktap_ioctl(struct inode *inode, struct file *filp,
 	case BLKTAP_IOCTL_FREEINTF:
 	{
 		unsigned long dev = arg;
-		tap_blkif_t *info = NULL;
 
-		if ( (dev > 0) && (dev < MAX_TAP_DEV) ) info = tapfds[dev];
+		/* Looking at another device */
+		info = NULL;
+
+		if ( (dev > 0) && (dev < MAX_TAP_DEV) )
+			info = tapfds[dev];
 
 		if ( (info != NULL) && (info->dev_pending) )
 			info->dev_pending = 0;
@@ -642,12 +618,17 @@ static int blktap_ioctl(struct inode *inode, struct file *filp,
 	case BLKTAP_IOCTL_MINOR:
 	{
 		unsigned long dev = arg;
-		tap_blkif_t *info = NULL;
+
+		/* Looking at another device */
+		info = NULL;
 		
-		if ( (dev > 0) && (dev < MAX_TAP_DEV) ) info = tapfds[dev];
+		if ( (dev > 0) && (dev < MAX_TAP_DEV) )
+			info = tapfds[dev];
 		
-		if (info != NULL) return info->minor;
-		else return -1;
+		if (info != NULL)
+			return info->minor;
+		else
+			return -1;
 	}
 	case BLKTAP_IOCTL_MAJOR:
 		return BLKTAP_DEV_MAJOR;
@@ -662,23 +643,20 @@ static int blktap_ioctl(struct inode *inode, struct file *filp,
 	return -ENOIOCTLCMD;
 }
 
-static unsigned int blktap_poll(struct file *file, poll_table *wait)
+static unsigned int blktap_poll(struct file *filp, poll_table *wait)
 {
-	private_info_t *prv;
-	tap_blkif_t *info;
+	tap_blkif_t *info = filp->private_data;
 	
-	/*Retrieve the dev info*/
-	prv = (private_info_t *)file->private_data;
-	if (prv == NULL) {
+	if (!info) {
 		WPRINTK(" poll, retrieving idx failed\n");
 		return 0;
 	}
-	
-	if (prv->idx == 0) return 0;
-	
-	info = tapfds[prv->idx];
-	
-	poll_wait(file, &info->wait, wait);
+
+	/* do not work on the control device */
+	if (!info->minor)
+		return 0;
+
+	poll_wait(filp, &info->wait, wait);
 	if (info->ufe_ring.req_prod_pvt != info->ufe_ring.sring->req_prod) {
 		flush_tlb_all();
 		RING_PUSH_REQUESTS(&info->ufe_ring);
@@ -691,11 +669,14 @@ void blktap_kick_user(int idx)
 {
 	tap_blkif_t *info;
 
-	if (idx == 0) return;
+	if (idx == 0)
+		return;
 	
 	info = tapfds[idx];
 	
-	if (info != NULL) wake_up_interruptible(&info->wait);
+	if (info != NULL)
+		wake_up_interruptible(&info->wait);
+
 	return;
 }
 
@@ -837,7 +818,8 @@ static void req_decrease(void)
 			mmap_inuse--;
 		}
 	}
-	if (mmap_inuse == 0) mmap_req_del(mmap_alloc-1);
+	if (mmap_inuse == 0)
+		mmap_req_del(mmap_alloc-1);
  done:
 	spin_unlock_irqrestore(&pending_free_lock, flags);
 	return;
@@ -1002,7 +984,7 @@ int tap_blkif_schedule(void *arg)
  * COMPLETION CALLBACK -- Called by user level ioctl()
  */
 
-static int blktap_read_ufe_ring(int idx)
+static int blktap_read_ufe_ring(tap_blkif_t *info)
 {
 	/* This is called to read responses from the UFE ring. */
 	RING_IDX i, j, rp;
@@ -1010,12 +992,9 @@ static int blktap_read_ufe_ring(int idx)
 	blkif_t *blkif=NULL;
 	int pending_idx, usr_idx, mmap_idx;
 	pending_req_t *pending_req;
-	tap_blkif_t *info;
 	
-	info = tapfds[idx];
-	if (info == NULL) {
+	if (!info)
 		return 0;
-	}
 
 	/* We currently only forward packets in INTERCEPT_FE mode. */
 	if (!(info->mode & BLKTAP_MODE_INTERCEPT_FE))
@@ -1063,7 +1042,7 @@ static int blktap_read_ufe_ring(int idx)
 				>> PAGE_SHIFT;
 			map[offset] = NULL;
 		}
-		fast_flush_area(pending_req, pending_idx, usr_idx, idx);
+		fast_flush_area(pending_req, pending_idx, usr_idx, info->minor);
 		make_response(blkif, pending_req->id, resp->operation,
 			      resp->status);
 		info->idx_map[usr_idx] = INVALID_REQ;
