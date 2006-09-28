@@ -33,6 +33,7 @@
 #include <asm/htab.h>
 #include <asm/current.h>
 #include <asm/hcalls.h>
+#include "rtas.h"
 
 #define next_arg(fmt, args) ({                                              \
     unsigned long __arg;                                                    \
@@ -95,18 +96,27 @@ void arch_domain_destroy(struct domain *d)
     shadow_teardown(d);
 }
 
+static void machine_fail(const char *s)
+{
+    printf("%s failed, manual powercycle required!\n", s);
+    while(1);
+}
+
 void machine_halt(void)
 {
-    printk("machine_halt called: spinning....\n");
     console_start_sync();
-    while(1);
+    printf("%s called\n", __func__);
+    rtas_halt();
+
+    machine_fail(__func__);
 }
 
 void machine_restart(char * __unused)
 {
-    printk("machine_restart called: spinning....\n");
     console_start_sync();
-    while(1);
+    printf("%s called\n", __func__);
+    rtas_reboot();
+    machine_fail(__func__);
 }
 
 struct vcpu *alloc_vcpu_struct(void)

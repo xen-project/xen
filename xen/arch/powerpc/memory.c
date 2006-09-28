@@ -22,6 +22,7 @@
 #include <xen/mm.h>
 #include "of-devtree.h"
 #include "oftree.h"
+#include "rtas.h"
 
 unsigned long xenheap_phys_end;
 struct membuf {
@@ -33,16 +34,29 @@ typedef void (*walk_mem_fn)(struct membuf *, uint);
 
 static ulong free_xenheap(ulong start, ulong end)
 {
+    ulong save_start;
+    ulong save_end;
+
     start = ALIGN_UP(start, PAGE_SIZE);
     end = ALIGN_DOWN(end, PAGE_SIZE);
 
     printk("%s: 0x%lx - 0x%lx\n", __func__, start, end);
 
-    if (oftree <= end && oftree >= start) {
-        printk("%s:     Go around the devtree: 0x%lx - 0x%lx\n",
-               __func__, oftree, oftree_end);
-        init_xenheap_pages(start, ALIGN_DOWN(oftree, PAGE_SIZE));
-        init_xenheap_pages(ALIGN_UP(oftree_end, PAGE_SIZE), end);
+    save_start = oftree;
+    save_end = oftree_end;
+    if (rtas_base) {
+        if (save_start > rtas_base)
+            save_start = rtas_base;
+        if (save_end < rtas_end)
+            save_end = rtas_end;
+    }
+
+    /* need to do this better */
+    if (save_start <= end && save_start >= start) {
+        printk("%s:     Go around the saved area: 0x%lx - 0x%lx\n",
+               __func__, save_start, save_end);
+        init_xenheap_pages(start, ALIGN_DOWN(save_start, PAGE_SIZE));
+        init_xenheap_pages(ALIGN_UP(save_end, PAGE_SIZE), end);
     } else {
         init_xenheap_pages(start, end);
     }
@@ -123,7 +137,7 @@ static void setup_xenheap(module_t *mod, int mcount)
     for (i = 0; i < mcount; i++) {
         u32 s;
 
-        if(mod[i].mod_end == mod[i].mod_start)
+        if (mod[i].mod_end == mod[i].mod_start)
             continue;
 
         s = ALIGN_DOWN(mod[i].mod_start, PAGE_SIZE);

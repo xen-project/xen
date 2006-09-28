@@ -25,6 +25,7 @@
 #include <public/xen.h>
 #include "of-devtree.h"
 #include "oftree.h"
+#include "rtas.h"
 
 #undef RTAS
 
@@ -346,6 +347,10 @@ static ofdn_t ofd_xen_props(void *m, struct domain *d, start_info_t *si)
         val[1] =  RMA_LAST_DOM0 * PAGE_SIZE;
         val[0] =  rma_size(d->arch.rma_order) - val[1];
         ofd_prop_add(m, n, "reserved", val, sizeof (val));
+
+        /* tell dom0 that Xen depends on it to have power control */
+        if (!rtas_entry)
+            ofd_prop_add(m, n, "power-control", NULL, 0);
 
         n = ofd_node_add(m, n, console, sizeof (console));
         if (n > 0) {

@@ -35,10 +35,18 @@ static inline void dump_execution_state(void)
     show_backtrace(sp, lr, lr);
 }
 
-static inline void debugger_trap_immediate(void)
+static inline void __force_crash(void)
 {
     dump_execution_state();
     __builtin_trap();
+}
+
+static inline void debugger_trap_immediate(void)
+{
+    dump_execution_state();
+#ifdef CRASH_DEBUG
+    __builtin_trap();
+#endif
 }
 
 static inline void unimplemented(void)
@@ -57,7 +65,7 @@ extern void __warn(char *file, int line);
 #define WARN() __warn(__FILE__, __LINE__)
 #define WARN_ON(_p) do { if (_p) WARN(); } while ( 0 )
 
-#define FORCE_CRASH() debugger_trap_immediate()
+#define FORCE_CRASH() __force_crash()
 
 #ifdef CRASH_DEBUG
 

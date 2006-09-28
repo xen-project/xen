@@ -32,6 +32,7 @@
 #include "exceptions.h"
 #include "of-devtree.h"
 #include "oftree.h"
+#include "rtas.h"
 
 /* Secondary processors use this for handshaking with main processor.  */
 volatile unsigned int __spin_ack;
@@ -68,7 +69,6 @@ struct of_service {
 static int bof_chosen;
 
 static struct of_service s;
-extern s32 prom_call(void *arg, ulong rtas_base, ulong func, ulong msr);
 
 static int __init of_call(
     const char *service, u32 nargs, u32 nrets, s32 rets[], ...)
@@ -362,6 +362,14 @@ static int __init of_getparent(int ph)
     return rets[0];
 }
 
+static int __init of_open(const char *devspec)
+{
+    int rets[1] = { OF_FAILURE };
+
+    of_call("open", 1, 1, rets, devspec);
+    return rets[0];
+}
+
 static void boot_of_probemem(multiboot_info_t *mbi)
 {
     int root;
@@ -500,7 +508,8 @@ static int save_props(void *m, ofdn_t n, int pkg)
                     of_panic("obj array not big enough for 0x%x\n", sz);
                 }
                 actual = of_getprop(pkg, name, obj, sz);
-                if (actual > sz) of_panic("obj too small");
+                if (actual > sz)
+                    of_panic("obj too small");
             }
 
             if (strncmp(name, name_str, sizeof(name_str)) == 0) {
@@ -512,7 +521,8 @@ static int save_props(void *m, ofdn_t n, int pkg)
             }
 
             pos = ofd_prop_add(m, n, name, obj, actual);
-            if (pos == 0) of_panic("prop_create");
+            if (pos == 0)
+                of_panic("prop_create");
         }
 
         result = of_nextprop(pkg, name, name);
@@ -536,10 +546,12 @@ retry:
 
     if (pnext != 0) {
         sz = of_package_to_path(pnext, path, psz);
-        if (sz == OF_FAILURE) of_panic("bad path\n");
+        if (sz == OF_FAILURE)
+            of_panic("bad path\n");
 
         nnext = ofd_node_child_create(m, n, path, sz);
-        if (nnext == 0) of_panic("out of mem\n");
+        if (nnext == 0)
+            of_panic("out of mem\n");
 
         do_pkg(m, nnext, pnext, path, psz);
     }
@@ -551,7 +563,8 @@ retry:
         sz = of_package_to_path(pnext, path, psz);
 
         nnext = ofd_node_peer_create(m, n, path, sz);
-        if (nnext <= 0) of_panic("out of space in OFD tree.\n");
+        if (nnext <= 0)
+            of_panic("out of space in OFD tree.\n");
 
         n = nnext;
         p = pnext;
@@ -570,7 +583,8 @@ static int pkg_save(void *mem)
 
     /* get root */
     root = of_getpeer(0);
-    if (root == OF_FAILURE) of_panic("no root package\n");
+    if (root == OF_FAILURE)
+        of_panic("no root package\n");
 
     do_pkg(mem, OFD_ROOT, root, path, sizeof(path));
 
@@ -604,7 +618,8 @@ static int boot_of_fixup_refs(void *mem)
             char ofpath[256];
 
             path = ofd_node_path(mem, c);
-            if (path == NULL) of_panic("no path to found prop: %s\n", name);
+            if (path == NULL)
+                of_panic("no path to found prop: %s\n", name);
 
             rp = of_finddevice(path);
             if (rp == OF_FAILURE)
@@ -629,13 +644,15 @@ static int boot_of_fixup_refs(void *mem)
                          "ref 0x%x\n", name, path, rp, ref);
 
             dp = ofd_node_find(mem, ofpath);
-            if (dp <= 0) of_panic("no ofd node for OF node[0x%x]: %s\n",
-                                  ref, ofpath);
+            if (dp <= 0)
+                of_panic("no ofd node for OF node[0x%x]: %s\n",
+                         ref, ofpath);
 
             ref = dp;
 
             upd = ofd_prop_add(mem, c, name, &ref, sizeof(ref));
-            if (upd <= 0) of_panic("update failed: %s\n", name);
+            if (upd <= 0)
+                of_panic("update failed: %s\n", name);
 
 #ifdef DEBUG
             of_printf("%s: %s/%s -> %s\n", __func__,
@@ -658,7 +675,8 @@ static int boot_of_fixup_chosen(void *mem)
     char ofpath[256];
 
     ch = of_finddevice("/chosen");
-    if (ch == OF_FAILURE) of_panic("/chosen not found\n");
+    if (ch == OF_FAILURE)
+        of_panic("/chosen not found\n");
 
     rc = of_getprop(ch, "cpu", &val, sizeof (val));
 
@@ -667,16 +685,19 @@ static int boot_of_fixup_chosen(void *mem)
 
         if (rc > 0) {
             dn = ofd_node_find(mem, ofpath);
-            if (dn <= 0) of_panic("no node for: %s\n", ofpath);
+            if (dn <= 0)
+                of_panic("no node for: %s\n", ofpath);
 
             ofd_boot_cpu = dn;
             val = dn;
 
             dn = ofd_node_find(mem, "/chosen");
-            if (dn <= 0) of_panic("no /chosen node\n");
+            if (dn <= 0)
+                of_panic("no /chosen node\n");
 
             dc = ofd_prop_add(mem, dn, "cpu", &val, sizeof (val));
-            if (dc <= 0) of_panic("could not fix /chosen/cpu\n");
+            if (dc <= 0)
+                of_panic("could not fix /chosen/cpu\n");
             rc = 1;
         } else {
             of_printf("*** can't find path to booting cpu, "
@@ -855,17 +876,101 @@ static int __init boot_of_serial(void *oft)
     return 1;
 }
 
-static void boot_of_module(ulong r3, ulong r4, multiboot_info_t *mbi)
+static int __init boot_of_rtas(module_t *mod, multiboot_info_t *mbi)
 {
-    static module_t mods[3];
+    int rtas_node;
+    int rtas_instance;
+    uint size = 0;
+    int res[2];
+    int mem;
+    int ret;
+
+    rtas_node = of_finddevice("/rtas");
+
+    if (rtas_node <= 0) {
+        of_printf("No RTAS, Xen has no power control\n");
+        return 0;
+    }
+    of_getprop(rtas_node, "rtas-size", &size, sizeof (size));
+    if (size == 0) {
+        of_printf("RTAS, has no size\n");
+        return 0;
+    }        
+
+    rtas_instance = of_open("/rtas");
+    if (rtas_instance == OF_FAILURE) {
+        of_printf("RTAS, could not open\n");
+        return 0;
+    }
+
+    size = ALIGN_UP(size, PAGE_SIZE);
+    
+    mem = find_space(size, PAGE_SIZE, mbi);
+    if (mem == 0)
+        of_panic("Could not allocate RTAS tree\n");
+
+    ret = of_call("call-method", 3, 2, res,
+                  "instantiate-rtas", rtas_instance, mem);
+    if (ret == OF_FAILURE) {
+        of_printf("RTAS, could not open\n");
+        return 0;
+    }
+    
+    rtas_entry = res[1];
+    rtas_base = mem;
+    rtas_end = mem + size;
+    rtas_msr = of_msr;
+
+    mod->mod_start = rtas_base;
+    mod->mod_end = rtas_end;
+    return 1;
+}
+
+static void * __init boot_of_devtree(module_t *mod, multiboot_info_t *mbi)
+{
     void *oft;
     ulong oft_sz = 48 * PAGE_SIZE;
+
+    /* snapshot the tree */
+    oft = (void*)find_space(oft_sz, PAGE_SIZE, mbi);
+    if (oft == 0)
+        of_panic("Could not allocate OFD tree\n");
+
+    of_printf("creating oftree\n");
+    of_test("package-to-path");
+    oft = ofd_create(oft, oft_sz);
+    pkg_save(oft);
+
+    if (ofd_size(oft) > oft_sz)
+         of_panic("Could not fit all of native devtree\n");
+
+    boot_of_fixup_refs(oft);
+    boot_of_fixup_chosen(oft);
+
+    if (ofd_size(oft) > oft_sz)
+         of_panic("Could not fit all devtree fixups\n");
+
+    ofd_walk(oft, OFD_ROOT, /* add_hype_props */ NULL, 2);
+
+    mod->mod_start = (ulong)oft;
+    mod->mod_end = mod->mod_start + oft_sz;
+    of_printf("%s: devtree mod @ 0x%016x[0x%x]\n", __func__,
+              mod->mod_start, mod->mod_end);
+
+    return oft;
+}
+
+static void * __init boot_of_module(ulong r3, ulong r4, multiboot_info_t *mbi)
+{
+    static module_t mods[4];
     ulong mod0_start;
     ulong mod0_size;
     static const char sepr[] = " -- ";
     extern char dom0_start[] __attribute__ ((weak));
     extern char dom0_size[] __attribute__ ((weak));
     const char *p;
+    int mod;
+    void *oft;
 
     if ((r3 > 0) && (r4 > 0)) {
         /* was it handed to us in registers ? */
@@ -909,50 +1014,35 @@ static void boot_of_module(ulong r3, ulong r4, multiboot_info_t *mbi)
     }
 
     space_base = (ulong)_end;
-    mods[0].mod_start = mod0_start;
-    mods[0].mod_end = mod0_start + mod0_size;
 
-    of_printf("%s: mod[0] @ 0x%016x[0x%x]\n", __func__,
-              mods[0].mod_start, mods[0].mod_end);
+    mod = 0;
+    mods[mod].mod_start = mod0_start;
+    mods[mod].mod_end = mod0_start + mod0_size;
+
+    of_printf("%s: dom0 mod @ 0x%016x[0x%x]\n", __func__,
+              mods[mod].mod_start, mods[mod].mod_end);
     p = strstr((char *)(ulong)mbi->cmdline, sepr);
     if (p != NULL) {
         p += sizeof (sepr) - 1;
-        mods[0].string = (u32)(ulong)p;
-        of_printf("%s: mod[0].string: %s\n", __func__, p);
+        mods[mod].string = (u32)(ulong)p;
+        of_printf("%s: dom0 mod string: %s\n", __func__, p);
     }
 
-    /* snapshot the tree */
-    oft = (void*)find_space(oft_sz, PAGE_SIZE, mbi);
-    if (oft == 0)
-        of_panic("Could not allocate OFD tree\n");
+    ++mod;
+    if (boot_of_rtas(&mods[mod], mbi))
+        ++mod;
 
-    of_printf("creating oft\n");
-    of_test("package-to-path");
-    oft = ofd_create(oft, oft_sz);
-    pkg_save(oft);
+    oft = boot_of_devtree(&mods[mod], mbi);
+    if (oft == NULL)
+        of_panic("%s: boot_of_devtree failed\n", __func__);
 
-    if (ofd_size(oft) > oft_sz)
-         of_panic("Could not fit all of native devtree\n");
-
-    boot_of_fixup_refs(oft);
-    boot_of_fixup_chosen(oft);
-
-    if (ofd_size(oft) > oft_sz)
-         of_panic("Could not fit all devtree fixups\n");
-
-    ofd_walk(oft, OFD_ROOT, /* add_hype_props */ NULL, 2);
-
-    mods[1].mod_start = (ulong)oft;
-    mods[1].mod_end = mods[1].mod_start + oft_sz;
-    of_printf("%s: mod[1] @ 0x%016x[0x%x]\n", __func__,
-              mods[1].mod_start, mods[1].mod_end);
-
+    ++mod;
 
     mbi->flags |= MBI_MODULES;
-    mbi->mods_count = 2;
+    mbi->mods_count = mod;
     mbi->mods_addr = (u32)mods;
 
-    boot_of_serial(oft);
+    return oft;
 }
 
 static int __init boot_of_cpus(void)
@@ -1075,15 +1165,11 @@ static int __init boot_of_cpus(void)
     return 1;
 }
 
-static int __init boot_of_rtas(void)
-{
-    return 1;
-}
-
 multiboot_info_t __init *boot_of_init(
         ulong r3, ulong r4, ulong vec, ulong r6, ulong r7, ulong orig_msr)
 {
     static multiboot_info_t mbi;
+    void *oft;
 
     of_vec = vec;
     of_msr = orig_msr;
@@ -1112,9 +1198,9 @@ multiboot_info_t __init *boot_of_init(
     boot_of_fix_maple();
     boot_of_probemem(&mbi);
     boot_of_bootargs(&mbi);
-    boot_of_module(r3, r4, &mbi);
+    oft = boot_of_module(r3, r4, &mbi);
     boot_of_cpus();
-    boot_of_rtas();
+    boot_of_serial(oft);
 
     /* end of OF */
     of_printf("Quiescing Open Firmware ...\n");

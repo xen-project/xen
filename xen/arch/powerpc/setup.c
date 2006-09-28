@@ -47,6 +47,7 @@
 #include "exceptions.h"
 #include "of-devtree.h"
 #include "oftree.h"
+#include "rtas.h"
 
 #define DEBUG
 
@@ -286,9 +287,8 @@ static void __init __start_xen(multiboot_info_t *mbi)
     serial_init_preirq();
 
     init_console();
-#ifdef CONSOLE_SYNC
+    /* let synchronize until we really get going */
     console_start_sync();
-#endif
 
     /* we give the first RMA to the hypervisor */
     xenheap_phys_end = rma_size(cpu_default_rma_order_pages());
@@ -312,6 +312,13 @@ static void __init __start_xen(multiboot_info_t *mbi)
     mod[mbi->mods_count-1].mod_end = 0;
     --mbi->mods_count;
 
+    if (rtas_entry) {
+        rtas_init((void *)oftree);
+        /* remove rtas module from consideration */
+        mod[mbi->mods_count-1].mod_start = 0;
+        mod[mbi->mods_count-1].mod_end = 0;
+        --mbi->mods_count;
+    }
     memory_init(mod, mbi->mods_count);
 
 #ifdef OF_DEBUG
@@ -319,7 +326,6 @@ static void __init __start_xen(multiboot_info_t *mbi)
     /* make sure the OF devtree is good */
     ofd_walk((void *)oftree, OFD_ROOT, ofd_dump_props, OFD_DUMP_ALL);
 #endif
-
     percpu_init_areas();
 
     init_parea(0);
@@ -395,8 +401,9 @@ static void __init __start_xen(multiboot_info_t *mbi)
     /* Hide UART from DOM0 if we're using it */
     serial_endboot();
 
-    domain_unpause_by_systemcontroller(dom0);
+    console_end_sync();
 
+    domain_unpause_by_systemcontroller(dom0);
     startup_cpu_idle_loop();
 }
 
