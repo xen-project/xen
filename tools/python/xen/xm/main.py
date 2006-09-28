@@ -1478,10 +1478,15 @@ def main(argv=sys.argv):
         except (ValueError, OverflowError):
             err("Invalid argument.")
             usage(argv[1])
+            sys.exit(1)
         except OptionError, e:
             err(str(e))
             usage(argv[1])
             print e.usage()
+            sys.exit(1)
+        except security.ACMError, e:
+            err(str(e))
+            sys.exit(1)
         except:
             print "Unexpected error:", sys.exc_info()[0]
             print
