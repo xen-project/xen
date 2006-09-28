@@ -139,7 +139,7 @@ struct shadow_vcpu {
     /* Last MFN that we emulated a write to. */
     unsigned long last_emulated_mfn;
     /* HVM guest: paging enabled (CR0.PG)?  */
-    unsigned int hvm_paging_enabled:1;
+    unsigned int translate_enabled:1;
     /* Emulated fault needs to be propagated to guest? */
     unsigned int propagate_fault:1;
 #if CONFIG_PAGING_LEVELS >= 3

@@ -205,6 +205,9 @@ static inline shadow_l4e_t shadow_l4e_from_mfn(mfn_t mfn, u32 flags)
     __sh_linear_l1_table; \
 })
 
+// XXX -- these should not be conditional on hvm_guest(v), but rather on
+//        shadow_mode_external(d)...
+//
 #define sh_linear_l2_table(v) ({ \
     ASSERT(current == (v)); \
     ((shadow_l2e_t *) \
@@ -507,10 +510,22 @@ struct shadow_walk_t
 #define sh_guess_wrmap             INTERNAL_NAME(sh_guess_wrmap)
 #define sh_clear_shadow_entry      INTERNAL_NAME(sh_clear_shadow_entry)
 
+/* The sh_guest_(map|get)_* functions only depends on the number of config
+ * levels
+ */
+#define sh_guest_map_l1e                                       \
+        SHADOW_INTERNAL_NAME(sh_guest_map_l1e,                \
+                              CONFIG_PAGING_LEVELS,             \
+                              CONFIG_PAGING_LEVELS)
+#define sh_guest_get_eff_l1e                                   \
+        SHADOW_INTERNAL_NAME(sh_guest_get_eff_l1e,            \
+                              CONFIG_PAGING_LEVELS,             \
+                              CONFIG_PAGING_LEVELS)
+
 /* sh_make_monitor_table only depends on the number of shadow levels */
-#define sh_make_monitor_table                          \
-        SHADOW_INTERNAL_NAME(sh_make_monitor_table,   \
-                              SHADOW_PAGING_LEVELS,     \
+#define sh_make_monitor_table                                  \
+        SHADOW_INTERNAL_NAME(sh_make_monitor_table,           \
+                              SHADOW_PAGING_LEVELS,             \
                               SHADOW_PAGING_LEVELS)
 #define sh_destroy_monitor_table                               \
         SHADOW_INTERNAL_NAME(sh_destroy_monitor_table,        \
@@ -652,7 +667,7 @@ static inline void sh_unpin_l3_subshadow(struct vcpu *v,
 #endif /* GUEST_PAGING_LEVELS >= 3 */
 
 static inline u32
-accumulate_guest_flags(walk_t *gw)
+accumulate_guest_flags(struct vcpu *v, walk_t *gw)
 {
     u32 accumulated_flags;
 
@@ -674,8 +689,14 @@ accumulate_guest_flags(walk_t *gw)
     accumulated_flags &= guest_l4e_get_flags(*gw->l4e) ^ _PAGE_NX_BIT;
 #endif
 
-    // Finally, revert the NX bit back to its original polarity
+    // Revert the NX bit back to its original polarity
     accumulated_flags ^= _PAGE_NX_BIT;
+
+    // In 64-bit PV guests, the _PAGE_USER bit is implied in all guest
+    // entries (since even the guest kernel runs in ring 3).
+    //
+    if ( (GUEST_PAGING_LEVELS == 4) && !hvm_guest(v) )
+        accumulated_flags |= _PAGE_USER;
 
     return accumulated_flags;
 }
