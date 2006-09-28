@@ -53,8 +53,9 @@
 #include <linux/skbuff.h>
 #include <linux/ethtool.h>
 #include <net/dst.h>
+#include <asm/hypervisor.h> /* is_initial_xendomain() */
 
-static int nloopbacks = 8;
+static int nloopbacks = -1;
 module_param(nloopbacks, int, 0);
 MODULE_PARM_DESC(nloopbacks, "Number of netback-loopback devices to create");
 
@@ -238,6 +239,9 @@ static void __exit clean_loopback(int i)
 static int __init loopback_init(void)
 {
 	int i, err = 0;
+
+	if (nloopbacks == -1)
+		nloopbacks = is_initial_xendomain() ? 8 : 0;
 
 	for (i = 0; i < nloopbacks; i++)
 		if ((err = make_loopback(i)) != 0)
