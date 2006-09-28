@@ -694,10 +694,7 @@ static int req_increase(void)
 {
 	int i, j;
 	struct page *page;
-	unsigned long flags;
 	int ret;
-
-	spin_lock_irqsave(&pending_free_lock, flags);
 
 	ret = -EINVAL;
 	if (mmap_alloc >= MAX_PENDING_REQS || mmap_lock) 
@@ -763,8 +760,7 @@ static int req_increase(void)
 
 	mmap_alloc++;
 	DPRINTK("# MMAPs increased to %d\n",mmap_alloc);
- done:
-	spin_unlock_irqrestore(&pending_free_lock, flags);
+done:
 	return ret;
 }
 
@@ -792,37 +788,6 @@ static void mmap_req_del(int mmap)
 	mmap_lock = 0;
 	DPRINTK("# MMAPs decreased to %d\n",mmap_alloc);
 	mmap_alloc--;
-}
-
-/*N.B. Currently unused - will be accessed via sysfs*/
-static void req_decrease(void)
-{
-	pending_req_t *req;
-	int i;
-	unsigned long flags;
-
-	spin_lock_irqsave(&pending_free_lock, flags);
-
-	DPRINTK("Req decrease called.\n");
-	if (mmap_lock || mmap_alloc == 1) 
-		goto done;
-
-	mmap_lock = 1;
-	mmap_inuse = MAX_PENDING_REQS;
-	
-        /*Go through reqs and remove any that aren't in use*/
-	for (i = 0; i < MAX_PENDING_REQS ; i++) {
-		req = &pending_reqs[mmap_alloc-1][i];
-		if (req->inuse == 0) {
-			list_del(&req->free_list);
-			mmap_inuse--;
-		}
-	}
-	if (mmap_inuse == 0)
-		mmap_req_del(mmap_alloc-1);
- done:
-	spin_unlock_irqrestore(&pending_free_lock, flags);
-	return;
 }
 
 static pending_req_t* alloc_req(void)
