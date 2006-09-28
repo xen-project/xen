@@ -140,44 +140,41 @@ def insert_policy(boot_file, kernel_version, policy_name):
 
 
 def main(argv):
-    try:
-        user_kver = None
-        policy = None
-        if len(argv) == 2:
-            policy = argv[1]
-        elif len(argv) == 3:
-            policy = argv[1]
-            user_kver = argv[2]
+    user_kver = None
+    policy = None
+    if len(argv) == 2:
+        policy = argv[1]
+    elif len(argv) == 3:
+        policy = argv[1]
+        user_kver = argv[2]
+    else:
+        raise OptionError('Invalid number of arguments')
+    
+    if not policy_name_re.match(policy):
+        raise OptionError("Illegal policy name: '%s'" % policy)
+
+    policy_file = '/'.join([policy_dir_prefix] + policy.split('.'))
+    src_binary_policy_file = policy_file + ".bin"
+    #check if .bin exists or if policy file exists
+    if not os.path.isfile(src_binary_policy_file):
+        if not os.path.isfile(policy_file + "-security_policy.xml"):
+            raise OptionError("Unknown policy '%s'" % policy)
         else:
-            raise OptionError('Invalid number of arguments')
-
-        if not policy_name_re.match(policy):
-            err("Illegal policy name \'" + policy + "\'")
-
-        policy_file = policy_dir_prefix + "/" + string.join(string.split(policy, "."), "/")
-        src_binary_policy_file = policy_file + ".bin"
-        #check if .bin exists or if policy file exists
-        if not os.path.isfile(src_binary_policy_file):
-            if not os.path.isfile(policy_file + "-security_policy.xml"):
-                err("Unknown policy \'" + policy +"\'")
-            else:
-                err("Cannot find binary file for policy \'" + policy +
-                    "\'. Please use makepolicy to create binary file.")
-        dst_binary_policy_file = "/boot/" + policy + ".bin"
-        shutil.copyfile(src_binary_policy_file, dst_binary_policy_file)
-
-        kernel_version = determine_kernelversion(user_kver)
-        insert_policy(boot_filename, kernel_version, policy)
-        print "Boot entry created and \'%s\' copied to /boot" % (policy + ".bin")
-
-    except ACMError:
-        sys.exit(-1)
-    except:
-        traceback.print_exc(limit=1)
-        sys.exit(-1)
-
-
+            err_msg = "Cannot find binary file for policy '%s'." % policy
+            err_msg += " Please use makepolicy to create binary file."
+            raise OptionError(err_msg)
+    
+    dst_binary_policy_file = "/boot/" + policy + ".bin"
+    shutil.copyfile(src_binary_policy_file, dst_binary_policy_file)
+    
+    kernel_version = determine_kernelversion(user_kver)
+    insert_policy(boot_filename, kernel_version, policy)
+    print "Boot entry created and \'%s\' copied to /boot" % (policy + ".bin")
 
 if __name__ == '__main__':
-    main(sys.argv)
-
+    try:
+        main(sys.argv)
+    except Exception, e:
+        sys.stderr.write('Error: ' + str(e) + '\n')    
+        sys.exit(-1)
+        
