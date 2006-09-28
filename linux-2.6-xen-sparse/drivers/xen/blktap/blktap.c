@@ -44,7 +44,6 @@
 #include <linux/kernel.h>
 #include <linux/fs.h>
 #include <linux/mm.h>
-#include <linux/miscdevice.h>
 #include <linux/errno.h>
 #include <linux/major.h>
 #include <linux/gfp.h>
@@ -54,6 +53,30 @@
 
 #define MAX_TAP_DEV 100     /*the maximum number of tapdisk ring devices    */
 #define MAX_DEV_NAME 100    /*the max tapdisk ring device name e.g. blktap0 */
+
+
+struct class *xen_class;
+EXPORT_SYMBOL_GPL(xen_class);
+
+/*
+ * Setup the xen class.  This should probably go in another file, but
+ * since blktap is the only user of it so far, it gets to keep it.
+ */
+int setup_xen_class(void)
+{
+	int ret;
+
+	if (xen_class)
+		return 0;
+
+	xen_class = class_create(THIS_MODULE, "xen");
+	if ((ret = IS_ERR(xen_class))) {
+		xen_class = NULL;
+		return ret;
+	}
+
+	return 0;
+}
 
 /*
  * The maximum number of requests that can be outstanding at any time
@@ -100,6 +123,7 @@ typedef struct tap_blkif {
 	unsigned long *idx_map;       /*Record the user ring id to kern 
 					[req id, idx] tuple                  */
 	blkif_t *blkif;               /*Associate blkif with tapdev          */
+	int sysfs_set;                /*Set if it has a class device.        */
 } tap_blkif_t;
 
 /*Data struct handed back to userspace for tapdisk device to VBD mapping*/
@@ -304,8 +328,6 @@ static int blktap_ioctl(struct inode *inode, struct file *filp,
                         unsigned int cmd, unsigned long arg);
 static unsigned int blktap_poll(struct file *file, poll_table *wait);
 
-struct miscdevice *set_misc(int minor, char *name, int dev);
-
 static struct file_operations blktap_fops = {
 	.owner   = THIS_MODULE,
 	.poll    = blktap_poll,
@@ -337,6 +359,16 @@ static int get_next_free_dev(void)
 	
 done:
 	spin_unlock_irqrestore(&pending_free_lock, flags);
+
+	/*
+	 * We are protected by having the dev_pending set.
+	 */
+	if (!tapfds[i]->sysfs_set && xen_class) {
+		class_device_create(xen_class, NULL,
+				    MKDEV(blktap_major, ret), NULL,
+				    "blktap%d", ret);
+		tapfds[i]->sysfs_set = 1;
+	}
 	return ret;
 }
 
@@ -428,7 +460,7 @@ static int blktap_release(struct inode *inode, struct file *filp)
 	if (!info) {
 		WPRINTK("Trying to free device that doesn't exist "
 		       "[/dev/xen/blktap%d]\n",iminor(inode) - BLKTAP_MINOR);
-		return -1;
+		return -EBADF;
 	}
 	info->dev_inuse = 0;
 	DPRINTK("Freeing device [/dev/xen/blktap%d]\n",info->minor);
@@ -602,6 +634,7 @@ static int blktap_ioctl(struct inode *inode, struct file *filp,
 	case BLKTAP_IOCTL_FREEINTF:
 	{
 		unsigned long dev = arg;
+		unsigned long flags;
 
 		/* Looking at another device */
 		info = NULL;
@@ -609,8 +642,11 @@ static int blktap_ioctl(struct inode *inode, struct file *filp,
 		if ( (dev > 0) && (dev < MAX_TAP_DEV) )
 			info = tapfds[dev];
 
+		spin_lock_irqsave(&pending_free_lock, flags);
 		if ( (info != NULL) && (info->dev_pending) )
 			info->dev_pending = 0;
+		spin_unlock_irqrestore(&pending_free_lock, flags);
+
 		return 0;
 	}
 	case BLKTAP_IOCTL_MINOR:
@@ -1371,7 +1407,8 @@ static int __init blkif_init(void)
 
 	for(i = 0; i < MAX_TAP_DEV; i++ ) {
 		info = tapfds[i] = kzalloc(sizeof(tap_blkif_t),GFP_KERNEL);
-		if(tapfds[i] == NULL) return -ENOMEM;
+		if(tapfds[i] == NULL)
+			return -ENOMEM;
 		info->minor = i;
 		info->pid = 0;
 		info->blkif = NULL;
@@ -1379,12 +1416,31 @@ static int __init blkif_init(void)
 		ret = devfs_mk_cdev(MKDEV(blktap_major, i),
 			S_IFCHR|S_IRUGO|S_IWUSR, "xen/blktap%d", i);
 
-		if(ret != 0) return -ENOMEM;
+		if(ret != 0)
+			return -ENOMEM;
 		info->dev_pending = info->dev_inuse = 0;
 
 		DPRINTK("Created misc_dev [/dev/xen/blktap%d]\n",i);
 	}
 	
+	/* Make sure the xen class exists */
+	if (!setup_xen_class()) {
+		/*
+		 * This will allow udev to create the blktap ctrl device.
+		 * We only want to create blktap0 first.  We don't want
+		 * to flood the sysfs system with needless blktap devices.
+		 * We only create the device when a request of a new device is
+		 * made.
+		 */
+		class_device_create(xen_class, NULL,
+				    MKDEV(blktap_major, 0), NULL,
+				    "blktap0");
+		tapfds[0]->sysfs_set = 1;
+	} else {
+		/* this is bad, but not fatal */
+		WPRINTK("blktap: sysfs xen_class not created\n");
+	}
+
 	DPRINTK("Blktap device successfully created\n");
 
 	return 0;
