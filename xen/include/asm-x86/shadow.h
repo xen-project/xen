@@ -481,7 +481,12 @@ shadow_remove_all_shadows_and_parents(struct vcpu *v, mfn_t gmfn);
 extern void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int all);
 static inline void shadow_remove_all_shadows(struct vcpu *v, mfn_t gmfn)
 {
+    int was_locked = shadow_lock_is_acquired(v->domain);
+    if ( !was_locked )
+        shadow_lock(v->domain);
     sh_remove_shadows(v, gmfn, 1);
+    if ( !was_locked )
+        shadow_unlock(v->domain);
 }
 
 /* Add a page to a domain */

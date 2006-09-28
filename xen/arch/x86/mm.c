@@ -1544,9 +1544,7 @@ void free_page_type(struct page_info *page, unsigned long type)
 
             gmfn = mfn_to_gmfn(owner, page_to_mfn(page));
             ASSERT(VALID_M2P(gmfn));
-            shadow_lock(owner);
             shadow_remove_all_shadows(owner->vcpu[0], _mfn(gmfn));
-            shadow_unlock(owner);
         }
     }
 
@@ -1618,8 +1616,8 @@ void put_page_type(struct page_info *page)
              *  2. Shadow mode reuses this field for shadowed page tables to
              *     store flags info -- we don't want to conflict with that.
              */
-            if ( !shadow_mode_enabled(page_get_owner(page)) ||
-                 ((nx & PGT_type_mask) == PGT_writable_page) )
+            if ( !(shadow_mode_enabled(page_get_owner(page)) &&
+                   (page->count_info & PGC_page_table)) )
                 page->tlbflush_timestamp = tlbflush_current_time();
         }
     }
@@ -1644,6 +1642,12 @@ int get_page_type(struct page_info *page, unsigned long type)
         }
         else if ( unlikely((x & PGT_count_mask) == 0) )
         {
+            struct domain *d = page_get_owner(page);
+
+            /* Never allow a shadowed frame to go from type count 0 to 1 */
+            if ( d && shadow_mode_enabled(d) )
+                shadow_remove_all_shadows(d->vcpu[0], _mfn(page_to_mfn(page)));
+
             ASSERT(!(x & PGT_pae_xen_l2));
             if ( (x & PGT_type_mask) != type )
             {
@@ -1652,8 +1656,9 @@ int get_page_type(struct page_info *page, unsigned long type)
                  * may be unnecessary (e.g., page was GDT/LDT) but those 
                  * circumstances should be very rare.
                  */
-                cpumask_t mask =
-                    page_get_owner(page)->domain_dirty_cpumask;
+                cpumask_t mask = d->domain_dirty_cpumask;
+
+                /* Don't flush if the timestamp is old enough */
                 tlbflush_filter(mask, page->tlbflush_timestamp);
 
                 if ( unlikely(!cpus_empty(mask)) &&

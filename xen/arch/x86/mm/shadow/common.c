@@ -256,7 +256,11 @@ void shadow_demote(struct vcpu *v, mfn_t gmfn, u32 type)
     clear_bit(type >> PGC_SH_type_shift, &page->shadow_flags);
 
     if ( (page->shadow_flags & SHF_page_type_mask) == 0 )
+    {
+        /* tlbflush timestamp field is valid again */
+        page->tlbflush_timestamp = tlbflush_current_time();
         clear_bit(_PGC_page_table, &page->count_info);
+    }
 }
 
 /**************************************************************************/
