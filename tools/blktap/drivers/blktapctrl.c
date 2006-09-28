@@ -67,6 +67,8 @@ int run = 1;
 int max_timeout = MAX_TIMEOUT;
 int ctlfd = 0;
 
+int blktap_major;
+
 static int open_ctrl_socket(char *devname);
 static int write_msg(int fd, int msgtype, void *ptr, void *ptr2);
 static int read_msg(int fd, int msgtype, void *ptr);
@@ -108,7 +110,18 @@ static void make_blktap_dev(char *devname, int major, int minor)
 		if (mknod(devname, S_IFCHR|0600,
                 	makedev(major, minor)) == 0)
 			DPRINTF("Created %s device\n",devname);
-	} else DPRINTF("%s device already exists\n",devname);
+	} else {
+		DPRINTF("%s device already exists\n",devname);
+		/* it already exists, but is it the same major number */
+		if (((st.st_rdev>>8) & 0xff) != major) {
+			DPRINTF("%s has old major %d\n",
+				devname,
+				(unsigned int)((st.st_rdev >> 8) & 0xff));
+			/* only try again if we succed in deleting it */
+			if (!unlink(devname))
+				make_blktap_dev(devname, major, minor);
+		}
+	}
 }
 
 static int get_new_dev(int *major, int *minor, blkif_t *blkif)
@@ -623,6 +636,30 @@ static void print_drivers(void)
 		DPRINTF("Found driver: [%s]\n",dtypes[i]->name);
 } 
 
+static int find_blktap_major(void)
+{
+	FILE *fp;
+	int major;
+	char device[256];
+
+	if ((fp = fopen("/proc/devices", "r")) == NULL)
+		return -1;
+
+	/* Skip title */
+	fscanf(fp,"%*s %*s\n");
+	while (fscanf(fp, "%d %255s\n", &major, device) == 2) {
+		if (strncmp("blktap", device, 6) == 0)
+			break;
+	}
+
+	fclose(fp);
+
+	if (strncmp("blktap", device, 6) == 0)
+		return major;
+
+	return -1;
+}
+
 int main(int argc, char *argv[])
 {
 	char *devname;
@@ -646,7 +683,10 @@ int main(int argc, char *argv[])
 
 	/*Attach to blktap0 */	
 	asprintf(&devname,"%s/%s0", BLKTAP_DEV_DIR, BLKTAP_DEV_NAME);
-	make_blktap_dev(devname,254,0);
+	blktap_major = find_blktap_major();
+	if (blktap_major < 0)
+		goto open_failed;
+	make_blktap_dev(devname,blktap_major,0);
 	ctlfd = open(devname, O_RDWR);
 	if (ctlfd == -1) {
 		DPRINTF("blktap0 open failed\n");

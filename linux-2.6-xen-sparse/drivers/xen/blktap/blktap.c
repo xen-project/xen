@@ -196,12 +196,10 @@ static struct grant_handle_pair
 
 static int blktap_read_ufe_ring(tap_blkif_t *info); /*local prototypes*/
 
-#define BLKTAP_MINOR 0  /*/dev/xen/blktap resides at device number
-			  major=254, minor numbers begin at 0            */ 
-#define BLKTAP_DEV_MAJOR 254         /* TODO: Make major number dynamic  *
-                                      * and create devices in the kernel *
-				      */
+#define BLKTAP_MINOR 0  /*/dev/xen/blktap has a dynamic major */
 #define BLKTAP_DEV_DIR  "/dev/xen"
+
+static int blktap_major;
 
 /* blktap IOCTLs: */
 #define BLKTAP_IOCTL_KICK_FE         1
@@ -631,7 +629,7 @@ static int blktap_ioctl(struct inode *inode, struct file *filp,
 			return -1;
 	}
 	case BLKTAP_IOCTL_MAJOR:
-		return BLKTAP_DEV_MAJOR;
+		return blktap_major;
 
 	case BLKTAP_QUERY_ALLOC_REQS:
 	{
@@ -1360,7 +1358,8 @@ static int __init blkif_init(void)
 	/*Create the blktap devices, but do not map memory or waitqueue*/
 	for(i = 0; i < MAX_TAP_DEV; i++) translate_domid[i].domid = 0xFFFF;
 
-	ret = register_chrdev(BLKTAP_DEV_MAJOR,"blktap",&blktap_fops);
+	/* Dynamically allocate a major for this device */
+	ret = register_chrdev(0, "blktap", &blktap_fops);
 	blktap_dir = devfs_mk_dir(NULL, "xen", 0, NULL);
 
 	if ( (ret < 0)||(blktap_dir < 0) ) {
@@ -1368,6 +1367,8 @@ static int __init blkif_init(void)
 		return -ENOMEM;
 	}	
 	
+	blktap_major = ret;
+
 	for(i = 0; i < MAX_TAP_DEV; i++ ) {
 		info = tapfds[i] = kzalloc(sizeof(tap_blkif_t),GFP_KERNEL);
 		if(tapfds[i] == NULL) return -ENOMEM;
@@ -1375,7 +1376,7 @@ static int __init blkif_init(void)
 		info->pid = 0;
 		info->blkif = NULL;
 
-		ret = devfs_mk_cdev(MKDEV(BLKTAP_DEV_MAJOR, i),
+		ret = devfs_mk_cdev(MKDEV(blktap_major, i),
 			S_IFCHR|S_IRUGO|S_IWUSR, "xen/blktap%d", i);
 
 		if(ret != 0) return -ENOMEM;
