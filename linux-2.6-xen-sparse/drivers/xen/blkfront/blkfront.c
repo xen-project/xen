@@ -355,8 +355,10 @@ static void blkfront_closing(struct xenbus_device *dev)
 	blk_stop_queue(info->rq);
 	/* No more gnttab callback work. */
 	gnttab_cancel_free_callback(&info->callback);
-	flush_scheduled_work();
 	spin_unlock_irqrestore(&blkif_io_lock, flags);
+
+	/* Flush gnttab callback work. Must be done with no locks held. */
+	flush_scheduled_work();
 
 	xlvbd_del(info);
 
@@ -714,8 +716,10 @@ static void blkif_free(struct blkfront_info *info, int suspend)
 		blk_stop_queue(info->rq);
 	/* No more gnttab callback work. */
 	gnttab_cancel_free_callback(&info->callback);
-	flush_scheduled_work();
 	spin_unlock_irq(&blkif_io_lock);
+
+	/* Flush gnttab callback work. Must be done with no locks held. */
+	flush_scheduled_work();
 
 	/* Free resources associated with old device channel. */
 	if (info->ring_ref != GRANT_INVALID_REF) {
