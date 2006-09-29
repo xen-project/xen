@@ -479,7 +479,7 @@ static void ioapic_deliver(hvm_vioapic_t *s, int irqno)
 
 static int ioapic_get_highest_irq(hvm_vioapic_t *s)
 {
-    uint32_t irqs = s->irr & ~s->isr & ~s->imr;
+    uint32_t irqs = (s->irr | s->irr_xen) & ~s->isr & ~s->imr;
     return fls(irqs) - 1;
 }
 
@@ -501,6 +501,7 @@ static void service_ioapic(hvm_vioapic_t *s)
         }
 
         s->irr &= ~(1 << irqno);
+	s->irr_xen &= ~(1 << irqno);
     }
 }
 
@@ -524,6 +525,25 @@ void hvm_vioapic_do_irqs_clear(struct domain *d, uint16_t irqs)
 
     s->irr &= ~irqs;
     service_ioapic(s);
+}
+
+void hvm_vioapic_set_xen_irq(struct domain *d, int irq, int level)
+{
+    hvm_vioapic_t *s = &d->arch.hvm_domain.vioapic;
+
+    if (!hvm_apic_support(d) || !IOAPICEnabled(s) ||
+	s->redirtbl[irq].RedirForm.mask)
+        return;
+
+    if (s->redirtbl[irq].RedirForm.trigmod != IOAPIC_LEVEL_TRIGGER) {
+	DPRINTK("Forcing edge triggered APIC irq %d?\n", irq);
+	domain_crash(d);
+    }
+
+    if (level)
+	s->irr_xen |= 1 << irq;
+    else
+	s->irr_xen &= ~(1 << irq);
 }
 
 void hvm_vioapic_set_irq(struct domain *d, int irq, int level)
