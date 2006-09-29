@@ -273,7 +273,7 @@ static void backend_changed(struct xenbus_device *dev,
 			xenbus_dev_fatal(dev, -ENODEV, "bdget failed");
 
 		down(&bd->bd_sem);
-		if (info->users > 0 && system_state == SYSTEM_RUNNING)
+		if (info->users > 0)
 			xenbus_dev_error(dev, -EBUSY,
 					 "Device in use; refusing to close");
 		else
