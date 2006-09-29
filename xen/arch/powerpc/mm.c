@@ -164,8 +164,6 @@ void __init init_frametable(void)
     int i;
 
     nr_pages = PFN_UP(max_page * sizeof(struct page_info));
-    nr_pages = min(nr_pages, (4UL << (20 - PAGE_SHIFT)));
-    
 
     p = alloc_boot_pages(nr_pages, 1);
     if (p == 0)
