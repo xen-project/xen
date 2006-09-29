@@ -393,9 +393,9 @@ void hvm_hlt(unsigned long rflags)
  *  @buf  = hypervisor buffer
  *  @addr = guest virtual or physical address to copy to/from
  *  @size = number of bytes to copy
- *  @dir  = HVM_COPY_IN / HVM_COPY_OUT
- *  @phy  = interpret addr as physical or virtual address?
- * Returns TRUE on success.
+ *  @dir  = copy *to* guest (TRUE) or *from* guest (FALSE)?
+ *  @phy  = interpret addr as physical (TRUE) or virtual (FALSE) address?
+ * Returns number of bytes failed to copy (0 == complete success).
  */
 static int __hvm_copy(
     void *buf, unsigned long addr, int size, int dir, int phy)
@@ -403,43 +403,54 @@ static int __hvm_copy(
     struct vcpu *v = current;
     unsigned long mfn;
     char *p;
-    int count;
+    int count, todo;
 
-    while ( size > 0 )
+    todo = size;
+    while ( todo > 0 )
     {
-        count = min_t(int, PAGE_SIZE - (addr & ~PAGE_MASK), size);
+        count = min_t(int, PAGE_SIZE - (addr & ~PAGE_MASK), todo);
 
         mfn = phy ? 
             get_mfn_from_gpfn(addr >> PAGE_SHIFT) :
             mfn_x(sh_vcpu_gfn_to_mfn(v, shadow_gva_to_gfn(v, addr)));
         if ( mfn == INVALID_MFN )
-            return 0;
+            return todo;
 
         p = (char *)map_domain_page(mfn) + (addr & ~PAGE_MASK);
 
-        if ( dir == HVM_COPY_IN )
-            memcpy(buf, p, count);
+        if ( dir )
+            memcpy(p, buf, count); /* dir == TRUE:  *to* guest */
         else
-            memcpy(p, buf, count);
+            memcpy(buf, p, count); /* dir == FALSE: *from guest */
 
         unmap_domain_page(p);
 
         addr += count;
         buf  += count;
-        size -= count;
+        todo -= count;
     }
 
-    return 1;
+    return 0;
 }
 
-int hvm_copy_phy(void *buf, unsigned long paddr, int size, int dir)
+int hvm_copy_to_guest_phys(unsigned long paddr, void *buf, int size)
 {
-    return __hvm_copy(buf, paddr, size, dir, 1);
+    return __hvm_copy(buf, paddr, size, 1, 1);
 }
 
-int hvm_copy(void *buf, unsigned long vaddr, int size, int dir)
+int hvm_copy_from_guest_phys(void *buf, unsigned long paddr, int size)
 {
-    return __hvm_copy(buf, vaddr, size, dir, 0);
+    return __hvm_copy(buf, paddr, size, 0, 1);
+}
+
+int hvm_copy_to_guest_virt(unsigned long vaddr, void *buf, int size)
+{
+    return __hvm_copy(buf, vaddr, size, 1, 0);
+}
+
+int hvm_copy_from_guest_virt(void *buf, unsigned long vaddr, int size)
+{
+    return __hvm_copy(buf, vaddr, size, 0, 0);
 }
 
 /*

@@ -90,17 +90,17 @@ static inline void hvm_mmio_access(struct vcpu *v,
                     data = read_handler(v,
                       req->addr + (sign * i * req->size),
                       req->size);
-                    hvm_copy(&data,
-                      (unsigned long)p->u.pdata + (sign * i * req->size),
-                      p->size,
-                      HVM_COPY_OUT);
+                    (void)hvm_copy_to_guest_virt(
+                        (unsigned long)p->u.pdata + (sign * i * req->size),
+                        &data,
+                        p->size);
                 }
             } else {                  /* !req->dir == IOREQ_READ */
                 for (i = 0; i < req->count; i++) {
-                    hvm_copy(&data,
-                      (unsigned long)p->u.pdata + (sign * i * req->size),
-                      p->size,
-                      HVM_COPY_IN);
+                    (void)hvm_copy_from_guest_virt(
+                        &data,
+                        (unsigned long)p->u.pdata + (sign * i * req->size),
+                        p->size);
                     write_handler(v,
                       req->addr + (sign * i * req->size),
                       req->size, data);

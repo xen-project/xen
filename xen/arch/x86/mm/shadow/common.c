@@ -80,7 +80,7 @@ sh_x86_emulate_read_std(unsigned long addr,
     //        It entirely ignores the permissions in the page tables.
     //        In this case, that is only a user vs supervisor access check.
     //
-    if ( hvm_copy(val, addr, bytes, HVM_COPY_IN) )
+    if ( hvm_copy_from_guest_virt(val, addr, bytes) == 0 )
     {
 #if 0
         struct vcpu *v = current;
@@ -115,7 +115,7 @@ sh_x86_emulate_write_std(unsigned long addr,
     //        In this case, that includes user vs supervisor, and
     //        write access.
     //
-    if ( hvm_copy(&val, addr, bytes, HVM_COPY_OUT) )
+    if ( hvm_copy_to_guest_virt(addr, &val, bytes) == 0 )
         return X86EMUL_CONTINUE;
 
     /* If we got here, there was nothing mapped here, or a bad GFN 

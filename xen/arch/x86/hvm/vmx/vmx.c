@@ -1164,7 +1164,7 @@ static void vmx_io_instruction(unsigned long exit_qualification,
 
             pio_opp->flags |= OVERLAP;
             if (dir == IOREQ_WRITE)
-                hvm_copy(&value, addr, size, HVM_COPY_IN);
+                (void)hvm_copy_from_guest_virt(&value, addr, size);
             send_pio_req(regs, port, 1, size, value, dir, 0);
         } else {
             if ((addr & PAGE_MASK) != ((addr + count * size - 1) & PAGE_MASK)) {
@@ -1371,7 +1371,8 @@ static int vmx_assist(struct vcpu *v, int mode)
     u32 cp;
 
     /* make sure vmxassist exists (this is not an error) */
-    if (!hvm_copy_phy(&magic, VMXASSIST_MAGIC_OFFSET, sizeof(magic), HVM_COPY_IN))
+    if (hvm_copy_from_guest_phys(&magic, VMXASSIST_MAGIC_OFFSET,
+                                 sizeof(magic)))
         return 0;
     if (magic != VMXASSIST_MAGIC)
         return 0;
@@ -1385,20 +1386,20 @@ static int vmx_assist(struct vcpu *v, int mode)
          */
     case VMX_ASSIST_INVOKE:
         /* save the old context */
-        if (!hvm_copy_phy(&cp, VMXASSIST_OLD_CONTEXT, sizeof(cp), HVM_COPY_IN))
+        if (hvm_copy_from_guest_phys(&cp, VMXASSIST_OLD_CONTEXT, sizeof(cp)))
             goto error;
         if (cp != 0) {
             if (!vmx_world_save(v, &c))
                 goto error;
-            if (!hvm_copy_phy(&c, cp, sizeof(c), HVM_COPY_OUT))
+            if (hvm_copy_to_guest_phys(cp, &c, sizeof(c)))
                 goto error;
         }
 
         /* restore the new context, this should activate vmxassist */
-        if (!hvm_copy_phy(&cp, VMXASSIST_NEW_CONTEXT, sizeof(cp), HVM_COPY_IN))
+        if (hvm_copy_from_guest_phys(&cp, VMXASSIST_NEW_CONTEXT, sizeof(cp)))
             goto error;
         if (cp != 0) {
-            if (!hvm_copy_phy(&c, cp, sizeof(c), HVM_COPY_IN))
+            if (hvm_copy_from_guest_phys(&c, cp, sizeof(c)))
                 goto error;
             if (!vmx_world_restore(v, &c))
                 goto error;
@@ -1412,10 +1413,10 @@ static int vmx_assist(struct vcpu *v, int mode)
          */
     case VMX_ASSIST_RESTORE:
         /* save the old context */
-        if (!hvm_copy_phy(&cp, VMXASSIST_OLD_CONTEXT, sizeof(cp), HVM_COPY_IN))
+        if (hvm_copy_from_guest_phys(&cp, VMXASSIST_OLD_CONTEXT, sizeof(cp)))
             goto error;
         if (cp != 0) {
-            if (!hvm_copy_phy(&c, cp, sizeof(c), HVM_COPY_IN))
+            if (hvm_copy_from_guest_phys(&c, cp, sizeof(c)))
                 goto error;
             if (!vmx_world_restore(v, &c))
                 goto error;

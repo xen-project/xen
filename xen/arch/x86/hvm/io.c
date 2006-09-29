@@ -379,7 +379,7 @@ static void hvm_pio_assist(struct cpu_user_regs *regs, ioreq_t *p,
                     addr += regs->es << 4;
                 if (sign > 0)
                     addr -= p->size;
-                hvm_copy(&p->u.data, addr, p->size, HVM_COPY_OUT);
+                (void)hvm_copy_to_guest_virt(addr, &p->u.data, p->size);
             }
         }
         else /* p->dir == IOREQ_WRITE */
@@ -493,7 +493,7 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
 
             if (sign > 0)
                 addr -= p->size;
-            hvm_copy(&p->u.data, addr, p->size, HVM_COPY_OUT);
+            (void)hvm_copy_to_guest_virt(addr, &p->u.data, p->size);
         }
 
         if (mmio_opp->flags & REPZ)

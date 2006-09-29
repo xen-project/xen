@@ -136,17 +136,18 @@ extern unsigned int opt_hvm_debug_level;
 
 extern int hvm_enabled;
 
-enum { HVM_COPY_IN = 0, HVM_COPY_OUT };
-extern int hvm_copy(void *buf, unsigned long vaddr, int size, int dir);
-extern int hvm_copy_phy(void *buf, unsigned long vaddr, int size, int dir);
+int hvm_copy_to_guest_phys(unsigned long paddr, void *buf, int size);
+int hvm_copy_from_guest_phys(void *buf, unsigned long paddr, int size);
+int hvm_copy_to_guest_virt(unsigned long vaddr, void *buf, int size);
+int hvm_copy_from_guest_virt(void *buf, unsigned long vaddr, int size);
 
-extern void hvm_setup_platform(struct domain* d);
-extern int hvm_mmio_intercept(ioreq_t *p);
-extern int hvm_io_intercept(ioreq_t *p, int type);
-extern int hvm_buffered_io_intercept(ioreq_t *p);
-extern void hvm_hooks_assist(struct vcpu *v);
-extern void hvm_print_line(struct vcpu *v, const char c);
-extern void hlt_timer_fn(void *data);
+void hvm_setup_platform(struct domain* d);
+int hvm_mmio_intercept(ioreq_t *p);
+int hvm_io_intercept(ioreq_t *p, int type);
+int hvm_buffered_io_intercept(ioreq_t *p);
+void hvm_hooks_assist(struct vcpu *v);
+void hvm_print_line(struct vcpu *v, const char c);
+void hlt_timer_fn(void *data);
 
 void hvm_do_hypercall(struct cpu_user_regs *pregs);
 

@@ -1471,7 +1471,7 @@ static void svm_io_instruction(struct vcpu *v)
             pio_opp->flags |= OVERLAP;
 
             if (dir == IOREQ_WRITE)
-                hvm_copy(&value, addr, size, HVM_COPY_IN);
+                (void)hvm_copy_from_guest_virt(&value, addr, size);
 
             send_pio_req(regs, port, 1, size, value, dir, 0);
         } 
@@ -2325,7 +2325,7 @@ void svm_dump_inst(unsigned long eip)
     ptr = eip & ~0xff;
     len = 0;
 
-    if (hvm_copy(opcode, ptr, sizeof(opcode), HVM_COPY_IN))
+    if (hvm_copy_from_guest_virt(opcode, ptr, sizeof(opcode)) == 0)
         len = sizeof(opcode);
 
     printf("Code bytes around(len=%d) %lx:", len, eip);

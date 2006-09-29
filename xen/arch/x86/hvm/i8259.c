@@ -497,8 +497,9 @@ static int intercept_pic_io(ioreq_t *p)
     }
     pic = &v->domain->arch.hvm_domain.vpic;
     if ( p->dir == 0 ) {
-        if(p->pdata_valid) 
-            hvm_copy(&data, (unsigned long)p->u.pdata, p->size, HVM_COPY_IN);
+        if (p->pdata_valid) 
+            (void)hvm_copy_from_guest_virt(
+                &data, (unsigned long)p->u.pdata, p->size);
         else
             data = p->u.data;
         spin_lock_irqsave(&pic->lock, flags);
@@ -511,8 +512,9 @@ static int intercept_pic_io(ioreq_t *p)
         data = pic_ioport_read(
             (void*)&pic->pics[p->addr>>7], (uint32_t) p->addr);
         spin_unlock_irqrestore(&pic->lock, flags);
-        if(p->pdata_valid) 
-            hvm_copy(&data, (unsigned long)p->u.pdata, p->size, HVM_COPY_OUT);
+        if (p->pdata_valid) 
+            (void)hvm_copy_to_guest_virt(
+                (unsigned long)p->u.pdata, &data, p->size);
         else 
             p->u.data = (u64)data;
     }
@@ -533,8 +535,9 @@ static int intercept_elcr_io(ioreq_t *p)
 
     s = &v->domain->arch.hvm_domain.vpic;
     if ( p->dir == 0 ) {
-        if(p->pdata_valid) 
-            hvm_copy(&data, (unsigned long)p->u.pdata, p->size, HVM_COPY_IN);
+        if (p->pdata_valid) 
+            (void)hvm_copy_from_guest_virt(
+                &data, (unsigned long)p->u.pdata, p->size);
         else
             data = p->u.data;
         spin_lock_irqsave(&s->lock, flags);
@@ -547,8 +550,9 @@ static int intercept_elcr_io(ioreq_t *p)
     else {
         data = (u64) elcr_ioport_read(
                 (void*)&s->pics[p->addr&1], (uint32_t) p->addr);
-        if(p->pdata_valid) 
-            hvm_copy(&data, (unsigned long)p->u.pdata, p->size, HVM_COPY_OUT);
+        if (p->pdata_valid) 
+            (void)hvm_copy_to_guest_virt(
+                (unsigned long)p->u.pdata, &data, p->size);
         else 
             p->u.data = (u64)data;
 
