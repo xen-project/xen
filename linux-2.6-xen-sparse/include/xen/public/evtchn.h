@@ -33,9 +33,6 @@
 #ifndef __LINUX_PUBLIC_EVTCHN_H__
 #define __LINUX_PUBLIC_EVTCHN_H__
 
-/* /dev/xen/evtchn resides at device number major=10, minor=201 */
-#define EVTCHN_MINOR 201
-
 /*
  * Bind a fresh port to VIRQ @virq.
  * Return allocated port.
