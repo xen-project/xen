@@ -133,27 +133,95 @@ int do_xen_hypercall(int xc_handle, privcmd_hypercall_t *hypercall)
                       (unsigned long)hypercall);
 }
 
+#define MTAB "/proc/mounts"
+#define MAX_PATH 255
+#define _STR(x) #x
+#define STR(x) _STR(x)
+
+static int find_sysfsdir(char *sysfsdir)
+{
+    FILE *fp;
+    char type[MAX_PATH + 1];
+
+    if ( (fp = fopen(MTAB, "r")) == NULL )
+        return -1;
+
+    while ( fscanf(fp, "%*s %"
+                   STR(MAX_PATH)
+                   "s %"
+                   STR(MAX_PATH)
+                   "s %*s %*d %*d\n",
+                   sysfsdir, type) == 2 )
+    {
+        if ( strncmp(type, "sysfs", 5) == 0 )
+            break;
+    }
+
+    fclose(fp);
+
+    return ((strncmp(type, "sysfs", 5) == 0) ? 0 : -1);
+}
+
+int xc_find_device_number(const char *name)
+{
+    FILE *fp;
+    int i, major, minor;
+    char sysfsdir[MAX_PATH + 1];
+    static char *classlist[] = { "xen", "misc" };
+
+    for ( i = 0; i < (sizeof(classlist) / sizeof(classlist[0])); i++ )
+    {
+        if ( find_sysfsdir(sysfsdir) < 0 )
+            goto not_found;
+
+        /* <base>/class/<classname>/<devname>/dev */
+        strncat(sysfsdir, "/class/", MAX_PATH);
+        strncat(sysfsdir, classlist[i], MAX_PATH);
+        strncat(sysfsdir, "/", MAX_PATH);
+        strncat(sysfsdir, name, MAX_PATH);
+        strncat(sysfsdir, "/dev", MAX_PATH);
+
+        if ( (fp = fopen(sysfsdir, "r")) != NULL )
+            goto found;
+    }
+
+ not_found:
+    errno = -ENOENT;
+    return -1;
+
+ found:
+    if ( fscanf(fp, "%d:%d", &major, &minor) != 2 )
+    {
+        fclose(fp);
+        goto not_found;
+    }
+
+    fclose(fp);
+
+    return makedev(major, minor);
+}
+
 #define EVTCHN_DEV_NAME  "/dev/xen/evtchn"
-#define EVTCHN_DEV_MAJOR 10
-#define EVTCHN_DEV_MINOR 201
 
 int xc_evtchn_open(void)
 {
     struct stat st;
     int fd;
+    int devnum;
+
+    devnum = xc_find_device_number("evtchn");
 
     /* Make sure any existing device file links to correct device. */
-    if ((lstat(EVTCHN_DEV_NAME, &st) != 0) || !S_ISCHR(st.st_mode) ||
-        (st.st_rdev != makedev(EVTCHN_DEV_MAJOR, EVTCHN_DEV_MINOR)))
+    if ( (lstat(EVTCHN_DEV_NAME, &st) != 0) || !S_ISCHR(st.st_mode) ||
+         (st.st_rdev != devnum) )
         (void)unlink(EVTCHN_DEV_NAME);
 
-reopen:
+ reopen:
     if ( (fd = open(EVTCHN_DEV_NAME, O_RDWR)) == -1 )
     {
         if ( (errno == ENOENT) &&
             ((mkdir("/dev/xen", 0755) == 0) || (errno == EEXIST)) &&
-            (mknod(EVTCHN_DEV_NAME, S_IFCHR|0600,
-            makedev(EVTCHN_DEV_MAJOR, EVTCHN_DEV_MINOR)) == 0) )
+             (mknod(EVTCHN_DEV_NAME, S_IFCHR|0600, devnum) == 0) )
             goto reopen;
 
         PERROR("Could not open event channel interface");

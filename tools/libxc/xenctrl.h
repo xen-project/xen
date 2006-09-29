@@ -92,6 +92,16 @@ int xc_interface_open(void);
 int xc_interface_close(int xc_handle);
 
 /*
+ * KERNEL INTERFACES
+ */
+
+/*
+ * Resolve a kernel device name (e.g., "evtchn", "blktap0") into a kernel
+ * device number. Returns -1 on error (and sets errno).
+ */
+int xc_find_device_number(const char *name);
+
+/*
  * DOMAIN DEBUGGING FUNCTIONS
  */
 
