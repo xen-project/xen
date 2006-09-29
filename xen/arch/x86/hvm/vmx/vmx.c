@@ -485,8 +485,10 @@ static void vmx_ctxt_switch_to(struct vcpu *v)
 
 static void stop_vmx(void)
 {
-    if (read_cr4() & X86_CR4_VMXE)
-        __vmxoff();
+    if ( !(read_cr4() & X86_CR4_VMXE) )
+        return;
+    __vmxoff();
+    clear_in_cr4(X86_CR4_VMXE);
 }
 
 void vmx_migrate_timers(struct vcpu *v)
@@ -806,12 +808,14 @@ int start_vmx(void)
 
     if ( (vmcs = vmx_alloc_host_vmcs()) == NULL )
     {
+        clear_in_cr4(X86_CR4_VMXE);
         printk("Failed to allocate host VMCS\n");
         return 0;
     }
 
     if ( __vmxon(virt_to_maddr(vmcs)) )
     {
+        clear_in_cr4(X86_CR4_VMXE);
         printk("VMXON failed\n");
         vmx_free_host_vmcs(vmcs);
         return 0;
