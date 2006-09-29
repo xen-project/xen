@@ -636,30 +636,6 @@ static void print_drivers(void)
 		DPRINTF("Found driver: [%s]\n",dtypes[i]->name);
 } 
 
-static int find_blktap_major(void)
-{
-	FILE *fp;
-	int major;
-	char device[256];
-
-	if ((fp = fopen("/proc/devices", "r")) == NULL)
-		return -1;
-
-	/* Skip title */
-	fscanf(fp,"%*s %*s\n");
-	while (fscanf(fp, "%d %255s\n", &major, device) == 2) {
-		if (strncmp("blktap", device, 6) == 0)
-			break;
-	}
-
-	fclose(fp);
-
-	if (strncmp("blktap", device, 6) == 0)
-		return major;
-
-	return -1;
-}
-
 int main(int argc, char *argv[])
 {
 	char *devname;
@@ -681,11 +657,11 @@ int main(int argc, char *argv[])
 	register_new_devmap_hook(map_new_blktapctrl);
 	register_new_unmap_hook(unmap_blktapctrl);
 
-	/*Attach to blktap0 */	
+	/* Attach to blktap0 */
 	asprintf(&devname,"%s/%s0", BLKTAP_DEV_DIR, BLKTAP_DEV_NAME);
-	blktap_major = find_blktap_major();
-	if (blktap_major < 0)
+	if ((ret = xc_find_device_number("blktap0")) < 0)
 		goto open_failed;
+	blktap_major = major(ret);
 	make_blktap_dev(devname,blktap_major,0);
 	ctlfd = open(devname, O_RDWR);
 	if (ctlfd == -1) {
