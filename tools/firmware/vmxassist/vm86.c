@@ -1412,12 +1412,14 @@ opcode(struct regs *regs)
 			{
 				int addr, data;
 				int seg = segment(prefix, regs, regs->vds);
+				int offset = prefix & ADDR32? fetch32(regs) : fetch16(regs);
+
 				if (prefix & DATA32) {
-					addr = address(regs, seg, fetch32(regs));
+					addr = address(regs, seg, offset);
 					data = read32(addr);
 					setreg32(regs, 0, data);
 				} else {
-					addr = address(regs, seg, fetch16(regs));
+					addr = address(regs, seg, offset);
 					data = read16(addr);
 					setreg16(regs, 0, data);
 				}
