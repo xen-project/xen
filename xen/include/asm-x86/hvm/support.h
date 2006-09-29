@@ -138,6 +138,7 @@ extern int hvm_enabled;
 
 enum { HVM_COPY_IN = 0, HVM_COPY_OUT };
 extern int hvm_copy(void *buf, unsigned long vaddr, int size, int dir);
+extern int hvm_copy_phy(void *buf, unsigned long vaddr, int size, int dir);
 
 extern void hvm_setup_platform(struct domain* d);
 extern int hvm_mmio_intercept(ioreq_t *p);

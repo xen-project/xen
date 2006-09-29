@@ -389,42 +389,57 @@ void hvm_hlt(unsigned long rflags)
 }
 
 /*
- * Copy from/to guest virtual.
+ * __hvm_copy():
+ *  @buf  = hypervisor buffer
+ *  @addr = guest virtual or physical address to copy to/from
+ *  @size = number of bytes to copy
+ *  @dir  = HVM_COPY_IN / HVM_COPY_OUT
+ *  @phy  = interpret addr as physical or virtual address?
+ * Returns TRUE on success.
  */
-int hvm_copy(void *buf, unsigned long vaddr, int size, int dir)
+static int __hvm_copy(
+    void *buf, unsigned long addr, int size, int dir, int phy)
 {
     struct vcpu *v = current;
-    unsigned long gfn;
     unsigned long mfn;
-    char *addr;
+    char *p;
     int count;
 
-    while (size > 0) {
-        count = PAGE_SIZE - (vaddr & ~PAGE_MASK);
-        if (count > size)
-            count = size;
+    while ( size > 0 )
+    {
+        count = min_t(int, PAGE_SIZE - (addr & ~PAGE_MASK), size);
 
-        gfn = shadow_gva_to_gfn(v, vaddr);
-        mfn = mfn_x(sh_vcpu_gfn_to_mfn(v, gfn));
-
-        if (mfn == INVALID_MFN)
+        mfn = phy ? 
+            get_mfn_from_gpfn(addr >> PAGE_SHIFT) :
+            mfn_x(sh_vcpu_gfn_to_mfn(v, shadow_gva_to_gfn(v, addr)));
+        if ( mfn == INVALID_MFN )
             return 0;
 
-        addr = (char *)map_domain_page(mfn) + (vaddr & ~PAGE_MASK);
+        p = (char *)map_domain_page(mfn) + (addr & ~PAGE_MASK);
 
-        if (dir == HVM_COPY_IN)
-            memcpy(buf, addr, count);
+        if ( dir == HVM_COPY_IN )
+            memcpy(buf, p, count);
         else
-            memcpy(addr, buf, count);
+            memcpy(p, buf, count);
 
-        unmap_domain_page(addr);
+        unmap_domain_page(p);
 
-        vaddr += count;
-        buf += count;
+        addr += count;
+        buf  += count;
         size -= count;
     }
 
     return 1;
+}
+
+int hvm_copy_phy(void *buf, unsigned long paddr, int size, int dir)
+{
+    return __hvm_copy(buf, paddr, size, dir, 1);
+}
+
+int hvm_copy(void *buf, unsigned long vaddr, int size, int dir)
+{
+    return __hvm_copy(buf, vaddr, size, dir, 0);
 }
 
 /*

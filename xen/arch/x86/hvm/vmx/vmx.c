@@ -1371,7 +1371,7 @@ static int vmx_assist(struct vcpu *v, int mode)
     u32 cp;
 
     /* make sure vmxassist exists (this is not an error) */
-    if (!hvm_copy(&magic, VMXASSIST_MAGIC_OFFSET, sizeof(magic), HVM_COPY_IN))
+    if (!hvm_copy_phy(&magic, VMXASSIST_MAGIC_OFFSET, sizeof(magic), HVM_COPY_IN))
         return 0;
     if (magic != VMXASSIST_MAGIC)
         return 0;
@@ -1385,20 +1385,20 @@ static int vmx_assist(struct vcpu *v, int mode)
          */
     case VMX_ASSIST_INVOKE:
         /* save the old context */
-        if (!hvm_copy(&cp, VMXASSIST_OLD_CONTEXT, sizeof(cp), HVM_COPY_IN))
+        if (!hvm_copy_phy(&cp, VMXASSIST_OLD_CONTEXT, sizeof(cp), HVM_COPY_IN))
             goto error;
         if (cp != 0) {
             if (!vmx_world_save(v, &c))
                 goto error;
-            if (!hvm_copy(&c, cp, sizeof(c), HVM_COPY_OUT))
+            if (!hvm_copy_phy(&c, cp, sizeof(c), HVM_COPY_OUT))
                 goto error;
         }
 
         /* restore the new context, this should activate vmxassist */
-        if (!hvm_copy(&cp, VMXASSIST_NEW_CONTEXT, sizeof(cp), HVM_COPY_IN))
+        if (!hvm_copy_phy(&cp, VMXASSIST_NEW_CONTEXT, sizeof(cp), HVM_COPY_IN))
             goto error;
         if (cp != 0) {
-            if (!hvm_copy(&c, cp, sizeof(c), HVM_COPY_IN))
+            if (!hvm_copy_phy(&c, cp, sizeof(c), HVM_COPY_IN))
                 goto error;
             if (!vmx_world_restore(v, &c))
                 goto error;
@@ -1412,10 +1412,10 @@ static int vmx_assist(struct vcpu *v, int mode)
          */
     case VMX_ASSIST_RESTORE:
         /* save the old context */
-        if (!hvm_copy(&cp, VMXASSIST_OLD_CONTEXT, sizeof(cp), HVM_COPY_IN))
+        if (!hvm_copy_phy(&cp, VMXASSIST_OLD_CONTEXT, sizeof(cp), HVM_COPY_IN))
             goto error;
         if (cp != 0) {
-            if (!hvm_copy(&c, cp, sizeof(c), HVM_COPY_IN))
+            if (!hvm_copy_phy(&c, cp, sizeof(c), HVM_COPY_IN))
                 goto error;
             if (!vmx_world_restore(v, &c))
                 goto error;
