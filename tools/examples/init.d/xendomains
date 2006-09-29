@@ -352,9 +352,9 @@ stop()
 	    if test $? -ne 0; then
 		rc_failed $?
 		echo -n '!'
-		kill $WDOG_PIG >/dev/null 2>&1
+		kill $WDOG_PID >/dev/null 2>&1
 	    else
-		kill $WDOG_PIG >/dev/null 2>&1
+		kill $WDOG_PID >/dev/null 2>&1
 		continue
 	    fi
 	fi
@@ -368,7 +368,7 @@ stop()
 		rc_failed $?
 		echo -n '!'
 	    fi
-	    kill $WDOG_PIG >/dev/null 2>&1
+	    kill $WDOG_PID >/dev/null 2>&1
 	fi
     done < <(xm list | grep -v '^Name')
 
