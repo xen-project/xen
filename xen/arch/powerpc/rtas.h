@@ -26,7 +26,7 @@ extern unsigned long rtas_msr;
 extern unsigned long rtas_base;
 extern unsigned long rtas_end;
 
-extern int prom_call(void *arg, unsigned rtas_base,
+extern int prom_call(void *arg, unsigned base,
                      unsigned long func, unsigned long msr);
 extern int rtas_init(void *);
 extern int rtas_halt(void);
