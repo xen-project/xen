@@ -53,7 +53,8 @@
 #include <linux/skbuff.h>
 #include <linux/ethtool.h>
 #include <net/dst.h>
-#include <asm/hypervisor.h> /* is_initial_xendomain() */
+#include <net/xfrm.h>		/* secpath_reset() */
+#include <asm/hypervisor.h>	/* is_initial_xendomain() */
 
 static int nloopbacks = -1;
 module_param(nloopbacks, int, 0);
@@ -111,6 +112,11 @@ static int loopback_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	skb->protocol = eth_type_trans(skb, dev);
 	skb->dev      = dev;
 	dev->last_rx  = jiffies;
+
+	/* Flush netfilter context: rx'ed skbuffs not expected to have any. */
+	nf_reset(skb);
+	secpath_reset(skb);
+
 	netif_rx(skb);
 
 	return 0;
