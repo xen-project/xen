@@ -45,42 +45,43 @@ struct cpu_caches cpu_caches = {
 };
 
 struct rma_settings {
-    int order;
+    int log;
     int rmlr_0;
     int rmlr_1_2;
 };
 
-static struct rma_settings rma_orders[] = {
-    { .order = 26, .rmlr_0 = 0, .rmlr_1_2 = 3, }, /*  64 MB */
-    { .order = 27, .rmlr_0 = 1, .rmlr_1_2 = 3, }, /* 128 MB */
-    { .order = 28, .rmlr_0 = 1, .rmlr_1_2 = 0, }, /* 256 MB */
-    { .order = 30, .rmlr_0 = 0, .rmlr_1_2 = 2, }, /*   1 GB */
-    { .order = 34, .rmlr_0 = 0, .rmlr_1_2 = 1, }, /*  16 GB */
-    { .order = 38, .rmlr_0 = 0, .rmlr_1_2 = 0, }, /* 256 GB */
+static struct rma_settings rma_logs[] = {
+    { .log = 26, .rmlr_0 = 0, .rmlr_1_2 = 3, }, /*  64 MB */
+    { .log = 27, .rmlr_0 = 1, .rmlr_1_2 = 3, }, /* 128 MB */
+    { .log = 28, .rmlr_0 = 1, .rmlr_1_2 = 0, }, /* 256 MB */
+    { .log = 30, .rmlr_0 = 0, .rmlr_1_2 = 2, }, /*   1 GB */
+    { .log = 34, .rmlr_0 = 0, .rmlr_1_2 = 1, }, /*  16 GB */
+    { .log = 38, .rmlr_0 = 0, .rmlr_1_2 = 0, }, /* 256 GB */
 };
 
 static uint log_large_page_sizes[] = {
     4 + 20, /* (1 << 4) == 16M */
 };
 
-static struct rma_settings *cpu_find_rma(unsigned int order)
+static struct rma_settings *cpu_find_rma(unsigned int log)
 {
     int i;
-    for (i = 0; i < ARRAY_SIZE(rma_orders); i++) {
-        if (rma_orders[i].order == order)
-            return &rma_orders[i];
+
+    for (i = 0; i < ARRAY_SIZE(rma_logs); i++) {
+        if (rma_logs[i].log == log)
+            return &rma_logs[i];
     }
     return NULL;
 }
 
 unsigned int cpu_default_rma_order_pages(void)
 {
-    return rma_orders[0].order - PAGE_SHIFT;
+    return rma_logs[0].log - PAGE_SHIFT;
 }
 
-int cpu_rma_valid(unsigned int log)
+int cpu_rma_valid(unsigned int order)
 {
-    return cpu_find_rma(log) != NULL;
+    return cpu_find_rma(order + PAGE_SHIFT) != NULL;
 }
 
 unsigned int cpu_large_page_orders(uint *sizes, uint max)

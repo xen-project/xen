@@ -120,7 +120,7 @@ extern int cpu_machinecheck(struct cpu_user_regs *);
 extern void show_registers(struct cpu_user_regs *);
 extern unsigned int cpu_extent_order(void);
 extern unsigned int cpu_default_rma_order_pages(void);
-extern int cpu_rma_valid(unsigned int log);
+extern int cpu_rma_valid(unsigned int order);
 extern uint cpu_large_page_orders(uint *sizes, uint max);
 extern void cpu_initialize(int cpuid);
 extern void cpu_init_vcpu(struct vcpu *);
