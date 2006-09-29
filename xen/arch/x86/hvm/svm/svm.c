@@ -1076,9 +1076,6 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb, unsigned long input,
                    clear_bit(X86_FEATURE_NX & 31, &edx);
             }
             clear_bit(X86_FEATURE_PSE36, &edx);
-            /* Disable machine check architecture */
-            clear_bit(X86_FEATURE_MCA, &edx);
-            clear_bit(X86_FEATURE_MCE, &edx);
             if (input == 0x00000001 )
             {
                 /* Clear out reserved bits. */
