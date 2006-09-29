@@ -692,7 +692,6 @@ static unsigned int blktap_poll(struct file *filp, poll_table *wait)
 
 	poll_wait(filp, &info->wait, wait);
 	if (info->ufe_ring.req_prod_pvt != info->ufe_ring.sring->req_prod) {
-		flush_tlb_all();
 		RING_PUSH_REQUESTS(&info->ufe_ring);
 		return POLLIN | POLLRDNORM;
 	}
