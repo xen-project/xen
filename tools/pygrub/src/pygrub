@@ -25,7 +25,18 @@ sys.path = [ '/usr/lib/python' ] + sys.path
 import grub.GrubConf
 import grub.fsys
 
-PYGRUB_VER = 0.4
+PYGRUB_VER = 0.5
+
+def enable_cursor(ison):
+    if ison:
+        val = 2
+    else:
+        val = 0
+        
+    try:
+        curses.curs_set(val)
+    except _curses.error:
+        pass
 
 def is_disk_image(file):
     fd = os.open(file, os.O_RDONLY)
@@ -141,10 +152,7 @@ class Grub:
             self.screen.timeout(1000)
             if hasattr(curses, 'use_default_colors'):
                 curses.use_default_colors()
-            try:
-                curses.curs_set(0)
-            except _curses.error:
-                pass
+            enable_cursor(False)
             self.entry_win = curses.newwin(10, 74, 2, 1)
             self.text_win = curses.newwin(10, 70, 12, 5)
             
@@ -247,6 +255,7 @@ class Grub:
         self.screen.refresh()
 
         t = GrubLineEditor(self.screen, 5, 2, line)
+        enable_cursor(True)
         ret = t.edit()
         if ret:
             return ret
@@ -262,6 +271,7 @@ class Grub:
         lines = []
         while 1:
             t = GrubLineEditor(self.screen, y, 2)
+            enable_cursor(True)            
             ret = t.edit()
             if ret:
                 if ret in ("quit", "return"):
