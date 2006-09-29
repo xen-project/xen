@@ -2180,7 +2180,12 @@ static shadow_l1e_t * shadow_get_and_create_l1e(struct vcpu *v,
     /* Get the l2e */
     sl2e = shadow_get_and_create_l2e(v, gw, &sl2mfn, ft);
     if ( sl2e == NULL ) return NULL;
-    if ( shadow_l2e_get_flags(*sl2e) & _PAGE_PRESENT ) 
+    /* Install the sl1 in the l2e if it wasn't there or if we need to
+     * re-do it to fix a PSE dirty bit. */
+    if ( shadow_l2e_get_flags(*sl2e) & _PAGE_PRESENT 
+         && likely(ft != ft_demand_write
+                   || (guest_l2e_get_flags(*gw->l2e) & _PAGE_DIRTY) 
+                   || !(guest_l2e_get_flags(*gw->l2e) & _PAGE_PSE)) )
     {
         *sl1mfn = shadow_l2e_get_mfn(*sl2e);
         ASSERT(valid_mfn(*sl1mfn));
