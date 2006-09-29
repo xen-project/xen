@@ -290,9 +290,6 @@ static void __init __start_xen(multiboot_info_t *mbi)
     /* let synchronize until we really get going */
     console_start_sync();
 
-    /* we give the first RMA to the hypervisor */
-    xenheap_phys_end = rma_size(cpu_default_rma_order_pages());
-
     /* Check that we have at least one Multiboot module. */
     if (!(mbi->flags & MBI_MODULES) || (mbi->mods_count == 0)) {
         panic("FATAL ERROR: Require at least one Multiboot module.\n");

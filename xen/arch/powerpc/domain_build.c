@@ -178,8 +178,7 @@ int construct_dom0(struct domain *d,
         shadow_set_allocation(d, opt_dom0_shadow, &preempt);
     } while (preempt);
     if (shadow_get_allocation(d) == 0)
-        panic("shadow allocation failed 0x%x < 0x%x\n",
-              shadow_get_allocation(d), opt_dom0_shadow);
+        panic("shadow allocation failed: %dMib\n", opt_dom0_shadow);
 
     ASSERT( image_len < rma_sz );
 
