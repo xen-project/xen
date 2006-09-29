@@ -121,9 +121,12 @@ asmlinkage void svm_intr_assist(void)
           pic_set_irq(pic, pt->irq, 1);
       }
 
-      callback_irq = v->domain->arch.hvm_domain.params[HVM_PARAM_CALLBACK_IRQ];
-      if ( callback_irq != 0)
-          pic_set_xen_irq(pic, callback_irq, local_events_need_delivery());
+      if (v->vcpu_id == 0) {
+          callback_irq =
+              v->domain->arch.hvm_domain.params[HVM_PARAM_CALLBACK_IRQ];
+          if ( callback_irq != 0)
+              pic_set_xen_irq(pic, callback_irq, local_events_need_delivery());
+      }
 
       if ( cpu_has_pending_irq(v) )
           intr_vector = cpu_get_interrupt(v, &intr_type);
