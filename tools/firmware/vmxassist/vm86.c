@@ -1230,6 +1230,18 @@ pushrm(struct regs *regs, int prefix, unsigned modrm)
 
 enum { OPC_INVALID, OPC_EMULATED };
 
+#define rdmsr(msr,val1,val2)				\
+	__asm__ __volatile__(				\
+		"rdmsr"					\
+		: "=a" (val1), "=d" (val2)		\
+		: "c" (msr))
+
+#define wrmsr(msr,val1,val2)				\
+	__asm__ __volatile__(				\
+		"wrmsr"					\
+		: /* no outputs */			\
+		: "c" (msr), "a" (val1), "d" (val2))
+
 /*
  * Emulate a single instruction, including all its prefixes. We only implement
  * a small subset of the opcodes, and not all opcodes are implemented for each
@@ -1287,6 +1299,12 @@ opcode(struct regs *regs)
 			case 0x22:
 				if (!movcr(regs, prefix, opc))
 					goto invalid;
+				return OPC_EMULATED;
+			case 0x30: /* WRMSR */
+				wrmsr(regs->ecx, regs->eax, regs->edx);
+				return OPC_EMULATED;
+			case 0x32: /* RDMSR */
+				rdmsr(regs->ecx, regs->eax, regs->edx);
 				return OPC_EMULATED;
 			default:
 				goto invalid;
