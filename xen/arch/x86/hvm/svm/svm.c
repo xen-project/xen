@@ -57,7 +57,7 @@
 extern void do_nmi(struct cpu_user_regs *, unsigned long);
 extern int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip,
                                 int inst_len);
- extern uint32_t vlapic_update_ppr(struct vlapic *vlapic);
+extern uint32_t vlapic_update_ppr(struct vlapic *vlapic);
 extern asmlinkage void do_IRQ(struct cpu_user_regs *);
 extern void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
                          unsigned long count, int size, long value, int dir, int pvalid);
@@ -904,9 +904,9 @@ static void svm_relinquish_guest_resources(struct domain *d)
 
         destroy_vmcb(&v->arch.hvm_svm);
         kill_timer(&v->arch.hvm_vcpu.hlt_timer);
-        if ( hvm_apic_support(v->domain) && (VLAPIC(v) != NULL) ) 
+        if ( VLAPIC(v) != NULL )
         {
-            kill_timer( &(VLAPIC(v)->vlapic_timer) );
+            kill_timer(&VLAPIC(v)->vlapic_timer);
             unmap_domain_page_global(VLAPIC(v)->regs);
             free_domheap_page(VLAPIC(v)->regs_page);
             xfree(VLAPIC(v));
@@ -930,12 +930,13 @@ static void svm_migrate_timers(struct vcpu *v)
     struct periodic_time *pt = 
         &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
 
-    if ( pt->enabled ) {
-        migrate_timer( &pt->timer, v->processor );
-        migrate_timer( &v->arch.hvm_vcpu.hlt_timer, v->processor );
+    if ( pt->enabled )
+    {
+        migrate_timer(&pt->timer, v->processor);
+        migrate_timer(&v->arch.hvm_vcpu.hlt_timer, v->processor);
     }
-    if ( hvm_apic_support(v->domain) && VLAPIC( v ))
-        migrate_timer( &(VLAPIC(v)->vlapic_timer ), v->processor );
+    if ( VLAPIC(v) != NULL )
+        migrate_timer(&VLAPIC(v)->vlapic_timer, v->processor);
 }
 
 
@@ -1634,9 +1635,11 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
     case 4:
         value = (unsigned long) v->arch.hvm_svm.cpu_shadow_cr4;
         if (svm_dbg_on)
-            printk( "CR4 read=%lx\n", value );
+            printk("CR4 read=%lx\n", value);
         break;
     case 8:
+        if ( vlapic == NULL )
+            break;
         value = (unsigned long)vlapic_get_reg(vlapic, APIC_TASKPRI);
         value = (value & 0xF0) >> 4;
         break;
@@ -1814,6 +1817,8 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
 
     case 8:
     {
+        if ( vlapic == NULL )
+            break;
         vlapic_set_reg(vlapic, APIC_TASKPRI, ((value & 0x0F) << 4));
         vlapic_update_ppr(vlapic);
         break;

@@ -135,7 +135,7 @@ static void vmx_relinquish_guest_resources(struct domain *d)
         if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
             continue;
         kill_timer(&v->arch.hvm_vcpu.hlt_timer);
-        if ( hvm_apic_support(v->domain) && (VLAPIC(v) != NULL) )
+        if ( VLAPIC(v) != NULL )
         {
             kill_timer(&VLAPIC(v)->vlapic_timer);
             unmap_domain_page_global(VLAPIC(v)->regs);
@@ -495,12 +495,13 @@ void vmx_migrate_timers(struct vcpu *v)
 {
     struct periodic_time *pt = &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
 
-    if ( pt->enabled ) {
+    if ( pt->enabled )
+    {
         migrate_timer(&pt->timer, v->processor);
         migrate_timer(&v->arch.hvm_vcpu.hlt_timer, v->processor);
     }
-    if ( hvm_apic_support(v->domain) && VLAPIC(v))
-        migrate_timer(&(VLAPIC(v)->vlapic_timer), v->processor);
+    if ( VLAPIC(v) != NULL )
+        migrate_timer(&VLAPIC(v)->vlapic_timer, v->processor);
 }
 
 static void vmx_store_cpu_guest_regs(
@@ -1767,6 +1768,8 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
     }
     case 8:
     {
+        if ( vlapic == NULL )
+            break;
         vlapic_set_reg(vlapic, APIC_TASKPRI, ((value & 0x0F) << 4));
         vlapic_update_ppr(vlapic);
         break;
@@ -1788,15 +1791,19 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
     struct vcpu *v = current;
     struct vlapic *vlapic = VLAPIC(v);
 
-    if ( cr != 3 && cr != 8)
-        __hvm_bug(regs);
-
-    if ( cr == 3 )
-        value = (unsigned long) v->arch.hvm_vmx.cpu_cr3;
-    else if ( cr == 8 )
+    switch ( cr )
     {
+    case 3:
+        value = (unsigned long)v->arch.hvm_vmx.cpu_cr3;
+        break;
+    case 8:
+        if ( vlapic == NULL )
+            break;
         value = (unsigned long)vlapic_get_reg(vlapic, APIC_TASKPRI);
         value = (value & 0xF0) >> 4;
+        break;
+    default:
+        __hvm_bug(regs);
     }
 
     switch ( gp ) {
