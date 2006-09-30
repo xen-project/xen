@@ -244,7 +244,8 @@ class HVMImageHandler(ImageHandler):
 
         info = xc.xeninfo()
         if not 'hvm' in info['xen_caps']:
-            raise VmError("Not an HVM capable platform, we stop creating!")
+            raise VmError("HVM guest support is unavailable: is VT/AMD-V "
+                          "supported by your CPU and enabled in your BIOS?")
 
         self.dmargs = self.parseDeviceModelArgs(imageConfig, deviceConfig)
         self.device_model = sxp.child_value(imageConfig, 'device_model')
