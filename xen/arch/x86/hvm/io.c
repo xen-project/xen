@@ -596,6 +596,7 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
         break;
 
     case INSTR_CMP:
+    case INSTR_SUB:
         if (src & REGISTER) {
             index = operand_index(src);
             value = get_reg_value(size, index, 0, regs);
@@ -607,6 +608,8 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
             index = operand_index(dst);
             value = get_reg_value(size, index, 0, regs);
             diff = value - (unsigned long) p->u.data;
+            if ( mmio_opp->instr == INSTR_SUB )
+                set_reg_value(size, index, 0, regs, diff);
         }
 
         /*

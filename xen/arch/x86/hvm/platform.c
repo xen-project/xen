@@ -394,6 +394,11 @@ static int hvm_decode(int realmode, unsigned char *opcode, struct instruction *i
         GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
         return mem_reg(instr->op_size, opcode, instr, rex);
 
+    case 0x2B: /* sub m32/16, r32/16 */
+        instr->instr = INSTR_SUB;
+        GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+        return mem_reg(instr->op_size, opcode, instr, rex);
+
     case 0x30: /* xor r8, m8 */
         instr->instr = INSTR_XOR;
         instr->op_size = BYTE;
@@ -1011,6 +1016,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
 
     case INSTR_CMP:        /* Pass through */
     case INSTR_TEST:
+    case INSTR_SUB:
         mmio_opp->flags = mmio_inst.flags;
         mmio_opp->instr = mmio_inst.instr;
         mmio_opp->operand[0] = mmio_inst.operand[0]; /* source */
