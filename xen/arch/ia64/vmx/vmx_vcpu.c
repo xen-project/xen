@@ -212,19 +212,32 @@ IA64FAULT vmx_vcpu_set_rr(VCPU *vcpu, UINT64 reg, UINT64 val)
 {
     ia64_rr oldrr,newrr;
     extern void * pal_vaddr;
+    u64 rrval;
 
     vcpu_get_rr(vcpu, reg, &oldrr.rrval);
     newrr.rrval=val;
     if (newrr.rid >= (1 << vcpu->domain->arch.rid_bits))
         panic_domain (NULL, "use of invalid rid %x\n", newrr.rid);
 
-    VMX(vcpu,vrr[reg>>61]) = val;
-    switch((u64)(reg>>61)) {
+    VMX(vcpu,vrr[reg>>VRN_SHIFT]) = val;
+    switch((u64)(reg>>VRN_SHIFT)) {
     case VRN7:
         vmx_switch_rr7(vrrtomrr(vcpu,val),vcpu->domain->shared_info,
         (void *)vcpu->arch.privregs,
         (void *)vcpu->arch.vhpt.hash, pal_vaddr );
        break;
+    case VRN4:
+        rrval = vrrtomrr(vcpu,val);
+        vcpu->arch.metaphysical_saved_rr4 = rrval;
+        if (!is_physical_mode(vcpu))
+            ia64_set_rr(reg,rrval);
+        break;
+    case VRN0:
+        rrval = vrrtomrr(vcpu,val);
+        vcpu->arch.metaphysical_saved_rr0 = rrval;
+        if (!is_physical_mode(vcpu))
+            ia64_set_rr(reg,rrval);
+        break;
     default:
         ia64_set_rr(reg,vrrtomrr(vcpu,val));
         break;
