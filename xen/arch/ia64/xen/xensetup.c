@@ -48,6 +48,7 @@ extern void setup_per_cpu_areas(void);
 extern void mem_init(void);
 extern void init_IRQ(void);
 extern void trap_init(void);
+extern void xen_patch_kernel(void);
 
 /* opt_nosmp: If true, secondary processors are ignored. */
 static int opt_nosmp = 0;
@@ -292,6 +293,8 @@ void start_kernel(void)
     xenheap_phys_end = xen_pstart + xenheap_size;
     printk("xen image pstart: 0x%lx, xenheap pend: 0x%lx\n",
            xen_pstart, xenheap_phys_end);
+
+    xen_patch_kernel();
 
     kern_md = md = efi_get_md(xen_pstart);
     md_end = __pa(ia64_imva(&_end));
