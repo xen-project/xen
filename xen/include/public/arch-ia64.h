@@ -395,10 +395,6 @@ struct xen_ia64_boot_param {
 
 #endif /* !__ASSEMBLY__ */
 
-/* Address of shared_info in domain virtual space.
-   This is the default address, for compatibility only.  */
-#define XSI_BASE			0xf100000000000000
-
 /* Size of the shared_info area (this is not related to page size).  */
 #define XSI_SHIFT			14
 #define XSI_SIZE			(1 << XSI_SHIFT)

@@ -14,12 +14,9 @@
 
 #define IA64_PARAVIRTUALIZED
 
-#if 0
-#undef XSI_BASE
 /* At 1 MB, before per-cpu space but still addressable using addl instead
    of movl. */
 #define XSI_BASE				0xfffffffffff00000
-#endif
 
 /* Address of mapped regs.  */
 #define XMAPPEDREGS_BASE		(XSI_BASE + XSI_SIZE)

@@ -23,12 +23,11 @@ GLOBAL_ENTRY(early_xen_setup)
 	
 	mov cr.iva=r10
 
-#if XSI_BASE != 0xf100000000000000UL
-	/* Backward compatibility.  */
-(isBP)	mov r2=0x600
+	/* Set xsi base.  */
+#define FW_HYPERCALL_SET_SHARED_INFO_VA			0x600
+(isBP)	mov r2=FW_HYPERCALL_SET_SHARED_INFO_VA
 (isBP)	movl r28=XSI_BASE;;
 (isBP)	break 0x1000;;
-#endif
 
 	br.ret.sptk.many rp
 	;;
