@@ -122,7 +122,8 @@ extern void nested_dtlb (VCPU *vcpu);
 extern void alt_dtlb (VCPU *vcpu, u64 vadr);
 extern void dvhpt_fault (VCPU *vcpu, u64 vadr);
 extern void dnat_page_consumption (VCPU *vcpu, uint64_t vadr);
-extern void page_not_present(VCPU *vcpu, u64 vadr);
+extern void data_page_not_present(VCPU *vcpu, u64 vadr);
+extern void inst_page_not_present(VCPU *vcpu, u64 vadr);
 extern void data_access_rights(VCPU *vcpu, u64 vadr);
 
 /**************************************************************************

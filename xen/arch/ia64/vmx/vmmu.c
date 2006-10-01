@@ -645,37 +645,30 @@ IA64FAULT vmx_vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
     visr.ei=pt_isr.ei;
     visr.ir=pt_isr.ir;
     vpsr.val = VCPU(vcpu, vpsr);
-    if(vpsr.ic==0){
-        visr.ni=1;
-    }
     visr.na=1;
     data = vtlb_lookup(vcpu, vadr, DSIDE_TLB);
     if(data){
         if(data->p==0){
-            visr.na=1;
             vcpu_set_isr(vcpu,visr.val);
-            page_not_present(vcpu, vadr);
+            data_page_not_present(vcpu, vadr);
             return IA64_FAULT;
         }else if(data->ma == VA_MATTR_NATPAGE){
-            visr.na = 1;
             vcpu_set_isr(vcpu, visr.val);
             dnat_page_consumption(vcpu, vadr);
             return IA64_FAULT;
         }else{
             *padr = ((data->ppn >> (data->ps - 12)) << data->ps) |
-                                                (vadr & (PSIZE(data->ps) - 1));
+                    (vadr & (PSIZE(data->ps) - 1));
             return IA64_NO_FAULT;
         }
     }
     data = vhpt_lookup(vadr);
     if(data){
         if(data->p==0){
-            visr.na=1;
             vcpu_set_isr(vcpu,visr.val);
-            page_not_present(vcpu, vadr);
+            data_page_not_present(vcpu, vadr);
             return IA64_FAULT;
         }else if(data->ma == VA_MATTR_NATPAGE){
-            visr.na = 1;
             vcpu_set_isr(vcpu, visr.val);
             dnat_page_consumption(vcpu, vadr);
             return IA64_FAULT;
