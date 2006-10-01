@@ -108,7 +108,7 @@ static void xen_patch_frametable_miss(u64 offset)
 
 void xen_patch_kernel(void)
 {
-	unsigned long patch_offset, orig_val, new_val;
+	unsigned long patch_offset;
 
 	patch_offset = xen_pstart - (KERNEL_START - PAGE_OFFSET);
 
