@@ -336,33 +336,30 @@ struct vcpu_guest_context {
 typedef struct vcpu_guest_context vcpu_guest_context_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 
-// dom0 vp op
+/* dom0 vp op */
 #define __HYPERVISOR_ia64_dom0vp_op     __HYPERVISOR_arch_0
-#define IA64_DOM0VP_ioremap             0       // map io space in machine
-                                                // address to dom0 physical
-                                                // address space.
-                                                // currently physical
-                                                // assignedg address equals to
-                                                // machine address
-#define IA64_DOM0VP_phystomach          1       // convert a pseudo physical
-                                                // page frame number
-                                                // to the corresponding
-                                                // machine page frame number.
-                                                // if no page is assigned,
-                                                // INVALID_MFN or GPFN_INV_MASK
-                                                // is returned depending on
-                                                // domain's non-vti/vti mode.
-#define IA64_DOM0VP_machtophys          3       // convert a machine page
-                                                // frame number
-                                                // to the corresponding
-                                                // pseudo physical page frame
-                                                // number of the caller domain
-#define IA64_DOM0VP_zap_physmap         17      // unmap and free pages
-                                                // contained in the specified
-                                                // pseudo physical region
-#define IA64_DOM0VP_add_physmap         18      // assigne machine page frane
-                                                // to dom0's pseudo physical
-                                                // address space.
+/*  Map io space in machine address to dom0 physical address space.
+    Currently physical assigned address equals to machine address.  */
+#define IA64_DOM0VP_ioremap             0
+
+/* Convert a pseudo physical page frame number to the corresponding
+   machine page frame number. If no page is assigned, INVALID_MFN or
+   GPFN_INV_MASK is returned depending on domain's non-vti/vti mode.  */
+#define IA64_DOM0VP_phystomach          1
+
+/* Convert a machine page frame number to the corresponding pseudo physical
+   page frame number of the caller domain.  */
+#define IA64_DOM0VP_machtophys          3
+
+/* Reserved for future use.  */
+#define IA64_DOM0VP_iounmap             4
+
+/* Unmap and free pages contained in the specified pseudo physical region.  */
+#define IA64_DOM0VP_zap_physmap         5
+
+/* Assign machine page frame to dom0's pseudo physical address space.  */
+#define IA64_DOM0VP_add_physmap         6
+
 // flags for page assignement to pseudo physical address space
 #define _ASSIGN_readonly                0
 #define ASSIGN_readonly                 (1UL << _ASSIGN_readonly)
