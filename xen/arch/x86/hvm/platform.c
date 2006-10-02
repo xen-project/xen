@@ -730,6 +730,11 @@ void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
     vcpu_iodata_t *vio;
     ioreq_t *p;
 
+    if (size == 0 || count == 0) {
+        printf("null pio request? port %lx, count %lx, size %d, value %lx, dir %d, pvalid %d.\n",
+               port, count, size, value, dir, pvalid);
+    }
+
     vio = get_vio(v->domain, v->vcpu_id);
     if (vio == NULL) {
         printk("bad shared page: %lx\n", (unsigned long) vio);
@@ -768,7 +773,7 @@ void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
     hvm_send_assist_req(v);
 }
 
-void send_mmio_req(
+static void send_mmio_req(
     unsigned char type, unsigned long gpa,
     unsigned long count, int size, long value, int dir, int pvalid)
 {
@@ -776,6 +781,11 @@ void send_mmio_req(
     vcpu_iodata_t *vio;
     ioreq_t *p;
     struct cpu_user_regs *regs;
+
+    if (size == 0 || count == 0) {
+        printf("null mmio request? type %d, gpa %lx, count %lx, size %d, value %lx, dir %d, pvalid %d.\n",
+               type, gpa, count, size, value, dir, pvalid);
+    }
 
     regs = &current->arch.hvm_vcpu.io_op.io_context;
 
@@ -918,6 +928,8 @@ void handle_mmio(unsigned long va, unsigned long gpa)
         unsigned long addr = 0;
         int dir;
 
+        ASSERT(count);
+
         /* determine non-MMIO address */
         if (realmode) {
             if (((regs->es << 4) + (regs->edi & 0xFFFF)) == va) {
@@ -940,6 +952,9 @@ void handle_mmio(unsigned long va, unsigned long gpa)
         mmio_opp->flags = mmio_inst.flags;
         mmio_opp->instr = mmio_inst.instr;
 
+        if (addr & (size - 1))
+            DPRINTK("Unaligned ioport access: %lx, %ld\n", addr, size);
+
         /*
          * In case of a movs spanning multiple pages, we break the accesses
          * up into multiple pages (the device model works with non-continguous
@@ -953,6 +968,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
         if ((addr & PAGE_MASK) != ((addr + sign * (size - 1)) & PAGE_MASK)) {
             unsigned long value = 0;
 
+            DPRINTK("Single io request in a movs crossing page boundary.\n");
             mmio_opp->flags |= OVERLAP;
 
             regs->eip -= inst_len; /* do not advance %eip */
@@ -964,12 +980,19 @@ void handle_mmio(unsigned long va, unsigned long gpa)
             if ((addr & PAGE_MASK) != ((addr + sign * (count * size - 1)) & PAGE_MASK)) {
                 regs->eip -= inst_len; /* do not advance %eip */
 
-                if (sign > 0)
+                if (sign > 0) {
                     count = (PAGE_SIZE - (addr & ~PAGE_MASK)) / size;
-                else
-                    count = (addr & ~PAGE_MASK) / size;
+                } else {
+                    /* We need to make sure we advance to the point
+                       where the next request will be on a different
+                       page.  If we're going down, that means
+                       advancing until one byte before the start of
+                       the page, hence +1. */
+                    count = ((addr + 1) & ~PAGE_MASK) / size;
+                }
             }
 
+            ASSERT(count);
             send_mmio_req(IOREQ_TYPE_COPY, gpa, count, size, addr, dir, 1);
         }
         break;
