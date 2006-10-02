@@ -123,6 +123,20 @@ xen_hypercall (struct pt_regs *regs)
 	return IA64_NO_FAULT;
 }
 
+static IA64FAULT
+xen_fast_hypercall (struct pt_regs *regs)
+{
+	uint32_t cmd = (uint32_t)regs->r2;
+	switch (cmd) {
+	case __HYPERVISOR_ia64_fast_eoi:
+		regs->r8 = pirq_guest_eoi(current->domain, regs->r14);
+		break;
+	default:
+		regs->r8 = -ENOSYS;
+	}
+	return IA64_NO_FAULT;
+}
+
 static void
 fw_hypercall_ipi (struct pt_regs *regs)
 {
@@ -187,8 +201,8 @@ fw_hypercall_fpswa (struct vcpu *v)
 	return PSCBX(v, fpswa_ret);
 }
 
-static IA64FAULT
-fw_hypercall (struct pt_regs *regs)
+IA64FAULT
+ia64_hypercall(struct pt_regs *regs)
 {
 	struct vcpu *v = current;
 	struct sal_ret_values x;
@@ -199,7 +213,13 @@ fw_hypercall (struct pt_regs *regs)
 
 	perfc_incra(fw_hypercall, index >> 8);
 	switch (index) {
-	    case FW_HYPERCALL_PAL_CALL:
+	case FW_HYPERCALL_XEN:
+		return xen_hypercall(regs);
+
+	case FW_HYPERCALL_XEN_FAST:
+		return xen_fast_hypercall(regs);
+
+	case FW_HYPERCALL_PAL_CALL:
 		//printf("*** PAL hypercall: index=%d\n",regs->r28);
 		//FIXME: This should call a C routine
 #if 0
@@ -250,7 +270,7 @@ fw_hypercall (struct pt_regs *regs)
 			regs->r10 = y.v1; regs->r11 = y.v2;
 		}
 		break;
-	    case FW_HYPERCALL_SAL_CALL:
+	case FW_HYPERCALL_SAL_CALL:
 		x = sal_emulator(vcpu_get_gr(v,32),vcpu_get_gr(v,33),
 			vcpu_get_gr(v,34),vcpu_get_gr(v,35),
 			vcpu_get_gr(v,36),vcpu_get_gr(v,37),
@@ -258,44 +278,33 @@ fw_hypercall (struct pt_regs *regs)
 		regs->r8 = x.r8; regs->r9 = x.r9;
 		regs->r10 = x.r10; regs->r11 = x.r11;
 		break;
- 	    case FW_HYPERCALL_SAL_RETURN:
+	case FW_HYPERCALL_SAL_RETURN:
 	        if ( !test_and_set_bit(_VCPUF_down, &v->vcpu_flags) )
 			vcpu_sleep_nosync(v);
 		break;
-	    case FW_HYPERCALL_EFI_CALL:
+	case FW_HYPERCALL_EFI_CALL:
 		efi_ret_value = efi_emulator (regs, &fault);
 		if (fault != IA64_NO_FAULT) return fault;
 		regs->r8 = efi_ret_value;
 		break;
-	    case FW_HYPERCALL_IPI:
+	case FW_HYPERCALL_IPI:
 		fw_hypercall_ipi (regs);
 		break;
-	    case FW_HYPERCALL_SET_SHARED_INFO_VA:
+	case FW_HYPERCALL_SET_SHARED_INFO_VA:
 	        regs->r8 = domain_set_shared_info_va (regs->r28);
 		break;
-	    case FW_HYPERCALL_FPSWA:
+	case FW_HYPERCALL_FPSWA:
 		fpswa_ret = fw_hypercall_fpswa (v);
 		regs->r8  = fpswa_ret.status;
 		regs->r9  = fpswa_ret.err0;
 		regs->r10 = fpswa_ret.err1;
 		regs->r11 = fpswa_ret.err2;
 		break;
-	    default:
+	default:
 		printf("unknown ia64 fw hypercall %lx\n", regs->r2);
 		regs->r8 = do_ni_hypercall();
 	}
 	return IA64_NO_FAULT;
-}
-
-IA64FAULT
-ia64_hypercall (struct pt_regs *regs)
-{
-	unsigned long index = regs->r2;
-
-	if (index >= FW_HYPERCALL_FIRST_ARCH)
-	    return fw_hypercall (regs);
-	else
-	    return xen_hypercall (regs);
 }
 
 unsigned long hypercall_create_continuation(

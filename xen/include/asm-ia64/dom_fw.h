@@ -39,6 +39,13 @@
 #define FW_HYPERCALL_NUM_MASK_HIGH	~0xffUL
 #define FW_HYPERCALL_NUM_MASK_LOW	 0xffUL
 
+/* Xen hypercalls are 0-63.  */
+#define FW_HYPERCALL_XEN		0x0000UL
+
+/* Define some faster and lighter hypercalls.
+   See definitions in arch-ia64.h */
+#define FW_HYPERCALL_XEN_FAST		0x0200UL
+
 /*
  * PAL can be called in physical or virtual mode simply by
  * branching to pal_entry_point, which is found in one of the

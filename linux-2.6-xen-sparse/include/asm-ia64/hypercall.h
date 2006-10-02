@@ -259,6 +259,18 @@ xencomm_arch_hypercall_hvm_op(int cmd, void *arg)
 	return _hypercall2(unsigned long, hvm_op, cmd, arg);
 }
 
+static inline int
+HYPERVISOR_physdev_op(int cmd, void *arg)
+{
+	switch (cmd) {
+	case PHYSDEVOP_eoi:
+		return _hypercall1(int, ia64_fast_eoi,
+		                   ((struct physdev_eoi *)arg)->irq);
+	default:
+		return xencomm_hypercall_physdev_op(cmd, arg);
+	}
+}
+
 extern fastcall unsigned int __do_IRQ(unsigned int irq, struct pt_regs *regs);
 static inline void exit_idle(void) {}
 #define do_IRQ(irq, regs) ({			\
@@ -377,7 +389,6 @@ HYPERVISOR_add_physmap(unsigned long gpfn, unsigned long mfn,
 #define HYPERVISOR_multicall xencomm_mini_hypercall_multicall
 #define HYPERVISOR_xen_version xencomm_mini_hypercall_xen_version
 #define HYPERVISOR_console_io xencomm_mini_hypercall_console_io
-#define HYPERVISOR_physdev_op xencomm_mini_hypercall_physdev_op
 #define HYPERVISOR_hvm_op xencomm_mini_hypercall_hvm_op
 #ifdef CONFIG_VMX_GUEST
 #define HYPERVISOR_memory_op 0
@@ -391,7 +402,6 @@ HYPERVISOR_add_physmap(unsigned long gpfn, unsigned long mfn,
 #define HYPERVISOR_multicall xencomm_hypercall_multicall
 #define HYPERVISOR_xen_version xencomm_hypercall_xen_version
 #define HYPERVISOR_console_io xencomm_hypercall_console_io
-#define HYPERVISOR_physdev_op xencomm_hypercall_physdev_op
 #define HYPERVISOR_hvm_op xencomm_hypercall_hvm_op
 #define HYPERVISOR_memory_op xencomm_hypercall_memory_op
 #endif
