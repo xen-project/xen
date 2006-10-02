@@ -63,6 +63,25 @@
 #include <xen/interface/grant_table.h>
 #include <xen/gnttab.h>
 
+/*
+ * Mutually-exclusive module options to select receive data path:
+ *  rx_copy : Packets are copied by network backend into local memory
+ *  rx_flip : Page containing packet data is transferred to our ownership
+ * For fully-virtualised guests there is no option - copying must be used.
+ * For paravirtualised guests, flipping is the default.
+ */
+#ifdef CONFIG_XEN
+static int MODPARM_rx_copy = 0;
+module_param_named(rx_copy, MODPARM_rx_copy, bool, 0);
+MODULE_PARM_DESC(rx_copy, "Copy packets from network card (rather than flip)");
+static int MODPARM_rx_flip = 0;
+module_param_named(rx_flip, MODPARM_rx_flip, bool, 0);
+MODULE_PARM_DESC(rx_flip, "Flip packets from network card (rather than copy)");
+#else
+static const int MODPARM_rx_copy = 1;
+static const int MODPARM_rx_flip = 0;
+#endif
+
 #define RX_COPY_THRESHOLD 256
 
 /* If we don't have GSO, fake things up so that we never try to use it. */
@@ -229,8 +248,7 @@ static int __devinit netfront_probe(struct xenbus_device *dev,
 	int err;
 	struct net_device *netdev;
 	struct netfront_info *info;
-	unsigned int handle;
-	unsigned feature_rx_copy;
+	unsigned int handle, feature_rx_copy, feature_rx_flip, use_copy;
 
 	err = xenbus_scanf(XBT_NIL, dev->nodename, "handle", "%u", &handle);
 	if (err != 1) {
@@ -238,22 +256,24 @@ static int __devinit netfront_probe(struct xenbus_device *dev,
 		return err;
 	}
 
-#ifndef CONFIG_XEN
 	err = xenbus_scanf(XBT_NIL, dev->otherend, "feature-rx-copy", "%u",
 			   &feature_rx_copy);
-	if (err != 1) {
-		xenbus_dev_fatal(dev, err, "reading feature-rx-copy");
-		return err;
-	}
-	if (!feature_rx_copy) {
-		xenbus_dev_fatal(dev, 0, "need a copy-capable backend");
-		return -EINVAL;
-	}
-#else
-	feature_rx_copy = 0;
-#endif
+	if (err != 1)
+		feature_rx_copy = 0;
+	err = xenbus_scanf(XBT_NIL, dev->otherend, "feature-rx-flip", "%u",
+			   &feature_rx_flip);
+	if (err != 1)
+		feature_rx_flip = 1;
 
-	netdev = create_netdev(handle, feature_rx_copy, dev);
+	/*
+	 * Copy packets on receive path if:
+	 *  (a) This was requested by user, and the backend supports it; or
+	 *  (b) Flipping was requested, but this is unsupported by the backend.
+	 */
+	use_copy = (MODPARM_rx_copy && feature_rx_copy) ||
+		(MODPARM_rx_flip && !feature_rx_flip);
+
+	netdev = create_netdev(handle, use_copy, dev);
 	if (IS_ERR(netdev)) {
 		err = PTR_ERR(netdev);
 		xenbus_dev_fatal(dev, err, "creating netdev");
@@ -270,6 +290,9 @@ static int __devinit netfront_probe(struct xenbus_device *dev,
 	err = open_netdev(info);
 	if (err)
 		goto fail_open;
+
+	IPRINTK("Created netdev %s with %sing receive path.\n",
+		netdev->name, info->copying_receiver ? "copy" : "flipp");
 
 	return 0;
 
@@ -742,7 +765,7 @@ no_skb:
 		} else {
 			gnttab_grant_foreign_access_ref(ref,
 							np->xbdev->otherend_id,
-							pfn,
+							pfn_to_mfn(pfn),
 							0);
 		}
 
@@ -1632,7 +1655,8 @@ static void network_connect(struct net_device *dev)
 		} else {
 			gnttab_grant_foreign_access_ref(
 				ref, np->xbdev->otherend_id,
-				page_to_pfn(skb_shinfo(skb)->frags->page),
+				pfn_to_mfn(page_to_pfn(skb_shinfo(skb)->
+						       frags->page)),
 				0);
 		}
 		req->gref = ref;
@@ -2052,6 +2076,16 @@ static int __init netif_init(void)
 {
 	if (!is_running_on_xen())
 		return -ENODEV;
+
+#ifdef CONFIG_XEN
+	if (MODPARM_rx_flip && MODPARM_rx_copy) {
+		WPRINTK("Cannot specify both rx_copy and rx_flip.\n");
+		return -EINVAL;
+	}
+
+	if (!MODPARM_rx_flip && !MODPARM_rx_copy)
+		MODPARM_rx_flip = 1; /* Default is to flip. */
+#endif
 
 	if (is_initial_xendomain())
 		return 0;
