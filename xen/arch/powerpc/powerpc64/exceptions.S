@@ -564,6 +564,18 @@ _GLOBAL(sleep)
  */	
     .globl spin_start
 spin_start:
+
+    /* Do a cache flush for our text, in case the loader didn't */
+    LOADADDR(r9, _start)
+    LOADADDR(r8, _etext)
+4:  dcbf r0,r9
+    icbi r0,r9
+    addi r9,r9,0x20		/* up to a 4 way set per line */
+    cmpld cr0,r9,r8
+    blt	4b
+    sync
+    isync
+
     /* Write our processor number as an acknowledgment that we're alive.  */
     LOADADDR(r14, __spin_ack)
     stw r3, 0(r14)
