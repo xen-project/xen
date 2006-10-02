@@ -50,24 +50,25 @@ void cpu_flush_icache(void)
 {
     union hid1 hid1;
     ulong flags;
-    ulong ra;
+    ulong ea;
 
     local_irq_save(flags);
 
-    /* uses special processor mode that forces a real address match */
+    /* uses special processor mode that forces a real address match on
+     * the whole line */
     hid1.word = mfhid1();
     hid1.bits.en_icbi = 1;
     mthid1(hid1.word);
 
-    for (ra = 0; ra < cpu_caches.isize; ra += cpu_caches.iline_size)
-        icbi(ra);
+    for (ea = 0; ea < cpu_caches.isize; ea += cpu_caches.iline_size)
+        icbi(ea);
 
     sync();
 
     hid1.bits.en_icbi = 0;
     mthid1(hid1.word);
 
-    local_irq_save(flags);
+    local_irq_restore(flags);
 }
 
 
