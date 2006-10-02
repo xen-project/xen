@@ -348,7 +348,7 @@ void memguard_unguard_range(void *p, unsigned long l);
 
 void memguard_guard_stack(void *p);
 
-int  ptwr_do_page_fault(struct domain *, unsigned long,
+int  ptwr_do_page_fault(struct vcpu *, unsigned long,
                         struct cpu_user_regs *);
 
 int audit_adjust_pgtables(struct domain *d, int dir, int noisy);

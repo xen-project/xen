@@ -5,3 +5,4 @@ SUBSYSTEM=="xen-backend", KERNEL=="vif*", ACTION=="online", RUN+="$env{script} o
 SUBSYSTEM=="xen-backend", KERNEL=="vif*", ACTION=="offline", RUN+="$env{script} offline"
 SUBSYSTEM=="xen-backend", ACTION=="remove", RUN+="/etc/xen/scripts/xen-hotplug-cleanup"
 KERNEL=="evtchn", NAME="xen/%k"
+KERNEL=="blktap[0-9]*", NAME="xen/%k"

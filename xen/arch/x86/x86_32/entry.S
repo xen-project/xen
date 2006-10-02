@@ -175,7 +175,7 @@ ENTRY(hypercall)
         jae   bad_hypercall
         PERFC_INCR(PERFC_hypercalls, %eax)
 #ifndef NDEBUG
-        /* Deliberately corrupt parameter regs not used by this hypercall. */
+        /* Create shadow parameters and corrupt those not used by this call. */
         pushl %eax
         pushl UREGS_eip+4(%esp)
         pushl 28(%esp) # EBP
@@ -192,11 +192,23 @@ ENTRY(hypercall)
         movl  $0xDEADBEEF,%eax
         rep   stosl
         movl  %esi,%eax
+#else
+        /* 
+         * We need shadow parameters even on non-debug builds. We depend on the
+         * original versions not being clobbered (needed to create a hypercall
+         * continuation). But that isn't guaranteed by the function-call ABI.
+         */ 
+        pushl 20(%esp) # EBP
+        pushl 20(%esp) # EDI
+        pushl 20(%esp) # ESI
+        pushl 20(%esp) # EDX
+        pushl 20(%esp) # ECX
+        pushl 20(%esp) # EBX
 #endif
         call *hypercall_table(,%eax,4)
+        addl  $24,%esp     # Discard the shadow parameters
 #ifndef NDEBUG
-        /* Deliberately corrupt parameter regs used by this hypercall. */
-        addl  $24,%esp     # Shadow parameters
+        /* Deliberately corrupt real parameter regs used by this hypercall. */
         popl  %ecx         # Shadow EIP
         cmpl  %ecx,UREGS_eip+4(%esp)
         popl  %ecx         # Shadow hypercall index

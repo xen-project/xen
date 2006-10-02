@@ -67,6 +67,8 @@ def blkdev_uname_to_file(uname):
         (typ, fn) = uname.split(":")
         if typ == "phy" and not fn.startswith("/"):
             fn = "/dev/%s" %(fn,)
+        if typ == "tap":
+            (typ, fn) = fn.split(":", 1)
     return fn
 
 def mount_mode(name):

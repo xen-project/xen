@@ -217,7 +217,7 @@ static struct sk_buff *netbk_copy_skb(struct sk_buff *skb)
 		copy = len >= PAGE_SIZE ? PAGE_SIZE : len;
 		zero = len >= PAGE_SIZE ? 0 : __GFP_ZERO;
 
-		page = alloc_page(GFP_ATOMIC | zero);
+		page = alloc_page(GFP_ATOMIC | __GFP_NOWARN | zero);
 		if (unlikely(!page))
 			goto err_free;
 

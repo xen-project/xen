@@ -33,16 +33,13 @@ def main(argv):
     if len(argv) != 2:
         raise OptionError('No XML policy file specified')
 
-    try:
-        make_policy(argv[1])
-    except ACMError:
-        sys.exit(-1)
-    except:
-        traceback.print_exc(limit=1)
-        sys.exit(-1)
-
+    make_policy(argv[1])
 
 if __name__ == '__main__':
-    main(sys.argv)
+    try:
+        main(sys.argv)
+    except Exception, e:
+        sys.stderr.write('Error: %s\n' % str(e))
+        sys.exit(-1)
 
 

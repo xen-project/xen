@@ -80,8 +80,9 @@ static inline int BLKTAP_MODE_VALID(unsigned long arg)
 #define MAX_PENDING_REQS 64
 #define BLKTAP_DEV_DIR   "/dev/xen"
 #define BLKTAP_DEV_NAME  "blktap"
-#define BLKTAP_DEV_MAJOR 254
 #define BLKTAP_DEV_MINOR 0
+
+extern int blktap_major;
 
 #define BLKTAP_RING_PAGES       1 /* Front */
 #define BLKTAP_MMAP_REGION_SIZE (BLKTAP_RING_PAGES + MMAP_PAGES)

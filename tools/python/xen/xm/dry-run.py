@@ -32,27 +32,26 @@ def help():
     individually along with the final security decision."""
 
 def main (argv):
-    try:
-        if len(argv) != 2:
-            raise OptionError('Invalid number of arguments')
-
-        passed = 0
-        (opts, config) = create.parseCommandLine(argv)
-        if create.check_domain_label(config, verbose=1):
-            if create.config_security_check(config, verbose=1):
-                passed = 1
-        else:
-            print "Checking resources: (skipped)"
-                
-        if passed:
-            print "Dry Run: PASSED"
-        else:
-            print "Dry Run: FAILED"
-            sys.exit(-1)
-
-    except security.ACMError:
+    if len(argv) != 2:
+        raise OptionError('Invalid number of arguments')
+    
+    passed = 0
+    (opts, config) = create.parseCommandLine(argv)
+    if create.check_domain_label(config, verbose=1):
+        if create.config_security_check(config, verbose=1):
+            passed = 1
+    else:
+        print "Checking resources: (skipped)"
+        
+    if passed:
+        print "Dry Run: PASSED"
+    else:
+        print "Dry Run: FAILED"
         sys.exit(-1)
 
-
 if __name__ == '__main__':
-    main(sys.argv)
+    try:
+        main(sys.argv)
+    except Exception, e:
+        sys.stderr.write('Error: %s\n' % str(e))
+        sys.exit(-1)

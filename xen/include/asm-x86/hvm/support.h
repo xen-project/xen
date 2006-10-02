@@ -118,7 +118,7 @@ enum hval_bitmaps {
 extern unsigned int opt_hvm_debug_level;
 #define HVM_DBG_LOG(level, _f, _a...)                                         \
     do {                                                                      \
-        if ( (level) & opt_hvm_debug_level )                                  \
+        if ( unlikely((level) & opt_hvm_debug_level) )                        \
             printk("[HVM:%d.%d] <%s> " _f "\n",                               \
                    current->domain->domain_id, current->vcpu_id, __func__,    \
                    ## _a);                                                    \
@@ -136,16 +136,18 @@ extern unsigned int opt_hvm_debug_level;
 
 extern int hvm_enabled;
 
-enum { HVM_COPY_IN = 0, HVM_COPY_OUT };
-extern int hvm_copy(void *buf, unsigned long vaddr, int size, int dir);
+int hvm_copy_to_guest_phys(unsigned long paddr, void *buf, int size);
+int hvm_copy_from_guest_phys(void *buf, unsigned long paddr, int size);
+int hvm_copy_to_guest_virt(unsigned long vaddr, void *buf, int size);
+int hvm_copy_from_guest_virt(void *buf, unsigned long vaddr, int size);
 
-extern void hvm_setup_platform(struct domain* d);
-extern int hvm_mmio_intercept(ioreq_t *p);
-extern int hvm_io_intercept(ioreq_t *p, int type);
-extern int hvm_buffered_io_intercept(ioreq_t *p);
-extern void hvm_hooks_assist(struct vcpu *v);
-extern void hvm_print_line(struct vcpu *v, const char c);
-extern void hlt_timer_fn(void *data);
+void hvm_setup_platform(struct domain* d);
+int hvm_mmio_intercept(ioreq_t *p);
+int hvm_io_intercept(ioreq_t *p, int type);
+int hvm_buffered_io_intercept(ioreq_t *p);
+void hvm_hooks_assist(struct vcpu *v);
+void hvm_print_line(struct vcpu *v, const char c);
+void hlt_timer_fn(void *data);
 
 void hvm_do_hypercall(struct cpu_user_regs *pregs);
 

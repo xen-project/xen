@@ -82,7 +82,10 @@ ENTRY(vmx_asm_vmexit_handler)
         /* selectors are restored/saved by VMX */
         HVM_SAVE_ALL_NOSEGREGS
         call vmx_trace_vmexit
+        movl %esp,%eax
+        push %eax
         call vmx_vmexit_handler
+        addl $4,%esp
         jmp vmx_asm_do_vmentry
 
         ALIGN

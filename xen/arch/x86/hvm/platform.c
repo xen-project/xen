@@ -394,6 +394,11 @@ static int hvm_decode(int realmode, unsigned char *opcode, struct instruction *i
         GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
         return mem_reg(instr->op_size, opcode, instr, rex);
 
+    case 0x2B: /* sub m32/16, r32/16 */
+        instr->instr = INSTR_SUB;
+        GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+        return mem_reg(instr->op_size, opcode, instr, rex);
+
     case 0x30: /* xor r8, m8 */
         instr->instr = INSTR_XOR;
         instr->op_size = BYTE;
@@ -689,7 +694,7 @@ int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip, int inst_l
 {
     if (inst_len > MAX_INST_LEN || inst_len <= 0)
         return 0;
-    if (!hvm_copy(buf, guest_eip, inst_len, HVM_COPY_IN))
+    if (hvm_copy_from_guest_virt(buf, guest_eip, inst_len))
         return 0;
     return inst_len;
 }
@@ -953,7 +958,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
             regs->eip -= inst_len; /* do not advance %eip */
 
             if (dir == IOREQ_WRITE)
-                hvm_copy(&value, addr, size, HVM_COPY_IN);
+                (void)hvm_copy_from_guest_virt(&value, addr, size);
             send_mmio_req(IOREQ_TYPE_COPY, gpa, 1, size, value, dir, 0);
         } else {
             if ((addr & PAGE_MASK) != ((addr + sign * (count * size - 1)) & PAGE_MASK)) {
@@ -1011,6 +1016,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
 
     case INSTR_CMP:        /* Pass through */
     case INSTR_TEST:
+    case INSTR_SUB:
         mmio_opp->flags = mmio_inst.flags;
         mmio_opp->instr = mmio_inst.instr;
         mmio_opp->operand[0] = mmio_inst.operand[0]; /* source */
@@ -1094,7 +1100,7 @@ unsigned long copy_to_user_hvm(void *to, const void *from, unsigned len)
         return 0;
     }
 
-    return !hvm_copy((void *)from, (unsigned long)to, len, HVM_COPY_OUT);
+    return hvm_copy_to_guest_virt((unsigned long)to, (void *)from, len);
 }
 
 unsigned long copy_from_user_hvm(void *to, const void *from, unsigned len)
@@ -1105,7 +1111,7 @@ unsigned long copy_from_user_hvm(void *to, const void *from, unsigned len)
         return 0;
     }
 
-    return !hvm_copy(to, (unsigned long)from, len, HVM_COPY_IN);
+    return hvm_copy_from_guest_virt(to, (unsigned long)from, len);
 }
 
 /*

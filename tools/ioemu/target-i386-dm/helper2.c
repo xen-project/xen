@@ -520,8 +520,8 @@ int main_loop(void)
             }
         }
 
-        /* Wait up to 100 msec. */
-        main_loop_wait(100);
+        /* Wait up to 10 msec. */
+        main_loop_wait(10);
 
         if (env->send_event) {
             env->send_event = 0;

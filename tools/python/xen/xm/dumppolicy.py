@@ -19,7 +19,7 @@
 """
 import sys
 from xen.util.security import ACMError, err, dump_policy
-
+from xen.xm.opts import OptionError
 
 def help():
     return """
@@ -27,16 +27,16 @@ def help():
     (low-level)."""
 
 def main(argv):
-    try:
-        if len(argv) != 1:
-            usage()
+    if len(argv) != 1:
+        raise OptionError("No arguments expected.")
 
-        dump_policy()
-    except ACMError:
-        sys.exit(-1)
-
+    dump_policy()
 
 if __name__ == '__main__':
-    main(sys.argv)
+    try:
+        main(sys.argv)
+    except Exception, e:
+        sys.stderr.write('Error: %s\n' % str(e))    
+        sys.exit(-1)
 
 

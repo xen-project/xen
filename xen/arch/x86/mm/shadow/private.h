@@ -532,55 +532,6 @@ static inline void sh_unpin(struct vcpu *v, mfn_t smfn)
     }
 }
 
-/**************************************************************************/
-/* Guest physmap (p2m) support */
-
-/* Read our own P2M table, checking in the linear pagetables first to be
- * sure that we will succeed.  Call this function if you expect it to
- * fail often, as it avoids page faults.  If you expect to succeed, use
- * vcpu_gfn_to_mfn, which copy_from_user()s the entry */
-static inline mfn_t
-vcpu_gfn_to_mfn_nofault(struct vcpu *v, unsigned long gfn)
-{
-    unsigned long entry_addr = (unsigned long) &phys_to_machine_mapping[gfn];
-#if CONFIG_PAGING_LEVELS >= 4
-    l4_pgentry_t *l4e;
-    l3_pgentry_t *l3e;
-#endif
-    l2_pgentry_t *l2e;
-    l1_pgentry_t *l1e;
-
-    ASSERT(current == v);
-    if ( !shadow_vcpu_mode_translate(v) )
-        return _mfn(gfn);
-
-#if CONFIG_PAGING_LEVELS > 2
-    if ( gfn >= (RO_MPT_VIRT_END - RO_MPT_VIRT_START) / sizeof(l1_pgentry_t) ) 
-        /* This pfn is higher than the p2m map can hold */
-        return _mfn(INVALID_MFN);
-#endif
-    
-    /* Walk the linear pagetables.  Note that this is *not* the same as 
-     * the walk in sh_gfn_to_mfn_foreign, which is walking the p2m map */
-#if CONFIG_PAGING_LEVELS >= 4
-    l4e = __linear_l4_table + l4_linear_offset(entry_addr);
-    if ( !(l4e_get_flags(*l4e) & _PAGE_PRESENT) ) return _mfn(INVALID_MFN);
-    l3e = __linear_l3_table + l3_linear_offset(entry_addr);
-    if ( !(l3e_get_flags(*l3e) & _PAGE_PRESENT) ) return _mfn(INVALID_MFN);
-#endif
-    l2e = __linear_l2_table + l2_linear_offset(entry_addr);
-    if ( !(l2e_get_flags(*l2e) & _PAGE_PRESENT) ) return _mfn(INVALID_MFN);
-    l1e = __linear_l1_table + l1_linear_offset(entry_addr);
-    if ( !(l1e_get_flags(*l1e) & _PAGE_PRESENT) ) return _mfn(INVALID_MFN);
-
-    /* Safe to look at this part of the table */
-    if ( l1e_get_flags(phys_to_machine_mapping[gfn])  & _PAGE_PRESENT )
-        return _mfn(l1e_get_pfn(phys_to_machine_mapping[gfn]));
-    
-    return _mfn(INVALID_MFN);
-}
-
-
 #endif /* _XEN_SHADOW_PRIVATE_H */
 
 /*

@@ -26,6 +26,7 @@
 #include <public/domctl.h> 
 #include <xen/sched.h>
 #include <xen/perfc.h>
+#include <xen/domain_page.h>
 #include <asm/flushtlb.h>
 
 /* How to make sure a page is not referred to in a shadow PT */
@@ -245,7 +246,9 @@ shadow_vcpu_mode_translate(struct vcpu *v)
     // enabled.  (HVM vcpu's with paging disabled are using the p2m table as
     // its paging table, so no translation occurs in this case.)
     //
-    return v->arch.shadow.hvm_paging_enabled;
+    // It is also true for translated PV domains.
+    //
+    return v->arch.shadow.translate_enabled;
 }
 
 
@@ -287,6 +290,10 @@ struct shadow_paging_mode {
                                             struct x86_emulate_ctxt *ctxt);
     mfn_t         (*make_monitor_table    )(struct vcpu *v);
     void          (*destroy_monitor_table )(struct vcpu *v, mfn_t mmfn);
+    void *        (*guest_map_l1e         )(struct vcpu *v, unsigned long va,
+                                            unsigned long *gl1mfn);
+    void          (*guest_get_eff_l1e     )(struct vcpu *v, unsigned long va,
+                                            void *eff_l1e);
 #if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC
     int           (*guess_wrmap           )(struct vcpu *v, 
                                             unsigned long vaddr, mfn_t gmfn);
@@ -452,9 +459,73 @@ shadow_destroy_monitor_table(struct vcpu *v, mfn_t mmfn)
     v->arch.shadow.mode->destroy_monitor_table(v, mmfn);
 }
 
+static inline void *
+guest_map_l1e(struct vcpu *v, unsigned long addr, unsigned long *gl1mfn)
+{
+    if ( likely(!shadow_mode_translate(v->domain)) )
+    {
+        l2_pgentry_t l2e;
+        ASSERT(!shadow_mode_external(v->domain));
+        /* Find this l1e and its enclosing l1mfn in the linear map */
+        if ( __copy_from_user(&l2e, 
+                              &__linear_l2_table[l2_linear_offset(addr)],
+                              sizeof(l2_pgentry_t)) != 0 )
+            return NULL;
+        /* Check flags that it will be safe to read the l1e */
+        if ( (l2e_get_flags(l2e) & (_PAGE_PRESENT | _PAGE_PSE)) 
+             != _PAGE_PRESENT )
+            return NULL;
+        *gl1mfn = l2e_get_pfn(l2e);
+        return &__linear_l1_table[l1_linear_offset(addr)];
+    }
+
+    return v->arch.shadow.mode->guest_map_l1e(v, addr, gl1mfn);
+}
+
+static inline void
+guest_unmap_l1e(struct vcpu *v, void *p)
+{
+    if ( unlikely(shadow_mode_translate(v->domain)) )
+        unmap_domain_page(p);
+}
+
+static inline void
+guest_get_eff_l1e(struct vcpu *v, unsigned long addr, void *eff_l1e)
+{
+    if ( likely(!shadow_mode_translate(v->domain)) )
+    {
+        ASSERT(!shadow_mode_external(v->domain));
+        if ( __copy_from_user(eff_l1e, 
+                              &__linear_l1_table[l1_linear_offset(addr)],
+                              sizeof(l1_pgentry_t)) != 0 )
+            *(l1_pgentry_t *)eff_l1e = l1e_empty();
+        return;
+    }
+        
+    v->arch.shadow.mode->guest_get_eff_l1e(v, addr, eff_l1e);
+}
+
+static inline void
+guest_get_eff_kern_l1e(struct vcpu *v, unsigned long addr, void *eff_l1e)
+{
+#if defined(__x86_64__)
+    int user_mode = !(v->arch.flags & TF_kernel_mode);
+#define TOGGLE_MODE() if ( user_mode ) toggle_guest_mode(v)
+#else
+#define TOGGLE_MODE() ((void)0)
+#endif
+
+    TOGGLE_MODE();
+    guest_get_eff_l1e(v, addr, eff_l1e);
+    TOGGLE_MODE();
+}
+
+
 /* Validate a pagetable change from the guest and update the shadows. */
 extern int shadow_validate_guest_entry(struct vcpu *v, mfn_t gmfn,
                                         void *new_guest_entry);
+extern int __shadow_validate_guest_entry(struct vcpu *v, mfn_t gmfn, 
+                                         void *entry, u32 size);
 
 /* Update the shadows in response to a pagetable write from a HVM guest */
 extern void shadow_validate_guest_pt_write(struct vcpu *v, mfn_t gmfn, 
@@ -481,7 +552,12 @@ shadow_remove_all_shadows_and_parents(struct vcpu *v, mfn_t gmfn);
 extern void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int all);
 static inline void shadow_remove_all_shadows(struct vcpu *v, mfn_t gmfn)
 {
+    int was_locked = shadow_lock_is_acquired(v->domain);
+    if ( !was_locked )
+        shadow_lock(v->domain);
     sh_remove_shadows(v, gmfn, 1);
+    if ( !was_locked )
+        shadow_unlock(v->domain);
 }
 
 /* Add a page to a domain */
@@ -624,7 +700,14 @@ sh_mfn_to_gfn(struct domain *d, mfn_t mfn)
         return mfn_x(mfn);
 }
 
-
+static inline l1_pgentry_t
+gl1e_to_ml1e(struct domain *d, l1_pgentry_t l1e)
+{
+    if ( unlikely(shadow_mode_translate(d)) )
+        l1e = l1e_from_pfn(gmfn_to_mfn(d, l1e_get_pfn(l1e)),
+                           l1e_get_flags(l1e));
+    return l1e;
+}
 
 #endif /* _XEN_SHADOW_H */
 

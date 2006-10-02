@@ -271,7 +271,6 @@ static int read_msg(char *buf)
 	int length, len, msglen, tap_fd, *io_fd;
 	char *ptr, *path;
 	image_t *img;
-	struct timeval timeout;
 	msg_hdr_t *msg;
 	msg_newdev_t *msg_dev;
 	msg_pid_t *msg_pid;
@@ -579,8 +578,7 @@ int main(int argc, char *argv[])
 {
 	int len, msglen, ret;
 	char *p, *buf;
-	fd_set readfds, writefds;
-	struct timeval timeout;
+	fd_set readfds, writefds;	
 	fd_list_entry_t *ptr;
 	struct tap_disk *drv;
 	struct td_state *s;
@@ -622,12 +620,9 @@ int main(int argc, char *argv[])
 		/*Set all tap fds*/
 		LOCAL_FD_SET(&readfds);
 
-		timeout.tv_sec = 0; 
-		timeout.tv_usec = 1000; 
-
 		/*Wait for incoming messages*/
 		ret = select(maxfds + 1, &readfds, (fd_set *) 0, 
-			     (fd_set *) 0, &timeout);
+			     (fd_set *) 0, NULL);
 
 		if (ret > 0) 
 		{

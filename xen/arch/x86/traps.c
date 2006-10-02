@@ -886,7 +886,7 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
          /* Do not check if access-protection fault since the page may 
             legitimately be not present in shadow page tables */
          ((regs->error_code & PFEC_write_access) == PFEC_write_access) &&
-         ptwr_do_page_fault(d, addr, regs) )
+         ptwr_do_page_fault(v, addr, regs) )
         return EXCRET_fault_fixed;
 
     if ( shadow_mode_enabled(d) )

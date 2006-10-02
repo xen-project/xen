@@ -341,7 +341,11 @@ unsigned long svm_rip2pointer(struct vmcb_struct *vmcb)
      * %cs is update, but fortunately, base contain the valid base address
      * no matter what kind of addressing is used.
      */
-    return vmcb->cs.base + vmcb->rip;
+    unsigned long p = vmcb->cs.base + vmcb->rip;
+    if (!(vmcb->cs.attributes.fields.l && vmcb->efer & EFER_LMA))
+        return (u32)p; /* mask to 32 bits */
+    /* NB. Should mask to 16 bits if in real mode or 16-bit protected mode. */
+    return p;
 }
 
 

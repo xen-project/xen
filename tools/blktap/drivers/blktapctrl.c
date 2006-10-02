@@ -67,6 +67,8 @@ int run = 1;
 int max_timeout = MAX_TIMEOUT;
 int ctlfd = 0;
 
+int blktap_major;
+
 static int open_ctrl_socket(char *devname);
 static int write_msg(int fd, int msgtype, void *ptr, void *ptr2);
 static int read_msg(int fd, int msgtype, void *ptr);
@@ -108,7 +110,18 @@ static void make_blktap_dev(char *devname, int major, int minor)
 		if (mknod(devname, S_IFCHR|0600,
                 	makedev(major, minor)) == 0)
 			DPRINTF("Created %s device\n",devname);
-	} else DPRINTF("%s device already exists\n",devname);
+	} else {
+		DPRINTF("%s device already exists\n",devname);
+		/* it already exists, but is it the same major number */
+		if (((st.st_rdev>>8) & 0xff) != major) {
+			DPRINTF("%s has old major %d\n",
+				devname,
+				(unsigned int)((st.st_rdev >> 8) & 0xff));
+			/* only try again if we succed in deleting it */
+			if (!unlink(devname))
+				make_blktap_dev(devname, major, minor);
+		}
+	}
 }
 
 static int get_new_dev(int *major, int *minor, blkif_t *blkif)
@@ -644,9 +657,12 @@ int main(int argc, char *argv[])
 	register_new_devmap_hook(map_new_blktapctrl);
 	register_new_unmap_hook(unmap_blktapctrl);
 
-	/*Attach to blktap0 */	
+	/* Attach to blktap0 */
 	asprintf(&devname,"%s/%s0", BLKTAP_DEV_DIR, BLKTAP_DEV_NAME);
-	make_blktap_dev(devname,254,0);
+	if ((ret = xc_find_device_number("blktap0")) < 0)
+		goto open_failed;
+	blktap_major = major(ret);
+	make_blktap_dev(devname,blktap_major,0);
 	ctlfd = open(devname, O_RDWR);
 	if (ctlfd == -1) {
 		DPRINTF("blktap0 open failed\n");

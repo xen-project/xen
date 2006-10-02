@@ -334,8 +334,10 @@ int arch_set_info_guest(
     }
     else
     {
-        if ( !get_page_and_type(mfn_to_page(cr3_pfn), d,
-                                PGT_base_page_table) )
+        if ( shadow_mode_refcounts(d)
+             ? !get_page(mfn_to_page(cr3_pfn), d)
+             : !get_page_and_type(mfn_to_page(cr3_pfn), d,
+                                  PGT_base_page_table) )
         {
             destroy_gdt(v);
             return -EINVAL;
@@ -952,7 +954,10 @@ void domain_relinquish_resources(struct domain *d)
         pfn = pagetable_get_pfn(v->arch.guest_table_user);
         if ( pfn != 0 )
         {
-            put_page_and_type(mfn_to_page(pfn));
+            if ( shadow_mode_refcounts(d) )
+                put_page(mfn_to_page(pfn));
+            else
+                put_page_and_type(mfn_to_page(pfn));
             v->arch.guest_table_user = pagetable_null();
         }
 #endif

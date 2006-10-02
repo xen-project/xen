@@ -86,7 +86,7 @@ static int pic_get_irq(PicState *s)
 
     ASSERT(spin_is_locked(&s->pics_state->lock));
 
-    mask = s->irr & ~s->imr;
+    mask = (s->irr|s->irr_xen) & ~s->imr;
     priority = get_priority(s, mask);
     if (priority == 8)
         return -1;
@@ -128,6 +128,32 @@ void pic_update_irq(struct hvm_virpic *s)
     }
 }
 
+void pic_set_xen_irq(void *opaque, int irq, int level)
+{
+    struct hvm_virpic *s = opaque;
+    unsigned long flags;
+    PicState *ps;
+
+    spin_lock_irqsave(&s->lock, flags);
+
+    hvm_vioapic_set_xen_irq(current->domain, irq, level);
+
+    /* Set it on the 8259s */
+    ps = &s->pics[irq >> 3];
+    if (!(ps->elcr & (1 << (irq & 7)))) {
+	DPRINTK("edge-triggered override IRQ?\n");
+	domain_crash(current->domain);
+    }
+    if (level) {
+	ps->irr_xen |= 1 << (irq & 7);
+    } else {
+	ps->irr_xen &= ~(1 << (irq & 7));
+    }
+
+    pic_update_irq(s);
+    spin_unlock_irqrestore(&s->lock, flags);
+}
+
 void pic_set_irq_new(void *opaque, int irq, int level)
 {
     struct hvm_virpic *s = opaque;
@@ -136,9 +162,6 @@ void pic_set_irq_new(void *opaque, int irq, int level)
     spin_lock_irqsave(&s->lock, flags);
     hvm_vioapic_set_irq(current->domain, irq, level);
     pic_set_irq1(&s->pics[irq >> 3], irq & 7, level);
-    /* used for IOAPIC irqs */
-    if (s->alt_irq_func)
-        s->alt_irq_func(s->alt_irq_opaque, irq, level);
     pic_update_irq(s);
     spin_unlock_irqrestore(&s->lock, flags);
 }
@@ -371,6 +394,7 @@ static uint32_t pic_poll_read (PicState *s, uint32_t addr1)
             s->pics_state->pics[0].irr &= ~(1 << 2);
         }
         s->irr &= ~(1 << ret);
+        s->irr_xen &= ~(1 << ret);
         s->isr &= ~(1 << ret);
         if (addr1 >> 7 || ret != 2)
             pic_update_irq(s->pics_state);
@@ -400,7 +424,7 @@ static uint32_t pic_ioport_read(void *opaque, uint32_t addr1)
             if (s->read_reg_select)
                 ret = s->isr;
             else
-                ret = s->irr;
+                ret = s->irr | s->irr_xen;
         } else {
             ret = s->imr;
         }
@@ -472,18 +496,6 @@ void pic_init(struct hvm_virpic *s, void (*irq_request)(void *, int),
     s->irq_request_opaque = irq_request_opaque;
 }
 
-void pic_set_alt_irq_func(struct hvm_virpic *s,
-                          void (*alt_irq_func)(void *, int, int),
-                          void *alt_irq_opaque)
-{
-    unsigned long flags;
-
-    spin_lock_irqsave(&s->lock, flags);
-    s->alt_irq_func = alt_irq_func;
-    s->alt_irq_opaque = alt_irq_opaque;
-    spin_unlock_irqrestore(&s->lock, flags);
-}
-
 static int intercept_pic_io(ioreq_t *p)
 {
     struct hvm_virpic  *pic;
@@ -497,8 +509,9 @@ static int intercept_pic_io(ioreq_t *p)
     }
     pic = &v->domain->arch.hvm_domain.vpic;
     if ( p->dir == 0 ) {
-        if(p->pdata_valid) 
-            hvm_copy(&data, (unsigned long)p->u.pdata, p->size, HVM_COPY_IN);
+        if (p->pdata_valid) 
+            (void)hvm_copy_from_guest_virt(
+                &data, (unsigned long)p->u.pdata, p->size);
         else
             data = p->u.data;
         spin_lock_irqsave(&pic->lock, flags);
@@ -511,8 +524,9 @@ static int intercept_pic_io(ioreq_t *p)
         data = pic_ioport_read(
             (void*)&pic->pics[p->addr>>7], (uint32_t) p->addr);
         spin_unlock_irqrestore(&pic->lock, flags);
-        if(p->pdata_valid) 
-            hvm_copy(&data, (unsigned long)p->u.pdata, p->size, HVM_COPY_OUT);
+        if (p->pdata_valid) 
+            (void)hvm_copy_to_guest_virt(
+                (unsigned long)p->u.pdata, &data, p->size);
         else 
             p->u.data = (u64)data;
     }
@@ -533,8 +547,9 @@ static int intercept_elcr_io(ioreq_t *p)
 
     s = &v->domain->arch.hvm_domain.vpic;
     if ( p->dir == 0 ) {
-        if(p->pdata_valid) 
-            hvm_copy(&data, (unsigned long)p->u.pdata, p->size, HVM_COPY_IN);
+        if (p->pdata_valid) 
+            (void)hvm_copy_from_guest_virt(
+                &data, (unsigned long)p->u.pdata, p->size);
         else
             data = p->u.data;
         spin_lock_irqsave(&s->lock, flags);
@@ -547,8 +562,9 @@ static int intercept_elcr_io(ioreq_t *p)
     else {
         data = (u64) elcr_ioport_read(
                 (void*)&s->pics[p->addr&1], (uint32_t) p->addr);
-        if(p->pdata_valid) 
-            hvm_copy(&data, (unsigned long)p->u.pdata, p->size, HVM_COPY_OUT);
+        if (p->pdata_valid) 
+            (void)hvm_copy_to_guest_virt(
+                (unsigned long)p->u.pdata, &data, p->size);
         else 
             p->u.data = (u64)data;
 

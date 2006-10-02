@@ -42,14 +42,14 @@ def rm_resource_label(resource):
     try:
         access_control = dictio.dict_read("resources", file)
     except:
-        security.err("Resource file not found, cannot remove label!")
+        raise security.ACMError("Resource file not found, cannot remove label!")
 
     # remove the entry and update file
     if access_control.has_key(resource):
         del access_control[resource]
         dictio.dict_write(access_control, "resources", file)
     else:
-        security.err("Resource not labeled.")
+        raise security.ACMError("Resource not labeled")
 
 
 def rm_domain_label(configfile):
@@ -65,8 +65,8 @@ def rm_domain_label(configfile):
                 fd = open(file, "rb")
                 break
     if not fd:
-        security.err("Configuration file '"+configfile+"' not found.")
-
+        raise OptionError("Configuration file '%s' not found." % configfile)
+        
     # read in the domain config file, removing label
     ac_entry_re = re.compile("^access_control\s*=.*", re.IGNORECASE)
     ac_exit_re = re.compile(".*'\].*")
@@ -86,7 +86,7 @@ def rm_domain_label(configfile):
 
     # send error message if we didn't find anything to remove
     if not removed:
-        security.err("Domain not labeled.")
+        raise security.ACMError('Domain not labeled')
 
     # write the data back out to the file
     fd = open(file, "wb")
@@ -102,17 +102,18 @@ def main (argv):
     if argv[1].lower() not in ('dom', 'res'):
         raise OptionError('Unrecognised type argument: %s' % argv[1])
 
-    try:
-        if argv[1].lower() == "dom":
-            configfile = argv[2]
-            rm_domain_label(configfile)
-        elif argv[1].lower() == "res":
-            resource = argv[2]
-            rm_resource_label(resource)
-    except security.ACMError:
-        sys.exit(-1)
+    if argv[1].lower() == "dom":
+        configfile = argv[2]
+        rm_domain_label(configfile)
+    elif argv[1].lower() == "res":
+        resource = argv[2]
+        rm_resource_label(resource)
 
 if __name__ == '__main__':
-    main(sys.argv)
+    try:
+        main(sys.argv)
+    except Exception, e:
+        sys.stderr.write('Error: %s\n' % str(e))
+        sys.exit(-1)    
 
 

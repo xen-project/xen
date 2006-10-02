@@ -427,23 +427,11 @@ int map_ldt_shadow_page(unsigned int off)
     unsigned long gmfn, mfn;
     l1_pgentry_t l1e, nl1e;
     unsigned long gva = v->arch.guest_context.ldt_base + (off << PAGE_SHIFT);
-    int res;
-
-#if defined(__x86_64__)
-    /* If in user mode, switch to kernel mode just to read LDT mapping. */
-    int user_mode = !(v->arch.flags & TF_kernel_mode);
-#define TOGGLE_MODE() if ( user_mode ) toggle_guest_mode(v)
-#elif defined(__i386__)
-#define TOGGLE_MODE() ((void)0)
-#endif
+    int okay;
 
     BUG_ON(unlikely(in_irq()));
 
-    TOGGLE_MODE();
-    __copy_from_user(&l1e, &linear_pg_table[l1_linear_offset(gva)],
-                     sizeof(l1e));
-    TOGGLE_MODE();
-
+    guest_get_eff_kern_l1e(v, gva, &l1e);
     if ( unlikely(!(l1e_get_flags(l1e) & _PAGE_PRESENT)) )
         return 0;
 
@@ -452,17 +440,17 @@ int map_ldt_shadow_page(unsigned int off)
     if ( unlikely(!VALID_MFN(mfn)) )
         return 0;
 
-    res = get_page_and_type(mfn_to_page(mfn), d, PGT_ldt_page);
+    okay = get_page_and_type(mfn_to_page(mfn), d, PGT_ldt_page);
 
-    if ( !res && unlikely(shadow_mode_refcounts(d)) )
+    if ( !okay && unlikely(shadow_mode_refcounts(d)) )
     {
         shadow_lock(d);
         shadow_remove_write_access(d->vcpu[0], _mfn(mfn), 0, 0);
-        res = get_page_and_type(mfn_to_page(mfn), d, PGT_ldt_page);
+        okay = get_page_and_type(mfn_to_page(mfn), d, PGT_ldt_page);
         shadow_unlock(d);
     }
 
-    if ( unlikely(!res) )
+    if ( unlikely(!okay) )
         return 0;
 
     nl1e = l1e_from_pfn(mfn, l1e_get_flags(l1e) | _PAGE_RW);
@@ -1233,7 +1221,7 @@ static inline int update_l1e(l1_pgentry_t *pl1e,
         }
     }
 #endif
-    if ( unlikely(shadow_mode_enabled(v->domain)) )
+    if ( unlikely(shadow_mode_enabled(v->domain)) && rv )
     {
         shadow_validate_guest_entry(v, _mfn(gl1mfn), pl1e);
         shadow_unlock(v->domain);    
@@ -1251,6 +1239,9 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
 
     if ( unlikely(__copy_from_user(&ol1e, pl1e, sizeof(ol1e)) != 0) )
         return 0;
+
+    if ( unlikely(shadow_mode_refcounts(d)) )
+        return update_l1e(pl1e, ol1e, nl1e, gl1mfn, current);
 
     if ( l1e_get_flags(nl1e) & _PAGE_PRESENT )
     {
@@ -1544,9 +1535,7 @@ void free_page_type(struct page_info *page, unsigned long type)
 
             gmfn = mfn_to_gmfn(owner, page_to_mfn(page));
             ASSERT(VALID_M2P(gmfn));
-            shadow_lock(owner);
             shadow_remove_all_shadows(owner->vcpu[0], _mfn(gmfn));
-            shadow_unlock(owner);
         }
     }
 
@@ -1618,8 +1607,8 @@ void put_page_type(struct page_info *page)
              *  2. Shadow mode reuses this field for shadowed page tables to
              *     store flags info -- we don't want to conflict with that.
              */
-            if ( !shadow_mode_enabled(page_get_owner(page)) ||
-                 ((nx & PGT_type_mask) == PGT_writable_page) )
+            if ( !(shadow_mode_enabled(page_get_owner(page)) &&
+                   (page->count_info & PGC_page_table)) )
                 page->tlbflush_timestamp = tlbflush_current_time();
         }
     }
@@ -1644,6 +1633,12 @@ int get_page_type(struct page_info *page, unsigned long type)
         }
         else if ( unlikely((x & PGT_count_mask) == 0) )
         {
+            struct domain *d = page_get_owner(page);
+
+            /* Never allow a shadowed frame to go from type count 0 to 1 */
+            if ( d && shadow_mode_enabled(d) )
+                shadow_remove_all_shadows(d->vcpu[0], _mfn(page_to_mfn(page)));
+
             ASSERT(!(x & PGT_pae_xen_l2));
             if ( (x & PGT_type_mask) != type )
             {
@@ -1652,8 +1647,9 @@ int get_page_type(struct page_info *page, unsigned long type)
                  * may be unnecessary (e.g., page was GDT/LDT) but those 
                  * circumstances should be very rare.
                  */
-                cpumask_t mask =
-                    page_get_owner(page)->domain_dirty_cpumask;
+                cpumask_t mask = d->domain_dirty_cpumask;
+
+                /* Don't flush if the timestamp is old enough */
                 tlbflush_filter(mask, page->tlbflush_timestamp);
 
                 if ( unlikely(!cpus_empty(mask)) &&
@@ -1866,6 +1862,14 @@ static int set_foreigndom(domid_t domid)
         }
     }
 
+    if ( unlikely(shadow_mode_translate(d)) )
+    {
+        MEM_LOG("%s: can not mix foreign mappings with translated domains",
+                __func__);
+        info->foreign = NULL;
+        okay = 0; 
+    }
+
  out:
     return okay;
 }
@@ -1897,7 +1901,7 @@ int do_mmuext_op(
 {
     struct mmuext_op op;
     int rc = 0, i = 0, okay;
-    unsigned long mfn, type;
+    unsigned long mfn = 0, gmfn = 0, type;
     unsigned int done = 0;
     struct page_info *page;
     struct vcpu *v = current;
@@ -1942,7 +1946,8 @@ int do_mmuext_op(
         }
 
         okay = 1;
-        mfn  = op.arg1.mfn;
+        gmfn  = op.arg1.mfn;
+        mfn = gmfn_to_mfn(FOREIGNDOM, gmfn);
         page = mfn_to_page(mfn);
 
         switch ( op.cmd )
@@ -2017,7 +2022,6 @@ int do_mmuext_op(
             break;
 
         case MMUEXT_NEW_BASEPTR:
-            mfn = gmfn_to_mfn(current->domain, mfn);
             okay = new_guest_cr3(mfn);
             this_cpu(percpu_mm_info).deferred_ops &= ~DOP_FLUSH_TLB;
             break;
@@ -2026,8 +2030,13 @@ int do_mmuext_op(
         case MMUEXT_NEW_USER_BASEPTR:
             okay = 1;
             if (likely(mfn != 0))
-                okay = get_page_and_type_from_pagenr(
-                    mfn, PGT_root_page_table, d);
+            {
+                if ( shadow_mode_refcounts(d) )
+                    okay = get_page_from_pagenr(mfn, d);
+                else
+                    okay = get_page_and_type_from_pagenr(
+                        mfn, PGT_root_page_table, d);
+            }
             if ( unlikely(!okay) )
             {
                 MEM_LOG("Error while installing new mfn %lx", mfn);
@@ -2038,7 +2047,12 @@ int do_mmuext_op(
                     pagetable_get_pfn(v->arch.guest_table_user);
                 v->arch.guest_table_user = pagetable_from_pfn(mfn);
                 if ( old_mfn != 0 )
-                    put_page_and_type(mfn_to_page(old_mfn));
+                {
+                    if ( shadow_mode_refcounts(d) )
+                        put_page(mfn_to_page(old_mfn));
+                    else
+                        put_page_and_type(mfn_to_page(old_mfn));
+                }
             }
             break;
 #endif
@@ -2499,17 +2513,26 @@ static int create_grant_va_mapping(
 {
     l1_pgentry_t *pl1e, ol1e;
     struct domain *d = v->domain;
+    unsigned long gl1mfn;
+    int okay;
     
     ASSERT(spin_is_locked(&d->big_lock));
 
     adjust_guest_l1e(nl1e);
 
-    pl1e = &linear_pg_table[l1_linear_offset(va)];
-
-    if ( unlikely(__copy_from_user(&ol1e, pl1e, sizeof(ol1e)) != 0) ||
-         !update_l1e(pl1e, ol1e, nl1e, 
-                    l2e_get_pfn(__linear_l2_table[l2_linear_offset(va)]), v) )
+    pl1e = guest_map_l1e(v, va, &gl1mfn);
+    if ( !pl1e )
+    {
+        MEM_LOG("Could not find L1 PTE for address %lx", va);
         return GNTST_general_error;
+    }
+    ol1e = *pl1e;
+    okay = update_l1e(pl1e, ol1e, nl1e, gl1mfn, v);
+    guest_unmap_l1e(v, pl1e);
+    pl1e = NULL;
+
+    if ( !okay )
+            return GNTST_general_error;
 
     if ( !shadow_mode_refcounts(d) )
         put_page_from_l1e(ol1e, d);
@@ -2518,17 +2541,19 @@ static int create_grant_va_mapping(
 }
 
 static int destroy_grant_va_mapping(
-    unsigned long addr, unsigned long frame, struct domain *d)
+    unsigned long addr, unsigned long frame, struct vcpu *v)
 {
     l1_pgentry_t *pl1e, ol1e;
+    unsigned long gl1mfn;
+    int rc = 0;
     
-    pl1e = &linear_pg_table[l1_linear_offset(addr)];
-
-    if ( unlikely(__get_user(ol1e.l1, &pl1e->l1) != 0) )
+    pl1e = guest_map_l1e(v, addr, &gl1mfn);
+    if ( !pl1e )
     {
-        MEM_LOG("Could not find PTE entry for address %lx", addr);
+        MEM_LOG("Could not find L1 PTE for address %lx", addr);
         return GNTST_general_error;
     }
+    ol1e = *pl1e;
 
     /*
      * Check that the virtual address supplied is actually mapped to
@@ -2538,19 +2563,21 @@ static int destroy_grant_va_mapping(
     {
         MEM_LOG("PTE entry %lx for address %lx doesn't match frame %lx",
                 l1e_get_pfn(ol1e), addr, frame);
-        return GNTST_general_error;
+        rc = GNTST_general_error;
+        goto out;
     }
 
     /* Delete pagetable entry. */
-    if ( unlikely(!update_l1e(pl1e, ol1e, l1e_empty(), 
-                      l2e_get_pfn(__linear_l2_table[l2_linear_offset(addr)]),
-                      d->vcpu[0] /* Change for per-vcpu shadows */)) )
+    if ( unlikely(!update_l1e(pl1e, ol1e, l1e_empty(), gl1mfn, v)) )
     {
         MEM_LOG("Cannot delete PTE entry at %p", (unsigned long *)pl1e);
-        return GNTST_general_error;
+        rc = GNTST_general_error;
+        goto out; // this is redundant & unnecessary, but informative
     }
 
-    return 0;
+ out:
+    guest_unmap_l1e(v, pl1e);
+    return rc;
 }
 
 int create_grant_host_mapping(
@@ -2573,7 +2600,7 @@ int destroy_grant_host_mapping(
 {
     if ( flags & GNTMAP_contains_pte )
         return destroy_grant_pte_mapping(addr, frame, current->domain);
-    return destroy_grant_va_mapping(addr, frame, current->domain);
+    return destroy_grant_va_mapping(addr, frame, current);
 }
 
 int steal_page(
@@ -2629,7 +2656,8 @@ int do_update_va_mapping(unsigned long va, u64 val64,
     l1_pgentry_t   val = l1e_from_intpte(val64);
     struct vcpu   *v   = current;
     struct domain *d   = v->domain;
-    unsigned long  vmask, bmap_ptr;
+    l1_pgentry_t  *pl1e;
+    unsigned long  vmask, bmap_ptr, gl1mfn;
     cpumask_t      pmask;
     int            rc  = 0;
 
@@ -2638,35 +2666,17 @@ int do_update_va_mapping(unsigned long va, u64 val64,
     if ( unlikely(!__addr_ok(va) && !shadow_mode_external(d)) )
         return -EINVAL;
 
-    if ( unlikely(shadow_mode_refcounts(d)) )
-    {
-        DPRINTK("Grant op on a shadow-refcounted domain\n");
-        return -EINVAL; 
-    }
-
     LOCK_BIGLOCK(d);
 
-    if ( likely(rc == 0) && unlikely(shadow_mode_enabled(d)) )
-    {
-        if ( unlikely(this_cpu(percpu_mm_info).foreign &&
-                      (shadow_mode_translate(d) ||
-                       shadow_mode_translate(
-                           this_cpu(percpu_mm_info).foreign))) )
-        {
-            /*
-             * The foreign domain's pfn's are in a different namespace. There's
-             * not enough information in just a gpte to figure out how to   
-             * (re-)shadow this entry.
-             */
-            domain_crash(d);
-        }
-    }
+    pl1e = guest_map_l1e(v, va, &gl1mfn);
 
-    if ( unlikely(!mod_l1_entry(
-                      &linear_pg_table[l1_linear_offset(va)], val,
-                      l2e_get_pfn(__linear_l2_table[l2_linear_offset(va)]))) )
+    if ( unlikely(!pl1e || !mod_l1_entry(pl1e, val, gl1mfn)) )
         rc = -EINVAL;
-    
+
+    if ( pl1e )
+        guest_unmap_l1e(v, pl1e);
+    pl1e = NULL;
+
     switch ( flags & UVMF_FLUSHTYPE_MASK )
     {
     case UVMF_TLB_FLUSH:
@@ -3028,7 +3038,7 @@ static int ptwr_emulated_update(
     unsigned int bytes,
     unsigned int do_cmpxchg)
 {
-    unsigned long pfn;
+    unsigned long gmfn, mfn;
     struct page_info *page;
     l1_pgentry_t pte, ol1e, nl1e, *pl1e;
     struct vcpu *v = current;
@@ -3068,15 +3078,17 @@ static int ptwr_emulated_update(
     }
 
     /* Read the PTE that maps the page being updated. */
-    if ( __copy_from_user(&pte, &linear_pg_table[l1_linear_offset(addr)],
-                          sizeof(pte)) )
+    guest_get_eff_l1e(v, addr, &pte);
+    if ( unlikely(!(l1e_get_flags(pte) & _PAGE_PRESENT)) )
     {
-        MEM_LOG("ptwr_emulate: Cannot read thru linear_pg_table");
+        MEM_LOG("%s: Cannot get L1 PTE for guest address %lx",
+                __func__, addr);
         return X86EMUL_UNHANDLEABLE;
     }
 
-    pfn  = l1e_get_pfn(pte);
-    page = mfn_to_page(pfn);
+    gmfn  = l1e_get_pfn(pte);
+    mfn = gmfn_to_mfn(d, gmfn);
+    page = mfn_to_page(mfn);
 
     /* We are looking only for read-only mappings of p.t. pages. */
     ASSERT((l1e_get_flags(pte) & (_PAGE_RW|_PAGE_PRESENT)) == _PAGE_PRESENT);
@@ -3086,7 +3098,7 @@ static int ptwr_emulated_update(
 
     /* Check the new PTE. */
     nl1e = l1e_from_intpte(val);
-    if ( unlikely(!get_page_from_l1e(nl1e, d)) )
+    if ( unlikely(!get_page_from_l1e(gl1e_to_ml1e(d, nl1e), d)) )
     {
         if ( (CONFIG_PAGING_LEVELS == 3) &&
              (bytes == 4) &&
@@ -3125,13 +3137,13 @@ static int ptwr_emulated_update(
             if ( shadow_mode_enabled(d) )
                 shadow_unlock(d);
             unmap_domain_page(pl1e);
-            put_page_from_l1e(nl1e, d);
+            put_page_from_l1e(gl1e_to_ml1e(d, nl1e), d);
             return X86EMUL_CMPXCHG_FAILED;
         }
-        if ( unlikely(shadow_mode_enabled(v->domain)) )
+        if ( unlikely(shadow_mode_enabled(d)) )
         {
             shadow_validate_guest_entry(v, _mfn(page_to_mfn(page)), pl1e);
-            shadow_unlock(v->domain);    
+            shadow_unlock(d);    
         }
     }
     else
@@ -3144,7 +3156,7 @@ static int ptwr_emulated_update(
     unmap_domain_page(pl1e);
 
     /* Finally, drop the old PTE. */
-    put_page_from_l1e(ol1e, d);
+    put_page_from_l1e(gl1e_to_ml1e(d, ol1e), d);
 
     return X86EMUL_CONTINUE;
 }
@@ -3193,13 +3205,13 @@ static struct x86_emulate_ops ptwr_emulate_ops = {
 };
 
 /* Write page fault handler: check if guest is trying to modify a PTE. */
-int ptwr_do_page_fault(struct domain *d, unsigned long addr, 
+int ptwr_do_page_fault(struct vcpu *v, unsigned long addr, 
                        struct cpu_user_regs *regs)
 {
+    struct domain *d = v->domain;
     unsigned long     pfn;
     struct page_info *page;
     l1_pgentry_t      pte;
-    l2_pgentry_t     *pl2e, l2e;
     struct x86_emulate_ctxt emul_ctxt;
 
     LOCK_BIGLOCK(d);
@@ -3208,13 +3220,9 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
      * Attempt to read the PTE that maps the VA being accessed. By checking for
      * PDE validity in the L2 we avoid many expensive fixups in __get_user().
      */
-    pl2e = &__linear_l2_table[l2_linear_offset(addr)];
-    if ( __copy_from_user(&l2e, pl2e, sizeof(l2e)) ||
-        !(l2e_get_flags(l2e) & _PAGE_PRESENT) ||
-         __copy_from_user(&pte, &linear_pg_table[l1_linear_offset(addr)],
-                          sizeof(pte)) )
+    guest_get_eff_l1e(v, addr, &pte);
+    if ( !(l1e_get_flags(pte) & _PAGE_PRESENT) )
         goto bail;
-
     pfn  = l1e_get_pfn(pte);
     page = mfn_to_page(pfn);
 

@@ -74,7 +74,6 @@ asmlinkage void svm_intr_assist(void)
     int intr_type = APIC_DM_EXTINT;
     int intr_vector = -1;
     int re_injecting = 0;
-    unsigned long rflags;
 
     ASSERT(vmcb);
 
@@ -87,14 +86,6 @@ asmlinkage void svm_intr_assist(void)
         re_injecting = 1;
     }
 
-    /* Guest's interrputs masked? */
-    rflags = vmcb->rflags;
-    if (irq_masked(rflags)) {
-        HVM_DBG_LOG(DBG_LEVEL_1, "Guest IRQs masked: rflags: %lx", rflags);
-        /* bail out, we won't be injecting an interrupt this time */
-        return;
-    }
-    
     /* Previous interrupt still pending? */
     if (vmcb->vintr.fields.irq) {
 //        printk("Re-injecting IRQ from Vintr\n");
@@ -121,13 +112,11 @@ asmlinkage void svm_intr_assist(void)
           pic_set_irq(pic, pt->irq, 1);
       }
 
-      callback_irq = v->domain->arch.hvm_domain.params[HVM_PARAM_CALLBACK_IRQ];
-      if ( callback_irq != 0 &&
-           local_events_need_delivery() ) {
-          /*inject para-device call back irq*/
-          v->vcpu_info->evtchn_upcall_mask = 1;
-          pic_set_irq(pic, callback_irq, 0);
-          pic_set_irq(pic, callback_irq, 1);
+      if (v->vcpu_id == 0) {
+          callback_irq =
+              v->domain->arch.hvm_domain.params[HVM_PARAM_CALLBACK_IRQ];
+          if ( callback_irq != 0)
+              pic_set_xen_irq(pic, callback_irq, local_events_need_delivery());
       }
 
       if ( cpu_has_pending_irq(v) )

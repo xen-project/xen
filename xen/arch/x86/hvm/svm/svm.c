@@ -57,7 +57,7 @@
 extern void do_nmi(struct cpu_user_regs *, unsigned long);
 extern int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip,
                                 int inst_len);
- extern uint32_t vlapic_update_ppr(struct vlapic *vlapic);
+extern uint32_t vlapic_update_ppr(struct vlapic *vlapic);
 extern asmlinkage void do_IRQ(struct cpu_user_regs *);
 extern void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
                          unsigned long count, int size, long value, int dir, int pvalid);
@@ -282,7 +282,7 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
     switch (regs->ecx)
     {
     case MSR_EFER:
-        msr_content = vmcb->efer;      
+        msr_content = vmcb->efer;
         msr_content &= ~EFER_SVME;
         break;
 
@@ -320,14 +320,14 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
     HVM_DBG_LOG(DBG_LEVEL_2, "mode_do_msr_read: msr_content: %"PRIx64"\n", 
                 msr_content);
 
-    regs->eax = msr_content & 0xffffffff;
-    regs->edx = msr_content >> 32;
+    regs->eax = (u32)(msr_content >>  0);
+    regs->edx = (u32)(msr_content >> 32);
     return 1;
 }
 
 static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 {
-    u64 msr_content = regs->eax | ((u64)regs->edx << 32);
+    u64 msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
     struct vcpu *vc = current;
     struct vmcb_struct *vmcb = vc->arch.hvm_svm.vmcb;
 
@@ -342,7 +342,8 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
         /* offending reserved bit will cause #GP */
         if ( msr_content & ~(EFER_LME | EFER_LMA | EFER_NX | EFER_SCE) )
         {
-            printk("trying to set reserved bit in EFER\n");
+            printk("Trying to set reserved bit in EFER: %"PRIx64"\n",
+                   msr_content);
             svm_inject_exception(vc, TRAP_gp_fault, 1, 0);
             return 0;
         }
@@ -355,7 +356,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
                  !test_bit(SVM_CPU_STATE_PAE_ENABLED,
                            &vc->arch.hvm_svm.cpu_state) )
             {
-                printk("trying to set LME bit when "
+                printk("Trying to set LME bit when "
                        "in paging mode or PAE bit is not set\n");
                 svm_inject_exception(vc, TRAP_gp_fault, 1, 0);
                 return 0;
@@ -903,9 +904,9 @@ static void svm_relinquish_guest_resources(struct domain *d)
 
         destroy_vmcb(&v->arch.hvm_svm);
         kill_timer(&v->arch.hvm_vcpu.hlt_timer);
-        if ( hvm_apic_support(v->domain) && (VLAPIC(v) != NULL) ) 
+        if ( VLAPIC(v) != NULL )
         {
-            kill_timer( &(VLAPIC(v)->vlapic_timer) );
+            kill_timer(&VLAPIC(v)->vlapic_timer);
             unmap_domain_page_global(VLAPIC(v)->regs);
             free_domheap_page(VLAPIC(v)->regs_page);
             xfree(VLAPIC(v));
@@ -929,12 +930,13 @@ static void svm_migrate_timers(struct vcpu *v)
     struct periodic_time *pt = 
         &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
 
-    if ( pt->enabled ) {
-        migrate_timer( &pt->timer, v->processor );
-        migrate_timer( &v->arch.hvm_vcpu.hlt_timer, v->processor );
+    if ( pt->enabled )
+    {
+        migrate_timer(&pt->timer, v->processor);
+        migrate_timer(&v->arch.hvm_vcpu.hlt_timer, v->processor);
     }
-    if ( hvm_apic_support(v->domain) && VLAPIC( v ))
-        migrate_timer( &(VLAPIC(v)->vlapic_timer ), v->processor );
+    if ( VLAPIC(v) != NULL )
+        migrate_timer(&VLAPIC(v)->vlapic_timer, v->processor);
 }
 
 
@@ -1075,9 +1077,6 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb, unsigned long input,
                    clear_bit(X86_FEATURE_NX & 31, &edx);
             }
             clear_bit(X86_FEATURE_PSE36, &edx);
-            /* Disable machine check architecture */
-            clear_bit(X86_FEATURE_MCA, &edx);
-            clear_bit(X86_FEATURE_MCE, &edx);
             if (input == 0x00000001 )
             {
                 /* Clear out reserved bits. */
@@ -1470,7 +1469,7 @@ static void svm_io_instruction(struct vcpu *v)
             pio_opp->flags |= OVERLAP;
 
             if (dir == IOREQ_WRITE)
-                hvm_copy(&value, addr, size, HVM_COPY_IN);
+                (void)hvm_copy_from_guest_virt(&value, addr, size);
 
             send_pio_req(regs, port, 1, size, value, dir, 0);
         } 
@@ -1636,9 +1635,11 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
     case 4:
         value = (unsigned long) v->arch.hvm_svm.cpu_shadow_cr4;
         if (svm_dbg_on)
-            printk( "CR4 read=%lx\n", value );
+            printk("CR4 read=%lx\n", value);
         break;
     case 8:
+        if ( vlapic == NULL )
+            break;
         value = (unsigned long)vlapic_get_reg(vlapic, APIC_TASKPRI);
         value = (value & 0xF0) >> 4;
         break;
@@ -1816,6 +1817,8 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
 
     case 8:
     {
+        if ( vlapic == NULL )
+            break;
         vlapic_set_reg(vlapic, APIC_TASKPRI, ((value & 0x0F) << 4));
         vlapic_update_ppr(vlapic);
         break;
@@ -1997,7 +2000,7 @@ static inline void svm_do_msr_access(
     else
     {
         inst_len = __get_instruction_length(vmcb, INSTR_WRMSR, NULL);
-        msr_content = (regs->eax & 0xFFFFFFFF) | ((u64)regs->edx << 32);
+        msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
 
         switch (regs->ecx)
         {
@@ -2324,7 +2327,7 @@ void svm_dump_inst(unsigned long eip)
     ptr = eip & ~0xff;
     len = 0;
 
-    if (hvm_copy(opcode, ptr, sizeof(opcode), HVM_COPY_IN))
+    if (hvm_copy_from_guest_virt(opcode, ptr, sizeof(opcode)) == 0)
         len = sizeof(opcode);
 
     printf("Code bytes around(len=%d) %lx:", len, eip);
@@ -2563,9 +2566,7 @@ void walk_shadow_and_guest_pt(unsigned long gva)
 #endif /* SVM_WALK_GUEST_PAGES */
 
 
-
-
-asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
+asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 {
     unsigned int exit_reason;
     unsigned long eip;
@@ -2577,7 +2578,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
     ASSERT(vmcb);
 
     exit_reason = vmcb->exitcode;
-    save_svm_cpu_user_regs(v, &regs);
+    save_svm_cpu_user_regs(v, regs);
 
     vmcb->tlb_control = 1;
 
@@ -2601,26 +2602,26 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
             if (svm_paging_enabled(v) && 
                 !mmio_space(shadow_gva_to_gpa(current, vmcb->exitinfo2)))
             {
-                printk("I%08ld,ExC=%s(%d),IP=%x:%llx,"
-                       "I1=%llx,I2=%llx,INT=%llx, "
-                       "gpa=%llx\n", intercepts_counter,
-                       exit_reasons[exit_reason], exit_reason, regs.cs,
-                       (unsigned long long) regs.rip,
-                       (unsigned long long) vmcb->exitinfo1,
-                       (unsigned long long) vmcb->exitinfo2,
-                       (unsigned long long) vmcb->exitintinfo.bytes,
-                       (unsigned long long) shadow_gva_to_gpa(current, vmcb->exitinfo2));
+                printk("I%08ld,ExC=%s(%d),IP=%x:%"PRIx64","
+                       "I1=%"PRIx64",I2=%"PRIx64",INT=%"PRIx64", "
+                       "gpa=%"PRIx64"\n", intercepts_counter,
+                       exit_reasons[exit_reason], exit_reason, regs->cs,
+                       (u64)regs->rip,
+                       (u64)vmcb->exitinfo1,
+                       (u64)vmcb->exitinfo2,
+                       (u64)vmcb->exitintinfo.bytes,
+                       (u64)shadow_gva_to_gpa(current, vmcb->exitinfo2));
             }
             else 
             {
-                printk("I%08ld,ExC=%s(%d),IP=%x:%llx,"
-                       "I1=%llx,I2=%llx,INT=%llx\n", 
+                printk("I%08ld,ExC=%s(%d),IP=%x:%"PRIx64","
+                       "I1=%"PRIx64",I2=%"PRIx64",INT=%"PRIx64"\n", 
                        intercepts_counter,
-                       exit_reasons[exit_reason], exit_reason, regs.cs,
-                       (unsigned long long) regs.rip,
-                       (unsigned long long) vmcb->exitinfo1,
-                       (unsigned long long) vmcb->exitinfo2,
-                       (unsigned long long) vmcb->exitintinfo.bytes );
+                       exit_reasons[exit_reason], exit_reason, regs->cs,
+                       (u64)regs->rip,
+                       (u64)vmcb->exitinfo1,
+                       (u64)vmcb->exitinfo2,
+                       (u64)vmcb->exitintinfo.bytes );
             }
         } 
         else if ( svm_dbg_on 
@@ -2630,24 +2631,24 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
 
             if (exit_reasons[exit_reason])
             {
-                printk("I%08ld,ExC=%s(%d),IP=%x:%llx,"
-                       "I1=%llx,I2=%llx,INT=%llx\n", 
+                printk("I%08ld,ExC=%s(%d),IP=%x:%"PRIx64","
+                       "I1=%"PRIx64",I2=%"PRIx64",INT=%"PRIx64"\n", 
                        intercepts_counter,
-                       exit_reasons[exit_reason], exit_reason, regs.cs,
-                       (unsigned long long) regs.rip,
-                       (unsigned long long) vmcb->exitinfo1,
-                       (unsigned long long) vmcb->exitinfo2,
-                       (unsigned long long) vmcb->exitintinfo.bytes);
+                       exit_reasons[exit_reason], exit_reason, regs->cs,
+                       (u64)regs->rip,
+                       (u64)vmcb->exitinfo1,
+                       (u64)vmcb->exitinfo2,
+                       (u64)vmcb->exitintinfo.bytes);
             } 
             else 
             {
-                printk("I%08ld,ExC=%d(0x%x),IP=%x:%llx,"
-                       "I1=%llx,I2=%llx,INT=%llx\n", 
-                       intercepts_counter, exit_reason, exit_reason, regs.cs, 
-                       (unsigned long long) regs.rip,
-                       (unsigned long long) vmcb->exitinfo1,
-                       (unsigned long long) vmcb->exitinfo2,
-                       (unsigned long long) vmcb->exitintinfo.bytes);
+                printk("I%08ld,ExC=%d(0x%x),IP=%x:%"PRIx64","
+                       "I1=%"PRIx64",I2=%"PRIx64",INT=%"PRIx64"\n", 
+                       intercepts_counter, exit_reason, exit_reason, regs->cs, 
+                       (u64)regs->rip,
+                       (u64)vmcb->exitinfo1,
+                       (u64)vmcb->exitinfo2,
+                       (u64)vmcb->exitintinfo.bytes);
             }
         }
 
@@ -2679,7 +2680,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
                    (int) v->arch.shadow_table.pfn);
 
             svm_dump_vmcb(__func__, vmcb);
-            svm_dump_regs(__func__, &regs);
+            svm_dump_regs(__func__, regs);
             svm_dump_inst(svm_rip2pointer(vmcb));
         }
 
@@ -2709,18 +2710,18 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
     case VMEXIT_EXCEPTION_DB:
     {
 #ifdef XEN_DEBUGGER
-        svm_debug_save_cpu_user_regs(&regs);
-        pdb_handle_exception(1, &regs, 1);
-        svm_debug_restore_cpu_user_regs(&regs);
+        svm_debug_save_cpu_user_regs(regs);
+        pdb_handle_exception(1, regs, 1);
+        svm_debug_restore_cpu_user_regs(regs);
 #else
-        svm_store_cpu_user_regs(&regs, v);
+        svm_store_cpu_user_regs(regs, v);
         domain_pause_for_debugger();  
 #endif
     }
     break;
 
     case VMEXIT_NMI:
-        do_nmi(&regs, 0);
+        do_nmi(regs, 0);
         break;
 
     case VMEXIT_SMI:
@@ -2740,9 +2741,9 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
 
     case VMEXIT_EXCEPTION_BP:
 #ifdef XEN_DEBUGGER
-        svm_debug_save_cpu_user_regs(&regs);
-        pdb_handle_exception(3, &regs, 1);
-        svm_debug_restore_cpu_user_regs(&regs);
+        svm_debug_save_cpu_user_regs(regs);
+        pdb_handle_exception(3, regs, 1);
+        svm_debug_restore_cpu_user_regs(regs);
 #else
         if ( test_bit(_DOMF_debugging, &v->domain->domain_flags) )
             domain_pause_for_debugger();
@@ -2757,25 +2758,25 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
 
     case VMEXIT_EXCEPTION_GP:
         /* This should probably not be trapped in the future */
-        regs.error_code = vmcb->exitinfo1;
-        svm_do_general_protection_fault(v, &regs);
+        regs->error_code = vmcb->exitinfo1;
+        svm_do_general_protection_fault(v, regs);
         break;  
 
     case VMEXIT_EXCEPTION_PF:
     {
         unsigned long va;
         va = vmcb->exitinfo2;
-        regs.error_code = vmcb->exitinfo1;
+        regs->error_code = vmcb->exitinfo1;
         HVM_DBG_LOG(DBG_LEVEL_VMMU, 
                     "eax=%lx, ebx=%lx, ecx=%lx, edx=%lx, esi=%lx, edi=%lx",
-                    (unsigned long)regs.eax, (unsigned long)regs.ebx,
-                    (unsigned long)regs.ecx, (unsigned long)regs.edx,
-                    (unsigned long)regs.esi, (unsigned long)regs.edi);
+                    (unsigned long)regs->eax, (unsigned long)regs->ebx,
+                    (unsigned long)regs->ecx, (unsigned long)regs->edx,
+                    (unsigned long)regs->esi, (unsigned long)regs->edi);
 
-        if (!(error = svm_do_page_fault(va, &regs))) 
+        if (!(error = svm_do_page_fault(va, regs))) 
         {
             /* Inject #PG using Interruption-Information Fields */
-            svm_inject_exception(v, TRAP_page_fault, 1, regs.error_code);
+            svm_inject_exception(v, TRAP_page_fault, 1, regs->error_code);
 
             v->arch.hvm_svm.cpu_cr2 = va;
             vmcb->cr2 = va;
@@ -2788,7 +2789,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
     case VMEXIT_EXCEPTION_DF:
         /* Debug info to hopefully help debug WHY the guest double-faulted. */
         svm_dump_vmcb(__func__, vmcb);
-        svm_dump_regs(__func__, &regs);
+        svm_dump_regs(__func__, regs);
         svm_dump_inst(svm_rip2pointer(vmcb));
         svm_inject_exception(v, TRAP_double_fault, 1, 0);
         break;
@@ -2805,11 +2806,11 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
         break;
 
     case VMEXIT_TASK_SWITCH:
-        __hvm_bug(&regs);
+        __hvm_bug(regs);
         break;
 
     case VMEXIT_CPUID:
-        svm_vmexit_do_cpuid(vmcb, regs.eax, &regs);
+        svm_vmexit_do_cpuid(vmcb, regs->eax, regs);
         break;
 
     case VMEXIT_HLT:
@@ -2817,60 +2818,60 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
         break;
 
     case VMEXIT_INVLPG:
-        svm_handle_invlpg(0, &regs);
+        svm_handle_invlpg(0, regs);
         break;
 
     case VMEXIT_INVLPGA:
-        svm_handle_invlpg(1, &regs);
+        svm_handle_invlpg(1, regs);
         break;
 
     case VMEXIT_VMMCALL:
-        svm_do_vmmcall(v, &regs);
+        svm_do_vmmcall(v, regs);
         break;
 
     case VMEXIT_CR0_READ:
-        svm_cr_access(v, 0, TYPE_MOV_FROM_CR, &regs);
+        svm_cr_access(v, 0, TYPE_MOV_FROM_CR, regs);
         break;
 
     case VMEXIT_CR2_READ:
-        svm_cr_access(v, 2, TYPE_MOV_FROM_CR, &regs);
+        svm_cr_access(v, 2, TYPE_MOV_FROM_CR, regs);
         break;
 
     case VMEXIT_CR3_READ:
-        svm_cr_access(v, 3, TYPE_MOV_FROM_CR, &regs);
+        svm_cr_access(v, 3, TYPE_MOV_FROM_CR, regs);
         break;
 
     case VMEXIT_CR4_READ:
-        svm_cr_access(v, 4, TYPE_MOV_FROM_CR, &regs);
+        svm_cr_access(v, 4, TYPE_MOV_FROM_CR, regs);
         break;
 
     case VMEXIT_CR8_READ:
-        svm_cr_access(v, 8, TYPE_MOV_FROM_CR, &regs);
+        svm_cr_access(v, 8, TYPE_MOV_FROM_CR, regs);
         break;
 
     case VMEXIT_CR0_WRITE:
-        svm_cr_access(v, 0, TYPE_MOV_TO_CR, &regs);
+        svm_cr_access(v, 0, TYPE_MOV_TO_CR, regs);
         break;
 
     case VMEXIT_CR2_WRITE:
-        svm_cr_access(v, 2, TYPE_MOV_TO_CR, &regs);
+        svm_cr_access(v, 2, TYPE_MOV_TO_CR, regs);
         break;
 
     case VMEXIT_CR3_WRITE:
-        svm_cr_access(v, 3, TYPE_MOV_TO_CR, &regs);
+        svm_cr_access(v, 3, TYPE_MOV_TO_CR, regs);
         local_flush_tlb();
         break;
 
     case VMEXIT_CR4_WRITE:
-        svm_cr_access(v, 4, TYPE_MOV_TO_CR, &regs);
+        svm_cr_access(v, 4, TYPE_MOV_TO_CR, regs);
         break;
 
     case VMEXIT_CR8_WRITE:
-        svm_cr_access(v, 8, TYPE_MOV_TO_CR, &regs);
+        svm_cr_access(v, 8, TYPE_MOV_TO_CR, regs);
         break;
 	
     case VMEXIT_DR0_WRITE ... VMEXIT_DR7_WRITE:
-        svm_dr_access(v, &regs);
+        svm_dr_access(v, regs);
         break;
 
     case VMEXIT_IOIO:
@@ -2878,7 +2879,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
         break;
 
     case VMEXIT_MSR:
-        svm_do_msr_access(v, &regs);
+        svm_do_msr_access(v, regs);
         break;
 
     case VMEXIT_SHUTDOWN:
@@ -2887,11 +2888,10 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
         break;
 
     default:
-        printk("unexpected VMEXIT: exit reason = 0x%x, exitinfo1 = %llx, "
-               "exitinfo2 = %llx\n", exit_reason, 
-               (unsigned long long)vmcb->exitinfo1, 
-               (unsigned long long)vmcb->exitinfo2);
-        __hvm_bug(&regs);       /* should not happen */
+        printk("unexpected VMEXIT: exit reason = 0x%x, exitinfo1 = %"PRIx64", "
+               "exitinfo2 = %"PRIx64"\n", exit_reason, 
+               (u64)vmcb->exitinfo1, (u64)vmcb->exitinfo2);
+        __hvm_bug(regs);       /* should not happen */
         break;
     }
 
@@ -2899,7 +2899,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
     if (do_debug) 
     {
         printk("%s: Done switch on vmexit_code\n", __func__);
-        svm_dump_regs(__func__, &regs);
+        svm_dump_regs(__func__, regs);
     }
 
     if (do_debug) 

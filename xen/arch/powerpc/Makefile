@@ -101,7 +101,8 @@ TARGET_OPTS = $(OMAGIC) -Wl,-Ttext,$(xen_link_base),-T,xen.lds
 TARGET_OPTS += start.o $(ALL_OBJS)
 
 .xen-syms: start.o $(ALL_OBJS) xen.lds
-	$(CC) $(CFLAGS) $(TARGET_OPTS) -o $@
+	$(MAKE) -f $(BASEDIR)/Rules.mk $(BASEDIR)/common/symbols-dummy.o
+	$(CC) $(CFLAGS) $(TARGET_OPTS) $(BASEDIR)/common/symbols-dummy.o -o $@
 
 NM=$(CROSS_COMPILE)nm
 new_nm := $(shell if $(NM) --help 2>&1 | grep -- '--synthetic' > /dev/null; then echo y; else echo n; fi)

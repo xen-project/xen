@@ -46,19 +46,24 @@ obj-$(crash_debug) += gdbstub.o
 
 $(TARGET): $(TARGET)-syms boot/mkelf32
 	./boot/mkelf32 $(TARGET)-syms $(TARGET) 0x100000 \
-	`$(NM) $(TARGET)-syms | sort | tail -n 1 | sed -e 's/^\([^ ]*\).*/0x\1/'`
+	`$(NM) $(TARGET)-syms | sort | tail -n 1 | \
+	 sed -e 's/^\([^ ]*\).*/0x\1/'`
 
 $(TARGET)-syms: boot/$(TARGET_SUBARCH).o $(ALL_OBJS) xen.lds
+	$(MAKE) -f $(BASEDIR)/Rules.mk $(BASEDIR)/common/symbols-dummy.o
 	$(LD) $(LDFLAGS) -T xen.lds -N \
-	    boot/$(TARGET_SUBARCH).o $(ALL_OBJS) -o $@
+	    boot/$(TARGET_SUBARCH).o $(ALL_OBJS) \
+	    $(BASEDIR)/common/symbols-dummy.o -o $@
 	$(NM) -n $@ | $(BASEDIR)/tools/symbols >$(BASEDIR)/xen-syms.S
 	$(MAKE) -f $(BASEDIR)/Rules.mk $(BASEDIR)/xen-syms.o
 	$(LD) $(LDFLAGS) -T xen.lds -N \
-	    boot/$(TARGET_SUBARCH).o $(ALL_OBJS) $(BASEDIR)/xen-syms.o -o $@
+	    boot/$(TARGET_SUBARCH).o $(ALL_OBJS) \
+	    $(BASEDIR)/xen-syms.o -o $@
 	$(NM) -n $@ | $(BASEDIR)/tools/symbols >$(BASEDIR)/xen-syms.S
 	$(MAKE) -f $(BASEDIR)/Rules.mk $(BASEDIR)/xen-syms.o
 	$(LD) $(LDFLAGS) -T xen.lds -N \
-	    boot/$(TARGET_SUBARCH).o $(ALL_OBJS) $(BASEDIR)/xen-syms.o -o $@
+	    boot/$(TARGET_SUBARCH).o $(ALL_OBJS) \
+	    $(BASEDIR)/xen-syms.o -o $@
 	rm -f $(BASEDIR)/xen-syms.S $(BASEDIR)/xen-syms.o
 
 asm-offsets.s: $(TARGET_SUBARCH)/asm-offsets.c $(HDRS)

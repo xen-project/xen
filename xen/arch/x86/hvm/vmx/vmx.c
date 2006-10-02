@@ -135,7 +135,7 @@ static void vmx_relinquish_guest_resources(struct domain *d)
         if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
             continue;
         kill_timer(&v->arch.hvm_vcpu.hlt_timer);
-        if ( hvm_apic_support(v->domain) && (VLAPIC(v) != NULL) )
+        if ( VLAPIC(v) != NULL )
         {
             kill_timer(&VLAPIC(v)->vlapic_timer);
             unmap_domain_page_global(VLAPIC(v)->regs);
@@ -269,15 +269,15 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
 
     HVM_DBG_LOG(DBG_LEVEL_2, "msr_content: 0x%"PRIx64, msr_content);
 
-    regs->eax = msr_content & 0xffffffff;
-    regs->edx = msr_content >> 32;
+    regs->eax = (u32)(msr_content >>  0);
+    regs->edx = (u32)(msr_content >> 32);
 
     return 1;
 }
 
 static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 {
-    u64 msr_content = regs->eax | ((u64)regs->edx << 32);
+    u64 msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
     struct vcpu *v = current;
     struct vmx_msr_state *msr = &v->arch.hvm_vmx.msr_content;
     struct vmx_msr_state *host_state = &this_cpu(percpu_msr);
@@ -290,7 +290,8 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
         /* offending reserved bit will cause #GP */
         if ( msr_content & ~(EFER_LME | EFER_LMA | EFER_NX | EFER_SCE) )
         {
-            printk("trying to set reserved bit in EFER\n");
+            printk("Trying to set reserved bit in EFER: %"PRIx64"\n",
+                   msr_content);
             vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
             return 0;
         }
@@ -303,7 +304,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
                  !test_bit(VMX_CPU_STATE_PAE_ENABLED,
                            &v->arch.hvm_vmx.cpu_state) )
             {
-                printk("trying to set LME bit when "
+                printk("Trying to set LME bit when "
                        "in paging mode or PAE bit is not set\n");
                 vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
                 return 0;
@@ -484,20 +485,23 @@ static void vmx_ctxt_switch_to(struct vcpu *v)
 
 static void stop_vmx(void)
 {
-    if (read_cr4() & X86_CR4_VMXE)
-        __vmxoff();
+    if ( !(read_cr4() & X86_CR4_VMXE) )
+        return;
+    __vmxoff();
+    clear_in_cr4(X86_CR4_VMXE);
 }
 
 void vmx_migrate_timers(struct vcpu *v)
 {
     struct periodic_time *pt = &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
 
-    if ( pt->enabled ) {
+    if ( pt->enabled )
+    {
         migrate_timer(&pt->timer, v->processor);
         migrate_timer(&v->arch.hvm_vcpu.hlt_timer, v->processor);
     }
-    if ( hvm_apic_support(v->domain) && VLAPIC(v))
-        migrate_timer(&(VLAPIC(v)->vlapic_timer), v->processor);
+    if ( VLAPIC(v) != NULL )
+        migrate_timer(&VLAPIC(v)->vlapic_timer, v->processor);
 }
 
 static void vmx_store_cpu_guest_regs(
@@ -805,12 +809,14 @@ int start_vmx(void)
 
     if ( (vmcs = vmx_alloc_host_vmcs()) == NULL )
     {
+        clear_in_cr4(X86_CR4_VMXE);
         printk("Failed to allocate host VMCS\n");
         return 0;
     }
 
     if ( __vmxon(virt_to_maddr(vmcs)) )
     {
+        clear_in_cr4(X86_CR4_VMXE);
         printk("VMXON failed\n");
         vmx_free_host_vmcs(vmcs);
         return 0;
@@ -1163,7 +1169,7 @@ static void vmx_io_instruction(unsigned long exit_qualification,
 
             pio_opp->flags |= OVERLAP;
             if (dir == IOREQ_WRITE)
-                hvm_copy(&value, addr, size, HVM_COPY_IN);
+                (void)hvm_copy_from_guest_virt(&value, addr, size);
             send_pio_req(regs, port, 1, size, value, dir, 0);
         } else {
             if ((addr & PAGE_MASK) != ((addr + count * size - 1) & PAGE_MASK)) {
@@ -1370,7 +1376,8 @@ static int vmx_assist(struct vcpu *v, int mode)
     u32 cp;
 
     /* make sure vmxassist exists (this is not an error) */
-    if (!hvm_copy(&magic, VMXASSIST_MAGIC_OFFSET, sizeof(magic), HVM_COPY_IN))
+    if (hvm_copy_from_guest_phys(&magic, VMXASSIST_MAGIC_OFFSET,
+                                 sizeof(magic)))
         return 0;
     if (magic != VMXASSIST_MAGIC)
         return 0;
@@ -1384,20 +1391,20 @@ static int vmx_assist(struct vcpu *v, int mode)
          */
     case VMX_ASSIST_INVOKE:
         /* save the old context */
-        if (!hvm_copy(&cp, VMXASSIST_OLD_CONTEXT, sizeof(cp), HVM_COPY_IN))
+        if (hvm_copy_from_guest_phys(&cp, VMXASSIST_OLD_CONTEXT, sizeof(cp)))
             goto error;
         if (cp != 0) {
             if (!vmx_world_save(v, &c))
                 goto error;
-            if (!hvm_copy(&c, cp, sizeof(c), HVM_COPY_OUT))
+            if (hvm_copy_to_guest_phys(cp, &c, sizeof(c)))
                 goto error;
         }
 
         /* restore the new context, this should activate vmxassist */
-        if (!hvm_copy(&cp, VMXASSIST_NEW_CONTEXT, sizeof(cp), HVM_COPY_IN))
+        if (hvm_copy_from_guest_phys(&cp, VMXASSIST_NEW_CONTEXT, sizeof(cp)))
             goto error;
         if (cp != 0) {
-            if (!hvm_copy(&c, cp, sizeof(c), HVM_COPY_IN))
+            if (hvm_copy_from_guest_phys(&c, cp, sizeof(c)))
                 goto error;
             if (!vmx_world_restore(v, &c))
                 goto error;
@@ -1411,10 +1418,10 @@ static int vmx_assist(struct vcpu *v, int mode)
          */
     case VMX_ASSIST_RESTORE:
         /* save the old context */
-        if (!hvm_copy(&cp, VMXASSIST_OLD_CONTEXT, sizeof(cp), HVM_COPY_IN))
+        if (hvm_copy_from_guest_phys(&cp, VMXASSIST_OLD_CONTEXT, sizeof(cp)))
             goto error;
         if (cp != 0) {
-            if (!hvm_copy(&c, cp, sizeof(c), HVM_COPY_IN))
+            if (hvm_copy_from_guest_phys(&c, cp, sizeof(c)))
                 goto error;
             if (!vmx_world_restore(v, &c))
                 goto error;
@@ -1761,6 +1768,8 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
     }
     case 8:
     {
+        if ( vlapic == NULL )
+            break;
         vlapic_set_reg(vlapic, APIC_TASKPRI, ((value & 0x0F) << 4));
         vlapic_update_ppr(vlapic);
         break;
@@ -1782,15 +1791,19 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
     struct vcpu *v = current;
     struct vlapic *vlapic = VLAPIC(v);
 
-    if ( cr != 3 && cr != 8)
-        __hvm_bug(regs);
-
-    if ( cr == 3 )
-        value = (unsigned long) v->arch.hvm_vmx.cpu_cr3;
-    else if ( cr == 8 )
+    switch ( cr )
     {
+    case 3:
+        value = (unsigned long)v->arch.hvm_vmx.cpu_cr3;
+        break;
+    case 8:
+        if ( vlapic == NULL )
+            break;
         value = (unsigned long)vlapic_get_reg(vlapic, APIC_TASKPRI);
         value = (value & 0xF0) >> 4;
+        break;
+    default:
+        __hvm_bug(regs);
     }
 
     switch ( gp ) {
@@ -1924,7 +1937,7 @@ static inline void vmx_do_msr_write(struct cpu_user_regs *regs)
                 (unsigned long)regs->ecx, (unsigned long)regs->eax,
                 (unsigned long)regs->edx);
 
-    msr_content = (regs->eax & 0xFFFFFFFF) | ((u64)regs->edx << 32);
+    msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
 
     switch (regs->ecx) {
     case MSR_IA32_TIME_STAMP_COUNTER:
@@ -2110,7 +2123,7 @@ static void vmx_reflect_exception(struct vcpu *v)
     }
 }
 
-asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
+asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 {
     unsigned int exit_reason;
     unsigned long exit_qualification, rip, inst_len = 0;
@@ -2181,16 +2194,16 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
 #ifdef XEN_DEBUGGER
         case TRAP_debug:
         {
-            save_cpu_user_regs(&regs);
-            pdb_handle_exception(1, &regs, 1);
-            restore_cpu_user_regs(&regs);
+            save_cpu_user_regs(regs);
+            pdb_handle_exception(1, regs, 1);
+            restore_cpu_user_regs(regs);
             break;
         }
         case TRAP_int3:
         {
-            save_cpu_user_regs(&regs);
-            pdb_handle_exception(3, &regs, 1);
-            restore_cpu_user_regs(&regs);
+            save_cpu_user_regs(regs);
+            pdb_handle_exception(3, regs, 1);
+            restore_cpu_user_regs(regs);
             break;
         }
 #else
@@ -2200,7 +2213,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
 
             if ( test_bit(_DOMF_debugging, &v->domain->domain_flags) )
             {
-                store_cpu_user_regs(&regs);
+                store_cpu_user_regs(regs);
                 domain_pause_for_debugger();
                 __vm_clear_bit(GUEST_PENDING_DBG_EXCEPTIONS,
                                PENDING_DEBUG_EXC_BS);
@@ -2231,29 +2244,29 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         case TRAP_page_fault:
         {
             __vmread(EXIT_QUALIFICATION, &va);
-            __vmread(VM_EXIT_INTR_ERROR_CODE, &regs.error_code);
+            __vmread(VM_EXIT_INTR_ERROR_CODE, &regs->error_code);
 
-            TRACE_VMEXIT(3,regs.error_code);
-            TRACE_VMEXIT(4,va);
+            TRACE_VMEXIT(3, regs->error_code);
+            TRACE_VMEXIT(4, va);
 
             HVM_DBG_LOG(DBG_LEVEL_VMMU,
                         "eax=%lx, ebx=%lx, ecx=%lx, edx=%lx, esi=%lx, edi=%lx",
-                        (unsigned long)regs.eax, (unsigned long)regs.ebx,
-                        (unsigned long)regs.ecx, (unsigned long)regs.edx,
-                        (unsigned long)regs.esi, (unsigned long)regs.edi);
+                        (unsigned long)regs->eax, (unsigned long)regs->ebx,
+                        (unsigned long)regs->ecx, (unsigned long)regs->edx,
+                        (unsigned long)regs->esi, (unsigned long)regs->edi);
 
-            if ( !vmx_do_page_fault(va, &regs) ) {
-                /*
-                 * Inject #PG using Interruption-Information Fields
-                 */
-                vmx_inject_hw_exception(v, TRAP_page_fault, regs.error_code);
+            if ( !vmx_do_page_fault(va, regs) )
+            {
+                /* Inject #PG using Interruption-Information Fields. */
+                vmx_inject_hw_exception(v, TRAP_page_fault, regs->error_code);
                 v->arch.hvm_vmx.cpu_cr2 = va;
-                TRACE_3D(TRC_VMX_INT, v->domain->domain_id, TRAP_page_fault, va);
+                TRACE_3D(TRC_VMX_INT, v->domain->domain_id,
+                         TRAP_page_fault, va);
             }
             break;
         }
         case TRAP_nmi:
-            do_nmi(&regs);
+            do_nmi(regs);
             break;
         default:
             vmx_reflect_exception(v);
@@ -2262,7 +2275,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         break;
     }
     case EXIT_REASON_EXTERNAL_INTERRUPT:
-        vmx_vmexit_do_extint(&regs);
+        vmx_vmexit_do_extint(regs);
         break;
     case EXIT_REASON_TRIPLE_FAULT:
         domain_crash_synchronous();
@@ -2279,7 +2292,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
     case EXIT_REASON_CPUID:
         inst_len = __get_instruction_length(); /* Safe: CPUID */
         __update_guest_eip(inst_len);
-        vmx_vmexit_do_cpuid(&regs);
+        vmx_vmexit_do_cpuid(regs);
         break;
     case EXIT_REASON_HLT:
         inst_len = __get_instruction_length(); /* Safe: HLT */
@@ -2301,7 +2314,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         __update_guest_eip(inst_len);
         __vmread(GUEST_RIP, &rip);
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
-        hvm_do_hypercall(&regs);
+        hvm_do_hypercall(regs);
         break;
     }
     case EXIT_REASON_CR_ACCESS:
@@ -2309,15 +2322,15 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         __vmread(GUEST_RIP, &rip);
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
         inst_len = __get_instruction_length(); /* Safe: MOV Cn, LMSW, CLTS */
-        if ( vmx_cr_access(exit_qualification, &regs) )
+        if ( vmx_cr_access(exit_qualification, regs) )
             __update_guest_eip(inst_len);
-        TRACE_VMEXIT(3,regs.error_code);
-        TRACE_VMEXIT(4,exit_qualification);
+        TRACE_VMEXIT(3, regs->error_code);
+        TRACE_VMEXIT(4, exit_qualification);
         break;
     }
     case EXIT_REASON_DR_ACCESS:
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
-        vmx_dr_access(exit_qualification, &regs);
+        vmx_dr_access(exit_qualification, regs);
         break;
     case EXIT_REASON_IO_INSTRUCTION:
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
@@ -2328,12 +2341,12 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
     case EXIT_REASON_MSR_READ:
         inst_len = __get_instruction_length(); /* Safe: RDMSR */
         __update_guest_eip(inst_len);
-        vmx_do_msr_read(&regs);
+        vmx_do_msr_read(regs);
         break;
     case EXIT_REASON_MSR_WRITE:
         inst_len = __get_instruction_length(); /* Safe: WRMSR */
         __update_guest_eip(inst_len);
-        vmx_do_msr_write(&regs);
+        vmx_do_msr_write(regs);
         break;
     case EXIT_REASON_MWAIT_INSTRUCTION:
     case EXIT_REASON_MONITOR_INSTRUCTION:

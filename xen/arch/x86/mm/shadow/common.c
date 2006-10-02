@@ -75,35 +75,27 @@ sh_x86_emulate_read_std(unsigned long addr,
                          unsigned int bytes,
                          struct x86_emulate_ctxt *ctxt)
 {
-    struct vcpu *v = current;
-    if ( hvm_guest(v) )
+    *val = 0;
+    // XXX -- this is WRONG.
+    //        It entirely ignores the permissions in the page tables.
+    //        In this case, that is only a user vs supervisor access check.
+    //
+    if ( hvm_copy_from_guest_virt(val, addr, bytes) == 0 )
     {
-        *val = 0;
-        // XXX -- this is WRONG.
-        //        It entirely ignores the permissions in the page tables.
-        //        In this case, that is only a user vs supervisor access check.
-        //
-        if ( hvm_copy(val, addr, bytes, HVM_COPY_IN) )
-        {
 #if 0
-            SHADOW_PRINTK("d=%u v=%u a=%#lx v=%#lx bytes=%u\n",
-                           v->domain->domain_id, v->vcpu_id, 
-                           addr, *val, bytes);
+        struct vcpu *v = current;
+        SHADOW_PRINTK("d=%u v=%u a=%#lx v=%#lx bytes=%u\n",
+                       v->domain->domain_id, v->vcpu_id, 
+                       addr, *val, bytes);
 #endif
-            return X86EMUL_CONTINUE;
-        }
+        return X86EMUL_CONTINUE;
+    }
 
-        /* If we got here, there was nothing mapped here, or a bad GFN 
-         * was mapped here.  This should never happen: we're here because
-         * of a write fault at the end of the instruction we're emulating. */ 
-        SHADOW_PRINTK("read failed to va %#lx\n", addr);
-        return X86EMUL_PROPAGATE_FAULT;
-    }
-    else 
-    {
-        SHADOW_PRINTK("this operation is not emulated yet\n");
-        return X86EMUL_UNHANDLEABLE;
-    }
+    /* If we got here, there was nothing mapped here, or a bad GFN 
+     * was mapped here.  This should never happen: we're here because
+     * of a write fault at the end of the instruction we're emulating. */ 
+    SHADOW_PRINTK("read failed to va %#lx\n", addr);
+    return X86EMUL_PROPAGATE_FAULT;
 }
 
 static int
@@ -112,33 +104,26 @@ sh_x86_emulate_write_std(unsigned long addr,
                           unsigned int bytes,
                           struct x86_emulate_ctxt *ctxt)
 {
-    struct vcpu *v = current;
 #if 0
+    struct vcpu *v = current;
     SHADOW_PRINTK("d=%u v=%u a=%#lx v=%#lx bytes=%u\n",
                   v->domain->domain_id, v->vcpu_id, addr, val, bytes);
 #endif
-    if ( hvm_guest(v) )
-    {
-        // XXX -- this is WRONG.
-        //        It entirely ignores the permissions in the page tables.
-        //        In this case, that includes user vs supervisor, and
-        //        write access.
-        //
-        if ( hvm_copy(&val, addr, bytes, HVM_COPY_OUT) )
-            return X86EMUL_CONTINUE;
 
-        /* If we got here, there was nothing mapped here, or a bad GFN 
-         * was mapped here.  This should never happen: we're here because
-         * of a write fault at the end of the instruction we're emulating,
-         * which should be handled by sh_x86_emulate_write_emulated. */ 
-        SHADOW_PRINTK("write failed to va %#lx\n", addr);
-        return X86EMUL_PROPAGATE_FAULT;
-    }
-    else 
-    {
-        SHADOW_PRINTK("this operation is not emulated yet\n");
-        return X86EMUL_UNHANDLEABLE;
-    }
+    // XXX -- this is WRONG.
+    //        It entirely ignores the permissions in the page tables.
+    //        In this case, that includes user vs supervisor, and
+    //        write access.
+    //
+    if ( hvm_copy_to_guest_virt(addr, &val, bytes) == 0 )
+        return X86EMUL_CONTINUE;
+
+    /* If we got here, there was nothing mapped here, or a bad GFN 
+     * was mapped here.  This should never happen: we're here because
+     * of a write fault at the end of the instruction we're emulating,
+     * which should be handled by sh_x86_emulate_write_emulated. */ 
+    SHADOW_PRINTK("write failed to va %#lx\n", addr);
+    return X86EMUL_PROPAGATE_FAULT;
 }
 
 static int
@@ -152,15 +137,7 @@ sh_x86_emulate_write_emulated(unsigned long addr,
     SHADOW_PRINTK("d=%u v=%u a=%#lx v=%#lx bytes=%u\n",
                   v->domain->domain_id, v->vcpu_id, addr, val, bytes);
 #endif
-    if ( hvm_guest(v) )
-    {
-        return v->arch.shadow.mode->x86_emulate_write(v, addr, &val, bytes, ctxt);
-    }
-    else 
-    {
-        SHADOW_PRINTK("this operation is not emulated yet\n");
-        return X86EMUL_UNHANDLEABLE;
-    }
+    return v->arch.shadow.mode->x86_emulate_write(v, addr, &val, bytes, ctxt);
 }
 
 static int 
@@ -175,16 +152,8 @@ sh_x86_emulate_cmpxchg_emulated(unsigned long addr,
     SHADOW_PRINTK("d=%u v=%u a=%#lx o?=%#lx n:=%#lx bytes=%u\n",
                    v->domain->domain_id, v->vcpu_id, addr, old, new, bytes);
 #endif
-    if ( hvm_guest(v) )
-    {
-        return v->arch.shadow.mode->x86_emulate_cmpxchg(v, addr, old, new, 
-                                                    bytes, ctxt);
-    }
-    else 
-    {
-        SHADOW_PRINTK("this operation is not emulated yet\n");
-        return X86EMUL_UNHANDLEABLE;
-    }
+    return v->arch.shadow.mode->x86_emulate_cmpxchg(v, addr, old, new,
+                                                     bytes, ctxt);
 }
 
 static int 
@@ -201,16 +170,8 @@ sh_x86_emulate_cmpxchg8b_emulated(unsigned long addr,
                    v->domain->domain_id, v->vcpu_id, addr, old_hi, old_lo,
                    new_hi, new_lo, ctxt);
 #endif
-    if ( hvm_guest(v) )
-    {
-        return v->arch.shadow.mode->x86_emulate_cmpxchg8b(v, addr, old_lo, old_hi,
-                                                      new_lo, new_hi, ctxt);
-    }
-    else 
-    {
-        SHADOW_PRINTK("this operation is not emulated yet\n");
-        return X86EMUL_UNHANDLEABLE;
-    }
+    return v->arch.shadow.mode->x86_emulate_cmpxchg8b(v, addr, old_lo, old_hi,
+                                                       new_lo, new_hi, ctxt);
 }
 
 
@@ -256,14 +217,18 @@ void shadow_demote(struct vcpu *v, mfn_t gmfn, u32 type)
     clear_bit(type >> PGC_SH_type_shift, &page->shadow_flags);
 
     if ( (page->shadow_flags & SHF_page_type_mask) == 0 )
+    {
+        /* tlbflush timestamp field is valid again */
+        page->tlbflush_timestamp = tlbflush_current_time();
         clear_bit(_PGC_page_table, &page->count_info);
+    }
 }
 
 /**************************************************************************/
 /* Validate a pagetable change from the guest and update the shadows.
  * Returns a bitmask of SHADOW_SET_* flags. */
 
-static int
+int
 __shadow_validate_guest_entry(struct vcpu *v, mfn_t gmfn, 
                                void *entry, u32 size)
 {
@@ -363,7 +328,9 @@ shadow_validate_guest_entry(struct vcpu *v, mfn_t gmfn, void *entry)
 void
 shadow_validate_guest_pt_write(struct vcpu *v, mfn_t gmfn,
                                 void *entry, u32 size)
-/* This is the entry point for emulated writes to pagetables in HVM guests */
+/* This is the entry point for emulated writes to pagetables in HVM guests and
+ * PV translated guests.
+ */
 {
     struct domain *d = v->domain;
     int rc;
@@ -802,7 +769,7 @@ void shadow_free(struct domain *d, mfn_t smfn)
 
 /* Divert some memory from the pool to be used by the p2m mapping.
  * This action is irreversible: the p2m mapping only ever grows.
- * That's OK because the p2m table only exists for external domains,
+ * That's OK because the p2m table only exists for translated domains,
  * and those domains can't ever turn off shadow mode.
  * Also, we only ever allocate a max-order chunk, so as to preserve
  * the invariant that shadow_prealloc() always works.
@@ -826,7 +793,12 @@ shadow_alloc_p2m_pages(struct domain *d)
     d->arch.shadow.total_pages -= (1<<SHADOW_MAX_ORDER);
     for (i = 0; i < (1<<SHADOW_MAX_ORDER); i++)
     {
-        /* Unlike shadow pages, mark p2m pages as owned by the domain */
+        /* Unlike shadow pages, mark p2m pages as owned by the domain.
+         * Marking the domain as the owner would normally allow the guest to
+         * create mappings of these pages, but these p2m pages will never be
+         * in the domain's guest-physical address space, and so that is not
+         * believed to be a concern.
+         */
         page_set_owner(&pg[i], d);
         list_add_tail(&pg[i].list, &d->arch.shadow.p2m_freelist);
     }
@@ -2265,7 +2237,7 @@ void sh_update_paging_modes(struct vcpu *v)
     //
     if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
     {
-        printk("%s: postponing determination of shadow mode\n", __func__);
+        SHADOW_PRINTK("%s: postponing determination of shadow mode\n", __func__);
         return;
     }
 
@@ -2290,6 +2262,7 @@ void sh_update_paging_modes(struct vcpu *v)
 #else
 #error unexpected paging mode
 #endif
+        v->arch.shadow.translate_enabled = !!shadow_mode_translate(d);
     }
     else
     {
@@ -2299,8 +2272,8 @@ void sh_update_paging_modes(struct vcpu *v)
         ASSERT(shadow_mode_translate(d));
         ASSERT(shadow_mode_external(d));
 
-        v->arch.shadow.hvm_paging_enabled = !!hvm_paging_enabled(v);
-        if ( !v->arch.shadow.hvm_paging_enabled )
+        v->arch.shadow.translate_enabled = !!hvm_paging_enabled(v);
+        if ( !v->arch.shadow.translate_enabled )
         {
             
             /* Set v->arch.guest_table to use the p2m map, and choose
@@ -2377,13 +2350,14 @@ void sh_update_paging_modes(struct vcpu *v)
 
         if ( v->arch.shadow.mode != old_mode )
         {
-            SHADOW_PRINTK("new paging mode: d=%u v=%u g=%u s=%u "
-                           "(was g=%u s=%u)\n",
-                           d->domain_id, v->vcpu_id, 
-                           v->arch.shadow.mode->guest_levels,
-                           v->arch.shadow.mode->shadow_levels,
-                           old_mode ? old_mode->guest_levels : 0,
-                           old_mode ? old_mode->shadow_levels : 0);
+            SHADOW_PRINTK("new paging mode: d=%u v=%u pe=%d g=%u s=%u "
+                          "(was g=%u s=%u)\n",
+                          d->domain_id, v->vcpu_id,
+                          hvm_guest(v) ? !!hvm_paging_enabled(v) : 1,
+                          v->arch.shadow.mode->guest_levels,
+                          v->arch.shadow.mode->shadow_levels,
+                          old_mode ? old_mode->guest_levels : 0,
+                          old_mode ? old_mode->shadow_levels : 0);
             if ( old_mode &&
                  (v->arch.shadow.mode->shadow_levels !=
                   old_mode->shadow_levels) )
@@ -2463,6 +2437,7 @@ static int shadow_enable(struct domain *d, u32 mode)
     /* Sanity check the arguments */
     if ( (d == current->domain) ||
          shadow_mode_enabled(d) ||
+         ((mode & SHM2_translate) && !(mode & SHM2_refcounts)) ||
          ((mode & SHM2_external) && !(mode & SHM2_translate)) )
     {
         rv = -EINVAL;
@@ -2518,7 +2493,7 @@ static int shadow_enable(struct domain *d, u32 mode)
  out:
     shadow_unlock(d);
     domain_unpause(d);
-    return 0;
+    return rv;
 }
 
 void shadow_teardown(struct domain *d)

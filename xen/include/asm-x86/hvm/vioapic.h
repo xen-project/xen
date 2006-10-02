@@ -88,6 +88,7 @@ typedef union RedirStatus
 
 typedef struct hvm_vioapic {
     uint32_t irr;
+    uint32_t irr_xen; /* interrupts forced on by the hypervisor. */
     uint32_t isr;           /* This is used for level trigger */
     uint32_t imr;
     uint32_t ioregsel;
@@ -105,6 +106,7 @@ hvm_vioapic_t *hvm_vioapic_init(struct domain *d);
 
 void hvm_vioapic_do_irqs_clear(struct domain *d, uint16_t irqs);
 void hvm_vioapic_do_irqs(struct domain *d, uint16_t irqs);
+void hvm_vioapic_set_xen_irq(struct domain *d, int irq, int level);
 void hvm_vioapic_set_irq(struct domain *d, int irq, int level);
 
 int hvm_vioapic_add_lapic(struct vlapic *vlapic, struct vcpu *v);

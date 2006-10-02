@@ -693,7 +693,7 @@ def make_config(vals):
         config_image = run_bootloader(vals, config_image)
         config.append(['bootloader', vals.bootloader])
         if vals.bootargs:
-            config.append(['bootloader_args'], vals.bootargs)
+            config.append(['bootloader_args', vals.bootargs])
     config.append(['image', config_image])
 
     config_devs = []

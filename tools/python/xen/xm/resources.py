@@ -24,7 +24,7 @@ from xen.util import security
 from xen.xm.opts import OptionError
 
 def help():
-    return """Usage: xm resource
+    return """
     This program lists information for each resource in the
     global resource label file."""
 
@@ -45,18 +45,13 @@ def main (argv):
         filename = security.res_label_filename
         access_control = dictio.dict_read("resources", filename)
     except:
-        print "Resource file not found."
-        return
+        raise OptionError("Resource file not found")
 
-        try:
-            file = security.res_label_filename
-            access_control = dictio.dict_read("resources", file)
-        except:
-            security.err("Error reading resource file.")
-
-        print_resource_data(access_control)
+    print_resource_data(access_control)
 
 if __name__ == '__main__':
-    main(sys.argv)
-
-
+    try:
+        main(sys.argv)
+    except Exception, e:
+        sys.stderr.write('Error: %s\n' % str(e))
+        sys.exit(-1)    

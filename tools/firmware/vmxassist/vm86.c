@@ -68,7 +68,7 @@ guest_linear_to_real(uint32_t base)
 		return base;
 
 	if (!(oldctx.cr4 & CR4_PAE)) {
-		l1_mfn = ((uint32_t *)gcr3)[(base >> 22) & 0x3ff];
+		l1_mfn = ((uint32_t *)(long)gcr3)[(base >> 22) & 0x3ff];
 		if (!(l1_mfn & PT_ENTRY_PRESENT))
 			panic("l2 entry not present\n");
 
@@ -79,19 +79,19 @@ guest_linear_to_real(uint32_t base)
 
 		l1_mfn &= 0xfffff000;
 
-		l0_mfn = ((uint32_t *)l1_mfn)[(base >> 12) & 0x3ff];
+		l0_mfn = ((uint32_t *)(long)l1_mfn)[(base >> 12) & 0x3ff];
 		if (!(l0_mfn & PT_ENTRY_PRESENT))
 			panic("l1 entry not present\n");
 		l0_mfn &= 0xfffff000;
 
 		return l0_mfn + (base & 0xfff);
 	} else {
-		l2_mfn = ((uint64_t *)gcr3)[(base >> 30) & 0x3];
+		l2_mfn = ((uint64_t *)(long)gcr3)[(base >> 30) & 0x3];
 		if (!(l2_mfn & PT_ENTRY_PRESENT))
 			panic("l3 entry not present\n");
 		l2_mfn &= 0x3fffff000ULL;
 
-		l1_mfn = ((uint64_t *)l2_mfn)[(base >> 21) & 0x1ff];
+		l1_mfn = ((uint64_t *)(long)l2_mfn)[(base >> 21) & 0x1ff];
 		if (!(l1_mfn & PT_ENTRY_PRESENT))
 			panic("l2 entry not present\n");
 
@@ -102,7 +102,7 @@ guest_linear_to_real(uint32_t base)
 
 		l1_mfn &= 0x3fffff000ULL;
 
-		l0_mfn = ((uint64_t *)l1_mfn)[(base >> 12) & 0x1ff];
+		l0_mfn = ((uint64_t *)(long)l1_mfn)[(base >> 12) & 0x1ff];
 		if (!(l0_mfn & PT_ENTRY_PRESENT))
 			panic("l1 entry not present\n");
 		l0_mfn &= 0x3fffff000ULL;
@@ -1230,6 +1230,18 @@ pushrm(struct regs *regs, int prefix, unsigned modrm)
 
 enum { OPC_INVALID, OPC_EMULATED };
 
+#define rdmsr(msr,val1,val2)				\
+	__asm__ __volatile__(				\
+		"rdmsr"					\
+		: "=a" (val1), "=d" (val2)		\
+		: "c" (msr))
+
+#define wrmsr(msr,val1,val2)				\
+	__asm__ __volatile__(				\
+		"wrmsr"					\
+		: /* no outputs */			\
+		: "c" (msr), "a" (val1), "d" (val2))
+
 /*
  * Emulate a single instruction, including all its prefixes. We only implement
  * a small subset of the opcodes, and not all opcodes are implemented for each
@@ -1287,6 +1299,12 @@ opcode(struct regs *regs)
 			case 0x22:
 				if (!movcr(regs, prefix, opc))
 					goto invalid;
+				return OPC_EMULATED;
+			case 0x30: /* WRMSR */
+				wrmsr(regs->ecx, regs->eax, regs->edx);
+				return OPC_EMULATED;
+			case 0x32: /* RDMSR */
+				rdmsr(regs->ecx, regs->eax, regs->edx);
 				return OPC_EMULATED;
 			default:
 				goto invalid;
@@ -1412,12 +1430,14 @@ opcode(struct regs *regs)
 			{
 				int addr, data;
 				int seg = segment(prefix, regs, regs->vds);
+				int offset = prefix & ADDR32? fetch32(regs) : fetch16(regs);
+
 				if (prefix & DATA32) {
-					addr = address(regs, seg, fetch32(regs));
+					addr = address(regs, seg, offset);
 					data = read32(addr);
 					setreg32(regs, 0, data);
 				} else {
-					addr = address(regs, seg, fetch16(regs));
+					addr = address(regs, seg, offset);
 					data = read16(addr);
 					setreg16(regs, 0, data);
 				}

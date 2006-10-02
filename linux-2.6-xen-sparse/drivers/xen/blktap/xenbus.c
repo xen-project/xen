@@ -273,7 +273,6 @@ static void tap_frontend_changed(struct xenbus_device *dev,
 			kthread_stop(be->blkif->xenblkd);
 			be->blkif->xenblkd = NULL;
 		}
-		tap_blkif_unmap(be->blkif);
 		xenbus_switch_state(dev, XenbusStateClosing);
 		break;
 

@@ -322,6 +322,20 @@ static void otherend_changed(struct xenbus_watch *watch,
 	DPRINTK("state is %d (%s), %s, %s", state, xenbus_strstate(state),
 		dev->otherend_watch.node, vec[XS_WATCH_PATH]);
 
+	/*
+	 * Ignore xenbus transitions during shutdown. This prevents us doing
+	 * work that can fail e.g., when the rootfs is gone.
+	 */
+	if (system_state > SYSTEM_RUNNING) {
+		struct xen_bus_type *bus = bus;
+		bus = container_of(dev->dev.bus, struct xen_bus_type, bus);
+		/* If we're frontend, drive the state machine to Closed. */
+		/* This should cause the backend to release our resources. */
+		if ((bus == &xenbus_frontend) && (state == XenbusStateClosing))
+			xenbus_frontend_closed(dev);
+		return;
+	}
+
 	if (drv->otherend_changed)
 		drv->otherend_changed(dev, state);
 }

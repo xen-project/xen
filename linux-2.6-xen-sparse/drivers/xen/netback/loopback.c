@@ -53,8 +53,10 @@
 #include <linux/skbuff.h>
 #include <linux/ethtool.h>
 #include <net/dst.h>
+#include <net/xfrm.h>		/* secpath_reset() */
+#include <asm/hypervisor.h>	/* is_initial_xendomain() */
 
-static int nloopbacks = 8;
+static int nloopbacks = -1;
 module_param(nloopbacks, int, 0);
 MODULE_PARM_DESC(nloopbacks, "Number of netback-loopback devices to create");
 
@@ -77,9 +79,59 @@ static int loopback_close(struct net_device *dev)
 	return 0;
 }
 
+#ifdef CONFIG_X86
+static int is_foreign(unsigned long pfn)
+{
+	/* NB. Play it safe for auto-translation mode. */
+	return (xen_feature(XENFEAT_auto_translated_physmap) ||
+		(phys_to_machine_mapping[pfn] & FOREIGN_FRAME_BIT));
+}
+#else
+/* How to detect a foreign mapping? Play it safe. */
+#define is_foreign(pfn)	(1)
+#endif
+
+static int skb_remove_foreign_references(struct sk_buff *skb)
+{
+	struct page *page;
+	unsigned long pfn;
+	int i, off;
+	char *vaddr;
+
+	BUG_ON(skb_shinfo(skb)->frag_list);
+
+	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+		pfn = page_to_pfn(skb_shinfo(skb)->frags[i].page);
+		if (!is_foreign(pfn))
+			continue;
+		
+		page = alloc_page(GFP_ATOMIC | __GFP_NOWARN);
+		if (unlikely(!page))
+			return 0;
+
+		vaddr = kmap_skb_frag(&skb_shinfo(skb)->frags[i]);
+		off = skb_shinfo(skb)->frags[i].page_offset;
+		memcpy(page_address(page) + off,
+		       vaddr + off,
+		       skb_shinfo(skb)->frags[i].size);
+		kunmap_skb_frag(vaddr);
+
+		put_page(skb_shinfo(skb)->frags[i].page);
+		skb_shinfo(skb)->frags[i].page = page;
+	}
+
+	return 1;
+}
+
 static int loopback_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct net_private *np = netdev_priv(dev);
+
+	if (!skb_remove_foreign_references(skb)) {
+		np->stats.tx_dropped++;
+		dev_kfree_skb(skb);
+		return 0;
+	}
 
 	dst_release(skb->dst);
 	skb->dst = NULL;
@@ -110,6 +162,11 @@ static int loopback_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	skb->protocol = eth_type_trans(skb, dev);
 	skb->dev      = dev;
 	dev->last_rx  = jiffies;
+
+	/* Flush netfilter context: rx'ed skbuffs not expected to have any. */
+	nf_reset(skb);
+	secpath_reset(skb);
+
 	netif_rx(skb);
 
 	return 0;
@@ -238,6 +295,9 @@ static void __exit clean_loopback(int i)
 static int __init loopback_init(void)
 {
 	int i, err = 0;
+
+	if (nloopbacks == -1)
+		nloopbacks = is_initial_xendomain() ? 4 : 0;
 
 	for (i = 0; i < nloopbacks; i++)
 		if ((err = make_loopback(i)) != 0)

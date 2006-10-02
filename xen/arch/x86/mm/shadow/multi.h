@@ -103,6 +103,13 @@ SHADOW_INTERNAL_NAME(sh_audit_l4_table, SHADOW_LEVELS, GUEST_LEVELS)
     (struct vcpu *v, mfn_t sl4mfn, mfn_t x);
 #endif
 
+extern void *
+SHADOW_INTERNAL_NAME(sh_guest_map_l1e, CONFIG_PAGING_LEVELS, CONFIG_PAGING_LEVELS)
+    (struct vcpu *v, unsigned long va, unsigned long *gl1mfn);
+extern void
+SHADOW_INTERNAL_NAME(sh_guest_get_eff_l1e, CONFIG_PAGING_LEVELS, CONFIG_PAGING_LEVELS)
+    (struct vcpu *v, unsigned long va, void *eff_l1e);
+
 #if SHADOW_LEVELS == GUEST_LEVELS
 extern mfn_t
 SHADOW_INTERNAL_NAME(sh_make_monitor_table, SHADOW_LEVELS, GUEST_LEVELS)

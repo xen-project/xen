@@ -526,7 +526,7 @@ def parse_sedf_info(info):
         return t(sxp.child_value(info, n, d))
 
     return {
-        'domid'    : get_info('domid',         int,   -1),
+        'domid'    : get_info('domain',        int,   -1),
         'period'   : get_info('period',        int,   -1),
         'slice'    : get_info('slice',         int,   -1),
         'latency'  : get_info('latency',       int,   -1),
@@ -979,7 +979,7 @@ def xm_uptime(args):
 
     for dom in doms:
         d = parse_doms_info(dom)
-        if d['dom'] > 0:
+        if d['domid'] > 0:
             uptime = int(round(d['up_time']))
         else:
             f=open('/proc/uptime', 'r')
@@ -1006,10 +1006,10 @@ def xm_uptime(args):
         if short_mode:
             now = datetime.datetime.now()
             upstring = now.strftime(" %H:%M:%S") + " up " + upstring
-            upstring += ", " + d['name'] + " (" + str(d['dom']) + ")"
+            upstring += ", " + d['name'] + " (" + str(d['domid']) + ")"
         else:
             upstring += ':%(seconds)02d' % vars()
-            upstring = ("%(name)-32s %(dom)3d " % d) + upstring
+            upstring = ("%(name)-32s %(domid)3d " % d) + upstring
 
         print upstring
 
@@ -1374,7 +1374,7 @@ IMPORTED_COMMANDS = [
     'cfgbootpolicy',
     'makepolicy',
     'loadpolicy',
-    'dumppolicy'
+    'dumppolicy',
     'rmlabel',
     'getlabel',
     'dry-run',
@@ -1423,13 +1423,14 @@ def main(argv=sys.argv):
     if len(argv) < 2:
         usage()
 
-    # intercept --help and output our own help
-    if '--help' in argv[1:]:
-        if '--help' == argv[1]:
-            longHelp()
-        else:
-            usage(argv[1])
-        sys.exit(0)
+    # intercept --help(-h) and output our own help
+    for help in ['--help', '-h']:
+        if help in argv[1:]:
+            if help == argv[1]:
+                longHelp()
+            else:
+                usage(argv[1])
+            sys.exit(0)
 
     cmd = xm_lookup_cmd(argv[1])
 
@@ -1477,10 +1478,15 @@ def main(argv=sys.argv):
         except (ValueError, OverflowError):
             err("Invalid argument.")
             usage(argv[1])
+            sys.exit(1)
         except OptionError, e:
             err(str(e))
             usage(argv[1])
             print e.usage()
+            sys.exit(1)
+        except security.ACMError, e:
+            err(str(e))
+            sys.exit(1)
         except:
             print "Unexpected error:", sys.exc_info()[0]
             print

@@ -68,6 +68,7 @@
 #define INSTR_TEST  12
 #define INSTR_BT    13
 #define INSTR_XCHG  14
+#define INSTR_SUB   15
 
 struct instruction {
     __s8    instr;        /* instruction type */

@@ -34,6 +34,8 @@ typedef struct IOAPICState IOAPICState;
 typedef struct PicState {
     uint8_t last_irr; /* edge detection */
     uint8_t irr; /* interrupt request register */
+    uint8_t irr_xen; /* interrupts forced on by the hypervisor e.g.
+			the callback irq. */
     uint8_t imr; /* interrupt mask register */
     uint8_t isr; /* interrupt service register */
     uint8_t priority_add; /* highest irq priority */
@@ -58,20 +60,16 @@ struct hvm_virpic {
     void (*irq_request)(void *opaque, int level);
     void *irq_request_opaque;
     /* IOAPIC callback support */
-    void (*alt_irq_func)(void *opaque, int irq_num, int level);
-    void *alt_irq_opaque;
     spinlock_t lock;
 };
 
 
+void pic_set_xen_irq(void *opaque, int irq, int level);
 void pic_set_irq(struct hvm_virpic *s, int irq, int level);
 void pic_set_irq_new(void *opaque, int irq, int level);
 void pic_init(struct hvm_virpic *s, 
               void (*irq_request)(void *, int),
               void *irq_request_opaque);
-void pic_set_alt_irq_func(struct hvm_virpic *s, 
-                          void (*alt_irq_func)(void *, int, int),
-                          void *alt_irq_opaque);
 int pic_read_irq(struct hvm_virpic *s);
 void pic_update_irq(struct hvm_virpic *s); /* Caller must hold s->lock */
 uint32_t pic_intack_read(struct hvm_virpic *s);
