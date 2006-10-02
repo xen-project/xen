@@ -32,7 +32,6 @@
 #include <xen/event.h>
 #include <xen/perfc.h>
 
-static long do_physdev_op_compat(XEN_GUEST_HANDLE(physdev_op_t) uop);
 static long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg);
 static long do_callback_op(int cmd, XEN_GUEST_HANDLE(void) arg);
 
@@ -54,10 +53,10 @@ const hypercall_t ia64_hypercall_table[NR_hypercalls] =
 	(hypercall_t)do_multicall,
 	(hypercall_t)do_ni_hypercall,		/* do_update_va_mapping */
 	(hypercall_t)do_ni_hypercall,		/* do_set_timer_op */  /* 15 */
-	(hypercall_t)do_event_channel_op_compat,
+	(hypercall_t)do_ni_hypercall,
 	(hypercall_t)do_xen_version,
 	(hypercall_t)do_console_io,
-	(hypercall_t)do_physdev_op_compat,
+	(hypercall_t)do_ni_hypercall,
 	(hypercall_t)do_grant_table_op,				       /* 20 */
 	(hypercall_t)do_ni_hypercall,		/* do_vm_assist */
 	(hypercall_t)do_ni_hypercall,		/* do_update_va_mapping_othe */
@@ -108,19 +107,6 @@ static IA64FAULT
 xen_hypercall (struct pt_regs *regs)
 {
 	uint32_t cmd = (uint32_t)regs->r2;
-	struct vcpu *v = current;
-
-	if (cmd == __HYPERVISOR_grant_table_op) {
-		XEN_GUEST_HANDLE(void) uop;
-
-		v->arch.hypercall_param.va = regs->r15;
-		v->arch.hypercall_param.pa1 = regs->r17;
-		v->arch.hypercall_param.pa2 = regs->r18;
-		set_xen_guest_handle(uop, (void *)regs->r15);
-		regs->r8 = do_grant_table_op(regs->r14, uop, regs->r16);
-		v->arch.hypercall_param.va = 0;
-		return IA64_NO_FAULT;
-	}
 
 	if (cmd < NR_hypercalls) {
 		perfc_incra(hypercalls, cmd);
@@ -133,7 +119,7 @@ xen_hypercall (struct pt_regs *regs)
 			regs->r19);
 	} else
 		regs->r8 = -ENOSYS;
-
+	
 	return IA64_NO_FAULT;
 }
 
@@ -463,28 +449,6 @@ static long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
     }
 
     return ret;
-}
-
-/* Legacy hypercall (as of 0x00030202). */
-static long do_physdev_op_compat(XEN_GUEST_HANDLE(physdev_op_t) uop)
-{
-    struct physdev_op op;
-
-    if ( unlikely(copy_from_guest(&op, uop, 1) != 0) )
-        return -EFAULT;
-
-    return do_physdev_op(op.cmd, guest_handle_from_ptr(&uop.p->u, void));
-}
-
-/* Legacy hypercall (as of 0x00030202). */
-long do_event_channel_op_compat(XEN_GUEST_HANDLE(evtchn_op_t) uop)
-{
-    struct evtchn_op op;
-
-    if ( unlikely(copy_from_guest(&op, uop, 1) != 0) )
-        return -EFAULT;
-
-    return do_event_channel_op(op.cmd, guest_handle_from_ptr(&uop.p->u, void));
 }
 
 static long register_guest_callback(struct callback_register *reg)

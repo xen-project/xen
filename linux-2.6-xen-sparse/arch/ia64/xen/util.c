@@ -28,6 +28,8 @@
 #include <linux/vmalloc.h>
 #include <asm/uaccess.h>
 #include <xen/driver_util.h>
+#include <xen/interface/memory.h>
+#include <asm/hypercall.h>
 
 struct vm_struct *alloc_vm_area(unsigned long size)
 {

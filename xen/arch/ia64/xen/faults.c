@@ -228,10 +228,10 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 			// indicate a bad xen pointer
 			printk("*** xen_handle_domain_access: exception table"
 			       " lookup failed, iip=0x%lx, addr=0x%lx, spinning...\n",
-				iip, address);
+			       iip, address);
 			panic_domain(regs,"*** xen_handle_domain_access: exception table"
-			       " lookup failed, iip=0x%lx, addr=0x%lx, spinning...\n",
-				iip, address);
+				     " lookup failed, iip=0x%lx, addr=0x%lx, spinning...\n",
+				     iip, address);
 		}
 		return;
 	}

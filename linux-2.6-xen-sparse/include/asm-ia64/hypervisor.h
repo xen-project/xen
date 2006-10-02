@@ -75,9 +75,6 @@ HYPERVISOR_yield(
 {
 	int rc = HYPERVISOR_sched_op(SCHEDOP_yield, NULL);
 
-	if (rc == -ENOSYS)
-		rc = HYPERVISOR_sched_op_compat(SCHEDOP_yield, 0);
-
 	return rc;
 }
 
@@ -86,9 +83,6 @@ HYPERVISOR_block(
 	void)
 {
 	int rc = HYPERVISOR_sched_op(SCHEDOP_block, NULL);
-
-	if (rc == -ENOSYS)
-		rc = HYPERVISOR_sched_op_compat(SCHEDOP_block, 0);
 
 	return rc;
 }
@@ -102,9 +96,6 @@ HYPERVISOR_shutdown(
 	};
 
 	int rc = HYPERVISOR_sched_op(SCHEDOP_shutdown, &sched_shutdown);
-
-	if (rc == -ENOSYS)
-		rc = HYPERVISOR_sched_op_compat(SCHEDOP_shutdown, reason);
 
 	return rc;
 }
@@ -122,8 +113,6 @@ HYPERVISOR_poll(
 
 	set_xen_guest_handle(sched_poll.ports, ports);
 	rc = HYPERVISOR_sched_op(SCHEDOP_poll, &sched_poll);
-	if (rc == -ENOSYS)
-		rc = HYPERVISOR_sched_op_compat(SCHEDOP_yield, 0);
 
 	return rc;
 }

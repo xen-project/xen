@@ -83,18 +83,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 				: "r8", "r10", "memory" );
 		}
 #elif defined (__ia64__)
-		__asm__ __volatile__ (
-			";; mov r14=%2; mov r15=%3; "
-			"mov r16=%4; mov r17=%5; mov r18=%6;"
-			"mov r2=%1; break 0x1000;; mov %0=r8 ;;"
-			: "=r" (ret)
-			: "r" (hypercall.op),
-			"r" (hypercall.arg[0]),
-			"r" (hypercall.arg[1]),
-			"r" (hypercall.arg[2]),
-			"r" (hypercall.arg[3]),
-			"r" (hypercall.arg[4])
-			: "r14","r15","r16","r17","r18","r2","r8","memory");
+		ret = privcmd_hypercall(&hypercall);
 #endif
 	}
 	break;

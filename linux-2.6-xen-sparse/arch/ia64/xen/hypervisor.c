@@ -40,60 +40,6 @@ EXPORT_SYMBOL(xen_start_info);
 int running_on_xen;
 EXPORT_SYMBOL(running_on_xen);
 
-//XXX xen/ia64 copy_from_guest() is broken.
-//    This is a temporal work around until it is fixed.
-//    used by balloon.c netfront.c
-
-// get_xen_guest_handle is defined only when __XEN_TOOLS__ is defined
-// if the definition in arch-ia64.h is changed, this must be updated.
-#define get_xen_guest_handle(val, hnd)  do { val = (hnd).p; } while (0)
-
-int
-ia64_xenmem_reservation_op(unsigned long op,
-			   struct xen_memory_reservation* reservation__)
-{
-	struct xen_memory_reservation reservation = *reservation__;
-	unsigned long* frame_list;
-	unsigned long nr_extents = reservation__->nr_extents;
-	int ret = 0;
-	get_xen_guest_handle(frame_list, reservation__->extent_start);
-
-	BUG_ON(op != XENMEM_increase_reservation &&
-	       op != XENMEM_decrease_reservation &&
-	       op != XENMEM_populate_physmap);
-
-	while (nr_extents > 0) {
-		int tmp_ret;
-		volatile unsigned long dummy;
-
-		set_xen_guest_handle(reservation.extent_start, frame_list);
-		reservation.nr_extents = nr_extents;
-
-		dummy = frame_list[0];// re-install tlb entry before hypercall
-		tmp_ret = ____HYPERVISOR_memory_op(op, &reservation);
-		if (tmp_ret < 0) {
-			if (ret == 0) {
-				ret = tmp_ret;
-			}
-			break;
-		}
-		if (tmp_ret == 0) {
-			//XXX dirty work around for skbuff_ctor()
-			//    of a non-privileged domain, 
-			if ((op == XENMEM_increase_reservation ||
-			     op == XENMEM_populate_physmap) &&
-			    !is_initial_xendomain() &&
-			    reservation.extent_order > 0)
-				return ret;
-		}
-		frame_list += tmp_ret;
-		nr_extents -= tmp_ret;
-		ret += tmp_ret;
-	}
-	return ret;
-}
-EXPORT_SYMBOL(ia64_xenmem_reservation_op);
-
 //XXX same as i386, x86_64 contiguous_bitmap_set(), contiguous_bitmap_clear()
 // move those to lib/contiguous_bitmap?
 //XXX discontigmem/sparsemem
@@ -371,8 +317,6 @@ gnttab_map_grant_ref_pre(struct gnttab_map_grant_ref *uop)
 int
 HYPERVISOR_grant_table_op(unsigned int cmd, void *uop, unsigned int count)
 {
-	__u64 va1, va2, pa1, pa2;
-
 	if (cmd == GNTTABOP_map_grant_ref) {
 		unsigned int i;
 		for (i = 0; i < count; i++) {
@@ -380,29 +324,7 @@ HYPERVISOR_grant_table_op(unsigned int cmd, void *uop, unsigned int count)
 				(struct gnttab_map_grant_ref*)uop + i);
 		}
 	}
-	va1 = (__u64)uop & PAGE_MASK;
-	pa1 = pa2 = 0;
-	if ((REGION_NUMBER(va1) == 5) &&
-	    ((va1 - KERNEL_START) >= KERNEL_TR_PAGE_SIZE)) {
-		pa1 = ia64_tpa(va1);
-		if (cmd <= GNTTABOP_transfer) {
-			static uint32_t uop_size[GNTTABOP_transfer + 1] = {
-				sizeof(struct gnttab_map_grant_ref),
-				sizeof(struct gnttab_unmap_grant_ref),
-				sizeof(struct gnttab_setup_table),
-				sizeof(struct gnttab_dump_table),
-				sizeof(struct gnttab_transfer),
-			};
-			va2 = (__u64)uop + (uop_size[cmd] * count) - 1;
-			va2 &= PAGE_MASK;
-			if (va1 != va2) {
-				/* maximum size of uop is 2pages */
-				BUG_ON(va2 > va1 + PAGE_SIZE);
-				pa2 = ia64_tpa(va2);
-			}
-		}
-	}
-	return ____HYPERVISOR_grant_table_op(cmd, uop, count, pa1, pa2);
+	return xencomm_mini_hypercall_grant_table_op(cmd, uop, count);
 }
 EXPORT_SYMBOL(HYPERVISOR_grant_table_op);
 

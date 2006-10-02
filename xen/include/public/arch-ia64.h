@@ -431,6 +431,14 @@ struct xen_ia64_boot_param {
 #define HYPERPRIVOP_GET_PSR		0x19
 #define HYPERPRIVOP_MAX			0x19
 
+/* Xencomm macros.  */
+#define XENCOMM_INLINE_MASK 0xf800000000000000UL
+#define XENCOMM_INLINE_FLAG 0x8000000000000000UL
+
+#define XENCOMM_IS_INLINE(addr) \
+  (((unsigned long)(addr) & XENCOMM_INLINE_MASK) == XENCOMM_INLINE_FLAG)
+#define XENCOMM_INLINE_ADDR(addr) \
+  ((unsigned long)(addr) & ~XENCOMM_INLINE_MASK)
 #endif /* __HYPERVISOR_IF_IA64_H__ */
 
 /*

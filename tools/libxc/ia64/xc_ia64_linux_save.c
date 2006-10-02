@@ -458,6 +458,9 @@ xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         goto out;
     }
 
+    fprintf(stderr, "ip=%016lx, b0=%016lx\n", ctxt.user_regs.cr_iip,
+            ctxt.user_regs.b0);
+
     mem = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
                                PROT_READ|PROT_WRITE, ctxt.privregs_pfn);
     if (mem == NULL) {

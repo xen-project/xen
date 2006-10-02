@@ -16,7 +16,6 @@
  *
  */
 #include <xen/config.h>
-#include <xen/console.h>
 #include <asm/system.h>
 #include <asm/pgalloc.h>
 
@@ -29,6 +28,7 @@
 #include <asm/vcpu.h>
 #include <asm/dom_fw.h>
 #include <asm/uaccess.h>
+#include <xen/console.h>
 
 extern unsigned long running_on_sim;
 

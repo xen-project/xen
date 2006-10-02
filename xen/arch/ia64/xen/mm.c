@@ -708,6 +708,22 @@ void *domain_mpa_to_imva(struct domain *d, unsigned long mpaddr)
 }
 #endif
 
+unsigned long
+xencomm_paddr_to_maddr(unsigned long paddr)
+{
+    struct vcpu *v = current;
+    struct domain *d = v->domain;
+    u64 pa;
+
+    pa = ____lookup_domain_mpa(d, paddr);
+    if (pa == INVALID_MFN) {
+        printf("%s: called with bad memory address: 0x%lx - iip=%lx\n",
+               __func__, paddr, vcpu_regs(v)->cr_iip);
+        return 0;
+    }
+    return __va_ul((pa & _PFN_MASK) | (paddr & ~PAGE_MASK));
+}
+
 /* Allocate a new page for domain and map it to the specified metaphysical
    address.  */
 static struct page_info *

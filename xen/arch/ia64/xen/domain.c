@@ -46,6 +46,7 @@
 #include <asm/regionreg.h>
 #include <asm/dom_fw.h>
 #include <asm/shadow.h>
+#include <xen/guest_access.h>
 
 unsigned long dom0_size = 512*1024*1024;
 unsigned long dom0_align = 64*1024*1024;
