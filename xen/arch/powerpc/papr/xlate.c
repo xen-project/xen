@@ -378,7 +378,6 @@ static void h_protect(struct cpu_user_regs *regs)
 
 static void h_clear_ref(struct cpu_user_regs *regs)
 {
-    ulong flags = regs->gprs[4];
     ulong ptex = regs->gprs[5];
     struct vcpu *v = get_current();
     struct domain *d = v->domain;
@@ -387,13 +386,13 @@ static void h_clear_ref(struct cpu_user_regs *regs)
     union pte lpte;
 
     DBG_LOW("%s: flags: 0x%lx ptex: 0x%lx\n", __func__,
-            flags, ptex);
+            regs->gprs[4], ptex);
 
 #ifdef DEBUG
-    if (flags != 0) {
+    if (regs->gprs[4] != 0) {
         DBG("WARNING: %s: "
             "flags are undefined and should be 0: 0x%lx\n",
-            __func__, flags);
+            __func__, regs->gprs[4]);
     }
 #endif
 
@@ -421,7 +420,6 @@ static void h_clear_ref(struct cpu_user_regs *regs)
 
 static void h_clear_mod(struct cpu_user_regs *regs)
 {
-    ulong flags = regs->gprs[4];
     ulong ptex = regs->gprs[5];
     struct vcpu *v = get_current();
     struct domain *d = v->domain;
@@ -430,13 +428,13 @@ static void h_clear_mod(struct cpu_user_regs *regs)
     union pte lpte;
 
     DBG_LOW("%s: flags: 0x%lx ptex: 0x%lx\n", __func__,
-           flags, ptex);
+          regs->gprs[4], ptex);
 
 #ifdef DEBUG
-    if (flags != 0) {
+    if (regs->gprs[4] != 0) {
         DBG("WARNING: %s: "
             "flags are undefined and should be 0: 0x%lx\n",
-            __func__, flags);
+            __func__, regs->gprs[4]);
     }
 #endif
 
