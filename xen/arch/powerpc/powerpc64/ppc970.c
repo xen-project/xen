@@ -39,10 +39,37 @@ struct cpu_caches cpu_caches = {
     .dline_size = 0x80,
     .log_dline_size = 7,
     .dlines_per_page = PAGE_SIZE >> 7,
+    .isize = (64 << 10),        /* 64 KiB */
     .iline_size = 0x80,
     .log_iline_size = 7,
     .ilines_per_page = PAGE_SIZE >> 7,
 };
+
+
+void cpu_flush_icache(void)
+{
+    union hid1 hid1;
+    ulong flags;
+    ulong ra;
+
+    local_irq_save(flags);
+
+    /* uses special processor mode that forces a real address match */
+    hid1.word = mfhid1();
+    hid1.bits.en_icbi = 1;
+    mthid1(hid1.word);
+
+    for (ra = 0; ra < cpu_caches.isize; ra += cpu_caches.iline_size)
+        icbi(ra);
+
+    sync();
+
+    hid1.bits.en_icbi = 0;
+    mthid1(hid1.word);
+
+    local_irq_save(flags);
+}
+
 
 struct rma_settings {
     int log;
