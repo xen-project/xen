@@ -155,6 +155,8 @@ void vcpu_flush_vtlb_all(struct vcpu *v)
 	/* We could clear bit in d->domain_dirty_cpumask only if domain d in
 	   not running on this processor.  There is currently no easy way to
 	   check this.  */
+
+	perfc_incrc(vcpu_flush_vtlb_all);
 }
 
 static void __vcpu_flush_vtlb_all(void *vcpu)
@@ -178,6 +180,7 @@ void domain_flush_vtlb_all (void)
 						 __vcpu_flush_vtlb_all,
 						 v, 1, 1);
 	}
+	perfc_incrc(domain_flush_vtlb_all);
 }
 
 static void cpu_flush_vhpt_range (int cpu, u64 vadr, u64 addr_range)
@@ -200,6 +203,7 @@ void vcpu_flush_tlb_vhpt_range (u64 vadr, u64 log_range)
 	cpu_flush_vhpt_range (current->processor, vadr, 1UL << log_range);
 	ia64_ptcl(vadr, log_range << 2);
 	ia64_srlz_i();
+	perfc_incrc(vcpu_flush_tlb_vhpt_range);
 }
 
 void domain_flush_vtlb_range (struct domain *d, u64 vadr, u64 addr_range)
@@ -236,6 +240,7 @@ void domain_flush_vtlb_range (struct domain *d, u64 vadr, u64 addr_range)
 
 	/* ptc.ga  */
 	ia64_global_tlb_purge(vadr,vadr+addr_range,PAGE_SHIFT);
+	perfc_incrc(domain_flush_vtlb_range);
 }
 
 static void flush_tlb_vhpt_all (struct domain *d)

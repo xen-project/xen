@@ -107,3 +107,12 @@ PERFSTATUS(privop_addr_##name##_overflow, "privop-addrs overflow " #name)
 PERFPRIVOPADDR(get_ifa)
 PERFPRIVOPADDR(thash)
 #endif
+
+// vhpt.c
+PERFCOUNTER_CPU(vcpu_flush_vtlb_all,            "vcpu_flush_vtlb_all")
+PERFCOUNTER_CPU(domain_flush_vtlb_all,          "domain_flush_vtlb_all")
+PERFCOUNTER_CPU(vcpu_flush_tlb_vhpt_range,      "vcpu_flush_tlb_vhpt_range")
+PERFCOUNTER_CPU(domain_flush_vtlb_range,        "domain_flush_vtlb_range")
+
+// domain.c
+PERFCOUNTER_CPU(flush_vtlb_for_context_switch,  "flush_vtlb_for_context_switch")

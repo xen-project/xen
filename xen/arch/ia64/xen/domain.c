@@ -101,6 +101,7 @@ static void flush_vtlb_for_context_switch(struct vcpu* vcpu)
 			vhpt_flush();
 		}
 		local_flush_tlb_all();
+		perfc_incrc(flush_vtlb_for_context_switch);
 	}
 }
 
