@@ -397,6 +397,7 @@ struct xen_ia64_boot_param {
 #define XSI_SIZE			(1 << XSI_SHIFT)
 /* Log size of mapped_regs area (64 KB - only 4KB is used).  */
 #define XMAPPEDREGS_SHIFT		12
+#define XMAPPEDREGS_SIZE		(1 << XMAPPEDREGS_SHIFT)
 /* Offset of XASI (Xen arch shared info) wrt XSI_BASE.  */
 #define XMAPPEDREGS_OFS			XSI_SIZE
 

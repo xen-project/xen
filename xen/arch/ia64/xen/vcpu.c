@@ -1314,12 +1314,21 @@ static inline int range_overlap (u64 b1, u64 e1, u64 b2, u64 e2)
 static inline void
 check_xen_space_overlap (const char *func, u64 base, u64 page_size)
 {
+	/* Overlaps can occur only in region 7.
+	   (This is an optimization to bypass all the checks).  */
+	if (REGION_NUMBER(base) != 7)
+		return;
+
 	/* Mask LSBs of base.  */
 	base &= ~(page_size - 1);
 
 	/* FIXME: ideally an MCA should be generated...  */
 	if (range_overlap (HYPERVISOR_VIRT_START, HYPERVISOR_VIRT_END,
-			   base, base + page_size))
+	                   base, base + page_size)
+	    || range_overlap(current->domain->arch.shared_info_va,
+	                     current->domain->arch.shared_info_va 
+	                     + XSI_SIZE + XMAPPEDREGS_SIZE,
+	                     base, base + page_size))
 		panic_domain (NULL, "%s on Xen virtual space (%lx)\n",
 			      func, base);
 }
