@@ -60,7 +60,8 @@ def rm_domain_label(configfile):
     fd = None
     file = None
     if configfile[0] == '/':
-        fd = open(configfile, "rb")
+        file = configfile
+        fd = open(file, "rb")
     else:
         for prefix in [".", "/etc/xen"]:
             file = prefix + "/" + configfile
