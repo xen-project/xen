@@ -18,7 +18,12 @@
 /*static*/ kmem_cache_t *skbuff_cachep;
 EXPORT_SYMBOL(skbuff_cachep);
 
-#define MAX_SKBUFF_ORDER 4
+/* Allow up to 64kB or page-sized packets (whichever is greater). */
+#if PAGE_SHIFT < 16
+#define MAX_SKBUFF_ORDER (16 - PAGE_SHIFT)
+#else
+#define MAX_SKBUFF_ORDER 0
+#endif
 static kmem_cache_t *skbuff_order_cachep[MAX_SKBUFF_ORDER + 1];
 
 static struct {
