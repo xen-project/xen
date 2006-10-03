@@ -117,6 +117,7 @@ xencommize_grant_table_op(unsigned int cmd, void *op, unsigned int count)
 	}
 	case GNTTABOP_dump_table:
 	case GNTTABOP_transfer:
+	case GNTTABOP_copy:
 		break;
 	default:
 		printk("%s: unknown grant table op %d\n", __func__, cmd);
