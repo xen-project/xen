@@ -1057,6 +1057,7 @@ assign_domain_page_replace(struct domain *d, unsigned long mpaddr,
             put_page(old_page);
         }
     }
+    perfc_incrc(assign_domain_page_replace);
 }
 
 // caller must get_page(new_page) before
@@ -1117,6 +1118,7 @@ assign_domain_page_cmpxchg_rel(struct domain* d, unsigned long mpaddr,
 
     domain_page_flush(d, mpaddr, old_mfn, new_mfn);
     put_page(old_page);
+    perfc_incrc(assign_domain_pge_cmpxchg_rel);
     return 0;
 }
 
@@ -1189,6 +1191,7 @@ zap_domain_page_one(struct domain *d, unsigned long mpaddr, unsigned long mfn)
         try_to_clear_PGC_allocate(d, page);
     }
     put_page(page);
+    perfc_incrc(zap_dcomain_page_one);
 }
 
 unsigned long
@@ -1201,6 +1204,7 @@ dom0vp_zap_physmap(struct domain *d, unsigned long gpfn,
     }
 
     zap_domain_page_one(d, gpfn << PAGE_SHIFT, INVALID_MFN);
+    perfc_incrc(dom0vp_zap_physmap);
     return 0;
 }
 
@@ -1246,6 +1250,7 @@ dom0vp_add_physmap(struct domain* d, unsigned long gpfn, unsigned long mfn,
            get_gpfn_from_mfn(mfn) != INVALID_M2P_ENTRY);
     assign_domain_page_replace(d, gpfn << PAGE_SHIFT, mfn, flags);
     //don't update p2m table because this page belongs to rd, not d.
+    perfc_incrc(dom0vp_add_physmap);
 out1:
     put_domain(rd);
     return error;
@@ -1277,6 +1282,7 @@ create_grant_host_mapping(unsigned long gpaddr,
            get_gpfn_from_mfn(mfn) != INVALID_M2P_ENTRY);
     assign_domain_page_replace(d, gpaddr, mfn, (flags & GNTMAP_readonly)?
                                               ASSIGN_readonly: ASSIGN_writable);
+    perfc_incrc(create_grant_host_mapping);
     return GNTST_okay;
 }
 
@@ -1336,6 +1342,7 @@ destroy_grant_host_mapping(unsigned long gpaddr,
     BUG_ON(page_get_owner(page) == d);//try_to_clear_PGC_allocate(d, page) is not needed.
     put_page(page);
 
+    perfc_incrc(destroy_grant_host_mapping);
     return GNTST_okay;
 }
 
@@ -1396,6 +1403,7 @@ steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
             free_domheap_page(new);
             return -1;
         }
+        perfc_incrc(steal_page_refcount);
     }
 
     spin_lock(&d->page_alloc_lock);
@@ -1465,6 +1473,7 @@ steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
     list_del(&page->list);
 
     spin_unlock(&d->page_alloc_lock);
+    perfc_incrc(steal_page);
     return 0;
 }
 
@@ -1482,6 +1491,8 @@ guest_physmap_add_page(struct domain *d, unsigned long gpfn,
     assign_domain_page_replace(d, gpfn << PAGE_SHIFT, mfn, ASSIGN_writable);
 
     //BUG_ON(mfn != ((lookup_domain_mpa(d, gpfn << PAGE_SHIFT) & _PFN_MASK) >> PAGE_SHIFT));
+
+    perfc_incrc(guest_physmap_add_page);
 }
 
 void
@@ -1490,6 +1501,7 @@ guest_physmap_remove_page(struct domain *d, unsigned long gpfn,
 {
     BUG_ON(mfn == 0);//XXX
     zap_domain_page_one(d, gpfn << PAGE_SHIFT, mfn);
+    perfc_incrc(guest_physmap_remove_page);
 }
 
 //XXX sledgehammer.
@@ -1502,6 +1514,7 @@ domain_page_flush(struct domain* d, unsigned long mpaddr,
         shadow_mark_page_dirty(d, mpaddr >> PAGE_SHIFT);
 
     domain_flush_vtlb_all();
+    perfc_incrc(domain_page_flush);
 }
 
 int
