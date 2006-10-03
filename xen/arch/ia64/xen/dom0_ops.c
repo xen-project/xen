@@ -256,6 +256,7 @@ do_dom0vp_op(unsigned long cmd,
         } else {
             ret = (ret & _PFN_MASK) >> PAGE_SHIFT;//XXX pte_pfn()
         }
+        perfc_incrc(dom0vp_phystomach);
         break;
     case IA64_DOM0VP_machtophys:
         if (!mfn_valid(arg0)) {
@@ -263,6 +264,7 @@ do_dom0vp_op(unsigned long cmd,
             break;
         }
         ret = get_gpfn_from_mfn(arg0);
+        perfc_incrc(dom0vp_machtophys);
         break;
     case IA64_DOM0VP_zap_physmap:
         ret = dom0vp_zap_physmap(d, arg0, (unsigned int)arg1);
