@@ -247,7 +247,22 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg);
 
 static inline unsigned long gmfn_to_mfn(struct domain *d, unsigned long gmfn)
 {
-	return pfn2mfn(d, gmfn, NULL);
+    int mtype;
+    ulong mfn;
+    
+    mfn = pfn2mfn(d, gmfn, &mtype);
+    if (mfn != INVALID_MFN) {
+        switch (mtype) {
+        case PFN_TYPE_RMA:
+        case PFN_TYPE_LOGICAL:
+            break;
+        default:
+            WARN();
+            mfn = INVALID_MFN;
+            break;
+        }
+    }
+    return mfn;
 }
 
 #define mfn_to_gmfn(_d, mfn) (mfn)

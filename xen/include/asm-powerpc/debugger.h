@@ -13,13 +13,16 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005
+ * Copyright (C) IBM Corp. 2005, 2006
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
+ *          Jimi Xenidis <jimix@watson.ibm.com>
  */
 
 #ifndef _ASM_DEBUGGER_H_
 #define _ASM_DEBUGGER_H_
+
+#include <public/xen.h>
 
 extern void show_backtrace_regs(struct cpu_user_regs *);
 extern void show_backtrace(ulong sp, ulong lr, ulong pc);

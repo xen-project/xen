@@ -46,12 +46,11 @@ int iommu_put(u32 buid, ulong ioba, union tce tce)
     struct domain *d = v->domain;
 
     if (buid < iommu_phbs_num && iommu_phbs[buid].iommu_put != NULL) {
-        ulong pfn;
+        ulong gpfn;
         ulong mfn;
-        int mtype;
 
-        pfn = tce.tce_bits.tce_rpn;
-        mfn = pfn2mfn(d, pfn, &mtype);
+        gpfn = tce.tce_bits.tce_rpn;
+        mfn = gmfn_to_mfn(d, gpfn);
         if (mfn != INVALID_MFN) {
 #ifdef DEBUG
             printk("%s: ioba=0x%lx pfn=0x%lx mfn=0x%lx\n", __func__,

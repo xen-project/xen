@@ -39,40 +39,20 @@ static unsigned long paddr_to_maddr(unsigned long paddr)
 {
     struct vcpu *v = get_current();
     struct domain *d = v->domain;
-    int mtype;
-    ulong pfn;
+    ulong gpfn;
     ulong offset;
     ulong pa = paddr;
 
     offset = pa & ~PAGE_MASK;
-    pfn = pa >> PAGE_SHIFT;
+    gpfn = pa >> PAGE_SHIFT;
 
-    pa = pfn2mfn(d, pfn, &mtype);
+    pa = gmfn_to_mfn(d, gpfn);
     if (pa == INVALID_MFN) {
         printk("%s: Dom:%d bad paddr: 0x%lx\n",
                __func__, d->domain_id, paddr);
         return 0;
     }
-    switch (mtype) {
-    case PFN_TYPE_RMA:
-    case PFN_TYPE_LOGICAL:
-        break;
 
-    case PFN_TYPE_FOREIGN:
-        /* I don't think this should ever happen, but I suppose it
-         * could be possible */
-        printk("%s: Dom:%d paddr: 0x%lx type: FOREIGN\n",
-               __func__, d->domain_id, paddr);
-        WARN();
-        break;
-
-    case PFN_TYPE_IO:
-    default:
-        printk("%s: Dom:%d paddr: 0x%lx bad type: 0x%x\n",
-               __func__, d->domain_id, paddr, mtype);
-        WARN();
-        return 0;
-    }
     pa <<= PAGE_SHIFT;
     pa |= offset;
 
