@@ -190,8 +190,8 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 		__ia64_per_cpu_var(current_psr_ic_addr) = NULL;
         }
     }
-    flush_vtlb_for_context_switch(current);
     local_irq_restore(spsr);
+    flush_vtlb_for_context_switch(current);
     context_saved(prev);
 }
 
