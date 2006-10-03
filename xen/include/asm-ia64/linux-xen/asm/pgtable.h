@@ -68,6 +68,20 @@
 #ifdef XEN
 #define _PAGE_VIRT_D		(__IA64_UL(1) << 53)	/* Virtual dirty bit */
 #define _PAGE_PROTNONE		0
+
+/* domVTI */
+#define GPFN_MEM		(0UL << 60)	/* Guest pfn is normal mem */
+#define GPFN_FRAME_BUFFER	(1UL << 60)	/* VGA framebuffer */
+#define GPFN_LOW_MMIO		(2UL << 60)	/* Low MMIO range */
+#define GPFN_PIB		(3UL << 60)	/* PIB base */
+#define GPFN_IOSAPIC		(4UL << 60)	/* IOSAPIC base */
+#define GPFN_LEGACY_IO		(5UL << 60)	/* Legacy I/O base */
+#define GPFN_GFW		(6UL << 60)	/* Guest Firmware */
+#define GPFN_HIGH_MMIO		(7UL << 60)	/* High MMIO range */
+
+#define GPFN_IO_MASK		(7UL << 60)	/* Guest pfn is I/O type */
+#define GPFN_INV_MASK		(1UL << 63)	/* Guest pfn is invalid */
+
 #else
 #define _PAGE_PROTNONE		(__IA64_UL(1) << 63)
 #endif

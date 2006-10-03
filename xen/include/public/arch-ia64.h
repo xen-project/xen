@@ -48,18 +48,6 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 
 typedef unsigned long xen_ulong_t;
 
-#define GPFN_MEM          (0UL << 56) /* Guest pfn is normal mem */
-#define GPFN_FRAME_BUFFER (1UL << 56) /* VGA framebuffer */
-#define GPFN_LOW_MMIO     (2UL << 56) /* Low MMIO range */
-#define GPFN_PIB          (3UL << 56) /* PIB base */
-#define GPFN_IOSAPIC      (4UL << 56) /* IOSAPIC base */
-#define GPFN_LEGACY_IO    (5UL << 56) /* Legacy I/O base */
-#define GPFN_GFW          (6UL << 56) /* Guest Firmware */
-#define GPFN_HIGH_MMIO    (7UL << 56) /* High MMIO range */
-
-#define GPFN_IO_MASK     (7UL << 56)  /* Guest pfn is I/O type */
-#define GPFN_INV_MASK    (31UL << 59) /* Guest pfn is invalid */
-
 #define INVALID_MFN       (~0UL)
 
 #define MEM_G   (1UL << 30)
