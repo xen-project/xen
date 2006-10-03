@@ -232,6 +232,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 
     mtsdr1(next->domain->arch.htab.sdr1);
     local_flush_tlb(); /* XXX maybe flush_tlb_mask? */
+    cpu_flush_icache();
 
     if (is_idle_vcpu(next)) {
         reset_stack_and_jump(idle_loop);
