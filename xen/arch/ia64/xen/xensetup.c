@@ -18,6 +18,7 @@
 #include <xen/domain.h>
 #include <xen/serial.h>
 #include <xen/trace.h>
+#include <xen/keyhandler.h>
 #include <asm/meminit.h>
 #include <asm/page.h>
 #include <asm/setup.h>
@@ -25,7 +26,6 @@
 #include <asm/vmx.h>
 #include <linux/efi.h>
 #include <asm/iosapic.h>
-#include <xen/keyhandler.h>
 
 unsigned long xenheap_phys_end, total_pages;
 

@@ -28,23 +28,15 @@
 #include "util.h"
 #include "hypercall.h"
 
-/* write SMBIOS tables starting at 'start', without writing more
-   than 'max_size' bytes.
-
-   Return the number of bytes written
-*/
 static size_t
-write_smbios_tables(void *start, size_t max_size,
+write_smbios_tables(void *start,
 		    uint32_t vcpus, uint64_t memsize,
 		    uint8_t uuid[16], char *xen_version,
 		    uint32_t xen_major_version, uint32_t xen_minor_version);
 
 static void
 get_cpu_manufacturer(char *buf, int len);
-static size_t
-smbios_table_size(uint32_t vcpus, const char *xen_version,
-		  const char *processor_manufacturer);
-static void *
+static void
 smbios_entry_point_init(void *start,
 			uint16_t max_structure_size,
 			uint16_t structure_table_length,
@@ -71,7 +63,7 @@ static void *
 smbios_type_20_init(void *start, uint32_t memory_size_mb);
 static void *
 smbios_type_32_init(void *start);
-void *
+static void *
 smbios_type_127_init(void *start);
 
 static void
@@ -80,7 +72,8 @@ get_cpu_manufacturer(char *buf, int len)
 	char id[12];
 	uint32_t eax = 0;
 
-	cpuid(0, &eax, (uint32_t *)&id[0], (uint32_t *)&id[8], (uint32_t *)&id[4]);
+	cpuid(0, &eax, (uint32_t *)&id[0], (uint32_t *)&id[8],
+	      (uint32_t *)&id[4]);
 
 	if (memcmp(id, "GenuineIntel", 12) == 0)
 		strncpy(buf, "Intel", len);
@@ -90,90 +83,51 @@ get_cpu_manufacturer(char *buf, int len)
 		strncpy(buf, "unknown", len);
 }
 
-
-/* Calculate the size of the SMBIOS structure table.
-*/
 static size_t
-smbios_table_size(uint32_t vcpus, const char *xen_version,
-		  const char *processor_manufacturer)
-{
-	size_t size;
-
-	/* first compute size without strings or terminating 0 bytes */
-	size =  sizeof(struct smbios_type_0) + sizeof(struct smbios_type_1) +
-		sizeof(struct smbios_type_3) + sizeof(struct smbios_type_4)*vcpus +
-		sizeof(struct smbios_type_16) + sizeof(struct smbios_type_17) +
-		sizeof(struct smbios_type_19) + sizeof(struct smbios_type_20) +
-		sizeof(struct smbios_type_32) + sizeof(struct smbios_type_127);
-
-	/* 5 structures with no strings, 2 null bytes each */
-	size += 10;
-
-	/* Need to include 1 null byte per structure with strings (first
-	   terminating null byte comes from the string terminator of the
-	   last string). */
-	size += 4 + vcpus;
-
-	/* type 0: "Xen", xen_version, and release_date */
-	size += strlen("Xen") + strlen(xen_version) + 2;
-	/* type 1: "Xen", xen_version, "HVM domU", UUID as string for 
-                   serial number */
-	size += strlen("Xen") + strlen("HVM domU") + strlen(xen_version) +
-			36 + 4;
-	/* type 3: "Xen" */
-	size += strlen("Xen") + 1;
-	/* type 4: socket designation ("CPU n"), processor_manufacturer */
-	size += vcpus * (strlen("CPU n") + strlen(processor_manufacturer) + 2);
-	/* Make room for two-digit CPU numbers if necessary -- doesn't handle
-	   vcpus > 99 */
-	if (vcpus > 9)
-		size += vcpus - 9;
-	/* type 17: device locator string ("DIMM 1") */
-	size += strlen("DIMM 1") + 1;
-
-	return size;
-}
-
-static size_t
-write_smbios_tables(void *start, size_t max_size,
+write_smbios_tables(void *start,
 		    uint32_t vcpus, uint64_t memsize,
 		    uint8_t uuid[16], char *xen_version,
 		    uint32_t xen_major_version, uint32_t xen_minor_version)
 {
-	unsigned cpu_num;
-	void *p = start;
+	unsigned cpu_num, nr_structs = 0, max_struct_size = 0;
+	char *p, *q;
 	char cpu_manufacturer[15];
 	size_t structure_table_length;
 
 	get_cpu_manufacturer(cpu_manufacturer, 15);
 
+	p = (char *)start + sizeof(struct smbios_entry_point);
 
-	structure_table_length = smbios_table_size(vcpus, xen_version,
-						   cpu_manufacturer);
+#define do_struct(fn) do {			\
+	q = (fn);				\
+	nr_structs++;				\
+	if ((q - p) > max_struct_size)		\
+		max_struct_size = q - p;	\
+	p = q;					\
+} while (0)
 
-	if (structure_table_length + sizeof(struct smbios_entry_point) > max_size)
-		return 0;
+	do_struct(smbios_type_0_init(p, xen_version, xen_major_version,
+				     xen_minor_version));
+	do_struct(smbios_type_1_init(p, xen_version, uuid));
+	do_struct(smbios_type_3_init(p));
+	for (cpu_num = 1; cpu_num <= vcpus; cpu_num++)
+		do_struct(smbios_type_4_init(p, cpu_num, cpu_manufacturer));
+	do_struct(smbios_type_16_init(p, memsize));
+	do_struct(smbios_type_17_init(p, memsize));
+	do_struct(smbios_type_19_init(p, memsize));
+	do_struct(smbios_type_20_init(p, memsize));
+	do_struct(smbios_type_32_init(p));
+	do_struct(smbios_type_127_init(p));
 
-	p = smbios_entry_point_init(p, sizeof(struct smbios_type_4), 
-				    structure_table_length,
-				    (uint32_t)start + 
-				    sizeof(struct smbios_entry_point),
-				    9 + vcpus);
+#undef do_struct
 
-	p = smbios_type_0_init(p, xen_version, xen_major_version,
-			       xen_minor_version);
-	p = smbios_type_1_init(p, xen_version, uuid);
-	p = smbios_type_3_init(p);
-	for (cpu_num = 1; cpu_num <= vcpus; ++cpu_num)
-		p = smbios_type_4_init(p, cpu_num, cpu_manufacturer);
-	p = smbios_type_16_init(p, memsize);
-	p = smbios_type_17_init(p, memsize);
-	p = smbios_type_19_init(p, memsize);
-	p = smbios_type_20_init(p, memsize);
-	p = smbios_type_32_init(p);
-	p = smbios_type_127_init(p);
+	smbios_entry_point_init(
+		start, max_struct_size,
+		(p - (char *)start) - sizeof(struct smbios_entry_point),
+		SMBIOS_PHYSICAL_ADDRESS + sizeof(struct smbios_entry_point),
+		nr_structs);
 
-	return (size_t)((char*)p - (char*)start);
+	return (size_t)((char *)p - (char *)start);
 }
 
 /* This tries to figure out how much pseudo-physical memory (in MB)
@@ -278,10 +232,16 @@ hvm_write_smbios_tables(void)
 
 	xen_version_str[sizeof(xen_version_str)-1] = '\0';
 
-	write_smbios_tables((void *) SMBIOS_PHYSICAL_ADDRESS,
-			    SMBIOS_SIZE_LIMIT, get_vcpu_nr(), get_memsize(),
-			    uuid, xen_version_str,
-			    xen_major_version, xen_minor_version);
+	/* NB. 0xC0000 is a safe large memory area for scratch. */
+	len = write_smbios_tables((void *)0xC0000,
+				  get_vcpu_nr(), get_memsize(),
+				  uuid, xen_version_str,
+				  xen_major_version, xen_minor_version);
+	if (len > SMBIOS_SIZE_LIMIT)
+		goto error_out;
+	/* Okay, not too large: copy out of scratch to final location. */
+	memcpy((void *)SMBIOS_PHYSICAL_ADDRESS, (void *)0xC0000, len);
+
 	return;
 
  error_out:
@@ -290,7 +250,7 @@ hvm_write_smbios_tables(void)
 }
 
 
-static void *
+static void
 smbios_entry_point_init(void *start,
 			uint16_t max_structure_size,
 			uint16_t structure_table_length,
@@ -327,8 +287,6 @@ smbios_entry_point_init(void *start,
 	for (i = 0x10; i < ep->length; ++i)
 		sum += ((int8_t *)start)[i];
 	ep->intermediate_checksum = -sum;
-
-	return (char *)start + sizeof(struct smbios_entry_point);
 }
 
 /* Type 0 -- BIOS Information */
@@ -597,7 +555,7 @@ smbios_type_32_init(void *start)
 }
 
 /* Type 127 -- End of Table */
-void *
+static void *
 smbios_type_127_init(void *start)
 {
 	struct smbios_type_127 *p = (struct smbios_type_127 *)start;

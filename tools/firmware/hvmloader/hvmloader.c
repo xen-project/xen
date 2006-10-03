@@ -170,6 +170,9 @@ main(void)
 
 	init_hypercalls();
 
+	puts("Writing SMBIOS tables ...\n");
+	hvm_write_smbios_tables();
+
 	puts("Loading ROMBIOS ...\n");
 	memcpy((void *)ROMBIOS_PHYSICAL_ADDRESS, rombios, sizeof(rombios));
 
@@ -200,9 +203,6 @@ main(void)
 			 					sizeof(acpi));
 		}
 	}
-
-	puts("Writing SMBIOS tables ...\n");
-	hvm_write_smbios_tables();
 
 	if (check_amd()) {
 		/* AMD implies this is SVM */

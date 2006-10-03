@@ -903,7 +903,7 @@ __gnttab_copy(
     }
     if ( !get_page_and_type(mfn_to_page(d_frame), dd, PGT_writable_page) )
         PIN_FAIL(error_out, GNTST_general_error,
-                 "could not get source frame %lx.\n", d_frame);
+                 "could not get destination frame %lx.\n", d_frame);
 
     sp = map_domain_page(s_frame);
     dp = map_domain_page(d_frame);
