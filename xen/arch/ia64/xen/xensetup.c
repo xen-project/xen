@@ -18,6 +18,7 @@
 #include <xen/domain.h>
 #include <xen/serial.h>
 #include <xen/trace.h>
+#include <xen/keyhandler.h>
 #include <asm/meminit.h>
 #include <asm/page.h>
 #include <asm/setup.h>
