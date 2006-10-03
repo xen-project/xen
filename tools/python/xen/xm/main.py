@@ -1261,7 +1261,7 @@ def parse_block_configuration(args):
         label = security.get_security_printlabel(dominfo)
     else:
         label = None
-        security.res_security_check(args[1], label)
+    security.res_security_check(args[1], label)
 
     return (dom, vbd)
 
