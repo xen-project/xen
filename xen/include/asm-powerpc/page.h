@@ -30,7 +30,6 @@
 
 #include <xen/config.h>
 #include <asm/cache.h>
-#include <asm/debugger.h>
 
 #define PFN_DOWN(x)   ((x) >> PAGE_SHIFT)
 #define PFN_UP(x)     (((x) + PAGE_SIZE-1) >> PAGE_SHIFT)

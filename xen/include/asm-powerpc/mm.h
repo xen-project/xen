@@ -28,6 +28,7 @@
 #include <asm/system.h>
 #include <asm/flushtlb.h>
 #include <asm/uaccess.h>
+#include <asm/debugger.h>
 
 #define memguard_guard_range(_p,_l)    ((void)0)
 #define memguard_unguard_range(_p,_l)    ((void)0)
@@ -273,5 +274,27 @@ extern void free_extents(struct domain *d);
 
 extern int steal_page(struct domain *d, struct page_info *page,
                         unsigned int memflags);
+
+static inline unsigned long gmfn_to_mfn(struct domain *d, unsigned long gmfn)
+{
+    int mtype;
+    ulong mfn;
+    
+    mfn = pfn2mfn(d, gmfn, &mtype);
+    if (mfn != INVALID_MFN) {
+        switch (mtype) {
+        case PFN_TYPE_RMA:
+        case PFN_TYPE_LOGICAL:
+            break;
+        default:
+            WARN();
+            mfn = INVALID_MFN;
+            break;
+        }
+    }
+    return mfn;
+}
+
+#define mfn_to_gmfn(_d, mfn) (mfn)
 
 #endif
