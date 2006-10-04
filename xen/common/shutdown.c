@@ -30,8 +30,6 @@ static void maybe_reboot(void)
 
 void dom0_shutdown(u8 reason)
 {
-    debugger_trap_immediate();
-
     switch ( reason )
     {
     case SHUTDOWN_poweroff:
@@ -43,6 +41,7 @@ void dom0_shutdown(u8 reason)
 
     case SHUTDOWN_crash:
     {
+        debugger_trap_immediate();
         printk("Domain 0 crashed: ");
         maybe_reboot();
         break; /* not reached */
