@@ -43,8 +43,11 @@ extern void program_exception(
     struct cpu_user_regs *regs, unsigned long cookie);
 
 extern long xen_hvcall_jump(struct cpu_user_regs *regs, ulong address);
+
 extern void *mambo_memset(void *, int, ulong);
 extern void *mambo_memcpy(void *, const void *, ulong);
+extern void sleep(void);
+extern void idle_loop(void);
 
 extern ulong *__hypercall_table[];
 

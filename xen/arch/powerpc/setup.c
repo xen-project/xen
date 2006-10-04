@@ -196,8 +196,6 @@ static void __init start_of_day(void)
     schedulers_start();
 }
 
-extern void idle_loop(void);
-
 void startup_cpu_idle_loop(void)
 {
     struct vcpu *v = current;

@@ -34,6 +34,7 @@
 #include <asm/current.h>
 #include <asm/hcalls.h>
 #include "rtas.h"
+#include "exceptions.h"
 
 #define next_arg(fmt, args) ({                                              \
     unsigned long __arg;                                                    \
@@ -47,7 +48,6 @@
     }                                                                       \
     __arg;                                                                  \
 })
-extern void idle_loop(void);
 
 unsigned long hypercall_create_continuation(unsigned int op,
         const char *format, ...)
@@ -99,7 +99,8 @@ void arch_domain_destroy(struct domain *d)
 static void machine_fail(const char *s)
 {
     printf("%s failed, manual powercycle required!\n", s);
-    while(1);
+    for (;;)
+        sleep();
 }
 
 void machine_halt(void)
@@ -302,7 +303,6 @@ void arch_dump_vcpu_info(struct vcpu *v)
 {
 }
 
-extern void sleep(void);
 static void safe_halt(void)
 {
     int cpu = smp_processor_id();
