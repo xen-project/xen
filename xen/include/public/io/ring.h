@@ -25,7 +25,7 @@ typedef unsigned int RING_IDX;
  * power of two (so we can mask with (size-1) to loop around).
  */
 #define __RING_SIZE(_s, _sz) \
-    (__RD32(((_sz) - (long)&(_s)->ring + (long)(_s)) / sizeof((_s)->ring[0])))
+    (__RD32(((_sz) - (long)(_s)->ring + (long)(_s)) / sizeof((_s)->ring[0])))
 
 /*
  * Macros to make the correct C datatypes for a new kind of ring.
