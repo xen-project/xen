@@ -366,6 +366,10 @@ static void connect(struct backend_info *be)
 	be->netif->remaining_credit = be->netif->credit_bytes;
 
 	xenbus_switch_state(dev, XenbusStateConnected);
+
+	/* May not get a kick from the frontend, so start the tx_queue now. */
+	if (!netbk_can_queue(be->netif->dev))
+		netif_start_queue(be->netif->dev);
 }
 
 
@@ -403,14 +407,16 @@ static int connect_rings(struct backend_info *be)
 	}
 	be->netif->copying_receiver = !!rx_copy;
 
-	if (xenbus_scanf(XBT_NIL, dev->otherend, "feature-rx-notify", "%d",
-			 &val) < 0)
-		val = 0;
-	if (val)
-		be->netif->can_queue = 1;
-	else
-		/* Must be non-zero for pfifo_fast to work. */
-		be->netif->dev->tx_queue_len = 1;
+	if (be->netif->dev->tx_queue_len != 0) {
+		if (xenbus_scanf(XBT_NIL, dev->otherend,
+				 "feature-rx-notify", "%d", &val) < 0)
+			val = 0;
+		if (val)
+			be->netif->can_queue = 1;
+		else
+			/* Must be non-zero for pfifo_fast to work. */
+			be->netif->dev->tx_queue_len = 1;
+	}
 
 	if (xenbus_scanf(XBT_NIL, dev->otherend, "feature-sg", "%d", &val) < 0)
 		val = 0;
