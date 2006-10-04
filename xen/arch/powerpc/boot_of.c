@@ -1022,6 +1022,8 @@ static void * __init boot_of_module(ulong r3, ulong r4, multiboot_info_t *mbi)
               mods[mod].mod_start, mods[mod].mod_end);
     p = strstr((char *)(ulong)mbi->cmdline, sepr);
     if (p != NULL) {
+        /* Xen proper should never know about the dom0 args.  */
+        *(char *)p = '\0';
         p += sizeof (sepr) - 1;
         mods[mod].string = (u32)(ulong)p;
         of_printf("%s: dom0 mod string: %s\n", __func__, p);
