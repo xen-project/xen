@@ -9,6 +9,7 @@ obj-y += audit.o
 obj-y += backtrace.o
 obj-y += bitops.o
 obj-y += boot_of.o
+obj-y += cmdline.o
 obj-y += dart.o
 obj-y += dart_u3.o
 obj-y += dart_u4.o
@@ -75,10 +76,11 @@ physdev.o: ../x86/physdev.c
 
 HDRS += $(wildcard *.h)
 
+ifneq ($(CMDLINE),)
 # The first token in the arguments will be silently dropped.
-IMAGENAME = xen
-CMDLINE = ""
-boot_of.o: CFLAGS += -DCMDLINE="\"$(IMAGENAME) $(CMDLINE)\""
+FULL_CMDLINE := xen $(CMDLINE)
+endif
+cmdline.o: CFLAGS += -DCMDLINE="\"$(FULL_CMDLINE)\""
 
 TARGET_OPTS = $(OMAGIC) -Wl,-Ttext,0x400000,-T,xen.lds
 TARGET_OPTS += start.o $(ALL_OBJS)

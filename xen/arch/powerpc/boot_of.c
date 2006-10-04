@@ -16,6 +16,7 @@
  * Copyright (C) IBM Corp. 2005, 2006
  *
  * Authors: Jimi Xenidis <jimix@watson.ibm.com>
+ *          Hollis Blanchard <hollisb@us.ibm.com>
  */
 
 #include <xen/config.h>
@@ -40,12 +41,8 @@ volatile unsigned int __spin_ack;
 static ulong of_vec;
 static ulong of_msr;
 static int of_out;
-static char bootargs[256];
 
-#define COMMAND_LINE_SIZE 512
-static char builtin_cmdline[COMMAND_LINE_SIZE]
-    __attribute__((section("__builtin_cmdline"))) = CMDLINE;
-
+extern char builtin_cmdline[];
 extern struct ns16550_defaults ns16550;
 
 #undef OF_DEBUG
@@ -464,15 +461,17 @@ static void boot_of_bootargs(multiboot_info_t *mbi)
 {
     int rc;
 
-    rc = of_getprop(bof_chosen, "bootargs", &bootargs, sizeof (bootargs));
-    if (rc == OF_FAILURE || bootargs[0] == '\0') {
-        strlcpy(bootargs, builtin_cmdline, sizeof(bootargs));
+    if (builtin_cmdline[0] == '\0') {
+        rc = of_getprop(bof_chosen, "bootargs", builtin_cmdline,
+                CONFIG_CMDLINE_SIZE);
+        if (rc > CONFIG_CMDLINE_SIZE)
+            of_panic("bootargs[] not big enough for /chosen/bootargs\n");
     }
 
     mbi->flags |= MBI_CMDLINE;
-    mbi->cmdline = (u32)bootargs;
+    mbi->cmdline = (ulong)builtin_cmdline;
 
-    of_printf("bootargs = %s\n", bootargs);
+    of_printf("bootargs = %s\n", builtin_cmdline);
 }
 
 static int save_props(void *m, ofdn_t n, int pkg)
