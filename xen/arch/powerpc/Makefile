@@ -54,11 +54,6 @@ PPC_C_WARNINGS += -Wundef -Wmissing-prototypes -Wmissing-declarations
 PPC_C_WARNINGS += -Wshadow
 CFLAGS += $(PPC_C_WARNINGS)
 
-LINK=0x400000
-boot32_link_base = $(LINK)
-xen_link_offset  = 100
-xen_link_base    = $(patsubst %000,%$(xen_link_offset),$(LINK))
-
 #
 # The following flags are fed to gcc in order to link several
 # objects into a single ELF segment and to not link in any additional
@@ -69,16 +64,8 @@ OMAGIC = -N -nodefaultlibs -nostartfiles
 firmware: of_handler/built_in.o $(TARGET_SUBARCH)/memcpy.o of-devtree.o
 	$(CC) $(CFLAGS) $(OMAGIC) -e __ofh_start -Wl,-Ttext,0x0 $^ -o $@
 
-firmware_image: firmware
+firmware_image.bin: firmware
 	$(CROSS_COMPILE)objcopy --output-target=binary $< $@
-
-firmware_image.o: firmware_image
-	$(CROSS_COMPILE)objcopy --input-target=binary \
-		--output-target=elf64-powerpc \
-		--binary-architecture=powerpc \
-		--redefine-sym _binary_$<_start=$(@:%.o=%)_start \
-		--redefine-sym _binary_$<_end=$(@:%.o=%)_end \
-		--redefine-sym _binary_$<_size=$(@:%.o=%)_size  $< $@
 
 #
 # Hacks for included C files
@@ -93,10 +80,7 @@ IMAGENAME = xen
 CMDLINE = ""
 boot_of.o: CFLAGS += -DCMDLINE="\"$(IMAGENAME) $(CMDLINE)\""
 
-start.o: boot/start.S
-	$(CC) $(CFLAGS) -D__ASSEMBLY__ -c $< -o $@
-
-TARGET_OPTS = $(OMAGIC) -Wl,-Ttext,$(xen_link_base),-T,xen.lds
+TARGET_OPTS = $(OMAGIC) -Wl,-Ttext,0x400000,-T,xen.lds
 TARGET_OPTS += start.o $(ALL_OBJS)
 
 .xen-syms: start.o $(ALL_OBJS) xen.lds
@@ -119,22 +103,12 @@ xen-syms.o: xen-syms.S
 $(TARGET)-syms: start.o $(ALL_OBJS) xen-syms.o xen.lds
 	$(CC) $(CFLAGS) $(TARGET_OPTS) xen-syms.o -o $@
 
-$(TARGET).bin: $(TARGET)-syms
-	$(CROSS_COMPILE)objcopy --output-target=binary $< $@
-
-$(TARGET).bin.o: $(TARGET).bin
-	$(CROSS_COMPILE)objcopy --input-target=binary \
+# our firmware only loads 32-bit ELF files
+$(TARGET): $(TARGET)-syms
+	$(CROSS_COMPILE)objcopy \
+		--input-target=elf64-powerpc \
 		--output-target=elf32-powerpc \
-		--binary-architecture=powerpc  $< $@
-
-boot32.o: boot/boot32.S
-	$(CC) -m32 -Wa,-a32,-mppc64bridge \
-		-D__ASSEMBLY__ -D__BRIDGE64__ $(CFLAGS) -c $< -o $@
-
-$(TARGET): boot32.o $(TARGET).bin.o
-	$(CC) -m32 -N -Wl,-melf32ppclinux -static -nostdlib \
-		-Wl,-Ttext,$(boot32_link_base)  -Wl,-Tdata,$(xen_link_base) \
-		$(CFLAGS) $^ -o $@
+		$^ $@
 
 asm-offsets.s: $(TARGET_SUBARCH)/asm-offsets.c $(HDRS)
 	$(CC) $(CFLAGS) -S -o $@ $<
@@ -147,4 +121,4 @@ dom0.bin: $(DOM0_IMAGE)
 
 clean::
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C of_handler clean
-	rm -f firmware firmware_image dom0.bin .xen-syms
+	rm -f firmware firmware_image.bin dom0.bin .xen-syms
