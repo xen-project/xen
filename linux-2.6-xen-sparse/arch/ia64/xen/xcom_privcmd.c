@@ -545,6 +545,34 @@ xencomm_privcmd_hvm_op(privcmd_hypercall_t *hypercall)
 	return ret;
 }
 
+static int
+xencomm_privcmd_sched_op(privcmd_hypercall_t *hypercall)
+{
+	int cmd = hypercall->arg[0];
+	struct xencomm_handle *desc;
+	unsigned int argsize;
+	int ret;
+
+	switch (cmd) {
+	case SCHEDOP_remote_shutdown:
+		argsize = sizeof(sched_remote_shutdown_t);
+		break;
+	default:
+		printk("%s: unknown SCHEDOP %d\n", __func__, cmd);
+		return -EINVAL;
+	}
+
+	ret = xencomm_create((void *)hypercall->arg[1], argsize,
+	                     &desc, GFP_KERNEL);
+	if (ret)
+		return ret;
+
+	ret = xencomm_arch_hypercall_sched_op(cmd, desc);
+
+	xencomm_free(desc);
+	return ret;
+}
+
 int
 privcmd_hypercall(privcmd_hypercall_t *hypercall)
 {
@@ -565,6 +593,8 @@ privcmd_hypercall(privcmd_hypercall_t *hypercall)
 		return xencomm_privcmd_event_channel_op(hypercall);
 	case __HYPERVISOR_hvm_op:
 		return xencomm_privcmd_hvm_op(hypercall);
+	case __HYPERVISOR_sched_op:
+		return xencomm_privcmd_sched_op(hypercall);
 	default:
 		printk("%s: unknown hcall (%ld)\n", __func__, hypercall->op);
 		return -ENOSYS;
