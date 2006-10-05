@@ -291,6 +291,11 @@ all_commands = (domain_commands + host_commands + scheduler_commands +
 def cmdHelp(cmd):
     """Print help for a specific subcommand."""
     
+    for fc in SUBCOMMAND_HELP.keys():
+        if fc[:len(cmd)] == cmd:
+            cmd = fc
+            break
+    
     try:
         args, desc = SUBCOMMAND_HELP[cmd]
     except KeyError:
