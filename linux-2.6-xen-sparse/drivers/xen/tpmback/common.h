@@ -46,11 +46,10 @@ typedef struct tpmif_st {
 	atomic_t refcnt;
 
 	struct backend_info *bi;
-	unsigned long mmap_vstart;
 
 	grant_handle_t shmem_handle;
 	grant_ref_t shmem_ref;
-	struct page *pagerange;
+	struct page **mmap_pages;
 
 	char devname[20];
 } tpmif_t;
@@ -80,6 +79,9 @@ int vtpm_release_packets(tpmif_t * tpmif, int send_msgs);
 
 extern int num_frontends;
 
-#define MMAP_VADDR(t,_req) ((t)->mmap_vstart + ((_req) * PAGE_SIZE))
+static inline unsigned long idx_to_kaddr(tpmif_t *t, unsigned int idx)
+{
+	return (unsigned long)pfn_to_kaddr(page_to_pfn(t->mmap_pages[idx]));
+}
 
 #endif /* __TPMIF__BACKEND__COMMON_H__ */
