@@ -18,7 +18,7 @@
 import types
 import StringIO
 
-import sxp
+from xen.xend import sxp
 
 class ArgError(StandardError):
     pass

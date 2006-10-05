@@ -14,8 +14,8 @@
 
 import os, select, errno
 import random
-import sxp
 import shlex
+from xen.xend import sxp
 
 from XendLogging import log
 from XendError import VmError

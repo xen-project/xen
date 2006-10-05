@@ -8,21 +8,18 @@
 import os
 import re
 import string
-import sxp
 import threading
 from struct import pack, unpack, calcsize
 
 from xen.util.xpopen import xPopen3
-
 import xen.util.auxbin
-
 import xen.lowlevel.xc
 
-import balloon
-from XendError import XendError
-from XendLogging import log
-from XendDomainInfo import DEV_MIGRATE_STEP1, DEV_MIGRATE_STEP2
-from XendDomainInfo import DEV_MIGRATE_STEP3
+from xen.xend import balloon, sxp
+from xen.xend.XendError import XendError
+from xen.xend.XendLogging import log
+from xen.xend.XendDomainInfo import DEV_MIGRATE_STEP1, DEV_MIGRATE_STEP2
+from xen.xend.XendDomainInfo import DEV_MIGRATE_STEP3
 
 SIGNATURE = "LinuxGuestRecord"
 XC_SAVE = "xc_save"

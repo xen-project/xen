@@ -30,11 +30,8 @@ import os.path
 import string
 import sys
 
-import XendLogging
-from XendError import XendError
-
-import sxp
-
+from xen.xend import sxp, XendLogging
+from xen.xend.XendError import XendError
 
 class XendRoot:
     """Root of the management classes."""
