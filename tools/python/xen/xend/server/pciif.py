@@ -155,9 +155,9 @@ class PciController(DevController):
         PCIQuirk(dev.vendor, dev.device, dev.subvendor, dev.subdevice, domain, 
                 bus, slot, func)
 
-	for (start, size) in dev.ioports:
+        for (start, size) in dev.ioports:
             log.debug('pci: enabling ioport 0x%x/0x%x'%(start,size))
-            rc = xc.domain_ioport_permission(dom = fe_domid, first_port = start,
+            rc = xc.domain_ioport_permission(domid = fe_domid, first_port = start,
                     nr_ports = size, allow_access = True)
             if rc<0:
                 raise VmError(('pci: failed to configure I/O ports on device '+
@@ -171,7 +171,7 @@ class PciController(DevController):
 
             log.debug('pci: enabling iomem 0x%x/0x%x pfn 0x%x/0x%x'% \
                     (start,size,start_pfn,nr_pfns))
-            rc = xc.domain_iomem_permission(dom = fe_domid,
+            rc = xc.domain_iomem_permission(domid =  fe_domid,
                     first_pfn = start_pfn,
                     nr_pfns = nr_pfns,
                     allow_access = True)
@@ -181,7 +181,7 @@ class PciController(DevController):
 
         if dev.irq>0:
             log.debug('pci: enabling irq %d'%dev.irq)
-            rc = xc.domain_irq_permission(dom = fe_domid, pirq = dev.irq,
+            rc = xc.domain_irq_permission(domid =  fe_domid, pirq = dev.irq,
                     allow_access = True)
             if rc<0:
                 raise VmError(('pci: failed to configure irq on device '+

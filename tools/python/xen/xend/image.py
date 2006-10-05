@@ -188,7 +188,7 @@ class LinuxImageHandler(ImageHandler):
         store_evtchn = self.vm.getStorePort()
         console_evtchn = self.vm.getConsolePort()
 
-        log.debug("dom            = %d", self.vm.getDomid())
+        log.debug("domid          = %d", self.vm.getDomid())
         log.debug("image          = %s", self.kernel)
         log.debug("store_evtchn   = %d", store_evtchn)
         log.debug("console_evtchn = %d", console_evtchn)
@@ -197,7 +197,7 @@ class LinuxImageHandler(ImageHandler):
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
         log.debug("features       = %s", self.vm.getFeatures())
 
-        return xc.linux_build(dom            = self.vm.getDomid(),
+        return xc.linux_build(domid          = self.vm.getDomid(),
                               image          = self.kernel,
                               store_evtchn   = store_evtchn,
                               console_evtchn = console_evtchn,
@@ -217,7 +217,7 @@ class PPC_LinuxImageHandler(LinuxImageHandler):
         store_evtchn = self.vm.getStorePort()
         console_evtchn = self.vm.getConsolePort()
 
-        log.debug("dom            = %d", self.vm.getDomid())
+        log.debug("domid          = %d", self.vm.getDomid())
         log.debug("image          = %s", self.kernel)
         log.debug("store_evtchn   = %d", store_evtchn)
         log.debug("console_evtchn = %d", console_evtchn)
@@ -228,7 +228,7 @@ class PPC_LinuxImageHandler(LinuxImageHandler):
 
         devtree = FlatDeviceTree.build(self)
 
-        return xc.linux_build(dom            = self.vm.getDomid(),
+        return xc.linux_build(domid          = self.vm.getDomid(),
                               image          = self.kernel,
                               store_evtchn   = store_evtchn,
                               console_evtchn = console_evtchn,
@@ -271,7 +271,7 @@ class HVMImageHandler(ImageHandler):
     def buildDomain(self):
         store_evtchn = self.vm.getStorePort()
 
-        log.debug("dom            = %d", self.vm.getDomid())
+        log.debug("domid          = %d", self.vm.getDomid())
         log.debug("image          = %s", self.kernel)
         log.debug("store_evtchn   = %d", store_evtchn)
         log.debug("memsize        = %d", self.vm.getMemoryTarget() / 1024)
@@ -282,7 +282,7 @@ class HVMImageHandler(ImageHandler):
 
         self.register_shutdown_watch()
 
-        return xc.hvm_build(dom            = self.vm.getDomid(),
+        return xc.hvm_build(domid          = self.vm.getDomid(),
                             image          = self.kernel,
                             store_evtchn   = store_evtchn,
                             memsize        = self.vm.getMemoryTarget() / 1024,

@@ -72,7 +72,7 @@ class IOPortsController(DevController):
             raise VmError('ioports: Invalid i/o range: %s - %s' %
                           (io_from, io_to))
 
-        rc = xc.domain_ioport_permission(dom          = self.getDomid(),
+        rc = xc.domain_ioport_permission(domid        = self.getDomid(),
                                          first_port   = io_from,
                                          nr_ports     = io_to - io_from + 1,
                                          allow_access = True)
