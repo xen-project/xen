@@ -124,12 +124,11 @@ XENAPI_UNSUPPORTED_IN_LEGACY_CFG = [
 
 # All parameters of VMs that may be configured on-the-fly, or at start-up.
 VM_CONFIG_ENTRIES = [
-    ('autostart',  int),
-    ('autostop',   int),    
     ('name',        str),
     ('on_crash',    str),
     ('on_poweroff', str),
     ('on_reboot',   str),
+    ('on_xend_start', str),
     ('on_xend_stop', str),        
 ]
 
@@ -216,9 +215,8 @@ DEFAULT_CONFIGURATION = (
     ('device',       lambda info: {}),
     ('image',        lambda info: None),
     ('security',     lambda info: []),
-    ('autostart',    lambda info: 0),
-    ('autostop',     lambda info: 0),
-    ('on_xend_stop', lambda info: 'shutdown'),
+    ('on_xend_start', lambda info: 'ignore'),    
+    ('on_xend_stop', lambda info: 'ignore'),
 
     ('cpus',         lambda info: []),
     ('cpu_weight',   lambda info: 1.0),
@@ -469,7 +467,7 @@ class XendConfig(dict):
             dev_info = {}
             for opt, val in config[1:]:
                 dev_info[opt] = val
-
+            log.debug("XendConfig: reading device: %s" % dev_info)
             # create uuid if it doesn't
             dev_uuid = dev_info.get('uuid', uuid.createString())
             dev_info['uuid'] = dev_uuid
@@ -654,9 +652,8 @@ class XendConfig(dict):
             sxpr.append(['up_time', str(uptime)])
             sxpr.append(['start_time', str(self['start_time'])])
 
-        sxpr.append(['autostart', self.get('autostart', 0)])
-        sxpr.append(['autostop', self.get('autostop', 0)])
-        sxpr.append(['on_xend_stop', self.get('on_xend_stop', 'shutdown')])
+        sxpr.append(['on_xend_start', self.get('on_xend_start', 'ignore')])
+        sxpr.append(['on_xend_stop', self.get('on_xend_stop', 'ignore')])
 
         sxpr.append(['status', domain.state])
 
@@ -729,6 +726,8 @@ class XendConfig(dict):
             raise XendConfigError("XendConfig: device_add requires some "
                                   "config.")
 
+        log.debug("XendConfig.device_add: %s" % str(cfg_sxp))
+
         if cfg_sxp:
             config = sxp.child0(cfg_sxp)
             dev_type = sxp.name(config)
@@ -738,7 +737,6 @@ class XendConfig(dict):
                 for opt, val in config[1:]:
                     dev_info[opt] = val
             except ValueError:
-                log.debug('XendConfig.device_add: %s' % config)
                 pass # SXP has no options for this device
 
             # create uuid if it doesn't exist

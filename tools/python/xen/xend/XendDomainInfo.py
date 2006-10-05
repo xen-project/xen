@@ -102,8 +102,7 @@ VM_STORE_ENTRIES = [
     ('shadow_memory', int),
     ('maxmem',        int),
     ('start_time',    float),
-    ('autostart',  int),
-    ('autostop',   int),
+    ('on_xend_start', str),
     ('on_xend_stop', str),
     ]
 
@@ -194,23 +193,28 @@ def recreate(info, priv):
     #       entry disappears (eg. xenstore-rm /)
     #
     if domid != 0:
-        vmpath = xstransact.Read(dompath, "vm")
-        if not vmpath:
-            log.warn('/dom/%d/vm is missing. recreate is confused, trying '
-                     'our best to recover' % domid)
-            needs_reinitialising = True
-        
-        uuid2_str = xstransact.Read(vmpath, "uuid")
-        if not uuid2_str:
-            log.warn('%s/uuid/ is missing. recreate is confused, trying '
-                     'our best to recover' % vmpath)
-            needs_reinitialising = True
+        try:
+            vmpath = xstransact.Read(dompath, "vm")
+            if not vmpath:
+                log.warn('/dom/%d/vm is missing. recreate is confused, '
+                         'trying our best to recover' % domid)
+                needs_reinitialising = True
+                raise XendError('reinit')
+            
+            uuid2_str = xstransact.Read(vmpath, "uuid")
+            if not uuid2_str:
+                log.warn('%s/uuid/ is missing. recreate is confused, '
+                         'trying our best to recover' % vmpath)
+                needs_reinitialising = True
+                raise XendError('reinit')
 
-        uuid2 = uuid.fromString(uuid2_str)
-        if uuid1 != uuid2:
-            log.warn('UUID in /vm does not match the UUID in /dom/%d.'
-                     'Trying out best to recover' % domid)
-            needs_reinitialising = True
+            uuid2 = uuid.fromString(uuid2_str)
+            if uuid1 != uuid2:
+                log.warn('UUID in /vm does not match the UUID in /dom/%d.'
+                         'Trying out best to recover' % domid)
+                needs_reinitialising = True
+        except XendError:
+            pass # our best shot at 'goto' in python :)
 
     vm = XendDomainInfo(xeninfo, domid, dompath, augment = True, priv = priv)
     
@@ -263,7 +267,6 @@ def createDormant(xeninfo):
     
     # Remove domid and uuid do not make sense for non-running domains.
     xeninfo.pop('domid', None)
-    xeninfo.pop('uuid', None)
     vm = XendDomainInfo(XendConfig(cfg = xeninfo))
     return vm    
 
@@ -506,10 +509,11 @@ class XendDomainInfo:
         @param dev_config: device configuration
         @type  dev_config: dictionary (parsed config)
         """
+        log.debug("XendDomainInfo.device_create: %s" % dev_config)
         dev_type = sxp.name(dev_config)
         devid = self._createDevice(dev_type, dev_config)
+        self.info.device_add(dev_type, cfg_sxp = dev_config)        
         self._waitForDevice(dev_type, devid)
-        self.info.device_add(dev_type, cfg_sxp = dev_config)
         return self.getDeviceController(dev_type).sxpr(devid)
 
     def device_configure(self, dev_config, devid):
@@ -622,7 +626,7 @@ class XendDomainInfo:
 
         if not self.info['device'] and devices is not None:
             for device in devices:
-                self.info.device_add(device[0], cfg_sxp = device[1])
+                self.info.device_add(device[0], cfg_sxp = device)
 
     #
     # Function to update xenstore /vm/*

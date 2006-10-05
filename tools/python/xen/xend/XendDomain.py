@@ -523,8 +523,7 @@ class XendDomain:
                     continue
                 
                 if dom.state == XendDomainInfo.DOM_STATE_RUNNING:
-                    shouldShutdown = dom.info.get('autostop', 0)
-                    shutdownAction = dom.info.get('on_xend_stop', 'shutdown')
+                    shutdownAction = dom.info.get('on_xend_stop', 'ignore')
                     if shouldShutdown and shutdownAction == 'shutdown':
                         log.debug('Shutting down domain: %s' % dom.getName())
                         dom.shutdown("poweroff")
