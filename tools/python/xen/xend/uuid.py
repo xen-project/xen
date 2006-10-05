@@ -54,10 +54,6 @@ def getUuidRandom():
 uuidFactory = getUuidRandom
 
 
-def create():
-    return uuidFactory()
-
-
 def toString(u):
     return "-".join(["%02x" * 4, "%02x" * 2, "%02x" * 2, "%02x" * 2,
                      "%02x" * 6]) % tuple(u)
@@ -65,3 +61,9 @@ def toString(u):
 def fromString(s):
     s = s.replace('-', '')
     return [ int(s[i : i + 2], 16) for i in range(0, 32, 2) ]
+
+def create():
+    return uuidFactory()
+
+def createString():
+    return toString(create())
