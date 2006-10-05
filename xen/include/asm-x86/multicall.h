@@ -16,7 +16,7 @@
             "    movq  "STR(MULTICALL_op)"(%0),%%rax; "      \
             "    cmpq  $("STR(NR_hypercalls)"),%%rax; "      \
             "    jae   2f; "                                 \
-            "    leaq  "STR(hypercall_table)"(%%rip),%%rdi; "\
+            "    leaq  hypercall_table(%%rip),%%rdi; "       \
             "    leaq  (%%rdi,%%rax,8),%%rax; "              \
             "    movq  "STR(MULTICALL_arg0)"(%0),%%rdi; "    \
             "    movq  "STR(MULTICALL_arg1)"(%0),%%rsi; "    \
