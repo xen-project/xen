@@ -104,8 +104,8 @@ long do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
 
     case XENPF_microcode_update:
     {
-        extern int microcode_update(void *buf, unsigned long len);
-        ret = microcode_update(op->u.microcode.data.p,
+        extern int microcode_update(XEN_GUEST_HANDLE(void), unsigned long len);
+        ret = microcode_update(op->u.microcode.data,
                                op->u.microcode.length);
     }
     break;
