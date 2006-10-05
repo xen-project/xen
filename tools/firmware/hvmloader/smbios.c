@@ -434,7 +434,7 @@ smbios_type_4_init(void *start, unsigned int cpu_number, char *cpu_manufacturer)
 	start += strlen(buf) + 1;
 
 	strcpy((char *)start, cpu_manufacturer);
-	start += strlen(buf) + 1;
+	start += strlen(cpu_manufacturer) + 1;
 
 	*((uint8_t *)start) = 0;
 	return start+1;

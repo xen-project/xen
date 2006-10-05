@@ -6310,7 +6310,7 @@ int main(int argc, char **argv)
             case QEMU_OPTION_vncunused:
                 vncunused++;
                 if (vnc_display == -1)
-                    vnc_display = -2;
+                    vnc_display = 0;
                 break;
             }
         }

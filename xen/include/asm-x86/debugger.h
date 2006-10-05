@@ -46,7 +46,8 @@
 static inline int debugger_trap_fatal(
     unsigned int vector, struct cpu_user_regs *regs)
 {
-    return (__trap_to_gdb(regs, vector) == 0);
+    int rc = __trap_to_gdb(regs, vector);
+    return ((rc == 0) || (vector == TRAP_int3));
 }
 
 /* Int3 is a trivial way to gather cpu_user_regs context. */
