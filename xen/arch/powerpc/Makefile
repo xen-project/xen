@@ -137,4 +137,5 @@ dom0.bin: $(DOM0_IMAGE)
 
 clean::
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C of_handler clean
-	rm -f firmware firmware_image.bin dom0.bin .xen-syms cmdline.dep
+	rm -f firmware firmware_image.bin dom0.bin .xen-syms xen-syms.S \
+		xen.lds asm-offsets.s cmdline.dep
