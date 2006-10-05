@@ -900,12 +900,12 @@ class XendAPI:
     def vm_clean_reboot(self, session, vm_ref):
         xendom = XendDomain.instance()
         xeninfo = xendom.get_vm_by_uuid(vm_ref)
-        xeninfo.shutdown(XendDomainInfo.DOMAIN_REBOOT)
+        xeninfo.shutdown("reboot")
         return xen_api_success_void()
     def vm_clean_shutdown(self, session, vm_ref):
         xendom = XendDomain.instance()
         xeninfo = xendom.get_vm_by_uuid(vm_ref)
-        xeninfo.shutdown(XendDomainInfo.DOMAIN_HALT)
+        xeninfo.shutdown("poweroff")
         return xen_api_success_void()
     def vm_clone(self, session, vm_ref):
         return xen_api_error(XEND_ERROR_UNSUPPORTED)
