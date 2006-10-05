@@ -165,7 +165,7 @@ int xs_exists(struct xs_handle *h, const char *path)
  * This assumes that the domain name we are looking for is unique. 
  * Name parameter Domain-0 
  */
-char *get_dom_domid(struct xs_handle *h, const char *name)
+char *get_dom_domid(struct xs_handle *h)
 {
 	char **e, *val, *domid = NULL;
 	unsigned int num, len;
@@ -187,7 +187,7 @@ char *get_dom_domid(struct xs_handle *h, const char *name)
 		if (val == NULL)
 			continue;
 		
-		if (strcmp(val, name) == 0) {
+		if (strcmp(val, DOMNAME) == 0) {
 			/* match! */
 			asprintf(&path, "/local/domain/%s/domid", e[i]);
 			domid = xs_read(h, xth, path, &len);

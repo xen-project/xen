@@ -356,16 +356,11 @@ static void ueblktap_probe(struct xs_handle *h, struct xenbus_watch *w,
  *are created, we initalise the state and attach a disk.
  */
 
-int add_blockdevice_probe_watch(struct xs_handle *h, const char *domname)
+int add_blockdevice_probe_watch(struct xs_handle *h, const char *domid)
 {
-	char *domid, *path;
+	char *path;
 	struct xenbus_watch *vbd_watch;
 	int er;
-	
-	domid = get_dom_domid(h, domname);
-
-	DPRINTF("%s: %s\n", 
-		domname, (domid != NULL) ? domid : "[ not found! ]");
 	
 	asprintf(&path, "/local/domain/%s/backend/tap", domid);
 	if (path == NULL) 
@@ -384,4 +379,70 @@ int add_blockdevice_probe_watch(struct xs_handle *h, const char *domname)
 		return -EINVAL;
 	}
 	return 0;
+}
+
+/*
+ *Asynch callback to check for /local/domain/<DOMID>/name
+ */
+void check_dom(struct xs_handle *h, struct xenbus_watch *w, 
+	       const char *bepath_im) {
+	char *domid = NULL;
+
+	domid = get_dom_domid(h);
+	if (domid) {
+		add_blockdevice_probe_watch(h, domid);
+		free(domid);
+		unregister_xenbus_watch(h, w);
+	}
+	return;	
+}
+
+/*
+ *We must wait for xend to register /local/domain/<DOMID>
+ */
+int watch_for_domid(struct xs_handle *h)
+{
+	struct xenbus_watch *domid_watch;
+	char *path = NULL;
+	int er;
+
+	asprintf(&path, "/local/domain");
+	if (path == NULL) 
+		return -ENOMEM;
+
+	domid_watch = (struct xenbus_watch *)malloc(sizeof(struct xenbus_watch));
+	if (!domid_watch) {
+		DPRINTF("ERROR: unable to malloc domid_watch [%s]\n", path);
+		return -EINVAL;
+	}	
+	domid_watch->node     = path;
+	domid_watch->callback = check_dom;
+	er = register_xenbus_watch(h, domid_watch);
+	if (er == 0) {
+		DPRINTF("ERROR: adding vbd probe watch %s\n", path);
+		return -EINVAL;
+	}
+	if (path == NULL) 
+		return -ENOMEM;	
+	return 1;
+}
+
+int setup_probe_watch(struct xs_handle *h)
+{
+	char *domid = NULL, *path;
+	int ret;
+	
+	domid = get_dom_domid(h);
+
+	if (!domid) {
+                /*Asynchronous path*/
+		ret = watch_for_domid(h);
+		goto finish;
+	} else {
+		/*Synchronous path*/
+		ret = add_blockdevice_probe_watch(h, domid);
+		free(domid);
+	}
+ finish:
+	return ret;
 }
