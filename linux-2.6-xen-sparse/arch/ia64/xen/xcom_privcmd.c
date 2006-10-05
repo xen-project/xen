@@ -192,10 +192,7 @@ xencomm_privcmd_domctl(privcmd_hypercall_t *hypercall)
 	case XEN_DOMCTL_getmemlist:
 	{
 		unsigned long nr_pages = kern_op.u.getmemlist.max_pfns;
-#ifdef __ia64__
-		/* FIXME: Xen/ia64 pass first_page and nr_pages in max_pfns! */
-		nr_pages &= 0xffffffff;
-#endif
+
 		ret = xencomm_create(
 			xen_guest_handle(kern_op.u.getmemlist.buffer),
 			nr_pages * sizeof(unsigned long),
