@@ -142,12 +142,6 @@ struct arch_domain {
     (sizeof(vcpu_info_t) * (v)->vcpu_id + \
     offsetof(vcpu_info_t, evtchn_upcall_mask))
 
-struct hypercall_param {
-    unsigned long va;
-    unsigned long pa1;
-    unsigned long pa2;
-};
-
 struct arch_vcpu {
     /* Save the state of vcpu.
        This is the first entry to speed up accesses.  */
@@ -191,8 +185,6 @@ struct arch_vcpu {
     char irq_new_pending;
     char irq_new_condition;    // vpsr.i/vtpr change, check for pending VHPI
     char hypercall_continuation;
-
-    struct hypercall_param hypercall_param;  // used to remap a hypercall param
 
     //for phycial  emulation
     unsigned long old_rsc;

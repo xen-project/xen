@@ -2226,28 +2226,3 @@ IA64FAULT vcpu_ptr_i(VCPU *vcpu,UINT64 vadr,UINT64 log_range)
 
 	return IA64_NO_FAULT;
 }
-
-int ia64_map_hypercall_param(void)
-{
-	struct vcpu *v = current;
-	struct domain *d = current->domain;
-	u64 vaddr = v->arch.hypercall_param.va & PAGE_MASK;
-	volatile pte_t* pte;
-
-	if (v->arch.hypercall_param.va == 0)
-		return FALSE;
-	pte = lookup_noalloc_domain_pte(d, v->arch.hypercall_param.pa1);
-	if (!pte || !pte_present(*pte))
-		return FALSE;
-	vcpu_itc_no_srlz(v, 2, vaddr, pte_val(*pte), -1UL, PAGE_SHIFT);
-	if (v->arch.hypercall_param.pa2) {
-		vaddr += PAGE_SIZE;
-		pte = lookup_noalloc_domain_pte(d, v->arch.hypercall_param.pa2);
-		if (pte && pte_present(*pte)) {
-			vcpu_itc_no_srlz(v, 2, vaddr, pte_val(*pte),
-			                 -1UL, PAGE_SHIFT);
-		}
-	}
-	ia64_srlz_d();
-	return TRUE;
-}
