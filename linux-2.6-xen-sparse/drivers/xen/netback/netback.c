@@ -70,8 +70,11 @@ static struct timer_list net_timer;
 
 static struct sk_buff_head rx_queue;
 
-static unsigned long mmap_vstart;
-#define MMAP_VADDR(_req) (mmap_vstart + ((_req) * PAGE_SIZE))
+static struct page **mmap_pages;
+static inline unsigned long idx_to_kaddr(unsigned int idx)
+{
+	return (unsigned long)pfn_to_kaddr(page_to_pfn(mmap_pages[idx]));
+}
 
 #define PKT_PROT_LEN 64
 
@@ -817,7 +820,7 @@ inline static void net_tx_action_dealloc(void)
 	gop = tx_unmap_ops;
 	while (dc != dp) {
 		pending_idx = dealloc_ring[MASK_PEND_IDX(dc++)];
-		gnttab_set_unmap_op(gop, MMAP_VADDR(pending_idx),
+		gnttab_set_unmap_op(gop, idx_to_kaddr(pending_idx),
 				    GNTMAP_host_map,
 				    grant_tx_handle[pending_idx]);
 		gop++;
@@ -905,7 +908,7 @@ static gnttab_map_grant_ref_t *netbk_get_requests(netif_t *netif,
 		txp = RING_GET_REQUEST(&netif->tx, cons++);
 		pending_idx = pending_ring[MASK_PEND_IDX(pending_cons++)];
 
-		gnttab_set_map_op(mop++, MMAP_VADDR(pending_idx),
+		gnttab_set_map_op(mop++, idx_to_kaddr(pending_idx),
 				  GNTMAP_host_map | GNTMAP_readonly,
 				  txp->gref, netif->domid);
 
@@ -938,7 +941,7 @@ static int netbk_tx_check_mop(struct sk_buff *skb,
 		netif_put(netif);
 	} else {
 		set_phys_to_machine(
-			__pa(MMAP_VADDR(pending_idx)) >> PAGE_SHIFT,
+			__pa(idx_to_kaddr(pending_idx)) >> PAGE_SHIFT,
 			FOREIGN_FRAME(mop->dev_bus_addr >> PAGE_SHIFT));
 		grant_tx_handle[pending_idx] = mop->handle;
 	}
@@ -955,7 +958,7 @@ static int netbk_tx_check_mop(struct sk_buff *skb,
 		newerr = (++mop)->status;
 		if (likely(!newerr)) {
 			set_phys_to_machine(
-				__pa(MMAP_VADDR(pending_idx))>>PAGE_SHIFT,
+				__pa(idx_to_kaddr(pending_idx))>>PAGE_SHIFT,
 				FOREIGN_FRAME(mop->dev_bus_addr>>PAGE_SHIFT));
 			grant_tx_handle[pending_idx] = mop->handle;
 			/* Had a previous error? Invalidate this fragment. */
@@ -1003,7 +1006,7 @@ static void netbk_fill_frags(struct sk_buff *skb)
 
 		pending_idx = (unsigned long)frag->page;
 		txp = &pending_tx_info[pending_idx].req;
-		frag->page = virt_to_page(MMAP_VADDR(pending_idx));
+		frag->page = virt_to_page(idx_to_kaddr(pending_idx));
 		frag->size = txp->size;
 		frag->page_offset = txp->offset;
 
@@ -1199,7 +1202,7 @@ static void net_tx_action(unsigned long unused)
 			}
 		}
 
-		gnttab_set_map_op(mop, MMAP_VADDR(pending_idx),
+		gnttab_set_map_op(mop, idx_to_kaddr(pending_idx),
 				  GNTMAP_host_map | GNTMAP_readonly,
 				  txreq.gref, netif->domid);
 		mop++;
@@ -1258,8 +1261,8 @@ static void net_tx_action(unsigned long unused)
 		}
 
 		data_len = skb->len;
-		memcpy(skb->data, 
-		       (void *)(MMAP_VADDR(pending_idx)|txp->offset),
+		memcpy(skb->data,
+		       (void *)(idx_to_kaddr(pending_idx)|txp->offset),
 		       data_len);
 		if (data_len < txp->size) {
 			/* Append the packet payload as a fragment. */
@@ -1313,12 +1316,10 @@ static void netif_idx_release(u16 pending_idx)
 
 static void netif_page_release(struct page *page)
 {
-	u16 pending_idx = page - virt_to_page(mmap_vstart);
-
 	/* Ready for next use. */
 	set_page_count(page, 1);
 
-	netif_idx_release(pending_idx);
+	netif_idx_release(page->index);
 }
 
 irqreturn_t netif_be_int(int irq, void *dev_id, struct pt_regs *regs)
@@ -1438,17 +1439,22 @@ static int __init netback_init(void)
 	init_timer(&net_timer);
 	net_timer.data = 0;
 	net_timer.function = net_alarm;
-    
-	page = balloon_alloc_empty_page_range(MAX_PENDING_REQS);
-	if (page == NULL)
-		return -ENOMEM;
 
-	mmap_vstart = (unsigned long)pfn_to_kaddr(page_to_pfn(page));
+	mmap_pages = kmalloc(sizeof(mmap_pages[0]) * MAX_PENDING_REQS,
+			     GFP_KERNEL);
+	if (mmap_pages == NULL)
+		goto out_of_memory;
 
 	for (i = 0; i < MAX_PENDING_REQS; i++) {
-		page = virt_to_page(MMAP_VADDR(i));
+		page = mmap_pages[i] = balloon_alloc_empty_page();
+		if (page == NULL) {
+			while (--i >= 0)
+				balloon_free_empty_page(mmap_pages[i]);
+			goto out_of_memory;
+		}
 		set_page_count(page, 1);
 		SetPageForeign(page, netif_page_release);
+		page->index = i;
 	}
 
 	pending_cons = 0;
@@ -1472,6 +1478,11 @@ static int __init netback_init(void)
 #endif
 
 	return 0;
+
+ out_of_memory:
+	kfree(mmap_pages);
+	printk("%s: out of memory\n", __FUNCTION__);
+	return -ENOMEM;
 }
 
 module_init(netback_init);
