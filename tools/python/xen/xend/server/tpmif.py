@@ -22,19 +22,16 @@
 """
 
 from xen.xend import sxp
+from xen.xend import XendRoot
 from xen.xend.XendLogging import log
 from xen.xend.XendError import XendError
-from xen.xend import XendRoot
-from xen.xend.XendDomainInfo import DEV_MIGRATE_TEST
-
+from xen.xend.XendConstants import DEV_MIGRATE_TEST
 from xen.xend.server.DevController import DevController
 
 import os
 import re
 
-
 xroot = XendRoot.instance()
-
 
 class TPMifController(DevController):
     """TPM interface controller. Handles all TPM devices for a domain.

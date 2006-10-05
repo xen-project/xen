@@ -18,8 +18,7 @@ import xen.lowlevel.xc
 from xen.xend import balloon, sxp
 from xen.xend.XendError import XendError
 from xen.xend.XendLogging import log
-from xen.xend.XendDomainInfo import DEV_MIGRATE_STEP1, DEV_MIGRATE_STEP2
-from xen.xend.XendDomainInfo import DEV_MIGRATE_STEP3
+from xen.xend.XendConstants import *
 
 SIGNATURE = "LinuxGuestRecord"
 XC_SAVE = "xc_save"

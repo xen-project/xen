@@ -412,7 +412,7 @@ class HVMImageHandler(ImageHandler):
         """ watch call back on node control/shutdown,
             if node changed, this function will be called
         """
-        from xen.xend.XendDomainInfo import shutdown_reasons
+        from xen.xend.XendConstants import DOMAIN_SHUTDOWN_REASONS
         xd = xen.xend.XendDomain.instance()
         vm = xd.domain_lookup( self.vm.getDomid() )
 
