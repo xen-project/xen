@@ -21,7 +21,6 @@ def blkdev_name_to_number(name):
     try:
         return os.stat(n).st_rdev
     except Exception, ex:
-        log.debug("exception looking up device number for %s: %s", name, ex)
         pass
 
     if re.match( '/dev/sd[a-p]([1-9]|1[0-5])?', n):
