@@ -267,12 +267,13 @@ class Parser:
         elif c == 'x':
             self.state.fn = self.state_hex
             self.state.val = 0
-        elif c == '0':
+        elif c in string.octdigits:
             self.state.fn = self.state_octal
             self.state.val = 0
             self.input_char(c)
         else:
             # ignore escape if it doesn't match anything we know
+            self.state.parent.buf += '\\'
             self.pop_state()
 
     def state_octal(self, c):
