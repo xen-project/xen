@@ -40,6 +40,8 @@ EXPORT_SYMBOL(xen_start_info);
 int running_on_xen;
 EXPORT_SYMBOL(running_on_xen);
 
+static int p2m_expose_init(void);
+
 //XXX same as i386, x86_64 contiguous_bitmap_set(), contiguous_bitmap_clear()
 // move those to lib/contiguous_bitmap?
 //XXX discontigmem/sparsemem
@@ -448,6 +450,10 @@ out:
 	       privcmd_resource_min, privcmd_resource_max, 
 	       (privcmd_resource_max - privcmd_resource_min) >> 20);
 	BUG_ON(privcmd_resource_min >= privcmd_resource_max);
+
+	// XXX this should be somewhere appropriate
+	(void)p2m_expose_init();
+
 	return 0;
 }
 late_initcall(xen_ia64_privcmd_init);
@@ -753,3 +759,276 @@ time_resume(void)
 	/* Just trigger a tick.  */
 	ia64_cpu_local_tick();
 }
+
+///////////////////////////////////////////////////////////////////////////
+// expose p2m table
+#ifdef CONFIG_XEN_IA64_EXPOSE_P2M
+#include <linux/cpu.h>
+#include <asm/uaccess.h>
+
+int p2m_initialized __read_mostly = 0;
+
+unsigned long p2m_min_low_pfn __read_mostly;
+unsigned long p2m_max_low_pfn __read_mostly;
+unsigned long p2m_convert_min_pfn __read_mostly;
+unsigned long p2m_convert_max_pfn __read_mostly;
+
+static struct resource p2m_resource = {
+	.name    = "Xen p2m table",
+	.flags   = IORESOURCE_MEM,
+};
+static unsigned long p2m_assign_start_pfn __read_mostly;
+static unsigned long p2m_assign_end_pfn __read_mostly;
+volatile const pte_t* p2m_pte __read_mostly;
+
+#define GRNULE_PFN	PTRS_PER_PTE
+static unsigned long p2m_granule_pfn __read_mostly = GRNULE_PFN;
+
+#define ROUNDDOWN(x, y)  ((x) & ~((y) - 1))
+#define ROUNDUP(x, y)    (((x) + (y) - 1) & ~((y) - 1))
+
+#define P2M_PREFIX	"Xen p2m: "
+
+static int xen_ia64_p2m_expose __read_mostly = 1;
+module_param(xen_ia64_p2m_expose, int, 0);
+MODULE_PARM_DESC(xen_ia64_p2m_expose,
+                 "enable/disable xen/ia64 p2m exposure optimization\n");
+
+#ifdef CONFIG_XEN_IA64_EXPOSE_P2M_USE_DTR
+static int xen_ia64_p2m_expose_use_dtr __read_mostly = 1;
+module_param(xen_ia64_p2m_expose_use_dtr, int, 0);
+MODULE_PARM_DESC(xen_ia64_p2m_expose_use_dtr,
+                 "use/unuse dtr to map exposed p2m table\n");
+
+static const int p2m_page_shifts[] = {
+	_PAGE_SIZE_4K,
+	_PAGE_SIZE_8K,
+	_PAGE_SIZE_16K,
+	_PAGE_SIZE_64K,
+	_PAGE_SIZE_256K,
+	_PAGE_SIZE_1M,
+	_PAGE_SIZE_4M,
+	_PAGE_SIZE_16M,
+	_PAGE_SIZE_64M,
+	_PAGE_SIZE_256M,
+};
+
+struct p2m_itr_arg {
+	unsigned long vaddr;
+	unsigned long pteval;
+	unsigned long log_page_size;
+};
+static struct p2m_itr_arg p2m_itr_arg __read_mostly;
+
+// This should be in asm-ia64/kregs.h
+#define IA64_TR_P2M_TABLE	3
+
+static void
+p2m_itr(void* info)
+{
+	struct p2m_itr_arg* arg = (struct p2m_itr_arg*)info;
+	ia64_itr(0x2, IA64_TR_P2M_TABLE,
+	         arg->vaddr, arg->pteval, arg->log_page_size);
+	ia64_srlz_d();
+}
+
+static int
+p2m_expose_dtr_call(struct notifier_block *self,
+                    unsigned long event, void* ptr)
+{
+	unsigned int cpu = (unsigned int)(long)ptr;
+	if (event != CPU_ONLINE)
+		return 0;
+	if (!(p2m_initialized && xen_ia64_p2m_expose_use_dtr))
+		smp_call_function_single(cpu, &p2m_itr, &p2m_itr_arg, 1, 1);
+	return 0;
+}
+
+static struct notifier_block p2m_expose_dtr_hotplug_notifier = {
+	.notifier_call = p2m_expose_dtr_call,
+	.next          = NULL,
+	.priority      = 0
+};
+#endif
+
+static int
+p2m_expose_init(void)
+{
+	unsigned long num_pfn;
+	unsigned long size = 0;
+	unsigned long p2m_size = 0;
+	unsigned long align = ~0UL;
+	int error = 0;
+#ifdef CONFIG_XEN_IA64_EXPOSE_P2M_USE_DTR
+	int i;
+	unsigned long page_size;
+	unsigned long log_page_size = 0;
+#endif
+
+	if (!xen_ia64_p2m_expose)
+		return -ENOSYS;
+	if (p2m_initialized)
+		return 0;
+
+#ifdef CONFIG_XEN_IA64_EXPOSE_P2M_USE_DTR
+	error = register_cpu_notifier(&p2m_expose_dtr_hotplug_notifier);
+	if (error < 0)
+		return error;
+#endif
+
+	lock_cpu_hotplug();
+	if (p2m_initialized)
+		goto out;
+
+#ifdef CONFIG_DISCONTIGMEM
+	p2m_min_low_pfn = min_low_pfn;
+	p2m_max_low_pfn = max_low_pfn;
+#else
+	p2m_min_low_pfn = 0;
+	p2m_max_low_pfn = max_pfn;
+#endif
+
+#ifdef CONFIG_XEN_IA64_EXPOSE_P2M_USE_DTR
+	if (xen_ia64_p2m_expose_use_dtr) {
+		unsigned long granule_pfn = 0;
+		p2m_size = p2m_max_low_pfn - p2m_min_low_pfn;
+		for (i = 0;
+		     i < sizeof(p2m_page_shifts)/sizeof(p2m_page_shifts[0]);
+		     i++) {
+			log_page_size = p2m_page_shifts[i];
+			page_size = 1UL << log_page_size;
+			if (page_size < p2m_size)
+				continue;
+
+			granule_pfn = max(page_size >> PAGE_SHIFT,
+			                  p2m_granule_pfn);
+			p2m_convert_min_pfn = ROUNDDOWN(p2m_min_low_pfn,
+			                                granule_pfn);
+			p2m_convert_max_pfn = ROUNDUP(p2m_max_low_pfn,
+			                              granule_pfn);
+			num_pfn = p2m_convert_max_pfn - p2m_convert_min_pfn;
+			size = num_pfn << PAGE_SHIFT;
+			p2m_size = num_pfn / PTRS_PER_PTE;
+			p2m_size = ROUNDUP(p2m_size, granule_pfn << PAGE_SHIFT);
+			if (p2m_size == page_size)
+				break;
+		}
+		if (p2m_size != page_size) {
+			printk(KERN_ERR "p2m_size != page_size\n");
+			error = -EINVAL;
+			goto out;
+		}
+		align = max(privcmd_resource_align, granule_pfn << PAGE_SHIFT);
+	} else
+#endif
+	{
+		BUG_ON(p2m_granule_pfn & (p2m_granule_pfn - 1));
+		p2m_convert_min_pfn = ROUNDDOWN(p2m_min_low_pfn,
+		                                p2m_granule_pfn);
+		p2m_convert_max_pfn = ROUNDUP(p2m_max_low_pfn, p2m_granule_pfn);
+		num_pfn = p2m_convert_max_pfn - p2m_convert_min_pfn;
+		size = num_pfn << PAGE_SHIFT;
+		p2m_size = num_pfn / PTRS_PER_PTE;
+		p2m_size = ROUNDUP(p2m_size, p2m_granule_pfn << PAGE_SHIFT);
+		align = max(privcmd_resource_align,
+		            p2m_granule_pfn << PAGE_SHIFT);
+	}
+	
+	// use privcmd region
+	error = allocate_resource(&iomem_resource, &p2m_resource, p2m_size,
+	                          privcmd_resource_min, privcmd_resource_max,
+	                          align, NULL, NULL);
+	if (error) {
+		printk(KERN_ERR P2M_PREFIX
+		       "can't allocate region for p2m exposure "
+		       "[0x%016lx, 0x%016lx) 0x%016lx\n",
+		       p2m_convert_min_pfn, p2m_convert_max_pfn, p2m_size);
+		goto out;
+	}
+
+	p2m_assign_start_pfn = p2m_resource.start >> PAGE_SHIFT;
+	p2m_assign_end_pfn = p2m_resource.end >> PAGE_SHIFT;
+	
+	error = HYPERVISOR_expose_p2m(p2m_convert_min_pfn,
+	                              p2m_assign_start_pfn,
+	                              size, p2m_granule_pfn);
+	if (error) {
+		printk(KERN_ERR P2M_PREFIX "failed expose p2m hypercall %d\n",
+		       error);
+		printk(KERN_ERR P2M_PREFIX "conv 0x%016lx assign 0x%016lx "
+		       "size 0x%016lx granule 0x%016lx\n",
+		       p2m_convert_min_pfn, p2m_assign_start_pfn,
+		       size, p2m_granule_pfn);;
+		release_resource(&p2m_resource);
+		goto out;
+	}
+	p2m_pte = (volatile const pte_t*)pfn_to_kaddr(p2m_assign_start_pfn);
+#ifdef CONFIG_XEN_IA64_EXPOSE_P2M_USE_DTR
+	if (xen_ia64_p2m_expose_use_dtr) {
+		p2m_itr_arg.vaddr = (unsigned long)__va(p2m_assign_start_pfn
+		                                        << PAGE_SHIFT);
+		p2m_itr_arg.pteval = pte_val(pfn_pte(p2m_assign_start_pfn,
+		                                     PAGE_KERNEL));
+		p2m_itr_arg.log_page_size = log_page_size;
+		smp_mb();
+		smp_call_function(&p2m_itr, &p2m_itr_arg, 1, 1);
+		p2m_itr(&p2m_itr_arg);
+	}
+#endif	
+	smp_mb();
+	p2m_initialized = 1;
+	printk(P2M_PREFIX "assign p2m table of [0x%016lx, 0x%016lx)\n",
+	       p2m_convert_min_pfn << PAGE_SHIFT,
+	       p2m_convert_max_pfn << PAGE_SHIFT);
+	printk(P2M_PREFIX "to [0x%016lx, 0x%016lx) (%ld KBytes)\n",
+	       p2m_assign_start_pfn << PAGE_SHIFT,
+	       p2m_assign_end_pfn << PAGE_SHIFT,
+	       p2m_size / 1024);
+out:
+	unlock_cpu_hotplug();
+	return error;
+}
+
+#ifdef notyet
+void
+p2m_expose_cleanup(void)
+{
+	BUG_ON(!p2m_initialized);
+#ifdef CONFIG_XEN_IA64_EXPOSE_P2M_USE_DTR
+	unregister_cpu_notifier(&p2m_expose_dtr_hotplug_notifier);
+#endif
+	release_resource(&p2m_resource);
+}
+#endif
+
+//XXX inlinize?
+unsigned long
+p2m_phystomach(unsigned long gpfn)
+{
+	volatile const pte_t* pte;
+	unsigned long mfn;
+	unsigned long pteval;
+	
+	if (!p2m_initialized ||
+	    gpfn < p2m_min_low_pfn || gpfn > p2m_max_low_pfn
+	    /* || !pfn_valid(gpfn) */)
+		return INVALID_MFN;
+	pte = p2m_pte + (gpfn - p2m_convert_min_pfn);
+
+	mfn = INVALID_MFN;
+	if (likely(__get_user(pteval, (unsigned long __user *)pte) == 0 &&
+	           pte_present(__pte(pteval)) &&
+	           pte_pfn(__pte(pteval)) != (INVALID_MFN >> PAGE_SHIFT)))
+		mfn = (pteval & _PFN_MASK) >> PAGE_SHIFT;
+
+	return mfn;
+}
+
+EXPORT_SYMBOL_GPL(p2m_initialized);
+EXPORT_SYMBOL_GPL(p2m_min_low_pfn);
+EXPORT_SYMBOL_GPL(p2m_max_low_pfn);
+EXPORT_SYMBOL_GPL(p2m_convert_min_pfn);
+EXPORT_SYMBOL_GPL(p2m_convert_max_pfn);
+EXPORT_SYMBOL_GPL(p2m_pte);
+EXPORT_SYMBOL_GPL(p2m_phystomach);
+#endif

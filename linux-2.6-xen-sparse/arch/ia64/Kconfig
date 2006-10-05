@@ -64,6 +64,20 @@ config XEN_IA64_VDSO_PARAVIRT
 	help
 	  vDSO paravirtualization
 
+config XEN_IA64_EXPOSE_P2M
+	bool "Xen/IA64 exposure p2m table"
+	depends on XEN
+	default y
+	help
+	  expose p2m from xen
+
+config XEN_IA64_EXPOSE_P2M_USE_DTR
+	bool "Xen/IA64 map p2m table with dtr"
+	depends on XEN_IA64_EXPOSE_P2M
+	default y
+	help
+	  use dtr to map the exposed p2m table
+
 config SCHED_NO_NO_OMIT_FRAME_POINTER
 	bool
 	default y

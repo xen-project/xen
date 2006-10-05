@@ -378,6 +378,18 @@ HYPERVISOR_add_physmap(unsigned long gpfn, unsigned long mfn,
 	return ret;
 }
 
+#ifdef CONFIG_XEN_IA64_EXPOSE_P2M
+static inline unsigned long
+HYPERVISOR_expose_p2m(unsigned long conv_start_gpfn,
+                      unsigned long assign_start_gpfn,
+                      unsigned long expose_size, unsigned long granule_pfn)
+{
+	return _hypercall5(unsigned long, ia64_dom0vp_op,
+	                   IA64_DOM0VP_expose_p2m, conv_start_gpfn,
+	                   assign_start_gpfn, expose_size, granule_pfn);
+}
+#endif
+
 // for balloon driver
 #define HYPERVISOR_update_va_mapping(va, new_val, flags) (0)
 

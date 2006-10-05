@@ -10,11 +10,26 @@
 
 #define INVALID_P2M_ENTRY       (~0UL)
 
+#ifdef CONFIG_XEN_IA64_EXPOSE_P2M
+extern int p2m_initialized;
+extern unsigned long p2m_min_low_pfn;
+extern unsigned long p2m_max_low_pfn;
+extern unsigned long p2m_convert_min_pfn;
+extern unsigned long p2m_convert_max_pfn;
+extern volatile const pte_t* p2m_pte;
+unsigned long p2m_phystomach(unsigned long gpfn);
+#else
+#define p2m_initialized		(0)
+#define p2m_phystomach(gpfn)	INVALID_MFN
+#endif
+
 /* XXX xen page size != page size */
 static inline unsigned long
 pfn_to_mfn_for_dma(unsigned long pfn)
 {
 	unsigned long mfn;
+	if (p2m_initialized)
+		return p2m_phystomach(pfn);
 	mfn = HYPERVISOR_phystomach(pfn);
 	BUG_ON(mfn == 0); // XXX
 	BUG_ON(mfn == INVALID_P2M_ENTRY); // XXX
