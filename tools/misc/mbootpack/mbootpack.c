@@ -128,6 +128,7 @@ static void usage(void)
     exit(1);
 }
 
+#define _p(x) ((void *)(unsigned long)(x))
 
 static void place_kernel_section(address_t start, long int size)
 /* Place the kernel in memory, checking for the memory hole. */
@@ -136,7 +137,8 @@ static void place_kernel_section(address_t start, long int size)
         /* Above the memory hole: easy */
         next_free_space = MAX(next_free_space, start + size);
         if (!quiet) {
-            printf("Placed kernel section (%p+%p)\n", start, size);
+            printf("Placed kernel section (%p+%p)\n",
+                   _p(start), _p(size));
         }
         return;
     }
@@ -144,14 +146,14 @@ static void place_kernel_section(address_t start, long int size)
     if (start >= MEM_HOLE_START) {
         /* In the memory hole.  Not so good */
         printf("Fatal: kernel load address (%p) is in the memory hole.\n",
-               start);
+               _p(start));
         exit(1);
     }
     
     if (start + size > MEM_HOLE_START) {
         /* Too big for low memory */
         printf("Fatal: kernel (%p+%p) runs into the memory hole.\n",
-               start, size);
+               _p(start), _p(size));
         exit(1);
     }	
     
@@ -159,7 +161,7 @@ static void place_kernel_section(address_t start, long int size)
     next_free_space = MAX(next_free_space, start + size);
 
     if (!quiet) {
-        printf("Placed kernel section (%p+%p)\n", start, size);
+        printf("Placed kernel section (%p+%p)\n", _p(start), _p(size));
     }
 }
 
@@ -182,12 +184,10 @@ static address_t place_section(long int size, int align)
 
     if (!quiet) {
         printf("Placed section (%p+%p), align=%p\n", 
-               start, size, align);
+               _p(start), _p(size), _p(align));
     }
     return start;
 }
-
-
 
 
 static address_t load_kernel(const char *filename)
@@ -296,7 +296,7 @@ static address_t load_kernel(const char *filename)
                 size = loadsize;
             
             if (loadsize > size) {
-                printf("Fatal: can't load %i bytes of kernel into %i bytes " 
+                printf("Fatal: can't load %ld bytes of kernel into %ld bytes "
                        "of memory.\n", loadsize, size);
                 exit(1);
             }
@@ -466,8 +466,6 @@ static address_t load_kernel(const char *filename)
 }
 
 
-
-
 int main(int argc, char **argv) 
 {
     char *buffer, *imagename, *command_line, *p;
@@ -480,7 +478,7 @@ int main(int argc, char **argv)
     struct mod_list *modp;
     address_t start, kernel_entry;
     long int size, mod_command_line_space, command_line_len;
-    int modules, opt, mbi_reloc_offset, make_multiboot;
+    int modules, opt, mbi_reloc_offset;
 
     static const char short_options[] = "hc:m:o:qM";
     static const struct option options[] = {
