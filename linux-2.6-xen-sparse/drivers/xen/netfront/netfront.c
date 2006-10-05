@@ -85,10 +85,7 @@ static const int MODPARM_rx_flip = 0;
 #define RX_COPY_THRESHOLD 256
 
 /* If we don't have GSO, fake things up so that we never try to use it. */
-#ifndef NETIF_F_GSO
-#define netif_needs_gso(dev, skb)	0
-#define dev_disable_gso_features(dev)	((void)0)
-#else
+#ifdef NETIF_F_GSO
 #define HAVE_GSO			1
 static inline void dev_disable_gso_features(struct net_device *dev)
 {
@@ -96,6 +93,9 @@ static inline void dev_disable_gso_features(struct net_device *dev)
 	dev->features &= (1 << NETIF_F_GSO_SHIFT) - 1;
 	dev->features |= NETIF_F_GSO_ROBUST;
 }
+#else
+#define netif_needs_gso(dev, skb)	0
+#define dev_disable_gso_features(dev)	((void)0)
 #endif
 
 #define GRANT_INVALID_REF	0
