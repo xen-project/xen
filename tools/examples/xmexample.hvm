@@ -132,6 +132,11 @@ sdl=0
 vnc=1
 
 #----------------------------------------------------------------------------
+# address that should be listened on for the VNC server if vnc is set.
+# default is to use 'vnc-listen' setting from /etc/xen/xend-config.sxp
+#vnclisten="127.0.0.1"
+
+#----------------------------------------------------------------------------
 # set VNC display number, default = domid
 #vncdisplay=1
 

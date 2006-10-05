@@ -1250,9 +1250,8 @@ static void vnc_listen_read(void *opaque)
     }
 }
 
-int vnc_display_init(DisplayState *ds, int display, int find_unused)
+int vnc_display_init(DisplayState *ds, int display, int find_unused, struct sockaddr_in *addr)
 {
-    struct sockaddr_in addr;
     int reuse_addr, ret;
     VncState *vs;
 
@@ -1290,11 +1289,10 @@ int vnc_display_init(DisplayState *ds, int display, int find_unused)
     }
 
  retry:
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(5900 + display);
-    memset(&addr.sin_addr, 0, sizeof(addr.sin_addr));
+    addr->sin_family = AF_INET;
+    addr->sin_port = htons(5900 + display);
 
-    if (bind(vs->lsock, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
+    if (bind(vs->lsock, (struct sockaddr *)addr, sizeof(struct sockaddr_in)) == -1) {
 	if (find_unused && errno == EADDRINUSE) {
 	    display++;
 	    goto retry;

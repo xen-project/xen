@@ -122,6 +122,7 @@ static DisplayState display_state;
 int nographic;
 int vncviewer;
 int vncunused;
+struct sockaddr_in vnclisten_addr;
 const char* keyboard_layout = NULL;
 int64_t ticks_per_sec;
 char *boot_device = NULL;
@@ -2783,10 +2784,22 @@ fail:
     return -1;
 }
 
+int parse_host(struct sockaddr_in *saddr, const char *buf)
+{
+    struct hostent *he;
+
+    if ((he = gethostbyname(buf)) != NULL) {
+        saddr->sin_addr = *(struct in_addr *)he->h_addr;
+    } else {
+        if (!inet_aton(buf, &saddr->sin_addr))
+            return -1;
+    }
+    return 0;
+}
+
 int parse_host_port(struct sockaddr_in *saddr, const char *str)
 {
     char buf[512];
-    struct hostent *he;
     const char *p, *r;
     int port;
 
@@ -2797,14 +2810,8 @@ int parse_host_port(struct sockaddr_in *saddr, const char *str)
     if (buf[0] == '\0') {
         saddr->sin_addr.s_addr = 0;
     } else {
-        if (isdigit(buf[0])) {
-            if (!inet_aton(buf, &saddr->sin_addr))
-                return -1;
-        } else {
-            if ((he = gethostbyname(buf)) == NULL)
-                return - 1;
-            saddr->sin_addr = *(struct in_addr *)he->h_addr;
-        }
+        if (parse_host(&saddr, buf) == -1)
+            return -1;
     }
     port = strtol(p, (char **)&r, 0);
     if (r == p)
@@ -5352,6 +5359,7 @@ void help(void)
 	   "-vnc display    start a VNC server on display\n"
            "-vncviewer      start a vncviewer process for this domain\n"
            "-vncunused      bind the VNC server to an unused port\n"
+           "-vnclisten      bind the VNC server to this address\n"
            "-timeoffset     time offset (in seconds) from local time\n"
            "-acpi           disable or enable ACPI of HVM domain \n"
            "\n"
@@ -5444,6 +5452,7 @@ enum {
     QEMU_OPTION_acpi,
     QEMU_OPTION_vncviewer,
     QEMU_OPTION_vncunused,
+    QEMU_OPTION_vnclisten,
 };
 
 typedef struct QEMUOption {
@@ -5522,6 +5531,7 @@ const QEMUOption qemu_options[] = {
     { "vnc", HAS_ARG, QEMU_OPTION_vnc },
     { "vncviewer", 0, QEMU_OPTION_vncviewer },
     { "vncunused", 0, QEMU_OPTION_vncunused },
+    { "vnclisten", HAS_ARG, QEMU_OPTION_vnclisten },
     
     /* temporary options */
     { "usb", 0, QEMU_OPTION_usb },
@@ -5928,6 +5938,8 @@ int main(int argc, char **argv)
 
     nb_nics = 0;
     /* default mac address of the first network interface */
+
+    memset(&vnclisten_addr.sin_addr, 0, sizeof(vnclisten_addr.sin_addr));
     
     /* init debug */
     sprintf(qemu_dm_logfilename, "/var/log/xen/qemu-dm.%d.log", getpid());
@@ -6312,6 +6324,9 @@ int main(int argc, char **argv)
                 if (vnc_display == -1)
                     vnc_display = 0;
                 break;
+            case QEMU_OPTION_vnclisten:
+                parse_host(&vnclisten_addr, optarg);
+                break;
             }
         }
     }
@@ -6548,7 +6563,7 @@ int main(int argc, char **argv)
     if (nographic) {
         dumb_display_init(ds);
     } else if (vnc_display != -1) {
-	vnc_display = vnc_display_init(ds, vnc_display, vncunused);
+	vnc_display = vnc_display_init(ds, vnc_display, vncunused, &vnclisten_addr);
 	if (vncviewer)
 	    vnc_start_viewer(vnc_display);
 	xenstore_write_vncport(vnc_display);
