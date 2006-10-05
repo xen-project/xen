@@ -112,7 +112,6 @@ void __dummy__(void)
     OFFSET(MULTICALL_arg3, struct multicall_entry, args[3]);
     OFFSET(MULTICALL_arg4, struct multicall_entry, args[4]);
     OFFSET(MULTICALL_arg5, struct multicall_entry, args[5]);
-    OFFSET(MULTICALL_arg6, struct multicall_entry, args[6]);
     OFFSET(MULTICALL_result, struct multicall_entry, result);
     BLANK();
 

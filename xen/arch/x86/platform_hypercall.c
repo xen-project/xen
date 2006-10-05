@@ -58,12 +58,13 @@ long do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
             op->u.add_memtype.nr_mfns,
             op->u.add_memtype.type,
             1);
-        if ( ret > 0 )
+        if ( ret >= 0 )
         {
             op->u.add_memtype.handle = 0;
             op->u.add_memtype.reg    = ret;
-            (void)copy_to_guest(u_xenpf_op, op, 1);
-            ret = 0;
+            ret = copy_to_guest(u_xenpf_op, op, 1) ? -EFAULT : 0;
+            if ( ret != 0 )
+                mtrr_del_page(ret, 0, 0);
         }
     }
     break;
@@ -75,7 +76,7 @@ long do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
             && (int)op->u.del_memtype.reg >= 0)
         {
             ret = mtrr_del_page(op->u.del_memtype.reg, 0, 0);
-            if (ret > 0)
+            if ( ret > 0 )
                 ret = 0;
         }
         else
@@ -96,16 +97,15 @@ long do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
             op->u.read_memtype.mfn     = mfn;
             op->u.read_memtype.nr_mfns = nr_mfns;
             op->u.read_memtype.type    = type;
-            (void)copy_to_guest(u_xenpf_op, op, 1);
-            ret = 0;
+            ret = copy_to_guest(u_xenpf_op, op, 1) ? -EFAULT : 0;
         }
     }
     break;
 
     case XENPF_microcode_update:
     {
-        extern int microcode_update(void *buf, unsigned long len);
-        ret = microcode_update(op->u.microcode.data.p,
+        extern int microcode_update(XEN_GUEST_HANDLE(void), unsigned long len);
+        ret = microcode_update(op->u.microcode.data,
                                op->u.microcode.length);
     }
     break;
