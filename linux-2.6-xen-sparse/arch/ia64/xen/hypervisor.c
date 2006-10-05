@@ -40,7 +40,11 @@ EXPORT_SYMBOL(xen_start_info);
 int running_on_xen;
 EXPORT_SYMBOL(running_on_xen);
 
+#ifdef CONFIG_XEN_IA64_EXPOSE_P2M
 static int p2m_expose_init(void);
+#else
+#define p2m_expose_init() (-ENOSYS)
+#endif
 
 //XXX same as i386, x86_64 contiguous_bitmap_set(), contiguous_bitmap_clear()
 // move those to lib/contiguous_bitmap?
