@@ -85,13 +85,38 @@ static const int MODPARM_rx_flip = 0;
 #define RX_COPY_THRESHOLD 256
 
 /* If we don't have GSO, fake things up so that we never try to use it. */
-#ifdef NETIF_F_GSO
+#if defined(NETIF_F_GSO)
 #define HAVE_GSO			1
+#define HAVE_TSO			1 /* TSO is a subset of GSO */
 static inline void dev_disable_gso_features(struct net_device *dev)
 {
 	/* Turn off all GSO bits except ROBUST. */
 	dev->features &= (1 << NETIF_F_GSO_SHIFT) - 1;
 	dev->features |= NETIF_F_GSO_ROBUST;
+}
+#elif defined(NETIF_F_TSO)
+#define HAVE_TSO                       1
+#define gso_size tso_size
+#define gso_segs tso_segs
+static inline void dev_disable_gso_features(struct net_device *dev)
+{
+       /* Turn off all TSO bits. */
+       dev->features &= ~NETIF_F_TSO;
+}
+static inline int skb_is_gso(const struct sk_buff *skb)
+{
+        return skb_shinfo(skb)->tso_size;
+}
+static inline int skb_gso_ok(struct sk_buff *skb, int features)
+{
+        return (features & NETIF_F_TSO);
+}
+
+static inline int netif_needs_gso(struct net_device *dev, struct sk_buff *skb)
+{
+        return skb_is_gso(skb) &&
+               (!skb_gso_ok(skb, dev->features) ||
+                unlikely(skb->ip_summed != CHECKSUM_HW));
 }
 #else
 #define netif_needs_gso(dev, skb)	0
@@ -408,7 +433,7 @@ again:
 		goto abort_transaction;
 	}
 
-#ifdef HAVE_GSO
+#ifdef HAVE_TSO
 	err = xenbus_printf(xbt, dev->nodename, "feature-gso-tcpv4", "%d", 1);
 	if (err) {
 		message = "writing feature-gso-tcpv4";
@@ -940,7 +965,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		tx->flags |= NETTXF_data_validated;
 #endif
 
-#ifdef HAVE_GSO
+#ifdef HAVE_TSO
 	if (skb_shinfo(skb)->gso_size) {
 		struct netif_extra_info *gso = (struct netif_extra_info *)
 			RING_GET_REQUEST(&np->tx, ++i);
@@ -1228,12 +1253,14 @@ static int xennet_set_skb_gso(struct sk_buff *skb,
 		return -EINVAL;
 	}
 
-#ifdef HAVE_GSO
+#ifdef HAVE_TSO
 	skb_shinfo(skb)->gso_size = gso->u.gso.size;
+#ifdef HAVE_GSO
 	skb_shinfo(skb)->gso_type = SKB_GSO_TCPV4;
 
 	/* Header must be checked, and gso_segs computed. */
 	skb_shinfo(skb)->gso_type |= SKB_GSO_DODGY;
+#endif
 	skb_shinfo(skb)->gso_segs = 0;
 
 	return 0;
@@ -1584,7 +1611,7 @@ static int xennet_set_sg(struct net_device *dev, u32 data)
 
 static int xennet_set_tso(struct net_device *dev, u32 data)
 {
-#ifdef HAVE_GSO
+#ifdef HAVE_TSO
 	if (data) {
 		struct netfront_info *np = netdev_priv(dev);
 		int val;
