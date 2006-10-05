@@ -16,7 +16,7 @@
 # Copyright (C) 2006 XenSource Ltd.
 #============================================================================
 
-from types import ListType
+import types
 import xmlrpclib
 from xen.util.xmlrpclib2 import UnixXMLRPCServer, TCPXMLRPCServer
 
@@ -24,10 +24,23 @@ from xen.xend import XendDomain, XendDomainInfo, XendNode
 from xen.xend import XendLogging, XendDmesg
 from xen.xend.XendClient import XML_RPC_SOCKET
 from xen.xend.XendLogging import log
+from xen.xend.XendAPI import XendAPI
 from xen.xend.XendError import XendInvalidDomain
 
+# vcpu_avail is a long and is not needed by the clients.  It's far easier
+# to just remove it then to try and marshal the long.
+def fixup_sxpr(sexpr):
+    ret = []
+    for k in sexpr:
+        if type(k) in (types.ListType, types.TupleType):
+            if len(k) != 2 or k[0] != 'vcpu_avail':
+                ret.append(fixup_sxpr(k))
+        else:
+            ret.append(k)
+    return ret
+
 def lookup(domid):
-    info = XendDomain.instance().domain_lookup_by_name_or_id(domid)
+    info = XendDomain.instance().domain_lookup_nr(domid)
     if not info:
         raise XendInvalidDomain(str(domid))
     return info
@@ -35,18 +48,6 @@ def lookup(domid):
 def dispatch(domid, fn, args):
     info = lookup(domid)
     return getattr(info, fn)(*args)
-
-# vcpu_avail is a long and is not needed by the clients.  It's far easier
-# to just remove it then to try and marshal the long.
-def fixup_sxpr(sexpr):
-    ret = []
-    for k in sexpr:
-        if type(k) is ListType:
-            if len(k) != 2 or k[0] != 'vcpu_avail':
-                ret.append(fixup_sxpr(k))
-        else:
-            ret.append(k)
-    return ret
 
 def domain(domid):
     info = lookup(domid)
@@ -92,6 +93,7 @@ class XMLRPCServer:
         
         self.ready = False        
         self.running = True
+        self.xenapi = XendAPI()
         
     def run(self):
         if self.use_tcp:
@@ -100,6 +102,16 @@ class XMLRPCServer:
         else:
             self.server = UnixXMLRPCServer(self.path, logRequests = False)
 
+        # Register Xen API Functions
+        # -------------------------------------------------------------------
+        # exportable functions are ones that do not begin with '_'
+        # and has the 'api' attribute.
+        
+        for meth_name in dir(self.xenapi):
+            meth = getattr(self.xenapi, meth_name)
+            if meth_name[0] != '_' and callable(meth) and hasattr(meth, 'api'):
+                self.server.register_function(meth, getattr(meth, 'api'))
+                
         # Legacy deprecated xm xmlrpc api
         # --------------------------------------------------------------------
 
