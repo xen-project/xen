@@ -606,6 +606,17 @@ void balloon_dealloc_empty_page_range(
 	schedule_work(&balloon_worker);
 }
 
+struct page *balloon_alloc_empty_page(void)
+{
+	return balloon_alloc_empty_page_range(1);
+}
+
+void balloon_free_empty_page(
+	struct page *page)
+{
+	balloon_dealloc_empty_page_range(page, 1);
+}
+
 void balloon_release_driver_page(struct page *page)
 {
 	unsigned long flags;
@@ -621,6 +632,8 @@ void balloon_release_driver_page(struct page *page)
 EXPORT_SYMBOL_GPL(balloon_update_driver_allowance);
 EXPORT_SYMBOL_GPL(balloon_alloc_empty_page_range);
 EXPORT_SYMBOL_GPL(balloon_dealloc_empty_page_range);
+EXPORT_SYMBOL_GPL(balloon_alloc_empty_page);
+EXPORT_SYMBOL_GPL(balloon_free_empty_page);
 EXPORT_SYMBOL_GPL(balloon_release_driver_page);
 
 MODULE_LICENSE("Dual BSD/GPL");
