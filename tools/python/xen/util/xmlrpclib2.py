@@ -25,7 +25,6 @@ import types
 import fcntl
 
 from httplib import HTTPConnection, HTTP
-from xmlrpclib import Transport
 from SimpleXMLRPCServer import SimpleXMLRPCServer, SimpleXMLRPCRequestHandler
 import SocketServer
 import xmlrpclib, socket, os, stat
@@ -81,10 +80,11 @@ class HTTPUnixConnection(HTTPConnection):
 class HTTPUnix(HTTP):
     _connection_class = HTTPUnixConnection
 
-class UnixTransport(Transport):
+class UnixTransport(xmlrpclib.Transport):
     def request(self, host, handler, request_body, verbose=0):
         self.__handler = handler
-        return Transport.request(self, host, '/RPC2', request_body, verbose)
+        return xmlrpclib.Transport.request(self, host, '/RPC2',
+                                           request_body, verbose)
     def make_connection(self, host):
         return HTTPUnix(self.__handler)
 
@@ -134,7 +134,7 @@ class TCPXMLRPCServer(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
     allow_reuse_address = True
 
     def __init__(self, addr, requestHandler=XMLRPCRequestHandler,
-                 logRequests=1):
+                 logRequests = 1):
         SimpleXMLRPCServer.__init__(self, addr, requestHandler, logRequests)
 
         flags = fcntl.fcntl(self.fileno(), fcntl.F_GETFD)
@@ -201,7 +201,7 @@ class UnixXMLRPCRequestHandler(XMLRPCRequestHandler):
 class UnixXMLRPCServer(TCPXMLRPCServer):
     address_family = socket.AF_UNIX
 
-    def __init__(self, addr, logRequests):
+    def __init__(self, addr, logRequests = 1):
         parent = os.path.dirname(addr)
         if os.path.exists(parent):
             os.chown(parent, os.geteuid(), os.getegid())
