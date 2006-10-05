@@ -80,6 +80,20 @@ ifneq ($(CMDLINE),)
 # The first token in the arguments will be silently dropped.
 FULL_CMDLINE := xen $(CMDLINE)
 endif
+
+ifeq ($(wildcard cmdline.dep),)
+cmdline.dep:
+	echo $(FULL_CMDLINE) > cmdline.dep
+else
+ifneq ($(FULL_CMDLINE),$(shell cat cmdline.dep))
+cmdline.dep::
+	echo $(FULL_CMDLINE) > cmdline.dep
+else
+cmdline.dep:
+endif
+endif
+
+cmdline.o: cmdline.dep
 cmdline.o: CFLAGS += -DCMDLINE="\"$(FULL_CMDLINE)\""
 
 TARGET_OPTS = $(OMAGIC) -Wl,-Ttext,0x400000,-T,xen.lds
@@ -123,4 +137,4 @@ dom0.bin: $(DOM0_IMAGE)
 
 clean::
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C of_handler clean
-	rm -f firmware firmware_image.bin dom0.bin .xen-syms
+	rm -f firmware firmware_image.bin dom0.bin .xen-syms cmdline.dep
