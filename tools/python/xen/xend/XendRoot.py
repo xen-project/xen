@@ -93,6 +93,9 @@ class XendRoot:
 
     dom0_vcpus_default = '0'
 
+    """Default interface to listen for VNC connections on"""
+    xend_vnc_listen_default = '127.0.0.1'
+
     """Default session storage path."""
     xend_domains_path_default = '/var/lib/xend/domains'
 
@@ -280,6 +283,9 @@ class XendRoot:
 
     def get_console_limit(self):
         return self.get_config_int('console-limit', 1024)
+
+    def get_vnclisten_address(self):
+        return self.get_config_value('vnc-listen', self.xend_vnc_listen_default)
 
 def instance():
     """Get an instance of XendRoot.
