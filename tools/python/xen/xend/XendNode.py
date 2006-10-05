@@ -44,7 +44,7 @@ class XendNode:
                         'host': self.uuid,
                         'number': i,
                         'features': cpu_features}
-            self.cpus[uuid] = cpu_info
+            self.cpus[cpu_uuid] = cpu_info
 
     def shutdown(self):
         return 0

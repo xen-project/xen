@@ -549,7 +549,7 @@ class XendDomain:
         result = []
         try:
             self.domains_lock.acquire()
-            result = [d.getVMRef() for d in self.domains]
+            result = [d.get_uuid() for d in self.domains.values()]
         finally:
             self.domains_lock.release()
         return result
