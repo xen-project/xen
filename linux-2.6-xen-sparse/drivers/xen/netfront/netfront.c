@@ -47,6 +47,7 @@
 #include <linux/in.h>
 #include <linux/if_ether.h>
 #include <linux/io.h>
+#include <linux/moduleparam.h>
 #include <net/sock.h>
 #include <net/pkt_sched.h>
 #include <net/arp.h>
