@@ -109,29 +109,54 @@ class PciController(DevController):
 
         return (0, back, {})
 
-    def configuration(self, devid):
-        """@see DevController.configuration"""
-
-        result = DevController.configuration(self, devid)
-
-        (num_devs) = self.readBackend(devid, 'num_devs')
-
+    def getDeviceConfiguration(self, devid):
+        result = DevController.getDeviceConfiguration(self, devid)
+        num_devs = self.readBackend(devid, 'num_devs')
+        pci_devs = []
+        
         for i in range(int(num_devs)):
-            (dev_config) = self.readBackend(devid, 'dev-%d'%(i))
+            (dev_config,) = self.readBackend(devid, 'dev-%d'%(i))
 
             pci_match = re.match(r"((?P<domain>[0-9a-fA-F]{1,4})[:,])?" + \
                     r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" + \
                     r"(?P<slot>[0-9a-fA-F]{1,2})[.,]" + \
                     r"(?P<func>[0-9a-fA-F]{1,2})", dev_config)
+            
             if pci_match!=None:
                 pci_dev_info = pci_match.groupdict('0')
-                result.append( ['dev', \
-                        ['domain', '0x'+pci_dev_info['domain']], \
-                        ['bus', '0x'+pci_dev_info['bus']], \
-                        ['slot', '0x'+pci_dev_info['slot']], \
-                        ['func', '0x'+pci_dev_info['func']]])
+                pci_devs.append({'domain': '0x%(domain)s' % pci_dev_info,
+                                 'bus': '0x%(bus)s' % pci_dev_info,
+                                 'slot': '0x(slot)s' % pci_dev_info,
+                                 'func': '0x(func)s' % pci_dev_info})
 
+        result['dev'] = pci_devs
         return result
+
+    def configuration(self, devid):
+        """Returns SXPR for devices on domain.
+
+        @note: we treat this dict especially to convert to
+        SXP because it is not a straight dict of strings."""
+        
+        configDict = self.getDeviceConfiguration(devid)
+        sxpr = [self.deviceClass]
+
+        # remove devs
+        devs = configDict.pop('dev', [])
+        for dev in devs:
+            dev_sxpr = ['dev']
+            for dev_item in dev.items():
+                dev_sxpr.append(list(dev_item))
+            sxpr.append(dev_sxpr)
+        
+        for key, val in configDict.items():
+            if type(val) == type(list()):
+                for v in val:
+                    sxpr.append([key, v])
+            else:
+                sxpr.append([key, val])
+
+        return sxpr    
 
     def setupDevice(self, domain, bus, slot, func):
         """ Attach I/O resources for device to frontend domain

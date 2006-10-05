@@ -26,12 +26,9 @@ import re
 
 from xen.xend import sxp
 from xen.xend import XendRoot
-
 from xen.xend.server.DevController import DevController
 
-
 xroot = XendRoot.instance()
-
 
 def randomMAC():
     """Generate a random MAC address.
@@ -139,7 +136,6 @@ class NetifController(DevController):
     def __init__(self, vm):
         DevController.__init__(self, vm)
 
-
     def getDeviceDetails(self, config):
         """@see DevController.getDeviceDetails"""
 
@@ -157,6 +153,7 @@ class NetifController(DevController):
         mac     = sxp.child_value(config, 'mac')
         vifname = sxp.child_value(config, 'vifname')
         rate    = sxp.child_value(config, 'rate')
+        uuid    = sxp.child_value(config, 'uuid')
         ipaddr  = _get_config_ipaddr(config)
 
         devid = self.allocateDeviceID()
@@ -182,34 +179,37 @@ class NetifController(DevController):
             back['vifname'] = vifname
         if rate:
             back['rate'] = parseRate(rate)
+        if uuid:
+            back['uuid'] = uuid
 
         return (devid, back, front)
 
 
-    def configuration(self, devid):
+    def getDeviceConfiguration(self, devid):
         """@see DevController.configuration"""
 
-        result = DevController.configuration(self, devid)
-
-        (script, ip, bridge, mac, typ, vifname, rate) = self.readBackend(
-            devid, 'script', 'ip', 'bridge', 'mac', 'type', 'vifname', 'rate')
+        result = DevController.getDeviceConfiguration(self, devid)
+        devinfo =  self.readBackend(devid, 'script', 'ip', 'bridge',
+                                    'mac', 'type', 'vifname', 'rate', 'uuid')
+        (script, ip, bridge, mac, typ, vifname, rate, uuid) = devinfo
 
         if script:
-            result.append(['script',
-                           script.replace(xroot.network_script_dir + os.sep,
-                                          "")])
+            network_script_dir = xroot.network_script_dir + os.sep
+            result['script'] = script.replace(network_script_dir, "")
         if ip:
-            for i in ip.split(" "):
-                result.append(['ip', i])
+            result['ip'] = ip.split(" ")
         if bridge:
-            result.append(['bridge', bridge])
+            result['bridge'] = bridge
         if mac:
-            result.append(['mac', mac])
+            result['mac'] = mac
         if typ:
-            result.append(['type', typ])
+            result['type'] = typ
         if vifname:
-            result.append(['vifname', vifname])
+            result['vifname'] = vifname
         if rate:
-            result.append(['rate', formatRate(rate)])
+            result['rate'] = formatRate(rate)
+        if uuid:
+            result['uuid'] = uuid
 
         return result
+
