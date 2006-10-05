@@ -16,16 +16,15 @@
 # Copyright (C) 2006 XenSource Ltd.
 #============================================================================
 
+from types import ListType
 import xmlrpclib
-
-from xen.xend import XendDomain, XendDomainInfo, XendNode, \
-                     XendLogging, XendDmesg
 from xen.util.xmlrpclib2 import UnixXMLRPCServer, TCPXMLRPCServer
 
-from xen.xend.XendClient import XML_RPC_SOCKET, ERROR_INVALID_DOMAIN
-from xen.xend.XendError import *
+from xen.xend import XendDomain, XendDomainInfo, XendNode
+from xen.xend import XendLogging, XendDmesg
+from xen.xend.XendClient import XML_RPC_SOCKET
 from xen.xend.XendLogging import log
-from types import ListType
+from xen.xend.XendError import XendInvalidDomain
 
 def lookup(domid):
     info = XendDomain.instance().domain_lookup_by_name_or_id(domid)
@@ -75,8 +74,8 @@ def get_log():
     finally:
         f.close()
 
-methods = ['device_create', 'device_configure', 'destroyDevice',
-           'getDeviceSxprs',
+methods = ['device_create', 'device_configure',
+           'destroyDevice','getDeviceSxprs',
            'setMemoryTarget', 'setName', 'setVCpuCount', 'shutdown',
            'send_sysrq', 'getVCPUInfo', 'waitForDevices',
            'getRestartCount']
@@ -84,25 +83,33 @@ methods = ['device_create', 'device_configure', 'destroyDevice',
 exclude = ['domain_create', 'domain_restore']
 
 class XMLRPCServer:
-    def __init__(self, use_tcp=False):
-        self.ready = False
+    def __init__(self, use_tcp=False, host = "localhost", port = 8006,
+                 path = XML_RPC_SOCKET):
         self.use_tcp = use_tcp
+        self.port = port
+        self.host = host
+        self.path = path
+        
+        self.ready = False        
+        self.running = True
         
     def run(self):
         if self.use_tcp:
-            # bind to something fixed for now as we may eliminate
-            # tcp support completely.
-            self.server = TCPXMLRPCServer(("localhost", 8005), logRequests=False)
+            self.server = TCPXMLRPCServer((self.host, self.port),
+                                          logRequests = False)
         else:
-            self.server = UnixXMLRPCServer(XML_RPC_SOCKET, False)
+            self.server = UnixXMLRPCServer(self.path, logRequests = False)
+
+        # Legacy deprecated xm xmlrpc api
+        # --------------------------------------------------------------------
 
         # Functions in XendDomainInfo
         for name in methods:
             fn = eval("lambda domid, *args: dispatch(domid, '%s', args)"%name)
             self.server.register_function(fn, "xend.domain.%s" % name)
 
-        # Functions in XendDomain
         inst = XendDomain.instance()
+
         for name in dir(inst):
             fn = getattr(inst, name)
             if name.startswith("domain_") and callable(fn):
@@ -126,4 +133,20 @@ class XMLRPCServer:
 
         self.server.register_introspection_functions()
         self.ready = True
-        self.server.serve_forever()
+
+        # Custom runloop so we can cleanup when exiting.
+        # -----------------------------------------------------------------
+        try:
+            self.server.socket.settimeout(1.0)
+            while self.running:
+                self.server.handle_request()
+        finally:
+            self.cleanup()
+
+    def cleanup(self):
+        log.debug("XMLRPCServer.cleanup()")
+
+    def shutdown(self):
+        self.running = False
+        self.ready = False
+

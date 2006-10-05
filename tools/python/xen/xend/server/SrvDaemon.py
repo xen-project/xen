@@ -195,6 +195,8 @@ class Daemon:
                                 sig)
                 else:
                     self.run(w and os.fdopen(w, 'w') or None)
+                    # if we reach here, the child should quit.
+                    os._exit(0)
 
         return ret
 
@@ -290,6 +292,8 @@ class Daemon:
             relocate.listenRelocation()
             servers = SrvServer.create()
             servers.start(status)
+            del servers
+            
         except Exception, ex:
             print >>sys.stderr, 'Exception starting xend:', ex
             if XEND_DEBUG:

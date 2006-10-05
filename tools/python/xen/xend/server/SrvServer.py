@@ -42,6 +42,7 @@
 
 import fcntl
 import time
+import signal
 from threading import Thread
 
 from xen.web.httpserver import HttpServer, UnixHttpServer
@@ -54,7 +55,6 @@ from xen.web.SrvDir import SrvDir
 from SrvRoot import SrvRoot
 from XMLRPCServer import XMLRPCServer
 
-
 xroot = XendRoot.instance()
 
 
@@ -65,6 +65,14 @@ class XendServers:
 
     def add(self, server):
         self.servers.append(server)
+
+    def cleanup(self, signum = 0, frame = None):
+        log.debug("SrvServer.cleanup()")
+        for server in self.servers:
+            try:
+                server.shutdown()
+            except:
+                pass
 
     def start(self, status):
         # Running the network script will spawn another process, which takes
@@ -100,8 +108,24 @@ class XendServers:
             status.write('0')
             status.close()
 
-        for t in threads:
-            t.join()
+        # Prepare to catch SIGTERM (received when 'xend stop' is executed)
+        # and call each server's cleanup if possible
+        signal.signal(signal.SIGTERM, self.cleanup)
+
+        # Interruptible Thread.join - Python Bug #1167930
+        #   Replaces: for t in threads: t.join()
+        #   Reason:   The above will cause python signal handlers to be
+        #             blocked so we're not able to catch SIGTERM in any
+        #             way for cleanup
+        runningThreads = len([t for t in threads if t.isAlive()])
+        while runningThreads > 0:
+            try:
+                for t in threads:
+                    t.join(1.0)
+                runningThreads = len([t for t in threads if t.isAlive()])
+            except:
+                pass
+
 
 def create():
     root = SrvDir()
