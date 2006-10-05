@@ -806,7 +806,7 @@ flags_to_prot (unsigned long flags)
 // flags: currently only ASSIGN_readonly, ASSIGN_nocache
 // This is called by assign_domain_mmio_page().
 // So accessing to pte is racy.
-void
+int
 __assign_domain_page(struct domain *d,
                      unsigned long mpaddr, unsigned long physaddr,
                      unsigned long flags)
@@ -822,8 +822,11 @@ __assign_domain_page(struct domain *d,
     old_pte = __pte(0);
     new_pte = pfn_pte(physaddr >> PAGE_SHIFT, __pgprot(prot));
     ret_pte = ptep_cmpxchg_rel(&d->arch.mm, mpaddr, pte, old_pte, new_pte);
-    if (pte_val(ret_pte) == pte_val(old_pte))
+    if (pte_val(ret_pte) == pte_val(old_pte)) {
         smp_mb();
+        return 0;
+    }
+    return -EAGAIN;
 }
 
 /* get_page() and map a physical address to the specified metaphysical addr */
@@ -840,7 +843,7 @@ assign_domain_page(struct domain *d,
     set_gpfn_from_mfn(physaddr >> PAGE_SHIFT, mpaddr >> PAGE_SHIFT);
     // because __assign_domain_page() uses set_pte_rel() which has
     // release semantics, smp_mb() isn't needed.
-    __assign_domain_page(d, mpaddr, physaddr, ASSIGN_writable);
+    (void)__assign_domain_page(d, mpaddr, physaddr, ASSIGN_writable);
 }
 
 int
@@ -863,8 +866,8 @@ ioports_permit_access(struct domain *d, unsigned long fp, unsigned long lp)
     lp_offset = PAGE_ALIGN(IO_SPACE_SPARSE_ENCODING(lp));
 
     for (off = fp_offset; off <= lp_offset; off += PAGE_SIZE)
-        __assign_domain_page(d, IO_PORTS_PADDR + off,
-                             __pa(ia64_iobase) + off, ASSIGN_nocache);
+        (void)__assign_domain_page(d, IO_PORTS_PADDR + off,
+                                   __pa(ia64_iobase) + off, ASSIGN_nocache);
 
     return 0;
 }
@@ -933,7 +936,7 @@ assign_domain_same_page(struct domain *d,
     //XXX optimization
     unsigned long end = PAGE_ALIGN(mpaddr + size);
     for (mpaddr &= PAGE_MASK; mpaddr < end; mpaddr += PAGE_SIZE) {
-        __assign_domain_page(d, mpaddr, mpaddr, flags);
+        (void)__assign_domain_page(d, mpaddr, mpaddr, flags);
     }
 }
 
@@ -1255,6 +1258,126 @@ out1:
     put_domain(rd);
     return error;
 }
+
+#ifdef CONFIG_XEN_IA64_EXPOSE_P2M
+static struct page_info* p2m_pte_zero_page = NULL;
+
+void
+expose_p2m_init(void)
+{
+    pte_t* pte;
+
+    pte = pte_alloc_one_kernel(NULL, 0);
+    BUG_ON(pte == NULL);
+    smp_mb();// make contents of the page visible.
+    p2m_pte_zero_page = virt_to_page(pte);
+}
+
+static int
+expose_p2m_page(struct domain* d, unsigned long mpaddr, struct page_info* page)
+{
+    // we can't get_page(page) here.
+    // pte page is allocated form xen heap.(see pte_alloc_one_kernel().)
+    // so that the page has NULL page owner and it's reference count
+    // is useless.
+    // see also relinquish_pte()'s page_get_owner() == NULL check.
+    BUG_ON(page_get_owner(page) != NULL);
+
+    return __assign_domain_page(d, mpaddr, page_to_maddr(page),
+                                ASSIGN_readonly);
+}
+
+// It is possible to optimize loop, But this isn't performance critical.
+unsigned long
+dom0vp_expose_p2m(struct domain* d,
+                  unsigned long conv_start_gpfn,
+                  unsigned long assign_start_gpfn,
+                  unsigned long expose_size, unsigned long granule_pfn)
+{
+    unsigned long expose_num_pfn = expose_size >> PAGE_SHIFT;
+    unsigned long i;
+    volatile pte_t* conv_pte;
+    volatile pte_t* assign_pte;
+
+    if ((expose_size % PAGE_SIZE) != 0 ||
+        (granule_pfn % PTRS_PER_PTE) != 0 ||
+        (expose_num_pfn % PTRS_PER_PTE) != 0 ||
+        (conv_start_gpfn % granule_pfn) != 0 ||
+        (assign_start_gpfn % granule_pfn) != 0 ||
+        (expose_num_pfn % granule_pfn) != 0) {
+        DPRINTK("%s conv_start_gpfn 0x%016lx assign_start_gpfn 0x%016lx "
+                "expose_size 0x%016lx granulte_pfn 0x%016lx\n", __func__, 
+                conv_start_gpfn, assign_start_gpfn, expose_size, granule_pfn);
+        return -EINVAL;
+    }
+
+    if (granule_pfn != PTRS_PER_PTE) {
+        DPRINTK("%s granule_pfn 0x%016lx PTRS_PER_PTE 0x%016lx\n",
+                __func__, granule_pfn, PTRS_PER_PTE);
+        return -ENOSYS;
+    }
+
+    // allocate pgd, pmd.
+    i = conv_start_gpfn;
+    while (i < expose_num_pfn) {
+        conv_pte = lookup_noalloc_domain_pte(d, (conv_start_gpfn + i) <<
+                                             PAGE_SHIFT);
+        if (conv_pte == NULL) {
+            i++;
+            continue;
+        }
+        
+        assign_pte = lookup_alloc_domain_pte(d, (assign_start_gpfn <<
+                                             PAGE_SHIFT) + i * sizeof(pte_t));
+        if (assign_pte == NULL) {
+            DPRINTK("%s failed to allocate pte page\n", __func__);
+            return -ENOMEM;
+        }
+
+        // skip to next pte page
+        i += PTRS_PER_PTE;
+        i &= ~(PTRS_PER_PTE - 1);
+    }
+
+    // expose pte page
+    i = 0;
+    while (i < expose_num_pfn) {
+        conv_pte = lookup_noalloc_domain_pte(d, (conv_start_gpfn + i) <<
+                                             PAGE_SHIFT);
+        if (conv_pte == NULL) {
+            i++;
+            continue;
+        }
+
+        if (expose_p2m_page(d, (assign_start_gpfn << PAGE_SHIFT) +
+                            i * sizeof(pte_t), virt_to_page(conv_pte)) < 0) {
+            DPRINTK("%s failed to assign page\n", __func__);
+            return -EAGAIN;
+        }
+
+        // skip to next pte page
+        i += PTRS_PER_PTE;
+        i &= ~(PTRS_PER_PTE - 1);
+    }
+
+    // expose p2m_pte_zero_page 
+    for (i = 0; i < expose_num_pfn / PTRS_PER_PTE + 1; i++) {
+        assign_pte = lookup_noalloc_domain_pte(d, (assign_start_gpfn + i) <<
+                                               PAGE_SHIFT);
+        BUG_ON(assign_pte == NULL);
+        if (pte_present(*assign_pte)) {
+            continue;
+        }
+        if (expose_p2m_page(d, (assign_start_gpfn + i) << PAGE_SHIFT,
+                            p2m_pte_zero_page) < 0) {
+            DPRINTK("%s failed to assign zero-pte page\n", __func__);
+            return -EAGAIN;
+        }
+    }
+    
+    return 0;
+}
+#endif
 
 // grant table host mapping
 // mpaddr: host_addr: pseudo physical address

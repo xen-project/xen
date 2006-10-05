@@ -499,6 +499,8 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
         efi.hcdp = NULL;
     }
 
+    expose_p2m_init();
+
     /* Create initial domain 0. */
     dom0 = domain_create(0);
     if ( (dom0 == NULL) || (alloc_vcpu(dom0, 0, 0) == NULL) )

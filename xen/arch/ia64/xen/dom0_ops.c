@@ -273,6 +273,9 @@ do_dom0vp_op(unsigned long cmd,
         ret = dom0vp_add_physmap(d, arg0, arg1, (unsigned int)arg2,
                                  (domid_t)arg3);
         break;
+    case IA64_DOM0VP_expose_p2m:
+        ret = dom0vp_expose_p2m(d, arg0, arg1, arg2, arg3);
+        break;
     default:
         ret = -1;
 		printf("unknown dom0_vp_op 0x%lx\n", cmd);
