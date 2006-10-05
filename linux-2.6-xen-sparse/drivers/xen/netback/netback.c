@@ -73,8 +73,6 @@ static struct sk_buff_head rx_queue;
 static unsigned long mmap_vstart;
 #define MMAP_VADDR(_req) (mmap_vstart + ((_req) * PAGE_SIZE))
 
-static void *rx_mmap_area;
-
 #define PKT_PROT_LEN 64
 
 static struct {
@@ -1323,12 +1321,6 @@ static void netif_page_release(struct page *page)
 	netif_idx_release(pending_idx);
 }
 
-static void netif_rx_page_release(struct page *page)
-{
-	/* Ready for next use. */
-	set_page_count(page, 1);
-}
-
 irqreturn_t netif_be_int(int irq, void *dev_id, struct pt_regs *regs)
 {
 	netif_t *netif = dev_id;
@@ -1457,16 +1449,6 @@ static int __init netback_init(void)
 		page = virt_to_page(MMAP_VADDR(i));
 		set_page_count(page, 1);
 		SetPageForeign(page, netif_page_release);
-	}
-
-	page = balloon_alloc_empty_page_range(NET_RX_RING_SIZE);
-	BUG_ON(page == NULL);
-	rx_mmap_area = pfn_to_kaddr(page_to_pfn(page));
-
-	for (i = 0; i < NET_RX_RING_SIZE; i++) {
-		page = virt_to_page(rx_mmap_area + (i * PAGE_SIZE));
-		set_page_count(page, 1);
-		SetPageForeign(page, netif_rx_page_release);
 	}
 
 	pending_cons = 0;
