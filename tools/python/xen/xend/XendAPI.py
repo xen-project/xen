@@ -176,7 +176,7 @@ class XendAPI:
     used via XMLRPCServer.
 
     All methods that need a valid session are marked with
-    a L{XendAuthManager.ession_required} decorator that will
+    a L{XendAuthManager.session_required} decorator that will
     transparently perform the required session authentication.
 
     We need to support Python <2.4, so we use the old decorator syntax.
@@ -282,7 +282,7 @@ class XendAPI:
 
     # Xen API: Class Session
     # ----------------------------------------------------------------
-    # Left unwrapped by __init__
+    # NOTE: Left unwrapped by __init__
 
     Session_attr_ro = ['this_host', 'this_user']
     Session_methods = ['logout']
