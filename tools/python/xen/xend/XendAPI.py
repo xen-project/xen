@@ -847,6 +847,9 @@ class XendAPI:
     def vm_get_record(self, session, vm_ref):
         xendom = XendDomain.instance()
         xeninfo = xendom.get_vm_by_uuid(vm_ref)
+        if not xeninfo:
+            return xen_api_error(XEND_ERROR_VM_INVALID)
+        
         record = {
             'uuid': xeninfo.get_uuid(),
             'power_state': xeninfo.get_power_state(),
@@ -870,7 +873,7 @@ class XendAPI:
             'vcpus_features_force_off': [],
             'actions_after_shutdown': xeninfo.get_on_shutdown(),
             'actions_after_reboot': xeninfo.get_on_reboot(),
-            'actions_after_suspend': xeninfo.get_on_preserve(),
+            'actions_after_suspend': xeninfo.get_on_suspend(),
             'actions_after_crash': xeninfo.get_on_crash(),
             'vifs': xeninfo.get_vifs(),
             'vbds': xeninfo.get_vbds(),
@@ -886,17 +889,13 @@ class XendAPI:
             'boot_method': xeninfo.get_boot_method(),
             'kernel_kernel': xeninfo.get_kernel_image(),
             'kernel_initrd': xeninfo.get_kernel_initrd(),
-            'kernel_args': xeninfo.get_boot_args(),
+            'kernel_args': xeninfo.get_kernel_args(),
             'grub_cmdline': xeninfo.get_grub_cmdline(),
             'pci_bus': xeninfo.get_pci_bus(),
             'tools_version': xeninfo.get_tools_version(),
             'otherconfig': xeninfo.get_other_config()
         }
-        
-        if not xeninfo:
-            xen_api_error(XEND_ERROR_VM_INVALID)
-        else:
-            xen_api_success(record)
+        return xen_api_success(record)
 
     def vm_clean_reboot(self, session, vm_ref):
         xendom = XendDomain.instance()

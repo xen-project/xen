@@ -807,7 +807,6 @@ class XendDomainInfo:
     def getVCpuCount(self):
         return self.info['vcpus']
 
-
     def setVCpuCount(self, vcpus):
         self.info['vcpu_avail'] = (1 << vcpus) - 1
         self.storeVm('vcpu_avail', self.info['vcpu_avail'])
@@ -1646,7 +1645,7 @@ class XendDomainInfo:
     def get_uuid(self):
         return self.info['uuid']
     def get_memory_static_max(self):
-        return self.info['memmax']
+        return self.info['maxmem']
     def get_memory_static_min(self):
         return self.info['memory']
     def get_vcpus_policy(self):
@@ -1761,19 +1760,21 @@ class XendDomainInfo:
 
     def get_vcpus_util(self):
         # TODO: this returns the total accum cpu time, rather than util
+        # TODO: spec says that key is int, however, python does not allow
+        #       non-string keys to dictionaries.
         vcpu_util = {}
-        if 'max_vcpu_id' in self.info:
+        if 'max_vcpu_id' in self.info and self.domid != None:
             for i in range(0, self.info['max_vcpu_id']+1):
                 info = xc.vcpu_getinfo(self.domid, i)
-                vcpu_util[i] = info['cpu_time']
+                vcpu_util[str(i)] = info['cpu_time']/1000000000.0
                 
         return vcpu_util
 
     def get_vifs(self):
-        return self.info['vif_refs']
+        return self.info.get('vif_refs', [])
 
     def get_vbds(self):
-        return self.info['vbd_refs']
+        return self.info.get('vbd_refs', [])
 
     def create_vbd(self, xenapi_vbd):
         """Create a VBD device from the passed struct in Xen API format.
