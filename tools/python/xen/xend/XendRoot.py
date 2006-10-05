@@ -93,6 +93,9 @@ class XendRoot:
 
     dom0_vcpus_default = '0'
 
+    """Default session storage path."""
+    xend_domains_path_default = '/var/lib/xend/domains'
+
     components = {}
 
     def __init__(self):
@@ -236,6 +239,11 @@ class XendRoot:
         """Get the path the xend unix-domain server listens at.
         """
         return self.get_config_value("xend-unix-path", self.xend_unix_path_default)
+
+    def get_xend_domains_path(self):
+        """ Get the path for persistent domain configuration storage
+        """
+        return self.get_config_value("xend-domains-path", self.xend_domains_path_default)
 
     def get_network_script(self):
         """@return the script used to alter the network configuration when
