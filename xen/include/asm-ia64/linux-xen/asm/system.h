@@ -189,6 +189,7 @@ do {								\
 
 #ifdef XEN
 #define local_irq_is_enabled() (!irqs_disabled())
+extern struct vcpu *ia64_switch_to(struct vcpu *next_task);
 #else
 #ifdef __KERNEL__
 

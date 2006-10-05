@@ -35,6 +35,7 @@ extern void vmx_final_setup_guest(struct vcpu *v);
 extern void vmx_save_state(struct vcpu *v);
 extern void vmx_load_state(struct vcpu *v);
 extern void vmx_setup_platform(struct domain *d);
+extern void vmx_do_launch(struct vcpu *v);
 extern void vmx_io_assist(struct vcpu *v);
 extern int ia64_hypercall (struct pt_regs *regs);
 extern void vmx_save_state(struct vcpu *v);

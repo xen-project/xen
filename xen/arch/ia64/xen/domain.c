@@ -59,13 +59,8 @@ extern unsigned long running_on_sim;
 
 extern char dom0_command_line[];
 
-/* FIXME: where these declarations should be there ? */
-extern void serial_input_init(void);
+/* forward declaration */
 static void init_switch_stack(struct vcpu *v);
-extern void vmx_do_launch(struct vcpu *);
-
-/* this belongs in include/asm, but there doesn't seem to be a suitable place */
-extern struct vcpu *ia64_switch_to (struct vcpu *next_task);
 
 /* Address of vpsr.i (in fact evtchn_upcall_mask) of current vcpu.
    This is a Xen virtual address.  */
@@ -1102,9 +1097,6 @@ int construct_dom0(struct domain *d,
 	vcpu_regs (v)->cr_iip = pkern_entry;
 
 	physdev_init_dom0(d);
-
-	// FIXME: Hack for keyboard input
-	//serial_input_init();
 
 	return 0;
 }
