@@ -165,7 +165,7 @@ struct netfront_info {
 	grant_ref_t gref_tx_head;
 	grant_ref_t grant_tx_ref[NET_TX_RING_SIZE + 1];
 	grant_ref_t gref_rx_head;
-	grant_ref_t grant_rx_ref[NET_TX_RING_SIZE];
+	grant_ref_t grant_rx_ref[NET_RX_RING_SIZE];
 
 	struct xenbus_device *xbdev;
 	int tx_ring_ref;
