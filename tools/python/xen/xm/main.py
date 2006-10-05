@@ -485,7 +485,7 @@ def getDomains(domain_names, full = 0):
     if domain_names:
         return [server.xend.domain(dom, full) for dom in domain_names]
     else:
-        return server.xend.domains(1)
+        return server.xend.domains(1, full)
 
 
 def xm_list(args):
