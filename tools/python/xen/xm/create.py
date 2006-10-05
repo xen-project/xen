@@ -439,6 +439,21 @@ gopts.var('uuid', val='',
           addresses for virtual network interfaces.  This must be a unique 
           value across the entire cluster.""")
 
+gopts.var('autostart', val='no|yes',
+          fn=set_bool, default=0,
+          use="Should the start VM automatically when Xend starts.")
+
+gopts.var('autostop', val='no|yes',
+          fn=set_bool, default=0,
+          use="Should stop VM automatically when Xend stops.")
+
+gopts.var('on_xend_stop', val='shtudown|suspend',
+          fn=set_value, default="shutdown",
+          use="""Behaviour when Xend stops and autostop is on:
+          - shutdown:       Domain is shutdown;
+          - suspend:        Domain is suspended;
+          """)
+
 def err(msg):
     """Print an error to stderr and exit.
     """
@@ -668,8 +683,9 @@ def make_config(vals):
                 config.append([n, v])
 
     map(add_conf, ['name', 'memory', 'maxmem', 'shadow_memory',
-                   'restart', 'on_poweroff', 'on_reboot', 'on_crash',
-                   'vcpus', 'features'])
+                   'restart', 'on_poweroff',
+                   'on_reboot', 'on_crash', 'vcpus', 'features',
+                   'autostart', 'autostop', 'on_xend_stop'])
 
     if vals.uuid is not None:
         config.append(['uuid', vals.uuid])
