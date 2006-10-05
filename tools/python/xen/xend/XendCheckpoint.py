@@ -109,7 +109,7 @@ def save(fd, dominfo, network, live, dst):
         raise Exception, exn
 
 
-def restore(xd, fd):
+def restore(xd, fd, dominfo = None):
     signature = read_exact(fd, len(SIGNATURE),
         "not a valid guest state file: signature read")
     if signature != SIGNATURE:
@@ -129,7 +129,11 @@ def restore(xd, fd):
 
     vmconfig = p.get_val()
 
-    dominfo = xd.restore_(vmconfig)
+    if dominfo:
+        dominfo.update(XendConfig(sxp = vmconfig), refresh = False)
+        dominfo.resume()
+    else:
+        dominfo = xd.restore_(vmconfig)
 
     store_port   = dominfo.getStorePort()
     console_port = dominfo.getConsolePort()
