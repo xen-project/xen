@@ -190,15 +190,18 @@ class XendRoot:
         return self.get_config_bool("xend-http-server", self.xend_http_server_default)
 
     def get_xend_tcp_xmlrpc_server(self):
-        return self.get_config_bool("xend-tcp-xmlrpc-server", self.xend_tcp_xmlrpc_server_default)
+        return self.get_config_bool("xend-tcp-xmlrpc-server",
+                                    self.xend_tcp_xmlrpc_server_default)
 
     def get_xend_unix_xmlrpc_server(self):
-        return self.get_config_bool("xend-unix-xmlrpc-server", self.xend_unix_xmlrpc_server_default)
+        return self.get_config_bool("xend-unix-xmlrpc-server",
+                                    self.xend_unix_xmlrpc_server_default)
 
     def get_xend_relocation_server(self):
         """Get the flag indicating whether xend should run a relocation server.
         """
-        return self.get_config_bool("xend-relocation-server", self.xend_relocation_server_default)
+        return self.get_config_bool("xend-relocation-server",
+                                    self.xend_relocation_server_default)
 
     def get_xend_port(self):
         """Get the port xend listens at for its HTTP interface.
@@ -208,7 +211,8 @@ class XendRoot:
     def get_xend_relocation_port(self):
         """Get the port xend listens at for connection to its relocation server.
         """
-        return self.get_config_int('xend-relocation-port', self.xend_relocation_port_default)
+        return self.get_config_int('xend-relocation-port',
+                                   self.xend_relocation_port_default)
 
     def get_xend_relocation_hosts_allow(self):
         return self.get_config_value("xend-relocation-hosts-allow",
