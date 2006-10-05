@@ -483,7 +483,7 @@ def xm_restore(args):
 
 def getDomains(domain_names, full = 0):
     if domain_names:
-        return [server.xend.domain(dom) for dom in domain_names]
+        return [server.xend.domain(dom, full) for dom in domain_names]
     else:
         return server.xend.domains(1)
 

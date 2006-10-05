@@ -53,12 +53,12 @@ def domain(domid):
     info = lookup(domid)
     return fixup_sxpr(info.sxpr())
 
-def domains(detail=1):
+def domains(detail=1, full = 0):
     if detail < 1:
         return XendDomain.instance().list_names()
     else:
         domains = XendDomain.instance().list_sorted()
-        return map(lambda dom: fixup_sxpr(dom.sxpr()), domains)
+        return map(lambda dom: fixup_sxpr(dom.sxpr(not full)), domains)
 
 def domain_create(config):
     info = XendDomain.instance().domain_create(config)
