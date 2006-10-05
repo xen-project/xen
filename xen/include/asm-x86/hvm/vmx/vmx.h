@@ -335,26 +335,30 @@ static inline int __vmxon (u64 addr)
     return rc;
 }
 
-/* Works only for vcpu == current */
 static inline int vmx_paging_enabled(struct vcpu *v)
 {
     unsigned long cr0;
-
     __vmread_vcpu(v, CR0_READ_SHADOW, &cr0);
-    return (cr0 & X86_CR0_PE) && (cr0 & X86_CR0_PG);
-}
-
-/* Works only for vcpu == current */
-static inline int vmx_long_mode_enabled(struct vcpu *v)
-{
-    ASSERT(v == current);
-    return VMX_LONG_GUEST(current);
+    return ((cr0 & (X86_CR0_PE|X86_CR0_PG)) == (X86_CR0_PE|X86_CR0_PG));
 }
 
 static inline int vmx_pae_enabled(struct vcpu *v)
 {
-    ASSERT(v == current);
-    return VMX_PAE_GUEST(current);
+    unsigned long cr4;
+    __vmread_vcpu(v, CR4_READ_SHADOW, &cr4);
+    return (vmx_paging_enabled(v) && (cr4 & X86_CR4_PAE));
+}
+
+static inline int vmx_long_mode_enabled(struct vcpu *v)
+{
+    u64 efer = v->arch.hvm_vmx.msr_content.msr_items[VMX_INDEX_MSR_EFER];
+    return efer & EFER_LMA;
+}
+
+static inline int vmx_lme_is_set(struct vcpu *v)
+{
+    u64 efer = v->arch.hvm_vmx.msr_content.msr_items[VMX_INDEX_MSR_EFER];
+    return efer & EFER_LME;
 }
 
 /* Works only for vcpu == current */

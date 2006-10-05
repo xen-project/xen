@@ -226,21 +226,10 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
     case MSR_EFER:
         HVM_DBG_LOG(DBG_LEVEL_2, "EFER msr_content 0x%"PRIx64, msr_content);
         msr_content = msr->msr_items[VMX_INDEX_MSR_EFER];
-
-        /* the following code may be not needed */
-        if ( test_bit(VMX_CPU_STATE_LME_ENABLED, &v->arch.hvm_vmx.cpu_state) )
-            msr_content |= EFER_LME;
-        else
-            msr_content &= ~EFER_LME;
-
-        if ( VMX_LONG_GUEST(v) )
-            msr_content |= EFER_LMA;
-        else
-            msr_content &= ~EFER_LMA;
         break;
 
     case MSR_FS_BASE:
-        if ( !(VMX_LONG_GUEST(v)) )
+        if ( !(vmx_long_mode_enabled(v)) )
             /* XXX should it be GP fault */
             domain_crash_synchronous();
 
@@ -248,7 +237,7 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
         break;
 
     case MSR_GS_BASE:
-        if ( !(VMX_LONG_GUEST(v)) )
+        if ( !(vmx_long_mode_enabled(v)) )
             domain_crash_synchronous();
 
         __vmread(GUEST_GS_BASE, &msr_content);
@@ -296,21 +285,25 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
             return 0;
         }
 
-        /* LME: 0 -> 1 */
-        if ( msr_content & EFER_LME &&
-             !test_bit(VMX_CPU_STATE_LME_ENABLED, &v->arch.hvm_vmx.cpu_state) )
+        if ( (msr_content & EFER_LME)
+             &&  !(msr->msr_items[VMX_INDEX_MSR_EFER] & EFER_LME) )
         {
-            if ( vmx_paging_enabled(v) ||
-                 !test_bit(VMX_CPU_STATE_PAE_ENABLED,
-                           &v->arch.hvm_vmx.cpu_state) )
+            if ( unlikely(vmx_paging_enabled(v)) )
             {
-                printk("Trying to set LME bit when "
-                       "in paging mode or PAE bit is not set\n");
+                printk("Trying to set EFER.LME with paging enabled\n");
                 vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
                 return 0;
             }
-
-            set_bit(VMX_CPU_STATE_LME_ENABLED, &v->arch.hvm_vmx.cpu_state);
+        }
+        else if ( !(msr_content & EFER_LME)
+                  && (msr->msr_items[VMX_INDEX_MSR_EFER] & EFER_LME) )
+        {
+            if ( unlikely(vmx_paging_enabled(v)) )
+            {
+                printk("Trying to clear EFER.LME with paging enabled\n");
+                vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
+                return 0;
+            }
         }
 
         msr->msr_items[VMX_INDEX_MSR_EFER] = msr_content;
@@ -318,7 +311,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 
     case MSR_FS_BASE:
     case MSR_GS_BASE:
-        if ( !(VMX_LONG_GUEST(v)) )
+        if ( !(vmx_long_mode_enabled(v)) )
             domain_crash_synchronous();
 
         if ( !IS_CANO_ADDRESS(msr_content) )
@@ -336,7 +329,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
         break;
 
     case MSR_SHADOW_GS_BASE:
-        if ( !(VMX_LONG_GUEST(v)) )
+        if ( !(vmx_long_mode_enabled(v)) )
             domain_crash_synchronous();
 
         v->arch.hvm_vmx.msr_content.shadow_gs = msr_content;
@@ -1307,7 +1300,6 @@ static int vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
 
  skip_cr3:
 
-    shadow_update_paging_modes(v);
     if (!vmx_paging_enabled(v))
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "switching to vmxassist. use phys table");
     else
@@ -1364,6 +1356,8 @@ static int vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
     error |= __vmwrite(GUEST_LDTR_BASE, c->ldtr_base);
     error |= __vmwrite(GUEST_LDTR_AR_BYTES, c->ldtr_arbytes.bytes);
 
+    shadow_update_paging_modes(v);
+
     return !error;
 }
 
@@ -1408,6 +1402,7 @@ static int vmx_assist(struct vcpu *v, int mode)
                 goto error;
             if (!vmx_world_restore(v, &c))
                 goto error;
+            v->arch.hvm_vmx.vmxassist_enabled = 1;            
             return 1;
         }
         break;
@@ -1425,6 +1420,7 @@ static int vmx_assist(struct vcpu *v, int mode)
                 goto error;
             if (!vmx_world_restore(v, &c))
                 goto error;
+            v->arch.hvm_vmx.vmxassist_enabled = 0;
             return 1;
         }
         break;
@@ -1480,26 +1476,23 @@ static int vmx_set_cr0(unsigned long value)
         }
 
 #if defined(__x86_64__)
-        if ( test_bit(VMX_CPU_STATE_LME_ENABLED,
-                      &v->arch.hvm_vmx.cpu_state) &&
-             !test_bit(VMX_CPU_STATE_PAE_ENABLED,
-                       &v->arch.hvm_vmx.cpu_state) )
+        if ( vmx_lme_is_set(v) )
         {
-            HVM_DBG_LOG(DBG_LEVEL_1, "Enable paging before PAE enabled\n");
-            vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
-        }
-
-        if ( test_bit(VMX_CPU_STATE_LME_ENABLED,
-                     &v->arch.hvm_vmx.cpu_state) )
-        {
-            /* Here the PAE is should be opened */
-            HVM_DBG_LOG(DBG_LEVEL_1, "Enable long mode\n");
-            set_bit(VMX_CPU_STATE_LMA_ENABLED,
-                    &v->arch.hvm_vmx.cpu_state);
-
-            __vmread(VM_ENTRY_CONTROLS, &vm_entry_value);
-            vm_entry_value |= VM_ENTRY_IA32E_MODE;
-            __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
+            if ( !(v->arch.hvm_vmx.cpu_shadow_cr4 & X86_CR4_PAE) )
+            {
+                HVM_DBG_LOG(DBG_LEVEL_1, "Guest enabled paging "
+                            "with EFER.LME set but not CR4.PAE\n");
+                vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
+            }
+            else 
+            {
+                HVM_DBG_LOG(DBG_LEVEL_1, "Enabling long mode\n");
+                v->arch.hvm_vmx.msr_content.msr_items[VMX_INDEX_MSR_EFER]
+                    |= EFER_LMA;
+                __vmread(VM_ENTRY_CONTROLS, &vm_entry_value);
+                vm_entry_value |= VM_ENTRY_IA32E_MODE;
+                __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
+            }
         }
 #endif
 
@@ -1546,11 +1539,10 @@ static int vmx_set_cr0(unsigned long value)
              * Disable paging here.
              * Same to PE == 1 && PG == 0
              */
-            if ( test_bit(VMX_CPU_STATE_LMA_ENABLED,
-                          &v->arch.hvm_vmx.cpu_state) )
+            if ( vmx_long_mode_enabled(v) )
             {
-                clear_bit(VMX_CPU_STATE_LMA_ENABLED,
-                          &v->arch.hvm_vmx.cpu_state);
+                v->arch.hvm_vmx.msr_content.msr_items[VMX_INDEX_MSR_EFER]
+                    &= ~EFER_LMA;
                 __vmread(VM_ENTRY_CONTROLS, &vm_entry_value);
                 vm_entry_value &= ~VM_ENTRY_IA32E_MODE;
                 __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
@@ -1559,22 +1551,19 @@ static int vmx_set_cr0(unsigned long value)
 
         if ( vmx_assist(v, VMX_ASSIST_INVOKE) )
         {
-            set_bit(VMX_CPU_STATE_ASSIST_ENABLED, &v->arch.hvm_vmx.cpu_state);
             __vmread(GUEST_RIP, &eip);
             HVM_DBG_LOG(DBG_LEVEL_1,
                         "Transfering control to vmxassist %%eip 0x%lx\n", eip);
             return 0; /* do not update eip! */
         }
-    } else if ( test_bit(VMX_CPU_STATE_ASSIST_ENABLED,
-                         &v->arch.hvm_vmx.cpu_state) )
+    }
+    else if ( v->arch.hvm_vmx.vmxassist_enabled )
     {
         __vmread(GUEST_RIP, &eip);
         HVM_DBG_LOG(DBG_LEVEL_1,
                     "Enabling CR0.PE at %%eip 0x%lx\n", eip);
         if ( vmx_assist(v, VMX_ASSIST_RESTORE) )
         {
-            clear_bit(VMX_CPU_STATE_ASSIST_ENABLED,
-                      &v->arch.hvm_vmx.cpu_state);
             __vmread(GUEST_RIP, &eip);
             HVM_DBG_LOG(DBG_LEVEL_1,
                         "Restoring to %%eip 0x%lx\n", eip);
@@ -1705,8 +1694,6 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
 
         if ( value & X86_CR4_PAE && !(old_cr & X86_CR4_PAE) )
         {
-            set_bit(VMX_CPU_STATE_PAE_ENABLED, &v->arch.hvm_vmx.cpu_state);
-
             if ( vmx_pgbit_test(v) )
             {
                 /* The guest is a 32-bit PAE guest. */
@@ -1745,14 +1732,14 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
 #endif
             }
         }
-        else if ( value & X86_CR4_PAE )
-            set_bit(VMX_CPU_STATE_PAE_ENABLED, &v->arch.hvm_vmx.cpu_state);
-        else
+        else if ( !(value & X86_CR4_PAE) )
         {
-            if ( test_bit(VMX_CPU_STATE_LMA_ENABLED, &v->arch.hvm_vmx.cpu_state) )
+            if ( unlikely(vmx_long_mode_enabled(v)) )
+            {
+                HVM_DBG_LOG(DBG_LEVEL_1, "Guest cleared CR4.PAE while "
+                            "EFER.LMA is set\n");
                 vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
-
-            clear_bit(VMX_CPU_STATE_PAE_ENABLED, &v->arch.hvm_vmx.cpu_state);
+            }
         }
 
         __vmwrite(GUEST_CR4, value| VMX_CR4_HOST_MASK);
