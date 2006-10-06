@@ -265,7 +265,7 @@ def createDormant(xeninfo):
     
     log.debug("XendDomainInfo.createDormant(%s)", xeninfo)
     
-    # Remove domid and uuid do not make sense for non-running domains.
+    # domid does not make sense for non-running domains.
     xeninfo.pop('domid', None)
     vm = XendDomainInfo(XendConfig(cfg = xeninfo))
     return vm    

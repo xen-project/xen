@@ -963,6 +963,7 @@ class XendAPI:
             dom = xendom.get_vm_by_uuid(vbd_struct['VM'])
             try:
                 vbd_ref = dom.create_vbd(vbd_struct)
+                xendom.managed_config_save(dom)
                 return xen_api_success(vbd_ref)
             except XendError:
                 return xen_api_error(XEND_ERROR_TODO)
@@ -1029,6 +1030,7 @@ class XendAPI:
             dom = xendom.get_vm_by_uuid(vif_struct['VM'])
             try:
                 vif_ref = dom.create_vif(vif_struct)
+                xendom.managed_config_save(dom)                
                 return xen_api_success(vif_ref)
             except XendError:
                 return xen_api_error(XEND_ERROR_TODO)

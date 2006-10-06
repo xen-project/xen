@@ -143,7 +143,7 @@ class XendDomain:
             running = self._running_domains()
             managed = self._managed_domains()
 
-            # add all active domains, replacing managed ones
+            # add all active domains
             for dom in running:
                 if dom['domid'] != DOM0_ID:
                     try:
@@ -160,12 +160,14 @@ class XendDomain:
                 dom_name = dom.get('name', 'Domain-%s' % dom_uuid)
                 
                 try:
-                    # instantiate domain if not started.
-                    if not self.domain_lookup_nr(dom_name):
+                    running_dom = self.domain_lookup_nr(dom_name)
+                    if not running_dom:
+                        # instantiate domain if not started.
                         new_dom = XendDomainInfo.createDormant(dom)
                         self._add_domain(new_dom)
-                    # keep track of maanged domains
-                    self._managed_domain_register(new_dom)
+                        self._managed_domain_register(new_dom)
+                    else:
+                        self._managed_domain_register(running_dom)
                 except Exception:
                     log.exception("Failed to create reference to managed "
                                   "domain: %s" % dom_name)
@@ -237,6 +239,9 @@ class XendDomain:
         @raise XendError: fails to save configuration.
         @rtype: None
         """
+        if not self.is_domain_managed(dominfo):
+            return # refuse to save configuration this domain isn't managed
+        
         if dominfo:
             domains_dir = self._managed_path()
             dom_uuid = dominfo.get_uuid()            
