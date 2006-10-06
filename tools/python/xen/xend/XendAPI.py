@@ -291,7 +291,6 @@ class XendAPI:
     def session_login_with_password(self, username, password):
         try:
             session = auth_manager().login_with_password(username, password)
-            log.info("User %s logged in.", username)
             return xen_api_success(session)
         except XendError, e:
             return xen_api_error(XEND_ERROR_AUTHENTICATION_FAILED)

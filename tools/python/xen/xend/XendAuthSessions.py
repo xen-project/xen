@@ -44,7 +44,6 @@ class XendAuthSessions:
             del self.sessions[session]
 
     def is_session_valid(self, session):
-        log.debug('isSessionValid: %s' % session)
         if type(session) == type(str()):
             return (session in self.sessions)
         return False
