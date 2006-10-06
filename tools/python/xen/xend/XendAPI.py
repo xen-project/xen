@@ -953,7 +953,7 @@ class XendAPI:
             return xen_api_error(XEND_ERROR_VIF_INVALID)
         cfg = vm.get_dev_xenapi_config('vbd', vbd_ref)
         if not cfg:
-            return xen_api_error(XEND_ERROR_UNKNOWN)
+            return xen_api_error(XEND_ERROR_VIF_INVALID)
         return xen_api_success(cfg)
     
     # class methods
@@ -968,7 +968,6 @@ class XendAPI:
                 return xen_api_error(XEND_ERROR_TODO)
         else:
             return xen_api_error(XEND_ERROR_DOMAIN_INVALID)
-
 
     # attributes (rw)
     def vbd_get_vm(self, session, vbd_ref):
@@ -1014,7 +1013,7 @@ class XendAPI:
             return xen_api_error(XEND_ERROR_VIF_INVALID)
         cfg = vm.get_dev_xenapi_config('vif', vif_ref)
         if not cfg:
-            return xen_api_error(XEND_ERROR_UNKNOWN)
+            return xen_api_error(XEND_ERROR_VIF_INVALID)
         valid_vif_keys = self.VIF_attr_ro + self.VIF_attr_rw + \
                          self.Base_attr_ro + self.Base_attr_rw
         for k in cfg.keys():

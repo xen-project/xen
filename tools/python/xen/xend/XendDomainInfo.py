@@ -1713,7 +1713,7 @@ class XendDomainInfo:
     def get_dev_config_by_uuid(self, dev_class, dev_uuid):
         """ Get's a device configuration either from XendConfig or
         from the DevController."""
-        if self.get_power_state() not in ('Halted',):
+        if self.get_power_state() in (XEN_API_VM_POWER_STATE_HALTED,):
             dev = self.info['device'].get(dev_uuid)
             if dev:
                 return dev[1].copy()
@@ -1722,9 +1722,11 @@ class XendDomainInfo:
             controller = self.getDeviceController(dev_class)
             if not controller:
                 return None
+            
             all_configs = controller.getAllDeviceConfigurations()
             if not all_configs:
                 return None
+
             for _devid, _devcfg in all_configs.items():
                 if _devcfg.get('uuid') == dev_uuid:
                     devcfg = _devcfg.copy()
