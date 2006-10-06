@@ -180,7 +180,7 @@ char *get_dom_domid(struct xs_handle *h)
 	
 	e = xs_directory(h, xth, "/local/domain", &num);
 	if (e == NULL)
-	    return NULL;
+		return NULL;
 
 	for (i = 0; (i < num) && (domid == NULL); i++) {
 		asprintf(&path, "/local/domain/%s/name", e[i]);
