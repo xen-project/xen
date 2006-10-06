@@ -18,6 +18,7 @@
 
 from xen.util.xmlrpclib2 import ServerProxy
 from optparse import *
+from pprint import pprint
 from types import DictType
 
 HOST_INFO_FORMAT = '%-20s: %-50s'
@@ -40,12 +41,32 @@ COMMANDS = {
     'vm-destroy': ('<name>', 'Hard shutdown a VM with name'),
 }
 
+OPTIONS = {
+    'vm-list': [(('-l', '--long'),
+                 {'action':'store_true',
+                  'help':'List all properties of VMs'})
+               ],
+   
+}
+
 class OptionError(Exception):
+    pass
+
+class XenAPIError(Exception):
     pass
 
 # 
 # Extra utility functions
 #
+
+def parse_args(cmd_name, args):
+    if cmd_name in OPTIONS:
+        parser = OptionParser()
+        for optargs, optkwds in OPTIONS[cmd_name]:
+            parser.add_option(*optargs, **optkwds)
+        (opts, extraargs) = parser.parse_args(list(args))
+        return opts, extraargs
+    return None, []
 
 def execute(fn, *args):
     result = fn(*args)
@@ -53,7 +74,7 @@ def execute(fn, *args):
         raise TypeError("Function returned object of type: %s" %
                         str(type(result)))
     if 'Value' not in result:
-        raise Exception(result['ErrorDescription'])
+        raise XenAPIError(*result['ErrorDescription'])
     return result['Value']
 
 
@@ -87,16 +108,24 @@ def xapi_host_info(*args):
         print HOST_INFO_FORMAT % ('UUID', host)        
 
 def xapi_vm_list(*args):
+    opts, args = parse_args('vm-list', args)
+    is_long = opts and opts.long
+    
     server, session = _connect()
     vm_uuids = execute(server.VM.get_all, session)
-    print VM_LIST_FORMAT % {'name_label':'Name',
-                            'memory_actual':'Mem',
-                            'vcpus_number': 'VCPUs',
-                            'power_state': 'State',
-                            'uuid': 'UUID'}
+    if not is_long:
+        print VM_LIST_FORMAT % {'name_label':'Name',
+                                'memory_actual':'Mem',
+                                'vcpus_number': 'VCPUs',
+                                'power_state': 'State',
+                                'uuid': 'UUID'}
+
     for uuid in vm_uuids:
         vm_info = execute(server.VM.get_record, session, uuid)
-        print VM_LIST_FORMAT % _stringify(vm_info)
+        if is_long:
+            pprint(vm_info)
+        else:
+            print VM_LIST_FORMAT % _stringify(vm_info)
 
 def xapi_vm_create(*args):
     if len(args) < 1:
@@ -108,7 +137,7 @@ def xapi_vm_create(*args):
     print 'Creating VM from %s ..' % filename
     server, session = _connect()
     uuid = execute(server.VM.create, session, cfg)
-    print 'Done.'
+    print 'Done. (%s)' % uuid
     print uuid
 
 def xapi_vm_delete(*args):
@@ -164,8 +193,7 @@ def xapi_vbd_create(*args):
     vm_uuid = execute(server.VM.get_by_label, session, domname)
     cfg['VM'] = vm_uuid
     vbd_uuid = execute(server.VBD.create, session, cfg)
-    print 'Done.'
-    print vbd_uuid
+    print 'Done. (%s)' % vbd_uuid
 
 def xapi_vif_create(*args):
     if len(args) < 2:
@@ -179,8 +207,7 @@ def xapi_vif_create(*args):
     vm_uuid = execute(server.VM.get_by_label, session, domname)
     cfg['VM'] = vm_uuid
     vif_uuid = execute(server.VIF.create, session, cfg)
-    print 'Done.'
-    print vif_uuid        
+    print 'Done. (%s)' % vif_uuid
 
 #
 # Command Line Utils
@@ -207,11 +234,18 @@ def main(args):
 
     subcmd_func_name = 'xapi_' + subcmd.replace('-', '_')
     subcmd_func = globals().get(subcmd_func_name, None)
-    if subcmd_func and callable(subcmd_func):
-        subcmd_func(*args[1:])
-    else:
+    if not subcmd_func or not callable(subcmd_func):
         print 'Error: Unable to find subcommand \'%s\'' % subcmd
         usage()
+        sys.exit(-1)
+                  
+    try:
+        subcmd_func(*args[1:])
+    except XenAPIError, e:
+        print 'Error: %s' % str(e.args[1])
+        sys.exit(-1)
+
+    sys.exit(0)
     
 if __name__ == "__main__":
     import sys
