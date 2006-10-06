@@ -1709,54 +1709,73 @@ class XendDomainInfo:
             return XEN_API_ON_CRASH_BEHAVIOUR.index(self.info['on_crash'])
         except ValueError, e:
             return XEN_API_ON_CRASH_BEHAVIOUR.index('destroy')
-    
 
-    def get_device_property(self, devclass, devid, field):
-        controller =  self.getDeviceController(devclass)
+    def get_dev_config_by_uuid(self, dev_class, dev_uuid):
+        """ Get's a device configuration either from XendConfig or
+        from the DevController."""
+        if self.get_power_state() not in ('Halted',):
+            dev = self.info['device'].get(dev_uuid)
+            if dev:
+                return dev[1].copy()
+            return None
+        else:
+            controller = self.getDeviceController(dev_class)
+            if not controller:
+                return None
+            all_configs = controller.getAllDeviceConfigurations()
+            if not all_configs:
+                return None
+            for _devid, _devcfg in all_configs.items():
+                if _devcfg.get('uuid') == dev_uuid:
+                    devcfg = _devcfg.copy()
+                    devcfg['id'] = _devid
+                    return devcfg
 
-        if devclass == 'vif':
-            if field in ('name', 'MAC', 'type'):
-                config = controller.getDeviceConfiguration(devid)
-                if field == 'name':
-                    return config['vifname']
-                if field == 'mac':
-                    return config['mac']
-                if field == 'type':
-                    return config['type']
-            if field == 'device':
-                return 'eth%s' % devid
-            if field == 'network':
-                return None # TODO
-            if field == 'VM':
-                return self.get_uuid()
-            if field == 'MTU':
-                return 0 # TODO
-            # TODO: network bandwidth values
-            return 0.0
+        return None
+                    
+    def get_dev_xenapi_config(self, dev_class, dev_uuid):
+        config = self.get_dev_config_by_uuid(dev_class, dev_uuid)
+        if not config:
+            return {}
+        
+        config['VM'] = self.get_uuid()
+        
+        if dev_class == 'vif':
+            if not config.has_key('name'):
+                config['name'] = config.get('vifname', '')
+            if not config.has_key('MAC'):
+                config['MAC'] = config.get('mac', '')
+            if not config.has_key('type'):
+                config['type'] = 'paravirtualised'
+            if not config.has_key('device'):
+                devid = config.get('id')
+                if devid != None:
+                    config['device'] = 'eth%d' % devid
+                else:
+                    config['device'] = ''
+                    
+            config['network'] = '' # Invalid for Xend
+            config['MTU'] = 1500 # TODO
+            config['network_read_kbs'] = 0.0
+            config['network_write_kbs'] = 0.0
+            config['IO_bandwidth_incoming_kbs'] = 0.0
+            config['IO_bandwidth_outgoing_kbs'] = 0.0
 
-        if devclass == 'vbd':
-            if field == 'VM':
-                return self.get_uuid()
-            if field == 'VDI':
-                return '' # TODO
-            if field in ('device', 'mode', 'driver'):
-                config = controller.getDeviceConfiguration(devid)
-                if field == 'device':
-                    return config['dev'] # TODO
-                if field == 'mode':
-                    return config['mode']
-                if field == 'driver':
-                    return config['uname'] # TODO
+        if dev_class == 'vbd':
+            config['VDI'] = '' # TODO
+            config['device'] = config.get('dev', '')
+            config['driver'] = config.get('uname', '')
+            config['IO_bandwidth_incoming_kbs'] = 0.0
+            config['IO_bandwidth_outgoing_kbs'] = 0.0                        
 
-            # TODO network bandwidth values
-            return 0.0
+        return config
 
-        raise XendError("Unrecognised dev class or property")
-
-
-    def is_device_valid(self, devclass, devid):
-        controller = self.getDeviceController(devclass)
-        return (devid in controller.deviceIDs())
+    def get_dev_property(self, dev_class, dev_uuid, field):
+        config = self.get_dev_xenapi_config(dev_class, dev_uuid)
+        try:
+            return config[field]
+        except KeyError:
+            raise XendError('Invalid property for device: %s' % field)
 
     def get_vcpus_util(self):
         # TODO: this returns the total accum cpu time, rather than util
@@ -1806,7 +1825,9 @@ class XendDomainInfo:
             raise XendError("Device creation failed")
 
         return dev_uuid
-    
+
+    def has_device(self, dev_class, dev_uuid):
+        return (dev_uuid in self.info['%s_refs' % dev_class])
 
     """
         def stateChar(name):

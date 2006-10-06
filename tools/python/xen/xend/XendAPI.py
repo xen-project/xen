@@ -948,9 +948,14 @@ class XendAPI:
     # object methods
     def vbd_get_record(self, session, vbd_ref):
         xendom = XendDomain.instance()
-        return xen_api_success(xendom.get_dev_by_uuid('vbd', vbd_ref,
-                                                      'driver'))
-
+        vm = xendom.get_vm_with_dev_uuid('vbd', vbd_ref)
+        if not vm:
+            return xen_api_error(XEND_ERROR_VIF_INVALID)
+        cfg = vm.get_dev_xenapi_config('vbd', vbd_ref)
+        if not cfg:
+            return xen_api_error(XEND_ERROR_UNKNOWN)
+        return xen_api_success(cfg)
+    
     # class methods
     def vbd_create(self, session, vbd_struct):
         xendom = XendDomain.instance()
@@ -968,20 +973,20 @@ class XendAPI:
     # attributes (rw)
     def vbd_get_vm(self, session, vbd_ref):
         xendom = XendDomain.instance()
-        return xen_api_success(xendom.get_dev_by_uuid('vbd', vbd_ref, 'VM'))
+        return xen_api_success(xendom.get_dev_property('vbd', vbd_ref, 'VM'))
     def vbd_get_vdi(self, session, vbd_ref):
         return xen_api_error(XEND_ERROR_UNSUPPORTED)
     def vbd_get_device(self, session, vbd_ref):
         xendom = XendDomain.instance()
-        return xen_api_success(xendom.get_dev_by_uuid('vbd', vbd_ref,
+        return xen_api_success(xendom.get_dev_property('vbd', vbd_ref,
                                                       'device'))
     def vbd_get_mode(self, session, vbd_ref):
         xendom = XendDomain.instance()
-        return xen_api_success(xendom.get_dev_by_uuid('vbd', vbd_ref,
+        return xen_api_success(xendom.get_dev_property('vbd', vbd_ref,
                                                       'mode'))
     def vbd_get_driver(self, session, vbd_ref):
         xendom = XendDomain.instance()
-        return xen_api_success(xendom.get_dev_by_uuid('vbd', vbd_ref,
+        return xen_api_success(xendom.get_dev_property('vbd', vbd_ref,
                                                       'driver'))
 
     # Xen API: Class VIF
@@ -1000,6 +1005,23 @@ class XendAPI:
                    'MTU']
 
     VIF_attr_inst = VIF_attr_rw
+
+    # object methods
+    def vif_get_record(self, session, vif_ref):
+        xendom = XendDomain.instance()
+        vm = xendom.get_vm_with_dev_uuid('vif', vif_ref)
+        if not vm:
+            return xen_api_error(XEND_ERROR_VIF_INVALID)
+        cfg = vm.get_dev_xenapi_config('vif', vif_ref)
+        if not cfg:
+            return xen_api_error(XEND_ERROR_UNKNOWN)
+        valid_vif_keys = self.VIF_attr_ro + self.VIF_attr_rw + \
+                         self.Base_attr_ro + self.Base_attr_rw
+        for k in cfg.keys():
+            if k not in valid_vif_keys:
+                del cfg[k]
+            
+        return xen_api_success(cfg)
 
     # class methods
     def vif_create(self, session, vif_struct):

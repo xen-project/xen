@@ -563,22 +563,25 @@ class XendDomain:
         finally:
             self.domains_lock.release()
 
-    def get_dev_by_uuid(self, klass, dev_uuid, field):
-        parts = dev_uuid.split('-%s-' % klass, 1)
+    def get_vm_with_dev_uuid(self, klass, dev_uuid):
+        self.domains_lock.acquire()
         try:
-            if len(parts) > 1:
-                dom = self.get_vm_by_uuid(parts[0])
-                if not dom:
-                    return None
-                
-                if field == 'VM':
-                    return dom.get_uuid()
-                if field == 'uuid':
-                    return dev_uuid
+            for dom in self.domains.values():
+                if dom.has_device(klass, dev_uuid):
+                    return dom
+            return None
+        finally:
+            self.domains_lock.release()
 
-                devid = int(parts[1])
-                value = dom.get_device_property(klass, devid, field)
-                return value
+    def get_dev_property_by_uuid(self, klass, dev_uuid, field):
+        self.domains_lock.acquire()
+        try:
+            dom = self.get_vm_with_dev_uuid(klass, dev_uuid)
+            if not dom:
+                return None
+
+            value = dom.get_device_property(klass, devid, field)
+            return value
         except ValueError, e:
             pass
         
@@ -588,18 +591,7 @@ class XendDomain:
         return (self.get_vm_by_uuid(vm_ref) != None)
 
     def is_valid_dev(self, klass, dev_uuid):
-        parts = dev_uuid.split('-%s-' % klass, 1)
-        try:
-            if len(parts) > 1:
-                dom = self.get_vm_by_uuid(parts[0])
-                if not dom:
-                    return False
-                devid = int(parts[1])
-                return dom.isDeviceValid(klass, devid)
-        except ValueError, e:
-            pass
-            
-        return False
+        return (self.get_vm_with_dev_uuid(klass, dev_uuid) != None)
 
     def do_legacy_api_with_uuid(self, fn, vm_uuid, *args):
         self.domains_lock.acquire()

@@ -717,6 +717,12 @@ class XendConfig(dict):
                 raise XendConfigError('Invalid restart event: %s = %s' % \
                                       (event, str(self[event])))
 
+        # Verify that {vif,vbd}_refs are here too
+        if 'vif_refs' not in self:
+            self['vif_refs'] = []
+        if 'vbd_refs' not in self:
+            self['vbd_refs'] = []
+
     def device_add(self, dev_type, cfg_sxp = None, cfg_xenapi = None):
         if dev_type not in XendDevices.valid_devices():
             raise XendConfigError("XendConfig: %s not a valid device type" %

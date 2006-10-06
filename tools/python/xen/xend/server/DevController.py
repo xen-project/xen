@@ -256,6 +256,13 @@ class DevController:
 
         return {'backend': int(backdomid)}
 
+    def getAllDeviceConfigurations(self):
+        all_configs = {}
+        for devid in self.deviceIDs():
+            config_dict = self.getDeviceConfiguration(devid)
+            all_configs[devid] = config_dict
+        return all_configs
+
     ## protected:
 
     def getDeviceDetails(self, config):
