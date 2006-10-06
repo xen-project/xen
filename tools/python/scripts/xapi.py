@@ -67,9 +67,9 @@ def _stringify(adict):
     return dict([(k, str(v)) for k, v in adict.items()])
 
 def _read_python_cfg(filename):
-    cfg_globals = {}
-    execfile(filename, cfg_globals, {})
-    return cfg_globals
+    cfg = {}
+    execfile(filename, {}, cfg)
+    return cfg
 
 #
 # Actual commands
