@@ -23,10 +23,9 @@ LIST_HEAD(tpmif_list);
 static tpmif_t *alloc_tpmif(domid_t domid, struct backend_info *bi)
 {
 	tpmif_t *tpmif;
-	int i;
 
 	tpmif = kmem_cache_alloc(tpmif_cachep, GFP_KERNEL);
-	if (!tpmif)
+	if (tpmif == NULL)
 		goto out_of_memory;
 
 	memset(tpmif, 0, sizeof (*tpmif));
@@ -36,19 +35,9 @@ static tpmif_t *alloc_tpmif(domid_t domid, struct backend_info *bi)
 	snprintf(tpmif->devname, sizeof(tpmif->devname), "tpmif%d", domid);
 	atomic_set(&tpmif->refcnt, 1);
 
-	tpmif->mmap_pages = kmalloc(sizeof(tpmif->mmap_pages[0])
-				    * TPMIF_TX_RING_SIZE, GFP_KERNEL);
+	tpmif->mmap_pages = alloc_empty_pages_and_pagevec(TPMIF_TX_RING_SIZE);
 	if (tpmif->mmap_pages == NULL)
 		goto out_of_memory;
-
-	for (i = 0; i < TPMIF_TX_RING_SIZE; i++) {
-		tpmif->mmap_pages[i] = balloon_alloc_empty_page();
-		if (tpmif->mmap_pages[i] == NULL) {
-			while (--i >= 0)
-				balloon_free_empty_page(tpmif->mmap_pages[i]);
-			goto out_of_memory;
-		}
-	}
 
 	list_add(&tpmif->tpmif_list, &tpmif_list);
 	num_frontends++;
@@ -56,26 +45,17 @@ static tpmif_t *alloc_tpmif(domid_t domid, struct backend_info *bi)
 	return tpmif;
 
  out_of_memory:
-	if (tpmif != NULL) {
-		kfree(tpmif->mmap_pages);
+	if (tpmif != NULL)
 		kmem_cache_free(tpmif_cachep, tpmif);
-	}
 	printk("%s: out of memory\n", __FUNCTION__);
 	return ERR_PTR(-ENOMEM);
 }
 
 static void free_tpmif(tpmif_t * tpmif)
 {
-	int i;
-
 	num_frontends--;
-
 	list_del(&tpmif->tpmif_list);
-
-	for (i = 0; i < TPMIF_TX_RING_SIZE; i++)
-		balloon_free_empty_page(tpmif->mmap_pages[i]);
-	kfree(tpmif->mmap_pages);
-
+	free_empty_pages_and_pagevec(tpmif->mmap_pages, TPMIF_TX_RING_SIZE);
 	kmem_cache_free(tpmif_cachep, tpmif);
 }
 

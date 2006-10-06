@@ -40,15 +40,9 @@
  */
 void balloon_update_driver_allowance(long delta);
 
-/* Allocate an empty low-memory page range. */
-struct page *balloon_alloc_empty_page_range(unsigned long nr_pages);
-
-/* Deallocate an empty page range, adding to the balloon. */
-void balloon_dealloc_empty_page_range(
-	struct page *page, unsigned long nr_pages);
-
-struct page *balloon_alloc_empty_page(void);
-void balloon_free_empty_page(struct page *page);
+/* Allocate/free a set of empty pages in low memory (i.e., no RAM mapped). */
+struct page **alloc_empty_pages_and_pagevec(int nr_pages);
+void free_empty_pages_and_pagevec(struct page **pagevec, int nr_pages);
 
 void balloon_release_driver_page(struct page *page);
 

@@ -1440,19 +1440,14 @@ static int __init netback_init(void)
 	net_timer.data = 0;
 	net_timer.function = net_alarm;
 
-	mmap_pages = kmalloc(sizeof(mmap_pages[0]) * MAX_PENDING_REQS,
-			     GFP_KERNEL);
-	if (mmap_pages == NULL)
-		goto out_of_memory;
+	mmap_pages = alloc_empty_pages_and_pagevec(MAX_PENDING_REQS);
+	if (mmap_pages == NULL) {
+		printk("%s: out of memory\n", __FUNCTION__);
+		return -ENOMEM;
+	}
 
 	for (i = 0; i < MAX_PENDING_REQS; i++) {
-		page = mmap_pages[i] = balloon_alloc_empty_page();
-		if (page == NULL) {
-			while (--i >= 0)
-				balloon_free_empty_page(mmap_pages[i]);
-			goto out_of_memory;
-		}
-		set_page_count(page, 1);
+		page = mmap_pages[i];
 		SetPageForeign(page, netif_page_release);
 		page->index = i;
 	}
@@ -1478,11 +1473,6 @@ static int __init netback_init(void)
 #endif
 
 	return 0;
-
- out_of_memory:
-	kfree(mmap_pages);
-	printk("%s: out of memory\n", __FUNCTION__);
-	return -ENOMEM;
 }
 
 module_init(netback_init);

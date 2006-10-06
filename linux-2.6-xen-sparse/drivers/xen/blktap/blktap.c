@@ -728,28 +728,16 @@ static void make_response(blkif_t *blkif, unsigned long id,
 static int req_increase(void)
 {
 	int i, j;
-	struct page **pages = NULL;
 
 	if (mmap_alloc >= MAX_PENDING_REQS || mmap_lock) 
 		return -EINVAL;
 
-	pending_reqs[mmap_alloc] = kzalloc(sizeof(pending_req_t) *
-					   blkif_reqs, GFP_KERNEL);
-	pages = kmalloc(sizeof(pages[0]) * mmap_pages, GFP_KERNEL);
+	pending_reqs[mmap_alloc]  = kzalloc(sizeof(pending_req_t)
+					    * blkif_reqs, GFP_KERNEL);
+	foreign_pages[mmap_alloc] = alloc_empty_pages_and_pagevec(mmap_pages);
 
-	if (!pending_reqs[mmap_alloc] || !pages)
+	if (!pending_reqs[mmap_alloc] || !foreign_pages[mmap_alloc])
 		goto out_of_memory;
-
-	for (i = 0; i < mmap_pages; i++) {
-		pages[i] = balloon_alloc_empty_page();
-		if (!pages[i]) {
-			while (--i >= 0)
-				balloon_free_empty_page(pages[i]);
-			goto out_of_memory;
-		}
-	}
-
-	foreign_pages[mmap_alloc] = pages;
 
 	DPRINTK("%s: reqs=%d, pages=%d\n",
 		__FUNCTION__, blkif_reqs, mmap_pages);
@@ -768,7 +756,7 @@ static int req_increase(void)
 	return 0;
 
  out_of_memory:
-	kfree(pages);
+	free_empty_pages_and_pagevec(foreign_pages[mmap_alloc], mmap_pages);
 	kfree(pending_reqs[mmap_alloc]);
 	WPRINTK("%s: out of memory\n", __FUNCTION__);
 	return -ENOMEM;
@@ -776,15 +764,12 @@ static int req_increase(void)
 
 static void mmap_req_del(int mmap)
 {
-	int i;
-
 	BUG_ON(!spin_is_locked(&pending_free_lock));
 
 	kfree(pending_reqs[mmap]);
+	pending_reqs[mmap] = NULL;
 
-	for (i = 0; i < mmap_pages; i++)
-		balloon_free_empty_page(foreign_pages[mmap][i]);
-	kfree(foreign_pages[mmap]);
+	free_empty_pages_and_pagevec(foreign_pages[mmap_alloc], mmap_pages);
 	foreign_pages[mmap] = NULL;
 
 	mmap_lock = 0;

@@ -515,20 +515,13 @@ static int __init blkif_init(void)
 					blkif_reqs, GFP_KERNEL);
 	pending_grant_handles = kmalloc(sizeof(pending_grant_handles[0]) *
 					mmap_pages, GFP_KERNEL);
-	pending_pages         = kmalloc(sizeof(pending_pages[0]) *
-					mmap_pages, GFP_KERNEL);
+	pending_pages         = alloc_empty_pages_and_pagevec(mmap_pages);
+
 	if (!pending_reqs || !pending_grant_handles || !pending_pages)
 		goto out_of_memory;
 
-	for (i = 0; i < mmap_pages; i++) {
-		pending_pages[i] = balloon_alloc_empty_page();
-		if (pending_pages[i] == NULL) {
-			while (--i >= 0)
-				balloon_free_empty_page(pending_pages[i]);
-			goto out_of_memory;
-		}
+	for (i = 0; i < mmap_pages; i++)
 		pending_grant_handles[i] = BLKBACK_INVALID_HANDLE;
-	}
 
 	blkif_interface_init();
 
@@ -545,7 +538,7 @@ static int __init blkif_init(void)
  out_of_memory:
 	kfree(pending_reqs);
 	kfree(pending_grant_handles);
-	kfree(pending_pages);
+	free_empty_pages_and_pagevec(pending_pages, mmap_pages);
 	printk("%s: out of memory\n", __FUNCTION__);
 	return -ENOMEM;
 }
