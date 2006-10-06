@@ -726,7 +726,10 @@ class XendConfig(dict):
             raise XendConfigError("XendConfig: device_add requires some "
                                   "config.")
 
-        log.debug("XendConfig.device_add: %s" % str(cfg_sxp))
+        if cfg_sxp:
+            log.debug("XendConfig.device_add: %s" % str(cfg_sxp))
+        if cfg_xenapi:
+            log.debug("XendConfig.device_add: %s" % str(cfg_xenapi))
 
         if cfg_sxp:
             config = sxp.child0(cfg_sxp)
@@ -743,6 +746,8 @@ class XendConfig(dict):
             dev_uuid = dev_info.get('uuid', uuid.createString())
             dev_info['uuid'] = dev_uuid
             self['device'][dev_uuid] = (dev_type, dev_info)
+            if dev_type in ('vif', 'vbd'):
+                self['%s_refs' % dev_type].append(dev_uuid)
             return dev_uuid
 
         if cfg_xenapi:
@@ -761,6 +766,7 @@ class XendConfig(dict):
                 dev_uuid = cfg_xenapi.get('uuid', uuid.createString())
                 dev_info['uuid'] = dev_uuid
                 self['device'][dev_uuid] = (dev_type, dev_info)
+                self['vif_refs'].append(dev_uuid)
                 return dev_uuid
             
             elif dev_type == 'vbd':
@@ -774,6 +780,7 @@ class XendConfig(dict):
                 dev_uuid = cfg_xenapi.get('uuid', uuid.createString())
                 dev_info['uuid'] = dev_uuid
                 self['device'][dev_uuid] = (dev_type, dev_info)
+                self['vbd_refs'].append(dev_uuid)                
                 return dev_uuid
                 
                 

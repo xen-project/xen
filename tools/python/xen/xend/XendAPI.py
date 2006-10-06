@@ -833,7 +833,9 @@ class XendAPI:
     def vm_get_by_label(self, session, label):
         xendom = XendDomain.instance()
         dom = xendom.domain_lookup_nr(label)
-        return xen_api_success(dom.get_uuid())
+        if dom:
+            return xen_api_success(dom.get_uuid())
+        return xen_api_error(XEND_ERROR_VM_INVALID)
     def vm_create(self, session, vm_struct):
         xendom = XendDomain.instance()
         domuuid = xendom.create_domain(vm_struct)
