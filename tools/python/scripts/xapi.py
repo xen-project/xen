@@ -37,6 +37,7 @@ COMMANDS = {
     'vbd-create': ('<domname> <pycfg>', 'Create VBD attached to domname'),
     'vif-create': ('<domname> <pycfg>', 'Create VIF attached to domname'),
     'vm-delete': ('<domname>', 'Delete VM'),
+    'vm-destroy': ('<name>', 'Hard shutdown a VM with name'),
 }
 
 class OptionError(Exception):
@@ -140,6 +141,16 @@ def xapi_vm_shutdown(*args):
     print 'Shutting down VM %s (%s)' % (args[0], vm_uuid)
     success = execute(server.VM.clean_shutdown, session, vm_uuid)
     print 'Done.'
+
+def xapi_vm_destroy(*args):
+    if len(args) < 1:
+        raise OptionError("No Domain name specified.")
+
+    server, session = _connect()
+    vm_uuid = execute(server.VM.get_by_label, session, args[0])
+    print 'Shutting down VM with force %s (%s)' % (args[0], vm_uuid)
+    success = execute(server.VM.hard_shutdown, session, vm_uuid)
+    print 'Done.'    
 
 def xapi_vbd_create(*args):
     if len(args) < 2:
