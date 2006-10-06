@@ -1,0 +1,136 @@
+Xend Lifecycle/XenAPI Implementation Changes
+============================================
+
+Summary of what has changed in this branch of Xend:
+
+Managed Domains
+---------------
+
+The concept of managed domains is that Xend now has the ability to
+manage the lifecycle of a domain from when it is created to being
+shutdown. 
+
+XendDomain
+~~~~~~~~~~
+
+In order to support managed domains, XendDomain has been modified to
+keep the configuration in /var/lib/xend/domains/.
+
+The configuration is stored in SXP format so that it can be easily
+loaded by the current Xend. In the future, we may switch to an XML
+format similar to how XenAPI defines a VM configuration.
+
+TODO: There are still places where the device configuration or VM
+configuration can be altered but the managed domain does not save it.
+
+XendDomainInfo
+~~~~~~~~~~~~~~
+
+XendDomainInfo has changed to support this mode of operation,
+especially with domain construction and assumptions about the domain
+when it shuts down.
+
+All configuration option parsing and validation has been moved from
+XendDomainInfo to XendConfig. The purpose is so that we can abstract
+away the knowledge of SXP in XendDomainInfo. The goal is to do away
+with the bulky way of accessing SXP in Xend and moving that all to a
+more pythonic interface.
+
+The DevController stuff at the end of XendDomainInfo has also been
+moved to XendDevices because now it is needed in both XendConfig and
+XendDomainInfo.
+
+Many of the constants are moved to XendConstants which reduces the
+amount of recursive or scoped imports that occur in the code.
+
+XendConfig
+~~~~~~~~~~
+
+XendConfig is the beginnings of an interface for configuration options
+so that other parts of Xend do not need to know what format the
+configuration in. It can accept configuration passed in as parsed SXP
+format, python filename or a Xen API struct.
+
+It is a subclass of a python dictionary, and hence access to its
+functions are via the __getitem__ accessor. 
+
+TODO: Define a proper interface to the XendConfig which is based on
+either the Xen API or some other flexible format.
+
+XMLRPCServer
+~~~~~~~~~~~~
+
+Changes to the busy loop in here and SrvServer so that the daemon
+shuts down cleanly. This also allows us to catch the shutdown and
+perform maintanence tasks on the domains. 
+
+Replacing xendomains init.d script 
+==================================
+
+Some work has gone into catching Xend's shutdown so that we can do the
+same tasks that xendomains init.d script does but natively in Xend.
+
+For instance, a new configuration option, 'on_xend_start' and
+'on_xend_stop' will allow domains that are managed by Xend to start up
+when Xend starts, and correspondingly stop when Xend stops.
+
+Xen API
+=======
+
+The new Xen API gives a standard interface to creating, configuring,
+controlling and destroying VMs and the virtual devices that belong to
+it.
+
+It also introduces the concept of Storage Repositories (SR) which are
+factories for creating disk images.
+
+XendDomain
+~~~~~~~~~~
+
+XendDomain has now separated the section for the Legacy XM XMLRPC API
+and the new Xen API.
+
+Since many things have a UUID, these are stored and represented as
+close to the existing configuration. 
+
+XendDomainInfo
+~~~~~~~~~~~~~~
+
+XendDomainInfo now supports UUIDs being assigned to devices and the
+domain itself. It will preserve the UUID for managed domains.
+
+A number of new functions are now in XendDomainInfo to provide an
+interface to devices.
+
+XendNode
+~~~~~~~~
+
+Represents the Host class in the Xen API and also contains an
+incomplete representation of the physical CPUs availabel for the host.
+
+XendAuthSessions
+~~~~~~~~~~~~~~~~
+
+An abstract authenticator for the Xen API. Currently it is an empty
+implementation with rudimentary support for users. The plan is the add
+PAM based authentication.
+
+XendAPI
+~~~~~~~
+
+The guts of the Xen API implementation. Implements all the supported
+functionality of the Xen API by placing calls to the relevent objects
+like XendDomain and XendDomanInfo.
+
+The initialisation of the XendAPI object will actually install a
+number of validation decorators in order to ensure the input is
+correct. It is using some features of introspection and
+metaprogramming in Python to reduce the amount of replication in the
+code.
+
+XMLRPCServer
+~~~~~~~~~~~~
+
+The XMLRPC Server will support both the new Xen API and the old XM
+XMLRPC API. The support is clearly marked in the code.
+
