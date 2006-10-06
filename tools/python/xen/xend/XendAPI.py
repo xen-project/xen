@@ -26,8 +26,23 @@ from xen.xend.XendLogging import log
 
 from xen.xend.XendAPIConstants import *
 
+from types import *
+
+def _stringify(value):
+    if isinstance(value, IntType) and not isinstance(value, BooleanType):
+        return str(value)
+    elif isinstance(value, DictType):
+        for k, v in value.items():
+            value[k] = _stringify(v)
+        return value
+    elif isinstance(value, (TupleType, ListType)):
+        return [_stringify(v) for v in value]
+    else:
+        return value
+    
 def xen_api_success(value):
-    return {"Status": "Success", "Value": value}
+    return {"Status": "Success", "Value": _stringify(value)}
+
 def xen_api_success_void():
     """Return success, but caller expects no return value."""
     return xen_api_success("")

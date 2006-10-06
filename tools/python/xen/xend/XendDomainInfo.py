@@ -1653,7 +1653,7 @@ class XendDomainInfo:
     def get_vcpus_params(self):
         return '' # TODO
     def get_power_state(self):
-        return self.state
+        return XEN_API_VM_POWER_STATE[self.state]
     def get_tpm_instance(self):
         return '' # TODO
     def get_tpm_backend(self):
@@ -1673,7 +1673,11 @@ class XendDomainInfo:
     def get_builder(self):
         return 'Linux' # TODO
     def get_boot_method(self):
-        return self.info['bootloader']
+        bootloader = self.info['bootloader']
+        if not bootloader or bootloader not in XEN_API_BOOT_TYPE:
+            return 'kernel_external'
+        return bootloader
+    
     def get_kernel_image(self):
         return self.info['kernel_kernel']
     def get_kernel_initrd(self):
@@ -1690,30 +1694,33 @@ class XendDomainInfo:
         return {} # TODO
     
     def get_on_shutdown(self):
-        try:
-            return XEN_API_ON_NORMAL_EXIT.index(self.info['on_poweroff'])
-        except ValueError, e:
-            return XEN_API_ON_NORMAL_EXIT.index('restart')
-    
+        after_shutdown = self.info.get('on_poweroff')
+        if not after_shutdown or after_shutdown not in XEN_API_ON_NORMAL_EXIT:
+            return XEN_API_ON_NORMAL_EXIT[-1]
+        return after_shutdown
+
     def get_on_reboot(self):
-        try:
-            return XEN_API_ON_NORMAL_EXIT.index(self.info['on_reboot'])
-        except ValueError, e:
-            return XEN_API_ON_NORMAL_EXIT.index('restart')        
+        after_reboot = self.info.get('on_reboot')
+        if not after_reboot or after_reboot not in XEN_API_ON_NORMAL_EXIT:
+            return XEN_API_ON_NORMAL_EXIT[-1]
+        return after_reboot
 
     def get_on_suspend(self):
-        return 0 # TODO
+        after_suspend = self.info.get('on_suspend') # TODO: not supported
+        if not after_suspend or after_suspend not in XEN_API_ON_NORMAL_EXIT:
+            return XEN_API_ON_NORMAL_EXIT[-1]
+        return after_suspend        
 
     def get_on_crash(self):
-        try:
-            return XEN_API_ON_CRASH_BEHAVIOUR.index(self.info['on_crash'])
-        except ValueError, e:
-            return XEN_API_ON_CRASH_BEHAVIOUR.index('destroy')
+        after_crash = self.info.get('on_crash')
+        if not after_crash or after_crash not in XEN_API_ON_CRASH_BEHAVIOUR:
+            return XEN_API_ON_CRASH_BEHAVIOUR[0]
+        return after_crash
 
     def get_dev_config_by_uuid(self, dev_class, dev_uuid):
         """ Get's a device configuration either from XendConfig or
         from the DevController."""
-        if self.get_power_state() in (XEN_API_VM_POWER_STATE_HALTED,):
+        if self.state in (XEN_API_VM_POWER_STATE_HALTED,):
             dev = self.info['device'].get(dev_uuid)
             if dev:
                 return dev[1].copy()
@@ -1768,7 +1775,11 @@ class XendDomainInfo:
             config['device'] = config.get('dev', '')
             config['driver'] = config.get('uname', '')
             config['IO_bandwidth_incoming_kbs'] = 0.0
-            config['IO_bandwidth_outgoing_kbs'] = 0.0                        
+            config['IO_bandwidth_outgoing_kbs'] = 0.0
+            if config['mode'] == 'r':
+                config['mode'] = 'RO'
+            else:
+                config['mode'] = 'RW'
 
         return config
 
@@ -1821,7 +1832,7 @@ class XendDomainInfo:
         if not dev_uuid:
             raise XendError('Failed to create device')
         
-        if self.state in (XEN_API_VM_POWER_STATE_RUNNING,):
+        if self.state in (DOM_STATE_HALTED,):
             sxpr = self.info.device_sxpr(dev_uuid)
             devid = self.getDeviceController('vif').createDevice(sxpr)
             raise XendError("Device creation failed")

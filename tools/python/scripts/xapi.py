@@ -22,8 +22,8 @@ from pprint import pprint
 from types import DictType
 
 HOST_INFO_FORMAT = '%-20s: %-50s'
-VM_LIST_FORMAT = '%(name_label)-24s %(memory_actual)-5s %(vcpus_number)-5s'\
-                 ' %(power_state)-5s %(uuid)-32s'
+VM_LIST_FORMAT = '%(name_label)-18s %(memory_actual)-5s %(vcpus_number)-5s'\
+                 ' %(power_state)-12s %(uuid)-32s'
 
 LOGIN = ('atse', 'passwd')
 
