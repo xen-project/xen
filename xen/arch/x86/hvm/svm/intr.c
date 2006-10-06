@@ -74,6 +74,7 @@ asmlinkage void svm_intr_assist(void)
     int intr_type = APIC_DM_EXTINT;
     int intr_vector = -1;
     int re_injecting = 0;
+    unsigned long rflags;
 
     ASSERT(vmcb);
 
@@ -86,6 +87,14 @@ asmlinkage void svm_intr_assist(void)
         re_injecting = 1;
     }
 
+    /* Guest's interrputs masked? */
+    rflags = vmcb->rflags;
+    if (irq_masked(rflags)) {
+        HVM_DBG_LOG(DBG_LEVEL_1, "Guest IRQs masked: rflags: %lx", rflags);
+        /* bail out, we won't be injecting an interrupt this time */
+        return;
+    }
+    
     /* Previous interrupt still pending? */
     if (vmcb->vintr.fields.irq) {
 //        printk("Re-injecting IRQ from Vintr\n");
