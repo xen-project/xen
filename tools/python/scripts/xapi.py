@@ -29,16 +29,18 @@ LOGIN = ('atse', 'passwd')
 
 COMMANDS = {
     'host-info': ('', 'Get Xen Host Info'),
-    'vm-list':   ('', 'List all domains.'),
-    'vm-uuid':   ('<name>', 'UUID of a domain by name.'),
-    'vm-name':   ('<uuid>', 'Name of UUID.'),
-    'vm-start':  ('<name>', 'Start VM with name'),
-    'vm-shutdown': ('<name>', 'Shutdown VM with name'),
-    'vm-create': ('<pycfg>', 'Create VM with python config'),
     'vbd-create': ('<domname> <pycfg>', 'Create VBD attached to domname'),
     'vif-create': ('<domname> <pycfg>', 'Create VIF attached to domname'),
+
+    'vm-create': ('<pycfg>', 'Create VM with python config'),
     'vm-delete': ('<domname>', 'Delete VM'),
+    
     'vm-destroy': ('<name>', 'Hard shutdown a VM with name'),
+    'vm-list':   ('', 'List all domains.'),
+    'vm-name':   ('<uuid>', 'Name of UUID.'),
+    'vm-shutdown': ('<name>', 'Shutdown VM with name'),
+    'vm-start':  ('<name>', 'Start VM with name'),
+    'vm-uuid':   ('<name>', 'UUID of a domain by name.'),    
 }
 
 OPTIONS = {
@@ -106,6 +108,22 @@ def xapi_host_info(*args):
         print HOST_INFO_FORMAT % ('CPUs', len(hostinfo['host_CPUs']))
         print HOST_INFO_FORMAT % ('VMs', len(hostinfo['resident_VMs']))
         print HOST_INFO_FORMAT % ('UUID', host)        
+
+def xapi_vm_uuid(*args):
+    if len(args) < 1:
+        raise OptionError("No domain name specified")
+    
+    server, session = _connect()
+    vm_uuid = execute(server.VM.get_by_label, session, args[0])
+    print vm_uuid
+
+def xapi_vm_name(*args):
+    if len(args) < 1:
+        raise OptionError("No UUID specified")
+    
+    server, session = _connect()
+    vm_name = execute(server.VM.get_name_label, session, args[0])
+    print vm_name
 
 def xapi_vm_list(*args):
     opts, args = parse_args('vm-list', args)
@@ -209,6 +227,8 @@ def xapi_vif_create(*args):
     vif_uuid = execute(server.VIF.create, session, cfg)
     print 'Done. (%s)' % vif_uuid
 
+    
+
 #
 # Command Line Utils
 #
@@ -237,13 +257,17 @@ def main(args):
     if not subcmd_func or not callable(subcmd_func):
         print 'Error: Unable to find subcommand \'%s\'' % subcmd
         usage()
-        sys.exit(-1)
-                  
+        sys.exit(1)
+
+    if '-h' in args[1:] or '--help' in args[1:]:
+        usage(subcmd)
+        sys.exit(1)
+        
     try:
         subcmd_func(*args[1:])
     except XenAPIError, e:
         print 'Error: %s' % str(e.args[1])
-        sys.exit(-1)
+        sys.exit(1)
 
     sys.exit(0)
     
