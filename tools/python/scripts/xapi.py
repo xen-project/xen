@@ -36,7 +36,7 @@ COMMANDS = {
     'vm-delete': ('<domname>', 'Delete VM'),
     
     'vm-destroy': ('<name>', 'Hard shutdown a VM with name'),
-    'vm-list':   ('', 'List all domains.'),
+    'vm-list':   ('[--long]', 'List all domains.'),
     'vm-name':   ('<uuid>', 'Name of UUID.'),
     'vm-shutdown': ('<name>', 'Shutdown VM with name'),
     'vm-start':  ('<name>', 'Start VM with name'),
@@ -62,13 +62,15 @@ class XenAPIError(Exception):
 #
 
 def parse_args(cmd_name, args):
+    argstring, desc = COMMANDS[cmd_name]
+    parser = OptionParser(usage = 'xapi %s %s' % (cmd_name, argstring),
+                          description = desc)
     if cmd_name in OPTIONS:
-        parser = OptionParser()
         for optargs, optkwds in OPTIONS[cmd_name]:
             parser.add_option(*optargs, **optkwds)
-        (opts, extraargs) = parser.parse_args(list(args))
-        return opts, extraargs
-    return None, []
+            
+    (opts, extraargs) = parser.parse_args(list(args))
+    return opts, extraargs
 
 def execute(fn, *args):
     result = fn(*args)
@@ -141,6 +143,18 @@ def xapi_vm_list(*args):
     for uuid in vm_uuids:
         vm_info = execute(server.VM.get_record, session, uuid)
         if is_long:
+            vbds = vm_info['vbds']
+            vifs = vm_info['vifs']
+            vif_infos = []
+            vbd_infos = []
+            for vbd in vbds:
+                vbd_info = execute(server.VBD.get_record, session, vbd)
+                vbd_infos.append(vbd_info)
+            for vif in vifs:
+                vif_info = execute(server.VIF.get_record, session, vif)
+                vif_infos.append(vif_info)
+            vm_info['vbds'] = vbd_infos
+            vm_info['vifs'] = vif_infos
             pprint(vm_info)
         else:
             print VM_LIST_FORMAT % _stringify(vm_info)
@@ -234,15 +248,18 @@ def xapi_vif_create(*args):
 #
 
 def usage(command = None):
-    print 'Usage: xapi <subcommand> [options] [args]'
-    print
-    print 'Subcommands:'
-    print
-    sorted_commands = sorted(COMMANDS.keys())
-    for command  in sorted_commands:
-        args, description = COMMANDS[command]
-        print '%-16s  %-40s' % (command, description)
-    print
+    if not command:
+        print 'Usage: xapi <subcommand> [options] [args]'
+        print
+        print 'Subcommands:'
+        print
+        sorted_commands = sorted(COMMANDS.keys())
+        for command  in sorted_commands:
+            args, description = COMMANDS[command]
+            print '%-16s  %-40s' % (command, description)
+        print
+    else:
+        parse_args(command, ['-h'])
 
 def main(args):
 
@@ -267,7 +284,7 @@ def main(args):
         subcmd_func(*args[1:])
     except XenAPIError, e:
         print 'Error: %s' % str(e.args[1])
-        sys.exit(1)
+        sys.exit(2)
 
     sys.exit(0)
     
