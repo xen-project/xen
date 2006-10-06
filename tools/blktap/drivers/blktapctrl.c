@@ -684,13 +684,10 @@ int main(int argc, char *argv[])
 	}
 	
 	ret = setup_probe_watch(h);
-	if (ret < 0) {
+	if (ret != 0) {
 		DPRINTF("Failed adding device probewatch\n");
 		xs_daemon_close(h);
 		goto open_failed;
-	} else {
-		DPRINTF("Added probe %s\n", 
-		       (ret ? "ASYNCHRONOUSLY":"SYNCHRONOUSLY"));
 	}
 
 	ioctl(ctlfd, BLKTAP_IOCTL_SETMODE, BLKTAP_MODE_INTERPOSE );
