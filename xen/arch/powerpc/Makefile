@@ -96,7 +96,7 @@ endif
 cmdline.o: cmdline.dep
 cmdline.o: CFLAGS += -DCMDLINE="\"$(FULL_CMDLINE)\""
 
-TARGET_OPTS = $(OMAGIC) -Wl,-Ttext,0x400000,-T,xen.lds
+TARGET_OPTS = $(OMAGIC) -Wl,-T,xen.lds
 TARGET_OPTS += start.o $(ALL_OBJS)
 
 .xen-syms: start.o $(ALL_OBJS) xen.lds
