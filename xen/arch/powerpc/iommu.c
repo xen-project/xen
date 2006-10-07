@@ -32,6 +32,12 @@
 #include "tce.h"
 #include "iommu.h"
 
+#ifdef DEBUG
+#define DBG(fmt...) printk(fmt)
+#else
+#define DBG(fmt...)
+#endif
+
 struct iommu_funcs {
     int (*iommu_put)(ulong, union tce);
 };
@@ -46,16 +52,31 @@ int iommu_put(u32 buid, ulong ioba, union tce tce)
     struct domain *d = v->domain;
 
     if (buid < iommu_phbs_num && iommu_phbs[buid].iommu_put != NULL) {
-        ulong gpfn;
+        ulong gmfn;
         ulong mfn;
+        int mtype;
 
-        gpfn = tce.tce_bits.tce_rpn;
-        mfn = gmfn_to_mfn(d, gpfn);
+        gmfn = tce.tce_bits.tce_rpn;
+
+        
+        mfn = pfn2mfn(d, gmfn, &mtype);
         if (mfn != INVALID_MFN) {
-#ifdef DEBUG
-            printk("%s: ioba=0x%lx pfn=0x%lx mfn=0x%lx\n", __func__,
-                   ioba, pfn, mfn);
-#endif
+            switch (mtype) {
+            case PFN_TYPE_RMA:
+            case PFN_TYPE_LOGICAL:
+                break;
+            case PFN_TYPE_FOREIGN:
+                DBG("%s: assigning to Foriegn page: "
+                    "gmfn: 0x%lx mfn: 0x%lx\n",  __func__, gmfn, mfn);
+                break;
+            default:
+                printk("%s: unsupported type[%d]: gmfn: 0x%lx mfn: 0x%lx\n",
+                       __func__, mtype, gmfn, mfn);
+                return -1;
+            break;
+            }
+            DBG("%s: ioba=0x%lx gmfn=0x%lx mfn=0x%lx\n", __func__,
+                ioba, gmfn, mfn);
             tce.tce_bits.tce_rpn = mfn;
             return iommu_phbs[buid].iommu_put(ioba, tce);
         }
