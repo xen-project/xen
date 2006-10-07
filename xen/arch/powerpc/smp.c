@@ -29,7 +29,21 @@ int ht_per_core = 1;
 
 void __flush_tlb_mask(cpumask_t mask, unsigned long addr)
 {
-    unimplemented();
+    if (cpu_isset(smp_processor_id(), mask)) {
+            cpu_clear(smp_processor_id(), mask);
+            if (cpus_empty(mask)) {
+                /* only local */
+                if (addr == FLUSH_ALL_ADDRS)
+                    local_flush_tlb();
+                else
+                    local_flush_tlb_one(addr);
+                return;
+            }
+    }
+    /* if we are still here and the mask is non-empty, then we need to
+     * flush other TLBs so we flush em all */
+    if (!cpus_empty(mask))
+        unimplemented();
 }
 
 void smp_send_event_check_mask(cpumask_t mask)
