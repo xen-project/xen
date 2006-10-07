@@ -275,7 +275,7 @@ static void create_new_vm(xen_session *session)
 
     xen_vm_record vm_record =
         {
-            .name_label = "New VM",
+            .name_label = "NewVM",
             .name_description = "New VM Description",
             .user_version = 1,
             .is_a_template = false,
