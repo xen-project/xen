@@ -74,11 +74,6 @@ static int write_msg(int fd, int msgtype, void *ptr, void *ptr2);
 static int read_msg(int fd, int msgtype, void *ptr);
 static driver_list_entry_t *active_disks[MAX_DISK_TYPES];
 
-void sig_handler(int sig)
-{
-	run = 0;	
-}
-
 static void init_driver_list(void)
 {
 	int i;
