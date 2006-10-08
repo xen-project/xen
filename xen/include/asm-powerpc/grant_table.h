@@ -29,6 +29,10 @@
  * Caller must own caller's BIGLOCK, is responsible for flushing the TLB, and
  * must hold a reference to the page.
  */
+extern long pte_enter(ulong flags, ulong ptex, ulong vsid, ulong rpn);
+extern long pte_remove(ulong flags, ulong ptex, ulong avpn,
+                       ulong *hi, ulong *lo);
+
 int create_grant_host_mapping(
     unsigned long addr, unsigned long frame, unsigned int flags);
 int destroy_grant_host_mapping(
@@ -41,8 +45,7 @@ int destroy_grant_host_mapping(
             (d), XENSHARE_writable);                                     \
     } while ( 0 )
 
-#define gnttab_shared_mfn(d, t, i)                      \
-    ((virt_to_maddr((t)->shared) >> PAGE_SHIFT) + (i))
+#define gnttab_shared_mfn(d, t, i) (((ulong)((t)->shared) >> PAGE_SHIFT) + (i))
 
 #define gnttab_shared_gmfn(d, t, i)                     \
     (mfn_to_gmfn(d, gnttab_shared_mfn(d, t, i)))
@@ -60,5 +63,14 @@ static inline void gnttab_clear_flag(unsigned long nr, uint16_t *addr)
     laddr = (unsigned long *)addr;
     clear_bit(lnr, laddr);
 }
+
+static inline uint cpu_foreign_map_order(void)
+{
+    /* 16 GiB */
+    return 34 - PAGE_SHIFT;
+}
+
+#define GNTTAB_DEV_BUS(f) \
+    ((f) | (1UL << (cpu_foreign_map_order() + PAGE_SHIFT)))
 
 #endif  /* __ASM_PPC_GRANT_TABLE_H__ */

@@ -94,6 +94,7 @@ int arch_domain_create(struct domain *d)
 void arch_domain_destroy(struct domain *d)
 {
     shadow_teardown(d);
+    /* shared_info is part of the RMA so no need to release it */
 }
 
 static void machine_fail(const char *s)
@@ -290,6 +291,7 @@ static void relinquish_memory(struct domain *d, struct list_head *list)
 
 void domain_relinquish_resources(struct domain *d)
 {
+    relinquish_memory(d, &d->xenpage_list);
     relinquish_memory(d, &d->page_list);
     free_extents(d);
     return;

@@ -352,6 +352,11 @@ static ofdn_t ofd_xen_props(void *m, struct domain *d, start_info_t *si)
         if (!rtas_entry)
             ofd_prop_add(m, n, "power-control", NULL, 0);
 
+        /* tell dom0 where ranted pages go in the linear map */
+        val[0] = cpu_foreign_map_order();
+        val[1] = max_page;
+        ofd_prop_add(m, n, "foreign-map", val, sizeof (val));
+
         n = ofd_node_add(m, n, console, sizeof (console));
         if (n > 0) {
             val[0] = 0;
