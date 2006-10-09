@@ -2324,11 +2324,11 @@ static void sh_destroy_l3_subshadow(struct vcpu *v,
 /* Tear down just a single 4-entry l3 on a 2-page l3 shadow. */
 {
     int i;
+    mfn_t sl3mfn = _mfn(maddr_from_mapped_domain_page(sl3e) >> PAGE_SHIFT);
     ASSERT((unsigned long)sl3e % (4 * sizeof (shadow_l3e_t)) == 0); 
     for ( i = 0; i < GUEST_L3_PAGETABLE_ENTRIES; i++ ) 
         if ( shadow_l3e_get_flags(sl3e[i]) & _PAGE_PRESENT ) 
-            sh_put_ref(v, shadow_l3e_get_mfn(sl3e[i]),
-                        maddr_from_mapped_domain_page(sl3e));
+            shadow_set_l3e(v, &sl3e[i], shadow_l3e_empty(), sl3mfn);
 }
 #endif
 
