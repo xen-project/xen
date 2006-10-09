@@ -38,7 +38,7 @@ struct initrd_info {
     enum { INITRD_none, INITRD_file, INITRD_mem } type;
     unsigned long len;
     union {
-        gzFile file_handle;
+        int fd;
         char *mem_addr;
     } u;
 };
@@ -152,7 +152,7 @@ int load_initrd(int xc_handle, domid_t dom,
         }
         else
         {
-            if ( gzread(initrd->u.file_handle, page, PAGE_SIZE) == -1 )
+            if ( read(initrd->u.fd, page, PAGE_SIZE) == -1 )
             {
                 PERROR("Error reading initrd image, could not");
                 return -EINVAL;
@@ -1344,20 +1344,16 @@ int xc_linux_build(int xc_handle,
 
     if ( (initrd_name != NULL) && (strlen(initrd_name) != 0) )
     {
-        initrd_info.type = INITRD_file;
-
         if ( (fd = open(initrd_name, O_RDONLY)) < 0 )
         {
             PERROR("Could not open the initial ramdisk image");
             goto error_out;
         }
 
-        initrd_info.len = xc_get_filesz(fd);
-        if ( (initrd_info.u.file_handle = gzdopen(fd, "rb")) == NULL )
-        {
-            PERROR("Could not allocate decompression state for initrd");
-            goto error_out;
-        }
+        initrd_info.type = INITRD_file;
+        initrd_info.u.fd = fd;
+        initrd_info.len  = lseek(fd, 0, SEEK_END);
+        lseek(fd, 0, SEEK_SET);
     }
 
     sts = xc_linux_build_internal(xc_handle, domid, image, image_size,
@@ -1367,8 +1363,8 @@ int xc_linux_build(int xc_handle,
 
  error_out:
     free(image);
-    if ( initrd_info.type == INITRD_file && initrd_info.u.file_handle )
-        gzclose(initrd_info.u.file_handle);
+    if ( initrd_info.type == INITRD_file )
+        close(initrd_info.u.fd);
     else if ( fd >= 0 )
         close(fd);
 
