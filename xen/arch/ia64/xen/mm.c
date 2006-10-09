@@ -826,6 +826,20 @@ __assign_domain_page(struct domain *d,
         smp_mb();
         return 0;
     }
+
+    // dom0 tries to map real machine's I/O region, but failed.
+    // It is very likely that dom0 doesn't boot correctly because
+    // it can't access I/O. So complain here.
+    if ((flags & ASSIGN_nocache) &&
+        (pte_pfn(ret_pte) != (physaddr >> PAGE_SHIFT) ||
+         !(pte_val(ret_pte) & _PAGE_MA_UC)))
+        printk("%s:%d WARNING can't assign page domain 0x%p id %d\n"
+               "\talready assigned pte_val 0x%016lx\n"
+               "\tmpaddr 0x%016lx physaddr 0x%016lx flags 0x%lx\n",
+               __func__, __LINE__,
+               d, d->domain_id, pte_val(ret_pte),
+               mpaddr, physaddr, flags);
+
     return -EAGAIN;
 }
 
