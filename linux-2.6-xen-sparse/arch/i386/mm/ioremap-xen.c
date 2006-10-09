@@ -29,6 +29,8 @@ static int direct_remap_area_pte_fn(pte_t *pte,
 {
 	mmu_update_t **v = (mmu_update_t **)data;
 
+	BUG_ON(!pte_none(*pte));
+
 	(*v)->ptr = ((u64)pfn_to_mfn(page_to_pfn(pmd_page)) <<
 		     PAGE_SHIFT) | ((unsigned long)pte & ~PAGE_MASK);
 	(*v)++;
@@ -110,11 +112,13 @@ int direct_remap_pfn_range(struct vm_area_struct *vma,
 			   pgprot_t prot,
 			   domid_t  domid)
 {
-	/* Same as remap_pfn_range(). */
-	vma->vm_flags |= VM_IO | VM_RESERVED | VM_PFNMAP;
+	if (xen_feature(XENFEAT_auto_translated_physmap))
+		return remap_pfn_range(vma, address, mfn, size, prot);
 
 	if (domid == DOMID_SELF)
 		return -EINVAL;
+
+	vma->vm_flags |= VM_IO | VM_RESERVED;
 
 	vma->vm_mm->context.has_foreign_mappings = 1;
 
