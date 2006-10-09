@@ -669,7 +669,7 @@ GLOBAL_ENTRY(vmx_switch_rr7)
 
    // re-pin mappings for guest_vhpt
 
-   mov r24=IA64_TR_PERVP_VHPT
+   mov r24=IA64_TR_VHPT
    movl r25=PAGE_KERNEL
    ;;
    or loc5 = r25,loc5          // construct PA | page properties

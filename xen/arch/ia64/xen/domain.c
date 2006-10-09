@@ -69,6 +69,16 @@ DEFINE_PER_CPU(int *, current_psr_ic_addr);
 
 #include <xen/sched-if.h>
 
+static void
+ia64_disable_vhpt_walker(void)
+{
+	// disable VHPT. ia64_new_rr7() might cause VHPT
+	// fault without this because it flushes dtr[IA64_TR_VHPT]
+	// (VHPT_SIZE_LOG2 << 2) is just for avoid
+	// Reserved Register/Field fault.
+	ia64_set_pta(VHPT_SIZE_LOG2 << 2);
+}
+
 static void flush_vtlb_for_context_switch(struct vcpu* vcpu)
 {
 	int cpu = smp_processor_id();
@@ -92,8 +102,10 @@ static void flush_vtlb_for_context_switch(struct vcpu* vcpu)
 		if (VMX_DOMAIN(vcpu)) {
 			// currently vTLB for vt-i domian is per vcpu.
 			// so any flushing isn't needed.
+		} else if (HAS_PERVCPU_VHPT(vcpu->domain)) {
+			// nothing to do
 		} else {
-			vhpt_flush();
+			local_vhpt_flush();
 		}
 		local_flush_tlb_all();
 		perfc_incrc(flush_vtlb_for_context_switch);
@@ -111,9 +123,9 @@ void schedule_tail(struct vcpu *prev)
 		              current->processor);
 	} else {
 		ia64_set_iva(&ia64_ivt);
-        	ia64_set_pta(VHPT_ADDR | (1 << 8) | (VHPT_SIZE_LOG2 << 2) |
-		        VHPT_ENABLED);
+		ia64_disable_vhpt_walker();
 		load_region_regs(current);
+        	ia64_set_pta(vcpu_pta(current));
 		vcpu_load_kernel_regs(current);
 		__ia64_per_cpu_var(current_psr_i_addr) = &current->domain->
 		  shared_info->vcpu_info[current->vcpu_id].evtchn_upcall_mask;
@@ -127,7 +139,6 @@ void schedule_tail(struct vcpu *prev)
 void context_switch(struct vcpu *prev, struct vcpu *next)
 {
     uint64_t spsr;
-    uint64_t pta;
 
     local_irq_save(spsr);
 
@@ -164,9 +175,9 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 
 	nd = current->domain;
     	if (!is_idle_domain(nd)) {
-        	ia64_set_pta(VHPT_ADDR | (1 << 8) | (VHPT_SIZE_LOG2 << 2) |
-			     VHPT_ENABLED);
+		ia64_disable_vhpt_walker();
 	    	load_region_regs(current);
+		ia64_set_pta(vcpu_pta(current));
 	    	vcpu_load_kernel_regs(current);
 		vcpu_set_next_timer(current);
 		if (vcpu_timer_expired(current))
@@ -180,8 +191,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 		 * walker. Then all accesses happen within idle context will
 		 * be handled by TR mapping and identity mapping.
 		 */
-		pta = ia64_get_pta();
-		ia64_set_pta(pta & ~VHPT_ENABLED);
+		ia64_disable_vhpt_walker();
 		__ia64_per_cpu_var(current_psr_i_addr) = NULL;
 		__ia64_per_cpu_var(current_psr_ic_addr) = NULL;
         }
@@ -270,6 +280,13 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 	    if (!d->arch.is_vti) {
 		int order;
 		int i;
+		// vti domain has its own vhpt policy.
+		if (HAS_PERVCPU_VHPT(d)) {
+			if (pervcpu_vhpt_alloc(v) < 0) {
+				free_xenheap_pages(v, KERNEL_STACK_SIZE_ORDER);
+				return NULL;
+			}
+		}
 
 		/* Create privregs page only if not VTi. */
 		order = get_order_from_shift(XMAPPEDREGS_SHIFT);
@@ -312,6 +329,8 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 
 void relinquish_vcpu_resources(struct vcpu *v)
 {
+    if (HAS_PERVCPU_VHPT(v->domain))
+        pervcpu_vhpt_free(v);
     if (v->arch.privregs != NULL) {
         free_xenheap_pages(v->arch.privregs,
                            get_order_from_shift(XMAPPEDREGS_SHIFT));
@@ -347,6 +366,11 @@ static void init_switch_stack(struct vcpu *v)
 	memset(v->arch._thread.fph,0,sizeof(struct ia64_fpreg)*96);
 }
 
+#ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
+static int opt_pervcpu_vhpt = 1;
+integer_param("pervcpu_vhpt", opt_pervcpu_vhpt);
+#endif
+
 int arch_domain_create(struct domain *d)
 {
 	int i;
@@ -361,6 +385,11 @@ int arch_domain_create(struct domain *d)
 	if (is_idle_domain(d))
 	    return 0;
 
+#ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
+	d->arch.has_pervcpu_vhpt = opt_pervcpu_vhpt;
+	DPRINTK("%s:%d domain %d pervcpu_vhpt %d\n",
+	        __func__, __LINE__, d->domain_id, d->arch.has_pervcpu_vhpt);
+#endif
 	d->shared_info = alloc_xenheap_pages(get_order_from_shift(XSI_SHIFT));
 	if (d->shared_info == NULL)
 	    goto fail_nomem;

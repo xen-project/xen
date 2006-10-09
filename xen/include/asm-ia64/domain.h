@@ -87,6 +87,9 @@ struct arch_domain {
         unsigned long flags;
         struct {
             unsigned int is_vti : 1;
+#ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
+            unsigned int has_pervcpu_vhpt : 1;
+#endif
         };
     };
 
@@ -142,6 +145,13 @@ struct arch_domain {
     (sizeof(vcpu_info_t) * (v)->vcpu_id + \
     offsetof(vcpu_info_t, evtchn_upcall_mask))
 
+#ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
+#define HAS_PERVCPU_VHPT(d)     ((d)->arch.has_pervcpu_vhpt)
+#else
+#define HAS_PERVCPU_VHPT(d)     (0)
+#endif
+
+
 struct arch_vcpu {
     /* Save the state of vcpu.
        This is the first entry to speed up accesses.  */
@@ -192,6 +202,13 @@ struct arch_vcpu {
     fpswa_ret_t fpswa_ret;	/* save return values of FPSWA emulation */
     struct timer hlt_timer;
     struct arch_vmx_struct arch_vmx; /* Virtual Machine Extensions */
+
+#ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
+    PTA                 pta;
+    unsigned long       vhpt_maddr;
+    struct page_info*   vhpt_page;
+    unsigned long       vhpt_entries;
+#endif
 
 #define INVALID_PROCESSOR       INT_MAX
     int last_processor;

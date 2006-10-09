@@ -3,6 +3,10 @@
  *
  * Copyright (C) 2004 Hewlett-Packard Co
  *	Dan Magenheimer <dan.magenheimer@hp.com>
+ *
+ * Copyright (c) 2006 Isaku Yamahata <yamahata at valinux co jp>
+ *                    VA Linux Systems Japan K.K.
+ *                    per vcpu vhpt support
  */
 #include <linux/config.h>
 #include <linux/kernel.h>
@@ -24,18 +28,32 @@ extern long running_on_sim;
 DEFINE_PER_CPU (unsigned long, vhpt_paddr);
 DEFINE_PER_CPU (unsigned long, vhpt_pend);
 
-void vhpt_flush(void)
+static void
+ __vhpt_flush(unsigned long vhpt_maddr)
 {
-	struct vhpt_lf_entry *v = __va(__ia64_per_cpu_var(vhpt_paddr));
+	struct vhpt_lf_entry *v = (struct vhpt_lf_entry*)__va(vhpt_maddr);
 	int i;
 
 	for (i = 0; i < VHPT_NUM_ENTRIES; i++, v++)
 		v->ti_tag = INVALID_TI_TAG;
 }
 
-static void vhpt_erase(void)
+void
+local_vhpt_flush(void)
 {
-	struct vhpt_lf_entry *v = (struct vhpt_lf_entry *)VHPT_ADDR;
+	__vhpt_flush(__ia64_per_cpu_var(vhpt_paddr));
+}
+
+static void
+vcpu_vhpt_flush(struct vcpu* v)
+{
+	__vhpt_flush(vcpu_vhpt_maddr(v));
+}
+
+static void
+vhpt_erase(unsigned long vhpt_maddr)
+{
+	struct vhpt_lf_entry *v = (struct vhpt_lf_entry*)__va(vhpt_maddr);
 	int i;
 
 	for (i = 0; i < VHPT_NUM_ENTRIES; i++, v++) {
@@ -45,17 +63,6 @@ static void vhpt_erase(void)
 		v->ti_tag = INVALID_TI_TAG;
 	}
 	// initialize cache too???
-}
-
-
-static void vhpt_map(unsigned long pte)
-{
-	unsigned long psr;
-
-	psr = ia64_clear_ic();
-	ia64_itr(0x2, IA64_TR_VHPT, VHPT_ADDR, pte, VHPT_SIZE_LOG2);
-	ia64_set_psr(psr);
-	ia64_srlz_i();
 }
 
 void vhpt_insert (unsigned long vadr, unsigned long pte, unsigned long logps)
@@ -102,7 +109,7 @@ void vhpt_multiple_insert(unsigned long vaddr, unsigned long pte, unsigned long 
 
 void vhpt_init(void)
 {
-	unsigned long paddr, pte;
+	unsigned long paddr;
 	struct page_info *page;
 #if !VHPT_ENABLED
 	return;
@@ -122,14 +129,51 @@ void vhpt_init(void)
 	__get_cpu_var(vhpt_pend) = paddr + (1 << VHPT_SIZE_LOG2) - 1;
 	printf("vhpt_init: vhpt paddr=0x%lx, end=0x%lx\n",
 		paddr, __get_cpu_var(vhpt_pend));
-	pte = pte_val(pfn_pte(paddr >> PAGE_SHIFT, PAGE_KERNEL));
-	vhpt_map(pte);
-	ia64_set_pta(VHPT_ADDR | (1 << 8) | (VHPT_SIZE_LOG2 << 2) |
-		VHPT_ENABLED);
-	vhpt_erase();
+	vhpt_erase(paddr);
+	// we don't enable VHPT here.
+	// context_switch() or schedule_tail() does it.
 }
 
+#ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
+int
+pervcpu_vhpt_alloc(struct vcpu *v)
+{
+	unsigned long vhpt_size_log2 = VHPT_SIZE_LOG2;
 
+	v->arch.vhpt_entries =
+		(1UL << vhpt_size_log2) / sizeof(struct vhpt_lf_entry);
+	v->arch.vhpt_page =
+		alloc_domheap_pages(NULL, vhpt_size_log2 - PAGE_SHIFT, 0);
+	if (!v->arch.vhpt_page)
+		return -ENOMEM;
+	
+	v->arch.vhpt_maddr = page_to_maddr(v->arch.vhpt_page);
+	if (v->arch.vhpt_maddr & ((1 << VHPT_SIZE_LOG2) - 1))
+		panic("pervcpu_vhpt_init: bad VHPT alignment!\n");
+
+	v->arch.pta.val = 0; // to zero reserved bits
+	v->arch.pta.ve = 1; // enable vhpt
+	v->arch.pta.size = VHPT_SIZE_LOG2;
+	v->arch.pta.vf = 1; // long format
+	//v->arch.pta.base = __va(v->arch.vhpt_maddr) >> 15;
+	v->arch.pta.base = VHPT_ADDR >> 15;
+
+	vhpt_erase(v->arch.vhpt_maddr);
+	smp_mb(); // per vcpu vhpt may be used by another physical cpu.
+	return 0;
+}
+
+void
+pervcpu_vhpt_free(struct vcpu *v)
+{
+	free_domheap_pages(v->arch.vhpt_page, VHPT_SIZE_LOG2 - PAGE_SHIFT);
+}
+#endif
+
+// SMP: we can't assume v == current, vcpu might move to another physical cpu.
+// So memory barrier is necessary.
+// if we can guranttee that vcpu can run on only this physical cpu
+// (e.g. vcpu == current), smp_mb() is unnecessary.
 void vcpu_flush_vtlb_all(struct vcpu *v)
 {
 	if (VMX_DOMAIN(v)) {
@@ -144,9 +188,14 @@ void vcpu_flush_vtlb_all(struct vcpu *v)
 		/* First VCPU tlb.  */
 		vcpu_purge_tr_entry(&PSCBX(v,dtlb));
 		vcpu_purge_tr_entry(&PSCBX(v,itlb));
+		smp_mb();
 
 		/* Then VHPT.  */
-		vhpt_flush();
+		if (HAS_PERVCPU_VHPT(v->domain))
+			vcpu_vhpt_flush(v);
+		else
+			local_vhpt_flush();
+		smp_mb();
 
 		/* Then mTLB.  */
 		local_flush_tlb_all();
@@ -176,6 +225,13 @@ void domain_flush_vtlb_all (void)
 		if (v->processor == cpu)
 			vcpu_flush_vtlb_all(v);
 		else
+			// SMP: it is racy to reference v->processor.
+			// vcpu scheduler may move this vcpu to another
+			// physicall processor, and change the value
+			// using plain store.
+			// We may be seeing the old value of it.
+			// In such case, flush_vtlb_for_context_switch()
+			// takes care of mTLB flush.
 			smp_call_function_single(v->processor,
 						 __vcpu_flush_vtlb_all,
 						 v, 1, 1);
@@ -183,24 +239,42 @@ void domain_flush_vtlb_all (void)
 	perfc_incrc(domain_flush_vtlb_all);
 }
 
-static void cpu_flush_vhpt_range (int cpu, u64 vadr, u64 addr_range)
+// Callers may need to call smp_mb() before/after calling this.
+// Be carefull.
+static void
+__flush_vhpt_range(unsigned long vhpt_maddr, u64 vadr, u64 addr_range)
 {
-	void *vhpt_base = __va(per_cpu(vhpt_paddr, cpu));
+	void *vhpt_base = __va(vhpt_maddr);
 
 	while ((long)addr_range > 0) {
 		/* Get the VHPT entry.  */
 		unsigned int off = ia64_thash(vadr) - VHPT_ADDR;
-		volatile struct vhpt_lf_entry *v;
-		v = vhpt_base + off;
+		struct vhpt_lf_entry *v = vhpt_base + off;
 		v->ti_tag = INVALID_TI_TAG;
 		addr_range -= PAGE_SIZE;
 		vadr += PAGE_SIZE;
 	}
 }
 
+static void
+cpu_flush_vhpt_range(int cpu, u64 vadr, u64 addr_range)
+{
+	__flush_vhpt_range(per_cpu(vhpt_paddr, cpu), vadr, addr_range);
+}
+
+static void
+vcpu_flush_vhpt_range(struct vcpu* v, u64 vadr, u64 addr_range)
+{
+	__flush_vhpt_range(vcpu_vhpt_maddr(v), vadr, addr_range);
+}
+
 void vcpu_flush_tlb_vhpt_range (u64 vadr, u64 log_range)
 {
-	cpu_flush_vhpt_range (current->processor, vadr, 1UL << log_range);
+	if (HAS_PERVCPU_VHPT(current->domain))
+		vcpu_flush_vhpt_range(current, vadr, 1UL << log_range);
+	else
+		cpu_flush_vhpt_range(current->processor,
+		                     vadr, 1UL << log_range);
 	ia64_ptcl(vadr, log_range << 2);
 	ia64_srlz_i();
 	perfc_incrc(vcpu_flush_tlb_vhpt_range);
@@ -233,8 +307,18 @@ void domain_flush_vtlb_range (struct domain *d, u64 vadr, u64 addr_range)
 		if (!test_bit(_VCPUF_initialised, &v->vcpu_flags))
 			continue;
 
-		/* Invalidate VHPT entries.  */
-		cpu_flush_vhpt_range (v->processor, vadr, addr_range);
+		if (HAS_PERVCPU_VHPT(d)) {
+			vcpu_flush_vhpt_range(v, vadr, addr_range);
+		} else {
+			// SMP: it is racy to reference v->processor.
+			// vcpu scheduler may move this vcpu to another
+			// physicall processor, and change the value
+			// using plain store.
+			// We may be seeing the old value of it.
+			// In such case, flush_vtlb_for_context_switch()
+			/* Invalidate VHPT entries.  */
+			cpu_flush_vhpt_range(v->processor, vadr, addr_range);
+		}
 	}
 	// ptc.ga has release semantics.
 
@@ -246,7 +330,7 @@ void domain_flush_vtlb_range (struct domain *d, u64 vadr, u64 addr_range)
 static void flush_tlb_vhpt_all (struct domain *d)
 {
 	/* First VHPT.  */
-	vhpt_flush ();
+	local_vhpt_flush ();
 
 	/* Then mTLB.  */
 	local_flush_tlb_all ();
@@ -255,7 +339,10 @@ static void flush_tlb_vhpt_all (struct domain *d)
 void domain_flush_tlb_vhpt(struct domain *d)
 {
 	/* Very heavy...  */
-	on_each_cpu ((void (*)(void *))flush_tlb_vhpt_all, d, 1, 1);
+	if (HAS_PERVCPU_VHPT(d) /* || VMX_DOMAIN(v) */)
+		on_each_cpu((void (*)(void *))local_flush_tlb_all, NULL, 1, 1);
+	else
+		on_each_cpu((void (*)(void *))flush_tlb_vhpt_all, d, 1, 1);
 	cpus_clear (d->domain_dirty_cpumask);
 }
 

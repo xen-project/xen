@@ -6,6 +6,7 @@ HAS_VGA  := y
 VALIDATE_VT	?= n
 no_warns ?= n
 xen_ia64_expose_p2m	?= y
+xen_ia64_pervcpu_vhpt	?= y
 
 ifneq ($(COMPILE_ARCH),$(TARGET_ARCH))
 CROSS_COMPILE ?= /usr/local/sp_env/v2.2.5/i686/bin/ia64-unknown-linux-
@@ -39,6 +40,9 @@ CFLAGS  += -DVALIDATE_VT
 endif
 ifeq ($(xen_ia64_expose_p2m),y)
 CFLAGS	+= -DCONFIG_XEN_IA64_EXPOSE_P2M
+endif
+ifeq ($(xen_ia64_pervcpu_vhpt),y)
+CFLAGS	+= -DCONFIG_XEN_IA64_PERVCPU_VHPT
 endif
 ifeq ($(no_warns),y)
 CFLAGS	+= -Wa,--fatal-warnings -Werror -Wno-uninitialized
