@@ -62,6 +62,7 @@ static void __netif_down(netif_t *netif)
 {
 	disable_irq(netif->irq);
 	netif_deschedule_work(netif);
+	del_timer_sync(&netif->credit_timeout);
 }
 
 static int net_open(struct net_device *dev)

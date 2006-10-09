@@ -1102,6 +1102,7 @@ static void net_tx_action(unsigned long unused)
 		i = netif->tx.req_cons;
 		rmb(); /* Ensure that we see the request before we copy it. */
 		memcpy(&txreq, RING_GET_REQUEST(&netif->tx, i), sizeof(txreq));
+
 		/* Credit-based scheduling. */
 		if (txreq.size > netif->remaining_credit) {
 			unsigned long now = jiffies;
@@ -1110,8 +1111,10 @@ static void net_tx_action(unsigned long unused)
 				msecs_to_jiffies(netif->credit_usec / 1000);
 
 			/* Timer could already be pending in rare cases. */
-			if (timer_pending(&netif->credit_timeout))
-				break;
+			if (timer_pending(&netif->credit_timeout)) {
+				netif_put(netif);
+				continue;
+			}
 
 			/* Passed the point where we can replenish credit? */
 			if (time_after_eq(now, next_credit)) {
@@ -1128,7 +1131,8 @@ static void net_tx_action(unsigned long unused)
 					tx_credit_callback;
 				__mod_timer(&netif->credit_timeout,
 					    next_credit);
-				break;
+				netif_put(netif);
+				continue;
 			}
 		}
 		netif->remaining_credit -= txreq.size;
