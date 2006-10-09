@@ -173,6 +173,9 @@ SECTIONS
   				 * kernel data
 				 */
 
+  .data.read_mostly : AT(ADDR(.data.read_mostly) - LOAD_OFFSET)
+        { *(.data.read_mostly) }
+
   .data.cacheline_aligned : AT(ADDR(.data.cacheline_aligned) - LOAD_OFFSET)
         { *(.data.cacheline_aligned) }
 

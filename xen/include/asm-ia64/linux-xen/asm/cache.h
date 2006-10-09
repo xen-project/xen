@@ -32,6 +32,6 @@
 #endif
 #endif
 
-#define __read_mostly
+#define __read_mostly __attribute__((__section__(".data.read_mostly")))
 
 #endif /* _ASM_IA64_CACHE_H */
