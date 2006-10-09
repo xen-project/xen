@@ -130,7 +130,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 
 		va = vma->vm_start;
 
-		for (i = 0; i < mmapcmd.num; i++, p++) {
+		for (i = 0; i < mmapcmd.num; i++) {
 			rc = -EFAULT;
 			if (copy_from_user(&msg, p, sizeof(msg)))
 				goto mmap_out;
