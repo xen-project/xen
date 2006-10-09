@@ -1250,7 +1250,7 @@ static int vmx_world_save(struct vcpu *v, struct vmx_assist_context *c)
 
 static int vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
 {
-    unsigned long mfn, old_cr4, old_base_mfn;
+    unsigned long mfn, old_base_mfn;
     int error = 0;
 
     error |= __vmwrite(GUEST_RIP, c->eip);
@@ -1304,9 +1304,7 @@ static int vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "switching to vmxassist. use phys table");
     else
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %x", c->cr3);
-    __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr3);
 
-    error |= __vmread(CR4_READ_SHADOW, &old_cr4);
     error |= __vmwrite(GUEST_CR4, (c->cr4 | VMX_CR4_HOST_MASK));
     error |= __vmwrite(CR4_READ_SHADOW, c->cr4);
 
@@ -1357,6 +1355,7 @@ static int vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
     error |= __vmwrite(GUEST_LDTR_AR_BYTES, c->ldtr_arbytes.bytes);
 
     shadow_update_paging_modes(v);
+    __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr3);
 
     return !error;
 }
@@ -1572,8 +1571,8 @@ static int vmx_set_cr0(unsigned long value)
     }
     else if ( (value & (X86_CR0_PE | X86_CR0_PG)) == X86_CR0_PE )
     {
-        __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr3);
         shadow_update_paging_modes(v);
+        __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr3);
     }
 
     return 1;
