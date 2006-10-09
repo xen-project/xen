@@ -39,7 +39,7 @@ seqlock_t xtime_lock __cacheline_aligned_in_smp = SEQLOCK_UNLOCKED;
 #define TIME_KEEPER_ID  0
 unsigned long domain0_ready = 0;
 static s_time_t        stime_irq = 0x0;       /* System time at last 'time update' */
-unsigned long itc_scale, ns_scale;
+unsigned long itc_scale __read_mostly, ns_scale __read_mostly;
 unsigned long itc_at_irq;
 
 /* We don't expect an absolute cycle value here, since then no way

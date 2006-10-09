@@ -38,13 +38,13 @@ boolean_param("contig_mem", opt_contig_mem);
 #define opt_contig_mem 1
 #endif
 
-struct page_info *frame_table;
+struct page_info *frame_table __read_mostly;
 unsigned long max_page;
 
 /*
  * Set up the page tables.
  */
-volatile unsigned long *mpt_table;
+volatile unsigned long *mpt_table __read_mostly;
 
 void
 paging_init (void)

@@ -82,7 +82,7 @@ unsigned int opt_xenheap_megabytes = XENHEAP_DEFAULT_MB;
 unsigned long xenheap_size = XENHEAP_DEFAULT_SIZE;
 extern long running_on_sim;
 unsigned long xen_pstart;
-void *xen_heap_start;
+void *xen_heap_start __read_mostly;
 
 static int
 xen_count_pages(u64 start, u64 end, void *arg)
