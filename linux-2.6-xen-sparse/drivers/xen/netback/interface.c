@@ -153,6 +153,7 @@ netif_t *netif_alloc(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN])
 	netif->credit_bytes = netif->remaining_credit = ~0UL;
 	netif->credit_usec  = 0UL;
 	init_timer(&netif->credit_timeout);
+	netif->credit_timeout.expires = jiffies;
 
 	dev->hard_start_xmit = netif_be_start_xmit;
 	dev->get_stats       = netif_be_get_stats;

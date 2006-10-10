@@ -793,10 +793,27 @@ void netif_deschedule_work(netif_t *netif)
 }
 
 
+static void tx_add_credit(netif_t *netif)
+{
+	unsigned long max_burst;
+
+	/*
+	 * Allow a burst big enough to transmit a jumbo packet of up to 128kB.
+	 * Otherwise the interface can seize up due to insufficient credit.
+	 */
+	max_burst = RING_GET_REQUEST(&netif->tx, netif->tx.req_cons)->size;
+	max_burst = min(max_burst, 131072UL);
+	max_burst = max(max_burst, netif->credit_bytes);
+
+	netif->remaining_credit = min(netif->remaining_credit +
+				      netif->credit_bytes,
+				      max_burst);
+}
+
 static void tx_credit_callback(unsigned long data)
 {
 	netif_t *netif = (netif_t *)data;
-	netif->remaining_credit = netif->credit_bytes;
+	tx_add_credit(netif);
 	netif_schedule_work(netif);
 }
 
@@ -1119,12 +1136,11 @@ static void net_tx_action(unsigned long unused)
 			/* Passed the point where we can replenish credit? */
 			if (time_after_eq(now, next_credit)) {
 				netif->credit_timeout.expires = now;
-				netif->remaining_credit = netif->credit_bytes;
+				tx_add_credit(netif);
 			}
 
 			/* Still too big to send right now? Set a callback. */
 			if (txreq.size > netif->remaining_credit) {
-				netif->remaining_credit = 0;
 				netif->credit_timeout.data     =
 					(unsigned long)netif;
 				netif->credit_timeout.function =
