@@ -412,7 +412,18 @@ ulong pfn2mfn(struct domain *d, ulong pfn, int *type)
                 }
             }
         }
-        BUG_ON(t != PFN_TYPE_NONE && page_get_owner(mfn_to_page(mfn)) != d);
+#ifdef DEBUG
+        if (t != PFN_TYPE_NONE &&
+            (d->domain_flags & DOMF_dying) &&
+            page_get_owner(mfn_to_page(mfn)) != d) {
+            printk("%s: page type: %d owner Dom[%d]:%p expected Dom[%d]:%p\n",
+                   __func__, t,
+                   page_get_owner(mfn_to_page(mfn))->domain_id,
+                   page_get_owner(mfn_to_page(mfn)),
+                   d->domain_id, d);
+            BUG();
+        }
+#endif
     }
 
     if (t == PFN_TYPE_NONE) {
