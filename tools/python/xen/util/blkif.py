@@ -63,7 +63,7 @@ def blkdev_uname_to_file(uname):
     """Take a blkdev uname and return the corresponding filename."""
     fn = None
     if uname.find(":") != -1:
-        (typ, fn) = uname.split(":")
+        (typ, fn) = uname.split(":", 1)
         if typ == "phy" and not fn.startswith("/"):
             fn = "/dev/%s" %(fn,)
         if typ == "tap":
