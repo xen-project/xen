@@ -111,12 +111,20 @@ static void __init do_initcalls(void)
     }
 }
 
-static void hw_probe_attn(unsigned char key, struct cpu_user_regs *regs)
+
+void noinline __attn(void)
 {
     /* To continue the probe will step over the ATTN instruction.  The
      * NOP is there to make sure there is something sane to "step
      * over" to. */
-    asm volatile(".long 0x00000200; nop");
+    console_start_sync();
+    asm volatile("attn");
+    console_end_sync();
+}
+
+static void hw_probe_attn(unsigned char key, struct cpu_user_regs *regs)
+{
+    __attn();
 }
 
 static void percpu_init_areas(void)
