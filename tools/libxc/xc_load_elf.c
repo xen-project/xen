@@ -364,7 +364,7 @@ static int parseelfimage(const char *image,
         if ( p != NULL && strncmp(p, "yes", 3) == 0 )
         {
             dsi->pae_kernel = PAEKERN_yes;
-            if ( !strncmp(p+4, "[extended-cr3]", 14) )
+            if ( !strncmp(p+3, "[extended-cr3]", 14) )
                 dsi->pae_kernel = PAEKERN_extended_cr3;
         }
     }
