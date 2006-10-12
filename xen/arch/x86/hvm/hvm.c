@@ -653,15 +653,15 @@ int hvm_bringup_ap(int vcpuid, int trampoline_vector)
     if ( rc != 0 )
     {
         DPRINTK("AP %d bringup failed in boot_vcpu %x.\n", vcpuid, rc);
-        return rc;
+        goto out;
     }
 
     if ( test_and_clear_bit(_VCPUF_down, &d->vcpu[vcpuid]->vcpu_flags) )
         vcpu_wake(d->vcpu[vcpuid]);
     DPRINTK("AP %d bringup suceeded.\n", vcpuid);
 
+ out:
     xfree(ctxt);
-
     return rc;
 }
 
