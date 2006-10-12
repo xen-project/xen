@@ -92,7 +92,6 @@ write_smbios_tables(void *start,
 	unsigned cpu_num, nr_structs = 0, max_struct_size = 0;
 	char *p, *q;
 	char cpu_manufacturer[15];
-	size_t structure_table_length;
 
 	get_cpu_manufacturer(cpu_manufacturer, 15);
 
