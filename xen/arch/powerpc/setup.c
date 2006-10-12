@@ -118,7 +118,7 @@ void noinline __attn(void)
      * NOP is there to make sure there is something sane to "step
      * over" to. */
     console_start_sync();
-    asm volatile("attn");
+    asm volatile(".long 0x200;nop");
     console_end_sync();
 }
 

@@ -587,7 +587,7 @@ spin_start:
     b .
     /* Find our index in the array of processor_area struct pointers.  */
 2:  LOADADDR(r14, global_cpu_table)
-    muli r15, r3, 8
+    mulli r15, r3, 8
     add r14, r14, r15
     /* Spin until the pointer for our processor goes valid.  */
 1:  ld r15, 0(r14)
