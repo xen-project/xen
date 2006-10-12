@@ -120,11 +120,9 @@ $(TARGET)-syms: start.o $(ALL_OBJS) xen-syms.o xen.lds
 	$(CC) $(CFLAGS) $(TARGET_OPTS) xen-syms.o -o $@
 
 # our firmware only loads 32-bit ELF files
+OCPYFLAGS := --input-target=elf64-powerpc --output-target=elf32-powerpc
 $(TARGET): $(TARGET)-syms
-	$(CROSS_COMPILE)objcopy \
-		--input-target=elf64-powerpc \
-		--output-target=elf32-powerpc \
-		$^ $@
+	$(CROSS_COMPILE)objcopy $(OCPYFLAGS) $^ $@
 
 asm-offsets.s: $(TARGET_SUBARCH)/asm-offsets.c $(HDRS)
 	$(CC) $(CFLAGS) -S -o $@ $<
