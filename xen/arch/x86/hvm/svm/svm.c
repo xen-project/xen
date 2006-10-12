@@ -840,6 +840,13 @@ int start_svm(void)
     
     if (!(test_bit(X86_FEATURE_SVME, &boot_cpu_data.x86_capability)))
         return 0;
+
+    /* check whether SVM feature is disabled in BIOS */
+    rdmsr(0xC0010114, eax, edx);
+    if ( eax & 0x00000010 ) {
+        printk("AMD SVM Extension is disabled in BIOS.\n");
+        return 0;
+    }
     
     if (!(hsa[cpu] = alloc_host_save_area()))
         return 0;
