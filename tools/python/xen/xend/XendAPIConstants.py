@@ -71,5 +71,5 @@ XEN_API_BOOT_TYPE = [
 ]
 
 XEN_API_VBD_MODE = ['RO', 'RW']
-
+XEN_API_VDI_TYPE = ['system', 'user', 'ephemeral']
 XEN_API_DRIVER_TYPE = ['ioemu', 'paravirtualised']

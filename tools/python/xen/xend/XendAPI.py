@@ -171,6 +171,51 @@ def valid_vif(func):
         
     return check_vif_ref
 
+
+def valid_vdi(func):
+    """Decorator to verify if vdi_ref is valid before calling
+    method.
+
+    @param func: function with params: (self, session, vdi_ref)
+    @rtype: callable object
+    """
+    def check_vdi_ref(self, session, vdi_ref, *args, **kwargs):
+        xennode = XendNode.instance()
+        if type(vdi_ref) == type(str()) and \
+               xennode.get_sr().is_valid_vdi(vdi_ref):
+            return func(self, session, vdi_ref, *args, **kwargs)
+        else:
+            return {'Status': 'Failure',
+                    'ErrorDescription': XEND_ERROR_VDI_INVALID}
+
+    # make sure we keep the 'api' attribute
+    if hasattr(func, 'api'):
+        check_vdi_ref.api = func.api
+        
+    return check_vdi_ref
+
+def valid_sr(func):
+    """Decorator to verify if sr_ref is valid before calling
+    method.
+
+    @param func: function with params: (self, session, sr_ref)
+    @rtype: callable object
+    """
+    def check_sr_ref(self, session, sr_ref, *args, **kwargs):
+        xennode = XendNode.instance()
+        if type(sr_ref) == type(str()) and \
+               xennode.get_sr().uuid == sr_ref:
+            return func(self, session, sr_ref, *args, **kwargs)
+        else:
+            return {'Status': 'Failure',
+                    'ErrorDescription': XEND_ERROR_SR_INVALID}
+
+    # make sure we keep the 'api' attribute
+    if hasattr(func, 'api'):
+        check_sr_ref.api = func.api
+        
+    return check_sr_ref
+
 def do_vm_func(fn_name, vm_ref, *args):
     """Helper wrapper func to abstract away from repeative code.
 
@@ -212,7 +257,9 @@ class XendAPI:
             'host_cpu': (valid_host_cpu, session_required),
             'VM': (valid_vm, session_required),
             'VBD': (valid_vbd, session_required),
-            'VIF': (valid_vif, session_required)}
+            'VIF': (valid_vif, session_required),
+            'VDI': (valid_vdi, session_required),
+            'SR':  (valid_sr, session_required)}
         
         # Cheat methods
         # -------------
@@ -849,8 +896,9 @@ class XendAPI:
         xendom = XendDomain.instance()
         dom = xendom.domain_lookup_nr(label)
         if dom:
-            return xen_api_success(dom.get_uuid())
+            return xen_api_success([dom.get_uuid()])
         return xen_api_error(XEND_ERROR_VM_INVALID)
+    
     def vm_create(self, session, vm_struct):
         xendom = XendDomain.instance()
         domuuid = xendom.create_domain(vm_struct)
@@ -1053,9 +1101,212 @@ class XendAPI:
             return xen_api_error(XEND_ERROR_DOMAIN_INVALID)
 
 
+    # Xen API: Class VDI
+    # ----------------------------------------------------------------
+    VDI_attr_ro = ['VBDs',
+                   'physical_utilisation',
+                   'sector_size',
+                   'type',
+                   'parent',
+                   'children']
+    VDI_attr_rw = ['name_label',
+                   'name_description',
+                   'SR',
+                   'virtual_size',
+                   'sharable',
+                   'read_only']
+    VDI_attr_inst = VDI_attr_ro + VDI_attr_rw
+
+    VDI_methods = ['snapshot']
+    VDI_funcs = ['get_by_label']
+    def vdi_get_vbds(self, session, vdi_ref):
+        return xen_api_todo()
+    def vdi_get_physical_utilisation(self, session, vdi_ref):
+        return xen_api_todo()
+    def vdi_get_sector_size(self, session, vdi_ref):
+        return xen_api_todo()
+    def vdi_get_type(self, session, vdi_ref):
+        return xen_api_todo()
+    def vdi_get_parent(self, session, vdi_ref):
+        return xen_api_todo()
+    def vdi_get_children(self, session, vdi_ref):
+        return xen_api_todo()
+    def vdi_get_name_label(self, session, vdi_ref):
+        return xen_api_todo()
+    def vdi_get_name_description(self, session, vdi_ref):
+        return xen_api_todo()
+    def vdi_get_sr(self, session, vdi_ref):
+        return xen_api_todo()
+    def vdi_get_virtual_size(self, session, vdi_ref):
+        return xen_api_todo()
+    def vdi_get_sharable(self, session, vdi_ref):
+        return xen_api_todo()
+    def vdi_get_read_only(self, session, vdi_ref):
+        return xen_api_todo()
+    def vdi_get_uuid(self, session, vdi_ref):
+        return xen_api_todo()
+    def vdi_set_name_label(self, session, vdi_ref, value):
+        return xen_api_todo()
+    def vdi_set_name_description(self, session, vdi_ref, value):
+        return xen_api_todo()
+    def vdi_set_sr(self, session, vdi_ref, value):
+        return xen_api_todo()
+    def vdi_set_virtual_size(self, session, vdi_ref, value):
+        return xen_api_todo()
+    def vdi_set_sharable(self, session, vdi_ref, value):
+        return xen_api_todo()
+    def vdi_set_read_only(self, session, vdi_ref, value):
+        return xen_api_todo()
+    def vdi_snapshot(self, session, vdi_ref):
+        return xen_api_todo()
+    def vdi_destroy(self, session, vdi_ref):
+        return xen_api_todo()
+    def vdi_to_xml(self, session, vdi_ref):
+        return xen_api_todo()
+    def vdi_get_record(self, session, vdi_ref):
+        return xen_api_todo()
+    def vdi_create(self, session):
+        return xen_api_todo()
+    def vdi_get_by_uuid(self, session):
+        return xen_api_todo()
+    def vdi_get_all(self, session):
+        return xen_api_todo()
+    def vdi_get_by_label(self, session):
+        return xen_api_todo()
+
     # Xen API: Class SR
     # ----------------------------------------------------------------
-    # NOT IMPLEMENTED
-
-
+    SR_attr_ro = ['VDIs',
+                  'virtual_allocation',
+                  'physical_utilisation',
+                  'physical_size',
+                  'type',
+                  'location']
     
+    SR_attr_rw = ['name_label',
+                  'name_description']
+    
+    SR_attr_inst = ['physical_size',
+                    'type',
+                    'location',
+                    'name_label',
+                    'name_description']
+    
+    SR_methods = ['clone']
+    SR_funcs = ['get_by_label']
+
+    # Class Functions
+    def sr_get_all(self, session):
+        sr = XendNode.instance().get_sr()
+        return xen_api_success([sr.uuid])
+
+    def sr_get_by_label(self, session, label):
+        sr = XendNode.instance().get_sr()
+        if sr.name_label != label:
+            return xen_api_error(XEND_ERROR_SR_INVALID)
+        return xen_api_success([sr.uuid])
+
+    def sr_create(self, session):
+        return xen_api_error(XEND_ERROR_UNSUPPORTED)
+
+    def sr_get_by_uuid(self, session):
+        return xen_api_success(XendNode.instance().get_sr().uuid)
+
+    # Class Methods
+    def sr_clone(self, session, sr_ref):
+        return xen_api_error(XEND_ERROR_UNSUPPORTED)
+    def sr_destroy(self, session, sr_ref):
+        return xen_api_error(XEND_ERROR_UNSUPPORTED)
+    
+    def sr_to_xml(self, session, sr_ref):
+        return xen_api_todo()
+    
+    def sr_get_record(self, session, sr_ref):
+        sr = XendNode.instance().get_sr()
+        return xen_api_success({
+            'uuid': sr.uuid,
+            'name_label': sr.name_label,
+            'name_description': sr.name_description,
+            'VDIs': sr.list_images(),
+            'virtual_allocation': sr.used_space_bytes(),
+            'physical_utilisation': sr.used_space_bytes(),
+            'physical_size': sr.total_space_bytes(),
+            'type': sr.type,
+            'location': sr.location
+            })
+
+    # Attribute acceess
+    def sr_get_vdis(self, session, sr_ref):
+        sr = XendNode.instance().get_sr()
+        return xen_api_success(sr.list_images())
+
+    def sr_get_virtual_allocation(self, session, sr_ref):
+        return sr.used_space_bytes()
+
+    def sr_get_physical_utilisation(self, session, sr_ref):
+        return sr.used_space_bytes()
+
+    def sr_get_physical_size(self, session, sr_ref):
+        return sr.total_space_bytes()
+    
+    def sr_get_type(self, session, sr_ref):
+        sr = XendNode.instance().get_sr()
+        return xen_api_success(sr.type)
+
+    def sr_get_location(self, session, sr_ref):
+        sr = XendNode.instance().get_sr()
+        return xen_api_success(sr.location)
+
+    def sr_get_name_label(self, session, sr_ref):
+        sr = XendNode.instance().get_sr()
+        return xen_api_success(sr.name_label)      
+    
+    def sr_get_name_description(self, session, sr_ref):
+        sr = XendNode.instance().get_sr()
+        return xen_api_success(sr.name_description)        
+
+    def sr_set_name_label(self, session, sr_ref, value):
+        sr = XendNode.instance().get_sr()
+        sr.name_label = value
+        return xen_api_success_void()
+    
+    def sr_set_name_description(self, session, sr_ref, value):
+        sr = XendNode.instance().get_sr()
+        sr.name_description = value
+        return xen_api_success_void()
+
+#   
+# Auto generate some stubs based on XendAPI introspection
+#
+if __name__ == "__main__":
+    def output(line):
+        print '    ' + line
+    
+    classes = ['VDI', 'SR']
+    for cls in classes:
+        ro_attrs = getattr(XendAPI, '%s_attr_ro' % cls, [])
+        rw_attrs = getattr(XendAPI, '%s_attr_rw' % cls, [])
+        methods  = getattr(XendAPI, '%s_methods' % cls, [])
+        funcs    = getattr(XendAPI, '%s_funcs' % cls, [])
+
+        ref = '%s_ref' % cls.lower()
+
+        for attr_name in ro_attrs + rw_attrs + XendAPI.Base_attr_ro:
+            getter_name = '%s_get_%s' % (cls.lower(), attr_name.lower())
+            output('def %s(self, session, %s):' % (getter_name, ref))
+            output('    return xen_api_todo()')
+
+        for attr_name in rw_attrs + XendAPI.Base_attr_rw:
+            setter_name = '%s_set_%s' % (cls.lower(), attr_name.lower())
+            output('def %s(self, session, %s, value):' % (setter_name, ref))
+            output('    return xen_api_todo()')
+
+        for method_name in methods + XendAPI.Base_methods:
+            method_full_name = '%s_%s' % (cls.lower(),method_name.lower())
+            output('def %s(self, session, %s):' % (method_full_name, ref))
+            output('    return xen_api_todo()')
+
+        for func_name in funcs + XendAPI.Base_funcs:
+            func_full_name = '%s_%s' % (cls.lower(), func_name.lower())
+            output('def %s(self, session):' % func_full_name)
+            output('    return xen_api_todo()')

@@ -68,6 +68,13 @@ class XendNode:
         return (cpu_ref in self.cpus)
 
     #
+    # Storage Repo
+    #
+
+    def get_sr(self):
+        return self.sr
+
+    #
     # Host Functions
     #
 

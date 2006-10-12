@@ -315,6 +315,8 @@ class XendStorageRepository:
     def total_space_bytes(self):
         return self.total_space_kb() * KB
 
+    def is_valid_vdi(self, vdi_uuid):
+        return (vdi_uuid in self.images)
 
 # remove everything below this line!!
 if __name__ == "__main__":
@@ -324,4 +326,7 @@ if __name__ == "__main__":
     print xsr.create_image(10 * 1024)
     print 'Delete all images:'
     for image_uuid in xsr.list_images():
+        print image_uuid,
         xsr.destroy_image(image_uuid)
+
+    print

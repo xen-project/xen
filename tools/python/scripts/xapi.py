@@ -96,6 +96,13 @@ def _read_python_cfg(filename):
     execfile(filename, {}, cfg)
     return cfg
 
+def resolve_vm(server, session, vm_name):
+    vm_uuid = execute(server.VM.get_by_label, session, vm_name)
+    if not vm_uuid:
+        return None
+    else:
+        return vm_uuid[0]
+
 #
 # Actual commands
 #
@@ -116,7 +123,7 @@ def xapi_vm_uuid(*args):
         raise OptionError("No domain name specified")
     
     server, session = _connect()
-    vm_uuid = execute(server.VM.get_by_label, session, args[0])
+    vm_uuid = resolve_vm(server, session, args[0])
     print vm_uuid
 
 def xapi_vm_name(*args):
@@ -177,7 +184,7 @@ def xapi_vm_delete(*args):
         raise OptionError("No domain name specified.")
     
     server, session = _connect()
-    vm_uuid = execute(server.VM.get_by_label, session, args[0])
+    vm_uuid = resolve_vm(server, session, args[0])    
     print 'Destroying VM %s (%s)' % (args[0], vm_uuid)
     success = execute(server.VM.destroy, session, vm_uuid)
     print 'Done.'
@@ -198,7 +205,7 @@ def xapi_vm_shutdown(*args):
         raise OptionError("No Domain name specified.")
 
     server, session = _connect()
-    vm_uuid = execute(server.VM.get_by_label, session, args[0])
+    vm_uuid = resolve_vm(server, session, args[0])
     print 'Shutting down VM %s (%s)' % (args[0], vm_uuid)
     success = execute(server.VM.clean_shutdown, session, vm_uuid)
     print 'Done.'
@@ -208,7 +215,7 @@ def xapi_vm_destroy(*args):
         raise OptionError("No Domain name specified.")
 
     server, session = _connect()
-    vm_uuid = execute(server.VM.get_by_label, session, args[0])
+    vm_uuid = resolve_vm(server, session, args[0])
     print 'Shutting down VM with force %s (%s)' % (args[0], vm_uuid)
     success = execute(server.VM.hard_shutdown, session, vm_uuid)
     print 'Done.'    
@@ -222,7 +229,7 @@ def xapi_vbd_create(*args):
     cfg = _read_python_cfg(filename)
     print 'Creating VBD from %s ..' % filename
     server, session = _connect()
-    vm_uuid = execute(server.VM.get_by_label, session, domname)
+    vm_uuid = resolve_vm(server, session, domname)
     cfg['VM'] = vm_uuid
     vbd_uuid = execute(server.VBD.create, session, cfg)
     print 'Done. (%s)' % vbd_uuid
@@ -236,7 +243,7 @@ def xapi_vif_create(*args):
     cfg = _read_python_cfg(filename)
     print 'Creating VIF from %s ..' % filename
     server, session = _connect()
-    vm_uuid = execute(server.VM.get_by_label, session, domname)
+    vm_uuid = resolve_vm(server, session, domname)
     cfg['VM'] = vm_uuid
     vif_uuid = execute(server.VIF.create, session, cfg)
     print 'Done. (%s)' % vif_uuid
