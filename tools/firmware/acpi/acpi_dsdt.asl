@@ -115,20 +115,15 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
                         0x0000,
                         0xF300)
 
-                /* reserve what device model consumed for PCI VGA device        */
+                /* reserve memory for pci devices */
 
                     DWordMemory (ResourceConsumer, PosDecode, MinFixed, MaxFixed, Cacheable, ReadWrite,
                         0x00000000,
                         0xF0000000,
-                        0xF1FFFFFF,
+                        0xF4FFFFFF,
                         0x00000000,
-                        0x02000000)
-                    DWordMemory (ResourceConsumer, PosDecode, MinFixed, MaxFixed, Cacheable, ReadWrite,
-                        0x00000000,
-                        0xF2000000,
-                        0xF2000FFF,
-                        0x00000000,
-                        0x00001000)
+                        0x05000000)
+
                 })
                 Return (PRT0)
             }
@@ -299,38 +294,43 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
                Return (PRTP)  
                } // end _PRT
 
-        Name(PRTP, Package(){
-                        Package(){0x0000ffff, 0, \_SB.PCI0.LNKA, 0}, // Slot 1, INTA
-                        Package(){0x0000ffff, 1, \_SB.PCI0.LNKB, 0}, // Slot 1, INTB
-                        Package(){0x0000ffff, 2, \_SB.PCI0.LNKC, 0}, // Slot 1, INTC
-                        Package(){0x0000ffff, 3, \_SB.PCI0.LNKD, 0}, // Slot 1, INTD
+        Name(PRTP, Package() {
+                        // Slot 1, INTA - INTD
+                        Package(){0x0000ffff, 0, \_SB.PCI0.LNKA, 0},
+                        Package(){0x0000ffff, 1, \_SB.PCI0.LNKB, 0},
+                        Package(){0x0000ffff, 2, \_SB.PCI0.LNKC, 0},
+                        Package(){0x0000ffff, 3, \_SB.PCI0.LNKD, 0},
 
-                        Package(){0x0001ffff, 0, \_SB.PCI0.LNKB, 0}, // Slot 2, INTB
-                        Package(){0x0001ffff, 1, \_SB.PCI0.LNKC, 0}, // Slot 2, INTC
-                        Package(){0x0001ffff, 2, \_SB.PCI0.LNKD, 0}, // Slot 2, INTD
-                        Package(){0x0001ffff, 3, \_SB.PCI0.LNKA, 0}, // Slot 2, INTA
+                        // Slot 2, INTA - INTD
+                        Package(){0x0001ffff, 0, \_SB.PCI0.LNKB, 0},
+                        Package(){0x0001ffff, 1, \_SB.PCI0.LNKC, 0},
+                        Package(){0x0001ffff, 2, \_SB.PCI0.LNKD, 0},
+                        Package(){0x0001ffff, 3, \_SB.PCI0.LNKA, 0},
                         
-                        Package(){0x0002ffff, 0, \_SB.PCI0.LNKC, 0}, // Slot 3, INTC
-                        Package(){0x0002ffff, 1, \_SB.PCI0.LNKD, 0}, // Slot 3, INTD
-                        Package(){0x0002ffff, 2, \_SB.PCI0.LNKA, 0}, // Slot 3, INTA
-                        Package(){0x0002ffff, 3, \_SB.PCI0.LNKB, 0}, // Slot 3, INTB
+                        // Slot 3, INTA - INTD
+                        Package(){0x0002ffff, 0, \_SB.PCI0.LNKC, 0},
+                        Package(){0x0002ffff, 1, \_SB.PCI0.LNKD, 0},
+                        Package(){0x0002ffff, 2, \_SB.PCI0.LNKA, 0},
+                        Package(){0x0002ffff, 3, \_SB.PCI0.LNKB, 0},
                         
-                        Package(){0x0003ffff, 0, \_SB.PCI0.LNKD, 0}, // Slot 2, INTD
-                        Package(){0x0003ffff, 1, \_SB.PCI0.LNKA, 0}, // Slot 2, INTA
-                        Package(){0x0003ffff, 2, \_SB.PCI0.LNKB, 0}, // Slot 2, INTB
-                        Package(){0x0003ffff, 3, \_SB.PCI0.LNKC, 0}, // Slot 2, INTC
+                        // Slot 4, INTA - INTD
+                        Package(){0x0003ffff, 0, \_SB.PCI0.LNKD, 0},
+                        Package(){0x0003ffff, 1, \_SB.PCI0.LNKA, 0},
+                        Package(){0x0003ffff, 2, \_SB.PCI0.LNKB, 0},
+                        Package(){0x0003ffff, 3, \_SB.PCI0.LNKC, 0},
                         
+                        // Slot 5, INTA - INTD
+                        Package(){0x0004ffff, 0, \_SB.PCI0.LNKA, 0},
+                        Package(){0x0004ffff, 1, \_SB.PCI0.LNKB, 0},
+                        Package(){0x0004ffff, 2, \_SB.PCI0.LNKC, 0},
+                        Package(){0x0004ffff, 3, \_SB.PCI0.LNKD, 0},
                         }
             )
         Name(PRTA, Package(){
-                        Package(){0x0001ffff, 0, 0, 5}, // Device 1, INTA
-
+                        Package(){0x0001ffff, 0, 0, 5},  // Device 1, INTA
                         Package(){0x0002ffff, 0, 0, 7},  // Device 2, INTA
-                       
                         Package(){0x0003ffff, 0, 0, 10}, // Device 3, INTA
-
-                        Package(){0x0004ffff, 0, 0, 11},  // Device 4, INTA                                
-                        
+                        Package(){0x0004ffff, 0, 0, 11}, // Device 4, INTA
                         }
             )
             
