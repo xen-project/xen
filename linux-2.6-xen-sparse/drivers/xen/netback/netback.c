@@ -78,7 +78,7 @@ static inline unsigned long idx_to_kaddr(unsigned int idx)
 
 #define PKT_PROT_LEN 64
 
-static struct {
+static struct pending_tx_info {
 	netif_tx_request_t req;
 	netif_t *netif;
 } pending_tx_info[MAX_PENDING_REQS];
@@ -374,14 +374,22 @@ static u16 netbk_gop_frag(netif_t *netif, struct netbk_rx_meta *meta,
 		   flipped. */
 		meta->copy = 1;
 		copy_gop = npo->copy + npo->copy_prod++;
-		copy_gop->source.domid = DOMID_SELF;
+		copy_gop->flags = GNTCOPY_dest_gref;
+		if (PageForeign(page)) {
+			struct pending_tx_info *src_pend =
+				&pending_tx_info[page->index];
+			copy_gop->source.domid = src_pend->netif->domid;
+			copy_gop->source.u.ref = src_pend->req.gref;
+			copy_gop->flags |= GNTCOPY_source_gref;
+		} else {
+			copy_gop->source.domid = DOMID_SELF;
+			copy_gop->source.u.gmfn = old_mfn;
+		}
 		copy_gop->source.offset = offset;
-		copy_gop->source.u.gmfn = old_mfn;
 		copy_gop->dest.domid = netif->domid;
 		copy_gop->dest.offset = 0;
 		copy_gop->dest.u.ref = req->gref;
 		copy_gop->len = size;
-		copy_gop->flags = GNTCOPY_dest_gref;
 	} else {
 		meta->copy = 0;
 		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
