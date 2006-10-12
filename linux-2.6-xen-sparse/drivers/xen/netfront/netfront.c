@@ -1120,6 +1120,7 @@ static int xennet_get_responses(struct netfront_info *np,
 			if (net_ratelimit())
 				WPRINTK("rx->offset: %x, size: %u\n",
 					rx->offset, rx->status);
+			xennet_move_rx_slot(np, skb, ref);
 			err = -EINVAL;
 			goto next;
 		}
@@ -1130,7 +1131,8 @@ static int xennet_get_responses(struct netfront_info *np,
 		 * situation to the system controller to reboot the backed.
 		 */
 		if (ref == GRANT_INVALID_REF) {
-			WPRINTK("Bad rx response id %d.\n", rx->id);
+			if (net_ratelimit())
+				WPRINTK("Bad rx response id %d.\n", rx->id);
 			err = -EINVAL;
 			goto next;
 		}
@@ -1201,6 +1203,9 @@ next:
 			WPRINTK("Too many frags\n");
 		err = -E2BIG;
 	}
+
+	if (unlikely(err))
+		np->rx.rsp_cons = cons + frags;
 
 	*pages_flipped_p = pages_flipped;
 
@@ -1306,9 +1311,9 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 	rp = np->rx.sring->rsp_prod;
 	rmb(); /* Ensure we see queued responses up to 'rp'. */
 
-	for (i = np->rx.rsp_cons, work_done = 0;
-	     (i != rp) && (work_done < budget);
-	     np->rx.rsp_cons = ++i, work_done++) {
+	i = np->rx.rsp_cons;
+	work_done = 0;
+	while ((i != rp) && (work_done < budget)) {
 		memcpy(rx, RING_GET_RESPONSE(&np->rx, i), sizeof(*rx));
 		memset(extras, 0, sizeof(extras));
 
@@ -1316,12 +1321,11 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 					   &pages_flipped);
 
 		if (unlikely(err)) {
-err:
-			i = np->rx.rsp_cons + skb_queue_len(&tmpq) - 1;
-			work_done--;
+err:	
 			while ((skb = __skb_dequeue(&tmpq)))
 				__skb_queue_tail(&errq, skb);
 			np->stats.rx_errors++;
+			i = np->rx.rsp_cons;
 			continue;
 		}
 
@@ -1333,6 +1337,7 @@ err:
 
 			if (unlikely(xennet_set_skb_gso(skb, gso))) {
 				__skb_queue_head(&tmpq, skb);
+				np->rx.rsp_cons += skb_queue_len(&tmpq);
 				goto err;
 			}
 		}
@@ -1396,6 +1401,9 @@ err:
 		np->stats.rx_bytes += skb->len;
 
 		__skb_queue_tail(&rxq, skb);
+
+		np->rx.rsp_cons = ++i;
+		work_done++;
 	}
 
 	if (pages_flipped) {
