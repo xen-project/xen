@@ -139,7 +139,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 
 			/* Do not allow range to wrap the address space. */
 			rc = -EINVAL;
-			if ((msg.npages > (INT_MAX >> PAGE_SHIFT)) ||
+			if ((msg.npages > (LONG_MAX >> PAGE_SHIFT)) ||
 			    ((unsigned long)(msg.npages << PAGE_SHIFT) >= -va))
 				goto mmap_out;
 
@@ -183,7 +183,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		if (copy_from_user(&m, udata, sizeof(m)))
 			return -EFAULT;
 
-		if ((m.num <= 0) || (m.num > (INT_MAX >> PAGE_SHIFT)))
+		if ((m.num <= 0) || (m.num > (LONG_MAX >> PAGE_SHIFT)))
 			return -EINVAL;
 
 		down_read(&mm->mmap_sem);
@@ -191,7 +191,8 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		vma = find_vma(mm, m.addr);
 		if (!vma ||
 		    (m.addr != vma->vm_start) ||
-		    ((m.addr + (m.num<<PAGE_SHIFT)) != vma->vm_end) ||
+		    ((m.addr + ((unsigned long)m.num<<PAGE_SHIFT)) !=
+		     vma->vm_end) ||
 		    !privcmd_enforce_singleshot_mapping(vma)) {
 			up_read(&mm->mmap_sem);
 			return -EINVAL;
