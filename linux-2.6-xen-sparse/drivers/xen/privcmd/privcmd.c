@@ -35,6 +35,15 @@
 static struct proc_dir_entry *privcmd_intf;
 static struct proc_dir_entry *capabilities_intf;
 
+static int privcmd_enforce_singleshot_mapping(struct vm_area_struct *vma)
+{
+#ifndef HAVE_ARCH_PRIVCMD_MMAP
+	if (xchg(&vma->vm_private_data, (void *)1) != NULL)
+		return 0;
+#endif
+	return 1;
+}
+
 static int privcmd_ioctl(struct inode *inode, struct file *file,
 			 unsigned int cmd, unsigned long data)
 {
@@ -122,11 +131,9 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 
 		vma = find_vma(mm, msg.va);
 		rc = -EINVAL;
-		if (!vma || (msg.va != vma->vm_start) || vma->vm_private_data)
+		if (!vma || (msg.va != vma->vm_start) ||
+		    !privcmd_enforce_singleshot_mapping(vma))
 			goto mmap_out;
-
-		/* Mapping is a one-shot operation per vma. */
-		vma->vm_private_data = (void *)1;
 
 		va = vma->vm_start;
 
@@ -190,13 +197,10 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		if (!vma ||
 		    (m.addr != vma->vm_start) ||
 		    ((m.addr + (m.num<<PAGE_SHIFT)) != vma->vm_end) ||
-		    vma->vm_private_data) {
+		    !privcmd_enforce_singleshot_mapping(vma)) {
 			up_read(&mm->mmap_sem);
 			return -EINVAL;
 		}
-
-		/* Mapping is a one-shot operation per vma. */
-		vma->vm_private_data = (void *)1;
 
 		p = m.arr;
 		addr = m.addr;
