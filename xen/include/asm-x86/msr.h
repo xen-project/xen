@@ -302,8 +302,14 @@ static inline void wrmsrl(unsigned int msr, __u64 val)
 
 #define MSR_K8_TOP_MEM1			0xC001001A
 #define MSR_K8_TOP_MEM2			0xC001001D
+#define MSR_K8_SYSCFG			0xC0010010
+#define MSR_K8_HWCR			0xC0010015
+#define MSR_K8_VM_CR			0xC0010114
 #define MSR_K8_VM_HSAVE_PA		0xC0010117
-#define MSR_K8_SYSCFG			0xC0000010	
+
+/* MSR_K8_VM_CR bits: */
+#define _K8_VMCR_SVME_DISABLE		4
+#define K8_VMCR_SVME_DISABLE		(1 << _K8_VMCR_SVME_DISABLE)
 
 /* Centaur-Hauls/IDT defined MSRs. */
 #define MSR_IDT_FCR1			0x107
