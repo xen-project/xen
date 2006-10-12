@@ -208,8 +208,8 @@ class XendAPI:
         
         classes = {
             'Session': (session_required,),
-            'Host': (valid_host, session_required),
-            'Host_CPU': (valid_host_cpu, session_required),
+            'host': (valid_host, session_required),
+            'host_cpu': (valid_host_cpu, session_required),
             'VM': (valid_vm, session_required),
             'VBD': (valid_vbd, session_required),
             'VIF': (valid_vif, session_required)}
@@ -346,19 +346,19 @@ class XendAPI:
     # Xen API: Class Host
     # ----------------------------------------------------------------    
 
-    Host_attr_ro = ['software_version',
+    host_attr_ro = ['software_version',
                     'resident_VMs',
                     'host_CPUs']
     
-    Host_attr_rw = ['name_label',
+    host_attr_rw = ['name_label',
                     'name_description']
 
-    Host_methods = ['disable',
+    host_methods = ['disable',
                     'enable',
                     'reboot',
                     'shutdown']
     
-    Host_funcs = ['get_by_label']
+    host_funcs = ['get_by_label']
 
     # attributes
     def host_get_name_label(self, session, host_ref):
@@ -412,7 +412,7 @@ class XendAPI:
     # Xen API: Class Host_CPU
     # ----------------------------------------------------------------
 
-    Host_CPU_attr_ro = ['host',
+    host_cpu_attr_ro = ['host',
                         'number',
                         'features',
                         'utilisation']

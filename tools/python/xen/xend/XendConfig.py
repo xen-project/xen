@@ -117,6 +117,20 @@ XENAPI_UNSUPPORTED_IN_LEGACY_CFG = [
     'otherconfig'
     ]
 
+# configuration params that need to be converted to ints
+# since the XMLRPC transport for Xen API does not use
+# 32 bit ints but string representation of 64 bit ints.
+XENAPI_INT_CFG = [
+    'user_version',
+    'vcpus_number',
+    'memory_static_min',
+    'memory_static_max',
+    'memory_dynamic_min',
+    'memory_dynamic_max',
+    'tpm_instance',
+    'tpm_backend',
+]    
+
 ##
 ## Xend Configuration Parameters
 ##
@@ -563,7 +577,10 @@ class XendConfig(dict):
 
         for cfgkey, apikey in LEGACY_CFG_TO_XENAPI_CFG.items():
             try:
-                cfg[cfgkey] = xenapi_vm[apikey]
+                if apikey in XENAPI_INT_CFG:
+                    cfg[cfgkey] = int(xenapi_vm[apikey])
+                else:
+                    cfg[cfgkey] = xenapi_vm[apikey]                    
             except KeyError:
                 pass
 
