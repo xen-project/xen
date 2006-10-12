@@ -35,14 +35,9 @@
 static struct proc_dir_entry *privcmd_intf;
 static struct proc_dir_entry *capabilities_intf;
 
-static int privcmd_enforce_singleshot_mapping(struct vm_area_struct *vma)
-{
 #ifndef HAVE_ARCH_PRIVCMD_MMAP
-	if (xchg(&vma->vm_private_data, (void *)1) != NULL)
-		return 0;
+static int privcmd_enforce_singleshot_mapping(struct vm_area_struct *vma);
 #endif
-	return 1;
-}
 
 static int privcmd_ioctl(struct inode *inode, struct file *file,
 			 unsigned int cmd, unsigned long data)
@@ -254,6 +249,11 @@ static int privcmd_mmap(struct file * file, struct vm_area_struct * vma)
 	vma->vm_private_data = NULL;
 
 	return 0;
+}
+
+static int privcmd_enforce_singleshot_mapping(struct vm_area_struct *vma)
+{
+	return (xchg(&vma->vm_private_data, (void *)1) == NULL);
 }
 #endif
 

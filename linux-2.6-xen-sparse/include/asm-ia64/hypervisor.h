@@ -138,6 +138,7 @@ int direct_remap_pfn_range(struct vm_area_struct *vma,
 			   pgprot_t prot,
 			   domid_t  domid);
 struct file;
+int privcmd_enforce_singleshot_mapping(struct vm_area_struct *vma);
 int privcmd_mmap(struct file * file, struct vm_area_struct * vma);
 #define HAVE_ARCH_PRIVCMD_MMAP
 

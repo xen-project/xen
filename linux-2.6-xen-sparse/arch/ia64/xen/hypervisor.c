@@ -546,6 +546,7 @@ struct xen_ia64_privcmd_range {
 };
 
 struct xen_ia64_privcmd_vma {
+	int				is_privcmd_mmapped;
 	struct xen_ia64_privcmd_range*	range;
 
 	unsigned long			num_entries;
@@ -684,12 +685,15 @@ __xen_ia64_privcmd_vma_open(struct vm_area_struct* vma,
 static void
 xen_ia64_privcmd_vma_open(struct vm_area_struct* vma)
 {
+	struct xen_ia64_privcmd_vma* old_privcmd_vma = (struct xen_ia64_privcmd_vma*)vma->vm_private_data;
 	struct xen_ia64_privcmd_vma* privcmd_vma = (struct xen_ia64_privcmd_vma*)vma->vm_private_data;
 	struct xen_ia64_privcmd_range* privcmd_range = privcmd_vma->range;
 
 	atomic_inc(&privcmd_range->ref_count);
 	// vm_op->open() can't fail.
 	privcmd_vma = kmalloc(sizeof(*privcmd_vma), GFP_KERNEL | __GFP_NOFAIL);
+	// copy original value if necessary
+	privcmd_vma->is_privcmd_mmapped = old_privcmd_vma->is_privcmd_mmapped;
 
 	__xen_ia64_privcmd_vma_open(vma, privcmd_vma, privcmd_range);
 }
@@ -725,6 +729,14 @@ xen_ia64_privcmd_vma_close(struct vm_area_struct* vma)
 }
 
 int
+privcmd_enforce_singleshot_mapping(struct vm_area_struct *vma)
+{
+	struct xen_ia64_privcmd_vma* privcmd_vma =
+		(struct xen_ia64_privcmd_vma *)vma->vm_private_data;
+	return (xchg(&privcmd_vma->is_privcmd_mmapped, 1) == 0);
+}
+
+int
 privcmd_mmap(struct file * file, struct vm_area_struct * vma)
 {
 	int error;
@@ -749,6 +761,8 @@ privcmd_mmap(struct file * file, struct vm_area_struct * vma)
 	if (privcmd_vma == NULL) {
 		goto out_enomem1;
 	}
+	privcmd_vma->is_privcmd_mmapped = 0;
+
 	res = kzalloc(sizeof(*res), GFP_KERNEL);
 	if (res == NULL) {
 		goto out_enomem1;
