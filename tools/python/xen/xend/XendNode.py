@@ -21,6 +21,7 @@ import socket
 import xen.lowlevel.xc
 from xen.xend import uuid
 from xen.xend.XendError import XendError
+from xen.xend.XendStorageRepository import XendStorageRepository
 
 class XendNode:
     """XendNode - Represents a Domain 0 Host."""
@@ -31,6 +32,7 @@ class XendNode:
         self.cpus = {}
         self.name = socket.gethostname()
         self.desc = ""
+        self.sr = XendStorageRepository()
         
         physinfo = self.physinfo_dict()
         cpu_count = physinfo['nr_cpus']
