@@ -44,12 +44,11 @@ COMMANDS = {
     'vif-create': ('<domname> <pycfg>', 'Create VIF attached to domname'),
 
     'vm-create': ('<pycfg>', 'Create VM with python config'),
-    'vm-delete': ('<domname>', 'Delete VM'),
+    'vm-destroy': ('<domname>', 'Delete VM'),
     
-    'vm-destroy': ('<name>', 'Hard shutdown a VM with name'),
     'vm-list':   ('[--long]', 'List all domains.'),
     'vm-name':   ('<uuid>', 'Name of UUID.'),
-    'vm-shutdown': ('<name>', 'Shutdown VM with name'),
+    'vm-shutdown': ('<name> [opts]', 'Shutdown VM with name'),
     'vm-start':  ('<name>', 'Start VM with name'),
     'vm-uuid':   ('<name>', 'UUID of a domain by name.'),    
 }
@@ -59,6 +58,8 @@ OPTIONS = {
                  {'action':'store_true',
                   'help':'List all properties of VMs'})
                ],
+    'vm-shutdown': [(('-f', '--force'), {'help': 'Shutdown Forcefully',
+                                         'action': 'store_true'})],
     
     'vdi-create': [(('--label',), {'help': 'Name for VDI'}),
                    (('--description',), {'help': 'Description for VDI'}),
@@ -103,7 +104,7 @@ class IterableValues(Values):
             yield opt, val        
 
 
-def parse_args(cmd_name, args):
+def parse_args(cmd_name, args, set_defaults = False):
     argstring, desc = COMMANDS[cmd_name]
     parser = OptionParser(usage = 'xapi %s %s' % (cmd_name, argstring),
                           description = desc)
@@ -111,8 +112,11 @@ def parse_args(cmd_name, args):
         for optargs, optkwds in OPTIONS[cmd_name]:
             parser.add_option(*optargs, **optkwds)
 
-    default_values = parser.get_default_values()
-    defaults = IterableValues(default_values.__dict__)
+    if set_defaults:
+        default_values = parser.get_default_values()
+        defaults = IterableValues(default_values.__dict__)
+    else:
+        defaults = IterableValues()
     (opts, extraargs) = parser.parse_args(args = list(args),
                                           values = defaults)
     return opts, extraargs
@@ -180,7 +184,7 @@ def xapi_vm_name(*args):
     print vm_name
 
 def xapi_vm_list(*args):
-    opts, args = parse_args('vm-list', args)
+    opts, args = parse_args('vm-list', args, set_defaults = True)
     is_long = opts and opts.long
     
     server, session = _connect()
@@ -224,7 +228,7 @@ def xapi_vm_create(*args):
     print 'Done. (%s)' % uuid
     print uuid
 
-def xapi_vm_delete(*args):
+def xapi_vm_destroy(*args):
     if len(args) < 1:
         raise OptionError("No domain name specified.")
     
@@ -246,24 +250,20 @@ def xapi_vm_start(*args):
     print 'Done.'
 
 def xapi_vm_shutdown(*args):
+    opts, args = parse_args("vm-shutdown", args, set_defaults = True)
+    
     if len(args) < 1:
         raise OptionError("No Domain name specified.")
 
     server, session = _connect()
     vm_uuid = resolve_vm(server, session, args[0])
-    print 'Shutting down VM %s (%s)' % (args[0], vm_uuid)
-    success = execute(server.VM.clean_shutdown, session, vm_uuid)
+    if opts.force:
+        print 'Forcefully shutting down VM %s (%s)' % (args[0], vm_uuid)
+        success = execute(server.VM.hard_shutdown, session, vm_uuid)
+    else:
+        print 'Shutting down VM %s (%s)' % (args[0], vm_uuid)
+        success = execute(server.VM.clean_shutdown, session, vm_uuid)
     print 'Done.'
-
-def xapi_vm_destroy(*args):
-    if len(args) < 1:
-        raise OptionError("No Domain name specified.")
-
-    server, session = _connect()
-    vm_uuid = resolve_vm(server, session, args[0])
-    print 'Shutting down VM with force %s (%s)' % (args[0], vm_uuid)
-    success = execute(server.VM.hard_shutdown, session, vm_uuid)
-    print 'Done.'    
 
 def xapi_vbd_create(*args):
     if len(args) < 2:
@@ -273,11 +273,9 @@ def xapi_vbd_create(*args):
     domname = args[0]
     filename = args[1]
 
-    cfg = {}
+    cfg = _read_python_cfg(filename)    
     for opt, val in opts:
         cfg[opt] = val
-    cfg.update(_read_python_cfg(filename))
-    
     
     print 'Creating VBD from %s ..' % filename
     server, session = _connect()
@@ -332,10 +330,9 @@ def xapi_vdi_create(*args):
     if len(args) < 1:
         raise OptionError("Not enough arguments.")
 
-    cfg = {}
+    cfg = _read_python_cfg(args[0])
     for opt, val in opts:
         cfg[opt] = val
-    cfg.update(_read_python_cfg(args[0]))
 
     server, session = _connect()
     srs = execute(server.SR.get_all, session)
