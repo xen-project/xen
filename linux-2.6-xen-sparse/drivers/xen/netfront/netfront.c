@@ -141,7 +141,6 @@ struct netfront_info {
 	spinlock_t   tx_lock;
 	spinlock_t   rx_lock;
 
-	unsigned int handle;
 	unsigned int evtchn, irq;
 	unsigned int copying_receiver;
 
@@ -232,7 +231,7 @@ static inline grant_ref_t xennet_get_rx_ref(struct netfront_info *np,
 
 static int talk_to_backend(struct xenbus_device *, struct netfront_info *);
 static int setup_device(struct xenbus_device *, struct netfront_info *);
-static struct net_device *create_netdev(int, int, struct xenbus_device *);
+static struct net_device *create_netdev(int, struct xenbus_device *);
 
 static void netfront_closing(struct xenbus_device *);
 
@@ -274,13 +273,7 @@ static int __devinit netfront_probe(struct xenbus_device *dev,
 	int err;
 	struct net_device *netdev;
 	struct netfront_info *info;
-	unsigned int handle, feature_rx_copy, feature_rx_flip, use_copy;
-
-	err = xenbus_scanf(XBT_NIL, dev->nodename, "handle", "%u", &handle);
-	if (err != 1) {
-		xenbus_dev_fatal(dev, err, "reading handle");
-		return err;
-	}
+	unsigned int feature_rx_copy, feature_rx_flip, use_copy;
 
 	err = xenbus_scanf(XBT_NIL, dev->otherend, "feature-rx-copy", "%u",
 			   &feature_rx_copy);
@@ -299,7 +292,7 @@ static int __devinit netfront_probe(struct xenbus_device *dev,
 	use_copy = (MODPARM_rx_copy && feature_rx_copy) ||
 		(MODPARM_rx_flip && !feature_rx_flip);
 
-	netdev = create_netdev(handle, use_copy, dev);
+	netdev = create_netdev(use_copy, dev);
 	if (IS_ERR(netdev)) {
 		err = PTR_ERR(netdev);
 		xenbus_dev_fatal(dev, err, "creating netdev");
@@ -1882,7 +1875,7 @@ static void network_set_multicast_list(struct net_device *dev)
 }
 
 static struct net_device * __devinit
-create_netdev(int handle, int copying_receiver, struct xenbus_device *dev)
+create_netdev(int copying_receiver, struct xenbus_device *dev)
 {
 	int i, err = 0;
 	struct net_device *netdev = NULL;
@@ -1896,7 +1889,6 @@ create_netdev(int handle, int copying_receiver, struct xenbus_device *dev)
 	}
 
 	np                   = netdev_priv(netdev);
-	np->handle           = handle;
 	np->xbdev            = dev;
 	np->copying_receiver = copying_receiver;
 
