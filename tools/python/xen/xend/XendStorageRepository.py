@@ -309,7 +309,7 @@ class XendStorageRepository:
             if self.storage_max != XEND_STORAGE_MAX_IGNORE:
                 return self.storage_max
             else:
-                return self.free_space_kb() + self.used_space_kb()
+                return self.free_space_bytes() + self.used_space_bytes()
         finally:
             self.lock.release()
             
@@ -321,7 +321,7 @@ class XendStorageRepository:
         try:
             total_used = 0
             for val in self.images.values():
-                total_used += val.get_physical_utilisation()
+                total_used += val.physical_utilisation
             return total_used
         finally:
             self.lock.release()
