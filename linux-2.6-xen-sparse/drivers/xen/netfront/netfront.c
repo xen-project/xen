@@ -229,9 +229,8 @@ static inline grant_ref_t xennet_get_rx_ref(struct netfront_info *np,
 #define WPRINTK(fmt, args...)				\
 	printk(KERN_WARNING "netfront: " fmt, ##args)
 
-static int talk_to_backend(struct xenbus_device *, struct netfront_info *);
 static int setup_device(struct xenbus_device *, struct netfront_info *);
-static struct net_device *create_netdev(int, struct xenbus_device *);
+static struct net_device *create_netdev(struct xenbus_device *);
 
 static void netfront_closing(struct xenbus_device *);
 
@@ -241,7 +240,7 @@ static int open_netdev(struct netfront_info *);
 static void close_netdev(struct netfront_info *);
 static void netif_free(struct netfront_info *);
 
-static void network_connect(struct net_device *);
+static int network_connect(struct net_device *);
 static void network_tx_buf_gc(struct net_device *);
 static void network_alloc_rx_buffers(struct net_device *);
 static int send_fake_arp(struct net_device *);
@@ -264,8 +263,7 @@ static inline int xennet_can_sg(struct net_device *dev)
 /**
  * Entry point to this code when a new device is created.  Allocate the basic
  * structures and the ring buffers for communication with the backend, and
- * inform the backend of the appropriate details for those.  Switch to
- * Connected state.
+ * inform the backend of the appropriate details for those.
  */
 static int __devinit netfront_probe(struct xenbus_device *dev,
 				    const struct xenbus_device_id *id)
@@ -273,26 +271,8 @@ static int __devinit netfront_probe(struct xenbus_device *dev,
 	int err;
 	struct net_device *netdev;
 	struct netfront_info *info;
-	unsigned int feature_rx_copy, feature_rx_flip, use_copy;
 
-	err = xenbus_scanf(XBT_NIL, dev->otherend, "feature-rx-copy", "%u",
-			   &feature_rx_copy);
-	if (err != 1)
-		feature_rx_copy = 0;
-	err = xenbus_scanf(XBT_NIL, dev->otherend, "feature-rx-flip", "%u",
-			   &feature_rx_flip);
-	if (err != 1)
-		feature_rx_flip = 1;
-
-	/*
-	 * Copy packets on receive path if:
-	 *  (a) This was requested by user, and the backend supports it; or
-	 *  (b) Flipping was requested, but this is unsupported by the backend.
-	 */
-	use_copy = (MODPARM_rx_copy && feature_rx_copy) ||
-		(MODPARM_rx_flip && !feature_rx_flip);
-
-	netdev = create_netdev(use_copy, dev);
+	netdev = create_netdev(dev);
 	if (IS_ERR(netdev)) {
 		err = PTR_ERR(netdev);
 		xenbus_dev_fatal(dev, err, "creating netdev");
@@ -302,23 +282,13 @@ static int __devinit netfront_probe(struct xenbus_device *dev,
 	info = netdev_priv(netdev);
 	dev->dev.driver_data = info;
 
-	err = talk_to_backend(dev, info);
-	if (err)
-		goto fail_backend;
-
 	err = open_netdev(info);
 	if (err)
-		goto fail_open;
-
-	IPRINTK("Created netdev %s with %sing receive path.\n",
-		netdev->name, info->copying_receiver ? "copy" : "flipp");
+		goto fail;
 
 	return 0;
 
- fail_open:
-	xennet_sysfs_delif(info->netdev);
-	unregister_netdev(netdev);
- fail_backend:
+ fail:
 	free_netdev(netdev);
 	dev->dev.driver_data = NULL;
 	return err;
@@ -338,7 +308,7 @@ static int netfront_resume(struct xenbus_device *dev)
 	DPRINTK("%s\n", dev->nodename);
 
 	netif_disconnect_backend(info);
-	return talk_to_backend(dev, info);
+	return 0;
 }
 
 static int xen_net_read_mac(struct xenbus_device *dev, u8 mac[])
@@ -449,7 +419,7 @@ again:
 	xenbus_transaction_end(xbt, 1);
 	xenbus_dev_fatal(dev, err, "%s", message);
  destroy_ring:
-	netif_free(info);
+	netif_disconnect_backend(info);
  out:
 	return err;
 }
@@ -539,7 +509,10 @@ static void backend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateInitWait:
-		network_connect(netdev);
+		if (network_connect(netdev) != 0) {
+			netif_free(np);
+			break;
+		}
 		xenbus_switch_state(dev, XenbusStateConnected);
 		(void)send_fake_arp(netdev);
 		break;
@@ -1644,15 +1617,40 @@ static void xennet_set_features(struct net_device *dev)
 		xennet_set_tso(dev, 1);
 }
 
-static void network_connect(struct net_device *dev)
+static int network_connect(struct net_device *dev)
 {
 	struct netfront_info *np = netdev_priv(dev);
-	int i, requeue_idx;
+	int i, requeue_idx, err;
 	struct sk_buff *skb;
 	grant_ref_t ref;
 	netif_rx_request_t *req;
+	unsigned int feature_rx_copy, feature_rx_flip;
+
+	err = xenbus_scanf(XBT_NIL, np->xbdev->otherend,
+			   "feature-rx-copy", "%u", &feature_rx_copy);
+	if (err != 1)
+		feature_rx_copy = 0;
+	err = xenbus_scanf(XBT_NIL, np->xbdev->otherend,
+			   "feature-rx-flip", "%u", &feature_rx_flip);
+	if (err != 1)
+		feature_rx_flip = 1;
+
+	/*
+	 * Copy packets on receive path if:
+	 *  (a) This was requested by user, and the backend supports it; or
+	 *  (b) Flipping was requested, but this is unsupported by the backend.
+	 */
+	np->copying_receiver = ((MODPARM_rx_copy && feature_rx_copy) ||
+				(MODPARM_rx_flip && !feature_rx_flip));
+
+	err = talk_to_backend(np->xbdev, np);
+	if (err)
+		return err;
 
 	xennet_set_features(dev);
+
+	IPRINTK("device %s has %sing receive path.\n",
+		dev->name, np->copying_receiver ? "copy" : "flipp");
 
 	spin_lock_irq(&np->tx_lock);
 	spin_lock(&np->rx_lock);
@@ -1709,6 +1707,8 @@ static void network_connect(struct net_device *dev)
 
 	spin_unlock(&np->rx_lock);
 	spin_unlock_irq(&np->tx_lock);
+
+	return 0;
 }
 
 static void netif_uninit(struct net_device *dev)
@@ -1874,8 +1874,7 @@ static void network_set_multicast_list(struct net_device *dev)
 {
 }
 
-static struct net_device * __devinit
-create_netdev(int copying_receiver, struct xenbus_device *dev)
+static struct net_device * __devinit create_netdev(struct xenbus_device *dev)
 {
 	int i, err = 0;
 	struct net_device *netdev = NULL;
@@ -1890,7 +1889,6 @@ create_netdev(int copying_receiver, struct xenbus_device *dev)
 
 	np                   = netdev_priv(netdev);
 	np->xbdev            = dev;
-	np->copying_receiver = copying_receiver;
 
 	netif_carrier_off(netdev);
 
@@ -2021,10 +2019,12 @@ static int open_netdev(struct netfront_info *info)
 
 	err = xennet_sysfs_addif(info->netdev);
 	if (err) {
-		/* This can be non-fatal: it only means no tuning parameters */
+		unregister_netdev(info->netdev);
 		printk(KERN_WARNING "%s: add sysfs failed err=%d\n",
 		       __FUNCTION__, err);
+		return err;
 	}
+
 	return 0;
 }
 
