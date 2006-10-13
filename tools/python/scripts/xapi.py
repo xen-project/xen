@@ -35,7 +35,9 @@ LOGIN = ('atse', 'passwd')
 COMMANDS = {
     'host-info': ('', 'Get Xen Host Info'),
     'sr-list':   ('', 'List all SRs'),
-    'vbd-create': ('<domname> <pycfg>', 'Create VBD attached to domname'),
+    'vbd-create': ('<domname> <pycfg> [opts]',
+                   'Create VBD attached to domname'),
+    'vdi-create': ('<pycfg> [opts]', 'Create a VDI'),
     'vdi-list'  : ('', 'List all VDI'),
     'vdi-rename': ('<vdi_uuid> <new_name>', 'Rename VDI'),
     'vdi-delete': ('<vdi_uuid>', 'Delete VDI'),
@@ -57,7 +59,28 @@ OPTIONS = {
                  {'action':'store_true',
                   'help':'List all properties of VMs'})
                ],
-   
+    
+    'vdi-create': [(('--label',), {'help': 'Name for VDI'}),
+                   (('--description',), {'help': 'Description for VDI'}),
+                   (('--sector-size',), {'type': 'int',
+                                         'help': 'Sector size'}),
+                   (('--virtual-size',), {'type': 'int',
+                                          'help': 'Size of VDI in sectors'}),
+                   (('--type',), {'choices': ['system', 'user', 'ephemeral'],
+                                  'help': 'VDI type'}),
+                   (('--sharable',), {'action': 'store_true',
+                                      'help': 'VDI sharable'}),
+                   (('--read-only',), {'action': 'store_true',
+                                       'help': 'Read only'})],
+    
+    'vbd-create': [(('--VDI',), {'help': 'UUID of VDI to attach to.'}),
+                   (('--mode',), {'choices': ['RO', 'RW'],
+                                  'help': 'device mount mode'}),
+                   (('--driver',), {'choices':['paravirtualised', 'ioemu'],
+                                    'help': 'Driver for VBD'}),
+                   (('--device',), {'help': 'Device name on guest domain'}),
+                   (('--image',), {'help': 'Location of drive image.'})]
+                   
 }
 
 class OptionError(Exception):
@@ -70,6 +93,16 @@ class XenAPIError(Exception):
 # Extra utility functions
 #
 
+class IterableValues(Values):
+    """Better interface to the list of values from optparse."""
+
+    def __iter__(self):
+        for opt, val in self.__dict__.items():
+            if opt[0] == '_' or callable(val):
+                continue
+            yield opt, val        
+
+
 def parse_args(cmd_name, args):
     argstring, desc = COMMANDS[cmd_name]
     parser = OptionParser(usage = 'xapi %s %s' % (cmd_name, argstring),
@@ -77,8 +110,11 @@ def parse_args(cmd_name, args):
     if cmd_name in OPTIONS:
         for optargs, optkwds in OPTIONS[cmd_name]:
             parser.add_option(*optargs, **optkwds)
-            
-    (opts, extraargs) = parser.parse_args(list(args))
+
+    default_values = parser.get_default_values()
+    defaults = IterableValues(default_values.__dict__)
+    (opts, extraargs) = parser.parse_args(args = list(args),
+                                          values = defaults)
     return opts, extraargs
 
 def execute(fn, *args):
@@ -106,7 +142,7 @@ def _read_python_cfg(filename):
     return cfg
 
 def resolve_vm(server, session, vm_name):
-    vm_uuid = execute(server.VM.get_by_label, session, vm_name)
+    vm_uuid = execute(server.VM.get_by_name_label, session, vm_name)
     if not vm_uuid:
         return None
     else:
@@ -204,7 +240,7 @@ def xapi_vm_start(*args):
         raise OptionError("No Domain name specified.")
     
     server, session = _connect()
-    vm_uuid = execute(server.VM.get_by_label, session, args[0])
+    vm_uuid = resolve_vm(server, session, args[0])
     print 'Starting VM %s (%s)' % (args[0], vm_uuid)
     success = execute(server.VM.start, session, vm_uuid)
     print 'Done.'
@@ -233,9 +269,16 @@ def xapi_vbd_create(*args):
     if len(args) < 2:
         raise OptionError("Configuration file not specified")
 
+    opts, args = parse_args('vbd-create', args)
     domname = args[0]
     filename = args[1]
-    cfg = _read_python_cfg(filename)
+
+    cfg = {}
+    for opt, val in opts:
+        cfg[opt] = val
+    cfg.update(_read_python_cfg(filename))
+    
+    
     print 'Creating VBD from %s ..' % filename
     server, session = _connect()
     vm_uuid = resolve_vm(server, session, domname)
@@ -250,6 +293,7 @@ def xapi_vif_create(*args):
     domname = args[0]
     filename = args[1]
     cfg = _read_python_cfg(filename)
+    
     print 'Creating VIF from %s ..' % filename
     server, session = _connect()
     vm_uuid = resolve_vm(server, session, domname)
@@ -283,9 +327,17 @@ def xapi_sr_list(*args):
         print SR_LIST_FORMAT % sr_struct
 
 def xapi_vdi_create(*args):
-    server, session = _connect()
-    cfg = _read_python_cfg(args[0])
+    opts, args = parse_args('vdi-create', args)
 
+    if len(args) < 1:
+        raise OptionError("Not enough arguments.")
+
+    cfg = {}
+    for opt, val in opts:
+        cfg[opt] = val
+    cfg.update(_read_python_cfg(args[0]))
+
+    server, session = _connect()
     srs = execute(server.SR.get_all, session)
     sr = srs[0]
     cfg['SR'] = sr
@@ -359,6 +411,8 @@ def main(args):
     except XenAPIError, e:
         print 'Error: %s' % str(e.args[1])
         sys.exit(2)
+    except OptionError, e:
+        print 'Error: %s' % e
 
     sys.exit(0)
     

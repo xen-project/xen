@@ -28,6 +28,7 @@ import logging
 import time
 import threading
 import re
+import copy
 
 import xen.lowlevel.xc
 from xen.util import asserts
@@ -1719,28 +1720,44 @@ class XendDomainInfo:
 
     def get_dev_config_by_uuid(self, dev_class, dev_uuid):
         """ Get's a device configuration either from XendConfig or
-        from the DevController."""
+        from the DevController.
+
+        @param dev_class: device class, either, 'vbd' or 'vif'
+        @param dev_uuid: device UUID
+
+        @rtype: dictionary
+        """
+        dev_type_config = self.info['device'].get(dev_uuid)
+
+        # shortcut if the domain isn't started because
+        # the devcontrollers will have no better information
+        # than XendConfig.
         if self.state in (XEN_API_VM_POWER_STATE_HALTED,):
-            dev = self.info['device'].get(dev_uuid)
-            if dev:
-                return dev[1].copy()
+            if dev_type_config:
+                return copy.deepcopy(dev_type_config[1])
             return None
-        else:
-            controller = self.getDeviceController(dev_class)
-            if not controller:
-                return None
+
+        # instead of using dev_class, we use the dev_type
+        # that is from XendConfig.
+        # This will accomdate 'tap' as well as 'vbd'
+        dev_type = dev_type_config[0]
+        
+        controller = self.getDeviceController(dev_type)
+        if not controller:
+            return None
             
-            all_configs = controller.getAllDeviceConfigurations()
-            if not all_configs:
-                return None
+        all_configs = controller.getAllDeviceConfigurations()
+        if not all_configs:
+            return None
 
-            for _devid, _devcfg in all_configs.items():
-                if _devcfg.get('uuid') == dev_uuid:
-                    devcfg = _devcfg.copy()
-                    devcfg['id'] = _devid
-                    return devcfg
+        dev_config = copy.deepcopy(dev_type_config[1])
+        for _devid, _devcfg in all_configs.items():
+            if _devcfg.get('uuid') == dev_uuid:
+                dev_config.update(_devcfg)
+                dev_config['id'] = _devid
+                return dev_config
 
-        return None
+        return dev_config
                     
     def get_dev_xenapi_config(self, dev_class, dev_uuid):
         config = self.get_dev_config_by_uuid(dev_class, dev_uuid)
@@ -1770,10 +1787,11 @@ class XendDomainInfo:
             config['IO_bandwidth_incoming_kbs'] = 0.0
             config['IO_bandwidth_outgoing_kbs'] = 0.0
 
-        if dev_class == 'vbd':
+        if dev_class =='vbd':
             config['VDI'] = '' # TODO
             config['device'] = config.get('dev', '')
-            config['driver'] = config.get('uname', '')
+            config['driver'] = 'paravirtualised' # TODO
+            config['image'] = config.get('uname', '')
             config['IO_bandwidth_incoming_kbs'] = 0.0
             config['IO_bandwidth_outgoing_kbs'] = 0.0
             if config['mode'] == 'r':
@@ -1835,6 +1853,7 @@ class XendDomainInfo:
         @return: uuid of the device
         """
         xenapi_vbd['image'] = vdi_image_path
+        log.debug('create_vbd_with_vdi: %s' % xenapi_vbd)
         dev_uuid = self.info.device_add('tap', cfg_xenapi = xenapi_vbd)
         if not dev_uuid:
             raise XendError('Failed to create device')

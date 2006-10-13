@@ -1001,10 +1001,10 @@ class XendAPI:
         xendom = XendDomain.instance()
         vm = xendom.get_vm_with_dev_uuid('vbd', vbd_ref)
         if not vm:
-            return xen_api_error(XEND_ERROR_VIF_INVALID)
+            return xen_api_error(XEND_ERROR_VBD_INVALID)
         cfg = vm.get_dev_xenapi_config('vbd', vbd_ref)
         if not cfg:
-            return xen_api_error(XEND_ERROR_VIF_INVALID)
+            return xen_api_error(XEND_ERROR_VBD_INVALID)
         return xen_api_success(cfg)
     
     # class methods
@@ -1016,7 +1016,7 @@ class XendAPI:
         dom = xendom.get_vm_by_uuid(vbd_struct['VM'])
         vbd_ref = ''
         try:
-            if vbd_struct.get('VDI', None):
+            if not vbd_struct.get('VDI', None):
                 # this is a traditional VBD without VDI and SR 
                 vbd_ref = dom.create_vbd(vbd_struct)
             else:
@@ -1024,8 +1024,10 @@ class XendAPI:
                 vdi_ref = vbd_struct.get('VDI')
                 sr = XendNode.instance().get_sr()
                 vdi_image = sr.xen_api_get_by_uuid(vdi_ref)
-                vdi_image_path = vdi_image.image_path
-                vbd_ref = dom.create_vbd_with_vdi(vbd_struct, vdi_image_path)
+                if not vdi_image:
+                    return xen_api_error(XEND_ERROR_VDI_INVALID)
+                vdi_image = vdi_image.qcow_path
+                vbd_ref = dom.create_vbd_with_vdi(vbd_struct, vdi_image)
         except XendError:
             return xen_api_todo()
 
