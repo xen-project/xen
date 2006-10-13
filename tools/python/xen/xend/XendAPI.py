@@ -25,23 +25,10 @@ from xen.xend.XendClient import ERROR_INVALID_DOMAIN
 from xen.xend.XendLogging import log
 
 from xen.xend.XendAPIConstants import *
+from xen.util.xmlrpclib2 import stringify
 
-from types import *
-
-def _stringify(value):
-    if isinstance(value, IntType) and not isinstance(value, BooleanType):
-        return str(value)
-    elif isinstance(value, DictType):
-        for k, v in value.items():
-            value[k] = _stringify(v)
-        return value
-    elif isinstance(value, (TupleType, ListType)):
-        return [_stringify(v) for v in value]
-    else:
-        return value
-    
 def xen_api_success(value):
-    return {"Status": "Success", "Value": _stringify(value)}
+    return {"Status": "Success", "Value": stringify(value)}
 
 def xen_api_success_void():
     """Return success, but caller expects no return value."""
@@ -252,7 +239,7 @@ class XendAPI:
         """
         
         classes = {
-            'Session': (session_required,),
+            'session': (session_required,),
             'host': (valid_host, session_required),
             'host_cpu': (valid_host_cpu, session_required),
             'VM': (valid_vm, session_required),
@@ -346,9 +333,9 @@ class XendAPI:
     # ----------------------------------------------------------------
     # NOTE: Left unwrapped by __init__
 
-    Session_attr_ro = ['this_host', 'this_user']
-    Session_methods = ['logout']
-    # Session_funcs = ['login_with_password']    
+    session_attr_ro = ['this_host', 'this_user']
+    session_methods = ['logout']
+    # session_funcs = ['login_with_password']    
 
     def session_login_with_password(self, username, password):
         try:
@@ -356,7 +343,7 @@ class XendAPI:
             return xen_api_success(session)
         except XendError, e:
             return xen_api_error(XEND_ERROR_AUTHENTICATION_FAILED)
-    session_login_with_password.api = 'Session.login_with_password'
+    session_login_with_password.api = 'session.login_with_password'
 
 
     # object methods
@@ -405,7 +392,7 @@ class XendAPI:
                     'reboot',
                     'shutdown']
     
-    host_funcs = ['get_by_label']
+    host_funcs = ['get_by_name_label']
 
     # attributes
     def host_get_name_label(self, session, host_ref):
@@ -572,7 +559,7 @@ class XendAPI:
                   'suspend',
                   'resume']
     
-    VM_funcs  = ['get_by_label']
+    VM_funcs  = ['get_by_name_label']
 
     # parameters required for _create()
     VM_attr_inst = [
@@ -892,7 +879,8 @@ class XendAPI:
     def vm_get_all(self, session):
         refs = [d.get_uuid() for d in XendDomain.instance().list()]
         return xen_api_success(refs)
-    def vm_get_by_label(self, session, label):
+    
+    def vm_get_by_name_label(self, session, label):
         xendom = XendDomain.instance()
         dom = xendom.domain_lookup_nr(label)
         if dom:
@@ -1022,16 +1010,27 @@ class XendAPI:
     # class methods
     def vbd_create(self, session, vbd_struct):
         xendom = XendDomain.instance()
-        if xendom.is_valid_vm(vbd_struct['VM']):
-            dom = xendom.get_vm_by_uuid(vbd_struct['VM'])
-            try:
-                vbd_ref = dom.create_vbd(vbd_struct)
-                xendom.managed_config_save(dom)
-                return xen_api_success(vbd_ref)
-            except XendError:
-                return xen_api_error(XEND_ERROR_TODO)
-        else:
+        if not xendom.is_valid_vm(vbd_struct['VM']):
             return xen_api_error(XEND_ERROR_DOMAIN_INVALID)
+        
+        dom = xendom.get_vm_by_uuid(vbd_struct['VM'])
+        vbd_ref = ''
+        try:
+            if vbd_struct.get('VDI', None):
+                # this is a traditional VBD without VDI and SR 
+                vbd_ref = dom.create_vbd(vbd_struct)
+            else:
+                # new VBD via VDI/SR
+                vdi_ref = vbd_struct.get('VDI')
+                sr = XendNode.instance().get_sr()
+                vdi_image = sr.xen_api_get_by_uuid(vdi_ref)
+                vdi_image_path = vdi_image.image_path
+                vbd_ref = dom.create_vbd_with_vdi(vbd_struct, vdi_image_path)
+        except XendError:
+            return xen_api_todo()
+
+        xendom.managed_config_save(dom)
+        return xen_api_success(vbd_ref)
 
     # attributes (rw)
     def vbd_get_vm(self, session, vbd_ref):
@@ -1118,61 +1117,144 @@ class XendAPI:
     VDI_attr_inst = VDI_attr_ro + VDI_attr_rw
 
     VDI_methods = ['snapshot']
-    VDI_funcs = ['get_by_label']
+    VDI_funcs = ['get_by_name_label']
+    
     def vdi_get_vbds(self, session, vdi_ref):
         return xen_api_todo()
+    
     def vdi_get_physical_utilisation(self, session, vdi_ref):
-        return xen_api_todo()
+        sr = XendNode.instance().get_sr()
+        image = sr.xen_api_get_by_uuid(vdi_ref)
+        return xen_api_success(image.get_physical_utilisation())        
+    
     def vdi_get_sector_size(self, session, vdi_ref):
-        return xen_api_todo()
+        sr = XendNode.instance().get_sr()
+        image = sr.xen_api_get_by_uuid(vdi_ref)
+        return xen_api_success(image.sector_size)        
+    
     def vdi_get_type(self, session, vdi_ref):
-        return xen_api_todo()
+        sr = XendNode.instance().get_sr()
+        image = sr.xen_api_get_by_uuid(vdi_ref)
+        return xen_api_success(image.type)
+    
     def vdi_get_parent(self, session, vdi_ref):
-        return xen_api_todo()
+        sr = XendNode.instance().get_sr()
+        image = sr.xen_api_get_by_uuid(vdi_ref)
+        return xen_api_success(image.parent)        
+    
     def vdi_get_children(self, session, vdi_ref):
-        return xen_api_todo()
+        sr = XendNode.instance().get_sr()
+        image = sr.xen_api_get_by_uuid(vdi_ref)
+        return xen_api_success(image.children)        
+    
     def vdi_get_name_label(self, session, vdi_ref):
-        return xen_api_todo()
+        sr = XendNode.instance().get_sr()
+        image = sr.xen_api_get_by_uuid(vdi_ref)
+        return xen_api_success(image.name_label)
+
     def vdi_get_name_description(self, session, vdi_ref):
-        return xen_api_todo()
+        sr = XendNode.instance().get_sr()
+        image = sr.xen_api_get_by_uuid(vdi_ref)
+        return xen_api_success(image.name_description)
+
     def vdi_get_sr(self, session, vdi_ref):
-        return xen_api_todo()
+        sr = XendNode.instance().get_sr()
+        return xen_api_success(sr.uuid)
+
     def vdi_get_virtual_size(self, session, vdi_ref):
-        return xen_api_todo()
+        sr = XendNode.instance().get_sr()
+        image = sr.xen_api_get_by_uuid(vdi_ref)
+        return xen_api_success(image.virtual_size)
+
     def vdi_get_sharable(self, session, vdi_ref):
-        return xen_api_todo()
+        sr = XendNode.instance().get_sr()
+        image = sr.xen_api_get_by_uuid(vdi_ref)
+        return xen_api_success(image.sharable)
+
     def vdi_get_read_only(self, session, vdi_ref):
-        return xen_api_todo()
-    def vdi_get_uuid(self, session, vdi_ref):
-        return xen_api_todo()
+        sr = XendNode.instance().get_sr()
+        image = sr.xen_api_get_by_uuid(vdi_ref)
+        return xen_api_success(image.sharable)        
+
     def vdi_set_name_label(self, session, vdi_ref, value):
-        return xen_api_todo()
+        sr = XendNode.instance().get_sr()
+        image = sr.xen_api_get_by_uuid(vdi_ref)
+        image.name_label = value
+        return xen_api_success_void()
+
     def vdi_set_name_description(self, session, vdi_ref, value):
-        return xen_api_todo()
+        sr = XendNode.instance().get_sr()
+        image = sr.xen_api_get_by_uuid(vdi_ref)
+        image.name_description = value
+        return xen_api_success_void()
+
     def vdi_set_sr(self, session, vdi_ref, value):
-        return xen_api_todo()
+        return xen_api_error(XEND_ERROR_UNSUPPORTED)
+
     def vdi_set_virtual_size(self, session, vdi_ref, value):
-        return xen_api_todo()
+        return xen_api_error(XEND_ERROR_UNSUPPORTED)
+
     def vdi_set_sharable(self, session, vdi_ref, value):
         return xen_api_todo()
     def vdi_set_read_only(self, session, vdi_ref, value):
         return xen_api_todo()
+
+    # Object Methods
     def vdi_snapshot(self, session, vdi_ref):
         return xen_api_todo()
+    
     def vdi_destroy(self, session, vdi_ref):
-        return xen_api_todo()
+        sr = XendNode.instance().get_sr()
+        sr.destroy_image(vdi_ref)
+        return xen_api_success_void()
+
     def vdi_to_xml(self, session, vdi_ref):
         return xen_api_todo()
+    
     def vdi_get_record(self, session, vdi_ref):
-        return xen_api_todo()
-    def vdi_create(self, session):
-        return xen_api_todo()
-    def vdi_get_by_uuid(self, session):
-        return xen_api_todo()
+        sr = XendNode.instance().get_sr()
+        image = sr.xen_api_get_by_uuid(vdi_ref)
+        if image:
+            return xen_api_success({
+                'uuid': vdi_ref,
+                'name_label': image.name_label,
+                'name_description': image.name_description,
+                'SR': sr.uuid,
+                'VBDs': [], # TODO
+                'virtual_size': image.virtual_size,
+                'physical_utilisation': image.physical_utilisation,
+                'sector_size': image.sector_size,
+                'type': image.type,
+                'parent': image.parent,
+                'children': image.children,
+                'sharable': image.sharable,
+                'read_only': image.read_only,
+                })
+
+        return xen_api_error(XEND_ERROR_VDI_INVALID)
+
+    # Class Functions    
+    def vdi_create(self, session, vdi_struct):
+        sr = XendNode.instance().get_sr()
+        sr_ref = vdi_struct['SR']
+        if sr.uuid != sr_ref:
+            return xen_api_error(XEND_ERROR_SR_INVALID)
+
+        vdi_uuid = sr.create_image(vdi_struct)
+        return xen_api_success(vdi_uuid)
+
     def vdi_get_all(self, session):
-        return xen_api_todo()
-    def vdi_get_by_label(self, session):
-        return xen_api_todo()
+        sr = XendNode.instance().get_sr()
+        return xen_api_success(sr.list_images())
+    
+    def vdi_get_by_name_label(self, session, name):
+        sr = XendNode.instance().get_sr()
+        image_uuid = sr.xen_api_get_by_name_label(name)
+        if image_uuid:
+            return xen_api_success(image_uuid)
+        
+        return xen_api_error(XEND_ERROR_VDI_INVALID)
+
 
     # Xen API: Class SR
     # ----------------------------------------------------------------
@@ -1193,14 +1275,14 @@ class XendAPI:
                     'name_description']
     
     SR_methods = ['clone']
-    SR_funcs = ['get_by_label']
+    SR_funcs = ['get_by_name_label']
 
     # Class Functions
     def sr_get_all(self, session):
         sr = XendNode.instance().get_sr()
         return xen_api_success([sr.uuid])
 
-    def sr_get_by_label(self, session, label):
+    def sr_get_by_name_label(self, session, label):
         sr = XendNode.instance().get_sr()
         if sr.name_label != label:
             return xen_api_error(XEND_ERROR_SR_INVALID)

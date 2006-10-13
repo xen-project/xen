@@ -566,7 +566,7 @@ class XendConfig(dict):
         for dev_uuid, (dev_type, dev_info) in cfg['device'].items():
             if dev_type == 'vif':
                 cfg['vif_refs'].append(dev_uuid)
-            elif dev_type == 'vbd':
+            elif dev_type in ('vbd','tap'):
                 cfg['vbd_refs'].append(dev_uuid)
                 
         return cfg
@@ -771,6 +771,8 @@ class XendConfig(dict):
             self['device'][dev_uuid] = (dev_type, dev_info)
             if dev_type in ('vif', 'vbd'):
                 self['%s_refs' % dev_type].append(dev_uuid)
+            elif dev_type in ('tap',):
+                self['vbd_refs'].append(dev_uuid)
             return dev_uuid
 
         if cfg_xenapi:
@@ -805,7 +807,21 @@ class XendConfig(dict):
                 self['device'][dev_uuid] = (dev_type, dev_info)
                 self['vbd_refs'].append(dev_uuid)                
                 return dev_uuid
+            
+            elif dev_type == 'tap':
+                dev_info['uname'] = 'tap:qcow:%s' % cfg_xenapi.get('image')
+                dev_info['dev'] = '%s:disk' % cfg_xenapi.get('device')
                 
+                if cfg_xenapi.get('mode') == 'RW':
+                    dev_info['mode'] = 'w'
+                else:
+                    dev_info['mode'] = 'r'
+
+                dev_uuid = cfg_xenapi.get('uuid', uuid.createString())
+                dev_info['uuid'] = dev_uuid
+                self['device'][dev_uuid] = (dev_type, dev_info)
+                self['vbd_refs'].append(dev_uuid)                
+                return dev_uuid                
                 
         return ''
 

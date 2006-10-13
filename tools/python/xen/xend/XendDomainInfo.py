@@ -1826,8 +1826,33 @@ class XendDomainInfo:
 
         return dev_uuid
 
+    def create_vbd_with_vdi(self, xenapi_vbd, vdi_image_path):
+        """Create a VBD using a VDI from XendStorageRepository.
+
+        @param xenapi_vbd: vbd struct from the Xen API
+        @param vdi_image_path: VDI UUID
+        @rtype: string
+        @return: uuid of the device
+        """
+        xenapi_vbd['image'] = vdi_image_path
+        dev_uuid = self.info.device_add('tap', cfg_xenapi = xenapi_vbd)
+        if not dev_uuid:
+            raise XendError('Failed to create device')
+
+        if self.state in (XEN_API_VM_POWER_STATE_RUNNING,):
+            sxpr = self.info.device_sxpr(dev_uuid)
+            devid = self.getDeviceController('tap').createDevice(sxpr)
+            raise XendError("Device creation failed")
+
+        return dev_uuid
+
     def create_vif(self, xenapi_vif):
-        
+        """Create VIF device from the passed struct in Xen API format.
+
+        @param xenapi_vif: Xen API VIF Struct.
+        @rtype: string
+        @return: UUID
+        """
         dev_uuid = self.info.device_add('vif', cfg_xenapi = xenapi_vif)
         if not dev_uuid:
             raise XendError('Failed to create device')

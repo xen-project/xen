@@ -21,15 +21,23 @@ from optparse import *
 from pprint import pprint
 from types import DictType
 
+MB = 1024 * 1024
+
 HOST_INFO_FORMAT = '%-20s: %-50s'
 VM_LIST_FORMAT = '%(name_label)-18s %(memory_actual)-5s %(vcpus_number)-5s'\
-                 ' %(power_state)-12s %(uuid)-32s'
-
+                 ' %(power_state)-12s %(uuid)-36s'
+SR_LIST_FORMAT = '%(name_label)-18s %(uuid)-36s %(physical_size)-10s' \
+                 '%(type)-10s'
+VDI_LIST_FORMAT = '%(name_label)-18s %(uuid)-36s %(virtual_size)-8s '\
+                  '%(sector_size)-8s'
 LOGIN = ('atse', 'passwd')
 
 COMMANDS = {
     'host-info': ('', 'Get Xen Host Info'),
+    'sr-list':   ('', 'List all SRs'),
     'vbd-create': ('<domname> <pycfg>', 'Create VBD attached to domname'),
+    'vdi-list'  : ('', 'List all VDI'),
+    'vdi-delete': ('<vdi_uuid>', 'Delete VDI'),
     'vif-create': ('<domname> <pycfg>', 'Create VIF attached to domname'),
 
     'vm-create': ('<pycfg>', 'Create VM with python config'),
@@ -84,8 +92,8 @@ def execute(fn, *args):
 
 def _connect(*args):
     server = ServerProxy('httpu:///var/run/xend/xmlrpc.sock')        
-    session = execute(server.Session.login_with_password, *LOGIN)
-    host = execute(server.Session.get_this_host, session)
+    session = execute(server.session.login_with_password, *LOGIN)
+    host = execute(server.session.get_this_host, session)
     return (server, session)
 
 def _stringify(adict):
@@ -248,8 +256,55 @@ def xapi_vif_create(*args):
     vif_uuid = execute(server.VIF.create, session, cfg)
     print 'Done. (%s)' % vif_uuid
 
-    
+def xapi_vdi_list(*args):
+    server, session = _connect()
+    vdis = execute(server.VDI.get_all, session)
 
+    print VDI_LIST_FORMAT % {'name_label': 'VDI Label',
+                             'uuid' : 'UUID',
+                             'virtual_size': 'Sectors',
+                             'sector_size': 'Sector Size'}
+    
+    for vdi in vdis:
+        vdi_struct = execute(server.VDI.get_record, session, vdi)
+        print VDI_LIST_FORMAT % vdi_struct
+
+def xapi_sr_list(*args):
+    server, session = _connect()
+    srs = execute(server.SR.get_all, session)
+    print SR_LIST_FORMAT % {'name_label': 'SR Label',
+                            'uuid' : 'UUID',
+                            'physical_size': 'Size',
+                            'type': 'Type'}
+    for sr in srs:
+        sr_struct = execute(server.SR.get_record, session, sr)
+        sr_struct['physical_size'] = int(sr_struct['physical_size'])/MB
+        print SR_LIST_FORMAT % sr_struct
+
+def xapi_vdi_create(*args):
+    server, session = _connect()
+    cfg = _read_python_cfg(args[0])
+
+    srs = execute(server.SR.get_all, session)
+    sr = srs[0]
+    cfg['SR'] = sr
+
+    size = (cfg['virtual_size'] * cfg['sector_size'])/MB
+    print 'Creating VDI of size: %dMB' % size
+    uuid = execute(server.VDI.create, session, cfg)
+    print 'Done. (%s)' % uuid
+
+def xapi_vdi_delete(*args):
+    server, session = _connect()
+    if len(args) < 1:
+        raise OptionError('Not enough arguments')
+
+    vdi_uuid = args[0]
+    print 'Deleting VDI %s' % vdi_uuid
+    result = execute(server.VDI.destroy, session, vdi_uuid)
+    print 'Done.'
+    
+        
 #
 # Command Line Utils
 #

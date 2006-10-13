@@ -31,7 +31,8 @@ XEND_STORAGE_MAX_IGNORE = -1
 XEND_STORAGE_DIR = "/var/lib/xend/storage/"
 XEND_STORAGE_QCOW_FILENAME = "%s.qcow"
 XEND_STORAGE_IMG_FILENAME = "%s.img"
-DF_COMMAND = "df -kl"
+XEND_STORAGE_VDICFG_FILENAME = "%s.vdi.xml"
+DF_COMMAND = "df -lP"
 QCOW_CREATE_COMMAND = "/usr/sbin/qcow-create %d %s %s"
 
 KB = 1024
@@ -55,7 +56,7 @@ class XendStorageRepository:
         """
         @keyword storage_dir: Where the images will be stored.
         @type    storage_dir: string
-        @keyword storage_max: Maximum disk space to use in KB.
+        @keyword storage_max: Maximum disk space to use in bytes.
         @type    storage_max: int
 
         @ivar    storage_free: storage space free for this repository
@@ -82,7 +83,7 @@ class XendStorageRepository:
     def _sr_uuid(self):
         uuid_file = os.path.join(XEND_STORAGE_DIR, 'uuid')
         try:
-            if os.path.exists(uuid_file):
+            if uuid_file and os.path.exists(uuid_file):
                 return open(uuid_file, 'r').read().strip()
             else:
                 new_uuid = uuid.createString()
@@ -114,16 +115,25 @@ class XendStorageRepository:
                     if image_uuid not in self.images:
                         image_file = XEND_STORAGE_IMG_FILENAME % image_uuid
                         qcow_file = XEND_STORAGE_QCOW_FILENAME % image_uuid
-                        image_path = os.path.join(XEND_STORAGE_DIR,
-                                                  image_file)
+                        cfg_file = XEND_STORAGE_VDICFG_FILENAME % image_uuid
+                        
+                        image_path = os.path.join(XEND_STORAGE_DIR,image_file)
                         qcow_path = os.path.join(XEND_STORAGE_DIR, qcow_file)
-                        image_size_kb = (os.stat(image_path).st_size)/1024
+                        cfg_path = os.path.join(XEND_STORAGE_DIR, cfg_file)
+
+                        qcow_size = os.stat(qcow_path).st_size
+                        image_size = os.stat(image_path).st_size
 
                         vdi = XendQCOWVDI(image_uuid, self.uuid,
-                                          qcow_path, image_path,
-                                          image_size_kb, image_size_kb)
+                                          qcow_path, image_path, cfg_path,
+                                          image_size,
+                                          qcow_size + image_size)
+                        
+                        if cfg_path and os.path.exists(cfg_path):
+                            vdi.load_config(cfg_path)
+                        
                         self.images[image_uuid] = vdi
-                        total_used += image_size_kb
+                        total_used += image_size
 
             # remove images that aren't valid
             for image_uuid in self.images.keys():
@@ -147,7 +157,7 @@ class XendStorageRepository:
     def _get_df(self):
         """Returns the output of 'df' in a dictionary where the keys
         are the Linux device numbers, and the values are it's corresponding
-        free space in KB.
+        free space in bytes
 
         @rtype: dictionary
         """
@@ -162,7 +172,7 @@ class XendStorageRepository:
         return devnum_free
 
     def _get_free_space(self):
-        """Returns the amount of free space in KB available in the storage
+        """Returns the amount of free space in bytes available in the storage
         partition. Note that this may not be used if the storage repository
         is initialised with a maximum size in storage_max.
 
@@ -175,7 +185,7 @@ class XendStorageRepository:
         raise DeviceInvalidError("Device not found for storage path: %s" %
                                  self.storage_dir)
 
-    def _has_space_available_for(self, size_kb):
+    def _has_space_available_for(self, size_bytes):
         """Returns whether there is enough space for an image in the
         partition which the storage_dir resides on.
 
@@ -184,15 +194,15 @@ class XendStorageRepository:
         if self.storage_max != -1:
             return self.storage_free
         
-        kb_free = self._get_free_space()
+        bytes_free = self._get_free_space()
         try:
-            if size_kb < kb_free:
+            if size_bytes < bytes_free:
                 return True
         except DeviceInvalidError:
             pass
         return False
 
-    def create_image(self, desired_size_kb):
+    def _create_image_files(self, desired_size_bytes):
         """Create an image and return its assigned UUID.
 
         @param desired_size_kb: Desired image size in KB.
@@ -204,23 +214,28 @@ class XendStorageRepository:
         """
         self.lock.acquire()
         try:
-            if not self._has_space_available_for(desired_size_kb):
+            if not self._has_space_available_for(desired_size_bytes):
                 raise XendError("Not enough space")
 
             image_uuid = uuid.createString()
             # create file based image
             image_path = os.path.join(XEND_STORAGE_DIR,
                                       XEND_STORAGE_IMG_FILENAME % image_uuid)
-            block = '\x00' * 1024
+            
+            if image_path and os.path.exists(image_path):
+                raise XendError("Image with same UUID alreaady exists:" %
+                                image_uuid)
+            
+            block = '\x00' * KB
             img = open(image_path, 'w')
-            for i in range(desired_size_kb):
+            for i in range(desired_size_bytes/KB):
                 img.write(block)
             img.close()
             
             # TODO: create qcow image
             qcow_path = os.path.join(XEND_STORAGE_DIR,
                                      XEND_STORAGE_QCOW_FILENAME % image_uuid)
-            cmd = QCOW_CREATE_COMMAND % (desired_size_kb/1024,
+            cmd = QCOW_CREATE_COMMAND % (desired_size_bytes/MB,
                                          qcow_path, image_path)
 
             rc, output = commands.getstatusoutput(cmd)
@@ -233,7 +248,7 @@ class XendStorageRepository:
             return image_uuid
         finally:
             self.lock.release()
-        
+
     def destroy_image(self, image_uuid):
         """Destroy an image that is managed by this storage repository.
 
@@ -247,9 +262,12 @@ class XendStorageRepository:
                 # TODO: check if it is being used?
                 qcow_path = self.images[image_uuid].qcow_path
                 image_path = self.images[image_uuid].image_path
+                cfg_path = self.images[image_uuid].cfg_path
                 try:
                     os.unlink(qcow_path)
                     os.unlink(image_path)
+                    if cfg_path and os.path.exists(cfg_path):
+                        os.unlink(cfg_path)
                 except OSError:
                     # TODO: log warning
                     pass
@@ -272,7 +290,7 @@ class XendStorageRepository:
         finally:
             self.lock.release()
 
-    def free_space_kb(self):
+    def free_space_bytes(self):
         """Returns the amount of available space in KB.
         @rtype: int
         """
@@ -282,7 +300,7 @@ class XendStorageRepository:
         finally:
             self.lock.release()
             
-    def total_space_kb(self):
+    def total_space_bytes(self):
         """Returns the total usable space of the storage repo in KB.
         @rtype: int
         """
@@ -295,7 +313,7 @@ class XendStorageRepository:
         finally:
             self.lock.release()
             
-    def used_space_kb(self):
+    def used_space_bytes(self):
         """Returns the total amount of space used by this storage repository.
         @rtype: int
         """
@@ -308,25 +326,72 @@ class XendStorageRepository:
         finally:
             self.lock.release()
 
-    def used_space_bytes(self):
-        return self.used_space_kb() * KB
-    def free_space_bytes(self):
-        return self.free_space_kb() * KB
-    def total_space_bytes(self):
-        return self.total_space_kb() * KB
-
     def is_valid_vdi(self, vdi_uuid):
         return (vdi_uuid in self.images)
+
+    def create_image(self, vdi_struct):
+        image_uuid = None
+        try:
+            sector_count = int(vdi_struct.get('virtual_size', 0))
+            sector_size = int(vdi_struct.get('sector_size', 1024))
+            size_bytes = (sector_count * sector_size)
+            
+            image_uuid = self._create_image_files(size_bytes)
+            image = self.images[image_uuid]
+            image_cfg = {
+                'sector_size': sector_size,
+                'virtual_size': sector_count,
+                'type': vdi_struct.get('type', 'system'),
+                'name_label': vdi_struct.get('name_label', ''),
+                'name_description': vdi_struct.get('name_description', ''),
+                'sharable': bool(vdi_struct.get('sharable', False)),
+                'read_only': bool(vdi_struct.get('read_only', False)),
+            }
+
+            # load in configuration from vdi_struct
+            image.load_config_dict(image_cfg)
+
+            # save configuration to file
+            cfg_filename =  XEND_STORAGE_VDICFG_FILENAME % image_uuid
+            cfg_path = os.path.join(XEND_STORAGE_DIR, cfg_filename)
+            image.save_config(cfg_path)
+            
+        except Exception, e:
+            # cleanup before raising exception
+            if image_uuid:
+                self.destroy_image(image_uuid)
+                
+            raise
+
+        return image_uuid
+        
+    def xen_api_get_by_label(self, label):
+        self.lock.acquire()
+        try:
+            for image_uuid, val in self.images.values():
+                if val.name_label == label:
+                    return image_uuid
+            return None
+        finally:
+            self.lock.release()
+
+    def xen_api_get_by_uuid(self, image_uuid):
+        self.lock.acquire()
+        try:
+            return self.images.get(image_uuid)
+        finally:
+            self.lock.release()        
+    
 
 # remove everything below this line!!
 if __name__ == "__main__":
     xsr = XendStorageRepository()
-    print 'Free Space: %d MB' % (xsr.free_space_kb()/1024)
+    print 'Free Space: %d MB' % (xsr.free_space_bytes()/MB)
     print "Create Image:",
-    print xsr.create_image(10 * 1024)
+    print xsr._create_image_files(10 * MB)
     print 'Delete all images:'
     for image_uuid in xsr.list_images():
         print image_uuid,
-        xsr.destroy_image(image_uuid)
+        xsr._destroy_image_files(image_uuid)
 
     print
