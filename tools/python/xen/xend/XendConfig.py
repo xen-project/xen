@@ -809,7 +809,7 @@ class XendConfig(dict):
                 return dev_uuid
             
             elif dev_type == 'tap':
-                dev_info['uname'] = 'tap:qcow:%s' % cfg_xenapi.get('image')
+                dev_info['uname'] = 'qcow:%s' % cfg_xenapi.get('image')
                 dev_info['dev'] = '%s:disk' % cfg_xenapi.get('device')
                 
                 if cfg_xenapi.get('mode') == 'RW':
