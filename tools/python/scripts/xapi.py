@@ -37,6 +37,7 @@ COMMANDS = {
     'sr-list':   ('', 'List all SRs'),
     'vbd-create': ('<domname> <pycfg>', 'Create VBD attached to domname'),
     'vdi-list'  : ('', 'List all VDI'),
+    'vdi-rename': ('<vdi_uuid> <new_name>', 'Rename VDI'),
     'vdi-delete': ('<vdi_uuid>', 'Delete VDI'),
     'vif-create': ('<domname> <pycfg>', 'Create VIF attached to domname'),
 
@@ -302,6 +303,17 @@ def xapi_vdi_delete(*args):
     vdi_uuid = args[0]
     print 'Deleting VDI %s' % vdi_uuid
     result = execute(server.VDI.destroy, session, vdi_uuid)
+    print 'Done.'
+
+def xapi_vdi_rename(*args):
+    server, session = _connect()
+    if len(args) < 2:
+        raise OptionError('Not enough arguments')
+
+    vdi_uuid = args[0]
+    vdi_name = args[1]
+    print 'Renaming VDI %s to %s' % (vdi_uuid, vdi_name)
+    result = execute(server.VDI.set_name_label, session, vdi_uuid, vdi_name)
     print 'Done.'
     
         

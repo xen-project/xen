@@ -27,7 +27,25 @@ from xmlrpclib import dumps, loads
 KB = 1024
 MB = 1024 * 1024
 
-class XendVDI:
+class AutoSaveObject(object):
+    
+    def __init__(self):
+        self.cfg_path = None
+        self.auto_save = True
+        object
+
+    def save_config(self, cfg_file = None):
+        raise NotImplementedError()
+    
+    def __setattr__(self, name, value):
+        """A very simple way of making sure all attribute changes are
+        flushed to disk.
+        """
+        object.__setattr__(self, name, value)
+        if name != 'auto_save' and getattr(self, 'auto_save', False):
+            self.save_config()
+
+class XendVDI(AutoSaveObject):
     """Generic Xen API compatible VDI representation.
 
     @cvar SAVED_CFG: list of configuration attributes to save.
@@ -60,20 +78,20 @@ class XendVDI:
         self.read_only = False
         self.type = "system"
 
-        self.cfg_path = None
-
     def load_config_dict(self, cfg):
         """Loads configuration into the object from a dict.
 
         @param cfg: configuration dict
         @type  cfg: dict
         """
+        self.auto_save = False
         for key in self.SAVED_CFG:
             if key in cfg:
                 if key in self.SAVED_CFG_INT:
                     setattr(self, key, int(cfg[key]))
                 else:
                     setattr(self, key, cfg[key])
+        self.auto_save = True
 
     def load_config(self, cfg_path):
         """Loads configuration from an XMLRPC parameter format.
@@ -128,10 +146,12 @@ class XendQCOWVDI(XendVDI):
     def __init__(self, uuid, sr_uuid, qcow_path, image_path, cfg_path,
                  vsize, psize):
         XendVDI.__init__(self, uuid, sr_uuid)
+        self.auto_save = False
         self.qcow_path = qcow_path
         self.image_path = image_path
         self.cfg_path = cfg_path
         self.physical_utilisation = psize
         self.virtual_size = vsize
         self.sector_size = 1
+        self.auto_save = True
 
