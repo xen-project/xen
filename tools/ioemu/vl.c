@@ -2810,7 +2810,7 @@ int parse_host_port(struct sockaddr_in *saddr, const char *str)
     if (buf[0] == '\0') {
         saddr->sin_addr.s_addr = 0;
     } else {
-        if (parse_host(&saddr, buf) == -1)
+        if (parse_host(saddr, buf) == -1)
             return -1;
     }
     port = strtol(p, (char **)&r, 0);
