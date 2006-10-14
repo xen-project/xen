@@ -74,11 +74,6 @@ static int write_msg(int fd, int msgtype, void *ptr, void *ptr2);
 static int read_msg(int fd, int msgtype, void *ptr);
 static driver_list_entry_t *active_disks[MAX_DISK_TYPES];
 
-void sig_handler(int sig)
-{
-	run = 0;	
-}
-
 static void init_driver_list(void)
 {
 	int i;
@@ -669,6 +664,7 @@ int main(int argc, char *argv[])
 		goto open_failed;
 	}
 
+
  retry:
 	/* Set up store connection and watch. */
 	h = xs_daemon_open();
@@ -682,15 +678,11 @@ int main(int argc, char *argv[])
                 } else goto open_failed;
 	}
 	
-	ret = add_blockdevice_probe_watch(h, "Domain-0");
+	ret = setup_probe_watch(h);
 	if (ret != 0) {
 		DPRINTF("Failed adding device probewatch\n");
-                if (count < MAX_ATTEMPTS) {
-                        count++;
-                        sleep(2);
-                        xs_daemon_close(h);
-                        goto retry;
-                } else goto open_failed;
+		xs_daemon_close(h);
+		goto open_failed;
 	}
 
 	ioctl(ctlfd, BLKTAP_IOCTL_SETMODE, BLKTAP_MODE_INTERPOSE );

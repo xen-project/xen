@@ -20,12 +20,8 @@ install: build
 
 #  Tools etc.
 RM 	:= rm -f
-GDB	:= gdb
 INCS	:= -I. -I-
 DEFS	:= 
-LDFLAGS	:= 
-CFLAGS	+= -Wpointer-arith -Wcast-qual -Wno-unused -Wno-format
-CFLAGS	+= -Wmissing-prototypes -pipe
 
 #  What object files need building for the program
 OBJS	:= mbootpack.o buildimage.o
@@ -35,22 +31,22 @@ DEPFLAGS = -Wp,-MD,.$(@F).d
 DEPS     = .*.d
 
 mbootpack: $(OBJS)
-	$(HOSTCC) -o $@ $(filter-out %.a, $^)
+	$(HOSTCC) $(HOSTCFLAGS) -o $@ $(filter-out %.a, $^)
 
 .PHONY: clean
 clean:
 	$(RM) mbootpack *.o $(DEPS) bootsect setup bzimage_header.c bin2c
 
 bootsect: bootsect.S
-	$(CC) $(CFLAGS) $(INCS) $(DEFS) -D__MB_ASM -c bootsect.S -o bootsect.o
+	$(CC) -m32 $(INCS) $(DEFS) -D__MB_ASM -c bootsect.S -o bootsect.o
 	$(LD) -m elf_i386 -Ttext 0x0 -s --oformat binary bootsect.o -o $@
 
 setup: setup.S
-	$(CC) $(CFLAGS) $(INCS) $(DEFS) -D__MB_ASM -c setup.S -o setup.o
+	$(CC) -m32 $(INCS) $(DEFS) -D__MB_ASM -c setup.S -o setup.o
 	$(LD) -m elf_i386 -Ttext 0x0 -s --oformat binary setup.o -o $@
 
 bin2c: bin2c.o 
-	$(HOSTCC) -o $@ $^ 
+	$(HOSTCC) $(HOSTCFLAGS) -o $@ $^ 
 
 bzimage_header.c: bootsect setup bin2c
 	./bin2c -n 8 -b1 -a bzimage_bootsect bootsect > bzimage_header.c
@@ -59,11 +55,8 @@ bzimage_header.c: bootsect setup bin2c
 buildimage.c: bzimage_header.c
 	@
 
-%.o: %.S
-	$(HOSTCC) $(DEPFLAGS) $(CFLAGS) $(INCS) $(DEFS) -c $< -o $@
-
 %.o: %.c
-	$(HOSTCC) $(DEPFLAGS) $(CFLAGS) $(INCS) $(DEFS) -c $< -o $@
+	$(HOSTCC) $(DEPFLAGS) $(HOSTCFLAGS) $(INCS) $(DEFS) -c $< -o $@
 
 .PRECIOUS: $(OBJS) $(OBJS:.o=.c) $(DEPS)
 .SUFFIXES: 

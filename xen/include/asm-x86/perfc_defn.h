@@ -81,8 +81,8 @@ PERFCOUNTER_CPU(shadow_up_pointer,     "shadow unshadow by up-pointer")
 PERFCOUNTER_CPU(shadow_unshadow_bf,    "shadow unshadow brute-force")
 PERFCOUNTER_CPU(shadow_get_page_fail,  "shadow_get_page_from_l1e failed")
 PERFCOUNTER_CPU(shadow_guest_walk,     "shadow walks guest tables")
-PERFCOUNTER_CPU(shadow_walk_cache_hit, "shadow walk-cache hits")
-PERFCOUNTER_CPU(shadow_walk_cache_miss, "shadow walk-cache misses")
+PERFCOUNTER_CPU(shadow_invlpg,         "shadow emulates invlpg")
+PERFCOUNTER_CPU(shadow_invlpg_fault,   "shadow invlpg faults")
 
 
 /*#endif*/ /* __XEN_PERFC_DEFN_H__ */

@@ -267,12 +267,13 @@ int
 main(int argc, char **argv)
 {
     struct xs_handle *xsh;
-    xs_transaction_t xth;
+    xs_transaction_t xth = XBT_NULL;
     int ret = 0, socket = 0;
     int prefix = 0;
     int tidy = 0;
     int upto = 0;
     int recurse = 0;
+    int transaction;
 
     while (1) {
 	int c, index = 0;
@@ -339,18 +340,28 @@ main(int argc, char **argv)
     }
 #endif
 
+#if defined(CLIENT_read)
+    transaction = (argc - optind) > 1;
+#elif defined(CLIENT_write)
+    transaction = (argc - optind) > 2;
+#else
+    transaction = 1;
+#endif
+
     xsh = socket ? xs_daemon_open() : xs_domain_open();
     if (xsh == NULL)
 	err(1, socket ? "xs_daemon_open" : "xs_domain_open");
 
   again:
-    xth = xs_transaction_start(xsh);
-    if (xth == XBT_NULL)
-	errx(1, "couldn't start transaction");
+    if (transaction) {
+	xth = xs_transaction_start(xsh);
+	if (xth == XBT_NULL)
+	    errx(1, "couldn't start transaction");
+    }
 
     ret = perform(optind, argc, argv, xsh, xth, prefix, tidy, upto, recurse);
 
-    if (!xs_transaction_end(xsh, xth, ret)) {
+    if (transaction && !xs_transaction_end(xsh, xth, ret)) {
 	if (ret == 0 && errno == EAGAIN) {
 	    output_pos = 0;
 	    goto again;

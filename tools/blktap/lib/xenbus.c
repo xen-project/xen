@@ -166,60 +166,58 @@ static void ueblktap_setup(struct xs_handle *h, char *bepath)
 		goto fail;
 	}
 
-        deverr = xs_gather(h, bepath, "physical-device", "%li", &pdev, NULL);
-        if (!deverr) {
-                DPRINTF("pdev set to %ld\n",pdev);
-                if (be->pdev && be->pdev != pdev) {
-                        DPRINTF("changing physical-device not supported");
-                        goto fail;
-                }
-                be->pdev = pdev;
-        }
+	deverr = xs_gather(h, bepath, "physical-device", "%li", &pdev, NULL);
+	if (!deverr) {
+		DPRINTF("pdev set to %ld\n",pdev);
+		if (be->pdev && be->pdev != pdev) {
+			DPRINTF("changing physical-device not supported");
+			goto fail;
+		}
+		be->pdev = pdev;
+	}
 
-        /*Check to see if device is to be opened read-only*/
-        asprintf(&path, "%s/%s", bepath, "read-only");
-        if (xs_exists(h, path))
-                be->readonly = 1;
+	/* Check to see if device is to be opened read-only. */
+	asprintf(&path, "%s/%s", bepath, "read-only");
+	if (xs_exists(h, path))
+		be->readonly = 1;
 
-        if (be->blkif == NULL) {
+	if (be->blkif == NULL) {
+		/* Front end dir is a number, which is used as the handle. */
+		p = strrchr(be->frontpath, '/') + 1;
+		handle = strtoul(p, NULL, 0);
 
-                /* Front end dir is a number, which is used as the handle. */
-                p = strrchr(be->frontpath, '/') + 1;
-                handle = strtoul(p, NULL, 0);
-
-                be->blkif = alloc_blkif(be->frontend_id);
-	
-                if (be->blkif == NULL)
-                        goto fail;
+		be->blkif = alloc_blkif(be->frontend_id);
+		if (be->blkif == NULL)
+			goto fail;
 
 		be->blkif->be_id = get_be_id(bepath);
 		
-                /*Insert device specific info*/
-                blk = malloc(sizeof(blkif_info_t));
+		/* Insert device specific info, */
+		blk = malloc(sizeof(blkif_info_t));
 		if (!blk) {
 			DPRINTF("Out of memory - blkif_info_t\n");
 			goto fail;
 		}
-                er = xs_gather(h, bepath, "params", NULL, &blk->params, NULL);
-                if (er)
-                        goto fail;
-                be->blkif->info = blk;
+		er = xs_gather(h, bepath, "params", NULL, &blk->params, NULL);
+		if (er)
+			goto fail;
+		be->blkif->info = blk;
 		
-                if (deverr) {
-                        /*Dev number was not available, try to set manually*/
-                        pdev = convert_dev_name_to_num(blk->params);
-                        be->pdev = pdev;
-                }
+		if (deverr) {
+			/*Dev number was not available, try to set manually*/
+			pdev = convert_dev_name_to_num(blk->params);
+			be->pdev = pdev;
+		}
 
-                er = blkif_init(be->blkif, handle, be->pdev, be->readonly);
-
-                if (er != 0) {
-                        DPRINTF("Unable to open device %s\n",blk->params);
+		er = blkif_init(be->blkif, handle, be->pdev, be->readonly);
+		if (er != 0) {
+			DPRINTF("Unable to open device %s\n",blk->params);
 			goto fail;
 		}
 
-                DPRINTF("[BECHG]: ADDED A NEW BLKIF (%s)\n", bepath);
-        }	
+		DPRINTF("[BECHG]: ADDED A NEW BLKIF (%s)\n", bepath);
+	}
+
 	/* Supply the information about the device to xenstore */
 	er = xs_printf(h, be->backpath, "sectors", "%lu",
 			be->blkif->ops->get_size(be->blkif));
@@ -283,10 +281,10 @@ static void ueblktap_probe(struct xs_handle *h, struct xenbus_watch *w,
 	 *asserts that xenstore structure is always 7 levels deep
 	 *e.g. /local/domain/0/backend/vbd/1/2049
 	 */
-        len = strsep_len(bepath, '/', 7);
-        if (len < 0) 
-		goto free_be;     
-        bepath[len] = '\0';
+	len = strsep_len(bepath, '/', 7);
+	if (len < 0) 
+		goto free_be;
+	bepath[len] = '\0';
 	
 	be = malloc(sizeof(*be));
 	if (!be) {
@@ -318,22 +316,21 @@ static void ueblktap_probe(struct xs_handle *h, struct xenbus_watch *w,
 		if ( (be != NULL) && (be->blkif != NULL) ) 
 			backend_remove(h, be);
 		else goto free_be;
-	        if (bepath)
+		if (bepath)
 			free(bepath);
 		return;
 	}
 	
-        /* Are we already tracking this device? */
-        if (be_exists_be(bepath)) {
+	/* Are we already tracking this device? */
+	if (be_exists_be(bepath))
 		goto free_be;
-	}
 	
 	be->backpath = bepath;
-       	be->frontpath = frontend;
+	be->frontpath = frontend;
 	
-        list_add(&be->list, &belist);
+	list_add(&be->list, &belist);
 	
-        DPRINTF("[PROBE]\tADDED NEW DEVICE (%s)\n", bepath);
+	DPRINTF("[PROBE]\tADDED NEW DEVICE (%s)\n", bepath);
 	DPRINTF("\tFRONTEND (%s),(%ld)\n", frontend,be->frontend_id);
 	
 	ueblktap_setup(h, bepath);	
@@ -342,11 +339,10 @@ static void ueblktap_probe(struct xs_handle *h, struct xenbus_watch *w,
  free_be:
 	if (frontend)
 		free(frontend);
-        if (bepath)
+	if (bepath)
 		free(bepath);
 	if (be) 
 		free(be);
-	return;
 }
 
 /**
@@ -356,16 +352,10 @@ static void ueblktap_probe(struct xs_handle *h, struct xenbus_watch *w,
  *are created, we initalise the state and attach a disk.
  */
 
-int add_blockdevice_probe_watch(struct xs_handle *h, const char *domname)
+int add_blockdevice_probe_watch(struct xs_handle *h, const char *domid)
 {
-	char *domid, *path;
+	char *path;
 	struct xenbus_watch *vbd_watch;
-	int er;
-	
-	domid = get_dom_domid(h, domname);
-
-	DPRINTF("%s: %s\n", 
-		domname, (domid != NULL) ? domid : "[ not found! ]");
 	
 	asprintf(&path, "/local/domain/%s/backend/tap", domid);
 	if (path == NULL) 
@@ -378,10 +368,67 @@ int add_blockdevice_probe_watch(struct xs_handle *h, const char *domname)
 	}	
 	vbd_watch->node     = path;
 	vbd_watch->callback = ueblktap_probe;
-	er = register_xenbus_watch(h, vbd_watch);
-	if (er == 0) {
+	if (register_xenbus_watch(h, vbd_watch) != 0) {
 		DPRINTF("ERROR: adding vbd probe watch %s\n", path);
 		return -EINVAL;
 	}
 	return 0;
+}
+
+/* Asynch callback to check for /local/domain/<DOMID>/name */
+void check_dom(struct xs_handle *h, struct xenbus_watch *w, 
+	       const char *bepath_im)
+{
+	char *domid;
+
+	domid = get_dom_domid(h);
+	if (domid == NULL)
+		return;
+
+	add_blockdevice_probe_watch(h, domid);
+	free(domid);
+	unregister_xenbus_watch(h, w);
+}
+
+/* We must wait for xend to register /local/domain/<DOMID> */
+int watch_for_domid(struct xs_handle *h)
+{
+	struct xenbus_watch *domid_watch;
+	char *path = NULL;
+
+	asprintf(&path, "/local/domain");
+	if (path == NULL) 
+		return -ENOMEM;
+
+	domid_watch = malloc(sizeof(struct xenbus_watch));
+	if (domid_watch == NULL) {
+		DPRINTF("ERROR: unable to malloc domid_watch [%s]\n", path);
+		return -EINVAL;
+	}	
+
+	domid_watch->node     = path;
+	domid_watch->callback = check_dom;
+
+	if (register_xenbus_watch(h, domid_watch) != 0) {
+		DPRINTF("ERROR: adding vbd probe watch %s\n", path);
+		return -EINVAL;
+	}
+
+	DPRINTF("Set async watch for /local/domain\n");
+
+	return 0;
+}
+
+int setup_probe_watch(struct xs_handle *h)
+{
+	char *domid;
+	int ret;
+	
+	domid = get_dom_domid(h);
+	if (domid == NULL)
+		return watch_for_domid(h);
+
+	ret = add_blockdevice_probe_watch(h, domid);
+	free(domid);
+	return ret;
 }

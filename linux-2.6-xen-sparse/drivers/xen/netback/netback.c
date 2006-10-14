@@ -70,14 +70,15 @@ static struct timer_list net_timer;
 
 static struct sk_buff_head rx_queue;
 
-static unsigned long mmap_vstart;
-#define MMAP_VADDR(_req) (mmap_vstart + ((_req) * PAGE_SIZE))
-
-static void *rx_mmap_area;
+static struct page **mmap_pages;
+static inline unsigned long idx_to_kaddr(unsigned int idx)
+{
+	return (unsigned long)pfn_to_kaddr(page_to_pfn(mmap_pages[idx]));
+}
 
 #define PKT_PROT_LEN 64
 
-static struct {
+static struct pending_tx_info {
 	netif_tx_request_t req;
 	netif_t *netif;
 } pending_tx_info[MAX_PENDING_REQS];
@@ -373,14 +374,22 @@ static u16 netbk_gop_frag(netif_t *netif, struct netbk_rx_meta *meta,
 		   flipped. */
 		meta->copy = 1;
 		copy_gop = npo->copy + npo->copy_prod++;
-		copy_gop->source.domid = DOMID_SELF;
+		copy_gop->flags = GNTCOPY_dest_gref;
+		if (PageForeign(page)) {
+			struct pending_tx_info *src_pend =
+				&pending_tx_info[page->index];
+			copy_gop->source.domid = src_pend->netif->domid;
+			copy_gop->source.u.ref = src_pend->req.gref;
+			copy_gop->flags |= GNTCOPY_source_gref;
+		} else {
+			copy_gop->source.domid = DOMID_SELF;
+			copy_gop->source.u.gmfn = old_mfn;
+		}
 		copy_gop->source.offset = offset;
-		copy_gop->source.u.gmfn = old_mfn;
 		copy_gop->dest.domid = netif->domid;
 		copy_gop->dest.offset = 0;
 		copy_gop->dest.u.ref = req->gref;
 		copy_gop->len = size;
-		copy_gop->flags = GNTCOPY_dest_gref;
 	} else {
 		meta->copy = 0;
 		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
@@ -792,10 +801,27 @@ void netif_deschedule_work(netif_t *netif)
 }
 
 
+static void tx_add_credit(netif_t *netif)
+{
+	unsigned long max_burst;
+
+	/*
+	 * Allow a burst big enough to transmit a jumbo packet of up to 128kB.
+	 * Otherwise the interface can seize up due to insufficient credit.
+	 */
+	max_burst = RING_GET_REQUEST(&netif->tx, netif->tx.req_cons)->size;
+	max_burst = min(max_burst, 131072UL);
+	max_burst = max(max_burst, netif->credit_bytes);
+
+	netif->remaining_credit = min(netif->remaining_credit +
+				      netif->credit_bytes,
+				      max_burst);
+}
+
 static void tx_credit_callback(unsigned long data)
 {
 	netif_t *netif = (netif_t *)data;
-	netif->remaining_credit = netif->credit_bytes;
+	tx_add_credit(netif);
 	netif_schedule_work(netif);
 }
 
@@ -819,7 +845,7 @@ inline static void net_tx_action_dealloc(void)
 	gop = tx_unmap_ops;
 	while (dc != dp) {
 		pending_idx = dealloc_ring[MASK_PEND_IDX(dc++)];
-		gnttab_set_unmap_op(gop, MMAP_VADDR(pending_idx),
+		gnttab_set_unmap_op(gop, idx_to_kaddr(pending_idx),
 				    GNTMAP_host_map,
 				    grant_tx_handle[pending_idx]);
 		gop++;
@@ -857,20 +883,28 @@ static void netbk_tx_err(netif_t *netif, netif_tx_request_t *txp, RING_IDX end)
 	netif_put(netif);
 }
 
-static int netbk_count_requests(netif_t *netif, netif_tx_request_t *txp,
-				int work_to_do)
+static int netbk_count_requests(netif_t *netif, netif_tx_request_t *first,
+				netif_tx_request_t *txp, int work_to_do)
 {
-	netif_tx_request_t *first = txp;
 	RING_IDX cons = netif->tx.req_cons;
 	int frags = 0;
 
-	while (txp->flags & NETTXF_more_data) {
+	if (!(first->flags & NETTXF_more_data))
+		return 0;
+
+	do {
 		if (frags >= work_to_do) {
 			DPRINTK("Need more frags\n");
 			return -frags;
 		}
 
-		txp = RING_GET_REQUEST(&netif->tx, cons + frags);
+		if (unlikely(frags >= MAX_SKB_FRAGS)) {
+			DPRINTK("Too many frags\n");
+			return -frags;
+		}
+
+		memcpy(txp, RING_GET_REQUEST(&netif->tx, cons + frags),
+		       sizeof(*txp));
 		if (txp->size > first->size) {
 			DPRINTK("Frags galore\n");
 			return -frags;
@@ -884,30 +918,28 @@ static int netbk_count_requests(netif_t *netif, netif_tx_request_t *txp,
 				txp->offset, txp->size);
 			return -frags;
 		}
-	}
+	} while ((txp++)->flags & NETTXF_more_data);
 
 	return frags;
 }
 
 static gnttab_map_grant_ref_t *netbk_get_requests(netif_t *netif,
 						  struct sk_buff *skb,
+						  netif_tx_request_t *txp,
 						  gnttab_map_grant_ref_t *mop)
 {
 	struct skb_shared_info *shinfo = skb_shinfo(skb);
 	skb_frag_t *frags = shinfo->frags;
-	netif_tx_request_t *txp;
 	unsigned long pending_idx = *((u16 *)skb->data);
-	RING_IDX cons = netif->tx.req_cons;
 	int i, start;
 
 	/* Skip first skb fragment if it is on same page as header fragment. */
 	start = ((unsigned long)shinfo->frags[0].page == pending_idx);
 
-	for (i = start; i < shinfo->nr_frags; i++) {
-		txp = RING_GET_REQUEST(&netif->tx, cons++);
+	for (i = start; i < shinfo->nr_frags; i++, txp++) {
 		pending_idx = pending_ring[MASK_PEND_IDX(pending_cons++)];
 
-		gnttab_set_map_op(mop++, MMAP_VADDR(pending_idx),
+		gnttab_set_map_op(mop++, idx_to_kaddr(pending_idx),
 				  GNTMAP_host_map | GNTMAP_readonly,
 				  txp->gref, netif->domid);
 
@@ -940,7 +972,7 @@ static int netbk_tx_check_mop(struct sk_buff *skb,
 		netif_put(netif);
 	} else {
 		set_phys_to_machine(
-			__pa(MMAP_VADDR(pending_idx)) >> PAGE_SHIFT,
+			__pa(idx_to_kaddr(pending_idx)) >> PAGE_SHIFT,
 			FOREIGN_FRAME(mop->dev_bus_addr >> PAGE_SHIFT));
 		grant_tx_handle[pending_idx] = mop->handle;
 	}
@@ -957,7 +989,7 @@ static int netbk_tx_check_mop(struct sk_buff *skb,
 		newerr = (++mop)->status;
 		if (likely(!newerr)) {
 			set_phys_to_machine(
-				__pa(MMAP_VADDR(pending_idx))>>PAGE_SHIFT,
+				__pa(idx_to_kaddr(pending_idx))>>PAGE_SHIFT,
 				FOREIGN_FRAME(mop->dev_bus_addr>>PAGE_SHIFT));
 			grant_tx_handle[pending_idx] = mop->handle;
 			/* Had a previous error? Invalidate this fragment. */
@@ -1005,7 +1037,7 @@ static void netbk_fill_frags(struct sk_buff *skb)
 
 		pending_idx = (unsigned long)frag->page;
 		txp = &pending_tx_info[pending_idx].req;
-		frag->page = virt_to_page(MMAP_VADDR(pending_idx));
+		frag->page = virt_to_page(idx_to_kaddr(pending_idx));
 		frag->size = txp->size;
 		frag->page_offset = txp->offset;
 
@@ -1018,7 +1050,7 @@ static void netbk_fill_frags(struct sk_buff *skb)
 int netbk_get_extras(netif_t *netif, struct netif_extra_info *extras,
 		     int work_to_do)
 {
-	struct netif_extra_info *extra;
+	struct netif_extra_info extra;
 	RING_IDX cons = netif->tx.req_cons;
 
 	do {
@@ -1027,18 +1059,18 @@ int netbk_get_extras(netif_t *netif, struct netif_extra_info *extras,
 			return -EBADR;
 		}
 
-		extra = (struct netif_extra_info *)
-			RING_GET_REQUEST(&netif->tx, cons);
-		if (unlikely(!extra->type ||
-			     extra->type >= XEN_NETIF_EXTRA_TYPE_MAX)) {
+		memcpy(&extra, RING_GET_REQUEST(&netif->tx, cons),
+		       sizeof(extra));
+		if (unlikely(!extra.type ||
+			     extra.type >= XEN_NETIF_EXTRA_TYPE_MAX)) {
 			netif->tx.req_cons = ++cons;
-			DPRINTK("Invalid extra type: %d\n", extra->type);
+			DPRINTK("Invalid extra type: %d\n", extra.type);
 			return -EINVAL;
 		}
 
-		memcpy(&extras[extra->type - 1], extra, sizeof(*extra));
+		memcpy(&extras[extra.type - 1], &extra, sizeof(extra));
 		netif->tx.req_cons = ++cons;
-	} while (extra->flags & XEN_NETIF_EXTRA_FLAG_MORE);
+	} while (extra.flags & XEN_NETIF_EXTRA_FLAG_MORE);
 
 	return work_to_do;
 }
@@ -1073,6 +1105,7 @@ static void net_tx_action(unsigned long unused)
 	struct sk_buff *skb;
 	netif_t *netif;
 	netif_tx_request_t txreq;
+	netif_tx_request_t txfrags[MAX_SKB_FRAGS];
 	struct netif_extra_info extras[XEN_NETIF_EXTRA_TYPE_MAX - 1];
 	u16 pending_idx;
 	RING_IDX i;
@@ -1101,6 +1134,7 @@ static void net_tx_action(unsigned long unused)
 		i = netif->tx.req_cons;
 		rmb(); /* Ensure that we see the request before we copy it. */
 		memcpy(&txreq, RING_GET_REQUEST(&netif->tx, i), sizeof(txreq));
+
 		/* Credit-based scheduling. */
 		if (txreq.size > netif->remaining_credit) {
 			unsigned long now = jiffies;
@@ -1109,25 +1143,27 @@ static void net_tx_action(unsigned long unused)
 				msecs_to_jiffies(netif->credit_usec / 1000);
 
 			/* Timer could already be pending in rare cases. */
-			if (timer_pending(&netif->credit_timeout))
-				break;
+			if (timer_pending(&netif->credit_timeout)) {
+				netif_put(netif);
+				continue;
+			}
 
 			/* Passed the point where we can replenish credit? */
 			if (time_after_eq(now, next_credit)) {
 				netif->credit_timeout.expires = now;
-				netif->remaining_credit = netif->credit_bytes;
+				tx_add_credit(netif);
 			}
 
 			/* Still too big to send right now? Set a callback. */
 			if (txreq.size > netif->remaining_credit) {
-				netif->remaining_credit = 0;
 				netif->credit_timeout.data     =
 					(unsigned long)netif;
 				netif->credit_timeout.function =
 					tx_credit_callback;
 				__mod_timer(&netif->credit_timeout,
 					    next_credit);
-				break;
+				netif_put(netif);
+				continue;
 			}
 		}
 		netif->remaining_credit -= txreq.size;
@@ -1146,18 +1182,12 @@ static void net_tx_action(unsigned long unused)
 			}
 		}
 
-		ret = netbk_count_requests(netif, &txreq, work_to_do);
+		ret = netbk_count_requests(netif, &txreq, txfrags, work_to_do);
 		if (unlikely(ret < 0)) {
 			netbk_tx_err(netif, &txreq, i - ret);
 			continue;
 		}
 		i += ret;
-
-		if (unlikely(ret > MAX_SKB_FRAGS)) {
-			DPRINTK("Too many frags\n");
-			netbk_tx_err(netif, &txreq, i);
-			continue;
-		}
 
 		if (unlikely(txreq.size < ETH_HLEN)) {
 			DPRINTK("Bad packet size: %d\n", txreq.size);
@@ -1201,7 +1231,7 @@ static void net_tx_action(unsigned long unused)
 			}
 		}
 
-		gnttab_set_map_op(mop, MMAP_VADDR(pending_idx),
+		gnttab_set_map_op(mop, idx_to_kaddr(pending_idx),
 				  GNTMAP_host_map | GNTMAP_readonly,
 				  txreq.gref, netif->domid);
 		mop++;
@@ -1227,7 +1257,7 @@ static void net_tx_action(unsigned long unused)
 
 		pending_cons++;
 
-		mop = netbk_get_requests(netif, skb, mop);
+		mop = netbk_get_requests(netif, skb, txfrags, mop);
 
 		netif->tx.req_cons = i;
 		netif_schedule_work(netif);
@@ -1260,8 +1290,8 @@ static void net_tx_action(unsigned long unused)
 		}
 
 		data_len = skb->len;
-		memcpy(skb->data, 
-		       (void *)(MMAP_VADDR(pending_idx)|txp->offset),
+		memcpy(skb->data,
+		       (void *)(idx_to_kaddr(pending_idx)|txp->offset),
 		       data_len);
 		if (data_len < txp->size) {
 			/* Append the packet payload as a fragment. */
@@ -1315,18 +1345,10 @@ static void netif_idx_release(u16 pending_idx)
 
 static void netif_page_release(struct page *page)
 {
-	u16 pending_idx = page - virt_to_page(mmap_vstart);
-
 	/* Ready for next use. */
 	set_page_count(page, 1);
 
-	netif_idx_release(pending_idx);
-}
-
-static void netif_rx_page_release(struct page *page)
-{
-	/* Ready for next use. */
-	set_page_count(page, 1);
+	netif_idx_release(page->index);
 }
 
 irqreturn_t netif_be_int(int irq, void *dev_id, struct pt_regs *regs)
@@ -1446,27 +1468,17 @@ static int __init netback_init(void)
 	init_timer(&net_timer);
 	net_timer.data = 0;
 	net_timer.function = net_alarm;
-    
-	page = balloon_alloc_empty_page_range(MAX_PENDING_REQS);
-	if (page == NULL)
+
+	mmap_pages = alloc_empty_pages_and_pagevec(MAX_PENDING_REQS);
+	if (mmap_pages == NULL) {
+		printk("%s: out of memory\n", __FUNCTION__);
 		return -ENOMEM;
-
-	mmap_vstart = (unsigned long)pfn_to_kaddr(page_to_pfn(page));
-
-	for (i = 0; i < MAX_PENDING_REQS; i++) {
-		page = virt_to_page(MMAP_VADDR(i));
-		set_page_count(page, 1);
-		SetPageForeign(page, netif_page_release);
 	}
 
-	page = balloon_alloc_empty_page_range(NET_RX_RING_SIZE);
-	BUG_ON(page == NULL);
-	rx_mmap_area = pfn_to_kaddr(page_to_pfn(page));
-
-	for (i = 0; i < NET_RX_RING_SIZE; i++) {
-		page = virt_to_page(rx_mmap_area + (i * PAGE_SIZE));
-		set_page_count(page, 1);
-		SetPageForeign(page, netif_rx_page_release);
+	for (i = 0; i < MAX_PENDING_REQS; i++) {
+		page = mmap_pages[i];
+		SetPageForeign(page, netif_page_release);
+		page->index = i;
 	}
 
 	pending_cons = 0;

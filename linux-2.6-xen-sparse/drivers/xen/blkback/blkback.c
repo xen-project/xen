@@ -56,8 +56,6 @@ static int blkif_reqs = 64;
 module_param_named(reqs, blkif_reqs, int, 0);
 MODULE_PARM_DESC(reqs, "Number of blkback requests to allocate");
 
-static int mmap_pages;
-
 /* Run-time switchable: /sys/module/blkback/parameters/ */
 static unsigned int log_stats = 0;
 static unsigned int debug_lvl = 0;
@@ -87,8 +85,7 @@ static DECLARE_WAIT_QUEUE_HEAD(pending_free_wq);
 
 #define BLKBACK_INVALID_HANDLE (~0)
 
-static unsigned long mmap_vstart;
-static unsigned long *pending_vaddrs;
+static struct page **pending_pages;
 static grant_handle_t *pending_grant_handles;
 
 static inline int vaddr_pagenr(pending_req_t *req, int seg)
@@ -98,7 +95,8 @@ static inline int vaddr_pagenr(pending_req_t *req, int seg)
 
 static inline unsigned long vaddr(pending_req_t *req, int seg)
 {
-	return pending_vaddrs[vaddr_pagenr(req, seg)];
+	unsigned long pfn = page_to_pfn(pending_pages[vaddr_pagenr(req, seg)]);
+	return (unsigned long)pfn_to_kaddr(pfn);
 }
 
 #define pending_handle(_req, _seg) \
@@ -506,52 +504,43 @@ static void make_response(blkif_t *blkif, unsigned long id,
 
 static int __init blkif_init(void)
 {
-	struct page *page;
-	int i;
+	int i, mmap_pages;
 
 	if (!is_running_on_xen())
 		return -ENODEV;
 
-	mmap_pages            = blkif_reqs * BLKIF_MAX_SEGMENTS_PER_REQUEST;
-
-	page = balloon_alloc_empty_page_range(mmap_pages);
-	if (page == NULL)
-		return -ENOMEM;
-	mmap_vstart = (unsigned long)pfn_to_kaddr(page_to_pfn(page));
+	mmap_pages = blkif_reqs * BLKIF_MAX_SEGMENTS_PER_REQUEST;
 
 	pending_reqs          = kmalloc(sizeof(pending_reqs[0]) *
 					blkif_reqs, GFP_KERNEL);
 	pending_grant_handles = kmalloc(sizeof(pending_grant_handles[0]) *
 					mmap_pages, GFP_KERNEL);
-	pending_vaddrs        = kmalloc(sizeof(pending_vaddrs[0]) *
-					mmap_pages, GFP_KERNEL);
-	if (!pending_reqs || !pending_grant_handles || !pending_vaddrs) {
-		kfree(pending_reqs);
-		kfree(pending_grant_handles);
-		kfree(pending_vaddrs);
-		printk("%s: out of memory\n", __FUNCTION__);
-		return -ENOMEM;
-	}
+	pending_pages         = alloc_empty_pages_and_pagevec(mmap_pages);
+
+	if (!pending_reqs || !pending_grant_handles || !pending_pages)
+		goto out_of_memory;
+
+	for (i = 0; i < mmap_pages; i++)
+		pending_grant_handles[i] = BLKBACK_INVALID_HANDLE;
 
 	blkif_interface_init();
-	
-	printk("%s: reqs=%d, pages=%d, mmap_vstart=0x%lx\n",
-	       __FUNCTION__, blkif_reqs, mmap_pages, mmap_vstart);
-	BUG_ON(mmap_vstart == 0);
-	for (i = 0; i < mmap_pages; i++) {
-		pending_vaddrs[i] = mmap_vstart + (i << PAGE_SHIFT);
-		pending_grant_handles[i] = BLKBACK_INVALID_HANDLE;
-	}
 
 	memset(pending_reqs, 0, sizeof(pending_reqs));
 	INIT_LIST_HEAD(&pending_free);
 
 	for (i = 0; i < blkif_reqs; i++)
 		list_add_tail(&pending_reqs[i].free_list, &pending_free);
-    
+
 	blkif_xenbus_init();
 
 	return 0;
+
+ out_of_memory:
+	kfree(pending_reqs);
+	kfree(pending_grant_handles);
+	free_empty_pages_and_pagevec(pending_pages, mmap_pages);
+	printk("%s: out of memory\n", __FUNCTION__);
+	return -ENOMEM;
 }
 
 module_init(blkif_init);

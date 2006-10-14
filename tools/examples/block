@@ -377,7 +377,6 @@ mount it read-write in a guest domain."
       "")
         claim_lock "block"
         success
-        echo happy gun \"$t\" >>/tmp/block.$$
         release_lock "block"
 	;;
     esac

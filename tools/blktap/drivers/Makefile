@@ -10,11 +10,8 @@ QCOW_UTIL    = img2qcow qcow2raw qcow-create
 INSTALL_DIR  = /usr/sbin
 LIBAIO_DIR   = ../../libaio/src
 
-CFLAGS   += -fPIC
-CFLAGS   += -Wall
 CFLAGS   += -Werror
 CFLAGS   += -Wno-unused
-CFLAGS   += -g3
 CFLAGS   += -fno-strict-aliasing
 CFLAGS   += -I $(XEN_LIBXC) -I $(LIBAIO_DIR)
 CFLAGS   += $(INCLUDES) -I. -I../../xenstore 

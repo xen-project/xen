@@ -390,7 +390,7 @@ struct page *vm_normal_page(struct vm_area_struct *vma, unsigned long addr, pte_
 
 	if (vma->vm_flags & VM_PFNMAP) {
 		unsigned long off = (addr - vma->vm_start) >> PAGE_SHIFT;
-		if ((pfn == vma->vm_pgoff + off) || !pfn_valid(pfn))
+		if (pfn == vma->vm_pgoff + off)
 			return NULL;
 		if (!is_cow_mapping(vma->vm_flags))
 			return NULL;
@@ -405,7 +405,8 @@ struct page *vm_normal_page(struct vm_area_struct *vma, unsigned long addr, pte_
 	 * Remove this test eventually!
 	 */
 	if (unlikely(!pfn_valid(pfn))) {
-		print_bad_pte(vma, pte, addr);
+		if (!(vma->vm_flags & VM_RESERVED))
+			print_bad_pte(vma, pte, addr);
 		return NULL;
 	}
 

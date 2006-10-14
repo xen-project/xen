@@ -29,19 +29,6 @@ extern void vmcs_dump_vcpu(void);
 extern void vmx_init_vmcs_config(void);
 extern void setup_vmcs_dump(void);
 
-enum {
-    VMX_CPU_STATE_PAE_ENABLED=0,
-    VMX_CPU_STATE_LME_ENABLED,
-    VMX_CPU_STATE_LMA_ENABLED,
-    VMX_CPU_STATE_ASSIST_ENABLED,
-};
-
-#define VMX_LONG_GUEST(ed)    \
-  (test_bit(VMX_CPU_STATE_LMA_ENABLED, &ed->arch.hvm_vmx.cpu_state))
-
-#define VMX_PAE_GUEST(ed)       \
-  (test_bit(VMX_CPU_STATE_PAE_ENABLED, &ed->arch.hvm_vmx.cpu_state))
-
 struct vmcs_struct {
     u32 vmcs_revision_id;
     unsigned char data [0]; /* vmcs size is read from MSR */
@@ -93,10 +80,10 @@ struct arch_vmx_struct {
     unsigned long        cpu_shadow_cr4; /* copy of guest read shadow CR4 */
     unsigned long        cpu_cr2; /* save CR2 */
     unsigned long        cpu_cr3;
-    unsigned long        cpu_state;
     unsigned long        cpu_based_exec_control;
     struct vmx_msr_state msr_content;
     void                *io_bitmap_a, *io_bitmap_b;
+    unsigned long        vmxassist_enabled:1; 
 };
 
 #define vmx_schedule_tail(next)         \

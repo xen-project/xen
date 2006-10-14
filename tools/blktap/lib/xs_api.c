@@ -106,7 +106,7 @@ again:
 	if (!xs_transaction_end(xs, xth, ret)) {
 		if (ret == 0 && errno == EAGAIN)
 			goto again;
-                else
+		else
 			ret = errno;
 	}
 
@@ -118,25 +118,25 @@ again:
 int xs_printf(struct xs_handle *h, const char *dir, const char *node, 
 	      const char *fmt, ...)
 {
-        char *buf, *path;
-        va_list ap;
-        int ret;
+	char *buf, *path;
+	va_list ap;
+	int ret;
 	
-        va_start(ap, fmt);
-        ret = vasprintf(&buf, fmt, ap);
-        va_end(ap);
+	va_start(ap, fmt);
+	ret = vasprintf(&buf, fmt, ap);
+	va_end(ap);
 	
-        asprintf(&path, "%s/%s", dir, node);
+	asprintf(&path, "%s/%s", dir, node);
 	
-        if ( (path == NULL) || (buf == NULL) )
+	if ((path == NULL) || (buf == NULL))
 		return 0;
 
-        ret = xs_write(h, XBT_NULL, path, buf, strlen(buf)+1);
+	ret = xs_write(h, XBT_NULL, path, buf, strlen(buf)+1);
 	
-        free(buf);
-        free(path);
+	free(buf);
+	free(path);
 	
-        return ret;
+	return ret;
 }
 
 
@@ -165,7 +165,7 @@ int xs_exists(struct xs_handle *h, const char *path)
  * This assumes that the domain name we are looking for is unique. 
  * Name parameter Domain-0 
  */
-char *get_dom_domid(struct xs_handle *h, const char *name)
+char *get_dom_domid(struct xs_handle *h)
 {
 	char **e, *val, *domid = NULL;
 	unsigned int num, len;
@@ -179,7 +179,9 @@ char *get_dom_domid(struct xs_handle *h, const char *name)
 	}
 	
 	e = xs_directory(h, xth, "/local/domain", &num);
-	
+	if (e == NULL)
+		return NULL;
+
 	for (i = 0; (i < num) && (domid == NULL); i++) {
 		asprintf(&path, "/local/domain/%s/name", e[i]);
 		val = xs_read(h, xth, path, &len);
@@ -187,7 +189,7 @@ char *get_dom_domid(struct xs_handle *h, const char *name)
 		if (val == NULL)
 			continue;
 		
-		if (strcmp(val, name) == 0) {
+		if (strcmp(val, DOMNAME) == 0) {
 			/* match! */
 			asprintf(&path, "/local/domain/%s/domid", e[i]);
 			domid = xs_read(h, xth, path, &len);
@@ -249,12 +251,12 @@ int convert_dev_name_to_num(char *name) {
 		ret = BASE_DEV_VAL;
 	}
 
-        free(p_sd);
-        free(p_hd);
-        free(p_xvd);
-        free(p_plx);
-        free(alpha);
-        
+	free(p_sd);
+	free(p_hd);
+	free(p_xvd);
+	free(p_plx);
+	free(alpha);
+
 	return ret;
 }
 
@@ -281,42 +283,39 @@ int register_xenbus_watch(struct xs_handle *h, struct xenbus_watch *watch)
 {
 	/* Pointer in ascii is the token. */
 	char token[sizeof(watch) * 2 + 1];
-	int er;
-	
+
 	sprintf(token, "%lX", (long)watch);
-	if (find_watch(token)) 
-	{
+	if (find_watch(token)) {
 		DPRINTF("watch collision!\n");
 		return -EINVAL;
 	}
 	
-	er = xs_watch(h, watch->node, token);
-	if (er != 0) {
-		list_add(&watch->list, &watches);
-	} 
-        
-	return er;
+	if (!xs_watch(h, watch->node, token)) {
+		DPRINTF("unable to set watch!\n");
+		return -EINVAL;
+	}
+
+	list_add(&watch->list, &watches);
+
+	return 0;
 }
 
 int unregister_xenbus_watch(struct xs_handle *h, struct xenbus_watch *watch)
 {
 	char token[sizeof(watch) * 2 + 1];
-	int er;
 	
 	sprintf(token, "%lX", (long)watch);
-	if (!find_watch(token))
-	{
+	if (!find_watch(token)) {
 		DPRINTF("no such watch!\n");
 		return -EINVAL;
 	}
-	
-	
-	er = xs_unwatch(h, watch->node, token);
+
+	if (!xs_unwatch(h, watch->node, token))
+		DPRINTF("XENBUS Failed to release watch %s: %i\n",
+			watch->node, er);
+
 	list_del(&watch->list);
 	
-	if (er == 0)
-		DPRINTF("XENBUS Failed to release watch %s: %i\n",
-		     watch->node, er);
 	return 0;
 }
 
@@ -354,14 +353,10 @@ int xs_fire_next_watch(struct xs_handle *h)
 	token = res[XS_WATCH_TOKEN];
 	
 	w = find_watch(token);
-	if (!w)
-	{
-		DPRINTF("unregistered watch fired\n");
-		goto done;
-	}
-	w->callback(h, w, node);
-	
- done:
+	if (w)
+		w->callback(h, w, node);
+
 	free(res);
+
 	return 1;
 }

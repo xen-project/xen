@@ -361,6 +361,11 @@ class HVMImageHandler(ImageHandler):
             else:
                 ret += ['-vnc', '%d' % vncdisplay]
             ret += ['-k', 'en-us']
+            vnclisten = sxp.child_value(config, 'vnclisten')
+            if not(vnclisten):
+                vnclisten = xen.xend.XendRoot.instance().get_vnclisten_address()
+            if vnclisten:
+                ret += ['-vnclisten', vnclisten]
         return ret
 
     def createDeviceModel(self):

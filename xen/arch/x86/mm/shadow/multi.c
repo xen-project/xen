@@ -1375,80 +1375,6 @@ static int shadow_set_l1e(struct vcpu *v,
 
 
 /**************************************************************************/
-/* These functions take a vcpu and a virtual address, and return a pointer
- * to the appropriate level N entry from the shadow tables.  
- * If the necessary tables are not present in the shadow, they return NULL. */
-
-/* N.B. The use of GUEST_PAGING_LEVELS here is correct.  If the shadow has
- * more levels than the guest, the upper levels are always fixed and do not 
- * reflect any information from the guest, so we do not use these functions 
- * to access them. */
-
-#if GUEST_PAGING_LEVELS >= 4
-static shadow_l4e_t *
-shadow_get_l4e(struct vcpu *v, unsigned long va)
-{
-    /* Reading the top level table is always valid. */
-    return sh_linear_l4_table(v) + shadow_l4_linear_offset(va);
-}
-#endif /* GUEST_PAGING_LEVELS >= 4 */
-
-
-#if GUEST_PAGING_LEVELS >= 3
-static shadow_l3e_t *
-shadow_get_l3e(struct vcpu *v, unsigned long va)
-{
-#if GUEST_PAGING_LEVELS >= 4 /* 64bit... */
-    /* Get the l4 */
-    shadow_l4e_t *sl4e = shadow_get_l4e(v, va);
-    ASSERT(sl4e != NULL);
-    if ( !(shadow_l4e_get_flags(*sl4e) & _PAGE_PRESENT) )
-        return NULL;
-    ASSERT(valid_mfn(shadow_l4e_get_mfn(*sl4e)));
-    /* l4 was present; OK to get the l3 */
-    return sh_linear_l3_table(v) + shadow_l3_linear_offset(va);
-#else /* PAE... */
-    /* Top level is always mapped */
-    ASSERT(v->arch.shadow_vtable);
-    return ((shadow_l3e_t *)v->arch.shadow_vtable) + shadow_l3_linear_offset(va);
-#endif 
-}
-#endif /* GUEST_PAGING_LEVELS >= 3 */
-
-
-static shadow_l2e_t *
-shadow_get_l2e(struct vcpu *v, unsigned long va)
-{
-#if GUEST_PAGING_LEVELS >= 3  /* 64bit/PAE... */
-    /* Get the l3 */
-    shadow_l3e_t *sl3e = shadow_get_l3e(v, va);
-    if ( sl3e == NULL || !(shadow_l3e_get_flags(*sl3e) & _PAGE_PRESENT) )
-        return NULL;
-    ASSERT(valid_mfn(shadow_l3e_get_mfn(*sl3e)));
-    /* l3 was present; OK to get the l2 */
-#endif
-    return sh_linear_l2_table(v) + shadow_l2_linear_offset(va);
-}
-
-
-#if 0 // avoid the compiler warning for now...
-
-static shadow_l1e_t *
-shadow_get_l1e(struct vcpu *v, unsigned long va)
-{
-    /* Get the l2 */
-    shadow_l2e_t *sl2e = shadow_get_l2e(v, va);
-    if ( sl2e == NULL || !(shadow_l2e_get_flags(*sl2e) & _PAGE_PRESENT) )
-        return NULL;
-    ASSERT(valid_mfn(shadow_l2e_get_mfn(*sl2e)));
-    /* l2 was present; OK to get the l1 */
-    return sh_linear_l1_table(v) + shadow_l1_linear_offset(va);
-}
-
-#endif
-
-
-/**************************************************************************/
 /* Macros to walk pagetables.  These take the shadow of a pagetable and 
  * walk every "interesting" entry.  That is, they don't touch Xen mappings, 
  * and for 32-bit l2s shadowed onto PAE or 64-bit, they only touch every 
@@ -2050,6 +1976,12 @@ sh_make_monitor_table(struct vcpu *v)
  * they are needed.  The "demand" argument is non-zero when handling
  * a demand fault (so we know what to do about accessed bits &c).
  * If the necessary tables are not present in the guest, they return NULL. */
+
+/* N.B. The use of GUEST_PAGING_LEVELS here is correct.  If the shadow has
+ * more levels than the guest, the upper levels are always fixed and do not 
+ * reflect any information from the guest, so we do not use these functions 
+ * to access them. */
+
 #if GUEST_PAGING_LEVELS >= 4
 static shadow_l4e_t * shadow_get_and_create_l4e(struct vcpu *v, 
                                                 walk_t *gw, 
@@ -2324,11 +2256,11 @@ static void sh_destroy_l3_subshadow(struct vcpu *v,
 /* Tear down just a single 4-entry l3 on a 2-page l3 shadow. */
 {
     int i;
+    mfn_t sl3mfn = _mfn(maddr_from_mapped_domain_page(sl3e) >> PAGE_SHIFT);
     ASSERT((unsigned long)sl3e % (4 * sizeof (shadow_l3e_t)) == 0); 
     for ( i = 0; i < GUEST_L3_PAGETABLE_ENTRIES; i++ ) 
         if ( shadow_l3e_get_flags(sl3e[i]) & _PAGE_PRESENT ) 
-            sh_put_ref(v, shadow_l3e_get_mfn(sl3e[i]),
-                        maddr_from_mapped_domain_page(sl3e));
+            shadow_set_l3e(v, &sl3e[i], shadow_l3e_empty(), sl3mfn);
 }
 #endif
 
@@ -3223,26 +3155,62 @@ sh_invlpg(struct vcpu *v, unsigned long va)
  * instruction should be issued on the hardware, or 0 if it's safe not
  * to do so. */
 {
-    shadow_l2e_t *ptr_sl2e = shadow_get_l2e(v, va);
+    shadow_l2e_t sl2e;
+    
+    perfc_incrc(shadow_invlpg);
 
-    // XXX -- might be a good thing to prefetch the va into the shadow
-
-    // no need to flush anything if there's no SL2...
-    //
-    if ( !ptr_sl2e )
+    /* First check that we can safely read the shadow l2e.  SMP/PAE linux can
+     * run as high as 6% of invlpg calls where we haven't shadowed the l2 
+     * yet. */
+#if SHADOW_PAGING_LEVELS == 4
+    {
+        shadow_l3e_t sl3e;
+        if ( !(shadow_l4e_get_flags(
+                   sh_linear_l4_table(v)[shadow_l4_linear_offset(va)])
+               & _PAGE_PRESENT) )
+            return 0;
+        /* This must still be a copy-from-user because we don't have the
+         * shadow lock, and the higher-level shadows might disappear
+         * under our feet. */
+        if ( __copy_from_user(&sl3e, (sh_linear_l3_table(v) 
+                                      + shadow_l3_linear_offset(va)),
+                              sizeof (sl3e)) != 0 )
+        {
+            perfc_incrc(shadow_invlpg_fault);
+            return 0;
+        }
+        if ( (!shadow_l3e_get_flags(sl3e) & _PAGE_PRESENT) )
+            return 0;
+    }
+#elif SHADOW_PAGING_LEVELS == 3
+    if ( !(shadow_l3e_get_flags(
+          ((shadow_l3e_t *)v->arch.shadow_vtable)[shadow_l3_linear_offset(va)])
+           & _PAGE_PRESENT) )
+        // no need to flush anything if there's no SL2...
         return 0;
+#endif
+
+    /* This must still be a copy-from-user because we don't have the shadow
+     * lock, and the higher-level shadows might disappear under our feet. */
+    if ( __copy_from_user(&sl2e, 
+                          sh_linear_l2_table(v) + shadow_l2_linear_offset(va),
+                          sizeof (sl2e)) != 0 )
+    {
+        perfc_incrc(shadow_invlpg_fault);
+        return 0;
+    }
 
     // If there's nothing shadowed for this particular sl2e, then
     // there is no need to do an invlpg, either...
     //
-    if ( !(shadow_l2e_get_flags(*ptr_sl2e) & _PAGE_PRESENT) )
+    if ( !(shadow_l2e_get_flags(sl2e) & _PAGE_PRESENT) )
         return 0;
 
     // Check to see if the SL2 is a splintered superpage...
     // If so, then we'll need to flush the entire TLB (because that's
     // easier than invalidating all of the individual 4K pages).
     //
-    if ( (mfn_to_page(shadow_l2e_get_mfn(*ptr_sl2e))->count_info &
+    if ( (mfn_to_page(shadow_l2e_get_mfn(sl2e))->count_info &
           PGC_SH_type_mask) == PGC_SH_fl1_shadow )
     {
         local_flush_tlb();

@@ -133,7 +133,7 @@ void do_transaction_start(struct connection *conn, struct buffered_data *in)
 		return;
 	}
 
-	if (conn->transaction_started > quota_max_transaction) {
+	if (conn->id && conn->transaction_started > quota_max_transaction) {
 		send_error(conn, ENOSPC);
 		return;
 	}

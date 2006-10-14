@@ -455,7 +455,7 @@ out:
 	return error;
 }
 
-int microcode_update(void *buf, unsigned long len)
+int microcode_update(XEN_GUEST_HANDLE(void) buf, unsigned long len)
 {
 	int ret;
 
@@ -464,10 +464,15 @@ int microcode_update(void *buf, unsigned long len)
 		return -EINVAL;
 	}
 
+	if (len != (typeof(user_buffer_size))len) {
+		printk(KERN_ERR "microcode: too much data\n");
+		return -E2BIG;
+	}
+
 	mutex_lock(&microcode_mutex);
 
-	user_buffer = (void __user *) buf;
-	user_buffer_size = (int) len;
+	user_buffer = buf.p;
+	user_buffer_size = len;
 
 	ret = do_microcode_update();
 

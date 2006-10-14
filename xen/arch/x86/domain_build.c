@@ -401,11 +401,11 @@ int construct_dom0(struct domain *d,
            _p(dsi.v_start), _p(v_end));
     printk(" ENTRY ADDRESS: %p\n", _p(dsi.v_kernentry));
 
-    if ( (v_end - dsi.v_start) > (nr_pages * PAGE_SIZE) )
+    if ( ((v_end - dsi.v_start)>>PAGE_SHIFT) > nr_pages )
     {
         printk("Initial guest OS requires too much space\n"
                "(%luMB is greater than %luMB limit)\n",
-               (v_end-dsi.v_start)>>20, (nr_pages<<PAGE_SHIFT)>>20);
+               (v_end-dsi.v_start)>>20, nr_pages>>(20-PAGE_SHIFT));
         return -ENOMEM;
     }
 

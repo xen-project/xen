@@ -62,6 +62,7 @@ static void __netif_down(netif_t *netif)
 {
 	disable_irq(netif->irq);
 	netif_deschedule_work(netif);
+	del_timer_sync(&netif->credit_timeout);
 }
 
 static int net_open(struct net_device *dev)
@@ -125,7 +126,7 @@ static struct ethtool_ops network_ethtool_ops =
 	.get_link = ethtool_op_get_link,
 };
 
-netif_t *netif_alloc(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN])
+netif_t *netif_alloc(domid_t domid, unsigned int handle)
 {
 	int err = 0, i;
 	struct net_device *dev;
@@ -152,6 +153,7 @@ netif_t *netif_alloc(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN])
 	netif->credit_bytes = netif->remaining_credit = ~0UL;
 	netif->credit_usec  = 0UL;
 	init_timer(&netif->credit_timeout);
+	netif->credit_timeout.expires = jiffies;
 
 	dev->hard_start_xmit = netif_be_start_xmit;
 	dev->get_stats       = netif_be_get_stats;
@@ -167,20 +169,14 @@ netif_t *netif_alloc(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN])
 		printk(KERN_WARNING "netbk: WARNING: device '%s' has non-zero "
 		       "queue length (%lu)!\n", dev->name, dev->tx_queue_len);
 
-	for (i = 0; i < ETH_ALEN; i++)
-		if (be_mac[i] != 0)
-			break;
-	if (i == ETH_ALEN) {
-		/*
-		 * Initialise a dummy MAC address. We choose the numerically
-		 * largest non-broadcast address to prevent the address getting
-		 * stolen by an Ethernet bridge for STP purposes.
-		 * (FE:FF:FF:FF:FF:FF)
-		 */ 
-		memset(dev->dev_addr, 0xFF, ETH_ALEN);
-		dev->dev_addr[0] &= ~0x01;
-	} else
-		memcpy(dev->dev_addr, be_mac, ETH_ALEN);
+	/*
+	 * Initialise a dummy MAC address. We choose the numerically
+	 * largest non-broadcast address to prevent the address getting
+	 * stolen by an Ethernet bridge for STP purposes.
+	 * (FE:FF:FF:FF:FF:FF)
+	 */ 
+	memset(dev->dev_addr, 0xFF, ETH_ALEN);
+	dev->dev_addr[0] &= ~0x01;
 
 	rtnl_lock();
 	err = register_netdevice(dev);

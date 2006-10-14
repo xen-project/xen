@@ -186,16 +186,18 @@ static inline unsigned int RTN_PEND_IDX(pending_req_t *req, int idx) {
 
 #define BLKBACK_INVALID_HANDLE (~0)
 
-typedef struct mmap_page {
-	unsigned long start;
-	struct page *mpage;
-} mmap_page_t;
+static struct page **foreign_pages[MAX_DYNAMIC_MEM];
+static inline unsigned long idx_to_kaddr(
+	unsigned int mmap_idx, unsigned int req_idx, unsigned int sg_idx)
+{
+	unsigned int arr_idx = req_idx*BLKIF_MAX_SEGMENTS_PER_REQUEST + sg_idx;
+	unsigned long pfn = page_to_pfn(foreign_pages[mmap_idx][arr_idx]);
+	return (unsigned long)pfn_to_kaddr(pfn);
+}
 
-static mmap_page_t mmap_start[MAX_DYNAMIC_MEM];
 static unsigned short mmap_alloc = 0;
 static unsigned short mmap_lock = 0;
 static unsigned short mmap_inuse = 0;
-static unsigned long *pending_addrs[MAX_DYNAMIC_MEM];
 
 /******************************************************************
  * GRANT HANDLES
@@ -726,63 +728,21 @@ static void make_response(blkif_t *blkif, unsigned long id,
 static int req_increase(void)
 {
 	int i, j;
-	struct page *page;
-	int ret;
 
-	ret = -EINVAL;
 	if (mmap_alloc >= MAX_PENDING_REQS || mmap_lock) 
-		goto done;
+		return -EINVAL;
 
-#ifdef __ia64__
-	extern unsigned long alloc_empty_foreign_map_page_range(
-		unsigned long pages);
-	mmap_start[mmap_alloc].start = (unsigned long)
-		alloc_empty_foreign_map_page_range(mmap_pages);
-#else /* ! ia64 */
-	page = balloon_alloc_empty_page_range(mmap_pages);
-	ret = -ENOMEM;
-	if (page == NULL) {
-		printk("%s balloon_alloc_empty_page_range gave NULL\n", __FUNCTION__);
-		goto done;
-	}
+	pending_reqs[mmap_alloc]  = kzalloc(sizeof(pending_req_t)
+					    * blkif_reqs, GFP_KERNEL);
+	foreign_pages[mmap_alloc] = alloc_empty_pages_and_pagevec(mmap_pages);
 
-	/* Pin all of the pages. */
-	for (i=0; i<mmap_pages; i++)
-		get_page(&page[i]);
+	if (!pending_reqs[mmap_alloc] || !foreign_pages[mmap_alloc])
+		goto out_of_memory;
 
-	mmap_start[mmap_alloc].start = 
-		(unsigned long)pfn_to_kaddr(page_to_pfn(page));
-	mmap_start[mmap_alloc].mpage = page;
+	DPRINTK("%s: reqs=%d, pages=%d\n",
+		__FUNCTION__, blkif_reqs, mmap_pages);
 
-#endif
-
-	pending_reqs[mmap_alloc]  = kzalloc(sizeof(pending_req_t) *
-					blkif_reqs, GFP_KERNEL);
-	pending_addrs[mmap_alloc] = kzalloc(sizeof(unsigned long) *
-					mmap_pages, GFP_KERNEL);
-
-	ret = -ENOMEM;
-	if (!pending_reqs[mmap_alloc] || !pending_addrs[mmap_alloc]) {
-		kfree(pending_reqs[mmap_alloc]);
-		kfree(pending_addrs[mmap_alloc]);
-		WPRINTK("%s: out of memory\n", __FUNCTION__);
-		ret = -ENOMEM;
-		goto done;
-	}
-
-	ret = 0;
-
-	DPRINTK("%s: reqs=%d, pages=%d, mmap_vstart=0x%lx\n",
-	        __FUNCTION__, blkif_reqs, mmap_pages, 
-	       mmap_start[mmap_alloc].start);
-
-	BUG_ON(mmap_start[mmap_alloc].start == 0);
-
-	for (i = 0; i < mmap_pages; i++) 
-		pending_addrs[mmap_alloc][i] = 
-			mmap_start[mmap_alloc].start + (i << PAGE_SHIFT);
-
-	for (i = 0; i < MAX_PENDING_REQS ; i++) {
+	for (i = 0; i < MAX_PENDING_REQS; i++) {
 		list_add_tail(&pending_reqs[mmap_alloc][i].free_list, 
 			      &pending_free);
 		pending_reqs[mmap_alloc][i].mem_idx = mmap_alloc;
@@ -793,30 +753,24 @@ static int req_increase(void)
 
 	mmap_alloc++;
 	DPRINTK("# MMAPs increased to %d\n",mmap_alloc);
-done:
-	return ret;
+	return 0;
+
+ out_of_memory:
+	free_empty_pages_and_pagevec(foreign_pages[mmap_alloc], mmap_pages);
+	kfree(pending_reqs[mmap_alloc]);
+	WPRINTK("%s: out of memory\n", __FUNCTION__);
+	return -ENOMEM;
 }
 
 static void mmap_req_del(int mmap)
 {
-	int i;
-	struct page *page;
+	BUG_ON(!spin_is_locked(&pending_free_lock));
 
-	/*Spinlock already acquired*/
 	kfree(pending_reqs[mmap]);
-	kfree(pending_addrs[mmap]);
+	pending_reqs[mmap] = NULL;
 
-#ifdef __ia64__
-	/*Not sure what goes here yet!*/
-#else
-
-	/* Unpin all of the pages. */
-	page = mmap_start[mmap].mpage;
-	for (i=0; i<mmap_pages; i++)
-		put_page(&page[i]);
-
-	balloon_dealloc_empty_page_range(mmap_start[mmap].mpage, mmap_pages);
-#endif
+	free_empty_pages_and_pagevec(foreign_pages[mmap_alloc], mmap_pages);
+	foreign_pages[mmap] = NULL;
 
 	mmap_lock = 0;
 	DPRINTK("# MMAPs decreased to %d\n",mmap_alloc);
@@ -887,7 +841,7 @@ static void fast_flush_area(pending_req_t *req, int k_idx, int u_idx, int
 	mmap_idx = req->mem_idx;
 
 	for (i = 0; i < req->nr_pages; i++) {
-		kvaddr = MMAP_VADDR(mmap_start[mmap_idx].start, k_idx, i);
+		kvaddr = idx_to_kaddr(mmap_idx, k_idx, i);
 		uvaddr = MMAP_VADDR(info->user_vstart, u_idx, i);
 
 		khandle = &pending_handle(mmap_idx, k_idx, i);
@@ -896,7 +850,7 @@ static void fast_flush_area(pending_req_t *req, int k_idx, int u_idx, int
 			continue;
 		}
 		gnttab_set_unmap_op(&unmap[invcount], 
-			MMAP_VADDR(mmap_start[mmap_idx].start, k_idx, i), 
+				    idx_to_kaddr(mmap_idx, k_idx, i), 
 				    GNTMAP_host_map, khandle->kernel);
 		invcount++;
 
@@ -1030,9 +984,8 @@ static int blktap_read_ufe_ring(tap_blkif_t *info)
 			struct page *pg;
 			int offset;
 
-			uvaddr  = MMAP_VADDR(info->user_vstart, usr_idx, j);
-			kvaddr = MMAP_VADDR(mmap_start[mmap_idx].start, 
-					    pending_idx, j);
+			uvaddr = MMAP_VADDR(info->user_vstart, usr_idx, j);
+			kvaddr = idx_to_kaddr(mmap_idx, pending_idx, j);
 
 			pg = pfn_to_page(__pa(kvaddr) >> PAGE_SHIFT);
 			ClearPageReserved(pg);
@@ -1214,8 +1167,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 		uint32_t flags;
 
 		uvaddr = MMAP_VADDR(info->user_vstart, usr_idx, i);
-		kvaddr = MMAP_VADDR(mmap_start[mmap_idx].start, 
-				    pending_idx, i);
+		kvaddr = idx_to_kaddr(mmap_idx, pending_idx, i);
 		page = virt_to_page(kvaddr);
 
 		sector = req->sector_number + (8*i);
@@ -1267,8 +1219,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 		struct page *pg;
 
 		uvaddr = MMAP_VADDR(info->user_vstart, usr_idx, i/2);
-		kvaddr = MMAP_VADDR(mmap_start[mmap_idx].start, 
-				    pending_idx, i/2);
+		kvaddr = idx_to_kaddr(mmap_idx, pending_idx, i/2);
 
 		if (unlikely(map[i].status != 0)) {
 			WPRINTK("invalid kernel buffer -- "
@@ -1298,8 +1249,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 		unsigned long kvaddr;
 		struct page *pg;
 
-		kvaddr = MMAP_VADDR(mmap_start[mmap_idx].start, 
-				    pending_idx, i);
+		kvaddr = idx_to_kaddr(mmap_idx, pending_idx, i);
 		pg = pfn_to_page(__pa(kvaddr) >> PAGE_SHIFT);
 		SetPageReserved(pg);
 	}

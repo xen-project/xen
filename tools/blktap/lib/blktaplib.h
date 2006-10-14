@@ -193,8 +193,8 @@ typedef struct msg_pid {
 #define CTLMSG_PID_RSP     10
 
 /* xenstore/xenbus: */
-extern int add_blockdevice_probe_watch(struct xs_handle *h, 
-                                       const char *domname);
+#define DOMNAME "Domain-0"
+int setup_probe_watch(struct xs_handle *h);
 int xs_fire_next_watch(struct xs_handle *h);
 
 

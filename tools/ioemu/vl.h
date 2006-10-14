@@ -37,6 +37,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 #include "xenctrl.h"
 #include "xs.h"
 #include <xen/hvm/e820.h>
@@ -786,7 +788,7 @@ void sdl_display_init(DisplayState *ds, int full_screen);
 void cocoa_display_init(DisplayState *ds, int full_screen);
 
 /* vnc.c */
-int vnc_display_init(DisplayState *ds, int display, int find_unused);
+int vnc_display_init(DisplayState *ds, int display, int find_unused, struct sockaddr_in *addr);
 int vnc_start_viewer(int port);
 
 /* ide.c */

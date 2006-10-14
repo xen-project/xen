@@ -53,18 +53,18 @@ $(TARGET)-syms: boot/$(TARGET_SUBARCH).o $(ALL_OBJS) xen.lds
 	$(MAKE) -f $(BASEDIR)/Rules.mk $(BASEDIR)/common/symbols-dummy.o
 	$(LD) $(LDFLAGS) -T xen.lds -N \
 	    boot/$(TARGET_SUBARCH).o $(ALL_OBJS) \
-	    $(BASEDIR)/common/symbols-dummy.o -o $@
-	$(NM) -n $@ | $(BASEDIR)/tools/symbols >$(BASEDIR)/xen-syms.S
-	$(MAKE) -f $(BASEDIR)/Rules.mk $(BASEDIR)/xen-syms.o
+	    $(BASEDIR)/common/symbols-dummy.o -o $(@D)/.$(@F).0
+	$(NM) -n $(@D)/.$(@F).0 | $(BASEDIR)/tools/symbols >$(@D)/.$(@F).0.S
+	$(MAKE) -f $(BASEDIR)/Rules.mk $(@D)/.$(@F).0.o
 	$(LD) $(LDFLAGS) -T xen.lds -N \
 	    boot/$(TARGET_SUBARCH).o $(ALL_OBJS) \
-	    $(BASEDIR)/xen-syms.o -o $@
-	$(NM) -n $@ | $(BASEDIR)/tools/symbols >$(BASEDIR)/xen-syms.S
-	$(MAKE) -f $(BASEDIR)/Rules.mk $(BASEDIR)/xen-syms.o
+	    $(@D)/.$(@F).0.o -o $(@D)/.$(@F).1
+	$(NM) -n $(@D)/.$(@F).1 | $(BASEDIR)/tools/symbols >$(@D)/.$(@F).1.S
+	$(MAKE) -f $(BASEDIR)/Rules.mk $(@D)/.$(@F).1.o
 	$(LD) $(LDFLAGS) -T xen.lds -N \
 	    boot/$(TARGET_SUBARCH).o $(ALL_OBJS) \
-	    $(BASEDIR)/xen-syms.o -o $@
-	rm -f $(BASEDIR)/xen-syms.S $(BASEDIR)/xen-syms.o
+	    $(@D)/.$(@F).1.o -o $@
+	rm -f $(@D)/.$(@F).[0-9]*
 
 asm-offsets.s: $(TARGET_SUBARCH)/asm-offsets.c $(HDRS)
 	$(CC) $(CFLAGS) -S -o $@ $<
@@ -78,3 +78,4 @@ boot/mkelf32: boot/mkelf32.c
 .PHONY: clean
 clean::
 	rm -f asm-offsets.s xen.lds boot/*.o boot/*~ boot/core boot/mkelf32
+	rm -f $(BASEDIR)/.xen-syms.[0-9]*

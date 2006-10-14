@@ -25,8 +25,6 @@
  *
  */
 
-
-
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -77,20 +75,22 @@
 /* Bring in the bzImage boot sector and setup code */
 #include "bzimage_header.c"
 
+#define _p(x) ((void *)(unsigned long)(x))
+
 address_t place_mbi(long int size) 
 /* Find space at the top of *low* memory for the MBI and associated red tape */
 {
     address_t start;
     start = 0xa000 - size;
     if (start < 0x9000 + sizeof(bzimage_bootsect) + sizeof(bzimage_setup)) {
-        printf("Fatal: command-lines too long: need %i, have %i bytes\n",
+        printf("Fatal: command-lines too long: need %ld, have %ld bytes\n",
                size, 
-               0x1000 - (sizeof(bzimage_bootsect) + sizeof(bzimage_setup)));
-        exit(1);        
+               0x1000L - (sizeof(bzimage_bootsect) + sizeof(bzimage_setup)));
+        exit(1);
     }
     if (!quiet) {
         printf("Placed MBI and strings (%p+%p)\n", 
-               start, size);
+               _p(start), _p(size));
     }
     return start;
 }
@@ -108,7 +108,7 @@ void make_bzImage(section_t *sections,
     /* Patch the kernel and mbi addresses into the setup code */
     *(address_t *)(bzimage_setup + BZ_ENTRY_OFFSET) = eswap(entry);
     *(address_t *)(bzimage_setup + BZ_MBI_OFFSET) = eswap(mbi);
-    if (!quiet) printf("Kernel entry is %p, MBI is %p.\n", entry, mbi);
+    if (!quiet) printf("Kernel entry is %p, MBI is %p.\n",_p(entry), _p(mbi));
 
     /* Write out header and trampoline */
     if (fseek(fp, 0, SEEK_SET) < 0) {
@@ -127,8 +127,9 @@ void make_bzImage(section_t *sections,
         exit(1);
     }
 
-    if (!quiet) printf("Wrote bzImage header: %i + %i bytes.\n", 
-                       sizeof(bzimage_bootsect), sizeof(bzimage_setup));
+    if (!quiet) printf("Wrote bzImage header: %ld + %ld bytes.\n", 
+                       (long)sizeof(bzimage_bootsect),
+                       (long)sizeof(bzimage_setup));
 
     /* Sorted list of sections below 1MB: write them out */
     for (s = sections, i = 0; s; s = s->next) {
