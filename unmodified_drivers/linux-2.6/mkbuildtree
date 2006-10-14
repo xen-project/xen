@@ -19,6 +19,7 @@ mkdir -p include
 mkdir -p include/xen
 mkdir -p include/public
 mkdir -p include/asm
+mkdir -p include/asm/xen
 
 lndir -silent ${XL}/include/xen include/xen
 ln -sf ${XEN}/include/public include/xen/interface
@@ -47,6 +48,10 @@ i[34567]86)
 	ln -sf ${XL}/include/asm-ia64/hypercall.h include/asm
 	ln -sf ${XL}/include/asm-ia64/synch_bitops.h include/asm
 	ln -sf ${XL}/include/asm-ia64/maddr.h include/asm
+	ln -sf ${XL}/include/asm-ia64/xen/xcom_hcall.h include/asm/xen
+	ln -sf ${XL}/include/asm-ia64/xen/xencomm.h include/asm/xen
+ 	ln -sf ${XL}/arch/ia64/xen/xcom_mini.c platform-pci
+ 	ln -sf ${XL}/arch/ia64/xen/xencomm.c platform-pci
 	;;
 *)
 	echo unknown architecture $uname
