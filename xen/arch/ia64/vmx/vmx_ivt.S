@@ -782,8 +782,10 @@ ENTRY(vmx_virtualization_fault)
     ;;
     cmp.eq p6,p0=EVENT_MOV_FROM_AR,r24
     cmp.eq p7,p0=EVENT_MOV_FROM_RR,r24
-    (p6) br.dptk.many asm_mov_from_ar
-    (p7) br.dptk.many asm_mov_from_rr
+    cmp.eq p8,p0=EVENT_MOV_TO_RR,r24
+    (p6) br.dptk.many vmx_asm_mov_from_ar
+    (p7) br.dptk.many vmx_asm_mov_from_rr
+    (p8) br.dptk.many vmx_asm_mov_to_rr
     ;;
 vmx_virtualization_fault_back:
     mov r19=37

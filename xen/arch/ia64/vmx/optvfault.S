@@ -18,11 +18,12 @@
 
 #define ACCE_MOV_FROM_AR
 #define ACCE_MOV_FROM_RR
+#define ACCE_MOV_TO_RR
 
 //mov r1=ar3
-GLOBAL_ENTRY(asm_mov_from_ar)
+GLOBAL_ENTRY(vmx_asm_mov_from_ar)
 #ifndef ACCE_MOV_FROM_AR
-    br.many vmx_vitualization_fault_back
+    br.many vmx_virtualization_fault_back
 #endif
     add r18=VCPU_VTM_OFFSET_OFS,r21
     mov r19=ar.itc
@@ -39,19 +40,19 @@ GLOBAL_ENTRY(asm_mov_from_ar)
     mov b0=r17
     br.sptk.few b0
     ;;
-END(asm_mov_from_ar)
+END(vmx_asm_mov_from_ar)
 
 
 // mov r1=rr[r3]
-GLOBAL_ENTRY(asm_mov_from_rr)
+GLOBAL_ENTRY(vmx_asm_mov_from_rr)
 #ifndef ACCE_MOV_FROM_RR
-    br.many vmx_vitualization_fault_back
+    br.many vmx_virtualization_fault_back
 #endif
     extr.u r16=r25,20,7
     extr.u r17=r25,6,7
     movl r20=asm_mov_from_reg
     ;;
-    adds r30=asm_mov_from_rr_back_1-asm_mov_from_reg,r20
+    adds r30=vmx_asm_mov_from_rr_back_1-asm_mov_from_reg,r20
     shladd r16=r16,4,r20
     mov r24=b0
     ;;
@@ -59,7 +60,7 @@ GLOBAL_ENTRY(asm_mov_from_rr)
     mov b0=r16
     br.many b0
     ;;   
-asm_mov_from_rr_back_1:  
+vmx_asm_mov_from_rr_back_1:  
     adds r30=vmx_resume_to_guest-asm_mov_from_reg,r20
     adds r22=asm_mov_to_reg-asm_mov_from_reg,r20
     shr.u r26=r19,61
@@ -70,7 +71,86 @@ asm_mov_from_rr_back_1:
     ld8 r19=[r27]
     mov b0=r17
     br.many b0
-END(asm_mov_from_rr)
+END(vmx_asm_mov_from_rr)
+
+
+// mov rr[r3]=r2
+GLOBAL_ENTRY(vmx_asm_mov_to_rr)
+#ifndef ACCE_MOV_TO_RR
+    br.many vmx_virtualization_fault_back
+#endif
+    extr.u r16=r25,20,7
+    extr.u r17=r25,13,7
+    movl r20=asm_mov_from_reg
+    ;;
+    adds r30=vmx_asm_mov_to_rr_back_1-asm_mov_from_reg,r20
+    shladd r16=r16,4,r20
+    mov r22=b0
+    ;;
+    add r27=VCPU_VRR0_OFS,r21
+    mov b0=r16
+    br.many b0
+    ;;   
+vmx_asm_mov_to_rr_back_1:
+    adds r30=vmx_asm_mov_to_rr_back_2-asm_mov_from_reg,r20
+    shr.u r23=r19,61
+    shladd r17=r17,4,r20
+    ;;
+    //if rr7, go back
+    cmp.eq p6,p0=7,r23
+    (p6) br.cond.dpnt.many vmx_virtualization_fault_back
+    ;;
+    mov r28=r19
+    mov b0=r17
+    br.many b0
+vmx_asm_mov_to_rr_back_2: 
+    adds r30=vmx_resume_to_guest-asm_mov_from_reg,r20
+    shladd r27=r23,3,r27
+    ;; // +starting_rid
+    st8 [r27]=r19
+    mov b0=r30
+    ;;
+    adds r16=IA64_VCPU_STARTING_RID_OFFSET,r21
+    ;;
+    ld4 r16=[r16]
+    ;;
+    shl r16=r16,8
+    ;;
+    add r19=r19,r16
+    ;; //mangling rid 1 and 3
+    extr.u r16=r19,8,8
+    extr.u r17=r19,24,8
+    extr.u r18=r19,2,6
+    ;;
+    dep r19=r16,r19,24,8
+    ;;
+    dep r19=r17,r19,8,8
+    ;; //set ve 1
+    dep r19=-1,r19,0,1  
+    cmp.lt p6,p0=14,r18
+    ;;
+    (p6) mov r18=14
+    ;;
+    (p6) dep r19=r18,r19,2,6
+    ;;
+    cmp.eq p6,p0=0,r23
+    ;;
+    cmp.eq.or p6,p0=4,r23
+    ;;
+    adds r16=IA64_VCPU_MODE_FLAGS_OFFSET,r21
+    (p6) adds r17=IA64_VCPU_META_SAVED_RR0_OFFSET,r21
+    ;;
+    ld8 r16=[r16]
+    cmp.eq p7,p0=r0,r0
+    (p6) shladd r17=r23,1,r17
+    ;;
+    (p6) st8 [r17]=r19
+    (p6) tbit.nz p6,p7=r16,0
+    ;;
+    (p7) mov rr[r28]=r19
+    mov r24=r22
+    br.many b0
+END(vmx_asm_mov_from_rr)
 
 
 #define MOV_TO_REG0	\
@@ -346,20 +426,17 @@ ENTRY(vmx_resume_to_guest)
     dep r16=r17,r16,IA64_PSR_RI_BIT,2
     ;;
     mov cr.ipsr=r16
-    mov r17=cr.isr
     adds r19= VPD_VPSR_START_OFFSET,r25
-    ld8 r26=[r25]
-    add r29=PAL_VPS_RESUME_NORMAL,r20
-    add r28=PAL_VPS_RESUME_HANDLER,r20
+    add r28=PAL_VPS_RESUME_NORMAL,r20
+    add r29=PAL_VPS_RESUME_HANDLER,r20
     ;;
     ld8 r19=[r19]
     mov b0=r29
     cmp.ne p6,p7 = r0,r0
     ;;
-    tbit.nz.or.andcm p6,p7 = r19,IA64_PSR_IC_BIT		// p1=vpsr.ic
-    tbit.nz.or.andcm p6,p7 = r17,IA64_ISR_IR_BIT		//p1=cr.isr.ir
+    tbit.z p6,p7 = r19,IA64_PSR_IC_BIT		// p1=vpsr.ic
     ;;
-    (p6) mov b0=r29
+    (p6) ld8 r26=[r25]
     (p7) mov b0=r28
     mov pr=r31,-2
     br.sptk.many b0             // call pal service
