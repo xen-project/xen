@@ -18,6 +18,10 @@
 
 #ifndef __ASSEMBLY__
 #include <xen/percpu.h>
+#include <asm/vcpumask.h>
+
+extern void domain_purge_swtc_entries(struct domain *d);
+extern void domain_purge_swtc_entries_vcpu_dirty_mask(struct domain* d, vcpumask_t vcpu_dirty_mask);
 
 //
 // VHPT Long Format Entry (as recognized by hw)

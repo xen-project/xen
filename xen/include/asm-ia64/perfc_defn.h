@@ -109,9 +109,12 @@ PERFPRIVOPADDR(thash)
 #endif
 
 // vhpt.c
+PERFCOUNTER_CPU(local_vhpt_flush,               "local_vhpt_flush")
+PERFCOUNTER_CPU(vcpu_vhpt_flush,                "vcpu_vhpt_flush")
 PERFCOUNTER_CPU(vcpu_flush_vtlb_all,            "vcpu_flush_vtlb_all")
 PERFCOUNTER_CPU(domain_flush_vtlb_all,          "domain_flush_vtlb_all")
 PERFCOUNTER_CPU(vcpu_flush_tlb_vhpt_range,      "vcpu_flush_tlb_vhpt_range")
+PERFCOUNTER_CPU(domain_flush_vtlb_track_entry,  "domain_flush_vtlb_track_entry")
 PERFCOUNTER_CPU(domain_flush_vtlb_range,        "domain_flush_vtlb_range")
 
 // domain.c
@@ -134,3 +137,30 @@ PERFCOUNTER_CPU(domain_page_flush,              "domain_page_flush")
 // dom0vp
 PERFCOUNTER_CPU(dom0vp_phystomach,              "dom0vp_phystomach")
 PERFCOUNTER_CPU(dom0vp_machtophys,              "dom0vp_machtophys")
+
+#ifdef CONFIG_XEN_IA64_TLB_TRACK
+// insert or dirty
+PERFCOUNTER_CPU(tlb_track_iod,                  "tlb_track_iod")
+PERFCOUNTER_CPU(tlb_track_iod_again,            "tlb_track_iod_again")
+PERFCOUNTER_CPU(tlb_track_iod_not_tracked,      "tlb_track_iod_not_tracked")
+PERFCOUNTER_CPU(tlb_track_iod_force_many,       "tlb_track_iod_force_many")
+PERFCOUNTER_CPU(tlb_track_iod_tracked_many,     "tlb_track_iod_tracked_many")
+PERFCOUNTER_CPU(tlb_track_iod_tracked_many_del, "tlb_track_iod_tracked_many_del")
+PERFCOUNTER_CPU(tlb_track_iod_found,            "tlb_track_iod_found")
+PERFCOUNTER_CPU(tlb_track_iod_new_entry,        "tlb_track_iod_new_entry")
+PERFCOUNTER_CPU(tlb_track_iod_new_failed,       "tlb_track_iod_new_failed")
+PERFCOUNTER_CPU(tlb_track_iod_new_many,         "tlb_track_iod_new_many")
+PERFCOUNTER_CPU(tlb_track_iod_insert,           "tlb_track_iod_insert")
+PERFCOUNTER_CPU(tlb_track_iod_dirtied,          "tlb_track_iod_dirtied")
+
+// search and remove
+PERFCOUNTER_CPU(tlb_track_sar,                  "tlb_track_sar")
+PERFCOUNTER_CPU(tlb_track_sar_not_tracked,      "tlb_track_sar_not_tracked")
+PERFCOUNTER_CPU(tlb_track_sar_not_found,        "tlb_track_sar_not_found")
+PERFCOUNTER_CPU(tlb_track_sar_found,            "tlb_track_sar_found")
+PERFCOUNTER_CPU(tlb_track_sar_many,             "tlb_track_sar_many")
+
+// flush
+PERFCOUNTER_CPU(tlb_track_use_rr7,              "tlb_track_use_rr7")
+PERFCOUNTER_CPU(tlb_track_swap_rr0,             "tlb_track_swap_rr0")
+#endif

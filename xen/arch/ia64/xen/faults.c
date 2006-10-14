@@ -31,6 +31,7 @@
 #include <asm/asm-xsi-offsets.h>
 #include <asm/shadow.h>
 #include <asm/uaccess.h>
+#include <asm/p2m_entry.h>
 
 extern void die_if_kernel(char *str, struct pt_regs *regs, long err);
 /* FIXME: where these declarations shold be there ? */
@@ -202,8 +203,11 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 	fault = vcpu_translate(current,address,is_data,&pteval,&itir,&iha);
 	if (fault == IA64_NO_FAULT || fault == IA64_USE_TLB) {
 		struct p2m_entry entry;
-		pteval = translate_domain_pte(pteval, address, itir, &logps, &entry);
-		vcpu_itc_no_srlz(current,is_data?2:1,address,pteval,-1UL,logps);
+		unsigned long m_pteval;
+		m_pteval = translate_domain_pte(pteval, address, itir,
+		                                &logps, &entry);
+		vcpu_itc_no_srlz(current, (is_data? 2: 1) | 4, 
+		                 address, m_pteval, pteval, logps, &entry);
 		if ((fault == IA64_USE_TLB && !current->arch.dtlb.pte.p) ||
 		    p2m_entry_retry(&entry)) {
 			/* dtlb has been purged in-between.  This dtlb was

@@ -69,6 +69,26 @@
 #define _PAGE_VIRT_D		(__IA64_UL(1) << 53)	/* Virtual dirty bit */
 #define _PAGE_PROTNONE		0
 
+#ifdef CONFIG_XEN_IA64_TLB_TRACK
+#define _PAGE_TLB_TRACKING_BIT          54
+#define _PAGE_TLB_INSERTED_BIT          55
+#define _PAGE_TLB_INSERTED_MANY_BIT     56
+
+#define _PAGE_TLB_TRACKING              (1UL << _PAGE_TLB_TRACKING_BIT)
+#define _PAGE_TLB_INSERTED              (1UL << _PAGE_TLB_INSERTED_BIT)
+#define _PAGE_TLB_INSERTED_MANY         (1UL << _PAGE_TLB_INSERTED_MANY_BIT)
+#define _PAGE_TLB_TRACK_MASK            (_PAGE_TLB_TRACKING |		\
+                                         _PAGE_TLB_INSERTED |		\
+                                         _PAGE_TLB_INSERTED_MANY)
+
+#define pte_tlb_tracking(pte)				\
+    ((pte_val(pte) & _PAGE_TLB_TRACKING) != 0)
+#define pte_tlb_inserted(pte)				\
+    ((pte_val(pte) & _PAGE_TLB_INSERTED) != 0)
+#define pte_tlb_inserted_many(pte)			\
+    ((pte_val(pte) & _PAGE_TLB_INSERTED_MANY) != 0)
+#endif // CONFIG_XEN_IA64_TLB_TRACK
+
 /* domVTI */
 #define GPFN_MEM		(0UL << 60)	/* Guest pfn is normal mem */
 #define GPFN_FRAME_BUFFER	(1UL << 60)	/* VGA framebuffer */

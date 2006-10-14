@@ -18,6 +18,7 @@
 #include <asm/page.h>
 #include <asm/vhpt.h>
 #include <asm/vcpu.h>
+#include <asm/vcpumask.h>
 #include <asm/vmmu.h>
 
 /* Defined in tlb.c  */
@@ -42,12 +43,14 @@ void
 local_vhpt_flush(void)
 {
 	__vhpt_flush(__ia64_per_cpu_var(vhpt_paddr));
+	perfc_incrc(local_vhpt_flush);
 }
 
 static void
 vcpu_vhpt_flush(struct vcpu* v)
 {
 	__vhpt_flush(vcpu_vhpt_maddr(v));
+	perfc_incrc(vcpu_vhpt_flush);
 }
 
 static void
@@ -169,6 +172,39 @@ pervcpu_vhpt_free(struct vcpu *v)
 	free_domheap_pages(v->arch.vhpt_page, VHPT_SIZE_LOG2 - PAGE_SHIFT);
 }
 #endif
+
+void
+domain_purge_swtc_entries(struct domain *d)
+{
+	struct vcpu* v;
+	for_each_vcpu(d, v) {
+		if (!test_bit(_VCPUF_initialised, &v->vcpu_flags))
+			continue;
+
+		/* Purge TC entries.
+		   FIXME: clear only if match.  */
+		vcpu_purge_tr_entry(&PSCBX(v,dtlb));
+		vcpu_purge_tr_entry(&PSCBX(v,itlb));
+	}
+}
+
+void
+domain_purge_swtc_entries_vcpu_dirty_mask(struct domain* d,
+                                          vcpumask_t vcpu_dirty_mask)
+{
+	int vcpu;
+
+	for_each_vcpu_mask(vcpu, vcpu_dirty_mask) {
+		struct vcpu* v = d->vcpu[vcpu];
+		if (!test_bit(_VCPUF_initialised, &v->vcpu_flags))
+			continue;
+
+		/* Purge TC entries.
+		   FIXME: clear only if match.  */
+		vcpu_purge_tr_entry(&PSCBX(v, dtlb));
+		vcpu_purge_tr_entry(&PSCBX(v, itlb));
+	}
+}
 
 // SMP: we can't assume v == current, vcpu might move to another physical cpu.
 // So memory barrier is necessary.
@@ -292,15 +328,7 @@ void domain_flush_vtlb_range (struct domain *d, u64 vadr, u64 addr_range)
 	}
 #endif
 
-	for_each_vcpu (d, v) {
-		if (!test_bit(_VCPUF_initialised, &v->vcpu_flags))
-			continue;
-
-		/* Purge TC entries.
-		   FIXME: clear only if match.  */
-		vcpu_purge_tr_entry(&PSCBX(v,dtlb));
-		vcpu_purge_tr_entry(&PSCBX(v,itlb));
-	}
+	domain_purge_swtc_entries(d);
 	smp_mb();
 
 	for_each_vcpu (d, v) {
@@ -326,6 +354,83 @@ void domain_flush_vtlb_range (struct domain *d, u64 vadr, u64 addr_range)
 	ia64_global_tlb_purge(vadr,vadr+addr_range,PAGE_SHIFT);
 	perfc_incrc(domain_flush_vtlb_range);
 }
+
+#ifdef CONFIG_XEN_IA64_TLB_TRACK
+#include <asm/tlb_track.h>
+#include <asm/vmx_vcpu.h>
+void
+__domain_flush_vtlb_track_entry(struct domain* d,
+                                const struct tlb_track_entry* entry)
+{
+	unsigned long rr7_rid;
+	int swap_rr0 = 0;
+	unsigned long old_rid;
+	unsigned long vaddr = entry->vaddr;
+	struct vcpu* v;
+	int cpu;
+	int vcpu;
+
+	BUG_ON((vaddr >> VRN_SHIFT) != VRN7);
+	/*
+	 * heuristic:
+	 * dom0linux accesses grant mapped pages via the kernel
+	 * straight mapped area and it doesn't change rr7 rid. 
+	 * So it is likey that rr7 == entry->rid so that
+	 * we can avoid rid change.
+	 * When blktap is supported, this heuristic should be revised.
+	 */
+	vcpu_get_rr(current, VRN7 << VRN_SHIFT, &rr7_rid);
+	if (likely(rr7_rid == entry->rid)) {
+		perfc_incrc(tlb_track_use_rr7);
+	} else {
+		swap_rr0 = 1;
+		vaddr = (vaddr << 3) >> 3;// force vrn0
+		perfc_incrc(tlb_track_swap_rr0);
+	}
+
+	// tlb_track_entry_printf(entry);
+	if (swap_rr0) {
+		vcpu_get_rr(current, 0, &old_rid);
+		vcpu_set_rr(current, 0, entry->rid);
+	}
+    
+	if (HAS_PERVCPU_VHPT(d)) {
+		for_each_vcpu_mask(vcpu, entry->vcpu_dirty_mask) {
+			v = d->vcpu[vcpu];
+			if (!test_bit(_VCPUF_initialised, &v->vcpu_flags))
+				continue;
+
+			/* Invalidate VHPT entries.  */
+			vcpu_flush_vhpt_range(v, vaddr, PAGE_SIZE);
+		}
+	} else {
+		for_each_cpu_mask(cpu, entry->pcpu_dirty_mask) {
+			/* Invalidate VHPT entries.  */
+			cpu_flush_vhpt_range(cpu, vaddr, PAGE_SIZE);
+		}
+	}
+	/* ptc.ga has release semantics. */
+
+	/* ptc.ga  */
+	ia64_global_tlb_purge(vaddr, vaddr + PAGE_SIZE, PAGE_SHIFT);
+
+	if (swap_rr0) {
+		vcpu_set_rr(current, 0, old_rid);
+	}
+	perfc_incrc(domain_flush_vtlb_track_entry);
+}
+
+void
+domain_flush_vtlb_track_entry(struct domain* d,
+                              const struct tlb_track_entry* entry)
+{
+	domain_purge_swtc_entries_vcpu_dirty_mask(d, entry->vcpu_dirty_mask);
+	smp_mb();
+
+	__domain_flush_vtlb_track_entry(d, entry);
+}
+
+#endif
 
 static void flush_tlb_vhpt_all (struct domain *d)
 {

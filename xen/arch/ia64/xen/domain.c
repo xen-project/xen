@@ -47,6 +47,7 @@
 #include <asm/dom_fw.h>
 #include <asm/shadow.h>
 #include <xen/guest_access.h>
+#include <asm/tlb_track.h>
 
 unsigned long dom0_size = 512*1024*1024;
 unsigned long dom0_align = 64*1024*1024;
@@ -390,6 +391,8 @@ int arch_domain_create(struct domain *d)
 	DPRINTK("%s:%d domain %d pervcpu_vhpt %d\n",
 	        __func__, __LINE__, d->domain_id, d->arch.has_pervcpu_vhpt);
 #endif
+	if (tlb_track_create(d) < 0)
+		goto fail_nomem1;
 	d->shared_info = alloc_xenheap_pages(get_order_from_shift(XSI_SHIFT));
 	if (d->shared_info == NULL)
 	    goto fail_nomem;
@@ -418,6 +421,8 @@ int arch_domain_create(struct domain *d)
 	return 0;
 
 fail_nomem:
+	tlb_track_destroy(d);
+fail_nomem1:
 	if (d->arch.mm.pgd != NULL)
 	    pgd_free(d->arch.mm.pgd);
 	if (d->shared_info != NULL)
@@ -432,6 +437,8 @@ void arch_domain_destroy(struct domain *d)
 	    free_xenheap_pages(d->shared_info, get_order_from_shift(XSI_SHIFT));
 	if (d->arch.shadow_bitmap != NULL)
 		xfree(d->arch.shadow_bitmap);
+
+	tlb_track_destroy(d);
 
 	/* Clear vTLB for the next domain.  */
 	domain_flush_tlb_vhpt(d);

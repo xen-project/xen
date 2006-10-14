@@ -24,6 +24,8 @@
 #include <asm/bundle.h>
 #include <asm/privop_stat.h>
 #include <asm/uaccess.h>
+#include <asm/p2m_entry.h>
+#include <asm/tlb_track.h>
 
 /* FIXME: where these declarations should be there ? */
 extern void getreg(unsigned long regnum, unsigned long *val, int *nat, struct pt_regs *regs);
@@ -2007,7 +2009,9 @@ IA64FAULT vcpu_set_dtr(VCPU *vcpu, u64 slot, u64 pte,
  VCPU translation cache access routines
 **************************************************************************/
 
-void vcpu_itc_no_srlz(VCPU *vcpu, UINT64 IorD, UINT64 vaddr, UINT64 pte, UINT64 mp_pte, UINT64 logps)
+void
+vcpu_itc_no_srlz(VCPU *vcpu, UINT64 IorD, UINT64 vaddr, UINT64 pte,
+                 UINT64 mp_pte, UINT64 logps, struct p2m_entry* entry)
 {
 	unsigned long psr;
 	unsigned long ps = (vcpu->domain==dom0) ? logps : PAGE_SHIFT;
@@ -2020,6 +2024,7 @@ void vcpu_itc_no_srlz(VCPU *vcpu, UINT64 IorD, UINT64 vaddr, UINT64 pte, UINT64 
  			      "smaller page size!\n");
 
 	BUG_ON(logps > PAGE_SHIFT);
+	vcpu_tlb_track_insert_or_dirty(vcpu, vaddr, entry);
 	psr = ia64_clear_ic();
 	ia64_itc(IorD,vaddr,pte,ps); // FIXME: look for bigger mappings
 	ia64_set_psr(psr);
@@ -2037,7 +2042,7 @@ void vcpu_itc_no_srlz(VCPU *vcpu, UINT64 IorD, UINT64 vaddr, UINT64 pte, UINT64 
 	// PAGE_SIZE mapping in the vhpt for now, else purging is complicated
 	else vhpt_insert(vaddr,pte,PAGE_SHIFT<<2);
 #endif
-	if ((mp_pte == -1UL) || (IorD & 0x4)) // don't place in 1-entry TLB
+	if (IorD & 0x4) /* don't place in 1-entry TLB */
 		return;
 	if (IorD & 0x1) {
 		vcpu_set_tr_entry(&PSCBX(vcpu,itlb),mp_pte,ps<<2,vaddr);
@@ -2062,7 +2067,7 @@ again:
 	pteval = translate_domain_pte(pte, ifa, itir, &logps, &entry);
 	if (!pteval) return IA64_ILLOP_FAULT;
 	if (swap_rr0) set_one_rr(0x0,PSCB(vcpu,rrs[0]));
-	vcpu_itc_no_srlz(vcpu,2,ifa,pteval,pte,logps);
+	vcpu_itc_no_srlz(vcpu, 2, ifa, pteval, pte, logps, &entry);
 	if (swap_rr0) set_metaphysical_rr0();
 	if (p2m_entry_retry(&entry)) {
 		vcpu_flush_tlb_vhpt_range(ifa, logps);
@@ -2085,7 +2090,7 @@ again:
 	pteval = translate_domain_pte(pte, ifa, itir, &logps, &entry);
 	if (!pteval) return IA64_ILLOP_FAULT;
 	if (swap_rr0) set_one_rr(0x0,PSCB(vcpu,rrs[0]));
-	vcpu_itc_no_srlz(vcpu, 1,ifa,pteval,pte,logps);
+	vcpu_itc_no_srlz(vcpu, 1, ifa, pteval, pte, logps, &entry);
 	if (swap_rr0) set_metaphysical_rr0();
 	if (p2m_entry_retry(&entry)) {
 		vcpu_flush_tlb_vhpt_range(ifa, logps);

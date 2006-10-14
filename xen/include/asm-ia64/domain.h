@@ -13,28 +13,10 @@
 #include <asm/fpswa.h>
 #include <xen/rangeset.h>
 
-struct p2m_entry {
-    volatile pte_t*     pte;
-    pte_t               used;
-};
-
-static inline void
-p2m_entry_set(struct p2m_entry* entry, volatile pte_t* pte, pte_t used)
-{
-    entry->pte  = pte;
-    entry->used = used;
-}
-
-static inline int
-p2m_entry_retry(struct p2m_entry* entry)
-{
-    //XXX see lookup_domain_pte().
-    //    NULL is set for invalid gpaddr for the time being.
-    if (entry->pte == NULL)
-        return 0;
-
-    return (pte_val(*entry->pte) != pte_val(entry->used));
-}
+struct p2m_entry;
+#ifdef CONFIG_XEN_IA64_TLB_TRACK
+struct tlb_track;
+#endif
 
 extern void domain_relinquish_resources(struct domain *);
 struct vcpu;
@@ -140,6 +122,10 @@ struct arch_domain {
     struct last_vcpu last_vcpu[NR_CPUS];
 
     struct arch_vmx_domain arch_vmx; /* Virtual Machine Extensions */
+
+#ifdef CONFIG_XEN_IA64_TLB_TRACK
+    struct tlb_track*   tlb_track;
+#endif
 };
 #define INT_ENABLE_OFFSET(v) 		  \
     (sizeof(vcpu_info_t) * (v)->vcpu_id + \

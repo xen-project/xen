@@ -172,13 +172,15 @@
 #include <asm/vhpt.h>
 #include <asm/vcpu.h>
 #include <asm/shadow.h>
+#include <asm/p2m_entry.h>
+#include <asm/tlb_track.h>
 #include <linux/efi.h>
 #include <xen/guest_access.h>
 #include <asm/page.h>
 #include <public/memory.h>
 
 static void domain_page_flush(struct domain* d, unsigned long mpaddr,
-                              unsigned long old_mfn, unsigned long new_mfn);
+                              volatile pte_t* ptep, pte_t old_pte);
 
 extern unsigned long ia64_iobase;
 
@@ -798,12 +800,15 @@ flags_to_prot (unsigned long flags)
 
     res |= flags & ASSIGN_readonly ? _PAGE_AR_R: _PAGE_AR_RWX;
     res |= flags & ASSIGN_nocache ? _PAGE_MA_UC: _PAGE_MA_WB;
+#ifdef CONFIG_XEN_IA64_TLB_TRACK
+    res |= flags & ASSIGN_tlb_track ? _PAGE_TLB_TRACKING: 0;
+#endif
     
     return res;
 }
 
 /* map a physical address to the specified metaphysical addr */
-// flags: currently only ASSIGN_readonly, ASSIGN_nocache
+// flags: currently only ASSIGN_readonly, ASSIGN_nocache, ASSIGN_tlb_tack
 // This is called by assign_domain_mmio_page().
 // So accessing to pte is racy.
 int
@@ -1034,7 +1039,7 @@ assign_domain_mach_page(struct domain *d,
 // caller must call set_gpfn_from_mfn() before call if necessary.
 // because set_gpfn_from_mfn() result must be visible before pte xchg
 // caller must use memory barrier. NOTE: xchg has acquire semantics.
-// flags: currently only ASSIGN_readonly
+// flags: ASSIGN_xxx
 static void
 assign_domain_page_replace(struct domain *d, unsigned long mpaddr,
                            unsigned long mfn, unsigned long flags)
@@ -1068,7 +1073,7 @@ assign_domain_page_replace(struct domain *d, unsigned long mpaddr,
                 set_gpfn_from_mfn(old_mfn, INVALID_M2P_ENTRY);
             }
 
-            domain_page_flush(d, mpaddr, old_mfn, mfn);
+            domain_page_flush(d, mpaddr, pte, old_pte);
 
             try_to_clear_PGC_allocate(d, old_page);
             put_page(old_page);
@@ -1088,7 +1093,7 @@ assign_domain_page_cmpxchg_rel(struct domain* d, unsigned long mpaddr,
     struct mm_struct *mm = &d->arch.mm;
     volatile pte_t* pte;
     unsigned long old_mfn;
-    unsigned long old_arflags;
+    unsigned long old_prot;
     pte_t old_pte;
     unsigned long new_mfn;
     unsigned long new_prot;
@@ -1098,12 +1103,12 @@ assign_domain_page_cmpxchg_rel(struct domain* d, unsigned long mpaddr,
     pte = lookup_alloc_domain_pte(d, mpaddr);
 
  again:
-    old_arflags = pte_val(*pte) & ~_PAGE_PPN_MASK;
+    old_prot = pte_val(*pte) & ~_PAGE_PPN_MASK;
     old_mfn = page_to_mfn(old_page);
-    old_pte = pfn_pte(old_mfn, __pgprot(old_arflags));
+    old_pte = pfn_pte(old_mfn, __pgprot(old_prot));
     if (!pte_present(old_pte)) {
-        DPRINTK("%s: old_pte 0x%lx old_arflags 0x%lx old_mfn 0x%lx\n",
-                __func__, pte_val(old_pte), old_arflags, old_mfn);
+        DPRINTK("%s: old_pte 0x%lx old_prot 0x%lx old_mfn 0x%lx\n",
+                __func__, pte_val(old_pte), old_prot, old_mfn);
         return -EINVAL;
     }
 
@@ -1118,10 +1123,10 @@ assign_domain_page_cmpxchg_rel(struct domain* d, unsigned long mpaddr,
             goto again;
         }
 
-        DPRINTK("%s: old_pte 0x%lx old_arflags 0x%lx old_mfn 0x%lx "
+        DPRINTK("%s: old_pte 0x%lx old_prot 0x%lx old_mfn 0x%lx "
                 "ret_pte 0x%lx ret_mfn 0x%lx\n",
                 __func__,
-                pte_val(old_pte), old_arflags, old_mfn,
+                pte_val(old_pte), old_prot, old_mfn,
                 pte_val(ret_pte), pte_pfn(ret_pte));
         return -EINVAL;
     }
@@ -1133,7 +1138,7 @@ assign_domain_page_cmpxchg_rel(struct domain* d, unsigned long mpaddr,
 
     set_gpfn_from_mfn(old_mfn, INVALID_M2P_ENTRY);
 
-    domain_page_flush(d, mpaddr, old_mfn, new_mfn);
+    domain_page_flush(d, mpaddr, pte, old_pte);
     put_page(old_page);
     perfc_incrc(assign_domain_pge_cmpxchg_rel);
     return 0;
@@ -1202,7 +1207,7 @@ zap_domain_page_one(struct domain *d, unsigned long mpaddr, unsigned long mfn)
         set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY);
     }
 
-    domain_page_flush(d, mpaddr, mfn, INVALID_MFN);
+    domain_page_flush(d, mpaddr, pte, old_pte);
 
     if (page_get_owner(page) != NULL) {
         try_to_clear_PGC_allocate(d, page);
@@ -1417,8 +1422,12 @@ create_grant_host_mapping(unsigned long gpaddr,
     BUG_ON(ret == 0);
     BUG_ON(page_get_owner(mfn_to_page(mfn)) == d &&
            get_gpfn_from_mfn(mfn) != INVALID_M2P_ENTRY);
-    assign_domain_page_replace(d, gpaddr, mfn, (flags & GNTMAP_readonly)?
-                                              ASSIGN_readonly: ASSIGN_writable);
+    assign_domain_page_replace(d, gpaddr, mfn,
+#ifdef CONFIG_XEN_IA64_TLB_TRACK
+                               ASSIGN_tlb_track |
+#endif
+                               ((flags & GNTMAP_readonly) ?
+                                ASSIGN_readonly : ASSIGN_writable));
     perfc_incrc(create_grant_host_mapping);
     return GNTST_okay;
 }
@@ -1473,7 +1482,7 @@ destroy_grant_host_mapping(unsigned long gpaddr,
     }
     BUG_ON(pte_pfn(old_pte) != mfn);
 
-    domain_page_flush(d, gpaddr, mfn, INVALID_MFN);
+    domain_page_flush(d, gpaddr, pte, old_pte);
 
     page = mfn_to_page(mfn);
     BUG_ON(page_get_owner(page) == d);//try_to_clear_PGC_allocate(d, page) is not needed.
@@ -1645,12 +1654,43 @@ guest_physmap_remove_page(struct domain *d, unsigned long gpfn,
 //    flush finer range.
 static void
 domain_page_flush(struct domain* d, unsigned long mpaddr,
-                  unsigned long old_mfn, unsigned long new_mfn)
+                  volatile pte_t* ptep, pte_t old_pte)
 {
+#ifdef CONFIG_XEN_IA64_TLB_TRACK
+    struct tlb_track_entry* entry;
+#endif
+
     if (shadow_mode_enabled(d))
         shadow_mark_page_dirty(d, mpaddr >> PAGE_SHIFT);
 
+#ifndef CONFIG_XEN_IA64_TLB_TRACK
     domain_flush_vtlb_all();
+#else
+    switch (tlb_track_search_and_remove(d->arch.tlb_track,
+                                        ptep, old_pte, &entry)) {
+    case TLB_TRACK_NOT_TRACKED:
+        // DPRINTK("%s TLB_TRACK_NOT_TRACKED\n", __func__);
+        domain_flush_vtlb_all();
+        break;
+    case TLB_TRACK_NOT_FOUND:
+        /* do nothing */
+        // DPRINTK("%s TLB_TRACK_NOT_FOUND\n", __func__);
+        break;
+    case TLB_TRACK_FOUND:
+        // DPRINTK("%s TLB_TRACK_FOUND\n", __func__);
+        domain_flush_vtlb_track_entry(d, entry);
+        tlb_track_free_entry(d->arch.tlb_track, entry);
+        break;
+    case TLB_TRACK_MANY:
+        DPRINTK("%s TLB_TRACK_MANY\n", __func__);
+        domain_flush_vtlb_all();
+        break;
+    case TLB_TRACK_AGAIN:
+        DPRINTK("%s TLB_TRACK_AGAIN\n", __func__);
+        BUG();
+        break;
+    }
+#endif
     perfc_incrc(domain_page_flush);
 }
 

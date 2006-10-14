@@ -358,6 +358,9 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 /* Internal only: memory attribute must be WC/UC/UCE.  */
 #define _ASSIGN_nocache                 1
 #define ASSIGN_nocache                  (1UL << _ASSIGN_nocache)
+// tlb tracking
+#define _ASSIGN_tlb_track               2
+#define ASSIGN_tlb_track                (1UL << _ASSIGN_tlb_track)
 
 /* This structure has the same layout of struct ia64_boot_param, defined in
    <asm/system.h>.  It is redefined here to ease use.  */
