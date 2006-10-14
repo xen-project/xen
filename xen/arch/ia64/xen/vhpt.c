@@ -30,7 +30,7 @@ DEFINE_PER_CPU (unsigned long, vhpt_paddr);
 DEFINE_PER_CPU (unsigned long, vhpt_pend);
 
 static void
- __vhpt_flush(unsigned long vhpt_maddr)
+__vhpt_flush(unsigned long vhpt_maddr)
 {
 	struct vhpt_lf_entry *v = (struct vhpt_lf_entry*)__va(vhpt_maddr);
 	int i;
@@ -158,8 +158,7 @@ pervcpu_vhpt_alloc(struct vcpu *v)
 	v->arch.pta.ve = 1; // enable vhpt
 	v->arch.pta.size = VHPT_SIZE_LOG2;
 	v->arch.pta.vf = 1; // long format
-	//v->arch.pta.base = __va(v->arch.vhpt_maddr) >> 15;
-	v->arch.pta.base = VHPT_ADDR >> 15;
+	v->arch.pta.base = __va_ul(v->arch.vhpt_maddr) >> 15;
 
 	vhpt_erase(v->arch.vhpt_maddr);
 	smp_mb(); // per vcpu vhpt may be used by another physical cpu.
@@ -284,7 +283,8 @@ __flush_vhpt_range(unsigned long vhpt_maddr, u64 vadr, u64 addr_range)
 
 	while ((long)addr_range > 0) {
 		/* Get the VHPT entry.  */
-		unsigned int off = ia64_thash(vadr) - VHPT_ADDR;
+		unsigned int off = ia64_thash(vadr) -
+			__va_ul(vcpu_vhpt_maddr(current));
 		struct vhpt_lf_entry *v = vhpt_base + off;
 		v->ti_tag = INVALID_TI_TAG;
 		addr_range -= PAGE_SIZE;
@@ -444,7 +444,7 @@ static void flush_tlb_vhpt_all (struct domain *d)
 void domain_flush_tlb_vhpt(struct domain *d)
 {
 	/* Very heavy...  */
-	if (HAS_PERVCPU_VHPT(d) /* || VMX_DOMAIN(v) */)
+	if (HAS_PERVCPU_VHPT(d) || d->arch.is_vti)
 		on_each_cpu((void (*)(void *))local_flush_tlb_all, NULL, 1, 1);
 	else
 		on_each_cpu((void (*)(void *))flush_tlb_vhpt_all, d, 1, 1);

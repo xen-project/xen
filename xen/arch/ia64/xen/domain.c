@@ -118,13 +118,13 @@ void schedule_tail(struct vcpu *prev)
 	extern char ia64_ivt;
 	context_saved(prev);
 
+	ia64_disable_vhpt_walker();
 	if (VMX_DOMAIN(current)) {
 		vmx_do_launch(current);
 		migrate_timer(&current->arch.arch_vmx.vtm.vtm_timer,
 		              current->processor);
 	} else {
 		ia64_set_iva(&ia64_ivt);
-		ia64_disable_vhpt_walker();
 		load_region_regs(current);
         	ia64_set_pta(vcpu_pta(current));
 		vcpu_load_kernel_regs(current);
@@ -157,6 +157,8 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     }
     if (VMX_DOMAIN(next))
 	vmx_load_state(next);
+
+    ia64_disable_vhpt_walker();
     /*ia64_psr(ia64_task_regs(next))->dfh = !ia64_is_local_fpu_owner(next);*/
     prev = ia64_switch_to(next);
 
@@ -176,7 +178,6 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 
 	nd = current->domain;
     	if (!is_idle_domain(nd)) {
-		ia64_disable_vhpt_walker();
 	    	load_region_regs(current);
 		ia64_set_pta(vcpu_pta(current));
 	    	vcpu_load_kernel_regs(current);
@@ -192,7 +193,6 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 		 * walker. Then all accesses happen within idle context will
 		 * be handled by TR mapping and identity mapping.
 		 */
-		ia64_disable_vhpt_walker();
 		__ia64_per_cpu_var(current_psr_i_addr) = NULL;
 		__ia64_per_cpu_var(current_psr_ic_addr) = NULL;
         }

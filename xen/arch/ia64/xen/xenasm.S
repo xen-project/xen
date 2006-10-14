@@ -26,10 +26,11 @@
 //                         void *shared_info,      	 /* in1 */
 //                         void *shared_arch_info, 	 /* in2 */
 //                         unsigned long shared_info_va, /* in3 */
-//                         unsigned long p_vhpt)   	 /* in4 */
+//                         unsigned long va_vhpt)   	 /* in4 */
 //Local usage:
 //  loc0=rp, loc1=ar.pfs, loc2=percpu_paddr, loc3=psr, loc4=ar.rse
 //  loc5=pal_vaddr, loc6=xen_paddr, loc7=shared_archinfo_paddr,
+//  r16, r19, r20 are used by ia64_switch_mode_{phys, virt}()
 GLOBAL_ENTRY(ia64_new_rr7)
 	// FIXME? not sure this unwind statement is correct...
 	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(1)
@@ -118,16 +119,31 @@ GLOBAL_ENTRY(ia64_new_rr7)
 
 	// VHPT
 #if VHPT_ENABLED
-	mov r24=VHPT_SIZE_LOG2<<2
-	movl r22=VHPT_ADDR
-	mov r21=IA64_TR_VHPT
+#if IA64_GRANULE_SHIFT < VHPT_SIZE_LOG2
+#error "it must be that VHPT_SIZE_LOG2 <= IA64_GRANULE_SHIFT"
+#endif	
+	// unless overlaps with KERNEL_TR and IA64_TR_CURRENT_STACK
+	dep r14=0,in4,0,KERNEL_TR_PAGE_SHIFT
+	dep r15=0,in4,0,IA64_GRANULE_SHIFT
+	dep r21=0,r13,0,IA64_GRANULE_SHIFT
 	;;
-	ptr.d	r22,r24
-	or r23=in4,r26			// construct PA | page properties
+	cmp.eq p7,p0=r17,r14
+	cmp.eq p8,p0=r15,r21
+(p7)	br.cond.sptk	.vhpt_overlaps
+(p8)	br.cond.sptk	.vhpt_overlaps
+	mov r21=IA64_TR_VHPT
+	dep r22=0,r15,60,4		// physical address of
+	                                // va_vhpt & ~(IA64_GRANULE_SIZE - 1)
+	mov r24=IA64_GRANULE_SHIFT<<2
+	;;
+	ptr.d	r15,r24
+	or r23=r22,r26			// construct PA | page properties
 	mov cr.itir=r24
-	mov cr.ifa=r22
+	mov cr.ifa=r15
+	srlz.d
 	;;
 	itr.d dtr[r21]=r23		// wire in new mapping...
+.vhpt_overlaps:	
 #endif
 
 	//  Shared info

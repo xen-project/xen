@@ -17,7 +17,7 @@
 #include <asm/vcpu.h>
 
 /* Defined in xemasm.S  */
-extern void ia64_new_rr7(unsigned long rid, void *shared_info, void *shared_arch_info, unsigned long shared_info_va, unsigned long p_vhpt);
+extern void ia64_new_rr7(unsigned long rid, void *shared_info, void *shared_arch_info, unsigned long shared_info_va, unsigned long va_vhpt);
 
 /* RID virtualization mechanism is really simple:  domains have less rid bits
    than the host and the host rid space is shared among the domains.  (Values
@@ -260,7 +260,7 @@ int set_one_rr(unsigned long rr, unsigned long val)
 	} else if (rreg == 7) {
 		ia64_new_rr7(vmMangleRID(newrrv.rrval),v->domain->shared_info,
 			     v->arch.privregs, v->domain->arch.shared_info_va,
-		             vcpu_vhpt_maddr(v));
+		             __va_ul(vcpu_vhpt_maddr(v)));
 	} else {
 		set_rr(rr,newrrv.rrval);
 	}

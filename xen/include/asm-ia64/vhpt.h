@@ -79,7 +79,8 @@ vcpu_pta(struct vcpu* v)
     if (HAS_PERVCPU_VHPT(v->domain))
         return v->arch.pta.val;
 #endif
-    return VHPT_ADDR | (1 << 8) | (VHPT_SIZE_LOG2 << 2) | VHPT_ENABLED;
+    return __va_ul(__get_cpu_var(vhpt_paddr)) | (1 << 8) |
+        (VHPT_SIZE_LOG2 << 2) | VHPT_ENABLED;
 }
 
 #endif /* !__ASSEMBLY */
