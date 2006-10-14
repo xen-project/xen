@@ -32,7 +32,6 @@
 #include <xen/interface/callback.h>
 #include <xen/interface/acm_ops.h>
 #include <xen/interface/hvm/params.h>
-#include <xen/public/privcmd.h>
 #include <asm/hypercall.h>
 #include <asm/page.h>
 #include <asm/uaccess.h>
@@ -142,9 +141,18 @@ xencomm_hypercall_sched_op(int cmd, void *arg)
 	case SCHEDOP_yield:
 	case SCHEDOP_block:
 	case SCHEDOP_shutdown:
-	case SCHEDOP_poll:
 	case SCHEDOP_remote_shutdown:
 		break;
+	case SCHEDOP_poll:
+	{
+		sched_poll_t *poll = arg;
+		struct xencomm_handle *ports;
+
+		ports = xencomm_create_inline(xen_guest_handle(poll->ports));
+
+		set_xen_guest_handle(poll->ports, (void *)ports);
+		break;
+	}
 	default:
 		printk("%s: unknown sched op %d\n", __func__, cmd);
 		return -ENOSYS;
@@ -263,207 +271,3 @@ xencomm_hypercall_suspend(unsigned long srec)
 
 	return xencomm_arch_hypercall_suspend(xencomm_create_inline(&arg));
 }
-
-int
-xencomm_mini_hypercall_event_channel_op(int cmd, void *op)
-{
-	struct xencomm_mini xc_area[2];
-	int nbr_area = 2;
-	struct xencomm_handle *desc;
-	int rc;
-
-	rc = xencomm_create_mini(xc_area, &nbr_area,
-	                         op, sizeof(evtchn_op_t), &desc);
-	if (rc)
-		return rc;
-
-	return xencomm_arch_hypercall_event_channel_op(cmd, desc);
-}
-EXPORT_SYMBOL(xencomm_mini_hypercall_event_channel_op);
-
-static int
-xencommize_mini_grant_table_op(struct xencomm_mini *xc_area, int *nbr_area,
-                               unsigned int cmd, void *op, unsigned int count,
-                               struct xencomm_handle **desc)
-{
-	struct xencomm_handle *desc1;
-	unsigned int argsize;
-	int rc;
-
-	switch (cmd) {
-	case GNTTABOP_map_grant_ref:
-		argsize = sizeof(struct gnttab_map_grant_ref);
-		break;
-	case GNTTABOP_unmap_grant_ref:
-		argsize = sizeof(struct gnttab_unmap_grant_ref);
-		break;
-	case GNTTABOP_setup_table:
-	{
-		struct gnttab_setup_table *setup = op;
-
-		argsize = sizeof(*setup);
-
-		if (count != 1)
-			return -EINVAL;
-		rc = xencomm_create_mini
-			(xc_area, nbr_area,
-			 xen_guest_handle(setup->frame_list),
-			 setup->nr_frames 
-			 * sizeof(*xen_guest_handle(setup->frame_list)),
-			 &desc1);
-		if (rc)
-			return rc;
-		set_xen_guest_handle(setup->frame_list, (void *)desc1);
-		break;
-	}
-	case GNTTABOP_dump_table:
-		argsize = sizeof(struct gnttab_dump_table);
-		break;
-	case GNTTABOP_transfer:
-		argsize = sizeof(struct gnttab_transfer);
-		break;
-	default:
-		printk("%s: unknown mini grant table op %d\n", __func__, cmd);
-		BUG();
-	}
-
-	rc = xencomm_create_mini(xc_area, nbr_area, op, count * argsize, desc);
-	if (rc)
-		return rc;
-
-	return 0;
-}
-
-int
-xencomm_mini_hypercall_grant_table_op(unsigned int cmd, void *op,
-                                      unsigned int count)
-{
-	int rc;
-	struct xencomm_handle *desc;
-	int nbr_area = 2;
-	struct xencomm_mini xc_area[2];
-
-	rc = xencommize_mini_grant_table_op(xc_area, &nbr_area,
-	                                    cmd, op, count, &desc);
-	if (rc)
-		return rc;
-
-	return xencomm_arch_hypercall_grant_table_op(cmd, desc, count);
-}
-EXPORT_SYMBOL(xencomm_mini_hypercall_grant_table_op);
-
-int
-xencomm_mini_hypercall_multicall(void *call_list, int nr_calls)
-{
-	int i;
-	multicall_entry_t *mce;
-	int nbr_area = 2 + nr_calls * 3;
-	struct xencomm_mini xc_area[nbr_area];
-	struct xencomm_handle *desc;
-	int rc;
-
-	for (i = 0; i < nr_calls; i++) {
-		mce = (multicall_entry_t *)call_list + i;
-
-		switch (mce->op) {
-		case __HYPERVISOR_update_va_mapping:
-		case __HYPERVISOR_mmu_update:
-			/* No-op on ia64.  */
-			break;
-		case __HYPERVISOR_grant_table_op:
-			rc = xencommize_mini_grant_table_op
-				(xc_area, &nbr_area,
-				 mce->args[0], (void *)mce->args[1],
-				 mce->args[2], &desc);
-			if (rc)
-				return rc;
-			mce->args[1] = (unsigned long)desc;
-			break;
-		case __HYPERVISOR_memory_op:
-		default:
-			printk("%s: unhandled multicall op entry op %lu\n",
-			       __func__, mce->op);
-			return -ENOSYS;
-		}
-	}
-
-	rc = xencomm_create_mini(xc_area, &nbr_area, call_list,
-	                         nr_calls * sizeof(multicall_entry_t), &desc);
-	if (rc)
-		return rc;
-
-	return xencomm_arch_hypercall_multicall(desc, nr_calls);
-}
-EXPORT_SYMBOL(xencomm_mini_hypercall_multicall);
-
-static int
-xencommize_mini_memory_reservation(struct xencomm_mini *area, int *nbr_area,
-                                   xen_memory_reservation_t *mop)
-{
-	struct xencomm_handle *desc;
-	int rc;
-
-	rc = xencomm_create_mini
-		(area, nbr_area,
-		 xen_guest_handle(mop->extent_start),
-		 mop->nr_extents 
-		 * sizeof(*xen_guest_handle(mop->extent_start)),
-		 &desc);
-	if (rc)
-		return rc;
-
-	set_xen_guest_handle(mop->extent_start, (void *)desc);
-
-	return 0;
-}
-
-int
-xencomm_mini_hypercall_memory_op(unsigned int cmd, void *arg)
-{
-	int nbr_area = 4;
-	struct xencomm_mini xc_area[4];
-	struct xencomm_handle *desc;
-	int rc;
-	unsigned int argsize;
-
-	switch (cmd) {
-	case XENMEM_increase_reservation:
-	case XENMEM_decrease_reservation:
-	case XENMEM_populate_physmap:
-		argsize = sizeof(xen_memory_reservation_t);
-		rc = xencommize_mini_memory_reservation
-			(xc_area, &nbr_area, (xen_memory_reservation_t *)arg);
-		if (rc)
-			return rc;
-		break;
-		
-	case XENMEM_maximum_ram_page:
-		argsize = 0;
-		break;
-
-	case XENMEM_exchange:
-		argsize = sizeof(xen_memory_exchange_t);
-		rc = xencommize_mini_memory_reservation
-			(xc_area, &nbr_area,
-			 &((xen_memory_exchange_t *)arg)->in);
-		if (rc)
-			return rc;
-		rc = xencommize_mini_memory_reservation
-			(xc_area, &nbr_area,
-			 &((xen_memory_exchange_t *)arg)->out);
-		if (rc)
-			return rc;
-		break;
-
-	default:
-		printk("%s: unknown mini memory op %d\n", __func__, cmd);
-		return -ENOSYS;
-	}
-
-	rc = xencomm_create_mini(xc_area, &nbr_area, arg, argsize, &desc);
-	if (rc)
-		return rc;
-
-	return xencomm_arch_hypercall_memory_op(cmd, desc);
-}
-EXPORT_SYMBOL(xencomm_mini_hypercall_memory_op);

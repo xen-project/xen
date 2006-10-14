@@ -402,11 +402,7 @@ HYPERVISOR_expose_p2m(unsigned long conv_start_gpfn,
 #define HYPERVISOR_xen_version xencomm_mini_hypercall_xen_version
 #define HYPERVISOR_console_io xencomm_mini_hypercall_console_io
 #define HYPERVISOR_hvm_op xencomm_mini_hypercall_hvm_op
-#ifdef CONFIG_VMX_GUEST
-#define HYPERVISOR_memory_op 0
-#else
 #define HYPERVISOR_memory_op xencomm_mini_hypercall_memory_op
-#endif
 #else
 #define HYPERVISOR_sched_op xencomm_hypercall_sched_op
 #define HYPERVISOR_event_channel_op xencomm_hypercall_event_channel_op

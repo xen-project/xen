@@ -63,6 +63,7 @@
 #include <asm/system.h>
 #ifdef CONFIG_XEN
 #include <asm/hypervisor.h>
+#include <asm/xen/xencomm.h>
 #endif
 #include <linux/dma-mapping.h>
 
@@ -76,8 +77,6 @@ EXPORT_SYMBOL(__per_cpu_offset);
 #endif
 
 #ifdef CONFIG_XEN
-unsigned long kernel_start_pa;
-
 static int
 xen_panic_event(struct notifier_block *this, unsigned long event, void *ptr)
 {
@@ -435,7 +434,9 @@ setup_arch (char **cmdline_p)
 
 #ifdef CONFIG_XEN
 	if (is_running_on_xen()) {
-		kernel_start_pa = KERNEL_START - ia64_tpa(KERNEL_START);
+		/* Must be done before any hypercall.  */
+		xencomm_init();
+
 		setup_xen_features();
 		/* Register a call for panic conditions. */
 		notifier_chain_register(&panic_notifier_list, &xen_panic_block);

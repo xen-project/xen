@@ -18,11 +18,19 @@
 
 #include <linux/gfp.h>
 #include <linux/mm.h>
+#include <xen/interface/xen.h>
 #include <asm/page.h>
 #include <asm/xen/xencomm.h>
-#include <xen/interface/xen.h>
 
 static int xencomm_debug = 0;
+
+static unsigned long kernel_start_pa;
+
+void
+xencomm_init (void)
+{
+	kernel_start_pa = KERNEL_START - ia64_tpa(KERNEL_START);
+}
 
 /* Translate virtual address to physical address.  */
 unsigned long
@@ -47,8 +55,6 @@ xencomm_vaddr_to_paddr(unsigned long vaddr)
 		   work on  addresses.  */
 		if (vaddr >= KERNEL_START
 		    && vaddr < (KERNEL_START + KERNEL_TR_PAGE_SIZE)) {
-			extern unsigned long kernel_start_pa;
-			
 			return vaddr - kernel_start_pa;
 		}
 
@@ -78,6 +84,11 @@ xencomm_vaddr_to_paddr(unsigned long vaddr)
 		return __pa(vaddr);
 	}
 
+
+#ifdef CONFIG_VMX_GUEST
+	/* No privcmd within vmx guest.  */
+	return ~0UL;
+#else
 	/* XXX double-check (lack of) locking */
 	vma = find_extend_vma(current->mm, vaddr);
 	if (!vma)
@@ -89,10 +100,11 @@ xencomm_vaddr_to_paddr(unsigned long vaddr)
 		return ~0UL;
 
 	return (page_to_pfn(page) << PAGE_SHIFT) | (vaddr & ~PAGE_MASK);
+#endif
 }
 
 static int
-xencomm_init(struct xencomm_desc *desc, void *buffer, unsigned long bytes)
+xencomm_init_desc(struct xencomm_desc *desc, void *buffer, unsigned long bytes)
 {
 	unsigned long recorded = 0;
 	int i = 0;
@@ -183,9 +195,9 @@ xencomm_create(void *buffer, unsigned long bytes,
 	}
 	handle = (struct xencomm_handle *)__pa(desc);
 
-	rc = xencomm_init(desc, buffer, bytes);
+	rc = xencomm_init_desc(desc, buffer, bytes);
 	if (rc) {
-		printk("%s failure: %d\n", "xencomm_init", rc);
+		printk("%s failure: %d\n", "xencomm_init_desc", rc);
 		xencomm_free(handle);
 		return rc;
 	}
@@ -231,7 +243,7 @@ xencomm_create_mini(struct xencomm_mini *area, int *nbr_area,
 		return -ENOMEM;
 	desc->nr_addrs = XENCOMM_MINI_ADDRS;
 
-	rc = xencomm_init(desc, buffer, bytes);
+	rc = xencomm_init_desc(desc, buffer, bytes);
 	if (rc)
 		return rc;
 

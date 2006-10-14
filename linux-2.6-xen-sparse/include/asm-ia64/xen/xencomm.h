@@ -27,6 +27,9 @@ struct xencomm_mini {
 	uint64_t address[XENCOMM_MINI_ADDRS];
 };
 
+/* Must be called before any hypercall.  */
+extern void xencomm_init (void);
+
 /* To avoid additionnal virt to phys conversion, an opaque structure is
    presented.  */
 struct xencomm_handle;

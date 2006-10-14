@@ -66,6 +66,8 @@ extern int xencomm_mini_hypercall_callback_op(int cmd, void *arg);
 
 extern int xencomm_mini_hypercall_memory_op(unsigned int cmd, void *arg);
 
+extern unsigned long xencomm_mini_hypercall_hvm_op(int cmd, void *arg);
+
 /* For privcmd.  Locally declare argument type to avoid include storm.
    Type coherency will be checked within privcmd.c  */
 struct privcmd_hypercall;
