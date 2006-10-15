@@ -2681,7 +2681,7 @@ int shadow_test_enable(struct domain *d)
     if ( shadow_mode_enabled(d) )
     {
         SHADOW_ERROR("Don't support enabling test mode"
-                      "on already shadowed doms\n");
+                      " on already shadowed doms\n");
         ret = -EINVAL;
         goto out;
     }
@@ -2754,7 +2754,7 @@ static int shadow_log_dirty_enable(struct domain *d)
     if ( shadow_mode_enabled(d) )
     {
         SHADOW_ERROR("Don't (yet) support enabling log-dirty"
-                      "on already shadowed doms\n");
+                      " on already shadowed doms\n");
         ret = -EINVAL;
         goto out;
     }
