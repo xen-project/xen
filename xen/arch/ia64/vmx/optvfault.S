@@ -150,7 +150,7 @@ vmx_asm_mov_to_rr_back_2:
     (p7) mov rr[r28]=r19
     mov r24=r22
     br.many b0
-END(vmx_asm_mov_from_rr)
+END(vmx_asm_mov_to_rr)
 
 
 #define MOV_TO_REG0	\
