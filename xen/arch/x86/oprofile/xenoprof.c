@@ -13,6 +13,9 @@
 /* Limit amount of pages used for shared buffer (per domain) */
 #define MAX_OPROF_SHARED_PAGES 32
 
+/* Lock protecting the following global state */
+static spinlock_t xenoprof_lock = SPIN_LOCK_UNLOCKED;
+
 struct domain *active_domains[MAX_OPROF_DOMAINS];
 int active_ready[MAX_OPROF_DOMAINS];
 unsigned int adomains;
@@ -514,6 +517,8 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
         return -EPERM;
     }
 
+    spin_lock(&xenoprof_lock);
+    
     switch ( op )
     {
     case XENOPROF_init:
@@ -539,23 +544,31 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
     case XENOPROF_set_active:
     {
         domid_t domid;
-        if ( xenoprof_state != XENOPROF_IDLE )
-            return -EPERM;
-        if ( copy_from_guest(&domid, arg, 1) )
-            return -EFAULT;
+        if ( xenoprof_state != XENOPROF_IDLE ) {
+            ret = -EPERM;
+            break;
+        }
+        if ( copy_from_guest(&domid, arg, 1) ) {
+            ret = -EFAULT;
+            break;
+        }
         ret = add_active_list(domid);
         break;
     }
     case XENOPROF_set_passive:
     {
-        if ( xenoprof_state != XENOPROF_IDLE )
-            return -EPERM;
+        if ( xenoprof_state != XENOPROF_IDLE ) {
+            ret = -EPERM;
+            break;
+        }
         ret = add_passive_list(arg);
         break;
     }
     case XENOPROF_reserve_counters:
-        if ( xenoprof_state != XENOPROF_IDLE )
-            return -EPERM;
+        if ( xenoprof_state != XENOPROF_IDLE ) {
+            ret = -EPERM;
+            break;
+        }
         ret = nmi_reserve_counters();
         if ( !ret )
             xenoprof_state = XENOPROF_COUNTERS_RESERVED;
@@ -564,16 +577,20 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
     case XENOPROF_counter:
     {
         struct xenoprof_counter counter;
-        if ( xenoprof_state != XENOPROF_COUNTERS_RESERVED )
-            return -EPERM;
-        if ( adomains == 0 )
-            return -EPERM;
+        if ( xenoprof_state != XENOPROF_COUNTERS_RESERVED || adomains == 0) {
+            ret = -EPERM;
+            break;
+        }
 
-        if ( copy_from_guest(&counter, arg, 1) )
-            return -EFAULT;
+        if ( copy_from_guest(&counter, arg, 1) ) {
+            ret = -EFAULT;
+            break;
+        }
 
-        if ( counter.ind > OP_MAX_COUNTER )
-            return -E2BIG;
+        if ( counter.ind > OP_MAX_COUNTER ) {
+            ret = -E2BIG;
+            break;
+        }
 
         counter_config[counter.ind].count     = (unsigned long) counter.count;
         counter_config[counter.ind].enabled   = (unsigned long) counter.enabled;
@@ -587,8 +604,10 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
     }
 
     case XENOPROF_setup_events:
-        if ( xenoprof_state != XENOPROF_COUNTERS_RESERVED )
-            return -EPERM;
+        if ( xenoprof_state != XENOPROF_COUNTERS_RESERVED ) {
+            ret = -EPERM;
+            break;
+        }
         ret = nmi_setup_events();
         if ( !ret )
             xenoprof_state = XENOPROF_READY;
@@ -621,16 +640,20 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
         break;
 
     case XENOPROF_stop:
-        if ( xenoprof_state != XENOPROF_PROFILING )
-            return -EPERM;
+        if ( xenoprof_state != XENOPROF_PROFILING ) {
+            ret = -EPERM;
+            break;
+        }
         nmi_stop();
         xenoprof_state = XENOPROF_READY;
         break;
 
     case XENOPROF_disable_virq:
         if ( (xenoprof_state == XENOPROF_PROFILING) && 
-             (is_active(current->domain)) )
-            return -EPERM;
+             (is_active(current->domain)) ) {
+            ret = -EPERM;
+            break;
+        }
         ret = reset_active(current->domain);
         break;
 
@@ -661,6 +684,8 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
     default:
         ret = -EINVAL;
     }
+
+    spin_unlock(&xenoprof_lock);
 
     if ( ret < 0 )
         printk("xenoprof: operation %d failed for dom %d (status : %d)\n",
