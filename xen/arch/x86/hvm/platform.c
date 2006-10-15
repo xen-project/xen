@@ -730,13 +730,13 @@ void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
     vcpu_iodata_t *vio;
     ioreq_t *p;
 
-    if (size == 0 || count == 0) {
+    if ( size == 0 || count == 0 ) {
         printf("null pio request? port %lx, count %lx, size %d, value %lx, dir %d, pvalid %d.\n",
                port, count, size, value, dir, pvalid);
     }
 
     vio = get_vio(v->domain, v->vcpu_id);
-    if (vio == NULL) {
+    if ( vio == NULL ) {
         printk("bad shared page: %lx\n", (unsigned long) vio);
         domain_crash_synchronous();
     }
@@ -745,6 +745,7 @@ void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
     if ( p->state != STATE_INVALID )
         printk("WARNING: send pio with something already pending (%d)?\n",
                p->state);
+
     p->dir = dir;
     p->pdata_valid = pvalid;
 
@@ -752,19 +753,20 @@ void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
     p->size = size;
     p->addr = port;
     p->count = count;
-    p->df = regs->eflags & EF_DF ? 1 : 0;
+    p->df = regs->eflags & X86_EFLAGS_DF ? 1 : 0;
 
     p->io_count++;
 
-    if (pvalid) {
-        if (hvm_paging_enabled(current))
-            p->u.data = shadow_gva_to_gpa(current, value);
+    if ( pvalid )   /* get physical address of data */
+    {
+        if ( hvm_paging_enabled(current) )
+            p->u.pdata = (void *)shadow_gva_to_gpa(current, value);
         else
-            p->u.pdata = (void *) value; /* guest VA == guest PA */
-    } else
+            p->u.pdata = (void *)value; /* guest VA == guest PA */
+    } else if ( dir == IOREQ_WRITE )
         p->u.data = value;
 
-    if (hvm_portio_intercept(p)) {
+    if ( hvm_portio_intercept(p) ) {
         p->state = STATE_IORESP_READY;
         hvm_io_assist(v);
         return;
