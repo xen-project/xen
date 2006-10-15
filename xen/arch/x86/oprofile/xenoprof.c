@@ -122,6 +122,7 @@ int alloc_xenoprof_struct(struct domain *d, int max_samples, int is_passive)
 {
     struct vcpu *v;
     int nvcpu, npages, bufsize, max_bufsize;
+    unsigned max_max_samples;
     int i;
 
     d->xenoprof = xmalloc(struct xenoprof);
@@ -139,17 +140,15 @@ int alloc_xenoprof_struct(struct domain *d, int max_samples, int is_passive)
     for_each_vcpu ( d, v )
         nvcpu++;
 
-    /* reduce buffer size if necessary to limit pages allocated */
+    /* reduce max_samples if necessary to limit pages allocated */
+    max_bufsize = (MAX_OPROF_SHARED_PAGES * PAGE_SIZE) / nvcpu;
+    max_max_samples = ( (max_bufsize - sizeof(struct xenoprof_buf)) /
+                        sizeof(struct event_log) ) + 1;
+    if ( (unsigned)max_samples > max_max_samples )
+        max_samples = max_max_samples;
+
     bufsize = sizeof(struct xenoprof_buf) +
         (max_samples - 1) * sizeof(struct event_log);
-    max_bufsize = (MAX_OPROF_SHARED_PAGES * PAGE_SIZE) / nvcpu;
-    if ( bufsize > max_bufsize )
-    {
-        bufsize = max_bufsize;
-        max_samples = ( (max_bufsize - sizeof(struct xenoprof_buf)) /
-                        sizeof(struct event_log) ) + 1;
-    }
-
     npages = (nvcpu * bufsize - 1) / PAGE_SIZE + 1;
     
     d->xenoprof->rawbuf = alloc_xenoprof_buf(is_passive ? dom0 : d, npages);
