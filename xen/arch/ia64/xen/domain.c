@@ -50,7 +50,6 @@
 #include <asm/tlb_track.h>
 
 unsigned long dom0_size = 512*1024*1024;
-unsigned long dom0_align = 64*1024*1024;
 
 /* dom0_max_vcpus: maximum number of VCPUs to create for dom0.  */
 static unsigned int dom0_max_vcpus = 1;
@@ -877,23 +876,6 @@ void alloc_dom0(void)
 			" (try e.g. dom0_mem=256M or dom0_mem=65536K)\n");
 	}
 
-	/* Check dom0 align.  */
-	if ((dom0_align - 1) & dom0_align) { /* not a power of two */
-		panic("dom0_align (%lx) must be power of two, boot aborted"
-		      " (try e.g. dom0_align=256M or dom0_align=65536K)\n",
-		      dom0_align);
-	}
-	if (dom0_align < PAGE_SIZE) {
-		panic("dom0_align must be >= %ld, boot aborted"
-		      " (try e.g. dom0_align=256M or dom0_align=65536K)\n",
-		      PAGE_SIZE);
-	}
-	if (dom0_size % dom0_align) {
-		dom0_size = (dom0_size / dom0_align + 1) * dom0_align;
-		printf("dom0_size rounded up to %ld, due to dom0_align=%lx\n",
-		     dom0_size,dom0_align);
-	}
-
 	if (running_on_sim) {
 		dom0_size = 128*1024*1024; //FIXME: Should be configurable
 	}
@@ -1172,10 +1154,3 @@ static void parse_dom0_mem(char *s)
 	dom0_size = parse_size_and_unit(s);
 }
 custom_param("dom0_mem", parse_dom0_mem);
-
-
-static void parse_dom0_align(char *s)
-{
-	dom0_align = parse_size_and_unit(s);
-}
-custom_param("dom0_align", parse_dom0_align);
