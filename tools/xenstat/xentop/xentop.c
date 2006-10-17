@@ -23,6 +23,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #include <sys/time.h>
 #include <time.h>
@@ -266,7 +267,7 @@ static void print(const char *fmt, ...)
 	if (!batch) {
 		if((current_row() < lines()-1)) {
 			va_start(args, fmt);
-			vw_printw(stdscr, fmt, args);
+			vwprintw(stdscr, (char *)fmt, args);
 			va_end(args);
 		}
 	} else {
@@ -280,7 +281,7 @@ static void print(const char *fmt, ...)
 static void attr_addstr(int attr, const char *str)
 {
 	attron(attr);
-	addstr(str);
+	addstr((char *)str);
 	attroff(attr);
 }
 
@@ -1035,7 +1036,9 @@ int main(int argc, char **argv)
 		nonl();
 		keypad(stdscr, TRUE);
 		halfdelay(5);
+#ifndef __sun__
 		use_default_colors();
+#endif
 		init_pair(1, -1, COLOR_YELLOW);
 
 		do {

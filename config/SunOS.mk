@@ -22,6 +22,7 @@ INSTALL_PROG = $(INSTALL) -m0755
 LIB64DIR = lib/amd64
 
 SOCKET_LIBS = -lsocket
+CURSES_LIBS = -lcurses
 SONAME_LDFLAG = -h
 SHLIB_CFLAGS = -static-libgcc -shared
 

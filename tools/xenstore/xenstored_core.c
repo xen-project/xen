@@ -1688,7 +1688,7 @@ static void write_pidfile(const char *pidfile)
 	if (lockf(fd, F_TLOCK, 0) == -1)
 		exit(0);
 
-	len = sprintf(buf, "%d\n", getpid());
+	len = sprintf(buf, "%ld\n", (long)getpid());
 	if (write(fd, buf, len) != len)
 		barf_perror("Writing pid file %s", pidfile);
 }
@@ -1901,7 +1901,7 @@ int main(int argc, char *argv[])
 	restore_existing_connections();
 
 	if (outputpid) {
-		printf("%i\n", getpid());
+		printf("%ld\n", (long)getpid());
 		fflush(stdout);
 	}
 

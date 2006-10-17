@@ -21,6 +21,7 @@ INSTALL_PROG = $(INSTALL) -m0755
 LIB64DIR = lib64
 
 SOCKET_LIBS =
+CURSES_LIBS = -lncurses
 SONAME_LDFLAG = -soname
 SHLIB_CFLAGS = -shared
 

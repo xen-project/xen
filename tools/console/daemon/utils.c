@@ -95,7 +95,7 @@ void daemonize(const char *pidfile)
 		exit(1);
 	}
 
-	len = sprintf(buf, "%d\n", getpid());
+	len = sprintf(buf, "%ld\n", (long)getpid());
 	if (write(fd, buf, len) < 0)
 		exit(1);
 

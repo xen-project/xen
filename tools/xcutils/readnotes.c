@@ -56,7 +56,8 @@ static void print_numeric_note(const char *prefix,Elf_Nhdr *note)
 		       prefix, *(uint64_t *)ELFNOTE_DESC(note));
 		break;
 	default:
-		printf("%s: unknown data size %#x\n", prefix, note->n_descsz);
+		printf("%s: unknown data size %#lx\n", prefix,
+		       (unsigned long)note->n_descsz);
 		break;
 	}
 }
@@ -301,7 +302,8 @@ int main(int argc, char **argv)
 				print_string_note("FEATURES", note);
 				break;
 			default:
-				printf("unknown note type %#x\n", note->n_type);
+				printf("unknown note type %#lx\n",
+				       (unsigned long)note->n_type);
 				break;
 			}
 		}
