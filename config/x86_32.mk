@@ -6,4 +6,5 @@ CONFIG_IOEMU := y
 CONFIG_MBOOTPACK := y
 
 CFLAGS += -m32 -march=i686
+LDFLAGS += -m32
 LIBDIR := lib
