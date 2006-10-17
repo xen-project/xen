@@ -59,11 +59,6 @@
 #define PPRINTF(_f, _a...)
 #endif
 
-#define ERR(_f, _a...) do {                     \
-    DPRINTF(_f ": %d\n" , ## _a, errno);        \
-    fflush(stderr); }                           \
-while (0)
-
 #define ERROR(_m, _a...)                        \
 do {                                            \
     int __saved_errno = errno;                  \
