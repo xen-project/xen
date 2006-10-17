@@ -1924,6 +1924,9 @@ int main(int argc, char *argv[])
 	/* Get ready to listen to the tools. */
 	max = initialize_set(&inset, &outset, *sock, *ro_sock);
 
+	/* Tell the kernel we're up and running. */
+	xenbus_notify_running();
+
 	/* Main loop. */
 	/* FIXME: Rewrite so noone can starve. */
 	for (;;) {

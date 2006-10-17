@@ -27,9 +27,10 @@ CLIENTS_OBJS := $(patsubst xenstore-%,xenstore_%.o,$(CLIENTS))
 
 XENSTORED_OBJS = xenstored_core.o xenstored_watch.o xenstored_domain.o xenstored_transaction.o xs_lib.o talloc.o utils.o tdb.o hashtable.o
 
-XENSTORED_Linux = xenstored_linux.o
+XENSTORED_OBJS_$(CONFIG_Linux) = xenstored_linux.o
+XENSTORED_OBJS_$(CONFIG_SunOS) = xenstored_solaris.o
 
-XENSTORED_OBJS += $(XENSTORED_$(XEN_OS))
+XENSTORED_OBJS += $(XENSTORED_OBJS_y)
 
 .PHONY: all
 all: libxenstore.so libxenstore.a xenstored $(CLIENTS) xs_tdb_dump xenstore-control xenstore-ls

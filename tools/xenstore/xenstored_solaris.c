@@ -15,34 +15,20 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/mman.h>
+#include <xen/sys/xenbus.h>
 
 #include "xenstored_core.h"
-
-#define XENSTORED_PROC_KVA  "/proc/xen/xsd_kva"
-#define XENSTORED_PROC_PORT "/proc/xen/xsd_port"
 
 evtchn_port_t xenbus_evtchn(void)
 {
 	int fd;
-	int rc;
 	evtchn_port_t port; 
-	char str[20]; 
 
-	fd = open(XENSTORED_PROC_PORT, O_RDONLY); 
+	fd = open("/dev/xen/xenbus", O_RDONLY); 
 	if (fd == -1)
 		return -1;
 
-	rc = read(fd, str, sizeof(str)); 
-	if (rc == -1)
-	{
-		int err = errno;
-		close(fd);
-		errno = err;
-		return -1;
-	}
-
-	str[rc] = '\0'; 
-	port = strtoul(str, NULL, 0); 
+	port = ioctl(fd, IOCTL_XENBUS_XENSTORE_EVTCHN);
 
 	close(fd); 
 	return port;
@@ -53,7 +39,7 @@ void *xenbus_map(void)
 	int fd;
 	void *addr;
 
-	fd = open(XENSTORED_PROC_KVA, O_RDWR);
+	fd = open("/dev/xen/xenbus", O_RDWR);
 	if (fd == -1)
 		return NULL;
 
@@ -70,4 +56,11 @@ void *xenbus_map(void)
 
 void xenbus_notify_running(void)
 {
+	int fd;
+
+	fd = open("/dev/xen/xenbus", O_RDONLY);
+
+	(void) ioctl(fd, IOCTL_XENBUS_NOTIFY_UP);
+
+	close(fd);
 }

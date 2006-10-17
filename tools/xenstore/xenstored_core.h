@@ -172,6 +172,9 @@ void *xenbus_map(void);
 /* Return the event channel used by xenbus. */
 evtchn_port_t xenbus_evtchn(void);
 
+/* Tell the kernel xenstored is running. */
+void xenbus_notify_running(void);
+
 #endif /* _XENSTORED_CORE_H */
 
 /*
