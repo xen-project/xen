@@ -196,7 +196,6 @@ delete_fl1_shadow_status(struct vcpu *v, gfn_t gfn, mfn_t smfn)
 {
     SHADOW_PRINTK("gfn=%"SH_PRI_gfn", type=%08x, smfn=%05lx\n",
                    gfn_x(gfn), PGC_SH_fl1_shadow, mfn_x(smfn));
-
     shadow_hash_delete(v, gfn_x(gfn),
                         PGC_SH_fl1_shadow >> PGC_SH_type_shift, smfn);
 }
@@ -3597,6 +3596,7 @@ int sh_remove_write_access(struct vcpu *v, mfn_t sl1mfn, mfn_t readonly_mfn)
     shadow_l1e_t *sl1e;
     int done = 0;
     int flags;
+    mfn_t base_sl1mfn = sl1mfn; /* Because sl1mfn changes in the foreach */
     
     SHADOW_FOREACH_L1E(sl1mfn, sl1e, 0, done, 
     {
@@ -3606,6 +3606,10 @@ int sh_remove_write_access(struct vcpu *v, mfn_t sl1mfn, mfn_t readonly_mfn)
              && (mfn_x(shadow_l1e_get_mfn(*sl1e)) == mfn_x(readonly_mfn)) )
         {
             shadow_set_l1e(v, sl1e, shadow_l1e_empty(), sl1mfn);
+#if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC 
+            /* Remember the last shadow that we shot a writeable mapping in */
+            v->arch.shadow.last_writeable_pte_smfn = mfn_x(base_sl1mfn);
+#endif
             if ( (mfn_to_page(readonly_mfn)->u.inuse.type_info
                   & PGT_count_mask) == 0 )
                 /* This breaks us cleanly out of the FOREACH macro */

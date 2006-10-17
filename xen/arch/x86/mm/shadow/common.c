@@ -720,6 +720,15 @@ void shadow_free(struct domain *d, mfn_t smfn)
 
     for ( i = 0; i < 1<<order; i++ ) 
     {
+#if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC
+        struct vcpu *v;
+        for_each_vcpu(d, v) 
+        {
+            /* No longer safe to look for a writeable mapping in this shadow */
+            if ( v->arch.shadow.last_writeable_pte_smfn == mfn_x(smfn) + i ) 
+                v->arch.shadow.last_writeable_pte_smfn = 0;
+        }
+#endif
         /* Strip out the type: this is now a free shadow page */
         pg[i].count_info = 0;
         /* Remember the TLB timestamp so we will know whether to flush 
@@ -1820,12 +1829,11 @@ int shadow_remove_write_access(struct vcpu *v, mfn_t gmfn,
         unsigned long gfn;
         /* Heuristic: there is likely to be only one writeable mapping,
          * and that mapping is likely to be in the current pagetable,
-         * either in the guest's linear map (linux, windows) or in a
-         * magic slot used to map high memory regions (linux HIGHTPTE) */
+         * in the guest's linear map (on non-HIGHPTE linux and windows)*/
 
 #define GUESS(_a, _h) do {                                              \
-            if ( v->arch.shadow.mode->guess_wrmap(v, (_a), gmfn) )          \
-                perfc_incrc(shadow_writeable_h_ ## _h);                \
+            if ( v->arch.shadow.mode->guess_wrmap(v, (_a), gmfn) )      \
+                perfc_incrc(shadow_writeable_h_ ## _h);                 \
             if ( (pg->u.inuse.type_info & PGT_count_mask) == 0 )        \
                 return 1;                                               \
         } while (0)
@@ -1875,9 +1883,35 @@ int shadow_remove_write_access(struct vcpu *v, mfn_t gmfn,
 #endif /* CONFIG_PAGING_LEVELS >= 3 */
 
 #undef GUESS
-
     }
-#endif
+
+    if ( (pg->u.inuse.type_info & PGT_count_mask) == 0 )
+        return 1;
+
+    /* Second heuristic: on HIGHPTE linux, there are two particular PTEs
+     * (entries in the fixmap) where linux maps its pagetables.  Since
+     * we expect to hit them most of the time, we start the search for
+     * the writeable mapping by looking at the same MFN where the last
+     * brute-force search succeeded. */
+
+    if ( v->arch.shadow.last_writeable_pte_smfn != 0 )
+    {
+        unsigned long old_count = (pg->u.inuse.type_info & PGT_count_mask);
+        mfn_t last_smfn = _mfn(v->arch.shadow.last_writeable_pte_smfn);
+        int shtype = (mfn_to_page(last_smfn)->count_info & PGC_SH_type_mask) 
+            >> PGC_SH_type_shift;
+
+        if ( callbacks[shtype] ) 
+            callbacks[shtype](v, last_smfn, gmfn);
+
+        if ( (pg->u.inuse.type_info & PGT_count_mask) != old_count )
+            perfc_incrc(shadow_writeable_h_5);
+    }
+
+    if ( (pg->u.inuse.type_info & PGT_count_mask) == 0 )
+        return 1;
+
+#endif /* SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC */
     
     /* Brute-force search of all the shadows, by walking the hash */
     perfc_incrc(shadow_writeable_bf);

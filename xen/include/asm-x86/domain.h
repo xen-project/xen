@@ -142,6 +142,8 @@ struct shadow_vcpu {
     struct shadow_paging_mode *mode;
     /* Last MFN that we emulated a write to. */
     unsigned long last_emulated_mfn;
+    /* MFN of the last shadow that we shot a writeable mapping in */
+    unsigned long last_writeable_pte_smfn;
     /* HVM guest: paging enabled (CR0.PG)?  */
     unsigned int translate_enabled:1;
     /* Emulated fault needs to be propagated to guest? */
