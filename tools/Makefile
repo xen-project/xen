@@ -60,7 +60,7 @@ check_clean:
 	$(MAKE) -C check clean
 
 .PHONY: ioemu ioemuinstall ioemuclean
-ifdef CONFIG_IOEMU
+ifeq ($(CONFIG_IOEMU),y)
 export IOEMU_DIR ?= ioemu
 ioemu ioemuinstall:
 	[ -f $(IOEMU_DIR)/config-host.mak ] || \
