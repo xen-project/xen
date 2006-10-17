@@ -32,3 +32,5 @@ else
 # Less than -O1 produces bad code and large stack frames
 CFLAGS ?= -O1 -fno-omit-frame-pointer
 endif
+
+CFLAGS += -Wa,--divide
