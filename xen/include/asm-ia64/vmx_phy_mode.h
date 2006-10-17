@@ -90,7 +90,7 @@ extern void physical_mode_init(VCPU *);
 extern void switch_to_physical_rid(VCPU *);
 extern void switch_to_virtual_rid(VCPU *vcpu);
 extern void switch_mm_mode(VCPU *vcpu, IA64_PSR old_psr, IA64_PSR new_psr);
-extern void stlb_phys_lookup(VCPU *vcpu, UINT64 paddr, UINT64 type);
+extern void stlb_phys_lookup(VCPU *vcpu, u64 paddr, u64 type);
 extern void check_mm_mode_switch (VCPU *vcpu,  IA64_PSR old_psr, IA64_PSR new_psr);
 extern void prepare_if_physical_mode(VCPU *vcpu);
 extern void recover_if_physical_mode(VCPU *vcpu);
@@ -120,9 +120,4 @@ extern void physical_tlb_miss(VCPU *vcpu, u64 vadr);
 #define GUEST_VIRT  1   /* Guest in virtual mode */
 #define GUEST_PHYS  2   /* Guest in physical mode, requiring emulation */
 
-
-
 #endif /* _PHY_MODE_H_ */
-
-
-

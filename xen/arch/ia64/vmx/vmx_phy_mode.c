@@ -204,7 +204,7 @@ vmx_load_all_rr(VCPU *vcpu)
 void
 switch_to_physical_rid(VCPU *vcpu)
 {
-    UINT64 psr;
+    u64 psr;
     /* Save original virtual mode rr[0] and rr[4] */
     psr=ia64_clear_ic();
     ia64_set_rr(VRN0<<VRN_SHIFT, vcpu->arch.metaphysical_rr0);
@@ -221,7 +221,7 @@ switch_to_physical_rid(VCPU *vcpu)
 void
 switch_to_virtual_rid(VCPU *vcpu)
 {
-    UINT64 psr;
+    u64 psr;
     psr=ia64_clear_ic();
     ia64_set_rr(VRN0<<VRN_SHIFT, vcpu->arch.metaphysical_saved_rr0);
     ia64_srlz_d();

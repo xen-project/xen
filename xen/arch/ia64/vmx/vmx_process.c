@@ -66,7 +66,7 @@ extern unsigned long handle_fpu_swa (int fp_fault, struct pt_regs *regs, unsigne
 #define DOMN_PAL_REQUEST    0x110000
 #define DOMN_SAL_REQUEST    0x110001
 
-static UINT64 vec2off[68] = {0x0,0x400,0x800,0xc00,0x1000, 0x1400,0x1800,
+static u64 vec2off[68] = {0x0,0x400,0x800,0xc00,0x1000,0x1400,0x1800,
     0x1c00,0x2000,0x2400,0x2800,0x2c00,0x3000,0x3400,0x3800,0x3c00,0x4000,
     0x4400,0x4800,0x4c00,0x5000,0x5100,0x5200,0x5300,0x5400,0x5500,0x5600,
     0x5700,0x5800,0x5900,0x5a00,0x5b00,0x5c00,0x5d00,0x5e00,0x5f00,0x6000,
@@ -78,12 +78,12 @@ static UINT64 vec2off[68] = {0x0,0x400,0x800,0xc00,0x1000, 0x1400,0x1800,
 
 
 
-void vmx_reflect_interruption(UINT64 ifa,UINT64 isr,UINT64 iim,
-     UINT64 vector,REGS *regs)
+void vmx_reflect_interruption(u64 ifa, u64 isr, u64 iim,
+                              u64 vector, REGS *regs)
 {
-    UINT64 status;
+    u64 status;
     VCPU *vcpu = current;
-    UINT64 vpsr = VCPU(vcpu, vpsr);
+    u64 vpsr = VCPU(vcpu, vpsr);
     vector=vec2off[vector];
     if(!(vpsr&IA64_PSR_IC)&&(vector!=IA64_DATA_NESTED_TLB_VECTOR)){
         panic_domain(regs, "Guest nested fault vector=%lx!\n", vector);
@@ -253,7 +253,7 @@ void leave_hypervisor_tail(struct pt_regs *regs)
     }
 }
 
-extern ia64_rr vmx_vcpu_rr(VCPU *vcpu,UINT64 vadr);
+extern ia64_rr vmx_vcpu_rr(VCPU *vcpu, u64 vadr);
 
 static int vmx_handle_lds(REGS* regs)
 {

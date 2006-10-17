@@ -48,7 +48,7 @@
 	}
 
 static void
-get_pal_parameters(VCPU *vcpu, UINT64 *gr29, UINT64 *gr30, UINT64 *gr31) {
+get_pal_parameters(VCPU *vcpu, u64 *gr29, u64 *gr30, u64 *gr31) {
 
 	vcpu_get_gr_nat(vcpu,29,gr29);
 	vcpu_get_gr_nat(vcpu,30,gr30); 
@@ -75,7 +75,7 @@ set_sal_result(VCPU *vcpu,struct sal_ret_values result) {
 
 static struct ia64_pal_retval
 pal_cache_flush(VCPU *vcpu) {
-	UINT64 gr28,gr29, gr30, gr31;
+	u64 gr28,gr29, gr30, gr31;
 	struct ia64_pal_retval result;
 
 	get_pal_parameters(vcpu, &gr29, &gr30, &gr31);
@@ -384,7 +384,7 @@ pal_vm_page_size(VCPU *vcpu) {
 
 void
 pal_emul(VCPU *vcpu) {
-	UINT64 gr28;
+	u64 gr28;
 	struct ia64_pal_retval result;
 
 	vcpu_get_gr_nat(vcpu,28,&gr28);  //bank1

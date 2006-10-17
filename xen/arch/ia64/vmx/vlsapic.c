@@ -49,8 +49,8 @@
  * Update the checked last_itc.
  */
 
-extern void vmx_reflect_interruption(UINT64 ifa,UINT64 isr,UINT64 iim,
-     UINT64 vector,REGS *regs);
+extern void vmx_reflect_interruption(u64 ifa, u64 isr, u64 iim,
+                                     u64 vector, REGS *regs);
 static void update_last_itc(vtime_t *vtm, uint64_t cur_itc)
 {
     vtm->last_itc = cur_itc;
@@ -533,7 +533,7 @@ int vmx_vcpu_pend_interrupt(VCPU *vcpu, uint8_t vector)
  * The interrupt source is contained in pend_irr[0-3] with
  * each bits stand for one interrupt.
  */
-void vmx_vcpu_pend_batch_interrupt(VCPU *vcpu, UINT64 *pend_irr)
+void vmx_vcpu_pend_batch_interrupt(VCPU *vcpu, u64 *pend_irr)
 {
     uint64_t    spsr;
     int     i;

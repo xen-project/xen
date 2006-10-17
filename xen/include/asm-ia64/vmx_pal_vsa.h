@@ -26,10 +26,9 @@
 /* PAL virtualization services */
 
 #ifndef __ASSEMBLY__
-extern UINT64 ia64_call_vsa(UINT64 proc,UINT64 arg1, UINT64 arg2,
-                   UINT64 arg3, UINT64 arg4, UINT64 arg5,
-                   UINT64 arg6, UINT64 arg7);
-extern UINT64 __vsa_base;
+extern u64 ia64_call_vsa(u64 proc, u64 arg1, u64 arg2, u64 arg3,
+                         u64 arg4, u64 arg5, u64 arg6, u64 arg7);
+extern u64 __vsa_base;
 #endif  /* __ASSEMBLY__ */
 
 #define PAL_VPS_RESUME_NORMAL           0x0000

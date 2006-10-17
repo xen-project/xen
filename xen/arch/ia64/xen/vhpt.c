@@ -22,7 +22,7 @@
 #include <asm/vmmu.h>
 
 /* Defined in tlb.c  */
-extern void ia64_global_tlb_purge(UINT64 start, UINT64 end, UINT64 nbits);
+extern void ia64_global_tlb_purge(u64 start, u64 end, u64 nbits);
 
 extern long running_on_sim;
 
