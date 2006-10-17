@@ -128,7 +128,7 @@ static struct ethtool_ops network_ethtool_ops =
 
 netif_t *netif_alloc(domid_t domid, unsigned int handle)
 {
-	int err = 0, i;
+	int err = 0;
 	struct net_device *dev;
 	netif_t *netif;
 	char name[IFNAMSIZ] = {};
