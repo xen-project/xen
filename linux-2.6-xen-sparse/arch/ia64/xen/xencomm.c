@@ -36,8 +36,10 @@ xencomm_init (void)
 unsigned long
 xencomm_vaddr_to_paddr(unsigned long vaddr)
 {
+#ifndef CONFIG_VMX_GUEST
 	struct page *page;
 	struct vm_area_struct *vma;
+#endif
 
 	if (vaddr == 0)
 		return 0;
