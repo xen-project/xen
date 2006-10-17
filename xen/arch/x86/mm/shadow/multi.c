@@ -2880,7 +2880,6 @@ static int sh_page_fault(struct vcpu *v,
     shadow_audit_tables(v);
     reset_early_unshadow(v);
     shadow_unlock(d);
-    sh_log_mmio(v, gpa);
     handle_mmio(va, gpa);
     return EXCRET_fault_fixed;
 
