@@ -187,6 +187,8 @@ char prompt_val[PROMPT_VAL_LEN];
 int prompt_val_len = 0;
 void (*prompt_complete_func)(char *);
 
+static WINDOW *cwin;
+
 /*
  * Function definitions
  */
@@ -223,7 +225,7 @@ static void version(void)
 /* Clean up any open resources */
 static void cleanup(void)
 {
-	if(!isendwin())
+	if(cwin != NULL && !isendwin())
 		endwin();
 	if(prev_node != NULL)
 		xenstat_free_node(prev_node);
@@ -236,7 +238,7 @@ static void cleanup(void)
 /* Display the given message and gracefully exit */
 static void fail(const char *str)
 {
-	if(!isendwin())
+	if(cwin != NULL && !isendwin())
 		endwin();
 	fprintf(stderr, str);
 	exit(1);
@@ -1029,7 +1031,7 @@ int main(int argc, char **argv)
 
 	if (!batch) {
 		/* Begin curses stuff */
-		initscr();
+		cwin = initscr();
 		start_color();
 		cbreak();
 		noecho();
