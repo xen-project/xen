@@ -134,6 +134,10 @@ struct pae_l3_cache { };
 #endif
 
 struct shadow_vcpu {
+#if CONFIG_PAGING_LEVELS >= 3
+    /* PAE guests: per-vcpu shadow top-level table */
+    l3_pgentry_t l3table[4] __attribute__((__aligned__(32)));
+#endif
     /* Pointers to mode-specific entry points. */
     struct shadow_paging_mode *mode;
     /* Last MFN that we emulated a write to. */
@@ -142,10 +146,6 @@ struct shadow_vcpu {
     unsigned int translate_enabled:1;
     /* Emulated fault needs to be propagated to guest? */
     unsigned int propagate_fault:1;
-#if CONFIG_PAGING_LEVELS >= 3
-    /* Shadow update requires this PAE cpu to recopy/install its L3 table. */
-    unsigned int pae_flip_pending:1;
-#endif
 };
 
 struct arch_vcpu
@@ -190,13 +190,12 @@ struct arch_vcpu
     pagetable_t guest_table;            /* (MFN) guest notion of cr3 */
     /* guest_table holds a ref to the page, and also a type-count unless
      * shadow refcounts are in use */
-    pagetable_t shadow_table;           /* (MFN) shadow of guest */
+    pagetable_t shadow_table[4];        /* (MFN) shadow(s) of guest */
     pagetable_t monitor_table;          /* (MFN) hypervisor PT (for HVM) */
     unsigned long cr3;           	    /* (MA) value to install in HW CR3 */
 
-    void *guest_vtable;                 /* virtual address of pagetable */
-    void *shadow_vtable;                /* virtual address of shadow_table */
-    root_pgentry_t *monitor_vtable;		/* virtual address of monitor_table */
+    void *guest_vtable;                 /* virtual addr of pagetable */
+    root_pgentry_t *monitor_vtable;		/* virtual addr of monitor_table */
 
     /* Current LDT details. */
     unsigned long shadow_ldt_mapcnt;

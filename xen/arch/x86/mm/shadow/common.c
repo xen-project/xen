@@ -283,11 +283,8 @@ __shadow_validate_guest_entry(struct vcpu *v, mfn_t gmfn,
     if ( page->shadow_flags & SHF_L2H_PAE ) 
         result |= SHADOW_INTERNAL_NAME(sh_map_and_validate_gl2he, 3, 3)
             (v, gmfn, entry, size);
-    if ( page->shadow_flags & SHF_L3_PAE ) 
-        result |= SHADOW_INTERNAL_NAME(sh_map_and_validate_gl3e, 3, 3)
-            (v, gmfn, entry, size);
 #else /* 32-bit non-PAE hypervisor does not support PAE guests */
-    ASSERT((page->shadow_flags & (SHF_L3_PAE|SHF_L2_PAE|SHF_L1_PAE)) == 0);
+    ASSERT((page->shadow_flags & (SHF_L2H_PAE|SHF_L2_PAE|SHF_L1_PAE)) == 0);
 #endif
 
 #if CONFIG_PAGING_LEVELS >= 4 
@@ -427,22 +424,16 @@ shadow_validate_guest_pt_write(struct vcpu *v, mfn_t gmfn,
 /* Allocating shadow pages
  * -----------------------
  *
- * Most shadow pages are allocated singly, but there are two cases where we 
- * need to allocate multiple pages together.
- * 
- * 1: Shadowing 32-bit guest tables on PAE or 64-bit shadows.
- *    A 32-bit guest l1 table covers 4MB of virtuial address space,
- *    and needs to be shadowed by two PAE/64-bit l1 tables (covering 2MB
- *    of virtual address space each).  Similarly, a 32-bit guest l2 table 
- *    (4GB va) needs to be shadowed by four PAE/64-bit l2 tables (1GB va 
- *    each).  These multi-page shadows are contiguous and aligned; 
- *    functions for handling offsets into them are defined in shadow.c 
- *    (shadow_l1_index() etc.)
+ * Most shadow pages are allocated singly, but there is one case where
+ * we need to allocate multiple pages together: shadowing 32-bit guest
+ * tables on PAE or 64-bit shadows.  A 32-bit guest l1 table covers 4MB
+ * of virtuial address space, and needs to be shadowed by two PAE/64-bit
+ * l1 tables (covering 2MB of virtual address space each).  Similarly, a
+ * 32-bit guest l2 table (4GB va) needs to be shadowed by four
+ * PAE/64-bit l2 tables (1GB va each).  These multi-page shadows are
+ * contiguous and aligned; functions for handling offsets into them are
+ * defined in shadow.c (shadow_l1_index() etc.)
  *    
- * 2: Shadowing PAE top-level pages.  Each guest page that contains
- *    any PAE top-level pages requires two shadow pages to shadow it.
- *    They contain alternating l3 tables and pae_l3_bookkeeping structs.
- *
  * This table shows the allocation behaviour of the different modes:
  *
  * Xen paging      32b  pae  pae  64b  64b  64b
@@ -452,7 +443,7 @@ shadow_validate_guest_pt_write(struct vcpu *v, mfn_t gmfn,
  *
  * sl1 size         4k   8k   4k   8k   4k   4k
  * sl2 size         4k  16k   4k  16k   4k   4k
- * sl3 size         -    -    8k   -    8k   4k
+ * sl3 size         -    -    -    -    -    4k
  * sl4 size         -    -    -    -    -    4k
  *
  * We allocate memory from xen in four-page units and break them down
@@ -506,7 +497,6 @@ shadow_order(u32 shadow_type)
         0, /* PGC_SH_fl1_pae_shadow */
         0, /* PGC_SH_l2_pae_shadow  */
         0, /* PGC_SH_l2h_pae_shadow */
-        1, /* PGC_SH_l3_pae_shadow  */
         0, /* PGC_SH_l1_64_shadow   */
         0, /* PGC_SH_fl1_64_shadow  */
         0, /* PGC_SH_l2_64_shadow   */
@@ -549,7 +539,8 @@ void shadow_unhook_mappings(struct vcpu *v, mfn_t smfn)
 #endif
         break;
 #if CONFIG_PAGING_LEVELS >= 3
-    case PGC_SH_l3_pae_shadow >> PGC_SH_type_shift:
+    case PGC_SH_l2_pae_shadow >> PGC_SH_type_shift:
+    case PGC_SH_l2h_pae_shadow >> PGC_SH_type_shift:
         SHADOW_INTERNAL_NAME(sh_unhook_pae_mappings,3,3)(v,smfn);
         break;
 #endif
@@ -590,18 +581,8 @@ void shadow_prealloc(struct domain *d, unsigned int order)
         pg = list_entry(l, struct page_info, list);
         smfn = page_to_mfn(pg);
 
-#if CONFIG_PAGING_LEVELS >= 3
-        if ( (pg->count_info & PGC_SH_type_mask) == PGC_SH_l3_pae_shadow )
-        {
-            /* For PAE, we need to unpin each subshadow on this shadow */
-            SHADOW_INTERNAL_NAME(sh_unpin_all_l3_subshadows,3,3)(v, smfn);
-        } 
-        else 
-#endif /* 32-bit code always takes this branch */
-        {
-            /* Unpin this top-level shadow */
-            sh_unpin(v, smfn);
-        }
+        /* Unpin this top-level shadow */
+        sh_unpin(v, smfn);
 
         /* See if that freed up a chunk of appropriate size */
         if ( chunk_is_available(d, order) ) return;
@@ -623,8 +604,12 @@ void shadow_prealloc(struct domain *d, unsigned int order)
         shadow_unhook_mappings(v, smfn);
 
         /* Need to flush TLB if we've altered our own tables */
-        if ( !shadow_mode_external(d) 
-             && pagetable_get_pfn(current->arch.shadow_table) == mfn_x(smfn) )
+        if ( !shadow_mode_external(d) &&
+             (pagetable_get_pfn(current->arch.shadow_table[0]) == mfn_x(smfn)
+              || pagetable_get_pfn(current->arch.shadow_table[1]) == mfn_x(smfn)
+              || pagetable_get_pfn(current->arch.shadow_table[2]) == mfn_x(smfn)
+              || pagetable_get_pfn(current->arch.shadow_table[3]) == mfn_x(smfn)
+                 ) )
             local_flush_tlb();
         
         /* See if that freed up a chunk of appropriate size */
@@ -923,9 +908,20 @@ p2m_next_level(struct domain *d, mfn_t *table_mfn, void **table,
 #if CONFIG_PAGING_LEVELS == 3
         if (type == PGT_l2_page_table)
         {
+            struct vcpu *v;
             /* We have written to the p2m l3: need to sync the per-vcpu
              * copies of it in the monitor tables */
             p2m_install_entry_in_monitors(d, (l3_pgentry_t *)p2m_entry);
+            /* Also, any vcpus running on shadows of the p2m need to 
+             * reload their CR3s so the change propagates to the shadow */
+            ASSERT(shadow_lock_is_acquired(d));
+            for_each_vcpu(d, v) 
+            {
+                if ( pagetable_get_pfn(v->arch.guest_table) 
+                     == pagetable_get_pfn(d->arch.phys_table) 
+                     && v->arch.shadow.mode != NULL )
+                    v->arch.shadow.mode->update_cr3(v);
+            }
         }
 #endif
         /* The P2M can be shadowed: keep the shadows synced */
@@ -1714,9 +1710,6 @@ void sh_destroy_shadow(struct vcpu *v, mfn_t smfn)
     case PGC_SH_l2h_pae_shadow >> PGC_SH_type_shift:
         SHADOW_INTERNAL_NAME(sh_destroy_l2_shadow, 3, 3)(v, smfn);
         break;
-    case PGC_SH_l3_pae_shadow >> PGC_SH_type_shift:
-        SHADOW_INTERNAL_NAME(sh_destroy_l3_shadow, 3, 3)(v, smfn);
-        break;
 #endif
 
 #if CONFIG_PAGING_LEVELS >= 4
@@ -1771,7 +1764,6 @@ int shadow_remove_write_access(struct vcpu *v, mfn_t gmfn,
 #endif
         NULL, /* l2_pae  */
         NULL, /* l2h_pae */
-        NULL, /* l3_pae  */
 #if CONFIG_PAGING_LEVELS >= 4
         SHADOW_INTERNAL_NAME(sh_remove_write_access,4,4), /* l1_64   */
         SHADOW_INTERNAL_NAME(sh_remove_write_access,4,4), /* fl1_64  */
@@ -1935,7 +1927,6 @@ int shadow_remove_all_mappings(struct vcpu *v, mfn_t gmfn)
 #endif
         NULL, /* l2_pae  */
         NULL, /* l2h_pae */
-        NULL, /* l3_pae  */
 #if CONFIG_PAGING_LEVELS >= 4
         SHADOW_INTERNAL_NAME(sh_remove_all_mappings,4,4), /* l1_64   */
         SHADOW_INTERNAL_NAME(sh_remove_all_mappings,4,4), /* fl1_64  */
@@ -2008,7 +1999,8 @@ static int sh_remove_shadow_via_pointer(struct vcpu *v, mfn_t smfn)
     ASSERT((pg->count_info & PGC_SH_type_mask) > 0);
     ASSERT((pg->count_info & PGC_SH_type_mask) < PGC_SH_max_shadow);
     ASSERT((pg->count_info & PGC_SH_type_mask) != PGC_SH_l2_32_shadow);
-    ASSERT((pg->count_info & PGC_SH_type_mask) != PGC_SH_l3_pae_shadow);
+    ASSERT((pg->count_info & PGC_SH_type_mask) != PGC_SH_l2_pae_shadow);
+    ASSERT((pg->count_info & PGC_SH_type_mask) != PGC_SH_l2h_pae_shadow);
     ASSERT((pg->count_info & PGC_SH_type_mask) != PGC_SH_l4_64_shadow);
     
     if (pg->up == 0) return 0;
@@ -2037,7 +2029,6 @@ static int sh_remove_shadow_via_pointer(struct vcpu *v, mfn_t smfn)
     case PGC_SH_l1_pae_shadow:
     case PGC_SH_l2_pae_shadow:
     case PGC_SH_l2h_pae_shadow:
-    case PGC_SH_l3_pae_shadow:
         SHADOW_INTERNAL_NAME(sh_clear_shadow_entry,3,3)(v, vaddr, pmfn);
         break;
 #if CONFIG_PAGING_LEVELS >= 4
@@ -2091,11 +2082,9 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
 #if CONFIG_PAGING_LEVELS >= 3
         SHADOW_INTERNAL_NAME(sh_remove_l1_shadow,3,3), /* l2_pae  */
         SHADOW_INTERNAL_NAME(sh_remove_l1_shadow,3,3), /* l2h_pae */
-        SHADOW_INTERNAL_NAME(sh_remove_l2_shadow,3,3), /* l3_pae  */
 #else 
         NULL, /* l2_pae  */
         NULL, /* l2h_pae */
-        NULL, /* l3_pae  */
 #endif
         NULL, /* l1_64   */
         NULL, /* fl1_64  */
@@ -2121,9 +2110,8 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
         ((1 << (PGC_SH_l2h_pae_shadow >> PGC_SH_type_shift))
          | (1 << (PGC_SH_l2_pae_shadow >> PGC_SH_type_shift))), /* l1_pae  */
         0, /* fl1_pae */
-        1 << (PGC_SH_l3_pae_shadow >> PGC_SH_type_shift), /* l2_pae  */
-        1 << (PGC_SH_l3_pae_shadow >> PGC_SH_type_shift), /* l2h_pae  */
-        0, /* l3_pae  */
+        0, /* l2_pae  */
+        0, /* l2h_pae  */
         1 << (PGC_SH_l2_64_shadow >> PGC_SH_type_shift), /* l1_64   */
         0, /* fl1_64  */
         1 << (PGC_SH_l3_64_shadow >> PGC_SH_type_shift), /* l2_64   */
@@ -2166,17 +2154,14 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
     smfn = shadow_hash_lookup(v, mfn_x(gmfn), t);                       \
     if ( mfn_to_page(smfn)->count_info & PGC_SH_pinned )                \
         sh_unpin(v, smfn);                                              \
-    if ( (_type) == PGC_SH_l3_pae_shadow )                              \
-        SHADOW_INTERNAL_NAME(sh_unpin_all_l3_subshadows,3,3)(v, smfn);  \
 } while (0)
 
     if ( sh_flags & SHF_L1_32 )   DO_UNSHADOW(PGC_SH_l1_32_shadow);
     if ( sh_flags & SHF_L2_32 )   DO_UNPIN(PGC_SH_l2_32_shadow);
 #if CONFIG_PAGING_LEVELS >= 3
     if ( sh_flags & SHF_L1_PAE )  DO_UNSHADOW(PGC_SH_l1_pae_shadow);
-    if ( sh_flags & SHF_L2_PAE )  DO_UNSHADOW(PGC_SH_l2_pae_shadow);
-    if ( sh_flags & SHF_L2H_PAE ) DO_UNSHADOW(PGC_SH_l2h_pae_shadow);
-    if ( sh_flags & SHF_L3_PAE )  DO_UNPIN(PGC_SH_l3_pae_shadow);
+    if ( sh_flags & SHF_L2_PAE )  DO_UNPIN(PGC_SH_l2_pae_shadow);
+    if ( sh_flags & SHF_L2H_PAE ) DO_UNPIN(PGC_SH_l2h_pae_shadow);
 #if CONFIG_PAGING_LEVELS >= 4
     if ( sh_flags & SHF_L1_64 )   DO_UNSHADOW(PGC_SH_l1_64_shadow);
     if ( sh_flags & SHF_L2_64 )   DO_UNSHADOW(PGC_SH_l2_64_shadow);
@@ -2187,14 +2172,6 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
 
 #undef DO_UNSHADOW
 #undef DO_UNPIN
-
-
-#if CONFIG_PAGING_LEVELS > 2
-    /* We may have caused some PAE l3 entries to change: need to 
-     * fix up the copies of them in various places */
-    if ( sh_flags & (SHF_L2_PAE|SHF_L2H_PAE) )
-        sh_pae_recopy(v->domain);
-#endif
 
     /* If that didn't catch the shadows, something is wrong */
     if ( !fast && (pg->count_info & PGC_page_table) )
@@ -3127,7 +3104,6 @@ void shadow_audit_tables(struct vcpu *v)
         SHADOW_INTERNAL_NAME(sh_audit_fl1_table,3,3), /* fl1_pae */
         SHADOW_INTERNAL_NAME(sh_audit_l2_table,3,3),  /* l2_pae  */
         SHADOW_INTERNAL_NAME(sh_audit_l2_table,3,3),  /* l2h_pae */
-        SHADOW_INTERNAL_NAME(sh_audit_l3_table,3,3),  /* l3_pae  */
 #if CONFIG_PAGING_LEVELS >= 4
         SHADOW_INTERNAL_NAME(sh_audit_l1_table,4,4),  /* l1_64   */
         SHADOW_INTERNAL_NAME(sh_audit_fl1_table,4,4), /* fl1_64  */
@@ -3152,7 +3128,7 @@ void shadow_audit_tables(struct vcpu *v)
         {
         case 2: mask = (SHF_L1_32|SHF_FL1_32|SHF_L2_32); break;
         case 3: mask = (SHF_L1_PAE|SHF_FL1_PAE|SHF_L2_PAE
-                        |SHF_L2H_PAE|SHF_L3_PAE); break;
+                        |SHF_L2H_PAE); break;
         case 4: mask = (SHF_L1_64|SHF_FL1_64|SHF_L2_64  
                         |SHF_L3_64|SHF_L4_64); break;
         default: BUG();

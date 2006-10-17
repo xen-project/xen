@@ -336,13 +336,9 @@ void shadow_convert_to_log_dirty(struct vcpu *v, mfn_t smfn);
  * non-Xen mappings in this top-level shadow mfn */
 void shadow_unhook_mappings(struct vcpu *v, mfn_t smfn);
 
-/* Re-sync copies of PAE shadow L3 tables if they have been changed */
-void sh_pae_recopy(struct domain *d);
-
 /* Install the xen mappings in various flavours of shadow */
 void sh_install_xen_entries_in_l4(struct vcpu *v, mfn_t gl4mfn, mfn_t sl4mfn);
 void sh_install_xen_entries_in_l2h(struct vcpu *v, mfn_t sl2hmfn);
-void sh_install_xen_entries_in_l3(struct vcpu *v, mfn_t gl3mfn, mfn_t sl3mfn);
 void sh_install_xen_entries_in_l2(struct vcpu *v, mfn_t gl2mfn, mfn_t sl2mfn);
 
 

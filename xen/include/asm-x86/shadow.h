@@ -72,7 +72,6 @@
 #define SHADOW_SET_CHANGED            0x1
 #define SHADOW_SET_FLUSH              0x2
 #define SHADOW_SET_ERROR              0x4
-#define SHADOW_SET_L3PAE_RECOPY       0x8
 
 // How do we tell that we have a 32-bit PV guest in a 64-bit Xen?
 #ifdef __x86_64__
@@ -406,7 +405,6 @@ shadow_update_cr3(struct vcpu *v)
  * for HVM guests, arch.monitor_table and hvm's guest CR3.
  *
  * Update ref counts to shadow tables appropriately.
- * For PAE, relocate L3 entries, if necessary, into low memory.
  */
 static inline void update_cr3(struct vcpu *v)
 {
@@ -587,7 +585,6 @@ shadow_guest_physmap_remove_page(struct domain *d, unsigned long gfn,
 #define SHF_FL1_PAE (1u << PGC_SH_type_to_index(PGC_SH_fl1_pae_shadow))
 #define SHF_L2_PAE  (1u << PGC_SH_type_to_index(PGC_SH_l2_pae_shadow))
 #define SHF_L2H_PAE (1u << PGC_SH_type_to_index(PGC_SH_l2h_pae_shadow))
-#define SHF_L3_PAE  (1u << PGC_SH_type_to_index(PGC_SH_l3_pae_shadow))
 #define SHF_L1_64   (1u << PGC_SH_type_to_index(PGC_SH_l1_64_shadow))
 #define SHF_FL1_64  (1u << PGC_SH_type_to_index(PGC_SH_fl1_64_shadow))
 #define SHF_L2_64   (1u << PGC_SH_type_to_index(PGC_SH_l2_64_shadow))

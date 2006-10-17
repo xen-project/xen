@@ -1739,9 +1739,6 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
             if (old_base_mfn)
                 put_page(mfn_to_page(old_base_mfn));
 
-            /*
-             * arch.shadow_table should now hold the next CR3 for shadow
-             */
             v->arch.hvm_svm.cpu_cr3 = value;
             update_cr3(v);
             vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3; 
@@ -1787,10 +1784,6 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
                             (unsigned long) (mfn << PAGE_SHIFT));
 
                 vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3; 
-
-                /*
-                 * arch->shadow_table should hold the next CR3 for shadow
-                 */
 
                 HVM_DBG_LOG(DBG_LEVEL_VMMU, 
                             "Update CR3 value = %lx, mfn = %lx",
@@ -2355,7 +2348,7 @@ void svm_dump_regs(const char *from, struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    unsigned long pt = pagetable_get_paddr(v->arch.shadow_table);
+    unsigned long pt = v->arch.hvm_vcpu.hw_cr3;
 
     printf("%s: guest registers from %s:\n", __func__, from);
 #if defined (__x86_64__)
@@ -2681,11 +2674,11 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         if (do_debug)
         {
             printk("%s:+ guest_table = 0x%08x, monitor_table = 0x%08x, "
-                   "shadow_table = 0x%08x\n", 
+                   "hw_cr3 = 0x%16lx\n", 
                    __func__,
                    (int) v->arch.guest_table.pfn,
                    (int) v->arch.monitor_table.pfn, 
-                   (int) v->arch.shadow_table.pfn);
+                   (long unsigned int) v->arch.hvm_vcpu.hw_cr3);
 
             svm_dump_vmcb(__func__, vmcb);
             svm_dump_regs(__func__, regs);
@@ -2913,10 +2906,10 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     if (do_debug) 
     {
         printk("vmexit_handler():- guest_table = 0x%08x, "
-               "monitor_table = 0x%08x, shadow_table = 0x%08x\n",
+               "monitor_table = 0x%08x, hw_cr3 = 0x%16x\n",
                (int)v->arch.guest_table.pfn,
                (int)v->arch.monitor_table.pfn, 
-               (int)v->arch.shadow_table.pfn);
+               (int)v->arch.hvm_vcpu.hw_cr3);
         printk("svm_vmexit_handler: Returning\n");
     }
 #endif
