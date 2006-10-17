@@ -381,7 +381,8 @@ __domain_flush_vtlb_track_entry(struct domain* d,
 	struct vcpu* v;
 	int cpu;
 	int vcpu;
-
+	int local_purge = 1;
+	
 	BUG_ON((vaddr >> VRN_SHIFT) != VRN7);
 	/*
 	 * heuristic:
@@ -414,17 +415,35 @@ __domain_flush_vtlb_track_entry(struct domain* d,
 
 			/* Invalidate VHPT entries.  */
 			vcpu_flush_vhpt_range(v, vaddr, PAGE_SIZE);
+
+			/*
+			 * current->processor == v->processor
+			 * is racy. we may see old v->processor and
+			 * a new physical processor of v might see old
+			 * vhpt entry and insert tlb.
+			 */
+			if (v != current)
+				local_purge = 0;
 		}
 	} else {
 		for_each_cpu_mask(cpu, entry->pcpu_dirty_mask) {
 			/* Invalidate VHPT entries.  */
 			cpu_flush_vhpt_range(cpu, vaddr, PAGE_SIZE);
+
+			if (d->vcpu[cpu] != current)
+				local_purge = 0;
 		}
 	}
-	/* ptc.ga has release semantics. */
 
 	/* ptc.ga  */
-	ia64_global_tlb_purge(vaddr, vaddr + PAGE_SIZE, PAGE_SHIFT);
+	if (local_purge) {
+		ia64_ptcl(vaddr, PAGE_SHIFT << 2);
+		perfc_incrc(domain_flush_vtlb_local);
+	} else {
+		/* ptc.ga has release semantics. */
+		ia64_global_tlb_purge(vaddr, vaddr + PAGE_SIZE, PAGE_SHIFT);
+		perfc_incrc(domain_flush_vtlb_global);
+	}
 
 	if (swap_rr0) {
 		vcpu_set_rr(current, 0, old_rid);

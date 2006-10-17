@@ -115,6 +115,8 @@ PERFCOUNTER_CPU(vcpu_flush_vtlb_all,            "vcpu_flush_vtlb_all")
 PERFCOUNTER_CPU(domain_flush_vtlb_all,          "domain_flush_vtlb_all")
 PERFCOUNTER_CPU(vcpu_flush_tlb_vhpt_range,      "vcpu_flush_tlb_vhpt_range")
 PERFCOUNTER_CPU(domain_flush_vtlb_track_entry,  "domain_flush_vtlb_track_entry")
+PERFCOUNTER_CPU(domain_flush_vtlb_local,        "domain_flush_vtlb_local")
+PERFCOUNTER_CPU(domain_flush_vtlb_global,       "domain_flush_vtlb_global")
 PERFCOUNTER_CPU(domain_flush_vtlb_range,        "domain_flush_vtlb_range")
 
 // domain.c
