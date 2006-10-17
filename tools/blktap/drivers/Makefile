@@ -3,11 +3,9 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 INCLUDES += -I.. -I../lib
 
-INSTALL      = install
-INSTALL_PROG = $(INSTALL) -m0755
 IBIN         = blktapctrl tapdisk
 QCOW_UTIL    = img2qcow qcow2raw qcow-create
-INSTALL_DIR  = /usr/sbin
+INST_DIR  = /usr/sbin
 LIBAIO_DIR   = ../../libaio/src
 
 CFLAGS   += -Werror
@@ -58,7 +56,7 @@ img2qcow qcow2raw qcow-create: %: $(BLK-OBJS)
 	$(CC) $(CFLAGS) -o $* $(BLK-OBJS) $*.c $(AIOLIBS)  $(LIBS)
 
 install: all
-	$(INSTALL_PROG) $(IBIN) $(QCOW_UTIL) $(DESTDIR)$(INSTALL_DIR)
+	$(INSTALL_PROG) $(IBIN) $(QCOW_UTIL) $(DESTDIR)$(INST_DIR)
 
 clean:
 	rm -rf *.o *~ $(DEPS) xen TAGS $(IBIN) $(LIB) $(QCOW_UTIL)

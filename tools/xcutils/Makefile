@@ -8,10 +8,6 @@
 # Copyright (C) 2005 by Christian Limpach
 #
 
-INSTALL		= install
-INSTALL_PROG	= $(INSTALL) -m0755
-INSTALL_DIR	= $(INSTALL) -d -m0755
-
 XEN_ROOT	= ../..
 include $(XEN_ROOT)/tools/Rules.mk
 

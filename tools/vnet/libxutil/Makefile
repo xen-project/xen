@@ -3,11 +3,6 @@ export VNET_ROOT = $(shell cd .. && pwd)
 include $(VNET_ROOT)/Make.env
 endif
 
-INSTALL		= install
-INSTALL_DATA	= $(INSTALL) -m0644
-INSTALL_PROG	= $(INSTALL) -m0755
-INSTALL_DIR	= $(INSTALL) -d -m0755
-
 include $(XEN_ROOT)/tools/Rules.mk
 
 LIB_SRCS :=

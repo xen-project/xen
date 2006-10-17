@@ -16,10 +16,6 @@ XEN_ROOT=../../..
 include $(XEN_ROOT)/tools/Rules.mk
 LINUX_ROOT := $(XEN_ROOT)/linux-2.6-xen-sparse
 
-INSTALL         = install
-INSTALL_PROG    = $(INSTALL) -m0755 -D
-INSTALL_DATA    = $(INSTALL) -m0644 -D
-
 prefix=/usr
 includedir=$(prefix)/include
 libdir=$(prefix)/lib

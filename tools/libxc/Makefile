@@ -1,14 +1,8 @@
-
-INSTALL		= install
-INSTALL_PROG	= $(INSTALL) -m0755
-INSTALL_DATA	= $(INSTALL) -m0644
-INSTALL_DIR	= $(INSTALL) -d -m0755
+XEN_ROOT = ../..
+include $(XEN_ROOT)/tools/Rules.mk
 
 MAJOR    = 3.0
 MINOR    = 0
-
-XEN_ROOT = ../..
-include $(XEN_ROOT)/tools/Rules.mk
 
 CTRL_SRCS-y       :=
 CTRL_SRCS-y       += xc_core.c

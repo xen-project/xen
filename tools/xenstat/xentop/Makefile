@@ -18,10 +18,6 @@ ifneq ($(XENSTAT_XENTOP),y)
 all install xentop:
 else
 
-INSTALL         = install
-INSTALL_PROG    = $(INSTALL) -m0755 -D
-INSTALL_DATA    = $(INSTALL) -m0644 -D
-
 prefix=/usr
 mandir=$(prefix)/share/man
 man1dir=$(mandir)/man1

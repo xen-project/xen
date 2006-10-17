@@ -35,10 +35,6 @@ HDRS += $(wildcard $(BASEDIR)/include/public/*.h)
 HDRS += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/*.h)
 HDRS += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/$(TARGET_SUBARCH)/*.h)
 
-INSTALL      := install
-INSTALL_DATA := $(INSTALL) -m0644
-INSTALL_DIR  := $(INSTALL) -d -m0755
-
 include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
 
 # Do not depend on auto-generated header files.

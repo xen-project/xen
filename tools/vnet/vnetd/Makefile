@@ -110,7 +110,7 @@ vnetd: $(VNETD_OBJ)
 .PHONY: install
 install: vnetd
 	mkdir -p $(DESTDIR)$(VNETD_INSTALL_DIR)
-	install -m 0755 vnetd $(DESTDIR)$(VNETD_INSTALL_DIR)
+	$(INSTALL_PROG) vnetd $(DESTDIR)$(VNETD_INSTALL_DIR)
 
 .PHONY: clean
 clean:

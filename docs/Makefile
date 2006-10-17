@@ -1,8 +1,9 @@
 #!/usr/bin/make -f
 
+XEN_ROOT=..
+include $(XEN_ROOT)/Config.mk
+
 VERSION		= xen-unstable
-INSTALL		= install
-INSTALL_DIR	= $(INSTALL) -d -m0755
 
 PS2PDF		:= ps2pdf
 DVIPS		:= dvips

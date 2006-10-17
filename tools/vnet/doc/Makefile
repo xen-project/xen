@@ -1,11 +1,10 @@
 #!/usr/bin/make -f
 # -*- mode: Makefile; -*-
+XEN_ROOT        = ../../..
+include $(XEN_ROOT)/tools/Rules.mk
 
 VERSION = 1.0
 HEADER  = Vnet
-
-INSTALL		= install
-INSTALL_DIR	= $(INSTALL) -d -m0755
 
 PS2PDF		:= ps2pdf
 DVIPS		:= dvips

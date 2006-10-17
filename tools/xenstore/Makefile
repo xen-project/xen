@@ -5,11 +5,6 @@ XEN_LIBXC          = $(XEN_ROOT)/tools/libxc
 MAJOR = 3.0
 MINOR = 0
 
-INSTALL         = install
-INSTALL_DATA	= $(INSTALL) -m0644
-INSTALL_PROG    = $(INSTALL) -m0755
-INSTALL_DIR     = $(INSTALL) -d -m0755
-
 PROFILE=#-pg
 BASECFLAGS=-Wall -g -Werror
 # Make gcc generate dependencies.

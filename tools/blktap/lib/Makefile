@@ -7,10 +7,6 @@ SONAME   = libblktap.so.$(MAJOR)
 
 BLKTAP_INSTALL_DIR = /usr/sbin
 
-INSTALL            = install
-INSTALL_PROG       = $(INSTALL) -m0755
-INSTALL_DIR        = $(INSTALL) -d -m0755
-
 INCLUDES += -I. -I.. -I $(XEN_LIBXC) -I $(XEN_XENSTORE)
 
 LIBS     := -lz
