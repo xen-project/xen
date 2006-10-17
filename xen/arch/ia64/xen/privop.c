@@ -148,9 +148,11 @@ static IA64FAULT priv_itr_d(VCPU * vcpu, INST64 inst)
 
 	//if (!vcpu_get_psr_ic(vcpu))
 	//      return IA64_ILLOP_FAULT;
-	if ((fault = vcpu_get_itir(vcpu, &itir)) != IA64_NO_FAULT)
+	fault = vcpu_get_itir(vcpu, &itir);
+	if (fault != IA64_NO_FAULT)
 		return IA64_ILLOP_FAULT;
-	if ((fault = vcpu_get_ifa(vcpu, &ifa)) != IA64_NO_FAULT)
+	fault = vcpu_get_ifa(vcpu, &ifa);
+	if (fault != IA64_NO_FAULT)
 		return IA64_ILLOP_FAULT;
 	pte = vcpu_get_gr(vcpu, inst.M42.r2);
 	slot = vcpu_get_gr(vcpu, inst.M42.r3);
@@ -163,9 +165,11 @@ static IA64FAULT priv_itr_i(VCPU * vcpu, INST64 inst)
 	u64 fault, itir, ifa, pte, slot;
 
 	//if (!vcpu_get_psr_ic(vcpu)) return IA64_ILLOP_FAULT;
-	if ((fault = vcpu_get_itir(vcpu, &itir)) != IA64_NO_FAULT)
+	fault = vcpu_get_itir(vcpu, &itir);
+	if (fault != IA64_NO_FAULT)
 		return IA64_ILLOP_FAULT;
-	if ((fault = vcpu_get_ifa(vcpu, &ifa)) != IA64_NO_FAULT)
+	fault = vcpu_get_ifa(vcpu, &ifa);
+	if (fault != IA64_NO_FAULT)
 		return IA64_ILLOP_FAULT;
 	pte = vcpu_get_gr(vcpu, inst.M42.r2);
 	slot = vcpu_get_gr(vcpu, inst.M42.r3);
@@ -178,9 +182,11 @@ static IA64FAULT priv_itc_d(VCPU * vcpu, INST64 inst)
 	u64 fault, itir, ifa, pte;
 
 	//if (!vcpu_get_psr_ic(vcpu)) return IA64_ILLOP_FAULT;
-	if ((fault = vcpu_get_itir(vcpu, &itir)) != IA64_NO_FAULT)
+	fault = vcpu_get_itir(vcpu, &itir);
+	if (fault != IA64_NO_FAULT)
 		return IA64_ILLOP_FAULT;
-	if ((fault = vcpu_get_ifa(vcpu, &ifa)) != IA64_NO_FAULT)
+	fault = vcpu_get_ifa(vcpu, &ifa);
+	if (fault != IA64_NO_FAULT)
 		return IA64_ILLOP_FAULT;
 	pte = vcpu_get_gr(vcpu, inst.M41.r2);
 
@@ -192,9 +198,11 @@ static IA64FAULT priv_itc_i(VCPU * vcpu, INST64 inst)
 	u64 fault, itir, ifa, pte;
 
 	//if (!vcpu_get_psr_ic(vcpu)) return IA64_ILLOP_FAULT;
-	if ((fault = vcpu_get_itir(vcpu, &itir)) != IA64_NO_FAULT)
+	fault = vcpu_get_itir(vcpu, &itir);
+	if (fault != IA64_NO_FAULT)
 		return IA64_ILLOP_FAULT;
-	if ((fault = vcpu_get_ifa(vcpu, &ifa)) != IA64_NO_FAULT)
+	fault = vcpu_get_ifa(vcpu, &ifa);
+	if (fault != IA64_NO_FAULT)
 		return IA64_ILLOP_FAULT;
 	pte = vcpu_get_gr(vcpu, inst.M41.r2);
 
@@ -516,7 +524,8 @@ static IA64FAULT priv_mov_from_psr(VCPU * vcpu, INST64 inst)
 	u64 val;
 	IA64FAULT fault;
 
-	if ((fault = vcpu_get_psr(vcpu, &val)) == IA64_NO_FAULT)
+	fault = vcpu_get_psr(vcpu, &val);
+	if (fault == IA64_NO_FAULT)
 		return vcpu_set_gr(vcpu, tgt, val, 0);
 	else
 		return fault;
