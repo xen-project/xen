@@ -366,7 +366,7 @@ void relinquish_vcpu_resources(struct vcpu *v)
 
 void free_vcpu_struct(struct vcpu *v)
 {
-	if (VMX_DOMAIN(v))
+	if (v->domain->arch.is_vti)
 		vmx_relinquish_vcpu_resources(v);
 	else
 		relinquish_vcpu_resources(v);
