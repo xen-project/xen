@@ -60,6 +60,12 @@
 #define safe_swapgs                             \
         "mfence; swapgs;"
 
+#ifdef __sun__
+#define REX64_PREFIX "rex64\\"
+#else
+#define REX64_PREFIX "rex64/"
+#endif
+
 #define BUILD_SMP_INTERRUPT(x,v) XBUILD_SMP_INTERRUPT(x,v)
 #define XBUILD_SMP_INTERRUPT(x,v)               \
 asmlinkage void x(void);                        \
