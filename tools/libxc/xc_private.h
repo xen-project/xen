@@ -30,6 +30,9 @@
 #define DECLARE_SYSCTL struct xen_sysctl sysctl
 #endif
 
+#undef PAGE_SHIFT
+#undef PAGE_SIZE
+#undef PAGE_MASK
 #define PAGE_SHIFT              XC_PAGE_SHIFT
 #define PAGE_SIZE               (1UL << PAGE_SHIFT)
 #define PAGE_MASK               (~(PAGE_SIZE-1))

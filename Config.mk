@@ -9,6 +9,8 @@ XEN_TARGET_ARCH     ?= $(XEN_COMPILE_ARCH)
 XEN_TARGET_X86_PAE  ?= n
 XEN_OS              ?= $(shell uname -s)
 
+CONFIG_$(XEN_OS) := y
+
 # Tools to run on system hosting the build
 HOSTCC     = gcc
 HOSTCFLAGS = -Wall -Werror -Wstrict-prototypes -O2 -fomit-frame-pointer

@@ -1,5 +1,3 @@
-#define XC_PTRACE_PRIVATE
-
 #include <sys/ptrace.h>
 #include <sys/wait.h>
 #include "xc_private.h"

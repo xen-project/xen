@@ -15,8 +15,9 @@ CTRL_SRCS-y       += xc_private.c
 CTRL_SRCS-y       += xc_sedf.c
 CTRL_SRCS-y       += xc_csched.c
 CTRL_SRCS-y       += xc_tbuf.c
-CTRL_SRCS-$(CONFIG_X86) += xc_ptrace.c xc_ptrace_core.c xc_pagetab.c
+CTRL_SRCS-$(CONFIG_X86) += xc_pagetab.c
 CTRL_SRCS-$(CONFIG_Linux) += xc_linux.c
+CTRL_SRCS-$(CONFIG_X86_Linux) += xc_ptrace.c xc_ptrace_core.c
 
 GUEST_SRCS-y :=
 GUEST_SRCS-y += xc_load_bin.c

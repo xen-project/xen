@@ -16,7 +16,6 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <sys/ptrace.h>
 #include <xen/xen.h>
 #include <xen/domctl.h>
 #include <xen/sysctl.h>
@@ -105,6 +104,11 @@ int xc_find_device_number(const char *name);
  * DOMAIN DEBUGGING FUNCTIONS
  */
 
+#ifdef __linux__
+
+#include <sys/ptrace.h>
+#include <thread_db.h>
+
 typedef struct xc_core_header {
     unsigned int xch_magic;
     unsigned int xch_nr_vcpus;
@@ -134,6 +138,26 @@ int xc_waitdomain_core(
     int *status,
     int options,
     vcpu_guest_context_t *ctxt);
+typedef void (*thr_ev_handler_t)(long);
+
+void xc_register_event_handler(
+    thr_ev_handler_t h,
+    td_event_e e);
+
+long xc_ptrace(
+    int xc_handle,
+    enum __ptrace_request request,
+    uint32_t  domid,
+    long addr,
+    long data);
+
+int xc_waitdomain(
+    int xc_handle,
+    int domain,
+    int *status,
+    int options);
+
+#endif /* __linux__ */
 
 /*
  * DOMAIN MANAGEMENT FUNCTIONS
