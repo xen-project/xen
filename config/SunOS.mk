@@ -12,6 +12,7 @@ OBJCOPY    = $(CROSS_COMPILE)gobjcopy
 OBJDUMP    = $(CROSS_COMPILE)gobjdump
 
 GREP       = ggrep
+SHELL      = bash
 
 INSTALL      = ginstall
 INSTALL_DIR  = $(INSTALL) -d -m0755
