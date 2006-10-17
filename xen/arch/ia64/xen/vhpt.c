@@ -28,6 +28,9 @@ extern long running_on_sim;
 
 DEFINE_PER_CPU (unsigned long, vhpt_paddr);
 DEFINE_PER_CPU (unsigned long, vhpt_pend);
+#ifdef CONFIG_XEN_IA64_TLBFLUSH_CLOCK
+DEFINE_PER_CPU(volatile u32, vhpt_tlbflush_timestamp);
+#endif
 
 static void
 __vhpt_flush(unsigned long vhpt_maddr)
@@ -42,14 +45,23 @@ __vhpt_flush(unsigned long vhpt_maddr)
 void
 local_vhpt_flush(void)
 {
+	/* increment flush clock before flush */
+	u32 flush_time = tlbflush_clock_inc_and_return();
 	__vhpt_flush(__ia64_per_cpu_var(vhpt_paddr));
+	/* this must be after flush */
+	tlbflush_update_time(&__get_cpu_var(vhpt_tlbflush_timestamp),
+	                     flush_time);
 	perfc_incrc(local_vhpt_flush);
 }
 
-static void
+void
 vcpu_vhpt_flush(struct vcpu* v)
 {
+	/* increment flush clock before flush */
+	u32 flush_time = tlbflush_clock_inc_and_return();
 	__vhpt_flush(vcpu_vhpt_maddr(v));
+	/* this must be after flush */
+	tlbflush_update_time(&v->arch.tlbflush_timestamp, flush_time);
 	perfc_incrc(vcpu_vhpt_flush);
 }
 

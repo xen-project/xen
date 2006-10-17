@@ -49,6 +49,9 @@ struct mm_struct {
 struct last_vcpu {
 #define INVALID_VCPU_ID INT_MAX
     int vcpu_id;
+#ifdef CONFIG_XEN_IA64_TLBFLUSH_CLOCK
+    u32 tlbflush_timestamp;
+#endif
 } ____cacheline_aligned_in_smp;
 
 /* These are data in domain memory for SAL emulator.  */
@@ -195,7 +198,9 @@ struct arch_vcpu {
     struct page_info*   vhpt_page;
     unsigned long       vhpt_entries;
 #endif
-
+#ifdef CONFIG_XEN_IA64_TLBFLUSH_CLOCK
+    u32 tlbflush_timestamp;
+#endif
 #define INVALID_PROCESSOR       INT_MAX
     int last_processor;
 };

@@ -40,7 +40,6 @@ void flush_tlb_mask(cpumask_t mask);
 /* Flush local machine TLB.  */
 void local_flush_tlb_all (void);
 
-#define tlbflush_current_time() 0
 #define tlbflush_filter(x,y) ((void)0)
 
 #endif

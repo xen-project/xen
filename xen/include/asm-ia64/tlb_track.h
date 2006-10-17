@@ -53,7 +53,6 @@ struct tlb_track_entry {
 
     cpumask_t           pcpu_dirty_mask;
     vcpumask_t          vcpu_dirty_mask;
-    // tlbflush_timestamp;
 
 #ifdef CONFIG_TLB_TRACK_CNT
 #define TLB_TRACK_CNT_FORCE_MANY        256 /* XXX how many? */
@@ -132,11 +131,15 @@ __tlb_track_entry_printf(const char* func, int line,
 #define tlb_track_entry_printf(entry)                       \
     __tlb_track_entry_printf(__func__, __LINE__, (entry))
 #else
-
-#define tlb_track_create(d)                                (0)
-#define tlb_track_destroy(d)                               do { } while (0)
-#define vcpu_tlb_track_insert_or_dirty(vcpu, vaddr, entry) do { } while (0)
-
+//define as nop
+#define tlb_track_create(d)                     do { } while (0)
+#define tlb_track_destroy(d)                    do { } while (0)
+#define tlb_track_free_entry(tlb_track, entry)  do { } while (0)
+#define vcpu_tlb_track_insert_or_dirty(vcpu, vaddr, entry)      \
+                                                do { } while (0)
+#define tlb_track_search_and_remove(tlb_track, ptep, old_pte, entryp)   \
+                                                do { } while (0)
+#define tlb_track_entry_printf(entry)           do { } while (0)
 #endif /* CONFIG_XEN_IA64_TLB_TRACK */
 
 #endif /* __TLB_TRACK_H__ */

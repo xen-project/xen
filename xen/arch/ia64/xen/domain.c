@@ -79,35 +79,57 @@ ia64_disable_vhpt_walker(void)
 	ia64_set_pta(VHPT_SIZE_LOG2 << 2);
 }
 
-static void flush_vtlb_for_context_switch(struct vcpu* vcpu)
+static void flush_vtlb_for_context_switch(struct vcpu* prev, struct vcpu* next)
 {
 	int cpu = smp_processor_id();
-	int last_vcpu_id = vcpu->domain->arch.last_vcpu[cpu].vcpu_id;
-	int last_processor = vcpu->arch.last_processor;
+	int last_vcpu_id, last_processor;
 
-	if (is_idle_domain(vcpu->domain))
+	if (!is_idle_domain(prev->domain))
+		tlbflush_update_time
+			(&prev->domain->arch.last_vcpu[cpu].tlbflush_timestamp,
+			 tlbflush_current_time());
+
+	if (is_idle_domain(next->domain))
 		return;
-	
-	vcpu->domain->arch.last_vcpu[cpu].vcpu_id = vcpu->vcpu_id;
-	vcpu->arch.last_processor = cpu;
 
-	if ((last_vcpu_id != vcpu->vcpu_id &&
+	last_vcpu_id = next->domain->arch.last_vcpu[cpu].vcpu_id;
+	last_processor = next->arch.last_processor;
+
+	next->domain->arch.last_vcpu[cpu].vcpu_id = next->vcpu_id;
+	next->arch.last_processor = cpu;
+
+	if ((last_vcpu_id != next->vcpu_id &&
 	     last_vcpu_id != INVALID_VCPU_ID) ||
-	    (last_vcpu_id == vcpu->vcpu_id &&
+	    (last_vcpu_id == next->vcpu_id &&
 	     last_processor != cpu &&
 	     last_processor != INVALID_PROCESSOR)) {
+#ifdef CONFIG_XEN_IA64_TLBFLUSH_CLOCK
+		u32 last_tlbflush_timestamp =
+			next->domain->arch.last_vcpu[cpu].tlbflush_timestamp;
+#endif
+		int vhpt_is_flushed = 0;
 
 		// if the vTLB implementation was changed,
 		// the followings must be updated either.
-		if (VMX_DOMAIN(vcpu)) {
+		if (VMX_DOMAIN(next)) {
 			// currently vTLB for vt-i domian is per vcpu.
 			// so any flushing isn't needed.
-		} else if (HAS_PERVCPU_VHPT(vcpu->domain)) {
+		} else if (HAS_PERVCPU_VHPT(next->domain)) {
 			// nothing to do
 		} else {
-			local_vhpt_flush();
+			if (NEED_FLUSH(__get_cpu_var(vhpt_tlbflush_timestamp),
+			               last_tlbflush_timestamp)) {
+				local_vhpt_flush();
+				vhpt_is_flushed = 1;
+			}
 		}
-		local_flush_tlb_all();
+		if (vhpt_is_flushed || NEED_FLUSH(__get_cpu_var(tlbflush_time),
+		                                  last_tlbflush_timestamp)) {
+			local_flush_tlb_all();
+			perfc_incrc(tlbflush_clock_cswitch_purge);
+		} else {
+			perfc_incrc(tlbflush_clock_cswitch_skip);
+		}
 		perfc_incrc(flush_vtlb_for_context_switch);
 	}
 }
@@ -133,7 +155,7 @@ void schedule_tail(struct vcpu *prev)
 		  (current->domain->arch.shared_info_va + XSI_PSR_IC_OFS);
 		migrate_timer(&current->arch.hlt_timer, current->processor);
 	}
-	flush_vtlb_for_context_switch(current);
+	flush_vtlb_for_context_switch(prev, current);
 }
 
 void context_switch(struct vcpu *prev, struct vcpu *next)
@@ -197,7 +219,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
         }
     }
     local_irq_restore(spsr);
-    flush_vtlb_for_context_switch(current);
+    flush_vtlb_for_context_switch(prev, current);
     context_saved(prev);
 }
 
@@ -296,6 +318,9 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 		for (i = 0; i < (1 << order); i++)
 		    share_xen_page_with_guest(virt_to_page(v->arch.privregs) +
 		                              i, d, XENSHARE_writable);
+
+		tlbflush_update_time(&v->arch.tlbflush_timestamp,
+		                     tlbflush_current_time());
 	    }
 
 	    v->arch.metaphysical_rr0 = d->arch.metaphysical_rr0;

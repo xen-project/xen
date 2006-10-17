@@ -9,6 +9,7 @@ xen_ia64_expose_p2m	?= y
 xen_ia64_pervcpu_vhpt	?= y
 xen_ia64_tlb_track	?= y
 xen_ia64_tlb_track_cnt	?= n
+xen_ia64_tlbflush_clock	?= y
 
 ifneq ($(COMPILE_ARCH),$(TARGET_ARCH))
 CROSS_COMPILE ?= /usr/local/sp_env/v2.2.5/i686/bin/ia64-unknown-linux-
@@ -51,6 +52,9 @@ CFLAGS	+= -DCONFIG_XEN_IA64_TLB_TRACK
 endif
 ifeq ($(xen_ia64_tlb_track_cnt),y)
 CFLAGS	+= -DCONFIG_TLB_TRACK_CNT
+endif
+ifeq ($(xen_ia64_tlbflush_clock),y)
+CFLAGS += -DCONFIG_XEN_IA64_TLBFLUSH_CLOCK
 endif
 ifeq ($(no_warns),y)
 CFLAGS	+= -Wa,--fatal-warnings -Werror -Wno-uninitialized

@@ -18,6 +18,7 @@
 #include <asm/processor.h>
 #include <asm/atomic.h>
 #include <asm/tlbflush.h>
+#include <asm/flushtlb.h>
 #include <asm/io.h>
 
 #include <public/xen.h>

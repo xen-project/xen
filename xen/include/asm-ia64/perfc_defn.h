@@ -164,3 +164,9 @@ PERFCOUNTER_CPU(tlb_track_sar_many,             "tlb_track_sar_many")
 PERFCOUNTER_CPU(tlb_track_use_rr7,              "tlb_track_use_rr7")
 PERFCOUNTER_CPU(tlb_track_swap_rr0,             "tlb_track_swap_rr0")
 #endif
+
+// tlb flush clock
+#ifdef CONFIG_XEN_IA64_TLBFLUSH_CLOCK
+PERFCOUNTER_CPU(tlbflush_clock_cswitch_purge,  "tlbflush_clock_cswitch_purge")
+PERFCOUNTER_CPU(tlbflush_clock_cswitch_skip,   "tlbflush_clock_cswitch_skip")
+#endif
