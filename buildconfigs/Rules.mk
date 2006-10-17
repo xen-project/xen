@@ -3,6 +3,9 @@ include Config.mk
 
 export DESTDIR
 
+# Choose the best mirror to download linux kernel
+KERNEL_REPO = http://www.kernel.org
+
 ALLKERNELS = $(patsubst buildconfigs/mk.%,%,$(wildcard buildconfigs/mk.*))
 ALLSPARSETREES = $(patsubst %-xen-sparse,%,$(wildcard *-xen-sparse))
 

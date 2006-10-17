@@ -24,9 +24,11 @@ endif
 override COMPILE_SUBARCH := $(XEN_COMPILE_ARCH)
 override TARGET_SUBARCH  := $(XEN_TARGET_ARCH)
 override COMPILE_ARCH    := $(shell echo $(XEN_COMPILE_ARCH) | \
-                              sed -e 's/\(x86\|powerpc\).*/\1/')
+                              sed -e 's/x86.*/x86/' \
+                                  -e 's/powerpc.*/powerpc/')
 override TARGET_ARCH     := $(shell echo $(XEN_TARGET_ARCH) | \
-                              sed -e 's/\(x86\|powerpc\).*/\1/')
+                              sed -e 's/x86.*/x86/' \
+                                  -e 's/powerpc.*/powerpc/')
 
 TARGET := $(BASEDIR)/xen
 
