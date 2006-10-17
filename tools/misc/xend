@@ -19,6 +19,9 @@
 
    The daemon should reconnect to device control interfaces
    and recover its state when restarted.
+
+   On Solaris, the daemons are SMF managed, and you should not attempt
+   to start xend by hand.
 """
 import os
 import os.path
@@ -108,9 +111,10 @@ def main():
     if not sys.argv[1:]:
         print 'usage: %s {start|stop|restart}' % sys.argv[0]
     elif sys.argv[1] == 'start':
-        start_xenstored()
-        start_consoled()
-	start_blktapctrl()
+        if os.uname()[0] != "SunOS":
+            start_xenstored()
+            start_consoled()
+            start_blktapctrl()
         return daemon.start()
     elif sys.argv[1] == 'trace_start':
         start_xenstored()

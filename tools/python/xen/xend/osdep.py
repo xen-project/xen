@@ -24,4 +24,13 @@ _scripts_dir = {
     "SunOS": "/usr/lib/xen/scripts",
 }
 
-scripts_dir = _scripts_dir.get(os.uname()[0], "/etc/xen/scripts")
+_xend_autorestart = {
+    "Linux": True,
+    "SunOS": False,
+}
+
+def _get(var, default=None):
+    return var.get(os.uname()[0], default)
+
+scripts_dir = _get(_scripts_dir, "/etc/xen/scripts")
+xend_autorestart = _get(_xend_autorestart)
