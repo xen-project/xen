@@ -549,13 +549,13 @@ shadow_remove_all_shadows_and_parents(struct vcpu *v, mfn_t gmfn);
  * Unshadow it, and recursively unshadow pages that reference it. */
 
 /* Remove all shadows of the guest mfn. */
-extern void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int all);
+extern void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all);
 static inline void shadow_remove_all_shadows(struct vcpu *v, mfn_t gmfn)
 {
     int was_locked = shadow_lock_is_acquired(v->domain);
     if ( !was_locked )
         shadow_lock(v->domain);
-    sh_remove_shadows(v, gmfn, 1);
+    sh_remove_shadows(v, gmfn, 0, 1);
     if ( !was_locked )
         shadow_unlock(v->domain);
 }

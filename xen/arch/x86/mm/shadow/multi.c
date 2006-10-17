@@ -2825,7 +2825,7 @@ static inline void check_for_early_unshadow(struct vcpu *v, mfn_t gmfn)
         if ( !(flags & (SHF_L2_32|SHF_L3_PAE|SHF_L4_64)) )
         {
             perfc_incrc(shadow_early_unshadow);
-            sh_remove_shadows(v, gmfn, 0 /* Can fail to unshadow */ );
+            sh_remove_shadows(v, gmfn, 1, 0 /* Fast, can fail to unshadow */ );
             return;
         }
         /* SHF_unhooked_mappings is set to make sure we only unhook

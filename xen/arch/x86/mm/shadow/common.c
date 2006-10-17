@@ -343,8 +343,11 @@ shadow_validate_guest_pt_write(struct vcpu *v, mfn_t gmfn,
     if ( rc & SHADOW_SET_ERROR ) 
     {
         /* This page is probably not a pagetable any more: tear it out of the 
-         * shadows, along with any tables that reference it */
-        shadow_remove_all_shadows_and_parents(v, gmfn);
+         * shadows, along with any tables that reference it.  
+         * Since the validate call above will have made a "safe" (i.e. zero) 
+         * shadow entry, we can let the domain live even if we can't fully 
+         * unshadow the page. */
+        sh_remove_shadows(v, gmfn, 0, 0);
     }
 }
 
@@ -2058,17 +2061,20 @@ static int sh_remove_shadow_via_pointer(struct vcpu *v, mfn_t smfn)
     return rc;
 }
 
-void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int all)
+void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
 /* Remove the shadows of this guest page.  
- * If all != 0, find all shadows, if necessary by walking the tables.
- * Otherwise, just try the (much faster) heuristics, which will remove 
- * at most one reference to each shadow of the page. */
+ * If fast != 0, just try the quick heuristic, which will remove 
+ * at most one reference to each shadow of the page.  Otherwise, walk
+ * all the shadow tables looking for refs to shadows of this gmfn.
+ * If all != 0, kill the domain if we can't find all the shadows.
+ * (all != 0 implies fast == 0)
+ */
 {
     struct page_info *pg;
     mfn_t smfn;
     u32 sh_flags;
     unsigned char t;
-
+    
     /* Dispatch table for getting per-type functions: each level must
      * be called with the function to remove a lower-level shadow. */
     static hash_callback_t callbacks[16] = {
@@ -2128,6 +2134,7 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int all)
     };
 
     ASSERT(shadow_lock_is_acquired(v->domain));
+    ASSERT(!(all && fast));
 
     pg = mfn_to_page(gmfn);
 
@@ -2147,20 +2154,20 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int all)
      * call will remove at most one shadow, and terminate immediately when
      * it does remove it, so we never walk the hash after doing a deletion.  */
 #define DO_UNSHADOW(_type) do {                                 \
-    t = (_type) >> PGC_SH_type_shift;                          \
-    smfn = shadow_hash_lookup(v, mfn_x(gmfn), t);              \
-    if ( !sh_remove_shadow_via_pointer(v, smfn) && all )       \
+    t = (_type) >> PGC_SH_type_shift;                           \
+    smfn = shadow_hash_lookup(v, mfn_x(gmfn), t);               \
+    if ( !sh_remove_shadow_via_pointer(v, smfn) && !fast )      \
         hash_foreach(v, masks[t], callbacks, smfn);             \
 } while (0)
 
     /* Top-level shadows need to be unpinned */
-#define DO_UNPIN(_type) do {                                             \
+#define DO_UNPIN(_type) do {                                            \
     t = (_type) >> PGC_SH_type_shift;                                   \
     smfn = shadow_hash_lookup(v, mfn_x(gmfn), t);                       \
     if ( mfn_to_page(smfn)->count_info & PGC_SH_pinned )                \
         sh_unpin(v, smfn);                                              \
     if ( (_type) == PGC_SH_l3_pae_shadow )                              \
-        SHADOW_INTERNAL_NAME(sh_unpin_all_l3_subshadows,3,3)(v, smfn); \
+        SHADOW_INTERNAL_NAME(sh_unpin_all_l3_subshadows,3,3)(v, smfn);  \
 } while (0)
 
     if ( sh_flags & SHF_L1_32 )   DO_UNSHADOW(PGC_SH_l1_32_shadow);
@@ -2190,11 +2197,13 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int all)
 #endif
 
     /* If that didn't catch the shadows, something is wrong */
-    if ( all && (pg->count_info & PGC_page_table) )
+    if ( !fast && (pg->count_info & PGC_page_table) )
     {
-        SHADOW_ERROR("can't find all shadows of mfn %05lx (shadow_flags=%08x)\n",
+        SHADOW_ERROR("can't find all shadows of mfn %05lx "
+                     "(shadow_flags=%08x)\n",
                       mfn_x(gmfn), pg->shadow_flags);
-        domain_crash(v->domain);
+        if ( all ) 
+            domain_crash(v->domain);
     }
 }
 
