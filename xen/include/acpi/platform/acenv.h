@@ -119,7 +119,7 @@
 
 /*! [Begin] no source code translation */
 
-#if defined(__linux__)
+#if 1 /*defined(__linux__)*/ /* XEN: suitable for all supported build OSes */
 #include "aclinux.h"
 
 #elif defined(_AED_EFI)
