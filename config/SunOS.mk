@@ -20,6 +20,10 @@ INSTALL_PROG = $(INSTALL) -m0755
 
 LIB64DIR = lib/amd64
 
+SOCKET_LIBS = -lsocket
+SONAME_LDFLAG = -h
+SHLIB_CFLAGS = -static-libgcc -shared
+
 ifneq ($(debug),y)
 # Optimisation flags are overridable
 CFLAGS ?= -O2 -fno-omit-frame-pointer

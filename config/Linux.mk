@@ -20,6 +20,10 @@ INSTALL_PROG = $(INSTALL) -m0755
 
 LIB64DIR = lib64
 
+SOCKET_LIBS =
+SONAME_LDFLAG = -soname
+SHLIB_CFLAGS = -shared
+
 ifneq ($(debug),y)
 # Optimisation flags are overridable
 CFLAGS ?= -O2 -fomit-frame-pointer

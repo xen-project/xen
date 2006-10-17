@@ -117,7 +117,7 @@ libxenctrl.so.$(MAJOR): libxenctrl.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
 libxenctrl.so.$(MAJOR).$(MINOR): $(CTRL_PIC_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-soname -Wl,libxenctrl.so.$(MAJOR) -shared -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenctrl.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $^
 
 # libxenguest
 
@@ -130,7 +130,7 @@ libxenguest.so.$(MAJOR): libxenguest.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
 libxenguest.so.$(MAJOR).$(MINOR): $(GUEST_PIC_OBJS) libxenctrl.so
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-soname -Wl,libxenguest.so.$(MAJOR) -shared -o $@ $^ -lz -lxenctrl
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenguest.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $^ -lz -lxenctrl
 
 -include $(DEPS)
 

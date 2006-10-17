@@ -52,8 +52,8 @@ clean:
 	rm -rf *.a *.so* *.o *.rpm $(LIB) *~ $(DEPS) xen TAGS
 
 libblktap.a: $(OBJS) 
-	$(CC) $(CFLAGS) -Wl,-soname -Wl,$(SONAME) -shared         \
-	      -L$(XEN_XENSTORE) -l xenstore                       \
+	$(CC) $(CFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,$(SONAME) $(SHLIB_CFLAGS) \
+	      -L$(XEN_XENSTORE) -l xenstore                                \
 	      -o libblktap.so.$(MAJOR).$(MINOR) $^ $(LIBS)
 	ln -sf libblktap.so.$(MAJOR).$(MINOR) libblktap.so.$(MAJOR)
 	ln -sf libblktap.so.$(MAJOR) libblktap.so

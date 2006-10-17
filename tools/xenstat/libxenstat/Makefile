@@ -30,7 +30,7 @@ LIB=src/libxenstat.a
 SHLIB=src/libxenstat.so.$(MAJOR).$(MINOR)
 SHLIB_LINKS=src/libxenstat.so.$(MAJOR) src/libxenstat.so
 OBJECTS=src/xenstat.o
-SONAME_FLAGS=-Wl,-soname -Wl,libxenstat.so.$(MAJOR)
+SONAME_FLAGS=-Wl,$(SONAME_LDFLAG) -Wl,libxenstat.so.$(MAJOR)
 
 WARN_FLAGS=-Wall -Werror
 
@@ -45,7 +45,7 @@ $(LIB): $(OBJECTS)
 	$(RANLIB) $@
 
 $(SHLIB): $(OBJECTS)
-	$(CC) $(CFLAGS) $(LDFLAGS) $(SONAME_FLAGS) -shared -o $@ $(OBJECTS) \
+	$(CC) $(CFLAGS) $(LDFLAGS) $(SONAME_FLAGS) $(SHLIB_CFLAGS) -o $@ $(OBJECTS) \
 		-lxenstore -lxenctrl
 
 src/xenstat.o: src/xenstat.c src/xenstat.h
@@ -97,7 +97,7 @@ $(PYSRC) $(PYMOD): bindings/swig/xenstat.i
 	swig -python $(SWIG_FLAGS) -outdir $(@D) -o $(PYSRC) $<
 
 $(PYLIB): $(PYSRC)
-	$(CC) $(CFLAGS) $(LDFLAGS) $(PYTHON_FLAGS) -shared -lxenstat -o $@ $<
+	$(CC) $(CFLAGS) $(LDFLAGS) $(PYTHON_FLAGS) $(SHLIB_CFLAGS) -lxenstat -o $@ $<
 
 python-bindings: $(PYLIB) $(PYMOD)
 
@@ -118,7 +118,7 @@ $(PERLSRC) $(PERLMOD): bindings/swig/xenstat.i
 	swig -perl $(SWIG_FLAGS) -outdir $(@D) -o $(PERLSRC) $<
 
 $(PERLLIB): $(PERLSRC)
-	$(CC) $(CFLAGS) $(LDFLAGS) $(PERL_FLAGS) -shared -lxenstat -o $@ $<
+	$(CC) $(CFLAGS) $(LDFLAGS) $(PERL_FLAGS) $(SHLIB_CFLAGS) -lxenstat -o $@ $<
 
 .PHONY: perl-bindings
 perl-bindings: $(PERLLIB) $(PERLMOD)

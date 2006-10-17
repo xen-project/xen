@@ -41,19 +41,19 @@ test_interleaved_transactions: test_interleaved_transactions.o
 testcode: xs_test xenstored_test xs_random
 
 xenstored: $(XENSTORED_OBJS)
-	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -lxenctrl -o $@
+	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -lxenctrl $(SOCKET_LIBS) -o $@
 
 $(CLIENTS): xenstore-%: xenstore_%.o libxenstore.so
-	$(LINK.o) $< $(LOADLIBES) $(LDLIBS) -L. -lxenstore -o $@
+	$(LINK.o) $< $(LOADLIBES) $(LDLIBS) -L. -lxenstore $(SOCKET_LIBS) -o $@
 
 $(CLIENTS_OBJS): xenstore_%.o: xenstore_client.c
 	$(COMPILE.c) -DCLIENT_$(*F) -o $@ $<
 
 xenstore-control: xenstore_control.o libxenstore.so
-	$(LINK.o) $< $(LOADLIBES) $(LDLIBS) -L. -lxenstore -o $@
+	$(LINK.o) $< $(LOADLIBES) $(LDLIBS) -L. -lxenstore $(SOCKET_LIBS) -o $@
 
 xenstore-ls: xsls.o libxenstore.so
-	$(LINK.o) $< $(LOADLIBES) $(LDLIBS) -L. -lxenstore -o $@
+	$(LINK.o) $< $(LOADLIBES) $(LDLIBS) -L. -lxenstore $(SOCKET_LIBS) -o $@
 
 xenstored_test: xenstored_core_test.o xenstored_watch_test.o xenstored_domain_test.o xenstored_transaction_test.o xs_lib.o talloc_test.o fake_libxc.o utils.o tdb.o
 	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -o $@
@@ -90,7 +90,7 @@ libxenstore.so.$(MAJOR): libxenstore.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
 libxenstore.so.$(MAJOR).$(MINOR): xs.opic xs_lib.opic
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-soname -Wl,libxenstore.so.$(MAJOR) -shared -o $@ $^ -lpthread
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenstore.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $^ -lpthread
 
 libxenstore.a: xs.o xs_lib.o
 	$(AR) rcs libxenstore.a $^
