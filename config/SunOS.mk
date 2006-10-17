@@ -11,6 +11,8 @@ STRIP      = $(CROSS_COMPILE)gstrip
 OBJCOPY    = $(CROSS_COMPILE)gobjcopy
 OBJDUMP    = $(CROSS_COMPILE)gobjdump
 
+GREP       = ggrep
+
 INSTALL      = ginstall
 INSTALL_DIR  = $(INSTALL) -d -m0755
 INSTALL_DATA = $(INSTALL) -m0644

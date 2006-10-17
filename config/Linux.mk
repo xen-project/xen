@@ -11,6 +11,8 @@ STRIP      = $(CROSS_COMPILE)strip
 OBJCOPY    = $(CROSS_COMPILE)objcopy
 OBJDUMP    = $(CROSS_COMPILE)objdump
 
+GREP       = grep
+
 INSTALL      = install
 INSTALL_DIR  = $(INSTALL) -d -m0755
 INSTALL_DATA = $(INSTALL) -m0644
