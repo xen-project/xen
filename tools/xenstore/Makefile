@@ -29,7 +29,7 @@ XENSTORED_OBJS = xenstored_core.o xenstored_watch.o xenstored_domain.o xenstored
 
 XENSTORED_Linux = xenstored_linux.o
 
-XENSTORED_OBJS += $(XENSTORED_$(OS))
+XENSTORED_OBJS += $(XENSTORED_$(XEN_OS))
 
 .PHONY: all
 all: libxenstore.so libxenstore.a xenstored $(CLIENTS) xs_tdb_dump xenstore-control xenstore-ls

@@ -25,9 +25,9 @@ CFLAGS += -D__XEN_TOOLS__
 %.o: %.cc
 	$(CC) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
 
-OS = $(shell uname -s)
+.PHONY: mk-symlinks mk-symlinks-xen mk-symlinks-$(XEN_OS)
 
-.PHONY: mk-symlinks mk-symlinks-xen mk-symlinks-$(OS)
+mk-symlinks-SunOS:
 
 mk-symlinks-Linux: LINUX_ROOT=$(XEN_ROOT)/linux-2.6-xen-sparse
 mk-symlinks-Linux:
@@ -44,4 +44,4 @@ mk-symlinks-xen:
 	mkdir -p xen/io
 	( cd xen/io && ln -sf ../../$(XEN_ROOT)/xen/include/public/io/*.h . )
 
-mk-symlinks: mk-symlinks-xen mk-symlinks-$(OS)
+mk-symlinks: mk-symlinks-xen mk-symlinks-$(XEN_OS)
