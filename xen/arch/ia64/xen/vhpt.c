@@ -228,6 +228,7 @@ void vcpu_flush_vtlb_all(struct vcpu *v)
 		   grant_table share page from guest_physmap_remove_page()
 		   in arch_memory_op() XENMEM_add_to_physmap to realize
 		   PV-on-HVM feature. */
+		/* FIXME: This is not SMP-safe yet about p2m table */
 		/* Purge vTLB for VT-i domain */
 		thash_purge_all(v);
 	}

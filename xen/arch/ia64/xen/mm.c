@@ -400,6 +400,7 @@ gmfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
 
 	// This function may be called from __gnttab_copy()
 	// during destruction of VT-i domain with PV-on-HVM driver.
+	// ** FIXME: This is not SMP-safe yet about p2m table. **
 	if (unlikely(d->arch.mm.pgd == NULL)) {
 		if (VMX_DOMAIN(d->vcpu[0]))
 			return INVALID_MFN;
