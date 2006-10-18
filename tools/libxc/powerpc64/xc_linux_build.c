@@ -167,10 +167,10 @@ static int load_devtree(
     unsigned long devtree_addr,
     uint64_t initrd_base,
     unsigned long initrd_len,
-    start_info_t *si,
-    unsigned long si_addr)
+    start_info_t *start_info __attribute__((unused)),
+    unsigned long start_info_addr)
 {
-    uint32_t start_info[4] = {0, si_addr, 0, 0x1000};
+    uint32_t start_info[4] = {0, start_info_addr, 0, 0x1000};
     struct boot_param_header *header;
     void *chosen;
     void *xen;
@@ -209,8 +209,7 @@ static int load_devtree(
     }
 
     /* start-info (XXX being removed soon) */
-    rc = ft_set_prop(&devtree, xen, "start-info",
-            start_info, sizeof(start_info));
+    rc = ft_set_prop(&devtree, xen, "start-info", start_info, sizeof(start_info));
     if (rc < 0) {
         DPRINTF("couldn't set /xen/start-info\n");
         return rc;
@@ -334,24 +333,24 @@ out:
     return rc;
 }
 
-static unsigned long create_start_info(start_info_t *si,
+static unsigned long create_start_info(start_info_t *start_info,
         unsigned int console_evtchn, unsigned int store_evtchn,
         unsigned long nr_pages)
 {
-    unsigned long si_addr;
+    unsigned long start_info_addr;
 
-    memset(si, 0, sizeof(*si));
-    snprintf(si->magic, sizeof(si->magic), "xen-%d.%d-powerpc64HV", 3, 0);
+    memset(start_info, 0, sizeof(*start_info));
+    snprintf(start_info->magic, sizeof(start_info->magic), "xen-%d.%d-powerpc64HV", 3, 0);
 
-    si->nr_pages = nr_pages;
-    si->shared_info = (nr_pages - 1) << PAGE_SHIFT;
-    si->store_mfn = si->nr_pages - 2;
-    si->store_evtchn = store_evtchn;
-    si->console.domU.mfn = si->nr_pages - 3;
-    si->console.domU.evtchn = console_evtchn;
-    si_addr = (si->nr_pages - 4) << PAGE_SHIFT;
+    start_info->nr_pages = nr_pages;
+    start_info->shared_info = (nr_pages - 1) << PAGE_SHIFT;
+    start_info->store_mfn = start_info->nr_pages - 2;
+    start_info->store_evtchn = store_evtchn;
+    start_info->console.domU.mfn = start_info->nr_pages - 3;
+    start_info->console.domU.evtchn = console_evtchn;
+    start_info_addr = (start_info->nr_pages - 4) << PAGE_SHIFT;
 
-    return si_addr;
+    return start_info_addr;
 }
 
 static int get_page_array(int xc_handle, int domid, xen_pfn_t **page_array,
@@ -399,7 +398,7 @@ int xc_linux_build(int xc_handle,
                    unsigned long *console_mfn,
                    void *devtree)
 {
-    start_info_t si;
+    start_info_t start_info;
     struct domain_setup_info dsi;
     xen_pfn_t *page_array = NULL;
     unsigned long nr_pages;
@@ -407,7 +406,7 @@ int xc_linux_build(int xc_handle,
     unsigned long kern_addr;
     unsigned long initrd_base = 0;
     unsigned long initrd_len = 0;
-    unsigned long si_addr;
+    unsigned long start_info_addr;
     int rc = 0;
 
     DPRINTF("%s\n", __func__);
@@ -434,11 +433,12 @@ int xc_linux_build(int xc_handle,
     }
 
     /* start_info stuff: about to be removed  */
-    si_addr = create_start_info(&si, console_evtchn, store_evtchn, nr_pages);
-    *console_mfn = page_array[si.console.domU.mfn];
-    *store_mfn = page_array[si.store_mfn];
-    if (install_image(xc_handle, domid, page_array, &si, si_addr,
-                sizeof(start_info_t))) {
+    start_info_addr = create_start_info(&start_info, console_evtchn,
+                                        store_evtchn, nr_pages);
+    *console_mfn = page_array[start_info.console.domU.mfn];
+    *store_mfn = page_array[start_info.store_mfn];
+    if (install_image(xc_handle, domid, page_array, &start_info,
+                      start_info_addr, sizeof(start_info_t))) {
         rc = -1;
         goto out;
     }
@@ -447,7 +447,8 @@ int xc_linux_build(int xc_handle,
         DPRINTF("loading flattened device tree\n");
         devtree_addr = DEVTREE_ADDR;
         if (load_devtree(xc_handle, domid, page_array, devtree, devtree_addr,
-                     initrd_base, initrd_len, &si, si_addr)) {
+                         initrd_base, initrd_len, &start_info,
+                         start_info_addr)) {
             DPRINTF("couldn't load flattened device tree.\n");
             rc = -1;
             goto out;
