@@ -1,5 +1,3 @@
-# -*- mode: Makefile; -*-
-
 AS         = $(CROSS_COMPILE)gas
 LD         = $(CROSS_COMPILE)gld
 CC         = $(CROSS_COMPILE)gcc

@@ -10,4 +10,8 @@ CFLAGS += -m64
 LIBDIR = $(LIB64DIR)
 
 # Use only if calling $(LD) directly.
+ifeq ($(XEN_OS),OpenBSD)
+LDFLAGS_DIRECT += -melf_x86_64_obsd
+else
 LDFLAGS_DIRECT += -melf_x86_64
+endif

@@ -2,7 +2,7 @@
 #define __LIB_H__
 
 #include <xen/inttypes.h>
-#include <stdarg.h>
+#include <xen/stdarg.h>
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/xmalloc.h>

@@ -10,4 +10,8 @@ CFLAGS += -m32 -march=i686
 LIBDIR := lib
 
 # Use only if calling $(LD) directly.
+ifeq ($(XEN_OS),OpenBSD)
+LDFLAGS_DIRECT += -melf_i386_obsd
+else
 LDFLAGS_DIRECT += -melf_i386
+endif

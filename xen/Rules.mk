@@ -72,7 +72,7 @@ AFLAGS   := $(strip $(AFLAGS) $(AFLAGS-y))
 AFLAGS   += $(patsubst -std=gnu%,,$(CFLAGS))
 
 # LDFLAGS are only passed directly to $(LD)
-LDFLAGS  += $(LDFLAGS_DIRECT)
+LDFLAGS  := $(strip $(LDFLAGS) $(LDFLAGS_DIRECT))
 
 include Makefile
 
