@@ -167,10 +167,10 @@ static int load_devtree(
     unsigned long devtree_addr,
     uint64_t initrd_base,
     unsigned long initrd_len,
-    start_info_t *si,
-    unsigned long si_addr)
+    start_info_t *start_info __attribute__((unused)),
+    unsigned long start_info_addr)
 {
-    uint32_t start_info[4] = {0, si_addr, 0, 0x1000};
+    uint32_t si[4] = {0, start_info_addr, 0, 0x1000};
     struct boot_param_header *header;
     void *chosen;
     void *xen;
@@ -215,8 +215,7 @@ static int load_devtree(
     }
 
     /* start-info (XXX being removed soon) */
-    rc = ft_set_prop(&devtree, xen, "start-info",
-            start_info, sizeof(start_info));
+    rc = ft_set_prop(&devtree, xen, "start-info", si, sizeof(si));
     if (rc < 0) {
         DPRINTF("couldn't set /xen/start-info\n");
         return rc;
@@ -317,18 +316,19 @@ out:
     return rc;
 }
 
-static unsigned long create_start_info(void *devtree, start_info_t *si,
+static unsigned long create_start_info(void *devtree, start_info_t *start_info,
         unsigned int console_evtchn, unsigned int store_evtchn,
         unsigned long nr_pages, const char *cmdline)
 {
     void *rma;
-    unsigned long si_addr;
+    unsigned long start_info_addr;
     uint64_t rma_reg[2];
     uint64_t rma_top;
     int rc;
 
-    memset(si, 0, sizeof(*si));
-    snprintf(si->magic, sizeof(si->magic), "xen-%d.%d-powerpc64HV", 3, 0);
+    memset(start_info, 0, sizeof(*start_info));
+    snprintf(start_info->magic, sizeof(start_info->magic),
+             "xen-%d.%d-powerpc64HV", 3, 0);
 
     rma = ft_find_node(devtree, "/memory@0");
     if (rma == NULL) {
@@ -343,25 +343,22 @@ static unsigned long create_start_info(void *devtree, start_info_t *si,
     rma_top = rma_reg[0] + rma_reg[1];
     DPRINTF("RMA top = 0x%"PRIX64"\n", rma_top);
 
-    si->nr_pages = nr_pages;
-    si->shared_info = rma_top - PAGE_SIZE;
-    si->store_mfn = (rma_top >> PAGE_SHIFT) - 2;
-    si->store_evtchn = store_evtchn;
-    si->console.domU.mfn = (rma_top >> PAGE_SHIFT) - 3;
-    si->console.domU.evtchn = console_evtchn;
-    strncpy((char *)si->cmd_line, cmdline, MAX_GUEST_CMDLINE);
-    /* just in case we truncated cmdline with strncpy add 0 at the end */
-    si->cmd_line[MAX_GUEST_CMDLINE]=0;
-    si_addr = rma_top - 4*PAGE_SIZE;
+    start_info->nr_pages = nr_pages;
+    start_info->shared_info = rma_top - PAGE_SIZE;
+    start_info->store_mfn = (rma_top >> PAGE_SHIFT) - 2;
+    start_info->store_evtchn = store_evtchn;
+    start_info->console.domU.mfn = (rma_top >> PAGE_SHIFT) - 3;
+    start_info->console.domU.evtchn = console_evtchn;
+    start_info_addr = rma_top - 4*PAGE_SIZE;
 
-    rc = ft_set_rsvmap(devtree, 0, si_addr, 4*PAGE_SIZE);
+    rc = ft_set_rsvmap(devtree, 0, start_info_addr, 4*PAGE_SIZE);
     if (rc < 0) {
         DPRINTF("couldn't set start_info reservation\n");
         return ~0UL;
     }
 
 
-    return si_addr;
+    return start_info_addr;
 }
 
 static int get_page_array(int xc_handle, int domid, xen_pfn_t **page_array,
@@ -409,7 +406,7 @@ int xc_prose_build(int xc_handle,
                    unsigned long *console_mfn,
                    void *devtree)
 {
-    start_info_t si;
+    start_info_t start_info;
     struct domain_setup_info dsi;
     xen_pfn_t *page_array = NULL;
     unsigned long nr_pages;
@@ -417,7 +414,7 @@ int xc_prose_build(int xc_handle,
     unsigned long kern_addr;
     unsigned long initrd_base = 0;
     unsigned long initrd_len = 0;
-    unsigned long si_addr;
+    unsigned long start_info_addr;
     int rc = 0;
 
     DPRINTF("%s\n", __func__);
@@ -446,12 +443,12 @@ int xc_prose_build(int xc_handle,
     }
 
     /* start_info stuff: about to be removed  */
-    si_addr = create_start_info(devtree, &si, console_evtchn, store_evtchn,
-                                nr_pages,cmdline);
-    *console_mfn = page_array[si.console.domU.mfn];
-    *store_mfn = page_array[si.store_mfn];
-    if (install_image(xc_handle, domid, page_array, &si, si_addr,
-                sizeof(start_info_t))) {
+    start_info_addr = create_start_info(devtree, &start_info, console_evtchn,
+                                        store_evtchn, nr_pages, cmdline);
+    *console_mfn = page_array[start_info.console.domU.mfn];
+    *store_mfn = page_array[start_info.store_mfn];
+    if (install_image(xc_handle, domid, page_array, &start_info,
+                      start_info_addr, sizeof(start_info_t))) {
         rc = -1;
         goto out;
     }
@@ -460,7 +457,8 @@ int xc_prose_build(int xc_handle,
         DPRINTF("loading flattened device tree\n");
         devtree_addr = DEVTREE_ADDR;
         if (load_devtree(xc_handle, domid, page_array, devtree, devtree_addr,
-                     initrd_base, initrd_len, &si, si_addr)) {
+                         initrd_base, initrd_len, &start_info,
+                         start_info_addr)) {
             DPRINTF("couldn't load flattened device tree.\n");
             rc = -1;
             goto out;
