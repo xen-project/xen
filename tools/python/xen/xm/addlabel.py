@@ -72,13 +72,8 @@ def add_resource_label(label, resource, policyref):
     # sanity check: make sure this label can be instantiated later on
     ssidref = security.label2ssidref(label, policyref, 'res')
 
-    # sanity check on resource name
-    (type, file) = resource.split(":")
-    if type == "phy":
-        file = "/dev/" + file
-    if not os.path.exists(file):
-        print "Invalid resource '"+resource+"'"
-        return
+    #build canonical resource name
+    resource = security.unify_resname(resource)
 
     # see if this resource is already in the file
     access_control = {}
