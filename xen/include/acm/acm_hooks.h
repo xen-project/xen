@@ -143,9 +143,9 @@ static inline int acm_pre_grant_map_ref(domid_t id)
 { return 0; }
 static inline int acm_pre_grant_setup(domid_t id) 
 { return 0; }
-static inline int acm_init(unsigned int *initrdidx,
-                           const multiboot_info_t *mbi,
-                           unsigned long start)
+static inline int acm_init(char *policy_start, unsigned long policy_len)
+{ return 0; }
+static inline int acm_is_policy(char *buf, unsigned long len)
 { return 0; }
 static inline void acm_post_domain0_create(domid_t domid) 
 { return; }
@@ -369,9 +369,11 @@ static inline int acm_sharing(ssidref_t ssidref1, ssidref_t ssidref2)
         return ACM_ACCESS_PERMITTED;
 }
 
-extern int acm_init(unsigned int *initrdidx,
-                    const multiboot_info_t *mbi,
-                    unsigned long start);
+
+extern int acm_init(char *policy_start, unsigned long policy_len);
+
+/* Return true iff buffer has an acm policy magic number.  */
+extern int acm_is_policy(char *buf, unsigned long len);
 
 #endif
 
