@@ -104,11 +104,6 @@ int xc_find_device_number(const char *name);
  * DOMAIN DEBUGGING FUNCTIONS
  */
 
-#ifdef __linux__
-
-#include <sys/ptrace.h>
-#include <thread_db.h>
-
 typedef struct xc_core_header {
     unsigned int xch_magic;
     unsigned int xch_nr_vcpus;
@@ -119,6 +114,11 @@ typedef struct xc_core_header {
 } xc_core_header_t;
 
 #define XC_CORE_MAGIC 0xF00FEBED
+
+#ifdef __linux__
+
+#include <sys/ptrace.h>
+#include <thread_db.h>
 
 void * map_domain_va_core(
     unsigned long domfd,
