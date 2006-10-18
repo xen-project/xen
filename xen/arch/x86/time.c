@@ -919,6 +919,13 @@ void send_timer_event(struct vcpu *v)
     send_guest_vcpu_virq(v, VIRQ_TIMER);
 }
 
+/* Return secs after 00:00:00 localtime, 1 January, 1970. */
+unsigned long get_localtime(struct domain *d)
+{
+    return wc_sec + (wc_nsec + NOW()) / 1000000000ULL 
+        + d->time_offset_seconds;
+}
+
 /*
  * Local variables:
  * mode: C

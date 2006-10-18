@@ -140,8 +140,8 @@ asmlinkage void svm_intr_assist(void)
         case APIC_DM_FIXED:
         case APIC_DM_LOWEST:
             /* Re-injecting a PIT interruptt? */
-            if (re_injecting && 
-                is_pit_irq(v, intr_vector, intr_type)) {
+            if (re_injecting && pt->enabled && 
+                is_periodic_irq(v, intr_vector, intr_type)) {
                     ++pt->pending_intr_nr;
             }
             /* let's inject this interrupt */

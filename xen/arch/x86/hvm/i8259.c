@@ -598,23 +598,47 @@ int cpu_get_pic_interrupt(struct vcpu *v, int *type)
     return intno;
 }
 
-int is_pit_irq(struct vcpu *v, int irq, int type)
+int is_periodic_irq(struct vcpu *v, int irq, int type)
 {
-    int pit_vec;
+    int vec;
+    struct periodic_time *pt =
+        &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
+    struct RTCState *vrtc =
+        &(v->domain->arch.hvm_domain.pl_time.vrtc);
 
-    if (type == APIC_DM_EXTINT)
-        pit_vec = v->domain->arch.hvm_domain.vpic.pics[0].irq_base;
-    else
-        pit_vec =
-          v->domain->arch.hvm_domain.vioapic.redirtbl[0].RedirForm.vector;
+    if (pt->irq == 0) { /* Is it pit irq? */
+        if (type == APIC_DM_EXTINT)
+            vec = v->domain->arch.hvm_domain.vpic.pics[0].irq_base;
+        else
+            vec =
+              v->domain->arch.hvm_domain.vioapic.redirtbl[0].RedirForm.vector;
 
-    return (irq == pit_vec);
+        if (irq == vec)
+            return 1;
+    }
+
+    if (pt->irq == 8) { /* Or rtc irq? */
+        if (type == APIC_DM_EXTINT)
+            vec = v->domain->arch.hvm_domain.vpic.pics[1].irq_base;
+        else
+            vec =
+              v->domain->arch.hvm_domain.vioapic.redirtbl[8].RedirForm.vector;
+
+        if (irq == vec)
+            return is_rtc_periodic_irq(vrtc);
+    }
+
+    return 0;
 }
 
 int is_irq_enabled(struct vcpu *v, int irq)
 {
+    struct hvm_vioapic *vioapic = &v->domain->arch.hvm_domain.vioapic;
     struct hvm_virpic *vpic=&v->domain->arch.hvm_domain.vpic;
-        
+
+    if (vioapic->redirtbl[irq].RedirForm.mask == 0)
+       return 1;
+
     if ( irq & 8 ) {
         return !( (1 << (irq&7)) & vpic->pics[1].imr);
     }

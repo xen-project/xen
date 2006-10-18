@@ -25,11 +25,12 @@
 #include <xen/lib.h>
 #include <xen/time.h>
 #include <xen/errno.h>
+#include <xen/time.h>
 #include <xen/timer.h>
 #include <asm/hvm/vpic.h>
 
 #define PIT_FREQ 1193181
-#define PIT_BASE        0x40
+#define PIT_BASE 0x40
 
 typedef struct PITChannelState {
     int count; /* can be 65536 */
@@ -49,10 +50,32 @@ typedef struct PITChannelState {
     struct vcpu      *vcpu;
     struct periodic_time *pt;
 } PITChannelState;
+
+typedef struct PITState {
+    PITChannelState channels[3];
+    int speaker_data_on;
+    int dummy_refresh_clock;
+} PITState;
+
+#define RTC_SIZE 14
+typedef struct RTCState {
+    uint8_t cmos_data[RTC_SIZE];  /* Only handle time/interrupt part in HV */
+    uint8_t cmos_index;
+    struct tm current_tm;
+    int irq;
+    /* second update */
+    int64_t next_second_time;
+    struct timer second_timer;
+    struct timer second_timer2;
+    struct vcpu      *vcpu;
+    struct periodic_time *pt;
+} RTCState;
    
 /*
  * Abstract layer of periodic time, one short time.
  */
+typedef void time_cb(struct vcpu *v, void *opaque);
+
 struct periodic_time {
     char enabled;               /* enabled */
     char one_shot;              /* one shot time */
@@ -64,19 +87,15 @@ struct periodic_time {
     s_time_t scheduled;         /* scheduled timer interrupt */
     u64 last_plt_gtime;         /* platform time when last IRQ is injected */
     struct timer timer;         /* ac_timer */
+    time_cb *cb;
     void *priv;                 /* ponit back to platform time source */
 };
-
-typedef struct PITState {
-    PITChannelState channels[3];
-    int speaker_data_on;
-    int dummy_refresh_clock;
-} PITState;
 
 struct pl_time {    /* platform time */
     struct periodic_time periodic_tm;
     struct PITState      vpit;
-    /* TODO: RTC/ACPI time */
+    struct RTCState      vrtc;
+    /* TODO: ACPI time */
 };
 
 static __inline__ s_time_t get_scheduled(
@@ -90,13 +109,30 @@ static __inline__ s_time_t get_scheduled(
         return -1;
 }
 
+extern u64 hvm_get_guest_time(struct vcpu *v);
+/*
+ * get processor time.
+ * unit: TSC
+ */
+static __inline__ int64_t hvm_get_clock(struct vcpu *v)
+{
+    uint64_t  gtsc;
+
+    gtsc = hvm_get_guest_time(v);
+    return gtsc;
+}
+
+#define ticks_per_sec(v)      (v->domain->arch.hvm_domain.tsc_frequency)
+
 /* to hook the ioreq packet to get the PIT initialization info */
 extern void hvm_hooks_assist(struct vcpu *v);
 extern void pickup_deactive_ticks(struct periodic_time *vpit);
-extern u64 hvm_get_guest_time(struct vcpu *v);
-extern struct periodic_time *create_periodic_time(PITChannelState *v, u32 period, char irq, char one_shot);
+extern struct periodic_time *create_periodic_time(u32 period, char irq, char one_shot, time_cb *cb, void *data);
 extern void destroy_periodic_time(struct periodic_time *pt);
 void pit_init(struct vcpu *v, unsigned long cpu_khz);
+void rtc_init(struct vcpu *v, int base, int irq);
+void rtc_deinit(struct domain *d);
+int is_rtc_periodic_irq(void *opaque);
 void pt_timer_fn(void *data);
 void pit_time_fired(struct vcpu *v, void *priv);
 

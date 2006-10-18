@@ -683,7 +683,7 @@ void hvm_interrupt_post(struct vcpu *v, int vector, int type)
     struct  periodic_time *pt = 
         &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
 
-    if ( is_pit_irq(v, vector, type) ) {
+    if ( pt->enabled && is_periodic_irq(v, vector, type) ) {
         if ( !pt->first_injected ) {
             pt->pending_intr_nr = 0;
             pt->last_plt_gtime = hvm_get_guest_time(v);
@@ -694,8 +694,9 @@ void hvm_interrupt_post(struct vcpu *v, int vector, int type)
             pt->pending_intr_nr--;
             pt->last_plt_gtime += pt->period_cycles;
             hvm_set_guest_time(v, pt->last_plt_gtime);
-            pit_time_fired(v, pt->priv);
         }
+        if (pt->cb)
+            pt->cb(v, pt->priv);
     }
     
     switch(type) {

@@ -315,17 +315,14 @@ void pickup_deactive_ticks(struct periodic_time *pt)
  * period: fire frequency in ns.
  */
 struct periodic_time * create_periodic_time(
-        PITChannelState *s,
         u32 period, 
         char irq,
-        char one_shot)
+        char one_shot,
+        time_cb *cb,
+        void *data)
 {
-    struct vcpu *v = s->vcpu;
-    struct periodic_time *pt = &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
+    struct periodic_time *pt = &(current->domain->arch.hvm_domain.pl_time.periodic_tm);
     if ( pt->enabled ) {
-        if ( v->vcpu_id != 0 ) {
-            printk("HVM_PIT: start 2nd periodic time on non BSP!\n");
-        }
         stop_timer (&pt->timer);
         pt->enabled = 0;
     }
@@ -345,7 +342,8 @@ struct periodic_time * create_periodic_time(
     pt->scheduled = NOW() + period;
     set_timer (&pt->timer,pt->scheduled);
     pt->enabled = 1;
-    pt->priv = s;
+    pt->cb = cb;
+    pt->priv = data;
     return pt;
 }
 
