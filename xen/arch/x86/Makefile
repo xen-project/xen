@@ -46,8 +46,7 @@ obj-$(crash_debug) += gdbstub.o
 
 $(TARGET): $(TARGET)-syms boot/mkelf32
 	./boot/mkelf32 $(TARGET)-syms $(TARGET) 0x100000 \
-	`$(NM) $(TARGET)-syms | sort | tail -n 1 | \
-	 sed -e 's/^\([^ ]*\).*/0x\1/'`
+	`$(NM) -nr $(TARGET)-syms | head -n 1 | sed -e 's/^\([^ ]*\).*/0x\1/'`
 
 $(TARGET)-syms: boot/$(TARGET_SUBARCH).o $(ALL_OBJS) xen.lds
 	$(MAKE) -f $(BASEDIR)/Rules.mk $(BASEDIR)/common/symbols-dummy.o

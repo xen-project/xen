@@ -22,7 +22,7 @@ endif
 
 # Expand Linux series to Linux version
 LINUX_SERIES	?= 2.6
-LINUX_VER	?= $(shell $(GREP) "^LINUX_VER " buildconfigs/mk.linux-2.6-xen | sed -e 's/.*=[ ]*//')
+LINUX_VER	?= $(shell grep "^LINUX_VER " buildconfigs/mk.linux-2.6-xen | sed -e 's/.*=[ ]*//')
 
 # Setup Linux search path
 LINUX_SRC_PATH	?= .:..
@@ -125,7 +125,7 @@ config-update-pae:
 ifeq ($(XEN_TARGET_X86_PAE),y)
 	sed -e 's!^CONFIG_HIGHMEM4G=y$$!\# CONFIG_HIGHMEM4G is not set!;s!^\# CONFIG_HIGHMEM64G is not set$$!CONFIG_HIGHMEM64G=y!' $(CONFIG_FILE) > $(CONFIG_FILE)- && mv $(CONFIG_FILE)- $(CONFIG_FILE)
 else
-	$(GREP) '^CONFIG_HIGHMEM64G=y' $(CONFIG_FILE) >/dev/null && ( sed -e 's!^CONFIG_HIGHMEM64G=y$$!\# CONFIG_HIGHMEM64G is not set!;s!^\# CONFIG_HIGHMEM4G is not set$$!CONFIG_HIGHMEM4G=y!' $(CONFIG_FILE) > $(CONFIG_FILE)- && mv $(CONFIG_FILE)- $(CONFIG_FILE) ) || true
+	grep '^CONFIG_HIGHMEM64G=y' $(CONFIG_FILE) >/dev/null && ( sed -e 's!^CONFIG_HIGHMEM64G=y$$!\# CONFIG_HIGHMEM64G is not set!;s!^\# CONFIG_HIGHMEM4G is not set$$!CONFIG_HIGHMEM4G=y!' $(CONFIG_FILE) > $(CONFIG_FILE)- && mv $(CONFIG_FILE)- $(CONFIG_FILE) ) || true
 endif
 
 # never delete any intermediate files.

@@ -26,7 +26,7 @@ EXTRA_INCLUDES += $(EXTRA_PREFIX)/include
 EXTRA_LIB += $(EXTRA_PREFIX)/$(LIBDIR)
 endif
 
-test-gcc-flag = $(shell $(1) -v --help 2>&1 | $(GREP) -q " $(2) " && echo $(2))
+test-gcc-flag = $(shell $(1) -v --help 2>&1 | grep " $(2) " >/dev/null 2>&1 && echo $(2))
 
 ifneq ($(debug),y)
 CFLAGS += -DNDEBUG

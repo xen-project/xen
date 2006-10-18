@@ -11,7 +11,6 @@ STRIP      = $(CROSS_COMPILE)gstrip
 OBJCOPY    = $(CROSS_COMPILE)gobjcopy
 OBJDUMP    = $(CROSS_COMPILE)gobjdump
 
-GREP       = ggrep
 SHELL      = bash
 
 INSTALL      = ginstall
