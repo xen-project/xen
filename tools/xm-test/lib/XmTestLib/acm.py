@@ -26,7 +26,7 @@ except:
     ACM_LABEL_RESOURCES = False
 
 labeled_resources = {}
-acm_verbose = False
+acm_verbose = True
 
 def isACMEnabled():
     return security.on()
@@ -43,6 +43,17 @@ def ACMLoadPolicy(policy='xm-test'):
              "Start the system without any policy.\n%s" %
              (policy, o))
 
+def ACMPrepareSystem(resources):
+    if isACMEnabled():
+        ACMLoadPolicy()
+        ACMLabelResources(resources)
+
+def ACMLabelResources(resources):
+    for k, v in resources.items():
+        if k == "disk":
+            for vv in v:
+                res = vv.split(',')[0]
+                ACMLabelResource(res)
 
 # Applications may label resources explicitly by calling this function
 def ACMLabelResource(resource, label='red'):

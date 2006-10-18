@@ -29,6 +29,7 @@ from Test import *
 from config import *
 from Console import *
 from XenDevice import *
+from acm import *
 
 BLOCK_ROOT_DEV = "hda"
 
@@ -103,7 +104,8 @@ class XenConfig:
         self.defaultOpts["vif"]  = []
         self.defaultOpts["vtpm"] = []
         if isACMEnabled():
-            self.defaultOpts["access_control"] = []
+            #A default so every VM can start with ACM enabled
+            self.defaultOpts["access_control"] = ['policy=xm-test,label=red']
 
         self.opts = self.defaultOpts
 
@@ -131,6 +133,7 @@ class XenConfig:
         output = file(filename, "w")
         output.write(self.toString())
         output.close()
+        ACMPrepareSystem(self.opts)
 
     def __str__(self):
         """When used as a string, we represent ourself by a config

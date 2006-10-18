@@ -125,8 +125,8 @@ following command from the xm-test directory
 
 Some of these tests will work even without support of ACM by Xen.
 
-Several of these tests require the privilege of being allowed to label
-resources and will otherwise be skipped. By default the test suite
+The xm test suite has been extended to support labeling of resources
+as required by the existing tests. However, by default the test suite
 is not allowed to automatically label resources since this may affect
 existing labels. To enable this, the test suite must be configured with
 the following parameter passed to the configure scripts (in addition to
