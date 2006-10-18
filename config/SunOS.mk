@@ -31,4 +31,5 @@ else
 CFLAGS ?= -O1 -fno-omit-frame-pointer
 endif
 
-CFLAGS += -Wa,--divide
+CFLAGS += -Wa,--divide -D_POSIX_C_SOURCE=200112L -D__EXTENSIONS__
+
