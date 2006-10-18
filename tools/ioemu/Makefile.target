@@ -23,7 +23,7 @@ VPATH+=:$(SRC_PATH)/linux-user
 DEFINES+=-I$(SRC_PATH)/linux-user -I$(SRC_PATH)/linux-user/$(TARGET_ARCH)
 endif
 CFLAGS+=-Wall -O2 -g -fno-strict-aliasing
-SSE2 := $(call test-gcc-flag,$(CC),-msse2)
+SSE2 := $(call cc-option,$(CC),-msse2,)
 ifeq ($(SSE2),-msse2)
 CFLAGS += -DUSE_SSE2=1 -msse2
 endif

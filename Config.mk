@@ -26,7 +26,10 @@ EXTRA_INCLUDES += $(EXTRA_PREFIX)/include
 EXTRA_LIB += $(EXTRA_PREFIX)/$(LIBDIR)
 endif
 
-test-gcc-flag = $(shell $(1) -v --help 2>&1 | grep " $(2) " >/dev/null 2>&1 && echo $(2))
+# cc-option
+# Usage: cflags-y += $(call cc-option,$(CC),-march=winchip-c6,-march=i586)
+cc-option = $(shell if test -z "`$(1) $(2) -S -o /dev/null -xc \
+              /dev/null 2>&1`"; then echo "$(2)"; else echo "$(3)"; fi ;)
 
 ifneq ($(debug),y)
 CFLAGS += -DNDEBUG
@@ -42,8 +45,8 @@ CFLAGS += -Wall -Wstrict-prototypes
 # result of any casted expression causes a warning.
 CFLAGS += -Wno-unused-value
 
-HOSTCFLAGS += $(call test-gcc-flag,$(HOSTCC),-Wdeclaration-after-statement)
-CFLAGS     += $(call test-gcc-flag,$(CC),-Wdeclaration-after-statement)
+HOSTCFLAGS += $(call cc-option,$(HOSTCC),-Wdeclaration-after-statement,)
+CFLAGS     += $(call cc-option,$(CC),-Wdeclaration-after-statement,)
 
 LDFLAGS += $(foreach i, $(EXTRA_LIB), -L$(i)) 
 CFLAGS += $(foreach i, $(EXTRA_INCLUDES), -I$(i))
