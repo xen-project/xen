@@ -246,6 +246,47 @@ class PPC_LinuxImageHandler(LinuxImageHandler):
                               features       = self.vm.getFeatures(),
                               arch_args      = devtree.to_bin())
 
+class PPC_ProseImageHandler(LinuxImageHandler):
+
+    ostype = "prose"
+
+    def configure(self, imageConfig, deviceConfig):
+        LinuxImageHandler.configure(self, imageConfig, deviceConfig)
+        self.imageConfig = imageConfig
+
+    def buildDomain(self):
+        store_evtchn = self.vm.getStorePort()
+        console_evtchn = self.vm.getConsolePort()
+
+        log.debug("dom            = %d", self.vm.getDomid())
+        log.debug("image          = %s", self.kernel)
+        log.debug("store_evtchn   = %d", store_evtchn)
+        log.debug("console_evtchn = %d", console_evtchn)
+        log.debug("cmdline        = %s", self.cmdline)
+        log.debug("ramdisk        = %s", self.ramdisk)
+        log.debug("vcpus          = %d", self.vm.getVCpuCount())
+        log.debug("features       = %s", self.vm.getFeatures())
+
+        devtree = FlatDeviceTree.build(self)
+
+        return xc.prose_build(dom            = self.vm.getDomid(),
+                              image          = self.kernel,
+                              store_evtchn   = store_evtchn,
+                              console_evtchn = console_evtchn,
+                              cmdline        = self.cmdline,
+                              ramdisk        = self.ramdisk,
+                              features       = self.vm.getFeatures(),
+                              arch_args      = devtree.to_bin())
+
+    def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
+        """@param shadow_mem_kb The configured shadow memory, in KiB.
+        @param maxmem_kb The configured maxmem, in KiB.
+        @return The corresponding required amount of shadow memory, also in
+        KiB.
+        PowerPC currently uses "shadow memory" to refer to the hash table."""
+        return max(maxmem_kb / 64, shadow_mem_kb)
+
+
 class HVMImageHandler(ImageHandler):
 
     def __init__(self, vm, imageConfig, deviceConfig):
@@ -512,6 +553,7 @@ class X86_HVM_ImageHandler(HVMImageHandler):
 _handlers = {
     "powerpc": {
         "linux": PPC_LinuxImageHandler,
+        "prose": PPC_ProseImageHandler,
     },
     "ia64": {
         "linux": LinuxImageHandler,

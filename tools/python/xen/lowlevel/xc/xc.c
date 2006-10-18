@@ -369,6 +369,47 @@ static PyObject *pyxc_linux_build(XcObject *self,
                          "console_mfn", console_mfn);
 }
 
+static PyObject *pyxc_prose_build(XcObject *self,
+                                  PyObject *args,
+                                  PyObject *kwds)
+{
+    uint32_t dom;
+    char *image, *ramdisk = NULL, *cmdline = "", *features = NULL;
+    int flags = 0;
+    int store_evtchn, console_evtchn;
+    unsigned long store_mfn = 0;
+    unsigned long console_mfn = 0;
+    void *arch_args = NULL;
+    int unused;
+
+    static char *kwd_list[] = { "dom", "store_evtchn",
+                                "console_evtchn", "image",
+                                /* optional */
+                                "ramdisk", "cmdline", "flags",
+                                "features", "arch_args", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiis|ssiss#", kwd_list,
+                                      &dom, &store_evtchn,
+                                      &console_evtchn, &image,
+                                      /* optional */
+                                      &ramdisk, &cmdline, &flags,
+                                      &features, &arch_args, &unused) )
+        return NULL;
+
+    if ( xc_prose_build(self->xc_handle, dom, image,
+                        ramdisk, cmdline, features, flags,
+                        store_evtchn, &store_mfn,
+                        console_evtchn, &console_mfn,
+                        arch_args) != 0 ) {
+        if (!errno)
+             errno = EINVAL;
+        return PyErr_SetFromErrno(xc_error);
+    }
+    return Py_BuildValue("{s:i,s:i}", 
+                         "store_mfn", store_mfn,
+                         "console_mfn", console_mfn);
+}
+
 static PyObject *pyxc_hvm_build(XcObject *self,
                                 PyObject *args,
                                 PyObject *kwds)
@@ -1002,6 +1043,18 @@ static PyMethodDef pyxc_methods[] = {
       " cmdline [str, n/a]: Kernel parameters, if any.\n\n"
       " vcpus   [int, 1]:   Number of Virtual CPUS in domain.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "prose_build", 
+      (PyCFunction)pyxc_prose_build, 
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Build a new Linux guest OS.\n"
+      " dom     [int]:      Identifier of domain to build into.\n"
+      " image   [str]:      Name of kernel image file. May be gzipped.\n"
+      " ramdisk [str, n/a]: Name of ramdisk file, if any.\n"
+      " cmdline [str, n/a]: Kernel parameters, if any.\n\n"
+      " vcpus   [int, 1]:   Number of Virtual CPUS in domain.\n\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
 
     { "hvm_build", 
       (PyCFunction)pyxc_hvm_build, 
