@@ -35,60 +35,10 @@
 
 #include "flatdevtree_env.h"
 #include "flatdevtree.h"
+#include "utils.h"
 
 #define INITRD_ADDR (24UL << 20)
 #define DEVTREE_ADDR (16UL << 20)
-
-#define ALIGN_UP(addr,size) (((addr)+((size)-1))&(~((size)-1)))
-
-#define max(x,y) ({ \
-        const typeof(x) _x = (x);       \
-        const typeof(y) _y = (y);       \
-        (void) (&_x == &_y);            \
-        _x > _y ? _x : _y; })
-
-static void *load_file(const char *path, unsigned long *filesize)
-{
-    void *img;
-    ssize_t size;
-    int fd;
-
-    DPRINTF("load_file(%s)\n", path);
-
-    fd = open(path, O_RDONLY);
-    if (fd < 0) {
-        perror(path);
-        return NULL;
-    }
-
-    size = lseek(fd, 0, SEEK_END);
-    if (size < 0) {
-        perror(path);
-        close(fd);
-        return NULL;
-    }
-    lseek(fd, 0, SEEK_SET);
-
-    img = malloc(size);
-    if (img == NULL) {
-        perror(path);
-        close(fd);
-        return NULL;
-    }
-
-    size = read(fd, img, size);
-    if (size <= 0) {
-        perror(path);
-        close(fd);
-        free(img);
-        return NULL;
-    }
-
-    if (filesize)
-        *filesize = size;
-    close(fd);
-    return img;
-}
 
 static int init_boot_vcpu(
     int xc_handle,
@@ -125,37 +75,6 @@ static int init_boot_vcpu(
     if (rc < 0)
         perror("setdomaininfo");
 
-    return rc;
-}
-
-static int install_image(
-        int xc_handle,
-        int domid,
-        xen_pfn_t *page_array,
-        void *image,
-        unsigned long paddr,
-        unsigned long size)
-{
-    uint8_t *img = image;
-    int i;
-    int rc = 0;
-
-    if (paddr & ~PAGE_MASK) {
-        printf("*** unaligned address\n");
-        return -1;
-    }
-
-    for (i = 0; i < size; i += PAGE_SIZE) {
-        void *page = img + i;
-        xen_pfn_t pfn = (paddr + i) >> PAGE_SHIFT;
-        xen_pfn_t mfn = page_array[pfn];
-
-        rc = xc_copy_to_domain_page(xc_handle, domid, mfn, page);
-        if (rc < 0) {
-            perror("xc_copy_to_domain_page");
-            break;
-        }
-    }
     return rc;
 }
 
@@ -223,87 +142,6 @@ static int load_devtree(
                        devtree_size);
 }
 
-unsigned long spin_list[] = {
-#if 0
-    0x100,
-    0x200,
-    0x300,
-    0x380,
-    0x400,
-    0x480,
-    0x500,
-    0x700,
-    0x900,
-    0xc00,
-#endif
-    0
-};
-
-/* XXX yes, this is a hack */
-static void hack_kernel_img(char *img)
-{
-    const off_t file_offset = 0x10000;
-    unsigned long *addr = spin_list;
-
-    while (*addr) {
-        uint32_t *instruction = (uint32_t *)(img + *addr + file_offset);
-        printf("installing spin loop at %lx (%x)\n", *addr, *instruction);
-        *instruction = 0x48000000;
-        addr++;
-    }
-}
-
-static int load_kernel(
-    int xc_handle,
-    int domid,
-    const char *kernel_path,
-    struct domain_setup_info *dsi,
-    xen_pfn_t *page_array)
-{
-    struct load_funcs load_funcs;
-    char *kernel_img;
-    unsigned long kernel_size;
-    int rc;
-
-    /* load the kernel ELF file */
-    kernel_img = load_file(kernel_path, &kernel_size);
-    if (kernel_img == NULL) {
-        rc = -1;
-        goto out;
-    }
-
-    hack_kernel_img(kernel_img);
-
-    DPRINTF("probe_elf\n");
-    rc = probe_elf(kernel_img, kernel_size, &load_funcs);
-    if (rc < 0) {
-        rc = -1;
-        printf("%s is not an ELF file\n", kernel_path);
-        goto out;
-    }
-
-    DPRINTF("parseimage\n");
-    rc = (load_funcs.parseimage)(kernel_img, kernel_size, dsi);
-    if (rc < 0) {
-        rc = -1;
-        goto out;
-    }
-
-    DPRINTF("loadimage\n");
-    (load_funcs.loadimage)(kernel_img, kernel_size, xc_handle, domid,
-            page_array, dsi);
-
-    DPRINTF("  v_start     %016"PRIx64"\n", dsi->v_start);
-    DPRINTF("  v_end       %016"PRIx64"\n", dsi->v_end);
-    DPRINTF("  v_kernstart %016"PRIx64"\n", dsi->v_kernstart);
-    DPRINTF("  v_kernend   %016"PRIx64"\n", dsi->v_kernend);
-    DPRINTF("  v_kernentry %016"PRIx64"\n", dsi->v_kernentry);
-
-out:
-    free(kernel_img);
-    return rc;
-}
-
 static int load_initrd(
     int xc_handle,
     int domid,
@@ -333,9 +171,10 @@ out:
     return rc;
 }
 
-static unsigned long create_start_info(start_info_t *start_info,
+static unsigned long create_start_info(
+	start_info_t *start_info,
         unsigned int console_evtchn, unsigned int store_evtchn,
-        unsigned long nr_pages)
+	unsigned long nr_pages, unsigned long rma_pages)
 {
     unsigned long start_info_addr;
 
@@ -351,31 +190,6 @@ static unsigned long create_start_info(start_info_t *start_info,
     start_info_addr = (start_info->nr_pages - 4) << PAGE_SHIFT;
 
     return start_info_addr;
-}
-
-static int get_page_array(int xc_handle, int domid, xen_pfn_t **page_array,
-                          unsigned long *nr_pages)
-{
-    int rc;
-
-    DPRINTF("xc_get_tot_pages\n");
-    *nr_pages = xc_get_tot_pages(xc_handle, domid);
-    DPRINTF("  0x%lx\n", *nr_pages);
-
-    *page_array = malloc(*nr_pages * sizeof(xen_pfn_t));
-    if (*page_array == NULL) {
-        perror("malloc");
-        return -1;
-    }
-
-    DPRINTF("xc_get_pfn_list\n");
-    rc = xc_get_pfn_list(xc_handle, domid, *page_array, *nr_pages);
-    if (rc != *nr_pages) {
-        perror("Could not get the page frame list");
-        return -1;
-    }
-
-    return 0;
 }
 
 static void free_page_array(xen_pfn_t *page_array)
@@ -407,17 +221,28 @@ int xc_linux_build(int xc_handle,
     unsigned long initrd_base = 0;
     unsigned long initrd_len = 0;
     unsigned long start_info_addr;
+    unsigned long rma_pages;
     int rc = 0;
 
     DPRINTF("%s\n", __func__);
 
-    if (get_page_array(xc_handle, domid, &page_array, &nr_pages)) {
+    DPRINTF("xc_get_tot_pages\n");
+    nr_pages = xc_get_tot_pages(xc_handle, domid);
+    DPRINTF("nr_pages 0x%lx\n", nr_pages);
+
+    rma_pages = get_rma_pages(devtree);
+    if (rma_pages == 0) {
+	    rc = -1;
+	    goto out;
+    }
+
+    if (get_rma_page_array(xc_handle, domid, &page_array, rma_pages)) {
         rc = -1;
         goto out;
     }
 
     DPRINTF("loading image '%s'\n", image_name);
-    if (load_kernel(xc_handle, domid, image_name, &dsi, page_array)) {
+    if (load_elf_kernel(xc_handle, domid, image_name, &dsi, page_array)) {
         rc = -1;
         goto out;
     }
@@ -434,7 +259,7 @@ int xc_linux_build(int xc_handle,
 
     /* start_info stuff: about to be removed  */
     start_info_addr = create_start_info(&start_info, console_evtchn,
-                                        store_evtchn, nr_pages);
+                                        store_evtchn, nr_pages, rma_pages);
     *console_mfn = page_array[start_info.console.domU.mfn];
     *store_mfn = page_array[start_info.store_mfn];
     if (install_image(xc_handle, domid, page_array, &start_info,
