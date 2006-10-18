@@ -684,7 +684,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 		 * necessary here.
 		 * 16 bytes added as necessary headroom for netif_receive_skb.
 		 */
-		skb = alloc_skb(RX_COPY_THRESHOLD + 16,
+		skb = alloc_skb(RX_COPY_THRESHOLD + 16 + NET_IP_ALIGN,
 				GFP_ATOMIC | __GFP_NOWARN);
 		if (unlikely(!skb))
 			goto no_skb;
@@ -702,7 +702,7 @@ no_skb:
 			break;
 		}
 
-		skb_reserve(skb, 16); /* mimic dev_alloc_skb() */
+		skb_reserve(skb, 16 + NET_IP_ALIGN); /* mimic dev_alloc_skb() */
 		skb_shinfo(skb)->frags[0].page = page;
 		skb_shinfo(skb)->nr_frags = 1;
 		__skb_queue_tail(&np->rx_batch, skb);
