@@ -226,7 +226,7 @@ function vtpmdb_remove_entry () {
 # Returns 'resume' or 'create'
 function vtpm_get_create_reason () {
 	local resume
-	resume=$(xenstore-read $XENBUS_PATH/resume)
+	resume=$(xenstore_read $XENBUS_PATH/resume)
 	if [ "$resume" == "True" ]; then
 		echo "resume"
 	else
@@ -287,6 +287,8 @@ function vtpm_create_instance () {
 #entry is kept in the VTPMDB file.
 function vtpm_remove_instance () {
 	local instance reason domname
+	#Stop script execution quietly if path does not exist (anymore)
+	xenstore-exists "$XENBUS_PATH"/domain
 	domname=$(xenstore_read "$XENBUS_PATH"/domain)
 
 	if [ "$domname" != "" ]; then
@@ -383,7 +385,7 @@ function vtpm_domid_from_name () {
 	local id name ids
 	ids=$(xenstore-list /local/domain)
 	for id in $ids; do
-		name=$(xenstore-read /local/domain/$id/name)
+		name=$(xenstore_read /local/domain/$id/name)
 		if [ "$name" == "$1" ]; then
 			echo "$id"
 			return
