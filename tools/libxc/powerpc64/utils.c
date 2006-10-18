@@ -160,3 +160,52 @@ void *load_file(const char *path, unsigned long *filesize)
     close(fd);
     return img;
 }
+
+int load_elf_kernel(
+    int xc_handle,
+    int domid,
+    const char *kernel_path,
+    struct domain_setup_info *dsi,
+    xen_pfn_t *page_array)
+{
+    struct load_funcs load_funcs;
+    char *kernel_img;
+    unsigned long kernel_size;
+    int rc;
+
+    /* load the kernel ELF file */
+    kernel_img = load_file(kernel_path, &kernel_size);
+    if (kernel_img == NULL) {
+        rc = -1;
+        goto out;
+    }
+
+    DPRINTF("probe_elf\n");
+    rc = probe_elf(kernel_img, kernel_size, &load_funcs);
+    if (rc < 0) {
+        rc = -1;
+        printf("%s is not an ELF file\n", kernel_path);
+        goto out;
+    }
+
+    DPRINTF("parseimage\n");
+    rc = (load_funcs.parseimage)(kernel_img, kernel_size, dsi);
+    if (rc < 0) {
+        rc = -1;
+        goto out;
+    }
+
+    DPRINTF("loadimage\n");
+    (load_funcs.loadimage)(kernel_img, kernel_size, xc_handle, domid,
+            page_array, dsi);
+
+    DPRINTF("  v_start     %016"PRIx64"\n", dsi->v_start);
+    DPRINTF("  v_end       %016"PRIx64"\n", dsi->v_end);
+    DPRINTF("  v_kernstart %016"PRIx64"\n", dsi->v_kernstart);
+    DPRINTF("  v_kernend   %016"PRIx64"\n", dsi->v_kernend);
+    DPRINTF("  v_kernentry %016"PRIx64"\n", dsi->v_kernentry);
+
+out:
+    free(kernel_img);
+    return rc;
+}
