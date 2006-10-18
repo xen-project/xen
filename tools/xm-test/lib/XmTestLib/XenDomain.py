@@ -102,6 +102,8 @@ class XenConfig:
         self.defaultOpts["disk"] = []
         self.defaultOpts["vif"]  = []
         self.defaultOpts["vtpm"] = []
+        if isACMEnabled():
+            self.defaultOpts["access_control"] = []
 
         self.opts = self.defaultOpts
 
