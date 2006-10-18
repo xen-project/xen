@@ -59,8 +59,6 @@ extern int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip,
                                 int inst_len);
 extern uint32_t vlapic_update_ppr(struct vlapic *vlapic);
 extern asmlinkage void do_IRQ(struct cpu_user_regs *);
-extern void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
-                         unsigned long count, int size, long value, int dir, int pvalid);
 extern void svm_dump_inst(unsigned long eip);
 extern int svm_dbg_on;
 void svm_dump_regs(const char *from, struct cpu_user_regs *regs);
@@ -1410,7 +1408,7 @@ static void svm_io_instruction(struct vcpu *v)
     struct cpu_user_regs *regs;
     struct hvm_io_op *pio_opp;
     unsigned int port;
-    unsigned int size, dir;
+    unsigned int size, dir, df;
     ioio_info_t info;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
@@ -1429,6 +1427,8 @@ static void svm_io_instruction(struct vcpu *v)
 
     port = info.fields.port; /* port used to be addr */
     dir = info.fields.type; /* direction */ 
+    df = regs->eflags & X86_EFLAGS_DF ? 1 : 0;
+
     if (info.fields.sz32) 
         size = 4;
     else if (info.fields.sz16)
@@ -1445,7 +1445,7 @@ static void svm_io_instruction(struct vcpu *v)
     if (info.fields.str)
     { 
         unsigned long addr, count;
-        int sign = regs->eflags & EF_DF ? -1 : 1;
+        int sign = regs->eflags & X86_EFLAGS_DF ? -1 : 1;
 
         if (!svm_get_io_address(v, regs, dir, &count, &addr)) 
         {
@@ -1475,25 +1475,37 @@ static void svm_io_instruction(struct vcpu *v)
             unsigned long value = 0;
 
             pio_opp->flags |= OVERLAP;
+            pio_opp->addr = addr;
 
-            if (dir == IOREQ_WRITE)
-                (void)hvm_copy_from_guest_virt(&value, addr, size);
+            if (dir == IOREQ_WRITE)   /* OUTS */
+            {
+                if (hvm_paging_enabled(current))
+                    (void)hvm_copy_from_guest_virt(&value, addr, size);
+                else
+                    (void)hvm_copy_from_guest_phys(&value, addr, size);
+            }
 
-            send_pio_req(regs, port, 1, size, value, dir, 0);
+            if (count == 1)
+                regs->eip = vmcb->exitinfo2;
+
+            send_pio_req(port, 1, size, value, dir, df, 0);
         } 
         else 
         {
-            if ((addr & PAGE_MASK) != ((addr + count * size - 1) & PAGE_MASK))
+            unsigned long last_addr = sign > 0 ? addr + count * size - 1
+                                               : addr - (count - 1) * size;
+
+            if ((addr & PAGE_MASK) != (last_addr & PAGE_MASK))
             {
                 if (sign > 0)
                     count = (PAGE_SIZE - (addr & ~PAGE_MASK)) / size;
                 else
-                    count = (addr & ~PAGE_MASK) / size;
+                    count = (addr & ~PAGE_MASK) / size + 1;
             }
             else    
                 regs->eip = vmcb->exitinfo2;
 
-            send_pio_req(regs, port, count, size, addr, dir, 1);
+            send_pio_req(port, count, size, addr, dir, df, 1);
         }
     } 
     else 
@@ -1507,7 +1519,7 @@ static void svm_io_instruction(struct vcpu *v)
         if (port == 0xe9 && dir == IOREQ_WRITE && size == 1) 
             hvm_print_line(v, regs->eax); /* guest debug output */
     
-        send_pio_req(regs, port, 1, size, regs->eax, dir, 0);
+        send_pio_req(port, 1, size, regs->eax, dir, df, 0);
     }
 }
 

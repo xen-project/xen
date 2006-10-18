@@ -1041,14 +1041,20 @@ static void vmx_vmexit_do_invlpg(unsigned long va)
 }
 
 
-static int check_for_null_selector(unsigned long eip)
+static int check_for_null_selector(unsigned long eip, int inst_len, int dir)
 {
     unsigned char inst[MAX_INST_LEN];
     unsigned long sel;
-    int i, inst_len;
+    int i;
     int inst_copy_from_guest(unsigned char *, unsigned long, int);
 
-    inst_len = __get_instruction_length(); /* Safe: INS/OUTS */
+    /* INS can only use ES segment register, and it can't be overridden */
+    if ( dir == IOREQ_READ )
+    {
+        __vmread(GUEST_ES_SELECTOR, &sel);
+        return sel == 0 ? 1 : 0;
+    }
+
     memset(inst, 0, MAX_INST_LEN);
     if ( inst_copy_from_guest(inst, eip, inst_len) != inst_len )
     {
@@ -1093,18 +1099,13 @@ static int check_for_null_selector(unsigned long eip)
     return 0;
 }
 
-extern void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
-                         unsigned long count, int size, long value,
-                         int dir, int pvalid);
-
 static void vmx_io_instruction(unsigned long exit_qualification,
                                unsigned long inst_len)
 {
     struct cpu_user_regs *regs;
     struct hvm_io_op *pio_opp;
-    unsigned long eip, cs, eflags;
-    unsigned long port, size, dir;
-    int vm86;
+    unsigned long port, size;
+    int dir, df, vm86;
 
     pio_opp = &current->arch.hvm_vcpu.io_op;
     pio_opp->instr = INSTR_PIO;
@@ -1116,28 +1117,26 @@ static void vmx_io_instruction(unsigned long exit_qualification,
     memcpy(regs, guest_cpu_user_regs(), HVM_CONTEXT_STACK_BYTES);
     hvm_store_cpu_guest_regs(current, regs, NULL);
 
-    eip = regs->eip;
-    cs = regs->cs;
-    eflags = regs->eflags;
+    vm86 = regs->eflags & X86_EFLAGS_VM ? 1 : 0;
+    df = regs->eflags & X86_EFLAGS_DF ? 1 : 0;
 
-    vm86 = eflags & X86_EFLAGS_VM ? 1 : 0;
-
-    HVM_DBG_LOG(DBG_LEVEL_IO,
-                "vmx_io_instruction: vm86 %d, eip=%lx:%lx, "
+    HVM_DBG_LOG(DBG_LEVEL_IO, "vm86 %d, eip=%x:%lx, "
                 "exit_qualification = %lx",
-                vm86, cs, eip, exit_qualification);
+                vm86, regs->cs, (unsigned long)regs->eip, exit_qualification);
 
-    if (test_bit(6, &exit_qualification))
+    if ( test_bit(6, &exit_qualification) )
         port = (exit_qualification >> 16) & 0xFFFF;
     else
         port = regs->edx & 0xffff;
-    TRACE_VMEXIT(1, port);
+
+    TRACE_VMEXIT(1,port);
+
     size = (exit_qualification & 7) + 1;
     dir = test_bit(3, &exit_qualification); /* direction */
 
-    if (test_bit(4, &exit_qualification)) { /* string instruction */
+    if ( test_bit(4, &exit_qualification) ) { /* string instruction */
         unsigned long addr, count = 1;
-        int sign = regs->eflags & EF_DF ? -1 : 1;
+        int sign = regs->eflags & X86_EFLAGS_DF ? -1 : 1;
 
         __vmread(GUEST_LINEAR_ADDRESS, &addr);
 
@@ -1145,10 +1144,10 @@ static void vmx_io_instruction(unsigned long exit_qualification,
          * In protected mode, guest linear address is invalid if the
          * selector is null.
          */
-        if (!vm86 && check_for_null_selector(eip))
+        if ( !vm86 && check_for_null_selector(regs->eip, inst_len, dir) )
             addr = dir == IOREQ_WRITE ? regs->esi : regs->edi;
 
-        if (test_bit(5, &exit_qualification)) { /* "rep" prefix */
+        if ( test_bit(5, &exit_qualification) ) { /* "rep" prefix */
             pio_opp->flags |= REPZ;
             count = vm86 ? regs->ecx & 0xFFFF : regs->ecx;
         }
@@ -1157,30 +1156,45 @@ static void vmx_io_instruction(unsigned long exit_qualification,
          * Handle string pio instructions that cross pages or that
          * are unaligned. See the comments in hvm_domain.c/handle_mmio()
          */
-        if ((addr & PAGE_MASK) != ((addr + size - 1) & PAGE_MASK)) {
+        if ( (addr & PAGE_MASK) != ((addr + size - 1) & PAGE_MASK) ) {
             unsigned long value = 0;
 
             pio_opp->flags |= OVERLAP;
-            if (dir == IOREQ_WRITE)
-                (void)hvm_copy_from_guest_virt(&value, addr, size);
-            send_pio_req(regs, port, 1, size, value, dir, 0);
+
+            if ( dir == IOREQ_WRITE )   /* OUTS */
+            {
+                if ( hvm_paging_enabled(current) )
+                    (void)hvm_copy_from_guest_virt(&value, addr, size);
+                else
+                    (void)hvm_copy_from_guest_phys(&value, addr, size);
+            } else
+                pio_opp->addr = addr;
+
+            if ( count == 1 )
+                regs->eip += inst_len;
+
+            send_pio_req(port, 1, size, value, dir, df, 0);
         } else {
-            if ((addr & PAGE_MASK) != ((addr + count * size - 1) & PAGE_MASK)) {
-                if (sign > 0)
+            unsigned long last_addr = sign > 0 ? addr + count * size - 1
+                                               : addr - (count - 1) * size;
+
+            if ( (addr & PAGE_MASK) != (last_addr & PAGE_MASK) )
+            {
+                if ( sign > 0 )
                     count = (PAGE_SIZE - (addr & ~PAGE_MASK)) / size;
                 else
-                    count = (addr & ~PAGE_MASK) / size;
+                    count = (addr & ~PAGE_MASK) / size + 1;
             } else
                 regs->eip += inst_len;
 
-            send_pio_req(regs, port, count, size, addr, dir, 1);
+            send_pio_req(port, count, size, addr, dir, df, 1);
         }
     } else {
-        if (port == 0xe9 && dir == IOREQ_WRITE && size == 1)
+        if ( port == 0xe9 && dir == IOREQ_WRITE && size == 1 )
             hvm_print_line(current, regs->eax); /* guest debug output */
 
         regs->eip += inst_len;
-        send_pio_req(regs, port, 1, size, regs->eax, dir, 0);
+        send_pio_req(port, 1, size, regs->eax, dir, df, 0);
     }
 }
 

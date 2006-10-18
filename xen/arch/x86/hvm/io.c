@@ -369,18 +369,18 @@ static void hvm_pio_assist(struct cpu_user_regs *regs, ioreq_t *p,
     {
         if ( pio_opp->flags & REPZ )
             regs->ecx -= p->count;
+
         if ( p->dir == IOREQ_READ )
         {
-            regs->edi += sign * p->count * p->size;
             if ( pio_opp->flags & OVERLAP )
             {
-                unsigned long addr = regs->edi;
-                if (hvm_realmode(current))
-                    addr += regs->es << 4;
-                if (sign > 0)
-                    addr -= p->size;
-                (void)hvm_copy_to_guest_virt(addr, &p->u.data, p->size);
+                unsigned long addr = pio_opp->addr;
+                if ( hvm_paging_enabled(current) )
+                    (void)hvm_copy_to_guest_virt(addr, &p->u.data, p->size);
+                else
+                    (void)hvm_copy_to_guest_phys(addr, &p->u.data, p->size);
             }
+            regs->edi += sign * p->count * p->size;
         }
         else /* p->dir == IOREQ_WRITE */
         {
@@ -485,19 +485,22 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
 
     case INSTR_MOVS:
         sign = p->df ? -1 : 1;
-        regs->esi += sign * p->count * p->size;
-        regs->edi += sign * p->count * p->size;
-
-        if ((mmio_opp->flags & OVERLAP) && p->dir == IOREQ_READ) {
-            unsigned long addr = regs->edi;
-
-            if (sign > 0)
-                addr -= p->size;
-            (void)hvm_copy_to_guest_virt(addr, &p->u.data, p->size);
-        }
 
         if (mmio_opp->flags & REPZ)
             regs->ecx -= p->count;
+
+        if ((mmio_opp->flags & OVERLAP) && p->dir == IOREQ_READ) {
+            unsigned long addr = mmio_opp->addr;
+
+            if (hvm_paging_enabled(current))
+                (void)hvm_copy_to_guest_virt(addr, &p->u.data, p->size);
+            else
+                (void)hvm_copy_to_guest_phys(addr, &p->u.data, p->size);
+        }
+
+        regs->esi += sign * p->count * p->size;
+        regs->edi += sign * p->count * p->size;
+
         break;
 
     case INSTR_STOS:
