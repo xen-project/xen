@@ -145,7 +145,7 @@ asmlinkage void svm_intr_assist(void)
                     ++pt->pending_intr_nr;
             }
             /* let's inject this interrupt */
-            TRACE_3D(TRC_VMX_INT, v->domain->domain_id, intr_vector, 0);
+            TRACE_3D(TRC_VMX_INTR, v->domain->domain_id, intr_vector, 0);
             svm_inject_extint(v, intr_vector, VMX_DELIVER_NO_ERROR_CODE);
             hvm_interrupt_post(v, intr_vector, intr_type);
             break;

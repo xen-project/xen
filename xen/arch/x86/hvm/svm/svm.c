@@ -2797,7 +2797,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 
             v->arch.hvm_svm.cpu_cr2 = va;
             vmcb->cr2 = va;
-            TRACE_3D(TRC_VMX_INT, v->domain->domain_id, 
+            TRACE_3D(TRC_VMX_INTR, v->domain->domain_id,
                      VMEXIT_EXCEPTION_PF, va);
         }
         break;

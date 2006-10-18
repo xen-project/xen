@@ -871,7 +871,7 @@ static int vmx_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
 
     result = shadow_fault(va, regs);
 
-    TRACE_VMEXIT (2,result);
+    TRACE_VMEXIT(2, result);
 #if 0
     if ( !result )
     {
@@ -902,7 +902,7 @@ static void vmx_do_no_device_fault(void)
 }
 
 #define bitmaskof(idx) (1U << ((idx)&31))
-static void vmx_vmexit_do_cpuid(struct cpu_user_regs *regs)
+static void vmx_do_cpuid(struct cpu_user_regs *regs)
 {
     unsigned int input = (unsigned int)regs->eax;
     unsigned int count = (unsigned int)regs->ecx;
@@ -1027,14 +1027,14 @@ static void vmx_dr_access(unsigned long exit_qualification,
  * Invalidate the TLB for va. Invalidate the shadow page corresponding
  * the address va.
  */
-static void vmx_vmexit_do_invlpg(unsigned long va)
+static void vmx_do_invlpg(unsigned long va)
 {
     unsigned long eip;
     struct vcpu *v = current;
 
     __vmread(GUEST_RIP, &eip);
 
-    HVM_DBG_LOG(DBG_LEVEL_VMMU, "vmx_vmexit_do_invlpg: eip=%lx, va=%lx",
+    HVM_DBG_LOG(DBG_LEVEL_VMMU, "eip=%lx, va=%lx",
                 eip, va);
 
     /*
@@ -1647,6 +1647,10 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
         __hvm_bug(regs);
     }
 
+    TRACE_VMEXIT(1, TYPE_MOV_TO_CR);
+    TRACE_VMEXIT(2, cr);
+    TRACE_VMEXIT(3, value);
+
     HVM_DBG_LOG(DBG_LEVEL_1, "CR%d, value = %lx", cr, value);
 
     switch ( cr ) {
@@ -1828,6 +1832,10 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
         __hvm_bug(regs);
     }
 
+    TRACE_VMEXIT(1, TYPE_MOV_FROM_CR);
+    TRACE_VMEXIT(2, cr);
+    TRACE_VMEXIT(3, value);
+
     HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR%d, value = %lx", cr, value);
 }
 
@@ -1842,20 +1850,14 @@ static int vmx_cr_access(unsigned long exit_qualification,
     case TYPE_MOV_TO_CR:
         gp = exit_qualification & CONTROL_REG_ACCESS_REG;
         cr = exit_qualification & CONTROL_REG_ACCESS_NUM;
-        TRACE_VMEXIT(1,TYPE_MOV_TO_CR);
-        TRACE_VMEXIT(2,cr);
-        TRACE_VMEXIT(3,gp);
         return mov_to_cr(gp, cr, regs);
     case TYPE_MOV_FROM_CR:
         gp = exit_qualification & CONTROL_REG_ACCESS_REG;
         cr = exit_qualification & CONTROL_REG_ACCESS_NUM;
-        TRACE_VMEXIT(1,TYPE_MOV_FROM_CR);
-        TRACE_VMEXIT(2,cr);
-        TRACE_VMEXIT(3,gp);
         mov_from_cr(cr, gp, regs);
         break;
     case TYPE_CLTS:
-        TRACE_VMEXIT(1,TYPE_CLTS);
+        TRACE_VMEXIT(1, TYPE_CLTS);
 
         /* We initialise the FPU now, to avoid needing another vmexit. */
         setup_fpu(v);
@@ -1870,10 +1872,11 @@ static int vmx_cr_access(unsigned long exit_qualification,
         __vmwrite(CR0_READ_SHADOW, value);
         break;
     case TYPE_LMSW:
-        TRACE_VMEXIT(1,TYPE_LMSW);
         __vmread_vcpu(v, CR0_READ_SHADOW, &value);
         value = (value & ~0xF) |
             (((exit_qualification & LMSW_SOURCE_DATA) >> 16) & 0xF);
+        TRACE_VMEXIT(1, TYPE_LMSW);
+        TRACE_VMEXIT(2, value);
         return vmx_set_cr0(value);
         break;
     default:
@@ -1889,7 +1892,7 @@ static inline void vmx_do_msr_read(struct cpu_user_regs *regs)
     u32 eax, edx;
     struct vcpu *v = current;
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "vmx_do_msr_read: ecx=%lx, eax=%lx, edx=%lx",
+    HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%lx, eax=%lx, edx=%lx",
                 (unsigned long)regs->ecx, (unsigned long)regs->eax,
                 (unsigned long)regs->edx);
     switch (regs->ecx) {
@@ -1926,8 +1929,7 @@ static inline void vmx_do_msr_read(struct cpu_user_regs *regs)
     regs->eax = msr_content & 0xFFFFFFFF;
     regs->edx = msr_content >> 32;
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "vmx_do_msr_read returns: "
-                "ecx=%lx, eax=%lx, edx=%lx",
+    HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%lx, eax=%lx, edx=%lx",
                 (unsigned long)regs->ecx, (unsigned long)regs->eax,
                 (unsigned long)regs->edx);
 }
@@ -1937,7 +1939,7 @@ static inline void vmx_do_msr_write(struct cpu_user_regs *regs)
     u64 msr_content;
     struct vcpu *v = current;
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "vmx_do_msr_write: ecx=%lx, eax=%lx, edx=%lx",
+    HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%lx, eax=%lx, edx=%lx",
                 (unsigned long)regs->ecx, (unsigned long)regs->eax,
                 (unsigned long)regs->edx);
 
@@ -1965,20 +1967,19 @@ static inline void vmx_do_msr_write(struct cpu_user_regs *regs)
         break;
     }
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "vmx_do_msr_write returns: "
-                "ecx=%lx, eax=%lx, edx=%lx",
+    HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%lx, eax=%lx, edx=%lx",
                 (unsigned long)regs->ecx, (unsigned long)regs->eax,
                 (unsigned long)regs->edx);
 }
 
-void vmx_vmexit_do_hlt(void)
+static void vmx_do_hlt(void)
 {
     unsigned long rflags;
     __vmread(GUEST_RFLAGS, &rflags);
     hvm_hlt(rflags);
 }
 
-static inline void vmx_vmexit_do_extint(struct cpu_user_regs *regs)
+static inline void vmx_do_extint(struct cpu_user_regs *regs)
 {
     unsigned int vector;
     int error;
@@ -1999,7 +2000,7 @@ static inline void vmx_vmexit_do_extint(struct cpu_user_regs *regs)
         __hvm_bug(regs);
 
     vector &= INTR_INFO_VECTOR_MASK;
-    TRACE_VMEXIT(1,vector);
+    TRACE_VMEXIT(1, vector);
 
     switch(vector) {
     case LOCAL_TIMER_VECTOR:
@@ -2130,7 +2131,7 @@ static void vmx_reflect_exception(struct vcpu *v)
 asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 {
     unsigned int exit_reason;
-    unsigned long exit_qualification, rip, inst_len = 0;
+    unsigned long exit_qualification, inst_len = 0;
     struct vcpu *v = current;
 
     __vmread(VM_EXIT_REASON, &exit_reason);
@@ -2172,7 +2173,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         domain_crash_synchronous();
     }
 
-    TRACE_VMEXIT(0,exit_reason);
+    TRACE_VMEXIT(0, exit_reason);
 
     switch ( exit_reason )
     {
@@ -2184,14 +2185,13 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
          * (2) NMI
          */
         unsigned int vector;
-        unsigned long va;
 
         if ( __vmread(VM_EXIT_INTR_INFO, &vector) ||
              !(vector & INTR_INFO_VALID_MASK) )
             domain_crash_synchronous();
         vector &= INTR_INFO_VECTOR_MASK;
 
-        TRACE_VMEXIT(1,vector);
+        TRACE_VMEXIT(1, vector);
         perfc_incra(cause_vector, vector);
 
         switch ( vector ) {
@@ -2247,11 +2247,11 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         }
         case TRAP_page_fault:
         {
-            __vmread(EXIT_QUALIFICATION, &va);
+            __vmread(EXIT_QUALIFICATION, &exit_qualification);
             __vmread(VM_EXIT_INTR_ERROR_CODE, &regs->error_code);
 
             TRACE_VMEXIT(3, regs->error_code);
-            TRACE_VMEXIT(4, va);
+            TRACE_VMEXIT(4, exit_qualification);
 
             HVM_DBG_LOG(DBG_LEVEL_VMMU,
                         "eax=%lx, ebx=%lx, ecx=%lx, edx=%lx, esi=%lx, edi=%lx",
@@ -2259,13 +2259,13 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
                         (unsigned long)regs->ecx, (unsigned long)regs->edx,
                         (unsigned long)regs->esi, (unsigned long)regs->edi);
 
-            if ( !vmx_do_page_fault(va, regs) )
+            if ( !vmx_do_page_fault(exit_qualification, regs) )
             {
                 /* Inject #PG using Interruption-Information Fields. */
                 vmx_inject_hw_exception(v, TRAP_page_fault, regs->error_code);
-                v->arch.hvm_vmx.cpu_cr2 = va;
-                TRACE_3D(TRC_VMX_INT, v->domain->domain_id,
-                         TRAP_page_fault, va);
+                v->arch.hvm_vmx.cpu_cr2 = exit_qualification;
+                TRACE_3D(TRC_VMX_INTR, v->domain->domain_id,
+                         TRAP_page_fault, exit_qualification);
             }
             break;
         }
@@ -2279,7 +2279,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
     }
     case EXIT_REASON_EXTERNAL_INTERRUPT:
-        vmx_vmexit_do_extint(regs);
+        vmx_do_extint(regs);
         break;
     case EXIT_REASON_TRIPLE_FAULT:
         domain_crash_synchronous();
@@ -2296,39 +2296,35 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     case EXIT_REASON_CPUID:
         inst_len = __get_instruction_length(); /* Safe: CPUID */
         __update_guest_eip(inst_len);
-        vmx_vmexit_do_cpuid(regs);
+        vmx_do_cpuid(regs);
         break;
     case EXIT_REASON_HLT:
         inst_len = __get_instruction_length(); /* Safe: HLT */
         __update_guest_eip(inst_len);
-        vmx_vmexit_do_hlt();
+        vmx_do_hlt();
         break;
     case EXIT_REASON_INVLPG:
     {
-        unsigned long va;
         inst_len = __get_instruction_length(); /* Safe: INVLPG */
         __update_guest_eip(inst_len);
-        __vmread(EXIT_QUALIFICATION, &va);
-        vmx_vmexit_do_invlpg(va);
+        __vmread(EXIT_QUALIFICATION, &exit_qualification);
+        vmx_do_invlpg(exit_qualification);
+        TRACE_VMEXIT(4, exit_qualification);
         break;
     }
     case EXIT_REASON_VMCALL:
     {
         inst_len = __get_instruction_length(); /* Safe: VMCALL */
         __update_guest_eip(inst_len);
-        __vmread(GUEST_RIP, &rip);
-        __vmread(EXIT_QUALIFICATION, &exit_qualification);
         hvm_do_hypercall(regs);
         break;
     }
     case EXIT_REASON_CR_ACCESS:
     {
-        __vmread(GUEST_RIP, &rip);
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
         inst_len = __get_instruction_length(); /* Safe: MOV Cn, LMSW, CLTS */
         if ( vmx_cr_access(exit_qualification, regs) )
             __update_guest_eip(inst_len);
-        TRACE_VMEXIT(3, regs->error_code);
         TRACE_VMEXIT(4, exit_qualification);
         break;
     }
@@ -2340,17 +2336,23 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
         inst_len = __get_instruction_length(); /* Safe: IN, INS, OUT, OUTS */
         vmx_io_instruction(exit_qualification, inst_len);
-        TRACE_VMEXIT(4,exit_qualification);
+        TRACE_VMEXIT(4, exit_qualification);
         break;
     case EXIT_REASON_MSR_READ:
         inst_len = __get_instruction_length(); /* Safe: RDMSR */
         __update_guest_eip(inst_len);
         vmx_do_msr_read(regs);
+        TRACE_VMEXIT(1, regs->ecx);
+        TRACE_VMEXIT(2, regs->eax);
+        TRACE_VMEXIT(3, regs->edx);
         break;
     case EXIT_REASON_MSR_WRITE:
         inst_len = __get_instruction_length(); /* Safe: WRMSR */
         __update_guest_eip(inst_len);
         vmx_do_msr_write(regs);
+        TRACE_VMEXIT(1, regs->ecx);
+        TRACE_VMEXIT(2, regs->eax);
+        TRACE_VMEXIT(3, regs->edx);
         break;
     case EXIT_REASON_MWAIT_INSTRUCTION:
     case EXIT_REASON_MONITOR_INSTRUCTION:
@@ -2384,26 +2386,25 @@ asmlinkage void vmx_load_cr2(void)
     asm volatile("mov %0,%%cr2": :"r" (v->arch.hvm_vmx.cpu_cr2));
 }
 
-asmlinkage void vmx_trace_vmentry (void)
+asmlinkage void vmx_trace_vmentry(void)
 {
-    TRACE_5D(TRC_VMX_VMENTRY,
+    TRACE_5D(TRC_VMX_VMENTRY + current->vcpu_id,
              this_cpu(trace_values)[0],
              this_cpu(trace_values)[1],
              this_cpu(trace_values)[2],
              this_cpu(trace_values)[3],
              this_cpu(trace_values)[4]);
-    TRACE_VMEXIT(0,9);
-    TRACE_VMEXIT(1,9);
-    TRACE_VMEXIT(2,9);
-    TRACE_VMEXIT(3,9);
-    TRACE_VMEXIT(4,9);
-    return;
+
+    TRACE_VMEXIT(0, 0);
+    TRACE_VMEXIT(1, 0);
+    TRACE_VMEXIT(2, 0);
+    TRACE_VMEXIT(3, 0);
+    TRACE_VMEXIT(4, 0);
 }
 
 asmlinkage void vmx_trace_vmexit (void)
 {
-    TRACE_3D(TRC_VMX_VMEXIT,0,0,0);
-    return;
+    TRACE_3D(TRC_VMX_VMEXIT + current->vcpu_id, 0, 0, 0);
 }
 
 /*
