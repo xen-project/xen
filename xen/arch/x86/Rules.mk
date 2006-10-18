@@ -34,7 +34,6 @@ CFLAGS  += -DCONFIG_X86_SUPERVISOR_MODE_KERNEL=1
 endif
 
 ifeq ($(XEN_TARGET_ARCH),x86_32)
-LDFLAGS += -m elf_i386
 x86_32 := y
 x86_64 := n
 endif
@@ -45,7 +44,6 @@ CFLAGS  += -fno-asynchronous-unwind-tables
 # -fvisibility=hidden reduces -fpic cost, if it's available
 CFLAGS  += $(shell $(CC) -v --help 2>&1 | grep " -fvisibility=" | \
              grep -q hidden && echo "-DGCC_HAS_VISIBILITY_ATTRIBUTE")
-LDFLAGS += -m elf_x86_64
 x86_32 := n
 x86_64 := y
 endif

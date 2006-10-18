@@ -71,6 +71,9 @@ CFLAGS   := $(strip $(CFLAGS) $(CFLAGS-y))
 AFLAGS   := $(strip $(AFLAGS) $(AFLAGS-y))
 AFLAGS   += $(patsubst -std=gnu%,,$(CFLAGS))
 
+# LDFLAGS are only passed directly to $(LD)
+LDFLAGS  += $(LDFLAGS_DIRECT)
+
 include Makefile
 
 # Ensure each subdirectory has exactly one trailing slash.

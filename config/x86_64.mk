@@ -7,5 +7,7 @@ CONFIG_XCUTILS := y
 CONFIG_IOEMU := y
 
 CFLAGS += -m64
-LDFLAGS += -m64
 LIBDIR = $(LIB64DIR)
+
+# Use only if calling $(LD) directly.
+LDFLAGS_DIRECT += -melf_x86_64

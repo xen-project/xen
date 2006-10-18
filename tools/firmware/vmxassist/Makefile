@@ -39,7 +39,6 @@ CFLAGS  += $(call test-gcc-flag,$(CC),-fno-stack-protector-all)
 CPP      = cpp -P
 OBJCOPY  = objcopy -p -O binary -R .note -R .comment -R .bss -S --gap-fill=0
 CFLAGS  += $(DEFINES) -I. $(XENINC) -fno-builtin -O2 -msoft-float
-LDFLAGS  = -m elf_i386
 
 OBJECTS = head.o trap.o vm86.o setup.o util.o
 
@@ -48,7 +47,7 @@ all: vmxassist.bin
 
 vmxassist.bin: vmxassist.ld $(OBJECTS)
 	$(CPP) $(DEFINES) vmxassist.ld > vmxassist.tmp
-	$(LD) -o vmxassist $(LDFLAGS) -nostdlib --fatal-warnings -N -T vmxassist.tmp $(OBJECTS)
+	$(LD) -o vmxassist $(LDFLAGS_DIRECT) -nostdlib --fatal-warnings -N -T vmxassist.tmp $(OBJECTS)
 	nm -n vmxassist > vmxassist.sym
 	$(OBJCOPY) vmxassist vmxassist.tmp
 	dd if=vmxassist.tmp of=vmxassist.bin ibs=512 conv=sync
