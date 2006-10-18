@@ -596,11 +596,33 @@ def get_res_security_details(resource):
     return (label, ssidref, policy)
 
 
+def unify_resname(resource):
+    """Makes all resource locations absolute. In case of physical
+    resources, '/dev/' is added to local file names"""
+
+    # sanity check on resource name
+    (type, resfile) = resource.split(":")
+    if type == "phy":
+        if not resfile.startswith("/"):
+            resfile = "/dev/" + resfile
+
+    #file: resources must specified with absolute path
+    if (not resfile.startswith("/")) or (not os.path.exists(resfile)):
+        err("Invalid resource.")
+
+    # from here on absolute file names with resources
+    resource = type + ":" + resfile
+    return resource
+
+
 def res_security_check(resource, domain_label):
     """Checks if the given resource can be used by the given domain
        label.  Returns 1 if the resource can be used, otherwise 0.
     """
     rtnval = 1
+
+    #build canonical resource name
+    resource = unify_resname(resource)
 
     # if security is on, ask the hypervisor for a decision
     if on():

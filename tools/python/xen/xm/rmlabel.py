@@ -37,6 +37,9 @@ def help():
 def rm_resource_label(resource):
     """Removes a resource label from the global resource label file.
     """
+    #build canonical resource name
+    resource = security.unify_resname(resource)
+
     # read in the resource file
     file = security.res_label_filename
     try:
