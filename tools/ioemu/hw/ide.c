@@ -557,9 +557,9 @@ static void ide_atapi_identify(IDEState *s)
     padstr((uint8_t *)(p + 23), QEMU_VERSION, 8); /* firmware version */
     padstr((uint8_t *)(p + 27), "QEMU CD-ROM", 40); /* model */
     put_le16(p + 48, 1); /* dword I/O (XXX: should not be set on CDROM) */
-    put_le16(p + 49, 1 << 9); /* LBA supported, no DMA */
+    put_le16(p + 49, (1 << 11) | (1 << 9) | (1 << 8)); /* DMA and LBA supported */
     put_le16(p + 53, 3); /* words 64-70, 54-58 valid */
-    put_le16(p + 63, 0x103); /* DMA modes XXX: may be incorrect */
+    put_le16(p + 63, 0x07); /* mdma0-2 supported */
     put_le16(p + 64, 1); /* PIO modes */
     put_le16(p + 65, 0xb4); /* minimum DMA multiword tx cycle time */
     put_le16(p + 66, 0xb4); /* recommended DMA multiword tx cycle time */
