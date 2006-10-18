@@ -63,8 +63,13 @@ endif
 AFLAGS-y               += -D__ASSEMBLY__
 
 ALL_OBJS := $(ALL_OBJS-y)
+
 CFLAGS   := $(strip $(CFLAGS) $(CFLAGS-y))
+
+# Most CFLAGS are safe for assembly files:
+#  -std=gnu{89,99} gets confused by #-prefixed end-of-line comments
 AFLAGS   := $(strip $(AFLAGS) $(AFLAGS-y))
+AFLAGS   += $(patsubst -std=gnu%,,$(CFLAGS))
 
 include Makefile
 
@@ -102,10 +107,11 @@ _clean_%/: FORCE
 	$(CC) $(CFLAGS) -c $< -o $@
 
 %.o: %.S $(HDRS) Makefile
-	$(CC) $(CFLAGS) $(AFLAGS) -c $< -o $@
+	$(CC) $(AFLAGS) -c $< -o $@
 
 %.i: %.c $(HDRS) Makefile
 	$(CPP) $(CFLAGS) $< -o $@
 
+# -std=gnu{89,99} gets confused by # as an end-of-line comment marker
 %.s: %.S $(HDRS) Makefile
-	$(CPP) $(CFLAGS) $(AFLAGS) $< -o $@
+	$(CPP) $(AFLAGS) $< -o $@

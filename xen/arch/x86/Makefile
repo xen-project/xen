@@ -69,7 +69,7 @@ asm-offsets.s: $(TARGET_SUBARCH)/asm-offsets.c $(HDRS)
 	$(CC) $(CFLAGS) -S -o $@ $<
 
 xen.lds: $(TARGET_SUBARCH)/xen.lds.S $(HDRS)
-	$(CC) $(CFLAGS) -P -E -Ui386 $(AFLAGS) -o $@ $<
+	$(CC) -P -E -Ui386 $(AFLAGS) -o $@ $<
 
 boot/mkelf32: boot/mkelf32.c
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<

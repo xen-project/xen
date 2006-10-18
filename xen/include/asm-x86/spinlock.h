@@ -12,9 +12,9 @@ typedef struct {
     u8 recurse_cnt;
 } spinlock_t;
 
-#define SPIN_LOCK_UNLOCKED (spinlock_t) { 1, -1, 0 }
+#define SPIN_LOCK_UNLOCKED /*(spinlock_t)*/ { 1, -1, 0 }
 
-#define spin_lock_init(x)	do { *(x) = SPIN_LOCK_UNLOCKED; } while(0)
+#define spin_lock_init(x)	do { *(x) = (spinlock_t) SPIN_LOCK_UNLOCKED; } while(0)
 #define spin_is_locked(x)	(*(volatile char *)(&(x)->lock) <= 0)
 
 static inline void _raw_spin_lock(spinlock_t *lock)
@@ -89,9 +89,9 @@ typedef struct {
     volatile unsigned int lock;
 } rwlock_t;
 
-#define RW_LOCK_UNLOCKED (rwlock_t) { RW_LOCK_BIAS }
+#define RW_LOCK_UNLOCKED /*(rwlock_t)*/ { RW_LOCK_BIAS }
 
-#define rwlock_init(x)	do { *(x) = RW_LOCK_UNLOCKED; } while(0)
+#define rwlock_init(x)	do { *(x) = (rwlock_t) RW_LOCK_UNLOCKED; } while(0)
 
 /*
  * On x86, we implement read-write locks as a 32-bit counter

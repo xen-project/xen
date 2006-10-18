@@ -418,7 +418,7 @@ void console_endboot(void)
 
 void console_force_unlock(void)
 {
-    console_lock = SPIN_LOCK_UNLOCKED;
+    spin_lock_init(&console_lock);
     serial_force_unlock(sercon_handle);
     console_start_sync();
 }

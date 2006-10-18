@@ -34,6 +34,8 @@ else
 CFLAGS += -g
 endif
 
+CFLAGS += -std=gnu99
+
 CFLAGS += -Wall -Wstrict-prototypes
 
 # -Wunused-value makes GCC 4.x too aggressive for my taste: ignoring the

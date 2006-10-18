@@ -27,7 +27,7 @@
 #include <public/vcpu.h>
 
 /* Both these structures are protected by the domlist_lock. */
-rwlock_t domlist_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(domlist_lock);
 struct domain *domain_hash[DOMAIN_HASH_SIZE];
 struct domain *domain_list;
 

@@ -113,7 +113,7 @@ int sched_init_vcpu(struct vcpu *v, unsigned int processor)
     if ( is_idle_domain(d) || ((d->domain_id == 0) && opt_dom0_vcpus_pin) )
         v->cpu_affinity = cpumask_of_cpu(processor);
     else
-        v->cpu_affinity = CPU_MASK_ALL;
+        cpus_setall(v->cpu_affinity);
 
     /* Initialise the per-domain timers. */
     init_timer(&v->timer, vcpu_timer_fn, v, v->processor);

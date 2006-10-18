@@ -14,7 +14,7 @@
 #define MAX_OPROF_SHARED_PAGES 32
 
 /* Lock protecting the following global state */
-static spinlock_t xenoprof_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(xenoprof_lock);
 
 struct domain *active_domains[MAX_OPROF_DOMAINS];
 int active_ready[MAX_OPROF_DOMAINS];

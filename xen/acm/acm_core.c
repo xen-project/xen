@@ -60,7 +60,7 @@ struct acm_operations *acm_secondary_ops = NULL;
 /* acm global binary policy (points to 'local' primary and secondary policies */
 struct acm_binary_policy acm_bin_pol;
 /* acm binary policy lock */
-rwlock_t acm_bin_pol_rwlock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(acm_bin_pol_rwlock);
 
 /* until we have endian support in Xen, we discover it at runtime */
 u8 little_endian = 1;
