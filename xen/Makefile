@@ -93,14 +93,14 @@ include/xen/acm_policy.h:
 include/xen/compile.h: include/xen/compile.h.in
 	@sed -e 's/@@date@@/$(shell LC_ALL=C date)/g' \
 	    -e 's/@@time@@/$(shell LC_ALL=C date +%T)/g' \
-	    -e 's/@@whoami@@/$(shell whoami)/g' \
+	    -e 's/@@whoami@@/$(USER)/g' \
 	    -e 's/@@domain@@/$(shell ([ -x /bin/dnsdomainname ] && /bin/dnsdomainname) || ([ -x /bin/domainname ] && /bin/domainname || echo [unknown]))/g' \
 	    -e 's/@@hostname@@/$(shell hostname)/g' \
 	    -e 's|@@compiler@@|$(shell $(CC) $(CFLAGS) -v 2>&1 | tail -n 1 | sed -e "s;|;/;")|g' \
 	    -e 's/@@version@@/$(XEN_VERSION)/g' \
 	    -e 's/@@subversion@@/$(XEN_SUBVERSION)/g' \
 	    -e 's/@@extraversion@@/$(XEN_EXTRAVERSION)/g' \
-	    -e 's!@@changeset@@!$(shell ((hg parents || head -n 7 ../ChangeLog || echo date: unavailable) | awk '{FS="changeset:[ ]+"}/^changeset/{CS=$$2};{FS="date:[ ]+"}/^date/{D=$$2}; END {print D, CS}') 2>/dev/null)!g' \
+	    -e 's!@@changeset@@!$(shell ((hg parents --template "{date|date} {rev}:{node|short}" >/dev/null && hg parents --template "{date|date} {rev}:{node|short}") || echo "unavailable") 2>/dev/null)!g' \
 	    < include/xen/compile.h.in > $@.new
 	tools/figlet/figlet -d tools/figlet Xen $(XEN_FULLVERSION) >> $@.new
 	@mv -f $@.new $@
