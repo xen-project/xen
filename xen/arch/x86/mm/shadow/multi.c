@@ -3514,7 +3514,16 @@ sh_update_cr3(struct vcpu *v)
     {
         /* We don't support PV except guest == shadow == config levels */
         BUG_ON(GUEST_PAGING_LEVELS != SHADOW_PAGING_LEVELS);
+#if SHADOW_PAGING_LEVELS == 3
+        /* 2-on-3 or 3-on-3: Use the PAE shadow l3 table we just fabricated.
+         * Don't use make_cr3 because (a) we know it's below 4GB, and
+         * (b) it's not necessarily page-aligned, and make_cr3 takes a pfn */
+        ASSERT(virt_to_maddr(&v->arch.shadow.l3table) <= 0xffffffe0ULL);
+        v->arch.cr3 = virt_to_maddr(&v->arch.shadow.l3table);
+#else
+        /* 2-on-2 or 4-on-4: Just use the shadow top-level directly */
         make_cr3(v, pagetable_get_pfn(v->arch.shadow_table[0]));
+#endif
     }
 
 
