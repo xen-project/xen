@@ -43,6 +43,8 @@
 fprintf(stderr, "ERROR: " _m " (%d = %s)\n" , ## _a ,	\
                 errno, strerror(errno))
 
+#define ALIGN8(x)  (void *)(((long)(x) + 7) & ~7)
+
 void usage(char *progname)
 {
     printf("Usage: %s ACTION\n"
@@ -182,14 +184,14 @@ void acm_dump_policy_buffer(void *buf, int buflen)
            ntohl(pol->secondary_buffer_offset));
     switch (ntohl(pol->primary_policy_code)) {
     case ACM_CHINESE_WALL_POLICY:
-        acm_dump_chinesewall_buffer(buf +
-                                    ntohl(pol->primary_buffer_offset),
+        acm_dump_chinesewall_buffer(ALIGN8(buf +
+                                     ntohl(pol->primary_buffer_offset)),
                                     ntohl(pol->len) -
                                     ntohl(pol->primary_buffer_offset));
         break;
 
     case ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY:
-        acm_dump_ste_buffer(buf + ntohl(pol->primary_buffer_offset),
+        acm_dump_ste_buffer(ALIGN8(buf + ntohl(pol->primary_buffer_offset)),
                             ntohl(pol->len) -
                             ntohl(pol->primary_buffer_offset));
         break;
@@ -204,14 +206,14 @@ void acm_dump_policy_buffer(void *buf, int buflen)
 
     switch (ntohl(pol->secondary_policy_code)) {
     case ACM_CHINESE_WALL_POLICY:
-        acm_dump_chinesewall_buffer(buf +
-                                    ntohl(pol->secondary_buffer_offset),
+        acm_dump_chinesewall_buffer(ALIGN8(buf +
+                                     ntohl(pol->secondary_buffer_offset)),
                                     ntohl(pol->len) -
                                     ntohl(pol->secondary_buffer_offset));
         break;
 
     case ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY:
-        acm_dump_ste_buffer(buf + ntohl(pol->secondary_buffer_offset),
+        acm_dump_ste_buffer(ALIGN8(buf + ntohl(pol->secondary_buffer_offset)),
                             ntohl(pol->len) -
                             ntohl(pol->secondary_buffer_offset));
         break;
