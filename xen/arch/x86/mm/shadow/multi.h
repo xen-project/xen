@@ -50,10 +50,6 @@ extern void
 SHADOW_INTERNAL_NAME(sh_destroy_l4_shadow, SHADOW_LEVELS, GUEST_LEVELS)(
     struct vcpu *v, mfn_t smfn);
 
-extern void
-SHADOW_INTERNAL_NAME(sh_unpin_all_l3_subshadows, 3, 3)
-    (struct vcpu *v, mfn_t smfn);
-
 extern void 
 SHADOW_INTERNAL_NAME(sh_unhook_32b_mappings, SHADOW_LEVELS, GUEST_LEVELS)
     (struct vcpu *v, mfn_t sl2mfn);

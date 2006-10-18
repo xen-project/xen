@@ -178,77 +178,6 @@ extern void shadow_audit_p2m(struct domain *d);
 
 
 /******************************************************************************
- * Mechanism for double-checking the optimized pagefault path: this
- * structure contains a record of actions taken by the fault handling
- * code.  In paranoid mode, the fast-path code fills out one of these
- * structures (but doesn't take any actual action) and then the normal 
- * path fills in another.  When the fault handler finishes, the 
- * two are compared */
-
-#ifdef SHADOW_OPTIMIZATION_PARANOIA
-
-typedef struct shadow_action_log sh_log_t;
-struct shadow_action_log {
-    paddr_t ad[CONFIG_PAGING_LEVELS];  /* A & D bits propagated here */
-    paddr_t mmio;                      /* Address of an mmio operation */
-    int rv;                            /* Result of the fault handler */
-};
-
-/* There are two logs, one for the fast path, one for the normal path */
-enum sh_log_type { log_slow = 0, log_fast= 1 };
-
-/* Alloc and zero the logs */
-static inline void sh_init_log(struct vcpu *v) 
-{
-    if ( unlikely(!v->arch.shadow.action_log) ) 
-        v->arch.shadow.action_log = xmalloc_array(sh_log_t, 2);
-    ASSERT(v->arch.shadow.action_log);
-    memset(v->arch.shadow.action_log, 0, 2 * sizeof (sh_log_t));
-}
-
-/* Log an A&D-bit update */
-static inline void sh_log_ad(struct vcpu *v, paddr_t e, unsigned int level)
-{
-    v->arch.shadow.action_log[v->arch.shadow.action_index].ad[level] = e;
-}
-
-/* Log an MMIO address */
-static inline void sh_log_mmio(struct vcpu *v, paddr_t m)
-{
-    v->arch.shadow.action_log[v->arch.shadow.action_index].mmio = m;
-}
-
-/* Log the result */
-static inline void sh_log_rv(struct vcpu *v, int rv)
-{
-    v->arch.shadow.action_log[v->arch.shadow.action_index].rv = rv;
-}
-
-/* Set which mode we're in */
-static inline void sh_set_log_mode(struct vcpu *v, enum sh_log_type t) 
-{
-    v->arch.shadow.action_index = t;
-}
-
-/* Know not to take action, because we're only checking the mechanism */
-static inline int sh_take_no_action(struct vcpu *v) 
-{
-    return (v->arch.shadow.action_index == log_fast);
-}
-
-#else /* Non-paranoid mode: these logs do not exist */
-
-#define sh_init_log(_v) do { (void)(_v); } while(0)
-#define sh_set_log_mode(_v,_t) do { (void)(_v); } while(0)
-#define sh_log_ad(_v,_e,_l) do { (void)(_v),(void)(_e),(void)(_l); } while (0)
-#define sh_log_mmio(_v,_m) do { (void)(_v),(void)(_m); } while (0)
-#define sh_log_rv(_v,_r) do { (void)(_v),(void)(_r); } while (0)
-#define sh_take_no_action(_v) (((void)(_v)), 0)
-
-#endif /* SHADOW_OPTIMIZATION_PARANOIA */
-
-
-/******************************************************************************
  * Macro for dealing with the naming of the internal names of the
  * shadow code's external entry points.
  */
@@ -336,13 +265,9 @@ void shadow_convert_to_log_dirty(struct vcpu *v, mfn_t smfn);
  * non-Xen mappings in this top-level shadow mfn */
 void shadow_unhook_mappings(struct vcpu *v, mfn_t smfn);
 
-/* Re-sync copies of PAE shadow L3 tables if they have been changed */
-void sh_pae_recopy(struct domain *d);
-
 /* Install the xen mappings in various flavours of shadow */
 void sh_install_xen_entries_in_l4(struct vcpu *v, mfn_t gl4mfn, mfn_t sl4mfn);
 void sh_install_xen_entries_in_l2h(struct vcpu *v, mfn_t sl2hmfn);
-void sh_install_xen_entries_in_l3(struct vcpu *v, mfn_t gl3mfn, mfn_t sl3mfn);
 void sh_install_xen_entries_in_l2(struct vcpu *v, mfn_t gl2mfn, mfn_t sl2mfn);
 
 

@@ -372,8 +372,8 @@ void svm_do_launch(struct vcpu *v)
     if (svm_dbg_on) 
     {
         unsigned long pt;
-        pt = pagetable_get_paddr(v->arch.shadow_table);
-        printk("%s: shadow_table = %lx\n", __func__, pt);
+        printk("%s: hw_cr3 = %llx\n", __func__, 
+               (unsigned long long) v->arch.hvm_vcpu.hw_cr3);
         pt = pagetable_get_paddr(v->arch.guest_table);
         printk("%s: guest_table  = %lx\n", __func__, pt);
         pt = pagetable_get_paddr(v->domain->arch.phys_table);
@@ -387,8 +387,9 @@ void svm_do_launch(struct vcpu *v)
     {
         printk("%s: cr3 = %lx ", __func__, (unsigned long)vmcb->cr3);
         printk("init_guest_table: guest_table = 0x%08x, monitor_table = 0x%08x,"
-                " shadow_table = 0x%08x\n", (int)v->arch.guest_table.pfn, 
-                (int)v->arch.monitor_table.pfn, (int)v->arch.shadow_table.pfn);
+                " hw_cr3 = 0x%16llx\n", (int)v->arch.guest_table.pfn, 
+               (int)v->arch.monitor_table.pfn, 
+               (unsigned long long) v->arch.hvm_vcpu.hw_cr3);
     }
 
     v->arch.schedule_tail = arch_svm_do_resume;

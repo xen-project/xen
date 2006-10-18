@@ -215,8 +215,7 @@ static inline shadow_l4e_t shadow_l4e_from_mfn(mfn_t mfn, u32 flags)
      shadow_l1_linear_offset(SH_LINEAR_PT_VIRT_START)); \
 })
 
-// shadow linear L3 and L4 tables only exist in 4 level paging...
-#if SHADOW_PAGING_LEVELS == 4
+#if SHADOW_PAGING_LEVELS >= 4
 #define sh_linear_l3_table(v) ({ \
     ASSERT(current == (v)); \
     ((shadow_l3e_t *) \
@@ -386,7 +385,6 @@ static inline guest_l4e_t guest_l4e_from_gfn(gfn_t gfn, u32 flags)
 #define PGC_SH_fl1_shadow PGC_SH_fl1_pae_shadow
 #define PGC_SH_l2_shadow  PGC_SH_l2_pae_shadow
 #define PGC_SH_l2h_shadow PGC_SH_l2h_pae_shadow
-#define PGC_SH_l3_shadow  PGC_SH_l3_pae_shadow
 #else
 #define PGC_SH_l1_shadow  PGC_SH_l1_64_shadow
 #define PGC_SH_fl1_shadow PGC_SH_fl1_64_shadow
@@ -404,14 +402,6 @@ valid_gfn(gfn_t m)
 {
     return VALID_GFN(gfn_x(m));
 }
-
-#if GUEST_PAGING_LEVELS == 2
-#define PGC_SH_guest_root_type PGC_SH_l2_32_shadow
-#elif GUEST_PAGING_LEVELS == 3
-#define PGC_SH_guest_root_type PGC_SH_l3_pae_shadow
-#else
-#define PGC_SH_guest_root_type PGC_SH_l4_64_shadow
-#endif
 
 /* Translation between mfns and gfns */
 static inline mfn_t
@@ -490,8 +480,6 @@ struct shadow_walk_t
 #define sh_map_and_validate_gl1e   INTERNAL_NAME(sh_map_and_validate_gl1e)
 #define sh_destroy_l4_shadow       INTERNAL_NAME(sh_destroy_l4_shadow)
 #define sh_destroy_l3_shadow       INTERNAL_NAME(sh_destroy_l3_shadow)
-#define sh_destroy_l3_subshadow    INTERNAL_NAME(sh_destroy_l3_subshadow)
-#define sh_unpin_all_l3_subshadows INTERNAL_NAME(sh_unpin_all_l3_subshadows)
 #define sh_destroy_l2_shadow       INTERNAL_NAME(sh_destroy_l2_shadow)
 #define sh_destroy_l1_shadow       INTERNAL_NAME(sh_destroy_l1_shadow)
 #define sh_unhook_32b_mappings     INTERNAL_NAME(sh_unhook_32b_mappings)
@@ -532,115 +520,6 @@ struct shadow_walk_t
                               SHADOW_PAGING_LEVELS,             \
                               SHADOW_PAGING_LEVELS)
 
-
-#if GUEST_PAGING_LEVELS == 3
-/*
- * Accounting information stored in the shadow of PAE Guest L3 pages.
- * Because these "L3 pages" are only 32-bytes, it is inconvenient to keep
- * various refcounts, etc., on the page_info of their page.  We provide extra
- * bookkeeping space in the shadow itself, and this is the structure
- * definition for that bookkeeping information.
- */
-struct pae_l3_bookkeeping {
-    u32 vcpus;                  /* bitmap of which vcpus are currently storing
-                                 * copies of this 32-byte page */
-    u32 refcount;               /* refcount for this 32-byte page */
-    u8 pinned;                  /* is this 32-byte page pinned or not? */
-};
-
-// Convert a shadow entry pointer into a pae_l3_bookkeeping pointer.
-#define sl3p_to_info(_ptr) ((struct pae_l3_bookkeeping *)         \
-                            (((unsigned long)(_ptr) & ~31) + 32))
-
-static void sh_destroy_l3_subshadow(struct vcpu *v, 
-                                     shadow_l3e_t *sl3e);
-
-/* Increment a subshadow ref
- * Called with a pointer to the subshadow, and the mfn of the
- * *first* page of the overall shadow. */
-static inline void sh_get_ref_l3_subshadow(shadow_l3e_t *sl3e, mfn_t smfn)
-{
-    struct pae_l3_bookkeeping *bk = sl3p_to_info(sl3e);
-
-    /* First ref to the subshadow takes a ref to the full shadow */
-    if ( bk->refcount == 0 ) 
-        sh_get_ref(smfn, 0);
-    if ( unlikely(++(bk->refcount) == 0) )
-    {
-        SHADOW_PRINTK("shadow l3 subshadow ref overflow, smfn=%" SH_PRI_mfn " sh=%p\n", 
-                       mfn_x(smfn), sl3e);
-        domain_crash_synchronous();
-    }
-}
-
-/* Decrement a subshadow ref.
- * Called with a pointer to the subshadow, and the mfn of the
- * *first* page of the overall shadow.  Calling this may cause the 
- * entire shadow to disappear, so the caller must immediately unmap 
- * the pointer after calling. */ 
-static inline void sh_put_ref_l3_subshadow(struct vcpu *v, 
-                                            shadow_l3e_t *sl3e,
-                                            mfn_t smfn)
-{
-    struct pae_l3_bookkeeping *bk;
-
-    bk = sl3p_to_info(sl3e);
-
-    ASSERT(bk->refcount > 0);
-    if ( --(bk->refcount) == 0 )
-    {
-        /* Need to destroy this subshadow */
-        sh_destroy_l3_subshadow(v, sl3e);
-        /* Last ref to the subshadow had a ref to the full shadow */
-        sh_put_ref(v, smfn, 0);
-    }
-}
-
-/* Pin a subshadow 
- * Called with a pointer to the subshadow, and the mfn of the
- * *first* page of the overall shadow. */
-static inline void sh_pin_l3_subshadow(shadow_l3e_t *sl3e, mfn_t smfn)
-{
-    struct pae_l3_bookkeeping *bk = sl3p_to_info(sl3e);
-
-#if 0
-    debugtrace_printk("%s smfn=%05lx offset=%ld\n",
-                      __func__, mfn_x(smfn),
-                      ((unsigned long)sl3e & ~PAGE_MASK) / 64);
-#endif
-
-    if ( !bk->pinned )
-    {
-        bk->pinned = 1;
-        sh_get_ref_l3_subshadow(sl3e, smfn);
-    }
-}
-
-/* Unpin a sub-shadow. 
- * Called with a pointer to the subshadow, and the mfn of the
- * *first* page of the overall shadow.  Calling this may cause the 
- * entire shadow to disappear, so the caller must immediately unmap 
- * the pointer after calling. */ 
-static inline void sh_unpin_l3_subshadow(struct vcpu *v, 
-                                          shadow_l3e_t *sl3e,
-                                          mfn_t smfn)
-{
-    struct pae_l3_bookkeeping *bk = sl3p_to_info(sl3e);
-
-#if 0
-    debugtrace_printk("%s smfn=%05lx offset=%ld\n",
-                      __func__, mfn_x(smfn),
-                      ((unsigned long)sl3e & ~PAGE_MASK) / 64);
-#endif
-
-    if ( bk->pinned )
-    {
-        bk->pinned = 0;
-        sh_put_ref_l3_subshadow(v, sl3e, smfn);
-    }
-}
-
-#endif /* GUEST_PAGING_LEVELS == 3 */
 
 #if SHADOW_PAGING_LEVELS == 3
 #define MFN_FITS_IN_HVM_CR3(_MFN) !(mfn_x(_MFN) >> 20)
