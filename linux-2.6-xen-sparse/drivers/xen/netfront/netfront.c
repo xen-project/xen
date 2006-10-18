@@ -2129,6 +2129,9 @@ module_init(netif_init);
 
 static void __exit netif_exit(void)
 {
+	if (is_initial_xendomain())
+		return;
+
 	unregister_inetaddr_notifier(&notifier_inetdev);
 
 	return xenbus_unregister_driver(&netfront);
