@@ -1,10 +1,27 @@
-#!/bin/bash
+#!/bin/sh
 # CHECK-INSTALL
 
-function error {
-   echo
-   echo '  *** Check for the bridge control utils (brctl) FAILED'
-   exit 1
-}
+RC=0
 
-which brctl 1>/dev/null 2>&1 || error
+case ${OS} in
+OpenBSD|NetBSD|FreeBSD)
+	# These systems have a bridge builtin
+	TOOL="brconfig"
+	which ${TOOL} 1>/dev/null 2>&1 || RC=1 
+	;;
+Linux)
+	TOOL="brctl"
+	which ${TOOL} 1>/dev/null 2>&1 || RC=1
+	;;
+*)
+	TOOL=""
+	echo "Unknown OS" && RC=1
+	;;
+esac
+
+if test ${RC} -ne 0; then
+	echo
+	echo " *** Check for the bridge control utils (${TOOL}) FAILED"
+fi
+
+exit ${RC} 

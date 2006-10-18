@@ -1,8 +1,9 @@
-#!/bin/bash
+#!/bin/sh
 
-function usage {
+func_usage ()
+{
     echo "Usage:"
-    echo "\t$0 [build|install|clean]"
+    echo "	$0 [build|install|clean]"
     echo
     echo "Check suitability for Xen build or install."
     echo "Exit with 0 if OK, 1 if not."
@@ -12,9 +13,13 @@ function usage {
     exit 1
 }
 
-export PATH=${PATH}:/sbin:/usr/sbin
+PATH=${PATH}:/sbin:/usr/sbin
+OS=`uname -s`
+export PATH OS
 
-[ `uname -s` = SunOS ] && exit 0
+if test "${OS}" = "SunOS"; then
+	exit 0
+fi
 
 case $1 in
     build)
@@ -27,7 +32,7 @@ case $1 in
         exit 0
         ;;
     *)
-        usage
+        func_usage
         ;;
 esac
 
@@ -56,4 +61,4 @@ for f in check_* ; do
     fi
 done
 
-exit $failed
+exit ${failed}
