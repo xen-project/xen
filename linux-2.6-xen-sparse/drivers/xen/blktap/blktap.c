@@ -1030,7 +1030,7 @@ static int print_dbug = 1;
 static int do_block_io_op(blkif_t *blkif)
 {
 	blkif_back_ring_t *blk_ring = &blkif->blk_ring;
-	blkif_request_t *req;
+	blkif_request_t req;
 	pending_req_t *pending_req;
 	RING_IDX rc, rp;
 	int more_to_do = 0;
@@ -1082,24 +1082,24 @@ static int do_block_io_op(blkif_t *blkif)
 			break;
 		}
 
-		req = RING_GET_REQUEST(blk_ring, rc);
+		memcpy(&req, RING_GET_REQUEST(blk_ring, rc), sizeof(req));
 		blk_ring->req_cons = ++rc; /* before make_response() */	
 
-		switch (req->operation) {
+		switch (req.operation) {
 		case BLKIF_OP_READ:
 			blkif->st_rd_req++;
-			dispatch_rw_block_io(blkif, req, pending_req);
+			dispatch_rw_block_io(blkif, &req, pending_req);
 			break;
 
 		case BLKIF_OP_WRITE:
 			blkif->st_wr_req++;
-			dispatch_rw_block_io(blkif, req, pending_req);
+			dispatch_rw_block_io(blkif, &req, pending_req);
 			break;
 
 		default:
 			WPRINTK("unknown operation [%d]\n",
-				req->operation);
-			make_response(blkif, req->id, req->operation,
+				req.operation);
+			make_response(blkif, req.id, req.operation,
 				      BLKIF_RSP_ERROR);
 			free_req(pending_req);
 			break;
