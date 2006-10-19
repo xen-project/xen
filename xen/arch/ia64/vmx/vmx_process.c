@@ -269,10 +269,12 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
     int type;
     u64 vhpt_adr, gppa, pteval, rr, itir;
     ISR misr;
+    PTA vpta;
     thash_data_t *data;
     VCPU *v = current;
+
     vpsr.val = VCPU(v, vpsr);
-    misr.val=VMX(v,cr_isr);
+    misr.val = VMX(v,cr_isr);
     
     if (vec == 1)
         type = ISIDE_TLB;
@@ -283,7 +285,8 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
 
     if(is_physical_mode(v)&&(!(vadr<<1>>62))){
         if(vec==2){
-            if(v->domain!=dom0&&__gpfn_is_io(v->domain,(vadr<<1)>>(PAGE_SHIFT+1))){
+            if (v->domain != dom0
+                && __gpfn_is_io(v->domain, (vadr << 1) >> (PAGE_SHIFT + 1))) {
                 emulate_io_inst(v,((vadr<<1)>>1),4);   //  UC
                 return IA64_FAULT;
             }
@@ -322,41 +325,55 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
                 nested_dtlb(v);
                 return IA64_FAULT;
             }
-        } else{
-            vmx_vcpu_thash(v, vadr, &vhpt_adr);
-            if(!guest_vhpt_lookup(vhpt_adr, &pteval)){
-                if (!(pteval & _PAGE_P)) {
-                    if (vpsr.ic) {
-                        vcpu_set_isr(v, misr.val);
-                        data_page_not_present(v, vadr);
-                        return IA64_FAULT;
-                    } else {
-                        nested_dtlb(v);
-                        return IA64_FAULT;
-                    }
-                }                     
-                else if ((pteval & _PAGE_MA_MASK) != _PAGE_MA_ST) {
-                    vcpu_get_rr(v, vadr, &rr);
-                    itir = rr&(RR_RID_MASK | RR_PS_MASK);
-                    thash_purge_and_insert(v, pteval, itir, vadr, DSIDE_TLB);
-                    return IA64_NO_FAULT;
-                } else if (vpsr.ic) {
+        }
+
+        vmx_vcpu_get_pta(v, &vpta.val);
+        if (vpta.vf) {
+            /* Long format is not yet supported.  */
+            if (vpsr.ic) {
+                vcpu_set_isr(v, misr.val);
+                dtlb_fault(v, vadr);
+                return IA64_FAULT;
+            } else {
+                nested_dtlb(v);
+                return IA64_FAULT;
+            }
+        }
+
+        vmx_vcpu_thash(v, vadr, &vhpt_adr);
+        if (!guest_vhpt_lookup(vhpt_adr, &pteval)) {
+            /* VHPT successfully read.  */
+            if (!(pteval & _PAGE_P)) {
+                if (vpsr.ic) {
                     vcpu_set_isr(v, misr.val);
-                    dtlb_fault(v, vadr);
+                    data_page_not_present(v, vadr);
                     return IA64_FAULT;
-                }else{
+                } else {
                     nested_dtlb(v);
                     return IA64_FAULT;
                 }
+            } else if ((pteval & _PAGE_MA_MASK) != _PAGE_MA_ST) {
+                vcpu_get_rr(v, vadr, &rr);
+                itir = rr & (RR_RID_MASK | RR_PS_MASK);
+                thash_purge_and_insert(v, pteval, itir, vadr, DSIDE_TLB);
+                return IA64_NO_FAULT;
+            } else if (vpsr.ic) {
+                vcpu_set_isr(v, misr.val);
+                dtlb_fault(v, vadr);
+                return IA64_FAULT;
             }else{
-                if(vpsr.ic){
-                    vcpu_set_isr(v, misr.val);
-                    dvhpt_fault(v, vadr);
-                    return IA64_FAULT;
-                }else{
-                    nested_dtlb(v);
-                    return IA64_FAULT;
-                }
+                nested_dtlb(v);
+                return IA64_FAULT;
+            }
+        } else {
+            /* Can't read VHPT.  */
+            if (vpsr.ic) {
+                vcpu_set_isr(v, misr.val);
+                dvhpt_fault(v, vadr);
+                return IA64_FAULT;
+            } else {
+                nested_dtlb(v);
+                return IA64_FAULT;
             }
         }
     }else if(type == ISIDE_TLB){
@@ -367,24 +384,34 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
             vcpu_set_isr(v, misr.val);
             alt_itlb(v, vadr);
             return IA64_FAULT;
-        } else{
-            vmx_vcpu_thash(v, vadr, &vhpt_adr);
-            if(!guest_vhpt_lookup(vhpt_adr, &pteval)){
-                if (pteval & _PAGE_P){
-                    vcpu_get_rr(v, vadr, &rr);
-                    itir = rr&(RR_RID_MASK | RR_PS_MASK);
-                    thash_purge_and_insert(v, pteval, itir, vadr, ISIDE_TLB);
-                    return IA64_NO_FAULT;
-                } else {
-                    vcpu_set_isr(v, misr.val);
-                    inst_page_not_present(v, vadr);
-                    return IA64_FAULT;
-                }
-            }else{
+        }
+
+        vmx_vcpu_get_pta(v, &vpta.val);
+        if (vpta.vf) {
+            /* Long format is not yet supported.  */
+            vcpu_set_isr(v, misr.val);
+            itlb_fault(v, vadr);
+            return IA64_FAULT;
+        }
+
+
+        vmx_vcpu_thash(v, vadr, &vhpt_adr);
+        if (!guest_vhpt_lookup(vhpt_adr, &pteval)) {
+            /* VHPT successfully read.  */
+            if (pteval & _PAGE_P) {
+                vcpu_get_rr(v, vadr, &rr);
+                itir = rr & (RR_RID_MASK | RR_PS_MASK);
+                thash_purge_and_insert(v, pteval, itir, vadr, ISIDE_TLB);
+                return IA64_NO_FAULT;
+            } else {
                 vcpu_set_isr(v, misr.val);
-                ivhpt_fault(v, vadr);
+                inst_page_not_present(v, vadr);
                 return IA64_FAULT;
             }
+        } else {
+            vcpu_set_isr(v, misr.val);
+            ivhpt_fault(v, vadr);
+            return IA64_FAULT;
         }
     }
     return IA64_NO_FAULT;
