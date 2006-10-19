@@ -29,6 +29,7 @@ import time
 import threading
 import re
 import copy
+from types import StringTypes
 
 import xen.lowlevel.xc
 from xen.util import asserts
@@ -183,7 +184,8 @@ def recreate(info, priv):
         raise XendError('No domain path in store for existing '
                         'domain %d' % domid)
 
-    log.info("Recreating domain %d, UUID %s.", domid, xeninfo['uuid'])
+    log.info("Recreating domain %d, UUID %s. at %s" %
+             (domid, xeninfo['uuid'], dompath))
 
     # need to verify the path and uuid if not Domain-0
     # if the required uuid and vm aren't set, then that means
@@ -193,29 +195,28 @@ def recreate(info, priv):
     #       abort or ignore, but there may be cases where xenstore's
     #       entry disappears (eg. xenstore-rm /)
     #
-    if domid != 0:
-        try:
-            vmpath = xstransact.Read(dompath, "vm")
-            if not vmpath:
-                log.warn('/dom/%d/vm is missing. recreate is confused, '
-                         'trying our best to recover' % domid)
-                needs_reinitialising = True
-                raise XendError('reinit')
-            
-            uuid2_str = xstransact.Read(vmpath, "uuid")
-            if not uuid2_str:
-                log.warn('%s/uuid/ is missing. recreate is confused, '
-                         'trying our best to recover' % vmpath)
-                needs_reinitialising = True
-                raise XendError('reinit')
-
-            uuid2 = uuid.fromString(uuid2_str)
-            if uuid1 != uuid2:
-                log.warn('UUID in /vm does not match the UUID in /dom/%d.'
-                         'Trying out best to recover' % domid)
-                needs_reinitialising = True
-        except XendError:
-            pass # our best shot at 'goto' in python :)
+    try:
+        vmpath = xstransact.Read(dompath, "vm")
+        if not vmpath:
+            log.warn('/local/domain/%d/vm is missing. recreate is '
+                     'confused, trying our best to recover' % domid)
+            needs_reinitialising = True
+            raise XendError('reinit')
+        
+        uuid2_str = xstransact.Read(vmpath, "uuid")
+        if not uuid2_str:
+            log.warn('%s/uuid/ is missing. recreate is confused, '
+                     'trying our best to recover' % vmpath)
+            needs_reinitialising = True
+            raise XendError('reinit')
+        
+        uuid2 = uuid.fromString(uuid2_str)
+        if uuid1 != uuid2:
+            log.warn('UUID in /vm does not match the UUID in /dom/%d.'
+                     'Trying out best to recover' % domid)
+            needs_reinitialising = True
+    except XendError:
+        pass # our best shot at 'goto' in python :)
 
     vm = XendDomainInfo(xeninfo, domid, dompath, augment = True, priv = priv)
     
@@ -537,7 +538,10 @@ class XendDomainInfo:
             self.getDeviceController(devclass).waitForDevices()
 
     def destroyDevice(self, deviceClass, devid):
-        if type(devid) is str:
+        try:
+            devid = int(devid)
+        except ValueError:
+            # devid is not a number, let's search for it in xenstore.
             devicePath = '%s/device/%s' % (self.dompath, deviceClass)
             for entry in xstransact.List(devicePath):
                 backend = xstransact.Read('%s/%s' % (devicePath, entry),
@@ -547,6 +551,7 @@ class XendDomainInfo:
                     # We found the integer matching our devid, use it instead
                     devid = entry
                     break
+                
         return self.getDeviceController(deviceClass).destroyDevice(devid)
 
 

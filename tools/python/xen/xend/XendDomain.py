@@ -93,9 +93,8 @@ class XendDomain:
                 dom0info = [d for d in self._running_domains() \
                             if d['domid'] == DOM0_ID][0]
                 
+                dom0info['name'] = DOM0_NAME
                 dom0 = XendDomainInfo.recreate(dom0info, True)
-                # Sometimes this is not set?
-                dom0.setName(DOM0_NAME)
                 self._add_domain(dom0)
             except IndexError:
                 raise XendError('Unable to find Domain 0')
