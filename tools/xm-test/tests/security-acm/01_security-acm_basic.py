@@ -24,6 +24,9 @@ testlabel = "blue"
 vmconfigfile = "/tmp/xm-test.conf"
 testresource = "phy:ram0"
 
+if not isACMEnabled():
+    SKIP("Not running this test since ACM not enabled.")
+
 status, output = traceCommand("xm makepolicy %s" % (testpolicy))
 if status != 0 or output != "":
     FAIL("'xm makepolicy' failed with status %d and output\n%s" %

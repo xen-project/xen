@@ -15,7 +15,10 @@ TESTS_ENVIRONMENT=@TENV@
 %.test: %.py
 	cp $< $@
 	chmod +x $@
-	@cp -f xm-test-security_policy.xml /etc/xen/acm-security/policies
+	@if [ -d /etc/xen/acm-security/policies ]; then \
+		cp -f xm-test-security_policy.xml      \
+		      /etc/xen/acm-security/policies;  \
+	fi;
 
 clean-local: am_config_clean-local
 
