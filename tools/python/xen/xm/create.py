@@ -1146,8 +1146,11 @@ def config_security_check(config, verbose):
         except security.ACMError:
             print "   %s: DENIED" % (resource)
             (res_label, res_policy) = security.get_res_label(resource)
-            print "   --> res:"+res_label+" ("+res_policy+")"
-            print "   --> dom:"+domain_label+" ("+domain_policy+")"
+            print "   --> res: %s (%s)" % (str(res_label),
+                                           str(res_policy))
+            print "   --> dom: %s (%s)" % (str(domain_label),
+                                           str(domain_policy))
+
             answer = 0
 
     return answer
