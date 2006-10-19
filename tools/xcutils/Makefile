@@ -33,7 +33,7 @@ all: build
 build: $(PROGRAMS)
 
 $(PROGRAMS): %: %.o
-	$(LINK.o) $^ $(LDLIBS) -o $@
+	$(CC) $(CFLAGS) $^ $(LDLIBS) -o $@
 
 .PHONY: install
 install: build

@@ -36,31 +36,31 @@ XENSTORED_OBJS += $(XENSTORED_OBJS_y)
 all: libxenstore.so libxenstore.a xenstored $(CLIENTS) xs_tdb_dump xenstore-control xenstore-ls
 
 test_interleaved_transactions: test_interleaved_transactions.o
-	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -L. -lxenstore -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -L. -lxenstore -o $@
 
 .PHONY: testcode
 testcode: xs_test xenstored_test xs_random
 
 xenstored: $(XENSTORED_OBJS)
-	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -lxenctrl $(SOCKET_LIBS) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -lxenctrl $(SOCKET_LIBS) -o $@
 
 $(CLIENTS): xenstore-%: xenstore_%.o libxenstore.so
-	$(LINK.o) $< $(LOADLIBES) $(LDLIBS) -L. -lxenstore $(SOCKET_LIBS) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $< $(LOADLIBES) $(LDLIBS) -L. -lxenstore $(SOCKET_LIBS) -o $@
 
 $(CLIENTS_OBJS): xenstore_%.o: xenstore_client.c
 	$(COMPILE.c) -DCLIENT_$(*F) -o $@ $<
 
 xenstore-control: xenstore_control.o libxenstore.so
-	$(LINK.o) $< $(LOADLIBES) $(LDLIBS) -L. -lxenstore $(SOCKET_LIBS) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $< $(LOADLIBES) $(LDLIBS) -L. -lxenstore $(SOCKET_LIBS) -o $@
 
 xenstore-ls: xsls.o libxenstore.so
-	$(LINK.o) $< $(LOADLIBES) $(LDLIBS) -L. -lxenstore $(SOCKET_LIBS) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $< $(LOADLIBES) $(LDLIBS) -L. -lxenstore $(SOCKET_LIBS) -o $@
 
 xenstored_test: xenstored_core_test.o xenstored_watch_test.o xenstored_domain_test.o xenstored_transaction_test.o xs_lib.o talloc_test.o fake_libxc.o utils.o tdb.o
-	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
 xs_tdb_dump: xs_tdb_dump.o utils.o tdb.o talloc.o
-	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
 xs_test xs_random xs_stress xs_crashme: LDFLAGS+=-lpthread
 xs_test: xs_test.o xs_lib.o utils.o
