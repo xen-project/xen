@@ -16,15 +16,21 @@
 #============================================================================
 
 import time
-import PAM
 
 from xen.xend import uuid
 from xen.xend.XendError import *
 from xen.xend.XendLogging import log
 
-class XendAuthSessions:
-    """Keeps track of Xen API Login Sessions. (Example only)"""
+try:
+    import PAM
+except ImportError:
+    log.warn("python-pam is required for XenAPI support.")
 
+class XendAuthSessions:
+    """Keeps track of Xen API Login Sessions using PAM.
+
+    Note: Login sessions are not valid across instances of Xend.
+    """
     def __init__(self):
         self.sessions = {}
 
@@ -32,6 +38,12 @@ class XendAuthSessions:
         pass
 
     def login_with_password(self, username, password):
+        """Returns a session UUID if valid, otherwise raises an error.
+
+        @raises XendError: If login fails.
+        @rtype: string
+        @return: Session UUID
+        """
         if self.is_authorized(username, password):
             new_session = uuid.createString()
             self.sessions[new_session] = (username, time.time())
@@ -40,16 +52,31 @@ class XendAuthSessions:
         raise XendError("Login failed")
 
     def logout(self, session):
+        """Delete session of it exists."""
         if self.is_session_valid(session):
             del self.sessions[session]
 
     def is_session_valid(self, session):
+        """Returns true is session is valid."""
         if type(session) == type(str()):
             return (session in self.sessions)
         return False
 
     def is_authorized(self, username, password):
-        pam_auth = PAM.pam()
+        """Returns true is a user is authorised via PAM.
+
+        Note: We use the 'login' PAM stack rather than inventing
+              our own.
+
+        @rtype: boolean
+        """
+        pam_auth = None
+        try:
+            pam_auth = PAM.pam()
+        except NameError:
+            # if PAM doesn't exist, let's ignore it
+            return False
+        
         pam_auth.start("login")
         pam_auth.set_item(PAM.PAM_USER, username)
 
