@@ -20,6 +20,7 @@ from xen.util.xmlrpclib2 import ServerProxy
 from optparse import *
 from pprint import pprint
 from types import DictType
+from getpass import getpass
 
 MB = 1024 * 1024
 
@@ -30,7 +31,6 @@ SR_LIST_FORMAT = '%(name_label)-18s %(uuid)-36s %(physical_size)-10s' \
                  '%(type)-10s'
 VDI_LIST_FORMAT = '%(name_label)-18s %(uuid)-36s %(virtual_size)-8s '\
                   '%(sector_size)-8s'
-LOGIN = ('atse', 'passwd')
 
 COMMANDS = {
     'host-info': ('', 'Get Xen Host Info'),
@@ -132,8 +132,11 @@ def execute(fn, *args):
 
 
 def _connect(*args):
-    server = ServerProxy('httpu:///var/run/xend/xmlrpc.sock')        
-    session = execute(server.session.login_with_password, *LOGIN)
+    server = ServerProxy('httpu:///var/run/xend/xmlrpc.sock')
+    login = raw_input("Login: ")
+    password = getpass()
+    creds = (login, password)
+    session = execute(server.session.login_with_password, *creds)
     host = execute(server.session.get_this_host, session)
     return (server, session)
 
@@ -158,9 +161,9 @@ def resolve_vm(server, session, vm_name):
 
 def xapi_host_info(*args):
     server, session = _connect()
-    hosts = execute(server.Host.get_all, session)
+    hosts = execute(server.host.get_all, session)
     for host in hosts: # there is only one, but ..
-        hostinfo = execute(server.Host.get_record, session, host)
+        hostinfo = execute(server.host.get_record, session, host)
         print HOST_INFO_FORMAT % ('Name', hostinfo['name_label'])
         print HOST_INFO_FORMAT % ('Version', hostinfo['software_version'])
         print HOST_INFO_FORMAT % ('CPUs', len(hostinfo['host_CPUs']))

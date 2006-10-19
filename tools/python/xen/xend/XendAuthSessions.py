@@ -16,6 +16,7 @@
 #============================================================================
 
 import time
+import PAM
 
 from xen.xend import uuid
 from xen.xend.XendError import *
@@ -26,7 +27,6 @@ class XendAuthSessions:
 
     def __init__(self):
         self.sessions = {}
-        self.users = {'atse': 'passwd'}
 
     def init(self):
         pass
@@ -47,11 +47,36 @@ class XendAuthSessions:
         if type(session) == type(str()):
             return (session in self.sessions)
         return False
-    
+
     def is_authorized(self, username, password):
-        if username in self.users and self.users[username] == password:
+        pam_auth = PAM.pam()
+        pam_auth.start("login")
+        pam_auth.set_item(PAM.PAM_USER, username)
+
+        def _pam_conv(auth, query_list, user_data):
+            resp = []
+            for i in range(len(query_list)):
+                query, qtype = query_list[i]
+                if qtype == PAM.PAM_PROMPT_ECHO_ON:
+                    resp.append((username, 0))
+                elif qtype == PAM.PAM_PROMPT_ECHO_OFF:
+                    resp.append((password, 0))
+                else:
+                    return None
+            return resp
+
+        pam_auth.set_item(PAM.PAM_CONV, _pam_conv)
+        
+        try:
+            pam_auth.authenticate()
+            pam_auth.acct_mgmt()
+        except PAM.error, resp:
+            return False
+        except Exception, e:
+            log.warn("Error with PAM: %s" % str(e))
+            return False
+        else:
             return True
-        return False
 
     def get_user(self, session):
         try:
