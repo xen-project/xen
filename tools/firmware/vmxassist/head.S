@@ -59,7 +59,7 @@ _start16:
 
         /* go to protected mode */
         movl    %cr0, %eax
-        orl     $CR0_PE, %eax
+        orl     $(CR0_PE), %eax
         movl    %eax, %cr0
         data32  ljmp $0x08, $1f
 

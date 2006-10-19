@@ -106,7 +106,7 @@ common_trap:				/* common trap handler */
 	pushl	%es
 	pushal
 
-	movl	$DATA_SELECTOR, %eax	/* make sure these are sane */
+	movl	$(DATA_SELECTOR), %eax	/* make sure these are sane */
 	movl	%eax, %ds
 	movl	%eax, %es
 	movl	%eax, %fs
