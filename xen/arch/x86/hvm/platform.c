@@ -367,8 +367,10 @@ static int hvm_decode(int realmode, unsigned char *opcode,
             *op_size = WORD;
     }
 
+    /* the operands order in comments conforms to AT&T convention */
+
     switch ( *opcode ) {
-    case 0x0A: /* or r8, m8 */
+    case 0x0A: /* or m8, r8 */
         mmio_op->instr = INSTR_OR;
         *op_size = BYTE;
         GET_OP_SIZE_FOR_BYTE(size_reg);
@@ -417,22 +419,28 @@ static int hvm_decode(int realmode, unsigned char *opcode,
         GET_OP_SIZE_FOR_NONEBYTE(*op_size);
         return reg_mem(*op_size, opcode, mmio_op, rex);
 
-    case 0x32: /* xor m8, r8*/
+    case 0x32: /* xor m8, r8 */
         mmio_op->instr = INSTR_XOR;
         *op_size = BYTE;
         GET_OP_SIZE_FOR_BYTE(size_reg);
         return mem_reg(size_reg, opcode, mmio_op, rex);
+
+    case 0x38: /* cmp r8, m8 */
+        mmio_op->instr = INSTR_CMP;
+        *op_size = BYTE;
+        GET_OP_SIZE_FOR_BYTE(size_reg);
+        return reg_mem(size_reg, opcode, mmio_op, rex);
 
     case 0x39: /* cmp r32/16, m32/16 */
         mmio_op->instr = INSTR_CMP;
         GET_OP_SIZE_FOR_NONEBYTE(*op_size);
         return reg_mem(*op_size, opcode, mmio_op, rex);
 
-    case 0x3A: /* cmp r8, r8/m8 */
+    case 0x3A: /* cmp m8, r8 */
         mmio_op->instr = INSTR_CMP;
         *op_size = BYTE;
         GET_OP_SIZE_FOR_BYTE(size_reg);
-        return reg_mem(size_reg, opcode, mmio_op, rex);
+        return mem_reg(size_reg, opcode, mmio_op, rex);
 
     case 0x3B: /* cmp m32/16, r32/16 */
         mmio_op->instr = INSTR_CMP;
@@ -480,16 +488,16 @@ static int hvm_decode(int realmode, unsigned char *opcode,
         }
     }
 
-    case 0x84:  /* test m8, r8 */
+    case 0x84:  /* test r8, m8 */
         mmio_op->instr = INSTR_TEST;
         *op_size = BYTE;
         GET_OP_SIZE_FOR_BYTE(size_reg);
-        return mem_reg(size_reg, opcode, mmio_op, rex);
+        return reg_mem(size_reg, opcode, mmio_op, rex);
 
-    case 0x85: /* text m16/32, r16/32 */
+    case 0x85: /* test r16/32, m16/32 */
         mmio_op->instr = INSTR_TEST;
         GET_OP_SIZE_FOR_NONEBYTE(*op_size);
-        return mem_reg(*op_size, opcode, mmio_op, rex);
+        return reg_mem(*op_size, opcode, mmio_op, rex);
 
     case 0x87:  /* xchg {r/m16|r/m32}, {m/r16|m/r32} */
         mmio_op->instr = INSTR_XCHG;
