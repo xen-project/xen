@@ -56,8 +56,8 @@ static char *rnames[] = { "ax", "cx", "dx", "bx", "sp", "bp", "si", "di" };
 #define PT_ENTRY_PRESENT 0x1
 
 /* We only support access to <=4G physical memory due to 1:1 mapping */
-static unsigned
-guest_linear_to_real(uint32_t base)
+static uint64_t
+guest_linear_to_phys(uint32_t base)
 {
 	uint32_t gcr3 = oldctx.cr3;
 	uint64_t l2_mfn;
@@ -89,23 +89,32 @@ guest_linear_to_real(uint32_t base)
 		l2_mfn = ((uint64_t *)(long)gcr3)[(base >> 30) & 0x3];
 		if (!(l2_mfn & PT_ENTRY_PRESENT))
 			panic("l3 entry not present\n");
-		l2_mfn &= 0x3fffff000ULL;
+		l2_mfn &= 0xffffff000ULL;
 
-		l1_mfn = ((uint64_t *)(long)l2_mfn)[(base >> 21) & 0x1ff];
+		if (l2_mfn & 0xf00000000ULL) {
+			printf("l2 page above 4G\n");
+			cpuid_addr_value(l2_mfn + 8 * ((base >> 21) & 0x1ff), &l1_mfn);
+		} else
+			l1_mfn = ((uint64_t *)(long)l2_mfn)[(base >> 21) & 0x1ff];
 		if (!(l1_mfn & PT_ENTRY_PRESENT))
 			panic("l2 entry not present\n");
 
 		if (l1_mfn & PDE_PS) { /* CR4.PSE is ignored in PAE mode */
-			l0_mfn = l1_mfn & 0x3ffe00000ULL;
+			l0_mfn = l1_mfn & 0xfffe00000ULL;
 			return l0_mfn + (base & 0x1fffff);
 		}
 
-		l1_mfn &= 0x3fffff000ULL;
+		l1_mfn &= 0xffffff000ULL;
 
-		l0_mfn = ((uint64_t *)(long)l1_mfn)[(base >> 12) & 0x1ff];
+		if (l1_mfn & 0xf00000000ULL) {
+			printf("l1 page above 4G\n");
+			cpuid_addr_value(l1_mfn + 8 * ((base >> 12) & 0x1ff), &l0_mfn);
+		} else
+			l0_mfn = ((uint64_t *)(long)l1_mfn)[(base >> 12) & 0x1ff];
 		if (!(l0_mfn & PT_ENTRY_PRESENT))
 			panic("l1 entry not present\n");
-		l0_mfn &= 0x3fffff000ULL;
+
+		l0_mfn &= 0xffffff000ULL;
 
 		return l0_mfn + (base & 0xfff);
 	}
@@ -114,6 +123,7 @@ guest_linear_to_real(uint32_t base)
 static unsigned
 address(struct regs *regs, unsigned seg, unsigned off)
 {
+	uint64_t gdt_phys_base;
 	unsigned long long entry;
 	unsigned seg_base, seg_limit;
 	unsigned entry_low, entry_high;
@@ -129,8 +139,13 @@ address(struct regs *regs, unsigned seg, unsigned off)
 	    (mode == VM86_REAL_TO_PROTECTED && regs->cs == seg))
 		return ((seg & 0xFFFF) << 4) + off;
 
-	entry = ((unsigned long long *)
-                 guest_linear_to_real(oldctx.gdtr_base))[seg >> 3];
+	gdt_phys_base = guest_linear_to_phys(oldctx.gdtr_base);
+	if (gdt_phys_base != (uint32_t)gdt_phys_base) {
+		printf("gdt base address above 4G\n");
+		cpuid_addr_value(gdt_phys_base + 8 * (seg >> 3), &entry);
+	} else
+		entry = ((unsigned long long *)(long)gdt_phys_base)[seg >> 3];
+
 	entry_high = entry >> 32;
 	entry_low = entry & 0xFFFFFFFF;
 
@@ -804,6 +819,7 @@ pop(struct regs *regs, unsigned prefix, unsigned opc)
 static int
 load_seg(unsigned long sel, uint32_t *base, uint32_t *limit, union vmcs_arbytes *arbytes)
 {
+	uint64_t gdt_phys_base;
 	unsigned long long entry;
 
 	/* protected mode: use seg as index into gdt */
@@ -815,8 +831,12 @@ load_seg(unsigned long sel, uint32_t *base, uint32_t *limit, union vmcs_arbytes 
 		return 1;
 	}
 
-	entry = ((unsigned long long *)
-                 guest_linear_to_real(oldctx.gdtr_base))[sel >> 3];
+	gdt_phys_base = guest_linear_to_phys(oldctx.gdtr_base);
+	if (gdt_phys_base != (uint32_t)gdt_phys_base) {
+		printf("gdt base address above 4G\n");
+		cpuid_addr_value(gdt_phys_base + 8 * (sel >> 3), &entry);
+	} else
+		entry = ((unsigned long long *)(long)gdt_phys_base)[sel >> 3];
 
 	/* Check the P bit first */
 	if (!((entry >> (15+32)) & 0x1) && sel != 0)

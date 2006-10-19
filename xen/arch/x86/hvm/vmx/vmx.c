@@ -921,7 +921,32 @@ static void vmx_do_cpuid(struct cpu_user_regs *regs)
     if ( input == CPUID_LEAF_0x4 )
     {
         cpuid_count(input, count, &eax, &ebx, &ecx, &edx);
-        eax &= NUM_CORES_RESET_MASK;  
+        eax &= NUM_CORES_RESET_MASK;
+    }
+    else if ( input == 0x40000003 )
+    {
+        /*
+         * NB. Unsupported interface for private use of VMXASSIST only.
+         * Note that this leaf lives at <max-hypervisor-leaf> + 1.
+         */
+        u64 value = ((u64)regs->edx << 32) | (u32)regs->ecx;
+        unsigned long mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
+        char *p;
+
+        DPRINTK("Input address is 0x%"PRIx64".\n", value);
+
+        /* 8-byte aligned valid pseudophys address from vmxassist, please. */
+        if ( (value & 7) || (mfn == INVALID_MFN) ||
+             !v->arch.hvm_vmx.vmxassist_enabled )
+            domain_crash_synchronous();
+
+        p = map_domain_page(mfn);
+        value = *((uint64_t *)(p + (value & (PAGE_SIZE - 1))));
+        unmap_domain_page(p);
+
+        DPRINTK("Output value is 0x%"PRIx64".\n", value);
+        ecx = (u32)(value >>  0);
+        edx = (u32)(value >> 32);
     }
     else if ( !cpuid_hypervisor_leaves(input, &eax, &ebx, &ecx, &edx) )
     {

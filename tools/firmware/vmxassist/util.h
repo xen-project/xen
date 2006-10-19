@@ -31,6 +31,7 @@
 
 struct vmx_assist_context;
 
+extern void cpuid_addr_value(uint64_t addr, uint64_t *value);
 extern void hexdump(unsigned char *, int);
 extern void dump_regs(struct regs *);
 extern void dump_vmx_context(struct vmx_assist_context *);

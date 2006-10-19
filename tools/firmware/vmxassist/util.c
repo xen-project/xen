@@ -29,6 +29,31 @@ static void putchar(int);
 static char *printnum(char *, unsigned long, int);
 static void _doprint(void (*)(int), char const *, va_list);
 
+void
+cpuid_addr_value(uint64_t addr, uint64_t *value)
+{
+	uint32_t addr_low   = (uint32_t)addr;
+	uint32_t addr_high  = (uint32_t)(addr >> 32);
+	uint32_t value_low, value_high;
+	static unsigned int addr_leaf;
+
+	if (!addr_leaf) {
+		unsigned int eax, ebx, ecx, edx;
+		__asm__ __volatile__(
+			"cpuid"
+			: "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx)
+			: "0" (0x40000000));
+		addr_leaf = eax + 1;
+	}
+
+	__asm__ __volatile__(
+		"cpuid"
+		: "=c" (value_low), "=d" (value_high)
+		: "a" (addr_leaf), "0" (addr_low), "1" (addr_high)
+		: "ebx");
+
+	*value = (uint64_t)value_high << 32 | value_low;
+}
 
 void
 dump_regs(struct regs *regs)
