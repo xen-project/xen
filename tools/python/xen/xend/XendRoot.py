@@ -30,7 +30,7 @@ import os.path
 import string
 import sys
 
-from xen.xend import sxp, XendLogging
+from xen.xend import sxp, osdep, XendLogging
 from xen.xend.XendError import XendError
 
 class XendRoot:
@@ -43,10 +43,10 @@ class XendRoot:
     config_var     = "XEND_CONFIG"
 
     """Where network control scripts live."""
-    network_script_dir = "/etc/xen/scripts"
+    network_script_dir = osdep.scripts_dir
 
     """Where block control scripts live."""
-    block_script_dir = "/etc/xen/scripts"
+    block_script_dir = osdep.scripts_dir
 
     """Default path to the log file. """
     logfile_default = "/var/log/xen/xend.log"
