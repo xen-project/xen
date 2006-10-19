@@ -392,6 +392,8 @@ def parseConfig(config):
             log.warn("Ignoring malformed and deprecated config option "
                      "restart = %s", restart)
 
+    result['start_time'] = get_cfg('start_time', float)
+
     log.debug("parseConfig: result is %s", result)
     return result
 

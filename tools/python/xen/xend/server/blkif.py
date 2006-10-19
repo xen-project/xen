@@ -81,6 +81,9 @@ class BlkifController(DevController):
                          'acm_policy' : policy})
 
         devid = blkif.blkdev_name_to_number(dev)
+        if not devid:
+            raise VmError('Unable to find number for device (%s)' % (dev))
+
         front = { 'virtual-device' : "%i" % devid,
                   'device-type' : dev_type
                 }
