@@ -26,9 +26,11 @@
 #include <public/sched.h>
 #include "hpsim_ssc.h"
 #include <asm/vcpu.h>
+#include <asm/vmx_vcpu.h>
 #include <asm/dom_fw.h>
 #include <asm/uaccess.h>
 #include <xen/console.h>
+#include <xen/hypercall.h>
 
 extern unsigned long running_on_sim;
 
@@ -173,6 +175,10 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 		break;
 	    case PAL_FREQ_BASE:
 		status = ia64_pal_freq_base(&r9);
+		if (status == PAL_STATUS_UNIMPLEMENTED) {
+			status = ia64_sal_freq_base(0, &r9, &r10);
+			r10 = 0;
+		}
 		break;
 	    case PAL_PROC_GET_FEATURES:
 		status = ia64_pal_proc_get_features(&r9,&r10,&r11);
@@ -215,7 +221,7 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 	        {
 			/* Use xen-specific values.
 			   hash_tag_id is somewhat random! */
-			const pal_vm_info_1_u_t v1 =
+			static const pal_vm_info_1_u_t v1 =
 				{.pal_vm_info_1_s =
 				 { .vw = 1,
 				   .phys_add_size = 44,
@@ -232,11 +238,12 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 				   .num_tc_levels = 1
 #endif
 				 }};
-			const pal_vm_info_2_u_t v2 =
-				{ .pal_vm_info_2_s =
-				  { .impl_va_msb = 50,
-				    .rid_size = current->domain->arch.rid_bits,
-				    .reserved = 0 }};
+			pal_vm_info_2_u_t v2;
+			v2.pvi2_val = 0;
+			v2.pal_vm_info_2_s.rid_size =
+				current->domain->arch.rid_bits;
+			v2.pal_vm_info_2_s.impl_va_msb =
+				VMX_DOMAIN(current) ? GUEST_IMPL_VA_MSB : 50;
 			r9 = v1.pvi1_val;
 			r10 = v2.pvi2_val;
 			status = PAL_STATUS_SUCCESS;
@@ -294,9 +301,20 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 		status = ia64_pal_register_info(in1, &r9, &r10);
 		break;
 	    case PAL_CACHE_FLUSH:
-		/* FIXME */
-		printk("PAL_CACHE_FLUSH NOT IMPLEMENTED!\n");
-		BUG();
+		/* Always call Host Pal in int=0 */
+		in2 &= ~PAL_CACHE_FLUSH_CHK_INTRS;
+
+		/*
+		 * Call Host PAL cache flush
+		 * Clear psr.ic when call PAL_CACHE_FLUSH
+		 */
+		r10 = in3;
+		status = ia64_pal_cache_flush(in1, in2, &r10, &r9);
+
+		if (status != 0)
+			panic_domain(NULL, "PAL_CACHE_FLUSH ERROR, "
+			             "status %lx", status);
+
 		break;
 	    case PAL_PERF_MON_INFO:
 		{
@@ -343,15 +361,26 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 	        }
 		break;
 	    case PAL_HALT:
-		    if (current->domain == dom0) {
-			    printf ("Domain0 halts the machine\n");
-			    console_start_sync();
-			    (*efi.reset_system)(EFI_RESET_SHUTDOWN,0,0,NULL);
-		    }
-		    else
-			    domain_shutdown (current->domain,
-					     SHUTDOWN_poweroff);
-		    break;
+		if (current->domain == dom0) {
+			printf ("Domain0 halts the machine\n");
+			console_start_sync();
+			(*efi.reset_system)(EFI_RESET_SHUTDOWN,0,0,NULL);
+		}
+		else
+			domain_shutdown(current->domain, SHUTDOWN_poweroff);
+		break;
+	    case PAL_HALT_LIGHT:
+		if (VMX_DOMAIN(current)) {
+			/* Called by VTI.  */
+			if (!is_unmasked_irq(current))
+				do_sched_op_compat(SCHEDOP_block, 0);
+			status = PAL_STATUS_SUCCESS;
+		}
+		break;
+	    case PAL_PLATFORM_ADDR:
+		if (VMX_DOMAIN(current))
+			status = PAL_STATUS_SUCCESS;
+		break;
 	    default:
 		printk("xen_pal_emulator: UNIMPLEMENTED PAL CALL %lu!!!!\n",
 				index);
