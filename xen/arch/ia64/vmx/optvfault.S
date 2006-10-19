@@ -98,6 +98,7 @@ vmx_asm_mov_to_rr_back_1:
     ;;
     //if rr7, go back
     cmp.eq p6,p0=7,r23
+    mov b0=r22
     (p6) br.cond.dpnt.many vmx_virtualization_fault_back
     ;;
     mov r28=r19
@@ -140,7 +141,7 @@ vmx_asm_mov_to_rr_back_2:
     adds r16=IA64_VCPU_MODE_FLAGS_OFFSET,r21
     (p6) adds r17=IA64_VCPU_META_SAVED_RR0_OFFSET,r21
     ;;
-    ld8 r16=[r16]
+    ld4 r16=[r16]
     cmp.eq p7,p0=r0,r0
     (p6) shladd r17=r23,1,r17
     ;;
