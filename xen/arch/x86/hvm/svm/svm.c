@@ -1555,9 +1555,8 @@ static int svm_set_cr0(unsigned long value)
     if ((value & X86_CR0_PE) && (value & X86_CR0_PG) && !paging_enabled) 
     {
         /* The guest CR3 must be pointing to the guest physical. */
-        if (!VALID_MFN(mfn = 
-                       get_mfn_from_gpfn(v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT))
-            || !get_page(mfn_to_page(mfn), v->domain))
+        mfn = get_mfn_from_gpfn(v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT);
+        if ( !VALID_MFN(mfn) || !get_page(mfn_to_page(mfn), v->domain))
         {
             printk("Invalid CR3 value = %lx\n", v->arch.hvm_svm.cpu_cr3);
             domain_crash_synchronous(); /* need to take a clean path */
@@ -1741,9 +1740,8 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
              * first.
              */
             HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 value = %lx", value);
-            if (((value >> PAGE_SHIFT) > v->domain->max_pages) 
-                || !VALID_MFN(mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT))
-                || !get_page(mfn_to_page(mfn), v->domain))
+            mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
+            if ( !VALID_MFN(mfn) || !get_page(mfn_to_page(mfn), v->domain))
             {
                 printk("Invalid CR3 value=%lx\n", value);
                 domain_crash_synchronous(); /* need to take a clean path */
@@ -1777,9 +1775,8 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
                 /* The guest is a 32-bit PAE guest. */
 #if CONFIG_PAGING_LEVELS >= 3
                 unsigned long mfn, old_base_mfn;
-
-                if ( !VALID_MFN(mfn = get_mfn_from_gpfn(
-                    v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT)) ||
+                mfn = get_mfn_from_gpfn(v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT);
+                if ( !VALID_MFN(mfn) || 
                      !get_page(mfn_to_page(mfn), v->domain) )
                 {
                     printk("Invalid CR3 value = %lx", v->arch.hvm_svm.cpu_cr3);
