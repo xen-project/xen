@@ -2811,6 +2811,11 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         svm_inject_exception(v, TRAP_double_fault, 1, 0);
         break;
 
+    case VMEXIT_VINTR:
+	vmcb->vintr.fields.irq = 0;
+	vmcb->general1_intercepts &= ~GENERAL1_INTERCEPT_VINTR;
+	break;
+
     case VMEXIT_INTR:
         break;
 

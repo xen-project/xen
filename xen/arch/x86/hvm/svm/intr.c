@@ -43,7 +43,7 @@
  * to be suitable for SVM.
  */
 
-static inline int svm_inject_extint(struct vcpu *v, int trap, int error_code)
+static inline int svm_inject_extint(struct vcpu *v, int trap)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     vintr_t intr;
@@ -85,6 +85,16 @@ asmlinkage void svm_intr_assist(void)
 //           printk("Injecting PF#: saving IRQ from ExitInfo\n");
         vmcb->exitintinfo.bytes = 0;
         re_injecting = 1;
+    }
+
+    /*
+     * create a 'fake' virtual interrupt on to intercept as soon
+     * as the guest _can_ take interrupts
+     */
+    if (irq_masked(vmcb->rflags) || vmcb->interrupt_shadow) {
+        vmcb->general1_intercepts |= GENERAL1_INTERCEPT_VINTR;
+        svm_inject_extint(v, 0x0); /* actual vector doesn't really matter */
+        return;
     }
 
     /* Guest's interrputs masked? */
@@ -146,7 +156,7 @@ asmlinkage void svm_intr_assist(void)
             }
             /* let's inject this interrupt */
             TRACE_3D(TRC_VMX_INTR, v->domain->domain_id, intr_vector, 0);
-            svm_inject_extint(v, intr_vector, VMX_DELIVER_NO_ERROR_CODE);
+            svm_inject_extint(v, intr_vector);
             hvm_interrupt_post(v, intr_vector, intr_type);
             break;
         case APIC_DM_SMI:
