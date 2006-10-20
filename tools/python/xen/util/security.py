@@ -31,6 +31,7 @@ from xen.util import dictio
 policy_dir_prefix = "/etc/xen/acm-security/policies"
 res_label_filename = policy_dir_prefix + "/resource_labels"
 boot_filename = "/boot/grub/menu.lst"
+altboot_filename = "/boot/grub/grub.conf"
 xensec_xml2bin = "/usr/sbin/xensec_xml2bin"
 xensec_tool = "/usr/sbin/xensec_tool"
 
