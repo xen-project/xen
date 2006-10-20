@@ -406,6 +406,7 @@ ifdef CONFIG_SDL
 VL_OBJS+=sdl.o
 endif
 VL_OBJS+=vnc.o
+VL_OBJS+=d3des.o
 ifdef CONFIG_COCOA
 VL_OBJS+=cocoa.o
 COCOA_LIBS=-F/System/Library/Frameworks -framework Cocoa -framework IOKit
@@ -464,6 +465,9 @@ sdl.o: sdl.c keymaps.c sdl_keysym.h
 	$(CC) $(CFLAGS) $(DEFINES) $(SDL_CFLAGS) -c -o $@ $<
 
 vnc.o: vnc.c keymaps.c sdl_keysym.h vnchextile.h
+	$(CC) $(CFLAGS) $(DEFINES) -c -o $@ $<
+
+d3des.o: d3des.c d3des.h
 	$(CC) $(CFLAGS) $(DEFINES) -c -o $@ $<
 
 sdlaudio.o: sdlaudio.c

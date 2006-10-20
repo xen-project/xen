@@ -171,6 +171,9 @@ time_t timeoffset = 0;
 char domain_name[1024] = { 'H','V', 'M', 'X', 'E', 'N', '-'};
 extern int domid;
 
+char vncpasswd[64];
+unsigned char challenge[AUTHCHALLENGESIZE];
+
 /***********************************************************/
 /* x86 ISA bus support */
 
@@ -5911,6 +5914,7 @@ int main(int argc, char **argv)
     vncunused = 0;
     kernel_filename = NULL;
     kernel_cmdline = "";
+    *vncpasswd = '\0';
 #ifndef CONFIG_DM
 #ifdef TARGET_PPC
     cdrom_index = 1;
@@ -6558,6 +6562,10 @@ int main(int argc, char **argv)
     register_savevm("ram", 0, 1, ram_save, ram_load, NULL);
 
     init_ioports();
+
+    /* read vncpasswd from xenstore */
+    if (0 > xenstore_read_vncpasswd(domid))
+        exit(1);
 
     /* terminal init */
     if (nographic) {

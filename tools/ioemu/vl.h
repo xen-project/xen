@@ -1211,6 +1211,7 @@ int xenstore_fd(void);
 void xenstore_process_event(void *opaque);
 void xenstore_check_new_media_present(int timeout);
 void xenstore_write_vncport(int vnc_display);
+int xenstore_read_vncpasswd(int domid);
 
 /* xen_platform.c */
 void pci_xen_platform_init(PCIBus *bus);
@@ -1221,5 +1222,8 @@ void kqemu_record_dump(void);
 extern char domain_name[];
 
 void destroy_hvm_domain(void);
+
+/* VNC Authentication */
+#define AUTHCHALLENGESIZE 16
 
 #endif /* VL_H */

@@ -104,6 +104,10 @@ gopts.opt('console_autoconnect', short='c',
           fn=set_true, default=0,
           use="Connect to the console after the domain is created.")
 
+gopts.var('vncpasswd', val='NAME',
+          fn=set_value, default=None,
+          use="Password for VNC console on HVM domain.")
+
 gopts.var('vncviewer', val='no|yes',
           fn=set_bool, default=None,
            use="Spawn a vncviewer listening for a vnc server in the domain.\n"
@@ -643,6 +647,7 @@ def configure_hvm(config_image, vals):
     for a in args:
         if (vals.__dict__[a]):
             config_image.append([a, vals.__dict__[a]])
+    config_image.append(['vncpasswd', vals.vncpasswd])
 
 def run_bootloader(vals, config_image):
     if not os.access(vals.bootloader, os.X_OK):
