@@ -54,7 +54,6 @@
 
 /* External functions. We should move these to some suitable header file(s) */
 
-extern void do_nmi(struct cpu_user_regs *, unsigned long);
 extern int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip,
                                 int inst_len);
 extern uint32_t vlapic_update_ppr(struct vlapic *vlapic);
@@ -2739,7 +2738,6 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     break;
 
     case VMEXIT_NMI:
-        do_nmi(regs, 0);
         break;
 
     case VMEXIT_SMI:
