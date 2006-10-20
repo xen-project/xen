@@ -2865,15 +2865,6 @@ static int sh_page_fault(struct vcpu *v,
 
  mmio:
     perfc_incrc(shadow_fault_mmio);
-    if ( !hvm_apic_support(d) && (gpa >= 0xFEC00000) )
-    {
-        /* Need to deal with these disabled-APIC accesses, as
-         * handle_mmio() apparently does not currently do that. */
-        /* TJD: What about it, then?   For now, I'm turning this BUG() 
-         * into a domain_crash() since we don't want to kill Xen. */
-        SHADOW_ERROR("disabled-APIC access: not supported\n.");
-        domain_crash(d); 
-    }
     sh_audit_gw(v, &gw);
     unmap_walk(v, &gw);
     SHADOW_PRINTK("mmio\n");
