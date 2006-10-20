@@ -31,7 +31,7 @@ platform_enable_audio =  False
 builder =  ''
 boot_method =  '' # this will remove the kernel/initrd ??
 kernel_kernel =  '/boot/vmlinuz-2.6.16.29-xen'
-kernel_initrd =  '/root/initrd.img-2.6.16.29-xen.ramfs'
+kernel_initrd =  '/root/initrd-2.6.16.29-xen.img'
 kernel_args =  'root=/dev/sda1 ro'
 grub_cmdline =  ''
 PCI_bus =  ''

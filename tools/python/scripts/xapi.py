@@ -26,7 +26,7 @@ MB = 1024 * 1024
 
 HOST_INFO_FORMAT = '%-20s: %-50s'
 VM_LIST_FORMAT = '%(name_label)-18s %(memory_actual)-5s %(vcpus_number)-5s'\
-                 ' %(power_state)-12s %(uuid)-36s'
+                 ' %(power_state)-10s %(uuid)-36s'
 SR_LIST_FORMAT = '%(name_label)-18s %(uuid)-36s %(physical_size)-10s' \
                  '%(type)-10s'
 VDI_LIST_FORMAT = '%(name_label)-18s %(uuid)-36s %(virtual_size)-8s '\
@@ -130,15 +130,19 @@ def execute(fn, *args):
         raise XenAPIError(*result['ErrorDescription'])
     return result['Value']
 
-
+_initialised = False
+_server = None
+_session = None
 def _connect(*args):
-    server = ServerProxy('httpu:///var/run/xend/xmlrpc.sock')
-    login = raw_input("Login: ")
-    password = getpass()
-    creds = (login, password)
-    session = execute(server.session.login_with_password, *creds)
-    host = execute(server.session.get_this_host, session)
-    return (server, session)
+    global _server, _session, _initialised
+    if not _initialised:
+        _server = ServerProxy('httpu:///var/run/xend/xmlrpc.sock')
+        login = raw_input("Login: ")
+        password = getpass()
+        creds = (login, password)
+        _session = execute(_server.session.login_with_password, *creds)
+        _initialised = True
+    return (_server, _session)
 
 def _stringify(adict):
     return dict([(k, str(v)) for k, v in adict.items()])
@@ -269,10 +273,11 @@ def xapi_vm_shutdown(*args):
     print 'Done.'
 
 def xapi_vbd_create(*args):
-    if len(args) < 2:
-        raise OptionError("Configuration file not specified")
-
     opts, args = parse_args('vbd-create', args)
+
+    if len(args) < 2:
+        raise OptionError("Configuration file and domain not specified")
+
     domname = args[0]
     filename = args[1]
 
@@ -372,13 +377,67 @@ def xapi_vdi_rename(*args):
 #
 # Command Line Utils
 #
+import cmd
+class XenAPICmd(cmd.Cmd):
+    def __init__(self, server, session):
+        cmd.Cmd.__init__(self)
+        self.server = server
+        self.session = session
+        self.prompt = ">>> "
 
-def usage(command = None):
+    def default(self, line):
+        words = line.split()
+        if len(words) > 0:
+            cmd_name = words[0].replace('-', '_')
+            func_name = 'xapi_%s' % cmd_name
+            func = globals().get(func_name)
+            if func:
+                try:
+                    args = tuple(words[1:])
+                    func(*args)
+                    return True
+                except SystemExit:
+                    return False
+                except OptionError, e:
+                    print 'Error:', str(e)
+                    return False
+                except Exception, e:
+                    import traceback
+                    traceback.print_exc()
+                    return False
+        print '*** Unknown command: %s' % words[0]
+        return False
+
+    def do_EOF(self, line):
+        print
+        sys.exit(0)
+
+    def do_help(self, line):
+        usage(print_usage = False)
+
+    def postcmd(self, stop, line):
+        return False
+
+    def precmd(self, line):
+        words = line.split()
+        if len(words) > 0:
+            words0 = words[0].replace('-', '_')
+            return ' '.join([words0] + words[1:])
+        else:
+            return line
+
+def shell():
+    server, session = _connect()
+    x = XenAPICmd(server, session)
+    x.cmdloop('Xen API Prompt. Type "help" for a list of functions')
+
+def usage(command = None, print_usage = True):
     if not command:
-        print 'Usage: xapi <subcommand> [options] [args]'
-        print
-        print 'Subcommands:'
-        print
+        if print_usage:
+            print 'Usage: xapi <subcommand> [options] [args]'
+            print
+            print 'Subcommands:'
+            print
         sorted_commands = sorted(COMMANDS.keys())
         for command  in sorted_commands:
             args, description = COMMANDS[command]
@@ -394,10 +453,12 @@ def main(args):
         sys.exit(1)
 
     subcmd = args[0]
-
     subcmd_func_name = 'xapi_' + subcmd.replace('-', '_')
     subcmd_func = globals().get(subcmd_func_name, None)
-    if not subcmd_func or not callable(subcmd_func):
+
+    if subcmd == 'shell':
+        shell()
+    elif not subcmd_func or not callable(subcmd_func):
         print 'Error: Unable to find subcommand \'%s\'' % subcmd
         usage()
         sys.exit(1)
