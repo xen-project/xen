@@ -845,28 +845,29 @@ static void fast_flush_area(pending_req_t *req, int k_idx, int u_idx, int
 		uvaddr = MMAP_VADDR(info->user_vstart, u_idx, i);
 
 		khandle = &pending_handle(mmap_idx, k_idx, i);
-		if (BLKTAP_INVALID_HANDLE(khandle)) {
-			WPRINTK("BLKTAP_INVALID_HANDLE\n");
-			continue;
-		}
-		gnttab_set_unmap_op(&unmap[invcount], 
-				    idx_to_kaddr(mmap_idx, k_idx, i), 
-				    GNTMAP_host_map, khandle->kernel);
-		invcount++;
 
-		if (create_lookup_pte_addr(
-		    info->vma->vm_mm,
-		    MMAP_VADDR(info->user_vstart, u_idx, i), 
-		    &ptep) !=0) {
-			WPRINTK("Couldn't get a pte addr!\n");
-			return;
+		if (khandle->kernel != 0xFFFF) {
+			gnttab_set_unmap_op(&unmap[invcount],
+					    idx_to_kaddr(mmap_idx, k_idx, i),
+					    GNTMAP_host_map, khandle->kernel);
+			invcount++;
 		}
 
-		gnttab_set_unmap_op(&unmap[invcount], 
-			ptep, GNTMAP_host_map,
-			khandle->user);
-		invcount++;
-            
+		if (khandle->user != 0xFFFF) {
+			if (create_lookup_pte_addr(
+				info->vma->vm_mm,
+				MMAP_VADDR(info->user_vstart, u_idx, i),
+				&ptep) !=0) {
+				WPRINTK("Couldn't get a pte addr!\n");
+				return;
+			}
+
+			gnttab_set_unmap_op(&unmap[invcount],
+					    ptep, GNTMAP_host_map,
+					    khandle->user);
+			invcount++;
+		}
+
 		BLKTAP_INVALIDATE_HANDLE(khandle);
 	}
 	ret = HYPERVISOR_grant_table_op(
@@ -1223,19 +1224,25 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 		if (unlikely(map[i].status != 0)) {
 			WPRINTK("invalid kernel buffer -- "
 				"could not remap it\n");
-			goto fail_flush;
+			ret |= 1;
+			map[i].handle = 0xFFFF;
 		}
 
 		if (unlikely(map[i+1].status != 0)) {
 			WPRINTK("invalid user buffer -- "
 				"could not remap it\n");
-			goto fail_flush;
+			ret |= 1;
+			map[i+1].handle = 0xFFFF;
 		}
 
 		pending_handle(mmap_idx, pending_idx, i/2).kernel 
 			= map[i].handle;
 		pending_handle(mmap_idx, pending_idx, i/2).user   
 			= map[i+1].handle;
+
+		if (ret)
+			continue;
+
 		set_phys_to_machine(__pa(kvaddr) >> PAGE_SHIFT,
 			FOREIGN_FRAME(map[i].dev_bus_addr >> PAGE_SHIFT));
 		offset = (uvaddr - info->vma->vm_start) >> PAGE_SHIFT;
@@ -1243,6 +1250,10 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 		((struct page **)info->vma->vm_private_data)[offset] =
 			pg;
 	}
+
+	if (ret)
+		goto fail_flush;
+
 	/* Mark mapped pages as reserved: */
 	for (i = 0; i < req->nr_segments; i++) {
 		unsigned long kvaddr;
