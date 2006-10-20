@@ -62,7 +62,7 @@ static inline int svm_inject_extint(struct vcpu *v, int trap)
 //  printf( "IRQ = %d\n", trap );
     return 0;
 }
-
+    
 asmlinkage void svm_intr_assist(void) 
 {
     struct vcpu *v = current;
@@ -74,7 +74,6 @@ asmlinkage void svm_intr_assist(void)
     int intr_type = APIC_DM_EXTINT;
     int intr_vector = -1;
     int re_injecting = 0;
-    unsigned long rflags;
 
     ASSERT(vmcb);
 
@@ -82,9 +81,16 @@ asmlinkage void svm_intr_assist(void)
     /* Previous Interrupt delivery caused this Intercept? */
     if (vmcb->exitintinfo.fields.v && (vmcb->exitintinfo.fields.type == 0)) {
         v->arch.hvm_svm.saved_irq_vector = vmcb->exitintinfo.fields.vector;
-//           printk("Injecting PF#: saving IRQ from ExitInfo\n");
         vmcb->exitintinfo.bytes = 0;
         re_injecting = 1;
+    }
+
+    /*
+     * If event requires injecting then do not inject int.
+     */
+    if (unlikely(v->arch.hvm_svm.inject_event)) {
+        v->arch.hvm_svm.inject_event = 0;
+        return;
     }
 
     /*
@@ -97,14 +103,6 @@ asmlinkage void svm_intr_assist(void)
         return;
     }
 
-    /* Guest's interrputs masked? */
-    rflags = vmcb->rflags;
-    if (irq_masked(rflags)) {
-        HVM_DBG_LOG(DBG_LEVEL_1, "Guest IRQs masked: rflags: %lx", rflags);
-        /* bail out, we won't be injecting an interrupt this time */
-        return;
-    }
-    
     /* Previous interrupt still pending? */
     if (vmcb->vintr.fields.irq) {
 //        printk("Re-injecting IRQ from Vintr\n");
@@ -157,7 +155,6 @@ asmlinkage void svm_intr_assist(void)
             /* let's inject this interrupt */
             TRACE_3D(TRC_VMX_INTR, v->domain->domain_id, intr_vector, 0);
             svm_inject_extint(v, intr_vector);
-            hvm_interrupt_post(v, intr_vector, intr_type);
             break;
         case APIC_DM_SMI:
         case APIC_DM_NMI:
@@ -168,6 +165,7 @@ asmlinkage void svm_intr_assist(void)
             BUG();
             break;
         }
+        hvm_interrupt_post(v, intr_vector, intr_type);
     }
 }
 
