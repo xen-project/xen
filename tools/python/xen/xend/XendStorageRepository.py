@@ -32,7 +32,7 @@ XEND_STORAGE_DIR = "/var/lib/xend/storage/"
 XEND_STORAGE_QCOW_FILENAME = "%s.qcow"
 XEND_STORAGE_IMG_FILENAME = "%s.img"
 XEND_STORAGE_VDICFG_FILENAME = "%s.vdi.xml"
-DF_COMMAND = "df -lP"
+DF_COMMAND = "df -lPk"
 QCOW_CREATE_COMMAND = "/usr/sbin/qcow-create %d %s %s"
 
 KB = 1024
@@ -167,8 +167,8 @@ class XendStorageRepository:
             words = line.split()
             mount_point = words[-1]
             dev_no = os.stat(mount_point).st_dev
-            free_blks = int(words[3])
-            devnum_free[dev_no] = free_blks
+            free_kb = int(words[3])
+            devnum_free[dev_no] = free_kb * KB
         return devnum_free
 
     def _get_free_space(self):
