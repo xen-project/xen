@@ -1195,8 +1195,6 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 					     uvaddr, &ptep);
 		if (ret) {
 			WPRINTK("Couldn't get a pte addr!\n");
-			fast_flush_area(pending_req, pending_idx, usr_idx, 
-					blkif->dev_num);
 			goto fail_flush;
 		}
 
