@@ -20,6 +20,7 @@
 import os, string
 import re
 import math
+import signal
 
 import xen.lowlevel.xc
 from xen.xend import sxp
@@ -421,7 +422,6 @@ class HVMImageHandler(ImageHandler):
 
     def destroy(self):
         self.unregister_shutdown_watch();
-        import signal
         if not self.pid:
             return
         os.kill(self.pid, signal.SIGKILL)
