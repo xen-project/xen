@@ -144,6 +144,8 @@ ENTRY(svm_asm_do_launch)
         VMLOAD
 
         STGI
+.globl svm_stgi_label;
+svm_stgi_label:
         movq %rsp,%rdi
         call svm_vmexit_handler
         jmp  svm_asm_do_resume

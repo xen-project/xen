@@ -7,6 +7,7 @@
 #include <xen/guest_access.h>
 #include <xen/sched.h>
 #include <public/xenoprof.h>
+#include <asm/hvm/support.h>
 
 #include "op_counter.h"
 
@@ -98,7 +99,7 @@ static void xenoprof_reset_buf(struct domain *d)
     }
 }
 
-char *alloc_xenoprof_buf(struct domain *d, int npages)
+static char *alloc_xenoprof_buf(struct domain *d, int npages)
 {
     char *rawbuf;
     int i, order;
@@ -121,7 +122,8 @@ char *alloc_xenoprof_buf(struct domain *d, int npages)
     return rawbuf;
 }
 
-int alloc_xenoprof_struct(struct domain *d, int max_samples, int is_passive)
+static int alloc_xenoprof_struct(
+    struct domain *d, int max_samples, int is_passive)
 {
     struct vcpu *v;
     int nvcpu, npages, bufsize, max_bufsize;
@@ -207,7 +209,7 @@ void free_xenoprof_pages(struct domain *d)
     d->xenoprof = NULL;
 }
 
-int active_index(struct domain *d)
+static int active_index(struct domain *d)
 {
     int i;
 
@@ -218,7 +220,7 @@ int active_index(struct domain *d)
     return -1;
 }
 
-int set_active(struct domain *d)
+static int set_active(struct domain *d)
 {
     int ind;
     struct xenoprof *x;
@@ -239,7 +241,7 @@ int set_active(struct domain *d)
     return 0;
 }
 
-int reset_active(struct domain *d)
+static int reset_active(struct domain *d)
 {
     int ind;
     struct xenoprof *x;
@@ -265,7 +267,7 @@ int reset_active(struct domain *d)
     return 0;
 }
 
-void reset_passive(struct domain *d)
+static void reset_passive(struct domain *d)
 {
     struct xenoprof *x;
 
@@ -281,7 +283,7 @@ void reset_passive(struct domain *d)
     return;
 }
 
-void reset_active_list(void)
+static void reset_active_list(void)
 {
     int i;
 
@@ -297,7 +299,7 @@ void reset_active_list(void)
     activated = 0;
 }
 
-void reset_passive_list(void)
+static void reset_passive_list(void)
 {
     int i;
 
@@ -311,7 +313,7 @@ void reset_passive_list(void)
     pdomains = 0;
 }
 
-int add_active_list (domid_t domid)
+static int add_active_list(domid_t domid)
 {
     struct domain *d;
 
@@ -329,7 +331,7 @@ int add_active_list (domid_t domid)
     return 0;
 }
 
-int add_passive_list(XEN_GUEST_HANDLE(void) arg)
+static int add_passive_list(XEN_GUEST_HANDLE(void) arg)
 {
     struct xenoprof_passive passive;
     struct domain *d;
@@ -436,7 +438,7 @@ void xenoprof_log_event(
     }
 }
 
-int xenoprof_op_init(XEN_GUEST_HANDLE(void) arg)
+static int xenoprof_op_init(XEN_GUEST_HANDLE(void) arg)
 {
     struct xenoprof_init xenoprof_init;
     int ret;
@@ -458,7 +460,7 @@ int xenoprof_op_init(XEN_GUEST_HANDLE(void) arg)
     return 0;
 }
 
-int xenoprof_op_get_buffer(XEN_GUEST_HANDLE(void) arg)
+static int xenoprof_op_get_buffer(XEN_GUEST_HANDLE(void) arg)
 {
     struct xenoprof_get_buffer xenoprof_get_buffer;
     struct domain *d = current->domain;
@@ -692,6 +694,17 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
                op, current->domain->domain_id, ret);
 
     return ret;
+}
+
+int xenoprofile_get_mode(struct vcpu *v, struct cpu_user_regs * const regs)
+{
+    if ( !guest_mode(regs) )
+        return 2;
+
+    if ( hvm_guest(v) )
+        return ((regs->cs & 3) != 3);
+
+    return guest_kernel_mode(v, regs);  
 }
 
 /*
