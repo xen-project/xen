@@ -165,6 +165,10 @@ void arch_dump_domain_info(struct domain *d)
 {
 }
 
+void arch_dump_vcpu_info(struct vcpu *v)
+{
+}
+
 void audit_domains_key(unsigned char key)
 {
 }

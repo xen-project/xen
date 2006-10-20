@@ -29,6 +29,8 @@ void domain_relinquish_resources(struct domain *d);
 
 void dump_pageframe_info(struct domain *d);
 
+void arch_dump_vcpu_info(struct vcpu *v);
+
 void arch_dump_domain_info(struct domain *d);
 
 #endif /* __XEN_DOMAIN_H__ */
