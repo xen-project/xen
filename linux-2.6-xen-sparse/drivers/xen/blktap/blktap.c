@@ -1128,9 +1128,10 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 	int usr_idx = GET_NEXT_REQ(info->idx_map);
 	uint16_t mmap_idx = pending_req->mem_idx;
 
-	/*Check we have space on user ring - should never fail*/
-	if(usr_idx == INVALID_REQ) goto fail_flush;
-	
+	/* Check we have space on user ring - should never fail. */
+	if (usr_idx == INVALID_REQ)
+		goto fail_response;
+
 	/* Check that number of segments is sane. */
 	nseg = req->nr_segments;
 	if ( unlikely(nseg == 0) || 
