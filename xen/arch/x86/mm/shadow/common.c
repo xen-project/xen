@@ -567,13 +567,18 @@ void shadow_prealloc(struct domain *d, unsigned int order)
 {
     /* Need a vpcu for calling unpins; for now, since we don't have
      * per-vcpu shadows, any will do */
-    struct vcpu *v = d->vcpu[0];
+    struct vcpu *v, *v2;
     struct list_head *l, *t;
     struct page_info *pg;
+    cpumask_t flushmask = CPU_MASK_NONE;
     mfn_t smfn;
 
     if ( chunk_is_available(d, order) ) return; 
     
+    v = current;
+    if ( v->domain != d )
+        v = d->vcpu[0];
+
     /* Stage one: walk the list of top-level pages, unpinning them */
     perfc_incrc(shadow_prealloc_1);
     list_for_each_backwards_safe(l, t, &d->arch.shadow.toplevel_shadows)
@@ -592,28 +597,30 @@ void shadow_prealloc(struct domain *d, unsigned int order)
      * loaded in cr3 on some vcpu.  Walk them, unhooking the non-Xen
      * mappings. */
     perfc_incrc(shadow_prealloc_2);
-    v = current;
-    if ( v->domain != d )
-        v = d->vcpu[0];
-    /* Walk the list from the tail: recently used toplevels have been pulled
-     * to the head */
     list_for_each_backwards_safe(l, t, &d->arch.shadow.toplevel_shadows)
     {
         pg = list_entry(l, struct page_info, list);
         smfn = page_to_mfn(pg);
         shadow_unhook_mappings(v, smfn);
 
-        /* Need to flush TLB if we've altered our own tables */
-        if ( !shadow_mode_external(d) &&
-             (pagetable_get_pfn(current->arch.shadow_table[0]) == mfn_x(smfn)
-              || pagetable_get_pfn(current->arch.shadow_table[1]) == mfn_x(smfn)
-              || pagetable_get_pfn(current->arch.shadow_table[2]) == mfn_x(smfn)
-              || pagetable_get_pfn(current->arch.shadow_table[3]) == mfn_x(smfn)
-                 ) )
-            local_flush_tlb();
-        
+        /* Remember to flush TLBs: we have removed shadow entries that 
+         * were in use by some vcpu(s). */
+        for_each_vcpu(d, v2) 
+        {
+            if ( pagetable_get_pfn(v2->arch.shadow_table[0]) == mfn_x(smfn)
+                 || pagetable_get_pfn(v2->arch.shadow_table[1]) == mfn_x(smfn)
+                 || pagetable_get_pfn(v2->arch.shadow_table[2]) == mfn_x(smfn) 
+                 || pagetable_get_pfn(v2->arch.shadow_table[3]) == mfn_x(smfn)
+                )
+                cpus_or(flushmask, v2->vcpu_dirty_cpumask, flushmask);
+        }
+
         /* See if that freed up a chunk of appropriate size */
-        if ( chunk_is_available(d, order) ) return;
+        if ( chunk_is_available(d, order) ) 
+        {
+            flush_tlb_mask(flushmask);
+            return;
+        }
     }
     
     /* Nothing more we can do: all remaining shadows are of pages that
@@ -2216,6 +2223,10 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
         if ( all ) 
             domain_crash(v->domain);
     }
+
+    /* Need to flush TLBs now, so that linear maps are safe next time we 
+     * take a fault. */
+    flush_tlb_mask(v->domain->domain_dirty_cpumask);
 }
 
 void

@@ -2562,41 +2562,11 @@ static inline void check_for_early_unshadow(struct vcpu *v, mfn_t gmfn)
          sh_mfn_is_a_page_table(gmfn) )
     {
         u32 flags = mfn_to_page(gmfn)->shadow_flags;
-        mfn_t smfn;
         if ( !(flags & (SHF_L2_32|SHF_L2_PAE|SHF_L2H_PAE|SHF_L4_64)) )
         {
             perfc_incrc(shadow_early_unshadow);
             sh_remove_shadows(v, gmfn, 1, 0 /* Fast, can fail to unshadow */ );
-            return;
-        }
-        /* SHF_unhooked_mappings is set to make sure we only unhook
-         * once in a single batch of updates. It is reset when this
-         * top-level page is loaded into CR3 again */
-        if ( !(flags & SHF_unhooked_mappings) ) 
-        {
-            perfc_incrc(shadow_early_unshadow_top);
-            mfn_to_page(gmfn)->shadow_flags |= SHF_unhooked_mappings;
-            if ( flags & SHF_L2_32 )
-            {
-                smfn = get_shadow_status(v, gmfn, PGC_SH_l2_32_shadow);
-                shadow_unhook_mappings(v, smfn);
-            }
-            if ( flags & SHF_L2_PAE ) 
-            {
-                smfn = get_shadow_status(v, gmfn, PGC_SH_l2_pae_shadow);
-                shadow_unhook_mappings(v, smfn);
-            }
-            if ( flags & SHF_L2H_PAE ) 
-            {
-                smfn = get_shadow_status(v, gmfn, PGC_SH_l2h_pae_shadow);
-                shadow_unhook_mappings(v, smfn);
-            }
-            if ( flags & SHF_L4_64 ) 
-            {
-                smfn = get_shadow_status(v, gmfn, PGC_SH_l4_64_shadow);
-                shadow_unhook_mappings(v, smfn);
-            }
-        }
+        } 
     }
     v->arch.shadow.last_emulated_mfn = mfn_x(gmfn);
 #endif
