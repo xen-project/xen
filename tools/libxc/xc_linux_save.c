@@ -363,19 +363,19 @@ static int suspend_and_state(int (*suspend)(int), int xc_handle, int io_fd,
     int i = 0;
 
     if (!(*suspend)(dom)) {
-        ERR("Suspend request failed");
+        ERROR("Suspend request failed");
         return -1;
     }
 
  retry:
 
     if (xc_domain_getinfo(xc_handle, dom, 1, info) != 1) {
-        ERR("Could not get domain info");
+        ERROR("Could not get domain info");
         return -1;
     }
 
     if ( xc_vcpu_getcontext(xc_handle, dom, 0 /* XXX */, ctxt))
-        ERR("Could not get vcpu context");
+        ERROR("Could not get vcpu context");
 
 
     if (info->shutdown && info->shutdown_reason == SHUTDOWN_suspend)
@@ -385,7 +385,7 @@ static int suspend_and_state(int (*suspend)(int), int xc_handle, int io_fd,
         // try unpausing domain, wait, and retest
         xc_domain_unpause( xc_handle, dom );
 
-        ERR("Domain was paused. Wait and re-test.");
+        ERROR("Domain was paused. Wait and re-test.");
         usleep(10000);  // 10ms
 
         goto retry;
@@ -393,12 +393,12 @@ static int suspend_and_state(int (*suspend)(int), int xc_handle, int io_fd,
 
 
     if( ++i < 100 ) {
-        ERR("Retry suspend domain.");
+        ERROR("Retry suspend domain.");
         usleep(10000);  // 10ms
         goto retry;
     }
 
-    ERR("Unable to suspend domain.");
+    ERROR("Unable to suspend domain.");
 
     return -1;
 }
@@ -516,25 +516,25 @@ static xen_pfn_t *xc_map_m2p(int xc_handle,
 
     xmml.max_extents = m2p_chunks;
     if (!(extent_start = malloc(m2p_chunks * sizeof(xen_pfn_t)))) {
-        ERR("failed to allocate space for m2p mfns");
+        ERROR("failed to allocate space for m2p mfns");
         return NULL;
     }
     set_xen_guest_handle(xmml.extent_start, extent_start);
 
     if (xc_memory_op(xc_handle, XENMEM_machphys_mfn_list, &xmml) ||
         (xmml.nr_extents != m2p_chunks)) {
-        ERR("xc_get_m2p_mfns");
+        ERROR("xc_get_m2p_mfns");
         return NULL;
     }
 
     if ((m2p = mmap(NULL, m2p_size, prot,
                     MAP_SHARED, xc_handle, 0)) == MAP_FAILED) {
-        ERR("failed to mmap m2p");
+        ERROR("failed to mmap m2p");
         return NULL;
     }
 
     if (!(entries = malloc(m2p_chunks * sizeof(privcmd_mmap_entry_t)))) {
-        ERR("failed to allocate space for mmap entries");
+        ERROR("failed to allocate space for mmap entries");
         return NULL;
     }
 
@@ -546,7 +546,7 @@ static xen_pfn_t *xc_map_m2p(int xc_handle,
 
     if ((rc = xc_map_foreign_ranges(xc_handle, DOMID_XEN,
         entries, m2p_chunks)) < 0) {
-        ERR("xc_mmap_foreign_ranges failed (rc = %d)", rc);
+        ERROR("xc_mmap_foreign_ranges failed (rc = %d)", rc);
         return NULL;
     }
 
@@ -619,23 +619,23 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     if(!get_platform_info(xc_handle, dom,
                           &max_mfn, &hvirt_start, &pt_levels)) {
-        ERR("Unable to get platform info.");
+        ERROR("Unable to get platform info.");
         return 1;
     }
 
     if (xc_domain_getinfo(xc_handle, dom, 1, &info) != 1) {
-        ERR("Could not get domain info");
+        ERROR("Could not get domain info");
         return 1;
     }
 
     if (mlock(&ctxt, sizeof(ctxt))) {
-        ERR("Unable to mlock ctxt");
+        ERROR("Unable to mlock ctxt");
         return 1;
     }
 
     /* Only have to worry about vcpu 0 even for SMP */
     if (xc_vcpu_getcontext(xc_handle, dom, 0, &ctxt)) {
-        ERR("Could not get vcpu context");
+        ERROR("Could not get vcpu context");
         goto out;
     }
     shared_info_frame = info.shared_info_frame;
@@ -643,13 +643,13 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     /* A cheesy test to see whether the domain contains valid state. */
     if (ctxt.ctrlreg[3] == 0)
     {
-        ERR("Domain is not in a valid Linux guest OS state");
+        ERROR("Domain is not in a valid Linux guest OS state");
         goto out;
     }
 
    /* cheesy sanity check */
     if ((info.max_memkb >> (PAGE_SHIFT - 10)) > max_mfn) {
-        ERR("Invalid state record -- pfn count out of range: %lu",
+        ERROR("Invalid state record -- pfn count out of range: %lu",
             (info.max_memkb >> (PAGE_SHIFT - 10)));
         goto out;
      }
@@ -657,7 +657,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     /* Map the shared info frame */
     if(!(live_shinfo = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
                                             PROT_READ, shared_info_frame))) {
-        ERR("Couldn't map live_shinfo");
+        ERROR("Couldn't map live_shinfo");
         goto out;
     }
 
@@ -668,7 +668,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                              live_shinfo->arch.pfn_to_mfn_frame_list_list);
 
     if (!live_p2m_frame_list_list) {
-        ERR("Couldn't map p2m_frame_list_list (errno %d)", errno);
+        ERROR("Couldn't map p2m_frame_list_list (errno %d)", errno);
         goto out;
     }
 
@@ -678,7 +678,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                              P2M_FLL_ENTRIES);
 
     if (!live_p2m_frame_list) {
-        ERR("Couldn't map p2m_frame_list");
+        ERROR("Couldn't map p2m_frame_list");
         goto out;
     }
 
@@ -692,20 +692,20 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                                     P2M_FL_ENTRIES);
 
     if (!live_p2m) {
-        ERR("Couldn't map p2m table");
+        ERROR("Couldn't map p2m table");
         goto out;
     }
 
     /* Setup the mfn_to_pfn table mapping */
     if(!(live_m2p = xc_map_m2p(xc_handle, max_mfn, PROT_READ))) {
-        ERR("Failed to map live M2P table");
+        ERROR("Failed to map live M2P table");
         goto out;
     }
 
 
     /* Get a local copy of the live_P2M_frame_list */
     if(!(p2m_frame_list = malloc(P2M_FL_SIZE))) {
-        ERR("Couldn't allocate p2m_frame_list array");
+        ERROR("Couldn't allocate p2m_frame_list array");
         goto out;
     }
     memcpy(p2m_frame_list, live_p2m_frame_list, P2M_FL_SIZE);
@@ -713,8 +713,8 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     /* Canonicalise the pfn-to-mfn table frame-number list. */
     for (i = 0; i < max_pfn; i += fpp) {
         if (!translate_mfn_to_pfn(&p2m_frame_list[i/fpp])) {
-            ERR("Frame# in pfn-to-mfn frame list is not in pseudophys");
-            ERR("entry %d: p2m_frame_list[%ld] is 0x%"PRIx64, i, i/fpp,
+            ERROR("Frame# in pfn-to-mfn frame list is not in pseudophys");
+            ERROR("entry %d: p2m_frame_list[%ld] is 0x%"PRIx64, i, i/fpp,
                 (uint64_t)p2m_frame_list[i/fpp]);
             goto out;
         }
@@ -726,7 +726,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         if (xc_shadow_control(xc_handle, dom,
                               XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY,
                               NULL, 0, NULL, 0, NULL) < 0) {
-            ERR("Couldn't enable shadow mode");
+            ERROR("Couldn't enable shadow mode");
             goto out;
         }
 
@@ -740,7 +740,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         last_iter = 1;
 
         if (suspend_and_state(suspend, xc_handle, io_fd, dom, &info, &ctxt)) {
-            ERR("Domain appears not to have suspended");
+            ERROR("Domain appears not to have suspended");
             goto out;
         }
 
@@ -761,20 +761,20 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     to_skip = malloc(BITMAP_SIZE);
 
     if (!to_send || !to_fix || !to_skip) {
-        ERR("Couldn't allocate to_send array");
+        ERROR("Couldn't allocate to_send array");
         goto out;
     }
 
     memset(to_send, 0xff, BITMAP_SIZE);
 
     if (mlock(to_send, BITMAP_SIZE)) {
-        ERR("Unable to mlock to_send");
+        ERROR("Unable to mlock to_send");
         return 1;
     }
 
     /* (to fix is local only) */
     if (mlock(to_skip, BITMAP_SIZE)) {
-        ERR("Unable to mlock to_skip");
+        ERROR("Unable to mlock to_skip");
         return 1;
     }
 
@@ -785,13 +785,13 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     pfn_batch = calloc(MAX_BATCH_SIZE, sizeof(*pfn_batch));
 
     if ((pfn_type == NULL) || (pfn_batch == NULL)) {
-        ERR("failed to alloc memory for pfn_type and/or pfn_batch arrays");
+        ERROR("failed to alloc memory for pfn_type and/or pfn_batch arrays");
         errno = ENOMEM;
         goto out;
     }
 
     if (mlock(pfn_type, MAX_BATCH_SIZE * sizeof(*pfn_type))) {
-        ERR("Unable to mlock");
+        ERROR("Unable to mlock");
         goto out;
     }
 
@@ -817,7 +817,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     /* Start writing out the saved-domain record. */
 
     if (!write_exact(io_fd, &max_pfn, sizeof(unsigned long))) {
-        ERR("write: max_pfn");
+        ERROR("write: max_pfn");
         goto out;
     }
 
@@ -837,13 +837,13 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             !write_exact(io_fd, &chunk_sig, 4) ||
             !write_exact(io_fd, &chunk_sz,  sizeof(chunk_sz)) ||
             !write_exact(io_fd, &ctxt,      sizeof(ctxt))) {
-            ERR("write: extended info");
+            ERROR("write: extended info");
             goto out;
         }
     }
 
     if (!write_exact(io_fd, p2m_frame_list, P2M_FL_SIZE)) {
-        ERR("write: p2m_frame_list");
+        ERROR("write: p2m_frame_list");
         goto out;
     }
 
@@ -877,7 +877,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             if (!last_iter && xc_shadow_control(
                     xc_handle, dom, XEN_DOMCTL_SHADOW_OP_PEEK,
                     to_skip, max_pfn, NULL, 0, NULL) != max_pfn) {
-                ERR("Error peeking shadow bitmap");
+                ERROR("Error peeking shadow bitmap");
                 goto out;
             }
 
@@ -942,12 +942,12 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
             if ((region_base = xc_map_foreign_batch(
                      xc_handle, dom, PROT_READ, pfn_type, batch)) == 0) {
-                ERR("map batch failed");
+                ERROR("map batch failed");
                 goto out;
             }
 
             if (xc_get_pfn_type_batch(xc_handle, dom, batch, pfn_type)) {
-                ERR("get_pfn_type_batch failed");
+                ERROR("get_pfn_type_batch failed");
                 goto out;
             }
 
@@ -978,12 +978,12 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             }
 
             if(!write_exact(io_fd, &batch, sizeof(unsigned int))) {
-                ERR("Error when writing to state file (2)");
+                ERROR("Error when writing to state file (2)");
                 goto out;
             }
 
             if(!write_exact(io_fd, pfn_type, sizeof(unsigned long)*j)) {
-                ERR("Error when writing to state file (3)");
+                ERROR("Error when writing to state file (3)");
                 goto out;
             }
 
@@ -1013,7 +1013,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                         goto out; 
 
                     if (ratewrite(io_fd, page, PAGE_SIZE) != PAGE_SIZE) {
-                        ERR("Error when writing to state file (4)");
+                        ERROR("Error when writing to state file (4)");
                         goto out;
                     }
 
@@ -1021,7 +1021,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
                     /* We have a normal page: just write it directly. */
                     if (ratewrite(io_fd, spage, PAGE_SIZE) != PAGE_SIZE) {
-                        ERR("Error when writing to state file (5)");
+                        ERROR("Error when writing to state file (5)");
                         goto out;
                     }
                 }
@@ -1056,7 +1056,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
             /* send "-1" to put receiver into debug mode */
             if(!write_exact(io_fd, &minusone, sizeof(int))) {
-                ERR("Error when writing to state file (6)");
+                ERROR("Error when writing to state file (6)");
                 goto out;
             }
 
@@ -1079,7 +1079,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
                 if (suspend_and_state(suspend, xc_handle, io_fd, dom, &info,
                                       &ctxt)) {
-                    ERR("Domain appears not to have suspended");
+                    ERROR("Domain appears not to have suspended");
                     goto out;
                 }
 
@@ -1092,7 +1092,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             if (xc_shadow_control(xc_handle, dom, 
                                   XEN_DOMCTL_SHADOW_OP_CLEAN, to_send, 
                                   max_pfn, NULL, 0, &stats) != max_pfn) {
-                ERR("Error flushing shadow PT");
+                ERROR("Error flushing shadow PT");
                 goto out;
             }
 
@@ -1110,7 +1110,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     /* Zero terminate */
     i = 0;
     if (!write_exact(io_fd, &i, sizeof(int))) {
-        ERR("Error when writing to state file (6)");
+        ERROR("Error when writing to state file (6)");
         goto out;
     }
 
@@ -1125,7 +1125,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         }
 
         if(!write_exact(io_fd, &j, sizeof(unsigned int))) {
-            ERR("Error when writing to state file (6a)");
+            ERROR("Error when writing to state file (6a)");
             goto out;
         }
 
@@ -1137,7 +1137,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             i++;
             if (j == 1024 || i == max_pfn) {
                 if(!write_exact(io_fd, &pfntab, sizeof(unsigned long)*j)) {
-                    ERR("Error when writing to state file (6b)");
+                    ERROR("Error when writing to state file (6b)");
                     goto out;
                 }
                 j = 0;
@@ -1148,21 +1148,21 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     /* Canonicalise the suspend-record frame number. */
     if ( !translate_mfn_to_pfn(&ctxt.user_regs.edx) ){
-        ERR("Suspend record is not in range of pseudophys map");
+        ERROR("Suspend record is not in range of pseudophys map");
         goto out;
     }
 
     /* Canonicalise each GDT frame number. */
     for ( i = 0; i < ctxt.gdt_ents; i += 512 ) {
         if ( !translate_mfn_to_pfn(&ctxt.gdt_frames[i]) ) {
-            ERR("GDT frame is not in range of pseudophys map");
+            ERROR("GDT frame is not in range of pseudophys map");
             goto out;
         }
     }
 
     /* Canonicalise the page table base pointer. */
     if ( !MFN_IS_IN_PSEUDOPHYS_MAP(xen_cr3_to_pfn(ctxt.ctrlreg[3])) ) {
-        ERR("PT base is not in range of pseudophys map");
+        ERROR("PT base is not in range of pseudophys map");
         goto out;
     }
     ctxt.ctrlreg[3] = 
@@ -1170,7 +1170,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     if (!write_exact(io_fd, &ctxt, sizeof(ctxt)) ||
         !write_exact(io_fd, live_shinfo, PAGE_SIZE)) {
-        ERR("Error when writing to state file (1)");
+        ERROR("Error when writing to state file (1)");
         goto out;
     }
 

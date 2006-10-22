@@ -6,7 +6,7 @@
  * Copyright (c) 2002-2004, K A Fraser.
  */
 
-#include <stdarg.h>
+#include <xen/stdarg.h>
 #include <xen/config.h>
 #include <xen/version.h>
 #include <xen/init.h>
@@ -418,7 +418,7 @@ void console_endboot(void)
 
 void console_force_unlock(void)
 {
-    console_lock = SPIN_LOCK_UNLOCKED;
+    spin_lock_init(&console_lock);
     serial_force_unlock(sercon_handle);
     console_start_sync();
 }

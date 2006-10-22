@@ -16,7 +16,6 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <sys/ptrace.h>
 #include <xen/xen.h>
 #include <xen/domctl.h>
 #include <xen/sysctl.h>
@@ -116,24 +115,44 @@ typedef struct xc_core_header {
 
 #define XC_CORE_MAGIC 0xF00FEBED
 
-long xc_ptrace_core(
-    int xc_handle,
-    enum __ptrace_request request,
-    uint32_t domid,
-    long addr,
-    long data,
-    vcpu_guest_context_t *ctxt);
+#ifdef __linux__
+
+#include <sys/ptrace.h>
+#include <thread_db.h>
+
 void * map_domain_va_core(
     unsigned long domfd,
     int cpu,
     void *guest_va,
     vcpu_guest_context_t *ctxt);
+
 int xc_waitdomain_core(
     int xc_handle,
     int domain,
     int *status,
     int options,
     vcpu_guest_context_t *ctxt);
+
+typedef void (*thr_ev_handler_t)(long);
+
+void xc_register_event_handler(
+    thr_ev_handler_t h,
+    td_event_e e);
+
+long xc_ptrace(
+    int xc_handle,
+    enum __ptrace_request request,
+    uint32_t  domid,
+    long addr,
+    long data);
+
+int xc_waitdomain(
+    int xc_handle,
+    int domain,
+    int *status,
+    int options);
+
+#endif /* __linux__ */
 
 /*
  * DOMAIN MANAGEMENT FUNCTIONS

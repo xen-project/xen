@@ -41,11 +41,6 @@ struct hvm_vcpu {
 
     int                 xen_port;
 
-#if CONFIG_PAGING_LEVELS >= 3
-    l3_pgentry_t hvm_lowmem_l3tab[4]
-    __attribute__((__aligned__(32)));
-#endif
-
     /* Flags */
     int                 flag_dr_dirty;
 

@@ -3,11 +3,6 @@ export VNET_ROOT = $(shell cd .. && pwd)
 include $(VNET_ROOT)/Make.env
 endif
 
-INSTALL		= install
-INSTALL_DATA	= $(INSTALL) -m0644
-INSTALL_PROG	= $(INSTALL) -m0755
-INSTALL_DIR	= $(INSTALL) -d -m0755
-
 include $(XEN_ROOT)/tools/Rules.mk
 
 LIB_SRCS :=
@@ -60,7 +55,7 @@ libxutil.so.$(MAJOR): libxutil.so.$(MAJOR).$(MINOR)
 	ln -sf $^ $@
 
 libxutil.so.$(MAJOR).$(MINOR): $(PIC_OBJS)
-	$(CC) $(CFLAGS) -Wl,-soname -Wl,libxutil.so.$(MAJOR) -shared -o $@ $^
+	$(CC) $(CFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxutil.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $^
 
 libxutil.a: $(LIB_OBJS)
 	$(AR) rc $@ $^

@@ -450,7 +450,7 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
         action->in_flight   = 0;
         action->shareable   = will_share;
         action->ack_type    = pirq_acktype(irq);
-        action->cpu_eoi_map = CPU_MASK_NONE;
+        cpus_clear(action->cpu_eoi_map);
 
         desc->depth = 0;
         desc->status |= IRQ_GUEST;

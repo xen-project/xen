@@ -1161,7 +1161,7 @@ grant_table_destroy(
         return;
     
     free_xenheap_pages(t->shared, ORDER_GRANT_FRAMES);
-    free_xenheap_page(t->maptrack);
+    free_xenheap_pages(t->maptrack, t->maptrack_order);
     xfree(t->active);
     xfree(t);
 

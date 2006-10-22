@@ -1,10 +1,13 @@
-#!/bin/bash
+#!/bin/sh
 # CHECK-BUILD CHECK-INSTALL
 
-function error {
-    echo
-    echo "  *** Check for Python version >= 2.2 FAILED"
-    exit 1
-}
+RC=0
 
-python -V 2>&1 | cut -d ' ' -f 2 | grep -q '^2.[2345]' || error
+python -V 2>&1 | cut -d ' ' -f 2 | grep -q '^2.[2345]' || RC=1
+
+if test ${RC} -ne 0; then
+	echo
+	echo " *** Check for Python version >= 2.2 FAILED"
+fi
+
+exit ${RC} 

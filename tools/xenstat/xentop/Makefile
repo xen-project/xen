@@ -18,10 +18,6 @@ ifneq ($(XENSTAT_XENTOP),y)
 all install xentop:
 else
 
-INSTALL         = install
-INSTALL_PROG    = $(INSTALL) -m0755 -D
-INSTALL_DATA    = $(INSTALL) -m0644 -D
-
 prefix=/usr
 mandir=$(prefix)/share/man
 man1dir=$(mandir)/man1
@@ -29,7 +25,7 @@ sbindir=$(prefix)/sbin
 
 CFLAGS += -DGCC_PRINTF -Wall -Werror -I$(XEN_LIBXENSTAT)
 LDFLAGS += -L$(XEN_LIBXENSTAT)
-LDLIBS += -lxenstat -lncurses
+LDLIBS += -lxenstat $(CURSES_LIBS) $(SOCKET_LIBS)
 
 .PHONY: all
 all: xentop
@@ -37,6 +33,7 @@ all: xentop
 .PHONY: install
 install: xentop xentop.1
 	$(INSTALL_PROG) xentop $(DESTDIR)$(sbindir)/xentop
+	$(INSTALL_DIR) $(DESTDIR)$(man1dir)
 	$(INSTALL_DATA) xentop.1 $(DESTDIR)$(man1dir)/xentop.1
 
 endif

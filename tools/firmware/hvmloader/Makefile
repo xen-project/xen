@@ -32,13 +32,13 @@ DEFINES  =-DDEBUG
 XENINC   =-I$(XEN_ROOT)/tools/libxc
 
 # Disable PIE/SSP if GCC supports them. They can break us.
-CFLAGS  += $(call test-gcc-flag,$(CC),-nopie)
-CFLAGS  += $(call test-gcc-flag,$(CC),-fno-stack-protector)
-CFLAGS  += $(call test-gcc-flag,$(CC),-fno-stack-protector-all)
+CFLAGS  += $(call cc-option,$(CC),-nopie,)
+CFLAGS  += $(call cc-option,$(CC),-fno-stack-protector,)
+CFLAGS  += $(call cc-option,$(CC),-fno-stack-protector-all,)
 
 OBJCOPY  = objcopy
 CFLAGS  += $(DEFINES) -I. $(XENINC) -fno-builtin -O2 -msoft-float
-LDFLAGS  = -m32 -nostdlib -Wl,-N -Wl,-Ttext -Wl,$(LOADADDR)
+LDFLAGS  = -nostdlib -Wl,-N -Wl,-Ttext -Wl,$(LOADADDR)
 
 SRCS = hvmloader.c acpi_madt.c mp_tables.c util.c smbios.c
 OBJS = $(patsubst %.c,%.o,$(SRCS))
@@ -48,7 +48,7 @@ all: hvmloader
 
 hvmloader: roms.h $(SRCS)
 	$(CC) $(CFLAGS) -c $(SRCS)
-	$(CC) $(LDFLAGS) -o hvmloader.tmp $(OBJS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o hvmloader.tmp $(OBJS)
 	$(OBJCOPY) hvmloader.tmp hvmloader
 	rm -f hvmloader.tmp
 

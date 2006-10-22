@@ -1,130 +1,12 @@
 ##
-# policy.txt <description to the Xen access control architecture>
+# policy.txt <description to the sHype/Xen access control architecture>
 #
 # Author:
-# Reiner Sailer 08/15/2005 <sailer@watson.ibm.com>
+# Reiner Sailer 08/30/2006 <sailer@watson.ibm.com>
 #
 #
-# This file gives an overview of the security policies currently
-# provided and also gives some reasoning about how to assign
-# labels to domains.
+# This file gives an overview of the example security policies.
 ##
-
-Xen access control policies
-
-
-General explanation of supported security policies:
-=====================================================
-
-We have implemented the mandatory access control architecture of our
-hypervisor security architecture (sHype) for the Xen hypervisor. It
-controls communication (in Xen: event channels, grant tables) between
-Virtual Machines (from here on called domains) and through this the
-virtual block devices, networking, and shared memory are implemented
-on top of these communication means. While we have implemented the
-described policies and access control architecture for other
-hypervisor systems, we will describe below specifically its
-implementation and use in the Xen hypervisor. The policy enforcement
-is called mandatory regarding user domains since the policy it is
-given by the security administration and enforced independently of the
-user domains by the Xen hypervisor in cooperation with the domain
-management.
-
-The access control architecture consists of three parts:
-
-i) The access control policy determines the "command set" of the ACM
-and the hooks with which they can be configured to constrain the
-sharing of virtual resources. The current access control architecture
-implemented for Xen supports two policies: Chinese Wall and Simple
-Type Enforcement, which we describe in turn below.
-
-
-ii) The actually enforced policy instantiation uses the policy
-language (i) to configure the Xen access control in a way that suits
-the specific application (home desktop environment, company desktop,
-Web server system, etc.). We have defined an exemplary policy
-instantiation for Chinese Wall (chwall policy) and Simple Type
-Enforcement (ste policy) for a desktop system. We offer these policies
-in combination since they are controlling orthogonal events.
-
-
-iii) The access control module (ACM) and related hooks are part of the
-core hypervisor and their controls cannot be bypassed by domains. The
-ACM and hooks are the active security components. We refer to
-publications that describe how access control is enforced in the Xen
-hypervisor using the ACM (access decision) and the hooks (decision
-enforcement) inserted into the setup of event channels and grant
-tables, and into domain operations (create, destroy, save, restore,
-migrate). These controls decide based on the active policy
-configuration (see i. and ii.) if the operation proceeds of if the
-operation is aborted (denied).
-
-In general, security policy instantiations in the Xen access control
-framework are defined by XML policy files. Each security policy has
-exactly one file including all the information the hypervisor needs to
-enforce the policy.
-
-The name of a policy is unique and consists of a colon-separated list
-of names, which can be translated into the location (subtree) where
-this policy must be located. The last part of the name is the file
-name pre-fix for the policy xml file. The preceding name parts are
-translated into the local path relative to the global policy root
-(/etc/xen/acm-security/policies) pointing to the policy xml file. For
-example: example.chwall_ste.client_v1 denotes the policy file
-example/chwall_ste/client_v1-security_policy.xml relative to the
-global policy root directory.
-
-Every security policy has its own sub-directory under the global
-policy root directory /etc/xen/acm-security/policies, which is
-installed during the Xen installation or can be manually installed
-(when switching from a "security disabled" Xen to a "security enabled"
-Xen AFTER configuring security, see install.txt) by the command
-sequence:
-
-   cd "Xen-root"/tools/security/policies; make install
-
-We will describe those files for our example policy (Chinese Wall and
-Simple Type Enforcement) in more detail as we go along. Eventually, we
-will move towards a system installation where the policies will reside
-under /etc.
-
-
-CHINESE WALL
-============
-
-The Chinese Wall policy enables the user to define "which workloads
-(domain payloads) cannot run on a single physical system at the same
-time". Why would we want to prevent workloads from running at the same
-time on the same system? This supports requirements that can (but
-don't have to) be rooted in the measure of trust into the isolation of
-different domains that share the same hardware. Since the access
-control architecture aims at high performance and non-intrusive
-implementation, it currently does not address covert (timing) channels
-and aims at medium assurance. Users can apply the Chinese Wall policy
-to guarantee an air-gap between very sensitive payloads both regarding
-covert information channels and regarding resource starvation.
-
-To enable the CW control, each domain is labeled with a set of Chinese
-Wall types and CW Conflict Sets are defined which include those CW
-types that cannot run simultaneously on the same hardware. This
-interpretation of conflict sets is the only policy rule for the Chines
-Wall policy.
-
-This is enforced by controlling the start of domains according to
-their assigned CW worload types. Domains with Chinese Wall types that
-appear in a common conflict set are running mutually exclusive on a
-platform, i.e., once a domain with one of the cw-types of a conflict
-set is running, no domain with another cw-type of the same conflict
-set can start until the first domain is destroyed, paused, or migrated
-away from the physical system (this assumes that such a partition can
-no longer be observed). The idea is to assign cw-types according to
-the type of payload that a domain runs and to use the Chinese Wall
-policy to ensure that payload types can be differentiated by the
-hypervisor and can be prevented from being executed on the same system
-at the same time. Using the flexible CW policy maintains system
-consolidation and workload-balancing while introducing guaranteed
-constraints where necessary.
-
 
 Example of a Chinese Wall Policy Instantiation
 ----------------------------------------------
@@ -233,13 +115,12 @@ Currently in Xen, Dom0 controls all hardware, needs to communicate
 with all domains during their setup, and intercepts all communication
 between domains. Consequently, Dom0 needs to be assigned all types
 used and must be completely trusted to maintain the separation of
-informatio ncoming from domains with different STE types. Thus a
+information coming from domains with different STE types. Thus a
 refactoring of Dom0 is recommended for stronger confinement
 guarantees.
 
 Domain --> RESOURCES Access
 '''''''''''''''''''''''''''
-(current work)
 
 We define for each resource that we want to distinguish a separate STE
 type. Each STE type is assigned to the respective resource and to
@@ -266,8 +147,7 @@ maximum security benefit from sHype.
 
 Example of a Simple Type Enforcement Policy Instantiation
 ---------------------------------------------------------
-
-We define the following types:
+The example policies define the following types:
 
 * ste_SystemManagement identifies workloads (and domains that runs
 them) that must share information to accomplish the management of the
@@ -384,19 +264,18 @@ Xen components and these components use a single consistent policy to
 co-operatively enforce the policy. In the storage domain example, we
 have three components that co-operate:
 
-1. The ACM module inside the hypervisor enforces: communication between
-user domains and the storage domain (only domains including types
-ste_PersonalFinances or ste_InternetInsecure can communicate with the
-storage domain and request access to logical resource). This confines
-the sharing to the types assigned to the storage domain.
+1. The ACM module inside the hypervisor enforces: communication
+between user domains and the storage domain (only domains including
+types ste_PersonalFinances or ste_InternetInsecure can communicate
+with the storage domain and request access to logical resource). This
+confines the sharing to the types assigned to the storage domain.
 
-2. The domain management will enforce (work in progress): assignment of
-real resources (hda) to domains (storage domain) that share a
-type with the resource.
+2. The domain management enforces: assignment of real resources (hda)
+to domains (storage domain) that share a type with the resource.
 
-3. If the storage domain serves multiple STE types (as in our example),
-it enforces (work in progress): that domains can access (mount)
-logical resources only if they share an STE type with the respective
+3. If the storage domain serves multiple STE types (as in our
+example), it enforces: that domains can access (mount) logical
+resources only if they share an STE type with the respective
 resource. In our example, domains with the STE type
 ste_PersonalFinances can request access (mount) to logical resource
 hda1 from the storage domain.
@@ -406,8 +285,8 @@ see the minimal set of types assigned to our domain manageing disk
 drive hda for serving logical disk partitions exclusively to
 dom_HomeBanking and dom_Fun.
 
-Similary, network domains can confine access to the network or
-network communication between user domains.
+Similary, network domains can confine access to the network or network
+communication between user domains.
 
 As a result, device domains (e.g., storage domain, network domain)
 must be simple and small to ensure their correct co-operation in the

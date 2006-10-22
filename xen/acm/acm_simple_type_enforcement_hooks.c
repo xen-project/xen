@@ -150,6 +150,8 @@ ste_dump_policy(u8 *buf, u32 buf_size) {
     ret = ntohl(ste_buf->ste_ssid_offset) +
         sizeof(domaintype_t)*ste_bin_pol.max_ssidrefs*ste_bin_pol.max_types;
 
+    ret = (ret + 7) & ~7;
+
     if (buf_size < ret)
         return -EINVAL;
 

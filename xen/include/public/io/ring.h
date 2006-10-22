@@ -152,7 +152,7 @@ typedef struct __name##_back_ring __name##_back_ring_t
     ((_r)->nr_ents)
 
 /* Number of free requests (for use on front side only). */
-#define RING_FREE_REQUESTS(_r)						\
+#define RING_FREE_REQUESTS(_r)                                          \
     (RING_SIZE(_r) - ((_r)->req_prod_pvt - (_r)->rsp_cons))
 
 /* Test if there is an empty slot available on the front ring.
@@ -165,13 +165,21 @@ typedef struct __name##_back_ring __name##_back_ring_t
 #define RING_HAS_UNCONSUMED_RESPONSES(_r)                               \
     ((_r)->sring->rsp_prod - (_r)->rsp_cons)
 
+#ifdef __GNUC__
+#define RING_HAS_UNCONSUMED_REQUESTS(_r) ({                             \
+    unsigned int req = (_r)->sring->req_prod - (_r)->req_cons;          \
+    unsigned int rsp = RING_SIZE(_r) -                                  \
+        ((_r)->req_cons - (_r)->rsp_prod_pvt);                          \
+    req < rsp ? req : rsp;                                              \
+})
+#else
+/* Same as above, but without the nice GCC ({ ... }) syntax. */
 #define RING_HAS_UNCONSUMED_REQUESTS(_r)                                \
-    ({									\
-	unsigned int req = (_r)->sring->req_prod - (_r)->req_cons;	\
-	unsigned int rsp = RING_SIZE(_r) -				\
-			   ((_r)->req_cons - (_r)->rsp_prod_pvt);	\
-	req < rsp ? req : rsp;						\
-    })
+    ((((_r)->sring->req_prod - (_r)->req_cons) <                        \
+      (RING_SIZE(_r) - ((_r)->req_cons - (_r)->rsp_prod_pvt))) ?        \
+     ((_r)->sring->req_prod - (_r)->req_cons) :                         \
+     (RING_SIZE(_r) - ((_r)->req_cons - (_r)->rsp_prod_pvt)))
+#endif
 
 /* Direct access to individual ring elements, by index. */
 #define RING_GET_REQUEST(_r, _idx)                                      \

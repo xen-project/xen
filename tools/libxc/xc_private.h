@@ -30,6 +30,9 @@
 #define DECLARE_SYSCTL struct xen_sysctl sysctl
 #endif
 
+#undef PAGE_SHIFT
+#undef PAGE_SIZE
+#undef PAGE_MASK
 #define PAGE_SHIFT              XC_PAGE_SHIFT
 #define PAGE_SIZE               (1UL << PAGE_SHIFT)
 #define PAGE_MASK               (~(PAGE_SIZE-1))
@@ -55,11 +58,6 @@
 #else
 #define PPRINTF(_f, _a...)
 #endif
-
-#define ERR(_f, _a...) do {                     \
-    DPRINTF(_f ": %d\n" , ## _a, errno);        \
-    fflush(stderr); }                           \
-while (0)
 
 #define ERROR(_m, _a...)                        \
 do {                                            \

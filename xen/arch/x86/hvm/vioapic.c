@@ -42,6 +42,9 @@
 
 /* HACK: Route IRQ0 only to VCPU0 to prevent time jumps. */
 #define IRQ0_SPECIAL_ROUTING 1
+#ifdef IRQ0_SPECIAL_ROUTING
+static int redir_warning_done = 0; 
+#endif
 
 #if defined(__ia64__)
 #define opt_hvm_debug_level opt_vmx_debug_level
@@ -155,6 +158,7 @@ static void hvm_vioapic_update_imr(struct hvm_vioapic *s, int index)
        clear_bit(index, &s->imr);
 }
 
+
 static void hvm_vioapic_write_indirect(struct hvm_vioapic *s,
                                       unsigned long addr,
                                       unsigned long length,
@@ -179,21 +183,35 @@ static void hvm_vioapic_write_indirect(struct hvm_vioapic *s,
         {
             uint32_t redir_index = 0;
 
+            redir_index = (s->ioregsel - 0x10) >> 1;
+
             HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "hvm_vioapic_write_indirect "
               "change redir index %x val %lx\n",
               redir_index, val);
-
-            redir_index = (s->ioregsel - 0x10) >> 1;
 
             if (redir_index >= 0 && redir_index < IOAPIC_NUM_PINS) {
                 uint64_t redir_content;
 
                 redir_content = s->redirtbl[redir_index].value;
 
-                if (s->ioregsel & 0x1)
+                if (s->ioregsel & 0x1) {
+#ifdef IRQ0_SPECIAL_ROUTING
+                    if ( !redir_warning_done && (redir_index == 0) &&
+                         ((val >> 24) != 0) ) {
+                        /*
+                         * Cannot yet handle delivering PIT interrupts to
+                         * any VCPU != 0. Needs proper fixing, but for now
+                         * simply spit a warning that we're going to ignore
+                         * the target in practice & always deliver to VCPU 0
+                         */
+                        printk("IO-APIC: PIT (IRQ0) redirect to VCPU %lx "
+                               "will be ignored.\n", val >> 24); 
+                        redir_warning_done = 1;
+                    }
+#endif
                     redir_content = (((uint64_t)val & 0xffffffff) << 32) |
                                     (redir_content & 0xffffffff);
-                else
+                } else
                     redir_content = ((redir_content >> 32) << 32) |
                                     (val & 0xffffffff);
                 s->redirtbl[redir_index].value = redir_content;
@@ -409,6 +427,8 @@ static void ioapic_deliver(hvm_vioapic_t *s, int irqno)
     uint8_t vector = s->redirtbl[irqno].RedirForm.vector;
     uint8_t trig_mode = s->redirtbl[irqno].RedirForm.trigmod;
     uint32_t deliver_bitmask;
+    struct vlapic *target;
+
 
     HVM_DBG_LOG(DBG_LEVEL_IOAPIC,
       "dest %x dest_mode %x delivery_mode %x vector %x trig_mode %x\n",
@@ -427,9 +447,8 @@ static void ioapic_deliver(hvm_vioapic_t *s, int irqno)
     switch (delivery_mode) {
     case dest_LowestPrio:
     {
-        struct vlapic* target;
-
 #ifdef IRQ0_SPECIAL_ROUTING
+        /* Force round-robin to pick VCPU 0 */
         if (irqno == 0)
             target = s->lapic_info[0];
         else
@@ -450,19 +469,17 @@ static void ioapic_deliver(hvm_vioapic_t *s, int irqno)
     {
         uint8_t bit;
         for (bit = 0; bit < s->lapic_count; bit++) {
-            if (deliver_bitmask & (1 << bit)) {
+            if ( !(deliver_bitmask & (1 << bit)) )
+                continue;
 #ifdef IRQ0_SPECIAL_ROUTING
-                if ( (irqno == 0) && (bit !=0) )
-                {
-                    printk("PIT irq to bit %x\n", bit);
-                    domain_crash_synchronous();
-                }
+            /* Do not deliver timer interrupts to VCPU != 0 */
+            if ( (irqno == 0) && (bit !=0 ) )
+                target = s->lapic_info[0];
+            else
 #endif
-                if (s->lapic_info[bit]) {
-                    ioapic_inj_irq(s, s->lapic_info[bit],
-                                vector, trig_mode, delivery_mode);
-                }
-            }
+                target = s->lapic_info[bit];
+            if (target)
+                ioapic_inj_irq(s, target, vector, trig_mode, delivery_mode);
         }
         break;
     }

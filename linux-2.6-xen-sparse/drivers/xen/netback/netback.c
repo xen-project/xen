@@ -187,7 +187,7 @@ static struct sk_buff *netbk_copy_skb(struct sk_buff *skb)
 	if (unlikely(!nskb))
 		goto err;
 
-	skb_reserve(nskb, 16);
+	skb_reserve(nskb, 16 + NET_IP_ALIGN);
 	headlen = nskb->end - nskb->data;
 	if (headlen > skb_headlen(skb))
 		headlen = skb_headlen(skb);
@@ -1210,7 +1210,7 @@ static void net_tx_action(unsigned long unused)
 			    ret < MAX_SKB_FRAGS) ?
 			PKT_PROT_LEN : txreq.size;
 
-		skb = alloc_skb(data_len+16, GFP_ATOMIC);
+		skb = alloc_skb(data_len + 16 + NET_IP_ALIGN, GFP_ATOMIC);
 		if (unlikely(skb == NULL)) {
 			DPRINTK("Can't allocate a skb in start_xmit.\n");
 			netbk_tx_err(netif, &txreq, i);
@@ -1218,7 +1218,7 @@ static void net_tx_action(unsigned long unused)
 		}
 
 		/* Packets passed to netif_rx() must have some headroom. */
-		skb_reserve(skb, 16);
+		skb_reserve(skb, 16 + NET_IP_ALIGN);
 
 		if (extras[XEN_NETIF_EXTRA_TYPE_GSO - 1].type) {
 			struct netif_extra_info *gso;

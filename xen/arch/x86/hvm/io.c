@@ -369,18 +369,18 @@ static void hvm_pio_assist(struct cpu_user_regs *regs, ioreq_t *p,
     {
         if ( pio_opp->flags & REPZ )
             regs->ecx -= p->count;
+
         if ( p->dir == IOREQ_READ )
         {
-            regs->edi += sign * p->count * p->size;
             if ( pio_opp->flags & OVERLAP )
             {
-                unsigned long addr = regs->edi;
-                if (hvm_realmode(current))
-                    addr += regs->es << 4;
-                if (sign > 0)
-                    addr -= p->size;
-                (void)hvm_copy_to_guest_virt(addr, &p->u.data, p->size);
+                unsigned long addr = pio_opp->addr;
+                if ( hvm_paging_enabled(current) )
+                    (void)hvm_copy_to_guest_virt(addr, &p->u.data, p->size);
+                else
+                    (void)hvm_copy_to_guest_phys(addr, &p->u.data, p->size);
             }
+            regs->edi += sign * p->count * p->size;
         }
         else /* p->dir == IOREQ_WRITE */
         {
@@ -485,19 +485,22 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
 
     case INSTR_MOVS:
         sign = p->df ? -1 : 1;
-        regs->esi += sign * p->count * p->size;
-        regs->edi += sign * p->count * p->size;
-
-        if ((mmio_opp->flags & OVERLAP) && p->dir == IOREQ_READ) {
-            unsigned long addr = regs->edi;
-
-            if (sign > 0)
-                addr -= p->size;
-            (void)hvm_copy_to_guest_virt(addr, &p->u.data, p->size);
-        }
 
         if (mmio_opp->flags & REPZ)
             regs->ecx -= p->count;
+
+        if ((mmio_opp->flags & OVERLAP) && p->dir == IOREQ_READ) {
+            unsigned long addr = mmio_opp->addr;
+
+            if (hvm_paging_enabled(current))
+                (void)hvm_copy_to_guest_virt(addr, &p->u.data, p->size);
+            else
+                (void)hvm_copy_to_guest_phys(addr, &p->u.data, p->size);
+        }
+
+        regs->esi += sign * p->count * p->size;
+        regs->edi += sign * p->count * p->size;
+
         break;
 
     case INSTR_STOS:
@@ -680,7 +683,7 @@ void hvm_interrupt_post(struct vcpu *v, int vector, int type)
     struct  periodic_time *pt = 
         &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
 
-    if ( is_pit_irq(v, vector, type) ) {
+    if ( pt->enabled && is_periodic_irq(v, vector, type) ) {
         if ( !pt->first_injected ) {
             pt->pending_intr_nr = 0;
             pt->last_plt_gtime = hvm_get_guest_time(v);
@@ -691,8 +694,9 @@ void hvm_interrupt_post(struct vcpu *v, int vector, int type)
             pt->pending_intr_nr--;
             pt->last_plt_gtime += pt->period_cycles;
             hvm_set_guest_time(v, pt->last_plt_gtime);
-            pit_time_fired(v, pt->priv);
         }
+        if (pt->cb)
+            pt->cb(v, pt->priv);
     }
     
     switch(type) {

@@ -6,15 +6,15 @@ all: build
 
 .PHONY: build
 build:
-	CFLAGS="$(CFLAGS)" python setup.py build
+	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py build
 
 .PHONY: install
 ifndef XEN_PYTHON_NATIVE_INSTALL
 install: all
-	CFLAGS="$(CFLAGS)" python setup.py install --home="$(DESTDIR)/usr" --prefix="" --force
+	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py install --home="$(DESTDIR)/usr" --prefix="" --force
 else
 install: all
-	CFLAGS="$(CFLAGS)" python setup.py install --root="$(DESTDIR)" --force
+	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py install --root="$(DESTDIR)" --force
 endif
 
 .PHONY: test

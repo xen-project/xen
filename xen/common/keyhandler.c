@@ -173,6 +173,7 @@ static void dump_domains(unsigned char key)
             printk("dirty_cpus=%s ", cpuset);
             cpuset_print(cpuset, sizeof(cpuset), v->cpu_affinity);
             printk("cpu_affinity=%s\n", cpuset);
+            arch_dump_vcpu_info(v);
             printk("    Notifying guest (virq %d, port %d, stat %d/%d/%d)\n",
                    VIRQ_DEBUG, v->virq_to_evtchn[VIRQ_DEBUG],
                    test_bit(v->virq_to_evtchn[VIRQ_DEBUG], 

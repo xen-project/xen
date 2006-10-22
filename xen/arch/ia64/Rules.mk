@@ -18,8 +18,6 @@ endif
 # Used only by linux/Makefile.
 AFLAGS_KERNEL  += -mconstant-gp -nostdinc $(CPPFLAGS)
 
-# Note: .S -> .o rule uses AFLAGS and CFLAGS.
-
 CFLAGS	+= -nostdinc -fno-builtin -fno-common -fno-strict-aliasing
 CFLAGS	+= -mconstant-gp
 #CFLAGS  += -O3		# -O3 over-inlines making debugging tough!

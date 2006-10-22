@@ -18,6 +18,7 @@
 #include <xen/sched.h>
 #include <asm/regs.h>
 #include <asm/current.h>
+#include <asm/hvm/support.h>
  
 #include "op_x86_model.h"
 #include "op_counter.h"
@@ -44,7 +45,11 @@ static unsigned long reset_value[NUM_COUNTERS];
 
 extern void xenoprof_log_event(struct vcpu *v, unsigned long eip,
 			       int mode, int event);
- 
+extern int xenoprofile_get_mode(struct vcpu *v,
+				struct cpu_user_regs * const regs);
+
+extern char svm_stgi_label[];
+
 static void athlon_fill_in_addresses(struct op_msrs * const msrs)
 {
 	msrs->counters[0].addr = MSR_K7_PERFCTR0;
@@ -97,10 +102,9 @@ static void athlon_setup_ctrs(struct op_msrs const * const msrs)
 	}
 }
 
- 
 static int athlon_check_ctrs(unsigned int const cpu,
-                             struct op_msrs const * const msrs,
-                             struct cpu_user_regs * const regs)
+			     struct op_msrs const * const msrs,
+			     struct cpu_user_regs * const regs)
 
 {
 	unsigned int low, high;
@@ -108,11 +112,19 @@ static int athlon_check_ctrs(unsigned int const cpu,
 	int ovf = 0;
 	unsigned long eip = regs->eip;
 	int mode = 0;
+	struct vcpu *v = current;
+	struct cpu_user_regs tmp_regs;
 
-	if (guest_kernel_mode(current, regs))
-		mode = 1;
-	else if (ring_0(regs))
-		mode = 2;
+	if (!guest_mode(regs) &&
+	    (regs->eip == (unsigned long)svm_stgi_label)) {
+		/* SVM guest was running when NMI occurred */
+		hvm_store_cpu_guest_regs(v, &tmp_regs, NULL);
+		eip = tmp_regs.eip;
+		mode = xenoprofile_get_mode(v, &tmp_regs);
+	} else {
+		eip = regs->eip;
+		mode = xenoprofile_get_mode(v, regs);
+	}
 
 	for (i = 0 ; i < NUM_COUNTERS; ++i) {
 		CTR_READ(low, high, msrs, i);

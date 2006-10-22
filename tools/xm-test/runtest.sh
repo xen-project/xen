@@ -197,6 +197,8 @@ run=yes
 unsafe=no
 GROUPENTERED=default
 
+cp -f tests/security-acm/xm-test-security_policy.xml /etc/xen/acm-security/policies
+
 # Resolve options
 while [ $# -gt 0 ]
   do

@@ -6,6 +6,7 @@
 #include <getopt.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
+#include <termios.h>
 
 static int max_width = 80;
 static int desired_width = 60;

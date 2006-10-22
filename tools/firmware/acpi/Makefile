@@ -53,7 +53,7 @@ iasl:
 	wget $(IASL_URL)
 	tar xzf $(IASL_VER).tar.gz
 	make -C $(IASL_VER)/compiler
-	install $(IASL_VER)/compiler/iasl /usr/bin/iasl
+	$(INSTALL_PROG) $(IASL_VER)/compiler/iasl /usr/bin/iasl
 
 $(ACPI_GEN):$(C_SRC) $(H_SRC) acpi_dsdt.c
 	$(HOSTCC) -o $(ACPI_GEN) $(HOSTCFLAGS) $(shell ls *.c)

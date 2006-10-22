@@ -4,6 +4,7 @@ subdir-y += vmx
 obj-y += hvm.o
 obj-y += i8254.o
 obj-y += i8259.o
+obj-y += rtc.o
 obj-y += instrlen.o
 obj-y += intercept.o
 obj-y += io.o

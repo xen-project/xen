@@ -19,11 +19,11 @@
 
 /* Trace subclasses */
 #define TRC_SUBCLS_SHIFT 12
+
 /* trace subclasses for VMX */
 #define TRC_VMXEXIT  0x00081000   /* VMX exit trace            */
-#define TRC_VMXTIMER 0x00082000   /* VMX timer trace           */
-#define TRC_VMXINT   0x00084000   /* VMX interrupt trace       */
-#define TRC_VMXIO    0x00088000   /* VMX io emulation trace  */
+#define TRC_VMXENTRY 0x00082000   /* VMX exit trace            */
+#define TRC_VMXINTR  0x00084000   /* VMX interrupt trace       */
 
 /* Trace events per class */
 #define TRC_LOST_RECORDS        (TRC_GEN + 1)
@@ -50,11 +50,8 @@
 
 /* trace events per subclass */
 #define TRC_VMX_VMEXIT          (TRC_VMXEXIT + 1)
-#define TRC_VMX_VMENTRY         (TRC_VMXEXIT + 2)
-
-#define TRC_VMX_TIMER_INTR      (TRC_VMXTIMER + 1)
-
-#define TRC_VMX_INT             (TRC_VMXINT + 1)
+#define TRC_VMX_VMENTRY         (TRC_VMXENTRY + 1)
+#define TRC_VMX_INTR            (TRC_VMXINTR + 1)
 
 
 /* This structure represents a single trace buffer record. */

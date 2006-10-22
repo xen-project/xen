@@ -150,6 +150,11 @@ vnc=1
 #vncconsole=0
 
 #----------------------------------------------------------------------------
+# set password for domain's VNC console
+# default is depents on vncpasswd in xend-config.sxp
+vncpasswd=''
+
+#----------------------------------------------------------------------------
 # no graphics, use serial port
 #nographic=0
 

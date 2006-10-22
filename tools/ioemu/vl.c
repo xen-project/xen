@@ -171,6 +171,9 @@ time_t timeoffset = 0;
 char domain_name[1024] = { 'H','V', 'M', 'X', 'E', 'N', '-'};
 extern int domid;
 
+char vncpasswd[64];
+unsigned char challenge[AUTHCHALLENGESIZE];
+
 /***********************************************************/
 /* x86 ISA bus support */
 
@@ -3028,7 +3031,7 @@ void net_slirp_smb(const char *exported_dir)
     }
 
     /* XXX: better tmp dir construction */
-    snprintf(smb_dir, sizeof(smb_dir), "/tmp/qemu-smb.%d", getpid());
+    snprintf(smb_dir, sizeof(smb_dir), "/tmp/qemu-smb.%ld", (long)getpid());
     if (mkdir(smb_dir, 0700) < 0) {
         fprintf(stderr, "qemu: could not create samba server dir '%s'\n", smb_dir);
         exit(1);
@@ -3995,7 +3998,7 @@ static void create_pidfile(const char *filename)
                 perror("Opening pidfile");
                 exit(1);
             }
-            fprintf(f, "%d\n", getpid());
+            fprintf(f, "%ld\n", (long)getpid());
             fclose(f);
             pid_filename = qemu_strdup(filename);
             if (!pid_filename) {
@@ -5911,6 +5914,7 @@ int main(int argc, char **argv)
     vncunused = 0;
     kernel_filename = NULL;
     kernel_cmdline = "";
+    *vncpasswd = '\0';
 #ifndef CONFIG_DM
 #ifdef TARGET_PPC
     cdrom_index = 1;
@@ -5942,7 +5946,7 @@ int main(int argc, char **argv)
     memset(&vnclisten_addr.sin_addr, 0, sizeof(vnclisten_addr.sin_addr));
     
     /* init debug */
-    sprintf(qemu_dm_logfilename, "/var/log/xen/qemu-dm.%d.log", getpid());
+    sprintf(qemu_dm_logfilename, "/var/log/xen/qemu-dm.%ld.log", (long)getpid());
     cpu_set_log_filename(qemu_dm_logfilename);
     cpu_set_log(0);
     
@@ -6558,6 +6562,10 @@ int main(int argc, char **argv)
     register_savevm("ram", 0, 1, ram_save, ram_load, NULL);
 
     init_ioports();
+
+    /* read vncpasswd from xenstore */
+    if (0 > xenstore_read_vncpasswd(domid))
+        exit(1);
 
     /* terminal init */
     if (nographic) {

@@ -1003,6 +1003,20 @@ void arch_dump_domain_info(struct domain *d)
     }
 }
 
+void arch_dump_vcpu_info(struct vcpu *v)
+{
+    if ( shadow_mode_enabled(v->domain) )
+    {
+        if ( v->arch.shadow.mode )
+            printk("    shadowed %u-on-%u, %stranslated\n",
+                   v->arch.shadow.mode->guest_levels,
+                   v->arch.shadow.mode->shadow_levels,
+                   shadow_vcpu_mode_translate(v) ? "" : "not ");
+        else
+            printk("    not shadowed\n");
+    }
+}
+
 /*
  * Local variables:
  * mode: C

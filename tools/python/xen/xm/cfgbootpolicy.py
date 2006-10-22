@@ -14,6 +14,7 @@
 #============================================================================
 # Copyright (C) 2006 International Business Machines Corp.
 # Author: Reiner Sailer <sailer@us.ibm.com>
+# Contributions: Stefan Berger <stefanb@us.ibm.com>
 #============================================================================
 """Configuring a security policy into the boot configuration
 """
@@ -24,67 +25,60 @@ import tempfile
 import os, stat
 import shutil
 import string
-from xen.util.security import ACMError, err
-from xen.util.security import policy_dir_prefix, boot_filename, xen_title_re
-from xen.util.security import any_title_re, xen_kernel_re, kernel_ver_re, any_module_re
+import re
+from xen.util.security import err
+from xen.util.security import policy_dir_prefix, xen_title_re
+from xen.util.security import boot_filename, altboot_filename
+from xen.util.security import any_title_re, xen_kernel_re, any_module_re
 from xen.util.security import empty_line_re, binary_name_re, policy_name_re
 from xen.xm.opts import OptionError
 
 def help():
     return """
-    Adds a 'module' line to the Xen grub.conf entry
-    so that xen boots into a specific access control
-    policy. If kernelversion is not given, then this
-    script tries to determine it by looking for a grub
-    entry with a line kernel xen.* If there are multiple
-    Xen entries, then it must be called with an explicit
-    version (it will fail otherwise).\n"""
+    Adds a 'module' line to the Xen grub configuration file entry
+    so that Xen boots with a specific access control policy. If
+    kernelversion is not given, then this script tries to determine
+    it by looking for a title starting with \"XEN\". If there are
+    multiple entries matching, then it must be called with the unique
+    beginning of the title's name.\n"""
 
-def determine_kernelversion(user_specified):
-    within_xen_title = 0
-    within_xen_entry = 0
-    version_list = []
-    guess_version = None
-
-    grub_fd = open(boot_filename)
-    for line in grub_fd:
-        if xen_title_re.match(line):
-            within_xen_title = 1
-        elif within_xen_title and xen_kernel_re.match(line):
-            within_xen_entry = 1
-        elif within_xen_title and within_xen_entry and kernel_ver_re.match(line):
-            for i in line.split():
-                if (i.find("vmlinuz-") >= 0):
-                    # skip start until "vmlinuz-"
-                    guess_version = i[i.find("vmlinuz-") + len("vmlinuz-"):]
-                    if user_specified:
-                        if (guess_version == user_specified):
-                            version_list.append(guess_version)
-                    else:
-                        version_list.append(guess_version)
-        elif len(line.split()) > 0:
-            if line.split()[0] == "title":
-                within_xen_title = 0
-                within_xen_entry = 0
-    if len(version_list) > 1:
-        err("Cannot decide between entries for kernels %s" % version_list)
-    elif len(version_list) == 0:
-        err("Cannot find a boot entry candidate (please create a Xen boot entry first).")
+def strip_title(line):
+    """
+    strips whitespace left and right and cuts 'title'
+    """
+    s_title = string.strip(line)
+    pos = string.index(s_title, "title")
+    if pos >= 0:
+        return s_title[pos+6:]
     else:
-        return version_list[0]
+        return s_title
 
 
-
-def insert_policy(boot_file, kernel_version, policy_name):
+def insert_policy(boot_file, alt_boot_file, user_title, policy_name):
     """
     inserts policy binary file as last line of the grub entry
     matching the kernel_version version
     """
+    if user_title:
+        #replace "(" by "\(" and ")" by "\)" for matching
+        user_title = string.replace(user_title, "(", "\(")
+        user_title = string.replace(user_title, ")", "\)")
+        user_title_re = re.compile("\s*title\s+.*%s" \
+                                   % user_title, re.IGNORECASE)
+    else:
+        user_title_re = xen_title_re
+
     within_xen_title = 0
     within_xen_entry = 0
     insert_at_end_of_entry = 0
     path_prefix = ''
+    this_title = ''
+    extended_titles = []
     (tmp_fd, tmp_grub) = tempfile.mkstemp()
+    #First check whether menu.lst exists
+    if not os.path.isfile(boot_file):
+        #take alternate boot file (grub.conf) instead
+        boot_file = alt_boot_file
     #follow symlink since menue.lst might be linked to grub.conf
     if stat.S_ISLNK(os.lstat(boot_file)[stat.ST_MODE]):
         new_name = os.readlink(boot_file)
@@ -95,30 +89,33 @@ def insert_policy(boot_file, kernel_version, policy_name):
             path[len(path)-1] = new_name
             boot_file = '/'.join(path)
         if not os.path.exists(boot_file):
-            err("Boot file \'" + boot_file + "\' not found.")
+            err("Boot file \'%s\' not found." % boot_file)
     grub_fd = open(boot_file)
     for line in grub_fd:
-        if xen_title_re.match(line):
+        if user_title_re.match(line):
+            this_title = strip_title(line)
             within_xen_title = 1
         elif within_xen_title and xen_kernel_re.match(line):
-            within_xen_entry = 1
-        elif within_xen_title and within_xen_entry and kernel_ver_re.match(line):
-            for i in line.split():
-                if (i.find("vmlinuz-") >= 0):
-                    if  kernel_version == i[i.find("vmlinuz-") + len("vmlinuz-"):]:
-                        insert_at_end_of_entry = 1
-                        path_prefix = i[0:i.find("vmlinuz-")]
+            insert_at_end_of_entry = 1
+            #use prefix from xen.gz path for policy
+            path_prefix = line.split()[1]
+            idx = path_prefix.rfind('/')
+            if idx >= 0:
+                path_prefix = path_prefix[0:idx+1]
+            else:
+                path_prefix = ''
         elif any_module_re.match(line) and insert_at_end_of_entry:
             if binary_name_re.match(line):
                 #delete existing policy module line
                 line=''
         elif any_title_re.match(line):
             within_xen_title = 0
-            within_xen_entry = 0
 
-        if (empty_line_re.match(line) or any_title_re.match(line)) and insert_at_end_of_entry:
+        if (empty_line_re.match(line) or any_title_re.match(line)) and \
+            insert_at_end_of_entry:
             #newline or new title: we insert the policy module line here
             os.write(tmp_fd, "\tmodule " + path_prefix + policy_name + ".bin\n")
+            extended_titles.append(this_title)
             insert_at_end_of_entry = 0
         #write the line that was read (except potential existing policy entry)
         os.write(tmp_fd, line)
@@ -126,27 +123,36 @@ def insert_policy(boot_file, kernel_version, policy_name):
     if insert_at_end_of_entry:
         #last entry, no empty line at end of file
         os.write(tmp_fd, "\tmodule " + path_prefix + policy_name + ".bin\n")
+        extended_titles.append(this_title)
 
-    #temp file might be destroyed when closing it, first copy ...
+    #if more than one entry was changed, abort
+    if len(extended_titles) > 1:
+        err("Following boot entries matched: %s. \nPlease specify "
+            "unique part of the boot title." % extended_titles)
+    if len(extended_titles) == 0:
+        err("Boot entry not found. Please specify unique part "
+            "of the boot title.")
+
+    #temp file might be destroyed when closing it, first copy it
     shutil.move(boot_file, boot_file+"_save")
     shutil.copyfile(tmp_grub, boot_file)
     os.close(tmp_fd)
-    #temp file did not disappear on my system ...
+    #sometimes the temp file does not disappear
     try:
         os.remove(tmp_grub)
     except:
         pass
-
+    return extended_titles[0]
 
 
 def main(argv):
     user_kver = None
-    policy = None
+    user_title = None
     if len(argv) == 2:
         policy = argv[1]
     elif len(argv) == 3:
         policy = argv[1]
-        user_kver = argv[2]
+        user_title = argv[2]
     else:
         raise OptionError('Invalid number of arguments')
     
@@ -167,9 +173,10 @@ def main(argv):
     dst_binary_policy_file = "/boot/" + policy + ".bin"
     shutil.copyfile(src_binary_policy_file, dst_binary_policy_file)
     
-    kernel_version = determine_kernelversion(user_kver)
-    insert_policy(boot_filename, kernel_version, policy)
-    print "Boot entry created and \'%s\' copied to /boot" % (policy + ".bin")
+    entryname = insert_policy(boot_filename, altboot_filename,
+                              user_title, policy)
+    print "Boot entry '%s' extended and \'%s\' copied to /boot" \
+          % (entryname, policy + ".bin")
 
 if __name__ == '__main__':
     try:
@@ -177,4 +184,3 @@ if __name__ == '__main__':
     except Exception, e:
         sys.stderr.write('Error: ' + str(e) + '\n')    
         sys.exit(-1)
-        

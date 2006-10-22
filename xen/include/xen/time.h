@@ -49,6 +49,20 @@ struct domain;
 typedef s64 s_time_t;
 
 s_time_t get_s_time(void);
+unsigned long get_localtime(struct domain *d);
+
+struct tm {
+    int     tm_sec;         /* seconds */
+    int     tm_min;         /* minutes */
+    int     tm_hour;        /* hours */
+    int     tm_mday;        /* day of the month */
+    int     tm_mon;         /* month */
+    int     tm_year;        /* year */
+    int     tm_wday;        /* day of the week */
+    int     tm_yday;        /* day in the year */
+    int     tm_isdst;       /* daylight saving time */
+};
+struct tm gmtime(unsigned long t);
 
 #define NOW()           ((s_time_t)get_s_time())
 #define SECONDS(_s)     ((s_time_t)((_s)  * 1000000000ULL))

@@ -79,7 +79,7 @@ int uncanonicalize_pagetable(unsigned long type, void *page)
 
             if(pfn >= max_pfn) {
                 /* This "page table page" is probably not one; bail. */
-                ERR("Frame number in type %lu page table is out of range: "
+                ERROR("Frame number in type %lu page table is out of range: "
                     "i=%d pfn=0x%lx max_pfn=%lu",
                     type >> 28, i, pfn, max_pfn);
                 return 0;
@@ -158,24 +158,24 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
     if(!get_platform_info(xc_handle, dom,
                           &max_mfn, &hvirt_start, &pt_levels)) {
-        ERR("Unable to get platform info.");
+        ERROR("Unable to get platform info.");
         return 1;
     }
 
     if (mlock(&ctxt, sizeof(ctxt))) {
         /* needed for build domctl, but might as well do early */
-        ERR("Unable to mlock ctxt");
+        ERROR("Unable to mlock ctxt");
         return 1;
     }
 
     if (!(p2m_frame_list = malloc(P2M_FL_SIZE))) {
-        ERR("Couldn't allocate p2m_frame_list array");
+        ERROR("Couldn't allocate p2m_frame_list array");
         goto out;
     }
 
     /* Read first entry of P2M list, or extended-info signature (~0UL). */
     if (!read_exact(io_fd, p2m_frame_list, sizeof(long))) {
-        ERR("read extended-info signature failed");
+        ERROR("read extended-info signature failed");
         goto out;
     }
 
@@ -184,7 +184,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
         /* Next 4 bytes: total size of following extended info. */
         if (!read_exact(io_fd, &tot_bytes, sizeof(tot_bytes))) {
-            ERR("read extended-info size failed");
+            ERROR("read extended-info size failed");
             goto out;
         }
 
@@ -195,7 +195,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
             /* 4-character chunk signature + 4-byte remaining chunk size. */
             if (!read_exact(io_fd, chunk_sig, sizeof(chunk_sig)) ||
                 !read_exact(io_fd, &chunk_bytes, sizeof(chunk_bytes))) {
-                ERR("read extended-info chunk signature failed");
+                ERROR("read extended-info chunk signature failed");
                 goto out;
             }
             tot_bytes -= 8;
@@ -203,7 +203,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
             /* VCPU context structure? */
             if (!strncmp(chunk_sig, "vcpu", 4)) {
                 if (!read_exact(io_fd, &ctxt, sizeof(ctxt))) {
-                    ERR("read extended-info vcpu context failed");
+                    ERROR("read extended-info vcpu context failed");
                     goto out;
                 }
                 tot_bytes   -= sizeof(struct vcpu_guest_context);
@@ -219,7 +219,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
                 if ( sz > P2M_FL_SIZE )
                     sz = P2M_FL_SIZE;
                 if (!read_exact(io_fd, p2m_frame_list, sz)) {
-                    ERR("read-and-discard extended-info chunk bytes failed");
+                    ERROR("read-and-discard extended-info chunk bytes failed");
                     goto out;
                 }
                 chunk_bytes -= sz;
@@ -229,14 +229,14 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
         /* Now read the real first entry of P2M list. */
         if (!read_exact(io_fd, p2m_frame_list, sizeof(long))) {
-            ERR("read first entry of p2m_frame_list failed");
+            ERROR("read first entry of p2m_frame_list failed");
             goto out;
         }
     }
 
     /* First entry is already read into the p2m array. */
     if (!read_exact(io_fd, &p2m_frame_list[1], P2M_FL_SIZE - sizeof(long))) {
-        ERR("read p2m_frame_list failed");
+        ERROR("read p2m_frame_list failed");
         goto out;
     }
 
@@ -246,13 +246,13 @@ int xc_linux_restore(int xc_handle, int io_fd,
     region_mfn = calloc(MAX_BATCH_SIZE, sizeof(xen_pfn_t));
 
     if ((p2m == NULL) || (pfn_type == NULL) || (region_mfn == NULL)) {
-        ERR("memory alloc failed");
+        ERROR("memory alloc failed");
         errno = ENOMEM;
         goto out;
     }
 
     if (mlock(region_mfn, sizeof(xen_pfn_t) * MAX_BATCH_SIZE)) {
-        ERR("Could not mlock region_mfn");
+        ERROR("Could not mlock region_mfn");
         goto out;
     }
 
@@ -260,7 +260,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
     domctl.cmd = XEN_DOMCTL_getdomaininfo;
     domctl.domain = (domid_t)dom;
     if (xc_domctl(xc_handle, &domctl) < 0) {
-        ERR("Could not get information on new domain");
+        ERROR("Could not get information on new domain");
         goto out;
     }
     shared_info_frame = domctl.u.getdomaininfo.shared_info_frame;
@@ -272,7 +272,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
     if(xc_domain_memory_increase_reservation(
            xc_handle, dom, max_pfn, 0, 0, NULL) != 0) {
-        ERR("Failed to increase reservation by %lx KB", PFN_TO_KB(max_pfn));
+        ERROR("Failed to increase reservation by %lx KB", PFN_TO_KB(max_pfn));
         errno = ENOMEM;
         goto out;
     }
@@ -281,12 +281,12 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
     /* Build the pfn-to-mfn table. We choose MFN ordering returned by Xen. */
     if (xc_get_pfn_list(xc_handle, dom, p2m, max_pfn) != max_pfn) {
-        ERR("Did not read correct number of frame numbers for new dom");
+        ERROR("Did not read correct number of frame numbers for new dom");
         goto out;
     }
 
     if(!(mmu = xc_init_mmu_updates(xc_handle, dom))) {
-        ERR("Could not initialise for MMU updates");
+        ERROR("Could not initialise for MMU updates");
         goto out;
     }
 
@@ -312,7 +312,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
         }
 
         if (!read_exact(io_fd, &j, sizeof(int))) {
-            ERR("Error when reading batch size");
+            ERROR("Error when reading batch size");
             goto out;
         }
 
@@ -328,12 +328,12 @@ int xc_linux_restore(int xc_handle, int io_fd,
             break;  /* our work here is done */
 
         if (j > MAX_BATCH_SIZE) {
-            ERR("Max batch size exceeded. Giving up.");
+            ERROR("Max batch size exceeded. Giving up.");
             goto out;
         }
 
         if (!read_exact(io_fd, region_pfn_type, j*sizeof(unsigned long))) {
-            ERR("Error when reading region pfn types");
+            ERROR("Error when reading region pfn types");
             goto out;
         }
 
@@ -353,7 +353,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
             xc_handle, dom, PROT_WRITE, region_mfn, j);
         if ( region_base == NULL )
         {
-            ERR("map batch failed");
+            ERROR("map batch failed");
             goto out;
         }
 
@@ -371,7 +371,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
             if ( pfn > max_pfn )
             {
-                ERR("pfn out of range");
+                ERROR("pfn out of range");
                 goto out;
             }
 
@@ -383,7 +383,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
             page = verify ? (void *)buf : (region_base + i*PAGE_SIZE);
 
             if (!read_exact(io_fd, page, PAGE_SIZE)) {
-                ERR("Error when reading page (type was %lx)", pagetype);
+                ERROR("Error when reading page (type was %lx)", pagetype);
                 goto out;
             }
 
@@ -422,7 +422,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
             }
             else if ( pagetype != XEN_DOMCTL_PFINFO_NOTAB )
             {
-                ERR("Bogus page type %lx page table is out of range: "
+                ERROR("Bogus page type %lx page table is out of range: "
                     "i=%d max_pfn=%lu", pagetype, i, max_pfn);
                 goto out;
 
@@ -455,7 +455,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
             if (xc_add_mmu_update(xc_handle, mmu,
                                   (((unsigned long long)mfn) << PAGE_SHIFT)
                                   | MMU_MACHPHYS_UPDATE, pfn)) {
-                ERR("failed machpys update mfn=%lx pfn=%lx", mfn, pfn);
+                ERROR("failed machpys update mfn=%lx pfn=%lx", mfn, pfn);
                 goto out;
             }
         } /* end of 'batch' for loop */
@@ -469,7 +469,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
      * reallocations below.
      */
     if (xc_finish_mmu_updates(xc_handle, mmu)) {
-        ERR("Error doing finish_mmu_updates()");
+        ERROR("Error doing finish_mmu_updates()");
         goto out;
     }
 
@@ -512,7 +512,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
                 munmap(l3tab, PAGE_SIZE);
 
                 if (!(new_mfn=xc_make_page_below_4G(xc_handle, dom, p2m[i]))) {
-                    ERR("Couldn't get a page below 4GB :-(");
+                    ERROR("Couldn't get a page below 4GB :-(");
                     goto out;
                 }
 
@@ -521,7 +521,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
                                       (((unsigned long long)new_mfn)
                                        << PAGE_SHIFT) |
                                       MMU_MACHPHYS_UPDATE, i)) {
-                    ERR("Couldn't m2p on PAE root pgdir");
+                    ERROR("Couldn't m2p on PAE root pgdir");
                     goto out;
                 }
 
@@ -554,14 +554,14 @@ int xc_linux_restore(int xc_handle, int io_fd,
                 if (!(region_base = xc_map_foreign_batch(
                           xc_handle, dom, PROT_READ | PROT_WRITE,
                           region_mfn, j))) {
-                    ERR("map batch failed");
+                    ERROR("map batch failed");
                     goto out;
                 }
 
                 for(k = 0; k < j; k++) {
                     if(!uncanonicalize_pagetable(XEN_DOMCTL_PFINFO_L1TAB,
                                                  region_base + k*PAGE_SIZE)) {
-                        ERR("failed uncanonicalize pt!");
+                        ERROR("failed uncanonicalize pt!");
                         goto out;
                     }
                 }
@@ -572,7 +572,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
         }
 
         if (xc_finish_mmu_updates(xc_handle, mmu)) {
-            ERR("Error doing finish_mmu_updates()");
+            ERROR("Error doing finish_mmu_updates()");
             goto out;
         }
     }
@@ -615,7 +615,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
         /* Batch full? Then flush. */
         if (nr_pins == MAX_PIN_BATCH) {
             if (xc_mmuext_op(xc_handle, pin, nr_pins, dom) < 0) {
-                ERR("Failed to pin batch of %d page tables", nr_pins);
+                ERROR("Failed to pin batch of %d page tables", nr_pins);
                 goto out;
             }
             nr_pins = 0;
@@ -624,7 +624,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
     /* Flush final partial batch. */
     if ((nr_pins != 0) && (xc_mmuext_op(xc_handle, pin, nr_pins, dom) < 0)) {
-        ERR("Failed to pin batch of %d page tables", nr_pins);
+        ERROR("Failed to pin batch of %d page tables", nr_pins);
         goto out;
     }
 
@@ -638,17 +638,17 @@ int xc_linux_restore(int xc_handle, int io_fd,
         int rc;
 
         if (!read_exact(io_fd, &count, sizeof(count))) {
-            ERR("Error when reading pfn count");
+            ERROR("Error when reading pfn count");
             goto out;
         }
 
         if(!(pfntab = malloc(sizeof(unsigned long) * count))) {
-            ERR("Out of memory");
+            ERROR("Out of memory");
             goto out;
         }
 
         if (!read_exact(io_fd, pfntab, sizeof(unsigned long)*count)) {
-            ERR("Error when reading pfntab");
+            ERROR("Error when reading pfntab");
             goto out;
         }
 
@@ -675,7 +675,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
             if ((rc = xc_memory_op(xc_handle, XENMEM_decrease_reservation,
                                    &reservation)) != count) {
-                ERR("Could not decrease reservation : %d", rc);
+                ERROR("Could not decrease reservation : %d", rc);
                 goto out;
             } else
                 DPRINTF("Decreased reservation by %d pages\n", count);
@@ -684,14 +684,14 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
     if (!read_exact(io_fd, &ctxt, sizeof(ctxt)) ||
         !read_exact(io_fd, shared_info_page, PAGE_SIZE)) {
-        ERR("Error when reading ctxt or shared info page");
+        ERROR("Error when reading ctxt or shared info page");
         goto out;
     }
 
     /* Uncanonicalise the suspend-record frame number and poke resume rec. */
     pfn = ctxt.user_regs.edx;
     if ((pfn >= max_pfn) || (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB)) {
-        ERR("Suspend record frame number is bad");
+        ERROR("Suspend record frame number is bad");
         goto out;
     }
     ctxt.user_regs.edx = mfn = p2m[pfn];
@@ -709,14 +709,14 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
     /* Uncanonicalise each GDT frame number. */
     if (ctxt.gdt_ents > 8192) {
-        ERR("GDT entry count out of range");
+        ERROR("GDT entry count out of range");
         goto out;
     }
 
     for (i = 0; i < ctxt.gdt_ents; i += 512) {
         pfn = ctxt.gdt_frames[i];
         if ((pfn >= max_pfn) || (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB)) {
-            ERR("GDT frame number is bad");
+            ERROR("GDT frame number is bad");
             goto out;
         }
         ctxt.gdt_frames[i] = p2m[pfn];
@@ -726,14 +726,14 @@ int xc_linux_restore(int xc_handle, int io_fd,
     pfn = xen_cr3_to_pfn(ctxt.ctrlreg[3]);
 
     if (pfn >= max_pfn) {
-        ERR("PT base is bad: pfn=%lu max_pfn=%lu type=%08lx",
+        ERROR("PT base is bad: pfn=%lu max_pfn=%lu type=%08lx",
             pfn, max_pfn, pfn_type[pfn]);
         goto out;
     }
 
     if ( (pfn_type[pfn] & XEN_DOMCTL_PFINFO_LTABTYPE_MASK) !=
          ((unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT) ) {
-        ERR("PT base is bad. pfn=%lu nr=%lu type=%08lx %08lx",
+        ERROR("PT base is bad. pfn=%lu nr=%lu type=%08lx %08lx",
             pfn, max_pfn, pfn_type[pfn],
             (unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT);
         goto out;
@@ -757,7 +757,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
     for (i = 0; i < P2M_FL_ENTRIES; i++) {
         pfn = p2m_frame_list[i];
         if ((pfn >= max_pfn) || (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB)) {
-            ERR("PFN-to-MFN frame number is bad");
+            ERROR("PFN-to-MFN frame number is bad");
             goto out;
         }
 
@@ -767,7 +767,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
     /* Copy the P2M we've constructed to the 'live' P2M */
     if (!(live_p2m = xc_map_foreign_batch(xc_handle, dom, PROT_WRITE,
                                           p2m_frame_list, P2M_FL_ENTRIES))) {
-        ERR("Couldn't map p2m table");
+        ERROR("Couldn't map p2m table");
         goto out;
     }
 
@@ -803,7 +803,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
         (ctxt.ldt_ents > 8192) ||
         (ctxt.ldt_base > hvirt_start) ||
         ((ctxt.ldt_base + ctxt.ldt_ents*8) > hvirt_start)) {
-        ERR("Bad LDT base or size");
+        ERROR("Bad LDT base or size");
         goto out;
     }
 
@@ -816,7 +816,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
     rc = xc_domctl(xc_handle, &domctl);
 
     if (rc != 0) {
-        ERR("Couldn't build the domain");
+        ERROR("Couldn't build the domain");
         goto out;
     }
 

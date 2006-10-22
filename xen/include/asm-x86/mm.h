@@ -114,15 +114,14 @@ struct page_info
 #define PGC_SH_fl1_pae_shadow (5U<<28) /* L1 shadow for pae 2M superpg */
 #define PGC_SH_l2_pae_shadow  (6U<<28) /* shadowing a pae L2-low page */
 #define PGC_SH_l2h_pae_shadow (7U<<28) /* shadowing a pae L2-high page */
-#define PGC_SH_l3_pae_shadow  (8U<<28) /* shadowing a pae L3 page */
-#define PGC_SH_l1_64_shadow   (9U<<28) /* shadowing a 64-bit L1 page */
-#define PGC_SH_fl1_64_shadow (10U<<28) /* L1 shadow for 64-bit 2M superpg */
-#define PGC_SH_l2_64_shadow  (11U<<28) /* shadowing a 64-bit L2 page */
-#define PGC_SH_l3_64_shadow  (12U<<28) /* shadowing a 64-bit L3 page */
-#define PGC_SH_l4_64_shadow  (13U<<28) /* shadowing a 64-bit L4 page */
-#define PGC_SH_max_shadow    (13U<<28)
-#define PGC_SH_p2m_table     (14U<<28) /* in use as the p2m table */
-#define PGC_SH_monitor_table (15U<<28) /* in use as a monitor table */
+#define PGC_SH_l1_64_shadow   (8U<<28) /* shadowing a 64-bit L1 page */
+#define PGC_SH_fl1_64_shadow  (9U<<28) /* L1 shadow for 64-bit 2M superpg */
+#define PGC_SH_l2_64_shadow  (10U<<28) /* shadowing a 64-bit L2 page */
+#define PGC_SH_l3_64_shadow  (11U<<28) /* shadowing a 64-bit L3 page */
+#define PGC_SH_l4_64_shadow  (12U<<28) /* shadowing a 64-bit L4 page */
+#define PGC_SH_max_shadow    (12U<<28)
+#define PGC_SH_p2m_table     (13U<<28) /* in use as the p2m table */
+#define PGC_SH_monitor_table (14U<<28) /* in use as a monitor table */
 #define PGC_SH_unused        (15U<<28)
 
 #define PGC_SH_type_mask     (15U<<28)

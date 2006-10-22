@@ -49,7 +49,6 @@
 #define RW_STATE_WORD0 3
 #define RW_STATE_WORD1 4
 
-#define ticks_per_sec(v)      (v->domain->arch.hvm_domain.tsc_frequency)
 static int handle_pit_io(ioreq_t *p);
 static int handle_speaker_io(ioreq_t *p);
 
@@ -75,17 +74,6 @@ uint64_t muldiv64(uint64_t a, uint32_t b, uint32_t c)
     res.l.high = rh / c;
     res.l.low = (((rh % c) << 32) + (rl & 0xffffffff)) / c;
     return res.ll;
-}
-
-/*
- * get processor time.
- * unit: TSC
- */
-int64_t hvm_get_clock(struct vcpu *v)
-{
-    uint64_t  gtsc;
-    gtsc = hvm_get_guest_time(v);
-    return gtsc;
 }
 
 static int pit_get_count(PITChannelState *s)
@@ -215,11 +203,11 @@ static inline void pit_load_count(PITChannelState *s, int val)
     switch (s->mode) {
         case 2:
             /* create periodic time */
-            s->pt = create_periodic_time (s, period, 0, 0);
+            s->pt = create_periodic_time (period, 0, 0, pit_time_fired, s);
             break;
         case 1:
             /* create one shot time */
-            s->pt = create_periodic_time (s, period, 0, 1);
+            s->pt = create_periodic_time (period, 0, 1, pit_time_fired, s);
 #ifdef DEBUG_PIT
             printk("HVM_PIT: create one shot time.\n");
 #endif

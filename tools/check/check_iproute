@@ -1,11 +1,26 @@
-#!/bin/bash
+#!/bin/sh
 # CHECK-INSTALL
 
-function error {
-   echo
-   echo '  *** Check for iproute (ip addr) FAILED'
-   exit 1
-}
+RC=0
 
-ip addr list 1>/dev/null 2>&1 || error
+case ${OS} in
+OpenBSD|NetBSD|FreeBSD)
+	TOOL="ifconfig"
+	eval ${TOOL} -a 1>/dev/null 2>&1 || RC=1 
+	;;
+Linux)
+	TOOL="ip addr"
+	eval ${TOOL} list 1>/dev/null 2>&1 || RC=1 
+	;;
+*)
+	TOOL=""
+	echo "Unknown OS" && RC=1 
+	;;
+esac
 
+if test ${RC} -ne 0; then
+	echo
+	echo " *** Check for iproute (${TOOL}) FAILED"
+fi
+
+exit ${RC} 

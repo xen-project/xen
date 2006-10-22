@@ -33,7 +33,7 @@ typedef struct {
 #endif
 } spinlock_t;
 
-#define SPIN_LOCK_UNLOCKED			(spinlock_t) { 0 }
+#define SPIN_LOCK_UNLOCKED			/*(spinlock_t)*/ { 0 }
 #define spin_lock_init(x)			((x)->lock = 0)
 
 #ifdef ASM_SUPPORTED
@@ -136,9 +136,9 @@ typedef struct {
 	unsigned int break_lock;
 #endif
 } rwlock_t;
-#define RW_LOCK_UNLOCKED (rwlock_t) { 0, 0 }
+#define RW_LOCK_UNLOCKED /*(rwlock_t)*/ { 0, 0 }
 
-#define rwlock_init(x)		do { *(x) = RW_LOCK_UNLOCKED; } while(0)
+#define rwlock_init(x)		do { *(x) = (rwlock_t) RW_LOCK_UNLOCKED; } while(0)
 #define read_can_lock(rw)	(*(volatile int *)(rw) >= 0)
 #define write_can_lock(rw)	(*(volatile int *)(rw) == 0)
 

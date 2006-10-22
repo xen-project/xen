@@ -17,7 +17,6 @@
 #include <xen/hvm/e820.h>
 
 #define HVM_LOADER_ENTR_ADDR  0x00100000
-
 static int
 parseelfimage(
     char *elfbase, unsigned long elfsize, struct domain_setup_info *dsi);
@@ -82,15 +81,16 @@ static void build_e820map(void *e820_page, unsigned long long mem_size)
     e820entry[nr_map].type = E820_IO;
     nr_map++;
 
+    e820entry[nr_map].addr = 0xEA000;
+    e820entry[nr_map].size = 0x01000;
+    e820entry[nr_map].type = E820_ACPI;
+    nr_map++;
+
     e820entry[nr_map].addr = 0xF0000;
     e820entry[nr_map].size = 0x10000;
     e820entry[nr_map].type = E820_RESERVED;
     nr_map++;
 
-/* ACPI data: 10 pages. */
-#define ACPI_DATA_PAGES     10
-/* ACPI NVS: 3 pages.   */
-#define ACPI_NVS_PAGES      3
 /* buffered io page.    */
 #define BUFFERED_IO_PAGES   1
 /* xenstore page.       */
@@ -102,36 +102,13 @@ static void build_e820map(void *e820_page, unsigned long long mem_size)
     /* Most of the ram goes here */
     e820entry[nr_map].addr = 0x100000;
     e820entry[nr_map].size = mem_size - 0x100000 - PAGE_SIZE *
-                                                (ACPI_DATA_PAGES +
-                                                 ACPI_NVS_PAGES +
-                                                 BUFFERED_IO_PAGES +
+                                                (BUFFERED_IO_PAGES +
                                                  XENSTORE_PAGES +
                                                  SHARED_IO_PAGES);
     e820entry[nr_map].type = E820_RAM;
     nr_map++;
 
     /* Statically allocated special pages */
-
-    /* For ACPI data */
-    e820entry[nr_map].addr = mem_size - PAGE_SIZE *
-                                        (ACPI_DATA_PAGES +
-                                         ACPI_NVS_PAGES +
-                                         BUFFERED_IO_PAGES +
-                                         XENSTORE_PAGES +
-                                         SHARED_IO_PAGES);
-    e820entry[nr_map].size = PAGE_SIZE * ACPI_DATA_PAGES;
-    e820entry[nr_map].type = E820_ACPI;
-    nr_map++;
-
-    /* For ACPI NVS */
-    e820entry[nr_map].addr = mem_size - PAGE_SIZE *
-                                        (ACPI_NVS_PAGES +
-                                         BUFFERED_IO_PAGES +
-                                         XENSTORE_PAGES +
-                                         SHARED_IO_PAGES);
-    e820entry[nr_map].size = PAGE_SIZE * ACPI_NVS_PAGES;
-    e820entry[nr_map].type = E820_NVS;
-    nr_map++;
 
     /* For buffered IO requests */
     e820entry[nr_map].addr = mem_size - PAGE_SIZE *

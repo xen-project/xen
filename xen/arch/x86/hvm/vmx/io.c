@@ -153,7 +153,7 @@ asmlinkage void vmx_intr_assist(void)
     case APIC_DM_FIXED:
     case APIC_DM_LOWEST:
         vmx_inject_extint(v, highest_vector, VMX_DELIVER_NO_ERROR_CODE);
-        TRACE_3D(TRC_VMX_INT, v->domain->domain_id, highest_vector, 0);
+        TRACE_3D(TRC_VMX_INTR, v->domain->domain_id, highest_vector, 0);
         break;
 
     case APIC_DM_SMI:

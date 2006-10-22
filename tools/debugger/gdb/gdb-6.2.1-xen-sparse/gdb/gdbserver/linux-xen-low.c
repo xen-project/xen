@@ -36,8 +36,6 @@
 #include <unistd.h>
 #include <errno.h>
 #include <xenctrl.h>
-#include <thread_db.h>
-#include <xc_ptrace.h>
 
 #define TRACE_ENTER /* printf("enter %s\n", __FUNCTION__) */
 

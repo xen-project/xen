@@ -17,6 +17,7 @@ import traceback
 import xen.lowlevel.xc
 
 from xen.xend.XendLogging import log
+from xen.xend import osdep
 
 import relocate
 import SrvServer
@@ -168,8 +169,14 @@ class Daemon:
             # ready to receive requests.  All subsequent restarts we don't
             # want this behaviour, or the pipe will eventually fill up, so
             # we just pass None into run in subsequent cases (by clearing w
-            # in the parent of the first fork).
+            # in the parent of the first fork).  On some operating systems,
+            # restart is managed externally, so we won't fork, and just exit.
             while True:
+
+                if not osdep.xend_autorestart:
+                    self.run(os.fdopen(w, 'w'))
+                    break
+
                 pid = self.fork_pid()
                 if pid:
                     if w is not None:

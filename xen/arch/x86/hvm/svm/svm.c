@@ -54,13 +54,10 @@
 
 /* External functions. We should move these to some suitable header file(s) */
 
-extern void do_nmi(struct cpu_user_regs *, unsigned long);
 extern int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip,
                                 int inst_len);
 extern uint32_t vlapic_update_ppr(struct vlapic *vlapic);
 extern asmlinkage void do_IRQ(struct cpu_user_regs *);
-extern void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
-                         unsigned long count, int size, long value, int dir, int pvalid);
 extern void svm_dump_inst(unsigned long eip);
 extern int svm_dbg_on;
 void svm_dump_regs(const char *from, struct cpu_user_regs *regs);
@@ -196,6 +193,7 @@ static inline void svm_inject_exception(struct vcpu *v, int trap,
     ASSERT(vmcb->eventinj.fields.v == 0);
     
     vmcb->eventinj = event;
+    v->arch.hvm_svm.inject_event=1;
 }
 
 static void stop_svm(void)
@@ -923,6 +921,7 @@ static void svm_relinquish_guest_resources(struct domain *d)
     }
 
     kill_timer(&d->arch.hvm_domain.pl_time.periodic_tm.timer);
+    rtc_deinit(d);
 
     if ( d->arch.hvm_domain.shared_page_va )
         unmap_domain_page_global(
@@ -937,6 +936,7 @@ static void svm_migrate_timers(struct vcpu *v)
 {
     struct periodic_time *pt = 
         &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
+    struct RTCState *vrtc = &v->domain->arch.hvm_domain.pl_time.vrtc;
 
     if ( pt->enabled )
     {
@@ -945,6 +945,8 @@ static void svm_migrate_timers(struct vcpu *v)
     }
     if ( VLAPIC(v) != NULL )
         migrate_timer(&VLAPIC(v)->vlapic_timer, v->processor);
+    migrate_timer(&vrtc->second_timer, v->processor);
+    migrate_timer(&vrtc->second_timer2, v->processor);
 }
 
 
@@ -1410,7 +1412,7 @@ static void svm_io_instruction(struct vcpu *v)
     struct cpu_user_regs *regs;
     struct hvm_io_op *pio_opp;
     unsigned int port;
-    unsigned int size, dir;
+    unsigned int size, dir, df;
     ioio_info_t info;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
@@ -1429,6 +1431,8 @@ static void svm_io_instruction(struct vcpu *v)
 
     port = info.fields.port; /* port used to be addr */
     dir = info.fields.type; /* direction */ 
+    df = regs->eflags & X86_EFLAGS_DF ? 1 : 0;
+
     if (info.fields.sz32) 
         size = 4;
     else if (info.fields.sz16)
@@ -1445,7 +1449,7 @@ static void svm_io_instruction(struct vcpu *v)
     if (info.fields.str)
     { 
         unsigned long addr, count;
-        int sign = regs->eflags & EF_DF ? -1 : 1;
+        int sign = regs->eflags & X86_EFLAGS_DF ? -1 : 1;
 
         if (!svm_get_io_address(v, regs, dir, &count, &addr)) 
         {
@@ -1475,25 +1479,37 @@ static void svm_io_instruction(struct vcpu *v)
             unsigned long value = 0;
 
             pio_opp->flags |= OVERLAP;
+            pio_opp->addr = addr;
 
-            if (dir == IOREQ_WRITE)
-                (void)hvm_copy_from_guest_virt(&value, addr, size);
+            if (dir == IOREQ_WRITE)   /* OUTS */
+            {
+                if (hvm_paging_enabled(current))
+                    (void)hvm_copy_from_guest_virt(&value, addr, size);
+                else
+                    (void)hvm_copy_from_guest_phys(&value, addr, size);
+            }
 
-            send_pio_req(regs, port, 1, size, value, dir, 0);
+            if (count == 1)
+                regs->eip = vmcb->exitinfo2;
+
+            send_pio_req(port, 1, size, value, dir, df, 0);
         } 
         else 
         {
-            if ((addr & PAGE_MASK) != ((addr + count * size - 1) & PAGE_MASK))
+            unsigned long last_addr = sign > 0 ? addr + count * size - 1
+                                               : addr - (count - 1) * size;
+
+            if ((addr & PAGE_MASK) != (last_addr & PAGE_MASK))
             {
                 if (sign > 0)
                     count = (PAGE_SIZE - (addr & ~PAGE_MASK)) / size;
                 else
-                    count = (addr & ~PAGE_MASK) / size;
+                    count = (addr & ~PAGE_MASK) / size + 1;
             }
             else    
                 regs->eip = vmcb->exitinfo2;
 
-            send_pio_req(regs, port, count, size, addr, dir, 1);
+            send_pio_req(port, count, size, addr, dir, df, 1);
         }
     } 
     else 
@@ -1507,7 +1523,7 @@ static void svm_io_instruction(struct vcpu *v)
         if (port == 0xe9 && dir == IOREQ_WRITE && size == 1) 
             hvm_print_line(v, regs->eax); /* guest debug output */
     
-        send_pio_req(regs, port, 1, size, regs->eax, dir, 0);
+        send_pio_req(port, 1, size, regs->eax, dir, df, 0);
     }
 }
 
@@ -1539,9 +1555,8 @@ static int svm_set_cr0(unsigned long value)
     if ((value & X86_CR0_PE) && (value & X86_CR0_PG) && !paging_enabled) 
     {
         /* The guest CR3 must be pointing to the guest physical. */
-        if (!VALID_MFN(mfn = 
-                       get_mfn_from_gpfn(v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT))
-            || !get_page(mfn_to_page(mfn), v->domain))
+        mfn = get_mfn_from_gpfn(v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT);
+        if ( !VALID_MFN(mfn) || !get_page(mfn_to_page(mfn), v->domain))
         {
             printk("Invalid CR3 value = %lx\n", v->arch.hvm_svm.cpu_cr3);
             domain_crash_synchronous(); /* need to take a clean path */
@@ -1725,9 +1740,8 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
              * first.
              */
             HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 value = %lx", value);
-            if (((value >> PAGE_SHIFT) > v->domain->max_pages) 
-                || !VALID_MFN(mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT))
-                || !get_page(mfn_to_page(mfn), v->domain))
+            mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
+            if ( !VALID_MFN(mfn) || !get_page(mfn_to_page(mfn), v->domain))
             {
                 printk("Invalid CR3 value=%lx\n", value);
                 domain_crash_synchronous(); /* need to take a clean path */
@@ -1739,9 +1753,6 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
             if (old_base_mfn)
                 put_page(mfn_to_page(old_base_mfn));
 
-            /*
-             * arch.shadow_table should now hold the next CR3 for shadow
-             */
             v->arch.hvm_svm.cpu_cr3 = value;
             update_cr3(v);
             vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3; 
@@ -1764,9 +1775,8 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
                 /* The guest is a 32-bit PAE guest. */
 #if CONFIG_PAGING_LEVELS >= 3
                 unsigned long mfn, old_base_mfn;
-
-                if ( !VALID_MFN(mfn = get_mfn_from_gpfn(
-                    v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT)) ||
+                mfn = get_mfn_from_gpfn(v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT);
+                if ( !VALID_MFN(mfn) || 
                      !get_page(mfn_to_page(mfn), v->domain) )
                 {
                     printk("Invalid CR3 value = %lx", v->arch.hvm_svm.cpu_cr3);
@@ -1787,10 +1797,6 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
                             (unsigned long) (mfn << PAGE_SHIFT));
 
                 vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3; 
-
-                /*
-                 * arch->shadow_table should hold the next CR3 for shadow
-                 */
 
                 HVM_DBG_LOG(DBG_LEVEL_VMMU, 
                             "Update CR3 value = %lx, mfn = %lx",
@@ -2355,7 +2361,7 @@ void svm_dump_regs(const char *from, struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    unsigned long pt = pagetable_get_paddr(v->arch.shadow_table);
+    unsigned long pt = v->arch.hvm_vcpu.hw_cr3;
 
     printf("%s: guest registers from %s:\n", __func__, from);
 #if defined (__x86_64__)
@@ -2589,7 +2595,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     save_svm_cpu_user_regs(v, regs);
 
     vmcb->tlb_control = 1;
-
+    v->arch.hvm_svm.inject_event = 0;
 
     if (exit_reason == VMEXIT_INVALID)
     {
@@ -2681,11 +2687,11 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         if (do_debug)
         {
             printk("%s:+ guest_table = 0x%08x, monitor_table = 0x%08x, "
-                   "shadow_table = 0x%08x\n", 
+                   "hw_cr3 = 0x%16lx\n", 
                    __func__,
                    (int) v->arch.guest_table.pfn,
                    (int) v->arch.monitor_table.pfn, 
-                   (int) v->arch.shadow_table.pfn);
+                   (long unsigned int) v->arch.hvm_vcpu.hw_cr3);
 
             svm_dump_vmcb(__func__, vmcb);
             svm_dump_regs(__func__, regs);
@@ -2729,7 +2735,6 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     break;
 
     case VMEXIT_NMI:
-        do_nmi(regs, 0);
         break;
 
     case VMEXIT_SMI:
@@ -2788,7 +2793,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 
             v->arch.hvm_svm.cpu_cr2 = va;
             vmcb->cr2 = va;
-            TRACE_3D(TRC_VMX_INT, v->domain->domain_id, 
+            TRACE_3D(TRC_VMX_INTR, v->domain->domain_id,
                      VMEXIT_EXCEPTION_PF, va);
         }
         break;
@@ -2801,6 +2806,11 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         svm_dump_inst(svm_rip2pointer(vmcb));
         svm_inject_exception(v, TRAP_double_fault, 1, 0);
         break;
+
+    case VMEXIT_VINTR:
+	vmcb->vintr.fields.irq = 0;
+	vmcb->general1_intercepts &= ~GENERAL1_INTERCEPT_VINTR;
+	break;
 
     case VMEXIT_INTR:
         break;
@@ -2913,10 +2923,10 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     if (do_debug) 
     {
         printk("vmexit_handler():- guest_table = 0x%08x, "
-               "monitor_table = 0x%08x, shadow_table = 0x%08x\n",
+               "monitor_table = 0x%08x, hw_cr3 = 0x%16x\n",
                (int)v->arch.guest_table.pfn,
                (int)v->arch.monitor_table.pfn, 
-               (int)v->arch.shadow_table.pfn);
+               (int)v->arch.hvm_vcpu.hw_cr3);
         printk("svm_vmexit_handler: Returning\n");
     }
 #endif

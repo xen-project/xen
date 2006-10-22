@@ -1,8 +1,3 @@
-INSTALL		= install
-INSTALL_PROG	= $(INSTALL) -m0755
-INSTALL_DIR	= $(INSTALL) -d -m0755
-INSTALL_DATA	= $(INSTALL) -m0644
-
 XEN_ROOT=../..
 include $(XEN_ROOT)/tools/Rules.mk
 

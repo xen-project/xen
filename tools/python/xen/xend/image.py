@@ -20,6 +20,7 @@
 import os, string
 import re
 import math
+import signal
 
 import xen.lowlevel.xc
 from xen.xend import sxp
@@ -312,6 +313,11 @@ class HVMImageHandler(ImageHandler):
                 if v:
                     ret.append("-%s" % a)
                     ret.append("%s" % v)
+
+            if a in ['fda', 'fdb' ]:
+                if v:
+                    if not os.path.isfile(v):
+                        raise VmError("Floppy file %s does not exist." % v)
             log.debug("args: %s, val: %s" % (a,v))
 
         # Handle disk/network related options
@@ -349,23 +355,49 @@ class HVMImageHandler(ImageHandler):
         sdl = sxp.child_value(config, 'sdl')
         ret = []
         nographic = sxp.child_value(config, 'nographic')
+
+        # get password from VM config (if password omitted, None)
+        vncpasswd_vmconfig = sxp.child_value(config, 'vncpasswd')
+
         if nographic:
             ret.append('-nographic')
+            # remove password
+            if vncpasswd_vmconfig:
+                config.remove(['vncpasswd', vncpasswd_vmconfig])
             return ret
+
         if vnc:
             vncdisplay = sxp.child_value(config, 'vncdisplay',
                                          int(self.vm.getDomid()))
+
             vncunused = sxp.child_value(config, 'vncunused')
             if vncunused:
                 ret += ['-vncunused']
             else:
                 ret += ['-vnc', '%d' % vncdisplay]
+
             ret += ['-k', 'en-us']
+
             vnclisten = sxp.child_value(config, 'vnclisten')
             if not(vnclisten):
-                vnclisten = xen.xend.XendRoot.instance().get_vnclisten_address()
+                vnclisten = (xen.xend.XendRoot.instance().
+                             get_vnclisten_address())
             if vnclisten:
                 ret += ['-vnclisten', vnclisten]
+
+            vncpasswd = vncpasswd_vmconfig
+            if vncpasswd is None:
+                vncpasswd = (xen.xend.XendRoot.instance().
+                             get_vncpasswd_default())
+                if vncpasswd is None:
+                    raise VmError('vncpasswd is not set up in ' +
+                                  'VMconfig and xend-config.')
+            if vncpasswd != '':
+                self.vm.storeVm("vncpasswd", vncpasswd)
+
+        # remove password
+        config.remove(['vncpasswd', vncpasswd_vmconfig])
+
         return ret
 
     def createDeviceModel(self):
@@ -390,7 +422,6 @@ class HVMImageHandler(ImageHandler):
 
     def destroy(self):
         self.unregister_shutdown_watch();
-        import signal
         if not self.pid:
             return
         os.kill(self.pid, signal.SIGKILL)

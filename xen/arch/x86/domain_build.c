@@ -286,7 +286,8 @@ int construct_dom0(struct domain *d,
         nr_pages = avail_domheap_pages() + initial_images_nrpages() +
             dom0_nrpages;
     else
-        nr_pages = dom0_nrpages;
+        nr_pages = min(avail_domheap_pages() + initial_images_nrpages(),
+                       (unsigned long)dom0_nrpages);
 
     if ( (rc = parseelfimage(&dsi)) != 0 )
         return rc;
@@ -667,6 +668,8 @@ int construct_dom0(struct domain *d,
         d->shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
 
     if ( opt_dom0_max_vcpus == 0 )
+        opt_dom0_max_vcpus = num_online_cpus();
+    if ( opt_dom0_max_vcpus > num_online_cpus() )
         opt_dom0_max_vcpus = num_online_cpus();
     if ( opt_dom0_max_vcpus > MAX_VIRT_CPUS )
         opt_dom0_max_vcpus = MAX_VIRT_CPUS;

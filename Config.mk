@@ -4,43 +4,21 @@
 debug ?= n
 
 XEN_COMPILE_ARCH    ?= $(shell uname -m | sed -e s/i.86/x86_32/ \
-                                              -e s/ppc/powerpc/)
+                         -e s/ppc/powerpc/ -e s/i86pc/x86_32/)
 XEN_TARGET_ARCH     ?= $(XEN_COMPILE_ARCH)
 XEN_TARGET_X86_PAE  ?= n
+XEN_OS              ?= $(shell uname -s)
+
+CONFIG_$(XEN_OS) := y
 
 # Tools to run on system hosting the build
 HOSTCC     = gcc
 HOSTCFLAGS = -Wall -Werror -Wstrict-prototypes -O2 -fomit-frame-pointer
 
-AS         = $(CROSS_COMPILE)as
-LD         = $(CROSS_COMPILE)ld
-CC         = $(CROSS_COMPILE)gcc
-CPP        = $(CROSS_COMPILE)gcc -E
-AR         = $(CROSS_COMPILE)ar
-RANLIB     = $(CROSS_COMPILE)ranlib
-NM         = $(CROSS_COMPILE)nm
-STRIP      = $(CROSS_COMPILE)strip
-OBJCOPY    = $(CROSS_COMPILE)objcopy
-OBJDUMP    = $(CROSS_COMPILE)objdump
-
 DISTDIR     ?= $(XEN_ROOT)/dist
 DESTDIR     ?= /
 
-INSTALL      = install
-INSTALL_DIR  = $(INSTALL) -d -m0755
-INSTALL_DATA = $(INSTALL) -m0644
-INSTALL_PROG = $(INSTALL) -m0755
-
-ifneq ($(debug),y)
-# Optimisation flags are overridable
-CFLAGS    ?= -O2 -fomit-frame-pointer
-CFLAGS    += -DNDEBUG
-else
-# Less than -O1 produces bad code and large stack frames
-CFLAGS    ?= -O1 -fno-omit-frame-pointer
-CFLAGS    += -g
-endif
-
+include $(XEN_ROOT)/config/$(XEN_OS).mk
 include $(XEN_ROOT)/config/$(XEN_TARGET_ARCH).mk
 
 ifneq ($(EXTRA_PREFIX),)
@@ -48,18 +26,30 @@ EXTRA_INCLUDES += $(EXTRA_PREFIX)/include
 EXTRA_LIB += $(EXTRA_PREFIX)/$(LIBDIR)
 endif
 
-test-gcc-flag = $(shell $(1) -v --help 2>&1 | grep -q " $(2) " && echo $(2))
+# cc-option
+# Usage: cflags-y += $(call cc-option,$(CC),-march=winchip-c6,-march=i586)
+cc-option = $(shell if test -z "`$(1) $(2) -S -o /dev/null -xc \
+              /dev/null 2>&1`"; then echo "$(2)"; else echo "$(3)"; fi ;)
+
+ifneq ($(debug),y)
+CFLAGS += -DNDEBUG
+else
+CFLAGS += -g
+endif
+
+CFLAGS += -std=gnu99
 
 CFLAGS += -Wall -Wstrict-prototypes
 
-HOSTCFLAGS += $(call test-gcc-flag,$(HOSTCC),-Wdeclaration-after-statement)
-CFLAGS     += $(call test-gcc-flag,$(CC),-Wdeclaration-after-statement)
+# -Wunused-value makes GCC 4.x too aggressive for my taste: ignoring the
+# result of any casted expression causes a warning.
+CFLAGS += -Wno-unused-value
+
+HOSTCFLAGS += $(call cc-option,$(HOSTCC),-Wdeclaration-after-statement,)
+CFLAGS     += $(call cc-option,$(CC),-Wdeclaration-after-statement,)
 
 LDFLAGS += $(foreach i, $(EXTRA_LIB), -L$(i)) 
 CFLAGS += $(foreach i, $(EXTRA_INCLUDES), -I$(i))
-
-# Choose the best mirror to download linux kernel
-KERNEL_REPO = http://www.kernel.org
 
 # If ACM_SECURITY = y, then the access control module is compiled
 # into Xen and the policy type can be set by the boot policy file

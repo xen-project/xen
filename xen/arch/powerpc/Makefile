@@ -141,7 +141,7 @@ asm-offsets.s: $(TARGET_SUBARCH)/asm-offsets.c $(HDRS)
 	$(CC) $(CFLAGS) -S -o $@ $<
 
 xen.lds: xen.lds.S $(HDRS)
-	$(CC) $(CFLAGS) -P -E $(AFLAGS) -o $@ $<
+	$(CC) -P -E $(AFLAGS) -o $@ $<
 
 dom0.bin: $(DOM0_IMAGE)
 	cp $< $@

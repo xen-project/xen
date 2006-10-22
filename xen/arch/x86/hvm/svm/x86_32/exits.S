@@ -126,6 +126,8 @@ ENTRY(svm_asm_do_launch)
 
         HVM_SAVE_ALL_NOSEGREGS
         STGI
+.globl svm_stgi_label;
+svm_stgi_label:
         movl %esp,%eax
         push %eax
         call svm_vmexit_handler

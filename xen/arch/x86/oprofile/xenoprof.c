@@ -7,11 +7,15 @@
 #include <xen/guest_access.h>
 #include <xen/sched.h>
 #include <public/xenoprof.h>
+#include <asm/hvm/support.h>
 
 #include "op_counter.h"
 
 /* Limit amount of pages used for shared buffer (per domain) */
 #define MAX_OPROF_SHARED_PAGES 32
+
+/* Lock protecting the following global state */
+static DEFINE_SPINLOCK(xenoprof_lock);
 
 struct domain *active_domains[MAX_OPROF_DOMAINS];
 int active_ready[MAX_OPROF_DOMAINS];
@@ -95,7 +99,7 @@ static void xenoprof_reset_buf(struct domain *d)
     }
 }
 
-char *alloc_xenoprof_buf(struct domain *d, int npages)
+static char *alloc_xenoprof_buf(struct domain *d, int npages)
 {
     char *rawbuf;
     int i, order;
@@ -118,10 +122,12 @@ char *alloc_xenoprof_buf(struct domain *d, int npages)
     return rawbuf;
 }
 
-int alloc_xenoprof_struct(struct domain *d, int max_samples, int is_passive)
+static int alloc_xenoprof_struct(
+    struct domain *d, int max_samples, int is_passive)
 {
     struct vcpu *v;
     int nvcpu, npages, bufsize, max_bufsize;
+    unsigned max_max_samples;
     int i;
 
     d->xenoprof = xmalloc(struct xenoprof);
@@ -139,17 +145,15 @@ int alloc_xenoprof_struct(struct domain *d, int max_samples, int is_passive)
     for_each_vcpu ( d, v )
         nvcpu++;
 
-    /* reduce buffer size if necessary to limit pages allocated */
+    /* reduce max_samples if necessary to limit pages allocated */
+    max_bufsize = (MAX_OPROF_SHARED_PAGES * PAGE_SIZE) / nvcpu;
+    max_max_samples = ( (max_bufsize - sizeof(struct xenoprof_buf)) /
+                        sizeof(struct event_log) ) + 1;
+    if ( (unsigned)max_samples > max_max_samples )
+        max_samples = max_max_samples;
+
     bufsize = sizeof(struct xenoprof_buf) +
         (max_samples - 1) * sizeof(struct event_log);
-    max_bufsize = (MAX_OPROF_SHARED_PAGES * PAGE_SIZE) / nvcpu;
-    if ( bufsize > max_bufsize )
-    {
-        bufsize = max_bufsize;
-        max_samples = ( (max_bufsize - sizeof(struct xenoprof_buf)) /
-                        sizeof(struct event_log) ) + 1;
-    }
-
     npages = (nvcpu * bufsize - 1) / PAGE_SIZE + 1;
     
     d->xenoprof->rawbuf = alloc_xenoprof_buf(is_passive ? dom0 : d, npages);
@@ -205,7 +209,7 @@ void free_xenoprof_pages(struct domain *d)
     d->xenoprof = NULL;
 }
 
-int active_index(struct domain *d)
+static int active_index(struct domain *d)
 {
     int i;
 
@@ -216,7 +220,7 @@ int active_index(struct domain *d)
     return -1;
 }
 
-int set_active(struct domain *d)
+static int set_active(struct domain *d)
 {
     int ind;
     struct xenoprof *x;
@@ -237,7 +241,7 @@ int set_active(struct domain *d)
     return 0;
 }
 
-int reset_active(struct domain *d)
+static int reset_active(struct domain *d)
 {
     int ind;
     struct xenoprof *x;
@@ -263,7 +267,7 @@ int reset_active(struct domain *d)
     return 0;
 }
 
-void reset_passive(struct domain *d)
+static void reset_passive(struct domain *d)
 {
     struct xenoprof *x;
 
@@ -279,7 +283,7 @@ void reset_passive(struct domain *d)
     return;
 }
 
-void reset_active_list(void)
+static void reset_active_list(void)
 {
     int i;
 
@@ -295,7 +299,7 @@ void reset_active_list(void)
     activated = 0;
 }
 
-void reset_passive_list(void)
+static void reset_passive_list(void)
 {
     int i;
 
@@ -309,7 +313,7 @@ void reset_passive_list(void)
     pdomains = 0;
 }
 
-int add_active_list (domid_t domid)
+static int add_active_list(domid_t domid)
 {
     struct domain *d;
 
@@ -327,7 +331,7 @@ int add_active_list (domid_t domid)
     return 0;
 }
 
-int add_passive_list(XEN_GUEST_HANDLE(void) arg)
+static int add_passive_list(XEN_GUEST_HANDLE(void) arg)
 {
     struct xenoprof_passive passive;
     struct domain *d;
@@ -434,7 +438,7 @@ void xenoprof_log_event(
     }
 }
 
-int xenoprof_op_init(XEN_GUEST_HANDLE(void) arg)
+static int xenoprof_op_init(XEN_GUEST_HANDLE(void) arg)
 {
     struct xenoprof_init xenoprof_init;
     int ret;
@@ -456,7 +460,7 @@ int xenoprof_op_init(XEN_GUEST_HANDLE(void) arg)
     return 0;
 }
 
-int xenoprof_op_get_buffer(XEN_GUEST_HANDLE(void) arg)
+static int xenoprof_op_get_buffer(XEN_GUEST_HANDLE(void) arg)
 {
     struct xenoprof_get_buffer xenoprof_get_buffer;
     struct domain *d = current->domain;
@@ -515,6 +519,8 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
         return -EPERM;
     }
 
+    spin_lock(&xenoprof_lock);
+    
     switch ( op )
     {
     case XENOPROF_init:
@@ -540,23 +546,31 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
     case XENOPROF_set_active:
     {
         domid_t domid;
-        if ( xenoprof_state != XENOPROF_IDLE )
-            return -EPERM;
-        if ( copy_from_guest(&domid, arg, 1) )
-            return -EFAULT;
+        if ( xenoprof_state != XENOPROF_IDLE ) {
+            ret = -EPERM;
+            break;
+        }
+        if ( copy_from_guest(&domid, arg, 1) ) {
+            ret = -EFAULT;
+            break;
+        }
         ret = add_active_list(domid);
         break;
     }
     case XENOPROF_set_passive:
     {
-        if ( xenoprof_state != XENOPROF_IDLE )
-            return -EPERM;
+        if ( xenoprof_state != XENOPROF_IDLE ) {
+            ret = -EPERM;
+            break;
+        }
         ret = add_passive_list(arg);
         break;
     }
     case XENOPROF_reserve_counters:
-        if ( xenoprof_state != XENOPROF_IDLE )
-            return -EPERM;
+        if ( xenoprof_state != XENOPROF_IDLE ) {
+            ret = -EPERM;
+            break;
+        }
         ret = nmi_reserve_counters();
         if ( !ret )
             xenoprof_state = XENOPROF_COUNTERS_RESERVED;
@@ -565,16 +579,20 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
     case XENOPROF_counter:
     {
         struct xenoprof_counter counter;
-        if ( xenoprof_state != XENOPROF_COUNTERS_RESERVED )
-            return -EPERM;
-        if ( adomains == 0 )
-            return -EPERM;
+        if ( xenoprof_state != XENOPROF_COUNTERS_RESERVED || adomains == 0) {
+            ret = -EPERM;
+            break;
+        }
 
-        if ( copy_from_guest(&counter, arg, 1) )
-            return -EFAULT;
+        if ( copy_from_guest(&counter, arg, 1) ) {
+            ret = -EFAULT;
+            break;
+        }
 
-        if ( counter.ind > OP_MAX_COUNTER )
-            return -E2BIG;
+        if ( counter.ind > OP_MAX_COUNTER ) {
+            ret = -E2BIG;
+            break;
+        }
 
         counter_config[counter.ind].count     = (unsigned long) counter.count;
         counter_config[counter.ind].enabled   = (unsigned long) counter.enabled;
@@ -588,8 +606,10 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
     }
 
     case XENOPROF_setup_events:
-        if ( xenoprof_state != XENOPROF_COUNTERS_RESERVED )
-            return -EPERM;
+        if ( xenoprof_state != XENOPROF_COUNTERS_RESERVED ) {
+            ret = -EPERM;
+            break;
+        }
         ret = nmi_setup_events();
         if ( !ret )
             xenoprof_state = XENOPROF_READY;
@@ -622,16 +642,20 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
         break;
 
     case XENOPROF_stop:
-        if ( xenoprof_state != XENOPROF_PROFILING )
-            return -EPERM;
+        if ( xenoprof_state != XENOPROF_PROFILING ) {
+            ret = -EPERM;
+            break;
+        }
         nmi_stop();
         xenoprof_state = XENOPROF_READY;
         break;
 
     case XENOPROF_disable_virq:
         if ( (xenoprof_state == XENOPROF_PROFILING) && 
-             (is_active(current->domain)) )
-            return -EPERM;
+             (is_active(current->domain)) ) {
+            ret = -EPERM;
+            break;
+        }
         ret = reset_active(current->domain);
         break;
 
@@ -663,11 +687,24 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
         ret = -EINVAL;
     }
 
+    spin_unlock(&xenoprof_lock);
+
     if ( ret < 0 )
         printk("xenoprof: operation %d failed for dom %d (status : %d)\n",
                op, current->domain->domain_id, ret);
 
     return ret;
+}
+
+int xenoprofile_get_mode(struct vcpu *v, struct cpu_user_regs * const regs)
+{
+    if ( !guest_mode(regs) )
+        return 2;
+
+    if ( hvm_guest(v) )
+        return ((regs->cs & 3) != 3);
+
+    return guest_kernel_mode(v, regs);  
 }
 
 /*

@@ -1,14 +1,8 @@
-
-INSTALL		= install
-INSTALL_PROG	= $(INSTALL) -m0755
-INSTALL_DATA	= $(INSTALL) -m0644
-INSTALL_DIR	= $(INSTALL) -d -m0755
+XEN_ROOT = ../..
+include $(XEN_ROOT)/tools/Rules.mk
 
 MAJOR    = 3.0
 MINOR    = 0
-
-XEN_ROOT = ../..
-include $(XEN_ROOT)/tools/Rules.mk
 
 CTRL_SRCS-y       :=
 CTRL_SRCS-y       += xc_core.c
@@ -21,8 +15,10 @@ CTRL_SRCS-y       += xc_private.c
 CTRL_SRCS-y       += xc_sedf.c
 CTRL_SRCS-y       += xc_csched.c
 CTRL_SRCS-y       += xc_tbuf.c
-CTRL_SRCS-$(CONFIG_X86) += xc_ptrace.c xc_ptrace_core.c xc_pagetab.c
+CTRL_SRCS-$(CONFIG_X86) += xc_pagetab.c
 CTRL_SRCS-$(CONFIG_Linux) += xc_linux.c
+CTRL_SRCS-$(CONFIG_SunOS) += xc_solaris.c
+CTRL_SRCS-$(CONFIG_X86_Linux) += xc_ptrace.c xc_ptrace_core.c
 
 GUEST_SRCS-y :=
 GUEST_SRCS-y += xc_load_bin.c
@@ -123,7 +119,7 @@ libxenctrl.so.$(MAJOR): libxenctrl.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
 libxenctrl.so.$(MAJOR).$(MINOR): $(CTRL_PIC_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-soname -Wl,libxenctrl.so.$(MAJOR) -shared -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenctrl.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $^
 
 # libxenguest
 
@@ -136,7 +132,7 @@ libxenguest.so.$(MAJOR): libxenguest.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
 libxenguest.so.$(MAJOR).$(MINOR): $(GUEST_PIC_OBJS) libxenctrl.so
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-soname -Wl,libxenguest.so.$(MAJOR) -shared -o $@ $^ -lz -lxenctrl
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenguest.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $(GUEST_PIC_OBJS) -lz -lxenctrl
 
 -include $(DEPS)
 

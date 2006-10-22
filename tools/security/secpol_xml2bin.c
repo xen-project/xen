@@ -979,13 +979,15 @@ unsigned char *write_policy_reference_binary(u_int32_t * len_pr)
     unsigned char *buf, *ptr;
     struct acm_policy_reference_buffer *pr_header;
     u_int32_t len;
+    u_int32_t name_len;
 
     if (policy_reference_name == NULL) {
         printf("ERROR: No policy reference name found.\n");
         exit(EXIT_FAILURE);
     }
-    len = (sizeof(struct acm_policy_reference_buffer) +
-           strlen(policy_reference_name) + 1);
+    name_len = strlen(policy_reference_name) + 1; /* strend '\0' */
+    len = sizeof(struct acm_policy_reference_buffer) + name_len;
+    len = (len + 7) & ~7; /* Alignment.  */
     buf = malloc(len);
     ptr = buf;
 
@@ -994,9 +996,9 @@ unsigned char *write_policy_reference_binary(u_int32_t * len_pr)
             ("ERROR: out of memory allocating label reference buffer.\n");
         exit(EXIT_FAILURE);
     }
+    memset (buf, 0, len);
     pr_header = (struct acm_policy_reference_buffer *) buf;
-    pr_header->len =
-        htonl(strlen(policy_reference_name) + 1 /* strend \'0' */ );
+    pr_header->len = htonl(name_len);
     ptr += sizeof(struct acm_policy_reference_buffer);
     strcpy((char *) ptr, policy_reference_name);
 

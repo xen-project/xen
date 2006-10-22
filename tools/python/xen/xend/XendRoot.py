@@ -30,6 +30,7 @@ import os.path
 import string
 import sys
 
+import osdep
 import XendLogging
 from XendError import XendError
 
@@ -46,10 +47,10 @@ class XendRoot:
     config_var     = "XEND_CONFIG"
 
     """Where network control scripts live."""
-    network_script_dir = "/etc/xen/scripts"
+    network_script_dir = osdep.scripts_dir
 
     """Where block control scripts live."""
-    block_script_dir = "/etc/xen/scripts"
+    block_script_dir = osdep.scripts_dir
 
     """Default path to the log file. """
     logfile_default = "/var/log/xen/xend.log"
@@ -95,6 +96,8 @@ class XendRoot:
     dom0_min_mem_default = '0'
 
     dom0_vcpus_default = '0'
+
+    vncpasswd_default = None
 
     """Default interface to listen for VNC connections on"""
     xend_vnc_listen_default = '127.0.0.1'
@@ -277,6 +280,10 @@ class XendRoot:
 
     def get_vnclisten_address(self):
         return self.get_config_value('vnc-listen', self.xend_vnc_listen_default)
+
+    def get_vncpasswd_default(self):
+        return self.get_config_value('vncpasswd',
+                                     self.vncpasswd_default)
 
 def instance():
     """Get an instance of XendRoot.

@@ -269,13 +269,10 @@ static void set_ioapic_affinity_irq(unsigned int irq, cpumask_t cpumask)
     int pin;
     struct irq_pin_list *entry = irq_2_pin + irq;
     unsigned int apicid_value;
-    cpumask_t tmp;
-	
-    cpus_and(tmp, cpumask, cpu_online_map);
-    if (cpus_empty(tmp))
-        tmp = TARGET_CPUS;
 
-    cpus_and(cpumask, tmp, CPU_MASK_ALL);
+    cpus_and(cpumask, cpumask, cpu_online_map);
+    if (cpus_empty(cpumask))
+        cpumask = TARGET_CPUS;
 
     apicid_value = cpu_mask_to_apicid(cpumask);
     /* Prepare to do the io_apic_write */

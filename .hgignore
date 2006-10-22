@@ -15,8 +15,11 @@
 .*\.rej$
 .*/a\.out$
 .*/cscope\..*$
+^cscope.*$
 ^[^/]*\.bz2$
+^\.config$
 ^TAGS$
+^tags$
 ^dist/.*$
 ^docs/.*\.aux$
 ^docs/.*\.dvi$

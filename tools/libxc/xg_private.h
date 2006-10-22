@@ -79,10 +79,6 @@ unsigned long csum_page (void * page);
 #define L4_PAGETABLE_ENTRIES    512
 #endif
 
-#define PAGE_SHIFT              XC_PAGE_SHIFT
-#define PAGE_SIZE               (1UL << PAGE_SHIFT)
-#define PAGE_MASK               (~(PAGE_SIZE-1))
-
 typedef uint32_t l1_pgentry_32_t;
 typedef uint32_t l2_pgentry_32_t;
 typedef uint64_t l1_pgentry_64_t;

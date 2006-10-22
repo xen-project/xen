@@ -286,6 +286,10 @@ void arch_dump_domain_info(struct domain *d)
 {
 }
 
+void arch_dump_vcpu_info(struct vcpu *v)
+{
+}
+
 extern void sleep(void);
 static void safe_halt(void)
 {

@@ -33,6 +33,9 @@ def help():
 def get_resource_label(resource):
     """Gets the resource label
     """
+    #build canonical resource name
+    resource = security.unify_resname(resource)
+
     # read in the resource file
     file = security.res_label_filename
     try:

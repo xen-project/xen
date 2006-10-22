@@ -704,7 +704,7 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
     {
         /* Freeing anonymous domain-heap pages. */
         for ( i = 0; i < (1 << order); i++ )
-            pg[i].u.free.cpumask = CPU_MASK_NONE;
+            cpus_clear(pg[i].u.free.cpumask);
         free_heap_pages(pfn_dom_zone_type(page_to_mfn(pg)), pg, order);
         drop_dom_ref = 0;
     }

@@ -1,11 +1,14 @@
-#!/bin/bash
+#!/bin/sh
 # CHECK-BUILD
 
-function error {
-    echo
-    echo "  *** Check for zlib headers FAILED"
-    exit 1
-}
+RC=0
 
 set -e
-[ -e /usr/include/zlib.h ] || error
+test -r /usr/include/zlib.h || RC=1
+
+if test ${RC} -ne 0; then
+	echo
+	echo " *** Check for zlib headers FAILED"
+fi 
+
+exit ${RC}

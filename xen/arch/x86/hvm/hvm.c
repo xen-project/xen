@@ -40,8 +40,10 @@
 #include <asm/processor.h>
 #include <asm/types.h>
 #include <asm/msr.h>
+#include <asm/mc146818rtc.h>
 #include <asm/spinlock.h>
 #include <asm/hvm/hvm.h>
+#include <asm/hvm/vpit.h>
 #include <asm/hvm/support.h>
 #include <public/sched.h>
 #include <public/hvm/ioreq.h>
@@ -277,6 +279,7 @@ void hvm_setup_platform(struct domain* d)
     init_timer(&platform->pl_time.periodic_tm.timer,
                pt_timer_fn, v, v->processor);
     pit_init(v, cpu_khz);
+    rtc_init(v, RTC_PORT(0), RTC_IRQ);
 }
 
 void pic_irq_request(void *data, int level)
@@ -368,7 +371,7 @@ void hvm_hlt(unsigned long rflags)
 {
     struct vcpu *v = current;
     struct periodic_time *pt = &v->domain->arch.hvm_domain.pl_time.periodic_tm;
-    s_time_t next_pit = -1, next_wakeup;
+    s_time_t next_pt = -1, next_wakeup;
 
     /*
      * If we halt with interrupts disabled, that's a pretty sure sign that we
@@ -379,10 +382,10 @@ void hvm_hlt(unsigned long rflags)
         return hvm_vcpu_down();
 
     if ( !v->vcpu_id )
-        next_pit = get_scheduled(v, pt->irq, pt);
+        next_pt = get_scheduled(v, pt->irq, pt);
     next_wakeup = get_apictime_scheduled(v);
-    if ( (next_pit != -1 && next_pit < next_wakeup) || next_wakeup == -1 )
-        next_wakeup = next_pit;
+    if ( (next_pt != -1 && next_pt < next_wakeup) || next_wakeup == -1 )
+        next_wakeup = next_pt;
     if ( next_wakeup != - 1 ) 
         set_timer(&current->arch.hvm_vcpu.hlt_timer, next_wakeup);
     do_sched_op_compat(SCHEDOP_block, 0);
