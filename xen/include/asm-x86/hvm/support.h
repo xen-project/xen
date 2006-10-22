@@ -147,8 +147,6 @@ void hlt_timer_fn(void *data);
 
 void hvm_do_hypercall(struct cpu_user_regs *pregs);
 
-void hvm_prod_vcpu(struct vcpu *v);
-
 void hvm_hlt(unsigned long rflags);
 
 #endif /* __ASM_X86_HVM_SUPPORT_H__ */

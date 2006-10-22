@@ -231,7 +231,8 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
               "level trig mode for vector %d\n", vector);
             vlapic_set_vector(vector, vlapic->regs + APIC_TMR);
         }
-        hvm_prod_vcpu(v);
+
+        vcpu_kick(v);
 
         result = 1;
         break;

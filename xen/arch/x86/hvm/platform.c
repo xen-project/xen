@@ -732,13 +732,6 @@ static void hvm_send_assist_req(struct vcpu *v)
     notify_via_xen_event_channel(v->arch.hvm_vcpu.xen_port);
 }
 
-
-/* Wake up a vcpu whihc is waiting for interrupts to come in */
-void hvm_prod_vcpu(struct vcpu *v)
-{
-    vcpu_unblock(v);
-}
-
 void send_pio_req(unsigned long port, unsigned long count, int size,
                   long value, int dir, int df, int pvalid)
 {
