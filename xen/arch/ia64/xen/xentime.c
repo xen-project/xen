@@ -109,7 +109,6 @@ void
 xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long new_itm, old_itc;
-	int f_setitm = 0;
 
 #if 0
 #define HEARTBEAT_FREQ 16	// period in seconds
@@ -125,20 +124,9 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 #endif
 #endif
 
-	if (!is_idle_domain(current->domain)&&!VMX_DOMAIN(current))
-		if (vcpu_timer_expired(current)) {
-			vcpu_pend_timer(current);
-			// ensure another timer interrupt happens even if domain doesn't
-			vcpu_set_next_timer(current);
-			f_setitm = 1;
-		}
 
 	new_itm = local_cpu_data->itm_next;
-
-	if (f_setitm && !time_after(ia64_get_itc(), new_itm)) 
-		return;
-
-	while (1) {
+	while (time_after(ia64_get_itc(), new_itm)) {
 		new_itm += local_cpu_data->itm_delta;
 
 		if (smp_processor_id() == TIME_KEEPER_ID) {
@@ -148,27 +136,32 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 			 * another CPU. We need to avoid to SMP race by acquiring the
 			 * xtime_lock.
 			 */
-//#ifdef TURN_ME_OFF_FOR_NOW_IA64_XEN
 			write_seqlock(&xtime_lock);
-//#endif
 #ifdef TURN_ME_OFF_FOR_NOW_IA64_XEN
 			do_timer(regs);
 #endif
-			local_cpu_data->itm_next = new_itm;
-
-		 	/* Updates system time (nanoseconds since boot). */
+			/* Updates system time (nanoseconds since boot). */
 			old_itc = itc_at_irq;
 			itc_at_irq = ia64_get_itc();
 			stime_irq += cycle_to_ns(itc_at_irq - old_itc);
 
-//#ifdef TURN_ME_OFF_FOR_NOW_IA64_XEN
 			write_sequnlock(&xtime_lock);
-//#endif
-		} else
-			local_cpu_data->itm_next = new_itm;
+		}
 
-		if (time_after(new_itm, ia64_get_itc()))
-			break;
+		local_cpu_data->itm_next = new_itm;
+
+	}
+
+	if (!is_idle_domain(current->domain) && !VMX_DOMAIN(current)) {
+		if (vcpu_timer_expired(current)) {
+			vcpu_pend_timer(current);
+		} else {
+			// ensure another timer interrupt happens
+			// even if domain doesn't
+			vcpu_set_next_timer(current);
+			raise_softirq(TIMER_SOFTIRQ);
+			return;
+		}
 	}
 
 	do {

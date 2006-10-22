@@ -242,10 +242,7 @@ void leave_hypervisor_tail(struct pt_regs *regs)
             vmx_check_pending_irq(v);
             return;
         }
-        if (VCPU(v, vac).a_int) {
-            vhpi_detection(v);
-            return;
-        }
+
         if (v->arch.irq_new_condition) {
             v->arch.irq_new_condition = 0;
             vhpi_detection(v);
