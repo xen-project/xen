@@ -399,11 +399,11 @@ gmfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
 	unsigned long pte;
 
 	// This function may be called from __gnttab_copy()
-	// during destruction of VT-i domain with PV-on-HVM driver.
+	// during domain destruction with VNIF copy receiver.
 	// ** FIXME: This is not SMP-safe yet about p2m table. **
 	if (unlikely(d->arch.mm.pgd == NULL)) {
-		if (VMX_DOMAIN(d->vcpu[0]))
-			return INVALID_MFN;
+		BUG();
+		return INVALID_MFN;
 	}
 	pte = lookup_domain_mpa(d,gpfn << PAGE_SHIFT, NULL);
 	if (!pte) {
