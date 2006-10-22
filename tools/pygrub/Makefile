@@ -6,16 +6,16 @@ include $(XEN_ROOT)/tools/Rules.mk
 all: build
 .PHONY: build
 build:
-	CFLAGS="$(CFLAGS)" python setup.py build
+	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py build
 
 .PHONY: install
 ifndef XEN_PYTHON_NATIVE_INSTALL
 install: all
-	CFLAGS="$(CFLAGS)" python setup.py install --home="$(DESTDIR)/usr" --prefix=""
+	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py install --home="$(DESTDIR)/usr" --prefix=""
 	$(INSTALL_DIR) -p $(DESTDIR)/var/lib/xen
 else
 install: all
-	CFLAGS="$(CFLAGS)" python setup.py install --root="$(DESTDIR)"
+	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py install --root="$(DESTDIR)"
 	$(INSTALL_DIR) -p $(DESTDIR)/var/lib/xen
 endif
 
