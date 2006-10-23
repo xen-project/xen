@@ -162,9 +162,9 @@ int xc_linux_restore(int xc_handle, int io_fd,
         return 1;
     }
 
-    if (mlock(&ctxt, sizeof(ctxt))) {
+    if (lock_pages(&ctxt, sizeof(ctxt))) {
         /* needed for build domctl, but might as well do early */
-        ERROR("Unable to mlock ctxt");
+        ERROR("Unable to lock ctxt");
         return 1;
     }
 
@@ -251,8 +251,8 @@ int xc_linux_restore(int xc_handle, int io_fd,
         goto out;
     }
 
-    if (mlock(region_mfn, sizeof(xen_pfn_t) * MAX_BATCH_SIZE)) {
-        ERROR("Could not mlock region_mfn");
+    if (lock_pages(region_mfn, sizeof(xen_pfn_t) * MAX_BATCH_SIZE)) {
+        ERROR("Could not lock region_mfn");
         goto out;
     }
 

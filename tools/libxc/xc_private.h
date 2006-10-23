@@ -66,6 +66,9 @@ do {                                            \
     errno = __saved_errno;                      \
 } while (0)
 
+int lock_pages(void *addr, size_t len);
+void unlock_pages(void *addr, size_t len);
+
 #define PERROR(_m, _a...)                               \
 do {                                                    \
     int __saved_errno = errno;                          \
@@ -104,7 +107,7 @@ static inline int do_domctl(int xc_handle, struct xen_domctl *domctl)
     hypercall.op     = __HYPERVISOR_domctl;
     hypercall.arg[0] = (unsigned long)domctl;
 
-    if ( mlock(domctl, sizeof(*domctl)) != 0 )
+    if ( lock_pages(domctl, sizeof(*domctl)) != 0 )
     {
         PERROR("Could not lock memory for Xen hypercall");
         goto out1;
@@ -117,7 +120,7 @@ static inline int do_domctl(int xc_handle, struct xen_domctl *domctl)
                     " rebuild the user-space tool set?\n");
     }
 
-    safe_munlock(domctl, sizeof(*domctl));
+    unlock_pages(domctl, sizeof(*domctl));
 
  out1:
     return ret;
@@ -133,7 +136,7 @@ static inline int do_sysctl(int xc_handle, struct xen_sysctl *sysctl)
     hypercall.op     = __HYPERVISOR_sysctl;
     hypercall.arg[0] = (unsigned long)sysctl;
 
-    if ( mlock(sysctl, sizeof(*sysctl)) != 0 )
+    if ( lock_pages(sysctl, sizeof(*sysctl)) != 0 )
     {
         PERROR("Could not lock memory for Xen hypercall");
         goto out1;
@@ -146,7 +149,7 @@ static inline int do_sysctl(int xc_handle, struct xen_sysctl *sysctl)
                     " rebuild the user-space tool set?\n");
     }
 
-    safe_munlock(sysctl, sizeof(*sysctl));
+    unlock_pages(sysctl, sizeof(*sysctl));
 
  out1:
     return ret;

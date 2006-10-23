@@ -24,12 +24,12 @@ int xc_acm_op(int xc_handle, int cmd, void *arg, size_t arg_size)
     hypercall.arg[0] = cmd;
     hypercall.arg[1] = (unsigned long) arg;
 
-    if (mlock(arg, arg_size) != 0) {
-        PERROR("xc_acm_op: arg mlock failed");
+    if (lock_pages(arg, arg_size) != 0) {
+        PERROR("xc_acm_op: arg lock failed");
         goto out;
     }
     ret = do_xen_hypercall(xc_handle, &hypercall);
-    safe_munlock(arg, arg_size);
+    unlock_pages(arg, arg_size);
  out:
     return ret;
 }

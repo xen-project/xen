@@ -1140,9 +1140,9 @@ static int xc_linux_build_internal(int xc_handle,
     memset(&st_ctxt, 0, sizeof(st_ctxt));
 #endif
 
-    if ( mlock(&st_ctxt, sizeof(st_ctxt) ) )
+    if ( lock_pages(&st_ctxt, sizeof(st_ctxt) ) )
     {
-        PERROR("%s: ctxt mlock failed", __func__);
+        PERROR("%s: ctxt lock failed", __func__);
         return 1;
     }
 
