@@ -25,6 +25,8 @@ import re
 import config
 import commands
 
+from Test import *
+
 BLOCK_ROOT_DEV = "hda"
 
 # This isn't truly platform related but it makes the code tidier
@@ -38,6 +40,9 @@ def getRdPath():
     return rdpath
 
 # Begin: Intel ia32 and ia64 as well as AMD 32-bit and 64-bit processors
+def ia_checkBuffer(buffer):
+    return
+
 def ia_minSafeMem():
     return 32
 
@@ -81,6 +86,19 @@ ia_HVMDefaults =      {"memory"       : 64,
 # End  : Intel ia32 and ia64 as well as AMD 32-bit and 64-bit processors
 
 # Begin: PowerPC
+def ppc_checkBuffer(buffer):
+    checks = [
+        {"pattern" : re.compile("^\d+:mon>\s*$", re.MULTILINE),
+         "message" : "domain trapped into XMON"},
+    ]
+
+    for i in range(0, len(checks)):
+        check=checks[i]
+        if check.get('pattern').search(buffer):
+		FAIL(check.get('message'))
+
+    return
+
 def ppc_minSafeMem():
     return 64
 
@@ -116,6 +134,7 @@ _arch = _uname_to_arch_map.get(os.uname()[4], "Unknown")
 if _arch == "x86" or _arch == "ia64":
     minSafeMem = ia_minSafeMem
     getDefaultKernel = ia_getDefaultKernel
+    checkBuffer = ia_checkBuffer
     if config.ENABLE_HVM_SUPPORT:
         configDefaults = ia_HVMDefaults
     else:
@@ -123,6 +142,7 @@ if _arch == "x86" or _arch == "ia64":
 elif _arch == "powerpc":
     minSafeMem = ppc_minSafeMem
     getDefaultKernel = ppc_getDefaultKernel
+    checkBuffer = ppc_checkBuffer
     configDefaults = ppc_ParavirtDefaults
 else:
     raise ValueError, "Unknown architecture!"
