@@ -601,8 +601,15 @@ def unify_resname(resource):
     """Makes all resource locations absolute. In case of physical
     resources, '/dev/' is added to local file names"""
 
+    if not resource:
+        return resource
+
     # sanity check on resource name
-    (type, resfile) = resource.split(":")
+    try:
+        (type, resfile) = resource.split(":")
+    except:
+        err("Resource spec '%s' contains no ':' delimiter" % resource)
+
     if type == "phy":
         if not resfile.startswith("/"):
             resfile = "/dev/" + resfile
