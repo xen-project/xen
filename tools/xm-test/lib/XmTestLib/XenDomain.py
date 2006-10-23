@@ -102,6 +102,9 @@ class XenConfig:
         if name in self.opts.keys() and isinstance(self.opts[name] ,
                                         list) and not isinstance(value, list):
                 self.opts[name] = [value]
+        # "extra" is special so append to it.
+        elif name == "extra" and name in self.opts.keys():
+            self.opts[name] += " %s" % (value)
         else:
             self.opts[name] = value
 
