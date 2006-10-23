@@ -153,8 +153,6 @@ svm_stgi_label:
 ENTRY(svm_asm_do_resume)
 svm_test_all_events:
         GET_CURRENT(%rbx)
-        movq %rbx, %rdi
-        call hvm_do_resume
 /*test_all_events:*/
         cli                             # tests must not race interrupts
 /*test_softirqs:*/

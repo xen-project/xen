@@ -727,7 +727,8 @@ static void hvm_send_assist_req(struct vcpu *v)
         domain_crash(v->domain);
         return;
     }
-    wmb();
+
+    prepare_wait_on_xen_event_channel(v->arch.hvm_vcpu.xen_port);
     p->state = STATE_IOREQ_READY;
     notify_via_xen_event_channel(v->arch.hvm_vcpu.xen_port);
 }

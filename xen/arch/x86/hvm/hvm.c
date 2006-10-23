@@ -237,12 +237,17 @@ void hvm_do_resume(struct vcpu *v)
     }
 
     p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;
-    wait_on_xen_event_channel(v->arch.hvm.xen_port,
+    wait_on_xen_event_channel(v->arch.hvm_vcpu.xen_port,
                               p->state != STATE_IOREQ_READY &&
                               p->state != STATE_IOREQ_INPROCESS);
-    if ( p->state == STATE_IORESP_READY )
+    switch ( p->state )
+    {
+    case STATE_IORESP_READY:
         hvm_io_assist(v);
-    if ( p->state != STATE_INVALID ) {
+        break;
+    case STATE_INVALID:
+        break;
+    default:
         printf("Weird HVM iorequest state %d.\n", p->state);
         domain_crash(v->domain);
     }

@@ -70,4 +70,11 @@ void notify_via_xen_event_channel(int lport);
         do_softirq();                                                   \
     } while ( 0 )
 
+#define prepare_wait_on_xen_event_channel(port)                         \
+    do {                                                                \
+        set_bit(_VCPUF_blocked_in_xen, &current->vcpu_flags);           \
+        raise_softirq(SCHEDULE_SOFTIRQ);                                \
+        mb(); /* set blocked status /then/ caller does his work */      \
+    } while ( 0 )
+
 #endif /* __XEN_EVENT_H__ */
