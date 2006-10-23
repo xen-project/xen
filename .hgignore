@@ -193,6 +193,7 @@
 ^tools/xm-test/.*/Makefile(.in)*$
 ^tools/xm-test/lib/XmTestLib/config.py$
 ^tools/xm-test/lib/XmTestReport/xmtest.py$
+^tools/xm-test/tests/.*\.test$
 ^xen/BLOG$
 ^xen/TAGS$
 ^xen/arch/x86/asm-offsets\.s$
