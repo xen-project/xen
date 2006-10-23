@@ -29,6 +29,7 @@ import re
 import os
 import commands
 import sys
+import arch
 
 class Machine:
 
@@ -89,8 +90,6 @@ class Machine:
         self.values = {}
         self.errors = 0
 
-        cpuValues = {"model_name"       : "Unknown",
-                     "flags"            : "Unknown"}
         xenValues = {"nr_cpus"          : "Unknown",
                      "nr_nodes"         : "Unknown",
                      "sockets_per_node" : "Unknown",
@@ -100,12 +99,7 @@ class Machine:
                      "total_memory"     : "Unknown"}
 
         xen = self.__getXenInfo(xenValues)
-        cpu = self.__getCpuInfo(cpuValues)
-
-        if cpu["model_name"] == "Unknown":   
-            cpuValues={"arch"  : "Unknown",
-                       "features": "Unknown"}
-            cpu=self.__getCpuInfo(cpuValues)
+        cpu = self.__getCpuInfo(arch.cpuValues)
 
         for k in xen.keys():
             self.values[k] = xen[k]
