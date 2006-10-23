@@ -131,7 +131,8 @@ ROUNDTRIPPING_CONFIG_ENTRIES = [
     ('uuid',            str),
     ('vcpus',           int),
     ('vcpu_avail',      int),
-    ('cpu_weight',      float),
+    ('cpu_cap',         int),
+    ('cpu_weight',      int),
     ('memory',          int),
     ('shadow_memory',   int),
     ('maxmem',          int),
@@ -562,7 +563,8 @@ class XendDomainInfo:
             defaultInfo('features',     lambda: "")
             defaultInfo('cpu',          lambda: None)
             defaultInfo('cpus',         lambda: [])
-            defaultInfo('cpu_weight',   lambda: 1.0)
+            defaultInfo('cpu_cap',      lambda: 0)
+            defaultInfo('cpu_weight',   lambda: 256)
 
             # some domains don't have a config file (e.g. dom0 )
             # to set number of vcpus so we derive available cpus
@@ -825,6 +827,12 @@ class XendDomainInfo:
 
     def getResume(self):
         return "%s" % self.info['resume']
+
+    def getCap(self):
+        return self.info['cpu_cap']
+
+    def getWeight(self):
+        return self.info['cpu_weight']
 
     def endRestore(self):
         self.setResume(False)

@@ -189,10 +189,14 @@ gopts.var('vcpus', val='VCPUS',
           fn=set_int, default=1,
           use="# of Virtual CPUS in domain.")
 
+gopts.var('cpu_cap', val='CAP',
+          fn=set_int, default=None,
+          use="""Set the maximum amount of cpu.
+          CAP is a percentage that fixes the maximum amount of cpu.""")
+
 gopts.var('cpu_weight', val='WEIGHT',
-          fn=set_float, default=None,
-          use="""Set the new domain's cpu weight.
-          WEIGHT is a float that controls the domain's share of the cpu.""")
+          fn=set_int, default=None,
+          use="""Set the cpu time ratio to be allocated to the domain.""")
 
 gopts.var('restart', val='onreboot|always|never',
           fn=set_value, default=None,
@@ -687,6 +691,8 @@ def make_config(vals):
         config.append(['cpu', vals.cpu])
     if vals.cpus is not None:
         config.append(['cpus', vals.cpus])
+    if vals.cpu_cap is not None:
+        config.append(['cpu_cap', vals.cpu_cap])
     if vals.cpu_weight is not None:
         config.append(['cpu_weight', vals.cpu_weight])
     if vals.blkif:
