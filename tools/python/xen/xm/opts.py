@@ -488,6 +488,8 @@ class Opts:
                 p = os.path.join(x, self.vals.defconfig)
             else:
                 p = self.vals.defconfig
+            if not p.startswith('/'):
+                p = os.path.join(os.path.curdir, p)
             if os.path.exists(p):
                 self.info('Using config file "%s".' % p)
                 self.load(p, help)
@@ -518,6 +520,10 @@ class Opts:
         exec cmd in globs, locs
         try:
             execfile(defconfig, globs, locs)
+        except SyntaxError,e:
+                raise SyntaxError, \
+                "Errors were found at line %d while processing %s:\n\t%s"\
+                %(e.lineno,defconfig,e.text)
         except:
             if not help: raise
         if help:
