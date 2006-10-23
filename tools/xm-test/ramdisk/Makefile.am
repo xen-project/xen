@@ -30,7 +30,7 @@ $(BR_SRC): $(BR_TAR)
 	tar xjf $(BR_TAR)
 
 $(BR_IMG): $(BR_SRC)
-	cp configs/buildroot $(BR_SRC)/.config
+	cp configs/buildroot-$(BR_ARCH) $(BR_SRC)/.config
 	cp configs/busybox $(BR_SRC)/package/busybox/busybox.config
 	cp configs/uClibc $(BR_SRC)/toolchain/uClibc/uClibc.config
 	(for i in patches/buildroot/*.patch; do \
