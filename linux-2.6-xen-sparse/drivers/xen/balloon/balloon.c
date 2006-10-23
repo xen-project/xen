@@ -53,10 +53,8 @@
 #include <asm/uaccess.h>
 #include <asm/tlb.h>
 #include <linux/list.h>
-
 #include <xen/xenbus.h>
-
-#define PAGES2KB(_p) ((_p)<<(PAGE_SHIFT-10))
+#include "common.h"
 
 #ifdef CONFIG_PROC_FS
 static struct proc_dir_entry *balloon_pde;
@@ -71,9 +69,7 @@ static DECLARE_MUTEX(balloon_mutex);
  */
 DEFINE_SPINLOCK(balloon_lock);
 
-/* We aim for 'current allocation' == 'target allocation'. */
-static unsigned long current_pages;
-static unsigned long target_pages;
+struct balloon_stats balloon_stats;
 
 /* We increase/decrease in batches which fit in a page */
 static unsigned long frame_list[PAGE_SIZE / sizeof(unsigned long)];
@@ -81,18 +77,8 @@ static unsigned long frame_list[PAGE_SIZE / sizeof(unsigned long)];
 /* VM /proc information for memory */
 extern unsigned long totalram_pages;
 
-/* We may hit the hard limit in Xen. If we do then we remember it. */
-static unsigned long hard_limit;
-
-/*
- * Drivers may alter the memory reservation independently, but they must
- * inform the balloon driver so that we can avoid hitting the hard limit.
- */
-static unsigned long driver_pages;
-
 /* List of ballooned pages, threaded through the mem_map array. */
 static LIST_HEAD(ballooned_pages);
-static unsigned long balloon_low, balloon_high;
 
 /* Main work function, always executed in process context. */
 static void balloon_process(void *unused);
@@ -124,10 +110,10 @@ static void balloon_append(struct page *page)
 	/* Lowmem is re-populated first, so highmem pages go at list tail. */
 	if (PageHighMem(page)) {
 		list_add_tail(PAGE_TO_LIST(page), &ballooned_pages);
-		balloon_high++;
+		bs.balloon_high++;
 	} else {
 		list_add(PAGE_TO_LIST(page), &ballooned_pages);
-		balloon_low++;
+		bs.balloon_low++;
 	}
 }
 
@@ -143,9 +129,9 @@ static struct page *balloon_retrieve(void)
 	UNLIST_PAGE(page);
 
 	if (PageHighMem(page))
-		balloon_high--;
+		bs.balloon_high--;
 	else
-		balloon_low--;
+		bs.balloon_low--;
 
 	return page;
 }
@@ -172,9 +158,9 @@ static void balloon_alarm(unsigned long unused)
 
 static unsigned long current_target(void)
 {
-	unsigned long target = min(target_pages, hard_limit);
-	if (target > (current_pages + balloon_low + balloon_high))
-		target = current_pages + balloon_low + balloon_high;
+	unsigned long target = min(bs.target_pages, bs.hard_limit);
+	if (target > (bs.current_pages + bs.balloon_low + bs.balloon_high))
+		target = bs.current_pages + bs.balloon_low + bs.balloon_high;
 	return target;
 }
 
@@ -216,7 +202,8 @@ static int increase_reservation(unsigned long nr_pages)
 			BUG_ON(ret != rc);
 		}
 		if (rc >= 0)
-			hard_limit = current_pages + rc - driver_pages;
+			bs.hard_limit = (bs.current_pages + rc -
+					 bs.driver_pages);
 		goto out;
 	}
 
@@ -248,8 +235,8 @@ static int increase_reservation(unsigned long nr_pages)
 		__free_page(page);
 	}
 
-	current_pages += nr_pages;
-	totalram_pages = current_pages;
+	bs.current_pages += nr_pages;
+	totalram_pages = bs.current_pages;
 
  out:
 	balloon_unlock(flags);
@@ -317,8 +304,8 @@ static int decrease_reservation(unsigned long nr_pages)
 	ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation, &reservation);
 	BUG_ON(ret != nr_pages);
 
-	current_pages -= nr_pages;
-	totalram_pages = current_pages;
+	bs.current_pages -= nr_pages;
+	totalram_pages = bs.current_pages;
 
 	balloon_unlock(flags);
 
@@ -339,7 +326,7 @@ static void balloon_process(void *unused)
 	down(&balloon_mutex);
 
 	do {
-		credit = current_target() - current_pages;
+		credit = current_target() - bs.current_pages;
 		if (credit > 0)
 			need_sleep = (increase_reservation(credit) != 0);
 		if (credit < 0)
@@ -352,18 +339,18 @@ static void balloon_process(void *unused)
 	} while ((credit != 0) && !need_sleep);
 
 	/* Schedule more work if there is some still to be done. */
-	if (current_target() != current_pages)
+	if (current_target() != bs.current_pages)
 		mod_timer(&balloon_timer, jiffies + HZ);
 
 	up(&balloon_mutex);
 }
 
 /* Resets the Xen limit, sets new target, and kicks off processing. */
-static void set_new_target(unsigned long target)
+void balloon_set_new_target(unsigned long target)
 {
 	/* No need for lock. Not read-modify-write updates. */
-	hard_limit   = ~0UL;
-	target_pages = target;
+	bs.hard_limit   = ~0UL;
+	bs.target_pages = target;
 	schedule_work(&balloon_worker);
 }
 
@@ -388,7 +375,7 @@ static void watch_target(struct xenbus_watch *watch,
 	/* The given memory/target value is in KiB, so it needs converting to
 	 * pages. PAGE_SHIFT converts bytes to pages, hence PAGE_SHIFT - 10.
 	 */
-	set_new_target(new_target >> (PAGE_SHIFT - 10));
+	balloon_set_new_target(new_target >> (PAGE_SHIFT - 10));
 }
 
 static int balloon_init_watcher(struct notifier_block *notifier,
@@ -424,7 +411,7 @@ static int balloon_write(struct file *file, const char __user *buffer,
 	memstring[sizeof(memstring)-1] = '\0';
 
 	target_bytes = memparse(memstring, &endchar);
-	set_new_target(target_bytes >> PAGE_SHIFT);
+	balloon_set_new_target(target_bytes >> PAGE_SHIFT);
 
 	return count;
 }
@@ -442,12 +429,13 @@ static int balloon_read(char *page, char **start, off_t off,
 		"High-mem balloon:   %8lu kB\n"
 		"Driver pages:       %8lu kB\n"
 		"Xen hard limit:     ",
-		PAGES2KB(current_pages), PAGES2KB(target_pages), 
-		PAGES2KB(balloon_low), PAGES2KB(balloon_high),
-		PAGES2KB(driver_pages));
+		PAGES2KB(bs.current_pages), PAGES2KB(bs.target_pages), 
+		PAGES2KB(bs.balloon_low), PAGES2KB(bs.balloon_high),
+		PAGES2KB(bs.driver_pages));
 
-	if (hard_limit != ~0UL)
-		len += sprintf(page + len, "%8lu kB\n", PAGES2KB(hard_limit));
+	if (bs.hard_limit != ~0UL)
+		len += sprintf(page + len, "%8lu kB\n",
+			       PAGES2KB(bs.hard_limit));
 	else
 		len += sprintf(page + len, "     ??? kB\n");
 
@@ -468,13 +456,13 @@ static int __init balloon_init(void)
 
 	IPRINTK("Initialising balloon driver.\n");
 
-	current_pages = min(xen_start_info->nr_pages, max_pfn);
-	totalram_pages = current_pages;
-	target_pages  = current_pages;
-	balloon_low   = 0;
-	balloon_high  = 0;
-	driver_pages  = 0UL;
-	hard_limit    = ~0UL;
+	bs.current_pages = min(xen_start_info->nr_pages, max_pfn);
+	totalram_pages   = bs.current_pages;
+	bs.target_pages  = bs.current_pages;
+	bs.balloon_low   = 0;
+	bs.balloon_high  = 0;
+	bs.driver_pages  = 0UL;
+	bs.hard_limit    = ~0UL;
 
 	init_timer(&balloon_timer);
 	balloon_timer.data = 0;
@@ -489,6 +477,7 @@ static int __init balloon_init(void)
 	balloon_pde->read_proc  = balloon_read;
 	balloon_pde->write_proc = balloon_write;
 #endif
+	balloon_sysfs_init();
     
 	/* Initialise the balloon with excess memory space. */
 	for (pfn = xen_start_info->nr_pages; pfn < max_pfn; pfn++) {
@@ -512,7 +501,7 @@ void balloon_update_driver_allowance(long delta)
 	unsigned long flags;
 
 	balloon_lock(flags);
-	driver_pages += delta;
+	bs.driver_pages += delta;
 	balloon_unlock(flags);
 }
 
@@ -578,7 +567,7 @@ struct page **alloc_empty_pages_and_pagevec(int nr_pages)
 			goto err;
 		}
 
-		totalram_pages = --current_pages;
+		totalram_pages = --bs.current_pages;
 
 		balloon_unlock(flags);
 	}
@@ -624,7 +613,7 @@ void balloon_release_driver_page(struct page *page)
 
 	balloon_lock(flags);
 	balloon_append(page);
-	driver_pages--;
+	bs.driver_pages--;
 	balloon_unlock(flags);
 
 	schedule_work(&balloon_worker);
