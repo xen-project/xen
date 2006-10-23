@@ -328,7 +328,7 @@ static void connect(struct backend_info *be)
 
 	/* May not get a kick from the frontend, so start the tx_queue now. */
 	if (!netbk_can_queue(be->netif->dev))
-		netif_start_queue(be->netif->dev);
+		netif_wake_queue(be->netif->dev);
 }
 
 

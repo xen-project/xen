@@ -92,6 +92,9 @@ typedef struct netif_st {
 	unsigned long   remaining_credit;
 	struct timer_list credit_timeout;
 
+	/* Enforce draining of the transmit queue. */
+	struct timer_list tx_queue_timeout;
+
 	/* Miscellaneous private stuff. */
 	struct list_head list;  /* scheduling list */
 	atomic_t         refcnt;
@@ -118,6 +121,8 @@ int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 	} while (0)
 
 void netif_xenbus_init(void);
+
+#define netif_schedulable(dev) (netif_running(dev) && netif_carrier_ok(dev))
 
 void netif_schedule_work(netif_t *netif);
 void netif_deschedule_work(netif_t *netif);
