@@ -112,7 +112,7 @@ void save_segments(struct vcpu *v)
         slb_entry[i].slb_esid = esid;
 #ifdef SLB_DEBUG
         if (vsid != 0) {
-            printf("%s: DOM[0x%x]: S%02d: 0x%016lx 0x%016lx\n",
+            printk("%s: DOM[0x%x]: S%02d: 0x%016lx 0x%016lx\n",
                     __func__, v->domain->domain_id, i, vsid, esid);
         }
 #endif
@@ -146,7 +146,7 @@ void load_segments(struct vcpu *v)
 
 #ifdef SLB_DEBUG
         if (vsid != 0) {
-            printf("%s: DOM[0x%x]: R%02d: 0x%016lx 0x%016lx\n",
+            printk("%s: DOM[0x%x]: R%02d: 0x%016lx 0x%016lx\n",
                     __func__, v->domain->domain_id, i, vsid, esid);
         }
 #endif
@@ -173,6 +173,6 @@ void dump_segments(int valid)
 
         if (valid && !(esid & SLB_ESID_VALID))
             continue;
-        printf("S%02d: 0x%016lx 0x%016lx\n", i, vsid, esid);
+        printk("S%02d: 0x%016lx 0x%016lx\n", i, vsid, esid);
     }
 }

@@ -803,7 +803,7 @@ cpu_init (void)
 	cpu_data = per_cpu_init();
 
 #ifdef XEN
-	printf ("cpu_init: current=%p\n", current);
+	printk("cpu_init: current=%p\n", current);
 #endif
 
 	/*

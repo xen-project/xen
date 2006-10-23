@@ -741,7 +741,8 @@ void send_pio_req(unsigned long port, unsigned long count, int size,
     ioreq_t *p;
 
     if ( size == 0 || count == 0 ) {
-        printf("null pio request? port %lx, count %lx, size %d, value %lx, dir %d, pvalid %d.\n",
+        printk("null pio request? port %lx, count %lx, "
+               "size %d, value %lx, dir %d, pvalid %d.\n",
                port, count, size, value, dir, pvalid);
     }
 
@@ -794,7 +795,8 @@ static void send_mmio_req(unsigned char type, unsigned long gpa,
     ioreq_t *p;
 
     if ( size == 0 || count == 0 ) {
-        printf("null mmio request? type %d, gpa %lx, count %lx, size %d, value %lx, dir %d, pvalid %d.\n",
+        printk("null mmio request? type %d, gpa %lx, "
+               "count %lx, size %d, value %lx, dir %d, pvalid %d.\n",
                type, gpa, count, size, value, dir, pvalid);
     }
 

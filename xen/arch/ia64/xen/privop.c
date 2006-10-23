@@ -525,14 +525,14 @@ priv_handle_op(VCPU *vcpu, REGS *regs, int privlvl)
 	if (iip==0xa000000100001820) {
 		static int firstpagefault = 1;
 		if (firstpagefault) {
-			printf("*** First time to domain page fault!\n");				firstpagefault=0;
+			printk("*** First time to domain page fault!\n");				firstpagefault=0;
 		}
 	}
 #endif
 	if (privop_trace) {
 		static long i = 400;
-		//if (i > 0) printf("priv_handle_op: at 0x%lx\n",iip);
-		if (i > 0) printf("priv_handle_op: privop trace at 0x%lx, itc=%lx, itm=%lx\n",
+		//if (i > 0) printk("priv_handle_op: at 0x%lx\n",iip);
+		if (i > 0) printk("priv_handle_op: privop trace at 0x%lx, itc=%lx, itm=%lx\n",
 			iip,ia64_get_itc(),ia64_get_itm());
 		i--;
 	}
@@ -541,11 +541,11 @@ priv_handle_op(VCPU *vcpu, REGS *regs, int privlvl)
 	else if (slot == 1)
 		inst.inst = ((bundle.i64[0]>>46) | bundle.i64[1]<<18) & MASK_41;
 	else if (slot == 2) inst.inst = (bundle.i64[1]>>23) & MASK_41; 
-	else printf("priv_handle_op: illegal slot: %d\n", slot);
+	else printk("priv_handle_op: illegal slot: %d\n", slot);
 
 	slot_type = slot_types[bundle.template][slot];
 	if (priv_verbose) {
-		printf("priv_handle_op: checking bundle at 0x%lx (op=0x%016lx) slot %d (type=%d)\n",
+		printk("priv_handle_op: checking bundle at 0x%lx (op=0x%016lx) slot %d (type=%d)\n",
 		 iip, (UINT64)inst.inst, slot, slot_type);
 	}
 	if (slot_type == B && inst.generic.major == 0 && inst.B8.x6 == 0x0) {
@@ -648,10 +648,10 @@ priv_handle_op(VCPU *vcpu, REGS *regs, int privlvl)
 	    default:
 		break;
 	}
-        //printf("We who are about do die salute you\n");
-	printf("priv_handle_op: can't handle privop at 0x%lx (op=0x%016lx) slot %d (type=%d), ipsr=0x%lx\n",
+        //printk("We who are about do die salute you\n");
+	printk("priv_handle_op: can't handle privop at 0x%lx (op=0x%016lx) slot %d (type=%d), ipsr=0x%lx\n",
 		 iip, (UINT64)inst.inst, slot, slot_type, ipsr);
-        //printf("vtop(0x%lx)==0x%lx\n", iip, tr_vtop(iip));
+        //printk("vtop(0x%lx)==0x%lx\n", iip, tr_vtop(iip));
         //thread_mozambique("privop fault\n");
 	return (IA64_ILLOP_FAULT);
 }
@@ -676,8 +676,8 @@ priv_emulate(VCPU *vcpu, REGS *regs, UINT64 isr)
 
 	// handle privops masked as illops? and breaks (6)
 	if (isrcode != 1 && isrcode != 2 && isrcode != 0 && isrcode != 6) {
-        	printf("priv_emulate: isrcode != 0 or 1 or 2\n");
-		printf("priv_emulate: returning ILLOP, not implemented!\n");
+        	printk("priv_emulate: isrcode != 0 or 1 or 2\n");
+		printk("priv_emulate: returning ILLOP, not implemented!\n");
 		while (1);
 		return IA64_ILLOP_FAULT;
 	}
@@ -690,7 +690,7 @@ priv_emulate(VCPU *vcpu, REGS *regs, UINT64 isr)
 		(void)vcpu_increment_iip(vcpu);
 	}
 	if (fault == IA64_ILLOP_FAULT)
-		printf("priv_emulate: priv_handle_op fails, "
+		printk("priv_emulate: priv_handle_op fails, "
 		       "isr=0x%lx iip=%lx\n",isr, regs->cr_iip);
 	return fault;
 }

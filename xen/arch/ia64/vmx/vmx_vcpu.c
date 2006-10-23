@@ -246,7 +246,7 @@ check_entry(u64 va, u64 ps, char *str)
       va == 0x600000000000C000UL ) {
     stop();
      }
-     if (tlb_debug) printf("%s at %lx %lx\n", str, va, 1UL<<ps);
+     if (tlb_debug) printk("%s at %lx %lx\n", str, va, 1UL<<ps);
 }
 #endif
 

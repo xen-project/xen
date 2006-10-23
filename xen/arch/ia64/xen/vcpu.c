@@ -189,7 +189,7 @@ IA64FAULT vcpu_set_ar(VCPU *vcpu, UINT64 reg, UINT64 val)
 	if (reg == 44) return (vcpu_set_itc(vcpu,val));
 	else if (reg == 27) return (IA64_ILLOP_FAULT);
 	else if (reg == 24)
-	    printf("warning: setting ar.eflg is a no-op; no IA-32 support\n");
+	    printk("warning: setting ar.eflg is a no-op; no IA-32 support\n");
 	else if (reg > 7) return (IA64_ILLOP_FAULT);
 	else {
 		PSCB(vcpu,krs[reg]) = val;
@@ -201,7 +201,7 @@ IA64FAULT vcpu_set_ar(VCPU *vcpu, UINT64 reg, UINT64 val)
 IA64FAULT vcpu_get_ar(VCPU *vcpu, UINT64 reg, UINT64 *val)
 {
 	if (reg == 24)
-	    printf("warning: getting ar.eflg is a no-op; no IA-32 support\n");
+	    printk("warning: getting ar.eflg is a no-op; no IA-32 support\n");
 	else if (reg > 7) return (IA64_ILLOP_FAULT);
 	else *val = PSCB(vcpu,krs[reg]);
 	return IA64_NO_FAULT;
@@ -304,7 +304,7 @@ IA64FAULT vcpu_set_psr_sm(VCPU *vcpu, UINT64 imm24)
 	if (imm.sp) { ipsr->sp = 1; psr.sp = 1; }
 	if (imm.i) {
 		if (vcpu->vcpu_info->evtchn_upcall_mask) {
-//printf("vcpu_set_psr_sm: psr.ic 0->1\n");
+//printk("vcpu_set_psr_sm: psr.ic 0->1\n");
 			enabling_interrupts = 1;
 		}
 		vcpu->vcpu_info->evtchn_upcall_mask = 0;
@@ -316,7 +316,7 @@ IA64FAULT vcpu_set_psr_sm(VCPU *vcpu, UINT64 imm24)
 	if (imm.ac) { ipsr->ac = 1; psr.ac = 1; }
 	if (imm.up) { ipsr->up = 1; psr.up = 1; }
 	if (imm.be) {
-		printf("*** DOMAIN TRYING TO TURN ON BIG-ENDIAN!!!\n");
+		printk("*** DOMAIN TRYING TO TURN ON BIG-ENDIAN!!!\n");
 		return (IA64_ILLOP_FAULT);
 	}
 	if (imm.dt) vcpu_set_metaphysical_mode(vcpu,FALSE);
@@ -365,7 +365,7 @@ IA64FAULT vcpu_set_psr_l(VCPU *vcpu, UINT64 val)
 	if (newpsr.dt && newpsr.rt) vcpu_set_metaphysical_mode(vcpu,FALSE);
 	else vcpu_set_metaphysical_mode(vcpu,TRUE);
 	if (newpsr.be) {
-		printf("*** DOMAIN TRYING TO TURN ON BIG-ENDIAN!!!\n");
+		printk("*** DOMAIN TRYING TO TURN ON BIG-ENDIAN!!!\n");
 		return (IA64_ILLOP_FAULT);
 	}
 	if (enabling_interrupts &&
@@ -408,7 +408,7 @@ UINT64 vcpu_get_ipsr_int_state(VCPU *vcpu,UINT64 prevpsr)
 	UINT64 dcr = PSCBX(vcpu,dcr);
 	PSR psr;
 
-	//printf("*** vcpu_get_ipsr_int_state (0x%016lx)...\n",prevpsr);
+	//printk("*** vcpu_get_ipsr_int_state (0x%016lx)...\n",prevpsr);
 	psr.i64 = prevpsr;
 	psr.ia64_psr.be = 0; if (dcr & IA64_DCR_BE) psr.ia64_psr.be = 1;
 	psr.ia64_psr.pp = 0; if (dcr & IA64_DCR_PP) psr.ia64_psr.pp = 1;
@@ -418,7 +418,7 @@ UINT64 vcpu_get_ipsr_int_state(VCPU *vcpu,UINT64 prevpsr)
 	psr.ia64_psr.dt = 1; psr.ia64_psr.it = 1; psr.ia64_psr.rt = 1;
 	if (psr.ia64_psr.cpl == 2) psr.ia64_psr.cpl = 0; // !!!! fool domain
 	// psr.pk = 1;
-	//printf("returns 0x%016lx...\n",psr.i64);
+	//printk("returns 0x%016lx...\n",psr.i64);
 	return psr.i64;
 }
 
@@ -519,7 +519,7 @@ IA64FAULT vcpu_get_iipa(VCPU *vcpu, UINT64 *pval)
 	UINT64 val = PSCB(vcpu,iipa);
 	// SP entry code does not save iipa yet nor does it get
 	//  properly delivered in the pscb
-//	printf("*** vcpu_get_iipa: cr.iipa not fully implemented yet!!\n");
+//	printk("*** vcpu_get_iipa: cr.iipa not fully implemented yet!!\n");
 	*pval = val;
 	return (IA64_NO_FAULT);
 }
@@ -570,7 +570,7 @@ IA64FAULT vcpu_set_iva(VCPU *vcpu, UINT64 val)
 IA64FAULT vcpu_set_pta(VCPU *vcpu, UINT64 val)
 {
 	if (val & IA64_PTA_LFMT) {
-		printf("*** No support for VHPT long format yet!!\n");
+		printk("*** No support for VHPT long format yet!!\n");
 		return (IA64_ILLOP_FAULT);
 	}
 	if (val & (0x3f<<9)) /* reserved fields */ return IA64_RSVDREG_FAULT;
@@ -622,7 +622,7 @@ IA64FAULT vcpu_set_iipa(VCPU *vcpu, UINT64 val)
 {
 	// SP entry code does not save iipa yet nor does it get
 	//  properly delivered in the pscb
-//	printf("*** vcpu_set_iipa: cr.iipa not fully implemented yet!!\n");
+//	printk("*** vcpu_set_iipa: cr.iipa not fully implemented yet!!\n");
 	PSCB(vcpu,iipa) = val;
 	return IA64_NO_FAULT;
 }
@@ -658,12 +658,12 @@ void vcpu_pend_unspecified_interrupt(VCPU *vcpu)
 void vcpu_pend_interrupt(VCPU *vcpu, UINT64 vector)
 {
 	if (vector & ~0xff) {
-		printf("vcpu_pend_interrupt: bad vector\n");
+		printk("vcpu_pend_interrupt: bad vector\n");
 		return;
 	}
 
 	if (vcpu->arch.event_callback_ip) {
-		printf("Deprecated interface. Move to new event based solution\n");
+		printk("Deprecated interface. Move to new event based solution\n");
 		return;
 	}
 		
@@ -718,7 +718,7 @@ check_start:
 	}
 	// have a pending,deliverable interrupt... see if it is masked
 	bitnum = ia64_fls(bits);
-//printf("XXXXXXX vcpu_check_pending_interrupts: got bitnum=%p...\n",bitnum);
+//printk("XXXXXXX vcpu_check_pending_interrupts: got bitnum=%p...\n",bitnum);
 	vector = bitnum+(i*64);
 	mask = 1L << bitnum;
 	/* sanity check for guest timer interrupt */
@@ -730,24 +730,24 @@ check_start:
 			goto check_start;
 		}
 	}
-//printf("XXXXXXX vcpu_check_pending_interrupts: got vector=%p...\n",vector);
+//printk("XXXXXXX vcpu_check_pending_interrupts: got vector=%p...\n",vector);
 	if (*r >= mask) {
 		// masked by equal inservice
-//printf("but masked by equal inservice\n");
+//printk("but masked by equal inservice\n");
 		return SPURIOUS_VECTOR;
 	}
 	if (PSCB(vcpu,tpr) & IA64_TPR_MMI) {
 		// tpr.mmi is set
-//printf("but masked by tpr.mmi\n");
+//printk("but masked by tpr.mmi\n");
 		return SPURIOUS_VECTOR;
 	}
 	if (((PSCB(vcpu,tpr) & IA64_TPR_MIC) + 15) >= vector) {
 		//tpr.mic masks class
-//printf("but masked by tpr.mic\n");
+//printk("but masked by tpr.mic\n");
 		return SPURIOUS_VECTOR;
 	}
 
-//printf("returned to caller\n");
+//printk("returned to caller\n");
 	return vector;
 }
 
@@ -805,7 +805,7 @@ IA64FAULT vcpu_get_ivr(VCPU *vcpu, UINT64 *pval)
 #if 0
 	if (vector == (PSCB(vcpu,itv) & 0xff)) {
 	    if (!(++count[domid] & ((HEARTBEAT_FREQ*1024)-1))) {
-		printf("Dom%d heartbeat... ticks=%lx,nonticks=%lx\n",
+		printk("Dom%d heartbeat... ticks=%lx,nonticks=%lx\n",
 			domid, count[domid], nonclockcount[domid]);
 		//count[domid] = 0;
 		//dump_runq();
@@ -818,7 +818,7 @@ IA64FAULT vcpu_get_ivr(VCPU *vcpu, UINT64 *pval)
 	// getting ivr has "side effects"
 #ifdef IRQ_DEBUG
 	if (firsttime[vector]) {
-		printf("*** First get_ivr on vector=%lu,itc=%lx\n",
+		printk("*** First get_ivr on vector=%lu,itc=%lx\n",
 			vector,ia64_get_itc());
 		firsttime[vector]=0;
 	}
@@ -832,7 +832,7 @@ IA64FAULT vcpu_get_ivr(VCPU *vcpu, UINT64 *pval)
 
 	i = vector >> 6;
 	mask = 1L << (vector & 0x3f);
-//printf("ZZZZZZ vcpu_get_ivr: setting insvc mask for vector %lu\n",vector);
+//printk("ZZZZZZ vcpu_get_ivr: setting insvc mask for vector %lu\n",vector);
 	PSCBX(vcpu,insvc[i]) |= mask;
 	PSCBX(vcpu,irr[i]) &= ~mask;
 	//PSCB(vcpu,pending_interruption)--;
@@ -897,7 +897,7 @@ IA64FAULT vcpu_get_cmcv(VCPU *vcpu, UINT64 *pval)
 IA64FAULT vcpu_get_lrr0(VCPU *vcpu, UINT64 *pval)
 {
 	// fix this when setting values other than m-bit is supported
-	printf("vcpu_get_lrr0: Unmasked interrupts unsupported\n");
+	printk("vcpu_get_lrr0: Unmasked interrupts unsupported\n");
 	*pval = (1L << 16);
 	return (IA64_NO_FAULT);
 }
@@ -905,14 +905,14 @@ IA64FAULT vcpu_get_lrr0(VCPU *vcpu, UINT64 *pval)
 IA64FAULT vcpu_get_lrr1(VCPU *vcpu, UINT64 *pval)
 {
 	// fix this when setting values other than m-bit is supported
-	printf("vcpu_get_lrr1: Unmasked interrupts unsupported\n");
+	printk("vcpu_get_lrr1: Unmasked interrupts unsupported\n");
 	*pval = (1L << 16);
 	return (IA64_NO_FAULT);
 }
 
 IA64FAULT vcpu_set_lid(VCPU *vcpu, UINT64 val)
 {
-	printf("vcpu_set_lid: Setting cr.lid is unsupported\n");
+	printk("vcpu_set_lid: Setting cr.lid is unsupported\n");
 	return (IA64_ILLOP_FAULT);
 }
 
@@ -934,7 +934,7 @@ IA64FAULT vcpu_set_eoi(VCPU *vcpu, UINT64 val)
 	p = &PSCBX(vcpu,insvc[3]);
 	for (i = 3; (i >= 0) && !(bits = *p); i--, p--);
 	if (i < 0) {
-		printf("Trying to EOI interrupt when none are in-service.\n");
+		printk("Trying to EOI interrupt when none are in-service.\n");
 		return IA64_NO_FAULT;
 	}
 	bitnum = ia64_fls(bits);
@@ -946,18 +946,18 @@ IA64FAULT vcpu_set_eoi(VCPU *vcpu, UINT64 val)
 	if (!vcpu->vcpu_info->evtchn_upcall_mask) { // but only if enabled...
 		// worry about this later... Linux only calls eoi
 		// with interrupts disabled
-		printf("Trying to EOI interrupt with interrupts enabled\n");
+		printk("Trying to EOI interrupt with interrupts enabled\n");
 	}
 	if (vcpu_check_pending_interrupts(vcpu) != SPURIOUS_VECTOR)
 		PSCB(vcpu,pending_interruption) = 1;
-//printf("YYYYY vcpu_set_eoi: Successful\n");
+//printk("YYYYY vcpu_set_eoi: Successful\n");
 	return (IA64_NO_FAULT);
 }
 
 IA64FAULT vcpu_set_lrr0(VCPU *vcpu, UINT64 val)
 {
 	if (!(val & (1L << 16))) {
-		printf("vcpu_set_lrr0: Unmasked interrupts unsupported\n");
+		printk("vcpu_set_lrr0: Unmasked interrupts unsupported\n");
 		return (IA64_ILLOP_FAULT);
 	}
 	// no place to save this state but nothing to do anyway
@@ -967,7 +967,7 @@ IA64FAULT vcpu_set_lrr0(VCPU *vcpu, UINT64 val)
 IA64FAULT vcpu_set_lrr1(VCPU *vcpu, UINT64 val)
 {
 	if (!(val & (1L << 16))) {
-		printf("vcpu_set_lrr0: Unmasked interrupts unsupported\n");
+		printk("vcpu_set_lrr0: Unmasked interrupts unsupported\n");
 		return (IA64_ILLOP_FAULT);
 	}
 	// no place to save this state but nothing to do anyway
@@ -1051,7 +1051,7 @@ void vcpu_safe_set_itm(unsigned long val)
 
 	local_irq_save(flags);
 	while (1) {
-//printf("*** vcpu_safe_set_itm: Setting itm to %lx, itc=%lx\n",val,now);
+//printk("*** vcpu_safe_set_itm: Setting itm to %lx, itc=%lx\n",val,now);
 		ia64_set_itm(val);
 		if (val > (now = ia64_get_itc())) break;
 		val = now + epsilon;
@@ -1071,7 +1071,7 @@ void vcpu_set_next_timer(VCPU *vcpu)
 	 * but it doesn't matter right now */
 
 	if (is_idle_domain(vcpu->domain)) {
-//		printf("****** vcpu_set_next_timer called during idle!!\n");
+//		printk("****** vcpu_set_next_timer called during idle!!\n");
 		vcpu_safe_set_itm(s);
 		return;
 	}
@@ -1091,7 +1091,7 @@ IA64FAULT vcpu_set_itm(VCPU *vcpu, UINT64 val)
 	//UINT now = ia64_get_itc();
 
 	//if (val < now) val = now + 1000;
-//printf("*** vcpu_set_itm: called with %lx\n",val);
+//printk("*** vcpu_set_itm: called with %lx\n",val);
 	PSCBX(vcpu,domain_itm) = val;
 	vcpu_set_next_timer(vcpu);
 	return (IA64_NO_FAULT);
@@ -1103,8 +1103,8 @@ IA64FAULT vcpu_set_itc(VCPU *vcpu, UINT64 val)
 #ifdef DISALLOW_SETTING_ITC_FOR_NOW
 	static int did_print;
 	if (!did_print) {
-		printf("vcpu_set_itc: Setting ar.itc is currently disabled\n");
-		printf("(this message is only displayed one)\n");
+		printk("vcpu_set_itc: Setting ar.itc is currently disabled\n");
+		printk("(this message is only displayed one)\n");
 		did_print = 1;
 	}
 #else
@@ -1117,7 +1117,7 @@ IA64FAULT vcpu_set_itc(VCPU *vcpu, UINT64 val)
 
 	local_irq_disable();
 	if (olditm) {
-printf("**** vcpu_set_itc(%lx): vitm changed to %lx\n",val,newnow+d);
+printk("**** vcpu_set_itc(%lx): vitm changed to %lx\n",val,newnow+d);
 		PSCBX(vcpu,domain_itm) = newnow + d;
 	}
 	local_cpu_data->itm_next = newnow + x;
@@ -1141,7 +1141,7 @@ printf("**** vcpu_set_itc(%lx): vitm changed to %lx\n",val,newnow+d);
 IA64FAULT vcpu_get_itm(VCPU *vcpu, UINT64 *pval)
 {
 	//FIXME: Implement this
-	printf("vcpu_get_itm: Getting cr.itm is unsupported... continuing\n");
+	printk("vcpu_get_itm: Getting cr.itm is unsupported... continuing\n");
 	return (IA64_NO_FAULT);
 	//return (IA64_ILLOP_FAULT);
 }
@@ -1149,7 +1149,7 @@ IA64FAULT vcpu_get_itm(VCPU *vcpu, UINT64 *pval)
 IA64FAULT vcpu_get_itc(VCPU *vcpu, UINT64 *pval)
 {
 	//TODO: Implement this
-	printf("vcpu_get_itc: Getting ar.itc is unsupported\n");
+	printk("vcpu_get_itc: Getting ar.itc is unsupported\n");
 	return (IA64_ILLOP_FAULT);
 }
 
@@ -1231,7 +1231,7 @@ IA64FAULT vcpu_rfi(VCPU *vcpu)
 	psr.ia64_psr.bn = 1;
 	//psr.pk = 1;  // checking pkeys shouldn't be a problem but seems broken
 	if (psr.ia64_psr.be) {
-		printf("*** DOMAIN TRYING TO TURN ON BIG-ENDIAN!!!\n");
+		printk("*** DOMAIN TRYING TO TURN ON BIG-ENDIAN!!!\n");
 		return (IA64_ILLOP_FAULT);
 	}
 	PSCB(vcpu,incomplete_regframe) = 0; // is this necessary?
@@ -1297,7 +1297,7 @@ IA64FAULT vcpu_thash(VCPU *vcpu, UINT64 vadr, UINT64 *pval)
 
 IA64FAULT vcpu_ttag(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
 {
-	printf("vcpu_ttag: ttag instruction unsupported\n");
+	printk("vcpu_ttag: ttag instruction unsupported\n");
 	return (IA64_ILLOP_FAULT);
 }
 
@@ -1601,7 +1601,7 @@ IA64FAULT vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
 
 IA64FAULT vcpu_tak(VCPU *vcpu, UINT64 vadr, UINT64 *key)
 {
-	printf("vcpu_tak: tak instruction unsupported\n");
+	printk("vcpu_tak: tak instruction unsupported\n");
 	return (IA64_ILLOP_FAULT);
 	// HACK ALERT: tak does a thash for now
 	//return vcpu_thash(vcpu,vadr,key);
@@ -1652,7 +1652,7 @@ IA64FAULT vcpu_set_pmc(VCPU *vcpu, UINT64 reg, UINT64 val)
 	// TODO: Should set Logical CPU state, not just physical
 	// NOTE: Writes to unimplemented PMC registers are discarded
 #ifdef DEBUG_PFMON
-printf("vcpu_set_pmc(%x,%lx)\n",reg,val);
+printk("vcpu_set_pmc(%x,%lx)\n",reg,val);
 #endif
 	ia64_set_pmc(reg,val);
 	return (IA64_NO_FAULT);
@@ -1663,7 +1663,7 @@ IA64FAULT vcpu_set_pmd(VCPU *vcpu, UINT64 reg, UINT64 val)
 	// TODO: Should set Logical CPU state, not just physical
 	// NOTE: Writes to unimplemented PMD registers are discarded
 #ifdef DEBUG_PFMON
-printf("vcpu_set_pmd(%x,%lx)\n",reg,val);
+printk("vcpu_set_pmd(%x,%lx)\n",reg,val);
 #endif
 	ia64_set_pmd(reg,val);
 	return (IA64_NO_FAULT);
@@ -1674,7 +1674,7 @@ IA64FAULT vcpu_get_pmc(VCPU *vcpu, UINT64 reg, UINT64 *pval)
 	// NOTE: Reads from unimplemented PMC registers return zero
 	UINT64 val = (UINT64)ia64_get_pmc(reg);
 #ifdef DEBUG_PFMON
-printf("%lx=vcpu_get_pmc(%x)\n",val,reg);
+printk("%lx=vcpu_get_pmc(%x)\n",val,reg);
 #endif
 	*pval = val;
 	return (IA64_NO_FAULT);
@@ -1685,7 +1685,7 @@ IA64FAULT vcpu_get_pmd(VCPU *vcpu, UINT64 reg, UINT64 *pval)
 	// NOTE: Reads from unimplemented PMD registers return zero
 	UINT64 val = (UINT64)ia64_get_pmd(reg);
 #ifdef DEBUG_PFMON
-printf("%lx=vcpu_get_pmd(%x)\n",val,reg);
+printk("%lx=vcpu_get_pmd(%x)\n",val,reg);
 #endif
 	*pval = val;
 	return (IA64_NO_FAULT);
@@ -1914,7 +1914,7 @@ IA64FAULT vcpu_itr_d(VCPU *vcpu, UINT64 slot, UINT64 pte,
 	vcpu_purge_tr_entry(&PSCBX(vcpu, dtlb));
 
 	trp = &PSCBX(vcpu,dtrs[slot]);
-//printf("***** itr.d: setting slot %d: ifa=%p\n",slot,ifa);
+//printk("***** itr.d: setting slot %d: ifa=%p\n",slot,ifa);
 	vcpu_set_tr_entry(trp,pte,itir,ifa);
 	vcpu_quick_region_set(PSCBX(vcpu,dtr_regions),ifa);
 
@@ -1940,7 +1940,7 @@ IA64FAULT vcpu_itr_i(VCPU *vcpu, UINT64 slot, UINT64 pte,
 	vcpu_purge_tr_entry(&PSCBX(vcpu, itlb));
 
 	trp = &PSCBX(vcpu,itrs[slot]);
-//printf("***** itr.i: setting slot %d: ifa=%p\n",slot,ifa);
+//printk("***** itr.i: setting slot %d: ifa=%p\n",slot,ifa);
 	vcpu_set_tr_entry(trp,pte,itir,ifa);
 	vcpu_quick_region_set(PSCBX(vcpu,itr_regions),ifa);
 
@@ -2020,7 +2020,7 @@ void vcpu_itc_no_srlz(VCPU *vcpu, UINT64 IorD, UINT64 vaddr, UINT64 pte, UINT64 
 		// FIXME: this is dangerous... vhpt_flush_address ensures these
 		// addresses never get flushed.  More work needed if this
 		// ever happens.
-//printf("vhpt_insert(%p,%p,%p)\n",vaddr,pte,1L<<logps);
+//printk("vhpt_insert(%p,%p,%p)\n",vaddr,pte,1L<<logps);
 		if (logps > PAGE_SHIFT) vhpt_multiple_insert(vaddr,pte,logps);
 		else vhpt_insert(vaddr,pte,logps<<2);
 	}
@@ -2147,7 +2147,7 @@ IA64FAULT vcpu_ptc_ga(VCPU *vcpu,UINT64 vadr,UINT64 addr_range)
 	// FIXME: validate not flushing Xen addresses
 	// if (Xen address) return(IA64_ILLOP_FAULT);
 	// FIXME: ??breaks if domain PAGE_SIZE < Xen PAGE_SIZE
-//printf("######## vcpu_ptc_ga(%p,%p) ##############\n",vadr,addr_range);
+//printk("######## vcpu_ptc_ga(%p,%p) ##############\n",vadr,addr_range);
 
 	check_xen_space_overlap ("ptc_ga", vadr, addr_range);
 

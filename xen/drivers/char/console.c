@@ -294,7 +294,7 @@ static inline void __putstr(const char *str)
     }
 }
 
-void printf(const char *fmt, ...)
+void printk(const char *fmt, ...)
 {
     static char   buf[1024];
     static int    start_of_line = 1;

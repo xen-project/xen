@@ -386,13 +386,13 @@ void start_kernel(void)
     /* first find highest page frame number */
     max_page = 0;
     efi_memmap_walk(find_max_pfn, &max_page);
-    printf("find_memory: efi_memmap_walk returns max_page=%lx\n",max_page);
+    printk("find_memory: efi_memmap_walk returns max_page=%lx\n",max_page);
     efi_print();
 
     heap_start = memguard_init(ia64_imva(&_end));
-    printf("Before heap_start: %p\n", heap_start);
+    printk("Before heap_start: %p\n", heap_start);
     heap_start = __va(init_boot_allocator(__pa(heap_start)));
-    printf("After heap_start: %p\n", heap_start);
+    printk("After heap_start: %p\n", heap_start);
 
     efi_memmap_walk(filter_rsvd_memory, init_boot_pages);
     efi_memmap_walk(xen_count_pages, &nr_pages);

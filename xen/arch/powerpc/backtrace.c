@@ -93,13 +93,13 @@ static void xmon_print_symbol(unsigned long address, const char *mid,
 	const char *name = NULL;
 	unsigned long offset, size;
 
-	printf(REG, address);
+	printk(REG, address);
 
     name = symbols_lookup(address, &size, &offset, namebuf);
 	if (name) {
-		printf("%s%s+%#lx/%#lx", mid, name, offset, size);
+		printk("%s%s+%#lx/%#lx", mid, name, offset, size);
 	}
-	printf("%s", after);
+	printk("%s", after);
 }
 
 static void backtrace(
@@ -114,13 +114,13 @@ static void backtrace(
 	do {
 		if (sp > xenheap_phys_end) {
 			if (sp != 0)
-				printf("SP (%lx) is not in xen space\n", sp);
+				printk("SP (%lx) is not in xen space\n", sp);
 			break;
 		}
 
 		if (!mread(sp + LRSAVE_OFFSET, &ip, sizeof(unsigned long))
 		    || !mread(sp, &newsp, sizeof(unsigned long))) {
-			printf("Couldn't read stack frame at %lx\n", sp);
+			printk("Couldn't read stack frame at %lx\n", sp);
 			break;
 		}
 
@@ -147,17 +147,17 @@ static void backtrace(
 				printip = 0;
 			} else if (lr < xenheap_phys_end
                        && !(fnstart <= lr && lr < fnend)) {
-				printf("[link register   ] ");
+				printk("[link register   ] ");
 				xmon_print_symbol(lr, " ", "\n");
 			}
 			if (printip) {
-				printf("["REG"] ", sp);
+				printk("["REG"] ", sp);
 				xmon_print_symbol(ip, " ", " (unreliable)\n");
 			}
 			pc = lr = 0;
 
 		} else {
-			printf("["REG"] ", sp);
+			printk("["REG"] ", sp);
 			xmon_print_symbol(ip, " ", "\n");
 		}
 
@@ -167,11 +167,11 @@ static void backtrace(
 		    && marker == REG_FRAME_MARKER) {
 			if (mread(sp + REGS_OFFSET, &regs, sizeof(regs))
 			    != sizeof(regs)) {
-				printf("Couldn't read registers at %lx\n",
+				printk("Couldn't read registers at %lx\n",
 				       sp + REGS_OFFSET);
 				break;
 			}
-            printf("--- Exception: %x %s at ", regs.entry_vector,
+            printk("--- Exception: %x %s at ", regs.entry_vector,
 			       getvecname(TRAP(&regs)));
 			pc = regs.pc;
 			lr = regs.lr;

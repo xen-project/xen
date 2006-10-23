@@ -144,7 +144,7 @@ int vmx_do_mmu_update(mmu_update_t *ureqs,u64 count,u64 *pdone,u64 foreigndom)
             gpfn = req.val;
             set_machinetophys(mfn,gpfn);
         }else{
-            printf("Unkown command of mmu_update:ptr: %lx,val: %lx \n",req.ptr,req.val);
+            printk("Unkown command of mmu_update:ptr: %lx,val: %lx \n",req.ptr,req.val);
             while(1);
         }
         ureqs ++;

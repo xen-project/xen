@@ -265,7 +265,7 @@ switch_mm_mode(VCPU *vcpu, IA64_PSR old_psr, IA64_PSR new_psr)
     perfc_incra(vmx_switch_mm_mode, act);
     switch (act) {
     case SW_V2P:
-//        printf("V -> P mode transition: (0x%lx -> 0x%lx)\n",
+//        printk("V -> P mode transition: (0x%lx -> 0x%lx)\n",
 //               old_psr.val, new_psr.val);
         vcpu->arch.old_rsc = regs->ar_rsc;
         switch_to_physical_rid(vcpu);
@@ -277,7 +277,7 @@ switch_mm_mode(VCPU *vcpu, IA64_PSR old_psr, IA64_PSR new_psr)
         vcpu->arch.mode_flags |= GUEST_IN_PHY;
         break;
     case SW_P2V:
-//        printf("P -> V mode transition: (0x%lx -> 0x%lx)\n",
+//        printk("P -> V mode transition: (0x%lx -> 0x%lx)\n",
 //               old_psr.val, new_psr.val);
         switch_to_virtual_rid(vcpu);
         /*
@@ -288,11 +288,11 @@ switch_mm_mode(VCPU *vcpu, IA64_PSR old_psr, IA64_PSR new_psr)
         vcpu->arch.mode_flags &= ~GUEST_IN_PHY;
         break;
     case SW_SELF:
-        printf("Switch to self-0x%lx!!! MM mode doesn't change...\n",
+        printk("Switch to self-0x%lx!!! MM mode doesn't change...\n",
             old_psr.val);
         break;
     case SW_NOP:
-//        printf("No action required for mode transition: (0x%lx -> 0x%lx)\n",
+//        printk("No action required for mode transition: (0x%lx -> 0x%lx)\n",
 //               old_psr.val, new_psr.val);
         break;
     default:

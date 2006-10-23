@@ -80,7 +80,7 @@ static void pib_write(VCPU *vcpu, void *src, uint64_t pib_off, size_t s, int ma)
             }
         }
         else {      // upper half
-            printf("IPI-UHF write %lx\n",pib_off);
+            printk("IPI-UHF write %lx\n",pib_off);
             panic_domain(NULL,"Not support yet for SM-VP\n");
         }
         break;
@@ -114,7 +114,7 @@ static void pib_read(VCPU *vcpu, uint64_t pib_off, void *dest, size_t s, int ma)
             }
             else {
 #ifdef  IPI_DEBUG
-                printf("IPI-LHF read %lx\n",pib_off);
+                printk("IPI-LHF read %lx\n",pib_off);
 #endif
                 *(uint64_t *)dest = 0;  // TODO for SM-VP
             }
@@ -125,7 +125,7 @@ static void pib_read(VCPU *vcpu, uint64_t pib_off, void *dest, size_t s, int ma)
             }
             else {
 #ifdef  IPI_DEBUG
-                printf("IPI-UHF read %lx\n",pib_off);
+                printk("IPI-UHF read %lx\n",pib_off);
 #endif
                 *(uint8_t *)dest = 0;   // TODO for SM-VP
             }
@@ -321,7 +321,7 @@ memread_p(VCPU *vcpu, u64 *src, u64 *dest, size_t s)
 static void deliver_ipi (VCPU *vcpu, uint64_t dm, uint64_t vector)
 {
 #ifdef  IPI_DEBUG
-  printf ("deliver_ipi %lx %lx\n",dm,vector);
+  printk ("deliver_ipi %lx %lx\n",dm,vector);
 #endif
     switch ( dm ) {
     case 0:     // INT
@@ -387,7 +387,7 @@ static void write_ipi (VCPU *vcpu, uint64_t addr, uint64_t value)
         memset (&c, 0, sizeof (c));
 
         if (arch_set_info_guest (targ, &c) != 0) {
-            printf ("arch_boot_vcpu: failure\n");
+            printk ("arch_boot_vcpu: failure\n");
             return;
         }
         /* First or next rendez-vous: set registers.  */
@@ -397,11 +397,11 @@ static void write_ipi (VCPU *vcpu, uint64_t addr, uint64_t value)
 
         if (test_and_clear_bit(_VCPUF_down,&targ->vcpu_flags)) {
             vcpu_wake(targ);
-            printf ("arch_boot_vcpu: vcpu %d awaken %016lx!\n",
+            printk ("arch_boot_vcpu: vcpu %d awaken %016lx!\n",
                     targ->vcpu_id, targ_regs->cr_iip);
         }
         else
-            printf ("arch_boot_vcpu: huu, already awaken!");
+            printk ("arch_boot_vcpu: huu, already awaken!");
     }
     else {
         int running = test_bit(_VCPUF_running,&targ->vcpu_flags);

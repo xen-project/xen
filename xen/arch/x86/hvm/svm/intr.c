@@ -59,7 +59,7 @@ static inline int svm_inject_extint(struct vcpu *v, int trap)
     intr.fields.prio = 0xF;
     intr.fields.ign_tpr = 1;
     vmcb->vintr = intr;
-//  printf( "IRQ = %d\n", trap );
+
     return 0;
 }
     

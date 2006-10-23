@@ -248,7 +248,7 @@ void hvm_do_resume(struct vcpu *v)
     case STATE_INVALID:
         break;
     default:
-        printf("Weird HVM iorequest state %d.\n", p->state);
+        printk("Weird HVM iorequest state %d.\n", p->state);
         domain_crash(v->domain);
     }
 }

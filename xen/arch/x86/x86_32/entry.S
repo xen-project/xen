@@ -398,7 +398,7 @@ domain_crash_synchronous_string:
 
 domain_crash_synchronous:
         pushl $domain_crash_synchronous_string
-        call  printf
+        call  printk
         jmp   __domain_crash_synchronous
 
         ALIGN
