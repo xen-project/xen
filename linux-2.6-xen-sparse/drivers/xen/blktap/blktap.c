@@ -356,6 +356,8 @@ static tap_blkif_t *get_next_free_dev(void)
 
 	spin_lock_irq(&pending_free_lock);
 
+	/* tapfds[0] is always NULL */
+
 	for (minor = 1; minor < blktap_next_minor; minor++) {
 		info = tapfds[minor];
 		/* we could have failed a previous attempt. */
@@ -421,7 +423,7 @@ int dom_to_devid(domid_t domid, int xenbus_id, blkif_t *blkif)
 	tap_blkif_t *info;
 	int i;
 
-	for (i = 0; i < blktap_next_minor; i++) {
+	for (i = 1; i < blktap_next_minor; i++) {
 		info = tapfds[i];
 		if ( info &&
 		     (info->trans.domid == domid) &&
@@ -460,6 +462,10 @@ static int blktap_open(struct inode *inode, struct file *filp)
 	tap_blkif_t *info;
 	int i;
 	
+	/* ctrl device, treat differently */
+	if (!idx)
+		return 0;
+
 	info = tapfds[idx];
 
 	if ((idx < 0) || (idx > MAX_TAP_DEV) || !info) {
@@ -509,12 +515,10 @@ static int blktap_release(struct inode *inode, struct file *filp)
 {
 	tap_blkif_t *info = filp->private_data;
 	
-	/* can this ever happen? - sdr */
-	if (!info) {
-		WPRINTK("Trying to free device that doesn't exist "
-		       "[/dev/xen/blktap%d]\n",iminor(inode) - BLKTAP_MINOR);
-		return -EBADF;
-	}
+	/* check for control device */
+	if (!info)
+		return 0;
+
 	info->dev_inuse = 0;
 	DPRINTK("Freeing device [/dev/xen/blktap%d]\n",info->minor);
 
@@ -706,7 +710,7 @@ static int blktap_ioctl(struct inode *inode, struct file *filp,
 
 		info = tapfds[dev];
 
-		if (!dev || (dev > MAX_TAP_DEV) || !info)
+		if ((dev > MAX_TAP_DEV) || !info)
 			return -EINVAL;
 
 		return info->minor;
@@ -728,13 +732,8 @@ static unsigned int blktap_poll(struct file *filp, poll_table *wait)
 {
 	tap_blkif_t *info = filp->private_data;
 	
-	if (!info) {
-		WPRINTK(" poll, retrieving idx failed\n");
-		return 0;
-	}
-
 	/* do not work on the control device */
-	if (!info->minor)
+	if (!info)
 		return 0;
 
 	poll_wait(filp, &info->wait, wait);
@@ -751,8 +750,7 @@ void blktap_kick_user(int idx)
 
 	info = tapfds[idx];
 
-	/* Don't kick control device minor==0 */
-	if ((idx <= 0) || (idx > MAX_TAP_DEV) || !info)
+	if ((idx < 0) || (idx > MAX_TAP_DEV) || !info)
 		return;
 
 	wake_up_interruptible(&info->wait);
@@ -1386,7 +1384,6 @@ static void make_response(blkif_t *blkif, unsigned long id,
 static int __init blkif_init(void)
 {
 	int i,ret,blktap_dir;
-	tap_blkif_t *info;
 
 	if (!is_running_on_xen())
 		return -ENODEV;
@@ -1417,10 +1414,7 @@ static int __init blkif_init(void)
 	
 	blktap_major = ret;
 
-	info = kzalloc(sizeof(tap_blkif_t),GFP_KERNEL);
-	if (!info)
-		return -ENOMEM;
-
+	/* tapfds[0] is always NULL */
 	blktap_next_minor++;
 
 	ret = devfs_mk_cdev(MKDEV(blktap_major, i),
@@ -1430,8 +1424,6 @@ static int __init blkif_init(void)
 		return -ENOMEM;
 
 	DPRINTK("Created misc_dev [/dev/xen/blktap%d]\n",i);
-
-	tapfds[0] = info;
 
 	/* Make sure the xen class exists */
 	if (!setup_xen_class()) {
