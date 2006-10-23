@@ -375,7 +375,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 			req->seg[i].first_sect + 1;
 
 		if ((req->seg[i].last_sect >= (PAGE_SIZE >> 9)) ||
-		    (seg[i].nsec <= 0))
+		    (req->seg[i].last_sect < req->seg[i].first_sect))
 			goto fail_response;
 		preq.nr_sects += seg[i].nsec;
 
