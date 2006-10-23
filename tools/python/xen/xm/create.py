@@ -1161,6 +1161,8 @@ def config_security_check(config, verbose):
         except security.ACMError:
             print "   %s: DENIED" % (resource)
             (res_label, res_policy) = security.get_res_label(resource)
+            if not res_label:
+                res_label = ""
             print "   --> res: %s (%s)" % (str(res_label),
                                            str(res_policy))
             print "   --> dom: %s (%s)" % (str(domain_label),
@@ -1202,7 +1204,7 @@ def main(argv):
         PrettyPrint.prettyprint(config)
     else:
         if not create_security_check(config):
-            raise OptionError('Security Configuration prevents domain from starting')
+            raise security.ACMError('Security Configuration prevents domain from starting')
         else:
             dom = make_domain(opts, config)
             if opts.vals.console_autoconnect:
