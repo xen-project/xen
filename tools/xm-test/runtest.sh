@@ -199,7 +199,10 @@ run=yes
 unsafe=no
 GROUPENTERED=default
 
-cp -f tests/security-acm/xm-test-security_policy.xml /etc/xen/acm-security/policies
+if [ -d /etc/xen/acm-security/policies ]; then
+	cp -f tests/security-acm/xm-test-security_policy.xml \
+	      /etc/xen/acm-security/policies
+fi
 
 # Resolve options
 while [ $# -gt 0 ]
