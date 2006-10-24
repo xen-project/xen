@@ -1,16 +1,16 @@
 Index: ioemu/vnc.c
 ===================================================================
---- ioemu.orig/vnc.c	2006-09-21 19:33:31.000000000 +0100
-+++ ioemu/vnc.c	2006-09-21 19:33:31.000000000 +0100
-@@ -1013,6 +1013,7 @@
+--- ioemu.orig/vnc.c	2006-10-24 14:33:46.000000000 +0100
++++ ioemu/vnc.c	2006-10-24 14:33:46.000000000 +0100
+@@ -1024,6 +1024,7 @@
  
  static int protocol_client_init(VncState *vs, char *data, size_t len)
  {
 +    size_t l;
      char pad[3] = { 0, 0, 0 };
  
-     vs->width = vs->ds->width;
-@@ -1058,8 +1059,10 @@
+     vga_hw_update();
+@@ -1071,8 +1072,10 @@
  	
      vnc_write(vs, pad, 3);           /* padding */
  

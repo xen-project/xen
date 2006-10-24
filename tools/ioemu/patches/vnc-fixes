@@ -1,7 +1,7 @@
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-09-21 19:08:18.000000000 +0100
-+++ ioemu/vl.c	2006-09-21 19:26:24.000000000 +0100
+--- ioemu.orig/vl.c	2006-10-24 13:47:23.000000000 +0100
++++ ioemu/vl.c	2006-10-24 14:19:36.000000000 +0100
 @@ -6534,8 +6534,10 @@
          }
      }
@@ -17,8 +17,8 @@ Index: ioemu/vl.c
      if (use_gdbstub) {
 Index: ioemu/vnc.c
 ===================================================================
---- ioemu.orig/vnc.c	2006-09-21 19:08:18.000000000 +0100
-+++ ioemu/vnc.c	2006-09-21 19:26:38.000000000 +0100
+--- ioemu.orig/vnc.c	2006-10-24 13:47:23.000000000 +0100
++++ ioemu/vnc.c	2006-10-24 14:20:00.000000000 +0100
 @@ -3,6 +3,7 @@
   * 
   * Copyright (C) 2006 Anthony Liguori <anthony@codemonkey.ws>
@@ -483,7 +483,16 @@ Index: ioemu/vnc.c
  
      vga_hw_invalidate();
      vga_hw_update();
-@@ -1010,11 +1101,11 @@
+@@ -924,6 +1015,8 @@
+ {
+     char pad[3] = { 0, 0, 0 };
+ 
++    vga_hw_update();
++
+     vs->width = vs->ds->width;
+     vs->height = vs->ds->height;
+     vnc_write_u16(vs, vs->ds->width);
+@@ -1010,11 +1103,11 @@
  	vnc_write(vs, "RFB 003.003\n", 12);
  	vnc_flush(vs);
  	vnc_read_when(vs, protocol_version, 12);
@@ -497,7 +506,7 @@ Index: ioemu/vnc.c
      }
  }
  
-@@ -1071,17 +1162,15 @@
+@@ -1071,17 +1164,15 @@
  	exit(1);
      }
  
@@ -520,8 +529,8 @@ Index: ioemu/vnc.c
  }
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-09-21 19:00:48.000000000 +0100
-+++ ioemu/vl.h	2006-09-21 19:26:24.000000000 +0100
+--- ioemu.orig/vl.h	2006-10-24 13:47:23.000000000 +0100
++++ ioemu/vl.h	2006-10-24 14:19:36.000000000 +0100
 @@ -319,6 +319,7 @@
  int is_graphic_console(void);
  CharDriverState *text_console_init(DisplayState *ds);
