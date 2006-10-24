@@ -72,7 +72,7 @@ int xc_domain_shutdown(int xc_handle,
     arg.domain_id = domid;
     arg.reason = reason;
 
-    if ( mlock(&arg, sizeof(arg)) != 0 )
+    if ( lock_pages(&arg, sizeof(arg)) != 0 )
     {
         PERROR("Could not lock memory for Xen hypercall");
         goto out1;
@@ -80,7 +80,7 @@ int xc_domain_shutdown(int xc_handle,
 
     ret = do_xen_hypercall(xc_handle, &hypercall);
 
-    safe_munlock(&arg, sizeof(arg));
+    unlock_pages(&arg, sizeof(arg));
 
  out1:
     return ret;
@@ -103,7 +103,7 @@ int xc_vcpu_setaffinity(int xc_handle,
                          (uint8_t *)&cpumap);
     domctl.u.vcpuaffinity.cpumap.nr_cpus = sizeof(cpumap) * 8;
     
-    if ( mlock(&cpumap, sizeof(cpumap)) != 0 )
+    if ( lock_pages(&cpumap, sizeof(cpumap)) != 0 )
     {
         PERROR("Could not lock memory for Xen hypercall");
         goto out;
@@ -111,7 +111,7 @@ int xc_vcpu_setaffinity(int xc_handle,
 
     ret = do_domctl(xc_handle, &domctl);
 
-    safe_munlock(&cpumap, sizeof(cpumap));
+    unlock_pages(&cpumap, sizeof(cpumap));
 
  out:
     return ret;
@@ -134,7 +134,7 @@ int xc_vcpu_getaffinity(int xc_handle,
                          (uint8_t *)cpumap);
     domctl.u.vcpuaffinity.cpumap.nr_cpus = sizeof(*cpumap) * 8;
     
-    if ( mlock(cpumap, sizeof(*cpumap)) != 0 )
+    if ( lock_pages(cpumap, sizeof(*cpumap)) != 0 )
     {
         PERROR("Could not lock memory for Xen hypercall");
         goto out;
@@ -142,7 +142,7 @@ int xc_vcpu_getaffinity(int xc_handle,
 
     ret = do_domctl(xc_handle, &domctl);
 
-    safe_munlock(cpumap, sizeof(*cpumap));
+    unlock_pages(cpumap, sizeof(*cpumap));
 
  out:
     return ret;
@@ -213,7 +213,7 @@ int xc_domain_getinfolist(int xc_handle,
     int ret = 0;
     DECLARE_SYSCTL;
 
-    if ( mlock(info, max_domains*sizeof(xc_domaininfo_t)) != 0 )
+    if ( lock_pages(info, max_domains*sizeof(xc_domaininfo_t)) != 0 )
         return -1;
 
     sysctl.cmd = XEN_SYSCTL_getdomaininfolist;
@@ -226,8 +226,7 @@ int xc_domain_getinfolist(int xc_handle,
     else
         ret = sysctl.u.getdomaininfolist.num_domains;
 
-    if ( munlock(info, max_domains*sizeof(xc_domaininfo_t)) != 0 )
-        ret = -1;
+    unlock_pages(info, max_domains*sizeof(xc_domaininfo_t));
 
     return ret;
 }
@@ -245,12 +244,12 @@ int xc_vcpu_getcontext(int xc_handle,
     domctl.u.vcpucontext.vcpu   = (uint16_t)vcpu;
     set_xen_guest_handle(domctl.u.vcpucontext.ctxt, ctxt);
 
-    if ( (rc = mlock(ctxt, sizeof(*ctxt))) != 0 )
+    if ( (rc = lock_pages(ctxt, sizeof(*ctxt))) != 0 )
         return rc;
 
     rc = do_domctl(xc_handle, &domctl);
 
-    safe_munlock(ctxt, sizeof(*ctxt));
+    unlock_pages(ctxt, sizeof(*ctxt));
 
     return rc;
 }
@@ -512,12 +511,12 @@ int xc_vcpu_setcontext(int xc_handle,
     domctl.u.vcpucontext.vcpu = vcpu;
     set_xen_guest_handle(domctl.u.vcpucontext.ctxt, ctxt);
 
-    if ( (rc = mlock(ctxt, sizeof(*ctxt))) != 0 )
+    if ( (rc = lock_pages(ctxt, sizeof(*ctxt))) != 0 )
         return rc;
 
     rc = do_domctl(xc_handle, &domctl);
 
-    safe_munlock(ctxt, sizeof(*ctxt));
+    unlock_pages(ctxt, sizeof(*ctxt));
 
     return rc;
 

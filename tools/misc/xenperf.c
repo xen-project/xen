@@ -18,6 +18,22 @@
 #include <errno.h>
 #include <string.h>
 
+int lock_pages(void *addr, size_t len)
+{
+    int e = 0;
+#ifndef __sun__
+    e = mlock(addr, len);
+#endif
+    return (e);
+}
+
+void unlock_pages(void *addr, size_t len)
+{
+#ifndef __sun__
+	munlock(addr, len);
+#endif
+}
+
 int main(int argc, char *argv[])
 {
     int              i, j, xc_handle;
@@ -87,11 +103,11 @@ int main(int argc, char *argv[])
 	pcv = malloc(sizeof(*pcv) * num_val);
 
     if ( pcd == NULL
-		 || mlock(pcd, sizeof(*pcd) * num_desc) != 0
+		 || lock_pages(pcd, sizeof(*pcd) * num_desc) != 0
 		 || pcv == NULL
-		 || mlock(pcd, sizeof(*pcv) * num_val) != 0)
+		 || lock_pages(pcd, sizeof(*pcv) * num_val) != 0)
     {
-        fprintf(stderr, "Could not alloc or mlock buffers: %d (%s)\n",
+        fprintf(stderr, "Could not alloc or lock buffers: %d (%s)\n",
                 errno, strerror(errno));
         exit(-1);
     }
@@ -104,8 +120,8 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    munlock(pcd, sizeof(*pcd) * num_desc);
-    munlock(pcv, sizeof(*pcv) * num_val);
+    unlock_pages(pcd, sizeof(*pcd) * num_desc);
+    unlock_pages(pcv, sizeof(*pcv) * num_val);
 
 	val = pcv;
     for ( i = 0; i < num_desc; i++ )

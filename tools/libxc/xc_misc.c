@@ -21,13 +21,13 @@ int xc_readconsolering(int xc_handle,
     sysctl.u.readconsole.count  = nr_chars;
     sysctl.u.readconsole.clear  = clear;
 
-    if ( (ret = mlock(buffer, nr_chars)) != 0 )
+    if ( (ret = lock_pages(buffer, nr_chars)) != 0 )
         return ret;
 
     if ( (ret = do_sysctl(xc_handle, &sysctl)) == 0 )
         *pnr_chars = sysctl.u.readconsole.count;
 
-    safe_munlock(buffer, nr_chars);
+    unlock_pages(buffer, nr_chars);
 
     return ret;
 }

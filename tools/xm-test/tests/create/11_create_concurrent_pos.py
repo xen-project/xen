@@ -16,7 +16,7 @@ else:
     MAX_DOMS = 50
 
 MIN_DOMS    = 5
-MEM_PER_DOM = 24
+MEM_PER_DOM = minSafeMem()
 
 domains = []
 console = []

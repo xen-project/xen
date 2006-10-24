@@ -109,7 +109,7 @@ void vhpt_multiple_insert(unsigned long vaddr, unsigned long pte, unsigned long 
 		//  only a few times/second, so OK for now.
 		//  An alternate solution would be to just insert the one
 		//  16KB in the vhpt (but with the full mapping)?
-		//printf("vhpt_multiple_insert: logps-PAGE_SHIFT==%d,"
+		//printk("vhpt_multiple_insert: logps-PAGE_SHIFT==%d,"
 			//"va=%p, pa=%p, pa-masked=%p\n",
 			//logps-PAGE_SHIFT,vaddr,pte&_PFN_MASK,
 			//(pte&_PFN_MASK)&~mask);
@@ -142,7 +142,7 @@ void vhpt_init(void)
 		panic("vhpt_init: bad VHPT alignment!\n");
 	__get_cpu_var(vhpt_paddr) = paddr;
 	__get_cpu_var(vhpt_pend) = paddr + (1 << VHPT_SIZE_LOG2) - 1;
-	printf("vhpt_init: vhpt paddr=0x%lx, end=0x%lx\n",
+	printk("vhpt_init: vhpt paddr=0x%lx, end=0x%lx\n",
 		paddr, __get_cpu_var(vhpt_pend));
 	vhpt_erase(paddr);
 	// we don't enable VHPT here.
@@ -336,7 +336,7 @@ void domain_flush_vtlb_range (struct domain *d, u64 vadr, u64 addr_range)
 #if 0
 	// this only seems to occur at shutdown, but it does occur
 	if ((!addr_range) || addr_range & (addr_range - 1)) {
-		printf("vhpt_flush_address: weird range, spinning...\n");
+		printk("vhpt_flush_address: weird range, spinning...\n");
 		while(1);
 	}
 #endif

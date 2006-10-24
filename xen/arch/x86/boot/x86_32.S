@@ -185,7 +185,7 @@ ignore_int:
         mov     %eax,%ds
         mov     %eax,%es
         pushl   $int_msg
-        call    printf
+        call    printk
 1:      jmp     1b
 
 /*** STACK LOCATION ***/

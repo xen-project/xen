@@ -481,7 +481,7 @@ xen_debug_irq(unsigned long vector, struct pt_regs *regs)
 		firstirq = 0;
 	}
 	if (firsttime[vector]) {
-		printf("**** (entry) First received int on vector=%lu,itc=%lx\n",
+		printk("**** (entry) First received int on vector=%lu,itc=%lx\n",
 			(unsigned long) vector, ia64_get_itc());
 		firsttime[vector] = 0;
 	}

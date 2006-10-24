@@ -92,7 +92,7 @@ xencomm_copy_from_guest(
     unsigned int i = 0;
 
     if (xencomm_debug)
-        printf("xencomm_copy_from_guest: from=%lx+%u n=%u\n",
+        printk("xencomm_copy_from_guest: from=%lx+%u n=%u\n",
                (unsigned long)from, skip, n);
 
     if (XENCOMM_IS_INLINE(from)) {
@@ -158,7 +158,7 @@ xencomm_copy_from_guest(
 	    int res;
 
             if (xencomm_debug > 1)
-                printf ("src_paddr=%lx i=%d, skip=%d\n",
+                printk ("src_paddr=%lx i=%d, skip=%d\n",
                         src_paddr, i, chunk_skip);
 
             res = xencomm_copy_chunk_from((unsigned long)to + to_pos,
@@ -233,7 +233,7 @@ xencomm_copy_to_guest(
     unsigned int i = 0;
 
     if (xencomm_debug)
-        printf ("xencomm_copy_to_guest: to=%lx+%u n=%u\n",
+        printk ("xencomm_copy_to_guest: to=%lx+%u n=%u\n",
                 (unsigned long)to, skip, n);
 
     if (XENCOMM_IS_INLINE(to)) {

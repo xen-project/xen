@@ -296,7 +296,7 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     init_console();
 
-    printf("Command line: %s\n", cmdline);
+    printk("Command line: %s\n", cmdline);
 
     /* Check that we have at least one Multiboot module. */
     if ( !(mbi->flags & MBI_MODULES) || (mbi->mods_count == 0) )

@@ -408,7 +408,7 @@ void svm_do_launch(struct vcpu *v)
 
 static void svm_dump_sel(char *name, segment_selector_t *s)
 {
-    printf("%s: sel=0x%04x, attr=0x%04x, limit=0x%08x, base=0x%016llx\n", 
+    printk("%s: sel=0x%04x, attr=0x%04x, limit=0x%08x, base=0x%016llx\n", 
            name, s->sel, s->attributes.bytes, s->limit,
            (unsigned long long)s->base);
 }
@@ -416,50 +416,50 @@ static void svm_dump_sel(char *name, segment_selector_t *s)
 
 void svm_dump_vmcb(const char *from, struct vmcb_struct *vmcb)
 {
-    printf("Dumping guest's current state at %s...\n", from);
-    printf("Size of VMCB = %d, address = %p\n", 
+    printk("Dumping guest's current state at %s...\n", from);
+    printk("Size of VMCB = %d, address = %p\n", 
             (int) sizeof(struct vmcb_struct), vmcb);
 
-    printf("cr_intercepts = 0x%08x dr_intercepts = 0x%08x "
+    printk("cr_intercepts = 0x%08x dr_intercepts = 0x%08x "
            "exception_intercepts = 0x%08x\n", 
            vmcb->cr_intercepts, vmcb->dr_intercepts, 
            vmcb->exception_intercepts);
-    printf("general1_intercepts = 0x%08x general2_intercepts = 0x%08x\n", 
+    printk("general1_intercepts = 0x%08x general2_intercepts = 0x%08x\n", 
            vmcb->general1_intercepts, vmcb->general2_intercepts);
-    printf("iopm_base_pa = %016llx msrpm_base_pa = 0x%016llx tsc_offset = "
+    printk("iopm_base_pa = %016llx msrpm_base_pa = 0x%016llx tsc_offset = "
             "0x%016llx\n", 
            (unsigned long long) vmcb->iopm_base_pa,
            (unsigned long long) vmcb->msrpm_base_pa,
            (unsigned long long) vmcb->tsc_offset);
-    printf("tlb_control = 0x%08x vintr = 0x%016llx interrupt_shadow = "
+    printk("tlb_control = 0x%08x vintr = 0x%016llx interrupt_shadow = "
             "0x%016llx\n", vmcb->tlb_control,
            (unsigned long long) vmcb->vintr.bytes,
            (unsigned long long) vmcb->interrupt_shadow);
-    printf("exitcode = 0x%016llx exitintinfo = 0x%016llx\n", 
+    printk("exitcode = 0x%016llx exitintinfo = 0x%016llx\n", 
            (unsigned long long) vmcb->exitcode,
            (unsigned long long) vmcb->exitintinfo.bytes);
-    printf("exitinfo1 = 0x%016llx exitinfo2 = 0x%016llx \n",
+    printk("exitinfo1 = 0x%016llx exitinfo2 = 0x%016llx \n",
            (unsigned long long) vmcb->exitinfo1,
            (unsigned long long) vmcb->exitinfo2);
-    printf("np_enable = 0x%016llx guest_asid = 0x%03x\n", 
+    printk("np_enable = 0x%016llx guest_asid = 0x%03x\n", 
            (unsigned long long) vmcb->np_enable, vmcb->guest_asid);
-    printf("cpl = %d efer = 0x%016llx star = 0x%016llx lstar = 0x%016llx\n", 
+    printk("cpl = %d efer = 0x%016llx star = 0x%016llx lstar = 0x%016llx\n", 
            vmcb->cpl, (unsigned long long) vmcb->efer,
            (unsigned long long) vmcb->star, (unsigned long long) vmcb->lstar);
-    printf("CR0 = 0x%016llx CR2 = 0x%016llx\n",
+    printk("CR0 = 0x%016llx CR2 = 0x%016llx\n",
            (unsigned long long) vmcb->cr0, (unsigned long long) vmcb->cr2);
-    printf("CR3 = 0x%016llx CR4 = 0x%016llx\n", 
+    printk("CR3 = 0x%016llx CR4 = 0x%016llx\n", 
            (unsigned long long) vmcb->cr3, (unsigned long long) vmcb->cr4);
-    printf("RSP = 0x%016llx  RIP = 0x%016llx\n", 
+    printk("RSP = 0x%016llx  RIP = 0x%016llx\n", 
            (unsigned long long) vmcb->rsp, (unsigned long long) vmcb->rip);
-    printf("RAX = 0x%016llx  RFLAGS=0x%016llx\n",
+    printk("RAX = 0x%016llx  RFLAGS=0x%016llx\n",
            (unsigned long long) vmcb->rax, (unsigned long long) vmcb->rflags);
-    printf("DR6 = 0x%016llx, DR7 = 0x%016llx\n", 
+    printk("DR6 = 0x%016llx, DR7 = 0x%016llx\n", 
            (unsigned long long) vmcb->dr6, (unsigned long long) vmcb->dr7);
-    printf("CSTAR = 0x%016llx SFMask = 0x%016llx\n",
+    printk("CSTAR = 0x%016llx SFMask = 0x%016llx\n",
            (unsigned long long) vmcb->cstar, 
            (unsigned long long) vmcb->sfmask);
-    printf("KernGSBase = 0x%016llx PAT = 0x%016llx \n", 
+    printk("KernGSBase = 0x%016llx PAT = 0x%016llx \n", 
            (unsigned long long) vmcb->kerngsbase,
            (unsigned long long) vmcb->g_pat);
     

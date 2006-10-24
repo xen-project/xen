@@ -1,0 +1,177 @@
+# HG changeset patch
+# User Christian Limpach <Christian.Limpach@xensource.com>
+# Node ID a95dfbc8dca8ecddcb9be51d78f446b0fa461892
+# Parent  8959876abbe319963974fab21dda7185e0ad84e6
+[HVM/vncserver] Implement a 'vnclisten' option to limit the interface
+that the VNC server from qemu listens on. 
+
+Defaults to only listen on 127.0.0.1
+
+The old behaviour (listen on all interfaces) can be restored, by
+- changing the system-wide default in /etc/xen/xend-config.sxp by adding:
+(vnc-listen '0.0.0.0')
+- changing individual domain config files by adding:
+vnclisten="0.0.0.0"
+
+Also allows specifying the hostname associated with an interface to limit
+to that interface.
+
+Signed-off-by:  Daniel P. Berrange <berrange@redhat.com>
+
+Index: ioemu/vl.c
+===================================================================
+--- ioemu.orig/vl.c	2006-10-24 14:33:46.000000000 +0100
++++ ioemu/vl.c	2006-10-24 14:34:28.000000000 +0100
+@@ -122,6 +122,7 @@
+ int nographic;
+ int vncviewer;
+ int vncunused;
++struct sockaddr_in vnclisten_addr;
+ const char* keyboard_layout = NULL;
+ int64_t ticks_per_sec;
+ int boot_device = 'c';
+@@ -2777,10 +2778,22 @@
+     return -1;
+ }
+ 
++int parse_host(struct sockaddr_in *saddr, const char *buf)
++{
++    struct hostent *he;
++
++    if ((he = gethostbyname(buf)) != NULL) {
++        saddr->sin_addr = *(struct in_addr *)he->h_addr;
++    } else {
++        if (!inet_aton(buf, &saddr->sin_addr))
++            return -1;
++    }
++    return 0;
++}
++
+ int parse_host_port(struct sockaddr_in *saddr, const char *str)
+ {
+     char buf[512];
+-    struct hostent *he;
+     const char *p, *r;
+     int port;
+ 
+@@ -2791,14 +2804,8 @@
+     if (buf[0] == '\0') {
+         saddr->sin_addr.s_addr = 0;
+     } else {
+-        if (isdigit(buf[0])) {
+-            if (!inet_aton(buf, &saddr->sin_addr))
+-                return -1;
+-        } else {
+-            if ((he = gethostbyname(buf)) == NULL)
+-                return - 1;
+-            saddr->sin_addr = *(struct in_addr *)he->h_addr;
+-        }
++        if (parse_host(saddr, buf) == -1)
++            return -1;
+     }
+     port = strtol(p, (char **)&r, 0);
+     if (r == p)
+@@ -5344,6 +5351,7 @@
+ 	   "-vnc display    start a VNC server on display\n"
+            "-vncviewer      start a vncviewer process for this domain\n"
+            "-vncunused      bind the VNC server to an unused port\n"
++           "-vnclisten      bind the VNC server to this address\n"
+            "-timeoffset     time offset (in seconds) from local time\n"
+            "-acpi           disable or enable ACPI of HVM domain \n"
+            "\n"
+@@ -5434,6 +5442,7 @@
+     QEMU_OPTION_acpi,
+     QEMU_OPTION_vncviewer,
+     QEMU_OPTION_vncunused,
++    QEMU_OPTION_vnclisten,
+ };
+ 
+ typedef struct QEMUOption {
+@@ -5510,6 +5519,7 @@
+     { "vnc", HAS_ARG, QEMU_OPTION_vnc },
+     { "vncviewer", 0, QEMU_OPTION_vncviewer },
+     { "vncunused", 0, QEMU_OPTION_vncunused },
++    { "vnclisten", HAS_ARG, QEMU_OPTION_vnclisten },
+     
+     /* temporary options */
+     { "usb", 0, QEMU_OPTION_usb },
+@@ -5905,6 +5915,8 @@
+ 
+     nb_nics = 0;
+     /* default mac address of the first network interface */
++
++    memset(&vnclisten_addr.sin_addr, 0, sizeof(vnclisten_addr.sin_addr));
+     
+     /* init debug */
+     sprintf(qemu_dm_logfilename, "/var/log/xen/qemu-dm.%d.log", getpid());
+@@ -6280,6 +6292,9 @@
+                 if (vnc_display == -1)
+                     vnc_display = 0;
+                 break;
++            case QEMU_OPTION_vnclisten:
++                parse_host(&vnclisten_addr, optarg);
++                break;
+             }
+         }
+     }
+@@ -6493,7 +6508,7 @@
+     if (nographic) {
+         dumb_display_init(ds);
+     } else if (vnc_display != -1) {
+-	vnc_display = vnc_display_init(ds, vnc_display, vncunused);
++	vnc_display = vnc_display_init(ds, vnc_display, vncunused, &vnclisten_addr);
+ 	if (vncviewer)
+ 	    vnc_start_viewer(vnc_display);
+     } else {
+Index: ioemu/vl.h
+===================================================================
+--- ioemu.orig/vl.h	2006-10-24 14:33:46.000000000 +0100
++++ ioemu/vl.h	2006-10-24 14:34:22.000000000 +0100
+@@ -37,6 +37,8 @@
+ #include <unistd.h>
+ #include <fcntl.h>
+ #include <sys/stat.h>
++#include <sys/socket.h>
++#include <sys/types.h>
+ #include "xenctrl.h"
+ #include "xs.h"
+ #include <xen/hvm/e820.h>
+@@ -785,7 +787,7 @@
+ void cocoa_display_init(DisplayState *ds, int full_screen);
+ 
+ /* vnc.c */
+-int vnc_display_init(DisplayState *ds, int display, int find_unused);
++int vnc_display_init(DisplayState *ds, int display, int find_unused, struct sockaddr_in *addr);
+ int vnc_start_viewer(int port);
+ 
+ /* ide.c */
+Index: ioemu/vnc.c
+===================================================================
+--- ioemu.orig/vnc.c	2006-10-24 14:33:46.000000000 +0100
++++ ioemu/vnc.c	2006-10-24 14:34:22.000000000 +0100
+@@ -1195,9 +1195,8 @@
+     }
+ }
+ 
+-int vnc_display_init(DisplayState *ds, int display, int find_unused)
++int vnc_display_init(DisplayState *ds, int display, int find_unused, struct sockaddr_in *addr)
+ {
+-    struct sockaddr_in addr;
+     int reuse_addr, ret;
+     VncState *vs;
+ 
+@@ -1235,11 +1234,10 @@
+     }
+ 
+  retry:
+-    addr.sin_family = AF_INET;
+-    addr.sin_port = htons(5900 + display);
+-    memset(&addr.sin_addr, 0, sizeof(addr.sin_addr));
++    addr->sin_family = AF_INET;
++    addr->sin_port = htons(5900 + display);
+ 
+-    if (bind(vs->lsock, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
++    if (bind(vs->lsock, (struct sockaddr *)addr, sizeof(struct sockaddr_in)) == -1) {
+ 	if (find_unused && errno == EADDRINUSE) {
+ 	    display++;
+ 	    goto retry;

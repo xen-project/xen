@@ -163,7 +163,7 @@ fw_hypercall_ipi (struct pt_regs *regs)
 			memset (&c, 0, sizeof (c));
 
 			if (arch_set_info_guest (targ, &c) != 0) {
-				printf ("arch_boot_vcpu: failure\n");
+				printk ("arch_boot_vcpu: failure\n");
 				return;
 			}
 		}
@@ -177,11 +177,11 @@ fw_hypercall_ipi (struct pt_regs *regs)
 		if (test_and_clear_bit(_VCPUF_down,
 				       &targ->vcpu_flags)) {
 			vcpu_wake(targ);
-			printf ("arch_boot_vcpu: vcpu %d awaken\n",
+			printk ("arch_boot_vcpu: vcpu %d awaken\n",
 				targ->vcpu_id);
 		}
 		else
-			printf ("arch_boot_vcpu: huu, already awaken!\n");
+			printk ("arch_boot_vcpu: huu, already awaken!\n");
 	}
 	else {
 		int running = test_bit(_VCPUF_running,
@@ -220,7 +220,7 @@ ia64_hypercall(struct pt_regs *regs)
 		return xen_fast_hypercall(regs);
 
 	case FW_HYPERCALL_PAL_CALL:
-		//printf("*** PAL hypercall: index=%d\n",regs->r28);
+		//printk("*** PAL hypercall: index=%d\n",regs->r28);
 		//FIXME: This should call a C routine
 #if 0
 		// This is very conservative, but avoids a possible
@@ -235,7 +235,7 @@ ia64_hypercall(struct pt_regs *regs)
 				event_pending(v)) {
 				perfc_incrc(idle_when_pending);
 				vcpu_pend_unspecified_interrupt(v);
-//printf("idle w/int#%d pending!\n",pi);
+//printk("idle w/int#%d pending!\n",pi);
 //this shouldn't happen, but it apparently does quite a bit!  so don't
 //allow it to happen... i.e. if a domain has an interrupt pending and
 //it tries to halt itself because it thinks it is idle, just return here
@@ -301,7 +301,7 @@ ia64_hypercall(struct pt_regs *regs)
 		regs->r11 = fpswa_ret.err2;
 		break;
 	default:
-		printf("unknown ia64 fw hypercall %lx\n", regs->r2);
+		printk("unknown ia64 fw hypercall %lx\n", regs->r2);
 		regs->r8 = do_ni_hypercall();
 	}
 	return IA64_NO_FAULT;

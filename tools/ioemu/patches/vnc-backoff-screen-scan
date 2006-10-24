@@ -1,10 +1,10 @@
 Index: ioemu/vnc.c
 ===================================================================
---- ioemu.orig/vnc.c	2006-09-21 19:31:03.000000000 +0100
-+++ ioemu/vnc.c	2006-09-21 19:32:23.000000000 +0100
-@@ -27,7 +27,19 @@
- #include "vl.h"
+--- ioemu.orig/vnc.c	2006-10-24 14:33:17.000000000 +0100
++++ ioemu/vnc.c	2006-10-24 14:33:24.000000000 +0100
+@@ -28,7 +28,19 @@
  #include "qemu_socket.h"
+ #include <assert.h>
  
 -#define VNC_REFRESH_INTERVAL (1000 / 30)
 +/* The refresh interval starts at BASE.  If we scan the buffer and
@@ -23,7 +23,7 @@ Index: ioemu/vnc.c
  
  #include "vnc_keysym.h"
  #include "keymaps.c"
-@@ -64,10 +76,11 @@
+@@ -65,10 +77,11 @@
  struct VncState
  {
      QEMUTimer *timer;
@@ -36,7 +36,7 @@ Index: ioemu/vnc.c
      int width;
      int height;
      uint64_t *dirty_row;	/* screen regions which are possibly dirty */
-@@ -98,8 +111,6 @@
+@@ -99,8 +112,6 @@
      int visible_w;
      int visible_h;
  
@@ -45,7 +45,7 @@ Index: ioemu/vnc.c
      int ctl_keys;               /* Ctrl+Alt starts calibration */
  };
  
-@@ -380,7 +391,7 @@
+@@ -381,7 +392,7 @@
      int y = 0;
      int pitch = ds->linesize;
      VncState *vs = ds->opaque;
@@ -54,19 +54,19 @@ Index: ioemu/vnc.c
  
      if (src_x < vs->visible_x || src_y < vs->visible_y ||
  	dst_x < vs->visible_x || dst_y < vs->visible_y ||
-@@ -390,11 +401,6 @@
+@@ -391,10 +402,8 @@
  	(dst_y + h) > (vs->visible_y + vs->visible_h))
  	updating_client = 0;
  
 -    if (updating_client) {
 -	vs->need_update = 1;
--	_vnc_update_client(vs);
++    if (updating_client)
+ 	_vnc_update_client(vs);
 -    }
--
+ 
      if (dst_y > src_y) {
  	y = h - 1;
- 	pitch = -pitch;
-@@ -445,110 +451,145 @@
+@@ -446,110 +455,149 @@
  static void _vnc_update_client(void *opaque)
  {
      VncState *vs = opaque;
@@ -279,12 +279,16 @@ Index: ioemu/vnc.c
 +	       interested (e.g. minimised) it'll ignore this, and we
 +	       can stop scanning the buffer until it sends another
 +	       update request. */
-+	    /* Note that there are bugs in xvncviewer which prevent
-+	       this from actually working.  Leave the code in place
-+	       for correct clients. */
++	    /* It turns out that there's a bug in realvncviewer 4.1.2
++	       which means that if you send a proper null update (with
++	       no update rectangles), it gets a bit out of sync and
++	       never sends any further requests, regardless of whether
++	       it needs one or not.  Fix this by sending a single 1x1
++	       update rectangle instead. */
 +	    vnc_write_u8(vs, 0);
 +	    vnc_write_u8(vs, 0);
-+	    vnc_write_u16(vs, 0);
++	    vnc_write_u16(vs, 1);
++	    send_framebuffer_update(vs, 0, 0, 1, 1);
 +	    vnc_flush(vs);
 +	    vs->last_update_time = now;
 +	    return;
@@ -295,7 +299,7 @@ Index: ioemu/vnc.c
  }
  
  static void vnc_update_client(void *opaque)
-@@ -561,8 +602,10 @@
+@@ -562,8 +610,10 @@
  
  static void vnc_timer_init(VncState *vs)
  {
@@ -307,7 +311,7 @@ Index: ioemu/vnc.c
  }
  
  static void vnc_dpy_refresh(DisplayState *ds)
-@@ -622,7 +665,6 @@
+@@ -623,7 +673,6 @@
  	vs->csock = -1;
  	buffer_reset(&vs->input);
  	buffer_reset(&vs->output);
@@ -315,7 +319,7 @@ Index: ioemu/vnc.c
  	return 0;
      }
      return ret;
-@@ -892,7 +934,6 @@
+@@ -895,7 +944,6 @@
  				       int x_position, int y_position,
  				       int w, int h)
  {
@@ -323,7 +327,7 @@ Index: ioemu/vnc.c
      if (!incremental)
  	framebuffer_set_updated(vs, x_position, y_position, w, h);
      vs->visible_x = x_position;
-@@ -1015,6 +1056,7 @@
+@@ -1018,6 +1066,7 @@
  {
      int i;
      uint16_t limit;
@@ -331,7 +335,7 @@ Index: ioemu/vnc.c
  
      switch (data[0]) {
      case 0:
-@@ -1054,12 +1096,18 @@
+@@ -1061,12 +1110,18 @@
  	if (len == 1)
  	    return 8;
  
@@ -352,15 +356,15 @@ Index: ioemu/vnc.c
      case 6:
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-09-21 19:31:03.000000000 +0100
-+++ ioemu/vl.c	2006-09-21 19:32:23.000000000 +0100
-@@ -725,6 +725,12 @@
+--- ioemu.orig/vl.c	2006-10-24 14:33:17.000000000 +0100
++++ ioemu/vl.c	2006-10-24 14:33:24.000000000 +0100
+@@ -726,6 +726,12 @@
      }
  }
  
 +void qemu_advance_timer(QEMUTimer *ts, int64_t expire_time)
 +{
-+    if (ts->expire_time > expire_time)
++    if (ts->expire_time > expire_time || !qemu_timer_pending(ts))
 +	qemu_mod_timer(ts, expire_time);
 +}
 +
@@ -369,9 +373,9 @@ Index: ioemu/vl.c
  void qemu_mod_timer(QEMUTimer *ts, int64_t expire_time)
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-09-21 19:31:03.000000000 +0100
-+++ ioemu/vl.h	2006-09-21 19:32:23.000000000 +0100
-@@ -405,6 +405,7 @@
+--- ioemu.orig/vl.h	2006-10-24 14:33:17.000000000 +0100
++++ ioemu/vl.h	2006-10-24 14:33:24.000000000 +0100
+@@ -407,6 +407,7 @@
  void qemu_free_timer(QEMUTimer *ts);
  void qemu_del_timer(QEMUTimer *ts);
  void qemu_mod_timer(QEMUTimer *ts, int64_t expire_time);

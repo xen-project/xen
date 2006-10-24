@@ -441,7 +441,7 @@ int arch_domain_create(struct domain *d)
 	d->arch.ioport_caps = rangeset_new(d, "I/O Ports",
 	                                   RANGESETF_prettyprint_hex);
 
-	printf ("arch_domain_create: domain=%p\n", d);
+	printk ("arch_domain_create: domain=%p\n", d);
 	return 0;
 
 fail_nomem:
@@ -655,7 +655,7 @@ domain_set_shared_info_va (unsigned long va)
 
 	/* Note: this doesn't work well if other cpus are already running.
 	   However this is part of the spec :-)  */
-	printf ("Domain set shared_info_va to 0x%016lx\n", va);
+	printk ("Domain set shared_info_va to 0x%016lx\n", va);
 	d->arch.shared_info_va = va;
 
 	for_each_vcpu (d, v1) {
@@ -955,7 +955,7 @@ int construct_dom0(struct domain *d,
 	struct page_info *page = NULL;
 #endif
 
-//printf("construct_dom0: starting\n");
+//printk("construct_dom0: starting\n");
 
 	/* Sanity! */
 	BUG_ON(d != dom0);
@@ -1059,10 +1059,10 @@ int construct_dom0(struct domain *d,
 	if (dom0_max_vcpus > MAX_VIRT_CPUS)
 	    dom0_max_vcpus = MAX_VIRT_CPUS;
 	
-	printf ("Dom0 max_vcpus=%d\n", dom0_max_vcpus);
+	printk ("Dom0 max_vcpus=%d\n", dom0_max_vcpus);
 	for ( i = 1; i < dom0_max_vcpus; i++ )
 	    if (alloc_vcpu(d, i, i) == NULL)
-		printf ("Cannot allocate dom0 vcpu %d\n", i);
+		printk ("Cannot allocate dom0 vcpu %d\n", i);
 
 	/* Copy the OS image. */
 	loaddomainelfimage(d,image_start);
@@ -1148,7 +1148,7 @@ void machine_restart(char * __unused)
 {
 	console_start_sync();
 	if (running_on_sim)
-		printf ("machine_restart called.  spinning...\n");
+		printk ("machine_restart called.  spinning...\n");
 	else
 		(*efi.reset_system)(EFI_RESET_WARM,0,0,NULL);
 	while(1);
@@ -1160,7 +1160,7 @@ void machine_halt(void)
 {
 	console_start_sync();
 	if (running_on_sim)
-		printf ("machine_halt called.  spinning...\n");
+		printk ("machine_halt called.  spinning...\n");
 	else
 		cpu_halt();
 	while(1);

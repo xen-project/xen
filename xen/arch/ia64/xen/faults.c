@@ -105,11 +105,11 @@ void reflect_extint(struct pt_regs *regs)
 	static int first_extint = 1;
 
 	if (first_extint) {
-		printf("Delivering first extint to domain: isr=0x%lx, iip=0x%lx\n", isr, regs->cr_iip);
+		printk("Delivering first extint to domain: isr=0x%lx, iip=0x%lx\n", isr, regs->cr_iip);
 		first_extint = 0;
 	}
 	if (vcpu_timer_pending_early(v))
-printf("*#*#*#* about to deliver early timer to domain %d!!!\n",v->domain->domain_id);
+printk("*#*#*#* about to deliver early timer to domain %d!!!\n",v->domain->domain_id);
 	PSCB(current,itir) = 0;
 	reflect_interruption(isr,regs,IA64_EXTINT_VECTOR);
 }
@@ -129,7 +129,7 @@ void reflect_event(struct pt_regs *regs)
 		return;
 
 	if (!PSCB(v,interrupt_collection_enabled))
-		printf("psr.ic off, delivering event, ipsr=%lx,iip=%lx,isr=%lx,viip=0x%lx\n",
+		printk("psr.ic off, delivering event, ipsr=%lx,iip=%lx,isr=%lx,viip=0x%lx\n",
 		       regs->cr_ipsr, regs->cr_iip, isr, PSCB(v, iip));
 	PSCB(v,unat) = regs->ar_unat;  // not sure if this is really needed?
 	PSCB(v,precover_ifs) = regs->cr_ifs;
@@ -245,7 +245,7 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 
 	if (!PSCB(current,interrupt_collection_enabled)) {
 		check_bad_nested_interruption(isr,regs,fault);
-		//printf("Delivering NESTED DATA TLB fault\n");
+		//printk("Delivering NESTED DATA TLB fault\n");
 		fault = IA64_DATA_NESTED_TLB_VECTOR;
 		regs->cr_iip = ((unsigned long) PSCBX(current,iva) + fault) & ~0xffUL;
 		regs->cr_ipsr = (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
@@ -374,7 +374,7 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		"Unknown fault 13", "Unknown fault 14", "Unknown fault 15"
 	};
 
-	printf("ia64_fault, vector=0x%lx, ifa=0x%016lx, iip=0x%016lx, ipsr=0x%016lx, isr=0x%016lx\n",
+	printk("ia64_fault, vector=0x%lx, ifa=0x%016lx, iip=0x%016lx, ipsr=0x%016lx, isr=0x%016lx\n",
 	       vector, ifa, regs->cr_iip, regs->cr_ipsr, isr);
 
 
@@ -384,7 +384,7 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		 * the lfetch.
 		 */
 		ia64_psr(regs)->ed = 1;
-		printf("ia64_fault: handled lfetch.fault\n");
+		printk("ia64_fault: handled lfetch.fault\n");
 		return;
 	}
 
@@ -433,7 +433,7 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 			       regs->cr_iip + ia64_psr(regs)->ri,
 			       regs->pr);
 # endif
-			printf("ia64_fault: returning on hazard\n");
+			printk("ia64_fault: returning on hazard\n");
 			return;
 		}
 		break;
@@ -592,7 +592,7 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 		if (((isr >> 4L) & 0xfL) == 1) {
 			/* Fault is due to a register NaT consumption fault. */
 			//regs->eml_unat = 0;  FIXME: DO WE NEED THIS??
-			printf("ia64_handle_reflection: handling regNaT fault\n");
+			printk("ia64_handle_reflection: handling regNaT fault\n");
 			vector = IA64_NAT_CONSUMPTION_VECTOR; break;
 		}
 #if 1
@@ -605,20 +605,20 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 #ifdef CONFIG_PRIVIFY
 		/* Some privified operations are coded using reg+64 instead
 		   of reg.  */
-		printf("*** NaT fault... attempting to handle as privop\n");
-		printf("isr=%016lx, ifa=%016lx, iip=%016lx, ipsr=%016lx\n",
+		printk("*** NaT fault... attempting to handle as privop\n");
+		printk("isr=%016lx, ifa=%016lx, iip=%016lx, ipsr=%016lx\n",
 		       isr, ifa, regs->cr_iip, psr);
 		//regs->eml_unat = 0;  FIXME: DO WE NEED THIS???
 		// certain NaT faults are higher priority than privop faults
 		vector = priv_emulate(v,regs,isr);
 		if (vector == IA64_NO_FAULT) {
-			printf("*** Handled privop masquerading as NaT fault\n");
+			printk("*** Handled privop masquerading as NaT fault\n");
 			return;
 		}
 #endif
 		vector = IA64_NAT_CONSUMPTION_VECTOR; break;
 	    case 27:
-		//printf("*** Handled speculation vector, itc=%lx!\n",ia64_get_itc());
+		//printk("*** Handled speculation vector, itc=%lx!\n",ia64_get_itc());
 		PSCB(current,iim) = iim;
 		vector = IA64_SPECULATION_VECTOR; break;
 	    case 30:
@@ -633,7 +633,7 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 		// fetch code fail
 		if (IA64_RETRY == status)
 			return;
-		printf("ia64_handle_reflection: handling FP fault\n");
+		printk("ia64_handle_reflection: handling FP fault\n");
 		vector = IA64_FP_FAULT_VECTOR; break;
 	    case 33:
 		status = handle_fpu_swa(0, regs, isr);
@@ -642,20 +642,20 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 		// fetch code fail
 		if (IA64_RETRY == status)
 			return;
-		printf("ia64_handle_reflection: handling FP trap\n");
+		printk("ia64_handle_reflection: handling FP trap\n");
 		vector = IA64_FP_TRAP_VECTOR; break;
 	    case 34:
-		printf("ia64_handle_reflection: handling lowerpriv trap\n");
+		printk("ia64_handle_reflection: handling lowerpriv trap\n");
 		vector = IA64_LOWERPRIV_TRANSFER_TRAP_VECTOR; break;
 	    case 35:
-		printf("ia64_handle_reflection: handling taken branch trap\n");
+		printk("ia64_handle_reflection: handling taken branch trap\n");
 		vector = IA64_TAKEN_BRANCH_TRAP_VECTOR; break;
 	    case 36:
-		printf("ia64_handle_reflection: handling single step trap\n");
+		printk("ia64_handle_reflection: handling single step trap\n");
 		vector = IA64_SINGLE_STEP_TRAP_VECTOR; break;
 
 	    default:
-		printf("ia64_handle_reflection: unhandled vector=0x%lx\n",vector);
+		printk("ia64_handle_reflection: unhandled vector=0x%lx\n",vector);
 		while(vector);
 		return;
 	}

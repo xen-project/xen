@@ -469,7 +469,7 @@ u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps,
 			   This can happen when domU tries to touch i/o
 			   port space.  Also prevents possible address
 			   aliasing issues.  */
-			printf("Warning: UC to WB for mpaddr=%lx\n", mpaddr);
+			printk("Warning: UC to WB for mpaddr=%lx\n", mpaddr);
 			pteval = (pteval & ~_PAGE_MA_MASK) | _PAGE_MA_WB;
 		}
 		break;
@@ -720,7 +720,7 @@ xencomm_paddr_to_maddr(unsigned long paddr)
 
     pa = ____lookup_domain_mpa(d, paddr);
     if (pa == INVALID_MFN) {
-        printf("%s: called with bad memory address: 0x%lx - iip=%lx\n",
+        printk("%s: called with bad memory address: 0x%lx - iip=%lx\n",
                __func__, paddr, vcpu_regs(v)->cr_iip);
         return 0;
     }
@@ -740,7 +740,7 @@ __assign_new_domain_page(struct domain *d, unsigned long mpaddr, pte_t* pte)
 
     p = alloc_domheap_page(d);
     if (unlikely(!p)) {
-        printf("assign_new_domain_page: Can't alloc!!!! Aaaargh!\n");
+        printk("assign_new_domain_page: Can't alloc!!!! Aaaargh!\n");
         return(p);
     }
 
@@ -751,7 +751,7 @@ __assign_new_domain_page(struct domain *d, unsigned long mpaddr, pte_t* pte)
                  && maddr < __get_cpu_var(vhpt_pend))) {
         /* FIXME: how can this happen ?
            vhpt is allocated by alloc_domheap_page.  */
-        printf("assign_new_domain_page: reassigned vhpt page %lx!!\n",
+        printk("assign_new_domain_page: reassigned vhpt page %lx!!\n",
                maddr);
     }
 
@@ -1749,7 +1749,7 @@ void domain_cache_flush (struct domain *d, int sync_only)
             }
         }
     }
-    //printf ("domain_cache_flush: %d %d pages\n", d->domain_id, nbr_page);
+    //printk ("domain_cache_flush: %d %d pages\n", d->domain_id, nbr_page);
 }
 
 #ifdef VERBOSE

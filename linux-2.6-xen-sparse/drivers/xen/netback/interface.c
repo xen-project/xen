@@ -44,12 +44,11 @@
  * For example, consider a packet that holds onto resources belonging to the
  * guest for which it is queued (e.g., packet received on vif1.0, destined for
  * vif1.1 which is not activated in the guest): in this situation the guest
- * will never be destroyed, unless vif1.1 is taken down (which flushes the
- * 'tx_queue').
- * 
- * Only set this parameter to non-zero value if you know what you are doing!
+ * will never be destroyed, unless vif1.1 is taken down. To avoid this, we
+ * run a timer (tx_queue_timeout) to drain the queue when the interface is
+ * blocked.
  */
-static unsigned long netbk_queue_length = 0;
+static unsigned long netbk_queue_length = 32;
 module_param_named(queue_length, netbk_queue_length, ulong, 0);
 
 static void __netif_up(netif_t *netif)
@@ -62,7 +61,6 @@ static void __netif_down(netif_t *netif)
 {
 	disable_irq(netif->irq);
 	netif_deschedule_work(netif);
-	del_timer_sync(&netif->credit_timeout);
 }
 
 static int net_open(struct net_device *dev)
@@ -153,7 +151,10 @@ netif_t *netif_alloc(domid_t domid, unsigned int handle)
 	netif->credit_bytes = netif->remaining_credit = ~0UL;
 	netif->credit_usec  = 0UL;
 	init_timer(&netif->credit_timeout);
+	/* Initialize 'expires' now: it's used to track the credit window. */
 	netif->credit_timeout.expires = jiffies;
+
+	init_timer(&netif->tx_queue_timeout);
 
 	dev->hard_start_xmit = netif_be_start_xmit;
 	dev->get_stats       = netif_be_get_stats;
@@ -319,10 +320,22 @@ err_rx:
 	return err;
 }
 
-static void netif_free(netif_t *netif)
+void netif_disconnect(netif_t *netif)
 {
+	if (netif_carrier_ok(netif->dev)) {
+		rtnl_lock();
+		netif_carrier_off(netif->dev);
+		if (netif_running(netif->dev))
+			__netif_down(netif);
+		rtnl_unlock();
+		netif_put(netif);
+	}
+
 	atomic_dec(&netif->refcnt);
 	wait_event(netif->waiting_to_free, atomic_read(&netif->refcnt) == 0);
+
+	del_timer_sync(&netif->credit_timeout);
+	del_timer_sync(&netif->tx_queue_timeout);
 
 	if (netif->irq)
 		unbind_from_irqhandler(netif->irq, netif);
@@ -336,17 +349,4 @@ static void netif_free(netif_t *netif)
 	}
 
 	free_netdev(netif->dev);
-}
-
-void netif_disconnect(netif_t *netif)
-{
-	if (netif_carrier_ok(netif->dev)) {
-		rtnl_lock();
-		netif_carrier_off(netif->dev);
-		if (netif_running(netif->dev))
-			__netif_down(netif);
-		rtnl_unlock();
-		netif_put(netif);
-	}
-	netif_free(netif);
 }

@@ -1,7 +1,7 @@
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-08-06 02:15:48.550893605 +0100
-+++ ioemu/vl.c	2006-08-06 02:16:31.246133963 +0100
+--- ioemu.orig/vl.c	2006-10-24 14:36:58.000000000 +0100
++++ ioemu/vl.c	2006-10-24 14:37:03.000000000 +0100
 @@ -5234,7 +5234,7 @@
             "-S              freeze CPU at startup (use 'c' to start execution)\n"
             "-s              wait gdb connection to port %d\n"
@@ -43,7 +43,7 @@ Index: ioemu/vl.c
      /* default mac address of the first network interface */
      
 +    /* init debug */
-+    sprintf(qemu_dm_logfilename, "/var/log/xen/qemu-dm.%d.log", getpid());
++    sprintf(qemu_dm_logfilename, "/var/log/xen/qemu-dm.%ld.log", (long)getpid());
 +    cpu_set_log_filename(qemu_dm_logfilename);
 +    cpu_set_log(0);
 +    

@@ -1021,7 +1021,7 @@ static void svm_do_general_protection_fault(struct vcpu *v,
     error_code = vmcb->exitinfo1;
 
     if (vmcb->idtr.limit == 0) {
-        printf("Huh? We got a GP Fault with an invalid IDTR!\n");
+        printk("Huh? We got a GP Fault with an invalid IDTR!\n");
         svm_dump_vmcb(__func__, vmcb);
         svm_dump_regs(__func__, regs);
         svm_dump_inst(vmcb->rip);
@@ -2295,7 +2295,7 @@ static int svm_do_vmmcall(struct vcpu *v, struct cpu_user_regs *regs)
         /* VMMCALL sanity check */
         if ( vmcb->cpl > get_vmmcall_cpl(regs->edi) )
         {
-            printf("VMMCALL CPL check failed\n");
+            printk("VMMCALL CPL check failed\n");
             return -1;
         }
 
@@ -2305,7 +2305,7 @@ static int svm_do_vmmcall(struct vcpu *v, struct cpu_user_regs *regs)
         case VMMCALL_RESET_TO_REALMODE:
             if ( svm_do_vmmcall_reset_to_realmode(v, regs) )
             {
-                printf("svm_do_vmmcall_reset_to_realmode() failed\n");
+                printk("svm_do_vmmcall_reset_to_realmode() failed\n");
                 return -1;
             }
             /* since we just reset the VMCB, return without adjusting
@@ -2313,7 +2313,7 @@ static int svm_do_vmmcall(struct vcpu *v, struct cpu_user_regs *regs)
             return 0;
 
         case VMMCALL_DEBUG:
-            printf("DEBUG features not implemented yet\n");
+            printk("DEBUG features not implemented yet\n");
             break;
         default:
             break;
@@ -2344,16 +2344,16 @@ void svm_dump_inst(unsigned long eip)
     if (hvm_copy_from_guest_virt(opcode, ptr, sizeof(opcode)) == 0)
         len = sizeof(opcode);
 
-    printf("Code bytes around(len=%d) %lx:", len, eip);
+    printk("Code bytes around(len=%d) %lx:", len, eip);
     for (i = 0; i < len; i++)
     {
         if ((i & 0x0f) == 0)
-            printf("\n%08lx:", ptr+i);
+            printk("\n%08lx:", ptr+i);
 
-        printf("%02x ", opcode[i]);
+        printk("%02x ", opcode[i]);
     }
 
-    printf("\n");
+    printk("\n");
 }
 
 
@@ -2363,7 +2363,7 @@ void svm_dump_regs(const char *from, struct cpu_user_regs *regs)
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     unsigned long pt = v->arch.hvm_vcpu.hw_cr3;
 
-    printf("%s: guest registers from %s:\n", __func__, from);
+    printk("%s: guest registers from %s:\n", __func__, from);
 #if defined (__x86_64__)
     printk("rax: %016lx   rbx: %016lx   rcx: %016lx\n",
            regs->rax, regs->rbx, regs->rcx);
@@ -2378,15 +2378,15 @@ void svm_dump_regs(const char *from, struct cpu_user_regs *regs)
     printk("r15: %016lx   cr0: %016lx   cr3: %016lx\n",
            regs->r15, v->arch.hvm_svm.cpu_shadow_cr0, vmcb->cr3);
 #else
-    printf("eax: %08x, ebx: %08x, ecx: %08x, edx: %08x\n", 
+    printk("eax: %08x, ebx: %08x, ecx: %08x, edx: %08x\n", 
            regs->eax, regs->ebx, regs->ecx, regs->edx);
-    printf("edi: %08x, esi: %08x, ebp: %08x, esp: %08x\n", 
+    printk("edi: %08x, esi: %08x, ebp: %08x, esp: %08x\n", 
            regs->edi, regs->esi, regs->ebp, regs->esp);
-    printf("%s: guest cr0: %lx\n", __func__, 
+    printk("%s: guest cr0: %lx\n", __func__, 
            v->arch.hvm_svm.cpu_shadow_cr0);
-    printf("guest CR3 = %llx\n", vmcb->cr3);
+    printk("guest CR3 = %llx\n", vmcb->cr3);
 #endif
-    printf("%s: pt = %lx\n", __func__, pt);
+    printk("%s: pt = %lx\n", __func__, pt);
 }
 
 
@@ -2395,12 +2395,12 @@ void svm_dump_host_regs(const char *from)
     struct vcpu *v = current;
     unsigned long pt = pt = pagetable_get_paddr(v->arch.monitor_table);
     unsigned long cr3, cr0;
-    printf("Host registers at %s\n", from);
+    printk("Host registers at %s\n", from);
 
     __asm__ __volatile__ ("\tmov %%cr0,%0\n"
                           "\tmov %%cr3,%1\n"
                           : "=r" (cr0), "=r"(cr3));
-    printf("%s: pt = %lx, cr3 = %lx, cr0 = %lx\n", __func__, pt, cr3, cr0);
+    printk("%s: pt = %lx, cr3 = %lx, cr0 = %lx\n", __func__, pt, cr3, cr0);
 }
 
 #ifdef SVM_EXTRA_DEBUG

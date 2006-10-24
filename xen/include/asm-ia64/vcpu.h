@@ -200,7 +200,7 @@ static inline s64 vcpu_get_next_timer_ns(VCPU * vcpu)
 	return vcpu_get_next_timer_ns;
 }
 
-#define verbose(a...) do {if (vcpu_verbose) printf(a);} while(0)
+#define verbose(a...) do {if (vcpu_verbose) printk(a);} while(0)
 
 //#define vcpu_quick_region_check(_tr_regions,_ifa) 1
 #define vcpu_quick_region_check(_tr_regions,_ifa)           \

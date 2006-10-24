@@ -232,7 +232,7 @@ typedef long clock_t;
 extern unsigned long loops_per_jiffy;
 extern char saved_command_line[];
 struct screen_info { };
-#define seq_printf(a,b...) printf(b)
+#define seq_printf(a,b...) printk(b)
 //#define CONFIG_BLK_DEV_INITRD // needed to reserve memory for domain0
 
 #define CONFIG_SHADOW	1

@@ -1364,7 +1364,7 @@ vmx_emulate(VCPU *vcpu, REGS *regs)
 #endif
 #if 0
 if ( (cause == 0xff && opcode == 0x1e000000000) || cause == 0 ) {
-		printf ("VMAL decode error: cause - %lx; op - %lx\n", 
+		printk ("VMAL decode error: cause - %lx; op - %lx\n", 
 			cause, opcode );
 		return;
 }
@@ -1381,7 +1381,7 @@ if ( (cause == 0xff && opcode == 0x1e000000000) || cause == 0 ) {
     else if (slot == 1)
         inst.inst = bundle.slot1a + (bundle.slot1b<<18);
     else if (slot == 2) inst.inst = bundle.slot2;
-    else printf("priv_handle_op: illegal slot: %d\n", slot);
+    else printk("priv_handle_op: illegal slot: %d\n", slot);
     slot_type = slot_types[bundle.template][slot];
     ia64_priv_decoder(slot_type, inst, &cause);
     if(cause==0){
@@ -1554,7 +1554,7 @@ if ( (cause == 0xff && opcode == 0x1e000000000) || cause == 0 ) {
         status=vmx_emul_mov_from_cpuid(vcpu, inst);
         break;
     case EVENT_VMSW:
-        printf ("Unimplemented instruction %ld\n", cause);
+        printk ("Unimplemented instruction %ld\n", cause);
 	status=IA64_FAULT;
         break;
     default:

@@ -1,8 +1,8 @@
 Index: ioemu/vnc.c
 ===================================================================
---- ioemu.orig/vnc.c	2006-09-21 19:33:31.000000000 +0100
-+++ ioemu/vnc.c	2006-09-21 19:33:31.000000000 +0100
-@@ -32,6 +32,10 @@
+--- ioemu.orig/vnc.c	2006-10-24 14:33:46.000000000 +0100
++++ ioemu/vnc.c	2006-10-24 14:33:46.000000000 +0100
+@@ -33,6 +33,10 @@
  #include "vnc_keysym.h"
  #include "keymaps.c"
  
@@ -13,7 +13,7 @@ Index: ioemu/vnc.c
  typedef struct Buffer
  {
      size_t capacity;
-@@ -95,6 +99,8 @@
+@@ -96,6 +100,8 @@
      int visible_h;
  
      int slow_client;
@@ -22,7 +22,7 @@ Index: ioemu/vnc.c
  };
  
  #define DIRTY_PIXEL_BITS 64
-@@ -791,16 +797,80 @@
+@@ -794,16 +800,80 @@
  
  static void do_key_event(VncState *vs, int down, uint32_t sym)
  {

@@ -38,13 +38,13 @@ static void xc_set_hvm_param(int handle,
     arg.domid = dom;
     arg.index = param;
     arg.value = value;
-    if ( mlock(&arg, sizeof(arg)) != 0 )
+    if ( lock_pages(&arg, sizeof(arg)) != 0 )
     {
         PERROR("Could not lock memory for set parameter");
         return;
     }
     rc = do_xen_hypercall(handle, &hypercall);
-    safe_munlock(&arg, sizeof(arg));
+    unlock_pages(&arg, sizeof(arg));
     if (rc < 0)
         PERROR("set HVM parameter failed (%d)", rc);
 }
@@ -403,7 +403,7 @@ static int xc_hvm_build_internal(int xc_handle,
         goto error_out;
     }
 
-    if ( mlock(&st_ctxt, sizeof(st_ctxt) ) )
+    if ( lock_pages(&st_ctxt, sizeof(st_ctxt) ) )
     {
         PERROR("%s: ctxt mlock failed", __func__);
         return 1;

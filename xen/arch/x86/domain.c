@@ -378,6 +378,7 @@ arch_do_vcpu_op(
     case VCPUOP_register_runstate_memory_area:
     {
         struct vcpu_register_runstate_memory_area area;
+        struct vcpu_runstate_info runstate;
 
         rc = -EFAULT;
         if ( copy_from_guest(&area, arg, 1) )
@@ -390,8 +391,15 @@ arch_do_vcpu_op(
         v->runstate_guest = area.addr.v;
 
         if ( v == current )
+        {
             __copy_to_user(v->runstate_guest, &v->runstate,
                            sizeof(v->runstate));
+        }
+        else
+        {
+            vcpu_runstate_get(v, &runstate);
+            __copy_to_user(v->runstate_guest, &runstate, sizeof(runstate));
+        }
 
         break;
     }

@@ -104,7 +104,7 @@ int xc_tbuf_set_cpu_mask(int xc_handle, uint32_t mask)
     set_xen_guest_handle(sysctl.u.tbuf_op.cpu_mask.bitmap, (uint8_t *)&mask);
     sysctl.u.tbuf_op.cpu_mask.nr_cpus = sizeof(mask) * 8;
 
-    if ( mlock(&mask, sizeof(mask)) != 0 )
+    if ( lock_pages(&mask, sizeof(mask)) != 0 )
     {
         PERROR("Could not lock memory for Xen hypercall");
         goto out;
@@ -112,7 +112,7 @@ int xc_tbuf_set_cpu_mask(int xc_handle, uint32_t mask)
 
     ret = do_sysctl(xc_handle, &sysctl);
 
-    safe_munlock(&mask, sizeof(mask));
+    unlock_pages(&mask, sizeof(mask));
 
  out:
     return ret;

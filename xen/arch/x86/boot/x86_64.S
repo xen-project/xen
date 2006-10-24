@@ -186,7 +186,7 @@ ignore_int:
         cld
         leaq    int_msg(%rip),%rdi
         xorl    %eax,%eax
-        call    printf
+        call    printk
 1:      jmp     1b
 
 

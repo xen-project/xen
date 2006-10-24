@@ -31,6 +31,7 @@ import termios
 import fcntl
 import select
 
+import arch
 from Test import *
 
 TIMEDOUT = 1
@@ -120,6 +121,7 @@ class XmConsole:
     def __getprompt(self, fd):
         timeout = 0
         bytes = 0
+        buffer = ""
         while timeout < 180:
             # eat anything while total bytes less than limit else raise RUNAWAY
             while (not self.limit) or (bytes < self.limit):
@@ -130,6 +132,7 @@ class XmConsole:
                         if self.debugMe:
                             sys.stdout.write(foo)
                         bytes += 1
+                        buffer += foo
                     except Exception, exn:
                         raise ConsoleError(str(exn))
                 else:
@@ -137,6 +140,8 @@ class XmConsole:
             else:
                 raise ConsoleError("Console run-away (exceeded %i bytes)"
                                    % self.limit, RUNAWAY)
+            # Check to see if the buffer contains anything interetsing
+            arch.checkBuffer(buffer)
             # press enter
             os.write(self.consoleFd, "\n")
             # look for prompt

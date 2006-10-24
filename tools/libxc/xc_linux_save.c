@@ -628,8 +628,8 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         return 1;
     }
 
-    if (mlock(&ctxt, sizeof(ctxt))) {
-        ERROR("Unable to mlock ctxt");
+    if (lock_pages(&ctxt, sizeof(ctxt))) {
+        ERROR("Unable to lock ctxt");
         return 1;
     }
 
@@ -767,14 +767,14 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     memset(to_send, 0xff, BITMAP_SIZE);
 
-    if (mlock(to_send, BITMAP_SIZE)) {
-        ERROR("Unable to mlock to_send");
+    if (lock_pages(to_send, BITMAP_SIZE)) {
+        ERROR("Unable to lock to_send");
         return 1;
     }
 
     /* (to fix is local only) */
-    if (mlock(to_skip, BITMAP_SIZE)) {
-        ERROR("Unable to mlock to_skip");
+    if (lock_pages(to_skip, BITMAP_SIZE)) {
+        ERROR("Unable to lock to_skip");
         return 1;
     }
 
@@ -790,8 +790,8 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         goto out;
     }
 
-    if (mlock(pfn_type, MAX_BATCH_SIZE * sizeof(*pfn_type))) {
-        ERROR("Unable to mlock");
+    if (lock_pages(pfn_type, MAX_BATCH_SIZE * sizeof(*pfn_type))) {
+        ERROR("Unable to lock");
         goto out;
     }
 

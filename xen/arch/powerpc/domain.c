@@ -97,14 +97,14 @@ void arch_domain_destroy(struct domain *d)
 
 void machine_halt(void)
 {
-    printf("machine_halt called: spinning....\n");
+    printk("machine_halt called: spinning....\n");
     console_start_sync();
     while(1);
 }
 
 void machine_restart(char * __unused)
 {
-    printf("machine_restart called: spinning....\n");
+    printk("machine_restart called: spinning....\n");
     console_start_sync();
     while(1);
 }
@@ -134,7 +134,7 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_t *c)
 { 
     memcpy(&v->arch.ctxt, &c->user_regs, sizeof(c->user_regs));
 
-    printf("Domain[%d].%d: initializing\n",
+    printk("Domain[%d].%d: initializing\n",
            v->domain->domain_id, v->vcpu_id);
 
     if (v->domain->arch.htab.order == 0)
@@ -186,7 +186,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     unsigned int cpu = smp_processor_id();
 
 #if 0
-    printf("%s: dom %x to dom %x\n", __func__, prev->domain->domain_id,
+    printk("%s: dom %x to dom %x\n", __func__, prev->domain->domain_id,
             next->domain->domain_id);
 #endif
 

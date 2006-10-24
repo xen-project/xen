@@ -1087,7 +1087,7 @@ static int check_for_null_selector(unsigned long eip, int inst_len, int dir)
     memset(inst, 0, MAX_INST_LEN);
     if ( inst_copy_from_guest(inst, eip, inst_len) != inst_len )
     {
-        printf("check_for_null_selector: get guest instruction failed\n");
+        printk("check_for_null_selector: get guest instruction failed\n");
         domain_crash_synchronous();
     }
 
@@ -1470,7 +1470,7 @@ static int vmx_assist(struct vcpu *v, int mode)
     }
 
  error:
-    printf("Failed to transfer to vmxassist\n");
+    printk("Failed to transfer to vmxassist\n");
     domain_crash_synchronous();
     return 0;
 }

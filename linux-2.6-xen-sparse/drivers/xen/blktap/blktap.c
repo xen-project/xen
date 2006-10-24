@@ -10,6 +10,9 @@
  * 
  * Copyright (c) 2004-2005, Andrew Warfield and Julian Chesterfield
  *
+ * Clean ups and fix ups:
+ *    Copyright (c) 2006, Steven Rostedt - Red Hat, Inc.
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation; or, when distributed
@@ -51,7 +54,7 @@
 #include <asm/tlbflush.h>
 #include <linux/devfs_fs_kernel.h>
 
-#define MAX_TAP_DEV 100     /*the maximum number of tapdisk ring devices    */
+#define MAX_TAP_DEV 256     /*the maximum number of tapdisk ring devices    */
 #define MAX_DEV_NAME 100    /*the max tapdisk ring device name e.g. blktap0 */
 
 
@@ -105,6 +108,12 @@ static int mmap_pages = MMAP_PAGES;
 		      * memory rings.
 		      */
 
+/*Data struct handed back to userspace for tapdisk device to VBD mapping*/
+typedef struct domid_translate {
+	unsigned short domid;
+	unsigned short busid;
+} domid_translate_t ;
+
 /*Data struct associated with each of the tapdisk devices*/
 typedef struct tap_blkif {
 	struct vm_area_struct *vma;   /*Shared memory area                   */
@@ -123,17 +132,11 @@ typedef struct tap_blkif {
 	unsigned long *idx_map;       /*Record the user ring id to kern 
 					[req id, idx] tuple                  */
 	blkif_t *blkif;               /*Associate blkif with tapdev          */
-	int sysfs_set;                /*Set if it has a class device.        */
+	struct domid_translate trans; /*Translation from domid to bus.       */
 } tap_blkif_t;
 
-/*Data struct handed back to userspace for tapdisk device to VBD mapping*/
-typedef struct domid_translate {
-	unsigned short domid;
-	unsigned short busid;
-} domid_translate_t ;
-
-static domid_translate_t  translate_domid[MAX_TAP_DEV];
-static tap_blkif_t *tapfds[MAX_TAP_DEV];
+static struct tap_blkif *tapfds[MAX_TAP_DEV];
+static int blktap_next_minor;
 
 static int __init set_blkif_reqs(char *str)
 {
@@ -322,7 +325,7 @@ struct vm_operations_struct blktap_vm_ops = {
  */
  
 /*Function Declarations*/
-static int get_next_free_dev(void);
+static tap_blkif_t *get_next_free_dev(void);
 static int blktap_open(struct inode *inode, struct file *filp);
 static int blktap_release(struct inode *inode, struct file *filp);
 static int blktap_mmap(struct file *filp, struct vm_area_struct *vma);
@@ -340,51 +343,96 @@ static struct file_operations blktap_fops = {
 };
 
 
-static int get_next_free_dev(void)
+static tap_blkif_t *get_next_free_dev(void)
 {
 	tap_blkif_t *info;
-	int i = 0, ret = -1;
-	unsigned long flags;
-
-	spin_lock_irqsave(&pending_free_lock, flags);
-	
-	while (i < MAX_TAP_DEV) {
-		info = tapfds[i];
-		if ( (tapfds[i] != NULL) && (info->dev_inuse == 0)
-			&& (info->dev_pending == 0) ) {
-			info->dev_pending = 1;
-			ret = i;
-			goto done;
-		}
-		i++;
-	}
-	
-done:
-	spin_unlock_irqrestore(&pending_free_lock, flags);
+	int minor;
 
 	/*
-	 * We are protected by having the dev_pending set.
+	 * This is called only from the ioctl, which
+	 * means we should always have interrupts enabled.
 	 */
-	if (!tapfds[i]->sysfs_set && xen_class) {
-		class_device_create(xen_class, NULL,
-				    MKDEV(blktap_major, ret), NULL,
-				    "blktap%d", ret);
-		tapfds[i]->sysfs_set = 1;
+	BUG_ON(irqs_disabled());
+
+	spin_lock_irq(&pending_free_lock);
+
+	/* tapfds[0] is always NULL */
+
+	for (minor = 1; minor < blktap_next_minor; minor++) {
+		info = tapfds[minor];
+		/* we could have failed a previous attempt. */
+		if (!info ||
+		    ((info->dev_inuse == 0) &&
+		     (info->dev_pending == 0)) ) {
+			info->dev_pending = 1;
+			goto found;
+		}
 	}
-	return ret;
+	info = NULL;
+	minor = -1;
+
+	/*
+	 * We didn't find free device. If we can still allocate
+	 * more, then we grab the next device minor that is
+	 * available.  This is done while we are still under
+	 * the protection of the pending_free_lock.
+	 */
+	if (blktap_next_minor < MAX_TAP_DEV)
+		minor = blktap_next_minor++;
+found:
+	spin_unlock_irq(&pending_free_lock);
+
+	if (!info && minor > 0) {
+		info = kzalloc(sizeof(*info), GFP_KERNEL);
+		if (unlikely(!info)) {
+			/*
+			 * If we failed here, try to put back
+			 * the next minor number. But if one
+			 * was just taken, then we just lose this
+			 * minor.  We can try to allocate this
+			 * minor again later.
+			 */
+			spin_lock_irq(&pending_free_lock);
+			if (blktap_next_minor == minor+1)
+				blktap_next_minor--;
+			spin_unlock_irq(&pending_free_lock);
+			goto out;
+		}
+
+		info->minor = minor;
+		/*
+		 * Make sure that we have a minor before others can
+		 * see us.
+		 */
+		wmb();
+		tapfds[minor] = info;
+
+		class_device_create(xen_class, NULL,
+				    MKDEV(blktap_major, minor), NULL,
+				    "blktap%d", minor);
+		devfs_mk_cdev(MKDEV(blktap_major, minor),
+			S_IFCHR|S_IRUGO|S_IWUSR, "xen/blktap%d", minor);
+	}
+
+out:
+	return info;
 }
 
 int dom_to_devid(domid_t domid, int xenbus_id, blkif_t *blkif) 
 {
+	tap_blkif_t *info;
 	int i;
-		
-	for (i = 0; i < MAX_TAP_DEV; i++)
-		if ( (translate_domid[i].domid == domid)
-		    && (translate_domid[i].busid == xenbus_id) ) {
-			tapfds[i]->blkif = blkif;
-			tapfds[i]->status = RUNNING;
+
+	for (i = 1; i < blktap_next_minor; i++) {
+		info = tapfds[i];
+		if ( info &&
+		     (info->trans.domid == domid) &&
+		     (info->trans.busid == xenbus_id) ) {
+			info->blkif = blkif;
+			info->status = RUNNING;
 			return i;
 		}
+	}
 	return -1;
 }
 
@@ -394,12 +442,16 @@ void signal_tapdisk(int idx)
 	struct task_struct *ptask;
 
 	info = tapfds[idx];
-	if ( (idx > 0) && (idx < MAX_TAP_DEV) && (info->pid > 0) ) {
+	if ((idx < 0) || (idx > MAX_TAP_DEV) || !info)
+		return;
+
+	if (info->pid > 0) {
 		ptask = find_task_by_pid(info->pid);
 		if (ptask)
 			info->status = CLEANSHUTDOWN;
 	}
 	info->blkif = NULL;
+
 	return;
 }
 
@@ -410,14 +462,19 @@ static int blktap_open(struct inode *inode, struct file *filp)
 	tap_blkif_t *info;
 	int i;
 	
-	if (tapfds[idx] == NULL) {
-		WPRINTK("Unable to open device /dev/xen/blktap%d\n",
-		       idx);
-		return -ENOMEM;
-	}
-	DPRINTK("Opening device /dev/xen/blktap%d\n",idx);
-	
+	/* ctrl device, treat differently */
+	if (!idx)
+		return 0;
+
 	info = tapfds[idx];
+
+	if ((idx < 0) || (idx > MAX_TAP_DEV) || !info) {
+		WPRINTK("Unable to open device /dev/xen/blktap%d\n",
+			idx);
+		return -ENODEV;
+	}
+
+	DPRINTK("Opening device /dev/xen/blktap%d\n",idx);
 	
 	/*Only one process can access device at a time*/
 	if (test_and_set_bit(0, &info->dev_inuse))
@@ -458,12 +515,10 @@ static int blktap_release(struct inode *inode, struct file *filp)
 {
 	tap_blkif_t *info = filp->private_data;
 	
-	/* can this ever happen? - sdr */
-	if (!info) {
-		WPRINTK("Trying to free device that doesn't exist "
-		       "[/dev/xen/blktap%d]\n",iminor(inode) - BLKTAP_MINOR);
-		return -EBADF;
-	}
+	/* check for control device */
+	if (!info)
+		return 0;
+
 	info->dev_inuse = 0;
 	DPRINTK("Freeing device [/dev/xen/blktap%d]\n",info->minor);
 
@@ -619,33 +674,31 @@ static int blktap_ioctl(struct inode *inode, struct file *filp,
 	{		
 		uint64_t val = (uint64_t)arg;
 		domid_translate_t *tr = (domid_translate_t *)&val;
-		int newdev;
 
 		DPRINTK("NEWINTF Req for domid %d and bus id %d\n", 
 		       tr->domid, tr->busid);
-		newdev = get_next_free_dev();
-		if (newdev < 1) {
+		info = get_next_free_dev();
+		if (!info) {
 			WPRINTK("Error initialising /dev/xen/blktap - "
 				"No more devices\n");
 			return -1;
 		}
-		translate_domid[newdev].domid = tr->domid;
-		translate_domid[newdev].busid = tr->busid;
-		return newdev;
+		info->trans.domid = tr->domid;
+		info->trans.busid = tr->busid;
+		return info->minor;
 	}
 	case BLKTAP_IOCTL_FREEINTF:
 	{
 		unsigned long dev = arg;
 		unsigned long flags;
 
-		/* Looking at another device */
-		info = NULL;
+		info = tapfds[dev];
 
-		if ( (dev > 0) && (dev < MAX_TAP_DEV) )
-			info = tapfds[dev];
+		if ((dev > MAX_TAP_DEV) || !info)
+			return 0; /* should this be an error? */
 
 		spin_lock_irqsave(&pending_free_lock, flags);
-		if ( (info != NULL) && (info->dev_pending) )
+		if (info->dev_pending)
 			info->dev_pending = 0;
 		spin_unlock_irqrestore(&pending_free_lock, flags);
 
@@ -655,16 +708,12 @@ static int blktap_ioctl(struct inode *inode, struct file *filp,
 	{
 		unsigned long dev = arg;
 
-		/* Looking at another device */
-		info = NULL;
-		
-		if ( (dev > 0) && (dev < MAX_TAP_DEV) )
-			info = tapfds[dev];
-		
-		if (info != NULL)
-			return info->minor;
-		else
-			return -1;
+		info = tapfds[dev];
+
+		if ((dev > MAX_TAP_DEV) || !info)
+			return -EINVAL;
+
+		return info->minor;
 	}
 	case BLKTAP_IOCTL_MAJOR:
 		return blktap_major;
@@ -683,13 +732,8 @@ static unsigned int blktap_poll(struct file *filp, poll_table *wait)
 {
 	tap_blkif_t *info = filp->private_data;
 	
-	if (!info) {
-		WPRINTK(" poll, retrieving idx failed\n");
-		return 0;
-	}
-
 	/* do not work on the control device */
-	if (!info->minor)
+	if (!info)
 		return 0;
 
 	poll_wait(filp, &info->wait, wait);
@@ -704,13 +748,12 @@ void blktap_kick_user(int idx)
 {
 	tap_blkif_t *info;
 
-	if (idx == 0)
-		return;
-	
 	info = tapfds[idx];
-	
-	if (info != NULL)
-		wake_up_interruptible(&info->wait);
+
+	if ((idx < 0) || (idx > MAX_TAP_DEV) || !info)
+		return;
+
+	wake_up_interruptible(&info->wait);
 
 	return;
 }
@@ -822,8 +865,8 @@ static void free_req(pending_req_t *req)
 		wake_up(&pending_free_wq);
 }
 
-static void fast_flush_area(pending_req_t *req, int k_idx, int u_idx, int 
-			    tapidx)
+static void fast_flush_area(pending_req_t *req, int k_idx, int u_idx,
+			    int tapidx)
 {
 	struct gnttab_unmap_grant_ref unmap[BLKIF_MAX_SEGMENTS_PER_REQUEST*2];
 	unsigned int i, invcount = 0;
@@ -831,13 +874,16 @@ static void fast_flush_area(pending_req_t *req, int k_idx, int u_idx, int
 	uint64_t ptep;
 	int ret, mmap_idx;
 	unsigned long kvaddr, uvaddr;
-
-	tap_blkif_t *info = tapfds[tapidx];
+	tap_blkif_t *info;
 	
-	if (info == NULL) {
+
+	info = tapfds[tapidx];
+
+	if ((tapidx < 0) || (tapidx > MAX_TAP_DEV) || !info) {
 		WPRINTK("fast_flush: Couldn't get info!\n");
 		return;
 	}
+
 	mmap_idx = req->mem_idx;
 
 	for (i = 0; i < req->nr_pages; i++) {
@@ -1042,7 +1088,7 @@ static int do_block_io_op(blkif_t *blkif)
 	rmb(); /* Ensure we see queued requests up to 'rp'. */
 
 	/*Check blkif has corresponding UE ring*/
-	if (blkif->dev_num == -1) {
+	if (blkif->dev_num < 0) {
 		/*oops*/
 		if (print_dbug) {
 			WPRINTK("Corresponding UE " 
@@ -1053,7 +1099,8 @@ static int do_block_io_op(blkif_t *blkif)
 	}
 
 	info = tapfds[blkif->dev_num];
-	if (info == NULL || !info->dev_inuse) {
+
+	if (blkif->dev_num > MAX_TAP_DEV || !info || !info->dev_inuse) {
 		if (print_dbug) {
 			WPRINTK("Can't get UE info!\n");
 			print_dbug = 0;
@@ -1121,15 +1168,22 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 	struct gnttab_map_grant_ref map[BLKIF_MAX_SEGMENTS_PER_REQUEST*2];
 	unsigned int nseg;
 	int ret, i;
-	tap_blkif_t *info = tapfds[blkif->dev_num];
+	tap_blkif_t *info;
 	uint64_t sector;
-	
 	blkif_request_t *target;
 	int pending_idx = RTN_PEND_IDX(pending_req,pending_req->mem_idx);
-	int usr_idx = GET_NEXT_REQ(info->idx_map);
+	int usr_idx;
 	uint16_t mmap_idx = pending_req->mem_idx;
 
+	if (blkif->dev_num < 0 || blkif->dev_num > MAX_TAP_DEV)
+		goto fail_response;
+
+	info = tapfds[blkif->dev_num];
+	if (info == NULL)
+		goto fail_response;
+
 	/* Check we have space on user ring - should never fail. */
+	usr_idx = GET_NEXT_REQ(info->idx_map);
 	if (usr_idx == INVALID_REQ)
 		goto fail_response;
 
@@ -1330,7 +1384,6 @@ static void make_response(blkif_t *blkif, unsigned long id,
 static int __init blkif_init(void)
 {
 	int i,ret,blktap_dir;
-	tap_blkif_t *info;
 
 	if (!is_running_on_xen())
 		return -ENODEV;
@@ -1350,9 +1403,6 @@ static int __init blkif_init(void)
 
 	tap_blkif_xenbus_init();
 
-	/*Create the blktap devices, but do not map memory or waitqueue*/
-	for(i = 0; i < MAX_TAP_DEV; i++) translate_domid[i].domid = 0xFFFF;
-
 	/* Dynamically allocate a major for this device */
 	ret = register_chrdev(0, "blktap", &blktap_fops);
 	blktap_dir = devfs_mk_dir(NULL, "xen", 0, NULL);
@@ -1364,24 +1414,17 @@ static int __init blkif_init(void)
 	
 	blktap_major = ret;
 
-	for(i = 0; i < MAX_TAP_DEV; i++ ) {
-		info = tapfds[i] = kzalloc(sizeof(tap_blkif_t),GFP_KERNEL);
-		if(tapfds[i] == NULL)
-			return -ENOMEM;
-		info->minor = i;
-		info->pid = 0;
-		info->blkif = NULL;
+	/* tapfds[0] is always NULL */
+	blktap_next_minor++;
 
-		ret = devfs_mk_cdev(MKDEV(blktap_major, i),
-			S_IFCHR|S_IRUGO|S_IWUSR, "xen/blktap%d", i);
+	ret = devfs_mk_cdev(MKDEV(blktap_major, i),
+			    S_IFCHR|S_IRUGO|S_IWUSR, "xen/blktap%d", i);
 
-		if(ret != 0)
-			return -ENOMEM;
-		info->dev_pending = info->dev_inuse = 0;
+	if(ret != 0)
+		return -ENOMEM;
 
-		DPRINTK("Created misc_dev [/dev/xen/blktap%d]\n",i);
-	}
-	
+	DPRINTK("Created misc_dev [/dev/xen/blktap%d]\n",i);
+
 	/* Make sure the xen class exists */
 	if (!setup_xen_class()) {
 		/*
@@ -1394,7 +1437,6 @@ static int __init blkif_init(void)
 		class_device_create(xen_class, NULL,
 				    MKDEV(blktap_major, 0), NULL,
 				    "blktap0");
-		tapfds[0]->sysfs_set = 1;
 	} else {
 		/* this is bad, but not fatal */
 		WPRINTK("blktap: sysfs xen_class not created\n");

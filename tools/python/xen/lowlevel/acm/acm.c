@@ -147,9 +147,10 @@ static PyObject *getdecision(PyObject * self, PyObject * args)
 {
     char *arg1_name, *arg1, *arg2_name, *arg2, *decision = NULL;
     struct acm_getdecision getdecision;
-    int xc_handle;
+    int xc_handle, rc;
 
-    if (!PyArg_ParseTuple(args, "ssss", &arg1_name, &arg1, &arg2_name, &arg2)) {
+    if (!PyArg_ParseTuple(args, "ssss", &arg1_name,
+                          &arg1, &arg2_name, &arg2)) {
         return NULL;
     }
 
@@ -179,12 +180,16 @@ static PyObject *getdecision(PyObject * self, PyObject * args)
         getdecision.id2.ssidref = atol(arg2);
     }
 
-    if (xc_acm_op(xc_handle, ACMOP_getdecision, &getdecision, sizeof(getdecision)) < 0) {
-        if (errno == EACCES)
-            PERROR("ACM operation failed.");
-    }
+    rc = xc_acm_op(xc_handle, ACMOP_getdecision,
+                   &getdecision, sizeof(getdecision));
 
     xc_interface_close(xc_handle);
+
+    if (rc < 0) {
+        if (errno == EACCES)
+            PERROR("ACM operation failed.");
+        return NULL;
+    }
 
     if (getdecision.acm_decision == ACM_ACCESS_PERMITTED)
         decision = "PERMITTED";

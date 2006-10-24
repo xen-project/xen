@@ -20,34 +20,23 @@
 
 import sys
 import commands
-import os
 import re
 import time
 
 from Xm import *
+from arch import *
 from Test import *
 from config import *
 from Console import *
 from XenDevice import *
 from acm import *
 
-BLOCK_ROOT_DEV = "hda"
-
-def getDeviceModel():
-    """Get the path to the device model based on
-    the architecture reported in uname"""
-    arch = os.uname()[4]
-    if re.search("64", arch):
-        return "/usr/lib64/xen/bin/qemu-dm"
-    else:
-        return "/usr/lib/xen/bin/qemu-dm"
 
 def getDefaultKernel():
-    """Get the path to the default DomU kernel"""
-    dom0Ver = commands.getoutput("uname -r");
-    domUVer = dom0Ver.replace("xen0", "xenU");
-    
-    return "/boot/vmlinuz-" + domUVer;
+    return arch.getDefaultKernel()
+
+def getRdPath():
+    return arch.getRdPath()
 
 def getUniqueName():
     """Get a uniqueish name for use in a domain"""
@@ -56,43 +45,8 @@ def getUniqueName():
     test_name = re.sub("\.test", "", test_name)
     test_name = re.sub("[\/\.]", "", test_name)
     name = "%s-%i" % (test_name, unixtime)
-    
+
     return name
-
-def getRdPath():
-    rdpath = os.environ.get("RD_PATH")
-    if not rdpath:
-        rdpath = "../../ramdisk"
-    rdpath = os.path.abspath(rdpath)
-
-    return rdpath
-
-ParavirtDefaults = {"memory"       : 64,
-                    "vcpus"        : 1,
-                    "kernel"       : getDefaultKernel(),
-                    "root"         : "/dev/ram0",
-                    "ramdisk"      : getRdPath() + "/initrd.img"
-                    }
-HVMDefaults =      {"memory"       : 64,
-                    "vcpus"        : 1,
-                    "acpi"         : 0,
-                    "apic"         : 0,
-                    "disk"         : ["file:%s/disk.img,ioemu:%s,w!" %
-                                   (getRdPath(), BLOCK_ROOT_DEV)],
-                    "kernel"       : "/usr/lib/xen/boot/hvmloader",
-                    "builder"      : "hvm",
-                    "sdl"          : 0,
-                    "vnc"          : 0,
-                    "vncviewer"    : 0,
-                    "nographic"    : 1,
-                    "serial"       : "pty",
-                    "device_model" : getDeviceModel()
-                    }
-
-if ENABLE_HVM_SUPPORT:
-    configDefaults = HVMDefaults
-else:
-    configDefaults = ParavirtDefaults
 
 class XenConfig:
     """An object to help create a xen-compliant config file"""
@@ -145,8 +99,12 @@ class XenConfig:
 
     def setOpt(self, name, value):
         """Set an option in the config"""
-        if name in self.opts.keys() and isinstance(self.opts[name], list) and not isinstance(value, list):
+        if name in self.opts.keys() and isinstance(self.opts[name] ,
+                                        list) and not isinstance(value, list):
                 self.opts[name] = [value]
+        # "extra" is special so append to it.
+        elif name == "extra" and name in self.opts.keys():
+            self.opts[name] += " %s" % (value)
         else:
             self.opts[name] = value
 
@@ -182,7 +140,7 @@ class DomainError(Exception):
             self.errorcode = int(errorcode)
         except Exception, e:
             self.errorcode = -1
-            
+
     def __str__(self):
         return str(self.msg)
 
@@ -204,7 +162,7 @@ class XenDomain:
         self.devices = {}
         self.netEnv = "bridge"
 
-        # Set domain type, either PV for ParaVirt domU or HVM for 
+        # Set domain type, either PV for ParaVirt domU or HVM for
         # FullVirt domain
         if ENABLE_HVM_SUPPORT:
             self.type = "HVM"
@@ -337,7 +295,8 @@ class XenDomain:
 
 class XmTestDomain(XenDomain):
 
-    def __init__(self, name=None, extraConfig=None, baseConfig=configDefaults):
+    def __init__(self, name=None, extraConfig=None,
+                 baseConfig=arch.configDefaults):
         """Create a new xm-test domain
         @param name: The requested domain name
         @param extraConfig: Additional configuration options
@@ -356,11 +315,12 @@ class XmTestDomain(XenDomain):
         XenDomain.__init__(self, config.getOpt("name"), config=config)
 
     def minSafeMem(self):
-        return 32
+        return arch.minSafeMem
 
 class XmTestNetDomain(XmTestDomain):
 
-    def __init__(self, name=None, extraConfig=None, baseConfig=configDefaults):
+    def __init__(self, name=None, extraConfig=None,
+                 baseConfig=arch.configDefaults):
         """Create a new xm-test domain with one network device
         @param name: The requested domain name
         @param extraConfig: Additional configuration options

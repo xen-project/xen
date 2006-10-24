@@ -115,7 +115,7 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 #ifdef HEARTBEAT_FREQ
 	static long count = 0;
 	if (!(++count & ((HEARTBEAT_FREQ*1024)-1))) {
-		printf("Heartbeat... iip=%p\n", /*",psr.i=%d,pend=%d\n", */
+		printk("Heartbeat... iip=%p\n", /*",psr.i=%d,pend=%d\n", */
 			regs->cr_iip /*,
 			!current->vcpu_info->evtchn_upcall_mask,
 			VCPU(current,pending_interruption) */);

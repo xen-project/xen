@@ -328,7 +328,7 @@ domain_crash_synchronous:
         # printk(domain_crash_synchronous_string)
         leaq  domain_crash_synchronous_string(%rip),%rdi
         xorl  %eax,%eax
-        call  printf
+        call  printk
         jmp  __domain_crash_synchronous
 
         ALIGN

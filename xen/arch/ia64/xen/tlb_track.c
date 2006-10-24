@@ -29,7 +29,7 @@
 #define CONFIG_TLB_TRACK_DEBUG
 #ifdef CONFIG_TLB_TRACK_DEBUG
 # define tlb_track_printd(fmt, ...)     \
-    printf("%s:%d " fmt, __func__, __LINE__, ##__VA_ARGS__)
+    printk("%s:%d " fmt, __func__, __LINE__, ##__VA_ARGS__)
 #else
 # define tlb_track_printd(fmt, ...)     do { } while (0)
 #endif

@@ -106,7 +106,7 @@ void init_rid_allocator (void)
 	/* Due to RID mangling, we expect 24 RID bits!
 	   This test should be removed if RID mangling is removed/modified.  */
 	if (implemented_rid_bits != 24) {
-		printf ("RID mangling expected 24 RID bits, got only %d!\n",
+		printk ("RID mangling expected 24 RID bits, got only %d!\n",
 			implemented_rid_bits);
 		BUG();
 	}
@@ -117,14 +117,14 @@ void init_rid_allocator (void)
 
 	/* Check for too small values.  */
 	if (domain_rid_bits_default < IA64_MIN_IMPL_RID_BITS) {
-		printf ("Default domain rid bits %d is too small, use %d\n",
+		printk ("Default domain rid bits %d is too small, use %d\n",
 			domain_rid_bits_default, IA64_MIN_IMPL_RID_BITS);
 		domain_rid_bits_default = IA64_MIN_IMPL_RID_BITS;
 	}
 
 	log_blocks = (implemented_rid_bits - IA64_MIN_IMPL_RID_BITS);
 
-	printf ("Maximum number of domains: %d; %d RID bits per domain\n",
+	printk ("Maximum number of domains: %d; %d RID bits per domain\n",
 		(1 << (implemented_rid_bits - domain_rid_bits_default)) - 1,
 		domain_rid_bits_default);
 	
@@ -185,7 +185,7 @@ int allocate_rid_range(struct domain *d, unsigned long ridbits)
 	d->arch.metaphysical_rr0 = allocate_metaphysical_rr(d, 0);
 	d->arch.metaphysical_rr4 = allocate_metaphysical_rr(d, 1);
 
-	printf("### domain %p: rid=%x-%x mp_rid=%x\n",
+	printk("### domain %p: rid=%x-%x mp_rid=%x\n",
 	       d, d->arch.starting_rid, d->arch.ending_rid,
 	       d->arch.starting_mp_rid);
 	

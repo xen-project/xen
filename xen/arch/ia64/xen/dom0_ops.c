@@ -171,7 +171,7 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     }
     break;
     default:
-        printf("arch_do_domctl: unrecognized domctl: %d!!!\n",op->cmd);
+        printk("arch_do_domctl: unrecognized domctl: %d!!!\n",op->cmd);
         ret = -ENOSYS;
 
     }
@@ -211,7 +211,7 @@ long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
     break;
 
     default:
-        printf("arch_do_sysctl: unrecognized sysctl: %d!!!\n",op->cmd);
+        printk("arch_do_sysctl: unrecognized sysctl: %d!!!\n",op->cmd);
         ret = -ENOSYS;
 
     }
@@ -278,7 +278,7 @@ do_dom0vp_op(unsigned long cmd,
         break;
     default:
         ret = -1;
-		printf("unknown dom0_vp_op 0x%lx\n", cmd);
+		printk("unknown dom0_vp_op 0x%lx\n", cmd);
         break;
     }
 

@@ -723,7 +723,7 @@ void hvm_io_assist(struct vcpu *v)
     vio = get_vio(v->domain, v->vcpu_id);
 
     if ( vio == 0 ) {
-        printf("bad shared page: %lx\n", (unsigned long)vio);
+        printk("bad shared page: %lx\n", (unsigned long)vio);
         domain_crash_synchronous();
     }
 

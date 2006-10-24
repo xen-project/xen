@@ -1,7 +1,7 @@
 Index: ioemu/hw/vga.c
 ===================================================================
---- ioemu.orig/hw/vga.c	2006-08-06 02:03:51.906765409 +0100
-+++ ioemu/hw/vga.c	2006-08-06 02:15:10.364150665 +0100
+--- ioemu.orig/hw/vga.c	2006-10-24 14:44:03.000000000 +0100
++++ ioemu/hw/vga.c	2006-10-24 14:45:22.000000000 +0100
 @@ -1622,7 +1622,9 @@
  static void vga_save(QEMUFile *f, void *opaque)
  {
@@ -26,8 +26,8 @@ Index: ioemu/hw/vga.c
          return -EINVAL;
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-08-06 02:15:01.774108287 +0100
-+++ ioemu/vl.c	2006-08-06 02:15:31.040845624 +0100
+--- ioemu.orig/vl.c	2006-10-24 14:44:08.000000000 +0100
++++ ioemu/vl.c	2006-10-24 14:45:29.000000000 +0100
 @@ -39,6 +39,7 @@
  #include <sys/ioctl.h>
  #include <sys/socket.h>
@@ -36,6 +36,24 @@ Index: ioemu/vl.c
  #include <dirent.h>
  #include <netdb.h>
  #ifdef _BSD
+@@ -2932,7 +2933,7 @@
+     }
+ 
+     /* XXX: better tmp dir construction */
+-    snprintf(smb_dir, sizeof(smb_dir), "/tmp/qemu-smb.%d", getpid());
++    snprintf(smb_dir, sizeof(smb_dir), "/tmp/qemu-smb.%ld", (long)getpid());
+     if (mkdir(smb_dir, 0700) < 0) {
+         fprintf(stderr, "qemu: could not create samba server dir '%s'\n", smb_dir);
+         exit(1);
+@@ -3893,7 +3894,7 @@
+                 perror("Opening pidfile");
+                 exit(1);
+             }
+-            fprintf(f, "%d\n", getpid());
++            fprintf(f, "%ld\n", (long)getpid());
+             fclose(f);
+             pid_filename = qemu_strdup(filename);
+             if (!pid_filename) {
 @@ -5308,7 +5309,9 @@
      QEMU_OPTION_d,
      QEMU_OPTION_hdachs,
@@ -70,8 +88,8 @@ Index: ioemu/vl.c
                      fprintf(stderr, "qemu: too many network clients\n");
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-08-06 02:15:01.775108175 +0100
-+++ ioemu/vl.h	2006-08-06 02:15:10.368150219 +0100
+--- ioemu.orig/vl.h	2006-10-24 14:44:08.000000000 +0100
++++ ioemu/vl.h	2006-10-24 14:45:22.000000000 +0100
 @@ -957,7 +957,7 @@
  	       unsigned long vram_offset, int vram_size, int width, int height);
  
@@ -81,3 +99,18 @@ Index: ioemu/vl.h
  void slavio_intctl_set_cpu(void *opaque, unsigned int cpu, CPUState *env);
  void slavio_pic_info(void *opaque);
  void slavio_irq_info(void *opaque);
+Index: ioemu/usb-linux.c
+===================================================================
+--- ioemu.orig/usb-linux.c	2006-10-24 14:44:03.000000000 +0100
++++ ioemu/usb-linux.c	2006-10-24 14:44:08.000000000 +0100
+@@ -26,7 +26,9 @@
+ #if defined(__linux__)
+ #include <dirent.h>
+ #include <sys/ioctl.h>
+-#include <linux/compiler.h>
++/* Some versions of usbdevice_fs.h need __user to be defined for them.   */
++/* This may (harmlessly) conflict with a definition in linux/compiler.h. */
++#define __user
+ #include <linux/usbdevice_fs.h>
+ #include <linux/version.h>
+ 
