@@ -8,10 +8,17 @@ from XmTestLib import *
 import time
 
 DOMS=5
-MEM=32
+MEM=minSafeMem()
 DUR=60
 
 domains = []
+
+free_mem = int(getInfo("free_memory"))
+NUM_DOMS = int(free_mem / MEM)
+
+if NUM_DOMS < DOMS:
+    SKIP("Need %i MB of RAM to start %i@%iMB domains! (%i MB avail)" %
+         (DOMS * MEM, DOMS, MEM, free_mem))
 
 for i in range(0,DOMS):
     dom = XmTestDomain(extraConfig={"memory" : MEM})

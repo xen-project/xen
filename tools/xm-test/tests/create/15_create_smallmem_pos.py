@@ -5,8 +5,8 @@
 
 from XmTestLib import *
 
-# 32MBs is the default lower limit for creating domains, it should work
-MEM = 32
+# Create a domain with the minimum memory allocation
+MEM = minSafeMem()
 
 domain = XmTestDomain(extraConfig={"memory": MEM,
                                    "extra" :"mem=%iM" % MEM})
