@@ -288,7 +288,7 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
                 return IA64_FAULT;
             }
         }
-        physical_tlb_miss(v, vadr);
+        physical_tlb_miss(v, vadr, type);
         return IA64_FAULT;
     }
 
@@ -306,7 +306,7 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
                 return IA64_FAULT;
             }
         }
-        thash_vhpt_insert(v,data->page_flags, data->itir ,vadr);
+        thash_vhpt_insert(v, data->page_flags, data->itir, vadr, type);
 
     }else if(type == DSIDE_TLB){
     

@@ -107,7 +107,7 @@ physical_mode_init(VCPU *vcpu)
 extern void vmx_switch_rr7(unsigned long ,shared_info_t*,void *,void *,void *);
 
 void
-physical_tlb_miss(VCPU *vcpu, u64 vadr)
+physical_tlb_miss(VCPU *vcpu, u64 vadr, int type)
 {
     u64 pte;
     ia64_rr rr;
@@ -117,7 +117,7 @@ physical_tlb_miss(VCPU *vcpu, u64 vadr)
         pte = pte | PHY_PAGE_UC;
     else
         pte = pte | PHY_PAGE_WB;
-    thash_vhpt_insert(vcpu, pte, (rr.ps << 2), vadr);
+    thash_vhpt_insert(vcpu, pte, (rr.ps << 2), vadr, type);
     return;
 }
 

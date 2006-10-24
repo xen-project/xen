@@ -178,11 +178,23 @@ static void vmx_vhpt_insert(thash_cb_t *hcb, u64 pte, u64 itir, u64 ifa)
     return;
 }
 
-void thash_vhpt_insert(VCPU *v, u64 pte, u64 itir, u64 va)
+void thash_vhpt_insert(VCPU *v, u64 pte, u64 itir, u64 va, int type)
 {
-    u64 phy_pte;
+    u64 phy_pte, psr;
+    ia64_rr mrr;
+
+    mrr.rrval = ia64_get_rr(va);
     phy_pte=translate_phy_pte(v, &pte, itir, va);
-    vmx_vhpt_insert(vcpu_get_vhpt(v), phy_pte, itir, va);
+
+    if (itir_ps(itir) >= mrr.ps) {
+        vmx_vhpt_insert(vcpu_get_vhpt(v), phy_pte, itir, va);
+    } else {
+        phy_pte  &= ~PAGE_FLAGS_RV_MASK;
+        psr = ia64_clear_ic();
+        ia64_itc(type + 1, va, phy_pte, itir_ps(itir));
+        ia64_set_psr(psr);
+        ia64_srlz_i();
+    }
 }
 /*
  *   vhpt lookup
@@ -191,7 +203,7 @@ void thash_vhpt_insert(VCPU *v, u64 pte, u64 itir, u64 va)
 thash_data_t * vhpt_lookup(u64 va)
 {
     thash_data_t *hash, *head;
-    u64 tag, pte;
+    u64 tag, pte, itir;
     head = (thash_data_t *)ia64_thash(va);
     hash=head;
     tag = ia64_ttag(va);
@@ -207,6 +219,9 @@ thash_data_t * vhpt_lookup(u64 va)
         tag = hash->etag;
         hash->etag = head->etag;
         head->etag = tag;
+        itir = hash->itir;
+        hash->itir = head->itir;
+        head->itir = itir;
         head->len = hash->len;
         hash->len=0;
         return head;
@@ -223,7 +238,8 @@ u64 guest_vhpt_lookup(u64 iha, u64 *pte)
     if (data == NULL) {
         data = vtlb_lookup(current, iha, DSIDE_TLB);
         if (data != NULL)
-            thash_vhpt_insert(current, data->page_flags, data->itir ,iha);
+            thash_vhpt_insert(current, data->page_flags, data->itir,
+                              iha, DSIDE_TLB);
     }
 
     asm volatile ("rsm psr.ic|psr.i;;"
@@ -607,7 +623,8 @@ void thash_init(thash_cb_t *hcb, u64 sz)
     head=hcb->hash;
     num = (hcb->hash_sz/sizeof(thash_data_t));
     do{
-        head->itir = PAGE_SHIFT<<2;
+        head->page_flags = 0;
+        head->itir = 0;
         head->etag = 1UL<<63;
         head->next = 0;
         head++;
@@ -617,11 +634,12 @@ void thash_init(thash_cb_t *hcb, u64 sz)
     hcb->cch_freelist = p = hcb->cch_buf;
     num = (hcb->cch_sz/sizeof(thash_data_t))-1;
     do{
-        p->itir = PAGE_SHIFT<<2;
+        p->page_flags = 0;
+        p->itir = 0;
         p->next =p+1;
         p++;
         num--;
     }while(num);
-    p->itir = PAGE_SHIFT<<2;
+    p->itir = 0;
     p->next = NULL;
 }

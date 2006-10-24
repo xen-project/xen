@@ -341,9 +341,9 @@ fetch_code(VCPU *vcpu, u64 gip, IA64_BUNDLE *pbundle)
             ia64_ptcl(gip, ARCH_PAGE_SHIFT << 2);
             return IA64_RETRY;
         }
-        mfn = tlb->ppn >> (PAGE_SHIFT - ARCH_PAGE_SHIFT);
         maddr = (tlb->ppn >> (tlb->ps - 12) << tlb->ps) |
                 (gip & (PSIZE(tlb->ps) - 1));
+        mfn = maddr >> PAGE_SHIFT;
     }
 
     page = mfn_to_page(mfn);
@@ -637,7 +637,7 @@ IA64FAULT vmx_vcpu_tpa(VCPU *vcpu, u64 vadr, u64 *padr)
     thash_data_t *data;
     ISR visr,pt_isr;
     REGS *regs;
-    u64 vhpt_adr;
+    u64 vhpt_adr, madr;
     IA64_PSR vpsr;
     regs=vcpu_regs(vcpu);
     pt_isr.val=VMX(vcpu,cr_isr);
@@ -673,7 +673,9 @@ IA64FAULT vmx_vcpu_tpa(VCPU *vcpu, u64 vadr, u64 *padr)
             dnat_page_consumption(vcpu, vadr);
             return IA64_FAULT;
         }else{
-            *padr = (get_gpfn_from_mfn(arch_to_xen_ppn(data->ppn)) << PAGE_SHIFT) | (vadr & (PAGE_SIZE - 1));
+            madr = (data->ppn >> (data->ps - 12) << data->ps) |
+                   (vadr & (PSIZE(data->ps) - 1));
+            *padr = __mpa_to_gpa(madr);
             return IA64_NO_FAULT;
         }
     }
