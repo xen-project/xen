@@ -16,6 +16,7 @@
  * Copyright (C) IBM Corporation 2006
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
+ *          Jonathan Appavoo <jappavoo@us.ibm.com>
  */
 
 #include <stdio.h>
@@ -208,6 +209,9 @@ static unsigned long create_start_info(
     start_info->store_evtchn = store_evtchn;
     start_info->console.domU.mfn = (rma_top >> PAGE_SHIFT) - 3;
     start_info->console.domU.evtchn = console_evtchn;
+    strncpy((char *)start_info->cmd_line, cmdline, MAX_GUEST_CMDLINE);
+    /* just in case we truncated cmdline with strncpy add 0 at the end */
+    start_info->cmd_line[MAX_GUEST_CMDLINE-1]=0;
     start_info_addr = rma_top - 4*PAGE_SIZE;
 
     rc = ft_set_rsvmap(devtree, 0, start_info_addr, 4*PAGE_SIZE);
@@ -216,10 +220,8 @@ static unsigned long create_start_info(
         return ~0UL;
     }
 
-
     return start_info_addr;
 }
-
 
 static void free_page_array(xen_pfn_t *page_array)
 {
