@@ -76,9 +76,11 @@ runnable_tests() {
     # using the right version
     realrd=$(readlink ramdisk/initrd.img)
     eval $(./lib/XmTestReport/xmtest.py)
-    rrdver="initrd-${XM_TEST_MAJ}.${XM_TEST_MIN}.img"
+    ARCH=$(uname -m | sed -e s/i.86/i386/ -e 's/ppc\(64\)*/powerpc/')
+    rrdver="initrd-${XM_TEST_MAJ}.${XM_TEST_MIN}-${ARCH}.img"
     if [ "$realrd" != "$rrdver" ]; then
-	echo "Error: ramdisk/initrd.img is from an old version"
+	echo "Error: ramdisk/initrd.img is from an old version, or is not for this "
+        echo "architecture ($ARCH)."
 	echo "You need to build a ramdisk from at least ${XM_TEST_MAJ}.${XM_TEST_MIN}"
 	exit 1
     fi
