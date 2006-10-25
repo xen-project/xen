@@ -12,9 +12,11 @@
 #include <xen/numa.h>
 #include <xen/keyhandler.h>
 #include <xen/time.h>
-
-#include <asm/numa.h>
+#include <xen/smp.h>
 #include <asm/acpi.h>
+
+static int numa_setup(char *s);
+custom_param("numa", numa_setup);
 
 #ifndef Dprintk
 #define Dprintk(x...)
@@ -28,7 +30,7 @@ struct node_data node_data[MAX_NUMNODES];
 int memnode_shift;
 u8  memnodemap[NODEMAPSIZE];
 
-unsigned int cpu_to_node[NR_CPUS] __read_mostly = {
+unsigned char cpu_to_node[NR_CPUS] __read_mostly = {
 	[0 ... NR_CPUS-1] = NUMA_NO_NODE
 };
 unsigned char apicid_to_node[MAX_LOCAL_APIC] __cpuinitdata = {
@@ -38,7 +40,8 @@ cpumask_t node_to_cpumask[MAX_NUMNODES] __read_mostly;
 
 nodemask_t node_online_map = { { [0] = 1UL } };
 
-int numa_off __initdata;
+/* Default NUMA to off for now. acpi=on required to enable it. */
+int numa_off __initdata = 1;
 
 int acpi_numa __initdata;
 
@@ -70,7 +73,7 @@ populate_memnodemap(const struct node *nodes, int numnodes, int shift)
 			if (memnodemap[addr >> shift] != 0xff)
 				return -1;
 			memnodemap[addr >> shift] = i;
-                       addr += (1UL << shift);
+			addr += (1UL << shift);
 		} while (addr < end);
 		res = 1;
 	} 
@@ -133,8 +136,7 @@ void __init numa_init_array(void)
 }
 
 #ifdef CONFIG_NUMA_EMU
-/* default to faking a single node as fallback for non-NUMA hardware */
-int numa_fake __initdata = 1;
+static int numa_fake __initdata = 0;
 
 /* Numa emulation */
 static int numa_emulation(unsigned long start_pfn, unsigned long end_pfn)
@@ -160,9 +162,9 @@ static int numa_emulation(unsigned long start_pfn, unsigned long end_pfn)
  			sz = (end_pfn<<PAGE_SHIFT) - nodes[i].start;
  		nodes[i].end = nodes[i].start + sz;
  		printk(KERN_INFO "Faking node %d at %"PRIx64"-%"PRIx64" (%"PRIu64"MB)\n",
- 		       i,
- 		       nodes[i].start, nodes[i].end,
- 		       (nodes[i].end - nodes[i].start) >> 20);
+		       i,
+		       nodes[i].start, nodes[i].end,
+		       (nodes[i].end - nodes[i].start) >> 20);
 		node_set_online(i);
  	}
  	memnode_shift = compute_hash_shift(nodes, numa_fake);
@@ -182,16 +184,15 @@ void __init numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
 { 
 	int i;
 
+#ifdef CONFIG_NUMA_EMU
+	if (numa_fake && !numa_emulation(start_pfn, end_pfn))
+		return;
+#endif
+
 #ifdef CONFIG_ACPI_NUMA
 	if (!numa_off && !acpi_scan_nodes(start_pfn << PAGE_SHIFT,
 					  end_pfn << PAGE_SHIFT))
- 		return;
-#endif
-
-#ifdef CONFIG_NUMA_EMU
-   /* fake a numa node for non-numa hardware */
-	if (numa_fake && !numa_emulation(start_pfn, end_pfn))
- 		return;
+		return;
 #endif
 
 	printk(KERN_INFO "%s\n",
@@ -200,7 +201,7 @@ void __init numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
 	printk(KERN_INFO "Faking a node at %016lx-%016lx\n", 
 	       start_pfn << PAGE_SHIFT,
 	       end_pfn << PAGE_SHIFT); 
-		/* setup dummy node covering all memory */ 
+	/* setup dummy node covering all memory */ 
 	memnode_shift = 63; 
 	memnodemap[0] = 0;
 	nodes_clear(node_online_map);
@@ -222,20 +223,25 @@ void __cpuinit numa_set_node(int cpu, int node)
 }
 
 /* [numa=off] */
-__init int numa_setup(char *opt) 
+static __init int numa_setup(char *opt) 
 { 
 	if (!strncmp(opt,"off",3))
 		numa_off = 1;
+	if (!strncmp(opt,"on",2))
+		numa_off = 0;
 #ifdef CONFIG_NUMA_EMU
 	if(!strncmp(opt, "fake=", 5)) {
+		numa_off = 0;
 		numa_fake = simple_strtoul(opt+5,NULL,0); ;
 		if (numa_fake >= MAX_NUMNODES)
 			numa_fake = MAX_NUMNODES;
 	}
 #endif
 #ifdef CONFIG_ACPI_NUMA
- 	if (!strncmp(opt,"noacpi",6))
- 		acpi_numa = -1;
+	if (!strncmp(opt,"noacpi",6)) {
+		numa_off = 0;
+		acpi_numa = -1;
+	}
 #endif
 	return 1;
 } 

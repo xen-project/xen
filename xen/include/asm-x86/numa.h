@@ -1,10 +1,17 @@
 #ifndef _ASM_X8664_NUMA_H 
 #define _ASM_X8664_NUMA_H 1
 
-#include <xen/nodemask.h>
-#include <xen/topology.h>
-#include <asm/numnodes.h>
-#include <asm/smp.h>
+#include <xen/cpumask.h>
+
+#define NODES_SHIFT 6
+
+extern unsigned char cpu_to_node[];
+extern cpumask_t     node_to_cpumask[];
+
+#define cpu_to_node(cpu)		(cpu_to_node[cpu])
+#define parent_node(node)		(node)
+#define node_to_first_cpu(node)  (__ffs(node_to_cpumask[node]))
+#define node_to_cpumask(node)    (node_to_cpumask[node])
 
 struct node { 
 	u64 start,end; 
@@ -36,6 +43,12 @@ static inline void clear_node_cpumask(int cpu)
 /* Simple perfect hash to map physical addresses to node numbers */
 extern int memnode_shift; 
 extern u8  memnodemap[NODEMAPSIZE]; 
+
+struct node_data {
+    unsigned long node_start_pfn;
+    unsigned long node_spanned_pages;
+    unsigned int  node_id;
+};
 
 extern struct node_data node_data[];
 

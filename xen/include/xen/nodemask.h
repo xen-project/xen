@@ -72,10 +72,6 @@
  *    way we do the other calls.
  */
 
-#if 0
-#include <linux/threads.h>
-#include <asm/bug.h>
-#endif
 #include <xen/kernel.h>
 #include <xen/bitmap.h>
 #include <xen/numa.h>

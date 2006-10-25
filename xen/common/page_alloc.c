@@ -34,9 +34,9 @@
 #include <xen/domain_page.h>
 #include <xen/keyhandler.h>
 #include <xen/perfc.h>
+#include <xen/numa.h>
+#include <xen/nodemask.h>
 #include <asm/page.h>
-#include <asm/numa.h>
-#include <asm/topology.h>
 
 /*
  * Comma-separated list of hexadecimal page numbers containing bad bytes.
@@ -702,9 +702,7 @@ inline struct page_info *alloc_domheap_pages(
     struct domain *d, unsigned int order, unsigned int flags)
 {
     return __alloc_domheap_pages(d, smp_processor_id(), order, flags);
-
 }
-
 
 void free_domheap_pages(struct page_info *pg, unsigned int order)
 {

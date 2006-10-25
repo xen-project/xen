@@ -11,22 +11,12 @@
  * Adapted for Xen: Ryan Harper <ryanh@us.ibm.com>
  */
 
-#if 0
-#include <linux/kernel.h>
-#include <linux/module.h>
-#include <asm/proto.h>
-#include <xen/bitmap.h>
-#include <xen/numa.h>
-#include <xen/topology.h>
-#include <asm/e820.h>
-#endif
 #include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/inttypes.h>
 #include <xen/nodemask.h>
 #include <xen/acpi.h>
-
-#include <asm/numa.h>
+#include <xen/numa.h>
 #include <asm/page.h>
 
 static struct acpi_table_slit *acpi_slit;

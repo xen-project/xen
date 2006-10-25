@@ -44,7 +44,6 @@
 #include <xen/softirq.h>
 #include <xen/serial.h>
 #include <xen/numa.h>
-#include <asm/numa.h>
 #include <asm/current.h>
 #include <asm/mc146818rtc.h>
 #include <asm/desc.h>

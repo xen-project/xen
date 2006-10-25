@@ -159,6 +159,7 @@ static inline void acpi_noirq_set(void) { acpi_noirq = 1; }
 static inline int acpi_irq_balance_set(char *str) { return 0; }
 extern int acpi_scan_nodes(u64 start, u64 end);
 extern int acpi_numa;
+#define NR_NODE_MEMBLKS (MAX_NUMNODES*2)
 
 #ifdef CONFIG_ACPI_SLEEP
 
