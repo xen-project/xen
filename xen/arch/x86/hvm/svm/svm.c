@@ -922,6 +922,7 @@ static void svm_relinquish_guest_resources(struct domain *d)
 
     kill_timer(&d->arch.hvm_domain.pl_time.periodic_tm.timer);
     rtc_deinit(d);
+    pmtimer_deinit(d);
 
     if ( d->arch.hvm_domain.shared_page_va )
         unmap_domain_page_global(
@@ -937,6 +938,7 @@ static void svm_migrate_timers(struct vcpu *v)
     struct periodic_time *pt = 
         &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
     struct RTCState *vrtc = &v->domain->arch.hvm_domain.pl_time.vrtc;
+    struct PMTState *vpmt = &v->domain->arch.hvm_domain.pl_time.vpmt;
 
     if ( pt->enabled )
     {
@@ -947,6 +949,7 @@ static void svm_migrate_timers(struct vcpu *v)
         migrate_timer(&VLAPIC(v)->vlapic_timer, v->processor);
     migrate_timer(&vrtc->second_timer, v->processor);
     migrate_timer(&vrtc->second_timer2, v->processor);
+    migrate_timer(&vpmt->timer, v->processor);
 }
 
 

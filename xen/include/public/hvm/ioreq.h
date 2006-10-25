@@ -86,6 +86,10 @@ struct buffered_iopage {
 };            /* sizeof this structure must be in one page */
 typedef struct buffered_iopage buffered_iopage_t;
 
+#define ACPI_PM1A_EVT_BLK_ADDRESS           0x000000000000c010
+#define ACPI_PM1A_CNT_BLK_ADDRESS           (ACPI_PM1A_EVT_BLK_ADDRESS + 0x04)
+#define ACPI_PM_TMR_BLK_ADDRESS             (ACPI_PM1A_EVT_BLK_ADDRESS + 0x08)
+
 #endif /* _IOREQ_H_ */
 
 /*

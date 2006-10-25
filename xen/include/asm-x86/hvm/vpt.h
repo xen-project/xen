@@ -1,5 +1,5 @@
 /*
- * vpit.h: Virtual PIT definitions
+ * vpt.h: Virtual Platform Timer definitions
  *
  * Copyright (c) 2004, Intel Corporation.
  *
@@ -17,8 +17,8 @@
  * Place - Suite 330, Boston, MA 02111-1307 USA.
  */
 
-#ifndef __ASM_X86_HVM_VPIT_H__
-#define __ASM_X86_HVM_VPIT_H__
+#ifndef __ASM_X86_HVM_VPT_H__
+#define __ASM_X86_HVM_VPT_H__
 
 #include <xen/config.h>
 #include <xen/init.h>
@@ -70,7 +70,17 @@ typedef struct RTCState {
     struct vcpu      *vcpu;
     struct periodic_time *pt;
 } RTCState;
-   
+
+#define FREQUENCE_PMTIMER  3579545
+typedef struct PMTState {
+    uint32_t pm1_timer;
+    uint32_t pm1_status;
+    uint64_t last_gtime;
+    struct timer timer;
+    uint64_t scale;
+    struct vcpu *vcpu;
+} PMTState;
+
 /*
  * Abstract layer of periodic time, one short time.
  */
@@ -95,7 +105,7 @@ struct pl_time {    /* platform time */
     struct periodic_time periodic_tm;
     struct PITState      vpit;
     struct RTCState      vrtc;
-    /* TODO: ACPI time */
+    struct PMTState      vpmt;
 };
 
 static __inline__ s_time_t get_scheduled(
@@ -132,8 +142,10 @@ extern void destroy_periodic_time(struct periodic_time *pt);
 void pit_init(struct vcpu *v, unsigned long cpu_khz);
 void rtc_init(struct vcpu *v, int base, int irq);
 void rtc_deinit(struct domain *d);
+void pmtimer_init(struct vcpu *v, int base);
+void pmtimer_deinit(struct domain *d);
 int is_rtc_periodic_irq(void *opaque);
 void pt_timer_fn(void *data);
 void pit_time_fired(struct vcpu *v, void *priv);
 
-#endif /* __ASM_X86_HVM_VPIT_H__ */
+#endif /* __ASM_X86_HVM_VPT_H__ */

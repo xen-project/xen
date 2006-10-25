@@ -35,7 +35,7 @@
 #include <asm/shadow.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
-#include <asm/hvm/vpit.h>
+#include <asm/hvm/vpt.h>
 #include <asm/hvm/vpic.h>
 #include <asm/hvm/vlapic.h>
 

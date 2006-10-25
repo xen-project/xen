@@ -23,7 +23,7 @@
 #define __ASM_X86_HVM_DOMAIN_H__
 
 #include <asm/hvm/vpic.h>
-#include <asm/hvm/vpit.h>
+#include <asm/hvm/vpt.h>
 #include <asm/hvm/vlapic.h>
 #include <asm/hvm/vioapic.h>
 #include <public/hvm/params.h>

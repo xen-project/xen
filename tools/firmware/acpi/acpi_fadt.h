@@ -18,6 +18,8 @@
 #ifndef _FADT_H_
 #define _FADT_H_
 
+#include <xen/hvm/ioreq.h>
+
 //
 // FADT Definitions, see ACPI 2.0 specification for details.
 //
@@ -51,7 +53,9 @@
 //
 // Fixed Feature Flags
 // 
-#define ACPI_FIXED_FEATURE_FLAGS (ACPI_PROC_C1|ACPI_SLP_BUTTON|ACPI_WBINVD|ACPI_PWR_BUTTON|ACPI_FIX_RTC)
+#define ACPI_FIXED_FEATURE_FLAGS (ACPI_PROC_C1 | ACPI_SLP_BUTTON | \
+                                  ACPI_WBINVD | ACPI_PWR_BUTTON | \
+                                  ACPI_FIX_RTC | ACPI_TMR_VAL_EXT)
 
 //
 // PM1A Event Register Block Generic Address Information
@@ -59,7 +63,6 @@
 #define ACPI_PM1A_EVT_BLK_ADDRESS_SPACE_ID  ACPI_SYSTEM_IO
 #define ACPI_PM1A_EVT_BLK_BIT_WIDTH         0x20
 #define ACPI_PM1A_EVT_BLK_BIT_OFFSET        0x00
-#define ACPI_PM1A_EVT_BLK_ADDRESS           0x000000000000c010
 
 //
 // PM1B Event Register Block Generic Address Information
@@ -75,7 +78,6 @@
 #define ACPI_PM1A_CNT_BLK_ADDRESS_SPACE_ID  ACPI_SYSTEM_IO
 #define ACPI_PM1A_CNT_BLK_BIT_WIDTH         0x10
 #define ACPI_PM1A_CNT_BLK_BIT_OFFSET        0x00
-#define ACPI_PM1A_CNT_BLK_ADDRESS           (ACPI_PM1A_EVT_BLK_ADDRESS + 0x04)
 
 //
 // PM1B Control Register Block Generic Address Information
@@ -100,7 +102,6 @@
 #define ACPI_PM_TMR_BLK_ADDRESS_SPACE_ID    ACPI_SYSTEM_IO
 #define ACPI_PM_TMR_BLK_BIT_WIDTH           0x20
 #define ACPI_PM_TMR_BLK_BIT_OFFSET          0x00
-#define ACPI_PM_TMR_BLK_ADDRESS             (ACPI_PM1A_EVT_BLK_ADDRESS + 0x08)
 
 //
 // General Purpose Event 0 Register Block Generic Address
