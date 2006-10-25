@@ -1,6 +1,7 @@
 #include <linux/config.h>
 #include <linux/version.h>
 
+#include <linux/mm.h>
 #include <linux/module.h>
 
 #include <xen/platform-compat.h>
@@ -28,4 +29,15 @@ size_t strcspn(const char *s, const char *reject)
         return count;
 }
 EXPORT_SYMBOL(strcspn);
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,10)
+/*
+ * Map a vmalloc()-space virtual address to the physical page frame number.
+ */
+unsigned long vmalloc_to_pfn(void * vmalloc_addr)
+{
+        return page_to_pfn(vmalloc_to_page(vmalloc_addr));
+}
+EXPORT_SYMBOL(vmalloc_to_pfn);
 #endif

@@ -29,4 +29,8 @@
 #define nonseekable_open(inode, filp) /* Nothing to do */
 #endif
 
+#if defined(_LINUX_MM_H) && LINUX_VERSION_CODE < KERNEL_VERSION(2,6,10)
+unsigned long vmalloc_to_pfn(void *addr);
+#endif
+
 #endif
