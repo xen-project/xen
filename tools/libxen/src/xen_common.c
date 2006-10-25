@@ -137,7 +137,7 @@ xen_session_login_with_password(xen_call_func call_func, void *handle,
     session->error_description = NULL;
     session->error_description_count = 0;
 
-    call_raw(session, "Session.login_with_password", params, 2,
+    call_raw(session, "session.login_with_password", params, 2,
              &abstract_type_string, &session->session_id);
 
     return session;
@@ -150,7 +150,7 @@ xen_session_logout(xen_session *session)
     abstract_value params[] =
         {
         };
-    xen_call_(session, "Session.logout", params, 0, NULL, NULL);
+    xen_call_(session, "session.logout", params, 0, NULL, NULL);
 
     if (session->error_description != NULL)
     {
@@ -173,7 +173,7 @@ xen_session_get_this_host(xen_session *session, xen_host *result)
         {
         };
 
-    xen_call_(session, "Session.get_this_host", params, 0,
+    xen_call_(session, "session.get_this_host", params, 0,
               &abstract_type_string, result);
     return session->ok;
 }
