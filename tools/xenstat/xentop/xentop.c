@@ -204,7 +204,7 @@ static void usage(const char *program)
 	       "-V, --version        output version information and exit\n"
 	       "-d, --delay=SECONDS  seconds between updates (default 3)\n"
 	       "-n, --networks       output vif network data\n"
-	       "-b, --vbds           output vbd block device data\n"
+	       "-x, --vbds           output vbd block device data\n"
 	       "-r, --repeat-header  repeat table header before each domain\n"
 	       "-v, --vcpus          output vcpu data\n"
 	       "-b, --batch	     output in batch mode, no user input accepted\n"
@@ -976,7 +976,7 @@ int main(int argc, char **argv)
 		{ "help",          no_argument,       NULL, 'h' },
 		{ "version",       no_argument,       NULL, 'V' },
 		{ "networks",      no_argument,       NULL, 'n' },
- 		{ "vbds",          no_argument,       NULL, 'x' },
+		{ "vbds",          no_argument,       NULL, 'x' },
 		{ "repeat-header", no_argument,       NULL, 'r' },
 		{ "vcpus",         no_argument,       NULL, 'v' },
 		{ "delay",         required_argument, NULL, 'd' },
@@ -1065,7 +1065,7 @@ int main(int argc, char **argv)
 					break;
 			} while (1);
 	}
-	
+
 	/* Cleanup occurs in cleanup(), so no work to do here. */
 
 	return 0;
