@@ -331,7 +331,9 @@ int xenbus_register_driver_common(struct xenbus_driver *drv,
 
 	drv->driver.name = drv->name;
 	drv->driver.bus = &bus->bus;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,10)
 	drv->driver.owner = drv->owner;
+#endif
 
 	mutex_lock(&xenwatch_mutex);
 	ret = driver_register(&drv->driver);
