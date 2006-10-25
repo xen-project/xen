@@ -26,6 +26,12 @@
 #ifdef CONFIG_XEN_SMP
 #define CONFIG_SMP 1
 #define NR_CPUS 64
+#define CONFIG_NUMA
+#define CONFIG_ACPI_NUMA
+#define NODES_SHIFT 3
+#define MAX_NUMNODES (1 << NODES_SHIFT)
+#define NR_NODE_MEMBLKS (MAX_NUMNODES*2)
+#define MAX_PXM_DOMAINS 256
 #else
 #undef CONFIG_SMP
 #define NR_CPUS 1

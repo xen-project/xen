@@ -15,6 +15,8 @@ mca.c			-> linux/arch/ia64/kernel/mca.c
 mca_asm.S		-> linux/arch/ia64/kernel/mca_asm.S
 minstate.h		-> linux/arch/ia64/kernel/minstate.h
 mm_contig.c		-> linux/arch/ia64/mm/contig.c
+mm_numa.c		-> linux/arch/ia64/mm/numa.c
+numa.c			-> linux/arch/ia64/kernel/numa.c
 pal.S			-> linux/arch/ia64/kernel/pal.S
 process-linux-xen.c	-> linux/arch/ia64/kernel/process.c
 sal.c			-> linux/arch/ia64/kernel/sal.c

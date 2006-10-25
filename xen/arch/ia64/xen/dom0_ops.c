@@ -22,8 +22,10 @@
 #include <asm/dom_fw.h>
 #include <xen/iocap.h>
 #include <xen/errno.h>
+#include <xen/nodemask.h>
 
 void build_physmap_table(struct domain *d);
+#define get_xen_guest_handle(val, hnd)  do { val = (hnd).p; } while (0)
 
 extern unsigned long total_pages;
 
@@ -179,17 +181,26 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     return ret;
 }
 
+/*
+ * Temporarily disable the NUMA PHYSINFO code until the rest of the
+ * changes are upstream.
+ */
+#undef IA64_NUMA_PHYSINFO
+
 long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 {
     long ret = 0;
-
-    if ( !IS_PRIV(current->domain) )
-        return -EPERM;
 
     switch ( op->cmd )
     {
     case XEN_SYSCTL_physinfo:
     {
+#ifdef IA64_NUMA_PHYSINFO
+        int i;
+        node_data_t *chunks;
+        u64 *map, cpu_to_node_map[MAX_NUMNODES];
+#endif
+
         xen_sysctl_physinfo_t *pi = &op->u.physinfo;
 
         pi->threads_per_core =
@@ -198,13 +209,70 @@ long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
             cpus_weight(cpu_core_map[0]) / pi->threads_per_core;
         pi->sockets_per_node = 
             num_online_cpus() / cpus_weight(cpu_core_map[0]);
-        pi->nr_nodes         = 1;
+#ifndef IA64_NUMA_PHYSINFO
+        pi->nr_nodes         = 1; 
+#endif
         pi->total_pages      = total_pages; 
         pi->free_pages       = avail_domheap_pages();
         pi->cpu_khz          = local_cpu_data->proc_freq / 1000;
         memset(pi->hw_cap, 0, sizeof(pi->hw_cap));
         //memcpy(pi->hw_cap, boot_cpu_data.x86_capability, NCAPINTS*4);
         ret = 0;
+
+#ifdef IA64_NUMA_PHYSINFO
+        /* fetch memory_chunk pointer from guest */
+        get_xen_guest_handle(chunks, pi->memory_chunks);
+
+        printk("chunks=%p, num_node_memblks=%u\n", chunks, num_node_memblks);
+        /* if it is set, fill out memory chunk array */
+        if (chunks != NULL) {
+            if (num_node_memblks == 0) {
+                /* Non-NUMA machine.  Put pseudo-values.  */
+                node_data_t data;
+                data.node_start_pfn = 0;
+                data.node_spanned_pages = total_pages;
+                data.node_id = 0;
+                /* copy memory chunk structs to guest */
+                if (copy_to_guest_offset(pi->memory_chunks, 0, &data, 1)) {
+                    ret = -EFAULT;
+                    break;
+                }
+            } else {
+                for (i = 0; i < num_node_memblks && i < PUBLIC_MAXCHUNKS; i++) {
+                    node_data_t data;
+                    data.node_start_pfn = node_memblk[i].start_paddr >>
+                                          PAGE_SHIFT;
+                    data.node_spanned_pages = node_memblk[i].size >> PAGE_SHIFT;
+                    data.node_id = node_memblk[i].nid;
+                    /* copy memory chunk structs to guest */
+                    if (copy_to_guest_offset(pi->memory_chunks, i, &data, 1)) {
+                        ret = -EFAULT;
+                        break;
+                    }
+                }
+            }
+        }
+        /* set number of notes */
+        pi->nr_nodes = num_online_nodes();
+
+        /* fetch cpu_to_node pointer from guest */
+        get_xen_guest_handle(map, pi->cpu_to_node);
+
+        /* if set, fill out cpu_to_node array */
+        if (map != NULL) {
+            /* copy cpu to node mapping to domU */
+            memset(cpu_to_node_map, 0, sizeof(cpu_to_node_map));
+            for (i = 0; i < num_online_cpus(); i++) {
+                cpu_to_node_map[i] = cpu_to_node(i);
+                if (copy_to_guest_offset(pi->cpu_to_node, i,
+                                         &(cpu_to_node_map[i]), 1)) {
+                    ret = -EFAULT;
+                    break;
+                }
+            }
+        }
+#endif
+
         if ( copy_to_guest(u_sysctl, op, 1) )
             ret = -EFAULT;
     }

@@ -53,6 +53,7 @@
 #include <asm/hw_irq.h>
 #ifdef XEN
 #include <xen/errno.h>
+#include <xen/nodemask.h>
 #endif
 
 #define BAD_MADT_ENTRY(entry, end) (                                        \
@@ -457,6 +458,7 @@ acpi_numa_memory_affinity_init (struct acpi_table_memory_affinity *ma)
 	num_node_memblks++;
 }
 
+static unsigned int numnodes;
 void __init
 acpi_numa_arch_fixup (void)
 {

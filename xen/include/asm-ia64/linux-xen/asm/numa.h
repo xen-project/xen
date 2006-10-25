@@ -18,7 +18,9 @@
 #include <linux/cache.h>
 #include <linux/cpumask.h>
 #include <linux/numa.h>
+#ifndef XEN /* dependency loop when this is included */
 #include <linux/smp.h>
+#endif
 #include <linux/threads.h>
 
 #include <asm/mmzone.h>
@@ -70,5 +72,9 @@ extern int paddr_to_nid(unsigned long paddr);
 #define paddr_to_nid(addr)	0
 
 #endif /* CONFIG_NUMA */
+
+#ifdef XEN
+#define phys_to_nid(paddr) paddr_to_nid(paddr)
+#endif
 
 #endif /* _ASM_IA64_NUMA_H */

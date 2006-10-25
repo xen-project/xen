@@ -78,6 +78,12 @@ xencomm_privcmd_dom0_op(privcmd_hypercall_t *hypercall)
 	return ret;
 }
 
+/*
+ * Temporarily disable the NUMA PHYSINFO code until the rest of the
+ * changes are upstream.
+ */
+#undef IA64_NUMA_PHYSINFO
+
 static int
 xencomm_privcmd_sysctl(privcmd_hypercall_t *hypercall)
 {
@@ -108,7 +114,9 @@ xencomm_privcmd_sysctl(privcmd_hypercall_t *hypercall)
 		                     (void *)desc);
 		break;
 	case XEN_SYSCTL_tbuf_op:
+#ifndef IA64_NUMA_PHYSINFO
 	case XEN_SYSCTL_physinfo:
+#endif
 	case XEN_SYSCTL_sched_id:
 		break;
 	case XEN_SYSCTL_perfc_op:
@@ -140,6 +148,27 @@ xencomm_privcmd_sysctl(privcmd_hypercall_t *hypercall)
 		set_xen_guest_handle(kern_op.u.getdomaininfolist.buffer,
 				     (void *)desc);
 		break;
+#ifdef IA64_NUMA_PHYSINFO
+	case XEN_SYSCTL_physinfo:
+		ret = xencomm_create(
+			xen_guest_handle(kern_op.u.physinfo.memory_chunks),
+			PUBLIC_MAXCHUNKS * sizeof(node_data_t),
+			&desc, GFP_KERNEL);
+		if (ret)
+			return ret;
+		set_xen_guest_handle(kern_op.u.physinfo.memory_chunks,
+		                     (void *)desc);
+
+		ret = xencomm_create(
+			xen_guest_handle(kern_op.u.physinfo.cpu_to_node),
+			PUBLIC_MAX_NUMNODES * sizeof(u64),
+			&desc1, GFP_KERNEL);
+		if (ret)
+			xencomm_free(desc);
+		set_xen_guest_handle(kern_op.u.physinfo.cpu_to_node,
+		                     (void *)desc1);
+		break;
+#endif
 	default:
 		printk("%s: unknown sysctl cmd %d\n", __func__, kern_op.cmd);
 		return -ENOSYS;
@@ -152,7 +181,7 @@ xencomm_privcmd_sysctl(privcmd_hypercall_t *hypercall)
 
 	ret = xencomm_arch_hypercall_sysctl(op_desc);
 
-	/* FIXME: should we restore the handle?  */
+	/* FIXME: should we restore the handles?  */
 	if (copy_to_user(user_op, &kern_op, sizeof(xen_sysctl_t)))
 		ret = -EFAULT;
 

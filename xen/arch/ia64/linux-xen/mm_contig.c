@@ -308,4 +308,4 @@ paging_init (void)
 #endif /* !CONFIG_VIRTUAL_MEM_MAP */
 	zero_page_memmap_ptr = virt_to_page(ia64_imva(empty_zero_page));
 }
-#endif
+#endif /* XEN */
