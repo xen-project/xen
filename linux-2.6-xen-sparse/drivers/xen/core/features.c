@@ -11,6 +11,10 @@
 #include <asm/hypervisor.h>
 #include <xen/features.h>
 
+#ifdef HAVE_XEN_PLATFORM_COMPAT_H
+#include <xen/platform-compat.h>
+#endif
+
 u8 xen_features[XENFEAT_NR_SUBMAPS * 32] __read_mostly;
 /* Not a GPL symbol: used in ubiquitous macros, so too restrictive. */
 EXPORT_SYMBOL(xen_features);

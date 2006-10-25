@@ -26,6 +26,10 @@
 #include <asm/hypervisor.h>
 #include "platform-pci.h"
 
+#ifdef HAVE_XEN_PLATFORM_COMPAT_H
+#include <xen/platform-compat.h>
+#endif
+
 void xen_machphys_update(unsigned long mfn, unsigned long pfn)
 {
 	BUG();

@@ -4,4 +4,4 @@ obj-m := xen-platform-pci.o
 
 EXTRA_CFLAGS += -I$(M)/platform-pci
 
-xen-platform-pci-objs := evtchn.o platform-pci.o gnttab.o xen_support.o features.o
+xen-platform-pci-objs := evtchn.o platform-pci.o gnttab.o xen_support.o features.o platform-compat.o

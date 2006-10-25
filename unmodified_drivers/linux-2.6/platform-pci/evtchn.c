@@ -36,6 +36,10 @@
 #include <xen/features.h>
 #include "platform-pci.h"
 
+#ifdef HAVE_XEN_PLATFORM_COMPAT_H
+#include <xen/platform-compat.h>
+#endif
+
 void *shared_info_area;
 
 #define MAX_EVTCHN 256

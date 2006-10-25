@@ -58,6 +58,10 @@
 #include "xenbus_comms.h"
 #include "xenbus_probe.h"
 
+#ifdef HAVE_XEN_PLATFORM_COMPAT_H
+#include <xen/platform-compat.h>
+#endif
+
 int xen_store_evtchn;
 struct xenstore_domain_interface *xen_store_interface;
 static unsigned long xen_store_mfn;
