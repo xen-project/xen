@@ -33,4 +33,8 @@
 unsigned long vmalloc_to_pfn(void *addr);
 #endif
 
+#if defined(__LINUX_COMPLETION_H) && LINUX_VERSION_CODE < KERNEL_VERSION(2,6,11)
+unsigned long wait_for_completion_timeout(struct completion *x, unsigned long timeout);
+#endif
+
 #endif
