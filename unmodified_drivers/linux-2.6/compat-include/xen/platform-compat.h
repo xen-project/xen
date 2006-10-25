@@ -45,4 +45,8 @@ signed long schedule_timeout_interruptible(signed long timeout);
 void *kzalloc(size_t size, int flags);
 #endif
 
+#if defined(_LINUX_BLKDEV_H) && LINUX_VERSION_CODE < KERNEL_VERSION(2,6,16)
+#define end_that_request_last(req, uptodate) end_that_request_last(req)
+#endif
+
 #endif
