@@ -392,16 +392,24 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 	for (i = 0; i < nseg; i++) {
 		if (unlikely(map[i].status != 0)) {
 			DPRINTK("invalid buffer -- could not remap it\n");
-			goto fail_flush;
+			map[i].handle = BLKBACK_INVALID_HANDLE;
+			ret |= 1;
 		}
 
 		pending_handle(pending_req, i) = map[i].handle;
+
+		if (ret)
+			continue;
+
 		set_phys_to_machine(__pa(vaddr(
 			pending_req, i)) >> PAGE_SHIFT,
 			FOREIGN_FRAME(map[i].dev_bus_addr >> PAGE_SHIFT));
 		seg[i].buf  = map[i].dev_bus_addr | 
 			(req->seg[i].first_sect << 9);
 	}
+
+	if (ret)
+		goto fail_flush;
 
 	if (vbd_translate(&preq, blkif, operation) != 0) {
 		DPRINTK("access denied: %s of [%llu,%llu] on dev=%04x\n", 
