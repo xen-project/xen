@@ -171,9 +171,11 @@ static struct xen_bus_type xenbus_frontend = {
 	.bus = {
 		.name     = "xen",
 		.match    = xenbus_match,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,16)
 		.probe    = xenbus_dev_probe,
 		.remove   = xenbus_dev_remove,
 		.shutdown = xenbus_dev_shutdown,
+#endif
 	},
 	.dev = {
 		.bus_id = "xen",
@@ -333,6 +335,11 @@ int xenbus_register_driver_common(struct xenbus_driver *drv,
 	drv->driver.bus = &bus->bus;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,10)
 	drv->driver.owner = drv->owner;
+#endif
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,16)
+	drv->driver.probe = xenbus_dev_probe;
+	drv->driver.remove = xenbus_dev_remove;
+	drv->driver.shutdown = xenbus_dev_shutdown;
 #endif
 
 	mutex_lock(&xenwatch_mutex);
