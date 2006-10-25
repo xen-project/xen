@@ -4,6 +4,7 @@
 #include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/sched.h>
+#include <linux/slab.h>
 
 #include <xen/platform-compat.h>
 
@@ -96,4 +97,20 @@ signed long schedule_timeout_interruptible(signed long timeout)
 	return schedule_timeout(timeout);
 }
 EXPORT_SYMBOL(schedule_timeout_interruptible);
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,14)
+/**
+ * kzalloc - allocate memory. The memory is set to zero.
+ * @size: how many bytes of memory are required.
+ * @flags: the type of memory to allocate.
+ */
+void *kzalloc(size_t size, int flags)
+{
+	void *ret = kmalloc(size, flags);
+	if (ret)
+		memset(ret, 0, size);
+	return ret;
+}
+EXPORT_SYMBOL(kzalloc);
 #endif

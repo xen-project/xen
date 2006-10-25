@@ -41,4 +41,8 @@ unsigned long wait_for_completion_timeout(struct completion *x, unsigned long ti
 signed long schedule_timeout_interruptible(signed long timeout);
 #endif
 
+#if defined(_LINUX_SLAB_H) && LINUX_VERSION_CODE < KERNEL_VERSION(2,6,14)
+void *kzalloc(size_t size, int flags);
+#endif
+
 #endif
