@@ -471,7 +471,7 @@ class IA64_HVM_ImageHandler(HVMImageHandler):
     def getRequiredAvailableMemory(self, mem_kb):
         page_kb = 16
         # ROM size for guest firmware, ioreq page and xenstore page
-        extra_pages = 1024 + 2
+        extra_pages = 1024 + 3
         return mem_kb + extra_pages * page_kb
 
     def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
