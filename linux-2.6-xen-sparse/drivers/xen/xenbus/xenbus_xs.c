@@ -42,8 +42,14 @@
 #include <linux/fcntl.h>
 #include <linux/kthread.h>
 #include <linux/rwsem.h>
+#include <linux/module.h>
+#include <linux/mutex.h>
 #include <xen/xenbus.h>
 #include "xenbus_comms.h"
+
+#ifdef HAVE_XEN_PLATFORM_COMPAT_H
+#include <xen/platform-compat.h>
+#endif
 
 /* xenbus_probe.c */
 extern char *kasprintf(const char *fmt, ...);

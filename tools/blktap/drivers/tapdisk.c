@@ -79,31 +79,17 @@ static void unmap_disk(struct td_state *s)
 {
 	tapdev_info_t *info = s->ring_info;
 	struct tap_disk *drv = s->drv;
-	fd_list_entry_t *ptr, *prev;
+	fd_list_entry_t *entry;
 
 	drv->td_close(s);
 
 	if (info != NULL && info->mem > 0)
 	        munmap(info->mem, getpagesize() * BLKTAP_MMAP_REGION_SIZE);
 
-	ptr = s->fd_entry;
-	prev = ptr->prev;
-
-	if (prev) {
-		/*There are entries earlier in the list*/
-		prev->next = ptr->next;
-		if (ptr->next) {
-			ptr = ptr->next;
-			ptr->prev = prev;
-		}
-	} else {
-		/*We are the first entry in list*/
-		if (ptr->next) {
-			ptr = ptr->next;
-			fd_start = ptr;
-			ptr->prev = NULL;
-		} else fd_start = NULL;
-	}
+	entry = s->fd_entry;
+	*entry->pprev = entry->next;
+	if (entry->next)
+		entry->next->pprev = entry->pprev;
 
 	close(info->fd);
 
@@ -144,35 +130,29 @@ static inline int LOCAL_FD_SET(fd_set *readfds)
 	return 0;
 }
 
-static inline fd_list_entry_t *add_fd_entry(int tap_fd, int io_fd[MAX_IOFD], struct td_state *s)
+static inline fd_list_entry_t *add_fd_entry(
+	int tap_fd, int io_fd[MAX_IOFD], struct td_state *s)
 {
-	fd_list_entry_t *ptr, *last, *entry;
+	fd_list_entry_t **pprev, *entry;
 	int i;
+
 	DPRINTF("Adding fd_list_entry\n");
 
 	/*Add to linked list*/
 	s->fd_entry = entry = malloc(sizeof(fd_list_entry_t));
 	entry->tap_fd = tap_fd;
-	for (i = 0; i < MAX_IOFD; i++) entry->io_fd[i] = io_fd[i];
+	for (i = 0; i < MAX_IOFD; i++)
+		entry->io_fd[i] = io_fd[i];
 	entry->s = s;
 	entry->next = NULL;
 
-	ptr = fd_start;
-	if (ptr == NULL) {
-		/*We are the first entry*/
-		fd_start = entry;
-		entry->prev = NULL;
-		goto finish;
-	}
+	pprev = &fd_start;
+	while (*pprev != NULL)
+		pprev = &(*pprev)->next;
 
-	while (ptr != NULL) {
-		last = ptr;
-		ptr = ptr->next;
-	}
-	last->next = entry;
-	entry->prev = last;
+	*pprev = entry;
+	entry->pprev = pprev;
 
- finish:
 	return entry;
 }
 

@@ -43,6 +43,7 @@
 #include <xen/delay.h>
 #include <xen/softirq.h>
 #include <xen/serial.h>
+#include <xen/numa.h>
 #include <asm/current.h>
 #include <asm/mc146818rtc.h>
 #include <asm/desc.h>
@@ -628,7 +629,7 @@ u8 cpu_2_logical_apicid[NR_CPUS] __read_mostly = { [0 ... NR_CPUS-1] = BAD_APICI
 static void map_cpu_to_logical_apicid(void)
 {
 	int cpu = smp_processor_id();
-	int apicid = logical_smp_processor_id();
+	int apicid = hard_smp_processor_id();
 
 	cpu_2_logical_apicid[cpu] = apicid;
 	map_cpu_to_node(cpu, apicid_to_node(apicid));

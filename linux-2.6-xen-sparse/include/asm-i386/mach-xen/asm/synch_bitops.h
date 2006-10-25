@@ -9,6 +9,10 @@
 
 #include <linux/config.h>
 
+#ifdef HAVE_XEN_PLATFORM_COMPAT_H
+#include <xen/platform-compat.h>
+#endif
+
 #define ADDR (*(volatile long *) addr)
 
 static __inline__ void synch_set_bit(int nr, volatile void * addr)

@@ -24,6 +24,8 @@
 #include <asm/hvm/vioapic.h>
 struct mmio_list;
 typedef struct virtual_platform_def {
+    unsigned long          buffered_io_va;
+    spinlock_t             buffered_io_lock;
     unsigned long       shared_page_va;
     unsigned long       pib_base;
     unsigned char       xtp;

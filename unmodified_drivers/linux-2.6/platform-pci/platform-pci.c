@@ -33,6 +33,7 @@
 #include <asm/irq.h>
 #include <asm/uaccess.h>
 #include <asm/hypervisor.h>
+#include <asm/pgtable.h>
 #include <xen/interface/memory.h>
 #include <xen/features.h>
 #ifdef __ia64__
@@ -40,6 +41,10 @@
 #endif
 
 #include "platform-pci.h"
+
+#ifdef HAVE_XEN_PLATFORM_COMPAT_H
+#include <xen/platform-compat.h>
+#endif
 
 #define DRV_NAME    "xen-platform-pci"
 #define DRV_VERSION "0.10"

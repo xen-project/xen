@@ -23,7 +23,7 @@
  */
 
 #include <asm/mc146818rtc.h>
-#include <asm/hvm/vpit.h>
+#include <asm/hvm/vpt.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/support.h>
 #include <asm/current.h>

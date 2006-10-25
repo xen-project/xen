@@ -6,6 +6,7 @@
 
 #include <inttypes.h>
 #include "xc_private.h"
+#include "xg_private.h"
 
 int lock_pages(void *addr, size_t len)
 {
@@ -33,23 +34,6 @@ int xc_get_pfn_type_batch(int xc_handle,
     domctl.u.getpageframeinfo2.num    = num;
     set_xen_guest_handle(domctl.u.getpageframeinfo2.array, arr);
     return do_domctl(xc_handle, &domctl);
-}
-
-#define GETPFN_ERR (~0U)
-unsigned int get_pfn_type(int xc_handle,
-                          unsigned long mfn,
-                          uint32_t dom)
-{
-    DECLARE_DOMCTL;
-    domctl.cmd = XEN_DOMCTL_getpageframeinfo;
-    domctl.u.getpageframeinfo.gmfn   = mfn;
-    domctl.domain = (domid_t)dom;
-    if ( do_domctl(xc_handle, &domctl) < 0 )
-    {
-        PERROR("Unexpected failure when getting page frame info!");
-        return GETPFN_ERR;
-    }
-    return domctl.u.getpageframeinfo.type;
 }
 
 int xc_mmuext_op(

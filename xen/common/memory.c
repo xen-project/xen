@@ -41,6 +41,8 @@ increase_reservation(
     struct page_info *page;
     unsigned long i;
     xen_pfn_t mfn;
+    /* use domain's first processor for locality parameter */
+    unsigned int cpu = d->vcpu[0]->processor;
 
     if ( !guest_handle_is_null(extent_list) &&
          !guest_handle_okay(extent_list, nr_extents) )
@@ -58,8 +60,8 @@ increase_reservation(
             return i;
         }
 
-        if ( unlikely((page = alloc_domheap_pages(
-            d, extent_order, memflags)) == NULL) )
+        if ( unlikely((page = __alloc_domheap_pages( d, cpu, 
+            extent_order, memflags )) == NULL) ) 
         {
             DPRINTK("Could not allocate order=%d extent: "
                     "id=%d memflags=%x (%ld of %d)\n",
@@ -92,6 +94,8 @@ populate_physmap(
     unsigned long i, j;
     xen_pfn_t gpfn;
     xen_pfn_t mfn;
+    /* use domain's first processor for locality parameter */
+    unsigned int cpu = d->vcpu[0]->processor;
 
     if ( !guest_handle_okay(extent_list, nr_extents) )
         return 0;
@@ -111,8 +115,8 @@ populate_physmap(
         if ( unlikely(__copy_from_guest_offset(&gpfn, extent_list, i, 1)) )
             goto out;
 
-        if ( unlikely((page = alloc_domheap_pages(
-            d, extent_order, memflags)) == NULL) )
+        if ( unlikely((page = __alloc_domheap_pages( d, cpu, 
+            extent_order, memflags )) == NULL) ) 
         {
             DPRINTK("Could not allocate order=%d extent: "
                     "id=%d memflags=%x (%ld of %d)\n",
@@ -294,7 +298,7 @@ memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
     unsigned long in_chunk_order, out_chunk_order;
     xen_pfn_t     gpfn, gmfn, mfn;
     unsigned long i, j, k;
-    unsigned int  memflags = 0;
+    unsigned int  memflags = 0, cpu;
     long          rc = 0;
     struct domain *d;
     struct page_info *page;
@@ -368,6 +372,9 @@ memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
     }
     d = current->domain;
 
+    /* use domain's first processor for locality parameter */
+    cpu = d->vcpu[0]->processor;
+
     for ( i = 0; i < (exch.in.nr_extents >> in_chunk_order); i++ )
     {
         if ( hypercall_preempt_check() )
@@ -413,8 +420,8 @@ memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
         /* Allocate a chunk's worth of anonymous output pages. */
         for ( j = 0; j < (1UL << out_chunk_order); j++ )
         {
-            page = alloc_domheap_pages(
-                NULL, exch.out.extent_order, memflags);
+            page = __alloc_domheap_pages( NULL, cpu, 
+                  exch.out.extent_order, memflags);
             if ( unlikely(page == NULL) )
             {
                 rc = -ENOMEM;

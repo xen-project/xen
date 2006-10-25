@@ -124,6 +124,7 @@ _uname_to_arch_map = {
     "i486"  : "x86",
     "i586"  : "x86",
     "i686"  : "x86",
+    "x86_64": "x86_64",
     "ia64"  : "ia64",
     "ppc"   : "powerpc",
     "ppc64" : "powerpc",
@@ -131,7 +132,7 @@ _uname_to_arch_map = {
 
 # Lookup current platform.
 _arch = _uname_to_arch_map.get(os.uname()[4], "Unknown")
-if _arch == "x86" or _arch == "ia64":
+if _arch == "x86" or _arch == "x86_64" or _arch == "ia64":
     minSafeMem = ia_minSafeMem
     getDefaultKernel = ia_getDefaultKernel
     checkBuffer = ia_checkBuffer

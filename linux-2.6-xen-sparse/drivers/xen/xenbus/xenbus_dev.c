@@ -40,6 +40,7 @@
 #include <linux/wait.h>
 #include <linux/fs.h>
 #include <linux/poll.h>
+#include <linux/mutex.h>
 
 #include "xenbus_comms.h"
 
@@ -48,6 +49,10 @@
 #include <xen/xenbus.h>
 #include <xen/xen_proc.h>
 #include <asm/hypervisor.h>
+
+#ifdef HAVE_XEN_PLATFORM_COMPAT_H
+#include <xen/platform-compat.h>
+#endif
 
 struct xenbus_dev_transaction {
 	struct list_head list;

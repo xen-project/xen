@@ -36,6 +36,10 @@
 #include <linux/blkdev.h>
 #include <linux/list.h>
 
+#ifdef HAVE_XEN_PLATFORM_COMPAT_H
+#include <xen/platform-compat.h>
+#endif
+
 #define BLKIF_MAJOR(dev) ((dev)>>8)
 #define BLKIF_MINOR(dev) ((dev) & 0xff)
 
@@ -91,7 +95,9 @@ static struct block_device_operations xlvbd_block_fops =
 	.open = blkif_open,
 	.release = blkif_release,
 	.ioctl  = blkif_ioctl,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,16)
 	.getgeo = blkif_getgeo
+#endif
 };
 
 DEFINE_SPINLOCK(blkif_io_lock);
@@ -186,7 +192,11 @@ xlvbd_init_blk_queue(struct gendisk *gd, u16 sector_size)
 	if (rq == NULL)
 		return -1;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,10)
 	elevator_init(rq, "noop");
+#else
+	elevator_init(rq, &elevator_noop);
+#endif
 
 	/* Hard sector size and max sectors impersonate the equiv. hardware. */
 	blk_queue_hardsect_size(rq, sector_size);

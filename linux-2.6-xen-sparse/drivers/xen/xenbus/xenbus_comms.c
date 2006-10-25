@@ -39,6 +39,10 @@
 #include <xen/xenbus.h>
 #include "xenbus_comms.h"
 
+#ifdef HAVE_XEN_PLATFORM_COMPAT_H
+#include <xen/platform-compat.h>
+#endif
+
 static int xenbus_irq;
 
 extern void xenbus_probe(void *);

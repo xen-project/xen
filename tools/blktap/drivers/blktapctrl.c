@@ -204,81 +204,49 @@ static blkif_t *test_path(char *path, char **dev, int *type)
 
 static void add_disktype(blkif_t *blkif, int type)
 {
-	driver_list_entry_t *entry, *ptr, *last;
+	driver_list_entry_t *entry, **pprev;
 
-	if (type > MAX_DISK_TYPES) return;
+	if (type > MAX_DISK_TYPES)
+		return;
 
 	entry = malloc(sizeof(driver_list_entry_t));
 	entry->blkif = blkif;
-	entry->next = NULL;
-	ptr = active_disks[type];
+	entry->next  = NULL;
 
-	if (ptr == NULL) {
-		active_disks[type] = entry;
-		entry->prev = NULL;
-		return;
-	}
+	pprev = &active_disks[type];
+	while (*pprev != NULL)
+		pprev = &(*pprev)->next;
 
-	while (ptr != NULL) {
-		last = ptr;
-		ptr = ptr->next;
-	}
-
-	/*We've found the end of the list*/
-        last->next = entry;
-	entry->prev = last;
-	
-	return;
+	*pprev = entry;
+	entry->pprev = pprev;
 }
 
 static int del_disktype(blkif_t *blkif)
 {
-	driver_list_entry_t *ptr, *cur, *last;
+	driver_list_entry_t *entry, **pprev;
 	int type = blkif->drivertype, count = 0, close = 0;
 
-	if (type > MAX_DISK_TYPES) return 1;
+	if (type > MAX_DISK_TYPES)
+		return 1;
 
-	ptr = active_disks[type];
-	last = NULL;
-	while (ptr != NULL) {
-		count++;
-		if (blkif == ptr->blkif) {
-			cur = ptr;
-			if (ptr->next != NULL) {
-				/*There's more later in the chain*/
-				if (!last) {
-					/*We're first in the list*/
-					active_disks[type] = ptr->next;
-					ptr = ptr->next;
-					ptr->prev = NULL;
-				}
-				else {
-					/*We're sandwiched*/
-					last->next = ptr->next;
-					ptr = ptr->next;
-					ptr->prev = last;
-				}
-				
-			} else if (last) {
-				/*There's more earlier in the chain*/
-				last->next = NULL;
-			} else {
-				/*We're the only entry*/
-				active_disks[type] = NULL;
-				if(dtypes[type]->single_handler == 1) 
-					close = 1;
-			}
-			DPRINTF("DEL_DISKTYPE: Freeing entry\n");
-			free(cur);
-			if (dtypes[type]->single_handler == 0) close = 1;
+	pprev = &active_disks[type];
+	while ((*pprev != NULL) && ((*pprev)->blkif != blkif))
+		pprev = &(*pprev)->next;
 
-			return close;
-		}
-		last = ptr;
-		ptr = ptr->next;
+	if ((entry = *pprev) == NULL) {
+		DPRINTF("DEL_DISKTYPE: No match\n");
+		return 1;
 	}
-	DPRINTF("DEL_DISKTYPE: No match\n");
-	return 1;
+
+	*pprev = entry->next;
+	if (entry->next)
+		entry->next->pprev = pprev;
+
+	DPRINTF("DEL_DISKTYPE: Freeing entry\n");
+	free(entry);
+
+	/* Caller should close() if no single controller, or list is empty. */
+	return (!dtypes[type]->single_handler || (active_disks[type] == NULL));
 }
 
 static int write_msg(int fd, int msgtype, void *ptr, void *ptr2)
@@ -592,8 +560,8 @@ int unmap_blktapctrl(blkif_t *blkif)
 	if (del_disktype(blkif)) {
 		close(blkif->fds[WRITE]);
 		close(blkif->fds[READ]);
-
 	}
+
 	return 0;
 }
 

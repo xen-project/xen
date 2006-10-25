@@ -44,6 +44,10 @@
 #include <asm/io.h>
 #include <xen/interface/memory.h>
 
+#ifdef HAVE_XEN_PLATFORM_COMPAT_H
+#include <xen/platform-compat.h>
+#endif
+
 /* External tools reserve first few grant table entries. */
 #define NR_RESERVED_ENTRIES 8
 

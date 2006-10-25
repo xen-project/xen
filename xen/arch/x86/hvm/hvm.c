@@ -43,7 +43,7 @@
 #include <asm/mc146818rtc.h>
 #include <asm/spinlock.h>
 #include <asm/hvm/hvm.h>
-#include <asm/hvm/vpit.h>
+#include <asm/hvm/vpt.h>
 #include <asm/hvm/support.h>
 #include <public/sched.h>
 #include <public/hvm/ioreq.h>
@@ -285,6 +285,7 @@ void hvm_setup_platform(struct domain* d)
                pt_timer_fn, v, v->processor);
     pit_init(v, cpu_khz);
     rtc_init(v, RTC_PORT(0), RTC_IRQ);
+    pmtimer_init(v, ACPI_PM_TMR_BLK_ADDRESS); 
 }
 
 void pic_irq_request(void *data, int level)

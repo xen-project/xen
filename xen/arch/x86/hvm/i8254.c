@@ -38,7 +38,7 @@
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/support.h>
-#include <asm/hvm/vpit.h>
+#include <asm/hvm/vpt.h>
 #include <asm/current.h>
 
 /* Enable DEBUG_PIT may cause guest calibration inaccuracy */

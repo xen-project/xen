@@ -9,6 +9,7 @@ import os
 import signal
 import sys
 import threading
+import time
 import linecache
 import pwd
 import re
@@ -106,12 +107,14 @@ class Daemon:
         os.close(2)
         if XEND_DEBUG:
             os.open('/dev/null', os.O_RDONLY)
-            os.open(XEND_DEBUG_LOG, os.O_WRONLY|os.O_CREAT)
+            os.open(XEND_DEBUG_LOG, os.O_WRONLY|os.O_CREAT|os.O_APPEND)
             os.dup(1)
         else:
             os.open('/dev/null', os.O_RDWR)
             os.dup(0)
-            os.open(XEND_DEBUG_LOG, os.O_WRONLY|os.O_CREAT)
+            os.open(XEND_DEBUG_LOG, os.O_WRONLY|os.O_CREAT|os.O_APPEND)
+        print >>sys.stderr, ("Xend started at %s." %
+                             time.asctime(time.localtime()))
 
         
     def start(self, trace=0):
