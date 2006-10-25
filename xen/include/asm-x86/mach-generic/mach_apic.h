@@ -22,11 +22,7 @@ static inline void enable_apic_mode(void)
 	return;
 }
 
-/* No sane NUMA support right now. We should parse ACPI SRAT. */
-static inline int apicid_to_node(int logical_apicid)
-{
-	return 0;
-}
+#define apicid_to_node(apicid) ((int)apicid_to_node[(u8)apicid])
 
 extern u8 bios_cpu_apicid[];
 static inline int cpu_present_to_apicid(int mps_cpu)

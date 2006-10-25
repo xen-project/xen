@@ -50,5 +50,7 @@
 #endif /* !__ASSEMBLY__ */
 
 #define fastcall
+#define __cpuinitdata
+#define __cpuinit
 
 #endif /* __XEN_CONFIG_H__ */

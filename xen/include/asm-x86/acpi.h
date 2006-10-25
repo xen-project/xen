@@ -157,6 +157,8 @@ static inline void check_acpi_pci(void) { }
 
 static inline void acpi_noirq_set(void) { acpi_noirq = 1; }
 static inline int acpi_irq_balance_set(char *str) { return 0; }
+extern int acpi_scan_nodes(u64 start, u64 end);
+extern int acpi_numa;
 
 #ifdef CONFIG_ACPI_SLEEP
 
@@ -173,5 +175,6 @@ extern void acpi_reserve_bootmem(void);
 #endif /*CONFIG_ACPI_SLEEP*/
 
 extern u8 x86_acpiid_to_apicid[];
+#define MAX_LOCAL_APIC 256
 
 #endif /*_ASM_ACPI_H*/

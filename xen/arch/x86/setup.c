@@ -16,6 +16,7 @@
 #include <xen/percpu.h>
 #include <xen/hypercall.h>
 #include <xen/keyhandler.h>
+#include <xen/numa.h>
 #include <public/version.h>
 #include <asm/bitops.h>
 #include <asm/smp.h>
@@ -25,10 +26,12 @@
 #include <asm/desc.h>
 #include <asm/shadow.h>
 #include <asm/e820.h>
+#include <asm/numa.h>
 #include <acm/acm_hooks.h>
 
 extern void dmi_scan_machine(void);
 extern void generic_apic_probe(void);
+extern void numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn);
 
 /*
  * opt_xenheap_megabytes: Size of Xen heap in megabytes, excluding the
@@ -59,6 +62,9 @@ boolean_param("watchdog", opt_watchdog);
 /* "acpi=noirq":  Disables ACPI interrupt routing.                  */
 static void parse_acpi_param(char *s);
 custom_param("acpi", parse_acpi_param);
+
+extern int numa_setup(char *s);
+custom_param("numa", numa_setup);
 
 /* **** Linux config option: propagated to domain0. */
 /* acpi_skip_timer_override: Skip IRQ0 overrides. */
@@ -255,6 +261,20 @@ static void __init init_idle_domain(void)
     idle_vcpu[0] = this_cpu(curr_vcpu) = current;
 
     setup_idle_pagetable();
+}
+
+static void srat_detect_node(int cpu)
+{
+   unsigned node;
+   u8 apicid = x86_cpu_to_apicid[cpu];
+
+   node = apicid_to_node[apicid];
+   if (node == NUMA_NO_NODE)
+      node = 0;
+   numa_set_node(cpu, node);
+
+   if (acpi_numa > 0)
+      printk(KERN_INFO "CPU %d APIC %d -> Node %d\n", cpu, apicid, node);
 }
 
 void __init __start_xen(multiboot_info_t *mbi)
@@ -485,6 +505,12 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     init_frametable();
 
+    acpi_boot_table_init();
+
+    acpi_numa_init();
+
+    numa_initmem_init(0, max_page);
+
     end_boot_allocator();
 
     /* Initialise the Xen heap, skipping RAM holes. */
@@ -536,8 +562,9 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     generic_apic_probe();
 
-    acpi_boot_table_init();
     acpi_boot_init();
+
+    init_cpu_to_node();
 
     if ( smp_found_config )
         get_smp_config();
@@ -589,6 +616,11 @@ void __init __start_xen(multiboot_info_t *mbi)
             break;
         if ( !cpu_online(i) )
             __cpu_up(i);
+
+		/* setup cpu_to_node[] */
+        srat_detect_node(i);
+		/* setup node_to_cpumask based on cpu_to_node[] */
+        numa_add_cpu(i);        
     }
 
     printk("Brought up %ld CPUs\n", (long)num_online_cpus());
