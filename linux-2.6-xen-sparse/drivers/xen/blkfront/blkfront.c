@@ -468,6 +468,27 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
 		      command, (long)argument, inode->i_rdev);
 
 	switch (command) {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,16)
+	case HDIO_GETGEO: {
+		struct block_device *bd = inode->i_bdev;
+		struct hd_geometry geo;
+		int ret;
+
+                if (!argument)
+                        return -EINVAL;
+
+		geo.start = get_start_sect(bd);
+		ret = blkif_getgeo(bd, &geo);
+		if (ret)
+			return ret;
+
+		if (copy_to_user((struct hd_geometry __user *)argument, &geo,
+				 sizeof(geo)))
+                        return -EFAULT;
+
+                return 0;
+	}
+#endif
 	case CDROMMULTISESSION:
 		DPRINTK("FIXME: support multisession CDs later\n");
 		for (i = 0; i < sizeof(struct cdrom_multisession); i++)

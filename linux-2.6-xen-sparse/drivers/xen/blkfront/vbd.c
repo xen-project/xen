@@ -91,7 +91,9 @@ static struct block_device_operations xlvbd_block_fops =
 	.open = blkif_open,
 	.release = blkif_release,
 	.ioctl  = blkif_ioctl,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,16)
 	.getgeo = blkif_getgeo
+#endif
 };
 
 DEFINE_SPINLOCK(blkif_io_lock);
