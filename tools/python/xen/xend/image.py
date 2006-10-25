@@ -500,9 +500,12 @@ class X86_HVM_ImageHandler(HVMImageHandler):
         # overhead due to getRequiredInitialReservation.
         maxmem_kb = self.getRequiredInitialReservation(maxmem_kb)
 
-        # 1MB per vcpu plus 4Kib/Mib of RAM.  This is higher than 
-        # the minimum that Xen would allocate if no value were given.
-        return max(1024 * self.vm.getVCpuCount() + maxmem_kb / 256,
+        # 256 pages (1MB) per vcpu,
+        # plus 1 page per MiB of RAM for the P2M map,
+        # plus 1 page per MiB of RAM to shadow the resident processes.  
+        # This is higher than the minimum that Xen would allocate if no value 
+        # were given (but the Xen minimum is for safety, not performance).
+        return max(4 * (256 * self.vm.getVCpuCount() + 2 * (maxmem_kb / 1024)),
                    shadow_mem_kb)
 
 
