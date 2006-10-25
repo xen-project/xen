@@ -88,3 +88,12 @@ fastcall NORET_TYPE void do_exit(long code)
 }
 EXPORT_SYMBOL_GPL(do_exit);
 #endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,14)
+signed long schedule_timeout_interruptible(signed long timeout)
+{
+	__set_current_state(TASK_INTERRUPTIBLE);
+	return schedule_timeout(timeout);
+}
+EXPORT_SYMBOL(schedule_timeout_interruptible);
+#endif

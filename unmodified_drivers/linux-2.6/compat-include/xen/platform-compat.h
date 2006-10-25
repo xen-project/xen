@@ -37,4 +37,8 @@ unsigned long vmalloc_to_pfn(void *addr);
 unsigned long wait_for_completion_timeout(struct completion *x, unsigned long timeout);
 #endif
 
+#if defined(_LINUX_SCHED_H) && LINUX_VERSION_CODE < KERNEL_VERSION(2,6,14)
+signed long schedule_timeout_interruptible(signed long timeout);
+#endif
+
 #endif
