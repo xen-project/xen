@@ -25,4 +25,8 @@
 #define NET_IP_ALIGN 0
 #endif
 
+#if defined(_LINUX_FS_H) && LINUX_VERSION_CODE < KERNEL_VERSION(2,6,9)
+#define nonseekable_open(inode, filp) /* Nothing to do */
+#endif
+
 #endif
