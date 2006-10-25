@@ -551,8 +551,9 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
             char *image, unsigned long image_size, uint32_t vcpus,
             unsigned int store_evtchn, unsigned long *store_mfn)
 {
-    unsigned long page_array[2];
+    unsigned long page_array[3];
     shared_iopage_t *sp;
+    void *ioreq_buffer_page;
     unsigned long dom_memsize = (memsize << 20);
     DECLARE_DOMCTL;
 
@@ -587,7 +588,7 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
 
     /* Retrieve special pages like io, xenstore, etc. */
     if (xc_ia64_get_pfn_list(xc_handle, dom, page_array,
-                             IO_PAGE_START>>PAGE_SHIFT, 2) != 2) {
+                             IO_PAGE_START>>PAGE_SHIFT, 3) != 3) {
         PERROR("Could not get the page frame list");
         goto error_out;
     }
@@ -604,7 +605,10 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
 
     memset(sp, 0, PAGE_SIZE);
     munmap(sp, PAGE_SIZE);
-
+    ioreq_buffer_page = xc_map_foreign_range(xc_handle, dom,
+                               PAGE_SIZE, PROT_READ|PROT_WRITE, page_array[2]); 
+    memset(ioreq_buffer_page,0,PAGE_SIZE);
+    munmap(ioreq_buffer_page, PAGE_SIZE);
     return 0;
 
 error_out:

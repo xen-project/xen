@@ -362,8 +362,8 @@ static const io_range_t io_ranges[] = {
 	{PIB_START, PIB_SIZE, GPFN_PIB},
 };
 
-/* Reseve 1 page for shared I/O and 1 page for xenstore.  */
-#define VMX_SYS_PAGES	(2 + (GFW_SIZE >> PAGE_SHIFT))
+/* Reseve 1 page for shared I/O ,1 page for xenstore and 1 page for buffer I/O.  */
+#define VMX_SYS_PAGES	(3 + (GFW_SIZE >> PAGE_SHIFT))
 #define VMX_CONFIG_PAGES(d) ((d)->max_pages - VMX_SYS_PAGES)
 
 static void vmx_build_physmap_table(struct domain *d)
@@ -424,8 +424,12 @@ static void vmx_build_physmap_table(struct domain *d)
 	mfn = page_to_mfn(list_entry(list_ent, struct page_info, list));
 	assign_domain_page(d, STORE_PAGE_START, mfn << PAGE_SHIFT);
 	list_ent = mfn_to_page(mfn)->list.next;
+	ASSERT(list_ent != &d->page_list);
+    
+    mfn = page_to_mfn(list_entry(list_ent, struct page_info, list));
+    assign_domain_page(d, BUFFER_IO_PAGE_START, mfn << PAGE_SHIFT);
+    list_ent = mfn_to_page(mfn)->list.next;
 	ASSERT(list_ent == &d->page_list);
-
 }
 
 void vmx_setup_platform(struct domain *d)
@@ -436,6 +440,10 @@ void vmx_setup_platform(struct domain *d)
 
 	d->arch.vmx_platform.shared_page_va =
 		(unsigned long)__va(__gpa_to_mpa(d, IO_PAGE_START));
+    //For buffered IO requests.
+    spin_lock_init(&d->arch.hvm_domain.buffered_io_lock);
+    d->arch.hvm_domain.buffered_io_va =
+        (unsigned long)__va(__gpa_to_mpa(d, BUFFER_IO_PAGE_START));
 	/* TEMP */
 	d->arch.vmx_platform.pib_base = 0xfee00000UL;
 
