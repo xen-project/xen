@@ -32,6 +32,7 @@
 #include "xen_string_string_map.h"
 #include "xen_vbd.h"
 #include "xen_vif.h"
+#include "xen_vtpm.h"
 #include "xen_vm.h"
 #include "xen_vm_power_state_internal.h"
 
@@ -125,12 +126,6 @@ static const struct_member xen_vm_record_struct_members[] =
         { .key = "vbds",
           .type = &abstract_type_ref_set,
           .offset = offsetof(xen_vm_record, vbds) },
-        { .key = "tpm_instance",
-          .type = &abstract_type_int,
-          .offset = offsetof(xen_vm_record, tpm_instance) },
-        { .key = "tpm_backend",
-          .type = &abstract_type_int,
-          .offset = offsetof(xen_vm_record, tpm_backend) },
         { .key = "bios_boot",
           .type = &abstract_type_string,
           .offset = offsetof(xen_vm_record, bios_boot) },
@@ -711,7 +706,7 @@ xen_vm_get_vbds(xen_session *session, xen_vbd *result, xen_vm vm)
 
 
 bool
-xen_vm_get_tpm_instance(xen_session *session, uint64_t *result, xen_vm vm)
+xen_vm_get_vtpms(xen_session *session, xen_vtpm *result, xen_vm vm)
 {
     abstract_value param_values[] =
         {
@@ -719,25 +714,10 @@ xen_vm_get_tpm_instance(xen_session *session, uint64_t *result, xen_vm vm)
               .u.string_val = vm }
         };
 
-    abstract_type result_type = abstract_type_int;
+    abstract_type result_type = abstract_type_string_set;
 
-    XEN_CALL_("VM.get_tpm_instance");
-    return session->ok;
-}
-
-
-bool
-xen_vm_get_tpm_backend(xen_session *session, uint64_t *result, xen_vm vm)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm }
-        };
-
-    abstract_type result_type = abstract_type_int;
-
-    XEN_CALL_("VM.get_tpm_backend");
+    *result = NULL;
+    XEN_CALL_("VM.get_vtpms");
     return session->ok;
 }
 

@@ -29,6 +29,7 @@
 #include "xen_string_string_map.h"
 #include "xen_vbd_decl.h"
 #include "xen_vif_decl.h"
+#include "xen_vtpm_decl.h"
 #include "xen_vm_decl.h"
 #include "xen_vm_power_state.h"
 
@@ -406,17 +407,10 @@ xen_vm_get_vbds(xen_session *session, xen_vbd *result, xen_vm vm);
 
 
 /**
- * Get the TPM/instance field of the given VM.
+ * Get the VTPMs field of the given VM.
  */
 extern bool
-xen_vm_get_tpm_instance(xen_session *session, uint64_t *result, xen_vm vm);
-
-
-/**
- * Get the TPM/backend field of the given VM.
- */
-extern bool
-xen_vm_get_tpm_backend(xen_session *session, uint64_t *result, xen_vm vm);
+xen_vm_get_vtpms(xen_session *session, xen_vtpm *result, xen_vm vm);
 
 
 /**

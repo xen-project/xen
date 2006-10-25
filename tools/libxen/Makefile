@@ -19,7 +19,7 @@
 CFLAGS = -Iinclude                     \
          $(shell xml2-config --cflags) \
          $(shell curl-config --cflags) \
-         -W -Wall -Werror -std=c99 -O2 -fPIC
+         -W -Wall -Wmissing-prototypes -Werror -std=c99 -O2 -fPIC
 
 LDFLAGS = $(shell xml2-config --libs) \
           $(shell curl-config --libs)
