@@ -42,6 +42,7 @@
 #include <linux/mm.h>
 #include <linux/notifier.h>
 #include <linux/kthread.h>
+#include <linux/mutex.h>
 
 #include <asm/io.h>
 #include <asm/page.h>

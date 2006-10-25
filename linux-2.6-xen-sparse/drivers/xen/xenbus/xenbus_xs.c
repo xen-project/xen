@@ -42,6 +42,8 @@
 #include <linux/fcntl.h>
 #include <linux/kthread.h>
 #include <linux/rwsem.h>
+#include <linux/module.h>
+#include <linux/mutex.h>
 #include <xen/xenbus.h>
 #include "xenbus_comms.h"
 

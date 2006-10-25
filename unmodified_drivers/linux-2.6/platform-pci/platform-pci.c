@@ -33,6 +33,7 @@
 #include <asm/irq.h>
 #include <asm/uaccess.h>
 #include <asm/hypervisor.h>
+#include <asm/pgtable.h>
 #include <xen/interface/memory.h>
 #include <xen/features.h>
 
