@@ -32,6 +32,7 @@ Name & Description \\
 {\tt SR} & A storage repository \\
 {\tt VDI} & A virtual disk image \\
 {\tt VBD} & A virtual block device \\
+{\tt VTPM} & A virtual TPM device \\
 {\tt user} & A user of the system \\
 {\tt debug} & A basic class for testing \\
 \hline
@@ -49,6 +50,7 @@ VBD.VM & VM.VBDs & one-to-many\\
 VIF.VM & VM.VIFs & one-to-many\\
 VIF.network & network.VIFs & one-to-many\\
 SR.VDIs & VDI.SR & many-to-one\\
+VTPM.VM & VM.VTPMs & one-to-many\\
 host.resident\_VMs & VM.resident\_on & many-to-one\\
 host.host\_CPUs & host\_cpu.host & many-to-one\\
 \hline
@@ -1049,8 +1051,7 @@ $\mathit{RW}$ &  {\tt actions/after\_suspend} & on\_normal\_exit & action to tak
 $\mathit{RW}$ &  {\tt actions/after\_crash} & on\_crash\_behaviour & action to take if the guest crashes \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt VIFs} & (VIF ref) Set & virtual network interfaces \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt VBDs} & (VBD ref) Set & virtual block devices \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt TPM/instance} & int & included for TPM support \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt TPM/backend} & int & included for TPM support \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt VTPM} & (VTPM ref) Set & virtual TPMs \\
 $\mathit{RW}$ &  {\tt bios/boot} & string & device to boot the guest from \\
 $\mathit{RW}$ &  {\tt platform/std\_VGA} & bool & emulate standard VGA instead of cirrus logic \\
 $\mathit{RW}$ &  {\tt platform/serial} & string & redirect serial port to pty \\
@@ -2796,13 +2797,13 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~get\_TPM\_instance}
+\subsubsection{RPC name:~get\_VTPMs}
 
 {\bf Overview:} 
-get accessor message derived from field TPM/instance of object VM
+get accessor message derived from field VTPMs of object VM
 
  \noindent {\bf Signature:} 
-\begin{verbatim} int get_TPM_instance (session_id s, VM ref self)\end{verbatim}
+\begin{verbatim} ((VTPM ref) Set) get_VTPMs (session_id s, VM ref self)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -2820,39 +2821,7 @@ get accessor message derived from field TPM/instance of object VM
 
  \noindent {\bf Return Type:} 
 {\tt 
-int
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_TPM\_backend}
-
-{\bf Overview:} 
-get accessor message derived from field TPM/backend of object VM
-
- \noindent {\bf Signature:} 
-\begin{verbatim} int get_TPM_backend (session_id s, VM ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-int
+(VTPM ref) Set
 }
 
 
@@ -8749,6 +8718,367 @@ returns a set of references to all objects
  \noindent {\bf Return Type:} 
 {\tt 
 (VBD ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+
+\vspace{1cm}
+\newpage
+\section{Class: VTPM}
+\subsection{Fields for class: VTPM}
+\begin{longtable}{|lllp{0.38\textwidth}|}
+\hline
+\multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf VTPM} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A virtual TPM device}} \\
+\hline
+Quals & Field & Type & Description \\
+\hline
+$\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
+$\mathit{RO}_\mathit{ins}$ & {\tt type} & driver\_type & the style of driver \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt VM} & VM ref & the virtual machine \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt backend} & VM ref & the domain where the backend is located \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt instance} & int & the instance number the virtual TPM represents \\
+\hline
+\end{longtable}
+\subsection{Additional RPCs associated with class: VTPM}
+\subsubsection{RPC name:~get\_uuid}
+
+{\bf Overview:} 
+get accessor message derived from field uuid of object VTPM
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_uuid (session_id s, VTPM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VTPM ref } & self & object instance \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_type}
+
+{\bf Overview:} 
+get accessor message derived from field type of object VTPM
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (driver_type) get_type (session_id s, VTPM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VTPM ref } & self & object instance \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+driver\_type
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_VM}
+
+{\bf Overview:} 
+get accessor message derived from field VM of object VTPM
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (VM ref) get_VM (session_id s, VTPM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VTPM ref } & self & object instance \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+VM ref
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_backend}
+
+{\bf Overview:} 
+get accessor message derived from field backend of object VTPM
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_backend (session_id s, VTPM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VTPM ref } & self & object instance \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_instance}
+
+{\bf Overview:} 
+get accessor message derived from field instance of object VTPM
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_instance (session_id s, VTPM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VTPM ref } & self & object instance \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~create}
+
+{\bf Overview:} 
+constructor for class VTPM
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (VTPM ref) create (session_id s, VTPM record args)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VTPM record } & args & All constructor arguments \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+VTPM ref
+}
+
+
+reference to the newly created object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~destroy}
+
+{\bf Overview:} 
+destructor for class VTPM
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void destroy (session_id s, VTPM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VTPM ref } & self & object instance \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_by\_uuid}
+
+{\bf Overview:} 
+returns the VTPM instance with a particular uuid
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (VTPM ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt string } & uuid & UUID of object to return \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+VTPM ref
+}
+
+
+reference to the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_record}
+
+{\bf Overview:} 
+returns a record containing the state of an instance of class VTPM
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (VTPM record) get_record (session_id s, VTPM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VTPM ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+VTPM record
+}
+
+
+all fields from the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_record\_internal}
+
+{\bf Overview:} 
+returns a record containing the state of an instance of class VTPM
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (VTPM record) get_record_internal (session_id s, VTPM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VTPM ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+VTPM record
+}
+
+
+all fields from the object, including implementation-only ones
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+returns a set of references to all objects
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((VTPM ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(VTPM ref) Set
 }
 
 
