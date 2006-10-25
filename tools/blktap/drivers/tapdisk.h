@@ -191,9 +191,8 @@ static disk_info_t *dtypes[] = {
 };
 
 typedef struct driver_list_entry {
-	void *blkif;
-	void *prev;
-	void *next;
+	struct blkif *blkif;
+	struct driver_list_entry **pprev, *next;
 } driver_list_entry_t;
 
 typedef struct fd_list_entry {
@@ -201,8 +200,7 @@ typedef struct fd_list_entry {
 	int  tap_fd;
 	int  io_fd[MAX_IOFD];
 	struct td_state *s;
-	void *prev;
-	void *next;
+	struct fd_list_entry **pprev, *next;
 } fd_list_entry_t;
 
 int qcow_create(const char *filename, uint64_t total_size,
