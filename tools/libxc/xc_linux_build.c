@@ -128,7 +128,7 @@ static int probeimageformat(const char *image,
     return 0;
 }
 
-int load_initrd(int xc_handle, domid_t dom,
+static int load_initrd(int xc_handle, domid_t dom,
                 struct initrd_info *initrd,
                 unsigned long physbase,
                 xen_pfn_t *phys_to_mach)

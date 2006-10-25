@@ -57,7 +57,7 @@ read_exact(int fd, void *buf, size_t count)
 ** This function inverts that operation, replacing the pfn values with
 ** the (now known) appropriate mfn values.
 */
-int uncanonicalize_pagetable(unsigned long type, void *page)
+static int uncanonicalize_pagetable(unsigned long type, void *page)
 {
     int i, pte_last;
     unsigned long pfn;

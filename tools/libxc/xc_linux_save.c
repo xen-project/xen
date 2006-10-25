@@ -413,7 +413,7 @@ static int suspend_and_state(int (*suspend)(int), int xc_handle, int io_fd,
 ** which entries do not require canonicalization (in particular, those
 ** entries which map the virtual address reserved for the hypervisor).
 */
-int canonicalize_pagetable(unsigned long type, unsigned long pfn,
+static int canonicalize_pagetable(unsigned long type, unsigned long pfn,
                            const void *spage, void *dpage)
 {
 

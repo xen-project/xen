@@ -31,7 +31,7 @@ GUEST_SRCS-$(CONFIG_HVM) += xc_hvm_build.c
 
 -include $(XEN_TARGET_ARCH)/Makefile
 
-CFLAGS   += -Werror
+CFLAGS   += -Werror -Wmissing-prototypes
 CFLAGS   += -fno-strict-aliasing
 CFLAGS   += $(INCLUDES) -I.
 
