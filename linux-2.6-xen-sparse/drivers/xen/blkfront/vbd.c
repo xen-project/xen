@@ -188,7 +188,11 @@ xlvbd_init_blk_queue(struct gendisk *gd, u16 sector_size)
 	if (rq == NULL)
 		return -1;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,10)
 	elevator_init(rq, "noop");
+#else
+	elevator_init(rq, &elevator_noop);
+#endif
 
 	/* Hard sector size and max sectors impersonate the equiv. hardware. */
 	blk_queue_hardsect_size(rq, sector_size);
