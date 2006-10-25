@@ -203,6 +203,8 @@ static void set_bits_in_row(VncState *vs, uint64_t *row,
 	mask = ~(0ULL);
 
     h += y;
+    if (h > vs->ds->height)
+        h = vs->ds->height;
     for (; y < h; y++)
 	row[y] |= mask;
 }
