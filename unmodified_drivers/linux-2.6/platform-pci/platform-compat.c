@@ -73,3 +73,18 @@ out:
 }
 EXPORT_SYMBOL(wait_for_completion_timeout);
 #endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,12)
+/*
+    fake do_exit using complete_and_exit
+ */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,10)
+asmlinkage NORET_TYPE void do_exit(long code)
+#else
+fastcall NORET_TYPE void do_exit(long code)
+#endif
+{
+    complete_and_exit(NULL, code);
+}
+EXPORT_SYMBOL_GPL(do_exit);
+#endif
