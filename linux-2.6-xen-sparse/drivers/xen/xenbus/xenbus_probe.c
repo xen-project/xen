@@ -781,7 +781,7 @@ void xenbus_probe(void *unused)
 }
 
 
-#ifdef CONFIG_PROC_FS
+#if defined(CONFIG_PROC_FS) && defined(CONFIG_XEN_PRIVILEGED_GUEST)
 static struct file_operations xsd_kva_fops;
 static struct proc_dir_entry *xsd_kva_intf;
 static struct proc_dir_entry *xsd_port_intf;
@@ -862,7 +862,7 @@ static int __init xenbus_probe_init(void)
 		xen_store_evtchn = xen_start_info->store_evtchn =
 			alloc_unbound.port;
 
-#ifdef CONFIG_PROC_FS
+#if defined(CONFIG_PROC_FS) && defined(CONFIG_XEN_PRIVILEGED_GUEST)
 		/* And finally publish the above info in /proc/xen */
 		xsd_kva_intf = create_xen_proc_entry("xsd_kva", 0600);
 		if (xsd_kva_intf) {
