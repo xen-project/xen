@@ -453,14 +453,20 @@ char *kasprintf(const char *fmt, ...)
 }
 
 static ssize_t xendev_show_nodename(struct device *dev,
-				    struct device_attribute *attr, char *buf)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,13)
+				    struct device_attribute *attr,
+#endif
+				    char *buf)
 {
 	return sprintf(buf, "%s\n", to_xenbus_device(dev)->nodename);
 }
 DEVICE_ATTR(nodename, S_IRUSR | S_IRGRP | S_IROTH, xendev_show_nodename, NULL);
 
 static ssize_t xendev_show_devtype(struct device *dev,
-				   struct device_attribute *attr, char *buf)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,13)
+				   struct device_attribute *attr,
+#endif
+				   char *buf)
 {
 	return sprintf(buf, "%s\n", to_xenbus_device(dev)->devicetype);
 }
