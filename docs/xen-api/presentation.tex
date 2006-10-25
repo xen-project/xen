@@ -127,9 +127,9 @@ values.
 \item Each class has a {\tt get\_by\_uuid(uuid)} RPC that returns the object
 of that class that has the specified {\tt uuid}.
 
-\item Each class that has a {\tt short\_name} field has a
-``{\tt get\_by\_short\_name(name)}'' RPC that returns a set of objects of that
-class that have the specified {\tt name}.
+\item Each class that has a {\tt name\_label} field has a
+``{\tt get\_by\_name\_label(name)}'' RPC that returns a set of objects of that
+class that have the specified {\tt label}.
 
 \item Each class has a ``{\tt to\_XML()}'' RPC that serialises the
 state of all fields as an XML string.
