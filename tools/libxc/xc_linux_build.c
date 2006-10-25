@@ -446,8 +446,6 @@ static int setup_pg_tables_64(int xc_handle, uint32_t dom,
 #endif
 
 #ifdef __ia64__
-extern unsigned long xc_ia64_fpsr_default(void);
-
 static int setup_guest(int xc_handle,
                        uint32_t dom,
                        const char *image, unsigned long image_size,

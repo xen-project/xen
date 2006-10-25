@@ -525,6 +525,8 @@ unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
 int xc_get_pfn_list(int xc_handle, uint32_t domid, xen_pfn_t *pfn_buf,
                     unsigned long max_pfns);
 
+unsigned long xc_ia64_fpsr_default(void);
+
 int xc_ia64_get_pfn_list(int xc_handle, uint32_t domid,
                          xen_pfn_t *pfn_buf,
                          unsigned int start_page, unsigned int nr_pages);
