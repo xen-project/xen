@@ -6448,7 +6448,6 @@ int main(int argc, char **argv)
     fprintf(logfile, "shared page at pfn:%lx, mfn: %"PRIx64"\n",
             shared_page_nr, (uint64_t)(page_array[shared_page_nr]));
 
-    /* not yet add for IA64 */
     buffered_io_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
                                             PROT_READ|PROT_WRITE,
                                             page_array[shared_page_nr - 2]);
@@ -6465,7 +6464,7 @@ int main(int argc, char **argv)
 #elif defined(__ia64__)
   
     if (xc_ia64_get_pfn_list(xc_handle, domid, page_array,
-                             IO_PAGE_START >> PAGE_SHIFT, 1) != 1) {
+                             IO_PAGE_START >> PAGE_SHIFT, 3) != 3) {
         fprintf(logfile, "xc_ia64_get_pfn_list returned error %d\n", errno);
         exit(-1);
     }
@@ -6476,6 +6475,12 @@ int main(int argc, char **argv)
 
     fprintf(logfile, "shared page at pfn:%lx, mfn: %016lx\n",
             IO_PAGE_START >> PAGE_SHIFT, page_array[0]);
+
+    buffered_io_page =xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
+                                       PROT_READ|PROT_WRITE,
+                                       page_array[2]);
+    fprintf(logfile, "Buffered IO page at pfn:%lx, mfn: %016lx\n",
+            BUFFER_IO_PAGE_START >> PAGE_SHIFT, page_array[2]);
 
     if (xc_ia64_get_pfn_list(xc_handle, domid,
                              page_array, 0, nr_pages) != nr_pages) {
@@ -6496,6 +6501,7 @@ int main(int argc, char **argv)
         fprintf(logfile, "xc_map_foreign_batch returned error %d\n", errno);
         exit(-1);
     }
+    free(page_array);
 #endif
 #else  /* !CONFIG_DM */
 
