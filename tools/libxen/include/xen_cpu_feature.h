@@ -338,7 +338,12 @@ enum xen_cpu_feature
     /**
      *  If yes HyperThreading not valid
      */
-    XEN_CPU_FEATURE_CMP_LEGACY
+    XEN_CPU_FEATURE_CMP_LEGACY,
+
+    /**
+     *  VMX instruction set
+     */
+    XEN_CPU_FEATURE_VMX
 };
 
 

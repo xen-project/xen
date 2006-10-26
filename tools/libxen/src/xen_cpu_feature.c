@@ -90,7 +90,8 @@ static const char *lookup_table[] =
     "XCRYPT",
     "XCRYPT_EN",
     "LAHF_LM",
-    "CMP_LEGACY"
+    "CMP_LEGACY",
+    "VMX"
 };
 
 
