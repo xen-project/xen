@@ -29,6 +29,7 @@ Name & Description \\
 {\tt host\_cpu} & A physical CPU \\
 {\tt network} & A virtual network \\
 {\tt VIF} & A virtual network interface \\
+{\tt PIF} & A physical network interface (note separate VLANs are represented as several PIFs) \\
 {\tt SR} & A storage repository \\
 {\tt VDI} & A virtual disk image \\
 {\tt VBD} & A virtual block device \\
@@ -49,6 +50,8 @@ VDI.parent & VDI.children & one-to-many\\
 VBD.VM & VM.VBDs & one-to-many\\
 VIF.VM & VM.VIFs & one-to-many\\
 VIF.network & network.VIFs & one-to-many\\
+PIF.host & host.PIFs & one-to-many\\
+PIF.network & network.PIFs & one-to-many\\
 SR.VDIs & VDI.SR & many-to-one\\
 VTPM.VM & VM.VTPMs & one-to-many\\
 host.resident\_VMs & VM.resident\_on & many-to-one\\
@@ -3921,6 +3924,7 @@ $\mathit{RW}$ &  {\tt name/label} & string & a human-readable name \\
 $\mathit{RW}$ &  {\tt name/description} & string & a notes field containg human-readable description \\
 $\mathit{RO}_\mathit{run}$ &  {\tt software\_version} & (string $\rightarrow$ string) Map & version strings \\
 $\mathit{RO}_\mathit{run}$ &  {\tt resident\_VMs} & (VM ref) Set & list of VMs currently resident on host \\
+$\mathit{RO}_\mathit{run}$ &  {\tt PIFs} & (PIF ref) Set & physical network interfaces \\
 $\mathit{RO}_\mathit{run}$ &  {\tt host\_CPUs} & (host\_cpu ref) Set & The physical CPUs on this host \\
 \hline
 \end{longtable}
@@ -4295,6 +4299,38 @@ get accessor message derived from field resident\_VMs of object host
  \noindent {\bf Return Type:} 
 {\tt 
 (VM ref) Set
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_PIFs}
+
+{\bf Overview:} 
+get accessor message derived from field PIFs of object host
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((PIF ref) Set) get_PIFs (session_id s, host ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & self & object instance \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(PIF ref) Set
 }
 
 
@@ -4860,6 +4896,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object ref
 $\mathit{RW}$ &  {\tt name/label} & string & a human-readable name \\
 $\mathit{RW}$ &  {\tt name/description} & string & a notes field containg human-readable description \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VIFs} & (VIF ref) Set & list of connected vifs \\
+$\mathit{RO}_\mathit{run}$ &  {\tt PIFs} & (PIF ref) Set & list of connected pifs \\
 $\mathit{RW}$ &  {\tt default\_gateway} & string & default gateway IP address. Used for auto-configuring guests with fixed IP setting \\
 $\mathit{RW}$ &  {\tt default\_netmask} & string & default netmask. Used for auto-configuring guests with fixed IP setting \\
 \hline
@@ -5075,6 +5112,38 @@ get accessor message derived from field VIFs of object network
  \noindent {\bf Return Type:} 
 {\tt 
 (VIF ref) Set
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_PIFs}
+
+{\bf Overview:} 
+get accessor message derived from field PIFs of object network
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((PIF ref) Set) get_PIFs (session_id s, network ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt network ref } & self & object instance \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(PIF ref) Set
 }
 
 
@@ -6120,6 +6189,671 @@ returns a set of references to all objects
  \noindent {\bf Return Type:} 
 {\tt 
 (VIF ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+
+\vspace{1cm}
+\newpage
+\section{Class: PIF}
+\subsection{Fields for class: PIF}
+\begin{longtable}{|lllp{0.38\textwidth}|}
+\hline
+\multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf PIF} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A physical network interface (note separate VLANs are represented as several PIFs)}} \\
+\hline
+Quals & Field & Type & Description \\
+\hline
+$\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
+$\mathit{RW}$ &  {\tt name} & string & human-readable name of the interface \\
+$\mathit{RW}$ &  {\tt network} & network ref & virtual network to which this pif is connected \\
+$\mathit{RW}$ &  {\tt host} & host ref & physical machine to which this pif is connected \\
+$\mathit{RW}$ &  {\tt MAC} & string & ethernet MAC address of physical interface \\
+$\mathit{RW}$ &  {\tt MTU} & int & MTU in octets \\
+$\mathit{RW}$ &  {\tt VLAN} & string & VLAN tag for all traffic passing through this interface \\
+$\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB/s) \\
+\hline
+\end{longtable}
+\subsection{Additional RPCs associated with class: PIF}
+\subsubsection{RPC name:~get\_uuid}
+
+{\bf Overview:} 
+get accessor message derived from field uuid of object PIF
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_uuid (session_id s, PIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PIF ref } & self & object instance \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_name}
+
+{\bf Overview:} 
+get accessor message derived from field name of object PIF
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_name (session_id s, PIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PIF ref } & self & object instance \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_name}
+
+{\bf Overview:} 
+set accessor message derived from field name of object PIF
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_name (session_id s, PIF ref self, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PIF ref } & self & object instance \\ \hline 
+
+{\tt string } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_network}
+
+{\bf Overview:} 
+get accessor message derived from field network of object PIF
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (network ref) get_network (session_id s, PIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PIF ref } & self & object instance \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+network ref
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_network}
+
+{\bf Overview:} 
+set accessor message derived from field network of object PIF
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_network (session_id s, PIF ref self, network ref value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PIF ref } & self & object instance \\ \hline 
+
+{\tt network ref } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_host}
+
+{\bf Overview:} 
+get accessor message derived from field host of object PIF
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (host ref) get_host (session_id s, PIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PIF ref } & self & object instance \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+host ref
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_host}
+
+{\bf Overview:} 
+set accessor message derived from field host of object PIF
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_host (session_id s, PIF ref self, host ref value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PIF ref } & self & object instance \\ \hline 
+
+{\tt host ref } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_MAC}
+
+{\bf Overview:} 
+get accessor message derived from field MAC of object PIF
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_MAC (session_id s, PIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PIF ref } & self & object instance \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_MAC}
+
+{\bf Overview:} 
+set accessor message derived from field MAC of object PIF
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_MAC (session_id s, PIF ref self, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PIF ref } & self & object instance \\ \hline 
+
+{\tt string } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_MTU}
+
+{\bf Overview:} 
+get accessor message derived from field MTU of object PIF
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_MTU (session_id s, PIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PIF ref } & self & object instance \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_MTU}
+
+{\bf Overview:} 
+set accessor message derived from field MTU of object PIF
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_MTU (session_id s, PIF ref self, int value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PIF ref } & self & object instance \\ \hline 
+
+{\tt int } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_VLAN}
+
+{\bf Overview:} 
+get accessor message derived from field VLAN of object PIF
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_VLAN (session_id s, PIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PIF ref } & self & object instance \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_VLAN}
+
+{\bf Overview:} 
+set accessor message derived from field VLAN of object PIF
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_VLAN (session_id s, PIF ref self, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PIF ref } & self & object instance \\ \hline 
+
+{\tt string } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_io\_read\_kbs}
+
+{\bf Overview:} 
+get accessor message derived from field io/read\_kbs of object PIF
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} float get_io_read_kbs (session_id s, PIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PIF ref } & self & object instance \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+float
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_io\_write\_kbs}
+
+{\bf Overview:} 
+get accessor message derived from field io/write\_kbs of object PIF
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} float get_io_write_kbs (session_id s, PIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PIF ref } & self & object instance \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+float
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~create}
+
+{\bf Overview:} 
+constructor for class PIF
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (PIF ref) create (session_id s, PIF record args)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PIF record } & args & All constructor arguments \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+PIF ref
+}
+
+
+reference to the newly created object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~destroy}
+
+{\bf Overview:} 
+destructor for class PIF
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void destroy (session_id s, PIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PIF ref } & self & object instance \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_by\_uuid}
+
+{\bf Overview:} 
+returns the PIF instance with a particular uuid
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (PIF ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt string } & uuid & UUID of object to return \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+PIF ref
+}
+
+
+reference to the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_record}
+
+{\bf Overview:} 
+returns a record containing the state of an instance of class PIF
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (PIF record) get_record (session_id s, PIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PIF ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+PIF record
+}
+
+
+all fields from the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+returns a set of references to all objects
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((PIF ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(PIF ref) Set
 }
 
 
