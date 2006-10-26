@@ -647,6 +647,15 @@ static PyObject *pyxc_shadow_mem_control(PyObject *self,
     return Py_BuildValue("i", mbarg);
 }
 
+static PyObject *pyxc_sched_id_get(XcObject *self) {
+    
+    int sched_id;
+    if (xc_sched_id(self->xc_handle, &sched_id) != 0)
+        return PyErr_SetFromErrno(xc_error);
+
+    return Py_BuildValue("i", sched_id);
+}
+
 static PyObject *pyxc_sched_credit_domain_set(XcObject *self,
                                               PyObject *args,
                                               PyObject *kwds)
@@ -976,6 +985,12 @@ static PyMethodDef pyxc_methods[] = {
       " vcpus   [int, 1]:   Number of Virtual CPUS in domain.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
+    { "sched_id_get",
+      (PyCFunction)pyxc_sched_id_get,
+      METH_NOARGS, "\n"
+      "Get the current scheduler type in use.\n"
+      "Returns: [int] sched_id.\n" },    
+
     { "sedf_domain_set",
       (PyCFunction)pyxc_sedf_domain_set,
       METH_KEYWORDS, "\n"
@@ -1242,6 +1257,11 @@ PyMODINIT_FUNC initxc(void)
 
     Py_INCREF(xc_error);
     PyModule_AddObject(m, "Error", xc_error);
+
+    /* Expose some libxc constants to Python */
+    PyModule_AddIntConstant(m, "XEN_SCHEDULER_SEDF", XEN_SCHEDULER_SEDF);
+    PyModule_AddIntConstant(m, "XEN_SCHEDULER_CREDIT", XEN_SCHEDULER_CREDIT);
+
 }
 
 

@@ -100,6 +100,7 @@ class XendStorageRepository:
         """
         self.lock.acquire()
         try:
+            # create directory if /var/lib/xend/storage does not exist
             if not os.path.exists(XEND_STORAGE_DIR):
                 os.makedirs(XEND_STORAGE_DIR)
                 os.chmod(XEND_STORAGE_DIR, 0700)
@@ -111,6 +112,8 @@ class XendStorageRepository:
                 if filename[-5:] == XEND_STORAGE_QCOW_FILENAME[-5:]:
                     image_uuid = filename[:-5]
                     seen_images.append(image_uuid)
+                    
+                    # add this image if we haven't seen it before
                     if image_uuid not in self.images:
                         qcow_file = XEND_STORAGE_QCOW_FILENAME % image_uuid
                         cfg_file = XEND_STORAGE_VDICFG_FILENAME % image_uuid

@@ -1655,7 +1655,13 @@ class XendDomainInfo:
     def get_memory_static_min(self):
         return self.info['memory']
     def get_vcpus_policy(self):
-        return '' # TODO
+        sched_id = xc.sched_id_get()
+        if sched_id == xen.lowlevel.xc.XEN_SCHEDULER_SEDF:
+            return 'sedf'
+        elif sched_id == xen.lowlevel.xc.XEN_SCHEDULER_CREDIT:
+            return 'credit'
+        else:
+            return 'unknown'
     def get_vcpus_params(self):
         return '' # TODO
     def get_power_state(self):

@@ -701,23 +701,23 @@ class XendAPI:
     
     def vm_get_actions_after_shutdown(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success('')
+        return xen_api_success(dom.get_on_shutdown())
     
     def vm_get_actions_after_reboot(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success('')
+        return xen_api_success(dom.get_on_reboot())
     
     def vm_get_actions_after_suspend(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success('')
+        return xen_api_success(dom.get_on_suspend())
     
     def vm_get_actions_after_crash(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success('')
+        return xen_api_success(dom.get_on_crash())
     
     def vm_get_bios_boot(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success('')
+        return xen_api_success(dom.get_bios_boot())
     
     def vm_get_platform_std_vga(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
