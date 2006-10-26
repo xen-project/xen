@@ -4567,6 +4567,9 @@ Quals & Field & Type & Description \\
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt host} & host ref & the host the CPU is in \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt number} & int & the number of the physical CPU within the host \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt vendor} & string & the vendor of the physical CPU \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt speed} & int & the speed of the physical CPU \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt modelname} & string & the model name of the physical CPU \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt features} & (cpu\_feature) Set & the features supported by the CPU \\
 $\mathit{RO}_\mathit{run}$ &  {\tt utilisation} & float & the current CPU utilisation \\
 \hline
@@ -4661,6 +4664,102 @@ get accessor message derived from field number of object host\_cpu
  \noindent {\bf Return Type:} 
 {\tt 
 int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_vendor}
+
+{\bf Overview:} 
+get accessor message derived from field vendor of object host\_cpu
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_vendor (session_id s, host_cpu ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host\_cpu ref } & self & object instance \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_speed}
+
+{\bf Overview:} 
+get accessor message derived from field speed of object host\_cpu
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_speed (session_id s, host_cpu ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host\_cpu ref } & self & object instance \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_modelname}
+
+{\bf Overview:} 
+get accessor message derived from field modelname of object host\_cpu
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_modelname (session_id s, host_cpu ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host\_cpu ref } & self & object instance \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
 }
 
 
