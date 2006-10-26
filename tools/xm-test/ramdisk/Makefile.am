@@ -17,9 +17,9 @@ INITRD ?= http://xm-test.xensource.com/ramdisks
 BR_ARCH ?= $(shell uname -m | sed -e s/i.86/i386/ -e 's/ppc\(64\)*/powerpc/')
 
 @MK@ifdef BR_SNAPSHOT
-  BR_URL = http://buildroot.uclibc.org/downloads/snapshots/buildroot-snapshot.tar.bz2
+@MK@  BR_URL = http://buildroot.uclibc.org/downloads/snapshots/buildroot-snapshot.tar.bz2
 @MK@else
-  BR_URL ?= http://xm-test.xensource.com/ramdisks/buildroot-20061023.tar.bz2
+@MK@  BR_URL = http://xm-test.xensource.com/ramdisks/buildroot-20061023.tar.bz2
 @MK@endif
 BR_TAR = $(notdir $(BR_URL))
 
