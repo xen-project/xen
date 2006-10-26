@@ -31,7 +31,7 @@ char *xc_read_image(const char *filename, unsigned long *size)
 {
     int kernel_fd = -1;
     gzFile kernel_gfd = NULL;
-    char *image = NULL;
+    char *image = NULL, *tmp;
     unsigned int bytes;
 
     if ( (filename == NULL) || (size == NULL) )
@@ -43,33 +43,58 @@ char *xc_read_image(const char *filename, unsigned long *size)
         goto out;
     }
 
-    if ( (*size = xc_get_filesz(kernel_fd)) == 0 )
-    {
-        PERROR("Could not read kernel image");
-        goto out;
-    }
-
     if ( (kernel_gfd = gzdopen(kernel_fd, "rb")) == NULL )
     {
         PERROR("Could not allocate decompression state for state file");
         goto out;
     }
 
-    if ( (image = malloc(*size)) == NULL )
-    {
-        PERROR("Could not allocate memory for kernel image");
-        goto out;
-    }
+    *size = 0;
 
-    if ( (bytes = gzread(kernel_gfd, image, *size)) != *size )
+#define CHUNK 1*1024*1024
+    while(1)
     {
-        PERROR("Error reading kernel image, could not"
-               " read the whole image (%d != %ld).", bytes, *size);
-        free(image);
-        image = NULL;
+	    if ( (tmp = realloc(image, *size + CHUNK)) == NULL )
+	    {
+		    PERROR("Could not allocate memory for kernel image");
+		    free(image);
+		    image = NULL;
+		    goto out;
+	    }
+	    image = tmp;
+
+	    bytes = gzread(kernel_gfd, image + *size, CHUNK);
+	    switch (bytes)
+	    {
+	    case -1:
+		    PERROR("Error reading kernel image");
+		    free(image);
+		    image = NULL;
+		    goto out;
+	    case 0: /* EOF */
+		    goto out;
+	    default:
+		    *size += bytes;
+		    break;
+	    }
     }
+#undef CHUNK
 
  out:
+    if ( *size == 0 )
+    {
+	    PERROR("Could not read kernel image");
+	    free(image);
+	    image = NULL;
+    }
+    else if ( image )
+    {
+	    /* Shrink allocation to fit image. */
+	    tmp = realloc(image, *size);
+	    if ( tmp )
+		    image = tmp;
+    }
+
     if ( kernel_gfd != NULL )
         gzclose(kernel_gfd);
     else if ( kernel_fd >= 0 )

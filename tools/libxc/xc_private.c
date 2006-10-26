@@ -344,28 +344,6 @@ int xc_clear_domain_page(int xc_handle,
     return 0;
 }
 
-unsigned long xc_get_filesz(int fd)
-{
-    uint16_t sig;
-    uint32_t _sz = 0;
-    unsigned long sz;
-
-    lseek(fd, 0, SEEK_SET);
-    if ( read(fd, &sig, sizeof(sig)) != sizeof(sig) )
-        return 0;
-    sz = lseek(fd, 0, SEEK_END);
-    if ( sig == 0x8b1f ) /* GZIP signature? */
-    {
-        lseek(fd, -4, SEEK_END);
-        if ( read(fd, &_sz, 4) != 4 )
-            return 0;
-        sz = _sz;
-    }
-    lseek(fd, 0, SEEK_SET);
-
-    return sz;
-}
-
 void xc_map_memcpy(unsigned long dst, const char *src, unsigned long size,
                    int xch, uint32_t dom, xen_pfn_t *parray,
                    unsigned long vstart)

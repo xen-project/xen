@@ -36,6 +36,11 @@
 
 struct initrd_info {
     enum { INITRD_none, INITRD_file, INITRD_mem } type;
+    /*
+     * .len must be filled in by the user for type==INITRD_mem. It is
+     * filled in by load_initrd() for INITRD_file and unused for
+     * INITRD_none.
+     */
     unsigned long len;
     union {
         gzFile file_handle;
@@ -134,30 +139,42 @@ static int load_initrd(int xc_handle, domid_t dom,
                 xen_pfn_t *phys_to_mach)
 {
     char page[PAGE_SIZE];
-    unsigned long pfn_start, pfn, nr_pages;
+    unsigned long pfn_start, pfn;
 
     if ( initrd->type == INITRD_none )
         return 0;
 
     pfn_start = physbase >> PAGE_SHIFT;
-    nr_pages  = (initrd->len + PAGE_SIZE - 1) >> PAGE_SHIFT;
 
-    for ( pfn = pfn_start; pfn < (pfn_start + nr_pages); pfn++ )
+    if ( initrd->type == INITRD_mem )
     {
-        if ( initrd->type == INITRD_mem )
+        unsigned long nr_pages  = (initrd->len + PAGE_SIZE - 1) >> PAGE_SHIFT;
+
+        for ( pfn = pfn_start; pfn < (pfn_start + nr_pages); pfn++ )
         {
             xc_copy_to_domain_page(
                 xc_handle, dom, phys_to_mach[pfn],
                 &initrd->u.mem_addr[(pfn - pfn_start) << PAGE_SHIFT]);
         }
-        else
+    }
+    else
+    {
+        int readlen;
+
+        pfn = pfn_start;
+        initrd->len = 0;
+
+        /* gzread returns 0 on EOF */
+        while ( (readlen = gzread(initrd->u.file_handle, page, PAGE_SIZE)) )
         {
-            if ( gzread(initrd->u.file_handle, page, PAGE_SIZE) == -1 )
+            if ( readlen < 0 )
             {
                 PERROR("Error reading initrd image, could not");
                 return -EINVAL;
             }
-            xc_copy_to_domain_page(xc_handle, dom, phys_to_mach[pfn], page);
+
+            initrd->len += readlen;
+            xc_copy_to_domain_page(xc_handle, dom, phys_to_mach[pfn++], page);
         }
     }
 
@@ -485,10 +502,17 @@ static int setup_guest(int xc_handle,
     if ( rc != 0 )
         goto error_out;
 
-    dsi.v_start      = round_pgdown(dsi.v_start);
-    vinitrd_start    = round_pgup(dsi.v_end);
-    vinitrd_end      = vinitrd_start + initrd->len;
-    v_end            = round_pgup(vinitrd_end);
+    dsi.v_start = round_pgdown(dsi.v_start);
+    (load_funcs.loadimage)(image, image_size, xc_handle, dom, page_array,
+                           &dsi);
+
+    vinitrd_start = round_pgup(dsi.v_end);
+    if ( load_initrd(xc_handle, dom, initrd,
+                     vinitrd_start - dsi.v_start, page_array) )
+        goto error_out;
+
+    vinitrd_end    = vinitrd_start + initrd->len;
+    v_end          = round_pgup(vinitrd_end);
     start_info_mpa = (nr_pages - 3) << PAGE_SHIFT;
 
     /* Build firmware.  */
@@ -524,13 +548,6 @@ static int setup_guest(int xc_handle,
            _p(vinitrd_start),   _p(vinitrd_end),
            _p(dsi.v_start),     _p(v_end));
     IPRINTF(" ENTRY ADDRESS: %p\n", _p(dsi.v_kernentry));
-
-    (load_funcs.loadimage)(image, image_size, xc_handle, dom, page_array,
-                           &dsi);
-
-    if ( load_initrd(xc_handle, dom, initrd,
-                     vinitrd_start - dsi.v_start, page_array) )
-        goto error_out;
 
     *pvke = dsi.v_kernentry;
 
@@ -728,6 +745,24 @@ static int setup_guest(int xc_handle,
     shadow_mode_enabled = test_feature_bit(XENFEAT_auto_translated_physmap,
                                            required_features);
 
+    if ( (page_array = malloc(nr_pages * sizeof(unsigned long))) == NULL )
+    {
+        PERROR("Could not allocate memory");
+        goto error_out;
+    }
+
+    if ( xc_get_pfn_list(xc_handle, dom, page_array, nr_pages) != nr_pages )
+    {
+        PERROR("Could not get the page frame list");
+        goto error_out;
+    }
+
+    rc = (load_funcs.loadimage)(image, image_size,
+                           xc_handle, dom, page_array,
+                           &dsi);
+    if ( rc != 0 )
+        goto error_out;
+
     /*
      * Why do we need this? The number of page-table frames depends on the
      * size of the bootstrap address space. But the size of the address space
@@ -741,9 +776,14 @@ static int setup_guest(int xc_handle,
         ERROR("End of mapped kernel image too close to end of memory");
         goto error_out;
     }
+
     vinitrd_start = v_end;
+    if ( load_initrd(xc_handle, dom, initrd,
+                     vinitrd_start - dsi.v_start, page_array) )
+        goto error_out;
     if ( !increment_ulong(&v_end, round_pgup(initrd->len)) )
         goto error_out;
+
     vphysmap_start = v_end;
     if ( !increment_ulong(&v_end, round_pgup(nr_pages * sizeof(long))) )
         goto error_out;
@@ -844,28 +884,6 @@ static int setup_guest(int xc_handle,
                _p((v_end-dsi.v_start)>>20), nr_pages>>(20-PAGE_SHIFT));
         goto error_out;
     }
-
-    if ( (page_array = malloc(nr_pages * sizeof(unsigned long))) == NULL )
-    {
-        PERROR("Could not allocate memory");
-        goto error_out;
-    }
-
-    if ( xc_get_pfn_list(xc_handle, dom, page_array, nr_pages) != nr_pages )
-    {
-        PERROR("Could not get the page frame list");
-        goto error_out;
-    }
-
-    rc = (load_funcs.loadimage)(image, image_size,
-                           xc_handle, dom, page_array,
-                           &dsi);
-    if ( rc != 0 )
-        goto error_out;
-
-    if ( load_initrd(xc_handle, dom, initrd,
-                     vinitrd_start - dsi.v_start, page_array) )
-        goto error_out;
 
     /* setup page tables */
 #if defined(__i386__)
@@ -1350,7 +1368,6 @@ int xc_linux_build(int xc_handle,
             goto error_out;
         }
 
-        initrd_info.len = xc_get_filesz(fd);
         if ( (initrd_info.u.file_handle = gzdopen(fd, "rb")) == NULL )
         {
             PERROR("Could not allocate decompression state for initrd");
