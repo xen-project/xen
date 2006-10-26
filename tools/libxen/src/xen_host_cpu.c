@@ -48,6 +48,15 @@ static const struct_member xen_host_cpu_record_struct_members[] =
         { .key = "number",
           .type = &abstract_type_int,
           .offset = offsetof(xen_host_cpu_record, number) },
+        { .key = "vendor",
+          .type = &abstract_type_string,
+          .offset = offsetof(xen_host_cpu_record, vendor) },
+        { .key = "speed",
+          .type = &abstract_type_int,
+          .offset = offsetof(xen_host_cpu_record, speed) },
+        { .key = "modelname",
+          .type = &abstract_type_string,
+          .offset = offsetof(xen_host_cpu_record, modelname) },
         { .key = "features",
           .type = &xen_cpu_feature_set_abstract_type_,
           .offset = offsetof(xen_host_cpu_record, features) },
@@ -72,6 +81,8 @@ xen_host_cpu_record_free(xen_host_cpu_record *record)
     free(record->handle);
     free(record->uuid);
     xen_host_record_opt_free(record->host);
+    free(record->vendor);
+    free(record->modelname);
     xen_cpu_feature_set_free(record->features);
     free(record);
 }
@@ -163,6 +174,56 @@ xen_host_cpu_get_number(xen_session *session, uint64_t *result, xen_host_cpu hos
     abstract_type result_type = abstract_type_int;
 
     XEN_CALL_("host_cpu.get_number");
+    return session->ok;
+}
+
+
+bool
+xen_host_cpu_get_vendor(xen_session *session, char **result, xen_host_cpu host_cpu)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host_cpu }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("host_cpu.get_vendor");
+    return session->ok;
+}
+
+
+bool
+xen_host_cpu_get_speed(xen_session *session, uint64_t *result, xen_host_cpu host_cpu)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host_cpu }
+        };
+
+    abstract_type result_type = abstract_type_int;
+
+    XEN_CALL_("host_cpu.get_speed");
+    return session->ok;
+}
+
+
+bool
+xen_host_cpu_get_modelname(xen_session *session, char **result, xen_host_cpu host_cpu)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host_cpu }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("host_cpu.get_modelname");
     return session->ok;
 }
 
