@@ -24,12 +24,17 @@
 #include "xen_common.h"
 #include "xen_driver_type_internal.h"
 #include "xen_internal.h"
-#include "xen_vtpm.h"
 #include "xen_vm.h"
+#include "xen_vtpm.h"
 
 
 XEN_FREE(xen_vtpm)
 XEN_SET_ALLOC_FREE(xen_vtpm)
+XEN_ALLOC(xen_vtpm_record)
+XEN_SET_ALLOC_FREE(xen_vtpm_record)
+XEN_ALLOC(xen_vtpm_record_opt)
+XEN_RECORD_OPT_FREE(xen_vtpm)
+XEN_SET_ALLOC_FREE(xen_vtpm_record_opt)
 
 
 static const struct_member xen_vtpm_record_struct_members[] =
@@ -46,6 +51,9 @@ static const struct_member xen_vtpm_record_struct_members[] =
         { .key = "driver",
           .type = &xen_driver_type_abstract_type_,
           .offset = offsetof(xen_vtpm_record, driver) },
+        { .key = "instance",
+          .type = &abstract_type_int,
+          .offset = offsetof(xen_vtpm_record, instance) }
     };
 
 const abstract_type xen_vtpm_record_abstract_type_ =
@@ -161,7 +169,24 @@ xen_vtpm_get_backend(xen_session *session, xen_vm *result, xen_vtpm vtpm)
 
 
 bool
-xen_vtpm_get_instance(xen_session *session, int *result, xen_vtpm vtpm)
+xen_vtpm_get_driver(xen_session *session, enum xen_driver_type *result, xen_vtpm vtpm)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vtpm }
+        };
+
+    abstract_type result_type = xen_driver_type_abstract_type_;
+    char *result_str = NULL;
+    XEN_CALL_("VTPM.get_driver");
+    *result = xen_driver_type_from_string(session, result_str);
+    return session->ok;
+}
+
+
+bool
+xen_vtpm_get_instance(xen_session *session, uint64_t *result, xen_vtpm vtpm)
 {
     abstract_value param_values[] =
         {
@@ -182,5 +207,3 @@ xen_vtpm_get_uuid(xen_session *session, char **result, xen_vtpm vtpm)
     *result = session->ok ? xen_strdup_((char *)vtpm) : NULL;
     return session->ok;
 }
-
-

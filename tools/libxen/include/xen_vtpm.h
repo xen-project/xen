@@ -22,13 +22,13 @@
 
 #include "xen_common.h"
 #include "xen_driver_type.h"
-#include "xen_vtpm_decl.h"
 #include "xen_vm_decl.h"
+#include "xen_vtpm_decl.h"
 
 
 /*
- * The VTPM class.
- *
+ * The VTPM class. 
+ *  
  * A virtual TPM device.
  */
 
@@ -67,8 +67,8 @@ typedef struct xen_vtpm_record
     char *uuid;
     struct xen_vm_record_opt *vm;
     struct xen_vm_record_opt *backend;
-    int instance;
     enum xen_driver_type driver;
+    uint64_t instance;
 } xen_vtpm_record;
 
 /**
@@ -78,8 +78,8 @@ extern xen_vtpm_record *
 xen_vtpm_record_alloc(void);
 
 /**
- * Free the given xen_vtpm_record, and all referenced values.  The given
- * record must have been allocated by this library.
+ * Free the given xen_vtpm_record, and all referenced values.  The
+ * given record must have been allocated by this library.
  */
 extern void
 xen_vtpm_record_free(xen_vtpm_record *record);
@@ -143,7 +143,7 @@ extern xen_vtpm_record_opt_set *
 xen_vtpm_record_opt_set_alloc(size_t size);
 
 /**
- * Free the given xen_vtpm_record_opt_set, and all referenced values.
+ * Free the given xen_vtpm_record_opt_set, and all referenced values. 
  * The given set must have been allocated by this library.
  */
 extern void
@@ -193,10 +193,17 @@ xen_vtpm_get_backend(xen_session *session, xen_vm *result, xen_vtpm vtpm);
 
 
 /**
+ * Get the driver field of the given VTPM.
+ */
+extern bool
+xen_vtpm_get_driver(xen_session *session, enum xen_driver_type *result, xen_vtpm vtpm);
+
+
+/**
  * Get the instance field of the given VTPM.
  */
 extern bool
-xen_vtpm_get_instance(xen_session *session, int *result, xen_vtpm vtpm);
+xen_vtpm_get_instance(xen_session *session, uint64_t *result, xen_vtpm vtpm);
 
 
 #endif

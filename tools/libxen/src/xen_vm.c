@@ -32,9 +32,9 @@
 #include "xen_string_string_map.h"
 #include "xen_vbd.h"
 #include "xen_vif.h"
-#include "xen_vtpm.h"
 #include "xen_vm.h"
 #include "xen_vm_power_state_internal.h"
+#include "xen_vtpm.h"
 
 
 XEN_FREE(xen_vm)
@@ -126,6 +126,9 @@ static const struct_member xen_vm_record_struct_members[] =
         { .key = "vbds",
           .type = &abstract_type_ref_set,
           .offset = offsetof(xen_vm_record, vbds) },
+        { .key = "vtpms",
+          .type = &abstract_type_ref_set,
+          .offset = offsetof(xen_vm_record, vtpms) },
         { .key = "bios_boot",
           .type = &abstract_type_string,
           .offset = offsetof(xen_vm_record, bios_boot) },
@@ -200,6 +203,7 @@ xen_vm_record_free(xen_vm_record *record)
     xen_cpu_feature_set_free(record->vcpus_features_force_off);
     xen_vif_record_opt_set_free(record->vifs);
     xen_vbd_record_opt_set_free(record->vbds);
+    xen_vtpm_record_opt_set_free(record->vtpms);
     free(record->bios_boot);
     free(record->platform_serial);
     free(record->builder);

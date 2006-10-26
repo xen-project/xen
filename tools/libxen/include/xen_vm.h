@@ -29,9 +29,9 @@
 #include "xen_string_string_map.h"
 #include "xen_vbd_decl.h"
 #include "xen_vif_decl.h"
-#include "xen_vtpm_decl.h"
 #include "xen_vm_decl.h"
 #include "xen_vm_power_state.h"
+#include "xen_vtpm_decl.h"
 
 
 /*
@@ -98,8 +98,7 @@ typedef struct xen_vm_record
     enum xen_on_crash_behaviour actions_after_crash;
     struct xen_vif_record_opt_set *vifs;
     struct xen_vbd_record_opt_set *vbds;
-    uint64_t tpm_instance;
-    uint64_t tpm_backend;
+    struct xen_vtpm_record_opt_set *vtpms;
     char *bios_boot;
     bool platform_std_vga;
     char *platform_serial;
