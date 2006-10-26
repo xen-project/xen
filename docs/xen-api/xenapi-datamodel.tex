@@ -1049,9 +1049,9 @@ $\mathit{RW}$ &  {\tt actions/after\_shutdown} & on\_normal\_exit & action to ta
 $\mathit{RW}$ &  {\tt actions/after\_reboot} & on\_normal\_exit & action to take after the guest has rebooted itself \\
 $\mathit{RW}$ &  {\tt actions/after\_suspend} & on\_normal\_exit & action to take after the guest has suspended itself \\
 $\mathit{RW}$ &  {\tt actions/after\_crash} & on\_crash\_behaviour & action to take if the guest crashes \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt VIFs} & (VIF ref) Set & virtual network interfaces \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt VBDs} & (VBD ref) Set & virtual block devices \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt VTPM} & (VTPM ref) Set & virtual TPMs \\
+$\mathit{RO}_\mathit{run}$ &  {\tt VIFs} & (VIF ref) Set & virtual network interfaces \\
+$\mathit{RO}_\mathit{run}$ &  {\tt VBDs} & (VBD ref) Set & virtual block devices \\
+$\mathit{RO}_\mathit{run}$ &  {\tt VTPMs} & (VTPM ref) Set & virtual TPMs \\
 $\mathit{RW}$ &  {\tt bios/boot} & string & device to boot the guest from \\
 $\mathit{RW}$ &  {\tt platform/std\_VGA} & bool & emulate standard VGA instead of cirrus logic \\
 $\mathit{RW}$ &  {\tt platform/serial} & string & redirect serial port to pty \\
@@ -5019,7 +5019,7 @@ Quals & Field & Type & Description \\
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
 $\mathit{RW}$ &  {\tt name/label} & string & a human-readable name \\
 $\mathit{RW}$ &  {\tt name/description} & string & a notes field containg human-readable description \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt VIFs} & (VIF ref) Set & list of connected vifs \\
+$\mathit{RO}_\mathit{run}$ &  {\tt VIFs} & (VIF ref) Set & list of connected vifs \\
 $\mathit{RW}$ &  {\tt NIC} & string & ethernet device to use to access this network. Note: in this revision of the API all hosts will use the specified NIC to access this network \\
 $\mathit{RW}$ &  {\tt VLAN} & string & VLAN tag to use to access this network. Note: in this revision of the API all hosts will use the specified VLAN tag to access this network \\
 $\mathit{RW}$ &  {\tt default\_gateway} & string & default gateway IP address. Used for auto-configuring guests with fixed IP setting \\
@@ -7218,13 +7218,13 @@ $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object ref
 $\mathit{RW}$ &  {\tt name/label} & string & a human-readable name \\
 $\mathit{RW}$ &  {\tt name/description} & string & a notes field containg human-readable description \\
 $\mathit{RW}$ &  {\tt SR} & SR ref & storage repository in which the VDI resides \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt VBDs} & (VBD ref) Set & list of vbds that refer to this disk \\
+$\mathit{RO}_\mathit{run}$ &  {\tt VBDs} & (VBD ref) Set & list of vbds that refer to this disk \\
 $\mathit{RW}$ &  {\tt virtual\_size} & int & size of disk as presented to the guest (in multiples of sector\_size field) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt physical\_utilisation} & int & amount of physical space that the disk image is currently taking up on the storage repository (in bytes) \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt sector\_size} & int & sector size of VDI (in bytes) \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt type} & vdi\_type & type of the VDI \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt parent} & VDI ref & parent disk (e.g. in the case of copy on write) \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt children} & (VDI ref) Set & child disks (e.g. in the case of copy on write) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt children} & (VDI ref) Set & child disks (e.g. in the case of copy on write) \\
 $\mathit{RW}$ &  {\tt sharable} & bool & true if this disk may be shared \\
 $\mathit{RW}$ &  {\tt read\_only} & bool & true if this disk may ONLY be mounted read-only \\
 \hline
