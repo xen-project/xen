@@ -492,6 +492,22 @@ xen_vdi_snapshot(xen_session *session, xen_vdi *result, xen_vdi vdi)
 
 
 bool
+xen_vdi_resize(xen_session *session, xen_vdi vdi, uint64_t size)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vdi },
+            { .type = &abstract_type_int,
+              .u.int_val = size }
+        };
+
+    xen_call_(session, "VDI.resize", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
 xen_vdi_get_uuid(xen_session *session, char **result, xen_vdi vdi)
 {
     *result = session->ok ? xen_strdup_((char *)vdi) : NULL;

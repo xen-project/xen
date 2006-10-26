@@ -327,4 +327,11 @@ extern bool
 xen_vdi_snapshot(xen_session *session, xen_vdi *result, xen_vdi vdi);
 
 
+/**
+ * Resize the vdi to the size.
+ */
+extern bool
+xen_vdi_resize(xen_session *session, xen_vdi vdi, uint64_t size);
+
+
 #endif
