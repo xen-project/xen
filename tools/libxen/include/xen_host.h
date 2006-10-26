@@ -22,6 +22,7 @@
 #include "xen_common.h"
 #include "xen_host_cpu_decl.h"
 #include "xen_host_decl.h"
+#include "xen_pif_decl.h"
 #include "xen_string_string_map.h"
 #include "xen_vm_decl.h"
 
@@ -69,6 +70,7 @@ typedef struct xen_host_record
     char *name_description;
     xen_string_string_map *software_version;
     struct xen_vm_record_opt_set *resident_vms;
+    struct xen_pif_record_opt_set *pifs;
     struct xen_host_cpu_record_opt_set *host_cpus;
 } xen_host_record;
 
@@ -212,6 +214,13 @@ xen_host_get_software_version(xen_session *session, xen_string_string_map **resu
  */
 extern bool
 xen_host_get_resident_vms(xen_session *session, xen_vm *result, xen_host host);
+
+
+/**
+ * Get the PIFs field of the given host.
+ */
+extern bool
+xen_host_get_pifs(xen_session *session, xen_pif *result, xen_host host);
 
 
 /**

@@ -71,8 +71,8 @@ typedef struct xen_vbd_record
     char *device;
     enum xen_vbd_mode mode;
     enum xen_driver_type driver;
-    double io_bandwidth_incoming_kbs;
-    double io_bandwidth_outgoing_kbs;
+    double io_read_kbs;
+    double io_write_kbs;
 } xen_vbd_record;
 
 /**
@@ -218,17 +218,17 @@ xen_vbd_get_driver(xen_session *session, enum xen_driver_type *result, xen_vbd v
 
 
 /**
- * Get the IO_bandwidth/incoming_kbs field of the given VBD.
+ * Get the io/read_kbs field of the given VBD.
  */
 extern bool
-xen_vbd_get_io_bandwidth_incoming_kbs(xen_session *session, double *result, xen_vbd vbd);
+xen_vbd_get_io_read_kbs(xen_session *session, double *result, xen_vbd vbd);
 
 
 /**
- * Get the IO_bandwidth/outgoing_kbs field of the given VBD.
+ * Get the io/write_kbs field of the given VBD.
  */
 extern bool
-xen_vbd_get_io_bandwidth_outgoing_kbs(xen_session *session, double *result, xen_vbd vbd);
+xen_vbd_get_io_write_kbs(xen_session *session, double *result, xen_vbd vbd);
 
 
 /**
@@ -264,6 +264,14 @@ xen_vbd_set_mode(xen_session *session, xen_vbd xen_vbd, enum xen_vbd_mode mode);
  */
 extern bool
 xen_vbd_set_driver(xen_session *session, xen_vbd xen_vbd, enum xen_driver_type driver);
+
+
+/**
+ * Change the media in the device for CDROM-like devices only. For
+ * other devices, detach the VBD and attach a new one
+ */
+extern bool
+xen_vbd_media_change(xen_session *session, xen_vbd vbd, xen_vdi vdi);
 
 
 #endif

@@ -21,6 +21,7 @@
 
 #include "xen_common.h"
 #include "xen_network_decl.h"
+#include "xen_pif_decl.h"
 #include "xen_vif_decl.h"
 
 
@@ -66,8 +67,7 @@ typedef struct xen_network_record
     char *name_label;
     char *name_description;
     struct xen_vif_record_opt_set *vifs;
-    char *nic;
-    char *vlan;
+    struct xen_pif_record_opt_set *pifs;
     char *default_gateway;
     char *default_netmask;
 } xen_network_record;
@@ -208,17 +208,10 @@ xen_network_get_vifs(xen_session *session, xen_vif *result, xen_network network)
 
 
 /**
- * Get the NIC field of the given network.
+ * Get the PIFs field of the given network.
  */
 extern bool
-xen_network_get_nic(xen_session *session, char **result, xen_network network);
-
-
-/**
- * Get the VLAN field of the given network.
- */
-extern bool
-xen_network_get_vlan(xen_session *session, char **result, xen_network network);
+xen_network_get_pifs(xen_session *session, xen_pif *result, xen_network network);
 
 
 /**
@@ -247,20 +240,6 @@ xen_network_set_name_label(xen_session *session, xen_network xen_network, char *
  */
 extern bool
 xen_network_set_name_description(xen_session *session, xen_network xen_network, char *description);
-
-
-/**
- * Set the NIC field of the given network.
- */
-extern bool
-xen_network_set_nic(xen_session *session, xen_network xen_network, char *nic);
-
-
-/**
- * Set the VLAN field of the given network.
- */
-extern bool
-xen_network_set_vlan(xen_session *session, xen_network xen_network, char *vlan);
 
 
 /**

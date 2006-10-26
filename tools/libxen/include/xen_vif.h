@@ -72,10 +72,8 @@ typedef struct xen_vif_record
     struct xen_vm_record_opt *vm;
     char *mac;
     uint64_t mtu;
-    double network_read_kbs;
-    double network_write_kbs;
-    double io_bandwidth_incoming_kbs;
-    double io_bandwidth_outgoing_kbs;
+    double io_read_kbs;
+    double io_write_kbs;
 } xen_vif_record;
 
 /**
@@ -235,31 +233,17 @@ xen_vif_get_mtu(xen_session *session, uint64_t *result, xen_vif vif);
 
 
 /**
- * Get the network_read_kbs field of the given VIF.
+ * Get the io/read_kbs field of the given VIF.
  */
 extern bool
-xen_vif_get_network_read_kbs(xen_session *session, double *result, xen_vif vif);
+xen_vif_get_io_read_kbs(xen_session *session, double *result, xen_vif vif);
 
 
 /**
- * Get the network_write_kbs field of the given VIF.
+ * Get the io/write_kbs field of the given VIF.
  */
 extern bool
-xen_vif_get_network_write_kbs(xen_session *session, double *result, xen_vif vif);
-
-
-/**
- * Get the IO_bandwidth/incoming_kbs field of the given VIF.
- */
-extern bool
-xen_vif_get_io_bandwidth_incoming_kbs(xen_session *session, double *result, xen_vif vif);
-
-
-/**
- * Get the IO_bandwidth/outgoing_kbs field of the given VIF.
- */
-extern bool
-xen_vif_get_io_bandwidth_outgoing_kbs(xen_session *session, double *result, xen_vif vif);
+xen_vif_get_io_write_kbs(xen_session *session, double *result, xen_vif vif);
 
 
 /**

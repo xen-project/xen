@@ -58,12 +58,12 @@ static const struct_member xen_vbd_record_struct_members[] =
         { .key = "driver",
           .type = &xen_driver_type_abstract_type_,
           .offset = offsetof(xen_vbd_record, driver) },
-        { .key = "io_bandwidth_incoming_kbs",
+        { .key = "io_read_kbs",
           .type = &abstract_type_float,
-          .offset = offsetof(xen_vbd_record, io_bandwidth_incoming_kbs) },
-        { .key = "io_bandwidth_outgoing_kbs",
+          .offset = offsetof(xen_vbd_record, io_read_kbs) },
+        { .key = "io_write_kbs",
           .type = &abstract_type_float,
-          .offset = offsetof(xen_vbd_record, io_bandwidth_outgoing_kbs) }
+          .offset = offsetof(xen_vbd_record, io_write_kbs) }
     };
 
 const abstract_type xen_vbd_record_abstract_type_ =
@@ -231,7 +231,7 @@ xen_vbd_get_driver(xen_session *session, enum xen_driver_type *result, xen_vbd v
 
 
 bool
-xen_vbd_get_io_bandwidth_incoming_kbs(xen_session *session, double *result, xen_vbd vbd)
+xen_vbd_get_io_read_kbs(xen_session *session, double *result, xen_vbd vbd)
 {
     abstract_value param_values[] =
         {
@@ -241,13 +241,13 @@ xen_vbd_get_io_bandwidth_incoming_kbs(xen_session *session, double *result, xen_
 
     abstract_type result_type = abstract_type_float;
 
-    XEN_CALL_("VBD.get_io_bandwidth_incoming_kbs");
+    XEN_CALL_("VBD.get_io_read_kbs");
     return session->ok;
 }
 
 
 bool
-xen_vbd_get_io_bandwidth_outgoing_kbs(xen_session *session, double *result, xen_vbd vbd)
+xen_vbd_get_io_write_kbs(xen_session *session, double *result, xen_vbd vbd)
 {
     abstract_value param_values[] =
         {
@@ -257,7 +257,7 @@ xen_vbd_get_io_bandwidth_outgoing_kbs(xen_session *session, double *result, xen_
 
     abstract_type result_type = abstract_type_float;
 
-    XEN_CALL_("VBD.get_io_bandwidth_outgoing_kbs");
+    XEN_CALL_("VBD.get_io_write_kbs");
     return session->ok;
 }
 
@@ -338,6 +338,22 @@ xen_vbd_set_driver(xen_session *session, xen_vbd xen_vbd, enum xen_driver_type d
         };
 
     xen_call_(session, "VBD.set_driver", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vbd_media_change(xen_session *session, xen_vbd vbd, xen_vdi vdi)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vbd },
+            { .type = &abstract_type_string,
+              .u.string_val = vdi }
+        };
+
+    xen_call_(session, "VBD.media_change", param_values, 2, NULL, NULL);
     return session->ok;
 }
 

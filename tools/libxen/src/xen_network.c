@@ -23,6 +23,7 @@
 #include "xen_common.h"
 #include "xen_internal.h"
 #include "xen_network.h"
+#include "xen_pif.h"
 #include "xen_vif.h"
 
 
@@ -49,12 +50,9 @@ static const struct_member xen_network_record_struct_members[] =
         { .key = "vifs",
           .type = &abstract_type_ref_set,
           .offset = offsetof(xen_network_record, vifs) },
-        { .key = "nic",
-          .type = &abstract_type_string,
-          .offset = offsetof(xen_network_record, nic) },
-        { .key = "vlan",
-          .type = &abstract_type_string,
-          .offset = offsetof(xen_network_record, vlan) },
+        { .key = "pifs",
+          .type = &abstract_type_ref_set,
+          .offset = offsetof(xen_network_record, pifs) },
         { .key = "default_gateway",
           .type = &abstract_type_string,
           .offset = offsetof(xen_network_record, default_gateway) },
@@ -81,8 +79,7 @@ xen_network_record_free(xen_network_record *record)
     free(record->name_label);
     free(record->name_description);
     xen_vif_record_opt_set_free(record->vifs);
-    free(record->nic);
-    free(record->vlan);
+    xen_pif_record_opt_set_free(record->pifs);
     free(record->default_gateway);
     free(record->default_netmask);
     free(record);
@@ -215,7 +212,7 @@ xen_network_get_vifs(xen_session *session, xen_vif *result, xen_network network)
 
 
 bool
-xen_network_get_nic(xen_session *session, char **result, xen_network network)
+xen_network_get_pifs(xen_session *session, xen_pif *result, xen_network network)
 {
     abstract_value param_values[] =
         {
@@ -223,27 +220,10 @@ xen_network_get_nic(xen_session *session, char **result, xen_network network)
               .u.string_val = network }
         };
 
-    abstract_type result_type = abstract_type_string;
+    abstract_type result_type = abstract_type_string_set;
 
     *result = NULL;
-    XEN_CALL_("network.get_nic");
-    return session->ok;
-}
-
-
-bool
-xen_network_get_vlan(xen_session *session, char **result, xen_network network)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = network }
-        };
-
-    abstract_type result_type = abstract_type_string;
-
-    *result = NULL;
-    XEN_CALL_("network.get_vlan");
+    XEN_CALL_("network.get_pifs");
     return session->ok;
 }
 
@@ -310,38 +290,6 @@ xen_network_set_name_description(xen_session *session, xen_network xen_network, 
         };
 
     xen_call_(session, "network.set_name_description", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_network_set_nic(xen_session *session, xen_network xen_network, char *nic)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = xen_network },
-            { .type = &abstract_type_string,
-              .u.string_val = nic }
-        };
-
-    xen_call_(session, "network.set_nic", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_network_set_vlan(xen_session *session, xen_network xen_network, char *vlan)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = xen_network },
-            { .type = &abstract_type_string,
-              .u.string_val = vlan }
-        };
-
-    xen_call_(session, "network.set_vlan", param_values, 2, NULL, NULL);
     return session->ok;
 }
 

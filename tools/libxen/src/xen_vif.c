@@ -63,18 +63,12 @@ static const struct_member xen_vif_record_struct_members[] =
         { .key = "mtu",
           .type = &abstract_type_int,
           .offset = offsetof(xen_vif_record, mtu) },
-        { .key = "network_read_kbs",
+        { .key = "io_read_kbs",
           .type = &abstract_type_float,
-          .offset = offsetof(xen_vif_record, network_read_kbs) },
-        { .key = "network_write_kbs",
+          .offset = offsetof(xen_vif_record, io_read_kbs) },
+        { .key = "io_write_kbs",
           .type = &abstract_type_float,
-          .offset = offsetof(xen_vif_record, network_write_kbs) },
-        { .key = "io_bandwidth_incoming_kbs",
-          .type = &abstract_type_float,
-          .offset = offsetof(xen_vif_record, io_bandwidth_incoming_kbs) },
-        { .key = "io_bandwidth_outgoing_kbs",
-          .type = &abstract_type_float,
-          .offset = offsetof(xen_vif_record, io_bandwidth_outgoing_kbs) }
+          .offset = offsetof(xen_vif_record, io_write_kbs) }
     };
 
 const abstract_type xen_vif_record_abstract_type_ =
@@ -277,7 +271,7 @@ xen_vif_get_mtu(xen_session *session, uint64_t *result, xen_vif vif)
 
 
 bool
-xen_vif_get_network_read_kbs(xen_session *session, double *result, xen_vif vif)
+xen_vif_get_io_read_kbs(xen_session *session, double *result, xen_vif vif)
 {
     abstract_value param_values[] =
         {
@@ -287,13 +281,13 @@ xen_vif_get_network_read_kbs(xen_session *session, double *result, xen_vif vif)
 
     abstract_type result_type = abstract_type_float;
 
-    XEN_CALL_("VIF.get_network_read_kbs");
+    XEN_CALL_("VIF.get_io_read_kbs");
     return session->ok;
 }
 
 
 bool
-xen_vif_get_network_write_kbs(xen_session *session, double *result, xen_vif vif)
+xen_vif_get_io_write_kbs(xen_session *session, double *result, xen_vif vif)
 {
     abstract_value param_values[] =
         {
@@ -303,39 +297,7 @@ xen_vif_get_network_write_kbs(xen_session *session, double *result, xen_vif vif)
 
     abstract_type result_type = abstract_type_float;
 
-    XEN_CALL_("VIF.get_network_write_kbs");
-    return session->ok;
-}
-
-
-bool
-xen_vif_get_io_bandwidth_incoming_kbs(xen_session *session, double *result, xen_vif vif)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vif }
-        };
-
-    abstract_type result_type = abstract_type_float;
-
-    XEN_CALL_("VIF.get_io_bandwidth_incoming_kbs");
-    return session->ok;
-}
-
-
-bool
-xen_vif_get_io_bandwidth_outgoing_kbs(xen_session *session, double *result, xen_vif vif)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vif }
-        };
-
-    abstract_type result_type = abstract_type_float;
-
-    XEN_CALL_("VIF.get_io_bandwidth_outgoing_kbs");
+    XEN_CALL_("VIF.get_io_write_kbs");
     return session->ok;
 }
 
