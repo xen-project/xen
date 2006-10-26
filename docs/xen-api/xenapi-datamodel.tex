@@ -7262,6 +7262,40 @@ The ID of the newly created VDI.
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~resize}
+
+{\bf Overview:} 
+Resize the vdi to the size.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void resize (session_id s, VDI ref vdi, int size)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VDI ref } & vdi & The VDI to resize \\ \hline 
+
+{\tt int } & size & The new size of the VDI \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
