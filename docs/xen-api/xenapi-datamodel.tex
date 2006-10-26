@@ -8606,9 +8606,9 @@ references to all objects
 Quals & Field & Type & Description \\
 \hline
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
-$\mathit{RO}_\mathit{ins}$ & {\tt type} & driver\_type & the style of driver \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt VM} & VM ref & the virtual machine \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt backend} & VM ref & the domain where the backend is located \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt driver} & driver\_type & the style of driver \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt instance} & int & the instance number the virtual TPM represents \\
 \hline
 \end{longtable}
@@ -8638,38 +8638,6 @@ get accessor message derived from field uuid of object VTPM
  \noindent {\bf Return Type:} 
 {\tt 
 string
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_type}
-
-{\bf Overview:} 
-get accessor message derived from field type of object VTPM
-
- \noindent {\bf Signature:} 
-\begin{verbatim} (driver_type) get_type (session_id s, VTPM ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VTPM ref } & self & object instance \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-driver\_type
 }
 
 
@@ -8715,7 +8683,7 @@ value of the field
 get accessor message derived from field backend of object VTPM
 
  \noindent {\bf Signature:} 
-\begin{verbatim} int get_backend (session_id s, VTPM ref self)\end{verbatim}
+\begin{verbatim} (VM ref) get_backend (session_id s, VTPM ref self)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -8733,7 +8701,39 @@ get accessor message derived from field backend of object VTPM
 
  \noindent {\bf Return Type:} 
 {\tt 
-int
+VM ref
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_driver}
+
+{\bf Overview:} 
+get accessor message derived from field driver of object VTPM
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (driver_type) get_driver (session_id s, VTPM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VTPM ref } & self & object instance \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+driver\_type
 }
 
 
