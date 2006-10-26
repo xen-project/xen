@@ -5020,8 +5020,6 @@ $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object ref
 $\mathit{RW}$ &  {\tt name/label} & string & a human-readable name \\
 $\mathit{RW}$ &  {\tt name/description} & string & a notes field containg human-readable description \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VIFs} & (VIF ref) Set & list of connected vifs \\
-$\mathit{RW}$ &  {\tt NIC} & string & ethernet device to use to access this network. Note: in this revision of the API all hosts will use the specified NIC to access this network \\
-$\mathit{RW}$ &  {\tt VLAN} & string & VLAN tag to use to access this network. Note: in this revision of the API all hosts will use the specified VLAN tag to access this network \\
 $\mathit{RW}$ &  {\tt default\_gateway} & string & default gateway IP address. Used for auto-configuring guests with fixed IP setting \\
 $\mathit{RW}$ &  {\tt default\_netmask} & string & default netmask. Used for auto-configuring guests with fixed IP setting \\
 \hline
@@ -5241,138 +5239,6 @@ get accessor message derived from field VIFs of object network
 
 
 value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_NIC}
-
-{\bf Overview:} 
-get accessor message derived from field NIC of object network
-
- \noindent {\bf Signature:} 
-\begin{verbatim} string get_NIC (session_id s, network ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt network ref } & self & object instance \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-string
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_NIC}
-
-{\bf Overview:} 
-set accessor message derived from field NIC of object network
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_NIC (session_id s, network ref self, string value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt network ref } & self & object instance \\ \hline 
-
-{\tt string } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_VLAN}
-
-{\bf Overview:} 
-get accessor message derived from field VLAN of object network
-
- \noindent {\bf Signature:} 
-\begin{verbatim} string get_VLAN (session_id s, network ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt network ref } & self & object instance \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-string
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_VLAN}
-
-{\bf Overview:} 
-set accessor message derived from field VLAN of object network
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_VLAN (session_id s, network ref self, string value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt network ref } & self & object instance \\ \hline 
-
-{\tt string } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -5741,10 +5607,8 @@ $\mathit{RW}$ &  {\tt network} & network ref & virtual network to which this vif
 $\mathit{RW}$ &  {\tt VM} & VM ref & virtual machine to which this vif is connected \\
 $\mathit{RW}$ &  {\tt MAC} & string & ethernet MAC address of virtual interface, as exposed to guest \\
 $\mathit{RW}$ &  {\tt MTU} & int & MTU in octets \\
-$\mathit{RO}_\mathit{run}$ &  {\tt network\_read\_kbs} & float & Incoming network bandwidth \\
-$\mathit{RO}_\mathit{run}$ &  {\tt network\_write\_kbs} & float & Outgoing network bandwidth \\
-$\mathit{RO}_\mathit{run}$ &  {\tt IO\_bandwidth/incoming\_kbs} & float & Read bandwidth (Kb/s) \\
-$\mathit{RO}_\mathit{run}$ &  {\tt IO\_bandwidth/outgoing\_kbs} & float & Write bandwidth (Kb/s) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB/s) \\
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: VIF}
@@ -6242,13 +6106,13 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~get\_network\_read\_kbs}
+\subsubsection{RPC name:~get\_io\_read\_kbs}
 
 {\bf Overview:} 
-get accessor message derived from field network\_read\_kbs of object VIF
+get accessor message derived from field io/read\_kbs of object VIF
 
  \noindent {\bf Signature:} 
-\begin{verbatim} float get_network_read_kbs (session_id s, VIF ref self)\end{verbatim}
+\begin{verbatim} float get_io_read_kbs (session_id s, VIF ref self)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -6274,77 +6138,13 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~get\_network\_write\_kbs}
+\subsubsection{RPC name:~get\_io\_write\_kbs}
 
 {\bf Overview:} 
-get accessor message derived from field network\_write\_kbs of object VIF
+get accessor message derived from field io/write\_kbs of object VIF
 
  \noindent {\bf Signature:} 
-\begin{verbatim} float get_network_write_kbs (session_id s, VIF ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VIF ref } & self & object instance \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-float
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_IO\_bandwidth\_incoming\_kbs}
-
-{\bf Overview:} 
-get accessor message derived from field IO\_bandwidth/incoming\_kbs of object VIF
-
- \noindent {\bf Signature:} 
-\begin{verbatim} float get_IO_bandwidth_incoming_kbs (session_id s, VIF ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VIF ref } & self & object instance \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-float
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_IO\_bandwidth\_outgoing\_kbs}
-
-{\bf Overview:} 
-get accessor message derived from field IO\_bandwidth/outgoing\_kbs of object VIF
-
- \noindent {\bf Signature:} 
-\begin{verbatim} float get_IO_bandwidth_outgoing_kbs (session_id s, VIF ref self)\end{verbatim}
+\begin{verbatim} float get_io_write_kbs (session_id s, VIF ref self)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -8147,11 +7947,45 @@ $\mathit{RW}$ &  {\tt VDI} & VDI ref & the virtual disk \\
 $\mathit{RW}$ &  {\tt device} & string & device seen by the guest e.g. hda1 \\
 $\mathit{RW}$ &  {\tt mode} & vbd\_mode & the mode the disk should be mounted with \\
 $\mathit{RW}$ &  {\tt driver} & driver\_type & the style of driver \\
-$\mathit{RO}_\mathit{run}$ &  {\tt IO\_bandwidth/incoming\_kbs} & float & Read bandwidth (Kb/s) \\
-$\mathit{RO}_\mathit{run}$ &  {\tt IO\_bandwidth/outgoing\_kbs} & float & Write bandwidth (Kb/s) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB/s) \\
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: VBD}
+\subsubsection{RPC name:~media\_change}
+
+{\bf Overview:} 
+Change the media in the device for CDROM-like devices only. For other devices, detach the VBD and attach a new one
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void media_change (session_id s, VBD ref vbd, VDI ref vdi)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & vbd & The vbd representing the CDROM-like device \\ \hline 
+
+{\tt VDI ref } & vdi & The new VDI to 'insert' \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
@@ -8514,13 +8348,13 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~get\_IO\_bandwidth\_incoming\_kbs}
+\subsubsection{RPC name:~get\_io\_read\_kbs}
 
 {\bf Overview:} 
-get accessor message derived from field IO\_bandwidth/incoming\_kbs of object VBD
+get accessor message derived from field io/read\_kbs of object VBD
 
  \noindent {\bf Signature:} 
-\begin{verbatim} float get_IO_bandwidth_incoming_kbs (session_id s, VBD ref self)\end{verbatim}
+\begin{verbatim} float get_io_read_kbs (session_id s, VBD ref self)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -8546,13 +8380,13 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~get\_IO\_bandwidth\_outgoing\_kbs}
+\subsubsection{RPC name:~get\_io\_write\_kbs}
 
 {\bf Overview:} 
-get accessor message derived from field IO\_bandwidth/outgoing\_kbs of object VBD
+get accessor message derived from field io/write\_kbs of object VBD
 
  \noindent {\bf Signature:} 
-\begin{verbatim} float get_IO_bandwidth_outgoing_kbs (session_id s, VBD ref self)\end{verbatim}
+\begin{verbatim} float get_io_write_kbs (session_id s, VBD ref self)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
