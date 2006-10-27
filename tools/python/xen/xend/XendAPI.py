@@ -1327,12 +1327,15 @@ class XendAPI:
         return xen_api_success(sr.list_images())
 
     def sr_get_virtual_allocation(self, session, sr_ref):
+        sr = XendNode.instance().get_sr()        
         return sr.used_space_bytes()
 
     def sr_get_physical_utilisation(self, session, sr_ref):
+        sr = XendNode.instance().get_sr()        
         return sr.used_space_bytes()
 
     def sr_get_physical_size(self, session, sr_ref):
+        sr = XendNode.instance().get_sr()        
         return sr.total_space_bytes()
     
     def sr_get_type(self, session, sr_ref):
