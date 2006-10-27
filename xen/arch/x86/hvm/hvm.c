@@ -194,7 +194,7 @@ void hvm_create_event_channels(struct vcpu *v)
             p = get_vio(v->domain, o->vcpu_id);
             o->arch.hvm_vcpu.xen_port = p->vp_eport =
                 alloc_unbound_xen_event_channel(o, 0);
-            DPRINTK(XENLOG_INFO "Allocated port %d for hvm.\n",
+            dprintk(XENLOG_INFO, "Allocated port %d for hvm.\n",
                     o->arch.hvm_vcpu.xen_port);
         }
     }
@@ -356,7 +356,7 @@ static void hvm_vcpu_down(void)
     struct domain *d = v->domain;
     int online_count = 0;
 
-    DPRINTK(XENLOG_G_INFO "DOM%d/VCPU%d: going offline.\n",
+    gdprintk(XENLOG_INFO, "DOM%d/VCPU%d: going offline.\n",
            d->domain_id, v->vcpu_id);
 
     /* Doesn't halt us immediately, but we'll never return to guest context. */
@@ -373,7 +373,7 @@ static void hvm_vcpu_down(void)
     /* ... Shut down the domain if not. */
     if ( online_count == 0 )
     {
-        DPRINTK(XENLOG_G_INFO "DOM%d: all CPUs offline -- powering off.\n",
+        gdprintk(XENLOG_INFO, "DOM%d: all CPUs offline -- powering off.\n",
                 d->domain_id);
         domain_shutdown(d, SHUTDOWN_poweroff);
     }
@@ -514,7 +514,7 @@ void hvm_do_hypercall(struct cpu_user_regs *pregs)
 
     if ( (pregs->eax >= NR_hypercalls) || !hvm_hypercall_table[pregs->eax] )
     {
-        DPRINTK(XENLOG_G_INFO "HVM vcpu %d:%d did a bad hypercall %d.\n",
+        gdprintk(XENLOG_INFO, "HVM vcpu %d:%d did a bad hypercall %d.\n",
                 current->domain->domain_id, current->vcpu_id,
                 pregs->eax);
         pregs->eax = -ENOSYS;
@@ -560,7 +560,7 @@ static long do_memory_op_compat32(int cmd, XEN_GUEST_HANDLE(void) arg)
     }
 
     default:
-        DPRINTK(XENLOG_G_INFO "memory_op %d.\n", cmd);
+        gdprintk(XENLOG_INFO, "memory_op %d.\n", cmd);
         rc = -ENOSYS;
         break;
     }
@@ -593,7 +593,7 @@ void hvm_do_hypercall(struct cpu_user_regs *pregs)
     pregs->rax = (uint32_t)pregs->eax; /* mask in case compat32 caller */
     if ( (pregs->rax >= NR_hypercalls) || !hvm_hypercall64_table[pregs->rax] )
     {
-        DPRINTK(XENLOG_G_INFO "HVM vcpu %d:%d did a bad hypercall %ld.\n",
+        gdprintk(XENLOG_INFO, "HVM vcpu %d:%d did a bad hypercall %ld.\n",
                 current->domain->domain_id, current->vcpu_id,
                 pregs->rax);
         pregs->rax = -ENOSYS;
@@ -644,7 +644,7 @@ int hvm_bringup_ap(int vcpuid, int trampoline_vector)
 
     if ( bsp->vcpu_id != 0 )
     {
-        DPRINTK(XENLOG_G_ERR "Not calling hvm_bringup_ap from BSP context.\n");
+        gdprintk(XENLOG_ERR, "Not calling hvm_bringup_ap from BSP context.\n");
         domain_crash_synchronous();
     }
 
@@ -653,7 +653,7 @@ int hvm_bringup_ap(int vcpuid, int trampoline_vector)
 
     if ( (ctxt = xmalloc(struct vcpu_guest_context)) == NULL )
     {
-        DPRINTK(XENLOG_G_INFO
+        gdprintk(XENLOG_INFO,
                 "Failed to allocate memory in hvm_bringup_ap.\n");
         return -ENOMEM;
     }
@@ -668,14 +668,14 @@ int hvm_bringup_ap(int vcpuid, int trampoline_vector)
 
     if ( rc != 0 )
     {
-        DPRINTK(XENLOG_G_INFO
+        gdprintk(XENLOG_INFO,
                "AP %d bringup failed in boot_vcpu %x.\n", vcpuid, rc);
         goto out;
     }
 
     if ( test_and_clear_bit(_VCPUF_down, &d->vcpu[vcpuid]->vcpu_flags) )
         vcpu_wake(d->vcpu[vcpuid]);
-    DPRINTK(XENLOG_G_INFO "AP %d bringup suceeded.\n", vcpuid);
+    gdprintk(XENLOG_INFO, "AP %d bringup suceeded.\n", vcpuid);
 
  out:
     xfree(ctxt);
@@ -734,7 +734,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
 
     default:
     {
-        DPRINTK(XENLOG_G_INFO "Bad HVM op %ld.\n", op);
+        gdprintk(XENLOG_INFO, "Bad HVM op %ld.\n", op);
         rc = -ENOSYS;
         break;
     }

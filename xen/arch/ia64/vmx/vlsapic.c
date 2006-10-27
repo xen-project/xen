@@ -95,7 +95,7 @@ static int vmx_vcpu_unpend_interrupt(VCPU *vcpu, uint8_t vector)
     int ret;
 
     if (vector & ~0xff) {
-        DPRINTK("vmx_vcpu_pend_interrupt: bad vector\n");
+        dprintk(XENLOG_WARNING, "vmx_vcpu_pend_interrupt: bad vector\n");
         return -1;
     }
 
@@ -410,7 +410,7 @@ void vlsapic_reset(VCPU *vcpu)
     vcpu->arch.arch_vmx.vlapic.vcpu = vcpu;
     hvm_vioapic_add_lapic(&vcpu->arch.arch_vmx.vlapic, vcpu);
 #endif
-    DPRINTK(XENLOG_INFO "VLSAPIC inservice base=%p\n", &VLSAPIC_INSVC(vcpu,0) );
+    dprintk(XENLOG_INFO, "VLSAPIC inservice base=%p\n", &VLSAPIC_INSVC(vcpu,0) );
 }
 
 /*
@@ -539,7 +539,7 @@ int vmx_vcpu_pend_interrupt(VCPU *vcpu, uint8_t vector)
     int ret;
 
     if (vector & ~0xff) {
-        DPRINTK(XENLOG_G_INFO "vmx_vcpu_pend_interrupt: bad vector\n");
+        gdprintk(XENLOG_INFO, "vmx_vcpu_pend_interrupt: bad vector\n");
         return -1;
     }
     local_irq_save(spsr);

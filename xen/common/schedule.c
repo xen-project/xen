@@ -468,7 +468,7 @@ long do_set_timer_op(s_time_t timeout)
          * timeout in this case can burn a lot of CPU. We therefore go for a
          * reasonable middleground of triggering a timer event in 100ms.
          */
-        DPRINTK(XENLOG_G_INFO "Warning: huge timeout set by domain %d (vcpu %d):"
+        gdprintk(XENLOG_INFO, "Warning: huge timeout set by domain %d (vcpu %d):"
                 " %"PRIx64"\n",
                 v->domain->domain_id, v->vcpu_id, (uint64_t)timeout);
         set_timer(&v->timer, NOW() + MILLISECS(100));

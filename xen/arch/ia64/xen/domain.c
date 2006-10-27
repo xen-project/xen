@@ -412,7 +412,7 @@ int arch_domain_create(struct domain *d)
 
 #ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
 	d->arch.has_pervcpu_vhpt = opt_pervcpu_vhpt;
-	DPRINTK("%s:%d domain %d pervcpu_vhpt %d\n",
+	dprintk(XENLOG_WARNING, "%s:%d domain %d pervcpu_vhpt %d\n",
 	        __func__, __LINE__, d->domain_id, d->arch.has_pervcpu_vhpt);
 #endif
 	if (tlb_track_create(d) < 0)
@@ -682,7 +682,7 @@ int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc)
 	//struct vcpu *v;
 
 	if (unlikely(d == current->domain)) {
-		DPRINTK(XENLOG_G_INFO
+		gdprintk(XENLOG_INFO,
                         "Don't try to do a shadow op on yourself!\n");
 		return -EINVAL;
 	}   

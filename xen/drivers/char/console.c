@@ -58,6 +58,30 @@ static int sercon_handle = -1;
 
 static DEFINE_SPINLOCK(console_lock);
 
+/*
+ * To control the amount of printing, thresholds are added.
+ * These thresholds correspond to the XENLOG logging levels.
+ * There's an upper and lower threshold for non-guest messages and for
+ * guest-provoked messages.  This works as follows, for a given log level L:
+ *
+ * L < lower_threshold                     : always logged
+ * lower_threshold <= L < upper_threshold  : rate-limited logging
+ * upper_threshold <= L                    : never logged
+ *
+ * Note, in the above algorithm, to disable rate limiting simply make
+ * the lower threshold equal to the upper.
+ */
+#define XENLOG_UPPER_THRESHOLD       2 /* Do not print INFO and DEBUG  */
+#define XENLOG_LOWER_THRESHOLD       2 /* Always print ERR and WARNING */
+#define XENLOG_GUEST_UPPER_THRESHOLD 2 /* Do not print INFO and DEBUG  */
+#define XENLOG_GUEST_LOWER_THRESHOLD 0 /* Rate-limit ERR and WARNING   */
+/*
+ * The XENLOG_DEFAULT is the default given to printks that
+ * do not have any print level associated with them.
+ */
+#define XENLOG_DEFAULT       1 /* XENLOG_WARNING */
+#define XENLOG_GUEST_DEFAULT 1 /* XENLOG_WARNING */
+
 int xenlog_upper_thresh = XENLOG_UPPER_THRESHOLD;
 int xenlog_lower_thresh = XENLOG_LOWER_THRESHOLD;
 int xenlog_guest_upper_thresh = XENLOG_GUEST_UPPER_THRESHOLD;
@@ -346,7 +370,7 @@ void printk(const char *fmt, ...)
 
     if ( !print_regardless )
     {
-        if ( level > upper_thresh )
+        if ( level >= upper_thresh )
             goto out;
         if ( (level >= lower_thresh) && (!printk_ratelimit()) )
             goto out;

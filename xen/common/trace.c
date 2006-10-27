@@ -131,7 +131,7 @@ static int tb_set_size(int size)
      */
     if ( (opt_tbuf_size != 0) || (size <= 0) )
     {
-        DPRINTK(XENLOG_G_INFO "tb_set_size from %d to %d not implemented\n",
+        gdprintk(XENLOG_INFO, "tb_set_size from %d to %d not implemented\n",
                 opt_tbuf_size, size);
         return -EINVAL;
     }

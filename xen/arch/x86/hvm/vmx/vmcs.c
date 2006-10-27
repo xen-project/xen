@@ -145,7 +145,7 @@ static struct vmcs_struct *vmx_alloc_vmcs(void)
 
     if ( (vmcs = alloc_xenheap_page()) == NULL )
     {
-        DPRINTK(XENLOG_G_WARNING "Failed to allocate VMCS.\n");
+        gdprintk(XENLOG_WARNING, "Failed to allocate VMCS.\n");
         return NULL;
     }
 

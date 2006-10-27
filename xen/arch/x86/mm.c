@@ -108,16 +108,7 @@
 #include <asm/e820.h>
 #include <public/memory.h>
 
-#ifdef VERBOSE
-#define MEM_LOG(_f, _a...)                                          \
-    do {                                                            \
-        if ( printk_ratelimit() )                                   \
-            printk("DOM%u: (file=mm.c, line=%d) " _f "\n",          \
-                   current->domain->domain_id , __LINE__ , ## _a ); \
-    } while (0)
-#else
-#define MEM_LOG(_f, _a...) ((void)0)
-#endif
+#define MEM_LOG(_f, _a...) gdprintk(XENLOG_WARNING , _f , ## _a)
 
 /*
  * PTE updates can be done with ordinary writes except:
@@ -2261,8 +2252,7 @@ int do_mmu_update(
             {
                 if ( shadow_mode_refcounts(d) )
                 {
-                    DPRINTK(XENLOG_INFO
-                            "mmu update on shadow-refcounted domain!");
+                    MEM_LOG("mmu update on shadow-refcounted domain!");
                     break;
                 }
 
@@ -2626,8 +2616,7 @@ int steal_page(
         x = y;
         if (unlikely((x & (PGC_count_mask|PGC_allocated)) !=
                      (1 | PGC_allocated)) || unlikely(_nd != _d)) { 
-            DPRINTK(XENLOG_G_WARNING
-                    "gnttab_transfer: Bad page %p: ed=%p(%u), sd=%p,"
+            MEM_LOG("gnttab_transfer: Bad page %p: ed=%p(%u), sd=%p,"
                     " caf=%08x, taf=%" PRtype_info "\n", 
                     (void *) page_to_mfn(page),
                     d, d->domain_id, unpickle_domptr(_nd), x, 

@@ -277,7 +277,7 @@ static void vmx_create_event_channels(struct vcpu *v)
 			p = get_vio(v->domain, o->vcpu_id);
 			o->arch.arch_vmx.xen_port = p->vp_eport =
 			                alloc_unbound_xen_event_channel(o, 0);
-			DPRINTK(XENLOG_G_INFO "Allocated port %d for hvm.\n",
+			gdprintk(XENLOG_INFO, "Allocated port %d for hvm.\n",
 			        o->arch.arch_vmx.xen_port);
 		}
 	}

@@ -63,7 +63,7 @@ increase_reservation(
         if ( unlikely((page = __alloc_domheap_pages( d, cpu, 
             extent_order, memflags )) == NULL) ) 
         {
-            DPRINTK(XENLOG_G_INFO "Could not allocate order=%d extent: "
+            gdprintk(XENLOG_INFO, "Could not allocate order=%d extent: "
                     "id=%d memflags=%x (%ld of %d)\n",
                     extent_order, d->domain_id, memflags, i, nr_extents);
             return i;
@@ -118,7 +118,7 @@ populate_physmap(
         if ( unlikely((page = __alloc_domheap_pages( d, cpu, 
             extent_order, memflags )) == NULL) ) 
         {
-            DPRINTK(XENLOG_G_INFO "Could not allocate order=%d extent: "
+            gdprintk(XENLOG_INFO, "Could not allocate order=%d extent: "
                     "id=%d memflags=%x (%ld of %d)\n",
                     extent_order, d->domain_id, memflags, i, nr_extents);
             goto out;
@@ -157,7 +157,7 @@ guest_remove_page(
     mfn = gmfn_to_mfn(d, gmfn);
     if ( unlikely(!mfn_valid(mfn)) )
     {
-        DPRINTK(XENLOG_G_INFO "Domain %u page number %lx invalid\n",
+        gdprintk(XENLOG_INFO, "Domain %u page number %lx invalid\n",
                 d->domain_id, gmfn);
         return 0;
     }
@@ -165,7 +165,7 @@ guest_remove_page(
     page = mfn_to_page(mfn);
     if ( unlikely(!get_page(page, d)) )
     {
-        DPRINTK(XENLOG_G_INFO "Bad page free for domain %u\n", d->domain_id);
+        gdprintk(XENLOG_INFO, "Bad page free for domain %u\n", d->domain_id);
         return 0;
     }
 
@@ -178,7 +178,7 @@ guest_remove_page(
     if ( unlikely(!page_is_removable(page)) )
     {
         /* We'll make this a guest-visible error in future, so take heed! */
-        DPRINTK(XENLOG_G_INFO "Dom%d freeing in-use page %lx (pseudophys %lx):"
+        gdprintk(XENLOG_INFO, "Dom%d freeing in-use page %lx (pseudophys %lx):"
                 " count=%lx type=%lx\n",
                 d->domain_id, mfn, get_gpfn_from_mfn(mfn),
                 (unsigned long)page->count_info, page->u.inuse.type_info);

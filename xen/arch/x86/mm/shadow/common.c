@@ -3072,7 +3072,7 @@ int shadow_domctl(struct domain *d,
 
     if ( unlikely(d == current->domain) )
     {
-        DPRINTK(XENLOG_G_INFO "Don't try to do a shadow op on yourself!\n");
+        gdprintk(XENLOG_INFO, "Don't try to do a shadow op on yourself!\n");
         return -EINVAL;
     }
 

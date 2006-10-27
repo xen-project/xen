@@ -1544,8 +1544,9 @@ vcpu_get_domain_bundle(VCPU * vcpu, REGS * regs, u64 gip,
 		// Last itc.i value is cached to PSCBX(vcpu, itlb).
 		tr = PSCBX(vcpu, itlb);
 		if (vcpu_match_tr_entry(&tr, gip, rid)) {
-			//DPRINTK("%s gip 0x%lx gpip 0x%lx\n", __func__,
-			//	gip, gpip);
+			//dprintk(XENLOG_WARNING,
+			//        "%s gip 0x%lx gpip 0x%lx\n", __func__,
+			//	  gip, gpip);
 			goto found;
 		}
 		trp = vcpu_tr_lookup(vcpu, gip, rid, 1);
@@ -1571,7 +1572,7 @@ vcpu_get_domain_bundle(VCPU * vcpu, REGS * regs, u64 gip,
 			set_metaphysical_rr0();
 		}
 		if (bundle->i64[0] == 0 && bundle->i64[1] == 0) {
-			DPRINTK(XENLOG_INFO "%s gip 0x%lx\n", __func__, gip);
+			dprintk(XENLOG_INFO, "%s gip 0x%lx\n", __func__, gip);
 			return 0;
 		}
 		return 1;

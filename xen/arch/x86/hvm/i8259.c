@@ -140,10 +140,8 @@ void pic_set_xen_irq(void *opaque, int irq, int level)
 
     /* Set it on the 8259s */
     ps = &s->pics[irq >> 3];
-    if (!(ps->elcr & (1 << (irq & 7)))) {
-	DPRINTK("edge-triggered override IRQ?\n");
-	domain_crash(current->domain);
-    }
+    if (!(ps->elcr & (1 << (irq & 7))))
+	gdprintk(XENLOG_WARNING, "edge-triggered override IRQ?\n");
     if (level) {
 	ps->irr_xen |= 1 << (irq & 7);
     } else {

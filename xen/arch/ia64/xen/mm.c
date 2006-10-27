@@ -229,7 +229,7 @@ try_to_clear_PGC_allocate(struct domain* d, struct page_info* page)
         if (unlikely(!(x & PGC_allocated)) || unlikely(_nd != _d)) {
             struct domain* nd = unpickle_domptr(_nd);
             if (nd == NULL) {
-                DPRINTK(XENLOG_G_INFO "gnttab_transfer: "
+                gdprintk(XENLOG_INFO, "gnttab_transfer: "
                         "Bad page %p: ed=%p(%u) 0x%x, "
                         "sd=%p 0x%x,"
                         " caf=%016lx, taf=%" PRtype_info "\n",
@@ -445,7 +445,8 @@ u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps,
 	arflags2 = pteval2 & _PAGE_AR_MASK;
 	if (arflags != _PAGE_AR_R && arflags2 == _PAGE_AR_R) {
 #if 0
-		DPRINTK("%s:%d "
+		dprintk(XENLOG_WARNING,
+                "%s:%d "
 		        "pteval 0x%lx arflag 0x%lx address 0x%lx itir 0x%lx "
 		        "pteval2 0x%lx arflags2 0x%lx mpaddr 0x%lx\n",
 		        __func__, __LINE__,
@@ -979,7 +980,7 @@ efi_mmio(unsigned long physaddr, unsigned long size)
 
         if (start <= physaddr && physaddr < end) {
             if ((physaddr + size) > end) {
-                DPRINTK(XENLOG_G_INFO "%s: physaddr 0x%lx size = 0x%lx\n",
+                gdprintk(XENLOG_INFO, "%s: physaddr 0x%lx size = 0x%lx\n",
                         __func__, physaddr, size);
                 return 0;
             }
@@ -1014,12 +1015,12 @@ assign_domain_mmio_page(struct domain *d,
                         unsigned long mpaddr, unsigned long size)
 {
     if (size == 0) {
-        DPRINTK(XENLOG_G_INFO "%s: domain %p mpaddr 0x%lx size = 0x%lx\n",
+        gdprintk(XENLOG_INFO, "%s: domain %p mpaddr 0x%lx size = 0x%lx\n",
                 __func__, d, mpaddr, size);
     }
     if (!efi_mmio(mpaddr, size)) {
 #ifndef NDEBUG
-        DPRINTK(XENLOG_G_INFO "%s: domain %p mpaddr 0x%lx size = 0x%lx\n",
+        gdprintk(XENLOG_INFO, "%s: domain %p mpaddr 0x%lx size = 0x%lx\n",
                 __func__, d, mpaddr, size);
 #endif
         return -EINVAL;
@@ -1109,7 +1110,7 @@ assign_domain_page_cmpxchg_rel(struct domain* d, unsigned long mpaddr,
     old_mfn = page_to_mfn(old_page);
     old_pte = pfn_pte(old_mfn, __pgprot(old_prot));
     if (!pte_present(old_pte)) {
-        DPRINTK(XENLOG_G_INFO
+        gdprintk(XENLOG_INFO,
                 "%s: old_pte 0x%lx old_prot 0x%lx old_mfn 0x%lx\n",
                 __func__, pte_val(old_pte), old_prot, old_mfn);
         return -EINVAL;
@@ -1126,7 +1127,7 @@ assign_domain_page_cmpxchg_rel(struct domain* d, unsigned long mpaddr,
             goto again;
         }
 
-        DPRINTK(XENLOG_G_INFO
+        gdprintk(XENLOG_INFO,
                 "%s: old_pte 0x%lx old_prot 0x%lx old_mfn 0x%lx "
                 "ret_pte 0x%lx ret_mfn 0x%lx\n",
                 __func__,
@@ -1187,7 +1188,7 @@ zap_domain_page_one(struct domain *d, unsigned long mpaddr, unsigned long mfn)
                 goto again;
             }
 
-            DPRINTK(XENLOG_G_INFO "%s: old_pte 0x%lx old_arflags 0x%lx mfn 0x%lx "
+            gdprintk(XENLOG_INFO, "%s: old_pte 0x%lx old_arflags 0x%lx mfn 0x%lx "
                     "ret_pte 0x%lx ret_mfn 0x%lx\n",
                     __func__,
                     pte_val(old_pte), old_arflags, mfn,
@@ -1255,7 +1256,7 @@ dom0vp_add_physmap(struct domain* d, unsigned long gpfn, unsigned long mfn,
             rd = dom_io;
             break;
         default:
-            DPRINTK(XENLOG_G_INFO "d 0x%p domid %d "
+            gdprintk(XENLOG_INFO, "d 0x%p domid %d "
                     "pgfn 0x%lx mfn 0x%lx flags 0x%lx domid %d\n",
                     d, d->domain_id, gpfn, mfn, flags, domid);
             return -ESRCH;
@@ -1328,7 +1329,7 @@ dom0vp_expose_p2m(struct domain* d,
         (conv_start_gpfn % granule_pfn) != 0 ||
         (assign_start_gpfn % granule_pfn) != 0 ||
         (expose_num_pfn % granule_pfn) != 0) {
-        DPRINTK(XENLOG_G_INFO
+        gdprintk(XENLOG_INFO,
                 "%s conv_start_gpfn 0x%016lx assign_start_gpfn 0x%016lx "
                 "expose_size 0x%016lx granulte_pfn 0x%016lx\n", __func__, 
                 conv_start_gpfn, assign_start_gpfn, expose_size, granule_pfn);
@@ -1336,7 +1337,7 @@ dom0vp_expose_p2m(struct domain* d,
     }
 
     if (granule_pfn != PTRS_PER_PTE) {
-        DPRINTK(XENLOG_G_INFO
+        gdprintk(XENLOG_INFO,
                 "%s granule_pfn 0x%016lx PTRS_PER_PTE 0x%016lx\n",
                 __func__, granule_pfn, PTRS_PER_PTE);
         return -ENOSYS;
@@ -1355,7 +1356,7 @@ dom0vp_expose_p2m(struct domain* d,
         assign_pte = lookup_alloc_domain_pte(d, (assign_start_gpfn <<
                                              PAGE_SHIFT) + i * sizeof(pte_t));
         if (assign_pte == NULL) {
-            DPRINTK(XENLOG_G_INFO "%s failed to allocate pte page\n", __func__);
+            gdprintk(XENLOG_INFO, "%s failed to allocate pte page\n", __func__);
             return -ENOMEM;
         }
 
@@ -1376,7 +1377,7 @@ dom0vp_expose_p2m(struct domain* d,
 
         if (expose_p2m_page(d, (assign_start_gpfn << PAGE_SHIFT) +
                             i * sizeof(pte_t), virt_to_page(conv_pte)) < 0) {
-            DPRINTK(XENLOG_G_INFO "%s failed to assign page\n", __func__);
+            gdprintk(XENLOG_INFO, "%s failed to assign page\n", __func__);
             return -EAGAIN;
         }
 
@@ -1395,7 +1396,7 @@ dom0vp_expose_p2m(struct domain* d,
         }
         if (expose_p2m_page(d, (assign_start_gpfn + i) << PAGE_SHIFT,
                             p2m_pte_zero_page) < 0) {
-            DPRINTK(XENLOG_G_INFO "%s failed to assign zero-pte page\n", __func__);
+            gdprintk(XENLOG_INFO, "%s failed to assign zero-pte page\n", __func__);
             return -EAGAIN;
         }
     }
@@ -1418,7 +1419,7 @@ create_grant_host_mapping(unsigned long gpaddr,
 
     if (flags & (GNTMAP_device_map |
                  GNTMAP_application_map | GNTMAP_contains_pte)) {
-        DPRINTK(XENLOG_G_INFO "%s: flags 0x%x\n", __func__, flags);
+        gdprintk(XENLOG_INFO, "%s: flags 0x%x\n", __func__, flags);
         return GNTST_general_error;
     }
 
@@ -1452,13 +1453,13 @@ destroy_grant_host_mapping(unsigned long gpaddr,
     struct page_info* page;
 
     if (flags & (GNTMAP_application_map | GNTMAP_contains_pte)) {
-        DPRINTK(XENLOG_G_INFO "%s: flags 0x%x\n", __func__, flags);
+        gdprintk(XENLOG_INFO, "%s: flags 0x%x\n", __func__, flags);
         return GNTST_general_error;
     }
 
     pte = lookup_noalloc_domain_pte(d, gpaddr);
     if (pte == NULL) {
-        DPRINTK(XENLOG_G_INFO "%s: gpaddr 0x%lx mfn 0x%lx\n",
+        gdprintk(XENLOG_INFO, "%s: gpaddr 0x%lx mfn 0x%lx\n",
                 __func__, gpaddr, mfn);
         return GNTST_general_error;
     }
@@ -1467,7 +1468,7 @@ destroy_grant_host_mapping(unsigned long gpaddr,
     cur_arflags = pte_val(*pte) & ~_PAGE_PPN_MASK;
     cur_pte = pfn_pte(mfn, __pgprot(cur_arflags));
     if (!pte_present(cur_pte)) {
-        DPRINTK(XENLOG_G_INFO "%s: gpaddr 0x%lx mfn 0x%lx cur_pte 0x%lx\n",
+        gdprintk(XENLOG_INFO, "%s: gpaddr 0x%lx mfn 0x%lx cur_pte 0x%lx\n",
                 __func__, gpaddr, mfn, pte_val(cur_pte));
         return GNTST_general_error;
     }
@@ -1475,7 +1476,7 @@ destroy_grant_host_mapping(unsigned long gpaddr,
 
     old_pte = ptep_cmpxchg_rel(&d->arch.mm, gpaddr, pte, cur_pte, new_pte);
     if (unlikely(!pte_present(old_pte))) {
-        DPRINTK(XENLOG_G_INFO "%s: gpaddr 0x%lx mfn 0x%lx"
+        gdprintk(XENLOG_INFO, "%s: gpaddr 0x%lx mfn 0x%lx"
                          " cur_pte 0x%lx old_pte 0x%lx\n",
                 __func__, gpaddr, mfn, pte_val(cur_pte), pte_val(old_pte));
         return GNTST_general_error;
@@ -1484,7 +1485,7 @@ destroy_grant_host_mapping(unsigned long gpaddr,
         if (pte_pfn(old_pte) == mfn) {
             goto again;
         }
-        DPRINTK(XENLOG_G_INFO "%s gpaddr 0x%lx mfn 0x%lx cur_pte "
+        gdprintk(XENLOG_INFO, "%s gpaddr 0x%lx mfn 0x%lx cur_pte "
                 "0x%lx old_pte 0x%lx\n",
                 __func__, gpaddr, mfn, pte_val(cur_pte), pte_val(old_pte));
         return GNTST_general_error;
@@ -1517,7 +1518,7 @@ steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
     u64 x, nx, y;
 
     if (page_get_owner(page) != d) {
-        DPRINTK(XENLOG_G_INFO "%s d 0x%p owner 0x%p\n",
+        gdprintk(XENLOG_INFO, "%s d 0x%p owner 0x%p\n",
                 __func__, d, page_get_owner(page));
         return -1;
     }
@@ -1530,7 +1531,7 @@ steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
 
         new = alloc_domheap_page(d);
         if (new == NULL) {
-            DPRINTK(XENLOG_G_INFO "alloc_domheap_page() failed\n");
+            gdprintk(XENLOG_INFO, "alloc_domheap_page() failed\n");
             return -1;
         }
         // zero out pages for security reasons
@@ -1554,7 +1555,7 @@ steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
         ret = assign_domain_page_cmpxchg_rel(d, gpfn << PAGE_SHIFT, page, new,
                                              ASSIGN_writable);
         if (ret < 0) {
-            DPRINTK(XENLOG_G_INFO "assign_domain_page_cmpxchg_rel failed %d\n",
+            gdprintk(XENLOG_INFO, "assign_domain_page_cmpxchg_rel failed %d\n",
                     ret);
             set_gpfn_from_mfn(new_mfn, INVALID_M2P_ENTRY);
             free_domheap_page(new);
@@ -1592,7 +1593,7 @@ steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
             unlikely(_nd != _d)) {
             struct domain* nd = unpickle_domptr(_nd);
             if (nd == NULL) {
-                DPRINTK(XENLOG_G_INFO "gnttab_transfer: "
+                gdprintk(XENLOG_INFO, "gnttab_transfer: "
                         "Bad page %p: ed=%p(%u) 0x%x, "
                         "sd=%p 0x%x,"
                         " caf=%016lx, taf=%" PRtype_info
@@ -1604,7 +1605,7 @@ steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
                         page->u.inuse.type_info,
                         memflags);
             } else {
-                DPRINTK(XENLOG_G_WARNING "gnttab_transfer: "
+                gdprintk(XENLOG_WARNING, "gnttab_transfer: "
                         "Bad page %p: ed=%p(%u) 0x%x, "
                         "sd=%p(%u) 0x%x,"
                         " caf=%016lx, taf=%" PRtype_info
@@ -1682,24 +1683,24 @@ domain_page_flush(struct domain* d, unsigned long mpaddr,
     switch (tlb_track_search_and_remove(d->arch.tlb_track,
                                         ptep, old_pte, &entry)) {
     case TLB_TRACK_NOT_TRACKED:
-        // DPRINTK("%s TLB_TRACK_NOT_TRACKED\n", __func__);
+        // dprintk(XENLOG_WARNING, "%s TLB_TRACK_NOT_TRACKED\n", __func__);
         domain_flush_vtlb_all();
         break;
     case TLB_TRACK_NOT_FOUND:
         /* do nothing */
-        // DPRINTK("%s TLB_TRACK_NOT_FOUND\n", __func__);
+        // dprintk(XENLOG_WARNING, "%s TLB_TRACK_NOT_FOUND\n", __func__);
         break;
     case TLB_TRACK_FOUND:
-        // DPRINTK("%s TLB_TRACK_FOUND\n", __func__);
+        // dprintk(XENLOG_WARNING, "%s TLB_TRACK_FOUND\n", __func__);
         domain_flush_vtlb_track_entry(d, entry);
         tlb_track_free_entry(d->arch.tlb_track, entry);
         break;
     case TLB_TRACK_MANY:
-        DPRINTK(XENLOG_G_INFO "%s TLB_TRACK_MANY\n", __func__);
+        gdprintk(XENLOG_INFO, "%s TLB_TRACK_MANY\n", __func__);
         domain_flush_vtlb_all();
         break;
     case TLB_TRACK_AGAIN:
-        DPRINTK(XENLOG_G_ERR "%s TLB_TRACK_AGAIN\n", __func__);
+        gdprintk(XENLOG_ERR, "%s TLB_TRACK_AGAIN\n", __func__);
         BUG();
         break;
     }

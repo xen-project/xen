@@ -805,7 +805,7 @@ static void svm_final_setup_guest(struct vcpu *v)
 
     if ( !shadow_mode_external(d) )
     {
-        DPRINTK(XENLOG_G_ERR "Can't init HVM for dom %u vcpu %u: "
+        gdprintk(XENLOG_ERR, "Can't init HVM for dom %u vcpu %u: "
                 "not in shadow external mode\n", d->domain_id, v->vcpu_id);
         domain_crash(d);
     }

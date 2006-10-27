@@ -556,10 +556,8 @@ void hvm_vioapic_set_xen_irq(struct domain *d, int irq, int level)
 	s->redirtbl[irq].RedirForm.mask)
         return;
 
-    if (s->redirtbl[irq].RedirForm.trigmod != IOAPIC_LEVEL_TRIGGER) {
-	DPRINTK("Forcing edge triggered APIC irq %d?\n", irq);
-	domain_crash(d);
-    }
+    if (s->redirtbl[irq].RedirForm.trigmod != IOAPIC_LEVEL_TRIGGER)
+	gdprintk(XENLOG_WARNING, "Forcing edge triggered APIC irq %d?\n", irq);
 
     if (level)
 	s->irr_xen |= 1 << irq;

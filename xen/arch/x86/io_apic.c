@@ -1980,7 +1980,7 @@ int ioapic_guest_read(unsigned long physbase, unsigned int reg, u32 *pval)
 }
 
 #define WARN_BOGUS_WRITE(f, a...)                                       \
-    DPRINTK(XENLOG_INFO "\n%s: "                                        \
+    dprintk(XENLOG_INFO, "\n%s: "                                        \
             "apic=%d, pin=%d, old_irq=%d, new_irq=%d\n"                 \
             "%s: old_entry=%08x, new_entry=%08x\n"                      \
             "%s: " f, __FUNCTION__, apic, pin, old_irq, new_irq,        \

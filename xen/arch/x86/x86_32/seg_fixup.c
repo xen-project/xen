@@ -181,7 +181,7 @@ int fixup_seg(u16 seg, unsigned long offset)
         table = (unsigned long *)LDT_VIRT_START(d);
         if ( idx >= d->arch.guest_context.ldt_ents )
         {
-            DPRINTK(XENLOG_DEBUG "Segment %04x out of LDT range (%ld)\n",
+            dprintk(XENLOG_DEBUG, "Segment %04x out of LDT range (%ld)\n",
                     seg, d->arch.guest_context.ldt_ents);
             goto fail;
         }
@@ -191,7 +191,7 @@ int fixup_seg(u16 seg, unsigned long offset)
         table = (unsigned long *)GDT_VIRT_START(d);
         if ( idx >= d->arch.guest_context.gdt_ents )
         {
-            DPRINTK(XENLOG_DEBUG "Segment %04x out of GDT range (%ld)\n",
+            dprintk(XENLOG_DEBUG, "Segment %04x out of GDT range (%ld)\n",
                     seg, d->arch.guest_context.gdt_ents);
             goto fail;
         }
@@ -201,7 +201,7 @@ int fixup_seg(u16 seg, unsigned long offset)
     if ( __get_user(a, &table[2*idx+0]) ||
          __get_user(b, &table[2*idx+1]) )
     {
-        DPRINTK(XENLOG_DEBUG "Fault while reading segment %04x\n", seg);
+        dprintk(XENLOG_DEBUG, "Fault while reading segment %04x\n", seg);
         goto fail; /* Barking up the wrong tree. Decode needs a page fault.*/
     }
 
@@ -210,7 +210,7 @@ int fixup_seg(u16 seg, unsigned long offset)
                _SEGMENT_G|_SEGMENT_CODE|_SEGMENT_DPL)) != 
          (_SEGMENT_P|_SEGMENT_S|_SEGMENT_DB|_SEGMENT_G|_SEGMENT_DPL) )
     {
-        DPRINTK(XENLOG_DEBUG "Bad segment %08lx:%08lx\n", a, b);
+        dprintk(XENLOG_DEBUG, "Bad segment %08lx:%08lx\n", a, b);
         goto fail;
     }
 
@@ -240,7 +240,7 @@ int fixup_seg(u16 seg, unsigned long offset)
         }
     }
 
-    DPRINTK(XENLOG_DEBUG "None of the above! "
+    dprintk(XENLOG_DEBUG, "None of the above! "
             "(%08lx:%08lx, %08lx, %08lx, %08lx)\n",
             a, b, base, limit, base+limit);
 
@@ -279,13 +279,13 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
     /* WARNING: We only work for ring-3 segments. */
     if ( unlikely(vm86_mode(regs)) || unlikely(!ring_3(regs)) )
     {
-        DPRINTK(XENLOG_DEBUG "Taken fault at bad CS %04x\n", regs->cs);
+        dprintk(XENLOG_DEBUG, "Taken fault at bad CS %04x\n", regs->cs);
         goto fail;
     }
 
     if ( !linearise_address((u16)regs->cs, regs->eip, (unsigned long *)&eip) )
     {
-        DPRINTK(XENLOG_DEBUG "Cannot linearise %04x:%08x\n",
+        dprintk(XENLOG_DEBUG, "Cannot linearise %04x:%08x\n",
                 regs->cs, regs->eip);
         goto fail;
     }
@@ -295,7 +295,7 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
     {
         if ( get_user(b, pb) )
         {
-            DPRINTK(XENLOG_DEBUG
+            dprintk(XENLOG_DEBUG,
                     "Fault while accessing byte %d of instruction\n",
                     pb-eip);
             goto page_fault;
@@ -303,7 +303,7 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
 
         if ( (pb - eip) >= 15 )
         {
-            DPRINTK(XENLOG_DEBUG "Too many instruction prefixes for a "
+            dprintk(XENLOG_DEBUG, "Too many instruction prefixes for a "
                     "legal instruction\n");
             goto fail;
         }
@@ -316,7 +316,7 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
         case 0x26: /* ES override */
         case 0x64: /* FS override */
         case 0x36: /* SS override */
-            DPRINTK(XENLOG_DEBUG "Unhandled prefix %02x\n", b);
+            dprintk(XENLOG_DEBUG, "Unhandled prefix %02x\n", b);
             goto fail;
         case 0x66: /* Operand-size override */
         case 0xf0: /* LOCK */
@@ -334,7 +334,7 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
 
     if ( !gs_override )
     {
-        DPRINTK(XENLOG_DEBUG "Only instructions with GS override\n");
+        dprintk(XENLOG_DEBUG, "Only instructions with GS override\n");
         goto fail;
     }
 
@@ -342,7 +342,7 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
     pb++;
     if ( decode == 0 )
     {
-        DPRINTK(XENLOG_DEBUG "Unsupported opcode %02x\n", b);
+        dprintk(XENLOG_DEBUG, "Unsupported opcode %02x\n", b);
         goto fail;
     }
     
@@ -354,7 +354,7 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
 
         if ( get_user(offset, (u32 *)pb) )
         {
-            DPRINTK(XENLOG_DEBUG "Fault while extracting <disp32>.\n");
+            dprintk(XENLOG_DEBUG, "Fault while extracting <disp32>.\n");
             goto page_fault;
         }
         pb += 4;
@@ -368,7 +368,7 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
 
     if ( get_user(modrm, pb) )
     {
-        DPRINTK(XENLOG_DEBUG "Fault while extracting modrm byte\n");
+        dprintk(XENLOG_DEBUG, "Fault while extracting modrm byte\n");
         goto page_fault;
     }
 
@@ -380,7 +380,7 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
 
     if ( rm == 4 )
     {
-        DPRINTK(XENLOG_DEBUG "FIXME: Add decoding for the SIB byte.\n");
+        dprintk(XENLOG_DEBUG, "FIXME: Add decoding for the SIB byte.\n");
         goto fixme;
     }
 
@@ -398,7 +398,7 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
             memreg = NULL;
             if ( get_user(disp32, (u32 *)pb) )
             {
-                DPRINTK(XENLOG_DEBUG "Fault while extracting <disp8>.\n");
+                dprintk(XENLOG_DEBUG, "Fault while extracting <disp8>.\n");
                 goto page_fault;
             }
             pb += 4;
@@ -408,7 +408,7 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
     case 1:
         if ( get_user(disp8, pb) )
         {
-            DPRINTK(XENLOG_DEBUG "Fault while extracting <disp8>.\n");
+            dprintk(XENLOG_DEBUG, "Fault while extracting <disp8>.\n");
             goto page_fault;
         }
         pb++;
@@ -418,14 +418,14 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
     case 2:
         if ( get_user(disp32, (u32 *)pb) )
         {
-            DPRINTK(XENLOG_DEBUG "Fault while extracting <disp8>.\n");
+            dprintk(XENLOG_DEBUG, "Fault while extracting <disp8>.\n");
             goto page_fault;
         }
         pb += 4;
         break;
 
     case 3:
-        DPRINTK(XENLOG_DEBUG "Not a memory operand!\n");
+        dprintk(XENLOG_DEBUG, "Not a memory operand!\n");
         goto fail;
     }
 
@@ -456,7 +456,7 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
     return EXCRET_fault_fixed;
 
  fixme:
-    DPRINTK(XENLOG_DEBUG "Undecodable instruction "
+    dprintk(XENLOG_DEBUG, "Undecodable instruction "
             "%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x "
             "caused GPF(0) at %04x:%08x\n",
             eip[0], eip[1], eip[2], eip[3],

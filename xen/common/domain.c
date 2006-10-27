@@ -35,6 +35,11 @@ struct domain *dom0;
 
 struct vcpu *idle_vcpu[NR_CPUS] __read_mostly;
 
+int current_domain_id(void)
+{
+    return current->domain->domain_id;
+}
+
 struct domain *alloc_domain(domid_t domid)
 {
     struct domain *d;
@@ -54,7 +59,6 @@ struct domain *alloc_domain(domid_t domid)
     return d;
 }
 
-
 void free_domain(struct domain *d)
 {
     struct vcpu *v;
@@ -68,7 +72,6 @@ void free_domain(struct domain *d)
 
     xfree(d);
 }
-
 
 struct vcpu *alloc_vcpu(
     struct domain *d, unsigned int vcpu_id, unsigned int cpu_id)
