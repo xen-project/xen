@@ -80,14 +80,15 @@ platform_clock_offset
 platform_enable_audio           !image.soundhw (bool)
 builder                         (sxp root name)
 boot_method                     
-kernel_kernel                   kernel_kernel
-kernel_initrd                   kernel_ramdisk
-kernel_args                     kernel_args
+kernel_kernel                   kernel.kernel
+kernel_initrd                   kernel.ramdisk
+kernel_args                     !kernel.args
 grub_cmdline                    bootloader_args
 PCI_bus                         
 tools_version
+
 otherConfig
- - image                        image (maybe?)
+ - image                        image (see image.*)
  - shadow_memory                shadow_memory
  - security                     security
  - vcpu_avail                   vcpu_avail
@@ -96,13 +97,19 @@ otherConfig
  - on_xend_start                on_xend_start
  - start_time                   start_time
  - cpus                         cpus (?)
+                                max_vcpu_id
+
  >> only from xc
  - online_vcpus                 xc.online_vcpus
  - status                       xc.status
  - cpu_time                     xc.cpu_time
  - shutdown_reason              xc.shutdown_reason
  - up_time                      xc.uptime
+ - crashed                      xc.crashed
+ - dying                        xc.dying
+ - shutdown                     xc.shutdown
 
+                                image.type (linux or hvm)
                                 image.root
                                 image.ip
                                 image.nographic
@@ -117,15 +124,15 @@ otherConfig
                                 image.hvm.pae
                                 image.hvm.acpi (also in image.devices)
                                 image.hvm.apic
-                                image.devices.boot
-                                image.devices.fda
-                                image.devices.fdb
-                                image.devices.soundhw
-                                image.devices.isa
-                                image.devices.vcpus?
-                                image.devices.acpi
-                                image.devices.usb
-                                image.devices.usbdevice
+                                image.hvm.devices.boot
+                                image.hvm.devices.fda
+                                image.hvm.devices.fdb
+                                image.hvm.devices.soundhw
+                                image.hvm.devices.isa
+                                image.hvm.devices.vcpus?
+                                image.hvm.devices.acpi
+                                image.hvm.devices.usb
+                                image.hvm.devices.usbdevice
 
 
                                 dev.backend
@@ -142,3 +149,12 @@ otherConfig
                                 pciquirk.unconstrained_dev_ids
 
                                 irq.irq
+
+- vcpu (probably not needed, only in XM and generated dynamically)
+                                vcpu.number
+                                vcpu.online
+                                vcpu.blocked
+                                vcpu.running
+                                vcpu.cpu_time
+                                vcpu.cpu
+                                vcpu.cpumap
