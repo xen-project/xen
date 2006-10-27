@@ -46,6 +46,7 @@
 /*
  * Priorities
  */
+#define CSCHED_PRI_TS_BOOST      0      /* time-share waking up */
 #define CSCHED_PRI_TS_UNDER     -1      /* time-share w/ credits */
 #define CSCHED_PRI_TS_OVER      -2      /* time-share w/o credits */
 #define CSCHED_PRI_IDLE         -64     /* idle */
@@ -410,6 +411,14 @@ csched_vcpu_acct(struct csched_vcpu *svc, int credit_dec)
 
         spin_unlock_irqrestore(&csched_priv.lock, flags);
     }
+
+    /*
+     * If this VCPU's priority was boosted when it last awoke, reset it.
+     * If the VCPU is found here, then it's consuming a non-negligeable
+     * amount of CPU resources and should no longer be boosted.
+     */
+    if ( svc->pri == CSCHED_PRI_TS_BOOST )
+        svc->pri = CSCHED_PRI_TS_UNDER;
 }
 
 static inline void
@@ -566,6 +575,25 @@ csched_vcpu_wake(struct vcpu *vc)
     else
         CSCHED_STAT_CRANK(vcpu_wake_not_runnable);
 
+    /*
+     * We temporarly boost the priority of awaking VCPUs!
+     *
+     * If this VCPU consumes a non negligeable amount of CPU, it
+     * will eventually find itself in the credit accounting code
+     * path where its priority will be reset to normal.
+     *
+     * If on the other hand the VCPU consumes little CPU and is
+     * blocking and awoken a lot (doing I/O for example), its
+     * priority will remain boosted, optimizing it's wake-to-run
+     * latencies.
+     *
+     * This allows wake-to-run latency sensitive VCPUs to preempt
+     * more CPU resource intensive VCPUs without impacting overall 
+     * system fairness.
+     */
+    if ( svc->pri == CSCHED_PRI_TS_UNDER )
+        svc->pri = CSCHED_PRI_TS_BOOST;
+
     /* Put the VCPU on the runq and tickle CPUs */
     __runq_insert(cpu, svc);
     __runq_tickle(cpu, svc);
@@ -659,7 +687,7 @@ csched_runq_sort(unsigned int cpu)
         next = elem->next;
         svc_elem = __runq_elem(elem);
 
-        if ( svc_elem->pri == CSCHED_PRI_TS_UNDER )
+        if ( svc_elem->pri >= CSCHED_PRI_TS_UNDER )
         {
             /* does elem need to move up the runq? */
             if ( elem->prev != last_under )
