@@ -264,3 +264,140 @@ int xenstore_read_vncpasswd(int domid)
 
     return rc;
 }
+
+
+/*
+ * get all device instances of a certain type
+ */
+char **xenstore_domain_get_devices(struct xs_handle *handle,
+                                   const char *devtype, unsigned int *num)
+{
+    char *path;
+    char *buf = NULL;
+    char **e  = NULL;
+
+    path = xs_get_domain_path(handle, domid);
+    if (path == NULL)
+        goto out;
+
+    if (pasprintf(&buf, "%s/device/%s", path,devtype) == -1)
+	goto out;
+
+    e = xs_directory(handle, XBT_NULL, buf, num);
+
+ out:
+    free(path);
+    free(buf);
+    return e;
+}
+
+/*
+ * Check whether a domain has devices of the given type
+ */
+int xenstore_domain_has_devtype(struct xs_handle *handle, const char *devtype)
+{
+    int rc = 0;
+    unsigned int num;
+    char **e = xenstore_domain_get_devices(handle, devtype, &num);
+    if (e)
+        rc = 1;
+    free(e);
+    return rc;
+}
+
+/*
+ * Function that creates a path to a variable of an instance of a
+ * certain device
+ */
+static char *get_device_variable_path(const char *devtype, const char *inst,
+                                      const char *var)
+{
+    char *buf = NULL;
+    if (pasprintf(&buf, "/local/domain/0/backend/%s/%d/%s/%s",
+                  devtype,
+                  domid,
+                  inst,
+                  var) == -1) {
+        free(buf);
+        buf = NULL;
+    }
+    return buf;
+}
+
+char *xenstore_backend_read_variable(struct xs_handle *handle,
+                                     const char *devtype, const char *inst,
+                                     const char *var)
+{
+    char *value = NULL;
+    char *buf = NULL;
+    unsigned int len;
+
+    buf = get_device_variable_path(devtype, inst, var);
+    if (NULL == buf)
+	goto out;
+
+    value = xs_read(handle, XBT_NULL, buf, &len);
+
+    free(buf);
+
+out:
+    return value;
+}
+
+/*
+  Read the hotplug status variable from the backend given the type
+  of device and its instance.
+*/
+char *xenstore_read_hotplug_status(struct xs_handle *handle,
+                                   const char *devtype, const char *inst)
+{
+    return xenstore_backend_read_variable(handle, devtype, inst,
+                                          "hotplug-status");
+}
+
+/*
+   Subscribe to the hotplug status of a device given the type of device and
+   its instance.
+   In case an error occurrs, a negative number is returned.
+ */
+int xenstore_subscribe_to_hotplug_status(struct xs_handle *handle,
+                                         const char *devtype,
+                                         const char *inst,
+                                         const char *token)
+{
+    int rc = 0;
+    char *path = get_device_variable_path(devtype, inst, "hotplug-status");
+
+    if (path == NULL)
+        return -1;
+
+    if (0 == xs_watch(handle, path, token))
+        rc = -2;
+
+    free(path);
+
+    return rc;
+}
+
+/*
+ * Unsubscribe from a subscription to the status of a hotplug variable of
+ * a device.
+ */
+int xenstore_unsubscribe_from_hotplug_status(struct xs_handle *handle,
+                                             const char *devtype,
+                                             const char *inst,
+                                             const char *token)
+{
+    int rc = 0;
+    char *path;
+    path = get_device_variable_path(devtype, inst, "hotplug-status");
+    if (path == NULL)
+        return -1;
+
+    if (0 == xs_unwatch(handle, path, token))
+        rc = -2;
+
+    free(path);
+
+    return rc;
+}

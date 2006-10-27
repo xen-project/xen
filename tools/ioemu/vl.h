@@ -1213,6 +1213,25 @@ void xenstore_check_new_media_present(int timeout);
 void xenstore_write_vncport(int vnc_display);
 int xenstore_read_vncpasswd(int domid);
 
+int xenstore_domain_has_devtype(struct xs_handle *handle,
+                                const char *devtype);
+char **xenstore_domain_get_devices(struct xs_handle *handle,
+                                   const char *devtype, unsigned int *num);
+char *xenstore_read_hotplug_status(struct xs_handle *handle,
+                                   const char *devtype, const char *inst);
+char *xenstore_backend_read_variable(struct xs_handle *,
+                                     const char *devtype, const char *inst,
+                                     const char *var);
+int xenstore_subscribe_to_hotplug_status(struct xs_handle *handle,
+                                         const char *devtype,
+                                         const char *inst,
+                                         const char *token);
+int xenstore_unsubscribe_from_hotplug_status(struct xs_handle *handle,
+                                             const char *devtype,
+                                             const char *inst,
+                                             const char *token);
+
+
 /* xen_platform.c */
 void pci_xen_platform_init(PCIBus *bus);
 
