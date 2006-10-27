@@ -320,7 +320,8 @@ do_dom0vp_op(unsigned long cmd,
     case IA64_DOM0VP_phystomach:
         ret = ____lookup_domain_mpa(d, arg0 << PAGE_SHIFT);
         if (ret == INVALID_MFN) {
-            DPRINTK("%s:%d INVALID_MFN ret: 0x%lx\n", __func__, __LINE__, ret);
+            DPRINTK(XENLOG_INFO "%s: INVALID_MFN ret: 0x%lx\n",
+                     __func__, ret);
         } else {
             ret = (ret & _PFN_MASK) >> PAGE_SHIFT;//XXX pte_pfn()
         }

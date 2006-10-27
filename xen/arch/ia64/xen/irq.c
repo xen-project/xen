@@ -377,7 +377,8 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
     {
         if ( desc->action != NULL )
         {
-            DPRINTK("Cannot bind IRQ %d to guest. In use by '%s'.\n",
+            DPRINTK(XENLOG_G_INFO
+                    "Cannot bind IRQ %d to guest. In use by '%s'.\n",
                     irq, desc->action->name);
             rc = -EBUSY;
             goto out;
@@ -386,7 +387,9 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
         action = xmalloc(irq_guest_action_t);
         if ( (desc->action = (struct irqaction *)action) == NULL )
         {
-            DPRINTK("Cannot bind IRQ %d to guest. Out of memory.\n", irq);
+            DPRINTK(XENLOG_G_INFO
+                    "Cannot bind IRQ %d to guest. Out of memory.\n",
+                    irq);
             rc = -ENOMEM;
             goto out;
         }
@@ -410,7 +413,8 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
     }
     else if ( !will_share || !action->shareable )
     {
-        DPRINTK("Cannot bind IRQ %d to guest. Will not share with others.\n",
+        DPRINTK(XENLOG_G_INFO
+                "Cannot bind IRQ %d to guest. Will not share with others.\n",
                 irq);
         rc = -EBUSY;
         goto out;
@@ -418,7 +422,9 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
 
     if ( action->nr_guests == IRQ_MAX_GUESTS )
     {
-        DPRINTK("Cannot bind IRQ %d to guest. Already at max share.\n", irq);
+        DPRINTK(XENLOG_G_INFO
+                "Cannot bind IRQ %d to guest. Already at max share.\n",
+                irq);
         rc = -EBUSY;
         goto out;
     }

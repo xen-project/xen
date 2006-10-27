@@ -1571,7 +1571,7 @@ vcpu_get_domain_bundle(VCPU * vcpu, REGS * regs, u64 gip,
 			set_metaphysical_rr0();
 		}
 		if (bundle->i64[0] == 0 && bundle->i64[1] == 0) {
-			DPRINTK("%s gip 0x%lx\n", __func__, gip);
+			DPRINTK(XENLOG_INFO "%s gip 0x%lx\n", __func__, gip);
 			return 0;
 		}
 		return 1;

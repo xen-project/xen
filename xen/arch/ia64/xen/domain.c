@@ -682,7 +682,8 @@ int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc)
 	//struct vcpu *v;
 
 	if (unlikely(d == current->domain)) {
-		DPRINTK("Don't try to do a shadow op on yourself!\n");
+		DPRINTK(XENLOG_G_INFO
+                        "Don't try to do a shadow op on yourself!\n");
 		return -EINVAL;
 	}   
 
