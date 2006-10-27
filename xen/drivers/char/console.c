@@ -4,6 +4,10 @@
  * Emergency console I/O for Xen and the domain-0 guest OS.
  * 
  * Copyright (c) 2002-2004, K A Fraser.
+ *
+ * Added printf_ratelimit
+ *     Taken from Linux - Author: Andi Kleen (net_ratelimit)
+ *     Ported to Xen - Steven Rostedt - Red Hat
  */
 
 #include <xen/stdarg.h>
@@ -26,6 +30,7 @@
 #include <asm/current.h>
 #include <asm/debugger.h>
 #include <asm/io.h>
+#include <asm/div64.h>
 
 /* console: comma-separated list of console outputs. */
 static char opt_console[30] = OPT_CONSOLE_STR;
@@ -448,6 +453,56 @@ int console_getc(void)
     return serial_getc(sercon_handle);
 }
 
+/*
+ * printk rate limiting, lifted from Linux.
+ *
+ * This enforces a rate limit: not more than one kernel message
+ * every printk_ratelimit_ms (millisecs).
+ */
+int __printk_ratelimit(int ratelimit_ms, int ratelimit_burst)
+{
+    static DEFINE_SPINLOCK(ratelimit_lock);
+    static unsigned long toks = 10 * 5 * 1000;
+    static unsigned long last_msg;
+    static int missed;
+    unsigned long flags;
+    unsigned long long now = NOW(); /* ns */
+    unsigned long ms;
+
+    do_div(now, 1000000);
+    ms = (unsigned long)now;
+
+    spin_lock_irqsave(&ratelimit_lock, flags);
+    toks += ms - last_msg;
+    last_msg = ms;
+    if ( toks > (ratelimit_burst * ratelimit_ms))
+        toks = ratelimit_burst * ratelimit_ms;
+    if ( toks >= ratelimit_ms )
+    {
+        int lost = missed;
+        missed = 0;
+        toks -= ratelimit_ms;
+        spin_unlock_irqrestore(&ratelimit_lock, flags);
+        if ( lost )
+            printk("printk: %d messages suppressed.\n", lost);
+        return 1;
+    }
+    missed++;
+    spin_unlock_irqrestore(&ratelimit_lock, flags);
+    return 0;
+}
+
+/* minimum time in ms between messages */
+int printk_ratelimit_ms = 5 * 1000;
+
+/* number of messages we send before ratelimiting */
+int printk_ratelimit_burst = 10;
+
+int printk_ratelimit(void)
+{
+    return __printk_ratelimit(printk_ratelimit_ms,
+                              printk_ratelimit_burst);
+}
 
 /*
  * **************************************************************

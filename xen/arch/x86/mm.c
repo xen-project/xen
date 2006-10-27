@@ -109,9 +109,12 @@
 #include <public/memory.h>
 
 #ifdef VERBOSE
-#define MEM_LOG(_f, _a...)                                  \
-  printk("DOM%u: (file=mm.c, line=%d) " _f "\n",            \
-         current->domain->domain_id , __LINE__ , ## _a )
+#define MEM_LOG(_f, _a...)                                          \
+    do {                                                            \
+        if ( printk_ratelimit() )                                   \
+            printk("DOM%u: (file=mm.c, line=%d) " _f "\n",          \
+                   current->domain->domain_id , __LINE__ , ## _a ); \
+    } while (0)
 #else
 #define MEM_LOG(_f, _a...) ((void)0)
 #endif

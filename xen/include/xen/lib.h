@@ -56,6 +56,8 @@ extern void printk(const char *format, ...)
 extern void panic(const char *format, ...)
     __attribute__ ((format (printf, 1, 2)));
 extern long vm_assist(struct domain *, unsigned int, unsigned int);
+extern int __printk_ratelimit(int ratelimit_ms, int ratelimit_burst);
+extern int printk_ratelimit(void);
 
 /* vsprintf.c */
 extern int sprintf(char * buf, const char * fmt, ...)
