@@ -361,9 +361,6 @@ class HVMImageHandler(ImageHandler):
 
         if nographic:
             ret.append('-nographic')
-            # remove password
-            if vncpasswd_vmconfig:
-                config.remove(['vncpasswd', vncpasswd_vmconfig])
             return ret
 
         if vnc:
@@ -394,9 +391,6 @@ class HVMImageHandler(ImageHandler):
                                   'VMconfig and xend-config.')
             if vncpasswd != '':
                 self.vm.storeVm("vncpasswd", vncpasswd)
-
-        # remove password
-        config.remove(['vncpasswd', vncpasswd_vmconfig])
 
         return ret
 
