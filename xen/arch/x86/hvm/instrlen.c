@@ -317,7 +317,7 @@ done_prefixes:
 
         if ( modrm_mod == 3 )
         {
-            DPRINTK("Cannot parse ModRM.mod == 3.\n");
+            DPRINTK(XENLOG_G_WARNING "Cannot parse ModRM.mod == 3.\n");
             goto cannot_emulate;
         }
 
@@ -444,7 +444,8 @@ done:
     return length;
 
 cannot_emulate:
-    DPRINTK("Cannot emulate %02x at address %lx (eip %lx, mode %d)\n",
+    DPRINTK(XENLOG_G_WARNING
+            "Cannot emulate %02x at address %lx (eip %lx, mode %d)\n",
             b, (unsigned long)_regs.eip, (unsigned long)regs->eip, mode);
     return -1;
 }

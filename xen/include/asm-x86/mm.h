@@ -213,7 +213,8 @@ static inline int get_page(struct page_info *page,
              unlikely(d != _domain) )                /* Wrong owner? */
         {
             if ( !_shadow_mode_refcounts(domain) )
-                DPRINTK("Error pfn %lx: rd=%p, od=%p, caf=%08x, taf=%" 
+                DPRINTK(XENLOG_G_INFO
+                        "Error pfn %lx: rd=%p, od=%p, caf=%08x, taf=%"
                         PRtype_info "\n",
                         page_to_mfn(page), domain, unpickle_domptr(d),
                         x, page->u.inuse.type_info);

@@ -407,7 +407,8 @@ static inline int do_trap(int trapnr, char *str,
 
     if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
     {
-        DPRINTK("Trap %d: %p -> %p\n", trapnr, _p(regs->eip), _p(fixup));
+        DPRINTK(XENLOG_ERR "Trap %d: %p -> %p\n",
+                trapnr, _p(regs->eip), _p(fixup));
         regs->eip = fixup;
         return 0;
     }
@@ -475,7 +476,8 @@ int wrmsr_hypervisor_regs(
 
         if ( idx > 0 )
         {
-            DPRINTK("Dom%d: Out of range index %u to MSR %08x\n",
+            DPRINTK(XENLOG_G_WARNING
+                    "Dom%d: Out of range index %u to MSR %08x\n",
                     d->domain_id, idx, 0x40000000);
             return 0;
         }
@@ -485,7 +487,8 @@ int wrmsr_hypervisor_regs(
         if ( !mfn_valid(mfn) ||
              !get_page_and_type(mfn_to_page(mfn), d, PGT_writable_page) )
         {
-            DPRINTK("Dom%d: Bad GMFN %lx (MFN %lx) to MSR %08x\n",
+            DPRINTK(XENLOG_G_WARNING
+                    "Dom%d: Bad GMFN %lx (MFN %lx) to MSR %08x\n",
                     d->domain_id, gmfn, mfn, 0x40000000);
             return 0;
         }
@@ -832,17 +835,18 @@ static int __spurious_page_fault(
         return 0;
 
  spurious:
-    DPRINTK("Spurious fault in domain %u:%u at addr %lx, e/c %04x\n",
+    DPRINTK(XENLOG_WARNING "Spurious fault in domain %u:%u "
+            "at addr %lx, e/c %04x\n",
             current->domain->domain_id, current->vcpu_id,
             addr, regs->error_code);
 #if CONFIG_PAGING_LEVELS >= 4
-    DPRINTK(" l4e = %"PRIpte"\n", l4e_get_intpte(l4e));
+    DPRINTK(XENLOG_WARNING " l4e = %"PRIpte"\n", l4e_get_intpte(l4e));
 #endif
 #if CONFIG_PAGING_LEVELS >= 3
-    DPRINTK(" l3e = %"PRIpte"\n", l3e_get_intpte(l3e));
+    DPRINTK(XENLOG_WARNING " l3e = %"PRIpte"\n", l3e_get_intpte(l3e));
 #endif
-    DPRINTK(" l2e = %"PRIpte"\n", l2e_get_intpte(l2e));
-    DPRINTK(" l1e = %"PRIpte"\n", l1e_get_intpte(l1e));
+    DPRINTK(XENLOG_WARNING " l2e = %"PRIpte"\n", l2e_get_intpte(l2e));
+    DPRINTK(XENLOG_WARNING " l1e = %"PRIpte"\n", l1e_get_intpte(l1e));
 #ifndef NDEBUG
     show_registers(regs);
 #endif
@@ -1313,7 +1317,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case 0: /* Write CR0 */
             if ( (*reg ^ read_cr0()) & ~X86_CR0_TS )
             {
-                DPRINTK("Attempt to change unmodifiable CR0 flags.\n");
+                DPRINTK(XENLOG_G_WARNING
+                        "Attempt to change unmodifiable CR0 flags.\n");
                 goto fail;
             }
             (void)do_fpu_taskswitch(!!(*reg & X86_CR0_TS));
@@ -1333,7 +1338,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case 4:
             if ( *reg != (read_cr4() & ~(X86_CR4_PGE|X86_CR4_PSE)) )
             {
-                DPRINTK("Attempt to change CR4 flags.\n");
+                DPRINTK(XENLOG_G_WARNING "Attempt to change CR4 flags.\n");
                 goto fail;
             }
             break;
@@ -1381,7 +1386,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
             if ( (rdmsr_safe(regs->ecx, l, h) != 0) ||
                  (regs->eax != l) || (regs->edx != h) )
-                DPRINTK("Domain attempted WRMSR %p from "
+                DPRINTK(XENLOG_G_WARNING "Domain attempted WRMSR %p from "
                         "%08x:%08x to %08lx:%08lx.\n",
                         _p(regs->ecx), h, l, (long)regs->edx, (long)regs->eax);
             break;
@@ -1510,7 +1515,7 @@ asmlinkage int do_general_protection(struct cpu_user_regs *regs)
 
     if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
     {
-        DPRINTK("GPF (%04x): %p -> %p\n",
+        DPRINTK(XENLOG_WARNING "GPF (%04x): %p -> %p\n",
                 regs->error_code, _p(regs->eip), _p(fixup));
         regs->eip = fixup;
         return 0;

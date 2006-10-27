@@ -206,7 +206,8 @@ unsigned long do_iret(void)
     if ( unlikely(copy_from_user(&iret_saved, (void *)regs->rsp,
                                  sizeof(iret_saved))) )
     {
-        DPRINTK("Fault while reading IRET context from guest stack\n");
+        DPRINTK(XENLOG_G_ERR "Fault while reading IRET context from "
+                "guest stack\n");
         domain_crash_synchronous();
     }
 
@@ -215,7 +216,8 @@ unsigned long do_iret(void)
     {
         if ( unlikely(pagetable_is_null(v->arch.guest_table_user)) )
         {
-            DPRINTK("Guest switching to user mode with no user page tables\n");
+            DPRINTK(XENLOG_G_ERR "Guest switching to user mode with no "
+                    "user page tables\n");
             domain_crash_synchronous();
         }
         toggle_guest_mode(v);

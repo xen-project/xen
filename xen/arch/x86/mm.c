@@ -2261,7 +2261,8 @@ int do_mmu_update(
             {
                 if ( shadow_mode_refcounts(d) )
                 {
-                    DPRINTK("mmu update on shadow-refcounted domain!");
+                    DPRINTK(XENLOG_INFO
+                            "mmu update on shadow-refcounted domain!");
                     break;
                 }
 
@@ -2625,7 +2626,8 @@ int steal_page(
         x = y;
         if (unlikely((x & (PGC_count_mask|PGC_allocated)) !=
                      (1 | PGC_allocated)) || unlikely(_nd != _d)) { 
-            DPRINTK("gnttab_transfer: Bad page %p: ed=%p(%u), sd=%p,"
+            DPRINTK(XENLOG_G_WARNING
+                    "gnttab_transfer: Bad page %p: ed=%p(%u), sd=%p,"
                     " caf=%08x, taf=%" PRtype_info "\n", 
                     (void *) page_to_mfn(page),
                     d, d->domain_id, unpickle_domptr(_nd), x, 

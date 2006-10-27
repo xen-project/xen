@@ -71,7 +71,7 @@ static int vmx_initialize_guest_resources(struct vcpu *v)
 
     if ( !shadow_mode_external(d) )
     {
-        DPRINTK("Can't init HVM for dom %u vcpu %u: "
+        DPRINTK(XENLOG_ERR "Can't init HVM for dom %u vcpu %u: "
                 "not in shadow external mode\n", 
                 d->domain_id, v->vcpu_id);
         domain_crash(d);
@@ -83,7 +83,8 @@ static int vmx_initialize_guest_resources(struct vcpu *v)
 
         if ( (rc = vmx_create_vmcs(vc)) != 0 )
         {
-            DPRINTK("Failed to create VMCS for vcpu %d: err=%d.\n",
+            DPRINTK(XENLOG_WARNING
+                    "Failed to create VMCS for vcpu %d: err=%d.\n",
                     vc->vcpu_id, rc);
             return 0;
         }
@@ -92,14 +93,16 @@ static int vmx_initialize_guest_resources(struct vcpu *v)
 
         if ( (io_bitmap_a = alloc_xenheap_pages(IO_BITMAP_ORDER)) == NULL )
         {
-            DPRINTK("Failed to allocate io bitmap b for vcpu %d.\n",
+            DPRINTK(XENLOG_WARNING
+                   "Failed to allocate io bitmap b for vcpu %d.\n",
                     vc->vcpu_id);
             return 0;
         }
 
         if ( (io_bitmap_b = alloc_xenheap_pages(IO_BITMAP_ORDER)) == NULL )
         {
-            DPRINTK("Failed to allocate io bitmap b for vcpu %d.\n",
+            DPRINTK(XENLOG_WARNING
+                    "Failed to allocate io bitmap b for vcpu %d.\n",
                     vc->vcpu_id);
             return 0;
         }
@@ -937,7 +940,7 @@ static void vmx_do_cpuid(struct cpu_user_regs *regs)
         unsigned long mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
         char *p;
 
-        DPRINTK("Input address is 0x%"PRIx64".\n", value);
+        DPRINTK(XENLOG_G_INFO "Input address is 0x%"PRIx64".\n", value);
 
         /* 8-byte aligned valid pseudophys address from vmxassist, please. */
         if ( (value & 7) || (mfn == INVALID_MFN) ||
@@ -948,7 +951,7 @@ static void vmx_do_cpuid(struct cpu_user_regs *regs)
         value = *((uint64_t *)(p + (value & (PAGE_SIZE - 1))));
         unmap_domain_page(p);
 
-        DPRINTK("Output value is 0x%"PRIx64".\n", value);
+        DPRINTK(XENLOG_G_INFO "Output value is 0x%"PRIx64".\n", value);
         ecx = (u32)(value >>  0);
         edx = (u32)(value >> 32);
     }

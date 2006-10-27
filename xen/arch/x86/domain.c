@@ -564,7 +564,8 @@ static void load_segments(struct vcpu *n)
              put_user(regs->r11,           rsp-10) |
              put_user(regs->rcx,           rsp-11) )
         {
-            DPRINTK("Error while creating failsafe callback frame.\n");
+            DPRINTK(XENLOG_G_ERR "Error while creating failsafe "
+                    "callback frame.\n");
             domain_crash(n->domain);
         }
 
