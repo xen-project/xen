@@ -599,7 +599,8 @@ int assign_pages(
 
     if ( unlikely(test_bit(_DOMF_dying, &d->domain_flags)) )
     {
-        DPRINTK("Cannot assign page to domain%d -- dying.\n", d->domain_id);
+        DPRINTK(XENLOG_G_INFO "Cannot assign page to domain%d -- dying.\n",
+                d->domain_id);
         goto fail;
     }
 
@@ -607,7 +608,7 @@ int assign_pages(
     {
         if ( unlikely((d->tot_pages + (1 << order)) > d->max_pages) )
         {
-            DPRINTK("Over-allocation for domain %u: %u > %u\n",
+            DPRINTK(XENLOG_G_INFO "Over-allocation for domain %u: %u > %u\n",
                     d->domain_id, d->tot_pages + (1 << order), d->max_pages);
             goto fail;
         }
