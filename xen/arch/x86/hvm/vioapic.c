@@ -39,6 +39,7 @@
 #include <asm/hvm/vpic.h>
 #include <asm/hvm/support.h>
 #include <asm/current.h>
+#include <asm/event.h>
 
 /* HACK: Route IRQ0 only to VCPU0 to prevent time jumps. */
 #define IRQ0_SPECIAL_ROUTING 1
@@ -455,9 +456,10 @@ static void ioapic_deliver(hvm_vioapic_t *s, int irqno)
 #endif
             target = apic_round_robin(s->domain, dest_mode,
                                       vector, deliver_bitmask);
-        if (target)
+        if (target) {
             ioapic_inj_irq(s, target, vector, trig_mode, delivery_mode);
-        else
+            vcpu_kick(target->vcpu);
+        } else
             HVM_DBG_LOG(DBG_LEVEL_IOAPIC,
               "null round robin mask %x vector %x delivery_mode %x\n",
               deliver_bitmask, vector, dest_LowestPrio);
@@ -478,8 +480,10 @@ static void ioapic_deliver(hvm_vioapic_t *s, int irqno)
             else
 #endif
                 target = s->lapic_info[bit];
-            if (target)
+            if (target) {
                 ioapic_inj_irq(s, target, vector, trig_mode, delivery_mode);
+                vcpu_kick(target->vcpu);
+            }
         }
         break;
     }
