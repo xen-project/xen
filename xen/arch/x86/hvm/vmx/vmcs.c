@@ -314,14 +314,20 @@ static void vmx_set_host_env(struct vcpu *v)
     error |= __vmwrite(HOST_RSP, (unsigned long)get_stack_bottom());
 }
 
+/* Update CR3, CR0, CR4, GDT, LDT, TR */
 static void vmx_do_launch(struct vcpu *v)
 {
-/* Update CR3, CR0, CR4, GDT, LDT, TR */
     unsigned int  error = 0;
     unsigned long cr0, cr4;
 
-    if (v->vcpu_id == 0)
+    if ( v->vcpu_id == 0 )
         hvm_setup_platform(v->domain);
+    else {
+        /* Sync AP's TSC with BSP's */
+        v->arch.hvm_vcpu.cache_tsc_offset = 
+            v->domain->vcpu[0]->arch.hvm_vcpu.cache_tsc_offset;
+        hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
+    }
 
     __asm__ __volatile__ ("mov %%cr0,%0" : "=r" (cr0) : );
 
@@ -360,9 +366,6 @@ static void vmx_do_launch(struct vcpu *v)
     __vmwrite(HOST_CR3, v->arch.cr3);
 
     v->arch.schedule_tail = arch_vmx_do_resume;
-
-    /* init guest tsc to start from 0 */
-    hvm_set_guest_time(v, 0);
 }
 
 /*

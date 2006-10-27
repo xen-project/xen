@@ -325,6 +325,7 @@ struct periodic_time * create_periodic_time(
         stop_timer (&pt->timer);
         pt->enabled = 0;
     }
+    pt->bind_vcpu = 0; /* timer interrupt delivered to BSP by default */
     pt->pending_intr_nr = 0;
     pt->first_injected = 0;
     if (period < 900000) { /* < 0.9 ms */

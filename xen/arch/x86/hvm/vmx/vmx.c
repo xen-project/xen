@@ -458,7 +458,8 @@ static void vmx_freeze_time(struct vcpu *v)
 {
     struct periodic_time *pt=&v->domain->arch.hvm_domain.pl_time.periodic_tm;
     
-    if ( pt->enabled && pt->first_injected && !v->arch.hvm_vcpu.guest_time ) {
+    if ( pt->enabled && pt->first_injected && v->vcpu_id == pt->bind_vcpu
+            && !v->arch.hvm_vcpu.guest_time ) {
         v->arch.hvm_vcpu.guest_time = hvm_get_guest_time(v);
         stop_timer(&(pt->timer));
     }
@@ -1972,6 +1973,13 @@ static inline void vmx_do_msr_write(struct cpu_user_regs *regs)
 
     switch (regs->ecx) {
     case MSR_IA32_TIME_STAMP_COUNTER:
+        {
+            struct periodic_time *pt =
+                &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
+            if ( pt->enabled && pt->first_injected 
+                    && v->vcpu_id == pt->bind_vcpu ) 
+                pt->first_injected = 0;
+        }
         hvm_set_guest_time(v, msr_content);
         break;
     case MSR_IA32_SYSENTER_CS:

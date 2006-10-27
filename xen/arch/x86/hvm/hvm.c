@@ -228,7 +228,7 @@ void hvm_do_resume(struct vcpu *v)
     hvm_stts(v);
 
     /* pick up the elapsed PIT ticks and re-enable pit_timer */
-    if ( pt->enabled && pt->first_injected ) {
+    if ( pt->enabled && v->vcpu_id == pt->bind_vcpu && pt->first_injected ) {
         if ( v->arch.hvm_vcpu.guest_time ) {
             hvm_set_guest_time(v, v->arch.hvm_vcpu.guest_time);
             v->arch.hvm_vcpu.guest_time = 0;
@@ -286,6 +286,9 @@ void hvm_setup_platform(struct domain* d)
     pit_init(v, cpu_khz);
     rtc_init(v, RTC_PORT(0), RTC_IRQ);
     pmtimer_init(v, ACPI_PM_TMR_BLK_ADDRESS); 
+
+    /* init guest tsc to start from 0 */
+    hvm_set_guest_time(v, 0);
 }
 
 void pic_irq_request(void *data, int level)

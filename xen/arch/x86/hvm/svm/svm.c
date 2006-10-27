@@ -761,7 +761,8 @@ static void svm_freeze_time(struct vcpu *v)
 {
     struct periodic_time *pt=&v->domain->arch.hvm_domain.pl_time.periodic_tm;
     
-    if ( pt->enabled && pt->first_injected && !v->arch.hvm_vcpu.guest_time ) {
+    if ( pt->enabled && pt->first_injected && v->vcpu_id == pt->bind_vcpu 
+            && !v->arch.hvm_vcpu.guest_time ) {
         v->arch.hvm_vcpu.guest_time = hvm_get_guest_time(v);
         stop_timer(&(pt->timer));
     }
