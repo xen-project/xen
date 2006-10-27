@@ -58,6 +58,13 @@ static int sercon_handle = -1;
 
 static DEFINE_SPINLOCK(console_lock);
 
+int xenlog_upper_thresh = XENLOG_UPPER_THRESHOLD;
+int xenlog_lower_thresh = XENLOG_LOWER_THRESHOLD;
+int xenlog_guest_upper_thresh = XENLOG_GUEST_UPPER_THRESHOLD;
+int xenlog_guest_lower_thresh = XENLOG_GUEST_LOWER_THRESHOLD;
+
+static int xen_startup = 1;
+
 /*
  * ********************************************************
  * *************** ACCESS TO CONSOLE RING *****************
@@ -307,6 +314,10 @@ void printk(const char *fmt, ...)
     va_list       args;
     char         *p, *q;
     unsigned long flags;
+    int           level = XENLOG_DEFAULT;
+    int           upper_thresh = xenlog_upper_thresh;
+    int           lower_thresh = xenlog_lower_thresh;
+    int           print_regardless = xen_startup;
 
     spin_lock_irqsave(&console_lock, flags);
 
@@ -315,6 +326,32 @@ void printk(const char *fmt, ...)
     va_end(args);        
 
     p = buf;
+
+    /* Is this print caused by a guest? */
+    if ( strncmp("<G>", p, 3) == 0 )
+    {
+        upper_thresh = xenlog_guest_upper_thresh;
+        lower_thresh = xenlog_guest_lower_thresh;
+        level = XENLOG_GUEST_DEFAULT;
+        p += 3;
+    }
+
+    if ( (p[0] == '<') &&
+         (p[1] >= '0') && (p[1] <= ('0' + XENLOG_MAX)) &&
+         (p[2] == '>') )
+    {
+        level = p[1] - '0';
+        p += 3;
+    }
+
+    if ( !print_regardless )
+    {
+        if ( level > upper_thresh )
+            goto out;
+        if ( (level >= lower_thresh) && (!printk_ratelimit()) )
+            goto out;
+    }
+
     while ( (q = strchr(p, '\n')) != NULL )
     {
         *q = '\0';
@@ -334,6 +371,7 @@ void printk(const char *fmt, ...)
         start_of_line = 0;
     }
 
+ out:
     spin_unlock_irqrestore(&console_lock, flags);
 }
 
@@ -419,6 +457,9 @@ void console_endboot(void)
 
     /* Serial input is directed to DOM0 by default. */
     switch_serial_input();
+
+    /* Now we implement the logging thresholds. */
+    xen_startup = 0;
 }
 
 void console_force_unlock(void)
