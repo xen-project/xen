@@ -268,7 +268,7 @@ int allocate_rma(struct domain *d, unsigned int order)
 
     d->arch.rma_page = alloc_domheap_pages(d, order, 0);
     if (d->arch.rma_page == NULL) {
-        DPRINTK("Could not allocate order=%d RMA for domain %u\n",
+        DPRINTK(XENLOG_G_INFO "Could not allocate order=%d RMA for domain %u\n",
                 order, d->domain_id);
         return -ENOMEM;
     }
