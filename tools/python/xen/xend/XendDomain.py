@@ -528,10 +528,10 @@ class XendDomain:
                 
                 if dom.state == XendDomainInfo.DOM_STATE_RUNNING:
                     shutdownAction = dom.info.get('on_xend_stop', 'ignore')
-                    if shouldShutdown and shutdownAction == 'shutdown':
+                    if shutdownAction == 'shutdown':
                         log.debug('Shutting down domain: %s' % dom.getName())
                         dom.shutdown("poweroff")
-                    elif shouldShutdown and shutdownAction == 'suspend':
+                    elif shutdownAction == 'suspend':
                         chkfile = self._managed_check_point_path(dom.getName())
                         self.domain_save(dom.domid, chkfile)
         finally:
@@ -584,7 +584,7 @@ class XendDomain:
             if not dom:
                 return None
 
-            value = dom.get_device_property(klass, devid, field)
+            value = dom.get_device_property(klass, dev_uuid, field)
             return value
         except ValueError, e:
             pass
@@ -952,15 +952,16 @@ class XendDomain:
     def domain_dump(self, domid, filename, live, crash):
         """Dump domain core."""
 
-        dominfo = self.domain_lookup_by_name_or_id_nr(domid)
+        dominfo = self.domain_lookup_nr(domid)
         if not dominfo:
             raise XendInvalidDomain(str(domid))
 
-        if dominfo.getDomid() == PRIV_DOMAIN:
+        if dominfo.getDomid() == DOM0_ID:
             raise XendError("Cannot dump core for privileged domain %s" % domid)
 
         try:
-            log.info("Domain core dump requested for domain %s (%d) live=%d crash=%d.",
+            log.info("Domain core dump requested for domain %s (%d) "
+                     "live=%d crash=%d.",
                      dominfo.getName(), dominfo.getDomid(), live, crash)
             return dominfo.dumpCore(filename)
         except Exception, ex:
