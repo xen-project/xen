@@ -929,6 +929,10 @@ extern int acpi_enabled;
 void piix4_pm_init(PCIBus *bus, int devfn);
 void acpi_bios_init(void);
 
+/* tpm_tis.c */
+int has_tpm_device(void);
+void tpm_tis_init(SetIRQFunc *set_irq, void *irq_opaque, int irq);
+
 /* piix4acpi.c */
 extern void pci_piix4_acpi_init(PCIBus *bus, int devfn);
 
