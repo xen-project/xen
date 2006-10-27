@@ -294,8 +294,6 @@ static void create_new_vm(xen_session *session)
             .actions_after_reboot = XEN_ON_NORMAL_EXIT_RESTART,
             .actions_after_suspend = XEN_ON_NORMAL_EXIT_DESTROY,
             .actions_after_crash = XEN_ON_CRASH_BEHAVIOUR_PRESERVE,
-            .tpm_instance = -1,
-            .tpm_backend = 0,
             .bios_boot = "hd(0,0)",
             .builder = "Linux",
             .boot_method = XEN_BOOT_TYPE_KERNEL_EXTERNAL,
