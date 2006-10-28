@@ -148,7 +148,7 @@ xen_network_create(xen_session *session, xen_network *result, xen_network_record
 
 
 bool
-xen_network_get_by_name_label(xen_session *session, xen_network *result, char *label)
+xen_network_get_by_name_label(xen_session *session, struct xen_network_set **result, char *label)
 {
     abstract_value param_values[] =
         {
@@ -156,7 +156,7 @@ xen_network_get_by_name_label(xen_session *session, xen_network *result, char *l
               .u.string_val = label }
         };
 
-    abstract_type result_type = abstract_type_string;
+    abstract_type result_type = abstract_type_string_set;
 
     *result = NULL;
     XEN_CALL_("network.get_by_name_label");

@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2006 XenSource, Inc.
+ * Copyright (c) 2006 XenSource, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
-*/
+ */
 
 #define _GNU_SOURCE
 #include <inttypes.h>
@@ -320,8 +320,9 @@ static void create_new_vm(xen_session *session)
     /*
      * Create a new disk for the new VM.
      */
-    xen_sr sr;
-    if (!xen_sr_get_by_name_label(session, &sr, "Local"))
+    xen_sr_set *srs;
+    if (!xen_sr_get_by_name_label(session, &srs, "Local") ||
+        srs->size < 1)
     {
         fprintf(stderr, "SR lookup failed.\n");
         print_error(session);
@@ -331,7 +332,7 @@ static void create_new_vm(xen_session *session)
 
     xen_sr_record_opt sr_record =
         {
-            .u.handle = sr
+            .u.handle = srs->contents[0]
         };
     xen_vdi_record vdi0_record =
         {
@@ -351,16 +352,24 @@ static void create_new_vm(xen_session *session)
         fprintf(stderr, "VDI creation failed.\n");
         print_error(session);
 
-        xen_sr_free(sr);
+        xen_sr_set_free(srs);
         xen_vm_free(vm);
         return;
     }
 
 
+    xen_vm_record_opt vm_record_opt =
+        {
+            .u.handle = vm
+        };
+    xen_vdi_record_opt vdi0_record_opt =
+        {
+            .u.handle = vdi0
+        };
     xen_vbd_record vbd0_record =
         {
-            .vm = vm,
-            .vdi = vdi0,
+            .vm = &vm_record_opt,
+            .vdi = &vdi0_record_opt,
             .device = "sda1",
             .mode = XEN_VBD_MODE_RW,
             .driver = XEN_DRIVER_TYPE_PARAVIRTUALISED
@@ -373,7 +382,7 @@ static void create_new_vm(xen_session *session)
         print_error(session);
 
         xen_vdi_free(vdi0);
-        xen_sr_free(sr);
+        xen_sr_set_free(srs);
         xen_vm_free(vm);
         return;
     }
@@ -396,7 +405,7 @@ static void create_new_vm(xen_session *session)
         xen_uuid_free(vbd0_uuid);
         xen_vbd_free(vbd0);
         xen_vdi_free(vdi0);
-        xen_sr_free(sr);
+        xen_sr_set_free(srs);
         xen_vm_free(vm);
         return;
     }
@@ -410,6 +419,6 @@ static void create_new_vm(xen_session *session)
     xen_uuid_free(vbd0_uuid);
     xen_vbd_free(vbd0);
     xen_vdi_free(vdi0);
-    xen_sr_free(sr);
+    xen_sr_set_free(srs);
     xen_vm_free(vm);
 }

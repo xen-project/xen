@@ -173,10 +173,10 @@ xen_network_create(xen_session *session, xen_network *result, xen_network_record
 
 
 /**
- * Get a reference to the object with the specified label.
+ * Get all the network instances with the given label.
  */
 extern bool
-xen_network_get_by_name_label(xen_session *session, xen_network *result, char *label);
+xen_network_get_by_name_label(xen_session *session, struct xen_network_set **result, char *label);
 
 
 /**

@@ -180,10 +180,10 @@ xen_vdi_create(xen_session *session, xen_vdi *result, xen_vdi_record *record);
 
 
 /**
- * Get a reference to the object with the specified label.
+ * Get all the VDI instances with the given label.
  */
 extern bool
-xen_vdi_get_by_name_label(xen_session *session, xen_vdi *result, char *label);
+xen_vdi_get_by_name_label(xen_session *session, struct xen_vdi_set **result, char *label);
 
 
 /**

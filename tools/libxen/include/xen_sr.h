@@ -174,10 +174,10 @@ xen_sr_create(xen_session *session, xen_sr *result, xen_sr_record *record);
 
 
 /**
- * Get a reference to the object with the specified label.
+ * Get all the SR instances with the given label.
  */
 extern bool
-xen_sr_get_by_name_label(xen_session *session, xen_sr *result, char *label);
+xen_sr_get_by_name_label(xen_session *session, struct xen_sr_set **result, char *label);
 
 
 /**

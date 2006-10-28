@@ -175,10 +175,10 @@ xen_host_create(xen_session *session, xen_host *result, xen_host_record *record)
 
 
 /**
- * Get a reference to the object with the specified label.
+ * Get all the host instances with the given label.
  */
 extern bool
-xen_host_get_by_name_label(xen_session *session, xen_host *result, char *label);
+xen_host_get_by_name_label(xen_session *session, struct xen_host_set **result, char *label);
 
 
 /**

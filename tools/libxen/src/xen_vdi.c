@@ -167,7 +167,7 @@ xen_vdi_create(xen_session *session, xen_vdi *result, xen_vdi_record *record)
 
 
 bool
-xen_vdi_get_by_name_label(xen_session *session, xen_vdi *result, char *label)
+xen_vdi_get_by_name_label(xen_session *session, struct xen_vdi_set **result, char *label)
 {
     abstract_value param_values[] =
         {
@@ -175,7 +175,7 @@ xen_vdi_get_by_name_label(xen_session *session, xen_vdi *result, char *label)
               .u.string_val = label }
         };
 
-    abstract_type result_type = abstract_type_string;
+    abstract_type result_type = abstract_type_string_set;
 
     *result = NULL;
     XEN_CALL_("VDI.get_by_name_label");

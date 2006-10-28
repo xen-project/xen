@@ -152,7 +152,7 @@ xen_sr_create(xen_session *session, xen_sr *result, xen_sr_record *record)
 
 
 bool
-xen_sr_get_by_name_label(xen_session *session, xen_sr *result, char *label)
+xen_sr_get_by_name_label(xen_session *session, struct xen_sr_set **result, char *label)
 {
     abstract_value param_values[] =
         {
@@ -160,7 +160,7 @@ xen_sr_get_by_name_label(xen_session *session, xen_sr *result, char *label)
               .u.string_val = label }
         };
 
-    abstract_type result_type = abstract_type_string;
+    abstract_type result_type = abstract_type_string_set;
 
     *result = NULL;
     XEN_CALL_("SR.get_by_name_label");

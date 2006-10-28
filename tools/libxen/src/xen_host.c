@@ -150,7 +150,7 @@ xen_host_create(xen_session *session, xen_host *result, xen_host_record *record)
 
 
 bool
-xen_host_get_by_name_label(xen_session *session, xen_host *result, char *label)
+xen_host_get_by_name_label(xen_session *session, struct xen_host_set **result, char *label)
 {
     abstract_value param_values[] =
         {
@@ -158,7 +158,7 @@ xen_host_get_by_name_label(xen_session *session, xen_host *result, char *label)
               .u.string_val = label }
         };
 
-    abstract_type result_type = abstract_type_string;
+    abstract_type result_type = abstract_type_string_set;
 
     *result = NULL;
     XEN_CALL_("host.get_by_name_label");

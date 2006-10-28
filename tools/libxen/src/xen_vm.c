@@ -280,7 +280,7 @@ xen_vm_create(xen_session *session, xen_vm *result, xen_vm_record *record)
 
 
 bool
-xen_vm_get_by_name_label(xen_session *session, xen_vm *result, char *label)
+xen_vm_get_by_name_label(xen_session *session, struct xen_vm_set **result, char *label)
 {
     abstract_value param_values[] =
         {
@@ -288,7 +288,7 @@ xen_vm_get_by_name_label(xen_session *session, xen_vm *result, char *label)
               .u.string_val = label }
         };
 
-    abstract_type result_type = abstract_type_string;
+    abstract_type result_type = abstract_type_string_set;
 
     *result = NULL;
     XEN_CALL_("VM.get_by_name_label");

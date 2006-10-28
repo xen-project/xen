@@ -217,10 +217,10 @@ xen_vm_create(xen_session *session, xen_vm *result, xen_vm_record *record);
 
 
 /**
- * Get a reference to the object with the specified label.
+ * Get all the VM instances with the given label.
  */
 extern bool
-xen_vm_get_by_name_label(xen_session *session, xen_vm *result, char *label);
+xen_vm_get_by_name_label(xen_session *session, struct xen_vm_set **result, char *label);
 
 
 /**
