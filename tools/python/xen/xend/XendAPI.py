@@ -930,11 +930,11 @@ class XendAPI:
             'actions_after_reboot': xeninfo.get_on_reboot(),
             'actions_after_suspend': xeninfo.get_on_suspend(),
             'actions_after_crash': xeninfo.get_on_crash(),
-            'vifs': xeninfo.get_vifs(),
-            'vbds': xeninfo.get_vbds(),
-            'vtpms': xeninfo.get_vtpms(),
+            'VIFs': xeninfo.get_vifs(),
+            'VBDs': xeninfo.get_vbds(),
+            'VTPMs': xeninfo.get_vtpms(),
             'bios_boot': xeninfo.get_bios_boot(),
-            'platform_std_vga': xeninfo.get_platform_std_vga(),
+            'platform_std_VGA': xeninfo.get_platform_std_vga(),
             'platform_serial': xeninfo.get_platform_serial(),
             'platform_localtime': xeninfo.get_platform_localtime(),
             'platform_clock_offset': xeninfo.get_platform_clock_offset(),
@@ -945,9 +945,9 @@ class XendAPI:
             'kernel_initrd': xeninfo.get_kernel_initrd(),
             'kernel_args': xeninfo.get_kernel_args(),
             'grub_cmdline': xeninfo.get_grub_cmdline(),
-            'pci_bus': xeninfo.get_pci_bus(),
+            'PCI_bus': xeninfo.get_pci_bus(),
             'tools_version': xeninfo.get_tools_version(),
-            'otherconfig': xeninfo.get_other_config()
+            'otherConfig': xeninfo.get_other_config()
         }
         return xen_api_success(record)
 
