@@ -79,6 +79,10 @@ const abstract_type xen_vbd_record_abstract_type_ =
 void
 xen_vbd_record_free(xen_vbd_record *record)
 {
+    if (record == NULL)
+    {
+        return;
+    }
     free(record->handle);
     free(record->uuid);
     xen_vm_record_opt_free(record->vm);

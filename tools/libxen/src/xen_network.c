@@ -74,6 +74,10 @@ const abstract_type xen_network_record_abstract_type_ =
 void
 xen_network_record_free(xen_network_record *record)
 {
+    if (record == NULL)
+    {
+        return;
+    }
     free(record->handle);
     free(record->uuid);
     free(record->name_label);

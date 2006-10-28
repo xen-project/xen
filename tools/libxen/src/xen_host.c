@@ -76,6 +76,10 @@ const abstract_type xen_host_record_abstract_type_ =
 void
 xen_host_record_free(xen_host_record *record)
 {
+    if (record == NULL)
+    {
+        return;
+    }
     free(record->handle);
     free(record->uuid);
     free(record->name_label);

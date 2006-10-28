@@ -84,6 +84,10 @@ const abstract_type xen_vif_record_abstract_type_ =
 void
 xen_vif_record_free(xen_vif_record *record)
 {
+    if (record == NULL)
+    {
+        return;
+    }
     free(record->handle);
     free(record->uuid);
     free(record->name);

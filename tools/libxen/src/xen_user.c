@@ -60,6 +60,10 @@ const abstract_type xen_user_record_abstract_type_ =
 void
 xen_user_record_free(xen_user_record *record)
 {
+    if (record == NULL)
+    {
+        return;
+    }
     free(record->handle);
     free(record->uuid);
     free(record->short_name);

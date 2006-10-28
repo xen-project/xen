@@ -189,6 +189,10 @@ const abstract_type xen_vm_record_abstract_type_ =
 void
 xen_vm_record_free(xen_vm_record *record)
 {
+    if (record == NULL)
+    {
+        return;
+    }
     free(record->handle);
     free(record->uuid);
     free(record->name_label);

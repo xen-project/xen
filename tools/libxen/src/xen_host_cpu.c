@@ -78,6 +78,10 @@ const abstract_type xen_host_cpu_record_abstract_type_ =
 void
 xen_host_cpu_record_free(xen_host_cpu_record *record)
 {
+    if (record == NULL)
+    {
+        return;
+    }
     free(record->handle);
     free(record->uuid);
     xen_host_record_opt_free(record->host);
