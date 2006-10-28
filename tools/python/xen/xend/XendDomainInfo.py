@@ -1837,6 +1837,9 @@ class XendDomainInfo:
     def get_vbds(self):
         return self.info.get('vbd_refs', [])
 
+    def get_vtpms(self):
+        return self.info.get('vtpm_refs', [])
+
     def create_vbd(self, xenapi_vbd):
         """Create a VBD device from the passed struct in Xen API format.
 

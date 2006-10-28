@@ -514,8 +514,7 @@ class XendAPI:
                   'VCPUs_can_use',
                   'VIFs',
                   'VBDs',
-                  'TPM_instance',
-                  'TPM_backend',
+                  'VTPMs',
                   'PCI_bus',
                   'tools_version',
                   ]
@@ -641,6 +640,10 @@ class XendAPI:
     def vm_get_vbds(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success(dom.get_vbds())
+    
+    def vm_get_vtpms(self, session, vm_ref):
+        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
+        return xen_api_success(dom.get_vtpms())
     
     def vm_get_tpm_instance(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
@@ -929,8 +932,7 @@ class XendAPI:
             'actions_after_crash': xeninfo.get_on_crash(),
             'vifs': xeninfo.get_vifs(),
             'vbds': xeninfo.get_vbds(),
-            'tpm_instance': xeninfo.get_tpm_instance(),
-            'tpm_backend': xeninfo.get_tpm_backend(),
+            'vtpms': xeninfo.get_vtpms(),
             'bios_boot': xeninfo.get_bios_boot(),
             'platform_std_vga': xeninfo.get_platform_std_vga(),
             'platform_serial': xeninfo.get_platform_serial(),
