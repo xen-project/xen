@@ -218,7 +218,7 @@ xen_vdi_get_sr(xen_session *session, xen_sr *result, xen_vdi vdi);
  * Get the VBDs field of the given VDI.
  */
 extern bool
-xen_vdi_get_vbds(xen_session *session, xen_vbd *result, xen_vdi vdi);
+xen_vdi_get_vbds(xen_session *session, struct xen_vbd_set **result, xen_vdi vdi);
 
 
 /**
@@ -260,7 +260,7 @@ xen_vdi_get_parent(xen_session *session, xen_vdi *result, xen_vdi vdi);
  * Get the children field of the given VDI.
  */
 extern bool
-xen_vdi_get_children(xen_session *session, xen_vdi *result, xen_vdi vdi);
+xen_vdi_get_children(xen_session *session, struct xen_vdi_set **result, xen_vdi vdi);
 
 
 /**

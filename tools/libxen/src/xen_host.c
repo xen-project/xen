@@ -214,7 +214,7 @@ xen_host_get_software_version(xen_session *session, xen_string_string_map **resu
 
 
 bool
-xen_host_get_resident_vms(xen_session *session, xen_vm *result, xen_host host)
+xen_host_get_resident_vms(xen_session *session, struct xen_vm_set **result, xen_host host)
 {
     abstract_value param_values[] =
         {
@@ -231,7 +231,7 @@ xen_host_get_resident_vms(xen_session *session, xen_vm *result, xen_host host)
 
 
 bool
-xen_host_get_pifs(xen_session *session, xen_pif *result, xen_host host)
+xen_host_get_pifs(xen_session *session, struct xen_pif_set **result, xen_host host)
 {
     abstract_value param_values[] =
         {
@@ -248,7 +248,7 @@ xen_host_get_pifs(xen_session *session, xen_pif *result, xen_host host)
 
 
 bool
-xen_host_get_host_cpus(xen_session *session, xen_host_cpu *result, xen_host host)
+xen_host_get_host_cpus(xen_session *session, struct xen_host_cpu_set **result, xen_host host)
 {
     abstract_value param_values[] =
         {
@@ -353,7 +353,7 @@ xen_host_reboot(xen_session *session, xen_host host)
 
 
 bool
-xen_host_get_all(xen_session *session, xen_host *result)
+xen_host_get_all(xen_session *session, struct xen_host_set **result)
 {
 
     abstract_type result_type = abstract_type_string_set;

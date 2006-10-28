@@ -395,21 +395,21 @@ xen_vm_get_actions_after_crash(xen_session *session, enum xen_on_crash_behaviour
  * Get the VIFs field of the given VM.
  */
 extern bool
-xen_vm_get_vifs(xen_session *session, xen_vif *result, xen_vm vm);
+xen_vm_get_vifs(xen_session *session, struct xen_vif_set **result, xen_vm vm);
 
 
 /**
  * Get the VBDs field of the given VM.
  */
 extern bool
-xen_vm_get_vbds(xen_session *session, xen_vbd *result, xen_vm vm);
+xen_vm_get_vbds(xen_session *session, struct xen_vbd_set **result, xen_vm vm);
 
 
 /**
  * Get the VTPMs field of the given VM.
  */
 extern bool
-xen_vm_get_vtpms(xen_session *session, xen_vtpm *result, xen_vm vm);
+xen_vm_get_vtpms(xen_session *session, struct xen_vtpm_set **result, xen_vm vm);
 
 
 /**
@@ -796,7 +796,7 @@ xen_vm_resume(xen_session *session, xen_vm vm, bool start_paused);
  * Return a list of all the VMs known to the system.
  */
 extern bool
-xen_vm_get_all(xen_session *session, xen_vm *result);
+xen_vm_get_all(xen_session *session, struct xen_vm_set **result);
 
 
 #endif

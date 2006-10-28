@@ -199,7 +199,7 @@ xen_sr_get_name_description(xen_session *session, char **result, xen_sr sr)
 
 
 bool
-xen_sr_get_vdis(xen_session *session, xen_vdi *result, xen_sr sr)
+xen_sr_get_vdis(xen_session *session, struct xen_vdi_set **result, xen_sr sr)
 {
     abstract_value param_values[] =
         {
@@ -351,7 +351,7 @@ xen_sr_clone(xen_session *session, xen_sr *result, xen_sr sr, char *loc, char *n
 
 
 bool
-xen_sr_get_all(xen_session *session, xen_sr *result)
+xen_sr_get_all(xen_session *session, struct xen_sr_set **result)
 {
 
     abstract_type result_type = abstract_type_string_set;

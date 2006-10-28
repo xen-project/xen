@@ -204,14 +204,14 @@ xen_network_get_name_description(xen_session *session, char **result, xen_networ
  * Get the VIFs field of the given network.
  */
 extern bool
-xen_network_get_vifs(xen_session *session, xen_vif *result, xen_network network);
+xen_network_get_vifs(xen_session *session, struct xen_vif_set **result, xen_network network);
 
 
 /**
  * Get the PIFs field of the given network.
  */
 extern bool
-xen_network_get_pifs(xen_session *session, xen_pif *result, xen_network network);
+xen_network_get_pifs(xen_session *session, struct xen_pif_set **result, xen_network network);
 
 
 /**
@@ -260,7 +260,7 @@ xen_network_set_default_netmask(xen_session *session, xen_network xen_network, c
  * Return a list of all the networks known to the system
  */
 extern bool
-xen_network_get_all(xen_session *session, xen_network *result);
+xen_network_get_all(xen_session *session, struct xen_network_set **result);
 
 
 #endif

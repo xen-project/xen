@@ -213,21 +213,21 @@ xen_host_get_software_version(xen_session *session, xen_string_string_map **resu
  * Get the resident_VMs field of the given host.
  */
 extern bool
-xen_host_get_resident_vms(xen_session *session, xen_vm *result, xen_host host);
+xen_host_get_resident_vms(xen_session *session, struct xen_vm_set **result, xen_host host);
 
 
 /**
  * Get the PIFs field of the given host.
  */
 extern bool
-xen_host_get_pifs(xen_session *session, xen_pif *result, xen_host host);
+xen_host_get_pifs(xen_session *session, struct xen_pif_set **result, xen_host host);
 
 
 /**
  * Get the host_CPUs field of the given host.
  */
 extern bool
-xen_host_get_host_cpus(xen_session *session, xen_host_cpu *result, xen_host host);
+xen_host_get_host_cpus(xen_session *session, struct xen_host_cpu_set **result, xen_host host);
 
 
 /**
@@ -279,7 +279,7 @@ xen_host_reboot(xen_session *session, xen_host host);
  * Return a list of all the hosts known to the system
  */
 extern bool
-xen_host_get_all(xen_session *session, xen_host *result);
+xen_host_get_all(xen_session *session, struct xen_host_set **result);
 
 
 #endif
