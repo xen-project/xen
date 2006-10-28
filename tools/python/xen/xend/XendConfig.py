@@ -239,7 +239,8 @@ DEFAULT_CONFIGURATION = (
     ('on_xend_stop', lambda info: 'ignore'),
 
     ('cpus',         lambda info: []),
-    ('cpu_weight',   lambda info: 1.0),
+    ('cpu_cap',      lambda info: 0),
+    ('cpu_weight',   lambda info: 256),
     ('vcpus',        lambda info: DEFAULT_VCPUS(info)),
     ('online_vcpus', lambda info: info['vcpus']),
     ('max_vcpu_id',  lambda info: info['vcpus']-1),

@@ -772,6 +772,9 @@ class XendDomain:
         try:
             dominfo = XendDomainInfo.create(config)
             self._add_domain(dominfo)
+            self.domain_sched_credit_set(dominfo.getDomid(),
+                                         dominfo.getWeight(),
+                                         dominfo.getCap())
             return dominfo
         finally:
             self.domains_lock.release()

@@ -79,7 +79,8 @@ ROUNDTRIPPING_CONFIG_ENTRIES = [
     ('uuid',            str),
     ('vcpus',           int),
     ('vcpu_avail',      int),
-    ('cpu_weight',      float),
+    ('cpu_cap',         int),
+    ('cpu_weight',      int),
     ('memory',          int),
     ('shadow_memory',   int),
     ('maxmem',          int),
@@ -827,6 +828,12 @@ class XendDomainInfo:
 
     def getResume(self):
         return "%s" % self.info['resume']
+
+    def getCap(self):
+        return self.info['cpu_cap']
+
+    def getWeight(self):
+        return self.info['cpu_weight']
 
     def setResume(self, state):
         self.info['resume'] = state
