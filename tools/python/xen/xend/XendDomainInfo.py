@@ -1440,7 +1440,7 @@ class XendDomainInfo:
         blcfg = None
         # FIXME: this assumes that we want to use the first disk device
         for (n, c) in self.info.all_devices_sxpr():
-            if not n or not c or n != "vbd":
+            if not n or not c or not(n in ["vbd", "tap"]):
                 continue
             disk = sxp.child_value(c, "uname")
             if disk is None:
