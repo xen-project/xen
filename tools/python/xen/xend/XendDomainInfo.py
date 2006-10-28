@@ -1897,6 +1897,24 @@ class XendDomainInfo:
 
         return dev_uuid
 
+    def create_vtpm(self, xenapi_vtpm):
+        """Create a VTPM device from the passed struct in Xen API format.
+
+        @return: uuid of the device
+        @rtype: string
+        """
+
+        dev_uuid = self.info.device_add('vtpm', cfg_xenapi = xenapi_vtpm)
+        if not dev_uuid:
+            raise XendError('Failed to create device')
+
+        if self.state in (DOM_STATE_HALTED,):
+            sxpr = self.info.device_sxpr(dev_uuid)
+            devid = self.getDeviceController('vtpm').createDevice(sxpr)
+            raise XendError("Device creation failed")
+
+        return dev_uuid
+
     def has_device(self, dev_class, dev_uuid):
         return (dev_uuid in self.info['%s_refs' % dev_class])
 

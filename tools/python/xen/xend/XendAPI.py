@@ -181,6 +181,28 @@ def valid_vdi(func):
         
     return check_vdi_ref
 
+def valid_vtpm(func):
+    """Decorator to verify if vtpm_ref is valid before calling
+    method.
+
+    @param func: function with params: (self, session, vtpm_ref)
+    @rtype: callable object
+    """
+    def check_vtpm_ref(self, session, vtpm_ref, *args, **kwargs):
+        xendom = XendDomain.instance()
+        if type(vtpm_ref) == type(str()) and \
+               xendom.is_valid_dev('vtpm', vtpm_ref):
+            return func(self, session, vtpm_ref, *args, **kwargs)
+        else:
+            return {'Status': 'Failure',
+                    'ErrorDescription': XEND_ERROR_VTPM_INVALID}
+
+    # make sure we keep the 'api' attribute
+    if hasattr(func, 'api'):
+        check_vtpm_ref.api = func.api
+
+    return check_vtpm_ref
+
 def valid_sr(func):
     """Decorator to verify if sr_ref is valid before calling
     method.
@@ -246,6 +268,7 @@ class XendAPI:
             'VBD': (valid_vbd, session_required),
             'VIF': (valid_vif, session_required),
             'VDI': (valid_vdi, session_required),
+            'VTPM':(valid_vtpm, session_required),
             'SR':  (valid_sr, session_required)}
         
         # Cheat methods
@@ -580,8 +603,6 @@ class XendAPI:
         'actions_after_reboot',
         'actions_after_suspend',
         'actions_after_crash',
-        'TPM_instance',
-        'TPM_backend',
         'bios_boot',
         'platform_std_VGA',
         'platform_serial',
@@ -644,14 +665,6 @@ class XendAPI:
     def vm_get_vtpms(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success(dom.get_vtpms())
-    
-    def vm_get_tpm_instance(self, session, vm_ref):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_todo() # unsupported by xc
-    
-    def vm_get_tpm_backend(self, session, vm_ref):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_todo() # unsupported by xc
     
     def vm_get_pci_bus(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
@@ -1260,6 +1273,49 @@ class XendAPI:
             return xen_api_success(image_uuid)
         
         return xen_api_error(XEND_ERROR_VDI_INVALID)
+
+
+    # Xen API: Class VTPM
+    # ----------------------------------------------------------------
+
+    VTPM_attr_ro = [ ]
+    VTPM_attr_rw = ['type',
+                    'VM',
+                    'backend',
+                    'instance']
+
+    VTPM_attr_inst = VTPM_attr_rw
+
+    # object methods
+    def vtpm_get_record(self, session, vtpm_ref):
+        xendom = XendDomain.instance()
+        vm = xendom.get_vm_with_dev_uuid('vtpm', vtpm_ref)
+        if not vm:
+            return xen_api_error(XEND_ERROR_VTPM_INVALID)
+        cfg = vm.get_dev_xenapi_config('vtpm', vtpm_ref)
+        if not cfg:
+            return xen_api_error(XEND_ERROR_VTPM_INVALID)
+        valid_vtpm_keys = self.VTPM_attr_ro + self.VTPM_attr_rw + \
+                          self.Base_attr_ro + self.Base_attr_rw
+        for k in cfg.keys():
+            if k not in valid_vtpm_keys:
+                del cfg[k]
+
+        return xen_api_success(cfg)
+
+    # class methods
+    def vtpm_create(self, session, vtpm_struct):
+        xendom = XendDomain.instance()
+        if xendom.is_valid_vm(vtpm_struct['VM']):
+            dom = xendom.get_vm_by_uuid(vtpm_struct['VM'])
+            try:
+                vtpm_ref = dom.create_vtpm(vtpm_struct)
+                xendom.managed_config_save(dom)
+                return xen_api_success(vtpm_ref)
+            except XendError:
+                return xen_api_error(XEND_ERROR_TODO)
+        else:
+            return xen_api_error(XEND_ERROR_DOMAIN_INVALID)
 
 
     # Xen API: Class SR

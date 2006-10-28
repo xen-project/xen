@@ -110,8 +110,6 @@ XENAPI_UNSUPPORTED_IN_LEGACY_CFG = [
     'vcpus_features_force_on',
     'vcpus_features_force_off',
     'actions_after_suspend',
-    'tpm_instance',
-    'tpm_backends',
     'bios_boot',
     'platform_std_vga',
     'platform_serial',
@@ -570,11 +568,14 @@ class XendConfig(dict):
         # ------------------
         cfg['vif_refs'] = []
         cfg['vbd_refs'] = []
+        cfg['vtpm_refs'] = []
         for dev_uuid, (dev_type, dev_info) in cfg['device'].items():
             if dev_type == 'vif':
                 cfg['vif_refs'].append(dev_uuid)
             elif dev_type in ('vbd','tap'):
                 cfg['vbd_refs'].append(dev_uuid)
+            elif dev_type == 'vtpm':
+                cfg['vtpm_refs'].append(dev_uuid)
                 
         return cfg
 
@@ -610,6 +611,8 @@ class XendConfig(dict):
             cfg['vif_refs'] = []
         if 'vbd_refs' not in cfg:
             cfg['vbd_refs'] = []
+        if 'vtpm_refs' not in cfg:
+            cfg['vtpm_refs'] = []
 
         return cfg
 
@@ -747,6 +750,8 @@ class XendConfig(dict):
             self['vif_refs'] = []
         if 'vbd_refs' not in self:
             self['vbd_refs'] = []
+        if 'vtpm_refs' not in self:
+            self['vtpm_refs'] = []
 
     def device_add(self, dev_type, cfg_sxp = None, cfg_xenapi = None):
         if dev_type not in XendDevices.valid_devices():
@@ -815,7 +820,16 @@ class XendConfig(dict):
                 self['device'][dev_uuid] = (dev_type, dev_info)
                 self['vbd_refs'].append(dev_uuid)                
                 return dev_uuid
-            
+
+            elif dev_type == 'vtpm':
+                if cfg_xenapi.get('type'):
+                    dev_info['type'] = cfg_xenapi.get('type')
+                dev_uuid = cfg_xenapi.get('uuid', uuid.createString())
+                dev_info['uuid'] = dev_uuid
+                self['device'][dev_uuid] = (dev_type, dev_info)
+                self['vtpm_refs'].append(dev_uuid)
+                return dev_uuid
+
             elif dev_type == 'tap':
                 dev_info['uname'] = 'tap:qcow:%s' % cfg_xenapi.get('image')
                 dev_info['dev'] = '%s:disk' % cfg_xenapi.get('device')
