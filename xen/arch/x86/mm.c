@@ -108,7 +108,7 @@
 #include <asm/e820.h>
 #include <public/memory.h>
 
-#define MEM_LOG(_f, _a...) gdprintk(XENLOG_WARNING , _f , ## _a)
+#define MEM_LOG(_f, _a...) gdprintk(XENLOG_WARNING , _f "\n" , ## _a)
 
 /*
  * PTE updates can be done with ordinary writes except:
