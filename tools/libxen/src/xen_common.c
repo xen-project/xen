@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2006 XenSource, Inc.
+ *  Copyright (c) 2006 XenSource, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
-*/
+ */
 
 #include <assert.h>
 #include <stdarg.h>
@@ -48,11 +48,17 @@ typedef struct
 
 typedef struct
 {
+    void *handle;
+} arbitrary_record;
+
+
+typedef struct
+{
     bool is_record;
     union
     {
         char *handle;
-        void *record;
+        arbitrary_record *record;
     } u;
 } arbitrary_record_opt;
 
@@ -449,6 +455,18 @@ static void destring(xen_session *s, xmlChar *name, const abstract_type *type,
 }
 
 
+/**
+ * result_type : STRING => value : char **, the char * is yours.
+ * result_type : ENUM   => value : int *
+ * result_type : INT    => value : uint64_t *
+ * result_type : FLOAT  => value : double *
+ * result_type : BOOL   => value : bool *
+ * result_type : SET    => value : arbitrary_set **, the set is yours.
+ * result_type : MAP    => value : arbitrary_map **, the map is yours.
+ * result_type : OPT    => value : arbitrary_record_opt **,
+ *                                 the record is yours, the handle is filled.
+ * result_type : STRUCT => value : void **, the void * is yours.
+ */
 static void parse_into(xen_session *s, xmlNode *value_node,
                        const abstract_type *result_type, void *value,
                        int slot)
@@ -809,7 +827,7 @@ static size_t size_of_member(const abstract_type *type)
         return sizeof(int);
 
     case REF:
-        return sizeof(arbitrary_record_opt);
+        return sizeof(arbitrary_record_opt *);
 
     default:
         assert(false);
@@ -1100,6 +1118,22 @@ add_struct_value(const struct abstract_type *type, void *value,
     switch (type->typename)
     {
     case REF:
+    {
+        arbitrary_record_opt *val = *(arbitrary_record_opt **)value;
+        if (val != NULL)
+        {
+            if (val->is_record)
+            {
+                adder(node, key, "string", val->u.record->handle);
+            }
+            else
+            {
+                adder(node, key, "string", val->u.handle);
+            }
+        }
+    }
+    break;
+
     case STRING:
     {
         char *val = *(char **)value;
