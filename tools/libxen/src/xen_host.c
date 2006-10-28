@@ -52,13 +52,13 @@ static const struct_member xen_host_record_struct_members[] =
         { .key = "software_version",
           .type = &abstract_type_string_string_map,
           .offset = offsetof(xen_host_record, software_version) },
-        { .key = "resident_vms",
+        { .key = "resident_VMs",
           .type = &abstract_type_ref_set,
           .offset = offsetof(xen_host_record, resident_vms) },
-        { .key = "pifs",
+        { .key = "PIFs",
           .type = &abstract_type_ref_set,
           .offset = offsetof(xen_host_record, pifs) },
-        { .key = "host_cpus",
+        { .key = "host_CPUs",
           .type = &abstract_type_ref_set,
           .offset = offsetof(xen_host_record, host_cpus) }
     };
