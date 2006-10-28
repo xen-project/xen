@@ -94,7 +94,7 @@ typedef struct abstract_value
     union
     {
         const char *string_val;
-        uint64_t int_val;
+        int64_t int_val;
         int enum_val;
         double double_val;
         bool bool_val;

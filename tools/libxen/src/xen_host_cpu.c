@@ -167,7 +167,7 @@ xen_host_cpu_get_host(xen_session *session, xen_host *result, xen_host_cpu host_
 
 
 bool
-xen_host_cpu_get_number(xen_session *session, uint64_t *result, xen_host_cpu host_cpu)
+xen_host_cpu_get_number(xen_session *session, int64_t *result, xen_host_cpu host_cpu)
 {
     abstract_value param_values[] =
         {
@@ -200,7 +200,7 @@ xen_host_cpu_get_vendor(xen_session *session, char **result, xen_host_cpu host_c
 
 
 bool
-xen_host_cpu_get_speed(xen_session *session, uint64_t *result, xen_host_cpu host_cpu)
+xen_host_cpu_get_speed(xen_session *session, int64_t *result, xen_host_cpu host_cpu)
 {
     abstract_value param_values[] =
         {

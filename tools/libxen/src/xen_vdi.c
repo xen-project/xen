@@ -252,7 +252,7 @@ xen_vdi_get_vbds(xen_session *session, struct xen_vbd_set **result, xen_vdi vdi)
 
 
 bool
-xen_vdi_get_virtual_size(xen_session *session, uint64_t *result, xen_vdi vdi)
+xen_vdi_get_virtual_size(xen_session *session, int64_t *result, xen_vdi vdi)
 {
     abstract_value param_values[] =
         {
@@ -268,7 +268,7 @@ xen_vdi_get_virtual_size(xen_session *session, uint64_t *result, xen_vdi vdi)
 
 
 bool
-xen_vdi_get_physical_utilisation(xen_session *session, uint64_t *result, xen_vdi vdi)
+xen_vdi_get_physical_utilisation(xen_session *session, int64_t *result, xen_vdi vdi)
 {
     abstract_value param_values[] =
         {
@@ -284,7 +284,7 @@ xen_vdi_get_physical_utilisation(xen_session *session, uint64_t *result, xen_vdi
 
 
 bool
-xen_vdi_get_sector_size(xen_session *session, uint64_t *result, xen_vdi vdi)
+xen_vdi_get_sector_size(xen_session *session, int64_t *result, xen_vdi vdi)
 {
     abstract_value param_values[] =
         {
@@ -431,7 +431,7 @@ xen_vdi_set_sr(xen_session *session, xen_vdi xen_vdi, xen_sr sr)
 
 
 bool
-xen_vdi_set_virtual_size(xen_session *session, xen_vdi xen_vdi, uint64_t virtual_size)
+xen_vdi_set_virtual_size(xen_session *session, xen_vdi xen_vdi, int64_t virtual_size)
 {
     abstract_value param_values[] =
         {
@@ -496,7 +496,7 @@ xen_vdi_snapshot(xen_session *session, xen_vdi *result, xen_vdi vdi)
 
 
 bool
-xen_vdi_resize(xen_session *session, xen_vdi vdi, uint64_t size)
+xen_vdi_resize(xen_session *session, xen_vdi vdi, int64_t size)
 {
     abstract_value param_values[] =
         {

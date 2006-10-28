@@ -71,7 +71,7 @@ typedef struct xen_vif_record
     struct xen_network_record_opt *network;
     struct xen_vm_record_opt *vm;
     char *mac;
-    uint64_t mtu;
+    int64_t mtu;
     double io_read_kbs;
     double io_write_kbs;
 } xen_vif_record;
@@ -229,7 +229,7 @@ xen_vif_get_mac(xen_session *session, char **result, xen_vif vif);
  * Get the MTU field of the given VIF.
  */
 extern bool
-xen_vif_get_mtu(xen_session *session, uint64_t *result, xen_vif vif);
+xen_vif_get_mtu(xen_session *session, int64_t *result, xen_vif vif);
 
 
 /**
@@ -292,7 +292,7 @@ xen_vif_set_mac(xen_session *session, xen_vif xen_vif, char *mac);
  * Set the MTU field of the given VIF.
  */
 extern bool
-xen_vif_set_mtu(xen_session *session, xen_vif xen_vif, uint64_t mtu);
+xen_vif_set_mtu(xen_session *session, xen_vif xen_vif, int64_t mtu);
 
 
 #endif

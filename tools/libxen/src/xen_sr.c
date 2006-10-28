@@ -220,7 +220,7 @@ xen_sr_get_vdis(xen_session *session, struct xen_vdi_set **result, xen_sr sr)
 
 
 bool
-xen_sr_get_virtual_allocation(xen_session *session, uint64_t *result, xen_sr sr)
+xen_sr_get_virtual_allocation(xen_session *session, int64_t *result, xen_sr sr)
 {
     abstract_value param_values[] =
         {
@@ -236,7 +236,7 @@ xen_sr_get_virtual_allocation(xen_session *session, uint64_t *result, xen_sr sr)
 
 
 bool
-xen_sr_get_physical_utilisation(xen_session *session, uint64_t *result, xen_sr sr)
+xen_sr_get_physical_utilisation(xen_session *session, int64_t *result, xen_sr sr)
 {
     abstract_value param_values[] =
         {
@@ -252,7 +252,7 @@ xen_sr_get_physical_utilisation(xen_session *session, uint64_t *result, xen_sr s
 
 
 bool
-xen_sr_get_physical_size(xen_session *session, uint64_t *result, xen_sr sr)
+xen_sr_get_physical_size(xen_session *session, int64_t *result, xen_sr sr)
 {
     abstract_value param_values[] =
         {

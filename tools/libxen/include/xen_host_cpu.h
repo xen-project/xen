@@ -65,9 +65,9 @@ typedef struct xen_host_cpu_record
     xen_host_cpu handle;
     char *uuid;
     struct xen_host_record_opt *host;
-    uint64_t number;
+    int64_t number;
     char *vendor;
-    uint64_t speed;
+    int64_t speed;
     char *modelname;
     struct xen_cpu_feature_set *features;
     double utilisation;
@@ -191,7 +191,7 @@ xen_host_cpu_get_host(xen_session *session, xen_host *result, xen_host_cpu host_
  * Get the number field of the given host_cpu.
  */
 extern bool
-xen_host_cpu_get_number(xen_session *session, uint64_t *result, xen_host_cpu host_cpu);
+xen_host_cpu_get_number(xen_session *session, int64_t *result, xen_host_cpu host_cpu);
 
 
 /**
@@ -205,7 +205,7 @@ xen_host_cpu_get_vendor(xen_session *session, char **result, xen_host_cpu host_c
  * Get the speed field of the given host_cpu.
  */
 extern bool
-xen_host_cpu_get_speed(xen_session *session, uint64_t *result, xen_host_cpu host_cpu);
+xen_host_cpu_get_speed(xen_session *session, int64_t *result, xen_host_cpu host_cpu);
 
 
 /**

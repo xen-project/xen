@@ -69,7 +69,7 @@ typedef struct xen_pif_record
     struct xen_network_record_opt *network;
     struct xen_host_record_opt *host;
     char *mac;
-    uint64_t mtu;
+    int64_t mtu;
     char *vlan;
     double io_read_kbs;
     double io_write_kbs;
@@ -214,7 +214,7 @@ xen_pif_get_mac(xen_session *session, char **result, xen_pif pif);
  * Get the MTU field of the given PIF.
  */
 extern bool
-xen_pif_get_mtu(xen_session *session, uint64_t *result, xen_pif pif);
+xen_pif_get_mtu(xen_session *session, int64_t *result, xen_pif pif);
 
 
 /**
@@ -270,7 +270,7 @@ xen_pif_set_mac(xen_session *session, xen_pif xen_pif, char *mac);
  * Set the MTU field of the given PIF.
  */
 extern bool
-xen_pif_set_mtu(xen_session *session, xen_pif xen_pif, uint64_t mtu);
+xen_pif_set_mtu(xen_session *session, xen_pif xen_pif, int64_t mtu);
 
 
 /**

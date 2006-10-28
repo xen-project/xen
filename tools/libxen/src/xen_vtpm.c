@@ -190,7 +190,7 @@ xen_vtpm_get_driver(xen_session *session, enum xen_driver_type *result, xen_vtpm
 
 
 bool
-xen_vtpm_get_instance(xen_session *session, uint64_t *result, xen_vtpm vtpm)
+xen_vtpm_get_instance(xen_session *session, int64_t *result, xen_vtpm vtpm)
 {
     abstract_value param_values[] =
         {

@@ -25,7 +25,7 @@
 
 typedef struct xen_int_float_map_contents
 {
-  uint64_t key;
+  int64_t key;
   double val;
 } xen_int_float_map_contents;
 

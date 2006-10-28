@@ -69,9 +69,9 @@ typedef struct xen_vdi_record
     char *name_description;
     struct xen_sr_record_opt *sr;
     struct xen_vbd_record_opt_set *vbds;
-    uint64_t virtual_size;
-    uint64_t physical_utilisation;
-    uint64_t sector_size;
+    int64_t virtual_size;
+    int64_t physical_utilisation;
+    int64_t sector_size;
     enum xen_vdi_type type;
     struct xen_vdi_record_opt *parent;
     struct xen_vdi_record_opt_set *children;
@@ -225,21 +225,21 @@ xen_vdi_get_vbds(xen_session *session, struct xen_vbd_set **result, xen_vdi vdi)
  * Get the virtual_size field of the given VDI.
  */
 extern bool
-xen_vdi_get_virtual_size(xen_session *session, uint64_t *result, xen_vdi vdi);
+xen_vdi_get_virtual_size(xen_session *session, int64_t *result, xen_vdi vdi);
 
 
 /**
  * Get the physical_utilisation field of the given VDI.
  */
 extern bool
-xen_vdi_get_physical_utilisation(xen_session *session, uint64_t *result, xen_vdi vdi);
+xen_vdi_get_physical_utilisation(xen_session *session, int64_t *result, xen_vdi vdi);
 
 
 /**
  * Get the sector_size field of the given VDI.
  */
 extern bool
-xen_vdi_get_sector_size(xen_session *session, uint64_t *result, xen_vdi vdi);
+xen_vdi_get_sector_size(xen_session *session, int64_t *result, xen_vdi vdi);
 
 
 /**
@@ -302,7 +302,7 @@ xen_vdi_set_sr(xen_session *session, xen_vdi xen_vdi, xen_sr sr);
  * Set the virtual_size field of the given VDI.
  */
 extern bool
-xen_vdi_set_virtual_size(xen_session *session, xen_vdi xen_vdi, uint64_t virtual_size);
+xen_vdi_set_virtual_size(xen_session *session, xen_vdi xen_vdi, int64_t virtual_size);
 
 
 /**
@@ -331,7 +331,7 @@ xen_vdi_snapshot(xen_session *session, xen_vdi *result, xen_vdi vdi);
  * Resize the vdi to the size.
  */
 extern bool
-xen_vdi_resize(xen_session *session, xen_vdi vdi, uint64_t size);
+xen_vdi_resize(xen_session *session, xen_vdi vdi, int64_t size);
 
 
 #endif

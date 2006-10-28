@@ -76,17 +76,17 @@ typedef struct xen_vm_record
     enum xen_vm_power_state power_state;
     char *name_label;
     char *name_description;
-    uint64_t user_version;
+    int64_t user_version;
     bool is_a_template;
     struct xen_host_record_opt *resident_on;
-    uint64_t memory_static_max;
-    uint64_t memory_dynamic_max;
-    uint64_t memory_actual;
-    uint64_t memory_dynamic_min;
-    uint64_t memory_static_min;
+    int64_t memory_static_max;
+    int64_t memory_dynamic_max;
+    int64_t memory_actual;
+    int64_t memory_dynamic_min;
+    int64_t memory_static_min;
     char *vcpus_policy;
     char *vcpus_params;
-    uint64_t vcpus_number;
+    int64_t vcpus_number;
     xen_int_float_map *vcpus_utilisation;
     struct xen_cpu_feature_set *vcpus_features_required;
     struct xen_cpu_feature_set *vcpus_features_can_use;
@@ -255,7 +255,7 @@ xen_vm_get_name_description(xen_session *session, char **result, xen_vm vm);
  * Get the user_version field of the given VM.
  */
 extern bool
-xen_vm_get_user_version(xen_session *session, uint64_t *result, xen_vm vm);
+xen_vm_get_user_version(xen_session *session, int64_t *result, xen_vm vm);
 
 
 /**
@@ -276,35 +276,35 @@ xen_vm_get_resident_on(xen_session *session, xen_host *result, xen_vm vm);
  * Get the memory/static_max field of the given VM.
  */
 extern bool
-xen_vm_get_memory_static_max(xen_session *session, uint64_t *result, xen_vm vm);
+xen_vm_get_memory_static_max(xen_session *session, int64_t *result, xen_vm vm);
 
 
 /**
  * Get the memory/dynamic_max field of the given VM.
  */
 extern bool
-xen_vm_get_memory_dynamic_max(xen_session *session, uint64_t *result, xen_vm vm);
+xen_vm_get_memory_dynamic_max(xen_session *session, int64_t *result, xen_vm vm);
 
 
 /**
  * Get the memory/actual field of the given VM.
  */
 extern bool
-xen_vm_get_memory_actual(xen_session *session, uint64_t *result, xen_vm vm);
+xen_vm_get_memory_actual(xen_session *session, int64_t *result, xen_vm vm);
 
 
 /**
  * Get the memory/dynamic_min field of the given VM.
  */
 extern bool
-xen_vm_get_memory_dynamic_min(xen_session *session, uint64_t *result, xen_vm vm);
+xen_vm_get_memory_dynamic_min(xen_session *session, int64_t *result, xen_vm vm);
 
 
 /**
  * Get the memory/static_min field of the given VM.
  */
 extern bool
-xen_vm_get_memory_static_min(xen_session *session, uint64_t *result, xen_vm vm);
+xen_vm_get_memory_static_min(xen_session *session, int64_t *result, xen_vm vm);
 
 
 /**
@@ -325,7 +325,7 @@ xen_vm_get_vcpus_params(xen_session *session, char **result, xen_vm vm);
  * Get the VCPUs/number field of the given VM.
  */
 extern bool
-xen_vm_get_vcpus_number(xen_session *session, uint64_t *result, xen_vm vm);
+xen_vm_get_vcpus_number(xen_session *session, int64_t *result, xen_vm vm);
 
 
 /**
@@ -535,7 +535,7 @@ xen_vm_set_name_description(xen_session *session, xen_vm xen_vm, char *descripti
  * Set the user_version field of the given VM.
  */
 extern bool
-xen_vm_set_user_version(xen_session *session, xen_vm xen_vm, uint64_t user_version);
+xen_vm_set_user_version(xen_session *session, xen_vm xen_vm, int64_t user_version);
 
 
 /**
@@ -549,14 +549,14 @@ xen_vm_set_is_a_template(xen_session *session, xen_vm xen_vm, bool is_a_template
  * Set the memory/dynamic_max field of the given VM.
  */
 extern bool
-xen_vm_set_memory_dynamic_max(xen_session *session, xen_vm xen_vm, uint64_t dynamic_max);
+xen_vm_set_memory_dynamic_max(xen_session *session, xen_vm xen_vm, int64_t dynamic_max);
 
 
 /**
  * Set the memory/dynamic_min field of the given VM.
  */
 extern bool
-xen_vm_set_memory_dynamic_min(xen_session *session, xen_vm xen_vm, uint64_t dynamic_min);
+xen_vm_set_memory_dynamic_min(xen_session *session, xen_vm xen_vm, int64_t dynamic_min);
 
 
 /**

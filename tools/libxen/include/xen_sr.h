@@ -66,9 +66,9 @@ typedef struct xen_sr_record
     char *name_label;
     char *name_description;
     struct xen_vdi_record_opt_set *vdis;
-    uint64_t virtual_allocation;
-    uint64_t physical_utilisation;
-    uint64_t physical_size;
+    int64_t virtual_allocation;
+    int64_t physical_utilisation;
+    int64_t physical_size;
     char *type;
     char *location;
 } xen_sr_record;
@@ -212,21 +212,21 @@ xen_sr_get_vdis(xen_session *session, struct xen_vdi_set **result, xen_sr sr);
  * Get the virtual_allocation field of the given SR.
  */
 extern bool
-xen_sr_get_virtual_allocation(xen_session *session, uint64_t *result, xen_sr sr);
+xen_sr_get_virtual_allocation(xen_session *session, int64_t *result, xen_sr sr);
 
 
 /**
  * Get the physical_utilisation field of the given SR.
  */
 extern bool
-xen_sr_get_physical_utilisation(xen_session *session, uint64_t *result, xen_sr sr);
+xen_sr_get_physical_utilisation(xen_session *session, int64_t *result, xen_sr sr);
 
 
 /**
  * Get the physical_size field of the given SR.
  */
 extern bool
-xen_sr_get_physical_size(xen_session *session, uint64_t *result, xen_sr sr);
+xen_sr_get_physical_size(xen_session *session, int64_t *result, xen_sr sr);
 
 
 /**

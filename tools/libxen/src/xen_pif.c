@@ -221,7 +221,7 @@ xen_pif_get_mac(xen_session *session, char **result, xen_pif pif)
 
 
 bool
-xen_pif_get_mtu(xen_session *session, uint64_t *result, xen_pif pif)
+xen_pif_get_mtu(xen_session *session, int64_t *result, xen_pif pif)
 {
     abstract_value param_values[] =
         {
@@ -350,7 +350,7 @@ xen_pif_set_mac(xen_session *session, xen_pif xen_pif, char *mac)
 
 
 bool
-xen_pif_set_mtu(xen_session *session, xen_pif xen_pif, uint64_t mtu)
+xen_pif_set_mtu(xen_session *session, xen_pif xen_pif, int64_t mtu)
 {
     abstract_value param_values[] =
         {

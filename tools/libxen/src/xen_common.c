@@ -442,7 +442,7 @@ static void destring(xen_session *s, xmlChar *name, const abstract_type *type,
         break;
 
     case INT:
-        *((uint64_t *)value) = atoll((const char *)name);
+        *((int64_t *)value) = atoll((const char *)name);
         break;
 
     case FLOAT:
@@ -458,7 +458,7 @@ static void destring(xen_session *s, xmlChar *name, const abstract_type *type,
 /**
  * result_type : STRING => value : char **, the char * is yours.
  * result_type : ENUM   => value : int *
- * result_type : INT    => value : uint64_t *
+ * result_type : INT    => value : int64_t *
  * result_type : FLOAT  => value : double *
  * result_type : BOOL   => value : bool *
  * result_type : SET    => value : arbitrary_set **, the set is yours.
@@ -532,7 +532,7 @@ static void parse_into(xen_session *s, xmlNode *value_node,
         }
         else
         {
-            ((uint64_t *)value)[slot] = (uint64_t)atoll((char *)string);
+            ((int64_t *)value)[slot] = (int64_t)atoll((char *)string);
             free(string);
         }
     }
@@ -815,7 +815,7 @@ static size_t size_of_member(const abstract_type *type)
 
 /*
     case INT:
-        return sizeof(uint64_t);
+        return sizeof(int64_t);
 
     case FLOAT:
         return sizeof(double);
@@ -1146,7 +1146,7 @@ add_struct_value(const struct abstract_type *type, void *value,
 
     case INT:
     {
-        uint64_t val = *(uint64_t *)value;
+        int64_t val = *(int64_t *)value;
         snprintf(buf, sizeof(buf), "%"PRId64, val);
         adder(node, key, "string", buf);
     }

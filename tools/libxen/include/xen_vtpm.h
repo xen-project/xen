@@ -68,7 +68,7 @@ typedef struct xen_vtpm_record
     struct xen_vm_record_opt *vm;
     struct xen_vm_record_opt *backend;
     enum xen_driver_type driver;
-    uint64_t instance;
+    int64_t instance;
 } xen_vtpm_record;
 
 /**
@@ -203,7 +203,7 @@ xen_vtpm_get_driver(xen_session *session, enum xen_driver_type *result, xen_vtpm
  * Get the instance field of the given VTPM.
  */
 extern bool
-xen_vtpm_get_instance(xen_session *session, uint64_t *result, xen_vtpm vtpm);
+xen_vtpm_get_instance(xen_session *session, int64_t *result, xen_vtpm vtpm);
 
 
 #endif

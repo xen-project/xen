@@ -259,7 +259,7 @@ xen_vif_get_mac(xen_session *session, char **result, xen_vif vif)
 
 
 bool
-xen_vif_get_mtu(xen_session *session, uint64_t *result, xen_vif vif)
+xen_vif_get_mtu(xen_session *session, int64_t *result, xen_vif vif)
 {
     abstract_value param_values[] =
         {
@@ -403,7 +403,7 @@ xen_vif_set_mac(xen_session *session, xen_vif xen_vif, char *mac)
 
 
 bool
-xen_vif_set_mtu(xen_session *session, xen_vif xen_vif, uint64_t mtu)
+xen_vif_set_mtu(xen_session *session, xen_vif xen_vif, int64_t mtu)
 {
     abstract_value param_values[] =
         {

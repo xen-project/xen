@@ -348,7 +348,7 @@ xen_vm_get_name_description(xen_session *session, char **result, xen_vm vm)
 
 
 bool
-xen_vm_get_user_version(xen_session *session, uint64_t *result, xen_vm vm)
+xen_vm_get_user_version(xen_session *session, int64_t *result, xen_vm vm)
 {
     abstract_value param_values[] =
         {
@@ -397,7 +397,7 @@ xen_vm_get_resident_on(xen_session *session, xen_host *result, xen_vm vm)
 
 
 bool
-xen_vm_get_memory_static_max(xen_session *session, uint64_t *result, xen_vm vm)
+xen_vm_get_memory_static_max(xen_session *session, int64_t *result, xen_vm vm)
 {
     abstract_value param_values[] =
         {
@@ -413,7 +413,7 @@ xen_vm_get_memory_static_max(xen_session *session, uint64_t *result, xen_vm vm)
 
 
 bool
-xen_vm_get_memory_dynamic_max(xen_session *session, uint64_t *result, xen_vm vm)
+xen_vm_get_memory_dynamic_max(xen_session *session, int64_t *result, xen_vm vm)
 {
     abstract_value param_values[] =
         {
@@ -429,7 +429,7 @@ xen_vm_get_memory_dynamic_max(xen_session *session, uint64_t *result, xen_vm vm)
 
 
 bool
-xen_vm_get_memory_actual(xen_session *session, uint64_t *result, xen_vm vm)
+xen_vm_get_memory_actual(xen_session *session, int64_t *result, xen_vm vm)
 {
     abstract_value param_values[] =
         {
@@ -445,7 +445,7 @@ xen_vm_get_memory_actual(xen_session *session, uint64_t *result, xen_vm vm)
 
 
 bool
-xen_vm_get_memory_dynamic_min(xen_session *session, uint64_t *result, xen_vm vm)
+xen_vm_get_memory_dynamic_min(xen_session *session, int64_t *result, xen_vm vm)
 {
     abstract_value param_values[] =
         {
@@ -461,7 +461,7 @@ xen_vm_get_memory_dynamic_min(xen_session *session, uint64_t *result, xen_vm vm)
 
 
 bool
-xen_vm_get_memory_static_min(xen_session *session, uint64_t *result, xen_vm vm)
+xen_vm_get_memory_static_min(xen_session *session, int64_t *result, xen_vm vm)
 {
     abstract_value param_values[] =
         {
@@ -511,7 +511,7 @@ xen_vm_get_vcpus_params(xen_session *session, char **result, xen_vm vm)
 
 
 bool
-xen_vm_get_vcpus_number(xen_session *session, uint64_t *result, xen_vm vm)
+xen_vm_get_vcpus_number(xen_session *session, int64_t *result, xen_vm vm)
 {
     abstract_value param_values[] =
         {
@@ -1014,7 +1014,7 @@ xen_vm_set_name_description(xen_session *session, xen_vm xen_vm, char *descripti
 
 
 bool
-xen_vm_set_user_version(xen_session *session, xen_vm xen_vm, uint64_t user_version)
+xen_vm_set_user_version(xen_session *session, xen_vm xen_vm, int64_t user_version)
 {
     abstract_value param_values[] =
         {
@@ -1046,7 +1046,7 @@ xen_vm_set_is_a_template(xen_session *session, xen_vm xen_vm, bool is_a_template
 
 
 bool
-xen_vm_set_memory_dynamic_max(xen_session *session, xen_vm xen_vm, uint64_t dynamic_max)
+xen_vm_set_memory_dynamic_max(xen_session *session, xen_vm xen_vm, int64_t dynamic_max)
 {
     abstract_value param_values[] =
         {
@@ -1062,7 +1062,7 @@ xen_vm_set_memory_dynamic_max(xen_session *session, xen_vm xen_vm, uint64_t dyna
 
 
 bool
-xen_vm_set_memory_dynamic_min(xen_session *session, xen_vm xen_vm, uint64_t dynamic_min)
+xen_vm_set_memory_dynamic_min(xen_session *session, xen_vm xen_vm, int64_t dynamic_min)
 {
     abstract_value param_values[] =
         {
