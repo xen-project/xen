@@ -10,7 +10,13 @@
 #define PAGE_SCRUB_SOFTIRQ                5
 #define DOMAIN_SHUTDOWN_FINALISE_SOFTIRQ  6
 #define TRACE_SOFTIRQ                     7
+#ifdef	__ia64__
+#define CMC_DISABLE_SOFTIRQ               8
+#define CMC_ENABLE_SOFTIRQ                9
+#define NR_SOFTIRQS                      10
+#else	/* __ia64__ */
 #define NR_SOFTIRQS                       8
+#endif	/* __ia64__ */
 
 #ifndef __ASSEMBLY__
 
