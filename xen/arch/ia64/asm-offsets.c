@@ -12,6 +12,7 @@
 #include <public/xen.h>
 #include <asm/tlb.h>
 #include <asm/regs.h>
+#include <asm/xenmca.h>
 
 #define task_struct vcpu
 
@@ -220,4 +221,37 @@ void foo(void)
 	DEFINE(FAST_HYPERPRIVOP_PERFC_OFS, offsetof (struct perfcounter, fast_hyperprivop));
 	DEFINE(FAST_REFLECT_PERFC_OFS, offsetof (struct perfcounter, fast_reflect));
 #endif
+
+	BLANK();
+	DEFINE(IA64_CPUINFO_PTCE_BASE_OFFSET,
+	       offsetof(struct cpuinfo_ia64, ptce_base));
+	DEFINE(IA64_CPUINFO_PTCE_COUNT_OFFSET,
+	       offsetof(struct cpuinfo_ia64, ptce_count));
+	DEFINE(IA64_CPUINFO_PTCE_STRIDE_OFFSET,
+	       offsetof(struct cpuinfo_ia64, ptce_stride));
+
+	BLANK();
+	DEFINE(IA64_MCA_CPU_PROC_STATE_DUMP_OFFSET,
+	       offsetof(struct ia64_mca_cpu, proc_state_dump));
+	DEFINE(IA64_MCA_CPU_STACK_OFFSET,
+	       offsetof(struct ia64_mca_cpu, stack));
+	DEFINE(IA64_MCA_CPU_STACKFRAME_OFFSET,
+	       offsetof(struct ia64_mca_cpu, stackframe));
+	DEFINE(IA64_MCA_CPU_RBSTORE_OFFSET,
+	       offsetof(struct ia64_mca_cpu, rbstore));
+
+	DEFINE(IA64_DOMAIN_SHARED_INFO_OFFSET,
+	       offsetof(struct domain, shared_info));
+	DEFINE(IA64_DOMAIN_SHARED_INFO_VA_OFFSET,
+	       offsetof(struct domain, arch.shared_info_va));
+	DEFINE(IA64_DOMAIN_FLAGS_OFFSET,
+	       offsetof(struct domain, arch.flags));
+
+	DEFINE(IA64_VCPU_VHPT_MADDR_OFFSET,
+	       offsetof(struct vcpu, arch.vhpt_maddr));
+
+	BLANK();
+	DEFINE(IA64_MCA_TLB_INFO_SIZE, sizeof(struct ia64_mca_tlb_info));
+	DEFINE(IA64_MCA_PERCPU_OFFSET,
+	       offsetof(struct ia64_mca_tlb_info, percpu_paddr));
 }
