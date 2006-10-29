@@ -218,7 +218,19 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 		status = ia64_pal_cache_summary(&r9,&r10);
 		break;
 	    case PAL_VM_SUMMARY:
-	        {
+		if (VMX_DOMAIN(current)) {
+			pal_vm_info_1_u_t v1;
+			pal_vm_info_2_u_t v2;
+			status = ia64_pal_vm_summary((pal_vm_info_1_u_t *)&v1,
+			                             (pal_vm_info_2_u_t *)&v2);
+			v1.pal_vm_info_1_s.max_itr_entry = NITRS - 1;
+			v1.pal_vm_info_1_s.max_dtr_entry = NDTRS - 1;
+			v2.pal_vm_info_2_s.impl_va_msb -= 1;
+			v2.pal_vm_info_2_s.rid_size =
+				current->domain->arch.rid_bits;
+			r9 = v1.pvi1_val;
+			r10 = v2.pvi2_val;
+		} else {
 			/* Use xen-specific values.
 			   hash_tag_id is somewhat random! */
 			static const pal_vm_info_1_u_t v1 =
@@ -242,14 +254,18 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 			v2.pvi2_val = 0;
 			v2.pal_vm_info_2_s.rid_size =
 				current->domain->arch.rid_bits;
-			v2.pal_vm_info_2_s.impl_va_msb =
-				VMX_DOMAIN(current) ? GUEST_IMPL_VA_MSB : 50;
+			v2.pal_vm_info_2_s.impl_va_msb = 50;
 			r9 = v1.pvi1_val;
 			r10 = v2.pvi2_val;
 			status = PAL_STATUS_SUCCESS;
 		}
 		break;
 	    case PAL_VM_INFO:
+		if (VMX_DOMAIN(current)) {
+			status = ia64_pal_vm_info(in1, in2, 
+			                          (pal_tc_info_u_t *)&r9, &r10);
+			break;
+		}
 #ifdef VHPT_GLOBAL
 		if (in1 == 0 && in2 == 2) {
 			/* Level 1: VHPT  */
