@@ -42,7 +42,9 @@
 
 #define RESCHEDULE_VECTOR	0
 #define IPI_VECTOR		1
-#define NR_IPIS			2
+#define CMCP_VECTOR		2
+#define CPEP_VECTOR		3
+#define NR_IPIS			4
 #endif /* CONFIG_XEN */
 
 /*

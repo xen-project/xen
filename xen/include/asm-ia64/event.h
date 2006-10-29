@@ -70,6 +70,8 @@ static inline int arch_virq_is_global(int virq)
     switch ( virq )
     {
     case VIRQ_ITC:
+    case VIRQ_MCA_CMC:
+    case VIRQ_MCA_CPE:
         rc = 0;
         break;
     default:
