@@ -769,12 +769,10 @@ class XendConfig(dict):
             log.debug("XendConfig.device_add: %s" % str(cfg_xenapi))
 
         if cfg_sxp:
-            config = sxp.child0(cfg_sxp)
-            dev_type = sxp.name(config)
             dev_info = {}
 
             try:
-                for opt, val in config[1:]:
+                for opt, val in cfg_sxp[1:]:
                     dev_info[opt] = val
             except ValueError:
                 pass # SXP has no options for this device
@@ -856,7 +854,7 @@ class XendConfig(dict):
         """
         sxpr = []
         if dev_uuid != None and dev_uuid in self['device']:
-            dev_type, dev_info = self['device']
+            dev_type, dev_info = self['device'][dev_uuid]
 
         if dev_type == None or dev_info == None:
             raise XendConfigError("Required either UUID or device type and "
