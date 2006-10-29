@@ -120,25 +120,49 @@ xencomm_privcmd_sysctl(privcmd_hypercall_t *hypercall)
 	case XEN_SYSCTL_sched_id:
 		break;
 	case XEN_SYSCTL_perfc_op:
-		ret = xencomm_create(
-			xen_guest_handle(kern_op.u.perfc_op.desc),
-			kern_op.u.perfc_op.nr_counters *
-			sizeof(xen_sysctl_perfc_desc_t),
-			&desc, GFP_KERNEL);
+	{
+		struct xencomm_handle *tmp_desc;
+		xen_sysctl_t tmp_op = {
+			.cmd = XEN_SYSCTL_perfc_op,
+			.interface_version = XEN_SYSCTL_INTERFACE_VERSION,
+			.u.perfc_op = {
+				.cmd = XEN_SYSCTL_PERFCOP_query,
+				// .desc.p = NULL,
+				// .val.p = NULL,
+			},
+		};
+
+		if (xen_guest_handle(kern_op.u.perfc_op.desc) == NULL) {
+			if (xen_guest_handle(kern_op.u.perfc_op.val) != NULL)
+				return -EINVAL;
+			break;
+		}
+
+		/* query the buffer size for xencomm */
+		tmp_desc = xencomm_create_inline(&tmp_op);
+		ret = xencomm_arch_hypercall_sysctl(tmp_desc);
 		if (ret)
 			return ret;
-		set_xen_guest_handle(kern_op.u.perfc_op.val,
-				     (void *)desc);
-		ret = xencomm_create(
-			xen_guest_handle(kern_op.u.perfc_op.val),
-			kern_op.u.perfc_op.nr_vals *
-			sizeof(xen_sysctl_perfc_desc_t),
-			&desc1, GFP_KERNEL);
+
+		ret = xencomm_create(xen_guest_handle(kern_op.u.perfc_op.desc),
+		                     tmp_op.u.perfc_op.nr_counters *
+		                     sizeof(xen_sysctl_perfc_desc_t),
+		                     &desc, GFP_KERNEL);
+		if (ret)
+			return ret;
+
+		set_xen_guest_handle(kern_op.u.perfc_op.desc, (void *)desc);
+
+		ret = xencomm_create(xen_guest_handle(kern_op.u.perfc_op.val),
+		                     tmp_op.u.perfc_op.nr_vals *
+		                     sizeof(xen_sysctl_perfc_val_t),
+		                     &desc1, GFP_KERNEL);
 		if (ret)
 			xencomm_free(desc);
-		set_xen_guest_handle(kern_op.u.perfc_op.val,
-				     (void *)desc1);
+
+		set_xen_guest_handle(kern_op.u.perfc_op.val, (void *)desc1);
 		break;
+	}
 	case XEN_SYSCTL_getdomaininfolist:
 		ret = xencomm_create(
 			xen_guest_handle(kern_op.u.getdomaininfolist.buffer),
