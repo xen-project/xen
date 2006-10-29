@@ -140,6 +140,7 @@ extern unsigned int opt_vmx_debug_level;
 #define VPD_VPR_START_OFFSET		1432
 #define VPD_VRSE_CFLE_START_OFFSET	1440
 #define VPD_VCR_START_OFFSET		2048
+#define VPD_VTPR_START_OFFSET		2576
 #define VPD_VRR_START_OFFSET		3072
 #define VPD_VMM_VAIL_START_OFFSET	31744
 

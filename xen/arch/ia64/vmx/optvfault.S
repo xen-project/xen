@@ -19,6 +19,9 @@
 #define ACCE_MOV_FROM_AR
 #define ACCE_MOV_FROM_RR
 #define ACCE_MOV_TO_RR
+#define ACCE_RSM
+#define ACCE_SSM
+#define ACCE_MOV_TO_PSR
 
 //mov r1=ar3
 GLOBAL_ENTRY(vmx_asm_mov_from_ar)
@@ -152,6 +155,243 @@ vmx_asm_mov_to_rr_back_2:
     mov r24=r22
     br.many b0
 END(vmx_asm_mov_to_rr)
+
+
+//rsm 
+GLOBAL_ENTRY(vmx_asm_rsm)
+#ifndef ACCE_RSM
+    br.many vmx_virtualization_fault_back
+#endif
+    add r16=IA64_VPD_BASE_OFFSET,r21
+    extr.u r26=r25,6,21
+    extr.u r27=r25,31,2
+    ;;
+    ld8 r16=[r16]
+    extr.u r28=r25,36,1
+    dep r26=r27,r26,21,2
+    ;;
+    add r17=VPD_VPSR_START_OFFSET,r16
+    add r22=IA64_VCPU_MODE_FLAGS_OFFSET,r21
+    //r26 is imm24
+    dep r26=r28,r26,23,1
+    ;;
+    ld8 r18=[r17]
+    movl r28=IA64_PSR_IC+IA64_PSR_I+IA64_PSR_DT+IA64_PSR_SI
+    ld8 r23=[r22]
+    sub r27=-1,r26
+    mov r24=b0
+    ;;
+    mov r20=cr.ipsr
+    or r28=r27,r28
+    and r19=r18,r27
+    ;;   
+    st8 [r17]=r19
+    and r20=r20,r28
+    ;;
+    mov cr.ipsr=r20
+    tbit.nz p6,p0=r23,0
+    ;;
+    tbit.z.or p6,p0=r26,IA64_PSR_DT_BIT
+    (p6) br.dptk vmx_resume_to_guest
+    ;;
+    add r26=IA64_VCPU_META_RR0_OFFSET,r21
+    add r27=IA64_VCPU_META_RR0_OFFSET+8,r21
+    dep r23=-1,r23,0,1
+    ;;
+    ld8 r26=[r26]
+    ld8 r27=[r27]
+    st8 [r22]=r23
+    dep.z r28=4,61,3
+    ;;
+    mov rr[r0]=r26
+    mov rr[r28]=r27
+    br.many vmx_resume_to_guest
+END(vmx_asm_rsm)
+
+
+//ssm 
+GLOBAL_ENTRY(vmx_asm_ssm)
+#ifndef ACCE_SSM
+    br.many vmx_virtualization_fault_back
+#endif
+    add r16=IA64_VPD_BASE_OFFSET,r21
+    extr.u r26=r25,6,21
+    extr.u r27=r25,31,2
+    ;;
+    ld8 r16=[r16]
+    extr.u r28=r25,36,1
+    dep r26=r27,r26,21,2
+    ;;  //r26 is imm24
+    add r27=VPD_VPSR_START_OFFSET,r16
+    dep r26=r28,r26,23,1
+    ;;  //r19 vpsr
+    ld8 r29=[r27]
+    mov r24=b0
+    ;;
+    add r22=IA64_VCPU_MODE_FLAGS_OFFSET,r21
+    mov r20=cr.ipsr
+    or r19=r29,r26
+    ;;
+    ld8 r23=[r22]
+    st8 [r27]=r19
+    or r20=r20,r26
+    ;;
+    mov cr.ipsr=r20
+    movl r28=IA64_PSR_DT+IA64_PSR_RT+IA64_PSR_IT
+    ;;
+    and r19=r28,r19
+    tbit.z p6,p0=r23,0
+    ;;
+    cmp.ne.or p6,p0=r28,r19
+    (p6) br.dptk vmx_asm_ssm_1
+    ;;
+    add r26=IA64_VCPU_META_SAVED_RR0_OFFSET,r21
+    add r27=IA64_VCPU_META_SAVED_RR0_OFFSET+8,r21
+    dep r23=0,r23,0,1
+    ;;
+    ld8 r26=[r26]
+    ld8 r27=[r27]
+    st8 [r22]=r23
+    dep.z r28=4,61,3
+    ;;
+    mov rr[r0]=r26
+    mov rr[r28]=r27
+    ;;
+    srlz.i
+    ;;
+vmx_asm_ssm_1:
+    tbit.nz p6,p0=r29,IA64_PSR_I_BIT
+    ;;
+    tbit.z.or p6,p0=r19,IA64_PSR_I_BIT
+    (p6) br.dptk vmx_resume_to_guest
+    ;;
+    add r29=VPD_VTPR_START_OFFSET,r16
+    add r30=VPD_VHPI_START_OFFSET,r16
+    ;;
+    ld8 r29=[r29]
+    ld8 r30=[r30]
+    ;;
+    extr.u r17=r29,4,4
+    extr.u r18=r29,16,1
+    ;;
+    dep r17=r18,r17,4,1
+    ;;
+    cmp.gt p6,p0=r30,r17
+    (p6) br.dpnt.few vmx_asm_dispatch_vexirq
+    br.many vmx_resume_to_guest
+END(vmx_asm_ssm)
+
+
+//mov psr.l=r2 
+GLOBAL_ENTRY(vmx_asm_mov_to_psr)
+#ifndef ACCE_MOV_TO_PSR
+    br.many vmx_virtualization_fault_back
+#endif
+    add r16=IA64_VPD_BASE_OFFSET,r21
+    extr.u r26=r25,13,7 //r2
+    ;;
+    ld8 r16=[r16]
+    movl r20=asm_mov_from_reg
+    ;;
+    adds r30=vmx_asm_mov_to_psr_back-asm_mov_from_reg,r20
+    shladd r26=r26,4,r20
+    mov r24=b0
+    ;;
+    add r27=VPD_VPSR_START_OFFSET,r16
+    mov b0=r26
+    br.many b0
+    ;;   
+vmx_asm_mov_to_psr_back:
+    ld8 r17=[r27]
+    add r22=IA64_VCPU_MODE_FLAGS_OFFSET,r21
+    dep r19=0,r19,32,32
+    ;;   
+    ld8 r23=[r22]
+    dep r18=0,r17,0,32
+    ;; 
+    add r30=r18,r19
+    movl r28=IA64_PSR_DT+IA64_PSR_RT+IA64_PSR_IT
+    ;;
+    st8 [r27]=r30
+    and r27=r28,r30
+    and r29=r28,r17
+    ;;
+    cmp.eq p5,p0=r29,r27
+    cmp.eq p6,p7=r28,r27
+    (p5) br.many vmx_asm_mov_to_psr_1
+    ;;
+    //virtual to physical
+    (p7) add r26=IA64_VCPU_META_RR0_OFFSET,r21
+    (p7) add r27=IA64_VCPU_META_RR0_OFFSET+8,r21
+    (p7) dep r23=-1,r23,0,1
+    ;;
+    //physical to virtual
+    (p6) add r26=IA64_VCPU_META_SAVED_RR0_OFFSET,r21
+    (p6) add r27=IA64_VCPU_META_SAVED_RR0_OFFSET+8,r21
+    (p6) dep r23=0,r23,0,1
+    ;;
+    ld8 r26=[r26]
+    ld8 r27=[r27]
+    st8 [r22]=r23
+    dep.z r28=4,61,3
+    ;;
+    mov rr[r0]=r26
+    mov rr[r28]=r27
+    ;;
+    srlz.i
+    ;;
+vmx_asm_mov_to_psr_1:
+    mov r20=cr.ipsr
+    movl r28=IA64_PSR_IC+IA64_PSR_I+IA64_PSR_DT+IA64_PSR_SI+IA64_PSR_RT
+    ;;
+    or r19=r19,r28
+    dep r20=0,r20,0,32
+    ;;
+    add r20=r19,r20
+    mov b0=r24
+    ;;
+    mov cr.ipsr=r20
+    cmp.ne p6,p0=r0,r0
+    ;;
+    tbit.nz.or p6,p0=r17,IA64_PSR_I_BIT
+    tbit.z.or p6,p0=r30,IA64_PSR_I_BIT
+    (p6) br.dpnt.few vmx_resume_to_guest
+    ;;
+    add r29=VPD_VTPR_START_OFFSET,r16
+    add r30=VPD_VHPI_START_OFFSET,r16
+    ;;
+    ld8 r29=[r29]
+    ld8 r30=[r30]
+    ;;
+    extr.u r17=r29,4,4
+    extr.u r18=r29,16,1
+    ;;
+    dep r17=r18,r17,4,1
+    ;;
+    cmp.gt p6,p0=r30,r17
+    (p6) br.dpnt.few vmx_asm_dispatch_vexirq
+    br.many vmx_resume_to_guest
+END(vmx_asm_mov_to_psr)
+
+
+ENTRY(vmx_asm_dispatch_vexirq)
+//increment iip
+    mov r16=cr.ipsr
+    ;;
+    extr.u r17=r16,IA64_PSR_RI_BIT,2
+    tbit.nz p6,p7=r16,IA64_PSR_RI_BIT+1
+    ;;	
+    (p6) mov r18=cr.iip
+    (p6) mov r17=r0
+    (p7) add r17=1,r17
+    ;;    
+    (p6) add r18=0x10,r18
+    dep r16=r17,r16,IA64_PSR_RI_BIT,2
+    ;;		
+    (p6) mov cr.iip=r18
+    mov cr.ipsr=r16
+    br.many vmx_dispatch_vexirq
+END(vmx_asm_dispatch_vexirq)
 
 
 #define MOV_TO_REG0	\

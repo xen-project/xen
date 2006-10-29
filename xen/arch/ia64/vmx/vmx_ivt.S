@@ -791,9 +791,15 @@ ENTRY(vmx_virtualization_fault)
     cmp.eq p6,p0=EVENT_MOV_FROM_AR,r24
     cmp.eq p7,p0=EVENT_MOV_FROM_RR,r24
     cmp.eq p8,p0=EVENT_MOV_TO_RR,r24
+    cmp.eq p9,p0=EVENT_RSM,r24
+    cmp.eq p10,p0=EVENT_SSM,r24
+    cmp.eq p11,p0=EVENT_MOV_TO_PSR,r24
     (p6) br.dptk.many vmx_asm_mov_from_ar
     (p7) br.dptk.many vmx_asm_mov_from_rr
     (p8) br.dptk.many vmx_asm_mov_to_rr
+    (p9) br.dptk.many vmx_asm_rsm
+    (p10) br.dptk.many vmx_asm_ssm
+    (p11) br.dptk.many vmx_asm_mov_to_psr
     ;;
 vmx_virtualization_fault_back:
     mov r19=37
@@ -1067,7 +1073,7 @@ ENTRY(vmx_dispatch_virtualization_fault)
 END(vmx_dispatch_virtualization_fault)
 
 
-ENTRY(vmx_dispatch_vexirq)
+GLOBAL_ENTRY(vmx_dispatch_vexirq)
     VMX_SAVE_MIN_WITH_COVER_R19
     alloc r14=ar.pfs,0,0,1,0
     mov out0=r13
