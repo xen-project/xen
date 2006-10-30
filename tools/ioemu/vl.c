@@ -1684,7 +1684,7 @@ static void tty_serial_init(int fd, int speed,
 
     tty.c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP
                           |INLCR|IGNCR|ICRNL|IXON);
-    tty.c_oflag |= OPOST;
+    tty.c_oflag &= ~OPOST; /* no output mangling of raw serial stream */
     tty.c_lflag &= ~(ECHO|ECHONL|ICANON|IEXTEN|ISIG);
     tty.c_cflag &= ~(CSIZE|PARENB|PARODD|CRTSCTS);
     switch(data_bits) {

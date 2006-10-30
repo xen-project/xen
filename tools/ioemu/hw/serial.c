@@ -93,6 +93,15 @@ struct SerialState {
     int last_break_enable;
     target_ulong base;
     int it_shift;
+
+    /*
+     * If a character transmitted via UART cannot be written to its
+     * destination immediately we remember it here and retry a few times via
+     * a polling timer.
+     */
+    int write_retries;
+    char write_chr;
+    QEMUTimer *write_retry_timer;
 };
 
 static void serial_update_irq(SerialState *s)
@@ -204,10 +213,32 @@ static void serial_get_token(void)
     tokens_avail--;
 }
 
+static void serial_chr_write(void *opaque)
+{
+    SerialState *s = opaque;
+
+    qemu_del_timer(s->write_retry_timer);
+
+    /* Retry every 100ms for 300ms total. */
+    if (qemu_chr_write(s->chr, &s->write_chr, 1) == -1) {
+        if (s->write_retries++ >= 3)
+            printf("serial: write error\n");
+        else
+            qemu_mod_timer(s->write_retry_timer,
+                           qemu_get_clock(vm_clock) + ticks_per_sec / 10);
+        return;
+    }
+
+    /* Success: Notify guest that THR is empty. */
+    s->thr_ipending = 1;
+    s->lsr |= UART_LSR_THRE;
+    s->lsr |= UART_LSR_TEMT;
+    serial_update_irq(s);
+}
+
 static void serial_ioport_write(void *opaque, uint32_t addr, uint32_t val)
 {
     SerialState *s = opaque;
-    unsigned char ch;
     
     addr &= 7;
 #ifdef DEBUG_SERIAL
@@ -223,12 +254,9 @@ static void serial_ioport_write(void *opaque, uint32_t addr, uint32_t val)
             s->thr_ipending = 0;
             s->lsr &= ~UART_LSR_THRE;
             serial_update_irq(s);
-            ch = val;
-            qemu_chr_write(s->chr, &ch, 1);
-            s->thr_ipending = 1;
-            s->lsr |= UART_LSR_THRE;
-            s->lsr |= UART_LSR_TEMT;
-            serial_update_irq(s);
+            s->write_chr = val;
+            s->write_retries = 0;
+            serial_chr_write(s);
         }
         break;
     case 1:
@@ -424,6 +452,7 @@ SerialState *serial_init(SetIRQFunc *set_irq, void *opaque,
     s->lsr = UART_LSR_TEMT | UART_LSR_THRE;
     s->iir = UART_IIR_NO_INT;
     s->msr = UART_MSR_DCD | UART_MSR_DSR | UART_MSR_CTS;
+    s->write_retry_timer = qemu_new_timer(vm_clock, serial_chr_write, s);
 
     register_savevm("serial", base, 1, serial_save, serial_load, s);
 
@@ -511,6 +540,7 @@ SerialState *serial_mm_init (SetIRQFunc *set_irq, void *opaque,
     s->msr = UART_MSR_DCD | UART_MSR_DSR | UART_MSR_CTS;
     s->base = base;
     s->it_shift = it_shift;
+    s->write_retry_timer = qemu_new_timer(vm_clock, serial_chr_write, s);
 
     register_savevm("serial", base, 1, serial_save, serial_load, s);
 
