@@ -56,15 +56,15 @@ static void __init machine_specific_arch_setup(void)
 	struct xen_machphys_mapping mapping;
 	unsigned long machine_to_phys_nr_ents;
 	struct xen_platform_parameters pp;
-	struct callback_register event = {
+	static struct callback_register __initdata event = {
 		.type = CALLBACKTYPE_event,
 		.address = { __KERNEL_CS, (unsigned long)hypervisor_callback },
 	};
-	struct callback_register failsafe = {
+	static struct callback_register __initdata failsafe = {
 		.type = CALLBACKTYPE_failsafe,
 		.address = { __KERNEL_CS, (unsigned long)failsafe_callback },
 	};
-	struct callback_register nmi_cb = {
+	static struct callback_register __initdata nmi_cb = {
 		.type = CALLBACKTYPE_nmi,
 		.address = { __KERNEL_CS, (unsigned long)nmi },
 	};
@@ -80,9 +80,10 @@ static void __init machine_specific_arch_setup(void)
 
 	ret = HYPERVISOR_callback_op(CALLBACKOP_register, &nmi_cb);
 	if (ret == -ENOSYS) {
-		struct xennmi_callback cb;
+		static struct xennmi_callback __initdata cb = {
+			.handler_address = (unsigned long)nmi;
+		};
 
-		cb.handler_address = nmi_cb.address.eip;
 		HYPERVISOR_nmi_op(XENNMI_register_callback, &cb);
 	}
 
