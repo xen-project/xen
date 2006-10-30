@@ -72,13 +72,16 @@ static void __init machine_specific_arch_setup(void)
 	ret = HYPERVISOR_callback_op(CALLBACKOP_register, &event);
 	if (ret == 0)
 		ret = HYPERVISOR_callback_op(CALLBACKOP_register, &failsafe);
+#ifdef CONFIG_XEN_COMPAT_030002
 	if (ret == -ENOSYS)
 		ret = HYPERVISOR_set_callbacks(
 			event.address.cs, event.address.eip,
 			failsafe.address.cs, failsafe.address.eip);
+#endif
 	BUG_ON(ret);
 
 	ret = HYPERVISOR_callback_op(CALLBACKOP_register, &nmi_cb);
+#ifdef CONFIG_XEN_COMPAT_030002
 	if (ret == -ENOSYS) {
 		static struct xennmi_callback __initdata cb = {
 			.handler_address = (unsigned long)nmi;
@@ -86,6 +89,7 @@ static void __init machine_specific_arch_setup(void)
 
 		HYPERVISOR_nmi_op(XENNMI_register_callback, &cb);
 	}
+#endif
 
 	if (HYPERVISOR_xen_version(XENVER_platform_parameters,
 				   &pp) == 0)

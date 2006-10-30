@@ -131,8 +131,10 @@ HYPERVISOR_yield(
 {
 	int rc = HYPERVISOR_sched_op(SCHEDOP_yield, NULL);
 
+#ifdef CONFIG_XEN_COMPAT_030002
 	if (rc == -ENOSYS)
 		rc = HYPERVISOR_sched_op_compat(SCHEDOP_yield, 0);
+#endif
 
 	return rc;
 }
@@ -143,8 +145,10 @@ HYPERVISOR_block(
 {
 	int rc = HYPERVISOR_sched_op(SCHEDOP_block, NULL);
 
+#ifdef CONFIG_XEN_COMPAT_030002
 	if (rc == -ENOSYS)
 		rc = HYPERVISOR_sched_op_compat(SCHEDOP_block, 0);
+#endif
 
 	return rc;
 }
@@ -159,8 +163,10 @@ HYPERVISOR_shutdown(
 
 	int rc = HYPERVISOR_sched_op(SCHEDOP_shutdown, &sched_shutdown);
 
+#ifdef CONFIG_XEN_COMPAT_030002
 	if (rc == -ENOSYS)
 		rc = HYPERVISOR_sched_op_compat(SCHEDOP_shutdown, reason);
+#endif
 
 	return rc;
 }
@@ -177,8 +183,10 @@ HYPERVISOR_poll(
 	set_xen_guest_handle(sched_poll.ports, ports);
 
 	rc = HYPERVISOR_sched_op(SCHEDOP_poll, &sched_poll);
+#ifdef CONFIG_XEN_COMPAT_030002
 	if (rc == -ENOSYS)
 		rc = HYPERVISOR_sched_op_compat(SCHEDOP_yield, 0);
+#endif
 
 	return rc;
 }

@@ -258,6 +258,8 @@ HYPERVISOR_event_channel_op(
 	int cmd, void *arg)
 {
 	int rc = _hypercall2(int, event_channel_op, cmd, arg);
+
+#ifdef CONFIG_XEN_COMPAT_030002
 	if (unlikely(rc == -ENOSYS)) {
 		struct evtchn_op op;
 		op.cmd = cmd;
@@ -265,6 +267,8 @@ HYPERVISOR_event_channel_op(
 		rc = _hypercall1(int, event_channel_op_compat, &op);
 		memcpy(arg, &op.u, sizeof(op.u));
 	}
+#endif
+
 	return rc;
 }
 
@@ -294,6 +298,8 @@ HYPERVISOR_physdev_op(
 	int cmd, void *arg)
 {
 	int rc = _hypercall2(int, physdev_op, cmd, arg);
+
+#ifdef CONFIG_XEN_COMPAT_030002
 	if (unlikely(rc == -ENOSYS)) {
 		struct physdev_op op;
 		op.cmd = cmd;
@@ -301,6 +307,8 @@ HYPERVISOR_physdev_op(
 		rc = _hypercall1(int, physdev_op_compat, &op);
 		memcpy(arg, &op.u, sizeof(op.u));
 	}
+#endif
+
 	return rc;
 }
 
@@ -351,9 +359,11 @@ HYPERVISOR_suspend(
 	int rc = _hypercall3(int, sched_op, SCHEDOP_shutdown,
 			     &sched_shutdown, srec);
 
+#ifdef CONFIG_XEN_COMPAT_030002
 	if (rc == -ENOSYS)
 		rc = _hypercall3(int, sched_op_compat, SCHEDOP_shutdown,
 				 SHUTDOWN_suspend, srec);
+#endif
 
 	return rc;
 }
