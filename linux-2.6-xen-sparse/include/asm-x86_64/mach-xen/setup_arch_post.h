@@ -53,7 +53,7 @@ static void __init machine_specific_arch_setup(void)
 #ifdef CONFIG_XEN_COMPAT_030002
 	if (ret == -ENOSYS) {
 		static struct xennmi_callback __initdata cb = {
-			.handler_address = (unsigned long)nmi;
+			.handler_address = (unsigned long)nmi
 		};
 
 		HYPERVISOR_nmi_op(XENNMI_register_callback, &cb);
