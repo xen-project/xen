@@ -217,8 +217,7 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
         if ( unlikely(vlapic == NULL || !vlapic_enabled(vlapic)) )
             break;
 
-        if ( vlapic_test_and_set_vector(vector, vlapic->regs + APIC_IRR) &&
-             trig_mode)
+        if ( vlapic_test_and_set_irr(vector, vlapic) && trig_mode )
         {
             HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
                   "level trig mode repeatedly for vector %d\n", vector);
@@ -482,6 +481,11 @@ static void vlapic_read_aligned(struct vlapic *vlapic, unsigned int offset,
     *result = 0;
 
     switch ( offset ) {
+    case APIC_PROCPRI:
+        vlapic_update_ppr(vlapic);
+        *result = vlapic_get_reg(vlapic, offset);
+        break;
+
     case APIC_ARBPRI:
         printk("access local APIC ARBPRI register which is for P6\n");
         break;
@@ -616,6 +620,7 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
     case APIC_TASKPRI:
         vlapic_set_reg(vlapic, APIC_TASKPRI, val & 0xff);
         vlapic_update_ppr(vlapic);
+        vlapic->flush_tpr_threshold = 1;
         break;
 
     case APIC_EOI:
@@ -814,7 +819,7 @@ void vlapic_timer_fn(void *data)
 
     vlapic->timer_last_update = now;
 
-    if ( vlapic_test_and_set_vector(timer_vector, vlapic->regs + APIC_IRR) )
+    if ( vlapic_test_and_set_irr(timer_vector, vlapic) )
         vlapic->intr_pending_count[timer_vector]++;
 
     if ( vlapic_lvtt_period(vlapic) )
@@ -891,7 +896,7 @@ int cpu_get_apic_interrupt(struct vcpu *v, int *mode)
                 HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
                             "Sending an illegal vector 0x%x.", highest_irr);
 
-                vlapic_set_vector(err_vector, vlapic->regs + APIC_IRR);
+                vlapic_set_irr(err_vector, vlapic);
                 highest_irr = err_vector;
             }
 
@@ -942,7 +947,7 @@ void vlapic_post_injection(struct vcpu *v, int vector, int deliver_mode)
     case APIC_DM_FIXED:
     case APIC_DM_LOWEST:
         vlapic_set_vector(vector, vlapic->regs + APIC_ISR);
-        vlapic_clear_vector(vector, vlapic->regs + APIC_IRR);
+        vlapic_clear_irr(vector, vlapic);
         vlapic_update_ppr(vlapic);
 
         if ( vector == vlapic_lvt_vector(vlapic, APIC_LVTT) )
@@ -950,7 +955,7 @@ void vlapic_post_injection(struct vcpu *v, int vector, int deliver_mode)
             if ( vlapic->intr_pending_count[vector] > 0 )
             {
                 vlapic->intr_pending_count[vector]--;
-                vlapic_test_and_set_vector(vector, vlapic->regs + APIC_IRR);
+                vlapic_set_irr(vector, vlapic);
             }
         }
         break;
@@ -1000,6 +1005,8 @@ static int vlapic_reset(struct vlapic *vlapic)
     vlapic_set_reg(vlapic, APIC_SPIV, 0xff);
 
     vlapic->apic_base_msr = MSR_IA32_APICBASE_ENABLE | APIC_DEFAULT_PHYS_BASE;
+
+    vlapic->flush_tpr_threshold = 0;
 
     if ( v->vcpu_id == 0 )
         vlapic->apic_base_msr |= MSR_IA32_APICBASE_BSP;

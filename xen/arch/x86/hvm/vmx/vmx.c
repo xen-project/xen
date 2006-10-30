@@ -2409,6 +2409,11 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         vmx_inject_hw_exception(v, TRAP_invalid_op, VMX_DELIVER_NO_ERROR_CODE);
         break;
 
+    case EXIT_REASON_TPR_BELOW_THRESHOLD:
+        vlapic_update_ppr(VLAPIC(v));
+        VLAPIC(v)->flush_tpr_threshold = 1;
+        break;
+
     default:
         domain_crash_synchronous();     /* should not happen */
     }

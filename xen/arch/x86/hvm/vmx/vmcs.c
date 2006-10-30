@@ -346,8 +346,21 @@ static void vmx_do_launch(struct vcpu *v)
 
     hvm_stts(v);
 
-    if(hvm_apic_support(v->domain))
-        vlapic_init(v);
+    if( hvm_apic_support(v->domain) && (vlapic_init(v) == 0) )
+    {
+#ifdef __x86_64__ 
+        u32 *cpu_exec_control = &v->arch.hvm_vcpu.u.vmx.exec_control;
+        u64  vapic_page_addr = 
+                        page_to_maddr(v->arch.hvm_vcpu.vlapic->regs_page);
+
+        *cpu_exec_control   |= CPU_BASED_TPR_SHADOW;
+        *cpu_exec_control   &= ~CPU_BASED_CR8_STORE_EXITING;
+        *cpu_exec_control   &= ~CPU_BASED_CR8_LOAD_EXITING;
+        error |= __vmwrite(CPU_BASED_VM_EXEC_CONTROL, *cpu_exec_control);
+        error |= __vmwrite(VIRTUAL_APIC_PAGE_ADDR, vapic_page_addr);
+        error |= __vmwrite(TPR_THRESHOLD, 0);
+#endif
+    }
 
     vmx_set_host_env(v);
     init_timer(&v->arch.hvm_vcpu.hlt_timer, hlt_timer_fn, v, v->processor);
@@ -514,12 +527,6 @@ static inline int construct_vmcs_host(void)
     error |= __vmwrite(HOST_CR4, crn);
 
     error |= __vmwrite(HOST_RIP, (unsigned long) vmx_asm_vmexit_handler);
-#ifdef __x86_64__
-    /* TBD: support cr8 for 64-bit guest */
-    __vmwrite(VIRTUAL_APIC_PAGE_ADDR, 0);
-    __vmwrite(TPR_THRESHOLD, 0);
-    __vmwrite(SECONDARY_VM_EXEC_CONTROL, 0);
-#endif
 
     return error;
 }

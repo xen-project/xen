@@ -68,6 +68,27 @@ static inline int is_interruptibility_state(void)
     return interruptibility;
 }
 
+#ifdef __x86_64__
+static void update_tpr_threshold(struct vlapic *vlapic)
+{
+    int highest_irr, tpr;
+
+    /* Clear the work-to-do flag /then/ do the work. */
+    vlapic->flush_tpr_threshold = 0;
+    mb();
+
+    highest_irr = vlapic_find_highest_irr(vlapic);
+    tpr = vlapic_get_reg(vlapic, APIC_TASKPRI) & 0xF0;
+
+    if ( highest_irr == -1 )
+        __vmwrite(TPR_THRESHOLD, 0);
+    else
+        __vmwrite(TPR_THRESHOLD,
+                  (highest_irr > tpr) ? (tpr >> 4) : (highest_irr >> 4));
+}
+#else
+#define update_tpr_threshold(v) ((void)0)
+#endif
 
 asmlinkage void vmx_intr_assist(void)
 {
@@ -75,6 +96,7 @@ asmlinkage void vmx_intr_assist(void)
     int highest_vector;
     unsigned long eflags;
     struct vcpu *v = current;
+    struct vlapic *vlapic = VLAPIC(v);
     struct hvm_domain *plat=&v->domain->arch.hvm_domain;
     struct periodic_time *pt = &plat->pl_time.periodic_tm;
     struct hvm_virpic *pic= &plat->vpic;
@@ -97,6 +119,9 @@ asmlinkage void vmx_intr_assist(void)
         if ( callback_irq != 0 )
             pic_set_xen_irq(pic, callback_irq, local_events_need_delivery());
     }
+
+    if ( vlapic && vlapic_enabled(vlapic) && vlapic->flush_tpr_threshold )
+        update_tpr_threshold(vlapic);
 
     has_ext_irq = cpu_has_pending_irq(v);
 

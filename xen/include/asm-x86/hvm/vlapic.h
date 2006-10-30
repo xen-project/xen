@@ -107,6 +107,7 @@ struct vlapic {
     uint32_t           timer_divide_count;
     struct timer       vlapic_timer;
     int                intr_pending_count[MAX_VECTOR];
+    int                flush_tpr_threshold;
     s_time_t           timer_last_update;
     direct_intr_info_t direct_intr;
     uint32_t           err_status;
@@ -117,12 +118,30 @@ struct vlapic {
     void               *regs;
 };
 
+static inline int vlapic_test_and_set_irr(int vector, struct vlapic *vlapic)
+{
+    vlapic->flush_tpr_threshold = 1;
+    return vlapic_test_and_set_vector(vector, vlapic->regs + APIC_IRR);
+}
+
+static inline void vlapic_set_irr(int vector, struct vlapic *vlapic)
+{
+    vlapic->flush_tpr_threshold = 1;
+    vlapic_set_vector(vector, vlapic->regs + APIC_IRR);
+}
+
+static inline void vlapic_clear_irr(int vector, struct vlapic *vlapic)
+{
+    vlapic->flush_tpr_threshold = 1;
+    vlapic_clear_vector(vector, vlapic->regs + APIC_IRR);
+}
+
 static inline int vlapic_set_irq(struct vlapic *vlapic,
                                  uint8_t vec, uint8_t trig)
 {
     int ret;
 
-    ret = vlapic_test_and_set_vector(vec, vlapic->regs + APIC_IRR);
+    ret = vlapic_test_and_set_irr(vec, vlapic);
     if ( trig )
         vlapic_set_vector(vec, vlapic->regs + APIC_TMR);
 
@@ -144,12 +163,16 @@ static inline void vlapic_set_reg(struct vlapic *vlapic,
 
 void vlapic_post_injection(struct vcpu* v, int vector, int deliver_mode);
 
+extern int vlapic_find_highest_irr(struct vlapic *vlapic);
+
 int cpu_has_apic_interrupt(struct vcpu* v);
 int cpu_get_apic_interrupt(struct vcpu* v, int *mode);
 
 extern int vlapic_init(struct vcpu *vc);
 
 extern void vlapic_msr_set(struct vlapic *vlapic, uint64_t value);
+
+extern uint32_t vlapic_update_ppr(struct vlapic *vlapic);
 
 int vlapic_accept_pic_intr(struct vcpu *v);
 
