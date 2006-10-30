@@ -36,11 +36,17 @@
 /*
  * Basic constants
  */
-#define CSCHED_TICK             10      /* milliseconds */
-#define CSCHED_TSLICE           30      /* milliseconds */
-#define CSCHED_ACCT_NTICKS      3
-#define CSCHED_ACCT_PERIOD      (CSCHED_ACCT_NTICKS * CSCHED_TICK)
-#define CSCHED_DEFAULT_WEIGHT   256
+#define CSCHED_DEFAULT_WEIGHT       256
+#define CSCHED_TICKS_PER_TSLICE     3
+#define CSCHED_TICKS_PER_ACCT       3
+#define CSCHED_MSECS_PER_TICK       10
+#define CSCHED_MSECS_PER_TSLICE     \
+    (CSCHED_MSECS_PER_TICK * CSCHED_TICKS_PER_TSLICE)
+#define CSCHED_CREDITS_PER_TICK     100
+#define CSCHED_CREDITS_PER_TSLICE   \
+    (CSCHED_CREDITS_PER_TICK * CSCHED_TICKS_PER_TSLICE)
+#define CSCHED_CREDITS_PER_ACCT     \
+    (CSCHED_CREDITS_PER_TICK * CSCHED_TICKS_PER_ACCT)
 
 
 /*
@@ -314,7 +320,7 @@ csched_pcpu_init(int cpu)
     spin_lock_irqsave(&csched_priv.lock, flags);
 
     /* Initialize/update system-wide config */
-    csched_priv.credit += CSCHED_ACCT_PERIOD;
+    csched_priv.credit += CSCHED_CREDITS_PER_ACCT;
     if ( csched_priv.ncpus <= cpu )
         csched_priv.ncpus = cpu + 1;
     if ( csched_priv.master >= csched_priv.ncpus )
@@ -439,8 +445,6 @@ __csched_vcpu_acct_idle_locked(struct csched_vcpu *svc)
         list_del_init(&sdom->active_sdom_elem);
         csched_priv.weight -= sdom->weight;
     }
-
-    atomic_set(&svc->credit, 0);
 }
 
 static int
@@ -767,7 +771,7 @@ csched_acct(void)
          * for one full accounting period. We allow a domain to earn more
          * only when the system-wide credit balance is negative.
          */
-        credit_peak = sdom->active_vcpu_count * CSCHED_ACCT_PERIOD;
+        credit_peak = sdom->active_vcpu_count * CSCHED_CREDITS_PER_ACCT;
         if ( csched_priv.credit_balance < 0 )
         {
             credit_peak += ( ( -csched_priv.credit_balance * sdom->weight) +
@@ -776,7 +780,9 @@ csched_acct(void)
         }
         if ( sdom->cap != 0U )
         {
-            uint32_t credit_cap = ((sdom->cap * CSCHED_ACCT_PERIOD) + 99) / 100;
+            uint32_t credit_cap;
+            
+            credit_cap = ((sdom->cap * CSCHED_CREDITS_PER_ACCT) + 99) / 100;
             if ( credit_cap < credit_peak )
                 credit_peak = credit_cap;
         }
@@ -839,10 +845,10 @@ csched_acct(void)
                 else
                     svc->pri = CSCHED_PRI_TS_PARKED;
 
-                if ( credit < -CSCHED_TSLICE )
+                if ( credit < -CSCHED_CREDITS_PER_TSLICE )
                 {
                     CSCHED_STAT_CRANK(acct_min_credit);
-                    credit = -CSCHED_TSLICE;
+                    credit = -CSCHED_CREDITS_PER_TSLICE;
                     atomic_set(&svc->credit, credit);
                 }
             }
@@ -850,8 +856,12 @@ csched_acct(void)
             {
                 svc->pri = CSCHED_PRI_TS_UNDER;
 
-                if ( credit > CSCHED_TSLICE )
+                if ( credit > CSCHED_CREDITS_PER_TSLICE )
+                {
                     __csched_vcpu_acct_idle_locked(svc);
+                    credit = 0;
+                    atomic_set(&svc->credit, credit);
+                }
             }
 
             svc->credit_last = credit;
@@ -881,7 +891,7 @@ csched_tick(unsigned int cpu)
      */
     if ( likely(sdom != NULL) )
     {
-        csched_vcpu_acct(svc, CSCHED_TICK);
+        csched_vcpu_acct(svc, CSCHED_CREDITS_PER_TICK);
     }
 
     /*
@@ -891,7 +901,7 @@ csched_tick(unsigned int cpu)
      * we could distribute or at the very least cycle the duty.
      */
     if ( (csched_priv.master == cpu) &&
-         (per_cpu(schedule_data, cpu).tick % CSCHED_ACCT_NTICKS) == 0 )
+         (per_cpu(schedule_data, cpu).tick % CSCHED_TICKS_PER_ACCT) == 0 )
     {
         csched_acct();
     }
@@ -1069,7 +1079,7 @@ csched_schedule(s_time_t now)
     /*
      * Return task to run next...
      */
-    ret.time = MILLISECS(CSCHED_TSLICE);
+    ret.time = MILLISECS(CSCHED_MSECS_PER_TSLICE);
     ret.task = snext->vcpu;
 
     CSCHED_VCPU_CHECK(ret.task);
@@ -1150,20 +1160,22 @@ csched_dump(void)
            "\tcredit balance     = %d\n"
            "\tweight             = %u\n"
            "\trunq_sort          = %u\n"
-           "\ttick               = %dms\n"
-           "\ttslice             = %dms\n"
-           "\taccounting period  = %dms\n"
-           "\tdefault-weight     = %d\n",
+           "\tdefault-weight     = %d\n"
+           "\tmsecs per tick     = %dms\n"
+           "\tcredits per tick   = %d\n"
+           "\tticks per tslice   = %d\n"
+           "\tticks per acct     = %d\n",
            csched_priv.ncpus,
            csched_priv.master,
            csched_priv.credit,
            csched_priv.credit_balance,
            csched_priv.weight,
            csched_priv.runq_sort,
-           CSCHED_TICK,
-           CSCHED_TSLICE,
-           CSCHED_ACCT_PERIOD,
-           CSCHED_DEFAULT_WEIGHT);
+           CSCHED_DEFAULT_WEIGHT,
+           CSCHED_MSECS_PER_TICK,
+           CSCHED_CREDITS_PER_TICK,
+           CSCHED_TICKS_PER_TSLICE,
+           CSCHED_TICKS_PER_ACCT);
 
     printk("idlers: 0x%lx\n", csched_priv.idlers.bits[0]);
 
