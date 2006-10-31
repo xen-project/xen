@@ -259,7 +259,7 @@ struct shadow_paging_mode {
     int           (*page_fault            )(struct vcpu *v, unsigned long va,
                                             struct cpu_user_regs *regs);
     int           (*invlpg                )(struct vcpu *v, unsigned long va);
-    unsigned long (*gva_to_gpa            )(struct vcpu *v, unsigned long va);
+    paddr_t       (*gva_to_gpa            )(struct vcpu *v, unsigned long va);
     unsigned long (*gva_to_gfn            )(struct vcpu *v, unsigned long va);
     void          (*update_cr3            )(struct vcpu *v);
     int           (*map_and_validate_gl1e )(struct vcpu *v, mfn_t gmfn,
@@ -368,11 +368,13 @@ shadow_invlpg(struct vcpu *v, unsigned long va)
     return v->arch.shadow.mode->invlpg(v, va);
 }
 
-static inline unsigned long
+static inline paddr_t
 shadow_gva_to_gpa(struct vcpu *v, unsigned long va)
 /* Called to translate a guest virtual address to what the *guest*
  * pagetables would map it to. */
 {
+    if ( unlikely(!shadow_vcpu_mode_translate(v)) )
+        return (paddr_t) va;
     return v->arch.shadow.mode->gva_to_gpa(v, va);
 }
 
@@ -381,6 +383,8 @@ shadow_gva_to_gfn(struct vcpu *v, unsigned long va)
 /* Called to translate a guest virtual address to what the *guest*
  * pagetables would map it to. */
 {
+    if ( unlikely(!shadow_vcpu_mode_translate(v)) )
+        return va >> PAGE_SHIFT;
     return v->arch.shadow.mode->gva_to_gfn(v, va);
 }
 
@@ -671,21 +675,6 @@ sh_gfn_to_mfn(struct domain *d, unsigned long gfn)
         return _mfn(get_mfn_from_gpfn(gfn));
     else
         return sh_gfn_to_mfn_foreign(d, gfn);
-}
-
-// vcpu-specific version of gfn_to_mfn().  This is where we hide the dirty
-// little secret that, for hvm guests with paging disabled, nearly all of the
-// shadow code actually think that the guest is running on *untranslated* page
-// tables (which is actually domain->phys_table).
-//
-static inline mfn_t
-sh_vcpu_gfn_to_mfn(struct vcpu *v, unsigned long gfn)
-{ 
-    if ( !shadow_vcpu_mode_translate(v) )
-        return _mfn(gfn);
-    if ( likely(current->domain == v->domain) )
-        return _mfn(get_mfn_from_gpfn(gfn));
-    return sh_gfn_to_mfn_foreign(v->domain, gfn);
 }
 
 static inline unsigned long

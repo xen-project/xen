@@ -392,17 +392,17 @@ static int handle_pit_io(ioreq_t *p)
     struct PITState *vpit = &(v->domain->arch.hvm_domain.pl_time.vpit);
 
     if (p->size != 1 ||
-        p->pdata_valid ||
+        p->data_is_ptr ||
         p->type != IOREQ_TYPE_PIO){
         printk("HVM_PIT:wrong PIT IO!\n");
         return 1;
     }
     
     if (p->dir == 0) {/* write */
-        pit_ioport_write(vpit, p->addr, p->u.data);
+        pit_ioport_write(vpit, p->addr, p->data);
     } else if (p->dir == 1) { /* read */
         if ( (p->addr & 3) != 3 ) {
-            p->u.data = pit_ioport_read(vpit, p->addr);
+            p->data = pit_ioport_read(vpit, p->addr);
         } else {
             printk("HVM_PIT: read A1:A0=3!\n");
         }
@@ -434,16 +434,16 @@ static int handle_speaker_io(ioreq_t *p)
     struct PITState *vpit = &(v->domain->arch.hvm_domain.pl_time.vpit);
 
     if (p->size != 1 ||
-        p->pdata_valid ||
+        p->data_is_ptr ||
         p->type != IOREQ_TYPE_PIO){
         printk("HVM_SPEAKER:wrong SPEAKER IO!\n");
         return 1;
     }
     
     if (p->dir == 0) {/* write */
-        speaker_ioport_write(vpit, p->addr, p->u.data);
+        speaker_ioport_write(vpit, p->addr, p->data);
     } else if (p->dir == 1) {/* read */
-        p->u.data = speaker_ioport_read(vpit, p->addr);
+        p->data = speaker_ioport_read(vpit, p->addr);
     }
 
     return 1;

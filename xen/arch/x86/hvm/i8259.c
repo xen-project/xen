@@ -491,11 +491,10 @@ static int intercept_pic_io(ioreq_t *p)
 
     pic = &current->domain->arch.hvm_domain.vpic;
     if ( p->dir == IOREQ_WRITE ) {
-        if ( p->pdata_valid )
-            (void)hvm_copy_from_guest_phys(
-                &data, (unsigned long)p->u.pdata, p->size);
+        if ( p->data_is_ptr )
+            (void)hvm_copy_from_guest_phys(&data, p->data, p->size);
         else
-            data = p->u.data;
+            data = p->data;
         spin_lock_irqsave(&pic->lock, flags);
         pic_ioport_write((void*)&pic->pics[p->addr>>7],
                 (uint32_t) p->addr, (uint32_t) (data & 0xff));
@@ -506,11 +505,10 @@ static int intercept_pic_io(ioreq_t *p)
         data = pic_ioport_read(
             (void*)&pic->pics[p->addr>>7], (uint32_t) p->addr);
         spin_unlock_irqrestore(&pic->lock, flags);
-        if ( p->pdata_valid )
-            (void)hvm_copy_to_guest_phys(
-                (unsigned long)p->u.pdata, &data, p->size);
+        if ( p->data_is_ptr )
+            (void)hvm_copy_to_guest_phys(p->data, &data, p->size);
         else
-            p->u.data = (u64)data;
+            p->data = (u64)data;
     }
     return 1;
 }
@@ -528,11 +526,10 @@ static int intercept_elcr_io(ioreq_t *p)
 
     s = &current->domain->arch.hvm_domain.vpic;
     if ( p->dir == IOREQ_WRITE ) {
-        if ( p->pdata_valid )
-            (void)hvm_copy_from_guest_phys(
-                &data, (unsigned long)p->u.pdata, p->size);
+        if ( p->data_is_ptr )
+            (void)hvm_copy_from_guest_phys(&data, p->data, p->size);
         else
-            data = p->u.data;
+            data = p->data;
         spin_lock_irqsave(&s->lock, flags);
         elcr_ioport_write((void*)&s->pics[p->addr&1],
                 (uint32_t) p->addr, (uint32_t)( data & 0xff));
@@ -543,11 +540,10 @@ static int intercept_elcr_io(ioreq_t *p)
     else {
         data = (u64) elcr_ioport_read(
                 (void*)&s->pics[p->addr&1], (uint32_t) p->addr);
-        if ( p->pdata_valid )
-            (void)hvm_copy_to_guest_phys(
-                (unsigned long)p->u.pdata, &data, p->size);
+        if ( p->data_is_ptr )
+            (void)hvm_copy_to_guest_phys(p->data, &data, p->size);
         else
-            p->u.data = (u64)data;
+            p->data = (u64)data;
     }
     return 1;
 }

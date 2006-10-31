@@ -741,7 +741,7 @@ static void hvm_send_assist_req(struct vcpu *v)
 }
 
 void send_pio_req(unsigned long port, unsigned long count, int size,
-                  long value, int dir, int df, int pvalid)
+                  long value, int dir, int df, int value_is_ptr)
 {
     struct vcpu *v = current;
     vcpu_iodata_t *vio;
@@ -749,8 +749,8 @@ void send_pio_req(unsigned long port, unsigned long count, int size,
 
     if ( size == 0 || count == 0 ) {
         printk("null pio request? port %lx, count %lx, "
-               "size %d, value %lx, dir %d, pvalid %d.\n",
-               port, count, size, value, dir, pvalid);
+               "size %d, value %lx, dir %d, value_is_ptr %d.\n",
+               port, count, size, value, dir, value_is_ptr);
     }
 
     vio = get_vio(v->domain, v->vcpu_id);
@@ -765,7 +765,7 @@ void send_pio_req(unsigned long port, unsigned long count, int size,
                p->state);
 
     p->dir = dir;
-    p->pdata_valid = pvalid;
+    p->data_is_ptr = value_is_ptr;
 
     p->type = IOREQ_TYPE_PIO;
     p->size = size;
@@ -775,14 +775,14 @@ void send_pio_req(unsigned long port, unsigned long count, int size,
 
     p->io_count++;
 
-    if ( pvalid )   /* get physical address of data */
+    if ( value_is_ptr )   /* get physical address of data */
     {
         if ( hvm_paging_enabled(current) )
-            p->u.pdata = (void *)shadow_gva_to_gpa(current, value);
+            p->data = shadow_gva_to_gpa(current, value);
         else
-            p->u.pdata = (void *)value; /* guest VA == guest PA */
+            p->data = value; /* guest VA == guest PA */
     } else if ( dir == IOREQ_WRITE )
-        p->u.data = value;
+        p->data = value;
 
     if ( hvm_portio_intercept(p) ) {
         p->state = STATE_IORESP_READY;
@@ -795,7 +795,7 @@ void send_pio_req(unsigned long port, unsigned long count, int size,
 
 static void send_mmio_req(unsigned char type, unsigned long gpa,
                           unsigned long count, int size, long value,
-                          int dir, int df, int pvalid)
+                          int dir, int df, int value_is_ptr)
 {
     struct vcpu *v = current;
     vcpu_iodata_t *vio;
@@ -803,8 +803,8 @@ static void send_mmio_req(unsigned char type, unsigned long gpa,
 
     if ( size == 0 || count == 0 ) {
         printk("null mmio request? type %d, gpa %lx, "
-               "count %lx, size %d, value %lx, dir %d, pvalid %d.\n",
-               type, gpa, count, size, value, dir, pvalid);
+               "count %lx, size %d, value %lx, dir %d, value_is_ptr %d.\n",
+               type, gpa, count, size, value, dir, value_is_ptr);
     }
 
     vio = get_vio(v->domain, v->vcpu_id);
@@ -819,7 +819,7 @@ static void send_mmio_req(unsigned char type, unsigned long gpa,
         printk("WARNING: send mmio with something already pending (%d)?\n",
                p->state);
     p->dir = dir;
-    p->pdata_valid = pvalid;
+    p->data_is_ptr = value_is_ptr;
 
     p->type = type;
     p->size = size;
@@ -829,13 +829,13 @@ static void send_mmio_req(unsigned char type, unsigned long gpa,
 
     p->io_count++;
 
-    if (pvalid) {
+    if (value_is_ptr) {
         if (hvm_paging_enabled(v))
-            p->u.data = shadow_gva_to_gpa(v, value);
+            p->data = shadow_gva_to_gpa(v, value);
         else
-            p->u.pdata = (void *) value; /* guest VA == guest PA */
+            p->data = value; /* guest VA == guest PA */
     } else
-        p->u.data = value;
+        p->data = value;
 
     if ( hvm_mmio_intercept(p) || hvm_buffered_io_intercept(p) ) {
         p->state = STATE_IORESP_READY;

@@ -404,11 +404,22 @@ valid_gfn(gfn_t m)
 }
 
 /* Translation between mfns and gfns */
+
+// vcpu-specific version of gfn_to_mfn().  This is where we hide the dirty
+// little secret that, for hvm guests with paging disabled, nearly all of the
+// shadow code actually think that the guest is running on *untranslated* page
+// tables (which is actually domain->phys_table).
+//
+
 static inline mfn_t
 vcpu_gfn_to_mfn(struct vcpu *v, gfn_t gfn)
 {
-    return sh_vcpu_gfn_to_mfn(v, gfn_x(gfn));
-} 
+    if ( !shadow_vcpu_mode_translate(v) )
+        return _mfn(gfn_x(gfn));
+    if ( likely(current->domain == v->domain) )
+        return _mfn(get_mfn_from_gpfn(gfn_x(gfn)));
+    return sh_gfn_to_mfn_foreign(v->domain, gfn_x(gfn));
+}
 
 static inline gfn_t
 mfn_to_gfn(struct domain *d, mfn_t mfn)

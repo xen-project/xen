@@ -41,10 +41,6 @@
  *
  * THINGS TO DO LATER:
  * 
- * FIX GVA_TO_GPA
- * The current interface returns an unsigned long, which is not big enough
- * to hold a physical address in PAE.  Should return a gfn instead.
- * 
  * TEARDOWN HEURISTICS
  * Also: have a heuristic for when to destroy a previous paging-mode's 
  * shadows.  When a guest is done with its start-of-day 32-bit tables
@@ -2837,7 +2833,7 @@ static int sh_page_fault(struct vcpu *v,
     perfc_incrc(shadow_fault_mmio);
     sh_audit_gw(v, &gw);
     unmap_walk(v, &gw);
-    SHADOW_PRINTK("mmio\n");
+    SHADOW_PRINTK("mmio %#"PRIpaddr"\n", gpa);
     shadow_audit_tables(v);
     reset_early_unshadow(v);
     shadow_unlock(d);
@@ -2941,7 +2937,7 @@ sh_gva_to_gfn(struct vcpu *v, unsigned long va)
 }
 
 
-static unsigned long
+static paddr_t
 sh_gva_to_gpa(struct vcpu *v, unsigned long va)
 /* Called to translate a guest virtual address to what the *guest*
  * pagetables would map it to. */
@@ -2950,7 +2946,7 @@ sh_gva_to_gpa(struct vcpu *v, unsigned long va)
     if ( gfn == INVALID_GFN )
         return 0;
     else
-        return (gfn << PAGE_SHIFT) | (va & ~PAGE_MASK);
+        return (((paddr_t)gfn) << PAGE_SHIFT) + (va & ~PAGE_MASK);
 }
 
 

@@ -67,12 +67,12 @@ static inline void hvm_mmio_access(struct vcpu *v,
     switch ( p->type ) {
     case IOREQ_TYPE_COPY:
     {
-        if ( !p->pdata_valid ) {
+        if ( !p->data_is_ptr ) {
             if ( p->dir == IOREQ_READ )
-                p->u.data = read_handler(v, p->addr, p->size);
+                p->data = read_handler(v, p->addr, p->size);
             else    /* p->dir == IOREQ_WRITE */
-                write_handler(v, p->addr, p->size, p->u.data);
-        } else {    /* !p->pdata_valid */
+                write_handler(v, p->addr, p->size, p->data);
+        } else {    /* p->data_is_ptr */
             int i, sign = (p->df) ? -1 : 1;
 
             if ( p->dir == IOREQ_READ ) {
@@ -81,7 +81,7 @@ static inline void hvm_mmio_access(struct vcpu *v,
                         p->addr + (sign * i * p->size),
                         p->size);
                     (void)hvm_copy_to_guest_phys(
-                        (unsigned long)p->u.pdata + (sign * i * p->size),
+                        p->data + (sign * i * p->size),
                         &data,
                         p->size);
                 }
@@ -89,7 +89,7 @@ static inline void hvm_mmio_access(struct vcpu *v,
                 for ( i = 0; i < p->count; i++ ) {
                     (void)hvm_copy_from_guest_phys(
                         &data,
-                        (unsigned long)p->u.pdata + (sign * i * p->size),
+                        p->data + (sign * i * p->size),
                         p->size);
                     write_handler(v,
                         p->addr + (sign * i * p->size),
@@ -103,37 +103,37 @@ static inline void hvm_mmio_access(struct vcpu *v,
     case IOREQ_TYPE_AND:
         tmp1 = read_handler(v, p->addr, p->size);
         if ( p->dir == IOREQ_WRITE ) {
-            tmp2 = tmp1 & (unsigned long) p->u.data;
+            tmp2 = tmp1 & (unsigned long) p->data;
             write_handler(v, p->addr, p->size, tmp2);
         }
-        p->u.data = tmp1;
+        p->data = tmp1;
         break;
 
     case IOREQ_TYPE_ADD:
         tmp1 = read_handler(v, p->addr, p->size);
         if (p->dir == IOREQ_WRITE) {
-            tmp2 = tmp1 + (unsigned long) p->u.data;
+            tmp2 = tmp1 + (unsigned long) p->data;
             write_handler(v, p->addr, p->size, tmp2);
         }
-        p->u.data = tmp1;
+        p->data = tmp1;
         break;
 
     case IOREQ_TYPE_OR:
         tmp1 = read_handler(v, p->addr, p->size);
         if ( p->dir == IOREQ_WRITE ) {
-            tmp2 = tmp1 | (unsigned long) p->u.data;
+            tmp2 = tmp1 | (unsigned long) p->data;
             write_handler(v, p->addr, p->size, tmp2);
         }
-        p->u.data = tmp1;
+        p->data = tmp1;
         break;
 
     case IOREQ_TYPE_XOR:
         tmp1 = read_handler(v, p->addr, p->size);
         if ( p->dir == IOREQ_WRITE ) {
-            tmp2 = tmp1 ^ (unsigned long) p->u.data;
+            tmp2 = tmp1 ^ (unsigned long) p->data;
             write_handler(v, p->addr, p->size, tmp2);
         }
-        p->u.data = tmp1;
+        p->data = tmp1;
         break;
 
     case IOREQ_TYPE_XCHG:
@@ -142,8 +142,8 @@ static inline void hvm_mmio_access(struct vcpu *v,
          * its own local APIC.
          */
         tmp1 = read_handler(v, p->addr, p->size);
-        write_handler(v, p->addr, p->size, (unsigned long) p->u.data);
-        p->u.data = tmp1;
+        write_handler(v, p->addr, p->size, (unsigned long) p->data);
+        p->data = tmp1;
         break;
 
     default:

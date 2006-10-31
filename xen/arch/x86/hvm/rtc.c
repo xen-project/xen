@@ -345,17 +345,17 @@ static int handle_rtc_io(ioreq_t *p)
     struct RTCState *vrtc = &v->domain->arch.hvm_domain.pl_time.vrtc;
 
     if (p->size != 1 ||
-        p->pdata_valid ||
+        p->data_is_ptr ||
         p->type != IOREQ_TYPE_PIO){
         printk("HVM_RTC: wrong RTC IO!\n");
         return 1;
     }
     
     if (p->dir == 0) { /* write */
-        if (rtc_ioport_write(vrtc, p->addr, p->u.data & 0xFF))
+        if (rtc_ioport_write(vrtc, p->addr, p->data & 0xFF))
             return 1;
     } else if (p->dir == 1 && vrtc->cmos_index < RTC_SIZE) { /* read */
-        p->u.data = rtc_ioport_read(vrtc, p->addr);
+        p->data = rtc_ioport_read(vrtc, p->addr);
         return 1;
     }
     return 0;

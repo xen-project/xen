@@ -12,7 +12,6 @@
 #include <unistd.h>
 #include <zlib.h>
 #include <xen/hvm/hvm_info_table.h>
-#include <xen/hvm/ioreq.h>
 #include <xen/hvm/params.h>
 #include <xen/hvm/e820.h>
 

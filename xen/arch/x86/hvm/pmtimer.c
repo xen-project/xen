@@ -20,7 +20,7 @@ static int handle_pmt_io(ioreq_t *p)
     uint64_t curr_gtime;
 
     if (p->size != 4 ||
-        p->pdata_valid ||
+        p->data_is_ptr ||
         p->type != IOREQ_TYPE_PIO){
         printk("HVM_PMT: wrong PM timer IO\n");
         return 1;
@@ -32,7 +32,7 @@ static int handle_pmt_io(ioreq_t *p)
     } else if (p->dir == 1) { /* read */
         curr_gtime = hvm_get_guest_time(s->vcpu);
         s->pm1_timer += ((curr_gtime - s->last_gtime) * s->scale) >> 32;
-        p->u.data = s->pm1_timer;
+        p->data = s->pm1_timer;
         s->last_gtime = curr_gtime;
         return 1;
     }

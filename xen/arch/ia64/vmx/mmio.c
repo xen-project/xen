@@ -214,8 +214,8 @@ static void low_mmio_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
     p->count = 1;
     p->dir = dir;
     if(dir==IOREQ_WRITE)     //write;
-        p->u.data = *val;
-    p->pdata_valid = 0;
+        p->data = *val;
+    p->data_is_ptr = 0;
     p->type = 1;
     p->df = 0;
 
@@ -227,7 +227,7 @@ static void low_mmio_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
     }else 
     vmx_send_assist_req(v);
     if(dir==IOREQ_READ){ //read
-        *val=p->u.data;
+        *val=p->data;
     }
     return;
 }
@@ -249,8 +249,8 @@ static void legacy_io_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
     p->count = 1;
     p->dir = dir;
     if(dir==IOREQ_WRITE)     //write;
-        p->u.data = *val;
-    p->pdata_valid = 0;
+        p->data = *val;
+    p->data_is_ptr = 0;
     p->type = 0;
     p->df = 0;
 
@@ -258,15 +258,15 @@ static void legacy_io_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
 
     vmx_send_assist_req(v);
     if(dir==IOREQ_READ){ //read
-        *val=p->u.data;
+        *val=p->data;
     }
 #ifdef DEBUG_PCI
     if(dir==IOREQ_WRITE)
         if(p->addr == 0xcf8UL)
-            printk("Write 0xcf8, with val [0x%lx]\n", p->u.data);
+            printk("Write 0xcf8, with val [0x%lx]\n", p->data);
     else
         if(p->addr == 0xcfcUL)
-            printk("Read 0xcfc, with val [0x%lx]\n", p->u.data);
+            printk("Read 0xcfc, with val [0x%lx]\n", p->data);
 #endif //DEBUG_PCI
     return;
 }

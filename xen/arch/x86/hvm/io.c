@@ -365,7 +365,7 @@ static void hvm_pio_assist(struct cpu_user_regs *regs, ioreq_t *p,
     unsigned long old_eax;
     int sign = p->df ? -1 : 1;
 
-    if ( p->pdata_valid || (pio_opp->flags & OVERLAP) )
+    if ( p->data_is_ptr || (pio_opp->flags & OVERLAP) )
     {
         if ( pio_opp->flags & REPZ )
             regs->ecx -= p->count;
@@ -376,9 +376,9 @@ static void hvm_pio_assist(struct cpu_user_regs *regs, ioreq_t *p,
             {
                 unsigned long addr = pio_opp->addr;
                 if ( hvm_paging_enabled(current) )
-                    (void)hvm_copy_to_guest_virt(addr, &p->u.data, p->size);
+                    (void)hvm_copy_to_guest_virt(addr, &p->data, p->size);
                 else
-                    (void)hvm_copy_to_guest_phys(addr, &p->u.data, p->size);
+                    (void)hvm_copy_to_guest_phys(addr, &p->data, p->size);
             }
             regs->edi += sign * p->count * p->size;
         }
@@ -394,13 +394,13 @@ static void hvm_pio_assist(struct cpu_user_regs *regs, ioreq_t *p,
         switch ( p->size )
         {
         case 1:
-            regs->eax = (old_eax & 0xffffff00) | (p->u.data & 0xff);
+            regs->eax = (old_eax & 0xffffff00) | (p->data & 0xff);
             break;
         case 2:
-            regs->eax = (old_eax & 0xffff0000) | (p->u.data & 0xffff);
+            regs->eax = (old_eax & 0xffff0000) | (p->data & 0xffff);
             break;
         case 4:
-            regs->eax = (p->u.data & 0xffffffff);
+            regs->eax = (p->data & 0xffffffff);
             break;
         default:
             printk("Error: %s unknown port size\n", __FUNCTION__);
@@ -425,7 +425,7 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
     case INSTR_MOV:
         if (dst & REGISTER) {
             index = operand_index(dst);
-            set_reg_value(size, index, 0, regs, p->u.data);
+            set_reg_value(size, index, 0, regs, p->data);
         }
         break;
 
@@ -433,15 +433,15 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
         if (dst & REGISTER) {
             switch (size) {
             case BYTE:
-                p->u.data &= 0xFFULL;
+                p->data &= 0xFFULL;
                 break;
 
             case WORD:
-                p->u.data &= 0xFFFFULL;
+                p->data &= 0xFFFFULL;
                 break;
 
             case LONG:
-                p->u.data &= 0xFFFFFFFFULL;
+                p->data &= 0xFFFFFFFFULL;
                 break;
 
             default:
@@ -449,7 +449,7 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
                 domain_crash_synchronous();
             }
             index = operand_index(dst);
-            set_reg_value(operand_size(dst), index, 0, regs, p->u.data);
+            set_reg_value(operand_size(dst), index, 0, regs, p->data);
         }
         break;
 
@@ -457,21 +457,21 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
         if (dst & REGISTER) {
             switch (size) {
             case BYTE:
-                p->u.data &= 0xFFULL;
-                if ( p->u.data & 0x80ULL )
-                    p->u.data |= 0xFFFFFFFFFFFFFF00ULL;
+                p->data &= 0xFFULL;
+                if ( p->data & 0x80ULL )
+                    p->data |= 0xFFFFFFFFFFFFFF00ULL;
                 break;
 
             case WORD:
-                p->u.data &= 0xFFFFULL;
-                if ( p->u.data & 0x8000ULL )
-                    p->u.data |= 0xFFFFFFFFFFFF0000ULL;
+                p->data &= 0xFFFFULL;
+                if ( p->data & 0x8000ULL )
+                    p->data |= 0xFFFFFFFFFFFF0000ULL;
                 break;
 
             case LONG:
-                p->u.data &= 0xFFFFFFFFULL;
-                if ( p->u.data & 0x80000000ULL )
-                    p->u.data |= 0xFFFFFFFF00000000ULL;
+                p->data &= 0xFFFFFFFFULL;
+                if ( p->data & 0x80000000ULL )
+                    p->data |= 0xFFFFFFFF00000000ULL;
                 break;
 
             default:
@@ -479,7 +479,7 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
                 domain_crash_synchronous();
             }
             index = operand_index(dst);
-            set_reg_value(operand_size(dst), index, 0, regs, p->u.data);
+            set_reg_value(operand_size(dst), index, 0, regs, p->data);
         }
         break;
 
@@ -493,9 +493,9 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
             unsigned long addr = mmio_opp->addr;
 
             if (hvm_paging_enabled(current))
-                (void)hvm_copy_to_guest_virt(addr, &p->u.data, p->size);
+                (void)hvm_copy_to_guest_virt(addr, &p->data, p->size);
             else
-                (void)hvm_copy_to_guest_phys(addr, &p->u.data, p->size);
+                (void)hvm_copy_to_guest_phys(addr, &p->data, p->size);
         }
 
         regs->esi += sign * p->count * p->size;
@@ -521,14 +521,14 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
         if (src & REGISTER) {
             index = operand_index(src);
             value = get_reg_value(size, index, 0, regs);
-            diff = (unsigned long) p->u.data & value;
+            diff = (unsigned long) p->data & value;
         } else if (src & IMMEDIATE) {
             value = mmio_opp->immediate;
-            diff = (unsigned long) p->u.data & value;
+            diff = (unsigned long) p->data & value;
         } else if (src & MEMORY) {
             index = operand_index(dst);
             value = get_reg_value(size, index, 0, regs);
-            diff = (unsigned long) p->u.data & value;
+            diff = (unsigned long) p->data & value;
             set_reg_value(size, index, 0, regs, diff);
         }
 
@@ -536,14 +536,14 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
         if (src & REGISTER) {
             index = operand_index(src);
             value = get_reg_value(size, index, 0, regs);
-            diff = (unsigned long) p->u.data + value;
+            diff = (unsigned long) p->data + value;
         } else if (src & IMMEDIATE) {
             value = mmio_opp->immediate;
-            diff = (unsigned long) p->u.data + value;
+            diff = (unsigned long) p->data + value;
         } else if (src & MEMORY) {
             index = operand_index(dst);
             value = get_reg_value(size, index, 0, regs);
-            diff = (unsigned long) p->u.data + value;
+            diff = (unsigned long) p->data + value;
             set_reg_value(size, index, 0, regs, diff);
         }
 
@@ -563,14 +563,14 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
         if (src & REGISTER) {
             index = operand_index(src);
             value = get_reg_value(size, index, 0, regs);
-            diff = (unsigned long) p->u.data | value;
+            diff = (unsigned long) p->data | value;
         } else if (src & IMMEDIATE) {
             value = mmio_opp->immediate;
-            diff = (unsigned long) p->u.data | value;
+            diff = (unsigned long) p->data | value;
         } else if (src & MEMORY) {
             index = operand_index(dst);
             value = get_reg_value(size, index, 0, regs);
-            diff = (unsigned long) p->u.data | value;
+            diff = (unsigned long) p->data | value;
             set_reg_value(size, index, 0, regs, diff);
         }
 
@@ -590,14 +590,14 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
         if (src & REGISTER) {
             index = operand_index(src);
             value = get_reg_value(size, index, 0, regs);
-            diff = (unsigned long) p->u.data ^ value;
+            diff = (unsigned long) p->data ^ value;
         } else if (src & IMMEDIATE) {
             value = mmio_opp->immediate;
-            diff = (unsigned long) p->u.data ^ value;
+            diff = (unsigned long) p->data ^ value;
         } else if (src & MEMORY) {
             index = operand_index(dst);
             value = get_reg_value(size, index, 0, regs);
-            diff = (unsigned long) p->u.data ^ value;
+            diff = (unsigned long) p->data ^ value;
             set_reg_value(size, index, 0, regs, diff);
         }
 
@@ -618,14 +618,14 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
         if (src & REGISTER) {
             index = operand_index(src);
             value = get_reg_value(size, index, 0, regs);
-            diff = (unsigned long) p->u.data - value;
+            diff = (unsigned long) p->data - value;
         } else if (src & IMMEDIATE) {
             value = mmio_opp->immediate;
-            diff = (unsigned long) p->u.data - value;
+            diff = (unsigned long) p->data - value;
         } else if (src & MEMORY) {
             index = operand_index(dst);
             value = get_reg_value(size, index, 0, regs);
-            diff = value - (unsigned long) p->u.data;
+            diff = value - (unsigned long) p->data;
             if ( mmio_opp->instr == INSTR_SUB )
                 set_reg_value(size, index, 0, regs, diff);
         }
@@ -636,9 +636,9 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
          */
         regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|X86_EFLAGS_AF|
                           X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
-        set_eflags_CF(size, value, (unsigned long) p->u.data, regs);
-        set_eflags_OF(size, diff, value, (unsigned long) p->u.data, regs);
-        set_eflags_AF(size, diff, value, (unsigned long) p->u.data, regs);
+        set_eflags_CF(size, value, (unsigned long) p->data, regs);
+        set_eflags_OF(size, diff, value, (unsigned long) p->data, regs);
+        set_eflags_AF(size, diff, value, (unsigned long) p->data, regs);
         set_eflags_ZF(size, diff, regs);
         set_eflags_SF(size, diff, regs);
         set_eflags_PF(size, diff, regs);
@@ -654,7 +654,7 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
             index = operand_index(dst);
             value = get_reg_value(size, index, 0, regs);
         }
-        diff = (unsigned long) p->u.data & value;
+        diff = (unsigned long) p->data & value;
 
         /*
          * Sets the SF, ZF, and PF status flags. CF and OF are set to 0
@@ -674,7 +674,7 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
         }
         else if ( src & IMMEDIATE )
             value = mmio_opp->immediate;
-        if (p->u.data & (1 << (value & ((1 << 5) - 1))))
+        if (p->data & (1 << (value & ((1 << 5) - 1))))
             regs->eflags |= X86_EFLAGS_CF;
         else
             regs->eflags &= ~X86_EFLAGS_CF;
@@ -684,10 +684,10 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
     case INSTR_XCHG:
         if (src & REGISTER) {
             index = operand_index(src);
-            set_reg_value(size, index, 0, regs, p->u.data);
+            set_reg_value(size, index, 0, regs, p->data);
         } else {
             index = operand_index(dst);
-            set_reg_value(size, index, 0, regs, p->u.data);
+            set_reg_value(size, index, 0, regs, p->data);
         }
         break;
     }

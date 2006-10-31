@@ -45,12 +45,10 @@ struct ioreq {
     uint64_t addr;          /*  physical address            */
     uint64_t size;          /*  size in bytes               */
     uint64_t count;         /*  for rep prefixes            */
-    union {
-        uint64_t data;      /*  data                        */
-        void    *pdata;     /*  pointer to data             */
-    } u;
+    uint64_t data;          /*  data (or paddr of data)     */
     uint8_t state:4;
-    uint8_t pdata_valid:1;  /* if 1, use pdata above        */
+    uint8_t data_is_ptr:1;  /*  if 1, data above is the guest paddr 
+                             *   of the real data to use.   */
     uint8_t dir:1;          /*  1=read, 0=write             */
     uint8_t df:1;
     uint8_t type;           /* I/O type                     */

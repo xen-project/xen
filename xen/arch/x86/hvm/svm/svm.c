@@ -2545,10 +2545,10 @@ void walk_shadow_and_guest_pt(unsigned long gva)
     l1_pgentry_t spte;
     struct vcpu        *v    = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    unsigned long gpa;
+    paddr_t gpa;
 
     gpa = shadow_gva_to_gpa(current, gva);
-    printk( "gva = %lx, gpa=%lx, gCR3=%x\n", gva, gpa, (u32)vmcb->cr3 );
+    printk("gva = %lx, gpa=%"PRIpaddr", gCR3=%x\n", gva, gpa, (u32)vmcb->cr3);
     if( !svm_paging_enabled(v) || mmio_space(gpa) )
         return;
 
