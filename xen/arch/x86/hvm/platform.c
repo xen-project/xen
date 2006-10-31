@@ -370,6 +370,13 @@ static int hvm_decode(int realmode, unsigned char *opcode,
     /* the operands order in comments conforms to AT&T convention */
 
     switch ( *opcode ) {
+
+    case 0x00: /* add r8, m8 */
+        mmio_op->instr = INSTR_ADD;
+        *op_size = BYTE;
+        GET_OP_SIZE_FOR_BYTE(size_reg);
+        return reg_mem(size_reg, opcode, mmio_op, rex);
+
     case 0x0A: /* or m8, r8 */
         mmio_op->instr = INSTR_OR;
         *op_size = BYTE;
@@ -1038,6 +1045,10 @@ void handle_mmio(unsigned long gpa)
 
     case INSTR_AND:
         mmio_operands(IOREQ_TYPE_AND, gpa, mmio_op, op_size);
+        break;
+
+    case INSTR_ADD:
+        mmio_operands(IOREQ_TYPE_ADD, gpa, mmio_op, op_size);
         break;
 
     case INSTR_XOR:

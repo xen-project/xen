@@ -532,6 +532,21 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
             set_reg_value(size, index, 0, regs, diff);
         }
 
+    case INSTR_ADD:
+        if (src & REGISTER) {
+            index = operand_index(src);
+            value = get_reg_value(size, index, 0, regs);
+            diff = (unsigned long) p->u.data + value;
+        } else if (src & IMMEDIATE) {
+            value = mmio_opp->immediate;
+            diff = (unsigned long) p->u.data + value;
+        } else if (src & MEMORY) {
+            index = operand_index(dst);
+            value = get_reg_value(size, index, 0, regs);
+            diff = (unsigned long) p->u.data + value;
+            set_reg_value(size, index, 0, regs, diff);
+        }
+
         /*
          * The OF and CF flags are cleared; the SF, ZF, and PF
          * flags are set according to the result. The state of
