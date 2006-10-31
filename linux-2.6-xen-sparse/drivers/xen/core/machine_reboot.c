@@ -59,10 +59,6 @@ EXPORT_SYMBOL(machine_restart);
 EXPORT_SYMBOL(machine_halt);
 EXPORT_SYMBOL(machine_power_off);
 
-#endif /* defined(__i386__) || defined(__x86_64__) */
-
-#if defined(__i386__) || defined(__x86_64__)
-
 /* Ensure we run on the idle task page tables so that we will
    switch page tables before running user space. This is needed
    on architectures with separate kernel and user page tables

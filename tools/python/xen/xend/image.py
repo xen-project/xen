@@ -282,7 +282,7 @@ class HVMImageHandler(ImageHandler):
         log.debug("apic           = %d", self.apic)
 
         self.register_shutdown_watch()
-        self.register_reboot_module_watch()
+        self.register_reboot_feature_watch()
 
         return xc.hvm_build(dom            = self.vm.getDomid(),
                             image          = self.kernel,
@@ -417,7 +417,7 @@ class HVMImageHandler(ImageHandler):
 
     def destroy(self):
         self.unregister_shutdown_watch();
-        self.unregister_reboot_module_watch();
+        self.unregister_reboot_feature_watch();
         if not self.pid:
             return
         os.kill(self.pid, signal.SIGKILL)
@@ -460,34 +460,34 @@ class HVMImageHandler(ImageHandler):
 
         return 1 # Keep watching
 
-    def register_reboot_module_watch(self):
-        """ add xen store watch on control/reboot_module """
-        self.rebootModuleWatch = xswatch(self.vm.dompath + "/control/reboot_module", \
-                                    self.hvm_reboot_module)
-        log.debug("hvm reboot module watch registered")
+    def register_reboot_feature_watch(self):
+        """ add xen store watch on control/feature-reboot """
+        self.rebootModuleWatch = xswatch(self.vm.dompath + "/control/feature-reboot", \
+                                         self.hvm_reboot_feature)
+        log.debug("hvm reboot feature watch registered")
 
-    def unregister_reboot_module_watch(self):
-        """Remove the watch on the control/reboot_module, if any. Nothrow
+    def unregister_reboot_feature_watch(self):
+        """Remove the watch on the control/feature-reboot, if any. Nothrow
         guarantee."""
 
         try:
-            if self.rebootModuleWatch:
-                self.rebootModuleWatch.unwatch()
+            if self.rebootFeatureWatch:
+                self.rebootFeatureWatch.unwatch()
         except:
-            log.exception("Unwatching hvm reboot module watch failed.")
-        self.rebootModuleWatch = None
-        log.debug("hvm reboot module watch unregistered")
+            log.exception("Unwatching hvm reboot feature watch failed.")
+        self.rebootFeatureWatch = None
+        log.debug("hvm reboot feature watch unregistered")
 
-    def hvm_reboot_module(self, _):
-        """ watch call back on node control/reboot_module,
+    def hvm_reboot_feature(self, _):
+        """ watch call back on node control/feature-reboot,
             if node changed, this function will be called
         """
         xd = xen.xend.XendDomain.instance()
         vm = xd.domain_lookup( self.vm.getDomid() )
 
-        reboot_module_status = vm.readDom('control/reboot_module')
-        log.debug("hvm_reboot_module fired, module status=%s", reboot_module_status)
-        if reboot_module_status == 'installed':
+        status = vm.readDom('control/feature-reboot')
+        log.debug("hvm_reboot_feature fired, module status=%s", status)
+        if status == '1':
             self.unregister_shutdown_watch()
 
         return 1 # Keep watching

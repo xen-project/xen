@@ -164,10 +164,14 @@ static int setup_shutdown_watcher(struct notifier_block *notifier,
 	err = register_xenbus_watch(&shutdown_watch);
 	if (err)
 		printk(KERN_ERR "Failed to set shutdown watcher\n");
+	else
+		xenbus_write(XBT_NIL, "control", "feature-reboot", "1");
 
 	err = register_xenbus_watch(&sysrq_watch);
 	if (err)
 		printk(KERN_ERR "Failed to set sysrq watcher\n");
+	else
+		xenbus_write(XBT_NIL, "control", "feature-sysrq", "1");
 
 	return NOTIFY_DONE;
 }
@@ -178,10 +182,6 @@ static int __init setup_shutdown_event(void)
 		.notifier_call = setup_shutdown_watcher
 	};
 	register_xenstore_notifier(&xenstore_notifier);
-
-	if (!is_initial_xendomain()) {
-		xenbus_write(XBT_NIL, "control", "reboot_module", "installed");
-	}
 
 	return 0;
 }
