@@ -166,9 +166,6 @@ netif_t *netif_alloc(domid_t domid, unsigned int handle)
 	SET_ETHTOOL_OPS(dev, &network_ethtool_ops);
 
 	dev->tx_queue_len = netbk_queue_length;
-	if (dev->tx_queue_len != 0)
-		printk(KERN_WARNING "netbk: WARNING: device '%s' has non-zero "
-		       "queue length (%lu)!\n", dev->name, dev->tx_queue_len);
 
 	/*
 	 * Initialise a dummy MAC address. We choose the numerically
