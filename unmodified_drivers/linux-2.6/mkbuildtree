@@ -22,6 +22,7 @@ done
 ln -sf ${XL}/drivers/xen/core/gnttab.c platform-pci
 ln -sf ${XL}/drivers/xen/core/features.c platform-pci
 ln -sf ${XL}/drivers/xen/core/xen_proc.c xenbus
+ln -sf ${XL}/drivers/xen/core/reboot.c util
 
 mkdir -p include
 mkdir -p include/xen

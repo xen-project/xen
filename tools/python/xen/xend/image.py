@@ -282,6 +282,7 @@ class HVMImageHandler(ImageHandler):
         log.debug("apic           = %d", self.apic)
 
         self.register_shutdown_watch()
+        self.register_reboot_module_watch()
 
         return xc.hvm_build(dom            = self.vm.getDomid(),
                             image          = self.kernel,
@@ -416,6 +417,7 @@ class HVMImageHandler(ImageHandler):
 
     def destroy(self):
         self.unregister_shutdown_watch();
+        self.unregister_reboot_module_watch();
         if not self.pid:
             return
         os.kill(self.pid, signal.SIGKILL)
@@ -457,6 +459,39 @@ class HVMImageHandler(ImageHandler):
                 vm.refreshShutdown(vm.info)
 
         return 1 # Keep watching
+
+    def register_reboot_module_watch(self):
+        """ add xen store watch on control/reboot_module """
+        self.rebootModuleWatch = xswatch(self.vm.dompath + "/control/reboot_module", \
+                                    self.hvm_reboot_module)
+        log.debug("hvm reboot module watch registered")
+
+    def unregister_reboot_module_watch(self):
+        """Remove the watch on the control/reboot_module, if any. Nothrow
+        guarantee."""
+
+        try:
+            if self.rebootModuleWatch:
+                self.rebootModuleWatch.unwatch()
+        except:
+            log.exception("Unwatching hvm reboot module watch failed.")
+        self.rebootModuleWatch = None
+        log.debug("hvm reboot module watch unregistered")
+
+    def hvm_reboot_module(self, _):
+        """ watch call back on node control/reboot_module,
+            if node changed, this function will be called
+        """
+        xd = xen.xend.XendDomain.instance()
+        vm = xd.domain_lookup( self.vm.getDomid() )
+
+        reboot_module_status = vm.readDom('control/reboot_module')
+        log.debug("hvm_reboot_module fired, module status=%s", reboot_module_status)
+        if reboot_module_status == 'installed':
+            self.unregister_shutdown_watch()
+
+        return 1 # Keep watching
+
 
 class IA64_HVM_ImageHandler(HVMImageHandler):
 
