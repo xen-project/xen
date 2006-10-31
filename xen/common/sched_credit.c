@@ -82,19 +82,12 @@
         printk("\t%-30s = %u\n", #_X, CSCHED_STAT(_X));  \
     } while ( 0 );
 
+/*
+ * Try and keep often cranked stats on top so they'll fit on one
+ * cache line.
+ */
 #define CSCHED_STATS_EXPAND_SCHED(_MACRO)   \
-    _MACRO(vcpu_init)                       \
-    _MACRO(vcpu_sleep)                      \
-    _MACRO(vcpu_wake_running)               \
-    _MACRO(vcpu_wake_onrunq)                \
-    _MACRO(vcpu_wake_runnable)              \
-    _MACRO(vcpu_wake_not_runnable)          \
-    _MACRO(dom_destroy)                     \
     _MACRO(schedule)                        \
-    _MACRO(tickle_local_idler)              \
-    _MACRO(tickle_local_over)               \
-    _MACRO(tickle_local_under)              \
-    _MACRO(tickle_local_other)              \
     _MACRO(acct_run)                        \
     _MACRO(acct_no_work)                    \
     _MACRO(acct_balance)                    \
@@ -102,20 +95,28 @@
     _MACRO(acct_min_credit)                 \
     _MACRO(acct_vcpu_active)                \
     _MACRO(acct_vcpu_idle)                  \
-    _MACRO(acct_vcpu_credit_min)
-
-#define CSCHED_STATS_EXPAND_SMP_LOAD_BALANCE(_MACRO)    \
-    _MACRO(vcpu_migrate)                                \
-    _MACRO(load_balance_idle)                           \
-    _MACRO(load_balance_over)                           \
-    _MACRO(load_balance_other)                          \
-    _MACRO(steal_trylock_failed)                        \
-    _MACRO(steal_peer_down)                             \
-    _MACRO(steal_peer_idle)                             \
-    _MACRO(steal_peer_running)                          \
-    _MACRO(steal_peer_pinned)                           \
-    _MACRO(tickle_idlers_none)                          \
-    _MACRO(tickle_idlers_some)
+    _MACRO(vcpu_sleep)                      \
+    _MACRO(vcpu_wake_running)               \
+    _MACRO(vcpu_wake_onrunq)                \
+    _MACRO(vcpu_wake_runnable)              \
+    _MACRO(vcpu_wake_not_runnable)          \
+    _MACRO(tickle_local_idler)              \
+    _MACRO(tickle_local_over)               \
+    _MACRO(tickle_local_under)              \
+    _MACRO(tickle_local_other)              \
+    _MACRO(tickle_idlers_none)              \
+    _MACRO(tickle_idlers_some)              \
+    _MACRO(vcpu_migrate)                    \
+    _MACRO(load_balance_idle)               \
+    _MACRO(load_balance_over)               \
+    _MACRO(load_balance_other)              \
+    _MACRO(steal_trylock_failed)            \
+    _MACRO(steal_peer_down)                 \
+    _MACRO(steal_peer_idle)                 \
+    _MACRO(steal_peer_running)              \
+    _MACRO(steal_peer_pinned)               \
+    _MACRO(vcpu_init)                       \
+    _MACRO(dom_destroy)
 
 #ifndef NDEBUG
 #define CSCHED_STATS_EXPAND_CHECKS(_MACRO)  \
@@ -124,10 +125,9 @@
 #define CSCHED_STATS_EXPAND_CHECKS(_MACRO)
 #endif
 
-#define CSCHED_STATS_EXPAND(_MACRO)                 \
-    CSCHED_STATS_EXPAND_SCHED(_MACRO)               \
-    CSCHED_STATS_EXPAND_SMP_LOAD_BALANCE(_MACRO)    \
-    CSCHED_STATS_EXPAND_CHECKS(_MACRO)
+#define CSCHED_STATS_EXPAND(_MACRO)         \
+    CSCHED_STATS_EXPAND_CHECKS(_MACRO)      \
+    CSCHED_STATS_EXPAND_SCHED(_MACRO)
 
 #define CSCHED_STATS_RESET()                                        \
     do                                                              \
@@ -177,11 +177,14 @@ struct csched_vcpu {
     struct csched_dom *sdom;
     struct vcpu *vcpu;
     atomic_t credit;
-    int credit_last;
-    uint32_t credit_incr;
-    uint32_t state_active;
-    uint32_t state_idle;
     int16_t pri;
+    struct {
+        int credit_last;
+        uint32_t credit_incr;
+        uint32_t state_active;
+        uint32_t state_idle;
+        uint32_t migrate;
+    } stats;
 };
 
 /*
@@ -404,7 +407,7 @@ csched_vcpu_acct(struct csched_vcpu *svc, int credit_dec)
         if ( list_empty(&svc->active_vcpu_elem) )
         {
             CSCHED_STAT_CRANK(acct_vcpu_active);
-            svc->state_active++;
+            svc->stats.state_active++;
 
             sdom->active_vcpu_count++;
             list_add(&svc->active_vcpu_elem, &sdom->active_vcpu);
@@ -435,7 +438,7 @@ __csched_vcpu_acct_idle_locked(struct csched_vcpu *svc)
     BUG_ON( list_empty(&svc->active_vcpu_elem) );
 
     CSCHED_STAT_CRANK(acct_vcpu_idle);
-    svc->state_idle++;
+    svc->stats.state_idle++;
 
     sdom->active_vcpu_count--;
     list_del_init(&svc->active_vcpu_elem);
@@ -495,11 +498,8 @@ csched_vcpu_init(struct vcpu *vc)
     svc->sdom = sdom;
     svc->vcpu = vc;
     atomic_set(&svc->credit, 0);
-    svc->credit_last = 0;
-    svc->credit_incr = 0U;
-    svc->state_active = 0U;
-    svc->state_idle = 0U;
     svc->pri = pri;
+    memset(&svc->stats, 0, sizeof(svc->stats));
     vc->sched_priv = svc;
 
     CSCHED_VCPU_CHECK(vc);
@@ -864,8 +864,8 @@ csched_acct(void)
                 }
             }
 
-            svc->credit_last = credit;
-            svc->credit_incr = credit_fair;
+            svc->stats.credit_last = credit;
+            svc->stats.credit_incr = credit_fair;
             credit_balance += credit;
         }
     }
@@ -1014,6 +1014,7 @@ csched_load_balance(int cpu, struct csched_vcpu *snext)
         if ( speer )
         {
             CSCHED_STAT_CRANK(vcpu_migrate);
+            speer->stats.migrate++;
             return speer;
         }
     }
@@ -1100,12 +1101,13 @@ csched_dump_vcpu(struct csched_vcpu *svc)
 
     if ( sdom )
     {
-        printk(" credit=%i (%d+%u) {a=%u i=%u w=%u}",
+        printk(" credit=%i (%d+%u) {a/i=%u/%u m=%u w=%u}",
             atomic_read(&svc->credit),
-            svc->credit_last,
-            svc->credit_incr,
-            svc->state_active,
-            svc->state_idle,
+            svc->stats.credit_last,
+            svc->stats.credit_incr,
+            svc->stats.state_active,
+            svc->stats.state_idle,
+            svc->stats.migrate,
             sdom->weight);
     }
 
