@@ -22,9 +22,10 @@
  * Place - Suite 330, Boston, MA 02111-1307 USA.
  */
 #include "roms.h"
-#include "../acpi/acpi2_0.h"  /* for ACPI_PHYSICAL_ADDRESS */
+#include "acpi/acpi2_0.h"  /* for ACPI_PHYSICAL_ADDRESS */
 #include "hypercall.h"
 #include "util.h"
+#include "acpi_utils.h"
 #include "smbios.h"
 #include <xen/version.h>
 #include <xen/hvm/params.h>
@@ -195,12 +196,18 @@ main(void)
 		puts("Loading ACPI ...\n");
 		acpi_madt_update((unsigned char *) acpi);
 		if (ACPI_PHYSICAL_ADDRESS+sizeof(acpi) <= 0xF0000) {
+			unsigned char *freemem = (unsigned char *)
+			         (ACPI_PHYSICAL_ADDRESS + sizeof(acpi));
 			/*
 			 * Make sure acpi table does not overlap rombios
 			 * currently acpi less than 8K will be OK.
 			 */
 			 memcpy((void *)ACPI_PHYSICAL_ADDRESS, acpi,
 			 					sizeof(acpi));
+			acpi_update((unsigned char *)ACPI_PHYSICAL_ADDRESS,
+			            sizeof(acpi),
+			            (unsigned char *)0xF0000,
+			            &freemem);
 		}
 	}
 

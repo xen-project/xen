@@ -1,5 +1,8 @@
 /*
- * Copyright (c) 2004, Intel Corporation.
+ * Commonly used ACPI utility functions.
+ *
+ * Yu Ke, ke.yu@intel.com
+ * Copyright (c) 2005, Intel Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -13,32 +16,21 @@
  * You should have received a copy of the GNU General Public License along with
  * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston, MA 02111-1307 USA.
- *
  */
-#ifndef _MADT_H_
-#define _MADT_H_
+#ifndef ACPI_UTILS_H
+#define ACPI_UTILS_H
 
-#include "acpi2_0.h"
+#define FIELD_OFFSET(TYPE,Field) ((unsigned int)(&(((TYPE *) 0)->Field)))
 
-//
-// MADT Definitions, see ACPI 2.0 specification for details
-//
+#define NULL ((void*)0)
 
-#define ACPI_LOCAL_APIC_ADDRESS 0xFEE00000
+void set_checksum(void *start, int checksum_offset, int len);
+void acpi_update(unsigned char *acpi_start,
+                 unsigned long acpi_size,
+                 unsigned char *limit,
+                 unsigned char **freemem);
 
-#define ACPI_MULTIPLE_APIC_FLAGS      (ACPI_PCAT_COMPAT)
-
-#define ACPI_IO_APIC_ADDRESS_1   0xFEC00000
-
-//
-// MADT structure
-//
-#pragma pack (1)
-typedef struct {
-	ACPI_2_0_MADT			Header;
-	ACPI_IO_APIC_STRUCTURE		IoApic[1];
-	ACPI_LOCAL_APIC_STRUCTURE	LocalApic[32];
-} ACPI_MULTIPLE_APIC_DESCRIPTION_TABLE;
-#pragma pack ()
+struct acpi_20_rsdt *acpi_rsdt_get(unsigned char *acpi_start);
+struct acpi_20_xsdt *acpi_xsdt_get(unsigned char *acpi_start);
 
 #endif
