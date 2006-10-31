@@ -81,8 +81,6 @@ int vlapic_init(struct vcpu *vc);
 
 void vlapic_msr_set(struct vlapic *vlapic, uint64_t value);
 
-uint32_t vlapic_update_ppr(struct vlapic *vlapic);
-
 int vlapic_accept_pic_intr(struct vcpu *v);
 
 struct vlapic *apic_round_robin(struct domain *d,

@@ -181,26 +181,19 @@ int vlapic_find_highest_isr(struct vlapic *vlapic)
     return result;
 }
 
-uint32_t vlapic_update_ppr(struct vlapic *vlapic)
+uint32_t vlapic_get_ppr(struct vlapic *vlapic)
 {
     uint32_t tpr, isrv, ppr;
     int isr;
 
-    tpr = vlapic_get_reg(vlapic, APIC_TASKPRI);
+    tpr  = vlapic_get_reg(vlapic, APIC_TASKPRI);
+    isr  = vlapic_find_highest_isr(vlapic);
+    isrv = (isr != -1) ? isr : 0;
 
-    isr = vlapic_find_highest_isr(vlapic);
-
-    if ( isr != -1 )
-        isrv = (isr >> 4) & 0xf;   /* ditto */
-    else
-        isrv = 0;
-
-    if ( (tpr >> 4) >= isrv )
+    if ( (tpr & 0xf0) >= (isrv & 0xf0) )
         ppr = tpr & 0xff;
     else
-        ppr = isrv << 4;  /* low 4 bits of PPR have to be cleared */
-
-    vlapic_set_reg(vlapic, APIC_PROCPRI, ppr);
+        ppr = isrv & 0xf0;
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC_INTERRUPT,
                 "vlapic %p, ppr 0x%x, isr 0x%x, isrv 0x%x.",
@@ -444,7 +437,6 @@ void vlapic_EOI_set(struct vlapic *vlapic)
         return ;
 
     vlapic_clear_vector(vector, vlapic->regs + APIC_ISR);
-    vlapic_update_ppr(vlapic);
 
     if ( vlapic_test_and_clear_vector(vector, vlapic->regs + APIC_TMR) )
         ioapic_update_EOI(vlapic->domain, vector);
@@ -555,8 +547,7 @@ static void vlapic_read_aligned(struct vlapic *vlapic, unsigned int offset,
 
     switch ( offset ) {
     case APIC_PROCPRI:
-        vlapic_update_ppr(vlapic);
-        *result = vlapic_get_reg(vlapic, offset);
+        *result = vlapic_get_ppr(vlapic);
         break;
 
     case APIC_ARBPRI:
@@ -683,7 +674,6 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
 
     case APIC_TASKPRI:
         vlapic_set_reg(vlapic, APIC_TASKPRI, val & 0xff);
-        vlapic_update_ppr(vlapic);
         vlapic->flush_tpr_threshold = 1;
         break;
 
@@ -912,7 +902,7 @@ int cpu_get_apic_interrupt(struct vcpu *v, int *mode)
 
     highest_irr = vlapic_find_highest_irr(vlapic);
     if ( (highest_irr == -1) ||
-         ((highest_irr & 0xF0) <= vlapic_get_reg(vlapic, APIC_PROCPRI)) )
+         ((highest_irr & 0xF0) <= vlapic_get_ppr(vlapic)) )
         return -1;
 
     *mode = APIC_DM_FIXED;
@@ -949,7 +939,6 @@ void vlapic_post_injection(struct vcpu *v, int vector, int deliver_mode)
     case APIC_DM_LOWEST:
         vlapic_set_vector(vector, vlapic->regs + APIC_ISR);
         vlapic_clear_irr(vector, vlapic);
-        vlapic_update_ppr(vlapic);
         if ( (vector == vlapic_lvt_vector(vlapic, APIC_LVTT)) &&
              (vlapic->timer_pending_count != 0) )
         {

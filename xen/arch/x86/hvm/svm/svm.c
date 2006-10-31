@@ -56,7 +56,6 @@
 
 extern int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip,
                                 int inst_len);
-extern uint32_t vlapic_update_ppr(struct vlapic *vlapic);
 extern asmlinkage void do_IRQ(struct cpu_user_regs *);
 extern void svm_dump_inst(unsigned long eip);
 extern int svm_dbg_on;
@@ -1838,7 +1837,6 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
         if ( vlapic == NULL )
             break;
         vlapic_set_reg(vlapic, APIC_TASKPRI, ((value & 0x0F) << 4));
-        vlapic_update_ppr(vlapic);
         break;
     }
 

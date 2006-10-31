@@ -47,8 +47,6 @@
 #include <asm/hvm/vlapic.h>
 #include <asm/x86_emulate.h>
 
-extern uint32_t vlapic_update_ppr(struct vlapic *vlapic);
-
 static DEFINE_PER_CPU(unsigned long, trace_values[5]);
 #define TRACE_VMEXIT(index,value) this_cpu(trace_values)[index]=value
 
@@ -1808,7 +1806,6 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
         if ( vlapic == NULL )
             break;
         vlapic_set_reg(vlapic, APIC_TASKPRI, ((value & 0x0F) << 4));
-        vlapic_update_ppr(vlapic);
         break;
     }
     default:
@@ -2410,7 +2407,6 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case EXIT_REASON_TPR_BELOW_THRESHOLD:
-        vlapic_update_ppr(VLAPIC(v));
         VLAPIC(v)->flush_tpr_threshold = 1;
         break;
 
