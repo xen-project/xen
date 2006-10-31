@@ -105,7 +105,8 @@ ENTRY(vmx_asm_do_vmentry)
         jnz  vmx_process_softirqs
 
         call vmx_intr_assist
-        call vmx_load_cr2
+        movl VCPU_vmx_cr2(%ebx),%eax
+        movl %eax,%cr2
         call vmx_trace_vmentry
 
         cmpl $0,VCPU_vmx_launched(%ebx)

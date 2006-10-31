@@ -2419,14 +2419,6 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     }
 }
 
-asmlinkage void vmx_load_cr2(void)
-{
-    struct vcpu *v = current;
-
-    local_irq_disable();
-    asm volatile("mov %0,%%cr2": :"r" (v->arch.hvm_vmx.cpu_cr2));
-}
-
 asmlinkage void vmx_trace_vmentry(void)
 {
     TRACE_5D(TRC_VMX_VMENTRY + current->vcpu_id,
