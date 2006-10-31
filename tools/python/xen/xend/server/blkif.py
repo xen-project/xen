@@ -66,7 +66,11 @@ class BlkifController(DevController):
 
         mode = sxp.child_value(config, 'mode', 'r')
         if mode not in ('r', 'w', 'w!'):
-            raise VmError('Invalid mode')
+            name = uname
+            if not name:
+                name = sxp.child_value(config, 'dev')
+            raise VmError('Invalid mode \'%s\' for %s. Valid modes are '
+            '{r,w,w!}' % (mode, name))
 
         back = { 'dev'    : dev,
                  'type'   : typ,
