@@ -242,7 +242,6 @@ static void end_access(int, void *);
 static void netif_disconnect_backend(struct netfront_info *);
 static int open_netdev(struct netfront_info *);
 static void close_netdev(struct netfront_info *);
-static void netif_free(struct netfront_info *);
 
 static int network_connect(struct net_device *);
 static void network_tx_buf_gc(struct net_device *);
@@ -428,7 +427,6 @@ again:
 	return err;
 }
 
-
 static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 {
 	struct netif_tx_sring *txs;
@@ -488,10 +486,8 @@ static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 	return 0;
 
  fail:
-	netif_free(info);
 	return err;
 }
-
 
 /**
  * Callback received when the backend's state changes.
@@ -513,23 +509,17 @@ static void backend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateInitWait:
-		if (network_connect(netdev) != 0) {
-			netif_free(np);
+		if (network_connect(netdev) != 0)
 			break;
-		}
 		xenbus_switch_state(dev, XenbusStateConnected);
 		(void)send_fake_arp(netdev);
 		break;
 
 	case XenbusStateClosing:
-		if (dev->state == XenbusStateConnected)
-			netfront_closing(dev);
-		else
-			printk(KERN_DEBUG "Netfront: going to state Closing without being connected...\n");
+		netfront_closing(dev);
 		break;
 	}
 }
-
 
 /** Send a packet on a net device to encourage switches to learn the
  * MAC. We send a fake ARP request.
@@ -558,7 +548,6 @@ static int send_fake_arp(struct net_device *dev)
 
 	return dev_queue_xmit(skb);
 }
-
 
 static int network_open(struct net_device *dev)
 {
@@ -651,13 +640,11 @@ static void network_tx_buf_gc(struct net_device *dev)
 	network_maybe_wake_tx(dev);
 }
 
-
 static void rx_refill_timeout(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
 	netif_rx_schedule(dev);
 }
-
 
 static void network_alloc_rx_buffers(struct net_device *dev)
 {
@@ -2063,14 +2050,6 @@ static void netif_disconnect_backend(struct netfront_info *info)
 	info->rx_ring_ref = GRANT_INVALID_REF;
 	info->tx.sring = NULL;
 	info->rx.sring = NULL;
-}
-
-
-static void netif_free(struct netfront_info *info)
-{
-	close_netdev(info);
-	netif_disconnect_backend(info);
-	free_netdev(info->netdev);
 }
 
 
