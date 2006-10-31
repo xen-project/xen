@@ -5,7 +5,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 DAEMON_INSTALL_DIR = /usr/sbin
 CLIENT_INSTALL_DIR = /usr/$(LIBDIR)/xen/bin
 
-CFLAGS  += -Werror -g
+CFLAGS  += -Werror
 
 CFLAGS  += -I $(XEN_LIBXC)
 CFLAGS  += -I $(XEN_XENSTORE)
