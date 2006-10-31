@@ -8,12 +8,30 @@
 #include <asm/hypervisor.h>
 #include <xen/xenbus.h>
 #include <linux/kthread.h>
-#include <xen/reboot.h>
 
 MODULE_LICENSE("Dual BSD/GPL");
 
+#define SHUTDOWN_INVALID  -1
+#define SHUTDOWN_POWEROFF  0
+#define SHUTDOWN_SUSPEND   2
+/* Code 3 is SHUTDOWN_CRASH, which we don't use because the domain can only
+ * report a crash, not be instructed to crash!
+ * HALT is the same as POWEROFF, as far as we're concerned.  The tools use
+ * the distinction when we return the reason code to them.
+ */
+#define SHUTDOWN_HALT      4
+
+/* Ignore multiple shutdown requests. */
+static int shutting_down = SHUTDOWN_INVALID;
+
 static void __shutdown_handler(void *unused);
 static DECLARE_WORK(shutdown_work, __shutdown_handler, NULL);
+
+#ifdef CONFIG_XEN
+int __xen_suspend(void);
+#else
+#define __xen_suspend() 0
+#endif
 
 static int shutdown_process(void *__unused)
 {
@@ -41,21 +59,36 @@ static int shutdown_process(void *__unused)
 	return 0;
 }
 
+static int xen_suspend(void *__unused)
+{
+	__xen_suspend();
+	shutting_down = SHUTDOWN_INVALID;
+	return 0;
+}
+
+static int kthread_create_on_cpu(int (*f)(void *arg),
+				 void *arg,
+				 const char *name,
+				 int cpu)
+{
+	struct task_struct *p;
+	p = kthread_create(f, arg, name);
+	if (IS_ERR(p))
+		return PTR_ERR(p);
+	kthread_bind(p, cpu);
+	wake_up_process(p);
+	return 0;
+}
 
 static void __shutdown_handler(void *unused)
 {
 	int err;
 
-#ifdef CONFIG_XEN
 	if (shutting_down != SHUTDOWN_SUSPEND)
 		err = kernel_thread(shutdown_process, NULL,
 				    CLONE_FS | CLONE_FILES);
 	else
-		err = kthread_create_on_cpu(__do_suspend, NULL, "suspend", 0);
-#else /* !CONFIG_XEN */
-		err = kernel_thread(shutdown_process, NULL,
-				    CLONE_FS | CLONE_FILES);
-#endif /* !CONFIG_XEN */
+		err = kthread_create_on_cpu(xen_suspend, NULL, "suspend", 0);
 
 	if (err < 0) {
 		printk(KERN_WARNING "Error creating shutdown process (%d): "
@@ -70,8 +103,6 @@ static void shutdown_handler(struct xenbus_watch *watch,
 	char *str;
 	struct xenbus_transaction xbt;
 	int err;
-
-	int cad_pid = 1; 
 
 	if (shutting_down != SHUTDOWN_INVALID)
 		return;
@@ -98,7 +129,7 @@ static void shutdown_handler(struct xenbus_watch *watch,
 	if (strcmp(str, "poweroff") == 0)
 		shutting_down = SHUTDOWN_POWEROFF;
 	else if (strcmp(str, "reboot") == 0)
-		kill_proc(cad_pid, SIGINT, 1);
+		kill_proc(1, SIGINT, 1); /* interrupt init */
 	else if (strcmp(str, "suspend") == 0)
 		shutting_down = SHUTDOWN_SUSPEND;
 	else if (strcmp(str, "halt") == 0)

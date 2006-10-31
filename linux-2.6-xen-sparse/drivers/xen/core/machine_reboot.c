@@ -18,7 +18,6 @@
 #include <xen/gnttab.h>
 #include <xen/xencons.h>
 #include <xen/cpu_hotplug.h>
-#include <xen/reboot.h>
 
 #if defined(__i386__) || defined(__x86_64__)
 
@@ -125,7 +124,7 @@ static void post_suspend(void)
 
 #endif
 
-int __do_suspend(void *ignore)
+int __xen_suspend(void)
 {
 	int err;
 
@@ -164,8 +163,6 @@ int __do_suspend(void *ignore)
 	 */
 	HYPERVISOR_suspend(virt_to_mfn(xen_start_info));
 
-	shutting_down = SHUTDOWN_INVALID;
-
 	post_suspend();
 
 	gnttab_resume();
@@ -185,18 +182,4 @@ int __do_suspend(void *ignore)
 	smp_resume();
 
 	return err;
-}
-
-int kthread_create_on_cpu(int (*f)(void *arg),
-				 void *arg,
-				 const char *name,
-				 int cpu)
-{
-	struct task_struct *p;
-	p = kthread_create(f, arg, name);
-	if (IS_ERR(p))
-		return PTR_ERR(p);
-	kthread_bind(p, cpu);
-	wake_up_process(p);
-	return 0;
 }

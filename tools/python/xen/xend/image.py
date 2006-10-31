@@ -462,7 +462,7 @@ class HVMImageHandler(ImageHandler):
 
     def register_reboot_feature_watch(self):
         """ add xen store watch on control/feature-reboot """
-        self.rebootModuleWatch = xswatch(self.vm.dompath + "/control/feature-reboot", \
+        self.rebootFeatureWatch = xswatch(self.vm.dompath + "/control/feature-reboot", \
                                          self.hvm_reboot_feature)
         log.debug("hvm reboot feature watch registered")
 
