@@ -210,7 +210,7 @@ static inline void pic_intack(PicState *s, int irq)
         s->irr &= ~(1 << irq);
 }
 
-int pic_read_irq(struct hvm_virpic *s)
+static int pic_read_irq(struct hvm_virpic *s)
 {
     int irq, irq2, intno;
     unsigned long flags;
@@ -225,6 +225,7 @@ int pic_read_irq(struct hvm_virpic *s)
                 pic_intack(&s->pics[1], irq2);
             } else {
                 /* spurious IRQ on slave controller */
+		gdprintk(XENLOG_WARNING, "Spurious irq on slave i8259.\n");
                 irq2 = 7;
             }
             intno = s->pics[1].irq_base + irq2;
@@ -236,10 +237,11 @@ int pic_read_irq(struct hvm_virpic *s)
         /* spurious IRQ on host controller */
         irq = 7;
         intno = s->pics[0].irq_base + irq;
+	gdprintk(XENLOG_WARNING, "Spurious irq on master i8259.\n");
     }
     pic_update_irq(s);
     spin_unlock_irqrestore(&s->lock, flags);
-        
+
     return intno;
 }
 
@@ -427,24 +429,6 @@ static uint32_t pic_ioport_read(void *opaque, uint32_t addr1)
             ret = s->imr;
         }
     }
-    return ret;
-}
-
-/* memory mapped interrupt status */
-/* XXX: may be the same than pic_read_rq() */
-uint32_t pic_intack_read(struct hvm_virpic *s)
-{
-    int ret;
-    unsigned long flags;
-
-    spin_lock_irqsave(&s->lock, flags);
-    ret = pic_poll_read(&s->pics[0], 0x00);
-    if (ret == 2)
-        ret = pic_poll_read(&s->pics[1], 0x80) + 8;
-    /* Prepare for ISR read */
-    s->pics[0].read_reg_select = 1;
-    spin_unlock_irqrestore(&s->lock, flags);
-    
     return ret;
 }
 
