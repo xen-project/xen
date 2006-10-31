@@ -522,7 +522,10 @@ static void backend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateClosing:
-		netfront_closing(dev);
+		if (dev->state == XenbusStateConnected)
+			netfront_closing(dev);
+		else
+			printk(KERN_DEBUG "Netfront: going to state Closing without being connected...\n");
 		break;
 	}
 }
