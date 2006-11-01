@@ -134,7 +134,7 @@ static void show_guest_stack(struct cpu_user_regs *regs)
     int i;
     unsigned long *stack, addr;
 
-    if ( hvm_guest(current) )
+    if ( is_hvm_vcpu(current) )
         return;
 
     if ( vm86_mode(regs) )

@@ -316,8 +316,7 @@ ulong pfn2mfn(struct domain *d, ulong pfn, int *type)
     int t = PFN_TYPE_NONE;
 
     /* quick tests first */
-    if (test_bit(_DOMF_privileged, &d->domain_flags) &&
-        cpu_io_mfn(pfn)) {
+    if (d->is_privileged && cpu_io_mfn(pfn)) {
         t = PFN_TYPE_IO;
         mfn = pfn;
     } else {
@@ -341,8 +340,7 @@ ulong pfn2mfn(struct domain *d, ulong pfn, int *type)
     if (t == PFN_TYPE_NONE) {
         /* This hack allows dom0 to map all memory, necessary to
          * initialize domU state. */
-        if (test_bit(_DOMF_privileged, &d->domain_flags) &&
-            mfn_valid(pfn)) {
+        if (d->is_privileged && mfn_valid(pfn)) {
             struct page_info *pg;
 
             /* page better be allocated to some domain but not the caller */

@@ -177,6 +177,7 @@ typedef xen_domctl_getdomaininfo_t xc_domaininfo_t;
 int xc_domain_create(int xc_handle,
                      uint32_t ssidref,
                      xen_domain_handle_t handle,
+                     uint32_t flags,
                      uint32_t *pdomid);
 
 

@@ -16,7 +16,7 @@
 
 #include "xen.h"
 
-#define XEN_DOMCTL_INTERFACE_VERSION 0x00000003
+#define XEN_DOMCTL_INTERFACE_VERSION 0x00000004
 
 struct xenctl_cpumap {
     XEN_GUEST_HANDLE(uint8_t) bitmap;
@@ -32,6 +32,9 @@ struct xen_domctl_createdomain {
     /* IN parameters */
     uint32_t ssidref;
     xen_domain_handle_t handle;
+#define _XEN_DOMCTL_CDF_hvm_guest 0
+#define XEN_DOMCTL_CDF_hvm_guest  (1U<<_XEN_DOMCTL_CDF_hvm_guest)
+    uint32_t flags;
 };
 typedef struct xen_domctl_createdomain xen_domctl_createdomain_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_createdomain_t);

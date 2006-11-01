@@ -39,7 +39,7 @@ enum EFLAGS {
     /* If a guest frame, it must be have guest privs (unless HVM guest).   */ \
     /* We permit CS==0 which can come from an uninitialised trap entry. */    \
     ASSERT((diff != 0) || vm86_mode(r) || ((r->cs&3) >= GUEST_KERNEL_RPL) ||  \
-           (r->cs == 0) || hvm_guest(current));                              \
+           (r->cs == 0) || is_hvm_vcpu(current));                             \
     /* If not a guest frame, it must be a hypervisor frame. */                \
     ASSERT((diff == 0) || (!vm86_mode(r) && (r->cs == __HYPERVISOR_CS)));     \
     /* Return TRUE if it's a guest frame. */                                  \

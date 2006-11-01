@@ -241,12 +241,10 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         struct domain *d;
         domid_t        dom;
         static domid_t rover = 0;
+        unsigned int domcr_flags;
 
-        /*
-         * Running the domain 0 kernel in ring 0 is not compatible
-         * with multiple guests.
-         */
-        if ( supervisor_mode_kernel )
+        if ( supervisor_mode_kernel ||
+             (op->u.createdomain.flags & ~XEN_DOMCTL_CDF_hvm_guest) )
             return -EINVAL;
 
         dom = op->domain;
@@ -273,8 +271,12 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             rover = dom;
         }
 
+        domcr_flags = 0;
+        if ( op->u.createdomain.flags & XEN_DOMCTL_CDF_hvm_guest )
+            domcr_flags |= DOMCRF_hvm;
+
         ret = -ENOMEM;
-        if ( (d = domain_create(dom)) == NULL )
+        if ( (d = domain_create(dom, domcr_flags)) == NULL )
             break;
 
         memcpy(d->handle, op->u.createdomain.handle,

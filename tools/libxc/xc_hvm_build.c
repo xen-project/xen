@@ -261,6 +261,19 @@ static int setup_guest(int xc_handle,
         goto error_out;
     }
 
+    /* HVM domains must be put into shadow mode at the start of day. */
+    /* XXX *After* xc_get_pfn_list()!! */
+    if ( xc_shadow_control(xc_handle, dom, XEN_DOMCTL_SHADOW_OP_ENABLE,
+                           NULL, 0, NULL, 
+                           XEN_DOMCTL_SHADOW_ENABLE_REFCOUNT  |
+                           XEN_DOMCTL_SHADOW_ENABLE_TRANSLATE |
+                           XEN_DOMCTL_SHADOW_ENABLE_EXTERNAL, 
+                           NULL) )
+    {
+        PERROR("Could not enable shadow paging for domain.\n");
+        goto error_out;
+    }        
+
     loadelfimage(image, xc_handle, dom, page_array, &dsi);
 
     if ( (mmu = xc_init_mmu_updates(xc_handle, dom)) == NULL )
@@ -417,6 +430,7 @@ static int xc_hvm_build_internal(int xc_handle,
         goto error_out;
     }
 
+#if 0
     /* HVM domains must be put into shadow mode at the start of day */
     if ( xc_shadow_control(xc_handle, domid, XEN_DOMCTL_SHADOW_OP_ENABLE,
                            NULL, 0, NULL, 
@@ -428,6 +442,7 @@ static int xc_hvm_build_internal(int xc_handle,
         PERROR("Could not enable shadow paging for domain.\n");
         goto error_out;
     }        
+#endif
 
     memset(ctxt, 0, sizeof(*ctxt));
 

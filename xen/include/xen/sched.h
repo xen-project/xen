@@ -144,6 +144,12 @@ struct domain
 
     unsigned long    domain_flags;
 
+    /* Boolean: Is this an HVM guest? */
+    char             is_hvm;
+
+    /* Boolean: Is this guest fully privileged (aka dom0)? */
+    char             is_privileged;
+
     spinlock_t       pause_lock;
     unsigned int     pause_count;
 
@@ -237,26 +243,30 @@ static inline void get_knownalive_domain(struct domain *d)
     ASSERT(!(atomic_read(&d->refcnt) & DOMAIN_DESTROYED));
 }
 
-extern struct domain *domain_create(domid_t domid);
-extern int construct_dom0(
+struct domain *domain_create(domid_t domid, unsigned int domcr_flags);
+ /* DOMCRF_hvm: Create an HVM domain, as opposed to a PV domain. */
+#define _DOMCRF_hvm 0
+#define DOMCRF_hvm  (1U<<_DOMCRF_hvm)
+
+int construct_dom0(
     struct domain *d,
     unsigned long image_start, unsigned long image_len, 
     unsigned long initrd_start, unsigned long initrd_len,
     char *cmdline);
-extern int set_info_guest(struct domain *d, xen_domctl_vcpucontext_t *);
+int set_info_guest(struct domain *d, xen_domctl_vcpucontext_t *);
 
 struct domain *find_domain_by_id(domid_t dom);
-extern void domain_destroy(struct domain *d);
-extern void domain_kill(struct domain *d);
-extern void domain_shutdown(struct domain *d, u8 reason);
-extern void domain_pause_for_debugger(void);
+void domain_destroy(struct domain *d);
+void domain_kill(struct domain *d);
+void domain_shutdown(struct domain *d, u8 reason);
+void domain_pause_for_debugger(void);
 
 /*
  * Mark specified domain as crashed. This function always returns, even if the
  * caller is the specified domain. The domain is not synchronously descheduled
  * from any processor.
  */
-extern void __domain_crash(struct domain *d);
+void __domain_crash(struct domain *d);
 #define domain_crash(d) do {                                              \
     printk("domain_crash called from %s:%d\n", __FILE__, __LINE__);       \
     __domain_crash(d);                                                    \
@@ -266,7 +276,7 @@ extern void __domain_crash(struct domain *d);
  * Mark current domain as crashed and synchronously deschedule from the local
  * processor. This function never returns.
  */
-extern void __domain_crash_synchronous(void) __attribute__((noreturn));
+void __domain_crash_synchronous(void) __attribute__((noreturn));
 #define domain_crash_synchronous() do {                                   \
     printk("domain_crash_sync called from %s:%d\n", __FILE__, __LINE__);  \
     __domain_crash_synchronous();                                         \
@@ -293,7 +303,7 @@ void vcpu_sleep_sync(struct vcpu *d);
  * this call will ensure that all its state is committed to memory and that
  * no CPU is using critical state (e.g., page tables) belonging to the VCPU.
  */
-extern void sync_vcpu_execstate(struct vcpu *v);
+void sync_vcpu_execstate(struct vcpu *v);
 
 /*
  * Called by the scheduler to switch to another VCPU. This function must
@@ -302,7 +312,7 @@ extern void sync_vcpu_execstate(struct vcpu *v);
  * implementing lazy context switching, it suffices to ensure that invoking
  * sync_vcpu_execstate() will switch and commit @prev's state.
  */
-extern void context_switch(
+void context_switch(
     struct vcpu *prev, 
     struct vcpu *next);
 
@@ -312,10 +322,10 @@ extern void context_switch(
  * saved to memory. Alternatively, if implementing lazy context switching,
  * ensure that invoking sync_vcpu_execstate() will switch and commit @prev.
  */
-extern void context_saved(struct vcpu *prev);
+void context_saved(struct vcpu *prev);
 
 /* Called by the scheduler to continue running the current VCPU. */
-extern void continue_running(
+void continue_running(
     struct vcpu *same);
 
 void startup_cpu_idle_loop(void);
@@ -396,26 +406,23 @@ extern struct domain *domain_list;
 /*
  * Per-domain flags (domain_flags).
  */
- /* Is this domain privileged? */
-#define _DOMF_privileged       0
-#define DOMF_privileged        (1UL<<_DOMF_privileged)
  /* Guest shut itself down for some reason. */
-#define _DOMF_shutdown         1
+#define _DOMF_shutdown         0
 #define DOMF_shutdown          (1UL<<_DOMF_shutdown)
  /* Death rattle. */
-#define _DOMF_dying            2
+#define _DOMF_dying            1
 #define DOMF_dying             (1UL<<_DOMF_dying)
  /* Domain is paused by controller software. */
-#define _DOMF_ctrl_pause       3
+#define _DOMF_ctrl_pause       2
 #define DOMF_ctrl_pause        (1UL<<_DOMF_ctrl_pause)
  /* Domain is being debugged by controller software. */
-#define _DOMF_debugging        4
+#define _DOMF_debugging        3
 #define DOMF_debugging         (1UL<<_DOMF_debugging)
  /* Are any VCPUs polling event channels (SCHEDOP_poll)? */
-#define _DOMF_polling          5
+#define _DOMF_polling          4
 #define DOMF_polling           (1UL<<_DOMF_polling)
  /* Domain is paused by the hypervisor? */
-#define _DOMF_paused           6
+#define _DOMF_paused           5
 #define DOMF_paused            (1UL<<_DOMF_paused)
 
 static inline int vcpu_runnable(struct vcpu *v)
@@ -450,8 +457,7 @@ static inline void vcpu_unblock(struct vcpu *v)
         vcpu_wake(v);
 }
 
-#define IS_PRIV(_d)                                         \
-    (test_bit(_DOMF_privileged, &(_d)->domain_flags))
+#define IS_PRIV(_d) ((_d)->is_privileged)
 
 #define VM_ASSIST(_d,_t) (test_bit((_t), &(_d)->vm_assist))
 

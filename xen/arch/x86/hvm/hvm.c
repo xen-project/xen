@@ -260,12 +260,12 @@ void hvm_release_assist_channel(struct vcpu *v)
 }
 
 
-void hvm_setup_platform(struct domain* d)
+void hvm_setup_platform(struct domain *d)
 {
     struct hvm_domain *platform;
-    struct vcpu *v=current;
+    struct vcpu *v = current;
 
-    if ( !hvm_guest(v) || (v->vcpu_id != 0) )
+    if ( !is_hvm_domain(d) || (v->vcpu_id != 0) )
         return;
 
     hvm_zap_iommu_pages(d);
@@ -635,7 +635,7 @@ int hvm_bringup_ap(int vcpuid, int trampoline_vector)
     struct vcpu_guest_context *ctxt;
     int rc = 0;
 
-    BUG_ON(!hvm_guest(bsp));
+    BUG_ON(!is_hvm_domain(d));
 
     if ( bsp->vcpu_id != 0 )
     {

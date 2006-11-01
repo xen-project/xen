@@ -224,7 +224,7 @@ long arch_do_domctl(
 
             spin_lock(&d->page_alloc_lock);
 
-            if ( hvm_guest(d->vcpu[0]) && shadow_mode_translate(d) )
+            if ( is_hvm_domain(d) && shadow_mode_translate(d) )
             {
                 /* HVM domain: scan P2M to get guaranteed physmap order. */
                 for ( i = 0, gmfn = 0;
@@ -321,7 +321,7 @@ void arch_getdomaininfo_ctxt(
 {
     memcpy(c, &v->arch.guest_context, sizeof(*c));
 
-    if ( hvm_guest(v) )
+    if ( is_hvm_vcpu(v) )
     {
         hvm_store_cpu_guest_regs(v, &c->user_regs, c->ctrlreg);
     }
@@ -334,11 +334,11 @@ void arch_getdomaininfo_ctxt(
 
     c->flags = 0;
     if ( test_bit(_VCPUF_fpu_initialised, &v->vcpu_flags) )
-        c->flags |= VGCF_I387_VALID;
+        c->flags |= VGCF_i387_valid;
     if ( guest_kernel_mode(v, &v->arch.guest_context.user_regs) )
-        c->flags |= VGCF_IN_KERNEL;
-    if ( hvm_guest(v) )
-        c->flags |= VGCF_HVM_GUEST;
+        c->flags |= VGCF_in_kernel;
+    if ( is_hvm_vcpu(v) )
+        c->flags |= VGCF_hvm_guest;
 
     c->ctrlreg[3] = xen_pfn_to_cr3(pagetable_get_pfn(v->arch.guest_table));
 

@@ -218,7 +218,7 @@ void vmx_vmcs_exit(struct vcpu *v)
 
     /* Don't confuse arch_vmx_do_resume (for @v or @current!) */
     vmx_clear_vmcs(v);
-    if ( hvm_guest(current) )
+    if ( is_hvm_vcpu(current) )
         vmx_load_vmcs(current);
 
     spin_unlock(&v->arch.hvm_vmx.vmcs_lock);
@@ -709,20 +709,14 @@ static void vmcs_dump(unsigned char ch)
     struct vcpu *v;
     
     printk("*********** VMCS Areas **************\n");
-    for_each_domain(d) {
+    for_each_domain ( d )
+    {
+        if ( !is_hvm_domain(d) )
+            continue;
         printk("\n>>> Domain %d <<<\n", d->domain_id);
-        for_each_vcpu(d, v) {
-
-            /* 
-             * Presumably, if a domain is not an HVM guest,
-             * the very first CPU will not pass this test
-             */
-            if (!hvm_guest(v)) {
-                printk("\t\tNot HVM guest\n");
-                break;
-            }
+        for_each_vcpu ( d, v )
+        {
             printk("\tVCPU %d\n", v->vcpu_id);
-
             vmx_vmcs_enter(v);
             vmcs_dump_vcpu();
             vmx_vmcs_exit(v);

@@ -1198,10 +1198,20 @@ class XendDomainInfo:
 
         log.debug('XendDomainInfo.constructDomain')
 
+        hvm = (self._infoIsSet('image') and
+               sxp.name(self.info['image']) == "hvm")
+        if hvm:
+            info = xc.xeninfo()
+            if not 'hvm' in info['xen_caps']:
+                raise VmError("HVM guest support is unavailable: is VT/AMD-V "
+                              "supported by your CPU and enabled in your "
+                              "BIOS?")
+
         self.domid = xc.domain_create(
             domid = 0,
             ssidref = security.get_security_info(self.info, 'ssidref'),
-            handle = uuid.fromString(self.info['uuid']))
+            handle = uuid.fromString(self.info['uuid']),
+            hvm = int(hvm))
 
         if self.domid < 0:
             raise VmError('Creating domain failed: name=%s' %

@@ -64,7 +64,7 @@
 #define shadow_mode_external(_d)  ((_d)->arch.shadow.mode & SHM2_external)
 
 /* Xen traps & emulates all reads of all page table pages:
- *not yet supported
+ * not yet supported
  */
 #define shadow_mode_trap_reads(_d) ({ (void)(_d); 0; })
 
@@ -77,7 +77,7 @@
 #ifdef __x86_64__
 #define pv_32bit_guest(_v) 0 // not yet supported
 #else
-#define pv_32bit_guest(_v) !hvm_guest(v)
+#define pv_32bit_guest(_v) !is_hvm_vcpu(v)
 #endif
 
 /* The shadow lock.

@@ -2286,7 +2286,7 @@ void sh_update_paging_modes(struct vcpu *v)
     //
     shadow_detach_old_tables(v);
 
-    if ( !hvm_guest(v) )
+    if ( !is_hvm_domain(d) )
     {
         ///
         /// PV guest
@@ -2394,7 +2394,7 @@ void sh_update_paging_modes(struct vcpu *v)
             SHADOW_PRINTK("new paging mode: d=%u v=%u pe=%d g=%u s=%u "
                           "(was g=%u s=%u)\n",
                           d->domain_id, v->vcpu_id,
-                          hvm_guest(v) ? !!hvm_paging_enabled(v) : 1,
+                          is_hvm_domain(d) ? !!hvm_paging_enabled(v) : 1,
                           v->arch.shadow.mode->guest_levels,
                           v->arch.shadow.mode->shadow_levels,
                           old_mode ? old_mode->guest_levels : 0,

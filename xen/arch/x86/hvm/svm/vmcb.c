@@ -482,20 +482,14 @@ static void vmcb_dump(unsigned char ch)
     struct vcpu *v;
     
     printk("*********** VMCB Areas **************\n");
-    for_each_domain(d) {
+    for_each_domain ( d )
+    {
+        if ( !is_hvm_domain(d) )
+            continue;
         printk("\n>>> Domain %d <<<\n", d->domain_id);
-        for_each_vcpu(d, v) {
-
-            /* 
-             * Presumably, if a domain is not an HVM guest,
-             * the very first CPU will not pass this test
-             */
-            if (!hvm_guest(v)) {
-                printk("\t\tNot HVM guest\n");
-                break;
-            }
+        for_each_vcpu ( d, v )
+        {
             printk("\tVCPU %d\n", v->vcpu_id);
-
             svm_dump_vmcb("key_handler", v->arch.hvm_svm.vmcb);
         }
     }

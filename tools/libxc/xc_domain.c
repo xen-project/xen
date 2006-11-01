@@ -12,6 +12,7 @@
 int xc_domain_create(int xc_handle,
                      uint32_t ssidref,
                      xen_domain_handle_t handle,
+                     uint32_t flags,
                      uint32_t *pdomid)
 {
     int err;
@@ -20,6 +21,7 @@ int xc_domain_create(int xc_handle,
     domctl.cmd = XEN_DOMCTL_createdomain;
     domctl.domain = (domid_t)*pdomid;
     domctl.u.createdomain.ssidref = ssidref;
+    domctl.u.createdomain.flags   = flags;
     memcpy(domctl.u.createdomain.handle, handle, sizeof(xen_domain_handle_t));
     if ( (err = do_domctl(xc_handle, &domctl)) != 0 )
         return err;

@@ -202,14 +202,14 @@ guest_supports_superpages(struct vcpu *v)
 {
     /* The _PAGE_PSE bit must be honoured in HVM guests, whenever
      * CR4.PSE is set or the guest is in PAE or long mode */
-    return (hvm_guest(v) && (GUEST_PAGING_LEVELS != 2 
+    return (is_hvm_vcpu(v) && (GUEST_PAGING_LEVELS != 2 
                              || (hvm_get_guest_ctrl_reg(v, 4) & X86_CR4_PSE)));
 }
 
 static inline int
 guest_supports_nx(struct vcpu *v)
 {
-    if ( !hvm_guest(v) )
+    if ( !is_hvm_vcpu(v) )
         return cpu_has_nx;
 
     // XXX - fix this!
@@ -769,7 +769,7 @@ _sh_propagate(struct vcpu *v,
     // PV guests in 64-bit mode use two different page tables for user vs
     // supervisor permissions, making the guest's _PAGE_USER bit irrelevant.
     // It is always shadowed as present...
-    if ( (GUEST_PAGING_LEVELS == 4) && !hvm_guest(v) )
+    if ( (GUEST_PAGING_LEVELS == 4) && !is_hvm_domain(d) )
     {
         sflags |= _PAGE_USER;
     }
@@ -2293,7 +2293,7 @@ static int validate_gl1e(struct vcpu *v, void *new_ge, mfn_t sl1mfn, void *se)
     gfn = guest_l1e_get_gfn(*new_gl1e);
     gmfn = vcpu_gfn_to_mfn(v, gfn);
 
-    mmio = (hvm_guest(v) && shadow_vcpu_mode_translate(v) && !valid_mfn(gmfn));
+    mmio = (is_hvm_vcpu(v) && shadow_vcpu_mode_translate(v) && !valid_mfn(gmfn));
     l1e_propagate_from_guest(v, new_gl1e, _mfn(INVALID_MFN), gmfn, &new_sl1e, 
                              ft_prefetch, mmio);
     
@@ -2523,7 +2523,7 @@ static void sh_prefetch(struct vcpu *v, walk_t *gw,
         /* Look at the gfn that the l1e is pointing at */
         gfn = guest_l1e_get_gfn(gl1e);
         gmfn = vcpu_gfn_to_mfn(v, gfn);
-        mmio = ( hvm_guest(v) 
+        mmio = ( is_hvm_vcpu(v) 
                  && shadow_vcpu_mode_translate(v) 
                  && mmio_space(gfn_to_paddr(gfn)) );
 
@@ -2585,7 +2585,8 @@ static int sh_page_fault(struct vcpu *v,
         {
             if ( sh_l1e_is_gnp(sl1e) )
             {
-                if ( likely(!hvm_guest(v) || shadow_vcpu_mode_translate(v)) )
+                if ( likely(!is_hvm_domain(d) ||
+                            shadow_vcpu_mode_translate(v)) )
                 { 
                     /* Not-present in a guest PT: pass to the guest as
                      * a not-present fault (by flipping two bits). */
@@ -2647,7 +2648,7 @@ static int sh_page_fault(struct vcpu *v,
     //
     if ( unlikely(!(guest_l1e_get_flags(gw.eff_l1e) & _PAGE_PRESENT)) )
     {
-        if ( hvm_guest(v) && !shadow_vcpu_mode_translate(v) )
+        if ( is_hvm_domain(d) && !shadow_vcpu_mode_translate(v) )
         {
             /* Not present in p2m map, means this is mmio */
             gpa = va;
@@ -2704,9 +2705,9 @@ static int sh_page_fault(struct vcpu *v,
     /* What mfn is the guest trying to access? */
     gfn = guest_l1e_get_gfn(gw.eff_l1e);
     gmfn = vcpu_gfn_to_mfn(v, gfn);
-    mmio = ( hvm_guest(v) 
-             && shadow_vcpu_mode_translate(v) 
-             && mmio_space(gfn_to_paddr(gfn)) );
+    mmio = (is_hvm_domain(d)
+            && shadow_vcpu_mode_translate(v) 
+            && mmio_space(gfn_to_paddr(gfn)));
 
     if ( !mmio && !valid_mfn(gmfn) )
     {
@@ -2775,14 +2776,15 @@ static int sh_page_fault(struct vcpu *v,
  emulate:
     /* Take the register set we were called with */
     emul_regs = *regs;
-    if ( hvm_guest(v) )
+    if ( is_hvm_domain(d) )
     {
         /* Add the guest's segment selectors, rip, rsp. rflags */ 
         hvm_store_cpu_guest_regs(v, &emul_regs, NULL);
     }
     emul_ctxt.regs = &emul_regs;
     emul_ctxt.cr2 = va;
-    emul_ctxt.mode = hvm_guest(v) ? hvm_guest_x86_mode(v) : X86EMUL_MODE_HOST;
+    emul_ctxt.mode = (is_hvm_domain(d) ?
+                      hvm_guest_x86_mode(v) : X86EMUL_MODE_HOST);
 
     SHADOW_PRINTK("emulate: eip=%#lx\n", emul_regs.eip);
 
@@ -2813,7 +2815,7 @@ static int sh_page_fault(struct vcpu *v,
         goto not_a_shadow_fault;
 
     /* Emulator has changed the user registers: write back */
-    if ( hvm_guest(v) )
+    if ( is_hvm_domain(d) )
     {
         /* Write back the guest's segment selectors, rip, rsp. rflags */ 
         hvm_load_cpu_guest_regs(v, &emul_regs);
@@ -3317,7 +3319,7 @@ sh_update_cr3(struct vcpu *v)
     
 #ifndef NDEBUG 
     /* Double-check that the HVM code has sent us a sane guest_table */
-    if ( hvm_guest(v) )
+    if ( is_hvm_domain(d) )
     {
         gfn_t gfn;
 
@@ -3492,7 +3494,7 @@ sh_update_cr3(struct vcpu *v)
     ///
     if ( shadow_mode_external(d) )
     {
-        ASSERT(hvm_guest(v));
+        ASSERT(is_hvm_domain(d));
 #if SHADOW_PAGING_LEVELS == 3
         /* 2-on-3 or 3-on-3: Use the PAE shadow l3 table we just fabricated */
         v->arch.hvm_vcpu.hw_cr3 = virt_to_maddr(&v->arch.shadow.l3table);
@@ -3890,7 +3892,7 @@ static char * sh_audit_flags(struct vcpu *v, int level,
 {
     if ( (sflags & _PAGE_PRESENT) && !(gflags & _PAGE_PRESENT) )
         return "shadow is present but guest is not present";
-    if ( (sflags & _PAGE_GLOBAL) && !hvm_guest(v) ) 
+    if ( (sflags & _PAGE_GLOBAL) && !is_hvm_vcpu(v) ) 
         return "global bit set in PV shadow";
     if ( (level == 1 || (level == 2 && (gflags & _PAGE_PSE)))
          && ((sflags & _PAGE_DIRTY) && !(gflags & _PAGE_DIRTY)) ) 

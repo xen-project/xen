@@ -701,7 +701,7 @@ int xenoprofile_get_mode(struct vcpu *v, struct cpu_user_regs * const regs)
     if ( !guest_mode(regs) )
         return 2;
 
-    if ( hvm_guest(v) )
+    if ( is_hvm_vcpu(v) )
         return ((regs->cs & 3) != 3);
 
     return guest_kernel_mode(v, regs);  

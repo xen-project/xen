@@ -672,8 +672,6 @@ static void vmx_init_ap_context(struct vcpu_guest_context *ctxt,
     ctxt->user_regs.edx = vcpuid;
     ctxt->user_regs.ebx = trampoline_vector;
 
-    ctxt->flags = VGCF_HVM_GUEST;
-
     /* Virtual IDT is empty at start-of-day. */
     for ( i = 0; i < 256; i++ )
     {

@@ -157,6 +157,13 @@ int arch_domain_create(struct domain *d)
     int vcpuid, pdpt_order;
     int i;
 
+    if ( is_hvm_domain(d) && !hvm_enabled )
+    {
+        gdprintk(XENLOG_WARNING, "Attempt to create a HVM guest "
+                 "on a non-VT/AMDV platform.\n");
+        return -EINVAL;
+    }
+
     pdpt_order = get_order_from_bytes(PDPT_L1_ENTRIES * sizeof(l1_pgentry_t));
     d->arch.mm_perdomain_pt = alloc_xenheap_pages(pdpt_order);
     if ( d->arch.mm_perdomain_pt == NULL )
@@ -258,7 +265,11 @@ int arch_set_info_guest(
     unsigned long cr3_pfn = INVALID_MFN;
     int i, rc;
 
-    if ( !(c->flags & VGCF_HVM_GUEST) )
+    if ( !!(c->flags & VGCF_hvm_guest) != is_hvm_vcpu(v) )
+        return -EINVAL;
+    c->flags &= ~VGCF_hvm_guest;
+
+    if ( !is_hvm_vcpu(v) )
     {
         fixup_guest_stack_selector(c->user_regs.ss);
         fixup_guest_stack_selector(c->kernel_ss);
@@ -272,15 +283,13 @@ int arch_set_info_guest(
         for ( i = 0; i < 256; i++ )
             fixup_guest_code_selector(c->trap_ctxt[i].cs);
     }
-    else if ( !hvm_enabled )
-      return -EINVAL;
 
     clear_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
-    if ( c->flags & VGCF_I387_VALID )
+    if ( c->flags & VGCF_i387_valid )
         set_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
 
     v->arch.flags &= ~TF_kernel_mode;
-    if ( (c->flags & VGCF_IN_KERNEL) || (c->flags & VGCF_HVM_GUEST) )
+    if ( (c->flags & VGCF_in_kernel) || is_hvm_vcpu(v)/*???*/ )
         v->arch.flags |= TF_kernel_mode;
 
     memcpy(&v->arch.guest_context, c, sizeof(*c));
@@ -291,7 +300,7 @@ int arch_set_info_guest(
 
     init_int80_direct_trap(v);
 
-    if ( !(c->flags & VGCF_HVM_GUEST) )
+    if ( !is_hvm_vcpu(v) )
     {
         /* IOPL privileges are virtualised. */
         v->arch.iopl = (v->arch.guest_context.user_regs.eflags >> 12) & 3;
@@ -316,7 +325,7 @@ int arch_set_info_guest(
     if ( v->vcpu_id == 0 )
         d->vm_assist = c->vm_assist;
 
-    if ( !(c->flags & VGCF_HVM_GUEST) )
+    if ( !is_hvm_vcpu(v) )
     {
         cr3_pfn = gmfn_to_mfn(d, xen_cr3_to_pfn(c->ctrlreg[3]));
         v->arch.guest_table = pagetable_from_pfn(cr3_pfn);
@@ -325,7 +334,7 @@ int arch_set_info_guest(
     if ( (rc = (int)set_gdt(v, c->gdt_frames, c->gdt_ents)) != 0 )
         return rc;
 
-    if ( c->flags & VGCF_HVM_GUEST )
+    if ( is_hvm_vcpu(v) )
     {
         v->arch.guest_table = pagetable_null();
 
@@ -745,7 +754,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
         /* Re-enable interrupts before restoring state which may fault. */
         local_irq_enable();
 
-        if ( !hvm_guest(next) )
+        if ( !is_hvm_vcpu(next) )
         {
             load_LDT(next);
             load_segments(next);
@@ -835,7 +844,7 @@ unsigned long hypercall_create_continuation(
 #if defined(__i386__)
         regs->eax  = op;
 
-        if ( supervisor_mode_kernel || hvm_guest(current) )
+        if ( supervisor_mode_kernel || is_hvm_vcpu(current) )
             regs->eip &= ~31; /* re-execute entire hypercall entry stub */
         else
             regs->eip -= 2;   /* re-execute 'int 0x82' */
@@ -972,7 +981,7 @@ void domain_relinquish_resources(struct domain *d)
 #endif
     }
 
-    if ( d->vcpu[0] && hvm_guest(d->vcpu[0]) )
+    if ( is_hvm_domain(d) )
         hvm_relinquish_guest_resources(d);
 
     /* Tear down shadow mode stuff. */

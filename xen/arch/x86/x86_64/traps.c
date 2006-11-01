@@ -42,7 +42,7 @@ void show_registers(struct cpu_user_regs *regs)
     unsigned long fault_crs[8];
     const char *context;
 
-    if ( hvm_guest(current) && guest_mode(regs) )
+    if ( is_hvm_vcpu(current) && guest_mode(regs) )
     {
         context = "hvm";
         hvm_store_cpu_guest_regs(current, &fault_regs, fault_crs);
@@ -229,7 +229,7 @@ unsigned long do_iret(void)
     regs->rsp    = iret_saved.rsp;
     regs->ss     = iret_saved.ss | 3; /* force guest privilege */
 
-    if ( !(iret_saved.flags & VGCF_IN_SYSCALL) )
+    if ( !(iret_saved.flags & VGCF_in_sycall) )
     {
         regs->entry_vector = 0;
         regs->r11 = iret_saved.r11;
@@ -500,7 +500,7 @@ static void hypercall_page_initialise_ring3_kernel(void *hypercall_page)
 
 void hypercall_page_initialise(struct domain *d, void *hypercall_page)
 {
-    if ( hvm_guest(d->vcpu[0]) )
+    if ( is_hvm_domain(d) )
         hvm_hypercall_page_initialise(d, hypercall_page);
     else
         hypercall_page_initialise_ring3_kernel(hypercall_page);

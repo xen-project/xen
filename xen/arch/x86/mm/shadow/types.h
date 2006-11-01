@@ -205,13 +205,13 @@ static inline shadow_l4e_t shadow_l4e_from_mfn(mfn_t mfn, u32 flags)
     __sh_linear_l1_table; \
 })
 
-// XXX -- these should not be conditional on hvm_guest(v), but rather on
+// XXX -- these should not be conditional on is_hvm_vcpu(v), but rather on
 //        shadow_mode_external(d)...
 //
 #define sh_linear_l2_table(v) ({ \
     ASSERT(current == (v)); \
     ((shadow_l2e_t *) \
-     (hvm_guest(v) ? __linear_l1_table : __sh_linear_l1_table) + \
+     (is_hvm_vcpu(v) ? __linear_l1_table : __sh_linear_l1_table) + \
      shadow_l1_linear_offset(SH_LINEAR_PT_VIRT_START)); \
 })
 
@@ -219,7 +219,7 @@ static inline shadow_l4e_t shadow_l4e_from_mfn(mfn_t mfn, u32 flags)
 #define sh_linear_l3_table(v) ({ \
     ASSERT(current == (v)); \
     ((shadow_l3e_t *) \
-     (hvm_guest(v) ? __linear_l2_table : __sh_linear_l2_table) + \
+     (is_hvm_vcpu(v) ? __linear_l2_table : __sh_linear_l2_table) + \
       shadow_l2_linear_offset(SH_LINEAR_PT_VIRT_START)); \
 })
 
@@ -228,7 +228,7 @@ static inline shadow_l4e_t shadow_l4e_from_mfn(mfn_t mfn, u32 flags)
 #define sh_linear_l4_table(v) ({ \
     ASSERT(current == (v)); \
     ((l4_pgentry_t *) \
-     (hvm_guest(v) ? __linear_l3_table : __sh_linear_l3_table) + \
+     (is_hvm_vcpu(v) ? __linear_l3_table : __sh_linear_l3_table) + \
       shadow_l3_linear_offset(SH_LINEAR_PT_VIRT_START)); \
 })
 #endif
@@ -585,7 +585,7 @@ accumulate_guest_flags(struct vcpu *v, walk_t *gw)
     // In 64-bit PV guests, the _PAGE_USER bit is implied in all guest
     // entries (since even the guest kernel runs in ring 3).
     //
-    if ( (GUEST_PAGING_LEVELS == 4) && !hvm_guest(v) )
+    if ( (GUEST_PAGING_LEVELS == 4) && !is_hvm_vcpu(v) )
         accumulated_flags |= _PAGE_USER;
 
     return accumulated_flags;

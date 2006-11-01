@@ -249,7 +249,7 @@ static void __init init_idle_domain(void)
     /* Domain creation requires that scheduler structures are initialised. */
     scheduler_init();
 
-    idle_domain = domain_create(IDLE_DOMAIN_ID);
+    idle_domain = domain_create(IDLE_DOMAIN_ID, 0);
     if ( (idle_domain == NULL) || (alloc_vcpu(idle_domain, 0, 0) == NULL) )
         BUG();
 
@@ -640,12 +640,13 @@ void __init __start_xen(multiboot_info_t *mbi)
     acm_init(_policy_start, _policy_len);
 
     /* Create initial domain 0. */
-    dom0 = domain_create(0);
+    dom0 = domain_create(0, 0);
     if ( (dom0 == NULL) || (alloc_vcpu(dom0, 0, 0) == NULL) )
         panic("Error creating domain 0\n");
 
-    set_bit(_DOMF_privileged, &dom0->domain_flags);
-    /* post-create hooks sets security label */
+    dom0->is_privileged = 1;
+
+    /* Post-create hook sets security label. */
     acm_post_domain0_create(dom0->domain_id);
 
     /* Grab the DOM0 command line. */

@@ -45,7 +45,7 @@ void show_registers(struct cpu_user_regs *regs)
     unsigned long fault_crs[8];
     const char *context;
 
-    if ( hvm_guest(current) && guest_mode(regs) )
+    if ( is_hvm_vcpu(current) && guest_mode(regs) )
     {
         context = "hvm";
         hvm_store_cpu_guest_regs(current, &fault_regs, fault_crs);
@@ -515,7 +515,7 @@ static void hypercall_page_initialise_ring1_kernel(void *hypercall_page)
 
 void hypercall_page_initialise(struct domain *d, void *hypercall_page)
 {
-    if ( hvm_guest(d->vcpu[0]) )
+    if ( is_hvm_domain(d) )
         hvm_hypercall_page_initialise(d, hypercall_page);
     else if ( supervisor_mode_kernel )
         hypercall_page_initialise_ring0_kernel(hypercall_page);

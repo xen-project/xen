@@ -65,18 +65,17 @@ static PyObject *pyxc_domain_create(XcObject *self,
                                     PyObject *args,
                                     PyObject *kwds)
 {
-    uint32_t dom = 0;
-    int      ret, i;
-    uint32_t ssidref = 0;
+    uint32_t dom = 0, ssidref = 0, flags = 0;
+    int      ret, i, hvm = 0;
     PyObject *pyhandle = NULL;
     xen_domain_handle_t handle = { 
         0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
         0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef };
 
-    static char *kwd_list[] = { "domid", "ssidref", "handle", NULL };
+    static char *kwd_list[] = { "domid", "ssidref", "handle", "hvm", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|iiO", kwd_list,
-                                      &dom, &ssidref, &pyhandle))
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|iiOi", kwd_list,
+                                      &dom, &ssidref, &pyhandle, &hvm))
         return NULL;
 
     if ( pyhandle != NULL )
@@ -94,7 +93,11 @@ static PyObject *pyxc_domain_create(XcObject *self,
         }
     }
 
-    if ( (ret = xc_domain_create(self->xc_handle, ssidref, handle, &dom)) < 0 )
+    if ( hvm )
+        flags |= XEN_DOMCTL_CDF_hvm_guest;
+
+    if ( (ret = xc_domain_create(self->xc_handle, ssidref,
+                                 handle, flags, &dom)) < 0 )
         return PyErr_SetFromErrno(xc_error);
 
     return PyInt_FromLong(dom);

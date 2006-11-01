@@ -114,7 +114,7 @@ struct vcpu *alloc_idle_vcpu(unsigned int cpu_id)
     unsigned int vcpu_id = cpu_id % MAX_VIRT_CPUS;
 
     d = (vcpu_id == 0) ?
-        domain_create(IDLE_DOMAIN_ID) :
+        domain_create(IDLE_DOMAIN_ID, 0) :
         idle_vcpu[cpu_id - vcpu_id]->domain;
     BUG_ON(d == NULL);
 
@@ -124,12 +124,15 @@ struct vcpu *alloc_idle_vcpu(unsigned int cpu_id)
     return v;
 }
 
-struct domain *domain_create(domid_t domid)
+struct domain *domain_create(domid_t domid, unsigned int domcr_flags)
 {
     struct domain *d, **pd;
 
     if ( (d = alloc_domain(domid)) == NULL )
         return NULL;
+
+    if ( domcr_flags & DOMCRF_hvm )
+        d->is_hvm = 1;
 
     rangeset_domain_initialise(d);
 

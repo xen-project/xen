@@ -152,7 +152,7 @@ typedef unsigned long xen_ulong_t;
  * directly with
  *      orb   $3,1*8(%rsp)
  *      iretq
- * If flags contains VGCF_IN_SYSCALL:
+ * If flags contains VGCF_in_syscall:
  *   Restore RAX, RIP, RFLAGS, RSP.
  *   Discard R11, RCX, CS, SS.
  * Otherwise:
@@ -160,7 +160,9 @@ typedef unsigned long xen_ulong_t;
  * All other registers are saved on hypercall entry and restored to user.
  */
 /* Guest exited in SYSCALL context? Return to guest with SYSRET? */
-#define VGCF_IN_SYSCALL (1<<8)
+#define _VGCF_in_syscall 8
+#define VGCF_in_syscall  (1<<_VGCF_in_syscall)
+#define VGCF_IN_SYSCALL  VGCF_in_syscall
 struct iret_context {
     /* Top of stack (%rsp at point of hypercall). */
     uint64_t rax, r11, rcx, flags, rip, cs, rflags, rsp, ss;

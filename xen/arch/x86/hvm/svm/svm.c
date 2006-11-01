@@ -562,7 +562,6 @@ static void svm_init_ap_context(struct vcpu_guest_context *ctxt,
      */
     ctxt->user_regs.eip = 0x0;
     ctxt->user_regs.cs = (trampoline_vector << 8);
-    ctxt->flags = VGCF_HVM_GUEST;
 }
 
 static void svm_init_hypercall_page(struct domain *d, void *hypercall_page)
