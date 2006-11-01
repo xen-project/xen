@@ -49,9 +49,9 @@ def dispatch(domid, fn, args):
     info = lookup(domid)
     return getattr(info, fn)(*args)
 
-def domain(domid):
+def domain(domid, full = 0):
     info = lookup(domid)
-    return fixup_sxpr(info.sxpr())
+    return fixup_sxpr(info.sxpr(not full))
 
 def domains(detail=1, full = 0):
     if detail < 1:
