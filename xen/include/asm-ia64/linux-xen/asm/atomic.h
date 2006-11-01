@@ -23,8 +23,13 @@
 typedef struct { volatile __s32 counter; } atomic_t;
 typedef struct { volatile __s64 counter; } atomic64_t;
 
+#ifndef XEN
 #define ATOMIC_INIT(i)		((atomic_t) { (i) })
 #define ATOMIC64_INIT(i)	((atomic64_t) { (i) })
+#else
+#define ATOMIC_INIT(i)		{ (i) }
+#define ATOMIC64_INIT(i)	{ (i) }
+#endif
 
 #define atomic_read(v)		((v)->counter)
 #define atomic64_read(v)	((v)->counter)
