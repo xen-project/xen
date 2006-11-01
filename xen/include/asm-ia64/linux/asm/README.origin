@@ -4,7 +4,6 @@
 # needs to be changed, move it to ../linux-xen and follow
 # the instructions in the README there.
 
-atomic.h		-> linux/include/asm-ia64/atomic.h
 bitops.h		-> linux/include/asm-ia64/bitops.h
 break.h			-> linux/include/asm-ia64/break.h
 byteorder.h		-> linux/include/asm-ia64/byteorder.h
