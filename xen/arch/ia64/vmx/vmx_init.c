@@ -364,7 +364,10 @@ static const io_range_t io_ranges[] = {
 
 /* Reseve 1 page for shared I/O ,1 page for xenstore and 1 page for buffer I/O.  */
 #define VMX_SYS_PAGES	(3 + (GFW_SIZE >> PAGE_SHIFT))
-#define VMX_CONFIG_PAGES(d) ((d)->max_pages - VMX_SYS_PAGES)
+/* If we support maxmem for domVTi, we should change from tot_page to max_pages.
+ * #define VMX_CONFIG_PAGES(d) ((d)->max_pages - VMX_SYS_PAGES)
+ */
+#define VMX_CONFIG_PAGES(d) ((d)->tot_pages - VMX_SYS_PAGES)
 
 static void vmx_build_physmap_table(struct domain *d)
 {
