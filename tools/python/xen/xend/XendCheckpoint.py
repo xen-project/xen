@@ -59,9 +59,7 @@ def save(fd, dominfo, network, live, dst):
     # Rename the domain temporarily, so that we don't get a name clash if this
     # domain is migrating (live or non-live) to the local host.  Doing such a
     # thing is useful for debugging.
-    #
-    # FIXME: I don't think this is such a good idea - atse@xensource.com
-    #dominfo.setName('migrating-' + domain_name)
+    dominfo.setName('migrating-' + domain_name)
 
     try:
         dominfo.migrateDevices(network, dst, DEV_MIGRATE_STEP1, domain_name)
@@ -102,10 +100,10 @@ def save(fd, dominfo, network, live, dst):
     except Exception, exn:
         log.exception("Save failed on domain %s (%d).", domain_name,
                       dominfo.getDomid())
-        #try:
-        #    dominfo.setName(domain_name)
-        #except:
-        #    log.exception("Failed to reset the migrating domain's name")
+        try:
+            dominfo.setName(domain_name)
+        except:
+            log.exception("Failed to reset the migrating domain's name")
         raise Exception, exn
 
 
