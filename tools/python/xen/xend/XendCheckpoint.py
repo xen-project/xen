@@ -8,21 +8,17 @@
 import os
 import re
 import string
-import sxp
 import threading
 from struct import pack, unpack, calcsize
 
 from xen.util.xpopen import xPopen3
-
 import xen.util.auxbin
-
 import xen.lowlevel.xc
 
-import balloon
-from XendError import XendError
-from XendLogging import log
-from XendDomainInfo import DEV_MIGRATE_STEP1, DEV_MIGRATE_STEP2
-from XendDomainInfo import DEV_MIGRATE_STEP3
+from xen.xend import balloon, sxp
+from xen.xend.XendError import XendError
+from xen.xend.XendLogging import log
+from xen.xend.XendConstants import *
 
 SIGNATURE = "LinuxGuestRecord"
 XC_SAVE = "xc_save"
@@ -43,13 +39,13 @@ def write_exact(fd, buf, errmsg):
 def read_exact(fd, size, errmsg):
     buf  = '' 
     while size != 0: 
-        str = os.read(fd, size)
-        if not len(str):
+        readstr = os.read(fd, size)
+        if not len(readstr):
             log.error("read_exact: EOF trying to read %d (buf='%s')" % \
                       (size, buf))
             raise XendError(errmsg)
-        size = size - len(str)
-        buf  = buf + str
+        size = size - len(readstr)
+        buf  = buf + readstr
     return buf
 
 
@@ -63,7 +59,9 @@ def save(fd, dominfo, network, live, dst):
     # Rename the domain temporarily, so that we don't get a name clash if this
     # domain is migrating (live or non-live) to the local host.  Doing such a
     # thing is useful for debugging.
-    dominfo.setName('migrating-' + domain_name)
+    #
+    # FIXME: I don't think this is such a good idea - atse@xensource.com
+    #dominfo.setName('migrating-' + domain_name)
 
     try:
         dominfo.migrateDevices(network, dst, DEV_MIGRATE_STEP1, domain_name)
@@ -104,14 +102,14 @@ def save(fd, dominfo, network, live, dst):
     except Exception, exn:
         log.exception("Save failed on domain %s (%d).", domain_name,
                       dominfo.getDomid())
-        try:
-            dominfo.setName(domain_name)
-        except:
-            log.exception("Failed to reset the migrating domain's name")
+        #try:
+        #    dominfo.setName(domain_name)
+        #except:
+        #    log.exception("Failed to reset the migrating domain's name")
         raise Exception, exn
 
 
-def restore(xd, fd):
+def restore(xd, fd, dominfo = None):
     signature = read_exact(fd, len(SIGNATURE),
         "not a valid guest state file: signature read")
     if signature != SIGNATURE:
@@ -131,7 +129,11 @@ def restore(xd, fd):
 
     vmconfig = p.get_val()
 
-    dominfo = xd.restore_(vmconfig)
+    if dominfo:
+        dominfo.update(XendConfig(sxp = vmconfig), refresh = False)
+        dominfo.resume()
+    else:
+        dominfo = xd.restore_(vmconfig)
 
     store_port   = dominfo.getStorePort()
     console_port = dominfo.getConsolePort()

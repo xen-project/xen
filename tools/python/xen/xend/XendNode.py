@@ -13,22 +13,40 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+# Copyright (c) 2006 Xensource Inc.
 #============================================================================
 
-"""Handler for node operations.
- Has some persistent state:
- - logs
- - notification urls
-
-"""
-
 import os
+import socket
 import xen.lowlevel.xc
+from xen.xend import uuid
+from xen.xend.XendError import XendError
+from xen.xend.XendStorageRepository import XendStorageRepository
 
 class XendNode:
-
+    """XendNode - Represents a Domain 0 Host."""
+    
     def __init__(self):
         self.xc = xen.lowlevel.xc.xc()
+        self.uuid = uuid.createString()
+        self.cpus = {}
+        self.name = socket.gethostname()
+        self.desc = ""
+        self.sr = XendStorageRepository()
+        
+        physinfo = self.physinfo_dict()
+        cpu_count = physinfo['nr_cpus']
+        cpu_features = physinfo['hw_caps']
+        
+        for i in range(cpu_count):
+            # construct uuid by appending extra bit on the host.
+            # since CPUs belong to a host.
+            cpu_uuid = self.uuid + '-%04d' % i
+            cpu_info = {'uuid': cpu_uuid,
+                        'host': self.uuid,
+                        'number': i,
+                        'features': cpu_features}
+            self.cpus[cpu_uuid] = cpu_info
 
     def shutdown(self):
         return 0
@@ -39,6 +57,78 @@ class XendNode:
     def notify(self, _):
         return 0
     
+    #
+    # Ref validation
+    #
+    
+    def is_valid_host(self, host_ref):
+        return (host_ref == self.uuid)
+
+    def is_valid_cpu(self, cpu_ref):
+        return (cpu_ref in self.cpus)
+
+    #
+    # Storage Repo
+    #
+
+    def get_sr(self):
+        return self.sr
+
+    #
+    # Host Functions
+    #
+
+    def xen_version(self):
+        info = self.xc.xeninfo()
+        from xen import VERSION
+        return {'Xen': '%(xen_major)d.%(xen_minor)d' % info,
+                'Xend': VERSION}
+
+    def get_name(self):
+        return self.name
+
+    def set_name(self, new_name):
+        self.name = new_name
+
+    #
+    # Host CPU Functions
+    #
+
+    def get_host_cpu_by_uuid(self, host_cpu_uuid):
+        if host_cpu_uuid in self.cpus:
+            return host_cpu_uuid
+        raise XendError('Invalid CPU UUID')
+
+    def get_host_cpu_refs(self):
+        return self.cpus.keys()
+
+    def get_host_cpu_uuid(self, host_cpu_ref):
+        if host_cpu_ref in self.cpus:
+            return host_cpu_ref
+        else:
+            raise XendError('Invalid CPU Reference')
+
+    def get_host_cpu_features(self, host_cpu_ref):
+        try:
+            return self.cpus[host_cpu_ref]['features']
+        except KeyError:
+            raise XendError('Invalid CPU Reference')
+
+    def get_host_cpu_number(self, host_cpu_ref):
+        try:
+            return self.cpus[host_cpu_ref]['number']
+        except KeyError:
+            raise XendError('Invalid CPU Reference')        
+            
+    def get_host_cpu_load(self, host_cpu_ref):
+        return 0.0
+
+    
+
+    #
+    # Getting host information.
+    #
+
     def info(self):
         return (self.nodeinfo() + self.physinfo() + self.xeninfo() +
                 self.xendinfo())
@@ -98,6 +188,19 @@ class XendNode:
     def xendinfo(self):
         return [['xend_config_format',  2]]
 
+    # dictionary version of *info() functions to get rid of
+    # SXPisms.
+    def nodeinfo_dict(self):
+        return dict(self.nodeinfo())
+    def xendinfo_dict(self):
+        return dict(self.xendinfo())
+    def xeninfo_dict(self):
+        return dict(self.xeninfo())
+    def physinfo_dict(self):
+        return dict(self.physinfo())
+    def info_dict(self):
+        return dict(self.info())
+    
 
 def instance():
     global inst

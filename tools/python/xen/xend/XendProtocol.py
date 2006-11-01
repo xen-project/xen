@@ -22,7 +22,7 @@ import time
 import types
 
 from encode import *
-import sxp
+from xen.xend import sxp
 
 from xen.xend import XendRoot
 

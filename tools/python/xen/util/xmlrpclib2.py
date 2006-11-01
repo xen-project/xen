@@ -21,11 +21,11 @@ An enhanced XML-RPC client/server interface for Python.
 """
 
 import string
-import types
 import fcntl
+from types import *
+    
 
 from httplib import HTTPConnection, HTTP
-from xmlrpclib import Transport
 from SimpleXMLRPCServer import SimpleXMLRPCServer, SimpleXMLRPCRequestHandler
 import SocketServer
 import xmlrpclib, socket, os, stat
@@ -39,6 +39,23 @@ except ImportError:
     # SSHTransport is disabled on Python <2.4, because it uses the subprocess
     # package.
     ssh_enabled = False
+
+#
+# Convert all integers to strings as described in the Xen API
+#
+
+
+def stringify(value):
+    if isinstance(value, IntType) and not isinstance(value, BooleanType):
+        return str(value)
+    elif isinstance(value, DictType):
+        for k, v in value.items():
+            value[k] = stringify(v)
+        return value
+    elif isinstance(value, (TupleType, ListType)):
+        return [stringify(v) for v in value]
+    else:
+        return value
 
 
 # A new ServerProxy that also supports httpu urls.  An http URL comes in the
@@ -81,18 +98,18 @@ class HTTPUnixConnection(HTTPConnection):
 class HTTPUnix(HTTP):
     _connection_class = HTTPUnixConnection
 
-class UnixTransport(Transport):
+class UnixTransport(xmlrpclib.Transport):
     def request(self, host, handler, request_body, verbose=0):
         self.__handler = handler
-        return Transport.request(self, host, '/RPC2', request_body, verbose)
+        return xmlrpclib.Transport.request(self, host, '/RPC2',
+                                           request_body, verbose)
     def make_connection(self, host):
         return HTTPUnix(self.__handler)
 
 
 # See _marshalled_dispatch below.
 def conv_string(x):
-    if (isinstance(x, types.StringType) or
-        isinstance(x, unicode)):
+    if isinstance(x, StringTypes):
         s = string.replace(x, "'", r"\047")
         exec "s = '" + s + "'"
         return s
@@ -134,7 +151,7 @@ class TCPXMLRPCServer(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
     allow_reuse_address = True
 
     def __init__(self, addr, requestHandler=XMLRPCRequestHandler,
-                 logRequests=1):
+                 logRequests = 1):
         SimpleXMLRPCServer.__init__(self, addr, requestHandler, logRequests)
 
         flags = fcntl.fcntl(self.fileno(), fcntl.F_GETFD)
@@ -169,8 +186,7 @@ class TCPXMLRPCServer(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
             # to transmit the string using Python encoding.
             # Thanks to David Mertz <mertz@gnosis.cx> for the trick (buried
             # in xml_pickle.py).
-            if (isinstance(response, types.StringType) or
-                isinstance(response, unicode)):
+            if isinstance(response, StringTypes):
                 response = repr(response)[1:-1]
 
             response = (response,)
@@ -201,7 +217,7 @@ class UnixXMLRPCRequestHandler(XMLRPCRequestHandler):
 class UnixXMLRPCServer(TCPXMLRPCServer):
     address_family = socket.AF_UNIX
 
-    def __init__(self, addr, logRequests):
+    def __init__(self, addr, logRequests = 1):
         parent = os.path.dirname(addr)
         if os.path.exists(parent):
             os.chown(parent, os.geteuid(), os.getegid())

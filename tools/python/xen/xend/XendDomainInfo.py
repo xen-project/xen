@@ -24,90 +24,38 @@ Author: Mike Wray <mike.wray@hp.com>
 
 """
 
-import errno
 import logging
-import string
 import time
 import threading
-import os
+import re
+import copy
+from types import StringTypes
 
 import xen.lowlevel.xc
 from xen.util import asserts
 from xen.util.blkif import blkdev_uname_to_file
 from xen.util import security
-import balloon
-import image
-import sxp
-import uuid
-import XendDomain
-import XendRoot
+
+from xen.xend import balloon, sxp, uuid, image, arch
+from xen.xend import XendRoot, XendNode
 
 from xen.xend.XendBootloader import bootloader
+from xen.xend.XendConfig import XendConfig
 from xen.xend.XendError import XendError, VmError
-
+from xen.xend.XendDevices import XendDevices
 from xen.xend.xenstore.xstransact import xstransact, complete
 from xen.xend.xenstore.xsutil import GetDomainPath, IntroduceDomain
 from xen.xend.xenstore.xswatch import xswatch
+from xen.xend.XendConstants import *
+from xen.xend.XendAPIConstants import *
 
-from xen.xend import arch
-
-"""Shutdown code for poweroff."""
-DOMAIN_POWEROFF = 0
-
-"""Shutdown code for reboot."""
-DOMAIN_REBOOT   = 1
-
-"""Shutdown code for suspend."""
-DOMAIN_SUSPEND  = 2
-
-"""Shutdown code for crash."""
-DOMAIN_CRASH    = 3
-
-"""Shutdown code for halt."""
-DOMAIN_HALT     = 4
-
-"""Map shutdown codes to strings."""
-shutdown_reasons = {
-    DOMAIN_POWEROFF: "poweroff",
-    DOMAIN_REBOOT  : "reboot",
-    DOMAIN_SUSPEND : "suspend",
-    DOMAIN_CRASH   : "crash",
-    DOMAIN_HALT    : "halt"
-    }
-
-restart_modes = [
-    "restart",
-    "destroy",
-    "preserve",
-    "rename-restart"
-    ]
-
-STATE_DOM_OK       = 1
-STATE_DOM_SHUTDOWN = 2
-
-SHUTDOWN_TIMEOUT = 30.0
 MIGRATE_TIMEOUT = 30.0
-
-ZOMBIE_PREFIX = 'Zombie-'
-
-"""Constants for the different stages of ext. device migration """
-DEV_MIGRATE_TEST  = 0
-DEV_MIGRATE_STEP1 = 1
-DEV_MIGRATE_STEP2 = 2
-DEV_MIGRATE_STEP3 = 3
-
-"""Minimum time between domain restarts in seconds."""
-MINIMUM_RESTART_TIME = 20
-
-RESTART_IN_PROGRESS = 'xend/restart_in_progress'
-
 
 xc = xen.lowlevel.xc.xc()
 xroot = XendRoot.instance()
 
 log = logging.getLogger("xend.XendDomainInfo")
 #log.setLevel(logging.TRACE)
-
 
 ##
 # All parameters of VMs that may be configured on-the-fly, or at start-up.
@@ -157,6 +105,8 @@ VM_STORE_ENTRIES = [
     ('shadow_memory', int),
     ('maxmem',        int),
     ('start_time',    float),
+    ('on_xend_start', str),
+    ('on_xend_stop', str),
     ]
 
 VM_STORE_ENTRIES += VM_CONFIG_PARAMS
@@ -182,224 +132,155 @@ VM_STORE_ENTRIES += VM_CONFIG_PARAMS
 
 
 def create(config):
-    """Create a VM from a configuration.
+    """Creates and start a VM using the supplied configuration. 
+    (called from XMLRPCServer directly)
 
-    @param config    configuration
-    @raise: VmError for invalid configuration
+    @param config: A configuration object involving lists of tuples.
+    @type  config: list of lists, eg ['vm', ['image', 'xen.gz']]
+
+    @rtype:  XendDomainInfo
+    @return: A up and running XendDomainInfo instance
+    @raise VmError: Invalid configuration or failure to start.
     """
 
     log.debug("XendDomainInfo.create(%s)", config)
-
-    vm = XendDomainInfo(parseConfig(config))
+    vm = XendDomainInfo(XendConfig(sxp = config))
     try:
-        vm.construct()
-        vm.initDomain()
-        vm.storeVmDetails()
-        vm.storeDomDetails()
-        vm.registerWatches()
-        vm.refreshShutdown()
-        return vm
+        vm.start()
     except:
         log.exception('Domain construction failed')
         vm.destroy()
         raise
 
+    return vm
 
-def recreate(xeninfo, priv):
+def recreate(info, priv):
     """Create the VM object for an existing domain.  The domain must not
     be dying, as the paths in the store should already have been removed,
-    and asking us to recreate them causes problems."""
+    and asking us to recreate them causes problems.
 
-    log.debug("XendDomainInfo.recreate(%s)", xeninfo)
+    @param xeninfo: Parsed configuration
+    @type  xeninfo: Dictionary
+    @param priv: TODO, unknown, something to do with memory
+    @type  priv: bool
 
-    assert not xeninfo['dying']
+    @rtype:  XendDomainInfo
+    @return: A up and running XendDomainInfo instance
+    @raise VmError: Invalid configuration.
+    @raise XendError: Errors with configuration.
+    """
 
-    domid = xeninfo['dom']
+    log.debug("XendDomainInfo.recreate(%s)", info)
+
+    assert not info['dying']
+
+    xeninfo = XendConfig(cfg = info)
+    domid = xeninfo['domid']
     uuid1 = xeninfo['handle']
     xeninfo['uuid'] = uuid.toString(uuid1)
+    needs_reinitialising = False
+    
     dompath = GetDomainPath(domid)
     if not dompath:
-        raise XendError(
-            'No domain path in store for existing domain %d' % domid)
+        raise XendError('No domain path in store for existing '
+                        'domain %d' % domid)
 
-    log.info("Recreating domain %d, UUID %s.", domid, xeninfo['uuid'])
+    log.info("Recreating domain %d, UUID %s. at %s" %
+             (domid, xeninfo['uuid'], dompath))
+
+    # need to verify the path and uuid if not Domain-0
+    # if the required uuid and vm aren't set, then that means
+    # we need to recreate the dom with our own values
+    #
+    # NOTE: this is probably not desirable, really we should just
+    #       abort or ignore, but there may be cases where xenstore's
+    #       entry disappears (eg. xenstore-rm /)
+    #
     try:
         vmpath = xstransact.Read(dompath, "vm")
         if not vmpath:
-            raise XendError(
-                'No vm path in store for existing domain %d' % domid)
+            log.warn('/local/domain/%d/vm is missing. recreate is '
+                     'confused, trying our best to recover' % domid)
+            needs_reinitialising = True
+            raise XendError('reinit')
+        
         uuid2_str = xstransact.Read(vmpath, "uuid")
         if not uuid2_str:
-            raise XendError(
-                'No vm/uuid path in store for existing domain %d' % domid)
-
+            log.warn('%s/uuid/ is missing. recreate is confused, '
+                     'trying our best to recover' % vmpath)
+            needs_reinitialising = True
+            raise XendError('reinit')
+        
         uuid2 = uuid.fromString(uuid2_str)
-
         if uuid1 != uuid2:
-            raise XendError(
-                'Uuid in store does not match uuid for existing domain %d: '
-                '%s != %s' % (domid, uuid2_str, xeninfo['uuid']))
+            log.warn('UUID in /vm does not match the UUID in /dom/%d.'
+                     'Trying out best to recover' % domid)
+            needs_reinitialising = True
+    except XendError:
+        pass # our best shot at 'goto' in python :)
 
-        vm = XendDomainInfo(xeninfo, domid, dompath, True, priv)
-
-    except Exception, exn:
-        if priv:
-            log.warn(str(exn))
-
-        vm = XendDomainInfo(xeninfo, domid, dompath, True, priv)
-        vm.recreateDom()
-        vm.removeVm()
-        vm.storeVmDetails()
-        vm.storeDomDetails()
-
-    vm.registerWatches()
-    vm.refreshShutdown(xeninfo)
+    vm = XendDomainInfo(xeninfo, domid, dompath, augment = True, priv = priv)
+    
+    if needs_reinitialising:
+        vm._recreateDom()
+        vm._removeVm()
+        vm._storeVmDetails()
+        vm._storeDomDetails()
+        
+    vm._registerWatches()
+    vm._refreshShutdown(xeninfo)
     return vm
 
 
 def restore(config):
     """Create a domain and a VM object to do a restore.
 
-    @param config: domain configuration
+    @param config: Domain configuration object
+    @type  config: list of lists. (see C{create})
+
+    @rtype:  XendDomainInfo
+    @return: A up and running XendDomainInfo instance
+    @raise VmError: Invalid configuration or failure to start.
+    @raise XendError: Errors with configuration.
     """
 
     log.debug("XendDomainInfo.restore(%s)", config)
 
-    vm = XendDomainInfo(parseConfig(config), None, None, False, False, True)
+    vm = XendDomainInfo(XendConfig(sxp = config), resume = True)
     try:
-        vm.construct()
-        vm.storeVmDetails()
-        vm.createDevices()
-        vm.createChannels()
-        vm.storeDomDetails()
-        vm.endRestore()
-        return vm
+        vm.resume()
     except:
         vm.destroy()
         raise
 
+def createDormant(xeninfo):
+    """Create a dormant/inactive XenDomainInfo without creating VM.
+    This is for creating instances of persistent domains that are not
+    yet start.
 
-def parseConfig(config):
-    def get_cfg(name, conv = None):
-        val = sxp.child_value(config, name)
-
-        if conv and not val is None:
-            try:
-                return conv(val)
-            except TypeError, exn:
-                raise VmError(
-                    'Invalid setting %s = %s in configuration: %s' %
-                    (name, val, str(exn)))
-        else:
-            return val
-
-
-    log.debug("parseConfig: config is %s", config)
-
-    result = {}
-
-    for e in ROUNDTRIPPING_CONFIG_ENTRIES:
-        result[e[0]] = get_cfg(e[0], e[1])
-
-    result['cpu']   = get_cfg('cpu',  int)
-    result['cpus']  = get_cfg('cpus', str)
-    result['image'] = get_cfg('image')
-    tmp_security = get_cfg('security')
-    if tmp_security:
-        result['security'] = tmp_security
-
-    try:
-        if result['image']:
-            v = sxp.child_value(result['image'], 'vcpus')
-            if result['vcpus'] is None and v is not None:
-                result['vcpus'] = int(v)
-            elif v is not None and int(v) != result['vcpus']:
-                log.warn(('Image VCPUs setting overrides vcpus=%d elsewhere.'
-                          '  Using %s VCPUs for VM %s.') %
-                         (result['vcpus'], v, result['uuid']))
-                result['vcpus'] = int(v)
-    except TypeError, exn:
-        raise VmError(
-            'Invalid configuration setting: vcpus = %s: %s' %
-            (sxp.child_value(result['image'], 'vcpus', 1), str(exn)))
-
-    try:
-        # support legacy config files with 'cpu' parameter
-        # NB: prepending to list to support previous behavior
-        #     where 'cpu' parameter pinned VCPU0.
-        if result['cpu']:
-           if result['cpus']:
-               result['cpus'] = "%s,%s" % (str(result['cpu']), result['cpus'])
-           else:
-               result['cpus'] = str(result['cpu'])
-
-        # convert 'cpus' string to list of ints
-        # 'cpus' supports a list of ranges (0-3), seperated by
-        # commas, and negation, (^1).  
-        # Precedence is settled by  order of the string:
-        #     "0-3,^1"   -> [0,2,3]
-        #     "0-3,^1,1" -> [0,1,2,3]
-        if result['cpus']:
-            cpus = []
-            for c in result['cpus'].split(','):
-                if c.find('-') != -1:             
-                    (x,y) = c.split('-')
-                    for i in range(int(x),int(y)+1):
-                        cpus.append(int(i))
-                else:
-                    # remove this element from the list 
-                    if c[0] == '^':
-                        cpus = [x for x in cpus if x != int(c[1:])]
-                    else:
-                        cpus.append(int(c))
-
-            result['cpus'] = cpus
-        
-    except ValueError, exn:
-        raise VmError(
-            'Invalid configuration setting: cpus = %s: %s' %
-            (result['cpus'], exn))
-
-    result['backend'] = []
-    for c in sxp.children(config, 'backend'):
-        result['backend'].append(sxp.name(sxp.child0(c)))
-
-    result['device'] = []
-    for d in sxp.children(config, 'device'):
-        c = sxp.child0(d)
-        result['device'].append((sxp.name(c), c))
-
-    # Configuration option "restart" is deprecated.  Parse it, but
-    # let on_xyz override it if they are present.
-    restart = get_cfg('restart')
-    if restart:
-        def handle_restart(event, val):
-            if result[event] is None:
-                result[event] = val
-
-        if restart == "onreboot":
-            handle_restart('on_poweroff', 'destroy')
-            handle_restart('on_reboot',   'restart')
-            handle_restart('on_crash',    'destroy')
-        elif restart == "always":
-            handle_restart('on_poweroff', 'restart')
-            handle_restart('on_reboot',   'restart')
-            handle_restart('on_crash',    'restart')
-        elif restart == "never":
-            handle_restart('on_poweroff', 'destroy')
-            handle_restart('on_reboot',   'destroy')
-            handle_restart('on_crash',    'destroy')
-        else:
-            log.warn("Ignoring malformed and deprecated config option "
-                     "restart = %s", restart)
-
-    result['start_time'] = get_cfg('start_time', float)
-
-    log.debug("parseConfig: result is %s", result)
-    return result
-
+    @param xeninfo: Parsed configuration
+    @type  xeninfo: dictionary
+    
+    @rtype:  XendDomainInfo
+    @return: A up and running XendDomainInfo instance
+    @raise XendError: Errors with configuration.    
+    """
+    
+    log.debug("XendDomainInfo.createDormant(%s)", xeninfo)
+    
+    # domid does not make sense for non-running domains.
+    xeninfo.pop('domid', None)
+    vm = XendDomainInfo(XendConfig(cfg = xeninfo))
+    return vm    
 
 def domain_by_name(name):
+    """Get domain by name
+
+    @params name: Name of the domain
+    @type   name: string
+    @return: XendDomainInfo or None
+    """
+    from xen.xend import XendDomain
     return XendDomain.instance().domain_lookup_by_name_nr(name)
 
 
@@ -411,17 +292,19 @@ def shutdown_reason(code):
     @return: shutdown reason
     @rtype:  string
     """
-    return shutdown_reasons.get(code, "?")
+    return DOMAIN_SHUTDOWN_REASONS.get(code, "?")
 
 def dom_get(dom):
     """Get info from xen for an existing domain.
 
     @param dom: domain id
+    @type  dom: int
     @return: info or None
+    @rtype: dictionary
     """
     try:
         domlist = xc.domain_getinfo(dom, 1)
-        if domlist and dom == domlist[0]['dom']:
+        if domlist and dom == domlist[0]['domid']:
             return domlist[0]
     except Exception, err:
         # ignore missing domain
@@ -430,32 +313,87 @@ def dom_get(dom):
 
 
 class XendDomainInfo:
+    """An object represents a domain.
 
+    @TODO: try to unify dom and domid, they mean the same thing, but
+           xc refers to it as dom, and everywhere else, including
+           xenstore it is domid. The best way is to change xc's
+           python interface.
+
+    @ivar info: Parsed configuration
+    @type info: dictionary
+    @ivar domid: Domain ID (if VM has started)
+    @type domid: int or None
+    @ivar vmpath: XenStore path to this VM.
+    @type vmpath: string
+    @ivar dompath: XenStore path to this Domain.
+    @type dompath: string
+    @ivar image:  Reference to the VM Image.
+    @type image: xen.xend.image.ImageHandler
+    @ivar store_port: event channel to xenstored
+    @type store_port: int
+    @ivar console_port: event channel to xenconsoled
+    @type console_port: int
+    @ivar store_mfn: xenstored mfn
+    @type store_mfn: int
+    @ivar console_mfn: xenconsoled mfn
+    @type console_mfn: int
+    @ivar vmWatch: reference to a watch on the xenstored vmpath
+    @type vmWatch: xen.xend.xenstore.xswatch
+    @ivar shutdownWatch: reference to watch on the xenstored domain shutdown
+    @type shutdownWatch: xen.xend.xenstore.xswatch
+    @ivar shutdownStartTime: UNIX Time when domain started shutting down.
+    @type shutdownStartTime: float or None
+    @ivar state: Domain state
+    @type state: enum(DOM_STATE_HALTED, DOM_STATE_RUNNING, ...)
+    @ivar state_updated: lock for self.state
+    @type state_updated: threading.Condition
+    @ivar refresh_shutdown_lock: lock for polling shutdown state
+    @type refresh_shutdown_lock: threading.Condition
+    @ivar _deviceControllers: device controller cache for this domain
+    @type _deviceControllers: dict 'string' to DevControllers
+    """
+    
     def __init__(self, info, domid = None, dompath = None, augment = False,
                  priv = False, resume = False):
+        """Constructor for a domain
+
+        @param   info: parsed configuration
+        @type    info: dictionary
+        @keyword domid: Set initial domain id (if any)
+        @type    domid: int
+        @keyword dompath: Set initial dompath (if any)
+        @type    dompath: string
+        @keyword augment: Augment given info with xenstored VM info
+        @type    augment: bool
+        @keyword priv: Is a privledged domain (Dom 0) (TODO: really?)
+        @type    priv: bool
+        @keyword resume: Is this domain being resumed?
+        @type    resume: bool
+        """
 
         self.info = info
-
-        if not self.infoIsSet('uuid'):
-            self.info['uuid'] = uuid.toString(uuid.create())
-
-        if domid is not None:
-            self.domid = domid
-        elif 'dom' in info:
-            self.domid = int(info['dom'])
+        if domid == None:
+            self.domid =  self.info.get('domid')
         else:
-            self.domid = None
+            self.domid = domid
+        
+        #REMOVE: uuid is now generated in XendConfig
+        #if not self._infoIsSet('uuid'):
+        #    self.info['uuid'] = uuid.toString(uuid.create())
 
-        self.vmpath  = XendDomain.VMROOT + self.info['uuid']
+        #REMOVE: domid logic can be shortened 
+        #if domid is not None:
+        #    self.domid = domid
+        #elif info.has_key('dom'):
+        #    self.domid = int(info['dom'])
+        #else:
+        #    self.domid = None
+
+        self.vmpath  = XS_VMROOT + self.info['uuid']
         self.dompath = dompath
 
-        if augment:
-            self.augmentInfo(priv)
-
-        self.validateInfo()
-
         self.image = None
-        self.security = None
         self.store_port = None
         self.store_mfn = None
         self.console_port = None
@@ -463,67 +401,215 @@ class XendDomainInfo:
 
         self.vmWatch = None
         self.shutdownWatch = None
-
         self.shutdownStartTime = None
         
-        self.state = STATE_DOM_OK
+        self.state = DOM_STATE_HALTED
         self.state_updated = threading.Condition()
         self.refresh_shutdown_lock = threading.Condition()
 
+        self._deviceControllers = {}
+
+        for state in DOM_STATES_OLD:
+            self.info[state] = 0
+
+        if augment:
+            self._augmentInfo(priv)
+
+        self._checkName(self.info['name'])
         self.setResume(resume)
+            
 
-    ## private:
+    #
+    # Public functions available through XMLRPC
+    #
 
-    def readVMDetails(self, params):
-        """Read the specified parameters from the store.
+
+    def start(self, is_managed = False):
+        """Attempts to start the VM by do the appropriate
+        initialisation if it not started.
+        """
+        from xen.xend import XendDomain
+        
+        if self.state == DOM_STATE_HALTED:
+            try:
+                self._constructDomain()
+                self._initDomain()
+                self._storeVmDetails()
+                self._storeDomDetails()
+                self._registerWatches()
+                self._refreshShutdown()
+                self.unpause()
+
+                # save running configuration if XendDomains believe domain is
+                # persistent
+                #
+                if is_managed:
+                    xendomains = XendDomain.instance()
+                    xendomains.managed_config_save(self)
+            except:
+                log.exception('VM start failed')
+                self.destroy()
+                raise
+        else:
+            raise XendError('VM already running')
+
+    def resume(self):
+        """Resumes a domain that has come back from suspension."""
+        if self.state in (DOM_STATE_HALTED, DOM_STATE_SUSPENDED):
+            try:
+                self._constructDomain()
+                self._storeVmDetails()
+                self._createDevices()
+                self._createChannels()
+                self._storeDomDetails()
+                self._endRestore()
+            except:
+                log.exception('VM resume failed')
+                raise
+        else:
+            raise XendError('VM already running')
+
+    def shutdown(self, reason):
+        """Shutdown a domain by signalling this via xenstored."""
+        log.debug('XendDomainInfo.shutdown')
+        if self.state in (DOM_STATE_SHUTDOWN, DOM_STATE_HALTED,):
+            raise XendError('Domain cannot be shutdown')
+        
+        if not reason in DOMAIN_SHUTDOWN_REASONS.values():
+            raise XendError('Invalid reason: %s' % reason)
+        self._storeDom("control/shutdown", reason)
+                
+    def pause(self):
+        """Pause domain
+        
+        @raise XendError: Failed pausing a domain
         """
         try:
-            return self.gatherVm(*params)
-        except ValueError:
-            # One of the int/float entries in params has a corresponding store
-            # entry that is invalid.  We recover, because older versions of
-            # Xend may have put the entry there (memory/target, for example),
-            # but this is in general a bad situation to have reached.
-            log.exception(
-                "Store corrupted at %s!  Domain %d's configuration may be "
-                "affected.", self.vmpath, self.domid)
-            return []
+            xc.domain_pause(self.domid)
+            self._stateSet(DOM_STATE_PAUSED)
+        except Exception, ex:
+            raise XendError("Domain unable to be paused: %s" % str(ex))
 
-
-    def storeChanged(self, _):
-        log.trace("XendDomainInfo.storeChanged");
-
-        changed = False
+    def unpause(self):
+        """Unpause domain
         
-        def f(x, y):
-            if y is not None and self.info[x[0]] != y:
-                self.info[x[0]] = y
-                changed = True
+        @raise XendError: Failed unpausing a domain
+        """
+        try:
+            xc.domain_unpause(self.domid)
+            self._stateSet(DOM_STATE_RUNNING)
+        except Exception, ex:
+            raise XendError("Domain unable to be unpaused: %s" % str(ex))
 
-        map(f, VM_CONFIG_PARAMS, self.readVMDetails(VM_CONFIG_PARAMS))
+    def send_sysrq(self, key):
+        """ Send a Sysrq equivalent key via xenstored."""
+        asserts.isCharConvertible(key)
+        self._storeDom("control/sysrq", '%c' % key)
 
-        im = self.readVm('image')
-        current_im = self.info['image']
-        if (im is not None and
-            (current_im is None or sxp.to_string(current_im) != im)):
-            self.info['image'] = sxp.from_string(im)
-            changed = True
+    def device_create(self, dev_config):
+        """Create a new device.
 
-        if changed:
-            # Update the domain section of the store, as this contains some
-            # parameters derived from the VM configuration.
-            self.storeDomDetails()
+        @param dev_config: device configuration
+        @type  dev_config: dictionary (parsed config)
+        """
+        log.debug("XendDomainInfo.device_create: %s" % dev_config)
+        dev_type = sxp.name(dev_config)
+        devid = self._createDevice(dev_type, dev_config)
+        self.info.device_add(dev_type, cfg_sxp = dev_config)        
+        self._waitForDevice(dev_type, devid)
+        return self.getDeviceController(dev_type).sxpr(devid)
 
-        return 1
+    def device_configure(self, dev_config, devid):
+        """Configure an existing device.
+        
+        @param dev_config: device configuration
+        @type  dev_config: dictionary (parsed config)
+        @param devid:      device id
+        @type  devid:      int
+        """
+        deviceClass = sxp.name(dev_config)
+        self._reconfigureDevice(deviceClass, devid, dev_config)
+
+    def waitForDevices(self):
+        """Wait for this domain's configured devices to connect.
+
+        @raise VmError: if any device fails to initialise.
+        """
+        for devclass in XendDevices.valid_devices():
+            self.getDeviceController(devclass).waitForDevices()
+
+    def destroyDevice(self, deviceClass, devid):
+        try:
+            devid = int(devid)
+        except ValueError:
+            # devid is not a number, let's search for it in xenstore.
+            devicePath = '%s/device/%s' % (self.dompath, deviceClass)
+            for entry in xstransact.List(devicePath):
+                backend = xstransact.Read('%s/%s' % (devicePath, entry),
+                                          "backend")
+                devName = xstransact.Read(backend, "dev")
+                if devName == devid:
+                    # We found the integer matching our devid, use it instead
+                    devid = entry
+                    break
+                
+        return self.getDeviceController(deviceClass).destroyDevice(devid)
 
 
-    def augmentInfo(self, priv):
-        """Augment self.info, as given to us through {@link #recreate}, with
-        values taken from the store.  This recovers those values known to xend
-        but not to the hypervisor.
+    def getDeviceSxprs(self, deviceClass):
+        return self.getDeviceController(deviceClass).sxprs()
+
+
+    def setMemoryTarget(self, target):
+        """Set the memory target of this domain.
+        @param target: In MiB.
+        """
+        log.debug("Setting memory target of domain %s (%d) to %d MiB.",
+                  self.info['name'], self.domid, target)
+        
+        if target <= 0:
+            raise XendError('Invalid memory size')
+        
+        self.info['memory'] = target
+        self.storeVm("memory", target)
+        self._storeDom("memory/target", target << 10)
+
+    def getVCPUInfo(self):
+        try:
+            # We include the domain name and ID, to help xm.
+            sxpr = ['domain',
+                    ['domid',      self.domid],
+                    ['name',       self.info['name']],
+                    ['vcpu_count', self.info['online_vcpus']]]
+
+            for i in range(0, self.info['max_vcpu_id']+1):
+                info = xc.vcpu_getinfo(self.domid, i)
+
+                sxpr.append(['vcpu',
+                             ['number',   i],
+                             ['online',   info['online']],
+                             ['blocked',  info['blocked']],
+                             ['running',  info['running']],
+                             ['cpu_time', info['cpu_time'] / 1e9],
+                             ['cpu',      info['cpu']],
+                             ['cpumap',   info['cpumap']]])
+
+            return sxpr
+
+        except RuntimeError, exn:
+            raise XendError(str(exn))
+
+    #
+    # internal functions ... TODO: re-categorised
+    # 
+
+    def _augmentInfo(self, priv):
+        """Augment self.info, as given to us through L{recreate}, with
+        values taken from the store.  This recovers those values known
+        to xend but not to the hypervisor.
         """
         def useIfNeeded(name, val):
-            if not self.infoIsSet(name) and val is not None:
+            if not self._infoIsSet(name) and val is not None:
                 self.info[name] = val
 
         if priv:
@@ -536,199 +622,63 @@ class XendDomainInfo:
         entries.append(('security', str))
 
         map(lambda x, y: useIfNeeded(x[0], y), entries,
-            self.readVMDetails(entries))
+            self._readVMDetails(entries))
 
-        device = []
-        for c in controllerClasses:
-            devconfig = self.getDeviceConfigurations(c)
+        devices = []
+
+        for devclass in XendDevices.valid_devices():
+            devconfig = self.getDeviceController(devclass).configurations()
             if devconfig:
-                device.extend(map(lambda x: (c, x), devconfig))
-        useIfNeeded('device', device)
+                devices.extend(map(lambda conf: (devclass, conf), devconfig))
 
+        if not self.info['device'] and devices is not None:
+            for device in devices:
+                self.info.device_add(device[0], cfg_sxp = device)
 
-    def validateInfo(self):
-        """Validate and normalise the info block.  This has either been parsed
-        by parseConfig, or received from xc through recreate and augmented by
-        the current store contents.
-        """
-        def defaultInfo(name, val):
-            if not self.infoIsSet(name):
-                self.info[name] = val()
+    #
+    # Function to update xenstore /vm/*
+    #
 
-        try:
-            defaultInfo('name',         lambda: "Domain-%d" % self.domid)
-            defaultInfo('on_poweroff',  lambda: "destroy")
-            defaultInfo('on_reboot',    lambda: "restart")
-            defaultInfo('on_crash',     lambda: "restart")
-            defaultInfo('features',     lambda: "")
-            defaultInfo('cpu',          lambda: None)
-            defaultInfo('cpus',         lambda: [])
-            defaultInfo('cpu_cap',      lambda: 0)
-            defaultInfo('cpu_weight',   lambda: 256)
-
-            # some domains don't have a config file (e.g. dom0 )
-            # to set number of vcpus so we derive available cpus
-            # from max_vcpu_id which is present for running domains.
-            if not self.infoIsSet('vcpus') and self.infoIsSet('max_vcpu_id'):
-                avail = int(self.info['max_vcpu_id'])+1
-            else:
-                avail = int(1)
-
-            defaultInfo('vcpus',        lambda: avail)
-            defaultInfo('online_vcpus', lambda: self.info['vcpus'])
-            defaultInfo('max_vcpu_id',  lambda: self.info['vcpus']-1)
-            defaultInfo('vcpu_avail',   lambda: (1 << self.info['vcpus']) - 1)
-
-            defaultInfo('memory',       lambda: 0)
-            defaultInfo('shadow_memory', lambda: 0)
-            defaultInfo('maxmem',       lambda: 0)
-            defaultInfo('bootloader',   lambda: None)
-            defaultInfo('bootloader_args', lambda: None)            
-            defaultInfo('backend',      lambda: [])
-            defaultInfo('device',       lambda: [])
-            defaultInfo('image',        lambda: None)
-            defaultInfo('security',     lambda: None)
-
-            self.check_name(self.info['name'])
-
-            if isinstance(self.info['image'], str):
-                self.info['image'] = sxp.from_string(self.info['image'])
-
-            if isinstance(self.info['security'], str):
-                self.info['security'] = sxp.from_string(self.info['security'])
-
-            if self.info['memory'] == 0:
-                if self.infoIsSet('mem_kb'):
-                    self.info['memory'] = (self.info['mem_kb'] + 1023) / 1024
-            if self.info['memory'] <= 0:
-                raise VmError('Invalid memory size')
-
-            if self.info['maxmem'] < self.info['memory']:
-                self.info['maxmem'] = self.info['memory']
-
-            for (n, c) in self.info['device']:
-                if not n or not c or n not in controllerClasses:
-                    raise VmError('invalid device (%s, %s)' %
-                                  (str(n), str(c)))
-
-            for event in ['on_poweroff', 'on_reboot', 'on_crash']:
-                if self.info[event] not in restart_modes:
-                    raise VmError('invalid restart event: %s = %s' %
-                                  (event, str(self.info[event])))
-
-        except KeyError, exn:
-            log.exception(exn)
-            raise VmError('Unspecified domain detail: %s' % exn)
-
-
-    def readVm(self, *args):
+    def _readVm(self, *args):
         return xstransact.Read(self.vmpath, *args)
 
-    def writeVm(self, *args):
+    def _writeVm(self, *args):
         return xstransact.Write(self.vmpath, *args)
 
-    def removeVm(self, *args):
+    def _removeVm(self, *args):
         return xstransact.Remove(self.vmpath, *args)
 
-    def gatherVm(self, *args):
+    def _gatherVm(self, *args):
         return xstransact.Gather(self.vmpath, *args)
-
-
-    ## public:
 
     def storeVm(self, *args):
         return xstransact.Store(self.vmpath, *args)
 
+    #
+    # Function to update xenstore /dom/*
+    #
 
-    ## private:
-
-    def readDom(self, *args):
+    def _readDom(self, *args):
         return xstransact.Read(self.dompath, *args)
 
-    def writeDom(self, *args):
+    def _writeDom(self, *args):
         return xstransact.Write(self.dompath, *args)
 
-
-    ## public:
-
-    def removeDom(self, *args):
+    def _removeDom(self, *args):
         return xstransact.Remove(self.dompath, *args)
 
-    def recreateDom(self):
-        complete(self.dompath, lambda t: self._recreateDom(t))
+    def _storeDom(self, *args):
+        return xstransact.Store(self.dompath, *args)
 
-    def _recreateDom(self, t):
+    def _recreateDom(self):
+        complete(self.dompath, lambda t: self._recreateDomFunc(t))
+
+    def _recreateDomFunc(self, t):
         t.remove()
         t.mkdir()
         t.set_permissions({ 'dom' : self.domid })
 
-
-    ## private:
-
-    def storeDom(self, *args):
-        return xstransact.Store(self.dompath, *args)
-
-
-    ## public:
-
-    def completeRestore(self, store_mfn, console_mfn):
-
-        log.debug("XendDomainInfo.completeRestore")
-
-        self.store_mfn = store_mfn
-        self.console_mfn = console_mfn
-
-        self.introduceDomain()
-        self.storeDomDetails()
-        self.registerWatches()
-        self.refreshShutdown()
-
-        log.debug("XendDomainInfo.completeRestore done")
-
-
-    def storeVmDetails(self):
-        to_store = {}
-
-        for k in VM_STORE_ENTRIES:
-            if self.infoIsSet(k[0]):
-                to_store[k[0]] = str(self.info[k[0]])
-
-        if self.infoIsSet('image'):
-            to_store['image'] = sxp.to_string(self.info['image'])
-
-        if self.infoIsSet('security'):
-            security = self.info['security']
-            to_store['security'] = sxp.to_string(security)
-            for idx in range(0, len(security)):
-                if security[idx][0] == 'access_control':
-                    to_store['security/access_control'] = sxp.to_string([ security[idx][1] , security[idx][2] ])
-                    for aidx in range(1, len(security[idx])):
-                        if security[idx][aidx][0] == 'label':
-                            to_store['security/access_control/label'] = security[idx][aidx][1]
-                        if security[idx][aidx][0] == 'policy':
-                            to_store['security/access_control/policy'] = security[idx][aidx][1]
-                if security[idx][0] == 'ssidref':
-                    to_store['security/ssidref'] = str(security[idx][1])
-
-        if not self.readVm('xend/restart_count'):
-            to_store['xend/restart_count'] = str(0)
-
-        log.debug("Storing VM details: %s", to_store)
-
-        self.writeVm(to_store)
-        self.setVmPermissions()
-
-
-    def setVmPermissions(self):
-        """Allow the guest domain to read its UUID.  We don't allow it to
-        access any other entry, for security."""
-        xstransact.SetPermissions('%s/uuid' % self.vmpath,
-                                  { 'dom' : self.domid,
-                                    'read' : True,
-                                    'write' : False })
-
-
-    def storeDomDetails(self):
+    def _storeDomDetails(self):
         to_store = {
             'domid':              str(self.domid),
             'vm':                 self.vmpath,
@@ -746,16 +696,13 @@ class XendDomainInfo:
         f('store/port',       self.store_port)
         f('store/ring-ref',   self.store_mfn)
 
-        to_store.update(self.vcpuDomDetails())
+        to_store.update(self._vcpuDomDetails())
 
         log.debug("Storing domain details: %s", to_store)
 
-        self.writeDom(to_store)
+        self._writeDom(to_store)
 
-
-    ## private:
-
-    def vcpuDomDetails(self):
+    def _vcpuDomDetails(self):
         def availability(n):
             if self.info['vcpu_avail'] & (1 << n):
                 return 'online'
@@ -767,25 +714,80 @@ class XendDomainInfo:
             result["cpu/%d/availability" % v] = availability(v)
         return result
 
+    #
+    # xenstore watches
+    #
 
-    ## public:
-
-    def registerWatches(self):
+    def _registerWatches(self):
         """Register a watch on this VM's entries in the store, and the
         domain's control/shutdown node, so that when they are changed
         externally, we keep up to date.  This should only be called by {@link
         #create}, {@link #recreate}, or {@link #restore}, once the domain's
         details have been written, but before the new instance is returned."""
-        self.vmWatch = xswatch(self.vmpath, self.storeChanged)
+        self.vmWatch = xswatch(self.vmpath, self._storeChanged)
         self.shutdownWatch = xswatch(self.dompath + '/control/shutdown',
-                                     self.handleShutdownWatch)
+                                     self._handleShutdownWatch)
+
+    def _storeChanged(self, _):
+        log.trace("XendDomainInfo.storeChanged");
+
+        changed = False
+        
+        def f(x, y):
+            if y is not None and self.info[x[0]] != y:
+                self.info[x[0]] = y
+                changed = True
+
+        map(f, VM_CONFIG_PARAMS, self._readVMDetails(VM_CONFIG_PARAMS))
+
+        im = self._readVm('image')
+        current_im = self.info['image']
+        if (im is not None and
+            (current_im is None or sxp.to_string(current_im) != im)):
+            self.info['image'] = sxp.from_string(im)
+            changed = True
+
+        if changed:
+            # Update the domain section of the store, as this contains some
+            # parameters derived from the VM configuration.
+            self._storeDomDetails()
+
+        return 1
+
+    def _handleShutdownWatch(self, _):
+        log.debug('XendDomainInfo.handleShutdownWatch')
+        
+        reason = self._readDom('control/shutdown')
+
+        if reason and reason != 'suspend':
+            sst = self._readDom('xend/shutdown_start_time')
+            now = time.time()
+            if sst:
+                self.shutdownStartTime = float(sst)
+                timeout = float(sst) + SHUTDOWN_TIMEOUT - now
+            else:
+                self.shutdownStartTime = now
+                self._storeDom('xend/shutdown_start_time', now)
+                timeout = SHUTDOWN_TIMEOUT
+
+            log.trace(
+                "Scheduling refreshShutdown on domain %d in %ds.",
+                self.domid, timeout)
+            threading.Timer(timeout, self._refreshShutdown).start()
+
+        return True
+
+
+    #
+    # Public Attributes for the VM
+    #
 
 
     def getDomid(self):
         return self.domid
 
     def setName(self, name):
-        self.check_name(name)
+        self._checkName(name)
         self.info['name'] = name
         self.storeVm("name", name)
 
@@ -812,11 +814,10 @@ class XendDomainInfo:
     def getVCpuCount(self):
         return self.info['vcpus']
 
-
     def setVCpuCount(self, vcpus):
         self.info['vcpu_avail'] = (1 << vcpus) - 1
         self.storeVm('vcpu_avail', self.info['vcpu_avail'])
-        self.writeDom(self.vcpuDomDetails())
+        self._writeDom(self._vcpuDomDetails())
 
     def getLabel(self):
         return security.get_security_info(self.info, 'label')
@@ -834,16 +835,13 @@ class XendDomainInfo:
     def getWeight(self):
         return self.info['cpu_weight']
 
-    def endRestore(self):
-        self.setResume(False)
-
     def setResume(self, state):
         self.info['resume'] = state
 
     def getRestartCount(self):
-        return self.readVm('xend/restart_count')
+        return self._readVm('xend/restart_count')
 
-    def refreshShutdown(self, xeninfo = None):
+    def _refreshShutdown(self, xeninfo = None):
         # If set at the end of this method, a restart is required, with the
         # given reason.  This restart has to be done out of the scope of
         # refresh_shutdown_lock.
@@ -862,6 +860,7 @@ class XendDomainInfo:
                     # VM may have migrated to a different domain on this
                     # machine.
                     self.cleanupDomain()
+                    self._stateSet(DOM_STATE_HALTED)
                     return
 
             if xeninfo['dying']:
@@ -873,10 +872,11 @@ class XendDomainInfo:
                 # holding the pages, by calling cleanupDomain.  We can't
                 # clean up the VM, as above.
                 self.cleanupDomain()
+                self._stateSet(DOM_STATE_SHUTDOWN)
                 return
 
             elif xeninfo['crashed']:
-                if self.readDom('xend/shutdown_completed'):
+                if self._readDom('xend/shutdown_completed'):
                     # We've seen this shutdown already, but we are preserving
                     # the domain for debugging.  Leave it alone.
                     return
@@ -888,9 +888,11 @@ class XendDomainInfo:
                     self.dumpCore()
 
                 restart_reason = 'crash'
+                self._stateSet(DOM_STATE_HALTED)
 
             elif xeninfo['shutdown']:
-                if self.readDom('xend/shutdown_completed'):
+                self._stateSet(DOM_STATE_SHUTDOWN)
+                if self._readDom('xend/shutdown_completed'):
                     # We've seen this shutdown already, but we are preserving
                     # the domain for debugging.  Leave it alone.
                     return
@@ -901,15 +903,15 @@ class XendDomainInfo:
                     log.info('Domain has shutdown: name=%s id=%d reason=%s.',
                              self.info['name'], self.domid, reason)
 
-                    self.clearRestart()
+                    self._clearRestart()
 
                     if reason == 'suspend':
-                        self.state_set(STATE_DOM_SHUTDOWN)
+                        self._stateSet(DOM_STATE_SUSPENDED)
                         # Don't destroy the domain.  XendCheckpoint will do
                         # this once it has finished.  However, stop watching
                         # the VM path now, otherwise we will end up with one
                         # watch for the old domain, and one for the new.
-                        self.unwatchVm()
+                        self._unwatchVm()
                     elif reason in ['poweroff', 'reboot']:
                         restart_reason = reason
                     else:
@@ -923,7 +925,8 @@ class XendDomainInfo:
             else:
                 # Domain is alive.  If we are shutting it down, then check
                 # the timeout on that, and destroy it if necessary.
-
+                self._stateSet(DOM_STATE_RUNNING)
+                
                 if self.shutdownStartTime:
                     timeout = (SHUTDOWN_TIMEOUT - time.time() +
                                self.shutdownStartTime)
@@ -936,61 +939,133 @@ class XendDomainInfo:
             self.refresh_shutdown_lock.release()
 
         if restart_reason:
-            self.maybeRestart(restart_reason)
+            self._maybeRestart(restart_reason)
 
 
-    def handleShutdownWatch(self, _):
-        log.debug('XendDomainInfo.handleShutdownWatch')
-        
-        reason = self.readDom('control/shutdown')
+    #
+    # Restart functions - handling whether we come back up on shutdown.
+    #
 
-        if reason and reason != 'suspend':
-            sst = self.readDom('xend/shutdown_start_time')
-            now = time.time()
-            if sst:
-                self.shutdownStartTime = float(sst)
-                timeout = float(sst) + SHUTDOWN_TIMEOUT - now
-            else:
-                self.shutdownStartTime = now
-                self.storeDom('xend/shutdown_start_time', now)
-                timeout = SHUTDOWN_TIMEOUT
-
-            log.trace(
-                "Scheduling refreshShutdown on domain %d in %ds.",
-                self.domid, timeout)
-            threading.Timer(timeout, self.refreshShutdown).start()
-
-        return True
+    def _clearRestart(self):
+        self._removeDom("xend/shutdown_start_time")
 
 
-    def shutdown(self, reason):
-        if not reason in shutdown_reasons.values():
-            raise XendError('Invalid reason: %s' % reason)
-        if self.domid == 0:
-            raise XendError("Can't specify Domain-0")
-        self.storeDom("control/shutdown", reason)
-
-
-    ## private:
-
-    def clearRestart(self):
-        self.removeDom("xend/shutdown_start_time")
-
-
-    def maybeRestart(self, reason):
+    def _maybeRestart(self, reason):
         # Dispatch to the correct method based upon the configured on_{reason}
         # behaviour.
         {"destroy"        : self.destroy,
-         "restart"        : self.restart,
-         "preserve"       : self.preserve,
-         "rename-restart" : self.renameRestart}[self.info['on_' + reason]]()
+         "restart"        : self._restart,
+         "preserve"       : self._preserve,
+         "rename-restart" : self._renameRestart}[self.info['on_' + reason]]()
 
 
-    def renameRestart(self):
-        self.restart(True)
+    def _renameRestart(self):
+        self._restart(True)
+
+    def _restart(self, rename = False):
+        """Restart the domain after it has exited.
+
+        @param rename True if the old domain is to be renamed and preserved,
+        False if it is to be destroyed.
+        """
+        from xen.xend import XendDomain
+        
+        self._configureBootloader()
+        config = self.sxpr()
+
+        if self._infoIsSet('cpus') and len(self.info['cpus']) != 0:
+            config.append(['cpus', reduce(lambda x, y: str(x) + "," + str(y),
+                                          self.info['cpus'])])
+
+        if self._readVm(RESTART_IN_PROGRESS):
+            log.error('Xend failed during restart of domain %s.  '
+                      'Refusing to restart to avoid loops.',
+                      str(self.domid))
+            self.destroy()
+            return
+
+        self._writeVm(RESTART_IN_PROGRESS, 'True')
+
+        now = time.time()
+        rst = self._readVm('xend/previous_restart_time')
+        if rst:
+            rst = float(rst)
+            timeout = now - rst
+            if timeout < MINIMUM_RESTART_TIME:
+                log.error(
+                    'VM %s restarting too fast (%f seconds since the last '
+                    'restart).  Refusing to restart to avoid loops.',
+                    self.info['name'], timeout)
+                self.destroy()
+                return
+
+        self._writeVm('xend/previous_restart_time', str(now))
+
+        try:
+            if rename:
+                self._preserveForRestart()
+            else:
+                self._unwatchVm()
+                self.destroyDomain()
+
+            # new_dom's VM will be the same as this domain's VM, except where
+            # the rename flag has instructed us to call preserveForRestart.
+            # In that case, it is important that we remove the
+            # RESTART_IN_PROGRESS node from the new domain, not the old one,
+            # once the new one is available.
+
+            new_dom = None
+            try:
+                new_dom = XendDomain.instance().domain_create(config)
+                new_dom.unpause()
+                rst_cnt = self._readVm('xend/restart_count')
+                rst_cnt = int(rst_cnt) + 1
+                self._writeVm('xend/restart_count', str(rst_cnt))
+                new_dom._removeVm(RESTART_IN_PROGRESS)
+            except:
+                if new_dom:
+                    new_dom._removeVm(RESTART_IN_PROGRESS)
+                    new_dom.destroy()
+                else:
+                    self._removeVm(RESTART_IN_PROGRESS)
+                raise
+        except:
+            log.exception('Failed to restart domain %s.', str(self.domid))
 
 
-    def dumpCore(self,corefile=None):
+    def _preserveForRestart(self):
+        """Preserve a domain that has been shut down, by giving it a new UUID,
+        cloning the VM details, and giving it a new name.  This allows us to
+        keep this domain for debugging, but restart a new one in its place
+        preserving the restart semantics (name and UUID preserved).
+        """
+        
+        new_uuid = uuid.createString()
+        new_name = 'Domain-%s' % new_uuid
+        log.info("Renaming dead domain %s (%d, %s) to %s (%s).",
+                 self.info['name'], self.domid, self.info['uuid'],
+                 new_name, new_uuid)
+        self._unwatchVm()
+        self._releaseDevices()
+        self.info['name'] = new_name
+        self.info['uuid'] = new_uuid
+        self.vmpath = XS_VMROOT + new_uuid
+        self._storeVmDetails()
+        self._preserve()
+
+
+    def _preserve(self):
+        log.info("Preserving dead domain %s (%d).", self.info['name'],
+                 self.domid)
+        self._unwatchVm()
+        self._storeDom('xend/shutdown_completed', 'True')
+        self._stateSet(DOM_STATE_HALTED)
+
+    #
+    # Debugging ..
+    #
+
+    def dumpCore(self, corefile = None):
         """Create a core dump for this domain.  Nothrow guarantee."""
         
         try:
@@ -1011,259 +1086,121 @@ class XendDomainInfo:
                           self.domid, self.info['name'])
             raise XendError("Failed to dump core: %s" %  str(ex))
 
-    ## public:
+    #
+    # Device creation/deletion functions
+    #
 
-    def setMemoryTarget(self, target):
-        """Set the memory target of this domain.
-        @param target In MiB.
-        """
-        if target <= 0:
-            raise XendError('Invalid memory size')
-        
-        log.debug("Setting memory target of domain %s (%d) to %d MiB.",
-                  self.info['name'], self.domid, target)
-        
-        self.info['memory'] = target
-        self.storeVm("memory", target)
-        self.storeDom("memory/target", target << 10)
+    def _createDevice(self, deviceClass, devConfig):
+        return self.getDeviceController(deviceClass).createDevice(devConfig)
 
-
-    def update(self, info = None):
-        """Update with info from xc.domain_getinfo().
-        """
-
-        log.trace("XendDomainInfo.update(%s) on domain %d", info, self.domid)
-        if not info:
-            info = dom_get(self.domid)
-            if not info:
-                return
-            
-        #manually update ssidref / security fields
-        if security.on() and info.has_key('ssidref'):
-            if (info['ssidref'] != 0) and self.info.has_key('security'):
-                security_field = self.info['security']
-                if not security_field:
-                    #create new security element
-                    self.info.update({'security': [['ssidref', str(info['ssidref'])]]})
-            #ssidref field not used any longer
-        info.pop('ssidref')
-
-        self.info.update(info)
-        self.validateInfo()
-        self.refreshShutdown(info)
-
-        log.trace("XendDomainInfo.update done on domain %d: %s", self.domid,
-                  self.info)
-
-
-    ## private:
-
-    def state_set(self, state):
-        self.state_updated.acquire()
-        try:
-            if self.state != state:
-                self.state = state
-                self.state_updated.notifyAll()
-        finally:
-            self.state_updated.release()
-
-
-    ## public:
-
-    def waitForShutdown(self):
-        self.state_updated.acquire()
-        try:
-            while self.state == STATE_DOM_OK:
-                self.state_updated.wait()
-        finally:
-            self.state_updated.release()
-
-
-    def __str__(self):
-        s = "<domain"
-        s += " id=" + str(self.domid)
-        s += " name=" + self.info['name']
-        s += " memory=" + str(self.info['memory'])
-        s += ">"
-        return s
-
-    __repr__ = __str__
-
-
-    ## private:
-
-    def createDevice(self, deviceClass, devconfig):
-        return self.getDeviceController(deviceClass).createDevice(devconfig)
-
-
-    def waitForDevices_(self, deviceClass):
-        return self.getDeviceController(deviceClass).waitForDevices()
-
-
-    def waitForDevice(self, deviceClass, devid):
+    def _waitForDevice(self, deviceClass, devid):
         return self.getDeviceController(deviceClass).waitForDevice(devid)
 
-
-    def reconfigureDevice(self, deviceClass, devid, devconfig):
+    def _reconfigureDevice(self, deviceClass, devid, devconfig):
         return self.getDeviceController(deviceClass).reconfigureDevice(
             devid, devconfig)
 
+    def _createDevices(self):
+        """Create the devices for a vm.
 
-    ## public:
+        @raise: VmError for invalid devices
+        """
+        for (devclass, config) in self.info.all_devices_sxpr():
+            log.info("createDevice: %s : %s" % (devclass, config))
+            self._createDevice(devclass, config)
 
-    def destroyDevice(self, deviceClass, devid):
-        if type(devid) is str:
-            devicePath = '%s/device/%s' % (self.dompath, deviceClass)
-            for entry in xstransact.List(devicePath):
-                backend = xstransact.Read('%s/%s' % (devicePath, entry),
-                                          "backend")
-                devName = xstransact.Read(backend, "dev")
-                if devName == devid:
-                    # We found the integer matching our devid, use it instead
-                    devid = entry
-                    break
-        return self.getDeviceController(deviceClass).destroyDevice(devid)
+        if self.image:
+            self.image.createDeviceModel()
 
+    def _releaseDevices(self):
+        """Release all domain's devices.  Nothrow guarantee."""
 
-    def getDeviceSxprs(self, deviceClass):
-        return self.getDeviceController(deviceClass).sxprs()
-
-
-    ## private:
-
-    def getDeviceConfigurations(self, deviceClass):
-        return self.getDeviceController(deviceClass).configurations()
-
+        while True:
+            t = xstransact("%s/device" % self.dompath)
+            for devclass in XendDevices.valid_devices():
+                for dev in t.list(devclass):
+                    try:
+                        t.remove(dev)
+                    except:
+                        # Log and swallow any exceptions in removal --
+                        # there's nothing more we can do.
+                        log.exception(
+                           "Device release failed: %s; %s; %s",
+                           self.info['name'], devclass, dev)
+            if t.commit():
+                break
 
     def getDeviceController(self, name):
-        if name not in controllerClasses:
-            raise XendError("unknown device type: " + str(name))
+        """Get the device controller for this domain, and if it
+        doesn't exist, create it.
 
-        return controllerClasses[name](self)
+        @param name: device class name
+        @type name: string
+        @rtype: subclass of DevController
+        """
+        if name not in self._deviceControllers:
+            devController = XendDevices.make_controller(name, self)
+            if not devController:
+                raise XendError("Unknown device type: %s" % name)
+            self._deviceControllers[name] = devController
+    
+        return self._deviceControllers[name]
 
+    #
+    # Migration functions (public)
+    # 
 
-    ## public:
+    def testMigrateDevices(self, network, dst):
+        """ Notify all device about intention of migration
+        @raise: XendError for a device that cannot be migrated
+        """
+        for (n, c) in self.info.all_devices_sxpr():
+            rc = self.migrateDevice(n, c, network, dst, DEV_MIGRATE_TEST)
+            if rc != 0:
+                raise XendError("Device of type '%s' refuses migration." % n)
 
-    def sxpr(self):
-        sxpr = ['domain',
-                ['domid',   self.domid]]
-
-        for e in ROUNDTRIPPING_CONFIG_ENTRIES:
-            if self.infoIsSet(e[0]):
-                sxpr.append([e[0], self.info[e[0]]])
-        
-        if self.infoIsSet('image'):
-            sxpr.append(['image', self.info['image']])
-
-        if self.infoIsSet('security'):
-            sxpr.append(['security', self.info['security']])
-
-        for cls in controllerClasses:
-            for config in self.getDeviceConfigurations(cls):
-                sxpr.append(['device', config])
-
-        def stateChar(name):
-            if name in self.info:
-                if self.info[name]:
-                    return name[0]
-                else:
-                    return '-'
-            else:
-                return '?'
-
-        state = reduce(
-            lambda x, y: x + y,
-            map(stateChar,
-                ['running', 'blocked', 'paused', 'shutdown', 'crashed',
-                 'dying']))
-
-        sxpr.append(['state', state])
-        if self.infoIsSet('shutdown'):
-            reason = shutdown_reason(self.info['shutdown_reason'])
-            sxpr.append(['shutdown_reason', reason])
-        if self.infoIsSet('cpu_time'):
-            sxpr.append(['cpu_time', self.info['cpu_time']/1e9])
-        sxpr.append(['online_vcpus', self.info['online_vcpus']])
-            
-        if self.infoIsSet('start_time'):
-            up_time =  time.time() - self.info['start_time']
-            sxpr.append(['up_time', str(up_time) ])
-            sxpr.append(['start_time', str(self.info['start_time']) ])
-
-        if self.store_mfn:
-            sxpr.append(['store_mfn', self.store_mfn])
-        if self.console_mfn:
-            sxpr.append(['console_mfn', self.console_mfn])
-
-        return sxpr
-
-
-    def getVCPUInfo(self):
+    def migrateDevices(self, network, dst, step, domName=''):
+        """Notify the devices about migration
+        """
+        ctr = 0
         try:
-            # We include the domain name and ID, to help xm.
-            sxpr = ['domain',
-                    ['domid',      self.domid],
-                    ['name',       self.info['name']],
-                    ['vcpu_count', self.info['online_vcpus']]]
+            for (dev_type, dev_conf) in self.info.all_devices_sxpr():
+                self.migrateDevice(dev_type, dev_conf, network, dst,
+                                   step, domName)
+                ctr = ctr + 1
+        except:
+            for dev_type, dev_conf in self.info.all_devices_sxpr():
+                if ctr == 0:
+                    step = step - 1
+                ctr = ctr - 1
+                self._recoverMigrateDevice(dev_type, dev_conf, network,
+                                           dst, step, domName)
+            raise
 
-            for i in range(0, self.info['max_vcpu_id']+1):
-                info = xc.vcpu_getinfo(self.domid, i)
+    def migrateDevice(self, deviceClass, deviceConfig, network, dst,
+                      step, domName=''):
+        return self.getDeviceController(deviceClass).migrate(deviceConfig,
+                                        network, dst, step, domName)
 
-                sxpr.append(['vcpu',
-                             ['number',   i],
-                             ['online',   info['online']],
-                             ['blocked',  info['blocked']],
-                             ['running',  info['running']],
-                             ['cpu_time', info['cpu_time'] / 1e9],
-                             ['cpu',      info['cpu']],
-                             ['cpumap',   info['cpumap']]])
+    def _recoverMigrateDevice(self, deviceClass, deviceConfig, network,
+                             dst, step, domName=''):
+        return self.getDeviceController(deviceClass).recover_migrate(
+                     deviceConfig, network, dst, step, domName)
 
-            return sxpr
-
-        except RuntimeError, exn:
-            raise XendError(str(exn))
-                      
 
     ## private:
 
-    def check_name(self, name):
-        """Check if a vm name is valid. Valid names contain alphabetic characters,
-        digits, or characters in '_-.:/+'.
-        The same name cannot be used for more than one vm at the same time.
-
-        @param name: name
-        @raise: VmError if invalid
-        """
-        if name is None or name == '':
-            raise VmError('missing vm name')
-        for c in name:
-            if c in string.digits: continue
-            if c in '_-.:/+': continue
-            if c in string.ascii_letters: continue
-            raise VmError('invalid vm name')
-
-        dominfo = domain_by_name(name)
-        if not dominfo:
-            return
-        if self.domid is None:
-            raise VmError("VM name '%s' already in use by domain %d" %
-                          (name, dominfo.domid))
-        if dominfo.domid != self.domid:
-            raise VmError("VM name '%s' is used in both domains %d and %d" %
-                          (name, self.domid, dominfo.domid))
-
-
-    def construct(self):
+    def _constructDomain(self):
         """Construct the domain.
 
         @raise: VmError on error
         """
 
-        log.debug('XendDomainInfo.construct: %s',
-                  self.domid)
+        log.debug('XendDomainInfo.constructDomain')
 
         self.domid = xc.domain_create(
-            dom = 0, ssidref = security.get_security_info(self.info, 'ssidref'),
+            domid = 0,
+            ssidref = security.get_security_info(self.info, 'ssidref'),
             handle = uuid.fromString(self.info['uuid']))
 
         if self.domid < 0:
@@ -1272,13 +1209,13 @@ class XendDomainInfo:
 
         self.dompath = GetDomainPath(self.domid)
 
-        self.recreateDom()
+        self._recreateDom()
 
         # Set maximum number of vcpus in domain
         xc.domain_max_vcpus(self.domid, int(self.info['vcpus']))
 
 
-    def introduceDomain(self):
+    def _introduceDomain(self):
         assert self.domid is not None
         assert self.store_mfn is not None
         assert self.store_port is not None
@@ -1289,25 +1226,25 @@ class XendDomainInfo:
             raise XendError(str(exn))
 
 
-    def initDomain(self):
+    def _initDomain(self):
         log.debug('XendDomainInfo.initDomain: %s %s',
                   self.domid,
                   self.info['cpu_weight'])
 
         # if we have a boot loader but no image, then we need to set things
         # up by running the boot loader non-interactively
-        if self.infoIsSet('bootloader') and not self.infoIsSet('image'):
-            self.configure_bootloader()
+        if self._infoIsSet('bootloader') and not self._infoIsSet('image'):
+            self._configureBootloader()
 
-        if not self.infoIsSet('image'):
+        if not self._infoIsSet('image'):
             raise VmError('Missing image in configuration')
 
         try:
             self.image = image.create(self,
                                       self.info['image'],
-                                      self.info['device'])
+                                      self.info.all_devices_sxpr())
 
-            localtime = self.info['localtime']
+            localtime = self.info.get('localtime', 0)
             if localtime is not None and localtime == 1:
                 xc.domain_set_time_offset(self.domid)
 
@@ -1352,7 +1289,7 @@ class XendDomainInfo:
             xc.domain_memory_increase_reservation(self.domid, reservation, 0,
                                                   0)
 
-            self.createChannels()
+            self._createChannels()
 
             channel_details = self.image.createImage()
 
@@ -1360,20 +1297,20 @@ class XendDomainInfo:
             if 'console_mfn' in channel_details:
                 self.console_mfn = channel_details['console_mfn']
 
-            self.introduceDomain()
+            self._introduceDomain()
 
-            self.createDevices()
+            self._createDevices()
 
             if self.info['bootloader']:
                 self.image.cleanupBootloading()
 
             self.info['start_time'] = time.time()
 
+            self._stateSet(DOM_STATE_RUNNING)
         except RuntimeError, exn:
+            log.exception("XendDomainInfo.initDomain: exception occurred")
             raise VmError(str(exn))
 
-
-    ## public:
 
     def cleanupDomain(self):
         """Cleanup domain resources; release devices.  Idempotent.  Nothrow
@@ -1383,7 +1320,7 @@ class XendDomainInfo:
         try:
             self.unwatchShutdown()
 
-            self.release_devices()
+            self._releaseDevices()
 
             if self.image:
                 try:
@@ -1394,46 +1331,15 @@ class XendDomainInfo:
                 self.image = None
 
             try:
-                self.removeDom()
+                self._removeDom()
             except:
                 log.exception("Removing domain path failed.")
 
-            try:
-                if not self.info['name'].startswith(ZOMBIE_PREFIX):
-                    self.info['name'] = ZOMBIE_PREFIX + self.info['name']
-            except:
-                log.exception("Renaming Zombie failed.")
-
-            self.state_set(STATE_DOM_SHUTDOWN)
+            self.info['dying'] = 0
+            self.info['shutdown'] = 0
+            self._stateSet(DOM_STATE_HALTED)
         finally:
             self.refresh_shutdown_lock.release()
-
-
-    def cleanupVm(self):
-        """Cleanup VM resources.  Idempotent.  Nothrow guarantee."""
-
-        self.unwatchVm()
-
-        try:
-            self.removeVm()
-        except:
-            log.exception("Removing VM path failed.")
-
-
-    ## private:
-
-    def unwatchVm(self):
-        """Remove the watch on the VM path, if any.  Idempotent.  Nothrow
-        guarantee."""
-
-        try:
-            try:
-                if self.vmWatch:
-                    self.vmWatch.unwatch()
-            finally:
-                self.vmWatch = None
-        except:
-            log.exception("Unwatching VM path failed.")
 
 
     def unwatchShutdown(self):
@@ -1450,84 +1356,142 @@ class XendDomainInfo:
         except:
             log.exception("Unwatching control/shutdown failed.")
 
+    def waitForShutdown(self):
+        self.state_updated.acquire()
+        try:
+            while self.state in (DOM_STATE_RUNNING,):
+                self.state_updated.wait()
+        finally:
+            self.state_updated.release()
 
-    ## public:
+
+    #
+    # TODO: recategorise - called from XendCheckpoint
+    # 
+
+    def completeRestore(self, store_mfn, console_mfn):
+
+        log.debug("XendDomainInfo.completeRestore")
+
+        self.store_mfn = store_mfn
+        self.console_mfn = console_mfn
+
+        self._introduceDomain()
+        self._storeDomDetails()
+        self._registerWatches()
+        self._refreshShutdown()
+
+        log.debug("XendDomainInfo.completeRestore done")
+
+
+    def _endRestore(self):
+        self.setResume(False)
+
+    #
+    # VM Destroy
+    # 
 
     def destroy(self):
         """Cleanup VM and destroy domain.  Nothrow guarantee."""
 
-        log.debug("XendDomainInfo.destroy: domid=%s", self.domid)
+        log.debug("XendDomainInfo.destroy: domid=%s", str(self.domid))
 
-        self.cleanupVm()
+        self._cleanupVm()
         if self.dompath is not None:
-                self.destroyDomain()
+            self.destroyDomain()
 
 
     def destroyDomain(self):
-        log.debug("XendDomainInfo.destroyDomain(%s)", self.domid)
+        log.debug("XendDomainInfo.destroyDomain(%s)", str(self.domid))
 
         try:
             if self.domid is not None:
                 xc.domain_destroy(self.domid)
+                self.domid = None
+                for state in DOM_STATES_OLD:
+                    self.info[state] = 0
         except:
             log.exception("XendDomainInfo.destroy: xc.domain_destroy failed.")
 
         self.cleanupDomain()
 
 
-    ## private:
+    #
+    # Channels for xenstore and console
+    # 
 
-    def release_devices(self):
-        """Release all domain's devices.  Nothrow guarantee."""
-
-        while True:
-            t = xstransact("%s/device" % self.dompath)
-            for n in controllerClasses.keys():
-                for d in t.list(n):
-                    try:
-                        t.remove(d)
-                    except:
-                        # Log and swallow any exceptions in removal --
-                        # there's nothing more we can do.
-                        log.exception(
-                           "Device release failed: %s; %s; %s",
-                           self.info['name'], n, d)
-            if t.commit():
-                break
-
-
-    def createChannels(self):
+    def _createChannels(self):
         """Create the channels to the domain.
         """
-        self.store_port = self.createChannel()
-        self.console_port = self.createChannel()
+        self.store_port = self._createChannel()
+        self.console_port = self._createChannel()
 
 
-    def createChannel(self):
+    def _createChannel(self):
         """Create an event channel to the domain.
         """
         try:
-            return xc.evtchn_alloc_unbound(dom=self.domid, remote_dom=0)
+            return xc.evtchn_alloc_unbound(domid=self.domid, remote_dom=0)
         except:
             log.exception("Exception in alloc_unbound(%d)", self.domid)
             raise
 
+    #
+    # Bootloader configuration
+    #
 
-    ## public:
+    def _configureBootloader(self):
+        """Run the bootloader if we're configured to do so."""
+        if not self.info['bootloader']:
+            return
+        blcfg = None
+        # FIXME: this assumes that we want to use the first disk device
+        for (n, c) in self.info.all_devices_sxpr():
+            if not n or not c or not(n in ["vbd", "tap"]):
+                continue
+            disk = sxp.child_value(c, "uname")
+            if disk is None:
+                continue
+            fn = blkdev_uname_to_file(disk)
+            blcfg = bootloader(self.info['bootloader'], fn, 1,
+                               self.info['bootloader_args'],
+                               self.info['image'])
+            break
+        if blcfg is None:
+            msg = "Had a bootloader specified, but can't find disk"
+            log.error(msg)
+            raise VmError(msg)
+        self.info['image'] = blcfg
 
-    def createDevices(self):
-        """Create the devices for a vm.
+    # 
+    # VM Functions
+    #
 
-        @raise: VmError for invalid devices
+    def _readVMDetails(self, params):
+        """Read the specified parameters from the store.
         """
+        try:
+            return self._gatherVm(*params)
+        except ValueError:
+            # One of the int/float entries in params has a corresponding store
+            # entry that is invalid.  We recover, because older versions of
+            # Xend may have put the entry there (memory/target, for example),
+            # but this is in general a bad situation to have reached.
+            log.exception(
+                "Store corrupted at %s!  Domain %d's configuration may be "
+                "affected.", self.vmpath, self.domid)
+            return []
 
-        for (n, c) in self.info['device']:
-            self.createDevice(n, c)
+    def _cleanupVm(self):
+        """Cleanup VM resources.  Idempotent.  Nothrow guarantee."""
 
-        if self.image:
-            self.image.createDeviceModel()
+        self._unwatchVm()
 
-    ## public:
+        try:
+            self._removeVm()
+        except:
+            log.exception("Removing VM path failed.")
+
 
     def checkLiveMigrateMemory(self):
         """ Make sure there's enough memory to migrate this domain """
@@ -1542,14 +1506,9 @@ class XendDomainInfo:
         if overhead_kb > 0:
             balloon.free(overhead_kb)
 
-    def testMigrateDevices(self, network, dst):
-        """ Notify all device about intention of migration
-        @raise: XendError for a device that cannot be migrated
-        """
-        for (n, c) in self.info['device']:
-            rc = self.migrateDevice(n, c, network, dst, DEV_MIGRATE_TEST)
-            if rc != 0:
-                raise XendError("Device of type '%s' refuses migration." % n)
+    def _unwatchVm(self):
+        """Remove the watch on the VM path, if any.  Idempotent.  Nothrow
+        guarantee."""
 
     def testDeviceComplete(self):
         """ For Block IO migration safety we must ensure that
@@ -1571,238 +1530,425 @@ class XendDomainInfo:
                 log.info("Dev still active but hit max loop timeout")
                 break
 
-    def migrateDevices(self, network, dst, step, domName=''):
-        """Notify the devices about migration
-        """
-        ctr = 0
+    def _storeVmDetails(self):
+        to_store = {}
+
+        for k in VM_STORE_ENTRIES:
+            if self._infoIsSet(k[0]):
+                to_store[k[0]] = str(self.info[k[0]])
+
+        if self._infoIsSet('image'):
+            to_store['image'] = sxp.to_string(self.info['image'])
+
+        if self._infoIsSet('security'):
+            secinfo = self.info['security']
+            to_store['security'] = sxp.to_string(secinfo)
+            for idx in range(0, len(secinfo)):
+                if secinfo[idx][0] == 'access_control':
+                    to_store['security/access_control'] = sxp.to_string(
+                        [secinfo[idx][1], secinfo[idx][2]])
+                    for aidx in range(1, len(secinfo[idx])):
+                        if secinfo[idx][aidx][0] == 'label':
+                            to_store['security/access_control/label'] = \
+                                secinfo[idx][aidx][1]
+                        if secinfo[idx][aidx][0] == 'policy':
+                            to_store['security/access_control/policy'] = \
+                                secinfo[idx][aidx][1]
+                if secinfo[idx][0] == 'ssidref':
+                    to_store['security/ssidref'] = str(secinfo[idx][1])
+
+
+        if not self._readVm('xend/restart_count'):
+            to_store['xend/restart_count'] = str(0)
+
+        log.debug("Storing VM details: %s", to_store)
+
+        self._writeVm(to_store)
+        self._setVmPermissions()
+
+
+    def _setVmPermissions(self):
+        """Allow the guest domain to read its UUID.  We don't allow it to
+        access any other entry, for security."""
+        xstransact.SetPermissions('%s/uuid' % self.vmpath,
+                                  { 'dom' : self.domid,
+                                    'read' : True,
+                                    'write' : False })
+
+    #
+    # Utility functions
+    #
+
+    def _stateSet(self, state):
+        self.state_updated.acquire()
         try:
-            for (n, c) in self.info['device']:
-                self.migrateDevice(n, c, network, dst, step, domName)
-                ctr = ctr + 1
-        except:
-            for (n, c) in self.info['device']:
-                if ctr == 0:
-                    step = step - 1
-                ctr = ctr - 1
-                self.recoverMigrateDevice(n, c, network, dst, step, domName)
-            raise
+            if self.state != state:
+                self.state = state
+                self.state_updated.notifyAll()
+        finally:
+            self.state_updated.release()
 
-    def migrateDevice(self, deviceClass, deviceConfig, network, dst,
-                      step, domName=''):
-        return self.getDeviceController(deviceClass).migrate(deviceConfig,
-                                        network, dst, step, domName)
-
-    def recoverMigrateDevice(self, deviceClass, deviceConfig, network,
-                             dst, step, domName=''):
-        return self.getDeviceController(deviceClass).recover_migrate(
-                     deviceConfig, network, dst, step, domName)
-
-    def waitForDevices(self):
-        """Wait for this domain's configured devices to connect.
-
-        @raise: VmError if any device fails to initialise.
-        """
-        for c in controllerClasses:
-            self.waitForDevices_(c)
-
-
-    def device_create(self, dev_config):
-        """Create a new device.
-
-        @param dev_config: device configuration
-        """
-        dev_type = sxp.name(dev_config)
-        devid = self.createDevice(dev_type, dev_config)
-        self.waitForDevice(dev_type, devid)
-        self.info['device'].append((dev_type, dev_config))
-        return self.getDeviceController(dev_type).sxpr(devid)
-
-
-    def device_configure(self, dev_config):
-        """Configure an existing device.
-        @param dev_config: device configuration
-        """
-        deviceClass = sxp.name(dev_config)
-        self.reconfigureDevice(deviceClass, None, dev_config)
-
-
-    def pause(self):
-        xc.domain_pause(self.domid)
-
-
-    def unpause(self):
-        xc.domain_unpause(self.domid)
-
-
-    ## private:
-
-    def restart(self, rename = False):
-        """Restart the domain after it has exited.
-
-        @param rename True if the old domain is to be renamed and preserved,
-        False if it is to be destroyed.
-        """
-
-        self.configure_bootloader()
-        config = self.sxpr()
-
-        if self.infoIsSet('cpus') and len(self.info['cpus']) != 0:
-            config.append(['cpus', reduce(lambda x, y: str(x) + "," + str(y),
-                                          self.info['cpus'])])
-
-        if self.readVm(RESTART_IN_PROGRESS):
-            log.error('Xend failed during restart of domain %d.  '
-                      'Refusing to restart to avoid loops.',
-                      self.domid)
-            self.destroy()
-            return
-
-        self.writeVm(RESTART_IN_PROGRESS, 'True')
-
-        now = time.time()
-        rst = self.readVm('xend/previous_restart_time')
-        if rst:
-            rst = float(rst)
-            timeout = now - rst
-            if timeout < MINIMUM_RESTART_TIME:
-                log.error(
-                    'VM %s restarting too fast (%f seconds since the last '
-                    'restart).  Refusing to restart to avoid loops.',
-                    self.info['name'], timeout)
-                self.destroy()
-                return
-
-        self.writeVm('xend/previous_restart_time', str(now))
-
-        try:
-            if rename:
-                self.preserveForRestart()
-            else:
-                self.unwatchVm()
-                self.destroyDomain()
-
-            # new_dom's VM will be the same as this domain's VM, except where
-            # the rename flag has instructed us to call preserveForRestart.
-            # In that case, it is important that we remove the
-            # RESTART_IN_PROGRESS node from the new domain, not the old one,
-            # once the new one is available.
-
-            new_dom = None
-            try:
-                new_dom = XendDomain.instance().domain_create(config)
-                new_dom.unpause()
-                rst_cnt = self.readVm('xend/restart_count')
-                rst_cnt = int(rst_cnt) + 1
-                self.writeVm('xend/restart_count', str(rst_cnt))
-                new_dom.removeVm(RESTART_IN_PROGRESS)
-            except:
-                if new_dom:
-                    new_dom.removeVm(RESTART_IN_PROGRESS)
-                    new_dom.destroy()
-                else:
-                    self.removeVm(RESTART_IN_PROGRESS)
-                raise
-        except:
-            log.exception('Failed to restart domain %d.', self.domid)
-
-
-    def preserveForRestart(self):
-        """Preserve a domain that has been shut down, by giving it a new UUID,
-        cloning the VM details, and giving it a new name.  This allows us to
-        keep this domain for debugging, but restart a new one in its place
-        preserving the restart semantics (name and UUID preserved).
-        """
-        
-        new_name = self.generateUniqueName()
-        new_uuid = uuid.toString(uuid.create())
-        log.info("Renaming dead domain %s (%d, %s) to %s (%s).",
-                 self.info['name'], self.domid, self.info['uuid'],
-                 new_name, new_uuid)
-        self.unwatchVm()
-        self.release_devices()
-        self.info['name'] = new_name
-        self.info['uuid'] = new_uuid
-        self.vmpath = XendDomain.VMROOT + new_uuid
-        self.storeVmDetails()
-        self.preserve()
-
-
-    def preserve(self):
-        log.info("Preserving dead domain %s (%d).", self.info['name'],
-                 self.domid)
-        self.unwatchVm()
-        self.storeDom('xend/shutdown_completed', 'True')
-        self.state_set(STATE_DOM_SHUTDOWN)
-
-
-    # private:
-
-    def generateUniqueName(self):
-        n = 1
-        while True:
-            name = "%s-%d" % (self.info['name'], n)
-            try:
-                self.check_name(name)
-                return name
-            except VmError:
-                n += 1
-
-
-    def configure_bootloader(self):
-        """Run the bootloader if we're configured to do so."""
-        if not self.info['bootloader']:
-            return
-        blcfg = None
-        # FIXME: this assumes that we want to use the first disk device
-        for (n,c) in self.info['device']:
-            if not n or not c or not(n in ["vbd", "tap"]):
-                continue
-            disk = sxp.child_value(c, "uname")
-            if disk is None:
-                continue
-            fn = blkdev_uname_to_file(disk)
-            blcfg = bootloader(self.info['bootloader'], fn, 1,
-                               self.info['bootloader_args'],
-                               self.info['image'])
-            break
-        if blcfg is None:
-            msg = "Had a bootloader specified, but can't find disk"
-            log.error(msg)
-            raise VmError(msg)
-        self.info['image'] = blcfg
-
-
-    def send_sysrq(self, key):
-        asserts.isCharConvertible(key)
-
-        self.storeDom("control/sysrq", '%c' % key)
-
-
-    def infoIsSet(self, name):
+    def _infoIsSet(self, name):
         return name in self.info and self.info[name] is not None
 
+    def _checkName(self, name):
+        """Check if a vm name is valid. Valid names contain alphabetic
+        characters, digits, or characters in '_-.:/+'.
+        The same name cannot be used for more than one vm at the same time.
 
-#============================================================================
-# Register device controllers and their device config types.
+        @param name: name
+        @raise: VmError if invalid
+        """
+        from xen.xend import XendDomain
+        
+        if name is None or name == '':
+            raise VmError('Missing VM Name')
 
-"""A map from device-class names to the subclass of DevController that
-implements the device control specific to that device-class."""
-controllerClasses = {}
+        if not re.search(r'^[A-Za-z0-9_\-\.\:\/\+]+$', name):
+            raise VmError('Invalid VM Name')
 
-def addControllerClass(device_class, cls):
-    """Register a subclass of DevController to handle the named device-class.
+        dom =  XendDomain.instance().domain_lookup_nr(name)
+        if dom and dom != self:
+            raise VmError("VM name '%s' already exists" % name)
+        
+
+    def update(self, info = None, refresh = True):
+        """Update with info from xc.domain_getinfo().
+        """
+
+        log.trace("XendDomainInfo.update(%s) on domain %s", info,
+                  str(self.domid))
+        
+        if not info:
+            info = dom_get(self.domid)
+            if not info:
+                return
+            
+        #manually update ssidref / security fields
+        if security.on() and info.has_key('ssidref'):
+            if (info['ssidref'] != 0) and self.info.has_key('security'):
+                security_field = self.info['security']
+                if not security_field:
+                    #create new security element
+                    self.info.update({'security':
+                                      [['ssidref', str(info['ssidref'])]]})
+        #ssidref field not used any longer
+        if 'ssidref' in info:
+            info.pop('ssidref')
+
+        # make sure state is reset for info
+        # TODO: we should eventually get rid of old_dom_states
+
+        self.info.update(info)
+        self.info.validate()
+
+        if refresh:
+            self._refreshShutdown(info)
+
+        log.trace("XendDomainInfo.update done on domain %s: %s",
+                  str(self.domid), self.info)
+
+    def sxpr(self, ignore_devices = False):
+        return self.info.get_sxp(domain = self,
+                                 ignore_devices = ignore_devices)
+
+    # Xen API
+    # ----------------------------------------------------------------
+
+    def get_uuid(self):
+        return self.info['uuid']
+    def get_memory_static_max(self):
+        return self.info['maxmem']
+    def get_memory_static_min(self):
+        return self.info['memory']
+    def get_vcpus_policy(self):
+        sched_id = xc.sched_id_get()
+        if sched_id == xen.lowlevel.xc.XEN_SCHEDULER_SEDF:
+            return 'sedf'
+        elif sched_id == xen.lowlevel.xc.XEN_SCHEDULER_CREDIT:
+            return 'credit'
+        else:
+            return 'unknown'
+    def get_vcpus_params(self):
+        return '' # TODO
+    def get_power_state(self):
+        return XEN_API_VM_POWER_STATE[self.state]
+    def get_tpm_instance(self):
+        return '' # TODO
+    def get_tpm_backend(self):
+        return '' # TODO
+    def get_bios_boot(self):
+        return '' # TODO
+    def get_platform_std_vga(self):
+        return False
+    def get_platform_serial(self):
+        return '' # TODO
+    def get_platform_localtime(self):
+        return False # TODO
+    def get_platform_clock_offset(self):
+        return False # TODO
+    def get_platform_enable_audio(self):
+        return False # TODO
+    def get_builder(self):
+        return 'Linux' # TODO
+    def get_boot_method(self):
+        bootloader = self.info['bootloader']
+        if not bootloader or bootloader not in XEN_API_BOOT_TYPE:
+            return 'kernel_external'
+        return bootloader
+    
+    def get_kernel_image(self):
+        return self.info['kernel_kernel']
+    def get_kernel_initrd(self):
+        return self.info['kernel_initrd']
+    def get_kernel_args(self):
+        return self.info['kernel_args']
+    def get_grub_cmdline(self):
+        return '' # TODO
+    def get_pci_bus(self):
+        return 0 # TODO
+    def get_tools_version(self):
+        return {} # TODO
+    def get_other_config(self):
+        return {} # TODO
+    
+    def get_on_shutdown(self):
+        after_shutdown = self.info.get('on_poweroff')
+        if not after_shutdown or after_shutdown not in XEN_API_ON_NORMAL_EXIT:
+            return XEN_API_ON_NORMAL_EXIT[-1]
+        return after_shutdown
+
+    def get_on_reboot(self):
+        after_reboot = self.info.get('on_reboot')
+        if not after_reboot or after_reboot not in XEN_API_ON_NORMAL_EXIT:
+            return XEN_API_ON_NORMAL_EXIT[-1]
+        return after_reboot
+
+    def get_on_suspend(self):
+        after_suspend = self.info.get('on_suspend') # TODO: not supported
+        if not after_suspend or after_suspend not in XEN_API_ON_NORMAL_EXIT:
+            return XEN_API_ON_NORMAL_EXIT[-1]
+        return after_suspend        
+
+    def get_on_crash(self):
+        after_crash = self.info.get('on_crash')
+        if not after_crash or after_crash not in XEN_API_ON_CRASH_BEHAVIOUR:
+            return XEN_API_ON_CRASH_BEHAVIOUR[0]
+        return after_crash
+
+    def get_dev_config_by_uuid(self, dev_class, dev_uuid):
+        """ Get's a device configuration either from XendConfig or
+        from the DevController.
+
+        @param dev_class: device class, either, 'vbd' or 'vif'
+        @param dev_uuid: device UUID
+
+        @rtype: dictionary
+        """
+        dev_type_config = self.info['device'].get(dev_uuid)
+
+        # shortcut if the domain isn't started because
+        # the devcontrollers will have no better information
+        # than XendConfig.
+        if self.state in (XEN_API_VM_POWER_STATE_HALTED,):
+            if dev_type_config:
+                return copy.deepcopy(dev_type_config[1])
+            return None
+
+        # instead of using dev_class, we use the dev_type
+        # that is from XendConfig.
+        # This will accomdate 'tap' as well as 'vbd'
+        dev_type = dev_type_config[0]
+        
+        controller = self.getDeviceController(dev_type)
+        if not controller:
+            return None
+            
+        all_configs = controller.getAllDeviceConfigurations()
+        if not all_configs:
+            return None
+
+        dev_config = copy.deepcopy(dev_type_config[1])
+        for _devid, _devcfg in all_configs.items():
+            if _devcfg.get('uuid') == dev_uuid:
+                dev_config.update(_devcfg)
+                dev_config['id'] = _devid
+                return dev_config
+
+        return dev_config
+                    
+    def get_dev_xenapi_config(self, dev_class, dev_uuid):
+        config = self.get_dev_config_by_uuid(dev_class, dev_uuid)
+        if not config:
+            return {}
+        
+        config['VM'] = self.get_uuid()
+        
+        if dev_class == 'vif':
+            if not config.has_key('name'):
+                config['name'] = config.get('vifname', '')
+            if not config.has_key('MAC'):
+                config['MAC'] = config.get('mac', '')
+            if not config.has_key('type'):
+                config['type'] = 'paravirtualised'
+            if not config.has_key('device'):
+                devid = config.get('id')
+                if devid != None:
+                    config['device'] = 'eth%d' % devid
+                else:
+                    config['device'] = ''
+                    
+            config['network'] = '' # Invalid for Xend
+            config['MTU'] = 1500 # TODO
+            config['network_read_kbs'] = 0.0
+            config['network_write_kbs'] = 0.0
+            config['IO_bandwidth_incoming_kbs'] = 0.0
+            config['IO_bandwidth_outgoing_kbs'] = 0.0
+
+        if dev_class =='vbd':
+            config['VDI'] = '' # TODO
+            config['device'] = config.get('dev', '')
+            config['driver'] = 'paravirtualised' # TODO
+            config['image'] = config.get('uname', '')
+            config['IO_bandwidth_incoming_kbs'] = 0.0
+            config['IO_bandwidth_outgoing_kbs'] = 0.0
+            if config['mode'] == 'r':
+                config['mode'] = 'RO'
+            else:
+                config['mode'] = 'RW'
+
+        return config
+
+    def get_dev_property(self, dev_class, dev_uuid, field):
+        config = self.get_dev_xenapi_config(dev_class, dev_uuid)
+        try:
+            return config[field]
+        except KeyError:
+            raise XendError('Invalid property for device: %s' % field)
+
+    def get_vcpus_util(self):
+        # TODO: this returns the total accum cpu time, rather than util
+        # TODO: spec says that key is int, however, python does not allow
+        #       non-string keys to dictionaries.
+        vcpu_util = {}
+        if 'max_vcpu_id' in self.info and self.domid != None:
+            for i in range(0, self.info['max_vcpu_id']+1):
+                info = xc.vcpu_getinfo(self.domid, i)
+                vcpu_util[str(i)] = info['cpu_time']/1000000000.0
+                
+        return vcpu_util
+
+    def get_vifs(self):
+        return self.info.get('vif_refs', [])
+
+    def get_vbds(self):
+        return self.info.get('vbd_refs', [])
+
+    def get_vtpms(self):
+        return self.info.get('vtpm_refs', [])
+
+    def create_vbd(self, xenapi_vbd):
+        """Create a VBD device from the passed struct in Xen API format.
+
+        @return: uuid of the device
+        @rtype: string
+        """
+
+        dev_uuid = self.info.device_add('vbd', cfg_xenapi = xenapi_vbd)
+        if not dev_uuid:
+            raise XendError('Failed to create device')
+        
+        if self.state in (XEN_API_VM_POWER_STATE_RUNNING,):
+            sxpr = self.info.device_sxpr(dev_uuid)
+            devid = self.getDeviceController('vbd').createDevice(sxpr)
+            raise XendError("Device creation failed")
+
+        return dev_uuid
+
+    def create_vbd_with_vdi(self, xenapi_vbd, vdi_image_path):
+        """Create a VBD using a VDI from XendStorageRepository.
+
+        @param xenapi_vbd: vbd struct from the Xen API
+        @param vdi_image_path: VDI UUID
+        @rtype: string
+        @return: uuid of the device
+        """
+        xenapi_vbd['image'] = vdi_image_path
+        log.debug('create_vbd_with_vdi: %s' % xenapi_vbd)
+        dev_uuid = self.info.device_add('tap', cfg_xenapi = xenapi_vbd)
+        if not dev_uuid:
+            raise XendError('Failed to create device')
+
+        if self.state in (XEN_API_VM_POWER_STATE_RUNNING,):
+            sxpr = self.info.device_sxpr(dev_uuid)
+            devid = self.getDeviceController('tap').createDevice(sxpr)
+            raise XendError("Device creation failed")
+
+        return dev_uuid
+
+    def create_vif(self, xenapi_vif):
+        """Create VIF device from the passed struct in Xen API format.
+
+        @param xenapi_vif: Xen API VIF Struct.
+        @rtype: string
+        @return: UUID
+        """
+        dev_uuid = self.info.device_add('vif', cfg_xenapi = xenapi_vif)
+        if not dev_uuid:
+            raise XendError('Failed to create device')
+        
+        if self.state in (DOM_STATE_HALTED,):
+            sxpr = self.info.device_sxpr(dev_uuid)
+            devid = self.getDeviceController('vif').createDevice(sxpr)
+            raise XendError("Device creation failed")
+
+        return dev_uuid
+
+    def create_vtpm(self, xenapi_vtpm):
+        """Create a VTPM device from the passed struct in Xen API format.
+
+        @return: uuid of the device
+        @rtype: string
+        """
+
+        dev_uuid = self.info.device_add('vtpm', cfg_xenapi = xenapi_vtpm)
+        if not dev_uuid:
+            raise XendError('Failed to create device')
+
+        if self.state in (DOM_STATE_HALTED,):
+            sxpr = self.info.device_sxpr(dev_uuid)
+            devid = self.getDeviceController('vtpm').createDevice(sxpr)
+            raise XendError("Device creation failed")
+
+        return dev_uuid
+
+    def has_device(self, dev_class, dev_uuid):
+        return (dev_uuid in self.info['%s_refs' % dev_class])
+
     """
-    cls.deviceClass = device_class
-    controllerClasses[device_class] = cls
+        def stateChar(name):
+            if name in self.info:
+                if self.info[name]:
+                    return name[0]
+                else:
+                    return '-'
+            else:
+                return '?'
 
+        state = reduce(lambda x, y: x + y, map(stateChar, DOM_STATES_OLD))
 
-from xen.xend.server import blkif, netif, tpmif, pciif, iopif, irqif, usbif
-from xen.xend.server.BlktapController import BlktapController
-addControllerClass('vbd',  blkif.BlkifController)
-addControllerClass('vif',  netif.NetifController)
-addControllerClass('vtpm', tpmif.TPMifController)
-addControllerClass('pci',  pciif.PciController)
-addControllerClass('ioports', iopif.IOPortsController)
-addControllerClass('irq',  irqif.IRQController)
-addControllerClass('usb',  usbif.UsbifController)
-addControllerClass('tap',  BlktapController)
+        sxpr.append(['state', state])
+
+        if self.store_mfn:
+            sxpr.append(['store_mfn', self.store_mfn])
+        if self.console_mfn:
+            sxpr.append(['console_mfn', self.console_mfn])
+    """
+
+    def __str__(self):
+        return '<domain id=%s name=%s memory=%s state=%s>' % \
+               (str(self.domid), self.info['name'],
+                str(self.info['memory']), DOM_STATES[self.state])
+
+    __repr__ = __str__
+

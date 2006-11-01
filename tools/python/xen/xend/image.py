@@ -189,7 +189,7 @@ class LinuxImageHandler(ImageHandler):
         store_evtchn = self.vm.getStorePort()
         console_evtchn = self.vm.getConsolePort()
 
-        log.debug("dom            = %d", self.vm.getDomid())
+        log.debug("domid          = %d", self.vm.getDomid())
         log.debug("image          = %s", self.kernel)
         log.debug("store_evtchn   = %d", store_evtchn)
         log.debug("console_evtchn = %d", console_evtchn)
@@ -198,7 +198,7 @@ class LinuxImageHandler(ImageHandler):
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
         log.debug("features       = %s", self.vm.getFeatures())
 
-        return xc.linux_build(dom            = self.vm.getDomid(),
+        return xc.linux_build(domid          = self.vm.getDomid(),
                               image          = self.kernel,
                               store_evtchn   = store_evtchn,
                               console_evtchn = console_evtchn,
@@ -218,7 +218,7 @@ class PPC_LinuxImageHandler(LinuxImageHandler):
         store_evtchn = self.vm.getStorePort()
         console_evtchn = self.vm.getConsolePort()
 
-        log.debug("dom            = %d", self.vm.getDomid())
+        log.debug("domid          = %d", self.vm.getDomid())
         log.debug("image          = %s", self.kernel)
         log.debug("store_evtchn   = %d", store_evtchn)
         log.debug("console_evtchn = %d", console_evtchn)
@@ -229,7 +229,7 @@ class PPC_LinuxImageHandler(LinuxImageHandler):
 
         devtree = FlatDeviceTree.build(self)
 
-        return xc.linux_build(dom            = self.vm.getDomid(),
+        return xc.linux_build(domid          = self.vm.getDomid(),
                               image          = self.kernel,
                               store_evtchn   = store_evtchn,
                               console_evtchn = console_evtchn,
@@ -272,7 +272,7 @@ class HVMImageHandler(ImageHandler):
     def buildDomain(self):
         store_evtchn = self.vm.getStorePort()
 
-        log.debug("dom            = %d", self.vm.getDomid())
+        log.debug("domid          = %d", self.vm.getDomid())
         log.debug("image          = %s", self.kernel)
         log.debug("store_evtchn   = %d", store_evtchn)
         log.debug("memsize        = %d", self.vm.getMemoryTarget() / 1024)
@@ -282,9 +282,8 @@ class HVMImageHandler(ImageHandler):
         log.debug("apic           = %d", self.apic)
 
         self.register_shutdown_watch()
-        self.register_reboot_feature_watch()
 
-        return xc.hvm_build(dom            = self.vm.getDomid(),
+        return xc.hvm_build(domid          = self.vm.getDomid(),
                             image          = self.kernel,
                             store_evtchn   = store_evtchn,
                             memsize        = self.vm.getMemoryTarget() / 1024,
@@ -417,7 +416,6 @@ class HVMImageHandler(ImageHandler):
 
     def destroy(self):
         self.unregister_shutdown_watch();
-        self.unregister_reboot_feature_watch();
         if not self.pid:
             return
         os.kill(self.pid, signal.SIGKILL)
@@ -446,7 +444,7 @@ class HVMImageHandler(ImageHandler):
         """ watch call back on node control/shutdown,
             if node changed, this function will be called
         """
-        from xen.xend.XendDomainInfo import shutdown_reasons
+        from xen.xend.XendConstants import DOMAIN_SHUTDOWN_REASONS
         xd = xen.xend.XendDomain.instance()
         vm = xd.domain_lookup( self.vm.getDomid() )
 
@@ -459,39 +457,6 @@ class HVMImageHandler(ImageHandler):
                 vm.refreshShutdown(vm.info)
 
         return 1 # Keep watching
-
-    def register_reboot_feature_watch(self):
-        """ add xen store watch on control/feature-reboot """
-        self.rebootFeatureWatch = xswatch(self.vm.dompath + "/control/feature-reboot", \
-                                         self.hvm_reboot_feature)
-        log.debug("hvm reboot feature watch registered")
-
-    def unregister_reboot_feature_watch(self):
-        """Remove the watch on the control/feature-reboot, if any. Nothrow
-        guarantee."""
-
-        try:
-            if self.rebootFeatureWatch:
-                self.rebootFeatureWatch.unwatch()
-        except:
-            log.exception("Unwatching hvm reboot feature watch failed.")
-        self.rebootFeatureWatch = None
-        log.debug("hvm reboot feature watch unregistered")
-
-    def hvm_reboot_feature(self, _):
-        """ watch call back on node control/feature-reboot,
-            if node changed, this function will be called
-        """
-        xd = xen.xend.XendDomain.instance()
-        vm = xd.domain_lookup( self.vm.getDomid() )
-
-        status = vm.readDom('control/feature-reboot')
-        log.debug("hvm_reboot_feature fired, module status=%s", status)
-        if status == '1':
-            self.unregister_shutdown_watch()
-
-        return 1 # Keep watching
-
 
 class IA64_HVM_ImageHandler(HVMImageHandler):
 

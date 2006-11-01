@@ -92,6 +92,15 @@ SUBCOMMAND_HELP = {
     'unpause'     : ('<Domain>', 'Unpause a paused domain.'),
     'uptime'      : ('[-s] <Domain>', 'Print uptime for a domain.'),
 
+    # Life cycle xm commands
+    'new'         : ('<ConfigFile> [options] [vars]',
+                     'Adds a domain to Xend domain management'),
+    'delete'      : ('<DomainName>',
+                     'Remove a domain from Xend domain management.'),
+    'start'       : ('<DomainName>', 'Start a Xend managed domain'),
+    'resume'      : ('<DomainName>', 'Resume a Xend managed domain'),
+    'suspend'     : ('<DomainName>', 'Suspend a Xend maanged domain'),
+
     # less used commands
 
     'dmesg'       : ('[-c|--clear]',
@@ -194,6 +203,8 @@ SUBCOMMAND_OPTIONS = {
 common_commands = [
     "console",
     "create",
+    "new",
+    "delete",
     "destroy",
     "dump-core",
     "help",
@@ -203,8 +214,11 @@ common_commands = [
     "pause",
     "reboot",
     "restore",
+    "resume",
     "save",
     "shutdown",
+    "start",
+    "suspend",
     "top",
     "unpause",
     "uptime",
@@ -214,6 +228,8 @@ common_commands = [
 domain_commands = [
     "console",
     "create",
+    "new",
+    "delete",
     "destroy",
     "domid",
     "domname",
@@ -226,8 +242,11 @@ domain_commands = [
     "reboot",
     "rename",
     "restore",
+    "resume",
     "save",
     "shutdown",
+    "start",
+    "suspend",
     "sysrq",
     "top",
     "unpause",
@@ -469,9 +488,9 @@ def xm_restore(args):
 
 def getDomains(domain_names, full = 0):
     if domain_names:
-        return [server.xend.domain(dom) for dom in domain_names]
+        return [server.xend.domain(dom, full) for dom in domain_names]
     else:
-        return server.xend.domains(1)
+        return server.xend.domains(1, full)
 
 
 def xm_list(args):
@@ -683,6 +702,26 @@ def xm_vcpu_list(args):
 
             print format % locals()
 
+def xm_start(args):
+    arg_check(args, "start", 1)
+    dom = args[0]
+    server.xend.domain.start(dom)
+
+def xm_delete(args):
+    arg_check(args, "delete", 1)
+    dom = args[0]
+    server.xend.domain.delete(dom)
+
+def xm_suspend(args):
+    arg_check(args, "suspend", 1)
+    dom = args[0]
+    server.xend.domain.suspend(dom)
+
+def xm_resume(args):
+    arg_check(args, "resume", 1)
+    dom = args[0]
+    server.xend.domain.resume(dom)
+    
 def xm_reboot(args):
     arg_check(args, "reboot", 1, 3)
     from xen.xm import shutdown
@@ -1323,6 +1362,7 @@ commands = {
     # xenstat commands
     "top": xm_top,
     # domain commands
+    "delete": xm_delete,
     "destroy": xm_destroy,
     "domid": xm_domid,
     "domname": xm_domname,
@@ -1332,8 +1372,10 @@ commands = {
     "restore": xm_restore,
     "save": xm_save,
     "shutdown": xm_shutdown,
+    "start": xm_start,
     "sysrq": xm_sysrq,
     "uptime": xm_uptime,
+    "suspend": xm_suspend,
     "list": xm_list,
     # memory commands
     "mem-max": xm_mem_max,
@@ -1373,13 +1415,14 @@ commands = {
 ## The commands supported by a separate argument parser in xend.xm.
 IMPORTED_COMMANDS = [
     'create',
+    'new',    
     'migrate',
     'labels',
-    'addlabel',
     'cfgbootpolicy',
     'makepolicy',
     'loadpolicy',
-    'dumppolicy',
+    'dumppolicy',        
+    'addlabel',
     'rmlabel',
     'getlabel',
     'dry-run',
