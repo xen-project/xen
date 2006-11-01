@@ -249,6 +249,7 @@ def restore(config):
     vm = XendDomainInfo(XendConfig(sxp = config), resume = True)
     try:
         vm.resume()
+        return vm
     except:
         vm.destroy()
         raise
