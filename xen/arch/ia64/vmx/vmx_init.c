@@ -183,7 +183,6 @@ static vpd_t *alloc_vpd(void)
 	mregs->vac.a_cover = 1;
 	mregs->vac.a_bsw = 1;
 	mregs->vac.a_int = 1;
-       
 	mregs->vdc.d_vmsw = 1;
 
 	return vpd;
@@ -276,7 +275,7 @@ static void vmx_create_event_channels(struct vcpu *v)
 		for_each_vcpu(v->domain, o) {
 			p = get_vio(v->domain, o->vcpu_id);
 			o->arch.arch_vmx.xen_port = p->vp_eport =
-			                alloc_unbound_xen_event_channel(o, 0);
+					alloc_unbound_xen_event_channel(o, 0);
 			DPRINTK("Allocated port %d for hvm.\n",
 			        o->arch.arch_vmx.xen_port);
 		}
@@ -306,8 +305,8 @@ vmx_final_setup_guest(struct vcpu *v)
 	/* Per-domain vTLB and vhpt implementation. Now vmx domain will stick
 	 * to this solution. Maybe it can be deferred until we know created
 	 * one as vmx domain */
-#ifndef HASH_VHPT     
-        init_domain_tlb(v);
+#ifndef HASH_VHPT
+	init_domain_tlb(v);
 #endif
 	vmx_create_event_channels(v);
 
@@ -378,44 +377,44 @@ static void vmx_build_physmap_table(struct domain *d)
 
 	/* Mark I/O ranges */
 	for (i = 0; i < (sizeof(io_ranges) / sizeof(io_range_t)); i++) {
-	    for (j = io_ranges[i].start;
-		j < io_ranges[i].start + io_ranges[i].size;
-		j += PAGE_SIZE)
-		(void)__assign_domain_page(d, j, io_ranges[i].type,
-		                           ASSIGN_writable);
+		for (j = io_ranges[i].start;
+		     j < io_ranges[i].start + io_ranges[i].size; j += PAGE_SIZE)
+			(void)__assign_domain_page(d, j, io_ranges[i].type,
+			                           ASSIGN_writable);
 	}
 
 	/* Map normal memory below 3G */
 	end = VMX_CONFIG_PAGES(d) << PAGE_SHIFT;
 	tmp = end < MMIO_START ? end : MMIO_START;
 	for (i = 0; (i < tmp) && (list_ent != &d->page_list); i += PAGE_SIZE) {
-	    mfn = page_to_mfn(list_entry(list_ent, struct page_info, list));
-	    list_ent = mfn_to_page(mfn)->list.next;
-	    if (VGA_IO_START <= i && i < VGA_IO_START + VGA_IO_SIZE)
-		continue;
-	    assign_domain_page(d, i, mfn << PAGE_SHIFT);
+		mfn = page_to_mfn(list_entry(list_ent, struct page_info, list));
+		list_ent = mfn_to_page(mfn)->list.next;
+		if (VGA_IO_START <= i && i < VGA_IO_START + VGA_IO_SIZE)
+			continue;
+		assign_domain_page(d, i, mfn << PAGE_SHIFT);
 	}
 	ASSERT(list_ent != &d->page_list);
 
 	/* Map normal memory beyond 4G */
 	if (unlikely(end > MMIO_START)) {
-	    start = 4 * MEM_G;
-	    end = start + (end - 3 * MEM_G);
-	    for (i = start;
-	         (i < end) && (list_ent != &d->page_list); i += PAGE_SIZE) {
-		mfn = page_to_mfn(list_entry(list_ent, struct page_info, list));
-		assign_domain_page(d, i, mfn << PAGE_SHIFT);
-		list_ent = mfn_to_page(mfn)->list.next;
-	    }
-	    ASSERT(list_ent != &d->page_list);
+		start = 4 * MEM_G;
+		end = start + (end - 3 * MEM_G);
+		for (i = start;
+		     (i < end) && (list_ent != &d->page_list); i += PAGE_SIZE) {
+			mfn = page_to_mfn(list_entry(list_ent,
+			                             struct page_info, list));
+			assign_domain_page(d, i, mfn << PAGE_SHIFT);
+			list_ent = mfn_to_page(mfn)->list.next;
+		}
+		ASSERT(list_ent != &d->page_list);
 	}
 	 
 	/* Map guest firmware */
 	for (i = GFW_START; (i < GFW_START + GFW_SIZE) &&
-		(list_ent != &d->page_list); i += PAGE_SIZE) {
-	    mfn = page_to_mfn(list_entry(list_ent, struct page_info, list));
-	    assign_domain_page(d, i, mfn << PAGE_SHIFT);
-	    list_ent = mfn_to_page(mfn)->list.next;
+	     (list_ent != &d->page_list); i += PAGE_SIZE) {
+		mfn = page_to_mfn(list_entry(list_ent, struct page_info, list));
+		assign_domain_page(d, i, mfn << PAGE_SHIFT);
+		list_ent = mfn_to_page(mfn)->list.next;
 	}
 	ASSERT(list_ent != &d->page_list);
 
@@ -429,10 +428,10 @@ static void vmx_build_physmap_table(struct domain *d)
 	assign_domain_page(d, STORE_PAGE_START, mfn << PAGE_SHIFT);
 	list_ent = mfn_to_page(mfn)->list.next;
 	ASSERT(list_ent != &d->page_list);
-    
-    mfn = page_to_mfn(list_entry(list_ent, struct page_info, list));
-    assign_domain_page(d, BUFFER_IO_PAGE_START, mfn << PAGE_SHIFT);
-    list_ent = mfn_to_page(mfn)->list.next;
+
+	mfn = page_to_mfn(list_entry(list_ent, struct page_info, list));
+	assign_domain_page(d, BUFFER_IO_PAGE_START, mfn << PAGE_SHIFT);
+	list_ent = mfn_to_page(mfn)->list.next;
 	ASSERT(list_ent == &d->page_list);
 }
 
@@ -444,10 +443,10 @@ void vmx_setup_platform(struct domain *d)
 
 	d->arch.vmx_platform.shared_page_va =
 		(unsigned long)__va(__gpa_to_mpa(d, IO_PAGE_START));
-    //For buffered IO requests.
-    spin_lock_init(&d->arch.hvm_domain.buffered_io_lock);
-    d->arch.hvm_domain.buffered_io_va =
-        (unsigned long)__va(__gpa_to_mpa(d, BUFFER_IO_PAGE_START));
+	/* For buffered IO requests. */
+	spin_lock_init(&d->arch.hvm_domain.buffered_io_lock);
+	d->arch.hvm_domain.buffered_io_va =
+		(unsigned long)__va(__gpa_to_mpa(d, BUFFER_IO_PAGE_START));
 	/* TEMP */
 	d->arch.vmx_platform.pib_base = 0xfee00000UL;
 
@@ -455,7 +454,7 @@ void vmx_setup_platform(struct domain *d)
 
 	/* Only open one port for I/O and interrupt emulation */
 	memset(&d->shared_info->evtchn_mask[0], 0xff,
-	    sizeof(d->shared_info->evtchn_mask));
+	       sizeof(d->shared_info->evtchn_mask));
 
 	/* initiate spinlock for pass virq */
 	spin_lock_init(&d->arch.arch_vmx.virq_assist_lock);
