@@ -338,12 +338,14 @@ void printk(const char *fmt, ...)
     va_list       args;
     char         *p, *q;
     unsigned long flags;
-    int           level = XENLOG_DEFAULT;
+    int           level = -1;
     int           upper_thresh = xenlog_upper_thresh;
     int           lower_thresh = xenlog_lower_thresh;
     int           print_regardless = xen_startup;
 
-    spin_lock_irqsave(&console_lock, flags);
+    /* console_lock can be acquired recursively from __printk_ratelimit(). */
+    local_irq_save(flags);
+    spin_lock_recursive(&console_lock);
 
     va_start(args, fmt);
     (void)vsnprintf(buf, sizeof(buf), fmt, args);
@@ -351,22 +353,25 @@ void printk(const char *fmt, ...)
 
     p = buf;
 
-    /* Is this print caused by a guest? */
-    if ( strncmp("<G>", p, 3) == 0 )
+    while ( (p[0] == '<') && (p[1] != '\0') && (p[2] == '>') )
     {
-        upper_thresh = xenlog_guest_upper_thresh;
-        lower_thresh = xenlog_guest_lower_thresh;
-        level = XENLOG_GUEST_DEFAULT;
+        switch ( p[1] )
+        {
+        case 'G':
+            upper_thresh = xenlog_guest_upper_thresh;
+            lower_thresh = xenlog_guest_lower_thresh;
+            if ( level == -1 )
+                level = XENLOG_GUEST_DEFAULT;
+            break;
+        case '0' ... '3':
+            level = p[1] - '0';
+            break;
+        }
         p += 3;
     }
 
-    if ( (p[0] == '<') &&
-         (p[1] >= '0') && (p[1] <= ('0' + XENLOG_MAX)) &&
-         (p[2] == '>') )
-    {
-        level = p[1] - '0';
-        p += 3;
-    }
+    if ( level == -1 )
+        level = XENLOG_DEFAULT;
 
     if ( !print_regardless )
     {
@@ -396,7 +401,8 @@ void printk(const char *fmt, ...)
     }
 
  out:
-    spin_unlock_irqrestore(&console_lock, flags);
+    spin_unlock_recursive(&console_lock);
+    local_irq_restore(flags);
 }
 
 void set_printk_prefix(const char *prefix)
@@ -547,9 +553,20 @@ int __printk_ratelimit(int ratelimit_ms, int ratelimit_burst)
         int lost = missed;
         missed = 0;
         toks -= ratelimit_ms;
-        spin_unlock_irqrestore(&ratelimit_lock, flags);
+        spin_unlock(&ratelimit_lock);
         if ( lost )
-            printk("printk: %d messages suppressed.\n", lost);
+        {
+            char lost_str[8];
+            snprintf(lost_str, sizeof(lost_str), "%d", lost);
+            /* console_lock may already be acquired by printk(). */
+            spin_lock_recursive(&console_lock);
+            __putstr(printk_prefix);
+            __putstr("printk: ");
+            __putstr(lost_str);
+            __putstr(" messages suppressed.\n");
+            spin_unlock_recursive(&console_lock);
+        }
+        local_irq_restore(flags);
         return 1;
     }
     missed++;
@@ -565,8 +582,7 @@ int printk_ratelimit_burst = 10;
 
 int printk_ratelimit(void)
 {
-    return __printk_ratelimit(printk_ratelimit_ms,
-                              printk_ratelimit_burst);
+    return __printk_ratelimit(printk_ratelimit_ms, printk_ratelimit_burst);
 }
 
 /*

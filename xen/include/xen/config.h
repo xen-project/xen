@@ -48,8 +48,6 @@
 #define XENLOG_G_INFO    XENLOG_GUEST XENLOG_INFO
 #define XENLOG_G_DEBUG   XENLOG_GUEST XENLOG_DEBUG
 
-#define XENLOG_MAX 3
-
 /*
  * Some code is copied directly from Linux.
  * Match some of the Linux log levels to Xen.
