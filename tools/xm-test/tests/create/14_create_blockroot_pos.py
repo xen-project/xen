@@ -18,17 +18,12 @@ rdpath = getRdPath()
 #     print "Using %s" % output
 
 if ENABLE_HVM_SUPPORT:
-    domain = XmTestDomain(name="14_create_blockroot")
+    config = None
 else:
-    config = {"memory" : "64",
-              "root"   : "/dev/hda1",
-              "name"   : "14_create_blockroot",
-              "kernel" : getDefaultKernel(),
+    config = {"root"   : "/dev/hda1",
               "disk"   : "file:%s/initrd.img,hda1,w" % rdpath
               }
-    domConfig = XenConfig()
-    domConfig.setOpts(config)
-    domain = XenDomain(name=domConfig.getOpt("name"), config=domConfig)
+domain = XmTestDomain(name="14_create_blockroot", extraConfig=config)
 
 try:
     console = domain.start()
