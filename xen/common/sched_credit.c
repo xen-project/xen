@@ -721,6 +721,7 @@ csched_acct(void)
     uint32_t weight_left;
     uint32_t credit_fair;
     uint32_t credit_peak;
+    uint32_t credit_cap;
     int credit_balance;
     int credit_xtra;
     int credit;
@@ -751,6 +752,7 @@ csched_acct(void)
     weight_left = weight_total;
     credit_balance = 0;
     credit_xtra = 0;
+    credit_cap = 0U;
 
     list_for_each_safe( iter_sdom, next_sdom, &csched_priv.active_sdom )
     {
@@ -778,13 +780,15 @@ csched_acct(void)
                              (weight_total - 1)
                            ) / weight_total;
         }
+
         if ( sdom->cap != 0U )
         {
-            uint32_t credit_cap;
-            
             credit_cap = ((sdom->cap * CSCHED_CREDITS_PER_ACCT) + 99) / 100;
             if ( credit_cap < credit_peak )
                 credit_peak = credit_cap;
+
+            credit_cap = ( credit_cap + ( sdom->active_vcpu_count - 1 )
+                         ) / sdom->active_vcpu_count;
         }
 
         credit_fair = ( ( credit_total * sdom->weight) + (weight_total - 1)
@@ -840,10 +844,10 @@ csched_acct(void)
              */
             if ( credit < 0 )
             {
-                if ( sdom->cap == 0U )
-                    svc->pri = CSCHED_PRI_TS_OVER;
-                else
+                if ( sdom->cap != 0U && credit < -credit_cap )
                     svc->pri = CSCHED_PRI_TS_PARKED;
+                else
+                    svc->pri = CSCHED_PRI_TS_OVER;
 
                 if ( credit < -CSCHED_CREDITS_PER_TSLICE )
                 {
