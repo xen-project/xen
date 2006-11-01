@@ -229,7 +229,7 @@ unsigned long do_iret(void)
     regs->rsp    = iret_saved.rsp;
     regs->ss     = iret_saved.ss | 3; /* force guest privilege */
 
-    if ( !(iret_saved.flags & VGCF_in_sycall) )
+    if ( !(iret_saved.flags & VGCF_in_syscall) )
     {
         regs->entry_vector = 0;
         regs->r11 = iret_saved.r11;

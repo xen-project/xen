@@ -214,7 +214,7 @@ long arch_do_domctl(
         int i;
         struct domain *d = find_domain_by_id(domctl->domain);
         unsigned long max_pfns = domctl->u.getmemlist.max_pfns;
-        unsigned long mfn, gmfn;
+        unsigned long mfn;
         struct list_head *list_ent;
 
         ret = -EINVAL;
