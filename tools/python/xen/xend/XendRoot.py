@@ -93,6 +93,8 @@ class XendRoot:
 
     dom0_vcpus_default = '0'
 
+    vncpasswd_default = None
+
     """Default interface to listen for VNC connections on"""
     xend_vnc_listen_default = '127.0.0.1'
 
@@ -286,6 +288,10 @@ class XendRoot:
 
     def get_vnclisten_address(self):
         return self.get_config_value('vnc-listen', self.xend_vnc_listen_default)
+
+    def get_vncpasswd_default(self):
+        return self.get_config_value('vncpasswd',
+                                     self.vncpasswd_default)
 
 def instance():
     """Get an instance of XendRoot.
