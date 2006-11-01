@@ -54,7 +54,7 @@ static unsigned long lowmem_emergency_pool_pages;
 static void parse_lowmem_emergency_pool(char *s)
 {
     unsigned long long bytes;
-    bytes = parse_size_and_unit(s);
+    bytes = parse_size_and_unit(s, NULL);
     lowmem_emergency_pool_pages = bytes >> PAGE_SHIFT;
 }
 custom_param("lowmem_emergency_pool", parse_lowmem_emergency_pool);

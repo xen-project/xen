@@ -1177,6 +1177,6 @@ void sync_vcpu_execstate(struct vcpu *v)
 
 static void parse_dom0_mem(char *s)
 {
-	dom0_size = parse_size_and_unit(s);
+	dom0_size = parse_size_and_unit(s, NULL);
 }
 custom_param("dom0_mem", parse_dom0_mem);

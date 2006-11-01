@@ -33,28 +33,45 @@
 extern unsigned long initial_images_nrpages(void);
 extern void discard_initial_images(void);
 
-static long dom0_nrpages;
+static long dom0_nrpages, dom0_min_nrpages, dom0_max_nrpages = LONG_MAX;
 
 /*
- * dom0_mem:
- *  If +ve:
- *   * The specified amount of memory is allocated to domain 0.
- *  If -ve:
- *   * All of memory is allocated to domain 0, minus the specified amount.
- *  If not specified: 
- *   * All of memory is allocated to domain 0, minus 1/16th which is reserved
- *     for uses such as DMA buffers (the reservation is clamped to 128MB).
+ * dom0_mem=[min:<min_amt>,][max:<max_amt>,][<amt>]
+ * 
+ * <min_amt>: The minimum amount of memory which should be allocated for dom0.
+ * <max_amt>: The maximum amount of memory which should be allocated for dom0.
+ * <amt>:     The precise amount of memory to allocate for dom0.
+ * 
+ * Notes:
+ *  1. <amt> is clamped from below by <min_amt> and from above by available
+ *     memory and <max_amt>
+ *  2. <min_amt> is clamped from above by available memory and <max_amt>
+ *  3. <min_amt> is ignored if it is greater than <max_amt>
+ *  4. If <amt> is not specified, it is calculated as follows:
+ *     "All of memory is allocated to domain 0, minus 1/16th which is reserved
+ *      for uses such as DMA buffers (the reservation is clamped to 128MB)."
+ * 
+ * Each value can be specified as positive or negative:
+ *  If +ve: The specified amount is an absolute value.
+ *  If -ve: The specified amount is subtracted from total available memory.
  */
+static long parse_amt(char *s, char **ps)
+{
+    long pages = parse_size_and_unit((*s == '-') ? s+1 : s, ps) >> PAGE_SHIFT;
+    return (*s == '-') ? -pages : pages;
+}
 static void parse_dom0_mem(char *s)
 {
-    unsigned long long bytes;
-    char *t = s;
-    if ( *s == '-' )
-        t++;
-    bytes = parse_size_and_unit(t);
-    dom0_nrpages = bytes >> PAGE_SHIFT;
-    if ( *s == '-' )
-        dom0_nrpages = -dom0_nrpages;
+    do {
+        if ( !strncmp(s, "min:", 4) )
+            dom0_min_nrpages = parse_amt(s+4, &s);
+        else if ( !strncmp(s, "max:", 4) )
+            dom0_max_nrpages = parse_amt(s+4, &s);
+        else
+            dom0_nrpages = parse_amt(s, &s);
+        if ( *s != ',' )
+            break;
+    } while ( *s++ == ',' );
 }
 custom_param("dom0_mem", parse_dom0_mem);
 
@@ -101,6 +118,35 @@ static struct page_info *alloc_chunk(struct domain *d, unsigned long max_pages)
         if ( order-- == 0 )
             break;
     return page;
+}
+
+static unsigned long compute_dom0_nr_pages(void)
+{
+    unsigned long avail = avail_domheap_pages() + initial_images_nrpages();
+
+    /*
+     * If domain 0 allocation isn't specified, reserve 1/16th of available
+     * memory for things like DMA buffers. This reservation is clamped to 
+     * a maximum of 128MB.
+     */
+    if ( dom0_nrpages == 0 )
+    {
+        dom0_nrpages = avail;
+        dom0_nrpages = min(dom0_nrpages / 16, 128L << (20 - PAGE_SHIFT));
+        dom0_nrpages = -dom0_nrpages;
+    }
+
+    /* Negative memory specification means "all memory - specified amount". */
+    if ( dom0_nrpages     < 0 ) dom0_nrpages     += avail;
+    if ( dom0_min_nrpages < 0 ) dom0_min_nrpages += avail;
+    if ( dom0_max_nrpages < 0 ) dom0_max_nrpages += avail;
+
+    /* Clamp dom0 memory according to min/max limits and available memory. */
+    dom0_nrpages = max(dom0_nrpages, dom0_min_nrpages);
+    dom0_nrpages = min(dom0_nrpages, dom0_max_nrpages);
+    dom0_nrpages = min(dom0_nrpages, (long)avail);
+
+    return dom0_nrpages;
 }
 
 static void process_dom0_ioports_disable(void)
@@ -269,25 +315,7 @@ int construct_dom0(struct domain *d,
 
     d->max_pages = ~0U;
 
-    /*
-     * If domain 0 allocation isn't specified, reserve 1/16th of available
-     * memory for things like DMA buffers. This reservation is clamped to 
-     * a maximum of 128MB.
-     */
-    if ( dom0_nrpages == 0 )
-    {
-        dom0_nrpages = avail_domheap_pages() + initial_images_nrpages();
-        dom0_nrpages = min(dom0_nrpages / 16, 128L << (20 - PAGE_SHIFT));
-        dom0_nrpages = -dom0_nrpages;
-    }
-
-    /* Negative memory specification means "all memory - specified amount". */
-    if ( dom0_nrpages < 0 )
-        nr_pages = avail_domheap_pages() + initial_images_nrpages() +
-            dom0_nrpages;
-    else
-        nr_pages = min(avail_domheap_pages() + initial_images_nrpages(),
-                       (unsigned long)dom0_nrpages);
+    nr_pages = compute_dom0_nr_pages();
 
     if ( (rc = parseelfimage(&dsi)) != 0 )
         return rc;

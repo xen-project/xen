@@ -40,7 +40,7 @@ static void parse_dom0_mem(char *s)
 {
     unsigned long long bytes;
 
-    bytes = parse_size_and_unit(s);
+    bytes = parse_size_and_unit(s, NULL);
     dom0_nrpages = bytes >> PAGE_SHIFT;
 }
 custom_param("dom0_mem", parse_dom0_mem);

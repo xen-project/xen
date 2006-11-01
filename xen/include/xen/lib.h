@@ -86,7 +86,7 @@ long long simple_strtoll(
 unsigned long long simple_strtoull(
     const char *cp,char **endp, unsigned int base);
 
-unsigned long long parse_size_and_unit(char *s);
+unsigned long long parse_size_and_unit(const char *s, char **ps);
 
 #define TAINT_UNSAFE_SMP                (1<<0)
 #define TAINT_MACHINE_CHECK             (1<<1)

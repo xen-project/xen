@@ -6,7 +6,7 @@
 
 /* opt_mem: Limit of physical RAM. Any RAM beyond this point is ignored. */
 unsigned long long opt_mem;
-static void parse_mem(char *s) { opt_mem = parse_size_and_unit(s); }
+static void parse_mem(char *s) { opt_mem = parse_size_and_unit(s, NULL); }
 custom_param("mem", parse_mem);
 
 struct e820map e820;
