@@ -343,7 +343,7 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
             if (!(pteval & _PAGE_P)) {
                 if (vpsr.ic) {
                     vcpu_set_isr(v, misr.val);
-                    data_page_not_present(v, vadr);
+                    dtlb_fault(v, vadr);
                     return IA64_FAULT;
                 } else {
                     nested_dtlb(v);
