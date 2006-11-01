@@ -33,111 +33,6 @@
 
 
 /******************************************************************************
- * Definitions for the use of the "available" bits in the shadow PTEs.
- *
- * Review of the low 12 bits of a shadow page table entry:
- *
- *         in a guest:                      in a shadow:
- * Bit 11: _PAGE_AVAIL2, aka _PAGE_GNTTAB
- * Bit 10: _PAGE_AVAIL1                     _PAGE_SHADOW_RW ("SW" below)
- * Bit  9: _PAGE_AVAIL0                     _PAGE_SHADOW_PRESENT ("SP" below)
- * Bit  8: _PAGE_GLOBAL                     _PAGE_SHADOW_MMIO ("MMIO" below),
- *                                          aka _PAGE_SHADOW_GUEST_NOT_PRESENT
- * Bit  7: _PAGE_PSE, aka _PAGE_PAT
- * Bit  6: _PAGE_DIRTY
- * Bit  5: _PAGE_ACCESSED
- * Bit  4: _PAGE_PCD
- * Bit  3: _PAGE_PWT
- * Bit  2: _PAGE_USER
- * Bit  1: _PAGE_RW ("GW" below)
- * Bit  0: _PAGE_PRESENT ("GP" below)
- *
- * Given a guest entry, as shown below, we can expect the following in the
- * corresponding shadow entry:
- *
- * Guest entry  Shadow entry      Commentary
- * -----------  ----------------  ---------------------------------------------
- *       Maps     
- * GP GW  IO    GP SP GW SW MMIO 
- * -- -- ----   -- -- -- -- ----
- *  -  -   -     0  0  0  0   0   The guest entry has not yet been shadowed.
- *  0  -   -     0  0  0  0   1   The guest entry is marked not-present.
- *  1  1  no     ?  1  ?  1   0   Writable entry in the guest.
- *  1  0  no     ?  1  0  0   0   Read-only entry in the guest.
- *  1  1  yes    0  1  ?  1   1   Writable MMIO mapping in the guest.
- *  1  0  yes    0  1  0  0   1   Read-only MMIO mapping in the guest.
- *
- * Normally, we would expect that GP=1 in the guest to imply GP=1 in the
- * shadow, and similarly for GW=1.  However, various functionality that may be
- * implemented via the shadow can cause GP or GW to be cleared in such cases.
- * A & D bit emulation is a prime example of such functionality.
- *
- * If _PAGE_SHADOW_PRESENT is zero, then the _PAGE_PRESENT bit in that same
- * entry will always be zero, too.
-
- * Bit 11 is used in debug builds as the _PAGE_GNTTAB bit in PV guests.  It is
- * currently available for random (ab)use in shadow entries.
- *
- * Bit 8 (the global bit) could be propagated from an HVM guest to the shadow,
- * but currently there is no benefit, as the guest's TLB is flushed on every
- * transition of CR3 anyway due to the HVM exit/re-entry.
- *
- * In shadow entries in which the _PAGE_SHADOW_PRESENT is set, bit 8 is used
- * as the _PAGE_SHADOW_MMIO bit.  In such entries, if _PAGE_SHADOW_MMIO is
- * set, then the entry contains the *gfn* directly from the corresponding
- * guest entry (not an mfn!!).
- *
- * Bit 7 is set in a guest L2 to signify a superpage entry.  The current
- * shadow code splinters superpage mappings into 512 or 1024 4K mappings; the
- * resulting shadow L1 table is called an FL1.  Note that there is no guest
- * page that corresponds to an FL1.
- *
- * Bit 7 in a guest L1 is the PAT2 bit.  Currently we do not support PAT in
- * this shadow code.
- *
- * Bit 6 is the dirty bit.
- *
- * Bit 5 is the accessed bit.
- *
- * Bit 4 is the cache disable bit.  If set in a guest, the hardware is
- * supposed to refuse to cache anything found via this entry.  It can be set
- * in an L4e, L3e, L2e, or L1e.  This shadow code currently does not support
- * cache disable bits.  They are silently ignored.
- *
- * Bit 4 is a guest L1 is also the PAT1 bit.  Currently we do not support PAT
- * in this shadow code.
- *
- * Bit 3 is the cache write-thru bit.  If set in a guest, the hardware is
- * supposed to use write-thru instead of write-back caching for anything found
- * via this entry.  It can be set in an L4e, L3e, L2e, or L1e.  This shadow
- * code currently does not support cache write-thru bits.  They are silently
- * ignored.
- *
- * Bit 3 is a guest L1 is also the PAT0 bit.  Currently we do not support PAT
- * in this shadow code.
- *
- * Bit 2 is the user bit.
- *
- * Bit 1 is the read-write bit.
- *
- * Bit 0 is the present bit.
- */
-
-// Copy of the _PAGE_RW bit from the guest's PTE, appropriately zero'ed by
-// the appropriate shadow rules.
-#define _PAGE_SHADOW_RW                 _PAGE_AVAIL1
-
-// Copy of the _PAGE_PRESENT bit from the guest's PTE
-#define _PAGE_SHADOW_PRESENT            _PAGE_AVAIL0
-
-// The matching guest entry maps MMIO space
-#define _PAGE_SHADOW_MMIO               _PAGE_GLOBAL
-
-// Shadow flags value used when the guest is not present
-#define _PAGE_SHADOW_GUEST_NOT_PRESENT  _PAGE_GLOBAL
-
-
-/******************************************************************************
  * Debug and error-message output
  */
 #define SHADOW_PRINTK(_f, _a...)                                     \
@@ -151,13 +46,13 @@
     } while (0)
 
 // The flags for use with SHADOW_DEBUG:
-#define SHADOW_DEBUG_PROPAGATE         0
-#define SHADOW_DEBUG_MAKE_SHADOW       0
-#define SHADOW_DEBUG_DESTROY_SHADOW    0
+#define SHADOW_DEBUG_PROPAGATE         1
+#define SHADOW_DEBUG_MAKE_SHADOW       1
+#define SHADOW_DEBUG_DESTROY_SHADOW    1
 #define SHADOW_DEBUG_P2M               0
-#define SHADOW_DEBUG_A_AND_D           0
-#define SHADOW_DEBUG_EMULATE           0
-#define SHADOW_DEBUG_LOGDIRTY          1
+#define SHADOW_DEBUG_A_AND_D           1
+#define SHADOW_DEBUG_EMULATE           1
+#define SHADOW_DEBUG_LOGDIRTY          0
 
 
 /******************************************************************************

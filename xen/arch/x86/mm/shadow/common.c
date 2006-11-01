@@ -1327,8 +1327,18 @@ static void sh_hash_audit_bucket(struct domain *d, int bucket)
              && e->t != (PGC_SH_fl1_pae_shadow >> PGC_SH_type_shift)
              && e->t != (PGC_SH_fl1_64_shadow >> PGC_SH_type_shift) )
         {
+            struct page_info *gpg = mfn_to_page(_mfn(e->n));
             /* Bad shadow flags on guest page? */
-            BUG_ON( !(mfn_to_page(_mfn(e->n))->shadow_flags & (1<<e->t)) );
+            BUG_ON( !(gpg->shadow_flags & (1<<e->t)) );
+            /* Bad type count on guest page? */
+            if ( (gpg->u.inuse.type_info & PGT_type_mask) == PGT_writable_page 
+                 && (gpg->u.inuse.type_info & PGT_count_mask) != 0 )
+            {
+                SHADOW_ERROR("MFN %#"SH_PRI_mfn" shadowed (by %#"SH_PRI_mfn")"
+                             " but has typecount %#lx\n",
+                             e->n, mfn_x(e->smfn), gpg->u.inuse.type_info);
+                BUG();
+            }
         }
         /* That entry was OK; on we go */
         e = e->next;

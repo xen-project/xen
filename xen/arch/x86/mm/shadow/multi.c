@@ -36,10 +36,7 @@
 #include "private.h"
 #include "types.h"
 
-/* The first cut: an absolutely synchronous, trap-and-emulate version,
- * supporting only HVM guests (and so only "external" shadow mode). 
- *
- * THINGS TO DO LATER:
+/* THINGS TO DO LATER:
  * 
  * TEARDOWN HEURISTICS
  * Also: have a heuristic for when to destroy a previous paging-mode's 
@@ -55,14 +52,6 @@
  * map_domain_page() version is OK on PAE, we could maybe allow a lightweight 
  * l3-and-l2h-only shadow mode for PAE PV guests that would allow them 
  * to share l2h pages again. 
- *
- * PAE L3 COPYING
- * In this code, we copy all 32 bytes of a PAE L3 every time we change an 
- * entry in it, and every time we change CR3.  We copy it for the linear 
- * mappings (ugh! PAE linear mappings) and we copy it to the low-memory
- * buffer so it fits in CR3.  Maybe we can avoid some of this recopying 
- * by using the shadow directly in some places. 
- * Also, for SMP, need to actually respond to seeing shadow.pae_flip_pending.
  *
  * GUEST_WALK_TABLES TLB FLUSH COALESCE
  * guest_walk_tables can do up to three remote TLB flushes as it walks to
@@ -98,9 +87,6 @@ static char *fetch_type_names[] = {
     [ft_demand_write] "demand write",
 };
 #endif
-
-/* XXX forward declarations */
-static inline void sh_update_linear_entries(struct vcpu *v);
 
 /**************************************************************************/
 /* Hash table mapping from guest pagetables to shadows
@@ -460,16 +446,20 @@ static u32 guest_set_ad_bits(struct vcpu *v,
     u32 flags;
     int res = 0;
 
+    ASSERT(ep && !(((unsigned long)ep) & ((sizeof *ep) - 1)));
+    ASSERT(level <= GUEST_PAGING_LEVELS);
+    ASSERT(shadow_lock_is_acquired(v->domain));
+
+    flags = guest_l1e_get_flags(*ep);
+
+    /* Only set A and D bits for guest-initiated accesses */
+    if ( !(ft & FETCH_TYPE_DEMAND) )
+        return flags;
+
     ASSERT(valid_mfn(gmfn)
            && (sh_mfn_is_a_page_table(gmfn)
                || ((mfn_to_page(gmfn)->u.inuse.type_info & PGT_count_mask) 
                    == 0)));
-    ASSERT(ep && !(((unsigned long)ep) & ((sizeof *ep) - 1)));
-    ASSERT(level <= GUEST_PAGING_LEVELS);
-    ASSERT(ft == ft_demand_read || ft == ft_demand_write);
-    ASSERT(shadow_lock_is_acquired(v->domain));
-
-    flags = guest_l1e_get_flags(*ep);
 
     /* PAE l3s do not have A and D bits */
     ASSERT(GUEST_PAGING_LEVELS > 3 || level != 3);
@@ -496,12 +486,20 @@ static u32 guest_set_ad_bits(struct vcpu *v,
     /* Set the bit(s) */
     sh_mark_dirty(v->domain, gmfn);
     SHADOW_DEBUG(A_AND_D, "gfn = %" SH_PRI_gfn ", "
-                  "old flags = %#x, new flags = %#x\n", 
-                  gfn_x(guest_l1e_get_gfn(*ep)), guest_l1e_get_flags(*ep), flags);
+                 "old flags = %#x, new flags = %#x\n", 
+                 gfn_x(guest_l1e_get_gfn(*ep)), guest_l1e_get_flags(*ep), 
+                 flags);
     *ep = guest_l1e_from_gfn(guest_l1e_get_gfn(*ep), flags);
     
-    /* Propagate this change to any existing shadows */
-    res = __shadow_validate_guest_entry(v, gmfn, ep, sizeof(*ep));
+    /* Propagate this change to any other shadows of the page 
+     * (only necessary if there is more than one shadow) */
+    if ( mfn_to_page(gmfn)->count_info & PGC_page_table )
+    {
+        u32 shflags = mfn_to_page(gmfn)->shadow_flags & SHF_page_type_mask;
+        /* More than one type bit set in shadow-flags? */
+        if ( shflags & ~(1UL << find_first_set_bit(shflags)) )
+            res = __shadow_validate_guest_entry(v, gmfn, ep, sizeof(*ep));
+    }
 
     /* We should never need to flush the TLB or recopy PAE entries */
     ASSERT((res == 0) || (res == SHADOW_SET_CHANGED));
@@ -637,78 +635,69 @@ shadow_l4_index(mfn_t *smfn, u32 guest_index)
 
 
 /**************************************************************************/
-/* Functions which compute shadow entries from their corresponding guest
- * entries.
- *
- * These are the "heart" of the shadow code.
- *
- * There are two sets of these: those that are called on demand faults (read
- * faults and write faults), and those that are essentially called to
- * "prefetch" (or propagate) entries from the guest into the shadow.  The read
- * fault and write fault are handled as two separate cases for L1 entries (due
- * to the _PAGE_DIRTY bit handling), but for L[234], they are grouped together
- * into the respective demand_fault functions.
+/* Function which computes shadow entries from their corresponding guest
+ * entries.  This is the "heart" of the shadow code. It operates using
+ * level-1 shadow types, but handles all levels of entry.
+ * Don't call it directly, but use the four wrappers below.
  */
-// The function below tries to capture all of the flag manipulation for the
-// demand and propagate functions into one place.
-//
-static always_inline u32
-sh_propagate_flags(struct vcpu *v, mfn_t target_mfn, 
-                    u32 gflags, guest_l1e_t *guest_entry_ptr, mfn_t gmfn, 
-                    int mmio, int level, fetch_type_t ft)
-{
-#define CHECK(_cond)                                    \
-do {                                                    \
-    if (unlikely(!(_cond)))                             \
-    {                                                   \
-        printk("%s %s %d ASSERTION (%s) FAILED\n",      \
-               __func__, __FILE__, __LINE__, #_cond);   \
-        domain_crash(d);                                \
-    }                                                   \
-} while (0);
 
+static always_inline void
+_sh_propagate(struct vcpu *v, 
+              void *guest_entry_ptr, 
+              mfn_t guest_table_mfn, 
+              mfn_t target_mfn, 
+              void *shadow_entry_ptr,
+              int level,
+              fetch_type_t ft, 
+              int mmio)
+{
+    guest_l1e_t *gp = guest_entry_ptr;
+    shadow_l1e_t *sp = shadow_entry_ptr;
     struct domain *d = v->domain;
     u32 pass_thru_flags;
-    u32 sflags;
+    u32 gflags, sflags;
 
     /* We don't shadow PAE l3s */
     ASSERT(GUEST_PAGING_LEVELS > 3 || level != 3);
 
-    // XXX -- might want to think about PAT support for HVM guests...
+    if ( valid_mfn(guest_table_mfn) )
+        /* Handle A and D bit propagation into the guest */
+        gflags = guest_set_ad_bits(v, guest_table_mfn, gp, level, ft);
+    else 
+    {
+        /* Must be an fl1e or a prefetch */
+        ASSERT(level==1 || !(ft & FETCH_TYPE_DEMAND));
+        gflags = guest_l1e_get_flags(*gp);
+    }
 
-#ifndef NDEBUG
-    // MMIO can only occur from L1e's
-    //
-    if ( mmio )
-        CHECK(level == 1);
-
-    // We should always have a pointer to the guest entry if it's a non-PSE
-    // non-MMIO demand access.
-    if ( ft & FETCH_TYPE_DEMAND )
-        CHECK(guest_entry_ptr || level == 1);
-#endif
-
-    // A not-present guest entry has a special signature in the shadow table,
-    // so that we do not have to consult the guest tables multiple times...
-    //
     if ( unlikely(!(gflags & _PAGE_PRESENT)) )
-        return _PAGE_SHADOW_GUEST_NOT_PRESENT;
+    {
+        /* If a guest l1 entry is not present, shadow with the magic 
+         * guest-not-present entry. */
+        if ( level == 1 )
+            *sp = sh_l1e_gnp();
+        else 
+            *sp = shadow_l1e_empty();
+        goto done;
+    }
 
-    // Must have a valid target_mfn, unless this is mmio, or unless this is a
-    // prefetch.  In the case of a prefetch, an invalid mfn means that we can
-    // not usefully shadow anything, and so we return early.
+    if ( level == 1 && mmio )
+    {
+        /* Guest l1e maps MMIO space */
+        *sp = sh_l1e_mmio(guest_l1e_get_gfn(*gp), gflags);
+        goto done;
+    }
+
+    // Must have a valid target_mfn, unless this is a prefetch.  In the
+    // case of a prefetch, an invalid mfn means that we can not usefully
+    // shadow anything, and so we return early.
     //
     if ( !valid_mfn(target_mfn) )
     {
-        CHECK((ft == ft_prefetch) || mmio);
-        if ( !mmio )
-            return 0;
+        ASSERT((ft == ft_prefetch));
+        *sp = shadow_l1e_empty();
+        goto done;
     }
-
-    // Set the A and D bits in the guest entry, if we need to.
-    if ( guest_entry_ptr && (ft & FETCH_TYPE_DEMAND) )
-        gflags = guest_set_ad_bits(v, gmfn, guest_entry_ptr, level, ft);
-    
 
     // Propagate bits from the guest to the shadow.
     // Some of these may be overwritten, below.
@@ -719,12 +708,7 @@ do {                                                    \
                        _PAGE_RW | _PAGE_PRESENT);
     if ( guest_supports_nx(v) )
         pass_thru_flags |= _PAGE_NX_BIT;
-    sflags = (gflags & pass_thru_flags) | _PAGE_SHADOW_PRESENT;
-
-    // Copy the guest's RW bit into the SHADOW_RW bit.
-    //
-    if ( gflags & _PAGE_RW )
-        sflags |= _PAGE_SHADOW_RW;
+    sflags = gflags & pass_thru_flags;
 
     // Set the A&D bits for higher level shadows.
     // Higher level entries do not, strictly speaking, have dirty bits, but
@@ -750,49 +734,35 @@ do {                                                    \
                   && !(gflags & _PAGE_DIRTY)) )
         sflags &= ~_PAGE_RW;
 
-    // MMIO caching
+    // shadow_mode_log_dirty support
     //
-    // MMIO mappings are marked as not present, but we set the SHADOW_MMIO bit
-    // to cache the fact that this entry  is in MMIO space.
+    // Only allow the guest write access to a page a) on a demand fault,
+    // or b) if the page is already marked as dirty.
     //
-    if ( (level == 1) && mmio )
+    if ( unlikely((level == 1) && shadow_mode_log_dirty(d)) )
     {
-        sflags &= ~(_PAGE_PRESENT);
-        sflags |= _PAGE_SHADOW_MMIO;
-    }
-    else 
-    {
-        // shadow_mode_log_dirty support
-        //
-        // Only allow the guest write access to a page a) on a demand fault,
-        // or b) if the page is already marked as dirty.
-        //
-        if ( unlikely((level == 1) &&
-                      !(ft & FETCH_TYPE_WRITE) &&
-                      shadow_mode_log_dirty(d) &&
-                      !sh_mfn_is_dirty(d, target_mfn)) )
-        {
+        if ( ft & FETCH_TYPE_WRITE ) 
+            sh_mark_dirty(d, target_mfn);
+        else if ( !sh_mfn_is_dirty(d, target_mfn) )
             sflags &= ~_PAGE_RW;
-        }
-        
-        // protect guest page tables
-        //
-        if ( unlikely((level == 1) &&
-                      sh_mfn_is_a_page_table(target_mfn)) )
+    }
+    
+    // protect guest page tables
+    //
+    if ( unlikely((level == 1) && sh_mfn_is_a_page_table(target_mfn)) )
+    {
+        if ( shadow_mode_trap_reads(d) )
         {
-            if ( shadow_mode_trap_reads(d) )
-            {
-                // if we are trapping both reads & writes, then mark this page
-                // as not present...
-                //
-                sflags &= ~_PAGE_PRESENT;
-            }
-            else
-            {
-                // otherwise, just prevent any writes...
-                //
-                sflags &= ~_PAGE_RW;
-            }
+            // if we are trapping both reads & writes, then mark this page
+            // as not present...
+            //
+            sflags &= ~_PAGE_PRESENT;
+        }
+        else
+        {
+            // otherwise, just prevent any writes...
+            //
+            sflags &= ~_PAGE_RW;
         }
     }
 
@@ -804,9 +774,17 @@ do {                                                    \
         sflags |= _PAGE_USER;
     }
 
-    return sflags;
-#undef CHECK
+    *sp = shadow_l1e_from_mfn(target_mfn, sflags);
+ done:
+    SHADOW_DEBUG(PROPAGATE,
+                 "%s level %u guest %" SH_PRI_gpte " shadow %" SH_PRI_pte "\n",
+                 fetch_type_names[ft], level, gp->l1, sp->l1);
 }
+
+
+/* These four wrappers give us a little bit of type-safety back around the 
+ * use of void-* pointers in _sh_propagate(), and allow the compiler to 
+ * optimize out some level checks. */
 
 #if GUEST_PAGING_LEVELS >= 4
 static void
@@ -814,19 +792,10 @@ l4e_propagate_from_guest(struct vcpu *v,
                          guest_l4e_t *gl4e,
                          mfn_t gl4mfn,
                          mfn_t sl3mfn,
-                         shadow_l4e_t *sl4p,
+                         shadow_l4e_t *sl4e,
                          fetch_type_t ft)
 {
-    u32 gflags = guest_l4e_get_flags(*gl4e);
-    u32 sflags = sh_propagate_flags(v, sl3mfn, gflags, (guest_l1e_t *) gl4e,
-                                     gl4mfn, 0, 4, ft);
-
-    *sl4p = shadow_l4e_from_mfn(sl3mfn, sflags);
-
-    SHADOW_DEBUG(PROPAGATE,
-                  "%s gl4e=%" SH_PRI_gpte " sl4e=%" SH_PRI_pte "\n",
-                  fetch_type_names[ft], gl4e->l4, sl4p->l4);
-    ASSERT(sflags != -1);
+    _sh_propagate(v, gl4e, gl4mfn, sl3mfn, sl4e, 4, ft, 0);
 }
 
 static void
@@ -834,19 +803,10 @@ l3e_propagate_from_guest(struct vcpu *v,
                          guest_l3e_t *gl3e,
                          mfn_t gl3mfn, 
                          mfn_t sl2mfn, 
-                         shadow_l3e_t *sl3p,
+                         shadow_l3e_t *sl3e,
                          fetch_type_t ft)
 {
-    u32 gflags = guest_l3e_get_flags(*gl3e);
-    u32 sflags = sh_propagate_flags(v, sl2mfn, gflags, (guest_l1e_t *) gl3e,
-                                     gl3mfn, 0, 3, ft);
-
-    *sl3p = shadow_l3e_from_mfn(sl2mfn, sflags);
-
-    SHADOW_DEBUG(PROPAGATE,
-                  "%s gl3e=%" SH_PRI_gpte " sl3e=%" SH_PRI_pte "\n",
-                  fetch_type_names[ft], gl3e->l3, sl3p->l3);
-    ASSERT(sflags != -1);
+    _sh_propagate(v, gl3e, gl3mfn, sl2mfn, sl3e, 3, ft, 0);
 }
 #endif // GUEST_PAGING_LEVELS >= 4
 
@@ -854,95 +814,23 @@ static void
 l2e_propagate_from_guest(struct vcpu *v, 
                          guest_l2e_t *gl2e,
                          mfn_t gl2mfn,
-                         mfn_t sl1mfn, 
-                         shadow_l2e_t *sl2p,
+                         mfn_t sl1mfn,
+                         shadow_l2e_t *sl2e,
                          fetch_type_t ft)
 {
-    u32 gflags = guest_l2e_get_flags(*gl2e);
-    u32 sflags = sh_propagate_flags(v, sl1mfn, gflags, (guest_l1e_t *) gl2e, 
-                                     gl2mfn, 0, 2, ft);
-
-    *sl2p = shadow_l2e_from_mfn(sl1mfn, sflags);
-
-    SHADOW_DEBUG(PROPAGATE,
-                  "%s gl2e=%" SH_PRI_gpte " sl2e=%" SH_PRI_pte "\n",
-                  fetch_type_names[ft], gl2e->l2, sl2p->l2);
-    ASSERT(sflags != -1);
+    _sh_propagate(v, gl2e, gl2mfn, sl1mfn, sl2e, 2, ft, 0);
 }
 
-static inline int
-l1e_read_fault(struct vcpu *v, walk_t *gw, mfn_t gmfn, shadow_l1e_t *sl1p,
-               int mmio)
-/* returns 1 if emulation is required, and 0 otherwise */
-{
-    struct domain *d = v->domain;
-    u32 gflags = guest_l1e_get_flags(gw->eff_l1e);
-    u32 sflags = sh_propagate_flags(v, gmfn, gflags, gw->l1e, gw->l1mfn,
-                                     mmio, 1, ft_demand_read);
-
-    if ( shadow_mode_trap_reads(d) && !mmio && sh_mfn_is_a_page_table(gmfn) )
-    {
-        // emulation required!
-        *sl1p = shadow_l1e_empty();
-        return 1;
-    }
-
-    *sl1p = shadow_l1e_from_mfn(gmfn, sflags);
-
-    SHADOW_DEBUG(PROPAGATE,
-                  "va=%p eff_gl1e=%" SH_PRI_gpte " sl1e=%" SH_PRI_pte "\n",
-                  (void *)gw->va, gw->eff_l1e.l1, sl1p->l1);
-
-    ASSERT(sflags != -1);
-    return 0;
-}
-
-static inline int
-l1e_write_fault(struct vcpu *v, walk_t *gw, mfn_t gmfn, shadow_l1e_t *sl1p,
-                int mmio)
-/* returns 1 if emulation is required, and 0 otherwise */
-{
-    struct domain *d = v->domain;
-    u32 gflags = guest_l1e_get_flags(gw->eff_l1e);
-    u32 sflags = sh_propagate_flags(v, gmfn, gflags, gw->l1e, gw->l1mfn,
-                                     mmio, 1, ft_demand_write);
-
-    sh_mark_dirty(d, gmfn);
-
-    if ( !mmio && sh_mfn_is_a_page_table(gmfn) )
-    {
-        // emulation required!
-        *sl1p = shadow_l1e_empty();
-        return 1;
-    }
-
-    *sl1p = shadow_l1e_from_mfn(gmfn, sflags);
-
-    SHADOW_DEBUG(PROPAGATE,
-                  "va=%p eff_gl1e=%" SH_PRI_gpte " sl1e=%" SH_PRI_pte "\n",
-                  (void *)gw->va, gw->eff_l1e.l1, sl1p->l1);
-
-    ASSERT(sflags != -1);
-    return 0;
-}
-
-static inline void
-l1e_propagate_from_guest(struct vcpu *v, guest_l1e_t gl1e, shadow_l1e_t *sl1p,
+static void
+l1e_propagate_from_guest(struct vcpu *v, 
+                         guest_l1e_t *gl1e,
+                         mfn_t gl1mfn,
+                         mfn_t gmfn, 
+                         shadow_l1e_t *sl1e,
+                         fetch_type_t ft, 
                          int mmio)
 {
-    gfn_t gfn = guest_l1e_get_gfn(gl1e);
-    mfn_t gmfn = (mmio) ? _mfn(gfn_x(gfn)) : vcpu_gfn_to_mfn(v, gfn);
-    u32 gflags = guest_l1e_get_flags(gl1e);
-    u32 sflags = sh_propagate_flags(v, gmfn, gflags, 0, _mfn(INVALID_MFN), 
-                                     mmio, 1, ft_prefetch);
-
-    *sl1p = shadow_l1e_from_mfn(gmfn, sflags);
-
-    SHADOW_DEBUG(PROPAGATE,
-                  "gl1e=%" SH_PRI_gpte " sl1e=%" SH_PRI_pte "\n",
-                  gl1e.l1, sl1p->l1);
-
-    ASSERT(sflags != -1);
+    _sh_propagate(v, gl1e, gl1mfn, gmfn, sl1e, 1, ft, mmio);
 }
 
 
@@ -956,8 +844,6 @@ l1e_propagate_from_guest(struct vcpu *v, guest_l1e_t gl1e, shadow_l1e_t *sl1p,
  * SHADOW_SET_FLUSH   -- the caller must cause a TLB flush.
  * SHADOW_SET_ERROR   -- the input is not a valid entry (for example, if
  *                        shadow_get_page_from_l1e() fails).
- * SHADOW_SET_L3PAE_RECOPY -- one or more vcpu's need to have their local
- *                             copies of their PAE L3 entries re-copied.
  */
 
 static inline void safe_write_entry(void *dst, void *src) 
@@ -1041,16 +927,13 @@ shadow_get_page_from_l1e(shadow_l1e_t sl1e, struct domain *d)
     int res;
     mfn_t mfn;
     struct domain *owner;
-    shadow_l1e_t sanitized_sl1e =
-        shadow_l1e_remove_flags(sl1e, _PAGE_SHADOW_RW | _PAGE_SHADOW_PRESENT);
 
-    //ASSERT(shadow_l1e_get_flags(sl1e) & _PAGE_PRESENT);
-    //ASSERT((shadow_l1e_get_flags(sl1e) & L1_DISALLOW_MASK) == 0);
+    ASSERT(!sh_l1e_is_magic(sl1e));
 
     if ( !shadow_mode_refcounts(d) )
         return 1;
 
-    res = get_page_from_l1e(sanitized_sl1e, d);
+    res = get_page_from_l1e(sl1e, d);
 
     // If a privileged domain is attempting to install a map of a page it does
     // not own, we let it succeed anyway.
@@ -1062,7 +945,7 @@ shadow_get_page_from_l1e(shadow_l1e_t sl1e, struct domain *d)
          (owner = page_get_owner(mfn_to_page(mfn))) &&
          (d != owner) )
     {
-        res = get_page_from_l1e(sanitized_sl1e, owner);
+        res = get_page_from_l1e(sl1e, owner);
         SHADOW_PRINTK("privileged domain %d installs map of mfn %05lx "
                        "which is owned by domain %d: %s\n",
                        d->domain_id, mfn_x(mfn), owner->domain_id,
@@ -1250,7 +1133,8 @@ static int shadow_set_l1e(struct vcpu *v,
 
     if ( old_sl1e.l1 == new_sl1e.l1 ) return 0; /* Nothing to do */
     
-    if ( shadow_l1e_get_flags(new_sl1e) & _PAGE_PRESENT ) 
+    if ( (shadow_l1e_get_flags(new_sl1e) & _PAGE_PRESENT)
+         && !sh_l1e_is_magic(new_sl1e) ) 
     {
         /* About to install a new reference */        
         if ( shadow_mode_refcounts(d) ) {
@@ -1267,7 +1151,8 @@ static int shadow_set_l1e(struct vcpu *v,
     shadow_write_entries(sl1e, &new_sl1e, 1, sl1mfn);
     flags |= SHADOW_SET_CHANGED;
 
-    if ( shadow_l1e_get_flags(old_sl1e) & _PAGE_PRESENT ) 
+    if ( (shadow_l1e_get_flags(old_sl1e) & _PAGE_PRESENT) 
+         && !sh_l1e_is_magic(old_sl1e) )
     {
         /* We lost a reference to an old mfn. */
         /* N.B. Unlike higher-level sets, never need an extra flush 
@@ -2133,7 +2018,8 @@ void sh_destroy_l1_shadow(struct vcpu *v, mfn_t smfn)
         /* Decrement refcounts of all the old entries */
         mfn_t sl1mfn = smfn; 
         SHADOW_FOREACH_L1E(sl1mfn, sl1e, 0, 0, {
-            if ( shadow_l1e_get_flags(*sl1e) & _PAGE_PRESENT ) 
+            if ( (shadow_l1e_get_flags(*sl1e) & _PAGE_PRESENT)
+                 && !sh_l1e_is_magic(*sl1e) )
                 shadow_put_page_from_l1e(*sl1e, d);
         });
     }
@@ -2399,16 +2285,17 @@ static int validate_gl1e(struct vcpu *v, void *new_ge, mfn_t sl1mfn, void *se)
     guest_l1e_t *new_gl1e = new_ge;
     shadow_l1e_t *sl1p = se;
     gfn_t gfn;
-    mfn_t mfn;
-    int result = 0;
+    mfn_t gmfn;
+    int result = 0, mmio;
 
     perfc_incrc(shadow_validate_gl1e_calls);
 
     gfn = guest_l1e_get_gfn(*new_gl1e);
-    mfn = vcpu_gfn_to_mfn(v, gfn);
+    gmfn = vcpu_gfn_to_mfn(v, gfn);
 
-    l1e_propagate_from_guest(v, *new_gl1e, &new_sl1e, 
-                             /* mmio? */ !valid_mfn(mfn));
+    mmio = (hvm_guest(v) && shadow_vcpu_mode_translate(v) && !valid_mfn(gmfn));
+    l1e_propagate_from_guest(v, new_gl1e, _mfn(INVALID_MFN), gmfn, &new_sl1e, 
+                             ft_prefetch, mmio);
     
     result |= shadow_set_l1e(v, sl1p, new_sl1e, sl1mfn);
     return result;
@@ -2579,6 +2466,80 @@ static inline void reset_early_unshadow(struct vcpu *v)
 
 
 /**************************************************************************/
+/* Optimization: Prefetch multiple L1 entries.  This is called after we have 
+ * demand-faulted a shadow l1e in the fault handler, to see if it's
+ * worth fetching some more.
+ */
+
+#if SHADOW_OPTIMIZATIONS & SHOPT_PREFETCH
+
+/* XXX magic number */
+#define PREFETCH_DISTANCE 32
+
+static void sh_prefetch(struct vcpu *v, walk_t *gw, 
+                        shadow_l1e_t *ptr_sl1e, mfn_t sl1mfn)
+{
+    int i, dist, mmio;
+    gfn_t gfn;
+    mfn_t gmfn;
+    guest_l1e_t gl1e;
+    shadow_l1e_t sl1e;
+    u32 gflags;
+
+    /* Prefetch no further than the end of the _shadow_ l1 MFN */
+    dist = (PAGE_SIZE - ((unsigned long)ptr_sl1e & ~PAGE_MASK)) / sizeof sl1e;
+    /* And no more than a maximum fetches-per-fault */
+    if ( dist > PREFETCH_DISTANCE )
+        dist = PREFETCH_DISTANCE;
+
+    for ( i = 1; i < dist ; i++ ) 
+    {
+        /* No point in prefetching if there's already a shadow */
+        if ( ptr_sl1e[i].l1 != 0 )
+            break;
+
+        if ( gw->l1e )
+        {
+            /* Normal guest page; grab the next guest entry */
+            gl1e = gw->l1e[i];
+            /* Not worth continuing if we hit an entry that will need another
+             * fault for A/D-bit propagation anyway */
+            gflags = guest_l1e_get_flags(gl1e);
+            if ( (gflags & _PAGE_PRESENT) 
+                 && (!(gflags & _PAGE_ACCESSED)
+                     || ((gflags & _PAGE_RW) && !(gflags & _PAGE_DIRTY))) )
+                break;
+        } 
+        else 
+        {
+            /* Fragmented superpage, unless we've been called wrongly */
+            ASSERT(guest_l2e_get_flags(*gw->l2e) & _PAGE_PSE);
+            /* Increment the l1e's GFN by the right number of guest pages */
+            gl1e = guest_l1e_from_gfn(
+                _gfn(gfn_x(guest_l1e_get_gfn(gw->eff_l1e)) + i), 
+                guest_l1e_get_flags(gw->eff_l1e));
+        }
+
+        /* Look at the gfn that the l1e is pointing at */
+        gfn = guest_l1e_get_gfn(gl1e);
+        gmfn = vcpu_gfn_to_mfn(v, gfn);
+        mmio = ( hvm_guest(v) 
+                 && shadow_vcpu_mode_translate(v) 
+                 && mmio_space(gfn_to_paddr(gfn)) );
+
+        /* Propagate the entry.  Safe to use a pointer to our local 
+         * gl1e, since this is not a demand-fetch so there will be no 
+         * write-back to the guest. */
+        l1e_propagate_from_guest(v, &gl1e, _mfn(INVALID_MFN),
+                                 gmfn, &sl1e, ft_prefetch, mmio);
+        (void) shadow_set_l1e(v, ptr_sl1e + i, sl1e, sl1mfn);
+    }
+}
+
+#endif /* SHADOW_OPTIMIZATIONS & SHOPT_PREFETCH */
+
+
+/**************************************************************************/
 /* Entry points into the shadow code */
 
 /* Called from pagefault handler in Xen, and from the HVM trap handlers
@@ -2602,16 +2563,70 @@ static int sh_page_fault(struct vcpu *v,
     int r, mmio;
     fetch_type_t ft = 0;
 
+    SHADOW_PRINTK("d:v=%u:%u va=%#lx err=%u\n",
+                   v->domain->domain_id, v->vcpu_id, va, regs->error_code);
+
     //
     // XXX: Need to think about eventually mapping superpages directly in the
     //      shadow (when possible), as opposed to splintering them into a
     //      bunch of 4K maps.
     //
 
-    shadow_lock(d);
+#if (SHADOW_OPTIMIZATIONS & SHOPT_FAST_FAULT_PATH) && SHADOW_PAGING_LEVELS > 2
+    if ( (regs->error_code & PFEC_reserved_bit) )
+    {
+        /* The only reasons for reserved bits to be set in shadow entries 
+         * are the two "magic" shadow_l1e entries. */
+        if ( likely((__copy_from_user(&sl1e, 
+                                      (sh_linear_l1_table(v) 
+                                       + shadow_l1_linear_offset(va)),
+                                      sizeof(sl1e)) == 0)
+                    && sh_l1e_is_magic(sl1e)) )
+        {
+            if ( sh_l1e_is_gnp(sl1e) )
+            {
+                if ( likely(!hvm_guest(v) || shadow_vcpu_mode_translate(v)) )
+                { 
+                    /* Not-present in a guest PT: pass to the guest as
+                     * a not-present fault (by flipping two bits). */
+                    ASSERT(regs->error_code & PFEC_page_present);
+                    regs->error_code ^= (PFEC_reserved_bit|PFEC_page_present);
+                    perfc_incrc(shadow_fault_fast_gnp);
+                    SHADOW_PRINTK("fast path not-present\n");
+                    return 0;
+                }
+                else 
+                {
+                    /* Not-present in the P2M: MMIO */
+                    gpa = va;
+                }
+            }
+            else
+            {
+                /* Magic MMIO marker: extract gfn for MMIO address */
+                ASSERT(sh_l1e_is_mmio(sl1e));
+                gpa = (((paddr_t)(gfn_x(sh_l1e_mmio_get_gfn(sl1e)))) 
+                       << PAGE_SHIFT) 
+                    | (va & ~PAGE_MASK);
+            }
+            perfc_incrc(shadow_fault_fast_mmio);
+            SHADOW_PRINTK("fast path mmio %#"PRIpaddr"\n", gpa);
+            reset_early_unshadow(v);
+            handle_mmio(gpa);
+            return EXCRET_fault_fixed;
+        }
+        else
+        {
+            /* This should be exceptionally rare: another vcpu has fixed
+             * the tables between the fault and our reading the l1e.
+             * Fall through to the normal fault handing logic */
+            perfc_incrc(shadow_fault_fast_fail);
+            SHADOW_PRINTK("fast path false alarm!\n");
+        }
+    }
+#endif /* SHOPT_FAST_FAULT_PATH */
 
-    SHADOW_PRINTK("d:v=%u:%u va=%#lx err=%u\n",
-                   v->domain->domain_id, v->vcpu_id, va, regs->error_code);
+    shadow_lock(d);
     
     shadow_audit_tables(v);
                    
@@ -2659,8 +2674,9 @@ static int sh_page_fault(struct vcpu *v,
     }
 
     // Was it a write fault?
-    //
-    if ( regs->error_code & PFEC_write_access )
+    ft = ((regs->error_code & PFEC_write_access)
+          ? ft_demand_write : ft_demand_read);
+    if ( ft == ft_demand_write )
     {
         if ( unlikely(!(accumulated_gflags & _PAGE_RW)) )
         {
@@ -2685,26 +2701,19 @@ static int sh_page_fault(struct vcpu *v,
         }
     }
 
-    /* Is this an MMIO access? */
+    /* What mfn is the guest trying to access? */
     gfn = guest_l1e_get_gfn(gw.eff_l1e);
+    gmfn = vcpu_gfn_to_mfn(v, gfn);
     mmio = ( hvm_guest(v) 
              && shadow_vcpu_mode_translate(v) 
              && mmio_space(gfn_to_paddr(gfn)) );
 
-    /* For MMIO, the shadow holds the *gfn*; for normal accesses, it holds 
-     * the equivalent mfn. */
-    if ( mmio ) 
-        gmfn = _mfn(gfn_x(gfn));
-    else
+    if ( !mmio && !valid_mfn(gmfn) )
     {
-        gmfn = vcpu_gfn_to_mfn(v, gfn);
-        if ( !valid_mfn(gmfn) )
-        {
-            perfc_incrc(shadow_fault_bail_bad_gfn);
-            SHADOW_PRINTK("BAD gfn=%"SH_PRI_gfn" gmfn=%"SH_PRI_mfn"\n", 
-                           gfn_x(gfn), mfn_x(gmfn));
-            goto not_a_shadow_fault;
-        }
+        perfc_incrc(shadow_fault_bail_bad_gfn);
+        SHADOW_PRINTK("BAD gfn=%"SH_PRI_gfn" gmfn=%"SH_PRI_mfn"\n", 
+                      gfn_x(gfn), mfn_x(gmfn));
+        goto not_a_shadow_fault;
     }
 
     /* Make sure there is enough free shadow memory to build a chain of
@@ -2717,44 +2726,39 @@ static int sh_page_fault(struct vcpu *v,
      * for the shadow entry, since we might promote a page here. */
     // XXX -- this code will need to change somewhat if/when the shadow code
     // can directly map superpages...
-    ft = ((regs->error_code & PFEC_write_access) ?
-          ft_demand_write : ft_demand_read);
     ptr_sl1e = shadow_get_and_create_l1e(v, &gw, &sl1mfn, ft);
     ASSERT(ptr_sl1e);
 
-    /* Calculate the shadow entry */
-    if ( ft == ft_demand_write )
+    /* Calculate the shadow entry and write it */
+    l1e_propagate_from_guest(v, (gw.l1e) ? gw.l1e : &gw.eff_l1e, gw.l1mfn, 
+                             gmfn, &sl1e, ft, mmio);
+    r = shadow_set_l1e(v, ptr_sl1e, sl1e, sl1mfn);
+
+#if SHADOW_OPTIMIZATIONS & SHOPT_PREFETCH
+    /* Prefetch some more shadow entries */
+    sh_prefetch(v, &gw, ptr_sl1e, sl1mfn);
+#endif
+
+    /* Need to emulate accesses to page tables */
+    if ( sh_mfn_is_a_page_table(gmfn) )
     {
-        if ( l1e_write_fault(v, &gw, gmfn, &sl1e, mmio) )
+        if ( ft == ft_demand_write )
         {
             perfc_incrc(shadow_fault_emulate_write);
             goto emulate;
         }
+        else if ( shadow_mode_trap_reads(d) && ft == ft_demand_read )
+        {
+            perfc_incrc(shadow_fault_emulate_read);
+            goto emulate;
+        }
     }
-    else if ( l1e_read_fault(v, &gw, gmfn, &sl1e, mmio) )
-    {
-        perfc_incrc(shadow_fault_emulate_read);
-        goto emulate;
-    }
-
-    /* Quick sanity check: we never make an MMIO entry that's got the 
-     * _PAGE_PRESENT flag set in it. */
-    ASSERT(!mmio || !(shadow_l1e_get_flags(sl1e) & _PAGE_PRESENT));
-
-    r = shadow_set_l1e(v, ptr_sl1e, sl1e, sl1mfn);
 
     if ( mmio ) 
     {
         gpa = guest_walk_to_gpa(&gw);
         goto mmio;
     }
-
-#if 0
-    if ( !(r & SHADOW_SET_CHANGED) )
-        debugtrace_printk("%s: shadow_set_l1e(va=%p, sl1e=%" SH_PRI_pte
-                          ") did not change anything\n",
-                          __func__, gw.va, l1e_get_intpte(sl1e));
-#endif
 
     perfc_incrc(shadow_fault_fixed);
     d->arch.shadow.fault_count++;
@@ -2769,7 +2773,6 @@ static int sh_page_fault(struct vcpu *v,
     return EXCRET_fault_fixed;
 
  emulate:
-
     /* Take the register set we were called with */
     emul_regs = *regs;
     if ( hvm_guest(v) )
@@ -3932,25 +3935,48 @@ int sh_audit_l1_table(struct vcpu *v, mfn_t sl1mfn, mfn_t x)
     gfn_t gfn;
     char *s;
     int done = 0;
-
+    
     /* Follow the backpointer */
     gl1mfn = _mfn(mfn_to_page(sl1mfn)->u.inuse.type_info);
     gl1e = gp = sh_map_domain_page(gl1mfn);
     SHADOW_FOREACH_L1E(sl1mfn, sl1e, &gl1e, done, {
 
-        s = sh_audit_flags(v, 1, guest_l1e_get_flags(*gl1e),
-                            shadow_l1e_get_flags(*sl1e));
-        if ( s ) AUDIT_FAIL(1, "%s", s);
-
-        if ( SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES_MFNS )
+        if ( sh_l1e_is_magic(*sl1e) ) 
         {
-            gfn = guest_l1e_get_gfn(*gl1e);
-            mfn = shadow_l1e_get_mfn(*sl1e);
-            gmfn = audit_gfn_to_mfn(v, gfn, gl1mfn);
-            if ( mfn_x(gmfn) != mfn_x(mfn) )
-                AUDIT_FAIL(1, "bad translation: gfn %" SH_PRI_gfn
-                           " --> %" SH_PRI_mfn " != mfn %" SH_PRI_mfn "\n",
-                           gfn_x(gfn), mfn_x(gmfn), mfn_x(mfn));
+#if (SHADOW_OPTIMIZATIONS & SHOPT_FAST_FAULT_PATH) && SHADOW_PAGING_LEVELS > 2
+            if ( sh_l1e_is_gnp(*sl1e) )
+            {
+                if ( guest_l1e_get_flags(*gl1e) & _PAGE_PRESENT )
+                    AUDIT_FAIL(1, "shadow is GNP magic but guest is present");
+            } 
+            else 
+            {
+                ASSERT(sh_l1e_is_mmio(*sl1e));
+                gfn = sh_l1e_mmio_get_gfn(*sl1e);
+                if ( gfn_x(gfn) != gfn_x(guest_l1e_get_gfn(*gl1e)) )
+                    AUDIT_FAIL(1, "shadow MMIO gfn is %" SH_PRI_gfn 
+                               " but guest gfn is %" SH_PRI_gfn,
+                               gfn_x(gfn),
+                               gfn_x(guest_l1e_get_gfn(*gl1e)));
+            }
+#endif
+        }
+        else 
+        {
+            s = sh_audit_flags(v, 1, guest_l1e_get_flags(*gl1e),
+                               shadow_l1e_get_flags(*sl1e));
+            if ( s ) AUDIT_FAIL(1, "%s", s);
+            
+            if ( SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES_MFNS )
+            {
+                gfn = guest_l1e_get_gfn(*gl1e);
+                mfn = shadow_l1e_get_mfn(*sl1e);
+                gmfn = audit_gfn_to_mfn(v, gfn, gl1mfn);
+                if ( mfn_x(gmfn) != mfn_x(mfn) )
+                    AUDIT_FAIL(1, "bad translation: gfn %" SH_PRI_gfn
+                               " --> %" SH_PRI_mfn " != mfn %" SH_PRI_mfn,
+                               gfn_x(gfn), mfn_x(gmfn), mfn_x(mfn));
+            }
         }
     });
     sh_unmap_domain_page(gp);
@@ -3973,7 +3999,8 @@ int sh_audit_fl1_table(struct vcpu *v, mfn_t sl1mfn, mfn_t x)
         if ( !(f == 0 
                || f == (_PAGE_PRESENT|_PAGE_USER|_PAGE_RW|
                         _PAGE_ACCESSED|_PAGE_DIRTY) 
-               || f == (_PAGE_PRESENT|_PAGE_USER|_PAGE_ACCESSED|_PAGE_DIRTY)) )
+               || f == (_PAGE_PRESENT|_PAGE_USER|_PAGE_ACCESSED|_PAGE_DIRTY)
+               || sh_l1e_is_magic(*sl1e)) )
             AUDIT_FAIL(1, "fl1e has bad flags");
     });
     return 0;
@@ -4011,7 +4038,7 @@ int sh_audit_l2_table(struct vcpu *v, mfn_t sl2mfn, mfn_t x)
             if ( mfn_x(gmfn) != mfn_x(mfn) )
                 AUDIT_FAIL(2, "bad translation: gfn %" SH_PRI_gfn
                            " (--> %" SH_PRI_mfn ")"
-                           " --> %" SH_PRI_mfn " != mfn %" SH_PRI_mfn "\n",
+                           " --> %" SH_PRI_mfn " != mfn %" SH_PRI_mfn,
                            gfn_x(gfn), 
                            (guest_l2e_get_flags(*gl2e) & _PAGE_PSE) ? 0
                            : mfn_x(audit_gfn_to_mfn(v, gfn, gl2mfn)),
@@ -4053,7 +4080,7 @@ int sh_audit_l3_table(struct vcpu *v, mfn_t sl3mfn, mfn_t x)
                                      : PGC_SH_l2_shadow);
             if ( mfn_x(gmfn) != mfn_x(mfn) )
                 AUDIT_FAIL(3, "bad translation: gfn %" SH_PRI_gfn
-                           " --> %" SH_PRI_mfn " != mfn %" SH_PRI_mfn "\n",
+                           " --> %" SH_PRI_mfn " != mfn %" SH_PRI_mfn,
                            gfn_x(gfn), mfn_x(gmfn), mfn_x(mfn));
         }
     });
@@ -4088,7 +4115,7 @@ int sh_audit_l4_table(struct vcpu *v, mfn_t sl4mfn, mfn_t x)
                                      PGC_SH_l3_shadow);
             if ( mfn_x(gmfn) != mfn_x(mfn) )
                 AUDIT_FAIL(4, "bad translation: gfn %" SH_PRI_gfn
-                           " --> %" SH_PRI_mfn " != mfn %" SH_PRI_mfn "\n",
+                           " --> %" SH_PRI_mfn " != mfn %" SH_PRI_mfn,
                            gfn_x(gfn), mfn_x(gmfn), mfn_x(mfn));
         }
     });

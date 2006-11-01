@@ -161,8 +161,10 @@ extern int shadow_audit_enable;
  */
 #define SHOPT_WRITABLE_HEURISTIC  0x01  /* Guess at RW PTEs via linear maps */
 #define SHOPT_EARLY_UNSHADOW      0x02  /* Unshadow l1s on fork or exit */
+#define SHOPT_FAST_FAULT_PATH     0x04  /* Fast-path MMIO and not-present */
+#define SHOPT_PREFETCH            0x08  /* Shadow multiple entries per fault */
 
-#define SHADOW_OPTIMIZATIONS      0x03
+#define SHADOW_OPTIMIZATIONS      0x0f
 
 
 /* With shadow pagetables, the different kinds of address start 
