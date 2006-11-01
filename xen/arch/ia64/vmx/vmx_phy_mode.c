@@ -113,10 +113,7 @@ physical_tlb_miss(VCPU *vcpu, u64 vadr, int type)
     ia64_rr rr;
     rr.rrval = ia64_get_rr(vadr);
     pte =  vadr& _PAGE_PPN_MASK;
-    if (vadr >> 63)
-        pte = pte | PHY_PAGE_UC;
-    else
-        pte = pte | PHY_PAGE_WB;
+    pte = pte | PHY_PAGE_WB;
     thash_vhpt_insert(vcpu, pte, (rr.ps << 2), vadr, type);
     return;
 }
@@ -347,10 +344,9 @@ prepare_if_physical_mode(VCPU *vcpu)
 void
 recover_if_physical_mode(VCPU *vcpu)
 {
-    if (is_physical_mode(vcpu)) {
-	vcpu->arch.mode_flags &= ~GUEST_PHY_EMUL;
+    if (is_physical_mode(vcpu))
         switch_to_physical_rid(vcpu);
-    }
+    vcpu->arch.mode_flags &= ~GUEST_PHY_EMUL;
     return;
 }
 
