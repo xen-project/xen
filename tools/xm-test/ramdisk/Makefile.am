@@ -4,7 +4,7 @@
 #   Download a pre-built ramdisk.
 #     INITRD = <Directory to download ramdisk from>
 #
-# make initrd:
+# make initrd.img:
 #
 #   Make a ramdisk from scratch.
 #     BR_URL = <The URL of the Buildroot source code>
