@@ -591,6 +591,77 @@ accumulate_guest_flags(struct vcpu *v, walk_t *gw)
     return accumulated_flags;
 }
 
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_FAST_FAULT_PATH) && SHADOW_PAGING_LEVELS > 2
+/******************************************************************************
+ * We implement a "fast path" for two special cases: faults that require
+ * MMIO emulation, and faults where the guest PTE is not present.  We
+ * record these as shadow l1 entries that have reserved bits set in
+ * them, so we can spot them immediately in the fault handler and handle
+ * them without needing to hold the shadow lock or walk the guest
+ * pagetables.
+ *
+ * This is only feasible for PAE and 64bit Xen: 32-bit non-PAE PTEs don't
+ * have reserved bits that we can use for this.
+ */
+
+#define SH_L1E_MAGIC 0xffffffff00000000ULL
+static inline int sh_l1e_is_magic(shadow_l1e_t sl1e)
+{
+    return ((sl1e.l1 & SH_L1E_MAGIC) == SH_L1E_MAGIC);
+}
+
+/* Guest not present: a single magic value */
+static inline shadow_l1e_t sh_l1e_gnp(void) 
+{
+    return (shadow_l1e_t){ -1ULL };
+}
+
+static inline int sh_l1e_is_gnp(shadow_l1e_t sl1e) 
+{
+    return (sl1e.l1 == sh_l1e_gnp().l1);
+}
+
+/* MMIO: an invalid PTE that contains the GFN of the equivalent guest l1e.
+ * We store 28 bits of GFN in bits 4:32 of the entry.
+ * The present bit is set, and the U/S and R/W bits are taken from the guest.
+ * Bit 3 is always 0, to differentiate from gnp above.  */
+#define SH_L1E_MMIO_MAGIC       0xffffffff00000001ULL
+#define SH_L1E_MMIO_MAGIC_MASK  0xffffffff00000009ULL
+#define SH_L1E_MMIO_GFN_MASK    0x00000000fffffff0ULL
+#define SH_L1E_MMIO_GFN_SHIFT   4
+
+static inline shadow_l1e_t sh_l1e_mmio(gfn_t gfn, u32 gflags) 
+{
+    return (shadow_l1e_t) { (SH_L1E_MMIO_MAGIC 
+                             | (gfn_x(gfn) << SH_L1E_MMIO_GFN_SHIFT) 
+                             | (gflags & (_PAGE_USER|_PAGE_RW))) };
+}
+
+static inline int sh_l1e_is_mmio(shadow_l1e_t sl1e) 
+{
+    return ((sl1e.l1 & SH_L1E_MMIO_MAGIC_MASK) == SH_L1E_MMIO_MAGIC);
+}
+
+static inline gfn_t sh_l1e_mmio_get_gfn(shadow_l1e_t sl1e) 
+{
+    return _gfn((sl1e.l1 & SH_L1E_MMIO_GFN_MASK) >> SH_L1E_MMIO_GFN_SHIFT);
+}
+
+static inline u32 sh_l1e_mmio_get_flags(shadow_l1e_t sl1e) 
+{
+    return (u32)((sl1e.l1 & (_PAGE_USER|_PAGE_RW)));
+}
+
+#else
+
+#define sh_l1e_gnp() shadow_l1e_empty()
+#define sh_l1e_mmio(_gfn, _flags) shadow_l1e_empty()
+#define sh_l1e_is_magic(_e) (0)
+
+#endif /* SHOPT_FAST_FAULT_PATH */
+
+
 #endif /* _XEN_SHADOW_TYPES_H */
 
 /*
