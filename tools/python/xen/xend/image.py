@@ -478,22 +478,12 @@ class X86_HVM_ImageHandler(HVMImageHandler):
 
     def getRequiredAvailableMemory(self, mem_kb):
         # Add 8 MiB overhead for QEMU's video RAM.
-        return self.getRequiredInitialReservation(mem_kb) + 8192
+        return mem_kb + 8192
 
     def getRequiredInitialReservation(self, mem_kb):
-        page_kb = 4
-        # This was derived emperically:
-        #   2.4 MB overhead per 1024 MB RAM
-        #   + 4 to avoid low-memory condition
-        extra_mb = (2.4/1024) * (mem_kb/1024.0) + 4;
-        extra_pages = int( math.ceil( extra_mb*1024 / page_kb ))
-        return mem_kb + extra_pages * page_kb
+        return mem_kb
 
     def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
-        # The given value is the configured value -- we need to include the
-        # overhead due to getRequiredInitialReservation.
-        maxmem_kb = self.getRequiredInitialReservation(maxmem_kb)
-
         # 256 pages (1MB) per vcpu,
         # plus 1 page per MiB of RAM for the P2M map,
         # plus 1 page per MiB of RAM to shadow the resident processes.  

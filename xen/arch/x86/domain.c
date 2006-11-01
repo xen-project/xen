@@ -155,19 +155,12 @@ int arch_domain_create(struct domain *d)
 {
     l1_pgentry_t gdt_l1e;
     int vcpuid, pdpt_order;
-    int i;
-
-    if ( is_hvm_domain(d) && !hvm_enabled )
-    {
-        gdprintk(XENLOG_WARNING, "Attempt to create a HVM guest "
-                 "on a non-VT/AMDV platform.\n");
-        return -EINVAL;
-    }
+    int i, rc = -ENOMEM;
 
     pdpt_order = get_order_from_bytes(PDPT_L1_ENTRIES * sizeof(l1_pgentry_t));
     d->arch.mm_perdomain_pt = alloc_xenheap_pages(pdpt_order);
     if ( d->arch.mm_perdomain_pt == NULL )
-        goto fail_nomem;
+        goto fail;
     memset(d->arch.mm_perdomain_pt, 0, PAGE_SIZE << pdpt_order);
 
     /*
@@ -192,7 +185,7 @@ int arch_domain_create(struct domain *d)
     d->arch.mm_perdomain_l3 = alloc_xenheap_page();
     if ( (d->arch.mm_perdomain_l2 == NULL) ||
          (d->arch.mm_perdomain_l3 == NULL) )
-        goto fail_nomem;
+        goto fail;
 
     memset(d->arch.mm_perdomain_l2, 0, PAGE_SIZE);
     for ( i = 0; i < (1 << pdpt_order); i++ )
@@ -219,26 +212,41 @@ int arch_domain_create(struct domain *d)
         d->arch.ioport_caps = 
             rangeset_new(d, "I/O Ports", RANGESETF_prettyprint_hex);
         if ( d->arch.ioport_caps == NULL )
-            goto fail_nomem;
+            goto fail;
 
         if ( (d->shared_info = alloc_xenheap_page()) == NULL )
-            goto fail_nomem;
+            goto fail;
 
         memset(d->shared_info, 0, PAGE_SIZE);
         share_xen_page_with_guest(
             virt_to_page(d->shared_info), d, XENSHARE_writable);
     }
 
+    if ( is_hvm_domain(d) )
+    {
+        if ( !hvm_enabled )
+        {
+            gdprintk(XENLOG_WARNING, "Attempt to create a HVM guest "
+                     "on a non-VT/AMDV platform.\n");
+            rc = -EINVAL;
+            goto fail;
+        }
+
+        rc = shadow_enable(d, SHM2_refcounts|SHM2_translate|SHM2_external);
+        if ( rc != 0 )
+            goto fail;
+    }
+
     return 0;
 
- fail_nomem:
+ fail:
     free_xenheap_page(d->shared_info);
 #ifdef __x86_64__
     free_xenheap_page(d->arch.mm_perdomain_l2);
     free_xenheap_page(d->arch.mm_perdomain_l3);
 #endif
     free_xenheap_pages(d->arch.mm_perdomain_pt, pdpt_order);
-    return -ENOMEM;
+    return rc;
 }
 
 void arch_domain_destroy(struct domain *d)

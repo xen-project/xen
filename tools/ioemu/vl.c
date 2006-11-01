@@ -6420,14 +6420,13 @@ int main(int argc, char **argv)
     }
 
 #if defined(__i386__) || defined(__x86_64__)
-    if (xc_get_pfn_list(xc_handle, domid, page_array, nr_pages) != nr_pages) {
+    for ( i = 0; i < tmp_nr_pages; i++)
+        page_array[i] = i;
+    if (xc_domain_translate_gpfn_list(xc_handle, domid, tmp_nr_pages,
+                                      page_array, page_array)) {
         fprintf(logfile, "xc_get_pfn_list returned error %d\n", errno);
         exit(-1);
     }
-
-    if (ram_size > HVM_BELOW_4G_RAM_END)
-        for (i = 0; i < nr_pages - (HVM_BELOW_4G_RAM_END >> PAGE_SHIFT); i++)
-            page_array[tmp_nr_pages - 1 - i] = page_array[nr_pages - 1 - i];
 
     phys_ram_base = xc_map_foreign_batch(xc_handle, domid,
                                          PROT_READ|PROT_WRITE, page_array,

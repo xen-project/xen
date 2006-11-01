@@ -1295,9 +1295,11 @@ class XendDomainInfo:
             shadow_cur = xc.shadow_mem_control(self.domid, shadow / 1024)
             self.info['shadow_memory'] = shadow_cur
 
-            # initial memory reservation
-            xc.domain_memory_increase_reservation(self.domid, reservation, 0,
-                                                  0)
+            # Initial memory reservation
+            if not (self._infoIsSet('image') and
+                    sxp.name(self.info['image']) == "hvm"):
+                xc.domain_memory_increase_reservation(
+                    self.domid, reservation, 0, 0)
 
             self._createChannels()
 

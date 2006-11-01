@@ -313,6 +313,9 @@ static inline int shadow_guest_paging_levels(struct vcpu *v)
 /**************************************************************************/
 /* Entry points into the shadow code */
 
+/* Enable arbitrary shadow mode. */
+int shadow_enable(struct domain *d, u32 mode);
+
 /* Turning on shadow test mode */
 int shadow_test_enable(struct domain *d);
 

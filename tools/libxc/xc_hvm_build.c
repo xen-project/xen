@@ -196,7 +196,6 @@ static int set_hvm_info(int xc_handle, uint32_t dom,
 static int setup_guest(int xc_handle,
                        uint32_t dom, int memsize,
                        char *image, unsigned long image_size,
-                       unsigned long nr_pages,
                        vcpu_guest_context_t *ctxt,
                        unsigned long shared_info_frame,
                        unsigned int vcpus,
@@ -207,17 +206,12 @@ static int setup_guest(int xc_handle,
                        unsigned long *store_mfn)
 {
     xen_pfn_t *page_array = NULL;
-    unsigned long count, i;
-    unsigned long long ptr;
-    xc_mmu_t *mmu = NULL;
-
+    unsigned long i, nr_pages = (unsigned long)memsize << (20 - PAGE_SHIFT);
+    unsigned long shared_page_nr;
     shared_info_t *shared_info;
     void *e820_page;
-
     struct domain_setup_info dsi;
     uint64_t v_end;
-
-    unsigned long shared_page_nr;
 
     memset(&dsi, 0, sizeof(struct domain_setup_info));
 
@@ -230,7 +224,6 @@ static int setup_guest(int xc_handle,
         goto error_out;
     }
 
-    /* memsize is in megabytes */
     v_end = (unsigned long long)memsize << 20;
 
     IPRINTF("VIRTUAL MEMORY ARRANGEMENT:\n"
@@ -255,52 +248,26 @@ static int setup_guest(int xc_handle,
         goto error_out;
     }
 
-    if ( xc_get_pfn_list(xc_handle, dom, page_array, nr_pages) != nr_pages )
+    for ( i = 0; i < nr_pages; i++ )
+        page_array[i] = i;
+    for ( i = HVM_BELOW_4G_RAM_END >> PAGE_SHIFT; i < nr_pages; i++ )
+        page_array[i] += HVM_BELOW_4G_MMIO_LENGTH >> PAGE_SHIFT;
+
+    if ( xc_domain_memory_populate_physmap(xc_handle, dom, nr_pages,
+                                           0, 0, page_array) )
     {
-        PERROR("Could not get the page frame list.\n");
+        PERROR("Could not allocate memory for HVM guest.\n");
         goto error_out;
     }
 
-    /* HVM domains must be put into shadow mode at the start of day. */
-    /* XXX *After* xc_get_pfn_list()!! */
-    if ( xc_shadow_control(xc_handle, dom, XEN_DOMCTL_SHADOW_OP_ENABLE,
-                           NULL, 0, NULL, 
-                           XEN_DOMCTL_SHADOW_ENABLE_REFCOUNT  |
-                           XEN_DOMCTL_SHADOW_ENABLE_TRANSLATE |
-                           XEN_DOMCTL_SHADOW_ENABLE_EXTERNAL, 
-                           NULL) )
+    if ( xc_domain_translate_gpfn_list(xc_handle, dom, nr_pages,
+                                       page_array, page_array) )
     {
-        PERROR("Could not enable shadow paging for domain.\n");
+        PERROR("Could not translate addresses of HVM guest.\n");
         goto error_out;
-    }        
+    }
 
     loadelfimage(image, xc_handle, dom, page_array, &dsi);
-
-    if ( (mmu = xc_init_mmu_updates(xc_handle, dom)) == NULL )
-        goto error_out;
-
-    /* Write the machine->phys table entries. */
-    for ( count = 0; count < nr_pages; count++ )
-    {
-        unsigned long gpfn_count_skip;
-
-        ptr = (unsigned long long)page_array[count] << PAGE_SHIFT;
-
-        gpfn_count_skip = 0;
-
-        /*
-         * physical address space from HVM_BELOW_4G_RAM_END to 4G is reserved
-         * for PCI devices MMIO. So if HVM has more than HVM_BELOW_4G_RAM_END
-         * RAM, memory beyond HVM_BELOW_4G_RAM_END will go to 4G above.
-         */
-        if ( count >= (HVM_BELOW_4G_RAM_END >> PAGE_SHIFT) )
-            gpfn_count_skip = HVM_BELOW_4G_MMIO_LENGTH >> PAGE_SHIFT;
-
-        if ( xc_add_mmu_update(xc_handle, mmu,
-                               ptr | MMU_MACHPHYS_UPDATE,
-                               count + gpfn_count_skip) )
-            goto error_out;
-    }
 
     if ( set_hvm_info(xc_handle, dom, page_array, vcpus, acpi) )
     {
@@ -352,22 +319,13 @@ static int setup_guest(int xc_handle,
     if ( xc_clear_domain_page(xc_handle, dom, *store_mfn) )
         goto error_out;
 
-    /* Send the page update requests down to the hypervisor. */
-    if ( xc_finish_mmu_updates(xc_handle, mmu) )
-        goto error_out;
-
-    free(mmu);
     free(page_array);
 
-    /*
-     * Initial register values:
-     */
     ctxt->user_regs.eip = dsi.v_kernentry;
 
     return 0;
 
  error_out:
-    free(mmu);
     free(page_array);
     return -1;
 }
@@ -387,31 +345,10 @@ static int xc_hvm_build_internal(int xc_handle,
     struct xen_domctl launch_domctl, domctl;
     int rc, i;
     vcpu_guest_context_t st_ctxt, *ctxt = &st_ctxt;
-    unsigned long nr_pages;
-    xen_capabilities_info_t xen_caps;
 
     if ( (image == NULL) || (image_size == 0) )
     {
         ERROR("Image required");
-        goto error_out;
-    }
-
-    if ( (rc = xc_version(xc_handle, XENVER_capabilities, &xen_caps)) != 0 )
-    {
-        PERROR("Failed to get xen version info");
-        goto error_out;
-    }
-
-    if ( !strstr(xen_caps, "hvm") )
-    {
-        PERROR("CPU doesn't support HVM extensions or "
-               "the extensions are not enabled");
-        goto error_out;
-    }
-
-    if ( (nr_pages = xc_get_tot_pages(xc_handle, domid)) < 0 )
-    {
-        PERROR("Could not find total pages for domain");
         goto error_out;
     }
 
@@ -430,24 +367,10 @@ static int xc_hvm_build_internal(int xc_handle,
         goto error_out;
     }
 
-#if 0
-    /* HVM domains must be put into shadow mode at the start of day */
-    if ( xc_shadow_control(xc_handle, domid, XEN_DOMCTL_SHADOW_OP_ENABLE,
-                           NULL, 0, NULL, 
-                           XEN_DOMCTL_SHADOW_ENABLE_REFCOUNT  |
-                           XEN_DOMCTL_SHADOW_ENABLE_TRANSLATE |
-                           XEN_DOMCTL_SHADOW_ENABLE_EXTERNAL, 
-                           NULL) )
-    {
-        PERROR("Could not enable shadow paging for domain.\n");
-        goto error_out;
-    }        
-#endif
-
     memset(ctxt, 0, sizeof(*ctxt));
-
     ctxt->flags = VGCF_HVM_GUEST;
-    if ( setup_guest(xc_handle, domid, memsize, image, image_size, nr_pages,
+
+    if ( setup_guest(xc_handle, domid, memsize, image, image_size,
                      ctxt, domctl.u.getdomaininfo.shared_info_frame,
                      vcpus, pae, acpi, apic, store_evtchn, store_mfn) < 0)
     {

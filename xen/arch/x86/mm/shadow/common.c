@@ -2461,7 +2461,7 @@ static void sh_new_mode(struct domain *d, u32 new_mode)
         sh_update_paging_modes(v);
 }
 
-static int shadow_enable(struct domain *d, u32 mode)
+int shadow_enable(struct domain *d, u32 mode)
 /* Turn on "permanent" shadow features: external, translate, refcount.
  * Can only be called once on a domain, and these features cannot be
  * disabled. 
@@ -3092,6 +3092,8 @@ int shadow_domctl(struct domain *d,
         if ( shadow_mode_log_dirty(d) )
             if ( (rc = shadow_log_dirty_disable(d)) != 0 ) 
                 return rc;
+        if ( is_hvm_domain(d) )
+            return -EINVAL;
         if ( d->arch.shadow.mode & SHM2_enable )
             if ( (rc = shadow_test_disable(d)) != 0 ) 
                 return rc;

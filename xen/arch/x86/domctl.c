@@ -224,45 +224,18 @@ long arch_do_domctl(
 
             spin_lock(&d->page_alloc_lock);
 
-            if ( is_hvm_domain(d) && shadow_mode_translate(d) )
+            list_ent = d->page_list.next;
+            for ( i = 0; (i < max_pfns) && (list_ent != &d->page_list); i++ )
             {
-                /* HVM domain: scan P2M to get guaranteed physmap order. */
-                for ( i = 0, gmfn = 0;
-                      (i < max_pfns) && (i < d->tot_pages); 
-                      i++, gmfn++ )
+                mfn = page_to_mfn(list_entry(
+                    list_ent, struct page_info, list));
+                if ( copy_to_guest_offset(domctl->u.getmemlist.buffer,
+                                          i, &mfn, 1) )
                 {
-                    if ( unlikely(i == (HVM_BELOW_4G_MMIO_START>>PAGE_SHIFT)) )
-                    {
-                        /* skip MMIO range */
-                        gmfn += HVM_BELOW_4G_MMIO_LENGTH >> PAGE_SHIFT;
-                    }
-                    mfn = gmfn_to_mfn(d, gmfn);
-                    if ( copy_to_guest_offset(domctl->u.getmemlist.buffer,
-                                              i, &mfn, 1) )
-                    {
-                        ret = -EFAULT;
-                        break;
-                    }
+                    ret = -EFAULT;
+                    break;
                 }
-            }
-            else 
-            {        
-                /* Other guests: return in order of ownership list. */
-                list_ent = d->page_list.next;
-                for ( i = 0;
-                      (i < max_pfns) && (list_ent != &d->page_list);
-                      i++ )
-                {
-                    mfn = page_to_mfn(list_entry(
-                        list_ent, struct page_info, list));
-                    if ( copy_to_guest_offset(domctl->u.getmemlist.buffer,
-                                              i, &mfn, 1) )
-                    {
-                        ret = -EFAULT;
-                        break;
-                    }
-                    list_ent = mfn_to_page(mfn)->list.next;
-                }
+                list_ent = mfn_to_page(mfn)->list.next;
             }
             
             spin_unlock(&d->page_alloc_lock);
