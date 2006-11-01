@@ -32,10 +32,10 @@ except ConsoleError, e:
     FAIL(str(e))
     
 
-block_attach(domain, "file:/dev/ram1", "sdb2")
+block_attach(domain, "file:/dev/ram1", "xvda1")
 
 try:
-	run = console.runCmd("cat /proc/partitions")
+    run = console.runCmd("cat /proc/partitions")
 except ConsoleError, e:
         FAIL(str(e))
 
@@ -45,5 +45,5 @@ domain.closeConsole()
 # Stop the domain (nice shutdown)
 domain.stop()
 
-if not re.search("sdb2",run["output"]):
-	FAIL("Device is not actually connected to the domU")
+if not re.search("xvda1",run["output"]):
+    FAIL("Device is not actually connected to the domU")

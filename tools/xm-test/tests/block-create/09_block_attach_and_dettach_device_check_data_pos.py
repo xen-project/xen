@@ -12,7 +12,7 @@ if ENABLE_HVM_SUPPORT:
     SKIP("Block-attach not supported for HVM domains")
 
 # Create a domain (default XmTestDomain, with our ramdisk)
-domain = XmTestDomain()
+domain = XmTestDomain(extraConfig={"extra":"rw"})
 
 try:
     console = domain.start()
@@ -35,27 +35,27 @@ if s != 0:
     FAIL("mke2fs returned %i != 0" % s)
 
 for i in range(10):
-	block_attach(domain, "phy:ram1", "hda1")
-	run = console.runCmd("cat /proc/partitions")
-	if not re.search("hda1", run["output"]):
-		FAIL("Failed to attach block device: /proc/partitions does not show that!")
-	
-	console.runCmd("mkdir -p /mnt/hda1; mount /dev/hda1 /mnt/hda1")
-	
-	if i:
-		run = console.runCmd("cat /mnt/hda1/myfile | grep %s" % (i-1))
-		if run['return']:
-			FAIL("File created was lost or not updated!")
-	
-	console.runCmd("echo \"%s\" > /mnt/hda1/myfile" % i)
-	run = console.runCmd("cat /mnt/hda1/myfile")
-	print run['output']
-	console.runCmd("umount /mnt/hda1")
-	
-	block_detach(domain, "hda1")
-	run = console.runCmd("cat /proc/partitions")
-	if re.search("hda1", run["output"]):
-		FAIL("Failed to dettach block device: /proc/partitions still showing that!")
+    block_attach(domain, "phy:ram1", "xvda1")
+    run = console.runCmd("cat /proc/partitions")
+    if not re.search("xvda1", run["output"]):
+        FAIL("Failed to attach block device: /proc/partitions does not show that!")
+    
+    console.runCmd("mkdir -p /mnt/xvda1; mount /dev/xvda1 /mnt/xvda1")
+    
+    if i:
+        run = console.runCmd("cat /mnt/xvda1/myfile | grep %s" % (i-1))
+        if run['return']:
+            FAIL("File created was lost or not updated!")
+    
+    console.runCmd("echo \"%s\" > /mnt/xvda1/myfile" % i)
+    run = console.runCmd("cat /mnt/xvda1/myfile")
+    print run['output']
+    console.runCmd("umount /mnt/xvda1")
+    
+    block_detach(domain, "xvda1")
+    run = console.runCmd("cat /proc/partitions")
+    if re.search("xvda1", run["output"]):
+        FAIL("Failed to dettach block device: /proc/partitions still showing that!")
 
 # Close the console
 domain.closeConsole()

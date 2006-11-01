@@ -12,7 +12,7 @@ def checkXmLongList(domain):
     s, o = traceCommand("xm list --long %s" % domain.getName())
     if s != 0:
         FAIL("xm list --long <dom> failed")
-    if re.search("hda1", o):
+    if re.search("xvda1", o):
         return True
     else:
         return False
@@ -27,12 +27,12 @@ try:
 except DomainError,e:
     FAIL(str(e))
 
-block_attach(domain, "phy:/dev/ram0", "hda1")
+block_attach(domain, "phy:/dev/ram0", "xvda1")
 
 if not checkXmLongList(domain):
-    FAIL("xm long list does not show that hda1 was attached")
+    FAIL("xm long list does not show that xvda1 was attached")
 
-block_detach(domain, "hda1")
+block_detach(domain, "xvda1")
 
 if checkXmLongList(domain):
-    FAIL("xm long list does not show that hda1 was removed")
+    FAIL("xm long list does not show that xvda1 was removed")

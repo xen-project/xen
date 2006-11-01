@@ -15,7 +15,7 @@ from XmTestLib.block_utils import *
 def availableRamdisks():
     i = 0
     while os.access("/dev/ram%d" % i, os.F_OK ):
-    	i += 1
+        i += 1
 
     return i
 
@@ -36,7 +36,7 @@ def detach(devname):
         return -2, "Failed to detach block device: /proc/partitions still showing that!"
 
     return 0, None
-	
+    
 if ENABLE_HVM_SUPPORT:
     SKIP("Block-attach not supported for HVM domains")
 
@@ -69,22 +69,22 @@ while i < ramdisks or devices:
     op = random.randint(0,1) # 1 = attach, 0 = detach
     if (not devices or op) and i < ramdisks:
         i += 1
-	devname = "/dev/hda%d" % i
-	phy = "/dev/ram%d" % i
-	print "Attaching %s to %s" % (devname, phy)
-	status, msg = attach( phy, devname )
-	if status:
-	    FAIL(msg)
-	else:
-	    devices.append(devname)
+    devname = "/dev/xvda%d" % i
+    phy = "/dev/ram%d" % i
+    print "Attaching %s to %s" % (devname, phy)
+    status, msg = attach( phy, devname )
+    if status:
+        FAIL(msg)
+    else:
+        devices.append(devname)
 
     elif devices:
         devname = random.choice(devices)
-	devices.remove(devname)
-	print "Detaching %s" % devname
-	status, msg = detach(devname)
-	if status:
-	    FAIL(msg)
+    devices.remove(devname)
+    print "Detaching %s" % devname
+    status, msg = detach(devname)
+    if status:
+        FAIL(msg)
 
 # Close the console
 domain.closeConsole()

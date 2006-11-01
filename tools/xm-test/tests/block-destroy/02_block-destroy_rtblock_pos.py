@@ -18,9 +18,9 @@ except DomainError, e:
         print e.extra
     FAIL("Unable to create domain")
 
-block_attach(domain, "phy:/dev/ram0", "hda1")
+block_attach(domain, "phy:/dev/ram0", "xvda1")
 try:
-    run = console.runCmd("cat /proc/partitions | grep hda1")
+    run = console.runCmd("cat /proc/partitions | grep xvda1")
 except ConsoleError, e:
     saveLog(console.getHistory())
     FAIL(str(e))
@@ -28,9 +28,9 @@ except ConsoleError, e:
 if run["return"] != 0:
     FAIL("Failed to verify that block dev is attached")
 
-block_detach(domain, "hda1")
+block_detach(domain, "xvda1")
 try:
-    run = console.runCmd("cat /proc/partitions | grep hda1")
+    run = console.runCmd("cat /proc/partitions | grep xvda1")
 except ConsoleError, e:
     saveLog(console.getHistory())
     FAIL(str(e))

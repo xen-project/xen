@@ -32,15 +32,15 @@ except ConsoleError, e:
     
 
 for i in range(10):
-	block_attach(domain, "phy:ram1", "sdb1")
-	run = console.runCmd("cat /proc/partitions")
-	if not re.search("sdb1", run["output"]):
-		FAIL("Failed to attach block device: /proc/partitions does not show that!")
-		
-	block_detach(domain, "sdb1")
-	run = console.runCmd("cat /proc/partitions")
-	if re.search("sdb1", run["output"]):
-		FAIL("Failed to dettach block device: /proc/partitions still showing that!")
+    block_attach(domain, "phy:ram1", "xvda1")
+    run = console.runCmd("cat /proc/partitions")
+    if not re.search("xvda1", run["output"]):
+        FAIL("Failed to attach block device: /proc/partitions does not show that!")
+
+    block_detach(domain, "xvda1")
+    run = console.runCmd("cat /proc/partitions")
+    if re.search("xvda1", run["output"]):
+        FAIL("Failed to dettach block device: /proc/partitions still showing that!")
 
 # Close the console
 domain.closeConsole()

@@ -19,7 +19,7 @@ except DomainError, e:
         print e.extra
     FAIL("Unable to create domain")
 
-status, output = traceCommand("xm block-detach %s sda1" % domain.getId())
+status, output = traceCommand("xm block-detach %s xvda1" % domain.getId())
 
 eyecatcher1 = "Error:"
 eyecatcher2 = "Traceback"

@@ -33,10 +33,10 @@ s, o = traceCommand("md5sum /dev/ram1")
 
 dom0_md5sum_match = re.search(r"^[\dA-Fa-f]{32}", o, re.M)
 
-block_attach(domain, "phy:ram1", "hda1")
+block_attach(domain, "phy:ram1", "xvda1")
 
 try:
-    run = console.runCmd("md5sum /dev/hda1")
+    run = console.runCmd("md5sum /dev/xvda1")
 except ConsoleError, e:
     FAIL(str(e))
 
