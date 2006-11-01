@@ -296,8 +296,8 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
         if ( get_user(b, pb) )
         {
             dprintk(XENLOG_DEBUG,
-                    "Fault while accessing byte %d of instruction\n",
-                    pb-eip);
+                    "Fault while accessing byte %ld of instruction\n",
+                    (long)(pb-eip));
             goto page_fault;
         }
 
