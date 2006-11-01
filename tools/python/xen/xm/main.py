@@ -1071,26 +1071,23 @@ def xm_top(args):
 def xm_dmesg(args):
     arg_check(args, "dmesg", 0, 1)
     
-    gopts = Opts(use="""[-c|--clear]
-
-Read Xen's message buffer (boot output, warning and error messages) or clear
-its contents if the [-c|--clear] flag is specified.
-""")
-
-    gopts.opt('clear', short='c',
-              fn=set_true, default=0,
-              use="Clear the contents of the Xen message buffer.")
-    # Work around for gopts
-    myargs = args
-    myargs.insert(0, 'dmesg')
-    gopts.parse(myargs)
+    try:
+        (options, params) = getopt.gnu_getopt(args, 'c', ['clear'])
+    except getopt.GetoptError, opterr:
+        err(opterr)
+        sys.exit(1)
     
-    if len(myargs) not in (1, 2):
-        err('Invalid arguments: ' + str(myargs))
+    use_clear = 0
+    for (k, v) in options:
+        if k in ['-c', '--clear']:
+            use_clear = 1
+    
+    if len(params) :
+        err("No parameter required")
         usage('dmesg')
         sys.exit(1)
 
-    if not gopts.vals.clear:
+    if not use_clear:
         print server.xend.node.dmesg.info()
     else:
         server.xend.node.dmesg.clear()
