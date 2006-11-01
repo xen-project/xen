@@ -84,6 +84,13 @@ class XendDomain:
     def init(self):
         """Singleton initialisation function."""
 
+        dom_path = self._managed_path()
+        try:
+            os.stat(dom_path)
+        except OSError:
+            log.info("Making %s", dom_path)
+            os.makedirs(dom_path, 0755)
+
         xstransact.Mkdir(XS_VMROOT)
         xstransact.SetPermissions(XS_VMROOT, {'dom': DOM0_ID})
 
