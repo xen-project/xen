@@ -1,0 +1,13 @@
+--- buildroot/target/generic/device_table.txt~	2006-10-26 17:38:04.000000000 +1000
++++ buildroot/target/generic/device_table.txt	2006-10-26 17:37:08.000000000 +1000
+@@ -169,3 +169,10 @@
+ #/dev/mcd	b	640	0	0	23	0	0	0	-
+ #/dev/optcd	b	640	0	0	17	0	0	0	-
+ 
++# Xen Virtual Block Devices
++/dev/xvda	b	640	0	0	202	0	0	0	-
++/dev/xvda	b	640	0	0	202	1	1	1	4
++/dev/xvdb	b	640	0	0	202	16	0	0	-
++/dev/xvdb	b	640	0	0	202	17	1	1	4
++/dev/xvdc	b	640	0	0	202	32	0	0	-
++/dev/xvdc	b	640	0	0	202	33	1	1	4
