@@ -38,6 +38,8 @@
  */
 #ifdef XEN
 # define MINSTATE_START_SAVE_MIN_PHYS								\
+(pKStk)	tbit.z pKStk,pUStk=r29,IA64_PSR_VM_BIT;							\
+	;;											\
 (pKStk)	movl r3=THIS_CPU(ia64_mca_data);;							\
 (pKStk)	tpa r3 = r3;;										\
 (pKStk)	ld8 r3 = [r3];;										\
