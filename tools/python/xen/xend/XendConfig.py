@@ -89,6 +89,13 @@ XENAPI_CFG_CUSTOM_TRANSLATE = [
     'vbds',
     ]
 
+XENAPI_HVM_CFG = {
+    'platform_std_vga': 'std-vga',
+    'platform_serial' : 'serial',
+    'platform_localtime': 'localtime',
+    'platform_enable_audio': 'soundhw',
+}    
+
 XENAPI_UNSUPPORTED_IN_LEGACY_CFG = [
     'name_description',
     'user_version',
@@ -116,6 +123,7 @@ XENAPI_UNSUPPORTED_IN_LEGACY_CFG = [
     'pci_bus',
     'otherconfig'
     ]
+
 
 # configuration params that need to be converted to ints
 # since the XMLRPC transport for Xen API does not use
@@ -505,7 +513,6 @@ class XendConfig(dict):
                     raise XendConfigError('integer expeceted: %s: %s' %
                                         str(cfg['image']), e)
 
-
         # Deprecated cpu configuration
         if 'cpu' in cfg:
             if 'cpus' in cfg:
@@ -593,6 +600,7 @@ class XendConfig(dict):
             sxp_image.append(['ramdisk', xenapi_vm['kernel_initrd']])
         if xenapi_vm['kernel_args']:
             sxp_image.append(['args', xenapi_vm['kernel_args']])
+
         cfg['image'] = prettyprintstring(sxp_image)
 
         # make sure device structures are there.

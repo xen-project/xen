@@ -143,15 +143,13 @@ class XendVDI(AutoSaveObject):
 
 class XendQCOWVDI(XendVDI):
 
-    def __init__(self, uuid, sr_uuid, qcow_path, image_path, cfg_path,
-                 vsize, psize):
+    def __init__(self, uuid, sr_uuid, qcow_path, cfg_path, vsize, psize):
         XendVDI.__init__(self, uuid, sr_uuid)
         self.auto_save = False
         self.qcow_path = qcow_path
-        self.image_path = image_path
         self.cfg_path = cfg_path
         self.physical_utilisation = psize
         self.virtual_size = vsize
-        self.sector_size = 1
+        self.sector_size = 512
         self.auto_save = True
 

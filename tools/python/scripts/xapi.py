@@ -61,7 +61,7 @@ OPTIONS = {
     'vm-shutdown': [(('-f', '--force'), {'help': 'Shutdown Forcefully',
                                          'action': 'store_true'})],
     
-    'vdi-create': [(('--label',), {'help': 'Name for VDI'}),
+    'vdi-create': [(('--name-label',), {'help': 'Name for VDI'}),
                    (('--description',), {'help': 'Description for VDI'}),
                    (('--sector-size',), {'type': 'int',
                                          'help': 'Sector size'}),
@@ -279,13 +279,17 @@ def xapi_vbd_create(*args):
         raise OptionError("Configuration file and domain not specified")
 
     domname = args[0]
-    filename = args[1]
 
-    cfg = _read_python_cfg(filename)    
+    if len(args) > 1:
+        filename = args[1]
+        cfg = _read_python_cfg(filename)
+    else:
+        cfg = {}
+        
     for opt, val in opts:
         cfg[opt] = val
     
-    print 'Creating VBD from %s ..' % filename
+    print 'Creating VBD ...',
     server, session = _connect()
     vm_uuid = resolve_vm(server, session, domname)
     cfg['VM'] = vm_uuid
@@ -335,10 +339,11 @@ def xapi_sr_list(*args):
 def xapi_vdi_create(*args):
     opts, args = parse_args('vdi-create', args)
 
-    if len(args) < 1:
-        raise OptionError("Not enough arguments.")
-
-    cfg = _read_python_cfg(args[0])
+    if len(args) > 0:
+        cfg = _read_python_cfg(args[0])
+    else:
+        cfg = {}
+        
     for opt, val in opts:
         cfg[opt] = val
 
@@ -348,7 +353,7 @@ def xapi_vdi_create(*args):
     cfg['SR'] = sr
 
     size = (cfg['virtual_size'] * cfg['sector_size'])/MB
-    print 'Creating VDI of size: %dMB' % size
+    print 'Creating VDI of size: %dMB ..' % size,
     uuid = execute(server.VDI.create, session, cfg)
     print 'Done. (%s)' % uuid
 
@@ -378,6 +383,8 @@ def xapi_vdi_rename(*args):
 # Command Line Utils
 #
 import cmd
+import shlex
+
 class XenAPICmd(cmd.Cmd):
     def __init__(self, server, session):
         cmd.Cmd.__init__(self)
@@ -386,7 +393,7 @@ class XenAPICmd(cmd.Cmd):
         self.prompt = ">>> "
 
     def default(self, line):
-        words = line.split()
+        words = shlex.split(line)
         if len(words) > 0:
             cmd_name = words[0].replace('-', '_')
             func_name = 'xapi_%s' % cmd_name
@@ -415,11 +422,14 @@ class XenAPICmd(cmd.Cmd):
     def do_help(self, line):
         usage(print_usage = False)
 
+    def emptyline(self):
+        pass
+
     def postcmd(self, stop, line):
         return False
 
     def precmd(self, line):
-        words = line.split()
+        words = shlex.split(line)
         if len(words) > 0:
             words0 = words[0].replace('-', '_')
             return ' '.join([words0] + words[1:])

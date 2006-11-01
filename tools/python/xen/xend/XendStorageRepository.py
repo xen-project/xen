@@ -30,10 +30,9 @@ from xen.xend.XendVDI import *
 XEND_STORAGE_MAX_IGNORE = -1
 XEND_STORAGE_DIR = "/var/lib/xend/storage/"
 XEND_STORAGE_QCOW_FILENAME = "%s.qcow"
-XEND_STORAGE_IMG_FILENAME = "%s.img"
 XEND_STORAGE_VDICFG_FILENAME = "%s.vdi.xml"
 DF_COMMAND = "df -lPk"
-QCOW_CREATE_COMMAND = "/usr/sbin/qcow-create %d %s %s"
+QCOW_CREATE_COMMAND = "/usr/sbin/qcow-create %d %s"
 
 KB = 1024
 MB = 1024 *1024
@@ -113,34 +112,29 @@ class XendStorageRepository:
                     image_uuid = filename[:-5]
                     seen_images.append(image_uuid)
                     if image_uuid not in self.images:
-                        image_file = XEND_STORAGE_IMG_FILENAME % image_uuid
                         qcow_file = XEND_STORAGE_QCOW_FILENAME % image_uuid
                         cfg_file = XEND_STORAGE_VDICFG_FILENAME % image_uuid
-                        
-                        image_path = os.path.join(XEND_STORAGE_DIR,image_file)
                         qcow_path = os.path.join(XEND_STORAGE_DIR, qcow_file)
                         cfg_path = os.path.join(XEND_STORAGE_DIR, cfg_file)
 
                         qcow_size = os.stat(qcow_path).st_size
-                        image_size = os.stat(image_path).st_size
 
+                        # TODO: no way to stat virtual size of qcow
                         vdi = XendQCOWVDI(image_uuid, self.uuid,
-                                          qcow_path, image_path, cfg_path,
-                                          image_size,
-                                          qcow_size + image_size)
+                                          qcow_path, cfg_path,
+                                          qcow_size, qcow_size) 
                         
                         if cfg_path and os.path.exists(cfg_path):
                             vdi.load_config(cfg_path)
                         
                         self.images[image_uuid] = vdi
-                        total_used += image_size
+                        total_used += qcow_size
 
             # remove images that aren't valid
             for image_uuid in self.images.keys():
                 if image_uuid not in seen_images:
                     try:
                         os.unlink(self.images[image_uuid].qcow_path)
-                        os.unlink(self.images[image_uuid].image_path)
                     except OSError:
                         pass
                     del self.images[image_uuid]
@@ -218,30 +212,19 @@ class XendStorageRepository:
                 raise XendError("Not enough space")
 
             image_uuid = uuid.createString()
-            # create file based image
-            image_path = os.path.join(XEND_STORAGE_DIR,
-                                      XEND_STORAGE_IMG_FILENAME % image_uuid)
+            qcow_path = os.path.join(XEND_STORAGE_DIR,
+                                     XEND_STORAGE_QCOW_FILENAME % image_uuid)
             
-            if image_path and os.path.exists(image_path):
+            if qcow_path and os.path.exists(qcow_path):
                 raise XendError("Image with same UUID alreaady exists:" %
                                 image_uuid)
             
-            block = '\x00' * KB
-            img = open(image_path, 'w')
-            for i in range(desired_size_bytes/KB):
-                img.write(block)
-            img.close()
-            
-            # TODO: create qcow image
-            qcow_path = os.path.join(XEND_STORAGE_DIR,
-                                     XEND_STORAGE_QCOW_FILENAME % image_uuid)
-            cmd = QCOW_CREATE_COMMAND % (desired_size_bytes/MB,
-                                         qcow_path, image_path)
-
+            cmd = QCOW_CREATE_COMMAND % (desired_size_bytes/MB, qcow_path)
             rc, output = commands.getstatusoutput(cmd)
+            
             if rc != 0:
                 # cleanup the image file
-                os.unlink(image_path)
+                os.unlink(qcow_path)
                 raise XendError("Failed to create QCOW Image: %s" % output)
 
             self._refresh()
@@ -261,11 +244,9 @@ class XendStorageRepository:
             if image_uuid in self.images:
                 # TODO: check if it is being used?
                 qcow_path = self.images[image_uuid].qcow_path
-                image_path = self.images[image_uuid].image_path
                 cfg_path = self.images[image_uuid].cfg_path
                 try:
                     os.unlink(qcow_path)
-                    os.unlink(image_path)
                     if cfg_path and os.path.exists(cfg_path):
                         os.unlink(cfg_path)
                 except OSError:

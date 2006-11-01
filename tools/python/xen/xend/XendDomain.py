@@ -91,7 +91,7 @@ class XendDomain:
         try:
             try:
                 dom0info = [d for d in self._running_domains() \
-                            if d['domid'] == DOM0_ID][0]
+                            if d.get('domid') == DOM0_ID][0]
                 
                 dom0info['name'] = DOM0_NAME
                 dom0 = XendDomainInfo.recreate(dom0info, True)

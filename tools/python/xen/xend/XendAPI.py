@@ -1038,8 +1038,10 @@ class XendAPI:
     def vbd_get_vm(self, session, vbd_ref):
         xendom = XendDomain.instance()
         return xen_api_success(xendom.get_dev_property('vbd', vbd_ref, 'VM'))
+    
     def vbd_get_vdi(self, session, vbd_ref):
-        return xen_api_error(XEND_ERROR_UNSUPPORTED)
+        return xen_api_todo()
+    
     def vbd_get_device(self, session, vbd_ref):
         xendom = XendDomain.instance()
         return xen_api_success(xendom.get_dev_property('vbd', vbd_ref,
