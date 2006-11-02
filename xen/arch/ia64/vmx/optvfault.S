@@ -177,7 +177,7 @@ GLOBAL_ENTRY(vmx_asm_rsm)
     ;;
     ld8 r18=[r17]
     movl r28=IA64_PSR_IC+IA64_PSR_I+IA64_PSR_DT+IA64_PSR_SI
-    ld8 r23=[r22]
+    ld4 r23=[r22]
     sub r27=-1,r26
     mov r24=b0
     ;;
@@ -200,7 +200,7 @@ GLOBAL_ENTRY(vmx_asm_rsm)
     ;;
     ld8 r26=[r26]
     ld8 r27=[r27]
-    st8 [r22]=r23
+    st4 [r22]=r23
     dep.z r28=4,61,3
     ;;
     mov rr[r0]=r26
@@ -232,7 +232,7 @@ GLOBAL_ENTRY(vmx_asm_ssm)
     mov r20=cr.ipsr
     or r19=r29,r26
     ;;
-    ld8 r23=[r22]
+    ld4 r23=[r22]
     st8 [r27]=r19
     or r20=r20,r26
     ;;
@@ -251,7 +251,7 @@ GLOBAL_ENTRY(vmx_asm_ssm)
     ;;
     ld8 r26=[r26]
     ld8 r27=[r27]
-    st8 [r22]=r23
+    st4 [r22]=r23
     dep.z r28=4,61,3
     ;;
     mov rr[r0]=r26
@@ -306,7 +306,7 @@ vmx_asm_mov_to_psr_back:
     add r22=IA64_VCPU_MODE_FLAGS_OFFSET,r21
     dep r19=0,r19,32,32
     ;;   
-    ld8 r23=[r22]
+    ld4 r23=[r22]
     dep r18=0,r17,0,32
     ;; 
     add r30=r18,r19
@@ -332,7 +332,7 @@ vmx_asm_mov_to_psr_back:
     ;;
     ld8 r26=[r26]
     ld8 r27=[r27]
-    st8 [r22]=r23
+    st4 [r22]=r23
     dep.z r28=4,61,3
     ;;
     mov rr[r0]=r26
