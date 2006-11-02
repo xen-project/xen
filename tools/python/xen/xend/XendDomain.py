@@ -36,6 +36,7 @@ from xen.xend.XendConfig import XendConfig
 from xen.xend.XendError import XendError, XendInvalidDomain
 from xen.xend.XendLogging import log
 from xen.xend.XendConstants import XS_VMROOT
+from xen.xend.XendConstants import DOM_STATE_HALTED, DOM_STATE_RUNNING
 
 from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.xenstore.xswatch import xswatch
@@ -69,7 +70,7 @@ class XendDomain:
 
     def __init__(self):
         self.domains = {}
-        self.managed_domains = []
+        self.managed_domains = {}
         self.domains_lock = threading.RLock()
 
         # xen api instance vars
@@ -170,7 +171,6 @@ class XendDomain:
                     if not running_dom:
                         # instantiate domain if not started.
                         new_dom = XendDomainInfo.createDormant(dom)
-                        self._add_domain(new_dom)
                         self._managed_domain_register(new_dom)
                     else:
                         self._managed_domain_register(running_dom)
@@ -307,31 +307,16 @@ class XendDomain:
 
     def _managed_domain_unregister(self, dom):
         try:
-            self.managed_domains.remove((dom.get_uuid(), dom.getName()))
+            if self.is_domain_managed(dom):
+                del self.managed_domains[dom.get_uuid()]
         except ValueError:
             log.warn("Domain is not registered: %s" % dom.get_uuid())
 
     def _managed_domain_register(self, dom):
-        self.managed_domains.append((dom.get_uuid(), dom.getName()))
+        self.managed_domains[dom.get_uuid()] = dom
 
-    def _managed_domain_rename(self, dom, new_name):
-        for i in range(len(self.managed_domains)):
-            if self.managed_domains[i][0] == dom.get_uuid():
-                self.managed_domains[i][1] = new_name
-                return True
-        return False
-
-    def is_domain_managed(self, dom = None, dom_name = None):
-        dom_uuid = dom.get_uuid()
-        dom_name = dom.getName()
-        if dom:
-            return ((dom_uuid, dom_name) in self.managed_domains)
-        if dom_name:
-            results = [d for d in self.managed_domains if d[1] == dom_name]
-            return (len(results) > 0)
-        return False
-
-    
+    def is_domain_managed(self, dom = None):
+        return (dom.get_uuid() in self.managed_domains)
 
     # End of Managed Domain Access
     # --------------------------------------------------------------------
@@ -376,55 +361,47 @@ class XendDomain:
             # - like cpu_time, status, dying, etc.
             running = self._running_domains()
             for dom in running:
-                dom_info = self.domain_lookup_nr(dom['domid'])
-                if dom_info:
-                    dom_info.update(dom)
+                domid = dom['domid']
+                if domid in self.domains:
+                    self.domains[domid].update(dom)
 
-            # clean up unmanaged domains
-            for dom in self.domains.values():
-                if (dom.getDomid() == None) and \
-                       not self.is_domain_managed(dom):
-                    self._remove_domain(dom)
+            # remove domains that are not running from active
+            # domain list
+            running_domids = [d['domid'] for d in running]
+            for domid, dom in self.domains.items():
+                if domid not in running_domids and domid != DOM0_ID:
+                    self._remove_domain(dom, domid)
                     
         finally:
             self.domains_lock.release()
 
-    def _add_domain(self, info, managed = False):
+    def _add_domain(self, info):
         """Add the given domain entry to this instance's internal cache.
         
         @requires: Expects to be protected by the domains_lock.
         @param info: XendDomainInfo of a domain to be added.
         @type info: XendDomainInfo
-        @keyword managed: Whether this domain is maanged by Xend
-        @type managed: boolean
         """
-        log.debug("Adding Domain: %s" % info.get_uuid())
-        self.domains[info.get_uuid()] = info
-        if managed and not self.is_domain_managed(info):
-            self._managed_domain_register(info)
+        log.debug("Adding Domain: %s" % info.getDomid())
+        self.domains[info.getDomid()] = info
 
-    def _remove_domain(self, info):
+    def _remove_domain(self, info, domid = None):
         """Remove the given domain from this instance's internal cache.
         
         @requires: Expects to be protected by the domains_lock.
         @param info: XendDomainInfo of a domain to be removed.
         @type info: XendDomainInfo
         """
-        if info:
-            dom_name = info.getName()
-            dom_uuid = info.get_uuid()
-            
-            if info.state != XendDomainInfo.DOM_STATE_HALTED:
-                info.cleanupDomain()
 
-            if self.is_domain_managed(info):
-                self._managed_config_remove(dom_uuid)
-                self._managed_domain_unregister(info)
-                
-            try:
-                del self.domains[dom_uuid]
-            except KeyError:
-                pass
+        if info:
+            if domid == None:
+                domid = info.getDomid()
+
+            if info.state != DOM_STATE_HALTED:
+                info.cleanupDomain()
+            
+            if domid in self.domains:
+                del self.domains[domid]
         else:
             log.warning("Attempted to remove non-existent domain.")
 
@@ -498,11 +475,9 @@ class XendDomain:
 
             # lookup by id
             try:
-                match = [d for d in self.domains.values() \
-                       if d.getDomid() == int(domid)]
-                if match:
-                    return match[0]
-            except (ValueError, TypeError):
+                if int(domid) in self.domains:
+                    return self.domains[int(domid)]
+            except ValueError:
                 pass
 
             return None
@@ -516,7 +491,7 @@ class XendDomain:
         """
         self.domains_lock.acquire()
         try:
-            return self.domains[DOM0_UUID]
+            return self.domains[DOM0_ID]
         finally:
             self.domains_lock.release()
 
@@ -533,7 +508,7 @@ class XendDomain:
                 if dom.getName() == DOM0_NAME:
                     continue
                 
-                if dom.state == XendDomainInfo.DOM_STATE_RUNNING:
+                if dom.state == DOM_STATE_RUNNING:
                     shutdownAction = dom.info.get('on_xend_stop', 'ignore')
                     if shutdownAction == 'shutdown':
                         log.debug('Shutting down domain: %s' % dom.getName())
@@ -561,15 +536,21 @@ class XendDomain:
         try:
             self.domains_lock.acquire()
             result = [d.get_uuid() for d in self.domains.values()]
+            result += self.managed_domains.keys()
+            return result
         finally:
             self.domains_lock.release()
-        return result
 
     def get_vm_by_uuid(self, vm_uuid):
         self.domains_lock.acquire()
         try:
-            if vm_uuid in self.domains:
-                return self.domains[vm_uuid]
+            for dom in self.domains.values():
+                if dom.get_uuid() == vm_uuid:
+                    return dom
+
+            if vm_uuid in self.managed_domains:
+                return self.managed_domains[vm_uuid]
+
             return None
         finally:
             self.domains_lock.release()
@@ -577,7 +558,7 @@ class XendDomain:
     def get_vm_with_dev_uuid(self, klass, dev_uuid):
         self.domains_lock.acquire()
         try:
-            for dom in self.domains.values():
+            for dom in self.domains.values() + self.managed_domains.values():
                 if dom.has_device(klass, dev_uuid):
                     return dom
             return None
@@ -607,17 +588,16 @@ class XendDomain:
     def do_legacy_api_with_uuid(self, fn, vm_uuid, *args):
         self.domains_lock.acquire()
         try:
-            if vm_uuid in self.domains:
-                # problem is domid does not exist for unstarted
-                # domains, so in that case, we use the name.
-                # TODO: probably want to modify domain_lookup_nr
-                #       to lookup uuids, or just ignore
-                #       the legacy api and reimplement all these
-                #       calls.
-                domid = self.domains[vm_uuid].getDomid()
+            for domid, dom in self.domains.items():
+                if dom.get_uuid == vm_uuid:
+                    return fn(domid, *args)
+                    
+            if vm_uuid in self.managed_domains:
+                domid = self.managed_domains[vm_uuid].getDomid()
                 if domid == None:
-                    domid = self.domains[vm_uuid].getName()
+                    domid = self.managed_domains[vm_uuid].getName()
                 return fn(domid, *args)
+            
             raise XendInvalidDomain("Domain does not exist")
         finally:
             self.domains_lock.release()
@@ -631,7 +611,7 @@ class XendDomain:
                 dominfo = XendDomainInfo.createDormant(xeninfo)
                 log.debug("Creating new managed domain: %s: %s" %
                           (dominfo.getName(), dominfo.get_uuid()))
-                self._add_domain(dominfo, managed = True)
+                self._managed_domain_register(dominfo)
                 self.managed_config_save(dominfo)
                 return dominfo.get_uuid()
             except XendError, e:
@@ -646,9 +626,6 @@ class XendDomain:
         try:
             old_name = dom.getName()
             dom.setName(new_name)
-
-            if self.is_domain_managed(dom):
-                self._managed_domain_rename(dom, new_name)
 
         finally:
             self.domains_lock.release()
@@ -670,7 +647,18 @@ class XendDomain:
         self.domains_lock.acquire()
         try:
             self._refresh()
-            return self.domains.values()
+            
+            # active domains
+            active_domains = self.domains.values()
+            active_uuids = [d.get_uuid() for d in active_domains]
+
+            # inactive domains
+            inactive_domains = []
+            for dom_uuid, dom in self.managed_domains.items():
+                if dom_uuid not in active_uuids:
+                    inactive_domains.append(dom)
+
+            return active_domains + inactive_domains
         finally:
             self.domains_lock.release()
 
@@ -710,7 +698,7 @@ class XendDomain:
             if dominfo.getDomid() == DOM0_ID:
                 raise XendError("Cannot save privileged domain %s" % domname)
 
-            if dominfo.state != XendDomainInfo.DOM_STATE_RUNNING:
+            if dominfo.state != DOM_STATE_RUNNING:
                 raise XendError("Cannot suspend domain that is not running.")
 
             if not os.path.exists(self._managed_config_path(domname)):
@@ -745,7 +733,7 @@ class XendDomain:
             if dominfo.getDomid() == DOM0_ID:
                 raise XendError("Cannot save privileged domain %s" % domname)
 
-            if dominfo.state != XendDomainInfo.DOM_STATE_HALTED:
+            if dominfo.state != DOM_STATE_HALTED:
                 raise XendError("Cannot suspend domain that is not running.")
 
             chkpath = self._managed_check_point_path(domname)
@@ -801,7 +789,7 @@ class XendDomain:
                 dominfo = XendDomainInfo.createDormant(xeninfo)
                 log.debug("Creating new managed domain: %s" %
                           dominfo.getName())
-                self._add_domain(dominfo, managed = True)
+                self._managed_domain_register(dominfo)
                 self.managed_config_save(dominfo)
                 # no return value because it isn't meaningful for client
             except XendError, e:
@@ -827,7 +815,7 @@ class XendDomain:
             if not dominfo:
                 raise XendInvalidDomain(str(domid))
 
-            if dominfo.state != XendDomainInfo.DOM_STATE_HALTED:
+            if dominfo.state != DOM_STATE_HALTED:
                 raise XendError("Domain is already running")
             
             dominfo.start(is_managed = True)
@@ -838,7 +826,7 @@ class XendDomain:
         
 
     def domain_delete(self, domid):
-        """Remove a domain from database
+        """Remove a managed domain from database
 
         @require: Domain must not be running.
         @param domid: Domain name or domain ID.
@@ -853,9 +841,10 @@ class XendDomain:
                 if not dominfo:
                     raise XendInvalidDomain(str(domid))
 
-                if dominfo.state != XendDomainInfo.DOM_STATE_HALTED:
+                if dominfo.state != DOM_STATE_HALTED:
                     raise XendError("Domain is still running")
 
+                self._managed_domain_unregister(dominfo)
                 self._remove_domain(dominfo)
                 
             except Exception, ex:

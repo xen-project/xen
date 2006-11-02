@@ -245,7 +245,6 @@ def restore(config):
     """
 
     log.debug("XendDomainInfo.restore(%s)", config)
-
     vm = XendDomainInfo(XendConfig(sxp = config), resume = True)
     try:
         vm.resume()
@@ -775,7 +774,7 @@ class XendDomainInfo:
                 "Scheduling refreshShutdown on domain %d in %ds.",
                 self.domid, timeout)
             threading.Timer(timeout, self._refreshShutdown).start()
-
+            
         return True
 
 
@@ -849,7 +848,7 @@ class XendDomainInfo:
         # given reason.  This restart has to be done out of the scope of
         # refresh_shutdown_lock.
         restart_reason = None
-        
+
         self.refresh_shutdown_lock.acquire()
         try:
             if xeninfo is None:
@@ -1368,7 +1367,7 @@ class XendDomainInfo:
     def waitForShutdown(self):
         self.state_updated.acquire()
         try:
-            while self.state in (DOM_STATE_RUNNING,):
+            while self.state in (DOM_STATE_RUNNING,DOM_STATE_PAUSED):
                 self.state_updated.wait()
         finally:
             self.state_updated.release()
@@ -1624,7 +1623,6 @@ class XendDomainInfo:
     def update(self, info = None, refresh = True):
         """Update with info from xc.domain_getinfo().
         """
-
         log.trace("XendDomainInfo.update(%s) on domain %s", info,
                   str(self.domid))
         
