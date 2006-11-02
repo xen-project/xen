@@ -724,10 +724,6 @@ __release_grant_for_copy(
 {
     grant_entry_t *const sha = &rd->grant_table->shared[gref];
     struct active_grant_entry *const act = &rd->grant_table->active[gref];
-    const unsigned long r_frame = act->frame;
-
-    if ( !readonly )
-        gnttab_mark_dirty(rd, r_frame);
 
     spin_lock(&rd->grant_table->lock);
 
@@ -750,7 +746,8 @@ __release_grant_for_copy(
 
 /* Grab a frame number from a grant entry and update the flags and pin
    count as appropriate.  Note that this does *not* update the page
-   type or reference counts. */
+   type or reference counts, and does not check that the mfn is
+   actually valid. */
 static int
 __acquire_grant_for_copy(
     struct domain *rd, unsigned long gref, int readonly,
@@ -892,6 +889,9 @@ __gnttab_copy(
     {
         s_frame = gmfn_to_mfn(sd, op->source.u.gmfn);
     }
+    if ( unlikely(!mfn_valid(s_frame)) )
+        PIN_FAIL(error_out, GNTST_general_error,
+                 "source frame %lx invalid.\n", s_frame);
     if ( !get_page(mfn_to_page(s_frame), sd) )
         PIN_FAIL(error_out, GNTST_general_error,
                  "could not get source frame %lx.\n", s_frame);
@@ -906,8 +906,11 @@ __gnttab_copy(
     }
     else
     {
-        d_frame = gmfn_to_mfn(sd, op->dest.u.gmfn);
+        d_frame = gmfn_to_mfn(dd, op->dest.u.gmfn);
     }
+    if ( unlikely(!mfn_valid(d_frame)) )
+        PIN_FAIL(error_out, GNTST_general_error,
+                 "destination frame %lx invalid.\n", d_frame);
     if ( !get_page_and_type(mfn_to_page(d_frame), dd, PGT_writable_page) )
         PIN_FAIL(error_out, GNTST_general_error,
                  "could not get destination frame %lx.\n", d_frame);
@@ -919,6 +922,8 @@ __gnttab_copy(
 
     unmap_domain_page(dp);
     unmap_domain_page(sp);
+
+    gnttab_mark_dirty(dd, d_frame);
 
     put_page_and_type(mfn_to_page(d_frame));
  error_out:
