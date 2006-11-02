@@ -14,9 +14,9 @@
  * must hold a reference to the page.
  */
 int create_grant_host_mapping(
-    unsigned long addr, unsigned long frame, unsigned int flags);
+    uint64_t addr, unsigned long frame, unsigned int flags);
 int destroy_grant_host_mapping(
-    unsigned long addr, unsigned long frame, unsigned int flags);
+    uint64_t addr, unsigned long frame, unsigned int flags);
 
 #define gnttab_create_shared_page(d, t, i)                               \
     do {                                                                 \
