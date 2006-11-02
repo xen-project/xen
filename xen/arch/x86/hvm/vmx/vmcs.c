@@ -56,7 +56,7 @@
       CPU_BASED_INVDPG_EXITING |                        \
       CPU_BASED_MWAIT_EXITING |                         \
       CPU_BASED_MOV_DR_EXITING |                        \
-      CPU_BASED_ACTIVATE_IO_BITMAP |                    \
+      CPU_BASED_UNCOND_IO_EXITING |                     \
       CPU_BASED_USE_TSC_OFFSETING )
 
 /* Basic flags for VM-Exit controls. */
@@ -240,21 +240,8 @@ static inline int construct_vmcs_controls(struct arch_vmx_struct *arch_vmx)
     int error = 0;
 
     error |= __vmwrite(PIN_BASED_VM_EXEC_CONTROL, vmx_pin_based_exec_control);
-
     error |= __vmwrite(VM_EXIT_CONTROLS, vmx_vmexit_control);
-
     error |= __vmwrite(VM_ENTRY_CONTROLS, vmx_vmentry_control);
-
-    error |= __vmwrite(IO_BITMAP_A, virt_to_maddr(arch_vmx->io_bitmap_a));
-    error |= __vmwrite(IO_BITMAP_B, virt_to_maddr(arch_vmx->io_bitmap_b));
-
-#ifdef CONFIG_X86_PAE
-    /* On PAE bitmaps may in future be above 4GB. Write high words. */
-    error |= __vmwrite(IO_BITMAP_A_HIGH,
-                       (paddr_t)virt_to_maddr(arch_vmx->io_bitmap_a) >> 32);
-    error |= __vmwrite(IO_BITMAP_B_HIGH,
-                       (paddr_t)virt_to_maddr(arch_vmx->io_bitmap_b) >> 32);
-#endif
 
     return error;
 }
@@ -588,12 +575,6 @@ void vmx_destroy_vmcs(struct vcpu *v)
         return;
 
     vmx_clear_vmcs(v);
-
-    free_xenheap_pages(arch_vmx->io_bitmap_a, IO_BITMAP_ORDER);
-    free_xenheap_pages(arch_vmx->io_bitmap_b, IO_BITMAP_ORDER);
-
-    arch_vmx->io_bitmap_a = NULL;
-    arch_vmx->io_bitmap_b = NULL;
 
     vmx_free_vmcs(arch_vmx->vmcs);
     arch_vmx->vmcs = NULL;

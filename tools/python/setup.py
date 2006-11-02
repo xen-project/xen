@@ -4,8 +4,7 @@ import os
 
 XEN_ROOT = "../.."
 
-extra_compile_args  = [ "-fno-strict-aliasing", "-Wall", "-Werror" ]
-
+extra_compile_args  = [ "-fno-strict-aliasing", "-Werror" ]
 
 include_dirs = [ XEN_ROOT + "/tools/libxc",
                  XEN_ROOT + "/tools/xenstore",

@@ -2379,7 +2379,7 @@ int do_mmu_update(
 
 
 static int create_grant_pte_mapping(
-    unsigned long pte_addr, l1_pgentry_t nl1e, struct vcpu *v)
+    uint64_t pte_addr, l1_pgentry_t nl1e, struct vcpu *v)
 {
     int rc = GNTST_okay;
     void *va;
@@ -2403,7 +2403,7 @@ static int create_grant_pte_mapping(
     }
     
     va = map_domain_page(mfn);
-    va = (void *)((unsigned long)va + (pte_addr & ~PAGE_MASK));
+    va = (void *)((unsigned long)va + ((unsigned long)pte_addr & ~PAGE_MASK));
     page = mfn_to_page(mfn);
 
     type = page->u.inuse.type_info & PGT_type_mask;
@@ -2435,7 +2435,7 @@ static int create_grant_pte_mapping(
 }
 
 static int destroy_grant_pte_mapping(
-    unsigned long addr, unsigned long frame, struct domain *d)
+    uint64_t addr, unsigned long frame, struct domain *d)
 {
     int rc = GNTST_okay;
     void *va;
@@ -2454,7 +2454,7 @@ static int destroy_grant_pte_mapping(
     }
     
     va = map_domain_page(mfn);
-    va = (void *)((unsigned long)va + (addr & ~PAGE_MASK));
+    va = (void *)((unsigned long)va + ((unsigned long)addr & ~PAGE_MASK));
     page = mfn_to_page(mfn);
 
     type = page->u.inuse.type_info & PGT_type_mask;
@@ -2475,7 +2475,7 @@ static int destroy_grant_pte_mapping(
     /* Check that the virtual address supplied is actually mapped to frame. */
     if ( unlikely((l1e_get_intpte(ol1e) >> PAGE_SHIFT) != frame) )
     {
-        MEM_LOG("PTE entry %lx for address %lx doesn't match frame %lx",
+        MEM_LOG("PTE entry %lx for address %"PRIx64" doesn't match frame %lx",
                 (unsigned long)l1e_get_intpte(ol1e), addr, frame);
         put_page_type(page);
         rc = GNTST_general_error;
@@ -2575,7 +2575,7 @@ static int destroy_grant_va_mapping(
 }
 
 int create_grant_host_mapping(
-    unsigned long addr, unsigned long frame, unsigned int flags)
+    uint64_t addr, unsigned long frame, unsigned int flags)
 {
     l1_pgentry_t pte = l1e_from_pfn(frame, GRANT_PTE_FLAGS);
 
@@ -2590,7 +2590,7 @@ int create_grant_host_mapping(
 }
 
 int destroy_grant_host_mapping(
-    unsigned long addr, unsigned long frame, unsigned int flags)
+    uint64_t addr, unsigned long frame, unsigned int flags)
 {
     if ( flags & GNTMAP_contains_pte )
         return destroy_grant_pte_mapping(addr, frame, current->domain);

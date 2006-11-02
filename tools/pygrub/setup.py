@@ -3,7 +3,7 @@ from distutils.ccompiler import new_compiler
 import os
 import sys
 
-extra_compile_args  = [ "-fno-strict-aliasing", "-Wall", "-Werror" ]
+extra_compile_args  = [ "-fno-strict-aliasing", "-Werror" ]
 
 fsys_mods = []
 fsys_pkgs = []

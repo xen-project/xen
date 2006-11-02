@@ -53,77 +53,25 @@ static DEFINE_PER_CPU(unsigned long, trace_values[5]);
 static void vmx_ctxt_switch_from(struct vcpu *v);
 static void vmx_ctxt_switch_to(struct vcpu *v);
 
-static int vmx_initialize_guest_resources(struct vcpu *v)
+static int vmx_vcpu_initialise(struct vcpu *v)
 {
-    struct domain *d = v->domain;
-    struct vcpu *vc;
-    void *io_bitmap_a, *io_bitmap_b;
     int rc;
 
     v->arch.schedule_tail    = arch_vmx_do_launch;
     v->arch.ctxt_switch_from = vmx_ctxt_switch_from;
     v->arch.ctxt_switch_to   = vmx_ctxt_switch_to;
 
-    if ( v->vcpu_id != 0 )
-        return 1;
-
-    if ( !shadow_mode_external(d) )
+    if ( (rc = vmx_create_vmcs(v)) != 0 )
     {
-        dprintk(XENLOG_ERR, "Can't init HVM for dom %u vcpu %u: "
-                "not in shadow external mode\n", 
-                d->domain_id, v->vcpu_id);
-        domain_crash(d);
+        dprintk(XENLOG_WARNING,
+                "Failed to create VMCS for vcpu %d: err=%d.\n",
+                v->vcpu_id, rc);
+        return rc;
     }
 
-    for_each_vcpu ( d, vc )
-    {
-        memset(&vc->arch.hvm_vmx, 0, sizeof(struct arch_vmx_struct));
+    spin_lock_init(&v->arch.hvm_vmx.vmcs_lock);
 
-        if ( (rc = vmx_create_vmcs(vc)) != 0 )
-        {
-            dprintk(XENLOG_WARNING,
-                    "Failed to create VMCS for vcpu %d: err=%d.\n",
-                    vc->vcpu_id, rc);
-            return 0;
-        }
-
-        spin_lock_init(&vc->arch.hvm_vmx.vmcs_lock);
-
-        if ( (io_bitmap_a = alloc_xenheap_pages(IO_BITMAP_ORDER)) == NULL )
-        {
-            dprintk(XENLOG_WARNING,
-                   "Failed to allocate io bitmap b for vcpu %d.\n",
-                    vc->vcpu_id);
-            return 0;
-        }
-
-        if ( (io_bitmap_b = alloc_xenheap_pages(IO_BITMAP_ORDER)) == NULL )
-        {
-            dprintk(XENLOG_WARNING,
-                    "Failed to allocate io bitmap b for vcpu %d.\n",
-                    vc->vcpu_id);
-            return 0;
-        }
-
-        memset(io_bitmap_a, 0xff, 0x1000);
-        memset(io_bitmap_b, 0xff, 0x1000);
-
-        /* don't bother debug port access */
-        clear_bit(PC_DEBUG_PORT, io_bitmap_a);
-
-        vc->arch.hvm_vmx.io_bitmap_a = io_bitmap_a;
-        vc->arch.hvm_vmx.io_bitmap_b = io_bitmap_b;
-
-    }
-
-    /*
-     * Required to do this once per domain XXX todo: add a seperate function 
-     * to do these.
-     */
-    memset(&d->shared_info->evtchn_mask[0], 0xff,
-           sizeof(d->shared_info->evtchn_mask));
-
-    return 1;
+    return 0;
 }
 
 static void vmx_relinquish_guest_resources(struct domain *d)
@@ -747,7 +695,7 @@ static void vmx_setup_hvm_funcs(void)
 
     hvm_funcs.disable = stop_vmx;
 
-    hvm_funcs.initialize_guest_resources = vmx_initialize_guest_resources;
+    hvm_funcs.vcpu_initialise = vmx_vcpu_initialise;
     hvm_funcs.relinquish_guest_resources = vmx_relinquish_guest_resources;
 
     hvm_funcs.store_cpu_guest_regs = vmx_store_cpu_guest_regs;
