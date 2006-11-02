@@ -24,47 +24,13 @@ from xen.xend.XendError import VmError
 from xen.xend.XendDevices import XendDevices
 from xen.xend.XendLogging import log
 from xen.xend.PrettyPrint import prettyprintstring
+from xen.xend.XendConstants import DOM_STATE_HALTED
 
 """
 XendConfig API
 
   XendConfig will try to mirror as closely the Xen API VM Struct
   providing a backwards compatibility mode for SXP dumping, loading.
-
-XendConfig is a subclass of the python dict in order to emulate the
-previous behaviour of the XendDomainInfo.info dictionary. However,
-the new dictionary also exposes a set of attributes that implement
-the Xen API VM configuration interface.
-
-Example:
-
->>> cfg = XendConfig(cfg = dict_from_xc_domain_getinfo)
->>> cfg.name_label
-Domain-0
->>> cfg['name']
-Domain-0
->>> cfg.kernel_kernel
-/boot/vmlinuz-xen
->>> cfg.kernel_initrd
-/root/initrd
->>> cfg.kernel_args
-root=/dev/sda1 ro
->>> cfg['image']
-(linux
-  (kernel /boot/vmlinuz-xen)
-  (ramdisk /root/initrd)
-  (root '/dev/sda1 ro'))
->>>  
-
-Internally, XendConfig will make sure changes via the old 'dict'
-interface get reflected, if possible, to the attribute store.
-
-It does this by overriding __setitem__, __getitem__, __hasitem__,
-__getattr__, __setattr__, __hasattr__.
-
-What this means is that as code is moved from the SXP interface to
-the Xen API interface, we can spot unported code by tracing calls
-to  __getitem__ and __setitem__.
 
 """
 
@@ -665,9 +631,9 @@ class XendConfig(dict):
                 if self[cfg] != None:
                     sxpr.append([cfg, self[cfg]])
 
-        if 'image' in self:
+        if 'image' in self and self['image'] != None:
             sxpr.append(['image', self['image']])
-        if 'security' in self:
+        if 'security' in self and self['security']:
             sxpr.append(['security', self['security']])
         if 'shutdown_reason' in self:
             sxpr.append(['shutdown_reason', self['shutdown_reason']])
@@ -684,7 +650,17 @@ class XendConfig(dict):
         sxpr.append(['on_xend_start', self.get('on_xend_start', 'ignore')])
         sxpr.append(['on_xend_stop', self.get('on_xend_stop', 'ignore')])
 
-        sxpr.append(['status', domain.state])
+        if domain:
+            sxpr.append(['status', domain.state])
+        else:
+            sxpr.append(['status', DOM_STATE_HALTED])
+
+        # For save/restore migration
+        if domain:
+            if domain.store_mfn:
+                sxpr.append(['store_mfn', domain.store_mfn])
+            if domain.console_mfn:
+                sxpr.append(['console_mfn', domain.console_mfn])
 
         # Marshall devices (running or from configuration)
         if not ignore_devices:

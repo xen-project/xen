@@ -39,6 +39,7 @@ from xen.xend import PrettyPrint
 from xen.xend import sxp
 from xen.xend import XendClient
 from xen.xend.XendClient import server
+from xen.xend.XendConstants import *
 
 from xen.xm.opts import OptionError, Opts, wrap, set_true
 from xen.xm import console
@@ -532,13 +533,16 @@ def xm_list(args):
 def parse_doms_info(info):
     def get_info(n, t, d):
         return t(sxp.child_value(info, n, d))
+
+    def get_status(n, t, d):
+        return DOM_STATES[t(sxp.child_value(info, n, d))]
     
     return {
         'domid'    : get_info('domid',        int,   -1),
         'name'     : get_info('name',         str,   '??'),
         'mem'      : get_info('memory',       int,   0),
         'vcpus'    : get_info('online_vcpus', int,   0),
-        'state'    : get_info('state',        str,   '??'),
+        'status'   : get_status('status',     int,   DOM_STATE_HALTED),
         'cpu_time' : get_info('cpu_time',     float, 0),
         'up_time'  : get_info('up_time',      float, -1),
         'seclabel' : security.get_security_printlabel(info),
@@ -559,10 +563,10 @@ def parse_sedf_info(info):
         }
 
 def xm_brief_list(doms):
-    print '%-40s %3s %8s %5s %5s %9s' % \
-          ('Name', 'ID', 'Mem(MiB)', 'VCPUs', 'State', 'Time(s)')
+    print '%-40s %3s %5s %5s %10s %9s' % \
+          ('Name', 'ID', 'Mem', 'VCPUs', 'State', 'Time(s)')
     
-    format = "%(name)-40s %(domid)3d %(mem)8d %(vcpus)5d %(state)5s " \
+    format = "%(name)-40s %(domid)3d %(mem)5d %(vcpus)5d %(status)10s " \
              "%(cpu_time)8.1f"
     
     for dom in doms:
@@ -570,11 +574,11 @@ def xm_brief_list(doms):
         print format % d
 
 def xm_label_list(doms):
-    print '%-32s %3s %8s %5s %5s %9s %-8s' % \
-          ('Name', 'ID', 'Mem(MiB)', 'VCPUs', 'State', 'Time(s)', 'Label')
+    print '%-32s %3s %5s %5s %5s %9s %-8s' % \
+          ('Name', 'ID', 'Mem', 'VCPUs', 'State', 'Time(s)', 'Label')
     
     output = []
-    format = '%(name)-32s %(domid)3d %(mem)8d %(vcpus)5d %(state)5s ' \
+    format = '%(name)-32s %(domid)3d %(mem)5d %(vcpus)5d %(status)10s ' \
              '%(cpu_time)8.1f %(seclabel)9s'
     
     for dom in doms:
