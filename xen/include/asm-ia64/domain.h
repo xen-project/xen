@@ -186,7 +186,6 @@ struct arch_vcpu {
     char hypercall_continuation;
 
     //for phycial  emulation
-    unsigned long old_rsc;
     int mode_flags;
     fpswa_ret_t fpswa_ret;	/* save return values of FPSWA emulation */
     struct timer hlt_timer;
