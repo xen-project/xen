@@ -425,7 +425,6 @@ int arch_domain_create(struct domain *d)
 	    share_xen_page_with_guest(virt_to_page((char *)d->shared_info + i),
 	                              d, XENSHARE_writable);
 
-	d->max_pages = (128UL*1024*1024)/PAGE_SIZE; // 128MB default // FIXME
 	/* We may also need emulation rid for region4, though it's unlikely
 	 * to see guest issue uncacheable access in metaphysical mode. But
 	 * keep such info here may be more sane.
