@@ -9,6 +9,7 @@
 #define pud_offset(d, va)     d
 #define pud_none(pud)         0
 #define pud_present(pud)      1
+#define pud_bad(pud)          0
 #define PTRS_PER_PUD          1
 
 #endif /* _PGTABLE_NOPUD_H */

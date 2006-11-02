@@ -25,6 +25,21 @@
 #define NET_IP_ALIGN 0
 #endif
 
+#if defined(_LINUX_ERR_H) && !defined(IS_ERR_VALUE)
+#define IS_ERR_VALUE(x) unlikely((x) > (unsigned long)-1000L)
+#endif
+
+#if defined(_ASM_IA64_PGTABLE_H) && !defined(_PGTABLE_NOPUD_H)
+#include <asm-generic/pgtable-nopud.h>
+#endif
+
+/* Some kernels have this typedef backported so we cannot reliably
+ * detect based on version number, hence we forcibly #define it.
+ */
+#if defined(__LINUX_TYPES_H) || defined(__LINUX_GFP_H)
+#define gfp_t unsigned
+#endif
+
 #if defined(_LINUX_FS_H) && LINUX_VERSION_CODE < KERNEL_VERSION(2,6,9)
 #define nonseekable_open(inode, filp) /* Nothing to do */
 #endif
