@@ -52,7 +52,7 @@ def blkdev_segment(name):
     """
     val = None
     n = blkdev_name_to_number(name)
-    if n:
+    if not n is None:
         val = { 'device'       : n,
                 'start_sector' : long(0),
                 'nr_sectors'   : long(1L<<63),
