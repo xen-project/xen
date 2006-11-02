@@ -30,7 +30,7 @@ static DECLARE_WORK(shutdown_work, __shutdown_handler, NULL);
 #ifdef CONFIG_XEN
 int __xen_suspend(void);
 #else
-#define __xen_suspend() 0
+#define __xen_suspend() (void)0
 #endif
 
 static int shutdown_process(void *__unused)
@@ -44,7 +44,7 @@ static int shutdown_process(void *__unused)
 
 	if ((shutting_down == SHUTDOWN_POWEROFF) ||
 	    (shutting_down == SHUTDOWN_HALT)) {
-		if (call_usermodehelper_keys("/sbin/poweroff", poweroff_argv, envp, NULL, 0) < 0) {
+		if (call_usermodehelper("/sbin/poweroff", poweroff_argv, envp, 0) < 0) {
 #ifdef CONFIG_XEN
 			sys_reboot(LINUX_REBOOT_MAGIC1,
 				   LINUX_REBOOT_MAGIC2,

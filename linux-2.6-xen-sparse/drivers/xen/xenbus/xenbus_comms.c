@@ -30,13 +30,16 @@
  * IN THE SOFTWARE.
  */
 
-#include <asm/hypervisor.h>
-#include <xen/evtchn.h>
 #include <linux/wait.h>
 #include <linux/interrupt.h>
 #include <linux/sched.h>
 #include <linux/err.h>
+#include <linux/ptrace.h>
+#include <xen/evtchn.h>
 #include <xen/xenbus.h>
+
+#include <asm/hypervisor.h>
+
 #include "xenbus_comms.h"
 
 #ifdef HAVE_XEN_PLATFORM_COMPAT_H

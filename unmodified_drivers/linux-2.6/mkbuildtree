@@ -31,7 +31,7 @@ mkdir -p include/asm
 mkdir -p include/asm/xen
 
 lndir -silent ${XL}/include/xen include/xen
-ln -sf ${XEN}/include/public include/xen/interface
+ln -nsf ${XEN}/include/public include/xen/interface
 
 # Need to be quite careful here: we don't want the files we link in to
 # risk overriding the native Linux ones (in particular, system.h must

@@ -101,6 +101,14 @@ static inline void dev_disable_gso_features(struct net_device *dev)
 }
 #elif defined(NETIF_F_TSO)
 #define HAVE_TSO                       1
+
+/* Some older kernels cannot cope with incorrect checksums,
+ * particularly in netfilter. I'm not sure there is 100% correlation
+ * with the presence of NETIF_F_TSO but it appears to be a good first
+ * approximiation.
+ */
+#define HAVE_NO_CSUM_OFFLOAD           1
+
 #define gso_size tso_size
 #define gso_segs tso_segs
 static inline void dev_disable_gso_features(struct net_device *dev)
@@ -393,6 +401,14 @@ again:
 		message = "writing feature-rx-notify";
 		goto abort_transaction;
 	}
+
+#ifdef HAVE_NO_CSUM_OFFLOAD
+	err = xenbus_printf(xbt, dev->nodename, "feature-no-csum-offload", "%d", 1);
+	if (err) {
+		message = "writing feature-no-csum-offload";
+		goto abort_transaction;
+	}
+#endif
 
 	err = xenbus_printf(xbt, dev->nodename, "feature-sg", "%d", 1);
 	if (err) {

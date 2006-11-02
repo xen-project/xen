@@ -1270,10 +1270,7 @@ class XendDomainInfo:
 
             # Use architecture- and image-specific calculations to determine
             # the various headrooms necessary, given the raw configured
-            # values.
-            # reservation, maxmem, memory, and shadow are all in KiB.
-            reservation = self.image.getRequiredInitialReservation(
-                self.info['memory'] * 1024)
+            # values. maxmem, memory, and shadow are all in KiB.
             maxmem = self.image.getRequiredAvailableMemory(
                 self.info['maxmem'] * 1024)
             memory = self.image.getRequiredAvailableMemory(
@@ -1295,12 +1292,6 @@ class XendDomainInfo:
             # Set up the shadow memory
             shadow_cur = xc.shadow_mem_control(self.domid, shadow / 1024)
             self.info['shadow_memory'] = shadow_cur
-
-            # Initial memory reservation
-            if not (self._infoIsSet('image') and
-                    sxp.name(self.info['image']) == "hvm"):
-                xc.domain_memory_increase_reservation(
-                    self.domid, reservation, 0, 0)
 
             self._createChannels()
 

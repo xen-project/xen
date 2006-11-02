@@ -152,13 +152,13 @@ class ImageHandler:
         necessary."""
         return mem_kb
 
-    def getRequiredInitialReservation(self, mem_kb):
+    def getRequiredInitialReservation(self):
         """@param mem_kb The configured memory, in KiB.
         @return The corresponding required amount of memory to be free, also
         in KiB. This is normally the same as getRequiredAvailableMemory, but
         architecture- or image-specific code may override this to
         add headroom where necessary."""
-        return self.getRequiredAvailableMemory(mem_kb)
+        return self.getRequiredAvailableMemory(self.vm.getMemoryTarget())
 
     def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
         """@param shadow_mem_kb The configured shadow memory, in KiB.
@@ -189,7 +189,10 @@ class LinuxImageHandler(ImageHandler):
         store_evtchn = self.vm.getStorePort()
         console_evtchn = self.vm.getConsolePort()
 
+        mem_mb = self.getRequiredInitialReservation() / 1024
+
         log.debug("domid          = %d", self.vm.getDomid())
+        log.debug("memsize        = %d", mem_mb)
         log.debug("image          = %s", self.kernel)
         log.debug("store_evtchn   = %d", store_evtchn)
         log.debug("console_evtchn = %d", console_evtchn)
@@ -199,6 +202,7 @@ class LinuxImageHandler(ImageHandler):
         log.debug("features       = %s", self.vm.getFeatures())
 
         return xc.linux_build(domid          = self.vm.getDomid(),
+                              memsize        = mem_mb,
                               image          = self.kernel,
                               store_evtchn   = store_evtchn,
                               console_evtchn = console_evtchn,
@@ -218,7 +222,10 @@ class PPC_LinuxImageHandler(LinuxImageHandler):
         store_evtchn = self.vm.getStorePort()
         console_evtchn = self.vm.getConsolePort()
 
+        mem_mb = self.getRequiredInitialReservation() / 1024
+
         log.debug("domid          = %d", self.vm.getDomid())
+        log.debug("memsize        = %d", mem_mb)
         log.debug("image          = %s", self.kernel)
         log.debug("store_evtchn   = %d", store_evtchn)
         log.debug("console_evtchn = %d", console_evtchn)
@@ -230,6 +237,7 @@ class PPC_LinuxImageHandler(LinuxImageHandler):
         devtree = FlatDeviceTree.build(self)
 
         return xc.linux_build(domid          = self.vm.getDomid(),
+                              memsize        = mem_mb,
                               image          = self.kernel,
                               store_evtchn   = store_evtchn,
                               console_evtchn = console_evtchn,
@@ -272,10 +280,12 @@ class HVMImageHandler(ImageHandler):
     def buildDomain(self):
         store_evtchn = self.vm.getStorePort()
 
+        mem_mb = self.getRequiredInitialReservation() / 1024
+
         log.debug("domid          = %d", self.vm.getDomid())
         log.debug("image          = %s", self.kernel)
         log.debug("store_evtchn   = %d", store_evtchn)
-        log.debug("memsize        = %d", self.vm.getMemoryTarget() / 1024)
+        log.debug("memsize        = %d", mem_mb)
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
         log.debug("pae            = %d", self.pae)
         log.debug("acpi           = %d", self.acpi)
@@ -286,7 +296,7 @@ class HVMImageHandler(ImageHandler):
         return xc.hvm_build(domid          = self.vm.getDomid(),
                             image          = self.kernel,
                             store_evtchn   = store_evtchn,
-                            memsize        = self.vm.getMemoryTarget() / 1024,
+                            memsize        = mem_mb,
                             vcpus          = self.vm.getVCpuCount(),
                             pae            = self.pae,
                             acpi           = self.acpi,
@@ -401,7 +411,7 @@ class HVMImageHandler(ImageHandler):
         #todo: Error handling
         args = [self.device_model]
         args = args + ([ "-d",  "%d" % self.vm.getDomid(),
-                  "-m", "%s" % (self.vm.getMemoryTarget() / 1024)])
+                  "-m", "%s" % (self.getRequiredInitialReservation() / 1024)])
         args = args + self.dmargs
         env = dict(os.environ)
         if self.display:
@@ -480,8 +490,8 @@ class X86_HVM_ImageHandler(HVMImageHandler):
         # Add 8 MiB overhead for QEMU's video RAM.
         return mem_kb + 8192
 
-    def getRequiredInitialReservation(self, mem_kb):
-        return mem_kb
+    def getRequiredInitialReservation(self):
+        return self.vm.getMemoryTarget()
 
     def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
         # 256 pages (1MB) per vcpu,
