@@ -3192,6 +3192,15 @@ editing \path{grub.conf}.
   input to DOM0 when it boots --- if it is `x' then auto-switching is
   disabled.  Any other value, or omitting the character, enables
   auto-switching.  [NB. Default switch-char is `a'.]
+\item [ loglvl=$<$level$>/<$level$>$ ]
+  Specify logging level. Messages of the specified severity level (and
+  higher) will be printed to the Xen console. Valid levels are `none',
+  `error', `warning', `info', `debug', and `all'. The second level
+  specifier is optional: it is used to specify message severities
+  which are to be rate limited. Default is `loglvl=warning'.
+\item [ guest\_loglvl=$<$level$>/<$level$>$ ] As for loglvl, but
+  applies to messages relating to guests. Default is
+  `guest\_loglvl=none/warning'. 
 \item [ nmi=xxx ]
   Specify what to do with an NMI parity or I/O error. \\
   `nmi=fatal':  Xen prints a diagnostic and then hangs. \\

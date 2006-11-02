@@ -325,22 +325,22 @@ int hvm_copy_from_guest_virt(void *buf, unsigned long vaddr, int size)
     return __hvm_copy(buf, shadow_gva_to_gpa(current, vaddr), size, 0);
 }
 
-/*
- * HVM specific printbuf. Mostly used for hvmloader chit-chat.
- */
+/* HVM specific printbuf. Mostly used for hvmloader chit-chat. */
 void hvm_print_line(struct vcpu *v, const char c)
 {
-    int *index = &v->domain->arch.hvm_domain.pbuf_index;
-    char *pbuf = v->domain->arch.hvm_domain.pbuf;
+    struct hvm_domain *hd = &v->domain->arch.hvm_domain;
 
-    if (*index == HVM_PBUF_SIZE-2 || c == '\n') {
-        if (*index == HVM_PBUF_SIZE-2)
-            pbuf[(*index)++] = c;
-        pbuf[*index] = '\0';
-        printk("(GUEST: %u) %s\n", v->domain->domain_id, pbuf);
-        *index = 0;
-    } else
-        pbuf[(*index)++] = c;
+    spin_lock(&hd->pbuf_lock);
+    hd->pbuf[hd->pbuf_idx++] = c;
+    if ( (hd->pbuf_idx == (sizeof(hd->pbuf) - 2)) || (c == '\n') )
+    {
+        if ( c != '\n' )
+            hd->pbuf[hd->pbuf_idx++] = '\n';
+        hd->pbuf[hd->pbuf_idx] = '\0';
+        printk(XENLOG_G_DEBUG "HVM%u: %s\n", v->domain->domain_id, hd->pbuf);
+        hd->pbuf_idx = 0;
+    }
+    spin_unlock(&hd->pbuf_lock);
 }
 
 typedef unsigned long hvm_hypercall_t(

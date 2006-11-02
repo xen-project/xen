@@ -58,10 +58,6 @@ extern void panic(const char *format, ...)
 extern long vm_assist(struct domain *, unsigned int, unsigned int);
 extern int __printk_ratelimit(int ratelimit_ms, int ratelimit_burst);
 extern int printk_ratelimit(void);
-extern int xenlog_upper_thresh;
-extern int xenlog_lower_thresh;
-extern int xenlog_guest_upper_thresh;
-extern int xenlog_guest_lower_thresh;
 
 /* vsprintf.c */
 extern int sprintf(char * buf, const char * fmt, ...)

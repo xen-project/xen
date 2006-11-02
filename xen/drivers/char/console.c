@@ -82,12 +82,75 @@ static DEFINE_SPINLOCK(console_lock);
 #define XENLOG_DEFAULT       1 /* XENLOG_WARNING */
 #define XENLOG_GUEST_DEFAULT 1 /* XENLOG_WARNING */
 
-int xenlog_upper_thresh = XENLOG_UPPER_THRESHOLD;
-int xenlog_lower_thresh = XENLOG_LOWER_THRESHOLD;
-int xenlog_guest_upper_thresh = XENLOG_GUEST_UPPER_THRESHOLD;
-int xenlog_guest_lower_thresh = XENLOG_GUEST_LOWER_THRESHOLD;
+static int xenlog_upper_thresh = XENLOG_UPPER_THRESHOLD;
+static int xenlog_lower_thresh = XENLOG_LOWER_THRESHOLD;
+static int xenlog_guest_upper_thresh = XENLOG_GUEST_UPPER_THRESHOLD;
+static int xenlog_guest_lower_thresh = XENLOG_GUEST_LOWER_THRESHOLD;
+
+static void parse_loglvl(char *s);
+static void parse_guest_loglvl(char *s);
+
+/*
+ * <lvl> := none|error|warning|info|debug|all
+ * loglvl=<lvl_print_always>[/<lvl_print_ratelimit>]
+ *  <lvl_print_always>: log level which is always printed
+ *  <lvl_print_rlimit>: log level which is rate-limit printed
+ * Similar definitions for guest_loglvl, but applies to guest tracing.
+ * Defaults: loglvl=warning ; guest_loglvl=none/warning
+ */
+custom_param("loglvl", parse_loglvl);
+custom_param("guest_loglvl", parse_guest_loglvl);
 
 static int xen_startup = 1;
+
+#define ___parse_loglvl(s, ps, lvlstr, lvlnum)          \
+    if ( !strncmp((s), (lvlstr), strlen(lvlstr)) ) {    \
+        *(ps) = (s) + strlen(lvlstr);                   \
+        return (lvlnum);                                \
+    }
+
+static int __parse_loglvl(char *s, char **ps)
+{
+    ___parse_loglvl(s, ps, "none",    0);
+    ___parse_loglvl(s, ps, "error",   1);
+    ___parse_loglvl(s, ps, "warning", 2);
+    ___parse_loglvl(s, ps, "info",    3);
+    ___parse_loglvl(s, ps, "debug",   4);
+    ___parse_loglvl(s, ps, "all",     4);
+    return 2; /* sane fallback */
+}
+
+static void _parse_loglvl(char *s, int *lower, int *upper)
+{
+    *lower = *upper = __parse_loglvl(s, &s);
+    if ( *s == '/' )
+        *upper = __parse_loglvl(s+1, &s);
+    if ( *upper < *lower )
+        *upper = *lower;
+}
+
+static void parse_loglvl(char *s)
+{
+    _parse_loglvl(s, &xenlog_lower_thresh, &xenlog_upper_thresh);
+}
+
+static void parse_guest_loglvl(char *s)
+{
+    _parse_loglvl(s, &xenlog_guest_lower_thresh, &xenlog_guest_upper_thresh);
+}
+
+static char *loglvl_str(int lvl)
+{
+    switch ( lvl )
+    {
+    case 0: return "Nothing";
+    case 1: return "Errors";
+    case 2: return "Errors and warnings";
+    case 3: return "Errors, warnings and info";
+    case 4: return "All";
+    }
+    return "???";
+}
 
 /*
  * ********************************************************
@@ -449,6 +512,14 @@ void init_console(void)
 void console_endboot(void)
 {
     int i, j;
+
+    printk("Std. Loglevel: %s", loglvl_str(xenlog_lower_thresh));
+    if ( xenlog_upper_thresh != xenlog_lower_thresh )
+        printk(" (Rate-limited: %s)", loglvl_str(xenlog_upper_thresh));
+    printk("\nGuest Loglevel: %s", loglvl_str(xenlog_guest_lower_thresh));
+    if ( xenlog_guest_upper_thresh != xenlog_guest_lower_thresh )
+        printk(" (Rate-limited: %s)", loglvl_str(xenlog_guest_upper_thresh));
+    printk("\n");
 
     if ( opt_sync_console )
     {

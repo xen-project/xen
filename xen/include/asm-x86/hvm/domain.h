@@ -28,8 +28,6 @@
 #include <asm/hvm/vioapic.h>
 #include <public/hvm/params.h>
 
-#define HVM_PBUF_SIZE   80
-
 struct hvm_domain {
     unsigned long          shared_page_va;
     unsigned long          buffered_io_va;
@@ -45,8 +43,10 @@ struct hvm_domain {
     spinlock_t             round_robin_lock;
     int                    interrupt_request;
 
-    int                    pbuf_index;
-    char                   pbuf[HVM_PBUF_SIZE];
+    /* hvm_print_line() logging. */
+    char                   pbuf[80];
+    int                    pbuf_idx;
+    spinlock_t             pbuf_lock;
 
     uint64_t               params[HVM_NR_PARAMS];
 };
