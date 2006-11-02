@@ -35,7 +35,7 @@ struct hvm_function_table {
     /*
      * Initialize/relinguish HVM guest resources
      */
-    int  (*initialize_guest_resources)(struct vcpu *v);
+    int  (*vcpu_initialise)(struct vcpu *v);
     void (*relinquish_guest_resources)(struct domain *d);
 
     /*
@@ -91,27 +91,21 @@ hvm_disable(void)
         hvm_funcs.disable();
 }
 
-void hvm_create_event_channels(struct vcpu *v);
-void hvm_map_io_shared_pages(struct vcpu *v);
+void hvm_create_event_channel(struct vcpu *v);
 
 static inline int
-hvm_initialize_guest_resources(struct vcpu *v)
+hvm_vcpu_initialise(struct vcpu *v)
 {
-    int ret = 1;
-    if ( hvm_funcs.initialize_guest_resources )
-        ret = hvm_funcs.initialize_guest_resources(v);
-    if ( ret == 1 ) {
-        hvm_map_io_shared_pages(v);
-        hvm_create_event_channels(v);
-    }
-    return ret;
+    int rc;
+    if ( (rc = hvm_funcs.vcpu_initialise(v)) == 0 )
+        hvm_create_event_channel(v);
+    return rc;
 }
 
 static inline void
 hvm_relinquish_guest_resources(struct domain *d)
 {
-    if (hvm_funcs.relinquish_guest_resources)
-        hvm_funcs.relinquish_guest_resources(d);
+    hvm_funcs.relinquish_guest_resources(d);
 }
 
 static inline void

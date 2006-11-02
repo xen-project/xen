@@ -7,7 +7,9 @@
 #define HVM_PARAM_STORE_EVTCHN 2
 #define HVM_PARAM_APIC_ENABLED 3
 #define HVM_PARAM_PAE_ENABLED  4
-#define HVM_NR_PARAMS          5
+#define HVM_PARAM_IOREQ_PFN    5
+#define HVM_PARAM_BUFIOREQ_PFN 6
+#define HVM_NR_PARAMS          7
 
 /* Get/set subcommands: extra argument == pointer to xen_hvm_param struct. */
 #define HVMOP_set_param 0

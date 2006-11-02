@@ -56,11 +56,12 @@ static void build_e820map(void *e820_page, unsigned long long mem_size)
     unsigned char nr_map = 0;
 
     /*
-     * physical address space from HVM_BELOW_4G_RAM_END to 4G is reserved
+     * Physical address space from HVM_BELOW_4G_RAM_END to 4G is reserved
      * for PCI devices MMIO. So if HVM has more than HVM_BELOW_4G_RAM_END
      * RAM, memory beyond HVM_BELOW_4G_RAM_END will go to 4G above.
      */
-    if ( mem_size > HVM_BELOW_4G_RAM_END ) {
+    if ( mem_size > HVM_BELOW_4G_RAM_END )
+    {
         extra_mem_size = mem_size - HVM_BELOW_4G_RAM_END;
         mem_size = HVM_BELOW_4G_RAM_END;
     }
@@ -75,11 +76,6 @@ static void build_e820map(void *e820_page, unsigned long long mem_size)
     e820entry[nr_map].type = E820_RESERVED;
     nr_map++;
 
-    e820entry[nr_map].addr = 0xA0000;
-    e820entry[nr_map].size = 0x20000;
-    e820entry[nr_map].type = E820_IO;
-    nr_map++;
-
     e820entry[nr_map].addr = 0xEA000;
     e820entry[nr_map].size = 0x01000;
     e820entry[nr_map].type = E820_ACPI;
@@ -90,54 +86,14 @@ static void build_e820map(void *e820_page, unsigned long long mem_size)
     e820entry[nr_map].type = E820_RESERVED;
     nr_map++;
 
-/* buffered io page.    */
-#define BUFFERED_IO_PAGES   1
-/* xenstore page.       */
-#define XENSTORE_PAGES      1
-/* shared io page.      */
-#define SHARED_IO_PAGES     1
-/* totally 16 static pages are reserved in E820 table */
-
-    /* Most of the ram goes here */
+    /* Low RAM goes here. Remove 3 pages for ioreq, bufioreq, and xenstore. */
     e820entry[nr_map].addr = 0x100000;
-    e820entry[nr_map].size = mem_size - 0x100000 - PAGE_SIZE *
-                                                (BUFFERED_IO_PAGES +
-                                                 XENSTORE_PAGES +
-                                                 SHARED_IO_PAGES);
+    e820entry[nr_map].size = mem_size - 0x100000 - PAGE_SIZE * 3;
     e820entry[nr_map].type = E820_RAM;
     nr_map++;
 
-    /* Statically allocated special pages */
-
-    /* For buffered IO requests */
-    e820entry[nr_map].addr = mem_size - PAGE_SIZE *
-                                        (BUFFERED_IO_PAGES +
-                                         XENSTORE_PAGES +
-                                         SHARED_IO_PAGES);
-    e820entry[nr_map].size = PAGE_SIZE * BUFFERED_IO_PAGES;
-    e820entry[nr_map].type = E820_BUFFERED_IO;
-    nr_map++;
-
-    /* For xenstore */
-    e820entry[nr_map].addr = mem_size - PAGE_SIZE *
-                                        (XENSTORE_PAGES +
-                                         SHARED_IO_PAGES);
-    e820entry[nr_map].size = PAGE_SIZE * XENSTORE_PAGES;
-    e820entry[nr_map].type = E820_XENSTORE;
-    nr_map++;
-
-    /* Shared ioreq_t page */
-    e820entry[nr_map].addr = mem_size - PAGE_SIZE * SHARED_IO_PAGES;
-    e820entry[nr_map].size = PAGE_SIZE * SHARED_IO_PAGES;
-    e820entry[nr_map].type = E820_SHARED_PAGE;
-    nr_map++;
-
-    e820entry[nr_map].addr = 0xFEC00000;
-    e820entry[nr_map].size = 0x1400000;
-    e820entry[nr_map].type = E820_IO;
-    nr_map++;
-
-    if ( extra_mem_size ) {
+    if ( extra_mem_size )
+    {
         e820entry[nr_map].addr = (1ULL << 32);
         e820entry[nr_map].size = extra_mem_size;
         e820entry[nr_map].type = E820_RAM;
@@ -212,6 +168,7 @@ static int setup_guest(int xc_handle,
     void *e820_page;
     struct domain_setup_info dsi;
     uint64_t v_end;
+    int rc;
 
     memset(&dsi, 0, sizeof(struct domain_setup_info));
 
@@ -253,10 +210,25 @@ static int setup_guest(int xc_handle,
     for ( i = HVM_BELOW_4G_RAM_END >> PAGE_SHIFT; i < nr_pages; i++ )
         page_array[i] += HVM_BELOW_4G_MMIO_LENGTH >> PAGE_SHIFT;
 
-    if ( xc_domain_memory_populate_physmap(xc_handle, dom, nr_pages,
-                                           0, 0, page_array) )
+    /* Allocate memory for HVM guest, skipping VGA hole 0xA0000-0xC0000. */
+    rc = xc_domain_memory_populate_physmap(
+        xc_handle, dom, (nr_pages > 0xa0) ? 0xa0 : nr_pages,
+        0, 0, &page_array[0x00]);
+    if ( (rc == 0) && (nr_pages > 0xc0) )
+        rc = xc_domain_memory_populate_physmap(
+            xc_handle, dom, nr_pages - 0xc0, 0, 0, &page_array[0xc0]);
+    if ( rc != 0 )
     {
         PERROR("Could not allocate memory for HVM guest.\n");
+        goto error_out;
+    }
+
+    if ( (nr_pages > 0xa0) &&
+         xc_domain_memory_decrease_reservation(
+             xc_handle, dom, (nr_pages < 0xc0) ? (nr_pages - 0xa0) : 0x20,
+             0, &page_array[0xa0]) )
+    {
+        PERROR("Could not free VGA hole.\n");
         goto error_out;
     }
 
@@ -295,6 +267,8 @@ static int setup_guest(int xc_handle,
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
         shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
+    memset(&shared_info->evtchn_mask[0], 0xff,
+           sizeof(shared_info->evtchn_mask));
     munmap(shared_info, PAGE_SIZE);
 
     if ( v_end > HVM_BELOW_4G_RAM_END )
@@ -302,22 +276,17 @@ static int setup_guest(int xc_handle,
     else
         shared_page_nr = (v_end >> PAGE_SHIFT) - 1;
 
+    /* Paranoia: clean pages. */
+    if ( xc_clear_domain_page(xc_handle, dom, page_array[shared_page_nr]) ||
+         xc_clear_domain_page(xc_handle, dom, page_array[shared_page_nr-1]) ||
+         xc_clear_domain_page(xc_handle, dom, page_array[shared_page_nr-2]) )
+        goto error_out;
+
     *store_mfn = page_array[shared_page_nr - 1];
-
-    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_PFN, shared_page_nr - 1);
+    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_PFN, shared_page_nr-1);
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_EVTCHN, store_evtchn);
-
-    /* Paranoia */
-    /* clean the shared IO requests page */
-    if ( xc_clear_domain_page(xc_handle, dom, page_array[shared_page_nr]) )
-        goto error_out;
-
-    /* clean the buffered IO requests page */
-    if ( xc_clear_domain_page(xc_handle, dom, page_array[shared_page_nr - 2]) )
-        goto error_out;
-
-    if ( xc_clear_domain_page(xc_handle, dom, *store_mfn) )
-        goto error_out;
+    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_BUFIOREQ_PFN, shared_page_nr-2);
+    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_IOREQ_PFN, shared_page_nr);
 
     free(page_array);
 

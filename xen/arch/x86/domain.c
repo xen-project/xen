@@ -123,20 +123,31 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 
     memset(v, 0, sizeof(*v));
 
+    v->vcpu_id = vcpu_id;
+    v->domain  = d;
+
     v->arch.flags = TF_kernel_mode;
 
-    if ( is_idle_domain(d) )
+    if ( is_hvm_domain(d) )
     {
-        v->arch.schedule_tail = continue_idle_domain;
-        v->arch.cr3           = __pa(idle_pg_table);
+        if ( hvm_vcpu_initialise(v) != 0 )
+        {
+            xfree(v);
+            return NULL;
+        }
     }
     else
     {
         v->arch.schedule_tail = continue_nonidle_domain;
-    }
+        v->arch.ctxt_switch_from = paravirt_ctxt_switch_from;
+        v->arch.ctxt_switch_to   = paravirt_ctxt_switch_to;
 
-    v->arch.ctxt_switch_from = paravirt_ctxt_switch_from;
-    v->arch.ctxt_switch_to   = paravirt_ctxt_switch_to;
+        if ( is_idle_domain(d) )
+        {
+            v->arch.schedule_tail = continue_idle_domain;
+            v->arch.cr3           = __pa(idle_pg_table);
+        }
+    }
 
     v->arch.perdomain_ptes =
         d->arch.mm_perdomain_pt + (vcpu_id << GDT_LDT_VCPU_SHIFT);
@@ -335,22 +346,11 @@ int arch_set_info_guest(
 
     if ( !is_hvm_vcpu(v) )
     {
+        if ( (rc = (int)set_gdt(v, c->gdt_frames, c->gdt_ents)) != 0 )
+            return rc;
+
         cr3_pfn = gmfn_to_mfn(d, xen_cr3_to_pfn(c->ctrlreg[3]));
-        v->arch.guest_table = pagetable_from_pfn(cr3_pfn);
-    }
 
-    if ( (rc = (int)set_gdt(v, c->gdt_frames, c->gdt_ents)) != 0 )
-        return rc;
-
-    if ( is_hvm_vcpu(v) )
-    {
-        v->arch.guest_table = pagetable_null();
-
-        if ( !hvm_initialize_guest_resources(v) )
-            return -EINVAL;
-    }
-    else
-    {
         if ( shadow_mode_refcounts(d)
              ? !get_page(mfn_to_page(cr3_pfn), d)
              : !get_page_and_type(mfn_to_page(cr3_pfn), d,
@@ -359,6 +359,8 @@ int arch_set_info_guest(
             destroy_gdt(v);
             return -EINVAL;
         }
+
+        v->arch.guest_table = pagetable_from_pfn(cr3_pfn);
     }    
 
     /* Shadow: make sure the domain has enough shadow memory to

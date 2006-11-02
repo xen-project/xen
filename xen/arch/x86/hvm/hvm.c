@@ -57,149 +57,13 @@ integer_param("hvm_debug", opt_hvm_debug_level);
 
 struct hvm_function_table hvm_funcs;
 
-static void hvm_zap_mmio_range(
-    struct domain *d, unsigned long pfn, unsigned long nr_pfn)
+void hvm_create_event_channel(struct vcpu *v)
 {
-    unsigned long i;
-
-    ASSERT(d == current->domain);
-
-    for ( i = 0; i < nr_pfn; i++ )
-    {
-        if ( pfn + i >= 0xfffff )
-            break;
-
-        if ( VALID_MFN(gmfn_to_mfn(d, pfn + i)) )
-            guest_remove_page(d, pfn + i);
-    }
+    v->arch.hvm_vcpu.xen_port = alloc_unbound_xen_event_channel(v, 0);
+    if ( get_sp(v->domain) && get_vio(v->domain, v->vcpu_id) )
+        get_vio(v->domain, v->vcpu_id)->vp_eport =
+            v->arch.hvm_vcpu.xen_port;
 }
-
-static void e820_zap_iommu_callback(struct domain *d,
-                                    struct e820entry *e,
-                                    void *ign)
-{
-    if ( e->type == E820_IO )
-        hvm_zap_mmio_range(d, e->addr >> PAGE_SHIFT, e->size >> PAGE_SHIFT);
-}
-
-static void e820_foreach(struct domain *d,
-                         void (*cb)(struct domain *d,
-                                    struct e820entry *e,
-                                    void *data),
-                         void *data)
-{
-    int i;
-    unsigned char e820_map_nr;
-    struct e820entry *e820entry;
-    unsigned char *p;
-    unsigned long mfn;
-
-    mfn = gmfn_to_mfn(d, E820_MAP_PAGE >> PAGE_SHIFT);
-    if ( mfn == INVALID_MFN )
-    {
-        printk("Can not find E820 memory map page for HVM domain.\n");
-        domain_crash_synchronous();
-    }
-
-    p = map_domain_page(mfn);
-    if ( p == NULL )
-    {
-        printk("Can not map E820 memory map page for HVM domain.\n");
-        domain_crash_synchronous();
-    }
-
-    e820_map_nr = *(p + E820_MAP_NR_OFFSET);
-    e820entry = (struct e820entry *)(p + E820_MAP_OFFSET);
-
-    for ( i = 0; i < e820_map_nr; i++ )
-        cb(d, e820entry + i, data);
-
-    unmap_domain_page(p);
-}
-
-static void hvm_zap_iommu_pages(struct domain *d)
-{
-    e820_foreach(d, e820_zap_iommu_callback, NULL);
-}
-
-static void e820_map_io_shared_callback(struct domain *d,
-                                        struct e820entry *e,
-                                        void *data)
-{
-    unsigned long *mfn = data;
-    if ( e->type == E820_SHARED_PAGE )
-    {
-        ASSERT(*mfn == INVALID_MFN);
-        *mfn = gmfn_to_mfn(d, e->addr >> PAGE_SHIFT);
-    }
-}
-
-static void e820_map_buffered_io_callback(struct domain *d,
-                                          struct e820entry *e,
-                                          void *data)
-{
-    unsigned long *mfn = data;
-    if ( e->type == E820_BUFFERED_IO ) {
-        ASSERT(*mfn == INVALID_MFN);
-        *mfn = gmfn_to_mfn(d, e->addr >> PAGE_SHIFT);
-    }
-}
-
-void hvm_map_io_shared_pages(struct vcpu *v)
-{
-    unsigned long mfn;
-    void *p;
-    struct domain *d = v->domain;
-
-    if ( d->arch.hvm_domain.shared_page_va ||
-         d->arch.hvm_domain.buffered_io_va )
-        return;
-
-    mfn = INVALID_MFN;
-    e820_foreach(d, e820_map_io_shared_callback, &mfn);
-
-    if ( mfn == INVALID_MFN )
-    {
-        printk("Can not find io request shared page for HVM domain.\n");
-        domain_crash_synchronous();
-    }
-
-    p = map_domain_page_global(mfn);
-    if ( p == NULL )
-    {
-        printk("Can not map io request shared page for HVM domain.\n");
-        domain_crash_synchronous();
-    }
-
-    d->arch.hvm_domain.shared_page_va = (unsigned long)p;
-
-    mfn = INVALID_MFN;
-    e820_foreach(d, e820_map_buffered_io_callback, &mfn);
-    if ( mfn != INVALID_MFN ) {
-        p = map_domain_page_global(mfn);
-        if ( p )
-            d->arch.hvm_domain.buffered_io_va = (unsigned long)p;
-    }
-}
-
-void hvm_create_event_channels(struct vcpu *v)
-{
-    vcpu_iodata_t *p;
-    struct vcpu *o;
-
-    if ( v->vcpu_id == 0 ) {
-        /* Ugly: create event channels for every vcpu when vcpu 0
-           starts, so that they're available for ioemu to bind to. */
-        for_each_vcpu(v->domain, o) {
-            p = get_vio(v->domain, o->vcpu_id);
-            o->arch.hvm_vcpu.xen_port = p->vp_eport =
-                alloc_unbound_xen_event_channel(o, 0);
-            dprintk(XENLOG_INFO, "Allocated port %d for hvm.\n",
-                    o->arch.hvm_vcpu.xen_port);
-        }
-    }
-}
-
 
 void hvm_stts(struct vcpu *v)
 {
@@ -267,8 +131,6 @@ void hvm_setup_platform(struct domain *d)
 
     if ( !is_hvm_domain(d) || (v->vcpu_id != 0) )
         return;
-
-    hvm_zap_iommu_pages(d);
 
     platform = &d->arch.hvm_domain;
     pic_init(&platform->vpic, pic_irq_request, &platform->interrupt_request);
@@ -689,6 +551,9 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
     {
         struct xen_hvm_param a;
         struct domain *d;
+        struct vcpu *v;
+        unsigned long mfn;
+        void *p;
 
         if ( copy_from_guest(&a, arg, 1) )
             return -EFAULT;
@@ -712,8 +577,41 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             return -EPERM;
         }
 
+        rc = -EINVAL;
+        if ( !is_hvm_domain(d) )
+            goto param_fail;
+
         if ( op == HVMOP_set_param )
         {
+            switch ( a.index )
+            {
+            case HVM_PARAM_IOREQ_PFN:
+                if ( d->arch.hvm_domain.shared_page_va )
+                    goto param_fail;
+                mfn = gmfn_to_mfn(d, a.value);
+                if ( mfn == INVALID_MFN )
+                    goto param_fail;
+                p = map_domain_page_global(mfn);
+                if ( p == NULL )
+                    goto param_fail;
+                d->arch.hvm_domain.shared_page_va = (unsigned long)p;
+                /* Initialise evtchn port info if VCPUs already created. */
+                for_each_vcpu ( d, v )
+                    get_vio(d, v->vcpu_id)->vp_eport =
+                    v->arch.hvm_vcpu.xen_port;
+                break;
+            case HVM_PARAM_BUFIOREQ_PFN:
+                if ( d->arch.hvm_domain.buffered_io_va )
+                    goto param_fail;
+                mfn = gmfn_to_mfn(d, a.value);
+                if ( mfn == INVALID_MFN )
+                    goto param_fail;
+                p = map_domain_page_global(mfn);
+                if ( p == NULL )
+                    goto param_fail;
+                d->arch.hvm_domain.buffered_io_va = (unsigned long)p;
+                break;
+            }
             d->arch.hvm_domain.params[a.index] = a.value;
             rc = 0;
         }
@@ -723,6 +621,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             rc = copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
         }
 
+    param_fail:
         put_domain(d);
         break;
     }

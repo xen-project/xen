@@ -789,40 +789,13 @@ static void svm_ctxt_switch_to(struct vcpu *v)
     svm_restore_dr(v);
 }
 
-
-static void svm_final_setup_guest(struct vcpu *v)
+static int svm_vcpu_initialise(struct vcpu *v)
 {
-    struct domain *d = v->domain;
-
     v->arch.schedule_tail    = arch_svm_do_launch;
     v->arch.ctxt_switch_from = svm_ctxt_switch_from;
     v->arch.ctxt_switch_to   = svm_ctxt_switch_to;
-
-    if ( v != d->vcpu[0] )
-        return;
-
-    if ( !shadow_mode_external(d) )
-    {
-        gdprintk(XENLOG_ERR, "Can't init HVM for dom %u vcpu %u: "
-                "not in shadow external mode\n", d->domain_id, v->vcpu_id);
-        domain_crash(d);
-    }
-
-    /* 
-     * Required to do this once per domain
-     * TODO: add a seperate function to do these.
-     */
-    memset(&d->shared_info->evtchn_mask[0], 0xff, 
-           sizeof(d->shared_info->evtchn_mask));       
+    return 0;
 }
-
-
-static int svm_initialize_guest_resources(struct vcpu *v)
-{
-    svm_final_setup_guest(v);
-    return 1;
-}
-
 
 int start_svm(void)
 {
@@ -871,7 +844,7 @@ int start_svm(void)
     /* Setup HVM interfaces */
     hvm_funcs.disable = stop_svm;
 
-    hvm_funcs.initialize_guest_resources = svm_initialize_guest_resources;
+    hvm_funcs.vcpu_initialise = svm_vcpu_initialise;
     hvm_funcs.relinquish_guest_resources = svm_relinquish_guest_resources;
 
     hvm_funcs.store_cpu_guest_regs = svm_store_cpu_guest_regs;
