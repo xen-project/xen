@@ -843,6 +843,8 @@ class XendDomainInfo:
         return self._readVm('xend/restart_count')
 
     def _refreshShutdown(self, xeninfo = None):
+        """ Checks the domain for whether a shutdown is required. """
+        
         # If set at the end of this method, a restart is required, with the
         # given reason.  This restart has to be done out of the scope of
         # refresh_shutdown_lock.
@@ -926,8 +928,11 @@ class XendDomainInfo:
             else:
                 # Domain is alive.  If we are shutting it down, then check
                 # the timeout on that, and destroy it if necessary.
-                self._stateSet(DOM_STATE_RUNNING)
-                
+                if xeninfo['paused']:
+                    self._stateSet(DOM_STATE_PAUSED)
+                else:
+                    self._stateSet(DOM_STATE_RUNNING)
+                    
                 if self.shutdownStartTime:
                     timeout = (SHUTDOWN_TIMEOUT - time.time() +
                                self.shutdownStartTime)

@@ -608,8 +608,6 @@ class XendConfig(dict):
     def get_sxp(self, domain = None, ignore_devices = False, ignore = []):
         """ Get SXP representation of this config object.
 
-        Incompat: removed store_mfn, console_mfn
-
         @keyword domain: (optional) XendDomainInfo to get extra information
                          from such as domid and running devices.
         @type    domain: XendDomainInfo
@@ -647,13 +645,10 @@ class XendConfig(dict):
             sxpr.append(['up_time', str(uptime)])
             sxpr.append(['start_time', str(self['start_time'])])
 
-        sxpr.append(['on_xend_start', self.get('on_xend_start', 'ignore')])
-        sxpr.append(['on_xend_stop', self.get('on_xend_stop', 'ignore')])
-
         if domain:
-            sxpr.append(['status', domain.state])
+            sxpr.append(['status', str(domain.state)])
         else:
-            sxpr.append(['status', DOM_STATE_HALTED])
+            sxpr.append(['status', str(DOM_STATE_HALTED)])
 
         # For save/restore migration
         if domain:
