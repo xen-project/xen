@@ -237,7 +237,6 @@ void
 switch_mm_mode(VCPU *vcpu, IA64_PSR old_psr, IA64_PSR new_psr)
 {
     int act;
-    REGS * regs=vcpu_regs(vcpu);
     act = mm_switch_action(old_psr, new_psr);
     perfc_incra(vmx_switch_mm_mode, act);
     switch (act) {
