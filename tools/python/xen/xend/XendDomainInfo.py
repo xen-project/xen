@@ -29,6 +29,7 @@ import time
 import threading
 import re
 import copy
+import os
 from types import StringTypes
 
 import xen.lowlevel.xc

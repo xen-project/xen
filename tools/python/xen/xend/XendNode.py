@@ -80,9 +80,13 @@ class XendNode:
 
     def xen_version(self):
         info = self.xc.xeninfo()
-        from xen import VERSION
-        return {'Xen': '%(xen_major)d.%(xen_minor)d' % info,
-                'Xend': VERSION}
+        try:
+            from xen import VERSION
+            return {'Xen': '%(xen_major)d.%(xen_minor)d' % info,
+                    'Xend': VERSION}
+        except (ImportError, AttributeError):
+            return {'Xen': '%(xen_major)d.%(xen_minor)d' % info,
+                    'Xend': '3.0.3'}
 
     def get_name(self):
         return self.name
