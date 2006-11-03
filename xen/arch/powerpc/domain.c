@@ -88,6 +88,12 @@ int arch_domain_create(struct domain *d)
 
     INIT_LIST_HEAD(&d->arch.extent_list);
 
+    d->arch.foreign_mfn_count = 1024;
+    d->arch.foreign_mfns = xmalloc_array(uint, d->arch.foreign_mfn_count);
+    BUG_ON(d->arch.foreign_mfns == NULL);
+
+    memset(d->arch.foreign_mfns, -1, d->arch.foreign_mfn_count * sizeof(uint));
+
     return 0;
 }
 
@@ -294,6 +300,7 @@ void domain_relinquish_resources(struct domain *d)
     relinquish_memory(d, &d->xenpage_list);
     relinquish_memory(d, &d->page_list);
     free_extents(d);
+    xfree(d->arch.foreign_mfns);
     return;
 }
 

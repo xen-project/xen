@@ -354,7 +354,7 @@ static ofdn_t ofd_xen_props(void *m, struct domain *d, start_info_t *si)
 
         /* tell dom0 where ranted pages go in the linear map */
         val[0] = cpu_foreign_map_order();
-        val[1] = max_page;
+        val[1] = d->arch.foreign_mfn_count;
         ofd_prop_add(m, n, "foreign-map", val, sizeof (val));
 
         n = ofd_node_add(m, n, console, sizeof (console));

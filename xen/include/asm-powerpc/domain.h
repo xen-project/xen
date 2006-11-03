@@ -41,6 +41,9 @@ struct arch_domain {
     /* list of extents beyond RMA */
     struct list_head extent_list;
 
+    uint foreign_mfn_count;
+    uint *foreign_mfns;
+
     /* I/O-port access bitmap mask. */
     u8 *iobmp_mask;       /* Address of IO bitmap mask, or NULL.      */
 

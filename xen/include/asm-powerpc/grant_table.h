@@ -69,8 +69,4 @@ static inline uint cpu_foreign_map_order(void)
     /* 16 GiB */
     return 34 - PAGE_SHIFT;
 }
-
-#define GNTTAB_DEV_BUS(f) \
-    ((f) | (1UL << (cpu_foreign_map_order() + PAGE_SHIFT)))
-
 #endif  /* __ASM_PPC_GRANT_TABLE_H__ */

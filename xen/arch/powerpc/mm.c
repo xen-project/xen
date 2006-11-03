@@ -93,6 +93,26 @@ void share_xen_page_with_privileged_guests(
         unimplemented();
 }
 
+static ulong foreign_to_mfn(struct domain *d, ulong pfn)
+{
+
+    pfn -= 1UL << cpu_foreign_map_order();
+
+    BUG_ON(pfn >= d->arch.foreign_mfn_count);
+
+    return d->arch.foreign_mfns[pfn];
+}
+
+static int set_foreign(struct domain *d, ulong pfn, ulong mfn)
+{
+    pfn -= 1UL << cpu_foreign_map_order();
+
+    BUG_ON(pfn >= d->arch.foreign_mfn_count);
+    d->arch.foreign_mfns[pfn] = mfn;
+
+    return 0;
+}
+
 static int create_grant_va_mapping(
     unsigned long va, unsigned long frame, struct vcpu *v)
 {
@@ -101,6 +121,7 @@ static int create_grant_va_mapping(
         BUG();
         return GNTST_permission_denied;
     }
+    set_foreign(v->domain, va >> PAGE_SHIFT, frame);
     return GNTST_okay;
 }
 
@@ -112,6 +133,7 @@ static int destroy_grant_va_mapping(
         BUG();
         return GNTST_permission_denied;
     }
+    set_foreign(d, addr >> PAGE_SHIFT, ~0UL);
     return GNTST_okay;
 }
 
@@ -388,7 +410,7 @@ ulong pfn2mfn(struct domain *d, ulong pfn, int *type)
     /* quick tests first */
     if (pfn & foreign_map_pfn) {
         t = PFN_TYPE_FOREIGN;
-        mfn = pfn & ~(foreign_map_pfn);
+        mfn = foreign_to_mfn(d, pfn);
     } else if (pfn >= max_page && pfn < (max_page + NR_GRANT_FRAMES)) {
         /* Its a grant table access */
         t = PFN_TYPE_GNTTAB;
