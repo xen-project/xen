@@ -542,7 +542,7 @@ def parse_doms_info(info):
         'name'     : get_info('name',         str,   '??'),
         'mem'      : get_info('memory',       int,   0),
         'vcpus'    : get_info('online_vcpus', int,   0),
-        'status'   : get_status('status',     int,   DOM_STATE_HALTED),
+        'state'    : get_info('state',        str,    ''),
         'cpu_time' : get_info('cpu_time',     float, 0),
         'up_time'  : get_info('up_time',      float, -1),
         'seclabel' : security.get_security_printlabel(info),
@@ -566,7 +566,7 @@ def xm_brief_list(doms):
     print '%-40s %3s %5s %5s %10s %9s' % \
           ('Name', 'ID', 'Mem', 'VCPUs', 'State', 'Time(s)')
     
-    format = "%(name)-40s %(domid)3d %(mem)5d %(vcpus)5d %(status)10s " \
+    format = "%(name)-40s %(domid)3d %(mem)5d %(vcpus)5d %(state)10s " \
              "%(cpu_time)8.1f"
     
     for dom in doms:
@@ -578,7 +578,7 @@ def xm_label_list(doms):
           ('Name', 'ID', 'Mem', 'VCPUs', 'State', 'Time(s)', 'Label')
     
     output = []
-    format = '%(name)-32s %(domid)3d %(mem)5d %(vcpus)5d %(status)10s ' \
+    format = '%(name)-32s %(domid)3d %(mem)5d %(vcpus)5d %(state)10s ' \
              '%(cpu_time)8.1f %(seclabel)9s'
     
     for dom in doms:

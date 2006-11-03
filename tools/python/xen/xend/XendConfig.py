@@ -603,7 +603,17 @@ class XendConfig(dict):
 
     def _populate_from_python_config(self, parsed_py):
         raise NotImplementedError
-        
+
+    def _get_old_state_string(self):
+        state_string = ''
+        for state_name in CONFIG_OLD_DOM_STATES:
+            on_off = self.get(state_name, 0)
+            if on_off:
+                state_string += state_name[0]
+            else:
+                state_string += '-'
+
+        return state_string
 
     def get_sxp(self, domain = None, ignore_devices = False, ignore = []):
         """ Get SXP representation of this config object.
@@ -649,6 +659,8 @@ class XendConfig(dict):
             sxpr.append(['status', str(domain.state)])
         else:
             sxpr.append(['status', str(DOM_STATE_HALTED)])
+
+        sxpr.append(['state', self._get_old_state_string()])
 
         # For save/restore migration
         if domain:
