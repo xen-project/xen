@@ -337,7 +337,7 @@ void hvm_print_line(struct vcpu *v, const char c)
         if ( c != '\n' )
             hd->pbuf[hd->pbuf_idx++] = '\n';
         hd->pbuf[hd->pbuf_idx] = '\0';
-        printk(XENLOG_G_DEBUG "HVM%u: %s\n", v->domain->domain_id, hd->pbuf);
+        printk(XENLOG_G_DEBUG "HVM%u: %s", v->domain->domain_id, hd->pbuf);
         hd->pbuf_idx = 0;
     }
     spin_unlock(&hd->pbuf_lock);

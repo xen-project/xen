@@ -801,7 +801,8 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
     break;
 
     default:
-        printk("Local APIC Write to read-only register\n");
+        gdprintk(XENLOG_WARNING, 
+                 "Local APIC Write to read-only register 0x%x\n", offset);
         break;
     }
 }
