@@ -371,7 +371,7 @@ void hvm_do_hypercall(struct cpu_user_regs *pregs)
 
     if ( (pregs->eax >= NR_hypercalls) || !hvm_hypercall_table[pregs->eax] )
     {
-        gdprintk(XENLOG_INFO, "HVM vcpu %d:%d did a bad hypercall %d.\n",
+        gdprintk(XENLOG_WARNING, "HVM vcpu %d:%d did a bad hypercall %d.\n",
                 current->domain->domain_id, current->vcpu_id,
                 pregs->eax);
         pregs->eax = -ENOSYS;
@@ -417,7 +417,7 @@ static long do_memory_op_compat32(int cmd, XEN_GUEST_HANDLE(void) arg)
     }
 
     default:
-        gdprintk(XENLOG_INFO, "memory_op %d.\n", cmd);
+        gdprintk(XENLOG_WARNING, "memory_op %d.\n", cmd);
         rc = -ENOSYS;
         break;
     }
@@ -450,7 +450,7 @@ void hvm_do_hypercall(struct cpu_user_regs *pregs)
     pregs->rax = (uint32_t)pregs->eax; /* mask in case compat32 caller */
     if ( (pregs->rax >= NR_hypercalls) || !hvm_hypercall64_table[pregs->rax] )
     {
-        gdprintk(XENLOG_INFO, "HVM vcpu %d:%d did a bad hypercall %ld.\n",
+        gdprintk(XENLOG_WARNING, "HVM vcpu %d:%d did a bad hypercall %ld.\n",
                 current->domain->domain_id, current->vcpu_id,
                 pregs->rax);
         pregs->rax = -ENOSYS;
@@ -510,7 +510,7 @@ int hvm_bringup_ap(int vcpuid, int trampoline_vector)
 
     if ( (ctxt = xmalloc(struct vcpu_guest_context)) == NULL )
     {
-        gdprintk(XENLOG_INFO,
+        gdprintk(XENLOG_ERR,
                 "Failed to allocate memory in hvm_bringup_ap.\n");
         return -ENOMEM;
     }
@@ -525,7 +525,7 @@ int hvm_bringup_ap(int vcpuid, int trampoline_vector)
 
     if ( rc != 0 )
     {
-        gdprintk(XENLOG_INFO,
+        gdprintk(XENLOG_ERR,
                "AP %d bringup failed in boot_vcpu %x.\n", vcpuid, rc);
         goto out;
     }
@@ -628,7 +628,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
 
     default:
     {
-        gdprintk(XENLOG_INFO, "Bad HVM op %ld.\n", op);
+        gdprintk(XENLOG_WARNING, "Bad HVM op %ld.\n", op);
         rc = -ENOSYS;
         break;
     }
