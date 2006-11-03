@@ -328,7 +328,11 @@ class XendDomain:
         @rtype: list of dicts
         @return: A list of dicts representing the running domains.
         """
-        return xc.domain_getinfo()
+        try:
+            return xc.domain_getinfo()
+        except RuntimeError, e:
+            log.exception("Unable to get domain information.")
+            return {}
 
     def _setDom0CPUCount(self):
         """Sets the number of VCPUs dom0 has. Retreived from the
