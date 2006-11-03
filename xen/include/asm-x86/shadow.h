@@ -23,7 +23,7 @@
 #ifndef _XEN_SHADOW_H
 #define _XEN_SHADOW_H
 
-#include <public/domctl.h> 
+#include <public/domctl.h>
 #include <xen/sched.h>
 #include <xen/perfc.h>
 #include <xen/domain_page.h>
@@ -103,36 +103,36 @@
 #error shadow.h currently requires CONFIG_SMP
 #endif
 
-#define shadow_lock_init(_d)                                   \
-    do {                                                        \
-        spin_lock_init(&(_d)->arch.shadow.lock);               \
-        (_d)->arch.shadow.locker = -1;                         \
-        (_d)->arch.shadow.locker_function = "nobody";          \
+#define shadow_lock_init(_d)                            \
+    do {                                                \
+        spin_lock_init(&(_d)->arch.shadow.lock);        \
+        (_d)->arch.shadow.locker = -1;                  \
+        (_d)->arch.shadow.locker_function = "nobody";   \
     } while (0)
 
-#define shadow_lock_is_acquired(_d)                            \
+#define shadow_lock_is_acquired(_d)                     \
     (current->processor == (_d)->arch.shadow.locker)
 
 #define shadow_lock(_d)                                                 \
-    do {                                                                 \
+    do {                                                                \
         if ( unlikely((_d)->arch.shadow.locker == current->processor) ) \
-        {                                                                \
+        {                                                               \
             printk("Error: shadow lock held by %s\n",                   \
                    (_d)->arch.shadow.locker_function);                  \
-            BUG();                                                       \
-        }                                                                \
+            BUG();                                                      \
+        }                                                               \
         spin_lock(&(_d)->arch.shadow.lock);                             \
         ASSERT((_d)->arch.shadow.locker == -1);                         \
         (_d)->arch.shadow.locker = current->processor;                  \
         (_d)->arch.shadow.locker_function = __func__;                   \
     } while (0)
 
-#define shadow_unlock(_d)                                              \
-    do {                                                                \
-        ASSERT((_d)->arch.shadow.locker == current->processor);        \
-        (_d)->arch.shadow.locker = -1;                                 \
-        (_d)->arch.shadow.locker_function = "nobody";                  \
-        spin_unlock(&(_d)->arch.shadow.lock);                          \
+#define shadow_unlock(_d)                                       \
+    do {                                                        \
+        ASSERT((_d)->arch.shadow.locker == current->processor); \
+        (_d)->arch.shadow.locker = -1;                          \
+        (_d)->arch.shadow.locker_function = "nobody";           \
+        spin_unlock(&(_d)->arch.shadow.lock);                   \
     } while (0)
 
 /* 
