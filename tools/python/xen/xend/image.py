@@ -460,8 +460,8 @@ class HVMImageHandler(ImageHandler):
 
         reason = vm._readDom('control/shutdown')
         log.debug("hvm_shutdown fired, shutdown reason=%s", reason)
-        for x in shutdown_reasons.keys():
-            if shutdown_reasons[x] == reason:
+        for x in DOMAIN_SHUTDOWN_REASONS.keys():
+            if DOMAIN_SHUTDOWN_REASONS[x] == reason:
                 vm.info['shutdown'] = 1
                 vm.info['shutdown_reason'] = x
                 vm.refreshShutdown(vm.info)
