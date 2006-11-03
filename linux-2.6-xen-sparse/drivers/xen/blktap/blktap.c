@@ -908,8 +908,10 @@ static void fast_flush_area(pending_req_t *req, int k_idx, int u_idx,
 				return;
 			}
 
-			gnttab_set_unmap_op(&unmap[invcount],
-					    ptep, GNTMAP_host_map,
+			gnttab_set_unmap_op(&unmap[invcount], ptep,
+					    GNTMAP_host_map
+					    | GNTMAP_application_map
+					    | GNTMAP_contains_pte,
 					    khandle->user);
 			invcount++;
 		}
