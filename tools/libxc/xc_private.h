@@ -158,4 +158,9 @@ static inline int do_sysctl(int xc_handle, struct xen_sysctl *sysctl)
 int xc_map_foreign_ranges(int xc_handle, uint32_t dom,
                           privcmd_mmap_entry_t *entries, int nr);
 
+void *map_domain_va_core(unsigned long domfd, int cpu, void *guest_va,
+                         vcpu_guest_context_t *ctxt);
+int xc_waitdomain_core(int xc_handle, int domain, int *status,
+    int options, vcpu_guest_context_t *ctxt);
+
 #endif /* __XC_PRIVATE_H__ */

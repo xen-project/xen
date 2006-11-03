@@ -172,12 +172,9 @@ struct vcpu_guest_context {
     /* FPU registers come first so they can be aligned for FXSAVE/FXRSTOR. */
     struct { char x[512]; } fpu_ctxt;       /* User-level FPU registers     */
 #define VGCF_I387_VALID                (1<<0)
-#define VGCF_HVM_GUEST                 (1<<1)
 #define VGCF_IN_KERNEL                 (1<<2)
 #define _VGCF_i387_valid               0
 #define VGCF_i387_valid                (1<<_VGCF_i387_valid)
-#define _VGCF_hvm_guest                1
-#define VGCF_hvm_guest                 (1<<_VGCF_hvm_guest)
 #define _VGCF_in_kernel                2
 #define VGCF_in_kernel                 (1<<_VGCF_in_kernel)
 #define _VGCF_failsafe_disables_events 3

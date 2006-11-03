@@ -83,7 +83,7 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
 {
     struct vcpu   *v;
     u64 cpu_time = 0;
-    int flags = DOMFLAGS_BLOCKED;
+    int flags = XEN_DOMINF_blocked;
     struct vcpu_runstate_info runstate;
     
     info->domain = d->domain_id;
@@ -93,16 +93,17 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
      * - domain is marked as blocked only if all its vcpus are blocked
      * - domain is marked as running if any of its vcpus is running
      */
-    for_each_vcpu ( d, v ) {
+    for_each_vcpu ( d, v )
+    {
         vcpu_runstate_get(v, &runstate);
         cpu_time += runstate.time[RUNSTATE_running];
         info->max_vcpu_id = v->vcpu_id;
         if ( !test_bit(_VCPUF_down, &v->vcpu_flags) )
         {
             if ( !(v->vcpu_flags & VCPUF_blocked) )
-                flags &= ~DOMFLAGS_BLOCKED;
+                flags &= ~XEN_DOMINF_blocked;
             if ( v->vcpu_flags & VCPUF_running )
-                flags |= DOMFLAGS_RUNNING;
+                flags |= XEN_DOMINF_running;
             info->nr_online_vcpus++;
         }
     }
@@ -110,12 +111,15 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
     info->cpu_time = cpu_time;
     
     info->flags = flags |
-        ((d->domain_flags & DOMF_dying)      ? DOMFLAGS_DYING    : 0) |
-        ((d->domain_flags & DOMF_shutdown)   ? DOMFLAGS_SHUTDOWN : 0) |
-        ((d->domain_flags & DOMF_ctrl_pause) ? DOMFLAGS_PAUSED   : 0) |
-        d->shutdown_code << DOMFLAGS_SHUTDOWNSHIFT;
+        ((d->domain_flags & DOMF_dying)      ? XEN_DOMINF_dying    : 0) |
+        ((d->domain_flags & DOMF_shutdown)   ? XEN_DOMINF_shutdown : 0) |
+        ((d->domain_flags & DOMF_ctrl_pause) ? XEN_DOMINF_paused   : 0) |
+        d->shutdown_code << XEN_DOMINF_shutdownshift;
 
-    if (d->ssid != NULL)
+    if ( is_hvm_domain(d) )
+        info->flags |= XEN_DOMINF_hvm_guest;
+
+    if ( d->ssid != NULL )
         info->ssidref = ((struct acm_ssid_domain *)d->ssid)->ssidref;
     else    
         info->ssidref = ACM_DEFAULT_SSID;

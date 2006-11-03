@@ -171,15 +171,16 @@ int xc_domain_getinfo(int xc_handle,
             break;
         info->domid      = (uint16_t)domctl.domain;
 
-        info->dying    = !!(domctl.u.getdomaininfo.flags & DOMFLAGS_DYING);
-        info->shutdown = !!(domctl.u.getdomaininfo.flags & DOMFLAGS_SHUTDOWN);
-        info->paused   = !!(domctl.u.getdomaininfo.flags & DOMFLAGS_PAUSED);
-        info->blocked  = !!(domctl.u.getdomaininfo.flags & DOMFLAGS_BLOCKED);
-        info->running  = !!(domctl.u.getdomaininfo.flags & DOMFLAGS_RUNNING);
+        info->dying    = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_dying);
+        info->shutdown = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_shutdown);
+        info->paused   = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_paused);
+        info->blocked  = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_blocked);
+        info->running  = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_running);
+        info->hvm      = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_hvm_guest);
 
         info->shutdown_reason =
-            (domctl.u.getdomaininfo.flags>>DOMFLAGS_SHUTDOWNSHIFT) &
-            DOMFLAGS_SHUTDOWNMASK;
+            (domctl.u.getdomaininfo.flags>>XEN_DOMINF_shutdownshift) &
+            XEN_DOMINF_shutdownmask;
 
         if ( info->shutdown && (info->shutdown_reason == SHUTDOWN_crash) )
         {
@@ -202,7 +203,8 @@ int xc_domain_getinfo(int xc_handle,
         info++;
     }
 
-    if( !nr_doms ) return rc;
+    if ( nr_doms == 0 )
+        return rc;
 
     return nr_doms;
 }

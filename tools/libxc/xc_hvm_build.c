@@ -337,7 +337,6 @@ static int xc_hvm_build_internal(int xc_handle,
     }
 
     memset(ctxt, 0, sizeof(*ctxt));
-    ctxt->flags = VGCF_HVM_GUEST;
 
     if ( setup_guest(xc_handle, domid, memsize, image, image_size,
                      ctxt, domctl.u.getdomaininfo.shared_info_frame,

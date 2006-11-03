@@ -7,6 +7,7 @@
 
 /* XXX application state */
 
+static int    current_is_hvm = 0;
 static long   nr_pages = 0;
 static unsigned long  *p2m_array = NULL;
 static unsigned long  *m2p_array = NULL;
@@ -24,8 +25,8 @@ map_mtop_offset(unsigned long ma)
 
 
 void *
-map_domain_va_core(unsigned long domfd, int cpu, void * guest_va,
-                        vcpu_guest_context_t *ctxt)
+map_domain_va_core(unsigned long domfd, int cpu, void *guest_va,
+                   vcpu_guest_context_t *ctxt)
 {
     unsigned long pde, page;
     unsigned long va = (unsigned long)guest_va;
@@ -55,7 +56,7 @@ map_domain_va_core(unsigned long domfd, int cpu, void * guest_va,
     }
     if ((pde = cr3_virt[cpu][l2_table_offset_i386(va)]) == 0) /* logical address */
         return NULL;
-    if (ctxt[cpu].flags & VGCF_HVM_GUEST)
+    if (current_is_hvm)
         pde = p2m_array[pde >> PAGE_SHIFT] << PAGE_SHIFT;
     if (pde != pde_phys[cpu])
     {
@@ -71,7 +72,7 @@ map_domain_va_core(unsigned long domfd, int cpu, void * guest_va,
     }
     if ((page = pde_virt[cpu][l1_table_offset_i386(va)]) == 0) /* logical address */
         return NULL;
-    if (ctxt[cpu].flags & VGCF_HVM_GUEST)
+    if (current_is_hvm)
         page = p2m_array[page >> PAGE_SHIFT] << PAGE_SHIFT;
     if (page != page_phys[cpu])
     {
@@ -104,17 +105,18 @@ xc_waitdomain_core(
     int i;
     xc_core_header_t header;
 
-    if (nr_pages == 0)
+    if ( nr_pages == 0 )
     {
-
         if (read(domfd, &header, sizeof(header)) != sizeof(header))
             return -1;
 
-        if (header.xch_magic != XC_CORE_MAGIC) {
-                IPRINTF("Magic number missmatch: 0x%08x (file) != "
-                                        " 0x%08x (code)\n", header.xch_magic,
-                                        XC_CORE_MAGIC);
-                return -1;
+        current_is_hvm = (header.xch_magic == XC_CORE_MAGIC_HVM);
+        if ( !current_is_hvm && (header.xch_magic != XC_CORE_MAGIC) )
+        {
+            IPRINTF("Magic number missmatch: 0x%08x (file) != "
+                    " 0x%08x (code)\n", header.xch_magic,
+                    XC_CORE_MAGIC);
+            return -1;
         }
 
         nr_pages = header.xch_nr_pages;

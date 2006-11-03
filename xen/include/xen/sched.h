@@ -461,6 +461,9 @@ static inline void vcpu_unblock(struct vcpu *v)
 
 #define VM_ASSIST(_d,_t) (test_bit((_t), &(_d)->vm_assist))
 
+#define is_hvm_domain(d) ((d)->is_hvm)
+#define is_hvm_vcpu(v)   (is_hvm_domain(v->domain))
+
 #endif /* __SCHED_H__ */
 
 /*

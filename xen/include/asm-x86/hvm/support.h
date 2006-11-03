@@ -32,9 +32,6 @@
 #define HVM_DEBUG 1
 #endif
 
-#define is_hvm_domain(d) ((d)->is_hvm)
-#define is_hvm_vcpu(v)   (is_hvm_domain(v->domain))
-
 static inline shared_iopage_t *get_sp(struct domain *d)
 {
     return (shared_iopage_t *) d->arch.hvm_domain.shared_page_va;

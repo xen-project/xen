@@ -286,10 +286,6 @@ int arch_set_info_guest(
     unsigned long cr3_pfn = INVALID_MFN;
     int i, rc;
 
-    if ( !!(c->flags & VGCF_hvm_guest) != is_hvm_vcpu(v) )
-        return -EINVAL;
-    c->flags &= ~VGCF_hvm_guest;
-
     if ( !is_hvm_vcpu(v) )
     {
         fixup_guest_stack_selector(c->user_regs.ss);

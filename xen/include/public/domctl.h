@@ -32,6 +32,7 @@ struct xen_domctl_createdomain {
     /* IN parameters */
     uint32_t ssidref;
     xen_domain_handle_t handle;
+ /* Is this an HVM guest (as opposed to a PV guest)? */
 #define _XEN_DOMCTL_CDF_hvm_guest 0
 #define XEN_DOMCTL_CDF_hvm_guest  (1U<<_XEN_DOMCTL_CDF_hvm_guest)
     uint32_t flags;
@@ -47,22 +48,37 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_createdomain_t);
 struct xen_domctl_getdomaininfo {
     /* OUT variables. */
     domid_t  domain;              /* Also echoed in domctl.domain */
-#define DOMFLAGS_DYING     (1<<0) /* Domain is scheduled to die.             */
-#define DOMFLAGS_SHUTDOWN  (1<<2) /* The guest OS has shut down.             */
-#define DOMFLAGS_PAUSED    (1<<3) /* Currently paused by control software.   */
-#define DOMFLAGS_BLOCKED   (1<<4) /* Currently blocked pending an event.     */
-#define DOMFLAGS_RUNNING   (1<<5) /* Domain is currently running.            */
-#define DOMFLAGS_CPUMASK      255 /* CPU to which this domain is bound.      */
-#define DOMFLAGS_CPUSHIFT       8
-#define DOMFLAGS_SHUTDOWNMASK 255 /* DOMFLAGS_SHUTDOWN guest-supplied code.  */
-#define DOMFLAGS_SHUTDOWNSHIFT 16
-    uint32_t flags;
+ /* Domain is scheduled to die. */
+#define _XEN_DOMINF_dying     0
+#define XEN_DOMINF_dying      (1U<<_XEN_DOMINF_dying)
+ /* Domain is an HVM guest (as opposed to a PV guest). */
+#define _XEN_DOMINF_hvm_guest 1
+#define XEN_DOMINF_hvm_guest  (1U<<_XEN_DOMINF_hvm_guest)
+ /* The guest OS has shut down. */
+#define _XEN_DOMINF_shutdown  2
+#define XEN_DOMINF_shutdown   (1U<<_XEN_DOMINF_shutdown)
+ /* Currently paused by control software. */
+#define _XEN_DOMINF_paused    3
+#define XEN_DOMINF_paused     (1U<<_XEN_DOMINF_paused)
+ /* Currently blocked pending an event.     */
+#define _XEN_DOMINF_blocked   4
+#define XEN_DOMINF_blocked    (1U<<_XEN_DOMINF_blocked)
+ /* Domain is currently running.            */
+#define _XEN_DOMINF_running   5
+#define XEN_DOMINF_running    (1U<<_XEN_DOMINF_running)
+ /* CPU to which this domain is bound.      */
+#define XEN_DOMINF_cpumask      255
+#define XEN_DOMINF_cpushift       8
+ /* XEN_DOMINF_shutdown guest-supplied code.  */
+#define XEN_DOMINF_shutdownmask 255
+#define XEN_DOMINF_shutdownshift 16
+    uint32_t flags;              /* XEN_DOMINF_* */
     uint64_t tot_pages;
     uint64_t max_pages;
     uint64_t shared_info_frame;  /* MFN of shared_info struct */
     uint64_t cpu_time;
-    uint32_t nr_online_vcpus;     /* Number of VCPUs currently online. */
-    uint32_t max_vcpu_id;         /* Maximum VCPUID in use by this domain. */
+    uint32_t nr_online_vcpus;    /* Number of VCPUs currently online. */
+    uint32_t max_vcpu_id;        /* Maximum VCPUID in use by this domain. */
     uint32_t ssidref;
     xen_domain_handle_t handle;
 };

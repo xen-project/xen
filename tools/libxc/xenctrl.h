@@ -113,25 +113,13 @@ typedef struct xc_core_header {
     unsigned int xch_pages_offset;
 } xc_core_header_t;
 
-#define XC_CORE_MAGIC 0xF00FEBED
+#define XC_CORE_MAGIC     0xF00FEBED
+#define XC_CORE_MAGIC_HVM 0xF00FEBEE
 
 #ifdef __linux__
 
 #include <sys/ptrace.h>
 #include <thread_db.h>
-
-void * map_domain_va_core(
-    unsigned long domfd,
-    int cpu,
-    void *guest_va,
-    vcpu_guest_context_t *ctxt);
-
-int xc_waitdomain_core(
-    int xc_handle,
-    int domain,
-    int *status,
-    int options,
-    vcpu_guest_context_t *ctxt);
 
 typedef void (*thr_ev_handler_t)(long);
 
@@ -158,11 +146,12 @@ int xc_waitdomain(
  * DOMAIN MANAGEMENT FUNCTIONS
  */
 
-typedef struct {
+typedef struct xc_dominfo {
     uint32_t      domid;
     uint32_t      ssidref;
     unsigned int  dying:1, crashed:1, shutdown:1,
-                  paused:1, blocked:1, running:1;
+                  paused:1, blocked:1, running:1,
+                  hvm:1;
     unsigned int  shutdown_reason; /* only meaningful if shutdown==1 */
     unsigned long nr_pages;
     unsigned long shared_info_frame;

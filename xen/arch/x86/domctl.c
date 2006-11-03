@@ -310,8 +310,6 @@ void arch_getdomaininfo_ctxt(
         c->flags |= VGCF_i387_valid;
     if ( guest_kernel_mode(v, &v->arch.guest_context.user_regs) )
         c->flags |= VGCF_in_kernel;
-    if ( is_hvm_vcpu(v) )
-        c->flags |= VGCF_hvm_guest;
 
     c->ctrlreg[3] = xen_pfn_to_cr3(pagetable_get_pfn(v->arch.guest_table));
 
