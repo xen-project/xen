@@ -309,7 +309,8 @@ class XendAPI:
                     getter.api = '%s.get_%s' % (cls, attr_name)
                     setattr(XendAPI, getter_name, getter)
                 except AttributeError:
-                    log.warn("API call: %s not found" % getter_name)
+                    pass
+                    #log.warn("API call: %s not found" % getter_name)
 
             # wrap validators around writable class attrributes
             for attr_name in rw_attrs + self.Base_attr_rw:
@@ -321,7 +322,8 @@ class XendAPI:
                     setter.api = '%s.set_%s' % (cls, attr_name)
                     setattr(XendAPI, setter_name, setter)
                 except AttributeError:
-                    log.warn("API call: %s not found" % setter_name)
+                    pass
+                    #log.warn("API call: %s not found" % setter_name)
 
             # wrap validators around methods
             for method_name in methods + self.Base_methods:
@@ -333,7 +335,8 @@ class XendAPI:
                     method.api = '%s.%s' % (cls, method_name)
                     setattr(XendAPI, method_full_name, method)
                 except AttributeError:
-                    log.warn('API call: %s not found' % method_full_name)
+                    pass
+                    #log.warn('API call: %s not found' % method_full_name)
 
             # wrap validators around class functions
             for func_name in funcs + self.Base_funcs:
@@ -344,7 +347,8 @@ class XendAPI:
                     method.api = '%s.%s' % (cls, func_name)
                     setattr(XendAPI, func_full_name, method)
                 except AttributeError:
-                    log.warn('API call: %s not found' % func_full_name)
+                    pass
+                    #log.warn('API call: %s not found' % func_full_name)
 
 
     Base_attr_ro = ['uuid']
