@@ -228,7 +228,7 @@ def recreate(info, priv):
         vm._storeDomDetails()
         
     vm._registerWatches()
-    vm._refreshShutdown(xeninfo)
+    vm.refreshShutdown(xeninfo)
     return vm
 
 
@@ -437,7 +437,7 @@ class XendDomainInfo:
                 self._storeVmDetails()
                 self._storeDomDetails()
                 self._registerWatches()
-                self._refreshShutdown()
+                self.refreshShutdown()
                 self.unpause()
 
                 # save running configuration if XendDomains believe domain is
@@ -773,7 +773,7 @@ class XendDomainInfo:
             log.trace(
                 "Scheduling refreshShutdown on domain %d in %ds.",
                 self.domid, timeout)
-            threading.Timer(timeout, self._refreshShutdown).start()
+            threading.Timer(timeout, self.refreshShutdown).start()
             
         return True
 
@@ -841,8 +841,11 @@ class XendDomainInfo:
     def getRestartCount(self):
         return self._readVm('xend/restart_count')
 
-    def _refreshShutdown(self, xeninfo = None):
-        """ Checks the domain for whether a shutdown is required. """
+    def refreshShutdown(self, xeninfo = None):
+        """ Checks the domain for whether a shutdown is required.
+
+        Called from XendDomainInfo and also image.py for HVM images.
+        """
         
         # If set at the end of this method, a restart is required, with the
         # given reason.  This restart has to be done out of the scope of
@@ -1387,7 +1390,7 @@ class XendDomainInfo:
         self._introduceDomain()
         self._storeDomDetails()
         self._registerWatches()
-        self._refreshShutdown()
+        self.refreshShutdown()
 
         log.debug("XendDomainInfo.completeRestore done")
 
@@ -1650,7 +1653,7 @@ class XendDomainInfo:
         self.info.validate()
 
         if refresh:
-            self._refreshShutdown(info)
+            self.refreshShutdown(info)
 
         log.trace("XendDomainInfo.update done on domain %s: %s",
                   str(self.domid), self.info)
