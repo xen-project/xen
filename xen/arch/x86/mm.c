@@ -572,8 +572,9 @@ get_page_from_l1e(
 
         if ( !iomem_access_permitted(d, mfn, mfn) )
         {
-            MEM_LOG("Non-privileged (%u) attempt to map I/O space %08lx", 
-                    d->domain_id, mfn);
+            if ( mfn != INVALID_MFN )
+                MEM_LOG("Non-privileged (%u) attempt to map I/O space %08lx", 
+                        d->domain_id, mfn);
             return 0;
         }
 
