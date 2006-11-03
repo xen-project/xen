@@ -24,7 +24,7 @@ import signal
 
 import xen.lowlevel.xc
 from xen.xend import sxp
-from xen.xend.XendError import VmError
+from xen.xend.XendError import VmError, XendError
 from xen.xend.XendLogging import log
 from xen.xend.server.netif import randomMAC
 from xen.xend.xenstore.xswatch import xswatch
@@ -456,9 +456,13 @@ class HVMImageHandler(ImageHandler):
         """
         from xen.xend.XendConstants import DOMAIN_SHUTDOWN_REASONS
         xd = xen.xend.XendDomain.instance()
-        vm = xd.domain_lookup( self.vm.getDomid() )
+        try:
+            vm = xd.domain_lookup( self.vm.getDomid() )
+        except XendError:
+            # domain isn't registered, no need to clean it up.
+            return
 
-        reason = vm._readDom('control/shutdown')
+        reason = vm.getShutdownReason()
         log.debug("hvm_shutdown fired, shutdown reason=%s", reason)
         for x in DOMAIN_SHUTDOWN_REASONS.keys():
             if DOMAIN_SHUTDOWN_REASONS[x] == reason:

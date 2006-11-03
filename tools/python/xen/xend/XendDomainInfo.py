@@ -797,11 +797,12 @@ class XendDomainInfo:
     def getDomainPath(self):
         return self.dompath
 
+    def getShutdownReason(self):
+        return self._readDom('control/shutdown')
 
     def getStorePort(self):
         """For use only by image.py and XendCheckpoint.py."""
         return self.store_port
-
 
     def getConsolePort(self):
         """For use only by image.py and XendCheckpoint.py"""
