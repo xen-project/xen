@@ -40,7 +40,7 @@ def fixup_sxpr(sexpr):
     return ret
 
 def lookup(domid):
-    info = XendDomain.instance().domain_lookup_nr(domid)
+    info = XendDomain.instance().domain_lookup(domid)
     if not info:
         raise XendInvalidDomain(str(domid))
     return info

@@ -458,7 +458,7 @@ class HVMImageHandler(ImageHandler):
         xd = xen.xend.XendDomain.instance()
         vm = xd.domain_lookup( self.vm.getDomid() )
 
-        reason = vm.readDom('control/shutdown')
+        reason = vm._readDom('control/shutdown')
         log.debug("hvm_shutdown fired, shutdown reason=%s", reason)
         for x in shutdown_reasons.keys():
             if shutdown_reasons[x] == reason:
