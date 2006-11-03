@@ -101,7 +101,7 @@ static void parse_guest_loglvl(char *s);
 custom_param("loglvl", parse_loglvl);
 custom_param("guest_loglvl", parse_guest_loglvl);
 
-static int xen_startup = 1;
+static atomic_t print_everything = ATOMIC_INIT(1);
 
 #define ___parse_loglvl(s, ps, lvlstr, lvlnum)          \
     if ( !strncmp((s), (lvlstr), strlen(lvlstr)) ) {    \
@@ -380,7 +380,7 @@ long do_console_io(int cmd, int count, XEN_GUEST_HANDLE(char) buffer)
  * *****************************************************
  */
 
-static inline void __putstr(const char *str)
+static void __putstr(const char *str)
 {
     int c;
 
@@ -393,18 +393,47 @@ static inline void __putstr(const char *str)
     }
 }
 
+static int printk_prefix_check(char *p, char **pp)
+{
+    int loglvl = -1;
+    int upper_thresh = xenlog_upper_thresh;
+    int lower_thresh = xenlog_lower_thresh;
+
+    while ( (p[0] == '<') && (p[1] != '\0') && (p[2] == '>') )
+    {
+        switch ( p[1] )
+        {
+        case 'G':
+            upper_thresh = xenlog_guest_upper_thresh;
+            lower_thresh = xenlog_guest_lower_thresh;
+            if ( loglvl == -1 )
+                loglvl = XENLOG_GUEST_DEFAULT;
+            break;
+        case '0' ... '3':
+            loglvl = p[1] - '0';
+            break;
+        }
+        p += 3;
+    }
+
+    if ( loglvl == -1 )
+        loglvl = XENLOG_DEFAULT;
+
+    *pp = p;
+
+    return ((atomic_read(&print_everything) != 0) ||
+            (loglvl < lower_thresh) ||
+            ((loglvl < upper_thresh) && printk_ratelimit()));
+} 
+
 void printk(const char *fmt, ...)
 {
     static char   buf[1024];
-    static int    start_of_line = 1;
+    static int    start_of_line = 1, do_print;
 
     va_list       args;
     char         *p, *q;
     unsigned long flags;
-    int           level = -1;
-    int           upper_thresh = xenlog_upper_thresh;
-    int           lower_thresh = xenlog_lower_thresh;
-    int           print_regardless = xen_startup;
 
     /* console_lock can be acquired recursively from __printk_ratelimit(). */
     local_irq_save(flags);
@@ -416,41 +445,18 @@ void printk(const char *fmt, ...)
 
     p = buf;
 
-    while ( (p[0] == '<') && (p[1] != '\0') && (p[2] == '>') )
-    {
-        switch ( p[1] )
-        {
-        case 'G':
-            upper_thresh = xenlog_guest_upper_thresh;
-            lower_thresh = xenlog_guest_lower_thresh;
-            if ( level == -1 )
-                level = XENLOG_GUEST_DEFAULT;
-            break;
-        case '0' ... '3':
-            level = p[1] - '0';
-            break;
-        }
-        p += 3;
-    }
-
-    if ( level == -1 )
-        level = XENLOG_DEFAULT;
-
-    if ( !print_regardless )
-    {
-        if ( level >= upper_thresh )
-            goto out;
-        if ( (level >= lower_thresh) && (!printk_ratelimit()) )
-            goto out;
-    }
-
     while ( (q = strchr(p, '\n')) != NULL )
     {
         *q = '\0';
         if ( start_of_line )
-            __putstr(printk_prefix);
-        __putstr(p);
-        __putstr("\n");
+            do_print = printk_prefix_check(p, &p);
+        if ( do_print )
+        {
+            if ( start_of_line )
+                __putstr(printk_prefix);
+            __putstr(p);
+            __putstr("\n");
+        }
         start_of_line = 1;
         p = q + 1;
     }
@@ -458,12 +464,16 @@ void printk(const char *fmt, ...)
     if ( *p != '\0' )
     {
         if ( start_of_line )
-            __putstr(printk_prefix);
-        __putstr(p);
+            do_print = printk_prefix_check(p, &p);
+        if ( do_print )
+        {
+            if ( start_of_line )
+                __putstr(printk_prefix);
+            __putstr(p);
+        }
         start_of_line = 0;
     }
 
- out:
     spin_unlock_recursive(&console_lock);
     local_irq_restore(flags);
 }
@@ -524,7 +534,7 @@ void console_endboot(void)
     if ( opt_sync_console )
     {
         printk("**********************************************\n");
-        printk("******* WARNING: CONSOLE OUTPUT IS SYCHRONOUS\n");
+        printk("******* WARNING: CONSOLE OUTPUT IS SYNCHRONOUS\n");
         printk("******* This option is intended to aid debugging "
                "of Xen by ensuring\n");
         printk("******* that all output is synchronously delivered "
@@ -560,7 +570,17 @@ void console_endboot(void)
     switch_serial_input();
 
     /* Now we implement the logging thresholds. */
-    xen_startup = 0;
+    console_end_log_everything();
+}
+
+void console_start_log_everything(void)
+{
+    atomic_inc(&print_everything);
+}
+
+void console_end_log_everything(void)
+{
+    atomic_dec(&print_everything);
 }
 
 void console_force_unlock(void)
@@ -577,12 +597,14 @@ void console_force_lock(void)
 
 void console_start_sync(void)
 {
+    console_start_log_everything();
     serial_start_sync(sercon_handle);
 }
 
 void console_end_sync(void)
 {
     serial_end_sync(sercon_handle);
+    console_end_log_everything();
 }
 
 void console_putc(char c)
@@ -701,9 +723,10 @@ static void debugtrace_toggle(void)
     watchdog_disable();
     spin_lock_irqsave(&debugtrace_lock, flags);
 
-    // dump the buffer *before* toggling, in case the act of dumping the
-    // buffer itself causes more printk's...
-    //
+    /*
+     * Dump the buffer *before* toggling, in case the act of dumping the
+     * buffer itself causes more printk() invocations.
+     */
     printk("debugtrace_printk now writing to %s.\n",
            !debugtrace_send_to_console ? "console": "buffer");
     if ( !debugtrace_send_to_console )
