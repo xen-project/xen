@@ -702,7 +702,7 @@ class XendConfig(dict):
 
         # Fill in default values
         for key, default_func in DEFAULT_CONFIGURATION:
-            if key not in self:
+            if key not in self or self[key] == None:
                 self[key] = default_func(self)
 
         # Basic sanity checks
