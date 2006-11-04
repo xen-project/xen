@@ -338,7 +338,6 @@ void show_execution_state(struct cpu_user_regs *regs)
  */
 asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs)
 {
-    int cpu = smp_processor_id();
     static char *trapstr[] = { 
         "divide error", "debug", "nmi", "bkpt", "overflow", "bounds", 
         "invalid opcode", "device not available", "double fault", 
@@ -360,20 +359,10 @@ asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs)
         show_page_walk(cr2);
     }
 
-    printk("************************************\n");
-    printk("CPU%d FATAL TRAP %d (%s), ERROR_CODE %04x%s.\n",
-           cpu, trapnr, trapstr[trapnr], regs->error_code,
-           (regs->eflags & X86_EFLAGS_IF) ? "" : ", IN INTERRUPT CONTEXT");
-    printk("System shutting down -- need manual reset.\n");
-    printk("************************************\n");
-
-    (void)debugger_trap_fatal(trapnr, regs);
-
-    /* Lock up the console to prevent spurious output from other CPUs. */
-    console_force_lock();
-
-    /* Wait for manual reset. */
-    machine_halt();
+    panic("FATAL TRAP: vector = %d (%s)\n"
+          "[error_code=%04x] %s\n",
+          trapnr, trapstr[trapnr], regs->error_code,
+          (regs->eflags & X86_EFLAGS_IF) ? "" : ", IN INTERRUPT CONTEXT");
 }
 
 static inline int do_trap(int trapnr, char *str,
@@ -416,9 +405,9 @@ static inline int do_trap(int trapnr, char *str,
     DEBUGGER_trap_fatal(trapnr, regs);
 
     show_execution_state(regs);
-    panic("CPU%d FATAL TRAP: vector = %d (%s)\n"
+    panic("FATAL TRAP: vector = %d (%s)\n"
           "[error_code=%04x]\n",
-          smp_processor_id(), trapnr, str, regs->error_code);
+          trapnr, str, regs->error_code);
     return 0;
 }
 
@@ -630,8 +619,7 @@ asmlinkage int do_invalid_op(struct cpu_user_regs *regs)
         }
         DEBUGGER_trap_fatal(TRAP_invalid_op, regs);
         show_execution_state(regs);
-        panic("CPU%d FATAL TRAP: vector = %d (invalid opcode)\n",
-              smp_processor_id(), TRAP_invalid_op);
+        panic("FATAL TRAP: vector = %d (invalid opcode)\n", TRAP_invalid_op);
     }
 
     if ( (rc = emulate_forced_invalid_op(regs)) != 0 )
@@ -659,7 +647,7 @@ asmlinkage int do_int3(struct cpu_user_regs *regs)
     {
         DEBUGGER_trap_fatal(TRAP_int3, regs);
         show_execution_state(regs);
-        panic("CPU%d FATAL TRAP: vector = 3 (Int3)\n", smp_processor_id());
+        panic("FATAL TRAP: vector = 3 (Int3)\n");
     } 
 
     ti = &current->arch.guest_context.trap_ctxt[TRAP_int3];
@@ -930,10 +918,10 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
 
         show_execution_state(regs);
         show_page_walk(addr);
-        panic("CPU%d FATAL PAGE FAULT\n"
+        panic("FATAL PAGE FAULT\n"
               "[error_code=%04x]\n"
               "Faulting linear address: %p\n",
-              smp_processor_id(), regs->error_code, _p(addr));
+              regs->error_code, _p(addr));
     }
 
     propagate_page_fault(addr, regs->error_code);
@@ -1517,8 +1505,7 @@ asmlinkage int do_general_protection(struct cpu_user_regs *regs)
 
  hardware_gp:
     show_execution_state(regs);
-    panic("CPU%d GENERAL PROTECTION FAULT\n[error_code=%04x]\n",
-          smp_processor_id(), regs->error_code);
+    panic("GENERAL PROTECTION FAULT\n[error_code=%04x]\n", regs->error_code);
     return 0;
 }
 

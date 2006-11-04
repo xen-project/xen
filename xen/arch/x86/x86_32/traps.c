@@ -168,16 +168,8 @@ asmlinkage void do_double_fault(void)
     printk("ds: %04x   es: %04x   fs: %04x   gs: %04x   ss: %04x\n",
            tss->ds, tss->es, tss->fs, tss->gs, tss->ss);
     show_stack_overflow(tss->esp);
-    printk("************************************\n");
-    printk("CPU%d DOUBLE FAULT -- system shutdown\n", cpu);
-    printk("System needs manual reset.\n");
-    printk("************************************\n");
 
-    /* Lock up the console to prevent spurious output from other CPUs. */
-    console_force_lock();
-
-    /* Wait for manual reset. */
-    machine_halt();
+    panic("DOUBLE FAULT -- system shutdown\n");
 }
 
 unsigned long do_iret(void)

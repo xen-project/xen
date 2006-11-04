@@ -172,16 +172,8 @@ asmlinkage void do_double_fault(struct cpu_user_regs *regs)
            regs->r12, regs->r13, regs->r14);
     printk("r15: %016lx\n", regs->r15);
     show_stack_overflow(regs->rsp);
-    printk("************************************\n");
-    printk("CPU%d DOUBLE FAULT -- system shutdown\n", cpu);
-    printk("System needs manual reset.\n");
-    printk("************************************\n");
 
-    /* Lock up the console to prevent spurious output from other CPUs. */
-    console_force_lock();
-
-    /* Wait for manual reset. */
-    machine_halt();
+    panic("DOUBLE FAULT -- system shutdown\n");
 }
 
 void toggle_guest_mode(struct vcpu *v)
