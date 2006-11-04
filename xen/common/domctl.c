@@ -107,9 +107,9 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
             info->nr_online_vcpus++;
         }
     }
-    
+
     info->cpu_time = cpu_time;
-    
+
     info->flags = flags |
         ((d->domain_flags & DOMF_dying)      ? XEN_DOMINF_dying    : 0) |
         ((d->domain_flags & DOMF_shutdown)   ? XEN_DOMINF_shutdown : 0) |

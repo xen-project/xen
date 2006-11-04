@@ -247,42 +247,6 @@ void __domain_crash_synchronous(void)
 }
 
 
-static DEFINE_PER_CPU(struct domain *, domain_shuttingdown);
-
-static void domain_shutdown_finalise(void)
-{
-    struct domain *d;
-    struct vcpu *v;
-
-    d = this_cpu(domain_shuttingdown);
-    this_cpu(domain_shuttingdown) = NULL;
-
-    BUG_ON(d == NULL);
-    BUG_ON(d == current->domain);
-
-    LOCK_BIGLOCK(d);
-
-    /* Make sure that every vcpu is descheduled before we finalise. */
-    for_each_vcpu ( d, v )
-        vcpu_sleep_sync(v);
-    BUG_ON(!cpus_empty(d->domain_dirty_cpumask));
-
-    /* Don't set DOMF_shutdown until execution contexts are sync'ed. */
-    if ( !test_and_set_bit(_DOMF_shutdown, &d->domain_flags) )
-        send_guest_global_virq(dom0, VIRQ_DOM_EXC);
-
-    UNLOCK_BIGLOCK(d);
-
-    put_domain(d);
-}
-
-static __init int domain_shutdown_finaliser_init(void)
-{
-    open_softirq(DOMAIN_SHUTDOWN_FINALISE_SOFTIRQ, domain_shutdown_finalise);
-    return 0;
-}
-__initcall(domain_shutdown_finaliser_init);
-
 void domain_shutdown(struct domain *d, u8 reason)
 {
     struct vcpu *v;
@@ -290,20 +254,13 @@ void domain_shutdown(struct domain *d, u8 reason)
     if ( d->domain_id == 0 )
         dom0_shutdown(reason);
 
-    /* Mark the domain as shutting down. */
     d->shutdown_code = reason;
+    set_bit(_DOMF_shutdown, &d->domain_flags);
 
-    /* Put every vcpu to sleep, but don't wait (avoids inter-vcpu deadlock). */
-    spin_lock(&d->pause_lock);
-    d->pause_count++;
-    set_bit(_DOMF_paused, &d->domain_flags);
-    spin_unlock(&d->pause_lock);
     for_each_vcpu ( d, v )
         vcpu_sleep_nosync(v);
 
-    get_knownalive_domain(d);
-    this_cpu(domain_shuttingdown) = d;
-    raise_softirq(DOMAIN_SHUTDOWN_FINALISE_SOFTIRQ);
+    send_guest_global_virq(dom0, VIRQ_DOM_EXC);
 }
 
 
@@ -312,12 +269,8 @@ void domain_pause_for_debugger(void)
     struct domain *d = current->domain;
     struct vcpu *v;
 
-    /*
-     * NOTE: This does not synchronously pause the domain. The debugger
-     * must issue a PAUSEDOMAIN command to ensure that all execution
-     * has ceased and guest state is committed to memory.
-     */
     set_bit(_DOMF_ctrl_pause, &d->domain_flags);
+
     for_each_vcpu ( d, v )
         vcpu_sleep_nosync(v);
 
