@@ -179,8 +179,8 @@ void init_frametable(void);
 
 int alloc_page_type(struct page_info *page, unsigned long type);
 void free_page_type(struct page_info *page, unsigned long type);
-extern void invalidate_shadow_ldt(struct vcpu *d);
-extern int _shadow_mode_refcounts(struct domain *d);
+void invalidate_shadow_ldt(struct vcpu *d);
+int _shadow_mode_refcounts(struct domain *d);
 
 static inline void put_page(struct page_info *page)
 {
@@ -384,5 +384,7 @@ long subarch_memory_op(int op, XEN_GUEST_HANDLE(void) arg);
 
 int steal_page(
     struct domain *d, struct page_info *page, unsigned int memflags);
+
+int map_ldt_shadow_page(unsigned int);
 
 #endif /* __ASM_X86_MM_H__ */

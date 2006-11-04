@@ -704,12 +704,6 @@ void propagate_page_fault(unsigned long addr, u16 error_code)
 static int handle_gdt_ldt_mapping_fault(
     unsigned long offset, struct cpu_user_regs *regs)
 {
-    extern int map_ldt_shadow_page(unsigned int);
-
-    struct vcpu *v = current;
-    struct domain *d  = v->domain;
-    int ret;
-
     /* Which vcpu's area did we fault in, and is it in the ldt sub-area? */
     unsigned int is_ldt_area = (offset >> (GDT_LDT_VCPU_VA_SHIFT-1)) & 1;
     unsigned int vcpu_area   = (offset >> GDT_LDT_VCPU_VA_SHIFT);
@@ -723,18 +717,15 @@ static int handle_gdt_ldt_mapping_fault(
     if ( likely(is_ldt_area) )
     {
         /* LDT fault: Copy a mapping from the guest's LDT, if it is valid. */
-        LOCK_BIGLOCK(d);
-        ret = map_ldt_shadow_page(offset >> PAGE_SHIFT);
-        UNLOCK_BIGLOCK(d);
-
-        if ( unlikely(ret == 0) )
+        if ( unlikely(map_ldt_shadow_page(offset >> PAGE_SHIFT) == 0) )
         {
             /* In hypervisor mode? Leave it to the #PF handler to fix up. */
             if ( !guest_mode(regs) )
                 return 0;
             /* In guest mode? Propagate #PF to guest, with adjusted %cr2. */
             propagate_page_fault(
-                v->arch.guest_context.ldt_base + offset, regs->error_code);
+                current->arch.guest_context.ldt_base + offset,
+                regs->error_code);
         }
     }
     else
@@ -787,7 +778,7 @@ static int __spurious_page_fault(
 
 #if CONFIG_PAGING_LEVELS >= 4
     l4t = map_domain_page(mfn);
-    l4e = l4t[l4_table_offset(addr)];
+    l4e = l4e_read_atomic(&l4t[l4_table_offset(addr)]);
     mfn = l4e_get_pfn(l4e);
     unmap_domain_page(l4t);
     if ( ((l4e_get_flags(l4e) & required_flags) != required_flags) ||
@@ -800,7 +791,7 @@ static int __spurious_page_fault(
 #ifdef CONFIG_X86_PAE
     l3t += (cr3 & 0xFE0UL) >> 3;
 #endif
-    l3e = l3t[l3_table_offset(addr)];
+    l3e = l3e_read_atomic(&l3t[l3_table_offset(addr)]);
     mfn = l3e_get_pfn(l3e);
     unmap_domain_page(l3t);
 #ifdef CONFIG_X86_PAE
@@ -814,7 +805,7 @@ static int __spurious_page_fault(
 #endif
 
     l2t = map_domain_page(mfn);
-    l2e = l2t[l2_table_offset(addr)];
+    l2e = l2e_read_atomic(&l2t[l2_table_offset(addr)]);
     mfn = l2e_get_pfn(l2e);
     unmap_domain_page(l2t);
     if ( ((l2e_get_flags(l2e) & required_flags) != required_flags) ||
@@ -827,7 +818,7 @@ static int __spurious_page_fault(
     }
 
     l1t = map_domain_page(mfn);
-    l1e = l1t[l1_table_offset(addr)];
+    l1e = l1e_read_atomic(&l1t[l1_table_offset(addr)]);
     mfn = l1e_get_pfn(l1e);
     unmap_domain_page(l1t);
     if ( ((l1e_get_flags(l1e) & required_flags) != required_flags) ||
@@ -856,12 +847,16 @@ static int __spurious_page_fault(
 static int spurious_page_fault(
     unsigned long addr, struct cpu_user_regs *regs)
 {
-    struct domain *d = current->domain;
-    int            is_spurious;
+    unsigned long flags;
+    int           is_spurious;
 
-    LOCK_BIGLOCK(d);
+    /*
+     * Disabling interrupts prevents TLB flushing, and hence prevents
+     * page tables from becoming invalid under our feet during the walk.
+     */
+    local_irq_save(flags);
     is_spurious = __spurious_page_fault(addr, regs);
-    UNLOCK_BIGLOCK(d);
+    local_irq_restore(flags);
 
     return is_spurious;
 }
@@ -878,11 +873,7 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
         if ( (addr >= GDT_LDT_VIRT_START) && (addr < GDT_LDT_VIRT_END) )
             return handle_gdt_ldt_mapping_fault(
                 addr - GDT_LDT_VIRT_START, regs);
-        /*
-         * Do not propagate spurious faults in the hypervisor area to the
-         * guest. It cannot fix them up.
-         */
-        return (spurious_page_fault(addr, regs) ? EXCRET_not_a_fault : 0);
+        return 0;
     }
 
     if ( VM_ASSIST(d, VMASST_TYPE_writable_pagetables) &&

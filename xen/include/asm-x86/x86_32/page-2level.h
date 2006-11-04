@@ -28,6 +28,9 @@ typedef l2_pgentry_t root_pgentry_t;
 
 #endif /* !__ASSEMBLY__ */
 
+#define pte_read_atomic(ptep)       (*(intpte_t *)(ptep))
+#define pte_write_atomic(ptep, pte) (*(intpte_t *)(ptep)) = (pte))
+
 /* root table */
 #define root_get_pfn              l2e_get_pfn
 #define root_get_flags            l2e_get_flags

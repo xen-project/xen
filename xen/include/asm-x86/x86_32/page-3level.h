@@ -38,6 +38,17 @@ typedef l3_pgentry_t root_pgentry_t;
 
 #endif /* !__ASSEMBLY__ */
 
+#define pte_read_atomic(ptep) ({                                            \
+    intpte_t __pte = *(intpte_t *)(ptep), __npte;                           \
+    while ( (__npte = cmpxchg((intpte_t *)(ptep), __pte, __pte)) != __pte ) \
+        __pte = __npte;                                                     \
+    __pte; })
+#define pte_write_atomic(ptep, pte) do {                                    \
+    intpte_t __pte = *(intpte_t *)(ptep), __npte;                           \
+    while ( (__npte = cmpxchg((intpte_t *)(ptep), __pte, (pte))) != __pte ) \
+        __pte = __npte;                                                     \
+} while ( 0 )
+
 /* root table */
 #define root_get_pfn              l3e_get_pfn
 #define root_get_flags            l3e_get_flags
