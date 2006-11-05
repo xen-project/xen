@@ -275,7 +275,6 @@ class HVMImageHandler(ImageHandler):
         self.pae  = int(sxp.child_value(imageConfig, 'pae', 0))
 
         self.acpi = int(sxp.child_value(imageConfig, 'acpi', 0))
-        self.apic = int(sxp.child_value(imageConfig, 'apic', 0))
 
     def buildDomain(self):
         store_evtchn = self.vm.getStorePort()
@@ -289,7 +288,6 @@ class HVMImageHandler(ImageHandler):
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
         log.debug("pae            = %d", self.pae)
         log.debug("acpi           = %d", self.acpi)
-        log.debug("apic           = %d", self.apic)
 
         self.register_shutdown_watch()
 
@@ -299,8 +297,7 @@ class HVMImageHandler(ImageHandler):
                             memsize        = mem_mb,
                             vcpus          = self.vm.getVCpuCount(),
                             pae            = self.pae,
-                            acpi           = self.acpi,
-                            apic           = self.apic)
+                            acpi           = self.acpi)
 
     # Return a list of cmd line args to the device models based on the
     # xm config file

@@ -355,11 +355,7 @@ void svm_do_launch(struct vcpu *v)
     if ( !asidpool_assign_next( vmcb, 0, core, core ))
         BUG();
 
-    if (v->vcpu_id == 0)
-        hvm_setup_platform(v->domain);
-
-    if (hvm_apic_support(v->domain))
-        vlapic_init(v);
+    vlapic_init(v);
     init_timer(&v->arch.hvm_vcpu.hlt_timer, hlt_timer_fn, v, v->processor);
 
     vmcb->ldtr.sel = 0;

@@ -90,6 +90,4 @@ struct vlapic *apic_round_robin(struct domain *d,
 
 s_time_t get_apictime_scheduled(struct vcpu *v);
 
-int hvm_apic_support(struct domain *d);
-
 #endif /* __ASM_X86_HVM_VLAPIC_H__ */

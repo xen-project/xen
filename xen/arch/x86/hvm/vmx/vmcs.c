@@ -307,9 +307,8 @@ static void vmx_do_launch(struct vcpu *v)
     unsigned int  error = 0;
     unsigned long cr0, cr4;
 
-    if ( v->vcpu_id == 0 )
-        hvm_setup_platform(v->domain);
-    else {
+    if ( v->vcpu_id != 0 )
+    {
         /* Sync AP's TSC with BSP's */
         v->arch.hvm_vcpu.cache_tsc_offset = 
             v->domain->vcpu[0]->arch.hvm_vcpu.cache_tsc_offset;
@@ -333,7 +332,7 @@ static void vmx_do_launch(struct vcpu *v)
 
     hvm_stts(v);
 
-    if( hvm_apic_support(v->domain) && (vlapic_init(v) == 0) )
+    if ( vlapic_init(v) == 0 )
     {
 #ifdef __x86_64__ 
         u32 *cpu_exec_control = &v->arch.hvm_vcpu.u.vmx.exec_control;

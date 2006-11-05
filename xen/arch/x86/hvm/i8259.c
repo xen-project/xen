@@ -548,12 +548,12 @@ static int intercept_elcr_io(ioreq_t *p)
     return 1;
 }
 
-void register_pic_io_hook (void)
+void register_pic_io_hook(struct domain *d)
 {
-    register_portio_handler(0x20, 2, intercept_pic_io);
-    register_portio_handler(0x4d0, 1, intercept_elcr_io);
-    register_portio_handler(0xa0, 2, intercept_pic_io);
-    register_portio_handler(0x4d1, 1, intercept_elcr_io);
+    register_portio_handler(d, 0x20, 2, intercept_pic_io);
+    register_portio_handler(d, 0x4d0, 1, intercept_elcr_io);
+    register_portio_handler(d, 0xa0, 2, intercept_pic_io);
+    register_portio_handler(d, 0x4d1, 1, intercept_elcr_io);
 }
 
 

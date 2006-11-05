@@ -165,8 +165,6 @@ init_hypercalls(void)
 int
 main(void)
 {
-	struct xen_hvm_param hvm_param;
-
 	puts("HVM Loader\n");
 
 	init_hypercalls();
@@ -177,10 +175,7 @@ main(void)
 	puts("Loading ROMBIOS ...\n");
 	memcpy((void *)ROMBIOS_PHYSICAL_ADDRESS, rombios, sizeof(rombios));
 
-	hvm_param.domid = DOMID_SELF;
-	hvm_param.index = HVM_PARAM_APIC_ENABLED;
-	if (!hypercall_hvm_op(HVMOP_get_param, &hvm_param) && hvm_param.value)
-		create_mp_tables();
+        create_mp_tables();
 	
 	if (cirrus_check()) {
 		puts("Loading Cirrus VGABIOS ...\n");

@@ -139,7 +139,6 @@ int hvm_copy_from_guest_phys(void *buf, paddr_t paddr, int size);
 int hvm_copy_to_guest_virt(unsigned long vaddr, void *buf, int size);
 int hvm_copy_from_guest_virt(void *buf, unsigned long vaddr, int size);
 
-void hvm_setup_platform(struct domain* d);
 void hvm_print_line(struct vcpu *v, const char c);
 void hlt_timer_fn(void *data);
 

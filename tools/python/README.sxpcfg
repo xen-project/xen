@@ -56,7 +56,6 @@ image
   - vncconsole
   - pae
   - acpi
-  - apic
   (parseDeviceModel)
   - boot
   - fda

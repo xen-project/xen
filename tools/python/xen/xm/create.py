@@ -181,10 +181,6 @@ gopts.var('acpi', val='ACPI',
           fn=set_int, default=0,
           use="Disable or enable ACPI of HVM domain.")
 
-gopts.var('apic', val='APIC',
-          fn=set_int, default=0,
-          use="Disable or enable APIC of HVM domain.")
-
 gopts.var('vcpus', val='VCPUS',
           fn=set_int, default=1,
           use="# of Virtual CPUS in domain.")
@@ -664,7 +660,7 @@ def configure_hvm(config_image, vals):
              'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'soundhw',
              'vnc', 'vncdisplay', 'vncunused', 'vncconsole', 'vnclisten',
              'sdl', 'display', 'xauthority',
-             'acpi', 'apic', 'usb', 'usbdevice' ]
+             'acpi', 'usb', 'usbdevice' ]
     for a in args:
         if (vals.__dict__[a]):
             config_image.append([a, vals.__dict__[a]])

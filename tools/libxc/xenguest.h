@@ -113,7 +113,6 @@ int xc_hvm_build(int xc_handle,
                  unsigned int vcpus,
                  unsigned int pae,
                  unsigned int acpi,
-                 unsigned int apic,
                  unsigned int store_evtchn,
                  unsigned long *store_mfn);
 
@@ -125,7 +124,6 @@ int xc_hvm_build_mem(int xc_handle,
                      unsigned int vcpus,
                      unsigned int pae,
                      unsigned int acpi,
-                     unsigned int apic,
                      unsigned int store_evtchn,
                      unsigned long *store_mfn);
 

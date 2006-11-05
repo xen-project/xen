@@ -116,8 +116,9 @@ struct hvm_mmio_handler {
 
 /* global io interception point in HV */
 extern int hvm_io_intercept(ioreq_t *p, int type);
-extern int register_io_handler(unsigned long addr, unsigned long size,
-                               intercept_action_t action, int type);
+extern int register_io_handler(
+    struct domain *d, unsigned long addr, unsigned long size,
+    intercept_action_t action, int type);
 
 static inline int hvm_portio_intercept(ioreq_t *p)
 {
@@ -127,11 +128,11 @@ static inline int hvm_portio_intercept(ioreq_t *p)
 extern int hvm_mmio_intercept(ioreq_t *p);
 extern int hvm_buffered_io_intercept(ioreq_t *p);
 
-static inline int register_portio_handler(unsigned long addr,
-                                          unsigned long size,
-                                          intercept_action_t action)
+static inline int register_portio_handler(
+    struct domain *d, unsigned long addr,
+    unsigned long size, intercept_action_t action)
 {
-    return register_io_handler(addr, size, action, HVM_PORTIO);
+    return register_io_handler(d, addr, size, action, HVM_PORTIO);
 }
 
 #if defined(__i386__) || defined(__x86_64__)

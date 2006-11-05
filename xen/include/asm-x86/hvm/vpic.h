@@ -71,7 +71,7 @@ void pic_init(struct hvm_virpic *s,
               void (*irq_request)(void *, int),
               void *irq_request_opaque);
 void pic_update_irq(struct hvm_virpic *s); /* Caller must hold s->lock */
-void register_pic_io_hook (void);
+void register_pic_io_hook(struct domain *d);
 int cpu_get_pic_interrupt(struct vcpu *v, int *type);
 int is_periodic_irq(struct vcpu *v, int irq, int type);
 int is_irq_enabled(struct vcpu *v, int irq);

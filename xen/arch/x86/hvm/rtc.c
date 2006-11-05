@@ -381,7 +381,7 @@ void rtc_init(struct vcpu *v, int base, int irq)
     s->next_second_time = NOW() + 1000000000ULL;
     set_timer(&s->second_timer2, s->next_second_time);
 
-    register_portio_handler(base, 2, handle_rtc_io);
+    register_portio_handler(v->domain, base, 2, handle_rtc_io);
 }
 
 void rtc_deinit(struct domain *d)

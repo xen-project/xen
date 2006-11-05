@@ -57,14 +57,6 @@ integer_param("hvm_debug", opt_hvm_debug_level);
 
 struct hvm_function_table hvm_funcs;
 
-void hvm_create_event_channel(struct vcpu *v)
-{
-    v->arch.hvm_vcpu.xen_port = alloc_unbound_xen_event_channel(v, 0);
-    if ( get_sp(v->domain) && get_vio(v->domain, v->vcpu_id) )
-        get_vio(v->domain, v->vcpu_id)->vp_eport =
-            v->arch.hvm_vcpu.xen_port;
-}
-
 void hvm_stts(struct vcpu *v)
 {
     /* FPU state already dirty? Then no need to setup_fpu() lazily. */
@@ -123,26 +115,56 @@ void hvm_release_assist_channel(struct vcpu *v)
     free_xen_event_channel(v, v->arch.hvm_vcpu.xen_port);
 }
 
-
-void hvm_setup_platform(struct domain *d)
+int hvm_domain_initialise(struct domain *d)
 {
-    struct hvm_domain *platform;
-    struct vcpu *v = current;
+    struct hvm_domain *platform = &d->arch.hvm_domain;
+    int rc;
 
-    if ( !is_hvm_domain(d) || (v->vcpu_id != 0) )
-        return;
+    if ( !is_hvm_domain(d) )
+        return 0;
 
-    platform = &d->arch.hvm_domain;
-    pic_init(&platform->vpic, pic_irq_request, &platform->interrupt_request);
-    register_pic_io_hook();
-
-    if ( hvm_apic_support(d) )
+    if ( !hvm_enabled )
     {
-        spin_lock_init(&d->arch.hvm_domain.round_robin_lock);
-        hvm_vioapic_init(d);
+        gdprintk(XENLOG_WARNING, "Attempt to create a HVM guest "
+                 "on a non-VT/AMDV platform.\n");
+        return -EINVAL;
     }
 
+    spin_lock_init(&d->arch.hvm_domain.pbuf_lock);
+    spin_lock_init(&d->arch.hvm_domain.round_robin_lock);
     spin_lock_init(&d->arch.hvm_domain.buffered_io_lock);
+
+    rc = shadow_enable(d, SHM2_refcounts|SHM2_translate|SHM2_external);
+    if ( rc != 0 )
+        return rc;
+
+    pic_init(&platform->vpic, pic_irq_request, &platform->interrupt_request);
+    register_pic_io_hook(d);
+
+    hvm_vioapic_init(d);
+
+    return 0;
+}
+
+int hvm_vcpu_initialise(struct vcpu *v)
+{
+    struct hvm_domain *platform;
+    int rc;
+
+    if ( (rc = hvm_funcs.vcpu_initialise(v)) != 0 )
+        return rc;
+
+    /* Create ioreq event channel. */
+    v->arch.hvm_vcpu.xen_port = alloc_unbound_xen_event_channel(v, 0);
+    if ( get_sp(v->domain) && get_vio(v->domain, v->vcpu_id) )
+        get_vio(v->domain, v->vcpu_id)->vp_eport =
+            v->arch.hvm_vcpu.xen_port;
+
+    if ( v->vcpu_id != 0 )
+        return 0;
+
+    /* XXX Below should happen in hvm_domain_initialise(). */
+    platform = &v->domain->arch.hvm_domain;
 
     init_timer(&platform->pl_time.periodic_tm.timer,
                pt_timer_fn, v, v->processor);
@@ -150,8 +172,10 @@ void hvm_setup_platform(struct domain *d)
     rtc_init(v, RTC_PORT(0), RTC_IRQ);
     pmtimer_init(v, ACPI_PM_TMR_BLK_ADDRESS); 
 
-    /* init guest tsc to start from 0 */
+    /* Init guest TSC to start from zero. */
     hvm_set_guest_time(v, 0);
+
+    return 0;
 }
 
 void pic_irq_request(void *data, int level)

@@ -208,18 +208,17 @@ int hvm_mmio_intercept(ioreq_t *p)
     struct vcpu *v = current;
     int i;
 
-    /* XXX currently only APIC use intercept */
-    if ( !hvm_apic_support(v->domain) )
-        return 0;
-
-    for ( i = 0; i < HVM_MMIO_HANDLER_NR; i++ ) {
-        if ( hvm_mmio_handlers[i]->check_handler(v, p->addr) ) {
+    for ( i = 0; i < HVM_MMIO_HANDLER_NR; i++ )
+    {
+        if ( hvm_mmio_handlers[i]->check_handler(v, p->addr) )
+        {
             hvm_mmio_access(v, p,
                             hvm_mmio_handlers[i]->read_handler,
                             hvm_mmio_handlers[i]->write_handler);
             return 1;
         }
     }
+
     return 0;
 }
 
@@ -247,15 +246,15 @@ int hvm_io_intercept(ioreq_t *p, int type)
     return 0;
 }
 
-int register_io_handler(unsigned long addr, unsigned long size,
-                        intercept_action_t action, int type)
+int register_io_handler(
+    struct domain *d, unsigned long addr, unsigned long size,
+    intercept_action_t action, int type)
 {
-    struct vcpu *v = current;
-    struct hvm_io_handler *handler =
-                             &(v->domain->arch.hvm_domain.io_handler);
+    struct hvm_io_handler *handler = &d->arch.hvm_domain.io_handler;
     int num = handler->num_slot;
 
-    if (num >= MAX_IO_HANDLER) {
+    if ( num >= MAX_IO_HANDLER )
+    {
         printk("no extra space, register io interceptor failed!\n");
         domain_crash_synchronous();
     }

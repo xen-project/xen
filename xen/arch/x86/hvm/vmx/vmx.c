@@ -905,17 +905,11 @@ static void vmx_do_cpuid(struct cpu_user_regs *regs)
 
         if ( input == CPUID_LEAF_0x1 )
         {
-            /* mask off reserved bits */
+            /* Mask off reserved bits. */
             ecx &= ~VMX_VCPU_CPUID_L1_ECX_RESERVED;
 
-            if ( !hvm_apic_support(v->domain) ||
-                 !vlapic_global_enabled((VLAPIC(v))) )
-            {
-                /* Since the apic is disabled, avoid any 
-                confusion about SMP cpus being available */
-
+            if ( !vlapic_global_enabled((VLAPIC(v))) )
                 clear_bit(X86_FEATURE_APIC, &edx);
-            }
     
 #if CONFIG_PAGING_LEVELS >= 3
             if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )

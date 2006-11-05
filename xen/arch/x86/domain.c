@@ -233,24 +233,7 @@ int arch_domain_create(struct domain *d)
             virt_to_page(d->shared_info), d, XENSHARE_writable);
     }
 
-    if ( is_hvm_domain(d) )
-    {
-        if ( !hvm_enabled )
-        {
-            gdprintk(XENLOG_WARNING, "Attempt to create a HVM guest "
-                     "on a non-VT/AMDV platform.\n");
-            rc = -EINVAL;
-            goto fail;
-        }
-
-        spin_lock_init(&d->arch.hvm_domain.pbuf_lock);
-
-        rc = shadow_enable(d, SHM2_refcounts|SHM2_translate|SHM2_external);
-        if ( rc != 0 )
-            goto fail;
-    }
-
-    return 0;
+    return hvm_domain_initialise(d);
 
  fail:
     free_xenheap_page(d->shared_info);

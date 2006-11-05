@@ -196,7 +196,6 @@ __attribute__((weak)) int xc_hvm_build(
     unsigned int vcpus,
     unsigned int pae,
     unsigned int acpi,
-    unsigned int apic,
     unsigned int store_evtchn,
     unsigned long *store_mfn)
 {

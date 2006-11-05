@@ -91,16 +91,8 @@ hvm_disable(void)
         hvm_funcs.disable();
 }
 
-void hvm_create_event_channel(struct vcpu *v);
-
-static inline int
-hvm_vcpu_initialise(struct vcpu *v)
-{
-    int rc;
-    if ( (rc = hvm_funcs.vcpu_initialise(v)) == 0 )
-        hvm_create_event_channel(v);
-    return rc;
-}
+int hvm_domain_initialise(struct domain *d);
+int hvm_vcpu_initialise(struct vcpu *v);
 
 static inline void
 hvm_relinquish_guest_resources(struct domain *d)

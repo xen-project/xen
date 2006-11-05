@@ -52,7 +52,7 @@ void pmtimer_init(struct vcpu *v, int base)
     /* ACPI supports a 32-bit power management timer */
     set_timer(&s->timer, NOW() + (1000000000ULL << 31) / FREQUENCE_PMTIMER);
     
-    register_portio_handler(base, 4, handle_pmt_io);
+    register_portio_handler(v->domain, base, 4, handle_pmt_io);
 }
 
 void pmtimer_deinit(struct domain *d)

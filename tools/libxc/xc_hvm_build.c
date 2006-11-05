@@ -157,7 +157,6 @@ static int setup_guest(int xc_handle,
                        unsigned int vcpus,
                        unsigned int pae,
                        unsigned int acpi,
-                       unsigned int apic,
                        unsigned int store_evtchn,
                        unsigned long *store_mfn)
 {
@@ -248,7 +247,6 @@ static int setup_guest(int xc_handle,
     }
 
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_PAE_ENABLED, pae);
-    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_APIC_ENABLED, apic);
 
     if ( (e820_page = xc_map_foreign_range(
               xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
@@ -307,7 +305,6 @@ static int xc_hvm_build_internal(int xc_handle,
                                  unsigned int vcpus,
                                  unsigned int pae,
                                  unsigned int acpi,
-                                 unsigned int apic,
                                  unsigned int store_evtchn,
                                  unsigned long *store_mfn)
 {
@@ -340,7 +337,7 @@ static int xc_hvm_build_internal(int xc_handle,
 
     if ( setup_guest(xc_handle, domid, memsize, image, image_size,
                      ctxt, domctl.u.getdomaininfo.shared_info_frame,
-                     vcpus, pae, acpi, apic, store_evtchn, store_mfn) < 0)
+                     vcpus, pae, acpi, store_evtchn, store_mfn) < 0)
     {
         ERROR("Error constructing guest OS");
         goto error_out;
@@ -531,7 +528,6 @@ int xc_hvm_build(int xc_handle,
                  unsigned int vcpus,
                  unsigned int pae,
                  unsigned int acpi,
-                 unsigned int apic,
                  unsigned int store_evtchn,
                  unsigned long *store_mfn)
 {
@@ -545,7 +541,7 @@ int xc_hvm_build(int xc_handle,
 
     sts = xc_hvm_build_internal(xc_handle, domid, memsize,
                                 image, image_size,
-                                vcpus, pae, acpi, apic,
+                                vcpus, pae, acpi,
                                 store_evtchn, store_mfn);
 
     free(image);
@@ -567,7 +563,6 @@ int xc_hvm_build_mem(int xc_handle,
                      unsigned int vcpus,
                      unsigned int pae,
                      unsigned int acpi,
-                     unsigned int apic,
                      unsigned int store_evtchn,
                      unsigned long *store_mfn)
 {
@@ -592,7 +587,7 @@ int xc_hvm_build_mem(int xc_handle,
 
     sts = xc_hvm_build_internal(xc_handle, domid, memsize,
                                 img, img_len,
-                                vcpus, pae, acpi, apic,
+                                vcpus, pae, acpi,
                                 store_evtchn, store_mfn);
 
     /* xc_inflate_buffer may return the original buffer pointer (for

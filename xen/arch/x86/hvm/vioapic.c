@@ -530,9 +530,6 @@ void hvm_vioapic_do_irqs(struct domain *d, uint16_t irqs)
 {
     hvm_vioapic_t *s = &(d->arch.hvm_domain.vioapic);
 
-    if (!hvm_apic_support(d))
-        return;
-
     s->irr |= irqs & ~s->imr;
     service_ioapic(s);
 }
@@ -540,9 +537,6 @@ void hvm_vioapic_do_irqs(struct domain *d, uint16_t irqs)
 void hvm_vioapic_do_irqs_clear(struct domain *d, uint16_t irqs)
 {
     hvm_vioapic_t *s = &(d->arch.hvm_domain.vioapic);
-
-    if (!hvm_apic_support(d))
-        return;
 
     s->irr &= ~irqs;
     service_ioapic(s);
@@ -552,8 +546,7 @@ void hvm_vioapic_set_xen_irq(struct domain *d, int irq, int level)
 {
     hvm_vioapic_t *s = &d->arch.hvm_domain.vioapic;
 
-    if (!hvm_apic_support(d) || !IOAPICEnabled(s) ||
-	s->redirtbl[irq].RedirForm.mask)
+    if (!IOAPICEnabled(s) || s->redirtbl[irq].RedirForm.mask)
         return;
 
     if (s->redirtbl[irq].RedirForm.trigmod != IOAPIC_LEVEL_TRIGGER)
@@ -568,9 +561,6 @@ void hvm_vioapic_set_xen_irq(struct domain *d, int irq, int level)
 void hvm_vioapic_set_irq(struct domain *d, int irq, int level)
 {
     hvm_vioapic_t *s = &(d->arch.hvm_domain.vioapic);
-
-    if (!hvm_apic_support(d))
-        return ;
 
     HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic_set_irq "
       "irq %x level %x\n", irq, level);

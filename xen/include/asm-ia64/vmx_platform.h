@@ -73,9 +73,7 @@ enum ioapic_irq_destination_types {
 	dest_ExtINT = 7
 };
 
-/* As long as we register vlsapic to ioapic controller, it's said enabled */
 #define vlapic_enabled(l) 1
-#define hvm_apic_support(d) 1
 
 #define VLAPIC_DELIV_MODE_FIXED		0x0
 #define VLAPIC_DELIV_MODE_REDIR		0x1

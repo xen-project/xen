@@ -1046,8 +1046,7 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb, unsigned long input,
         cpuid(input, &eax, &ebx, &ecx, &edx);       
         if (input == 0x00000001 || input == 0x80000001 )
         {
-            if ( !hvm_apic_support(v->domain) ||
-                 !vlapic_global_enabled((VLAPIC(v))) )
+            if ( !vlapic_global_enabled((VLAPIC(v))) )
             {
                 /* Since the apic is disabled, avoid any confusion 
                    about SMP cpus being available */

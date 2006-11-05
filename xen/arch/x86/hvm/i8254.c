@@ -374,9 +374,9 @@ void pit_init(struct vcpu *v, unsigned long cpu_khz)
     s++; s->vcpu = v;
     s++; s->vcpu = v;
 
-    register_portio_handler(PIT_BASE, 4, handle_pit_io);
+    register_portio_handler(v->domain, PIT_BASE, 4, handle_pit_io);
     /* register the speaker port */
-    register_portio_handler(0x61, 1, handle_speaker_io);
+    register_portio_handler(v->domain, 0x61, 1, handle_speaker_io);
     ticks_per_sec(v) = cpu_khz * (int64_t)1000;
 #ifdef DEBUG_PIT
     printk("HVM_PIT: guest frequency =%lld\n", (long long)ticks_per_sec(v));

@@ -155,17 +155,11 @@ int vlapic_set_irq(struct vlapic *vlapic, uint8_t vec, uint8_t trig)
     return ret;
 }
 
-int hvm_apic_support(struct domain *d)
-{
-    return d->arch.hvm_domain.params[HVM_PARAM_APIC_ENABLED];
-}
-
 s_time_t get_apictime_scheduled(struct vcpu *v)
 {
     struct vlapic *vlapic = VLAPIC(v);
 
-    if ( !hvm_apic_support(v->domain) ||
-         !vlapic_lvt_enabled(vlapic, APIC_LVTT) )
+    if ( !vlapic_lvt_enabled(vlapic, APIC_LVTT) )
         return -1;
 
     return vlapic->vlapic_timer.expires;
