@@ -227,4 +227,5 @@ uuid_to_string(char *dest, uint8_t *uuid)
 		byte_to_hex(p, uuid[i]);
 		p += 2;
 	}
+	*p = 0;
 }
