@@ -955,8 +955,10 @@ csched_runq_steal(struct csched_pcpu *spc, int cpu, int pri)
 static struct csched_vcpu *
 csched_load_balance(int cpu, struct csched_vcpu *snext)
 {
-    struct csched_pcpu *spc;
     struct csched_vcpu *speer;
+    struct csched_pcpu *spc;
+    struct vcpu *peer_vcpu;
+    cpumask_t workers;
     int peer_cpu;
 
     if ( snext->pri == CSCHED_PRI_IDLE )
@@ -966,15 +968,23 @@ csched_load_balance(int cpu, struct csched_vcpu *snext)
     else
         CSCHED_STAT_CRANK(load_balance_other);
 
+    /*
+     * Peek at non-idling CPUs in the system
+     */
+    cpus_andnot(workers, cpu_online_map, csched_priv.idlers);
+    cpu_clear(cpu, workers);
+
     peer_cpu = cpu;
     BUG_ON( peer_cpu != snext->vcpu->processor );
 
-    while ( 1 )
+    while ( !cpus_empty(workers) )
     {
-        /* For each PCPU in the system starting with our neighbour... */
-        peer_cpu = (peer_cpu + 1) % csched_priv.ncpus;
-        if ( peer_cpu == cpu )
-            break;
+        /* For each CPU of interest, starting with our neighbour... */
+        peer_cpu = next_cpu(peer_cpu, workers);
+        if ( peer_cpu == NR_CPUS )
+            peer_cpu = first_cpu(workers);
+
+        cpu_clear(peer_cpu, workers);
 
         /*
          * Get ahold of the scheduler lock for this peer CPU.
@@ -990,13 +1000,19 @@ csched_load_balance(int cpu, struct csched_vcpu *snext)
         }
 
         spc = CSCHED_PCPU(peer_cpu);
+        peer_vcpu = per_cpu(schedule_data, peer_cpu).curr;
+
         if ( unlikely(spc == NULL) )
         {
             CSCHED_STAT_CRANK(steal_peer_down);
             speer = NULL;
         }
-        else if ( is_idle_vcpu(per_cpu(schedule_data, peer_cpu).curr) )
+        else if ( unlikely(is_idle_vcpu(peer_vcpu)) )
         {
+            /*
+             * Don't steal from an idle CPU's runq because it's about to
+             * pick up work from it itself.
+             */
             CSCHED_STAT_CRANK(steal_peer_idle);
             speer = NULL;
         }
