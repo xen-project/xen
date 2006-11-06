@@ -74,6 +74,7 @@ struct scheduler {
 
     struct task_slice (*do_schedule) (s_time_t);
 
+    int          (*pick_cpu)       (struct vcpu *);
     int          (*adjust)         (struct domain *,
                                     struct xen_domctl_scheduler_op *);
     void         (*dump_settings)  (void);

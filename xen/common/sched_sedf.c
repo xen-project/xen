@@ -411,6 +411,14 @@ static void sedf_destroy_domain(struct domain *d)
     xfree(d->sched_priv);
 }
 
+static int sedf_pick_cpu(struct vcpu *v)
+{
+    cpumask_t online_affinity;
+
+    cpus_and(online_affinity, v->cpu_affinity, cpu_online_map);
+    return first_cpu(online_affinity);
+}
+
 /*
  * Handles the rescheduling & bookkeeping of domains running in their
  * guaranteed timeslice.
@@ -1436,6 +1444,7 @@ struct scheduler sched_sedf_def = {
     .destroy_vcpu   = sedf_destroy_vcpu,
 
     .do_schedule    = sedf_do_schedule,
+    .pick_cpu       = sedf_pick_cpu,
     .dump_cpu_state = sedf_dump_cpu_state,
     .sleep          = sedf_sleep,
     .wake           = sedf_wake,

@@ -203,7 +203,6 @@ void vcpu_wake(struct vcpu *v)
 
 static void vcpu_migrate(struct vcpu *v)
 {
-    cpumask_t online_affinity;
     unsigned long flags;
     int old_cpu;
 
@@ -218,8 +217,7 @@ static void vcpu_migrate(struct vcpu *v)
 
     /* Switch to new CPU, then unlock old CPU. */
     old_cpu = v->processor;
-    cpus_and(online_affinity, v->cpu_affinity, cpu_online_map);
-    v->processor = first_cpu(online_affinity);
+    v->processor = SCHED_OP(pick_cpu, v);
     spin_unlock_irqrestore(
         &per_cpu(schedule_data, old_cpu).schedule_lock, flags);
 

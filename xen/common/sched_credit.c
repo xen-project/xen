@@ -115,6 +115,10 @@
     _MACRO(steal_peer_idle)                 \
     _MACRO(steal_peer_running)              \
     _MACRO(steal_peer_pinned)               \
+    _MACRO(steal_peer_migrating)            \
+    _MACRO(steal_peer_best_idler)           \
+    _MACRO(steal_loner_candidate)           \
+    _MACRO(steal_loner_signal)              \
     _MACRO(dom_init)                        \
     _MACRO(dom_destroy)                     \
     _MACRO(vcpu_init)                       \
@@ -370,8 +374,42 @@ __csched_vcpu_check(struct vcpu *vc)
 #define CSCHED_VCPU_CHECK(_vc)
 #endif
 
+/*
+ * Indicates which of two given idlers is most efficient to run
+ * an additional VCPU.
+ *
+ * Returns:
+ *  0:           They are the same.
+ *  negative:    One is less efficient than Two.
+ *  positive:    One is more efficient than Two.
+ */
+static int
+csched_idler_compare(int one, int two)
+{
+    cpumask_t idlers;
+    cpumask_t one_idlers;
+    cpumask_t two_idlers;
+
+    idlers = csched_priv.idlers;
+    cpu_clear(one, idlers);
+    cpu_clear(two, idlers);
+
+    if ( cpu_isset(one, cpu_core_map[two]) )
+    {
+        cpus_and(one_idlers, idlers, cpu_sibling_map[one]);
+        cpus_and(two_idlers, idlers, cpu_sibling_map[two]);
+    }
+    else
+    {
+        cpus_and(one_idlers, idlers, cpu_core_map[one]);
+        cpus_and(two_idlers, idlers, cpu_core_map[two]);
+    }
+
+    return cpus_weight(one_idlers) - cpus_weight(two_idlers);
+}
+
 static inline int
-__csched_vcpu_is_stealable(int local_cpu, struct vcpu *vc)
+__csched_queued_vcpu_is_stealable(int local_cpu, struct vcpu *vc)
 {
     /*
      * Don't pick up work that's in the peer's scheduling tail. Also only pick
@@ -386,6 +424,32 @@ __csched_vcpu_is_stealable(int local_cpu, struct vcpu *vc)
     if ( unlikely(!cpu_isset(local_cpu, vc->cpu_affinity)) )
     {
         CSCHED_STAT_CRANK(steal_peer_pinned);
+        return 0;
+    }
+
+    return 1;
+}
+
+static inline int
+__csched_running_vcpu_is_stealable(int local_cpu, struct vcpu *vc)
+{
+    BUG_ON( is_idle_vcpu(vc) );
+
+    if ( unlikely(!cpu_isset(local_cpu, vc->cpu_affinity)) )
+    {
+        CSCHED_STAT_CRANK(steal_peer_pinned);
+        return 0;
+    }
+
+    if ( test_bit(_VCPUF_migrating, &vc->vcpu_flags) )
+    {
+        CSCHED_STAT_CRANK(steal_peer_migrating);
+        return 0;
+    }
+
+    if ( csched_idler_compare(local_cpu, vc->processor) <= 0 )
+    {
+        CSCHED_STAT_CRANK(steal_peer_best_idler);
         return 0;
     }
 
@@ -650,6 +714,64 @@ csched_dom_destroy(struct domain *dom)
     CSCHED_STAT_CRANK(dom_destroy);
 
     xfree(sdom);
+}
+
+static int
+csched_cpu_pick(struct vcpu *vc)
+{
+    cpumask_t cpus;
+    int cpu, nxt;
+
+    /*
+     * Pick from online CPUs in VCPU's affinity mask, giving a
+     * preference to its current processor if it's in there.
+     */
+    cpus_and(cpus, cpu_online_map, vc->cpu_affinity);
+    ASSERT( !cpus_empty(cpus) );
+    cpu = cpu_isset(vc->processor, cpus) ? vc->processor : first_cpu(cpus);
+
+    /*
+     * Try to find an idle processor within the above constraints.
+     */
+    cpus_and(cpus, cpus, csched_priv.idlers);
+    if ( !cpus_empty(cpus) )
+    {
+        cpu = cpu_isset(cpu, cpus) ? cpu : first_cpu(cpus);
+        cpu_clear(cpu, cpus);
+
+        /*
+         * In multi-core and multi-threaded CPUs, not all idle execution
+         * vehicles are equal!
+         *
+         * We give preference to the idle execution vehicle with the most
+         * idling neighbours in its grouping. This distributes work across
+         * distinct cores first and guarantees we don't do something stupid
+         * like run two VCPUs on co-hyperthreads while there are idle cores
+         * or sockets.
+         */
+        while ( !cpus_empty(cpus) )
+        {
+            nxt = first_cpu(cpus);
+
+            if ( csched_idler_compare(cpu, nxt) < 0 )
+            {
+                cpu = nxt;
+                cpu_clear(nxt, cpus);
+            }
+            else if ( cpu_isset(cpu, cpu_core_map[nxt]) )
+            {
+                cpus_andnot(cpus, cpus, cpu_sibling_map[nxt]);
+            }
+            else
+            {
+                cpus_andnot(cpus, cpus, cpu_core_map[nxt]);
+            }
+
+            ASSERT( !cpu_isset(nxt, cpus) );
+        }
+    }
+
+    return cpu;
 }
 
 /*
@@ -939,7 +1061,7 @@ csched_runq_steal(struct csched_pcpu *spc, int cpu, int pri)
         vc = speer->vcpu;
         BUG_ON( is_idle_vcpu(vc) );
 
-        if ( __csched_vcpu_is_stealable(cpu, vc) )
+        if ( __csched_queued_vcpu_is_stealable(cpu, vc) )
         {
             /* We got a candidate. Grab it! */
             __runq_remove(speer);
@@ -959,6 +1081,7 @@ csched_load_balance(int cpu, struct csched_vcpu *snext)
     struct csched_pcpu *spc;
     struct vcpu *peer_vcpu;
     cpumask_t workers;
+    cpumask_t loners;
     int peer_cpu;
 
     if ( snext->pri == CSCHED_PRI_IDLE )
@@ -971,6 +1094,7 @@ csched_load_balance(int cpu, struct csched_vcpu *snext)
     /*
      * Peek at non-idling CPUs in the system
      */
+    cpus_clear(loners);
     cpus_andnot(workers, cpu_online_map, csched_priv.idlers);
     cpu_clear(cpu, workers);
 
@@ -999,13 +1123,12 @@ csched_load_balance(int cpu, struct csched_vcpu *snext)
             continue;
         }
 
-        spc = CSCHED_PCPU(peer_cpu);
         peer_vcpu = per_cpu(schedule_data, peer_cpu).curr;
+        spc = CSCHED_PCPU(peer_cpu);
 
         if ( unlikely(spc == NULL) )
         {
             CSCHED_STAT_CRANK(steal_peer_down);
-            speer = NULL;
         }
         else if ( unlikely(is_idle_vcpu(peer_vcpu)) )
         {
@@ -1014,26 +1137,72 @@ csched_load_balance(int cpu, struct csched_vcpu *snext)
              * pick up work from it itself.
              */
             CSCHED_STAT_CRANK(steal_peer_idle);
-            speer = NULL;
+        }
+        else if ( is_idle_vcpu(__runq_elem(spc->runq.next)->vcpu) )
+        {
+            if ( snext->pri == CSCHED_PRI_IDLE &&
+                 __csched_running_vcpu_is_stealable(cpu, peer_vcpu) )
+            {
+                CSCHED_STAT_CRANK(steal_loner_candidate);
+                cpu_set(peer_cpu, loners);
+            }
         }
         else
         {
-            /* Try to steal work from an online non-idle CPU. */
+            /* Try to steal work from a remote CPU's runq. */
             speer = csched_runq_steal(spc, cpu, snext->pri);
+            if ( speer != NULL )
+            {
+                spin_unlock(&per_cpu(schedule_data, peer_cpu).schedule_lock);
+                CSCHED_STAT_CRANK(vcpu_migrate);
+                speer->stats.migrate++;
+                return speer;
+            }
         }
 
         spin_unlock(&per_cpu(schedule_data, peer_cpu).schedule_lock);
+    }
 
-        /* Got one? */
-        if ( speer )
+    /*
+     * If we failed to find any remotely queued VCPUs to move here,
+     * see if it would be more efficient to move any of the running
+     * remote VCPUs over here.
+     */
+    while ( !cpus_empty(loners) )
+    {
+        /* For each CPU of interest, starting with our neighbour... */
+        peer_cpu = next_cpu(peer_cpu, loners);
+        if ( peer_cpu == NR_CPUS )
+            peer_cpu = first_cpu(loners);
+
+        cpu_clear(peer_cpu, loners);
+
+        if ( !spin_trylock(&per_cpu(schedule_data, peer_cpu).schedule_lock) )
         {
-            CSCHED_STAT_CRANK(vcpu_migrate);
-            speer->stats.migrate++;
-            return speer;
+            CSCHED_STAT_CRANK(steal_trylock_failed);
+            continue;
+        }
+
+        peer_vcpu = per_cpu(schedule_data, peer_cpu).curr;
+        spc = CSCHED_PCPU(peer_cpu);
+
+        if ( !is_idle_vcpu(peer_vcpu) &&
+             is_idle_vcpu(__runq_elem(spc->runq.next)->vcpu) &&
+             __csched_running_vcpu_is_stealable(cpu, peer_vcpu) )
+        {
+            set_bit(_VCPUF_migrating, &peer_vcpu->vcpu_flags);
+            spin_unlock(&per_cpu(schedule_data, peer_cpu).schedule_lock);
+
+            CSCHED_STAT_CRANK(steal_loner_signal);
+            cpu_raise_softirq(peer_cpu, SCHEDULE_SOFTIRQ);
+        }
+        else
+        {
+            spin_unlock(&per_cpu(schedule_data, peer_cpu).schedule_lock);
         }
     }
 
-    /* Failed to find more important work */
+    /* Failed to find more important work elsewhere... */
     __runq_remove(snext);
     return snext;
 }
@@ -1139,9 +1308,11 @@ csched_dump_pcpu(int cpu)
     spc = CSCHED_PCPU(cpu);
     runq = &spc->runq;
 
-    printk(" tick=%lu, sort=%d\n",
+    printk(" tick=%lu, sort=%d, sibling=0x%lx, core=0x%lx\n",
             per_cpu(schedule_data, cpu).tick,
-            spc->runq_sort_last);
+            spc->runq_sort_last,
+            cpu_sibling_map[cpu].bits[0],
+            cpu_core_map[cpu].bits[0]);
 
     /* current VCPU */
     svc = CSCHED_VCPU(per_cpu(schedule_data, cpu).curr);
@@ -1247,6 +1418,7 @@ struct scheduler sched_credit_def = {
 
     .adjust         = csched_dom_cntl,
 
+    .pick_cpu       = csched_cpu_pick,
     .tick           = csched_tick,
     .do_schedule    = csched_schedule,
 
