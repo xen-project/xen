@@ -30,7 +30,6 @@ extern void vmx_asm_vmexit_handler(struct cpu_user_regs);
 extern void vmx_asm_do_vmentry(void);
 extern void vmx_intr_assist(void);
 extern void vmx_migrate_timers(struct vcpu *v);
-extern void arch_vmx_do_launch(struct vcpu *);
 extern void arch_vmx_do_resume(struct vcpu *);
 extern void set_guest_time(struct vcpu *v, u64 gtime);
 
@@ -220,54 +219,8 @@ static always_inline int ___vmread(
     return rc;
 }
 
-
-static always_inline void __vmwrite_vcpu(
-    struct vcpu *v, unsigned long field, unsigned long value)
-{
-    switch ( field ) {
-    case CR0_READ_SHADOW:
-        v->arch.hvm_vmx.cpu_shadow_cr0 = value;
-        break;
-    case GUEST_CR0:
-        v->arch.hvm_vmx.cpu_cr0 = value;
-        break;
-    case CR4_READ_SHADOW:
-        v->arch.hvm_vmx.cpu_shadow_cr4 = value;
-        break;
-    case CPU_BASED_VM_EXEC_CONTROL:
-        v->arch.hvm_vmx.cpu_based_exec_control = value;
-        break;
-    default:
-        printk("__vmwrite_cpu: invalid field %lx\n", field);
-        break;
-    }
-}
-
-static always_inline void __vmread_vcpu(
-    struct vcpu *v, unsigned long field, unsigned long *value)
-{
-    switch ( field ) {
-    case CR0_READ_SHADOW:
-        *value = v->arch.hvm_vmx.cpu_shadow_cr0;
-        break;
-    case GUEST_CR0:
-        *value = v->arch.hvm_vmx.cpu_cr0;
-        break;
-    case CR4_READ_SHADOW:
-        *value = v->arch.hvm_vmx.cpu_shadow_cr4;
-        break;
-    case CPU_BASED_VM_EXEC_CONTROL:
-        *value = v->arch.hvm_vmx.cpu_based_exec_control;
-        break;
-    default:
-        printk("__vmread_vcpu: invalid field %lx\n", field);
-        break;
-    }
-}
-
 static inline int __vmwrite(unsigned long field, unsigned long value)
 {
-    struct vcpu *v = current;
     int rc;
 
     __asm__ __volatile__ ( VMWRITE_OPCODE
@@ -277,15 +230,6 @@ static inline int __vmwrite(unsigned long field, unsigned long value)
                            : "=q" (rc)
                            : "0" (0), "a" (field) , "c" (value)
                            : "memory");
-
-    switch ( field ) {
-    case CR0_READ_SHADOW:
-    case GUEST_CR0:
-    case CR4_READ_SHADOW:
-    case CPU_BASED_VM_EXEC_CONTROL:
-        __vmwrite_vcpu(v, field, value);
-        break;
-    }
 
     return rc;
 }
@@ -337,16 +281,8 @@ static inline int __vmxon (u64 addr)
 
 static inline int vmx_paging_enabled(struct vcpu *v)
 {
-    unsigned long cr0;
-    __vmread_vcpu(v, CR0_READ_SHADOW, &cr0);
+    unsigned long cr0 = v->arch.hvm_vmx.cpu_shadow_cr0;
     return ((cr0 & (X86_CR0_PE|X86_CR0_PG)) == (X86_CR0_PE|X86_CR0_PG));
-}
-
-static inline int vmx_pae_enabled(struct vcpu *v)
-{
-    unsigned long cr4;
-    __vmread_vcpu(v, CR4_READ_SHADOW, &cr4);
-    return (vmx_paging_enabled(v) && (cr4 & X86_CR4_PAE));
 }
 
 static inline int vmx_long_mode_enabled(struct vcpu *v)
@@ -370,9 +306,7 @@ static inline void vmx_update_host_cr3(struct vcpu *v)
 
 static inline int vmx_pgbit_test(struct vcpu *v)
 {
-    unsigned long cr0;
-
-    __vmread_vcpu(v, CR0_READ_SHADOW, &cr0);
+    unsigned long cr0 = v->arch.hvm_vmx.cpu_shadow_cr0;
     return (cr0 & X86_CR0_PG);
 }
 

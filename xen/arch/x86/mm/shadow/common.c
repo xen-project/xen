@@ -2273,15 +2273,6 @@ void sh_update_paging_modes(struct vcpu *v)
     //     - changes in CR0.PG, CR4.PAE, CR4.PSE, or CR4.PGE
     //
 
-    // Avoid determining the current shadow mode for uninitialized CPUs, as
-    // we can not yet determine whether it is an HVM or PV domain.
-    //
-    if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
-    {
-        SHADOW_PRINTK("%s: postponing determination of shadow mode\n", __func__);
-        return;
-    }
-
     // First, tear down any old shadow tables held by this vcpu.
     //
     shadow_detach_old_tables(v);
@@ -2316,7 +2307,6 @@ void sh_update_paging_modes(struct vcpu *v)
         v->arch.shadow.translate_enabled = !!hvm_paging_enabled(v);
         if ( !v->arch.shadow.translate_enabled )
         {
-            
             /* Set v->arch.guest_table to use the p2m map, and choose
              * the appropriate shadow mode */
             old_guest_table = pagetable_get_mfn(v->arch.guest_table);

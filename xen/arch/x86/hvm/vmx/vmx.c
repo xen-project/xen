@@ -59,7 +59,7 @@ static int vmx_vcpu_initialise(struct vcpu *v)
 
     spin_lock_init(&v->arch.hvm_vmx.vmcs_lock);
 
-    v->arch.schedule_tail    = arch_vmx_do_launch;
+    v->arch.schedule_tail    = arch_vmx_do_resume;
     v->arch.ctxt_switch_from = vmx_ctxt_switch_from;
     v->arch.ctxt_switch_to   = vmx_ctxt_switch_to;
 
@@ -474,10 +474,10 @@ static void vmx_store_cpu_guest_regs(
 
     if ( crs != NULL )
     {
-        __vmread(CR0_READ_SHADOW, &crs[0]);
+        crs[0] = v->arch.hvm_vmx.cpu_shadow_cr0;
         crs[2] = v->arch.hvm_vmx.cpu_cr2;
         __vmread(GUEST_CR3, &crs[3]);
-        __vmread(CR4_READ_SHADOW, &crs[4]);
+        crs[4] = v->arch.hvm_vmx.cpu_shadow_cr4;
     }
 
     vmx_vmcs_exit(v);
@@ -570,8 +570,6 @@ static unsigned long vmx_get_ctrl_reg(struct vcpu *v, unsigned int num)
 /* Make sure that xen intercepts any FP accesses from current */
 static void vmx_stts(struct vcpu *v)
 {
-    unsigned long cr0;
-
     /* VMX depends on operating on the current vcpu */
     ASSERT(v == current);
 
@@ -581,11 +579,10 @@ static void vmx_stts(struct vcpu *v)
      * then this is not necessary: no FPU activity can occur until the guest
      * clears CR0.TS, and we will initialise the FPU when that happens.
      */
-    __vmread_vcpu(v, CR0_READ_SHADOW, &cr0);
-    if ( !(cr0 & X86_CR0_TS) )
+    if ( !(v->arch.hvm_vmx.cpu_shadow_cr0 & X86_CR0_TS) )
     {
-        __vmread_vcpu(v, GUEST_CR0, &cr0);
-        __vmwrite(GUEST_CR0, cr0 | X86_CR0_TS);
+        v->arch.hvm_vmx.cpu_cr0 |= X86_CR0_TS;
+        __vmwrite(GUEST_CR0, v->arch.hvm_vmx.cpu_cr0);
         __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_NM);
     }
 }
@@ -660,6 +657,12 @@ static int vmx_guest_x86_mode(struct vcpu *v)
 
     return ((cs_ar_bytes & (1u<<14)) ?
             X86EMUL_MODE_PROT32 : X86EMUL_MODE_PROT16);
+}
+
+static int vmx_pae_enabled(struct vcpu *v)
+{
+    unsigned long cr4 = v->arch.hvm_vmx.cpu_shadow_cr4;
+    return (vmx_paging_enabled(v) && (cr4 & X86_CR4_PAE));
 }
 
 /* Setup HVM interfaces */
@@ -811,19 +814,16 @@ static int vmx_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
 
 static void vmx_do_no_device_fault(void)
 {
-    unsigned long cr0;
     struct vcpu *v = current;
 
     setup_fpu(current);
     __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_NM);
 
     /* Disable TS in guest CR0 unless the guest wants the exception too. */
-    __vmread_vcpu(v, CR0_READ_SHADOW, &cr0);
-    if ( !(cr0 & X86_CR0_TS) )
+    if ( !(v->arch.hvm_vmx.cpu_shadow_cr0 & X86_CR0_TS) )
     {
-        __vmread_vcpu(v, GUEST_CR0, &cr0);
-        cr0 &= ~X86_CR0_TS;
-        __vmwrite(GUEST_CR0, cr0);
+        v->arch.hvm_vmx.cpu_cr0 &= ~X86_CR0_TS;
+        __vmwrite(GUEST_CR0, v->arch.hvm_vmx.cpu_cr0);
     }
 }
 
@@ -1158,9 +1158,9 @@ static int vmx_world_save(struct vcpu *v, struct vmx_assist_context *c)
     error |= __vmread(GUEST_RSP, &c->esp);
     error |= __vmread(GUEST_RFLAGS, &c->eflags);
 
-    error |= __vmread(CR0_READ_SHADOW, &c->cr0);
+    c->cr0 = v->arch.hvm_vmx.cpu_shadow_cr0;
     c->cr3 = v->arch.hvm_vmx.cpu_cr3;
-    error |= __vmread(CR4_READ_SHADOW, &c->cr4);
+    c->cr4 = v->arch.hvm_vmx.cpu_shadow_cr4;
 
     error |= __vmread(GUEST_IDTR_LIMIT, &c->idtr_limit);
     error |= __vmread(GUEST_IDTR_BASE, &c->idtr_base);
@@ -1220,7 +1220,8 @@ static int vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
     error |= __vmwrite(GUEST_RSP, c->esp);
     error |= __vmwrite(GUEST_RFLAGS, c->eflags);
 
-    error |= __vmwrite(CR0_READ_SHADOW, c->cr0);
+    v->arch.hvm_vmx.cpu_shadow_cr0 = c->cr0;
+    error |= __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr0);
 
     if (!vmx_paging_enabled(v))
         goto skip_cr3;
@@ -1270,7 +1271,8 @@ static int vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %x", c->cr3);
 
     error |= __vmwrite(GUEST_CR4, (c->cr4 | VMX_CR4_HOST_MASK));
-    error |= __vmwrite(CR4_READ_SHADOW, c->cr4);
+    v->arch.hvm_vmx.cpu_shadow_cr4 = c->cr4;
+    error |= __vmwrite(CR4_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr4);
 
     error |= __vmwrite(GUEST_IDTR_LIMIT, c->idtr_limit);
     error |= __vmwrite(GUEST_IDTR_BASE, c->idtr_base);
@@ -1408,7 +1410,7 @@ static int vmx_set_cr0(unsigned long value)
     /*
      * CR0: We don't want to lose PE and PG.
      */
-    __vmread_vcpu(v, CR0_READ_SHADOW, &old_cr0);
+    old_cr0 = v->arch.hvm_vmx.cpu_shadow_cr0;
     paging_enabled = (old_cr0 & X86_CR0_PE) && (old_cr0 & X86_CR0_PG);
 
     /* TS cleared? Then initialise FPU now. */
@@ -1418,8 +1420,11 @@ static int vmx_set_cr0(unsigned long value)
         __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_NM);
     }
 
-    __vmwrite(GUEST_CR0, value | X86_CR0_PE | X86_CR0_PG | X86_CR0_NE);
-    __vmwrite(CR0_READ_SHADOW, value);
+    v->arch.hvm_vmx.cpu_cr0 = value | X86_CR0_PE | X86_CR0_PG | X86_CR0_NE;
+    __vmwrite(GUEST_CR0, v->arch.hvm_vmx.cpu_cr0);
+
+    v->arch.hvm_vmx.cpu_shadow_cr0 = value;
+    __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr0);
 
     HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx\n", value);
 
@@ -1655,9 +1660,9 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
     }
     case 4: /* CR4 */
     {
-        __vmread(CR4_READ_SHADOW, &old_cr);
+        old_cr = v->arch.hvm_vmx.cpu_shadow_cr4;
 
-        if ( value & X86_CR4_PAE && !(old_cr & X86_CR4_PAE) )
+        if ( (value & X86_CR4_PAE) && !(old_cr & X86_CR4_PAE) )
         {
             if ( vmx_pgbit_test(v) )
             {
@@ -1706,7 +1711,8 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
         }
 
         __vmwrite(GUEST_CR4, value| VMX_CR4_HOST_MASK);
-        __vmwrite(CR4_READ_SHADOW, value);
+        v->arch.hvm_vmx.cpu_shadow_cr4 = value;
+        __vmwrite(CR4_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr4);
 
         /*
          * Writing to CR4 to modify the PSE, PGE, or PAE flag invalidates
@@ -1804,16 +1810,14 @@ static int vmx_cr_access(unsigned long exit_qualification,
         setup_fpu(v);
         __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_NM);
 
-        __vmread_vcpu(v, GUEST_CR0, &value);
-        value &= ~X86_CR0_TS; /* clear TS */
-        __vmwrite(GUEST_CR0, value);
+        v->arch.hvm_vmx.cpu_cr0 &= ~X86_CR0_TS; /* clear TS */
+        __vmwrite(GUEST_CR0, v->arch.hvm_vmx.cpu_cr0);
 
-        __vmread_vcpu(v, CR0_READ_SHADOW, &value);
-        value &= ~X86_CR0_TS; /* clear TS */
-        __vmwrite(CR0_READ_SHADOW, value);
+        v->arch.hvm_vmx.cpu_shadow_cr0 &= ~X86_CR0_TS; /* clear TS */
+        __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr0);
         break;
     case TYPE_LMSW:
-        __vmread_vcpu(v, CR0_READ_SHADOW, &value);
+        value = v->arch.hvm_vmx.cpu_shadow_cr0;
         value = (value & ~0xF) |
             (((exit_qualification & LMSW_SOURCE_DATA) >> 16) & 0xF);
         TRACE_VMEXIT(1, TYPE_LMSW);

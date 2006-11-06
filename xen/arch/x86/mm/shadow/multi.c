@@ -3357,7 +3357,7 @@ sh_update_cr3(struct vcpu *v)
 
     sh_detach_old_tables(v);
 
-    if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+    if ( !is_hvm_domain(d) && !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
     {
         ASSERT(v->arch.cr3 == 0);
         return;

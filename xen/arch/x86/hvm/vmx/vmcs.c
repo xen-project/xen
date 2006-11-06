@@ -285,12 +285,9 @@ static void vmx_set_host_env(struct vcpu *v)
     error |= __vmwrite(HOST_RSP, (unsigned long)get_stack_bottom());
 }
 
-/* Update CR3, CR0, CR4, GDT, LDT, TR */
+#if 0
 static void vmx_do_launch(struct vcpu *v)
 {
-    unsigned int  error = 0;
-    unsigned long cr0, cr4;
-
     if ( v->vcpu_id != 0 )
     {
         /* Sync AP's TSC with BSP's */
@@ -298,62 +295,13 @@ static void vmx_do_launch(struct vcpu *v)
             v->domain->vcpu[0]->arch.hvm_vcpu.cache_tsc_offset;
         hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
     }
-
-    __asm__ __volatile__ ("mov %%cr0,%0" : "=r" (cr0) : );
-
-    error |= __vmwrite(GUEST_CR0, cr0);
-    cr0 &= ~X86_CR0_PG;
-    error |= __vmwrite(CR0_READ_SHADOW, cr0);
-    error |= __vmwrite(CPU_BASED_VM_EXEC_CONTROL, vmx_cpu_based_exec_control);
-    v->arch.hvm_vcpu.u.vmx.exec_control = vmx_cpu_based_exec_control;
-
-    __asm__ __volatile__ ("mov %%cr4,%0" : "=r" (cr4) : );
-
-    error |= __vmwrite(GUEST_CR4, cr4 & ~X86_CR4_PSE);
-    cr4 &= ~(X86_CR4_PGE | X86_CR4_VMXE | X86_CR4_PAE);
-
-    error |= __vmwrite(CR4_READ_SHADOW, cr4);
-
-    hvm_stts(v);
-
-    if ( vlapic_init(v) == 0 )
-    {
-#ifdef __x86_64__ 
-        u32 *cpu_exec_control = &v->arch.hvm_vcpu.u.vmx.exec_control;
-        u64  vapic_page_addr = 
-                        page_to_maddr(v->arch.hvm_vcpu.vlapic->regs_page);
-
-        *cpu_exec_control   |= CPU_BASED_TPR_SHADOW;
-        *cpu_exec_control   &= ~CPU_BASED_CR8_STORE_EXITING;
-        *cpu_exec_control   &= ~CPU_BASED_CR8_LOAD_EXITING;
-        error |= __vmwrite(CPU_BASED_VM_EXEC_CONTROL, *cpu_exec_control);
-        error |= __vmwrite(VIRTUAL_APIC_PAGE_ADDR, vapic_page_addr);
-        error |= __vmwrite(TPR_THRESHOLD, 0);
-#endif
-    }
-
-    vmx_set_host_env(v);
-    init_timer(&v->arch.hvm_vcpu.hlt_timer, hlt_timer_fn, v, v->processor);
-
-    error |= __vmwrite(GUEST_LDTR_SELECTOR, 0);
-    error |= __vmwrite(GUEST_LDTR_BASE, 0);
-    error |= __vmwrite(GUEST_LDTR_LIMIT, 0);
-
-    error |= __vmwrite(GUEST_TR_BASE, 0);
-    error |= __vmwrite(GUEST_TR_LIMIT, 0xff);
-
-    shadow_update_paging_modes(v);
-
-    __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr3);
-    __vmwrite(HOST_CR3, v->arch.cr3);
-
-    v->arch.schedule_tail = arch_vmx_do_resume;
 }
+#endif
 
 static int construct_vmcs(struct vcpu *v)
 {
     int error = 0;
-    unsigned long tmp;
+    unsigned long tmp, cr0, cr4;
     union vmcs_arbytes arbytes;
 
     vmx_vmcs_enter(v);
@@ -362,6 +310,8 @@ static int construct_vmcs(struct vcpu *v)
     error |= __vmwrite(PIN_BASED_VM_EXEC_CONTROL, vmx_pin_based_exec_control);
     error |= __vmwrite(VM_EXIT_CONTROLS, vmx_vmexit_control);
     error |= __vmwrite(VM_ENTRY_CONTROLS, vmx_vmentry_control);
+    error |= __vmwrite(CPU_BASED_VM_EXEC_CONTROL, vmx_cpu_based_exec_control);
+    v->arch.hvm_vcpu.u.vmx.exec_control = vmx_cpu_based_exec_control;
 
     /* Host data selectors. */
     error |= __vmwrite(HOST_SS_SELECTOR, __HYPERVISOR_DS);
@@ -465,6 +415,48 @@ static int construct_vmcs(struct vcpu *v)
     error |= __vmwrite(EXCEPTION_BITMAP,
                        MONITOR_DEFAULT_EXCEPTION_BITMAP);
 
+    /* Guest CR0. */
+    cr0 = read_cr0();
+    v->arch.hvm_vmx.cpu_cr0 = cr0;
+    error |= __vmwrite(GUEST_CR0, v->arch.hvm_vmx.cpu_cr0);
+    v->arch.hvm_vmx.cpu_shadow_cr0 = cr0 & ~(X86_CR0_PG | X86_CR0_TS);
+    error |= __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr0);
+
+    /* Guest CR4. */
+    cr4 = read_cr4();
+    error |= __vmwrite(GUEST_CR4, cr4 & ~X86_CR4_PSE);
+    v->arch.hvm_vmx.cpu_shadow_cr4 =
+        cr4 & ~(X86_CR4_PGE | X86_CR4_VMXE | X86_CR4_PAE);
+    error |= __vmwrite(CR4_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr4);
+
+    /* XXX Move this out. */
+    init_timer(&v->arch.hvm_vcpu.hlt_timer, hlt_timer_fn, v, v->processor);
+    if ( vlapic_init(v) != 0 )
+        return -1;
+
+#ifdef __x86_64__ 
+    /* VLAPIC TPR optimisation. */
+    v->arch.hvm_vcpu.u.vmx.exec_control |= CPU_BASED_TPR_SHADOW;
+    v->arch.hvm_vcpu.u.vmx.exec_control &=
+        ~(CPU_BASED_CR8_STORE_EXITING | CPU_BASED_CR8_LOAD_EXITING);
+    error |= __vmwrite(CPU_BASED_VM_EXEC_CONTROL,
+                       v->arch.hvm_vcpu.u.vmx.exec_control);
+    error |= __vmwrite(VIRTUAL_APIC_PAGE_ADDR,
+                       page_to_maddr(v->arch.hvm_vcpu.vlapic->regs_page));
+    error |= __vmwrite(TPR_THRESHOLD, 0);
+#endif
+
+    error |= __vmwrite(GUEST_LDTR_SELECTOR, 0);
+    error |= __vmwrite(GUEST_LDTR_BASE, 0);
+    error |= __vmwrite(GUEST_LDTR_LIMIT, 0);
+
+    error |= __vmwrite(GUEST_TR_BASE, 0);
+    error |= __vmwrite(GUEST_TR_LIMIT, 0xff);
+
+    shadow_update_paging_modes(v);
+    __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr3);
+    __vmwrite(HOST_CR3, v->arch.cr3);
+
     vmx_vmcs_exit(v);
 
     return error;
@@ -533,14 +525,6 @@ void arch_vmx_do_resume(struct vcpu *v)
     hvm_do_resume(v);
     reset_stack_and_jump(vmx_asm_do_vmentry);
 }
-
-void arch_vmx_do_launch(struct vcpu *v)
-{
-    vmx_load_vmcs(v);
-    vmx_do_launch(v);
-    reset_stack_and_jump(vmx_asm_do_vmentry);
-}
-
 
 /* Dump a section of VMCS */
 static void print_section(char *header, uint32_t start, 
