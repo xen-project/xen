@@ -160,7 +160,6 @@ static int construct_init_vmcb_guest(struct arch_svm_struct *arch_svm,
     unsigned long crn;
     segment_attributes_t attrib;
     unsigned long dr7;
-    unsigned long eflags;
     unsigned long shadow_cr;
     struct vmcb_struct *vmcb = arch_svm->vmcb;
 
@@ -254,10 +253,7 @@ static int construct_init_vmcb_guest(struct arch_svm_struct *arch_svm,
     vmcb->rsp = 0;
     vmcb->rip = regs->eip;
 
-    eflags = regs->eflags & ~HVM_EFLAGS_RESERVED_0; /* clear 0s */
-    eflags |= HVM_EFLAGS_RESERVED_1; /* set 1s */
-
-    vmcb->rflags = eflags;
+    vmcb->rflags = regs->eflags | 2UL; /* inc. reserved bit */
 
     __asm__ __volatile__ ("mov %%dr7, %0\n" : "=r" (dr7));
     vmcb->dr7 = dr7;

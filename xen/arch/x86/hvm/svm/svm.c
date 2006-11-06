@@ -530,30 +530,10 @@ static void svm_set_tsc_offset(struct vcpu *v, u64 offset)
 }
 
 
-/* SVM-specific intitialization code for VCPU application processors */
-static void svm_init_ap_context(struct vcpu_guest_context *ctxt, 
-                                int vcpuid, int trampoline_vector)
+static void svm_init_ap_context(
+    struct vcpu_guest_context *ctxt, int vcpuid, int trampoline_vector)
 {
-    int i;
-    struct vcpu *v, *bsp = current;
-    struct domain *d = bsp->domain;
-    cpu_user_regs_t *regs;;
-
-  
-    if ((v = d->vcpu[vcpuid]) == NULL)
-    {
-        printk("vcpuid %d is invalid!  good-bye.\n", vcpuid);
-        domain_crash_synchronous();
-    }
-    regs = &v->arch.guest_context.user_regs;
-
     memset(ctxt, 0, sizeof(*ctxt));
-    for (i = 0; i < 256; ++i)
-    {
-        ctxt->trap_ctxt[i].vector = i;
-        ctxt->trap_ctxt[i].cs = FLAT_KERNEL_CS;
-    }
-
 
     /*
      * We execute the trampoline code in real mode. The trampoline vector
@@ -691,7 +671,7 @@ static void svm_load_cpu_user_regs(struct vcpu *v, struct cpu_user_regs *regs)
     vmcb->rax      = regs->eax;
     vmcb->ss.sel   = regs->ss;
     vmcb->rsp      = regs->esp;   
-    vmcb->rflags   = regs->eflags;
+    vmcb->rflags   = regs->eflags | 2UL;
     vmcb->cs.sel   = regs->cs;
     vmcb->rip      = regs->eip;
     if (regs->eflags & EF_TF)

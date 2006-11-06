@@ -94,13 +94,6 @@ enum hval_bitmaps {
 
 #define VMX_DELIVER_NO_ERROR_CODE  -1
 
-/*
- * This works for both 32bit & 64bit eflags filteration
- * done in construct_init_vmc[sb]_guest()
- */
-#define HVM_EFLAGS_RESERVED_0          0xffc08028 /* bitmap for 0 */
-#define HVM_EFLAGS_RESERVED_1          0x00000002 /* bitmap for 1 */
-
 #if HVM_DEBUG
 #define DBG_LEVEL_0                 (1 << 0)
 #define DBG_LEVEL_1                 (1 << 1)

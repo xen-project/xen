@@ -309,19 +309,13 @@ static int xc_hvm_build_internal(int xc_handle,
                                  unsigned long *store_mfn)
 {
     struct xen_domctl launch_domctl, domctl;
-    int rc, i;
-    vcpu_guest_context_t st_ctxt, *ctxt = &st_ctxt;
+    vcpu_guest_context_t ctxt;
+    int rc;
 
     if ( (image == NULL) || (image_size == 0) )
     {
         ERROR("Image required");
         goto error_out;
-    }
-
-    if ( lock_pages(&st_ctxt, sizeof(st_ctxt) ) )
-    {
-        PERROR("%s: ctxt mlock failed", __func__);
-        return 1;
     }
 
     domctl.cmd = XEN_DOMCTL_getdomaininfo;
@@ -333,55 +327,30 @@ static int xc_hvm_build_internal(int xc_handle,
         goto error_out;
     }
 
-    memset(ctxt, 0, sizeof(*ctxt));
+    memset(&ctxt, 0, sizeof(ctxt));
 
     if ( setup_guest(xc_handle, domid, memsize, image, image_size,
-                     ctxt, domctl.u.getdomaininfo.shared_info_frame,
+                     &ctxt, domctl.u.getdomaininfo.shared_info_frame,
                      vcpus, pae, acpi, store_evtchn, store_mfn) < 0)
     {
         ERROR("Error constructing guest OS");
         goto error_out;
     }
 
-    /* FPU is set up to default initial state. */
-    memset(&ctxt->fpu_ctxt, 0, sizeof(ctxt->fpu_ctxt));
-
-    /* Virtual IDT is empty at start-of-day. */
-    for ( i = 0; i < 256; i++ )
+    if ( lock_pages(&ctxt, sizeof(ctxt) ) )
     {
-        ctxt->trap_ctxt[i].vector = i;
-        ctxt->trap_ctxt[i].cs     = FLAT_KERNEL_CS;
+        PERROR("%s: ctxt mlock failed", __func__);
+        goto error_out;
     }
 
-    /* No LDT. */
-    ctxt->ldt_ents = 0;
-
-    /* Use the default Xen-provided GDT. */
-    ctxt->gdt_ents = 0;
-
-    /* No debugging. */
-    memset(ctxt->debugreg, 0, sizeof(ctxt->debugreg));
-
-    /* No callback handlers. */
-#if defined(__i386__)
-    ctxt->event_callback_cs     = FLAT_KERNEL_CS;
-    ctxt->event_callback_eip    = 0;
-    ctxt->failsafe_callback_cs  = FLAT_KERNEL_CS;
-    ctxt->failsafe_callback_eip = 0;
-#elif defined(__x86_64__)
-    ctxt->event_callback_eip    = 0;
-    ctxt->failsafe_callback_eip = 0;
-    ctxt->syscall_callback_eip  = 0;
-#endif
-
     memset(&launch_domctl, 0, sizeof(launch_domctl));
-
     launch_domctl.domain = (domid_t)domid;
     launch_domctl.u.vcpucontext.vcpu   = 0;
-    set_xen_guest_handle(launch_domctl.u.vcpucontext.ctxt, ctxt);
-
+    set_xen_guest_handle(launch_domctl.u.vcpucontext.ctxt, &ctxt);
     launch_domctl.cmd = XEN_DOMCTL_setvcpucontext;
     rc = xc_domctl(xc_handle, &launch_domctl);
+
+    unlock_pages(&ctxt, sizeof(ctxt));
 
     return rc;
 

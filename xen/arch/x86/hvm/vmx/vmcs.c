@@ -233,10 +233,7 @@ void vmx_free_host_vmcs(struct vmcs_struct *vmcs)
     vmx_free_vmcs(vmcs);
 }
 
-#define GUEST_LAUNCH_DS         0x08
-#define GUEST_LAUNCH_CS         0x10
 #define GUEST_SEGMENT_LIMIT     0xffffffff
-#define HOST_SEGMENT_LIMIT      0xffffffff
 
 struct host_execution_env {
     /* selectors */
@@ -353,11 +350,13 @@ static void vmx_do_launch(struct vcpu *v)
     v->arch.schedule_tail = arch_vmx_do_resume;
 }
 
-static int construct_vmcs(struct vcpu *v, cpu_user_regs_t *regs)
+static int construct_vmcs(struct vcpu *v)
 {
     int error = 0;
-    unsigned long tmp, eflags;
+    unsigned long tmp;
     union vmcs_arbytes arbytes;
+
+    vmx_vmcs_enter(v);
 
     /* VMCS controls. */
     error |= __vmwrite(PIN_BASED_VM_EXEC_CONTROL, vmx_pin_based_exec_control);
@@ -404,14 +403,6 @@ static int construct_vmcs(struct vcpu *v, cpu_user_regs_t *regs)
     error |= __vmwrite(CR3_TARGET_COUNT, 0);
 
     error |= __vmwrite(GUEST_ACTIVITY_STATE, 0);
-
-    /* Guest selectors. */
-    error |= __vmwrite(GUEST_ES_SELECTOR, GUEST_LAUNCH_DS);
-    error |= __vmwrite(GUEST_SS_SELECTOR, GUEST_LAUNCH_DS);
-    error |= __vmwrite(GUEST_DS_SELECTOR, GUEST_LAUNCH_DS);
-    error |= __vmwrite(GUEST_FS_SELECTOR, GUEST_LAUNCH_DS);
-    error |= __vmwrite(GUEST_GS_SELECTOR, GUEST_LAUNCH_DS);
-    error |= __vmwrite(GUEST_CS_SELECTOR, GUEST_LAUNCH_CS);
 
     /* Guest segment bases. */
     error |= __vmwrite(GUEST_ES_BASE, 0);
@@ -463,14 +454,6 @@ static int construct_vmcs(struct vcpu *v, cpu_user_regs_t *regs)
     arbytes.fields.seg_type = 0xb;          /* 32-bit TSS (busy) */
     error |= __vmwrite(GUEST_TR_AR_BYTES, arbytes.bytes);
 
-    error |= __vmwrite(GUEST_RSP, 0);
-    error |= __vmwrite(GUEST_RIP, regs->eip);
-
-    /* Guest EFLAGS. */
-    eflags = regs->eflags & ~HVM_EFLAGS_RESERVED_0; /* clear 0s */
-    eflags |= HVM_EFLAGS_RESERVED_1; /* set 1s */
-    error |= __vmwrite(GUEST_RFLAGS, eflags);
-
     error |= __vmwrite(GUEST_INTERRUPTIBILITY_INFO, 0);
     __asm__ __volatile__ ("mov %%dr7, %0\n" : "=r" (tmp));
     error |= __vmwrite(GUEST_DR7, tmp);
@@ -482,10 +465,7 @@ static int construct_vmcs(struct vcpu *v, cpu_user_regs_t *regs)
     error |= __vmwrite(EXCEPTION_BITMAP,
                        MONITOR_DEFAULT_EXCEPTION_BITMAP);
 
-    if ( regs->eflags & EF_TF )
-        error |= __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
-    else
-        error |= __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
+    vmx_vmcs_exit(v);
 
     return error;
 }
@@ -494,7 +474,16 @@ int vmx_create_vmcs(struct vcpu *v)
 {
     if ( (v->arch.hvm_vmx.vmcs = vmx_alloc_vmcs()) == NULL )
         return -ENOMEM;
+ 
     __vmx_clear_vmcs(v);
+    
+    if ( construct_vmcs(v) != 0 )
+    {
+        vmx_free_vmcs(v->arch.hvm_vmx.vmcs);
+        v->arch.hvm_vmx.vmcs = NULL;
+        return -EINVAL;
+    }
+
     return 0;
 }
 
@@ -547,20 +536,7 @@ void arch_vmx_do_resume(struct vcpu *v)
 
 void arch_vmx_do_launch(struct vcpu *v)
 {
-    cpu_user_regs_t *regs = &current->arch.guest_context.user_regs;
-
     vmx_load_vmcs(v);
-
-    if ( construct_vmcs(v, regs) < 0 )
-    {
-        if ( v->vcpu_id == 0 ) {
-            printk("Failed to construct VMCS for BSP.\n");
-        } else {
-            printk("Failed to construct VMCS for AP %d.\n", v->vcpu_id);
-        }
-        domain_crash_synchronous();
-    }
-
     vmx_do_launch(v);
     reset_stack_and_jump(vmx_asm_do_vmentry);
 }

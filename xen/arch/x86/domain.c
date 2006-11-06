@@ -311,7 +311,7 @@ int arch_set_info_guest(
         /* Ensure real hardware interrupts are enabled. */
         v->arch.guest_context.user_regs.eflags |= EF_IE;
     }
-    else if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+    else
     {
         hvm_load_cpu_guest_regs(v, &v->arch.guest_context.user_regs);
     }

@@ -57,6 +57,8 @@ static int vmx_vcpu_initialise(struct vcpu *v)
 {
     int rc;
 
+    spin_lock_init(&v->arch.hvm_vmx.vmcs_lock);
+
     v->arch.schedule_tail    = arch_vmx_do_launch;
     v->arch.ctxt_switch_from = vmx_ctxt_switch_from;
     v->arch.ctxt_switch_to   = vmx_ctxt_switch_to;
@@ -68,8 +70,6 @@ static int vmx_vcpu_initialise(struct vcpu *v)
                 v->vcpu_id, rc);
         return rc;
     }
-
-    spin_lock_init(&v->arch.hvm_vmx.vmcs_lock);
 
     return 0;
 }
@@ -534,7 +534,8 @@ static void vmx_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
 
     __vmwrite(GUEST_RSP, regs->esp);
 
-    __vmwrite(GUEST_RFLAGS, regs->eflags);
+    /* NB. Bit 1 of RFLAGS must be set for VMENTRY to succeed. */
+    __vmwrite(GUEST_RFLAGS, regs->eflags | 2UL);
     if (regs->eflags & EF_TF)
         __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
     else
@@ -599,33 +600,13 @@ static void vmx_set_tsc_offset(struct vcpu *v, u64 offset)
     vmx_vmcs_exit(v);
 }
 
-/* SMP VMX guest support */
-static void vmx_init_ap_context(struct vcpu_guest_context *ctxt,
-                         int vcpuid, int trampoline_vector)
+static void vmx_init_ap_context(
+    struct vcpu_guest_context *ctxt, int vcpuid, int trampoline_vector)
 {
-    int i;
-
     memset(ctxt, 0, sizeof(*ctxt));
-
-    /*
-     * Initial register values:
-     */
     ctxt->user_regs.eip = VMXASSIST_BASE;
     ctxt->user_regs.edx = vcpuid;
     ctxt->user_regs.ebx = trampoline_vector;
-
-    /* Virtual IDT is empty at start-of-day. */
-    for ( i = 0; i < 256; i++ )
-    {
-        ctxt->trap_ctxt[i].vector = i;
-        ctxt->trap_ctxt[i].cs     = FLAT_KERNEL_CS;
-    }
-
-    /* No callback handlers. */
-#if defined(__i386__)
-    ctxt->event_callback_cs     = FLAT_KERNEL_CS;
-    ctxt->failsafe_callback_cs  = FLAT_KERNEL_CS;
-#endif
 }
 
 void do_nmi(struct cpu_user_regs *);
