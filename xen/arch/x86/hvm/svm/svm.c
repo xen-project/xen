@@ -213,10 +213,7 @@ static void stop_svm(void)
     free_vmcb(root_vmcb[cpu]);
     root_vmcb[cpu] = NULL;
     root_vmcb_pa[cpu] = 0;
-
-    printk("AMD SVM Extension is disabled.\n");
 }
-
 
 static void svm_store_cpu_guest_regs(
     struct vcpu *v, struct cpu_user_regs *regs, unsigned long *crs)
@@ -690,35 +687,13 @@ int svm_long_mode_enabled(struct vcpu *v)
     return SVM_LONG_GUEST(v);
 }
 
-
-
 static void arch_svm_do_launch(struct vcpu *v) 
 {
-    cpu_user_regs_t *regs = &current->arch.guest_context.user_regs;
-    int error;
-
-#if 0
-    if (svm_dbg_on)
-        printk("Do launch\n");
-#endif
-    error = construct_vmcb(&v->arch.hvm_svm, regs);
-    if ( error < 0 )
-    {
-        if (v->vcpu_id == 0) {
-            printk("Failed to construct a new VMCB for BSP.\n");
-        } else {
-            printk("Failed to construct a new VMCB for AP %d\n", v->vcpu_id);
-        }
-        domain_crash_synchronous();
-    }
-
     svm_do_launch(v);
-#if 0
-    if (svm_dbg_on)
-        svm_dump_host_regs(__func__);
-#endif
-    if (v->vcpu_id != 0) 
+
+    if ( v->vcpu_id != 0 )
     {
+        cpu_user_regs_t *regs = &current->arch.guest_context.user_regs;
         u16 cs_sel = regs->cs;
         /*
          * This is the launch of an AP; set state so that we begin executing
@@ -770,24 +745,26 @@ static void svm_ctxt_switch_to(struct vcpu *v)
 
 static int svm_vcpu_initialise(struct vcpu *v)
 {
+    int rc;
+
     v->arch.schedule_tail    = arch_svm_do_launch;
     v->arch.ctxt_switch_from = svm_ctxt_switch_from;
     v->arch.ctxt_switch_to   = svm_ctxt_switch_to;
 
-    if ( (v->arch.hvm_svm.vmcb = alloc_vmcb()) == NULL )
+    if ( (rc = svm_create_vmcb(v)) != 0 )
     {
-        printk("Failed to create a new VMCB\n");
-        return -ENOMEM;
+        dprintk(XENLOG_WARNING,
+                "Failed to create VMCB for vcpu %d: err=%d.\n",
+                v->vcpu_id, rc);
+        return rc;
     }
-
-    v->arch.hvm_svm.vmcb_pa = virt_to_maddr(v->arch.hvm_svm.vmcb);
 
     return 0;
 }
 
 static void svm_vcpu_destroy(struct vcpu *v)
 {
-    destroy_vmcb(&v->arch.hvm_svm);
+    svm_destroy_vmcb(v);
 }
 
 int start_svm(void)
