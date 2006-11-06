@@ -333,14 +333,6 @@ static int sedf_init_vcpu(struct vcpu *v)
 {
     struct sedf_vcpu_info *inf;
 
-    if ( v->domain->sched_priv == NULL )
-    {
-        v->domain->sched_priv = xmalloc(struct sedf_dom_info);
-        if ( v->domain->sched_priv == NULL )
-            return -1;
-        memset(v->domain->sched_priv, 0, sizeof(struct sedf_dom_info));
-    }
-
     if ( (v->sched_priv = xmalloc(struct sedf_vcpu_info)) == NULL )
         return -1;
     memset(v->sched_priv, 0, sizeof(struct sedf_vcpu_info));
@@ -398,15 +390,25 @@ static int sedf_init_vcpu(struct vcpu *v)
     return 0;
 }
 
+static void sedf_destroy_vcpu(struct vcpu *v)
+{
+    xfree(v->sched_priv);
+}
+
+static int sedf_init_domain(struct domain *d)
+{
+    d->sched_priv = xmalloc(struct sedf_dom_info);
+    if ( d->sched_priv == NULL )
+        return -ENOMEM;
+
+    memset(d->sched_priv, 0, sizeof(struct sedf_dom_info));
+
+    return 0;
+}
+
 static void sedf_destroy_domain(struct domain *d)
 {
-    int i;
-
     xfree(d->sched_priv);
- 
-    for ( i = 0; i < MAX_VIRT_CPUS; i++ )
-        if ( d->vcpu[i] )
-            xfree(d->vcpu[i]->sched_priv);
 }
 
 /*
@@ -1427,8 +1429,11 @@ struct scheduler sched_sedf_def = {
     .opt_name = "sedf",
     .sched_id = XEN_SCHEDULER_SEDF,
     
-    .init_vcpu      = sedf_init_vcpu,
+    .init_domain    = sedf_init_domain,
     .destroy_domain = sedf_destroy_domain,
+
+    .init_vcpu      = sedf_init_vcpu,
+    .destroy_vcpu   = sedf_destroy_vcpu,
 
     .do_schedule    = sedf_do_schedule,
     .dump_cpu_state = sedf_dump_cpu_state,

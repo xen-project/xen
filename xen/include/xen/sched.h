@@ -291,7 +291,9 @@ void new_thread(struct vcpu *d,
 void scheduler_init(void);
 void schedulers_start(void);
 int  sched_init_vcpu(struct vcpu *v, unsigned int processor);
-void sched_destroy_domain(struct domain *);
+void sched_destroy_vcpu(struct vcpu *v);
+int  sched_init_domain(struct domain *d);
+void sched_destroy_domain(struct domain *d);
 long sched_adjust(struct domain *, struct xen_domctl_scheduler_op *);
 int  sched_id(void);
 void vcpu_wake(struct vcpu *d);

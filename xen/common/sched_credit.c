@@ -115,8 +115,10 @@
     _MACRO(steal_peer_idle)                 \
     _MACRO(steal_peer_running)              \
     _MACRO(steal_peer_pinned)               \
+    _MACRO(dom_init)                        \
+    _MACRO(dom_destroy)                     \
     _MACRO(vcpu_init)                       \
-    _MACRO(dom_destroy)
+    _MACRO(vcpu_destroy)
 
 #ifndef NDEBUG
 #define CSCHED_STATS_EXPAND_CHECKS(_MACRO)  \
@@ -454,43 +456,14 @@ static int
 csched_vcpu_init(struct vcpu *vc)
 {
     struct domain * const dom = vc->domain;
-    struct csched_dom *sdom;
+    struct csched_dom *sdom = CSCHED_DOM(dom);
     struct csched_vcpu *svc;
-    int16_t pri;
 
     CSCHED_STAT_CRANK(vcpu_init);
 
-    /* Allocate, if appropriate, per-domain info */
-    if ( is_idle_vcpu(vc) )
-    {
-        sdom = NULL;
-        pri = CSCHED_PRI_IDLE;
-    }
-    else if ( CSCHED_DOM(dom) )
-    {
-        sdom = CSCHED_DOM(dom);
-        pri = CSCHED_PRI_TS_UNDER;
-    }
-    else 
-    {
-        sdom = xmalloc(struct csched_dom);
-        if ( !sdom )
-            return -1;
-
-        /* Initialize credit and weight */
-        INIT_LIST_HEAD(&sdom->active_vcpu);
-        sdom->active_vcpu_count = 0;
-        INIT_LIST_HEAD(&sdom->active_sdom_elem);
-        sdom->dom = dom;
-        sdom->weight = CSCHED_DEFAULT_WEIGHT;
-        sdom->cap = 0U;
-        dom->sched_priv = sdom;
-        pri = CSCHED_PRI_TS_UNDER;
-    }
-
     /* Allocate per-VCPU info */
     svc = xmalloc(struct csched_vcpu);
-    if ( !svc )
+    if ( svc == NULL )
         return -1;
 
     INIT_LIST_HEAD(&svc->runq_elem);
@@ -498,7 +471,7 @@ csched_vcpu_init(struct vcpu *vc)
     svc->sdom = sdom;
     svc->vcpu = vc;
     atomic_set(&svc->credit, 0);
-    svc->pri = pri;
+    svc->pri = is_idle_domain(dom) ? CSCHED_PRI_IDLE : CSCHED_PRI_TS_UNDER;
     memset(&svc->stats, 0, sizeof(svc->stats));
     vc->sched_priv = svc;
 
@@ -521,11 +494,13 @@ csched_vcpu_init(struct vcpu *vc)
 }
 
 static void
-csched_vcpu_free(struct vcpu *vc)
+csched_vcpu_destroy(struct vcpu *vc)
 {
     struct csched_vcpu * const svc = CSCHED_VCPU(vc);
     struct csched_dom * const sdom = svc->sdom;
     unsigned long flags;
+
+    CSCHED_STAT_CRANK(vcpu_destroy);
 
     BUG_ON( sdom == NULL );
     BUG_ON( !list_empty(&svc->runq_elem) );
@@ -641,19 +616,38 @@ csched_dom_cntl(
     return 0;
 }
 
+static int
+csched_dom_init(struct domain *dom)
+{
+    struct csched_dom *sdom;
+
+    CSCHED_STAT_CRANK(dom_init);
+
+    if ( is_idle_domain(dom) )
+        return 0;
+
+    sdom = xmalloc(struct csched_dom);
+    if ( sdom == NULL )
+        return -ENOMEM;
+
+    /* Initialize credit and weight */
+    INIT_LIST_HEAD(&sdom->active_vcpu);
+    sdom->active_vcpu_count = 0;
+    INIT_LIST_HEAD(&sdom->active_sdom_elem);
+    sdom->dom = dom;
+    sdom->weight = CSCHED_DEFAULT_WEIGHT;
+    sdom->cap = 0U;
+    dom->sched_priv = sdom;
+
+    return 0;
+}
+
 static void
 csched_dom_destroy(struct domain *dom)
 {
     struct csched_dom * const sdom = CSCHED_DOM(dom);
-    int i;
 
     CSCHED_STAT_CRANK(dom_destroy);
-
-    for ( i = 0; i < MAX_VIRT_CPUS; i++ )
-    {
-        if ( dom->vcpu[i] )
-            csched_vcpu_free(dom->vcpu[i]);
-    }
 
     xfree(sdom);
 }
@@ -1226,8 +1220,11 @@ struct scheduler sched_credit_def = {
     .opt_name       = "credit",
     .sched_id       = XEN_SCHEDULER_CREDIT,
 
-    .init_vcpu      = csched_vcpu_init,
+    .init_domain    = csched_dom_init,
     .destroy_domain = csched_dom_destroy,
+
+    .init_vcpu      = csched_vcpu_init,
+    .destroy_vcpu   = csched_vcpu_destroy,
 
     .sleep          = csched_vcpu_sleep,
     .wake           = csched_vcpu_wake,

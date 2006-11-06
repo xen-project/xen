@@ -193,11 +193,9 @@ void vmx_vmcs_enter(struct vcpu *v)
 {
     /*
      * NB. We must *always* run an HVM VCPU on its own VMCS, except for
-     * vmx_vmcs_enter/exit critical regions. This leads to some XXX TODOs XXX:
-     *  1. Move construct_vmcs() much earlier, to domain creation or
-     *     context initialisation.
-     *  2. VMPTRLD as soon as we context-switch to a HVM VCPU.
-     *  3. VMCS destruction needs to happen later (from domain_destroy()).
+     * vmx_vmcs_enter/exit critical regions. This leads to some TODOs:
+     *  1. VMPTRLD as soon as we context-switch to a HVM VCPU.
+     *  2. VMCS destruction needs to happen later (from domain_destroy()).
      * We can relax this a bit if a paused VCPU always commits its
      * architectural state to a software structure.
      */
@@ -233,17 +231,6 @@ struct vmcs_struct *vmx_alloc_host_vmcs(void)
 void vmx_free_host_vmcs(struct vmcs_struct *vmcs)
 {
     vmx_free_vmcs(vmcs);
-}
-
-static inline int construct_vmcs_controls(struct arch_vmx_struct *arch_vmx)
-{
-    int error = 0;
-
-    error |= __vmwrite(PIN_BASED_VM_EXEC_CONTROL, vmx_pin_based_exec_control);
-    error |= __vmwrite(VM_EXIT_CONTROLS, vmx_vmexit_control);
-    error |= __vmwrite(VM_ENTRY_CONTROLS, vmx_vmentry_control);
-
-    return error;
 }
 
 #define GUEST_LAUNCH_DS         0x08
@@ -366,17 +353,40 @@ static void vmx_do_launch(struct vcpu *v)
     v->arch.schedule_tail = arch_vmx_do_resume;
 }
 
-/*
- * Initially set the same environement as host.
- */
-static inline int construct_init_vmcs_guest(cpu_user_regs_t *regs)
+static int construct_vmcs(struct vcpu *v, cpu_user_regs_t *regs)
 {
     int error = 0;
+    unsigned long tmp, eflags;
     union vmcs_arbytes arbytes;
-    unsigned long dr7;
-    unsigned long eflags;
 
-    /* MSR */
+    /* VMCS controls. */
+    error |= __vmwrite(PIN_BASED_VM_EXEC_CONTROL, vmx_pin_based_exec_control);
+    error |= __vmwrite(VM_EXIT_CONTROLS, vmx_vmexit_control);
+    error |= __vmwrite(VM_ENTRY_CONTROLS, vmx_vmentry_control);
+
+    /* Host data selectors. */
+    error |= __vmwrite(HOST_SS_SELECTOR, __HYPERVISOR_DS);
+    error |= __vmwrite(HOST_DS_SELECTOR, __HYPERVISOR_DS);
+    error |= __vmwrite(HOST_ES_SELECTOR, __HYPERVISOR_DS);
+#if defined(__i386__)
+    error |= __vmwrite(HOST_FS_SELECTOR, __HYPERVISOR_DS);
+    error |= __vmwrite(HOST_GS_SELECTOR, __HYPERVISOR_DS);
+    error |= __vmwrite(HOST_FS_BASE, 0);
+    error |= __vmwrite(HOST_GS_BASE, 0);
+#elif defined(__x86_64__)
+    rdmsrl(MSR_FS_BASE, tmp); error |= __vmwrite(HOST_FS_BASE, tmp);
+    rdmsrl(MSR_GS_BASE, tmp); error |= __vmwrite(HOST_GS_BASE, tmp);
+#endif
+
+    /* Host control registers. */
+    error |= __vmwrite(HOST_CR0, read_cr0());
+    error |= __vmwrite(HOST_CR4, read_cr4());
+
+    /* Host CS:RIP. */
+    error |= __vmwrite(HOST_CS_SELECTOR, __HYPERVISOR_CS);
+    error |= __vmwrite(HOST_RIP, (unsigned long)vmx_asm_vmexit_handler);
+
+    /* MSR intercepts. */
     error |= __vmwrite(VM_EXIT_MSR_LOAD_ADDR, 0);
     error |= __vmwrite(VM_EXIT_MSR_STORE_ADDR, 0);
     error |= __vmwrite(VM_EXIT_MSR_STORE_COUNT, 0);
@@ -395,7 +405,7 @@ static inline int construct_init_vmcs_guest(cpu_user_regs_t *regs)
 
     error |= __vmwrite(GUEST_ACTIVITY_STATE, 0);
 
-    /* Guest Selectors */
+    /* Guest selectors. */
     error |= __vmwrite(GUEST_ES_SELECTOR, GUEST_LAUNCH_DS);
     error |= __vmwrite(GUEST_SS_SELECTOR, GUEST_LAUNCH_DS);
     error |= __vmwrite(GUEST_DS_SELECTOR, GUEST_LAUNCH_DS);
@@ -403,7 +413,7 @@ static inline int construct_init_vmcs_guest(cpu_user_regs_t *regs)
     error |= __vmwrite(GUEST_GS_SELECTOR, GUEST_LAUNCH_DS);
     error |= __vmwrite(GUEST_CS_SELECTOR, GUEST_LAUNCH_CS);
 
-    /* Guest segment bases */
+    /* Guest segment bases. */
     error |= __vmwrite(GUEST_ES_BASE, 0);
     error |= __vmwrite(GUEST_SS_BASE, 0);
     error |= __vmwrite(GUEST_DS_BASE, 0);
@@ -411,7 +421,7 @@ static inline int construct_init_vmcs_guest(cpu_user_regs_t *regs)
     error |= __vmwrite(GUEST_GS_BASE, 0);
     error |= __vmwrite(GUEST_CS_BASE, 0);
 
-    /* Guest segment Limits */
+    /* Guest segment limits. */
     error |= __vmwrite(GUEST_ES_LIMIT, GUEST_SEGMENT_LIMIT);
     error |= __vmwrite(GUEST_SS_LIMIT, GUEST_SEGMENT_LIMIT);
     error |= __vmwrite(GUEST_DS_LIMIT, GUEST_SEGMENT_LIMIT);
@@ -419,7 +429,7 @@ static inline int construct_init_vmcs_guest(cpu_user_regs_t *regs)
     error |= __vmwrite(GUEST_GS_LIMIT, GUEST_SEGMENT_LIMIT);
     error |= __vmwrite(GUEST_CS_LIMIT, GUEST_SEGMENT_LIMIT);
 
-    /* Guest segment AR bytes */
+    /* Guest segment AR bytes. */
     arbytes.bytes = 0;
     arbytes.fields.seg_type = 0x3;          /* type = 3 */
     arbytes.fields.s = 1;                   /* code or data, i.e. not system */
@@ -428,131 +438,54 @@ static inline int construct_init_vmcs_guest(cpu_user_regs_t *regs)
     arbytes.fields.default_ops_size = 1;    /* 32-bit */
     arbytes.fields.g = 1;
     arbytes.fields.null_bit = 0;            /* not null */
-
     error |= __vmwrite(GUEST_ES_AR_BYTES, arbytes.bytes);
     error |= __vmwrite(GUEST_SS_AR_BYTES, arbytes.bytes);
     error |= __vmwrite(GUEST_DS_AR_BYTES, arbytes.bytes);
     error |= __vmwrite(GUEST_FS_AR_BYTES, arbytes.bytes);
     error |= __vmwrite(GUEST_GS_AR_BYTES, arbytes.bytes);
-
     arbytes.fields.seg_type = 0xb;          /* type = 0xb */
     error |= __vmwrite(GUEST_CS_AR_BYTES, arbytes.bytes);
 
-    /* Guest GDT */
+    /* Guest GDT. */
     error |= __vmwrite(GUEST_GDTR_BASE, 0);
     error |= __vmwrite(GUEST_GDTR_LIMIT, 0);
 
-    /* Guest IDT */
+    /* Guest IDT. */
     error |= __vmwrite(GUEST_IDTR_BASE, 0);
     error |= __vmwrite(GUEST_IDTR_LIMIT, 0);
 
-    /* Guest LDT & TSS */
+    /* Guest LDT and TSS. */
     arbytes.fields.s = 0;                   /* not code or data segement */
     arbytes.fields.seg_type = 0x2;          /* LTD */
     arbytes.fields.default_ops_size = 0;    /* 16-bit */
     arbytes.fields.g = 0;
     error |= __vmwrite(GUEST_LDTR_AR_BYTES, arbytes.bytes);
-
     arbytes.fields.seg_type = 0xb;          /* 32-bit TSS (busy) */
     error |= __vmwrite(GUEST_TR_AR_BYTES, arbytes.bytes);
-    /* CR3 is set in vmx_final_setup_guest */
 
     error |= __vmwrite(GUEST_RSP, 0);
     error |= __vmwrite(GUEST_RIP, regs->eip);
 
-    /* Guest EFLAGS */
+    /* Guest EFLAGS. */
     eflags = regs->eflags & ~HVM_EFLAGS_RESERVED_0; /* clear 0s */
     eflags |= HVM_EFLAGS_RESERVED_1; /* set 1s */
     error |= __vmwrite(GUEST_RFLAGS, eflags);
 
     error |= __vmwrite(GUEST_INTERRUPTIBILITY_INFO, 0);
-    __asm__ __volatile__ ("mov %%dr7, %0\n" : "=r" (dr7));
-    error |= __vmwrite(GUEST_DR7, dr7);
+    __asm__ __volatile__ ("mov %%dr7, %0\n" : "=r" (tmp));
+    error |= __vmwrite(GUEST_DR7, tmp);
     error |= __vmwrite(VMCS_LINK_POINTER, ~0UL);
 #if defined(__i386__)
     error |= __vmwrite(VMCS_LINK_POINTER_HIGH, ~0UL);
 #endif
 
-    return error;
-}
-
-static inline int construct_vmcs_host(void)
-{
-    int error = 0;
-#ifdef __x86_64__
-    unsigned long fs_base;
-    unsigned long gs_base;
-#endif
-    unsigned long crn;
-
-    /* Host Selectors */
-    error |= __vmwrite(HOST_ES_SELECTOR, __HYPERVISOR_DS);
-    error |= __vmwrite(HOST_SS_SELECTOR, __HYPERVISOR_DS);
-    error |= __vmwrite(HOST_DS_SELECTOR, __HYPERVISOR_DS);
-#if defined(__i386__)
-    error |= __vmwrite(HOST_FS_SELECTOR, __HYPERVISOR_DS);
-    error |= __vmwrite(HOST_GS_SELECTOR, __HYPERVISOR_DS);
-    error |= __vmwrite(HOST_FS_BASE, 0);
-    error |= __vmwrite(HOST_GS_BASE, 0);
-
-#else
-    rdmsrl(MSR_FS_BASE, fs_base);
-    rdmsrl(MSR_GS_BASE, gs_base);
-    error |= __vmwrite(HOST_FS_BASE, fs_base);
-    error |= __vmwrite(HOST_GS_BASE, gs_base);
-
-#endif
-    error |= __vmwrite(HOST_CS_SELECTOR, __HYPERVISOR_CS);
-
-    __asm__ __volatile__ ("mov %%cr0,%0" : "=r" (crn) : );
-    error |= __vmwrite(HOST_CR0, crn); /* same CR0 */
-
-    /* CR3 is set in vmx_final_setup_hostos */
-    __asm__ __volatile__ ("mov %%cr4,%0" : "=r" (crn) : );
-    error |= __vmwrite(HOST_CR4, crn);
-
-    error |= __vmwrite(HOST_RIP, (unsigned long) vmx_asm_vmexit_handler);
-
-    return error;
-}
-
-/*
- * the working VMCS pointer has been set properly
- * just before entering this function.
- */
-static int construct_vmcs(struct vcpu *v,
-                          cpu_user_regs_t *regs)
-{
-    struct arch_vmx_struct *arch_vmx = &v->arch.hvm_vmx;
-    int error;
-
-    if ( (error = construct_vmcs_controls(arch_vmx)) ) {
-        printk("construct_vmcs: construct_vmcs_controls failed.\n");
-        return error;
-    }
-
-    /* host selectors */
-    if ( (error = construct_vmcs_host()) ) {
-        printk("construct_vmcs: construct_vmcs_host failed.\n");
-        return error;
-    }
-
-    /* guest selectors */
-    if ( (error = construct_init_vmcs_guest(regs)) ) {
-        printk("construct_vmcs: construct_vmcs_guest failed.\n");
-        return error;
-    }
-
-    if ( (error = __vmwrite(EXCEPTION_BITMAP,
-                            MONITOR_DEFAULT_EXCEPTION_BITMAP)) ) {
-        printk("construct_vmcs: setting exception bitmap failed.\n");
-        return error;
-    }
+    error |= __vmwrite(EXCEPTION_BITMAP,
+                       MONITOR_DEFAULT_EXCEPTION_BITMAP);
 
     if ( regs->eflags & EF_TF )
-        error = __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
+        error |= __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
     else
-        error = __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
+        error |= __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
 
     return error;
 }

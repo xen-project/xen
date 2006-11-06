@@ -132,17 +132,20 @@ int sched_init_vcpu(struct vcpu *v, unsigned int processor)
     return SCHED_OP(init_vcpu, v);
 }
 
+void sched_destroy_vcpu(struct vcpu *v)
+{
+    kill_timer(&v->timer);
+    kill_timer(&v->poll_timer);
+    SCHED_OP(destroy_vcpu, v);
+}
+
+int sched_init_domain(struct domain *d)
+{
+    return SCHED_OP(init_domain, d);
+}
+
 void sched_destroy_domain(struct domain *d)
 {
-    struct vcpu *v;
-
-    for_each_vcpu ( d, v )
-    {
-        kill_timer(&v->timer);
-        kill_timer(&v->poll_timer);
-        TRACE_2D(TRC_SCHED_DOM_REM, v->domain->domain_id, v->vcpu_id);
-    }
-
     SCHED_OP(destroy_domain, d);
 }
 

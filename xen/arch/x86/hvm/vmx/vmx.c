@@ -566,8 +566,6 @@ static unsigned long vmx_get_ctrl_reg(struct vcpu *v, unsigned int num)
     return 0;                   /* dummy */
 }
 
-
-
 /* Make sure that xen intercepts any FP accesses from current */
 static void vmx_stts(struct vcpu *v)
 {
@@ -591,19 +589,15 @@ static void vmx_stts(struct vcpu *v)
     }
 }
 
-
 static void vmx_set_tsc_offset(struct vcpu *v, u64 offset)
 {
-    /* VMX depends on operating on the current vcpu */
-    ASSERT(v == current);
-
+    vmx_vmcs_enter(v);
     __vmwrite(TSC_OFFSET, offset);
 #if defined (__i386__)
     __vmwrite(TSC_OFFSET_HIGH, offset >> 32);
 #endif
+    vmx_vmcs_exit(v);
 }
-
-
 
 /* SMP VMX guest support */
 static void vmx_init_ap_context(struct vcpu_guest_context *ctxt,

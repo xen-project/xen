@@ -64,12 +64,16 @@ void free_domain(struct domain *d)
     struct vcpu *v;
     int i;
 
-    sched_destroy_domain(d);
-
     for ( i = MAX_VIRT_CPUS-1; i >= 0; i-- )
-        if ( (v = d->vcpu[i]) != NULL )
-            free_vcpu_struct(v);
+    {
+        if ( (v = d->vcpu[i]) == NULL )
+            continue;
+        vcpu_destroy(v);
+        sched_destroy_vcpu(v);
+        free_vcpu_struct(v);
+    }
 
+    sched_destroy_domain(d);
     xfree(d);
 }
 
@@ -80,7 +84,7 @@ struct vcpu *alloc_vcpu(
 
     BUG_ON(d->vcpu[vcpu_id] != NULL);
 
-    if ( (v = alloc_vcpu_struct(d, vcpu_id)) == NULL )
+    if ( (v = alloc_vcpu_struct()) == NULL )
         return NULL;
 
     v->domain = d;
@@ -94,8 +98,15 @@ struct vcpu *alloc_vcpu(
     if ( (vcpu_id != 0) && !is_idle_domain(d) )
         set_bit(_VCPUF_down, &v->vcpu_flags);
 
-    if ( sched_init_vcpu(v, cpu_id) < 0 )
+    if ( sched_init_vcpu(v, cpu_id) != 0 )
     {
+        free_vcpu_struct(v);
+        return NULL;
+    }
+
+    if ( vcpu_initialise(v) != 0 )
+    {
+        sched_destroy_vcpu(v);
         free_vcpu_struct(v);
         return NULL;
     }
@@ -151,6 +162,9 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags)
     d->iomem_caps = rangeset_new(d, "I/O Memory", RANGESETF_prettyprint_hex);
     d->irq_caps   = rangeset_new(d, "Interrupts", 0);
     if ( (d->iomem_caps == NULL) || (d->irq_caps == NULL) )
+        goto fail4;
+
+    if ( sched_init_domain(d) != 0 )
         goto fail4;
 
     if ( !is_idle_domain(d) )

@@ -275,40 +275,61 @@ void hlt_timer_fn(void *data)
 	vcpu_unblock(v);
 }
 
-struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
+void relinquish_vcpu_resources(struct vcpu *v)
+{
+    if (HAS_PERVCPU_VHPT(v->domain))
+        pervcpu_vhpt_free(v);
+    if (v->arch.privregs != NULL) {
+        free_xenheap_pages(v->arch.privregs,
+                           get_order_from_shift(XMAPPEDREGS_SHIFT));
+        v->arch.privregs = NULL;
+    }
+    kill_timer(&v->arch.hlt_timer);
+}
+
+struct vcpu *alloc_vcpu_struct(void)
 {
 	struct vcpu *v;
 	struct thread_info *ti;
+	static int first_allocation = 1;
 
-	/* Still keep idle vcpu0 static allocated at compilation, due
-	 * to some code from Linux still requires it in early phase.
-	 */
-	if (is_idle_domain(d) && !vcpu_id)
-	    v = idle_vcpu[0];
-	else {
-	    if ((v = alloc_xenheap_pages(KERNEL_STACK_SIZE_ORDER)) == NULL)
-		return NULL;
-	    memset(v, 0, sizeof(*v)); 
-
-	    ti = alloc_thread_info(v);
-	    /* Clear thread_info to clear some important fields, like
-	     * preempt_count
-	     */
-	    memset(ti, 0, sizeof(struct thread_info));
-	    init_switch_stack(v);
+	if (first_allocation) {
+		first_allocation = 0;
+		/* Still keep idle vcpu0 static allocated at compilation, due
+		 * to some code from Linux still requires it in early phase.
+		 */
+		return idle_vcpu[0];
 	}
+
+	if ((v = alloc_xenheap_pages(KERNEL_STACK_SIZE_ORDER)) == NULL)
+		return NULL;
+	memset(v, 0, sizeof(*v)); 
+
+	ti = alloc_thread_info(v);
+	/* Clear thread_info to clear some important fields, like
+	 * preempt_count
+	 */
+	memset(ti, 0, sizeof(struct thread_info));
+	init_switch_stack(v);
+
+	return v;
+}
+
+void free_vcpu_struct(struct vcpu *v)
+{
+	free_xenheap_pages(v, KERNEL_STACK_SIZE_ORDER);
+}
+
+int vcpu_initialise(struct vcpu *v)
+{
+	struct domain *d = v->domain;
+	int rc, order, i;
 
 	if (!is_idle_domain(d)) {
 	    if (!d->arch.is_vti) {
-		int order;
-		int i;
-		// vti domain has its own vhpt policy.
-		if (HAS_PERVCPU_VHPT(d)) {
-			if (pervcpu_vhpt_alloc(v) < 0) {
-				free_xenheap_pages(v, KERNEL_STACK_SIZE_ORDER);
-				return NULL;
-			}
-		}
+		if (HAS_PERVCPU_VHPT(d))
+			if ((rc = pervcpu_vhpt_alloc(v)) != 0)
+				return rc;
 
 		/* Create privregs page only if not VTi. */
 		order = get_order_from_shift(XMAPPEDREGS_SHIFT);
@@ -344,34 +365,20 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 	    v->arch.breakimm = d->arch.breakimm;
 	    v->arch.last_processor = INVALID_PROCESSOR;
 	}
-	if (!VMX_DOMAIN(v)){
+
+	if (!VMX_DOMAIN(v))
 		init_timer(&v->arch.hlt_timer, hlt_timer_fn, v,
 		           first_cpu(cpu_online_map));
-	}
 
-	return v;
+	return 0;
 }
 
-void relinquish_vcpu_resources(struct vcpu *v)
-{
-    if (HAS_PERVCPU_VHPT(v->domain))
-        pervcpu_vhpt_free(v);
-    if (v->arch.privregs != NULL) {
-        free_xenheap_pages(v->arch.privregs,
-                           get_order_from_shift(XMAPPEDREGS_SHIFT));
-        v->arch.privregs = NULL;
-    }
-    kill_timer(&v->arch.hlt_timer);
-}
-
-void free_vcpu_struct(struct vcpu *v)
+void vcpu_destroy(struct vcpu *v)
 {
 	if (v->domain->arch.is_vti)
 		vmx_relinquish_vcpu_resources(v);
 	else
 		relinquish_vcpu_resources(v);
-
-	free_xenheap_pages(v, KERNEL_STACK_SIZE_ORDER);
 }
 
 static void init_switch_stack(struct vcpu *v)

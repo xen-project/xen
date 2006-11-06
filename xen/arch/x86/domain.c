@@ -114,27 +114,30 @@ void dump_pageframe_info(struct domain *d)
     }
 }
 
-struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
+struct vcpu *alloc_vcpu_struct(void)
 {
     struct vcpu *v;
+    if ( (v = xmalloc(struct vcpu)) != NULL )
+        memset(v, 0, sizeof(*v));
+    return v;
+}
 
-    if ( (v = xmalloc(struct vcpu)) == NULL )
-        return NULL;
+void free_vcpu_struct(struct vcpu *v)
+{
+    xfree(v);
+}
 
-    memset(v, 0, sizeof(*v));
-
-    v->vcpu_id = vcpu_id;
-    v->domain  = d;
+int vcpu_initialise(struct vcpu *v)
+{
+    struct domain *d = v->domain;
+    int rc;
 
     v->arch.flags = TF_kernel_mode;
 
     if ( is_hvm_domain(d) )
     {
-        if ( hvm_vcpu_initialise(v) != 0 )
-        {
-            xfree(v);
-            return NULL;
-        }
+        if ( (rc = hvm_vcpu_initialise(v)) != 0 )
+            return rc;
     }
     else
     {
@@ -150,16 +153,15 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
     }
 
     v->arch.perdomain_ptes =
-        d->arch.mm_perdomain_pt + (vcpu_id << GDT_LDT_VCPU_SHIFT);
+        d->arch.mm_perdomain_pt + (v->vcpu_id << GDT_LDT_VCPU_SHIFT);
 
     pae_l3_cache_init(&v->arch.pae_l3_cache);
 
-    return v;
+    return 0;
 }
 
-void free_vcpu_struct(struct vcpu *v)
+void vcpu_destroy(struct vcpu *v)
 {
-    xfree(v);
 }
 
 int arch_domain_create(struct domain *d)
