@@ -285,19 +285,6 @@ static void vmx_set_host_env(struct vcpu *v)
     error |= __vmwrite(HOST_RSP, (unsigned long)get_stack_bottom());
 }
 
-#if 0
-static void vmx_do_launch(struct vcpu *v)
-{
-    if ( v->vcpu_id != 0 )
-    {
-        /* Sync AP's TSC with BSP's */
-        v->arch.hvm_vcpu.cache_tsc_offset = 
-            v->domain->vcpu[0]->arch.hvm_vcpu.cache_tsc_offset;
-        hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
-    }
-}
-#endif
-
 static int construct_vmcs(struct vcpu *v)
 {
     int error = 0;

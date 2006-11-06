@@ -69,9 +69,9 @@ void hvm_stts(struct vcpu *v)
 void hvm_set_guest_time(struct vcpu *v, u64 gtime)
 {
     u64 host_tsc;
-   
+
     rdtscll(host_tsc);
-    
+
     v->arch.hvm_vcpu.cache_tsc_offset = gtime - host_tsc;
     hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
 }
@@ -540,6 +540,11 @@ int hvm_bringup_ap(int vcpuid, int trampoline_vector)
     }
 
     hvm_init_ap_context(ctxt, vcpuid, trampoline_vector);
+
+    /* Sync AP's TSC with BSP's. */
+    v->arch.hvm_vcpu.cache_tsc_offset =
+        v->domain->vcpu[0]->arch.hvm_vcpu.cache_tsc_offset;
+    hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
 
     LOCK_BIGLOCK(d);
     rc = -EEXIST;
