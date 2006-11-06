@@ -38,71 +38,59 @@
 #include <xen/keyhandler.h>
 
 extern int svm_dbg_on;
-extern int asidpool_assign_next( struct vmcb_struct *vmcb, int retire_current,
-                                  int oldcore, int newcore);
+extern int asidpool_assign_next(
+    struct vmcb_struct *vmcb, int retire_current, int oldcore, int newcore);
 
 #define GUEST_SEGMENT_LIMIT 0xffffffff
 
 #define IOPM_SIZE   (12 * 1024)
 #define MSRPM_SIZE  (8  * 1024)
 
-/* VMCBs and HSAs are architecturally defined to be a 4K page each */
-#define VMCB_ORDER 0 
-#define HSA_ORDER  0 
-
-
 struct vmcb_struct *alloc_vmcb(void) 
 {
-    struct vmcb_struct *vmcb = alloc_xenheap_pages(VMCB_ORDER);
+    struct vmcb_struct *vmcb;
 
-    if (!vmcb) {
-        printk("Warning: failed to allocate vmcb.\n");
+    vmcb = alloc_xenheap_page();
+    if ( vmcb == NULL )
+    {
+        printk(XENLOG_WARNING "Warning: failed to allocate vmcb.\n");
         return NULL;
     }
 
-    memset(vmcb, 0, (PAGE_SIZE << VMCB_ORDER));
+    memset(vmcb, 0, PAGE_SIZE);
     return vmcb;
 }
 
-
 void free_vmcb(struct vmcb_struct *vmcb)
 {
-    ASSERT(vmcb);
-    free_xenheap_pages(vmcb, VMCB_ORDER);
+    free_xenheap_page(vmcb);
 }
-
 
 struct host_save_area *alloc_host_save_area(void)
 {
-    struct host_save_area *hsa = alloc_xenheap_pages(HSA_ORDER);
+    struct host_save_area *hsa;
 
-    if (!hsa) {
-        printk("Warning: failed to allocate vmcb.\n");
+    hsa = alloc_xenheap_page();
+    if ( hsa == NULL )
+    {
+        printk(XENLOG_WARNING "Warning: failed to allocate vmcb.\n");
         return NULL;
     }
 
-    memset(hsa, 0, (PAGE_SIZE << HSA_ORDER));
+    memset(hsa, 0, PAGE_SIZE);
     return hsa;
 }
 
-
 void free_host_save_area(struct host_save_area *hsa)
 {
-    ASSERT(hsa);
-    free_xenheap_pages(hsa, HSA_ORDER);
+    free_xenheap_page(hsa);
 }
-
 
 /* Set up intercepts to exit the guest into the hypervisor when we want it. */
 static int construct_vmcb_controls(struct arch_svm_struct *arch_svm)
 {
-    struct vmcb_struct *vmcb;
-    u32 *iopm;
-    u32 *msrpm;
-
-    vmcb = arch_svm->vmcb;
-
-    ASSERT(vmcb);
+    struct vmcb_struct *vmcb = arch_svm->vmcb;
+    u32 *iopm, *msrpm;
 
     /* mask off all general 1 intercepts except those listed here */
     vmcb->general1_intercepts = 
@@ -128,19 +116,19 @@ static int construct_vmcb_controls(struct arch_svm_struct *arch_svm)
 
     /* The following is for I/O and MSR permision map */
     iopm = alloc_xenheap_pages(get_order_from_bytes(IOPM_SIZE));
-    if (iopm)
+    if ( iopm != NULL )
     {
         memset(iopm, 0xff, IOPM_SIZE);
         clear_bit(PC_DEBUG_PORT, iopm);
     }
     msrpm = alloc_xenheap_pages(get_order_from_bytes(MSRPM_SIZE));
-    if (msrpm)
+    if ( msrpm != NULL )
         memset(msrpm, 0xff, MSRPM_SIZE);
 
     arch_svm->iopm = iopm;
     arch_svm->msrpm = msrpm;
 
-    if (! iopm || ! msrpm)
+    if ( !iopm || !msrpm )
         return 1;
 
     vmcb->iopm_base_pa = (u64) virt_to_maddr(iopm);
@@ -261,78 +249,53 @@ static int construct_init_vmcb_guest(struct arch_svm_struct *arch_svm,
     return error;
 }
 
-
-/*
- * destroy the vmcb.
- */
-
 void destroy_vmcb(struct arch_svm_struct *arch_svm)
 {
-    if(arch_svm->vmcb != NULL)
+    if ( arch_svm->vmcb != NULL )
     {
         asidpool_retire(arch_svm->vmcb, arch_svm->asid_core);
-         free_vmcb(arch_svm->vmcb);
+        free_vmcb(arch_svm->vmcb);
     }
-    if(arch_svm->iopm != NULL) {
+
+    if ( arch_svm->iopm != NULL )
+    {
         free_xenheap_pages(
             arch_svm->iopm, get_order_from_bytes(IOPM_SIZE));
         arch_svm->iopm = NULL;
     }
-    if(arch_svm->msrpm != NULL) {
+
+    if ( arch_svm->msrpm != NULL )
+    {
         free_xenheap_pages(
             arch_svm->msrpm, get_order_from_bytes(MSRPM_SIZE));
         arch_svm->msrpm = NULL;
     }
+
     arch_svm->vmcb = NULL;
 }
-
-
-/*
- * construct the vmcb.
- */
 
 int construct_vmcb(struct arch_svm_struct *arch_svm, 
                    struct cpu_user_regs *regs)
 {
-    int error;
-    long rc=0;
-
-    memset(arch_svm, 0, sizeof(struct arch_svm_struct));
-
-    if (!(arch_svm->vmcb = alloc_vmcb())) {
-        printk("Failed to create a new VMCB\n");
-        rc = -ENOMEM;
-        goto err_out;
-    }
-
-    arch_svm->vmcb_pa  = (u64) virt_to_maddr(arch_svm->vmcb);
-
-    if ((error = construct_vmcb_controls(arch_svm))) 
+    if ( construct_vmcb_controls(arch_svm) != 0 )
     {
         printk("construct_vmcb: construct_vmcb_controls failed\n");
-        rc = -EINVAL;         
-        goto err_out;
+        return -EINVAL;
     }
 
-    /* guest selectors */
-    if ((error = construct_init_vmcb_guest(arch_svm, regs))) 
+    if ( construct_init_vmcb_guest(arch_svm, regs) != 0 )
     {
         printk("construct_vmcb: construct_vmcb_guest failed\n");
-        rc = -EINVAL;         
-        goto err_out;
+        return -EINVAL;
     }
 
     arch_svm->vmcb->exception_intercepts = MONITOR_DEFAULT_EXCEPTION_BITMAP;
-    if (regs->eflags & EF_TF)
+    if ( regs->eflags & EF_TF )
         arch_svm->vmcb->exception_intercepts |= EXCEPTION_BITMAP_DB;
     else
         arch_svm->vmcb->exception_intercepts &= ~EXCEPTION_BITMAP_DB;
 
     return 0;
-
-err_out:
-    destroy_vmcb(arch_svm);
-    return rc;
 }
 
 
@@ -340,7 +303,6 @@ void svm_do_launch(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     int core = smp_processor_id();
-    ASSERT(vmcb);
 
     /* Update CR3, GDT, LDT, TR */
     hvm_stts(v);
@@ -348,7 +310,7 @@ void svm_do_launch(struct vcpu *v)
     /* current core is the one we intend to perform the VMRUN on */
     v->arch.hvm_svm.launch_core = v->arch.hvm_svm.asid_core = core;
     clear_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
-    if ( !asidpool_assign_next( vmcb, 0, core, core ))
+    if ( !asidpool_assign_next(vmcb, 0, core, core) )
         BUG();
 
     vmcb->ldtr.sel = 0;
@@ -358,7 +320,7 @@ void svm_do_launch(struct vcpu *v)
 
     vmcb->efer = EFER_SVME; /* Make sure VMRUN won't return with -1 */
     
-    if (svm_dbg_on) 
+    if ( svm_dbg_on )
     {
         unsigned long pt;
         printk("%s: hw_cr3 = %llx\n", __func__, 
@@ -372,13 +334,14 @@ void svm_do_launch(struct vcpu *v)
     /* Set cr3 from hw_cr3 even when guest-visible paging is not enabled */
     vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3; 
 
-    if (svm_dbg_on) 
+    if ( svm_dbg_on )
     {
         printk("%s: cr3 = %lx ", __func__, (unsigned long)vmcb->cr3);
-        printk("init_guest_table: guest_table = 0x%08x, monitor_table = 0x%08x,"
-                " hw_cr3 = 0x%16llx\n", (int)v->arch.guest_table.pfn, 
+        printk("init_guest_table: guest_table = 0x%08x, "
+               "monitor_table = 0x%08x, hw_cr3 = 0x%16llx\n",
+               (int)v->arch.guest_table.pfn, 
                (int)v->arch.monitor_table.pfn, 
-               (unsigned long long) v->arch.hvm_vcpu.hw_cr3);
+               (unsigned long long)v->arch.hvm_vcpu.hw_cr3);
     }
 
     v->arch.schedule_tail = arch_svm_do_resume;

@@ -773,6 +773,15 @@ static int svm_vcpu_initialise(struct vcpu *v)
     v->arch.schedule_tail    = arch_svm_do_launch;
     v->arch.ctxt_switch_from = svm_ctxt_switch_from;
     v->arch.ctxt_switch_to   = svm_ctxt_switch_to;
+
+    if ( (v->arch.hvm_svm.vmcb = alloc_vmcb()) == NULL )
+    {
+        printk("Failed to create a new VMCB\n");
+        return -ENOMEM;
+    }
+
+    v->arch.hvm_svm.vmcb_pa = virt_to_maddr(v->arch.hvm_svm.vmcb);
+
     return 0;
 }
 
