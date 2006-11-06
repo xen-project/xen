@@ -110,18 +110,10 @@ void hvm_do_resume(struct vcpu *v)
     }
 }
 
-void hvm_release_assist_channel(struct vcpu *v)
-{
-    free_xen_event_channel(v, v->arch.hvm_vcpu.xen_port);
-}
-
 int hvm_domain_initialise(struct domain *d)
 {
     struct hvm_domain *platform = &d->arch.hvm_domain;
     int rc;
-
-    if ( !is_hvm_domain(d) )
-        return 0;
 
     if ( !hvm_enabled )
     {
@@ -146,6 +138,20 @@ int hvm_domain_initialise(struct domain *d)
     return 0;
 }
 
+void hvm_domain_destroy(struct domain *d)
+{
+    kill_timer(&d->arch.hvm_domain.pl_time.periodic_tm.timer);
+    rtc_deinit(d);
+    pmtimer_deinit(d);
+
+    if ( d->arch.hvm_domain.shared_page_va )
+        unmap_domain_page_global(
+            (void *)d->arch.hvm_domain.shared_page_va);
+
+    if ( d->arch.hvm_domain.buffered_io_va )
+        unmap_domain_page_global((void *)d->arch.hvm_domain.buffered_io_va);
+}
+
 int hvm_vcpu_initialise(struct vcpu *v)
 {
     struct hvm_domain *platform;
@@ -154,11 +160,19 @@ int hvm_vcpu_initialise(struct vcpu *v)
     if ( (rc = hvm_funcs.vcpu_initialise(v)) != 0 )
         return rc;
 
+    if ( (rc = vlapic_init(v)) != 0 )
+    {
+        hvm_funcs.vcpu_destroy(v);
+        return rc;
+    }
+
     /* Create ioreq event channel. */
     v->arch.hvm_vcpu.xen_port = alloc_unbound_xen_event_channel(v, 0);
     if ( get_sp(v->domain) && get_vio(v->domain, v->vcpu_id) )
         get_vio(v->domain, v->vcpu_id)->vp_eport =
             v->arch.hvm_vcpu.xen_port;
+
+    init_timer(&v->arch.hvm_vcpu.hlt_timer, hlt_timer_fn, v, v->processor);
 
     if ( v->vcpu_id != 0 )
         return 0;
@@ -176,6 +190,16 @@ int hvm_vcpu_initialise(struct vcpu *v)
     hvm_set_guest_time(v, 0);
 
     return 0;
+}
+
+void hvm_vcpu_destroy(struct vcpu *v)
+{
+    kill_timer(&v->arch.hvm_vcpu.hlt_timer);
+    vlapic_destroy(v);
+    hvm_funcs.vcpu_destroy(v);
+
+    /* Event channel is already freed by evtchn_destroy(). */
+    /*free_xen_event_channel(v, v->arch.hvm_vcpu.xen_port);*/
 }
 
 void pic_irq_request(void *data, int level)

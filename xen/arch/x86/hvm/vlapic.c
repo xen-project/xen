@@ -1016,7 +1016,7 @@ static int vlapic_reset(struct vlapic *vlapic)
 
 int vlapic_init(struct vcpu *v)
 {
-    struct vlapic *vlapic = NULL;
+    struct vlapic *vlapic;
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "vlapic_init %d", v->vcpu_id);
 
@@ -1046,4 +1046,19 @@ int vlapic_init(struct vcpu *v)
     vlapic_reset(vlapic);
 
     return 0;
+}
+
+void vlapic_destroy(struct vcpu *v)
+{
+    struct vlapic *vlapic = VLAPIC(v);
+    
+    if ( vlapic == NULL )
+        return;
+
+    VLAPIC(v) = NULL;
+
+    kill_timer(&vlapic->vlapic_timer);
+    unmap_domain_page_global(vlapic->regs);
+    free_domheap_page(vlapic->regs_page);
+    xfree(vlapic);
 }

@@ -74,36 +74,9 @@ static int vmx_vcpu_initialise(struct vcpu *v)
     return 0;
 }
 
-static void vmx_relinquish_guest_resources(struct domain *d)
+static void vmx_vcpu_destroy(struct vcpu *v)
 {
-    struct vcpu *v;
-
-    for_each_vcpu ( d, v )
-    {
-        vmx_destroy_vmcs(v);
-        if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
-            continue;
-        kill_timer(&v->arch.hvm_vcpu.hlt_timer);
-        if ( VLAPIC(v) != NULL )
-        {
-            kill_timer(&VLAPIC(v)->vlapic_timer);
-            unmap_domain_page_global(VLAPIC(v)->regs);
-            free_domheap_page(VLAPIC(v)->regs_page);
-            xfree(VLAPIC(v));
-        }
-        hvm_release_assist_channel(v);
-    }
-
-    kill_timer(&d->arch.hvm_domain.pl_time.periodic_tm.timer);
-    rtc_deinit(d);
-    pmtimer_deinit(d);
-
-    if ( d->arch.hvm_domain.shared_page_va )
-        unmap_domain_page_global(
-            (void *)d->arch.hvm_domain.shared_page_va);
-
-    if ( d->arch.hvm_domain.buffered_io_va )
-        unmap_domain_page_global((void *)d->arch.hvm_domain.buffered_io_va);
+    vmx_destroy_vmcs(v);
 }
 
 #ifdef __x86_64__
@@ -674,7 +647,7 @@ static void vmx_setup_hvm_funcs(void)
     hvm_funcs.disable = stop_vmx;
 
     hvm_funcs.vcpu_initialise = vmx_vcpu_initialise;
-    hvm_funcs.relinquish_guest_resources = vmx_relinquish_guest_resources;
+    hvm_funcs.vcpu_destroy    = vmx_vcpu_destroy;
 
     hvm_funcs.store_cpu_guest_regs = vmx_store_cpu_guest_regs;
     hvm_funcs.load_cpu_guest_regs = vmx_load_cpu_guest_regs;

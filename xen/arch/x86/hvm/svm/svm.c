@@ -61,7 +61,6 @@ extern void svm_dump_inst(unsigned long eip);
 extern int svm_dbg_on;
 void svm_dump_regs(const char *from, struct cpu_user_regs *regs);
 
-static void svm_relinquish_guest_resources(struct domain *d);
 static int svm_do_vmmcall_reset_to_realmode(struct vcpu *v,
                                             struct cpu_user_regs *regs);
 
@@ -777,6 +776,11 @@ static int svm_vcpu_initialise(struct vcpu *v)
     return 0;
 }
 
+static void svm_vcpu_destroy(struct vcpu *v)
+{
+    destroy_vmcb(&v->arch.hvm_svm);
+}
+
 int start_svm(void)
 {
     u32 eax, ecx, edx;
@@ -825,7 +829,7 @@ int start_svm(void)
     hvm_funcs.disable = stop_svm;
 
     hvm_funcs.vcpu_initialise = svm_vcpu_initialise;
-    hvm_funcs.relinquish_guest_resources = svm_relinquish_guest_resources;
+    hvm_funcs.vcpu_destroy    = svm_vcpu_destroy;
 
     hvm_funcs.store_cpu_guest_regs = svm_store_cpu_guest_regs;
     hvm_funcs.load_cpu_guest_regs = svm_load_cpu_guest_regs;
@@ -848,40 +852,6 @@ int start_svm(void)
     hvm_enabled = 1;
 
     return 1;
-}
-
-
-static void svm_relinquish_guest_resources(struct domain *d)
-{
-    struct vcpu *v;
-
-    for_each_vcpu ( d, v )
-    {
-        if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
-            continue;
-
-        destroy_vmcb(&v->arch.hvm_svm);
-        kill_timer(&v->arch.hvm_vcpu.hlt_timer);
-        if ( VLAPIC(v) != NULL )
-        {
-            kill_timer(&VLAPIC(v)->vlapic_timer);
-            unmap_domain_page_global(VLAPIC(v)->regs);
-            free_domheap_page(VLAPIC(v)->regs_page);
-            xfree(VLAPIC(v));
-        }
-        hvm_release_assist_channel(v);
-    }
-
-    kill_timer(&d->arch.hvm_domain.pl_time.periodic_tm.timer);
-    rtc_deinit(d);
-    pmtimer_deinit(d);
-
-    if ( d->arch.hvm_domain.shared_page_va )
-        unmap_domain_page_global(
-            (void *)d->arch.hvm_domain.shared_page_va);
-
-    if ( d->arch.hvm_domain.buffered_io_va )
-        unmap_domain_page_global((void *)d->arch.hvm_domain.buffered_io_va);
 }
 
 

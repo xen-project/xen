@@ -77,7 +77,8 @@ int vlapic_find_highest_irr(struct vlapic *vlapic);
 
 int cpu_get_apic_interrupt(struct vcpu *v, int *mode);
 
-int vlapic_init(struct vcpu *vc);
+int  vlapic_init(struct vcpu *v);
+void vlapic_destroy(struct vcpu *v);
 
 void vlapic_msr_set(struct vlapic *vlapic, uint64_t value);
 

@@ -235,7 +235,7 @@ int arch_domain_create(struct domain *d)
             virt_to_page(d->shared_info), d, XENSHARE_writable);
     }
 
-    return hvm_domain_initialise(d);
+    return is_hvm_domain(d) ? hvm_domain_initialise(d) : 0;
 
  fail:
     free_xenheap_page(d->shared_info);
@@ -249,6 +249,15 @@ int arch_domain_create(struct domain *d)
 
 void arch_domain_destroy(struct domain *d)
 {
+    struct vcpu *v;
+
+    if ( is_hvm_domain(d) )
+    {
+        for_each_vcpu ( d, v )
+            hvm_vcpu_destroy(v);
+        hvm_domain_destroy(d);
+    }
+
     shadow_final_teardown(d);
 
     free_xenheap_pages(
@@ -973,9 +982,6 @@ void domain_relinquish_resources(struct domain *d)
         }
 #endif
     }
-
-    if ( is_hvm_domain(d) )
-        hvm_relinquish_guest_resources(d);
 
     /* Tear down shadow mode stuff. */
     shadow_teardown(d);

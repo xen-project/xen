@@ -193,11 +193,7 @@ void vmx_vmcs_enter(struct vcpu *v)
 {
     /*
      * NB. We must *always* run an HVM VCPU on its own VMCS, except for
-     * vmx_vmcs_enter/exit critical regions. This leads to some TODOs:
-     *  1. VMPTRLD as soon as we context-switch to a HVM VCPU.
-     *  2. VMCS destruction needs to happen later (from domain_destroy()).
-     * We can relax this a bit if a paused VCPU always commits its
-     * architectural state to a software structure.
+     * vmx_vmcs_enter/exit critical regions.
      */
     if ( v == current )
         return;
@@ -415,11 +411,6 @@ static int construct_vmcs(struct vcpu *v)
     v->arch.hvm_vmx.cpu_shadow_cr4 =
         cr4 & ~(X86_CR4_PGE | X86_CR4_VMXE | X86_CR4_PAE);
     error |= __vmwrite(CR4_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr4);
-
-    /* XXX Move this out. */
-    init_timer(&v->arch.hvm_vcpu.hlt_timer, hlt_timer_fn, v, v->processor);
-    if ( vlapic_init(v) != 0 )
-        return -1;
 
 #ifdef __x86_64__ 
     /* VLAPIC TPR optimisation. */
