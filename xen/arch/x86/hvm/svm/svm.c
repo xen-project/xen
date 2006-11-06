@@ -751,6 +751,8 @@ static int svm_vcpu_initialise(struct vcpu *v)
     v->arch.ctxt_switch_from = svm_ctxt_switch_from;
     v->arch.ctxt_switch_to   = svm_ctxt_switch_to;
 
+    v->arch.hvm_svm.saved_irq_vector = -1;
+
     if ( (rc = svm_create_vmcb(v)) != 0 )
     {
         dprintk(XENLOG_WARNING,
@@ -2503,7 +2505,6 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     exit_reason = vmcb->exitcode;
     save_svm_cpu_user_regs(v, regs);
 
-    vmcb->tlb_control = 1;
     v->arch.hvm_svm.inject_event = 0;
 
     if (exit_reason == VMEXIT_INVALID)

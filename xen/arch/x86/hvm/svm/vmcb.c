@@ -93,6 +93,9 @@ static int construct_vmcb(struct vcpu *v)
     segment_attributes_t attrib;
     unsigned long dr7;
 
+    /* Always flush the TLB on VMRUN. */
+    vmcb->tlb_control = 1;
+
     /* SVM intercepts. */
     vmcb->general1_intercepts = 
         GENERAL1_INTERCEPT_INTR         | GENERAL1_INTERCEPT_NMI         |
@@ -137,6 +140,9 @@ static int construct_vmcb(struct vcpu *v)
     /* TSC. */
     vmcb->tsc_offset = 0;
     
+    /* Guest EFER: *must* contain SVME or VMRUN will fail. */
+    vmcb->efer = EFER_SVME;
+
     /* Guest segment limits. */
     vmcb->cs.limit = GUEST_SEGMENT_LIMIT;
     vmcb->es.limit = GUEST_SEGMENT_LIMIT;
@@ -178,11 +184,10 @@ static int construct_vmcb(struct vcpu *v)
     vmcb->gdtr.limit = 0;
 
     /* Guest LDT. */
-    attrib.fields.s = 0;      /* not code or data segement */
-    attrib.fields.type = 0x2; /* LDT */
-    attrib.fields.db = 0;     /* 16-bit */
-    attrib.fields.g = 0;
-    vmcb->ldtr.attributes = attrib;
+    vmcb->ldtr.sel = 0;
+    vmcb->ldtr.base = 0;
+    vmcb->ldtr.limit = 0;
+    vmcb->ldtr.attributes.bytes = 0;
 
     /* Guest TSS. */
     attrib.fields.type = 0xb; /* 32-bit TSS (busy) */
@@ -202,6 +207,9 @@ static int construct_vmcb(struct vcpu *v)
     /* Guest DR7. */
     __asm__ __volatile__ ("mov %%dr7, %0\n" : "=r" (dr7));
     vmcb->dr7 = dr7;
+
+    shadow_update_paging_modes(v);
+    vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3; 
 
     arch_svm->vmcb->exception_intercepts = MONITOR_DEFAULT_EXCEPTION_BITMAP;
 
@@ -263,7 +271,6 @@ void svm_do_launch(struct vcpu *v)
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     int core = smp_processor_id();
 
-    /* Update CR3, GDT, LDT, TR */
     hvm_stts(v);
 
     /* current core is the one we intend to perform the VMRUN on */
@@ -272,50 +279,8 @@ void svm_do_launch(struct vcpu *v)
     if ( !asidpool_assign_next(vmcb, 0, core, core) )
         BUG();
 
-    vmcb->ldtr.sel = 0;
-    vmcb->ldtr.base = 0;
-    vmcb->ldtr.limit = 0;
-    vmcb->ldtr.attributes.bytes = 0;
-
-    vmcb->efer = EFER_SVME; /* Make sure VMRUN won't return with -1 */
-    
-    if ( svm_dbg_on )
-    {
-        unsigned long pt;
-        printk("%s: hw_cr3 = %llx\n", __func__, 
-               (unsigned long long) v->arch.hvm_vcpu.hw_cr3);
-        pt = pagetable_get_paddr(v->arch.guest_table);
-        printk("%s: guest_table  = %lx\n", __func__, pt);
-        pt = pagetable_get_paddr(v->domain->arch.phys_table);
-        printk("%s: phys_table   = %lx\n", __func__, pt);
-    }
-
-    /* Set cr3 from hw_cr3 even when guest-visible paging is not enabled */
-    vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3; 
-
-    if ( svm_dbg_on )
-    {
-        printk("%s: cr3 = %lx ", __func__, (unsigned long)vmcb->cr3);
-        printk("init_guest_table: guest_table = 0x%08x, "
-               "monitor_table = 0x%08x, hw_cr3 = 0x%16llx\n",
-               (int)v->arch.guest_table.pfn, 
-               (int)v->arch.monitor_table.pfn, 
-               (unsigned long long)v->arch.hvm_vcpu.hw_cr3);
-    }
-
     v->arch.schedule_tail = arch_svm_do_resume;
-
-    v->arch.hvm_svm.saved_irq_vector = -1;
-
-    hvm_set_guest_time(v, 0);
-
-    if (svm_dbg_on)
-        svm_dump_vmcb(__func__, vmcb);
-
-    vmcb->tlb_control = 1;
 }
-
-
 
 static void svm_dump_sel(char *name, segment_selector_t *s)
 {
@@ -323,7 +288,6 @@ static void svm_dump_sel(char *name, segment_selector_t *s)
            name, s->sel, s->attributes.bytes, s->limit,
            (unsigned long long)s->base);
 }
-
 
 void svm_dump_vmcb(const char *from, struct vmcb_struct *vmcb)
 {
