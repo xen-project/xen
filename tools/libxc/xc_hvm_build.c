@@ -222,15 +222,6 @@ static int setup_guest(int xc_handle,
         goto error_out;
     }
 
-    if ( (nr_pages > 0xa0) &&
-         xc_domain_memory_decrease_reservation(
-             xc_handle, dom, (nr_pages < 0xc0) ? (nr_pages - 0xa0) : 0x20,
-             0, &page_array[0xa0]) )
-    {
-        PERROR("Could not free VGA hole.\n");
-        goto error_out;
-    }
-
     if ( xc_domain_translate_gpfn_list(xc_handle, dom, nr_pages,
                                        page_array, page_array) )
     {
