@@ -133,7 +133,7 @@ int hvm_domain_initialise(struct domain *d)
     pic_init(&platform->vpic, pic_irq_request, &platform->interrupt_request);
     register_pic_io_hook(d);
 
-    hvm_vioapic_init(d);
+    vioapic_init(d);
 
     return 0;
 }
@@ -219,15 +219,15 @@ u64 hvm_get_guest_time(struct vcpu *v)
 int cpu_get_interrupt(struct vcpu *v, int *type)
 {
     int intno;
-    struct hvm_virpic *s = &v->domain->arch.hvm_domain.vpic;
+    struct vpic *vpic = domain_vpic(v->domain);
     unsigned long flags;
 
     if ( (intno = cpu_get_apic_interrupt(v, type)) != -1 ) {
         /* set irq request if a PIC irq is still pending */
         /* XXX: improve that */
-        spin_lock_irqsave(&s->lock, flags);
-        pic_update_irq(s);
-        spin_unlock_irqrestore(&s->lock, flags);
+        spin_lock_irqsave(&vpic->lock, flags);
+        pic_update_irq(vpic);
+        spin_unlock_irqrestore(&vpic->lock, flags);
         return intno;
     }
     /* read the irq from the PIC */
@@ -674,7 +674,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         rc = -EINVAL;
         if ( is_hvm_domain(d) )
         {
-            pic_set_irq(&d->arch.hvm_domain.vpic, op.irq, op.level);
+            pic_set_irq(domain_vpic(d), op.irq, op.level);
             rc = 0;
         }
 

@@ -35,8 +35,8 @@ struct hvm_domain {
     s64                    tsc_frequency;
     struct pl_time         pl_time;
 
-    struct hvm_virpic      vpic;
-    struct hvm_vioapic     vioapic;
+    struct vpic            vpic;
+    struct vioapic         vioapic;
     struct hvm_io_handler  io_handler;
 
     unsigned char          round_info[256];

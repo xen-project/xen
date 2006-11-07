@@ -432,7 +432,7 @@ void vlapic_EOI_set(struct vlapic *vlapic)
     vlapic_clear_vector(vector, vlapic->regs + APIC_ISR);
 
     if ( vlapic_test_and_clear_vector(vector, vlapic->regs + APIC_TMR) )
-        ioapic_update_EOI(vlapic_domain(vlapic), vector);
+        vioapic_update_EOI(vlapic_domain(vlapic), vector);
 }
 
 static void vlapic_ipi(struct vlapic *vlapic)
@@ -1001,7 +1001,7 @@ int vlapic_init(struct vcpu *v)
     if ( v->vcpu_id == 0 )
         vlapic->apic_base_msr |= MSR_IA32_APICBASE_BSP;
 
-    hvm_vioapic_add_lapic(vlapic, v);
+    vioapic_add_lapic(vlapic, v);
 
     init_timer(&vlapic->vlapic_timer,
                   vlapic_timer_fn, vlapic, v->processor);

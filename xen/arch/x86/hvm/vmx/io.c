@@ -99,7 +99,7 @@ asmlinkage void vmx_intr_assist(void)
     struct vlapic *vlapic = vcpu_vlapic(v);
     struct hvm_domain *plat=&v->domain->arch.hvm_domain;
     struct periodic_time *pt = &plat->pl_time.periodic_tm;
-    struct hvm_virpic *pic= &plat->vpic;
+    struct vpic *pic= &plat->vpic;
     unsigned int idtv_info_field;
     unsigned long inst_len;
     int    has_ext_irq;

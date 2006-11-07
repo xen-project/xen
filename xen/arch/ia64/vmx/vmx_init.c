@@ -456,7 +456,7 @@ void vmx_setup_platform(struct domain *d)
 	spin_lock_init(&d->arch.arch_vmx.virq_assist_lock);
 
 	/* Initialize iosapic model within hypervisor */
-	hvm_vioapic_init(d);
+	vioapic_init(d);
 }
 
 void vmx_do_launch(struct vcpu *v)

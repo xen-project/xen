@@ -4,10 +4,10 @@
  * Copyright (c) 2003-2004 Fabrice Bellard
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
  * The above copyright notice and this permission notice shall be included in
@@ -17,9 +17,9 @@
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
  * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
 #include <asm/mc146818rtc.h>
@@ -263,8 +263,8 @@ static void rtc_update_second(void *opaque)
 static void rtc_update_second2(void *opaque)
 {
     RTCState *s = opaque;
-    struct hvm_domain *plat=&s->vcpu->domain->arch.hvm_domain;
-    struct hvm_virpic *pic= &plat->vpic;
+    struct hvm_domain *plat = &s->vcpu->domain->arch.hvm_domain;
+    struct vpic       *pic  = &plat->vpic;
 
     if (!(s->cmos_data[RTC_REG_B] & RTC_SET)) {
         rtc_copy_date(s);
@@ -302,8 +302,8 @@ static void rtc_update_second2(void *opaque)
 static uint32_t rtc_ioport_read(void *opaque, uint32_t addr)
 {
     RTCState *s = opaque;
-    struct hvm_domain *plat=&s->vcpu->domain->arch.hvm_domain;
-    struct hvm_virpic *pic= &plat->vpic;
+    struct hvm_domain *plat = &s->vcpu->domain->arch.hvm_domain;
+    struct vpic       *pic  = &plat->vpic;
     int ret;
 
     if ((addr & 1) == 0) {

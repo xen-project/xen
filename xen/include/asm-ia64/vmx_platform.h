@@ -32,7 +32,7 @@ typedef struct virtual_platform_def {
     unsigned long       params[HVM_NR_PARAMS];
     struct mmio_list    *mmio;
     /* One IOSAPIC now... */
-    struct hvm_vioapic  vioapic;
+    struct vioapic      vioapic;
 } vir_plat_t;
 
 static inline int __fls(uint32_t word)

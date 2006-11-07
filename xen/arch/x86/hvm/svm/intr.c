@@ -65,7 +65,7 @@ asmlinkage void svm_intr_assist(void)
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     struct hvm_domain *plat=&v->domain->arch.hvm_domain;
     struct periodic_time *pt = &plat->pl_time.periodic_tm;
-    struct hvm_virpic *pic= &plat->vpic;
+    struct vpic *pic= &plat->vpic;
     int callback_irq;
     int intr_type = APIC_DM_EXTINT;
     int intr_vector = -1;

@@ -324,7 +324,7 @@ void vtm_domain_in(VCPU *vcpu)
  */
 
 #ifdef V_IOSAPIC_READY
-int ioapic_match_logical_addr(hvm_vioapic_t *s, int number, uint16_t dest)
+int ioapic_match_logical_addr(struct vioapic *s, int number, uint16_t dest)
 {
     return (VLAPIC_ID(s->lapic_info[number]) == dest);
 }
@@ -335,14 +335,14 @@ struct vlapic* apic_round_robin(struct domain *d,
 				uint32_t bitmap)
 {
     uint8_t bit;
-    hvm_vioapic_t *s;
+    struct vioapic *s;
     
     if (!bitmap) {
 	printk("<apic_round_robin> no bit on bitmap\n");
 	return NULL;
     }
 
-    s = &d->arch.vmx_platform.vioapic;
+    s = domain_vioapic(d);
     for (bit = 0; bit < s->lapic_count; bit++) {
 	if (bitmap & (1 << bit))
 	    return s->lapic_info[bit];
@@ -375,7 +375,7 @@ void vlsapic_reset(VCPU *vcpu)
 
 #ifdef V_IOSAPIC_READY
     vcpu->arch.arch_vmx.vlapic.vcpu = vcpu;
-    hvm_vioapic_add_lapic(&vcpu->arch.arch_vmx.vlapic, vcpu);
+    vioapic_add_lapic(&vcpu->arch.arch_vmx.vlapic, vcpu);
 #endif
     dprintk(XENLOG_INFO, "VLSAPIC inservice base=%p\n", &VLSAPIC_INSVC(vcpu,0) );
 }

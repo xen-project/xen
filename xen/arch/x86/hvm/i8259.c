@@ -5,10 +5,10 @@
  * Copyright (c) 2005 Intel Corperation
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
  * The above copyright notice and this permission notice shall be included in
@@ -18,10 +18,11 @@
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
  * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
+
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/mm.h>
@@ -33,6 +34,8 @@
 #include <asm/hvm/io.h>
 #include <asm/hvm/support.h>
 #include <asm/current.h>
+
+#define hw_error(x) ((void)0)
 
 /* set irq level. If an edge is detected, then the IRR is set to 1 */
 static inline void pic_set_irq1(PicState *s, int irq, int level)
@@ -108,38 +111,38 @@ static int pic_get_irq(PicState *s)
 /* raise irq to CPU if necessary. must be called every time the active
    irq may change */
 /* XXX: should not export it, but it is needed for an APIC kludge */
-void pic_update_irq(struct hvm_virpic *s)
+void pic_update_irq(struct vpic *vpic)
 {
     int irq2, irq;
 
-    ASSERT(spin_is_locked(&s->lock));
+    ASSERT(spin_is_locked(&vpic->lock));
 
     /* first look at slave pic */
-    irq2 = pic_get_irq(&s->pics[1]);
+    irq2 = pic_get_irq(&vpic->pics[1]);
     if (irq2 >= 0) {
         /* if irq request by slave pic, signal master PIC */
-        pic_set_irq1(&s->pics[0], 2, 1);
-        pic_set_irq1(&s->pics[0], 2, 0);
+        pic_set_irq1(&vpic->pics[0], 2, 1);
+        pic_set_irq1(&vpic->pics[0], 2, 0);
     }
     /* look at requested irq */
-    irq = pic_get_irq(&s->pics[0]);
+    irq = pic_get_irq(&vpic->pics[0]);
     if (irq >= 0) {
-        s->irq_request(s->irq_request_opaque, 1);
+        vpic->irq_request(vpic->irq_request_opaque, 1);
     }
 }
 
 void pic_set_xen_irq(void *opaque, int irq, int level)
 {
-    struct hvm_virpic *s = opaque;
+    struct vpic *vpic = opaque;
     unsigned long flags;
     PicState *ps;
 
-    spin_lock_irqsave(&s->lock, flags);
+    spin_lock_irqsave(&vpic->lock, flags);
 
-    hvm_vioapic_set_xen_irq(current->domain, irq, level);
+    vioapic_set_xen_irq(current->domain, irq, level);
 
     /* Set it on the 8259s */
-    ps = &s->pics[irq >> 3];
+    ps = &vpic->pics[irq >> 3];
     if (!(ps->elcr & (1 << (irq & 7))))
 	gdprintk(XENLOG_WARNING, "edge-triggered override IRQ?\n");
     if (level) {
@@ -148,26 +151,25 @@ void pic_set_xen_irq(void *opaque, int irq, int level)
 	ps->irr_xen &= ~(1 << (irq & 7));
     }
 
-    pic_update_irq(s);
-    spin_unlock_irqrestore(&s->lock, flags);
+    pic_update_irq(vpic);
+    spin_unlock_irqrestore(&vpic->lock, flags);
 }
 
-void pic_set_irq(struct hvm_virpic *s, int irq, int level)
+void pic_set_irq(struct vpic *vpic, int irq, int level)
 {
     unsigned long flags;
 
     if ( irq < 0 )
         return;
 
-    spin_lock_irqsave(&s->lock, flags);
-    hvm_vioapic_set_irq(container_of(s, struct domain, arch.hvm_domain.vpic),
-                        irq, level);
+    spin_lock_irqsave(&vpic->lock, flags);
+    vioapic_set_irq(vpic_domain(vpic), irq, level);
     if ( irq < 16 )
     {
-        pic_set_irq1(&s->pics[irq >> 3], irq & 7, level);
-        pic_update_irq(s);
+        pic_set_irq1(&vpic->pics[irq >> 3], irq & 7, level);
+        pic_update_irq(vpic);
     }
-    spin_unlock_irqrestore(&s->lock, flags);
+    spin_unlock_irqrestore(&vpic->lock, flags);
 }
 
 /* acknowledge interrupt 'irq' */
@@ -186,37 +188,37 @@ static inline void pic_intack(PicState *s, int irq)
         s->irr &= ~(1 << irq);
 }
 
-static int pic_read_irq(struct hvm_virpic *s)
+static int pic_read_irq(struct vpic *vpic)
 {
     int irq, irq2, intno;
     unsigned long flags;
 
-    spin_lock_irqsave(&s->lock, flags);
-    irq = pic_get_irq(&s->pics[0]);
+    spin_lock_irqsave(&vpic->lock, flags);
+    irq = pic_get_irq(&vpic->pics[0]);
     if (irq >= 0) {
-        pic_intack(&s->pics[0], irq);
+        pic_intack(&vpic->pics[0], irq);
         if (irq == 2) {
-            irq2 = pic_get_irq(&s->pics[1]);
+            irq2 = pic_get_irq(&vpic->pics[1]);
             if (irq2 >= 0) {
-                pic_intack(&s->pics[1], irq2);
+                pic_intack(&vpic->pics[1], irq2);
             } else {
                 /* spurious IRQ on slave controller */
 		gdprintk(XENLOG_WARNING, "Spurious irq on slave i8259.\n");
                 irq2 = 7;
             }
-            intno = s->pics[1].irq_base + irq2;
+            intno = vpic->pics[1].irq_base + irq2;
             irq = irq2 + 8;
         } else {
-            intno = s->pics[0].irq_base + irq;
+            intno = vpic->pics[0].irq_base + irq;
         }
     } else {
         /* spurious IRQ on host controller */
         irq = 7;
-        intno = s->pics[0].irq_base + irq;
+        intno = vpic->pics[0].irq_base + irq;
 	gdprintk(XENLOG_WARNING, "Spurious irq on master i8259.\n");
     }
-    pic_update_irq(s);
-    spin_unlock_irqrestore(&s->lock, flags);
+    pic_update_irq(vpic);
+    spin_unlock_irqrestore(&vpic->lock, flags);
 
     return intno;
 }
@@ -414,28 +416,28 @@ static void pic_init1(int io_addr, int elcr_addr, PicState *s)
     s->elcr = 0xff & s->elcr_mask;
 }
 
-void pic_init(struct hvm_virpic *s, void (*irq_request)(void *, int),
+void pic_init(struct vpic *vpic, void (*irq_request)(void *, int),
               void *irq_request_opaque)
 {
     unsigned long flags;
 
-    memset(s, 0, sizeof(*s));
-    spin_lock_init(&s->lock);
-    s->pics[0].pics_state = s;
-    s->pics[1].pics_state = s;
-    s->pics[0].elcr_mask = 0xf8;
-    s->pics[1].elcr_mask = 0xde;
-    spin_lock_irqsave(&s->lock, flags);
-    pic_init1(0x20, 0x4d0, &s->pics[0]);
-    pic_init1(0xa0, 0x4d1, &s->pics[1]);
-    spin_unlock_irqrestore(&s->lock, flags);
-    s->irq_request = irq_request;
-    s->irq_request_opaque = irq_request_opaque;
+    memset(vpic, 0, sizeof(*vpic));
+    spin_lock_init(&vpic->lock);
+    vpic->pics[0].pics_state = vpic;
+    vpic->pics[1].pics_state = vpic;
+    vpic->pics[0].elcr_mask = 0xf8;
+    vpic->pics[1].elcr_mask = 0xde;
+    spin_lock_irqsave(&vpic->lock, flags);
+    pic_init1(0x20, 0x4d0, &vpic->pics[0]);
+    pic_init1(0xa0, 0x4d1, &vpic->pics[1]);
+    spin_unlock_irqrestore(&vpic->lock, flags);
+    vpic->irq_request = irq_request;
+    vpic->irq_request_opaque = irq_request_opaque;
 }
 
 static int intercept_pic_io(ioreq_t *p)
 {
-    struct hvm_virpic *pic;
+    struct vpic *pic;
     uint32_t data;
     unsigned long flags;
 
@@ -444,7 +446,7 @@ static int intercept_pic_io(ioreq_t *p)
         return 1;
     }
 
-    pic = &current->domain->arch.hvm_domain.vpic;
+    pic = domain_vpic(current->domain);
     if ( p->dir == IOREQ_WRITE ) {
         if ( p->data_is_ptr )
             (void)hvm_copy_from_guest_phys(&data, p->data, p->size);
@@ -470,7 +472,7 @@ static int intercept_pic_io(ioreq_t *p)
 
 static int intercept_elcr_io(ioreq_t *p)
 {
-    struct hvm_virpic *s;
+    struct vpic *vpic;
     uint32_t data;
     unsigned long flags;
 
@@ -479,20 +481,20 @@ static int intercept_elcr_io(ioreq_t *p)
         return 1;
     }
 
-    s = &current->domain->arch.hvm_domain.vpic;
+    vpic = domain_vpic(current->domain);
     if ( p->dir == IOREQ_WRITE ) {
         if ( p->data_is_ptr )
             (void)hvm_copy_from_guest_phys(&data, p->data, p->size);
         else
             data = p->data;
-        spin_lock_irqsave(&s->lock, flags);
-        elcr_ioport_write((void*)&s->pics[p->addr&1],
+        spin_lock_irqsave(&vpic->lock, flags);
+        elcr_ioport_write((void*)&vpic->pics[p->addr&1],
                 (uint32_t) p->addr, (uint32_t)( data & 0xff));
-        spin_unlock_irqrestore(&s->lock, flags);
+        spin_unlock_irqrestore(&vpic->lock, flags);
     }
     else {
         data = (u64) elcr_ioport_read(
-                (void*)&s->pics[p->addr&1], (uint32_t) p->addr);
+                (void*)&vpic->pics[p->addr&1], (uint32_t) p->addr);
         if ( p->data_is_ptr )
             (void)hvm_copy_to_guest_phys(p->data, &data, p->size);
         else
@@ -514,7 +516,7 @@ void register_pic_io_hook(struct domain *d)
 int cpu_get_pic_interrupt(struct vcpu *v, int *type)
 {
     int intno;
-    struct hvm_virpic *s = &v->domain->arch.hvm_domain.vpic;
+    struct vpic *vpic = domain_vpic(v->domain);
     struct hvm_domain *plat = &v->domain->arch.hvm_domain;
 
     if ( !vlapic_accept_pic_intr(v) )
@@ -524,7 +526,7 @@ int cpu_get_pic_interrupt(struct vcpu *v, int *type)
         return -1;
 
     /* read the irq from the PIC */
-    intno = pic_read_irq(s);
+    intno = pic_read_irq(vpic);
     *type = APIC_DM_EXTINT;
     return intno;
 }
@@ -539,10 +541,9 @@ int is_periodic_irq(struct vcpu *v, int irq, int type)
 
     if (pt->irq == 0) { /* Is it pit irq? */
         if (type == APIC_DM_EXTINT)
-            vec = v->domain->arch.hvm_domain.vpic.pics[0].irq_base;
+            vec = domain_vpic(v->domain)->pics[0].irq_base;
         else
-            vec =
-              v->domain->arch.hvm_domain.vioapic.redirtbl[0].RedirForm.vector;
+            vec = domain_vioapic(v->domain)->redirtbl[0].fields.vector;
 
         if (irq == vec)
             return 1;
@@ -550,10 +551,9 @@ int is_periodic_irq(struct vcpu *v, int irq, int type)
 
     if (pt->irq == 8) { /* Or rtc irq? */
         if (type == APIC_DM_EXTINT)
-            vec = v->domain->arch.hvm_domain.vpic.pics[1].irq_base;
+            vec = domain_vpic(v->domain)->pics[1].irq_base;
         else
-            vec =
-              v->domain->arch.hvm_domain.vioapic.redirtbl[8].RedirForm.vector;
+            vec = domain_vioapic(v->domain)->redirtbl[8].fields.vector;
 
         if (irq == vec)
             return is_rtc_periodic_irq(vrtc);
@@ -564,10 +564,10 @@ int is_periodic_irq(struct vcpu *v, int irq, int type)
 
 int is_irq_enabled(struct vcpu *v, int irq)
 {
-    struct hvm_vioapic *vioapic = &v->domain->arch.hvm_domain.vioapic;
-    struct hvm_virpic *vpic=&v->domain->arch.hvm_domain.vpic;
+    struct vioapic *vioapic = domain_vioapic(v->domain);
+    struct vpic    *vpic    = domain_vpic(v->domain);
 
-    if (vioapic->redirtbl[irq].RedirForm.mask == 0)
+    if (vioapic->redirtbl[irq].fields.mask == 0)
        return 1;
 
     if ( irq & 8 ) {
