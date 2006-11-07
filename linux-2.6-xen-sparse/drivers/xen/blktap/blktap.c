@@ -93,8 +93,9 @@ int setup_xen_class(void)
  * mmap_alloc is initialised to 2 and should be adjustable on the fly via
  * sysfs.
  */
-#define MAX_DYNAMIC_MEM 64
-#define MAX_PENDING_REQS 64   
+#define BLK_RING_SIZE		__RING_SIZE((blkif_sring_t *)0, PAGE_SIZE)
+#define MAX_DYNAMIC_MEM		BLK_RING_SIZE
+#define MAX_PENDING_REQS	BLK_RING_SIZE
 #define MMAP_PAGES (MAX_PENDING_REQS * BLKIF_MAX_SEGMENTS_PER_REQUEST)
 #define MMAP_VADDR(_start, _req,_seg)                                   \
         (_start +                                                       \
@@ -215,6 +216,7 @@ struct grant_handle_pair
         grant_handle_t kernel;
         grant_handle_t user;
 };
+#define INVALID_GRANT_HANDLE	0xFFFF
 
 static struct grant_handle_pair 
     pending_grant_handles[MAX_DYNAMIC_MEM][MMAP_PAGES];
@@ -293,10 +295,11 @@ static inline int GET_NEXT_REQ(unsigned long *idx_map)
 
 
 #define BLKTAP_INVALID_HANDLE(_g) \
-    (((_g->kernel) == 0xFFFF) && ((_g->user) == 0xFFFF))
+    (((_g->kernel) == INVALID_GRANT_HANDLE) &&  \
+     ((_g->user) == INVALID_GRANT_HANDLE))
 
 #define BLKTAP_INVALIDATE_HANDLE(_g) do {       \
-    (_g)->kernel = 0xFFFF; (_g)->user = 0xFFFF; \
+    (_g)->kernel = INVALID_GRANT_HANDLE; (_g)->user = INVALID_GRANT_HANDLE; \
     } while(0)
 
 
@@ -588,8 +591,6 @@ static int blktap_mmap(struct file *filp, struct vm_area_struct *vma)
 	info->user_vstart  = info->rings_vstart + (RING_PAGES << PAGE_SHIFT);
     
 	/* Map the ring pages to the start of the region and reserve it. */
-	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-
 	if (remap_pfn_range(vma, vma->vm_start, 
 			    __pa(info->ufe_ring.sring) >> PAGE_SHIFT, 
 			    PAGE_SIZE, vma->vm_page_prot)) {
@@ -892,14 +893,14 @@ static void fast_flush_area(pending_req_t *req, int k_idx, int u_idx,
 
 		khandle = &pending_handle(mmap_idx, k_idx, i);
 
-		if (khandle->kernel != 0xFFFF) {
+		if (khandle->kernel != INVALID_GRANT_HANDLE) {
 			gnttab_set_unmap_op(&unmap[invcount],
 					    idx_to_kaddr(mmap_idx, k_idx, i),
 					    GNTMAP_host_map, khandle->kernel);
 			invcount++;
 		}
 
-		if (khandle->user != 0xFFFF) {
+		if (khandle->user != INVALID_GRANT_HANDLE) {
 			if (create_lookup_pte_addr(
 				info->vma->vm_mm,
 				MMAP_VADDR(info->user_vstart, u_idx, i),
@@ -1186,8 +1187,10 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 
 	/* Check we have space on user ring - should never fail. */
 	usr_idx = GET_NEXT_REQ(info->idx_map);
-	if (usr_idx == INVALID_REQ)
+	if (usr_idx == INVALID_REQ) {
+		BUG();
 		goto fail_response;
+	}
 
 	/* Check that number of segments is sane. */
 	nseg = req->nr_segments;
@@ -1221,14 +1224,12 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 		unsigned long uvaddr;
 		unsigned long kvaddr;
 		uint64_t ptep;
-		struct page *page;
 		uint32_t flags;
 
 		uvaddr = MMAP_VADDR(info->user_vstart, usr_idx, i);
 		kvaddr = idx_to_kaddr(mmap_idx, pending_idx, i);
-		page = virt_to_page(kvaddr);
 
-		sector = req->sector_number + (8*i);
+		sector = req->sector_number + ((PAGE_SIZE / 512) * i);
 		if( (blkif->sectors > 0) && (sector >= blkif->sectors) ) {
 			WPRINTK("BLKTAP: Sector request greater" 
 			       "than size\n");
@@ -1238,7 +1239,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 				BLKIF_OP_WRITE ? "WRITE" : "READ"),
 				(long long unsigned) sector,
 				(long long unsigned) sector>>9,
-				blkif->sectors);
+				(long long unsigned) blkif->sectors);
 		}
 
 		flags = GNTMAP_host_map;
@@ -1281,14 +1282,14 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 			WPRINTK("invalid kernel buffer -- "
 				"could not remap it\n");
 			ret |= 1;
-			map[i].handle = 0xFFFF;
+			map[i].handle = INVALID_GRANT_HANDLE;
 		}
 
 		if (unlikely(map[i+1].status != 0)) {
 			WPRINTK("invalid user buffer -- "
 				"could not remap it\n");
 			ret |= 1;
-			map[i+1].handle = 0xFFFF;
+			map[i+1].handle = INVALID_GRANT_HANDLE;
 		}
 
 		pending_handle(mmap_idx, pending_idx, i/2).kernel 

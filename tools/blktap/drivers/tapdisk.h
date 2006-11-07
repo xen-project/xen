@@ -61,7 +61,6 @@
 
 /* Things disks need to know about, these should probably be in a higher-level
  * header. */
-#define MAX_REQUESTS            64
 #define MAX_SEGMENTS_PER_REQ    11
 #define SECTOR_SHIFT             9
 #define DEFAULT_SECTOR_SIZE    512

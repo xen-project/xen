@@ -41,7 +41,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define BLK_RING_SIZE __RING_SIZE((blkif_sring_t *)0, getpagesize())
+#define BLK_RING_SIZE __RING_SIZE((blkif_sring_t *)0, XC_PAGE_SIZE)
 
 /* size of the extra VMA area to map in attached pages. */
 #define BLKTAP_VMA_PAGES BLK_RING_SIZE
@@ -74,10 +74,10 @@ static inline int BLKTAP_MODE_VALID(unsigned long arg)
 		( arg == BLKTAP_MODE_INTERPOSE    ) );
 }
 
-#define MAX_REQUESTS            64
+#define MAX_REQUESTS            BLK_RING_SIZE
 
 #define BLKTAP_IOCTL_KICK 1
-#define MAX_PENDING_REQS 64
+#define MAX_PENDING_REQS	BLK_RING_SIZE
 #define BLKTAP_DEV_DIR   "/dev/xen"
 #define BLKTAP_DEV_NAME  "blktap"
 #define BLKTAP_DEV_MINOR 0
@@ -199,7 +199,6 @@ int xs_fire_next_watch(struct xs_handle *h);
 
 
 /* Abitrary values, must match the underlying driver... */
-#define MAX_PENDING_REQS 64
 #define MAX_TAP_DEV 100
 
 /* Accessing attached data page mappings */

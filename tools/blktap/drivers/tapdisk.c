@@ -562,12 +562,14 @@ int main(int argc, char *argv[])
 	fd_list_entry_t *ptr;
 	struct tap_disk *drv;
 	struct td_state *s;
+	char openlogbuf[128];
 	
 	if (argc != 3) usage();
 
 	daemonize();
 
-	openlog("TAPDISK", LOG_CONS|LOG_ODELAY, LOG_DAEMON);
+	snprintf(openlogbuf, sizeof(openlogbuf), "TAPDISK[%d]", getpid());
+	openlog(openlogbuf, LOG_CONS|LOG_ODELAY, LOG_DAEMON);
 	/*Setup signal handlers*/
 	signal (SIGBUS, sig_handler);
 	signal (SIGINT, sig_handler);

@@ -607,9 +607,11 @@ int main(int argc, char *argv[])
 	struct xs_handle *h;
 	struct pollfd  pfd[NUM_POLL_FDS];
 	pid_t process;
+	char buf[128];
 
 	__init_blkif();
-	openlog("BLKTAPCTRL", LOG_CONS|LOG_ODELAY, LOG_DAEMON);
+	snprintf(buf, sizeof(buf), "BLKTAPCTRL[%d]", getpid());
+	openlog(buf, LOG_CONS|LOG_ODELAY, LOG_DAEMON);
 	daemon(0,0);
 
 	print_drivers();
