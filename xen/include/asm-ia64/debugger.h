@@ -23,7 +23,6 @@
 #define __ASM_DEBUGGER_H__
 
 // this number is an arbitary number which is not used for any other purpose
-// __builtin_trap(), FORCE_CRASH() 0x0
 // ski  0x80001, 0x80002
 // kdb  0x80100, 0x80101
 // kprobe 0x80200, jprobe 0x80300

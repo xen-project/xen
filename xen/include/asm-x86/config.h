@@ -86,13 +86,6 @@
 
 #ifndef __ASSEMBLY__
 extern unsigned long _end; /* standard ELF symbol */
-
-static inline void FORCE_CRASH(void) __attribute__((noreturn,always_inline)); 
-static inline void FORCE_CRASH(void) 
-{
-    __asm__ __volatile__ ( "ud2" );
-    while(1);
-}
 #endif /* __ASSEMBLY__ */
 
 #if defined(__x86_64__)
