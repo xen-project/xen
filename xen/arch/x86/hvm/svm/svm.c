@@ -264,6 +264,11 @@ static int svm_pae_enabled(struct vcpu *v)
     return (cr4 & X86_CR4_PAE);
 }
 
+static int svm_long_mode_enabled(struct vcpu *v)
+{
+    return test_bit(SVM_CPU_STATE_LMA_ENABLED, &v->arch.hvm_svm.cpu_state);
+}
+
 #define IS_CANO_ADDRESS(add) 1
 
 static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
@@ -369,7 +374,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 
     case MSR_FS_BASE:
     case MSR_GS_BASE:
-        if (!(SVM_LONG_GUEST(vc)))
+        if ( !svm_long_mode_enabled(vc) )
             domain_crash_synchronous();
 
         if (!IS_CANO_ADDRESS(msr_content))
@@ -680,11 +685,6 @@ static void svm_load_cpu_guest_regs(
     struct vcpu *v, struct cpu_user_regs *regs)
 {
     svm_load_cpu_user_regs(v, regs);
-}
-
-int svm_long_mode_enabled(struct vcpu *v)
-{
-    return SVM_LONG_GUEST(v);
 }
 
 static void arch_svm_do_launch(struct vcpu *v) 
@@ -1487,9 +1487,8 @@ static int svm_set_cr0(unsigned long value)
         {
             /* Here the PAE is should to be opened */
             HVM_DBG_LOG(DBG_LEVEL_1, "Enable the Long mode\n");
-            set_bit(SVM_CPU_STATE_LMA_ENABLED,
-                    &v->arch.hvm_svm.cpu_state);
-            vmcb->efer |= (EFER_LMA | EFER_LME);
+            set_bit(SVM_CPU_STATE_LMA_ENABLED, &v->arch.hvm_svm.cpu_state);
+            vmcb->efer |= EFER_LMA;
         }
 #endif  /* __x86_64__ */
 
@@ -1530,6 +1529,11 @@ static int svm_set_cr0(unsigned long value)
     }
     else if ( (value & (X86_CR0_PE | X86_CR0_PG)) == X86_CR0_PE )
     {
+        if ( svm_long_mode_enabled(v) )
+        {
+            vmcb->efer &= ~EFER_LMA;
+            clear_bit(SVM_CPU_STATE_LMA_ENABLED, &v->arch.hvm_svm.cpu_state);
+        }
         /* we should take care of this kind of situation */
         shadow_update_paging_modes(v);
         vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3;

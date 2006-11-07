@@ -310,10 +310,6 @@ enum {
     SVM_CPU_STATE_LMA_ENABLED,
     SVM_CPU_STATE_ASSIST_ENABLED,
 };  
-    
-#define SVM_LONG_GUEST(ed)    \
-  (test_bit(SVM_CPU_STATE_LMA_ENABLED, &ed->arch.hvm_svm.cpu_state))
-
 
 /* 
  * Attribute for segment selector. This is a copy of bit 40:47 & 52:55 of the
