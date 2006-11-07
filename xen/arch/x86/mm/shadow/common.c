@@ -578,6 +578,7 @@ void shadow_prealloc(struct domain *d, unsigned int order)
     v = current;
     if ( v->domain != d )
         v = d->vcpu[0];
+    ASSERT(v != NULL);
 
     /* Stage one: walk the list of top-level pages, unpinning them */
     perfc_incrc(shadow_prealloc_1);
@@ -941,9 +942,9 @@ p2m_next_level(struct domain *d, mfn_t *table_mfn, void **table,
         }
 #endif
         /* The P2M can be shadowed: keep the shadows synced */
-        if ( d->vcpu[0] )
+        if ( d->vcpu[0] != NULL )
             (void)__shadow_validate_guest_entry(d->vcpu[0], *table_mfn,
-                                                 p2m_entry, sizeof *p2m_entry);
+                                                p2m_entry, sizeof *p2m_entry);
     }
     *table_mfn = _mfn(l1e_get_pfn(*p2m_entry));
     next = sh_map_domain_page(*table_mfn);
@@ -997,8 +998,9 @@ shadow_set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
         *p2m_entry = l1e_empty();
 
     /* The P2M can be shadowed: keep the shadows synced */
-    (void) __shadow_validate_guest_entry(d->vcpu[0], table_mfn, 
-                                          p2m_entry, sizeof *p2m_entry);
+    if ( d->vcpu[0] != NULL )
+        (void)__shadow_validate_guest_entry(
+            d->vcpu[0], table_mfn, p2m_entry, sizeof(*p2m_entry));
 
     sh_unmap_domain_page(table);
 
@@ -1015,9 +1017,11 @@ shadow_set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
 static int
 shadow_alloc_p2m_table(struct domain *d)
 {
-    mfn_t p2m_top;
+    mfn_t p2m_top, mfn;
     struct list_head *entry;
+    struct page_info *page;
     unsigned int page_count = 0;
+    unsigned long gfn;
     
     SHADOW_PRINTK("allocating p2m table\n");
     ASSERT(pagetable_get_pfn(d->arch.phys_table) == 0);
@@ -1041,13 +1045,19 @@ shadow_alloc_p2m_table(struct domain *d)
 
     SHADOW_PRINTK("populating p2m table\n");
  
+    /* Initialise physmap tables for slot zero. Other code assumes this. */
+    gfn = 0;
+    mfn = _mfn(INVALID_MFN);
+    if ( !shadow_set_p2m_entry(d, gfn, mfn) )
+        goto error;
+
     for ( entry = d->page_list.next;
           entry != &d->page_list;
           entry = entry->next )
     {
-        struct page_info *page = list_entry(entry, struct page_info, list);
-        mfn_t mfn = page_to_mfn(page);
-        unsigned long gfn = get_gpfn_from_mfn(mfn_x(mfn));
+        page = list_entry(entry, struct page_info, list);
+        mfn = page_to_mfn(page);
+        gfn = get_gpfn_from_mfn(mfn_x(mfn));
         page_count++;
         if (
 #ifdef __x86_64__
@@ -1057,15 +1067,16 @@ shadow_alloc_p2m_table(struct domain *d)
 #endif
              && gfn != INVALID_M2P_ENTRY
              && !shadow_set_p2m_entry(d, gfn, mfn) )
-        {
-            SHADOW_PRINTK("failed to initialize p2m table, gfn=%05lx, mfn=%" SH_PRI_mfn "\n",
-                           gfn, mfn_x(mfn));
-            return 0;
-        }
+            goto error;
     }
 
     SHADOW_PRINTK("p2m table initialised (%u pages)\n", page_count);
     return 1;
+
+ error:
+    SHADOW_PRINTK("failed to initialize p2m table, gfn=%05lx, mfn=%"
+                  SH_PRI_mfn "\n", gfn, mfn_x(mfn));
+    return 0;
 }
 
 mfn_t
@@ -2837,15 +2848,18 @@ sh_p2m_remove_page(struct domain *d, unsigned long gfn, unsigned long mfn)
     if ( v->domain != d )
         v = d->vcpu[0];
 
-
     SHADOW_DEBUG(P2M, "removing gfn=%#lx mfn=%#lx\n", gfn, mfn);
 
     ASSERT(mfn_x(sh_gfn_to_mfn(d, gfn)) == mfn);
     //ASSERT(sh_mfn_to_gfn(d, mfn) == gfn);
 
-    shadow_remove_all_shadows_and_parents(v, _mfn(mfn));
-    if ( shadow_remove_all_mappings(v, _mfn(mfn)) )
-        flush_tlb_mask(d->domain_dirty_cpumask);
+    if ( v != NULL )
+    {
+        shadow_remove_all_shadows_and_parents(v, _mfn(mfn));
+        if ( shadow_remove_all_mappings(v, _mfn(mfn)) )
+            flush_tlb_mask(d->domain_dirty_cpumask);
+    }
+
     shadow_set_p2m_entry(d, gfn, _mfn(INVALID_MFN));
     set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY);
 }
@@ -2865,16 +2879,11 @@ void
 shadow_guest_physmap_add_page(struct domain *d, unsigned long gfn,
                                unsigned long mfn)
 {
-    struct vcpu *v;
     unsigned long ogfn;
     mfn_t omfn;
 
     if ( !shadow_mode_translate(d) )
         return;
-
-    v = current;
-    if ( v->domain != d )
-        v = d->vcpu[0];
 
     shadow_lock(d);
     shadow_audit_p2m(d);
@@ -2885,11 +2894,17 @@ shadow_guest_physmap_add_page(struct domain *d, unsigned long gfn,
     if ( valid_mfn(omfn) )
     {
         /* Get rid of the old mapping, especially any shadows */
-        shadow_remove_all_shadows_and_parents(v, omfn);
-        if ( shadow_remove_all_mappings(v, omfn) )
-            flush_tlb_mask(d->domain_dirty_cpumask);
+        struct vcpu *v = current;
+        if ( v->domain != d )
+            v = d->vcpu[0];
+        if ( v != NULL )
+        {
+            shadow_remove_all_shadows_and_parents(v, omfn);
+            if ( shadow_remove_all_mappings(v, omfn) )
+                flush_tlb_mask(d->domain_dirty_cpumask);
+        }
         set_gpfn_from_mfn(mfn_x(omfn), INVALID_M2P_ENTRY);
-    }        
+    }
 
     ogfn = sh_mfn_to_gfn(d, _mfn(mfn));
     if (
@@ -2961,7 +2976,8 @@ static int shadow_log_dirty_op(
         list_for_each_safe(l, t, &d->arch.shadow.toplevel_shadows)
         {
             pg = list_entry(l, struct page_info, list);
-            shadow_unhook_mappings(d->vcpu[0], page_to_mfn(pg));
+            if ( d->vcpu[0] != NULL )
+                shadow_unhook_mappings(d->vcpu[0], page_to_mfn(pg));
         }
 
         d->arch.shadow.fault_count = 0;

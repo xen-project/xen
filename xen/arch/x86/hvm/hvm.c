@@ -157,12 +157,12 @@ int hvm_vcpu_initialise(struct vcpu *v)
     struct hvm_domain *platform;
     int rc;
 
-    if ( (rc = hvm_funcs.vcpu_initialise(v)) != 0 )
+    if ( (rc = vlapic_init(v)) != 0 )
         return rc;
 
-    if ( (rc = vlapic_init(v)) != 0 )
+    if ( (rc = hvm_funcs.vcpu_initialise(v)) != 0 )
     {
-        hvm_funcs.vcpu_destroy(v);
+        vlapic_destroy(v);
         return rc;
     }
 
