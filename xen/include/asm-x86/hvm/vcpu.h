@@ -47,6 +47,8 @@ struct hvm_vcpu {
     /* hlt ins emulation wakeup timer */
     struct timer        hlt_timer;
 
+    unsigned long       hvm_trace_values[5];
+
     union {
         struct arch_vmx_struct vmx;
         struct arch_svm_struct svm;

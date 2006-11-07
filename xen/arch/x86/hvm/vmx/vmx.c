@@ -47,9 +47,6 @@
 #include <asm/hvm/vlapic.h>
 #include <asm/x86_emulate.h>
 
-static DEFINE_PER_CPU(unsigned long, trace_values[5]);
-#define TRACE_VMEXIT(index,value) this_cpu(trace_values)[index]=value
-
 static void vmx_ctxt_switch_from(struct vcpu *v);
 static void vmx_ctxt_switch_to(struct vcpu *v);
 
@@ -1051,7 +1048,7 @@ static void vmx_io_instruction(unsigned long exit_qualification,
     else
         port = regs->edx & 0xffff;
 
-    TRACE_VMEXIT(1,port);
+    TRACE_VMEXIT(1, port);
 
     size = (exit_qualification & 7) + 1;
     dir = test_bit(3, &exit_qualification); /* direction */
@@ -1114,6 +1111,9 @@ static void vmx_io_instruction(unsigned long exit_qualification,
     } else {
         if ( port == 0xe9 && dir == IOREQ_WRITE && size == 1 )
             hvm_print_line(current, regs->eax); /* guest debug output */
+
+        if ( dir == IOREQ_WRITE )
+            TRACE_VMEXIT(2, regs->eax);
 
         regs->eip += inst_len;
         send_pio_req(port, 1, size, regs->eax, dir, df, 0);
@@ -2317,12 +2317,13 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
 asmlinkage void vmx_trace_vmentry(void)
 {
+    struct vcpu *v = current;
     TRACE_5D(TRC_VMX_VMENTRY + current->vcpu_id,
-             this_cpu(trace_values)[0],
-             this_cpu(trace_values)[1],
-             this_cpu(trace_values)[2],
-             this_cpu(trace_values)[3],
-             this_cpu(trace_values)[4]);
+             v->arch.hvm_vcpu.hvm_trace_values[0],
+             v->arch.hvm_vcpu.hvm_trace_values[1],
+             v->arch.hvm_vcpu.hvm_trace_values[2],
+             v->arch.hvm_vcpu.hvm_trace_values[3],
+             v->arch.hvm_vcpu.hvm_trace_values[4]);
 
     TRACE_VMEXIT(0, 0);
     TRACE_VMEXIT(1, 0);

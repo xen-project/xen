@@ -125,6 +125,9 @@ extern unsigned int opt_hvm_debug_level;
         domain_crash_synchronous();                             \
     } while (0)
 
+#define TRACE_VMEXIT(index, value)                              \
+    current->arch.hvm_vcpu.hvm_trace_values[index] = (value)
+
 extern int hvm_enabled;
 
 int hvm_copy_to_guest_phys(paddr_t paddr, void *buf, int size);
