@@ -1512,6 +1512,14 @@ static int vmx_set_cr0(unsigned long value)
     }
     else if ( (value & (X86_CR0_PE | X86_CR0_PG)) == X86_CR0_PE )
     {
+        if ( vmx_long_mode_enabled(v) )
+        {
+            v->arch.hvm_vmx.msr_content.msr_items[VMX_INDEX_MSR_EFER]
+              &= ~EFER_LMA;
+            __vmread(VM_ENTRY_CONTROLS, &vm_entry_value);
+            vm_entry_value &= ~VM_ENTRY_IA32E_MODE;
+            __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
+        }
         shadow_update_paging_modes(v);
         __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr3);
     }
