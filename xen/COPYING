@@ -14,6 +14,11 @@ includes all files within the subdirectory include/public, are
 *not* covered by the GPL but by a much weaker license:
  include/public/COPYING
 
+A few other files are also licensed under the weaker BSD-style
+license. These files all include the license stanza as a text
+comment. Although this stanza refers to the "Software", the license
+applies *only* those source files that explicitly include it.
+
 Also note that the only valid version of the GPL as far as Xen is
 concerned is _this_ particular version of the license (i.e., *only*
 v2, not v2.2 or v3.x or whatever), unless explicitly otherwise
