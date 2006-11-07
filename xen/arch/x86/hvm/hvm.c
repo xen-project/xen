@@ -208,29 +208,6 @@ void pic_irq_request(void *data, int level)
     *interrupt_request = level;
 }
 
-void hvm_pic_assist(struct vcpu *v)
-{
-    global_iodata_t *spg;
-    u16   *virq_line, irqs;
-    struct hvm_virpic *pic = &v->domain->arch.hvm_domain.vpic;
-
-    spg = &get_sp(v->domain)->sp_global;
-    virq_line  = &spg->pic_clear_irr;
-    if ( *virq_line ) {
-        do {
-            irqs = *(volatile u16*)virq_line;
-        } while ( (u16)cmpxchg(virq_line,irqs, 0) != irqs );
-        do_pic_irqs_clear(pic, irqs);
-    }
-    virq_line  = &spg->pic_irr;
-    if ( *virq_line ) {
-        do {
-            irqs = *(volatile u16*)virq_line;
-        } while ( (u16)cmpxchg(virq_line,irqs, 0) != irqs );
-        do_pic_irqs(pic, irqs);
-    }
-}
-
 u64 hvm_get_guest_time(struct vcpu *v)
 {
     u64    host_tsc;
@@ -675,6 +652,32 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         }
 
     param_fail:
+        put_domain(d);
+        break;
+    }
+
+    case HVMOP_set_irq_level:
+    {
+        struct xen_hvm_set_irq_level op;
+        struct domain *d;
+
+        if ( copy_from_guest(&op, arg, 1) )
+            return -EFAULT;
+
+        if ( !IS_PRIV(current->domain) )
+            return -EPERM;
+
+        d = find_domain_by_id(op.domid);
+        if ( d == NULL )
+            return -ESRCH;
+
+        rc = -EINVAL;
+        if ( is_hvm_domain(d) )
+        {
+            pic_set_irq(&d->arch.hvm_domain.vpic, op.irq, op.level);
+            rc = 0;
+        }
+
         put_domain(d);
         break;
     }

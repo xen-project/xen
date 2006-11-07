@@ -152,46 +152,22 @@ void pic_set_xen_irq(void *opaque, int irq, int level)
     spin_unlock_irqrestore(&s->lock, flags);
 }
 
-void pic_set_irq_new(void *opaque, int irq, int level)
-{
-    struct hvm_virpic *s = opaque;
-    unsigned long flags;
-
-    spin_lock_irqsave(&s->lock, flags);
-    hvm_vioapic_set_irq(current->domain, irq, level);
-    pic_set_irq1(&s->pics[irq >> 3], irq & 7, level);
-    pic_update_irq(s);
-    spin_unlock_irqrestore(&s->lock, flags);
-}
-
-void do_pic_irqs (struct hvm_virpic *s, uint16_t irqs)
+void pic_set_irq(struct hvm_virpic *s, int irq, int level)
 {
     unsigned long flags;
 
-    spin_lock_irqsave(&s->lock, flags);
-    s->pics[1].irr |= (uint8_t)(irqs >> 8);
-    s->pics[0].irr |= (uint8_t) irqs;
-    hvm_vioapic_do_irqs(current->domain, irqs);
-    pic_update_irq(s);
-    spin_unlock_irqrestore(&s->lock, flags);
-}
-
-void do_pic_irqs_clear (struct hvm_virpic *s, uint16_t irqs)
-{
-    unsigned long flags;
+    if ( irq < 0 )
+        return;
 
     spin_lock_irqsave(&s->lock, flags);
-    s->pics[1].irr &= ~(uint8_t)(irqs >> 8);
-    s->pics[0].irr &= ~(uint8_t) irqs;
-    hvm_vioapic_do_irqs_clear(current->domain, irqs);
-    pic_update_irq(s);
+    hvm_vioapic_set_irq(container_of(s, struct domain, arch.hvm_domain.vpic),
+                        irq, level);
+    if ( irq < 16 )
+    {
+        pic_set_irq1(&s->pics[irq >> 3], irq & 7, level);
+        pic_update_irq(s);
+    }
     spin_unlock_irqrestore(&s->lock, flags);
-}
-
-/* obsolete function */
-void pic_set_irq(struct hvm_virpic *isa_pic, int irq, int level)
-{
-    pic_set_irq_new(isa_pic, irq, level);
 }
 
 /* acknowledge interrupt 'irq' */
@@ -245,26 +221,6 @@ static int pic_read_irq(struct hvm_virpic *s)
     return intno;
 }
 
-static void update_shared_irr(struct hvm_virpic *s, PicState *c)
-{
-    uint8_t *pl, *pe;
-
-    ASSERT(spin_is_locked(&s->lock));
-
-    get_sp(current->domain)->sp_global.pic_elcr = 
-        s->pics[0].elcr | ((u16)s->pics[1].elcr << 8);
-    pl =(uint8_t*)&get_sp(current->domain)->sp_global.pic_last_irr;
-    pe =(uint8_t*)&get_sp(current->domain)->sp_global.pic_elcr;
-    if ( c == &s->pics[0] ) {
-         *pl = c->last_irr;
-         *pe = c->elcr;
-    }
-    else {
-         *(pl+1) = c->last_irr;
-         *(pe+1) = c->elcr;
-    }
-}
-
 static void pic_reset(void *opaque)
 {
     PicState *s = opaque;
@@ -300,7 +256,6 @@ static void pic_ioport_write(void *opaque, uint32_t addr, uint32_t val)
         if (val & 0x10) {
             /* init */
             pic_reset(s);
-            update_shared_irr(s->pics_state, s);
             /* deassert a pending interrupt */
             s->pics_state->irq_request(s->pics_state->irq_request_opaque, 0);
             s->init_state = 1;
@@ -533,8 +488,6 @@ static int intercept_elcr_io(ioreq_t *p)
         spin_lock_irqsave(&s->lock, flags);
         elcr_ioport_write((void*)&s->pics[p->addr&1],
                 (uint32_t) p->addr, (uint32_t)( data & 0xff));
-        get_sp(current->domain)->sp_global.pic_elcr =
-            s->pics[0].elcr | ((u16)s->pics[1].elcr << 8);
         spin_unlock_irqrestore(&s->lock, flags);
     }
     else {

@@ -22,58 +22,18 @@
  * THE SOFTWARE.
  */
 #include "vl.h"
-
-/* debug PIC */
-//#define DEBUG_PIC
-
-//#define DEBUG_IRQ_LATENCY
-//#define DEBUG_IRQ_COUNT
-
 #include "xenctrl.h"
 #include <xen/hvm/ioreq.h>
 #include <stdio.h>
 #include "cpu.h"
 #include "cpu-all.h"
 
-extern shared_iopage_t *shared_page;
-
 struct PicState2 {
 };
 
 void pic_set_irq_new(void *opaque, int irq, int level)
 {
-    /* PicState2 *s = opaque; */
-    global_iodata_t  *gio;
-    int  mask;
-
-    gio = &shared_page->sp_global;
-    mask = 1 << irq;
-    if ( gio->pic_elcr & mask ) {
-        /* level */
-       if ( level ) {
-           atomic_clear_bit(irq, &gio->pic_clear_irr);
-           atomic_set_bit(irq, &gio->pic_irr);
-           cpu_single_env->send_event = 1;
-       }
-       else {
-           atomic_clear_bit(irq, &gio->pic_irr);
-           atomic_set_bit(irq, &gio->pic_clear_irr);
-           cpu_single_env->send_event = 1;
-       }
-    }
-    else {
-       /* edge */
-       if ( level ) {
-           if ( (mask & gio->pic_last_irr) == 0 ) { 
-               atomic_set_bit(irq, &gio->pic_irr);
-               atomic_set_bit(irq, &gio->pic_last_irr);
-               cpu_single_env->send_event = 1;
-           }
-       }
-       else {
-           atomic_clear_bit(irq, &gio->pic_last_irr);
-       }
-    }
+    xc_hvm_set_irq_level(xc_handle, domid, irq, level);
 }
 
 /* obsolete function */

@@ -104,8 +104,6 @@ typedef struct hvm_vioapic {
 
 hvm_vioapic_t *hvm_vioapic_init(struct domain *d);
 
-void hvm_vioapic_do_irqs_clear(struct domain *d, uint16_t irqs);
-void hvm_vioapic_do_irqs(struct domain *d, uint16_t irqs);
 void hvm_vioapic_set_xen_irq(struct domain *d, int irq, int level);
 void hvm_vioapic_set_irq(struct domain *d, int irq, int level);
 

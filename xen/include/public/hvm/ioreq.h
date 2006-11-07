@@ -56,14 +56,6 @@ struct ioreq {
 };
 typedef struct ioreq ioreq_t;
 
-struct global_iodata {
-    uint16_t    pic_elcr;
-    uint16_t    pic_irr;
-    uint16_t    pic_last_irr;
-    uint16_t    pic_clear_irr;
-};
-typedef struct global_iodata global_iodata_t;
-
 struct vcpu_iodata {
     struct ioreq         vp_ioreq;
     /* Event channel port */
@@ -72,7 +64,6 @@ struct vcpu_iodata {
 typedef struct vcpu_iodata vcpu_iodata_t;
 
 struct shared_iopage {
-    struct global_iodata sp_global;
     struct vcpu_iodata   vcpu_iodata[1];
 };
 typedef struct shared_iopage shared_iopage_t;

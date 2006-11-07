@@ -5,6 +5,7 @@
  */
 
 #include "xc_private.h"
+#include <xen/hvm/hvm_op.h>
 
 int xc_readconsolering(int xc_handle,
                        char **pbuffer,
@@ -85,6 +86,33 @@ int xc_perfc_control(int xc_handle,
         *nbr_desc = sysctl.u.perfc_op.nr_counters;
     if (nbr_val)
         *nbr_val = sysctl.u.perfc_op.nr_vals;
+
+    return rc;
+}
+
+int xc_hvm_set_irq_level(int xc_handle, domid_t dom, int irq, int level)
+{
+    DECLARE_HYPERCALL;
+    struct xen_hvm_set_irq_level arg;
+    int rc;
+
+    hypercall.op     = __HYPERVISOR_hvm_op;
+    hypercall.arg[0] = HVMOP_set_irq_level;
+    hypercall.arg[1] = (unsigned long)&arg;
+
+    arg.domid = dom;
+    arg.irq   = irq;
+    arg.level = level;
+
+    if ( mlock(&arg, sizeof(arg)) != 0 )
+    {
+        PERROR("Could not lock memory");
+        return -1;
+    }
+
+    rc = do_xen_hypercall(xc_handle, &hypercall);
+
+    safe_munlock(&arg, sizeof(arg));
 
     return rc;
 }

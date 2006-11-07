@@ -24,7 +24,6 @@
 #define _LSAPIC_H
 #include <xen/sched.h>
 
-extern void vmx_virq_line_init(struct domain *d);
 extern void vtm_init(struct vcpu *vcpu);
 extern void vtm_set_itc(struct  vcpu *vcpu, uint64_t new_itc);
 extern void vtm_set_itm(struct vcpu *vcpu, uint64_t val);

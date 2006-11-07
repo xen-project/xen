@@ -66,7 +66,6 @@ struct hvm_virpic {
 
 void pic_set_xen_irq(void *opaque, int irq, int level);
 void pic_set_irq(struct hvm_virpic *s, int irq, int level);
-void pic_set_irq_new(void *opaque, int irq, int level);
 void pic_init(struct hvm_virpic *s, 
               void (*irq_request)(void *, int),
               void *irq_request_opaque);
@@ -75,7 +74,5 @@ void register_pic_io_hook(struct domain *d);
 int cpu_get_pic_interrupt(struct vcpu *v, int *type);
 int is_periodic_irq(struct vcpu *v, int irq, int type);
 int is_irq_enabled(struct vcpu *v, int irq);
-void do_pic_irqs (struct hvm_virpic *s, uint16_t irqs);
-void do_pic_irqs_clear (struct hvm_virpic *s, uint16_t irqs);
 
 #endif  /* __ASM_X86_HVM_VPIC_H__ */  

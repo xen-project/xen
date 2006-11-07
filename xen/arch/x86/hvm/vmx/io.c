@@ -104,9 +104,6 @@ asmlinkage void vmx_intr_assist(void)
     unsigned long inst_len;
     int    has_ext_irq;
 
-    if ( v->vcpu_id == 0 )
-        hvm_pic_assist(v);
-
     if ( (v->vcpu_id == 0) && pt->enabled && pt->pending_intr_nr ) {
         pic_set_irq(pic, pt->irq, 0);
         pic_set_irq(pic, pt->irq, 1);

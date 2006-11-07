@@ -116,7 +116,6 @@ struct arch_vmx_struct {
 #define VMX_DOMAIN(v)   v->arch.arch_vmx.flags
 
 #define ARCH_VMX_IO_WAIT        3       /* Waiting for I/O completion */
-#define ARCH_VMX_INTR_ASSIST    4       /* Need DM's assist to issue intr */
 #define ARCH_VMX_DOMAIN         5       /* Need it to indicate VTi domain */
 
 

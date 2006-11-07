@@ -324,39 +324,6 @@ void vtm_domain_in(VCPU *vcpu)
  */
 
 #ifdef V_IOSAPIC_READY
-/* Assist to check virtual interrupt lines */
-void vmx_virq_line_assist(struct vcpu *v)
-{
-    global_iodata_t *spg = &get_sp(v->domain)->sp_global;
-    uint16_t *virq_line, irqs;
-
-    virq_line = &spg->pic_irr;
-    if (*virq_line) {
-	do {
-	    irqs = *(volatile uint16_t*)virq_line;
-	} while ((uint16_t)cmpxchg(virq_line, irqs, 0) != irqs);
-	hvm_vioapic_do_irqs(v->domain, irqs);
-    }
-
-    virq_line = &spg->pic_clear_irr;
-    if (*virq_line) {
-	do {
-	    irqs = *(volatile uint16_t*)virq_line;
-	} while ((uint16_t)cmpxchg(virq_line, irqs, 0) != irqs);
-	hvm_vioapic_do_irqs_clear(v->domain, irqs);
-    }
-}
-
-void vmx_virq_line_init(struct domain *d)
-{
-    global_iodata_t *spg = &get_sp(d)->sp_global;
-
-    spg->pic_elcr = 0xdef8; /* Level/Edge trigger mode */
-    spg->pic_irr = 0;
-    spg->pic_last_irr = 0;
-    spg->pic_clear_irr = 0;
-}
-
 int ioapic_match_logical_addr(hvm_vioapic_t *s, int number, uint16_t dest)
 {
     return (VLAPIC_ID(s->lapic_info[number]) == dest);

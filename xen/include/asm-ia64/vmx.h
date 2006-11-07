@@ -44,13 +44,11 @@ extern void show_registers(struct pt_regs *regs);
 #define show_execution_state show_registers
 extern unsigned long __gpfn_to_mfn_foreign(struct domain *d, unsigned long gpfn);
 extern void sync_split_caches(void);
-extern void vmx_virq_line_assist(struct vcpu *v);
 extern void set_privileged_operation_isr (struct vcpu *vcpu,int inst);
 extern void privilege_op (struct vcpu *vcpu);
 extern void set_ifa_itir_iha (struct vcpu *vcpu, u64 vadr,
           int set_ifa, int set_itir, int set_iha);
 extern void inject_guest_interruption(struct vcpu *vcpu, u64 vec);
-extern void vmx_intr_assist(struct vcpu *v);
 extern void set_illegal_op_isr (struct vcpu *vcpu);
 extern void illegal_op (struct vcpu *vcpu);
 extern void vmx_relinquish_guest_resources(struct domain *d);

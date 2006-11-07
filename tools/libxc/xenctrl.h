@@ -666,4 +666,6 @@ evtchn_port_t xc_evtchn_pending(int xce_handle);
  */
 int xc_evtchn_unmask(int xce_handle, evtchn_port_t port);
 
+int xc_hvm_set_irq_level(int xce_handle, domid_t dom, int irq, int level);
+
 #endif

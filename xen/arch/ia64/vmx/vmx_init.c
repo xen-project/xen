@@ -322,8 +322,6 @@ vmx_final_setup_guest(struct vcpu *v)
 	vlsapic_reset(v);
 	vtm_init(v);
 
-	/* One more step to enable interrupt assist */
-	set_bit(ARCH_VMX_INTR_ASSIST, &v->arch.arch_vmx.flags);
 	/* Set up guest 's indicator for VTi domain*/
 	set_bit(ARCH_VMX_DOMAIN, &v->arch.arch_vmx.flags);
 }
@@ -456,9 +454,6 @@ void vmx_setup_platform(struct domain *d)
 
 	/* initiate spinlock for pass virq */
 	spin_lock_init(&d->arch.arch_vmx.virq_assist_lock);
-
-	/* Initialize the virtual interrupt lines */
-	vmx_virq_line_init(d);
 
 	/* Initialize iosapic model within hypervisor */
 	hvm_vioapic_init(d);

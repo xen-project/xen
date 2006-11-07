@@ -526,22 +526,6 @@ static void service_ioapic(hvm_vioapic_t *s)
     }
 }
 
-void hvm_vioapic_do_irqs(struct domain *d, uint16_t irqs)
-{
-    hvm_vioapic_t *s = &(d->arch.hvm_domain.vioapic);
-
-    s->irr |= irqs & ~s->imr;
-    service_ioapic(s);
-}
-
-void hvm_vioapic_do_irqs_clear(struct domain *d, uint16_t irqs)
-{
-    hvm_vioapic_t *s = &(d->arch.hvm_domain.vioapic);
-
-    s->irr &= ~irqs;
-    service_ioapic(s);
-}
-
 void hvm_vioapic_set_xen_irq(struct domain *d, int irq, int level)
 {
     hvm_vioapic_t *s = &d->arch.hvm_domain.vioapic;
@@ -565,12 +549,10 @@ void hvm_vioapic_set_irq(struct domain *d, int irq, int level)
     HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic_set_irq "
       "irq %x level %x\n", irq, level);
 
-    if (irq < 0 || irq >= IOAPIC_NUM_PINS) {
-        printk("ioapic_set_irq irq %x is illegal\n", irq);
-        domain_crash_synchronous();
-    }
+    if ( (irq < 0) || (irq >= IOAPIC_NUM_PINS) )
+        return;
 
-    if (!IOAPICEnabled(s) || s->redirtbl[irq].RedirForm.mask)
+    if ( !IOAPICEnabled(s) || s->redirtbl[irq].RedirForm.mask )
         return;
 
     HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "hvm_vioapic_set_irq entry %x "
