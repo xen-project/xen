@@ -401,7 +401,7 @@ typedef unsigned long hvm_hypercall_t(
 
 #if defined(__i386__)
 
-static hvm_hypercall_t *hvm_hypercall_table[] = {
+static hvm_hypercall_t *hvm_hypercall_table[NR_hypercalls] = {
     HYPERCALL(memory_op),
     HYPERCALL(multicall),
     HYPERCALL(xen_version),
