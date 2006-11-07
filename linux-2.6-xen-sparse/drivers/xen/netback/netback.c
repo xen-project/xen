@@ -814,7 +814,7 @@ void netif_deschedule_work(netif_t *netif)
 
 static void tx_add_credit(netif_t *netif)
 {
-	unsigned long max_burst;
+	unsigned long max_burst, max_credit;
 
 	/*
 	 * Allow a burst big enough to transmit a jumbo packet of up to 128kB.
@@ -824,9 +824,10 @@ static void tx_add_credit(netif_t *netif)
 	max_burst = min(max_burst, 131072UL);
 	max_burst = max(max_burst, netif->credit_bytes);
 
-	netif->remaining_credit = min(netif->remaining_credit +
-				      netif->credit_bytes,
-				      max_burst);
+	/* Take care that adding a new chunk of credit doesn't wrap to zero. */
+	max_credit = max(netif->remaining_credit + netif->credit_bytes, ~0UL);
+
+	netif->remaining_credit = min(max_credit, max_burst);
 }
 
 static void tx_credit_callback(unsigned long data)
