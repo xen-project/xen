@@ -663,8 +663,8 @@ void __init mem_init(void)
 	totalram_pages += free_all_bootmem();
 	/* XEN: init and count low-mem pages outside initial allocation. */
 	for (pfn = xen_start_info->nr_pages; pfn < max_low_pfn; pfn++) {
-		ClearPageReserved(&mem_map[pfn]);
-		set_page_count(&mem_map[pfn], 1);
+		ClearPageReserved(pfn_to_page(pfn));
+		set_page_count(pfn_to_page(pfn), 1);
 		totalram_pages++;
 	}
 

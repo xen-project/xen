@@ -913,8 +913,8 @@ void __init mem_init(void)
 #endif
 	/* XEN: init and count pages outside initial allocation. */
 	for (pfn = xen_start_info->nr_pages; pfn < max_pfn; pfn++) {
-		ClearPageReserved(&mem_map[pfn]);
-		set_page_count(&mem_map[pfn], 1);
+		ClearPageReserved(pfn_to_page(pfn));
+		set_page_count(pfn_to_page(pfn), 1);
 		totalram_pages++;
 	}
 	reservedpages = end_pfn - totalram_pages - e820_hole_size(0, end_pfn);
