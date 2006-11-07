@@ -69,6 +69,7 @@ typedef struct xen_vbd_record
     struct xen_vm_record_opt *vm;
     struct xen_vdi_record_opt *vdi;
     char *device;
+    char *image;
     enum xen_vbd_mode mode;
     enum xen_driver_type driver;
     double io_read_kbs;
