@@ -887,6 +887,15 @@ static void fast_flush_area(pending_req_t *req, int k_idx, int u_idx,
 		return;
 	}
 
+	if (info->vma != NULL &&
+	    xen_feature(XENFEAT_auto_translated_physmap)) {
+		down_write(&info->vma->vm_mm->mmap_sem);
+		zap_page_range(info->vma, 
+			       MMAP_VADDR(info->user_vstart, u_idx, 0), 
+			       req->nr_pages << PAGE_SHIFT, NULL);
+		up_write(&info->vma->vm_mm->mmap_sem);
+	}
+
 	mmap_idx = req->mem_idx;
 
 	for (i = 0; i < req->nr_pages; i++) {
@@ -903,6 +912,7 @@ static void fast_flush_area(pending_req_t *req, int k_idx, int u_idx,
 		}
 
 		if (khandle->user != INVALID_GRANT_HANDLE) {
+			BUG_ON(xen_feature(XENFEAT_auto_translated_physmap));
 			if (create_lookup_pte_addr(
 				info->vma->vm_mm,
 				MMAP_VADDR(info->user_vstart, u_idx, i),
@@ -925,7 +935,7 @@ static void fast_flush_area(pending_req_t *req, int k_idx, int u_idx,
 		GNTTABOP_unmap_grant_ref, unmap, invcount);
 	BUG_ON(ret);
 	
-	if (info->vma != NULL)
+	if (info->vma != NULL && !xen_feature(XENFEAT_auto_translated_physmap))
 		zap_page_range(info->vma, 
 			       MMAP_VADDR(info->user_vstart, u_idx, 0), 
 			       req->nr_pages << PAGE_SHIFT, NULL);
@@ -1254,68 +1264,103 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 				  req->seg[i].gref, blkif->domid);
 		op++;
 
-		/* Now map it to user. */
-		ret = create_lookup_pte_addr(info->vma->vm_mm, 
-					     uvaddr, &ptep);
-		if (ret) {
-			WPRINTK("Couldn't get a pte addr!\n");
-			goto fail_flush;
-		}
+		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+			/* Now map it to user. */
+			ret = create_lookup_pte_addr(info->vma->vm_mm, 
+						     uvaddr, &ptep);
+			if (ret) {
+				WPRINTK("Couldn't get a pte addr!\n");
+				goto fail_flush;
+			}
 
-		flags = GNTMAP_host_map | GNTMAP_application_map
-			| GNTMAP_contains_pte;
-		if (operation == WRITE)
-			flags |= GNTMAP_readonly;
-		gnttab_set_map_op(&map[op], ptep, flags,
-				  req->seg[i].gref, blkif->domid);
-		op++;
+			flags = GNTMAP_host_map | GNTMAP_application_map
+				| GNTMAP_contains_pte;
+			if (operation == WRITE)
+				flags |= GNTMAP_readonly;
+			gnttab_set_map_op(&map[op], ptep, flags,
+					  req->seg[i].gref, blkif->domid);
+			op++;
+		}
 	}
 
 	ret = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, map, op);
 	BUG_ON(ret);
 
-	for (i = 0; i < (nseg*2); i+=2) {
-		unsigned long uvaddr;
-		unsigned long kvaddr;
-		unsigned long offset;
-		struct page *pg;
+	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+		for (i = 0; i < (nseg*2); i+=2) {
+			unsigned long uvaddr;
+			unsigned long kvaddr;
+			unsigned long offset;
+			struct page *pg;
 
-		uvaddr = MMAP_VADDR(info->user_vstart, usr_idx, i/2);
-		kvaddr = idx_to_kaddr(mmap_idx, pending_idx, i/2);
+			uvaddr = MMAP_VADDR(info->user_vstart, usr_idx, i/2);
+			kvaddr = idx_to_kaddr(mmap_idx, pending_idx, i/2);
 
-		if (unlikely(map[i].status != 0)) {
-			WPRINTK("invalid kernel buffer -- "
-				"could not remap it\n");
-			ret |= 1;
-			map[i].handle = INVALID_GRANT_HANDLE;
+			if (unlikely(map[i].status != 0)) {
+				WPRINTK("invalid kernel buffer -- "
+					"could not remap it\n");
+				ret |= 1;
+				map[i].handle = INVALID_GRANT_HANDLE;
+			}
+
+			if (unlikely(map[i+1].status != 0)) {
+				WPRINTK("invalid user buffer -- "
+					"could not remap it\n");
+				ret |= 1;
+				map[i+1].handle = INVALID_GRANT_HANDLE;
+			}
+
+			pending_handle(mmap_idx, pending_idx, i/2).kernel 
+				= map[i].handle;
+			pending_handle(mmap_idx, pending_idx, i/2).user   
+				= map[i+1].handle;
+
+			if (ret)
+				continue;
+
+			set_phys_to_machine(__pa(kvaddr) >> PAGE_SHIFT,
+					    FOREIGN_FRAME(map[i].dev_bus_addr
+							  >> PAGE_SHIFT));
+			offset = (uvaddr - info->vma->vm_start) >> PAGE_SHIFT;
+			pg = pfn_to_page(__pa(kvaddr) >> PAGE_SHIFT);
+			((struct page **)info->vma->vm_private_data)[offset] =
+				pg;
 		}
+	} else {
+		for (i = 0; i < nseg; i++) {
+			unsigned long uvaddr;
+			unsigned long kvaddr;
+			unsigned long offset;
+			struct page *pg;
 
-		if (unlikely(map[i+1].status != 0)) {
-			WPRINTK("invalid user buffer -- "
-				"could not remap it\n");
-			ret |= 1;
-			map[i+1].handle = INVALID_GRANT_HANDLE;
+			uvaddr = MMAP_VADDR(info->user_vstart, usr_idx, i);
+			kvaddr = idx_to_kaddr(mmap_idx, pending_idx, i);
+
+			if (unlikely(map[i].status != 0)) {
+				WPRINTK("invalid kernel buffer -- "
+					"could not remap it\n");
+				ret |= 1;
+				map[i].handle = INVALID_GRANT_HANDLE;
+			}
+
+			pending_handle(mmap_idx, pending_idx, i).kernel 
+				= map[i].handle;
+
+			if (ret)
+				continue;
+
+			offset = (uvaddr - info->vma->vm_start) >> PAGE_SHIFT;
+			pg = pfn_to_page(__pa(kvaddr) >> PAGE_SHIFT);
+			((struct page **)info->vma->vm_private_data)[offset] =
+				pg;
 		}
-
-		pending_handle(mmap_idx, pending_idx, i/2).kernel 
-			= map[i].handle;
-		pending_handle(mmap_idx, pending_idx, i/2).user   
-			= map[i+1].handle;
-
-		if (ret)
-			continue;
-
-		set_phys_to_machine(__pa(kvaddr) >> PAGE_SHIFT,
-			FOREIGN_FRAME(map[i].dev_bus_addr >> PAGE_SHIFT));
-		offset = (uvaddr - info->vma->vm_start) >> PAGE_SHIFT;
-		pg = pfn_to_page(__pa(kvaddr) >> PAGE_SHIFT);
-		((struct page **)info->vma->vm_private_data)[offset] =
-			pg;
 	}
 
 	if (ret)
 		goto fail_flush;
 
+	if (xen_feature(XENFEAT_auto_translated_physmap))
+		down_write(&info->vma->vm_mm->mmap_sem);
 	/* Mark mapped pages as reserved: */
 	for (i = 0; i < req->nr_segments; i++) {
 		unsigned long kvaddr;
@@ -1324,7 +1369,18 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 		kvaddr = idx_to_kaddr(mmap_idx, pending_idx, i);
 		pg = pfn_to_page(__pa(kvaddr) >> PAGE_SHIFT);
 		SetPageReserved(pg);
+		if (xen_feature(XENFEAT_auto_translated_physmap)) {
+			ret = vm_insert_page(info->vma,
+					     MMAP_VADDR(info->user_vstart,
+							usr_idx, i), pg);
+			if (ret) {
+				up_write(&info->vma->vm_mm->mmap_sem);
+				goto fail_flush;
+			}
+		}
 	}
+	if (xen_feature(XENFEAT_auto_translated_physmap))
+		up_write(&info->vma->vm_mm->mmap_sem);
 	
 	/*record [mmap_idx,pending_idx] to [usr_idx] mapping*/
 	info->idx_map[usr_idx] = MAKE_ID(mmap_idx, pending_idx);

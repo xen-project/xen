@@ -191,6 +191,22 @@ MULTI_grant_table_op(multicall_entry_t *mcl, unsigned int cmd,
 	mcl->args[2] = count;
 }
 
+/*
+ * for blktap.c
+ * int create_lookup_pte_addr(struct mm_struct *mm, 
+ *                            unsigned long address,
+ *                            uint64_t *ptep);
+ */
+#define create_lookup_pte_addr(mm, address, ptep)			\
+	({								\
+		printk(KERN_EMERG					\
+		       "%s:%d "						\
+		       "create_lookup_pte_addr() isn't supported.\n",	\
+		       __func__, __LINE__);				\
+		BUG();							\
+		(-ENOSYS);						\
+	})
+
 // for debug
 asmlinkage int xprintk(const char *fmt, ...);
 #define xprintd(fmt, ...)	xprintk("%s:%d " fmt, __func__, __LINE__, \

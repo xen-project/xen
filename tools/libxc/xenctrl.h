@@ -47,10 +47,9 @@
 #define rmb() __asm__ __volatile__ ( "lfence" : : : "memory")
 #define wmb() __asm__ __volatile__ ( "" : : : "memory")
 #elif defined(__ia64__)
-/* FIXME */
-#define mb()
-#define rmb()
-#define wmb()
+#define mb()   __asm__ __volatile__ ("mf" ::: "memory")
+#define rmb()  __asm__ __volatile__ ("mf" ::: "memory")
+#define wmb()  __asm__ __volatile__ ("mf" ::: "memory")
 #elif defined(__powerpc__)
 /* XXX loosen these up later */
 #define mb()   __asm__ __volatile__ ("sync" : : : "memory")
