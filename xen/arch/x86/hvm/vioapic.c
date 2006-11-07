@@ -399,7 +399,8 @@ static void ioapic_deliver(struct vioapic *vioapic, int irq)
     struct vlapic *target;
 
     HVM_DBG_LOG(DBG_LEVEL_IOAPIC,
-                "dest %x dest_mode %x delivery_mode %x vector %x trig_mode %x\n",
+                "dest=%x dest_mode=%x delivery_mode=%x "
+                "vector=%x trig_mode=%x\n",
                 dest, dest_mode, delivery_mode, vector, trig_mode);
 
     deliver_bitmask = ioapic_get_delivery_bitmask(
@@ -430,8 +431,8 @@ static void ioapic_deliver(struct vioapic *vioapic, int irq)
         }
         else
         {
-            HVM_DBG_LOG(DBG_LEVEL_IOAPIC,
-                        "null round robin mask %x vector %x delivery_mode %x\n",
+            HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "null round robin: "
+                        "mask=%x vector=%x delivery_mode=%x\n",
                         deliver_bitmask, vector, dest_LowestPrio);
         }
         break;

@@ -420,7 +420,7 @@ static int construct_vmcs(struct vcpu *v)
     error |= __vmwrite(CPU_BASED_VM_EXEC_CONTROL,
                        v->arch.hvm_vcpu.u.vmx.exec_control);
     error |= __vmwrite(VIRTUAL_APIC_PAGE_ADDR,
-                       page_to_maddr(v->arch.hvm_vcpu.vlapic->regs_page));
+                       page_to_maddr(vcpu_vlapic(v)->regs_page));
     error |= __vmwrite(TPR_THRESHOLD, 0);
 #endif
 
