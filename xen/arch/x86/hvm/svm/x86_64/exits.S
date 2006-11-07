@@ -1,5 +1,5 @@
 /*
- * exits.S: SVM architecture-specific exit handling.
+ * exits.S: AMD-V architecture-specific exit handling.
  * Copyright (c) 2004, Intel Corporation.
  * Copyright (c) 2005, AMD Corporation.
  *
@@ -34,7 +34,7 @@
  * At VMExit time the processor saves the guest selectors, rsp, rip, 
  * and rflags. Therefore we don't save them, but simply decrement 
  * the kernel stack pointer to make it consistent with the stack frame 
- * at usual interruption time. The rflags of the host is not saved by VMX, 
+ * at usual interruption time. The rflags of the host is not saved by AMD-V, 
  * and we set it to the fixed value.
  *
  * We also need the room, especially because orig_eax field is used 
@@ -99,8 +99,8 @@
 #define CLGI   .byte 0x0F,0x01,0xDD
 
 ENTRY(svm_asm_do_launch)
-        sti
         CLGI                
+        sti
         GET_CURRENT(%rbx)
         movq VCPU_svm_vmcb(%rbx), %rcx
         movq UREGS_rax(%rsp), %rax
@@ -165,10 +165,9 @@ svm_restore_all_guest:
         call svm_intr_assist
         call svm_asid
         call svm_load_cr2
-        sti
         /*
-         * Check if we are going back to VMX-based VM
-         * By this time, all the setups in the VMCS must be complete.
+         * Check if we are going back to AMD-V based VM
+         * By this time, all the setups in the VMCB must be complete.
          */
         jmp svm_asm_do_launch
 

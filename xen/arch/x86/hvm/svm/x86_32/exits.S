@@ -34,7 +34,7 @@
  * At VMExit time the processor saves the guest selectors, esp, eip, 
  * and eflags. Therefore we don't save them, but simply decrement 
  * the kernel stack pointer to make it consistent with the stack frame 
- * at usual interruption time. The eflags of the host is not saved by VMX, 
+ * at usual interruption time. The eflags of the host is not saved by AMD-V, 
  * and we set it to the fixed value.
  *
  * We also need the room, especially because orig_eax field is used 
@@ -89,8 +89,8 @@
 #define CLGI   .byte 0x0F,0x01,0xDD
 
 ENTRY(svm_asm_do_launch)
-        sti
         CLGI                
+        sti
         GET_CURRENT(%ebx)
         movl VCPU_svm_vmcb(%ebx), %ecx
         movl 24(%esp), %eax
@@ -152,9 +152,8 @@ svm_restore_all_guest:
         call svm_intr_assist
         call svm_asid
         call svm_load_cr2
-        sti
         /* 
-         * Check if we are going back to SVM-based VM
+         * Check if we are going back to AMD-V based VM
          * By this time, all the setups in the VMCB must be complete.
          */
         jmp svm_asm_do_launch
