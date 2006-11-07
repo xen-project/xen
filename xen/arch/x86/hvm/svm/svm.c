@@ -855,8 +855,7 @@ static void svm_migrate_timers(struct vcpu *v)
         migrate_timer(&pt->timer, v->processor);
         migrate_timer(&v->arch.hvm_vcpu.hlt_timer, v->processor);
     }
-    if ( VLAPIC(v) != NULL )
-        migrate_timer(&VLAPIC(v)->vlapic_timer, v->processor);
+    migrate_timer(&vcpu_vlapic(v)->vlapic_timer, v->processor);
     migrate_timer(&vrtc->second_timer, v->processor);
     migrate_timer(&vrtc->second_timer2, v->processor);
     migrate_timer(&vpmt->timer, v->processor);
@@ -984,7 +983,7 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb, unsigned long input,
         cpuid(input, &eax, &ebx, &ecx, &edx);       
         if (input == 0x00000001 || input == 0x80000001 )
         {
-            if ( !vlapic_global_enabled((VLAPIC(v))) )
+            if ( !vlapic_global_enabled(vcpu_vlapic(v)) )
             {
                 /* Since the apic is disabled, avoid any confusion 
                    about SMP cpus being available */
@@ -1550,7 +1549,7 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
 {
     unsigned long value = 0;
     struct vcpu *v = current;
-    struct vlapic *vlapic = VLAPIC(v);
+    struct vlapic *vlapic = vcpu_vlapic(v);
     struct vmcb_struct *vmcb;
 
     vmcb = v->arch.hvm_svm.vmcb;
@@ -1577,8 +1576,6 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
             printk("CR4 read=%lx\n", value);
         break;
     case 8:
-        if ( vlapic == NULL )
-            break;
         value = (unsigned long)vlapic_get_reg(vlapic, APIC_TASKPRI);
         value = (value & 0xF0) >> 4;
         break;
@@ -1607,7 +1604,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
     unsigned long value;
     unsigned long old_cr;
     struct vcpu *v = current;
-    struct vlapic *vlapic = VLAPIC(v);
+    struct vlapic *vlapic = vcpu_vlapic(v);
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
     ASSERT(vmcb);
@@ -1747,8 +1744,6 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
 
     case 8:
     {
-        if ( vlapic == NULL )
-            break;
         vlapic_set_reg(vlapic, APIC_TASKPRI, ((value & 0x0F) << 4));
         break;
     }
@@ -1907,7 +1902,7 @@ static inline void svm_do_msr_access(
             msr_content = vmcb->sysenter_eip;
             break;
         case MSR_IA32_APICBASE:
-            msr_content = VLAPIC(v) ? VLAPIC(v)->apic_base_msr : 0;
+            msr_content = vcpu_vlapic(v)->apic_base_msr;
             break;
         default:
             if (long_mode_do_msr_read(regs))
@@ -1946,7 +1941,7 @@ static inline void svm_do_msr_access(
             vmcb->sysenter_eip = msr_content;
             break;
         case MSR_IA32_APICBASE:
-            vlapic_msr_set(VLAPIC(v), msr_content);
+            vlapic_msr_set(vcpu_vlapic(v), msr_content);
             break;
         default:
             if ( !long_mode_do_msr_write(regs) )

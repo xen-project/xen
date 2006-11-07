@@ -96,7 +96,7 @@ asmlinkage void vmx_intr_assist(void)
     int highest_vector;
     unsigned long eflags;
     struct vcpu *v = current;
-    struct vlapic *vlapic = VLAPIC(v);
+    struct vlapic *vlapic = vcpu_vlapic(v);
     struct hvm_domain *plat=&v->domain->arch.hvm_domain;
     struct periodic_time *pt = &plat->pl_time.periodic_tm;
     struct hvm_virpic *pic= &plat->vpic;
@@ -117,7 +117,7 @@ asmlinkage void vmx_intr_assist(void)
             pic_set_xen_irq(pic, callback_irq, local_events_need_delivery());
     }
 
-    if ( vlapic && vlapic_enabled(vlapic) && vlapic->flush_tpr_threshold )
+    if ( vlapic_enabled(vlapic) && vlapic->flush_tpr_threshold )
         update_tpr_threshold(vlapic);
 
     has_ext_irq = cpu_has_pending_irq(v);

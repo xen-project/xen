@@ -32,7 +32,7 @@ struct hvm_vcpu {
     unsigned long       hw_cr3;     /* value we give to HW to use */
     unsigned long       ioflags;
     struct hvm_io_op    io_op;
-    struct vlapic       *vlapic;
+    struct vlapic       vlapic;
     s64                 cache_tsc_offset;
     u64                 guest_time;
 

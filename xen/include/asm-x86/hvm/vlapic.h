@@ -25,7 +25,10 @@
 
 #define MAX_VECTOR      256
 
-#define VLAPIC(v)                       (v->arch.hvm_vcpu.vlapic)
+#define vcpu_vlapic(vcpu)   (&(vcpu)->arch.hvm_vcpu.vlapic)
+#define vlapic_vcpu(vpic)   (container_of((vpic), struct vcpu, \
+                                          arch.hvm_vcpu.vlapic))
+#define vlapic_domain(vpic) (vlapic_vcpu(vlapic)->domain)
 
 #define VLAPIC_ID(vlapic)   \
     (GET_APIC_ID(vlapic_get_reg(vlapic, APIC_ID)))
@@ -51,8 +54,6 @@ struct vlapic {
     int                timer_pending_count;
     int                flush_tpr_threshold;
     s_time_t           timer_last_update;
-    struct vcpu        *vcpu;
-    struct domain      *domain;
     struct page_info   *regs_page;
     void               *regs;
 };

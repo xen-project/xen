@@ -157,7 +157,7 @@ int vlapic_set_irq(struct vlapic *vlapic, uint8_t vec, uint8_t trig)
 
 s_time_t get_apictime_scheduled(struct vcpu *v)
 {
-    struct vlapic *vlapic = VLAPIC(v);
+    struct vlapic *vlapic = vcpu_vlapic(v);
 
     if ( !vlapic_lvt_enabled(vlapic, APIC_LVTT) )
         return -1;
@@ -202,7 +202,7 @@ static int vlapic_match_dest(struct vcpu *v, struct vlapic *source,
                              int delivery_mode)
 {
     int result = 0;
-    struct vlapic *target = VLAPIC(v);
+    struct vlapic *target = vcpu_vlapic(v);
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "target %p, source %p, dest 0x%x, "
                 "dest_mode 0x%x, short_hand 0x%x, delivery_mode 0x%x.",
@@ -285,7 +285,7 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
                              int vector, int level, int trig_mode)
 {
     int result = 0;
-    struct vlapic *vlapic = VLAPIC(v);
+    struct vlapic *vlapic = vcpu_vlapic(v);
 
     switch ( delivery_mode ) {
     case APIC_DM_FIXED:
@@ -404,8 +404,7 @@ struct vlapic *apic_round_robin(struct domain *d,
 
         if ( test_bit(next, &bitmap) )
         {
-            target = d->vcpu[next]->arch.hvm_vcpu.vlapic;
-
+            target = vcpu_vlapic(d->vcpu[next]);
             if ( target == NULL || !vlapic_enabled(target) )
             {
                 printk("warning: targe round robin local apic disabled\n");
@@ -433,7 +432,7 @@ void vlapic_EOI_set(struct vlapic *vlapic)
     vlapic_clear_vector(vector, vlapic->regs + APIC_ISR);
 
     if ( vlapic_test_and_clear_vector(vector, vlapic->regs + APIC_TMR) )
-        ioapic_update_EOI(vlapic->domain, vector);
+        ioapic_update_EOI(vlapic_domain(vlapic), vector);
 }
 
 static void vlapic_ipi(struct vlapic *vlapic)
@@ -446,12 +445,12 @@ static void vlapic_ipi(struct vlapic *vlapic)
     unsigned int trig_mode =    icr_low & APIC_INT_LEVELTRIG;
     unsigned int level =        icr_low & APIC_INT_ASSERT;
     unsigned int dest_mode =    icr_low & APIC_DEST_MASK;
-    unsigned int delivery_mode =    icr_low & APIC_MODE_MASK;
+    unsigned int delivery_mode =icr_low & APIC_MODE_MASK;
     unsigned int vector =       icr_low & APIC_VECTOR_MASK;
 
     struct vlapic *target;
-    struct vcpu *v = NULL;
-    uint32_t lpr_map=0;
+    struct vcpu *v;
+    uint32_t lpr_map = 0;
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "icr_high 0x%x, icr_low 0x%x, "
                 "short_hand 0x%x, dest 0x%x, trig_mode 0x%x, level 0x%x, "
@@ -459,7 +458,7 @@ static void vlapic_ipi(struct vlapic *vlapic)
                 icr_high, icr_low, short_hand, dest,
                 trig_mode, level, dest_mode, delivery_mode, vector);
 
-    for_each_vcpu ( vlapic->domain, v )
+    for_each_vcpu ( vlapic_domain(vlapic), v )
     {
         if ( vlapic_match_dest(v, vlapic, short_hand,
                                dest, dest_mode, delivery_mode) )
@@ -474,11 +473,10 @@ static void vlapic_ipi(struct vlapic *vlapic)
 
     if ( delivery_mode == APIC_DM_LOWEST)
     {
-        v = vlapic->vcpu;
-        target = apic_round_robin(v->domain, dest_mode, vector, lpr_map);
-
-        if ( target )
-            vlapic_accept_irq(target->vcpu, delivery_mode,
+        target = apic_round_robin(vlapic_domain(v), dest_mode,
+                                  vector, lpr_map);
+        if ( target != NULL )
+            vlapic_accept_irq(vlapic_vcpu(target), delivery_mode,
                               vector, level, trig_mode);
     }
 }
@@ -488,8 +486,6 @@ static uint32_t vlapic_get_tmcct(struct vlapic *vlapic)
     uint32_t counter_passed;
     s_time_t passed, now = NOW();
     uint32_t tmcct = vlapic_get_reg(vlapic, APIC_TMCCT);
-
-    ASSERT(vlapic != NULL);
 
     if ( unlikely(now <= vlapic->timer_last_update) )
     {
@@ -564,7 +560,7 @@ static unsigned long vlapic_read(struct vcpu *v, unsigned long address,
     unsigned int alignment;
     unsigned int tmp;
     unsigned long result;
-    struct vlapic *vlapic = VLAPIC(v);
+    struct vlapic *vlapic = vcpu_vlapic(v);
     unsigned int offset = address - vlapic->base_address;
 
     if ( offset > APIC_TDCR)
@@ -609,7 +605,7 @@ static unsigned long vlapic_read(struct vcpu *v, unsigned long address,
 static void vlapic_write(struct vcpu *v, unsigned long address,
                          unsigned long len, unsigned long val)
 {
-    struct vlapic *vlapic = VLAPIC(v);
+    struct vlapic *vlapic = vcpu_vlapic(v);
     unsigned int offset = address - vlapic->base_address;
 
     if ( offset != 0xb0 )
@@ -741,7 +737,7 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
 
         vlapic_set_reg(vlapic, offset, val);
 
-        if ( !vlapic->vcpu->vcpu_id && (offset == APIC_LVT0) )
+        if ( (vlapic_vcpu(vlapic)->vcpu_id == 0) && (offset == APIC_LVT0) )
         {
             if ( (val & APIC_MODE_MASK) == APIC_DM_EXTINT )
                 if ( val & APIC_LVT_MASKED)
@@ -803,7 +799,7 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
 
 static int vlapic_range(struct vcpu *v, unsigned long addr)
 {
-    struct vlapic *vlapic = VLAPIC(v);
+    struct vlapic *vlapic = vcpu_vlapic(v);
 
     return (vlapic_global_enabled(vlapic) &&
             (addr >= vlapic->base_address) &&
@@ -818,12 +814,6 @@ struct hvm_mmio_handler vlapic_mmio_handler = {
 
 void vlapic_msr_set(struct vlapic *vlapic, uint64_t value)
 {
-    if ( vlapic == NULL )
-        return;
-
-    if ( vlapic->vcpu->vcpu_id )
-        value &= ~MSR_IA32_APICBASE_BSP;
-
     vlapic->apic_base_msr = value;
     vlapic->base_address  = vlapic->apic_base_msr & MSR_IA32_APICBASE_BASE;
 
@@ -840,7 +830,6 @@ void vlapic_msr_set(struct vlapic *vlapic, uint64_t value)
 void vlapic_timer_fn(void *data)
 {
     struct vlapic *vlapic = data;
-    struct vcpu *v;
     uint32_t timer_vector;
     s_time_t now;
 
@@ -848,7 +837,6 @@ void vlapic_timer_fn(void *data)
                   !vlapic_lvt_enabled(vlapic, APIC_LVTT)) )
         return;
 
-    v = vlapic->vcpu;
     timer_vector = vlapic_lvt_vector(vlapic, APIC_LVTT);
     now = NOW();
 
@@ -882,14 +870,14 @@ void vlapic_timer_fn(void *data)
 
 int vlapic_accept_pic_intr(struct vcpu *v)
 {
-    struct vlapic *vlapic = VLAPIC(v);
+    struct vlapic *vlapic = vcpu_vlapic(v);
 
     return vlapic ? test_bit(_VLAPIC_BSP_ACCEPT_PIC, &vlapic->status) : 1;
 }
 
 int cpu_get_apic_interrupt(struct vcpu *v, int *mode)
 {
-    struct vlapic *vlapic = VLAPIC(v);
+    struct vlapic *vlapic = vcpu_vlapic(v);
     int highest_irr;
 
     if ( !vlapic || !vlapic_enabled(vlapic) )
@@ -923,7 +911,7 @@ int cpu_has_pending_irq(struct vcpu *v)
 
 void vlapic_post_injection(struct vcpu *v, int vector, int deliver_mode)
 {
-    struct vlapic *vlapic = VLAPIC(v);
+    struct vlapic *vlapic = vcpu_vlapic(v);
 
     if ( unlikely(vlapic == NULL) )
         return;
@@ -961,10 +949,8 @@ void vlapic_post_injection(struct vcpu *v, int vector, int deliver_mode)
 
 static int vlapic_reset(struct vlapic *vlapic)
 {
-    struct vcpu *v = vlapic->vcpu;
+    struct vcpu *v = vlapic_vcpu(vlapic);
     int i;
-
-    vlapic->domain = v->domain;
 
     vlapic_set_reg(vlapic, APIC_ID, v->vcpu_id << 24);
 
@@ -981,29 +967,8 @@ static int vlapic_reset(struct vlapic *vlapic)
 
     vlapic->flush_tpr_threshold = 0;
 
-    if ( v->vcpu_id == 0 )
-        vlapic->apic_base_msr |= MSR_IA32_APICBASE_BSP;
-
     vlapic->base_address = vlapic->apic_base_msr &
                            MSR_IA32_APICBASE_BASE;
-
-    hvm_vioapic_add_lapic(vlapic, v);
-
-    init_timer(&vlapic->vlapic_timer,
-                  vlapic_timer_fn, vlapic, v->processor);
-
-#ifdef VLAPIC_NO_BIOS
-    /*
-     * XXX According to mp sepcific, BIOS will enable LVT0/1,
-     * remove it after BIOS enabled
-     */
-    if ( !v->vcpu_id )
-    {
-        vlapic_set_reg(vlapic, APIC_LVT0, APIC_MODE_EXTINT << 8);
-        vlapic_set_reg(vlapic, APIC_LVT1, APIC_MODE_NMI << 8);
-        set_bit(_VLAPIC_BSP_ACCEPT_PIC, &vlapic->status);
-    }
-#endif
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
                 "vcpu=%p, id=%d, vlapic_apic_base_msr=0x%016"PRIx64", "
@@ -1016,18 +981,9 @@ static int vlapic_reset(struct vlapic *vlapic)
 
 int vlapic_init(struct vcpu *v)
 {
-    struct vlapic *vlapic;
+    struct vlapic *vlapic = vcpu_vlapic(v);
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "vlapic_init %d", v->vcpu_id);
-
-    vlapic = xmalloc_bytes(sizeof(struct vlapic));
-    if ( vlapic == NULL )
-    {
-        printk("malloc vlapic error for vcpu %x\n", v->vcpu_id);
-        return -ENOMEM;
-    }
-
-    memset(vlapic, 0, sizeof(struct vlapic));
 
     vlapic->regs_page = alloc_domheap_page(NULL);
     if ( vlapic->regs_page == NULL )
@@ -1040,22 +996,32 @@ int vlapic_init(struct vcpu *v)
     vlapic->regs = map_domain_page_global(page_to_mfn(vlapic->regs_page));
     memset(vlapic->regs, 0, PAGE_SIZE);
 
-    VLAPIC(v) = vlapic;
-    vlapic->vcpu = v;
-
     vlapic_reset(vlapic);
+
+    if ( v->vcpu_id == 0 )
+        vlapic->apic_base_msr |= MSR_IA32_APICBASE_BSP;
+
+    hvm_vioapic_add_lapic(vlapic, v);
+
+    init_timer(&vlapic->vlapic_timer,
+                  vlapic_timer_fn, vlapic, v->processor);
+
+#ifdef VLAPIC_NO_BIOS
+    /* According to mp specification, BIOS will enable LVT0/1. */
+    if ( v->vcpu_id == 0 )
+    {
+        vlapic_set_reg(vlapic, APIC_LVT0, APIC_MODE_EXTINT << 8);
+        vlapic_set_reg(vlapic, APIC_LVT1, APIC_MODE_NMI << 8);
+        set_bit(_VLAPIC_BSP_ACCEPT_PIC, &vlapic->status);
+    }
+#endif
 
     return 0;
 }
 
 void vlapic_destroy(struct vcpu *v)
 {
-    struct vlapic *vlapic = VLAPIC(v);
-    
-    if ( vlapic == NULL )
-        return;
-
-    VLAPIC(v) = NULL;
+    struct vlapic *vlapic = vcpu_vlapic(v);
 
     kill_timer(&vlapic->vlapic_timer);
     unmap_domain_page_global(vlapic->regs);

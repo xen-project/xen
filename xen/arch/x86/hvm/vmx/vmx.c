@@ -408,7 +408,7 @@ static void stop_vmx(void)
 
 void vmx_migrate_timers(struct vcpu *v)
 {
-    struct periodic_time *pt = &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
+    struct periodic_time *pt = &v->domain->arch.hvm_domain.pl_time.periodic_tm;
     struct RTCState *vrtc = &v->domain->arch.hvm_domain.pl_time.vrtc;
     struct PMTState *vpmt = &v->domain->arch.hvm_domain.pl_time.vpmt;
 
@@ -417,8 +417,7 @@ void vmx_migrate_timers(struct vcpu *v)
         migrate_timer(&pt->timer, v->processor);
         migrate_timer(&v->arch.hvm_vcpu.hlt_timer, v->processor);
     }
-    if ( VLAPIC(v) != NULL )
-        migrate_timer(&VLAPIC(v)->vlapic_timer, v->processor);
+    migrate_timer(&vcpu_vlapic(v)->vlapic_timer, v->processor);
     migrate_timer(&vrtc->second_timer, v->processor);
     migrate_timer(&vrtc->second_timer2, v->processor);
     migrate_timer(&vpmt->timer, v->processor);
@@ -853,7 +852,7 @@ static void vmx_do_cpuid(struct cpu_user_regs *regs)
             /* Mask off reserved bits. */
             ecx &= ~VMX_VCPU_CPUID_L1_ECX_RESERVED;
 
-            if ( !vlapic_global_enabled((VLAPIC(v))) )
+            if ( !vlapic_global_enabled(vcpu_vlapic(v)) )
                 clear_bit(X86_FEATURE_APIC, &edx);
     
 #if CONFIG_PAGING_LEVELS >= 3
@@ -1559,7 +1558,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
     unsigned long value;
     unsigned long old_cr;
     struct vcpu *v = current;
-    struct vlapic *vlapic = VLAPIC(v);
+    struct vlapic *vlapic = vcpu_vlapic(v);
 
     switch ( gp ) {
     CASE_GET_REG(EAX, eax);
@@ -1705,8 +1704,6 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
     }
     case 8:
     {
-        if ( vlapic == NULL )
-            break;
         vlapic_set_reg(vlapic, APIC_TASKPRI, ((value & 0x0F) << 4));
         break;
     }
@@ -1725,7 +1722,7 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
 {
     unsigned long value = 0;
     struct vcpu *v = current;
-    struct vlapic *vlapic = VLAPIC(v);
+    struct vlapic *vlapic = vcpu_vlapic(v);
 
     switch ( cr )
     {
@@ -1733,8 +1730,6 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
         value = (unsigned long)v->arch.hvm_vmx.cpu_cr3;
         break;
     case 8:
-        if ( vlapic == NULL )
-            break;
         value = (unsigned long)vlapic_get_reg(vlapic, APIC_TASKPRI);
         value = (value & 0xF0) >> 4;
         break;
@@ -1835,7 +1830,7 @@ static inline void vmx_do_msr_read(struct cpu_user_regs *regs)
         __vmread(GUEST_SYSENTER_EIP, &msr_content);
         break;
     case MSR_IA32_APICBASE:
-        msr_content = VLAPIC(v) ? VLAPIC(v)->apic_base_msr : 0;
+        msr_content = vcpu_vlapic(v)->apic_base_msr;
         break;
     default:
         if (long_mode_do_msr_read(regs))
@@ -1892,7 +1887,7 @@ static inline void vmx_do_msr_write(struct cpu_user_regs *regs)
         __vmwrite(GUEST_SYSENTER_EIP, msr_content);
         break;
     case MSR_IA32_APICBASE:
-        vlapic_msr_set(VLAPIC(v), msr_content);
+        vlapic_msr_set(vcpu_vlapic(v), msr_content);
         break;
     default:
         if ( !long_mode_do_msr_write(regs) )
@@ -2307,7 +2302,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case EXIT_REASON_TPR_BELOW_THRESHOLD:
-        VLAPIC(v)->flush_tpr_threshold = 1;
+        vcpu_vlapic(v)->flush_tpr_threshold = 1;
         break;
 
     default:
