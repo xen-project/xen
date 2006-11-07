@@ -119,6 +119,7 @@
     _MACRO(steal_peer_best_idler)           \
     _MACRO(steal_loner_candidate)           \
     _MACRO(steal_loner_signal)              \
+    _MACRO(cpu_pick)                        \
     _MACRO(dom_init)                        \
     _MACRO(dom_destroy)                     \
     _MACRO(vcpu_init)                       \
@@ -722,6 +723,8 @@ csched_cpu_pick(struct vcpu *vc)
     cpumask_t cpus;
     int cpu, nxt;
 
+    CSCHED_STAT_CRANK(cpu_pick);
+
     /*
      * Pick from online CPUs in VCPU's affinity mask, giving a
      * preference to its current processor if it's in there.
@@ -1186,6 +1189,7 @@ csched_load_balance(int cpu, struct csched_vcpu *snext)
         peer_vcpu = per_cpu(schedule_data, peer_cpu).curr;
         spc = CSCHED_PCPU(peer_cpu);
 
+        /* Signal the first candidate only. */
         if ( !is_idle_vcpu(peer_vcpu) &&
              is_idle_vcpu(__runq_elem(spc->runq.next)->vcpu) &&
              __csched_running_vcpu_is_stealable(cpu, peer_vcpu) )
@@ -1195,11 +1199,10 @@ csched_load_balance(int cpu, struct csched_vcpu *snext)
 
             CSCHED_STAT_CRANK(steal_loner_signal);
             cpu_raise_softirq(peer_cpu, SCHEDULE_SOFTIRQ);
+            break;
         }
-        else
-        {
-            spin_unlock(&per_cpu(schedule_data, peer_cpu).schedule_lock);
-        }
+
+        spin_unlock(&per_cpu(schedule_data, peer_cpu).schedule_lock);
     }
 
     /* Failed to find more important work elsewhere... */
