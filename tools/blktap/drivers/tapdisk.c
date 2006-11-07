@@ -381,7 +381,6 @@ static inline int write_rsp_to_ring(struct td_state *s, blkif_response_t *rsp)
 	
 	rsp_d = RING_GET_RESPONSE(&info->fe_ring, info->fe_ring.rsp_prod_pvt);
 	memcpy(rsp_d, rsp, sizeof(blkif_response_t));
-	wmb();
 	info->fe_ring.rsp_prod_pvt++;
 	
 	return 0;
