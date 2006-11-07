@@ -538,8 +538,10 @@ static int blktap_release(struct inode *inode, struct file *filp)
 	}
 	
 	if ( (info->status != CLEANSHUTDOWN) && (info->blkif != NULL) ) {
-		kthread_stop(info->blkif->xenblkd);
-		info->blkif->xenblkd = NULL;
+		if (info->blkif->xenblkd != NULL) {
+			kthread_stop(info->blkif->xenblkd);
+			info->blkif->xenblkd = NULL;
+		}
 		info->status = CLEANSHUTDOWN;
 	}	
 	return 0;
@@ -1007,11 +1009,14 @@ static int blktap_read_ufe_ring(tap_blkif_t *info)
 	rmb();
         
 	for (i = info->ufe_ring.rsp_cons; i != rp; i++) {
+		blkif_response_t res;
 		resp = RING_GET_RESPONSE(&info->ufe_ring, i);
+		memcpy(&res, resp, sizeof(res));
+		mb(); /* rsp_cons read by RING_FULL() in do_block_io_op(). */
 		++info->ufe_ring.rsp_cons;
 
 		/*retrieve [usr_idx] to [mmap_idx,pending_idx] mapping*/
-		usr_idx = (int)resp->id;
+		usr_idx = (int)res.id;
 		pending_idx = MASK_PEND_IDX(ID_TO_IDX(info->idx_map[usr_idx]));
 		mmap_idx = ID_TO_MIDX(info->idx_map[usr_idx]);
 
@@ -1044,8 +1049,8 @@ static int blktap_read_ufe_ring(tap_blkif_t *info)
 			map[offset] = NULL;
 		}
 		fast_flush_area(pending_req, pending_idx, usr_idx, info->minor);
-		make_response(blkif, pending_req->id, resp->operation,
-			      resp->status);
+		make_response(blkif, pending_req->id, res.operation,
+			      res.status);
 		info->idx_map[usr_idx] = INVALID_REQ;
 		blkif_put(pending_req->blkif);
 		free_req(pending_req);
@@ -1330,6 +1335,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 				  info->ufe_ring.req_prod_pvt);
 	memcpy(target, req, sizeof(*req));
 	target->id = usr_idx;
+	wmb(); /* blktap_poll() reads req_prod_pvt asynchronously */
 	info->ufe_ring.req_prod_pvt++;
 	return;
 
