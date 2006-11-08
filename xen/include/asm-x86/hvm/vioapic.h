@@ -94,19 +94,11 @@ struct vioapic {
     uint32_t id;
     unsigned long base_address;
     union vioapic_redir_entry redirtbl[VIOAPIC_NUM_PINS];
-    struct vlapic *lapic_info[32];
-    uint32_t lapic_count;
 };
 
 void vioapic_init(struct domain *d);
 void vioapic_set_xen_irq(struct domain *d, int irq, int level);
 void vioapic_set_irq(struct domain *d, int irq, int level);
-int  vioapic_add_lapic(struct vlapic *vlapic, struct vcpu *v);
 void vioapic_update_EOI(struct domain *d, int vector);
-
-#ifdef HVM_DOMAIN_SAVE_RESTORE
-void ioapic_save(QEMUFile* f, void* opaque);
-int ioapic_load(QEMUFile* f, void* opaque, int version_id);
-#endif
 
 #endif /* __ASM_X86_HVM_VIOAPIC_H__ */

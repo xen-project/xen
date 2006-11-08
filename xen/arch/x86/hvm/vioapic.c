@@ -49,19 +49,6 @@ static int redir_warning_done = 0;
 #define opt_hvm_debug_level opt_vmx_debug_level
 #endif
 
-#ifdef HVM_DOMAIN_SAVE_RESTORE
-void ioapic_save(QEMUFile* f, void* opaque)
-{
-    printk("no implementation for ioapic_save\n");
-}
-
-int ioapic_load(QEMUFile* f, void* opaque, int version_id)
-{
-    printk("no implementation for ioapic_load\n");
-    return 0;
-}
-#endif
-
 static unsigned long vioapic_read_indirect(struct vioapic *vioapic,
                                            unsigned long addr,
                                            unsigned long length)
@@ -299,19 +286,18 @@ static int ioapic_inj_irq(struct vioapic *vioapic,
 }
 
 #ifndef __ia64__
-static int ioapic_match_logical_addr(
-    struct vioapic *vioapic, int number, uint8_t dest)
+static int vlapic_match_logical_addr(struct vlapic *vlapic, uint8_t dest)
 {
     int result = 0;
     uint32_t logical_dest;
 
-    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic_match_logical_addr "
-                "number %i dest %x\n",
-                number, dest);
+    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "vlapic_match_logical_addr "
+                "vcpu=%d vlapic_id=%x dest=%x\n",
+                vlapic_vcpu(vlapic)->vcpu_id, VLAPIC_ID(vlapic), dest);
 
-    logical_dest = vlapic_get_reg(vioapic->lapic_info[number], APIC_LDR);
+    logical_dest = vlapic_get_reg(vlapic, APIC_LDR);
 
-    switch ( vlapic_get_reg(vioapic->lapic_info[number], APIC_DFR) )
+    switch ( vlapic_get_reg(vlapic, APIC_DFR) )
     {
     case APIC_DFR_FLAT:
         result = ((dest & GET_APIC_LOGICAL_ID(logical_dest)) != 0);
@@ -324,15 +310,15 @@ static int ioapic_match_logical_addr(
             result = 1;
         break;
     default:
-        gdprintk(XENLOG_WARNING, "error DFR value for %x lapic\n", number);
+        gdprintk(XENLOG_WARNING, "error DFR value for lapic of vcpu %d\n",
+                 vlapic_vcpu(vlapic)->vcpu_id);
         break;
     }
 
     return result;
 }
 #else
-extern int ioapic_match_logical_addr(
-    struct vioapic *vioapic, int number, uint8_t dest);
+extern int vlapic_match_logical_addr(struct vlapic *vlapic, uint16_t dest);
 #endif
 
 static uint32_t ioapic_get_delivery_bitmask(struct vioapic *vioapic,
@@ -342,49 +328,40 @@ static uint32_t ioapic_get_delivery_bitmask(struct vioapic *vioapic,
                                             uint8_t delivery_mode)
 {
     uint32_t mask = 0;
-    int i;
+    struct vcpu *v;
 
     HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic_get_delivery_bitmask "
-                "dest %d dest_mode %d "
-                "vector %d del_mode %d, lapic_count %d\n",
-                dest, dest_mode, vector, delivery_mode, vioapic->lapic_count);
+                "dest %d dest_mode %d vector %d del_mode %d\n",
+                dest, dest_mode, vector, delivery_mode);
 
-    if ( dest_mode == 0 )
+    if ( dest_mode == 0 ) /* Physical mode. */
     {
-        /* Physical mode. */
-        for ( i = 0; i < vioapic->lapic_count; i++ )
+        if ( dest == 0xFF ) /* Broadcast. */
         {
-            if ( VLAPIC_ID(vioapic->lapic_info[i]) == dest )
+            for_each_vcpu ( vioapic_domain(vioapic), v )
+                mask |= 1 << v->vcpu_id;
+            goto out;
+        }
+
+        for_each_vcpu ( vioapic_domain(vioapic), v )
+        {
+            if ( VLAPIC_ID(vcpu_vlapic(v)) == dest )
             {
-                mask = 1 << i;
+                mask = 1 << v->vcpu_id;
                 break;
             }
         }
-
-        /* Broadcast. */
-        if ( dest == 0xFF )
-        {
-            for ( i = 0; i < vioapic->lapic_count; i++ )
-                mask |= ( 1 << i );
-        }
     }
-    else
+    else if ( dest != 0 ) /* Logical mode, MDA non-zero. */
     {
-        /* Logical destination. Call match_logical_addr for each APIC. */
-        if ( dest != 0 )
-        {
-            for ( i = 0; i < vioapic->lapic_count; i++ )
-            {
-                if ( vioapic->lapic_info[i] &&
-                     ioapic_match_logical_addr(vioapic, i, dest) )
-                    mask |= (1<<i);
-            }
-        }
+        for_each_vcpu ( vioapic_domain(vioapic), v )
+            if ( vlapic_match_logical_addr(vcpu_vlapic(v), dest) )
+                mask |= 1 << v->vcpu_id;
     }
 
+ out:
     HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic_get_delivery_bitmask "
                 "mask %x\n", mask);
-
     return mask;
 }
 
@@ -397,6 +374,7 @@ static void ioapic_deliver(struct vioapic *vioapic, int irq)
     uint8_t trig_mode = vioapic->redirtbl[irq].fields.trig_mode;
     uint32_t deliver_bitmask;
     struct vlapic *target;
+    struct vcpu *v;
 
     HVM_DBG_LOG(DBG_LEVEL_IOAPIC,
                 "dest=%x dest_mode=%x delivery_mode=%x "
@@ -419,7 +397,10 @@ static void ioapic_deliver(struct vioapic *vioapic, int irq)
 #ifdef IRQ0_SPECIAL_ROUTING
         /* Force round-robin to pick VCPU 0 */
         if ( irq == 0 )
-            target = vioapic->lapic_info[0];
+        {
+            v = vioapic_domain(vioapic)->vcpu[0];
+            target = v ? vcpu_vlapic(v) : NULL;
+        }
         else
 #endif
             target = apic_round_robin(vioapic_domain(vioapic), dest_mode,
@@ -442,19 +423,21 @@ static void ioapic_deliver(struct vioapic *vioapic, int irq)
     case dest_ExtINT:
     {
         uint8_t bit;
-        for ( bit = 0; bit < vioapic->lapic_count; bit++ )
+        for ( bit = 0; deliver_bitmask != 0; bit++ )
         {
             if ( !(deliver_bitmask & (1 << bit)) )
                 continue;
+            deliver_bitmask &= ~(1 << bit);
 #ifdef IRQ0_SPECIAL_ROUTING
             /* Do not deliver timer interrupts to VCPU != 0 */
             if ( (irq == 0) && (bit != 0) )
-                target = vioapic->lapic_info[0];
+                v = vioapic_domain(vioapic)->vcpu[0];
             else
 #endif
-                target = vioapic->lapic_info[bit];
-            if ( target != NULL )
+                v = vioapic_domain(vioapic)->vcpu[bit];
+            if ( v != NULL )
             {
+                target = vcpu_vlapic(v);
                 ioapic_inj_irq(vioapic, target, vector,
                                trig_mode, delivery_mode);
                 vcpu_kick(vlapic_vcpu(target));
@@ -593,26 +576,6 @@ void vioapic_update_EOI(struct domain *d, int vector)
                  redir_num, vector);
         return;
     }
-}
-
-int vioapic_add_lapic(struct vlapic *vlapic, struct vcpu *v)
-{
-    struct vioapic *vioapic = domain_vioapic(v->domain);
-
-    if ( v->vcpu_id != vioapic->lapic_count )
-    {
-        gdprintk(XENLOG_ERR, "vioapic_add_lapic "
-                 "cpu_id not match vcpu_id %x lapic_count %x\n",
-                 v->vcpu_id, vioapic->lapic_count);
-        domain_crash_synchronous();
-    }
-
-    /* Update count later for race condition on interrupt. */
-    vioapic->lapic_info[vioapic->lapic_count] = vlapic;
-    wmb();
-    vioapic->lapic_count++;
-
-    return vioapic->lapic_count;
 }
 
 void vioapic_init(struct domain *d)

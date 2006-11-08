@@ -1001,8 +1001,6 @@ int vlapic_init(struct vcpu *v)
     if ( v->vcpu_id == 0 )
         vlapic->apic_base_msr |= MSR_IA32_APICBASE_BSP;
 
-    vioapic_add_lapic(vlapic, v);
-
     init_timer(&vlapic->vlapic_timer,
                   vlapic_timer_fn, vlapic, v->processor);
 
