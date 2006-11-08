@@ -2112,17 +2112,19 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
          * (1) We can get an exception (e.g. #PG) in the guest, or
          * (2) NMI
          */
-        unsigned int vector;
+        unsigned int intr_info, vector;
 
-        if ( __vmread(VM_EXIT_INTR_INFO, &vector) ||
-             !(vector & INTR_INFO_VALID_MASK) )
-            domain_crash_synchronous();
-        vector &= INTR_INFO_VECTOR_MASK;
+        if ( __vmread(VM_EXIT_INTR_INFO, &intr_info) ||
+             !(intr_info & INTR_INFO_VALID_MASK) )
+            __hvm_bug(regs);
+
+        vector = intr_info & INTR_INFO_VECTOR_MASK;
 
         TRACE_VMEXIT(1, vector);
         perfc_incra(cause_vector, vector);
 
-        switch ( vector ) {
+        switch ( vector )
+        {
 #ifdef XEN_DEBUGGER
         case TRAP_debug:
         {
@@ -2198,7 +2200,10 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
             break;
         }
         case TRAP_nmi:
-            do_nmi(regs);
+            if ( (intr_info & INTR_INFO_INTR_TYPE_MASK) == INTR_TYPE_NMI )
+                do_nmi(regs); /* Real NMI, vector 2: normal processing. */
+            else
+                vmx_reflect_exception(v);
             break;
         default:
             vmx_reflect_exception(v);

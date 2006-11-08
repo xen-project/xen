@@ -93,6 +93,7 @@ extern unsigned int cpu_rev;
 #define INTR_INFO_VALID_MASK            0x80000000      /* 31 */
 
 #define INTR_TYPE_EXT_INTR              (0 << 8)    /* external interrupt */
+#define INTR_TYPE_NMI                   (2 << 8)    /* NMI                */
 #define INTR_TYPE_HW_EXCEPTION          (3 << 8)    /* hardware exception */
 #define INTR_TYPE_SW_EXCEPTION          (6 << 8)    /* software exception */
 
