@@ -9,20 +9,17 @@ Foundation, but the instance of code that it refers to (the Xen
 virtual machine monitor) is copyrighted by me and others who actually
 wrote it.
 
-Further note that the guest-OS interfacing header files, which
-includes all files within the subdirectory include/public, are
-*not* covered by the GPL but by a much weaker license:
- include/public/COPYING
+A few files are licensed under both GPL and a weaker BSD-style
+license. This includes all files within the subdirectory
+include/public, as described in include/public/COPYING. All such files
+include the non-GPL license text as a source-code comment. Although
+the license text refers generically to "the software", the non-GPL
+license applies *only* to those source files that explicitly include
+the non-GPL license text.
 
-A few other files are also licensed under the weaker BSD-style
-license. These files all include the license stanza as a text
-comment. Although this stanza refers to the "Software", the license
-applies *only* those source files that explicitly include it.
-
-Also note that the only valid version of the GPL as far as Xen is
-concerned is _this_ particular version of the license (i.e., *only*
-v2, not v2.2 or v3.x or whatever), unless explicitly otherwise
-stated.
+Note that the only valid version of the GPL as far as Xen is concerned
+is _this_ particular version of the license (i.e., *only* v2, not v2.2
+or v3.x or whatever), unless explicitly otherwise stated.
 
  -- Keir Fraser (on behalf of the Xen team)
 
