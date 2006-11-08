@@ -1580,3 +1580,17 @@ xen_vm_get_uuid(xen_session *session, char **result, xen_vm vm)
     *result = session->ok ? xen_strdup_((char *)vm) : NULL;
     return session->ok;
 }
+
+
+bool
+xen_vm_destroy(xen_session *session, xen_vm vm)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm }
+        };
+
+    xen_call_(session, "VM.destroy", param_values, 1, NULL, NULL);
+    return session->ok;
+}

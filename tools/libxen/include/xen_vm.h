@@ -799,4 +799,12 @@ extern bool
 xen_vm_get_all(xen_session *session, struct xen_vm_set **result);
 
 
+/**
+ * Destroy the specified VM.  The VM is completely removed from the system.
+ * This function can only be called when the VM is in the Halted State.
+ */
+extern bool
+xen_vm_destroy(xen_session *session, xen_vm vm);
+
+
 #endif
