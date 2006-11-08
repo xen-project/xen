@@ -769,6 +769,8 @@ class XendDomain:
         """
         self.domains_lock.acquire()
         try:
+            self._refresh()
+
             dominfo = XendDomainInfo.create(config)
             self._add_domain(dominfo)
             self.domain_sched_credit_set(dominfo.getDomid(),
@@ -815,6 +817,8 @@ class XendDomain:
         """
         self.domains_lock.acquire()
         try:
+            self._refresh()
+
             dominfo = self.domain_lookup_nr(domid)
             if not dominfo:
                 raise XendInvalidDomain(str(domid))
@@ -824,7 +828,6 @@ class XendDomain:
             
             dominfo.start(is_managed = True)
 
-            
         finally:
             self.domains_lock.release()
         
