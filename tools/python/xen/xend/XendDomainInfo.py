@@ -994,6 +994,7 @@ class XendDomainInfo:
             self.destroy()
             return
 
+        old_domid = self.domid
         self._writeVm(RESTART_IN_PROGRESS, 'True')
 
         now = time.time()
@@ -1040,7 +1041,7 @@ class XendDomainInfo:
                     self._removeVm(RESTART_IN_PROGRESS)
                 raise
         except:
-            log.exception('Failed to restart domain %s.', str(self.domid))
+            log.exception('Failed to restart domain %s.', str(old_domid))
 
     def getSysMem(self):
         info = dom_get(self.domid)
