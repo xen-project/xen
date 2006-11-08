@@ -183,80 +183,55 @@ static inline void __vmpclear(u64 addr)
                            : "memory");
 }
 
-#define __vmread(x, ptr) ___vmread((x), (ptr), sizeof(*(ptr)))
-
-static always_inline int ___vmread(
-    const unsigned long field, void *ptr, const int size)
+static inline unsigned long __vmread(unsigned long field)
 {
-    unsigned long ecx = 0;
-    int rc;
+    unsigned long ecx;
+
+    __asm__ __volatile__ ( VMREAD_OPCODE
+                           MODRM_EAX_ECX
+                           /* CF==1 or ZF==1 --> crash (ud2) */
+                           "ja 1f ; ud2 ; 1:\n"
+                           : "=c" (ecx)
+                           : "a" (field)
+                           : "memory");
+
+    return ecx;
+}
+
+static inline void __vmwrite(unsigned long field, unsigned long value)
+{
+    __asm__ __volatile__ ( VMWRITE_OPCODE
+                           MODRM_EAX_ECX
+                           /* CF==1 or ZF==1 --> crash (ud2) */
+                           "ja 1f ; ud2 ; 1:\n"
+                           : 
+                           : "a" (field) , "c" (value)
+                           : "memory");
+}
+
+static inline unsigned long __vmread_safe(unsigned long field, int *error)
+{
+    unsigned long ecx;
 
     __asm__ __volatile__ ( VMREAD_OPCODE
                            MODRM_EAX_ECX
                            /* CF==1 or ZF==1 --> rc = -1 */
                            "setna %b0 ; neg %0"
-                           : "=q" (rc), "=c" (ecx)
+                           : "=q" (*error), "=c" (ecx)
                            : "0" (0), "a" (field)
                            : "memory");
 
-    switch ( size ) {
-    case 1:
-        *((u8 *) (ptr)) = ecx;
-        break;
-    case 2:
-        *((u16 *) (ptr)) = ecx;
-        break;
-    case 4:
-        *((u32 *) (ptr)) = ecx;
-        break;
-    case 8:
-        *((u64 *) (ptr)) = ecx;
-        break;
-    default:
-        domain_crash_synchronous();
-        break;
-    }
-
-    return rc;
+    return ecx;
 }
 
-static inline int __vmwrite(unsigned long field, unsigned long value)
+static inline void __vm_set_bit(unsigned long field, unsigned long mask)
 {
-    int rc;
-
-    __asm__ __volatile__ ( VMWRITE_OPCODE
-                           MODRM_EAX_ECX
-                           /* CF==1 or ZF==1 --> rc = -1 */
-                           "setna %b0 ; neg %0"
-                           : "=q" (rc)
-                           : "0" (0), "a" (field) , "c" (value)
-                           : "memory");
-
-    return rc;
+    __vmwrite(field, __vmread(field) | mask);
 }
 
-static inline int __vm_set_bit(unsigned long field, unsigned long mask)
+static inline void __vm_clear_bit(unsigned long field, unsigned long mask)
 {
-    unsigned long tmp;
-    int err = 0;
-
-    err |= __vmread(field, &tmp);
-    tmp |= mask;
-    err |= __vmwrite(field, tmp);
-
-    return err;
-}
-
-static inline int __vm_clear_bit(unsigned long field, unsigned long mask)
-{
-    unsigned long tmp;
-    int err = 0;
-
-    err |= __vmread(field, &tmp);
-    tmp &= ~mask;
-    err |= __vmwrite(field, tmp);
-
-    return err;
+    __vmwrite(field, __vmread(field) & ~mask);
 }
 
 static inline void __vmxoff (void)

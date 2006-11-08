@@ -424,17 +424,21 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 
 static inline void svm_save_dr(struct vcpu *v)
 {
-    if (v->arch.hvm_vcpu.flag_dr_dirty)
-    {
-        /* clear the DR dirty flag and re-enable intercepts for DR accesses */ 
-        v->arch.hvm_vcpu.flag_dr_dirty = 0;
-        v->arch.hvm_svm.vmcb->dr_intercepts = DR_INTERCEPT_ALL_WRITES;
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-        savedebug(&v->arch.guest_context, 0);    
-        savedebug(&v->arch.guest_context, 1);    
-        savedebug(&v->arch.guest_context, 2);    
-        savedebug(&v->arch.guest_context, 3);    
-    }
+    if ( !v->arch.hvm_vcpu.flag_dr_dirty )
+        return;
+
+    /* Clear the DR dirty flag and re-enable intercepts for DR accesses. */
+    v->arch.hvm_vcpu.flag_dr_dirty = 0;
+    v->arch.hvm_svm.vmcb->dr_intercepts = DR_INTERCEPT_ALL_WRITES;
+
+    savedebug(&v->arch.guest_context, 0);
+    savedebug(&v->arch.guest_context, 1);
+    savedebug(&v->arch.guest_context, 2);
+    savedebug(&v->arch.guest_context, 3);
+    v->arch.guest_context.debugreg[6] = vmcb->dr6;
+    v->arch.guest_context.debugreg[7] = vmcb->dr7;
 }
 
 
@@ -444,17 +448,13 @@ static inline void __restore_debug_registers(struct vcpu *v)
     loaddebug(&v->arch.guest_context, 1);
     loaddebug(&v->arch.guest_context, 2);
     loaddebug(&v->arch.guest_context, 3);
+    /* DR6 and DR7 are loaded from the VMCB. */
 }
 
 
 static inline void svm_restore_dr(struct vcpu *v)
 {
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-
-    if (!vmcb)
-        return;
-
-    if (unlikely(vmcb->dr7 & 0xFF))
+    if ( unlikely(v->arch.guest_context.debugreg[7] & 0xFF) )
         __restore_debug_registers(v);
 }
 

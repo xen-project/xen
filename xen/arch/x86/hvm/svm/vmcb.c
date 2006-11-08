@@ -91,7 +91,6 @@ static int construct_vmcb(struct vcpu *v)
     struct arch_svm_struct *arch_svm = &v->arch.hvm_svm;
     struct vmcb_struct *vmcb = arch_svm->vmcb;
     segment_attributes_t attrib;
-    unsigned long dr7;
 
     /* Always flush the TLB on VMRUN. */
     vmcb->tlb_control = 1;
@@ -203,10 +202,6 @@ static int construct_vmcb(struct vcpu *v)
     arch_svm->cpu_shadow_cr4 =
         read_cr4() & ~(X86_CR4_PGE | X86_CR4_PSE | X86_CR4_PAE);
     vmcb->cr4 = arch_svm->cpu_shadow_cr4 | SVM_CR4_HOST_MASK;
-
-    /* Guest DR7. */
-    __asm__ __volatile__ ("mov %%dr7, %0\n" : "=r" (dr7));
-    vmcb->dr7 = dr7;
 
     shadow_update_paging_modes(v);
     vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3; 

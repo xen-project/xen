@@ -63,9 +63,7 @@ disable_irq_window(struct vcpu *v)
 
 static inline int is_interruptibility_state(void)
 {
-    int  interruptibility;
-    __vmread(GUEST_INTERRUPTIBILITY_INFO, &interruptibility);
-    return interruptibility;
+    return __vmread(GUEST_INTERRUPTIBILITY_INFO);
 }
 
 #ifdef __x86_64__
@@ -129,7 +127,7 @@ asmlinkage void vmx_intr_assist(void)
     }
 
     /* This could be moved earlier in the VMX resume sequence. */
-    __vmread(IDT_VECTORING_INFO_FIELD, &idtv_info_field);
+    idtv_info_field = __vmread(IDT_VECTORING_INFO_FIELD);
     if (unlikely(idtv_info_field & INTR_INFO_VALID_MASK)) {
         __vmwrite(VM_ENTRY_INTR_INFO_FIELD, idtv_info_field);
 
@@ -138,14 +136,12 @@ asmlinkage void vmx_intr_assist(void)
          * and interrupts. If we get here then delivery of some event caused a
          * fault, and this always results in defined VM_EXIT_INSTRUCTION_LEN.
          */
-        __vmread(VM_EXIT_INSTRUCTION_LEN, &inst_len); /* Safe */
+        inst_len = __vmread(VM_EXIT_INSTRUCTION_LEN); /* Safe */
         __vmwrite(VM_ENTRY_INSTRUCTION_LEN, inst_len);
 
-        if (unlikely(idtv_info_field & 0x800)) { /* valid error code */
-            unsigned long error_code;
-            __vmread(IDT_VECTORING_ERROR_CODE, &error_code);
-            __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
-        }
+        if (unlikely(idtv_info_field & 0x800)) /* valid error code */
+            __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE,
+                      __vmread(IDT_VECTORING_ERROR_CODE));
         if (unlikely(has_ext_irq))
             enable_irq_window(v);
 
@@ -163,7 +159,7 @@ asmlinkage void vmx_intr_assist(void)
         return;
     }
 
-    __vmread(GUEST_RFLAGS, &eflags);
+    eflags = __vmread(GUEST_RFLAGS);
     if (irq_masked(eflags)) {
         enable_irq_window(v);
         return;

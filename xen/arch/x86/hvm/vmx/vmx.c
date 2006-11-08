@@ -154,14 +154,14 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
             /* XXX should it be GP fault */
             domain_crash_synchronous();
 
-        __vmread(GUEST_FS_BASE, &msr_content);
+        msr_content = __vmread(GUEST_FS_BASE);
         break;
 
     case MSR_GS_BASE:
         if ( !(vmx_long_mode_enabled(v)) )
             domain_crash_synchronous();
 
-        __vmread(GUEST_GS_BASE, &msr_content);
+        msr_content = __vmread(GUEST_GS_BASE);
         break;
 
     case MSR_SHADOW_GS_BASE:
@@ -323,20 +323,20 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 
 static inline void vmx_save_dr(struct vcpu *v)
 {
-    if ( v->arch.hvm_vcpu.flag_dr_dirty )
-    {
-        savedebug(&v->arch.guest_context, 0);
-        savedebug(&v->arch.guest_context, 1);
-        savedebug(&v->arch.guest_context, 2);
-        savedebug(&v->arch.guest_context, 3);
-        savedebug(&v->arch.guest_context, 6);
-        
-        v->arch.hvm_vcpu.flag_dr_dirty = 0;
+    if ( !v->arch.hvm_vcpu.flag_dr_dirty )
+        return;
 
-        v->arch.hvm_vcpu.u.vmx.exec_control |= CPU_BASED_MOV_DR_EXITING;
-        __vmwrite(CPU_BASED_VM_EXEC_CONTROL,
-                  v->arch.hvm_vcpu.u.vmx.exec_control);
-    }
+    /* Clear the DR dirty flag and re-enable intercepts for DR accesses. */
+    v->arch.hvm_vcpu.flag_dr_dirty = 0;
+    v->arch.hvm_vcpu.u.vmx.exec_control |= CPU_BASED_MOV_DR_EXITING;
+    __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vcpu.u.vmx.exec_control);
+
+    savedebug(&v->arch.guest_context, 0);
+    savedebug(&v->arch.guest_context, 1);
+    savedebug(&v->arch.guest_context, 2);
+    savedebug(&v->arch.guest_context, 3);
+    savedebug(&v->arch.guest_context, 6);
+    v->arch.guest_context.debugreg[7] = __vmread(GUEST_DR7);
 }
 
 static inline void __restore_debug_registers(struct vcpu *v)
@@ -347,7 +347,7 @@ static inline void __restore_debug_registers(struct vcpu *v)
     loaddebug(&v->arch.guest_context, 3);
     /* No 4 and 5 */
     loaddebug(&v->arch.guest_context, 6);
-    /* DR7 is loaded from the vmcs. */
+    /* DR7 is loaded from the VMCS. */
 }
 
 /*
@@ -355,21 +355,13 @@ static inline void __restore_debug_registers(struct vcpu *v)
  * need to be restored if their value is going to affect execution -- i.e.,
  * if one of the breakpoints is enabled.  So mask out all bits that don't
  * enable some breakpoint functionality.
- *
- * This is in part necessary because bit 10 of DR7 is hardwired to 1, so a
- * simple if( guest_dr7 ) will always return true.  As long as we're masking,
- * we might as well do it right.
  */
 #define DR7_ACTIVE_MASK 0xff
 
 static inline void vmx_restore_dr(struct vcpu *v)
 {
-    unsigned long guest_dr7;
-
-    __vmread(GUEST_DR7, &guest_dr7);
-
-    /* Assumes guest does not have DR access at time of context switch. */
-    if ( unlikely(guest_dr7 & DR7_ACTIVE_MASK) )
+    /* NB. __vmread() is not usable here, so we cannot read from the VMCS. */
+    if ( unlikely(v->arch.guest_context.debugreg[7] & DR7_ACTIVE_MASK) )
         __restore_debug_registers(v);
 }
 
@@ -430,22 +422,22 @@ static void vmx_store_cpu_guest_regs(
 
     if ( regs != NULL )
     {
-        __vmread(GUEST_RFLAGS, &regs->eflags);
-        __vmread(GUEST_SS_SELECTOR, &regs->ss);
-        __vmread(GUEST_CS_SELECTOR, &regs->cs);
-        __vmread(GUEST_DS_SELECTOR, &regs->ds);
-        __vmread(GUEST_ES_SELECTOR, &regs->es);
-        __vmread(GUEST_GS_SELECTOR, &regs->gs);
-        __vmread(GUEST_FS_SELECTOR, &regs->fs);
-        __vmread(GUEST_RIP, &regs->eip);
-        __vmread(GUEST_RSP, &regs->esp);
+        regs->eflags = __vmread(GUEST_RFLAGS);
+        regs->ss = __vmread(GUEST_SS_SELECTOR);
+        regs->cs = __vmread(GUEST_CS_SELECTOR);
+        regs->ds = __vmread(GUEST_DS_SELECTOR);
+        regs->es = __vmread(GUEST_ES_SELECTOR);
+        regs->gs = __vmread(GUEST_GS_SELECTOR);
+        regs->fs = __vmread(GUEST_FS_SELECTOR);
+        regs->eip = __vmread(GUEST_RIP);
+        regs->esp = __vmread(GUEST_RSP);
     }
 
     if ( crs != NULL )
     {
         crs[0] = v->arch.hvm_vmx.cpu_shadow_cr0;
         crs[2] = v->arch.hvm_vmx.cpu_cr2;
-        __vmread(GUEST_CR3, &crs[3]);
+        crs[3] = __vmread(GUEST_CR3);
         crs[4] = v->arch.hvm_vmx.cpu_shadow_cr4;
     }
 
@@ -466,29 +458,26 @@ static void vmx_store_cpu_guest_regs(
  */
 static void fixup_vm86_seg_bases(struct cpu_user_regs *regs)
 {
-    int err = 0;
     unsigned long base;
 
-    err |= __vmread(GUEST_ES_BASE, &base);
+    base = __vmread(GUEST_ES_BASE);
     if (regs->es << 4 != base)
-        err |= __vmwrite(GUEST_ES_BASE, regs->es << 4);
-    err |= __vmread(GUEST_CS_BASE, &base);
+        __vmwrite(GUEST_ES_BASE, regs->es << 4);
+    base = __vmread(GUEST_CS_BASE);
     if (regs->cs << 4 != base)
-        err |= __vmwrite(GUEST_CS_BASE, regs->cs << 4);
-    err |= __vmread(GUEST_SS_BASE, &base);
+        __vmwrite(GUEST_CS_BASE, regs->cs << 4);
+    base = __vmread(GUEST_SS_BASE);
     if (regs->ss << 4 != base)
-        err |= __vmwrite(GUEST_SS_BASE, regs->ss << 4);
-    err |= __vmread(GUEST_DS_BASE, &base);
+        __vmwrite(GUEST_SS_BASE, regs->ss << 4);
+    base = __vmread(GUEST_DS_BASE);
     if (regs->ds << 4 != base)
-        err |= __vmwrite(GUEST_DS_BASE, regs->ds << 4);
-    err |= __vmread(GUEST_FS_BASE, &base);
+        __vmwrite(GUEST_DS_BASE, regs->ds << 4);
+    base = __vmread(GUEST_FS_BASE);
     if (regs->fs << 4 != base)
-        err |= __vmwrite(GUEST_FS_BASE, regs->fs << 4);
-    err |= __vmread(GUEST_GS_BASE, &base);
+        __vmwrite(GUEST_FS_BASE, regs->fs << 4);
+    base = __vmread(GUEST_GS_BASE);
     if (regs->gs << 4 != base)
-        err |= __vmwrite(GUEST_GS_BASE, regs->gs << 4);
-
-    BUG_ON(err);
+        __vmwrite(GUEST_GS_BASE, regs->gs << 4);
 }
 
 static void vmx_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
@@ -605,7 +594,7 @@ static int vmx_realmode(struct vcpu *v)
 
     ASSERT(v == current);
 
-    __vmread(GUEST_RFLAGS, &rflags);
+    rflags = __vmread(GUEST_RFLAGS);
     return rflags & X86_EFLAGS_VM;
 }
 
@@ -615,7 +604,7 @@ static int vmx_guest_x86_mode(struct vcpu *v)
 
     ASSERT(v == current);
 
-    __vmread(GUEST_CS_AR_BYTES, &cs_ar_bytes);
+    cs_ar_bytes = __vmread(GUEST_CS_AR_BYTES);
 
     if ( vmx_long_mode_enabled(v) )
         return ((cs_ar_bytes & (1u<<13)) ?
@@ -735,7 +724,7 @@ int start_vmx(void)
 static int __get_instruction_length(void)
 {
     int len;
-    __vmread(VM_EXIT_INSTRUCTION_LEN, &len); /* Safe: callers audited */
+    len = __vmread(VM_EXIT_INSTRUCTION_LEN); /* Safe: callers audited */
     if ( (len < 1) || (len > 15) )
         __hvm_bug(guest_cpu_user_regs());
     return len;
@@ -745,7 +734,7 @@ static void inline __update_guest_eip(unsigned long inst_len)
 {
     unsigned long current_eip;
 
-    __vmread(GUEST_RIP, &current_eip);
+    current_eip = __vmread(GUEST_RIP);
     __vmwrite(GUEST_RIP, current_eip + inst_len);
     __vmwrite(GUEST_INTERRUPTIBILITY_INFO, 0);
 }
@@ -758,8 +747,8 @@ static int vmx_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
     {
         unsigned long eip, cs;
 
-        __vmread(GUEST_CS_BASE, &cs);
-        __vmread(GUEST_RIP, &eip);
+        cs = __vmread(GUEST_CS_BASE);
+        eip = __vmread(GUEST_RIP);
         HVM_DBG_LOG(DBG_LEVEL_VMMU,
                     "vmx_do_page_fault = 0x%lx, cs_base=%lx, "
                     "eip = %lx, error_code = %lx\n",
@@ -773,7 +762,7 @@ static int vmx_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
 #if 0
     if ( !result )
     {
-        __vmread(GUEST_RIP, &eip);
+        eip = __vmread(GUEST_RIP);
         printk("vmx pgfault to guest va=%lx eip=%lx\n", va, eip);
     }
 #endif
@@ -805,7 +794,7 @@ static void vmx_do_cpuid(struct cpu_user_regs *regs)
     unsigned long eip;
     struct vcpu *v = current;
 
-    __vmread(GUEST_RIP, &eip);
+    eip = __vmread(GUEST_RIP);
 
     HVM_DBG_LOG(DBG_LEVEL_3, "(eax) 0x%08lx, (ebx) 0x%08lx, "
                 "(ecx) 0x%08lx, (edx) 0x%08lx, (esi) 0x%08lx, (edi) 0x%08lx",
@@ -946,7 +935,7 @@ static void vmx_do_invlpg(unsigned long va)
     unsigned long eip;
     struct vcpu *v = current;
 
-    __vmread(GUEST_RIP, &eip);
+    eip = __vmread(GUEST_RIP);
 
     HVM_DBG_LOG(DBG_LEVEL_VMMU, "eip=%lx, va=%lx",
                 eip, va);
@@ -969,7 +958,7 @@ static int check_for_null_selector(unsigned long eip, int inst_len, int dir)
     /* INS can only use ES segment register, and it can't be overridden */
     if ( dir == IOREQ_READ )
     {
-        __vmread(GUEST_ES_SELECTOR, &sel);
+        sel = __vmread(GUEST_ES_SELECTOR);
         return sel == 0 ? 1 : 0;
     }
 
@@ -991,25 +980,25 @@ static int check_for_null_selector(unsigned long eip, int inst_len, int dir)
         case 0x67: /* addr32 */
             continue;
         case 0x2e: /* CS */
-            __vmread(GUEST_CS_SELECTOR, &sel);
+            sel = __vmread(GUEST_CS_SELECTOR);
             break;
         case 0x36: /* SS */
-            __vmread(GUEST_SS_SELECTOR, &sel);
+            sel = __vmread(GUEST_SS_SELECTOR);
             break;
         case 0x26: /* ES */
-            __vmread(GUEST_ES_SELECTOR, &sel);
+            sel = __vmread(GUEST_ES_SELECTOR);
             break;
         case 0x64: /* FS */
-            __vmread(GUEST_FS_SELECTOR, &sel);
+            sel = __vmread(GUEST_FS_SELECTOR);
             break;
         case 0x65: /* GS */
-            __vmread(GUEST_GS_SELECTOR, &sel);
+            sel = __vmread(GUEST_GS_SELECTOR);
             break;
         case 0x3e: /* DS */
             /* FALLTHROUGH */
         default:
             /* DS is the default */
-            __vmread(GUEST_DS_SELECTOR, &sel);
+            sel = __vmread(GUEST_DS_SELECTOR);
         }
         return sel == 0 ? 1 : 0;
     }
@@ -1056,7 +1045,7 @@ static void vmx_io_instruction(unsigned long exit_qualification,
         unsigned long addr, count = 1;
         int sign = regs->eflags & X86_EFLAGS_DF ? -1 : 1;
 
-        __vmread(GUEST_LINEAR_ADDRESS, &addr);
+        addr = __vmread(GUEST_LINEAR_ADDRESS);
 
         /*
          * In protected mode, guest linear address is invalid if the
@@ -1119,98 +1108,96 @@ static void vmx_io_instruction(unsigned long exit_qualification,
     }
 }
 
-static int vmx_world_save(struct vcpu *v, struct vmx_assist_context *c)
+static void vmx_world_save(struct vcpu *v, struct vmx_assist_context *c)
 {
-    int error = 0;
-
     /* NB. Skip transition instruction. */
-    error |= __vmread(GUEST_RIP, &c->eip);
+    c->eip = __vmread(GUEST_RIP);
     c->eip += __get_instruction_length(); /* Safe: MOV Cn, LMSW, CLTS */
 
-    error |= __vmread(GUEST_RSP, &c->esp);
-    error |= __vmread(GUEST_RFLAGS, &c->eflags);
+    c->esp = __vmread(GUEST_RSP);
+    c->eflags = __vmread(GUEST_RFLAGS);
 
     c->cr0 = v->arch.hvm_vmx.cpu_shadow_cr0;
     c->cr3 = v->arch.hvm_vmx.cpu_cr3;
     c->cr4 = v->arch.hvm_vmx.cpu_shadow_cr4;
 
-    error |= __vmread(GUEST_IDTR_LIMIT, &c->idtr_limit);
-    error |= __vmread(GUEST_IDTR_BASE, &c->idtr_base);
+    c->idtr_limit = __vmread(GUEST_IDTR_LIMIT);
+    c->idtr_base = __vmread(GUEST_IDTR_BASE);
 
-    error |= __vmread(GUEST_GDTR_LIMIT, &c->gdtr_limit);
-    error |= __vmread(GUEST_GDTR_BASE, &c->gdtr_base);
+    c->gdtr_limit = __vmread(GUEST_GDTR_LIMIT);
+    c->gdtr_base = __vmread(GUEST_GDTR_BASE);
 
-    error |= __vmread(GUEST_CS_SELECTOR, &c->cs_sel);
-    error |= __vmread(GUEST_CS_LIMIT, &c->cs_limit);
-    error |= __vmread(GUEST_CS_BASE, &c->cs_base);
-    error |= __vmread(GUEST_CS_AR_BYTES, &c->cs_arbytes.bytes);
+    c->cs_sel = __vmread(GUEST_CS_SELECTOR);
+    c->cs_limit = __vmread(GUEST_CS_LIMIT);
+    c->cs_base = __vmread(GUEST_CS_BASE);
+    c->cs_arbytes.bytes = __vmread(GUEST_CS_AR_BYTES);
 
-    error |= __vmread(GUEST_DS_SELECTOR, &c->ds_sel);
-    error |= __vmread(GUEST_DS_LIMIT, &c->ds_limit);
-    error |= __vmread(GUEST_DS_BASE, &c->ds_base);
-    error |= __vmread(GUEST_DS_AR_BYTES, &c->ds_arbytes.bytes);
+    c->ds_sel = __vmread(GUEST_DS_SELECTOR);
+    c->ds_limit = __vmread(GUEST_DS_LIMIT);
+    c->ds_base = __vmread(GUEST_DS_BASE);
+    c->ds_arbytes.bytes = __vmread(GUEST_DS_AR_BYTES);
 
-    error |= __vmread(GUEST_ES_SELECTOR, &c->es_sel);
-    error |= __vmread(GUEST_ES_LIMIT, &c->es_limit);
-    error |= __vmread(GUEST_ES_BASE, &c->es_base);
-    error |= __vmread(GUEST_ES_AR_BYTES, &c->es_arbytes.bytes);
+    c->es_sel = __vmread(GUEST_ES_SELECTOR);
+    c->es_limit = __vmread(GUEST_ES_LIMIT);
+    c->es_base = __vmread(GUEST_ES_BASE);
+    c->es_arbytes.bytes = __vmread(GUEST_ES_AR_BYTES);
 
-    error |= __vmread(GUEST_SS_SELECTOR, &c->ss_sel);
-    error |= __vmread(GUEST_SS_LIMIT, &c->ss_limit);
-    error |= __vmread(GUEST_SS_BASE, &c->ss_base);
-    error |= __vmread(GUEST_SS_AR_BYTES, &c->ss_arbytes.bytes);
+    c->ss_sel = __vmread(GUEST_SS_SELECTOR);
+    c->ss_limit = __vmread(GUEST_SS_LIMIT);
+    c->ss_base = __vmread(GUEST_SS_BASE);
+    c->ss_arbytes.bytes = __vmread(GUEST_SS_AR_BYTES);
 
-    error |= __vmread(GUEST_FS_SELECTOR, &c->fs_sel);
-    error |= __vmread(GUEST_FS_LIMIT, &c->fs_limit);
-    error |= __vmread(GUEST_FS_BASE, &c->fs_base);
-    error |= __vmread(GUEST_FS_AR_BYTES, &c->fs_arbytes.bytes);
+    c->fs_sel = __vmread(GUEST_FS_SELECTOR);
+    c->fs_limit = __vmread(GUEST_FS_LIMIT);
+    c->fs_base = __vmread(GUEST_FS_BASE);
+    c->fs_arbytes.bytes = __vmread(GUEST_FS_AR_BYTES);
 
-    error |= __vmread(GUEST_GS_SELECTOR, &c->gs_sel);
-    error |= __vmread(GUEST_GS_LIMIT, &c->gs_limit);
-    error |= __vmread(GUEST_GS_BASE, &c->gs_base);
-    error |= __vmread(GUEST_GS_AR_BYTES, &c->gs_arbytes.bytes);
+    c->gs_sel = __vmread(GUEST_GS_SELECTOR);
+    c->gs_limit = __vmread(GUEST_GS_LIMIT);
+    c->gs_base = __vmread(GUEST_GS_BASE);
+    c->gs_arbytes.bytes = __vmread(GUEST_GS_AR_BYTES);
 
-    error |= __vmread(GUEST_TR_SELECTOR, &c->tr_sel);
-    error |= __vmread(GUEST_TR_LIMIT, &c->tr_limit);
-    error |= __vmread(GUEST_TR_BASE, &c->tr_base);
-    error |= __vmread(GUEST_TR_AR_BYTES, &c->tr_arbytes.bytes);
+    c->tr_sel = __vmread(GUEST_TR_SELECTOR);
+    c->tr_limit = __vmread(GUEST_TR_LIMIT);
+    c->tr_base = __vmread(GUEST_TR_BASE);
+    c->tr_arbytes.bytes = __vmread(GUEST_TR_AR_BYTES);
 
-    error |= __vmread(GUEST_LDTR_SELECTOR, &c->ldtr_sel);
-    error |= __vmread(GUEST_LDTR_LIMIT, &c->ldtr_limit);
-    error |= __vmread(GUEST_LDTR_BASE, &c->ldtr_base);
-    error |= __vmread(GUEST_LDTR_AR_BYTES, &c->ldtr_arbytes.bytes);
-
-    return !error;
+    c->ldtr_sel = __vmread(GUEST_LDTR_SELECTOR);
+    c->ldtr_limit = __vmread(GUEST_LDTR_LIMIT);
+    c->ldtr_base = __vmread(GUEST_LDTR_BASE);
+    c->ldtr_arbytes.bytes = __vmread(GUEST_LDTR_AR_BYTES);
 }
 
-static int vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
+static void vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
 {
     unsigned long mfn, old_base_mfn;
-    int error = 0;
 
-    error |= __vmwrite(GUEST_RIP, c->eip);
-    error |= __vmwrite(GUEST_RSP, c->esp);
-    error |= __vmwrite(GUEST_RFLAGS, c->eflags);
+    __vmwrite(GUEST_RIP, c->eip);
+    __vmwrite(GUEST_RSP, c->esp);
+    __vmwrite(GUEST_RFLAGS, c->eflags);
 
     v->arch.hvm_vmx.cpu_shadow_cr0 = c->cr0;
-    error |= __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr0);
+    __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr0);
 
-    if (!vmx_paging_enabled(v))
+    if ( !vmx_paging_enabled(v) )
         goto skip_cr3;
 
-    if (c->cr3 == v->arch.hvm_vmx.cpu_cr3) {
+    if ( c->cr3 == v->arch.hvm_vmx.cpu_cr3 )
+    {
         /*
          * This is simple TLB flush, implying the guest has
          * removed some translation or changed page attributes.
          * We simply invalidate the shadow.
          */
         mfn = get_mfn_from_gpfn(c->cr3 >> PAGE_SHIFT);
-        if (mfn != pagetable_get_pfn(v->arch.guest_table)) {
+        if ( mfn != pagetable_get_pfn(v->arch.guest_table) )
+        {
             printk("Invalid CR3 value=%x", c->cr3);
             domain_crash_synchronous();
-            return 0;
         }
-    } else {
+    }
+    else
+    {
         /*
          * If different, make a shadow. Check if the PDBR is valid
          * first.
@@ -1221,10 +1208,9 @@ static int vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
         {
             printk("Invalid CR3 value=%x", c->cr3);
             domain_crash_synchronous();
-            return 0;
         }
-        if(!get_page(mfn_to_page(mfn), v->domain))
-                return 0;
+        if ( !get_page(mfn_to_page(mfn), v->domain) )
+            domain_crash_synchronous();
         old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
         v->arch.guest_table = pagetable_from_pfn(mfn);
         if (old_base_mfn)
@@ -1236,66 +1222,63 @@ static int vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
     }
 
  skip_cr3:
-
-    if (!vmx_paging_enabled(v))
+    if ( !vmx_paging_enabled(v) )
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "switching to vmxassist. use phys table");
     else
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %x", c->cr3);
 
-    error |= __vmwrite(GUEST_CR4, (c->cr4 | VMX_CR4_HOST_MASK));
+    __vmwrite(GUEST_CR4, (c->cr4 | VMX_CR4_HOST_MASK));
     v->arch.hvm_vmx.cpu_shadow_cr4 = c->cr4;
-    error |= __vmwrite(CR4_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr4);
+    __vmwrite(CR4_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr4);
 
-    error |= __vmwrite(GUEST_IDTR_LIMIT, c->idtr_limit);
-    error |= __vmwrite(GUEST_IDTR_BASE, c->idtr_base);
+    __vmwrite(GUEST_IDTR_LIMIT, c->idtr_limit);
+    __vmwrite(GUEST_IDTR_BASE, c->idtr_base);
 
-    error |= __vmwrite(GUEST_GDTR_LIMIT, c->gdtr_limit);
-    error |= __vmwrite(GUEST_GDTR_BASE, c->gdtr_base);
+    __vmwrite(GUEST_GDTR_LIMIT, c->gdtr_limit);
+    __vmwrite(GUEST_GDTR_BASE, c->gdtr_base);
 
-    error |= __vmwrite(GUEST_CS_SELECTOR, c->cs_sel);
-    error |= __vmwrite(GUEST_CS_LIMIT, c->cs_limit);
-    error |= __vmwrite(GUEST_CS_BASE, c->cs_base);
-    error |= __vmwrite(GUEST_CS_AR_BYTES, c->cs_arbytes.bytes);
+    __vmwrite(GUEST_CS_SELECTOR, c->cs_sel);
+    __vmwrite(GUEST_CS_LIMIT, c->cs_limit);
+    __vmwrite(GUEST_CS_BASE, c->cs_base);
+    __vmwrite(GUEST_CS_AR_BYTES, c->cs_arbytes.bytes);
 
-    error |= __vmwrite(GUEST_DS_SELECTOR, c->ds_sel);
-    error |= __vmwrite(GUEST_DS_LIMIT, c->ds_limit);
-    error |= __vmwrite(GUEST_DS_BASE, c->ds_base);
-    error |= __vmwrite(GUEST_DS_AR_BYTES, c->ds_arbytes.bytes);
+    __vmwrite(GUEST_DS_SELECTOR, c->ds_sel);
+    __vmwrite(GUEST_DS_LIMIT, c->ds_limit);
+    __vmwrite(GUEST_DS_BASE, c->ds_base);
+    __vmwrite(GUEST_DS_AR_BYTES, c->ds_arbytes.bytes);
 
-    error |= __vmwrite(GUEST_ES_SELECTOR, c->es_sel);
-    error |= __vmwrite(GUEST_ES_LIMIT, c->es_limit);
-    error |= __vmwrite(GUEST_ES_BASE, c->es_base);
-    error |= __vmwrite(GUEST_ES_AR_BYTES, c->es_arbytes.bytes);
+    __vmwrite(GUEST_ES_SELECTOR, c->es_sel);
+    __vmwrite(GUEST_ES_LIMIT, c->es_limit);
+    __vmwrite(GUEST_ES_BASE, c->es_base);
+    __vmwrite(GUEST_ES_AR_BYTES, c->es_arbytes.bytes);
 
-    error |= __vmwrite(GUEST_SS_SELECTOR, c->ss_sel);
-    error |= __vmwrite(GUEST_SS_LIMIT, c->ss_limit);
-    error |= __vmwrite(GUEST_SS_BASE, c->ss_base);
-    error |= __vmwrite(GUEST_SS_AR_BYTES, c->ss_arbytes.bytes);
+    __vmwrite(GUEST_SS_SELECTOR, c->ss_sel);
+    __vmwrite(GUEST_SS_LIMIT, c->ss_limit);
+    __vmwrite(GUEST_SS_BASE, c->ss_base);
+    __vmwrite(GUEST_SS_AR_BYTES, c->ss_arbytes.bytes);
 
-    error |= __vmwrite(GUEST_FS_SELECTOR, c->fs_sel);
-    error |= __vmwrite(GUEST_FS_LIMIT, c->fs_limit);
-    error |= __vmwrite(GUEST_FS_BASE, c->fs_base);
-    error |= __vmwrite(GUEST_FS_AR_BYTES, c->fs_arbytes.bytes);
+    __vmwrite(GUEST_FS_SELECTOR, c->fs_sel);
+    __vmwrite(GUEST_FS_LIMIT, c->fs_limit);
+    __vmwrite(GUEST_FS_BASE, c->fs_base);
+    __vmwrite(GUEST_FS_AR_BYTES, c->fs_arbytes.bytes);
 
-    error |= __vmwrite(GUEST_GS_SELECTOR, c->gs_sel);
-    error |= __vmwrite(GUEST_GS_LIMIT, c->gs_limit);
-    error |= __vmwrite(GUEST_GS_BASE, c->gs_base);
-    error |= __vmwrite(GUEST_GS_AR_BYTES, c->gs_arbytes.bytes);
+    __vmwrite(GUEST_GS_SELECTOR, c->gs_sel);
+    __vmwrite(GUEST_GS_LIMIT, c->gs_limit);
+    __vmwrite(GUEST_GS_BASE, c->gs_base);
+    __vmwrite(GUEST_GS_AR_BYTES, c->gs_arbytes.bytes);
 
-    error |= __vmwrite(GUEST_TR_SELECTOR, c->tr_sel);
-    error |= __vmwrite(GUEST_TR_LIMIT, c->tr_limit);
-    error |= __vmwrite(GUEST_TR_BASE, c->tr_base);
-    error |= __vmwrite(GUEST_TR_AR_BYTES, c->tr_arbytes.bytes);
+    __vmwrite(GUEST_TR_SELECTOR, c->tr_sel);
+    __vmwrite(GUEST_TR_LIMIT, c->tr_limit);
+    __vmwrite(GUEST_TR_BASE, c->tr_base);
+    __vmwrite(GUEST_TR_AR_BYTES, c->tr_arbytes.bytes);
 
-    error |= __vmwrite(GUEST_LDTR_SELECTOR, c->ldtr_sel);
-    error |= __vmwrite(GUEST_LDTR_LIMIT, c->ldtr_limit);
-    error |= __vmwrite(GUEST_LDTR_BASE, c->ldtr_base);
-    error |= __vmwrite(GUEST_LDTR_AR_BYTES, c->ldtr_arbytes.bytes);
+    __vmwrite(GUEST_LDTR_SELECTOR, c->ldtr_sel);
+    __vmwrite(GUEST_LDTR_LIMIT, c->ldtr_limit);
+    __vmwrite(GUEST_LDTR_BASE, c->ldtr_base);
+    __vmwrite(GUEST_LDTR_AR_BYTES, c->ldtr_arbytes.bytes);
 
     shadow_update_paging_modes(v);
     __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr3);
-
-    return !error;
 }
 
 enum { VMX_ASSIST_INVOKE = 0, VMX_ASSIST_RESTORE };
@@ -1325,8 +1308,7 @@ static int vmx_assist(struct vcpu *v, int mode)
         if (hvm_copy_from_guest_phys(&cp, VMXASSIST_OLD_CONTEXT, sizeof(cp)))
             goto error;
         if (cp != 0) {
-            if (!vmx_world_save(v, &c))
-                goto error;
+            vmx_world_save(v, &c);
             if (hvm_copy_to_guest_phys(cp, &c, sizeof(c)))
                 goto error;
         }
@@ -1337,8 +1319,7 @@ static int vmx_assist(struct vcpu *v, int mode)
         if (cp != 0) {
             if (hvm_copy_from_guest_phys(&c, cp, sizeof(c)))
                 goto error;
-            if (!vmx_world_restore(v, &c))
-                goto error;
+            vmx_world_restore(v, &c);
             v->arch.hvm_vmx.vmxassist_enabled = 1;            
             return 1;
         }
@@ -1355,8 +1336,7 @@ static int vmx_assist(struct vcpu *v, int mode)
         if (cp != 0) {
             if (hvm_copy_from_guest_phys(&c, cp, sizeof(c)))
                 goto error;
-            if (!vmx_world_restore(v, &c))
-                goto error;
+            vmx_world_restore(v, &c);
             v->arch.hvm_vmx.vmxassist_enabled = 0;
             return 1;
         }
@@ -1428,7 +1408,7 @@ static int vmx_set_cr0(unsigned long value)
                 HVM_DBG_LOG(DBG_LEVEL_1, "Enabling long mode\n");
                 v->arch.hvm_vmx.msr_content.msr_items[VMX_INDEX_MSR_EFER]
                     |= EFER_LMA;
-                __vmread(VM_ENTRY_CONTROLS, &vm_entry_value);
+                vm_entry_value = __vmread(VM_ENTRY_CONTROLS);
                 vm_entry_value |= VM_ENTRY_IA32E_MODE;
                 __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
             }
@@ -1482,7 +1462,7 @@ static int vmx_set_cr0(unsigned long value)
             {
                 v->arch.hvm_vmx.msr_content.msr_items[VMX_INDEX_MSR_EFER]
                     &= ~EFER_LMA;
-                __vmread(VM_ENTRY_CONTROLS, &vm_entry_value);
+                vm_entry_value = __vmread(VM_ENTRY_CONTROLS);
                 vm_entry_value &= ~VM_ENTRY_IA32E_MODE;
                 __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
             }
@@ -1490,7 +1470,7 @@ static int vmx_set_cr0(unsigned long value)
 
         if ( vmx_assist(v, VMX_ASSIST_INVOKE) )
         {
-            __vmread(GUEST_RIP, &eip);
+            eip = __vmread(GUEST_RIP);
             HVM_DBG_LOG(DBG_LEVEL_1,
                         "Transfering control to vmxassist %%eip 0x%lx\n", eip);
             return 0; /* do not update eip! */
@@ -1498,12 +1478,12 @@ static int vmx_set_cr0(unsigned long value)
     }
     else if ( v->arch.hvm_vmx.vmxassist_enabled )
     {
-        __vmread(GUEST_RIP, &eip);
+        eip = __vmread(GUEST_RIP);
         HVM_DBG_LOG(DBG_LEVEL_1,
                     "Enabling CR0.PE at %%eip 0x%lx\n", eip);
         if ( vmx_assist(v, VMX_ASSIST_RESTORE) )
         {
-            __vmread(GUEST_RIP, &eip);
+            eip = __vmread(GUEST_RIP);
             HVM_DBG_LOG(DBG_LEVEL_1,
                         "Restoring to %%eip 0x%lx\n", eip);
             return 0; /* do not update eip! */
@@ -1515,7 +1495,7 @@ static int vmx_set_cr0(unsigned long value)
         {
             v->arch.hvm_vmx.msr_content.msr_items[VMX_INDEX_MSR_EFER]
               &= ~EFER_LMA;
-            __vmread(VM_ENTRY_CONTROLS, &vm_entry_value);
+            vm_entry_value = __vmread(VM_ENTRY_CONTROLS);
             vm_entry_value &= ~VM_ENTRY_IA32E_MODE;
             __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
         }
@@ -1570,7 +1550,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
     CASE_GET_REG(EDI, edi);
     CASE_EXTEND_GET_REG;
     case REG_ESP:
-        __vmread(GUEST_RSP, &value);
+        value = __vmread(GUEST_RSP);
         break;
     default:
         printk("invalid gp: %d\n", gp);
@@ -1821,13 +1801,13 @@ static inline void vmx_do_msr_read(struct cpu_user_regs *regs)
         msr_content = hvm_get_guest_time(v);
         break;
     case MSR_IA32_SYSENTER_CS:
-        __vmread(GUEST_SYSENTER_CS, (u32 *)&msr_content);
+        msr_content = (u32)__vmread(GUEST_SYSENTER_CS);
         break;
     case MSR_IA32_SYSENTER_ESP:
-        __vmread(GUEST_SYSENTER_ESP, &msr_content);
+        msr_content = __vmread(GUEST_SYSENTER_ESP);
         break;
     case MSR_IA32_SYSENTER_EIP:
-        __vmread(GUEST_SYSENTER_EIP, &msr_content);
+        msr_content = __vmread(GUEST_SYSENTER_EIP);
         break;
     case MSR_IA32_APICBASE:
         msr_content = vcpu_vlapic(v)->apic_base_msr;
@@ -1903,14 +1883,13 @@ static inline void vmx_do_msr_write(struct cpu_user_regs *regs)
 static void vmx_do_hlt(void)
 {
     unsigned long rflags;
-    __vmread(GUEST_RFLAGS, &rflags);
+    rflags = __vmread(GUEST_RFLAGS);
     hvm_hlt(rflags);
 }
 
 static inline void vmx_do_extint(struct cpu_user_regs *regs)
 {
     unsigned int vector;
-    int error;
 
     asmlinkage void do_IRQ(struct cpu_user_regs *);
     fastcall void smp_apic_timer_interrupt(struct cpu_user_regs *);
@@ -1923,9 +1902,8 @@ static inline void vmx_do_extint(struct cpu_user_regs *regs)
     fastcall void smp_thermal_interrupt(struct cpu_user_regs *regs);
 #endif
 
-    if ((error = __vmread(VM_EXIT_INTR_INFO, &vector))
-        && !(vector & INTR_INFO_VALID_MASK))
-        __hvm_bug(regs);
+    vector = __vmread(VM_EXIT_INTR_INFO);
+    BUG_ON(!(vector & INTR_INFO_VALID_MASK));
 
     vector &= INTR_INFO_VECTOR_MASK;
     TRACE_VMEXIT(1, vector);
@@ -1964,40 +1942,40 @@ static inline void vmx_do_extint(struct cpu_user_regs *regs)
 #if defined (__x86_64__)
 void store_cpu_user_regs(struct cpu_user_regs *regs)
 {
-    __vmread(GUEST_SS_SELECTOR, &regs->ss);
-    __vmread(GUEST_RSP, &regs->rsp);
-    __vmread(GUEST_RFLAGS, &regs->rflags);
-    __vmread(GUEST_CS_SELECTOR, &regs->cs);
-    __vmread(GUEST_DS_SELECTOR, &regs->ds);
-    __vmread(GUEST_ES_SELECTOR, &regs->es);
-    __vmread(GUEST_RIP, &regs->rip);
+    regs->ss = __vmread(GUEST_SS_SELECTOR);
+    regs->rsp = __vmread(GUEST_RSP);
+    regs->rflags = __vmread(GUEST_RFLAGS);
+    regs->cs = __vmread(GUEST_CS_SELECTOR);
+    regs->ds = __vmread(GUEST_DS_SELECTOR);
+    regs->es = __vmread(GUEST_ES_SELECTOR);
+    regs->rip = __vmread(GUEST_RIP);
 }
 #elif defined (__i386__)
 void store_cpu_user_regs(struct cpu_user_regs *regs)
 {
-    __vmread(GUEST_SS_SELECTOR, &regs->ss);
-    __vmread(GUEST_RSP, &regs->esp);
-    __vmread(GUEST_RFLAGS, &regs->eflags);
-    __vmread(GUEST_CS_SELECTOR, &regs->cs);
-    __vmread(GUEST_DS_SELECTOR, &regs->ds);
-    __vmread(GUEST_ES_SELECTOR, &regs->es);
-    __vmread(GUEST_RIP, &regs->eip);
+    regs->ss = __vmread(GUEST_SS_SELECTOR);
+    regs->esp = __vmread(GUEST_RSP);
+    regs->eflags = __vmread(GUEST_RFLAGS);
+    regs->cs = __vmread(GUEST_CS_SELECTOR);
+    regs->ds = __vmread(GUEST_DS_SELECTOR);
+    regs->es = __vmread(GUEST_ES_SELECTOR);
+    regs->eip = __vmread(GUEST_RIP);
 }
 #endif 
 
 #ifdef XEN_DEBUGGER
 void save_cpu_user_regs(struct cpu_user_regs *regs)
 {
-    __vmread(GUEST_SS_SELECTOR, &regs->xss);
-    __vmread(GUEST_RSP, &regs->esp);
-    __vmread(GUEST_RFLAGS, &regs->eflags);
-    __vmread(GUEST_CS_SELECTOR, &regs->xcs);
-    __vmread(GUEST_RIP, &regs->eip);
+    regs->xss = __vmread(GUEST_SS_SELECTOR);
+    regs->esp = __vmread(GUEST_RSP);
+    regs->eflags = __vmread(GUEST_RFLAGS);
+    regs->xcs = __vmread(GUEST_CS_SELECTOR);
+    regs->eip = __vmread(GUEST_RIP);
 
-    __vmread(GUEST_GS_SELECTOR, &regs->xgs);
-    __vmread(GUEST_FS_SELECTOR, &regs->xfs);
-    __vmread(GUEST_ES_SELECTOR, &regs->xes);
-    __vmread(GUEST_DS_SELECTOR, &regs->xds);
+    regs->xgs = __vmread(GUEST_GS_SELECTOR);
+    regs->xfs = __vmread(GUEST_FS_SELECTOR);
+    regs->xes = __vmread(GUEST_ES_SELECTOR);
+    regs->xds = __vmread(GUEST_DS_SELECTOR);
 }
 
 void restore_cpu_user_regs(struct cpu_user_regs *regs)
@@ -2019,10 +1997,10 @@ static void vmx_reflect_exception(struct vcpu *v)
 {
     int error_code, intr_info, vector;
 
-    __vmread(VM_EXIT_INTR_INFO, &intr_info);
+    intr_info = __vmread(VM_EXIT_INTR_INFO);
     vector = intr_info & 0xff;
     if ( intr_info & INTR_INFO_DELIVER_CODE_MASK )
-        __vmread(VM_EXIT_INTR_ERROR_CODE, &error_code);
+        error_code = __vmread(VM_EXIT_INTR_ERROR_CODE);
     else
         error_code = VMX_DELIVER_NO_ERROR_CODE;
 
@@ -2030,7 +2008,7 @@ static void vmx_reflect_exception(struct vcpu *v)
     {
         unsigned long rip;
 
-        __vmread(GUEST_RIP, &rip);
+        rip = __vmread(GUEST_RIP);
         HVM_DBG_LOG(DBG_LEVEL_1, "rip = %lx, error_code = %x",
                     rip, error_code);
     }
@@ -2062,7 +2040,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     unsigned long exit_qualification, inst_len = 0;
     struct vcpu *v = current;
 
-    __vmread(VM_EXIT_REASON, &exit_reason);
+    exit_reason = __vmread(VM_EXIT_REASON);
 
     perfc_incra(vmexits, exit_reason);
 
@@ -2078,7 +2056,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     {
         unsigned int failed_vmentry_reason = exit_reason & 0xFFFF;
 
-        __vmread(EXIT_QUALIFICATION, &exit_qualification);
+        exit_qualification = __vmread(EXIT_QUALIFICATION);
         printk("Failed vm entry (exit reason 0x%x) ", exit_reason);
         switch ( failed_vmentry_reason ) {
         case EXIT_REASON_INVALID_GUEST_STATE:
@@ -2114,9 +2092,8 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
          */
         unsigned int intr_info, vector;
 
-        if ( __vmread(VM_EXIT_INTR_INFO, &intr_info) ||
-             !(intr_info & INTR_INFO_VALID_MASK) )
-            __hvm_bug(regs);
+        intr_info = __vmread(VM_EXIT_INTR_INFO);
+        BUG_ON(!(intr_info & INTR_INFO_VALID_MASK));
 
         vector = intr_info & INTR_INFO_VECTOR_MASK;
 
@@ -2177,8 +2154,8 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         }
         case TRAP_page_fault:
         {
-            __vmread(EXIT_QUALIFICATION, &exit_qualification);
-            __vmread(VM_EXIT_INTR_ERROR_CODE, &regs->error_code);
+            exit_qualification = __vmread(EXIT_QUALIFICATION);
+            regs->error_code = __vmread(VM_EXIT_INTR_ERROR_CODE);
 
             TRACE_VMEXIT(3, regs->error_code);
             TRACE_VMEXIT(4, exit_qualification);
@@ -2240,7 +2217,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     {
         inst_len = __get_instruction_length(); /* Safe: INVLPG */
         __update_guest_eip(inst_len);
-        __vmread(EXIT_QUALIFICATION, &exit_qualification);
+        exit_qualification = __vmread(EXIT_QUALIFICATION);
         vmx_do_invlpg(exit_qualification);
         TRACE_VMEXIT(4, exit_qualification);
         break;
@@ -2254,7 +2231,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     }
     case EXIT_REASON_CR_ACCESS:
     {
-        __vmread(EXIT_QUALIFICATION, &exit_qualification);
+        exit_qualification = __vmread(EXIT_QUALIFICATION);
         inst_len = __get_instruction_length(); /* Safe: MOV Cn, LMSW, CLTS */
         if ( vmx_cr_access(exit_qualification, regs) )
             __update_guest_eip(inst_len);
@@ -2262,11 +2239,11 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
     }
     case EXIT_REASON_DR_ACCESS:
-        __vmread(EXIT_QUALIFICATION, &exit_qualification);
+        exit_qualification = __vmread(EXIT_QUALIFICATION);
         vmx_dr_access(exit_qualification, regs);
         break;
     case EXIT_REASON_IO_INSTRUCTION:
-        __vmread(EXIT_QUALIFICATION, &exit_qualification);
+        exit_qualification = __vmread(EXIT_QUALIFICATION);
         inst_len = __get_instruction_length(); /* Safe: IN, INS, OUT, OUTS */
         vmx_io_instruction(exit_qualification, inst_len);
         TRACE_VMEXIT(4, exit_qualification);

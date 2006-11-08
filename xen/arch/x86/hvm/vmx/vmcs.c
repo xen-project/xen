@@ -257,7 +257,7 @@ struct host_execution_env {
 
 static void vmx_set_host_env(struct vcpu *v)
 {
-    unsigned int tr, cpu, error = 0;
+    unsigned int tr, cpu;
     struct host_execution_env host_env;
     struct Xgt_desc_struct desc;
 
@@ -265,93 +265,95 @@ static void vmx_set_host_env(struct vcpu *v)
     __asm__ __volatile__ ("sidt  (%0) \n" :: "a"(&desc) : "memory");
     host_env.idtr_limit = desc.size;
     host_env.idtr_base = desc.address;
-    error |= __vmwrite(HOST_IDTR_BASE, host_env.idtr_base);
+    __vmwrite(HOST_IDTR_BASE, host_env.idtr_base);
 
     __asm__ __volatile__ ("sgdt  (%0) \n" :: "a"(&desc) : "memory");
     host_env.gdtr_limit = desc.size;
     host_env.gdtr_base = desc.address;
-    error |= __vmwrite(HOST_GDTR_BASE, host_env.gdtr_base);
+    __vmwrite(HOST_GDTR_BASE, host_env.gdtr_base);
 
     __asm__ __volatile__ ("str  (%0) \n" :: "a"(&tr) : "memory");
     host_env.tr_selector = tr;
     host_env.tr_limit = sizeof(struct tss_struct);
     host_env.tr_base = (unsigned long) &init_tss[cpu];
-    error |= __vmwrite(HOST_TR_SELECTOR, host_env.tr_selector);
-    error |= __vmwrite(HOST_TR_BASE, host_env.tr_base);
-    error |= __vmwrite(HOST_RSP, (unsigned long)get_stack_bottom());
+    __vmwrite(HOST_TR_SELECTOR, host_env.tr_selector);
+    __vmwrite(HOST_TR_BASE, host_env.tr_base);
+    __vmwrite(HOST_RSP, (unsigned long)get_stack_bottom());
 }
 
-static int construct_vmcs(struct vcpu *v)
+static void construct_vmcs(struct vcpu *v)
 {
-    int error = 0;
-    unsigned long tmp, cr0, cr4;
+    unsigned long cr0, cr4;
     union vmcs_arbytes arbytes;
 
     vmx_vmcs_enter(v);
 
     /* VMCS controls. */
-    error |= __vmwrite(PIN_BASED_VM_EXEC_CONTROL, vmx_pin_based_exec_control);
-    error |= __vmwrite(VM_EXIT_CONTROLS, vmx_vmexit_control);
-    error |= __vmwrite(VM_ENTRY_CONTROLS, vmx_vmentry_control);
-    error |= __vmwrite(CPU_BASED_VM_EXEC_CONTROL, vmx_cpu_based_exec_control);
+    __vmwrite(PIN_BASED_VM_EXEC_CONTROL, vmx_pin_based_exec_control);
+    __vmwrite(VM_EXIT_CONTROLS, vmx_vmexit_control);
+    __vmwrite(VM_ENTRY_CONTROLS, vmx_vmentry_control);
+    __vmwrite(CPU_BASED_VM_EXEC_CONTROL, vmx_cpu_based_exec_control);
     v->arch.hvm_vcpu.u.vmx.exec_control = vmx_cpu_based_exec_control;
 
     /* Host data selectors. */
-    error |= __vmwrite(HOST_SS_SELECTOR, __HYPERVISOR_DS);
-    error |= __vmwrite(HOST_DS_SELECTOR, __HYPERVISOR_DS);
-    error |= __vmwrite(HOST_ES_SELECTOR, __HYPERVISOR_DS);
+    __vmwrite(HOST_SS_SELECTOR, __HYPERVISOR_DS);
+    __vmwrite(HOST_DS_SELECTOR, __HYPERVISOR_DS);
+    __vmwrite(HOST_ES_SELECTOR, __HYPERVISOR_DS);
 #if defined(__i386__)
-    error |= __vmwrite(HOST_FS_SELECTOR, __HYPERVISOR_DS);
-    error |= __vmwrite(HOST_GS_SELECTOR, __HYPERVISOR_DS);
-    error |= __vmwrite(HOST_FS_BASE, 0);
-    error |= __vmwrite(HOST_GS_BASE, 0);
+    __vmwrite(HOST_FS_SELECTOR, __HYPERVISOR_DS);
+    __vmwrite(HOST_GS_SELECTOR, __HYPERVISOR_DS);
+    __vmwrite(HOST_FS_BASE, 0);
+    __vmwrite(HOST_GS_BASE, 0);
 #elif defined(__x86_64__)
-    rdmsrl(MSR_FS_BASE, tmp); error |= __vmwrite(HOST_FS_BASE, tmp);
-    rdmsrl(MSR_GS_BASE, tmp); error |= __vmwrite(HOST_GS_BASE, tmp);
+    {
+        unsigned long msr;
+        rdmsrl(MSR_FS_BASE, msr); __vmwrite(HOST_FS_BASE, msr);
+        rdmsrl(MSR_GS_BASE, msr); __vmwrite(HOST_GS_BASE, msr);
+    }
 #endif
 
     /* Host control registers. */
-    error |= __vmwrite(HOST_CR0, read_cr0());
-    error |= __vmwrite(HOST_CR4, read_cr4());
+    __vmwrite(HOST_CR0, read_cr0());
+    __vmwrite(HOST_CR4, read_cr4());
 
     /* Host CS:RIP. */
-    error |= __vmwrite(HOST_CS_SELECTOR, __HYPERVISOR_CS);
-    error |= __vmwrite(HOST_RIP, (unsigned long)vmx_asm_vmexit_handler);
+    __vmwrite(HOST_CS_SELECTOR, __HYPERVISOR_CS);
+    __vmwrite(HOST_RIP, (unsigned long)vmx_asm_vmexit_handler);
 
     /* MSR intercepts. */
-    error |= __vmwrite(VM_EXIT_MSR_LOAD_ADDR, 0);
-    error |= __vmwrite(VM_EXIT_MSR_STORE_ADDR, 0);
-    error |= __vmwrite(VM_EXIT_MSR_STORE_COUNT, 0);
-    error |= __vmwrite(VM_EXIT_MSR_LOAD_COUNT, 0);
-    error |= __vmwrite(VM_ENTRY_MSR_LOAD_COUNT, 0);
+    __vmwrite(VM_EXIT_MSR_LOAD_ADDR, 0);
+    __vmwrite(VM_EXIT_MSR_STORE_ADDR, 0);
+    __vmwrite(VM_EXIT_MSR_STORE_COUNT, 0);
+    __vmwrite(VM_EXIT_MSR_LOAD_COUNT, 0);
+    __vmwrite(VM_ENTRY_MSR_LOAD_COUNT, 0);
 
-    error |= __vmwrite(VM_ENTRY_INTR_INFO_FIELD, 0);
+    __vmwrite(VM_ENTRY_INTR_INFO_FIELD, 0);
 
-    error |= __vmwrite(CR0_GUEST_HOST_MASK, ~0UL);
-    error |= __vmwrite(CR4_GUEST_HOST_MASK, ~0UL);
+    __vmwrite(CR0_GUEST_HOST_MASK, ~0UL);
+    __vmwrite(CR4_GUEST_HOST_MASK, ~0UL);
 
-    error |= __vmwrite(PAGE_FAULT_ERROR_CODE_MASK, 0);
-    error |= __vmwrite(PAGE_FAULT_ERROR_CODE_MATCH, 0);
+    __vmwrite(PAGE_FAULT_ERROR_CODE_MASK, 0);
+    __vmwrite(PAGE_FAULT_ERROR_CODE_MATCH, 0);
 
-    error |= __vmwrite(CR3_TARGET_COUNT, 0);
+    __vmwrite(CR3_TARGET_COUNT, 0);
 
-    error |= __vmwrite(GUEST_ACTIVITY_STATE, 0);
+    __vmwrite(GUEST_ACTIVITY_STATE, 0);
 
     /* Guest segment bases. */
-    error |= __vmwrite(GUEST_ES_BASE, 0);
-    error |= __vmwrite(GUEST_SS_BASE, 0);
-    error |= __vmwrite(GUEST_DS_BASE, 0);
-    error |= __vmwrite(GUEST_FS_BASE, 0);
-    error |= __vmwrite(GUEST_GS_BASE, 0);
-    error |= __vmwrite(GUEST_CS_BASE, 0);
+    __vmwrite(GUEST_ES_BASE, 0);
+    __vmwrite(GUEST_SS_BASE, 0);
+    __vmwrite(GUEST_DS_BASE, 0);
+    __vmwrite(GUEST_FS_BASE, 0);
+    __vmwrite(GUEST_GS_BASE, 0);
+    __vmwrite(GUEST_CS_BASE, 0);
 
     /* Guest segment limits. */
-    error |= __vmwrite(GUEST_ES_LIMIT, GUEST_SEGMENT_LIMIT);
-    error |= __vmwrite(GUEST_SS_LIMIT, GUEST_SEGMENT_LIMIT);
-    error |= __vmwrite(GUEST_DS_LIMIT, GUEST_SEGMENT_LIMIT);
-    error |= __vmwrite(GUEST_FS_LIMIT, GUEST_SEGMENT_LIMIT);
-    error |= __vmwrite(GUEST_GS_LIMIT, GUEST_SEGMENT_LIMIT);
-    error |= __vmwrite(GUEST_CS_LIMIT, GUEST_SEGMENT_LIMIT);
+    __vmwrite(GUEST_ES_LIMIT, GUEST_SEGMENT_LIMIT);
+    __vmwrite(GUEST_SS_LIMIT, GUEST_SEGMENT_LIMIT);
+    __vmwrite(GUEST_DS_LIMIT, GUEST_SEGMENT_LIMIT);
+    __vmwrite(GUEST_FS_LIMIT, GUEST_SEGMENT_LIMIT);
+    __vmwrite(GUEST_GS_LIMIT, GUEST_SEGMENT_LIMIT);
+    __vmwrite(GUEST_CS_LIMIT, GUEST_SEGMENT_LIMIT);
 
     /* Guest segment AR bytes. */
     arbytes.bytes = 0;
@@ -362,82 +364,77 @@ static int construct_vmcs(struct vcpu *v)
     arbytes.fields.default_ops_size = 1;    /* 32-bit */
     arbytes.fields.g = 1;
     arbytes.fields.null_bit = 0;            /* not null */
-    error |= __vmwrite(GUEST_ES_AR_BYTES, arbytes.bytes);
-    error |= __vmwrite(GUEST_SS_AR_BYTES, arbytes.bytes);
-    error |= __vmwrite(GUEST_DS_AR_BYTES, arbytes.bytes);
-    error |= __vmwrite(GUEST_FS_AR_BYTES, arbytes.bytes);
-    error |= __vmwrite(GUEST_GS_AR_BYTES, arbytes.bytes);
+    __vmwrite(GUEST_ES_AR_BYTES, arbytes.bytes);
+    __vmwrite(GUEST_SS_AR_BYTES, arbytes.bytes);
+    __vmwrite(GUEST_DS_AR_BYTES, arbytes.bytes);
+    __vmwrite(GUEST_FS_AR_BYTES, arbytes.bytes);
+    __vmwrite(GUEST_GS_AR_BYTES, arbytes.bytes);
     arbytes.fields.seg_type = 0xb;          /* type = 0xb */
-    error |= __vmwrite(GUEST_CS_AR_BYTES, arbytes.bytes);
+    __vmwrite(GUEST_CS_AR_BYTES, arbytes.bytes);
 
     /* Guest GDT. */
-    error |= __vmwrite(GUEST_GDTR_BASE, 0);
-    error |= __vmwrite(GUEST_GDTR_LIMIT, 0);
+    __vmwrite(GUEST_GDTR_BASE, 0);
+    __vmwrite(GUEST_GDTR_LIMIT, 0);
 
     /* Guest IDT. */
-    error |= __vmwrite(GUEST_IDTR_BASE, 0);
-    error |= __vmwrite(GUEST_IDTR_LIMIT, 0);
+    __vmwrite(GUEST_IDTR_BASE, 0);
+    __vmwrite(GUEST_IDTR_LIMIT, 0);
 
     /* Guest LDT and TSS. */
     arbytes.fields.s = 0;                   /* not code or data segement */
     arbytes.fields.seg_type = 0x2;          /* LTD */
     arbytes.fields.default_ops_size = 0;    /* 16-bit */
     arbytes.fields.g = 0;
-    error |= __vmwrite(GUEST_LDTR_AR_BYTES, arbytes.bytes);
+    __vmwrite(GUEST_LDTR_AR_BYTES, arbytes.bytes);
     arbytes.fields.seg_type = 0xb;          /* 32-bit TSS (busy) */
-    error |= __vmwrite(GUEST_TR_AR_BYTES, arbytes.bytes);
+    __vmwrite(GUEST_TR_AR_BYTES, arbytes.bytes);
 
-    error |= __vmwrite(GUEST_INTERRUPTIBILITY_INFO, 0);
-    __asm__ __volatile__ ("mov %%dr7, %0\n" : "=r" (tmp));
-    error |= __vmwrite(GUEST_DR7, tmp);
-    error |= __vmwrite(VMCS_LINK_POINTER, ~0UL);
+    __vmwrite(GUEST_INTERRUPTIBILITY_INFO, 0);
+    __vmwrite(GUEST_DR7, 0);
+    __vmwrite(VMCS_LINK_POINTER, ~0UL);
 #if defined(__i386__)
-    error |= __vmwrite(VMCS_LINK_POINTER_HIGH, ~0UL);
+    __vmwrite(VMCS_LINK_POINTER_HIGH, ~0UL);
 #endif
 
-    error |= __vmwrite(EXCEPTION_BITMAP,
-                       MONITOR_DEFAULT_EXCEPTION_BITMAP);
+    __vmwrite(EXCEPTION_BITMAP, MONITOR_DEFAULT_EXCEPTION_BITMAP);
 
     /* Guest CR0. */
     cr0 = read_cr0();
     v->arch.hvm_vmx.cpu_cr0 = cr0;
-    error |= __vmwrite(GUEST_CR0, v->arch.hvm_vmx.cpu_cr0);
+    __vmwrite(GUEST_CR0, v->arch.hvm_vmx.cpu_cr0);
     v->arch.hvm_vmx.cpu_shadow_cr0 = cr0 & ~(X86_CR0_PG | X86_CR0_TS);
-    error |= __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr0);
+    __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr0);
 
     /* Guest CR4. */
     cr4 = read_cr4();
-    error |= __vmwrite(GUEST_CR4, cr4 & ~X86_CR4_PSE);
+    __vmwrite(GUEST_CR4, cr4 & ~X86_CR4_PSE);
     v->arch.hvm_vmx.cpu_shadow_cr4 =
         cr4 & ~(X86_CR4_PGE | X86_CR4_VMXE | X86_CR4_PAE);
-    error |= __vmwrite(CR4_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr4);
+    __vmwrite(CR4_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr4);
 
 #ifdef __x86_64__ 
     /* VLAPIC TPR optimisation. */
     v->arch.hvm_vcpu.u.vmx.exec_control |= CPU_BASED_TPR_SHADOW;
     v->arch.hvm_vcpu.u.vmx.exec_control &=
         ~(CPU_BASED_CR8_STORE_EXITING | CPU_BASED_CR8_LOAD_EXITING);
-    error |= __vmwrite(CPU_BASED_VM_EXEC_CONTROL,
-                       v->arch.hvm_vcpu.u.vmx.exec_control);
-    error |= __vmwrite(VIRTUAL_APIC_PAGE_ADDR,
-                       page_to_maddr(vcpu_vlapic(v)->regs_page));
-    error |= __vmwrite(TPR_THRESHOLD, 0);
+    __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vcpu.u.vmx.exec_control);
+    __vmwrite(VIRTUAL_APIC_PAGE_ADDR,
+              page_to_maddr(vcpu_vlapic(v)->regs_page));
+    __vmwrite(TPR_THRESHOLD, 0);
 #endif
 
-    error |= __vmwrite(GUEST_LDTR_SELECTOR, 0);
-    error |= __vmwrite(GUEST_LDTR_BASE, 0);
-    error |= __vmwrite(GUEST_LDTR_LIMIT, 0);
+    __vmwrite(GUEST_LDTR_SELECTOR, 0);
+    __vmwrite(GUEST_LDTR_BASE, 0);
+    __vmwrite(GUEST_LDTR_LIMIT, 0);
 
-    error |= __vmwrite(GUEST_TR_BASE, 0);
-    error |= __vmwrite(GUEST_TR_LIMIT, 0xff);
+    __vmwrite(GUEST_TR_BASE, 0);
+    __vmwrite(GUEST_TR_LIMIT, 0xff);
 
     shadow_update_paging_modes(v);
     __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr3);
     __vmwrite(HOST_CR3, v->arch.cr3);
 
     vmx_vmcs_exit(v);
-
-    return error;
 }
 
 int vmx_create_vmcs(struct vcpu *v)
@@ -446,13 +443,8 @@ int vmx_create_vmcs(struct vcpu *v)
         return -ENOMEM;
  
     __vmx_clear_vmcs(v);
-    
-    if ( construct_vmcs(v) != 0 )
-    {
-        vmx_free_vmcs(v->arch.hvm_vmx.vmcs);
-        v->arch.hvm_vmx.vmcs = NULL;
-        return -EINVAL;
-    }
+
+    construct_vmcs(v);
 
     return 0;
 }
@@ -472,16 +464,14 @@ void vmx_destroy_vmcs(struct vcpu *v)
 
 void vm_launch_fail(unsigned long eflags)
 {
-    unsigned long error;
-    __vmread(VM_INSTRUCTION_ERROR, &error);
+    unsigned long error = __vmread(VM_INSTRUCTION_ERROR);
     printk("<vm_launch_fail> error code %lx\n", error);
     __hvm_bug(guest_cpu_user_regs());
 }
 
 void vm_resume_fail(unsigned long eflags)
 {
-    unsigned long error;
-    __vmread(VM_INSTRUCTION_ERROR, &error);
+    unsigned long error = __vmread(VM_INSTRUCTION_ERROR);
     printk("<vm_resume_fail> error code %lx\n", error);
     __hvm_bug(guest_cpu_user_regs());
 }
@@ -510,7 +500,7 @@ static void print_section(char *header, uint32_t start,
 {
     uint32_t addr, j;
     unsigned long val;
-    int code;
+    int code, rc;
     char *fmt[4] = {"0x%04lx ", "0x%016lx ", "0x%08lx ", "0x%016lx "};
     char *err[4] = {"------ ", "------------------ ", 
                     "---------- ", "------------------ "};
@@ -526,7 +516,8 @@ static void print_section(char *header, uint32_t start,
         if (!(j&3))
             printk("\n\t\t0x%08x: ", addr);
 
-        if (!__vmread(addr, &val))
+        val = __vmread_safe(addr, &rc);
+        if (rc == 0)
             printk(fmt[code], val);
         else
             printk("%s", err[code]);
