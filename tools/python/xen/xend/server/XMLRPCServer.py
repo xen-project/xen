@@ -79,7 +79,7 @@ methods = ['device_create', 'device_configure',
            'destroyDevice','getDeviceSxprs',
            'setMemoryTarget', 'setName', 'setVCpuCount', 'shutdown',
            'send_sysrq', 'getVCPUInfo', 'waitForDevices',
-           'getRestartCount']
+           'getRestartCount', 'getSysMem']
 
 exclude = ['domain_create', 'domain_restore']
 

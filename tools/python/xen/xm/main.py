@@ -563,6 +563,12 @@ def parse_sedf_info(info):
         }
 
 def xm_brief_list(doms):
+    def get_mem_info():
+       dom_sysMem=server.xend.domain.getSysMem(d['domid'])
+       if dom_sysMem:
+               d['mem']=dom_sysMem
+
+
     print '%-40s %3s %5s %5s %10s %9s' % \
           ('Name', 'ID', 'Mem', 'VCPUs', 'State', 'Time(s)')
     
@@ -571,6 +577,7 @@ def xm_brief_list(doms):
     
     for dom in doms:
         d = parse_doms_info(dom)
+        get_mem_info()
         print format % d
 
 def xm_label_list(doms):
