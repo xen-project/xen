@@ -59,7 +59,7 @@ class XendDomain:
 
     @ivar domains: map of domains indexed by UUID Strings
     @type domains: dict of XendDomainInfo
-    @ivar domains_managed: uuid of domains that are managed by Xend
+    @ivar managed_domains: uuid of domains that are managed by Xend
     @type managed_domains: list of (uuids, dom_name)
     @ivar domains_lock: lock that must be held when manipulating self.domains
     @type domains_lock: threaading.RLock
@@ -152,6 +152,11 @@ class XendDomain:
 
             # add all active domains
             for dom in running:
+                if dom['dying'] == 1:
+                    log.warn('Ignoring dying domain %d from now on' %
+                             dom['domid'])
+                    continue
+
                 if dom['domid'] != DOM0_ID:
                     try:
                         new_dom = XendDomainInfo.recreate(dom, False)
