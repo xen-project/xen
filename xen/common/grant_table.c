@@ -253,8 +253,12 @@ __gnttab_map_grant_ref(
                     get_page(mfn_to_page(frame), rd) :
                     get_page_and_type(mfn_to_page(frame), rd,
                                       PGT_writable_page))) )
-        PIN_FAIL(undo_out, GNTST_general_error,
-                 "Could not pin the granted frame (%lx)!\n", frame);
+    {
+        if ( !test_bit(_DOMF_dying, &rd->domain_flags) )
+            gdprintk(XENLOG_WARNING, "Could not pin grant frame %lx\n", frame);
+        rc = GNTST_general_error;
+        goto undo_out;
+    }
 
     if ( op->flags & GNTMAP_host_map )
     {
@@ -893,8 +897,12 @@ __gnttab_copy(
         PIN_FAIL(error_out, GNTST_general_error,
                  "source frame %lx invalid.\n", s_frame);
     if ( !get_page(mfn_to_page(s_frame), sd) )
-        PIN_FAIL(error_out, GNTST_general_error,
-                 "could not get source frame %lx.\n", s_frame);
+    {
+        if ( !test_bit(_DOMF_dying, &sd->domain_flags) )
+            gdprintk(XENLOG_WARNING, "Could not get src frame %lx\n", s_frame);
+        rc = GNTST_general_error;
+        goto error_out;
+    }
     have_s_ref = 1;
 
     if ( dest_is_gref )
@@ -912,8 +920,12 @@ __gnttab_copy(
         PIN_FAIL(error_out, GNTST_general_error,
                  "destination frame %lx invalid.\n", d_frame);
     if ( !get_page_and_type(mfn_to_page(d_frame), dd, PGT_writable_page) )
-        PIN_FAIL(error_out, GNTST_general_error,
-                 "could not get destination frame %lx.\n", d_frame);
+    {
+        if ( !test_bit(_DOMF_dying, &dd->domain_flags) )
+            gdprintk(XENLOG_WARNING, "Could not get dst frame %lx\n", d_frame);
+        rc = GNTST_general_error;
+        goto error_out;
+    }
 
     sp = map_domain_page(s_frame);
     dp = map_domain_page(d_frame);
