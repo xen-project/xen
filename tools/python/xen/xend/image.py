@@ -248,6 +248,11 @@ class PPC_LinuxImageHandler(LinuxImageHandler):
 
 class HVMImageHandler(ImageHandler):
 
+    def __init__(self, vm, imageConfig, deviceConfig):
+        ImageHandler.__init__(self, vm, imageConfig, deviceConfig)
+        self.shutdownWatch = None
+
+
     def configure(self, imageConfig, deviceConfig):
         ImageHandler.configure(self, imageConfig, deviceConfig)
 
