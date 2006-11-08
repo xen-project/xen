@@ -77,7 +77,7 @@ static void build_e820map(void *e820_page, unsigned long long mem_size)
     nr_map++;
 
     e820entry[nr_map].addr = 0xEA000;
-    e820entry[nr_map].size = 0x01000;
+    e820entry[nr_map].size = 0x02000;
     e820entry[nr_map].type = E820_ACPI;
     nr_map++;
 
