@@ -1353,8 +1353,6 @@ class XendDomainInfo:
             except:
                 log.exception("Removing domain path failed.")
 
-            self.info['dying'] = 0
-            self.info['shutdown'] = 0
             self._stateSet(DOM_STATE_HALTED)
         finally:
             self.refresh_shutdown_lock.release()
@@ -1626,7 +1624,7 @@ class XendDomainInfo:
             raise VmError('Invalid VM Name')
 
         dom =  XendDomain.instance().domain_lookup_nr(name)
-        if dom and dom != self:
+        if dom and dom != self and not dom.info['dying']:
             raise VmError("VM name '%s' already exists" % name)
         
 

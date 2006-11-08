@@ -357,27 +357,29 @@ class XendDomain:
         either xenstore has changed or when a method requires
         up to date information (like uptime, cputime stats).
 
+        Expects to be protected by the domains_lock.
+
         @rtype: None
         """
-        self.domains_lock.acquire()
-        try:
-            # update information for all running domains
-            # - like cpu_time, status, dying, etc.
-            running = self._running_domains()
-            for dom in running:
-                domid = dom['domid']
-                if domid in self.domains:
-                    self.domains[domid].update(dom)
 
-            # remove domains that are not running from active
-            # domain list
-            running_domids = [d['domid'] for d in running]
-            for domid, dom in self.domains.items():
-                if domid not in running_domids and domid != DOM0_ID:
-                    self._remove_domain(dom, domid)
-                    
-        finally:
-            self.domains_lock.release()
+        # update information for all running domains
+        # - like cpu_time, status, dying, etc.
+        running = self._running_domains()
+        for dom in running:
+            domid = dom['domid']
+            if domid in self.domains:
+                self.domains[domid].update(dom)
+
+        # remove domains that are not running from active domain list.
+        # The list might have changed by now, because the update call may
+        # cause new domains to be added, if the domain has rebooted.  We get
+        # the list again.
+        running = self._running_domains()
+        running_domids = [d['domid'] for d in running]
+        for domid, dom in self.domains.items():
+            if domid not in running_domids and domid != DOM0_ID:
+                self._remove_domain(dom, domid)
+
 
     def _add_domain(self, info):
         """Add the given domain entry to this instance's internal cache.
@@ -1228,8 +1230,12 @@ class XendDomain:
             elif cap < 0 or cap > dominfo.getVCpuCount() * 100:
                 raise XendError("cap is out of range")
 
+            assert type(weight) == int
+            assert type(cap) == int
+
             return xc.sched_credit_domain_set(dominfo.getDomid(), weight, cap)
         except Exception, ex:
+            log.exception(ex)
             raise XendError(str(ex))
 
     def domain_maxmem_set(self, domid, mem):
