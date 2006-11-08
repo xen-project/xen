@@ -142,7 +142,7 @@ ROUNDTRIPPING_CONFIG_ENTRIES = [
     ('uuid',       str),
     ('vcpus',      int),
     ('vcpu_avail', int),
-    ('cpu_weight', float),
+    ('cpu_weight', int),
     ('memory',     int),
     ('shadow_memory', int),
     ('maxmem',     int),
