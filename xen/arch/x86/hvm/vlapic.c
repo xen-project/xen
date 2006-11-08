@@ -1026,5 +1026,4 @@ void vlapic_destroy(struct vcpu *v)
     kill_timer(&vlapic->vlapic_timer);
     unmap_domain_page_global(vlapic->regs);
     free_domheap_page(vlapic->regs_page);
-    xfree(vlapic);
 }
