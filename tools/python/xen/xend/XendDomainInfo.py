@@ -678,6 +678,7 @@ class XendDomainInfo:
         t.remove()
         t.mkdir()
         t.set_permissions({ 'dom' : self.domid })
+        t.write('vm', self.vmpath)
 
     def _storeDomDetails(self):
         to_store = {
