@@ -66,23 +66,46 @@ static void build_e820map(void *e820_page, unsigned long long mem_size)
         mem_size = HVM_BELOW_4G_RAM_END;
     }
 
+    /* 0x0-0x9F000: Ordinary RAM. */
     e820entry[nr_map].addr = 0x0;
     e820entry[nr_map].size = 0x9F000;
     e820entry[nr_map].type = E820_RAM;
     nr_map++;
 
+    /*
+     * 0x9F000-0x9F800: SMBIOS tables.
+     * 0x9FC00-0xA0000: Extended BIOS Data Area (EBDA).
+     * TODO: SMBIOS tables should be moved higher (>=0xE0000).
+     *       They are unusually low in our memory map: could cause problems?
+     */
     e820entry[nr_map].addr = 0x9F000;
     e820entry[nr_map].size = 0x1000;
     e820entry[nr_map].type = E820_RESERVED;
     nr_map++;
 
-    e820entry[nr_map].addr = 0xEA000;
-    e820entry[nr_map].size = 0x02000;
-    e820entry[nr_map].type = E820_ACPI;
-    nr_map++;
+    /*
+     * Following regions are standard regions of the PC memory map.
+     * They are not covered by e820 regions. OSes will not use as RAM.
+     * 0xA0000-0xC0000: VGA memory-mapped I/O. Not covered by E820.
+     * 0xC0000-0xE0000: 16-bit devices, expansion ROMs (inc. vgabios).
+     * TODO: hvmloader should free pages which turn out to be unused.
+     */
 
-    e820entry[nr_map].addr = 0xF0000;
-    e820entry[nr_map].size = 0x10000;
+    /*
+     * 0xE0000-0x0F0000: PC-specific area. We place ACPI tables here.
+     *                   We *cannot* mark as E820_ACPI, for two reasons:
+     *                    1. ACPI spec. says that E820_ACPI regions below
+     *                       16MB must clip INT15h 0x88 and 0xe801 queries.
+     *                       Our rombios doesn't do this.
+     *                    2. The OS is allowed to reclaim ACPI memory after
+     *                       parsing the tables. But our FACS is in this
+     *                       region and it must not be reclaimed (it contains
+     *                       the ACPI global lock!).
+     * 0xF0000-0x100000: System BIOS.
+     * TODO: hvmloader should free pages which turn out to be unused.
+     */
+    e820entry[nr_map].addr = 0xE0000;
+    e820entry[nr_map].size = 0x20000;
     e820entry[nr_map].type = E820_RESERVED;
     nr_map++;
 
