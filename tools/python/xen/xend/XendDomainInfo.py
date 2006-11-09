@@ -1044,11 +1044,6 @@ class XendDomainInfo:
         except:
             log.exception('Failed to restart domain %s.', str(old_domid))
 
-    def getSysMem(self):
-        info = dom_get(self.domid)
-        xs_memory=int(info['mem_kb'])/1024
-        return xs_memory
-
     def _preserveForRestart(self):
         """Preserve a domain that has been shut down, by giving it a new UUID,
         cloning the VM details, and giving it a new name.  This allows us to

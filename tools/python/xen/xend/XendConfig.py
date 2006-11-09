@@ -661,6 +661,8 @@ class XendConfig(dict):
             sxpr.append(['status', str(DOM_STATE_HALTED)])
 
         sxpr.append(['state', self._get_old_state_string()])
+        sxpr.append(['memory_dynamic_max', self.get('memory_dynamic_max',
+                                                    self['memory'])])
 
         # For save/restore migration
         if domain:
@@ -717,6 +719,10 @@ class XendConfig(dict):
                                   str(self['memory']))
 
         self['maxmem'] = max(self['memory'], self['maxmem'])
+
+        # convert mem_kb from domain_getinfo to something more descriptive
+        if 'mem_kb' in self:
+            self['memory_dynamic_max'] = (self['mem_kb'] + 1023)/1024
 
         # Verify devices
         for d_uuid, (d_type, d_info) in self['device'].items():
