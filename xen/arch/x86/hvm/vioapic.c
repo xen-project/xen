@@ -497,6 +497,8 @@ void vioapic_set_xen_irq(struct domain *d, int irq, int level)
         vioapic->irr_xen |= 1 << irq;
     else
         vioapic->irr_xen &= ~(1 << irq);
+
+    service_ioapic(vioapic);
 }
 
 void vioapic_set_irq(struct domain *d, int irq, int level)
