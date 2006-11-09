@@ -96,10 +96,11 @@ typedef struct abstract_value
         const char *string_val;
         int64_t int_val;
         int enum_val;
-        double double_val;
+        double float_val;
         bool bool_val;
         arbitrary_set *set_val;
         void *struct_val;
+        time_t datetime_val;
     } u;
 } abstract_value;
 

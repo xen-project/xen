@@ -1050,7 +1050,7 @@ make_body(const char *method_name, abstract_value params[], int param_count)
             break;
 
         case FLOAT:
-            snprintf(buf, sizeof(buf), "%lf", v->u.double_val);
+            snprintf(buf, sizeof(buf), "%lf", v->u.float_val);
             add_param(params_node, "double", buf);
             break;
 
