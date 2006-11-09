@@ -246,8 +246,8 @@ static int vlapic_match_dest(struct vcpu *v, struct vlapic *source,
                      (dest == 0xff) )
                 {
                     /* What shall we do now? */
-                    printk("Broadcast IPI with lowest priority "
-                           "delivery mode\n");
+                    gdprintk(XENLOG_ERR, "Broadcast IPI with lowest priority "
+                             "delivery mode\n");
                     domain_crash_synchronous();
                 }
                 result = ((GET_APIC_LOGICAL_ID(ldr) == (dest & 0xf)) ?
@@ -287,7 +287,8 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
     int result = 0;
     struct vlapic *vlapic = vcpu_vlapic(v);
 
-    switch ( delivery_mode ) {
+    switch ( delivery_mode )
+    {
     case APIC_DM_FIXED:
     case APIC_DM_LOWEST:
         /* FIXME add logic for vcpu on reset */
@@ -314,13 +315,12 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
         break;
 
     case APIC_DM_REMRD:
-        printk("Ignore deliver mode 3 in vlapic_accept_irq\n");
+        gdprintk(XENLOG_WARNING, "Ignoring delivery mode 3\n");
         break;
 
     case APIC_DM_SMI:
     case APIC_DM_NMI:
-        /* Fixme */
-        printk("TODO: for guest SMI/NMI\n");
+        gdprintk(XENLOG_WARNING, "Ignoring guest SMI/NMI\n");
         break;
 
     case APIC_DM_INIT:
@@ -348,7 +348,7 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
 
         if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
         {
-            printk("SIPI for initialized vcpu vcpuid %x\n", v->vcpu_id);
+            gdprintk(XENLOG_ERR, "SIPI for initialized vcpu %x\n", v->vcpu_id);
             domain_crash_synchronous();
         }
 
@@ -357,7 +357,8 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
         break;
 
     default:
-        printk("TODO: not support interrupt type %x\n", delivery_mode);
+        gdprintk(XENLOG_ERR, "TODO: unsupported delivery mode %x\n",
+                 delivery_mode);
         domain_crash_synchronous();
         break;
     }
@@ -365,52 +366,31 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
     return result;
 }
 
-/*
- * This function is used by both ioapic and local APIC
- * The bitmap is for vcpu_id
- */
-struct vlapic *apic_round_robin(struct domain *d,
-                                uint8_t dest_mode,
-                                uint8_t vector,
-                                uint32_t bitmap)
+/* This function is used by both ioapic and lapic.The bitmap is for vcpu_id. */
+struct vlapic *apic_round_robin(
+    struct domain *d, uint8_t vector, uint32_t bitmap)
 {
     int next, old;
-    struct vlapic* target = NULL;
-
-    if ( dest_mode == 0 ) /* Physical mode */
-    {
-        printk("<apic_round_robin> lowest priority for physical mode.\n");
-        return NULL;
-    }
-
-    if ( !bitmap )
-    {
-        printk("<apic_round_robin> no bit set in bitmap.\n");
-        return NULL;
-    }
+    struct vlapic *target = NULL;
 
     spin_lock(&d->arch.hvm_domain.round_robin_lock);
 
     old = next = d->arch.hvm_domain.round_info[vector];
 
     /* the vcpu array is arranged according to vcpu_id */
-    do
-    {
+    do {
         if ( ++next == MAX_VIRT_CPUS ) 
             next = 0;
-        if ( d->vcpu[next] == NULL ||
+        if ( (d->vcpu[next] == NULL) ||
              !test_bit(_VCPUF_initialised, &d->vcpu[next]->vcpu_flags) )
             continue;
 
         if ( test_bit(next, &bitmap) )
         {
             target = vcpu_vlapic(d->vcpu[next]);
-            if ( target == NULL || !vlapic_enabled(target) )
-            {
-                printk("warning: targe round robin local apic disabled\n");
-                /* XXX should we domain crash?? Or should we return NULL */
-            }
-            break;
+            if ( vlapic_enabled(target) )
+                break;
+            target = NULL;
         }
     } while ( next != old );
 
@@ -471,10 +451,9 @@ static void vlapic_ipi(struct vlapic *vlapic)
         }
     }
 
-    if ( delivery_mode == APIC_DM_LOWEST)
+    if ( delivery_mode == APIC_DM_LOWEST )
     {
-        target = apic_round_robin(vlapic_domain(v), dest_mode,
-                                  vector, lpr_map);
+        target = apic_round_robin(vlapic_domain(v), vector, lpr_map);
         if ( target != NULL )
             vlapic_accept_irq(vlapic_vcpu(target), delivery_mode,
                               vector, level, trig_mode);
@@ -543,15 +522,10 @@ static void vlapic_read_aligned(struct vlapic *vlapic, unsigned int offset,
 {
     ASSERT((len == 4) && (offset > 0) && (offset <= APIC_TDCR));
 
-    *result = 0;
-
-    switch ( offset ) {
+    switch ( offset )
+    {
     case APIC_PROCPRI:
         *result = vlapic_get_ppr(vlapic);
-        break;
-
-    case APIC_ARBPRI:
-        printk("access local APIC ARBPRI register which is for P6\n");
         break;
 
     case APIC_TMCCT: /* Timer CCR */
@@ -585,7 +559,8 @@ static unsigned long vlapic_read(struct vcpu *v, unsigned long address,
     alignment = offset & 0x3;
 
     vlapic_read_aligned(vlapic, offset & ~0x3, 4, &tmp);
-    switch ( len ) {
+    switch ( len )
+    {
     case 1:
         result = *((unsigned char *)&tmp + alignment);
         break;
@@ -601,7 +576,8 @@ static unsigned long vlapic_read(struct vcpu *v, unsigned long address,
         break;
 
     default:
-        printk("Local APIC read with len=0x%lx, should be 4 instead.\n", len);
+        gdprintk(XENLOG_ERR, "Local APIC read with len=0x%lx, "
+                 "should be 4 instead.\n", len);
         domain_crash_synchronous();
         break;
     }
@@ -929,9 +905,8 @@ void vlapic_post_injection(struct vcpu *v, int vector, int deliver_mode)
         }
         break;
 
-    /*XXX deal with these later */
     case APIC_DM_REMRD:
-        printk("Ignore deliver mode 3 in vlapic_post_injection\n");
+        gdprintk(XENLOG_WARNING, "Ignoring delivery mode 3.\n");
         break;
 
     case APIC_DM_SMI:
@@ -941,7 +916,7 @@ void vlapic_post_injection(struct vcpu *v, int vector, int deliver_mode)
         break;
 
     default:
-        printk("<vlapic_post_injection> invalid deliver mode\n");
+        gdprintk(XENLOG_WARNING, "Invalid delivery mode\n");
         break;
     }
 }
@@ -989,7 +964,8 @@ int vlapic_init(struct vcpu *v)
     vlapic->regs_page = alloc_domheap_page(NULL);
     if ( vlapic->regs_page == NULL )
     {
-        printk("malloc vlapic regs error for vcpu %x\n", v->vcpu_id);
+        dprintk(XENLOG_ERR, "malloc vlapic regs error for vcpu %x\n",
+                v->vcpu_id);
         xfree(vlapic);
         return -ENOMEM;
     }

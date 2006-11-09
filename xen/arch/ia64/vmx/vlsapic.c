@@ -330,7 +330,6 @@ int vlapic_match_logical_addr(struct vlapic *vlapic, uint16_t dest)
 }
 
 struct vlapic* apic_round_robin(struct domain *d,
-				uint8_t dest_mode,
 				uint8_t vector,
 				uint32_t bitmap)
 {

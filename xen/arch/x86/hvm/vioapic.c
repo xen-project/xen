@@ -403,7 +403,7 @@ static void ioapic_deliver(struct vioapic *vioapic, int irq)
         }
         else
 #endif
-            target = apic_round_robin(vioapic_domain(vioapic), dest_mode,
+            target = apic_round_robin(vioapic_domain(vioapic),
                                       vector, deliver_bitmask);
         if ( target != NULL )
         {

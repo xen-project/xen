@@ -85,10 +85,8 @@ void vlapic_msr_set(struct vlapic *vlapic, uint64_t value);
 
 int vlapic_accept_pic_intr(struct vcpu *v);
 
-struct vlapic *apic_round_robin(struct domain *d,
-                                uint8_t dest_mode,
-                                uint8_t vector,
-                                uint32_t bitmap);
+struct vlapic *apic_round_robin(
+    struct domain *d, uint8_t vector, uint32_t bitmap);
 
 s_time_t get_apictime_scheduled(struct vcpu *v);
 
