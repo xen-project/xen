@@ -42,6 +42,7 @@ COMMANDS = {
     'vdi-rename': ('<vdi_uuid> <new_name>', 'Rename VDI'),
     'vdi-delete': ('<vdi_uuid>', 'Delete VDI'),
     'vif-create': ('<domname> <pycfg>', 'Create VIF attached to domname'),
+    'vtpm-create' : ('<domname> <pycfg>', 'Create VTPM attached to domname'),
 
     'vm-create': ('<pycfg>', 'Create VM with python config'),
     'vm-destroy': ('<domname>', 'Delete VM'),
@@ -208,16 +209,22 @@ def xapi_vm_list(*args):
         if is_long:
             vbds = vm_info['vbds']
             vifs = vm_info['vifs']
+            vtpms = vm_info['vtpms']
             vif_infos = []
             vbd_infos = []
+            vtpm_infos = []
             for vbd in vbds:
                 vbd_info = execute(server.VBD.get_record, session, vbd)
                 vbd_infos.append(vbd_info)
             for vif in vifs:
                 vif_info = execute(server.VIF.get_record, session, vif)
                 vif_infos.append(vif_info)
+            for vtpm in vtpms:
+                vtpm_info = execute(server.VTPM.get_record, session, vtpm)
+                vtpm_infos.append(vtpm_info)
             vm_info['vbds'] = vbd_infos
             vm_info['vifs'] = vif_infos
+            vm_info['vtpms'] = vtpm_infos
             pprint(vm_info)
         else:
             print VM_LIST_FORMAT % _stringify(vm_info)
@@ -377,8 +384,30 @@ def xapi_vdi_rename(*args):
     print 'Renaming VDI %s to %s' % (vdi_uuid, vdi_name)
     result = execute(server.VDI.set_name_label, session, vdi_uuid, vdi_name)
     print 'Done.'
-    
-        
+
+
+def xapi_vtpm_create(*args):
+    server, session = _connect()
+    domname = args[0]
+    cfg = _read_python_cfg(args[1])
+
+    vm_uuid = resolve_vm(server, session, domname)
+    cfg['VM'] = vm_uuid
+    print "Creating vTPM with cfg = %s" % cfg
+    vtpm_uuid = execute(server.VTPM.create, session, cfg)
+    print "Done. (%s)" % vtpm_uuid
+    vtpm_id = execute(server.VTPM.get_instance, session, vtpm_uuid)
+    print "Has instance number '%s'" % vtpm_id
+    vtpm_be = execute(server.VTPM.get_backend, session, vtpm_uuid)
+    print "Has backend in '%s'" % vtpm_be
+    driver = execute(server.VTPM.get_driver, session, vtpm_uuid)
+    print "Has driver type '%s'" % driver
+    vtpm_rec = execute(server.VTPM.get_record, session, vtpm_uuid)
+    print "Has vtpm record '%s'" % vtpm_rec
+    vm = execute(server.VTPM.get_VM, session, vtpm_uuid)
+    print "Has VM '%s'" % vm
+
+
 #
 # Command Line Utils
 #

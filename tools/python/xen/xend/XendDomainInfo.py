@@ -1689,10 +1689,6 @@ class XendDomainInfo:
         return '' # TODO
     def get_power_state(self):
         return XEN_API_VM_POWER_STATE[self.state]
-    def get_tpm_instance(self):
-        return '' # TODO
-    def get_tpm_backend(self):
-        return '' # TODO
     def get_bios_boot(self):
         return '' # TODO
     def get_platform_std_vga(self):
@@ -1833,6 +1829,9 @@ class XendDomainInfo:
             else:
                 config['mode'] = 'RW'
 
+        if dev_class == 'vtpm':
+            config['driver'] = 'paravirtualised' # TODO
+
         return config
 
     def get_dev_property(self, dev_class, dev_uuid, field):
@@ -1927,14 +1926,13 @@ class XendDomainInfo:
         @rtype: string
         """
 
+        if self.state not in (DOM_STATE_HALTED,):
+            raise VmError("Can only add vTPM to a halted domain.")
+        if self.get_vtpms() != []:
+            raise VmError('Domain already has a vTPM.')
         dev_uuid = self.info.device_add('vtpm', cfg_xenapi = xenapi_vtpm)
         if not dev_uuid:
             raise XendError('Failed to create device')
-
-        if self.state in (DOM_STATE_HALTED,):
-            sxpr = self.info.device_sxpr(dev_uuid)
-            devid = self.getDeviceController('vtpm').createDevice(sxpr)
-            raise XendError("Device creation failed")
 
         return dev_uuid
 

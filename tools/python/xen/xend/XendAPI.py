@@ -1282,11 +1282,11 @@ class XendAPI:
     # Xen API: Class VTPM
     # ----------------------------------------------------------------
 
-    VTPM_attr_ro = [ ]
-    VTPM_attr_rw = ['type',
-                    'VM',
+    VTPM_attr_rw = [ ]
+    VTPM_attr_ro = ['VM',
                     'backend',
-                    'instance']
+                    'instance',
+                    'driver']
 
     VTPM_attr_inst = VTPM_attr_rw
 
@@ -1307,17 +1307,61 @@ class XendAPI:
 
         return xen_api_success(cfg)
 
+    # Class Functions
+    def vtpm_get_instance(self, session, vtpm_ref):
+        xendom = XendDomain.instance()
+        vm = xendom.get_vm_with_dev_uuid('vtpm', vtpm_ref)
+        if not vm:
+            return xen_api_error(XEND_ERROR_VTPM_INVALID)
+        cfg = vm.get_dev_xenapi_config('vtpm', vtpm_ref)
+        if not cfg:
+            return xen_api_error(XEND_ERROR_VTPM_INVALID)
+        if cfg.has_key('instance'):
+            instance = cfg['instance']
+        else:
+            instance = -1
+        return xen_api_success(instance)
+
+    def vtpm_get_driver(self, session, vtpm_ref):
+        xendom = XendDomain.instance()
+        vm = xendom.get_vm_with_dev_uuid('vtpm', vtpm_ref)
+        if not vm:
+            return xen_api_error(XEND_ERROR_VTPM_INVALID)
+        cfg = vm.get_dev_xenapi_config('vtpm', vtpm_ref)
+        if not cfg:
+            return xen_api_error(XEND_ERROR_VTPM_INVALID)
+        if cfg.has_key('type'):
+            driver = cfg['type']
+        else:
+            driver = "Unknown"
+        return xen_api_success(driver)
+
+    def vtpm_get_backend(self, session, vtpm_ref):
+        xendom = XendDomain.instance()
+        vm = xendom.get_vm_with_dev_uuid('vtpm', vtpm_ref)
+        if not vm:
+            return xen_api_error(XEND_ERROR_VTPM_INVALID)
+        cfg = vm.get_dev_xenapi_config('vtpm', vtpm_ref)
+        if not cfg:
+            return xen_api_error(XEND_ERROR_VTPM_INVALID)
+        if cfg.has_key('backend'):
+            backend = cfg['backend']
+        else:
+            backend = "Domain-0"
+        return xen_api_success(backend)
+
+    def vtpm_get_vm(self, session, vtpm_ref):
+        xendom = XendDomain.instance()
+        return xen_api_success(xendom.get_dev_property('vtpm', vtpm_ref, 'VM'))
+
     # class methods
     def vtpm_create(self, session, vtpm_struct):
         xendom = XendDomain.instance()
         if xendom.is_valid_vm(vtpm_struct['VM']):
             dom = xendom.get_vm_by_uuid(vtpm_struct['VM'])
-            try:
-                vtpm_ref = dom.create_vtpm(vtpm_struct)
-                xendom.managed_config_save(dom)
-                return xen_api_success(vtpm_ref)
-            except XendError:
-                return xen_api_error(XEND_ERROR_TODO)
+            vtpm_ref = dom.create_vtpm(vtpm_struct)
+            xendom.managed_config_save(dom)
+            return xen_api_success(vtpm_ref)
         else:
             return xen_api_error(XEND_ERROR_DOMAIN_INVALID)
 
