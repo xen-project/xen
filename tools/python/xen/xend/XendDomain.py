@@ -319,6 +319,7 @@ class XendDomain:
     def _managed_domain_unregister(self, dom):
         try:
             if self.is_domain_managed(dom):
+                self._managed_config_remove(dom.get_uuid())
                 del self.managed_domains[dom.get_uuid()]
         except ValueError:
             log.warn("Domain is not registered: %s" % dom.get_uuid())
@@ -378,15 +379,14 @@ class XendDomain:
         running = self._running_domains()
         for dom in running:
             domid = dom['domid']
-            if domid in self.domains:
+            if domid in self.domains and dom['dying'] != 1:
                 self.domains[domid].update(dom)
 
         # remove domains that are not running from active domain list.
         # The list might have changed by now, because the update call may
         # cause new domains to be added, if the domain has rebooted.  We get
         # the list again.
-        running = self._running_domains()
-        running_domids = [d['domid'] for d in running]
+        running_domids = [d['domid'] for d in running if d['dying'] != 1]
         for domid, dom in self.domains.items():
             if domid not in running_domids and domid != DOM0_ID:
                 self._remove_domain(dom, domid)
