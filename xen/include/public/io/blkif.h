@@ -47,8 +47,22 @@
 #endif
 #define blkif_sector_t uint64_t
 
-#define BLKIF_OP_READ      0
-#define BLKIF_OP_WRITE     1
+/*
+ * REQUEST CODES.
+ */
+#define BLKIF_OP_READ              0
+#define BLKIF_OP_WRITE             1
+/*
+ * Recognised only if "feature-barrier" is present in backend xenbus info.
+ * The "feature_barrier" node contains a boolean indicating whether barrier
+ * requests are likely to succeed or fail. Either way, a barrier request
+ * may fail at any time with BLKIF_RSP_EOPNOTSUPP if it is unsupported by
+ * the underlying block-device hardware. The boolean simply indicates whether
+ * or not it is worthwhile for the frontend to attempt barrier requests.
+ * If a backend does not recognise BLKIF_OP_WRITE_BARRIER, it should *not*
+ * create the "feature-barrier" node!
+ */
+#define BLKIF_OP_WRITE_BARRIER     2
 
 /*
  * Maximum scatter/gather segments per request.
@@ -79,8 +93,15 @@ struct blkif_response {
 };
 typedef struct blkif_response blkif_response_t;
 
-#define BLKIF_RSP_ERROR  -1 /* non-specific 'error' */
-#define BLKIF_RSP_OKAY    0 /* non-specific 'okay'  */
+/*
+ * STATUS RETURN CODES.
+ */
+ /* Operation not supported (only happens on barrier writes). */
+#define BLKIF_RSP_EOPNOTSUPP  -2
+ /* Operation failed for some unspecified reason (-EIO). */
+#define BLKIF_RSP_ERROR       -1
+ /* Operation completed successfully. */
+#define BLKIF_RSP_OKAY         0
 
 /*
  * Generate blkif ring structures and types.
