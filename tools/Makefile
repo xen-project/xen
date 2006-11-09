@@ -18,6 +18,7 @@ SUBDIRS-$(VTPM_TOOLS) += vtpm
 SUBDIRS-y += xenstat
 SUBDIRS-y += libaio
 SUBDIRS-y += blktap
+SUBDIRS-y += libfsimage
 
 # These don't cross-compile
 ifeq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
