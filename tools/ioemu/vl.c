@@ -6390,17 +6390,17 @@ int main(int argc, char **argv)
             exit(1);
     }
 
+#if defined (__ia64__)
+    if (ram_size > MMIO_START)
+        ram_size += 1 * MEM_G; /* skip 3G-4G MMIO, LEGACY_IO_SPACE etc. */
+#endif
+
     /* init the memory */
     phys_ram_size = ram_size + vga_ram_size + bios_size;
 
 #ifdef CONFIG_DM
 
     xc_handle = xc_interface_open();
-
-#if defined (__ia64__)
-    if (ram_size > MMIO_START)
-        ram_size += 1 * MEM_G; /* skip 3G-4G MMIO, LEGACY_IO_SPACE etc. */
-#endif
 
     nr_pages = ram_size/PAGE_SIZE;
     tmp_nr_pages = nr_pages;
