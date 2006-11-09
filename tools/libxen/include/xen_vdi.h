@@ -281,42 +281,42 @@ xen_vdi_get_read_only(xen_session *session, bool *result, xen_vdi vdi);
  * Set the name/label field of the given VDI.
  */
 extern bool
-xen_vdi_set_name_label(xen_session *session, xen_vdi xen_vdi, char *label);
+xen_vdi_set_name_label(xen_session *session, xen_vdi vdi, char *label);
 
 
 /**
  * Set the name/description field of the given VDI.
  */
 extern bool
-xen_vdi_set_name_description(xen_session *session, xen_vdi xen_vdi, char *description);
+xen_vdi_set_name_description(xen_session *session, xen_vdi vdi, char *description);
 
 
 /**
  * Set the SR field of the given VDI.
  */
 extern bool
-xen_vdi_set_sr(xen_session *session, xen_vdi xen_vdi, xen_sr sr);
+xen_vdi_set_sr(xen_session *session, xen_vdi vdi, xen_sr sr);
 
 
 /**
  * Set the virtual_size field of the given VDI.
  */
 extern bool
-xen_vdi_set_virtual_size(xen_session *session, xen_vdi xen_vdi, int64_t virtual_size);
+xen_vdi_set_virtual_size(xen_session *session, xen_vdi vdi, int64_t virtual_size);
 
 
 /**
  * Set the sharable field of the given VDI.
  */
 extern bool
-xen_vdi_set_sharable(xen_session *session, xen_vdi xen_vdi, bool sharable);
+xen_vdi_set_sharable(xen_session *session, xen_vdi vdi, bool sharable);
 
 
 /**
  * Set the read_only field of the given VDI.
  */
 extern bool
-xen_vdi_set_read_only(xen_session *session, xen_vdi xen_vdi, bool read_only);
+xen_vdi_set_read_only(xen_session *session, xen_vdi vdi, bool read_only);
 
 
 /**

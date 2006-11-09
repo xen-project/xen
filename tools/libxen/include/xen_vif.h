@@ -250,49 +250,49 @@ xen_vif_get_io_write_kbs(xen_session *session, double *result, xen_vif vif);
  * Set the name field of the given VIF.
  */
 extern bool
-xen_vif_set_name(xen_session *session, xen_vif xen_vif, char *name);
+xen_vif_set_name(xen_session *session, xen_vif vif, char *name);
 
 
 /**
  * Set the type field of the given VIF.
  */
 extern bool
-xen_vif_set_type(xen_session *session, xen_vif xen_vif, enum xen_driver_type type);
+xen_vif_set_type(xen_session *session, xen_vif vif, enum xen_driver_type type);
 
 
 /**
  * Set the device field of the given VIF.
  */
 extern bool
-xen_vif_set_device(xen_session *session, xen_vif xen_vif, char *device);
+xen_vif_set_device(xen_session *session, xen_vif vif, char *device);
 
 
 /**
  * Set the network field of the given VIF.
  */
 extern bool
-xen_vif_set_network(xen_session *session, xen_vif xen_vif, xen_network network);
+xen_vif_set_network(xen_session *session, xen_vif vif, xen_network network);
 
 
 /**
  * Set the VM field of the given VIF.
  */
 extern bool
-xen_vif_set_vm(xen_session *session, xen_vif xen_vif, xen_vm vm);
+xen_vif_set_vm(xen_session *session, xen_vif vif, xen_vm vm);
 
 
 /**
  * Set the MAC field of the given VIF.
  */
 extern bool
-xen_vif_set_mac(xen_session *session, xen_vif xen_vif, char *mac);
+xen_vif_set_mac(xen_session *session, xen_vif vif, char *mac);
 
 
 /**
  * Set the MTU field of the given VIF.
  */
 extern bool
-xen_vif_set_mtu(xen_session *session, xen_vif xen_vif, int64_t mtu);
+xen_vif_set_mtu(xen_session *session, xen_vif vif, int64_t mtu);
 
 
 #endif

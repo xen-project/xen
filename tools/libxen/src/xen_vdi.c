@@ -383,12 +383,12 @@ xen_vdi_get_read_only(xen_session *session, bool *result, xen_vdi vdi)
 
 
 bool
-xen_vdi_set_name_label(xen_session *session, xen_vdi xen_vdi, char *label)
+xen_vdi_set_name_label(xen_session *session, xen_vdi vdi, char *label)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_vdi },
+              .u.string_val = vdi },
             { .type = &abstract_type_string,
               .u.string_val = label }
         };
@@ -399,12 +399,12 @@ xen_vdi_set_name_label(xen_session *session, xen_vdi xen_vdi, char *label)
 
 
 bool
-xen_vdi_set_name_description(xen_session *session, xen_vdi xen_vdi, char *description)
+xen_vdi_set_name_description(xen_session *session, xen_vdi vdi, char *description)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_vdi },
+              .u.string_val = vdi },
             { .type = &abstract_type_string,
               .u.string_val = description }
         };
@@ -415,12 +415,12 @@ xen_vdi_set_name_description(xen_session *session, xen_vdi xen_vdi, char *descri
 
 
 bool
-xen_vdi_set_sr(xen_session *session, xen_vdi xen_vdi, xen_sr sr)
+xen_vdi_set_sr(xen_session *session, xen_vdi vdi, xen_sr sr)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_vdi },
+              .u.string_val = vdi },
             { .type = &abstract_type_string,
               .u.string_val = sr }
         };
@@ -431,12 +431,12 @@ xen_vdi_set_sr(xen_session *session, xen_vdi xen_vdi, xen_sr sr)
 
 
 bool
-xen_vdi_set_virtual_size(xen_session *session, xen_vdi xen_vdi, int64_t virtual_size)
+xen_vdi_set_virtual_size(xen_session *session, xen_vdi vdi, int64_t virtual_size)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_vdi },
+              .u.string_val = vdi },
             { .type = &abstract_type_int,
               .u.int_val = virtual_size }
         };
@@ -447,12 +447,12 @@ xen_vdi_set_virtual_size(xen_session *session, xen_vdi xen_vdi, int64_t virtual_
 
 
 bool
-xen_vdi_set_sharable(xen_session *session, xen_vdi xen_vdi, bool sharable)
+xen_vdi_set_sharable(xen_session *session, xen_vdi vdi, bool sharable)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_vdi },
+              .u.string_val = vdi },
             { .type = &abstract_type_bool,
               .u.bool_val = sharable }
         };
@@ -463,12 +463,12 @@ xen_vdi_set_sharable(xen_session *session, xen_vdi xen_vdi, bool sharable)
 
 
 bool
-xen_vdi_set_read_only(xen_session *session, xen_vdi xen_vdi, bool read_only)
+xen_vdi_set_read_only(xen_session *session, xen_vdi vdi, bool read_only)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_vdi },
+              .u.string_val = vdi },
             { .type = &abstract_type_bool,
               .u.bool_val = read_only }
         };

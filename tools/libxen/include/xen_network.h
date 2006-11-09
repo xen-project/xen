@@ -232,28 +232,28 @@ xen_network_get_default_netmask(xen_session *session, char **result, xen_network
  * Set the name/label field of the given network.
  */
 extern bool
-xen_network_set_name_label(xen_session *session, xen_network xen_network, char *label);
+xen_network_set_name_label(xen_session *session, xen_network network, char *label);
 
 
 /**
  * Set the name/description field of the given network.
  */
 extern bool
-xen_network_set_name_description(xen_session *session, xen_network xen_network, char *description);
+xen_network_set_name_description(xen_session *session, xen_network network, char *description);
 
 
 /**
  * Set the default_gateway field of the given network.
  */
 extern bool
-xen_network_set_default_gateway(xen_session *session, xen_network xen_network, char *default_gateway);
+xen_network_set_default_gateway(xen_session *session, xen_network network, char *default_gateway);
 
 
 /**
  * Set the default_netmask field of the given network.
  */
 extern bool
-xen_network_set_default_netmask(xen_session *session, xen_network xen_network, char *default_netmask);
+xen_network_set_default_netmask(xen_session *session, xen_network network, char *default_netmask);
 
 
 /**

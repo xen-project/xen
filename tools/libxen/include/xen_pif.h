@@ -242,42 +242,42 @@ xen_pif_get_io_write_kbs(xen_session *session, double *result, xen_pif pif);
  * Set the name field of the given PIF.
  */
 extern bool
-xen_pif_set_name(xen_session *session, xen_pif xen_pif, char *name);
+xen_pif_set_name(xen_session *session, xen_pif pif, char *name);
 
 
 /**
  * Set the network field of the given PIF.
  */
 extern bool
-xen_pif_set_network(xen_session *session, xen_pif xen_pif, xen_network network);
+xen_pif_set_network(xen_session *session, xen_pif pif, xen_network network);
 
 
 /**
  * Set the host field of the given PIF.
  */
 extern bool
-xen_pif_set_host(xen_session *session, xen_pif xen_pif, xen_host host);
+xen_pif_set_host(xen_session *session, xen_pif pif, xen_host host);
 
 
 /**
  * Set the MAC field of the given PIF.
  */
 extern bool
-xen_pif_set_mac(xen_session *session, xen_pif xen_pif, char *mac);
+xen_pif_set_mac(xen_session *session, xen_pif pif, char *mac);
 
 
 /**
  * Set the MTU field of the given PIF.
  */
 extern bool
-xen_pif_set_mtu(xen_session *session, xen_pif xen_pif, int64_t mtu);
+xen_pif_set_mtu(xen_session *session, xen_pif pif, int64_t mtu);
 
 
 /**
  * Set the VLAN field of the given PIF.
  */
 extern bool
-xen_pif_set_vlan(xen_session *session, xen_pif xen_pif, char *vlan);
+xen_pif_set_vlan(xen_session *session, xen_pif pif, char *vlan);
 
 
 #endif

@@ -302,12 +302,12 @@ xen_sr_get_location(xen_session *session, char **result, xen_sr sr)
 
 
 bool
-xen_sr_set_name_label(xen_session *session, xen_sr xen_sr, char *label)
+xen_sr_set_name_label(xen_session *session, xen_sr sr, char *label)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_sr },
+              .u.string_val = sr },
             { .type = &abstract_type_string,
               .u.string_val = label }
         };
@@ -318,12 +318,12 @@ xen_sr_set_name_label(xen_session *session, xen_sr xen_sr, char *label)
 
 
 bool
-xen_sr_set_name_description(xen_session *session, xen_sr xen_sr, char *description)
+xen_sr_set_name_description(xen_session *session, xen_sr sr, char *description)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_sr },
+              .u.string_val = sr },
             { .type = &abstract_type_string,
               .u.string_val = description }
         };

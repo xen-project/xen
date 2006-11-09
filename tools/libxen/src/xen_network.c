@@ -267,12 +267,12 @@ xen_network_get_default_netmask(xen_session *session, char **result, xen_network
 
 
 bool
-xen_network_set_name_label(xen_session *session, xen_network xen_network, char *label)
+xen_network_set_name_label(xen_session *session, xen_network network, char *label)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_network },
+              .u.string_val = network },
             { .type = &abstract_type_string,
               .u.string_val = label }
         };
@@ -283,12 +283,12 @@ xen_network_set_name_label(xen_session *session, xen_network xen_network, char *
 
 
 bool
-xen_network_set_name_description(xen_session *session, xen_network xen_network, char *description)
+xen_network_set_name_description(xen_session *session, xen_network network, char *description)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_network },
+              .u.string_val = network },
             { .type = &abstract_type_string,
               .u.string_val = description }
         };
@@ -299,12 +299,12 @@ xen_network_set_name_description(xen_session *session, xen_network xen_network, 
 
 
 bool
-xen_network_set_default_gateway(xen_session *session, xen_network xen_network, char *default_gateway)
+xen_network_set_default_gateway(xen_session *session, xen_network network, char *default_gateway)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_network },
+              .u.string_val = network },
             { .type = &abstract_type_string,
               .u.string_val = default_gateway }
         };
@@ -315,12 +315,12 @@ xen_network_set_default_gateway(xen_session *session, xen_network xen_network, c
 
 
 bool
-xen_network_set_default_netmask(xen_session *session, xen_network xen_network, char *default_netmask)
+xen_network_set_default_netmask(xen_session *session, xen_network network, char *default_netmask)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_network },
+              .u.string_val = network },
             { .type = &abstract_type_string,
               .u.string_val = default_netmask }
         };

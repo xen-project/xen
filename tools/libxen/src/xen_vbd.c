@@ -270,12 +270,12 @@ xen_vbd_get_io_write_kbs(xen_session *session, double *result, xen_vbd vbd)
 
 
 bool
-xen_vbd_set_vm(xen_session *session, xen_vbd xen_vbd, xen_vm vm)
+xen_vbd_set_vm(xen_session *session, xen_vbd vbd, xen_vm vm)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_vbd },
+              .u.string_val = vbd },
             { .type = &abstract_type_string,
               .u.string_val = vm }
         };
@@ -286,12 +286,12 @@ xen_vbd_set_vm(xen_session *session, xen_vbd xen_vbd, xen_vm vm)
 
 
 bool
-xen_vbd_set_vdi(xen_session *session, xen_vbd xen_vbd, xen_vdi vdi)
+xen_vbd_set_vdi(xen_session *session, xen_vbd vbd, xen_vdi vdi)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_vbd },
+              .u.string_val = vbd },
             { .type = &abstract_type_string,
               .u.string_val = vdi }
         };
@@ -302,12 +302,12 @@ xen_vbd_set_vdi(xen_session *session, xen_vbd xen_vbd, xen_vdi vdi)
 
 
 bool
-xen_vbd_set_device(xen_session *session, xen_vbd xen_vbd, char *device)
+xen_vbd_set_device(xen_session *session, xen_vbd vbd, char *device)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_vbd },
+              .u.string_val = vbd },
             { .type = &abstract_type_string,
               .u.string_val = device }
         };
@@ -318,12 +318,12 @@ xen_vbd_set_device(xen_session *session, xen_vbd xen_vbd, char *device)
 
 
 bool
-xen_vbd_set_mode(xen_session *session, xen_vbd xen_vbd, enum xen_vbd_mode mode)
+xen_vbd_set_mode(xen_session *session, xen_vbd vbd, enum xen_vbd_mode mode)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_vbd },
+              .u.string_val = vbd },
             { .type = &xen_vbd_mode_abstract_type_,
               .u.string_val = xen_vbd_mode_to_string(mode) }
         };
@@ -334,12 +334,12 @@ xen_vbd_set_mode(xen_session *session, xen_vbd xen_vbd, enum xen_vbd_mode mode)
 
 
 bool
-xen_vbd_set_driver(xen_session *session, xen_vbd xen_vbd, enum xen_driver_type driver)
+xen_vbd_set_driver(xen_session *session, xen_vbd vbd, enum xen_driver_type driver)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_vbd },
+              .u.string_val = vbd },
             { .type = &xen_driver_type_abstract_type_,
               .u.string_val = xen_driver_type_to_string(driver) }
         };

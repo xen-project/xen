@@ -521,189 +521,189 @@ xen_vm_get_otherconfig(xen_session *session, xen_string_string_map **result, xen
  * Set the name/label field of the given VM.
  */
 extern bool
-xen_vm_set_name_label(xen_session *session, xen_vm xen_vm, char *label);
+xen_vm_set_name_label(xen_session *session, xen_vm vm, char *label);
 
 
 /**
  * Set the name/description field of the given VM.
  */
 extern bool
-xen_vm_set_name_description(xen_session *session, xen_vm xen_vm, char *description);
+xen_vm_set_name_description(xen_session *session, xen_vm vm, char *description);
 
 
 /**
  * Set the user_version field of the given VM.
  */
 extern bool
-xen_vm_set_user_version(xen_session *session, xen_vm xen_vm, int64_t user_version);
+xen_vm_set_user_version(xen_session *session, xen_vm vm, int64_t user_version);
 
 
 /**
  * Set the is_a_template field of the given VM.
  */
 extern bool
-xen_vm_set_is_a_template(xen_session *session, xen_vm xen_vm, bool is_a_template);
+xen_vm_set_is_a_template(xen_session *session, xen_vm vm, bool is_a_template);
 
 
 /**
  * Set the memory/dynamic_max field of the given VM.
  */
 extern bool
-xen_vm_set_memory_dynamic_max(xen_session *session, xen_vm xen_vm, int64_t dynamic_max);
+xen_vm_set_memory_dynamic_max(xen_session *session, xen_vm vm, int64_t dynamic_max);
 
 
 /**
  * Set the memory/dynamic_min field of the given VM.
  */
 extern bool
-xen_vm_set_memory_dynamic_min(xen_session *session, xen_vm xen_vm, int64_t dynamic_min);
+xen_vm_set_memory_dynamic_min(xen_session *session, xen_vm vm, int64_t dynamic_min);
 
 
 /**
  * Set the VCPUs/policy field of the given VM.
  */
 extern bool
-xen_vm_set_vcpus_policy(xen_session *session, xen_vm xen_vm, char *policy);
+xen_vm_set_vcpus_policy(xen_session *session, xen_vm vm, char *policy);
 
 
 /**
  * Set the VCPUs/params field of the given VM.
  */
 extern bool
-xen_vm_set_vcpus_params(xen_session *session, xen_vm xen_vm, char *params);
+xen_vm_set_vcpus_params(xen_session *session, xen_vm vm, char *params);
 
 
 /**
  * Set the VCPUs/features/force_on field of the given VM.
  */
 extern bool
-xen_vm_set_vcpus_features_force_on(xen_session *session, xen_vm xen_vm, struct xen_cpu_feature_set *force_on);
+xen_vm_set_vcpus_features_force_on(xen_session *session, xen_vm vm, struct xen_cpu_feature_set *force_on);
 
 
 /**
  * Set the VCPUs/features/force_off field of the given VM.
  */
 extern bool
-xen_vm_set_vcpus_features_force_off(xen_session *session, xen_vm xen_vm, struct xen_cpu_feature_set *force_off);
+xen_vm_set_vcpus_features_force_off(xen_session *session, xen_vm vm, struct xen_cpu_feature_set *force_off);
 
 
 /**
  * Set the actions/after_shutdown field of the given VM.
  */
 extern bool
-xen_vm_set_actions_after_shutdown(xen_session *session, xen_vm xen_vm, enum xen_on_normal_exit after_shutdown);
+xen_vm_set_actions_after_shutdown(xen_session *session, xen_vm vm, enum xen_on_normal_exit after_shutdown);
 
 
 /**
  * Set the actions/after_reboot field of the given VM.
  */
 extern bool
-xen_vm_set_actions_after_reboot(xen_session *session, xen_vm xen_vm, enum xen_on_normal_exit after_reboot);
+xen_vm_set_actions_after_reboot(xen_session *session, xen_vm vm, enum xen_on_normal_exit after_reboot);
 
 
 /**
  * Set the actions/after_suspend field of the given VM.
  */
 extern bool
-xen_vm_set_actions_after_suspend(xen_session *session, xen_vm xen_vm, enum xen_on_normal_exit after_suspend);
+xen_vm_set_actions_after_suspend(xen_session *session, xen_vm vm, enum xen_on_normal_exit after_suspend);
 
 
 /**
  * Set the actions/after_crash field of the given VM.
  */
 extern bool
-xen_vm_set_actions_after_crash(xen_session *session, xen_vm xen_vm, enum xen_on_crash_behaviour after_crash);
+xen_vm_set_actions_after_crash(xen_session *session, xen_vm vm, enum xen_on_crash_behaviour after_crash);
 
 
 /**
  * Set the bios/boot field of the given VM.
  */
 extern bool
-xen_vm_set_bios_boot(xen_session *session, xen_vm xen_vm, char *boot);
+xen_vm_set_bios_boot(xen_session *session, xen_vm vm, char *boot);
 
 
 /**
  * Set the platform/std_VGA field of the given VM.
  */
 extern bool
-xen_vm_set_platform_std_vga(xen_session *session, xen_vm xen_vm, bool std_vga);
+xen_vm_set_platform_std_vga(xen_session *session, xen_vm vm, bool std_vga);
 
 
 /**
  * Set the platform/serial field of the given VM.
  */
 extern bool
-xen_vm_set_platform_serial(xen_session *session, xen_vm xen_vm, char *serial);
+xen_vm_set_platform_serial(xen_session *session, xen_vm vm, char *serial);
 
 
 /**
  * Set the platform/localtime field of the given VM.
  */
 extern bool
-xen_vm_set_platform_localtime(xen_session *session, xen_vm xen_vm, bool localtime);
+xen_vm_set_platform_localtime(xen_session *session, xen_vm vm, bool localtime);
 
 
 /**
  * Set the platform/clock_offset field of the given VM.
  */
 extern bool
-xen_vm_set_platform_clock_offset(xen_session *session, xen_vm xen_vm, bool clock_offset);
+xen_vm_set_platform_clock_offset(xen_session *session, xen_vm vm, bool clock_offset);
 
 
 /**
  * Set the platform/enable_audio field of the given VM.
  */
 extern bool
-xen_vm_set_platform_enable_audio(xen_session *session, xen_vm xen_vm, bool enable_audio);
+xen_vm_set_platform_enable_audio(xen_session *session, xen_vm vm, bool enable_audio);
 
 
 /**
  * Set the builder field of the given VM.
  */
 extern bool
-xen_vm_set_builder(xen_session *session, xen_vm xen_vm, char *builder);
+xen_vm_set_builder(xen_session *session, xen_vm vm, char *builder);
 
 
 /**
  * Set the boot_method field of the given VM.
  */
 extern bool
-xen_vm_set_boot_method(xen_session *session, xen_vm xen_vm, enum xen_boot_type boot_method);
+xen_vm_set_boot_method(xen_session *session, xen_vm vm, enum xen_boot_type boot_method);
 
 
 /**
  * Set the kernel/kernel field of the given VM.
  */
 extern bool
-xen_vm_set_kernel_kernel(xen_session *session, xen_vm xen_vm, char *kernel);
+xen_vm_set_kernel_kernel(xen_session *session, xen_vm vm, char *kernel);
 
 
 /**
  * Set the kernel/initrd field of the given VM.
  */
 extern bool
-xen_vm_set_kernel_initrd(xen_session *session, xen_vm xen_vm, char *initrd);
+xen_vm_set_kernel_initrd(xen_session *session, xen_vm vm, char *initrd);
 
 
 /**
  * Set the kernel/args field of the given VM.
  */
 extern bool
-xen_vm_set_kernel_args(xen_session *session, xen_vm xen_vm, char *args);
+xen_vm_set_kernel_args(xen_session *session, xen_vm vm, char *args);
 
 
 /**
  * Set the grub/cmdline field of the given VM.
  */
 extern bool
-xen_vm_set_grub_cmdline(xen_session *session, xen_vm xen_vm, char *cmdline);
+xen_vm_set_grub_cmdline(xen_session *session, xen_vm vm, char *cmdline);
 
 
 /**
  * Set the otherConfig field of the given VM.
  */
 extern bool
-xen_vm_set_otherconfig(xen_session *session, xen_vm xen_vm, xen_string_string_map *otherconfig);
+xen_vm_set_otherconfig(xen_session *session, xen_vm vm, xen_string_string_map *otherconfig);
 
 
 /**

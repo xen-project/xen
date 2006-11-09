@@ -236,35 +236,35 @@ xen_vbd_get_io_write_kbs(xen_session *session, double *result, xen_vbd vbd);
  * Set the VM field of the given VBD.
  */
 extern bool
-xen_vbd_set_vm(xen_session *session, xen_vbd xen_vbd, xen_vm vm);
+xen_vbd_set_vm(xen_session *session, xen_vbd vbd, xen_vm vm);
 
 
 /**
  * Set the VDI field of the given VBD.
  */
 extern bool
-xen_vbd_set_vdi(xen_session *session, xen_vbd xen_vbd, xen_vdi vdi);
+xen_vbd_set_vdi(xen_session *session, xen_vbd vbd, xen_vdi vdi);
 
 
 /**
  * Set the device field of the given VBD.
  */
 extern bool
-xen_vbd_set_device(xen_session *session, xen_vbd xen_vbd, char *device);
+xen_vbd_set_device(xen_session *session, xen_vbd vbd, char *device);
 
 
 /**
  * Set the mode field of the given VBD.
  */
 extern bool
-xen_vbd_set_mode(xen_session *session, xen_vbd xen_vbd, enum xen_vbd_mode mode);
+xen_vbd_set_mode(xen_session *session, xen_vbd vbd, enum xen_vbd_mode mode);
 
 
 /**
  * Set the driver field of the given VBD.
  */
 extern bool
-xen_vbd_set_driver(xen_session *session, xen_vbd xen_vbd, enum xen_driver_type driver);
+xen_vbd_set_driver(xen_session *session, xen_vbd vbd, enum xen_driver_type driver);
 
 
 /**

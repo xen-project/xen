@@ -286,12 +286,12 @@ xen_pif_get_io_write_kbs(xen_session *session, double *result, xen_pif pif)
 
 
 bool
-xen_pif_set_name(xen_session *session, xen_pif xen_pif, char *name)
+xen_pif_set_name(xen_session *session, xen_pif pif, char *name)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_pif },
+              .u.string_val = pif },
             { .type = &abstract_type_string,
               .u.string_val = name }
         };
@@ -302,12 +302,12 @@ xen_pif_set_name(xen_session *session, xen_pif xen_pif, char *name)
 
 
 bool
-xen_pif_set_network(xen_session *session, xen_pif xen_pif, xen_network network)
+xen_pif_set_network(xen_session *session, xen_pif pif, xen_network network)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_pif },
+              .u.string_val = pif },
             { .type = &abstract_type_string,
               .u.string_val = network }
         };
@@ -318,12 +318,12 @@ xen_pif_set_network(xen_session *session, xen_pif xen_pif, xen_network network)
 
 
 bool
-xen_pif_set_host(xen_session *session, xen_pif xen_pif, xen_host host)
+xen_pif_set_host(xen_session *session, xen_pif pif, xen_host host)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_pif },
+              .u.string_val = pif },
             { .type = &abstract_type_string,
               .u.string_val = host }
         };
@@ -334,12 +334,12 @@ xen_pif_set_host(xen_session *session, xen_pif xen_pif, xen_host host)
 
 
 bool
-xen_pif_set_mac(xen_session *session, xen_pif xen_pif, char *mac)
+xen_pif_set_mac(xen_session *session, xen_pif pif, char *mac)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_pif },
+              .u.string_val = pif },
             { .type = &abstract_type_string,
               .u.string_val = mac }
         };
@@ -350,12 +350,12 @@ xen_pif_set_mac(xen_session *session, xen_pif xen_pif, char *mac)
 
 
 bool
-xen_pif_set_mtu(xen_session *session, xen_pif xen_pif, int64_t mtu)
+xen_pif_set_mtu(xen_session *session, xen_pif pif, int64_t mtu)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_pif },
+              .u.string_val = pif },
             { .type = &abstract_type_int,
               .u.int_val = mtu }
         };
@@ -366,12 +366,12 @@ xen_pif_set_mtu(xen_session *session, xen_pif xen_pif, int64_t mtu)
 
 
 bool
-xen_pif_set_vlan(xen_session *session, xen_pif xen_pif, char *vlan)
+xen_pif_set_vlan(xen_session *session, xen_pif pif, char *vlan)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_pif },
+              .u.string_val = pif },
             { .type = &abstract_type_string,
               .u.string_val = vlan }
         };

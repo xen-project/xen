@@ -247,26 +247,26 @@ xen_sr_get_location(xen_session *session, char **result, xen_sr sr);
  * Set the name/label field of the given SR.
  */
 extern bool
-xen_sr_set_name_label(xen_session *session, xen_sr xen_sr, char *label);
+xen_sr_set_name_label(xen_session *session, xen_sr sr, char *label);
 
 
 /**
  * Set the name/description field of the given SR.
  */
 extern bool
-xen_sr_set_name_description(xen_session *session, xen_sr xen_sr, char *description);
+xen_sr_set_name_description(xen_session *session, xen_sr sr, char *description);
 
 
 /**
- * Take an exact copy of the Storage Repository; 
- *         the cloned storage repository has the same type as its parent
+ * Take an exact copy of the Storage Repository; the cloned storage
+ * repository has the same type as its parent
  */
 extern bool
 xen_sr_clone(xen_session *session, xen_sr *result, xen_sr sr, char *loc, char *name);
 
 
 /**
- * Return a list of all the Storage Repositories known to the system
+ * Return a list of all the SRs known to the system
  */
 extern bool
 xen_sr_get_all(xen_session *session, struct xen_sr_set **result);

@@ -191,7 +191,7 @@ xen_user_get_fullname(xen_session *session, char **result, xen_user user);
  * Set the fullname field of the given user.
  */
 extern bool
-xen_user_set_fullname(xen_session *session, xen_user xen_user, char *fullname);
+xen_user_set_fullname(xen_session *session, xen_user user, char *fullname);
 
 
 #endif

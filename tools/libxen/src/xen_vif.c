@@ -307,12 +307,12 @@ xen_vif_get_io_write_kbs(xen_session *session, double *result, xen_vif vif)
 
 
 bool
-xen_vif_set_name(xen_session *session, xen_vif xen_vif, char *name)
+xen_vif_set_name(xen_session *session, xen_vif vif, char *name)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_vif },
+              .u.string_val = vif },
             { .type = &abstract_type_string,
               .u.string_val = name }
         };
@@ -323,12 +323,12 @@ xen_vif_set_name(xen_session *session, xen_vif xen_vif, char *name)
 
 
 bool
-xen_vif_set_type(xen_session *session, xen_vif xen_vif, enum xen_driver_type type)
+xen_vif_set_type(xen_session *session, xen_vif vif, enum xen_driver_type type)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_vif },
+              .u.string_val = vif },
             { .type = &xen_driver_type_abstract_type_,
               .u.string_val = xen_driver_type_to_string(type) }
         };
@@ -339,12 +339,12 @@ xen_vif_set_type(xen_session *session, xen_vif xen_vif, enum xen_driver_type typ
 
 
 bool
-xen_vif_set_device(xen_session *session, xen_vif xen_vif, char *device)
+xen_vif_set_device(xen_session *session, xen_vif vif, char *device)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_vif },
+              .u.string_val = vif },
             { .type = &abstract_type_string,
               .u.string_val = device }
         };
@@ -355,12 +355,12 @@ xen_vif_set_device(xen_session *session, xen_vif xen_vif, char *device)
 
 
 bool
-xen_vif_set_network(xen_session *session, xen_vif xen_vif, xen_network network)
+xen_vif_set_network(xen_session *session, xen_vif vif, xen_network network)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_vif },
+              .u.string_val = vif },
             { .type = &abstract_type_string,
               .u.string_val = network }
         };
@@ -371,12 +371,12 @@ xen_vif_set_network(xen_session *session, xen_vif xen_vif, xen_network network)
 
 
 bool
-xen_vif_set_vm(xen_session *session, xen_vif xen_vif, xen_vm vm)
+xen_vif_set_vm(xen_session *session, xen_vif vif, xen_vm vm)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_vif },
+              .u.string_val = vif },
             { .type = &abstract_type_string,
               .u.string_val = vm }
         };
@@ -387,12 +387,12 @@ xen_vif_set_vm(xen_session *session, xen_vif xen_vif, xen_vm vm)
 
 
 bool
-xen_vif_set_mac(xen_session *session, xen_vif xen_vif, char *mac)
+xen_vif_set_mac(xen_session *session, xen_vif vif, char *mac)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_vif },
+              .u.string_val = vif },
             { .type = &abstract_type_string,
               .u.string_val = mac }
         };
@@ -403,12 +403,12 @@ xen_vif_set_mac(xen_session *session, xen_vif xen_vif, char *mac)
 
 
 bool
-xen_vif_set_mtu(xen_session *session, xen_vif xen_vif, int64_t mtu)
+xen_vif_set_mtu(xen_session *session, xen_vif vif, int64_t mtu)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_vif },
+              .u.string_val = vif },
             { .type = &abstract_type_int,
               .u.int_val = mtu }
         };

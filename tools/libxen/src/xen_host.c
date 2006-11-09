@@ -269,12 +269,12 @@ xen_host_get_host_cpus(xen_session *session, struct xen_host_cpu_set **result, x
 
 
 bool
-xen_host_set_name_label(xen_session *session, xen_host xen_host, char *label)
+xen_host_set_name_label(xen_session *session, xen_host host, char *label)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_host },
+              .u.string_val = host },
             { .type = &abstract_type_string,
               .u.string_val = label }
         };
@@ -285,12 +285,12 @@ xen_host_set_name_label(xen_session *session, xen_host xen_host, char *label)
 
 
 bool
-xen_host_set_name_description(xen_session *session, xen_host xen_host, char *description)
+xen_host_set_name_description(xen_session *session, xen_host host, char *description)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
-              .u.string_val = xen_host },
+              .u.string_val = host },
             { .type = &abstract_type_string,
               .u.string_val = description }
         };
