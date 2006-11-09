@@ -727,7 +727,7 @@ static void hvm_send_assist_req(struct vcpu *v)
     ioreq_t *p;
 
     p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;
-    if ( unlikely(p->state != STATE_INVALID) ) {
+    if ( unlikely(p->state != STATE_IOREQ_NONE) ) {
         /* This indicates a bug in the device model.  Crash the
            domain. */
         printk("Device model set bad IO state %d.\n", p->state);
@@ -760,7 +760,7 @@ void send_pio_req(unsigned long port, unsigned long count, int size,
     }
 
     p = &vio->vp_ioreq;
-    if ( p->state != STATE_INVALID )
+    if ( p->state != STATE_IOREQ_NONE )
         printk("WARNING: send pio with something already pending (%d)?\n",
                p->state);
 
@@ -815,7 +815,7 @@ static void send_mmio_req(unsigned char type, unsigned long gpa,
 
     p = &vio->vp_ioreq;
 
-    if ( p->state != STATE_INVALID )
+    if ( p->state != STATE_IOREQ_NONE )
         printk("WARNING: send mmio with something already pending (%d)?\n",
                p->state);
     p->dir = dir;

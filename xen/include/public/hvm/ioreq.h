@@ -27,7 +27,7 @@
 #define IOREQ_READ      1
 #define IOREQ_WRITE     0
 
-#define STATE_INVALID           0
+#define STATE_IOREQ_NONE        0
 #define STATE_IOREQ_READY       1
 #define STATE_IOREQ_INPROCESS   2
 #define STATE_IORESP_READY      3

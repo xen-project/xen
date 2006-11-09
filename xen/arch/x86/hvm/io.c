@@ -736,27 +736,25 @@ void hvm_io_assist(struct vcpu *v)
 
     io_opp = &v->arch.hvm_vcpu.io_op;
     regs   = &io_opp->io_context;
+    vio    = get_vio(v->domain, v->vcpu_id);
 
-    vio = get_vio(v->domain, v->vcpu_id);
-
-    if ( vio == 0 ) {
-        printk("bad shared page: %lx\n", (unsigned long)vio);
+    p = &vio->vp_ioreq;
+    if ( p->state != STATE_IORESP_READY )
+    {
+        gdprintk(XENLOG_ERR, "Unexpected HVM iorequest state %d.\n", p->state);
         domain_crash_synchronous();
     }
 
-    p = &vio->vp_ioreq;
+    p->state = STATE_IOREQ_NONE;
 
-    if ( p->state == STATE_IORESP_READY ) {
-        p->state = STATE_INVALID;
-        if ( p->type == IOREQ_TYPE_PIO )
-            hvm_pio_assist(regs, p, io_opp);
-        else
-            hvm_mmio_assist(regs, p, io_opp);
+    if ( p->type == IOREQ_TYPE_PIO )
+        hvm_pio_assist(regs, p, io_opp);
+    else
+        hvm_mmio_assist(regs, p, io_opp);
 
-        /* Copy register changes back into current guest state. */
-        hvm_load_cpu_guest_regs(v, regs);
-        memcpy(guest_cpu_user_regs(), regs, HVM_CONTEXT_STACK_BYTES);
-    }
+    /* Copy register changes back into current guest state. */
+    hvm_load_cpu_guest_regs(v, regs);
+    memcpy(guest_cpu_user_regs(), regs, HVM_CONTEXT_STACK_BYTES);
 }
 
 /*

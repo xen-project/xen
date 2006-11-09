@@ -506,10 +506,10 @@ void cpu_handle_ioreq(void *opaque)
 
         /* No state change if state = STATE_IORESP_HOOK */
         if (req->state == STATE_IOREQ_INPROCESS) {
-            mb();
             req->state = STATE_IORESP_READY;
-        }
-        env->send_event = 1;
+            xc_evtchn_notify(xce_handle, ioreq_local_port[send_vcpu]);
+        } else
+            destroy_hvm_domain();
     }
 }
 
@@ -526,8 +526,6 @@ int main_loop(void)
 
     qemu_set_fd_handler(evtchn_fd, cpu_handle_ioreq, NULL, env);
 
-    env->send_event = 0;
-
     while (1) {
         if (vm_running) {
             if (shutdown_requested)
@@ -540,11 +538,6 @@ int main_loop(void)
 
         /* Wait up to 10 msec. */
         main_loop_wait(10);
-
-        if (env->send_event) {
-            env->send_event = 0;
-            xc_evtchn_notify(xce_handle, ioreq_local_port[send_vcpu]);
-        }
     }
     destroy_hvm_domain();
     return 0;

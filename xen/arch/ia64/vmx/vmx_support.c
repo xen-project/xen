@@ -49,7 +49,7 @@ void vmx_io_assist(struct vcpu *v)
     p = &vio->vp_ioreq;
 
     if (p->state == STATE_IORESP_READY) {
-        p->state = STATE_INVALID;
+        p->state = STATE_IOREQ_NONE;
     }
     else {
         /* Can't block here, for the same reason as other places to
@@ -65,7 +65,7 @@ void vmx_send_assist_req(struct vcpu *v)
     ioreq_t *p;
 
     p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;
-    if (unlikely(p->state != STATE_INVALID)) {
+    if (unlikely(p->state != STATE_IOREQ_NONE)) {
         /* This indicates a bug in the device model.  Crash the
            domain. */
         printk("Device model set bad IO state %d.\n", p->state);

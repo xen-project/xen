@@ -60,10 +60,8 @@ struct hvm_function_table hvm_funcs;
 void hvm_stts(struct vcpu *v)
 {
     /* FPU state already dirty? Then no need to setup_fpu() lazily. */
-    if ( test_bit(_VCPUF_fpu_dirtied, &v->vcpu_flags) )
-        return;
-    
-    hvm_funcs.stts(v);
+    if ( !test_bit(_VCPUF_fpu_dirtied, &v->vcpu_flags) )
+        hvm_funcs.stts(v);
 }
 
 void hvm_set_guest_time(struct vcpu *v, u64 gtime)
@@ -79,34 +77,40 @@ void hvm_set_guest_time(struct vcpu *v, u64 gtime)
 void hvm_do_resume(struct vcpu *v)
 {
     ioreq_t *p;
-    struct periodic_time *pt =
-        &v->domain->arch.hvm_domain.pl_time.periodic_tm;
+    struct periodic_time *pt = &v->domain->arch.hvm_domain.pl_time.periodic_tm;
 
     hvm_stts(v);
 
-    /* pick up the elapsed PIT ticks and re-enable pit_timer */
-    if ( pt->enabled && v->vcpu_id == pt->bind_vcpu && pt->first_injected ) {
-        if ( v->arch.hvm_vcpu.guest_time ) {
+    /* Pick up the elapsed PIT ticks and re-enable pit_timer. */
+    if ( pt->enabled && (v->vcpu_id == pt->bind_vcpu) && pt->first_injected )
+    {
+        if ( v->arch.hvm_vcpu.guest_time )
+        {
             hvm_set_guest_time(v, v->arch.hvm_vcpu.guest_time);
             v->arch.hvm_vcpu.guest_time = 0;
         }
         pickup_deactive_ticks(pt);
     }
 
+    /* NB. Optimised for common case (p->state == STATE_IOREQ_NONE). */
     p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;
-    wait_on_xen_event_channel(v->arch.hvm_vcpu.xen_port,
-                              p->state != STATE_IOREQ_READY &&
-                              p->state != STATE_IOREQ_INPROCESS);
-    switch ( p->state )
+    while ( p->state != STATE_IOREQ_NONE )
     {
-    case STATE_IORESP_READY:
-        hvm_io_assist(v);
-        break;
-    case STATE_INVALID:
-        break;
-    default:
-        printk("Weird HVM iorequest state %d.\n", p->state);
-        domain_crash(v->domain);
+        switch ( p->state )
+        {
+        case STATE_IORESP_READY: /* IORESP_READY -> NONE */
+            hvm_io_assist(v);
+            break;
+        case STATE_IOREQ_READY:  /* IOREQ_{READY,INPROCESS} -> IORESP_READY */
+        case STATE_IOREQ_INPROCESS:
+            wait_on_xen_event_channel(v->arch.hvm_vcpu.xen_port,
+                                      (p->state != STATE_IOREQ_READY) &&
+                                      (p->state != STATE_IOREQ_INPROCESS));
+            break;
+        default:
+            gdprintk(XENLOG_ERR, "Weird HVM iorequest state %d.\n", p->state);
+            domain_crash_synchronous();
+        }
     }
 }
 

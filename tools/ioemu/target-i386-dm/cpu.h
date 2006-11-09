@@ -55,8 +55,6 @@ typedef struct CPUX86State {
     int interrupt_request;
 
     CPU_COMMON
-
-    int send_event;
 } CPUX86State;
 
 CPUX86State *cpu_x86_init(void);
