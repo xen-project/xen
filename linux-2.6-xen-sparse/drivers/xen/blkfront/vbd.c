@@ -50,7 +50,7 @@
  */
 
 #define NUM_IDE_MAJORS 10
-#define NUM_SCSI_MAJORS 9
+#define NUM_SCSI_MAJORS 17
 #define NUM_VBD_MAJORS 1
 
 static struct xlbd_type_info xlbd_ide_type = {
@@ -165,8 +165,11 @@ xlbd_get_major_info(int vdevice)
 	case SCSI_DISK1_MAJOR ... SCSI_DISK7_MAJOR:
 		index = 11 + major - SCSI_DISK1_MAJOR;
 		break;
-	case SCSI_CDROM_MAJOR: index = 18; break;
-	default: index = 19; break;
+        case SCSI_DISK8_MAJOR ... SCSI_DISK15_MAJOR:
+                index = 18 + major - SCSI_DISK8_MAJOR;
+                break;
+        case SCSI_CDROM_MAJOR: index = 26; break;
+        default: index = 27; break;
 	}
 
 	mi = ((major_info[index] != NULL) ? major_info[index] :
@@ -227,6 +230,7 @@ xlvbd_alloc_gendisk(int minor, blkif_sector_t capacity, int vdevice,
 	struct xlbd_major_info *mi;
 	int nr_minors = 1;
 	int err = -ENODEV;
+	unsigned int offset;
 
 	BUG_ON(info->gd != NULL);
 	BUG_ON(info->mi != NULL);
@@ -244,15 +248,33 @@ xlvbd_alloc_gendisk(int minor, blkif_sector_t capacity, int vdevice,
 	if (gd == NULL)
 		goto out;
 
-	if (nr_minors > 1)
-		sprintf(gd->disk_name, "%s%c", mi->type->diskname,
-			'a' + mi->index * mi->type->disks_per_major +
-			(minor >> mi->type->partn_shift));
-	else
-		sprintf(gd->disk_name, "%s%c%d", mi->type->diskname,
-			'a' + mi->index * mi->type->disks_per_major +
-			(minor >> mi->type->partn_shift),
-			minor & ((1 << mi->type->partn_shift) - 1));
+	offset =  mi->index * mi->type->disks_per_major +
+			(minor >> mi->type->partn_shift);
+	if (nr_minors > 1) {
+		if (offset < 26) {
+			sprintf(gd->disk_name, "%s%c",
+				 mi->type->diskname, 'a' + offset );
+		}
+		else {
+			sprintf(gd->disk_name, "%s%c%c",
+				mi->type->diskname,
+				'a' + ((offset/26)-1), 'a' + (offset%26) );
+		}
+	}
+	else {
+		if (offset < 26) {
+			sprintf(gd->disk_name, "%s%c%d",
+				mi->type->diskname,
+				'a' + offset,
+				minor & ((1 << mi->type->partn_shift) - 1));
+		}
+		else {
+			sprintf(gd->disk_name, "%s%c%c%d",
+				mi->type->diskname,
+				'a' + ((offset/26)-1), 'a' + (offset%26),
+				minor & ((1 << mi->type->partn_shift) - 1));
+		}
+	}
 
 	gd->major = mi->major;
 	gd->first_minor = minor;
