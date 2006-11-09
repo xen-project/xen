@@ -432,9 +432,9 @@ class XendAPI:
         return xen_api_success(XendNode.instance().description)
     def host_get_software_version(self, session, host_ref):
         return xen_api_success(XendNode.instance().xen_version())
-    def host_get_resident_vms(self, session, host_ref):
+    def host_get_resident_VMs(self, session, host_ref):
         return xen_api_success(XendDomain.instance().get_domain_refs())
-    def host_get_host_cpus(self, session, host_ref):
+    def host_get_host_CPUs(self, session, host_ref):
         return xen_api_success(XendNode.instance().get_host_cpu_refs())
 
     # object methods
@@ -572,7 +572,7 @@ class XendAPI:
                   'kernel_initrd',
                   'kernel_args',
                   'grub_cmdline',
-                  'other_config']
+                  'otherConfig']
 
     VM_methods = ['clone',
                   'start',
@@ -620,7 +620,7 @@ class XendAPI:
         'kernel_args',
         'grub_cmdline',
         'PCI_bus',
-        'other_config']
+        'otherConfig']
         
     # attributes (ro)
     def vm_get_power_state(self, session, vm_ref):
@@ -642,35 +642,35 @@ class XendAPI:
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success(dom.get_memory_static_min())
     
-    def vm_get_vcpus_number(self, session, vm_ref):
+    def vm_get_VCPUs_number(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success(dom.getVCpuCount())
     
-    def vm_get_vcpus_utilisation(self, session, vm_ref):
+    def vm_get_VCPUs_utilisation(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success(dom.get_vcpus_util())
     
-    def vm_get_vcpus_features_required(self, session, vm_ref):
+    def vm_get_VCPUs_features_required(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_todo() # unsupported by xc
     
-    def vm_get_vcpus_can_use(self, session, vm_ref):
+    def vm_get_VCPUs_can_use(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_todo() # unsupported by xc
     
-    def vm_get_vifs(self, session, vm_ref):
+    def vm_get_VIFs(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success(dom.get_vifs())
     
-    def vm_get_vbds(self, session, vm_ref):
+    def vm_get_VBDs(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success(dom.get_vbds())
     
-    def vm_get_vtpms(self, session, vm_ref):
+    def vm_get_VTPMs(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success(dom.get_vtpms())
     
-    def vm_get_pci_bus(self, session, vm_ref):
+    def vm_get_PCI_bus(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_todo() # unsupported by xc
     
@@ -703,19 +703,19 @@ class XendAPI:
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_todo()    
     
-    def vm_get_vcpus_policy(self, session, vm_ref):
+    def vm_get_VCPUs_policy(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_todo() # need to access scheduler
     
-    def vm_get_vcpus_params(self, session, vm_ref):
+    def vm_get_VCPUs_params(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_todo() # need access to scheduler
     
-    def vm_get_vcpus_features_force_on(self, session, vm_ref):
+    def vm_get_VCPUs_features_force_on(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_todo()
     
-    def vm_get_vcpus_features_force_off(self, session, vm_ref):
+    def vm_get_VCPUs_features_force_off(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_todo()
     
@@ -739,7 +739,7 @@ class XendAPI:
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success(dom.get_bios_boot())
     
-    def vm_get_platform_std_vga(self, session, vm_ref):
+    def vm_get_platform_std_VGA(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_todo()
     
@@ -783,7 +783,7 @@ class XendAPI:
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success('')
     
-    def vm_get_other_config(self, session, vm_ref):
+    def vm_get_otherConfig(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_todo()
     
@@ -847,7 +847,7 @@ class XendAPI:
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success_void()
     
-    def vm_set_platform_std_vga(self, session, vm_ref):
+    def vm_set_platform_std_VGA(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success_void()
     
@@ -891,7 +891,7 @@ class XendAPI:
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success_void()
     
-    def vm_set_other_config(self, session, vm_ref):
+    def vm_set_otherConfig(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success_void()
     
@@ -1142,7 +1142,7 @@ class XendAPI:
     VDI_methods = ['snapshot']
     VDI_funcs = ['get_by_name_label']
     
-    def vdi_get_vbds(self, session, vdi_ref):
+    def vdi_get_VBDs(self, session, vdi_ref):
         return xen_api_todo()
     
     def vdi_get_physical_utilisation(self, session, vdi_ref):
@@ -1350,7 +1350,7 @@ class XendAPI:
             backend = "Domain-0"
         return xen_api_success(backend)
 
-    def vtpm_get_vm(self, session, vtpm_ref):
+    def vtpm_get_VM(self, session, vtpm_ref):
         xendom = XendDomain.instance()
         return xen_api_success(xendom.get_dev_property('vtpm', vtpm_ref, 'VM'))
 
