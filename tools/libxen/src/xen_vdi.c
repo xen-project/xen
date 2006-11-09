@@ -229,7 +229,7 @@ xen_vdi_get_sr(xen_session *session, xen_sr *result, xen_vdi vdi)
     abstract_type result_type = abstract_type_string;
 
     *result = NULL;
-    XEN_CALL_("VDI.get_sr");
+    XEN_CALL_("VDI.get_SR");
     return session->ok;
 }
 
@@ -246,7 +246,7 @@ xen_vdi_get_vbds(xen_session *session, struct xen_vbd_set **result, xen_vdi vdi)
     abstract_type result_type = abstract_type_string_set;
 
     *result = NULL;
-    XEN_CALL_("VDI.get_vbds");
+    XEN_CALL_("VDI.get_VBDs");
     return session->ok;
 }
 
@@ -425,7 +425,7 @@ xen_vdi_set_sr(xen_session *session, xen_vdi vdi, xen_sr sr)
               .u.string_val = sr }
         };
 
-    xen_call_(session, "VDI.set_sr", param_values, 2, NULL, NULL);
+    xen_call_(session, "VDI.set_SR", param_values, 2, NULL, NULL);
     return session->ok;
 }
 

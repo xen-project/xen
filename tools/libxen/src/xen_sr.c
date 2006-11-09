@@ -214,7 +214,7 @@ xen_sr_get_vdis(xen_session *session, struct xen_vdi_set **result, xen_sr sr)
     abstract_type result_type = abstract_type_string_set;
 
     *result = NULL;
-    XEN_CALL_("SR.get_vdis");
+    XEN_CALL_("SR.get_VDIs");
     return session->ok;
 }
 

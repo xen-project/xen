@@ -150,7 +150,7 @@ xen_vtpm_get_vm(xen_session *session, xen_vm *result, xen_vtpm vtpm)
     abstract_type result_type = abstract_type_string;
 
     *result = NULL;
-    XEN_CALL_("VTPM.get_vm");
+    XEN_CALL_("VTPM.get_VM");
     return session->ok;
 }
 

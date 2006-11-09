@@ -488,7 +488,7 @@ xen_vm_get_vcpus_policy(xen_session *session, char **result, xen_vm vm)
     abstract_type result_type = abstract_type_string;
 
     *result = NULL;
-    XEN_CALL_("VM.get_vcpus_policy");
+    XEN_CALL_("VM.get_VCPUs_policy");
     return session->ok;
 }
 
@@ -505,7 +505,7 @@ xen_vm_get_vcpus_params(xen_session *session, char **result, xen_vm vm)
     abstract_type result_type = abstract_type_string;
 
     *result = NULL;
-    XEN_CALL_("VM.get_vcpus_params");
+    XEN_CALL_("VM.get_VCPUs_params");
     return session->ok;
 }
 
@@ -521,7 +521,7 @@ xen_vm_get_vcpus_number(xen_session *session, int64_t *result, xen_vm vm)
 
     abstract_type result_type = abstract_type_int;
 
-    XEN_CALL_("VM.get_vcpus_number");
+    XEN_CALL_("VM.get_VCPUs_number");
     return session->ok;
 }
 
@@ -538,7 +538,7 @@ xen_vm_get_vcpus_utilisation(xen_session *session, xen_int_float_map **result, x
     abstract_type result_type = abstract_type_int_float_map;
 
     *result = NULL;
-    XEN_CALL_("VM.get_vcpus_utilisation");
+    XEN_CALL_("VM.get_VCPUs_utilisation");
     return session->ok;
 }
 
@@ -555,7 +555,7 @@ xen_vm_get_vcpus_features_required(xen_session *session, struct xen_cpu_feature_
     abstract_type result_type = xen_cpu_feature_set_abstract_type_;
 
     *result = NULL;
-    XEN_CALL_("VM.get_vcpus_features_required");
+    XEN_CALL_("VM.get_VCPUs_features_required");
     return session->ok;
 }
 
@@ -572,7 +572,7 @@ xen_vm_get_vcpus_features_can_use(xen_session *session, struct xen_cpu_feature_s
     abstract_type result_type = xen_cpu_feature_set_abstract_type_;
 
     *result = NULL;
-    XEN_CALL_("VM.get_vcpus_features_can_use");
+    XEN_CALL_("VM.get_VCPUs_features_can_use");
     return session->ok;
 }
 
@@ -589,7 +589,7 @@ xen_vm_get_vcpus_features_force_on(xen_session *session, struct xen_cpu_feature_
     abstract_type result_type = xen_cpu_feature_set_abstract_type_;
 
     *result = NULL;
-    XEN_CALL_("VM.get_vcpus_features_force_on");
+    XEN_CALL_("VM.get_VCPUs_features_force_on");
     return session->ok;
 }
 
@@ -606,7 +606,7 @@ xen_vm_get_vcpus_features_force_off(xen_session *session, struct xen_cpu_feature
     abstract_type result_type = xen_cpu_feature_set_abstract_type_;
 
     *result = NULL;
-    XEN_CALL_("VM.get_vcpus_features_force_off");
+    XEN_CALL_("VM.get_VCPUs_features_force_off");
     return session->ok;
 }
 
@@ -691,7 +691,7 @@ xen_vm_get_vifs(xen_session *session, struct xen_vif_set **result, xen_vm vm)
     abstract_type result_type = abstract_type_string_set;
 
     *result = NULL;
-    XEN_CALL_("VM.get_vifs");
+    XEN_CALL_("VM.get_VIFs");
     return session->ok;
 }
 
@@ -708,7 +708,7 @@ xen_vm_get_vbds(xen_session *session, struct xen_vbd_set **result, xen_vm vm)
     abstract_type result_type = abstract_type_string_set;
 
     *result = NULL;
-    XEN_CALL_("VM.get_vbds");
+    XEN_CALL_("VM.get_VBDs");
     return session->ok;
 }
 
@@ -725,7 +725,7 @@ xen_vm_get_vtpms(xen_session *session, struct xen_vtpm_set **result, xen_vm vm)
     abstract_type result_type = abstract_type_string_set;
 
     *result = NULL;
-    XEN_CALL_("VM.get_vtpms");
+    XEN_CALL_("VM.get_VTPMs");
     return session->ok;
 }
 
@@ -758,7 +758,7 @@ xen_vm_get_platform_std_vga(xen_session *session, bool *result, xen_vm vm)
 
     abstract_type result_type = abstract_type_bool;
 
-    XEN_CALL_("VM.get_platform_std_vga");
+    XEN_CALL_("VM.get_platform_std_VGA");
     return session->ok;
 }
 
@@ -942,7 +942,7 @@ xen_vm_get_pci_bus(xen_session *session, char **result, xen_vm vm)
     abstract_type result_type = abstract_type_string;
 
     *result = NULL;
-    XEN_CALL_("VM.get_pci_bus");
+    XEN_CALL_("VM.get_PCI_bus");
     return session->ok;
 }
 
@@ -976,7 +976,7 @@ xen_vm_get_otherconfig(xen_session *session, xen_string_string_map **result, xen
     abstract_type result_type = abstract_type_string_string_map;
 
     *result = NULL;
-    XEN_CALL_("VM.get_otherconfig");
+    XEN_CALL_("VM.get_otherConfig");
     return session->ok;
 }
 

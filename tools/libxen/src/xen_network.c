@@ -210,7 +210,7 @@ xen_network_get_vifs(xen_session *session, struct xen_vif_set **result, xen_netw
     abstract_type result_type = abstract_type_string_set;
 
     *result = NULL;
-    XEN_CALL_("network.get_vifs");
+    XEN_CALL_("network.get_VIFs");
     return session->ok;
 }
 
@@ -227,7 +227,7 @@ xen_network_get_pifs(xen_session *session, struct xen_pif_set **result, xen_netw
     abstract_type result_type = abstract_type_string_set;
 
     *result = NULL;
-    XEN_CALL_("network.get_pifs");
+    XEN_CALL_("network.get_PIFs");
     return session->ok;
 }
 

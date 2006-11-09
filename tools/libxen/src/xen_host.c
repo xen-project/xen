@@ -229,7 +229,7 @@ xen_host_get_resident_vms(xen_session *session, struct xen_vm_set **result, xen_
     abstract_type result_type = abstract_type_string_set;
 
     *result = NULL;
-    XEN_CALL_("host.get_resident_vms");
+    XEN_CALL_("host.get_resident_VMs");
     return session->ok;
 }
 
@@ -246,7 +246,7 @@ xen_host_get_pifs(xen_session *session, struct xen_pif_set **result, xen_host ho
     abstract_type result_type = abstract_type_string_set;
 
     *result = NULL;
-    XEN_CALL_("host.get_pifs");
+    XEN_CALL_("host.get_PIFs");
     return session->ok;
 }
 
@@ -263,7 +263,7 @@ xen_host_get_host_cpus(xen_session *session, struct xen_host_cpu_set **result, x
     abstract_type result_type = abstract_type_string_set;
 
     *result = NULL;
-    XEN_CALL_("host.get_host_cpus");
+    XEN_CALL_("host.get_host_CPUs");
     return session->ok;
 }
 

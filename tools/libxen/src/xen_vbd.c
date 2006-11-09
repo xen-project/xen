@@ -164,7 +164,7 @@ xen_vbd_get_vm(xen_session *session, xen_vm *result, xen_vbd vbd)
     abstract_type result_type = abstract_type_string;
 
     *result = NULL;
-    XEN_CALL_("VBD.get_vm");
+    XEN_CALL_("VBD.get_VM");
     return session->ok;
 }
 
@@ -181,7 +181,7 @@ xen_vbd_get_vdi(xen_session *session, xen_vdi *result, xen_vbd vbd)
     abstract_type result_type = abstract_type_string;
 
     *result = NULL;
-    XEN_CALL_("VBD.get_vdi");
+    XEN_CALL_("VBD.get_VDI");
     return session->ok;
 }
 
@@ -280,7 +280,7 @@ xen_vbd_set_vm(xen_session *session, xen_vbd vbd, xen_vm vm)
               .u.string_val = vm }
         };
 
-    xen_call_(session, "VBD.set_vm", param_values, 2, NULL, NULL);
+    xen_call_(session, "VBD.set_VM", param_values, 2, NULL, NULL);
     return session->ok;
 }
 
@@ -296,7 +296,7 @@ xen_vbd_set_vdi(xen_session *session, xen_vbd vbd, xen_vdi vdi)
               .u.string_val = vdi }
         };
 
-    xen_call_(session, "VBD.set_vdi", param_values, 2, NULL, NULL);
+    xen_call_(session, "VBD.set_VDI", param_values, 2, NULL, NULL);
     return session->ok;
 }
 

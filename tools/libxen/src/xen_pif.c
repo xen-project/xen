@@ -215,7 +215,7 @@ xen_pif_get_mac(xen_session *session, char **result, xen_pif pif)
     abstract_type result_type = abstract_type_string;
 
     *result = NULL;
-    XEN_CALL_("PIF.get_mac");
+    XEN_CALL_("PIF.get_MAC");
     return session->ok;
 }
 
@@ -231,7 +231,7 @@ xen_pif_get_mtu(xen_session *session, int64_t *result, xen_pif pif)
 
     abstract_type result_type = abstract_type_int;
 
-    XEN_CALL_("PIF.get_mtu");
+    XEN_CALL_("PIF.get_MTU");
     return session->ok;
 }
 
@@ -248,7 +248,7 @@ xen_pif_get_vlan(xen_session *session, char **result, xen_pif pif)
     abstract_type result_type = abstract_type_string;
 
     *result = NULL;
-    XEN_CALL_("PIF.get_vlan");
+    XEN_CALL_("PIF.get_VLAN");
     return session->ok;
 }
 
@@ -344,7 +344,7 @@ xen_pif_set_mac(xen_session *session, xen_pif pif, char *mac)
               .u.string_val = mac }
         };
 
-    xen_call_(session, "PIF.set_mac", param_values, 2, NULL, NULL);
+    xen_call_(session, "PIF.set_MAC", param_values, 2, NULL, NULL);
     return session->ok;
 }
 
@@ -360,7 +360,7 @@ xen_pif_set_mtu(xen_session *session, xen_pif pif, int64_t mtu)
               .u.int_val = mtu }
         };
 
-    xen_call_(session, "PIF.set_mtu", param_values, 2, NULL, NULL);
+    xen_call_(session, "PIF.set_MTU", param_values, 2, NULL, NULL);
     return session->ok;
 }
 
@@ -376,7 +376,7 @@ xen_pif_set_vlan(xen_session *session, xen_pif pif, char *vlan)
               .u.string_val = vlan }
         };
 
-    xen_call_(session, "PIF.set_vlan", param_values, 2, NULL, NULL);
+    xen_call_(session, "PIF.set_VLAN", param_values, 2, NULL, NULL);
     return session->ok;
 }
 

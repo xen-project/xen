@@ -236,7 +236,7 @@ xen_vif_get_vm(xen_session *session, xen_vm *result, xen_vif vif)
     abstract_type result_type = abstract_type_string;
 
     *result = NULL;
-    XEN_CALL_("VIF.get_vm");
+    XEN_CALL_("VIF.get_VM");
     return session->ok;
 }
 
@@ -253,7 +253,7 @@ xen_vif_get_mac(xen_session *session, char **result, xen_vif vif)
     abstract_type result_type = abstract_type_string;
 
     *result = NULL;
-    XEN_CALL_("VIF.get_mac");
+    XEN_CALL_("VIF.get_MAC");
     return session->ok;
 }
 
@@ -269,7 +269,7 @@ xen_vif_get_mtu(xen_session *session, int64_t *result, xen_vif vif)
 
     abstract_type result_type = abstract_type_int;
 
-    XEN_CALL_("VIF.get_mtu");
+    XEN_CALL_("VIF.get_MTU");
     return session->ok;
 }
 
@@ -381,7 +381,7 @@ xen_vif_set_vm(xen_session *session, xen_vif vif, xen_vm vm)
               .u.string_val = vm }
         };
 
-    xen_call_(session, "VIF.set_vm", param_values, 2, NULL, NULL);
+    xen_call_(session, "VIF.set_VM", param_values, 2, NULL, NULL);
     return session->ok;
 }
 
@@ -397,7 +397,7 @@ xen_vif_set_mac(xen_session *session, xen_vif vif, char *mac)
               .u.string_val = mac }
         };
 
-    xen_call_(session, "VIF.set_mac", param_values, 2, NULL, NULL);
+    xen_call_(session, "VIF.set_MAC", param_values, 2, NULL, NULL);
     return session->ok;
 }
 
@@ -413,7 +413,7 @@ xen_vif_set_mtu(xen_session *session, xen_vif vif, int64_t mtu)
               .u.int_val = mtu }
         };
 
-    xen_call_(session, "VIF.set_mtu", param_values, 2, NULL, NULL);
+    xen_call_(session, "VIF.set_MTU", param_values, 2, NULL, NULL);
     return session->ok;
 }
 
