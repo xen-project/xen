@@ -495,8 +495,7 @@ static uint32_t vlapic_get_tmcct(struct vlapic *vlapic)
     else
         passed = now - vlapic->timer_last_update;
 
-    counter_passed = passed /
-      (APIC_BUS_CYCLE_NS * vlapic->timer_divide_count);
+    counter_passed = passed / (APIC_BUS_CYCLE_NS * vlapic->timer_divisor);
 
     tmcct -= counter_passed;
 
@@ -528,10 +527,21 @@ static uint32_t vlapic_get_tmcct(struct vlapic *vlapic)
     return tmcct;
 }
 
+static void vlapic_set_tdcr(struct vlapic *vlapic, unsigned int val)
+{
+    /* Only bits 0, 1 and 3 are settable; others are MBZ. */
+    val &= 0xb;
+    vlapic_set_reg(vlapic, APIC_TDCR, val);
+
+    /* Update the demangled timer_divisor. */
+    val = ((val & 3) | ((val & 8) >> 1)) + 1;
+    vlapic->timer_divisor = 1 << (val & 7);
+}
+
 static void vlapic_read_aligned(struct vlapic *vlapic, unsigned int offset,
                          unsigned int len, unsigned int *result)
 {
-    ASSERT(len == 4 && offset > 0 && offset <= APIC_TDCR);
+    ASSERT((len == 4) && (offset > 0) && (offset <= APIC_TDCR));
 
     *result = 0;
 
@@ -563,7 +573,7 @@ static unsigned long vlapic_read(struct vcpu *v, unsigned long address,
     struct vlapic *vlapic = vcpu_vlapic(v);
     unsigned int offset = address - vlapic->base_address;
 
-    if ( offset > APIC_TDCR)
+    if ( offset > APIC_TDCR )
         return 0;
 
     /* some bugs on kernel cause read this with byte*/
@@ -760,8 +770,7 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
         vlapic_set_reg(vlapic, APIC_TMCCT, val);
         vlapic->timer_last_update = now;
 
-        offset = APIC_BUS_CYCLE_NS *
-            vlapic->timer_divide_count * val;
+        offset = APIC_BUS_CYCLE_NS * vlapic->timer_divisor * val;
 
         set_timer(&vlapic->vlapic_timer, now + offset);
 
@@ -776,19 +785,10 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
     break;
 
     case APIC_TDCR:
-    {
-        unsigned int tmp1, tmp2;
-
-        tmp1 = val & 0xf;
-        tmp2 = ((tmp1 & 0x3) | ((tmp1 & 0x8) >> 1)) + 1;
-        vlapic->timer_divide_count = 0x1 << (tmp2 & 0x7);
-
-        vlapic_set_reg(vlapic, APIC_TDCR, val);
-
-        HVM_DBG_LOG(DBG_LEVEL_VLAPIC_TIMER, "timer divide count is 0x%x",
-                    vlapic->timer_divide_count);
-    }
-    break;
+        vlapic_set_tdcr(vlapic, val & 0xb);
+        HVM_DBG_LOG(DBG_LEVEL_VLAPIC_TIMER, "timer divisor is 0x%x",
+                    vlapic->timer_divisor);
+        break;
 
     default:
         gdprintk(XENLOG_WARNING, 
@@ -852,8 +852,7 @@ void vlapic_timer_fn(void *data)
 
         vlapic_set_reg(vlapic, APIC_TMCCT, tmict);
 
-        offset = APIC_BUS_CYCLE_NS *
-                 vlapic->timer_divide_count * tmict;
+        offset = APIC_BUS_CYCLE_NS * vlapic->timer_divisor * tmict;
 
         set_timer(&vlapic->vlapic_timer, now + offset);
     }
@@ -966,6 +965,8 @@ static int vlapic_reset(struct vlapic *vlapic)
     vlapic->apic_base_msr = MSR_IA32_APICBASE_ENABLE | APIC_DEFAULT_PHYS_BASE;
 
     vlapic->flush_tpr_threshold = 0;
+
+    vlapic_set_tdcr(vlapic, 0);
 
     vlapic->base_address = vlapic->apic_base_msr &
                            MSR_IA32_APICBASE_BASE;

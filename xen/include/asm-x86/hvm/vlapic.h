@@ -49,7 +49,7 @@ struct vlapic {
     uint32_t           status;
     uint64_t           apic_base_msr;
     unsigned long      base_address;
-    uint32_t           timer_divide_count;
+    uint32_t           timer_divisor;
     struct timer       vlapic_timer;
     int                timer_pending_count;
     int                flush_tpr_threshold;
