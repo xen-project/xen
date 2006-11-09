@@ -276,7 +276,7 @@ xen_host_reboot(xen_session *session, xen_host host);
 
 
 /**
- * Return a list of all the hosts known to the system
+ * Return a list of all the hosts known to the system.
  */
 extern bool
 xen_host_get_all(xen_session *session, struct xen_host_set **result);

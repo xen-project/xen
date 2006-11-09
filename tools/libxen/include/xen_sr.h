@@ -266,7 +266,7 @@ xen_sr_clone(xen_session *session, xen_sr *result, xen_sr sr, char *loc, char *n
 
 
 /**
- * Return a list of all the SRs known to the system
+ * Return a list of all the SRs known to the system.
  */
 extern bool
 xen_sr_get_all(xen_session *session, struct xen_sr_set **result);

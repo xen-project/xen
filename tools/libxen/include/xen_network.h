@@ -257,7 +257,7 @@ xen_network_set_default_netmask(xen_session *session, xen_network network, char 
 
 
 /**
- * Return a list of all the networks known to the system
+ * Return a list of all the networks known to the system.
  */
 extern bool
 xen_network_get_all(xen_session *session, struct xen_network_set **result);
