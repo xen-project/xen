@@ -1667,7 +1667,12 @@ class XendDomainInfo:
     # ----------------------------------------------------------------
 
     def get_uuid(self):
-        return self.info['uuid']
+        dom_uuid = self.info.get('uuid')
+        if not dom_uuid: # if it doesn't exist, make one up
+            dom_uuid = uuid.createString()
+            self.info['uuid'] = dom_uuid
+        return dom_uuid
+    
     def get_memory_static_max(self):
         return self.info['maxmem']
     def get_memory_static_min(self):

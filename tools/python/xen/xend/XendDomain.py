@@ -167,10 +167,11 @@ class XendDomain:
 
             # add all managed domains as dormant domains.
             for dom in managed:
-                dom_uuid = dom.get('uuid', uuid.createString())
-                dom['uuid'] = dom_uuid
-                dom_name = dom.get('name', 'Domain-%s' % dom_uuid)
+                dom_uuid = dom.get('uuid')
+                if not dom_uuid:
+                    continue
                 
+                dom_name = dom.get('name', 'Domain-%s' % dom_uuid)
                 try:
                     running_dom = self.domain_lookup_nr(dom_name)
                     if not running_dom:
@@ -304,6 +305,11 @@ class XendDomain:
             try:
                 cfg_file = self._managed_config_path(dom_uuid)
                 cfg = XendConfig(filename = cfg_file)
+                if cfg.get('uuid') != dom_uuid:
+                    # something is wrong with the SXP
+                    log.error("UUID mismatch in stored configuration: %s" %
+                              cfg_file)
+                    continue
                 doms.append(cfg)
             except Exception:
                 log.exception('Unable to open or parse config.sxp: %s' % \
@@ -387,7 +393,7 @@ class XendDomain:
 
 
     def _add_domain(self, info):
-        """Add the given domain entry to this instance's internal cache.
+        """Add a domain to the list of running domains
         
         @requires: Expects to be protected by the domains_lock.
         @param info: XendDomainInfo of a domain to be added.
@@ -397,7 +403,7 @@ class XendDomain:
         self.domains[info.getDomid()] = info
 
     def _remove_domain(self, info, domid = None):
-        """Remove the given domain from this instance's internal cache.
+        """Remove the domain from the list of running domains
         
         @requires: Expects to be protected by the domains_lock.
         @param info: XendDomainInfo of a domain to be removed.
@@ -849,7 +855,7 @@ class XendDomain:
                 raise XendError("Domain is already running")
             
             dominfo.start(is_managed = True)
-
+            self._add_domain(dominfo)
         finally:
             self.domains_lock.release()
         
