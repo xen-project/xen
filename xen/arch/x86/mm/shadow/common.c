@@ -635,6 +635,56 @@ void shadow_prealloc(struct domain *d, unsigned int order)
     BUG();
 }
 
+#ifndef NDEBUG
+/* Deliberately free all the memory we can: this can be used to cause the
+ * guest's pagetables to be re-shadowed if we suspect that the shadows
+ * have somehow got out of sync */
+static void shadow_blow_tables(unsigned char c)
+{
+    struct list_head *l, *t;
+    struct page_info *pg;
+    struct domain *d;
+    struct vcpu *v;
+    mfn_t smfn;
+
+    for_each_domain(d)
+    {
+        if ( shadow_mode_enabled(d) && (v = d->vcpu[0]) != NULL)
+        {
+            shadow_lock(d);
+            printk("Blowing shadow tables for domain %u\n", d->domain_id);
+
+            /* Pass one: unpin all top-level pages */
+            list_for_each_backwards_safe(l,t, &d->arch.shadow.toplevel_shadows)
+            {
+                pg = list_entry(l, struct page_info, list);
+                smfn = page_to_mfn(pg);
+                sh_unpin(v, smfn);
+            }
+
+            /* Second pass: unhook entries of in-use shadows */
+            list_for_each_backwards_safe(l,t, &d->arch.shadow.toplevel_shadows)
+            {
+                pg = list_entry(l, struct page_info, list);
+                smfn = page_to_mfn(pg);
+                shadow_unhook_mappings(v, smfn);
+            }
+            
+            /* Make sure everyone sees the unshadowings */
+            flush_tlb_mask(d->domain_dirty_cpumask);
+            shadow_unlock(d);
+        }
+    }
+}
+
+/* Register this function in the Xen console keypress table */
+static __init int shadow_blow_tables_keyhandler_init(void)
+{
+    register_keyhandler('S', shadow_blow_tables, "reset shadow pagetables");
+    return 0;
+}
+__initcall(shadow_blow_tables_keyhandler_init);
+#endif /* !NDEBUG */
 
 /* Allocate another shadow's worth of (contiguous, aligned) pages,
  * and fill in the type and backpointer fields of their page_infos. 
