@@ -113,17 +113,21 @@ class GrubLineEditor(curses.textpad.Textbox):
         elif ch == curses.ascii.SOH:  # ^a
             self.pos = 0
         elif ch in (curses.ascii.STX,curses.KEY_LEFT):
-            self.pos -= 1
+            if self.pos > 0:
+                self.pos -= 1
         elif ch in (curses.ascii.BS,curses.KEY_BACKSPACE):
             if self.pos > 0:
                 self.pos -= 1
-                self.line.pop(self.pos)
+                if self.pos < len(self.line):
+                    self.line.pop(self.pos)
         elif ch == curses.ascii.EOT:                           # ^d
-            self.line.pop(self.pos)
+            if self.pos < len(self.line):
+                self.line.pop(self.pos)
         elif ch == curses.ascii.ENQ:                           # ^e
             self.pos = len(self.line)
         elif ch in (curses.ascii.ACK, curses.KEY_RIGHT):
-            self.pos +=1
+            if self.pos < len(self.line):
+                self.pos +=1
         elif ch == curses.ascii.VT:                            # ^k
             self.line = self.line[:self.pos]
         else:
