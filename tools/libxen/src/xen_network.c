@@ -148,6 +148,20 @@ xen_network_create(xen_session *session, xen_network *result, xen_network_record
 
 
 bool
+xen_network_destroy(xen_session *session, xen_network network)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = network }
+        };
+
+    xen_call_(session, "network.destroy", param_values, 1, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
 xen_network_get_by_name_label(xen_session *session, struct xen_network_set **result, char *label)
 {
     abstract_value param_values[] =

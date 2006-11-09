@@ -153,6 +153,20 @@ xen_pif_create(xen_session *session, xen_pif *result, xen_pif_record *record)
 
 
 bool
+xen_pif_destroy(xen_session *session, xen_pif pif)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = pif }
+        };
+
+    xen_call_(session, "PIF.destroy", param_values, 1, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
 xen_pif_get_name(xen_session *session, char **result, xen_pif pif)
 {
     abstract_value param_values[] =

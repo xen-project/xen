@@ -150,6 +150,20 @@ xen_host_cpu_create(xen_session *session, xen_host_cpu *result, xen_host_cpu_rec
 
 
 bool
+xen_host_cpu_destroy(xen_session *session, xen_host_cpu host_cpu)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host_cpu }
+        };
+
+    xen_call_(session, "host_cpu.destroy", param_values, 1, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
 xen_host_cpu_get_host(xen_session *session, xen_host *result, xen_host_cpu host_cpu)
 {
     abstract_value param_values[] =

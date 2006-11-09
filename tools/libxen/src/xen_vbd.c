@@ -153,6 +153,20 @@ xen_vbd_create(xen_session *session, xen_vbd *result, xen_vbd_record *record)
 
 
 bool
+xen_vbd_destroy(xen_session *session, xen_vbd vbd)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vbd }
+        };
+
+    xen_call_(session, "VBD.destroy", param_values, 1, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
 xen_vbd_get_vm(xen_session *session, xen_vm *result, xen_vbd vbd)
 {
     abstract_value param_values[] =

@@ -280,6 +280,20 @@ xen_vm_create(xen_session *session, xen_vm *result, xen_vm_record *record)
 
 
 bool
+xen_vm_destroy(xen_session *session, xen_vm vm)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm }
+        };
+
+    xen_call_(session, "VM.destroy", param_values, 1, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
 xen_vm_get_by_name_label(xen_session *session, struct xen_vm_set **result, char *label)
 {
     abstract_value param_values[] =
@@ -1578,19 +1592,5 @@ bool
 xen_vm_get_uuid(xen_session *session, char **result, xen_vm vm)
 {
     *result = session->ok ? xen_strdup_((char *)vm) : NULL;
-    return session->ok;
-}
-
-
-bool
-xen_vm_destroy(xen_session *session, xen_vm vm)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm }
-        };
-
-    xen_call_(session, "VM.destroy", param_values, 1, NULL, NULL);
     return session->ok;
 }

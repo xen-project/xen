@@ -139,6 +139,20 @@ xen_vtpm_create(xen_session *session, xen_vtpm *result, xen_vtpm_record *record)
 
 
 bool
+xen_vtpm_destroy(xen_session *session, xen_vtpm vtpm)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vtpm }
+        };
+
+    xen_call_(session, "VTPM.destroy", param_values, 1, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
 xen_vtpm_get_vm(xen_session *session, xen_vm *result, xen_vtpm vtpm)
 {
     abstract_value param_values[] =

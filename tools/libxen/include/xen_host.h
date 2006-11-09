@@ -175,6 +175,13 @@ xen_host_create(xen_session *session, xen_host *result, xen_host_record *record)
 
 
 /**
+ * Destroy the specified host instance.
+ */
+extern bool
+xen_host_destroy(xen_session *session, xen_host host);
+
+
+/**
  * Get all the host instances with the given label.
  */
 extern bool

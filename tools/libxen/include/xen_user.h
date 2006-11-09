@@ -167,6 +167,13 @@ xen_user_create(xen_session *session, xen_user *result, xen_user_record *record)
 
 
 /**
+ * Destroy the specified user instance.
+ */
+extern bool
+xen_user_destroy(xen_session *session, xen_user user);
+
+
+/**
  * Get the uuid field of the given user.
  */
 extern bool

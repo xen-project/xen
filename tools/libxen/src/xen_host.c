@@ -150,6 +150,20 @@ xen_host_create(xen_session *session, xen_host *result, xen_host_record *record)
 
 
 bool
+xen_host_destroy(xen_session *session, xen_host host)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host }
+        };
+
+    xen_call_(session, "host.destroy", param_values, 1, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
 xen_host_get_by_name_label(xen_session *session, struct xen_host_set **result, char *label)
 {
     abstract_value param_values[] =

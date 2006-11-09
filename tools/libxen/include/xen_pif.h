@@ -176,6 +176,13 @@ xen_pif_create(xen_session *session, xen_pif *result, xen_pif_record *record);
 
 
 /**
+ * Destroy the specified PIF instance.
+ */
+extern bool
+xen_pif_destroy(xen_session *session, xen_pif pif);
+
+
+/**
  * Get the uuid field of the given PIF.
  */
 extern bool

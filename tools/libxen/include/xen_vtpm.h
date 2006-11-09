@@ -172,6 +172,13 @@ xen_vtpm_create(xen_session *session, xen_vtpm *result, xen_vtpm_record *record)
 
 
 /**
+ * Destroy the specified VTPM instance.
+ */
+extern bool
+xen_vtpm_destroy(xen_session *session, xen_vtpm vtpm);
+
+
+/**
  * Get the uuid field of the given VTPM.
  */
 extern bool

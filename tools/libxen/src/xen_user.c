@@ -130,6 +130,20 @@ xen_user_create(xen_session *session, xen_user *result, xen_user_record *record)
 
 
 bool
+xen_user_destroy(xen_session *session, xen_user user)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = user }
+        };
+
+    xen_call_(session, "user.destroy", param_values, 1, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
 xen_user_get_short_name(xen_session *session, char **result, xen_user user)
 {
     abstract_value param_values[] =

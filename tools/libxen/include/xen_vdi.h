@@ -180,6 +180,13 @@ xen_vdi_create(xen_session *session, xen_vdi *result, xen_vdi_record *record);
 
 
 /**
+ * Destroy the specified VDI instance.
+ */
+extern bool
+xen_vdi_destroy(xen_session *session, xen_vdi vdi);
+
+
+/**
  * Get all the VDI instances with the given label.
  */
 extern bool

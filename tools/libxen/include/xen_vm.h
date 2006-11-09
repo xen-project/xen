@@ -217,6 +217,15 @@ xen_vm_create(xen_session *session, xen_vm *result, xen_vm_record *record);
 
 
 /**
+ * Destroy the specified VM.  The VM is completely removed from the
+ * system.  This function can only be called when the VM is in the Halted
+ * State.
+ */
+extern bool
+xen_vm_destroy(xen_session *session, xen_vm vm);
+
+
+/**
  * Get all the VM instances with the given label.
  */
 extern bool

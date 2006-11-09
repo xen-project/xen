@@ -174,6 +174,13 @@ xen_host_cpu_create(xen_session *session, xen_host_cpu *result, xen_host_cpu_rec
 
 
 /**
+ * Destroy the specified host_cpu instance.
+ */
+extern bool
+xen_host_cpu_destroy(xen_session *session, xen_host_cpu host_cpu);
+
+
+/**
  * Get the uuid field of the given host_cpu.
  */
 extern bool

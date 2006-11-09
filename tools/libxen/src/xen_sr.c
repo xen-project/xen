@@ -152,6 +152,20 @@ xen_sr_create(xen_session *session, xen_sr *result, xen_sr_record *record)
 
 
 bool
+xen_sr_destroy(xen_session *session, xen_sr sr)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = sr }
+        };
+
+    xen_call_(session, "SR.destroy", param_values, 1, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
 xen_sr_get_by_name_label(xen_session *session, struct xen_sr_set **result, char *label)
 {
     abstract_value param_values[] =

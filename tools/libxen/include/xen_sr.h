@@ -174,6 +174,13 @@ xen_sr_create(xen_session *session, xen_sr *result, xen_sr_record *record);
 
 
 /**
+ * Destroy the specified SR instance.
+ */
+extern bool
+xen_sr_destroy(xen_session *session, xen_sr sr);
+
+
+/**
  * Get all the SR instances with the given label.
  */
 extern bool

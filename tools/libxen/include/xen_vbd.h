@@ -177,6 +177,13 @@ xen_vbd_create(xen_session *session, xen_vbd *result, xen_vbd_record *record);
 
 
 /**
+ * Destroy the specified VBD instance.
+ */
+extern bool
+xen_vbd_destroy(xen_session *session, xen_vbd vbd);
+
+
+/**
  * Get the uuid field of the given VBD.
  */
 extern bool

@@ -173,6 +173,13 @@ xen_network_create(xen_session *session, xen_network *result, xen_network_record
 
 
 /**
+ * Destroy the specified network instance.
+ */
+extern bool
+xen_network_destroy(xen_session *session, xen_network network);
+
+
+/**
  * Get all the network instances with the given label.
  */
 extern bool

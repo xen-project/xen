@@ -157,6 +157,20 @@ xen_vif_create(xen_session *session, xen_vif *result, xen_vif_record *record)
 
 
 bool
+xen_vif_destroy(xen_session *session, xen_vif vif)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vif }
+        };
+
+    xen_call_(session, "VIF.destroy", param_values, 1, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
 xen_vif_get_name(xen_session *session, char **result, xen_vif vif)
 {
     abstract_value param_values[] =

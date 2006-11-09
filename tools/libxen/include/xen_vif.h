@@ -177,6 +177,13 @@ xen_vif_create(xen_session *session, xen_vif *result, xen_vif_record *record);
 
 
 /**
+ * Destroy the specified VIF instance.
+ */
+extern bool
+xen_vif_destroy(xen_session *session, xen_vif vif);
+
+
+/**
  * Get the uuid field of the given VIF.
  */
 extern bool
