@@ -289,6 +289,10 @@ xlvbd_alloc_gendisk(int minor, blkif_sector_t capacity, int vdevice,
 	}
 
 	info->rq = gd->queue;
+	info->gd = gd;
+
+	if (info->feature_barrier)
+		xlvbd_barrier(info);
 
 	if (vdisk_info & VDISK_READONLY)
 		set_disk_ro(gd, 1);
@@ -298,8 +302,6 @@ xlvbd_alloc_gendisk(int minor, blkif_sector_t capacity, int vdevice,
 
 	if (vdisk_info & VDISK_CDROM)
 		gd->flags |= GENHD_FL_CD;
-
-	info->gd = gd;
 
 	return 0;
 
@@ -347,4 +349,18 @@ xlvbd_del(struct blkfront_info *info)
 	BUG_ON(info->rq == NULL);
 	blk_cleanup_queue(info->rq);
 	info->rq = NULL;
+}
+
+int
+xlvbd_barrier(struct blkfront_info *info)
+{
+	int err;
+
+	err = blk_queue_ordered(info->rq,
+		info->feature_barrier ? QUEUE_ORDERED_DRAIN : QUEUE_ORDERED_NONE, NULL);
+	if (err)
+		return err;
+	printk("blkfront: %s: barriers %s\n",
+	       info->gd->disk_name, info->feature_barrier ? "enabled" : "disabled");
+	return 0;
 }

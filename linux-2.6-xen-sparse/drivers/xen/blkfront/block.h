@@ -126,6 +126,7 @@ struct blkfront_info
 	struct gnttab_free_callback callback;
 	struct blk_shadow shadow[BLK_RING_SIZE];
 	unsigned long shadow_free;
+	int feature_barrier;
 
 	/**
 	 * The number of people holding this device open.  We won't allow a
@@ -152,5 +153,6 @@ extern void do_blkif_request (request_queue_t *rq);
 int xlvbd_add(blkif_sector_t capacity, int device,
 	      u16 vdisk_info, u16 sector_size, struct blkfront_info *info);
 void xlvbd_del(struct blkfront_info *info);
+int xlvbd_barrier(struct blkfront_info *info);
 
 #endif /* __XEN_DRIVERS_BLOCK_H__ */

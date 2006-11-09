@@ -20,7 +20,6 @@
 #include <stdarg.h>
 #include <linux/module.h>
 #include <linux/kthread.h>
-#include <xen/xenbus.h>
 #include "common.h"
 
 #undef DPRINTK
@@ -91,11 +90,13 @@ static void update_blkif_status(blkif_t *blkif)
 VBD_SHOW(oo_req, "%d\n", be->blkif->st_oo_req);
 VBD_SHOW(rd_req, "%d\n", be->blkif->st_rd_req);
 VBD_SHOW(wr_req, "%d\n", be->blkif->st_wr_req);
+VBD_SHOW(br_req, "%d\n", be->blkif->st_br_req);
 
 static struct attribute *vbdstat_attrs[] = {
 	&dev_attr_oo_req.attr,
 	&dev_attr_rd_req.attr,
 	&dev_attr_wr_req.attr,
+	&dev_attr_br_req.attr,
 	NULL
 };
 
@@ -165,6 +166,19 @@ static int blkback_remove(struct xenbus_device *dev)
 	return 0;
 }
 
+int blkback_barrier(struct xenbus_transaction xbt,
+		    struct backend_info *be, int state)
+{
+	struct xenbus_device *dev = be->dev;
+	int err;
+
+	err = xenbus_printf(xbt, dev->nodename, "feature-barrier",
+			    "%d", state);
+	if (err)
+		xenbus_dev_fatal(dev, err, "writing feature-barrier");
+
+	return err;
+}
 
 /**
  * Entry point to this code when a new device is created.  Allocate the basic
@@ -366,11 +380,14 @@ static void connect(struct backend_info *be)
 	/* Supply the information about the device the frontend needs */
 again:
 	err = xenbus_transaction_start(&xbt);
-
 	if (err) {
 		xenbus_dev_fatal(dev, err, "starting transaction");
 		return;
 	}
+
+	err = blkback_barrier(xbt, be, 1);
+	if (err)
+		goto abort;
 
 	err = xenbus_printf(xbt, dev->nodename, "sectors", "%lu",
 			    vbd_size(&be->blkif->vbd));
