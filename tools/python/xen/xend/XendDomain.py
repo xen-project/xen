@@ -57,10 +57,10 @@ DOM0_ID   = 0
 class XendDomain:
     """Index of all domains. Singleton.
 
-    @ivar domains: map of domains indexed by UUID Strings
+    @ivar domains: map of domains indexed by domid
     @type domains: dict of XendDomainInfo
-    @ivar managed_domains: uuid of domains that are managed by Xend
-    @type managed_domains: list of (uuids, dom_name)
+    @ivar managed_domains: domains that are not running and managed by Xend
+    @type managed_domains: dict of XendDomainInfo indexed by uuid
     @ivar domains_lock: lock that must be held when manipulating self.domains
     @type domains_lock: threaading.RLock
     @ivar _allow_new_domains: Flag to set that allows creating of new domains.
@@ -484,12 +484,27 @@ class XendDomain:
             if match:
                 return match[0]
 
+            match = [dom for dom in self.managed_domains.values() \
+                     if dom.getName() == domid]
+            if match:
+                return match[0]
+
             # lookup by id
             try:
                 if int(domid) in self.domains:
                     return self.domains[int(domid)]
             except ValueError:
                 pass
+
+            # lookup by uuid for running domains
+            match = [dom for dom in self.domains.values() \
+                     if dom.get_uuid() == domid]
+            if match:
+                return match[0]
+
+            # lookup by uuid for inactive managed domains 
+            if domid in self.managed_domains:
+                return self.managed_domains[domid]
 
             return None
         finally:
