@@ -168,6 +168,8 @@ extern int smp_num_siblings;
 
 #ifndef __ASSEMBLY__
 #include "asm/types.h"	// for u64
+#include "linux/linkage.h"	// for asmlinkage which is used by
+                                // xen/include/acpi/acpixf.h
 #endif
 
 // warning: unless search_extable is declared, the return value gets
