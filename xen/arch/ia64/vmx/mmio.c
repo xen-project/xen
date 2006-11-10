@@ -380,6 +380,24 @@ memread_p(VCPU *vcpu, u64 *src, u64 *dest, size_t s)
 }
 */
 
+/*
+ * To inject INIT to guest, we must set the PAL_INIT entry 
+ * and set psr to switch to physical mode
+ */
+#define PAL_INIT_ENTRY 0x80000000ffffffa0
+#define PSR_SET_BITS (IA64_PSR_DT | IA64_PSR_IT | IA64_PSR_RT |	\
+                      IA64_PSR_IC | IA64_PSR_RI)
+
+static void vmx_inject_guest_pal_init(VCPU *vcpu)
+{
+    REGS *regs = vcpu_regs(vcpu);
+    uint64_t psr = vmx_vcpu_get_psr(vcpu);
+
+    regs->cr_iip = PAL_INIT_ENTRY;
+
+    psr = psr & (~PSR_SET_BITS);
+    vmx_vcpu_set_psr(vcpu,psr);
+}
 
 /*
  * Deliver IPI message. (Only U-VP is supported now)
@@ -403,8 +421,7 @@ static void deliver_ipi (VCPU *vcpu, uint64_t dm, uint64_t vector)
         vmx_vcpu_pend_interrupt (vcpu, 2);
         break;
     case 5:     // INIT
-        // TODO -- inject guest INIT
-        panic_domain (NULL, "Inject guest INIT!\n");
+        vmx_inject_guest_pal_init(vcpu);
         break;
     case 7:     // ExtINT
         vmx_vcpu_pend_interrupt (vcpu, 0);
