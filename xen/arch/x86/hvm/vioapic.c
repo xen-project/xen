@@ -35,6 +35,7 @@
 #include <public/hvm/ioreq.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/vpic.h>
+#include <asm/hvm/vlapic.h>
 #include <asm/hvm/support.h>
 #include <asm/current.h>
 #include <asm/event.h>
@@ -284,42 +285,6 @@ static int ioapic_inj_irq(struct vioapic *vioapic,
 
     return result;
 }
-
-#ifndef __ia64__
-static int vlapic_match_logical_addr(struct vlapic *vlapic, uint8_t dest)
-{
-    int result = 0;
-    uint32_t logical_dest;
-
-    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "vlapic_match_logical_addr "
-                "vcpu=%d vlapic_id=%x dest=%x\n",
-                vlapic_vcpu(vlapic)->vcpu_id, VLAPIC_ID(vlapic), dest);
-
-    logical_dest = vlapic_get_reg(vlapic, APIC_LDR);
-
-    switch ( vlapic_get_reg(vlapic, APIC_DFR) )
-    {
-    case APIC_DFR_FLAT:
-        result = ((dest & GET_APIC_LOGICAL_ID(logical_dest)) != 0);
-        break;
-    case APIC_DFR_CLUSTER:
-        /* Should we support flat cluster mode ?*/
-        if ( (GET_APIC_LOGICAL_ID(logical_dest) >> 4
-              == ((dest >> 0x4) & 0xf)) &&
-             (logical_dest & (dest  & 0xf)) )
-            result = 1;
-        break;
-    default:
-        gdprintk(XENLOG_WARNING, "error DFR value for lapic of vcpu %d\n",
-                 vlapic_vcpu(vlapic)->vcpu_id);
-        break;
-    }
-
-    return result;
-}
-#else
-extern int vlapic_match_logical_addr(struct vlapic *vlapic, uint16_t dest);
-#endif
 
 static uint32_t ioapic_get_delivery_bitmask(struct vioapic *vioapic,
                                             uint16_t dest,
