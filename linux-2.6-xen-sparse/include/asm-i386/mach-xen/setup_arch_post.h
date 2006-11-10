@@ -13,7 +13,6 @@ static char * __init machine_specific_memory_setup(void)
 {
 	int rc;
 	struct xen_memory_map memmap;
-	unsigned long arg = DOMID_SELF;
 	/*
 	 * This is rather large for a stack variable but this early in
 	 * the boot process we know we have plenty slack space.
@@ -24,14 +23,9 @@ static char * __init machine_specific_memory_setup(void)
 	set_xen_guest_handle(memmap.buffer, map);
 
 	rc = HYPERVISOR_memory_op(XENMEM_memory_map, &memmap);
-	if (rc == -ENOSYS) {
+	if ( rc == -ENOSYS ) {
 		memmap.nr_entries = 1;
 		map[0].addr = 0ULL;
-		rc = HYPERVISOR_memory_op(XENMEM_maximum_reservation, &arg);
-		if (rc < 0)
-			map[0].size = PFN_PHYS(xen_start_info->nr_pages);
-		else
-			map[0].size = PFN_PHYS(rc);
 		map[0].size = PFN_PHYS(xen_start_info->nr_pages);
 		/* 8MB slack (to balance backend allocations). */
 		map[0].size += 8ULL << 20;

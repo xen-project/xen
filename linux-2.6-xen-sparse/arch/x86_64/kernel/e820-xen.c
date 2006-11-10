@@ -583,20 +583,15 @@ void __init setup_memory_region(void)
 	 * the boot process we know we have plenty slack space.
 	 */
 	struct e820entry map[E820MAX];
-	unsigned long arg = DOMID_SELF;
 
 	memmap.nr_entries = E820MAX;
 	set_xen_guest_handle(memmap.buffer, map);
 
 	rc = HYPERVISOR_memory_op(XENMEM_memory_map, &memmap);
-	if (rc == -ENOSYS) {
+	if ( rc == -ENOSYS ) {
 		memmap.nr_entries = 1;
 		map[0].addr = 0ULL;
-		rc = HYPERVISOR_memory_op(XENMEM_maximum_reservation, &arg);
-		if (rc < 0)
-			map[0].size = xen_start_info->nr_pages << PAGE_SHIFT;
-		else
-			map[0].size = rc << PAGE_SHIFT;
+		map[0].size = xen_start_info->nr_pages << PAGE_SHIFT;
 		/* 8MB slack (to balance backend allocations). */
 		map[0].size += 8 << 20;
 		map[0].type = E820_RAM;
