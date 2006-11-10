@@ -496,18 +496,10 @@ static int setup_guest(int xc_handle,
     if ( rc != 0 )
         goto error_out;
 
-    dsi.v_start = round_pgdown(dsi.v_start);
-    (load_funcs.loadimage)(image, image_size, xc_handle, dom, page_array,
-                           &dsi);
-
-    vinitrd_start = round_pgup(dsi.v_end);
-    if ( load_initrd(xc_handle, dom, initrd,
-                     vinitrd_start - dsi.v_start, page_array) )
-        goto error_out;
-
-    vinitrd_end    = vinitrd_start + initrd->len;
-    v_end          = round_pgup(vinitrd_end);
+    dsi.v_start    = round_pgdown(dsi.v_start);
+    vinitrd_start  = round_pgup(dsi.v_end);
     start_info_mpa = (nr_pages - 3) << PAGE_SHIFT;
+    *pvke          = dsi.v_kernentry;
 
     /* Build firmware.  */
     memset(&domctl.u.arch_setup, 0, sizeof(domctl.u.arch_setup));
@@ -519,19 +511,42 @@ static int setup_guest(int xc_handle,
     if ( xc_domctl(xc_handle, &domctl) )
         goto error_out;
 
-    start_page = dsi.v_start >> PAGE_SHIFT;
-    pgnr = (v_end - dsi.v_start) >> PAGE_SHIFT;
-    if ( (page_array = malloc(pgnr * sizeof(xen_pfn_t))) == NULL )
+    if ( (page_array = malloc(nr_pages * sizeof(xen_pfn_t))) == NULL )
     {
         PERROR("Could not allocate memory");
         goto error_out;
     }
 
+    start_page = dsi.v_start >> PAGE_SHIFT;
     if ( xc_ia64_get_pfn_list(xc_handle, dom, page_array,
-                              start_page, pgnr) != pgnr )
+                              start_page, nr_pages) != nr_pages )
     {
         PERROR("Could not get the page frame list");
         goto error_out;
+    }
+
+    /* in order to get initrd->len, we need to load initrd image at first */
+    if ( load_initrd(xc_handle, dom, initrd,
+                     vinitrd_start - dsi.v_start, page_array) )
+        goto error_out;
+
+    vinitrd_end    = vinitrd_start + initrd->len;
+    v_end          = round_pgup(vinitrd_end);
+    pgnr = (v_end - dsi.v_start) >> PAGE_SHIFT;
+    if ( pgnr > nr_pages )
+    {
+        free(page_array);
+        if ( (page_array = malloc(pgnr * sizeof(xen_pfn_t))) == NULL )
+        {
+            PERROR("Could not reallocate memory");
+            goto error_out;
+        }
+        if ( xc_ia64_get_pfn_list(xc_handle, dom, page_array,
+                                  start_page, pgnr) != pgnr )
+        {
+                PERROR("Could not get the page frame list");
+                goto error_out;
+        }
     }
 
     IPRINTF("VIRTUAL MEMORY ARRANGEMENT:\n"
@@ -543,7 +558,8 @@ static int setup_guest(int xc_handle,
            _p(dsi.v_start),     _p(v_end));
     IPRINTF(" ENTRY ADDRESS: %p\n", _p(dsi.v_kernentry));
 
-    *pvke = dsi.v_kernentry;
+    (load_funcs.loadimage)(image, image_size, xc_handle, dom, page_array,
+                           &dsi);
 
     /* Now need to retrieve machine pfn for system pages:
      *  start_info/store/console
