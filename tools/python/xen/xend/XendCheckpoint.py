@@ -19,6 +19,7 @@ from xen.xend import balloon, sxp
 from xen.xend.XendError import XendError
 from xen.xend.XendLogging import log
 from xen.xend.XendConstants import *
+from xen.xend.XendConfig import XendConfig
 
 SIGNATURE = "LinuxGuestRecord"
 XC_SAVE = "xc_save"
