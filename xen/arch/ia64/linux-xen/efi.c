@@ -216,6 +216,7 @@ STUB_SET_VARIABLE(virt, id)
 STUB_GET_NEXT_HIGH_MONO_COUNT(virt, id)
 STUB_RESET_SYSTEM(virt, id)
 
+#ifndef XEN
 void
 efi_gettimeofday (struct timespec *ts)
 {
@@ -228,6 +229,7 @@ efi_gettimeofday (struct timespec *ts)
 	ts->tv_sec = mktime(tm.year, tm.month, tm.day, tm.hour, tm.minute, tm.second);
 	ts->tv_nsec = tm.nanosecond;
 }
+#endif
 
 static int
 is_available_memory (efi_memory_desc_t *md)
