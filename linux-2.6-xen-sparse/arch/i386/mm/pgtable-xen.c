@@ -186,8 +186,15 @@ void set_pmd_pfn(unsigned long vaddr, unsigned long pfn, pgprot_t flags)
 }
 
 static int nr_fixmaps = 0;
+unsigned long hypervisor_virt_start = HYPERVISOR_VIRT_START;
 unsigned long __FIXADDR_TOP = (HYPERVISOR_VIRT_START - 2 * PAGE_SIZE);
 EXPORT_SYMBOL(__FIXADDR_TOP);
+
+void __init set_fixaddr_top()
+{
+	BUG_ON(nr_fixmaps > 0);
+	__FIXADDR_TOP = hypervisor_virt_start - 2 * PAGE_SIZE;
+}
 
 void __set_fixmap (enum fixed_addresses idx, maddr_t phys, pgprot_t flags)
 {
@@ -209,12 +216,6 @@ void __set_fixmap (enum fixed_addresses idx, maddr_t phys, pgprot_t flags)
 		break;
 	}
 	nr_fixmaps++;
-}
-
-void set_fixaddr_top(unsigned long top)
-{
-	BUG_ON(nr_fixmaps > 0);
-	__FIXADDR_TOP = top - PAGE_SIZE;
 }
 
 pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)

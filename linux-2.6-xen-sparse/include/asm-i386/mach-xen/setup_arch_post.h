@@ -92,8 +92,10 @@ static void __init machine_specific_arch_setup(void)
 #endif
 
 	if (HYPERVISOR_xen_version(XENVER_platform_parameters,
-				   &pp) == 0)
-		set_fixaddr_top(pp.virt_start - PAGE_SIZE);
+				   &pp) == 0) {
+		hypervisor_virt_start = pp.virt_start;
+		set_fixaddr_top();
+	}
 
 	machine_to_phys_mapping = (unsigned long *)MACH2PHYS_VIRT_START;
 	machine_to_phys_nr_ents = MACH2PHYS_NR_ENTRIES;

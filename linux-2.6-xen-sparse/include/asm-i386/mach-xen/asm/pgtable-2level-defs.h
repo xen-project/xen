@@ -9,7 +9,6 @@
 
 #define PGDIR_SHIFT	22
 #define PTRS_PER_PGD	1024
-#define PTRS_PER_PGD_NO_HV	(HYPERVISOR_VIRT_START >> PGDIR_SHIFT)
 
 /*
  * the i386 is two-level, so we don't really have any

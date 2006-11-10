@@ -138,6 +138,15 @@
  */
 #define XEN_ELFNOTE_BSD_SYMTAB    11
 
+/*
+ * The lowest address the hypervisor hole can begin at (numeric).
+ *
+ * This must not be set higher than HYPERVISOR_VIRT_START. Its presence
+ * also indicates to the hypervisor that the kernel can deal with the
+ * hole starting at a higher address.
+ */
+#define XEN_ELFNOTE_HV_START_LOW  12
+
 #endif /* __XEN_PUBLIC_ELFNOTE_H__ */
 
 /*
