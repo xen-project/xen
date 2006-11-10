@@ -134,7 +134,7 @@ PERFCOUNTER_CPU(steal_page_refcount,            "steal_page_refcount")
 PERFCOUNTER_CPU(steal_page,                     "steal_page")
 PERFCOUNTER_CPU(guest_physmap_add_page,         "guest_physmap_add_page")
 PERFCOUNTER_CPU(guest_physmap_remove_page,      "guest_physmap_remove_page")
-PERFCOUNTER_CPU(domain_page_flush,              "domain_page_flush")
+PERFCOUNTER_CPU(domain_page_flush_and_put,      "domain_page_flush_and_put")
 
 // dom0vp
 PERFCOUNTER_CPU(dom0vp_phystomach,              "dom0vp_phystomach")
