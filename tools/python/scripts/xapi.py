@@ -16,11 +16,15 @@
 # Copyright (C) 2006 XenSource Ltd.
 #============================================================================
 
+import sys
+sys.path.append('/usr/lib/python')
+
 from xen.util.xmlrpclib2 import ServerProxy
 from optparse import *
 from pprint import pprint
 from types import DictType
 from getpass import getpass
+
 
 MB = 1024 * 1024
 
@@ -34,6 +38,7 @@ VDI_LIST_FORMAT = '%(name_label)-18s %(uuid)-36s %(virtual_size)-8s '\
 
 COMMANDS = {
     'host-info': ('', 'Get Xen Host Info'),
+    'host-set-name': ('', 'Set host name'),
     'sr-list':   ('', 'List all SRs'),
     'vbd-create': ('<domname> <pycfg> [opts]',
                    'Create VBD attached to domname'),
@@ -51,7 +56,7 @@ COMMANDS = {
     'vm-name':   ('<uuid>', 'Name of UUID.'),
     'vm-shutdown': ('<name> [opts]', 'Shutdown VM with name'),
     'vm-start':  ('<name>', 'Start VM with name'),
-    'vm-uuid':   ('<name>', 'UUID of a domain by name.'),    
+    'vm-uuid':   ('<name>', 'UUID of a domain by name.'),
 }
 
 OPTIONS = {
@@ -174,6 +179,17 @@ def xapi_host_info(*args):
         print HOST_INFO_FORMAT % ('CPUs', len(hostinfo['host_CPUs']))
         print HOST_INFO_FORMAT % ('VMs', len(hostinfo['resident_VMs']))
         print HOST_INFO_FORMAT % ('UUID', host)        
+
+def xapi_host_set_name(*args):
+    if len(args) < 1:
+        raise OptionError("No hostname specified")
+    
+    server, session = _connect()
+    hosts = execute(server.host.get_all, session)
+    if len(hosts) > 0:
+        execute(server.host.set_name_label, session, hosts[0], args[0])
+        print 'Hostname: %s' % execute(server.host.get_name_label, session,
+                                       hosts[0])
 
 def xapi_vm_uuid(*args):
     if len(args) < 1:
