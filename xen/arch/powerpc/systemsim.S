@@ -20,11 +20,11 @@
 #include <asm/config.h>
 #include <asm/processor.h>
 
-_GLOBAL(mambo_callthru)
+_GLOBAL(systemsim_callthru)
 	.long 0x000eaeb0
 	blr
 
-_GLOBAL(mambo_write)
+_GLOBAL(systemsim_write)
 	mr	r5, r4
 	mr	r4, r3
 	li	r3, 0		# Write console code
@@ -32,31 +32,31 @@ _GLOBAL(mambo_write)
 	li	r6, 0
 	/* need to fix return value */
 	mflr	r7
-	bl	_ENTRY(mambo_callthru)
+	bl	_ENTRY(systemsim_callthru)
 	mtlr	r7
 	mr	r3, r5
 	blr
 
-_GLOBAL(mambo_memset)
+_GLOBAL(systemsim_memset)
 	mr	r6, r5
 	mr	r5, r4
 	mr	r4, r3
 	li	r3, 0x47	# memset
 	/* need to fix return value */
 	mflr	r7
-	bl	_ENTRY(mambo_callthru)
+	bl	_ENTRY(systemsim_callthru)
 	mtlr	r7
 	mr	r3, r4
 	blr
 
-_GLOBAL(mambo_memcpy)
+_GLOBAL(systemsim_memcpy)
 	mr	r6, r5
 	mr	r5, r4
 	mr	r4, r3
 	li	r3, 0x45 # memcpy
 	/* need to fix return value */
 	mflr	r7
-	bl	_ENTRY(mambo_callthru)
+	bl	_ENTRY(systemsim_callthru)
 	mtlr	r7
 	mr	r3, r4
 	blr

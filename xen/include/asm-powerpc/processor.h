@@ -276,13 +276,13 @@ static inline unsigned mfdsisr(void)
     return val;
 }
 
-#ifdef CONFIG_MAMBO
-static inline int on_mambo(void)
+#ifdef CONFIG_SYSTEMSIM
+static inline int on_systemsim(void)
 {
-    return !!(mfmsr() & MSR_MAMBO);
+    return !!(mfmsr() & MSR_SYSTEMSIM);
 }
-#else /* CONFIG_MAMBO */
-static inline int on_mambo(void) { return 0; }
+#else /* CONFIG_SYSTEMSIM */
+static inline int on_systemsim(void) { return 0; }
 #endif
 
 #endif /* __ASSEMBLY__ */

@@ -27,6 +27,7 @@
 #include <xen/perfc.h>
 #include <asm/init.h>
 #include <asm/page.h>
+#include <asm/string.h>
 
 #ifdef VERBOSE
 #define MEM_LOG(_f, _a...)                                  \
@@ -276,9 +277,8 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
 extern void copy_page(void *dp, void *sp)
 {
-    if (on_mambo()) {
-        extern void *mambo_memcpy(void *,const void *,__kernel_size_t);
-        mambo_memcpy(dp, sp, PAGE_SIZE);
+    if (on_systemsim()) {
+        systemsim_memcpy(dp, sp, PAGE_SIZE);
     } else {
         memcpy(dp, sp, PAGE_SIZE);
     }

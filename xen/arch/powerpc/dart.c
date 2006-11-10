@@ -189,10 +189,8 @@ static int find_dart(struct dart_info *di)
     ofdn_t n;
     char compat[128];
 
-
-    if (on_mambo()) {
-        /* mambo has no dart */
-        DBG("%s: Mambo does not support a dart\n", __func__);
+    if (on_systemsim()) {
+        DBG("%s: systemsim does not support a dart\n", __func__);
         return -1;
     }
 
