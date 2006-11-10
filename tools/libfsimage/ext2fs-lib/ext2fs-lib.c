@@ -24,6 +24,7 @@
 #include <fsimage_plugin.h>
 #include <ext2fs/ext2fs.h>
 #include <errno.h>
+#include <inttypes.h>
 
 static int
 ext2lib_mount(fsi_t *fsi, const char *name)
@@ -34,7 +35,7 @@ ext2lib_mount(fsi_t *fsi, const char *name)
 	uint64_t offset = fsip_fs_offset(fsi);
 
 	if (offset)
-		snprintf(opts, 29, "offset=%lld", offset);
+		snprintf(opts, 29, "offset=%" PRId64, offset);
 
 	fs = malloc(sizeof (*fs));
 	if (fs == NULL)
