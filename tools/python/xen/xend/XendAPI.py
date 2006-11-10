@@ -27,20 +27,36 @@ from xen.xend.XendLogging import log
 from xen.xend.XendAPIConstants import *
 from xen.util.xmlrpclib2 import stringify
 
+# ------------------------------------------
+# Utility Methods for Xen API Implementation
+# ------------------------------------------
+
 def xen_api_success(value):
+    """Wraps a return value in XenAPI format."""
     return {"Status": "Success", "Value": stringify(value)}
 
 def xen_api_success_void():
     """Return success, but caller expects no return value."""
     return xen_api_success("")
+
 def xen_api_error(error):
+    """Wraps an error value in XenAPI format."""
     return {"Status": "Error", "ErrorDescription": error}
+
 def xen_api_todo():
     """Temporary method to make sure we track down all the TODOs"""
     return {"Status": "Error", "ErrorDescription": XEND_ERROR_TODO}
 
+# ---------------------------------------------------
+# Python Method Decorators for input value validation
+# ---------------------------------------------------
+
 def trace(func, api_name = ''):
-    """Decorator to trace XMLRPC Xen API methods."""
+    """Decorator to trace XMLRPC Xen API methods.
+
+    @param func: function with any parameters
+    @param api_name: name of the api call for debugging.
+    """
     if hasattr(func, 'api'):
         api_name = func.api
     def trace_func(self, *args, **kwargs):
@@ -225,6 +241,10 @@ def valid_sr(func):
         
     return check_sr_ref
 
+# -----------------------------
+# Bridge to Legacy XM API calls
+# -----------------------------
+
 def do_vm_func(fn_name, vm_ref, *args):
     """Helper wrapper func to abstract away from repeative code.
 
@@ -239,6 +259,7 @@ def do_vm_func(fn_name, vm_ref, *args):
     fn = getattr(xendom, fn_name)
     return xen_api_success(xendom.do_legacy_api_with_uuid(
         fn, vm_ref, *args))
+
 
 class XendAPI:
     """Implementation of the Xen-API in Xend. Expects to be
@@ -274,7 +295,8 @@ class XendAPI:
         # Cheat methods
         # -------------
         # Methods that have a trivial implementation for all classes.
-        # 1. get_by_uuid == getting by ref, so just return uuid.
+        # 1. get_by_uuid == getting by ref, so just return uuid for
+        #    all get_by_uuid() methods.
         
         for cls in classes.keys():
             get_by_uuid = '%s_get_by_uuid' % cls.lower()
@@ -424,12 +446,14 @@ class XendAPI:
     # attributes
     def host_get_name_label(self, session, host_ref):
         return xen_api_success(XendNode.instance().name)
-    def host_set_name_label(self, session, host_ref):
-        return xen_api_success(XendNode.instance().name)
+    def host_set_name_label(self, session, host_ref, new_name):
+        XendNode.instance().set_name(new_name)
+        return xen_api_success_void()
     def host_get_name_description(self, session, host_ref):
-        return xen_api_success(XendNode.instance().description)    
-    def host_set_name_description(self, session, host_ref):
         return xen_api_success(XendNode.instance().description)
+    def host_set_name_description(self, session, host_ref):
+        XendNode.instance().set_description(new_description)
+        return xen_api_success_void()
     def host_get_software_version(self, session, host_ref):
         return xen_api_success(XendNode.instance().xen_version())
     def host_get_resident_VMs(self, session, host_ref):

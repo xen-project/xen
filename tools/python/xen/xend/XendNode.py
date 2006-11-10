@@ -94,6 +94,12 @@ class XendNode:
     def set_name(self, new_name):
         self.name = new_name
 
+    def get_description(self):
+        return self.desc
+
+    def set_description(self, new_desc):
+        self.desc = new_desc
+
     #
     # Host CPU Functions
     #
