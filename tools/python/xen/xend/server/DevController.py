@@ -455,7 +455,9 @@ class DevController:
 
 
     def backendPath(self, backdom, devid):
-        """@param backdom [XendDomainInfo] The backend domain info."""
+        """Construct backend path given the backend domain and device id.
+
+        @param backdom [XendDomainInfo] The backend domain info."""
 
         return "%s/backend/%s/%s/%d" % (backdom.getDomainPath(),
                                         self.deviceClass,
@@ -470,10 +472,10 @@ class DevController:
         return "%s/device/%s" % (self.vm.getDomainPath(), self.deviceClass)
 
     def backendRoot(self):
-        import xen.xend.XendDomain
+        """Construct backend root path assuming backend is domain 0."""
+        from xen.xend.XendDomain import DOM0_ID
         from xen.xend.xenstore.xsutil import GetDomainPath
-        backdom = xen.xend.XendDomain.DOM0_ID
-        return "%s/backend/%s/%s" % (GetDomainPath(backdom),
+        return "%s/backend/%s/%s" % (GetDomainPath(DOM0_ID),
                                      self.deviceClass, self.vm.getDomid())
 
     def frontendMiscPath(self):
