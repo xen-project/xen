@@ -1717,7 +1717,7 @@ domain_page_flush_and_put(struct domain* d, unsigned long mpaddr,
          * Probably the domain did only DMA.
          */
         /* do nothing */
-        put_page(page)
+        put_page(page);
         break;
     case TLB_TRACK_FOUND:
         // dprintk(XENLOG_WARNING, "%s TLB_TRACK_FOUND\n", __func__);
@@ -1728,7 +1728,7 @@ domain_page_flush_and_put(struct domain* d, unsigned long mpaddr,
          */
         domain_flush_vtlb_track_entry(d, entry);
         tlb_track_free_entry(d->arch.tlb_track, entry);
-        put_page(page)
+        put_page(page);
         break;
     case TLB_TRACK_MANY:
         gdprintk(XENLOG_INFO, "%s TLB_TRACK_MANY\n", __func__);
@@ -1740,7 +1740,7 @@ domain_page_flush_and_put(struct domain* d, unsigned long mpaddr,
          * full vTLB flush is necessary.
          */
         domain_flush_vtlb_all();
-        put_page(page)
+        put_page(page);
         break;
     case TLB_TRACK_AGAIN:
         gdprintk(XENLOG_ERR, "%s TLB_TRACK_AGAIN\n", __func__);
