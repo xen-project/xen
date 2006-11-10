@@ -119,7 +119,7 @@ ssize_t
 ext2lib_pread(fsi_file_t *file, void *buf, size_t nbytes, uint64_t off)
 {
 	ext2_file_t *f = fsip_file_data(file);
-	uint64_t tmpoff;
+	__u64 tmpoff;
 	unsigned int n;
 	int err;
 
