@@ -95,6 +95,7 @@
 
 #define VMX_FAULT(n)    \
 vmx_fault_##n:;          \
+    mov r19=n;;          \
     br.sptk.many dispatch_to_fault_handler;         \
     ;;                  \
 
@@ -106,7 +107,7 @@ vmx_fault_##n:;          \
     ;;      \
     tbit.z p6,p7=r29,IA64_PSR_VM_BIT;       \
 (p7)br.sptk.many vmx_dispatch_reflection;        \
-    VMX_FAULT(n);            \
+    br.sptk.many dispatch_to_fault_handler;      \
 
 
 GLOBAL_ENTRY(vmx_panic)
