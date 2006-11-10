@@ -176,8 +176,6 @@ int hvm_vcpu_initialise(struct vcpu *v)
         get_vio(v->domain, v->vcpu_id)->vp_eport =
             v->arch.hvm_vcpu.xen_port;
 
-    init_timer(&v->arch.hvm_vcpu.hlt_timer, hlt_timer_fn, v, v->processor);
-
     if ( v->vcpu_id != 0 )
         return 0;
 
@@ -198,7 +196,6 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
 void hvm_vcpu_destroy(struct vcpu *v)
 {
-    kill_timer(&v->arch.hvm_vcpu.hlt_timer);
     vlapic_destroy(v);
     hvm_funcs.vcpu_destroy(v);
 
@@ -272,10 +269,6 @@ static void hvm_vcpu_down(void)
 
 void hvm_hlt(unsigned long rflags)
 {
-    struct vcpu *v = current;
-    struct periodic_time *pt = &v->domain->arch.hvm_domain.pl_time.periodic_tm;
-    s_time_t next_pt = -1, next_wakeup;
-
     /*
      * If we halt with interrupts disabled, that's a pretty sure sign that we
      * want to shut down. In a real processor, NMIs are the only way to break
@@ -284,13 +277,6 @@ void hvm_hlt(unsigned long rflags)
     if ( unlikely(!(rflags & X86_EFLAGS_IF)) )
         return hvm_vcpu_down();
 
-    if ( !v->vcpu_id )
-        next_pt = get_scheduled(v, pt->irq, pt);
-    next_wakeup = get_apictime_scheduled(v);
-    if ( (next_pt != -1 && next_pt < next_wakeup) || next_wakeup == -1 )
-        next_wakeup = next_pt;
-    if ( next_wakeup != - 1 ) 
-        set_timer(&current->arch.hvm_vcpu.hlt_timer, next_wakeup);
     do_sched_op_compat(SCHEDOP_block, 0);
 }
 

@@ -44,9 +44,6 @@ struct hvm_vcpu {
     /* Flags */
     int                 flag_dr_dirty;
 
-    /* hlt ins emulation wakeup timer */
-    struct timer        hlt_timer;
-
     unsigned long       hvm_trace_values[5];
 
     union {

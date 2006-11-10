@@ -835,6 +835,8 @@ void vlapic_timer_fn(void *data)
     else
         vlapic_set_reg(vlapic, APIC_TMCCT, 0);
 
+    vcpu_kick(vlapic_vcpu(vlapic));
+
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC_TIMER,
                 "now 0x%016"PRIx64", expire @ 0x%016"PRIx64", "
                 "timer initial count 0x%x, timer current count 0x%x.",

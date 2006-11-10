@@ -368,11 +368,13 @@ static inline void vmx_restore_dr(struct vcpu *v)
 static void vmx_freeze_time(struct vcpu *v)
 {
     struct periodic_time *pt=&v->domain->arch.hvm_domain.pl_time.periodic_tm;
-    
-    if ( pt->enabled && pt->first_injected && v->vcpu_id == pt->bind_vcpu
+
+    if ( pt->enabled && pt->first_injected
+            && (v->vcpu_id == pt->bind_vcpu)
             && !v->arch.hvm_vcpu.guest_time ) {
         v->arch.hvm_vcpu.guest_time = hvm_get_guest_time(v);
-        stop_timer(&(pt->timer));
+        if ( !test_bit(_VCPUF_blocked, &v->vcpu_flags) )
+            stop_timer(&pt->timer);
     }
 }
 
@@ -407,7 +409,6 @@ void vmx_migrate_timers(struct vcpu *v)
     if ( pt->enabled )
     {
         migrate_timer(&pt->timer, v->processor);
-        migrate_timer(&v->arch.hvm_vcpu.hlt_timer, v->processor);
     }
     migrate_timer(&vcpu_vlapic(v)->vlapic_timer, v->processor);
     migrate_timer(&vrtc->second_timer, v->processor);

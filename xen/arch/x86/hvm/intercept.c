@@ -268,13 +268,6 @@ int register_io_handler(
     return 1;
 }
 
-/* Hook function for the HLT instruction emulation wakeup. */
-void hlt_timer_fn(void *data)
-{
-    struct vcpu *v = data;
-    vcpu_kick(v);
-}
-
 static __inline__ void missed_ticks(struct periodic_time *pt)
 {
     s_time_t missed_ticks;
@@ -297,16 +290,19 @@ static __inline__ void missed_ticks(struct periodic_time *pt)
 void pt_timer_fn(void *data)
 {
     struct vcpu *v = data;
-    struct periodic_time *pt = &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
+    struct periodic_time *pt = &v->domain->arch.hvm_domain.pl_time.periodic_tm;
 
     pt->pending_intr_nr++;
     pt->scheduled += pt->period;
 
-    /* pick up missed timer tick */
+    /* Pick up missed timer ticks. */
     missed_ticks(pt);
-    if ( test_bit(_VCPUF_running, &v->vcpu_flags) ) {
+
+    /* No need to run the timer while a VCPU is descheduled. */
+    if ( test_bit(_VCPUF_running, &v->vcpu_flags) )
         set_timer(&pt->timer, pt->scheduled);
-    }
+
+    vcpu_kick(v);
 }
 
 /* pick up missed timer ticks at deactive time */
