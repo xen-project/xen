@@ -745,6 +745,8 @@ void hvm_io_assist(struct vcpu *v)
         domain_crash_synchronous();
     }
 
+    rmb(); /* see IORESP_READY /then/ read contents of ioreq */
+
     p->state = STATE_IOREQ_NONE;
 
     if ( p->type == IOREQ_TYPE_PIO )

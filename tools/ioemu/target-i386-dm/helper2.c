@@ -209,18 +209,19 @@ static ioreq_t *__cpu_get_ioreq(int vcpu)
 
     req = &(shared_page->vcpu_iodata[vcpu].vp_ioreq);
 
-    if (req->state == STATE_IOREQ_READY) {
-        req->state = STATE_IOREQ_INPROCESS;
-        rmb();
-        return req;
+    if (req->state != STATE_IOREQ_READY) {
+        fprintf(logfile, "I/O request not ready: "
+                "%x, ptr: %x, port: %"PRIx64", "
+                "data: %"PRIx64", count: %"PRIx64", size: %"PRIx64"\n",
+                req->state, req->data_is_ptr, req->addr,
+                req->data, req->count, req->size);
+        return NULL;
     }
 
-    fprintf(logfile, "False I/O request ... in-service already: "
-            "%x, ptr: %x, port: %"PRIx64", "
-            "data: %"PRIx64", count: %"PRIx64", size: %"PRIx64"\n",
-            req->state, req->data_is_ptr, req->addr,
-            req->data, req->count, req->size);
-    return NULL;
+    rmb(); /* see IOREQ_READY /then/ read contents of ioreq */
+
+    req->state = STATE_IOREQ_INPROCESS;
+    return req;
 }
 
 //use poll to get the port notification
@@ -504,12 +505,19 @@ void cpu_handle_ioreq(void *opaque)
     if (req) {
         __handle_ioreq(env, req);
 
-        /* No state change if state = STATE_IORESP_HOOK */
-        if (req->state == STATE_IOREQ_INPROCESS) {
-            req->state = STATE_IORESP_READY;
-            xc_evtchn_notify(xce_handle, ioreq_local_port[send_vcpu]);
-        } else
+        if (req->state != STATE_IOREQ_INPROCESS) {
+            fprintf(logfile, "Badness in I/O request ... not in service?!: "
+                    "%x, ptr: %x, port: %"PRIx64", "
+                    "data: %"PRIx64", count: %"PRIx64", size: %"PRIx64"\n",
+                    req->state, req->data_is_ptr, req->addr,
+                    req->data, req->count, req->size);
             destroy_hvm_domain();
+            return;
+        }
+
+        wmb(); /* Update ioreq contents /then/ update state. */
+        req->state = STATE_IORESP_READY;
+        xc_evtchn_notify(xce_handle, ioreq_local_port[send_vcpu]);
     }
 }
 

@@ -727,15 +727,20 @@ static void hvm_send_assist_req(struct vcpu *v)
     ioreq_t *p;
 
     p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;
-    if ( unlikely(p->state != STATE_IOREQ_NONE) ) {
-        /* This indicates a bug in the device model.  Crash the
-           domain. */
-        printk("Device model set bad IO state %d.\n", p->state);
+    if ( unlikely(p->state != STATE_IOREQ_NONE) )
+    {
+        /* This indicates a bug in the device model.  Crash the domain. */
+        gdprintk(XENLOG_ERR, "Device model set bad IO state %d.\n", p->state);
         domain_crash(v->domain);
         return;
     }
 
     prepare_wait_on_xen_event_channel(v->arch.hvm_vcpu.xen_port);
+
+    /*
+     * Following happens /after/ blocking and setting up ioreq contents.
+     * prepare_wait_on_xen_event_channel() is an implicit barrier.
+     */
     p->state = STATE_IOREQ_READY;
     notify_via_xen_event_channel(v->arch.hvm_vcpu.xen_port);
 }
@@ -781,10 +786,12 @@ void send_pio_req(unsigned long port, unsigned long count, int size,
             p->data = shadow_gva_to_gpa(current, value);
         else
             p->data = value; /* guest VA == guest PA */
-    } else if ( dir == IOREQ_WRITE )
+    }
+    else if ( dir == IOREQ_WRITE )
         p->data = value;
 
-    if ( hvm_portio_intercept(p) ) {
+    if ( hvm_portio_intercept(p) )
+    {
         p->state = STATE_IORESP_READY;
         hvm_io_assist(v);
         return;
@@ -829,15 +836,18 @@ static void send_mmio_req(unsigned char type, unsigned long gpa,
 
     p->io_count++;
 
-    if (value_is_ptr) {
-        if (hvm_paging_enabled(v))
+    if ( value_is_ptr )
+    {
+        if ( hvm_paging_enabled(v) )
             p->data = shadow_gva_to_gpa(v, value);
         else
             p->data = value; /* guest VA == guest PA */
-    } else
+    }
+    else
         p->data = value;
 
-    if ( hvm_mmio_intercept(p) || hvm_buffered_io_intercept(p) ) {
+    if ( hvm_mmio_intercept(p) || hvm_buffered_io_intercept(p) )
+    {
         p->state = STATE_IORESP_READY;
         hvm_io_assist(v);
         return;
