@@ -504,6 +504,7 @@ void vioapic_set_xen_irq(struct domain *d, int irq, int level)
 void vioapic_set_irq(struct domain *d, int irq, int level)
 {
     struct vioapic *vioapic = domain_vioapic(d);
+    uint32_t bit;
 
     HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic_set_irq "
                 "irq %x level %x\n", irq, level);
@@ -528,22 +529,19 @@ void vioapic_set_irq(struct domain *d, int irq, int level)
                 vioapic->redirtbl[irq].fields.mask,
                 vioapic->redirtbl[irq].fields.dest_id);
 
-    if ( (irq >= 0) && (irq < VIOAPIC_NUM_PINS) )
+    bit = 1 << irq;
+    if ( vioapic->redirtbl[irq].fields.trig_mode == VIOAPIC_LEVEL_TRIG )
     {
-        uint32_t bit = 1 << irq;
-        if ( vioapic->redirtbl[irq].fields.trig_mode == VIOAPIC_LEVEL_TRIG )
-        {
-            if ( level )
-                vioapic->irr |= bit;
-            else
-                vioapic->irr &= ~bit;
-        }
+        if ( level )
+            vioapic->irr |= bit;
         else
-        {
-            if ( level )
-                /* XXX No irr clear for edge interrupt */
-                vioapic->irr |= bit;
-        }
+            vioapic->irr &= ~bit;
+    }
+    else
+    {
+        if ( level )
+            /* XXX No irr clear for edge interrupt */
+            vioapic->irr |= bit;
     }
 
     service_ioapic(vioapic);
