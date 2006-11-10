@@ -119,14 +119,11 @@ static uint64_t now_itc(vtime_t *vtm)
         if ( vtm->vtm_local_drift ) {
 //          guest_itc -= vtm->vtm_local_drift;
         }       
-        if ( (long)(guest_itc - vtm->last_itc) > 0 ) {
+        if (guest_itc >= vtm->last_itc)
             return guest_itc;
-
-        }
-        else {
+        else
             /* guest ITC backwarded due after LP switch */
             return vtm->last_itc;
-        }
 }
 
 /*
@@ -134,33 +131,42 @@ static uint64_t now_itc(vtime_t *vtm)
  */
 static void vtm_reset(VCPU *vcpu)
 {
-    uint64_t    cur_itc;
-    vtime_t     *vtm;
-    
-    vtm=&(vcpu->arch.arch_vmx.vtm);
-    vtm->vtm_offset = 0;
+    int i;
+    u64 vtm_offset;
+    VCPU *v;
+    struct domain *d = vcpu->domain;
+    vtime_t *vtm = &VMX(vcpu, vtm);
+
+    if (vcpu->vcpu_id == 0) {
+        vtm_offset = 0UL - ia64_get_itc();
+        for (i = MAX_VIRT_CPUS - 1; i >= 0; i--) {
+            if ((v = d->vcpu[i]) != NULL) {
+                VMX(v, vtm).vtm_offset = vtm_offset;
+                VMX(v, vtm).last_itc = 0;
+            }
+        }
+    }
     vtm->vtm_local_drift = 0;
     VCPU(vcpu, itm) = 0;
     VCPU(vcpu, itv) = 0x10000;
-    cur_itc = ia64_get_itc();
-    vtm->last_itc = vtm->vtm_offset + cur_itc;
+    vtm->last_itc = 0;
 }
 
 /* callback function when vtm_timer expires */
 static void vtm_timer_fn(void *data)
 {
-    vtime_t *vtm;
-    VCPU    *vcpu = data;
-    u64	    cur_itc,vitv;
+    VCPU *vcpu = data;
+    vtime_t *vtm = &VMX(vcpu, vtm);
+    u64 vitv;
 
     vitv = VCPU(vcpu, itv);
-    if ( !ITV_IRQ_MASK(vitv) ){
-        vmx_vcpu_pend_interrupt(vcpu, vitv & 0xff);
+    if (!ITV_IRQ_MASK(vitv)) {
+        vmx_vcpu_pend_interrupt(vcpu, ITV_VECTOR(vitv));
         vcpu_unblock(vcpu);
-    }
-    vtm=&(vcpu->arch.arch_vmx.vtm);
-    cur_itc = now_itc(vtm);
-    update_last_itc(vtm,cur_itc);  // pseudo read to update vITC
+    } else
+        vtm->pending = 1;
+
+    update_last_itc(vtm, VCPU(vcpu, itm));  // update vITC
 }
 
 void vtm_init(VCPU *vcpu)
@@ -168,7 +174,7 @@ void vtm_init(VCPU *vcpu)
     vtime_t     *vtm;
     uint64_t    itc_freq;
     
-    vtm=&(vcpu->arch.arch_vmx.vtm);
+    vtm = &VMX(vcpu, vtm);
 
     itc_freq = local_cpu_data->itc_freq;
     vtm->cfg_max_jump=itc_freq*MAX_JUMP_STEP/1000;
@@ -182,36 +188,38 @@ void vtm_init(VCPU *vcpu)
  */
 uint64_t vtm_get_itc(VCPU *vcpu)
 {
-    uint64_t    guest_itc;
-    vtime_t    *vtm;
+    uint64_t guest_itc;
+    vtime_t *vtm = &VMX(vcpu, vtm);
 
-    vtm=&(vcpu->arch.arch_vmx.vtm);
     guest_itc = now_itc(vtm);
-    update_last_itc(vtm, guest_itc);  // update vITC
     return guest_itc;
 }
 
 
 void vtm_set_itc(VCPU *vcpu, uint64_t new_itc)
 {
-    uint64_t    vitm, vitv;
-    vtime_t     *vtm;
-    vitm = VCPU(vcpu,itm);
-    vitv = VCPU(vcpu,itv);
-    vtm=&(vcpu->arch.arch_vmx.vtm);
-    if(vcpu->vcpu_id == 0){
-        vtm->vtm_offset = new_itc - ia64_get_itc();
-        vtm->last_itc = new_itc;
+    int i;
+    uint64_t vitm, vtm_offset;
+    vtime_t *vtm;
+    VCPU *v;
+    struct domain *d = vcpu->domain;
+
+    vitm = VCPU(vcpu, itm);
+    vtm = &VMX(vcpu, vtm);
+    if (vcpu->vcpu_id == 0) {
+        vtm_offset = new_itc - ia64_get_itc();
+        for (i = MAX_VIRT_CPUS - 1; i >= 0; i--) {
+            if ((v = d->vcpu[i]) != NULL) {
+                VMX(v, vtm).vtm_offset = vtm_offset;
+                VMX(v, vtm).last_itc = 0;
+            }
+        }
     }
-    else{
-        vtm->vtm_offset = vcpu->domain->vcpu[0]->arch.arch_vmx.vtm.vtm_offset;
-        new_itc=vtm->vtm_offset + ia64_get_itc();
-        vtm->last_itc = new_itc;
-    }
-    if(vitm < new_itc){
-        vmx_vcpu_unpend_interrupt(vcpu, ITV_VECTOR(vitv));
+    vtm->last_itc = 0;
+    if (vitm <= new_itc)
         stop_timer(&vtm->vtm_timer);
-    }
+    else
+        vtm_set_itm(vcpu, vitm);
 }
 
 
@@ -223,16 +231,16 @@ void vtm_set_itm(VCPU *vcpu, uint64_t val)
 {
     vtime_t *vtm;
     uint64_t   vitv, cur_itc, expires;
+
     vitv = VCPU(vcpu, itv);
-    vtm=&(vcpu->arch.arch_vmx.vtm);
-    // TODO; need to handle VHPI in future
-    vmx_vcpu_unpend_interrupt(vcpu, ITV_VECTOR(vitv));
-    VCPU(vcpu,itm)=val;
-    if (val >= vtm->last_itc) {
+    vtm = &VMX(vcpu, vtm);
+    VCPU(vcpu, itm) = val;
+    if (val > vtm->last_itc) {
         cur_itc = now_itc(vtm);
         if (time_before(val, cur_itc))
             val = cur_itc;
         expires = NOW() + cycle_to_ns(val-cur_itc) + TIMER_SLOP;
+        vmx_vcpu_unpend_interrupt(vcpu, ITV_VECTOR(vitv));
         set_timer(&vtm->vtm_timer, expires);
     }else{
         stop_timer(&vtm->vtm_timer);
@@ -242,14 +250,13 @@ void vtm_set_itm(VCPU *vcpu, uint64_t val)
 
 void vtm_set_itv(VCPU *vcpu, uint64_t val)
 {
-    uint64_t    olditv;
-    olditv = VCPU(vcpu, itv);
+    vtime_t *vtm = &VMX(vcpu, vtm);
+
     VCPU(vcpu, itv) = val;
-    if(ITV_IRQ_MASK(val)){
-        vmx_vcpu_unpend_interrupt(vcpu, ITV_VECTOR(olditv));
-    }else if(ITV_VECTOR(olditv)!=ITV_VECTOR(val)){
-        if (vmx_vcpu_unpend_interrupt(vcpu, ITV_VECTOR(olditv)))
-            vmx_vcpu_pend_interrupt(vcpu, ITV_VECTOR(val));
+
+    if (!ITV_IRQ_MASK(val) && vtm->pending) {
+        vmx_vcpu_pend_interrupt(vcpu, ITV_VECTOR(val));
+        vtm->pending = 0;
     }
 }
 

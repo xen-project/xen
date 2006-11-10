@@ -29,17 +29,22 @@ GLOBAL_ENTRY(vmx_asm_mov_from_ar)
     br.many vmx_virtualization_fault_back
 #endif
     add r18=VCPU_VTM_OFFSET_OFS,r21
-    mov r19=ar.itc
+    add r16=VCPU_VTM_LAST_ITC_OFS,r21
     extr.u r17=r25,6,7
     ;;
     ld8 r18=[r18]
+    mov r19=ar.itc
+    mov r24=b0
+    ;;
+    ld8 r16=[r16]
+    add r19=r19,r18
     movl r20=asm_mov_to_reg
     ;;
     adds r30=vmx_resume_to_guest-asm_mov_to_reg,r20
     shladd r17=r17,4,r20
-    mov r24=b0
+    cmp.gtu p6,p0=r16,r19
     ;;
-    add r19=r19,r18
+    (p6) mov r19=r16
     mov b0=r17
     br.sptk.few b0
     ;;

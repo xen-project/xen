@@ -38,6 +38,7 @@ void foo(void)
 
 	BLANK();
 	DEFINE(VCPU_VTM_OFFSET_OFS, offsetof(struct vcpu, arch.arch_vmx.vtm.vtm_offset));
+	DEFINE(VCPU_VTM_LAST_ITC_OFS, offsetof(struct vcpu, arch.arch_vmx.vtm.last_itc));
 	DEFINE(VCPU_VRR0_OFS, offsetof(struct vcpu, arch.arch_vmx.vrr[0]));
 #ifdef   VTI_DEBUG
 	DEFINE(IVT_CUR_OFS, offsetof(struct vcpu, arch.arch_vmx.ivt_current));
