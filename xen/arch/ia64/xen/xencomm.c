@@ -382,6 +382,6 @@ xencomm_handle_is_null(
             return 1;
 
         desc = (struct xencomm_desc *)desc_addr;
-        return (desc->address[0] == XENCOMM_INVALID);
+        return (desc->nr_addrs == 0);
     }
 }
