@@ -32,6 +32,8 @@
 #include <xen/console.h>
 #include <xen/hypercall.h>
 
+static DEFINE_SPINLOCK(efi_time_services_lock);
+
 extern unsigned long running_on_sim;
 
 struct sal_ret_values
@@ -445,7 +447,6 @@ efi_emulate_get_time(
 	struct page_info *tc_page = NULL;
 	efi_status_t status = 0;
 
-	//printk("efi_get_time(%016lx,%016lx) called\n", tv_addr, tc_addr);
 	tv = efi_translate_domain_addr(tv_addr, fault, &tv_page);
 	if (*fault != IA64_NO_FAULT)
 		goto errout;
@@ -455,9 +456,9 @@ efi_emulate_get_time(
 			goto errout;
 	}
 
-	//printk("efi_get_time(%016lx,%016lx) translated to xen virtual address\n", tv, tc);
+	spin_lock(&efi_time_services_lock);
 	status = (*efi.get_time)((efi_time_t *) tv, (efi_time_cap_t *) tc);
-	//printk("efi_get_time returns %lx\n", status);
+	spin_unlock(&efi_time_services_lock);
 
 errout:
 	if (tc_page != NULL)
@@ -483,7 +484,9 @@ efi_emulate_set_time(
 	if (*fault != IA64_NO_FAULT)
 		goto errout;
 
+	spin_lock(&efi_time_services_lock);
 	status = (*efi.set_time)((efi_time_t *)tv);
+	spin_unlock(&efi_time_services_lock);
 
 errout:
 	if (tv_page != NULL)
@@ -518,9 +521,11 @@ efi_emulate_get_wakeup_time(
 	if (*fault != IA64_NO_FAULT)
 		goto errout;
 
+	spin_lock(&efi_time_services_lock);
 	status = (*efi.get_wakeup_time)((efi_bool_t *)enabled,
 	                                (efi_bool_t *)pending,
 	                                (efi_time_t *)tv);
+	spin_unlock(&efi_time_services_lock);
 
 errout:
 	if (e_page != NULL)
@@ -551,8 +556,10 @@ efi_emulate_set_wakeup_time(
 			goto errout;
 	}
 
+	spin_lock(&efi_time_services_lock);
 	status = (*efi.set_wakeup_time)((efi_bool_t)enabled,
 	                                (efi_time_t *)tv);
+	spin_unlock(&efi_time_services_lock);
 
 errout:
 	if (tv_page != NULL)
