@@ -6,7 +6,7 @@ MAJOR = 3.0
 MINOR = 0
 
 PROFILE=#-pg
-BASECFLAGS=-Wall -g -Werror
+BASECFLAGS=-Werror
 # Make gcc generate dependencies.
 BASECFLAGS += -Wp,-MD,.$(@F).d
 PROG_DEP = .*.d

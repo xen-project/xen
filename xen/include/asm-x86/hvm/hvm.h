@@ -33,10 +33,10 @@ struct hvm_function_table {
     void (*disable)(void);
 
     /*
-     * Initialize/relinguish HVM guest resources
+     * Initialise/destroy HVM VCPU resources
      */
-    int  (*initialize_guest_resources)(struct vcpu *v);
-    void (*relinquish_guest_resources)(struct domain *d);
+    int  (*vcpu_initialise)(struct vcpu *v);
+    void (*vcpu_destroy)(struct vcpu *v);
 
     /*
      * Store and load guest state:
@@ -91,28 +91,11 @@ hvm_disable(void)
         hvm_funcs.disable();
 }
 
-void hvm_create_event_channels(struct vcpu *v);
-void hvm_map_io_shared_pages(struct vcpu *v);
+int hvm_domain_initialise(struct domain *d);
+void hvm_domain_destroy(struct domain *d);
 
-static inline int
-hvm_initialize_guest_resources(struct vcpu *v)
-{
-    int ret = 1;
-    if ( hvm_funcs.initialize_guest_resources )
-        ret = hvm_funcs.initialize_guest_resources(v);
-    if ( ret == 1 ) {
-        hvm_map_io_shared_pages(v);
-        hvm_create_event_channels(v);
-    }
-    return ret;
-}
-
-static inline void
-hvm_relinquish_guest_resources(struct domain *d)
-{
-    if (hvm_funcs.relinquish_guest_resources)
-        hvm_funcs.relinquish_guest_resources(d);
-}
+int hvm_vcpu_initialise(struct vcpu *v);
+void hvm_vcpu_destroy(struct vcpu *v);
 
 static inline void
 hvm_store_cpu_guest_regs(

@@ -53,6 +53,8 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 			return -EFAULT;
 
 #if defined(__i386__)
+		if (hypercall.op >= (PAGE_SIZE >> 5))
+			break;
 		__asm__ __volatile__ (
 			"pushl %%ebx; pushl %%ecx; pushl %%edx; "
 			"pushl %%esi; pushl %%edi; "
@@ -69,21 +71,21 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 			"popl %%ecx; popl %%ebx"
 			: "=a" (ret) : "0" (&hypercall) : "memory" );
 #elif defined (__x86_64__)
-		{
+		if (hypercall.op < (PAGE_SIZE >> 5)) {
 			long ign1, ign2, ign3;
 			__asm__ __volatile__ (
 				"movq %8,%%r10; movq %9,%%r8;"
-				"shlq $5,%%rax ;"
+				"shll $5,%%eax ;"
 				"addq $hypercall_page,%%rax ;"
 				"call *%%rax"
 				: "=a" (ret), "=D" (ign1),
 				  "=S" (ign2), "=d" (ign3)
-				: "0" ((unsigned long)hypercall.op), 
-				"1" ((unsigned long)hypercall.arg[0]), 
-				"2" ((unsigned long)hypercall.arg[1]),
-				"3" ((unsigned long)hypercall.arg[2]), 
-				"g" ((unsigned long)hypercall.arg[3]),
-				"g" ((unsigned long)hypercall.arg[4])
+				: "0" ((unsigned int)hypercall.op),
+				"1" (hypercall.arg[0]),
+				"2" (hypercall.arg[1]),
+				"3" (hypercall.arg[2]),
+				"g" (hypercall.arg[3]),
+				"g" (hypercall.arg[4])
 				: "r8", "r10", "memory" );
 		}
 #elif defined (__ia64__)

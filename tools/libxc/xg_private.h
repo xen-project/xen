@@ -193,8 +193,6 @@ typedef struct mfn_mapper {
 int xc_copy_to_domain_page(int xc_handle, uint32_t domid,
                             unsigned long dst_pfn, const char *src_page);
 
-unsigned long xc_get_filesz(int fd);
-
 void xc_map_memcpy(unsigned long dst, const char *src, unsigned long size,
                    int xch, uint32_t dom, xen_pfn_t *parray,
                    unsigned long vstart);

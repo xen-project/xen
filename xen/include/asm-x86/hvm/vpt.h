@@ -91,6 +91,7 @@ struct periodic_time {
     char one_shot;              /* one shot time */
     char irq;
     char first_injected;        /* flag to prevent shadow window */
+    u32 bind_vcpu;              /* vcpu timer interrupt delivers to */
     u32 pending_intr_nr;        /* the couner for pending timer interrupts */
     u32 period;                 /* frequency in ns */
     u64 period_cycles;          /* frequency in cpu cycles */

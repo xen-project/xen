@@ -320,6 +320,12 @@ static void connect(struct blkfront_info *info)
 		return;
 	}
 
+	err = xenbus_gather(XBT_NIL, info->xbdev->otherend,
+			    "feature-barrier", "%lu", &info->feature_barrier,
+			    NULL);
+	if (err)
+		info->feature_barrier = 0;
+
 	err = xlvbd_add(sectors, info->vdevice, binfo, sector_size, info);
 	if (err) {
 		xenbus_dev_fatal(info->xbdev, err, "xlvbd_add at %s",
@@ -569,10 +575,13 @@ static int blkif_queue_request(struct request *req)
 	info->shadow[id].request = (unsigned long)req;
 
 	ring_req->id = id;
-	ring_req->operation = rq_data_dir(req) ?
-		BLKIF_OP_WRITE : BLKIF_OP_READ;
 	ring_req->sector_number = (blkif_sector_t)req->sector;
 	ring_req->handle = info->handle;
+
+	ring_req->operation = rq_data_dir(req) ?
+		BLKIF_OP_WRITE : BLKIF_OP_READ;
+	if (blk_barrier_rq(req))
+		ring_req->operation = BLKIF_OP_WRITE_BARRIER;
 
 	ring_req->nr_segments = 0;
 	rq_for_each_bio (bio, req) {
@@ -670,6 +679,7 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 	RING_IDX i, rp;
 	unsigned long flags;
 	struct blkfront_info *info = (struct blkfront_info *)dev_id;
+	int uptodate;
 
 	spin_lock_irqsave(&blkif_io_lock, flags);
 
@@ -694,19 +704,27 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 
 		ADD_ID_TO_FREELIST(info, id);
 
+		uptodate = (bret->status == BLKIF_RSP_OKAY);
 		switch (bret->operation) {
+		case BLKIF_OP_WRITE_BARRIER:
+			if (unlikely(bret->status == BLKIF_RSP_EOPNOTSUPP)) {
+				printk("blkfront: %s: write barrier op failed\n",
+				       info->gd->disk_name);
+				uptodate = -EOPNOTSUPP;
+				info->feature_barrier = 0;
+			        xlvbd_barrier(info);
+			}
+			/* fall through */
 		case BLKIF_OP_READ:
 		case BLKIF_OP_WRITE:
 			if (unlikely(bret->status != BLKIF_RSP_OKAY))
 				DPRINTK("Bad return from blkdev data "
 					"request: %x\n", bret->status);
 
-			ret = end_that_request_first(
-				req, (bret->status == BLKIF_RSP_OKAY),
+			ret = end_that_request_first(req, uptodate,
 				req->hard_nr_sectors);
 			BUG_ON(ret);
-			end_that_request_last(
-				req, (bret->status == BLKIF_RSP_OKAY));
+			end_that_request_last(req, uptodate);
 			break;
 		default:
 			BUG();

@@ -48,9 +48,6 @@ name = "ExampleHVMDomain"
 # enable/disable HVM guest ACPI, default=0 (disabled)
 #acpi=0
 
-# enable/disable HVM guest APIC, default=0 (disabled)
-#apic=0
-
 # List of which CPUS this domain is allowed to use, default Xen picks
 #cpus = ""         # leave to Xen to pick
 #cpus = "0"        # all vcpus run on CPU0

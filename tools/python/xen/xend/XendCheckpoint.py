@@ -8,21 +8,18 @@
 import os
 import re
 import string
-import sxp
 import threading
 from struct import pack, unpack, calcsize
 
 from xen.util.xpopen import xPopen3
-
 import xen.util.auxbin
-
 import xen.lowlevel.xc
 
-import balloon
-from XendError import XendError
-from XendLogging import log
-from XendDomainInfo import DEV_MIGRATE_STEP1, DEV_MIGRATE_STEP2
-from XendDomainInfo import DEV_MIGRATE_STEP3
+from xen.xend import balloon, sxp
+from xen.xend.XendError import XendError
+from xen.xend.XendLogging import log
+from xen.xend.XendConstants import *
+from xen.xend.XendConfig import XendConfig
 
 SIGNATURE = "LinuxGuestRecord"
 XC_SAVE = "xc_save"
@@ -43,13 +40,13 @@ def write_exact(fd, buf, errmsg):
 def read_exact(fd, size, errmsg):
     buf  = '' 
     while size != 0: 
-        str = os.read(fd, size)
-        if not len(str):
+        readstr = os.read(fd, size)
+        if not len(readstr):
             log.error("read_exact: EOF trying to read %d (buf='%s')" % \
                       (size, buf))
             raise XendError(errmsg)
-        size = size - len(str)
-        buf  = buf + str
+        size = size - len(readstr)
+        buf  = buf + readstr
     return buf
 
 
@@ -111,7 +108,7 @@ def save(fd, dominfo, network, live, dst):
         raise Exception, exn
 
 
-def restore(xd, fd):
+def restore(xd, fd, dominfo = None):
     signature = read_exact(fd, len(SIGNATURE),
         "not a valid guest state file: signature read")
     if signature != SIGNATURE:
@@ -131,7 +128,11 @@ def restore(xd, fd):
 
     vmconfig = p.get_val()
 
-    dominfo = xd.restore_(vmconfig)
+    if dominfo:
+        dominfo.update(XendConfig(sxp = vmconfig), refresh = False)
+        dominfo.resume()
+    else:
+        dominfo = xd.restore_(vmconfig)
 
     store_port   = dominfo.getStorePort()
     console_port = dominfo.getConsolePort()

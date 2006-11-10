@@ -15,9 +15,19 @@ void free_domain(struct domain *d);
  * Arch-specifics.
  */
 
-struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id);
-
+/* Allocate/free a VCPU structure. */
+struct vcpu *alloc_vcpu_struct(void);
 void free_vcpu_struct(struct vcpu *v);
+
+/*
+ * Initialise/destroy arch-specific details of a VCPU.
+ *  - vcpu_initialise() is called after the basic generic fields of the
+ *    VCPU structure are initialised. Many operations can be applied to the
+ *    VCPU at this point (e.g., vcpu_pause()).
+ *  - vcpu_destroy() is called only if vcpu_initialise() previously succeeded.
+ */
+int  vcpu_initialise(struct vcpu *v);
+void vcpu_destroy(struct vcpu *v);
 
 int arch_domain_create(struct domain *d);
 

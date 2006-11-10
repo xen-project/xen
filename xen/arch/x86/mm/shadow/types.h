@@ -205,13 +205,13 @@ static inline shadow_l4e_t shadow_l4e_from_mfn(mfn_t mfn, u32 flags)
     __sh_linear_l1_table; \
 })
 
-// XXX -- these should not be conditional on hvm_guest(v), but rather on
+// XXX -- these should not be conditional on is_hvm_vcpu(v), but rather on
 //        shadow_mode_external(d)...
 //
 #define sh_linear_l2_table(v) ({ \
     ASSERT(current == (v)); \
     ((shadow_l2e_t *) \
-     (hvm_guest(v) ? __linear_l1_table : __sh_linear_l1_table) + \
+     (is_hvm_vcpu(v) ? __linear_l1_table : __sh_linear_l1_table) + \
      shadow_l1_linear_offset(SH_LINEAR_PT_VIRT_START)); \
 })
 
@@ -219,7 +219,7 @@ static inline shadow_l4e_t shadow_l4e_from_mfn(mfn_t mfn, u32 flags)
 #define sh_linear_l3_table(v) ({ \
     ASSERT(current == (v)); \
     ((shadow_l3e_t *) \
-     (hvm_guest(v) ? __linear_l2_table : __sh_linear_l2_table) + \
+     (is_hvm_vcpu(v) ? __linear_l2_table : __sh_linear_l2_table) + \
       shadow_l2_linear_offset(SH_LINEAR_PT_VIRT_START)); \
 })
 
@@ -228,7 +228,7 @@ static inline shadow_l4e_t shadow_l4e_from_mfn(mfn_t mfn, u32 flags)
 #define sh_linear_l4_table(v) ({ \
     ASSERT(current == (v)); \
     ((l4_pgentry_t *) \
-     (hvm_guest(v) ? __linear_l3_table : __sh_linear_l3_table) + \
+     (is_hvm_vcpu(v) ? __linear_l3_table : __sh_linear_l3_table) + \
       shadow_l3_linear_offset(SH_LINEAR_PT_VIRT_START)); \
 })
 #endif
@@ -404,11 +404,22 @@ valid_gfn(gfn_t m)
 }
 
 /* Translation between mfns and gfns */
+
+// vcpu-specific version of gfn_to_mfn().  This is where we hide the dirty
+// little secret that, for hvm guests with paging disabled, nearly all of the
+// shadow code actually think that the guest is running on *untranslated* page
+// tables (which is actually domain->phys_table).
+//
+
 static inline mfn_t
 vcpu_gfn_to_mfn(struct vcpu *v, gfn_t gfn)
 {
-    return sh_vcpu_gfn_to_mfn(v, gfn_x(gfn));
-} 
+    if ( !shadow_vcpu_mode_translate(v) )
+        return _mfn(gfn_x(gfn));
+    if ( likely(current->domain == v->domain) )
+        return _mfn(get_mfn_from_gpfn(gfn_x(gfn)));
+    return sh_gfn_to_mfn_foreign(v->domain, gfn_x(gfn));
+}
 
 static inline gfn_t
 mfn_to_gfn(struct domain *d, mfn_t mfn)
@@ -574,11 +585,82 @@ accumulate_guest_flags(struct vcpu *v, walk_t *gw)
     // In 64-bit PV guests, the _PAGE_USER bit is implied in all guest
     // entries (since even the guest kernel runs in ring 3).
     //
-    if ( (GUEST_PAGING_LEVELS == 4) && !hvm_guest(v) )
+    if ( (GUEST_PAGING_LEVELS == 4) && !is_hvm_vcpu(v) )
         accumulated_flags |= _PAGE_USER;
 
     return accumulated_flags;
 }
+
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_FAST_FAULT_PATH) && SHADOW_PAGING_LEVELS > 2
+/******************************************************************************
+ * We implement a "fast path" for two special cases: faults that require
+ * MMIO emulation, and faults where the guest PTE is not present.  We
+ * record these as shadow l1 entries that have reserved bits set in
+ * them, so we can spot them immediately in the fault handler and handle
+ * them without needing to hold the shadow lock or walk the guest
+ * pagetables.
+ *
+ * This is only feasible for PAE and 64bit Xen: 32-bit non-PAE PTEs don't
+ * have reserved bits that we can use for this.
+ */
+
+#define SH_L1E_MAGIC 0xffffffff00000000ULL
+static inline int sh_l1e_is_magic(shadow_l1e_t sl1e)
+{
+    return ((sl1e.l1 & SH_L1E_MAGIC) == SH_L1E_MAGIC);
+}
+
+/* Guest not present: a single magic value */
+static inline shadow_l1e_t sh_l1e_gnp(void) 
+{
+    return (shadow_l1e_t){ -1ULL };
+}
+
+static inline int sh_l1e_is_gnp(shadow_l1e_t sl1e) 
+{
+    return (sl1e.l1 == sh_l1e_gnp().l1);
+}
+
+/* MMIO: an invalid PTE that contains the GFN of the equivalent guest l1e.
+ * We store 28 bits of GFN in bits 4:32 of the entry.
+ * The present bit is set, and the U/S and R/W bits are taken from the guest.
+ * Bit 3 is always 0, to differentiate from gnp above.  */
+#define SH_L1E_MMIO_MAGIC       0xffffffff00000001ULL
+#define SH_L1E_MMIO_MAGIC_MASK  0xffffffff00000009ULL
+#define SH_L1E_MMIO_GFN_MASK    0x00000000fffffff0ULL
+#define SH_L1E_MMIO_GFN_SHIFT   4
+
+static inline shadow_l1e_t sh_l1e_mmio(gfn_t gfn, u32 gflags) 
+{
+    return (shadow_l1e_t) { (SH_L1E_MMIO_MAGIC 
+                             | (gfn_x(gfn) << SH_L1E_MMIO_GFN_SHIFT) 
+                             | (gflags & (_PAGE_USER|_PAGE_RW))) };
+}
+
+static inline int sh_l1e_is_mmio(shadow_l1e_t sl1e) 
+{
+    return ((sl1e.l1 & SH_L1E_MMIO_MAGIC_MASK) == SH_L1E_MMIO_MAGIC);
+}
+
+static inline gfn_t sh_l1e_mmio_get_gfn(shadow_l1e_t sl1e) 
+{
+    return _gfn((sl1e.l1 & SH_L1E_MMIO_GFN_MASK) >> SH_L1E_MMIO_GFN_SHIFT);
+}
+
+static inline u32 sh_l1e_mmio_get_flags(shadow_l1e_t sl1e) 
+{
+    return (u32)((sl1e.l1 & (_PAGE_USER|_PAGE_RW)));
+}
+
+#else
+
+#define sh_l1e_gnp() shadow_l1e_empty()
+#define sh_l1e_mmio(_gfn, _flags) shadow_l1e_empty()
+#define sh_l1e_is_magic(_e) (0)
+
+#endif /* SHOPT_FAST_FAULT_PATH */
+
 
 #endif /* _XEN_SHADOW_TYPES_H */
 

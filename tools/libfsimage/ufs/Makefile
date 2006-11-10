@@ -1,0 +1,13 @@
+XEN_ROOT = ../../..
+
+LIB_SRCS-y = fsys_ufs.c
+
+FS = ufs
+
+.PHONY: all
+all: fs-all
+
+.PHONY: install
+install: fs-install
+
+include $(XEN_ROOT)/tools/libfsimage/Rules.mk

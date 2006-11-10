@@ -1684,7 +1684,7 @@ static void tty_serial_init(int fd, int speed,
 
     tty.c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP
                           |INLCR|IGNCR|ICRNL|IXON);
-    tty.c_oflag |= OPOST;
+    tty.c_oflag &= ~OPOST; /* no output mangling of raw serial stream */
     tty.c_lflag &= ~(ECHO|ECHONL|ICANON|IEXTEN|ISIG);
     tty.c_cflag &= ~(CSIZE|PARENB|PARODD|CRTSCTS);
     switch(data_bits) {
@@ -6390,17 +6390,17 @@ int main(int argc, char **argv)
             exit(1);
     }
 
+#if defined (__ia64__)
+    if (ram_size > MMIO_START)
+        ram_size += 1 * MEM_G; /* skip 3G-4G MMIO, LEGACY_IO_SPACE etc. */
+#endif
+
     /* init the memory */
     phys_ram_size = ram_size + vga_ram_size + bios_size;
 
 #ifdef CONFIG_DM
 
     xc_handle = xc_interface_open();
-
-#if defined (__ia64__)
-    if (ram_size > MMIO_START)
-        ram_size += 1 * MEM_G; /* skip 3G-4G MMIO, LEGACY_IO_SPACE etc. */
-#endif
 
     nr_pages = ram_size/PAGE_SIZE;
     tmp_nr_pages = nr_pages;
@@ -6420,14 +6420,13 @@ int main(int argc, char **argv)
     }
 
 #if defined(__i386__) || defined(__x86_64__)
-    if (xc_get_pfn_list(xc_handle, domid, page_array, nr_pages) != nr_pages) {
+    for ( i = 0; i < tmp_nr_pages; i++)
+        page_array[i] = i;
+    if (xc_domain_translate_gpfn_list(xc_handle, domid, tmp_nr_pages,
+                                      page_array, page_array)) {
         fprintf(logfile, "xc_get_pfn_list returned error %d\n", errno);
         exit(-1);
     }
-
-    if (ram_size > HVM_BELOW_4G_RAM_END)
-        for (i = 0; i < nr_pages - (HVM_BELOW_4G_RAM_END >> PAGE_SHIFT); i++)
-            page_array[tmp_nr_pages - 1 - i] = page_array[nr_pages - 1 - i];
 
     phys_ram_base = xc_map_foreign_batch(xc_handle, domid,
                                          PROT_READ|PROT_WRITE, page_array,

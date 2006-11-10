@@ -1,0 +1,17 @@
+digraph g{
+node [ shape=box ]; session [ URL="session.html" ] task [ URL="task.html" ] VM [ URL="VM.html" ] host [ URL="host.html" ] host_cpu [ URL="host_cpu.html" ] network [ URL="network.html" ] VIF [ URL="VIF.html" ] PIF [ URL="PIF.html" ] SR [ URL="SR.html" ] VDI [ URL="VDI.html" ] VBD [ URL="VBD.html" ] VTPM [ URL="VTPM.html" ] user [ URL="user.html" ] debug [ URL="debug.html" ];
+session -> host [ label="this_host(1)" ]
+session -> user [ label="this_user(1)" ]
+host -> VM [ color="blue", arrowhead="crow", arrowtail="none" ]
+host -> host_cpu [ color="blue", arrowhead="crow", arrowtail="none" ]
+VIF -> VM [ color="blue", arrowhead="none", arrowtail="crow" ]
+VIF -> network [ color="blue", arrowhead="none", arrowtail="crow" ]
+PIF -> host [ color="blue", arrowhead="none", arrowtail="crow" ]
+PIF -> network [ color="blue", arrowhead="none", arrowtail="crow" ]
+SR -> VDI [ color="blue", arrowhead="crow", arrowtail="none" ]
+VDI -> VBD [ color="blue", arrowhead="crow", arrowtail="none" ]
+VDI -> VDI [ color="blue", arrowhead="none", arrowtail="crow" ]
+VBD -> VM [ color="blue", arrowhead="none", arrowtail="crow" ]
+VTPM -> VM [ label="backend(1)" ]
+VTPM -> VM [ color="blue", arrowhead="none", arrowtail="crow" ]
+}

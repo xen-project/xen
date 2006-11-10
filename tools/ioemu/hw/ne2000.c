@@ -137,6 +137,7 @@ typedef struct NE2000State {
     uint8_t curpag;
     uint8_t mult[8]; /* multicast mask array */
     int irq;
+    int tainted;
     PCIDevice *pci_dev;
     VLANClientState *vc;
     uint8_t macaddr[6];
@@ -226,6 +227,27 @@ static int ne2000_can_receive(void *opaque)
 
 #define MIN_BUF_SIZE 60
 
+static inline int ne2000_valid_ring_addr(NE2000State *s, unsigned int addr)
+{
+    addr <<= 8;
+    return addr < s->stop && addr >= s->start;
+}
+
+static inline int ne2000_check_state(NE2000State *s)
+{
+    if (!s->tainted)
+        return 0;
+
+    if (s->start >= s->stop || s->stop > NE2000_MEM_SIZE)
+        return -EINVAL;
+
+    if (!ne2000_valid_ring_addr(s, s->curpag))
+        return -EINVAL;
+
+    s->tainted = 0;
+    return 0;
+}
+
 static void ne2000_receive(void *opaque, const uint8_t *buf, int size)
 {
     NE2000State *s = opaque;
@@ -238,6 +260,12 @@ static void ne2000_receive(void *opaque, const uint8_t *buf, int size)
 #if defined(DEBUG_NE2000)
     printf("NE2000: received len=%d\n", size);
 #endif
+
+    if (ne2000_check_state(s))
+        return;
+
+    if (!ne2000_valid_ring_addr(s, s->boundary))
+        return;
 
     if (s->cmd & E8390_STOP || ne2000_buffer_full(s))
         return;
@@ -359,9 +387,11 @@ static void ne2000_ioport_write(void *opaque, uint32_t addr, uint32_t val)
         switch(offset) {
         case EN0_STARTPG:
             s->start = val << 8;
+            s->tainted = 1;
             break;
         case EN0_STOPPG:
             s->stop = val << 8;
+            s->tainted = 1;
             break;
         case EN0_BOUNDARY:
             s->boundary = val;
@@ -406,6 +436,7 @@ static void ne2000_ioport_write(void *opaque, uint32_t addr, uint32_t val)
             break;
         case EN1_CURPAG:
             s->curpag = val;
+            s->tainted = 1;
             break;
         case EN1_MULT ... EN1_MULT + 7:
             s->mult[offset - EN1_MULT] = val;
@@ -509,7 +540,7 @@ static inline void ne2000_mem_writel(NE2000State *s, uint32_t addr,
 {
     addr &= ~1; /* XXX: check exact behaviour if not even */
     if (addr < 32 || 
-        (addr >= NE2000_PMEM_START && addr < NE2000_MEM_SIZE)) {
+        (addr >= NE2000_PMEM_START && addr < NE2000_MEM_SIZE - 2)) {
         cpu_to_le32wu((uint32_t *)(s->mem + addr), val);
     }
 }
@@ -539,7 +570,7 @@ static inline uint32_t ne2000_mem_readl(NE2000State *s, uint32_t addr)
 {
     addr &= ~1; /* XXX: check exact behaviour if not even */
     if (addr < 32 || 
-        (addr >= NE2000_PMEM_START && addr < NE2000_MEM_SIZE)) {
+        (addr >= NE2000_PMEM_START && addr < NE2000_MEM_SIZE - 2)) {
         return le32_to_cpupu((uint32_t *)(s->mem + addr));
     } else {
         return 0xffffffff;

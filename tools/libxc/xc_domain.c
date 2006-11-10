@@ -12,6 +12,7 @@
 int xc_domain_create(int xc_handle,
                      uint32_t ssidref,
                      xen_domain_handle_t handle,
+                     uint32_t flags,
                      uint32_t *pdomid)
 {
     int err;
@@ -20,6 +21,7 @@ int xc_domain_create(int xc_handle,
     domctl.cmd = XEN_DOMCTL_createdomain;
     domctl.domain = (domid_t)*pdomid;
     domctl.u.createdomain.ssidref = ssidref;
+    domctl.u.createdomain.flags   = flags;
     memcpy(domctl.u.createdomain.handle, handle, sizeof(xen_domain_handle_t));
     if ( (err = do_domctl(xc_handle, &domctl)) != 0 )
         return err;
@@ -169,15 +171,16 @@ int xc_domain_getinfo(int xc_handle,
             break;
         info->domid      = (uint16_t)domctl.domain;
 
-        info->dying    = !!(domctl.u.getdomaininfo.flags & DOMFLAGS_DYING);
-        info->shutdown = !!(domctl.u.getdomaininfo.flags & DOMFLAGS_SHUTDOWN);
-        info->paused   = !!(domctl.u.getdomaininfo.flags & DOMFLAGS_PAUSED);
-        info->blocked  = !!(domctl.u.getdomaininfo.flags & DOMFLAGS_BLOCKED);
-        info->running  = !!(domctl.u.getdomaininfo.flags & DOMFLAGS_RUNNING);
+        info->dying    = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_dying);
+        info->shutdown = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_shutdown);
+        info->paused   = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_paused);
+        info->blocked  = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_blocked);
+        info->running  = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_running);
+        info->hvm      = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_hvm_guest);
 
         info->shutdown_reason =
-            (domctl.u.getdomaininfo.flags>>DOMFLAGS_SHUTDOWNSHIFT) &
-            DOMFLAGS_SHUTDOWNMASK;
+            (domctl.u.getdomaininfo.flags>>XEN_DOMINF_shutdownshift) &
+            XEN_DOMINF_shutdownmask;
 
         if ( info->shutdown && (info->shutdown_reason == SHUTDOWN_crash) )
         {
@@ -200,7 +203,8 @@ int xc_domain_getinfo(int xc_handle,
         info++;
     }
 
-    if( !nr_doms ) return rc;
+    if ( nr_doms == 0 )
+        return rc;
 
     return nr_doms;
 }
@@ -345,7 +349,7 @@ int xc_domain_memory_increase_reservation(int xc_handle,
     if ( err == nr_extents )
         return 0;
 
-    if ( err > 0 )
+    if ( err >= 0 )
     {
         DPRINTF("Failed allocation for dom %d: "
                 "%ld pages order %d addr_bits %d\n",
@@ -384,11 +388,11 @@ int xc_domain_memory_decrease_reservation(int xc_handle,
     if ( err == nr_extents )
         return 0;
 
-    if ( err > 0 )
+    if ( err >= 0 )
     {
         DPRINTF("Failed deallocation for dom %d: %ld pages order %d\n",
                 domid, nr_extents, extent_order);
-        errno = EBUSY;
+        errno = EINVAL;
         err = -1;
     }
 
@@ -415,7 +419,7 @@ int xc_domain_memory_populate_physmap(int xc_handle,
     if ( err == nr_extents )
         return 0;
 
-    if ( err > 0 )
+    if ( err >= 0 )
     {
         DPRINTF("Failed allocation for dom %d: %ld pages order %d\n",
                 domid, nr_extents, extent_order);

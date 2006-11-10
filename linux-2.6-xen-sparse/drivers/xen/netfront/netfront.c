@@ -101,6 +101,14 @@ static inline void dev_disable_gso_features(struct net_device *dev)
 }
 #elif defined(NETIF_F_TSO)
 #define HAVE_TSO                       1
+
+/* Some older kernels cannot cope with incorrect checksums,
+ * particularly in netfilter. I'm not sure there is 100% correlation
+ * with the presence of NETIF_F_TSO but it appears to be a good first
+ * approximiation.
+ */
+#define HAVE_NO_CSUM_OFFLOAD           1
+
 #define gso_size tso_size
 #define gso_segs tso_segs
 static inline void dev_disable_gso_features(struct net_device *dev)
@@ -242,7 +250,6 @@ static void end_access(int, void *);
 static void netif_disconnect_backend(struct netfront_info *);
 static int open_netdev(struct netfront_info *);
 static void close_netdev(struct netfront_info *);
-static void netif_free(struct netfront_info *);
 
 static int network_connect(struct net_device *);
 static void network_tx_buf_gc(struct net_device *);
@@ -395,6 +402,14 @@ again:
 		goto abort_transaction;
 	}
 
+#ifdef HAVE_NO_CSUM_OFFLOAD
+	err = xenbus_printf(xbt, dev->nodename, "feature-no-csum-offload", "%d", 1);
+	if (err) {
+		message = "writing feature-no-csum-offload";
+		goto abort_transaction;
+	}
+#endif
+
 	err = xenbus_printf(xbt, dev->nodename, "feature-sg", "%d", 1);
 	if (err) {
 		message = "writing feature-sg";
@@ -427,7 +442,6 @@ again:
  out:
 	return err;
 }
-
 
 static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 {
@@ -488,10 +502,8 @@ static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 	return 0;
 
  fail:
-	netif_free(info);
 	return err;
 }
-
 
 /**
  * Callback received when the backend's state changes.
@@ -513,10 +525,8 @@ static void backend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateInitWait:
-		if (network_connect(netdev) != 0) {
-			netif_free(np);
+		if (network_connect(netdev) != 0)
 			break;
-		}
 		xenbus_switch_state(dev, XenbusStateConnected);
 		(void)send_fake_arp(netdev);
 		break;
@@ -526,7 +536,6 @@ static void backend_changed(struct xenbus_device *dev,
 		break;
 	}
 }
-
 
 /** Send a packet on a net device to encourage switches to learn the
  * MAC. We send a fake ARP request.
@@ -555,7 +564,6 @@ static int send_fake_arp(struct net_device *dev)
 
 	return dev_queue_xmit(skb);
 }
-
 
 static int network_open(struct net_device *dev)
 {
@@ -648,13 +656,11 @@ static void network_tx_buf_gc(struct net_device *dev)
 	network_maybe_wake_tx(dev);
 }
 
-
 static void rx_refill_timeout(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
 	netif_rx_schedule(dev);
 }
-
 
 static void network_alloc_rx_buffers(struct net_device *dev)
 {
@@ -1617,8 +1623,16 @@ static void xennet_set_features(struct net_device *dev)
 	if (!(dev->features & NETIF_F_IP_CSUM))
 		return;
 
-	if (!xennet_set_sg(dev, 1))
-		xennet_set_tso(dev, 1);
+	if (xennet_set_sg(dev, 1))
+		return;
+
+	/* Before 2.6.9 TSO seems to be unreliable so do not enable it
+	 * on older kernels.
+	 */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,9)
+	xennet_set_tso(dev, 1);
+#endif
+
 }
 
 static int network_connect(struct net_device *dev)
@@ -2060,14 +2074,6 @@ static void netif_disconnect_backend(struct netfront_info *info)
 	info->rx_ring_ref = GRANT_INVALID_REF;
 	info->tx.sring = NULL;
 	info->rx.sring = NULL;
-}
-
-
-static void netif_free(struct netfront_info *info)
-{
-	close_netdev(info);
-	netif_disconnect_backend(info);
-	free_netdev(info->netdev);
 }
 
 

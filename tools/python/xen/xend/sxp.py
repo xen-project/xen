@@ -267,10 +267,14 @@ class Parser:
         elif c == 'x':
             self.state.fn = self.state_hex
             self.state.val = 0
-        else:
+        elif c in string.octdigits:
             self.state.fn = self.state_octal
             self.state.val = 0
             self.input_char(c)
+        else:
+            # ignore escape if it doesn't match anything we know
+            self.state.parent.buf += '\\'
+            self.pop_state()
 
     def state_octal(self, c):
         def octaldigit(c):
@@ -375,7 +379,7 @@ def atomp(sxpr):
 def show(sxpr, out=sys.stdout):
     """Print an sxpr in bracketed (lisp-style) syntax.
     """
-    if isinstance(sxpr, types.ListType):
+    if isinstance(sxpr, (types.ListType, types.TupleType)):
         out.write(k_list_open)
         i = 0
         for x in sxpr:
@@ -393,7 +397,7 @@ def show(sxpr, out=sys.stdout):
 def show_xml(sxpr, out=sys.stdout):
     """Print an sxpr in XML syntax.
     """
-    if isinstance(sxpr, types.ListType):
+    if isinstance(sxpr, (types.ListType, types.TupleType)):
         element = name(sxpr)
         out.write('<%s' % element)
         for attr in attributes(sxpr):
@@ -416,7 +420,7 @@ def elementp(sxpr, elt=None):
     sxpr sxpr
     elt  element type
     """
-    return (isinstance(sxpr, types.ListType)
+    return (isinstance(sxpr, (types.ListType, types.TupleType))
             and len(sxpr)
             and (None == elt or sxpr[0] == elt))
 
@@ -432,7 +436,7 @@ def name(sxpr):
     val = None
     if isinstance(sxpr, types.StringType):
         val = sxpr
-    elif isinstance(sxpr, types.ListType) and len(sxpr):
+    elif isinstance(sxpr, (types.ListType, types.TupleType)) and len(sxpr):
         val = sxpr[0]
     return val
 
@@ -444,7 +448,7 @@ def attributes(sxpr):
     returns attribute list
     """
     val = []
-    if isinstance(sxpr, types.ListType) and len(sxpr) > 1:
+    if isinstance(sxpr, (types.ListType, types.TupleType)) and len(sxpr) > 1:
         attr = sxpr[1]
         if elementp(attr, k_attr_open):
             val = attr[1:]
@@ -474,7 +478,7 @@ def children(sxpr, elt=None):
     returns children (filtered by elt if specified)
     """
     val = []
-    if isinstance(sxpr, types.ListType) and len(sxpr) > 1:
+    if isinstance(sxpr, (types.ListType, types.TupleType)) and len(sxpr) > 1:
         i = 1
         x = sxpr[i]
         if elementp(x, k_attr_open):
@@ -563,7 +567,7 @@ def with_id(sxpr, id, val=None):
 
     return s-exp or val
     """
-    if isinstance(sxpr, types.ListType):
+    if isinstance(sxpr, (types.ListType, types.TupleType)):
         for n in sxpr:
             if has_id(n, id):
                 val = n
@@ -583,7 +587,7 @@ def child_with_id(sxpr, id, val=None):
 
     return s-exp or val
     """
-    if isinstance(sxpr, types.ListType):
+    if isinstance(sxpr, (types.ListType, types.TupleType)):
         for n in sxpr:
             if has_id(n, id):
                 val = n
@@ -605,7 +609,7 @@ def elements(sxpr, ctxt=None):
     yield (sxpr, ctxt)
     i = 0
     for n in children(sxpr):
-        if isinstance(n, types.ListType):
+        if isinstance(n, (types.ListType, types.TupleType)):
             # Calling elements() recursively does not generate recursively,
             # it just returns a generator object. So we must iterate over it.
             for v in elements(n, (i, sxpr, ctxt)):

@@ -249,6 +249,11 @@ int xencomm_add_offset(void *handle, unsigned int bytes)
         unsigned int chunksz;
         unsigned int chunk_skip;
 
+        if (dest_paddr == XENCOMM_INVALID) {
+            i++;
+            continue;
+        }
+
         pgoffset = dest_paddr % PAGE_SIZE;
         chunksz = PAGE_SIZE - pgoffset;
 
@@ -260,6 +265,8 @@ int xencomm_add_offset(void *handle, unsigned int bytes)
             desc->address[i] += chunk_skip;
         }
         bytes -= chunk_skip;
+
+	i++;
     }
     return 0;
 }

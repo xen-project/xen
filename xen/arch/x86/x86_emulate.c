@@ -10,14 +10,14 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <public/xen.h>
-#define DPRINTF(_f, _a...) printf( _f , ## _a )
+#define dprintf(_f, _a...) printf( _f , ## _a )
 #else
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
 #include <asm/regs.h>
-#define DPRINTF DPRINTK
+#define dprintf(_f, _a...) gdprintk(XENLOG_WARNING, _f , ## _a )
 #endif
 #include <asm-x86/x86_emulate.h>
 
@@ -560,7 +560,7 @@ x86_emulate_memop(
 
         if ( modrm_mod == 3 )
         {
-            DPRINTF("Cannot parse ModRM.mod == 3.\n");
+            dprintf("Cannot parse ModRM.mod == 3.\n");
             goto cannot_emulate;
         }
 
@@ -970,7 +970,7 @@ x86_emulate_memop(
             _regs.edi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
         break;
     case 0xa6 ... 0xa7: /* cmps */
-        DPRINTF("Urk! I don't handle CMPS.\n");
+        dprintf("Urk! I don't handle CMPS.\n");
         goto cannot_emulate;
     case 0xaa ... 0xab: /* stos */
         dst.type  = OP_MEM;
@@ -990,7 +990,7 @@ x86_emulate_memop(
             _regs.esi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
         break;
     case 0xae ... 0xaf: /* scas */
-        DPRINTF("Urk! I don't handle SCAS.\n");
+        dprintf("Urk! I don't handle SCAS.\n");
         goto cannot_emulate;
     }
     goto writeback;
@@ -1149,7 +1149,7 @@ x86_emulate_memop(
     goto writeback;
 
  cannot_emulate:
-    DPRINTF("Cannot emulate %02x\n", b);
+    dprintf("Cannot emulate %02x\n", b);
     return -1;
 }
 

@@ -44,13 +44,14 @@ tlb_track_allocate_entries(struct tlb_track* tlb_track)
 
     BUG_ON(tlb_track->num_free > 0);
     if (tlb_track->num_entries >= tlb_track->limit) {
-        DPRINTK("%s: num_entries %d limit %d\n",
+        dprintk(XENLOG_WARNING, "%s: num_entries %d limit %d\n",
                 __func__, tlb_track->num_entries, tlb_track->limit);
         return -ENOMEM;
     }
     entry_page = alloc_domheap_page(NULL);
     if (entry_page == NULL) {
-        DPRINTK("%s: domheap page failed. num_entries %d limit %d\n",
+        dprintk(XENLOG_WARNING,
+                "%s: domheap page failed. num_entries %d limit %d\n",
                 __func__, tlb_track->num_entries, tlb_track->limit);
         return -ENOMEM;
     }

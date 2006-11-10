@@ -39,6 +39,7 @@
 
 #include <linux/config.h>
 #include <asm/hypervisor.h>
+#include <asm/maddr.h> /* maddr_t */
 #include <xen/interface/grant_table.h>
 #include <xen/features.h>
 
@@ -118,7 +119,7 @@ int gnttab_suspend(void);
 int gnttab_resume(void);
 
 static inline void
-gnttab_set_map_op(struct gnttab_map_grant_ref *map, unsigned long addr,
+gnttab_set_map_op(struct gnttab_map_grant_ref *map, maddr_t addr,
 		  uint32_t flags, grant_ref_t ref, domid_t domid)
 {
 	if (flags & GNTMAP_contains_pte)
@@ -134,7 +135,7 @@ gnttab_set_map_op(struct gnttab_map_grant_ref *map, unsigned long addr,
 }
 
 static inline void
-gnttab_set_unmap_op(struct gnttab_unmap_grant_ref *unmap, unsigned long addr,
+gnttab_set_unmap_op(struct gnttab_unmap_grant_ref *unmap, maddr_t addr,
 		    uint32_t flags, grant_handle_t handle)
 {
 	if (flags & GNTMAP_contains_pte)

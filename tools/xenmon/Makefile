@@ -15,7 +15,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 sbindir=/usr/sbin
 
-CFLAGS  += -Werror -g
+CFLAGS  += -Werror
 CFLAGS  += -I $(XEN_XC)
 CFLAGS  += -I $(XEN_LIBXC)
 LDFLAGS += -L $(XEN_LIBXC)

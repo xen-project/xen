@@ -132,17 +132,20 @@ int sched_init_vcpu(struct vcpu *v, unsigned int processor)
     return SCHED_OP(init_vcpu, v);
 }
 
+void sched_destroy_vcpu(struct vcpu *v)
+{
+    kill_timer(&v->timer);
+    kill_timer(&v->poll_timer);
+    SCHED_OP(destroy_vcpu, v);
+}
+
+int sched_init_domain(struct domain *d)
+{
+    return SCHED_OP(init_domain, d);
+}
+
 void sched_destroy_domain(struct domain *d)
 {
-    struct vcpu *v;
-
-    for_each_vcpu ( d, v )
-    {
-        kill_timer(&v->timer);
-        kill_timer(&v->poll_timer);
-        TRACE_2D(TRC_SCHED_DOM_REM, v->domain->domain_id, v->vcpu_id);
-    }
-
     SCHED_OP(destroy_domain, d);
 }
 
@@ -200,7 +203,6 @@ void vcpu_wake(struct vcpu *v)
 
 static void vcpu_migrate(struct vcpu *v)
 {
-    cpumask_t online_affinity;
     unsigned long flags;
     int old_cpu;
 
@@ -215,8 +217,7 @@ static void vcpu_migrate(struct vcpu *v)
 
     /* Switch to new CPU, then unlock old CPU. */
     old_cpu = v->processor;
-    cpus_and(online_affinity, v->cpu_affinity, cpu_online_map);
-    v->processor = first_cpu(online_affinity);
+    v->processor = SCHED_OP(pick_cpu, v);
     spin_unlock_irqrestore(
         &per_cpu(schedule_data, old_cpu).schedule_lock, flags);
 
@@ -468,7 +469,7 @@ long do_set_timer_op(s_time_t timeout)
          * timeout in this case can burn a lot of CPU. We therefore go for a
          * reasonable middleground of triggering a timer event in 100ms.
          */
-        DPRINTK("Warning: huge timeout set by domain %d (vcpu %d):"
+        gdprintk(XENLOG_INFO, "Warning: huge timeout set by domain %d (vcpu %d):"
                 " %"PRIx64"\n",
                 v->domain->domain_id, v->vcpu_id, (uint64_t)timeout);
         set_timer(&v->timer, NOW() + MILLISECS(100));

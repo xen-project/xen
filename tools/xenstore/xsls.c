@@ -94,14 +94,8 @@ void usage(int argc, char *argv[])
 int main(int argc, char *argv[])
 {
     struct winsize ws;
-    int ret;
-    int c;
-    int show_perm = 0;
-
-    struct xs_handle *xsh = xs_daemon_open();
-
-    if (xsh == NULL)
-        err(1, "xs_daemon_open");
+    int ret, c, socket = 0, show_perm = 0;
+    struct xs_handle *xsh;
 
 #define PAD 2
 
@@ -110,11 +104,14 @@ int main(int argc, char *argv[])
     if (!ret)
         max_width = ws.ws_col - PAD;
 
-    while (0 < (c = getopt(argc, argv, "p"))) {
+    while (0 < (c = getopt(argc, argv, "ps"))) {
         switch (c) {
         case 'p':
             show_perm = 1;
             max_width -= 16;
+            break;
+        case 's':
+            socket = 1;
             break;
         case ':':
         case '?':
@@ -123,6 +120,10 @@ int main(int argc, char *argv[])
             return 0;
         }
     }
+
+    xsh = socket ? xs_daemon_open() : xs_domain_open();
+    if (xsh == NULL)
+        err(1, socket ? "xs_daemon_open" : "xs_domain_open");
 
     print_dir(xsh, (argc - optind) == 1 ? argv[optind] : "/", 0, show_perm);
 

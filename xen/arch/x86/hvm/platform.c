@@ -370,6 +370,13 @@ static int hvm_decode(int realmode, unsigned char *opcode,
     /* the operands order in comments conforms to AT&T convention */
 
     switch ( *opcode ) {
+
+    case 0x00: /* add r8, m8 */
+        mmio_op->instr = INSTR_ADD;
+        *op_size = BYTE;
+        GET_OP_SIZE_FOR_BYTE(size_reg);
+        return reg_mem(size_reg, opcode, mmio_op, rex);
+
     case 0x0A: /* or m8, r8 */
         mmio_op->instr = INSTR_OR;
         *op_size = BYTE;
@@ -720,21 +727,26 @@ static void hvm_send_assist_req(struct vcpu *v)
     ioreq_t *p;
 
     p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;
-    if ( unlikely(p->state != STATE_INVALID) ) {
-        /* This indicates a bug in the device model.  Crash the
-           domain. */
-        printk("Device model set bad IO state %d.\n", p->state);
+    if ( unlikely(p->state != STATE_IOREQ_NONE) )
+    {
+        /* This indicates a bug in the device model.  Crash the domain. */
+        gdprintk(XENLOG_ERR, "Device model set bad IO state %d.\n", p->state);
         domain_crash(v->domain);
         return;
     }
 
     prepare_wait_on_xen_event_channel(v->arch.hvm_vcpu.xen_port);
+
+    /*
+     * Following happens /after/ blocking and setting up ioreq contents.
+     * prepare_wait_on_xen_event_channel() is an implicit barrier.
+     */
     p->state = STATE_IOREQ_READY;
     notify_via_xen_event_channel(v->arch.hvm_vcpu.xen_port);
 }
 
 void send_pio_req(unsigned long port, unsigned long count, int size,
-                  long value, int dir, int df, int pvalid)
+                  long value, int dir, int df, int value_is_ptr)
 {
     struct vcpu *v = current;
     vcpu_iodata_t *vio;
@@ -742,8 +754,8 @@ void send_pio_req(unsigned long port, unsigned long count, int size,
 
     if ( size == 0 || count == 0 ) {
         printk("null pio request? port %lx, count %lx, "
-               "size %d, value %lx, dir %d, pvalid %d.\n",
-               port, count, size, value, dir, pvalid);
+               "size %d, value %lx, dir %d, value_is_ptr %d.\n",
+               port, count, size, value, dir, value_is_ptr);
     }
 
     vio = get_vio(v->domain, v->vcpu_id);
@@ -753,12 +765,12 @@ void send_pio_req(unsigned long port, unsigned long count, int size,
     }
 
     p = &vio->vp_ioreq;
-    if ( p->state != STATE_INVALID )
+    if ( p->state != STATE_IOREQ_NONE )
         printk("WARNING: send pio with something already pending (%d)?\n",
                p->state);
 
     p->dir = dir;
-    p->pdata_valid = pvalid;
+    p->data_is_ptr = value_is_ptr;
 
     p->type = IOREQ_TYPE_PIO;
     p->size = size;
@@ -768,16 +780,18 @@ void send_pio_req(unsigned long port, unsigned long count, int size,
 
     p->io_count++;
 
-    if ( pvalid )   /* get physical address of data */
+    if ( value_is_ptr )   /* get physical address of data */
     {
         if ( hvm_paging_enabled(current) )
-            p->u.pdata = (void *)shadow_gva_to_gpa(current, value);
+            p->data = shadow_gva_to_gpa(current, value);
         else
-            p->u.pdata = (void *)value; /* guest VA == guest PA */
-    } else if ( dir == IOREQ_WRITE )
-        p->u.data = value;
+            p->data = value; /* guest VA == guest PA */
+    }
+    else if ( dir == IOREQ_WRITE )
+        p->data = value;
 
-    if ( hvm_portio_intercept(p) ) {
+    if ( hvm_portio_intercept(p) )
+    {
         p->state = STATE_IORESP_READY;
         hvm_io_assist(v);
         return;
@@ -788,7 +802,7 @@ void send_pio_req(unsigned long port, unsigned long count, int size,
 
 static void send_mmio_req(unsigned char type, unsigned long gpa,
                           unsigned long count, int size, long value,
-                          int dir, int df, int pvalid)
+                          int dir, int df, int value_is_ptr)
 {
     struct vcpu *v = current;
     vcpu_iodata_t *vio;
@@ -796,8 +810,8 @@ static void send_mmio_req(unsigned char type, unsigned long gpa,
 
     if ( size == 0 || count == 0 ) {
         printk("null mmio request? type %d, gpa %lx, "
-               "count %lx, size %d, value %lx, dir %d, pvalid %d.\n",
-               type, gpa, count, size, value, dir, pvalid);
+               "count %lx, size %d, value %lx, dir %d, value_is_ptr %d.\n",
+               type, gpa, count, size, value, dir, value_is_ptr);
     }
 
     vio = get_vio(v->domain, v->vcpu_id);
@@ -808,11 +822,11 @@ static void send_mmio_req(unsigned char type, unsigned long gpa,
 
     p = &vio->vp_ioreq;
 
-    if ( p->state != STATE_INVALID )
+    if ( p->state != STATE_IOREQ_NONE )
         printk("WARNING: send mmio with something already pending (%d)?\n",
                p->state);
     p->dir = dir;
-    p->pdata_valid = pvalid;
+    p->data_is_ptr = value_is_ptr;
 
     p->type = type;
     p->size = size;
@@ -822,15 +836,18 @@ static void send_mmio_req(unsigned char type, unsigned long gpa,
 
     p->io_count++;
 
-    if (pvalid) {
-        if (hvm_paging_enabled(v))
-            p->u.data = shadow_gva_to_gpa(v, value);
+    if ( value_is_ptr )
+    {
+        if ( hvm_paging_enabled(v) )
+            p->data = shadow_gva_to_gpa(v, value);
         else
-            p->u.pdata = (void *) value; /* guest VA == guest PA */
-    } else
-        p->u.data = value;
+            p->data = value; /* guest VA == guest PA */
+    }
+    else
+        p->data = value;
 
-    if ( hvm_mmio_intercept(p) || hvm_buffered_io_intercept(p) ) {
+    if ( hvm_mmio_intercept(p) || hvm_buffered_io_intercept(p) )
+    {
         p->state = STATE_IORESP_READY;
         hvm_io_assist(v);
         return;
@@ -956,7 +973,8 @@ void handle_mmio(unsigned long gpa)
         }
 
         if ( addr & (size - 1) )
-            DPRINTK("Unaligned ioport access: %lx, %d\n", addr, size);
+            gdprintk(XENLOG_WARNING,
+                     "Unaligned ioport access: %lx, %d\n", addr, size);
 
         /*
          * In case of a movs spanning multiple pages, we break the accesses
@@ -971,7 +989,8 @@ void handle_mmio(unsigned long gpa)
         if ( (addr & PAGE_MASK) != ((addr + size - 1) & PAGE_MASK) ) {
             unsigned long value = 0;
 
-            DPRINTK("Single io request in a movs crossing page boundary.\n");
+            gdprintk(XENLOG_WARNING,
+                     "Single io request in a movs crossing page boundary.\n");
             mmio_op->flags |= OVERLAP;
 
             if ( dir == IOREQ_WRITE ) {
@@ -1036,6 +1055,10 @@ void handle_mmio(unsigned long gpa)
 
     case INSTR_AND:
         mmio_operands(IOREQ_TYPE_AND, gpa, mmio_op, op_size);
+        break;
+
+    case INSTR_ADD:
+        mmio_operands(IOREQ_TYPE_ADD, gpa, mmio_op, op_size);
         break;
 
     case INSTR_XOR:

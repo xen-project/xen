@@ -24,7 +24,7 @@ if s != 0:
 
 # Now try to start a DomU with write access to /dev/ram0
 
-config = {"disk":"phy:/dev/ram0,hda1,w"}
+config = {"disk":"phy:/dev/ram0,xvda1,w"}
 
 domain = XmTestDomain(extraConfig=config);
 

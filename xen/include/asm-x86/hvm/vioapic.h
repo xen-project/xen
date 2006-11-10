@@ -23,99 +23,82 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
 
-#ifndef __ASM_X86_HVM_IOAPIC_H__
-#define __ASM_X86_HVM_IOAPIC_H__
+#ifndef __ASM_X86_HVM_VIOAPIC_H__
+#define __ASM_X86_HVM_VIOAPIC_H__
 
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/smp.h>
 
-#ifndef __ia64__
-#define IOAPIC_VERSION_ID 0x11
-#else
-#define IOAPIC_VERSION_ID 0x21
-#endif
-
-#define IOAPIC_NUM_PINS 24
-#define MAX_LAPIC_NUM   32
-
-#define IOAPIC_LEVEL_TRIGGER 1
-
-#define IOAPIC_DEFAULT_BASE_ADDRESS  0xfec00000
-#define IOAPIC_MEM_LENGTH            0x100
-
-#define IOAPIC_ENABLE_MASK  0x0
-#define IOAPIC_ENABLE_FLAG  (1 << IOAPIC_ENABLE_MASK)
-#define IOAPICEnabled(s)    (s->flags & IOAPIC_ENABLE_FLAG)
-
-#define IOAPIC_REG_SELECT  0x0
-#define IOAPIC_REG_WINDOW  0x10
-
 #ifdef __ia64__
-#define IOAPIC_REG_ASSERTION    0x20
-#define IOAPIC_REG_EOI          0x40
+#define VIOAPIC_IS_IOSAPIC 1
 #endif
 
-#ifndef __ia64__
-#define IOAPIC_REG_APIC_ID 0x0
-#define IOAPIC_REG_ARB_ID  0x2
+#if !VIOAPIC_IS_IOSAPIC
+#define VIOAPIC_VERSION_ID 0x11 /* IOAPIC version */
+#else
+#define VIOAPIC_VERSION_ID 0x21 /* IOSAPIC version */
 #endif
 
-#define IOAPIC_REG_VERSION 0x1
+#define VIOAPIC_NUM_PINS 24
 
-typedef union RedirStatus
+#define VIOAPIC_EDGE_TRIG  0
+#define VIOAPIC_LEVEL_TRIG 1
+
+#define VIOAPIC_DEFAULT_BASE_ADDRESS  0xfec00000
+#define VIOAPIC_MEM_LENGTH            0x100
+
+/* Direct registers. */
+#define VIOAPIC_REG_SELECT  0x00
+#define VIOAPIC_REG_WINDOW  0x10
+#define VIOAPIC_REG_EOI     0x40 /* IA64 IOSAPIC only */
+
+/* Indirect registers. */
+#define VIOAPIC_REG_APIC_ID 0x00 /* x86 IOAPIC only */
+#define VIOAPIC_REG_VERSION 0x01
+#define VIOAPIC_REG_ARB_ID  0x02 /* x86 IOAPIC only */
+
+#define domain_vioapic(d) (&(d)->arch.hvm_domain.vioapic)
+#define vioapic_domain(v) (container_of((v), struct domain, \
+                                        arch.hvm_domain.vioapic))
+
+union vioapic_redir_entry
 {
-    uint64_t value;
+    uint64_t bits;
     struct {
         uint8_t vector;
-        uint8_t deliver_mode:3;
-        uint8_t destmode:1;
-        uint8_t delivestatus:1;
+        uint8_t delivery_mode:3;
+        uint8_t dest_mode:1;
+        uint8_t delivery_status:1;
         uint8_t polarity:1;
-        uint8_t remoteirr:1;
-        uint8_t trigmod:1;
-        uint8_t mask:1;         /* interrupt mask*/
+        uint8_t remote_irr:1;
+        uint8_t trig_mode:1;
+        uint8_t mask:1;
         uint8_t reserve:7;
-#ifndef __ia64__
+#if !VIOAPIC_IS_IOSAPIC
         uint8_t reserved[4];
         uint8_t dest_id;
 #else
         uint8_t reserved[3];
         uint16_t dest_id;
 #endif
-    } RedirForm;
-} RedirStatus;
+    } fields;
+};
 
-typedef struct hvm_vioapic {
+struct vioapic {
     uint32_t irr;
     uint32_t irr_xen; /* interrupts forced on by the hypervisor. */
-    uint32_t isr;           /* This is used for level trigger */
+    uint32_t isr;     /* This is used for level trigger */
     uint32_t imr;
     uint32_t ioregsel;
-    uint32_t flags;
-    uint32_t lapic_count;
     uint32_t id;
-    uint32_t arb_id;
     unsigned long base_address;
-    RedirStatus redirtbl[IOAPIC_NUM_PINS];
-    struct vlapic *lapic_info[MAX_LAPIC_NUM];
-    struct domain *domain;
-} hvm_vioapic_t;
+    union vioapic_redir_entry redirtbl[VIOAPIC_NUM_PINS];
+};
 
-hvm_vioapic_t *hvm_vioapic_init(struct domain *d);
+void vioapic_init(struct domain *d);
+void vioapic_set_xen_irq(struct domain *d, int irq, int level);
+void vioapic_set_irq(struct domain *d, int irq, int level);
+void vioapic_update_EOI(struct domain *d, int vector);
 
-void hvm_vioapic_do_irqs_clear(struct domain *d, uint16_t irqs);
-void hvm_vioapic_do_irqs(struct domain *d, uint16_t irqs);
-void hvm_vioapic_set_xen_irq(struct domain *d, int irq, int level);
-void hvm_vioapic_set_irq(struct domain *d, int irq, int level);
-
-int hvm_vioapic_add_lapic(struct vlapic *vlapic, struct vcpu *v);
-
-void ioapic_update_EOI(struct domain *d, int vector);
-
-#ifdef HVM_DOMAIN_SAVE_RESTORE
-void ioapic_save(QEMUFile* f, void* opaque);
-int ioapic_load(QEMUFile* f, void* opaque, int version_id);
-#endif
-
-#endif /* __ASM_X86_HVM_IOAPIC_H__ */
+#endif /* __ASM_X86_HVM_VIOAPIC_H__ */

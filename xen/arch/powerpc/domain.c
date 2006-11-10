@@ -109,25 +109,26 @@ void machine_restart(char * __unused)
     while(1);
 }
 
-struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
+struct vcpu *alloc_vcpu_struct(void)
 {
     struct vcpu *v;
-
-    if ( (v = xmalloc(struct vcpu)) == NULL )
-        return NULL;
-
-    memset(v, 0, sizeof(*v));
-    v->vcpu_id = vcpu_id;
-
+    if ( (v = xmalloc(struct vcpu)) != NULL )
+        memset(v, 0, sizeof(*v));
     return v;
 }
 
 void free_vcpu_struct(struct vcpu *v)
 {
-    BUG_ON(v->next_in_list != NULL);
-    if ( v->vcpu_id != 0 )
-        v->domain->vcpu[v->vcpu_id - 1]->next_in_list = NULL;
     xfree(v);
+}
+
+int vcpu_initialise(struct vcpu *v)
+{
+    return 0;
+}
+
+void vcpu_destroy(struct vcpu *v)
+{
 }
 
 int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_t *c)

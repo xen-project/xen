@@ -39,6 +39,7 @@ from xen.xend import PrettyPrint
 from xen.xend import sxp
 from xen.xend import XendClient
 from xen.xend.XendClient import server
+from xen.xend.XendConstants import *
 
 from xen.xm.opts import OptionError, Opts, wrap, set_true
 from xen.xm import console
@@ -91,6 +92,15 @@ SUBCOMMAND_HELP = {
     'top'         : ('', 'Monitor a host and the domains in real time.'),
     'unpause'     : ('<Domain>', 'Unpause a paused domain.'),
     'uptime'      : ('[-s] <Domain>', 'Print uptime for a domain.'),
+
+    # Life cycle xm commands
+    'new'         : ('<ConfigFile> [options] [vars]',
+                     'Adds a domain to Xend domain management'),
+    'delete'      : ('<DomainName>',
+                     'Remove a domain from Xend domain management.'),
+    'start'       : ('<DomainName>', 'Start a Xend managed domain'),
+    'resume'      : ('<DomainName>', 'Resume a Xend managed domain'),
+    'suspend'     : ('<DomainName>', 'Suspend a Xend maanged domain'),
 
     # less used commands
 
@@ -194,6 +204,8 @@ SUBCOMMAND_OPTIONS = {
 common_commands = [
     "console",
     "create",
+    "new",
+    "delete",
     "destroy",
     "dump-core",
     "help",
@@ -203,8 +215,11 @@ common_commands = [
     "pause",
     "reboot",
     "restore",
+    "resume",
     "save",
     "shutdown",
+    "start",
+    "suspend",
     "top",
     "unpause",
     "uptime",
@@ -214,6 +229,8 @@ common_commands = [
 domain_commands = [
     "console",
     "create",
+    "new",
+    "delete",
     "destroy",
     "domid",
     "domname",
@@ -226,8 +243,11 @@ domain_commands = [
     "reboot",
     "rename",
     "restore",
+    "resume",
     "save",
     "shutdown",
+    "start",
+    "suspend",
     "sysrq",
     "top",
     "unpause",
@@ -469,9 +489,9 @@ def xm_restore(args):
 
 def getDomains(domain_names, full = 0):
     if domain_names:
-        return [server.xend.domain(dom) for dom in domain_names]
+        return [server.xend.domain(dom, full) for dom in domain_names]
     else:
-        return server.xend.domains(1)
+        return server.xend.domains(1, full)
 
 
 def xm_list(args):
@@ -513,13 +533,16 @@ def xm_list(args):
 def parse_doms_info(info):
     def get_info(n, t, d):
         return t(sxp.child_value(info, n, d))
+
+    def get_status(n, t, d):
+        return DOM_STATES[t(sxp.child_value(info, n, d))]
     
     return {
         'domid'    : get_info('domid',        int,   -1),
         'name'     : get_info('name',         str,   '??'),
-        'mem'      : get_info('memory',       int,   0),
+        'mem'      : get_info('memory_dynamic_max', int,   0),
         'vcpus'    : get_info('online_vcpus', int,   0),
-        'state'    : get_info('state',        str,   '??'),
+        'state'    : get_info('state',        str,    ''),
         'cpu_time' : get_info('cpu_time',     float, 0),
         'up_time'  : get_info('up_time',      float, -1),
         'seclabel' : security.get_security_printlabel(info),
@@ -531,7 +554,7 @@ def parse_sedf_info(info):
         return t(sxp.child_value(info, n, d))
 
     return {
-        'domid'    : get_info('domain',        int,   -1),
+        'domid'    : get_info('domid',        int,   -1),
         'period'   : get_info('period',        int,   -1),
         'slice'    : get_info('slice',         int,   -1),
         'latency'  : get_info('latency',       int,   -1),
@@ -540,10 +563,10 @@ def parse_sedf_info(info):
         }
 
 def xm_brief_list(doms):
-    print '%-40s %3s %8s %5s %5s %9s' % \
-          ('Name', 'ID', 'Mem(MiB)', 'VCPUs', 'State', 'Time(s)')
+    print '%-40s %3s %5s %5s %10s %9s' % \
+          ('Name', 'ID', 'Mem', 'VCPUs', 'State', 'Time(s)')
     
-    format = "%(name)-40s %(domid)3d %(mem)8d %(vcpus)5d %(state)5s " \
+    format = "%(name)-40s %(domid)3d %(mem)5d %(vcpus)5d %(state)10s " \
              "%(cpu_time)8.1f"
     
     for dom in doms:
@@ -551,11 +574,11 @@ def xm_brief_list(doms):
         print format % d
 
 def xm_label_list(doms):
-    print '%-32s %3s %8s %5s %5s %9s %-8s' % \
-          ('Name', 'ID', 'Mem(MiB)', 'VCPUs', 'State', 'Time(s)', 'Label')
+    print '%-32s %3s %5s %5s %5s %9s %-8s' % \
+          ('Name', 'ID', 'Mem', 'VCPUs', 'State', 'Time(s)', 'Label')
     
     output = []
-    format = '%(name)-32s %(domid)3d %(mem)8d %(vcpus)5d %(state)5s ' \
+    format = '%(name)-32s %(domid)3d %(mem)5d %(vcpus)5d %(state)10s ' \
              '%(cpu_time)8.1f %(seclabel)9s'
     
     for dom in doms:
@@ -683,6 +706,26 @@ def xm_vcpu_list(args):
 
             print format % locals()
 
+def xm_start(args):
+    arg_check(args, "start", 1)
+    dom = args[0]
+    server.xend.domain.start(dom)
+
+def xm_delete(args):
+    arg_check(args, "delete", 1)
+    dom = args[0]
+    server.xend.domain.delete(dom)
+
+def xm_suspend(args):
+    arg_check(args, "suspend", 1)
+    dom = args[0]
+    server.xend.domain.suspend(dom)
+
+def xm_resume(args):
+    arg_check(args, "resume", 1)
+    dom = args[0]
+    server.xend.domain.resume(dom)
+    
 def xm_reboot(args):
     arg_check(args, "reboot", 1, 3)
     from xen.xm import shutdown
@@ -1032,26 +1075,23 @@ def xm_top(args):
 def xm_dmesg(args):
     arg_check(args, "dmesg", 0, 1)
     
-    gopts = Opts(use="""[-c|--clear]
-
-Read Xen's message buffer (boot output, warning and error messages) or clear
-its contents if the [-c|--clear] flag is specified.
-""")
-
-    gopts.opt('clear', short='c',
-              fn=set_true, default=0,
-              use="Clear the contents of the Xen message buffer.")
-    # Work around for gopts
-    myargs = args
-    myargs.insert(0, 'dmesg')
-    gopts.parse(myargs)
+    try:
+        (options, params) = getopt.gnu_getopt(args, 'c', ['clear'])
+    except getopt.GetoptError, opterr:
+        err(opterr)
+        sys.exit(1)
     
-    if len(myargs) not in (1, 2):
-        err('Invalid arguments: ' + str(myargs))
+    use_clear = 0
+    for (k, v) in options:
+        if k in ['-c', '--clear']:
+            use_clear = 1
+    
+    if len(params) :
+        err("No parameter required")
         usage('dmesg')
         sys.exit(1)
 
-    if not gopts.vals.clear:
+    if not use_clear:
         print server.xend.node.dmesg.info()
     else:
         server.xend.node.dmesg.clear()
@@ -1323,6 +1363,7 @@ commands = {
     # xenstat commands
     "top": xm_top,
     # domain commands
+    "delete": xm_delete,
     "destroy": xm_destroy,
     "domid": xm_domid,
     "domname": xm_domname,
@@ -1332,8 +1373,10 @@ commands = {
     "restore": xm_restore,
     "save": xm_save,
     "shutdown": xm_shutdown,
+    "start": xm_start,
     "sysrq": xm_sysrq,
     "uptime": xm_uptime,
+    "suspend": xm_suspend,
     "list": xm_list,
     # memory commands
     "mem-max": xm_mem_max,
@@ -1373,13 +1416,14 @@ commands = {
 ## The commands supported by a separate argument parser in xend.xm.
 IMPORTED_COMMANDS = [
     'create',
+    'new',    
     'migrate',
     'labels',
-    'addlabel',
     'cfgbootpolicy',
     'makepolicy',
     'loadpolicy',
-    'dumppolicy',
+    'dumppolicy',        
+    'addlabel',
     'rmlabel',
     'getlabel',
     'dry-run',

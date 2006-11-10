@@ -867,6 +867,18 @@ load_seg(unsigned long sel, uint32_t *base, uint32_t *limit, union vmcs_arbytes 
 }
 
 /*
+ * Emulate a protected mode segment load, falling back to clearing it if
+ * the descriptor was invalid.
+ */
+static void
+load_or_clear_seg(unsigned long sel, uint32_t *base, uint32_t *limit, union vmcs_arbytes *arbytes)
+{
+	if (!load_seg(sel, base, limit, arbytes))
+		load_seg(0, base, limit, arbytes);	    
+}
+
+
+/*
  * Transition to protected mode
  */
 static void
@@ -878,63 +890,22 @@ protected_mode(struct regs *regs)
 	oldctx.esp = regs->uesp;
 	oldctx.eflags = regs->eflags;
 
-	memset(&saved_rm_regs, 0, sizeof(struct regs));
-
 	/* reload all segment registers */
 	if (!load_seg(regs->cs, &oldctx.cs_base,
 				&oldctx.cs_limit, &oldctx.cs_arbytes))
 		panic("Invalid %%cs=0x%x for protected mode\n", regs->cs);
 	oldctx.cs_sel = regs->cs;
 
-	if (load_seg(regs->ves, &oldctx.es_base,
-				&oldctx.es_limit, &oldctx.es_arbytes))
-		oldctx.es_sel = regs->ves;
-	else {
-		load_seg(0, &oldctx.es_base,
-			    &oldctx.es_limit, &oldctx.es_arbytes);
-		oldctx.es_sel = 0;
-		saved_rm_regs.ves = regs->ves;
-	}
-
-	if (load_seg(regs->uss, &oldctx.ss_base,
-				&oldctx.ss_limit, &oldctx.ss_arbytes))
-		oldctx.ss_sel = regs->uss;
-	else {
-		load_seg(0, &oldctx.ss_base,
-			    &oldctx.ss_limit, &oldctx.ss_arbytes);
-		oldctx.ss_sel = 0;
-		saved_rm_regs.uss = regs->uss;
-	}
-
-	if (load_seg(regs->vds, &oldctx.ds_base,
-				&oldctx.ds_limit, &oldctx.ds_arbytes))
-		oldctx.ds_sel = regs->vds;
-	else {
-		load_seg(0, &oldctx.ds_base,
-			    &oldctx.ds_limit, &oldctx.ds_arbytes);
-		oldctx.ds_sel = 0;
-		saved_rm_regs.vds = regs->vds;
-	}
-
-	if (load_seg(regs->vfs, &oldctx.fs_base,
-				&oldctx.fs_limit, &oldctx.fs_arbytes))
-		oldctx.fs_sel = regs->vfs;
-	else {
-		load_seg(0, &oldctx.fs_base,
-			    &oldctx.fs_limit, &oldctx.fs_arbytes);
-		oldctx.fs_sel = 0;
-		saved_rm_regs.vfs = regs->vfs;
-	}
-
-	if (load_seg(regs->vgs, &oldctx.gs_base,
-				&oldctx.gs_limit, &oldctx.gs_arbytes))
-		oldctx.gs_sel = regs->vgs;
-	else {
-		load_seg(0, &oldctx.gs_base,
-			    &oldctx.gs_limit, &oldctx.gs_arbytes);
-		oldctx.gs_sel = 0;
-		saved_rm_regs.vgs = regs->vgs;
-	}
+	load_or_clear_seg(oldctx.es_sel, &oldctx.es_base,
+			  &oldctx.es_limit, &oldctx.es_arbytes);
+	load_or_clear_seg(oldctx.ss_sel, &oldctx.ss_base,
+			  &oldctx.ss_limit, &oldctx.ss_arbytes);
+	load_or_clear_seg(oldctx.ds_sel, &oldctx.ds_base,
+			  &oldctx.ds_limit, &oldctx.ds_arbytes);
+	load_or_clear_seg(oldctx.fs_sel, &oldctx.fs_base,
+			  &oldctx.fs_limit, &oldctx.fs_arbytes);
+	load_or_clear_seg(oldctx.gs_sel, &oldctx.gs_base,
+			  &oldctx.gs_limit, &oldctx.gs_arbytes);
 
 	/* initialize jump environment to warp back to protected mode */
 	regs->cs = CODE_SELECTOR;
@@ -1022,6 +993,16 @@ set_mode(struct regs *regs, enum vm86_mode newmode)
 	case VM86_REAL_TO_PROTECTED:
 		if (mode == VM86_REAL) {
 			regs->eflags |= EFLAGS_TF;
+			saved_rm_regs.vds = regs->vds;
+			saved_rm_regs.ves = regs->ves;
+			saved_rm_regs.vfs = regs->vfs;
+			saved_rm_regs.vgs = regs->vgs;
+			saved_rm_regs.uss = regs->uss;
+			oldctx.ds_sel = 0;
+			oldctx.es_sel = 0;
+			oldctx.fs_sel = 0;
+			oldctx.gs_sel = 0;
+			oldctx.ss_sel = 0;
 			break;
 		} else if (mode == VM86_REAL_TO_PROTECTED) {
 			break;
@@ -1282,6 +1263,10 @@ opcode(struct regs *regs)
 			else
 				regs->ves = pop16(regs);
 			TRACE((regs, regs->eip - eip, "pop %%es"));
+			if (mode == VM86_REAL_TO_PROTECTED) {
+				saved_rm_regs.ves = 0;
+				oldctx.es_sel = regs->ves;
+			}
 			return OPC_EMULATED;
 
 		case 0x0F: /* two byte opcode */

@@ -36,16 +36,23 @@
 /*
  * Basic constants
  */
-#define CSCHED_TICK             10      /* milliseconds */
-#define CSCHED_TSLICE           30      /* milliseconds */
-#define CSCHED_ACCT_NTICKS      3
-#define CSCHED_ACCT_PERIOD      (CSCHED_ACCT_NTICKS * CSCHED_TICK)
-#define CSCHED_DEFAULT_WEIGHT   256
+#define CSCHED_DEFAULT_WEIGHT       256
+#define CSCHED_TICKS_PER_TSLICE     3
+#define CSCHED_TICKS_PER_ACCT       3
+#define CSCHED_MSECS_PER_TICK       10
+#define CSCHED_MSECS_PER_TSLICE     \
+    (CSCHED_MSECS_PER_TICK * CSCHED_TICKS_PER_TSLICE)
+#define CSCHED_CREDITS_PER_TICK     100
+#define CSCHED_CREDITS_PER_TSLICE   \
+    (CSCHED_CREDITS_PER_TICK * CSCHED_TICKS_PER_TSLICE)
+#define CSCHED_CREDITS_PER_ACCT     \
+    (CSCHED_CREDITS_PER_TICK * CSCHED_TICKS_PER_ACCT)
 
 
 /*
  * Priorities
  */
+#define CSCHED_PRI_TS_BOOST      0      /* time-share waking up */
 #define CSCHED_PRI_TS_UNDER     -1      /* time-share w/ credits */
 #define CSCHED_PRI_TS_OVER      -2      /* time-share w/o credits */
 #define CSCHED_PRI_IDLE         -64     /* idle */
@@ -75,19 +82,12 @@
         printk("\t%-30s = %u\n", #_X, CSCHED_STAT(_X));  \
     } while ( 0 );
 
+/*
+ * Try and keep often cranked stats on top so they'll fit on one
+ * cache line.
+ */
 #define CSCHED_STATS_EXPAND_SCHED(_MACRO)   \
-    _MACRO(vcpu_init)                       \
-    _MACRO(vcpu_sleep)                      \
-    _MACRO(vcpu_wake_running)               \
-    _MACRO(vcpu_wake_onrunq)                \
-    _MACRO(vcpu_wake_runnable)              \
-    _MACRO(vcpu_wake_not_runnable)          \
-    _MACRO(dom_destroy)                     \
     _MACRO(schedule)                        \
-    _MACRO(tickle_local_idler)              \
-    _MACRO(tickle_local_over)               \
-    _MACRO(tickle_local_under)              \
-    _MACRO(tickle_local_other)              \
     _MACRO(acct_run)                        \
     _MACRO(acct_no_work)                    \
     _MACRO(acct_balance)                    \
@@ -95,20 +95,35 @@
     _MACRO(acct_min_credit)                 \
     _MACRO(acct_vcpu_active)                \
     _MACRO(acct_vcpu_idle)                  \
-    _MACRO(acct_vcpu_credit_min)
-
-#define CSCHED_STATS_EXPAND_SMP_LOAD_BALANCE(_MACRO)    \
-    _MACRO(vcpu_migrate)                                \
-    _MACRO(load_balance_idle)                           \
-    _MACRO(load_balance_over)                           \
-    _MACRO(load_balance_other)                          \
-    _MACRO(steal_trylock_failed)                        \
-    _MACRO(steal_peer_down)                             \
-    _MACRO(steal_peer_idle)                             \
-    _MACRO(steal_peer_running)                          \
-    _MACRO(steal_peer_pinned)                           \
-    _MACRO(tickle_idlers_none)                          \
-    _MACRO(tickle_idlers_some)
+    _MACRO(vcpu_sleep)                      \
+    _MACRO(vcpu_wake_running)               \
+    _MACRO(vcpu_wake_onrunq)                \
+    _MACRO(vcpu_wake_runnable)              \
+    _MACRO(vcpu_wake_not_runnable)          \
+    _MACRO(tickle_local_idler)              \
+    _MACRO(tickle_local_over)               \
+    _MACRO(tickle_local_under)              \
+    _MACRO(tickle_local_other)              \
+    _MACRO(tickle_idlers_none)              \
+    _MACRO(tickle_idlers_some)              \
+    _MACRO(vcpu_migrate)                    \
+    _MACRO(load_balance_idle)               \
+    _MACRO(load_balance_over)               \
+    _MACRO(load_balance_other)              \
+    _MACRO(steal_trylock_failed)            \
+    _MACRO(steal_peer_down)                 \
+    _MACRO(steal_peer_idle)                 \
+    _MACRO(steal_peer_running)              \
+    _MACRO(steal_peer_pinned)               \
+    _MACRO(steal_peer_migrating)            \
+    _MACRO(steal_peer_best_idler)           \
+    _MACRO(steal_loner_candidate)           \
+    _MACRO(steal_loner_signal)              \
+    _MACRO(cpu_pick)                        \
+    _MACRO(dom_init)                        \
+    _MACRO(dom_destroy)                     \
+    _MACRO(vcpu_init)                       \
+    _MACRO(vcpu_destroy)
 
 #ifndef NDEBUG
 #define CSCHED_STATS_EXPAND_CHECKS(_MACRO)  \
@@ -117,10 +132,9 @@
 #define CSCHED_STATS_EXPAND_CHECKS(_MACRO)
 #endif
 
-#define CSCHED_STATS_EXPAND(_MACRO)                 \
-    CSCHED_STATS_EXPAND_SCHED(_MACRO)               \
-    CSCHED_STATS_EXPAND_SMP_LOAD_BALANCE(_MACRO)    \
-    CSCHED_STATS_EXPAND_CHECKS(_MACRO)
+#define CSCHED_STATS_EXPAND(_MACRO)         \
+    CSCHED_STATS_EXPAND_CHECKS(_MACRO)      \
+    CSCHED_STATS_EXPAND_SCHED(_MACRO)
 
 #define CSCHED_STATS_RESET()                                        \
     do                                                              \
@@ -170,11 +184,14 @@ struct csched_vcpu {
     struct csched_dom *sdom;
     struct vcpu *vcpu;
     atomic_t credit;
-    int credit_last;
-    uint32_t credit_incr;
-    uint32_t state_active;
-    uint32_t state_idle;
     int16_t pri;
+    struct {
+        int credit_last;
+        uint32_t credit_incr;
+        uint32_t state_active;
+        uint32_t state_idle;
+        uint32_t migrate;
+    } stats;
 };
 
 /*
@@ -313,7 +330,7 @@ csched_pcpu_init(int cpu)
     spin_lock_irqsave(&csched_priv.lock, flags);
 
     /* Initialize/update system-wide config */
-    csched_priv.credit += CSCHED_ACCT_PERIOD;
+    csched_priv.credit += CSCHED_CREDITS_PER_ACCT;
     if ( csched_priv.ncpus <= cpu )
         csched_priv.ncpus = cpu + 1;
     if ( csched_priv.master >= csched_priv.ncpus )
@@ -358,8 +375,42 @@ __csched_vcpu_check(struct vcpu *vc)
 #define CSCHED_VCPU_CHECK(_vc)
 #endif
 
+/*
+ * Indicates which of two given idlers is most efficient to run
+ * an additional VCPU.
+ *
+ * Returns:
+ *  0:           They are the same.
+ *  negative:    One is less efficient than Two.
+ *  positive:    One is more efficient than Two.
+ */
+static int
+csched_idler_compare(int one, int two)
+{
+    cpumask_t idlers;
+    cpumask_t one_idlers;
+    cpumask_t two_idlers;
+
+    idlers = csched_priv.idlers;
+    cpu_clear(one, idlers);
+    cpu_clear(two, idlers);
+
+    if ( cpu_isset(one, cpu_core_map[two]) )
+    {
+        cpus_and(one_idlers, idlers, cpu_sibling_map[one]);
+        cpus_and(two_idlers, idlers, cpu_sibling_map[two]);
+    }
+    else
+    {
+        cpus_and(one_idlers, idlers, cpu_core_map[one]);
+        cpus_and(two_idlers, idlers, cpu_core_map[two]);
+    }
+
+    return cpus_weight(one_idlers) - cpus_weight(two_idlers);
+}
+
 static inline int
-__csched_vcpu_is_stealable(int local_cpu, struct vcpu *vc)
+__csched_queued_vcpu_is_stealable(int local_cpu, struct vcpu *vc)
 {
     /*
      * Don't pick up work that's in the peer's scheduling tail. Also only pick
@@ -374,6 +425,32 @@ __csched_vcpu_is_stealable(int local_cpu, struct vcpu *vc)
     if ( unlikely(!cpu_isset(local_cpu, vc->cpu_affinity)) )
     {
         CSCHED_STAT_CRANK(steal_peer_pinned);
+        return 0;
+    }
+
+    return 1;
+}
+
+static inline int
+__csched_running_vcpu_is_stealable(int local_cpu, struct vcpu *vc)
+{
+    BUG_ON( is_idle_vcpu(vc) );
+
+    if ( unlikely(!cpu_isset(local_cpu, vc->cpu_affinity)) )
+    {
+        CSCHED_STAT_CRANK(steal_peer_pinned);
+        return 0;
+    }
+
+    if ( test_bit(_VCPUF_migrating, &vc->vcpu_flags) )
+    {
+        CSCHED_STAT_CRANK(steal_peer_migrating);
+        return 0;
+    }
+
+    if ( csched_idler_compare(local_cpu, vc->processor) <= 0 )
+    {
+        CSCHED_STAT_CRANK(steal_peer_best_idler);
         return 0;
     }
 
@@ -397,7 +474,7 @@ csched_vcpu_acct(struct csched_vcpu *svc, int credit_dec)
         if ( list_empty(&svc->active_vcpu_elem) )
         {
             CSCHED_STAT_CRANK(acct_vcpu_active);
-            svc->state_active++;
+            svc->stats.state_active++;
 
             sdom->active_vcpu_count++;
             list_add(&svc->active_vcpu_elem, &sdom->active_vcpu);
@@ -410,6 +487,14 @@ csched_vcpu_acct(struct csched_vcpu *svc, int credit_dec)
 
         spin_unlock_irqrestore(&csched_priv.lock, flags);
     }
+
+    /*
+     * If this VCPU's priority was boosted when it last awoke, reset it.
+     * If the VCPU is found here, then it's consuming a non-negligeable
+     * amount of CPU resources and should no longer be boosted.
+     */
+    if ( svc->pri == CSCHED_PRI_TS_BOOST )
+        svc->pri = CSCHED_PRI_TS_UNDER;
 }
 
 static inline void
@@ -420,7 +505,7 @@ __csched_vcpu_acct_idle_locked(struct csched_vcpu *svc)
     BUG_ON( list_empty(&svc->active_vcpu_elem) );
 
     CSCHED_STAT_CRANK(acct_vcpu_idle);
-    svc->state_idle++;
+    svc->stats.state_idle++;
 
     sdom->active_vcpu_count--;
     list_del_init(&svc->active_vcpu_elem);
@@ -430,51 +515,20 @@ __csched_vcpu_acct_idle_locked(struct csched_vcpu *svc)
         list_del_init(&sdom->active_sdom_elem);
         csched_priv.weight -= sdom->weight;
     }
-
-    atomic_set(&svc->credit, 0);
 }
 
 static int
 csched_vcpu_init(struct vcpu *vc)
 {
     struct domain * const dom = vc->domain;
-    struct csched_dom *sdom;
+    struct csched_dom *sdom = CSCHED_DOM(dom);
     struct csched_vcpu *svc;
-    int16_t pri;
 
     CSCHED_STAT_CRANK(vcpu_init);
 
-    /* Allocate, if appropriate, per-domain info */
-    if ( is_idle_vcpu(vc) )
-    {
-        sdom = NULL;
-        pri = CSCHED_PRI_IDLE;
-    }
-    else if ( CSCHED_DOM(dom) )
-    {
-        sdom = CSCHED_DOM(dom);
-        pri = CSCHED_PRI_TS_UNDER;
-    }
-    else 
-    {
-        sdom = xmalloc(struct csched_dom);
-        if ( !sdom )
-            return -1;
-
-        /* Initialize credit and weight */
-        INIT_LIST_HEAD(&sdom->active_vcpu);
-        sdom->active_vcpu_count = 0;
-        INIT_LIST_HEAD(&sdom->active_sdom_elem);
-        sdom->dom = dom;
-        sdom->weight = CSCHED_DEFAULT_WEIGHT;
-        sdom->cap = 0U;
-        dom->sched_priv = sdom;
-        pri = CSCHED_PRI_TS_UNDER;
-    }
-
     /* Allocate per-VCPU info */
     svc = xmalloc(struct csched_vcpu);
-    if ( !svc )
+    if ( svc == NULL )
         return -1;
 
     INIT_LIST_HEAD(&svc->runq_elem);
@@ -482,11 +536,8 @@ csched_vcpu_init(struct vcpu *vc)
     svc->sdom = sdom;
     svc->vcpu = vc;
     atomic_set(&svc->credit, 0);
-    svc->credit_last = 0;
-    svc->credit_incr = 0U;
-    svc->state_active = 0U;
-    svc->state_idle = 0U;
-    svc->pri = pri;
+    svc->pri = is_idle_domain(dom) ? CSCHED_PRI_IDLE : CSCHED_PRI_TS_UNDER;
+    memset(&svc->stats, 0, sizeof(svc->stats));
     vc->sched_priv = svc;
 
     CSCHED_VCPU_CHECK(vc);
@@ -508,11 +559,13 @@ csched_vcpu_init(struct vcpu *vc)
 }
 
 static void
-csched_vcpu_free(struct vcpu *vc)
+csched_vcpu_destroy(struct vcpu *vc)
 {
     struct csched_vcpu * const svc = CSCHED_VCPU(vc);
     struct csched_dom * const sdom = svc->sdom;
     unsigned long flags;
+
+    CSCHED_STAT_CRANK(vcpu_destroy);
 
     BUG_ON( sdom == NULL );
     BUG_ON( !list_empty(&svc->runq_elem) );
@@ -566,6 +619,25 @@ csched_vcpu_wake(struct vcpu *vc)
     else
         CSCHED_STAT_CRANK(vcpu_wake_not_runnable);
 
+    /*
+     * We temporarly boost the priority of awaking VCPUs!
+     *
+     * If this VCPU consumes a non negligeable amount of CPU, it
+     * will eventually find itself in the credit accounting code
+     * path where its priority will be reset to normal.
+     *
+     * If on the other hand the VCPU consumes little CPU and is
+     * blocking and awoken a lot (doing I/O for example), its
+     * priority will remain boosted, optimizing it's wake-to-run
+     * latencies.
+     *
+     * This allows wake-to-run latency sensitive VCPUs to preempt
+     * more CPU resource intensive VCPUs without impacting overall 
+     * system fairness.
+     */
+    if ( svc->pri == CSCHED_PRI_TS_UNDER )
+        svc->pri = CSCHED_PRI_TS_BOOST;
+
     /* Put the VCPU on the runq and tickle CPUs */
     __runq_insert(cpu, svc);
     __runq_tickle(cpu, svc);
@@ -609,21 +681,100 @@ csched_dom_cntl(
     return 0;
 }
 
+static int
+csched_dom_init(struct domain *dom)
+{
+    struct csched_dom *sdom;
+
+    CSCHED_STAT_CRANK(dom_init);
+
+    if ( is_idle_domain(dom) )
+        return 0;
+
+    sdom = xmalloc(struct csched_dom);
+    if ( sdom == NULL )
+        return -ENOMEM;
+
+    /* Initialize credit and weight */
+    INIT_LIST_HEAD(&sdom->active_vcpu);
+    sdom->active_vcpu_count = 0;
+    INIT_LIST_HEAD(&sdom->active_sdom_elem);
+    sdom->dom = dom;
+    sdom->weight = CSCHED_DEFAULT_WEIGHT;
+    sdom->cap = 0U;
+    dom->sched_priv = sdom;
+
+    return 0;
+}
+
 static void
 csched_dom_destroy(struct domain *dom)
 {
     struct csched_dom * const sdom = CSCHED_DOM(dom);
-    int i;
 
     CSCHED_STAT_CRANK(dom_destroy);
 
-    for ( i = 0; i < MAX_VIRT_CPUS; i++ )
+    xfree(sdom);
+}
+
+static int
+csched_cpu_pick(struct vcpu *vc)
+{
+    cpumask_t cpus;
+    int cpu, nxt;
+
+    CSCHED_STAT_CRANK(cpu_pick);
+
+    /*
+     * Pick from online CPUs in VCPU's affinity mask, giving a
+     * preference to its current processor if it's in there.
+     */
+    cpus_and(cpus, cpu_online_map, vc->cpu_affinity);
+    ASSERT( !cpus_empty(cpus) );
+    cpu = cpu_isset(vc->processor, cpus) ? vc->processor : first_cpu(cpus);
+
+    /*
+     * Try to find an idle processor within the above constraints.
+     */
+    cpus_and(cpus, cpus, csched_priv.idlers);
+    if ( !cpus_empty(cpus) )
     {
-        if ( dom->vcpu[i] )
-            csched_vcpu_free(dom->vcpu[i]);
+        cpu = cpu_isset(cpu, cpus) ? cpu : first_cpu(cpus);
+        cpu_clear(cpu, cpus);
+
+        /*
+         * In multi-core and multi-threaded CPUs, not all idle execution
+         * vehicles are equal!
+         *
+         * We give preference to the idle execution vehicle with the most
+         * idling neighbours in its grouping. This distributes work across
+         * distinct cores first and guarantees we don't do something stupid
+         * like run two VCPUs on co-hyperthreads while there are idle cores
+         * or sockets.
+         */
+        while ( !cpus_empty(cpus) )
+        {
+            nxt = first_cpu(cpus);
+
+            if ( csched_idler_compare(cpu, nxt) < 0 )
+            {
+                cpu = nxt;
+                cpu_clear(nxt, cpus);
+            }
+            else if ( cpu_isset(cpu, cpu_core_map[nxt]) )
+            {
+                cpus_andnot(cpus, cpus, cpu_sibling_map[nxt]);
+            }
+            else
+            {
+                cpus_andnot(cpus, cpus, cpu_core_map[nxt]);
+            }
+
+            ASSERT( !cpu_isset(nxt, cpus) );
+        }
     }
 
-    xfree(sdom);
+    return cpu;
 }
 
 /*
@@ -659,7 +810,7 @@ csched_runq_sort(unsigned int cpu)
         next = elem->next;
         svc_elem = __runq_elem(elem);
 
-        if ( svc_elem->pri == CSCHED_PRI_TS_UNDER )
+        if ( svc_elem->pri >= CSCHED_PRI_TS_UNDER )
         {
             /* does elem need to move up the runq? */
             if ( elem->prev != last_under )
@@ -689,6 +840,7 @@ csched_acct(void)
     uint32_t weight_left;
     uint32_t credit_fair;
     uint32_t credit_peak;
+    uint32_t credit_cap;
     int credit_balance;
     int credit_xtra;
     int credit;
@@ -719,6 +871,7 @@ csched_acct(void)
     weight_left = weight_total;
     credit_balance = 0;
     credit_xtra = 0;
+    credit_cap = 0U;
 
     list_for_each_safe( iter_sdom, next_sdom, &csched_priv.active_sdom )
     {
@@ -739,18 +892,22 @@ csched_acct(void)
          * for one full accounting period. We allow a domain to earn more
          * only when the system-wide credit balance is negative.
          */
-        credit_peak = sdom->active_vcpu_count * CSCHED_ACCT_PERIOD;
+        credit_peak = sdom->active_vcpu_count * CSCHED_CREDITS_PER_ACCT;
         if ( csched_priv.credit_balance < 0 )
         {
             credit_peak += ( ( -csched_priv.credit_balance * sdom->weight) +
                              (weight_total - 1)
                            ) / weight_total;
         }
+
         if ( sdom->cap != 0U )
         {
-            uint32_t credit_cap = ((sdom->cap * CSCHED_ACCT_PERIOD) + 99) / 100;
+            credit_cap = ((sdom->cap * CSCHED_CREDITS_PER_ACCT) + 99) / 100;
             if ( credit_cap < credit_peak )
                 credit_peak = credit_cap;
+
+            credit_cap = ( credit_cap + ( sdom->active_vcpu_count - 1 )
+                         ) / sdom->active_vcpu_count;
         }
 
         credit_fair = ( ( credit_total * sdom->weight) + (weight_total - 1)
@@ -806,15 +963,15 @@ csched_acct(void)
              */
             if ( credit < 0 )
             {
-                if ( sdom->cap == 0U )
-                    svc->pri = CSCHED_PRI_TS_OVER;
-                else
+                if ( sdom->cap != 0U && credit < -credit_cap )
                     svc->pri = CSCHED_PRI_TS_PARKED;
+                else
+                    svc->pri = CSCHED_PRI_TS_OVER;
 
-                if ( credit < -CSCHED_TSLICE )
+                if ( credit < -CSCHED_CREDITS_PER_TSLICE )
                 {
                     CSCHED_STAT_CRANK(acct_min_credit);
-                    credit = -CSCHED_TSLICE;
+                    credit = -CSCHED_CREDITS_PER_TSLICE;
                     atomic_set(&svc->credit, credit);
                 }
             }
@@ -822,12 +979,16 @@ csched_acct(void)
             {
                 svc->pri = CSCHED_PRI_TS_UNDER;
 
-                if ( credit > CSCHED_TSLICE )
+                if ( credit > CSCHED_CREDITS_PER_TSLICE )
+                {
                     __csched_vcpu_acct_idle_locked(svc);
+                    credit = 0;
+                    atomic_set(&svc->credit, credit);
+                }
             }
 
-            svc->credit_last = credit;
-            svc->credit_incr = credit_fair;
+            svc->stats.credit_last = credit;
+            svc->stats.credit_incr = credit_fair;
             credit_balance += credit;
         }
     }
@@ -853,7 +1014,7 @@ csched_tick(unsigned int cpu)
      */
     if ( likely(sdom != NULL) )
     {
-        csched_vcpu_acct(svc, CSCHED_TICK);
+        csched_vcpu_acct(svc, CSCHED_CREDITS_PER_TICK);
     }
 
     /*
@@ -863,7 +1024,7 @@ csched_tick(unsigned int cpu)
      * we could distribute or at the very least cycle the duty.
      */
     if ( (csched_priv.master == cpu) &&
-         (per_cpu(schedule_data, cpu).tick % CSCHED_ACCT_NTICKS) == 0 )
+         (per_cpu(schedule_data, cpu).tick % CSCHED_TICKS_PER_ACCT) == 0 )
     {
         csched_acct();
     }
@@ -903,7 +1064,7 @@ csched_runq_steal(struct csched_pcpu *spc, int cpu, int pri)
         vc = speer->vcpu;
         BUG_ON( is_idle_vcpu(vc) );
 
-        if ( __csched_vcpu_is_stealable(cpu, vc) )
+        if ( __csched_queued_vcpu_is_stealable(cpu, vc) )
         {
             /* We got a candidate. Grab it! */
             __runq_remove(speer);
@@ -919,8 +1080,11 @@ csched_runq_steal(struct csched_pcpu *spc, int cpu, int pri)
 static struct csched_vcpu *
 csched_load_balance(int cpu, struct csched_vcpu *snext)
 {
-    struct csched_pcpu *spc;
     struct csched_vcpu *speer;
+    struct csched_pcpu *spc;
+    struct vcpu *peer_vcpu;
+    cpumask_t workers;
+    cpumask_t loners;
     int peer_cpu;
 
     if ( snext->pri == CSCHED_PRI_IDLE )
@@ -930,15 +1094,24 @@ csched_load_balance(int cpu, struct csched_vcpu *snext)
     else
         CSCHED_STAT_CRANK(load_balance_other);
 
+    /*
+     * Peek at non-idling CPUs in the system
+     */
+    cpus_clear(loners);
+    cpus_andnot(workers, cpu_online_map, csched_priv.idlers);
+    cpu_clear(cpu, workers);
+
     peer_cpu = cpu;
     BUG_ON( peer_cpu != snext->vcpu->processor );
 
-    while ( 1 )
+    while ( !cpus_empty(workers) )
     {
-        /* For each PCPU in the system starting with our neighbour... */
-        peer_cpu = (peer_cpu + 1) % csched_priv.ncpus;
-        if ( peer_cpu == cpu )
-            break;
+        /* For each CPU of interest, starting with our neighbour... */
+        peer_cpu = next_cpu(peer_cpu, workers);
+        if ( peer_cpu == NR_CPUS )
+            peer_cpu = first_cpu(workers);
+
+        cpu_clear(peer_cpu, workers);
 
         /*
          * Get ahold of the scheduler lock for this peer CPU.
@@ -953,34 +1126,86 @@ csched_load_balance(int cpu, struct csched_vcpu *snext)
             continue;
         }
 
+        peer_vcpu = per_cpu(schedule_data, peer_cpu).curr;
         spc = CSCHED_PCPU(peer_cpu);
+
         if ( unlikely(spc == NULL) )
         {
             CSCHED_STAT_CRANK(steal_peer_down);
-            speer = NULL;
         }
-        else if ( is_idle_vcpu(per_cpu(schedule_data, peer_cpu).curr) )
+        else if ( unlikely(is_idle_vcpu(peer_vcpu)) )
         {
+            /*
+             * Don't steal from an idle CPU's runq because it's about to
+             * pick up work from it itself.
+             */
             CSCHED_STAT_CRANK(steal_peer_idle);
-            speer = NULL;
+        }
+        else if ( is_idle_vcpu(__runq_elem(spc->runq.next)->vcpu) )
+        {
+            if ( snext->pri == CSCHED_PRI_IDLE &&
+                 __csched_running_vcpu_is_stealable(cpu, peer_vcpu) )
+            {
+                CSCHED_STAT_CRANK(steal_loner_candidate);
+                cpu_set(peer_cpu, loners);
+            }
         }
         else
         {
-            /* Try to steal work from an online non-idle CPU. */
+            /* Try to steal work from a remote CPU's runq. */
             speer = csched_runq_steal(spc, cpu, snext->pri);
+            if ( speer != NULL )
+            {
+                spin_unlock(&per_cpu(schedule_data, peer_cpu).schedule_lock);
+                CSCHED_STAT_CRANK(vcpu_migrate);
+                speer->stats.migrate++;
+                return speer;
+            }
         }
 
         spin_unlock(&per_cpu(schedule_data, peer_cpu).schedule_lock);
-
-        /* Got one? */
-        if ( speer )
-        {
-            CSCHED_STAT_CRANK(vcpu_migrate);
-            return speer;
-        }
     }
 
-    /* Failed to find more important work */
+    /*
+     * If we failed to find any remotely queued VCPUs to move here,
+     * see if it would be more efficient to move any of the running
+     * remote VCPUs over here.
+     */
+    while ( !cpus_empty(loners) )
+    {
+        /* For each CPU of interest, starting with our neighbour... */
+        peer_cpu = next_cpu(peer_cpu, loners);
+        if ( peer_cpu == NR_CPUS )
+            peer_cpu = first_cpu(loners);
+
+        cpu_clear(peer_cpu, loners);
+
+        if ( !spin_trylock(&per_cpu(schedule_data, peer_cpu).schedule_lock) )
+        {
+            CSCHED_STAT_CRANK(steal_trylock_failed);
+            continue;
+        }
+
+        peer_vcpu = per_cpu(schedule_data, peer_cpu).curr;
+        spc = CSCHED_PCPU(peer_cpu);
+
+        /* Signal the first candidate only. */
+        if ( !is_idle_vcpu(peer_vcpu) &&
+             is_idle_vcpu(__runq_elem(spc->runq.next)->vcpu) &&
+             __csched_running_vcpu_is_stealable(cpu, peer_vcpu) )
+        {
+            set_bit(_VCPUF_migrating, &peer_vcpu->vcpu_flags);
+            spin_unlock(&per_cpu(schedule_data, peer_cpu).schedule_lock);
+
+            CSCHED_STAT_CRANK(steal_loner_signal);
+            cpu_raise_softirq(peer_cpu, SCHEDULE_SOFTIRQ);
+            break;
+        }
+
+        spin_unlock(&per_cpu(schedule_data, peer_cpu).schedule_lock);
+    }
+
+    /* Failed to find more important work elsewhere... */
     __runq_remove(snext);
     return snext;
 }
@@ -1041,7 +1266,7 @@ csched_schedule(s_time_t now)
     /*
      * Return task to run next...
      */
-    ret.time = MILLISECS(CSCHED_TSLICE);
+    ret.time = MILLISECS(CSCHED_MSECS_PER_TSLICE);
     ret.task = snext->vcpu;
 
     CSCHED_VCPU_CHECK(ret.task);
@@ -1062,12 +1287,13 @@ csched_dump_vcpu(struct csched_vcpu *svc)
 
     if ( sdom )
     {
-        printk(" credit=%i (%d+%u) {a=%u i=%u w=%u}",
+        printk(" credit=%i (%d+%u) {a/i=%u/%u m=%u w=%u}",
             atomic_read(&svc->credit),
-            svc->credit_last,
-            svc->credit_incr,
-            svc->state_active,
-            svc->state_idle,
+            svc->stats.credit_last,
+            svc->stats.credit_incr,
+            svc->stats.state_active,
+            svc->stats.state_idle,
+            svc->stats.migrate,
             sdom->weight);
     }
 
@@ -1085,9 +1311,11 @@ csched_dump_pcpu(int cpu)
     spc = CSCHED_PCPU(cpu);
     runq = &spc->runq;
 
-    printk(" tick=%lu, sort=%d\n",
+    printk(" tick=%lu, sort=%d, sibling=0x%lx, core=0x%lx\n",
             per_cpu(schedule_data, cpu).tick,
-            spc->runq_sort_last);
+            spc->runq_sort_last,
+            cpu_sibling_map[cpu].bits[0],
+            cpu_core_map[cpu].bits[0]);
 
     /* current VCPU */
     svc = CSCHED_VCPU(per_cpu(schedule_data, cpu).curr);
@@ -1122,20 +1350,22 @@ csched_dump(void)
            "\tcredit balance     = %d\n"
            "\tweight             = %u\n"
            "\trunq_sort          = %u\n"
-           "\ttick               = %dms\n"
-           "\ttslice             = %dms\n"
-           "\taccounting period  = %dms\n"
-           "\tdefault-weight     = %d\n",
+           "\tdefault-weight     = %d\n"
+           "\tmsecs per tick     = %dms\n"
+           "\tcredits per tick   = %d\n"
+           "\tticks per tslice   = %d\n"
+           "\tticks per acct     = %d\n",
            csched_priv.ncpus,
            csched_priv.master,
            csched_priv.credit,
            csched_priv.credit_balance,
            csched_priv.weight,
            csched_priv.runq_sort,
-           CSCHED_TICK,
-           CSCHED_TSLICE,
-           CSCHED_ACCT_PERIOD,
-           CSCHED_DEFAULT_WEIGHT);
+           CSCHED_DEFAULT_WEIGHT,
+           CSCHED_MSECS_PER_TICK,
+           CSCHED_CREDITS_PER_TICK,
+           CSCHED_TICKS_PER_TSLICE,
+           CSCHED_TICKS_PER_ACCT);
 
     printk("idlers: 0x%lx\n", csched_priv.idlers.bits[0]);
 
@@ -1180,14 +1410,18 @@ struct scheduler sched_credit_def = {
     .opt_name       = "credit",
     .sched_id       = XEN_SCHEDULER_CREDIT,
 
-    .init_vcpu      = csched_vcpu_init,
+    .init_domain    = csched_dom_init,
     .destroy_domain = csched_dom_destroy,
+
+    .init_vcpu      = csched_vcpu_init,
+    .destroy_vcpu   = csched_vcpu_destroy,
 
     .sleep          = csched_vcpu_sleep,
     .wake           = csched_vcpu_wake,
 
     .adjust         = csched_dom_cntl,
 
+    .pick_cpu       = csched_cpu_pick,
     .tick           = csched_tick,
     .do_schedule    = csched_schedule,
 

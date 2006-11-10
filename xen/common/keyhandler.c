@@ -36,8 +36,10 @@ static void keypress_softirq(void)
 {
     keyhandler_t *h;
     unsigned char key = keypress_key;
+    console_start_log_everything();
     if ( (h = key_table[key].u.handler) != NULL )
         (*h)(key);
+    console_end_log_everything();
 }
 
 void handle_keypress(unsigned char key, struct cpu_user_regs *regs)
@@ -46,8 +48,10 @@ void handle_keypress(unsigned char key, struct cpu_user_regs *regs)
 
     if ( key_table[key].flags & KEYHANDLER_IRQ_CALLBACK )
     {
+        console_start_log_everything();
         if ( (h = key_table[key].u.irq_handler) != NULL )
             (*h)(key, regs);
+        console_end_log_everything();
     }
     else
     {

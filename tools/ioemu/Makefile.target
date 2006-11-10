@@ -368,6 +368,7 @@ VL_OBJS+= usb-uhci.o
 VL_OBJS+= piix4acpi.o
 VL_OBJS+= xenstore.o
 VL_OBJS+= xen_platform.o
+VL_OBJS+= tpm_tis.o
 DEFINES += -DHAS_AUDIO
 endif
 ifeq ($(TARGET_BASE_ARCH), ppc)

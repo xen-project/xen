@@ -32,8 +32,6 @@
 #define HVM_DEBUG 1
 #endif
 
-#define hvm_guest(v) ((v)->arch.guest_context.flags & VGCF_HVM_GUEST)
-
 static inline shared_iopage_t *get_sp(struct domain *d)
 {
     return (shared_iopage_t *) d->arch.hvm_domain.shared_page_va;
@@ -96,13 +94,6 @@ enum hval_bitmaps {
 
 #define VMX_DELIVER_NO_ERROR_CODE  -1
 
-/*
- * This works for both 32bit & 64bit eflags filteration
- * done in construct_init_vmc[sb]_guest()
- */
-#define HVM_EFLAGS_RESERVED_0          0xffc08028 /* bitmap for 0 */
-#define HVM_EFLAGS_RESERVED_1          0x00000002 /* bitmap for 1 */
-
 #if HVM_DEBUG
 #define DBG_LEVEL_0                 (1 << 0)
 #define DBG_LEVEL_1                 (1 << 1)
@@ -134,14 +125,16 @@ extern unsigned int opt_hvm_debug_level;
         domain_crash_synchronous();                             \
     } while (0)
 
+#define TRACE_VMEXIT(index, value)                              \
+    current->arch.hvm_vcpu.hvm_trace_values[index] = (value)
+
 extern int hvm_enabled;
 
-int hvm_copy_to_guest_phys(unsigned long paddr, void *buf, int size);
-int hvm_copy_from_guest_phys(void *buf, unsigned long paddr, int size);
+int hvm_copy_to_guest_phys(paddr_t paddr, void *buf, int size);
+int hvm_copy_from_guest_phys(void *buf, paddr_t paddr, int size);
 int hvm_copy_to_guest_virt(unsigned long vaddr, void *buf, int size);
 int hvm_copy_from_guest_virt(void *buf, unsigned long vaddr, int size);
 
-void hvm_setup_platform(struct domain* d);
 void hvm_print_line(struct vcpu *v, const char c);
 void hlt_timer_fn(void *data);
 

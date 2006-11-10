@@ -28,12 +28,12 @@ except DomainError, e:
 
 console.setHistorySaveCmds(value=True)
 
-block_attach(domain, "phy:ram1", "hda1")
+block_attach(domain, "phy:ram1", "xvda1")
 
 console.setTimeout(120)
 
 try:
-    run = console.runCmd("dd if=/dev/urandom bs=512 count=`cat /sys/block/hda1/size` | tee /dev/hda1 | md5sum")
+    run = console.runCmd("dd if=/dev/urandom bs=512 count=`cat /sys/block/xvda1/size` | tee /dev/xvda1 | md5sum")
 except ConsoleError, e:
     FAIL(str(e))
 

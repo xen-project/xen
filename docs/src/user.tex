@@ -3192,6 +3192,15 @@ editing \path{grub.conf}.
   input to DOM0 when it boots --- if it is `x' then auto-switching is
   disabled.  Any other value, or omitting the character, enables
   auto-switching.  [NB. Default switch-char is `a'.]
+\item [ loglvl=$<$level$>/<$level$>$ ]
+  Specify logging level. Messages of the specified severity level (and
+  higher) will be printed to the Xen console. Valid levels are `none',
+  `error', `warning', `info', `debug', and `all'. The second level
+  specifier is optional: it is used to specify message severities
+  which are to be rate limited. Default is `loglvl=warning'.
+\item [ guest\_loglvl=$<$level$>/<$level$>$ ] As for loglvl, but
+  applies to messages relating to guests. Default is
+  `guest\_loglvl=none/warning'. 
 \item [ nmi=xxx ]
   Specify what to do with an NMI parity or I/O error. \\
   `nmi=fatal':  Xen prints a diagnostic and then hangs. \\
@@ -3202,12 +3211,21 @@ editing \path{grub.conf}.
   ignored. This parameter may be specified with a B, K, M or G suffix,
   representing bytes, kilobytes, megabytes and gigabytes respectively.
   The default unit, if no suffix is specified, is kilobytes.
-\item [ dom0\_mem=xxx ] Set the amount of memory to be allocated to
-  domain0. In Xen 3.x the parameter may be specified with a B, K, M or
+\item [ dom0\_mem=$<$specifier list$>$ ] Set the amount of memory to
+  be allocated to domain 0. This is a comma-separated list containing
+  the following optional components:
+  \begin{description}
+  \item[ min:$<$min\_amt$>$ ] Minimum amount to allocate to domain 0
+  \item[ max:$<$min\_amt$>$ ] Maximum amount to allocate to domain 0
+  \item[ $<$amt$>$ ] Precise amount to allocate to domain 0
+  \end{description}
+  Each numeric parameter may be specified with a B, K, M or
   G suffix, representing bytes, kilobytes, megabytes and gigabytes
   respectively; if no suffix is specified, the parameter defaults to
-  kilobytes. In previous versions of Xen, suffixes were not supported
-  and the value is always interpreted as kilobytes.
+  kilobytes. Negative values are subtracted from total available
+  memory. If $<$amt$>$ is not specified, it defaults to all available
+  memory less a small amount (clamped to 128MB) for uses such as DMA
+  buffers.
 \item [ dom0\_vcpus\_pin ] Pins domain 0 VCPUs on their respective
   physical CPUS (default=false).
 \item [ tbuf\_size=xxx ] Set the size of the per-cpu trace buffers, in

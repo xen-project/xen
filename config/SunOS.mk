@@ -21,7 +21,7 @@ LIB64DIR = lib/amd64
 SOCKET_LIBS = -lsocket
 CURSES_LIBS = -lcurses
 SONAME_LDFLAG = -h
-SHLIB_CFLAGS = -static-libgcc -shared
+SHLIB_CFLAGS = -R /usr/sfw/$(LIBDIR) -shared
 
 ifneq ($(debug),y)
 # Optimisation flags are overridable

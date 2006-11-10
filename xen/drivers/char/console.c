@@ -4,6 +4,10 @@
  * Emergency console I/O for Xen and the domain-0 guest OS.
  * 
  * Copyright (c) 2002-2004, K A Fraser.
+ *
+ * Added printf_ratelimit
+ *     Taken from Linux - Author: Andi Kleen (net_ratelimit)
+ *     Ported to Xen - Steven Rostedt - Red Hat
  */
 
 #include <xen/stdarg.h>
@@ -26,6 +30,7 @@
 #include <asm/current.h>
 #include <asm/debugger.h>
 #include <asm/io.h>
+#include <asm/div64.h>
 
 /* console: comma-separated list of console outputs. */
 static char opt_console[30] = OPT_CONSOLE_STR;
@@ -52,6 +57,100 @@ static char printk_prefix[16] = "";
 static int sercon_handle = -1;
 
 static DEFINE_SPINLOCK(console_lock);
+
+/*
+ * To control the amount of printing, thresholds are added.
+ * These thresholds correspond to the XENLOG logging levels.
+ * There's an upper and lower threshold for non-guest messages and for
+ * guest-provoked messages.  This works as follows, for a given log level L:
+ *
+ * L < lower_threshold                     : always logged
+ * lower_threshold <= L < upper_threshold  : rate-limited logging
+ * upper_threshold <= L                    : never logged
+ *
+ * Note, in the above algorithm, to disable rate limiting simply make
+ * the lower threshold equal to the upper.
+ */
+#define XENLOG_UPPER_THRESHOLD       2 /* Do not print INFO and DEBUG  */
+#define XENLOG_LOWER_THRESHOLD       2 /* Always print ERR and WARNING */
+#define XENLOG_GUEST_UPPER_THRESHOLD 2 /* Do not print INFO and DEBUG  */
+#define XENLOG_GUEST_LOWER_THRESHOLD 0 /* Rate-limit ERR and WARNING   */
+/*
+ * The XENLOG_DEFAULT is the default given to printks that
+ * do not have any print level associated with them.
+ */
+#define XENLOG_DEFAULT       1 /* XENLOG_WARNING */
+#define XENLOG_GUEST_DEFAULT 1 /* XENLOG_WARNING */
+
+static int xenlog_upper_thresh = XENLOG_UPPER_THRESHOLD;
+static int xenlog_lower_thresh = XENLOG_LOWER_THRESHOLD;
+static int xenlog_guest_upper_thresh = XENLOG_GUEST_UPPER_THRESHOLD;
+static int xenlog_guest_lower_thresh = XENLOG_GUEST_LOWER_THRESHOLD;
+
+static void parse_loglvl(char *s);
+static void parse_guest_loglvl(char *s);
+
+/*
+ * <lvl> := none|error|warning|info|debug|all
+ * loglvl=<lvl_print_always>[/<lvl_print_ratelimit>]
+ *  <lvl_print_always>: log level which is always printed
+ *  <lvl_print_rlimit>: log level which is rate-limit printed
+ * Similar definitions for guest_loglvl, but applies to guest tracing.
+ * Defaults: loglvl=warning ; guest_loglvl=none/warning
+ */
+custom_param("loglvl", parse_loglvl);
+custom_param("guest_loglvl", parse_guest_loglvl);
+
+static atomic_t print_everything = ATOMIC_INIT(1);
+
+#define ___parse_loglvl(s, ps, lvlstr, lvlnum)          \
+    if ( !strncmp((s), (lvlstr), strlen(lvlstr)) ) {    \
+        *(ps) = (s) + strlen(lvlstr);                   \
+        return (lvlnum);                                \
+    }
+
+static int __parse_loglvl(char *s, char **ps)
+{
+    ___parse_loglvl(s, ps, "none",    0);
+    ___parse_loglvl(s, ps, "error",   1);
+    ___parse_loglvl(s, ps, "warning", 2);
+    ___parse_loglvl(s, ps, "info",    3);
+    ___parse_loglvl(s, ps, "debug",   4);
+    ___parse_loglvl(s, ps, "all",     4);
+    return 2; /* sane fallback */
+}
+
+static void _parse_loglvl(char *s, int *lower, int *upper)
+{
+    *lower = *upper = __parse_loglvl(s, &s);
+    if ( *s == '/' )
+        *upper = __parse_loglvl(s+1, &s);
+    if ( *upper < *lower )
+        *upper = *lower;
+}
+
+static void parse_loglvl(char *s)
+{
+    _parse_loglvl(s, &xenlog_lower_thresh, &xenlog_upper_thresh);
+}
+
+static void parse_guest_loglvl(char *s)
+{
+    _parse_loglvl(s, &xenlog_guest_lower_thresh, &xenlog_guest_upper_thresh);
+}
+
+static char *loglvl_str(int lvl)
+{
+    switch ( lvl )
+    {
+    case 0: return "Nothing";
+    case 1: return "Errors";
+    case 2: return "Errors and warnings";
+    case 3: return "Errors, warnings and info";
+    case 4: return "All";
+    }
+    return "???";
+}
 
 /*
  * ********************************************************
@@ -281,7 +380,7 @@ long do_console_io(int cmd, int count, XEN_GUEST_HANDLE(char) buffer)
  * *****************************************************
  */
 
-static inline void __putstr(const char *str)
+static void __putstr(const char *str)
 {
     int c;
 
@@ -294,29 +393,70 @@ static inline void __putstr(const char *str)
     }
 }
 
+static int printk_prefix_check(char *p, char **pp)
+{
+    int loglvl = -1;
+    int upper_thresh = xenlog_upper_thresh;
+    int lower_thresh = xenlog_lower_thresh;
+
+    while ( (p[0] == '<') && (p[1] != '\0') && (p[2] == '>') )
+    {
+        switch ( p[1] )
+        {
+        case 'G':
+            upper_thresh = xenlog_guest_upper_thresh;
+            lower_thresh = xenlog_guest_lower_thresh;
+            if ( loglvl == -1 )
+                loglvl = XENLOG_GUEST_DEFAULT;
+            break;
+        case '0' ... '3':
+            loglvl = p[1] - '0';
+            break;
+        }
+        p += 3;
+    }
+
+    if ( loglvl == -1 )
+        loglvl = XENLOG_DEFAULT;
+
+    *pp = p;
+
+    return ((atomic_read(&print_everything) != 0) ||
+            (loglvl < lower_thresh) ||
+            ((loglvl < upper_thresh) && printk_ratelimit()));
+} 
+
 void printk(const char *fmt, ...)
 {
     static char   buf[1024];
-    static int    start_of_line = 1;
+    static int    start_of_line = 1, do_print;
 
     va_list       args;
     char         *p, *q;
     unsigned long flags;
 
-    spin_lock_irqsave(&console_lock, flags);
+    /* console_lock can be acquired recursively from __printk_ratelimit(). */
+    local_irq_save(flags);
+    spin_lock_recursive(&console_lock);
 
     va_start(args, fmt);
     (void)vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);        
 
     p = buf;
+
     while ( (q = strchr(p, '\n')) != NULL )
     {
         *q = '\0';
         if ( start_of_line )
-            __putstr(printk_prefix);
-        __putstr(p);
-        __putstr("\n");
+            do_print = printk_prefix_check(p, &p);
+        if ( do_print )
+        {
+            if ( start_of_line )
+                __putstr(printk_prefix);
+            __putstr(p);
+            __putstr("\n");
+        }
         start_of_line = 1;
         p = q + 1;
     }
@@ -324,12 +464,18 @@ void printk(const char *fmt, ...)
     if ( *p != '\0' )
     {
         if ( start_of_line )
-            __putstr(printk_prefix);
-        __putstr(p);
+            do_print = printk_prefix_check(p, &p);
+        if ( do_print )
+        {
+            if ( start_of_line )
+                __putstr(printk_prefix);
+            __putstr(p);
+        }
         start_of_line = 0;
     }
 
-    spin_unlock_irqrestore(&console_lock, flags);
+    spin_unlock_recursive(&console_lock);
+    local_irq_restore(flags);
 }
 
 void set_printk_prefix(const char *prefix)
@@ -377,10 +523,18 @@ void console_endboot(void)
 {
     int i, j;
 
+    printk("Std. Loglevel: %s", loglvl_str(xenlog_lower_thresh));
+    if ( xenlog_upper_thresh != xenlog_lower_thresh )
+        printk(" (Rate-limited: %s)", loglvl_str(xenlog_upper_thresh));
+    printk("\nGuest Loglevel: %s", loglvl_str(xenlog_guest_lower_thresh));
+    if ( xenlog_guest_upper_thresh != xenlog_guest_lower_thresh )
+        printk(" (Rate-limited: %s)", loglvl_str(xenlog_guest_upper_thresh));
+    printk("\n");
+
     if ( opt_sync_console )
     {
         printk("**********************************************\n");
-        printk("******* WARNING: CONSOLE OUTPUT IS SYCHRONOUS\n");
+        printk("******* WARNING: CONSOLE OUTPUT IS SYNCHRONOUS\n");
         printk("******* This option is intended to aid debugging "
                "of Xen by ensuring\n");
         printk("******* that all output is synchronously delivered "
@@ -414,6 +568,19 @@ void console_endboot(void)
 
     /* Serial input is directed to DOM0 by default. */
     switch_serial_input();
+
+    /* Now we implement the logging thresholds. */
+    console_end_log_everything();
+}
+
+void console_start_log_everything(void)
+{
+    atomic_inc(&print_everything);
+}
+
+void console_end_log_everything(void)
+{
+    atomic_dec(&print_everything);
 }
 
 void console_force_unlock(void)
@@ -430,12 +597,14 @@ void console_force_lock(void)
 
 void console_start_sync(void)
 {
+    console_start_log_everything();
     serial_start_sync(sercon_handle);
 }
 
 void console_end_sync(void)
 {
     serial_end_sync(sercon_handle);
+    console_end_log_everything();
 }
 
 void console_putc(char c)
@@ -448,6 +617,66 @@ int console_getc(void)
     return serial_getc(sercon_handle);
 }
 
+/*
+ * printk rate limiting, lifted from Linux.
+ *
+ * This enforces a rate limit: not more than one kernel message
+ * every printk_ratelimit_ms (millisecs).
+ */
+int __printk_ratelimit(int ratelimit_ms, int ratelimit_burst)
+{
+    static DEFINE_SPINLOCK(ratelimit_lock);
+    static unsigned long toks = 10 * 5 * 1000;
+    static unsigned long last_msg;
+    static int missed;
+    unsigned long flags;
+    unsigned long long now = NOW(); /* ns */
+    unsigned long ms;
+
+    do_div(now, 1000000);
+    ms = (unsigned long)now;
+
+    spin_lock_irqsave(&ratelimit_lock, flags);
+    toks += ms - last_msg;
+    last_msg = ms;
+    if ( toks > (ratelimit_burst * ratelimit_ms))
+        toks = ratelimit_burst * ratelimit_ms;
+    if ( toks >= ratelimit_ms )
+    {
+        int lost = missed;
+        missed = 0;
+        toks -= ratelimit_ms;
+        spin_unlock(&ratelimit_lock);
+        if ( lost )
+        {
+            char lost_str[8];
+            snprintf(lost_str, sizeof(lost_str), "%d", lost);
+            /* console_lock may already be acquired by printk(). */
+            spin_lock_recursive(&console_lock);
+            __putstr(printk_prefix);
+            __putstr("printk: ");
+            __putstr(lost_str);
+            __putstr(" messages suppressed.\n");
+            spin_unlock_recursive(&console_lock);
+        }
+        local_irq_restore(flags);
+        return 1;
+    }
+    missed++;
+    spin_unlock_irqrestore(&ratelimit_lock, flags);
+    return 0;
+}
+
+/* minimum time in ms between messages */
+int printk_ratelimit_ms = 5 * 1000;
+
+/* number of messages we send before ratelimiting */
+int printk_ratelimit_burst = 10;
+
+int printk_ratelimit(void)
+{
+    return __printk_ratelimit(printk_ratelimit_ms, printk_ratelimit_burst);
+}
 
 /*
  * **************************************************************
@@ -494,9 +723,10 @@ static void debugtrace_toggle(void)
     watchdog_disable();
     spin_lock_irqsave(&debugtrace_lock, flags);
 
-    // dump the buffer *before* toggling, in case the act of dumping the
-    // buffer itself causes more printk's...
-    //
+    /*
+     * Dump the buffer *before* toggling, in case the act of dumping the
+     * buffer itself causes more printk() invocations.
+     */
     printk("debugtrace_printk now writing to %s.\n",
            !debugtrace_send_to_console ? "console": "buffer");
     if ( !debugtrace_send_to_console )
@@ -650,9 +880,9 @@ void panic(const char *fmt, ...)
 void __bug(char *file, int line)
 {
     console_start_sync();
-    debugtrace_dump();
     printk("BUG at %s:%d\n", file, line);
-    FORCE_CRASH();
+    dump_execution_state();
+    panic("BUG at %s:%d\n", file, line);
     for ( ; ; ) ;
 }
 

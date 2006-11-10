@@ -88,9 +88,9 @@ class DevController:
         xd = xen.xend.XendDomain.instance()
         backdom_name = sxp.child_value(config, 'backend')
         if backdom_name is None:
-            backdom = xen.xend.XendDomain.PRIV_DOMAIN
+            backdom = xen.xend.XendDomain.DOM0_ID
         else:
-            bd = xd.domain_lookup_by_name_or_id_nr(backdom_name)
+            bd = xd.domain_lookup_nr(backdom_name)
             backdom = bd.getDomid()
         count = 0
         while True:
@@ -141,7 +141,6 @@ class DevController:
 
     def waitForDevices(self):
         log.debug("Waiting for devices %s.", self.deviceClass)
-        
         return map(self.waitForDevice, self.deviceIDs())
 
 
@@ -221,13 +220,15 @@ class DevController:
         """@return an s-expression giving the current configuration of the
         specified device.  This would be suitable for giving to {@link
         #createDevice} in order to recreate that device."""
-
-        backdomid = xstransact.Read(self.frontendPath(devid), "backend-id")
-        if backdomid is None:
-            raise VmError("Device %s not connected" % devid)
-        
-        return [self.deviceClass, ['backend', int(backdomid)]]
-
+        configDict = self.getDeviceConfiguration(devid)
+        sxpr = [self.deviceClass]
+        for key, val in configDict.items():
+            if type(val) == type(list()):
+                for v in val:
+                    sxpr.append([key, v])
+            else:
+                sxpr.append([key, val])
+        return sxpr
 
     def sxprs(self):
         """@return an s-expression describing all the devices of this
@@ -242,6 +243,25 @@ class DevController:
         return [self.deviceClass, ['dom', self.vm.getDomid(),
                                    'id', devid]]
 
+
+    def getDeviceConfiguration(self, devid):
+        """Returns the configuration of a device.
+
+        @note: Similar to L{configuration} except it returns a dict.
+        @return: dict
+        """
+        backdomid = xstransact.Read(self.frontendPath(devid), "backend-id")
+        if backdomid is None:
+            raise VmError("Device %s not connected" % devid)
+
+        return {'backend': int(backdomid)}
+
+    def getAllDeviceConfigurations(self):
+        all_configs = {}
+        for devid in self.deviceIDs():
+            config_dict = self.getDeviceConfiguration(devid)
+            all_configs[devid] = config_dict
+        return all_configs
 
     ## protected:
 
@@ -387,7 +407,7 @@ class DevController:
 
         backdom_name = sxp.child_value(config, 'backend')
         if backdom_name:
-            backdom = xd.domain_lookup_by_name_or_id_nr(backdom_name)
+            backdom = xd.domain_lookup_nr(backdom_name)
         else:
             backdom = xd.privilegedDomain()
 
@@ -435,7 +455,9 @@ class DevController:
 
 
     def backendPath(self, backdom, devid):
-        """@param backdom [XendDomainInfo] The backend domain info."""
+        """Construct backend path given the backend domain and device id.
+
+        @param backdom [XendDomainInfo] The backend domain info."""
 
         return "%s/backend/%s/%s/%d" % (backdom.getDomainPath(),
                                         self.deviceClass,
@@ -450,10 +472,11 @@ class DevController:
         return "%s/device/%s" % (self.vm.getDomainPath(), self.deviceClass)
 
     def backendRoot(self):
-        import xen.xend.XendDomain
-	from xen.xend.xenstore.xsutil import GetDomainPath
-        backdom = xen.xend.XendDomain.PRIV_DOMAIN
-        return "%s/backend/%s/%s" % (GetDomainPath(backdom), self.deviceClass, self.vm.getDomid())
+        """Construct backend root path assuming backend is domain 0."""
+        from xen.xend.XendDomain import DOM0_ID
+        from xen.xend.xenstore.xsutil import GetDomainPath
+        return "%s/backend/%s/%s" % (GetDomainPath(DOM0_ID),
+                                     self.deviceClass, self.vm.getDomid())
 
     def frontendMiscPath(self):
         return "%s/device-misc/%s" % (self.vm.getDomainPath(),

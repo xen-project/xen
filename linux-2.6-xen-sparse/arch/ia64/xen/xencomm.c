@@ -20,6 +20,11 @@
 #include <linux/mm.h>
 #include <xen/interface/xen.h>
 #include <asm/page.h>
+
+#ifdef HAVE_XEN_PLATFORM_COMPAT_H
+#include <xen/platform-compat.h>
+#endif
+
 #include <asm/xen/xencomm.h>
 
 static int xencomm_debug = 0;

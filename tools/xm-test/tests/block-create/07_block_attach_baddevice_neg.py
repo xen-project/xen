@@ -30,18 +30,18 @@ except ConsoleError, e:
     FAIL(str(e))
     
 
-status, output = traceCommand("xm block-attach %s phy:NOT-EXIST sdb1 w" % domain.getName())
+status, output = traceCommand("xm block-attach %s phy:NOT-EXIST xvda1 w" % domain.getName())
 eyecatcher = "Error"
 where = output.find(eyecatcher)
 if status == 0:
-	FAIL("xm block-attach returned bad status, expected non 0, status is: %i" % status )
+    FAIL("xm block-attach returned bad status, expected non 0, status is: %i" % status )
 elif where == -1:
-	FAIL("xm block-attach returned bad output, expected Error, output is: %s" % output )
+    FAIL("xm block-attach returned bad output, expected Error, output is: %s" % output )
 
 try:
-	run = console.runCmd("cat /proc/partitions")
+    run = console.runCmd("cat /proc/partitions")
 except ConsoleError, e:
-	FAIL(str(e))
+    FAIL(str(e))
 
 # Close the console
 domain.closeConsole()
@@ -49,5 +49,5 @@ domain.closeConsole()
 # Stop the domain (nice shutdown)
 domain.stop()
 
-if re.search("sdb1",run["output"]):
-	FAIL("Non existent Device was connected to the domU")
+if re.search("xvda1",run["output"]):
+    FAIL("Non existent Device was connected to the domU")

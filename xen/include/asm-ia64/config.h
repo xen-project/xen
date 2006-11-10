@@ -271,13 +271,6 @@ struct screen_info { };
 #endif /* __ASSEMBLY__ */
 #endif /* __XEN_IA64_CONFIG_H__ */
 
-#ifndef __ASSEMBLY__
-#include <linux/linkage.h>
-#define FORCE_CRASH()	asm("break.m 0;;");
-#else
-#define FORCE_CRASH	break.m 0;;
-#endif
-
 /* Allow .serialize.data/instruction in asm files.
    Old as doesn't handle this.  */
 #define HAVE_SERIALIZE_DIRECTIVE

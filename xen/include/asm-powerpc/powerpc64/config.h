@@ -36,10 +36,4 @@
 #define HAS_FLOAT 1
 #define HAS_VMX 1
 
-#ifndef __ASSEMBLY__
-
-#define FORCE_CRASH() __asm__ __volatile__ ( "trap" )
-
-#endif /* __ASSEMBLY__ */
-
 #endif

@@ -95,7 +95,7 @@ static int vmx_vcpu_unpend_interrupt(VCPU *vcpu, uint8_t vector)
     int ret;
 
     if (vector & ~0xff) {
-        DPRINTK("vmx_vcpu_pend_interrupt: bad vector\n");
+        dprintk(XENLOG_WARNING, "vmx_vcpu_pend_interrupt: bad vector\n");
         return -1;
     }
 
@@ -324,64 +324,26 @@ void vtm_domain_in(VCPU *vcpu)
  */
 
 #ifdef V_IOSAPIC_READY
-/* Assist to check virtual interrupt lines */
-void vmx_virq_line_assist(struct vcpu *v)
+int vlapic_match_logical_addr(struct vlapic *vlapic, uint16_t dest)
 {
-    global_iodata_t *spg = &get_sp(v->domain)->sp_global;
-    uint16_t *virq_line, irqs;
-
-    virq_line = &spg->pic_irr;
-    if (*virq_line) {
-	do {
-	    irqs = *(volatile uint16_t*)virq_line;
-	} while ((uint16_t)cmpxchg(virq_line, irqs, 0) != irqs);
-	hvm_vioapic_do_irqs(v->domain, irqs);
-    }
-
-    virq_line = &spg->pic_clear_irr;
-    if (*virq_line) {
-	do {
-	    irqs = *(volatile uint16_t*)virq_line;
-	} while ((uint16_t)cmpxchg(virq_line, irqs, 0) != irqs);
-	hvm_vioapic_do_irqs_clear(v->domain, irqs);
-    }
-}
-
-void vmx_virq_line_init(struct domain *d)
-{
-    global_iodata_t *spg = &get_sp(d)->sp_global;
-
-    spg->pic_elcr = 0xdef8; /* Level/Edge trigger mode */
-    spg->pic_irr = 0;
-    spg->pic_last_irr = 0;
-    spg->pic_clear_irr = 0;
-}
-
-int ioapic_match_logical_addr(hvm_vioapic_t *s, int number, uint16_t dest)
-{
-    return (VLAPIC_ID(s->lapic_info[number]) == dest);
+    return (VLAPIC_ID(vlapic) == dest);
 }
 
 struct vlapic* apic_round_robin(struct domain *d,
-				uint8_t dest_mode,
 				uint8_t vector,
 				uint32_t bitmap)
 {
-    uint8_t bit;
-    hvm_vioapic_t *s;
+    uint8_t bit = 0;
     
     if (!bitmap) {
 	printk("<apic_round_robin> no bit on bitmap\n");
 	return NULL;
     }
 
-    s = &d->arch.vmx_platform.vioapic;
-    for (bit = 0; bit < s->lapic_count; bit++) {
-	if (bitmap & (1 << bit))
-	    return s->lapic_info[bit];
-    }
+    while (!(bitmap & (1 << bit)))
+        bit++;
 
-    return NULL;
+    return vcpu_vlapic(d->vcpu[bit]);
 }
 #endif
 
@@ -408,9 +370,8 @@ void vlsapic_reset(VCPU *vcpu)
 
 #ifdef V_IOSAPIC_READY
     vcpu->arch.arch_vmx.vlapic.vcpu = vcpu;
-    hvm_vioapic_add_lapic(&vcpu->arch.arch_vmx.vlapic, vcpu);
 #endif
-    DPRINTK("VLSAPIC inservice base=%p\n", &VLSAPIC_INSVC(vcpu,0) );
+    dprintk(XENLOG_INFO, "VLSAPIC inservice base=%p\n", &VLSAPIC_INSVC(vcpu,0) );
 }
 
 /*
@@ -539,7 +500,7 @@ int vmx_vcpu_pend_interrupt(VCPU *vcpu, uint8_t vector)
     int ret;
 
     if (vector & ~0xff) {
-        DPRINTK("vmx_vcpu_pend_interrupt: bad vector\n");
+        gdprintk(XENLOG_INFO, "vmx_vcpu_pend_interrupt: bad vector\n");
         return -1;
     }
     local_irq_save(spsr);

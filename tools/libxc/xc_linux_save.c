@@ -978,12 +978,14 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             }
 
             if(!write_exact(io_fd, &batch, sizeof(unsigned int))) {
-                ERROR("Error when writing to state file (2)");
+                ERROR("Error when writing to state file (2) (errno %d)",
+                      errno);
                 goto out;
             }
 
             if(!write_exact(io_fd, pfn_type, sizeof(unsigned long)*j)) {
-                ERROR("Error when writing to state file (3)");
+                ERROR("Error when writing to state file (3) (errno %d)",
+                      errno);
                 goto out;
             }
 
@@ -1013,7 +1015,8 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                         goto out; 
 
                     if (ratewrite(io_fd, page, PAGE_SIZE) != PAGE_SIZE) {
-                        ERROR("Error when writing to state file (4)");
+                        ERROR("Error when writing to state file (4)"
+                              " (errno %d)", errno);
                         goto out;
                     }
 
@@ -1021,7 +1024,8 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
                     /* We have a normal page: just write it directly. */
                     if (ratewrite(io_fd, spage, PAGE_SIZE) != PAGE_SIZE) {
-                        ERROR("Error when writing to state file (5)");
+                        ERROR("Error when writing to state file (5)"
+                              " (errno %d)", errno);
                         goto out;
                     }
                 }
@@ -1056,7 +1060,8 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
             /* send "-1" to put receiver into debug mode */
             if(!write_exact(io_fd, &minusone, sizeof(int))) {
-                ERROR("Error when writing to state file (6)");
+                ERROR("Error when writing to state file (6) (errno %d)",
+                      errno);
                 goto out;
             }
 
@@ -1110,7 +1115,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     /* Zero terminate */
     i = 0;
     if (!write_exact(io_fd, &i, sizeof(int))) {
-        ERROR("Error when writing to state file (6)");
+        ERROR("Error when writing to state file (6') (errno %d)", errno);
         goto out;
     }
 
@@ -1125,7 +1130,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         }
 
         if(!write_exact(io_fd, &j, sizeof(unsigned int))) {
-            ERROR("Error when writing to state file (6a)");
+            ERROR("Error when writing to state file (6a) (errno %d)", errno);
             goto out;
         }
 
@@ -1137,7 +1142,8 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             i++;
             if (j == 1024 || i == max_pfn) {
                 if(!write_exact(io_fd, &pfntab, sizeof(unsigned long)*j)) {
-                    ERROR("Error when writing to state file (6b)");
+                    ERROR("Error when writing to state file (6b) (errno %d)",
+                          errno);
                     goto out;
                 }
                 j = 0;
@@ -1170,7 +1176,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     if (!write_exact(io_fd, &ctxt, sizeof(ctxt)) ||
         !write_exact(io_fd, live_shinfo, PAGE_SIZE)) {
-        ERROR("Error when writing to state file (1)");
+        ERROR("Error when writing to state file (1) (errno %d)", errno);
         goto out;
     }
 

@@ -42,7 +42,7 @@ void show_registers(struct cpu_user_regs *regs)
     unsigned long fault_crs[8];
     const char *context;
 
-    if ( hvm_guest(current) && guest_mode(regs) )
+    if ( is_hvm_vcpu(current) && guest_mode(regs) )
     {
         context = "hvm";
         hvm_store_cpu_guest_regs(current, &fault_regs, fault_crs);
@@ -172,16 +172,8 @@ asmlinkage void do_double_fault(struct cpu_user_regs *regs)
            regs->r12, regs->r13, regs->r14);
     printk("r15: %016lx\n", regs->r15);
     show_stack_overflow(regs->rsp);
-    printk("************************************\n");
-    printk("CPU%d DOUBLE FAULT -- system shutdown\n", cpu);
-    printk("System needs manual reset.\n");
-    printk("************************************\n");
 
-    /* Lock up the console to prevent spurious output from other CPUs. */
-    console_force_lock();
-
-    /* Wait for manual reset. */
-    machine_halt();
+    panic("DOUBLE FAULT -- system shutdown\n");
 }
 
 void toggle_guest_mode(struct vcpu *v)
@@ -206,7 +198,8 @@ unsigned long do_iret(void)
     if ( unlikely(copy_from_user(&iret_saved, (void *)regs->rsp,
                                  sizeof(iret_saved))) )
     {
-        DPRINTK("Fault while reading IRET context from guest stack\n");
+        gdprintk(XENLOG_ERR, "Fault while reading IRET context from "
+                "guest stack\n");
         domain_crash_synchronous();
     }
 
@@ -215,7 +208,8 @@ unsigned long do_iret(void)
     {
         if ( unlikely(pagetable_is_null(v->arch.guest_table_user)) )
         {
-            DPRINTK("Guest switching to user mode with no user page tables\n");
+            gdprintk(XENLOG_ERR, "Guest switching to user mode with no "
+                    "user page tables\n");
             domain_crash_synchronous();
         }
         toggle_guest_mode(v);
@@ -227,7 +221,7 @@ unsigned long do_iret(void)
     regs->rsp    = iret_saved.rsp;
     regs->ss     = iret_saved.ss | 3; /* force guest privilege */
 
-    if ( !(iret_saved.flags & VGCF_IN_SYSCALL) )
+    if ( !(iret_saved.flags & VGCF_in_syscall) )
     {
         regs->entry_vector = 0;
         regs->r11 = iret_saved.r11;
@@ -498,7 +492,7 @@ static void hypercall_page_initialise_ring3_kernel(void *hypercall_page)
 
 void hypercall_page_initialise(struct domain *d, void *hypercall_page)
 {
-    if ( hvm_guest(d->vcpu[0]) )
+    if ( is_hvm_domain(d) )
         hvm_hypercall_page_initialise(d, hypercall_page);
     else
         hypercall_page_initialise_ring3_kernel(hypercall_page);

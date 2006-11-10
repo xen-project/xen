@@ -167,11 +167,17 @@ irqreturn_t evtchn_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			l2 = s->evtchn_pending[l1i] & ~s->evtchn_mask[l1i];
 		}
 	}
+
+	/* Make sure the hypervisor has a chance to notice that the
+	   upcall_pending condition has been cleared, so that we don't
+	   try and reinject the interrupt again. */
+        (void)HYPERVISOR_xen_version(0, NULL);
+
 	return IRQ_HANDLED;
 }
 
 void force_evtchn_callback(void)
 {
-	evtchn_interrupt(0, NULL, NULL);
+        (void)HYPERVISOR_xen_version(0, NULL);
 }
 EXPORT_SYMBOL(force_evtchn_callback);

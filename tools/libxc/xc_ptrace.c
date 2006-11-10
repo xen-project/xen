@@ -36,8 +36,9 @@ static char *ptrace_names[] = {
 };
 #endif
 
-static int                      current_domid = -1;
-static int                      current_isfile;
+static int current_domid = -1;
+static int current_isfile;
+static int current_is_hvm;
 
 static uint64_t                 online_cpumap;
 static uint64_t                 regs_valid;
@@ -45,7 +46,6 @@ static vcpu_guest_context_t     ctxt[MAX_VIRT_CPUS];
 
 extern int ffsll(long long int);
 #define FOREACH_CPU(cpumap, i)  for ( cpumap = online_cpumap; (i = ffsll(cpumap)); cpumap &= ~(1 << (index - 1)) )
-
 
 static int
 fetch_regs(int xc_handle, int cpu, int *online)
@@ -172,7 +172,7 @@ to_ma(int cpu,
 {
     unsigned long maddr = in_addr;
 
-    if ( (ctxt[cpu].flags & VGCF_HVM_GUEST) && paging_enabled(&ctxt[cpu]) )
+    if ( current_is_hvm && paging_enabled(&ctxt[cpu]) )
         maddr = page_array[maddr >> PAGE_SHIFT] << PAGE_SHIFT;
     return maddr;
 }
@@ -443,7 +443,7 @@ __xc_waitdomain(
         goto done;
     }
 
-    if ( !(domctl.u.getdomaininfo.flags & DOMFLAGS_PAUSED) )
+    if ( !(domctl.u.getdomaininfo.flags & XEN_DOMINF_paused) )
     {
         nanosleep(&ts,NULL);
         goto retry;
@@ -482,11 +482,11 @@ xc_ptrace(
     case PTRACE_PEEKTEXT:
     case PTRACE_PEEKDATA:
         if (current_isfile)
-            guest_va = (unsigned long *)map_domain_va_core(current_domid,
-                                cpu, addr, ctxt);
+            guest_va = (unsigned long *)map_domain_va_core(
+                current_domid, cpu, addr, ctxt);
         else
-            guest_va = (unsigned long *)map_domain_va(xc_handle,
-                                cpu, addr, PROT_READ);
+            guest_va = (unsigned long *)map_domain_va(
+                xc_handle, cpu, addr, PROT_READ);
         if ( guest_va == NULL )
             goto out_error;
         retval = *guest_va;
@@ -496,11 +496,11 @@ xc_ptrace(
     case PTRACE_POKEDATA:
         /* XXX assume that all CPUs have the same address space */
         if (current_isfile)
-            guest_va = (unsigned long *)map_domain_va_core(current_domid,
-                                cpu, addr, ctxt);
+            guest_va = (unsigned long *)map_domain_va_core(
+                current_domid, cpu, addr, ctxt);
         else
-            guest_va = (unsigned long *)map_domain_va(xc_handle,
-                                cpu, addr, PROT_READ|PROT_WRITE);
+            guest_va = (unsigned long *)map_domain_va(
+                xc_handle, cpu, addr, PROT_READ|PROT_WRITE);
         if ( guest_va == NULL )
             goto out_error;
         *guest_va = (unsigned long)data;
@@ -590,10 +590,11 @@ xc_ptrace(
         retval = do_domctl(xc_handle, &domctl);
         if ( retval || (domctl.domain != current_domid) )
             goto out_error_domctl;
-        if ( domctl.u.getdomaininfo.flags & DOMFLAGS_PAUSED )
+        if ( domctl.u.getdomaininfo.flags & XEN_DOMINF_paused )
             IPRINTF("domain currently paused\n");
         else if ((retval = xc_domain_pause(xc_handle, current_domid)))
             goto out_error_domctl;
+        current_is_hvm = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_hvm_guest);
         domctl.cmd = XEN_DOMCTL_setdebugging;
         domctl.domain = current_domid;
         domctl.u.setdebugging.enable = 1;

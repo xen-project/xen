@@ -23,7 +23,7 @@
 #ifndef _XEN_SHADOW_H
 #define _XEN_SHADOW_H
 
-#include <public/domctl.h> 
+#include <public/domctl.h>
 #include <xen/sched.h>
 #include <xen/perfc.h>
 #include <xen/domain_page.h>
@@ -64,7 +64,7 @@
 #define shadow_mode_external(_d)  ((_d)->arch.shadow.mode & SHM2_external)
 
 /* Xen traps & emulates all reads of all page table pages:
- *not yet supported
+ * not yet supported
  */
 #define shadow_mode_trap_reads(_d) ({ (void)(_d); 0; })
 
@@ -77,7 +77,7 @@
 #ifdef __x86_64__
 #define pv_32bit_guest(_v) 0 // not yet supported
 #else
-#define pv_32bit_guest(_v) !hvm_guest(v)
+#define pv_32bit_guest(_v) !is_hvm_vcpu(v)
 #endif
 
 /* The shadow lock.
@@ -103,36 +103,36 @@
 #error shadow.h currently requires CONFIG_SMP
 #endif
 
-#define shadow_lock_init(_d)                                   \
-    do {                                                        \
-        spin_lock_init(&(_d)->arch.shadow.lock);               \
-        (_d)->arch.shadow.locker = -1;                         \
-        (_d)->arch.shadow.locker_function = "nobody";          \
+#define shadow_lock_init(_d)                            \
+    do {                                                \
+        spin_lock_init(&(_d)->arch.shadow.lock);        \
+        (_d)->arch.shadow.locker = -1;                  \
+        (_d)->arch.shadow.locker_function = "nobody";   \
     } while (0)
 
-#define shadow_lock_is_acquired(_d)                            \
+#define shadow_lock_is_acquired(_d)                     \
     (current->processor == (_d)->arch.shadow.locker)
 
 #define shadow_lock(_d)                                                 \
-    do {                                                                 \
+    do {                                                                \
         if ( unlikely((_d)->arch.shadow.locker == current->processor) ) \
-        {                                                                \
+        {                                                               \
             printk("Error: shadow lock held by %s\n",                   \
                    (_d)->arch.shadow.locker_function);                  \
-            BUG();                                                       \
-        }                                                                \
+            BUG();                                                      \
+        }                                                               \
         spin_lock(&(_d)->arch.shadow.lock);                             \
         ASSERT((_d)->arch.shadow.locker == -1);                         \
         (_d)->arch.shadow.locker = current->processor;                  \
         (_d)->arch.shadow.locker_function = __func__;                   \
     } while (0)
 
-#define shadow_unlock(_d)                                              \
-    do {                                                                \
-        ASSERT((_d)->arch.shadow.locker == current->processor);        \
-        (_d)->arch.shadow.locker = -1;                                 \
-        (_d)->arch.shadow.locker_function = "nobody";                  \
-        spin_unlock(&(_d)->arch.shadow.lock);                          \
+#define shadow_unlock(_d)                                       \
+    do {                                                        \
+        ASSERT((_d)->arch.shadow.locker == current->processor); \
+        (_d)->arch.shadow.locker = -1;                          \
+        (_d)->arch.shadow.locker_function = "nobody";           \
+        spin_unlock(&(_d)->arch.shadow.lock);                   \
     } while (0)
 
 /* 
@@ -161,8 +161,10 @@ extern int shadow_audit_enable;
  */
 #define SHOPT_WRITABLE_HEURISTIC  0x01  /* Guess at RW PTEs via linear maps */
 #define SHOPT_EARLY_UNSHADOW      0x02  /* Unshadow l1s on fork or exit */
+#define SHOPT_FAST_FAULT_PATH     0x04  /* Fast-path MMIO and not-present */
+#define SHOPT_PREFETCH            0x08  /* Shadow multiple entries per fault */
 
-#define SHADOW_OPTIMIZATIONS      0x03
+#define SHADOW_OPTIMIZATIONS      0x0f
 
 
 /* With shadow pagetables, the different kinds of address start 
@@ -259,7 +261,7 @@ struct shadow_paging_mode {
     int           (*page_fault            )(struct vcpu *v, unsigned long va,
                                             struct cpu_user_regs *regs);
     int           (*invlpg                )(struct vcpu *v, unsigned long va);
-    unsigned long (*gva_to_gpa            )(struct vcpu *v, unsigned long va);
+    paddr_t       (*gva_to_gpa            )(struct vcpu *v, unsigned long va);
     unsigned long (*gva_to_gfn            )(struct vcpu *v, unsigned long va);
     void          (*update_cr3            )(struct vcpu *v);
     int           (*map_and_validate_gl1e )(struct vcpu *v, mfn_t gmfn,
@@ -310,6 +312,9 @@ static inline int shadow_guest_paging_levels(struct vcpu *v)
 
 /**************************************************************************/
 /* Entry points into the shadow code */
+
+/* Enable arbitrary shadow mode. */
+int shadow_enable(struct domain *d, u32 mode);
 
 /* Turning on shadow test mode */
 int shadow_test_enable(struct domain *d);
@@ -368,11 +373,13 @@ shadow_invlpg(struct vcpu *v, unsigned long va)
     return v->arch.shadow.mode->invlpg(v, va);
 }
 
-static inline unsigned long
+static inline paddr_t
 shadow_gva_to_gpa(struct vcpu *v, unsigned long va)
 /* Called to translate a guest virtual address to what the *guest*
  * pagetables would map it to. */
 {
+    if ( unlikely(!shadow_vcpu_mode_translate(v)) )
+        return (paddr_t) va;
     return v->arch.shadow.mode->gva_to_gpa(v, va);
 }
 
@@ -381,6 +388,8 @@ shadow_gva_to_gfn(struct vcpu *v, unsigned long va)
 /* Called to translate a guest virtual address to what the *guest*
  * pagetables would map it to. */
 {
+    if ( unlikely(!shadow_vcpu_mode_translate(v)) )
+        return va >> PAGE_SHIFT;
     return v->arch.shadow.mode->gva_to_gfn(v, va);
 }
 
@@ -671,21 +680,6 @@ sh_gfn_to_mfn(struct domain *d, unsigned long gfn)
         return _mfn(get_mfn_from_gpfn(gfn));
     else
         return sh_gfn_to_mfn_foreign(d, gfn);
-}
-
-// vcpu-specific version of gfn_to_mfn().  This is where we hide the dirty
-// little secret that, for hvm guests with paging disabled, nearly all of the
-// shadow code actually think that the guest is running on *untranslated* page
-// tables (which is actually domain->phys_table).
-//
-static inline mfn_t
-sh_vcpu_gfn_to_mfn(struct vcpu *v, unsigned long gfn)
-{ 
-    if ( !shadow_vcpu_mode_translate(v) )
-        return _mfn(gfn);
-    if ( likely(current->domain == v->domain) )
-        return _mfn(get_mfn_from_gpfn(gfn));
-    return sh_gfn_to_mfn_foreign(v->domain, gfn);
 }
 
 static inline unsigned long

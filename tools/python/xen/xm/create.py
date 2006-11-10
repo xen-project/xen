@@ -181,10 +181,6 @@ gopts.var('acpi', val='ACPI',
           fn=set_int, default=0,
           use="Disable or enable ACPI of HVM domain.")
 
-gopts.var('apic', val='APIC',
-          fn=set_int, default=0,
-          use="Disable or enable APIC of HVM domain.")
-
 gopts.var('vcpus', val='VCPUS',
           fn=set_int, default=1,
           use="# of Virtual CPUS in domain.")
@@ -299,7 +295,7 @@ gopts.var('vif', val="type=TYPE,mac=MAC,bridge=BRIDGE,ip=IPADDR,script=SCRIPT,ba
           This option may be repeated to add more than one vif.
           Specifying vifs will increase the number of interfaces as needed.""")
 
-gopts.var('vtpm', val="instance=INSTANCE,backend=DOM",
+gopts.var('vtpm', val="instance=INSTANCE,backend=DOM,type=TYPE",
           fn=append_value, default=[],
           use="""Add a TPM interface. On the backend side use the given
           instance as virtual TPM instance. The given number is merely the
@@ -307,7 +303,11 @@ gopts.var('vtpm', val="instance=INSTANCE,backend=DOM",
           which instance number will actually be assigned to the domain.
           The associtation between virtual machine and the TPM instance
           number can be found in /etc/xen/vtpm.db. Use the backend in the
-          given domain.""")
+          given domain.
+          The type parameter can be used to select a specific driver type
+          that the VM can use. To prevent a fully virtualized domain (HVM)
+          from being able to access an emulated device model, you may specify
+          'paravirtualized' here.""")
 
 gopts.var('access_control', val="policy=POLICY,label=LABEL",
           fn=append_value, default=[],
@@ -451,6 +451,18 @@ gopts.var('uuid', val='',
           addresses for virtual network interfaces.  This must be a unique 
           value across the entire cluster.""")
 
+gopts.var('on_xend_start', val='ignore|start',
+          fn=set_value, default='ignore',
+          use='Action to perform when xend starts')
+
+gopts.var('on_xend_stop', val='continue|shutdown|suspend',
+          fn=set_value, default="ignore",
+          use="""Behaviour when Xend stops:
+          - ignore:         Domain continues to run;
+          - shutdown:       Domain is shutdown;
+          - suspend:        Domain is suspended;
+          """)
+
 def err(msg):
     """Print an error to stderr and exit.
     """
@@ -585,27 +597,28 @@ def configure_vtpm(config_devs, vals):
     """Create the config for virtual TPM interfaces.
     """
     vtpm = vals.vtpm
-    vtpm_n = 1
-    for idx in range(0, vtpm_n):
-        if idx < len(vtpm):
-            d = vtpm[idx]
-            instance = d.get('instance')
-            if instance == "VTPMD":
-                instance = "0"
-            else:
-                if instance != None:
-                    try:
-                        if int(instance) == 0:
-                            err('VM config error: vTPM instance must not be 0.')
-                    except ValueError:
-                        err('Vm config error: could not parse instance number.')
-            backend = d.get('backend')
-            config_vtpm = ['vtpm']
-            if instance:
-                config_vtpm.append(['pref_instance', instance])
-            if backend:
-                config_vtpm.append(['backend', backend])
-            config_devs.append(['device', config_vtpm])
+    if len(vtpm) > 0:
+        d = vtpm[0]
+        instance = d.get('instance')
+        if instance == "VTPMD":
+            instance = "0"
+        else:
+            if instance != None:
+                try:
+                    if int(instance) == 0:
+                        err('VM config error: vTPM instance must not be 0.')
+                except ValueError:
+                    err('Vm config error: could not parse instance number.')
+        backend = d.get('backend')
+        typ = d.get('type')
+        config_vtpm = ['vtpm']
+        if instance:
+            config_vtpm.append(['pref_instance', instance])
+        if backend:
+            config_vtpm.append(['backend', backend])
+        if typ:
+            config_vtpm.append(['type', type])
+        config_devs.append(['device', config_vtpm])
 
 
 def configure_vifs(config_devs, vals):
@@ -647,7 +660,7 @@ def configure_hvm(config_image, vals):
              'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'soundhw',
              'vnc', 'vncdisplay', 'vncunused', 'vncconsole', 'vnclisten',
              'sdl', 'display', 'xauthority',
-             'acpi', 'apic', 'usb', 'usbdevice' ]
+             'acpi', 'usb', 'usbdevice' ]
     for a in args:
         if (vals.__dict__[a]):
             config_image.append([a, vals.__dict__[a]])
@@ -682,8 +695,9 @@ def make_config(vals):
                 config.append([n, v])
 
     map(add_conf, ['name', 'memory', 'maxmem', 'shadow_memory',
-                   'restart', 'on_poweroff', 'on_reboot', 'on_crash',
-                   'vcpus', 'features'])
+                   'restart', 'on_poweroff',
+                   'on_reboot', 'on_crash', 'vcpus', 'features',
+                   'on_xend_start', 'on_xend_stop'])
 
     if vals.uuid is not None:
         config.append(['uuid', vals.uuid])
@@ -1151,8 +1165,11 @@ def config_security_check(config, verbose):
             (res_label, res_policy) = security.get_res_label(resource)
             if not res_label:
                 res_label = ""
-            print "   --> res:"+res_label+" ("+res_policy+")"
-            print "   --> dom:"+domain_label+" ("+domain_policy+")"
+            print "   --> res: %s (%s)" % (str(res_label),
+                                           str(res_policy))
+            print "   --> dom: %s (%s)" % (str(domain_label),
+                                           str(domain_policy))
+
             answer = 0
 
     return answer
@@ -1183,7 +1200,10 @@ def main(argv):
         return
 
     if type(config) == str:
+        try:
             config = sxp.parse(file(config))[0]
+        except IOError, exn:
+            raise OptionError("Cannot read file %s: %s" % (config, exn[1]))
 
     if opts.vals.dryrun:
         PrettyPrint.prettyprint(config)

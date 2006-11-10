@@ -18,7 +18,7 @@
  * Place - Suite 330, Boston, MA 02111-1307 USA.
  */
 
-#include "../acpi/acpi2_0.h"  /* for ACPI_PHYSICAL_ADDRESS */
+#include "acpi/acpi2_0.h"  /* for ACPI_PHYSICAL_ADDRESS */
 #include "util.h"
 #include <stdint.h>
 
@@ -227,4 +227,5 @@ uuid_to_string(char *dest, uint8_t *uuid)
 		byte_to_hex(p, uuid[i]);
 		p += 2;
 	}
+	*p = 0;
 }

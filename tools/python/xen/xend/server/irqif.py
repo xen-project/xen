@@ -23,7 +23,7 @@
 
 import types
 
-import xen.lowlevel.xc;
+import xen.lowlevel.xc
 
 from xen.xend import sxp
 from xen.xend.XendError import VmError

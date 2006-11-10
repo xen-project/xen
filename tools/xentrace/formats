@@ -1,3 +1,5 @@
+0x0001f001	CPU%(cpu)d	%(tsc)d		lost_records        0x%(1)08x
+
 0x0002f001	CPU%(cpu)d	%(tsc)d		sched_add_domain	[ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
 0x0002f002	CPU%(cpu)d	%(tsc)d		sched_rem_domain	[ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
 0x0002f003	CPU%(cpu)d	%(tsc)d		domain_sleep		[ domid = 0x%(1)08x, edomid = 0x%(2)08x ]

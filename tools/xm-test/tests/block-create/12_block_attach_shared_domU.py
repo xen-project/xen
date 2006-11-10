@@ -8,7 +8,7 @@ from XmTestLib import *
 if ENABLE_HVM_SUPPORT:
     SKIP("Block-attach not supported for HVM domains")
 
-config = {"disk":"phy:/dev/ram0,hda1,w"}
+config = {"disk":"phy:/dev/ram0,xvda1,w"}
 
 dom1 = XmTestDomain(extraConfig=config)
 dom2 = XmTestDomain(dom1.getName() + "-2",

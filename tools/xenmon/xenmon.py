@@ -653,7 +653,6 @@ def writelog():
 # start xenbaked
 def start_xenbaked():
     global options
-    global args
     
     os.system("killall -9 xenbaked")
     # assumes that xenbaked is in your path
@@ -672,6 +671,9 @@ def main():
 
     parser = setup_cmdline_parser()
     (options, args) = parser.parse_args()
+
+    if len(args):
+        parser.error("No parameter required")
     if options.mspersample < 0:
         parser.error("option --ms_per_sample: invalid negative value: '%d'" %
                      options.mspersample)

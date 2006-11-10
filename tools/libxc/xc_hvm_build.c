@@ -12,7 +12,6 @@
 #include <unistd.h>
 #include <zlib.h>
 #include <xen/hvm/hvm_info_table.h>
-#include <xen/hvm/ioreq.h>
 #include <xen/hvm/params.h>
 #include <xen/hvm/e820.h>
 
@@ -57,88 +56,67 @@ static void build_e820map(void *e820_page, unsigned long long mem_size)
     unsigned char nr_map = 0;
 
     /*
-     * physical address space from HVM_BELOW_4G_RAM_END to 4G is reserved
+     * Physical address space from HVM_BELOW_4G_RAM_END to 4G is reserved
      * for PCI devices MMIO. So if HVM has more than HVM_BELOW_4G_RAM_END
      * RAM, memory beyond HVM_BELOW_4G_RAM_END will go to 4G above.
      */
-    if ( mem_size > HVM_BELOW_4G_RAM_END ) {
+    if ( mem_size > HVM_BELOW_4G_RAM_END )
+    {
         extra_mem_size = mem_size - HVM_BELOW_4G_RAM_END;
         mem_size = HVM_BELOW_4G_RAM_END;
     }
 
+    /* 0x0-0x9F000: Ordinary RAM. */
     e820entry[nr_map].addr = 0x0;
     e820entry[nr_map].size = 0x9F000;
     e820entry[nr_map].type = E820_RAM;
     nr_map++;
 
+    /*
+     * 0x9F000-0x9F800: SMBIOS tables.
+     * 0x9FC00-0xA0000: Extended BIOS Data Area (EBDA).
+     * TODO: SMBIOS tables should be moved higher (>=0xE0000).
+     *       They are unusually low in our memory map: could cause problems?
+     */
     e820entry[nr_map].addr = 0x9F000;
     e820entry[nr_map].size = 0x1000;
     e820entry[nr_map].type = E820_RESERVED;
     nr_map++;
 
-    e820entry[nr_map].addr = 0xA0000;
+    /*
+     * Following regions are standard regions of the PC memory map.
+     * They are not covered by e820 regions. OSes will not use as RAM.
+     * 0xA0000-0xC0000: VGA memory-mapped I/O. Not covered by E820.
+     * 0xC0000-0xE0000: 16-bit devices, expansion ROMs (inc. vgabios).
+     * TODO: hvmloader should free pages which turn out to be unused.
+     */
+
+    /*
+     * 0xE0000-0x0F0000: PC-specific area. We place ACPI tables here.
+     *                   We *cannot* mark as E820_ACPI, for two reasons:
+     *                    1. ACPI spec. says that E820_ACPI regions below
+     *                       16MB must clip INT15h 0x88 and 0xe801 queries.
+     *                       Our rombios doesn't do this.
+     *                    2. The OS is allowed to reclaim ACPI memory after
+     *                       parsing the tables. But our FACS is in this
+     *                       region and it must not be reclaimed (it contains
+     *                       the ACPI global lock!).
+     * 0xF0000-0x100000: System BIOS.
+     * TODO: hvmloader should free pages which turn out to be unused.
+     */
+    e820entry[nr_map].addr = 0xE0000;
     e820entry[nr_map].size = 0x20000;
-    e820entry[nr_map].type = E820_IO;
-    nr_map++;
-
-    e820entry[nr_map].addr = 0xEA000;
-    e820entry[nr_map].size = 0x01000;
-    e820entry[nr_map].type = E820_ACPI;
-    nr_map++;
-
-    e820entry[nr_map].addr = 0xF0000;
-    e820entry[nr_map].size = 0x10000;
     e820entry[nr_map].type = E820_RESERVED;
     nr_map++;
 
-/* buffered io page.    */
-#define BUFFERED_IO_PAGES   1
-/* xenstore page.       */
-#define XENSTORE_PAGES      1
-/* shared io page.      */
-#define SHARED_IO_PAGES     1
-/* totally 16 static pages are reserved in E820 table */
-
-    /* Most of the ram goes here */
+    /* Low RAM goes here. Remove 3 pages for ioreq, bufioreq, and xenstore. */
     e820entry[nr_map].addr = 0x100000;
-    e820entry[nr_map].size = mem_size - 0x100000 - PAGE_SIZE *
-                                                (BUFFERED_IO_PAGES +
-                                                 XENSTORE_PAGES +
-                                                 SHARED_IO_PAGES);
+    e820entry[nr_map].size = mem_size - 0x100000 - PAGE_SIZE * 3;
     e820entry[nr_map].type = E820_RAM;
     nr_map++;
 
-    /* Statically allocated special pages */
-
-    /* For buffered IO requests */
-    e820entry[nr_map].addr = mem_size - PAGE_SIZE *
-                                        (BUFFERED_IO_PAGES +
-                                         XENSTORE_PAGES +
-                                         SHARED_IO_PAGES);
-    e820entry[nr_map].size = PAGE_SIZE * BUFFERED_IO_PAGES;
-    e820entry[nr_map].type = E820_BUFFERED_IO;
-    nr_map++;
-
-    /* For xenstore */
-    e820entry[nr_map].addr = mem_size - PAGE_SIZE *
-                                        (XENSTORE_PAGES +
-                                         SHARED_IO_PAGES);
-    e820entry[nr_map].size = PAGE_SIZE * XENSTORE_PAGES;
-    e820entry[nr_map].type = E820_XENSTORE;
-    nr_map++;
-
-    /* Shared ioreq_t page */
-    e820entry[nr_map].addr = mem_size - PAGE_SIZE * SHARED_IO_PAGES;
-    e820entry[nr_map].size = PAGE_SIZE * SHARED_IO_PAGES;
-    e820entry[nr_map].type = E820_SHARED_PAGE;
-    nr_map++;
-
-    e820entry[nr_map].addr = 0xFEC00000;
-    e820entry[nr_map].size = 0x1400000;
-    e820entry[nr_map].type = E820_IO;
-    nr_map++;
-
-    if ( extra_mem_size ) {
+    if ( extra_mem_size )
+    {
         e820entry[nr_map].addr = (1ULL << 32);
         e820entry[nr_map].size = extra_mem_size;
         e820entry[nr_map].type = E820_RAM;
@@ -197,28 +175,22 @@ static int set_hvm_info(int xc_handle, uint32_t dom,
 static int setup_guest(int xc_handle,
                        uint32_t dom, int memsize,
                        char *image, unsigned long image_size,
-                       unsigned long nr_pages,
                        vcpu_guest_context_t *ctxt,
                        unsigned long shared_info_frame,
                        unsigned int vcpus,
                        unsigned int pae,
                        unsigned int acpi,
-                       unsigned int apic,
                        unsigned int store_evtchn,
                        unsigned long *store_mfn)
 {
     xen_pfn_t *page_array = NULL;
-    unsigned long count, i;
-    unsigned long long ptr;
-    xc_mmu_t *mmu = NULL;
-
+    unsigned long i, nr_pages = (unsigned long)memsize << (20 - PAGE_SHIFT);
+    unsigned long shared_page_nr;
     shared_info_t *shared_info;
     void *e820_page;
-
     struct domain_setup_info dsi;
     uint64_t v_end;
-
-    unsigned long shared_page_nr;
+    int rc;
 
     memset(&dsi, 0, sizeof(struct domain_setup_info));
 
@@ -231,7 +203,6 @@ static int setup_guest(int xc_handle,
         goto error_out;
     }
 
-    /* memsize is in megabytes */
     v_end = (unsigned long long)memsize << 20;
 
     IPRINTF("VIRTUAL MEMORY ARRANGEMENT:\n"
@@ -256,39 +227,32 @@ static int setup_guest(int xc_handle,
         goto error_out;
     }
 
-    if ( xc_get_pfn_list(xc_handle, dom, page_array, nr_pages) != nr_pages )
+    for ( i = 0; i < nr_pages; i++ )
+        page_array[i] = i;
+    for ( i = HVM_BELOW_4G_RAM_END >> PAGE_SHIFT; i < nr_pages; i++ )
+        page_array[i] += HVM_BELOW_4G_MMIO_LENGTH >> PAGE_SHIFT;
+
+    /* Allocate memory for HVM guest, skipping VGA hole 0xA0000-0xC0000. */
+    rc = xc_domain_memory_populate_physmap(
+        xc_handle, dom, (nr_pages > 0xa0) ? 0xa0 : nr_pages,
+        0, 0, &page_array[0x00]);
+    if ( (rc == 0) && (nr_pages > 0xc0) )
+        rc = xc_domain_memory_populate_physmap(
+            xc_handle, dom, nr_pages - 0xc0, 0, 0, &page_array[0xc0]);
+    if ( rc != 0 )
     {
-        PERROR("Could not get the page frame list.\n");
+        PERROR("Could not allocate memory for HVM guest.\n");
+        goto error_out;
+    }
+
+    if ( xc_domain_translate_gpfn_list(xc_handle, dom, nr_pages,
+                                       page_array, page_array) )
+    {
+        PERROR("Could not translate addresses of HVM guest.\n");
         goto error_out;
     }
 
     loadelfimage(image, xc_handle, dom, page_array, &dsi);
-
-    if ( (mmu = xc_init_mmu_updates(xc_handle, dom)) == NULL )
-        goto error_out;
-
-    /* Write the machine->phys table entries. */
-    for ( count = 0; count < nr_pages; count++ )
-    {
-        unsigned long gpfn_count_skip;
-
-        ptr = (unsigned long long)page_array[count] << PAGE_SHIFT;
-
-        gpfn_count_skip = 0;
-
-        /*
-         * physical address space from HVM_BELOW_4G_RAM_END to 4G is reserved
-         * for PCI devices MMIO. So if HVM has more than HVM_BELOW_4G_RAM_END
-         * RAM, memory beyond HVM_BELOW_4G_RAM_END will go to 4G above.
-         */
-        if ( count >= (HVM_BELOW_4G_RAM_END >> PAGE_SHIFT) )
-            gpfn_count_skip = HVM_BELOW_4G_MMIO_LENGTH >> PAGE_SHIFT;
-
-        if ( xc_add_mmu_update(xc_handle, mmu,
-                               ptr | MMU_MACHPHYS_UPDATE,
-                               count + gpfn_count_skip) )
-            goto error_out;
-    }
 
     if ( set_hvm_info(xc_handle, dom, page_array, vcpus, acpi) )
     {
@@ -297,7 +261,6 @@ static int setup_guest(int xc_handle,
     }
 
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_PAE_ENABLED, pae);
-    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_APIC_ENABLED, apic);
 
     if ( (e820_page = xc_map_foreign_range(
               xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
@@ -316,6 +279,8 @@ static int setup_guest(int xc_handle,
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
         shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
+    memset(&shared_info->evtchn_mask[0], 0xff,
+           sizeof(shared_info->evtchn_mask));
     munmap(shared_info, PAGE_SIZE);
 
     if ( v_end > HVM_BELOW_4G_RAM_END )
@@ -323,39 +288,25 @@ static int setup_guest(int xc_handle,
     else
         shared_page_nr = (v_end >> PAGE_SHIFT) - 1;
 
+    /* Paranoia: clean pages. */
+    if ( xc_clear_domain_page(xc_handle, dom, page_array[shared_page_nr]) ||
+         xc_clear_domain_page(xc_handle, dom, page_array[shared_page_nr-1]) ||
+         xc_clear_domain_page(xc_handle, dom, page_array[shared_page_nr-2]) )
+        goto error_out;
+
     *store_mfn = page_array[shared_page_nr - 1];
-
-    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_PFN, shared_page_nr - 1);
+    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_PFN, shared_page_nr-1);
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_EVTCHN, store_evtchn);
+    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_BUFIOREQ_PFN, shared_page_nr-2);
+    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_IOREQ_PFN, shared_page_nr);
 
-    /* Paranoia */
-    /* clean the shared IO requests page */
-    if ( xc_clear_domain_page(xc_handle, dom, page_array[shared_page_nr]) )
-        goto error_out;
-
-    /* clean the buffered IO requests page */
-    if ( xc_clear_domain_page(xc_handle, dom, page_array[shared_page_nr - 2]) )
-        goto error_out;
-
-    if ( xc_clear_domain_page(xc_handle, dom, *store_mfn) )
-        goto error_out;
-
-    /* Send the page update requests down to the hypervisor. */
-    if ( xc_finish_mmu_updates(xc_handle, mmu) )
-        goto error_out;
-
-    free(mmu);
     free(page_array);
 
-    /*
-     * Initial register values:
-     */
     ctxt->user_regs.eip = dsi.v_kernentry;
 
     return 0;
 
  error_out:
-    free(mmu);
     free(page_array);
     return -1;
 }
@@ -368,45 +319,17 @@ static int xc_hvm_build_internal(int xc_handle,
                                  unsigned int vcpus,
                                  unsigned int pae,
                                  unsigned int acpi,
-                                 unsigned int apic,
                                  unsigned int store_evtchn,
                                  unsigned long *store_mfn)
 {
     struct xen_domctl launch_domctl, domctl;
-    int rc, i;
-    vcpu_guest_context_t st_ctxt, *ctxt = &st_ctxt;
-    unsigned long nr_pages;
-    xen_capabilities_info_t xen_caps;
+    vcpu_guest_context_t ctxt;
+    int rc;
 
     if ( (image == NULL) || (image_size == 0) )
     {
         ERROR("Image required");
         goto error_out;
-    }
-
-    if ( (rc = xc_version(xc_handle, XENVER_capabilities, &xen_caps)) != 0 )
-    {
-        PERROR("Failed to get xen version info");
-        goto error_out;
-    }
-
-    if ( !strstr(xen_caps, "hvm") )
-    {
-        PERROR("CPU doesn't support HVM extensions or "
-               "the extensions are not enabled");
-        goto error_out;
-    }
-
-    if ( (nr_pages = xc_get_tot_pages(xc_handle, domid)) < 0 )
-    {
-        PERROR("Could not find total pages for domain");
-        goto error_out;
-    }
-
-    if ( lock_pages(&st_ctxt, sizeof(st_ctxt) ) )
-    {
-        PERROR("%s: ctxt mlock failed", __func__);
-        return 1;
     }
 
     domctl.cmd = XEN_DOMCTL_getdomaininfo;
@@ -418,68 +341,30 @@ static int xc_hvm_build_internal(int xc_handle,
         goto error_out;
     }
 
-    /* HVM domains must be put into shadow mode at the start of day */
-    if ( xc_shadow_control(xc_handle, domid, XEN_DOMCTL_SHADOW_OP_ENABLE,
-                           NULL, 0, NULL, 
-                           XEN_DOMCTL_SHADOW_ENABLE_REFCOUNT  |
-                           XEN_DOMCTL_SHADOW_ENABLE_TRANSLATE |
-                           XEN_DOMCTL_SHADOW_ENABLE_EXTERNAL, 
-                           NULL) )
-    {
-        PERROR("Could not enable shadow paging for domain.\n");
-        goto error_out;
-    }        
+    memset(&ctxt, 0, sizeof(ctxt));
 
-    memset(ctxt, 0, sizeof(*ctxt));
-
-    ctxt->flags = VGCF_HVM_GUEST;
-    if ( setup_guest(xc_handle, domid, memsize, image, image_size, nr_pages,
-                     ctxt, domctl.u.getdomaininfo.shared_info_frame,
-                     vcpus, pae, acpi, apic, store_evtchn, store_mfn) < 0)
+    if ( setup_guest(xc_handle, domid, memsize, image, image_size,
+                     &ctxt, domctl.u.getdomaininfo.shared_info_frame,
+                     vcpus, pae, acpi, store_evtchn, store_mfn) < 0)
     {
         ERROR("Error constructing guest OS");
         goto error_out;
     }
 
-    /* FPU is set up to default initial state. */
-    memset(&ctxt->fpu_ctxt, 0, sizeof(ctxt->fpu_ctxt));
-
-    /* Virtual IDT is empty at start-of-day. */
-    for ( i = 0; i < 256; i++ )
+    if ( lock_pages(&ctxt, sizeof(ctxt) ) )
     {
-        ctxt->trap_ctxt[i].vector = i;
-        ctxt->trap_ctxt[i].cs     = FLAT_KERNEL_CS;
+        PERROR("%s: ctxt mlock failed", __func__);
+        goto error_out;
     }
 
-    /* No LDT. */
-    ctxt->ldt_ents = 0;
-
-    /* Use the default Xen-provided GDT. */
-    ctxt->gdt_ents = 0;
-
-    /* No debugging. */
-    memset(ctxt->debugreg, 0, sizeof(ctxt->debugreg));
-
-    /* No callback handlers. */
-#if defined(__i386__)
-    ctxt->event_callback_cs     = FLAT_KERNEL_CS;
-    ctxt->event_callback_eip    = 0;
-    ctxt->failsafe_callback_cs  = FLAT_KERNEL_CS;
-    ctxt->failsafe_callback_eip = 0;
-#elif defined(__x86_64__)
-    ctxt->event_callback_eip    = 0;
-    ctxt->failsafe_callback_eip = 0;
-    ctxt->syscall_callback_eip  = 0;
-#endif
-
     memset(&launch_domctl, 0, sizeof(launch_domctl));
-
     launch_domctl.domain = (domid_t)domid;
     launch_domctl.u.vcpucontext.vcpu   = 0;
-    set_xen_guest_handle(launch_domctl.u.vcpucontext.ctxt, ctxt);
-
+    set_xen_guest_handle(launch_domctl.u.vcpucontext.ctxt, &ctxt);
     launch_domctl.cmd = XEN_DOMCTL_setvcpucontext;
     rc = xc_domctl(xc_handle, &launch_domctl);
+
+    unlock_pages(&ctxt, sizeof(ctxt));
 
     return rc;
 
@@ -626,7 +511,6 @@ int xc_hvm_build(int xc_handle,
                  unsigned int vcpus,
                  unsigned int pae,
                  unsigned int acpi,
-                 unsigned int apic,
                  unsigned int store_evtchn,
                  unsigned long *store_mfn)
 {
@@ -640,7 +524,7 @@ int xc_hvm_build(int xc_handle,
 
     sts = xc_hvm_build_internal(xc_handle, domid, memsize,
                                 image, image_size,
-                                vcpus, pae, acpi, apic,
+                                vcpus, pae, acpi,
                                 store_evtchn, store_mfn);
 
     free(image);
@@ -662,7 +546,6 @@ int xc_hvm_build_mem(int xc_handle,
                      unsigned int vcpus,
                      unsigned int pae,
                      unsigned int acpi,
-                     unsigned int apic,
                      unsigned int store_evtchn,
                      unsigned long *store_mfn)
 {
@@ -687,7 +570,7 @@ int xc_hvm_build_mem(int xc_handle,
 
     sts = xc_hvm_build_internal(xc_handle, domid, memsize,
                                 img, img_len,
-                                vcpus, pae, acpi, apic,
+                                vcpus, pae, acpi,
                                 store_evtchn, store_mfn);
 
     /* xc_inflate_buffer may return the original buffer pointer (for

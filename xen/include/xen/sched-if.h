@@ -63,14 +63,18 @@ struct scheduler {
     void         (*init)           (void);
     void         (*tick)           (unsigned int cpu);
 
-    int          (*init_vcpu)      (struct vcpu *);
+    int          (*init_domain)    (struct domain *);
     void         (*destroy_domain) (struct domain *);
+
+    int          (*init_vcpu)      (struct vcpu *);
+    void         (*destroy_vcpu)   (struct vcpu *);
 
     void         (*sleep)          (struct vcpu *);
     void         (*wake)           (struct vcpu *);
 
     struct task_slice (*do_schedule) (s_time_t);
 
+    int          (*pick_cpu)       (struct vcpu *);
     int          (*adjust)         (struct domain *,
                                     struct xen_domctl_scheduler_op *);
     void         (*dump_settings)  (void);

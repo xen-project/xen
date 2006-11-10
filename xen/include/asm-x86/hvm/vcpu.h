@@ -32,7 +32,7 @@ struct hvm_vcpu {
     unsigned long       hw_cr3;     /* value we give to HW to use */
     unsigned long       ioflags;
     struct hvm_io_op    io_op;
-    struct vlapic       *vlapic;
+    struct vlapic       vlapic;
     s64                 cache_tsc_offset;
     u64                 guest_time;
 
@@ -44,8 +44,7 @@ struct hvm_vcpu {
     /* Flags */
     int                 flag_dr_dirty;
 
-    /* hlt ins emulation wakeup timer */
-    struct timer        hlt_timer;
+    unsigned long       hvm_trace_values[5];
 
     union {
         struct arch_vmx_struct vmx;

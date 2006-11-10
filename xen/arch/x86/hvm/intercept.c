@@ -67,12 +67,12 @@ static inline void hvm_mmio_access(struct vcpu *v,
     switch ( p->type ) {
     case IOREQ_TYPE_COPY:
     {
-        if ( !p->pdata_valid ) {
+        if ( !p->data_is_ptr ) {
             if ( p->dir == IOREQ_READ )
-                p->u.data = read_handler(v, p->addr, p->size);
+                p->data = read_handler(v, p->addr, p->size);
             else    /* p->dir == IOREQ_WRITE */
-                write_handler(v, p->addr, p->size, p->u.data);
-        } else {    /* !p->pdata_valid */
+                write_handler(v, p->addr, p->size, p->data);
+        } else {    /* p->data_is_ptr */
             int i, sign = (p->df) ? -1 : 1;
 
             if ( p->dir == IOREQ_READ ) {
@@ -81,7 +81,7 @@ static inline void hvm_mmio_access(struct vcpu *v,
                         p->addr + (sign * i * p->size),
                         p->size);
                     (void)hvm_copy_to_guest_phys(
-                        (unsigned long)p->u.pdata + (sign * i * p->size),
+                        p->data + (sign * i * p->size),
                         &data,
                         p->size);
                 }
@@ -89,7 +89,7 @@ static inline void hvm_mmio_access(struct vcpu *v,
                 for ( i = 0; i < p->count; i++ ) {
                     (void)hvm_copy_from_guest_phys(
                         &data,
-                        (unsigned long)p->u.pdata + (sign * i * p->size),
+                        p->data + (sign * i * p->size),
                         p->size);
                     write_handler(v,
                         p->addr + (sign * i * p->size),
@@ -103,28 +103,37 @@ static inline void hvm_mmio_access(struct vcpu *v,
     case IOREQ_TYPE_AND:
         tmp1 = read_handler(v, p->addr, p->size);
         if ( p->dir == IOREQ_WRITE ) {
-            tmp2 = tmp1 & (unsigned long) p->u.data;
+            tmp2 = tmp1 & (unsigned long) p->data;
             write_handler(v, p->addr, p->size, tmp2);
         }
-        p->u.data = tmp1;
+        p->data = tmp1;
+        break;
+
+    case IOREQ_TYPE_ADD:
+        tmp1 = read_handler(v, p->addr, p->size);
+        if (p->dir == IOREQ_WRITE) {
+            tmp2 = tmp1 + (unsigned long) p->data;
+            write_handler(v, p->addr, p->size, tmp2);
+        }
+        p->data = tmp1;
         break;
 
     case IOREQ_TYPE_OR:
         tmp1 = read_handler(v, p->addr, p->size);
         if ( p->dir == IOREQ_WRITE ) {
-            tmp2 = tmp1 | (unsigned long) p->u.data;
+            tmp2 = tmp1 | (unsigned long) p->data;
             write_handler(v, p->addr, p->size, tmp2);
         }
-        p->u.data = tmp1;
+        p->data = tmp1;
         break;
 
     case IOREQ_TYPE_XOR:
         tmp1 = read_handler(v, p->addr, p->size);
         if ( p->dir == IOREQ_WRITE ) {
-            tmp2 = tmp1 ^ (unsigned long) p->u.data;
+            tmp2 = tmp1 ^ (unsigned long) p->data;
             write_handler(v, p->addr, p->size, tmp2);
         }
-        p->u.data = tmp1;
+        p->data = tmp1;
         break;
 
     case IOREQ_TYPE_XCHG:
@@ -133,8 +142,8 @@ static inline void hvm_mmio_access(struct vcpu *v,
          * its own local APIC.
          */
         tmp1 = read_handler(v, p->addr, p->size);
-        write_handler(v, p->addr, p->size, (unsigned long) p->u.data);
-        p->u.data = tmp1;
+        write_handler(v, p->addr, p->size, (unsigned long) p->data);
+        p->data = tmp1;
         break;
 
     default:
@@ -199,18 +208,17 @@ int hvm_mmio_intercept(ioreq_t *p)
     struct vcpu *v = current;
     int i;
 
-    /* XXX currently only APIC use intercept */
-    if ( !hvm_apic_support(v->domain) )
-        return 0;
-
-    for ( i = 0; i < HVM_MMIO_HANDLER_NR; i++ ) {
-        if ( hvm_mmio_handlers[i]->check_handler(v, p->addr) ) {
+    for ( i = 0; i < HVM_MMIO_HANDLER_NR; i++ )
+    {
+        if ( hvm_mmio_handlers[i]->check_handler(v, p->addr) )
+        {
             hvm_mmio_access(v, p,
                             hvm_mmio_handlers[i]->read_handler,
                             hvm_mmio_handlers[i]->write_handler);
             return 1;
         }
     }
+
     return 0;
 }
 
@@ -238,15 +246,15 @@ int hvm_io_intercept(ioreq_t *p, int type)
     return 0;
 }
 
-int register_io_handler(unsigned long addr, unsigned long size,
-                        intercept_action_t action, int type)
+int register_io_handler(
+    struct domain *d, unsigned long addr, unsigned long size,
+    intercept_action_t action, int type)
 {
-    struct vcpu *v = current;
-    struct hvm_io_handler *handler =
-                             &(v->domain->arch.hvm_domain.io_handler);
+    struct hvm_io_handler *handler = &d->arch.hvm_domain.io_handler;
     int num = handler->num_slot;
 
-    if (num >= MAX_IO_HANDLER) {
+    if ( num >= MAX_IO_HANDLER )
+    {
         printk("no extra space, register io interceptor failed!\n");
         domain_crash_synchronous();
     }
@@ -258,13 +266,6 @@ int register_io_handler(unsigned long addr, unsigned long size,
     handler->num_slot++;
 
     return 1;
-}
-
-/* Hook function for the HLT instruction emulation wakeup. */
-void hlt_timer_fn(void *data)
-{
-    struct vcpu *v = data;
-    vcpu_kick(v);
 }
 
 static __inline__ void missed_ticks(struct periodic_time *pt)
@@ -289,16 +290,19 @@ static __inline__ void missed_ticks(struct periodic_time *pt)
 void pt_timer_fn(void *data)
 {
     struct vcpu *v = data;
-    struct periodic_time *pt = &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
+    struct periodic_time *pt = &v->domain->arch.hvm_domain.pl_time.periodic_tm;
 
     pt->pending_intr_nr++;
     pt->scheduled += pt->period;
 
-    /* pick up missed timer tick */
+    /* Pick up missed timer ticks. */
     missed_ticks(pt);
-    if ( test_bit(_VCPUF_running, &v->vcpu_flags) ) {
+
+    /* No need to run the timer while a VCPU is descheduled. */
+    if ( test_bit(_VCPUF_running, &v->vcpu_flags) )
         set_timer(&pt->timer, pt->scheduled);
-    }
+
+    vcpu_kick(v);
 }
 
 /* pick up missed timer ticks at deactive time */
@@ -325,6 +329,7 @@ struct periodic_time * create_periodic_time(
         stop_timer (&pt->timer);
         pt->enabled = 0;
     }
+    pt->bind_vcpu = 0; /* timer interrupt delivered to BSP by default */
     pt->pending_intr_nr = 0;
     pt->first_injected = 0;
     if (period < 900000) { /* < 0.9 ms */

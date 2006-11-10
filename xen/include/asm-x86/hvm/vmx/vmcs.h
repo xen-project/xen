@@ -50,10 +50,6 @@ struct vmx_msr_state {
     unsigned long shadow_gs;
 };
 
-/* io bitmap is 4KBytes in size */
-#define IO_BITMAP_SIZE      0x1000
-#define IO_BITMAP_ORDER     (get_order_from_bytes(IO_BITMAP_SIZE))
-
 struct arch_vmx_struct {
     /* Virtual address of VMCS. */
     struct vmcs_struct  *vmcs;
@@ -80,9 +76,7 @@ struct arch_vmx_struct {
     unsigned long        cpu_shadow_cr4; /* copy of guest read shadow CR4 */
     unsigned long        cpu_cr2; /* save CR2 */
     unsigned long        cpu_cr3;
-    unsigned long        cpu_based_exec_control;
     struct vmx_msr_state msr_content;
-    void                *io_bitmap_a, *io_bitmap_b;
     unsigned long        vmxassist_enabled:1; 
 };
 

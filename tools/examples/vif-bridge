@@ -61,7 +61,7 @@ esac
 handle_iptable
 
 log debug "Successful vif-bridge $command for $vif, bridge $bridge."
-if [ "$command" == "online" ]
+if [ "$command" = "online" ]
 then
   success
 fi

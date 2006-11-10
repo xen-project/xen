@@ -41,6 +41,7 @@
 #include <xen/evtchn.h>
 #include <xen/interface/grant_table.h>
 #include <xen/interface/io/tpmif.h>
+#include <xen/gnttab.h>
 #include <xen/xenbus.h>
 #include "tpm.h"
 #include "tpm_vtpm.h"

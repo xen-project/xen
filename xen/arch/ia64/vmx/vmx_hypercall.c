@@ -79,7 +79,7 @@ do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
     }
 
     default:
-        DPRINTK("Bad HVM op %ld.\n", op);
+        gdprintk(XENLOG_INFO, "Bad HVM op %ld.\n", op);
         rc = -ENOSYS;
     }
     return rc;

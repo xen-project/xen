@@ -34,6 +34,20 @@ class XendError(Fault):
 
 class VmError(XendError):
     """Vm construction error."""
-
     pass
 
+
+XEND_ERROR_AUTHENTICATION_FAILED = ('ELUSER', 'Authentication Failed')
+XEND_ERROR_SESSION_INVALID       = ('EPERMDENIED', 'Session Invalid')
+XEND_ERROR_DOMAIN_INVALID        = ('EINVALIDDOMAIN', 'Domain Invalid')
+XEND_ERROR_HOST_INVALID          = ('EINVALIDHOST', 'Host Invalid')
+XEND_ERROR_HOST_RUNNING          = ('EHOSTRUNNING', 'Host is still Running')
+XEND_ERROR_HOST_CPU_INVALID      = ('EHOSTCPUINVALID', 'Host CPU Invalid')
+XEND_ERROR_UNSUPPORTED           = ('EUNSUPPORTED', 'Method Unsupported')
+XEND_ERROR_VM_INVALID            = ('EVMINVALID', 'VM Invalid')
+XEND_ERROR_VBD_INVALID           = ('EVBDINVALID', 'VBD Invalid')
+XEND_ERROR_VIF_INVALID           = ('EVIFINVALID', 'VIF Invalid')
+XEND_ERROR_VTPM_INVALID          = ('EVTPMINVALID', 'VTPM Invalid')
+XEND_ERROR_VDI_INVALID           = ('EVDIINVALID', 'VDI Invalid')
+XEND_ERROR_SR_INVALID           = ('ESRINVALID', 'SR Invalid')
+XEND_ERROR_TODO                  = ('ETODO', 'Lazy Programmer Error')

@@ -179,8 +179,8 @@ void init_frametable(void);
 
 int alloc_page_type(struct page_info *page, unsigned long type);
 void free_page_type(struct page_info *page, unsigned long type);
-extern void invalidate_shadow_ldt(struct vcpu *d);
-extern int _shadow_mode_refcounts(struct domain *d);
+void invalidate_shadow_ldt(struct vcpu *d);
+int _shadow_mode_refcounts(struct domain *d);
 
 static inline void put_page(struct page_info *page)
 {
@@ -213,7 +213,8 @@ static inline int get_page(struct page_info *page,
              unlikely(d != _domain) )                /* Wrong owner? */
         {
             if ( !_shadow_mode_refcounts(domain) )
-                DPRINTK("Error pfn %lx: rd=%p, od=%p, caf=%08x, taf=%" 
+                gdprintk(XENLOG_INFO,
+                        "Error pfn %lx: rd=%p, od=%p, caf=%08x, taf=%"
                         PRtype_info "\n",
                         page_to_mfn(page), domain, unpickle_domptr(d),
                         x, page->u.inuse.type_info);
@@ -383,5 +384,7 @@ long subarch_memory_op(int op, XEN_GUEST_HANDLE(void) arg);
 
 int steal_page(
     struct domain *d, struct page_info *page, unsigned int memflags);
+
+int map_ldt_shadow_page(unsigned int);
 
 #endif /* __ASM_X86_MM_H__ */

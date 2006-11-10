@@ -1,6 +1,6 @@
 diff -pruN ../orig-linux-2.6.16.29/drivers/oprofile/buffer_sync.c ./drivers/oprofile/buffer_sync.c
---- ../orig-linux-2.6.16.29/drivers/oprofile/buffer_sync.c	2006-09-12 19:02:10.000000000 +0100
-+++ ./drivers/oprofile/buffer_sync.c	2006-09-19 14:06:05.000000000 +0100
+--- ../orig-linux-2.6.16.29/drivers/oprofile/buffer_sync.c	2006-11-06 14:46:52.000000000 -0800
++++ ./drivers/oprofile/buffer_sync.c	2006-11-06 15:16:52.000000000 -0800
 @@ -6,6 +6,10 @@
   *
   * @author John Levon <levon@movementarian.org>
@@ -12,7 +12,27 @@ diff -pruN ../orig-linux-2.6.16.29/drivers/oprofile/buffer_sync.c ./drivers/opro
   * This is the core of the buffer management. Each
   * CPU buffer is processed and entered into the
   * global event buffer. Such processing is necessary
-@@ -275,15 +279,31 @@ static void add_cpu_switch(int i)
+@@ -38,6 +42,7 @@ static cpumask_t marked_cpus = CPU_MASK_
+ static DEFINE_SPINLOCK(task_mortuary);
+ static void process_task_mortuary(void);
+ 
++static int cpu_current_domain[NR_CPUS];
+ 
+ /* Take ownership of the task struct and place it on the
+  * list for processing. Only after two full buffer syncs
+@@ -146,6 +151,11 @@ static void end_sync(void)
+ int sync_start(void)
+ {
+ 	int err;
++	int i;
++
++	for (i = 0; i < NR_CPUS; i++) {
++		cpu_current_domain[i] = COORDINATOR_DOMAIN;
++	}
+ 
+ 	start_cpu_work();
+ 
+@@ -275,15 +285,31 @@ static void add_cpu_switch(int i)
  	last_cookie = INVALID_COOKIE;
  }
  
@@ -50,7 +70,7 @@ diff -pruN ../orig-linux-2.6.16.29/drivers/oprofile/buffer_sync.c ./drivers/opro
  static void
  add_user_ctx_switch(struct task_struct const * task, unsigned long cookie)
  {
-@@ -348,9 +368,9 @@ static int add_us_sample(struct mm_struc
+@@ -348,9 +374,9 @@ static int add_us_sample(struct mm_struc
   * for later lookup from userspace.
   */
  static int
@@ -62,7 +82,7 @@ diff -pruN ../orig-linux-2.6.16.29/drivers/oprofile/buffer_sync.c ./drivers/opro
  		add_sample_entry(s->eip, s->event);
  		return 1;
  	} else if (mm) {
-@@ -496,10 +516,11 @@ void sync_buffer(int cpu)
+@@ -496,15 +522,21 @@ void sync_buffer(int cpu)
  	struct mm_struct *mm = NULL;
  	struct task_struct * new;
  	unsigned long cookie = 0;
@@ -75,7 +95,17 @@ diff -pruN ../orig-linux-2.6.16.29/drivers/oprofile/buffer_sync.c ./drivers/opro
  
  	down(&buffer_sem);
   
-@@ -512,16 +533,18 @@ void sync_buffer(int cpu)
+ 	add_cpu_switch(cpu);
+ 
++	/* We need to assign the first samples in this CPU buffer to the
++	   same domain that we were processing at the last sync_buffer */
++	if (cpu_current_domain[cpu] != COORDINATOR_DOMAIN) {
++		add_domain_switch(cpu_current_domain[cpu]);
++	}
+ 	/* Remember, only we can modify tail_pos */
+ 
+ 	available = get_slots(cpu_buf);
+@@ -512,16 +544,18 @@ void sync_buffer(int cpu)
  	for (i = 0; i < available; ++i) {
  		struct op_sample * s = &cpu_buf->buffer[cpu_buf->tail_pos];
   
@@ -99,7 +129,7 @@ diff -pruN ../orig-linux-2.6.16.29/drivers/oprofile/buffer_sync.c ./drivers/opro
  			} else {
  				struct mm_struct * oldmm = mm;
  
-@@ -535,11 +558,16 @@ void sync_buffer(int cpu)
+@@ -535,11 +569,21 @@ void sync_buffer(int cpu)
  				add_user_ctx_switch(new, cookie);
  			}
  		} else {
@@ -109,10 +139,15 @@ diff -pruN ../orig-linux-2.6.16.29/drivers/oprofile/buffer_sync.c ./drivers/opro
 -					state = sb_bt_ignore;
 -					atomic_inc(&oprofile_stats.bt_lost_no_mapping);
 +			if (domain_switch) {
++				cpu_current_domain[cpu] = s->eip;
 +				add_domain_switch(s->eip);
 +				domain_switch = 0;
 +			} else {
-+				if (state >= sb_bt_start &&
++				if (cpu_current_domain[cpu] !=
++				    COORDINATOR_DOMAIN) {
++					add_sample_entry(s->eip, s->event);
++				}
++				else  if (state >= sb_bt_start &&
 +				    !add_sample(mm, s, cpu_mode)) {
 +					if (state == sb_bt_start) {
 +						state = sb_bt_ignore;
@@ -121,9 +156,21 @@ diff -pruN ../orig-linux-2.6.16.29/drivers/oprofile/buffer_sync.c ./drivers/opro
  				}
  			}
  		}
+@@ -548,6 +592,11 @@ void sync_buffer(int cpu)
+ 	}
+ 	release_mm(mm);
+ 
++	/* We reset domain to COORDINATOR at each CPU switch */
++	if (cpu_current_domain[cpu] != COORDINATOR_DOMAIN) {
++		add_domain_switch(COORDINATOR_DOMAIN);
++	}
++
+ 	mark_done(cpu);
+ 
+ 	up(&buffer_sem);
 diff -pruN ../orig-linux-2.6.16.29/drivers/oprofile/cpu_buffer.c ./drivers/oprofile/cpu_buffer.c
---- ../orig-linux-2.6.16.29/drivers/oprofile/cpu_buffer.c	2006-09-12 19:02:10.000000000 +0100
-+++ ./drivers/oprofile/cpu_buffer.c	2006-09-19 14:06:05.000000000 +0100
+--- ../orig-linux-2.6.16.29/drivers/oprofile/cpu_buffer.c	2006-11-06 14:46:52.000000000 -0800
++++ ./drivers/oprofile/cpu_buffer.c	2006-11-06 14:47:55.000000000 -0800
 @@ -6,6 +6,10 @@
   *
   * @author John Levon <levon@movementarian.org>
@@ -233,8 +280,8 @@ diff -pruN ../orig-linux-2.6.16.29/drivers/oprofile/cpu_buffer.c ./drivers/oprof
   * This serves to avoid cpu buffer overflow, and makes sure
   * the task mortuary progresses
 diff -pruN ../orig-linux-2.6.16.29/drivers/oprofile/cpu_buffer.h ./drivers/oprofile/cpu_buffer.h
---- ../orig-linux-2.6.16.29/drivers/oprofile/cpu_buffer.h	2006-09-12 19:02:10.000000000 +0100
-+++ ./drivers/oprofile/cpu_buffer.h	2006-09-19 14:06:05.000000000 +0100
+--- ../orig-linux-2.6.16.29/drivers/oprofile/cpu_buffer.h	2006-11-06 14:46:52.000000000 -0800
++++ ./drivers/oprofile/cpu_buffer.h	2006-11-06 14:47:55.000000000 -0800
 @@ -36,7 +36,7 @@ struct oprofile_cpu_buffer {
  	volatile unsigned long tail_pos;
  	unsigned long buffer_size;
@@ -258,8 +305,8 @@ diff -pruN ../orig-linux-2.6.16.29/drivers/oprofile/cpu_buffer.h ./drivers/oprof
  
  #endif /* OPROFILE_CPU_BUFFER_H */
 diff -pruN ../orig-linux-2.6.16.29/drivers/oprofile/event_buffer.h ./drivers/oprofile/event_buffer.h
---- ../orig-linux-2.6.16.29/drivers/oprofile/event_buffer.h	2006-09-12 19:02:10.000000000 +0100
-+++ ./drivers/oprofile/event_buffer.h	2006-09-19 14:06:05.000000000 +0100
+--- ../orig-linux-2.6.16.29/drivers/oprofile/event_buffer.h	2006-11-06 14:46:52.000000000 -0800
++++ ./drivers/oprofile/event_buffer.h	2006-11-06 14:47:55.000000000 -0800
 @@ -29,15 +29,20 @@ void wake_up_buffer_waiter(void);
  #define CPU_SWITCH_CODE 		2
  #define COOKIE_SWITCH_CODE 		3
@@ -283,8 +330,8 @@ diff -pruN ../orig-linux-2.6.16.29/drivers/oprofile/event_buffer.h ./drivers/opr
  void add_event_entry(unsigned long data);
   
 diff -pruN ../orig-linux-2.6.16.29/drivers/oprofile/oprof.c ./drivers/oprofile/oprof.c
---- ../orig-linux-2.6.16.29/drivers/oprofile/oprof.c	2006-09-12 19:02:10.000000000 +0100
-+++ ./drivers/oprofile/oprof.c	2006-09-19 14:06:05.000000000 +0100
+--- ../orig-linux-2.6.16.29/drivers/oprofile/oprof.c	2006-11-06 14:46:52.000000000 -0800
++++ ./drivers/oprofile/oprof.c	2006-11-06 14:47:55.000000000 -0800
 @@ -5,6 +5,10 @@
   * @remark Read the file COPYING
   *
@@ -339,8 +386,8 @@ diff -pruN ../orig-linux-2.6.16.29/drivers/oprofile/oprof.c ./drivers/oprofile/o
  {
  	int err;
 diff -pruN ../orig-linux-2.6.16.29/drivers/oprofile/oprof.h ./drivers/oprofile/oprof.h
---- ../orig-linux-2.6.16.29/drivers/oprofile/oprof.h	2006-09-12 19:02:10.000000000 +0100
-+++ ./drivers/oprofile/oprof.h	2006-09-19 14:06:05.000000000 +0100
+--- ../orig-linux-2.6.16.29/drivers/oprofile/oprof.h	2006-11-06 14:46:52.000000000 -0800
++++ ./drivers/oprofile/oprof.h	2006-11-06 14:47:55.000000000 -0800
 @@ -35,5 +35,8 @@ void oprofile_create_files(struct super_
  void oprofile_timer_init(struct oprofile_operations * ops);
  
@@ -351,8 +398,8 @@ diff -pruN ../orig-linux-2.6.16.29/drivers/oprofile/oprof.h ./drivers/oprofile/o
   
  #endif /* OPROF_H */
 diff -pruN ../orig-linux-2.6.16.29/drivers/oprofile/oprofile_files.c ./drivers/oprofile/oprofile_files.c
---- ../orig-linux-2.6.16.29/drivers/oprofile/oprofile_files.c	2006-09-12 19:02:10.000000000 +0100
-+++ ./drivers/oprofile/oprofile_files.c	2006-09-19 14:06:05.000000000 +0100
+--- ../orig-linux-2.6.16.29/drivers/oprofile/oprofile_files.c	2006-11-06 14:46:52.000000000 -0800
++++ ./drivers/oprofile/oprofile_files.c	2006-11-06 14:47:55.000000000 -0800
 @@ -5,15 +5,21 @@
   * @remark Read the file COPYING
   *
@@ -581,8 +628,8 @@ diff -pruN ../orig-linux-2.6.16.29/drivers/oprofile/oprofile_files.c ./drivers/o
  	oprofilefs_create_ulong(sb, root, "buffer_size", &fs_buffer_size);
  	oprofilefs_create_ulong(sb, root, "buffer_watershed", &fs_buffer_watershed);
 diff -pruN ../orig-linux-2.6.16.29/include/linux/oprofile.h ./include/linux/oprofile.h
---- ../orig-linux-2.6.16.29/include/linux/oprofile.h	2006-09-12 19:02:10.000000000 +0100
-+++ ./include/linux/oprofile.h	2006-09-19 14:06:05.000000000 +0100
+--- ../orig-linux-2.6.16.29/include/linux/oprofile.h	2006-11-06 14:46:42.000000000 -0800
++++ ./include/linux/oprofile.h	2006-11-06 14:47:55.000000000 -0800
 @@ -16,6 +16,8 @@
  #include <linux/types.h>
  #include <linux/spinlock.h>

@@ -189,7 +189,7 @@ static int blktap_probe(struct xenbus_device *dev,
 	return 0;
 
 fail:
-	DPRINTK("blktap probe failed");
+	DPRINTK("blktap probe failed\n");
 	blktap_remove(dev);
 	return err;
 }
@@ -243,7 +243,7 @@ static void tap_frontend_changed(struct xenbus_device *dev,
 	struct backend_info *be = dev->dev.driver_data;
 	int err;
 
-	DPRINTK("");
+	DPRINTK("\n");
 
 	switch (frontend_state) {
 	case XenbusStateInitialising:
@@ -318,7 +318,7 @@ static int connect_ring(struct backend_info *be)
 	unsigned int evtchn;
 	int err;
 
-	DPRINTK("%s", dev->otherend);
+	DPRINTK("%s\n", dev->otherend);
 
 	err = xenbus_gather(XBT_NIL, dev->otherend, "ring-ref", "%lu", 
 			    &ring_ref, "event-channel", "%u", &evtchn, NULL);

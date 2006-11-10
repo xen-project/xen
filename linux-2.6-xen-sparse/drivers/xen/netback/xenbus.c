@@ -93,10 +93,22 @@ static int netback_probe(struct xenbus_device *dev,
 			goto abort_transaction;
 		}
 
+		/* We support rx-copy path. */
 		err = xenbus_printf(xbt, dev->nodename,
 				    "feature-rx-copy", "%d", 1);
 		if (err) {
-			message = "writing feature-copying";
+			message = "writing feature-rx-copy";
+			goto abort_transaction;
+		}
+
+		/*
+		 * We don't support rx-flip path (except old guests who don't
+		 * grok this feature flag).
+		 */
+		err = xenbus_printf(xbt, dev->nodename,
+				    "feature-rx-flip", "%d", 0);
+		if (err) {
+			message = "writing feature-rx-flip";
 			goto abort_transaction;
 		}
 

@@ -11,7 +11,7 @@ from XmTestLib import *
 if ENABLE_HVM_SUPPORT:
     SKIP("Block-list not supported for HVM domains")
 
-config = {"disk":"phy:/dev/ram0,hda1,w"}
+config = {"disk":"phy:/dev/ram0,xvda1,w"}
 domain = XmTestDomain(extraConfig=config)
 
 try:
@@ -22,7 +22,7 @@ except DomainError, e:
     FAIL("Unable to create domain")
 
 status, output = traceCommand("xm block-list %s" % domain.getId())
-eyecatcher = "769"
+eyecatcher = "51713"
 where = output.find(eyecatcher)
 if status != 0:
     FAIL("xm block-list returned bad status, expected 0, status is %i" % status)
@@ -31,7 +31,7 @@ elif where < 0:
 
 #Verify the block device on DomainU
 try:
-    run = console.runCmd("cat /proc/partitions | grep hda1")
+    run = console.runCmd("cat /proc/partitions | grep xvda1")
 except ConsoleError, e:
     saveLog(console.getHistory())
     FAIL(str(e))

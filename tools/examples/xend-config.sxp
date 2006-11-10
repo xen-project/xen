@@ -51,7 +51,7 @@
 # regular expressions will be accepted.
 #
 # For example:
-#  (xend-relocation-hosts-allow '^localhost$ ^.*\.example\.org$')
+#  (xend-relocation-hosts-allow '^localhost$ ^.*\\.example\\.org$')
 #
 #(xend-relocation-hosts-allow '')
 (xend-relocation-hosts-allow '^localhost$ ^localhost\\.localdomain$')

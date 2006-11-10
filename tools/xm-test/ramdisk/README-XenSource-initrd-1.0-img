@@ -7,7 +7,8 @@ suitable for use with Xen's xm-test regression testing suite.  They has been
 built and provided by XenSource, for the convenience of Xen users.  xm-test
 initrds may be mixed across minor xm-test versions, but not across major
 versions; this initrd is suitable for all 1.0.x versions of xm-test (as
-shipped with Xen 3.0.4 and the unstable tree leading up to that release).
+shipped with the Xen unstable tree for a short while between Xen 3.0.3 and
+Xen 3.0.4).
 
 In order to use one of these initrds, run "./autogen; ./configure; make
 existing" inside the xm-test directory, and the appropriate initrd for your

@@ -98,7 +98,7 @@
 ^tools/firmware/.*\.bin$
 ^tools/firmware/.*\.sym$
 ^tools/firmware/.*bios/.*bios.*\.txt$
-^tools/firmware/acpi/acpigen$
+^tools/firmware/hvmloader/acpi/acpigen$
 ^tools/firmware/hvmloader/hvmloader$
 ^tools/firmware/hvmloader/roms\.h$
 ^tools/firmware/rombios/BIOS-bochs-[^/]*$
@@ -123,6 +123,7 @@
 ^tools/ioemu/qemu\.1$
 ^tools/ioemu/qemu\.pod$
 ^tools/libxc/xen/.*$
+^tools/libxen/test/test_bindings$
 ^tools/libaio/src/.*\.ol$
 ^tools/libaio/src/.*\.os$
 ^tools/misc/cpuperf/cpuperf-perfcntr$

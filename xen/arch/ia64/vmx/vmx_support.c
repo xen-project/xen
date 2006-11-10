@@ -49,7 +49,7 @@ void vmx_io_assist(struct vcpu *v)
     p = &vio->vp_ioreq;
 
     if (p->state == STATE_IORESP_READY) {
-        p->state = STATE_INVALID;
+        p->state = STATE_IOREQ_NONE;
     }
     else {
         /* Can't block here, for the same reason as other places to
@@ -60,33 +60,12 @@ void vmx_io_assist(struct vcpu *v)
     }
 }
 
-/*
- * VMX domainN has two types of interrupt source: lsapic model within
- * HV, and device model within domain 0 (service OS). There're another
- * pending array in share page, manipulated by device model directly.
- * To conform to VT-i spec, we have to sync pending bits in shared page
- * into VPD. This has to be done before checking pending interrupt at
- * resume to guest. For domain 0, all the interrupt sources come from
- * HV, which then doesn't require this assist.
- */
-void vmx_intr_assist(struct vcpu *v)
-{
-#ifdef V_IOSAPIC_READY
-    /* Confirm virtual interrupt line signals, and set pending bits in vpd */
-    if (spin_trylock(&v->domain->arch.arch_vmx.virq_assist_lock)) {
-        vmx_virq_line_assist(v);
-        spin_unlock(&v->domain->arch.arch_vmx.virq_assist_lock);
-    }
-#endif
-    return;
-}
-
 void vmx_send_assist_req(struct vcpu *v)
 {
     ioreq_t *p;
 
     p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;
-    if (unlikely(p->state != STATE_INVALID)) {
+    if (unlikely(p->state != STATE_IOREQ_NONE)) {
         /* This indicates a bug in the device model.  Crash the
            domain. */
         printk("Device model set bad IO state %d.\n", p->state);

@@ -60,7 +60,7 @@ int __init sysenter_setup(void)
 
 #ifdef CONFIG_XEN
 	if (boot_cpu_has(X86_FEATURE_SEP)) {
-		struct callback_register sysenter = {
+		static struct callback_register __initdata sysenter = {
 			.type = CALLBACKTYPE_sysenter,
 			.address = { __KERNEL_CS, (unsigned long)sysenter_entry },
 		};

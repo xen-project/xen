@@ -47,10 +47,9 @@
 #define rmb() __asm__ __volatile__ ( "lfence" : : : "memory")
 #define wmb() __asm__ __volatile__ ( "" : : : "memory")
 #elif defined(__ia64__)
-/* FIXME */
-#define mb()
-#define rmb()
-#define wmb()
+#define mb()   __asm__ __volatile__ ("mf" ::: "memory")
+#define rmb()  __asm__ __volatile__ ("mf" ::: "memory")
+#define wmb()  __asm__ __volatile__ ("mf" ::: "memory")
 #elif defined(__powerpc__)
 /* XXX loosen these up later */
 #define mb()   __asm__ __volatile__ ("sync" : : : "memory")
@@ -113,25 +112,13 @@ typedef struct xc_core_header {
     unsigned int xch_pages_offset;
 } xc_core_header_t;
 
-#define XC_CORE_MAGIC 0xF00FEBED
+#define XC_CORE_MAGIC     0xF00FEBED
+#define XC_CORE_MAGIC_HVM 0xF00FEBEE
 
 #ifdef __linux__
 
 #include <sys/ptrace.h>
 #include <thread_db.h>
-
-void * map_domain_va_core(
-    unsigned long domfd,
-    int cpu,
-    void *guest_va,
-    vcpu_guest_context_t *ctxt);
-
-int xc_waitdomain_core(
-    int xc_handle,
-    int domain,
-    int *status,
-    int options,
-    vcpu_guest_context_t *ctxt);
 
 typedef void (*thr_ev_handler_t)(long);
 
@@ -158,11 +145,12 @@ int xc_waitdomain(
  * DOMAIN MANAGEMENT FUNCTIONS
  */
 
-typedef struct {
+typedef struct xc_dominfo {
     uint32_t      domid;
     uint32_t      ssidref;
     unsigned int  dying:1, crashed:1, shutdown:1,
-                  paused:1, blocked:1, running:1;
+                  paused:1, blocked:1, running:1,
+                  hvm:1;
     unsigned int  shutdown_reason; /* only meaningful if shutdown==1 */
     unsigned long nr_pages;
     unsigned long shared_info_frame;
@@ -177,6 +165,7 @@ typedef xen_domctl_getdomaininfo_t xc_domaininfo_t;
 int xc_domain_create(int xc_handle,
                      uint32_t ssidref,
                      xen_domain_handle_t handle,
+                     uint32_t flags,
                      uint32_t *pdomid);
 
 
@@ -676,5 +665,7 @@ evtchn_port_t xc_evtchn_pending(int xce_handle);
  * will be set appropriately.
  */
 int xc_evtchn_unmask(int xce_handle, evtchn_port_t port);
+
+int xc_hvm_set_irq_level(int xce_handle, domid_t dom, int irq, int level);
 
 #endif

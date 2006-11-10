@@ -65,18 +65,17 @@ static PyObject *pyxc_domain_create(XcObject *self,
                                     PyObject *args,
                                     PyObject *kwds)
 {
-    uint32_t dom = 0;
-    int      ret, i;
-    uint32_t ssidref = 0;
+    uint32_t dom = 0, ssidref = 0, flags = 0;
+    int      ret, i, hvm = 0;
     PyObject *pyhandle = NULL;
     xen_domain_handle_t handle = { 
         0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
         0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef };
 
-    static char *kwd_list[] = { "dom", "ssidref", "handle", NULL };
+    static char *kwd_list[] = { "domid", "ssidref", "handle", "hvm", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|iiO", kwd_list,
-                                      &dom, &ssidref, &pyhandle))
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|iiOi", kwd_list,
+                                      &dom, &ssidref, &pyhandle, &hvm))
         return NULL;
 
     if ( pyhandle != NULL )
@@ -94,7 +93,11 @@ static PyObject *pyxc_domain_create(XcObject *self,
         }
     }
 
-    if ( (ret = xc_domain_create(self->xc_handle, ssidref, handle, &dom)) < 0 )
+    if ( hvm )
+        flags |= XEN_DOMCTL_CDF_hvm_guest;
+
+    if ( (ret = xc_domain_create(self->xc_handle, ssidref,
+                                 handle, flags, &dom)) < 0 )
         return PyErr_SetFromErrno(xc_error);
 
     return PyInt_FromLong(dom);
@@ -144,7 +147,7 @@ static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
     uint64_t  cpumap = ~0ULL;
     PyObject *cpulist = NULL;
 
-    static char *kwd_list[] = { "dom", "vcpu", "cpumap", NULL };
+    static char *kwd_list[] = { "domid", "vcpu", "cpumap", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|iO", kwd_list, 
                                       &dom, &vcpu, &cpulist) )
@@ -171,7 +174,7 @@ static PyObject *pyxc_domain_setcpuweight(XcObject *self,
     uint32_t dom;
     float cpuweight = 1;
 
-    static char *kwd_list[] = { "dom", "cpuweight", NULL };
+    static char *kwd_list[] = { "domid", "cpuweight", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|f", kwd_list, 
                                       &dom, &cpuweight) )
@@ -254,11 +257,12 @@ static PyObject *pyxc_domain_getinfo(XcObject *self,
         PyObject *pyhandle = PyList_New(sizeof(xen_domain_handle_t));
         for ( j = 0; j < sizeof(xen_domain_handle_t); j++ )
             PyList_SetItem(pyhandle, j, PyInt_FromLong(info[i].handle[j]));
-        info_dict = Py_BuildValue("{s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i"
+        info_dict = Py_BuildValue("{s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i"
                                   ",s:l,s:L,s:l,s:i,s:i}",
-                                  "dom",       info[i].domid,
+                                  "domid",       info[i].domid,
                                   "online_vcpus", info[i].nr_online_vcpus,
                                   "max_vcpu_id", info[i].max_vcpu_id,
+                                  "hvm",       info[i].hvm,
                                   "dying",     info[i].dying,
                                   "crashed",   info[i].crashed,
                                   "shutdown",  info[i].shutdown,
@@ -291,7 +295,7 @@ static PyObject *pyxc_vcpu_getinfo(XcObject *self,
     int rc, i;
     uint64_t cpumap;
 
-    static char *kwd_list[] = { "dom", "vcpu", NULL };
+    static char *kwd_list[] = { "domid", "vcpu", NULL };
     
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwd_list,
                                       &dom, &vcpu) )
@@ -331,24 +335,25 @@ static PyObject *pyxc_linux_build(XcObject *self,
     char *image, *ramdisk = NULL, *cmdline = "", *features = NULL;
     int flags = 0;
     int store_evtchn, console_evtchn;
+    unsigned int mem_mb;
     unsigned long store_mfn = 0;
     unsigned long console_mfn = 0;
 
-    static char *kwd_list[] = { "dom", "store_evtchn",
+    static char *kwd_list[] = { "domid", "store_evtchn", "memsize",
                                 "console_evtchn", "image",
                                 /* optional */
                                 "ramdisk", "cmdline", "flags",
                                 "features", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiis|ssis", kwd_list,
-                                      &dom, &store_evtchn,
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiis|ssis", kwd_list,
+                                      &dom, &store_evtchn, &mem_mb,
                                       &console_evtchn, &image,
                                       /* optional */
                                       &ramdisk, &cmdline, &flags,
                                       &features) )
         return NULL;
 
-    if ( xc_linux_build(self->xc_handle, dom, image,
+    if ( xc_linux_build(self->xc_handle, dom, mem_mb, image,
                         ramdisk, cmdline, features, flags,
                         store_evtchn, &store_mfn,
                         console_evtchn, &console_mfn) != 0 ) {
@@ -372,19 +377,18 @@ static PyObject *pyxc_hvm_build(XcObject *self,
     int vcpus = 1;
     int pae  = 0;
     int acpi = 0;
-    int apic = 0;
     unsigned long store_mfn = 0;
 
-    static char *kwd_list[] = { "dom", "store_evtchn", "memsize", "image",
-                                "vcpus", "pae", "acpi", "apic",
-                                NULL };
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiisiiii", kwd_list,
+    static char *kwd_list[] = { "domid", "store_evtchn",
+				"memsize", "image", "vcpus", "pae", "acpi",
+				NULL };
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiisiii", kwd_list,
                                       &dom, &store_evtchn, &memsize,
-                                      &image, &vcpus, &pae, &acpi, &apic) )
+                                      &image, &vcpus, &pae, &acpi) )
         return NULL;
 
     if ( xc_hvm_build(self->xc_handle, dom, memsize, image,
-                      vcpus, pae, acpi, apic, store_evtchn, &store_mfn) != 0 )
+                      vcpus, pae, acpi, store_evtchn, &store_mfn) != 0 )
         return PyErr_SetFromErrno(xc_error);
 
     return Py_BuildValue("{s:i}", "store_mfn", store_mfn);
@@ -397,7 +401,7 @@ static PyObject *pyxc_evtchn_alloc_unbound(XcObject *self,
     uint32_t dom, remote_dom;
     int port;
 
-    static char *kwd_list[] = { "dom", "remote_dom", NULL };
+    static char *kwd_list[] = { "domid", "remote_dom", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii", kwd_list,
                                       &dom, &remote_dom) )
@@ -416,7 +420,7 @@ static PyObject *pyxc_physdev_pci_access_modify(XcObject *self,
     uint32_t dom;
     int bus, dev, func, enable, ret;
 
-    static char *kwd_list[] = { "dom", "bus", "dev", "func", "enable", NULL };
+    static char *kwd_list[] = { "domid", "bus", "dev", "func", "enable", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiii", kwd_list, 
                                       &dom, &bus, &dev, &func, &enable) )
@@ -557,7 +561,7 @@ static PyObject *pyxc_sedf_domain_set(XcObject *self,
     uint32_t domid;
     uint64_t period, slice, latency;
     uint16_t extratime, weight;
-    static char *kwd_list[] = { "dom", "period", "slice",
+    static char *kwd_list[] = { "domid", "period", "slice",
                                 "latency", "extratime", "weight",NULL };
     
     if( !PyArg_ParseTupleAndKeywords(args, kwds, "iLLLhh", kwd_list, 
@@ -586,7 +590,7 @@ static PyObject *pyxc_sedf_domain_get(XcObject *self, PyObject *args)
         return PyErr_SetFromErrno(xc_error);
 
     return Py_BuildValue("{s:i,s:L,s:L,s:L,s:i,s:i}",
-                         "domain",    domid,
+                         "domid",    domid,
                          "period",    period,
                          "slice",     slice,
                          "latency",   latency,
@@ -647,6 +651,15 @@ static PyObject *pyxc_shadow_mem_control(PyObject *self,
     return Py_BuildValue("i", mbarg);
 }
 
+static PyObject *pyxc_sched_id_get(XcObject *self) {
+    
+    int sched_id;
+    if (xc_sched_id(self->xc_handle, &sched_id) != 0)
+        return PyErr_SetFromErrno(xc_error);
+
+    return Py_BuildValue("i", sched_id);
+}
+
 static PyObject *pyxc_sched_credit_domain_set(XcObject *self,
                                               PyObject *args,
                                               PyObject *kwds)
@@ -654,7 +667,7 @@ static PyObject *pyxc_sched_credit_domain_set(XcObject *self,
     uint32_t domid;
     uint16_t weight;
     uint16_t cap;
-    static char *kwd_list[] = { "dom", "weight", "cap", NULL };
+    static char *kwd_list[] = { "domid", "weight", "cap", NULL };
     static char kwd_type[] = "I|HH";
     struct xen_domctl_sched_credit sdom;
     
@@ -714,7 +727,7 @@ static PyObject *pyxc_domain_memory_increase_reservation(XcObject *self,
     unsigned int extent_order = 0 , address_bits = 0;
     unsigned long nr_extents;
 
-    static char *kwd_list[] = { "dom", "mem_kb", "extent_order", "address_bits", NULL };
+    static char *kwd_list[] = { "domid", "mem_kb", "extent_order", "address_bits", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "il|ii", kwd_list, 
                                       &dom, &mem_kb, &extent_order, &address_bits) )
@@ -739,7 +752,7 @@ static PyObject *pyxc_domain_ioport_permission(XcObject *self,
     uint32_t dom;
     int first_port, nr_ports, allow_access, ret;
 
-    static char *kwd_list[] = { "dom", "first_port", "nr_ports", "allow_access", NULL };
+    static char *kwd_list[] = { "domid", "first_port", "nr_ports", "allow_access", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiii", kwd_list, 
                                       &dom, &first_port, &nr_ports, &allow_access) )
@@ -762,7 +775,7 @@ static PyObject *pyxc_domain_irq_permission(PyObject *self,
     uint32_t dom;
     int pirq, allow_access, ret;
 
-    static char *kwd_list[] = { "dom", "pirq", "allow_access", NULL };
+    static char *kwd_list[] = { "domid", "pirq", "allow_access", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iii", kwd_list, 
                                       &dom, &pirq, &allow_access) )
@@ -785,7 +798,7 @@ static PyObject *pyxc_domain_iomem_permission(PyObject *self,
     uint32_t dom;
     unsigned long first_pfn, nr_pfns, allow_access, ret;
 
-    static char *kwd_list[] = { "dom", "first_pfn", "nr_pfns", "allow_access", NULL };
+    static char *kwd_list[] = { "domid", "first_pfn", "nr_pfns", "allow_access", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "illi", kwd_list, 
                                       &dom, &first_pfn, &nr_pfns, &allow_access) )
@@ -975,6 +988,12 @@ static PyMethodDef pyxc_methods[] = {
       " image   [str]:      Name of HVM loader image file.\n"
       " vcpus   [int, 1]:   Number of Virtual CPUS in domain.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "sched_id_get",
+      (PyCFunction)pyxc_sched_id_get,
+      METH_NOARGS, "\n"
+      "Get the current scheduler type in use.\n"
+      "Returns: [int] sched_id.\n" },    
 
     { "sedf_domain_set",
       (PyCFunction)pyxc_sedf_domain_set,
@@ -1242,6 +1261,11 @@ PyMODINIT_FUNC initxc(void)
 
     Py_INCREF(xc_error);
     PyModule_AddObject(m, "Error", xc_error);
+
+    /* Expose some libxc constants to Python */
+    PyModule_AddIntConstant(m, "XEN_SCHEDULER_SEDF", XEN_SCHEDULER_SEDF);
+    PyModule_AddIntConstant(m, "XEN_SCHEDULER_CREDIT", XEN_SCHEDULER_CREDIT);
+
 }
 
 

@@ -381,7 +381,6 @@ static inline int write_rsp_to_ring(struct td_state *s, blkif_response_t *rsp)
 	
 	rsp_d = RING_GET_RESPONSE(&info->fe_ring, info->fe_ring.rsp_prod_pvt);
 	memcpy(rsp_d, rsp, sizeof(blkif_response_t));
-	wmb();
 	info->fe_ring.rsp_prod_pvt++;
 	
 	return 0;
@@ -562,12 +561,14 @@ int main(int argc, char *argv[])
 	fd_list_entry_t *ptr;
 	struct tap_disk *drv;
 	struct td_state *s;
+	char openlogbuf[128];
 	
 	if (argc != 3) usage();
 
 	daemonize();
 
-	openlog("TAPDISK", LOG_CONS|LOG_ODELAY, LOG_DAEMON);
+	snprintf(openlogbuf, sizeof(openlogbuf), "TAPDISK[%d]", getpid());
+	openlog(openlogbuf, LOG_CONS|LOG_ODELAY, LOG_DAEMON);
 	/*Setup signal handlers*/
 	signal (SIGBUS, sig_handler);
 	signal (SIGINT, sig_handler);

@@ -30,12 +30,8 @@ import os.path
 import string
 import sys
 
-import osdep
-import XendLogging
-from XendError import XendError
-
-import sxp
-
+from xen.xend import sxp, osdep, XendLogging
+from xen.xend.XendError import XendError
 
 class XendRoot:
     """Root of the management classes."""
@@ -101,6 +97,9 @@ class XendRoot:
 
     """Default interface to listen for VNC connections on"""
     xend_vnc_listen_default = '127.0.0.1'
+
+    """Default session storage path."""
+    xend_domains_path_default = '/var/lib/xend/domains'
 
     components = {}
 
@@ -196,15 +195,18 @@ class XendRoot:
         return self.get_config_bool("xend-http-server", self.xend_http_server_default)
 
     def get_xend_tcp_xmlrpc_server(self):
-        return self.get_config_bool("xend-tcp-xmlrpc-server", self.xend_tcp_xmlrpc_server_default)
+        return self.get_config_bool("xend-tcp-xmlrpc-server",
+                                    self.xend_tcp_xmlrpc_server_default)
 
     def get_xend_unix_xmlrpc_server(self):
-        return self.get_config_bool("xend-unix-xmlrpc-server", self.xend_unix_xmlrpc_server_default)
+        return self.get_config_bool("xend-unix-xmlrpc-server",
+                                    self.xend_unix_xmlrpc_server_default)
 
     def get_xend_relocation_server(self):
         """Get the flag indicating whether xend should run a relocation server.
         """
-        return self.get_config_bool("xend-relocation-server", self.xend_relocation_server_default)
+        return self.get_config_bool("xend-relocation-server",
+                                    self.xend_relocation_server_default)
 
     def get_xend_port(self):
         """Get the port xend listens at for its HTTP interface.
@@ -214,7 +216,8 @@ class XendRoot:
     def get_xend_relocation_port(self):
         """Get the port xend listens at for connection to its relocation server.
         """
-        return self.get_config_int('xend-relocation-port', self.xend_relocation_port_default)
+        return self.get_config_int('xend-relocation-port',
+                                   self.xend_relocation_port_default)
 
     def get_xend_relocation_hosts_allow(self):
         return self.get_config_value("xend-relocation-hosts-allow",
@@ -245,6 +248,11 @@ class XendRoot:
         """Get the path the xend unix-domain server listens at.
         """
         return self.get_config_value("xend-unix-path", self.xend_unix_path_default)
+
+    def get_xend_domains_path(self):
+        """ Get the path for persistent domain configuration storage
+        """
+        return self.get_config_value("xend-domains-path", self.xend_domains_path_default)
 
     def get_network_script(self):
         """@return the script used to alter the network configuration when

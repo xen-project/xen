@@ -44,6 +44,7 @@
 #include <xen/interface/io/ring.h>
 #include <xen/gnttab.h>
 #include <xen/driver_util.h>
+#include <xen/xenbus.h>
 
 #define DPRINTK(_f, _a...)			\
 	pr_debug("(file=%s, line=%d) " _f,	\
@@ -87,6 +88,7 @@ typedef struct blkif_st {
 	int                 st_rd_req;
 	int                 st_wr_req;
 	int                 st_oo_req;
+	int                 st_br_req;
 
 	wait_queue_head_t waiting_to_free;
 
@@ -130,5 +132,8 @@ void blkif_xenbus_init(void);
 
 irqreturn_t blkif_be_int(int irq, void *dev_id, struct pt_regs *regs);
 int blkif_schedule(void *arg);
+
+int blkback_barrier(struct xenbus_transaction xbt,
+		    struct backend_info *be, int state);
 
 #endif /* __BLKIF__BACKEND__COMMON_H__ */

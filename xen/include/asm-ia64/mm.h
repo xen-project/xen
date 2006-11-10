@@ -175,7 +175,7 @@ static inline int get_page(struct page_info *page,
 	    unlikely((nx & PGC_count_mask) == 0) ||	/* Count overflow? */
 	    unlikely((x >> 32) != _domain)) {		/* Wrong owner? */
 
-	    DPRINTK("Error pfn %lx: rd=%p, od=%p, caf=%016lx, taf=%"
+	    gdprintk(XENLOG_INFO, "Error pfn %lx: rd=%p, od=%p, caf=%016lx, taf=%"
 		PRtype_info "\n", page_to_mfn(page), domain,
 		unpickle_domptr(x >> 32), x, page->u.inuse.type_info);
 	    return 0;

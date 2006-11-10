@@ -1,7 +1,7 @@
 # xm-test configure.ac input script
 
 # Basic header information
-AC_INIT([xm-test], [1.0.0])
+AC_INIT([xm-test], [1.1.0])
 AM_INIT_AUTOMAKE([1.7 foreign])
 
 MK=''; AC_SUBST(MK)
@@ -11,11 +11,10 @@ AC_PROG_CC
 #AC_PROG_INSTALL
 AC_CHECK_PROG([LILO],	lilo,	lilo,	"no",	[$PATH])
 
-# Right now, we can assume that the lib/ and ramdisk/ directories
-# are two levels above the tests
+# Right now, we can assume that the lib/ directory
+# is two levels above the tests
 TESTLIB=../../lib
-RD_PATH=../../ramdisk
-TENV="PYTHONPATH=$PYTHONPATH:$TESTLIB RD_PATH=$RD_PATH"
+TENV="PYTHONPATH=$PYTHONPATH:$TESTLIB"
 
 AC_ARG_ENABLE(hvm-support,
 	[[  --enable-hvm-support           enable hardware virtual machine assist]],

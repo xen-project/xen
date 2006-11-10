@@ -214,7 +214,7 @@ long arch_do_domctl(
         int i;
         struct domain *d = find_domain_by_id(domctl->domain);
         unsigned long max_pfns = domctl->u.getmemlist.max_pfns;
-        unsigned long mfn, gmfn;
+        unsigned long mfn;
         struct list_head *list_ent;
 
         ret = -EINVAL;
@@ -224,45 +224,18 @@ long arch_do_domctl(
 
             spin_lock(&d->page_alloc_lock);
 
-            if ( hvm_guest(d->vcpu[0]) && shadow_mode_translate(d) )
+            list_ent = d->page_list.next;
+            for ( i = 0; (i < max_pfns) && (list_ent != &d->page_list); i++ )
             {
-                /* HVM domain: scan P2M to get guaranteed physmap order. */
-                for ( i = 0, gmfn = 0;
-                      (i < max_pfns) && (i < d->tot_pages); 
-                      i++, gmfn++ )
+                mfn = page_to_mfn(list_entry(
+                    list_ent, struct page_info, list));
+                if ( copy_to_guest_offset(domctl->u.getmemlist.buffer,
+                                          i, &mfn, 1) )
                 {
-                    if ( unlikely(i == (HVM_BELOW_4G_MMIO_START>>PAGE_SHIFT)) )
-                    {
-                        /* skip MMIO range */
-                        gmfn += HVM_BELOW_4G_MMIO_LENGTH >> PAGE_SHIFT;
-                    }
-                    mfn = gmfn_to_mfn(d, gmfn);
-                    if ( copy_to_guest_offset(domctl->u.getmemlist.buffer,
-                                              i, &mfn, 1) )
-                    {
-                        ret = -EFAULT;
-                        break;
-                    }
+                    ret = -EFAULT;
+                    break;
                 }
-            }
-            else 
-            {        
-                /* Other guests: return in order of ownership list. */
-                list_ent = d->page_list.next;
-                for ( i = 0;
-                      (i < max_pfns) && (list_ent != &d->page_list);
-                      i++ )
-                {
-                    mfn = page_to_mfn(list_entry(
-                        list_ent, struct page_info, list));
-                    if ( copy_to_guest_offset(domctl->u.getmemlist.buffer,
-                                              i, &mfn, 1) )
-                    {
-                        ret = -EFAULT;
-                        break;
-                    }
-                    list_ent = mfn_to_page(mfn)->list.next;
-                }
+                list_ent = mfn_to_page(mfn)->list.next;
             }
             
             spin_unlock(&d->page_alloc_lock);
@@ -321,7 +294,7 @@ void arch_getdomaininfo_ctxt(
 {
     memcpy(c, &v->arch.guest_context, sizeof(*c));
 
-    if ( hvm_guest(v) )
+    if ( is_hvm_vcpu(v) )
     {
         hvm_store_cpu_guest_regs(v, &c->user_regs, c->ctrlreg);
     }
@@ -334,11 +307,9 @@ void arch_getdomaininfo_ctxt(
 
     c->flags = 0;
     if ( test_bit(_VCPUF_fpu_initialised, &v->vcpu_flags) )
-        c->flags |= VGCF_I387_VALID;
+        c->flags |= VGCF_i387_valid;
     if ( guest_kernel_mode(v, &v->arch.guest_context.user_regs) )
-        c->flags |= VGCF_IN_KERNEL;
-    if ( hvm_guest(v) )
-        c->flags |= VGCF_HVM_GUEST;
+        c->flags |= VGCF_in_kernel;
 
     c->ctrlreg[3] = xen_pfn_to_cr3(pagetable_get_pfn(v->arch.guest_table));
 

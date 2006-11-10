@@ -54,7 +54,7 @@ static unsigned long lowmem_emergency_pool_pages;
 static void parse_lowmem_emergency_pool(char *s)
 {
     unsigned long long bytes;
-    bytes = parse_size_and_unit(s);
+    bytes = parse_size_and_unit(s, NULL);
     lowmem_emergency_pool_pages = bytes >> PAGE_SHIFT;
 }
 custom_param("lowmem_emergency_pool", parse_lowmem_emergency_pool);
@@ -599,7 +599,8 @@ int assign_pages(
 
     if ( unlikely(test_bit(_DOMF_dying, &d->domain_flags)) )
     {
-        DPRINTK("Cannot assign page to domain%d -- dying.\n", d->domain_id);
+        gdprintk(XENLOG_INFO, "Cannot assign page to domain%d -- dying.\n",
+                d->domain_id);
         goto fail;
     }
 
@@ -607,7 +608,7 @@ int assign_pages(
     {
         if ( unlikely((d->tot_pages + (1 << order)) > d->max_pages) )
         {
-            DPRINTK("Over-allocation for domain %u: %u > %u\n",
+            gdprintk(XENLOG_INFO, "Over-allocation for domain %u: %u > %u\n",
                     d->domain_id, d->tot_pages + (1 << order), d->max_pages);
             goto fail;
         }

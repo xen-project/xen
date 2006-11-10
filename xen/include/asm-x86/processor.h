@@ -107,7 +107,7 @@
 #define TRAP_deferred_nmi     31
 
 /* Set for entry via SYSCALL. Informs return code to use SYSRETQ not IRETQ. */
-/* NB. Same as VGCF_IN_SYSCALL. No bits in common with any other TRAP_ defn. */
+/* NB. Same as VGCF_in_syscall. No bits in common with any other TRAP_ defn. */
 #define TRAP_syscall         256
 
 /*

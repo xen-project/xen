@@ -108,13 +108,7 @@
 #include <asm/e820.h>
 #include <public/memory.h>
 
-#ifdef VERBOSE
-#define MEM_LOG(_f, _a...)                                  \
-  printk("DOM%u: (file=mm.c, line=%d) " _f "\n",            \
-         current->domain->domain_id , __LINE__ , ## _a )
-#else
-#define MEM_LOG(_f, _a...) ((void)0)
-#endif
+#define MEM_LOG(_f, _a...) gdprintk(XENLOG_WARNING , _f "\n" , ## _a)
 
 /*
  * PTE updates can be done with ordinary writes except:
@@ -578,8 +572,9 @@ get_page_from_l1e(
 
         if ( !iomem_access_permitted(d, mfn, mfn) )
         {
-            MEM_LOG("Non-privileged (%u) attempt to map I/O space %08lx", 
-                    d->domain_id, mfn);
+            if ( mfn != (PADDR_MASK >> PAGE_SHIFT) ) /* INVALID_MFN? */
+                MEM_LOG("Non-privileged (%u) attempt to map I/O space %08lx", 
+                        d->domain_id, mfn);
             return 0;
         }
 
@@ -1721,7 +1716,7 @@ int new_guest_cr3(unsigned long mfn)
     int okay;
     unsigned long old_base_mfn;
 
-    if ( hvm_guest(v) && !hvm_paging_enabled(v) )
+    if ( is_hvm_domain(d) && !hvm_paging_enabled(v) )
         domain_crash_synchronous();
 
     if ( shadow_mode_refcounts(d) )
@@ -2258,7 +2253,7 @@ int do_mmu_update(
             {
                 if ( shadow_mode_refcounts(d) )
                 {
-                    DPRINTK("mmu update on shadow-refcounted domain!");
+                    MEM_LOG("mmu update on shadow-refcounted domain!");
                     break;
                 }
 
@@ -2385,7 +2380,7 @@ int do_mmu_update(
 
 
 static int create_grant_pte_mapping(
-    unsigned long pte_addr, l1_pgentry_t nl1e, struct vcpu *v)
+    uint64_t pte_addr, l1_pgentry_t nl1e, struct vcpu *v)
 {
     int rc = GNTST_okay;
     void *va;
@@ -2409,7 +2404,7 @@ static int create_grant_pte_mapping(
     }
     
     va = map_domain_page(mfn);
-    va = (void *)((unsigned long)va + (pte_addr & ~PAGE_MASK));
+    va = (void *)((unsigned long)va + ((unsigned long)pte_addr & ~PAGE_MASK));
     page = mfn_to_page(mfn);
 
     type = page->u.inuse.type_info & PGT_type_mask;
@@ -2441,7 +2436,7 @@ static int create_grant_pte_mapping(
 }
 
 static int destroy_grant_pte_mapping(
-    unsigned long addr, unsigned long frame, struct domain *d)
+    uint64_t addr, unsigned long frame, struct domain *d)
 {
     int rc = GNTST_okay;
     void *va;
@@ -2460,7 +2455,7 @@ static int destroy_grant_pte_mapping(
     }
     
     va = map_domain_page(mfn);
-    va = (void *)((unsigned long)va + (addr & ~PAGE_MASK));
+    va = (void *)((unsigned long)va + ((unsigned long)addr & ~PAGE_MASK));
     page = mfn_to_page(mfn);
 
     type = page->u.inuse.type_info & PGT_type_mask;
@@ -2481,7 +2476,7 @@ static int destroy_grant_pte_mapping(
     /* Check that the virtual address supplied is actually mapped to frame. */
     if ( unlikely((l1e_get_intpte(ol1e) >> PAGE_SHIFT) != frame) )
     {
-        MEM_LOG("PTE entry %lx for address %lx doesn't match frame %lx",
+        MEM_LOG("PTE entry %lx for address %"PRIx64" doesn't match frame %lx",
                 (unsigned long)l1e_get_intpte(ol1e), addr, frame);
         put_page_type(page);
         rc = GNTST_general_error;
@@ -2581,7 +2576,7 @@ static int destroy_grant_va_mapping(
 }
 
 int create_grant_host_mapping(
-    unsigned long addr, unsigned long frame, unsigned int flags)
+    uint64_t addr, unsigned long frame, unsigned int flags)
 {
     l1_pgentry_t pte = l1e_from_pfn(frame, GRANT_PTE_FLAGS);
 
@@ -2596,7 +2591,7 @@ int create_grant_host_mapping(
 }
 
 int destroy_grant_host_mapping(
-    unsigned long addr, unsigned long frame, unsigned int flags)
+    uint64_t addr, unsigned long frame, unsigned int flags)
 {
     if ( flags & GNTMAP_contains_pte )
         return destroy_grant_pte_mapping(addr, frame, current->domain);
@@ -2622,7 +2617,7 @@ int steal_page(
         x = y;
         if (unlikely((x & (PGC_count_mask|PGC_allocated)) !=
                      (1 | PGC_allocated)) || unlikely(_nd != _d)) { 
-            DPRINTK("gnttab_transfer: Bad page %p: ed=%p(%u), sd=%p,"
+            MEM_LOG("gnttab_transfer: Bad page %p: ed=%p(%u), sd=%p,"
                     " caf=%08x, taf=%" PRtype_info "\n", 
                     (void *) page_to_mfn(page),
                     d, d->domain_id, unpickle_domptr(_nd), x, 

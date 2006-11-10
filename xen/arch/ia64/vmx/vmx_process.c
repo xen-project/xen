@@ -209,10 +209,6 @@ void leave_hypervisor_tail(struct pt_regs *regs)
 //        if (user_regs != regs)
 //            printk("WARNING: checking pending interrupt in nested interrupt!!!\n");
 
-        /* VMX Domain N has other interrupt source, saying DM  */
-        if (test_bit(ARCH_VMX_INTR_ASSIST, &v->arch.arch_vmx.flags))
-                      vmx_intr_assist(v);
-
         /* FIXME: Check event pending indicator, and set
          * pending bit if necessary to inject back to guest.
          * Should be careful about window between this check

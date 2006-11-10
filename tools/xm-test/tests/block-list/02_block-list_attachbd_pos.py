@@ -22,11 +22,11 @@ except DomainError, e:
     FAIL("Unable to create domain")
 
 #Attach one virtual block device to domainU
-block_attach(domain, "phy:/dev/ram0", "hda1")
+block_attach(domain, "phy:/dev/ram0", "xvda1")
 
 #Verify block-list on Domain0
 status, output = traceCommand("xm block-list %s" % domain.getId())
-eyecatcher = "769"
+eyecatcher = "51713"
 where = output.find(eyecatcher)
 if status != 0:
     FAIL("xm block-list returned bad status, expected 0, status is %i" % status)
@@ -35,7 +35,7 @@ elif where < 0 :
 
 #Verify attached block device on DomainU
 try:
-    run = console.runCmd("cat /proc/partitions | grep hda1")
+    run = console.runCmd("cat /proc/partitions | grep xvda1")
 except ConsoleError, e:
     saveLog(console.getHistory())
     FAIL(str(e))

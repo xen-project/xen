@@ -1,0 +1,45 @@
+XenSource xm-test 1.1 initrds
+=============================
+
+http://xm-test.xensource.com/ramdisks/initrd-1.1-i386.img and
+http://xm-test.xensource.com/ramdisks/initrd-1.1-powerpc.img are initrds
+suitable for use with Xen's xm-test regression testing suite.  They has been
+built and provided by XenSource, for the convenience of Xen users.  xm-test
+initrds may be mixed across minor xm-test versions, but not across major
+versions; this initrd is suitable for all 1.1.x versions of xm-test (as
+shipped with Xen 3.0.4 and the unstable tree leading up to that release).
+
+In order to use one of these initrds, run "./autogen; ./configure; make
+existing" inside the xm-test directory, and the appropriate initrd for your
+architecture will be downloaded automatically.  Alternatively, if you have
+already downloaded that file, place it into the xm-test/ramdisk directory and
+run the same command.  In either case, runtest.sh can then be used as normal.
+See xm-test/README for more details.
+
+These initrds were built using the infrastructure provided by xm-test.  Each
+is a full guest operating system and filesystem, and as such includes a large
+number of pieces of software.  The source code for the majority of these are
+included in full inside the file
+http://xm-test.xensource.com/ramdisks/<INITRD>-buildroot.tar.bz2, where
+<INITRD> is either initrd-1.1-i386 or initrd-1.1-powerpc as appropriate, or
+alongside this file.  Copyright statements and licences are contained therein.
+The remaining source code is included in the Xen distribution, at
+http://www.xensource.com/xen/downloads/archives.html.  The configurations used
+for BusyBox, uClibc, and Buildroot are available as
+http://xm-test.xensource.com/ramdisks/<INITRD>-busybox-config,
+http://xm-test.xensource.com/ramdisks/<INITRD>-uClibc-config, and
+http://xm-test.xensource.com/ramdisks/<INITRD>-buildroot-config respectively,
+or alongside this file.
+
+XenSource and the Xen contributors are grateful to the authors of these
+software packages for their contributions to free and open-source software.
+
+
+Buildroot and BusyBox are Copyright (c) Erik Andersen <andersen@codepoet.org>.
+BusyBox is licensed under the GNU General Public License (GPL).  A copy of
+this license is available in the file GPL-2,
+http://xm-test.xensource.com/ramdisks/GPL-2, or alongside this file.
+
+uClibc is licensed under the GNU Lesser General Public License (LGPL).  A copy
+of this license is available in the file
+http://xm-test.xensource.com/ramdisks/LGPL-2, or alongside this file.

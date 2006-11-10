@@ -143,9 +143,6 @@ static int perfc_copy_info(XEN_GUEST_HANDLE(xen_sysctl_perfc_desc_t) desc,
     unsigned int v = 0;
     atomic_t *counters = (atomic_t *)&perfcounters;
 
-    if ( guest_handle_is_null(desc) )
-        return 0;
-
     /* We only copy the name and array-size information once. */
     if ( !perfc_init ) 
     {
@@ -175,7 +172,11 @@ static int perfc_copy_info(XEN_GUEST_HANDLE(xen_sysctl_perfc_desc_t) desc,
         perfc_vals = xmalloc_array(xen_sysctl_perfc_val_t, perfc_nbr_vals);
         perfc_init = 1;
     }
-    if (perfc_vals == NULL)
+
+    if ( guest_handle_is_null(desc) )
+        return 0;
+
+    if ( perfc_vals == NULL )
         return -ENOMEM;
 
     /* Architecture may fill counters from hardware.  */
@@ -207,9 +208,9 @@ static int perfc_copy_info(XEN_GUEST_HANDLE(xen_sysctl_perfc_desc_t) desc,
     }
     BUG_ON(v != perfc_nbr_vals);
 
-    if (copy_to_guest(desc, (xen_sysctl_perfc_desc_t *)perfc_d, NR_PERFCTRS))
+    if ( copy_to_guest(desc, (xen_sysctl_perfc_desc_t *)perfc_d, NR_PERFCTRS) )
         return -EFAULT;
-    if (copy_to_guest(val, perfc_vals, perfc_nbr_vals))
+    if ( copy_to_guest(val, perfc_vals, perfc_nbr_vals) )
         return -EFAULT;
     return 0;
 }

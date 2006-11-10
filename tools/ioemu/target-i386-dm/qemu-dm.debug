@@ -1,5 +1,10 @@
 #!/bin/sh
 
+if [ "`arch`" = "x86_64" ]; then
+    LIBDIR="lib64"
+else
+    LIBDIR="lib"
+fi
 echo $* > /tmp/args
 echo $DISPLAY >> /tmp/args
-exec /usr/lib/xen/bin/qemu-dm $*
+exec /usr/$LIBDIR/xen/bin/qemu-dm $*

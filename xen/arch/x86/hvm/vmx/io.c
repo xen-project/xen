@@ -63,11 +63,30 @@ disable_irq_window(struct vcpu *v)
 
 static inline int is_interruptibility_state(void)
 {
-    int  interruptibility;
-    __vmread(GUEST_INTERRUPTIBILITY_INFO, &interruptibility);
-    return interruptibility;
+    return __vmread(GUEST_INTERRUPTIBILITY_INFO);
 }
 
+#ifdef __x86_64__
+static void update_tpr_threshold(struct vlapic *vlapic)
+{
+    int highest_irr, tpr;
+
+    /* Clear the work-to-do flag /then/ do the work. */
+    vlapic->flush_tpr_threshold = 0;
+    mb();
+
+    highest_irr = vlapic_find_highest_irr(vlapic);
+    tpr = vlapic_get_reg(vlapic, APIC_TASKPRI) & 0xF0;
+
+    if ( highest_irr == -1 )
+        __vmwrite(TPR_THRESHOLD, 0);
+    else
+        __vmwrite(TPR_THRESHOLD,
+                  (highest_irr > tpr) ? (tpr >> 4) : (highest_irr >> 4));
+}
+#else
+#define update_tpr_threshold(v) ((void)0)
+#endif
 
 asmlinkage void vmx_intr_assist(void)
 {
@@ -75,15 +94,13 @@ asmlinkage void vmx_intr_assist(void)
     int highest_vector;
     unsigned long eflags;
     struct vcpu *v = current;
+    struct vlapic *vlapic = vcpu_vlapic(v);
     struct hvm_domain *plat=&v->domain->arch.hvm_domain;
     struct periodic_time *pt = &plat->pl_time.periodic_tm;
-    struct hvm_virpic *pic= &plat->vpic;
+    struct vpic *pic= &plat->vpic;
     unsigned int idtv_info_field;
     unsigned long inst_len;
     int    has_ext_irq;
-
-    if ( v->vcpu_id == 0 )
-        hvm_pic_assist(v);
 
     if ( (v->vcpu_id == 0) && pt->enabled && pt->pending_intr_nr ) {
         pic_set_irq(pic, pt->irq, 0);
@@ -98,6 +115,9 @@ asmlinkage void vmx_intr_assist(void)
             pic_set_xen_irq(pic, callback_irq, local_events_need_delivery());
     }
 
+    if ( vlapic_enabled(vlapic) && vlapic->flush_tpr_threshold )
+        update_tpr_threshold(vlapic);
+
     has_ext_irq = cpu_has_pending_irq(v);
 
     if (unlikely(v->arch.hvm_vmx.vector_injected)) {
@@ -107,7 +127,7 @@ asmlinkage void vmx_intr_assist(void)
     }
 
     /* This could be moved earlier in the VMX resume sequence. */
-    __vmread(IDT_VECTORING_INFO_FIELD, &idtv_info_field);
+    idtv_info_field = __vmread(IDT_VECTORING_INFO_FIELD);
     if (unlikely(idtv_info_field & INTR_INFO_VALID_MASK)) {
         __vmwrite(VM_ENTRY_INTR_INFO_FIELD, idtv_info_field);
 
@@ -116,14 +136,12 @@ asmlinkage void vmx_intr_assist(void)
          * and interrupts. If we get here then delivery of some event caused a
          * fault, and this always results in defined VM_EXIT_INSTRUCTION_LEN.
          */
-        __vmread(VM_EXIT_INSTRUCTION_LEN, &inst_len); /* Safe */
+        inst_len = __vmread(VM_EXIT_INSTRUCTION_LEN); /* Safe */
         __vmwrite(VM_ENTRY_INSTRUCTION_LEN, inst_len);
 
-        if (unlikely(idtv_info_field & 0x800)) { /* valid error code */
-            unsigned long error_code;
-            __vmread(IDT_VECTORING_ERROR_CODE, &error_code);
-            __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
-        }
+        if (unlikely(idtv_info_field & 0x800)) /* valid error code */
+            __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE,
+                      __vmread(IDT_VECTORING_ERROR_CODE));
         if (unlikely(has_ext_irq))
             enable_irq_window(v);
 
@@ -141,7 +159,7 @@ asmlinkage void vmx_intr_assist(void)
         return;
     }
 
-    __vmread(GUEST_RFLAGS, &eflags);
+    eflags = __vmread(GUEST_RFLAGS);
     if (irq_masked(eflags)) {
         enable_irq_window(v);
         return;
