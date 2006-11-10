@@ -141,7 +141,11 @@ get_contact_info() {
 run_tests() {
     groupentered=$1
     output=$2
+    report=$3
+    startfile=${report}.start
+    stopfile=${report}.stop
 
+    date -R > $startfile
     exec <  grouptest/$groupentered
     while read casename testlist; do
        echo Running $casename tests...
@@ -155,6 +159,7 @@ run_tests() {
        fi
 
     done
+    date -R > $stopfile
 
 }
 
@@ -164,7 +169,10 @@ make_text_reports() {
     failures=$2
     output=$3
     reportfile=$4
+    report=$5
     summary=summary.tmp
+    startfile=${report}.start
+    stopfile=${report}.stop
     echo "Making PASS/FAIL report ($passfail)..."
     cat $OUTPUT | egrep '(REASON|PASS|FAIL|XPASS|XFAIL|SKIP)' | perl -pe 's/^(PASS|FAIL|XPASS|XFAIL)(.+)$/$1$2\n/' > $passfail
     
@@ -175,7 +183,12 @@ make_text_reports() {
     NUMFAIL=`grep -c FAIL $output`
     NUMXPASS=`grep -c XPASS $output`
     NUMXFAIL=`grep -c XFAIL $output`
+    START=`cat $startfile`
+    STOP=`cat $stopfile`
     cat > $summary << EOF
+Xm-test timing summary:
+  Run Started : $START
+  Run Stoped  : $STOP
 Xm-test execution summary:
   PASS:  $NUMPASS
   FAIL:  $NUMFAIL
@@ -302,8 +315,8 @@ if [ "$run" != "no" ]; then
     if [ "$unsafe" = "no" ]; then
       make_environment_report $OSREPORTTEMP $PROGREPORTTEMP
     fi
-    run_tests $GROUPENTERED $OUTPUT
-    make_text_reports $PASSFAIL $FAILURES $OUTPUT $TXTREPORT
+    run_tests $GROUPENTERED $OUTPUT $REPORT
+    make_text_reports $PASSFAIL $FAILURES $OUTPUT $TXTREPORT $REPORT
     if [ "$unsafe" = "no" ]; then
       make_result_report $OUTPUT $RESULTREPORTTEMP
       cat $OSREPORTTEMP $PROGREPORTTEMP $RESULTREPORTTEMP > $XMLREPORT
