@@ -322,7 +322,7 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
         if ( test_and_clear_bit(_VCPUF_initialised, &v->vcpu_flags) )
         {
             gdprintk(XENLOG_ERR, "Reset hvm vcpu not supported yet\n");
-            domain_crash_synchronous();
+            goto exit_and_crash;
         }
         v->arch.hvm_vcpu.init_sipi_sipi_state =
             HVM_VCPU_INIT_SIPI_SIPI_STATE_WAIT_SIPI;
@@ -340,7 +340,7 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
         if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
         {
             gdprintk(XENLOG_ERR, "SIPI for initialized vcpu %x\n", v->vcpu_id);
-            domain_crash_synchronous();
+            goto exit_and_crash;
         }
 
         if ( hvm_bringup_ap(v->vcpu_id, vector) != 0 )
@@ -350,11 +350,14 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
     default:
         gdprintk(XENLOG_ERR, "TODO: unsupported delivery mode %x\n",
                  delivery_mode);
-        domain_crash_synchronous();
-        break;
+        goto exit_and_crash;
     }
 
     return result;
+
+ exit_and_crash:
+    domain_crash(v->domain);
+    return 0;
 }
 
 /* This function is used by both ioapic and lapic.The bitmap is for vcpu_id. */
@@ -568,14 +571,17 @@ static unsigned long vlapic_read(struct vcpu *v, unsigned long address,
     default:
         gdprintk(XENLOG_ERR, "Local APIC read with len=0x%lx, "
                  "should be 4 instead.\n", len);
-        domain_crash_synchronous();
-        break;
+        goto exit_and_crash;
     }
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "offset 0x%x with length 0x%lx, "
                 "and the result is 0x%lx.", offset, len, result);
 
     return result;
+
+ exit_and_crash:
+    domain_crash(v->domain);
+    return 0;
 }
 
 static void vlapic_write(struct vcpu *v, unsigned long address,
@@ -615,7 +621,7 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
             {
                 gdprintk(XENLOG_ERR, "Uneven alignment error for "
                          "2-byte vlapic access\n");
-                domain_crash_synchronous();
+                goto exit_and_crash;
             }
 
             val = (tmp & ~(0xffff << (8*alignment))) |
@@ -625,8 +631,9 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
         default:
             gdprintk(XENLOG_ERR, "Local APIC write with len = %lx, "
                      "should be 4 instead\n", len);
-            domain_crash_synchronous();
-            break;
+        exit_and_crash:
+            domain_crash(v->domain);
+            return;
         }
     }
 
