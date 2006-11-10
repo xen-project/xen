@@ -24,7 +24,6 @@
 #include <xen/errno.h>
 #include <xen/nodemask.h>
 
-void build_physmap_table(struct domain *d);
 #define get_xen_guest_handle(val, hnd)  do { val = (hnd).p; } while (0)
 
 extern unsigned long total_pages;
@@ -117,7 +116,6 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
                 vmx_setup_platform(d);
             }
             else {
-                build_physmap_table(d);
                 dom_fw_setup(d, ds->bp, ds->maxmem);
                 if (ds->xsi_va)
                     d->arch.shared_info_va = ds->xsi_va;

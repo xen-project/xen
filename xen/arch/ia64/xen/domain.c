@@ -628,21 +628,6 @@ void domain_relinquish_resources(struct domain *d)
 	    xfree(d->arch.sal_data);
 }
 
-void build_physmap_table(struct domain *d)
-{
-	struct list_head *list_ent = d->page_list.next;
-	unsigned long mfn, i = 0;
-
-	while(list_ent != &d->page_list) {
-	    mfn = page_to_mfn(list_entry(
-		list_ent, struct page_info, list));
-	    assign_domain_page(d, i << PAGE_SHIFT, mfn << PAGE_SHIFT);
-
-	    i++;
-	    list_ent = mfn_to_page(mfn)->list.next;
-	}
-}
-
 unsigned long
 domain_set_shared_info_va (unsigned long va)
 {

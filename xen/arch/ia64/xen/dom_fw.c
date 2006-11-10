@@ -55,9 +55,9 @@ extern unsigned long running_on_sim;
 		tables->func_ptrs[pfn++] = 0;                     	\
 	} while (0)
 
-// allocate a page for fw
-// build_physmap_table() which is called by new_thread()
-// does for domU.
+/* allocate a page for fw
+ * guest_setup() @ libxc/xc_linux_build.c does for domU
+ */
 static inline void
 assign_new_domain_page_if_dom0(struct domain *d, unsigned long mpaddr)
 {
@@ -634,9 +634,10 @@ complete_dom0_memmap(struct domain *d,
 	sort(tables->efi_memmap, num_mds, sizeof(efi_memory_desc_t),
 	     efi_mdt_cmp, NULL);
 
-	// dom0 doesn't need build_physmap_table()
-	// see arch_set_info_guest()
-	// instead we allocate pages manually.
+	/* setup_guest() @ libxc/xc_linux_build() arranges memory for domU.
+	 * however no one arranges memory for dom0,
+	 * instead we allocate pages manually.
+	 */
 	for (i = 0; i < num_mds; i++) {
 		md = &tables->efi_memmap[i];
 		if (md->phys_addr > maxmem)
