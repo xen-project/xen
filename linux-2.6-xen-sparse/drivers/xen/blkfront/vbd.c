@@ -351,6 +351,7 @@ xlvbd_del(struct blkfront_info *info)
 	info->rq = NULL;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,16)
 int
 xlvbd_barrier(struct blkfront_info *info)
 {
@@ -364,3 +365,11 @@ xlvbd_barrier(struct blkfront_info *info)
 	       info->gd->disk_name, info->feature_barrier ? "enabled" : "disabled");
 	return 0;
 }
+#else
+int
+xlvbd_barrier(struct blkfront_info *info)
+{
+	printk("blkfront: %s: barriers disabled\n", info->gd->disk_name);
+	return -ENOSYS;
+}
+#endif
