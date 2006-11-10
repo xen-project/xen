@@ -89,6 +89,8 @@
     ((pte_val(pte) & _PAGE_TLB_INSERTED_MANY) != 0)
 #endif // CONFIG_XEN_IA64_TLB_TRACK
 
+#define _PAGE_PGC_ALLOCATED_BIT	59	/* _PGC_allocated */
+#define _PAGE_PGC_ALLOCATED	(__IA64_UL(1) << _PAGE_PGC_ALLOCATED_BIT)
 /* domVTI */
 #define GPFN_MEM		(0UL << 60)	/* Guest pfn is normal mem */
 #define GPFN_FRAME_BUFFER	(1UL << 60)	/* VGA framebuffer */
@@ -333,6 +335,7 @@ set_pte_rel(volatile pte_t* ptep, pte_t pteval)
 #define pte_young(pte)		((pte_val(pte) & _PAGE_A) != 0)
 #define pte_file(pte)		((pte_val(pte) & _PAGE_FILE) != 0)
 #ifdef XEN
+#define pte_pgc_allocated(pte)	((pte_val(pte) & _PAGE_PGC_ALLOCATED) != 0)
 #define pte_mem(pte) \
 	(!(pte_val(pte) & (GPFN_IO_MASK | GPFN_INV_MASK)) && !pte_none(pte))
 #endif

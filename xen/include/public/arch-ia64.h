@@ -384,6 +384,9 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 // tlb tracking
 #define _ASSIGN_tlb_track               2
 #define ASSIGN_tlb_track                (1UL << _ASSIGN_tlb_track)
+/* Internal only: associated with PGC_allocated bit */
+#define _ASSIGN_pgc_allocated           3
+#define ASSIGN_pgc_allocated            (1UL << _ASSIGN_pgc_allocated)
 
 /* This structure has the same layout of struct ia64_boot_param, defined in
    <asm/system.h>.  It is redefined here to ease use.  */

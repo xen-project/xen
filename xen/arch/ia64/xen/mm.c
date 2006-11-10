@@ -765,7 +765,8 @@ __assign_new_domain_page(struct domain *d, unsigned long mpaddr, pte_t* pte)
     // because set_pte_rel() has release semantics
     set_pte_rel(pte,
                 pfn_pte(maddr >> PAGE_SHIFT,
-                        __pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX)));
+                        __pgprot(_PAGE_PGC_ALLOCATED | __DIRTY_BITS |
+                                 _PAGE_PL_2 | _PAGE_AR_RWX)));
 
     smp_mb();
     return p;
@@ -807,6 +808,7 @@ flags_to_prot (unsigned long flags)
 #ifdef CONFIG_XEN_IA64_TLB_TRACK
     res |= flags & ASSIGN_tlb_track ? _PAGE_TLB_TRACKING: 0;
 #endif
+    res |= flags & ASSIGN_pgc_allocated ? _PAGE_PGC_ALLOCATED: 0;
     
     return res;
 }
@@ -866,7 +868,8 @@ assign_domain_page(struct domain *d,
     set_gpfn_from_mfn(physaddr >> PAGE_SHIFT, mpaddr >> PAGE_SHIFT);
     // because __assign_domain_page() uses set_pte_rel() which has
     // release semantics, smp_mb() isn't needed.
-    (void)__assign_domain_page(d, mpaddr, physaddr, ASSIGN_writable);
+    (void)__assign_domain_page(d, mpaddr, physaddr,
+                               ASSIGN_writable | ASSIGN_pgc_allocated);
 }
 
 int
@@ -1035,6 +1038,7 @@ assign_domain_mach_page(struct domain *d,
                         unsigned long mpaddr, unsigned long size,
                         unsigned long flags)
 {
+    BUG_ON(flags & ASSIGN_pgc_allocated);
     assign_domain_same_page(d, mpaddr, size, flags);
     return mpaddr;
 }
@@ -1046,15 +1050,17 @@ domain_put_page(struct domain* d, unsigned long mpaddr,
     unsigned long mfn = pte_pfn(old_pte);
     struct page_info* page = mfn_to_page(mfn);
 
-    if (page_get_owner(page) == d ||
-        page_get_owner(page) == NULL) {
-        BUG_ON(get_gpfn_from_mfn(mfn) != (mpaddr >> PAGE_SHIFT));
-        set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY);
+    if (pte_pgc_allocated(old_pte)) {
+        if (page_get_owner(page) == d || page_get_owner(page) == NULL) {
+            BUG_ON(get_gpfn_from_mfn(mfn) != (mpaddr >> PAGE_SHIFT));
+	    set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY);
+        } else {
+            BUG();
+        }
+
+	if (clear_PGC_allocate)
+            try_to_clear_PGC_allocate(d, page);
     }
-
-    if (clear_PGC_allocate)
-        try_to_clear_PGC_allocate(d, page);
-
     domain_page_flush_and_put(d, mpaddr, ptep, old_pte, page);
 }
 
@@ -1146,6 +1152,7 @@ assign_domain_page_cmpxchg_rel(struct domain* d, unsigned long mpaddr,
     }
 
     BUG_ON(!pte_mem(old_pte));
+    BUG_ON(!pte_pgc_allocated(old_pte));
     BUG_ON(page_get_owner(old_page) != d);
     BUG_ON(get_gpfn_from_mfn(old_mfn) != (mpaddr >> PAGE_SHIFT));
     BUG_ON(old_mfn == new_mfn);
@@ -1240,7 +1247,7 @@ dom0vp_add_physmap(struct domain* d, unsigned long gpfn, unsigned long mfn,
     struct domain* rd;
 
     /* Not allowed by a domain.  */
-    if (flags & ASSIGN_nocache)
+    if (flags & (ASSIGN_nocache | ASSIGN_pgc_allocated))
         return -EINVAL;
 
     rd = find_domain_by_id(domid);
@@ -1424,8 +1431,6 @@ create_grant_host_mapping(unsigned long gpaddr,
     page = mfn_to_page(mfn);
     ret = get_page(page, page_get_owner(page));
     BUG_ON(ret == 0);
-    BUG_ON(page_get_owner(mfn_to_page(mfn)) == d &&
-           get_gpfn_from_mfn(mfn) != INVALID_M2P_ENTRY);
     assign_domain_page_replace(d, gpaddr, mfn,
 #ifdef CONFIG_XEN_IA64_TLB_TRACK
                                ASSIGN_tlb_track |
@@ -1551,7 +1556,8 @@ steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
         // has release semantics.
 
         ret = assign_domain_page_cmpxchg_rel(d, gpfn << PAGE_SHIFT, page, new,
-                                             ASSIGN_writable);
+                                             ASSIGN_writable |
+                                             ASSIGN_pgc_allocated);
         if (ret < 0) {
             gdprintk(XENLOG_INFO, "assign_domain_page_cmpxchg_rel failed %d\n",
                     ret);
@@ -1648,7 +1654,8 @@ guest_physmap_add_page(struct domain *d, unsigned long gpfn,
     BUG_ON(ret == 0);
     set_gpfn_from_mfn(mfn, gpfn);
     smp_mb();
-    assign_domain_page_replace(d, gpfn << PAGE_SHIFT, mfn, ASSIGN_writable);
+    assign_domain_page_replace(d, gpfn << PAGE_SHIFT, mfn,
+                               ASSIGN_writable | ASSIGN_pgc_allocated);
 
     //BUG_ON(mfn != ((lookup_domain_mpa(d, gpfn << PAGE_SHIFT) & _PFN_MASK) >> PAGE_SHIFT));
 
