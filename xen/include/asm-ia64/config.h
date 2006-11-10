@@ -280,4 +280,9 @@ struct screen_info { };
 /* Define CONFIG_PRIVIFY to support privified OS (deprecated).  */
 #undef CONFIG_PRIVIFY
 
+/* Necessary for hvm_vioapic.c */
+#define vcpu_vlapic(vcpu)   (&(vcpu)->arch.arch_vmx.vlapic)
+#define vlapic_vcpu(vpic)   (container_of((vpic), struct vcpu, \
+                                          arch.arch_vmx.vlapic))
+
 #endif	/* _IA64_CONFIG_H_ */
