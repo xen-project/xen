@@ -1623,8 +1623,16 @@ static void xennet_set_features(struct net_device *dev)
 	if (!(dev->features & NETIF_F_IP_CSUM))
 		return;
 
-	if (!xennet_set_sg(dev, 1))
-		xennet_set_tso(dev, 1);
+	if (xennet_set_sg(dev, 1))
+		return;
+
+	/* Before 2.6.9 TSO seems to be unreliable so do not enable it
+	 * on older kernels.
+	 */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,9)
+	xennet_set_tso(dev, 1);
+#endif
+
 }
 
 static int network_connect(struct net_device *dev)
