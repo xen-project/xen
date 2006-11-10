@@ -1162,7 +1162,7 @@ class XendDomain:
             sedf_info = xc.sedf_domain_get(dominfo.getDomid())
             # return sxpr
             return ['sedf',
-                    ['domain',    sedf_info['domain']],
+                    ['domid',    sedf_info['domid']],
                     ['period',    sedf_info['period']],
                     ['slice',     sedf_info['slice']],
                     ['latency',   sedf_info['latency']],
