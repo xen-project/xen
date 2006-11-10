@@ -193,7 +193,6 @@ fsig_mount(fsi_t *fsi, const char *path)
 static int
 fsig_umount(fsi_t *fsi)
 {
-	fsip_fs_free(fsi);
 	return (0);
 }
 
