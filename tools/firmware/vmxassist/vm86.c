@@ -813,6 +813,40 @@ pop(struct regs *regs, unsigned prefix, unsigned opc)
 	return 1;
 }
 
+static int
+mov_to_seg(struct regs *regs, unsigned prefix, unsigned opc)
+{
+	unsigned eip = regs->eip - 1;
+	unsigned modrm = fetch8(regs);
+	unsigned addr = operand(prefix, regs, modrm);
+
+	/* Only need to emulate segment loads in real->protected mode. */
+	if (mode != VM86_REAL_TO_PROTECTED)
+		return 0;
+
+	/* Register source only. */
+	if ((modrm & 0xC0) != 0xC0)
+		goto fail;
+
+	switch ((modrm & 0x38) >> 3) {
+	case 3: /* ds */
+		regs->vds = getreg16(regs, modrm);
+		saved_rm_regs.vds = 0;
+		oldctx.ds_sel = regs->vds;
+		return 1;
+	case 0: /* es */
+		regs->ves = getreg16(regs, modrm);
+		saved_rm_regs.ves = 0;
+		oldctx.es_sel = regs->ves;
+		return 1;
+	}
+
+ fail:
+	printf("%s:%d: missed opcode %02x %02x\n",
+	       __FUNCTION__, __LINE__, opc, modrm);
+	return 0;
+}
+
 /*
  * Emulate a segment load in protected mode
  */
@@ -1257,11 +1291,9 @@ opcode(struct regs *regs)
 
 	for (;;) {
 		switch ((opc = fetch8(regs))) {
-		case 0x07:
-			if (prefix & DATA32)
-				regs->ves = pop32(regs);
-			else
-				regs->ves = pop16(regs);
+		case 0x07: /* pop %es */
+			regs->ves = (prefix & DATA32) ?
+				pop32(regs) : pop16(regs);
 			TRACE((regs, regs->eip - eip, "pop %%es"));
 			if (mode == VM86_REAL_TO_PROTECTED) {
 				saved_rm_regs.ves = 0;
@@ -1315,6 +1347,16 @@ opcode(struct regs *regs)
 				goto invalid;
 			}
 			goto invalid;
+
+		case 0x1F: /* pop %ds */
+			regs->vds = (prefix & DATA32) ?
+				pop32(regs) : pop16(regs);
+			TRACE((regs, regs->eip - eip, "pop %%ds"));
+			if (mode == VM86_REAL_TO_PROTECTED) {
+				saved_rm_regs.vds = 0;
+				oldctx.ds_sel = regs->vds;
+			}
+			return OPC_EMULATED;
 
 		case 0x26:
 			TRACE((regs, regs->eip - eip, "%%es:"));
@@ -1401,6 +1443,11 @@ opcode(struct regs *regs)
                         if (!movr(regs, prefix, opc))
                                 goto invalid;
                         return OPC_EMULATED;
+
+		case 0x8E: /* mov r16, sreg */
+			if (!mov_to_seg(regs, prefix, opc))
+				goto invalid;
+			return OPC_EMULATED;
 
 		case 0x8F: /* addr32 pop r/m16 */
                         if ((prefix & ADDR32) == 0)
