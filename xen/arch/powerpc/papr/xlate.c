@@ -199,6 +199,7 @@ long pte_enter(ulong flags, ulong ptex, ulong vsid, ulong rpn)
         DBG("%s: Dom[%d] mapping grant table: 0x%lx\n",
             __func__, d->domain_id, pfn << PAGE_SHIFT);
         pte.bits.i = 0;
+        pte.bits.g = 0;
     }
     /* fixup the RPN field of our local PTE copy */
     pte.bits.rpn = mfn | lp_bits;
