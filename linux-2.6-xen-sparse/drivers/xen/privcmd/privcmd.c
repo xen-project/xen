@@ -165,7 +165,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		struct mm_struct *mm = current->mm;
 		struct vm_area_struct *vma;
 		xen_pfn_t __user *p;
-		unsigned long addr, mfn;
+		unsigned long addr, mfn, nr_pages;
 		int i;
 
 		if (!is_initial_xendomain())
@@ -174,7 +174,8 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		if (copy_from_user(&m, udata, sizeof(m)))
 			return -EFAULT;
 
-		if ((m.num <= 0) || (m.num > (LONG_MAX >> PAGE_SHIFT)))
+		nr_pages = m.num;
+		if ((m.num <= 0) || (nr_pages > (LONG_MAX >> PAGE_SHIFT)))
 			return -EINVAL;
 
 		down_read(&mm->mmap_sem);
@@ -182,8 +183,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		vma = find_vma(mm, m.addr);
 		if (!vma ||
 		    (m.addr != vma->vm_start) ||
-		    ((m.addr + ((unsigned long)m.num<<PAGE_SHIFT)) !=
-		     vma->vm_end) ||
+		    ((m.addr + (nr_pages << PAGE_SHIFT)) != vma->vm_end) ||
 		    !privcmd_enforce_singleshot_mapping(vma)) {
 			up_read(&mm->mmap_sem);
 			return -EINVAL;
@@ -191,7 +191,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 
 		p = m.arr;
 		addr = m.addr;
-		for (i = 0; i < m.num; i++, addr += PAGE_SIZE, p++) {
+		for (i = 0; i < nr_pages; i++, addr += PAGE_SIZE, p++) {
 			if (get_user(mfn, p)) {
 				up_read(&mm->mmap_sem);
 				return -EFAULT;
