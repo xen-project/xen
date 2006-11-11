@@ -126,7 +126,7 @@ int
 fsig_devread(fsi_file_t *ffi, unsigned int sector, unsigned int offset,
     unsigned int bufsize, char *buf)
 {
-	uint64_t off = ffi->ff_fsi->f_off + ((uint64_t)(sector * 512)) + offset;
+	uint64_t off = ffi->ff_fsi->f_off + ((uint64_t)sector * 512) + offset;
 	ssize_t bytes_read = 0;
 
 	while (bufsize) {
