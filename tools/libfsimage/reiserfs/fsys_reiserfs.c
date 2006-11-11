@@ -363,6 +363,8 @@ struct fsys_reiser_info
 #define JOURNAL_START    ((__u32 *) (INFO + 1))
 #define JOURNAL_END      ((__u32 *) (FSYS_BUF + FSYS_BUFLEN))
 
+#if defined(__i386__) || defined(__x86_64__)
+
 #ifdef __amd64
 #define BSF "bsfq"
 #else
@@ -376,6 +378,61 @@ grub_log2 (unsigned long word)
 	   : "r" (word));
   return word;
 }
+
+#elif defined(__ia64__)
+
+#if __GNUC__ >= 4 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4)
+# define ia64_popcnt(x) __builtin_popcountl(x)
+#else
+# define ia64_popcnt(x)                                     \
+  ({                                                        \
+    __u64 ia64_intri_res;                                   \
+    asm ("popcnt %0=%1" : "=r" (ia64_intri_res) : "r" (x)); \
+    ia64_intri_res;                                         \
+  })
+#endif
+
+static __inline__ unsigned long
+grub_log2 (unsigned long word)
+{
+  unsigned long result;
+
+  result = ia64_popcnt((word - 1) & ~word);
+  return result;
+}
+
+#elif defined(__powerpc__)
+
+static __inline__ int
+__ilog2(unsigned long x)
+{
+  int lz;
+
+  asm (PPC_CNTLZL "%0,%1" : "=r" (lz) : "r" (x));
+  return BITS_PER_LONG - 1 - lz;
+}
+
+static __inline__ unsigned long
+grub_log2 (unsigned long word)
+{
+  return __ilog2(word & -word);
+}
+
+#else /* Unoptimized */
+
+static __inline__ unsigned long
+grub_log2 (unsigned long word)
+{
+  unsigned long result = 0;
+
+  while (!(word & 1UL))
+    {
+      result++;
+      word >>= 1;
+    }
+  return result;
+}
+#endif
 #define log2 grub_log2
 
 static __inline__ int
