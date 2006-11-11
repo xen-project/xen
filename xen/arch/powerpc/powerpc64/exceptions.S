@@ -564,7 +564,11 @@ _GLOBAL(sleep)
  */	
     .globl spin_start
 spin_start:
-
+    /* We discovered by experiment that the ERAT must be flushed early.  */
+    isync
+    slbia
+    isync
+	
     /* Do a cache flush for our text, in case the loader didn't */
     LOADADDR(r9, _start)
     LOADADDR(r8, _etext)
