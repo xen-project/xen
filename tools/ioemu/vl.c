@@ -6424,7 +6424,8 @@ int main(int argc, char **argv)
         page_array[i] = i;
     if (xc_domain_translate_gpfn_list(xc_handle, domid, tmp_nr_pages,
                                       page_array, page_array)) {
-        fprintf(logfile, "xc_get_pfn_list returned error %d\n", errno);
+        fprintf(logfile, "xc_domain_translate_gpfn_list returned error %d\n",
+                errno);
         exit(-1);
     }
 
