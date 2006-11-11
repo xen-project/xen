@@ -829,15 +829,33 @@ mov_to_seg(struct regs *regs, unsigned prefix, unsigned opc)
 		goto fail;
 
 	switch ((modrm & 0x38) >> 3) {
+	case 0: /* es */
+		regs->ves = getreg16(regs, modrm);
+		saved_rm_regs.ves = 0;
+		oldctx.es_sel = regs->ves;
+		return 1;
+
+	/* case 1: cs */
+
+	case 2: /* ss */
+		regs->uss = getreg16(regs, modrm);
+		saved_rm_regs.uss = 0;
+		oldctx.ss_sel = regs->uss;
+		return 1;
 	case 3: /* ds */
 		regs->vds = getreg16(regs, modrm);
 		saved_rm_regs.vds = 0;
 		oldctx.ds_sel = regs->vds;
 		return 1;
-	case 0: /* es */
-		regs->ves = getreg16(regs, modrm);
-		saved_rm_regs.ves = 0;
-		oldctx.es_sel = regs->ves;
+	case 4: /* fs */
+		regs->vfs = getreg16(regs, modrm);
+		saved_rm_regs.vfs = 0;
+		oldctx.fs_sel = regs->vfs;
+		return 1;
+	case 5: /* gs */
+		regs->vgs = getreg16(regs, modrm);
+		saved_rm_regs.vgs = 0;
+		oldctx.gs_sel = regs->vgs;
 		return 1;
 	}
 
