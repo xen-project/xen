@@ -575,8 +575,10 @@ struct node *get_node(struct connection *conn,
 	/* If we don't have permission, we don't have node. */
 	if (node) {
 		if ((perm_for_conn(conn, node->perms, node->num_perms) & perm)
-		    != perm)
+		    != perm) {
+			errno = EACCES;
 			node = NULL;
+		}
 	}
 	/* Clean up errno if they weren't supposed to know. */
 	if (!node) 
