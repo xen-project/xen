@@ -73,6 +73,11 @@
 #define UART_LSR_OE	0x02	/* Overrun error indicator */
 #define UART_LSR_DR	0x01	/* Receiver data ready */
 
+/* Maximum retries for a single byte transmit. */
+#define WRITE_MAX_SINGLE_RETRIES 3
+/* Maximum retries for a sequence of back-to-back unsuccessful transmits. */
+#define WRITE_MAX_TOTAL_RETRIES 10
+
 struct SerialState {
     uint8_t divider;
     uint8_t rbr; /* receive register */
@@ -98,8 +103,12 @@ struct SerialState {
      * If a character transmitted via UART cannot be written to its
      * destination immediately we remember it here and retry a few times via
      * a polling timer.
+     *  - write_single_retries: Number of write retries for current byte.
+     *  - write_total_retries:  Number of write retries for back-to-back
+     *                          unsuccessful transmits.
      */
-    int write_retries;
+    int write_single_retries;
+    int write_total_retries;
     char write_chr;
     QEMUTimer *write_retry_timer;
 };
@@ -217,16 +226,21 @@ static void serial_chr_write(void *opaque)
 {
     SerialState *s = opaque;
 
+    /* Cancel any outstanding retry if this is a new byte. */
     qemu_del_timer(s->write_retry_timer);
 
     /* Retry every 100ms for 300ms total. */
     if (qemu_chr_write(s->chr, &s->write_chr, 1) == -1) {
-        if (s->write_retries++ >= 3)
-            printf("serial: write error\n");
-        else
+        s->write_total_retries++; 
+        if (s->write_single_retries++ >= WRITE_MAX_SINGLE_RETRIES)
+            fprintf(stderr, "serial: write error\n");
+        else if (s->write_total_retries <= WRITE_MAX_TOTAL_RETRIES) {
             qemu_mod_timer(s->write_retry_timer,
                            qemu_get_clock(vm_clock) + ticks_per_sec / 10);
-        return;
+            return;
+        }
+    } else {
+        s->write_total_retries = 0;  /* if successful then reset counter */
     }
 
     /* Success: Notify guest that THR is empty. */
@@ -255,7 +269,7 @@ static void serial_ioport_write(void *opaque, uint32_t addr, uint32_t val)
             s->lsr &= ~UART_LSR_THRE;
             serial_update_irq(s);
             s->write_chr = val;
-            s->write_retries = 0;
+            s->write_single_retries = 0;
             serial_chr_write(s);
         }
         break;
