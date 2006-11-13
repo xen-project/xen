@@ -466,14 +466,14 @@ void vm_launch_fail(unsigned long eflags)
 {
     unsigned long error = __vmread(VM_INSTRUCTION_ERROR);
     printk("<vm_launch_fail> error code %lx\n", error);
-    __hvm_bug(guest_cpu_user_regs());
+    domain_crash_synchronous();
 }
 
 void vm_resume_fail(unsigned long eflags)
 {
     unsigned long error = __vmread(VM_INSTRUCTION_ERROR);
     printk("<vm_resume_fail> error code %lx\n", error);
-    __hvm_bug(guest_cpu_user_regs());
+    domain_crash_synchronous();
 }
 
 void arch_vmx_do_resume(struct vcpu *v)

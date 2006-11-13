@@ -8,7 +8,6 @@
  */
 #define PGDIR_SHIFT	30
 #define PTRS_PER_PGD	4
-#define PTRS_PER_PGD_NO_HV 4
 
 /*
  * PMD_SHIFT determines the size of the area a middle-level

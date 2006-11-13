@@ -575,8 +575,10 @@ struct node *get_node(struct connection *conn,
 	/* If we don't have permission, we don't have node. */
 	if (node) {
 		if ((perm_for_conn(conn, node->perms, node->num_perms) & perm)
-		    != perm)
+		    != perm) {
+			errno = EACCES;
 			node = NULL;
+		}
 	}
 	/* Clean up errno if they weren't supposed to know. */
 	if (!node) 
@@ -789,7 +791,7 @@ static void delete_node_single(struct connection *conn, struct node *node)
 		corrupt(conn, "Could not delete '%s'", node->name);
 		return;
 	}
-	domain_entry_dec(conn);
+	domain_entry_dec(conn, node);
 }
 
 /* Must not be / */
@@ -840,7 +842,7 @@ static struct node *construct_node(struct connection *conn, const char *name)
 	node->children = node->data = NULL;
 	node->childlen = node->datalen = 0;
 	node->parent = parent;
-	domain_entry_inc(conn);
+	domain_entry_inc(conn, node);
 	return node;
 }
 
@@ -876,7 +878,7 @@ static struct node *create_node(struct connection *conn,
 	 * something goes wrong. */
 	for (i = node; i; i = i->parent) {
 		if (!write_node(conn, i)) {
-			domain_entry_dec(conn);
+			domain_entry_dec(conn, i);
 			return NULL;
 		}
 		talloc_set_destructor(i, destroy_node);
@@ -1106,6 +1108,7 @@ static void do_get_perms(struct connection *conn, const char *name)
 static void do_set_perms(struct connection *conn, struct buffered_data *in)
 {
 	unsigned int num;
+	struct xs_permissions *perms;
 	char *name, *permstr;
 	struct node *node;
 
@@ -1127,12 +1130,24 @@ static void do_set_perms(struct connection *conn, struct buffered_data *in)
 		return;
 	}
 
-	node->perms = talloc_array(node, struct xs_permissions, num);
-	node->num_perms = num;
-	if (!xs_strings_to_perms(node->perms, num, permstr)) {
+	perms = talloc_array(node, struct xs_permissions, num);
+	if (!xs_strings_to_perms(perms, num, permstr)) {
 		send_error(conn, errno);
 		return;
 	}
+
+	/* Unprivileged domains may not change the owner. */
+	if (domain_is_unprivileged(conn) &&
+	    perms[0].id != node->perms[0].id) {
+		send_error(conn, EPERM);
+		return;
+	}
+
+	domain_entry_dec(conn, node);
+	node->perms = perms;
+	node->num_perms = num;
+	domain_entry_inc(conn, node);
+
 	if (!write_node(conn, node)) {
 		send_error(conn, errno);
 		return;

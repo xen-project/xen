@@ -22,6 +22,7 @@
 #include <xen/delay.h>
 #include <xen/shutdown.h>
 #include <xen/percpu.h>
+#include <xen/multicall.h>
 #include <asm/debugger.h>
 #include <public/sched.h>
 #include <public/vcpu.h>
@@ -256,6 +257,10 @@ void __domain_crash(struct domain *d)
 void __domain_crash_synchronous(void)
 {
     __domain_crash(current->domain);
+
+    /* Flush multicall state before dying. */
+    this_cpu(mc_state).flags = 0;
+
     for ( ; ; )
         do_softirq();
 }

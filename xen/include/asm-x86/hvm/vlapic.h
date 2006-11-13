@@ -90,4 +90,6 @@ struct vlapic *apic_round_robin(
 
 s_time_t get_apictime_scheduled(struct vcpu *v);
 
+int vlapic_match_logical_addr(struct vlapic *vlapic, uint8_t mda);
+
 #endif /* __ASM_X86_HVM_VLAPIC_H__ */

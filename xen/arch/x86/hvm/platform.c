@@ -731,8 +731,7 @@ static void hvm_send_assist_req(struct vcpu *v)
     {
         /* This indicates a bug in the device model.  Crash the domain. */
         gdprintk(XENLOG_ERR, "Device model set bad IO state %d.\n", p->state);
-        domain_crash(v->domain);
-        return;
+        domain_crash_synchronous();
     }
 
     prepare_wait_on_xen_event_channel(v->arch.hvm_vcpu.xen_port);

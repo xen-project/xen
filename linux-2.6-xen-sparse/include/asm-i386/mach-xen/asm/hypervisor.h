@@ -56,6 +56,10 @@
 
 extern shared_info_t *HYPERVISOR_shared_info;
 
+#ifdef CONFIG_X86_32
+extern unsigned long hypervisor_virt_start;
+#endif
+
 /* arch/xen/i386/kernel/setup.c */
 extern start_info_t *xen_start_info;
 #ifdef CONFIG_XEN_PRIVILEGED_GUEST

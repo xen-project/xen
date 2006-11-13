@@ -151,15 +151,14 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
 
     case MSR_FS_BASE:
         if ( !(vmx_long_mode_enabled(v)) )
-            /* XXX should it be GP fault */
-            domain_crash_synchronous();
+            goto exit_and_crash;
 
         msr_content = __vmread(GUEST_FS_BASE);
         break;
 
     case MSR_GS_BASE:
         if ( !(vmx_long_mode_enabled(v)) )
-            domain_crash_synchronous();
+            goto exit_and_crash;
 
         msr_content = __vmread(GUEST_GS_BASE);
         break;
@@ -183,6 +182,11 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
     regs->edx = (u32)(msr_content >> 32);
 
     return 1;
+
+ exit_and_crash:
+    gdprintk(XENLOG_ERR, "Fatal error reading MSR %lx\n", (long)regs->ecx);
+    domain_crash(v->domain);
+    return 1; /* handled */
 }
 
 static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
@@ -233,7 +237,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     case MSR_FS_BASE:
     case MSR_GS_BASE:
         if ( !(vmx_long_mode_enabled(v)) )
-            domain_crash_synchronous();
+            goto exit_and_crash;
 
         if ( !IS_CANO_ADDRESS(msr_content) )
         {
@@ -251,7 +255,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 
     case MSR_SHADOW_GS_BASE:
         if ( !(vmx_long_mode_enabled(v)) )
-            domain_crash_synchronous();
+            goto exit_and_crash;
 
         v->arch.hvm_vmx.msr_content.shadow_gs = msr_content;
         wrmsrl(MSR_SHADOW_GS_BASE, msr_content);
@@ -267,6 +271,11 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     }
 
     return 1;
+
+ exit_and_crash:
+    gdprintk(XENLOG_ERR, "Fatal error writing MSR %lx\n", (long)regs->ecx);
+    domain_crash(v->domain);
+    return 1; /* handled */
 }
 
 static void vmx_restore_msrs(struct vcpu *v)
@@ -726,8 +735,7 @@ static int __get_instruction_length(void)
 {
     int len;
     len = __vmread(VM_EXIT_INSTRUCTION_LEN); /* Safe: callers audited */
-    if ( (len < 1) || (len > 15) )
-        __hvm_bug(guest_cpu_user_regs());
+    BUG_ON((len < 1) || (len > 15));
     return len;
 }
 
@@ -823,7 +831,10 @@ static void vmx_do_cpuid(struct cpu_user_regs *regs)
         /* 8-byte aligned valid pseudophys address from vmxassist, please. */
         if ( (value & 7) || (mfn == INVALID_MFN) ||
              !v->arch.hvm_vmx.vmxassist_enabled )
-            domain_crash_synchronous();
+        {
+            domain_crash(v->domain);
+            return;
+        }
 
         p = map_domain_page(mfn);
         value = *((uint64_t *)(p + (value & (PAGE_SIZE - 1))));
@@ -966,8 +977,9 @@ static int check_for_null_selector(unsigned long eip, int inst_len, int dir)
     memset(inst, 0, MAX_INST_LEN);
     if ( inst_copy_from_guest(inst, eip, inst_len) != inst_len )
     {
-        printk("check_for_null_selector: get guest instruction failed\n");
-        domain_crash_synchronous();
+        gdprintk(XENLOG_ERR, "Get guest instruction failed\n");
+        domain_crash(current->domain);
+        return 0;
     }
 
     for ( i = 0; i < inst_len; i++ )
@@ -1169,7 +1181,7 @@ static void vmx_world_save(struct vcpu *v, struct vmx_assist_context *c)
     c->ldtr_arbytes.bytes = __vmread(GUEST_LDTR_AR_BYTES);
 }
 
-static void vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
+static int vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
 {
     unsigned long mfn, old_base_mfn;
 
@@ -1192,10 +1204,7 @@ static void vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
          */
         mfn = get_mfn_from_gpfn(c->cr3 >> PAGE_SHIFT);
         if ( mfn != pagetable_get_pfn(v->arch.guest_table) )
-        {
-            printk("Invalid CR3 value=%x", c->cr3);
-            domain_crash_synchronous();
-        }
+            goto bad_cr3;
     }
     else
     {
@@ -1205,13 +1214,8 @@ static void vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
          */
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 c->cr3 = %x", c->cr3);
         mfn = get_mfn_from_gpfn(c->cr3 >> PAGE_SHIFT);
-        if ( !VALID_MFN(mfn) )
-        {
-            printk("Invalid CR3 value=%x", c->cr3);
-            domain_crash_synchronous();
-        }
-        if ( !get_page(mfn_to_page(mfn), v->domain) )
-            domain_crash_synchronous();
+        if ( !VALID_MFN(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
+            goto bad_cr3;
         old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
         v->arch.guest_table = pagetable_from_pfn(mfn);
         if (old_base_mfn)
@@ -1280,6 +1284,11 @@ static void vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
 
     shadow_update_paging_modes(v);
     __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr3);
+    return 0;
+
+ bad_cr3:
+    gdprintk(XENLOG_ERR, "Invalid CR3 value=%x", c->cr3);
+    return -EINVAL;
 }
 
 enum { VMX_ASSIST_INVOKE = 0, VMX_ASSIST_RESTORE };
@@ -1320,7 +1329,8 @@ static int vmx_assist(struct vcpu *v, int mode)
         if (cp != 0) {
             if (hvm_copy_from_guest_phys(&c, cp, sizeof(c)))
                 goto error;
-            vmx_world_restore(v, &c);
+            if ( vmx_world_restore(v, &c) != 0 )
+                goto error;
             v->arch.hvm_vmx.vmxassist_enabled = 1;            
             return 1;
         }
@@ -1337,7 +1347,8 @@ static int vmx_assist(struct vcpu *v, int mode)
         if (cp != 0) {
             if (hvm_copy_from_guest_phys(&c, cp, sizeof(c)))
                 goto error;
-            vmx_world_restore(v, &c);
+            if ( vmx_world_restore(v, &c) != 0 )
+                goto error;
             v->arch.hvm_vmx.vmxassist_enabled = 0;
             return 1;
         }
@@ -1345,8 +1356,8 @@ static int vmx_assist(struct vcpu *v, int mode)
     }
 
  error:
-    printk("Failed to transfer to vmxassist\n");
-    domain_crash_synchronous();
+    gdprintk(XENLOG_ERR, "Failed to transfer to vmxassist\n");
+    domain_crash(v->domain);
     return 0;
 }
 
@@ -1390,9 +1401,10 @@ static int vmx_set_cr0(unsigned long value)
         mfn = get_mfn_from_gpfn(v->arch.hvm_vmx.cpu_cr3 >> PAGE_SHIFT);
         if ( !VALID_MFN(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
         {
-            printk("Invalid CR3 value = %lx (mfn=%lx)\n", 
-                   v->arch.hvm_vmx.cpu_cr3, mfn);
-            domain_crash_synchronous(); /* need to take a clean path */
+            gdprintk(XENLOG_ERR, "Invalid CR3 value = %lx (mfn=%lx)\n", 
+                     v->arch.hvm_vmx.cpu_cr3, mfn);
+            domain_crash(v->domain);
+            return 0;
         }
 
 #if defined(__x86_64__)
@@ -1536,12 +1548,12 @@ static int vmx_set_cr0(unsigned long value)
  */
 static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
 {
-    unsigned long value;
-    unsigned long old_cr;
+    unsigned long value, old_cr, old_base_mfn, mfn;
     struct vcpu *v = current;
     struct vlapic *vlapic = vcpu_vlapic(v);
 
-    switch ( gp ) {
+    switch ( gp )
+    {
     CASE_GET_REG(EAX, eax);
     CASE_GET_REG(ECX, ecx);
     CASE_GET_REG(EDX, edx);
@@ -1554,8 +1566,8 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
         value = __vmread(GUEST_RSP);
         break;
     default:
-        printk("invalid gp: %d\n", gp);
-        __hvm_bug(regs);
+        gdprintk(XENLOG_ERR, "invalid gp: %d\n", gp);
+        goto exit_and_crash;
     }
 
     TRACE_VMEXIT(1, TYPE_MOV_TO_CR);
@@ -1564,13 +1576,12 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
 
     HVM_DBG_LOG(DBG_LEVEL_1, "CR%d, value = %lx", cr, value);
 
-    switch ( cr ) {
+    switch ( cr )
+    {
     case 0:
         return vmx_set_cr0(value);
-    case 3:
-    {
-        unsigned long old_base_mfn, mfn;
 
+    case 3:
         /*
          * If paging is not enabled yet, simply copy the value to CR3.
          */
@@ -1590,7 +1601,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
              */
             mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
             if (mfn != pagetable_get_pfn(v->arch.guest_table))
-                __hvm_bug(regs);
+                goto bad_cr3;
             shadow_update_cr3(v);
         } else {
             /*
@@ -1600,10 +1611,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
             HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 value = %lx", value);
             mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
             if ( !VALID_MFN(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
-            {
-                printk("Invalid CR3 value=%lx\n", value);
-                domain_crash_synchronous(); /* need to take a clean path */
-            }
+                goto bad_cr3;
             old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
             v->arch.guest_table = pagetable_from_pfn(mfn);
             if (old_base_mfn)
@@ -1618,9 +1626,8 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
             __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr3);
         }
         break;
-    }
+
     case 4: /* CR4 */
-    {
         old_cr = v->arch.hvm_vmx.cpu_shadow_cr4;
 
         if ( (value & X86_CR4_PAE) && !(old_cr & X86_CR4_PAE) )
@@ -1633,10 +1640,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
                 mfn = get_mfn_from_gpfn(v->arch.hvm_vmx.cpu_cr3 >> PAGE_SHIFT);
                 if ( !VALID_MFN(mfn) ||
                      !get_page(mfn_to_page(mfn), v->domain) )
-                {
-                    printk("Invalid CR3 value = %lx", v->arch.hvm_vmx.cpu_cr3);
-                    domain_crash_synchronous(); /* need to take a clean path */
-                }
+                    goto bad_cr3;
 
                 /*
                  * Now arch.guest_table points to machine physical.
@@ -1682,18 +1686,24 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
         if ( (old_cr ^ value) & (X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE) )
             shadow_update_paging_modes(v);
         break;
-    }
+
     case 8:
-    {
         vlapic_set_reg(vlapic, APIC_TASKPRI, ((value & 0x0F) << 4));
         break;
-    }
+
     default:
-        printk("invalid cr: %d\n", gp);
-        __hvm_bug(regs);
+        gdprintk(XENLOG_ERR, "invalid cr: %d\n", cr);
+        domain_crash(v->domain);
+        return 0;
     }
 
     return 1;
+
+ bad_cr3:
+    gdprintk(XENLOG_ERR, "Invalid CR3\n");
+ exit_and_crash:
+    domain_crash(v->domain);
+    return 0;
 }
 
 /*
@@ -1715,7 +1725,9 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
         value = (value & 0xF0) >> 4;
         break;
     default:
-        __hvm_bug(regs);
+        gdprintk(XENLOG_ERR, "invalid cr: %d\n", cr);
+        domain_crash(v->domain);
+        break;
     }
 
     switch ( gp ) {
@@ -1733,7 +1745,8 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
         break;
     default:
         printk("invalid gp: %d\n", gp);
-        __hvm_bug(regs);
+        domain_crash(v->domain);
+        break;
     }
 
     TRACE_VMEXIT(1, TYPE_MOV_FROM_CR);
@@ -1782,9 +1795,9 @@ static int vmx_cr_access(unsigned long exit_qualification,
         return vmx_set_cr0(value);
         break;
     default:
-        __hvm_bug(regs);
-        break;
+        BUG();
     }
+
     return 1;
 }
 
@@ -1814,7 +1827,7 @@ static inline void vmx_do_msr_read(struct cpu_user_regs *regs)
         msr_content = vcpu_vlapic(v)->apic_base_msr;
         break;
     default:
-        if (long_mode_do_msr_read(regs))
+        if ( long_mode_do_msr_read(regs) )
             return;
 
         if ( rdmsr_hypervisor_regs(regs->ecx, &eax, &edx) )
@@ -2045,11 +2058,6 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     perfc_incra(vmexits, exit_reason);
 
-    if ( (exit_reason != EXIT_REASON_EXTERNAL_INTERRUPT) &&
-         (exit_reason != EXIT_REASON_VMCALL) &&
-         (exit_reason != EXIT_REASON_IO_INSTRUCTION) )
-        HVM_DBG_LOG(DBG_LEVEL_0, "exit reason = %x", exit_reason);
-
     if ( exit_reason != EXIT_REASON_EXTERNAL_INTERRUPT )
         local_irq_enable();
 
@@ -2077,7 +2085,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         printk("************* VMCS Area **************\n");
         vmcs_dump_vcpu();
         printk("**************************************\n");
-        domain_crash_synchronous();
+        goto exit_and_crash;
     }
 
     TRACE_VMEXIT(0, exit_reason);
@@ -2121,8 +2129,6 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 #else
         case TRAP_debug:
         {
-            void store_cpu_user_regs(struct cpu_user_regs *regs);
-
             if ( test_bit(_DOMF_debugging, &v->domain->domain_flags) )
             {
                 store_cpu_user_regs(regs);
@@ -2193,8 +2199,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         vmx_do_extint(regs);
         break;
     case EXIT_REASON_TRIPLE_FAULT:
-        domain_crash_synchronous();
-        break;
+        goto exit_and_crash;
     case EXIT_REASON_PENDING_INTERRUPT:
         /* Disable the interrupt window. */
         v->arch.hvm_vcpu.u.vmx.exec_control &= ~CPU_BASED_VIRTUAL_INTR_PENDING;
@@ -2202,8 +2207,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
                   v->arch.hvm_vcpu.u.vmx.exec_control);
         break;
     case EXIT_REASON_TASK_SWITCH:
-        domain_crash_synchronous();
-        break;
+        goto exit_and_crash;
     case EXIT_REASON_CPUID:
         inst_len = __get_instruction_length(); /* Safe: CPUID */
         __update_guest_eip(inst_len);
@@ -2268,8 +2272,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     case EXIT_REASON_MWAIT_INSTRUCTION:
     case EXIT_REASON_MONITOR_INSTRUCTION:
     case EXIT_REASON_PAUSE_INSTRUCTION:
-        domain_crash_synchronous();
-        break;
+        goto exit_and_crash;
     case EXIT_REASON_VMCLEAR:
     case EXIT_REASON_VMLAUNCH:
     case EXIT_REASON_VMPTRLD:
@@ -2289,7 +2292,10 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     default:
-        domain_crash_synchronous();     /* should not happen */
+    exit_and_crash:
+        gdprintk(XENLOG_ERR, "Bad vmexit (reason %x)\n", exit_reason);
+        domain_crash(v->domain);
+        break;
     }
 }
 

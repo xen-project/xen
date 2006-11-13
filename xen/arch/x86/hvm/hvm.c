@@ -517,7 +517,8 @@ int hvm_bringup_ap(int vcpuid, int trampoline_vector)
     if ( bsp->vcpu_id != 0 )
     {
         gdprintk(XENLOG_ERR, "Not calling hvm_bringup_ap from BSP context.\n");
-        domain_crash_synchronous();
+        domain_crash(bsp->domain);
+        return -EINVAL;
     }
 
     if ( (v = d->vcpu[vcpuid]) == NULL )

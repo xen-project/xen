@@ -1717,7 +1717,7 @@ int new_guest_cr3(unsigned long mfn)
     unsigned long old_base_mfn;
 
     if ( is_hvm_domain(d) && !hvm_paging_enabled(v) )
-        domain_crash_synchronous();
+        return 0;
 
     if ( shadow_mode_refcounts(d) )
     {
@@ -2134,13 +2134,14 @@ int do_mmuext_op(
 
         default:
             MEM_LOG("Invalid extended pt command 0x%x", op.cmd);
+            rc = -ENOSYS;
             okay = 0;
             break;
         }
 
         if ( unlikely(!okay) )
         {
-            rc = -EINVAL;
+            rc = rc ? rc : -EINVAL;
             break;
         }
 
@@ -2151,9 +2152,11 @@ int do_mmuext_op(
     process_deferred_ops();
 
     /* Add incremental work we have done to the @done output parameter. */
-    done += i;
     if ( unlikely(!guest_handle_is_null(pdone)) )
+    {
+        done += i;
         copy_to_guest(pdone, &done, 1);
+    }
 
     UNLOCK_BIGLOCK(d);
     return rc;
@@ -2351,12 +2354,14 @@ int do_mmu_update(
 
         default:
             MEM_LOG("Invalid page update command %x", cmd);
+            rc = -ENOSYS;
+            okay = 0;
             break;
         }
 
         if ( unlikely(!okay) )
         {
-            rc = -EINVAL;
+            rc = rc ? rc : -EINVAL;
             break;
         }
 
@@ -2370,9 +2375,11 @@ int do_mmu_update(
     process_deferred_ops();
 
     /* Add incremental work we have done to the @done output parameter. */
-    done += i;
     if ( unlikely(!guest_handle_is_null(pdone)) )
+    {
+        done += i;
         copy_to_guest(pdone, &done, 1);
+    }
 
     UNLOCK_BIGLOCK(d);
     return rc;
@@ -3106,7 +3113,7 @@ static int ptwr_emulated_update(
              * zap the PRESENT bit on the assumption the bottom half will be
              * written immediately after we return to the guest.
              */
-            MEM_LOG("ptwr_emulate: fixing up invalid PAE PTE %"PRIpte"\n",
+            MEM_LOG("ptwr_emulate: fixing up invalid PAE PTE %"PRIpte,
                     l1e_get_intpte(nl1e));
             l1e_remove_flags(nl1e, _PAGE_PRESENT);
         }

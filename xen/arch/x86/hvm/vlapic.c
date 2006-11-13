@@ -196,63 +196,56 @@ uint32_t vlapic_get_ppr(struct vlapic *vlapic)
     return ppr;
 }
 
-/* This only for fixed delivery mode */
+int vlapic_match_logical_addr(struct vlapic *vlapic, uint8_t mda)
+{
+    int result = 0;
+    uint8_t logical_id;
+
+    logical_id = GET_APIC_LOGICAL_ID(vlapic_get_reg(vlapic, APIC_LDR));
+
+    switch ( vlapic_get_reg(vlapic, APIC_DFR) )
+    {
+    case APIC_DFR_FLAT:
+        if ( logical_id & mda )
+            result = 1;
+        break;
+    case APIC_DFR_CLUSTER:
+        if ( ((logical_id >> 4) == (mda >> 0x4)) && (logical_id & mda & 0xf) )
+            result = 1;
+        break;
+    default:
+        gdprintk(XENLOG_WARNING, "Bad DFR value for lapic of vcpu %d\n",
+                 vlapic_vcpu(vlapic)->vcpu_id);
+        break;
+    }
+
+    return result;
+}
+
 static int vlapic_match_dest(struct vcpu *v, struct vlapic *source,
-                             int short_hand, int dest, int dest_mode,
-                             int delivery_mode)
+                             int short_hand, int dest, int dest_mode)
 {
     int result = 0;
     struct vlapic *target = vcpu_vlapic(v);
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "target %p, source %p, dest 0x%x, "
-                "dest_mode 0x%x, short_hand 0x%x, delivery_mode 0x%x.",
-                target, source, dest, dest_mode, short_hand, delivery_mode);
-
-    if ( unlikely(target == NULL) &&
-         ((delivery_mode != APIC_DM_INIT) &&
-          (delivery_mode != APIC_DM_STARTUP) &&
-          (delivery_mode != APIC_DM_NMI)) )
-    {
-        HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "uninitialized target vcpu %p, "
-                    "delivery_mode 0x%x, dest 0x%x.\n",
-                    v, delivery_mode, dest);
-        return result;
-    }
+                "dest_mode 0x%x, short_hand 0x%x\n",
+                target, source, dest, dest_mode, short_hand);
 
     switch ( short_hand )
     {
-    case APIC_DEST_NOSHORT:             /* no shorthand */
-        if ( !dest_mode )   /* Physical */
+    case APIC_DEST_NOSHORT:
+        if ( dest_mode == 0 )
         {
-            result = ( ((target != NULL) ?
-                         GET_APIC_ID(vlapic_get_reg(target, APIC_ID)):
-                         v->vcpu_id)) == dest;
+            /* Physical mode. */
+            if ( (dest == 0xFF) || /* broadcast? */
+                 (GET_APIC_ID(vlapic_get_reg(target, APIC_ID)) == dest) )
+                result = 1;
         }
-        else                /* Logical */
+        else
         {
-            uint32_t ldr;
-            if ( target == NULL )
-                break;
-            ldr = vlapic_get_reg(target, APIC_LDR);
-            
-            /* Flat mode */
-            if ( vlapic_get_reg(target, APIC_DFR) == APIC_DFR_FLAT )
-            {
-                result = GET_APIC_LOGICAL_ID(ldr) & dest;
-            }
-            else
-            {
-                if ( (delivery_mode == APIC_DM_LOWEST) &&
-                     (dest == 0xff) )
-                {
-                    /* What shall we do now? */
-                    gdprintk(XENLOG_ERR, "Broadcast IPI with lowest priority "
-                             "delivery mode\n");
-                    domain_crash_synchronous();
-                }
-                result = ((GET_APIC_LOGICAL_ID(ldr) == (dest & 0xf)) ?
-                          (GET_APIC_LOGICAL_ID(ldr) >> 4) & (dest >> 4) : 0);
-            }
+            /* Logical mode. */
+            result = vlapic_match_logical_addr(target, dest);
         }
         break;
 
@@ -271,16 +264,14 @@ static int vlapic_match_dest(struct vcpu *v, struct vlapic *source,
         break;
 
     default:
+        gdprintk(XENLOG_WARNING, "Bad dest shorthand value %x\n", short_hand);
         break;
     }
 
     return result;
 }
 
-/*
- * Add a pending IRQ into lapic.
- * Return 1 if successfully added and 0 if discarded.
- */
+/* Add a pending IRQ into lapic. */
 static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
                              int vector, int level, int trig_mode)
 {
@@ -331,7 +322,7 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
         if ( test_and_clear_bit(_VCPUF_initialised, &v->vcpu_flags) )
         {
             gdprintk(XENLOG_ERR, "Reset hvm vcpu not supported yet\n");
-            domain_crash_synchronous();
+            goto exit_and_crash;
         }
         v->arch.hvm_vcpu.init_sipi_sipi_state =
             HVM_VCPU_INIT_SIPI_SIPI_STATE_WAIT_SIPI;
@@ -349,7 +340,7 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
         if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
         {
             gdprintk(XENLOG_ERR, "SIPI for initialized vcpu %x\n", v->vcpu_id);
-            domain_crash_synchronous();
+            goto exit_and_crash;
         }
 
         if ( hvm_bringup_ap(v->vcpu_id, vector) != 0 )
@@ -359,11 +350,14 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
     default:
         gdprintk(XENLOG_ERR, "TODO: unsupported delivery mode %x\n",
                  delivery_mode);
-        domain_crash_synchronous();
-        break;
+        goto exit_and_crash;
     }
 
     return result;
+
+ exit_and_crash:
+    domain_crash(v->domain);
+    return 0;
 }
 
 /* This function is used by both ioapic and lapic.The bitmap is for vcpu_id. */
@@ -440,10 +434,9 @@ static void vlapic_ipi(struct vlapic *vlapic)
 
     for_each_vcpu ( vlapic_domain(vlapic), v )
     {
-        if ( vlapic_match_dest(v, vlapic, short_hand,
-                               dest, dest_mode, delivery_mode) )
+        if ( vlapic_match_dest(v, vlapic, short_hand, dest, dest_mode) )
         {
-            if ( delivery_mode == APIC_DM_LOWEST)
+            if ( delivery_mode == APIC_DM_LOWEST )
                 set_bit(v->vcpu_id, &lpr_map);
             else
                 vlapic_accept_irq(v, delivery_mode,
@@ -578,14 +571,17 @@ static unsigned long vlapic_read(struct vcpu *v, unsigned long address,
     default:
         gdprintk(XENLOG_ERR, "Local APIC read with len=0x%lx, "
                  "should be 4 instead.\n", len);
-        domain_crash_synchronous();
-        break;
+        goto exit_and_crash;
     }
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "offset 0x%x with length 0x%lx, "
                 "and the result is 0x%lx.", offset, len, result);
 
     return result;
+
+ exit_and_crash:
+    domain_crash(v->domain);
+    return 0;
 }
 
 static void vlapic_write(struct vcpu *v, unsigned long address,
@@ -625,7 +621,7 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
             {
                 gdprintk(XENLOG_ERR, "Uneven alignment error for "
                          "2-byte vlapic access\n");
-                domain_crash_synchronous();
+                goto exit_and_crash;
             }
 
             val = (tmp & ~(0xffff << (8*alignment))) |
@@ -635,8 +631,9 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
         default:
             gdprintk(XENLOG_ERR, "Local APIC write with len = %lx, "
                      "should be 4 instead\n", len);
-            domain_crash_synchronous();
-            break;
+        exit_and_crash:
+            domain_crash(v->domain);
+            return;
         }
     }
 

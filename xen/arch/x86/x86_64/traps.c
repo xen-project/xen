@@ -200,7 +200,7 @@ unsigned long do_iret(void)
     {
         gdprintk(XENLOG_ERR, "Fault while reading IRET context from "
                 "guest stack\n");
-        domain_crash_synchronous();
+        goto exit_and_crash;
     }
 
     /* Returning to user mode? */
@@ -210,7 +210,7 @@ unsigned long do_iret(void)
         {
             gdprintk(XENLOG_ERR, "Guest switching to user mode with no "
                     "user page tables\n");
-            domain_crash_synchronous();
+            goto exit_and_crash;
         }
         toggle_guest_mode(v);
     }
@@ -236,6 +236,11 @@ unsigned long do_iret(void)
 
     /* Saved %rax gets written back to regs->rax in entry.S. */
     return iret_saved.rax;
+
+ exit_and_crash:
+    gdprintk(XENLOG_ERR, "Fatal error\n");
+    domain_crash(v->domain);
+    return 0;
 }
 
 asmlinkage void syscall_enter(void);
@@ -285,9 +290,9 @@ void __init percpu_traps_init(void)
     stack[14] = 0x41;
     stack[15] = 0x53;
 
-    /* pushq $__GUEST_CS64 */
+    /* pushq $FLAT_KERNEL_CS64 */
     stack[16] = 0x68;
-    *(u32 *)&stack[17] = __GUEST_CS64;
+    *(u32 *)&stack[17] = FLAT_KERNEL_CS64;
 
     /* jmp syscall_enter */
     stack[21] = 0xe9;
@@ -317,9 +322,9 @@ void __init percpu_traps_init(void)
     stack[14] = 0x41;
     stack[15] = 0x53;
 
-    /* pushq $__GUEST_CS32 */
+    /* pushq $FLAT_KERNEL_CS32 */
     stack[16] = 0x68;
-    *(u32 *)&stack[17] = __GUEST_CS32;
+    *(u32 *)&stack[17] = FLAT_KERNEL_CS32;
 
     /* jmp syscall_enter */
     stack[21] = 0xe9;
@@ -369,7 +374,7 @@ static long register_guest_callback(struct callback_register *reg)
         break;
 
     default:
-        ret = -EINVAL;
+        ret = -ENOSYS;
         break;
     }
 
@@ -382,12 +387,18 @@ static long unregister_guest_callback(struct callback_unregister *unreg)
 
     switch ( unreg->type )
     {
+    case CALLBACKTYPE_event:
+    case CALLBACKTYPE_failsafe:
+    case CALLBACKTYPE_syscall:
+        ret = -EINVAL;
+        break;
+
     case CALLBACKTYPE_nmi:
         ret = unregister_guest_nmi_callback();
         break;
 
     default:
-        ret = -EINVAL;
+        ret = -ENOSYS;
         break;
     }
 
@@ -426,7 +437,7 @@ long do_callback_op(int cmd, XEN_GUEST_HANDLE(void) arg)
     break;
 
     default:
-        ret = -EINVAL;
+        ret = -ENOSYS;
         break;
     }
 

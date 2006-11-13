@@ -102,8 +102,11 @@ static void set_pte_pfn(unsigned long vaddr, unsigned long pfn, pgprot_t flags)
 		return;
 	}
 	pte = pte_offset_kernel(pmd, vaddr);
-	/* <pfn,flags> stored as-is, to permit clearing entries */
-	set_pte(pte, pfn_pte(pfn, flags));
+	if (pgprot_val(flags))
+		/* <pfn,flags> stored as-is, to permit clearing entries */
+		set_pte(pte, pfn_pte(pfn, flags));
+	else
+		pte_clear(&init_mm, vaddr, pte);
 
 	/*
 	 * It's enough to flush this one mapping.
@@ -140,8 +143,11 @@ static void set_pte_pfn_ma(unsigned long vaddr, unsigned long pfn,
 		return;
 	}
 	pte = pte_offset_kernel(pmd, vaddr);
-	/* <pfn,flags> stored as-is, to permit clearing entries */
-	set_pte(pte, pfn_pte_ma(pfn, flags));
+	if (pgprot_val(flags))
+		/* <pfn,flags> stored as-is, to permit clearing entries */
+		set_pte(pte, pfn_pte_ma(pfn, flags));
+	else
+		pte_clear(&init_mm, vaddr, pte);
 
 	/*
 	 * It's enough to flush this one mapping.
@@ -186,8 +192,15 @@ void set_pmd_pfn(unsigned long vaddr, unsigned long pfn, pgprot_t flags)
 }
 
 static int nr_fixmaps = 0;
+unsigned long hypervisor_virt_start = HYPERVISOR_VIRT_START;
 unsigned long __FIXADDR_TOP = (HYPERVISOR_VIRT_START - 2 * PAGE_SIZE);
 EXPORT_SYMBOL(__FIXADDR_TOP);
+
+void __init set_fixaddr_top()
+{
+	BUG_ON(nr_fixmaps > 0);
+	__FIXADDR_TOP = hypervisor_virt_start - 2 * PAGE_SIZE;
+}
 
 void __set_fixmap (enum fixed_addresses idx, maddr_t phys, pgprot_t flags)
 {
@@ -209,12 +222,6 @@ void __set_fixmap (enum fixed_addresses idx, maddr_t phys, pgprot_t flags)
 		break;
 	}
 	nr_fixmaps++;
-}
-
-void set_fixaddr_top(unsigned long top)
-{
-	BUG_ON(nr_fixmaps > 0);
-	__FIXADDR_TOP = top - PAGE_SIZE;
 }
 
 pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)

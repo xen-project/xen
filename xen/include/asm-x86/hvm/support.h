@@ -118,13 +118,6 @@ extern unsigned int opt_hvm_debug_level;
 #define HVM_DBG_LOG(level, _f, _a...)
 #endif
 
-#define  __hvm_bug(regs)                                        \
-    do {                                                        \
-        printk("__hvm_bug at %s:%d\n", __FILE__, __LINE__);     \
-        show_execution_state(regs);                             \
-        domain_crash_synchronous();                             \
-    } while (0)
-
 #define TRACE_VMEXIT(index, value)                              \
     current->arch.hvm_vcpu.hvm_trace_values[index] = (value)
 

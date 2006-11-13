@@ -135,7 +135,7 @@ long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
     }
 
     default:
-        ret = -EINVAL;
+        ret = -ENOSYS;
         break;
     }
 
