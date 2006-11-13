@@ -398,8 +398,16 @@ void pci_piix4_acpi_init(PCIBus *bus, int devfn)
     pci_conf[0x0e] = 0x00;
     pci_conf[0x3d] = 0x01;  /* Hardwired to PIRQA is used */
 
-    pci_register_io_region((PCIDevice *)d, 4, 0x10,
-                           PCI_ADDRESS_SPACE_IO, acpi_map);
 
+    /* PMBA POWER MANAGEMENT BASE ADDRESS, hardcoded to 0x1f40 
+     * to make shutdown work for IPF, due to IPF Guest Firmware 
+     * will enumerate pci devices. 
+     *
+     * TODO:  if Guest Firmware or Guest OS will change this PMBA,
+     * More logic will be added.
+     */
+    pci_conf[0x40] = 0x41;
+    pci_conf[0x41] = 0x1f;
+    acpi_map(d, 0, 0x1f40, 0x10, PCI_ADDRESS_SPACE_IO);
     acpi_reset(d);
 }
