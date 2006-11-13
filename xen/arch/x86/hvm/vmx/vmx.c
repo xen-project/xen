@@ -1814,7 +1814,7 @@ static inline void vmx_do_msr_read(struct cpu_user_regs *regs)
         msr_content = vcpu_vlapic(v)->apic_base_msr;
         break;
     default:
-        if (long_mode_do_msr_read(regs))
+        if ( long_mode_do_msr_read(regs) )
             return;
 
         if ( rdmsr_hypervisor_regs(regs->ecx, &eax, &edx) )
@@ -2045,11 +2045,6 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     perfc_incra(vmexits, exit_reason);
 
-    if ( (exit_reason != EXIT_REASON_EXTERNAL_INTERRUPT) &&
-         (exit_reason != EXIT_REASON_VMCALL) &&
-         (exit_reason != EXIT_REASON_IO_INSTRUCTION) )
-        HVM_DBG_LOG(DBG_LEVEL_0, "exit reason = %x", exit_reason);
-
     if ( exit_reason != EXIT_REASON_EXTERNAL_INTERRUPT )
         local_irq_enable();
 
@@ -2121,8 +2116,6 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 #else
         case TRAP_debug:
         {
-            void store_cpu_user_regs(struct cpu_user_regs *regs);
-
             if ( test_bit(_DOMF_debugging, &v->domain->domain_flags) )
             {
                 store_cpu_user_regs(regs);
