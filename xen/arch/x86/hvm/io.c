@@ -81,9 +81,7 @@ static void set_reg_value (int size, int index, int seg, struct cpu_user_regs *r
             regs->ebx |= ((value & 0xFF) << 8);
             break;
         default:
-            printk("Error: size:%x, index:%x are invalid!\n", size, index);
-            domain_crash_synchronous();
-            break;
+            goto crash;
         }
         break;
     case WORD:
@@ -121,9 +119,7 @@ static void set_reg_value (int size, int index, int seg, struct cpu_user_regs *r
             regs->edi |= (value & 0xFFFF);
             break;
         default:
-            printk("Error: size:%x, index:%x are invalid!\n", size, index);
-            domain_crash_synchronous();
-            break;
+            goto crash;
         }
         break;
     case LONG:
@@ -153,15 +149,13 @@ static void set_reg_value (int size, int index, int seg, struct cpu_user_regs *r
             regs->edi = value;
             break;
         default:
-            printk("Error: size:%x, index:%x are invalid!\n", size, index);
-            domain_crash_synchronous();
-            break;
+            goto crash;
         }
         break;
     default:
-        printk("Error: size:%x, index:%x are invalid!\n", size, index);
+    crash:
+        gdprintk(XENLOG_ERR, "size:%x, index:%x are invalid!\n", size, index);
         domain_crash_synchronous();
-        break;
     }
 }
 #else
@@ -184,7 +178,7 @@ static inline void __set_reg_value(unsigned long *reg, int size, long value)
         *reg = value;
         break;
     default:
-        printk("Error: <__set_reg_value>: size:%x is invalid\n", size);
+        gdprintk(XENLOG_ERR, "size:%x is invalid\n", size);
         domain_crash_synchronous();
     }
 }
@@ -226,7 +220,8 @@ static void set_reg_value (int size, int index, int seg, struct cpu_user_regs *r
             regs->rbx |= ((value & 0xFF) << 8);
             break;
         default:
-            printk("Error: size:%x, index:%x are invalid!\n", size, index);
+            gdprintk(XENLOG_ERR, "size:%x, index:%x are invalid!\n",
+                     size, index);
             domain_crash_synchronous();
             break;
         }
@@ -283,7 +278,7 @@ static void set_reg_value (int size, int index, int seg, struct cpu_user_regs *r
         __set_reg_value(&regs->r15, size, value);
         break;
     default:
-        printk("Error: <set_reg_value> Invalid index\n");
+        gdprintk(XENLOG_ERR, "Invalid index\n");
         domain_crash_synchronous();
     }
     return;

@@ -253,11 +253,7 @@ int register_io_handler(
     struct hvm_io_handler *handler = &d->arch.hvm_domain.io_handler;
     int num = handler->num_slot;
 
-    if ( num >= MAX_IO_HANDLER )
-    {
-        printk("no extra space, register io interceptor failed!\n");
-        domain_crash_synchronous();
-    }
+    BUG_ON(num >= MAX_IO_HANDLER);
 
     handler->hdl_list[num].addr = addr;
     handler->hdl_list[num].size = size;

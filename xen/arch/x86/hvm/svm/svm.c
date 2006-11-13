@@ -326,14 +326,14 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
 static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 {
     u64 msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
-    struct vcpu *vc = current;
-    struct vmcb_struct *vmcb = vc->arch.hvm_svm.vmcb;
+    struct vcpu *v = current;
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
     HVM_DBG_LOG(DBG_LEVEL_1, "mode_do_msr_write msr %lx "
                 "msr_content %"PRIx64"\n", 
                 (unsigned long)regs->ecx, msr_content);
 
-    switch (regs->ecx)
+    switch ( regs->ecx )
     {
     case MSR_EFER:
 #ifdef __x86_64__
@@ -342,24 +342,24 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
         {
             printk("Trying to set reserved bit in EFER: %"PRIx64"\n",
                    msr_content);
-            svm_inject_exception(vc, TRAP_gp_fault, 1, 0);
+            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
             return 0;
         }
 
         /* LME: 0 -> 1 */
         if ( msr_content & EFER_LME &&
-             !test_bit(SVM_CPU_STATE_LME_ENABLED, &vc->arch.hvm_svm.cpu_state))
+             !test_bit(SVM_CPU_STATE_LME_ENABLED, &v->arch.hvm_svm.cpu_state))
         {
-            if ( svm_paging_enabled(vc) ||
+            if ( svm_paging_enabled(v) ||
                  !test_bit(SVM_CPU_STATE_PAE_ENABLED,
-                           &vc->arch.hvm_svm.cpu_state) )
+                           &v->arch.hvm_svm.cpu_state) )
             {
                 printk("Trying to set LME bit when "
                        "in paging mode or PAE bit is not set\n");
-                svm_inject_exception(vc, TRAP_gp_fault, 1, 0);
+                svm_inject_exception(v, TRAP_gp_fault, 1, 0);
                 return 0;
             }
-            set_bit(SVM_CPU_STATE_LME_ENABLED, &vc->arch.hvm_svm.cpu_state);
+            set_bit(SVM_CPU_STATE_LME_ENABLED, &v->arch.hvm_svm.cpu_state);
         }
 
         /* We have already recorded that we want LME, so it will be set 
@@ -374,13 +374,13 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 
     case MSR_FS_BASE:
     case MSR_GS_BASE:
-        if ( !svm_long_mode_enabled(vc) )
-            domain_crash_synchronous();
+        if ( !svm_long_mode_enabled(v) )
+            goto exit_and_crash;
 
         if (!IS_CANO_ADDRESS(msr_content))
         {
             HVM_DBG_LOG(DBG_LEVEL_1, "Not cano address of msr write\n");
-            svm_inject_exception(vc, TRAP_gp_fault, 1, 0);
+            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
         }
 
         if (regs->ecx == MSR_FS_BASE)
@@ -412,7 +412,13 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     default:
         return 0;
     }
+
     return 1;
+
+ exit_and_crash:
+    gdprintk(XENLOG_ERR, "Fatal error writing MSR %lx\n", (long)regs->ecx);
+    domain_crash(v->domain);
+    return 1; /* handled */
 }
 
 
@@ -420,7 +426,6 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     __asm__ __volatile__ ("mov %0,%%db" #_reg : : "r" ((_v)->debugreg[_reg]))
 #define savedebug(_v,_reg) \
     __asm__ __volatile__ ("mov %%db" #_reg ",%0" : : "r" ((_v)->debugreg[_reg]))
-
 
 static inline void svm_save_dr(struct vcpu *v)
 {
@@ -938,7 +943,8 @@ static void svm_do_general_protection_fault(struct vcpu *v,
         svm_dump_vmcb(__func__, vmcb);
         svm_dump_regs(__func__, regs);
         svm_dump_inst(vmcb->rip);
-        __hvm_bug(regs);
+        domain_crash(v->domain);
+        return;
     }
 
     HVM_DBG_LOG(DBG_LEVEL_1,
@@ -1169,8 +1175,9 @@ static void svm_get_prefix_info(
     if (inst_copy_from_guest(inst, svm_rip2pointer(vmcb), sizeof(inst)) 
         != MAX_INST_LEN) 
     {
-        printk("%s: get guest instruction failed\n", __func__);
-        domain_crash_synchronous();
+        gdprintk(XENLOG_ERR, "get guest instruction failed\n");
+        domain_crash(current->domain);
+        return;
     }
 
     for (i = 0; i < MAX_INST_LEN; i++)
@@ -1266,9 +1273,7 @@ static inline int svm_get_io_address(
         isize --;
 
     if (isize > 1) 
-    {
         svm_get_prefix_info(vmcb, dir, &seg, &asize);
-    }
 
     ASSERT(dir == IOREQ_READ || dir == IOREQ_WRITE);
 
@@ -1470,8 +1475,10 @@ static int svm_set_cr0(unsigned long value)
         mfn = get_mfn_from_gpfn(v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT);
         if ( !VALID_MFN(mfn) || !get_page(mfn_to_page(mfn), v->domain))
         {
-            printk("Invalid CR3 value = %lx\n", v->arch.hvm_svm.cpu_cr3);
-            domain_crash_synchronous(); /* need to take a clean path */
+            gdprintk(XENLOG_ERR, "Invalid CR3 value = %lx (mfn=%lx)\n", 
+                     v->arch.hvm_svm.cpu_cr3, mfn);
+            domain_crash(v->domain);
+            return 0;
         }
 
 #if defined(__x86_64__)
@@ -1556,7 +1563,7 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
     vmcb = v->arch.hvm_svm.vmcb;
     ASSERT(vmcb);
 
-    switch (cr)
+    switch ( cr )
     {
     case 0:
         value = v->arch.hvm_svm.cpu_shadow_cr0;
@@ -1582,7 +1589,8 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
         break;
         
     default:
-        __hvm_bug(regs);
+        domain_crash(v->domain);
+        return;
     }
 
     set_reg(gp, value, regs, vmcb);
@@ -1602,13 +1610,10 @@ static inline int svm_pgbit_test(struct vcpu *v)
  */
 static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
 {
-    unsigned long value;
-    unsigned long old_cr;
+    unsigned long value, old_cr, old_base_mfn, mfn;
     struct vcpu *v = current;
     struct vlapic *vlapic = vcpu_vlapic(v);
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-
-    ASSERT(vmcb);
 
     value = get_reg(gpreg, regs, vmcb);
 
@@ -1623,8 +1628,6 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
         return svm_set_cr0(value);
 
     case 3: 
-    {
-        unsigned long old_base_mfn, mfn;
         if (svm_dbg_on)
             printk("CR3 write =%lx \n", value );
         /* If paging is not enabled yet, simply copy the value to CR3. */
@@ -1644,7 +1647,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
              */
             mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
             if (mfn != pagetable_get_pfn(v->arch.guest_table))
-                __hvm_bug(regs);
+                goto bad_cr3;
             shadow_update_cr3(v);
         }
         else 
@@ -1656,10 +1659,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
             HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 value = %lx", value);
             mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
             if ( !VALID_MFN(mfn) || !get_page(mfn_to_page(mfn), v->domain))
-            {
-                printk("Invalid CR3 value=%lx\n", value);
-                domain_crash_synchronous(); /* need to take a clean path */
-            }
+                goto bad_cr3;
 
             old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
             v->arch.guest_table = pagetable_from_pfn(mfn);
@@ -1673,10 +1673,8 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
             HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx", value);
         }
         break;
-    }
 
     case 4: /* CR4 */
-    {
         if (svm_dbg_on)
             printk( "write cr4=%lx, cr0=%lx\n", 
                     value,  v->arch.hvm_svm.cpu_shadow_cr0 );
@@ -1692,10 +1690,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
                 mfn = get_mfn_from_gpfn(v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT);
                 if ( !VALID_MFN(mfn) || 
                      !get_page(mfn_to_page(mfn), v->domain) )
-                {
-                    printk("Invalid CR3 value = %lx", v->arch.hvm_svm.cpu_cr3);
-                    domain_crash_synchronous(); /* need to take a clean path */
-                }
+                    goto bad_cr3;
 
                 /*
                  * Now arch.guest_table points to machine physical.
@@ -1741,20 +1736,23 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
             shadow_update_paging_modes(v);
         }
         break;
-    }
 
     case 8:
-    {
         vlapic_set_reg(vlapic, APIC_TASKPRI, ((value & 0x0F) << 4));
         break;
-    }
 
     default:
-        printk("invalid cr: %d\n", cr);
-        __hvm_bug(regs);
+        gdprintk(XENLOG_ERR, "invalid cr: %d\n", cr);
+        domain_crash(v->domain);
+        return 0;
     }
 
     return 1;
+
+ bad_cr3:
+    gdprintk(XENLOG_ERR, "Invalid CR3\n");
+    domain_crash(v->domain);
+    return 0;
 }
 
 
@@ -1857,8 +1855,7 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
         break;
 
     default:
-        __hvm_bug(regs);
-        break;
+        BUG();
     }
 
     ASSERT(inst_len);
@@ -2037,16 +2034,15 @@ void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
     int inst_len;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    ASSERT(vmcb);
     /* 
      * Unknown how many bytes the invlpg instruction will take.  Use the
      * maximum instruction length here
      */
     if (inst_copy_from_guest(opcode, svm_rip2pointer(vmcb), length) < length)
     {
-        printk("svm_handle_invlpg (): Error reading memory %d bytes\n", 
-               length);
-        __hvm_bug(regs);
+        gdprintk(XENLOG_ERR, "Error reading memory %d bytes\n", length);
+        domain_crash(v->domain);
+        return;
     }
 
     if (invlpga)
@@ -2510,7 +2506,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     if (exit_reason == VMEXIT_INVALID)
     {
         svm_dump_vmcb(__func__, vmcb);
-        domain_crash_synchronous();
+        goto exit_and_crash;
     }
 
 #ifdef SVM_EXTRA_DEBUG
@@ -2734,8 +2730,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case VMEXIT_TASK_SWITCH:
-        __hvm_bug(regs);
-        break;
+        goto exit_and_crash;
 
     case VMEXIT_CPUID:
         svm_vmexit_do_cpuid(vmcb, regs->eax, regs);
@@ -2811,15 +2806,16 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case VMEXIT_SHUTDOWN:
-        printk("Guest shutdown exit\n");
-        domain_crash_synchronous();
-        break;
+        gdprintk(XENLOG_ERR, "Guest shutdown exit\n");
+        goto exit_and_crash;
 
     default:
-        printk("unexpected VMEXIT: exit reason = 0x%x, exitinfo1 = %"PRIx64", "
-               "exitinfo2 = %"PRIx64"\n", exit_reason, 
-               (u64)vmcb->exitinfo1, (u64)vmcb->exitinfo2);
-        __hvm_bug(regs);       /* should not happen */
+    exit_and_crash:
+        gdprintk(XENLOG_ERR, "unexpected VMEXIT: exit reason = 0x%x, "
+                 "exitinfo1 = %"PRIx64", exitinfo2 = %"PRIx64"\n",
+                 exit_reason, 
+                 (u64)vmcb->exitinfo1, (u64)vmcb->exitinfo2);
+        domain_crash(v->domain);
         break;
     }
 
@@ -2840,8 +2836,6 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         printk("svm_vmexit_handler: Returning\n");
     }
 #endif
-
-    return;
 }
 
 asmlinkage void svm_load_cr2(void)

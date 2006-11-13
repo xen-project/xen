@@ -200,7 +200,7 @@ unsigned long do_iret(void)
     {
         gdprintk(XENLOG_ERR, "Fault while reading IRET context from "
                 "guest stack\n");
-        domain_crash_synchronous();
+        goto exit_and_crash;
     }
 
     /* Returning to user mode? */
@@ -210,7 +210,7 @@ unsigned long do_iret(void)
         {
             gdprintk(XENLOG_ERR, "Guest switching to user mode with no "
                     "user page tables\n");
-            domain_crash_synchronous();
+            goto exit_and_crash;
         }
         toggle_guest_mode(v);
     }
@@ -236,6 +236,11 @@ unsigned long do_iret(void)
 
     /* Saved %rax gets written back to regs->rax in entry.S. */
     return iret_saved.rax;
+
+ exit_and_crash:
+    gdprintk(XENLOG_ERR, "Fatal error\n");
+    domain_crash(v->domain);
+    return 0;
 }
 
 asmlinkage void syscall_enter(void);

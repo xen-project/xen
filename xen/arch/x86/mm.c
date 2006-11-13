@@ -1717,7 +1717,7 @@ int new_guest_cr3(unsigned long mfn)
     unsigned long old_base_mfn;
 
     if ( is_hvm_domain(d) && !hvm_paging_enabled(v) )
-        domain_crash_synchronous();
+        return 0;
 
     if ( shadow_mode_refcounts(d) )
     {

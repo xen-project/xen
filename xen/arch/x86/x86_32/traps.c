@@ -179,16 +179,16 @@ unsigned long do_iret(void)
 
     /* Check worst-case stack frame for overlap with Xen protected area. */
     if ( unlikely(!access_ok(regs->esp, 40)) )
-        domain_crash_synchronous();
+        goto exit_and_crash;
 
     /* Pop and restore EAX (clobbered by hypercall). */
     if ( unlikely(__copy_from_user(&regs->eax, (void __user *)regs->esp, 4)) )
-        domain_crash_synchronous();
+        goto exit_and_crash;
     regs->esp += 4;
 
     /* Pop and restore CS and EIP. */
     if ( unlikely(__copy_from_user(&regs->eip, (void __user *)regs->esp, 8)) )
-        domain_crash_synchronous();
+        goto exit_and_crash;
     regs->esp += 8;
 
     /*
@@ -196,7 +196,7 @@ unsigned long do_iret(void)
      * to avoid firing the BUG_ON(IOPL) check in arch_getdomaininfo_ctxt.
      */
     if ( unlikely(__copy_from_user(&eflags, (void __user *)regs->esp, 4)) )
-        domain_crash_synchronous();
+        goto exit_and_crash;
     regs->esp += 4;
     regs->eflags = (eflags & ~X86_EFLAGS_IOPL) | X86_EFLAGS_IF;
 
@@ -204,17 +204,17 @@ unsigned long do_iret(void)
     {
         /* Return to VM86 mode: pop and restore ESP,SS,ES,DS,FS and GS. */
         if ( __copy_from_user(&regs->esp, (void __user *)regs->esp, 24) )
-            domain_crash_synchronous();
+            goto exit_and_crash;
     }
     else if ( unlikely(ring_0(regs)) )
     {
-        domain_crash_synchronous();
+        goto exit_and_crash;
     }
     else if ( !ring_1(regs) )
     {
         /* Return to ring 2/3: pop and restore ESP and SS. */
         if ( __copy_from_user(&regs->esp, (void __user *)regs->esp, 8) )
-            domain_crash_synchronous();
+            goto exit_and_crash;
     }
 
     /* No longer in NMI context. */
@@ -228,6 +228,11 @@ unsigned long do_iret(void)
      * value.
      */
     return regs->eax;
+
+ exit_and_crash:
+    gdprintk(XENLOG_ERR, "Fatal error\n");
+    domain_crash(current->domain);
+    return 0;
 }
 
 #include <asm/asm_defns.h>
