@@ -406,7 +406,7 @@ void pci_piix4_acpi_init(PCIBus *bus, int devfn)
      * TODO:  if Guest Firmware or Guest OS will change this PMBA,
      * More logic will be added.
      */
-    pci_conf[0x40] = 0x41;
+    pci_conf[0x40] = 0x41; /* Special device-specific BAR at 0x40 */
     pci_conf[0x41] = 0x1f;
     acpi_map(d, 0, 0x1f40, 0x10, PCI_ADDRESS_SPACE_IO);
     acpi_reset(d);
