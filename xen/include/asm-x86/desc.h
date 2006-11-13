@@ -155,16 +155,11 @@ __asm__ __volatile__ ("movw %w3,0(%2)\n\t" \
 #endif
 
 extern struct desc_struct gdt_table[];
-extern struct desc_struct *gdt;
-extern idt_entry_t        *idt;
 
 struct Xgt_desc_struct {
     unsigned short size;
     unsigned long address __attribute__((packed));
 };
-
-#define idt_descr (*(struct Xgt_desc_struct *)((char *)&idt - 2))
-#define gdt_descr (*(struct Xgt_desc_struct *)((char *)&gdt - 2))
 
 extern void set_intr_gate(unsigned int irq, void * addr);
 extern void set_system_gate(unsigned int n, void *addr);

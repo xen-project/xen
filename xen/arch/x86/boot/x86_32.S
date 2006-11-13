@@ -196,21 +196,16 @@ ENTRY(stack_start)
         
 /*** DESCRIPTOR TABLES ***/
 
-.globl idt
-.globl gdt        
-
         ALIGN
         
         .word   0    
 idt_descr:
         .word   256*8-1
-idt:
         .long   idt_table
 
         .word   0
 gdt_descr:
         .word   LAST_RESERVED_GDT_BYTE
-gdt:
         .long   gdt_table - FIRST_RESERVED_GDT_BYTE
 
         .word   0

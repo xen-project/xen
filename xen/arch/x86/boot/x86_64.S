@@ -192,9 +192,6 @@ ignore_int:
 
 /*** DESCRIPTOR TABLES ***/
 
-.globl idt
-.globl gdt        
-
         .align 8, 0xCC
 multiboot_ptr:
         .long   0
@@ -210,13 +207,11 @@ cpuid_ext_features:
         .word   0
 gdt_descr:
         .word   LAST_RESERVED_GDT_BYTE
-gdt:
         .quad   gdt_table - FIRST_RESERVED_GDT_BYTE
 
         .word   0,0,0
 idt_descr:
         .word   256*16-1
-idt:
         .quad   idt_table
 
 ENTRY(stack_start)
