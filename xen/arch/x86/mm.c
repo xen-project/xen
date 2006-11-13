@@ -2134,13 +2134,14 @@ int do_mmuext_op(
 
         default:
             MEM_LOG("Invalid extended pt command 0x%x", op.cmd);
+            rc = -ENOSYS;
             okay = 0;
             break;
         }
 
         if ( unlikely(!okay) )
         {
-            rc = -EINVAL;
+            rc = rc ? rc : -EINVAL;
             break;
         }
 
@@ -2151,9 +2152,11 @@ int do_mmuext_op(
     process_deferred_ops();
 
     /* Add incremental work we have done to the @done output parameter. */
-    done += i;
     if ( unlikely(!guest_handle_is_null(pdone)) )
+    {
+        done += i;
         copy_to_guest(pdone, &done, 1);
+    }
 
     UNLOCK_BIGLOCK(d);
     return rc;
@@ -2351,12 +2354,14 @@ int do_mmu_update(
 
         default:
             MEM_LOG("Invalid page update command %x", cmd);
+            rc = -ENOSYS;
+            okay = 0;
             break;
         }
 
         if ( unlikely(!okay) )
         {
-            rc = -EINVAL;
+            rc = rc ? rc : -EINVAL;
             break;
         }
 
@@ -2370,9 +2375,11 @@ int do_mmu_update(
     process_deferred_ops();
 
     /* Add incremental work we have done to the @done output parameter. */
-    done += i;
     if ( unlikely(!guest_handle_is_null(pdone)) )
+    {
+        done += i;
         copy_to_guest(pdone, &done, 1);
+    }
 
     UNLOCK_BIGLOCK(d);
     return rc;

@@ -684,7 +684,7 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
         break;
 
     default:
-        ret = -EINVAL;
+        ret = -ENOSYS;
     }
 
     spin_unlock(&xenoprof_lock);

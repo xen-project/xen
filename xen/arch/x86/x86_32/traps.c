@@ -360,7 +360,7 @@ static long register_guest_callback(struct callback_register *reg)
         break;
 
     default:
-        ret = -EINVAL;
+        ret = -ENOSYS;
         break;
     }
 
@@ -373,12 +373,20 @@ static long unregister_guest_callback(struct callback_unregister *unreg)
 
     switch ( unreg->type )
     {
+    case CALLBACKTYPE_event:
+    case CALLBACKTYPE_failsafe:
+#ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL
+    case CALLBACKTYPE_sysenter:
+#endif
+        ret = -EINVAL;
+        break;
+
     case CALLBACKTYPE_nmi:
         ret = unregister_guest_nmi_callback();
         break;
 
     default:
-        ret = -EINVAL;
+        ret = -ENOSYS;
         break;
     }
 
@@ -417,7 +425,7 @@ long do_callback_op(int cmd, XEN_GUEST_HANDLE(void) arg)
     break;
 
     default:
-        ret = -EINVAL;
+        ret = -ENOSYS;
         break;
     }
 
