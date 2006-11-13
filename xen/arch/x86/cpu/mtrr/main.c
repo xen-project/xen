@@ -64,7 +64,11 @@ struct mtrr_ops * mtrr_if = NULL;
 static void set_mtrr(unsigned int reg, unsigned long base,
 		     unsigned long size, mtrr_type type);
 
+#ifndef CONFIG_X86_64
 extern int arr3_protected;
+#else
+#define arr3_protected 0
+#endif
 
 static char *mtrr_strings[MTRR_NUM_TYPES] =
 {
@@ -539,9 +543,11 @@ extern void centaur_init_mtrr(void);
 
 static void __init init_ifs(void)
 {
+#ifndef CONFIG_X86_64
 	amd_init_mtrr();
 	cyrix_init_mtrr();
 	centaur_init_mtrr();
+#endif
 }
 
 /* The suspend/resume methods are only for CPU without MTRR. CPU using generic
@@ -593,6 +599,7 @@ void __init mtrr_bp_init(void)
 			size_and_mask = 0;
 		}
 	} else {
+#ifndef CONFIG_X86_64
 		switch (boot_cpu_data.x86_vendor) {
 		case X86_VENDOR_AMD:
 			if (cpu_has_k6_mtrr) {
@@ -619,6 +626,7 @@ void __init mtrr_bp_init(void)
 		default:
 			break;
 		}
+#endif
 	}
 
 	if (mtrr_if) {
