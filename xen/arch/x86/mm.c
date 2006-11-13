@@ -3113,7 +3113,7 @@ static int ptwr_emulated_update(
              * zap the PRESENT bit on the assumption the bottom half will be
              * written immediately after we return to the guest.
              */
-            MEM_LOG("ptwr_emulate: fixing up invalid PAE PTE %"PRIpte"\n",
+            MEM_LOG("ptwr_emulate: fixing up invalid PAE PTE %"PRIpte,
                     l1e_get_intpte(nl1e));
             l1e_remove_flags(nl1e, _PAGE_PRESENT);
         }
