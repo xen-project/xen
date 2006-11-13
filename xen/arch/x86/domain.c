@@ -166,6 +166,9 @@ void vcpu_destroy(struct vcpu *v)
 
 int arch_domain_create(struct domain *d)
 {
+#ifdef __x86_64__
+    struct page_info *pg;
+#endif
     l1_pgentry_t gdt_l1e;
     int vcpuid, pdpt_order;
     int i, rc = -ENOMEM;
@@ -194,19 +197,17 @@ int arch_domain_create(struct domain *d)
 
 #else /* __x86_64__ */
 
-    d->arch.mm_perdomain_l2 = alloc_xenheap_page();
-    d->arch.mm_perdomain_l3 = alloc_xenheap_page();
-    if ( (d->arch.mm_perdomain_l2 == NULL) ||
-         (d->arch.mm_perdomain_l3 == NULL) )
+    if ( (pg = alloc_domheap_page(NULL)) == NULL )
         goto fail;
-
-    memset(d->arch.mm_perdomain_l2, 0, PAGE_SIZE);
+    d->arch.mm_perdomain_l2 = clear_page(page_to_virt(pg));
     for ( i = 0; i < (1 << pdpt_order); i++ )
         d->arch.mm_perdomain_l2[l2_table_offset(PERDOMAIN_VIRT_START)+i] =
             l2e_from_page(virt_to_page(d->arch.mm_perdomain_pt)+i,
                           __PAGE_HYPERVISOR);
 
-    memset(d->arch.mm_perdomain_l3, 0, PAGE_SIZE);
+    if ( (pg = alloc_domheap_page(NULL)) == NULL )
+        goto fail;
+    d->arch.mm_perdomain_l3 = clear_page(page_to_virt(pg));
     d->arch.mm_perdomain_l3[l3_table_offset(PERDOMAIN_VIRT_START)] =
         l3e_from_page(virt_to_page(d->arch.mm_perdomain_l2),
                             __PAGE_HYPERVISOR);
@@ -240,8 +241,8 @@ int arch_domain_create(struct domain *d)
  fail:
     free_xenheap_page(d->shared_info);
 #ifdef __x86_64__
-    free_xenheap_page(d->arch.mm_perdomain_l2);
-    free_xenheap_page(d->arch.mm_perdomain_l3);
+    free_domheap_page(virt_to_page(d->arch.mm_perdomain_l2));
+    free_domheap_page(virt_to_page(d->arch.mm_perdomain_l3));
 #endif
     free_xenheap_pages(d->arch.mm_perdomain_pt, pdpt_order);
     return rc;
@@ -265,8 +266,8 @@ void arch_domain_destroy(struct domain *d)
         get_order_from_bytes(PDPT_L1_ENTRIES * sizeof(l1_pgentry_t)));
 
 #ifdef __x86_64__
-    free_xenheap_page(d->arch.mm_perdomain_l2);
-    free_xenheap_page(d->arch.mm_perdomain_l3);
+    free_domheap_page(virt_to_page(d->arch.mm_perdomain_l2));
+    free_domheap_page(virt_to_page(d->arch.mm_perdomain_l3));
 #endif
 
     free_xenheap_page(d->shared_info);
