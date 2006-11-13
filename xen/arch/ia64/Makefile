@@ -59,8 +59,6 @@ $(BASEDIR)/include/asm-ia64/.offsets.h.stamp:
 	[ -e $(BASEDIR)/include/asm-ia64/xen ] \
 	 || ln -sf $(BASEDIR)/include/asm-ia64/linux $(BASEDIR)/include/asm-ia64/xen
 # Link to HVM files in Xen for ia64/vti
-	[ -e $(BASEDIR)/include/asm-ia64/hvm ] \
-	 || mkdir $(BASEDIR)/include/asm-ia64/hvm
 	[ -e $(BASEDIR)/include/asm-ia64/hvm/support.h ] \
 	 || ln -sf ../../../include/asm-x86/hvm/support.h $(BASEDIR)/include/asm-ia64/hvm/support.h
 	[ -e $(BASEDIR)/include/asm-ia64/hvm/io.h ] \
@@ -83,4 +81,7 @@ clean::
 	rm -f asm-xsi-offsets.s $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h
 	rm -f $(BASEDIR)/System.map
 	rm -f vmx/hvm_*.c
-	rm -rf $(BASEDIR)/include/asm-ia64/hvm
+	rm -f $(BASEDIR)/include/asm-ia64/hvm/support.h
+	rm -f $(BASEDIR)/include/asm-ia64/hvm/io.h
+	rm -f $(BASEDIR)/include/asm-ia64/hvm/vpic.h
+	rm -f $(BASEDIR)/include/asm-ia64/hvm/vioapic.h
