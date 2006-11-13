@@ -985,8 +985,7 @@ static inline int admin_io_okay(
     return ioports_access_permitted(v->domain, port, port + bytes - 1);
 }
 
-/* Check admin limits. Silently fail the access if it is disallowed. */
-static inline unsigned char inb_user(
+static inline int guest_inb_okay(
     unsigned int port, struct vcpu *v, struct cpu_user_regs *regs)
 {
     /*
@@ -996,19 +995,21 @@ static inline unsigned char inb_user(
      * Note that we could emulate bit 4 instead of directly reading port 0x61,
      * but there's not really a good reason to do so.
      */
-    if ( admin_io_okay(port, 1, v, regs) || (port == 0x61) )
-        return inb(port);
-    return ~0;
+    return (admin_io_okay(port, 1, v, regs) || (port == 0x61));
 }
-//#define inb_user(_p, _d, _r) (admin_io_okay(_p, 1, _d, _r) ? inb(_p) : ~0)
-#define inw_user(_p, _d, _r) (admin_io_okay(_p, 2, _d, _r) ? inw(_p) : ~0)
-#define inl_user(_p, _d, _r) (admin_io_okay(_p, 4, _d, _r) ? inl(_p) : ~0)
-#define outb_user(_v, _p, _d, _r) \
-    (admin_io_okay(_p, 1, _d, _r) ? outb(_v, _p) : ((void)0))
-#define outw_user(_v, _p, _d, _r) \
-    (admin_io_okay(_p, 2, _d, _r) ? outw(_v, _p) : ((void)0))
-#define outl_user(_v, _p, _d, _r) \
-    (admin_io_okay(_p, 4, _d, _r) ? outl(_v, _p) : ((void)0))
+#define guest_inw_okay(_p, _d, _r) admin_io_okay(_p, 2, _d, _r)
+#define guest_inl_okay(_p, _d, _r) admin_io_okay(_p, 4, _d, _r)
+#define guest_outb_okay(_p, _d, _r) admin_io_okay(_p, 1, _d, _r)
+#define guest_outw_okay(_p, _d, _r) admin_io_okay(_p, 2, _d, _r)
+#define guest_outl_okay(_p, _d, _r) admin_io_okay(_p, 4, _d, _r)
+
+/* I/O emulation support. Helper routines for, and type of, the stack stub.*/
+void host_to_guest_gpr_switch(struct cpu_user_regs *)
+    __attribute__((__regparm__(1)));
+unsigned long guest_to_host_gpr_switch(unsigned long)
+    __attribute__((__regparm__(1)));
+typedef unsigned long (*io_emul_stub_t)(struct cpu_user_regs *)
+    __attribute__((__regparm__(1)));
 
 /* Instruction fetch with error handling. */
 #define insn_fetch(_type, _size, cs, eip)                                   \
@@ -1028,6 +1029,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     unsigned long *reg, eip = regs->eip, cs = regs->cs, res;
     u8 opcode, modrm_reg = 0, modrm_rm = 0, rep_prefix = 0;
     unsigned int port, i, op_bytes = 4, data, rc;
+    char io_emul_stub[16];
     u32 l, h;
 
     /* Legacy prefixes. */
@@ -1068,6 +1070,9 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         opcode = insn_fetch(u8, 1, cs, eip);
     }
 #endif
+
+    if ( opcode == 0x0f )
+        goto twobyte_opcode;
     
     /* Input/Output String instructions. */
     if ( (opcode >= 0x6c) && (opcode <= 0x6f) )
@@ -1083,16 +1088,17 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case 0x6d: /* INSW/INSL */
             if ( !guest_io_okay((u16)regs->edx, op_bytes, v, regs) )
                 goto fail;
+            port = (u16)regs->edx;
             switch ( op_bytes )
             {
             case 1:
-                data = (u8)inb_user((u16)regs->edx, v, regs);
+                data = (u8)(guest_inb_okay(port, v, regs) ? inb(port) : ~0);
                 break;
             case 2:
-                data = (u16)inw_user((u16)regs->edx, v, regs);
+                data = (u16)(guest_inw_okay(port, v, regs) ? inw(port) : ~0);
                 break;
             case 4:
-                data = (u32)inl_user((u16)regs->edx, v, regs);
+                data = (u32)(guest_inl_okay(port, v, regs) ? inl(port) : ~0);
                 break;
             }
             if ( (rc = copy_to_user((void *)regs->edi, &data, op_bytes)) != 0 )
@@ -1115,16 +1121,20 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 propagate_page_fault(regs->esi + op_bytes - rc, 0);
                 return EXCRET_fault_fixed;
             }
+            port = (u16)regs->edx;
             switch ( op_bytes )
             {
             case 1:
-                outb_user((u8)data, (u16)regs->edx, v, regs);
+                if ( guest_outb_okay(port, v, regs) )
+                    outb((u8)data, port);
                 break;
             case 2:
-                outw_user((u16)data, (u16)regs->edx, v, regs);
+                if ( guest_outw_okay(port, v, regs) )
+                    outw((u16)data, port);
                 break;
             case 4:
-                outl_user((u32)data, (u16)regs->edx, v, regs);
+                if ( guest_outl_okay(port, v, regs) )
+                    outl((u32)data, port);
                 break;
             }
             regs->esi += (int)((regs->eflags & EF_DF) ? -op_bytes : op_bytes);
@@ -1141,6 +1151,27 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         goto done;
     }
 
+    /*
+     * Very likely to be an I/O instruction (IN/OUT).
+     * Build an on-stack stub to execute the instruction with full guest
+     * GPR context. This is needed for some systems which (ab)use IN/OUT
+     * to communicate with BIOS code in system-management mode.
+     */
+    /* call host_to_guest_gpr_switch */
+    io_emul_stub[0] = 0xe8;
+    *(s32 *)&io_emul_stub[1] =
+        (char *)host_to_guest_gpr_switch - &io_emul_stub[5];
+    /* data16 or nop */
+    io_emul_stub[5] = (op_bytes != 2) ? 0x90 : 0x66;
+    /* <io-access opcode> */
+    io_emul_stub[6] = opcode;
+    /* imm8 or nop */
+    io_emul_stub[7] = 0x90;
+    /* jmp guest_to_host_gpr_switch */
+    io_emul_stub[8] = 0xe9;
+    *(s32 *)&io_emul_stub[9] =
+        (char *)guest_to_host_gpr_switch - &io_emul_stub[13];
+
     /* I/O Port and Interrupt Flag instructions. */
     switch ( opcode )
     {
@@ -1148,21 +1179,31 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         op_bytes = 1;
     case 0xe5: /* IN imm8,%eax */
         port = insn_fetch(u8, 1, cs, eip);
+        io_emul_stub[7] = port; /* imm8 */
     exec_in:
         if ( !guest_io_okay(port, op_bytes, v, regs) )
             goto fail;
         switch ( op_bytes )
         {
         case 1:
-            regs->eax &= ~0xffUL;
-            regs->eax |= (u8)inb_user(port, v, regs);
+            res = regs->eax & ~0xffUL;
+            if ( guest_inb_okay(port, v, regs) )
+                regs->eax = res | (u8)((io_emul_stub_t)io_emul_stub)(regs);
+            else
+                regs->eax = res | (u8)~0;
             break;
         case 2:
-            regs->eax &= ~0xffffUL;
-            regs->eax |= (u16)inw_user(port, v, regs);
+            res = regs->eax & ~0xffffUL;
+            if ( guest_inw_okay(port, v, regs) )
+                regs->eax = res | (u16)((io_emul_stub_t)io_emul_stub)(regs);
+            else
+                regs->eax = res | (u16)~0;
             break;
         case 4:
-            regs->eax = (u32)inl_user(port, v, regs);
+            if ( guest_inl_okay(port, v, regs) )
+                regs->eax = (u32)((io_emul_stub_t)io_emul_stub)(regs);
+            else
+                regs->eax = (u32)~0;
             break;
         }
         goto done;
@@ -1177,19 +1218,23 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         op_bytes = 1;
     case 0xe7: /* OUT %eax,imm8 */
         port = insn_fetch(u8, 1, cs, eip);
+        io_emul_stub[7] = port; /* imm8 */
     exec_out:
         if ( !guest_io_okay(port, op_bytes, v, regs) )
             goto fail;
         switch ( op_bytes )
         {
         case 1:
-            outb_user((u8)regs->eax, port, v, regs);
+            if ( guest_outb_okay(port, v, regs) )
+                ((io_emul_stub_t)io_emul_stub)(regs);
             break;
         case 2:
-            outw_user((u16)regs->eax, port, v, regs);
+            if ( guest_outw_okay(port, v, regs) )
+                ((io_emul_stub_t)io_emul_stub)(regs);
             break;
         case 4:
-            outl_user((u32)regs->eax, port, v, regs);
+            if ( guest_outl_okay(port, v, regs) )
+                ((io_emul_stub_t)io_emul_stub)(regs);
             break;
         }
         goto done;
@@ -1212,15 +1257,13 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
          */
         /*v->vcpu_info->evtchn_upcall_mask = (opcode == 0xfa);*/
         goto done;
-
-    case 0x0f: /* Two-byte opcode */
-        break;
-
-    default:
-        goto fail;
     }
 
-    /* Remaining instructions only emulated from guest kernel. */
+    /* No decode of this single-byte opcode. */
+    goto fail;
+
+ twobyte_opcode:
+    /* Two-byte opcodes only emulated from guest kernel. */
     if ( !guest_kernel_mode(v, regs) )
         goto fail;
 
