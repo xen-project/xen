@@ -587,9 +587,9 @@ static void load_segments(struct vcpu *n)
         regs->entry_vector  = TRAP_syscall;
         regs->rflags       &= ~(X86_EFLAGS_AC|X86_EFLAGS_VM|X86_EFLAGS_RF|
                                 X86_EFLAGS_NT|X86_EFLAGS_TF);
-        regs->ss            = __GUEST_SS;
+        regs->ss            = FLAT_KERNEL_SS;
         regs->rsp           = (unsigned long)(rsp-11);
-        regs->cs            = __GUEST_CS;
+        regs->cs            = FLAT_KERNEL_CS;
         regs->rip           = nctxt->failsafe_callback_eip;
     }
 }

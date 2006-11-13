@@ -45,7 +45,7 @@ restore_all_guest:
         addq  $8,%rsp
         popq  %rcx                    # RIP
         popq  %r11                    # CS
-        cmpw  $__GUEST_CS32,%r11
+        cmpw  $FLAT_KERNEL_CS32,%r11
         popq  %r11                    # RFLAGS
         popq  %rsp                    # RSP
         je    1f
@@ -119,7 +119,7 @@ restore_all_xen:
         ALIGN
 ENTRY(syscall_enter)
         sti
-        movl  $__GUEST_SS,24(%rsp)
+        movl  $FLAT_KERNEL_SS,24(%rsp)
         pushq %rcx
         pushq $0
         movl  $TRAP_syscall,4(%rsp)
@@ -298,9 +298,9 @@ FLT13:  movq  %rax,(%rsi)               # RCX
         movl  $TRAP_syscall,UREGS_entry_vector+8(%rsp)
         andl  $~(X86_EFLAGS_AC|X86_EFLAGS_VM|X86_EFLAGS_RF|\
                  X86_EFLAGS_NT|X86_EFLAGS_TF),UREGS_eflags+8(%rsp)
-        movq  $__GUEST_SS,UREGS_ss+8(%rsp)
+        movq  $FLAT_KERNEL_SS,UREGS_ss+8(%rsp)
         movq  %rsi,UREGS_rsp+8(%rsp)
-        movq  $__GUEST_CS,UREGS_cs+8(%rsp)
+        movq  $FLAT_KERNEL_CS,UREGS_cs+8(%rsp)
         movq  TRAPBOUNCE_eip(%rdx),%rax
         testq %rax,%rax
         jz    domain_crash_synchronous

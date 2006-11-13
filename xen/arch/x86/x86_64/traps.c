@@ -290,9 +290,9 @@ void __init percpu_traps_init(void)
     stack[14] = 0x41;
     stack[15] = 0x53;
 
-    /* pushq $__GUEST_CS64 */
+    /* pushq $FLAT_KERNEL_CS64 */
     stack[16] = 0x68;
-    *(u32 *)&stack[17] = __GUEST_CS64;
+    *(u32 *)&stack[17] = FLAT_KERNEL_CS64;
 
     /* jmp syscall_enter */
     stack[21] = 0xe9;
@@ -322,9 +322,9 @@ void __init percpu_traps_init(void)
     stack[14] = 0x41;
     stack[15] = 0x53;
 
-    /* pushq $__GUEST_CS32 */
+    /* pushq $FLAT_KERNEL_CS32 */
     stack[16] = 0x68;
-    *(u32 *)&stack[17] = __GUEST_CS32;
+    *(u32 *)&stack[17] = FLAT_KERNEL_CS32;
 
     /* jmp syscall_enter */
     stack[21] = 0xe9;

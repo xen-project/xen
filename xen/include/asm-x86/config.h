@@ -194,12 +194,6 @@ extern unsigned long _end; /* standard ELF symbol */
 #define __HYPERVISOR_DS32 0xe018
 #define __HYPERVISOR_DS   __HYPERVISOR_DS64
 
-#define __GUEST_CS64      0xe033
-#define __GUEST_CS32      0xe023
-#define __GUEST_CS        __GUEST_CS64
-#define __GUEST_DS        0x0000
-#define __GUEST_SS        0xe02b
-
 /* For generic assembly code: use macros to define operation/operand sizes. */
 #define __OS          "q"  /* Operation Suffix */
 #define __OP          "r"  /* Operand Prefix */
