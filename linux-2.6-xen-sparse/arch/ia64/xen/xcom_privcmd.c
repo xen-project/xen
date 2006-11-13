@@ -579,6 +579,9 @@ xencomm_privcmd_hvm_op(privcmd_hypercall_t *hypercall)
 	case HVMOP_set_param:
 		argsize = sizeof(xen_hvm_param_t);
 		break;
+	case HVMOP_set_irq_level:
+		argsize = sizeof(xen_hvm_set_irq_level_t);
+		break;
 	default:
 		printk("%s: unknown HVMOP %d\n", __func__, cmd);
 		return -EINVAL;

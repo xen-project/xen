@@ -55,6 +55,7 @@ extern void vmx_relinquish_guest_resources(struct domain *d);
 extern void vmx_relinquish_vcpu_resources(struct vcpu *v);
 extern void vmx_die_if_kernel(char *str, struct pt_regs *regs, long err);
 extern void vmx_send_assist_req(struct vcpu *v);
+extern void vmx_vioapic_set_irq(struct domain *d, int irq, int level);
 
 static inline vcpu_iodata_t *get_vio(struct domain *d, unsigned long cpu)
 {

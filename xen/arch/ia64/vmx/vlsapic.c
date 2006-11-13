@@ -666,3 +666,25 @@ void vmx_vexirq(VCPU *vcpu)
 {
     generate_exirq (vcpu);
 }
+
+
+void vmx_vioapic_set_irq(struct domain *d, int irq, int level)
+{
+    unsigned long flags;
+
+    spin_lock_irqsave(&d->arch.arch_vmx.virq_assist_lock, flags);
+    vioapic_set_irq(d, irq, level);
+    spin_unlock_irqrestore(&d->arch.arch_vmx.virq_assist_lock, flags);
+}
+
+int vmx_vlapic_set_irq(VCPU *v, uint8_t vec, uint8_t trig)
+{
+    int ret;
+    int running = test_bit(_VCPUF_running, &v->vcpu_flags);
+
+    ret = vmx_vcpu_pend_interrupt(v, vec);
+    vcpu_unblock(v);
+    if (running)
+        smp_send_event_check_cpu(v->processor);
+    return ret;
+}
