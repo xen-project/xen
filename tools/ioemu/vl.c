@@ -6489,9 +6489,9 @@ int main(int argc, char **argv)
     }
 
     if (ram_size > MMIO_START) {	
-        for (i = 0 ; i < MEM_G >> PAGE_SHIFT; i++)
-            page_array[MMIO_START >> PAGE_SHIFT + i] =
-                page_array[IO_PAGE_START >> PAGE_SHIFT + 1];
+        for (i = 0 ; i < (MEM_G >> PAGE_SHIFT); i++)
+            page_array[(MMIO_START >> PAGE_SHIFT) + i] =
+                page_array[(IO_PAGE_START >> PAGE_SHIFT) + 1];
     }
 
     phys_ram_base = xc_map_foreign_batch(xc_handle, domid,
