@@ -853,7 +853,7 @@ static void vmx_do_cpuid(struct cpu_user_regs *regs)
             /* Mask off reserved bits. */
             ecx &= ~VMX_VCPU_CPUID_L1_ECX_RESERVED;
 
-            if ( !vlapic_global_enabled(vcpu_vlapic(v)) )
+            if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
                 clear_bit(X86_FEATURE_APIC, &edx);
     
 #if CONFIG_PAGING_LEVELS >= 3

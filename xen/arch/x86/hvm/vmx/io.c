@@ -69,20 +69,21 @@ static inline int is_interruptibility_state(void)
 #ifdef __x86_64__
 static void update_tpr_threshold(struct vlapic *vlapic)
 {
-    int highest_irr, tpr;
+    int max_irr, tpr;
 
     /* Clear the work-to-do flag /then/ do the work. */
     vlapic->flush_tpr_threshold = 0;
     mb();
 
-    highest_irr = vlapic_find_highest_irr(vlapic);
-    tpr = vlapic_get_reg(vlapic, APIC_TASKPRI) & 0xF0;
-
-    if ( highest_irr == -1 )
+    if ( !vlapic_enabled(vlapic) || 
+         ((max_irr = vlapic_find_highest_irr(vlapic)) == -1) )
+    {
         __vmwrite(TPR_THRESHOLD, 0);
-    else
-        __vmwrite(TPR_THRESHOLD,
-                  (highest_irr > tpr) ? (tpr >> 4) : (highest_irr >> 4));
+        return;
+    }
+
+    tpr = vlapic_get_reg(vlapic, APIC_TASKPRI) & 0xF0;
+    __vmwrite(TPR_THRESHOLD, (max_irr > tpr) ? (tpr >> 4) : (max_irr >> 4));
 }
 #else
 #define update_tpr_threshold(v) ((void)0)
@@ -115,7 +116,7 @@ asmlinkage void vmx_intr_assist(void)
             pic_set_xen_irq(pic, callback_irq, local_events_need_delivery());
     }
 
-    if ( vlapic_enabled(vlapic) && vlapic->flush_tpr_threshold )
+    if ( vlapic->flush_tpr_threshold )
         update_tpr_threshold(vlapic);
 
     has_ext_irq = cpu_has_pending_irq(v);
