@@ -520,7 +520,7 @@ class XendDomainInfo:
         self._waitForDevice(dev_type, devid)
         return self.getDeviceController(dev_type).sxpr(devid)
 
-    def device_configure(self, dev_config, devid):
+    def device_configure(self, dev_config, devid = None):
         """Configure an existing device.
         
         @param dev_config: device configuration
