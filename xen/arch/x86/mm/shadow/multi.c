@@ -3266,8 +3266,9 @@ sh_set_toplevel_shadow(struct vcpu *v,
     }
     else
     {
-        /* This guest MFN is a pagetable.  Must revoke write access. */
-        if ( shadow_remove_write_access(v, gmfn, GUEST_PAGING_LEVELS, 0) != 0 )
+        /* This guest MFN is a pagetable.  Must revoke write access 
+         * (and can't use heuristics because we have no linear map here). */
+        if ( shadow_remove_write_access(v, gmfn, 0, 0) != 0 )
             flush_tlb_mask(v->domain->domain_dirty_cpumask); 
         /* Make sure there's enough free shadow memory. */
         shadow_prealloc(d, SHADOW_MAX_ORDER); 
