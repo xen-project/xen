@@ -371,8 +371,6 @@ static void vmx_build_physmap_table(struct domain *d)
 	unsigned long i, j, start, tmp, end, mfn;
 	struct list_head *list_ent = d->page_list.next;
 
-	ASSERT(d->max_pages == d->tot_pages);
-
 	/* Mark I/O ranges */
 	for (i = 0; i < (sizeof(io_ranges) / sizeof(io_range_t)); i++) {
 		for (j = io_ranges[i].start;
