@@ -2623,6 +2623,10 @@ static int sh_page_fault(struct vcpu *v,
              * Fall through to the normal fault handing logic */
             perfc_incrc(shadow_fault_fast_fail);
             SHADOW_PRINTK("fast path false alarm!\n");
+            /* Don't pass the reserved-bit bit: if we look at the fault 
+             * below and decide to pass it to the guest, the reserved-bit
+             * bit won't make sense there. */
+            regs->error_code &= ~PFEC_reserved_bit;
         }
     }
 #endif /* SHOPT_FAST_FAULT_PATH */
