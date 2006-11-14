@@ -127,6 +127,14 @@ static inline paddr_t machine_to_phys(maddr_t machine)
 	return phys;
 }
 
+static inline paddr_t pte_machine_to_phys(maddr_t machine)
+{
+	paddr_t phys;
+	phys = mfn_to_pfn((machine & PHYSICAL_PAGE_MASK) >> PAGE_SHIFT);
+	phys = (phys << PAGE_SHIFT) | (machine & ~PHYSICAL_PAGE_MASK);
+	return phys;
+}
+
 /* VIRT <-> MACHINE conversion */
 #define virt_to_machine(v)	(phys_to_machine(__pa(v)))
 #define virt_to_mfn(v)		(pfn_to_mfn(__pa(v) >> PAGE_SHIFT))
