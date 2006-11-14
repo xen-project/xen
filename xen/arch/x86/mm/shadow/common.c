@@ -1953,9 +1953,11 @@ int shadow_remove_write_access(struct vcpu *v, mfn_t gmfn,
             case 3: GUESS(0x70381C00000UL + (fault_addr >> 27), 3); break;
             }
 
-            /* Linux direct map at 0xffff810000000000 */
+            /* 64bit Linux direct map at 0xffff810000000000; older kernels 
+             * had it at 0x0000010000000000UL */
             gfn = sh_mfn_to_gfn(v->domain, gmfn); 
             GUESS(0xffff810000000000UL + (gfn << PAGE_SHIFT), 4); 
+            GUESS(0x0000010000000000UL + (gfn << PAGE_SHIFT), 4); 
         }
 #endif /* CONFIG_PAGING_LEVELS >= 4 */
 #endif /* CONFIG_PAGING_LEVELS >= 3 */

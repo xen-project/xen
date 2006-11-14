@@ -33,22 +33,23 @@
 #define VLAPIC_ID(vlapic)   \
     (GET_APIC_ID(vlapic_get_reg(vlapic, APIC_ID)))
 
-#define _VLAPIC_GLOB_DISABLE            0x0
-#define VLAPIC_GLOB_DISABLE_MASK        0x1
-#define VLAPIC_SOFTWARE_DISABLE_MASK    0x2
-#define _VLAPIC_BSP_ACCEPT_PIC          0x3
-
-#define vlapic_enabled(vlapic)              \
-    (!((vlapic)->status &                   \
-       (VLAPIC_GLOB_DISABLE_MASK | VLAPIC_SOFTWARE_DISABLE_MASK)))
-
-#define vlapic_global_enabled(vlapic)       \
-    (!(test_bit(_VLAPIC_GLOB_DISABLE, &(vlapic)->status)))
+/*
+ * APIC can be disabled in two ways:
+ *  1. 'Hardware disable': via IA32_APIC_BASE_MSR[11]
+ *     CPU should behave as if it does not have an APIC.
+ *  2. 'Software disable': via APIC_SPIV[8].
+ *     APIC is visible but does not respond to interrupt messages.
+ */
+#define VLAPIC_HW_DISABLED              0x1
+#define VLAPIC_SW_DISABLED              0x2
+#define vlapic_sw_disabled(vlapic)  ((vlapic)->disabled & VLAPIC_SW_DISABLED)
+#define vlapic_hw_disabled(vlapic)  ((vlapic)->disabled & VLAPIC_HW_DISABLED)
+#define vlapic_disabled(vlapic)     ((vlapic)->disabled)
+#define vlapic_enabled(vlapic)      (!vlapic_disabled(vlapic))
 
 struct vlapic {
-    uint32_t           status;
     uint64_t           apic_base_msr;
-    unsigned long      base_address;
+    uint32_t           disabled; /* VLAPIC_xx_DISABLED */
     uint32_t           timer_divisor;
     struct timer       vlapic_timer;
     int                timer_pending_count;

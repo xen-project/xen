@@ -31,10 +31,8 @@ XEND_STORAGE_MAX_IGNORE = -1
 XEND_STORAGE_DIR = "/var/lib/xend/storage/"
 XEND_STORAGE_QCOW_FILENAME = "%s.qcow"
 XEND_STORAGE_VDICFG_FILENAME = "%s.vdi.xml"
-DF_COMMAND = "df -lPk"
 QCOW_CREATE_COMMAND = "/usr/sbin/qcow-create %d %s"
 
-KB = 1024
 MB = 1024 *1024
 
 class DeviceInvalidError(Exception):
@@ -151,23 +149,6 @@ class XendStorageRepository:
         finally:
             self.lock.release()
 
-    def _get_df(self):
-        """Returns the output of 'df' in a dictionary where the keys
-        are the Linux device numbers, and the values are it's corresponding
-        free space in bytes
-
-        @rtype: dictionary
-        """
-        df = commands.getoutput(DF_COMMAND)
-        devnum_free = {}
-        for line in df.split('\n')[1:]:
-            words = line.split()
-            mount_point = words[-1]
-            dev_no = os.stat(mount_point).st_dev
-            free_kb = int(words[3])
-            devnum_free[dev_no] = free_kb * KB
-        return devnum_free
-
     def _get_free_space(self):
         """Returns the amount of free space in bytes available in the storage
         partition. Note that this may not be used if the storage repository
@@ -175,12 +156,8 @@ class XendStorageRepository:
 
         @rtype: int
         """
-        df = self._get_df()
-        devnum = os.stat(self.storage_dir).st_dev
-        if df.has_key(devnum):
-            return df[devnum]
-        raise DeviceInvalidError("Device not found for storage path: %s" %
-                                 self.storage_dir)
+        stfs = os.statvfs(self.storage_dir)
+        return stfs.f_bavail * stfs.f_frsize
 
     def _has_space_available_for(self, size_bytes):
         """Returns whether there is enough space for an image in the

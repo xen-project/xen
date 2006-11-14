@@ -127,10 +127,24 @@ static inline maddr_t phys_to_machine(paddr_t phys)
 	machine = (machine << PAGE_SHIFT) | (phys & ~PAGE_MASK);
 	return machine;
 }
+
 static inline paddr_t machine_to_phys(maddr_t machine)
 {
 	paddr_t phys = mfn_to_pfn(machine >> PAGE_SHIFT);
 	phys = (phys << PAGE_SHIFT) | (machine & ~PAGE_MASK);
+	return phys;
+}
+
+static inline paddr_t pte_machine_to_phys(maddr_t machine)
+{
+	/*
+	 * In PAE mode, the NX bit needs to be dealt with in the value
+	 * passed to mfn_to_pfn(). On x86_64, we need to mask it off,
+	 * but for i386 the conversion to ulong for the argument will
+	 * clip it off.
+	 */
+	paddr_t phys = mfn_to_pfn(machine >> PAGE_SHIFT);
+	phys = (phys << PAGE_SHIFT) | (machine & ~PHYSICAL_PAGE_MASK);
 	return phys;
 }
 

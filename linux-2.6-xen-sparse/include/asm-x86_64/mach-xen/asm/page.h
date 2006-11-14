@@ -33,6 +33,13 @@
 #define PAGE_SIZE	(1UL << PAGE_SHIFT)
 #endif
 #define PAGE_MASK	(~(PAGE_SIZE-1))
+
+/* See Documentation/x86_64/mm.txt for a description of the memory map. */
+#define __PHYSICAL_MASK_SHIFT	46
+#define __PHYSICAL_MASK		((1UL << __PHYSICAL_MASK_SHIFT) - 1)
+#define __VIRTUAL_MASK_SHIFT	48
+#define __VIRTUAL_MASK		((1UL << __VIRTUAL_MASK_SHIFT) - 1)
+
 #define PHYSICAL_PAGE_MASK	(~(PAGE_SIZE-1) & __PHYSICAL_MASK)
 
 #define THREAD_ORDER 1 
@@ -90,28 +97,28 @@ typedef struct { unsigned long pgd; } pgd_t;
 
 typedef struct { unsigned long pgprot; } pgprot_t;
 
-#define pte_val(x)	(((x).pte & 1) ? machine_to_phys((x).pte) : \
+#define pte_val(x)	(((x).pte & 1) ? pte_machine_to_phys((x).pte) : \
 			 (x).pte)
 #define pte_val_ma(x)	((x).pte)
 
 static inline unsigned long pmd_val(pmd_t x)
 {
 	unsigned long ret = x.pmd;
-	if (ret) ret = machine_to_phys(ret);
+	if (ret) ret = pte_machine_to_phys(ret);
 	return ret;
 }
 
 static inline unsigned long pud_val(pud_t x)
 {
 	unsigned long ret = x.pud;
-	if (ret) ret = machine_to_phys(ret);
+	if (ret) ret = pte_machine_to_phys(ret);
 	return ret;
 }
 
 static inline unsigned long pgd_val(pgd_t x)
 {
 	unsigned long ret = x.pgd;
-	if (ret) ret = machine_to_phys(ret);
+	if (ret) ret = pte_machine_to_phys(ret);
 	return ret;
 }
 
@@ -162,12 +169,6 @@ static inline pgd_t __pgd(unsigned long x)
 
 /* to align the pointer to the (next) page boundary */
 #define PAGE_ALIGN(addr)	(((addr)+PAGE_SIZE-1)&PAGE_MASK)
-
-/* See Documentation/x86_64/mm.txt for a description of the memory map. */
-#define __PHYSICAL_MASK_SHIFT	46
-#define __PHYSICAL_MASK		((1UL << __PHYSICAL_MASK_SHIFT) - 1)
-#define __VIRTUAL_MASK_SHIFT	48
-#define __VIRTUAL_MASK		((1UL << __VIRTUAL_MASK_SHIFT) - 1)
 
 #define KERNEL_TEXT_SIZE  (40UL*1024*1024)
 #define KERNEL_TEXT_START 0xffffffff80000000UL 

@@ -71,17 +71,22 @@ static unsigned int vlapic_lvt_mask[VLAPIC_LVT_NUM] =
 #define APIC_DEST_NOSHORT                0x0
 #define APIC_DEST_MASK                   0x800
 
-#define vlapic_lvt_enabled(vlapic, lvt_type)    \
+#define vlapic_lvt_enabled(vlapic, lvt_type)                    \
     (!(vlapic_get_reg(vlapic, lvt_type) & APIC_LVT_MASKED))
 
-#define vlapic_lvt_vector(vlapic, lvt_type)     \
+#define vlapic_lvt_vector(vlapic, lvt_type)                     \
     (vlapic_get_reg(vlapic, lvt_type) & APIC_VECTOR_MASK)
 
-#define vlapic_lvt_dm(vlapic, lvt_type)           \
+#define vlapic_lvt_dm(vlapic, lvt_type)                         \
     (vlapic_get_reg(vlapic, lvt_type) & APIC_MODE_MASK)
 
-#define vlapic_lvtt_period(vlapic)     \
+#define vlapic_lvtt_period(vlapic)                              \
     (vlapic_get_reg(vlapic, APIC_LVTT) & APIC_LVT_TIMER_PERIODIC)
+
+#define vlapic_base_address(vlapic)                             \
+    (vlapic->apic_base_msr & MSR_IA32_APICBASE_BASE)
+
+static int vlapic_reset(struct vlapic *vlapic);
 
 /*
  * Generic APIC bitmap vector update & search routines.
@@ -238,8 +243,7 @@ static int vlapic_match_dest(struct vcpu *v, struct vlapic *source,
         if ( dest_mode == 0 )
         {
             /* Physical mode. */
-            if ( (dest == 0xFF) || /* broadcast? */
-                 (GET_APIC_ID(vlapic_get_reg(target, APIC_ID)) == dest) )
+            if ( (dest == 0xFF) || (dest == v->vcpu_id) )
                 result = 1;
         }
         else
@@ -283,7 +287,7 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
     case APIC_DM_FIXED:
     case APIC_DM_LOWEST:
         /* FIXME add logic for vcpu on reset */
-        if ( unlikely(vlapic == NULL || !vlapic_enabled(vlapic)) )
+        if ( unlikely(!vlapic_enabled(vlapic)) )
             break;
 
         if ( vlapic_test_and_set_irr(vector, vlapic) && trig_mode )
@@ -319,7 +323,7 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
         if ( trig_mode && !(level & APIC_INT_ASSERT) )
             break;
         /* FIXME How to check the situation after vcpu reset? */
-        if ( test_and_clear_bit(_VCPUF_initialised, &v->vcpu_flags) )
+        if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
         {
             gdprintk(XENLOG_ERR, "Reset hvm vcpu not supported yet\n");
             goto exit_and_crash;
@@ -371,21 +375,15 @@ struct vlapic *apic_round_robin(
 
     old = next = d->arch.hvm_domain.round_info[vector];
 
-    /* the vcpu array is arranged according to vcpu_id */
     do {
         if ( ++next == MAX_VIRT_CPUS ) 
             next = 0;
-        if ( (d->vcpu[next] == NULL) ||
-             !test_bit(_VCPUF_initialised, &d->vcpu[next]->vcpu_flags) )
+        if ( (d->vcpu[next] == NULL) || !test_bit(next, &bitmap) )
             continue;
-
-        if ( test_bit(next, &bitmap) )
-        {
-            target = vcpu_vlapic(d->vcpu[next]);
-            if ( vlapic_enabled(target) )
-                break;
-            target = NULL;
-        }
+        target = vcpu_vlapic(d->vcpu[next]);
+        if ( vlapic_enabled(target) )
+            break;
+        target = NULL;
     } while ( next != old );
 
     d->arch.hvm_domain.round_info[vector] = next;
@@ -398,10 +396,9 @@ void vlapic_EOI_set(struct vlapic *vlapic)
 {
     int vector = vlapic_find_highest_isr(vlapic);
 
-    /* Not every write EOI will has correpsoning ISR,
-       one example is when Kernel check timer on setup_IO_APIC */
+    /* Some EOI writes may not have a matching to an in-service interrupt. */
     if ( vector == -1 )
-        return ;
+        return;
 
     vlapic_clear_vector(vector, vlapic->regs + APIC_ISR);
 
@@ -538,7 +535,7 @@ static unsigned long vlapic_read(struct vcpu *v, unsigned long address,
     unsigned int tmp;
     unsigned long result;
     struct vlapic *vlapic = vcpu_vlapic(v);
-    unsigned int offset = address - vlapic->base_address;
+    unsigned int offset = address - vlapic_base_address(vlapic);
 
     if ( offset > APIC_TDCR )
         return 0;
@@ -588,7 +585,7 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
                          unsigned long len, unsigned long val)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
-    unsigned int offset = address - vlapic->base_address;
+    unsigned int offset = address - vlapic_base_address(vlapic);
 
     if ( offset != 0xb0 )
         HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
@@ -641,10 +638,6 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
 
     switch ( offset )
     {
-    case APIC_ID:   /* Local APIC ID */
-        vlapic_set_reg(vlapic, APIC_ID, val);
-        break;
-
     case APIC_TASKPRI:
         vlapic_set_reg(vlapic, APIC_TASKPRI, val & 0xff);
         vlapic->flush_tpr_threshold = 1;
@@ -670,7 +663,7 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
             int i;
             uint32_t lvt_val;
 
-            vlapic->status |= VLAPIC_SOFTWARE_DISABLE_MASK;
+            vlapic->disabled |= VLAPIC_SW_DISABLED;
 
             for ( i = 0; i < VLAPIC_LVT_NUM; i++ )
             {
@@ -678,17 +671,11 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
                 vlapic_set_reg(vlapic, APIC_LVTT + 0x10 * i,
                                lvt_val | APIC_LVT_MASKED);
             }
-
-            if ( (vlapic_get_reg(vlapic, APIC_LVT0) & APIC_MODE_MASK)
-                 == APIC_DM_EXTINT )
-                clear_bit(_VLAPIC_BSP_ACCEPT_PIC, &vlapic->status);
         }
         else
         {
-            vlapic->status &= ~VLAPIC_SOFTWARE_DISABLE_MASK;
-            if ( (vlapic_get_reg(vlapic, APIC_LVT0) & APIC_MODE_MASK)
-                  == APIC_DM_EXTINT )
-                set_bit(_VLAPIC_BSP_ACCEPT_PIC, &vlapic->status);
+            vlapic->disabled &= ~VLAPIC_SW_DISABLED;
+            vlapic->flush_tpr_threshold = 1;
         }
         break;
 
@@ -712,26 +699,11 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
     case APIC_LVT0:         /* LVT LINT0 Reg */
     case APIC_LVT1:         /* LVT Lint1 Reg */
     case APIC_LVTERR:       /* LVT Error Reg */
-    {
-        if ( vlapic->status & VLAPIC_SOFTWARE_DISABLE_MASK )
+        if ( vlapic_sw_disabled(vlapic) )
             val |= APIC_LVT_MASKED;
-
         val &= vlapic_lvt_mask[(offset - APIC_LVTT) >> 4];
-
         vlapic_set_reg(vlapic, offset, val);
-
-        if ( (vlapic_vcpu(vlapic)->vcpu_id == 0) && (offset == APIC_LVT0) )
-        {
-            if ( (val & APIC_MODE_MASK) == APIC_DM_EXTINT )
-                if ( val & APIC_LVT_MASKED)
-                    clear_bit(_VLAPIC_BSP_ACCEPT_PIC, &vlapic->status);
-                else
-                    set_bit(_VLAPIC_BSP_ACCEPT_PIC, &vlapic->status);
-            else
-                clear_bit(_VLAPIC_BSP_ACCEPT_PIC, &vlapic->status);
-        }
-    }
-    break;
+        break;
 
     case APIC_TMICT:
     {
@@ -773,10 +745,8 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
 static int vlapic_range(struct vcpu *v, unsigned long addr)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
-
-    return (vlapic_global_enabled(vlapic) &&
-            (addr >= vlapic->base_address) &&
-            (addr < vlapic->base_address + PAGE_SIZE));
+    unsigned long offset  = addr - vlapic_base_address(vlapic);
+    return (!vlapic_hw_disabled(vlapic) && (offset < PAGE_SIZE));
 }
 
 struct hvm_mmio_handler vlapic_mmio_handler = {
@@ -787,17 +757,23 @@ struct hvm_mmio_handler vlapic_mmio_handler = {
 
 void vlapic_msr_set(struct vlapic *vlapic, uint64_t value)
 {
-    vlapic->apic_base_msr = value;
-    vlapic->base_address  = vlapic->apic_base_msr & MSR_IA32_APICBASE_BASE;
+    if ( (vlapic->apic_base_msr ^ value) & MSR_IA32_APICBASE_ENABLE )
+    {
+        if ( value & MSR_IA32_APICBASE_ENABLE )
+        {
+            vlapic_reset(vlapic);
+            vlapic->disabled &= ~VLAPIC_HW_DISABLED;
+        }
+        else
+        {
+            vlapic->disabled |= VLAPIC_HW_DISABLED;
+        }
+    }
 
-    if ( !(value & MSR_IA32_APICBASE_ENABLE) )
-        set_bit(_VLAPIC_GLOB_DISABLE, &vlapic->status );
-    else
-        clear_bit(_VLAPIC_GLOB_DISABLE, &vlapic->status);
+    vlapic->apic_base_msr = value;
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
-                "apic base msr is 0x%016"PRIx64", and base address is 0x%lx.",
-                vlapic->apic_base_msr, vlapic->base_address);
+                "apic base msr is 0x%016"PRIx64".", vlapic->apic_base_msr);
 }
 
 void vlapic_timer_fn(void *data)
@@ -845,8 +821,15 @@ void vlapic_timer_fn(void *data)
 int vlapic_accept_pic_intr(struct vcpu *v)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
+    uint32_t lvt0 = vlapic_get_reg(vlapic, APIC_LVT0);
 
-    return vlapic ? test_bit(_VLAPIC_BSP_ACCEPT_PIC, &vlapic->status) : 1;
+    /*
+     * Only CPU0 is wired to the 8259A. INTA cycles occur if LINT0 is set up
+     * accept ExtInts, or if the LAPIC is disabled (so LINT0 behaves as INTR).
+     */
+    return ((v->vcpu_id == 0) &&
+            (((lvt0 & (APIC_MODE_MASK|APIC_LVT_MASKED)) == APIC_DM_EXTINT) ||
+             vlapic_hw_disabled(vlapic)));
 }
 
 int cpu_get_apic_interrupt(struct vcpu *v, int *mode)
@@ -854,7 +837,7 @@ int cpu_get_apic_interrupt(struct vcpu *v, int *mode)
     struct vlapic *vlapic = vcpu_vlapic(v);
     int highest_irr;
 
-    if ( !vlapic || !vlapic_enabled(vlapic) )
+    if ( !vlapic_enabled(vlapic) )
         return -1;
 
     highest_irr = vlapic_find_highest_irr(vlapic);
@@ -887,9 +870,6 @@ void vlapic_post_injection(struct vcpu *v, int vector, int deliver_mode)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
 
-    if ( unlikely(vlapic == NULL) )
-        return;
-
     switch ( deliver_mode )
     {
     case APIC_DM_FIXED:
@@ -920,36 +900,38 @@ void vlapic_post_injection(struct vcpu *v, int vector, int deliver_mode)
     }
 }
 
+/* Reset the VLPAIC back to its power-on/reset state. */
 static int vlapic_reset(struct vlapic *vlapic)
 {
     struct vcpu *v = vlapic_vcpu(vlapic);
     int i;
 
-    vlapic_set_reg(vlapic, APIC_ID, v->vcpu_id << 24);
-
+    vlapic_set_reg(vlapic, APIC_ID,  v->vcpu_id << 24);
     vlapic_set_reg(vlapic, APIC_LVR, VLAPIC_VERSION);
+
+    for ( i = 0; i < 8; i++ )
+    {
+        vlapic_set_reg(vlapic, APIC_IRR + 0x10 * i, 0);
+        vlapic_set_reg(vlapic, APIC_ISR + 0x10 * i, 0);
+        vlapic_set_reg(vlapic, APIC_TMR + 0x10 * i, 0);
+    }
+    vlapic_set_reg(vlapic, APIC_ICR,     0);
+    vlapic_set_reg(vlapic, APIC_ICR2,    0);
+    vlapic_set_reg(vlapic, APIC_LDR,     0);
+    vlapic_set_reg(vlapic, APIC_TASKPRI, 0);
+    vlapic_set_reg(vlapic, APIC_TMICT,   0);
+    vlapic_set_reg(vlapic, APIC_TMCCT,   0);
+    vlapic_set_tdcr(vlapic, 0);
+
+    vlapic_set_reg(vlapic, APIC_DFR, 0xffffffffU);
 
     for ( i = 0; i < VLAPIC_LVT_NUM; i++ )
         vlapic_set_reg(vlapic, APIC_LVTT + 0x10 * i, APIC_LVT_MASKED);
 
-    vlapic_set_reg(vlapic, APIC_DFR, 0xffffffffU);
-
     vlapic_set_reg(vlapic, APIC_SPIV, 0xff);
+    vlapic->disabled |= VLAPIC_SW_DISABLED;
 
-    vlapic->apic_base_msr = MSR_IA32_APICBASE_ENABLE | APIC_DEFAULT_PHYS_BASE;
-
-    vlapic->flush_tpr_threshold = 0;
-
-    vlapic_set_tdcr(vlapic, 0);
-
-    vlapic->base_address = vlapic->apic_base_msr &
-                           MSR_IA32_APICBASE_BASE;
-
-    HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
-                "vcpu=%p, id=%d, vlapic_apic_base_msr=0x%016"PRIx64", "
-                "base_address=0x%0lx.",
-                v,  GET_APIC_ID(vlapic_get_reg(vlapic, APIC_ID)),
-                vlapic->apic_base_msr, vlapic->base_address);
+    vlapic->flush_tpr_threshold = 1;
 
     return 1;
 }
@@ -974,6 +956,7 @@ int vlapic_init(struct vcpu *v)
 
     vlapic_reset(vlapic);
 
+    vlapic->apic_base_msr = MSR_IA32_APICBASE_ENABLE | APIC_DEFAULT_PHYS_BASE;
     if ( v->vcpu_id == 0 )
         vlapic->apic_base_msr |= MSR_IA32_APICBASE_BSP;
 
@@ -986,7 +969,6 @@ int vlapic_init(struct vcpu *v)
     {
         vlapic_set_reg(vlapic, APIC_LVT0, APIC_MODE_EXTINT << 8);
         vlapic_set_reg(vlapic, APIC_LVT1, APIC_MODE_NMI << 8);
-        set_bit(_VLAPIC_BSP_ACCEPT_PIC, &vlapic->status);
     }
 #endif
 

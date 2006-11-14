@@ -56,6 +56,11 @@
 struct dma_mapping_ops* dma_ops;
 EXPORT_SYMBOL(dma_ops);
 
+#ifdef CONFIG_XEN_COMPAT_030002
+unsigned int __kernel_page_user;
+EXPORT_SYMBOL(__kernel_page_user);
+#endif
+
 extern unsigned long *contiguous_bitmap;
 
 static unsigned long dma_reserve __initdata;
@@ -526,6 +531,33 @@ void __init xen_init_pt(void)
 	addr_to_page(addr, page);
 	addr = page[pud_index(__START_KERNEL_map)];
 	addr_to_page(addr, page);
+
+#ifdef CONFIG_XEN_COMPAT_030002
+	/* On Xen 3.0.2 and older we may need to explicitly specify _PAGE_USER
+	   in kernel PTEs. We check that here. */
+	if (HYPERVISOR_xen_version(XENVER_version, NULL) <= 0x30000) {
+		unsigned long *pg;
+		pte_t pte;
+
+		/* Mess with the initial mapping of page 0. It's not needed. */
+		BUILD_BUG_ON(__START_KERNEL <= __START_KERNEL_map);
+		addr = page[pmd_index(__START_KERNEL_map)];
+		addr_to_page(addr, pg);
+		pte.pte = pg[pte_index(__START_KERNEL_map)];
+		BUG_ON(!(pte.pte & _PAGE_PRESENT));
+
+		/* If _PAGE_USER isn't set, we obviously do not need it. */
+		if (pte.pte & _PAGE_USER) {
+			/* _PAGE_USER is needed, but is it set implicitly? */
+			pte.pte &= ~_PAGE_USER;
+			if ((HYPERVISOR_update_va_mapping(__START_KERNEL_map,
+							  pte, 0) != 0) ||
+			    !(pg[pte_index(__START_KERNEL_map)] & _PAGE_USER))
+				/* We need to explicitly specify _PAGE_USER. */
+				__kernel_page_user = _PAGE_USER;
+		}
+	}
+#endif
 
 	/* Construct mapping of initial pte page in our own directories. */
 	init_level4_pgt[pgd_index(__START_KERNEL_map)] = 

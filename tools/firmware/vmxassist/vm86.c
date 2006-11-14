@@ -816,9 +816,7 @@ pop(struct regs *regs, unsigned prefix, unsigned opc)
 static int
 mov_to_seg(struct regs *regs, unsigned prefix, unsigned opc)
 {
-	unsigned eip = regs->eip - 1;
 	unsigned modrm = fetch8(regs);
-	unsigned addr = operand(prefix, regs, modrm);
 
 	/* Only need to emulate segment loads in real->protected mode. */
 	if (mode != VM86_REAL_TO_PROTECTED)

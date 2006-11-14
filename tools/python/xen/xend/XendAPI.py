@@ -481,7 +481,8 @@ class XendAPI:
     def host_get_record(self, session, host_ref):
         node = XendNode.instance()
         dom = XendDomain.instance()
-        record = {'name_label': node.name,
+        record = {'uuid': node.uuid,
+                  'name_label': node.name,
                   'name_description': '',
                   'software_version': node.xen_version(),
                   'resident_VMs': dom.get_domain_refs(),

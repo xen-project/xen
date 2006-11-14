@@ -2623,6 +2623,10 @@ static int sh_page_fault(struct vcpu *v,
              * Fall through to the normal fault handing logic */
             perfc_incrc(shadow_fault_fast_fail);
             SHADOW_PRINTK("fast path false alarm!\n");
+            /* Don't pass the reserved-bit bit: if we look at the fault 
+             * below and decide to pass it to the guest, the reserved-bit
+             * bit won't make sense there. */
+            regs->error_code &= ~PFEC_reserved_bit;
         }
     }
 #endif /* SHOPT_FAST_FAULT_PATH */
@@ -3266,8 +3270,9 @@ sh_set_toplevel_shadow(struct vcpu *v,
     }
     else
     {
-        /* This guest MFN is a pagetable.  Must revoke write access. */
-        if ( shadow_remove_write_access(v, gmfn, GUEST_PAGING_LEVELS, 0) != 0 )
+        /* This guest MFN is a pagetable.  Must revoke write access 
+         * (and can't use heuristics because we have no linear map here). */
+        if ( shadow_remove_write_access(v, gmfn, 0, 0) != 0 )
             flush_tlb_mask(v->domain->domain_dirty_cpumask); 
         /* Make sure there's enough free shadow memory. */
         shadow_prealloc(d, SHADOW_MAX_ORDER); 
@@ -3773,7 +3778,7 @@ sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
         shadow_validate_guest_pt_write(v, mfn, addr, bytes_on_page);
         bytes -= bytes_on_page;
         /* If we are writing zeros to this page, might want to unshadow */
-        if ( *(u8 *)addr == 0 )
+        if ( likely(bytes_on_page >= 4) && (*(u32 *)addr == 0) )
             check_for_early_unshadow(v, mfn);
         sh_unmap_domain_page(addr);
     }
@@ -3818,7 +3823,7 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
                   vaddr, prev, old, new, *(unsigned long *)addr, bytes);
 
     /* If we are writing zeros to this page, might want to unshadow */
-    if ( *(u8 *)addr == 0 )
+    if ( likely(bytes >= 4) && (*(u32 *)addr == 0) )
         check_for_early_unshadow(v, mfn);
 
     sh_unmap_domain_page(addr);
@@ -3853,7 +3858,7 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
         rv = X86EMUL_CMPXCHG_FAILED;
 
     /* If we are writing zeros to this page, might want to unshadow */
-    if ( *(u8 *)addr == 0 )
+    if ( *(u32 *)addr == 0 )
         check_for_early_unshadow(v, mfn);
 
     sh_unmap_domain_page(addr);
