@@ -205,7 +205,7 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 		}
 		break;
 	    case SAL_GET_STATE_INFO:
-		{
+		if (current->domain == dom0) {
 			sal_queue_entry_t *e;
 			unsigned long flags;
 			struct smp_call_args_t arg;
@@ -274,13 +274,16 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 				spin_unlock_irqrestore(&sal_queue_lock, flags);
 				xfree(e);
 			}
+		} else {
+			status = IA64_SAL_NO_INFORMATION_AVAILABLE;
+			r9 = 0;
 		}
 		break;
 	    case SAL_GET_STATE_INFO_SIZE:
 		r9 = ia64_sal_get_state_info_size(in1);
 		break;
 	    case SAL_CLEAR_STATE_INFO:
-		{
+		if (current->domain == dom0) {
 			sal_queue_entry_t *e;
 			unsigned long flags;
 			struct smp_call_args_t arg;

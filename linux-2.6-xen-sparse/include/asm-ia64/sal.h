@@ -699,16 +699,16 @@ ia64_sal_get_state_info (u64 sal_info_type, u64 *sal_info)
 	struct ia64_sal_retval isrv;
 #ifdef CONFIG_XEN
 	if (is_running_on_xen()) {
-		struct xencomm_mini xc_area[2];
-		int nbr_area = 2;
 		struct xencomm_handle *desc;
 
-		if (xencomm_create_mini(xc_area, &nbr_area, sal_info,
-		           ia64_sal_get_state_info_size(sal_info_type), &desc))
+		if (xencomm_create(sal_info,
+		                   ia64_sal_get_state_info_size(sal_info_type),
+		                   &desc, GFP_KERNEL))
 			return 0;
 
 		SAL_CALL_REENTRANT(isrv, SAL_GET_STATE_INFO, sal_info_type, 0,
 		                   desc, 0, 0, 0, 0);
+		xencomm_free(desc);
 	} else
 #endif
 	SAL_CALL_REENTRANT(isrv, SAL_GET_STATE_INFO, sal_info_type, 0,

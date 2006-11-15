@@ -118,6 +118,12 @@ extern void setup_vector (unsigned int vec, struct irqaction *action);
 
 static ia64_mc_info_t		ia64_mc_info;
 
+#ifdef XEN
+#define jiffies			NOW()
+#undef HZ
+#define HZ			1000000000UL
+#endif
+
 #define MAX_CPE_POLL_INTERVAL (15*60*HZ) /* 15 minutes */
 #define MIN_CPE_POLL_INTERVAL (2*60*HZ)  /* 2 minutes */
 #define CMC_POLL_INTERVAL     (1*60*HZ)  /* 1 minute */
@@ -1388,7 +1394,11 @@ static irqreturn_t
 ia64_mca_cpe_int_caller(int cpe_irq, void *arg, struct pt_regs *ptregs)
 {
 	static int start_count = -1;
+#ifdef XEN
+	static unsigned long poll_time = MIN_CPE_POLL_INTERVAL;
+#else
 	static int poll_time = MIN_CPE_POLL_INTERVAL;
+#endif
 	unsigned int cpuid;
 
 	cpuid = smp_processor_id();
