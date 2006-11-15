@@ -294,6 +294,12 @@ int arch_set_info_guest(
 
         for ( i = 0; i < 256; i++ )
             fixup_guest_code_selector(c->trap_ctxt[i].cs);
+
+        /* LDT safety checks. */
+        if ( ((c->ldt_base & (PAGE_SIZE-1)) != 0) || 
+             (c->ldt_ents > 8192) ||
+             !array_access_ok(c->ldt_base, c->ldt_ents, LDT_ENTRY_SIZE) )
+            return -EINVAL;
     }
 
     clear_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
@@ -422,33 +428,6 @@ arch_do_vcpu_op(
 
     return rc;
 }
-
-void new_thread(struct vcpu *d,
-                unsigned long start_pc,
-                unsigned long start_stack,
-                unsigned long start_info)
-{
-    struct cpu_user_regs *regs = &d->arch.guest_context.user_regs;
-
-    /*
-     * Initial register values:
-     *  DS,ES,FS,GS = FLAT_KERNEL_DS
-     *       CS:EIP = FLAT_KERNEL_CS:start_pc
-     *       SS:ESP = FLAT_KERNEL_SS:start_stack
-     *          ESI = start_info
-     *  [EAX,EBX,ECX,EDX,EDI,EBP are zero]
-     */
-    regs->ds = regs->es = regs->fs = regs->gs = FLAT_KERNEL_DS;
-    regs->ss = FLAT_KERNEL_SS;
-    regs->cs = FLAT_KERNEL_CS;
-    regs->eip = start_pc;
-    regs->esp = start_stack;
-    regs->esi = start_info;
-
-    __save_flags(regs->eflags);
-    regs->eflags |= X86_EFLAGS_IF;
-}
-
 
 #ifdef __x86_64__
 

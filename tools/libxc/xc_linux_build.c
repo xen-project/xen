@@ -1106,7 +1106,7 @@ static int xc_linux_build_internal(int xc_handle,
 {
     struct xen_domctl launch_domctl;
     DECLARE_DOMCTL;
-    int rc, i;
+    int rc;
     struct vcpu_guest_context st_ctxt, *ctxt = &st_ctxt;
     unsigned long vstartinfo_start, vkern_entry, vstack_start;
     uint32_t      features_bitmap[XENFEAT_NR_SUBMAPS] = { 0, };
@@ -1180,21 +1180,8 @@ static int xc_linux_build_internal(int xc_handle,
 
     ctxt->flags = VGCF_IN_KERNEL;
 
-    /* Virtual IDT is empty at start-of-day. */
-    for ( i = 0; i < 256; i++ )
-    {
-        ctxt->trap_ctxt[i].vector = i;
-        ctxt->trap_ctxt[i].cs     = FLAT_KERNEL_CS;
-    }
-
-    /* Ring 1 stack is the initial stack. */
-    ctxt->kernel_ss = FLAT_KERNEL_SS;
-    ctxt->kernel_sp = vstack_start + PAGE_SIZE;
-
-#if defined(__i386__)
-    ctxt->event_callback_cs     = FLAT_KERNEL_CS;
-    ctxt->failsafe_callback_cs  = FLAT_KERNEL_CS;
-#endif
+    ctxt->kernel_ss = ctxt->user_regs.ss;
+    ctxt->kernel_sp = ctxt->user_regs.esp;
 #endif /* x86 */
 
     memset(&launch_domctl, 0, sizeof(launch_domctl));

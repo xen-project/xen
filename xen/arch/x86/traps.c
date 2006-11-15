@@ -331,14 +331,9 @@ void show_execution_state(struct cpu_user_regs *regs)
     show_stack(regs);
 }
 
-/*
- * This is called for faults at very unexpected times (e.g., when interrupts
- * are disabled). In such situations we can't do much that is safe. We try to
- * print out some tracing and then we just spin.
- */
-asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs)
+char *trapstr(int trapnr)
 {
-    static char *trapstr[] = { 
+    static char *strings[] = { 
         "divide error", "debug", "nmi", "bkpt", "overflow", "bounds", 
         "invalid opcode", "device not available", "double fault", 
         "coprocessor segment", "invalid tss", "segment not found", 
@@ -347,6 +342,19 @@ asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs)
         "machine check", "simd error"
     };
 
+    if ( (trapnr < 0) || (trapnr >= ARRAY_SIZE(strings)) )
+        return "???";
+
+    return strings[trapnr];
+}
+
+/*
+ * This is called for faults at very unexpected times (e.g., when interrupts
+ * are disabled). In such situations we can't do much that is safe. We try to
+ * print out some tracing and then we just spin.
+ */
+asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs)
+{
     watchdog_disable();
     console_start_sync();
 
@@ -361,38 +369,51 @@ asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs)
 
     panic("FATAL TRAP: vector = %d (%s)\n"
           "[error_code=%04x] %s\n",
-          trapnr, trapstr[trapnr], regs->error_code,
+          trapnr, trapstr(trapnr), regs->error_code,
           (regs->eflags & X86_EFLAGS_IF) ? "" : ", IN INTERRUPT CONTEXT");
 }
 
-static inline int do_trap(int trapnr, char *str,
-                          struct cpu_user_regs *regs, 
-                          int use_error_code)
+static int do_guest_trap(
+    int trapnr, const struct cpu_user_regs *regs, int use_error_code)
 {
     struct vcpu *v = current;
-    struct trap_bounce *tb = &v->arch.trap_bounce;
-    struct trap_info *ti;
-    unsigned long fixup;
+    struct trap_bounce *tb;
+    const struct trap_info *ti;
 
-    DEBUGGER_trap_entry(trapnr, regs);
+    tb = &v->arch.trap_bounce;
+    ti = &v->arch.guest_context.trap_ctxt[trapnr];
 
-    if ( !guest_mode(regs) )
-        goto xen_fault;
-
-    ti = &current->arch.guest_context.trap_ctxt[trapnr];
     tb->flags = TBF_EXCEPTION;
     tb->cs    = ti->cs;
     tb->eip   = ti->address;
+
     if ( use_error_code )
     {
         tb->flags |= TBF_EXCEPTION_ERRCODE;
         tb->error_code = regs->error_code;
     }
+
     if ( TI_GET_IF(ti) )
         tb->flags |= TBF_INTERRUPT;
-    return 0;
 
- xen_fault:
+    if ( unlikely(null_trap_bounce(tb)) )
+        gdprintk(XENLOG_WARNING, "Unhandled %s fault/trap [#%d] in "
+                 "domain %d on VCPU %d [ec=%04x]\n",
+                 trapstr(trapnr), trapnr, v->domain->domain_id, v->vcpu_id,
+                 regs->error_code);
+
+    return 0;
+}
+
+static inline int do_trap(
+    int trapnr, struct cpu_user_regs *regs, int use_error_code)
+{
+    unsigned long fixup;
+
+    DEBUGGER_trap_entry(trapnr, regs);
+
+    if ( guest_mode(regs) )
+        return do_guest_trap(trapnr, regs, use_error_code);
 
     if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
     {
@@ -407,32 +428,32 @@ static inline int do_trap(int trapnr, char *str,
     show_execution_state(regs);
     panic("FATAL TRAP: vector = %d (%s)\n"
           "[error_code=%04x]\n",
-          trapnr, str, regs->error_code);
+          trapnr, trapstr(trapnr), regs->error_code);
     return 0;
 }
 
-#define DO_ERROR_NOCODE(trapnr, str, name)              \
+#define DO_ERROR_NOCODE(trapnr, name)                   \
 asmlinkage int do_##name(struct cpu_user_regs *regs)    \
 {                                                       \
-    return do_trap(trapnr, str, regs, 0);               \
+    return do_trap(trapnr, regs, 0);                    \
 }
 
-#define DO_ERROR(trapnr, str, name)                     \
+#define DO_ERROR(trapnr, name)                          \
 asmlinkage int do_##name(struct cpu_user_regs *regs)    \
 {                                                       \
-    return do_trap(trapnr, str, regs, 1);               \
+    return do_trap(trapnr, regs, 1);                    \
 }
 
-DO_ERROR_NOCODE( 0, "divide error", divide_error)
-DO_ERROR_NOCODE( 4, "overflow", overflow)
-DO_ERROR_NOCODE( 5, "bounds", bounds)
-DO_ERROR_NOCODE( 9, "coprocessor segment overrun", coprocessor_segment_overrun)
-DO_ERROR(10, "invalid TSS", invalid_TSS)
-DO_ERROR(11, "segment not present", segment_not_present)
-DO_ERROR(12, "stack segment", stack_segment)
-DO_ERROR_NOCODE(16, "fpu error", coprocessor_error)
-DO_ERROR(17, "alignment check", alignment_check)
-DO_ERROR_NOCODE(19, "simd error", simd_coprocessor_error)
+DO_ERROR_NOCODE(TRAP_divide_error,    divide_error)
+DO_ERROR_NOCODE(TRAP_overflow,        overflow)
+DO_ERROR_NOCODE(TRAP_bounds,          bounds)
+DO_ERROR_NOCODE(TRAP_copro_seg,       coprocessor_segment_overrun)
+DO_ERROR(       TRAP_invalid_tss,     invalid_TSS)
+DO_ERROR(       TRAP_no_segment,      segment_not_present)
+DO_ERROR(       TRAP_stack_error,     stack_segment)
+DO_ERROR_NOCODE(TRAP_copro_error,     coprocessor_error)
+DO_ERROR(       TRAP_alignment_check, alignment_check)
+DO_ERROR_NOCODE(TRAP_simd_error,      simd_coprocessor_error)
 
 int rdmsr_hypervisor_regs(
     uint32_t idx, uint32_t *eax, uint32_t *edx)
@@ -599,9 +620,6 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
 
 asmlinkage int do_invalid_op(struct cpu_user_regs *regs)
 {
-    struct vcpu *v = current;
-    struct trap_bounce *tb = &v->arch.trap_bounce;
-    struct trap_info *ti;
     int rc;
 
     DEBUGGER_trap_entry(TRAP_invalid_op, regs);
@@ -625,22 +643,11 @@ asmlinkage int do_invalid_op(struct cpu_user_regs *regs)
     if ( (rc = emulate_forced_invalid_op(regs)) != 0 )
         return rc;
 
-    ti = &current->arch.guest_context.trap_ctxt[TRAP_invalid_op];
-    tb->flags = TBF_EXCEPTION;
-    tb->cs    = ti->cs;
-    tb->eip   = ti->address;
-    if ( TI_GET_IF(ti) )
-        tb->flags |= TBF_INTERRUPT;
-
-    return 0;
+    return do_guest_trap(TRAP_invalid_op, regs, 0);
 }
 
 asmlinkage int do_int3(struct cpu_user_regs *regs)
 {
-    struct vcpu *v = current;
-    struct trap_bounce *tb = &v->arch.trap_bounce;
-    struct trap_info *ti;
-
     DEBUGGER_trap_entry(TRAP_int3, regs);
 
     if ( !guest_mode(regs) )
@@ -650,14 +657,7 @@ asmlinkage int do_int3(struct cpu_user_regs *regs)
         panic("FATAL TRAP: vector = 3 (Int3)\n");
     } 
 
-    ti = &current->arch.guest_context.trap_ctxt[TRAP_int3];
-    tb->flags = TBF_EXCEPTION;
-    tb->cs    = ti->cs;
-    tb->eip   = ti->address;
-    if ( TI_GET_IF(ti) )
-        tb->flags |= TBF_INTERRUPT;
-
-    return 0;
+    return do_guest_trap(TRAP_int3, regs, 0);
 }
 
 asmlinkage int do_machine_check(struct cpu_user_regs *regs)
@@ -687,6 +687,12 @@ void propagate_page_fault(unsigned long addr, u16 error_code)
     tb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
         tb->flags |= TBF_INTERRUPT;
+    if ( unlikely(null_trap_bounce(tb)) )
+    {
+        printk("Unhandled page fault in domain %d on VCPU %d (ec=%04X)\n",
+               v->domain->domain_id, v->vcpu_id, error_code);
+        show_page_walk(addr);
+    }
 }
 
 static int handle_gdt_ldt_mapping_fault(
@@ -1481,8 +1487,6 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 asmlinkage int do_general_protection(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
-    struct trap_bounce *tb = &v->arch.trap_bounce;
-    struct trap_info *ti;
     unsigned long fixup;
 
     DEBUGGER_trap_entry(TRAP_gp_fault, regs);
@@ -1516,12 +1520,13 @@ asmlinkage int do_general_protection(struct cpu_user_regs *regs)
     if ( (regs->error_code & 3) == 2 )
     {
         /* This fault must be due to <INT n> instruction. */
-        ti = &current->arch.guest_context.trap_ctxt[regs->error_code>>3];
+        const struct trap_info *ti;
+        unsigned char vector = regs->error_code >> 3;
+        ti = &v->arch.guest_context.trap_ctxt[vector];
         if ( permit_softint(TI_GET_DPL(ti), v, regs) )
         {
-            tb->flags = TBF_EXCEPTION;
             regs->eip += 2;
-            goto finish_propagation;
+            return do_guest_trap(vector, regs, 0);
         }
     }
 
@@ -1538,15 +1543,7 @@ asmlinkage int do_general_protection(struct cpu_user_regs *regs)
 #endif
 
     /* Pass on GPF as is. */
-    ti = &current->arch.guest_context.trap_ctxt[TRAP_gp_fault];
-    tb->flags      = TBF_EXCEPTION | TBF_EXCEPTION_ERRCODE;
-    tb->error_code = regs->error_code;
- finish_propagation:
-    tb->cs         = ti->cs;
-    tb->eip        = ti->address;
-    if ( TI_GET_IF(ti) )
-        tb->flags |= TBF_INTERRUPT;
-    return 0;
+    return do_guest_trap(TRAP_gp_fault, regs, 1);
 
  gp_in_kernel:
 
@@ -1684,22 +1681,11 @@ void unset_nmi_callback(void)
 
 asmlinkage int math_state_restore(struct cpu_user_regs *regs)
 {
-    struct trap_bounce *tb;
-    struct trap_info *ti;
-
     setup_fpu(current);
 
     if ( current->arch.guest_context.ctrlreg[0] & X86_CR0_TS )
     {
-        tb = &current->arch.trap_bounce;
-        ti = &current->arch.guest_context.trap_ctxt[TRAP_no_device];
-
-        tb->flags = TBF_EXCEPTION;
-        tb->cs    = ti->cs;
-        tb->eip   = ti->address;
-        if ( TI_GET_IF(ti) )
-            tb->flags |= TBF_INTERRUPT;
-
+        do_guest_trap(TRAP_no_device, regs, 0);
         current->arch.guest_context.ctrlreg[0] &= ~X86_CR0_TS;
     }
 
@@ -1710,8 +1696,6 @@ asmlinkage int do_debug(struct cpu_user_regs *regs)
 {
     unsigned long condition;
     struct vcpu *v = current;
-    struct trap_bounce *tb = &v->arch.trap_bounce;
-    struct trap_info *ti;
 
     __asm__ __volatile__("mov %%db6,%0" : "=r" (condition));
 
@@ -1741,12 +1725,7 @@ asmlinkage int do_debug(struct cpu_user_regs *regs)
     /* Save debug status register where guest OS can peek at it */
     v->arch.guest_context.debugreg[6] = condition;
 
-    ti = &v->arch.guest_context.trap_ctxt[TRAP_debug];
-    tb->flags = TBF_EXCEPTION;
-    tb->cs    = ti->cs;
-    tb->eip   = ti->address;
-    if ( TI_GET_IF(ti) )
-        tb->flags |= TBF_INTERRUPT;
+    return do_guest_trap(TRAP_debug, regs, 0);
 
  out:
     return EXCRET_not_a_fault;

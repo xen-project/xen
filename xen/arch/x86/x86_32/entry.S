@@ -373,10 +373,11 @@ nvm86_3:/* Rewrite our stack frame and return to ring 1. */
         mov  %gs,UREGS_ss+4(%esp)
         movl %esi,UREGS_esp+4(%esp)
         movzwl TRAPBOUNCE_cs(%edx),%eax
+        /* Null selectors (0-3) are not allowed. */
+        testl $~3,%eax
+        jz   domain_crash_synchronous
         movl %eax,UREGS_cs+4(%esp)
         movl TRAPBOUNCE_eip(%edx),%eax
-        test %eax,%eax
-        jz   domain_crash_synchronous
         movl %eax,UREGS_eip+4(%esp)
         movb $0,TRAPBOUNCE_flags(%edx)
         ret

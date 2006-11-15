@@ -282,11 +282,6 @@ void __domain_crash_synchronous(void) __attribute__((noreturn));
     __domain_crash_synchronous();                                         \
 } while (0)
 
-void new_thread(struct vcpu *d,
-                unsigned long start_pc,
-                unsigned long start_stack,
-                unsigned long start_info);
-
 #define set_current_state(_s) do { current->state = (_s); } while (0)
 void scheduler_init(void);
 void schedulers_start(void);
