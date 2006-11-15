@@ -3,7 +3,7 @@
 
 function error {
    echo
-   echo '  *** Check for the hotplug scripts (hotplug) FAILED'
+   echo '  *** Check for udev/hotplug FAILED'
    exit 1
 }
 [ -x "$(which udevinfo)" ] && \
