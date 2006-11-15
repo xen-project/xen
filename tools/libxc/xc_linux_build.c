@@ -1120,11 +1120,9 @@ static int xc_linux_build_internal(int xc_handle,
         }
     }
 
-#ifdef VALGRIND
-    memset(&st_ctxt, 0, sizeof(st_ctxt));
-#endif
+    memset(ctxt, 0, sizeof(*ctxt));
 
-    if ( lock_pages(&st_ctxt, sizeof(st_ctxt) ) )
+    if ( lock_pages(ctxt, sizeof(*ctxt) ) )
     {
         PERROR("%s: ctxt lock failed", __func__);
         return 1;
@@ -1138,8 +1136,6 @@ static int xc_linux_build_internal(int xc_handle,
         PERROR("Could not get info on domain");
         goto error_out;
     }
-
-    memset(ctxt, 0, sizeof(*ctxt));
 
     if ( setup_guest(xc_handle, domid, image, image_size,
                      initrd,
@@ -1157,8 +1153,6 @@ static int xc_linux_build_internal(int xc_handle,
 
 #ifdef __ia64__
     /* based on new_thread in xen/arch/ia64/domain.c */
-    ctxt->flags = 0;
-    ctxt->user_regs.cr_ipsr = 0; /* all necessary bits filled by hypervisor */
     ctxt->user_regs.cr_iip = vkern_entry;
     ctxt->user_regs.cr_ifs = 1UL << 63;
     ctxt->user_regs.ar_fpsr = xc_ia64_fpsr_default();
@@ -1186,9 +1180,6 @@ static int xc_linux_build_internal(int xc_handle,
 
     ctxt->flags = VGCF_IN_KERNEL;
 
-    /* FPU is set up to default initial state. */
-    memset(&ctxt->fpu_ctxt, 0, sizeof(ctxt->fpu_ctxt));
-
     /* Virtual IDT is empty at start-of-day. */
     for ( i = 0; i < 256; i++ )
     {
@@ -1196,33 +1187,17 @@ static int xc_linux_build_internal(int xc_handle,
         ctxt->trap_ctxt[i].cs     = FLAT_KERNEL_CS;
     }
 
-    /* No LDT. */
-    ctxt->ldt_ents = 0;
-
-    /* Use the default Xen-provided GDT. */
-    ctxt->gdt_ents = 0;
-
     /* Ring 1 stack is the initial stack. */
     ctxt->kernel_ss = FLAT_KERNEL_SS;
     ctxt->kernel_sp = vstack_start + PAGE_SIZE;
 
-    /* No debugging. */
-    memset(ctxt->debugreg, 0, sizeof(ctxt->debugreg));
-
-    /* No callback handlers. */
 #if defined(__i386__)
     ctxt->event_callback_cs     = FLAT_KERNEL_CS;
-    ctxt->event_callback_eip    = 0;
     ctxt->failsafe_callback_cs  = FLAT_KERNEL_CS;
-    ctxt->failsafe_callback_eip = 0;
-#elif defined(__x86_64__)
-    ctxt->event_callback_eip    = 0;
-    ctxt->failsafe_callback_eip = 0;
-    ctxt->syscall_callback_eip  = 0;
 #endif
 #endif /* x86 */
 
-    memset( &launch_domctl, 0, sizeof(launch_domctl) );
+    memset(&launch_domctl, 0, sizeof(launch_domctl));
 
     launch_domctl.domain = (domid_t)domid;
     launch_domctl.u.vcpucontext.vcpu   = 0;
