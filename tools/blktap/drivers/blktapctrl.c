@@ -167,13 +167,22 @@ static int get_tapdisk_pid(blkif_t *blkif)
 	return 1;
 }
 
-static blkif_t *test_path(char *path, char **dev, int *type)
+/* Look up the disk specified by path: 
+ *   if found, dev points to the device string in the path
+ *             type is the tapdisk driver type id
+ *             blkif is the existing interface if this is a shared driver
+ *             and NULL otherwise.
+ *   return 0 on success, -1 on error.
+ */
+
+static int test_path(char *path, char **dev, int *type, blkif_t *blkif)
 {
 	char *ptr, handle[10];
-	int i, size;
+	int i, size, found = 0;
 
 	size = sizeof(dtypes)/sizeof(disk_info_t *);
 	*type = MAX_DISK_TYPES + 1;
+        blkif = NULL;
 
 	if ( (ptr = strstr(path, ":"))!=NULL) {
 		memcpy(handle, path, (ptr - path));
@@ -182,25 +191,35 @@ static blkif_t *test_path(char *path, char **dev, int *type)
 		*ptr = '\0';
 		DPRINTF("Detected handle: [%s]\n",handle);
 
-		for (i = 0; i < size; i++) {
-			if (strncmp(handle, dtypes[i]->handle, (ptr - path))
-			    ==0) {
-				*type = dtypes[i]->idnum;
+		for (i = 0; i < size; i++) 
+			if (strncmp(handle, dtypes[i]->handle, 
+                                    (ptr - path)) ==0) {
+                                found = 1;
+                                break;
+                        }
 
-				if (dtypes[i]->single_handler == 1) {
-					/* Check whether tapdisk process 
-					   already exists */
-					if (active_disks[dtypes[i]->idnum] 
-					    == NULL) return NULL;
-					else 
-						return active_disks[dtypes[i]->idnum]->blkif;
-				}
-			}
-		}
-	} else *dev = NULL;
+                if (found) {
+                        *type = dtypes[i]->idnum;
+                        
+                        if (dtypes[i]->single_handler == 1) {
+                                /* Check whether tapdisk process 
+                                   already exists */
+                                if (active_disks[dtypes[i]->idnum] == NULL) 
+                                        blkif = NULL;
+                                else 
+                                        blkif = active_disks[dtypes[i]
+                                                             ->idnum]->blkif;
+                        }
+                        return 0;
+                }
+        }
 
-	return NULL;
+        /* Fall-through case, we didn't find a disk driver. */
+        DPRINTF("Unknown blktap disk type [%s]!\n",handle);
+        *dev = NULL;
+        return -1;
 }
+
 
 static void add_disktype(blkif_t *blkif, int type)
 {
@@ -463,7 +482,11 @@ int blktapctrl_new_blkif(blkif_t *blkif)
 		if (get_new_dev(&major, &minor, blkif)<0)
 			return -1;
 
-		exist = test_path(blk->params, &ptr, &type);
+		if (test_path(blk->params, &ptr, &type, exist) != 0) {
+                        DPRINTF("Error in blktap device string(%s).\n",
+                                blk->params);
+                        return -1;
+                }
 		blkif->drivertype = type;
 		blkif->cookie = lrand48() % MAX_RAND_VAL;
 
