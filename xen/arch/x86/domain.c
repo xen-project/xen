@@ -396,21 +396,20 @@ arch_do_vcpu_op(
         if ( copy_from_guest(&area, arg, 1) )
             break;
 
-        if ( !access_ok(area.addr.v, sizeof(*area.addr.v)) )
+        if ( !guest_handle_okay(area.addr.h, 1) )
             break;
 
         rc = 0;
-        v->runstate_guest = area.addr.v;
+        v->runstate_guest = area.addr.h;
 
         if ( v == current )
         {
-            __copy_to_user(v->runstate_guest, &v->runstate,
-                           sizeof(v->runstate));
+            __copy_to_guest(v->runstate_guest, &v->runstate, 1);
         }
         else
         {
             vcpu_runstate_get(v, &runstate);
-            __copy_to_user(v->runstate_guest, &runstate, sizeof(runstate));
+            __copy_to_guest(v->runstate_guest, &runstate, 1);
         }
 
         break;
@@ -767,9 +766,8 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     context_saved(prev);
 
     /* Update per-VCPU guest runstate shared memory area (if registered). */
-    if ( next->runstate_guest != NULL )
-        __copy_to_user(next->runstate_guest, &next->runstate,
-                       sizeof(next->runstate));
+    if ( !guest_handle_is_null(next->runstate_guest) )
+        __copy_to_guest(next->runstate_guest, &next->runstate, 1);
 
     schedule_tail(next);
     BUG();

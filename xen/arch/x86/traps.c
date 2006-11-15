@@ -952,7 +952,6 @@ static inline int guest_io_okay(
     unsigned int port, unsigned int bytes,
     struct vcpu *v, struct cpu_user_regs *regs)
 {
-    u16 x;
 #if defined(__x86_64__)
     /* If in user mode, switch to kernel mode just to read I/O bitmap. */
     int user_mode = !(v->arch.flags & TF_kernel_mode);
@@ -967,10 +966,23 @@ static inline int guest_io_okay(
 
     if ( v->arch.iobmp_limit > (port + bytes) )
     {
+        union { uint8_t bytes[2]; uint16_t mask; } x;
+
+        /*
+         * Grab permission bytes from guest space. Inaccessible bytes are
+         * read as 0xff (no access allowed).
+         */
         TOGGLE_MODE();
-        __get_user(x, (u16 *)(v->arch.iobmp+(port>>3)));
+        switch ( __copy_from_guest_offset(&x.bytes[0], v->arch.iobmp,
+                                          port>>3, 2) )
+        {
+        default: x.bytes[0] = ~0;
+        case 1:  x.bytes[1] = ~0;
+        case 0:  break;
+        }
         TOGGLE_MODE();
-        if ( (x & (((1<<bytes)-1) << (port&7))) == 0 )
+
+        if ( (x.mask & (((1<<bytes)-1) << (port&7))) == 0 )
             return 1;
     }
 

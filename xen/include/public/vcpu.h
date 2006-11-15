@@ -86,6 +86,7 @@ struct vcpu_runstate_info {
     uint64_t time[4];
 };
 typedef struct vcpu_runstate_info vcpu_runstate_info_t;
+DEFINE_XEN_GUEST_HANDLE(vcpu_runstate_info_t);
 
 /* VCPU is currently running on a physical CPU. */
 #define RUNSTATE_running  0
@@ -108,8 +109,9 @@ typedef struct vcpu_runstate_info vcpu_runstate_info_t;
  * Register a shared memory area from which the guest may obtain its own
  * runstate information without needing to execute a hypercall.
  * Notes:
- *  1. The registered address may be virtual or physical, depending on the
- *     platform. The virtual address should be registered on x86 systems.
+ *  1. The registered address may be virtual or physical or guest handle,
+ *     depending on the platform. Virtual address or guest handle should be
+ *     registered on x86 systems.
  *  2. Only one shared area may be registered per VCPU. The shared area is
  *     updated by the hypervisor each time the VCPU is scheduled. Thus
  *     runstate.state will always be RUNSTATE_running and
@@ -120,6 +122,7 @@ typedef struct vcpu_runstate_info vcpu_runstate_info_t;
 #define VCPUOP_register_runstate_memory_area 5
 struct vcpu_register_runstate_memory_area {
     union {
+        XEN_GUEST_HANDLE(vcpu_runstate_info_t) h;
         struct vcpu_runstate_info *v;
         uint64_t p;
     } addr;

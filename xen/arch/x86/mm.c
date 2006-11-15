@@ -2067,7 +2067,7 @@ int do_mmuext_op(
         {
             unsigned long vmask;
             cpumask_t     pmask;
-            if ( unlikely(get_user(vmask, (unsigned long *)op.arg2.vcpumask)) )
+            if ( unlikely(copy_from_guest(&vmask, op.arg2.vcpumask, 1)) )
             {
                 okay = 0;
                 break;
