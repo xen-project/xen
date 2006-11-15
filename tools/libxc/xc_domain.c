@@ -352,7 +352,7 @@ int xc_domain_memory_increase_reservation(int xc_handle,
     if ( err >= 0 )
     {
         DPRINTF("Failed allocation for dom %d: "
-                "%ld pages order %d addr_bits %d\n",
+                "%ld extents of order %d, addr_bits %d\n",
                 domid, nr_extents, extent_order, address_bits);
         errno = ENOMEM;
         err = -1;
@@ -390,7 +390,7 @@ int xc_domain_memory_decrease_reservation(int xc_handle,
 
     if ( err >= 0 )
     {
-        DPRINTF("Failed deallocation for dom %d: %ld pages order %d\n",
+        DPRINTF("Failed deallocation for dom %d: %ld extents of order %d\n",
                 domid, nr_extents, extent_order);
         errno = EINVAL;
         err = -1;
@@ -421,7 +421,7 @@ int xc_domain_memory_populate_physmap(int xc_handle,
 
     if ( err >= 0 )
     {
-        DPRINTF("Failed allocation for dom %d: %ld pages order %d\n",
+        DPRINTF("Failed allocation for dom %d: %ld extents of order %d\n",
                 domid, nr_extents, extent_order);
         errno = EBUSY;
         err = -1;
