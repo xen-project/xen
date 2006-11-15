@@ -1842,8 +1842,8 @@ ia64_mca_late_init(void)
 	init_timer(&cmc_poll_timer);
 	cmc_poll_timer.function = ia64_mca_cmc_poll;
 #else
-	init_timer(&cmc_poll_timer, ia64_mca_cmc_poll, NULL, smp_processor_id());
-	printk("INIT_TIMER(cmc_poll_timer): on cpu%d\n", smp_processor_id());
+	init_timer(&cmc_poll_timer, ia64_mca_cmc_poll,
+	           NULL, smp_processor_id());
 #endif
 
 	/* Unmask/enable the vector */
@@ -1863,8 +1863,8 @@ ia64_mca_late_init(void)
 	init_timer(&cpe_poll_timer);
 	cpe_poll_timer.function = ia64_mca_cpe_poll;
 #else
-	init_timer(&cpe_poll_timer, ia64_mca_cpe_poll, NULL, smp_processor_id());
-	printk("INIT_TIMER(cpe_poll_timer): on cpu%d\n", smp_processor_id());
+	init_timer(&cpe_poll_timer, ia64_mca_cpe_poll,
+	           NULL,smp_processor_id());
 #endif
 
 	{
