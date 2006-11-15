@@ -304,37 +304,9 @@ int check_descriptor(struct desc_struct *d);
 
 #define gmfn_to_mfn(_d, gpfn)  mfn_x(sh_gfn_to_mfn(_d, gpfn))
 
-
-/*
- * The phys_to_machine_mapping is the reversed mapping of MPT for full
- * virtualization.  It is only used by shadow_mode_translate()==true
- * guests, so we steal the address space that would have normally
- * been used by the read-only MPT map.
- */
-#define phys_to_machine_mapping ((l1_pgentry_t *)RO_MPT_VIRT_START)
 #define INVALID_MFN             (~0UL)
 #define VALID_MFN(_mfn)         (!((_mfn) & (1U<<31)))
 
-static inline unsigned long get_mfn_from_gpfn(unsigned long pfn)
-{
-    l1_pgentry_t l1e = l1e_empty();
-    int ret;
-
-#if CONFIG_PAGING_LEVELS > 2
-    if ( pfn >= (RO_MPT_VIRT_END - RO_MPT_VIRT_START) / sizeof(l1_pgentry_t) ) 
-        /* This pfn is higher than the p2m map can hold */
-        return INVALID_MFN;
-#endif
-
-    ret = __copy_from_user(&l1e,
-                               &phys_to_machine_mapping[pfn],
-                               sizeof(l1e));
-
-    if ( (ret == 0) && (l1e_get_flags(l1e) & _PAGE_PRESENT) )
-        return l1e_get_pfn(l1e);
-
-    return INVALID_MFN;
-}
 
 #ifdef MEMORY_GUARD
 void memguard_init(void);

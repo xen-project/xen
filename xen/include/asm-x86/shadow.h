@@ -663,12 +663,40 @@ struct shadow_walk_cache {
 
 
 /**************************************************************************/
-/* Guest physmap (p2m) support */
+/* Guest physmap (p2m) support 
+ *
+ * The phys_to_machine_mapping is the reversed mapping of MPT for full
+ * virtualization.  It is only used by shadow_mode_translate()==true
+ * guests, so we steal the address space that would have normally
+ * been used by the read-only MPT map.
+ */
+
+#define phys_to_machine_mapping ((l1_pgentry_t *)RO_MPT_VIRT_START)
+
+/* Read the current domain's P2M table. */
+static inline mfn_t sh_gfn_to_mfn_current(unsigned long gfn)
+{
+    l1_pgentry_t l1e = l1e_empty();
+    int ret;
+
+    if ( gfn > current->domain->arch.max_mapped_pfn )
+        return _mfn(INVALID_MFN);
+
+    /* Don't read off the end of the p2m table */
+    ASSERT(gfn < (RO_MPT_VIRT_END - RO_MPT_VIRT_START) / sizeof(l1_pgentry_t));
+
+    ret = __copy_from_user(&l1e,
+                           &phys_to_machine_mapping[gfn],
+                           sizeof(l1e));
+
+    if ( (ret == 0) && (l1e_get_flags(l1e) & _PAGE_PRESENT) )
+        return _mfn(l1e_get_pfn(l1e));
+
+    return _mfn(INVALID_MFN);
+}
 
 /* Walk another domain's P2M table, mapping pages as we go */
-extern mfn_t
-sh_gfn_to_mfn_foreign(struct domain *d, unsigned long gpfn);
-
+extern mfn_t sh_gfn_to_mfn_foreign(struct domain *d, unsigned long gpfn);
 
 /* General conversion function from gfn to mfn */
 static inline mfn_t
@@ -676,12 +704,19 @@ sh_gfn_to_mfn(struct domain *d, unsigned long gfn)
 {
     if ( !shadow_mode_translate(d) )
         return _mfn(gfn);
-    else if ( likely(current->domain == d) )
-        return _mfn(get_mfn_from_gpfn(gfn));
-    else
+    if ( likely(current->domain == d) )
+        return sh_gfn_to_mfn_current(gfn);
+    else 
         return sh_gfn_to_mfn_foreign(d, gfn);
 }
 
+/* Compatibility function for HVM code */
+static inline unsigned long get_mfn_from_gpfn(unsigned long pfn)
+{
+    return mfn_x(sh_gfn_to_mfn_current(pfn));
+}
+
+/* General conversion function from mfn to gfn */
 static inline unsigned long
 sh_mfn_to_gfn(struct domain *d, mfn_t mfn)
 {
@@ -689,6 +724,14 @@ sh_mfn_to_gfn(struct domain *d, mfn_t mfn)
         return get_gpfn_from_mfn(mfn_x(mfn));
     else
         return mfn_x(mfn);
+}
+
+/* Is this guest address an mmio one? (i.e. not defined in p2m map) */
+static inline int
+mmio_space(paddr_t gpa)
+{
+    unsigned long gfn = gpa >> PAGE_SHIFT;    
+    return !VALID_MFN(mfn_x(sh_gfn_to_mfn_current(gfn)));
 }
 
 static inline l1_pgentry_t

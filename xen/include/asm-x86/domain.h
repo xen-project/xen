@@ -111,6 +111,8 @@ struct arch_domain
 
     /* Shadow translated domain: P2M mapping */
     pagetable_t phys_table;
+    /* Highest guest frame that's ever been mapped in the p2m */
+    unsigned long max_mapped_pfn;
 
 } __cacheline_aligned;
 
