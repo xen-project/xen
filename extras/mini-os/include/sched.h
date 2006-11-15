@@ -2,6 +2,7 @@
 #define __SCHED_H__
 
 #include <list.h>
+#include <time.h>
 
 struct thread
 {
@@ -11,6 +12,7 @@ struct thread
     unsigned long ip;  /* Instruction pointer */
     struct list_head thread_list;
     u32 flags;
+    s_time_t wakeup_time;
 };
 
 
@@ -36,5 +38,6 @@ static inline struct thread* get_current(void)
 
 void wake(struct thread *thread);
 void block(struct thread *thread);
+void sleep(u32 millisecs);
 
 #endif /* __SCHED_H__ */

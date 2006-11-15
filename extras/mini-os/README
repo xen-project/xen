@@ -26,5 +26,5 @@ Stuff it doesn't show:
 - to start it do the following in domain0 (assuming xend is running)
   # xm create domain_config
 
-this starts the kernel and prints out a bunch of stuff and then every
-1000 timer interrupts the system time.
+this starts the kernel and prints out a bunch of stuff and then once
+every second the system time.

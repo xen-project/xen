@@ -7,8 +7,9 @@
  *        File: time.h
  *      Author: Rolf Neugebauer (neugebar@dcs.gla.ac.uk)
  *     Changes: Grzegorz Milos (gm281@cam.ac.uk)
+ *              Robert Kaiser (kaiser@informatik.fh-wiesbaden.de)
  *              
- *        Date: Jul 2003, changesJun 2005
+ *        Date: Jul 2003, changes: Jun 2005, Sep 2006
  * 
  * Environment: Xen Minimal OS
  * Description: Time and timer functions
@@ -57,7 +58,8 @@ struct timespec {
 void     init_time(void);
 s_time_t get_s_time(void);
 s_time_t get_v_time(void);
+u64      monotonic_clock(void);
 void     gettimeofday(struct timeval *tv);
-void     block_domain(u32 millisecs);
+void     block_domain(s_time_t until);
 
 #endif /* _TIME_H_ */

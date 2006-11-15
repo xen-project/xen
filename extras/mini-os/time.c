@@ -3,6 +3,7 @@
  * (C) 2003 - Rolf Neugebauer - Intel Research Cambridge
  * (C) 2002-2003 - Keir Fraser - University of Cambridge 
  * (C) 2005 - Grzegorz Milos - Intel Research Cambridge
+ * (C) 2006 - Robert Kaiser - FH Wiesbaden
  ****************************************************************************
  *
  *        File: time.c
@@ -194,21 +195,15 @@ void gettimeofday(struct timeval *tv)
 }
 
 
-static void print_current_time(void)
-{
-    struct timeval tv;    
-
-    gettimeofday(&tv);
-    printk("T(s=%ld us=%ld)\n", tv.tv_sec, tv.tv_usec);
-}
-
-
-void block_domain(u32 millisecs)
+void block_domain(s_time_t until)
 {
     struct timeval tv;
     gettimeofday(&tv);
-    HYPERVISOR_set_timer_op(monotonic_clock() + 1000000LL * (s64) millisecs);
-    HYPERVISOR_sched_op(SCHEDOP_block, 0);
+    if(monotonic_clock() < until)
+    {
+        HYPERVISOR_set_timer_op(until);
+        HYPERVISOR_sched_op(SCHEDOP_block, 0);
+    }
 }
 
 
@@ -217,15 +212,8 @@ void block_domain(u32 millisecs)
  */
 static void timer_handler(evtchn_port_t ev, struct pt_regs *regs, void *ign)
 {
-    static int i;
-
     get_time_values_from_xen();
     update_wallclock();
-    i++;
-    if (i >= 1000) {
-        print_current_time();
-        i = 0;
-    }
 }
 
 
