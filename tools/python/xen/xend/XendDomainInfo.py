@@ -1659,9 +1659,17 @@ class XendDomainInfo:
         log.trace("XendDomainInfo.update done on domain %s: %s",
                   str(self.domid), self.info)
 
-    def sxpr(self, ignore_devices = False):
-        return self.info.get_sxp(domain = self,
-                                 ignore_devices = ignore_devices)
+    def sxpr(self, ignore_store = False):
+        result = self.info.get_sxp(domain = self,
+                                   ignore_devices = ignore_store)
+
+        if not ignore_store:
+            vnc_port = self._readDom('console/vnc-port')
+            if vnc_port is not None:
+                result.append(['device',
+                               ['console', ['vnc-port', str(vnc_port)]]])
+
+        return result
 
     # Xen API
     # ----------------------------------------------------------------
