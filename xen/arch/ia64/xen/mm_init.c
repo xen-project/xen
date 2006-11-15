@@ -10,6 +10,11 @@
 
 #include <xen/sched.h>
 #include <asm/vhpt.h>
+#include <asm/xenmca.h>
+#include <asm/meminit.h>
+#include <asm/page.h>
+
+struct ia64_mca_tlb_info ia64_mca_tlb_list[NR_CPUS];
 
 extern void ia64_tlb_init (void);
 
@@ -93,11 +98,13 @@ ia64_mmu_init (void *my_cpu_data)
 
 	cpu = smp_processor_id();
 
-#ifndef XEN
 	/* mca handler uses cr.lid as key to pick the right entry */
 	ia64_mca_tlb_list[cpu].cr_lid = ia64_getreg(_IA64_REG_CR_LID);
 
 	/* insert this percpu data information into our list for MCA recovery purposes */
+#ifdef XEN
+	ia64_mca_tlb_list[cpu].percpu_paddr = __pa(my_cpu_data);
+#else
 	ia64_mca_tlb_list[cpu].percpu_paddr = pte_val(mk_pte_phys(__pa(my_cpu_data), PAGE_KERNEL));
 	/* Also save per-cpu tlb flush recipe for use in physical mode mca handler */
 	ia64_mca_tlb_list[cpu].ptce_base = local_cpu_data->ptce_base;

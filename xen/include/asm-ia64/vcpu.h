@@ -10,7 +10,7 @@
 #include <asm/ia64_int.h>
 #include <xen/types.h>
 #include <public/xen.h>
-typedef int BOOLEAN;
+#include <linux/acpi.h>
 struct vcpu;
 typedef struct vcpu VCPU;
 typedef cpu_user_regs_t REGS;

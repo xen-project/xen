@@ -29,13 +29,15 @@
  */
 #ifdef XEN
 typedef void irqreturn_t;
+#define IRQ_NONE
+#define IRQ_HANDLED
+#define IRQ_RETVAL(x)
 #else
 typedef int irqreturn_t;
-#endif
-
 #define IRQ_NONE	(0)
 #define IRQ_HANDLED	(1)
 #define IRQ_RETVAL(x)	((x) != 0)
+#endif
 
 #ifndef XEN
 struct irqaction {

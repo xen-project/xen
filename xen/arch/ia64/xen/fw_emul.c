@@ -22,6 +22,7 @@
 #include <linux/efi.h>
 #include <asm/pal.h>
 #include <asm/sal.h>
+#include <asm/xenmca.h>
 
 #include <public/sched.h>
 #include "hpsim_ssc.h"
@@ -36,6 +37,93 @@ static DEFINE_SPINLOCK(efi_time_services_lock);
 
 extern unsigned long running_on_sim;
 
+struct sal_mc_params {
+	u64 param_type;
+	u64 i_or_m;
+	u64 i_or_m_val;
+	u64 timeout;
+	u64 rz_always;
+} sal_mc_params[SAL_MC_PARAM_CPE_INT + 1];
+
+struct sal_vectors {
+	u64 vector_type;
+	u64 handler_addr1;
+	u64 gp1;
+	u64 handler_len1;
+	u64 handler_addr2;
+	u64 gp2;
+	u64 handler_len2;
+} sal_vectors[SAL_VECTOR_OS_BOOT_RENDEZ + 1];
+
+struct smp_call_args_t {
+	u64 type;
+	u64 ret;
+	u64 target;
+	struct domain *domain;
+	int corrected;
+	int status;
+	void *data;
+}; 
+
+extern sal_log_record_header_t	*sal_record;
+DEFINE_SPINLOCK(sal_record_lock);
+
+extern spinlock_t sal_queue_lock;
+
+#define IA64_SAL_NO_INFORMATION_AVAILABLE	-5
+
+#if defined(IA64_SAL_DEBUG_INFO)
+static const char * const rec_name[] = { "MCA", "INIT", "CMC", "CPE" };
+
+# define IA64_SAL_DEBUG(fmt...)	printk("sal_emulator: " fmt)
+#else
+# define IA64_SAL_DEBUG(fmt...)
+#endif
+
+void get_state_info_on(void *data) {
+	struct smp_call_args_t *arg = data;
+	int flags;
+
+	spin_lock_irqsave(&sal_record_lock, flags);
+	memset(sal_record, 0, ia64_sal_get_state_info_size(arg->type));
+	arg->ret = ia64_sal_get_state_info(arg->type, (u64 *)sal_record);
+	IA64_SAL_DEBUG("SAL_GET_STATE_INFO(%s) on CPU#%d returns %ld.\n",
+	               rec_name[arg->type], smp_processor_id(), arg->ret);
+	if (arg->corrected) {
+		sal_record->severity = sal_log_severity_corrected;
+		IA64_SAL_DEBUG("%s: IA64_SAL_CLEAR_STATE_INFO(SAL_INFO_TYPE_MCA)"
+		               " force\n", __FUNCTION__);
+	}
+	if (arg->ret > 0) {
+	  	/*
+		 * Save current->domain and set to local(caller) domain for
+		 * xencomm_paddr_to_maddr() which calculates maddr from
+		 * paddr using mpa value of current->domain.
+		 */
+		struct domain *save;
+		save = current->domain;
+		current->domain = arg->domain;
+		if (xencomm_copy_to_guest((void*)arg->target,
+		                          sal_record, arg->ret, 0)) {
+			printk("SAL_GET_STATE_INFO can't copy to user!!!!\n");
+			arg->status = IA64_SAL_NO_INFORMATION_AVAILABLE;
+			arg->ret = 0;
+		}
+	  	/* Restore current->domain to saved value. */
+		current->domain = save;
+	}
+	spin_unlock_irqrestore(&sal_record_lock, flags);
+}
+
+void clear_state_info_on(void *data) {
+	struct smp_call_args_t *arg = data;
+
+	arg->ret = ia64_sal_clear_state_info(arg->type);
+	IA64_SAL_DEBUG("SAL_CLEAR_STATE_INFO(%s) on CPU#%d returns %ld.\n",
+	               rec_name[arg->type], smp_processor_id(), arg->ret);
+
+}
+  
 struct sal_ret_values
 sal_emulator (long index, unsigned long in1, unsigned long in2,
 	      unsigned long in3, unsigned long in4, unsigned long in5,
@@ -106,27 +194,160 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 			}
  		}
  		else
- 			printk("*** CALLED SAL_SET_VECTORS %lu.  IGNORED...\n",
- 			       in1);
+		{
+			if (in1 > sizeof(sal_vectors)/sizeof(sal_vectors[0])-1)
+				BUG();
+			sal_vectors[in1].vector_type	= in1;
+			sal_vectors[in1].handler_addr1	= in2;
+			sal_vectors[in1].gp1		= in3;
+			sal_vectors[in1].handler_len1	= in4;
+			sal_vectors[in1].handler_addr2	= in5;
+			sal_vectors[in1].gp2		= in6;
+			sal_vectors[in1].handler_len2	= in7;
+		}
 		break;
 	    case SAL_GET_STATE_INFO:
-		/* No more info.  */
-		status = -5;
-		r9 = 0;
+		if (current->domain == dom0) {
+			sal_queue_entry_t *e;
+			unsigned long flags;
+			struct smp_call_args_t arg;
+
+			spin_lock_irqsave(&sal_queue_lock, flags);
+			if (list_empty(&sal_queue[in1])) {
+				sal_log_record_header_t header;
+				XEN_GUEST_HANDLE(void) handle =
+					*(XEN_GUEST_HANDLE(void)*)&in3;
+
+				IA64_SAL_DEBUG("SAL_GET_STATE_INFO(%s) "
+				               "no sal_queue entry found.\n",
+				               rec_name[in1]);
+				memset(&header, 0, sizeof(header));
+
+				if (copy_to_guest(handle, &header, 1)) {
+					printk("sal_emulator: "
+					       "SAL_GET_STATE_INFO can't copy "
+					       "empty header to user: 0x%lx\n",
+					       in3);
+				}
+				status = IA64_SAL_NO_INFORMATION_AVAILABLE;
+				r9 = 0;
+				spin_unlock_irqrestore(&sal_queue_lock, flags);
+				break;
+			}
+			e = list_entry(sal_queue[in1].next,
+			               sal_queue_entry_t, list);
+			spin_unlock_irqrestore(&sal_queue_lock, flags);
+
+			IA64_SAL_DEBUG("SAL_GET_STATE_INFO(%s <= %s) "
+			               "on CPU#%d.\n",
+			               rec_name[e->sal_info_type],
+			               rec_name[in1], e->cpuid);
+
+			arg.type = e->sal_info_type;
+			arg.target = in3;
+			arg.corrected = !!((in1 != e->sal_info_type) && 
+			                (e->sal_info_type == SAL_INFO_TYPE_MCA));
+			arg.domain = current->domain;
+			arg.status = 0;
+
+			if (e->cpuid == smp_processor_id()) {
+				IA64_SAL_DEBUG("SAL_GET_STATE_INFO: local\n");
+				get_state_info_on(&arg);
+			} else {
+				int ret;
+				IA64_SAL_DEBUG("SAL_GET_STATE_INFO: remote\n");
+				ret = smp_call_function_single(e->cpuid,
+				                               get_state_info_on,
+				                               &arg, 0, 1);
+				if (ret < 0) {
+					printk("SAL_GET_STATE_INFO "
+					       "smp_call_function_single error:"
+					       " %d\n", ret);
+					arg.ret = 0;
+					arg.status =
+					     IA64_SAL_NO_INFORMATION_AVAILABLE;
+				}
+			}
+			r9 = arg.ret;
+			status = arg.status;
+			if (r9 == 0) {
+				spin_lock_irqsave(&sal_queue_lock, flags);
+				list_del(&e->list);
+				spin_unlock_irqrestore(&sal_queue_lock, flags);
+				xfree(e);
+			}
+		} else {
+			status = IA64_SAL_NO_INFORMATION_AVAILABLE;
+			r9 = 0;
+		}
 		break;
 	    case SAL_GET_STATE_INFO_SIZE:
-		/* Return a dummy size.  */
-		status = 0;
-		r9 = 128;
+		r9 = ia64_sal_get_state_info_size(in1);
 		break;
 	    case SAL_CLEAR_STATE_INFO:
-		/* Noop.  */
+		if (current->domain == dom0) {
+			sal_queue_entry_t *e;
+			unsigned long flags;
+			struct smp_call_args_t arg;
+
+			spin_lock_irqsave(&sal_queue_lock, flags);
+			if (list_empty(&sal_queue[in1])) {
+				IA64_SAL_DEBUG("SAL_CLEAR_STATE_INFO(%s) "
+				               "no sal_queue entry found.\n",
+				               rec_name[in1]);
+				status = IA64_SAL_NO_INFORMATION_AVAILABLE;
+				r9 = 0;
+				spin_unlock_irqrestore(&sal_queue_lock, flags);
+				break;
+			}
+			e = list_entry(sal_queue[in1].next,
+			               sal_queue_entry_t, list);
+
+			list_del(&e->list);
+			spin_unlock_irqrestore(&sal_queue_lock, flags);
+
+			IA64_SAL_DEBUG("SAL_CLEAR_STATE_INFO(%s <= %s) "
+			               "on CPU#%d.\n",
+			               rec_name[e->sal_info_type],
+			               rec_name[in1], e->cpuid);
+			
+
+			arg.type = e->sal_info_type;
+			arg.status = 0;
+			if (e->cpuid == smp_processor_id()) {
+				IA64_SAL_DEBUG("SAL_CLEAR_STATE_INFO: local\n");
+				clear_state_info_on(&arg);
+			} else {
+				int ret;
+				IA64_SAL_DEBUG("SAL_CLEAR_STATE_INFO: remote\n");
+				ret = smp_call_function_single(e->cpuid,
+					clear_state_info_on, &arg, 0, 1);
+				if (ret < 0) {
+					printk("sal_emulator: "
+					       "SAL_CLEAR_STATE_INFO "
+					       "smp_call_function_single error:"
+					       " %d\n", ret);
+					arg.ret = 0;
+					arg.status =
+					     IA64_SAL_NO_INFORMATION_AVAILABLE;
+				}
+			}
+			r9 = arg.ret;
+			status = arg.status;
+			xfree(e);
+		}
 		break;
 	    case SAL_MC_RENDEZ:
 		printk("*** CALLED SAL_MC_RENDEZ.  IGNORED...\n");
 		break;
 	    case SAL_MC_SET_PARAMS:
-		printk("*** CALLED SAL_MC_SET_PARAMS.  IGNORED...\n");
+		if (in1 > sizeof(sal_mc_params)/sizeof(sal_mc_params[0]))
+			BUG();
+		sal_mc_params[in1].param_type	= in1;
+		sal_mc_params[in1].i_or_m	= in2;
+		sal_mc_params[in1].i_or_m_val	= in3;
+		sal_mc_params[in1].timeout	= in4;
+		sal_mc_params[in1].rz_always	= in5;
 		break;
 	    case SAL_CACHE_FLUSH:
 		if (1) {

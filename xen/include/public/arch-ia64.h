@@ -59,6 +59,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 
 /* Arch specific VIRQs definition */
 #define VIRQ_ITC        VIRQ_ARCH_0 /* V. Virtual itc timer */
+#define VIRQ_MCA_CMC    VIRQ_ARCH_1 /* MCA cmc interrupt */
+#define VIRQ_MCA_CPE    VIRQ_ARCH_2 /* MCA cpe interrupt */
 
 /* Maximum number of virtual CPUs in multi-processor guests. */
 /* WARNING: before changing this, check that shared_info fits on a page */

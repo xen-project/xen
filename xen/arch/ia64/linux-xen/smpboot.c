@@ -365,9 +365,7 @@ smp_callin (void)
 
 	smp_setup_percpu_timer();
 
-#ifndef XEN
 	ia64_mca_cmc_vector_setup();	/* Setup vector on AP */
-#endif
 
 #ifdef CONFIG_PERFMON
 	pfm_init_percpu();

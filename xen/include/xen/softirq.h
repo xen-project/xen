@@ -9,7 +9,13 @@
 #define NMI_SOFTIRQ                       4
 #define PAGE_SCRUB_SOFTIRQ                5
 #define TRACE_SOFTIRQ                     6
+#ifdef	__ia64__
+#define CMC_DISABLE_SOFTIRQ               7
+#define CMC_ENABLE_SOFTIRQ                8
+#define NR_SOFTIRQS                       9
+#else	/* __ia64__ */
 #define NR_SOFTIRQS                       7
+#endif	/* __ia64__ */
 
 #ifndef __ASSEMBLY__
 

@@ -46,8 +46,6 @@ typedef union {
 // this def for vcpu_regs won't work if kernel stack is present
 //#define       vcpu_regs(vcpu) ((struct pt_regs *) vcpu->arch.regs
 
-#define	TRUE			1
-#define	FALSE			0
 #define	IA64_PTA_SZ_BIT		2
 #define	IA64_PTA_VF_BIT		8
 #define	IA64_PTA_BASE_BIT	15
