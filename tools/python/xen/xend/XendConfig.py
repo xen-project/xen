@@ -17,6 +17,7 @@
 
 import re
 import time
+import types
 
 from xen.xend import sxp
 from xen.xend import uuid
@@ -450,11 +451,36 @@ class XendConfig(dict):
         for c in sxp.children(parsed, 'backend'):
             cfg['backend'].append(sxp.name(sxp.child0(c)))
 
+        # Parsing the device SXP's. In most cases, the SXP looks
+        # like this:
+        #
+        # [device, [vif, [mac, xx:xx:xx:xx:xx:xx], [ip 1.3.4.5]]]
+        #
+        # However, for PCI devices it looks like this:
+        #
+        # [device, [pci, [dev, [domain, 0], [bus, 0], [slot, 1]]]]
+        #
+        # It seems the reasoning for this difference is because
+        # pciif.py needs all the PCI device configurations at
+        # the same time when creating the devices.
+        #
+        # To further complicate matters, Xen 2.0 configuration format
+        # uses the following for pci device configuration:
+        #
+        # [device, [pci, [domain, 0], [bus, 0], [dev, 1], [func, 2]]]
+        #
+        # Hence we deal with pci device configurations outside of
+        # the regular device parsing.
+        
         cfg['device'] = {}
         for dev in sxp.children(parsed, 'device'):
             config = sxp.child0(dev)
             dev_type = sxp.name(config)
             dev_info = {}
+            
+            if dev_type == 'pci':
+                continue 
+            
             for opt, val in config[1:]:
                 dev_info[opt] = val
             log.debug("XendConfig: reading device: %s" % dev_info)
@@ -462,9 +488,34 @@ class XendConfig(dict):
             dev_uuid = dev_info.get('uuid', uuid.createString())
             dev_info['uuid'] = dev_uuid
             cfg['device'][dev_uuid] = (dev_type, dev_info)
-            
-            #cfg['device'].append((sxp.name(config), config))
 
+        # deal with PCI device configurations if they exist
+        for dev in sxp.children(parsed, 'device'):
+            config = sxp.child0(dev)
+            dev_type = sxp.name(config)
+
+            if dev_type != 'pci':
+                continue
+            
+            dev_attr = sxp.child_value(config, 'dev')
+            if isinstance(dev_attr, (types.ListType, types.TupleType)):
+                for pci_dev in sxp.children(config, 'dev'):
+                    dev_info = {}
+                    for opt, val in pci_dev[1:]:
+                        dev_info[opt] = val
+                    log.debug("XendConfig: reading device: %s" % dev_info)
+                    dev_uuid = dev_info.get('uuid', uuid.createString())
+                    dev_info['uuid'] = dev_uuid
+                    cfg['device'][dev_uuid] = (dev_type, dev_info)
+                    
+            else: # Xen 2.0 PCI device configuration
+                for opt, val in config[1:]:
+                    dev_info[opt] = val
+                log.debug("XendConfig: reading device: %s" % dev_info)
+                # create uuid if it doesn't
+                dev_uuid = dev_info.get('uuid', uuid.createString())
+                dev_info['uuid'] = dev_uuid
+                cfg['device'][dev_uuid] = (dev_type, dev_info)
 
         # Extract missing data from configuration entries
         if 'image' in cfg:
@@ -859,10 +910,27 @@ class XendConfig(dict):
         return sxpr
 
     def all_devices_sxpr(self):
+        """Returns the SXPR for all devices in the current configuration."""
         sxprs = []
+        pci_devs = []
         for dev_type, dev_info in self['device'].values():
-            sxpr =  self.device_sxpr(dev_type = dev_type, dev_info = dev_info)
-            sxprs.append((dev_type, sxpr))
+            if dev_type == 'pci': # special case for pci devices
+                pci_devs.append(dev_info)
+            else:
+                sxpr =  self.device_sxpr(dev_type = dev_type,
+                                         dev_info = dev_info)
+                sxprs.append((dev_type, sxpr))
+
+        # if we have any pci_devs, we parse them differently into
+        # one single pci SXP entry.
+        if pci_devs:
+            sxpr = ['pci',]
+            for dev_info in pci_devs:
+                dev_sxpr = self.device_sxpr(dev_type = 'dev',
+                                            dev_info = dev_info)
+                sxpr.append(dev_sxpr)
+            sxprs.append(('pci', sxpr))
+            
         return sxprs
 
                      
