@@ -825,7 +825,9 @@ static void tx_add_credit(netif_t *netif)
 	max_burst = max(max_burst, netif->credit_bytes);
 
 	/* Take care that adding a new chunk of credit doesn't wrap to zero. */
-	max_credit = max(netif->remaining_credit + netif->credit_bytes, ~0UL);
+	max_credit = netif->remaining_credit + netif->credit_bytes;
+	if (max_credit < netif->remaining_credit)
+		max_credit = ULONG_MAX; /* wrapped: clamp to ULONG_MAX */
 
 	netif->remaining_credit = min(max_credit, max_burst);
 }
