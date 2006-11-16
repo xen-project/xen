@@ -328,7 +328,7 @@ class HVMImageHandler(ImageHandler):
 
             if a in ['fda', 'fdb' ]:
                 if v:
-                    if not os.path.isfile(v):
+                    if not os.path.isabs(v):
                         raise VmError("Floppy file %s does not exist." % v)
             log.debug("args: %s, val: %s" % (a,v))
 
