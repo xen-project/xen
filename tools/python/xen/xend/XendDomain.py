@@ -1049,7 +1049,7 @@ class XendDomain:
             raise XendInvalidDomain(str(domid))
 
         if dominfo.getDomid() == DOM0_ID:
-            raise XendError("Cannot migrate privileged domain %i" % domid)
+            raise XendError("Cannot migrate privileged domain %s" % domid)
 
         """ The following call may raise a XendError exception """
         dominfo.testMigrateDevices(True, dst)
