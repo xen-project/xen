@@ -2798,8 +2798,9 @@ static int sh_page_fault(struct vcpu *v,
      * We do not emulate user writes. Instead we use them as a hint that the
      * page is no longer a page table. This behaviour differs from native, but
      * it seems very unlikely that any OS grants user access to page tables.
+     * We also disallow guest PTE updates from within Xen.
      */
-    if ( (regs->error_code & PFEC_user_mode) ||
+    if ( (regs->error_code & PFEC_user_mode) || !guest_mode(regs) ||
          x86_emulate_memop(&emul_ctxt, &shadow_emulator_ops) )
     {
         SHADOW_PRINTK("emulator failure, unshadowing mfn %#lx\n", 
@@ -2839,6 +2840,8 @@ static int sh_page_fault(struct vcpu *v,
     goto done;
 
  mmio:
+    if ( !guest_mode(regs) )
+        goto not_a_shadow_fault;
     perfc_incrc(shadow_fault_mmio);
     sh_audit_gw(v, &gw);
     unmap_walk(v, &gw);
