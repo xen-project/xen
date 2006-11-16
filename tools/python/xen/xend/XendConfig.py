@@ -60,6 +60,7 @@ XENAPI_HVM_CFG = {
     'platform_serial' : 'serial',
     'platform_localtime': 'localtime',
     'platform_enable_audio': 'soundhw',
+    'platform_keymap' : 'keymap',
 }    
 
 XENAPI_UNSUPPORTED_IN_LEGACY_CFG = [
@@ -82,6 +83,7 @@ XENAPI_UNSUPPORTED_IN_LEGACY_CFG = [
     'platform_localtime',
     'platform_clock_offset',
     'platform_enable_audio',
+    'platform_keymap',
     'builder',
     'grub_cmdline',
     'pci_bus',

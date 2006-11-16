@@ -309,13 +309,14 @@ class HVMImageHandler(ImageHandler):
     def parseDeviceModelArgs(self, imageConfig, deviceConfig):
         dmargs = [ 'boot', 'fda', 'fdb', 'soundhw',
                    'localtime', 'serial', 'stdvga', 'isa', 'vcpus',
-                   'acpi', 'usb', 'usbdevice']
+                   'acpi', 'usb', 'usbdevice', 'keymap' ]
         ret = []
         for a in dmargs:
             v = sxp.child_value(imageConfig, a)
 
             # python doesn't allow '-' in variable names
             if a == 'stdvga': a = 'std-vga'
+            if a == 'keymap': a = 'k'
 
             # Handle booleans gracefully
             if a in ['localtime', 'std-vga', 'isa', 'usb', 'acpi']:
@@ -384,8 +385,6 @@ class HVMImageHandler(ImageHandler):
                 ret += ['-vncunused']
             else:
                 ret += ['-vnc', '%d' % vncdisplay]
-
-            ret += ['-k', 'en-us']
 
             vnclisten = sxp.child_value(config, 'vnclisten')
             if not(vnclisten):

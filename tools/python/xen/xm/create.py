@@ -387,6 +387,10 @@ gopts.var('localtime', val='no|yes',
           fn=set_bool, default=0,
           use="Is RTC set to localtime?")
 
+gopts.var('keymap', val='FILE',
+          fn=set_value, default='',
+          use="Set keyboard layout used")
+
 gopts.var('usb', val='no|yes',
           fn=set_bool, default=0,
           use="Emulate USB devices?")
@@ -660,7 +664,7 @@ def configure_hvm(config_image, vals):
              'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'soundhw',
              'vnc', 'vncdisplay', 'vncunused', 'vncconsole', 'vnclisten',
              'sdl', 'display', 'xauthority',
-             'acpi', 'usb', 'usbdevice' ]
+             'acpi', 'usb', 'usbdevice', 'keymap' ]
     for a in args:
         if (vals.__dict__[a]):
             config_image.append([a, vals.__dict__[a]])
