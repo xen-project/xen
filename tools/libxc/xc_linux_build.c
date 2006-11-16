@@ -1156,7 +1156,6 @@ static int xc_linux_build_internal(int xc_handle,
     ctxt->user_regs.cr_iip = vkern_entry;
     ctxt->user_regs.cr_ifs = 1UL << 63;
     ctxt->user_regs.ar_fpsr = xc_ia64_fpsr_default();
-    i = 0; /* silence unused variable warning */
 #else /* x86 */
     /*
      * Initial register values:
