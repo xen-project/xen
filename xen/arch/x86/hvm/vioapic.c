@@ -471,8 +471,8 @@ void vioapic_set_irq(struct domain *d, int irq, int level)
     struct vioapic *vioapic = domain_vioapic(d);
     uint32_t bit;
 
-    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic_set_irq "
-                "irq %x level %x\n", irq, level);
+    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic_set_irq irq %x level %x", 
+                irq, level);
 
     if ( (irq < 0) || (irq >= VIOAPIC_NUM_PINS) )
         return;

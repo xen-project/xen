@@ -723,7 +723,10 @@ static void svm_freeze_time(struct vcpu *v)
             && !v->arch.hvm_vcpu.guest_time ) {
         v->arch.hvm_vcpu.guest_time = hvm_get_guest_time(v);
         if ( test_bit(_VCPUF_blocked, &v->vcpu_flags) )
+        {
             stop_timer(&pt->timer);
+            rtc_freeze(v);
+        }
     }
 }
 
@@ -850,24 +853,6 @@ int start_svm(void)
 }
 
 
-static void svm_migrate_timers(struct vcpu *v)
-{
-    struct periodic_time *pt = 
-        &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
-    struct RTCState *vrtc = &v->domain->arch.hvm_domain.pl_time.vrtc;
-    struct PMTState *vpmt = &v->domain->arch.hvm_domain.pl_time.vpmt;
-
-    if ( pt->enabled )
-    {
-        migrate_timer(&pt->timer, v->processor);
-    }
-    migrate_timer(&vcpu_vlapic(v)->vlapic_timer, v->processor);
-    migrate_timer(&vrtc->second_timer, v->processor);
-    migrate_timer(&vrtc->second_timer2, v->processor);
-    migrate_timer(&vpmt->timer, v->processor);
-}
-
-
 void arch_svm_do_resume(struct vcpu *v) 
 {
     /* pinning VCPU to a different core? */
@@ -880,7 +865,7 @@ void arch_svm_do_resume(struct vcpu *v)
             printk("VCPU core pinned: %d to %d\n", 
                    v->arch.hvm_svm.launch_core, smp_processor_id() );
         v->arch.hvm_svm.launch_core = smp_processor_id();
-        svm_migrate_timers( v );
+        hvm_migrate_timers( v );
         hvm_do_resume( v );
         reset_stack_and_jump( svm_asm_do_resume );
     }

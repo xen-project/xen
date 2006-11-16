@@ -536,8 +536,6 @@ int is_periodic_irq(struct vcpu *v, int irq, int type)
     int vec;
     struct periodic_time *pt =
         &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
-    struct RTCState *vrtc =
-        &(v->domain->arch.hvm_domain.pl_time.vrtc);
 
     if (pt->irq == 0) { /* Is it pit irq? */
         if (type == APIC_DM_EXTINT)
@@ -547,16 +545,6 @@ int is_periodic_irq(struct vcpu *v, int irq, int type)
 
         if (irq == vec)
             return 1;
-    }
-
-    if (pt->irq == 8) { /* Or rtc irq? */
-        if (type == APIC_DM_EXTINT)
-            vec = domain_vpic(v->domain)->pics[1].irq_base;
-        else
-            vec = domain_vioapic(v->domain)->redirtbl[8].fields.vector;
-
-        if (irq == vec)
-            return is_rtc_periodic_irq(vrtc);
     }
 
     return 0;

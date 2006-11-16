@@ -74,6 +74,20 @@ void hvm_set_guest_time(struct vcpu *v, u64 gtime)
     hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
 }
 
+void hvm_migrate_timers(struct vcpu *v)
+{
+    struct periodic_time *pt = &v->domain->arch.hvm_domain.pl_time.periodic_tm;
+    struct PMTState *vpmt = &v->domain->arch.hvm_domain.pl_time.vpmt;
+
+    if ( pt->enabled )
+    {
+        migrate_timer(&pt->timer, v->processor);
+    }
+    migrate_timer(&vcpu_vlapic(v)->vlapic_timer, v->processor);
+    migrate_timer(&vpmt->timer, v->processor);
+    rtc_migrate_timers(v);
+}
+
 void hvm_do_resume(struct vcpu *v)
 {
     ioreq_t *p;
@@ -91,6 +105,9 @@ void hvm_do_resume(struct vcpu *v)
         }
         pickup_deactive_ticks(pt);
     }
+
+    /* Re-enable the RTC timer if needed */
+    rtc_thaw(v);
 
     /* NB. Optimised for common case (p->state == STATE_IOREQ_NONE). */
     p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;

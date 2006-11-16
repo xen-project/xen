@@ -67,8 +67,10 @@ typedef struct RTCState {
     int64_t next_second_time;
     struct timer second_timer;
     struct timer second_timer2;
+    struct timer pie_timer;
+    int period;
+    s_time_t next_pie;
     struct vcpu      *vcpu;
-    struct periodic_time *pt;
 } RTCState;
 
 #define FREQUENCE_PMTIMER  3579545
@@ -143,9 +145,11 @@ extern void destroy_periodic_time(struct periodic_time *pt);
 void pit_init(struct vcpu *v, unsigned long cpu_khz);
 void rtc_init(struct vcpu *v, int base, int irq);
 void rtc_deinit(struct domain *d);
+void rtc_freeze(struct vcpu *v);
+void rtc_thaw(struct vcpu *v);
+void rtc_migrate_timers(struct vcpu *v);
 void pmtimer_init(struct vcpu *v, int base);
 void pmtimer_deinit(struct domain *d);
-int is_rtc_periodic_irq(void *opaque);
 void pt_timer_fn(void *data);
 void pit_time_fired(struct vcpu *v, void *priv);
 

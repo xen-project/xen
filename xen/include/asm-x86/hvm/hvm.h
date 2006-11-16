@@ -161,6 +161,7 @@ hvm_get_guest_ctrl_reg(struct vcpu *v, unsigned int num)
 
 void hvm_stts(struct vcpu *v);
 void hvm_set_guest_time(struct vcpu *v, u64 gtime);
+void hvm_migrate_timers(struct vcpu *v);
 void hvm_do_resume(struct vcpu *v);
 
 static inline void

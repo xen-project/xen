@@ -376,14 +376,18 @@ static inline void vmx_restore_dr(struct vcpu *v)
 
 static void vmx_freeze_time(struct vcpu *v)
 {
-    struct periodic_time *pt=&v->domain->arch.hvm_domain.pl_time.periodic_tm;
+    struct hvm_domain *plat = &v->domain->arch.hvm_domain;
+    struct periodic_time *pt = &plat->pl_time.periodic_tm;
 
     if ( pt->enabled && pt->first_injected
             && (v->vcpu_id == pt->bind_vcpu)
             && !v->arch.hvm_vcpu.guest_time ) {
         v->arch.hvm_vcpu.guest_time = hvm_get_guest_time(v);
         if ( !test_bit(_VCPUF_blocked, &v->vcpu_flags) )
+        {
             stop_timer(&pt->timer);
+            rtc_freeze(v);
+        }
     }
 }
 
@@ -407,22 +411,6 @@ static void stop_vmx(void)
         return;
     __vmxoff();
     clear_in_cr4(X86_CR4_VMXE);
-}
-
-void vmx_migrate_timers(struct vcpu *v)
-{
-    struct periodic_time *pt = &v->domain->arch.hvm_domain.pl_time.periodic_tm;
-    struct RTCState *vrtc = &v->domain->arch.hvm_domain.pl_time.vrtc;
-    struct PMTState *vpmt = &v->domain->arch.hvm_domain.pl_time.vpmt;
-
-    if ( pt->enabled )
-    {
-        migrate_timer(&pt->timer, v->processor);
-    }
-    migrate_timer(&vcpu_vlapic(v)->vlapic_timer, v->processor);
-    migrate_timer(&vrtc->second_timer, v->processor);
-    migrate_timer(&vrtc->second_timer2, v->processor);
-    migrate_timer(&vpmt->timer, v->processor);
 }
 
 static void vmx_store_cpu_guest_regs(
