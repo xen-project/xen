@@ -3831,7 +3831,6 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
 
     sh_unmap_domain_page(addr);
     shadow_audit_tables(v);
-    check_for_early_unshadow(v, mfn);
     return rv;
 }
 
@@ -3866,7 +3865,6 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
 
     sh_unmap_domain_page(addr);
     shadow_audit_tables(v);
-    check_for_early_unshadow(v, mfn);
     return rv;
 }
 
