@@ -813,7 +813,7 @@ int construct_dom0(struct domain *d,
      *          ESI = start_info
      *  [EAX,EBX,ECX,EDX,EDI,EBP are zero]
      */
-    regs = &d->arch.guest_context.user_regs;
+    regs = &v->arch.guest_context.user_regs;
     regs->ds = regs->es = regs->fs = regs->gs = FLAT_KERNEL_DS;
     regs->ss = FLAT_KERNEL_SS;
     regs->cs = FLAT_KERNEL_CS;
