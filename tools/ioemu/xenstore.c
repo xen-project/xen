@@ -100,7 +100,7 @@ void xenstore_parse_domain_config(int domid)
 	if (strncmp(dev, "hd", 2) || strlen(dev) != 3)
 	    continue;
 	hd_index = dev[2] - 'a';
-	if (hd_index > MAX_DISKS)
+	if (hd_index >= MAX_DISKS)
 	    continue;
 	/* read the type of the device */
 	if (pasprintf(&buf, "%s/device/vbd/%s/device-type", path, e[i]) == -1)
