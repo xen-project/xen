@@ -29,6 +29,7 @@
 #include <xen/mm.h>
 #include <xen/errno.h>
 #include <xen/guest_access.h>
+#include <xen/multicall.h>
 #include <public/sched.h>
 
 extern void arch_getdomaininfo_ctxt(struct vcpu *,
