@@ -948,10 +948,10 @@ class XendDomain:
             dominfo = self.domain_lookup_nr(domid)
             if not dominfo:
                 raise XendInvalidDomain(str(domid))
-            
+            if dominfo.getDomid() == DOM0_ID:
+                raise XendError("Cannot unpause privileged domain %s" % domid)
             log.info("Domain %s (%d) unpaused.", dominfo.getName(),
                      int(dominfo.getDomid()))
-            
             dominfo.unpause()
         except XendInvalidDomain:
             log.exception("domain_unpause")
@@ -973,6 +973,8 @@ class XendDomain:
             dominfo = self.domain_lookup_nr(domid)
             if not dominfo:
                 raise XendInvalidDomain(str(domid))
+            if dominfo.getDomid() == DOM0_ID:
+                raise XendError("Cannot pause privileged domain %s" % domid)
             log.info("Domain %s (%d) paused.", dominfo.getName(),
                      int(dominfo.getDomid()))
             dominfo.pause()
