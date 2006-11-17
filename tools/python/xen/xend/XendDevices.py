@@ -49,6 +49,11 @@ class XendDevices:
     valid_devices = classmethod(valid_devices)
 
     #@classmethod
+    def pseudo_devices(cls):
+        return ['console']
+    pseudo_devices = classmethod(pseudo_devices)
+
+    #@classmethod
     def make_controller(cls, name, domain):
         """Factory function to make device controllers per domain.
 

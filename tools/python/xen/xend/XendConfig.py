@@ -780,7 +780,8 @@ class XendConfig(dict):
 
         # Verify devices
         for d_uuid, (d_type, d_info) in self['device'].items():
-            if d_type not in XendDevices.valid_devices():
+            if d_type not in XendDevices.valid_devices() and \
+               d_type not in XendDevices.pseudo_devices():
                 raise XendConfigError('Invalid device (%s)' % d_type)
 
         # Verify restart modes
@@ -798,7 +799,8 @@ class XendConfig(dict):
             self['vtpm_refs'] = []
 
     def device_add(self, dev_type, cfg_sxp = None, cfg_xenapi = None):
-        if dev_type not in XendDevices.valid_devices():
+        if dev_type not in XendDevices.valid_devices() and \
+           dev_type not in XendDevices.pseudo_devices():
             raise XendConfigError("XendConfig: %s not a valid device type" %
                             dev_type)
 
@@ -917,8 +919,8 @@ class XendConfig(dict):
             if dev_type == 'pci': # special case for pci devices
                 pci_devs.append(dev_info)
             else:
-                sxpr =  self.device_sxpr(dev_type = dev_type,
-                                         dev_info = dev_info)
+                sxpr = self.device_sxpr(dev_type = dev_type,
+                                        dev_info = dev_info)
                 sxprs.append((dev_type, sxpr))
 
         # if we have any pci_devs, we parse them differently into

@@ -1119,8 +1119,9 @@ class XendDomainInfo:
         @raise: VmError for invalid devices
         """
         for (devclass, config) in self.info.all_devices_sxpr():
-            log.info("createDevice: %s : %s" % (devclass, config))
-            self._createDevice(devclass, config)
+            if devclass in XendDevices.valid_devices():
+                log.info("createDevice: %s : %s" % (devclass, config))
+                self._createDevice(devclass, config)
 
         if self.image:
             self.image.createDeviceModel()
