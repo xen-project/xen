@@ -994,7 +994,7 @@ do_grant_table_op(
         if ( unlikely(!guest_handle_okay(map, count)) )
             goto out;
         rc = -EPERM;
-        if ( unlikely(!grant_flip_permitted(d)) )
+        if ( unlikely(!grant_operation_permitted(d)) )
             goto out;
         rc = gnttab_map_grant_ref(map, count);
         break;
@@ -1006,7 +1006,7 @@ do_grant_table_op(
         if ( unlikely(!guest_handle_okay(unmap, count)) )
             goto out;
         rc = -EPERM;
-        if ( unlikely(!grant_flip_permitted(d)) )
+        if ( unlikely(!grant_operation_permitted(d)) )
             goto out;
         rc = gnttab_unmap_grant_ref(unmap, count);
         break;
@@ -1024,7 +1024,7 @@ do_grant_table_op(
         if ( unlikely(!guest_handle_okay(transfer, count)) )
             goto out;
         rc = -EPERM;
-        if ( unlikely(!grant_flip_permitted(d)) )
+        if ( unlikely(!grant_operation_permitted(d)) )
             goto out;
         rc = gnttab_transfer(transfer, count);
         break;

@@ -36,7 +36,7 @@
  * domains with no hardware-access privileges to perform grant map/transfer
  * operations.
  */
-#define grant_operations_permitted(d)                   \
+#define grant_operation_permitted(d)                    \
     (!rangeset_is_empty((d)->iomem_caps))
 
 #endif /* __XEN_IOCAP_H__ */
