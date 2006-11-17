@@ -90,6 +90,23 @@ void *memcpy(void *dest, const void *src, unsigned n)
 	return dest;
 }
 
+void *memmove(void *dest, const void *src, unsigned n)
+{
+	if ((long)dest > (long)src) {
+		n--;
+		while (n > 0) {
+			((char *)dest)[n] = ((char *)src)[n];
+			n--;
+		}
+	} else {
+		memcpy(dest, src, n);
+	}
+	return dest;
+}
+
+
+
+
 void puts(const char *s)
 {
 	while (*s)
@@ -228,4 +245,38 @@ uuid_to_string(char *dest, uint8_t *uuid)
 		p += 2;
 	}
 	*p = 0;
+}
+
+#include <xen/hvm/e820.h>
+#define E820_MAP_NR ((unsigned char *)E820_MAP_PAGE + E820_MAP_NR_OFFSET)
+#define E820_MAP    ((struct e820entry *)(E820_MAP_PAGE + E820_MAP_OFFSET))
+uint64_t e820_malloc(uint64_t size, uint32_t type, uint64_t mask)
+{
+	uint64_t addr = 0;
+	int c = *E820_MAP_NR - 1;
+	struct e820entry *e820entry = (struct e820entry *)E820_MAP;
+
+	while (c >= 0) {
+		if (e820entry[c].type  == E820_RAM     &&
+		    (e820entry[c].addr & (~mask)) == 0 &&
+		    e820entry[c].size >= size) {
+			addr = e820entry[c].addr;
+			if (e820entry[c].size != size) {
+				(*E820_MAP_NR)++;
+				memmove(&e820entry[c+1],
+				        &e820entry[c],
+				        (*E820_MAP_NR - c) *
+				            sizeof(struct e820entry));
+				e820entry[c].size -= size;
+				addr += e820entry[c].size;
+				c++;
+			}
+			e820entry[c].addr = addr;
+			e820entry[c].size = size;
+			e820entry[c].type = type;
+			break;
+		}
+		c--;
+	}
+        return addr;
 }

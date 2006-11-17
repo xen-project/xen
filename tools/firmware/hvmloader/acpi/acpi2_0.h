@@ -34,6 +34,11 @@ typedef   signed long int64_t;
 
 #include <xen/xen.h>
 
+#define ASCII32(a,b,c,d)         \
+    (((a) <<  0) | ((b) <<  8) | ((c) << 16) | ((d) << 24))
+#define ASCII64(a,b,c,d,e,f,g,h) \
+    (((uint64_t)ASCII32(a,b,c,d)) | (((uint64_t)ASCII32(e,f,g,h)) << 32))
+
 #pragma pack (1)
 
 /*
@@ -52,7 +57,7 @@ struct acpi_header {
 };
 
 #define ACPI_OEM_ID             {'I','N','T','E','L',' '}
-#define ACPI_OEM_TABLE_ID       0x544244   /* "TBD" */
+#define ACPI_OEM_TABLE_ID       ASCII32(' ','T','B','D')
 #define ACPI_OEM_REVISION       0x00000002
 #define ACPI_CREATOR_ID         0x00       /* TBD */
 #define ACPI_CREATOR_REVISION   0x00000002
@@ -126,6 +131,20 @@ struct acpi_20_xsdt {
     uint64_t entry[ACPI_MAX_NUM_TABLES];
 };
 #define ACPI_2_0_XSDT_REVISION 0x01
+
+/*
+ * TCG Hardware Interface Table (TCPA)
+ */
+
+typedef struct _ACPI_2_0_TCPA_CLIENT {
+    struct acpi_header header;
+    uint16_t PlatformClass;
+    uint32_t LAML;
+    uint64_t LASA;
+} ACPI_2_0_TCPA_CLIENT;
+
+#define ACPI_2_0_TCPA_REVISION 0x02
+#define ACPI_2_0_TCPA_LAML_SIZE (64*1024)
 
 /*
  * Fixed ACPI Description Table Structure (FADT).
@@ -297,12 +316,13 @@ struct acpi_20_madt {
 /*
  * Table Signatures.
  */
-#define ACPI_2_0_RSDP_SIGNATURE 0x2052545020445352LL /* "RSD PTR " */
-#define ACPI_2_0_FACS_SIGNATURE 0x53434146 /* "FACS" */
-#define ACPI_2_0_FADT_SIGNATURE 0x50434146 /* "FADT" */
-#define ACPI_2_0_MADT_SIGNATURE 0x43495041 /* "APIC" */
-#define ACPI_2_0_RSDT_SIGNATURE 0x54445352 /* "RSDT" */
-#define ACPI_2_0_XSDT_SIGNATURE 0x54445358 /* "XSDT" */
+#define ACPI_2_0_RSDP_SIGNATURE ASCII64('R','S','D',' ','P','T','R',' ')
+#define ACPI_2_0_FACS_SIGNATURE ASCII32('F','A','C','S')
+#define ACPI_2_0_FADT_SIGNATURE ASCII32('F','A','C','P')
+#define ACPI_2_0_MADT_SIGNATURE ASCII32('A','P','I','C')
+#define ACPI_2_0_RSDT_SIGNATURE ASCII32('R','S','D','T')
+#define ACPI_2_0_XSDT_SIGNATURE ASCII32('X','S','D','T')
+#define ACPI_2_0_TCPA_SIGNATURE ASCII32('T','C','P','A')
 
 #pragma pack ()
 
