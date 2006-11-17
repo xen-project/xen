@@ -74,6 +74,30 @@ void hvm_set_guest_time(struct vcpu *v, u64 gtime)
     hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
 }
 
+u64 hvm_get_guest_time(struct vcpu *v)
+{
+    u64    host_tsc;
+
+    rdtscll(host_tsc);
+    return host_tsc + v->arch.hvm_vcpu.cache_tsc_offset;
+}
+
+void hvm_freeze_time(struct vcpu *v)
+{
+    struct periodic_time *pt=&v->domain->arch.hvm_domain.pl_time.periodic_tm;
+
+    if ( pt->enabled && pt->first_injected
+            && (v->vcpu_id == pt->bind_vcpu)
+            && !v->arch.hvm_vcpu.guest_time ) {
+        v->arch.hvm_vcpu.guest_time = hvm_get_guest_time(v);
+        if ( !test_bit(_VCPUF_blocked, &v->vcpu_flags) )
+        {
+            stop_timer(&pt->timer);
+            rtc_freeze(v);
+        }
+    }
+}
+
 void hvm_migrate_timers(struct vcpu *v)
 {
     struct periodic_time *pt = &v->domain->arch.hvm_domain.pl_time.periodic_tm;
@@ -203,7 +227,7 @@ int hvm_vcpu_initialise(struct vcpu *v)
                pt_timer_fn, v, v->processor);
     pit_init(v, cpu_khz);
     rtc_init(v, RTC_PORT(0), RTC_IRQ);
-    pmtimer_init(v, ACPI_PM_TMR_BLK_ADDRESS); 
+    pmtimer_init(v, ACPI_PM_TMR_BLK_ADDRESS);
 
     /* Init guest TSC to start from zero. */
     hvm_set_guest_time(v, 0);
@@ -224,14 +248,6 @@ void pic_irq_request(void *data, int level)
 {
     int *interrupt_request = data;
     *interrupt_request = level;
-}
-
-u64 hvm_get_guest_time(struct vcpu *v)
-{
-    u64    host_tsc;
-    
-    rdtscll(host_tsc);
-    return host_tsc + v->arch.hvm_vcpu.cache_tsc_offset;
 }
 
 int cpu_get_interrupt(struct vcpu *v, int *type)
@@ -282,6 +298,28 @@ static void hvm_vcpu_down(void)
                 d->domain_id);
         domain_shutdown(d, SHUTDOWN_poweroff);
     }
+}
+
+void hvm_send_assist_req(struct vcpu *v)
+{
+    ioreq_t *p;
+
+    p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;
+    if ( unlikely(p->state != STATE_IOREQ_NONE) )
+    {
+        /* This indicates a bug in the device model.  Crash the domain. */
+        gdprintk(XENLOG_ERR, "Device model set bad IO state %d.\n", p->state);
+        domain_crash_synchronous();
+    }
+
+    prepare_wait_on_xen_event_channel(v->arch.hvm_vcpu.xen_port);
+
+    /*
+     * Following happens /after/ blocking and setting up ioreq contents.
+     * prepare_wait_on_xen_event_channel() is an implicit barrier.
+     */
+    p->state = STATE_IOREQ_READY;
+    notify_via_xen_event_channel(v->arch.hvm_vcpu.xen_port);
 }
 
 void hvm_hlt(unsigned long rflags)

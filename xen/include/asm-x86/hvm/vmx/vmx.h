@@ -262,13 +262,13 @@ static inline int vmx_paging_enabled(struct vcpu *v)
 
 static inline int vmx_long_mode_enabled(struct vcpu *v)
 {
-    u64 efer = v->arch.hvm_vmx.msr_content.msr_items[VMX_INDEX_MSR_EFER];
+    u64 efer = v->arch.hvm_vmx.msr_state.msrs[VMX_INDEX_MSR_EFER];
     return efer & EFER_LMA;
 }
 
 static inline int vmx_lme_is_set(struct vcpu *v)
 {
-    u64 efer = v->arch.hvm_vmx.msr_content.msr_items[VMX_INDEX_MSR_EFER];
+    u64 efer = v->arch.hvm_vmx.msr_state.msrs[VMX_INDEX_MSR_EFER];
     return efer & EFER_LME;
 }
 

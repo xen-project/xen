@@ -41,12 +41,12 @@ enum {
     VMX_INDEX_MSR_SYSCALL_MASK,
     VMX_INDEX_MSR_EFER,
 
-    VMX_MSR_COUNT,
+    VMX_MSR_COUNT
 };
 
 struct vmx_msr_state {
     unsigned long flags;
-    unsigned long msr_items[VMX_MSR_COUNT];
+    unsigned long msrs[VMX_MSR_COUNT];
     unsigned long shadow_gs;
 };
 
@@ -76,8 +76,8 @@ struct arch_vmx_struct {
     unsigned long        cpu_shadow_cr4; /* copy of guest read shadow CR4 */
     unsigned long        cpu_cr2; /* save CR2 */
     unsigned long        cpu_cr3;
-    struct vmx_msr_state msr_content;
-    unsigned long        vmxassist_enabled:1; 
+    struct vmx_msr_state msr_state;
+    unsigned long        vmxassist_enabled:1;
 };
 
 #define vmx_schedule_tail(next)         \
@@ -141,10 +141,10 @@ enum vmcs_field {
     HOST_FS_SELECTOR                = 0x00000c08,
     HOST_GS_SELECTOR                = 0x00000c0a,
     HOST_TR_SELECTOR                = 0x00000c0c,
-    IO_BITMAP_A                     = 0x00002000, 
-    IO_BITMAP_A_HIGH                = 0x00002001, 
-    IO_BITMAP_B                     = 0x00002002, 
-    IO_BITMAP_B_HIGH                = 0x00002003, 
+    IO_BITMAP_A                     = 0x00002000,
+    IO_BITMAP_A_HIGH                = 0x00002001,
+    IO_BITMAP_B                     = 0x00002002,
+    IO_BITMAP_B_HIGH                = 0x00002003,
     VM_EXIT_MSR_STORE_ADDR          = 0x00002006,
     VM_EXIT_MSR_STORE_ADDR_HIGH     = 0x00002007,
     VM_EXIT_MSR_LOAD_ADDR           = 0x00002008,
@@ -160,7 +160,7 @@ enum vmcs_field {
     GUEST_IA32_DEBUGCTL             = 0x00002802,
     GUEST_IA32_DEBUGCTL_HIGH        = 0x00002803,
     PIN_BASED_VM_EXEC_CONTROL       = 0x00004000,
-    CPU_BASED_VM_EXEC_CONTROL       = 0x00004002,   
+    CPU_BASED_VM_EXEC_CONTROL       = 0x00004002,
     EXCEPTION_BITMAP                = 0x00004004,
     PAGE_FAULT_ERROR_CODE_MASK      = 0x00004006,
     PAGE_FAULT_ERROR_CODE_MATCH     = 0x00004008,
@@ -177,7 +177,7 @@ enum vmcs_field {
     SECONDARY_VM_EXEC_CONTROL       = 0x0000401e,
     VM_INSTRUCTION_ERROR            = 0x00004400,
     VM_EXIT_REASON                  = 0x00004402,
-    VM_EXIT_INTR_INFO               = 0x00004404,   
+    VM_EXIT_INTR_INFO               = 0x00004404,
     VM_EXIT_INTR_ERROR_CODE         = 0x00004406,
     IDT_VECTORING_INFO_FIELD        = 0x00004408,
     IDT_VECTORING_ERROR_CODE        = 0x0000440a,
@@ -209,10 +209,10 @@ enum vmcs_field {
     CR4_GUEST_HOST_MASK             = 0x00006002,
     CR0_READ_SHADOW                 = 0x00006004,
     CR4_READ_SHADOW                 = 0x00006006,
-    CR3_TARGET_VALUE0               = 0x00006008, 
-    CR3_TARGET_VALUE1               = 0x0000600a, 
-    CR3_TARGET_VALUE2               = 0x0000600c, 
-    CR3_TARGET_VALUE3               = 0x0000600e, 
+    CR3_TARGET_VALUE0               = 0x00006008,
+    CR3_TARGET_VALUE1               = 0x0000600a,
+    CR3_TARGET_VALUE2               = 0x0000600c,
+    CR3_TARGET_VALUE3               = 0x0000600e,
     EXIT_QUALIFICATION              = 0x00006400,
     GUEST_LINEAR_ADDRESS            = 0x0000640a,
     GUEST_CR0                       = 0x00006800,
@@ -226,7 +226,7 @@ enum vmcs_field {
     GUEST_GS_BASE                   = 0x00006810,
     GUEST_LDTR_BASE                 = 0x00006812,
     GUEST_TR_BASE                   = 0x00006814,
-    GUEST_GDTR_BASE                 = 0x00006816,    
+    GUEST_GDTR_BASE                 = 0x00006816,
     GUEST_IDTR_BASE                 = 0x00006818,
     GUEST_DR7                       = 0x0000681a,
     GUEST_RSP                       = 0x0000681c,

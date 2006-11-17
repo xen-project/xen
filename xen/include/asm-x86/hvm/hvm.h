@@ -97,6 +97,8 @@ void hvm_domain_destroy(struct domain *d);
 int hvm_vcpu_initialise(struct vcpu *v);
 void hvm_vcpu_destroy(struct vcpu *v);
 
+void hvm_send_assist_req(struct vcpu *v);
+
 static inline void
 hvm_store_cpu_guest_regs(
     struct vcpu *v, struct cpu_user_regs *r, unsigned long *crs)
@@ -161,6 +163,7 @@ hvm_get_guest_ctrl_reg(struct vcpu *v, unsigned int num)
 
 void hvm_stts(struct vcpu *v);
 void hvm_set_guest_time(struct vcpu *v, u64 gtime);
+void hvm_freeze_time(struct vcpu *v);
 void hvm_migrate_timers(struct vcpu *v);
 void hvm_do_resume(struct vcpu *v);
 

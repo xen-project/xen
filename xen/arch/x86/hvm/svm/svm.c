@@ -714,26 +714,9 @@ static void arch_svm_do_launch(struct vcpu *v)
     reset_stack_and_jump(svm_asm_do_launch);
 }
 
-static void svm_freeze_time(struct vcpu *v)
-{
-    struct periodic_time *pt=&v->domain->arch.hvm_domain.pl_time.periodic_tm;
-
-    if ( pt->enabled && pt->first_injected
-            && (v->vcpu_id == pt->bind_vcpu)
-            && !v->arch.hvm_vcpu.guest_time ) {
-        v->arch.hvm_vcpu.guest_time = hvm_get_guest_time(v);
-        if ( test_bit(_VCPUF_blocked, &v->vcpu_flags) )
-        {
-            stop_timer(&pt->timer);
-            rtc_freeze(v);
-        }
-    }
-}
-
-
 static void svm_ctxt_switch_from(struct vcpu *v)
 {
-    svm_freeze_time(v);
+    hvm_freeze_time(v);
     svm_save_dr(v);
 }
 
@@ -852,7 +835,6 @@ int start_svm(void)
     return 1;
 }
 
-
 void arch_svm_do_resume(struct vcpu *v) 
 {
     /* pinning VCPU to a different core? */
@@ -870,8 +852,6 @@ void arch_svm_do_resume(struct vcpu *v)
         reset_stack_and_jump( svm_asm_do_resume );
     }
 }
-
-
 
 static int svm_do_page_fault(unsigned long va, struct cpu_user_regs *regs) 
 {
