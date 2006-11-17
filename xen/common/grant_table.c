@@ -24,6 +24,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <xen/config.h>
+#include <xen/iocap.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <xen/shadow.h>
@@ -991,6 +993,9 @@ do_grant_table_op(
             guest_handle_cast(uop, gnttab_map_grant_ref_t);
         if ( unlikely(!guest_handle_okay(map, count)) )
             goto out;
+        rc = -EPERM;
+        if ( unlikely(!grant_flip_permitted(d)) )
+            goto out;
         rc = gnttab_map_grant_ref(map, count);
         break;
     }
@@ -999,6 +1004,9 @@ do_grant_table_op(
         XEN_GUEST_HANDLE(gnttab_unmap_grant_ref_t) unmap =
             guest_handle_cast(uop, gnttab_unmap_grant_ref_t);
         if ( unlikely(!guest_handle_okay(unmap, count)) )
+            goto out;
+        rc = -EPERM;
+        if ( unlikely(!grant_flip_permitted(d)) )
             goto out;
         rc = gnttab_unmap_grant_ref(unmap, count);
         break;
@@ -1014,6 +1022,9 @@ do_grant_table_op(
         XEN_GUEST_HANDLE(gnttab_transfer_t) transfer =
             guest_handle_cast(uop, gnttab_transfer_t);
         if ( unlikely(!guest_handle_okay(transfer, count)) )
+            goto out;
+        rc = -EPERM;
+        if ( unlikely(!grant_flip_permitted(d)) )
             goto out;
         rc = gnttab_transfer(transfer, count);
         break;
