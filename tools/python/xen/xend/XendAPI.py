@@ -257,8 +257,8 @@ def do_vm_func(fn_name, vm_ref, *args):
     """
     xendom = XendDomain.instance()
     fn = getattr(xendom, fn_name)
-    return xen_api_success(xendom.do_legacy_api_with_uuid(
-        fn, vm_ref, *args))
+    xendom.do_legacy_api_with_uuid(fn, vm_ref, *args)
+    return xen_api_success_void()
 
 
 class XendAPI:
