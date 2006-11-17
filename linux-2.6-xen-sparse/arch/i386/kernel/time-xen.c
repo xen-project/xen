@@ -716,6 +716,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		rcu_check_callbacks(cpu, user_mode(regs));
 	scheduler_tick();
 	run_posix_cpu_timers(current);
+	profile_tick(CPU_PROFILING, regs);
 
 	return IRQ_HANDLED;
 }
