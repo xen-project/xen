@@ -116,6 +116,9 @@ void start_kernel(start_info_t *si)
     printk("  cmd_line:   %s\n",  
            si->cmd_line ? (const char *)si->cmd_line : "NULL");
 
+    /* Set up events. */
+    init_events();
+    
     arch_print_info();
 
     setup_xen_features();
@@ -123,9 +126,6 @@ void start_kernel(start_info_t *si)
     /* Init memory management. */
     init_mm();
 
-    /* Set up events. */
-    init_events();
-    
     /* Init time and timers. */
     init_time();
 
