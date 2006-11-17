@@ -4,7 +4,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 MAJOR = 1.0
 MINOR = 0
 
-CFLAGS += -Werror -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -Wp,-MD,.$(@F).d
+CFLAGS += -Werror -Wp,-MD,.$(@F).d
 DEPS = .*.d
 
 LDFLAGS-$(CONFIG_SunOS) = -Wl,-M -Wl,mapfile-SunOS
