@@ -122,6 +122,7 @@ clean:
 	rm -f *.o *~ core $(TARGET).elf $(TARGET).raw $(TARGET) $(TARGET).gz
 	rm -f libminios.a
 	find . -type l | xargs rm -f
+	rm -f tags TAGS
 
 %.o: %.c $(HDRS) Makefile
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
@@ -137,4 +138,7 @@ endef
 cscope:
 	$(all_sources) > cscope.files
 	cscope -k -b -q
-
+    
+.PHONY: tags
+tags:
+	$(all_sources) | xargs ctags

@@ -235,9 +235,9 @@ HYPERVISOR_update_va_mapping(
 
 static inline int
 HYPERVISOR_event_channel_op(
-	void *op)
+       int cmd, void *op)
 {
-	return _hypercall1(int, event_channel_op, op);
+    return _hypercall2(int, event_channel_op, cmd, op);
 }
 
 static inline int
