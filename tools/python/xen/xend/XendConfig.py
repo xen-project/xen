@@ -583,7 +583,7 @@ class XendConfig(dict):
         old_state = sxp.child_value(parsed, 'state')
         if old_state:
             for i in range(len(CONFIG_OLD_DOM_STATES)):
-                cfg[CONFIG_OLD_DOM_STATES[i]] = (old_state[i] != '-')
+                cfg[CONFIG_OLD_DOM_STATES[i]] = int(old_state[i] != '-')
 
         # Xen API extra cfgs
         # ------------------

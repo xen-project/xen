@@ -33,7 +33,7 @@ import xen.lowlevel.xc
 from xen.xend import XendRoot, XendCheckpoint, XendDomainInfo
 from xen.xend.PrettyPrint import prettyprint
 from xen.xend.XendConfig import XendConfig
-from xen.xend.XendError import XendError, XendInvalidDomain
+from xen.xend.XendError import XendError, XendInvalidDomain, VmError
 from xen.xend.XendLogging import log
 from xen.xend.XendConstants import XS_VMROOT
 from xen.xend.XendConstants import DOM_STATE_HALTED, DOM_STATE_RUNNING
@@ -65,7 +65,6 @@ class XendDomain:
     @type domains_lock: threaading.RLock
     @ivar _allow_new_domains: Flag to set that allows creating of new domains.
     @type _allow_new_domains: boolean
-    
     """
 
     def __init__(self):
@@ -281,9 +280,13 @@ class XendDomain:
                 sxp_cache_file = open(self._managed_config_path(dom_uuid),'w')
                 prettyprint(dominfo.sxpr(), sxp_cache_file, width = 78)
                 sxp_cache_file.close()
-            except IOError:
-                log.error("Error occurred saving configuration file to %s" %
-                          domain_config_dir)
+            except:
+                log.exception("Error occurred saving configuration file " +
+                              "to %s" % domain_config_dir)
+                try:
+                    self._managed_domain_remove(dom_uuid)
+                except:
+                    pass
                 raise XendError("Failed to save configuration file to: %s" %
                                 domain_config_dir)
         else:
@@ -377,19 +380,33 @@ class XendDomain:
         # update information for all running domains
         # - like cpu_time, status, dying, etc.
         running = self._running_domains()
-        for dom in running:
-            domid = dom['domid']
-            if domid in self.domains and dom['dying'] != 1:
-                self.domains[domid].update(dom)
+        running_domids = [d['domid'] for d in running if d['dying'] != 1]
 
         # remove domains that are not running from active domain list.
         # The list might have changed by now, because the update call may
         # cause new domains to be added, if the domain has rebooted.  We get
-        # the list again.
-        running_domids = [d['domid'] for d in running if d['dying'] != 1]
+        # the list again.        
         for domid, dom in self.domains.items():
             if domid not in running_domids and domid != DOM0_ID:
                 self._remove_domain(dom, domid)
+
+        # Add domains that are not already tracked but running in Xen,
+        # and update domain state for those that are running and tracked.
+        for dom in running:
+            domid = dom['domid']
+            if domid in self.domains and dom['dying'] != 1:
+                self.domains[domid].update(dom)
+            elif domid not in self.domains and dom['dying'] != 1:
+                try:
+                    new_dom = XendDomainInfo.recreate(dom, False)
+                    self._add_domain(new_dom)                    
+                except VmError:
+                    log.exception("Unable to recreate domain")
+                    try:
+                        xc.domain_destroy(domid)
+                    except:
+                        log.exception("Hard destruction of domain failed: %d" %
+                                      domid)
 
 
     def _add_domain(self, info):
@@ -409,7 +426,6 @@ class XendDomain:
         @param info: XendDomainInfo of a domain to be removed.
         @type info: XendDomainInfo
         """
-
         if info:
             if domid == None:
                 domid = info.getDomid()
