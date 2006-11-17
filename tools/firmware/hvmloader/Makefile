@@ -46,16 +46,14 @@ OBJS = $(patsubst %.c,%.o,$(SRCS))
 .PHONY: all
 all: hvmloader
 
-acpi/acpi.bin:
-	$(MAKE) -C acpi
-
 hvmloader: roms.h $(SRCS)
 	$(CC) $(CFLAGS) -c $(SRCS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o hvmloader.tmp $(OBJS)
 	$(OBJCOPY) hvmloader.tmp hvmloader
 	rm -f hvmloader.tmp
 
-roms.h:	../rombios/BIOS-bochs-latest ../vgabios/VGABIOS-lgpl-latest.bin ../vgabios/VGABIOS-lgpl-latest.cirrus.bin ../vmxassist/vmxassist.bin acpi/acpi.bin
+roms.h:	../rombios/BIOS-bochs-latest ../vgabios/VGABIOS-lgpl-latest.bin ../vgabios/VGABIOS-lgpl-latest.cirrus.bin ../vmxassist/vmxassist.bin
+	$(MAKE) -C acpi
 	sh ./mkhex rombios ../rombios/BIOS-bochs-latest > roms.h
 	sh ./mkhex vgabios_stdvga ../vgabios/VGABIOS-lgpl-latest.bin >> roms.h
 	sh ./mkhex vgabios_cirrusvga ../vgabios/VGABIOS-lgpl-latest.cirrus.bin >> roms.h

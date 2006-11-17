@@ -117,6 +117,13 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
 
                 /* reserve memory for pci devices */
 
+                    DWordMemory (ResourceProducer, PosDecode, MinFixed, MaxFixed, Cacheable, ReadWrite,
+                        0x00000000,
+                        0x000A0000,
+                        0x000BFFFF,
+                        0x00000000,
+                        0x00020000)
+
                     DWordMemory (ResourceConsumer, PosDecode, MinFixed, MaxFixed, Cacheable, ReadWrite,
                         0x00000000,
                         0xF0000000,
