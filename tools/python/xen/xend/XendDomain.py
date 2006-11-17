@@ -377,24 +377,12 @@ class XendDomain:
         @rtype: None
         """
 
-        # update information for all running domains
-        # - like cpu_time, status, dying, etc.
         running = self._running_domains()
-        running_domids = [d['domid'] for d in running if d['dying'] != 1]
-
-        # remove domains that are not running from active domain list.
-        # The list might have changed by now, because the update call may
-        # cause new domains to be added, if the domain has rebooted.  We get
-        # the list again.        
-        for domid, dom in self.domains.items():
-            if domid not in running_domids and domid != DOM0_ID:
-                self._remove_domain(dom, domid)
-
         # Add domains that are not already tracked but running in Xen,
         # and update domain state for those that are running and tracked.
         for dom in running:
             domid = dom['domid']
-            if domid in self.domains and dom['dying'] != 1:
+            if domid in self.domains:
                 self.domains[domid].update(dom)
             elif domid not in self.domains and dom['dying'] != 1:
                 try:
@@ -407,6 +395,19 @@ class XendDomain:
                     except:
                         log.exception("Hard destruction of domain failed: %d" %
                                       domid)
+
+        # update information for all running domains
+        # - like cpu_time, status, dying, etc.
+        # remove domains that are not running from active domain list.
+        # The list might have changed by now, because the update call may
+        # cause new domains to be added, if the domain has rebooted.  We get
+        # the list again.
+        running = self._running_domains()
+        running_domids = [d['domid'] for d in running if d['dying'] != 1]
+        for domid, dom in self.domains.items():
+            if domid not in running_domids and domid != DOM0_ID:
+                self._remove_domain(dom, domid)
+
 
 
     def _add_domain(self, info):
