@@ -496,9 +496,9 @@ ia64_mca_cpe_int_handler (int cpe_irq, void *arg, struct pt_regs *ptregs)
 	/* Get the CPE error record and log it */
 	ia64_mca_log_sal_error_record(SAL_INFO_TYPE_CPE);
 #else
+	ia64_log_queue(SAL_INFO_TYPE_CPE, VIRQ_MCA_CPE);
 	/* CPE error does not inform to dom0 but the following codes are 
 	   reserved for future implementation */
-/* 	ia64_log_queue(SAL_INFO_TYPE_CPE, VIRQ_MCA_CPE); */
 /* 	send_guest_vcpu_virq(dom0->vcpu[0], VIRQ_MCA_CPE); */
 #endif
 
@@ -1325,6 +1325,10 @@ ia64_mca_cmc_int_caller(int cmc_irq, void *arg, struct pt_regs *ptregs)
 
 #ifndef XEN
 	ia64_mca_cmc_int_handler(cmc_irq, arg, ptregs);
+#else
+	IA64_MCA_DEBUG("%s: received polling vector = %#x on CPU %d\n",
+	               __FUNCTION__, cmc_irq, smp_processor_id());
+	ia64_log_queue(SAL_INFO_TYPE_CMC, VIRQ_MCA_CMC);
 #endif
 
 	for (++cpuid ; cpuid < NR_CPUS && !cpu_online(cpuid) ; cpuid++);
@@ -1409,6 +1413,10 @@ ia64_mca_cpe_int_caller(int cpe_irq, void *arg, struct pt_regs *ptregs)
 
 #ifndef XEN
 	ia64_mca_cpe_int_handler(cpe_irq, arg, ptregs);
+#else
+	IA64_MCA_DEBUG("%s: received polling vector = %#x on CPU %d\n",
+	               __FUNCTION__, cpe_irq, smp_processor_id());
+	ia64_log_queue(SAL_INFO_TYPE_CPE, VIRQ_MCA_CPE);
 #endif
 
 	for (++cpuid ; cpuid < NR_CPUS && !cpu_online(cpuid) ; cpuid++);
