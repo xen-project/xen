@@ -1326,6 +1326,8 @@ class XendDomainInfo:
             self._stateSet(DOM_STATE_RUNNING)
         except RuntimeError, exn:
             log.exception("XendDomainInfo.initDomain: exception occurred")
+            if self.info['bootloader'] and self.image is not None:
+                self.image.cleanupBootloading()
             raise VmError(str(exn))
 
 
