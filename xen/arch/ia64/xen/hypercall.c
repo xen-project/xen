@@ -453,7 +453,7 @@ static long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
     }
 
     default:
-        ret = -EINVAL;
+        ret = -ENOSYS;
         break;
     }
 
@@ -479,7 +479,7 @@ static long register_guest_callback(struct callback_register *reg)
         break;
 
     default:
-        ret = -EINVAL;
+        ret = -ENOSYS;
         break;
     }
 
@@ -488,7 +488,7 @@ static long register_guest_callback(struct callback_register *reg)
 
 static long unregister_guest_callback(struct callback_unregister *unreg)
 {
-    return -EINVAL ;
+    return -EINVAL;
 }
 
 /* First time to add callback to xen/ia64, so let's just stick to
@@ -525,7 +525,7 @@ static long do_callback_op(int cmd, XEN_GUEST_HANDLE(void) arg)
     break;
 
     default:
-        ret = -EINVAL;
+        ret = -ENOSYS;
         break;
     }
 
