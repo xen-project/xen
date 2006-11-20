@@ -148,7 +148,7 @@ static chunk_head_t  free_tail[FREELIST_SIZE];
  * Prints allocation[0/1] for @nr_pages, starting at @start
  * address (virtual).
  */
-static void print_allocation(void *start, int nr_pages)
+USED static void print_allocation(void *start, int nr_pages)
 {
     unsigned long pfn_start = virt_to_pfn(start);
     int count;
@@ -163,7 +163,7 @@ static void print_allocation(void *start, int nr_pages)
  * Prints chunks (making them with letters) for @nr_pages starting
  * at @start (virtual).
  */
-static void print_chunks(void *start, int nr_pages)
+USED static void print_chunks(void *start, int nr_pages)
 {
     char chunks[1001], current='A';
     int order, count;
@@ -408,7 +408,6 @@ void new_pt_frame(unsigned long *pt_pfn, unsigned long prev_l_mfn,
          do_exit();
          break;
     }
-
     /* Update the entry */
 #if defined(__x86_64__)
     tab = pte_to_virt(tab[l4_table_offset(pt_page)]);
@@ -446,7 +445,6 @@ void new_pt_frame(unsigned long *pt_pfn, unsigned long prev_l_mfn,
        printk("ERROR: mmu_update failed\n");
        do_exit();
     }
-
     *pt_pfn += 1;
 }
 
@@ -581,7 +579,6 @@ void build_pagetable(unsigned long *start_pfn, unsigned long *max_pfn)
         }
         start_address += PAGE_SIZE;
     }
-
     *start_pfn = pt_pfn;
 }
 

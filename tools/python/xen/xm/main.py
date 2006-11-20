@@ -199,6 +199,10 @@ SUBCOMMAND_OPTIONS = {
     'network-list': (
        ('-l', '--long', 'List resources as SXP'),
     ),
+    'dump-core': (
+       ('-L', '--live', 'Dump core without pausing the domain'),
+       ('-C', '--crash', 'Crash domain after dumping core'),
+    ),
 }
 
 common_commands = [

@@ -57,7 +57,7 @@ int xc_tbuf_get_size(int xc_handle, unsigned long *size)
     return rc;
 }
 
-int xc_tbuf_enable(int xc_handle, size_t cnt, unsigned long *mfn,
+int xc_tbuf_enable(int xc_handle, unsigned long pages, unsigned long *mfn,
                    unsigned long *size)
 {
     DECLARE_SYSCTL;
@@ -68,7 +68,7 @@ int xc_tbuf_enable(int xc_handle, size_t cnt, unsigned long *mfn,
      * set (since trace buffers cannot be reallocated). If we really have no
      * buffers at all then tbuf_enable() will fail, so this is safe.
      */
-    (void)xc_tbuf_set_size(xc_handle, cnt);
+    (void)xc_tbuf_set_size(xc_handle, pages);
 
     if ( tbuf_enable(xc_handle, 1) != 0 )
         return -1;

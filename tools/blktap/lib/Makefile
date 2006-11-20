@@ -17,7 +17,6 @@ SRCS     += xenbus.c blkif.c xs_api.c
 CFLAGS   += -Werror
 CFLAGS   += -Wno-unused
 CFLAGS   += -fno-strict-aliasing -fPIC
-CFLAGS   += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
 # get asprintf():
 CFLAGS   += -D _GNU_SOURCE
 

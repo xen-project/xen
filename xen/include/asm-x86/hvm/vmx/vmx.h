@@ -29,7 +29,6 @@
 extern void vmx_asm_vmexit_handler(struct cpu_user_regs);
 extern void vmx_asm_do_vmentry(void);
 extern void vmx_intr_assist(void);
-extern void vmx_migrate_timers(struct vcpu *v);
 extern void arch_vmx_do_resume(struct vcpu *);
 extern void set_guest_time(struct vcpu *v, u64 gtime);
 
@@ -263,13 +262,13 @@ static inline int vmx_paging_enabled(struct vcpu *v)
 
 static inline int vmx_long_mode_enabled(struct vcpu *v)
 {
-    u64 efer = v->arch.hvm_vmx.msr_content.msr_items[VMX_INDEX_MSR_EFER];
+    u64 efer = v->arch.hvm_vmx.msr_state.msrs[VMX_INDEX_MSR_EFER];
     return efer & EFER_LMA;
 }
 
 static inline int vmx_lme_is_set(struct vcpu *v)
 {
-    u64 efer = v->arch.hvm_vmx.msr_content.msr_items[VMX_INDEX_MSR_EFER];
+    u64 efer = v->arch.hvm_vmx.msr_state.msrs[VMX_INDEX_MSR_EFER];
     return efer & EFER_LME;
 }
 

@@ -6,6 +6,7 @@
  * 
  * Copyright (c) 2002-2003, K A Fraser & R Neugebauer
  * Copyright (c) 2005, Grzegorz Milos, Intel Research Cambridge
+ * Copyright (c) 2006, Robert Kaiser, FH Wiesbaden
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -66,11 +67,24 @@ void xenbus_tester(void *p)
     /* test_xenbus(); */
 }
 
+void periodic_thread(void *p)
+{
+    struct timeval tv;
+    printk("Periodic thread started.\n");
+    for(;;)
+    {
+        gettimeofday(&tv);
+        printk("T(s=%ld us=%ld)\n", tv.tv_sec, tv.tv_usec);
+        sleep(1000);
+    }
+}
+
 /* This should be overridden by the application we are linked against. */
 __attribute__((weak)) int app_main(start_info_t *si)
 {
     printk("Dummy main: start_info=%p\n", si);
     create_thread("xenbus_tester", xenbus_tester, si);
+    create_thread("periodic_thread", periodic_thread, si);
     return 0;
 }
 
@@ -87,9 +101,6 @@ void start_kernel(start_info_t *si)
 
     trap_init();
 
-    /* ENABLE EVENT DELIVERY. This is disabled at start of day. */
-    __sti();
-    
     /* print out some useful information  */
     printk("Xen Minimal OS!\n");
     printk("start_info:   %p\n",    si);
@@ -102,6 +113,12 @@ void start_kernel(start_info_t *si)
     printk("  cmd_line:   %s\n",  
            si->cmd_line ? (const char *)si->cmd_line : "NULL");
 
+    /* Set up events. */
+    init_events();
+    
+    /* ENABLE EVENT DELIVERY. This is disabled at start of day. */
+    __sti();
+
     arch_print_info();
 
     setup_xen_features();
@@ -109,9 +126,6 @@ void start_kernel(start_info_t *si)
     /* Init memory management. */
     init_mm();
 
-    /* Set up events. */
-    init_events();
-    
     /* Init time and timers. */
     init_time();
 

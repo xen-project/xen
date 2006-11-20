@@ -13,7 +13,6 @@ CFLAGS   += -Wno-unused
 CFLAGS   += -fno-strict-aliasing
 CFLAGS   += -I $(XEN_LIBXC) -I $(LIBAIO_DIR)
 CFLAGS   += $(INCLUDES) -I. -I../../xenstore 
-CFLAGS   += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
 CFLAGS   += -D_GNU_SOURCE
 
 # Get gcc to generate the dependencies for us.

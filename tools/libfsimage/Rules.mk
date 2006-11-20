@@ -2,7 +2,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 DEPS = .*.d
 
-CFLAGS += -I$(XEN_ROOT)/tools/libfsimage/common/ -Werror -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -Wp,-MD,.$(@F).d
+CFLAGS += -I$(XEN_ROOT)/tools/libfsimage/common/ -Werror -Wp,-MD,.$(@F).d
 LDFLAGS += -L../common/
 
 PIC_OBJS := $(patsubst %.c,%.opic,$(LIB_SRCS-y))

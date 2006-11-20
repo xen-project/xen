@@ -373,10 +373,11 @@ nvm86_3:/* Rewrite our stack frame and return to ring 1. */
         mov  %gs,UREGS_ss+4(%esp)
         movl %esi,UREGS_esp+4(%esp)
         movzwl TRAPBOUNCE_cs(%edx),%eax
+        /* Null selectors (0-3) are not allowed. */
+        testl $~3,%eax
+        jz   domain_crash_synchronous
         movl %eax,UREGS_cs+4(%esp)
         movl TRAPBOUNCE_eip(%edx),%eax
-        test %eax,%eax
-        jz   domain_crash_synchronous
         movl %eax,UREGS_eip+4(%esp)
         movb $0,TRAPBOUNCE_flags(%edx)
         ret
@@ -596,20 +597,6 @@ ENTRY(setup_vm86_frame)
         addl $16,%esp
         ret
 
-do_arch_sched_op_compat:
-        # Ensure we return success even if we return via schedule_tail()
-        xorl %eax,%eax
-        GET_GUEST_REGS(%ecx)
-        movl %eax,UREGS_eax(%ecx)
-        jmp  do_sched_op_compat
-
-do_arch_sched_op:
-        # Ensure we return success even if we return via schedule_tail()
-        xorl %eax,%eax
-        GET_GUEST_REGS(%ecx)
-        movl %eax,UREGS_eax(%ecx)
-        jmp  do_sched_op
-
 .data
 
 ENTRY(exception_table)
@@ -641,7 +628,7 @@ ENTRY(hypercall_table)
         .long do_stack_switch
         .long do_set_callbacks
         .long do_fpu_taskswitch     /*  5 */
-        .long do_arch_sched_op_compat
+        .long do_sched_op_compat
         .long do_platform_op
         .long do_set_debugreg
         .long do_get_debugreg
@@ -664,7 +651,7 @@ ENTRY(hypercall_table)
         .long do_mmuext_op
         .long do_acm_op
         .long do_nmi_op
-        .long do_arch_sched_op
+        .long do_sched_op
         .long do_callback_op        /* 30 */
         .long do_xenoprof_op
         .long do_event_channel_op
@@ -683,7 +670,7 @@ ENTRY(hypercall_args_table)
         .byte 2 /* do_stack_switch      */
         .byte 4 /* do_set_callbacks     */
         .byte 1 /* do_fpu_taskswitch    */  /*  5 */
-        .byte 2 /* do_arch_sched_op_compat */
+        .byte 2 /* do_sched_op_compat   */
         .byte 1 /* do_platform_op       */
         .byte 2 /* do_set_debugreg      */
         .byte 1 /* do_get_debugreg      */
@@ -706,7 +693,7 @@ ENTRY(hypercall_args_table)
         .byte 4 /* do_mmuext_op         */
         .byte 1 /* do_acm_op            */
         .byte 2 /* do_nmi_op            */
-        .byte 2 /* do_arch_sched_op     */
+        .byte 2 /* do_sched_op          */
         .byte 2 /* do_callback_op       */  /* 30 */
         .byte 2 /* do_xenoprof_op       */
         .byte 2 /* do_event_channel_op  */

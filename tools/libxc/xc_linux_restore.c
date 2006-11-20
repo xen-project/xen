@@ -774,39 +774,6 @@ int xc_linux_restore(int xc_handle, int io_fd,
     memcpy(live_p2m, p2m, P2M_SIZE);
     munmap(live_p2m, P2M_SIZE);
 
-    /*
-     * Safety checking of saved context:
-     *  1. user_regs is fine, as Xen checks that on context switch.
-     *  2. fpu_ctxt is fine, as it can't hurt Xen.
-     *  3. trap_ctxt needs the code selectors checked.
-     *  4. ldt base must be page-aligned, no more than 8192 ents, ...
-     *  5. gdt already done, and further checking is done by Xen.
-     *  6. check that kernel_ss is safe.
-     *  7. pt_base is already done.
-     *  8. debugregs are checked by Xen.
-     *  9. callback code selectors need checking.
-     */
-    for ( i = 0; i < 256; i++ ) {
-        ctxt.trap_ctxt[i].vector = i;
-        if ((ctxt.trap_ctxt[i].cs & 3) == 0)
-            ctxt.trap_ctxt[i].cs = FLAT_KERNEL_CS;
-    }
-    if ((ctxt.kernel_ss & 3) == 0)
-        ctxt.kernel_ss = FLAT_KERNEL_DS;
-#if defined(__i386__)
-    if ((ctxt.event_callback_cs & 3) == 0)
-        ctxt.event_callback_cs = FLAT_KERNEL_CS;
-    if ((ctxt.failsafe_callback_cs & 3) == 0)
-        ctxt.failsafe_callback_cs = FLAT_KERNEL_CS;
-#endif
-    if (((ctxt.ldt_base & (PAGE_SIZE - 1)) != 0) ||
-        (ctxt.ldt_ents > 8192) ||
-        (ctxt.ldt_base > hvirt_start) ||
-        ((ctxt.ldt_base + ctxt.ldt_ents*8) > hvirt_start)) {
-        ERROR("Bad LDT base or size");
-        goto out;
-    }
-
     DPRINTF("Domain ready to be built.\n");
 
     domctl.cmd = XEN_DOMCTL_setvcpucontext;

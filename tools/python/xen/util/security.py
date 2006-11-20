@@ -606,11 +606,17 @@ def unify_resname(resource):
 
     # sanity check on resource name
     try:
-        (type, resfile) = resource.split(":")
+        (type, resfile) = resource.split(":", 1)
     except:
         err("Resource spec '%s' contains no ':' delimiter" % resource)
 
-    if type == "phy":
+    if type == "tap":
+        try:
+            (subtype, resfile) = resfile.split(":")
+        except:
+            err("Resource spec '%s' contains no tap subtype" % resource)
+
+    if type in ["phy", "tap"]:
         if not resfile.startswith("/"):
             resfile = "/dev/" + resfile
 
@@ -619,6 +625,8 @@ def unify_resname(resource):
         err("Invalid resource.")
 
     # from here on absolute file names with resources
+    if type == "tap":
+        type = type + ":" + subtype
     resource = type + ":" + resfile
     return resource
 

@@ -14,6 +14,11 @@ X11_LDPATH = -L/usr/X11R6/$(LIBDIR)
 
 CFLAGS += -D__XEN_TOOLS__
 
+# Enable implicit LFS support *and* explicit LFS names.
+CFLAGS  += $(shell getconf LFS_CFLAGS)
+CFLAGS  += -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
+LDFLAGS += $(shell getconf LFS_LDFLAGS)
+
 %.opic: %.c
 	$(CC) $(CPPFLAGS) -DPIC $(CFLAGS) -fPIC -c -o $@ $<
 

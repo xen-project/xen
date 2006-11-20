@@ -78,75 +78,48 @@ static void vmx_vcpu_destroy(struct vcpu *v)
 
 #ifdef __x86_64__
 
-static DEFINE_PER_CPU(struct vmx_msr_state, percpu_msr);
+static DEFINE_PER_CPU(struct vmx_msr_state, host_msr_state);
 
-static u32 msr_data_index[VMX_MSR_COUNT] =
+static u32 msr_index[VMX_MSR_COUNT] =
 {
     MSR_LSTAR, MSR_STAR, MSR_CSTAR,
     MSR_SYSCALL_MASK, MSR_EFER,
 };
 
-static void vmx_save_segments(struct vcpu *v)
+static void vmx_save_host_msrs(void)
 {
-    rdmsrl(MSR_SHADOW_GS_BASE, v->arch.hvm_vmx.msr_content.shadow_gs);
-}
-
-/*
- * To avoid MSR save/restore at every VM exit/entry time, we restore
- * the x86_64 specific MSRs at domain switch time. Since those MSRs are
- * are not modified once set for generic domains, we don't save them,
- * but simply reset them to the values set at percpu_traps_init().
- */
-static void vmx_load_msrs(void)
-{
-    struct vmx_msr_state *host_state = &this_cpu(percpu_msr);
-    int i;
-
-    while ( host_state->flags )
-    {
-        i = find_first_set_bit(host_state->flags);
-        wrmsrl(msr_data_index[i], host_state->msr_items[i]);
-        clear_bit(i, &host_state->flags);
-    }
-}
-
-static void vmx_save_init_msrs(void)
-{
-    struct vmx_msr_state *host_state = &this_cpu(percpu_msr);
+    struct vmx_msr_state *host_msr_state = &this_cpu(host_msr_state);
     int i;
 
     for ( i = 0; i < VMX_MSR_COUNT; i++ )
-        rdmsrl(msr_data_index[i], host_state->msr_items[i]);
+        rdmsrl(msr_index[i], host_msr_state->msrs[i]);
 }
 
-#define CASE_READ_MSR(address)              \
-    case MSR_ ## address:                 \
-    msr_content = msr->msr_items[VMX_INDEX_MSR_ ## address]; \
-    break
+#define CASE_READ_MSR(address)                                              \
+    case MSR_ ## address:                                                   \
+        msr_content = guest_msr_state->msrs[VMX_INDEX_MSR_ ## address];     \
+        break
 
-#define CASE_WRITE_MSR(address)                                     \
-    case MSR_ ## address:                                           \
-    {                                                               \
-        msr->msr_items[VMX_INDEX_MSR_ ## address] = msr_content;    \
-        if (!test_bit(VMX_INDEX_MSR_ ## address, &msr->flags)) {    \
-            set_bit(VMX_INDEX_MSR_ ## address, &msr->flags);        \
-        }                                                           \
-        wrmsrl(MSR_ ## address, msr_content);                       \
-        set_bit(VMX_INDEX_MSR_ ## address, &host_state->flags);     \
-    }                                                               \
-    break
+#define CASE_WRITE_MSR(address)                                             \
+    case MSR_ ## address:                                                   \
+        guest_msr_state->msrs[VMX_INDEX_MSR_ ## address] = msr_content;     \
+        if ( !test_bit(VMX_INDEX_MSR_ ## address, &guest_msr_state->flags) )\
+            set_bit(VMX_INDEX_MSR_ ## address, &guest_msr_state->flags);    \
+        wrmsrl(MSR_ ## address, msr_content);                               \
+        set_bit(VMX_INDEX_MSR_ ## address, &host_msr_state->flags);         \
+        break
 
 #define IS_CANO_ADDRESS(add) 1
 static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
 {
     u64 msr_content = 0;
     struct vcpu *v = current;
-    struct vmx_msr_state *msr = &v->arch.hvm_vmx.msr_content;
+    struct vmx_msr_state *guest_msr_state = &v->arch.hvm_vmx.msr_state;
 
     switch ( regs->ecx ) {
     case MSR_EFER:
         HVM_DBG_LOG(DBG_LEVEL_2, "EFER msr_content 0x%"PRIx64, msr_content);
-        msr_content = msr->msr_items[VMX_INDEX_MSR_EFER];
+        msr_content = guest_msr_state->msrs[VMX_INDEX_MSR_EFER];
         break;
 
     case MSR_FS_BASE:
@@ -164,7 +137,7 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
         break;
 
     case MSR_SHADOW_GS_BASE:
-        msr_content = msr->shadow_gs;
+        msr_content = guest_msr_state->shadow_gs;
         break;
 
     CASE_READ_MSR(STAR);
@@ -193,8 +166,8 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 {
     u64 msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
     struct vcpu *v = current;
-    struct vmx_msr_state *msr = &v->arch.hvm_vmx.msr_content;
-    struct vmx_msr_state *host_state = &this_cpu(percpu_msr);
+    struct vmx_msr_state *guest_msr_state = &v->arch.hvm_vmx.msr_state;
+    struct vmx_msr_state *host_msr_state = &this_cpu(host_msr_state);
 
     HVM_DBG_LOG(DBG_LEVEL_1, "msr 0x%lx msr_content 0x%"PRIx64"\n",
                 (unsigned long)regs->ecx, msr_content);
@@ -211,7 +184,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
         }
 
         if ( (msr_content & EFER_LME)
-             &&  !(msr->msr_items[VMX_INDEX_MSR_EFER] & EFER_LME) )
+             &&  !(guest_msr_state->msrs[VMX_INDEX_MSR_EFER] & EFER_LME) )
         {
             if ( unlikely(vmx_paging_enabled(v)) )
             {
@@ -221,7 +194,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
             }
         }
         else if ( !(msr_content & EFER_LME)
-                  && (msr->msr_items[VMX_INDEX_MSR_EFER] & EFER_LME) )
+                  && (guest_msr_state->msrs[VMX_INDEX_MSR_EFER] & EFER_LME) )
         {
             if ( unlikely(vmx_paging_enabled(v)) )
             {
@@ -231,12 +204,12 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
             }
         }
 
-        msr->msr_items[VMX_INDEX_MSR_EFER] = msr_content;
+        guest_msr_state->msrs[VMX_INDEX_MSR_EFER] = msr_content;
         break;
 
     case MSR_FS_BASE:
     case MSR_GS_BASE:
-        if ( !(vmx_long_mode_enabled(v)) )
+        if ( !vmx_long_mode_enabled(v) )
             goto exit_and_crash;
 
         if ( !IS_CANO_ADDRESS(msr_content) )
@@ -257,7 +230,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
         if ( !(vmx_long_mode_enabled(v)) )
             goto exit_and_crash;
 
-        v->arch.hvm_vmx.msr_content.shadow_gs = msr_content;
+        v->arch.hvm_vmx.msr_state.shadow_gs = msr_content;
         wrmsrl(MSR_SHADOW_GS_BASE, msr_content);
         break;
 
@@ -278,40 +251,57 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     return 1; /* handled */
 }
 
-static void vmx_restore_msrs(struct vcpu *v)
+/*
+ * To avoid MSR save/restore at every VM exit/entry time, we restore
+ * the x86_64 specific MSRs at domain switch time. Since these MSRs
+ * are not modified once set for para domains, we don't save them,
+ * but simply reset them to values set in percpu_traps_init().
+ */
+static void vmx_restore_host_msrs(void)
 {
-    int i = 0;
-    struct vmx_msr_state *guest_state;
-    struct vmx_msr_state *host_state;
-    unsigned long guest_flags ;
+    struct vmx_msr_state *host_msr_state = &this_cpu(host_msr_state);
+    int i;
 
-    guest_state = &v->arch.hvm_vmx.msr_content;;
-    host_state = &this_cpu(percpu_msr);
+    while ( host_msr_state->flags )
+    {
+        i = find_first_set_bit(host_msr_state->flags);
+        wrmsrl(msr_index[i], host_msr_state->msrs[i]);
+        clear_bit(i, &host_msr_state->flags);
+    }
+}
 
-    wrmsrl(MSR_SHADOW_GS_BASE, guest_state->shadow_gs);
-    guest_flags = guest_state->flags;
-    if (!guest_flags)
+static void vmx_restore_guest_msrs(struct vcpu *v)
+{
+    struct vmx_msr_state *guest_msr_state, *host_msr_state;
+    unsigned long guest_flags;
+    int i;
+
+    guest_msr_state = &v->arch.hvm_vmx.msr_state;
+    host_msr_state = &this_cpu(host_msr_state);
+
+    wrmsrl(MSR_SHADOW_GS_BASE, guest_msr_state->shadow_gs);
+
+    guest_flags = guest_msr_state->flags;
+    if ( !guest_flags )
         return;
 
-    while (guest_flags){
+    while ( guest_flags ) {
         i = find_first_set_bit(guest_flags);
 
         HVM_DBG_LOG(DBG_LEVEL_2,
-                    "restore guest's index %d msr %lx with %lx\n",
-                    i, (unsigned long)msr_data_index[i],
-                    (unsigned long)guest_state->msr_items[i]);
-        set_bit(i, &host_state->flags);
-        wrmsrl(msr_data_index[i], guest_state->msr_items[i]);
+                    "restore guest's index %d msr %x with value %lx",
+                    i, msr_index[i], guest_msr_state->msrs[i]);
+        set_bit(i, &host_msr_state->flags);
+        wrmsrl(msr_index[i], guest_msr_state->msrs[i]);
         clear_bit(i, &guest_flags);
     }
 }
 
 #else  /* __i386__ */
 
-#define vmx_save_segments(v)      ((void)0)
-#define vmx_load_msrs()           ((void)0)
-#define vmx_restore_msrs(v)       ((void)0)
-#define vmx_save_init_msrs()      ((void)0)
+#define vmx_save_host_msrs()        ((void)0)
+#define vmx_restore_host_msrs()     ((void)0)
+#define vmx_restore_guest_msrs(v)   ((void)0)
 
 static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
 {
@@ -325,9 +315,9 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 
 #endif /* __i386__ */
 
-#define loaddebug(_v,_reg) \
+#define loaddebug(_v,_reg)  \
     __asm__ __volatile__ ("mov %0,%%db" #_reg : : "r" ((_v)->debugreg[_reg]))
-#define savedebug(_v,_reg) \
+#define savedebug(_v,_reg)  \
     __asm__ __volatile__ ("mov %%db" #_reg ",%0" : : "r" ((_v)->debugreg[_reg]))
 
 static inline void vmx_save_dr(struct vcpu *v)
@@ -374,30 +364,21 @@ static inline void vmx_restore_dr(struct vcpu *v)
         __restore_debug_registers(v);
 }
 
-static void vmx_freeze_time(struct vcpu *v)
-{
-    struct periodic_time *pt=&v->domain->arch.hvm_domain.pl_time.periodic_tm;
-
-    if ( pt->enabled && pt->first_injected
-            && (v->vcpu_id == pt->bind_vcpu)
-            && !v->arch.hvm_vcpu.guest_time ) {
-        v->arch.hvm_vcpu.guest_time = hvm_get_guest_time(v);
-        if ( !test_bit(_VCPUF_blocked, &v->vcpu_flags) )
-            stop_timer(&pt->timer);
-    }
-}
-
 static void vmx_ctxt_switch_from(struct vcpu *v)
 {
-    vmx_freeze_time(v);
-    vmx_save_segments(v);
-    vmx_load_msrs();
+    hvm_freeze_time(v);
+
+    /* NB. MSR_SHADOW_GS_BASE may be changed by swapgs instrucion in guest,
+     * so we must save it. */
+    rdmsrl(MSR_SHADOW_GS_BASE, v->arch.hvm_vmx.msr_state.shadow_gs);
+
+    vmx_restore_host_msrs();
     vmx_save_dr(v);
 }
 
 static void vmx_ctxt_switch_to(struct vcpu *v)
 {
-    vmx_restore_msrs(v);
+    vmx_restore_guest_msrs(v);
     vmx_restore_dr(v);
 }
 
@@ -405,24 +386,9 @@ static void stop_vmx(void)
 {
     if ( !(read_cr4() & X86_CR4_VMXE) )
         return;
+
     __vmxoff();
     clear_in_cr4(X86_CR4_VMXE);
-}
-
-void vmx_migrate_timers(struct vcpu *v)
-{
-    struct periodic_time *pt = &v->domain->arch.hvm_domain.pl_time.periodic_tm;
-    struct RTCState *vrtc = &v->domain->arch.hvm_domain.pl_time.vrtc;
-    struct PMTState *vpmt = &v->domain->arch.hvm_domain.pl_time.vpmt;
-
-    if ( pt->enabled )
-    {
-        migrate_timer(&pt->timer, v->processor);
-    }
-    migrate_timer(&vcpu_vlapic(v)->vlapic_timer, v->processor);
-    migrate_timer(&vrtc->second_timer, v->processor);
-    migrate_timer(&vrtc->second_timer2, v->processor);
-    migrate_timer(&vpmt->timer, v->processor);
 }
 
 static void vmx_store_cpu_guest_regs(
@@ -718,7 +684,7 @@ int start_vmx(void)
 
     printk("VMXON is done\n");
 
-    vmx_save_init_msrs();
+    vmx_save_host_msrs();
 
     vmx_setup_hvm_funcs();
 
@@ -855,14 +821,14 @@ static void vmx_do_cpuid(struct cpu_user_regs *regs)
 
             if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
                 clear_bit(X86_FEATURE_APIC, &edx);
-    
+
 #if CONFIG_PAGING_LEVELS >= 3
             if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
 #endif
                 clear_bit(X86_FEATURE_PAE, &edx);
             clear_bit(X86_FEATURE_PSE36, &edx);
 
-            ebx &= NUM_THREADS_RESET_MASK;  
+            ebx &= NUM_THREADS_RESET_MASK;
 
             /* Unsupportable for virtualised CPUs. */
             ecx &= ~(bitmaskof(X86_FEATURE_VMXE)  |
@@ -875,7 +841,7 @@ static void vmx_do_cpuid(struct cpu_user_regs *regs)
                      bitmaskof(X86_FEATURE_ACPI)  |
                      bitmaskof(X86_FEATURE_ACC) );
         }
-        else if (  ( input == CPUID_LEAF_0x6 ) 
+        else if (  ( input == CPUID_LEAF_0x6 )
                 || ( input == CPUID_LEAF_0x9 )
                 || ( input == CPUID_LEAF_0xA ))
         {
@@ -1331,7 +1297,7 @@ static int vmx_assist(struct vcpu *v, int mode)
                 goto error;
             if ( vmx_world_restore(v, &c) != 0 )
                 goto error;
-            v->arch.hvm_vmx.vmxassist_enabled = 1;            
+            v->arch.hvm_vmx.vmxassist_enabled = 1;
             return 1;
         }
         break;
@@ -1401,7 +1367,7 @@ static int vmx_set_cr0(unsigned long value)
         mfn = get_mfn_from_gpfn(v->arch.hvm_vmx.cpu_cr3 >> PAGE_SHIFT);
         if ( !VALID_MFN(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
         {
-            gdprintk(XENLOG_ERR, "Invalid CR3 value = %lx (mfn=%lx)\n", 
+            gdprintk(XENLOG_ERR, "Invalid CR3 value = %lx (mfn=%lx)\n",
                      v->arch.hvm_vmx.cpu_cr3, mfn);
             domain_crash(v->domain);
             return 0;
@@ -1416,10 +1382,10 @@ static int vmx_set_cr0(unsigned long value)
                             "with EFER.LME set but not CR4.PAE\n");
                 vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
             }
-            else 
+            else
             {
                 HVM_DBG_LOG(DBG_LEVEL_1, "Enabling long mode\n");
-                v->arch.hvm_vmx.msr_content.msr_items[VMX_INDEX_MSR_EFER]
+                v->arch.hvm_vmx.msr_state.msrs[VMX_INDEX_MSR_EFER]
                     |= EFER_LMA;
                 vm_entry_value = __vmread(VM_ENTRY_CONTROLS);
                 vm_entry_value |= VM_ENTRY_IA32E_MODE;
@@ -1473,7 +1439,7 @@ static int vmx_set_cr0(unsigned long value)
              */
             if ( vmx_long_mode_enabled(v) )
             {
-                v->arch.hvm_vmx.msr_content.msr_items[VMX_INDEX_MSR_EFER]
+                v->arch.hvm_vmx.msr_state.msrs[VMX_INDEX_MSR_EFER]
                     &= ~EFER_LMA;
                 vm_entry_value = __vmread(VM_ENTRY_CONTROLS);
                 vm_entry_value &= ~VM_ENTRY_IA32E_MODE;
@@ -1506,8 +1472,7 @@ static int vmx_set_cr0(unsigned long value)
     {
         if ( vmx_long_mode_enabled(v) )
         {
-            v->arch.hvm_vmx.msr_content.msr_items[VMX_INDEX_MSR_EFER]
-              &= ~EFER_LMA;
+            v->arch.hvm_vmx.msr_state.msrs[VMX_INDEX_MSR_EFER] &= ~EFER_LMA;
             vm_entry_value = __vmread(VM_ENTRY_CONTROLS);
             vm_entry_value &= ~VM_ENTRY_IA32E_MODE;
             __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
@@ -1865,8 +1830,8 @@ static inline void vmx_do_msr_write(struct cpu_user_regs *regs)
         {
             struct periodic_time *pt =
                 &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
-            if ( pt->enabled && pt->first_injected 
-                    && v->vcpu_id == pt->bind_vcpu ) 
+            if ( pt->enabled && pt->first_injected
+                    && v->vcpu_id == pt->bind_vcpu )
                 pt->first_injected = 0;
         }
         hvm_set_guest_time(v, msr_content);
@@ -1975,7 +1940,7 @@ void store_cpu_user_regs(struct cpu_user_regs *regs)
     regs->es = __vmread(GUEST_ES_SELECTOR);
     regs->eip = __vmread(GUEST_RIP);
 }
-#endif 
+#endif
 
 #ifdef XEN_DEBUGGER
 void save_cpu_user_regs(struct cpu_user_regs *regs)

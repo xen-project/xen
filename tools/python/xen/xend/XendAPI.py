@@ -591,6 +591,7 @@ class XendAPI:
                   'platform_localtime',
                   'platform_clock_offset',
                   'platform_enable_audio',
+                  'platform_keymap',
                   'builder',
                   'boot_method',
                   'kernel_kernel',
@@ -638,6 +639,7 @@ class XendAPI:
         'platform_localtime',
         'platform_clock_offset',
         'platform_enable_audio',
+        'platform_keymap',
         'builder',
         'boot_method',
         'kernel_kernel',
@@ -781,6 +783,10 @@ class XendAPI:
         return xen_api_todo()
     
     def vm_get_platform_enable_audio(self, session, vm_ref):
+        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
+        return xen_api_todo()
+    
+    def vm_get_platform_keymap(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_todo()
     
@@ -981,6 +987,7 @@ class XendAPI:
             'platform_localtime': xeninfo.get_platform_localtime(),
             'platform_clock_offset': xeninfo.get_platform_clock_offset(),
             'platform_enable_audio': xeninfo.get_platform_enable_audio(),
+            'platform_keymap': xeninfo.get_platform_keymap(),
             'builder': xeninfo.get_builder(),
             'boot_method': xeninfo.get_boot_method(),
             'kernel_kernel': xeninfo.get_kernel_image(),

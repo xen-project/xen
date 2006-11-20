@@ -346,7 +346,7 @@ static int reg_mem(unsigned char size, unsigned char *opcode,
     return DECODE_success;
 }
 
-static int hvm_decode(int realmode, unsigned char *opcode,
+static int mmio_decode(int realmode, unsigned char *opcode,
                       struct hvm_io_op *mmio_op, unsigned char *op_size)
 {
     unsigned char size_reg = 0;
@@ -722,28 +722,6 @@ int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip, int inst_l
     return inst_len;
 }
 
-static void hvm_send_assist_req(struct vcpu *v)
-{
-    ioreq_t *p;
-
-    p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;
-    if ( unlikely(p->state != STATE_IOREQ_NONE) )
-    {
-        /* This indicates a bug in the device model.  Crash the domain. */
-        gdprintk(XENLOG_ERR, "Device model set bad IO state %d.\n", p->state);
-        domain_crash_synchronous();
-    }
-
-    prepare_wait_on_xen_event_channel(v->arch.hvm_vcpu.xen_port);
-
-    /*
-     * Following happens /after/ blocking and setting up ioreq contents.
-     * prepare_wait_on_xen_event_channel() is an implicit barrier.
-     */
-    p->state = STATE_IOREQ_READY;
-    notify_via_xen_event_channel(v->arch.hvm_vcpu.xen_port);
-}
-
 void send_pio_req(unsigned long port, unsigned long count, int size,
                   long value, int dir, int df, int value_is_ptr)
 {
@@ -927,7 +905,7 @@ void handle_mmio(unsigned long gpa)
         domain_crash_synchronous();
     }
 
-    if ( hvm_decode(realmode, inst, mmio_op, &op_size) == DECODE_failure ) {
+    if ( mmio_decode(realmode, inst, mmio_op, &op_size) == DECODE_failure ) {
         printk("handle_mmio: failed to decode instruction\n");
         printk("mmio opcode: gpa 0x%lx, len %d:", gpa, inst_len);
         for ( i = 0; i < inst_len; i++ )

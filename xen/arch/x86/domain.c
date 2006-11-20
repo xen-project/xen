@@ -294,6 +294,12 @@ int arch_set_info_guest(
 
         for ( i = 0; i < 256; i++ )
             fixup_guest_code_selector(c->trap_ctxt[i].cs);
+
+        /* LDT safety checks. */
+        if ( ((c->ldt_base & (PAGE_SIZE-1)) != 0) || 
+             (c->ldt_ents > 8192) ||
+             !array_access_ok(c->ldt_base, c->ldt_ents, LDT_ENTRY_SIZE) )
+            return -EINVAL;
     }
 
     clear_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
@@ -396,21 +402,20 @@ arch_do_vcpu_op(
         if ( copy_from_guest(&area, arg, 1) )
             break;
 
-        if ( !access_ok(area.addr.v, sizeof(*area.addr.v)) )
+        if ( !guest_handle_okay(area.addr.h, 1) )
             break;
 
         rc = 0;
-        v->runstate_guest = area.addr.v;
+        v->runstate_guest = area.addr.h;
 
         if ( v == current )
         {
-            __copy_to_user(v->runstate_guest, &v->runstate,
-                           sizeof(v->runstate));
+            __copy_to_guest(v->runstate_guest, &v->runstate, 1);
         }
         else
         {
             vcpu_runstate_get(v, &runstate);
-            __copy_to_user(v->runstate_guest, &runstate, sizeof(runstate));
+            __copy_to_guest(v->runstate_guest, &runstate, 1);
         }
 
         break;
@@ -423,33 +428,6 @@ arch_do_vcpu_op(
 
     return rc;
 }
-
-void new_thread(struct vcpu *d,
-                unsigned long start_pc,
-                unsigned long start_stack,
-                unsigned long start_info)
-{
-    struct cpu_user_regs *regs = &d->arch.guest_context.user_regs;
-
-    /*
-     * Initial register values:
-     *  DS,ES,FS,GS = FLAT_KERNEL_DS
-     *       CS:EIP = FLAT_KERNEL_CS:start_pc
-     *       SS:ESP = FLAT_KERNEL_SS:start_stack
-     *          ESI = start_info
-     *  [EAX,EBX,ECX,EDX,EDI,EBP are zero]
-     */
-    regs->ds = regs->es = regs->fs = regs->gs = FLAT_KERNEL_DS;
-    regs->ss = FLAT_KERNEL_SS;
-    regs->cs = FLAT_KERNEL_CS;
-    regs->eip = start_pc;
-    regs->esp = start_stack;
-    regs->esi = start_info;
-
-    __save_flags(regs->eflags);
-    regs->eflags |= X86_EFLAGS_IF;
-}
-
 
 #ifdef __x86_64__
 
@@ -767,9 +745,8 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     context_saved(prev);
 
     /* Update per-VCPU guest runstate shared memory area (if registered). */
-    if ( next->runstate_guest != NULL )
-        __copy_to_user(next->runstate_guest, &next->runstate,
-                       sizeof(next->runstate));
+    if ( !guest_handle_is_null(next->runstate_guest) )
+        __copy_to_guest(next->runstate_guest, &next->runstate, 1);
 
     schedule_tail(next);
     BUG();

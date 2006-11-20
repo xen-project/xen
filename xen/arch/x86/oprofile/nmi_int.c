@@ -305,22 +305,24 @@ static int __init ppro_init(char *cpu_type)
 {
 	__u8 cpu_model = current_cpu_data.x86_model;
 
-	if (cpu_model > 0xd) {
+	if (cpu_model > 15) {
 		printk("xenoprof: Initialization failed. "
 		       "Intel processor model %d for P6 class family is not "
 		       "supported\n", cpu_model);
 		return 0;
 	}
-
-	if (cpu_model == 9) {
+	else if (cpu_model == 15)
+		strncpy (cpu_type, "i386/core_2", XENOPROF_CPU_TYPE_SIZE - 1);
+	else if (cpu_model == 14)
+		strncpy (cpu_type, "i386/core", XENOPROF_CPU_TYPE_SIZE - 1);
+	else if (cpu_model == 9)
 		strncpy (cpu_type, "i386/p6_mobile", XENOPROF_CPU_TYPE_SIZE - 1);
-	} else if (cpu_model > 5) {
+	else if (cpu_model > 5)
 		strncpy (cpu_type, "i386/piii", XENOPROF_CPU_TYPE_SIZE - 1);
-	} else if (cpu_model > 2) {
+	else if (cpu_model > 2)
 		strncpy (cpu_type, "i386/pii", XENOPROF_CPU_TYPE_SIZE - 1);
-	} else {
+	else
 		strncpy (cpu_type, "i386/ppro", XENOPROF_CPU_TYPE_SIZE - 1);
-	}
 
 	model = &op_ppro_spec;
 	return 1;

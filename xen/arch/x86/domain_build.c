@@ -249,6 +249,7 @@ int construct_dom0(struct domain *d,
                    char *cmdline)
 {
     int i, rc, dom0_pae, xen_pae, order;
+    struct cpu_user_regs *regs;
     unsigned long pfn, mfn;
     unsigned long nr_pages;
     unsigned long nr_pt_pages;
@@ -441,19 +442,7 @@ int construct_dom0(struct domain *d,
     mpt_alloc = (vpt_start - dsi.v_start) + 
         (unsigned long)pfn_to_paddr(alloc_spfn);
 
-    /*
-     * We're basically forcing default RPLs to 1, so that our "what privilege
-     * level are we returning to?" logic works.
-     */
-    v->arch.guest_context.kernel_ss = FLAT_KERNEL_SS;
-    for ( i = 0; i < 256; i++ ) 
-        v->arch.guest_context.trap_ctxt[i].cs = FLAT_KERNEL_CS;
-
 #if defined(__i386__)
-
-    v->arch.guest_context.failsafe_callback_cs = FLAT_KERNEL_CS;
-    v->arch.guest_context.event_callback_cs    = FLAT_KERNEL_CS;
-
     /*
      * Protect the lowest 1GB of memory. We use a temporary mapping there
      * from which we copy the kernel and ramdisk images.
@@ -816,7 +805,22 @@ int construct_dom0(struct domain *d,
 
     set_bit(_VCPUF_initialised, &v->vcpu_flags);
 
-    new_thread(v, dsi.v_kernentry, vstack_end, vstartinfo_start);
+    /*
+     * Initial register values:
+     *  DS,ES,FS,GS = FLAT_KERNEL_DS
+     *       CS:EIP = FLAT_KERNEL_CS:start_pc
+     *       SS:ESP = FLAT_KERNEL_SS:start_stack
+     *          ESI = start_info
+     *  [EAX,EBX,ECX,EDX,EDI,EBP are zero]
+     */
+    regs = &v->arch.guest_context.user_regs;
+    regs->ds = regs->es = regs->fs = regs->gs = FLAT_KERNEL_DS;
+    regs->ss = FLAT_KERNEL_SS;
+    regs->cs = FLAT_KERNEL_CS;
+    regs->eip = dsi.v_kernentry;
+    regs->esp = vstack_end;
+    regs->esi = vstartinfo_start;
+    regs->eflags = X86_EFLAGS_IF;
 
     if ( opt_dom0_shadow )
         if ( shadow_test_enable(d) == 0 ) 

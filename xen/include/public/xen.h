@@ -246,7 +246,7 @@ struct mmuext_op {
         /* SET_LDT */
         unsigned int nr_ents;
         /* TLB_FLUSH_MULTI, INVLPG_MULTI */
-        void *vcpumask;
+        XEN_GUEST_HANDLE_00030205(void) vcpumask;
     } arg2;
 };
 typedef struct mmuext_op mmuext_op_t;

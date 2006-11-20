@@ -556,8 +556,8 @@ long xc_get_tot_pages(int xc_handle, uint32_t domid);
  * Gets the machine address of the trace pointer area and the size of the
  * per CPU buffers.
  */
-int xc_tbuf_enable(int xc_handle, size_t cnt, unsigned long *mfn,
-    unsigned long *size);
+int xc_tbuf_enable(int xc_handle, unsigned long pages,
+                   unsigned long *mfn, unsigned long *size);
 
 /*
  * Disable tracing buffers.
@@ -610,7 +610,7 @@ int xc_add_mmu_update(int xc_handle, xc_mmu_t *mmu,
                    unsigned long long ptr, unsigned long long val);
 int xc_finish_mmu_updates(int xc_handle, xc_mmu_t *mmu);
 
-int xc_acm_op(int xc_handle, int cmd, void *arg, size_t arg_size);
+int xc_acm_op(int xc_handle, int cmd, void *arg, unsigned long arg_size);
 
 /*
  * Return a handle to the event channel driver, or -1 on failure, in which case

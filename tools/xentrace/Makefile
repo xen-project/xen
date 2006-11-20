@@ -1,7 +1,7 @@
 XEN_ROOT=../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-CFLAGS  += -Werror -D_LARGEFILE64_SOURCE
+CFLAGS  += -Werror
 
 CFLAGS  += -I $(XEN_XC)
 CFLAGS  += -I $(XEN_LIBXC)

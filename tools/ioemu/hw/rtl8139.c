@@ -1999,12 +1999,12 @@ static int rtl8139_cplus_transmit_one(RTL8139State *s)
         DEBUG_PRINT(("RTL8139: +++ C+ mode transmission buffer allocated space %d\n", s->cplus_txbuffer_len));
     }
 
-    while (s->cplus_txbuffer && s->cplus_txbuffer_offset + txsize >= s->cplus_txbuffer_len)
+    if (s->cplus_txbuffer && s->cplus_txbuffer_offset + txsize >= s->cplus_txbuffer_len)
     {
-        s->cplus_txbuffer_len += CP_TX_BUFFER_SIZE;
-        s->cplus_txbuffer = realloc(s->cplus_txbuffer, s->cplus_txbuffer_len);
+	free(s->cplus_txbuffer);
+	s->cplus_txbuffer = NULL;
 
-        DEBUG_PRINT(("RTL8139: +++ C+ mode transmission buffer space changed to %d\n", s->cplus_txbuffer_len));
+	DEBUG_PRINT(("RTL8139: +++ C+ mode transmission buffer space exceeded: %d\n", s->cplus_txbuffer_offset + txsize));
     }
 
     if (!s->cplus_txbuffer)

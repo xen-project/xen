@@ -95,8 +95,7 @@ void vmx_send_assist_req(struct vcpu *v)
             break;
         }
 
-        /* I want to call __enter_scheduler() only */
-        do_sched_op_compat(SCHEDOP_yield, 0);
+        raise_softirq(SCHEDULE_SOFTIRQ);
         mb();
     }
 

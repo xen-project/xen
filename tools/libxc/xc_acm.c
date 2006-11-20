@@ -14,8 +14,7 @@
 
 #include "xc_private.h"
 
-
-int xc_acm_op(int xc_handle, int cmd, void *arg, size_t arg_size)
+int xc_acm_op(int xc_handle, int cmd, void *arg, unsigned long arg_size)
 {
     int ret = -1;
     DECLARE_HYPERCALL;

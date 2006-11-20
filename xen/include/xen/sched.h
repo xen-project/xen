@@ -75,7 +75,7 @@ struct vcpu
     void            *sched_priv;    /* scheduler-specific data */
 
     struct vcpu_runstate_info runstate;
-    struct vcpu_runstate_info *runstate_guest; /* guest address */
+    XEN_GUEST_HANDLE(vcpu_runstate_info_t) runstate_guest; /* guest address */
 
     unsigned long    vcpu_flags;
 
@@ -281,11 +281,6 @@ void __domain_crash_synchronous(void) __attribute__((noreturn));
     printk("domain_crash_sync called from %s:%d\n", __FILE__, __LINE__);  \
     __domain_crash_synchronous();                                         \
 } while (0)
-
-void new_thread(struct vcpu *d,
-                unsigned long start_pc,
-                unsigned long start_stack,
-                unsigned long start_info);
 
 #define set_current_state(_s) do { current->state = (_s); } while (0)
 void scheduler_init(void);

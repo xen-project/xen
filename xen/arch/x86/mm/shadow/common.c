@@ -1047,6 +1047,10 @@ shadow_set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
     else
         *p2m_entry = l1e_empty();
 
+    /* Track the highest gfn for which we have ever had a valid mapping */
+    if ( valid_mfn(mfn) && (gfn > d->arch.max_mapped_pfn) ) 
+        d->arch.max_mapped_pfn = gfn;
+
     /* The P2M can be shadowed: keep the shadows synced */
     if ( d->vcpu[0] != NULL )
         (void)__shadow_validate_guest_entry(
@@ -1142,12 +1146,9 @@ sh_gfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
     mfn = pagetable_get_mfn(d->arch.phys_table);
 
 
-#if CONFIG_PAGING_LEVELS > 2
-    if ( gpfn >= (RO_MPT_VIRT_END-RO_MPT_VIRT_START) / sizeof(l1_pgentry_t) ) 
-        /* This pfn is higher than the p2m map can hold */
+    if ( gpfn > d->arch.max_mapped_pfn ) 
+        /* This pfn is higher than the highest the p2m map currently holds */
         return _mfn(INVALID_MFN);
-#endif
-
 
 #if CONFIG_PAGING_LEVELS >= 4
     { 
@@ -3333,13 +3334,14 @@ void shadow_audit_p2m(struct domain *d)
             set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY);
         }
 
-        if ( test_linear )
+        if ( test_linear && (gfn <= d->arch.max_mapped_pfn) )
         {
-            lp2mfn = get_mfn_from_gpfn(gfn);
-            if ( lp2mfn != mfn_x(p2mfn) )
+            lp2mfn = gfn_to_mfn_current(gfn);
+            if ( mfn_x(lp2mfn) != mfn_x(p2mfn) )
             {
                 SHADOW_PRINTK("linear mismatch gfn %#lx -> mfn %#lx "
-                               "(!= mfn %#lx)\n", gfn, lp2mfn, p2mfn);
+                              "(!= mfn %#lx)\n", gfn, 
+                              mfn_x(lp2mfn), mfn_x(p2mfn));
             }
         }
 

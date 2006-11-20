@@ -403,7 +403,7 @@ class XendDomainInfo:
         self.vmWatch = None
         self.shutdownWatch = None
         self.shutdownStartTime = None
-        
+
         self.state = DOM_STATE_HALTED
         self.state_updated = threading.Condition()
         self.refresh_shutdown_lock = threading.Condition()
@@ -430,7 +430,7 @@ class XendDomainInfo:
         initialisation if it not started.
         """
         from xen.xend import XendDomain
-        
+
         if self.state == DOM_STATE_HALTED:
             try:
                 self._constructDomain()
@@ -443,7 +443,6 @@ class XendDomainInfo:
 
                 # save running configuration if XendDomains believe domain is
                 # persistent
-                #
                 if is_managed:
                     xendomains = XendDomain.instance()
                     xendomains.managed_config_save(self)
@@ -475,6 +474,9 @@ class XendDomainInfo:
         log.debug('XendDomainInfo.shutdown')
         if self.state in (DOM_STATE_SHUTDOWN, DOM_STATE_HALTED,):
             raise XendError('Domain cannot be shutdown')
+
+        if self.domid == 0:
+            raise XendError('Domain 0 cannot be shutdown')
         
         if not reason in DOMAIN_SHUTDOWN_REASONS.values():
             raise XendError('Invalid reason: %s' % reason)
@@ -920,7 +922,7 @@ class XendDomainInfo:
                         # the VM path now, otherwise we will end up with one
                         # watch for the old domain, and one for the new.
                         self._unwatchVm()
-                    elif reason in ['poweroff', 'reboot']:
+                    elif reason in ('poweroff', 'reboot'):
                         restart_reason = reason
                     else:
                         self.destroy()
@@ -1117,8 +1119,9 @@ class XendDomainInfo:
         @raise: VmError for invalid devices
         """
         for (devclass, config) in self.info.all_devices_sxpr():
-            log.info("createDevice: %s : %s" % (devclass, config))
-            self._createDevice(devclass, config)
+            if devclass in XendDevices.valid_devices():
+                log.info("createDevice: %s : %s" % (devclass, config))
+                self._createDevice(devclass, config)
 
         if self.image:
             self.image.createDeviceModel()
@@ -1323,6 +1326,8 @@ class XendDomainInfo:
             self._stateSet(DOM_STATE_RUNNING)
         except RuntimeError, exn:
             log.exception("XendDomainInfo.initDomain: exception occurred")
+            if self.info['bootloader'] and self.image is not None:
+                self.image.cleanupBootloading()
             raise VmError(str(exn))
 
 
@@ -1521,6 +1526,14 @@ class XendDomainInfo:
     def _unwatchVm(self):
         """Remove the watch on the VM path, if any.  Idempotent.  Nothrow
         guarantee."""
+        try:
+            try:
+                if self.vmWatch:
+                    self.vmWatch.unwatch()
+            finally:
+                self.vmWatch = None
+        except:
+            log.exception("Unwatching VM path failed.")
 
     def testDeviceComplete(self):
         """ For Block IO migration safety we must ensure that
@@ -1659,9 +1672,17 @@ class XendDomainInfo:
         log.trace("XendDomainInfo.update done on domain %s: %s",
                   str(self.domid), self.info)
 
-    def sxpr(self, ignore_devices = False):
-        return self.info.get_sxp(domain = self,
-                                 ignore_devices = ignore_devices)
+    def sxpr(self, ignore_store = False):
+        result = self.info.get_sxp(domain = self,
+                                   ignore_devices = ignore_store)
+
+        if not ignore_store and self.dompath:
+            vnc_port = self._readDom('console/vnc-port')
+            if vnc_port is not None:
+                result.append(['device',
+                               ['console', ['vnc-port', str(vnc_port)]]])
+
+        return result
 
     # Xen API
     # ----------------------------------------------------------------

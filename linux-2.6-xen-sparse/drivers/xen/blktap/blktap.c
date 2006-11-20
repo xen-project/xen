@@ -1059,9 +1059,9 @@ static int blktap_read_ufe_ring(tap_blkif_t *info)
 			map[offset] = NULL;
 		}
 		fast_flush_area(pending_req, pending_idx, usr_idx, info->minor);
+		info->idx_map[usr_idx] = INVALID_REQ;
 		make_response(blkif, pending_req->id, res.operation,
 			      res.status);
-		info->idx_map[usr_idx] = INVALID_REQ;
 		blkif_put(pending_req->blkif);
 		free_req(pending_req);
 	}

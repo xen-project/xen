@@ -65,7 +65,7 @@ class PciController(DevController):
                     else:
                         return default
 
-                if isinstance(val, types.StringType):
+                if isinstance(val, types.StringTypes):
                     return int(val, 16)
                 else:
                     return val
@@ -79,7 +79,7 @@ class PciController(DevController):
         back = {}
 
         val = sxp.child_value(config, 'dev')
-        if isinstance(val, list):
+        if isinstance(val, (types.ListType, types.TupleType)):
             pcidevid = 0
             for dev_config in sxp.children(config, 'dev'):
                 domain = get_param(dev_config, 'domain', 0)
@@ -89,7 +89,7 @@ class PciController(DevController):
 
                 self.setupDevice(domain, bus, slot, func)
 
-                back['dev-%i'%(pcidevid)]="%04x:%02x:%02x.%02x"% \
+                back['dev-%i' % pcidevid]="%04x:%02x:%02x.%02x"% \
                         (domain, bus, slot, func)
                 pcidevid+=1
             
@@ -115,19 +115,19 @@ class PciController(DevController):
         pci_devs = []
         
         for i in range(int(num_devs)):
-            (dev_config,) = self.readBackend(devid, 'dev-%d'%(i))
+            dev_config = self.readBackend(devid, 'dev-%d' % i)
 
-            pci_match = re.match(r"((?P<domain>[0-9a-fA-F]{1,4})[:,])?" + \
-                    r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" + \
-                    r"(?P<slot>[0-9a-fA-F]{1,2})[.,]" + \
-                    r"(?P<func>[0-9a-fA-F]{1,2})", dev_config)
+            pci_match = re.match(r"((?P<domain>[0-9a-fA-F]{1,4})[:,])?" +
+                                 r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" + 
+                                 r"(?P<slot>[0-9a-fA-F]{1,2})[.,]" + 
+                                 r"(?P<func>[0-9a-fA-F]{1,2})", dev_config)
             
             if pci_match!=None:
-                pci_dev_info = pci_match.groupdict('0')
+                pci_dev_info = pci_match.groupdict()
                 pci_devs.append({'domain': '0x%(domain)s' % pci_dev_info,
                                  'bus': '0x%(bus)s' % pci_dev_info,
-                                 'slot': '0x(slot)s' % pci_dev_info,
-                                 'func': '0x(func)s' % pci_dev_info})
+                                 'slot': '0x%(slot)s' % pci_dev_info,
+                                 'func': '0x%(func)s' % pci_dev_info})
 
         result['dev'] = pci_devs
         return result

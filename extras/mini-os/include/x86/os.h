@@ -19,6 +19,8 @@
 #include <types.h>
 #include <hypervisor.h>
 
+#define USED    __attribute__ ((used))
+
 extern void do_exit(void);
 #define BUG do_exit
 

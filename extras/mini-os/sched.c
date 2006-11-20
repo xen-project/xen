@@ -5,7 +5,7 @@
  *
  *        File: sched.c
  *      Author: Grzegorz Milos
- *     Changes: 
+ *     Changes: Robert Kaiser
  *              
  *        Date: Aug 2005
  * 
@@ -142,6 +142,54 @@ void inline print_runqueue(void)
     printk("\n");
 }
 
+/* Find the time when the next timeout expires. If this is more than
+   10 seconds from now, return 10 seconds from now. */
+static s_time_t blocking_time(void)
+{
+    struct thread *thread;
+    struct list_head *iterator;
+    s_time_t min_wakeup_time;
+    unsigned long flags;
+    local_irq_save(flags);
+    /* default-block the domain for 10 seconds: */
+    min_wakeup_time = NOW() + SECONDS(10);
+
+    /* Thread list needs to be protected */
+    list_for_each(iterator, &idle_thread->thread_list)
+    {
+        thread = list_entry(iterator, struct thread, thread_list);
+        if(!is_runnable(thread) && thread->wakeup_time != 0LL)
+        {
+            if(thread->wakeup_time < min_wakeup_time)
+            {
+                min_wakeup_time = thread->wakeup_time;
+            }
+        }
+    }
+    local_irq_restore(flags);
+    return(min_wakeup_time);
+}
+
+/* Wake up all threads with expired timeouts. */
+static void wake_expired(void)
+{
+    struct thread *thread;
+    struct list_head *iterator;
+    s_time_t now = NOW();
+    unsigned long flags;
+    local_irq_save(flags);
+    /* Thread list needs to be protected */
+    list_for_each(iterator, &idle_thread->thread_list)
+    {
+        thread = list_entry(iterator, struct thread, thread_list);
+        if(!is_runnable(thread) && thread->wakeup_time != 0LL)
+        {
+            if(thread->wakeup_time <= now)
+                wake(thread);
+        }
+    }
+    local_irq_restore(flags);
+}
 
 void schedule(void)
 {
@@ -229,8 +277,9 @@ struct thread* create_thread(char *name, void (*function)(void *), void *data)
     stack_push(thread, (unsigned long) data);
     thread->ip = (unsigned long) thread_starter;
      
-    /* Not runable, not exited */ 
+    /* Not runable, not exited, not sleeping */
     thread->flags = 0;
+    thread->wakeup_time = 0LL;
     set_runnable(thread);
     local_irq_save(flags);
     if(idle_thread != NULL) {
@@ -247,20 +296,34 @@ struct thread* create_thread(char *name, void (*function)(void *), void *data)
 
 void block(struct thread *thread)
 {
+    thread->wakeup_time = 0LL;
     clear_runnable(thread);
+}
+
+void sleep(u32 millisecs)
+{
+    struct thread *thread = get_current();
+    thread->wakeup_time = NOW()  + MILLISECS(millisecs);
+    clear_runnable(thread);
+    schedule();
 }
 
 void wake(struct thread *thread)
 {
+    thread->wakeup_time = 0LL;
     set_runnable(thread);
 }
 
 void idle_thread_fn(void *unused)
 {
+    s_time_t until;
     for(;;)
     {
         schedule();
-        block_domain(10000);
+        /* block until the next timeout expires, or for 10 secs, whichever comes first */
+        until = blocking_time();
+        block_domain(until);
+        wake_expired();
     }
 }
 
@@ -278,7 +341,7 @@ void run_idle_thread(void)
                          "push %1\n\t" 
                          "ret"                                            
                          :"=m" (idle_thread->sp)
-                         :"m" (idle_thread->ip));                          
+                         :"m" (idle_thread->ip));                                                    
 #endif
 }
 

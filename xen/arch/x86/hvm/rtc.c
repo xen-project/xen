@@ -30,40 +30,43 @@
 
 /* #define DEBUG_RTC */
 
-void rtc_periodic_cb(struct vcpu *v, void *opaque)
+/* Callback that fires the RTC's periodic interrupt */
+void rtc_pie_callback(void *opaque)
 {
     RTCState *s = opaque;
-    s->cmos_data[RTC_REG_C] |= 0xc0;
+    struct hvm_domain *plat = &s->vcpu->domain->arch.hvm_domain;
+    struct vpic       *pic  = &plat->vpic;
+    /* Record that we have fired */
+    s->cmos_data[RTC_REG_C] |= (RTC_IRQF|RTC_PF); /* 0xc0 */
+    /* Fire */
+    pic_set_irq(pic, s->irq, 1);
+    /* Remember to fire again */
+    s->next_pie = NOW() + s->period;
+    set_timer(&s->pie_timer, s->next_pie);
 }
 
-int is_rtc_periodic_irq(void *opaque)
-{
-    RTCState *s = opaque;
-    return !(s->cmos_data[RTC_REG_C] & RTC_AF || 
-           s->cmos_data[RTC_REG_C] & RTC_UF);
-}
-
-static void rtc_timer_update(RTCState *s, int64_t current_time)
+/* Enable/configure/disable the periodic timer based on the RTC_PIE and
+ * RTC_RATE_SELECT settings */
+static void rtc_timer_update(RTCState *s)
 {
     int period_code; 
     int period;
 
-    period_code = s->cmos_data[RTC_REG_A] & 0x0f;
+    period_code = s->cmos_data[RTC_REG_A] & RTC_RATE_SELECT;
     if (period_code != 0 && (s->cmos_data[RTC_REG_B] & RTC_PIE)) {
         if (period_code <= 2)
             period_code += 7;
         
         period = 1 << (period_code - 1); /* period in 32 Khz cycles */
         period = DIV_ROUND((period * 1000000000ULL), 32768); /* period in ns */
-
+        s->period = period;
 #ifdef DEBUG_RTC
         printk("HVM_RTC: period = %uns\n", period);
 #endif
-
-        s->pt = create_periodic_time(period, RTC_IRQ, 0, rtc_periodic_cb, s);
-    } else if (s->pt) {
-        destroy_periodic_time(s->pt);
-        s->pt = NULL;
+        s->next_pie = NOW() + s->period;
+        set_timer(&s->pie_timer, s->next_pie);
+    } else {
+        stop_timer(&s->pie_timer);
     }
 }
 
@@ -105,7 +108,7 @@ static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
             /* UIP bit is read only */
             s->cmos_data[RTC_REG_A] = (data & ~RTC_UIP) |
                 (s->cmos_data[RTC_REG_A] & RTC_UIP);
-            rtc_timer_update(s, hvm_get_clock(s->vcpu));
+            rtc_timer_update(s);
             break;
         case RTC_REG_B:
             if (data & RTC_SET) {
@@ -119,14 +122,14 @@ static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
                 }
             }
             s->cmos_data[RTC_REG_B] = data;
-            rtc_timer_update(s, hvm_get_clock(s->vcpu));
+            rtc_timer_update(s);
             break;
         case RTC_REG_C:
         case RTC_REG_D:
             /* cannot write to them */
             break;
-        return 1;
         }
+        return 1;
     }
     return 0;
 }
@@ -172,7 +175,7 @@ static void rtc_copy_date(RTCState *s)
 
     s->cmos_data[RTC_SECONDS] = to_bcd(s, tm->tm_sec);
     s->cmos_data[RTC_MINUTES] = to_bcd(s, tm->tm_min);
-    if (s->cmos_data[RTC_REG_B] & 0x02) {
+    if (s->cmos_data[RTC_REG_B] & RTC_24H) {
         /* 24 hour format */
         s->cmos_data[RTC_HOURS] = to_bcd(s, tm->tm_hour);
     } else {
@@ -245,7 +248,7 @@ static void rtc_update_second(void *opaque)
     RTCState *s = opaque;
 
     /* if the oscillator is not in normal operation, we do not update */
-    if ((s->cmos_data[RTC_REG_A] & 0x70) != 0x20) {
+    if ((s->cmos_data[RTC_REG_A] & RTC_DIV_CTL) != RTC_REF_CLCK_32KHZ) {
         s->next_second_time += 1000000000ULL;
         set_timer(&s->second_timer, s->next_second_time);
     } else {
@@ -361,22 +364,48 @@ static int handle_rtc_io(ioreq_t *p)
     return 0;
 }
 
+/* Stop the periodic interrupts from this RTC */
+void rtc_freeze(struct vcpu *v)
+{
+    RTCState *s = &v->domain->arch.hvm_domain.pl_time.vrtc;
+    stop_timer(&s->pie_timer);
+}
+
+/* Start them again */
+void rtc_thaw(struct vcpu *v)
+{
+    RTCState *s = &v->domain->arch.hvm_domain.pl_time.vrtc;
+    if ( (s->cmos_data[RTC_REG_A] & RTC_RATE_SELECT) /* Period is not zero */
+         && (s->cmos_data[RTC_REG_B] & RTC_PIE) ) 
+        set_timer(&s->pie_timer, s->next_pie);
+}
+
+/* Move the RTC timers on to this vcpu's current cpu */
+void rtc_migrate_timers(struct vcpu *v)
+{
+    RTCState *s = &v->domain->arch.hvm_domain.pl_time.vrtc;
+    migrate_timer(&s->second_timer, v->processor);
+    migrate_timer(&s->second_timer2, v->processor);
+    migrate_timer(&s->pie_timer, v->processor);
+}
+
 void rtc_init(struct vcpu *v, int base, int irq)
 {
     RTCState *s = &v->domain->arch.hvm_domain.pl_time.vrtc;
 
     s->vcpu = v;
     s->irq = irq;
-    s->cmos_data[RTC_REG_A] = 0x26;
-    s->cmos_data[RTC_REG_B] = 0x02;
-    s->cmos_data[RTC_REG_C] = 0x00;
-    s->cmos_data[RTC_REG_D] = 0x80;
+    s->cmos_data[RTC_REG_A] = RTC_REF_CLCK_32KHZ | 6; /* ~1kHz */
+    s->cmos_data[RTC_REG_B] = RTC_24H;
+    s->cmos_data[RTC_REG_C] = 0;
+    s->cmos_data[RTC_REG_D] = RTC_VRT;
 
     s->current_tm = gmtime(get_localtime(v->domain));
     rtc_copy_date(s);
 
     init_timer(&s->second_timer, rtc_update_second, s, v->processor);
     init_timer(&s->second_timer2, rtc_update_second2, s, v->processor);
+    init_timer(&s->pie_timer, rtc_pie_callback, s, v->processor);
 
     s->next_second_time = NOW() + 1000000000ULL;
     set_timer(&s->second_timer2, s->next_second_time);
@@ -390,4 +419,5 @@ void rtc_deinit(struct domain *d)
 
     kill_timer(&s->second_timer);
     kill_timer(&s->second_timer2);
+    kill_timer(&s->pie_timer);
 }

@@ -29,6 +29,7 @@
 #include <xen/mm.h>
 #include <xen/errno.h>
 #include <xen/guest_access.h>
+#include <xen/multicall.h>
 #include <public/sched.h>
 
 extern void arch_getdomaininfo_ctxt(struct vcpu *,
@@ -59,8 +60,6 @@ static struct scheduler *schedulers[] = {
     &sched_credit_def,
     NULL
 };
-
-static void __enter_scheduler(void);
 
 static struct scheduler ops;
 
@@ -270,7 +269,7 @@ static long do_block(void)
     else
     {
         TRACE_2D(TRC_SCHED_BLOCK, v->domain->domain_id, v->vcpu_id);
-        __enter_scheduler();
+        raise_softirq(SCHEDULE_SOFTIRQ);
     }
 
     return 0;
@@ -315,9 +314,9 @@ static long do_poll(struct sched_poll *sched_poll)
         set_timer(&v->poll_timer, sched_poll->timeout);
 
     TRACE_2D(TRC_SCHED_BLOCK, v->domain->domain_id, v->vcpu_id);
-    __enter_scheduler();
+    raise_softirq(SCHEDULE_SOFTIRQ);
 
-    stop_timer(&v->poll_timer);
+    return 0;
 
  out:
     clear_bit(_VCPUF_polling, &v->vcpu_flags);
@@ -329,7 +328,7 @@ static long do_poll(struct sched_poll *sched_poll)
 static long do_yield(void)
 {
     TRACE_2D(TRC_SCHED_YIELD, current->domain->domain_id, current->vcpu_id);
-    __enter_scheduler();
+    raise_softirq(SCHEDULE_SOFTIRQ);
     return 0;
 }
 
@@ -540,7 +539,7 @@ long sched_adjust(struct domain *d, struct xen_domctl_scheduler_op *op)
  * - deschedule the current domain (scheduler independent).
  * - pick a new domain (scheduler dependent).
  */
-static void __enter_scheduler(void)
+static void schedule(void)
 {
     struct vcpu          *prev = current, *next = NULL;
     s_time_t              now = NOW();
@@ -549,6 +548,7 @@ static void __enter_scheduler(void)
     s32                   r_time;     /* time for new dom to run */
 
     ASSERT(!in_irq());
+    ASSERT(this_cpu(mc_state).flags == 0);
 
     perfc_incrc(sched_run);
 
@@ -679,7 +679,7 @@ void __init scheduler_init(void)
 {
     int i;
 
-    open_softirq(SCHEDULE_SOFTIRQ, __enter_scheduler);
+    open_softirq(SCHEDULE_SOFTIRQ, schedule);
 
     for_each_cpu ( i )
     {
