@@ -101,9 +101,6 @@ void start_kernel(start_info_t *si)
 
     trap_init();
 
-    /* ENABLE EVENT DELIVERY. This is disabled at start of day. */
-    __sti();
-    
     /* print out some useful information  */
     printk("Xen Minimal OS!\n");
     printk("start_info:   %p\n",    si);
@@ -119,6 +116,9 @@ void start_kernel(start_info_t *si)
     /* Set up events. */
     init_events();
     
+    /* ENABLE EVENT DELIVERY. This is disabled at start of day. */
+    __sti();
+
     arch_print_info();
 
     setup_xen_features();
