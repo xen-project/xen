@@ -3941,22 +3941,22 @@ static char * sh_audit_flags(struct vcpu *v, int level,
         return "shadow is present but guest is not present";
     if ( (sflags & _PAGE_GLOBAL) && !is_hvm_vcpu(v) ) 
         return "global bit set in PV shadow";
-    if ( (level == 1 || (level == 2 && (gflags & _PAGE_PSE)))
-         && ((sflags & _PAGE_DIRTY) && !(gflags & _PAGE_DIRTY)) ) 
-        return "dirty bit not propagated";
     if ( level == 2 && (sflags & _PAGE_PSE) )
         return "PS bit set in shadow";
 #if SHADOW_PAGING_LEVELS == 3
     if ( level == 3 ) return NULL; /* All the other bits are blank in PAEl3 */
 #endif
+    if ( (sflags & _PAGE_PRESENT) && !(gflags & _PAGE_ACCESSED) ) 
+        return "accessed bit not propagated";
+    if ( (level == 1 || (level == 2 && (gflags & _PAGE_PSE)))
+         && ((sflags & _PAGE_RW) && !(gflags & _PAGE_DIRTY)) ) 
+        return "dirty bit not propagated";
     if ( (sflags & _PAGE_USER) != (gflags & _PAGE_USER) ) 
         return "user/supervisor bit does not match";
     if ( (sflags & _PAGE_NX_BIT) != (gflags & _PAGE_NX_BIT) ) 
         return "NX bit does not match";
     if ( (sflags & _PAGE_RW) && !(gflags & _PAGE_RW) ) 
         return "shadow grants write access but guest does not";
-    if ( (sflags & _PAGE_ACCESSED) && !(gflags & _PAGE_ACCESSED) ) 
-        return "accessed bit not propagated";
     return NULL;
 }
 
