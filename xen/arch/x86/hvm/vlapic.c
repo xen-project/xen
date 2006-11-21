@@ -152,7 +152,7 @@ int vlapic_set_irq(struct vlapic *vlapic, uint8_t vec, uint8_t trig)
 {
     int ret;
 
-    ret = vlapic_test_and_set_irr(vec, vlapic);
+    ret = !vlapic_test_and_set_irr(vec, vlapic);
     if ( trig )
         vlapic_set_vector(vec, vlapic->regs + APIC_TMR);
 
@@ -371,9 +371,7 @@ struct vlapic *apic_round_robin(
     int next, old;
     struct vlapic *target = NULL;
 
-    spin_lock(&d->arch.hvm_domain.round_robin_lock);
-
-    old = next = d->arch.hvm_domain.round_info[vector];
+    old = next = d->arch.hvm_domain.irq.round_robin_prev_vcpu;
 
     do {
         if ( ++next == MAX_VIRT_CPUS ) 
@@ -386,8 +384,7 @@ struct vlapic *apic_round_robin(
         target = NULL;
     } while ( next != old );
 
-    d->arch.hvm_domain.round_info[vector] = next;
-    spin_unlock(&d->arch.hvm_domain.round_robin_lock);
+    d->arch.hvm_domain.irq.round_robin_prev_vcpu = next;
 
     return target;
 }
@@ -863,7 +860,7 @@ int cpu_has_pending_irq(struct vcpu *v)
     if ( !vlapic_accept_pic_intr(v) )
         return 0;
 
-    return plat->interrupt_request;
+    return plat->irq.vpic.irq_pending;
 }
 
 void vlapic_post_injection(struct vcpu *v, int vector, int deliver_mode)

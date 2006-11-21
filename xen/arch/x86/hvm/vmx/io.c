@@ -98,23 +98,17 @@ asmlinkage void vmx_intr_assist(void)
     struct vlapic *vlapic = vcpu_vlapic(v);
     struct hvm_domain *plat=&v->domain->arch.hvm_domain;
     struct periodic_time *pt = &plat->pl_time.periodic_tm;
-    struct vpic *pic= &plat->vpic;
     unsigned int idtv_info_field;
     unsigned long inst_len;
     int    has_ext_irq;
 
-    if ( (v->vcpu_id == 0) && pt->enabled && pt->pending_intr_nr ) {
-        pic_set_irq(pic, pt->irq, 0);
-        pic_set_irq(pic, pt->irq, 1);
+    if ( (v->vcpu_id == 0) && pt->enabled && pt->pending_intr_nr )
+    {
+        hvm_isa_irq_deassert(current->domain, pt->irq);
+        hvm_isa_irq_assert(current->domain, pt->irq);
     }
 
-    if (v->vcpu_id == 0) {
-        int callback_irq;
-        callback_irq =
-            v->domain->arch.hvm_domain.params[HVM_PARAM_CALLBACK_IRQ];
-        if ( callback_irq != 0 )
-            pic_set_xen_irq(pic, callback_irq, local_events_need_delivery());
-    }
+    hvm_set_callback_irq_level();
 
     if ( vlapic->flush_tpr_threshold )
         update_tpr_threshold(vlapic);

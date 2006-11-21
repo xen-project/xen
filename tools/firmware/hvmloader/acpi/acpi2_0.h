@@ -327,7 +327,6 @@ struct acpi_20_madt {
 #pragma pack ()
 
 #define ACPI_PHYSICAL_ADDRESS 0xEA000
-#define ACPI_TABLE_SIZE (4*1024)
 
 void AcpiBuildTable(uint8_t *buf);
 

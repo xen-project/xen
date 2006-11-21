@@ -42,7 +42,7 @@ static inline void pic_set_irq1(PicState *s, int irq, int level)
 {
     int mask;
 
-    ASSERT(spin_is_locked(&s->pics_state->lock));
+    ASSERT(spin_is_locked(vpic_lock(s->pics_state)));
 
     mask = 1 << irq;
     if (s->elcr & mask) {
@@ -72,7 +72,7 @@ static inline int get_priority(PicState *s, int mask)
 {
     int priority;
 
-    ASSERT(spin_is_locked(&s->pics_state->lock));
+    ASSERT(spin_is_locked(vpic_lock(s->pics_state)));
 
     if (mask == 0)
         return 8;
@@ -87,9 +87,9 @@ static int pic_get_irq(PicState *s)
 {
     int mask, cur_priority, priority;
 
-    ASSERT(spin_is_locked(&s->pics_state->lock));
+    ASSERT(spin_is_locked(vpic_lock(s->pics_state)));
 
-    mask = (s->irr|s->irr_xen) & ~s->imr;
+    mask = s->irr & ~s->imr;
     priority = get_priority(s, mask);
     if (priority == 8)
         return -1;
@@ -115,7 +115,7 @@ void pic_update_irq(struct vpic *vpic)
 {
     int irq2, irq;
 
-    ASSERT(spin_is_locked(&vpic->lock));
+    ASSERT(spin_is_locked(vpic_lock(vpic)));
 
     /* first look at slave pic */
     irq2 = pic_get_irq(&vpic->pics[1]);
@@ -126,56 +126,21 @@ void pic_update_irq(struct vpic *vpic)
     }
     /* look at requested irq */
     irq = pic_get_irq(&vpic->pics[0]);
-    if (irq >= 0) {
-        vpic->irq_request(vpic->irq_request_opaque, 1);
-    }
-}
-
-void pic_set_xen_irq(void *opaque, int irq, int level)
-{
-    struct vpic *vpic = opaque;
-    unsigned long flags;
-    PicState *ps;
-
-    spin_lock_irqsave(&vpic->lock, flags);
-
-    vioapic_set_xen_irq(current->domain, irq, level);
-
-    /* Set it on the 8259s */
-    ps = &vpic->pics[irq >> 3];
-    if (!(ps->elcr & (1 << (irq & 7))))
-	gdprintk(XENLOG_WARNING, "edge-triggered override IRQ?\n");
-    if (level) {
-	ps->irr_xen |= 1 << (irq & 7);
-    } else {
-	ps->irr_xen &= ~(1 << (irq & 7));
-    }
-
-    pic_update_irq(vpic);
-    spin_unlock_irqrestore(&vpic->lock, flags);
+    if (irq >= 0)
+        vpic->irq_pending = 1;
 }
 
 void pic_set_irq(struct vpic *vpic, int irq, int level)
 {
-    unsigned long flags;
-
-    if ( irq < 0 )
-        return;
-
-    spin_lock_irqsave(&vpic->lock, flags);
-    vioapic_set_irq(vpic_domain(vpic), irq, level);
-    if ( irq < 16 )
-    {
-        pic_set_irq1(&vpic->pics[irq >> 3], irq & 7, level);
-        pic_update_irq(vpic);
-    }
-    spin_unlock_irqrestore(&vpic->lock, flags);
+    ASSERT(spin_is_locked(vpic_lock(vpic)));
+    pic_set_irq1(&vpic->pics[irq >> 3], irq & 7, level);
+    pic_update_irq(vpic);
 }
 
 /* acknowledge interrupt 'irq' */
 static inline void pic_intack(PicState *s, int irq)
 {
-    ASSERT(spin_is_locked(&s->pics_state->lock));
+    ASSERT(spin_is_locked(vpic_lock(s->pics_state)));
 
     if (s->auto_eoi) {
         if (s->rotate_on_auto_eoi)
@@ -193,7 +158,7 @@ static int pic_read_irq(struct vpic *vpic)
     int irq, irq2, intno;
     unsigned long flags;
 
-    spin_lock_irqsave(&vpic->lock, flags);
+    spin_lock_irqsave(vpic_lock(vpic), flags);
     irq = pic_get_irq(&vpic->pics[0]);
     if (irq >= 0) {
         pic_intack(&vpic->pics[0], irq);
@@ -218,7 +183,7 @@ static int pic_read_irq(struct vpic *vpic)
 	gdprintk(XENLOG_WARNING, "Spurious irq on master i8259.\n");
     }
     pic_update_irq(vpic);
-    spin_unlock_irqrestore(&vpic->lock, flags);
+    spin_unlock_irqrestore(vpic_lock(vpic), flags);
 
     return intno;
 }
@@ -227,7 +192,7 @@ static void pic_reset(void *opaque)
 {
     PicState *s = opaque;
 
-    ASSERT(spin_is_locked(&s->pics_state->lock));
+    ASSERT(spin_is_locked(vpic_lock(s->pics_state)));
 
     s->last_irr = 0;
     s->irr = 0;
@@ -251,7 +216,7 @@ static void pic_ioport_write(void *opaque, uint32_t addr, uint32_t val)
     PicState *s = opaque;
     int priority, cmd, irq;
 
-    ASSERT(spin_is_locked(&s->pics_state->lock));
+    ASSERT(spin_is_locked(vpic_lock(s->pics_state)));
 
     addr &= 1;
     if (addr == 0) {
@@ -259,7 +224,7 @@ static void pic_ioport_write(void *opaque, uint32_t addr, uint32_t val)
             /* init */
             pic_reset(s);
             /* deassert a pending interrupt */
-            s->pics_state->irq_request(s->pics_state->irq_request_opaque, 0);
+            s->pics_state->irq_pending = 0;
             s->init_state = 1;
             s->init4 = val & 1;
             if (val & 0x02)
@@ -342,7 +307,7 @@ static uint32_t pic_poll_read (PicState *s, uint32_t addr1)
 {
     int ret;
 
-    ASSERT(spin_is_locked(&s->pics_state->lock));
+    ASSERT(spin_is_locked(vpic_lock(s->pics_state)));
 
     ret = pic_get_irq(s);
     if (ret >= 0) {
@@ -351,7 +316,6 @@ static uint32_t pic_poll_read (PicState *s, uint32_t addr1)
             s->pics_state->pics[0].irr &= ~(1 << 2);
         }
         s->irr &= ~(1 << ret);
-        s->irr_xen &= ~(1 << ret);
         s->isr &= ~(1 << ret);
         if (addr1 >> 7 || ret != 2)
             pic_update_irq(s->pics_state);
@@ -369,7 +333,7 @@ static uint32_t pic_ioport_read(void *opaque, uint32_t addr1)
     unsigned int addr;
     int ret;
 
-    ASSERT(spin_is_locked(&s->pics_state->lock));
+    ASSERT(spin_is_locked(vpic_lock(s->pics_state)));
 
     addr = addr1;
     addr &= 1;
@@ -381,7 +345,7 @@ static uint32_t pic_ioport_read(void *opaque, uint32_t addr1)
             if (s->read_reg_select)
                 ret = s->isr;
             else
-                ret = s->irr | s->irr_xen;
+                ret = s->irr;
         } else {
             ret = s->imr;
         }
@@ -393,7 +357,7 @@ static void elcr_ioport_write(void *opaque, uint32_t addr, uint32_t val)
 {
     PicState *s = opaque;
 
-    ASSERT(spin_is_locked(&s->pics_state->lock));
+    ASSERT(spin_is_locked(vpic_lock(s->pics_state)));
 
     s->elcr = val & s->elcr_mask;
 }
@@ -407,7 +371,7 @@ static uint32_t elcr_ioport_read(void *opaque, uint32_t addr1)
 /* XXX: add generic master/slave system */
 static void pic_init1(int io_addr, int elcr_addr, PicState *s)
 {
-    ASSERT(spin_is_locked(&s->pics_state->lock));
+    ASSERT(spin_is_locked(vpic_lock(s->pics_state)));
 
     pic_reset(s);
 
@@ -416,23 +380,20 @@ static void pic_init1(int io_addr, int elcr_addr, PicState *s)
     s->elcr = 0xff & s->elcr_mask;
 }
 
-void pic_init(struct vpic *vpic, void (*irq_request)(void *, int),
-              void *irq_request_opaque)
+void pic_init(struct vpic *vpic)
 {
     unsigned long flags;
 
     memset(vpic, 0, sizeof(*vpic));
-    spin_lock_init(&vpic->lock);
+    spin_lock_init(vpic_lock(vpic));
     vpic->pics[0].pics_state = vpic;
     vpic->pics[1].pics_state = vpic;
     vpic->pics[0].elcr_mask = 0xf8;
     vpic->pics[1].elcr_mask = 0xde;
-    spin_lock_irqsave(&vpic->lock, flags);
+    spin_lock_irqsave(vpic_lock(vpic), flags);
     pic_init1(0x20, 0x4d0, &vpic->pics[0]);
     pic_init1(0xa0, 0x4d1, &vpic->pics[1]);
-    spin_unlock_irqrestore(&vpic->lock, flags);
-    vpic->irq_request = irq_request;
-    vpic->irq_request_opaque = irq_request_opaque;
+    spin_unlock_irqrestore(vpic_lock(vpic), flags);
 }
 
 static int intercept_pic_io(ioreq_t *p)
@@ -452,16 +413,16 @@ static int intercept_pic_io(ioreq_t *p)
             (void)hvm_copy_from_guest_phys(&data, p->data, p->size);
         else
             data = p->data;
-        spin_lock_irqsave(&pic->lock, flags);
+        spin_lock_irqsave(vpic_lock(pic), flags);
         pic_ioport_write((void*)&pic->pics[p->addr>>7],
                 (uint32_t) p->addr, (uint32_t) (data & 0xff));
-        spin_unlock_irqrestore(&pic->lock, flags);
+        spin_unlock_irqrestore(vpic_lock(pic), flags);
     }
     else {
-        spin_lock_irqsave(&pic->lock, flags);
+        spin_lock_irqsave(vpic_lock(pic), flags);
         data = pic_ioport_read(
             (void*)&pic->pics[p->addr>>7], (uint32_t) p->addr);
-        spin_unlock_irqrestore(&pic->lock, flags);
+        spin_unlock_irqrestore(vpic_lock(pic), flags);
         if ( p->data_is_ptr )
             (void)hvm_copy_to_guest_phys(p->data, &data, p->size);
         else
@@ -487,10 +448,10 @@ static int intercept_elcr_io(ioreq_t *p)
             (void)hvm_copy_from_guest_phys(&data, p->data, p->size);
         else
             data = p->data;
-        spin_lock_irqsave(&vpic->lock, flags);
+        spin_lock_irqsave(vpic_lock(vpic), flags);
         elcr_ioport_write((void*)&vpic->pics[p->addr&1],
                 (uint32_t) p->addr, (uint32_t)( data & 0xff));
-        spin_unlock_irqrestore(&vpic->lock, flags);
+        spin_unlock_irqrestore(vpic_lock(vpic), flags);
     }
     else {
         data = (u64) elcr_ioport_read(
@@ -522,7 +483,7 @@ int cpu_get_pic_interrupt(struct vcpu *v, int *type)
     if ( !vlapic_accept_pic_intr(v) )
         return -1;
 
-    if (cmpxchg(&plat->interrupt_request, 1, 0) != 1)
+    if ( xchg(&plat->irq.vpic.irq_pending, 0) == 0 )
         return -1;
 
     /* read the irq from the PIC */

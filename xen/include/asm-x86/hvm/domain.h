@@ -16,16 +16,15 @@
  * You should have received a copy of the GNU General Public License along with
  * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston, MA 02111-1307 USA.
- *
  */
 
 #ifndef __ASM_X86_HVM_DOMAIN_H__
 #define __ASM_X86_HVM_DOMAIN_H__
 
-#include <asm/hvm/vpic.h>
+#include <asm/hvm/irq.h>
 #include <asm/hvm/vpt.h>
 #include <asm/hvm/vlapic.h>
-#include <asm/hvm/vioapic.h>
+#include <asm/hvm/io.h>
 #include <public/hvm/params.h>
 
 struct hvm_domain {
@@ -35,13 +34,9 @@ struct hvm_domain {
     s64                    tsc_frequency;
     struct pl_time         pl_time;
 
-    struct vpic            vpic;
-    struct vioapic         vioapic;
     struct hvm_io_handler  io_handler;
 
-    unsigned char          round_info[256];
-    spinlock_t             round_robin_lock;
-    int                    interrupt_request;
+    struct hvm_irq         irq;
 
     /* hvm_print_line() logging. */
     char                   pbuf[80];

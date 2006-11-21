@@ -175,7 +175,7 @@ main(void)
 	puts("Loading ROMBIOS ...\n");
 	memcpy((void *)ROMBIOS_PHYSICAL_ADDRESS, rombios, sizeof(rombios));
 
-        create_mp_tables();
+	create_mp_tables();
 	
 	if (cirrus_check()) {
 		puts("Loading Cirrus VGABIOS ...\n");

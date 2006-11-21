@@ -26,14 +26,14 @@
 #ifndef __ASM_X86_HVM_VPIC_H__
 #define __ASM_X86_HVM_VPIC_H__
 
-#define domain_vpic(d) (&(d)->arch.hvm_domain.vpic)
-#define vpic_domain(v) (container_of((v), struct domain, arch.hvm_domain.vpic))
+#define domain_vpic(d) (&(d)->arch.hvm_domain.irq.vpic)
+#define vpic_domain(v) (container_of((v), struct domain, \
+                                     arch.hvm_domain.irq.vpic))
+#define vpic_lock(v)   (&container_of((v), struct hvm_irq, vpic)->lock)
 
 typedef struct PicState {
     uint8_t last_irr; /* edge detection */
     uint8_t irr; /* interrupt request register */
-    uint8_t irr_xen; /* interrupts forced on by the hypervisor e.g.
-			the callback irq. */
     uint8_t imr; /* interrupt mask register */
     uint8_t isr; /* interrupt service register */
     uint8_t priority_add; /* highest irq priority */
@@ -54,17 +54,11 @@ typedef struct PicState {
 struct vpic {
     /* 0 is master pic, 1 is slave pic */
     PicState pics[2];
-    void (*irq_request)(void *opaque, int level);
-    void *irq_request_opaque;
-    /* IOAPIC callback support */
-    spinlock_t lock;
+    int irq_pending;
 };
 
-void pic_set_xen_irq(void *opaque, int irq, int level);
 void pic_set_irq(struct vpic *vpic, int irq, int level);
-void pic_init(struct vpic *vpic,
-              void (*irq_request)(void *, int),
-              void *irq_request_opaque);
+void pic_init(struct vpic *vpic);
 void pic_update_irq(struct vpic *vpic); /* Caller must hold vpic->lock */
 void register_pic_io_hook(struct domain *d);
 int cpu_get_pic_interrupt(struct vcpu *v, int *type);

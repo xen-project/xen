@@ -33,7 +33,7 @@ struct PicState2 {
 
 void pic_set_irq_new(void *opaque, int irq, int level)
 {
-    xc_hvm_set_irq_level(xc_handle, domid, irq, level);
+    xc_hvm_set_isa_irq_level(xc_handle, domid, irq, level);
 }
 
 /* obsolete function */

@@ -157,7 +157,6 @@ void hvm_do_resume(struct vcpu *v)
 
 int hvm_domain_initialise(struct domain *d)
 {
-    struct hvm_domain *platform = &d->arch.hvm_domain;
     int rc;
 
     if ( !hvm_enabled )
@@ -168,14 +167,13 @@ int hvm_domain_initialise(struct domain *d)
     }
 
     spin_lock_init(&d->arch.hvm_domain.pbuf_lock);
-    spin_lock_init(&d->arch.hvm_domain.round_robin_lock);
     spin_lock_init(&d->arch.hvm_domain.buffered_io_lock);
 
     rc = shadow_enable(d, SHM2_refcounts|SHM2_translate|SHM2_external);
     if ( rc != 0 )
         return rc;
 
-    pic_init(&platform->vpic, pic_irq_request, &platform->interrupt_request);
+    pic_init(domain_vpic(d));
     register_pic_io_hook(d);
 
     vioapic_init(d);
@@ -244,12 +242,6 @@ void hvm_vcpu_destroy(struct vcpu *v)
     /*free_xen_event_channel(v, v->arch.hvm_vcpu.xen_port);*/
 }
 
-void pic_irq_request(void *data, int level)
-{
-    int *interrupt_request = data;
-    *interrupt_request = level;
-}
-
 int cpu_get_interrupt(struct vcpu *v, int *type)
 {
     int intno;
@@ -259,9 +251,9 @@ int cpu_get_interrupt(struct vcpu *v, int *type)
     if ( (intno = cpu_get_apic_interrupt(v, type)) != -1 ) {
         /* set irq request if a PIC irq is still pending */
         /* XXX: improve that */
-        spin_lock_irqsave(&vpic->lock, flags);
+        spin_lock_irqsave(vpic_lock(vpic), flags);
         pic_update_irq(vpic);
-        spin_unlock_irqrestore(&vpic->lock, flags);
+        spin_unlock_irqrestore(vpic_lock(vpic), flags);
         return intno;
     }
     /* read the irq from the PIC */
@@ -615,6 +607,124 @@ int hvm_bringup_ap(int vcpuid, int trampoline_vector)
     return rc;
 }
 
+static int hvmop_set_pci_intx_level(
+    XEN_GUEST_HANDLE(xen_hvm_set_pci_intx_level_t) uop)
+{
+    struct xen_hvm_set_pci_intx_level op;
+    struct domain *d;
+    int rc;
+
+    if ( copy_from_guest(&op, uop, 1) )
+        return -EFAULT;
+
+    if ( !IS_PRIV(current->domain) )
+        return -EPERM;
+
+    if ( (op.domain > 0) || (op.bus > 0) || (op.device > 31) || (op.intx > 3) )
+        return -EINVAL;
+
+    d = find_domain_by_id(op.domid);
+    if ( d == NULL )
+        return -ESRCH;
+
+    rc = -EINVAL;
+    if ( !is_hvm_domain(d) )
+        goto out;
+
+    rc = 0;
+    switch ( op.level )
+    {
+    case 0:
+        hvm_pci_intx_deassert(d, op.device, op.intx);
+        break;
+    case 1:
+        hvm_pci_intx_assert(d, op.device, op.intx);
+        break;
+    default:
+        rc = -EINVAL;
+        break;
+    }
+
+ out:
+    put_domain(d);
+    return rc;
+}
+
+static int hvmop_set_isa_irq_level(
+    XEN_GUEST_HANDLE(xen_hvm_set_isa_irq_level_t) uop)
+{
+    struct xen_hvm_set_isa_irq_level op;
+    struct domain *d;
+    int rc;
+
+    if ( copy_from_guest(&op, uop, 1) )
+        return -EFAULT;
+
+    if ( !IS_PRIV(current->domain) )
+        return -EPERM;
+
+    if ( op.isa_irq > 15 )
+        return -EINVAL;
+
+    d = find_domain_by_id(op.domid);
+    if ( d == NULL )
+        return -ESRCH;
+
+    rc = -EINVAL;
+    if ( !is_hvm_domain(d) )
+        goto out;
+
+    rc = 0;
+    switch ( op.level )
+    {
+    case 0:
+        hvm_isa_irq_deassert(d, op.isa_irq);
+        break;
+    case 1:
+        hvm_isa_irq_assert(d, op.isa_irq);
+        break;
+    default:
+        rc = -EINVAL;
+        break;
+    }
+
+ out:
+    put_domain(d);
+    return rc;
+}
+
+static int hvmop_set_pci_link_route(
+    XEN_GUEST_HANDLE(xen_hvm_set_pci_link_route_t) uop)
+{
+    struct xen_hvm_set_pci_link_route op;
+    struct domain *d;
+    int rc;
+
+    if ( copy_from_guest(&op, uop, 1) )
+        return -EFAULT;
+
+    if ( !IS_PRIV(current->domain) )
+        return -EPERM;
+
+    if ( (op.link > 3) || (op.isa_irq > 15) )
+        return -EINVAL;
+
+    d = find_domain_by_id(op.domid);
+    if ( d == NULL )
+        return -ESRCH;
+
+    rc = -EINVAL;
+    if ( !is_hvm_domain(d) )
+        goto out;
+
+    rc = 0;
+    hvm_set_pci_link_route(d, op.link, op.isa_irq);
+
+ out:
+    put_domain(d);
+    return rc;
+}
+
 long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
 
 {
@@ -687,6 +797,9 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                     goto param_fail;
                 d->arch.hvm_domain.buffered_io_va = (unsigned long)p;
                 break;
+            case HVM_PARAM_CALLBACK_IRQ:
+                hvm_set_callback_gsi(d, a.value);
+                break;
             }
             d->arch.hvm_domain.params[a.index] = a.value;
             rc = 0;
@@ -702,31 +815,20 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
-    case HVMOP_set_irq_level:
-    {
-        struct xen_hvm_set_irq_level op;
-        struct domain *d;
-
-        if ( copy_from_guest(&op, arg, 1) )
-            return -EFAULT;
-
-        if ( !IS_PRIV(current->domain) )
-            return -EPERM;
-
-        d = find_domain_by_id(op.domid);
-        if ( d == NULL )
-            return -ESRCH;
-
-        rc = -EINVAL;
-        if ( is_hvm_domain(d) )
-        {
-            pic_set_irq(domain_vpic(d), op.irq, op.level);
-            rc = 0;
-        }
-
-        put_domain(d);
+    case HVMOP_set_pci_intx_level:
+        rc = hvmop_set_pci_intx_level(
+            guest_handle_cast(arg, xen_hvm_set_pci_intx_level_t));
         break;
-    }
+
+    case HVMOP_set_isa_irq_level:
+        rc = hvmop_set_isa_irq_level(
+            guest_handle_cast(arg, xen_hvm_set_isa_irq_level_t));
+        break;
+
+    case HVMOP_set_pci_link_route:
+        rc = hvmop_set_pci_link_route(
+            guest_handle_cast(arg, xen_hvm_set_pci_link_route_t));
+        break;
 
     default:
     {

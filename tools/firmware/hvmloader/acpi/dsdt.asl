@@ -1,24 +1,21 @@
-//**********************************************************************//
-//*
-//* Copyright (c) 2004, Intel Corporation.
-//*
-//* This program is free software; you can redistribute it and/or modify it
-//* under the terms and conditions of the GNU General Public License,
-//* version 2, as published by the Free Software Foundation.
-//*
-//* This program is distributed in the hope it will be useful, but WITHOUT
-//* ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-//* FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-//* more details.
-//*
-//* You should have received a copy of the GNU General Public License along with
-//* this program; if not, write to the Free Software Foundation, Inc., 59 Temple
-//* Place - Suite 330, Boston, MA 02111-1307 USA.
-
-//**
-//**  DSDT for Xen with Qemu device model
-//**
-//**
+/******************************************************************************
+ * DSDT for Xen with Qemu device model
+ *
+ * Copyright (c) 2004, Intel Corporation.
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms and conditions of the GNU General Public License,
+ * version 2, as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+ * Place - Suite 330, Boston, MA 02111-1307 USA.
+ */
 
 DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
 {
@@ -36,11 +33,9 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
         Processor (CPU1, 0x01, 0x00000000, 0x00) {}
         Processor (CPU2, 0x02, 0x00000000, 0x00) {}
         Processor (CPU3, 0x03, 0x00000000, 0x00) {}
-
     }
 
-/* Poweroff support - ties in with qemu emulation */
-
+    /* Poweroff support - ties in with qemu emulation */
     Name (\_S5, Package (0x04)
     {
         0x07,
@@ -49,318 +44,476 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
         0x00
     })
 
-
     Name(PICD, 0)
-
-    Method(_PIC, 1) { 
- 
-    Store(Arg0, PICD) 
+    Method(_PIC, 1)
+    {
+        Store(Arg0, PICD) 
     }
+
     Scope (\_SB)
     {
-       /* Fix HCT test for 0x400 pci memory - need to report low 640 MB mem as motherboard resource            */
+        /* Fix HCT test for 0x400 pci memory:
+         * - need to report low 640 MB mem as motherboard resource
+         */
 
-       Device(MEM0) {
+       Device(MEM0)
+       {
            Name(_HID, EISAID("PNP0C02"))
            Name(_CRS, ResourceTemplate() {
-           QWordMemory (ResourceConsumer, PosDecode, MinFixed, MaxFixed, Cacheable, ReadWrite,
+               QWordMemory(
+                    ResourceConsumer, PosDecode, MinFixed,
+                    MaxFixed, Cacheable, ReadWrite,
                     0x00000000,
                     0x00000000,
                     0x0009ffff,
                     0x00000000,
                     0x000a0000)
-           }
-           )
+           })
        }
 
        Device (PCI0)
-        {
+       {
            Name (_HID, EisaId ("PNP0A03"))
            Name (_UID, 0x00)
            Name (_ADR, 0x00)
            Name (_BBN, 0x00)
            OperationRegion (PIRP, PCI_Config, 0x3c, 0x10)
            Field(PIRP, ByteAcc, NoLock, Preserve){        
-          IRQ3,3,
-          IRQ5,5,
-          IRQ7,7,
-          IRQ9,9,
-          IRQA,10,
-          IRQB,11
-         }
+               IRQ3, 3,
+               IRQ5, 5,
+               IRQ7, 7,
+               IRQ9, 9,
+               IRQA, 10,
+               IRQB, 11
+           }
  
-            Method (_CRS, 0, NotSerialized)
-            {
-          
+           Method (_CRS, 0, NotSerialized)
+           {
                Name (PRT0, ResourceTemplate ()
-                {
-         /* bus number is from 0 - 255*/
-                    WordBusNumber (ResourceConsumer, MinFixed, MaxFixed, SubDecode,
+               {
+                   /* bus number is from 0 - 255*/
+                   WordBusNumber(
+                        ResourceConsumer, MinFixed, MaxFixed, SubDecode,
                         0x0000,
                         0x0000,
                         0x00FF,
                         0x0000,
                         0x0100)
                     IO (Decode16, 0x0CF8, 0x0CF8, 0x01, 0x08)
-                    WordIO (ResourceProducer, MinFixed, MaxFixed, PosDecode, EntireRange,
+                    WordIO(
+                        ResourceProducer, MinFixed, MaxFixed, PosDecode,
+                        EntireRange,
                         0x0000,
                         0x0000,
                         0x0CF7,
                         0x0000,
                         0x0CF8)
-                    WordIO (ResourceProducer, MinFixed, MaxFixed, PosDecode, EntireRange,
+                    WordIO(
+                        ResourceProducer, MinFixed, MaxFixed, PosDecode,
+                        EntireRange,
                         0x0000,
                         0x0D00,
                         0xFFFF,
                         0x0000,
                         0xF300)
 
-                /* reserve memory for pci devices */
-
-                    DWordMemory (ResourceProducer, PosDecode, MinFixed, MaxFixed, Cacheable, ReadWrite,
+                    /* reserve memory for pci devices */
+                    DWordMemory(
+                        ResourceProducer, PosDecode, MinFixed, MaxFixed,
+                        Cacheable, ReadWrite,
                         0x00000000,
                         0x000A0000,
                         0x000BFFFF,
                         0x00000000,
                         0x00020000)
 
-                    DWordMemory (ResourceConsumer, PosDecode, MinFixed, MaxFixed, Cacheable, ReadWrite,
+                    DWordMemory(
+                        ResourceConsumer, PosDecode, MinFixed, MaxFixed,
+                        Cacheable, ReadWrite,
                         0x00000000,
                         0xF0000000,
                         0xF4FFFFFF,
                         0x00000000,
                         0x05000000)
-
                 })
                 Return (PRT0)
             }
-       Name(BUFA, ResourceTemplate() {
+
+            Name(BUFA, ResourceTemplate() {
                 IRQ(Level, ActiveLow, Shared) {
-                        3,4,5,6,7,10,11,12,14,15} 
-                }) 
+                    3,4,5,6,7,10,11,12,14,15
+                }
+            })
 
-                Name(BUFB, Buffer(){
-                0x23, 0x00, 0x00, 0x18,
-                0x79, 0})
+            Name(BUFB, Buffer() {
+                0x23, 0x00, 0x00, 0x18, 0x79, 0
+            })
 
-                CreateWordField(BUFB, 0x01, IRQV)
+            CreateWordField(BUFB, 0x01, IRQV)
 
-                Name(BUFC, Buffer(){
-                5, 7, 10, 11
-                 })
-                
-                CreateByteField(BUFC, 0x01, PIQA)
-                CreateByteField(BUFC, 0x01, PIQB)
-                CreateByteField(BUFC, 0x01, PIQC)
-                CreateByteField(BUFC, 0x01, PIQD)
-                
-                Device(LNKA)    {
-                Name(_HID, EISAID("PNP0C0F")) // PCI interrupt link
+            Device(LNKA) {
+                Name(_HID, EISAID("PNP0C0F")) /* PCI interrupt link */
                 Name(_UID, 1)
+
                 Method(_STA, 0) {
-                               And(PIRA, 0x80, Local0)
-                        If(LEqual(Local0, 0x80)) {
-                                Return(0x09)   
-                                }
-                        Else {
-                                Return(0x0B) 
-                                }
-                        }
+                    And(PIRA, 0x80, Local0)
+                    If(LEqual(Local0, 0x80)) {
+                        Return(0x09)   
+                    } Else {
+                        Return(0x0B) 
+                    }
+                }
 
                 Method(_PRS) {
-
-                        Return(BUFA)
-                } // Method(_PRS)
+                    Return(BUFA)
+                }
 
                 Method(_DIS) {
-                               Or(PIRA, 0x80, PIRA)
+                    Or(PIRA, 0x80, PIRA)
                 }
 
                 Method(_CRS) {
-                        And(PIRB, 0x0f, Local0) 
-                        ShiftLeft(0x1, Local0, IRQV) 
-                        Return(BUFB) 
-                } 
+                    And(PIRA, 0x0f, Local0)
+                    ShiftLeft(0x1, Local0, IRQV)
+                    Return(BUFB)
+                }
 
                 Method(_SRS, 1) {
-                                CreateWordField(ARG0, 0x01, IRQ1) 
-                        FindSetRightBit(IRQ1, Local0) 
-                        Decrement(Local0) 
-                        Store(Local0, PIRA)
-                 } // Method(_SRS)
-        }
+                    CreateWordField(ARG0, 0x01, IRQ1)
+                    FindSetRightBit(IRQ1, Local0)
+                    Decrement(Local0)
+                    Store(Local0, PIRA)
+                }
+            }
 
-        Device(LNKB){
-                Name(_HID, EISAID("PNP0C0F"))  
+            Device(LNKB) {
+                Name(_HID, EISAID("PNP0C0F")) /* PCI interrupt link */
                 Name(_UID, 2)
+
                 Method(_STA, 0) {
-                               And(PIRB, 0x80, Local0)
-                        If(LEqual(Local0, 0x80)) {
-                                Return(0x09) 
-                                }
-                        Else {
-                                Return(0x0B) 
-                                }
-                        }
+                    And(PIRB, 0x80, Local0)
+                    If(LEqual(Local0, 0x80)) {
+                        Return(0x09) 
+                    } Else {
+                        Return(0x0B) 
+                    }
+                }
 
                 Method(_PRS) {
-                                Return(BUFA) 
-                } // Method(_PRS)
+                    Return(BUFA) 
+                }
 
                 Method(_DIS) {
-
-                               Or(PIRB, 0x80, PIRB)
+                    Or(PIRB, 0x80, PIRB)
                 }
 
                 Method(_CRS) {
-                        And(PIRB, 0x0f, Local0) 
-                        ShiftLeft(0x1, Local0, IRQV) 
-                        Return(BUFB) 
-                } // Method(_CRS)
+                    And(PIRB, 0x0f, Local0) 
+                    ShiftLeft(0x1, Local0, IRQV) 
+                    Return(BUFB) 
+                }
 
                 Method(_SRS, 1) {
-                        CreateWordField(ARG0, 0x01, IRQ1) 
-                        FindSetRightBit(IRQ1, Local0) 
-                        Decrement(Local0)
-                        Store(Local0, PIRB) 
-                 } // Method(_SRS)
-        }
+                    CreateWordField(ARG0, 0x01, IRQ1) 
+                    FindSetRightBit(IRQ1, Local0) 
+                    Decrement(Local0)
+                    Store(Local0, PIRB) 
+                }
+            }
 
-        Device(LNKC){
-                Name(_HID, EISAID("PNP0C0F")) // PCI interrupt link
+            Device(LNKC) {
+                Name(_HID, EISAID("PNP0C0F")) /* PCI interrupt link */
                 Name(_UID, 3)
+
                 Method(_STA, 0) {
-                        And(PIRC, 0x80, Local0)
-                        If(LEqual(Local0, 0x80)) {
-                                Return(0x09) 
-                        }
-                        Else {
-                                Return(0x0B)
-                        }
+                    And(PIRC, 0x80, Local0)
+                    If(LEqual(Local0, 0x80)) {
+                        Return(0x09) 
+                    } Else {
+                        Return(0x0B)
+                    }
                 }
 
                 Method(_PRS) { 
-                        Return(BUFA)
-                } // Method(_PRS)
+                    Return(BUFA)
+                }
 
                 Method(_DIS) {
-
-                               Or(PIRC, 0x80, PIRC)
+                    Or(PIRC, 0x80, PIRC)
                 }
 
                 Method(_CRS) {
-                        And(PIRC, 0x0f, Local0) 
-                        ShiftLeft(0x1, Local0, IRQV) 
-                        Return(BUFB) 
-                } // Method(_CRS)
+                    And(PIRC, 0x0f, Local0) 
+                    ShiftLeft(0x1, Local0, IRQV) 
+                    Return(BUFB) 
+                }
 
                 Method(_SRS, 1) {
-                                CreateWordField(ARG0, 0x01, IRQ1) 
-                        FindSetRightBit(IRQ1, Local0) 
-                        Decrement(Local0) 
-                        Store(Local0, PIRC)
-                 } // Method(_SRS)
-        }
+                    CreateWordField(ARG0, 0x01, IRQ1) 
+                    FindSetRightBit(IRQ1, Local0) 
+                    Decrement(Local0) 
+                    Store(Local0, PIRC)
+                }
+            }
 
-        Device(LNKD) {
-                Name(_HID, EISAID("PNP0C0F"))  
+            Device(LNKD) {
+                Name(_HID, EISAID("PNP0C0F")) /* PCI interrupt link */
                 Name(_UID, 4)
+
                 Method(_STA, 0) {
-                               And(PIRD, 0x80, Local0)
-                        If(LEqual(Local0, 0x80)) {
-                                Return(0x09) 
-                        }
-                        Else {
-                                Return(0x0B) 
-                        }
+                    And(PIRD, 0x80, Local0)
+                    If(LEqual(Local0, 0x80)) {
+                        Return(0x09) 
+                    } Else {
+                        Return(0x0B) 
+                    }
                 }
 
                 Method(_PRS) { 
-                        Return(BUFA) 
-                } // Method(_PRS)
+                    Return(BUFA) 
+                }
 
                 Method(_DIS) {
-                               Or(PIRD, 0x80, PIRD)
+                    Or(PIRD, 0x80, PIRD)
                 }
 
                 Method(_CRS) {
-                        And(PIRD, 0x0f, Local0) 
-                        ShiftLeft(0x1, Local0, IRQV) 
-                        Return(BUFB) 
-                } // Method(_CRS)
+                    And(PIRD, 0x0f, Local0) 
+                    ShiftLeft(0x1, Local0, IRQV) 
+                    Return(BUFB) 
+                }
 
                 Method(_SRS, 1) {
-                                CreateWordField(ARG0, 0x01, IRQ1) 
-                        FindSetRightBit(IRQ1, Local0) 
-                        Decrement(Local0) 
-                        Store(Local0, PIRD) 
-                 } // Method(_SRS)
-        }
-        Method(_PRT,0) {
-               If(PICD) {Return(PRTA)}  
-               Return (PRTP)  
-               } // end _PRT
+                    CreateWordField(ARG0, 0x01, IRQ1) 
+                    FindSetRightBit(IRQ1, Local0) 
+                    Decrement(Local0) 
+                    Store(Local0, PIRD) 
+                }
+            }
 
-        Name(PRTP, Package() {
-                        // Slot 1, INTA - INTD
-                        Package(){0x0000ffff, 0, \_SB.PCI0.LNKA, 0},
-                        Package(){0x0000ffff, 1, \_SB.PCI0.LNKB, 0},
-                        Package(){0x0000ffff, 2, \_SB.PCI0.LNKC, 0},
-                        Package(){0x0000ffff, 3, \_SB.PCI0.LNKD, 0},
+            Method(_PRT,0) {
+                If(PICD) {
+                    Return(PRTA)
+                }  
+                Return (PRTP)  
+            }
 
-                        // Slot 2, INTA - INTD
-                        Package(){0x0001ffff, 0, \_SB.PCI0.LNKB, 0},
-                        Package(){0x0001ffff, 1, \_SB.PCI0.LNKC, 0},
-                        Package(){0x0001ffff, 2, \_SB.PCI0.LNKD, 0},
-                        Package(){0x0001ffff, 3, \_SB.PCI0.LNKA, 0},
+            Name(PRTP, Package() {
+                /* Device 0, INTA - INTD */
+                Package(){0x0000ffff, 0, \_SB.PCI0.LNKA, 0},
+                Package(){0x0000ffff, 1, \_SB.PCI0.LNKB, 0},
+                Package(){0x0000ffff, 2, \_SB.PCI0.LNKC, 0},
+                Package(){0x0000ffff, 3, \_SB.PCI0.LNKD, 0},
+
+                /* Device 1, INTA - INTD */
+                Package(){0x0001ffff, 0, \_SB.PCI0.LNKB, 0},
+                Package(){0x0001ffff, 1, \_SB.PCI0.LNKC, 0},
+                Package(){0x0001ffff, 2, \_SB.PCI0.LNKD, 0},
+                Package(){0x0001ffff, 3, \_SB.PCI0.LNKA, 0},
                         
-                        // Slot 3, INTA - INTD
-                        Package(){0x0002ffff, 0, \_SB.PCI0.LNKC, 0},
-                        Package(){0x0002ffff, 1, \_SB.PCI0.LNKD, 0},
-                        Package(){0x0002ffff, 2, \_SB.PCI0.LNKA, 0},
-                        Package(){0x0002ffff, 3, \_SB.PCI0.LNKB, 0},
+                /* Device 2, INTA - INTD */
+                Package(){0x0002ffff, 0, \_SB.PCI0.LNKC, 0},
+                Package(){0x0002ffff, 1, \_SB.PCI0.LNKD, 0},
+                Package(){0x0002ffff, 2, \_SB.PCI0.LNKA, 0},
+                Package(){0x0002ffff, 3, \_SB.PCI0.LNKB, 0},
                         
-                        // Slot 4, INTA - INTD
-                        Package(){0x0003ffff, 0, \_SB.PCI0.LNKD, 0},
-                        Package(){0x0003ffff, 1, \_SB.PCI0.LNKA, 0},
-                        Package(){0x0003ffff, 2, \_SB.PCI0.LNKB, 0},
-                        Package(){0x0003ffff, 3, \_SB.PCI0.LNKC, 0},
+                /* Device 3, INTA - INTD */
+                Package(){0x0003ffff, 0, \_SB.PCI0.LNKD, 0},
+                Package(){0x0003ffff, 1, \_SB.PCI0.LNKA, 0},
+                Package(){0x0003ffff, 2, \_SB.PCI0.LNKB, 0},
+                Package(){0x0003ffff, 3, \_SB.PCI0.LNKC, 0},
                         
-                        // Slot 5, INTA - INTD
-                        Package(){0x0004ffff, 0, \_SB.PCI0.LNKA, 0},
-                        Package(){0x0004ffff, 1, \_SB.PCI0.LNKB, 0},
-                        Package(){0x0004ffff, 2, \_SB.PCI0.LNKC, 0},
-                        Package(){0x0004ffff, 3, \_SB.PCI0.LNKD, 0},
-                        }
-            )
-        Name(PRTA, Package(){
-                        Package(){0x0001ffff, 0, 0, 5},  // Device 1, INTA
-                        Package(){0x0002ffff, 0, 0, 7},  // Device 2, INTA
-                        Package(){0x0003ffff, 0, 0, 10}, // Device 3, INTA
-                        Package(){0x0004ffff, 0, 0, 11}, // Device 4, INTA
-                        }
-            )
+                /* Device 4, INTA - INTD */
+                Package(){0x0004ffff, 0, \_SB.PCI0.LNKA, 0},
+                Package(){0x0004ffff, 1, \_SB.PCI0.LNKB, 0},
+                Package(){0x0004ffff, 2, \_SB.PCI0.LNKC, 0},
+                Package(){0x0004ffff, 3, \_SB.PCI0.LNKD, 0},
+                        
+                /* Device 5, INTA - INTD */
+                Package(){0x0005ffff, 0, \_SB.PCI0.LNKB, 0},
+                Package(){0x0005ffff, 1, \_SB.PCI0.LNKC, 0},
+                Package(){0x0005ffff, 2, \_SB.PCI0.LNKD, 0},
+                Package(){0x0005ffff, 3, \_SB.PCI0.LNKA, 0},
+                        
+                /* Device 6, INTA - INTD */
+                Package(){0x0006ffff, 0, \_SB.PCI0.LNKC, 0},
+                Package(){0x0006ffff, 1, \_SB.PCI0.LNKD, 0},
+                Package(){0x0006ffff, 2, \_SB.PCI0.LNKA, 0},
+                Package(){0x0006ffff, 3, \_SB.PCI0.LNKB, 0},
+                        
+                /* Device 7, INTA - INTD */
+                Package(){0x0007ffff, 0, \_SB.PCI0.LNKD, 0},
+                Package(){0x0007ffff, 1, \_SB.PCI0.LNKA, 0},
+                Package(){0x0007ffff, 2, \_SB.PCI0.LNKB, 0},
+                Package(){0x0007ffff, 3, \_SB.PCI0.LNKC, 0},
+                        
+                /* Device 8, INTA - INTD */
+                Package(){0x0008ffff, 0, \_SB.PCI0.LNKA, 0},
+                Package(){0x0008ffff, 1, \_SB.PCI0.LNKB, 0},
+                Package(){0x0008ffff, 2, \_SB.PCI0.LNKC, 0},
+                Package(){0x0008ffff, 3, \_SB.PCI0.LNKD, 0},
+                        
+                /* Device 9, INTA - INTD */
+                Package(){0x0009ffff, 0, \_SB.PCI0.LNKB, 0},
+                Package(){0x0009ffff, 1, \_SB.PCI0.LNKC, 0},
+                Package(){0x0009ffff, 2, \_SB.PCI0.LNKD, 0},
+                Package(){0x0009ffff, 3, \_SB.PCI0.LNKA, 0},
+                        
+                /* Device 10, INTA - INTD */
+                Package(){0x000affff, 0, \_SB.PCI0.LNKC, 0},
+                Package(){0x000affff, 1, \_SB.PCI0.LNKD, 0},
+                Package(){0x000affff, 2, \_SB.PCI0.LNKA, 0},
+                Package(){0x000affff, 3, \_SB.PCI0.LNKB, 0},
+                        
+                /* Device 11, INTA - INTD */
+                Package(){0x000bffff, 0, \_SB.PCI0.LNKD, 0},
+                Package(){0x000bffff, 1, \_SB.PCI0.LNKA, 0},
+                Package(){0x000bffff, 2, \_SB.PCI0.LNKB, 0},
+                Package(){0x000bffff, 3, \_SB.PCI0.LNKC, 0},
+                        
+                /* Device 12, INTA - INTD */
+                Package(){0x000cffff, 0, \_SB.PCI0.LNKA, 0},
+                Package(){0x000cffff, 1, \_SB.PCI0.LNKB, 0},
+                Package(){0x000cffff, 2, \_SB.PCI0.LNKC, 0},
+                Package(){0x000cffff, 3, \_SB.PCI0.LNKD, 0},
+                        
+                /* Device 13, INTA - INTD */
+                Package(){0x000dffff, 0, \_SB.PCI0.LNKB, 0},
+                Package(){0x000dffff, 1, \_SB.PCI0.LNKC, 0},
+                Package(){0x000dffff, 2, \_SB.PCI0.LNKD, 0},
+                Package(){0x000dffff, 3, \_SB.PCI0.LNKA, 0},
+                        
+                /* Device 14, INTA - INTD */
+                Package(){0x000effff, 0, \_SB.PCI0.LNKC, 0},
+                Package(){0x000effff, 1, \_SB.PCI0.LNKD, 0},
+                Package(){0x000effff, 2, \_SB.PCI0.LNKA, 0},
+                Package(){0x000effff, 3, \_SB.PCI0.LNKB, 0},
+                        
+                /* Device 15, INTA - INTD */
+                Package(){0x000fffff, 0, \_SB.PCI0.LNKD, 0},
+                Package(){0x000fffff, 1, \_SB.PCI0.LNKA, 0},
+                Package(){0x000fffff, 2, \_SB.PCI0.LNKB, 0},
+                Package(){0x000fffff, 3, \_SB.PCI0.LNKC, 0},
+            })
+
+            Name(PRTA, Package() {
+                /* Device 0, INTA - INTD */
+                Package(){0x0000ffff, 0, 0, 16},
+                Package(){0x0000ffff, 1, 0, 17},
+                Package(){0x0000ffff, 2, 0, 18},
+                Package(){0x0000ffff, 3, 0, 19},
+
+                /* Device 1, INTA - INTD */
+                Package(){0x0001ffff, 0, 0, 20},
+                Package(){0x0001ffff, 1, 0, 21},
+                Package(){0x0001ffff, 2, 0, 22},
+                Package(){0x0001ffff, 3, 0, 23},
+
+                /* Device 2, INTA - INTD */
+                Package(){0x0002ffff, 0, 0, 24},
+                Package(){0x0002ffff, 1, 0, 25},
+                Package(){0x0002ffff, 2, 0, 26},
+                Package(){0x0002ffff, 3, 0, 27},
+
+                /* Device 3, INTA - INTD */
+                Package(){0x0003ffff, 0, 0, 28},
+                Package(){0x0003ffff, 1, 0, 29},
+                Package(){0x0003ffff, 2, 0, 30},
+                Package(){0x0003ffff, 3, 0, 31},
+
+                /* Device 4, INTA - INTD */
+                Package(){0x0004ffff, 0, 0, 32},
+                Package(){0x0004ffff, 1, 0, 33},
+                Package(){0x0004ffff, 2, 0, 34},
+                Package(){0x0004ffff, 3, 0, 35},
+
+                /* Device 5, INTA - INTD */
+                Package(){0x0005ffff, 0, 0, 36},
+                Package(){0x0005ffff, 1, 0, 37},
+                Package(){0x0005ffff, 2, 0, 38},
+                Package(){0x0005ffff, 3, 0, 39},
+
+                /* Device 6, INTA - INTD */
+                Package(){0x0006ffff, 0, 0, 40},
+                Package(){0x0006ffff, 1, 0, 41},
+                Package(){0x0006ffff, 2, 0, 42},
+                Package(){0x0006ffff, 3, 0, 43},
+
+                /* Device 7, INTA - INTD */
+                Package(){0x0007ffff, 0, 0, 44},
+                Package(){0x0007ffff, 1, 0, 45},
+                Package(){0x0007ffff, 2, 0, 46},
+                Package(){0x0007ffff, 3, 0, 47},
+
+                /* Device 8, INTA - INTD */
+                Package(){0x0008ffff, 0, 0, 17},
+                Package(){0x0008ffff, 1, 0, 18},
+                Package(){0x0008ffff, 2, 0, 19},
+                Package(){0x0008ffff, 3, 0, 20},
+
+                /* Device 9, INTA - INTD */
+                Package(){0x0009ffff, 0, 0, 21},
+                Package(){0x0009ffff, 1, 0, 22},
+                Package(){0x0009ffff, 2, 0, 23},
+                Package(){0x0009ffff, 3, 0, 24},
+
+                /* Device 10, INTA - INTD */
+                Package(){0x000affff, 0, 0, 25},
+                Package(){0x000affff, 1, 0, 26},
+                Package(){0x000affff, 2, 0, 27},
+                Package(){0x000affff, 3, 0, 28},
+
+                /* Device 11, INTA - INTD */
+                Package(){0x000bffff, 0, 0, 29},
+                Package(){0x000bffff, 1, 0, 30},
+                Package(){0x000bffff, 2, 0, 31},
+                Package(){0x000bffff, 3, 0, 32},
+
+                /* Device 12, INTA - INTD */
+                Package(){0x000cffff, 0, 0, 33},
+                Package(){0x000cffff, 1, 0, 34},
+                Package(){0x000cffff, 2, 0, 35},
+                Package(){0x000cffff, 3, 0, 36},
+
+                /* Device 13, INTA - INTD */
+                Package(){0x000dffff, 0, 0, 37},
+                Package(){0x000dffff, 1, 0, 38},
+                Package(){0x000dffff, 2, 0, 39},
+                Package(){0x000dffff, 3, 0, 40},
+
+                /* Device 14, INTA - INTD */
+                Package(){0x000effff, 0, 0, 41},
+                Package(){0x000effff, 1, 0, 42},
+                Package(){0x000effff, 2, 0, 43},
+                Package(){0x000effff, 3, 0, 44},
+
+                /* Device 15, INTA - INTD */
+                Package(){0x000fffff, 0, 0, 45},
+                Package(){0x000fffff, 1, 0, 46},
+                Package(){0x000fffff, 2, 0, 47},
+                Package(){0x000fffff, 3, 0, 16},
+            })
             
             Device (ISA)
             {
-                Name (_ADR, 0x00000000) /* device id, PCI bus num, ... */
- 
-            OperationRegion(PIRQ, PCI_Config, 0x60, 0x4)
-                        Scope(\) {
-                                 Field (\_SB.PCI0.ISA.PIRQ, ByteAcc, NoLock, Preserve) {
-                                        PIRA, 8,
-                                        PIRB, 8,
-                                        PIRC, 8,
-                                        PIRD, 8
-                                        }
-                                 }
+                Name (_ADR, 0x00010000) /* device 1, fn 0 */
+
+                OperationRegion(PIRQ, PCI_Config, 0x60, 0x4)
+                Scope(\) {
+                    Field (\_SB.PCI0.ISA.PIRQ, ByteAcc, NoLock, Preserve) {
+                        PIRA, 8,
+                        PIRB, 8,
+                        PIRC, 8,
+                        PIRD, 8
+                    }
+                }
                 Device (SYSR)
                 {
                     Name (_HID, EisaId ("PNP0C02"))
                     Name (_UID, 0x01)
                     Name (CRS, ResourceTemplate ()
                     {
-               /* TODO: list hidden resources */
+                        /* TODO: list hidden resources */
                         IO (Decode16, 0x0010, 0x0010, 0x00, 0x10)
                         IO (Decode16, 0x0022, 0x0022, 0x00, 0x0C)
                         IO (Decode16, 0x0030, 0x0030, 0x00, 0x10)
@@ -525,4 +678,3 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
         }
     }
 }
-

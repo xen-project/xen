@@ -24,6 +24,8 @@
 		"       generage acpitable and write to the binary \n"	\
 		"       filename - the binary name\n"
 
+#define ACPI_TABLE_SIZE (8*1024)
+
 int main(int argc, char **argv)
 {
 	char *filename;
