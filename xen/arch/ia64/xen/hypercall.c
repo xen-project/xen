@@ -248,6 +248,8 @@ ia64_hypercall(struct pt_regs *regs)
 				set_timer(&v->arch.hlt_timer,
 				          vcpu_get_next_timer_ns(v));
 				do_sched_op_compat(SCHEDOP_block, 0);
+				/* do_block only pends a softirq */
+				do_softirq();
 				stop_timer(&v->arch.hlt_timer);
 			}
 			regs->r8 = 0;
