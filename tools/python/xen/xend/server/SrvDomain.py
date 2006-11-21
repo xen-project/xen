@@ -82,6 +82,18 @@ class SrvDomain(SrvDir):
     def do_save(self, _, req):
         return self.xd.domain_save(self.dom.domid, req.args['file'][0])
 
+    def op_dump(self, op, req):
+        self.acceptCommand(req)
+        return req.threadRequest(self.do_dump, op, req)
+
+    def do_dump(self, _, req):
+        fn = FormFn(self.xd.domain_dump,
+	            [['dom',         'int'],
+		     ['file',        'str'],
+		     ['live',        'int'],
+		     ['crash',       'int']])
+        return fn(req.args, {'dom': self.dom.domid})
+
     def op_migrate(self, op, req):
         return req.threadRequest(self.do_migrate, op, req)
     
