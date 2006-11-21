@@ -234,4 +234,9 @@ def slurp(infile):
         if line == "":
             break
         else:
-            log.error('%s', line.strip())
+            line = line.strip()
+            m = re.match(r"^ERROR: (.*)", line)
+            if m is None:
+                log.info('%s', line)
+            else:
+                log.error('%s', m.group(1))
