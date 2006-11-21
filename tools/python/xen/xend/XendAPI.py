@@ -1391,9 +1391,12 @@ class XendAPI:
         xendom = XendDomain.instance()
         if xendom.is_valid_vm(vtpm_struct['VM']):
             dom = xendom.get_vm_by_uuid(vtpm_struct['VM'])
-            vtpm_ref = dom.create_vtpm(vtpm_struct)
-            xendom.managed_config_save(dom)
-            return xen_api_success(vtpm_ref)
+            try:
+                vtpm_ref = dom.create_vtpm(vtpm_struct)
+                xendom.managed_config_save(dom)
+                return xen_api_success(vtpm_ref)
+            except XendError:
+                return xen_api_error(XEND_ERROR_TODO)
         else:
             return xen_api_error(XEND_ERROR_DOMAIN_INVALID)
 

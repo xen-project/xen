@@ -37,6 +37,7 @@ from xen.xend.XendError import XendError, XendInvalidDomain, VmError
 from xen.xend.XendLogging import log
 from xen.xend.XendConstants import XS_VMROOT
 from xen.xend.XendConstants import DOM_STATE_HALTED, DOM_STATE_RUNNING
+from xen.xend.XendDevices import XendDevices
 
 from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.xenstore.xswatch import xswatch
@@ -898,7 +899,7 @@ class XendDomain:
 
                 self._managed_domain_unregister(dominfo)
                 self._remove_domain(dominfo)
-                
+                XendDevices.destroy_device_state(dominfo)
             except Exception, ex:
                 raise XendError(str(ex))
         finally:
