@@ -298,7 +298,8 @@ static void backend_changed(struct xenbus_device *dev,
  */
 static void connect(struct blkfront_info *info)
 {
-	unsigned long sectors, sector_size;
+	unsigned long long sectors;
+	unsigned long sector_size;
 	unsigned int binfo;
 	int err;
 
@@ -309,7 +310,7 @@ static void connect(struct blkfront_info *info)
 	DPRINTK("blkfront.c:connect:%s.\n", info->xbdev->otherend);
 
 	err = xenbus_gather(XBT_NIL, info->xbdev->otherend,
-			    "sectors", "%lu", &sectors,
+			    "sectors", "%llu", &sectors,
 			    "info", "%u", &binfo,
 			    "sector-size", "%lu", &sector_size,
 			    NULL);
