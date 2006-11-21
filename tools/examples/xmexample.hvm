@@ -190,3 +190,7 @@ serial='pty'
 #			      absolute mouse)
 #usbdevice='mouse'
 #usbdevice='tablet'
+
+#-----------------------------------------------------------------------------
+#   Set keyboard layout, default is en-us keyboard. 
+#keymap='ja'
