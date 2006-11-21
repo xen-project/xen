@@ -818,8 +818,10 @@ static int __init boot_of_serial(void *oft)
             of_panic("package-to-path failed\n");
 
         rc = of_getprop(p, "device_type", type, sizeof (type));
-        if (rc == OF_FAILURE)
-            of_panic("fetching device type failed\n");
+        if (rc == OF_FAILURE) {
+            of_printf("%s: fetching type of `%s' failed\n", __func__, buf);
+            continue;
+        }
 
         if (strcmp(type, "serial") != 0)
             continue;
