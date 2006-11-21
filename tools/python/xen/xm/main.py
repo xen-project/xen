@@ -158,7 +158,7 @@ SUBCOMMAND_HELP = {
     'dry-run'       :  ('<ConfigFile>',
                         'Test if a domain can access its resources.'),
     'resources'     :  ('', 'Show info for each labeled resource.'),
-    'cfgbootpolicy' :  ('<policy> [kernelversion]',
+    'cfgbootpolicy' :  ('<policy> [boot-title]',
                         'Add policy to boot configuration.'),
     'dumppolicy'    :  ('', 'Print hypervisor ACM state information.'),
     'loadpolicy'    :  ('<policy.bin>', 'Load binary policy into hypervisor.'),
