@@ -67,7 +67,7 @@ USAGE_FOOTER = '<Domain> can either be the Domain Name or Id.\n' \
 SUBCOMMAND_HELP = {
     # common commands
     
-    'console'     : ('<Domain>',
+    'console'     : ('[-q|--quiet] <Domain>',
                      'Attach to <Domain>\'s console.'),
     'create'      : ('<ConfigFile> [options] [vars]',
                      'Create a domain based on <ConfigFile>.'),
@@ -189,6 +189,9 @@ SUBCOMMAND_OPTIONS = {
     'list': (
        ('-l', '--long', 'Output all VM details in SXP'),
        ('', '--label',  'Include security labels'),
+    ),
+    'console': (
+       ('-q', '--quiet', 'Do not print an error message if the domain does not exist'),
     ),
     'dmesg': (
        ('-c', '--clear', 'Clear dmesg buffer'),
@@ -1002,14 +1005,45 @@ def xm_info(args):
             print "%-23s:" % x[0], x[1]
 
 def xm_console(args):
-    arg_check(args, "console", 1)
+    arg_check(args, "console", 1, 2)
 
-    dom = args[0]
-    info = server.xend.domain(dom)
+    quiet = False;
+
+    try:
+        (options, params) = getopt.gnu_getopt(args, 'q', ['quiet'])
+    except getopt.GetoptError, opterr:
+        err(opterr)
+        sys.exit(1)
+
+    for (k, v) in options:
+        if k in ['-q', '--quiet']:
+            quiet = True
+        else:
+            assert False
+
+    if len(params) != 1:
+        err('No domain given')
+        usage('console')
+        sys.exit(1)
+
+    dom = params[0]
+
+    try:
+        info = server.xend.domain(dom)
+    except:
+        if quiet:
+            sys.exit(1)
+        else:
+            raise
     domid = int(sxp.child_value(info, 'domid', '-1'))
     if domid == -1:
-        raise Exception("Domain is not started")
+        if quiet:
+            sys.exit(1)
+        else:
+            raise Exception("Domain is not started")
+
     console.execConsole(domid)
+
 
 def xm_uptime(args):
     short_mode = 0
