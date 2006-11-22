@@ -54,81 +54,8 @@
 #define DEBUG(_f, _a...)    ((void)0)
 #endif
 
-
-#define RUNNABLE_FLAG   0x00000001
-
-#define is_runnable(_thread)    (_thread->flags & RUNNABLE_FLAG)
-#define set_runnable(_thread)   (_thread->flags |= RUNNABLE_FLAG)
-#define clear_runnable(_thread) (_thread->flags &= ~RUNNABLE_FLAG)
-
-
 struct thread *idle_thread = NULL;
 LIST_HEAD(exited_threads);
-
-void idle_thread_fn(void *unused);
-
-void dump_stack(struct thread *thread)
-{
-    unsigned long *bottom = (unsigned long *)(thread->stack + 2*4*1024); 
-    unsigned long *pointer = (unsigned long *)thread->sp;
-    int count;
-    if(thread == current)
-    {
-#ifdef __i386__    
-        asm("movl %%esp,%0"
-            : "=r"(pointer));
-#else
-        asm("movq %%rsp,%0"
-            : "=r"(pointer));
-#endif
-    }
-    printk("The stack for \"%s\"\n", thread->name);
-    for(count = 0; count < 25 && pointer < bottom; count ++)
-    {
-        printk("[0x%lx] 0x%lx\n", pointer, *pointer);
-        pointer++;
-    }
-    
-    if(pointer < bottom) printk(" ... continues.\n");
-}
-
-#ifdef __i386__
-#define switch_threads(prev, next) do {                                 \
-    unsigned long esi,edi;                                              \
-    __asm__ __volatile__("pushfl\n\t"                                   \
-                         "pushl %%ebp\n\t"                              \
-                         "movl %%esp,%0\n\t"         /* save ESP */     \
-                         "movl %4,%%esp\n\t"        /* restore ESP */   \
-                         "movl $1f,%1\n\t"          /* save EIP */      \
-                         "pushl %5\n\t"             /* restore EIP */   \
-                         "ret\n\t"                                      \
-                         "1:\t"                                         \
-                         "popl %%ebp\n\t"                               \
-                         "popfl"                                        \
-                         :"=m" (prev->sp),"=m" (prev->ip),            \
-                          "=S" (esi),"=D" (edi)             \
-                         :"m" (next->sp),"m" (next->ip),              \
-                          "2" (prev), "d" (next));                      \
-} while (0)
-#elif __x86_64__
-#define switch_threads(prev, next) do {                                 \
-    unsigned long rsi,rdi;                                              \
-    __asm__ __volatile__("pushfq\n\t"                                   \
-                         "pushq %%rbp\n\t"                              \
-                         "movq %%rsp,%0\n\t"         /* save RSP */     \
-                         "movq %4,%%rsp\n\t"        /* restore RSP */   \
-                         "movq $1f,%1\n\t"          /* save RIP */      \
-                         "pushq %5\n\t"             /* restore RIP */   \
-                         "ret\n\t"                                      \
-                         "1:\t"                                         \
-                         "popq %%rbp\n\t"                               \
-                         "popfq"                                        \
-                         :"=m" (prev->sp),"=m" (prev->ip),            \
-                          "=S" (rsi),"=D" (rdi)             \
-                         :"m" (next->sp),"m" (next->ip),              \
-                          "2" (prev), "d" (next));                      \
-} while (0)
-#endif
 
 void inline print_runqueue(void)
 {
@@ -250,50 +177,6 @@ void exit_thread(void)
     schedule();
 }
 
-/* Pushes the specified value onto the stack of the specified thread */
-static void stack_push(struct thread *thread, unsigned long value)
-{
-    thread->sp -= sizeof(unsigned long);
-    *((unsigned long *)thread->sp) = value;
-}
-
-struct thread* create_thread(char *name, void (*function)(void *), void *data)
-{
-    struct thread *thread;
-    unsigned long flags;
-    
-    thread = xmalloc(struct thread);
-    /* Allocate 2 pages for stack, stack will be 2pages aligned */
-    thread->stack = (char *)alloc_pages(1);
-    thread->name = name;
-    printk("Thread \"%s\": pointer: 0x%lx, stack: 0x%lx\n", name, thread, 
-            thread->stack);
-    
-    thread->sp = (unsigned long)thread->stack + 4096 * 2;
-    /* Save pointer to the thread on the stack, used by current macro */
-    *((unsigned long *)thread->stack) = (unsigned long)thread;
-    
-    stack_push(thread, (unsigned long) function);
-    stack_push(thread, (unsigned long) data);
-    thread->ip = (unsigned long) thread_starter;
-     
-    /* Not runable, not exited, not sleeping */
-    thread->flags = 0;
-    thread->wakeup_time = 0LL;
-    set_runnable(thread);
-    local_irq_save(flags);
-    if(idle_thread != NULL) {
-        list_add_tail(&thread->thread_list, &idle_thread->thread_list); 
-    } else if(function != idle_thread_fn)
-    {
-        printk("BUG: Not allowed to create thread before initialising scheduler.\n");
-        BUG();
-    }
-    local_irq_restore(flags);
-    return thread;
-}
-
-
 void block(struct thread *thread)
 {
     thread->wakeup_time = 0LL;
@@ -326,26 +209,6 @@ void idle_thread_fn(void *unused)
         wake_expired();
     }
 }
-
-void run_idle_thread(void)
-{
-    /* Switch stacks and run the thread */ 
-#if defined(__i386__)
-    __asm__ __volatile__("mov %0,%%esp\n\t"
-                         "push %1\n\t" 
-                         "ret"                                            
-                         :"=m" (idle_thread->sp)
-                         :"m" (idle_thread->ip));                          
-#elif defined(__x86_64__)
-    __asm__ __volatile__("mov %0,%%rsp\n\t"
-                         "push %1\n\t" 
-                         "ret"                                            
-                         :"=m" (idle_thread->sp)
-                         :"m" (idle_thread->ip));                                                    
-#endif
-}
-
-
 
 DECLARE_MUTEX(mutex);
 
