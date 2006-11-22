@@ -510,6 +510,24 @@ unsigned long svm_get_ctrl_reg(struct vcpu *v, unsigned int num)
     return 0;                   /* dummy */
 }
 
+static unsigned long svm_get_segment_base(struct vcpu *v, enum segment seg)
+{
+    switch ( seg )
+    {
+    case seg_cs: return v->arch.hvm_svm.vmcb->cs.base;
+    case seg_ds: return v->arch.hvm_svm.vmcb->ds.base;
+    case seg_es: return v->arch.hvm_svm.vmcb->es.base;
+    case seg_fs: return v->arch.hvm_svm.vmcb->fs.base;
+    case seg_gs: return v->arch.hvm_svm.vmcb->gs.base;
+    case seg_ss: return v->arch.hvm_svm.vmcb->ss.base;
+    case seg_tr: return v->arch.hvm_svm.vmcb->tr.base;
+    case seg_gdtr: return v->arch.hvm_svm.vmcb->gdtr.base;
+    case seg_idtr: return v->arch.hvm_svm.vmcb->idtr.base;
+    case seg_ldtr: return v->arch.hvm_svm.vmcb->ldtr.base;
+    }
+    BUG();
+    return 0;
+}
 
 /* Make sure that xen intercepts any FP accesses from current */
 static void svm_stts(struct vcpu *v) 
@@ -821,6 +839,7 @@ int start_svm(void)
     hvm_funcs.pae_enabled = svm_pae_enabled;
     hvm_funcs.guest_x86_mode = svm_guest_x86_mode;
     hvm_funcs.get_guest_ctrl_reg = svm_get_ctrl_reg;
+    hvm_funcs.get_segment_base = svm_get_segment_base;
 
     hvm_funcs.update_host_cr3 = svm_update_host_cr3;
     

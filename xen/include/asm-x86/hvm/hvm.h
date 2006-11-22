@@ -20,6 +20,19 @@
 #ifndef __ASM_X86_HVM_HVM_H__
 #define __ASM_X86_HVM_HVM_H__
 
+enum segment {
+    seg_cs,
+    seg_ss,
+    seg_ds,
+    seg_es,
+    seg_fs,
+    seg_gs,
+    seg_tr,
+    seg_ldtr,
+    seg_gdtr,
+    seg_idtr
+};
+
 /*
  * The hardware virtual machine (HVM) interface abstracts away from the
  * x86/x86_64 CPU virtualization assist specifics. Currently this interface
@@ -52,6 +65,7 @@ struct hvm_function_table {
      * 1) determine whether the guest is in real or vm8086 mode,
      * 2) determine whether paging is enabled,
      * 3) return the current guest control-register value
+     * 4) return the current guest segment descriptor base
      */
     int (*realmode)(struct vcpu *v);
     int (*paging_enabled)(struct vcpu *v);
@@ -59,6 +73,7 @@ struct hvm_function_table {
     int (*pae_enabled)(struct vcpu *v);
     int (*guest_x86_mode)(struct vcpu *v);
     unsigned long (*get_guest_ctrl_reg)(struct vcpu *v, unsigned int num);
+    unsigned long (*get_segment_base)(struct vcpu *v, enum segment seg);
 
     /* 
      * Re-set the value of CR3 that Xen runs on when handling VM exits
@@ -159,6 +174,12 @@ hvm_get_guest_ctrl_reg(struct vcpu *v, unsigned int num)
     if ( hvm_funcs.get_guest_ctrl_reg )
         return hvm_funcs.get_guest_ctrl_reg(v, num);
     return 0;                   /* force to fail */
+}
+
+static inline unsigned long
+hvm_get_segment_base(struct vcpu *v, enum segment seg)
+{
+    return hvm_funcs.get_segment_base(v, seg);
 }
 
 void hvm_stts(struct vcpu *v);

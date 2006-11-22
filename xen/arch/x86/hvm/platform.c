@@ -895,9 +895,10 @@ void handle_mmio(unsigned long gpa)
 
     realmode = hvm_realmode(v);
     if ( realmode )
-        inst_addr = (regs->cs << 4) + regs->eip;
+        inst_addr = regs->cs << 4;
     else
-        inst_addr = regs->eip;
+        inst_addr = hvm_get_segment_base(current, seg_cs);
+    inst_addr += regs->eip;
 
     memset(inst, 0, MAX_INST_LEN);
     if ( inst_copy_from_guest(inst, inst_addr, inst_len) != inst_len ) {

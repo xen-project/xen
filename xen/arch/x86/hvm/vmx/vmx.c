@@ -501,6 +501,28 @@ static unsigned long vmx_get_ctrl_reg(struct vcpu *v, unsigned int num)
     return 0;                   /* dummy */
 }
 
+static unsigned long vmx_get_segment_base(struct vcpu *v, enum segment seg)
+{
+    unsigned long base;
+
+    BUG_ON(v != current);
+    switch ( seg )
+    {
+    case seg_cs: __vmread(GUEST_CS_BASE, &base); break;
+    case seg_ds: __vmread(GUEST_DS_BASE, &base); break;
+    case seg_es: __vmread(GUEST_ES_BASE, &base); break;
+    case seg_fs: __vmread(GUEST_FS_BASE, &base); break;
+    case seg_gs: __vmread(GUEST_GS_BASE, &base); break;
+    case seg_ss: __vmread(GUEST_SS_BASE, &base); break;
+    case seg_tr: __vmread(GUEST_TR_BASE, &base); break;
+    case seg_gdtr: __vmread(GUEST_GDTR_BASE, &base); break;
+    case seg_idtr: __vmread(GUEST_IDTR_BASE, &base); break;
+    case seg_ldtr: __vmread(GUEST_LDTR_BASE, &base); break;
+    default: BUG(); base = 0; break;
+    }
+    return base;
+}
+
 /* Make sure that xen intercepts any FP accesses from current */
 static void vmx_stts(struct vcpu *v)
 {
@@ -619,6 +641,7 @@ static void vmx_setup_hvm_funcs(void)
     hvm_funcs.pae_enabled = vmx_pae_enabled;
     hvm_funcs.guest_x86_mode = vmx_guest_x86_mode;
     hvm_funcs.get_guest_ctrl_reg = vmx_get_ctrl_reg;
+    hvm_funcs.get_segment_base = vmx_get_segment_base;
 
     hvm_funcs.update_host_cr3 = vmx_update_host_cr3;
 
