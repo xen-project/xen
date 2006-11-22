@@ -41,4 +41,8 @@ struct xenoprof {
 struct domain;
 void free_xenoprof_pages(struct domain *d);
 
+int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg);
+
+extern struct domain *xenoprof_primary_profiler;
+
 #endif  /* __XEN__XENOPROF_H__ */

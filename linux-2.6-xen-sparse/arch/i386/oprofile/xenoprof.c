@@ -93,7 +93,7 @@ int xenoprof_arch_map_shared_buffer(struct xenoprof_get_buffer * get_buffer,
 
 	if ( (ret = direct_kernel_remap_pfn_range(
 		      (unsigned long)area->addr,
-		      get_buffer->buf_maddr >> PAGE_SHIFT,
+		      get_buffer->buf_gmaddr >> PAGE_SHIFT,
 		      npages * PAGE_SIZE, __pgprot(_KERNPG_TABLE),
 		      DOMID_SELF)) ) {
 		vunmap(area->addr);
@@ -127,7 +127,7 @@ int xenoprof_arch_set_passive(struct xenoprof_passive * pdomain,
 
 	ret = direct_kernel_remap_pfn_range(
 		(unsigned long)area->addr,
-		pdomain->buf_maddr >> PAGE_SHIFT,
+		pdomain->buf_gmaddr >> PAGE_SHIFT,
 		npages * PAGE_SIZE, prot, DOMID_SELF);
 	if (ret) {
 		vunmap(area->addr);

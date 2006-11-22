@@ -44,6 +44,17 @@ void nmi_release_counters(void);
 
 int xenoprof_arch_counter(XEN_GUEST_HANDLE(void) arg);
 
+struct vcpu;
+struct cpu_user_regs;
+int xenoprofile_get_mode(struct vcpu *v, struct cpu_user_regs * const regs);
+#define xenoprof_shared_gmfn(d, gmaddr, maddr)                      \
+    do {                                                            \
+        (void)(maddr);                                              \
+        gdprintk(XENLOG_WARNING,                                    \
+                 "xenoprof/x86 with autotranslated mode enabled"    \
+                 "isn't supported yet\n");                          \
+    } while (0)
+
 #endif /* __ASM_X86_XENOPROF_H__ */
 
 /*

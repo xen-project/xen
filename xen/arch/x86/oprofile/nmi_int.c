@@ -33,7 +33,6 @@ static unsigned long saved_lvtpc[NR_CPUS];
 #define VIRQ_BITMASK_SIZE (MAX_OPROF_DOMAINS/32 + 1)
 extern int active_domains[MAX_OPROF_DOMAINS];
 extern unsigned int adomains;
-extern struct domain *primary_profiler;
 extern struct domain *adomain_ptrs[MAX_OPROF_DOMAINS];
 extern unsigned long virq_ovf_pending[VIRQ_BITMASK_SIZE];
 extern int is_active(struct domain *d);
@@ -339,10 +338,10 @@ int nmi_init(int *num_events, int *is_primary, char *cpu_type)
 		return -ENODEV;
 	}
 
-	if (primary_profiler == NULL) {
+	if (xenoprof_primary_profiler == NULL) {
 		/* For now, only dom0 can be the primary profiler */
 		if (current->domain->domain_id == 0) {
-			primary_profiler = current->domain;
+			xenoprof_primary_profiler = current->domain;
 			prim = 1;
 		}
 	}

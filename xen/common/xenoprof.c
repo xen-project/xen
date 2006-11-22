@@ -2,15 +2,17 @@
  * Copyright (C) 2005 Hewlett-Packard Co.
  * written by Aravind Menon & Jose Renato Santos
  *            (email: xenoprof@groups.hp.com)
+ *
+ * arch generic xenoprof and IA64 support.
+ * dynamic map/unmap xenoprof buffer support.
  * Copyright (c) 2006 Isaku Yamahata <yamahata at valinux co jp>
  *                    VA Linux Systems Japan K.K.
- * arch generic xenoprof and IA64 support.
  */
 
 #include <xen/guest_access.h>
 #include <xen/sched.h>
 #include <public/xenoprof.h>
-#include <asm/hvm/support.h>
+#include <asm/shadow.h>
 
 /* Limit amount of pages used for shared buffer (per domain) */
 #define MAX_OPROF_SHARED_PAGES 32
@@ -26,7 +28,7 @@ struct domain *passive_domains[MAX_OPROF_DOMAINS];
 unsigned int pdomains;
 
 unsigned int activated;
-struct domain *primary_profiler;
+struct domain *xenoprof_primary_profiler;
 int xenoprof_state = XENOPROF_IDLE;
 
 u64 total_samples;
@@ -90,10 +92,46 @@ static void xenoprof_reset_buf(struct domain *d)
     }
 }
 
-static char *alloc_xenoprof_buf(struct domain *d, int npages)
+static void
+share_xenoprof_page_with_guest(struct domain* d, unsigned long mfn, int npages)
+{
+    int i;
+    
+    for ( i = 0; i < npages; i++ )
+        share_xen_page_with_guest(mfn_to_page(mfn + i), d, XENSHARE_writable);
+}
+
+static void
+unshare_xenoprof_page_with_guest(unsigned long mfn, int npages)
+{
+    int i;
+
+    for ( i = 0; i < npages; i++ )
+    {
+        struct page_info *page = mfn_to_page(mfn + i);
+        BUG_ON(page_get_owner(page) != current->domain);
+        if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
+            put_page(page);
+    }
+}
+
+static void
+xenoprof_shared_gmfn_with_guest(
+    struct domain* d, unsigned long maddr, unsigned long gmaddr, int npages)
+{
+    int i;
+    
+    for ( i = 0; i < npages; i++, maddr += PAGE_SIZE, gmaddr += PAGE_SIZE )
+    {
+        BUG_ON(page_get_owner(maddr_to_page(maddr)) != d);
+        xenoprof_shared_gmfn(d, gmaddr, maddr);
+    }
+}
+
+static char *alloc_xenoprof_buf(struct domain *d, int npages, uint64_t gmaddr)
 {
     char *rawbuf;
-    int i, order;
+    int order;
 
     /* allocate pages to store sample buffer shared with domain */
     order  = get_order_from_pages(npages);
@@ -104,17 +142,11 @@ static char *alloc_xenoprof_buf(struct domain *d, int npages)
         return 0;
     }
 
-    /* Share pages so that kernel can map it */
-    for ( i = 0; i < npages; i++ )
-        share_xen_page_with_guest(
-            virt_to_page(rawbuf + i * PAGE_SIZE), 
-            d, XENSHARE_writable);
-
     return rawbuf;
 }
 
 static int alloc_xenoprof_struct(
-    struct domain *d, int max_samples, int is_passive)
+    struct domain *d, int max_samples, int is_passive, uint64_t gmaddr)
 {
     struct vcpu *v;
     int nvcpu, npages, bufsize, max_bufsize;
@@ -147,7 +179,8 @@ static int alloc_xenoprof_struct(
         (max_samples - 1) * sizeof(struct event_log);
     npages = (nvcpu * bufsize - 1) / PAGE_SIZE + 1;
     
-    d->xenoprof->rawbuf = alloc_xenoprof_buf(is_passive ? dom0 : d, npages);
+    d->xenoprof->rawbuf = alloc_xenoprof_buf(is_passive ? dom0 : d, npages,
+                                             gmaddr);
 
     if ( d->xenoprof->rawbuf == NULL )
     {
@@ -269,6 +302,7 @@ static void reset_passive(struct domain *d)
     if ( x == NULL )
         return;
 
+    unshare_xenoprof_page_with_guest(virt_to_mfn(x->rawbuf), x->npages);
     x->domain_type = XENOPROF_DOMAIN_IGNORED;
 }
 
@@ -332,17 +366,30 @@ static int add_passive_list(XEN_GUEST_HANDLE(void) arg)
     if ( d == NULL )
         return -EINVAL;
 
-    if ( (d->xenoprof == NULL) && 
-         ((ret = alloc_xenoprof_struct(d, passive.max_samples, 1)) < 0) )
+    if ( d->xenoprof == NULL )
     {
-        put_domain(d);
-        return -ENOMEM;
+        ret = alloc_xenoprof_struct(
+            d, passive.max_samples, 1, passive.buf_gmaddr);
+        if ( ret < 0 )
+        {
+            put_domain(d);
+            return -ENOMEM;
+        }
     }
+
+    share_xenoprof_page_with_guest(
+        current->domain, virt_to_mfn(d->xenoprof->rawbuf),
+        d->xenoprof->npages);
 
     d->xenoprof->domain_type = XENOPROF_DOMAIN_PASSIVE;
     passive.nbuf = d->xenoprof->nbuf;
     passive.bufsize = d->xenoprof->bufsize;
-    passive.buf_maddr = __pa(d->xenoprof->rawbuf);
+    if ( !shadow_mode_translate(d) )
+        passive.buf_gmaddr = __pa(d->xenoprof->rawbuf);
+    else
+        xenoprof_shared_gmfn_with_guest(
+            current->domain, __pa(d->xenoprof->rawbuf),
+            passive.buf_gmaddr, d->xenoprof->npages);
 
     if ( copy_to_guest(arg, &passive, 1) )
     {
@@ -442,7 +489,7 @@ static int xenoprof_op_init(XEN_GUEST_HANDLE(void) arg)
         return -EFAULT;
 
     if ( xenoprof_init.is_primary )
-        primary_profiler = current->domain;
+        xenoprof_primary_profiler = current->domain;
 
     return 0;
 }
@@ -462,20 +509,30 @@ static int xenoprof_op_get_buffer(XEN_GUEST_HANDLE(void) arg)
      */
     if ( d->xenoprof == NULL )
     {
-        ret = alloc_xenoprof_struct(d, xenoprof_get_buffer.max_samples, 0);
+        ret = alloc_xenoprof_struct(
+            d, xenoprof_get_buffer.max_samples, 0,
+            xenoprof_get_buffer.buf_gmaddr);
         if ( ret < 0 )
             return ret;
     }
+
+    share_xenoprof_page_with_guest(
+        d, virt_to_mfn(d->xenoprof->rawbuf), d->xenoprof->npages);
 
     xenoprof_reset_buf(d);
 
     d->xenoprof->domain_type  = XENOPROF_DOMAIN_IGNORED;
     d->xenoprof->domain_ready = 0;
-    d->xenoprof->is_primary   = (primary_profiler == current->domain);
+    d->xenoprof->is_primary   = (xenoprof_primary_profiler == current->domain);
         
     xenoprof_get_buffer.nbuf = d->xenoprof->nbuf;
     xenoprof_get_buffer.bufsize = d->xenoprof->bufsize;
-    xenoprof_get_buffer.buf_maddr = __pa(d->xenoprof->rawbuf);
+    if ( !shadow_mode_translate(d) )
+        xenoprof_get_buffer.buf_gmaddr = __pa(d->xenoprof->rawbuf);
+    else
+        xenoprof_shared_gmfn_with_guest(
+            d, __pa(d->xenoprof->rawbuf), xenoprof_get_buffer.buf_gmaddr,
+            d->xenoprof->npages);
 
     if ( copy_to_guest(arg, &xenoprof_get_buffer, 1) )
         return -EFAULT;
@@ -499,7 +556,7 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
         return -EINVAL;
     }
 
-    if ( !NONPRIV_OP(op) && (current->domain != primary_profiler) )
+    if ( !NONPRIV_OP(op) && (current->domain != xenoprof_primary_profiler) )
     {
         printk("xenoprof: dom %d denied privileged operation %d\n",
                current->domain->domain_id, op);
@@ -592,7 +649,7 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
     case XENOPROF_enable_virq:
     {
         int i;
-        if ( current->domain == primary_profiler )
+        if ( current->domain == xenoprof_primary_profiler )
         {
             xenoprof_arch_enable_virq();
             xenoprof_reset_stat();
@@ -609,7 +666,6 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
         if ( (xenoprof_state == XENOPROF_READY) &&
              (activated == adomains) )
             ret = xenoprof_arch_start();
-
         if ( ret == 0 )
             xenoprof_state = XENOPROF_PROFILING;
         break;
@@ -624,14 +680,20 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
         break;
 
     case XENOPROF_disable_virq:
+    {
+        struct xenoprof *x;
         if ( (xenoprof_state == XENOPROF_PROFILING) && 
              (is_active(current->domain)) )
         {
             ret = -EPERM;
             break;
         }
-        ret = reset_active(current->domain);
+        if ( (ret = reset_active(current->domain)) != 0 )
+            break;
+        x = current->domain->xenoprof;
+        unshare_xenoprof_page_with_guest(virt_to_mfn(x->rawbuf), x->npages);
         break;
+    }
 
     case XENOPROF_release_counters:
         ret = -EPERM;
@@ -652,7 +714,7 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
         {
             activated = 0;
             adomains=0;
-            primary_profiler = NULL;
+            xenoprof_primary_profiler = NULL;
             ret = 0;
         }
         break;
