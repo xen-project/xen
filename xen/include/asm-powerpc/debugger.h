@@ -27,11 +27,19 @@
 extern void show_backtrace_regs(struct cpu_user_regs *);
 extern void show_backtrace(ulong sp, ulong lr, ulong pc);
 
-static inline void dump_execution_state(void)
+static inline void show_execution_state(struct cpu_user_regs *regs)
+{
+    show_registers(regs);
+}
+
+extern void dump_execution_state(void);
+
+static inline void dump_all_execution_state(void)
 {
     ulong sp;
     ulong lr;
 
+    dump_execution_state();
     sp = (ulong)__builtin_frame_address(0);
     lr = (ulong)__builtin_return_address(0);
 
@@ -40,13 +48,13 @@ static inline void dump_execution_state(void)
 
 static inline void __force_crash(void)
 {
-    dump_execution_state();
+    dump_all_execution_state();
     __builtin_trap();
 }
 
 static inline void debugger_trap_immediate(void)
 {
-    dump_execution_state();
+    dump_all_execution_state();
 #ifdef CRASH_DEBUG
     __builtin_trap();
 #endif
@@ -55,13 +63,8 @@ static inline void debugger_trap_immediate(void)
 static inline void unimplemented(void)
 {
 #ifdef VERBOSE
-    dump_execution_state();
+    dump_all_execution_state();
 #endif
-}
-
-static inline void show_execution_state(struct cpu_user_regs *regs)
-{
-    show_registers(regs);
 }
 
 extern void __warn(char *file, int line);

@@ -220,3 +220,15 @@ void __warn(char *file, int line)
 
     console_end_sync();
 }
+
+void dump_execution_state(void)
+{
+    struct vcpu *v = current;
+    struct cpu_user_regs *regs = &v->arch.ctxt;
+
+    show_registers(regs);
+    if (regs->msr & MSR_HV) {
+        printk("In Xen:\n");
+        show_backtrace(regs->gprs[1], regs->pc, regs->lr);
+    }
+}
