@@ -15,15 +15,15 @@
 /* XXX Xen hacks ... */
 /* make this generic */
 
-#define le32_to_cpu(x) \
-({ \
-	__u32 __x = (x); \
-	((__u32)( \
-		(((__u32)(__x) & (__u32)0x000000ffUL) << 24) | \
-		(((__u32)(__x) & (__u32)0x0000ff00UL) <<  8) | \
-		(((__u32)(__x) & (__u32)0x00ff0000UL) >>  8) | \
-		(((__u32)(__x) & (__u32)0xff000000UL) >> 24) )); \
-})
+#define le32_to_cpu(x)                                          \
+    ({                                                          \
+        __u32 __x = (x);                                        \
+        ((__u32)(                                               \
+             (((__u32)(__x) & (__u32)0x000000ffUL) << 24) |     \
+             (((__u32)(__x) & (__u32)0x0000ff00UL) <<  8) |     \
+             (((__u32)(__x) & (__u32)0x00ff0000UL) >>  8) |     \
+             (((__u32)(__x) & (__u32)0xff000000UL) >> 24) ));   \
+    })
 
 
 #define alloc_bootmem(x) xmalloc_bytes(x)
@@ -117,7 +117,7 @@ static DEFINE_SPINLOCK(mpic_lock);
 
 
 static inline u32 _mpic_read(unsigned int be, volatile u32 __iomem *base,
-			    unsigned int reg)
+                             unsigned int reg)
 {
 	if (be)
 		return in_be32(base + (reg >> 2));
@@ -126,7 +126,7 @@ static inline u32 _mpic_read(unsigned int be, volatile u32 __iomem *base,
 }
 
 static inline void _mpic_write(unsigned int be, volatile u32 __iomem *base,
-			      unsigned int reg, u32 value)
+                               unsigned int reg, u32 value)
 {
 	if (be)
 		out_be32(base + (reg >> 2), value);
@@ -177,17 +177,17 @@ static inline u32 _mpic_irq_read(struct mpic *mpic, unsigned int src_no, unsigne
 	unsigned int	idx = src_no & mpic->isu_mask;
 
 	return _mpic_read(mpic->flags & MPIC_BIG_ENDIAN, mpic->isus[isu],
-			  reg + (idx * MPIC_IRQ_STRIDE));
+                      reg + (idx * MPIC_IRQ_STRIDE));
 }
 
 static inline void _mpic_irq_write(struct mpic *mpic, unsigned int src_no,
-				   unsigned int reg, u32 value)
+                                   unsigned int reg, u32 value)
 {
 	unsigned int	isu = src_no >> mpic->isu_shift;
 	unsigned int	idx = src_no & mpic->isu_mask;
 
 	_mpic_write(mpic->flags & MPIC_BIG_ENDIAN, mpic->isus[isu],
-		    reg + (idx * MPIC_IRQ_STRIDE), value);
+                reg + (idx * MPIC_IRQ_STRIDE), value);
 }
 
 #define mpic_read(b,r)		_mpic_read(mpic->flags & MPIC_BIG_ENDIAN,(b),(r))
@@ -252,7 +252,7 @@ static inline void mpic_ht_end_irq(struct mpic *mpic, unsigned int source)
 }
 
 static void mpic_startup_ht_interrupt(struct mpic *mpic, unsigned int source,
-				      unsigned int irqflags)
+                                      unsigned int irqflags)
 {
 	struct mpic_irq_fixup *fixup = &mpic->fixups[source];
 	unsigned long flags;
@@ -275,7 +275,7 @@ static void mpic_startup_ht_interrupt(struct mpic *mpic, unsigned int source,
 }
 
 static void mpic_shutdown_ht_interrupt(struct mpic *mpic, unsigned int source,
-				       unsigned int irqflags)
+                                       unsigned int irqflags)
 {
 	struct mpic_irq_fixup *fixup = &mpic->fixups[source];
 	unsigned long flags;
@@ -296,7 +296,7 @@ static void mpic_shutdown_ht_interrupt(struct mpic *mpic, unsigned int source,
 }
 
 static void __init mpic_scan_ht_pic(struct mpic *mpic, u8 __iomem *devbase,
-				    unsigned int devfn, u32 vdid)
+                                    unsigned int devfn, u32 vdid)
 {
 	int i, irq, n;
 	u8 __iomem *base;
@@ -476,8 +476,8 @@ static void mpic_enable_irq(unsigned int irq)
 	DBG("%p: %s: enable_irq: %d (src %d)\n", mpic, mpic->name, irq, src);
 
 	mpic_irq_write(src, MPIC_IRQ_VECTOR_PRI,
-		       mpic_irq_read(src, MPIC_IRQ_VECTOR_PRI) &
-		       ~MPIC_VECPRI_MASK);
+                   mpic_irq_read(src, MPIC_IRQ_VECTOR_PRI) &
+                   ~MPIC_VECPRI_MASK);
 
 	/* make sure mask gets to controller before we return to user */
 	do {
@@ -523,8 +523,8 @@ static void mpic_disable_irq(unsigned int irq)
 	DBG("%s: disable_irq: %d (src %d)\n", mpic->name, irq, src);
 
 	mpic_irq_write(src, MPIC_IRQ_VECTOR_PRI,
-		       mpic_irq_read(src, MPIC_IRQ_VECTOR_PRI) |
-		       MPIC_VECPRI_MASK);
+                   mpic_irq_read(src, MPIC_IRQ_VECTOR_PRI) |
+                   MPIC_VECPRI_MASK);
 
 	/* make sure mask gets to controller before we return to user */
 	do {
@@ -614,7 +614,7 @@ static void mpic_set_affinity(unsigned int irq, cpumask_t cpumask)
 	cpus_and(tmp, cpumask, cpu_online_map);
 
 	mpic_irq_write(irq - mpic->irq_offset, MPIC_IRQ_DESTINATION,
-		       mpic_physmask(cpus_addr(tmp)[0]));	
+                   mpic_physmask(cpus_addr(tmp)[0]));	
 }
 
 
@@ -624,14 +624,14 @@ static void mpic_set_affinity(unsigned int irq, cpumask_t cpumask)
 
 
 struct mpic * __init mpic_alloc(unsigned long phys_addr,
-				unsigned int flags,
-				unsigned int isu_size,
-				unsigned int irq_offset,
-				unsigned int irq_count,
-				unsigned int ipi_offset,
-				unsigned char *senses,
-				unsigned int senses_count,
-				const char *name)
+                                unsigned int flags,
+                                unsigned int isu_size,
+                                unsigned int irq_offset,
+                                unsigned int irq_count,
+                                unsigned int ipi_offset,
+                                unsigned char *senses,
+                                unsigned int senses_count,
+                                const char *name)
 {
 	struct mpic	*mpic;
 	u32		reg;
@@ -678,8 +678,8 @@ struct mpic * __init mpic_alloc(unsigned long phys_addr,
 	/* Reset */
 	if (flags & MPIC_WANTS_RESET) {
 		mpic_write(mpic->gregs, MPIC_GREG_GLOBAL_CONF_0,
-			   mpic_read(mpic->gregs, MPIC_GREG_GLOBAL_CONF_0)
-			   | MPIC_GREG_GCONF_RESET);
+                   mpic_read(mpic->gregs, MPIC_GREG_GLOBAL_CONF_0)
+                   | MPIC_GREG_GCONF_RESET);
 		while( mpic_read(mpic->gregs, MPIC_GREG_GLOBAL_CONF_0)
 		       & MPIC_GREG_GCONF_RESET)
 			mb();
@@ -691,15 +691,15 @@ struct mpic * __init mpic_alloc(unsigned long phys_addr,
 	 */
 	reg = mpic_read(mpic->gregs, MPIC_GREG_FEATURE_0);
 	mpic->num_cpus = ((reg & MPIC_GREG_FEATURE_LAST_CPU_MASK)
-			  >> MPIC_GREG_FEATURE_LAST_CPU_SHIFT) + 1;
+                      >> MPIC_GREG_FEATURE_LAST_CPU_SHIFT) + 1;
 	if (isu_size == 0)
 		mpic->num_sources = ((reg & MPIC_GREG_FEATURE_LAST_SRC_MASK)
-				     >> MPIC_GREG_FEATURE_LAST_SRC_SHIFT) + 1;
+                             >> MPIC_GREG_FEATURE_LAST_SRC_SHIFT) + 1;
 
 	/* Map the per-CPU registers */
 	for (i = 0; i < mpic->num_cpus; i++) {
 		mpic->cpuregs[i] = ioremap(phys_addr + MPIC_CPU_BASE +
-					   i * MPIC_CPU_STRIDE, 0x1000);
+                                   i * MPIC_CPU_STRIDE, 0x1000);
 		BUG_ON(mpic->cpuregs[i] == NULL);
 	}
 
@@ -707,7 +707,7 @@ struct mpic * __init mpic_alloc(unsigned long phys_addr,
 	if (mpic->isu_size == 0) {
 		mpic->isu_size = mpic->num_sources;
 		mpic->isus[0] = ioremap(phys_addr + MPIC_IRQ_BASE,
-					MPIC_IRQ_STRIDE * mpic->isu_size);
+                                MPIC_IRQ_STRIDE * mpic->isu_size);
 		BUG_ON(mpic->isus[0] == NULL);
 	}
 	mpic->isu_shift = 1 + __ilog2(mpic->isu_size - 1);
@@ -743,7 +743,7 @@ struct mpic * __init mpic_alloc(unsigned long phys_addr,
 }
 
 void __init mpic_assign_isu(struct mpic *mpic, unsigned int isu_num,
-			    unsigned long phys_addr)
+                            unsigned long phys_addr)
 {
 	unsigned int isu_first = isu_num * mpic->isu_size;
 
@@ -755,7 +755,7 @@ void __init mpic_assign_isu(struct mpic *mpic, unsigned int isu_num,
 }
 
 void __init mpic_setup_cascade(unsigned int irq, mpic_cascade_t handler,
-			       void *data)
+                               void *data)
 {
 	struct mpic *mpic = mpic_find(irq, NULL);
 	unsigned long flags;
@@ -790,20 +790,20 @@ void __init mpic_init(struct mpic *mpic)
 	/* Initialize timers: just disable them all */
 	for (i = 0; i < 4; i++) {
 		mpic_write(mpic->tmregs,
-			   i * MPIC_TIMER_STRIDE + MPIC_TIMER_DESTINATION, 0);
+                   i * MPIC_TIMER_STRIDE + MPIC_TIMER_DESTINATION, 0);
 		mpic_write(mpic->tmregs,
-			   i * MPIC_TIMER_STRIDE + MPIC_TIMER_VECTOR_PRI,
-			   MPIC_VECPRI_MASK |
-			   (MPIC_VEC_TIMER_0 + i));
+                   i * MPIC_TIMER_STRIDE + MPIC_TIMER_VECTOR_PRI,
+                   MPIC_VECPRI_MASK |
+                   (MPIC_VEC_TIMER_0 + i));
 	}
 
 	/* Initialize IPIs to our reserved vectors and mark them disabled for now */
 	mpic_test_broken_ipi(mpic);
 	for (i = 0; i < 4; i++) {
 		mpic_ipi_write(i,
-			       MPIC_VECPRI_MASK |
-			       (10 << MPIC_VECPRI_PRIORITY_SHIFT) |
-			       (MPIC_VEC_IPI_0 + i));
+                       MPIC_VECPRI_MASK |
+                       (10 << MPIC_VECPRI_PRIORITY_SHIFT) |
+                       (MPIC_VEC_IPI_0 + i));
 #ifdef CONFIG_SMP
 		if (!(mpic->flags & MPIC_PRIMARY))
 			continue;
@@ -850,7 +850,7 @@ void __init mpic_init(struct mpic *mpic)
 #ifdef CONFIG_MPIC_BROKEN_U3
 			if (mpic_is_ht_interrupt(mpic, i)) {
 				vecpri &= ~(MPIC_VECPRI_SENSE_MASK |
-					    MPIC_VECPRI_POLARITY_MASK);
+                            MPIC_VECPRI_POLARITY_MASK);
 				vecpri |= MPIC_VECPRI_POLARITY_POSITIVE;
 			}
 #else
@@ -864,7 +864,7 @@ void __init mpic_init(struct mpic *mpic)
 		/* init hw */
 		mpic_irq_write(i, MPIC_IRQ_VECTOR_PRI, vecpri);
 		mpic_irq_write(i, MPIC_IRQ_DESTINATION,
-			       1 << hard_smp_processor_id());
+                       1 << hard_smp_processor_id());
 
 		/* init linux descriptors */
 		if (i < mpic->irq_count) {
@@ -878,8 +878,8 @@ void __init mpic_init(struct mpic *mpic)
 
 	/* Disable 8259 passthrough */
 	mpic_write(mpic->gregs, MPIC_GREG_GLOBAL_CONF_0,
-		   mpic_read(mpic->gregs, MPIC_GREG_GLOBAL_CONF_0)
-		   | MPIC_GREG_GCONF_8259_PTHROU_DIS);
+               mpic_read(mpic->gregs, MPIC_GREG_GLOBAL_CONF_0)
+               | MPIC_GREG_GCONF_8259_PTHROU_DIS);
 
 	/* Set current processor priority to 0 */
 	mpic_cpu_write(MPIC_CPU_CURRENT_TASK_PRI, 0);
@@ -899,12 +899,12 @@ void mpic_irq_set_priority(unsigned int irq, unsigned int pri)
 		reg = mpic_ipi_read(irq - mpic->ipi_offset) &
 			~MPIC_VECPRI_PRIORITY_MASK;
 		mpic_ipi_write(irq - mpic->ipi_offset,
-			       reg | (pri << MPIC_VECPRI_PRIORITY_SHIFT));
+                       reg | (pri << MPIC_VECPRI_PRIORITY_SHIFT));
 	} else {
 		reg = mpic_irq_read(irq - mpic->irq_offset,MPIC_IRQ_VECTOR_PRI)
 			& ~MPIC_VECPRI_PRIORITY_MASK;
 		mpic_irq_write(irq - mpic->irq_offset, MPIC_IRQ_VECTOR_PRI,
-			       reg | (pri << MPIC_VECPRI_PRIORITY_SHIFT));
+                       reg | (pri << MPIC_VECPRI_PRIORITY_SHIFT));
 	}
 	spin_unlock_irqrestore(&mpic_lock, flags);
 }
@@ -947,7 +947,7 @@ void mpic_setup_this_cpu(void)
 	if (distribute_irqs) {
 	 	for (i = 0; i < mpic->num_sources ; i++)
 			mpic_irq_write(i, MPIC_IRQ_DESTINATION,
-				mpic_irq_read(i, MPIC_IRQ_DESTINATION) | msk);
+                           mpic_irq_read(i, MPIC_IRQ_DESTINATION) | msk);
 	}
 
 	/* Set current processor priority to 0 */
@@ -992,7 +992,7 @@ void mpic_teardown_this_cpu(int secondary)
 	/* let the mpic know we don't want intrs.  */
 	for (i = 0; i < mpic->num_sources ; i++)
 		mpic_irq_write(i, MPIC_IRQ_DESTINATION,
-			mpic_irq_read(i, MPIC_IRQ_DESTINATION) & ~msk);
+                       mpic_irq_read(i, MPIC_IRQ_DESTINATION) & ~msk);
 
 	/* Set current processor priority to max */
 	mpic_cpu_write(MPIC_CPU_CURRENT_TASK_PRI, 0xf);
@@ -1012,7 +1012,7 @@ void mpic_send_ipi(unsigned int ipi_no, unsigned int cpu_mask)
 #endif
 
 	mpic_cpu_write(MPIC_CPU_IPI_DISPATCH_0 + ipi_no * 0x10,
-		       mpic_physmask(cpu_mask & cpus_addr(cpu_online_map)[0]));
+                   mpic_physmask(cpu_mask & cpus_addr(cpu_online_map)[0]));
 }
 
 int mpic_get_one_irq(struct mpic *mpic, struct pt_regs *regs)
@@ -1040,7 +1040,7 @@ int mpic_get_one_irq(struct mpic *mpic, struct pt_regs *regs)
 		return irq + mpic->irq_offset;
 	}
 #ifdef DEBUG_IPI
-       	DBG("%s: ipi %d !\n", mpic->name, irq - MPIC_VEC_IPI_0);
+    DBG("%s: ipi %d !\n", mpic->name, irq - MPIC_VEC_IPI_0);
 #endif
 	return irq - MPIC_VEC_IPI_0 + mpic->ipi_offset;
 }
@@ -1066,13 +1066,13 @@ void mpic_request_ipis(void)
 
 	/* IPIs are marked SA_INTERRUPT as they must run with irqs disabled */
 	request_irq(mpic->ipi_offset+0, mpic_ipi_action, SA_INTERRUPT,
-		    "IPI0 (call function)", mpic);
+                "IPI0 (call function)", mpic);
 	request_irq(mpic->ipi_offset+1, mpic_ipi_action, SA_INTERRUPT,
-		   "IPI1 (reschedule)", mpic);
+                "IPI1 (reschedule)", mpic);
 	request_irq(mpic->ipi_offset+2, mpic_ipi_action, SA_INTERRUPT,
-		   "IPI2 (unused)", mpic);
+                "IPI2 (unused)", mpic);
 	request_irq(mpic->ipi_offset+3, mpic_ipi_action, SA_INTERRUPT,
-		   "IPI3 (debugger break)", mpic);
+                "IPI3 (debugger break)", mpic);
 
 	printk("IPIs requested... \n");
 }

@@ -83,14 +83,14 @@ void do_external(struct cpu_user_regs *regs)
     vec = xen_mpic_get_irq(regs);
 
     if (vector_is_ipi(vec)) {
-	/* do_IRQ is fundamentally broken for reliable IPI delivery.  */
-	irq_desc_t *desc = &irq_desc[vec];
-	regs->entry_vector = vec;
-	spin_lock(&desc->lock);
-	desc->handler->ack(vec);
-	desc->action->handler(vector_to_irq(vec), desc->action->dev_id, regs);
-	desc->handler->end(vec);
-	spin_unlock(&desc->lock);
+        /* do_IRQ is fundamentally broken for reliable IPI delivery.  */
+        irq_desc_t *desc = &irq_desc[vec];
+        regs->entry_vector = vec;
+        spin_lock(&desc->lock);
+        desc->handler->ack(vec);
+        desc->action->handler(vector_to_irq(vec), desc->action->dev_id, regs);
+        desc->handler->end(vec);
+        spin_unlock(&desc->lock);
     } else if (vec != -1) {
         DBG("EE:0x%lx isrc: %d\n", regs->msr, vec);
         regs->entry_vector = vec;
@@ -271,10 +271,10 @@ void send_IPI_mask(cpumask_t mask, int vector)
     switch(vector) {
     case CALL_FUNCTION_VECTOR:
     case EVENT_CHECK_VECTOR:
-	break;
+        break;
     default:
-	BUG();
-	return;
+        BUG();
+        return;
     }
 
     BUG_ON(NR_CPUS > bits);

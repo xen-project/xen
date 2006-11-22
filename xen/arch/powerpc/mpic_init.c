@@ -75,7 +75,7 @@ static unsigned long reg2(void *oft_p, ofdn_t c)
     rc = ofd_getprop(oft_p, c, "reg", &isa_reg, sizeof(isa_reg));
 
     DBG("%s: reg property address=0x%08x  size=0x%08x\n", __func__,
-                    isa_reg.address, isa_reg.size);
+        isa_reg.address, isa_reg.size);
     return isa_reg.address;
 }
 
@@ -93,7 +93,7 @@ static unsigned long reg1(void *oft_p, ofdn_t c)
     rc = ofd_getprop(oft_p, c, "reg", &reg, sizeof(reg));
 
     DBG("%s: reg property address=0x%08x  size=0x%08x\n", __func__,
-                        reg.address, reg.size);
+        reg.address, reg.size);
     return reg.address;
 }
 
@@ -174,15 +174,15 @@ static unsigned long find_ranges_addr_from_node(void *oft_p, ofdn_t c)
         break;
     case 2:
         ranges_addr = (((u64)ranges[ranges_i]) << 32) |
-                      ranges[ranges_i + 1];
+            ranges[ranges_i + 1];
         break;
     case 3:  /* the G5 case, how to squeeze 96 bits into 64 */
         ranges_addr = (((u64)ranges[ranges_i+1]) << 32) |
-                      ranges[ranges_i + 2];
+            ranges[ranges_i + 2];
         break;
     case 4:
         ranges_addr = (((u64)ranges[ranges_i+2]) << 32) |
-                      ranges[ranges_i + 4];
+            ranges[ranges_i + 4];
         break;
     default:
         PANIC("#address-cells out of range\n");
@@ -267,7 +267,7 @@ static int find_mpic_canonical_probe(void *oft_p)
      * We select the one without an 'interrupt' property.
      */
     c = ofd_node_find_by_prop(oft_p, OFD_ROOT, "device_type", mpic_type,
-                                        sizeof(mpic_type));
+                              sizeof(mpic_type));
     while (c > 0) {
         int int_len;
         int good_mpic;
@@ -366,8 +366,8 @@ static unsigned int mpic_startup_ipi(unsigned int irq)
 }
 
 int request_irq(unsigned int irq,
-		irqreturn_t (*handler)(int, void *, struct cpu_user_regs *),
-		unsigned long irqflags, const char * devname, void *dev_id)
+                irqreturn_t (*handler)(int, void *, struct cpu_user_regs *),
+                unsigned long irqflags, const char * devname, void *dev_id)
 {
     int retval;
     struct irqaction *action;
@@ -375,8 +375,8 @@ int request_irq(unsigned int irq,
 
     action = xmalloc(struct irqaction);
     if (!action) {
-	BUG();
-	return -ENOMEM;
+        BUG();
+        return -ENOMEM;
     }
 
     /* Xen's handler prototype is slightly different than Linux's.  */
@@ -388,8 +388,8 @@ int request_irq(unsigned int irq,
 
     retval = setup_irq(irq, action);
     if (retval) {
-	BUG();
-	xfree(action);
+        BUG();
+        xfree(action);
     }
 
     return retval;

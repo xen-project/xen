@@ -13,9 +13,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005
+ * Copyright (C) IBM Corp. 2005,2006
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
+ * Authors: Amos Waterland <apw@us.ibm.com>
  */
 
 #include <xen/cpumask.h>
@@ -32,15 +33,15 @@ int ht_per_core = 1;
 void __flush_tlb_mask(cpumask_t mask, unsigned long addr)
 {
     if (cpu_isset(smp_processor_id(), mask)) {
-            cpu_clear(smp_processor_id(), mask);
-            if (cpus_empty(mask)) {
-                /* only local */
-                if (addr == FLUSH_ALL_ADDRS)
-                    local_flush_tlb();
-                else
-                    local_flush_tlb_one(addr);
-                return;
-            }
+        cpu_clear(smp_processor_id(), mask);
+        if (cpus_empty(mask)) {
+            /* only local */
+            if (addr == FLUSH_ALL_ADDRS)
+                local_flush_tlb();
+            else
+                local_flush_tlb_one(addr);
+            return;
+        }
     }
     /* if we are still here and the mask is non-empty, then we need to
      * flush other TLBs so we flush em all */
@@ -57,7 +58,7 @@ void smp_send_event_check_mask(cpumask_t mask)
 
 
 int smp_call_function(void (*func) (void *info), void *info, int retry,
-        int wait)
+                      int wait)
 {
     cpumask_t allbutself = cpu_online_map;
     cpu_clear(smp_processor_id(), allbutself);
@@ -105,20 +106,20 @@ int on_selected_cpus(
 
     /* We always wait for an initiation ACK from remote CPU.  */
     for (t = 0; atomic_read(&call_data.started) != nr_cpus; t++) {
-	if (t && t % timebase_freq == 0) {
-	    printk("IPI start stall: %d ACKS to %d SYNS\n", 
-		   atomic_read(&call_data.started), nr_cpus);
-	}
+        if (t && t % timebase_freq == 0) {
+            printk("IPI start stall: %d ACKS to %d SYNS\n", 
+                   atomic_read(&call_data.started), nr_cpus);
+        }
     }
 
     /* If told to, we wait for a completion ACK from remote CPU.  */
     if (wait) {
-	for (t = 0; atomic_read(&call_data.finished) != nr_cpus; t++) {
-	    if (t > timebase_freq && t % timebase_freq == 0) {
-		printk("IPI finish stall: %d ACKS to %d SYNS\n", 
-		       atomic_read(&call_data.finished), nr_cpus);
-	    }
-	}
+        for (t = 0; atomic_read(&call_data.finished) != nr_cpus; t++) {
+            if (t > timebase_freq && t % timebase_freq == 0) {
+                printk("IPI finish stall: %d ACKS to %d SYNS\n", 
+                       atomic_read(&call_data.finished), nr_cpus);
+            }
+        }
     }
 
     spin_unlock(&call_lock);
@@ -139,7 +140,7 @@ void smp_call_function_interrupt(struct cpu_user_regs *regs)
     mb();
 
     if (wait)
-	atomic_inc(&call_data.finished);
+        atomic_inc(&call_data.finished);
 
     return;
 }
@@ -154,14 +155,14 @@ void smp_message_recv(int msg, struct cpu_user_regs *regs)
 {
     switch(msg) {
     case CALL_FUNCTION_VECTOR:
-	smp_call_function_interrupt(regs);
-	break;
+        smp_call_function_interrupt(regs);
+        break;
     case EVENT_CHECK_VECTOR:
         smp_event_check_interrupt();
-	break;
+        break;
     default:
-	BUG();
-	break;
+        BUG();
+        break;
     }
 }
 
@@ -181,19 +182,19 @@ void ipi_torture_test(void)
     cpus_clear(mask);
 
     while (tick < 1000000) {
-	for_each_online_cpu(cpu) {
-	    cpu_set(cpu, mask);
-	    before = mftb();
-	    on_selected_cpus(mask, debug_ipi_ack, NULL, 1, 1);
-	    after = mftb();
-	    cpus_clear(mask);
+        for_each_online_cpu(cpu) {
+            cpu_set(cpu, mask);
+            before = mftb();
+            on_selected_cpus(mask, debug_ipi_ack, NULL, 1, 1);
+            after = mftb();
+            cpus_clear(mask);
 
-	    delta = after - before;
-	    if (delta > max) max = delta;
-	    if (delta < min) min = delta;
-	    sum += delta;
-	    tick++;
-	}
+            delta = after - before;
+            if (delta > max) max = delta;
+            if (delta < min) min = delta;
+            sum += delta;
+            tick++;
+        }
     }
 
     mean = sum / tick;

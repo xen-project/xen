@@ -1,8 +1,8 @@
 /*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of the
+ * License, or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -393,10 +393,10 @@ static void __init __start_xen(multiboot_info_t *mbi)
     }
 
     init_xenheap_pages(ALIGN_UP(dom0_start, PAGE_SIZE),
-                 ALIGN_DOWN(dom0_start + dom0_len, PAGE_SIZE));
+                       ALIGN_DOWN(dom0_start + dom0_len, PAGE_SIZE));
     if (initrd_start)
         init_xenheap_pages(ALIGN_UP(initrd_start, PAGE_SIZE),
-                     ALIGN_DOWN(initrd_start + initrd_len, PAGE_SIZE));
+                           ALIGN_DOWN(initrd_start + initrd_len, PAGE_SIZE));
 
     init_trace_bufs();
 
