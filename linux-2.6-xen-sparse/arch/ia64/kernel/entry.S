@@ -602,7 +602,7 @@ GLOBAL_ENTRY(ia64_strace_leave_kernel)
 .ret4:	br.cond.sptk ia64_leave_kernel
 END(ia64_strace_leave_kernel)
 
-GLOBAL_ENTRY(ia64_ret_from_clone)
+GLOBAL_ENTRY(__ia64_ret_from_clone)
 	PT_REGS_UNWIND_INFO(0)
 {	/*
 	 * Some versions of gas generate bad unwind info if the first instruction of a
@@ -628,7 +628,7 @@ GLOBAL_ENTRY(ia64_ret_from_clone)
 	cmp.ne p6,p0=r2,r0
 (p6)	br.cond.spnt .strace_check_retval
 	;;					// added stop bits to prevent r8 dependency
-END(ia64_ret_from_clone)
+END(__ia64_ret_from_clone)
 	// fall through
 GLOBAL_ENTRY(ia64_ret_from_syscall)
 	PT_REGS_UNWIND_INFO(0)

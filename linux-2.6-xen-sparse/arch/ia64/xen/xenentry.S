@@ -237,6 +237,47 @@ END(xen_trace_syscall)
 END(ia64_trace_syscall)
 #endif
 
+#ifdef CONFIG_XEN
+GLOBAL_ENTRY(xen_ret_from_clone)
+	PT_REGS_UNWIND_INFO(0)
+	movl r16=running_on_xen;;
+	ld4 r16=[r16];;
+	cmp.eq p7,p0=r16,r0
+(p7)	br.cond.sptk.many __ia64_ret_from_clone;;
+#else	
+GLOBAL_ENTRY(ia64_ret_from_clone)
+	PT_REGS_UNWIND_INFO(0)
+#endif	
+{	/*
+	 * Some versions of gas generate bad unwind info if the first instruction of a
+	 * procedure doesn't go into the first slot of a bundle.  This is a workaround.
+	 */
+	nop.m 0
+	nop.i 0
+	/*
+	 * We need to call schedule_tail() to complete the scheduling process.
+	 * Called by ia64_switch_to() after do_fork()->copy_thread().  r8 contains the
+	 * address of the previously executing task.
+	 */
+	br.call.sptk.many rp=ia64_invoke_schedule_tail
+}
+.ret8:
+	adds r2=TI_FLAGS+IA64_TASK_SIZE,r13
+	;;
+	ld4 r2=[r2]
+	;;
+	mov r8=0
+	and r2=_TIF_SYSCALL_TRACEAUDIT,r2
+	;;
+	cmp.ne p6,p0=r2,r0
+(p6)	br.cond.spnt .strace_check_retval
+	;;					// added stop bits to prevent r8 dependency
+#ifdef CONFIG_XEN
+	br.cond.sptk ia64_ret_from_syscall
+END(xen_ret_from_clone)
+#else
+END(ia64_ret_from_clone)
+#endif		
 /*
  * ia64_leave_syscall(): Same as ia64_leave_kernel, except that it doesn't
  *	need to switch to bank 0 and doesn't restore the scratch registers.

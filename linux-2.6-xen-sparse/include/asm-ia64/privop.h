@@ -49,6 +49,7 @@
 #define ia64_leave_kernel		__ia64_leave_kernel
 #define ia64_leave_syscall		__ia64_leave_syscall
 #define ia64_trace_syscall		__ia64_trace_syscall
+#define ia64_ret_from_clone		__ia64_ret_from_clone
 #define ia64_switch_to			__ia64_switch_to
 #define ia64_pal_call_static		__ia64_pal_call_static
 
