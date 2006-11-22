@@ -301,10 +301,6 @@ static void __init __start_xen(multiboot_info_t *mbi)
         panic("FATAL ERROR: Require at least one Multiboot module.\n");
     }
 
-    if (!(mbi->flags & MBI_MEMMAP)) {
-        panic("FATAL ERROR: Bootloader provided no memory information.\n");
-    }
-
     /* OF dev tree is the last module */
     oftree = mod[mbi->mods_count-1].mod_start;
     oftree_end = mod[mbi->mods_count-1].mod_end;

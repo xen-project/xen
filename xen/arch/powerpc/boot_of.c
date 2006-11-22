@@ -41,16 +41,27 @@ volatile unsigned int __spin_ack;
 static ulong of_vec;
 static ulong of_msr;
 static int of_out;
+static ulong eomem;
+
+#define MEM_AVAILABLE_PAGES ((32 << 20) >> PAGE_SHIFT)
+static DECLARE_BITMAP(mem_available_pages, MEM_AVAILABLE_PAGES);
 
 extern char builtin_cmdline[];
 extern struct ns16550_defaults ns16550;
 
 #undef OF_DEBUG
+#undef OF_DEBUG_LOW
 
 #ifdef OF_DEBUG
 #define DBG(args...) of_printf(args)
 #else
 #define DBG(args...)
+#endif
+
+#ifdef OF_DEBUG_LOW
+#define DBG_LOW(args...) of_printf(args)
+#else
+#define DBG_LOW(args...)
 #endif
 
 #define of_panic(MSG...) \
@@ -75,7 +86,6 @@ static int __init of_call(
     if (of_vec != 0) {
         va_list args;
         int i;
-
         memset(&s, 0, sizeof (s));
         s.ofs_service = (ulong)service;
         s.ofs_nargs = nargs;
@@ -186,7 +196,7 @@ static int __init of_finddevice(const char *devspec)
         DBG("finddevice %s -> FAILURE %d\n",devspec,rets[0]);
         return OF_FAILURE;
     }
-    DBG("finddevice %s -> %d\n",devspec, rets[0]);
+    DBG_LOW("finddevice %s -> %d\n",devspec, rets[0]);
     return rets[0];
 }
 
@@ -197,11 +207,11 @@ static int __init of_getprop(int ph, const char *name, void *buf, u32 buflen)
     of_call("getprop", 4, 1, rets, ph, name, buf, buflen);
 
     if (rets[0] == OF_FAILURE) {
-        DBG("getprop 0x%x %s -> FAILURE\n", ph, name);
+        DBG_LOW("getprop 0x%x %s -> FAILURE\n", ph, name);
         return OF_FAILURE;
     }
 
-    DBG("getprop 0x%x %s -> 0x%x (%s)\n", ph, name, rets[0], (char *)buf);
+    DBG_LOW("getprop 0x%x %s -> 0x%x (%s)\n", ph, name, rets[0], (char *)buf);
     return rets[0];
 }
 
@@ -217,7 +227,7 @@ static int __init of_setprop(
         return OF_FAILURE;
     }
 
-    DBG("setprop 0x%x %s -> %s\n", ph, name, (char *)buf);
+    DBG_LOW("setprop 0x%x %s -> %s\n", ph, name, (char *)buf);
     return rets[0];
 }
 
@@ -229,7 +239,7 @@ static int __init of_getchild(int ph)
     int rets[1] = { OF_FAILURE };
 
     of_call("child", 1, 1, rets, ph);
-    DBG("getchild 0x%x -> 0x%x\n", ph, rets[0]);
+    DBG_LOW("getchild 0x%x -> 0x%x\n", ph, rets[0]);
 
     return rets[0];
 }
@@ -242,7 +252,7 @@ static int __init of_getpeer(int ph)
     int rets[1] = { OF_FAILURE };
 
     of_call("peer", 1, 1, rets, ph);
-    DBG("getpeer 0x%x -> 0x%x\n", ph, rets[0]);
+    DBG_LOW("getpeer 0x%x -> 0x%x\n", ph, rets[0]);
 
     return rets[0];
 }
@@ -256,7 +266,7 @@ static int __init of_getproplen(int ph, const char *name)
         DBG("getproplen 0x%x %s -> FAILURE\n", ph, name);
         return OF_FAILURE;
     }
-    DBG("getproplen 0x%x %s -> 0x%x\n", ph, name, rets[0]);
+    DBG_LOW("getproplen 0x%x %s -> 0x%x\n", ph, name, rets[0]);
     return rets[0];
 }
 
@@ -269,7 +279,7 @@ static int __init of_package_to_path(int ph, char *buffer, u32 buflen)
         DBG("%s 0x%x -> FAILURE\n", __func__, ph);
         return OF_FAILURE;
     }
-    DBG("%s 0x%x %s -> 0x%x\n", __func__, ph, buffer, rets[0]);
+    DBG_LOW("%s 0x%x %s -> 0x%x\n", __func__, ph, buffer, rets[0]);
     if (rets[0] <= buflen)
         buffer[rets[0]] = '\0';
     return rets[0];
@@ -286,7 +296,7 @@ static int __init of_nextprop(int ph, const char *name, void *buf)
         return OF_FAILURE;
     }
 
-    DBG("nextprop 0x%x %s -> %s\n", ph, name, (char *)buf);
+    DBG_LOW("nextprop 0x%x %s -> %s\n", ph, name, (char *)buf);
     return rets[0];
 }
 
@@ -333,7 +343,7 @@ static int __init of_claim(u32 virt, u32 size, u32 align)
         return OF_FAILURE;
     }
 
-    DBG("%s 0x%08x 0x%08x  0x%08x -> 0x%08x\n", __func__, virt, size, align,
+    DBG_LOW("%s 0x%08x 0x%08x  0x%08x -> 0x%08x\n", __func__, virt, size, align,
         rets[0]);
     return rets[0];
 }
@@ -355,7 +365,7 @@ static int __init of_getparent(int ph)
 
     of_call("parent", 1, 1, rets, ph);
 
-    DBG("getparent 0x%x -> 0x%x\n", ph, rets[0]);
+    DBG_LOW("getparent 0x%x -> 0x%x\n", ph, rets[0]);
     return rets[0];
 }
 
@@ -367,25 +377,196 @@ static int __init of_open(const char *devspec)
     return rets[0];
 }
 
-static void boot_of_probemem(multiboot_info_t *mbi)
+static void boot_of_alloc_init(int m, uint addr_cells, uint size_cells)
+{
+    int rc;
+    uint pg;
+    uint a[64];
+    int tst;
+    u64 start;
+    u64 size;
+
+    rc = of_getprop(m, "available", a, sizeof (a));
+    if (rc > 0) {
+        int l =  rc / sizeof(a[0]);
+        int r = 0;
+
+#ifdef OF_DEBUG
+        { 
+            int i;
+            of_printf("avail:\n");
+            for (i = 0; i < l; i += 4)
+                of_printf("  0x%x%x, 0x%x%x\n",
+                          a[i], a[i + 1],
+                          a[i + 2] ,a[i + 3]);
+        }
+#endif
+            
+        pg = 0;
+        while (pg < MEM_AVAILABLE_PAGES && r < l) {
+            ulong end;
+
+            start = a[r++];
+            if (addr_cells == 2 && (r < l) )
+                start = (start << 32) | a[r++];
+            
+            size = a[r++];
+            if (size_cells == 2 && (r < l) )
+                size = (size << 32) | a[r++];
+                
+            end = ALIGN_DOWN(start + size, PAGE_SIZE);
+
+            start = ALIGN_UP(start, PAGE_SIZE);
+
+            DBG("%s: marking 0x%x - 0x%lx\n", __func__,
+                pg << PAGE_SHIFT, start);
+
+            start >>= PAGE_SHIFT;
+            while (pg < MEM_AVAILABLE_PAGES && pg < start) {
+                set_bit(pg, mem_available_pages);
+                pg++;
+            }
+
+            pg = end  >> PAGE_SHIFT;
+        }
+    }
+
+    /* FW is incorrect in that the space below our image is not safe
+     * either */
+    start = (ulong)_start >> PAGE_SHIFT;
+    pg = 0;
+    DBG("%s: marking 0x%x - 0x%lx\n", __func__,
+        pg << PAGE_SHIFT, start);
+    while (pg < start - 1) {
+        set_bit(pg, mem_available_pages);
+        ++pg;
+    }
+        
+    /* Now make sure we mark our own memory */
+    pg = start;
+    start = (ulong)_end >> PAGE_SHIFT;
+
+    DBG("%s: marking 0x%x - 0x%lx\n", __func__,
+        pg << PAGE_SHIFT, start << PAGE_SHIFT);
+
+    /* Lets try and detect if our image has stepped on something. It
+     * is possible that FW has already subtracted our image from
+     * available memory so we must make sure that the previous bits
+     * are the same for the whole image */
+    tst = test_and_set_bit(pg, mem_available_pages);
+    ++pg;
+    while (pg <= start) {
+        if (test_and_set_bit(pg, mem_available_pages) != tst)
+            of_panic("%s: pg :0x%x of our image is different\n",
+                     __func__, pg);
+        ++pg;
+    }
+
+    DBG("%s: marking 0x%x - 0x%x\n", __func__,
+        0 << PAGE_SHIFT, 3 << PAGE_SHIFT);
+    /* First for pages (where the vectors are) should be left alone as well */
+    set_bit(0, mem_available_pages);
+    set_bit(1, mem_available_pages);
+    set_bit(2, mem_available_pages);
+    set_bit(3, mem_available_pages);
+}
+
+#ifdef BOOT_OF_FREE
+/* this is here in case we ever need a free call at a later date */
+static void boot_of_free(ulong addr, ulong size)
+{
+    ulong bits;
+    ulong pos;
+    ulong i;
+
+    size = ALIGN_UP(size, PAGE_SIZE);
+    bits = size >> PAGE_SHIFT;
+    pos = addr >> PAGE_SHIFT;
+
+    for (i = 0; i < bits; i++) {
+        if (!test_and_clear_bit(pos + i, mem_available_pages))
+            of_panic("%s: pg :0x%lx was never allocated\n",
+                     __func__, pos + i);
+    }
+}
+#endif
+
+static ulong boot_of_alloc(ulong size)
+{
+    ulong bits;
+    ulong pos;
+
+    if (size == 0)
+        return 0;
+
+    DBG("%s(0x%lx)\n", __func__, size);
+
+    size = ALIGN_UP(size, PAGE_SIZE);
+    bits = size >> PAGE_SHIFT;
+    pos = 0;
+    for (;;) {
+        ulong i;
+
+        pos = find_next_zero_bit(mem_available_pages,
+                                 MEM_AVAILABLE_PAGES, pos);
+        DBG("%s: found start bit at: 0x%lx\n", __func__, pos);
+
+        /* found nothing */
+        if ((pos + bits) > MEM_AVAILABLE_PAGES) {
+            of_printf("%s: allocation of size: 0x%lx failed\n",
+                     __func__, size);
+            return 0;
+        }
+
+        /* find a set that fits */
+        DBG("%s: checking for 0x%lx bits: 0x%lx\n", __func__, bits, pos);
+
+        i = 1;
+        while (i < bits && !test_bit(pos + i, mem_available_pages))
+            ++i;
+
+        if (i == bits) {
+            uint addr = pos << PAGE_SHIFT;
+
+            /* make sure OF is happy with our choice */
+            if (of_claim(addr, size, 0) != OF_FAILURE) {
+                for (i = 0; i < bits; i++)
+                    set_bit(pos + i, mem_available_pages);
+
+                DBG("%s: 0x%lx is good returning 0x%x\n",
+                    __func__, pos, addr);
+                return addr;
+            }
+            /* if OF did not like the address then simply start from
+             * the next bit */
+            i = 1;
+        }
+
+        pos = pos + i;
+    }
+}
+
+static ulong boot_of_mem_init(void)
 {
     int root;
     int p;
-    u32 addr_cells = 1;
-    u32 size_cells = 1;
     int rc;
-    int mcount = 0;
-    static memory_map_t mmap[16];
+    uint addr_cells;
+    uint size_cells;
 
     root = of_finddevice("/");
     p = of_getchild(root);
 
     /* code is writen to assume sizes of 1 */
-    of_getprop(root, "#address-cells", &addr_cells, sizeof (addr_cells));
-    of_getprop(root, "#size-cells", &size_cells, sizeof (size_cells));
+    of_getprop(root, "#address-cells", &addr_cells,
+               sizeof (addr_cells));
+    of_getprop(root, "#size-cells", &size_cells,
+               sizeof (size_cells));
     DBG("%s: address_cells=%d  size_cells=%d\n",
                     __func__, addr_cells, size_cells);
-    
+
+    /* We do ream memory discovery later, for now we only want to find
+     * the first LMB */
     do {
         const char memory[] = "memory";
         char type[32];
@@ -394,67 +575,52 @@ static void boot_of_probemem(multiboot_info_t *mbi)
 
         of_getprop(p, "device_type", type, sizeof (type));
         if (strncmp(type, memory, sizeof (memory)) == 0) {
-            u32 reg[48];  
-            u32 al, ah, ll, lh;
+            uint reg[48];  
+            u64 start;
+            u64 size;
             int r;
+            int l;
 
             rc = of_getprop(p, "reg", reg, sizeof (reg));
             if (rc == OF_FAILURE) {
                 of_panic("no reg property for memory node: 0x%x.\n", p);
             }
-            int l = rc/sizeof(u32); /* number reg element */
+
+            l = rc / sizeof(reg[0]); /* number reg element */
             DBG("%s: number of bytes in property 'reg' %d\n",
                             __func__, rc);
             
             r = 0;
             while (r < l) {
-                al = ah = ll = lh = 0;
-                if (addr_cells == 2) {
-                    ah = reg[r++];
-                    if (r >= l)
-                        break;  /* partial line.  Skip  */
-                    al = reg[r++];
-                    if (r >= l)
-                        break;  /* partial line.  Skip */
-                } else {
-                    al = reg[r++];
-                    if (r >= l)
-                        break;  /* partial line.  Skip */
-                }
-                if (size_cells == 2) {
-                    lh = reg[r++];
-                    if (r >= l)
-                        break;  /* partial line.  Skip */
-                    ll = reg[r++];
-                } else {
-                    ll = reg[r++];
+                start = reg[r++];
+                if (addr_cells == 2 && (r < l) )
+                    start = (start << 32) | reg[r++];
+
+                if (r >= l)
+                    break;  /* partial line.  Skip */
+
+                if (start > 0) {
+                    /* this is not the first LMB so we skip it */
+                    break;
                 }
 
-                if ((ll != 0) || (lh != 0)) {
-                    mmap[mcount].size = 20; /* - size field */
-                    mmap[mcount].type = 1; /* Regular ram */
-                    mmap[mcount].length_high = lh;
-                    mmap[mcount].length_low = ll;
-                    mmap[mcount].base_addr_high = ah;
-                    mmap[mcount].base_addr_low = al;
-                    of_printf("%s: memory 0x%016lx[0x%08lx]\n",
-                      __func__,
-                      (u64)(((u64)mmap[mcount].base_addr_high << 32)
-                            | mmap[mcount].base_addr_low),
-                      (u64)(((u64)mmap[mcount].length_high << 32)
-                            | mmap[mcount].length_low));
-                    ++mcount;
-                }
+                size = reg[r++];
+                if (size_cells == 2 && (r < l) )
+                    size = (size << 32) | reg[r++];
+                
+                if (r >= l)
+                    break;  /* partial line.  Skip */
+
+                boot_of_alloc_init(p, addr_cells, size_cells);
+                
+                eomem = size;
+                return size;
             }
         }
         p = of_getpeer(p);
     } while (p != OF_FAILURE && p != 0);
 
-    if (mcount > 0) {
-        mbi->flags |= MBI_MEMMAP;
-        mbi->mmap_length = sizeof (mmap[0]) * mcount;
-        mbi->mmap_addr = (ulong)mmap;
-    }
+    return 0;
 }
 
 static void boot_of_bootargs(multiboot_info_t *mbi)
@@ -571,7 +737,7 @@ retry:
     }
 }
 
-static int pkg_save(void *mem)
+static long pkg_save(void *mem)
 {
     int root;
     char path[256];
@@ -587,7 +753,7 @@ static int pkg_save(void *mem)
 
     do_pkg(mem, OFD_ROOT, root, path, sizeof(path));
 
-    r = (((ofdn_t *)mem)[1] + 1) * sizeof (u64);
+    r = ofd_size(mem);
 
     of_printf("%s: saved device tree in 0x%x bytes\n", __func__, r);
 
@@ -705,56 +871,6 @@ static int boot_of_fixup_chosen(void *mem)
         }
     }
     return rc;
-}
-
-static ulong space_base;
-
-/*
- * The following function is necessary because we cannot depend on all
- * FW to actually allocate us any space, so we look for it _hoping_
- * that at least is will fail if we try to claim something that
- * belongs to FW.  This hope does not seem to be true on some version
- * of PIBS.
- */
-static ulong find_space(u32 size, u32 align, multiboot_info_t *mbi)
-{
-    memory_map_t *map = (memory_map_t *)((ulong)mbi->mmap_addr);
-    ulong eomem = ((u64)map->length_high << 32) | (u64)map->length_low;
-    ulong base;
-
-    if (size == 0)
-        return 0;
-
-    if (align == 0)
-        of_panic("cannot call %s() with align of 0\n", __func__);
-
-#ifdef BROKEN_CLAIM_WORKAROUND
-    {
-        static int broken_claim;
-        if (!broken_claim) {
-            /* just try and claim it to the FW chosen address */
-            base = of_claim(0, size, align);
-            if (base != OF_FAILURE)
-                return base;
-            of_printf("%s: Firmware does not allocate memory for you\n",
-                      __func__);
-            broken_claim = 1;
-        }
-    }
-#endif
-
-    of_printf("%s base=0x%016lx  eomem=0x%016lx  size=0x%08x  align=0x%x\n",
-                    __func__, space_base, eomem, size, align);
-    base = ALIGN_UP(space_base, PAGE_SIZE);
-
-    while ((base + size) < rma_size(cpu_default_rma_order_pages())) {
-        if (of_claim(base, size, 0) != OF_FAILURE) {
-            space_base = base + size;
-            return base;
-        }
-        base += (PAGE_SIZE >  align) ? PAGE_SIZE : align;
-    }
-    of_panic("Cannot find memory in the RMA\n");
 }
 
 /* PIBS Version 1.05.0000 04/26/2005 has an incorrect /ht/isa/ranges
@@ -896,7 +1012,7 @@ static int __init boot_of_rtas(module_t *mod, multiboot_info_t *mbi)
     if (size == 0) {
         of_printf("RTAS, has no size\n");
         return 0;
-    }        
+    }
 
     rtas_instance = of_open("/rtas");
     if (rtas_instance == OF_FAILURE) {
@@ -906,9 +1022,11 @@ static int __init boot_of_rtas(module_t *mod, multiboot_info_t *mbi)
 
     size = ALIGN_UP(size, PAGE_SIZE);
     
-    mem = find_space(size, PAGE_SIZE, mbi);
+    mem = boot_of_alloc(size);
     if (mem == 0)
         of_panic("Could not allocate RTAS tree\n");
+
+    of_printf("instantiating RTAS at: 0x%x\n", mem);
 
     ret = of_call("call-method", 3, 2, res,
                   "instantiate-rtas", rtas_instance, mem);
@@ -933,11 +1051,11 @@ static void * __init boot_of_devtree(module_t *mod, multiboot_info_t *mbi)
     ulong oft_sz = 48 * PAGE_SIZE;
 
     /* snapshot the tree */
-    oft = (void*)find_space(oft_sz, PAGE_SIZE, mbi);
-    if (oft == 0)
+    oft = (void *)boot_of_alloc(oft_sz);
+    if (oft == NULL)
         of_panic("Could not allocate OFD tree\n");
 
-    of_printf("creating oftree\n");
+    of_printf("creating oftree at: 0x%p\n", oft);
     of_test("package-to-path");
     oft = ofd_create(oft, oft_sz);
     pkg_save(oft);
@@ -1014,8 +1132,6 @@ static void * __init boot_of_module(ulong r3, ulong r4, multiboot_info_t *mbi)
         of_printf("mod0: %o %c %c %c\n", c[0], c[1], c[2], c[3]);
     }
 
-    space_base = (ulong)_end;
-
     mod = 0;
     mods[mod].mod_start = mod0_start;
     mods[mod].mod_end = mod0_start + mod0_size;
@@ -1036,6 +1152,7 @@ static void * __init boot_of_module(ulong r3, ulong r4, multiboot_info_t *mbi)
         ++mod;
 
     oft = boot_of_devtree(&mods[mod], mbi);
+    of_printf("hello\n");
     if (oft == NULL)
         of_panic("%s: boot_of_devtree failed\n", __func__);
 
@@ -1192,14 +1309,14 @@ multiboot_info_t __init *boot_of_init(
             r3, r4, vec, r6, r7, orig_msr);
 
     if ((vec >= (ulong)_start) && (vec <= (ulong)_end)) {
-        of_printf("Hmm.. OF[0x%lx] seems to have stepped on our image "
-                "that ranges: %p .. %p.\n HANG!\n",
+        of_panic("Hmm.. OF[0x%lx] seems to have stepped on our image "
+                "that ranges: %p .. %p.\n",
                 vec, _start, _end);
     }
     of_printf("%s: _start %p _end %p 0x%lx\n", __func__, _start, _end, r6);
 
     boot_of_fix_maple();
-    boot_of_probemem(&mbi);
+    boot_of_mem_init();
     boot_of_bootargs(&mbi);
     oft = boot_of_module(r3, r4, &mbi);
     boot_of_cpus();
