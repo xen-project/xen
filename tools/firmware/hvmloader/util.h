@@ -1,12 +1,34 @@
 #ifndef __HVMLOADER_UTIL_H__
 #define __HVMLOADER_UTIL_H__
 
+#include <stdarg.h>
+
+extern void __assert_failed(char *assertion, char *file, int line)
+    __attribute__((noreturn));
+#define ASSERT(p) \
+    do { if (!(p)) __assert_failed(#p, __FILE__, __LINE__); } while (0)
+extern void __bug(char *file, int line) __attribute__((noreturn));
+#define BUG() __bug()
+
 /* I/O output */
+void outb(uint16_t addr, uint8_t  val);
 void outw(uint16_t addr, uint16_t val);
-void outb(uint16_t addr, uint8_t val);
+void outl(uint16_t addr, uint32_t val);
 
 /* I/O input */
-uint8_t inb(uint16_t addr);
+uint8_t  inb(uint16_t addr);
+uint16_t inw(uint16_t addr);
+uint32_t inl(uint16_t addr);
+
+/* PCI access */
+uint32_t pci_read(uint32_t devfn, uint32_t reg, uint32_t len);
+#define pci_readb(devfn, reg) ((uint8_t) pci_read(devfn, reg, 1))
+#define pci_readw(devfn, reg) ((uint16_t)pci_read(devfn, reg, 2))
+#define pci_readl(devfn, reg) ((uint32_t)pci_read(devfn, reg, 4))
+void pci_write(uint32_t devfn, uint32_t reg, uint32_t len, uint32_t val);
+#define pci_writeb(devfn, reg, val) (pci_write(devfn, reg, 1, (uint8_t) val))
+#define pci_writew(devfn, reg, val) (pci_write(devfn, reg, 2, (uint16_t)val))
+#define pci_writel(devfn, reg, val) (pci_write(devfn, reg, 4, (uint32_t)val))
 
 /* Do cpuid instruction, with operation 'idx' */
 void cpuid(uint32_t idx, uint32_t *eax, uint32_t *ebx,
@@ -31,15 +53,16 @@ char *itoa(char *a, unsigned int i);
 void byte_to_hex(char *digits, uint8_t byte);
 
 /* Convert an array of 16 unsigned bytes to a DCE/OSF formatted UUID
-   string.
-
-   Pre-condition: sizeof(dest) >= 37 */
+   string. Pre-condition: sizeof(dest) >= 37 */
 void uuid_to_string(char *dest, uint8_t *uuid);
 
 /* Debug output */
-void puts(const char *s);
+int printf(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
+int vprintf(const char *fmt, va_list ap);
 
 /* Allocate region of specified type in the e820 table. */
 uint64_t e820_malloc(uint64_t size, uint32_t type, uint64_t mask);
+
+#define isdigit(c) ((c) >= '0' && (c) <= '9')
 
 #endif /* __HVMLOADER_UTIL_H__ */

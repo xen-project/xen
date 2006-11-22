@@ -84,12 +84,6 @@ PCIBus *i440fx_init(void)
 
 static PCIDevice *piix3_dev;
 
-static int pci_slot_get_pirq(PCIDevice *pci_dev, int irq_num)
-{
-    /* This is the barber's pole mapping used by Xen. */
-    return (irq_num + (pci_dev->devfn >> 3)) & 3;
-}
-
 static void piix3_write_config(PCIDevice *d, 
                                uint32_t address, uint32_t val, int len)
 {
@@ -114,12 +108,9 @@ static void piix3_reset(PCIDevice *d)
     uint8_t *pci_conf = d->config;
 
     pci_conf[0x04] = 0x07; // master, memory and I/O
-    pci_conf[0x05] = 0x00;
-    pci_conf[0x06] = 0x00;
     pci_conf[0x07] = 0x02; // PCI_status_devsel_medium
     pci_conf[0x4c] = 0x4d;
     pci_conf[0x4e] = 0x03;
-    pci_conf[0x4f] = 0x00;
     pci_conf[0x60] = 0x80;
     pci_conf[0x61] = 0x80;
     pci_conf[0x62] = 0x80;
@@ -129,22 +120,9 @@ static void piix3_reset(PCIDevice *d)
     pci_conf[0x76] = 0x0c;
     pci_conf[0x77] = 0x0c;
     pci_conf[0x78] = 0x02;
-    pci_conf[0x79] = 0x00;
-    pci_conf[0x80] = 0x00;
-    pci_conf[0x82] = 0x00;
     pci_conf[0xa0] = 0x08;
     pci_conf[0xa0] = 0x08;
-    pci_conf[0xa2] = 0x00;
-    pci_conf[0xa3] = 0x00;
-    pci_conf[0xa4] = 0x00;
-    pci_conf[0xa5] = 0x00;
-    pci_conf[0xa6] = 0x00;
-    pci_conf[0xa7] = 0x00;
     pci_conf[0xa8] = 0x0f;
-    pci_conf[0xaa] = 0x00;
-    pci_conf[0xab] = 0x00;
-    pci_conf[0xac] = 0x00;
-    pci_conf[0xae] = 0x00;
 }
 
 int piix3_init(PCIBus *bus)
@@ -171,227 +149,4 @@ int piix3_init(PCIBus *bus)
     return d->devfn;
 }
 
-/***********************************************************/
-/* XXX: the following should be moved to the PC BIOS */
-
-static __attribute__((unused)) uint32_t isa_inb(uint32_t addr)
-{
-    return cpu_inb(NULL, addr);
-}
-
-static void isa_outb(uint32_t val, uint32_t addr)
-{
-    cpu_outb(NULL, addr, val);
-}
-
-static __attribute__((unused)) uint32_t isa_inw(uint32_t addr)
-{
-    return cpu_inw(NULL, addr);
-}
-
-static __attribute__((unused)) void isa_outw(uint32_t val, uint32_t addr)
-{
-    cpu_outw(NULL, addr, val);
-}
-
-static __attribute__((unused)) uint32_t isa_inl(uint32_t addr)
-{
-    return cpu_inl(NULL, addr);
-}
-
-static __attribute__((unused)) void isa_outl(uint32_t val, uint32_t addr)
-{
-    cpu_outl(NULL, addr, val);
-}
-
-static uint32_t pci_bios_io_addr;
-static uint32_t pci_bios_mem_addr;
-/* host irqs corresponding to PCI irqs A-D */
-static uint8_t pci_irqs[4] = { 10, 11, 10, 11 };
-
-static void pci_config_writel(PCIDevice *d, uint32_t addr, uint32_t val)
-{
-    PCIBus *s = d->bus;
-    addr |= (pci_bus_num(s) << 16) | (d->devfn << 8);
-    pci_data_write(s, addr, val, 4);
-}
-
-static void pci_config_writew(PCIDevice *d, uint32_t addr, uint32_t val)
-{
-    PCIBus *s = d->bus;
-    addr |= (pci_bus_num(s) << 16) | (d->devfn << 8);
-    pci_data_write(s, addr, val, 2);
-}
-
-static void pci_config_writeb(PCIDevice *d, uint32_t addr, uint32_t val)
-{
-    PCIBus *s = d->bus;
-    addr |= (pci_bus_num(s) << 16) | (d->devfn << 8);
-    pci_data_write(s, addr, val, 1);
-}
-
-static __attribute__((unused)) uint32_t pci_config_readl(PCIDevice *d, uint32_t addr)
-{
-    PCIBus *s = d->bus;
-    addr |= (pci_bus_num(s) << 16) | (d->devfn << 8);
-    return pci_data_read(s, addr, 4);
-}
-
-static uint32_t pci_config_readw(PCIDevice *d, uint32_t addr)
-{
-    PCIBus *s = d->bus;
-    addr |= (pci_bus_num(s) << 16) | (d->devfn << 8);
-    return pci_data_read(s, addr, 2);
-}
-
-static uint32_t pci_config_readb(PCIDevice *d, uint32_t addr)
-{
-    PCIBus *s = d->bus;
-    addr |= (pci_bus_num(s) << 16) | (d->devfn << 8);
-    return pci_data_read(s, addr, 1);
-}
-
-static void pci_set_io_region_addr(PCIDevice *d, int region_num, uint32_t addr)
-{
-    PCIIORegion *r;
-    uint16_t cmd;
-    uint32_t ofs;
-
-    if ( region_num == PCI_ROM_SLOT ) {
-        ofs = 0x30;
-    }else{
-        ofs = 0x10 + region_num * 4;
-    }
-
-    pci_config_writel(d, ofs, addr);
-    r = &d->io_regions[region_num];
-
-    /* enable memory mappings */
-    cmd = pci_config_readw(d, PCI_COMMAND);
-    if ( region_num == PCI_ROM_SLOT )
-        cmd |= 2;
-    else if (r->type & PCI_ADDRESS_SPACE_IO)
-        cmd |= 1;
-    else
-        cmd |= 2;
-    pci_config_writew(d, PCI_COMMAND, cmd);
-}
-
-static void pci_bios_init_device(PCIDevice *d)
-{
-    int class;
-    PCIIORegion *r;
-    uint32_t *paddr;
-    int i, pin, pic_irq, vendor_id, device_id;
-
-    class = pci_config_readw(d, PCI_CLASS_DEVICE);
-    vendor_id = pci_config_readw(d, PCI_VENDOR_ID);
-    device_id = pci_config_readw(d, PCI_DEVICE_ID);
-    switch(class) {
-    case 0x0101:
-        if (vendor_id == 0x8086 && device_id == 0x7010) {
-            /* PIIX3 IDE */
-            pci_config_writew(d, 0x40, 0x8000); // enable IDE0
-            pci_config_writew(d, 0x42, 0x8000); // enable IDE1
-            goto default_map;
-        } else {
-            /* IDE: we map it as in ISA mode */
-            pci_set_io_region_addr(d, 0, 0x1f0);
-            pci_set_io_region_addr(d, 1, 0x3f4);
-            pci_set_io_region_addr(d, 2, 0x170);
-            pci_set_io_region_addr(d, 3, 0x374);
-        }
-        break;
-    case 0x0680:
-        if (vendor_id == 0x8086 && device_id == 0x7113) {
-            /*
-             * PIIX4 ACPI PM.
-             * Special device with special PCI config space. No ordinary BARs.
-             */
-            pci_config_writew(d, 0x20, 0x0000); // No smb bus IO enable
-            pci_config_writew(d, 0x22, 0x0000);
-            pci_config_writew(d, 0x3c, 0x0009); // Hardcoded IRQ9
-            pci_config_writew(d, 0x3d, 0x0001);
-        }
-        break;
-    case 0x0300:
-        if (vendor_id != 0x1234)
-            goto default_map;
-        /* VGA: map frame buffer to default Bochs VBE address */
-        pci_set_io_region_addr(d, 0, 0xE0000000);
-        break;
-    case 0x0800:
-        /* PIC */
-        vendor_id = pci_config_readw(d, PCI_VENDOR_ID);
-        device_id = pci_config_readw(d, PCI_DEVICE_ID);
-        if (vendor_id == 0x1014) {
-            /* IBM */
-            if (device_id == 0x0046 || device_id == 0xFFFF) {
-                /* MPIC & MPIC2 */
-                pci_set_io_region_addr(d, 0, 0x80800000 + 0x00040000);
-            }
-        }
-        break;
-    case 0xff00:
-        if (vendor_id == 0x0106b &&
-            (device_id == 0x0017 || device_id == 0x0022)) {
-            /* macio bridge */
-            pci_set_io_region_addr(d, 0, 0x80800000);
-        }
-        break;
-    default:
-    default_map:
-        /* default memory mappings */
-        for(i = 0; i < PCI_NUM_REGIONS; i++) {
-            r = &d->io_regions[i];
-            if (r->size) {
-                if (r->type & PCI_ADDRESS_SPACE_IO)
-                    paddr = &pci_bios_io_addr;
-                else
-                    paddr = &pci_bios_mem_addr;
-                *paddr = (*paddr + r->size - 1) & ~(r->size - 1);
-                pci_set_io_region_addr(d, i, *paddr);
-                *paddr += r->size;
-            }
-        }
-        break;
-    }
-
-    /* map the interrupt */
-    pin = pci_config_readb(d, PCI_INTERRUPT_PIN);
-    if (pin != 0) {
-        pin = pci_slot_get_pirq(d, pin - 1);
-        pic_irq = pci_irqs[pin];
-        pci_config_writeb(d, PCI_INTERRUPT_LINE, pic_irq);
-    }
-}
-
-/*
- * This function initializes the PCI devices as a normal PCI BIOS
- * would do. It is provided just in case the BIOS has no support for
- * PCI.
- */
-void pci_bios_init(void)
-{
-    int i, irq;
-    uint8_t elcr[2];
-
-    pci_bios_io_addr = 0xc000;
-    pci_bios_mem_addr = HVM_BELOW_4G_MMIO_START;
-
-    /* activate IRQ mappings */
-    elcr[0] = 0x00;
-    elcr[1] = 0x00;
-    for(i = 0; i < 4; i++) {
-        irq = pci_irqs[i];
-        /* set to trigger level */
-        elcr[irq >> 3] |= (1 << (irq & 7));
-        /* activate irq remapping in PIIX */
-        pci_config_writeb(piix3_dev, 0x60 + i, irq);
-    }
-    isa_outb(elcr[0], 0x4d0);
-    isa_outb(elcr[1], 0x4d1);
-
-    pci_for_each_device(pci_bios_init_device);
-}
-
+void pci_bios_init(void) {}
