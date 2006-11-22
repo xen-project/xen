@@ -11,6 +11,7 @@
 #define __XEN_XENOPROF_H__
 
 #include <public/xenoprof.h>
+#include <asm/xenoprof.h>
 
 #define XENOPROF_DOMAIN_IGNORED    0
 #define XENOPROF_DOMAIN_ACTIVE     1
@@ -27,7 +28,7 @@ struct xenoprof_vcpu {
 };
 
 struct xenoprof {
-    char* rawbuf;
+    char *rawbuf;
     int npages;
     int nbuf;
     int bufsize;

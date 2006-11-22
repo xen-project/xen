@@ -12,8 +12,6 @@
 #include <public/xenoprof.h>
 #include <asm/hvm/support.h>
 
-#include "../arch/x86/oprofile/op_counter.h"
-
 /* Limit amount of pages used for shared buffer (per domain) */
 #define MAX_OPROF_SHARED_PAGES 32
 
@@ -39,16 +37,6 @@ u64 active_samples;
 u64 passive_samples;
 u64 idle_samples;
 u64 others_samples;
-
-
-extern int nmi_init(int *num_events, int *is_primary, char *cpu_type);
-extern int nmi_reserve_counters(void);
-extern int nmi_setup_events(void);
-extern int nmi_enable_virq(void);
-extern int nmi_start(void);
-extern void nmi_stop(void);
-extern void nmi_disable_virq(void);
-extern void nmi_release_counters(void);
 
 int is_active(struct domain *d)
 {
@@ -445,9 +433,9 @@ static int xenoprof_op_init(XEN_GUEST_HANDLE(void) arg)
     if ( copy_from_guest(&xenoprof_init, arg, 1) )
         return -EFAULT;
 
-    if ( (ret = nmi_init(&xenoprof_init.num_events, 
-                         &xenoprof_init.is_primary, 
-                         xenoprof_init.cpu_type)) )
+    if ( (ret = xenoprof_arch_init(&xenoprof_init.num_events, 
+                                   &xenoprof_init.is_primary, 
+                                   xenoprof_init.cpu_type)) )
         return ret;
 
     if ( copy_to_guest(arg, &xenoprof_init, 1) )
@@ -574,14 +562,12 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
             ret = -EPERM;
             break;
         }
-        ret = nmi_reserve_counters();
+        ret = xenoprof_arch_reserve_counters();
         if ( !ret )
             xenoprof_state = XENOPROF_COUNTERS_RESERVED;
         break;
 
     case XENOPROF_counter:
-    {
-        struct xenoprof_counter counter;
         if ( (xenoprof_state != XENOPROF_COUNTERS_RESERVED) ||
              (adomains == 0) )
         {
@@ -589,22 +575,8 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
             break;
         }
 
-        if ( copy_from_guest(&counter, arg, 1) )
-            return -EFAULT;
-
-        if ( counter.ind > OP_MAX_COUNTER )
-            return -E2BIG;
-
-        counter_config[counter.ind].count     = counter.count;
-        counter_config[counter.ind].enabled   = counter.enabled;
-        counter_config[counter.ind].event     = counter.event;
-        counter_config[counter.ind].kernel    = counter.kernel;
-        counter_config[counter.ind].user      = counter.user;
-        counter_config[counter.ind].unit_mask = counter.unit_mask;
-
-        ret = 0;
+        ret = xenoprof_arch_counter(arg);
         break;
-    }
 
     case XENOPROF_setup_events:
         if ( xenoprof_state != XENOPROF_COUNTERS_RESERVED )
@@ -612,7 +584,7 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
             ret = -EPERM;
             break;
         }
-        ret = nmi_setup_events();
+        ret = xenoprof_arch_setup_events();
         if ( !ret )
             xenoprof_state = XENOPROF_READY;
         break;
@@ -622,7 +594,7 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
         int i;
         if ( current->domain == primary_profiler )
         {
-            nmi_enable_virq();
+            xenoprof_arch_enable_virq();
             xenoprof_reset_stat();
             for ( i = 0; i < pdomains; i++ )
                 xenoprof_reset_buf(passive_domains[i]);
@@ -636,7 +608,7 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
         ret = -EPERM;
         if ( (xenoprof_state == XENOPROF_READY) &&
              (activated == adomains) )
-            ret = nmi_start();
+            ret = xenoprof_arch_start();
 
         if ( ret == 0 )
             xenoprof_state = XENOPROF_PROFILING;
@@ -647,7 +619,7 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
             ret = -EPERM;
             break;
         }
-        nmi_stop();
+        xenoprof_arch_stop();
         xenoprof_state = XENOPROF_READY;
         break;
 
@@ -667,8 +639,8 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
              (xenoprof_state == XENOPROF_READY) )
         {
             xenoprof_state = XENOPROF_IDLE;
-            nmi_release_counters();
-            nmi_disable_virq();
+            xenoprof_arch_release_counters();
+            xenoprof_arch_disable_virq();
             reset_passive_list();
             ret = 0;
         }
