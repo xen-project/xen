@@ -29,6 +29,7 @@ obj-y += xmalloc.o
 
 obj-$(perfc)       += perfc.o
 obj-$(crash_debug) += gdbstub.o
+obj-$(xenoprof)    += xenoprof.o
 
 # Object file contains changeset and compiler information.
 version.o: $(BASEDIR)/include/xen/compile.h
