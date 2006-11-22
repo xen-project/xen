@@ -508,16 +508,16 @@ static unsigned long vmx_get_segment_base(struct vcpu *v, enum segment seg)
     BUG_ON(v != current);
     switch ( seg )
     {
-    case seg_cs: __vmread(GUEST_CS_BASE, &base); break;
-    case seg_ds: __vmread(GUEST_DS_BASE, &base); break;
-    case seg_es: __vmread(GUEST_ES_BASE, &base); break;
-    case seg_fs: __vmread(GUEST_FS_BASE, &base); break;
-    case seg_gs: __vmread(GUEST_GS_BASE, &base); break;
-    case seg_ss: __vmread(GUEST_SS_BASE, &base); break;
-    case seg_tr: __vmread(GUEST_TR_BASE, &base); break;
-    case seg_gdtr: __vmread(GUEST_GDTR_BASE, &base); break;
-    case seg_idtr: __vmread(GUEST_IDTR_BASE, &base); break;
-    case seg_ldtr: __vmread(GUEST_LDTR_BASE, &base); break;
+    case seg_cs: base = __vmread(GUEST_CS_BASE); break;
+    case seg_ds: base = __vmread(GUEST_DS_BASE); break;
+    case seg_es: base = __vmread(GUEST_ES_BASE); break;
+    case seg_fs: base = __vmread(GUEST_FS_BASE); break;
+    case seg_gs: base = __vmread(GUEST_GS_BASE); break;
+    case seg_ss: base = __vmread(GUEST_SS_BASE); break;
+    case seg_tr: base = __vmread(GUEST_TR_BASE); break;
+    case seg_gdtr: base = __vmread(GUEST_GDTR_BASE); break;
+    case seg_idtr: base = __vmread(GUEST_IDTR_BASE); break;
+    case seg_ldtr: base = __vmread(GUEST_LDTR_BASE); break;
     default: BUG(); base = 0; break;
     }
     return base;
