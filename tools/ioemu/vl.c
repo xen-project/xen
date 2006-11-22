@@ -2530,6 +2530,7 @@ static CharDriverState *qemu_chr_open_tcp(const char *host_str,
     int is_waitconnect = 1;
     const char *ptr;
     struct sockaddr_in saddr;
+    int opt;
 
     if (parse_host_port(&saddr, host_str) < 0)
         goto fail;
@@ -2598,6 +2599,8 @@ static CharDriverState *qemu_chr_open_tcp(const char *host_str,
             }
         }
         s->fd = fd;
+	opt = 1;
+	setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&opt, sizeof(opt));
         if (s->connected)
             tcp_chr_connect(chr);
         else
