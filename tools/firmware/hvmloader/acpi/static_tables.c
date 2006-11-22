@@ -40,6 +40,37 @@ struct acpi_20_madt Madt = {
         .flags      = ACPI_PCAT_COMPAT
     },
 
+    .intsrcovr = {
+        [0] = {
+            .type   = ACPI_INTERRUPT_SOURCE_OVERRIDE,
+            .length = sizeof(struct acpi_20_madt_intsrcovr),
+            .source = 5,
+            .gsi    = 5,
+            .flags  = 0xf /* PCI: active-low level-triggered */
+        },
+        [1] = {
+            .type   = ACPI_INTERRUPT_SOURCE_OVERRIDE,
+            .length = sizeof(struct acpi_20_madt_intsrcovr),
+            .source = 6,
+            .gsi    = 6,
+            .flags  = 0xf /* PCI: active-low level-triggered */
+        },
+        [2] = {
+            .type   = ACPI_INTERRUPT_SOURCE_OVERRIDE,
+            .length = sizeof(struct acpi_20_madt_intsrcovr),
+            .source = 10,
+            .gsi    = 10,
+            .flags  = 0xf /* PCI: active-low level-triggered */
+        },
+        [3] = {
+            .type   = ACPI_INTERRUPT_SOURCE_OVERRIDE,
+            .length = sizeof(struct acpi_20_madt_intsrcovr),
+            .source = 11,
+            .gsi    = 11,
+            .flags  = 0xf /* PCI: active-low level-triggered */
+        }
+    },
+
     /* IO APIC */
     .io_apic = {
         [0] = {
@@ -55,7 +86,7 @@ struct acpi_20_madt Madt = {
         [0] = {
             .type   = ACPI_PROCESSOR_LOCAL_APIC,
             .length = sizeof(struct acpi_20_madt_lapic),
-            .flags  = 0x00000001
+            .flags  = ACPI_LOCAL_APIC_ENABLED
         }
     }
 };
