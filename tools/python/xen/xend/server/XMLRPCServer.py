@@ -64,8 +64,8 @@ def domain_create(config):
     info = XendDomain.instance().domain_create(config)
     return fixup_sxpr(info.sxpr())
 
-def domain_restore(src):
-    info = XendDomain.instance().domain_restore(src)
+def domain_restore(src, paused=False):
+    info = XendDomain.instance().domain_restore(src, paused)
     return fixup_sxpr(info.sxpr())
 
 def get_log():

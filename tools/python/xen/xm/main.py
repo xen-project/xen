@@ -84,7 +84,7 @@ SUBCOMMAND_HELP = {
                      'Migrate a domain to another machine.'),
     'pause'       : ('<Domain>', 'Pause execution of a domain.'),
     'reboot'      : ('<Domain> [-wa]', 'Reboot a domain.'),
-    'restore'     : ('<CheckpointFile>',
+    'restore'     : ('<CheckpointFile> [-p]',
                      'Restore a domain from a saved state.'),
     'save'        : ('<Domain> <CheckpointFile>',
                      'Save a domain state to restore later.'),
@@ -205,6 +205,9 @@ SUBCOMMAND_OPTIONS = {
     'dump-core': (
        ('-L', '--live', 'Dump core without pausing the domain'),
        ('-C', '--crash', 'Crash domain after dumping core'),
+    ),
+    'restore': (
+      ('-p', '--paused', 'Do not unpause domain after restoring it'),
     ),
 }
 
@@ -483,15 +486,31 @@ def xm_save(args):
     server.xend.domain.save(domid, savefile)
     
 def xm_restore(args):
-    arg_check(args, "restore", 1)
+    arg_check(args, "restore", 1, 2)
 
-    savefile = os.path.abspath(args[0])
+    try:
+        (options, params) = getopt.gnu_getopt(args, 'p', ['paused'])
+    except getopt.GetoptError, opterr:
+        err(opterr)
+        sys.exit(1)
+
+    paused = False
+    for (k, v) in options:
+        if k in ['-p', '--paused']:
+            paused = True
+
+    if len(params) != 1:
+        err("Wrong number of parameters")
+        usage('restore')
+        sys.exit(1)
+
+    savefile = os.path.abspath(params[0])
 
     if not os.access(savefile, os.R_OK):
         err("xm restore: Unable to read file %s" % savefile)
         sys.exit(1)
 
-    server.xend.domain.restore(savefile)
+    server.xend.domain.restore(savefile, paused)
 
 
 def getDomains(domain_names, full = 0):

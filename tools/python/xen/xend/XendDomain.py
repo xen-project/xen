@@ -916,7 +916,7 @@ class XendDomain:
         # !!!
         raise XendError("Unsupported")
 
-    def domain_restore(self, src):
+    def domain_restore(self, src, paused=False):
         """Restore a domain from file.
 
         @param src: filename of checkpoint file to restore from
@@ -928,14 +928,14 @@ class XendDomain:
         try:
             fd = os.open(src, os.O_RDONLY)
             try:
-                return self.domain_restore_fd(fd)
+                return self.domain_restore_fd(fd, paused=paused)
             finally:
                 os.close(fd)
         except OSError, ex:
             raise XendError("can't read guest state file %s: %s" %
                             (src, ex[1]))
 
-    def domain_restore_fd(self, fd):
+    def domain_restore_fd(self, fd, paused=False):
         """Restore a domain from the given file descriptor.
 
         @param fd: file descriptor of the checkpoint file
@@ -945,7 +945,7 @@ class XendDomain:
         """
 
         try:
-            return XendCheckpoint.restore(self, fd)
+            return XendCheckpoint.restore(self, fd, paused=paused)
         except:
             # I don't really want to log this exception here, but the error
             # handling in the relocation-socket handling code (relocate.py) is

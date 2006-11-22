@@ -108,7 +108,7 @@ def save(fd, dominfo, network, live, dst):
         raise Exception, exn
 
 
-def restore(xd, fd, dominfo = None):
+def restore(xd, fd, dominfo = None, paused = False):
     signature = read_exact(fd, len(SIGNATURE),
         "not a valid guest state file: signature read")
     if signature != SIGNATURE:
@@ -164,7 +164,8 @@ def restore(xd, fd, dominfo = None):
 
         os.read(fd, 1)           # Wait for source to close connection
         dominfo.waitForDevices() # Wait for backends to set up
-        dominfo.unpause()
+        if not paused:
+            dominfo.unpause()
         
         dominfo.completeRestore(handler.store_mfn, handler.console_mfn)
         
