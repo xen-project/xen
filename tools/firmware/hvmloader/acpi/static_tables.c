@@ -17,6 +17,7 @@
  */
 
 #include "acpi2_0.h"
+#include "../config.h"
 #include <xen/hvm/ioreq.h>
 
 /*
@@ -35,16 +36,17 @@ struct acpi_20_madt Madt = {
             .creator_id   = ACPI_CREATOR_ID,
             .creator_revision = ACPI_CREATOR_REVISION
         },
-        .lapic_addr = 0xFEE00000,
+        .lapic_addr = LAPIC_BASE_ADDRESS,
         .flags      = ACPI_PCAT_COMPAT
     },
 
     /* IO APIC */
     .io_apic = {
         [0] = {
-            .type        = ACPI_IO_APIC,                         
+            .type        = ACPI_IO_APIC,
             .length      = sizeof(struct acpi_20_madt_ioapic),
-            .ioapic_addr = 0xFEC00000
+            .ioapic_id   = IOAPIC_ID,
+            .ioapic_addr = IOAPIC_BASE_ADDRESS
         }
     },
 

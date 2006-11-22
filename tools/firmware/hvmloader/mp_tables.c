@@ -29,6 +29,7 @@
  */
 
 #include <acpi_utils.h>
+#include "config.h"
 
 /* FIXME find a header that already has types defined!!! */
 typedef unsigned char  uint8_t;
@@ -45,11 +46,11 @@ typedef unsigned long uint64_t;
 typedef   signed long int64_t;
 #endif
 
-#define ROMBIOS_SEG              0xF000
-#define ROMBIOS_BEGIN            0x000F0000
-#define ROMBIOS_SIZE             0x00010000 
-#define ROMBIOS_MAXOFFSET        0x0000FFFF
-#define ROMBIOS_END             (ROMBIOS_BEGIN + ROMBIOS_SIZE)
+#define ROMBIOS_SEG            0xF000
+#define ROMBIOS_BEGIN          0x000F0000
+#define ROMBIOS_SIZE           0x00010000 
+#define ROMBIOS_MAXOFFSET      0x0000FFFF
+#define ROMBIOS_END            (ROMBIOS_BEGIN + ROMBIOS_SIZE)
 
 /* number of non-processor MP table entries */
 #define NR_NONPROC_ENTRIES     18
@@ -78,17 +79,7 @@ typedef   signed long int64_t;
 
 #define BUS_TYPE_LENGTH        6
 #define BUS_TYPE_STR_ISA       "ISA   "
-#define BUS_TYPE_STR_PCI       "PCI   "
-
 #define BUS_ID_ISA             0
-#define BUS_ID_PCI             1
-
-#define LAPIC_BASE_ADDR        0xFEE00000
-
-#define IOAPIC_ID              0
-#define IOAPIC_VERSION         0x11
-#define IOAPIC_BASE_ADDR       0xFEC00000
-#define IOAPIC_FLAG_ENABLED    (1U << 0)
 
 #define INTR_TYPE_INT          0
 #define INTR_TYPE_NMI          1
@@ -217,7 +208,7 @@ void fill_mp_config_table(struct mp_config_table *mpct, int length)
 
     mpct->nr_entries = vcpu_nr + NR_NONPROC_ENTRIES;
 
-    mpct->lapic = LAPIC_BASE_ADDR;
+    mpct->lapic = LAPIC_BASE_ADDRESS;
     mpct->extended_length = 0;
     mpct->extended_checksum = 0;
 
@@ -255,13 +246,13 @@ void fill_mp_bus_entry(struct mp_bus_entry *mpbe, int bus_id, const char *type)
 
 
 /* fills in an MP IOAPIC entry for IOAPIC 'ioapic_id' */
-void fill_mp_ioapic_entry(struct mp_ioapic_entry *mpie, int ioapic_id)
+void fill_mp_ioapic_entry(struct mp_ioapic_entry *mpie)
 {
     mpie->type = ENTRY_TYPE_IOAPIC;
-    mpie->ioapic_id = ioapic_id;
+    mpie->ioapic_id = IOAPIC_ID;
     mpie->ioapic_version = IOAPIC_VERSION;
-    mpie->ioapic_flags = IOAPIC_FLAG_ENABLED;
-    mpie->ioapic_addr = IOAPIC_BASE_ADDR;
+    mpie->ioapic_flags = 1; /* enabled */
+    mpie->ioapic_addr = IOAPIC_BASE_ADDRESS;
 }
 
 
@@ -379,10 +370,7 @@ void create_mp_tables(void)
     fill_mp_bus_entry((struct mp_bus_entry *)p, BUS_ID_ISA, BUS_TYPE_STR_ISA);
     p += sizeof(struct mp_bus_entry);
 
-    fill_mp_bus_entry((struct mp_bus_entry *)p, BUS_ID_PCI, BUS_TYPE_STR_PCI);
-    p += sizeof(struct mp_bus_entry);
-
-    fill_mp_ioapic_entry((struct mp_ioapic_entry *)p, IOAPIC_ID);
+    fill_mp_ioapic_entry((struct mp_ioapic_entry *)p);
     p += sizeof(struct mp_ioapic_entry);
 
     for ( i = 0; i < 16; i++ )
