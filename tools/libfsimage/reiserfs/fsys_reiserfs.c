@@ -403,12 +403,19 @@ grub_log2 (unsigned long word)
 
 #elif defined(__powerpc__)
 
+#ifdef __powerpc64__
+#define PPC_CNTLZL "cntlzd"
+#else
+#define PPC_CNTLZL "cntlzw"
+#endif
+#define BITS_PER_LONG (sizeof(long) * 8)
+
 static __inline__ int
 __ilog2(unsigned long x)
 {
   int lz;
 
-  asm (PPC_CNTLZL "%0,%1" : "=r" (lz) : "r" (x));
+  asm (PPC_CNTLZL " %0,%1" : "=r" (lz) : "r" (x));
   return BITS_PER_LONG - 1 - lz;
 }
 
