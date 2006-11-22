@@ -359,17 +359,11 @@ static const io_range_t io_ranges[] = {
 	{PIB_START, PIB_SIZE, GPFN_PIB},
 };
 
-/* Reseve 1 page for shared I/O ,1 page for xenstore and 1 page for buffer I/O.  */
-#define VMX_SYS_PAGES	(3 + (GFW_SIZE >> PAGE_SHIFT))
-/* If we support maxmem for domVTi, we should change from tot_page to max_pages.
- * #define VMX_CONFIG_PAGES(d) ((d)->max_pages - VMX_SYS_PAGES)
- */
-#define VMX_CONFIG_PAGES(d) ((d)->tot_pages - VMX_SYS_PAGES)
-
-static void vmx_build_physmap_table(struct domain *d)
+// The P2M table is built in libxc/ia64/xc_ia64_hvm_build.c @ setup_guest()
+// so only mark IO memory space here
+static void vmx_build_io_physmap_table(struct domain *d)
 {
-	unsigned long i, j, start, tmp, end, mfn;
-	struct list_head *list_ent = d->page_list.next;
+	unsigned long i, j;
 
 	/* Mark I/O ranges */
 	for (i = 0; i < (sizeof(io_ranges) / sizeof(io_range_t)); i++) {
@@ -379,63 +373,13 @@ static void vmx_build_physmap_table(struct domain *d)
 			                           ASSIGN_writable);
 	}
 
-	/* Map normal memory below 3G */
-	end = VMX_CONFIG_PAGES(d) << PAGE_SHIFT;
-	tmp = end < MMIO_START ? end : MMIO_START;
-	for (i = 0; (i < tmp) && (list_ent != &d->page_list); i += PAGE_SIZE) {
-		mfn = page_to_mfn(list_entry(list_ent, struct page_info, list));
-		list_ent = mfn_to_page(mfn)->list.next;
-		if (VGA_IO_START <= i && i < VGA_IO_START + VGA_IO_SIZE)
-			continue;
-		assign_domain_page(d, i, mfn << PAGE_SHIFT);
-	}
-	ASSERT(list_ent != &d->page_list);
-
-	/* Map normal memory beyond 4G */
-	if (unlikely(end > MMIO_START)) {
-		start = 4 * MEM_G;
-		end = start + (end - 3 * MEM_G);
-		for (i = start;
-		     (i < end) && (list_ent != &d->page_list); i += PAGE_SIZE) {
-			mfn = page_to_mfn(list_entry(list_ent,
-			                             struct page_info, list));
-			assign_domain_page(d, i, mfn << PAGE_SHIFT);
-			list_ent = mfn_to_page(mfn)->list.next;
-		}
-		ASSERT(list_ent != &d->page_list);
-	}
-	 
-	/* Map guest firmware */
-	for (i = GFW_START; (i < GFW_START + GFW_SIZE) &&
-	     (list_ent != &d->page_list); i += PAGE_SIZE) {
-		mfn = page_to_mfn(list_entry(list_ent, struct page_info, list));
-		assign_domain_page(d, i, mfn << PAGE_SHIFT);
-		list_ent = mfn_to_page(mfn)->list.next;
-	}
-	ASSERT(list_ent != &d->page_list);
-
-	/* Map for shared I/O page and xenstore */
-	mfn = page_to_mfn(list_entry(list_ent, struct page_info, list));
-	assign_domain_page(d, IO_PAGE_START, mfn << PAGE_SHIFT);
-	list_ent = mfn_to_page(mfn)->list.next;
-	ASSERT(list_ent != &d->page_list);
-
-	mfn = page_to_mfn(list_entry(list_ent, struct page_info, list));
-	assign_domain_page(d, STORE_PAGE_START, mfn << PAGE_SHIFT);
-	list_ent = mfn_to_page(mfn)->list.next;
-	ASSERT(list_ent != &d->page_list);
-
-	mfn = page_to_mfn(list_entry(list_ent, struct page_info, list));
-	assign_domain_page(d, BUFFER_IO_PAGE_START, mfn << PAGE_SHIFT);
-	list_ent = mfn_to_page(mfn)->list.next;
-	ASSERT(list_ent == &d->page_list);
 }
 
 void vmx_setup_platform(struct domain *d)
 {
 	ASSERT(d != dom0); /* only for non-privileged vti domain */
 
-	vmx_build_physmap_table(d);
+	vmx_build_io_physmap_table(d);
 
 	d->arch.vmx_platform.shared_page_va =
 		(unsigned long)__va(__gpa_to_mpa(d, IO_PAGE_START));
