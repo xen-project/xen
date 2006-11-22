@@ -21,7 +21,7 @@
  */
 #ifndef __ASM_XENOPROF_H__
 #define __ASM_XENOPROF_H__
-#ifdef CONFIG_OPROFILE
+#ifdef CONFIG_XEN
 
 struct super_block;
 struct dentry;
@@ -44,5 +44,5 @@ int xenoprof_arch_map_shared_buffer(struct xenoprof_get_buffer* get_buffer, stru
 struct xenoprof_passive;
 int xenoprof_arch_set_passive(struct xenoprof_passive* pdomain, struct xenoprof_shared_buffer* sbuf);
 
-#endif /* CONFIG_OPROFILE */
+#endif /* CONFIG_XEN */
 #endif /* __ASM_XENOPROF_H__ */

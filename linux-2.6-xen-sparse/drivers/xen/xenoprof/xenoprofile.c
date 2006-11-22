@@ -48,7 +48,7 @@ static int xenoprof_start(void);
 static void xenoprof_stop(void);
 
 static int xenoprof_enabled = 0;
-int xenoprof_is_primary = 0;
+static int xenoprof_is_primary = 0;
 static int active_defined;
 
 /* Number of buffers in shared area (one per VCPU) */
