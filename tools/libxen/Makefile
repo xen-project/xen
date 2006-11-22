@@ -15,23 +15,55 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
 #
+XEN_ROOT=../..
+include $(XEN_ROOT)/tools/Rules.mk
+
+MAJOR = 0.1
+MINOR = 0
 
 CFLAGS = -Iinclude                     \
-         $(shell xml2-config --cflags) \
+	 $(shell xml2-config --cflags) \
          $(shell curl-config --cflags) \
          -W -Wall -Wmissing-prototypes -Werror -std=c99 -O2 -fPIC
 
 LDFLAGS = $(shell xml2-config --libs) \
           $(shell curl-config --libs)
 
-test/test_bindings: test/test_bindings.o src/libxen.so
-	$(CC) $(LDFLAGS) -o $@ $< -L src -lxen
+LIBXENAPI_HDRS = $(wildcard include/*.h)
+LIBXENAPI_OBJS = $(patsubst %.c, %.o, $(wildcard src/*.c))
 
-src/libxen.so: $(patsubst %.c, %.o, $(wildcard src/*.c))
-	$(CC) -shared -o $@ $^
+
+.PHONY: all
+all: libxenapi.so libxenapi.a
+
+libxenapi.so: libxenapi.so.$(MAJOR)
+	ln -sf $< $@
+
+libxenapi.so.$(MAJOR): libxenapi.so.$(MAJOR).$(MINOR)
+	ln -sf $< $@
+
+libxenapi.so.$(MAJOR).$(MINOR): $(LIBXENAPI_OBJS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenapi.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $^
+
+libxenapi.a: $(LIBXENAPI_OBJS)
+	$(AR) rcs libxenapi.a $^
+
+
+.PHONY: install
+install: all
+	$(INSTALL_DIR) -p $(DESTDIR)/usr/include/xen/api
+	$(INSTALL_DIR) -p $(DESTDIR)/usr/$(LIBDIR)
+	$(INSTALL_PROG) libxenapi.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)
+	ln -sf libxenapi.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)/libxenapi.so.$(MAJOR)
+	ln -sf libxenapi.so.$(MAJOR) $(DESTDIR)/usr/$(LIBDIR)/libxenapi.so
+	$(INSTALL_DATA) libxenapi.a $(DESTDIR)/usr/$(LIBDIR)
+	for i in $(LIBXENAPI_HDRS); do \
+	    $(INSTALL_DATA) $$i $(DESTDIR)/usr/include/xen/api; \
+	done
 
 .PHONY: clean
 clean:
 	rm -f `find -name *.o`
-	rm -f src/libxen.so
+	rm -f libxenapi.so*
+	rm -f libxenapi.a
 	rm -f test/test_bindings
