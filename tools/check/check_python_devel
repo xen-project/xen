@@ -1,0 +1,16 @@
+#!/bin/bash
+# CHECK-BUILD
+
+function error {
+    echo
+    echo "  *** Check for python development environment FAILED"
+    exit 1
+}
+
+python -c '
+import os.path, sys
+for p in sys.path:
+	if os.path.exists(p + "/config/Makefile"):
+		sys.exit(0)
+sys.exit(1)
+' || error
