@@ -27,10 +27,6 @@
 
 
 #define alloc_bootmem(x) xmalloc_bytes(x)
-#define request_irq(irq, handler, f, devname, dev_id) \
-    panic("IPI requested: %d: %p: %s: %p\n", irq, handler, devname, dev_id)
-
-typedef int irqreturn_t;
 
 #define IRQ_NONE	(0)
 #define IRQ_HANDLED	(1)
@@ -96,11 +92,6 @@ typedef int irqreturn_t;
 #endif
 #include <asm/mpic.h>
 #include <asm/smp.h>
-
-static inline void smp_message_recv(int msg, struct pt_regs *regs)
-{
-    return;
-}
 
 #ifdef DEBUG
 #define DBG(fmt...) printk(fmt)

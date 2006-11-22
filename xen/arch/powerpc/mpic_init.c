@@ -22,6 +22,7 @@
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <asm/mpic.h>
+#include <errno.h>
 #include "mpic_init.h"
 #include "oftree.h"
 #include "of-devtree.h"
@@ -358,6 +359,42 @@ static struct hw_interrupt_type *share_mpic(
 
 #endif
 
+static unsigned int mpic_startup_ipi(unsigned int irq)
+{
+    mpic->hc_ipi.enable(irq);
+    return 0;
+}
+
+int request_irq(unsigned int irq,
+		irqreturn_t (*handler)(int, void *, struct cpu_user_regs *),
+		unsigned long irqflags, const char * devname, void *dev_id)
+{
+    int retval;
+    struct irqaction *action;
+    void (*func)(int, void *, struct cpu_user_regs *);
+
+    action = xmalloc(struct irqaction);
+    if (!action) {
+	BUG();
+	return -ENOMEM;
+    }
+
+    /* Xen's handler prototype is slightly different than Linux's.  */
+    func = (void (*)(int, void *, struct cpu_user_regs *))handler;
+
+    action->handler = func;
+    action->name = devname;
+    action->dev_id = dev_id;
+
+    retval = setup_irq(irq, action);
+    if (retval) {
+	BUG();
+	xfree(action);
+    }
+
+    return retval;
+}
+
 struct hw_interrupt_type *xen_mpic_init(struct hw_interrupt_type *xen_irq)
 {
     unsigned int isu_size;
@@ -397,6 +434,11 @@ struct hw_interrupt_type *xen_mpic_init(struct hw_interrupt_type *xen_irq)
     hit = share_mpic(&mpic->hc_irq, xen_irq);
 
     printk("%s: success\n", __func__);
+
+    mpic->hc_ipi.ack = xen_irq->ack;
+    mpic->hc_ipi.startup = mpic_startup_ipi;
+    mpic_request_ipis();
+
     return hit;
 }
 
@@ -405,4 +447,10 @@ int xen_mpic_get_irq(struct cpu_user_regs *regs)
     BUG_ON(mpic == NULL);
 
 	return mpic_get_one_irq(mpic, regs);
+}
+
+int vector_is_ipi(int vector)
+{
+    BUG_ON(!mpic);
+    return (mpic->ipi_offset <= vector) && (vector < mpic->ipi_offset + 4);
 }

@@ -22,6 +22,8 @@
 #include <xen/smp.h>
 #include <asm/flushtlb.h>
 #include <asm/debugger.h>
+#include <asm/mpic.h>
+#include <asm/mach-default/irq_vectors.h>
 
 int smp_num_siblings = 1;
 int smp_num_cpus = 1;
@@ -50,7 +52,7 @@ void smp_send_event_check_mask(cpumask_t mask)
 {
     cpu_clear(smp_processor_id(), mask);
     if (!cpus_empty(mask))
-        unimplemented();
+        send_IPI_mask(mask, EVENT_CHECK_VECTOR);
 }
 
 
@@ -65,8 +67,20 @@ int smp_call_function(void (*func) (void *info), void *info, int retry,
 
 void smp_send_stop(void)
 {
-    unimplemented();
+    BUG();
 }
+
+struct call_data_struct {
+    void (*func) (void *info);
+    void *info;
+    int wait;
+    atomic_t started;
+    atomic_t finished;
+    cpumask_t selected;
+};
+
+static DEFINE_SPINLOCK(call_lock);
+static struct call_data_struct call_data;
 
 int on_selected_cpus(
     cpumask_t selected,
@@ -75,6 +89,115 @@ int on_selected_cpus(
     int retry,
     int wait)
 {
-    unimplemented();
-    return 0;
+    int t, retval = 0, nr_cpus = cpus_weight(selected);
+
+    spin_lock(&call_lock);
+
+    call_data.func = func;
+    call_data.info = info;
+    call_data.wait = wait;
+    call_data.wait = 1;  /* Until we get RCU around call_data.  */
+    atomic_set(&call_data.started, 0);
+    atomic_set(&call_data.finished, 0);
+    mb();
+
+    send_IPI_mask(selected, CALL_FUNCTION_VECTOR);
+
+    /* We always wait for an initiation ACK from remote CPU.  */
+    for (t = 0; atomic_read(&call_data.started) != nr_cpus; t++) {
+	if (t && t % timebase_freq == 0) {
+	    printk("IPI start stall: %d ACKS to %d SYNS\n", 
+		   atomic_read(&call_data.started), nr_cpus);
+	}
+    }
+
+    /* If told to, we wait for a completion ACK from remote CPU.  */
+    if (wait) {
+	for (t = 0; atomic_read(&call_data.finished) != nr_cpus; t++) {
+	    if (t > timebase_freq && t % timebase_freq == 0) {
+		printk("IPI finish stall: %d ACKS to %d SYNS\n", 
+		       atomic_read(&call_data.finished), nr_cpus);
+	    }
+	}
+    }
+
+    spin_unlock(&call_lock);
+
+    return retval;
 }
+
+void smp_call_function_interrupt(struct cpu_user_regs *regs)
+{
+
+    void (*func)(void *info) = call_data.func;
+    void *info = call_data.info;
+    int wait = call_data.wait;
+
+    atomic_inc(&call_data.started);
+    mb();
+    (*func)(info);
+    mb();
+
+    if (wait)
+	atomic_inc(&call_data.finished);
+
+    return;
+}
+
+void smp_event_check_interrupt(void)
+{
+    /* We are knocked out of NAP state at least.  */
+    return;
+}
+
+void smp_message_recv(int msg, struct cpu_user_regs *regs)
+{
+    switch(msg) {
+    case CALL_FUNCTION_VECTOR:
+	smp_call_function_interrupt(regs);
+	break;
+    case EVENT_CHECK_VECTOR:
+        smp_event_check_interrupt();
+	break;
+    default:
+	BUG();
+	break;
+    }
+}
+
+#ifdef DEBUG_IPI
+static void debug_ipi_ack(void *info)
+{
+    return;
+}
+
+void ipi_torture_test(void)
+{
+    int cpu;
+    unsigned long before, after, delta;
+    unsigned long min = ~0, max = 0, mean = 0, sum = 0, tick = 0;
+    cpumask_t mask;
+
+    cpus_clear(mask);
+
+    while (tick < 1000000) {
+	for_each_online_cpu(cpu) {
+	    cpu_set(cpu, mask);
+	    before = mftb();
+	    on_selected_cpus(mask, debug_ipi_ack, NULL, 1, 1);
+	    after = mftb();
+	    cpus_clear(mask);
+
+	    delta = after - before;
+	    if (delta > max) max = delta;
+	    if (delta < min) min = delta;
+	    sum += delta;
+	    tick++;
+	}
+    }
+
+    mean = sum / tick;
+
+    printk("IPI tb ticks: min = %ld max = %ld mean = %ld\n", min, max, mean);
+}
+#endif

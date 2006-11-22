@@ -37,6 +37,7 @@
 #include <xen/keyhandler.h>
 #include <acm/acm_hooks.h>
 #include <public/version.h>
+#include <asm/mpic.h>
 #include <asm/processor.h>
 #include <asm/desc.h>
 #include <asm/cache.h>
@@ -87,6 +88,8 @@ ulong isa_io_base;
 struct ns16550_defaults ns16550;
 
 extern char __per_cpu_start[], __per_cpu_data_end[], __per_cpu_end[];
+
+static struct domain *idle_domain;
 
 volatile struct processor_area * volatile global_cpu_table[NR_CPUS];
 
@@ -159,8 +162,6 @@ static void percpu_free_unused_areas(void)
 
 static void __init start_of_day(void)
 {
-    struct domain *idle_domain;
-
     init_IRQ();
 
     scheduler_init();
@@ -175,23 +176,6 @@ static void __init start_of_day(void)
     /* for some reason we need to set our own bit in the thread map */
     cpu_set(0, cpu_sibling_map[0]);
 
-    percpu_free_unused_areas();
-
-    {
-        /* FIXME: Xen assumes that an online CPU is a schedualable
-         * CPU, but we just are not there yet. Remove this fragment when
-         * scheduling processors actually works. */
-        int cpuid;
-
-        printk("WARNING!: Taking all secondary CPUs offline\n");
-
-        for_each_online_cpu(cpuid) {
-            if (cpuid == 0)
-                continue;
-            cpu_clear(cpuid, cpu_online_map);
-        }
-    }
-
     initialize_keytable();
     /* Register another key that will allow for the the Harware Probe
      * to be contacted, this works with RiscWatch probes and should
@@ -201,7 +185,6 @@ static void __init start_of_day(void)
     timer_init();
     serial_init_postirq();
     do_initcalls();
-    schedulers_start();
 }
 
 void startup_cpu_idle_loop(void)
@@ -234,6 +217,7 @@ static void init_parea(int cpuid)
     pa->whoami = cpuid;
     pa->hard_id = cpu_hard_id[cpuid];
     pa->hyp_stack_base = (void *)((ulong)stack + STACK_SIZE);
+    mb();
 
     /* This store has the effect of invoking secondary_cpu_init.  */
     global_cpu_table[cpuid] = pa;
@@ -263,9 +247,22 @@ static int kick_secondary_cpus(int maxcpus)
 /* This is the first C code that secondary processors invoke.  */
 int secondary_cpu_init(int cpuid, unsigned long r4)
 {
+    struct vcpu *vcpu;
+
     cpu_initialize(cpuid);
     smp_generic_take_timebase();
+
+    /* If we are online, we must be able to ACK IPIs.  */
+    mpic_setup_this_cpu();
     cpu_set(cpuid, cpu_online_map);
+
+    vcpu = alloc_vcpu(idle_domain, cpuid, cpuid);
+    BUG_ON(vcpu == NULL);
+
+    set_current(idle_domain->vcpu[cpuid]);
+    idle_vcpu[cpuid] = current;
+    startup_cpu_idle_loop();
+
     while(1);
 }
 
@@ -336,6 +333,10 @@ static void __init __start_xen(multiboot_info_t *mbi)
         debugger_trap_immediate();
 #endif
 
+    start_of_day();
+
+    mpic_setup_this_cpu();
+
     /* Deal with secondary processors.  */
     if (opt_nosmp || ofd_boot_cpu == -1) {
         printk("nosmp: leaving secondary processors spinning forever\n");
@@ -344,7 +345,11 @@ static void __init __start_xen(multiboot_info_t *mbi)
         kick_secondary_cpus(max_cpus);
     }
 
-    start_of_day();
+    /* Secondary processors must be online before we call this.  */
+    schedulers_start();
+
+    /* This cannot be called before secondary cpus are marked online.  */
+    percpu_free_unused_areas();
 
     /* Create initial domain 0. */
     dom0 = domain_create(0, 0);
@@ -403,6 +408,9 @@ static void __init __start_xen(multiboot_info_t *mbi)
     console_end_sync();
 
     domain_unpause_by_systemcontroller(dom0);
+#ifdef DEBUG_IPI
+    ipi_torture_test();
+#endif
     startup_cpu_idle_loop();
 }
 
