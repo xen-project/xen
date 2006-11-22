@@ -21,11 +21,28 @@
  */
 #ifndef __ASM_XENOPROF_H__
 #define __ASM_XENOPROF_H__
-#ifdef CONFIG_OPROFILE 
+#ifdef CONFIG_OPROFILE
 
 struct super_block;
 struct dentry;
 int xenoprof_create_files(struct super_block * sb, struct dentry * root);
+#define HAVE_XENOPROF_CREATE_FILES
+
+struct xenoprof_init;
+void xenoprof_arch_init_counter(struct xenoprof_init *init);
+void xenoprof_arch_counter(void);
+void xenoprof_arch_start(void);
+void xenoprof_arch_stop(void);
+
+struct xenoprof_arch_shared_buffer {
+	/* nothing */
+};
+struct xenoprof_shared_buffer;
+void xenoprof_arch_unmap_shared_buffer(struct xenoprof_shared_buffer* sbuf);
+struct xenoprof_get_buffer;
+int xenoprof_arch_map_shared_buffer(struct xenoprof_get_buffer* get_buffer, struct xenoprof_shared_buffer* sbuf);
+struct xenoprof_passive;
+int xenoprof_arch_set_passive(struct xenoprof_passive* pdomain, struct xenoprof_shared_buffer* sbuf);
 
 #endif /* CONFIG_OPROFILE */
 #endif /* __ASM_XENOPROF_H__ */

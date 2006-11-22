@@ -22,9 +22,24 @@
 
 #ifndef __XEN_XENOPROF_H__
 #define __XEN_XENOPROF_H__
-#ifdef CONFIG_OPROFILE
 
+#ifdef CONFIG_OPROFILE
 #include <asm/xenoprof.h>
 
+struct oprofile_operations;
+int xenoprofile_init(struct oprofile_operations * ops);
+void xenoprofile_exit(void);
+
+extern int xenoprof_is_primary;
+#define is_xenoprof_primary()	(xenoprof_is_primary)
+struct xenoprof_shared_buffer {
+	char					*buffer;
+	struct xenoprof_arch_shared_buffer	arch;
+};
+#else
+#define xenoprofile_init(ops)	do { } while (0)
+#define xenoprofile_exit()	do { } while (0)
+#define is_xenoprof_primary()	(0)
 #endif /* CONFIG_OPROFILE */
+
 #endif /* __XEN_XENOPROF_H__ */
