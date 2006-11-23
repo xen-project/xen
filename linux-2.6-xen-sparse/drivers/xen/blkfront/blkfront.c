@@ -138,10 +138,10 @@ static int blkfront_resume(struct xenbus_device *dev)
 
 	DPRINTK("blkfront_resume: %s\n", dev->nodename);
 
-	blkif_free(info, 1);
+	blkif_free(info, info->connected == BLKIF_STATE_CONNECTED);
 
 	err = talk_to_backend(dev, info);
-	if (!err)
+	if (info->connected == BLKIF_STATE_SUSPENDED && !err)
 		blkif_recover(info);
 
 	return err;

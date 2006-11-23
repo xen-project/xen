@@ -35,32 +35,34 @@ static int validate_hvm_info(struct hvm_info_table *t)
     int i;
 
     /* strncmp(t->signature, "HVM INFO", 8) */
-    for (i = 0; i < 8; i++) {
-        if (signature[i] != t->signature[i]) {
-            puts("Bad hvm info signature\n");
+    for ( i = 0; i < 8; i++ )
+    {
+        if ( signature[i] != t->signature[i] )
+        {
+            printf("Bad hvm info signature\n");
             return 0;
         }
     }
 
-    for (i = 0; i < t->length; i++)
+    for ( i = 0; i < t->length; i++ )
         sum += ptr[i];
 
     return (sum == 0);
 }
 
 /* xc_vmx_builder wrote hvm info at 0x9F800. Return it. */
-struct hvm_info_table *
-get_hvm_info_table(void)
+struct hvm_info_table *get_hvm_info_table(void)
 {
     struct hvm_info_table *t;
 
-    if (table != NULL)
+    if ( table != NULL )
         return table;
 
     t = (struct hvm_info_table *)HVM_INFO_PADDR;
 
-    if (!validate_hvm_info(t)) {
-        puts("Bad hvm info table\n");
+    if ( !validate_hvm_info(t) )
+    {
+        printf("Bad hvm info table\n");
         return NULL;
     }
 
@@ -69,15 +71,13 @@ get_hvm_info_table(void)
     return table;
 }
 
-int
-get_vcpu_nr(void)
+int get_vcpu_nr(void)
 {
     struct hvm_info_table *t = get_hvm_info_table();
     return (t ? t->nr_vcpus : 1); /* default 1 vcpu */
 }
 
-int
-get_acpi_enabled(void)
+int get_acpi_enabled(void)
 {
     struct hvm_info_table *t = get_hvm_info_table();
     return (t ? t->acpi_enabled : 0); /* default no acpi */
@@ -91,13 +91,14 @@ acpi_madt_get_madt(unsigned char *acpi_start)
     struct acpi_20_madt *madt;
 
     rsdt = acpi_rsdt_get(acpi_start);
-    if (rsdt == NULL)
+    if ( rsdt == NULL )
         return NULL;
 
     madt = (struct acpi_20_madt *)(acpi_start + rsdt->entry[1] -
                                    ACPI_PHYSICAL_ADDRESS);
-    if (madt->header.header.signature != ACPI_2_0_MADT_SIGNATURE) {
-        puts("Bad MADT signature \n");
+    if ( madt->header.header.signature != ACPI_2_0_MADT_SIGNATURE )
+    {
+        printf("Bad MADT signature \n");
         return NULL;
     }
 
@@ -111,10 +112,11 @@ acpi_madt_set_local_apics(
 {
     int i;
 
-    if ((nr_vcpu > MAX_VIRT_CPUS) || (nr_vcpu < 0) || !madt)
+    if ( (nr_vcpu > MAX_VIRT_CPUS) || (nr_vcpu < 0) || !madt )
         return -1;
 
-    for (i = 0; i < nr_vcpu; i++) {
+    for ( i = 0; i < nr_vcpu; i++ )
+    {
         madt->lapic[i].type    = ACPI_PROCESSOR_LOCAL_APIC;
         madt->lapic[i].length  = sizeof(struct acpi_20_madt_lapic);
         madt->lapic[i].acpi_processor_id = i;
@@ -137,11 +139,11 @@ int acpi_madt_update(unsigned char *acpi_start)
     struct acpi_20_madt *madt;
 
     madt = acpi_madt_get_madt(acpi_start);
-    if (!madt)
+    if ( !madt )
         return -1;
 
     rc = acpi_madt_set_local_apics(get_vcpu_nr(), madt);
-    if (rc != 0)
+    if ( rc != 0 )
         return rc;
 
     set_checksum(

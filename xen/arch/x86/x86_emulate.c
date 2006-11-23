@@ -113,12 +113,10 @@ static uint8_t opcode_table[256] = {
     /* 0xA0 - 0xA7 */
     ByteOp|DstReg|SrcMem|Mov, DstReg|SrcMem|Mov,
     ByteOp|DstMem|SrcReg|Mov, DstMem|SrcReg|Mov,
-    ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
-    ByteOp|ImplicitOps, ImplicitOps,
+    ByteOp|ImplicitOps|Mov, ImplicitOps|Mov, 0, 0,
     /* 0xA8 - 0xAF */
     0, 0, ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
-    ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
-    ByteOp|ImplicitOps, ImplicitOps,
+    ByteOp|ImplicitOps|Mov, ImplicitOps|Mov, 0, 0,
     /* 0xB0 - 0xBF */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     /* 0xC0 - 0xC7 */
@@ -368,15 +366,16 @@ do{ __asm__ __volatile__ (                                              \
 #endif /* __i386__ */
 
 /* Fetch next part of the instruction being emulated. */
-#define insn_fetch(_type, _size)                                        \
+#define _insn_fetch(_size)                                              \
 ({ unsigned long _x, _ptr = _regs.eip;                                  \
    if ( mode == X86EMUL_MODE_REAL ) _ptr += _regs.cs << 4;              \
    rc = ops->read_std(_ptr, &_x, (_size), ctxt);                        \
    if ( rc != 0 )                                                       \
        goto done;                                                       \
    _regs.eip += (_size);                                                \
-   (_type)_x;                                                           \
+   _x;                                                                  \
 })
+#define insn_fetch(_type) ((_type)_insn_fetch(sizeof(_type)))
 
 /* Access/update address held in a register, based on addressing mode. */
 #define register_address(sel, reg)                                      \
@@ -392,6 +391,17 @@ do {                                                                    \
         (reg) = ((reg) & ~((1UL << (ad_bytes << 3)) - 1)) |             \
                 (((reg) + _inc) & ((1UL << (ad_bytes << 3)) - 1));      \
 } while (0)
+
+/*
+ * We cannot handle a page fault on a data access that straddles two pages
+ * and faults on the second page. This is because CR2 is not equal to the
+ * memory operand's effective address in this case. Rather than fix up the
+ * effective address it is okay for us to fail the emulation.
+ */
+#define page_boundary_test() do {                               \
+    if ( ((cr2 & (PAGE_SIZE-1)) == 0) && ((ea & 3) != 0) )      \
+        goto bad_ea;                                            \
+} while ( 0 )
 
 void *
 decode_register(
@@ -438,13 +448,13 @@ x86_emulate_memop(
     struct x86_emulate_ctxt *ctxt,
     struct x86_emulate_ops  *ops)
 {
-    uint8_t b, d, sib, twobyte = 0, rex_prefix = 0;
+    uint8_t b, d, sib, sib_index, sib_base, twobyte = 0, rex_prefix = 0;
     uint8_t modrm, modrm_mod = 0, modrm_reg = 0, modrm_rm = 0;
     uint16_t *seg = NULL; /* override segment */
     unsigned int op_bytes, ad_bytes, lock_prefix = 0, rep_prefix = 0, i;
     int rc = 0;
     struct operand src, dst;
-    unsigned long cr2 = ctxt->cr2;
+    unsigned long ea = 0, cr2 = ctxt->cr2;
     int mode = ctxt->mode;
 
     /* Shadow copy of register state. Committed on successful emulation. */
@@ -479,7 +489,7 @@ x86_emulate_memop(
     /* Legacy prefixes. */
     for ( i = 0; i < 8; i++ )
     {
-        switch ( b = insn_fetch(uint8_t, 1) )
+        switch ( b = insn_fetch(uint8_t) )
         {
         case 0x66: /* operand-size override */
             op_bytes ^= 6;      /* switch between 2/4 bytes */
@@ -526,11 +536,9 @@ x86_emulate_memop(
     if ( (mode == X86EMUL_MODE_PROT64) && ((b & 0xf0) == 0x40) )
     {
         rex_prefix = b;
-        if ( b & 8 )
-            op_bytes = 8;          /* REX.W */
-        modrm_reg = (b & 4) << 1;  /* REX.R */
-        /* REX.B and REX.X do not need to be decoded. */
-        b = insn_fetch(uint8_t, 1);
+        if ( b & 8 ) /* REX.W */
+            op_bytes = 8;
+        b = insn_fetch(uint8_t);
     }
 
     /* Opcode byte(s). */
@@ -541,7 +549,7 @@ x86_emulate_memop(
         if ( b == 0x0f )
         {
             twobyte = 1;
-            b = insn_fetch(uint8_t, 1);
+            b = insn_fetch(uint8_t);
             d = twobyte_table[b];
         }
 
@@ -553,10 +561,10 @@ x86_emulate_memop(
     /* ModRM and SIB bytes. */
     if ( d & ModRM )
     {
-        modrm = insn_fetch(uint8_t, 1);
-        modrm_mod |= (modrm & 0xc0) >> 6;
-        modrm_reg |= (modrm & 0x38) >> 3;
-        modrm_rm  |= (modrm & 0x07);
+        modrm = insn_fetch(uint8_t);
+        modrm_mod = (modrm & 0xc0) >> 6;
+        modrm_reg = ((rex_prefix & 4) << 1) | ((modrm & 0x38) >> 3);
+        modrm_rm  = modrm & 0x07;
 
         if ( modrm_mod == 3 )
         {
@@ -567,44 +575,74 @@ x86_emulate_memop(
         if ( ad_bytes == 2 )
         {
             /* 16-bit ModR/M decode. */
+            switch ( modrm_rm )
+            {
+            case 0: ea = _regs.ebx + _regs.esi; break;
+            case 1: ea = _regs.ebx + _regs.edi; break;
+            case 2: ea = _regs.ebp + _regs.esi; break;
+            case 3: ea = _regs.ebp + _regs.edi; break;
+            case 4: ea = _regs.esi; break;
+            case 5: ea = _regs.edi; break;
+            case 6: ea = _regs.ebp; break;
+            case 7: ea = _regs.ebx; break;
+            }
             switch ( modrm_mod )
             {
-            case 0:
-                if ( modrm_rm == 6 )
-                    _regs.eip += 2; /* skip disp16 */
-                break;
-            case 1:
-                _regs.eip += 1; /* skip disp8 */
-                break;
-            case 2:
-                _regs.eip += 2; /* skip disp16 */
-                break;
+            case 0: if ( modrm_rm == 6 ) ea = insn_fetch(uint16_t); break;
+            case 1: ea += insn_fetch(uint8_t);  break;
+            case 2: ea += insn_fetch(uint16_t); break;
             }
+            ea = (uint16_t)ea;
         }
         else
         {
             /* 32/64-bit ModR/M decode. */
+            if ( modrm_rm == 4 )
+            {
+                sib = insn_fetch(uint8_t);
+                sib_index = ((sib >> 3) & 7) | ((modrm << 2) & 8);
+                sib_base  = (sib & 7) | ((modrm << 3) & 8);
+                if ( sib_index != 4 )
+                    ea = *(long *)decode_register(sib_index, &_regs, 0);
+                ea <<= (sib >> 6) & 3;
+                if ( (modrm_mod == 0) && ((sib_base & 7) == 5) )
+                    ea += insn_fetch(uint32_t);
+                else
+                    ea += *(long *)decode_register(sib_base, &_regs, 0);
+            }
+            else
+            {
+                modrm_rm |= (rex_prefix & 1) << 3;
+                ea = *(long *)decode_register(modrm_rm, &_regs, 0);
+            }
             switch ( modrm_mod )
             {
             case 0:
-                if ( (modrm_rm == 4) && 
-                     (((sib = insn_fetch(uint8_t, 1)) & 7) == 5) )
-                    _regs.eip += 4; /* skip disp32 specified by SIB.base */
-                else if ( modrm_rm == 5 )
-                    _regs.eip += 4; /* skip disp32 */
+                if ( (modrm_rm & 7) != 5 )
+                    break;
+                ea = insn_fetch(uint32_t);
+                if ( mode != X86EMUL_MODE_PROT64 )
+                    break;
+                /* Relative to RIP of next instruction. Argh! */
+                ea += _regs.eip;
+                if ( (d & SrcMask) == SrcImm )
+                    ea += (d & ByteOp) ? 1 : op_bytes;
+                else if ( (d & SrcMask) == SrcImmByte )
+                    ea += 1;
+                else if ( ((b == 0xf6) || (b == 0xf7)) &&
+                          ((modrm_reg & 7) <= 1) )
+                    /* Special case in Grp3: test has immediate operand. */
+                    ea += (d & ByteOp) ? 1
+                        : ((op_bytes == 8) ? 4 : op_bytes);
                 break;
-            case 1:
-                if ( modrm_rm == 4 )
-                    sib = insn_fetch(uint8_t, 1);
-                _regs.eip += 1; /* skip disp8 */
-                break;
-            case 2:
-                if ( modrm_rm == 4 )
-                    sib = insn_fetch(uint8_t, 1);
-                _regs.eip += 4; /* skip disp32 */
-                break;
+            case 1: ea += insn_fetch(uint8_t);  break;
+            case 2: ea += insn_fetch(uint32_t); break;
             }
+            if ( ad_bytes == 4 )
+                ea = (uint32_t)ea;
         }
+
+        page_boundary_test();
     }
 
     /* Decode and fetch the destination operand: register or memory. */
@@ -692,16 +730,16 @@ x86_emulate_memop(
         /* NB. Immediates are sign-extended as necessary. */
         switch ( src.bytes )
         {
-        case 1: src.val = insn_fetch(int8_t,  1); break;
-        case 2: src.val = insn_fetch(int16_t, 2); break;
-        case 4: src.val = insn_fetch(int32_t, 4); break;
+        case 1: src.val = insn_fetch(int8_t);  break;
+        case 2: src.val = insn_fetch(int16_t); break;
+        case 4: src.val = insn_fetch(int32_t); break;
         }
         break;
     case SrcImmByte:
         src.type  = OP_IMM;
         src.ptr   = (unsigned long *)_regs.eip;
         src.bytes = 1;
-        src.val   = insn_fetch(int8_t,  1);
+        src.val   = insn_fetch(int8_t);
         break;
     }
 
@@ -740,7 +778,7 @@ x86_emulate_memop(
         dst.val = (int32_t)src.val;
         break;
     case 0x80 ... 0x83: /* Grp1 */
-        switch ( modrm_reg )
+        switch ( modrm_reg & 7 )
         {
         case 0: goto add;
         case 1: goto or;
@@ -771,11 +809,13 @@ x86_emulate_memop(
     case 0xa0 ... 0xa1: /* mov */
         dst.ptr = (unsigned long *)&_regs.eax;
         dst.val = src.val;
-        _regs.eip += ad_bytes; /* skip src displacement */
+        ea = _insn_fetch(ad_bytes); /* src effective address */
+        page_boundary_test();
         break;
     case 0xa2 ... 0xa3: /* mov */
         dst.val = (unsigned long)_regs.eax;
-        _regs.eip += ad_bytes; /* skip dst displacement */
+        ea = _insn_fetch(ad_bytes); /* dst effective address */
+        page_boundary_test();
         break;
     case 0x88 ... 0x8b: /* mov */
     case 0xc6 ... 0xc7: /* mov (sole member of Grp11) */
@@ -798,7 +838,7 @@ x86_emulate_memop(
         register_address_increment(_regs.esp, dst.bytes);
         break;
     case 0xc0 ... 0xc1: grp2: /* Grp2 */
-        switch ( modrm_reg )
+        switch ( modrm_reg & 7 )
         {
         case 0: /* rol */
             emulate_2op_SrcB("rol", src, dst, _regs.eflags);
@@ -831,7 +871,7 @@ x86_emulate_memop(
         src.val = _regs.ecx;
         goto grp2;
     case 0xf6 ... 0xf7: /* Grp3 */
-        switch ( modrm_reg )
+        switch ( modrm_reg & 7 )
         {
         case 0 ... 1: /* test */
             /* Special case in Grp3: test has an immediate source operand. */
@@ -841,9 +881,9 @@ x86_emulate_memop(
             if ( src.bytes == 8 ) src.bytes = 4;
             switch ( src.bytes )
             {
-            case 1: src.val = insn_fetch(int8_t,  1); break;
-            case 2: src.val = insn_fetch(int16_t, 2); break;
-            case 4: src.val = insn_fetch(int32_t, 4); break;
+            case 1: src.val = insn_fetch(int8_t);  break;
+            case 2: src.val = insn_fetch(int16_t); break;
+            case 4: src.val = insn_fetch(int32_t); break;
             }
             goto test;
         case 2: /* not */
@@ -857,7 +897,7 @@ x86_emulate_memop(
         }
         break;
     case 0xfe ... 0xff: /* Grp4/Grp5 */
-        switch ( modrm_reg )
+        switch ( modrm_reg & 7 )
         {
         case 0: /* inc */
             emulate_1op("inc", dst, _regs.eflags);
@@ -955,6 +995,7 @@ x86_emulate_memop(
                                                       _regs.esi),
                                      &dst.val, dst.bytes, ctxt)) != 0 )
                 goto done;
+            ea = _regs.edi & ((1UL << (ad_bytes*8)) - 1UL);
         }
         else
         {
@@ -963,15 +1004,14 @@ x86_emulate_memop(
             if ( (rc = ops->read_emulated(cr2, &dst.val,
                                           dst.bytes, ctxt)) != 0 )
                 goto done;
+            ea = _regs.esi & ((1UL << (ad_bytes*8)) - 1UL);
         }
         register_address_increment(
             _regs.esi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
         register_address_increment(
             _regs.edi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
+        page_boundary_test();
         break;
-    case 0xa6 ... 0xa7: /* cmps */
-        dprintf("Urk! I don't handle CMPS.\n");
-        goto cannot_emulate;
     case 0xaa ... 0xab: /* stos */
         dst.type  = OP_MEM;
         dst.bytes = (d & ByteOp) ? 1 : op_bytes;
@@ -979,6 +1019,8 @@ x86_emulate_memop(
         dst.val   = _regs.eax;
         register_address_increment(
             _regs.edi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
+        ea = _regs.edi & ((1UL << (ad_bytes*8)) - 1UL);
+        page_boundary_test();
         break;
     case 0xac ... 0xad: /* lods */
         dst.type  = OP_REG;
@@ -988,10 +1030,9 @@ x86_emulate_memop(
             goto done;
         register_address_increment(
             _regs.esi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
+        ea = _regs.esi & ((1UL << (ad_bytes*8)) - 1UL);
+        page_boundary_test();
         break;
-    case 0xae ... 0xaf: /* scas */
-        dprintf("Urk! I don't handle SCAS.\n");
-        goto cannot_emulate;
     }
     goto writeback;
 
@@ -1150,6 +1191,10 @@ x86_emulate_memop(
 
  cannot_emulate:
     dprintf("Cannot emulate %02x\n", b);
+    return -1;
+
+ bad_ea:
+    dprintf("Access faulted on page boundary (cr2=%lx,ea=%lx).\n", cr2, ea);
     return -1;
 }
 

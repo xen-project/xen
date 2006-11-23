@@ -263,10 +263,7 @@ void fill_mp_io_intr_entry(
 {
     mpiie->type = ENTRY_TYPE_IO_INTR;
     mpiie->intr_type = INTR_TYPE_INT;
-    mpiie->io_intr_flags = 0;
-    /* IRQs 10 and 11 are PCI, so level triggered and active low. */
-    if ( (src_bus_irq == 10) || (src_bus_irq == 11) )
-        mpiie->io_intr_flags = 0xf;
+    mpiie->io_intr_flags = (PCI_ISA_IRQ_MASK & (1U<<src_bus_irq)) ? 0xf : 0x0;
     mpiie->src_bus_id = src_bus_id;
     mpiie->src_bus_irq = src_bus_irq;
     mpiie->dst_ioapic_id = ioapic_id;
@@ -349,13 +346,13 @@ void create_mp_tables(void)
 
     vcpu_nr = get_vcpu_nr();
 
-    puts("Creating MP tables ...\n");
+    printf("Creating MP tables ...\n");
 
     /* Find the 'safe' place in ROMBIOS for the MP tables. */
     mp_table_base = get_mp_table_start();
     if ( mp_table_base == NULL )
     {
-        puts("Couldn't find start point for MP tables\n");
+        printf("Couldn't find start point for MP tables\n");
         return;
     }
 

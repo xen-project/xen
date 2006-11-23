@@ -77,15 +77,6 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
            Name (_UID, 0x00)
            Name (_ADR, 0x00)
            Name (_BBN, 0x00)
-           OperationRegion (PIRP, PCI_Config, 0x3c, 0x10)
-           Field(PIRP, ByteAcc, NoLock, Preserve){        
-               IRQ3, 3,
-               IRQ5, 5,
-               IRQ7, 7,
-               IRQ9, 9,
-               IRQA, 10,
-               IRQB, 11
-           }
  
            Method (_CRS, 0, NotSerialized)
            {
@@ -140,9 +131,7 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
             }
 
             Name(BUFA, ResourceTemplate() {
-                IRQ(Level, ActiveLow, Shared) {
-                    3,4,5,6,7,10,11,12,14,15
-                }
+                IRQ(Level, ActiveLow, Shared) { 5, 6, 10, 11 }
             })
 
             Name(BUFB, Buffer() {
@@ -299,12 +288,6 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
             }
 
             Name(PRTP, Package() {
-                /* Device 0, INTA - INTD */
-                Package(){0x0000ffff, 0, \_SB.PCI0.LNKA, 0},
-                Package(){0x0000ffff, 1, \_SB.PCI0.LNKB, 0},
-                Package(){0x0000ffff, 2, \_SB.PCI0.LNKC, 0},
-                Package(){0x0000ffff, 3, \_SB.PCI0.LNKD, 0},
-
                 /* Device 1, INTA - INTD */
                 Package(){0x0001ffff, 0, \_SB.PCI0.LNKB, 0},
                 Package(){0x0001ffff, 1, \_SB.PCI0.LNKC, 0},
@@ -397,12 +380,6 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
             })
 
             Name(PRTA, Package() {
-                /* Device 0, INTA - INTD */
-                Package(){0x0000ffff, 0, 0, 16},
-                Package(){0x0000ffff, 1, 0, 17},
-                Package(){0x0000ffff, 2, 0, 18},
-                Package(){0x0000ffff, 3, 0, 19},
-
                 /* Device 1, INTA - INTD */
                 Package(){0x0001ffff, 0, 0, 20},
                 Package(){0x0001ffff, 1, 0, 21},

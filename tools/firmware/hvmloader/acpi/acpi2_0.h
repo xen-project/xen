@@ -307,10 +307,20 @@ struct acpi_20_madt_ioapic {
     uint32_t gsi_base;
 };
 
+struct acpi_20_madt_intsrcovr {
+    uint8_t  type;
+    uint8_t  length;
+    uint8_t  bus;
+    uint8_t  source;
+    uint32_t gsi;
+    uint16_t flags;
+};
+
 struct acpi_20_madt {
-    struct acpi_20_madt_header header;
-    struct acpi_20_madt_ioapic io_apic[1];
-    struct acpi_20_madt_lapic  lapic[32];
+    struct acpi_20_madt_header    header;
+    struct acpi_20_madt_intsrcovr intsrcovr[4];
+    struct acpi_20_madt_ioapic    io_apic[1];
+    struct acpi_20_madt_lapic     lapic[32];
 };
 
 /*

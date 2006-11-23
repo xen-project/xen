@@ -78,7 +78,7 @@ static void acpi_tpm_tis_probe(unsigned char *acpi_start,
                 sizeof(tis_did_vid_rid)) != 0 )
         return;
 
-    puts("TIS is available\n");
+    printf("TIS is available\n");
     addr = acpi_xsdt_add_entry(acpi_start, freemem, limit,
                                AmlCode_TPM, sizeof(AmlCode_TPM));
     if ( addr == NULL )
@@ -133,7 +133,7 @@ struct acpi_20_rsdt *acpi_rsdt_get(unsigned char *acpi_start)
     rsdp = (struct acpi_20_rsdp *)(acpi_start + sizeof(struct acpi_20_facs));
     if ( rsdp->signature != ACPI_2_0_RSDP_SIGNATURE )
     {
-        puts("Bad RSDP signature\n");
+        printf("Bad RSDP signature\n");
         return NULL;
     }
 
@@ -141,7 +141,7 @@ struct acpi_20_rsdt *acpi_rsdt_get(unsigned char *acpi_start)
         (acpi_start + rsdp->rsdt_address - ACPI_PHYSICAL_ADDRESS);
     if ( rsdt->header.signature != ACPI_2_0_RSDT_SIGNATURE )
     {
-        puts("Bad RSDT signature\n");
+        printf("Bad RSDT signature\n");
         return NULL;
     }
 
@@ -192,7 +192,7 @@ struct acpi_20_xsdt *acpi_xsdt_get(unsigned char *acpi_start)
     rsdp = (struct acpi_20_rsdp *)(acpi_start + sizeof(struct acpi_20_facs));
     if ( rsdp->signature != ACPI_2_0_RSDP_SIGNATURE )
     {
-        puts("Bad RSDP signature\n");
+        printf("Bad RSDP signature\n");
         return NULL;
     }
 
@@ -200,7 +200,7 @@ struct acpi_20_xsdt *acpi_xsdt_get(unsigned char *acpi_start)
         (acpi_start + rsdp->xsdt_address - ACPI_PHYSICAL_ADDRESS);
     if ( xsdt->header.signature != ACPI_2_0_XSDT_SIGNATURE )
     {
-        puts("Bad XSDT signature\n");
+        printf("Bad XSDT signature\n");
         return NULL;
     }
     return xsdt;
@@ -270,8 +270,9 @@ static unsigned char *acpi_xsdt_add_entry(unsigned char *acpi_start,
     if ( found )
     {
         /* memory below hard limit ? */
-        if (*freemem + table_size <= limit) {
-            puts("Copying SSDT entry!\n");
+        if ( (*freemem + table_size) <= limit )
+        {
+            printf("Copying SSDT entry\n");
             addr = *freemem;
             memcpy(addr, table, table_size);
             *freemem += table_size;
