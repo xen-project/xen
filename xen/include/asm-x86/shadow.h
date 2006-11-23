@@ -577,32 +577,6 @@ void
 shadow_guest_physmap_remove_page(struct domain *d, unsigned long gfn,
                                   unsigned long mfn);
 
-/*
- * Definitions for the shadow_flags field in page_info.
- * These flags are stored on *guest* pages...
- * Bits 1-13 are encodings for the shadow types.
- */
-#define PGC_SH_type_to_index(_type) ((_type) >> PGC_SH_type_shift)
-#define SHF_page_type_mask \
-    (((1u << (PGC_SH_type_to_index(PGC_SH_max_shadow) + 1u)) - 1u) - \
-     ((1u << PGC_SH_type_to_index(PGC_SH_min_shadow)) - 1u))
-
-#define SHF_L1_32   (1u << PGC_SH_type_to_index(PGC_SH_l1_32_shadow))
-#define SHF_FL1_32  (1u << PGC_SH_type_to_index(PGC_SH_fl1_32_shadow))
-#define SHF_L2_32   (1u << PGC_SH_type_to_index(PGC_SH_l2_32_shadow))
-#define SHF_L1_PAE  (1u << PGC_SH_type_to_index(PGC_SH_l1_pae_shadow))
-#define SHF_FL1_PAE (1u << PGC_SH_type_to_index(PGC_SH_fl1_pae_shadow))
-#define SHF_L2_PAE  (1u << PGC_SH_type_to_index(PGC_SH_l2_pae_shadow))
-#define SHF_L2H_PAE (1u << PGC_SH_type_to_index(PGC_SH_l2h_pae_shadow))
-#define SHF_L1_64   (1u << PGC_SH_type_to_index(PGC_SH_l1_64_shadow))
-#define SHF_FL1_64  (1u << PGC_SH_type_to_index(PGC_SH_fl1_64_shadow))
-#define SHF_L2_64   (1u << PGC_SH_type_to_index(PGC_SH_l2_64_shadow))
-#define SHF_L3_64   (1u << PGC_SH_type_to_index(PGC_SH_l3_64_shadow))
-#define SHF_L4_64   (1u << PGC_SH_type_to_index(PGC_SH_l4_64_shadow))
-
-/* Used for hysteresis when automatically unhooking mappings on fork/exit */
-#define SHF_unhooked_mappings (1u<<31)
-
 /* 
  * Allocation of shadow pages 
  */

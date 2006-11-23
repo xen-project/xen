@@ -129,6 +129,97 @@ extern void shadow_audit_p2m(struct domain *d);
 #undef SHADOW_LEVELS
 #endif /* CONFIG_PAGING_LEVELS == 4 */
 
+/******************************************************************************
+ * Page metadata for shadow pages.
+ */
+
+struct shadow_page_info
+{
+    union {
+        /* When in use, guest page we're a shadow of */
+        unsigned long backpointer;
+        /* When free, order of the freelist we're on */
+        unsigned int order;
+    };
+    union {
+        /* When in use, next shadow in this hash chain */
+        struct shadow_page_info *next_shadow;
+        /* When free, TLB flush time when freed */
+        u32 tlbflush_timestamp;
+    };
+    struct {
+        unsigned int type:4;      /* What kind of shadow is this? */
+        unsigned int pinned:1;    /* Is the shadow pinned? */
+        unsigned int logdirty:1;  /* Was it made in log-dirty mode? */
+        unsigned int count:26;    /* Reference count */
+        u32 mbz;                  /* Must be zero: this is where the owner 
+                                   * field lives in a non-shadow page */
+    } __attribute__((packed));
+    union {
+        /* For unused shadow pages, a list of pages of this order; 
+         * for top-level shadows, a list of other top-level shadows */
+        struct list_head list;
+        /* For lower-level shadows, a higher entry that points at us */
+        paddr_t up;
+    };
+};
+
+/* The structure above *must* be the same size as a struct page_info
+ * from mm.h, since we'll be using the same space in the frametable. 
+ * Also, the mbz field must line up with the owner field of normal 
+ * pages, so they look properly like anonymous/xen pages. */
+static inline void shadow_check_page_struct_offsets(void) {
+    BUILD_BUG_ON(sizeof (struct shadow_page_info) 
+                 != sizeof (struct page_info));
+    BUILD_BUG_ON(offsetof(struct shadow_page_info, mbz) 
+                 != offsetof(struct page_info, u.inuse._domain));
+};
+
+/* Shadow type codes */
+#define SH_type_none           (0U) /* on the shadow free list */
+#define SH_type_min_shadow     (1U)
+#define SH_type_l1_32_shadow   (1U) /* shadowing a 32-bit L1 guest page */
+#define SH_type_fl1_32_shadow  (2U) /* L1 shadow for a 32b 4M superpage */
+#define SH_type_l2_32_shadow   (3U) /* shadowing a 32-bit L2 guest page */
+#define SH_type_l1_pae_shadow  (4U) /* shadowing a pae L1 page */
+#define SH_type_fl1_pae_shadow (5U) /* L1 shadow for pae 2M superpg */
+#define SH_type_l2_pae_shadow  (6U) /* shadowing a pae L2-low page */
+#define SH_type_l2h_pae_shadow (7U) /* shadowing a pae L2-high page */
+#define SH_type_l1_64_shadow   (8U) /* shadowing a 64-bit L1 page */
+#define SH_type_fl1_64_shadow  (9U) /* L1 shadow for 64-bit 2M superpg */
+#define SH_type_l2_64_shadow  (10U) /* shadowing a 64-bit L2 page */
+#define SH_type_l3_64_shadow  (11U) /* shadowing a 64-bit L3 page */
+#define SH_type_l4_64_shadow  (12U) /* shadowing a 64-bit L4 page */
+#define SH_type_max_shadow    (12U)
+#define SH_type_p2m_table     (13U) /* in use as the p2m table */
+#define SH_type_monitor_table (14U) /* in use as a monitor table */
+#define SH_type_unused        (15U)
+
+/*
+ * Definitions for the shadow_flags field in page_info.
+ * These flags are stored on *guest* pages...
+ * Bits 1-13 are encodings for the shadow types.
+ */
+#define SHF_page_type_mask \
+    (((1u << (SH_type_max_shadow + 1u)) - 1u) - \
+     ((1u << SH_type_min_shadow) - 1u))
+
+#define SHF_L1_32   (1u << SH_type_l1_32_shadow)
+#define SHF_FL1_32  (1u << SH_type_fl1_32_shadow)
+#define SHF_L2_32   (1u << SH_type_l2_32_shadow)
+#define SHF_L1_PAE  (1u << SH_type_l1_pae_shadow)
+#define SHF_FL1_PAE (1u << SH_type_fl1_pae_shadow)
+#define SHF_L2_PAE  (1u << SH_type_l2_pae_shadow)
+#define SHF_L2H_PAE (1u << SH_type_l2h_pae_shadow)
+#define SHF_L1_64   (1u << SH_type_l1_64_shadow)
+#define SHF_FL1_64  (1u << SH_type_fl1_64_shadow)
+#define SHF_L2_64   (1u << SH_type_l2_64_shadow)
+#define SHF_L3_64   (1u << SH_type_l3_64_shadow)
+#define SHF_L4_64   (1u << SH_type_l4_64_shadow)
+
+/* Used for hysteresis when automatically unhooking mappings on fork/exit */
+#define SHF_unhooked_mappings (1u<<31)
+
 
 /******************************************************************************
  * Various function declarations 
@@ -173,12 +264,14 @@ void sh_install_xen_entries_in_l2(struct vcpu *v, mfn_t gl2mfn, mfn_t sl2mfn);
 // Override mfn_to_page from asm/page.h, which was #include'd above,
 // in order to make it work with our mfn type.
 #undef mfn_to_page
-#define mfn_to_page(_mfn) (frame_table + mfn_x(_mfn))
+#define mfn_to_page(_m) (frame_table + mfn_x(_m))
+#define mfn_to_shadow_page(_m) ((struct shadow_page_info *)mfn_to_page(_m))
 
 // Override page_to_mfn from asm/page.h, which was #include'd above,
 // in order to make it work with our mfn type.
 #undef page_to_mfn
 #define page_to_mfn(_pg) (_mfn((_pg) - frame_table))
+#define shadow_page_to_mfn(_spg) (page_to_mfn((struct page_info *)_spg))
 
 // Override mfn_valid from asm/page.h, which was #include'd above,
 // in order to make it work with our mfn type.
@@ -189,28 +282,24 @@ void sh_install_xen_entries_in_l2(struct vcpu *v, mfn_t gl2mfn, mfn_t sl2mfn);
 static inline void *
 sh_map_domain_page(mfn_t mfn)
 {
-    /* XXX Using the monitor-table as a map will happen here  */
     return map_domain_page(mfn_x(mfn));
 }
 
 static inline void 
 sh_unmap_domain_page(void *p) 
 {
-    /* XXX Using the monitor-table as a map will happen here  */
     unmap_domain_page(p);
 }
 
 static inline void *
 sh_map_domain_page_global(mfn_t mfn)
 {
-    /* XXX Using the monitor-table as a map will happen here  */
     return map_domain_page_global(mfn_x(mfn));
 }
 
 static inline void 
 sh_unmap_domain_page_global(void *p) 
 {
-    /* XXX Using the monitor-table as a map will happen here  */
     unmap_domain_page_global(p);
 }
 
@@ -253,8 +342,7 @@ sh_mfn_is_a_page_table(mfn_t gmfn)
 
 
 /**************************************************************************/
-/* Shadow-page refcounting. See comment in shadow-common.c about the  
- * use of struct page_info fields for shadow pages */
+/* Shadow-page refcounting. */
 
 void sh_destroy_shadow(struct vcpu *v, mfn_t smfn);
 
@@ -264,27 +352,26 @@ void sh_destroy_shadow(struct vcpu *v, mfn_t smfn);
 static inline void sh_get_ref(mfn_t smfn, paddr_t entry_pa)
 {
     u32 x, nx;
-    struct page_info *page = mfn_to_page(smfn);
+    struct shadow_page_info *sp = mfn_to_shadow_page(smfn);
 
     ASSERT(mfn_valid(smfn));
 
-    x = page->count_info & PGC_SH_count_mask;
+    x = sp->count;
     nx = x + 1;
 
-    if ( unlikely(nx & ~PGC_SH_count_mask) )
+    if ( unlikely(nx >= 1U<<26) )
     {
         SHADOW_PRINTK("shadow ref overflow, gmfn=%" PRtype_info " smfn=%lx\n",
-                       page->u.inuse.type_info, mfn_x(smfn));
+                       sp->backpointer, mfn_x(smfn));
         domain_crash_synchronous();
     }
     
     /* Guarded by the shadow lock, so no need for atomic update */
-    page->count_info &= ~PGC_SH_count_mask;
-    page->count_info |= nx;
+    sp->count = nx;
 
     /* We remember the first shadow entry that points to each shadow. */
-    if ( entry_pa != 0 && page->up == 0 ) 
-        page->up = entry_pa;
+    if ( entry_pa != 0 && sp->up == 0 ) 
+        sp->up = entry_pa;
 }
 
 
@@ -293,31 +380,27 @@ static inline void sh_get_ref(mfn_t smfn, paddr_t entry_pa)
 static inline void sh_put_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
 {
     u32 x, nx;
-    struct page_info *page = mfn_to_page(smfn);
+    struct shadow_page_info *sp = mfn_to_shadow_page(smfn);
 
     ASSERT(mfn_valid(smfn));
-    ASSERT(page_get_owner(page) == NULL);
+    ASSERT(sp->mbz == 0);
 
     /* If this is the entry in the up-pointer, remove it */
-    if ( entry_pa != 0 && page->up == entry_pa ) 
-        page->up = 0;
+    if ( entry_pa != 0 && sp->up == entry_pa ) 
+        sp->up = 0;
 
-    x = page->count_info & PGC_SH_count_mask;
+    x = sp->count;
     nx = x - 1;
 
     if ( unlikely(x == 0) ) 
     {
-        SHADOW_PRINTK("shadow ref underflow, smfn=%lx oc=%08x t=%" 
-                       PRtype_info "\n",
-                       mfn_x(smfn),
-                       page->count_info & PGC_SH_count_mask,
-                       page->u.inuse.type_info);
+        SHADOW_PRINTK("shadow ref underflow, smfn=%lx oc=%08x t=%#x\n",
+                      mfn_x(smfn), sp->count, sp->type);
         domain_crash_synchronous();
     }
 
     /* Guarded by the shadow lock, so no need for atomic update */
-    page->count_info &= ~PGC_SH_count_mask;
-    page->count_info |= nx;
+    sp->count = nx;
 
     if ( unlikely(nx == 0) ) 
         sh_destroy_shadow(v, smfn);
@@ -327,27 +410,27 @@ static inline void sh_put_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
 /* Pin a shadow page: take an extra refcount and set the pin bit. */
 static inline void sh_pin(mfn_t smfn)
 {
-    struct page_info *page;
+    struct shadow_page_info *sp;
     
     ASSERT(mfn_valid(smfn));
-    page = mfn_to_page(smfn);
-    if ( !(page->count_info & PGC_SH_pinned) ) 
+    sp = mfn_to_shadow_page(smfn);
+    if ( !(sp->pinned) ) 
     {
         sh_get_ref(smfn, 0);
-        page->count_info |= PGC_SH_pinned;
+        sp->pinned = 1;
     }
 }
 
 /* Unpin a shadow page: unset the pin bit and release the extra ref. */
 static inline void sh_unpin(struct vcpu *v, mfn_t smfn)
 {
-    struct page_info *page;
+    struct shadow_page_info *sp;
     
     ASSERT(mfn_valid(smfn));
-    page = mfn_to_page(smfn);
-    if ( page->count_info & PGC_SH_pinned )
+    sp = mfn_to_shadow_page(smfn);
+    if ( sp->pinned )
     {
-        page->count_info &= ~PGC_SH_pinned;
+        sp->pinned = 0;
         sh_put_ref(v, smfn, 0);
     }
 }

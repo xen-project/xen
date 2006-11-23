@@ -281,9 +281,9 @@ static inline guest_l2e_t guest_l2e_from_gfn(gfn_t gfn, u32 flags)
 #define guest_l2_table_offset(a) l2_table_offset_32(a)
 
 /* The shadow types needed for the various levels. */
-#define PGC_SH_l1_shadow  PGC_SH_l1_32_shadow
-#define PGC_SH_l2_shadow  PGC_SH_l2_32_shadow
-#define PGC_SH_fl1_shadow PGC_SH_fl1_32_shadow
+#define SH_type_l1_shadow  SH_type_l1_32_shadow
+#define SH_type_l2_shadow  SH_type_l2_32_shadow
+#define SH_type_fl1_shadow SH_type_fl1_32_shadow
 
 #else /* GUEST_PAGING_LEVELS != 2 */
 
@@ -381,16 +381,16 @@ static inline guest_l4e_t guest_l4e_from_gfn(gfn_t gfn, u32 flags)
 
 /* The shadow types needed for the various levels. */
 #if GUEST_PAGING_LEVELS == 3
-#define PGC_SH_l1_shadow  PGC_SH_l1_pae_shadow
-#define PGC_SH_fl1_shadow PGC_SH_fl1_pae_shadow
-#define PGC_SH_l2_shadow  PGC_SH_l2_pae_shadow
-#define PGC_SH_l2h_shadow PGC_SH_l2h_pae_shadow
+#define SH_type_l1_shadow  SH_type_l1_pae_shadow
+#define SH_type_fl1_shadow SH_type_fl1_pae_shadow
+#define SH_type_l2_shadow  SH_type_l2_pae_shadow
+#define SH_type_l2h_shadow SH_type_l2h_pae_shadow
 #else
-#define PGC_SH_l1_shadow  PGC_SH_l1_64_shadow
-#define PGC_SH_fl1_shadow PGC_SH_fl1_64_shadow
-#define PGC_SH_l2_shadow  PGC_SH_l2_64_shadow
-#define PGC_SH_l3_shadow  PGC_SH_l3_64_shadow
-#define PGC_SH_l4_shadow  PGC_SH_l4_64_shadow
+#define SH_type_l1_shadow  SH_type_l1_64_shadow
+#define SH_type_fl1_shadow SH_type_fl1_64_shadow
+#define SH_type_l2_shadow  SH_type_l2_64_shadow
+#define SH_type_l3_shadow  SH_type_l3_64_shadow
+#define SH_type_l4_shadow  SH_type_l4_64_shadow
 #endif
 
 #endif /* GUEST_PAGING_LEVELS != 2 */

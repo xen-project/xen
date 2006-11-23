@@ -20,11 +20,7 @@
 struct page_info
 {
     /* Each frame can be threaded onto a doubly-linked list. */
-    union {
-        struct list_head list;
-        /* Shadow uses this field as an up-pointer in lower-level shadows */
-        paddr_t up;
-    };
+    struct list_head list;
 
     /* Reference count and various PGC_xxx flags and fields. */
     u32 count_info;
@@ -59,11 +55,11 @@ struct page_info
         u32 tlbflush_timestamp;
 
         /*
-         * Guest pages with a shadow. This does not conflict with
+         * Guest pages with a shadow.  This does not conflict with
          * tlbflush_timestamp since page table pages are explicitly not
          * tracked for TLB-flush avoidance when a guest runs in shadow mode.
          */
-        u32 shadow_flags;
+        unsigned long shadow_flags;
     };
 };
 
@@ -102,38 +98,6 @@ struct page_info
 #define PGC_page_table      (1U<<_PGC_page_table)
  /* 29-bit count of references to this frame. */
 #define PGC_count_mask      ((1U<<29)-1)
-
-/* shadow uses the count_info on shadow pages somewhat differently */
-/* NB: please coordinate any changes here with the SHF's in shadow.h */
-#define PGC_SH_none           (0U<<28) /* on the shadow free list */
-#define PGC_SH_min_shadow     (1U<<28)
-#define PGC_SH_l1_32_shadow   (1U<<28) /* shadowing a 32-bit L1 guest page */
-#define PGC_SH_fl1_32_shadow  (2U<<28) /* L1 shadow for a 32b 4M superpage */
-#define PGC_SH_l2_32_shadow   (3U<<28) /* shadowing a 32-bit L2 guest page */
-#define PGC_SH_l1_pae_shadow  (4U<<28) /* shadowing a pae L1 page */
-#define PGC_SH_fl1_pae_shadow (5U<<28) /* L1 shadow for pae 2M superpg */
-#define PGC_SH_l2_pae_shadow  (6U<<28) /* shadowing a pae L2-low page */
-#define PGC_SH_l2h_pae_shadow (7U<<28) /* shadowing a pae L2-high page */
-#define PGC_SH_l1_64_shadow   (8U<<28) /* shadowing a 64-bit L1 page */
-#define PGC_SH_fl1_64_shadow  (9U<<28) /* L1 shadow for 64-bit 2M superpg */
-#define PGC_SH_l2_64_shadow  (10U<<28) /* shadowing a 64-bit L2 page */
-#define PGC_SH_l3_64_shadow  (11U<<28) /* shadowing a 64-bit L3 page */
-#define PGC_SH_l4_64_shadow  (12U<<28) /* shadowing a 64-bit L4 page */
-#define PGC_SH_max_shadow    (12U<<28)
-#define PGC_SH_p2m_table     (13U<<28) /* in use as the p2m table */
-#define PGC_SH_monitor_table (14U<<28) /* in use as a monitor table */
-#define PGC_SH_unused        (15U<<28)
-
-#define PGC_SH_type_mask     (15U<<28)
-#define PGC_SH_type_shift          28
-
-#define PGC_SH_pinned         (1U<<27)
-
-#define _PGC_SH_log_dirty          26
-#define PGC_SH_log_dirty      (1U<<26)
-
-/* 26 bit ref count for shadow pages */
-#define PGC_SH_count_mask    ((1U<<26) - 1)
 
 /* We trust the slab allocator in slab.c, and our use of it. */
 #define PageSlab(page)	    (1)
