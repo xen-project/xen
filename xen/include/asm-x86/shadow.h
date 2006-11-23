@@ -599,24 +599,6 @@ static inline unsigned int shadow_get_allocation(struct domain *d)
             + ((pg & ((1 << (20 - PAGE_SHIFT)) - 1)) ? 1 : 0));
 }
 
-/*
- * Linked list for chaining entries in the shadow hash table. 
- */
-struct shadow_hash_entry {
-    struct shadow_hash_entry *next;
-    mfn_t smfn;                 /* MFN of the shadow */
-#ifdef _x86_64_ /* Shorten 'n' so we don't waste a whole word on storing 't' */
-    unsigned long n:56;         /* MFN of guest PT or GFN of guest superpage */
-#else
-    unsigned long n;            /* MFN of guest PT or GFN of guest superpage */
-#endif
-    unsigned char t;            /* shadow type bits, or 0 for empty */
-};
-
-#define SHADOW_HASH_BUCKETS 251
-/* Other possibly useful primes are 509, 1021, 2039, 4093, 8191, 16381 */
-
-
 #if SHADOW_OPTIMIZATIONS & SHOPT_CACHE_WALKS
 /* Optimization: cache the results of guest walks.  This helps with MMIO
  * and emulated writes, which tend to issue very similar walk requests

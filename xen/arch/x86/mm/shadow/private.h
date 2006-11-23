@@ -229,9 +229,11 @@ static inline void shadow_check_page_struct_offsets(void) {
 extern struct x86_emulate_ops shadow_emulator_ops;
 
 /* Hash table functions */
-mfn_t shadow_hash_lookup(struct vcpu *v, unsigned long n, u8 t);
-void  shadow_hash_insert(struct vcpu *v, unsigned long n, u8 t, mfn_t smfn);
-void  shadow_hash_delete(struct vcpu *v, unsigned long n, u8 t, mfn_t smfn);
+mfn_t shadow_hash_lookup(struct vcpu *v, unsigned long n, unsigned int t);
+void  shadow_hash_insert(struct vcpu *v, 
+                         unsigned long n, unsigned int t, mfn_t smfn);
+void  shadow_hash_delete(struct vcpu *v, 
+                         unsigned long n, unsigned int t, mfn_t smfn);
 
 /* shadow promotion */
 void shadow_promote(struct vcpu *v, mfn_t gmfn, u32 type);

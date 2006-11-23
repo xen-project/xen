@@ -71,9 +71,7 @@ struct shadow_domain {
     unsigned int      p2m_pages;    /* number of pages in p2m map */
 
     /* Shadow hashtable */
-    struct shadow_hash_entry *hash_table;
-    struct shadow_hash_entry *hash_freelist;
-    struct shadow_hash_entry *hash_allocations;
+    struct shadow_page_info **hash_table;
     int hash_walking;  /* Some function is walking the hash table */
 
     /* Shadow log-dirty bitmap */

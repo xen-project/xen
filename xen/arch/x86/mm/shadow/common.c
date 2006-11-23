@@ -1265,17 +1265,22 @@ unsigned int shadow_set_allocation(struct domain *d,
 }
 
 /**************************************************************************/
-/* Hash table for storing the guest->shadow mappings */
+/* Hash table for storing the guest->shadow mappings.
+ * The table itself is an array of pointers to shadows; the shadows are then 
+ * threaded on a singly-linked list of shadows with the same hash value */
+
+#define SHADOW_HASH_BUCKETS 251
+/* Other possibly useful primes are 509, 1021, 2039, 4093, 8191, 16381 */
 
 /* Hash function that takes a gfn or mfn, plus another byte of type info */
 typedef u32 key_t;
-static inline key_t sh_hash(unsigned long n, u8 t) 
+static inline key_t sh_hash(unsigned long n, unsigned int t) 
 {
     unsigned char *p = (unsigned char *)&n;
     key_t k = t;
     int i;
     for ( i = 0; i < sizeof(n) ; i++ ) k = (u32)p[i] + (k<<6) + (k<<16) - k;
-    return k;
+    return k % SHADOW_HASH_BUCKETS;
 }
 
 #if SHADOW_AUDIT & (SHADOW_AUDIT_HASH|SHADOW_AUDIT_HASH_FULL)
@@ -1285,58 +1290,50 @@ static inline key_t sh_hash(unsigned long n, u8 t)
 static void sh_hash_audit_bucket(struct domain *d, int bucket)
 /* Audit one bucket of the hash table */
 {
-    struct shadow_hash_entry *e, *x;
-    struct shadow_page_info *sp;
+    struct shadow_page_info *sp, *x;
 
     if ( !(SHADOW_AUDIT_ENABLE) )
         return;
 
-    e = &d->arch.shadow.hash_table[bucket];
-    if ( e->t == 0 ) return; /* Bucket is empty */ 
-    while ( e )
+    sp = d->arch.shadow.hash_table[bucket];
+    while ( sp )
     {
-        /* Empty link? */
-        BUG_ON( e->t == 0 ); 
-        /* Bogus type? */
-        BUG_ON( e->t > SH_type_max_shadow );
-        /* Wrong bucket? */
-        BUG_ON( sh_hash(e->n, e->t) % SHADOW_HASH_BUCKETS != bucket ); 
-        /* Duplicate entry? */
-        for ( x = e->next; x; x = x->next )
-            BUG_ON( x->n == e->n && x->t == e->t );
-        /* Bogus MFN? */
-        BUG_ON( !valid_mfn(e->smfn) );
-        sp = mfn_to_shadow_page(e->smfn);
         /* Not a shadow? */
         BUG_ON( sp->mbz != 0 );
-        /* Wrong kind of shadow? */
-        BUG_ON( sp->type != e->t ); 
-        /* Bad backlink? */
-        BUG_ON( sp->backpointer != e->n );
-        if ( e->t != SH_type_fl1_32_shadow
-             && e->t != SH_type_fl1_pae_shadow
-             && e->t != SH_type_fl1_64_shadow )
+        /* Bogus type? */
+        BUG_ON( sp->type == 0 ); 
+        BUG_ON( sp->type > SH_type_max_shadow );
+        /* Wrong bucket? */
+        BUG_ON( sh_hash(sp->backpointer, sp->type) != bucket ); 
+        /* Duplicate entry? */
+        for ( x = sp->next_shadow; x; x = x->next_shadow )
+            BUG_ON( x->backpointer == sp->backpointer && x->type == sp->type );
+        /* Follow the backpointer to the guest pagetable */
+        if ( sp->type != SH_type_fl1_32_shadow
+             && sp->type != SH_type_fl1_pae_shadow
+             && sp->type != SH_type_fl1_64_shadow )
         {
-            struct page_info *gpg = mfn_to_page(_mfn(e->n));
+            struct page_info *gpg = mfn_to_page(_mfn(sp->backpointer));
             /* Bad shadow flags on guest page? */
-            BUG_ON( !(gpg->shadow_flags & (1<<e->t)) );
+            BUG_ON( !(gpg->shadow_flags & (1<<sp->type)) );
             /* Bad type count on guest page? */
             if ( (gpg->u.inuse.type_info & PGT_type_mask) == PGT_writable_page 
                  && (gpg->u.inuse.type_info & PGT_count_mask) != 0 )
             {
-                SHADOW_ERROR("MFN %#"SH_PRI_mfn" shadowed (by %#"SH_PRI_mfn")"
+                SHADOW_ERROR("MFN %#lx shadowed (by %#"SH_PRI_mfn")"
                              " but has typecount %#lx\n",
-                             e->n, mfn_x(e->smfn), gpg->u.inuse.type_info);
+                             sp->backpointer, mfn_x(shadow_page_to_mfn(sp)), 
+                             gpg->u.inuse.type_info);
                 BUG();
             }
         }
         /* That entry was OK; on we go */
-        e = e->next;
+        sp = sp->next_shadow;
     }
 }
 
 #else
-#define sh_hash_audit_bucket(_d, _b)
+#define sh_hash_audit_bucket(_d, _b) do {} while(0)
 #endif /* Hashtable bucket audit */
 
 
@@ -1357,75 +1354,22 @@ static void sh_hash_audit(struct domain *d)
 }
 
 #else
-#define sh_hash_audit(_d)
+#define sh_hash_audit(_d) do {} while(0)
 #endif /* Hashtable bucket audit */
-
-/* Memory management interface for bucket allocation.
- * These ought to come out of shadow memory, but at least on 32-bit
- * machines we are forced to allocate them from xenheap so that we can
- * address them. */
-static struct shadow_hash_entry *sh_alloc_hash_entry(struct domain *d)
-{
-    struct shadow_hash_entry *extra, *x;
-    int i;
-
-    /* We need to allocate a new node. Ensure the free list is not empty. 
-     * Allocate new entries in units the same size as the original table. */
-    if ( unlikely(d->arch.shadow.hash_freelist == NULL) )
-    {
-        size_t sz = sizeof(void *) + (SHADOW_HASH_BUCKETS * sizeof(*x));
-        extra = xmalloc_bytes(sz);
-
-        if ( extra == NULL )
-        {
-            /* No memory left! */
-            SHADOW_ERROR("xmalloc() failed when allocating hash buckets.\n");
-            domain_crash_synchronous();
-        }
-        memset(extra, 0, sz);
-
-        /* Record the allocation block so it can be correctly freed later. */
-        *((struct shadow_hash_entry **)&extra[SHADOW_HASH_BUCKETS]) = 
-            d->arch.shadow.hash_allocations;
-        d->arch.shadow.hash_allocations = &extra[0];
-
-        /* Thread a free chain through the newly-allocated nodes. */
-        for ( i = 0; i < (SHADOW_HASH_BUCKETS - 1); i++ )
-            extra[i].next = &extra[i+1];
-        extra[i].next = NULL;
-
-        /* Add the new nodes to the free list. */
-        d->arch.shadow.hash_freelist = &extra[0];
-    }
-
-    /* Allocate a new node from the free list. */
-    x = d->arch.shadow.hash_freelist;
-    d->arch.shadow.hash_freelist = x->next;
-    return x;
-}
-
-static void sh_free_hash_entry(struct domain *d, struct shadow_hash_entry *e)
-{
-    /* Mark the bucket as empty and return it to the free list */
-    e->t = 0; 
-    e->next = d->arch.shadow.hash_freelist;
-    d->arch.shadow.hash_freelist = e;
-}
-
 
 /* Allocate and initialise the table itself.  
  * Returns 0 for success, 1 for error. */
 static int shadow_hash_alloc(struct domain *d)
 {
-    struct shadow_hash_entry *table;
+    struct shadow_page_info **table;
 
     ASSERT(shadow_lock_is_acquired(d));
     ASSERT(!d->arch.shadow.hash_table);
 
-    table = xmalloc_array(struct shadow_hash_entry, SHADOW_HASH_BUCKETS);
+    table = xmalloc_array(struct shadow_page_info *, SHADOW_HASH_BUCKETS);
     if ( !table ) return 1;
     memset(table, 0, 
-           SHADOW_HASH_BUCKETS * sizeof (struct shadow_hash_entry));
+           SHADOW_HASH_BUCKETS * sizeof (struct shadow_page_info *));
     d->arch.shadow.hash_table = table;
     return 0;
 }
@@ -1434,35 +1378,20 @@ static int shadow_hash_alloc(struct domain *d)
  * This function does not care whether the table is populated. */
 static void shadow_hash_teardown(struct domain *d)
 {
-    struct shadow_hash_entry *a, *n;
-
     ASSERT(shadow_lock_is_acquired(d));
     ASSERT(d->arch.shadow.hash_table);
 
-    /* Return the table itself */
     xfree(d->arch.shadow.hash_table);
     d->arch.shadow.hash_table = NULL;
-
-    /* Return any extra allocations */
-    a = d->arch.shadow.hash_allocations;
-    while ( a ) 
-    {
-        /* We stored a linked-list pointer at the end of each allocation */
-        n = *((struct shadow_hash_entry **)(&a[SHADOW_HASH_BUCKETS]));
-        xfree(a);
-        a = n;
-    }
-    d->arch.shadow.hash_allocations = NULL;
-    d->arch.shadow.hash_freelist = NULL;
 }
 
 
-mfn_t shadow_hash_lookup(struct vcpu *v, unsigned long n, u8 t)
+mfn_t shadow_hash_lookup(struct vcpu *v, unsigned long n, unsigned int t)
 /* Find an entry in the hash table.  Returns the MFN of the shadow,
  * or INVALID_MFN if it doesn't exist */
 {
     struct domain *d = v->domain;
-    struct shadow_hash_entry *p, *x, *head;
+    struct shadow_page_info *sp, *prev;
     key_t key;
 
     ASSERT(shadow_lock_is_acquired(d));
@@ -1473,58 +1402,50 @@ mfn_t shadow_hash_lookup(struct vcpu *v, unsigned long n, u8 t)
 
     perfc_incrc(shadow_hash_lookups);
     key = sh_hash(n, t);
+    sh_hash_audit_bucket(d, key);
 
-    x = head = &d->arch.shadow.hash_table[key % SHADOW_HASH_BUCKETS];
-    p = NULL;
-
-    sh_hash_audit_bucket(d, key % SHADOW_HASH_BUCKETS);
-
-    do
+    sp = d->arch.shadow.hash_table[key];
+    prev = NULL;
+    while(sp)
     {
-        ASSERT(x->t || ((x == head) && (x->next == NULL)));
-
-        if ( x->n == n && x->t == t )
+        if ( sp->backpointer == n && sp->type == t )
         {
-            /* Pull-to-front if 'x' isn't already the head item */
-            if ( unlikely(x != head) )
+            /* Pull-to-front if 'sp' isn't already the head item */
+            if ( unlikely(sp != d->arch.shadow.hash_table[key]) )
             {
                 if ( unlikely(d->arch.shadow.hash_walking != 0) )
                     /* Can't reorder: someone is walking the hash chains */
-                    return x->smfn;
+                    return shadow_page_to_mfn(sp);
                 else 
                 {
-                    /* Delete 'x' from list and reinsert after head. */
-                    p->next = x->next;
-                    x->next = head->next;
-                    head->next = x;
-                    
-                    /* Swap 'x' contents with head contents. */
-                    SWAP(head->n, x->n);
-                    SWAP(head->t, x->t);
-                    SWAP(head->smfn, x->smfn);
+                    ASSERT(prev);
+                    /* Delete sp from the list */
+                    prev->next_shadow = sp->next_shadow;                    
+                    /* Re-insert it at the head of the list */
+                    sp->next_shadow = d->arch.shadow.hash_table[key];
+                    d->arch.shadow.hash_table[key] = sp;
                 }
             }
             else
             {
                 perfc_incrc(shadow_hash_lookup_head);
             }
-            return head->smfn;
+            return shadow_page_to_mfn(sp);
         }
-
-        p = x;
-        x = x->next;
+        prev = sp;
+        sp = sp->next_shadow;
     }
-    while ( x != NULL );
 
     perfc_incrc(shadow_hash_lookup_miss);
     return _mfn(INVALID_MFN);
 }
 
-void shadow_hash_insert(struct vcpu *v, unsigned long n, u8 t, mfn_t smfn)
+void shadow_hash_insert(struct vcpu *v, unsigned long n, unsigned int t, 
+                        mfn_t smfn)
 /* Put a mapping (n,t)->smfn into the hash table */
 {
     struct domain *d = v->domain;
-    struct shadow_hash_entry *x, *head;
+    struct shadow_page_info *sp;
     key_t key;
     
     ASSERT(shadow_lock_is_acquired(d));
@@ -1535,38 +1456,22 @@ void shadow_hash_insert(struct vcpu *v, unsigned long n, u8 t, mfn_t smfn)
 
     perfc_incrc(shadow_hash_inserts);
     key = sh_hash(n, t);
-
-    head = &d->arch.shadow.hash_table[key % SHADOW_HASH_BUCKETS];
-
-    sh_hash_audit_bucket(d, key % SHADOW_HASH_BUCKETS);
-
-    /* If the bucket is empty then insert the new page as the head item. */
-    if ( head->t == 0 )
-    {
-        head->n = n;
-        head->t = t;
-        head->smfn = smfn;
-        ASSERT(head->next == NULL);
-    }
-    else 
-    {
-        /* Insert a new entry directly after the head item. */
-        x = sh_alloc_hash_entry(d);
-        x->n = n; 
-        x->t = t;
-        x->smfn = smfn;
-        x->next = head->next;
-        head->next = x;
-    }
+    sh_hash_audit_bucket(d, key);
     
-    sh_hash_audit_bucket(d, key % SHADOW_HASH_BUCKETS);
+    /* Insert this shadow at the top of the bucket */
+    sp = mfn_to_shadow_page(smfn);
+    sp->next_shadow = d->arch.shadow.hash_table[key];
+    d->arch.shadow.hash_table[key] = sp;
+    
+    sh_hash_audit_bucket(d, key);
 }
 
-void shadow_hash_delete(struct vcpu *v, unsigned long n, u8 t, mfn_t smfn)
+void shadow_hash_delete(struct vcpu *v, unsigned long n, unsigned int t, 
+                        mfn_t smfn)
 /* Excise the mapping (n,t)->smfn from the hash table */
 {
     struct domain *d = v->domain;
-    struct shadow_hash_entry *p, *x, *head;
+    struct shadow_page_info *sp, *x;
     key_t key;
 
     ASSERT(shadow_lock_is_acquired(d));
@@ -1577,54 +1482,31 @@ void shadow_hash_delete(struct vcpu *v, unsigned long n, u8 t, mfn_t smfn)
 
     perfc_incrc(shadow_hash_deletes);
     key = sh_hash(n, t);
-
-    head = &d->arch.shadow.hash_table[key % SHADOW_HASH_BUCKETS];
-
-    sh_hash_audit_bucket(d, key % SHADOW_HASH_BUCKETS);
-
-    /* Match on head item? */
-    if ( head->n == n && head->t == t )
-    {
-        if ( (x = head->next) != NULL )
-        {
-            /* Overwrite head with contents of following node. */
-            head->n = x->n;
-            head->t = x->t;
-            head->smfn = x->smfn;
-
-            /* Delete following node. */
-            head->next = x->next;
-            sh_free_hash_entry(d, x);
-        }
-        else
-        {
-            /* This bucket is now empty. Initialise the head node. */
-            head->t = 0;
-        }
-    }
+    sh_hash_audit_bucket(d, key);
+    
+    sp = mfn_to_shadow_page(smfn);
+    if ( d->arch.shadow.hash_table[key] == sp ) 
+        /* Easy case: we're deleting the head item. */
+        d->arch.shadow.hash_table[key] = sp->next_shadow;
     else 
     {
-        /* Not at the head; need to walk the chain */
-        p = head;
-        x = head->next; 
-        
-        while(1)
+        /* Need to search for the one we want */
+        x = d->arch.shadow.hash_table[key];
+        while ( 1 )
         {
             ASSERT(x); /* We can't have hit the end, since our target is
                         * still in the chain somehwere... */
-            if ( x->n == n && x->t == t )
+            if ( x->next_shadow == sp ) 
             {
-                /* Delete matching node. */
-                p->next = x->next;
-                sh_free_hash_entry(d, x);
+                x->next_shadow = sp->next_shadow;
                 break;
             }
-            p = x;
-            x = x->next;
+            x = x->next_shadow;
         }
     }
+    sp->next_shadow = NULL;
 
-    sh_hash_audit_bucket(d, key % SHADOW_HASH_BUCKETS);
+    sh_hash_audit_bucket(d, key);
 }
 
 typedef int (*hash_callback_t)(struct vcpu *v, mfn_t smfn, mfn_t other_mfn);
@@ -1644,27 +1526,27 @@ static void hash_foreach(struct vcpu *v,
 {
     int i, done = 0;
     struct domain *d = v->domain;
-    struct shadow_hash_entry *x;
+    struct shadow_page_info *x;
 
     /* Say we're here, to stop hash-lookups reordering the chains */
     ASSERT(shadow_lock_is_acquired(d));
     ASSERT(d->arch.shadow.hash_walking == 0);
     d->arch.shadow.hash_walking = 1;
 
-    callback_mask &= ~1; /* Never attempt to call back on empty buckets */
     for ( i = 0; i < SHADOW_HASH_BUCKETS; i++ ) 
     {
         /* WARNING: This is not safe against changes to the hash table.
          * The callback *must* return non-zero if it has inserted or
          * deleted anything from the hash (lookups are OK, though). */
-        for ( x = &d->arch.shadow.hash_table[i]; x; x = x->next )
+        for ( x = d->arch.shadow.hash_table[i]; x; x = x->next_shadow )
         {
-            if ( callback_mask & (1 << x->t) ) 
+            if ( callback_mask & (1 << x->type) ) 
             {
-                ASSERT(x->t <= 15);
-                ASSERT(callbacks[x->t] != NULL);
-                if ( (done = callbacks[x->t](v, x->smfn, callback_mfn)) != 0 )
-                    break;
+                ASSERT(x->type <= 15);
+                ASSERT(callbacks[x->type] != NULL);
+                done = callbacks[x->type](v, shadow_page_to_mfn(x), 
+                                          callback_mfn);
+                if ( done ) break;
             }
         }
         if ( done ) break; 
