@@ -260,6 +260,18 @@ void sh_install_xen_entries_in_l2(struct vcpu *v, mfn_t gl2mfn, mfn_t sl2mfn);
 
 
 /******************************************************************************
+ * Flags used in the return value of the shadow_set_lXe() functions...
+ */
+
+/* We actually wrote something new to the shadow */
+#define SHADOW_SET_CHANGED            0x1
+/* Caller should flush TLBs to clear the old entry */
+#define SHADOW_SET_FLUSH              0x2
+/* Something went wrong: the shadow entry was invalid or refcount failed */
+#define SHADOW_SET_ERROR              0x4
+
+
+/******************************************************************************
  * MFN/page-info handling 
  */
 
@@ -350,8 +362,9 @@ void sh_destroy_shadow(struct vcpu *v, mfn_t smfn);
 
 /* Increase the refcount of a shadow page.  Arguments are the mfn to refcount, 
  * and the physical address of the shadow entry that holds the ref (or zero
- * if the ref is held by something else) */
-static inline void sh_get_ref(mfn_t smfn, paddr_t entry_pa)
+ * if the ref is held by something else).  
+ * Returns 0 for failure, 1 for success. */
+static inline int sh_get_ref(mfn_t smfn, paddr_t entry_pa)
 {
     u32 x, nx;
     struct shadow_page_info *sp = mfn_to_shadow_page(smfn);
@@ -365,7 +378,7 @@ static inline void sh_get_ref(mfn_t smfn, paddr_t entry_pa)
     {
         SHADOW_PRINTK("shadow ref overflow, gmfn=%" PRtype_info " smfn=%lx\n",
                        sp->backpointer, mfn_x(smfn));
-        domain_crash_synchronous();
+        return 0;
     }
     
     /* Guarded by the shadow lock, so no need for atomic update */
@@ -374,6 +387,8 @@ static inline void sh_get_ref(mfn_t smfn, paddr_t entry_pa)
     /* We remember the first shadow entry that points to each shadow. */
     if ( entry_pa != 0 && sp->up == 0 ) 
         sp->up = entry_pa;
+    
+    return 1;
 }
 
 
@@ -396,9 +411,9 @@ static inline void sh_put_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
 
     if ( unlikely(x == 0) ) 
     {
-        SHADOW_PRINTK("shadow ref underflow, smfn=%lx oc=%08x t=%#x\n",
-                      mfn_x(smfn), sp->count, sp->type);
-        domain_crash_synchronous();
+        SHADOW_ERROR("shadow ref underflow, smfn=%lx oc=%08x t=%#x\n",
+                     mfn_x(smfn), sp->count, sp->type);
+        BUG();
     }
 
     /* Guarded by the shadow lock, so no need for atomic update */
@@ -409,8 +424,9 @@ static inline void sh_put_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
 }
 
 
-/* Pin a shadow page: take an extra refcount and set the pin bit. */
-static inline void sh_pin(mfn_t smfn)
+/* Pin a shadow page: take an extra refcount and set the pin bit.
+ * Returns 0 for failure, 1 for success. */
+static inline int sh_pin(mfn_t smfn)
 {
     struct shadow_page_info *sp;
     
@@ -418,9 +434,11 @@ static inline void sh_pin(mfn_t smfn)
     sp = mfn_to_shadow_page(smfn);
     if ( !(sp->pinned) ) 
     {
-        sh_get_ref(smfn, 0);
+        if ( !sh_get_ref(smfn, 0) )
+            return 0;
         sp->pinned = 1;
     }
+    return 1;
 }
 
 /* Unpin a shadow page: unset the pin bit and release the extra ref. */

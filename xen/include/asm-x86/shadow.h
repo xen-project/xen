@@ -68,11 +68,6 @@
  */
 #define shadow_mode_trap_reads(_d) ({ (void)(_d); 0; })
 
-// flags used in the return value of the shadow_set_lXe() functions...
-#define SHADOW_SET_CHANGED            0x1
-#define SHADOW_SET_FLUSH              0x2
-#define SHADOW_SET_ERROR              0x4
-
 // How do we tell that we have a 32-bit PV guest in a 64-bit Xen?
 #ifdef __x86_64__
 #define pv_32bit_guest(_v) 0 // not yet supported

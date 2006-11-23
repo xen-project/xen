@@ -791,6 +791,7 @@ shadow_alloc_p2m_page(struct domain *d)
     struct list_head *entry;
     mfn_t mfn;
     void *p;
+    int ok;
 
     if ( list_empty(&d->arch.shadow.p2m_freelist) &&
          !shadow_alloc_p2m_pages(d) )
@@ -799,7 +800,8 @@ shadow_alloc_p2m_page(struct domain *d)
     list_del(entry);
     list_add_tail(entry, &d->arch.shadow.p2m_inuse);
     mfn = page_to_mfn(list_entry(entry, struct page_info, list));
-    sh_get_ref(mfn, 0);
+    ok = sh_get_ref(mfn, 0);
+    ASSERT(ok); /* First sh_get_ref() can't possibly overflow */
     p = sh_map_domain_page(mfn);
     clear_page(p);
     sh_unmap_domain_page(p);
