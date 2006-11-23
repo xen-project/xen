@@ -1373,7 +1373,8 @@ static int vmx_set_cr0(unsigned long value)
         __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_NM);
     }
 
-    v->arch.hvm_vmx.cpu_cr0 = value | X86_CR0_PE | X86_CR0_PG | X86_CR0_NE;
+    v->arch.hvm_vmx.cpu_cr0 = (value | X86_CR0_PE | X86_CR0_PG 
+                               | X86_CR0_NE | X86_CR0_WP);
     __vmwrite(GUEST_CR0, v->arch.hvm_vmx.cpu_cr0);
 
     v->arch.hvm_vmx.cpu_shadow_cr0 = value;
