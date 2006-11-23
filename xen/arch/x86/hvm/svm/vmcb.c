@@ -197,6 +197,7 @@ static int construct_vmcb(struct vcpu *v)
     /* Guest CR0. */
     vmcb->cr0 = read_cr0();
     arch_svm->cpu_shadow_cr0 = vmcb->cr0 & ~(X86_CR0_PG | X86_CR0_TS);
+    vmcb->cr0 |= X86_CR0_WP;
 
     /* Guest CR4. */
     arch_svm->cpu_shadow_cr4 =

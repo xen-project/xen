@@ -1441,7 +1441,7 @@ static int svm_set_cr0(unsigned long value)
     /* We don't want to lose PG.  ET is reserved and should be always be 1*/
     paging_enabled = svm_paging_enabled(v);
     value |= X86_CR0_ET;
-    vmcb->cr0 = value | X86_CR0_PG;
+    vmcb->cr0 = value | X86_CR0_PG | X86_CR0_WP;
     v->arch.hvm_svm.cpu_shadow_cr0 = value;
 
     /* TS cleared? Then initialise FPU now. */
@@ -2094,7 +2094,7 @@ static int svm_do_vmmcall_reset_to_realmode(struct vcpu *v,
     vmcb->tsc_offset = 0;
 
     /* VMCB State */
-    vmcb->cr0 = X86_CR0_ET | X86_CR0_PG;
+    vmcb->cr0 = X86_CR0_ET | X86_CR0_PG | X86_CR0_WP;
     v->arch.hvm_svm.cpu_shadow_cr0 = X86_CR0_ET;
 
     vmcb->cr2 = 0;
