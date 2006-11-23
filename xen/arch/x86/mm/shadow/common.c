@@ -495,6 +495,7 @@ void shadow_prealloc(struct domain *d, unsigned int order)
     struct shadow_page_info *sp;
     cpumask_t flushmask = CPU_MASK_NONE;
     mfn_t smfn;
+    int i;
 
     if ( chunk_is_available(d, order) ) return; 
     
@@ -503,9 +504,9 @@ void shadow_prealloc(struct domain *d, unsigned int order)
         v = d->vcpu[0];
     ASSERT(v != NULL);
 
-    /* Stage one: walk the list of top-level pages, unpinning them */
+    /* Stage one: walk the list of pinned pages, unpinning them */
     perfc_incrc(shadow_prealloc_1);
-    list_for_each_backwards_safe(l, t, &d->arch.shadow.toplevel_shadows)
+    list_for_each_backwards_safe(l, t, &d->arch.shadow.pinned_shadows)
     {
         sp = list_entry(l, struct shadow_page_info, list);
         smfn = shadow_page_to_mfn(sp);
@@ -521,31 +522,24 @@ void shadow_prealloc(struct domain *d, unsigned int order)
      * loaded in cr3 on some vcpu.  Walk them, unhooking the non-Xen
      * mappings. */
     perfc_incrc(shadow_prealloc_2);
-    list_for_each_backwards_safe(l, t, &d->arch.shadow.toplevel_shadows)
-    {
-        sp = list_entry(l, struct shadow_page_info, list);
-        smfn = shadow_page_to_mfn(sp);
-        shadow_unhook_mappings(v, smfn);
 
-        /* Remember to flush TLBs: we have removed shadow entries that 
-         * were in use by some vcpu(s). */
-        for_each_vcpu(d, v2) 
+    for_each_vcpu(d, v2) 
+        for ( i = 0 ; i < 4 ; i++ )
         {
-            if ( pagetable_get_pfn(v2->arch.shadow_table[0]) == mfn_x(smfn)
-                 || pagetable_get_pfn(v2->arch.shadow_table[1]) == mfn_x(smfn)
-                 || pagetable_get_pfn(v2->arch.shadow_table[2]) == mfn_x(smfn) 
-                 || pagetable_get_pfn(v2->arch.shadow_table[3]) == mfn_x(smfn)
-                )
+            if ( !pagetable_is_null(v2->arch.shadow_table[i]) )
+            {
+                shadow_unhook_mappings(v, 
+                               pagetable_get_mfn(v2->arch.shadow_table[i]));
                 cpus_or(flushmask, v2->vcpu_dirty_cpumask, flushmask);
-        }
 
-        /* See if that freed up a chunk of appropriate size */
-        if ( chunk_is_available(d, order) ) 
-        {
-            flush_tlb_mask(flushmask);
-            return;
+                /* See if that freed up a chunk of appropriate size */
+                if ( chunk_is_available(d, order) ) 
+                {
+                    flush_tlb_mask(flushmask);
+                    return;
+                }
+            }
         }
-    }
     
     /* Nothing more we can do: all remaining shadows are of pages that
      * hold Xen mappings for some vcpu.  This can never happen. */
@@ -558,52 +552,57 @@ void shadow_prealloc(struct domain *d, unsigned int order)
     BUG();
 }
 
-#ifndef NDEBUG
-/* Deliberately free all the memory we can: this can be used to cause the
- * guest's pagetables to be re-shadowed if we suspect that the shadows
- * have somehow got out of sync */
-static void shadow_blow_tables(unsigned char c)
+/* Deliberately free all the memory we can: this will tear down all of
+ * this domain's shadows */
+static void shadow_blow_tables(struct domain *d) 
 {
     struct list_head *l, *t;
     struct shadow_page_info *sp;
-    struct domain *d;
-    struct vcpu *v;
+    struct vcpu *v = d->vcpu[0];
     mfn_t smfn;
-
-    for_each_domain(d)
+    int i;
+    
+    /* Pass one: unpin all pinned pages */
+    list_for_each_backwards_safe(l,t, &d->arch.shadow.pinned_shadows)
     {
-        if ( shadow_mode_enabled(d) && (v = d->vcpu[0]) != NULL)
+        sp = list_entry(l, struct shadow_page_info, list);
+        smfn = shadow_page_to_mfn(sp);
+        sh_unpin(v, smfn);
+    }
+        
+    /* Second pass: unhook entries of in-use shadows */
+    for_each_vcpu(d, v) 
+        for ( i = 0 ; i < 4 ; i++ )
+            if ( !pagetable_is_null(v->arch.shadow_table[i]) )
+                shadow_unhook_mappings(v, 
+                               pagetable_get_mfn(v->arch.shadow_table[i]));
+
+    /* Make sure everyone sees the unshadowings */
+    flush_tlb_mask(d->domain_dirty_cpumask);
+}
+
+
+#ifndef NDEBUG
+/* Blow all shadows of all shadowed domains: this can be used to cause the
+ * guest's pagetables to be re-shadowed if we suspect that the shadows
+ * have somehow got out of sync */
+static void shadow_blow_all_tables(unsigned char c)
+{
+    struct domain *d;
+    printk("'%c' pressed -> blowing all shadow tables\n", c);
+    for_each_domain(d)
+        if ( shadow_mode_enabled(d) && d->vcpu[0] != NULL )
         {
             shadow_lock(d);
-            printk("Blowing shadow tables for domain %u\n", d->domain_id);
-
-            /* Pass one: unpin all top-level pages */
-            list_for_each_backwards_safe(l,t, &d->arch.shadow.toplevel_shadows)
-            {
-                sp = list_entry(l, struct shadow_page_info, list);
-                smfn = shadow_page_to_mfn(sp);
-                sh_unpin(v, smfn);
-            }
-
-            /* Second pass: unhook entries of in-use shadows */
-            list_for_each_backwards_safe(l,t, &d->arch.shadow.toplevel_shadows)
-            {
-                sp = list_entry(l, struct shadow_page_info, list);
-                smfn = shadow_page_to_mfn(sp);
-                shadow_unhook_mappings(v, smfn);
-            }
-            
-            /* Make sure everyone sees the unshadowings */
-            flush_tlb_mask(d->domain_dirty_cpumask);
+            shadow_blow_tables(d);
             shadow_unlock(d);
         }
-    }
 }
 
 /* Register this function in the Xen console keypress table */
 static __init int shadow_blow_tables_keyhandler_init(void)
 {
-    register_keyhandler('S', shadow_blow_tables, "reset shadow pagetables");
+    register_keyhandler('S', shadow_blow_all_tables,"reset shadow pagetables");
     return 0;
 }
 __initcall(shadow_blow_tables_keyhandler_init);
@@ -789,9 +788,9 @@ mfn_t
 shadow_alloc_p2m_page(struct domain *d)
 {
     struct list_head *entry;
+    struct page_info *pg;
     mfn_t mfn;
     void *p;
-    int ok;
 
     if ( list_empty(&d->arch.shadow.p2m_freelist) &&
          !shadow_alloc_p2m_pages(d) )
@@ -799,9 +798,9 @@ shadow_alloc_p2m_page(struct domain *d)
     entry = d->arch.shadow.p2m_freelist.next;
     list_del(entry);
     list_add_tail(entry, &d->arch.shadow.p2m_inuse);
-    mfn = page_to_mfn(list_entry(entry, struct page_info, list));
-    ok = sh_get_ref(mfn, 0);
-    ASSERT(ok); /* First sh_get_ref() can't possibly overflow */
+    pg = list_entry(entry, struct page_info, list);
+    pg->count_info = 1;
+    mfn = page_to_mfn(pg);
     p = sh_map_domain_page(mfn);
     clear_page(p);
     sh_unmap_domain_page(p);
@@ -2067,37 +2066,32 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
      * This call to hash_foreach() looks dangerous but is in fact OK: each
      * call will remove at most one shadow, and terminate immediately when
      * it does remove it, so we never walk the hash after doing a deletion.  */
-#define DO_UNSHADOW(_type) do {                                 \
-    t = (_type);                                                \
-    smfn = shadow_hash_lookup(v, mfn_x(gmfn), t);               \
-    if ( !sh_remove_shadow_via_pointer(v, smfn) && !fast )      \
-        hash_foreach(v, masks[t], callbacks, smfn);             \
-} while (0)
-
-    /* Top-level shadows need to be unpinned */
-#define DO_UNPIN(_type) do {                            \
+#define DO_UNSHADOW(_type) do {                         \
     t = (_type);                                        \
     smfn = shadow_hash_lookup(v, mfn_x(gmfn), t);       \
-    if ( mfn_to_shadow_page(smfn)->pinned )             \
+    if ( sh_type_is_pinnable(v, t) )                    \
         sh_unpin(v, smfn);                              \
+    else                                                \
+        sh_remove_shadow_via_pointer(v, smfn);          \
+    if ( (pg->count_info & PGC_page_table) && !fast )   \
+        hash_foreach(v, masks[t], callbacks, smfn);     \
 } while (0)
 
     if ( sh_flags & SHF_L1_32 )   DO_UNSHADOW(SH_type_l1_32_shadow);
-    if ( sh_flags & SHF_L2_32 )   DO_UNPIN(SH_type_l2_32_shadow);
+    if ( sh_flags & SHF_L2_32 )   DO_UNSHADOW(SH_type_l2_32_shadow);
 #if CONFIG_PAGING_LEVELS >= 3
     if ( sh_flags & SHF_L1_PAE )  DO_UNSHADOW(SH_type_l1_pae_shadow);
-    if ( sh_flags & SHF_L2_PAE )  DO_UNPIN(SH_type_l2_pae_shadow);
-    if ( sh_flags & SHF_L2H_PAE ) DO_UNPIN(SH_type_l2h_pae_shadow);
+    if ( sh_flags & SHF_L2_PAE )  DO_UNSHADOW(SH_type_l2_pae_shadow);
+    if ( sh_flags & SHF_L2H_PAE ) DO_UNSHADOW(SH_type_l2h_pae_shadow);
 #if CONFIG_PAGING_LEVELS >= 4
     if ( sh_flags & SHF_L1_64 )   DO_UNSHADOW(SH_type_l1_64_shadow);
     if ( sh_flags & SHF_L2_64 )   DO_UNSHADOW(SH_type_l2_64_shadow);
     if ( sh_flags & SHF_L3_64 )   DO_UNSHADOW(SH_type_l3_64_shadow);
-    if ( sh_flags & SHF_L4_64 )   DO_UNPIN(SH_type_l4_64_shadow);
+    if ( sh_flags & SHF_L4_64 )   DO_UNSHADOW(SH_type_l4_64_shadow);
 #endif
 #endif
 
 #undef DO_UNSHADOW
-#undef DO_UNPIN
 
     /* If that didn't catch the shadows, something is wrong */
     if ( !fast && (pg->count_info & PGC_page_table) )
@@ -2392,6 +2386,12 @@ int shadow_enable(struct domain *d, u32 mode)
             rv = -ENOMEM;
             goto out;
         }
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_LINUX_L3_TOPLEVEL) 
+    /* We assume we're dealing with an older 64bit linux guest until we 
+     * see the guest use more than one l4 per vcpu. */
+    d->arch.shadow.opt_flags = SHOPT_LINUX_L3_TOPLEVEL;
+#endif
 
     /* Update the bits */
     sh_new_mode(d, mode);
@@ -2831,18 +2831,10 @@ static int shadow_log_dirty_op(
         
     if ( clean ) 
     {
-        struct list_head *l, *t;
-        struct shadow_page_info *sp;
-
         /* Need to revoke write access to the domain's pages again. 
          * In future, we'll have a less heavy-handed approach to this, 
          * but for now, we just unshadow everything except Xen. */
-        list_for_each_safe(l, t, &d->arch.shadow.toplevel_shadows)
-        {
-            sp = list_entry(l, struct shadow_page_info, list);
-            if ( d->vcpu[0] != NULL )
-                shadow_unhook_mappings(d->vcpu[0], shadow_page_to_mfn(sp));
-        }
+        shadow_blow_tables(d);
 
         d->arch.shadow.fault_count = 0;
         d->arch.shadow.dirty_count = 0;

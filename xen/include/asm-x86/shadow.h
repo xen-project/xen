@@ -158,8 +158,9 @@ extern int shadow_audit_enable;
 #define SHOPT_EARLY_UNSHADOW      0x02  /* Unshadow l1s on fork or exit */
 #define SHOPT_FAST_FAULT_PATH     0x04  /* Fast-path MMIO and not-present */
 #define SHOPT_PREFETCH            0x08  /* Shadow multiple entries per fault */
+#define SHOPT_LINUX_L3_TOPLEVEL   0x10  /* Pin l3es on early 64bit linux */
 
-#define SHADOW_OPTIMIZATIONS      0x0f
+#define SHADOW_OPTIMIZATIONS      0x1f
 
 
 /* With shadow pagetables, the different kinds of address start 
@@ -593,24 +594,6 @@ static inline unsigned int shadow_get_allocation(struct domain *d)
     return ((pg >> (20 - PAGE_SHIFT))
             + ((pg & ((1 << (20 - PAGE_SHIFT)) - 1)) ? 1 : 0));
 }
-
-#if SHADOW_OPTIMIZATIONS & SHOPT_CACHE_WALKS
-/* Optimization: cache the results of guest walks.  This helps with MMIO
- * and emulated writes, which tend to issue very similar walk requests
- * repeatedly.  We keep the results of the last few walks, and blow
- * away the cache on guest cr3 write, mode change, or page fault. */
-
-#define SH_WALK_CACHE_ENTRIES 4
-
-/* Rather than cache a guest walk, which would include mapped pointers 
- * to pages, we cache what a TLB would remember about the walk: the 
- * permissions and the l1 gfn */
-struct shadow_walk_cache {
-    unsigned long va;           /* The virtual address (or 0 == unused) */
-    unsigned long gfn;          /* The gfn from the effective l1e   */
-    u32 permissions;            /* The aggregated permission bits   */
-};
-#endif
 
 
 /**************************************************************************/

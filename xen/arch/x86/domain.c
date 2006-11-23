@@ -219,7 +219,7 @@ int arch_domain_create(struct domain *d)
         INIT_LIST_HEAD(&d->arch.shadow.freelists[i]);
     INIT_LIST_HEAD(&d->arch.shadow.p2m_freelist);
     INIT_LIST_HEAD(&d->arch.shadow.p2m_inuse);
-    INIT_LIST_HEAD(&d->arch.shadow.toplevel_shadows);
+    INIT_LIST_HEAD(&d->arch.shadow.pinned_shadows);
 
     if ( !is_idle_domain(d) )
     {

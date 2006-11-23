@@ -157,9 +157,11 @@ struct shadow_page_info
     } __attribute__((packed));
     union {
         /* For unused shadow pages, a list of pages of this order; 
-         * for top-level shadows, a list of other top-level shadows */
+         * for pinnable shadows, if pinned, a list of other pinned shadows
+         * (see sh_type_is_pinnable() below for the definition of 
+         * "pinnable" shadow types). */
         struct list_head list;
-        /* For lower-level shadows, a higher entry that points at us */
+        /* For non-pinnable shadows, a higher entry that points at us */
         paddr_t up;
     };
 };
@@ -194,6 +196,36 @@ static inline void shadow_check_page_struct_offsets(void) {
 #define SH_type_p2m_table     (13U) /* in use as the p2m table */
 #define SH_type_monitor_table (14U) /* in use as a monitor table */
 #define SH_type_unused        (15U)
+
+/* 
+ * What counts as a pinnable shadow?
+ */
+
+static inline int sh_type_is_pinnable(struct vcpu *v, unsigned int t) 
+{
+    /* Top-level shadow types in each mode can be pinned, so that they 
+     * persist even when not currently in use in a guest CR3 */
+    if ( t == SH_type_l2_32_shadow
+         || t == SH_type_l2_pae_shadow
+         || t == SH_type_l2h_pae_shadow 
+         || t == SH_type_l4_64_shadow )
+        return 1;
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_LINUX_L3_TOPLEVEL) 
+    /* Early 64-bit linux used three levels of pagetables for the guest
+     * and context switched by changing one l4 entry in a per-cpu l4
+     * page.  When we're shadowing those kernels, we have to pin l3
+     * shadows so they don't just evaporate on every context switch.
+     * For all other guests, we'd rather use the up-pointer field in l3s. */ 
+    if ( unlikely((v->domain->arch.shadow.opt_flags & SHOPT_LINUX_L3_TOPLEVEL) 
+                  && CONFIG_PAGING_LEVELS >= 4
+                  && t == SH_type_l3_64_shadow) )
+        return 1;
+#endif
+
+    /* Everything else is not pinnable, and can use the "up" pointer */
+    return 0;
+}
 
 /*
  * Definitions for the shadow_flags field in page_info.
@@ -364,7 +396,7 @@ void sh_destroy_shadow(struct vcpu *v, mfn_t smfn);
  * and the physical address of the shadow entry that holds the ref (or zero
  * if the ref is held by something else).  
  * Returns 0 for failure, 1 for success. */
-static inline int sh_get_ref(mfn_t smfn, paddr_t entry_pa)
+static inline int sh_get_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
 {
     u32 x, nx;
     struct shadow_page_info *sp = mfn_to_shadow_page(smfn);
@@ -385,7 +417,9 @@ static inline int sh_get_ref(mfn_t smfn, paddr_t entry_pa)
     sp->count = nx;
 
     /* We remember the first shadow entry that points to each shadow. */
-    if ( entry_pa != 0 && sp->up == 0 ) 
+    if ( entry_pa != 0 
+         && sh_type_is_pinnable(v, sp->type) 
+         && sp->up == 0 ) 
         sp->up = entry_pa;
     
     return 1;
@@ -403,7 +437,9 @@ static inline void sh_put_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
     ASSERT(sp->mbz == 0);
 
     /* If this is the entry in the up-pointer, remove it */
-    if ( entry_pa != 0 && sp->up == entry_pa ) 
+    if ( entry_pa != 0 
+         && sh_type_is_pinnable(v, sp->type) 
+         && sp->up == entry_pa ) 
         sp->up = 0;
 
     x = sp->count;
@@ -424,33 +460,48 @@ static inline void sh_put_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
 }
 
 
-/* Pin a shadow page: take an extra refcount and set the pin bit.
+/* Pin a shadow page: take an extra refcount, set the pin bit,
+ * and put the shadow at the head of the list of pinned shadows.
  * Returns 0 for failure, 1 for success. */
-static inline int sh_pin(mfn_t smfn)
+static inline int sh_pin(struct vcpu *v, mfn_t smfn)
 {
     struct shadow_page_info *sp;
     
     ASSERT(mfn_valid(smfn));
     sp = mfn_to_shadow_page(smfn);
-    if ( !(sp->pinned) ) 
+    ASSERT(sh_type_is_pinnable(v, sp->type));
+    if ( sp->pinned ) 
     {
-        if ( !sh_get_ref(smfn, 0) )
+        /* Already pinned: take it out of the pinned-list so it can go 
+         * at the front */
+        list_del(&sp->list);
+    }
+    else
+    {
+        /* Not pinned: pin it! */
+        if ( !sh_get_ref(v, smfn, 0) )
             return 0;
         sp->pinned = 1;
     }
+    /* Put it at the head of the list of pinned shadows */
+    list_add(&sp->list, &v->domain->arch.shadow.pinned_shadows);
     return 1;
 }
 
-/* Unpin a shadow page: unset the pin bit and release the extra ref. */
+/* Unpin a shadow page: unset the pin bit, take the shadow off the list
+ * of pinned shadows, and release the extra ref. */
 static inline void sh_unpin(struct vcpu *v, mfn_t smfn)
 {
     struct shadow_page_info *sp;
     
     ASSERT(mfn_valid(smfn));
     sp = mfn_to_shadow_page(smfn);
+    ASSERT(sh_type_is_pinnable(v, sp->type));
     if ( sp->pinned )
     {
         sp->pinned = 0;
+        list_del(&sp->list);
+        sp->up = 0; /* in case this stops being a pinnable type in future */
         sh_put_ref(v, smfn, 0);
     }
 }

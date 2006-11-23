@@ -964,7 +964,7 @@ static int shadow_set_l4e(struct vcpu *v,
                           shadow_l4e_t new_sl4e, 
                           mfn_t sl4mfn)
 {
-    int flags = 0;
+    int flags = 0, ok;
     shadow_l4e_t old_sl4e;
     paddr_t paddr;
     ASSERT(sl4e != NULL);
@@ -976,12 +976,19 @@ static int shadow_set_l4e(struct vcpu *v,
              | (((unsigned long)sl4e) & ~PAGE_MASK));
 
     if ( shadow_l4e_get_flags(new_sl4e) & _PAGE_PRESENT ) 
+    {
         /* About to install a new reference */        
-        if ( !sh_get_ref(shadow_l4e_get_mfn(new_sl4e), paddr) )
+        mfn_t sl3mfn = shadow_l4e_get_mfn(new_sl4e);
+        ok = sh_get_ref(v, sl3mfn, paddr);
+        /* Are we pinning l3 shadows to handle wierd linux behaviour? */
+        if ( sh_type_is_pinnable(v, SH_type_l3_64_shadow) )
+            ok |= sh_pin(v, sl3mfn);
+        if ( !ok )
         {
             domain_crash(v->domain);
             return SHADOW_SET_ERROR;
         }
+    }
 
     /* Write the new entry */
     shadow_write_entries(sl4e, &new_sl4e, 1, sl4mfn);
@@ -1020,7 +1027,7 @@ static int shadow_set_l3e(struct vcpu *v,
     
     if ( shadow_l3e_get_flags(new_sl3e) & _PAGE_PRESENT )
         /* About to install a new reference */        
-        if ( !sh_get_ref(shadow_l3e_get_mfn(new_sl3e), paddr) )
+        if ( !sh_get_ref(v, shadow_l3e_get_mfn(new_sl3e), paddr) )
         {
             domain_crash(v->domain);
             return SHADOW_SET_ERROR;
@@ -1076,7 +1083,7 @@ static int shadow_set_l2e(struct vcpu *v,
 
     if ( shadow_l2e_get_flags(new_sl2e) & _PAGE_PRESENT ) 
         /* About to install a new reference */
-        if ( !sh_get_ref(shadow_l2e_get_mfn(new_sl2e), paddr) )
+        if ( !sh_get_ref(v, shadow_l2e_get_mfn(new_sl2e), paddr) )
         {
             domain_crash(v->domain);
             return SHADOW_SET_ERROR;
@@ -1361,8 +1368,6 @@ do {                                                                    \
 /**************************************************************************/
 /* Functions to install Xen mappings and linear mappings in shadow pages */
 
-static mfn_t sh_make_shadow(struct vcpu *v, mfn_t gmfn, u32 shadow_type);
-
 // XXX -- this function should probably be moved to shadow-common.c, but that
 //        probably wants to wait until the shadow types have been moved from
 //        shadow-types.h to shadow-private.h
@@ -1546,6 +1551,44 @@ sh_make_shadow(struct vcpu *v, mfn_t gmfn, u32 shadow_type)
          && shadow_type != SH_type_l4_64_shadow )
         /* Lower-level shadow, not yet linked form a higher level */
         mfn_to_shadow_page(smfn)->up = 0;
+
+#if GUEST_PAGING_LEVELS == 4
+#if (SHADOW_OPTIMIZATIONS & SHOPT_LINUX_L3_TOPLEVEL) 
+    if ( shadow_type == SH_type_l4_64_shadow &&
+         unlikely(v->domain->arch.shadow.opt_flags & SHOPT_LINUX_L3_TOPLEVEL) )
+    {
+        /* We're shadowing a new l4, but we've been assuming the guest uses
+         * only one l4 per vcpu and context switches using an l4 entry. 
+         * Count the number of active l4 shadows.  If there are enough
+         * of them, decide that this isn't an old linux guest, and stop
+         * pinning l3es.  This is not very quick but it doesn't happen
+         * very often. */
+        struct list_head *l, *t;
+        struct shadow_page_info *sp;
+        struct vcpu *v2;
+        int l4count = 0, vcpus = 0;
+        list_for_each(l, &v->domain->arch.shadow.pinned_shadows)
+        {
+            sp = list_entry(l, struct shadow_page_info, list);
+            if ( sp->type == SH_type_l4_64_shadow )
+                l4count++;
+        }
+        for_each_vcpu ( v->domain, v2 ) 
+            vcpus++;
+        if ( l4count > 2 * vcpus ) 
+        {
+            /* Unpin all the pinned l3 tables, and don't pin any more. */
+            list_for_each_safe(l, t, &v->domain->arch.shadow.pinned_shadows)
+            {
+                sp = list_entry(l, struct shadow_page_info, list);
+                if ( sp->type == SH_type_l3_64_shadow )
+                    sh_unpin(v, shadow_page_to_mfn(sp));
+            }
+            v->domain->arch.shadow.opt_flags &= ~SHOPT_LINUX_L3_TOPLEVEL;
+        }
+    }
+#endif
+#endif
 
     // Create the Xen mappings...
     if ( !shadow_mode_external(v->domain) )
@@ -1893,9 +1936,6 @@ void sh_destroy_l4_shadow(struct vcpu *v, mfn_t smfn)
     gmfn = _mfn(mfn_to_shadow_page(smfn)->backpointer);
     delete_shadow_status(v, gmfn, t, smfn);
     shadow_demote(v, gmfn, t);
-    /* Take this shadow off the list of root shadows */
-    list_del_init(&mfn_to_shadow_page(smfn)->list);
-
     /* Decrement refcounts of all the old entries */
     xen_mappings = (!shadow_mode_external(v->domain));
     sl4mfn = smfn; 
@@ -1903,8 +1943,8 @@ void sh_destroy_l4_shadow(struct vcpu *v, mfn_t smfn)
         if ( shadow_l4e_get_flags(*sl4e) & _PAGE_PRESENT ) 
         {
             sh_put_ref(v, shadow_l4e_get_mfn(*sl4e),
-                        (((paddr_t)mfn_x(sl4mfn)) << PAGE_SHIFT) 
-                        | ((unsigned long)sl4e & ~PAGE_MASK));
+                       (((paddr_t)mfn_x(sl4mfn)) << PAGE_SHIFT) 
+                       | ((unsigned long)sl4e & ~PAGE_MASK));
         }
     });
     
@@ -1958,10 +1998,6 @@ void sh_destroy_l2_shadow(struct vcpu *v, mfn_t smfn)
     gmfn = _mfn(mfn_to_shadow_page(smfn)->backpointer);
     delete_shadow_status(v, gmfn, t, smfn);
     shadow_demote(v, gmfn, t);
-#if (GUEST_PAGING_LEVELS == 2) || (GUEST_PAGING_LEVELS == 3)
-    /* Take this shadow off the list of root shadows */
-    list_del_init(&mfn_to_shadow_page(smfn)->list);
-#endif
 
     /* Decrement refcounts of all the old entries */
     sl2mfn = smfn;
@@ -3276,13 +3312,7 @@ sh_set_toplevel_shadow(struct vcpu *v,
 
     /* Guest mfn is valid: shadow it and install the shadow */
     smfn = get_shadow_status(v, gmfn, root_type);
-    if ( valid_mfn(smfn) )
-    {
-        /* Pull this root shadow out of the list of roots (we will put
-         * it back in at the head). */
-        list_del(&mfn_to_shadow_page(smfn)->list);
-    }
-    else
+    if ( !valid_mfn(smfn) )
     {
         /* Make sure there's enough free shadow memory. */
         shadow_prealloc(d, SHADOW_MAX_ORDER); 
@@ -3298,17 +3328,15 @@ sh_set_toplevel_shadow(struct vcpu *v,
 #endif
 
     /* Pin the shadow and put it (back) on the list of top-level shadows */
-    if ( sh_pin(smfn) )
-        list_add(&mfn_to_shadow_page(smfn)->list, 
-                 &d->arch.shadow.toplevel_shadows);
-    else 
+    if ( sh_pin(v, smfn) == 0 )
     {
         SHADOW_ERROR("can't pin %#lx as toplevel shadow\n", mfn_x(smfn));
         domain_crash(v->domain);
-    }        
+    }
 
-    /* Take a ref to this page: it will be released in sh_detach_old_tables. */
-    if ( !sh_get_ref(smfn, 0) )
+    /* Take a ref to this page: it will be released in sh_detach_old_tables()
+     * or the next call to set_toplevel_shadow() */
+    if ( !sh_get_ref(v, smfn, 0) )
     {
         SHADOW_ERROR("can't install %#lx as toplevel shadow\n", mfn_x(smfn));
         domain_crash(v->domain);

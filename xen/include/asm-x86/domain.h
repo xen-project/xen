@@ -65,10 +65,11 @@ struct shadow_domain {
     struct list_head  freelists[SHADOW_MAX_ORDER + 1]; 
     struct list_head  p2m_freelist;
     struct list_head  p2m_inuse;
-    struct list_head  toplevel_shadows;
+    struct list_head  pinned_shadows;
     unsigned int      total_pages;  /* number of pages allocated */
     unsigned int      free_pages;   /* number of pages on freelists */
     unsigned int      p2m_pages;    /* number of pages in p2m map */
+    unsigned int      opt_flags;    /* runtime tunable optimizations on/off */
 
     /* Shadow hashtable */
     struct shadow_page_info **hash_table;
