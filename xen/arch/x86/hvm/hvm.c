@@ -330,12 +330,13 @@ void hvm_hlt(unsigned long rflags)
 /*
  * __hvm_copy():
  *  @buf  = hypervisor buffer
- *  @addr = guest physical address to copy to/from
+ *  @addr = guest address to copy to/from
  *  @size = number of bytes to copy
  *  @dir  = copy *to* guest (TRUE) or *from* guest (FALSE)?
+ *  @virt = addr is *virtual* (TRUE) or *guest physical* (FALSE)?
  * Returns number of bytes failed to copy (0 == complete success).
  */
-static int __hvm_copy(void *buf, paddr_t addr, int size, int dir)
+static int __hvm_copy(void *buf, paddr_t addr, int size, int dir, int virt)
 {
     unsigned long mfn;
     char *p;
@@ -346,7 +347,11 @@ static int __hvm_copy(void *buf, paddr_t addr, int size, int dir)
     {
         count = min_t(int, PAGE_SIZE - (addr & ~PAGE_MASK), todo);
 
-        mfn = get_mfn_from_gpfn(addr >> PAGE_SHIFT);
+        if ( virt )
+            mfn = get_mfn_from_gpfn(shadow_gva_to_gfn(current, addr));
+        else
+            mfn = get_mfn_from_gpfn(addr >> PAGE_SHIFT);
+
         if ( mfn == INVALID_MFN )
             return todo;
 
@@ -369,23 +374,24 @@ static int __hvm_copy(void *buf, paddr_t addr, int size, int dir)
 
 int hvm_copy_to_guest_phys(paddr_t paddr, void *buf, int size)
 {
-    return __hvm_copy(buf, paddr, size, 1);
+    return __hvm_copy(buf, paddr, size, 1, 0);
 }
 
 int hvm_copy_from_guest_phys(void *buf, paddr_t paddr, int size)
 {
-    return __hvm_copy(buf, paddr, size, 0);
+    return __hvm_copy(buf, paddr, size, 0, 0);
 }
 
 int hvm_copy_to_guest_virt(unsigned long vaddr, void *buf, int size)
 {
-    return __hvm_copy(buf, shadow_gva_to_gpa(current, vaddr), size, 1);
+    return __hvm_copy(buf, vaddr, size, 1, 1);
 }
 
 int hvm_copy_from_guest_virt(void *buf, unsigned long vaddr, int size)
 {
-    return __hvm_copy(buf, shadow_gva_to_gpa(current, vaddr), size, 0);
+    return __hvm_copy(buf, vaddr, size, 0, 1);
 }
+
 
 /* HVM specific printbuf. Mostly used for hvmloader chit-chat. */
 void hvm_print_line(struct vcpu *v, const char c)
