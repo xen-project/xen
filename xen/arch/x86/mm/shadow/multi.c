@@ -3823,13 +3823,10 @@ static inline void * emulate_map_dest(struct vcpu *v,
         v->arch.shadow.propagate_fault = 1;
         return NULL;
     }
-    
-    if ( !valid_mfn(mfn) )
-    {
-        /* Attempted a write to a bad gfn.  This should never happen:
-         * after all, we're here because this write is to a page table. */
-        BUG();
-    }
+
+    /* Attempted a write to a bad gfn? This should never happen:
+     * after all, we're here because this write is to a page table. */
+    BUG_ON(!valid_mfn(mfn));
 
     ASSERT(sh_mfn_is_a_page_table(mfn));
     *mfnp = mfn;
@@ -3840,27 +3837,26 @@ int
 sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
                       u32 bytes, struct x86_emulate_ctxt *ctxt)
 {
+    mfn_t mfn;
+    void *addr;
+
+    if ( vaddr & (bytes-1) )
+        return X86EMUL_UNHANDLEABLE;
+
     ASSERT(shadow_lock_is_acquired(v->domain));
-    while ( bytes > 0 )
-    {
-        mfn_t mfn;
-        int bytes_on_page;
-        void *addr;
+    ASSERT(((vaddr & ~PAGE_MASK) + bytes) <= PAGE_SIZE);
 
-        bytes_on_page = PAGE_SIZE - (vaddr & ~PAGE_MASK);
-        if ( bytes_on_page > bytes )
-            bytes_on_page = bytes;
+    if ( (addr = emulate_map_dest(v, vaddr, ctxt, &mfn)) == NULL )
+        return X86EMUL_PROPAGATE_FAULT;
 
-        if ( (addr = emulate_map_dest(v, vaddr, ctxt, &mfn)) == NULL )
-            return X86EMUL_PROPAGATE_FAULT;
-        memcpy(addr, src, bytes_on_page);
-        shadow_validate_guest_pt_write(v, mfn, addr, bytes_on_page);
-        bytes -= bytes_on_page;
-        /* If we are writing zeros to this page, might want to unshadow */
-        if ( likely(bytes_on_page >= 4) && (*(u32 *)addr == 0) )
-            check_for_early_unshadow(v, mfn);
-        sh_unmap_domain_page(addr);
-    }
+    memcpy(addr, src, bytes);
+    shadow_validate_guest_pt_write(v, mfn, addr, bytes);
+
+    /* If we are writing zeros to this page, might want to unshadow */
+    if ( likely(bytes >= 4) && (*(u32 *)addr == 0) )
+        check_for_early_unshadow(v, mfn);
+
+    sh_unmap_domain_page(addr);
     shadow_audit_tables(v);
     return X86EMUL_CONTINUE;
 }
@@ -3876,12 +3872,15 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
     int rv = X86EMUL_CONTINUE;
 
     ASSERT(shadow_lock_is_acquired(v->domain));
-    ASSERT(bytes <= sizeof (unsigned long));
+    ASSERT(bytes <= sizeof(unsigned long));
+
+    if ( vaddr & (bytes-1) )
+        return X86EMUL_UNHANDLEABLE;
 
     if ( (addr = emulate_map_dest(v, vaddr, ctxt, &mfn)) == NULL )
         return X86EMUL_PROPAGATE_FAULT;
 
-    switch (bytes) 
+    switch ( bytes )
     {
     case 1: prev = cmpxchg(((u8 *)addr), old, new);  break;
     case 2: prev = cmpxchg(((u16 *)addr), old, new); break;
@@ -3892,7 +3891,7 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
         prev = ~old;
     }
 
-    if ( (prev == old)  )
+    if ( prev == old )
         shadow_validate_guest_pt_write(v, mfn, addr, bytes);
     else
         rv = X86EMUL_CMPXCHG_FAILED;
@@ -3923,6 +3922,9 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
 
     ASSERT(shadow_lock_is_acquired(v->domain));
 
+    if ( vaddr & 7 )
+        return X86EMUL_UNHANDLEABLE;
+
     if ( (addr = emulate_map_dest(v, vaddr, ctxt, &mfn)) == NULL )
         return X86EMUL_PROPAGATE_FAULT;
 
@@ -3930,7 +3932,7 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
     new = (((u64) new_hi) << 32) | (u64) new_lo;
     prev = cmpxchg(((u64 *)addr), old, new);
 
-    if ( (prev == old)  )
+    if ( prev == old )
         shadow_validate_guest_pt_write(v, mfn, addr, 8);
     else
         rv = X86EMUL_CMPXCHG_FAILED;
