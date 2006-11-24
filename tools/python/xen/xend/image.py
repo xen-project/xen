@@ -377,8 +377,8 @@ class HVMImageHandler(ImageHandler):
             return ret
 
         if vnc:
-            vncdisplay = sxp.child_value(config, 'vncdisplay',
-                                         int(self.vm.getDomid()))
+            vncdisplay = int(sxp.child_value(config, 'vncdisplay',
+                                             self.vm.getDomid()))
 
             vncunused = sxp.child_value(config, 'vncunused')
             if vncunused:
