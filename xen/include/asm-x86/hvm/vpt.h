@@ -111,36 +111,19 @@ struct pl_time {    /* platform time */
     struct PMTState      vpmt;
 };
 
-static __inline__ s_time_t get_scheduled(
-    struct vcpu *v, int irq,
-    struct periodic_time *pt)
-{
-    if ( is_irq_enabled(v, irq) ) {
-        return pt->scheduled;
-    }
-    else
-        return -1;
-}
-
 extern u64 hvm_get_guest_time(struct vcpu *v);
-/*
- * get processor time.
- * unit: TSC
- */
-static __inline__ int64_t hvm_get_clock(struct vcpu *v)
+static inline int64_t hvm_get_clock(struct vcpu *v)
 {
-    uint64_t  gtsc;
-
-    gtsc = hvm_get_guest_time(v);
-    return gtsc;
+    return hvm_get_guest_time(v);
 }
 
-#define ticks_per_sec(v)      (v->domain->arch.hvm_domain.tsc_frequency)
+#define ticks_per_sec(v) (v->domain->arch.hvm_domain.tsc_frequency)
 
 /* to hook the ioreq packet to get the PIT initialization info */
 extern void hvm_hooks_assist(struct vcpu *v);
 extern void pickup_deactive_ticks(struct periodic_time *vpit);
-extern struct periodic_time *create_periodic_time(u32 period, char irq, char one_shot, time_cb *cb, void *data);
+extern struct periodic_time *create_periodic_time(
+    u32 period, char irq, char one_shot, time_cb *cb, void *data);
 extern void destroy_periodic_time(struct periodic_time *pt);
 void pit_init(struct vcpu *v, unsigned long cpu_khz);
 void rtc_init(struct vcpu *v, int base, int irq);

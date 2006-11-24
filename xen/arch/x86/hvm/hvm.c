@@ -244,21 +244,13 @@ void hvm_vcpu_destroy(struct vcpu *v)
 
 int cpu_get_interrupt(struct vcpu *v, int *type)
 {
-    int intno;
-    struct vpic *vpic = domain_vpic(v->domain);
-    unsigned long flags;
+    int irq;
 
-    if ( (intno = cpu_get_apic_interrupt(v, type)) != -1 ) {
-        /* set irq request if a PIC irq is still pending */
-        /* XXX: improve that */
-        spin_lock_irqsave(vpic_lock(vpic), flags);
-        pic_update_irq(vpic);
-        spin_unlock_irqrestore(vpic_lock(vpic), flags);
-        return intno;
-    }
-    /* read the irq from the PIC */
-    if ( v->vcpu_id == 0 && (intno = cpu_get_pic_interrupt(v, type)) != -1 )
-        return intno;
+    if ( (irq = cpu_get_apic_interrupt(v, type)) != -1 )
+        return irq;
+
+    if ( (v->vcpu_id == 0) && ((irq = cpu_get_pic_interrupt(v, type)) != -1) )
+        return irq;
 
     return -1;
 }

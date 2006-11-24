@@ -1,8 +1,9 @@
 /*
- * QEMU System Emulator header
+ * i8259 interrupt controller emulation
  * 
  * Copyright (c) 2003 Fabrice Bellard
  * Copyright (c) 2005 Intel Corp
+ * Copyright (c) 2006 Keir Fraser, XenSource Inc.
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -59,10 +60,8 @@ struct vpic {
 
 void pic_set_irq(struct vpic *vpic, int irq, int level);
 void pic_init(struct vpic *vpic);
-void pic_update_irq(struct vpic *vpic); /* Caller must hold vpic->lock */
 void register_pic_io_hook(struct domain *d);
 int cpu_get_pic_interrupt(struct vcpu *v, int *type);
 int is_periodic_irq(struct vcpu *v, int irq, int type);
-int is_irq_enabled(struct vcpu *v, int irq);
 
 #endif  /* __ASM_X86_HVM_VPIC_H__ */  
