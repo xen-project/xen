@@ -3,6 +3,9 @@
 
 #include <stdarg.h>
 
+#undef offsetof
+#define offsetof(t, m) ((unsigned long)&((t *)0)->m)
+
 extern void __assert_failed(char *assertion, char *file, int line)
     __attribute__((noreturn));
 #define ASSERT(p) \
@@ -40,8 +43,9 @@ void pci_write(uint32_t devfn, uint32_t reg, uint32_t len, uint32_t val);
 void cpuid(uint32_t idx, uint32_t *eax, uint32_t *ebx,
            uint32_t *ecx, uint32_t *edx);
 
-/* Return number of vcpus. */
+/* HVM-builder info. */
 int get_vcpu_nr(void);
+int get_acpi_enabled(void);
 
 /* String and memory functions */
 int strcmp(const char *cs, const char *ct);

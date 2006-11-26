@@ -15,21 +15,20 @@
 # Place - Suite 330, Boston, MA 02111-1307 USA.
 #
 
+override XEN_TARGET_ARCH = x86_32
 XEN_ROOT = ../../../..
+CFLAGS := -I. -I.. -I$(XEN_ROOT)/tools/libxc
 include $(XEN_ROOT)/tools/Rules.mk
 
-HOSTCFLAGS += -I. -I.. -I$(XEN_ROOT)/tools/libxc
-
-C_SRC = build.c dsdt.c gen.c static_tables.c
+C_SRC = build.c dsdt.c static_tables.c
 H_SRC = $(wildcard *.h)
-ACPI_GEN = acpigen
-ACPI_BIN = acpi.bin
+OBJS  = $(patsubst %.c,%.o,$(C_SRC))
 
 IASL_VER = acpica-unix-20050513
 IASL_URL = http://developer.intel.com/technology/iapc/acpi/downloads/$(IASL_VER).tar.gz
 
 vpath iasl $(PATH)
-all:$(ACPI_BIN)
+all: acpi.a
 
 dsdt.c: dsdt.asl
 	$(MAKE) iasl
@@ -50,14 +49,13 @@ iasl:
 	make -C $(IASL_VER)/compiler
 	$(INSTALL_PROG) $(IASL_VER)/compiler/iasl /usr/bin/iasl
 
-$(ACPI_GEN): $(C_SRC) $(H_SRC)
-	$(HOSTCC) -o $(ACPI_GEN) $(HOSTCFLAGS) $(C_SRC)
+acpi.a: $(OBJS)
+	$(AR) rc $@ $(OBJS)
 
-$(ACPI_BIN): $(ACPI_GEN)
-	./$(ACPI_GEN) $(ACPI_BIN)
+%.o: %.c $(H_SRC)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
 
 clean:
-	rm -rf *.o $(ACPI_GEN) $(ACPI_BIN) $(IASL_VER) 
-	rm -rf  $(IASL_VER).tar.gz
+	rm -rf *.a *.o $(IASL_VER) $(IASL_VER).tar.gz
 
 install: all

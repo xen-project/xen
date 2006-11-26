@@ -23,6 +23,7 @@
 #include "config.h"
 #include <stdint.h>
 #include <xenctrl.h>
+#include <xen/hvm/hvm_info_table.h>
 
 void outb(uint16_t addr, uint8_t val)
 {
@@ -485,6 +486,62 @@ void __bug(char *file, int line)
     printf("HVMLoader bug at %s:%d\n", file, line);
     for ( ; ; )
         __asm__ __volatile__ ( "ud2" );
+}
+
+static int validate_hvm_info(struct hvm_info_table *t)
+{
+    char signature[] = "HVM INFO";
+    uint8_t *ptr = (uint8_t *)t;
+    uint8_t sum = 0;
+    int i;
+
+    /* strncmp(t->signature, "HVM INFO", 8) */
+    for ( i = 0; i < 8; i++ )
+    {
+        if ( signature[i] != t->signature[i] )
+        {
+            printf("Bad hvm info signature\n");
+            return 0;
+        }
+    }
+
+    for ( i = 0; i < t->length; i++ )
+        sum += ptr[i];
+
+    return (sum == 0);
+}
+
+static struct hvm_info_table *get_hvm_info_table(void)
+{
+    static struct hvm_info_table *table;
+    struct hvm_info_table *t;
+
+    if ( table != NULL )
+        return table;
+
+    t = (struct hvm_info_table *)HVM_INFO_PADDR;
+
+    if ( !validate_hvm_info(t) )
+    {
+        printf("Bad hvm info table\n");
+        return NULL;
+    }
+
+    table = t;
+
+    return table;
+}
+
+int get_vcpu_nr(void)
+{
+    struct hvm_info_table *t = get_hvm_info_table();
+    return (t ? t->nr_vcpus : 1); /* default 1 vcpu */
+}
+
+int get_acpi_enabled(void)
+{
+    struct hvm_info_table *t = get_hvm_info_table();
+    return (t ? t->acpi_enabled : 0); /* default no acpi */
 }
 
 /*

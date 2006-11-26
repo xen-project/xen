@@ -249,7 +249,7 @@ struct acpi_20_facs {
 /*
  * Multiple APIC Description Table header definition (MADT).
  */
-struct acpi_20_madt_header {
+struct acpi_20_madt {
     struct acpi_header header;
     uint32_t lapic_addr;
     uint32_t flags;
@@ -316,13 +316,6 @@ struct acpi_20_madt_intsrcovr {
     uint16_t flags;
 };
 
-struct acpi_20_madt {
-    struct acpi_20_madt_header    header;
-    struct acpi_20_madt_intsrcovr intsrcovr[4];
-    struct acpi_20_madt_ioapic    io_apic[1];
-    struct acpi_20_madt_lapic     lapic[32];
-};
-
 /*
  * Table Signatures.
  */
@@ -338,7 +331,7 @@ struct acpi_20_madt {
 
 #define ACPI_PHYSICAL_ADDRESS 0xEA000
 
-void AcpiBuildTable(uint8_t *buf);
+int acpi_build_tables(uint8_t *);
 
 #endif /* _ACPI_2_0_H_ */
 

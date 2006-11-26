@@ -74,10 +74,7 @@ asm(
     "stack_top:                      \n"
     );
 
-extern int get_acpi_enabled(void);
-extern int acpi_madt_update(unsigned char* acpi_start);
 extern void create_mp_tables(void);
-struct hvm_info_table *get_hvm_info_table(void);
 
 static int
 cirrus_check(void)
@@ -285,6 +282,9 @@ static void pci_setup(void)
 
 int main(void)
 {
+    int acpi_sz;
+    uint8_t *freemem;
+
     printf("HVM Loader\n");
 
     init_hypercalls();
@@ -297,7 +297,9 @@ int main(void)
 
     apic_setup();
     pci_setup();
-    create_mp_tables();
+
+    if ( get_vcpu_nr() > 1 )
+        create_mp_tables();
 
     if ( cirrus_check() )
     {
@@ -315,22 +317,13 @@ int main(void)
     if ( get_acpi_enabled() != 0 )
     {
         printf("Loading ACPI ...\n");
-        acpi_madt_update((unsigned char *) acpi);
-        if ( (ACPI_PHYSICAL_ADDRESS + sizeof(acpi)) <= 0xF0000 )
-        {
-            unsigned char *freemem = (unsigned char *)
-                (ACPI_PHYSICAL_ADDRESS + sizeof(acpi));
-            /*
-             * Make sure acpi table does not overlap rombios
-             * currently acpi less than 8K will be OK.
-             */
-            memcpy((void *)ACPI_PHYSICAL_ADDRESS, acpi,
-                   sizeof(acpi));
-            acpi_update((unsigned char *)ACPI_PHYSICAL_ADDRESS,
-                        sizeof(acpi),
-                        (unsigned char *)0xF0000,
-                        &freemem);
-        }
+        acpi_sz = acpi_build_tables((uint8_t *)ACPI_PHYSICAL_ADDRESS);
+        freemem = (uint8_t *)ACPI_PHYSICAL_ADDRESS + acpi_sz;
+        ASSERT(freemem <= (uint8_t *)0xF0000);
+        acpi_update((unsigned char *)ACPI_PHYSICAL_ADDRESS,
+                    freemem - (uint8_t *)ACPI_PHYSICAL_ADDRESS,
+                    (unsigned char *)0xF0000,
+                    &freemem);
     }
 
     if ( check_amd() )
