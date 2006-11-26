@@ -98,7 +98,6 @@
 ^tools/firmware/.*\.bin$
 ^tools/firmware/.*\.sym$
 ^tools/firmware/.*bios/.*bios.*\.txt$
-^tools/firmware/hvmloader/acpi/acpigen$
 ^tools/firmware/hvmloader/hvmloader$
 ^tools/firmware/hvmloader/roms\.h$
 ^tools/firmware/rombios/BIOS-bochs-[^/]*$
