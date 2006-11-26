@@ -1007,23 +1007,25 @@ x86_emulate_memop(
                 goto done;
             ea = register_address(*seg, _regs.esi);
         }
+        page_boundary_test();
         register_address_increment(
             _regs.esi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
         register_address_increment(
             _regs.edi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
-        page_boundary_test();
         break;
     case 0xaa ... 0xab: /* stos */
+        ea = register_address(_regs.es, _regs.edi);
+        page_boundary_test();
         dst.type  = OP_MEM;
         dst.bytes = (d & ByteOp) ? 1 : op_bytes;
         dst.ptr   = (unsigned long *)cr2;
         dst.val   = _regs.eax;
         register_address_increment(
             _regs.edi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
-        ea = register_address(_regs.es, _regs.edi);
-        page_boundary_test();
         break;
     case 0xac ... 0xad: /* lods */
+        ea = register_address(*seg, _regs.esi);
+        page_boundary_test();
         dst.type  = OP_REG;
         dst.bytes = (d & ByteOp) ? 1 : op_bytes;
         dst.ptr   = (unsigned long *)&_regs.eax;
@@ -1031,8 +1033,6 @@ x86_emulate_memop(
             goto done;
         register_address_increment(
             _regs.esi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
-        ea = register_address(*seg, _regs.esi);
-        page_boundary_test();
         break;
     }
     goto writeback;
