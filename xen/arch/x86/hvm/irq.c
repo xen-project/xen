@@ -48,7 +48,7 @@ void hvm_pci_intx_assert(
          (hvm_irq->gsi_assert_count[isa_irq]++ == 0) )
     {
         vioapic_irq_positive_edge(d, isa_irq);
-        pic_set_irq(&hvm_irq->vpic, isa_irq, 1);
+        vpic_irq_positive_edge(d, isa_irq);
     }
 
  out:
@@ -75,7 +75,7 @@ void hvm_pci_intx_deassert(
     isa_irq = hvm_irq->pci_link_route[link];
     if ( (--hvm_irq->pci_link_assert_count[link] == 0) && isa_irq &&
          (--hvm_irq->gsi_assert_count[isa_irq] == 0) )
-        pic_set_irq(&hvm_irq->vpic, isa_irq, 0);
+        vpic_irq_negative_edge(d, isa_irq);
 
  out:
     spin_unlock(&hvm_irq->lock);
@@ -94,7 +94,7 @@ void hvm_isa_irq_assert(
          (hvm_irq->gsi_assert_count[isa_irq]++ == 0) )
     {
         vioapic_irq_positive_edge(d, isa_irq);
-        pic_set_irq(&hvm_irq->vpic, isa_irq, 1);
+        vpic_irq_positive_edge(d, isa_irq);
     }
 
     spin_unlock(&hvm_irq->lock);
@@ -111,7 +111,7 @@ void hvm_isa_irq_deassert(
 
     if ( __test_and_clear_bit(isa_irq, &hvm_irq->isa_irq) &&
          (--hvm_irq->gsi_assert_count[isa_irq] == 0) )
-        pic_set_irq(&hvm_irq->vpic, isa_irq, 0);
+        vpic_irq_negative_edge(d, isa_irq);
 
     spin_unlock(&hvm_irq->lock);
 }
@@ -140,7 +140,7 @@ void hvm_set_callback_irq_level(void)
         {
             vioapic_irq_positive_edge(d, gsi);
             if ( gsi <= 15 )
-                pic_set_irq(&hvm_irq->vpic, gsi, 1);
+                vpic_irq_positive_edge(d, gsi);
         }
     }
     else
@@ -149,7 +149,7 @@ void hvm_set_callback_irq_level(void)
              (--hvm_irq->gsi_assert_count[gsi] == 0) )
         {
             if ( gsi <= 15 )
-                pic_set_irq(&hvm_irq->vpic, gsi, 0);
+                vpic_irq_negative_edge(d, gsi);
         }
     }
 
@@ -175,12 +175,12 @@ void hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq)
         goto out;
 
     if ( old_isa_irq && (--hvm_irq->gsi_assert_count[old_isa_irq] == 0) )
-        pic_set_irq(&hvm_irq->vpic, isa_irq, 0);
+        vpic_irq_negative_edge(d, isa_irq);
 
     if ( isa_irq && (hvm_irq->gsi_assert_count[isa_irq]++ == 0) )
     {
         vioapic_irq_positive_edge(d, isa_irq);
-        pic_set_irq(&hvm_irq->vpic, isa_irq, 1);
+        vpic_irq_positive_edge(d, isa_irq);
     }
 
  out:
@@ -210,13 +210,13 @@ void hvm_set_callback_gsi(struct domain *d, unsigned int gsi)
 
     if ( old_gsi && (--hvm_irq->gsi_assert_count[old_gsi] == 0) )
         if ( old_gsi <= 15 )
-            pic_set_irq(&hvm_irq->vpic, old_gsi, 0);
+            vpic_irq_negative_edge(d, old_gsi);
 
     if ( gsi && (hvm_irq->gsi_assert_count[gsi]++ == 0) )
     {
         vioapic_irq_positive_edge(d, gsi);
         if ( gsi <= 15 )
-            pic_set_irq(&hvm_irq->vpic, gsi, 1);
+            vpic_irq_positive_edge(d, gsi);
     }
 
  out:

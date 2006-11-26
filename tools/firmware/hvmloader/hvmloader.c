@@ -26,6 +26,7 @@
 #include "acpi_utils.h"
 #include "smbios.h"
 #include "config.h"
+#include "apic_regs.h"
 #include "pci_regs.h"
 #include <xen/version.h>
 #include <xen/hvm/params.h>
@@ -154,16 +155,13 @@ init_hypercalls(void)
 
 static void apic_setup(void)
 {
-    volatile uint32_t *ioregsel;
-    volatile uint32_t *iowin;
-
-    /* IOAPIC memory-mapped access window registers. */
-    ioregsel = (volatile uint32_t *)(IOAPIC_BASE_ADDRESS + 0x00);
-    iowin    = (volatile uint32_t *)(IOAPIC_BASE_ADDRESS + 0x10);
-
     /* Set the IOAPIC ID to tha static value used in the MP/ACPI tables. */
-    *ioregsel = 0;
-    *iowin    = IOAPIC_ID;
+    ioapic_write(0x00, IOAPIC_ID);
+
+    /* Set up Virtual Wire mode. */
+    lapic_write(APIC_SPIV, APIC_SPIV_APIC_ENABLED | 0xFF);
+    lapic_write(APIC_LVT0, APIC_MODE_EXTINT << 8);
+    lapic_write(APIC_LVT1, APIC_MODE_NMI    << 8);
 }
 
 static void pci_setup(void)

@@ -132,7 +132,7 @@ EXPORT_SYMBOL(notify_remote_via_irq);
 
 irqreturn_t evtchn_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	unsigned int l1i, l2i, port;
+	unsigned int l1i, port;
 	int cpu = smp_processor_id();
 	irqreturn_t(*handler) (int, void *, struct pt_regs *);
 	shared_info_t *s = shared_info_area;
@@ -140,44 +140,28 @@ irqreturn_t evtchn_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	unsigned long l1, l2;
 
 	v->evtchn_upcall_pending = 0;
-	/* NB. No need for a barrier here -- XCHG is a barrier
-	 * on x86. */
+	/* NB. No need for a barrier here -- XCHG is a barrier on x86. */
 	l1 = xchg(&v->evtchn_pending_sel, 0);
-	while (l1 != 0)
-	{
+	while (l1 != 0) {
 		l1i = __ffs(l1);
 		l1 &= ~(1 << l1i);
-
-		l2 = s->evtchn_pending[l1i] & ~s->evtchn_mask[l1i];
-		while (l2 != 0)
-		{
-			l2i = __ffs(l2);
-
-			port = (l1i * BITS_PER_LONG) + l2i;
+		while ((l2 = s->evtchn_pending[l1i] & ~s->evtchn_mask[l1i])) {
+			port = (l1i * BITS_PER_LONG) + __ffs(l2);
 			synch_clear_bit(port, &s->evtchn_pending[0]);
 			if ((handler = evtchns[port].handler) != NULL)
-			{
 				handler(port, evtchns[port].dev_id,
 					regs);
-			}
 			else
-			{
-				printk(KERN_WARNING "unexpected event channel upcall on port %d!\n", port);
-			}
-			l2 = s->evtchn_pending[l1i] & ~s->evtchn_mask[l1i];
+				printk(KERN_WARNING "unexpected event channel "
+				       "upcall on port %d!\n", port);
 		}
 	}
-
-	/* Make sure the hypervisor has a chance to notice that the
-	   upcall_pending condition has been cleared, so that we don't
-	   try and reinject the interrupt again. */
-        (void)HYPERVISOR_xen_version(0, NULL);
 
 	return IRQ_HANDLED;
 }
 
 void force_evtchn_callback(void)
 {
-        (void)HYPERVISOR_xen_version(0, NULL);
+	(void)HYPERVISOR_xen_version(0, NULL);
 }
 EXPORT_SYMBOL(force_evtchn_callback);

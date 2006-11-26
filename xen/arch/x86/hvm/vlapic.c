@@ -2,6 +2,7 @@
  * vlapic.c: virtualize LAPIC for HVM vcpus.
  *
  * Copyright (c) 2004, Intel Corporation.
+ * Copyright (c) 2006 Keir Fraser, XenSource Inc.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -37,9 +38,6 @@
 
 #define VLAPIC_VERSION                  0x00050014
 #define VLAPIC_LVT_NUM                  6
-
-/* XXX remove this definition after GFW enabled */
-#define VLAPIC_NO_BIOS
 
 extern u32 get_apic_bus_cycle(void);
 
@@ -146,7 +144,6 @@ int vlapic_find_highest_irr(struct vlapic *vlapic)
 
     return result;
 }
-
 
 int vlapic_set_irq(struct vlapic *vlapic, uint8_t vec, uint8_t trig)
 {
@@ -860,7 +857,7 @@ int cpu_has_pending_irq(struct vcpu *v)
     if ( !vlapic_accept_pic_intr(v) )
         return 0;
 
-    return plat->irq.vpic.irq_pending;
+    return plat->irq.vpic[0].int_output;
 }
 
 void vlapic_post_injection(struct vcpu *v, int vector, int deliver_mode)
@@ -959,15 +956,6 @@ int vlapic_init(struct vcpu *v)
 
     init_timer(&vlapic->vlapic_timer,
                   vlapic_timer_fn, vlapic, v->processor);
-
-#ifdef VLAPIC_NO_BIOS
-    /* According to mp specification, BIOS will enable LVT0/1. */
-    if ( v->vcpu_id == 0 )
-    {
-        vlapic_set_reg(vlapic, APIC_LVT0, APIC_MODE_EXTINT << 8);
-        vlapic_set_reg(vlapic, APIC_LVT1, APIC_MODE_NMI << 8);
-    }
-#endif
 
     return 0;
 }

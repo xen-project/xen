@@ -20,6 +20,12 @@ uint8_t  inb(uint16_t addr);
 uint16_t inw(uint16_t addr);
 uint32_t inl(uint16_t addr);
 
+/* APIC access */
+uint32_t ioapic_read(uint32_t reg);
+void ioapic_write(uint32_t reg, uint32_t val);
+uint32_t lapic_read(uint32_t reg);
+void lapic_write(uint32_t reg, uint32_t val);
+
 /* PCI access */
 uint32_t pci_read(uint32_t devfn, uint32_t reg, uint32_t len);
 #define pci_readb(devfn, reg) ((uint8_t) pci_read(devfn, reg, 1))

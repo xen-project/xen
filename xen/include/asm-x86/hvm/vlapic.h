@@ -2,6 +2,7 @@
  * hvm_vlapic.h: virtualize LAPIC definitions.
  *
  * Copyright (c) 2004, Intel Corporation.
+ * Copyright (c) 2006 Keir Fraser, XenSource Inc.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,

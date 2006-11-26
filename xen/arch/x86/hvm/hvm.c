@@ -168,14 +168,13 @@ int hvm_domain_initialise(struct domain *d)
 
     spin_lock_init(&d->arch.hvm_domain.pbuf_lock);
     spin_lock_init(&d->arch.hvm_domain.buffered_io_lock);
+    spin_lock_init(&d->arch.hvm_domain.irq.lock);
 
     rc = shadow_enable(d, SHM2_refcounts|SHM2_translate|SHM2_external);
     if ( rc != 0 )
         return rc;
 
-    pic_init(domain_vpic(d));
-    register_pic_io_hook(d);
-
+    vpic_init(d);
     vioapic_init(d);
 
     return 0;
@@ -244,13 +243,14 @@ void hvm_vcpu_destroy(struct vcpu *v)
 
 int cpu_get_interrupt(struct vcpu *v, int *type)
 {
-    int irq;
+    int vector;
 
-    if ( (irq = cpu_get_apic_interrupt(v, type)) != -1 )
-        return irq;
+    if ( (vector = cpu_get_apic_interrupt(v, type)) != -1 )
+        return vector;
 
-    if ( (v->vcpu_id == 0) && ((irq = cpu_get_pic_interrupt(v, type)) != -1) )
-        return irq;
+    if ( (v->vcpu_id == 0) &&
+         ((vector = cpu_get_pic_interrupt(v, type)) != -1) )
+        return vector;
 
     return -1;
 }

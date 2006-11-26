@@ -309,22 +309,24 @@ uint64_t e820_malloc(uint64_t size, uint32_t type, uint64_t mask)
 
 uint32_t ioapic_read(uint32_t reg)
 {
-    uint32_t *ioregsel = (uint32_t *)(IOAPIC_BASE_ADDRESS + 0x00);
-    uint32_t *iowin    = (uint32_t *)(IOAPIC_BASE_ADDRESS + 0x10);
-
-    *ioregsel = reg;
-    mb();
-    return *iowin;
+    *(volatile uint32_t *)(IOAPIC_BASE_ADDRESS + 0x00) = reg;
+    return *(volatile uint32_t *)(IOAPIC_BASE_ADDRESS + 0x10);
 }
 
 void ioapic_write(uint32_t reg, uint32_t val)
 {
-    uint32_t *ioregsel = (uint32_t *)(IOAPIC_BASE_ADDRESS + 0x00);
-    uint32_t *iowin    = (uint32_t *)(IOAPIC_BASE_ADDRESS + 0x10);
+    *(volatile uint32_t *)(IOAPIC_BASE_ADDRESS + 0x00) = reg;
+    *(volatile uint32_t *)(IOAPIC_BASE_ADDRESS + 0x10) = val;
+}
 
-    *ioregsel = reg;
-    wmb();
-    *iowin = val;
+uint32_t lapic_read(uint32_t reg)
+{
+    return *(volatile uint32_t *)(LAPIC_BASE_ADDRESS + reg);
+}
+
+void lapic_write(uint32_t reg, uint32_t val)
+{
+    *(volatile uint32_t *)(LAPIC_BASE_ADDRESS + reg) = val;
 }
 
 #define PCI_CONF1_ADDRESS(bus, devfn, reg) \

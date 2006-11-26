@@ -75,7 +75,7 @@ struct hvm_irq {
      *  8-15: Slave  8259 PIC, IO-APIC pins 8-15
      *  16+ : IO-APIC pins 16+
      */
-    struct vpic    vpic;
+    struct vpic    vpic[2]; /* 0=master; 1=slave */
     struct vioapic vioapic;
 
     /* Last VCPU that was delivered a LowestPrio interrupt. */
