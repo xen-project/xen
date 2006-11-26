@@ -379,9 +379,11 @@ do{ __asm__ __volatile__ (                                              \
 
 /* Access/update address held in a register, based on addressing mode. */
 #define register_address(sel, reg)                                      \
+({  unsigned long __reg = (reg);                                        \
     (((mode == X86EMUL_MODE_REAL) ? ((unsigned long)(sel) << 4) : 0) +  \
-     ((ad_bytes == sizeof(unsigned long)) ? (reg) :                     \
-      ((reg) & ((1UL << (ad_bytes << 3)) - 1))))
+     ((ad_bytes == sizeof(unsigned long)) ? __reg :                     \
+      (__reg & ((1UL << (ad_bytes << 3)) - 1))));                       \
+})
 #define register_address_increment(reg, inc)                            \
 do {                                                                    \
     int _inc = (inc); /* signed type ensures sign extension to long */  \
@@ -399,7 +401,7 @@ do {                                                                    \
  * effective address it is okay for us to fail the emulation.
  */
 #define page_boundary_test() do {                               \
-    if ( ((cr2 & (PAGE_SIZE-1)) == 0) && ((ea & 3) != 0) )      \
+    if ( ((cr2 & (PAGE_SIZE-1)) == 0) && ((ea & 7) != 0) )      \
         goto bad_ea;                                            \
 } while ( 0 )
 
@@ -448,17 +450,17 @@ x86_emulate_memop(
     struct x86_emulate_ctxt *ctxt,
     struct x86_emulate_ops  *ops)
 {
+    /* Shadow copy of register state. Committed on successful emulation. */
+    struct cpu_user_regs _regs = *ctxt->regs;
+
     uint8_t b, d, sib, sib_index, sib_base, twobyte = 0, rex_prefix = 0;
     uint8_t modrm, modrm_mod = 0, modrm_reg = 0, modrm_rm = 0;
-    uint16_t *seg = NULL; /* override segment */
+    uint16_t *seg = &_regs.ds; /* override segment */
     unsigned int op_bytes, ad_bytes, lock_prefix = 0, rep_prefix = 0, i;
     int rc = 0;
     struct operand src, dst;
     unsigned long ea = 0, cr2 = ctxt->cr2;
     int mode = ctxt->mode;
-
-    /* Shadow copy of register state. Committed on successful emulation. */
-    struct cpu_user_regs _regs = *ctxt->regs;
 
     /*
      * We do not emulate faults on instruction fetch. We assume that the
@@ -592,7 +594,6 @@ x86_emulate_memop(
             case 1: ea += insn_fetch(uint8_t);  break;
             case 2: ea += insn_fetch(uint16_t); break;
             }
-            ea = (uint16_t)ea;
         }
         else
         {
@@ -638,10 +639,9 @@ x86_emulate_memop(
             case 1: ea += insn_fetch(uint8_t);  break;
             case 2: ea += insn_fetch(uint32_t); break;
             }
-            if ( ad_bytes == 4 )
-                ea = (uint32_t)ea;
         }
 
+        ea = register_address(*seg, ea);
         page_boundary_test();
     }
 
@@ -809,12 +809,14 @@ x86_emulate_memop(
     case 0xa0 ... 0xa1: /* mov */
         dst.ptr = (unsigned long *)&_regs.eax;
         dst.val = src.val;
-        ea = _insn_fetch(ad_bytes); /* src effective address */
+        /* Source EA is not encoded via ModRM. */
+        ea = register_address(*seg, _insn_fetch(ad_bytes));
         page_boundary_test();
         break;
     case 0xa2 ... 0xa3: /* mov */
         dst.val = (unsigned long)_regs.eax;
-        ea = _insn_fetch(ad_bytes); /* dst effective address */
+        /* Destination EA is not encoded via ModRM. */
+        ea = register_address(*seg, _insn_fetch(ad_bytes));
         page_boundary_test();
         break;
     case 0x88 ... 0x8b: /* mov */
@@ -991,11 +993,10 @@ x86_emulate_memop(
         {
             /* Write fault: destination is special memory. */
             dst.ptr = (unsigned long *)cr2;
-            if ( (rc = ops->read_std(register_address(seg ? *seg : _regs.ds,
-                                                      _regs.esi),
+            if ( (rc = ops->read_std(register_address(*seg, _regs.esi),
                                      &dst.val, dst.bytes, ctxt)) != 0 )
                 goto done;
-            ea = _regs.edi & ((1UL << (ad_bytes*8)) - 1UL);
+            ea = register_address(_regs.es, _regs.edi);
         }
         else
         {
@@ -1004,7 +1005,7 @@ x86_emulate_memop(
             if ( (rc = ops->read_emulated(cr2, &dst.val,
                                           dst.bytes, ctxt)) != 0 )
                 goto done;
-            ea = _regs.esi & ((1UL << (ad_bytes*8)) - 1UL);
+            ea = register_address(*seg, _regs.esi);
         }
         register_address_increment(
             _regs.esi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
@@ -1019,7 +1020,7 @@ x86_emulate_memop(
         dst.val   = _regs.eax;
         register_address_increment(
             _regs.edi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
-        ea = _regs.edi & ((1UL << (ad_bytes*8)) - 1UL);
+        ea = register_address(_regs.es, _regs.edi);
         page_boundary_test();
         break;
     case 0xac ... 0xad: /* lods */
@@ -1030,7 +1031,7 @@ x86_emulate_memop(
             goto done;
         register_address_increment(
             _regs.esi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
-        ea = _regs.esi & ((1UL << (ad_bytes*8)) - 1UL);
+        ea = register_address(*seg, _regs.esi);
         page_boundary_test();
         break;
     }
