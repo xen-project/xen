@@ -564,8 +564,7 @@ class XendDomain:
                         log.debug('Shutting down domain: %s' % dom.getName())
                         dom.shutdown("poweroff")
                     elif shutdownAction == 'suspend':
-                        chkfile = self._managed_check_point_path(dom.getName())
-                        self.domain_save(dom.domid, chkfile)
+                        self.domain_suspend(dom.getName())
         finally:
             self.domains_lock.release()
 
@@ -751,11 +750,13 @@ class XendDomain:
             if dominfo.state != DOM_STATE_RUNNING:
                 raise XendError("Cannot suspend domain that is not running.")
 
-            if not os.path.exists(self._managed_config_path(domname)):
+            dom_uuid = dominfo.get_uuid()
+
+            if not os.path.exists(self._managed_config_path(dom_uuid)):
                 raise XendError("Domain is not managed by Xend lifecycle " +
                                 "support.")
-            
-            path = self._managed_check_point_path(domname)
+
+            path = self._managed_check_point_path(dom_uuid)
             fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
             try:
                 # For now we don't support 'live checkpoint' 
@@ -774,36 +775,42 @@ class XendDomain:
         @rtype: None
         @raise XendError: If failed to restore.
         """
+        self.domains_lock.acquire()
         try:
-            dominfo = self.domain_lookup_nr(domname)
-            
-            if not dominfo:
-                raise XendInvalidDomain(domname)
-
-            if dominfo.getDomid() == DOM0_ID:
-                raise XendError("Cannot save privileged domain %s" % domname)
-
-            if dominfo.state != DOM_STATE_HALTED:
-                raise XendError("Cannot suspend domain that is not running.")
-
-            chkpath = self._managed_check_point_path(domname)
-            if not os.path.exists(chkpath):
-                raise XendError("Domain was not suspended by Xend")
-
-            # Restore that replaces the existing XendDomainInfo
             try:
-                log.debug('Current DomainInfo state: %d' % dominfo.state)
-                XendCheckpoint.restore(self,
-                                       os.open(chkpath, os.O_RDONLY),
-                                       dominfo)
-                os.unlink(chkpath)
-            except OSError, ex:
-                raise XendError("Failed to read stored checkpoint file")
-            except IOError, ex:
-                raise XendError("Failed to delete checkpoint file")
-        except Exception, ex:
-            log.exception("Exception occurred when resuming")
-            raise XendError("Error occurred when resuming: %s" % str(ex))
+                dominfo = self.domain_lookup_nr(domname)
+
+                if not dominfo:
+                    raise XendInvalidDomain(domname)
+
+                if dominfo.getDomid() == DOM0_ID:
+                    raise XendError("Cannot save privileged domain %s" % domname)
+
+                if dominfo.state != DOM_STATE_HALTED:
+                    raise XendError("Cannot suspend domain that is not running.")
+
+                dom_uuid = dominfo.get_uuid()
+                chkpath = self._managed_check_point_path(dom_uuid)
+                if not os.path.exists(chkpath):
+                    raise XendError("Domain was not suspended by Xend")
+
+                # Restore that replaces the existing XendDomainInfo
+                try:
+                    log.debug('Current DomainInfo state: %d' % dominfo.state)
+                    XendCheckpoint.restore(self,
+                                           os.open(chkpath, os.O_RDONLY),
+                                           dominfo)
+                    self._add_domain(dominfo)
+                    os.unlink(chkpath)
+                except OSError, ex:
+                    raise XendError("Failed to read stored checkpoint file")
+                except IOError, ex:
+                    raise XendError("Failed to delete checkpoint file")
+            except Exception, ex:
+                log.exception("Exception occurred when resuming")
+                raise XendError("Error occurred when resuming: %s" % str(ex))
+        finally:
+            self.domains_lock.release()
 
 
     def domain_create(self, config):
