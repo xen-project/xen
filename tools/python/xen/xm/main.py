@@ -1428,6 +1428,7 @@ commands = {
     "reboot": xm_reboot,    
     "rename": xm_rename,
     "restore": xm_restore,
+    "resume": xm_resume,
     "save": xm_save,
     "shutdown": xm_shutdown,
     "start": xm_start,
