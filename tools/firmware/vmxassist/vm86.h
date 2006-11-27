@@ -33,11 +33,11 @@
 #ifndef __ASSEMBLY__
 
 struct regs {
-        unsigned	edi, esi, ebp, esp, ebx, edx, ecx, eax;
-        unsigned	ds, es, fs, gs;
-        unsigned	trapno, errno;
-        unsigned	eip, cs, eflags, uesp, uss;
-        unsigned	ves, vds, vfs, vgs;
+	unsigned	edi, esi, ebp, esp, ebx, edx, ecx, eax;
+	unsigned	es, ds, fs, gs;
+	unsigned	trapno, errno;
+	unsigned	eip, cs, eflags, uesp, uss;
+	unsigned	ves, vds, vfs, vgs;
 };
 
 enum vm86_mode {
