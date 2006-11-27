@@ -41,7 +41,7 @@
 #define vpic_lock(v)   spin_lock(__vpic_lock(v))
 #define vpic_unlock(v) spin_unlock(__vpic_lock(v))
 #define vpic_is_locked(v) spin_is_locked(__vpic_lock(v))
-#define vpic_elcr_mask(v) (vpic->is_master ? (uint8_t)0xd8 : (uint8_t)0xfe);
+#define vpic_elcr_mask(v) (vpic->is_master ? (uint8_t)0xf8 : (uint8_t)0xde);
 
 /* Return the highest priority found in mask. Return 8 if none. */
 #define VPIC_PRIO_NONE 8
