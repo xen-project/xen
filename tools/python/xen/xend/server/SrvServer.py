@@ -62,12 +62,14 @@ class XendServers:
 
     def __init__(self):
         self.servers = []
+        self.cleaningUp = False
 
     def add(self, server):
         self.servers.append(server)
 
     def cleanup(self, signum = 0, frame = None):
         log.debug("SrvServer.cleanup()")
+        self.cleaningUp = True
         for server in self.servers:
             try:
                 server.shutdown()
@@ -84,7 +86,9 @@ class XendServers:
         Vifctl.network('start')
         threads = []
         for server in self.servers:
-            thread = Thread(target=server.run)
+            thread = Thread(target=server.run, name=server.__class__.__name__)
+            if isinstance(server, HttpServer):
+                thread.setDaemon(True)
             thread.start()
             threads.append(thread)
 
@@ -117,12 +121,16 @@ class XendServers:
         #   Reason:   The above will cause python signal handlers to be
         #             blocked so we're not able to catch SIGTERM in any
         #             way for cleanup
-        runningThreads = len([t for t in threads if t.isAlive()])
-        while runningThreads > 0:
+        runningThreads = threads
+        while len(runningThreads) > 0:
             try:
                 for t in threads:
                     t.join(1.0)
-                runningThreads = len([t for t in threads if t.isAlive()])
+                runningThreads = [t for t in threads
+                                  if t.isAlive() and not t.isDaemon()]
+                if self.cleaningUp and len(runningThreads) > 0:
+                    log.debug("Waiting for %s." %
+                              [x.getName() for x in runningThreads])
             except:
                 pass
 
