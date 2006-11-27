@@ -298,7 +298,7 @@ int main(void)
     apic_setup();
     pci_setup();
 
-    if ( get_vcpu_nr() > 1 )
+    if ( (get_vcpu_nr() > 1) || get_apic_mode() )
         create_mp_tables();
 
     if ( cirrus_check() )

@@ -46,6 +46,7 @@ void cpuid(uint32_t idx, uint32_t *eax, uint32_t *ebx,
 /* HVM-builder info. */
 int get_vcpu_nr(void);
 int get_acpi_enabled(void);
+int get_apic_mode(void);
 
 /* String and memory functions */
 int strcmp(const char *cs, const char *ct);

@@ -119,10 +119,11 @@ int acpi_build_tables(uint8_t *buf)
     struct acpi_20_madt *madt = 0;
     struct acpi_20_facs *facs;
     unsigned char       *dsdt;
-    int offset = 0, nr_vcpus = get_vcpu_nr();
+    int offset = 0, requires_madt;
+
+    requires_madt = ((get_vcpu_nr() > 1) || get_apic_mode());
 
 #define inc_offset(sz)  (offset = (offset + (sz) + 15) & ~15)
-#define requires_madt() (nr_vcpus > 1)
 
     facs = (struct acpi_20_facs *)&buf[offset];
     memcpy(facs, &Facs, sizeof(struct acpi_20_facs));
@@ -143,7 +144,7 @@ int acpi_build_tables(uint8_t *buf)
                  offsetof(struct acpi_header, checksum),
                  sizeof(struct acpi_20_fadt));
 
-    if ( requires_madt() )
+    if ( requires_madt )
     {
         madt = (struct acpi_20_madt *)&buf[offset];
         inc_offset(construct_madt(madt));
@@ -154,7 +155,7 @@ int acpi_build_tables(uint8_t *buf)
     inc_offset(sizeof(struct acpi_20_xsdt));
     xsdt->entry[0] = (unsigned long)fadt;
     xsdt->header.length = sizeof(struct acpi_header) + sizeof(uint64_t);
-    if ( requires_madt() )
+    if ( requires_madt )
     {
         xsdt->entry[1] = (unsigned long)madt;
         xsdt->header.length += sizeof(uint64_t);
@@ -168,7 +169,7 @@ int acpi_build_tables(uint8_t *buf)
     inc_offset(sizeof(struct acpi_20_rsdt));
     rsdt->entry[0] = (unsigned long)fadt;
     rsdt->header.length = sizeof(struct acpi_header) + sizeof(uint32_t);
-    if ( requires_madt() )
+    if ( requires_madt )
     {
         rsdt->entry[1] = (unsigned long)madt;
         rsdt->header.length += sizeof(uint32_t);
@@ -188,6 +189,8 @@ int acpi_build_tables(uint8_t *buf)
     set_checksum(rsdp,
                  offsetof(struct acpi_20_rsdp, extended_checksum),
                  sizeof(struct acpi_20_rsdp));
+
+#undef inc_offset
 
     return offset;
 }

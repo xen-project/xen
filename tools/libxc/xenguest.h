@@ -109,22 +109,17 @@ int xc_linux_build_mem(int xc_handle,
 int xc_hvm_build(int xc_handle,
                  uint32_t domid,
                  int memsize,
-                 const char *image_name,
-                 unsigned int vcpus,
-                 unsigned int pae,
-                 unsigned int acpi,
-                 unsigned int store_evtchn,
-                 unsigned long *store_mfn);
+                 const char *image_name);
 
 int xc_hvm_build_mem(int xc_handle,
                      uint32_t domid,
                      int memsize,
                      const char *image_buffer,
-                     unsigned long image_size,
-                     unsigned int vcpus,
-                     unsigned int pae,
-                     unsigned int acpi,
-                     unsigned int store_evtchn,
-                     unsigned long *store_mfn);
+                     unsigned long image_size);
+
+int xc_set_hvm_param(
+    int handle, domid_t dom, int param, unsigned long value);
+int xc_get_hvm_param(
+    int handle, domid_t dom, int param, unsigned long *value);
 
 #endif /* XENGUEST_H */

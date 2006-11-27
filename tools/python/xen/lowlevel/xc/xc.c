@@ -13,10 +13,13 @@
 #include <netinet/tcp.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/mman.h>
 #include <netdb.h>
 #include <arpa/inet.h>
 
 #include "xenctrl.h"
+#include <xen/hvm/hvm_info_table.h>
+#include <xen/hvm/params.h>
 
 /* Needed for Python versions earlier than 2.3. */
 #ifndef PyMODINIT_FUNC
@@ -371,25 +374,45 @@ static PyObject *pyxc_hvm_build(XcObject *self,
                                 PyObject *kwds)
 {
     uint32_t dom;
+    struct hvm_info_table *va_hvm;
+    uint8_t *va_map, sum;
     char *image;
-    int store_evtchn;
-    int memsize;
-    int vcpus = 1;
-    int pae  = 0;
-    int acpi = 0;
-    unsigned long store_mfn = 0;
+    int i, store_evtchn, memsize, vcpus = 1, pae = 0, acpi = 0, apic = 1;
+    unsigned long store_mfn;
 
     static char *kwd_list[] = { "domid", "store_evtchn",
 				"memsize", "image", "vcpus", "pae", "acpi",
-				NULL };
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiisiii", kwd_list,
+				"apic", NULL };
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiis|iiii", kwd_list,
                                       &dom, &store_evtchn, &memsize,
-                                      &image, &vcpus, &pae, &acpi) )
+                                      &image, &vcpus, &pae, &acpi, &apic) )
         return NULL;
 
-    if ( xc_hvm_build(self->xc_handle, dom, memsize, image,
-                      vcpus, pae, acpi, store_evtchn, &store_mfn) != 0 )
+    if ( xc_hvm_build(self->xc_handle, dom, memsize, image) != 0 )
         return PyErr_SetFromErrno(xc_error);
+
+    /* Set up the HVM info table. */
+    va_map = xc_map_foreign_range(self->xc_handle, dom, PAGE_SIZE,
+                                  PROT_READ | PROT_WRITE,
+                                  HVM_INFO_PFN);
+    if ( va_map == NULL )
+        return PyErr_SetFromErrno(xc_error);
+    va_hvm = (struct hvm_info_table *)(va_map + HVM_INFO_OFFSET);
+    memset(va_hvm, 0, sizeof(*va_hvm));
+    strncpy(va_hvm->signature, "HVM INFO", 8);
+    va_hvm->length       = sizeof(struct hvm_info_table);
+    va_hvm->acpi_enabled = acpi;
+    va_hvm->apic_mode    = apic;
+    va_hvm->nr_vcpus     = vcpus;
+    for ( i = 0, sum = 0; i < va_hvm->length; i++ )
+        sum += ((uint8_t *)va_hvm)[i];
+    va_hvm->checksum = -sum;
+    munmap(va_map, PAGE_SIZE);
+
+    xc_get_hvm_param(self->xc_handle, dom, HVM_PARAM_STORE_PFN, &store_mfn);
+    xc_set_hvm_param(self->xc_handle, dom, HVM_PARAM_PAE_ENABLED, pae);
+    xc_set_hvm_param(self->xc_handle, dom, HVM_PARAM_STORE_EVTCHN,
+                     store_evtchn);
 
     return Py_BuildValue("{s:i}", "store_mfn", store_mfn);
 }

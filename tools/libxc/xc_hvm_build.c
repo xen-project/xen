@@ -15,6 +15,8 @@
 #include <xen/hvm/params.h>
 #include <xen/hvm/e820.h>
 
+#define SCRATCH_PFN 0xFFFFF
+
 #define HVM_LOADER_ENTR_ADDR  0x00100000
 static int
 parseelfimage(
@@ -24,8 +26,8 @@ loadelfimage(
     char *elfbase, int xch, uint32_t dom, unsigned long *parray,
     struct domain_setup_info *dsi);
 
-static void xc_set_hvm_param(int handle,
-                             domid_t dom, int param, unsigned long value)
+int xc_set_hvm_param(
+    int handle, domid_t dom, int param, unsigned long value)
 {
     DECLARE_HYPERCALL;
     xen_hvm_param_t arg;
@@ -38,14 +40,30 @@ static void xc_set_hvm_param(int handle,
     arg.index = param;
     arg.value = value;
     if ( lock_pages(&arg, sizeof(arg)) != 0 )
-    {
-        PERROR("Could not lock memory for set parameter");
-        return;
-    }
+        return -1;
     rc = do_xen_hypercall(handle, &hypercall);
     unlock_pages(&arg, sizeof(arg));
-    if (rc < 0)
-        PERROR("set HVM parameter failed (%d)", rc);
+    return rc;
+}
+
+int xc_get_hvm_param(
+    int handle, domid_t dom, int param, unsigned long *value)
+{
+    DECLARE_HYPERCALL;
+    xen_hvm_param_t arg;
+    int rc;
+
+    hypercall.op     = __HYPERVISOR_hvm_op;
+    hypercall.arg[0] = HVMOP_get_param;
+    hypercall.arg[1] = (unsigned long)&arg;
+    arg.domid = dom;
+    arg.index = param;
+    if ( lock_pages(&arg, sizeof(arg)) != 0 )
+        return -1;
+    rc = do_xen_hypercall(handle, &hypercall);
+    unlock_pages(&arg, sizeof(arg));
+    *value = arg.value;
+    return rc;
 }
 
 static void build_e820map(void *e820_page, unsigned long long mem_size)
@@ -126,67 +144,16 @@ static void build_e820map(void *e820_page, unsigned long long mem_size)
     *(((unsigned char *)e820_page) + E820_MAP_NR_OFFSET) = nr_map;
 }
 
-static void set_hvm_info_checksum(struct hvm_info_table *t)
-{
-    uint8_t *ptr = (uint8_t *)t, sum = 0;
-    unsigned int i;
-
-    t->checksum = 0;
-
-    for (i = 0; i < t->length; i++)
-        sum += *ptr++;
-
-    t->checksum = -sum;
-}
-
-/*
- * Use E820 reserved memory 0x9F800 to pass HVM info to hvmloader
- * hvmloader will use this info to set BIOS accordingly
- */
-static int set_hvm_info(int xc_handle, uint32_t dom,
-                        xen_pfn_t *pfn_list, unsigned int vcpus,
-                        unsigned int acpi)
-{
-    char *va_map;
-    struct hvm_info_table *va_hvm;
-
-    va_map = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                  PROT_READ | PROT_WRITE,
-                                  pfn_list[HVM_INFO_PFN]);
-
-    if ( va_map == NULL )
-        return -1;
-
-    va_hvm = (struct hvm_info_table *)(va_map + HVM_INFO_OFFSET);
-    memset(va_hvm, 0, sizeof(*va_hvm));
-
-    strncpy(va_hvm->signature, "HVM INFO", 8);
-    va_hvm->length       = sizeof(struct hvm_info_table);
-    va_hvm->acpi_enabled = acpi;
-    va_hvm->nr_vcpus     = vcpus;
-
-    set_hvm_info_checksum(va_hvm);
-
-    munmap(va_map, PAGE_SIZE);
-
-    return 0;
-}
-
 static int setup_guest(int xc_handle,
                        uint32_t dom, int memsize,
                        char *image, unsigned long image_size,
-                       vcpu_guest_context_t *ctxt,
-                       unsigned long shared_info_frame,
-                       unsigned int vcpus,
-                       unsigned int pae,
-                       unsigned int acpi,
-                       unsigned int store_evtchn,
-                       unsigned long *store_mfn)
+                       vcpu_guest_context_t *ctxt)
 {
     xen_pfn_t *page_array = NULL;
     unsigned long i, nr_pages = (unsigned long)memsize << (20 - PAGE_SHIFT);
     unsigned long shared_page_nr;
-    shared_info_t *shared_info;
+    struct xen_add_to_physmap xatp;
+    struct shared_info *shared_info;
     void *e820_page;
     struct domain_setup_info dsi;
     uint64_t v_end;
@@ -247,29 +214,25 @@ static int setup_guest(int xc_handle,
 
     loadelfimage(image, xc_handle, dom, page_array, &dsi);
 
-    if ( set_hvm_info(xc_handle, dom, page_array, vcpus, acpi) )
-    {
-        ERROR("Couldn't set hvm info for HVM guest.\n");
-        goto error_out;
-    }
-
-    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_PAE_ENABLED, pae);
-
     if ( (e820_page = xc_map_foreign_range(
               xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
-              page_array[E820_MAP_PAGE >> PAGE_SHIFT])) == NULL )
+              E820_MAP_PAGE >> PAGE_SHIFT)) == NULL )
         goto error_out;
     memset(e820_page, 0, PAGE_SIZE);
     build_e820map(e820_page, v_end);
     munmap(e820_page, PAGE_SIZE);
 
-    /* shared_info page starts its life empty. */
-    if ( (shared_info = xc_map_foreign_range(
-              xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
-              shared_info_frame)) == NULL )
+    /* Map and initialise shared_info page. */
+    xatp.domid = dom;
+    xatp.space = XENMAPSPACE_shared_info;
+    xatp.idx   = 0;
+    xatp.gpfn  = SCRATCH_PFN;
+    if ( (xc_memory_op(xc_handle, XENMEM_add_to_physmap, &xatp) != 0) ||
+         ((shared_info = xc_map_foreign_range(
+             xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
+             SCRATCH_PFN)) == NULL) )
         goto error_out;
     memset(shared_info, 0, PAGE_SIZE);
-    /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
         shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
     memset(&shared_info->evtchn_mask[0], 0xff,
@@ -282,14 +245,12 @@ static int setup_guest(int xc_handle,
         shared_page_nr = (v_end >> PAGE_SHIFT) - 1;
 
     /* Paranoia: clean pages. */
-    if ( xc_clear_domain_page(xc_handle, dom, page_array[shared_page_nr]) ||
-         xc_clear_domain_page(xc_handle, dom, page_array[shared_page_nr-1]) ||
-         xc_clear_domain_page(xc_handle, dom, page_array[shared_page_nr-2]) )
+    if ( xc_clear_domain_page(xc_handle, dom, shared_page_nr) ||
+         xc_clear_domain_page(xc_handle, dom, shared_page_nr-1) ||
+         xc_clear_domain_page(xc_handle, dom, shared_page_nr-2) )
         goto error_out;
 
-    *store_mfn = page_array[shared_page_nr - 1];
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_PFN, shared_page_nr-1);
-    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_EVTCHN, store_evtchn);
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_BUFIOREQ_PFN, shared_page_nr-2);
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_IOREQ_PFN, shared_page_nr);
 
@@ -308,14 +269,9 @@ static int xc_hvm_build_internal(int xc_handle,
                                  uint32_t domid,
                                  int memsize,
                                  char *image,
-                                 unsigned long image_size,
-                                 unsigned int vcpus,
-                                 unsigned int pae,
-                                 unsigned int acpi,
-                                 unsigned int store_evtchn,
-                                 unsigned long *store_mfn)
+                                 unsigned long image_size)
 {
-    struct xen_domctl launch_domctl, domctl;
+    struct xen_domctl launch_domctl;
     vcpu_guest_context_t ctxt;
     int rc;
 
@@ -325,20 +281,9 @@ static int xc_hvm_build_internal(int xc_handle,
         goto error_out;
     }
 
-    domctl.cmd = XEN_DOMCTL_getdomaininfo;
-    domctl.domain = (domid_t)domid;
-    if ( (xc_domctl(xc_handle, &domctl) < 0) ||
-         ((uint16_t)domctl.domain != domid) )
-    {
-        PERROR("Could not get info on domain");
-        goto error_out;
-    }
-
     memset(&ctxt, 0, sizeof(ctxt));
 
-    if ( setup_guest(xc_handle, domid, memsize, image, image_size,
-                     &ctxt, domctl.u.getdomaininfo.shared_info_frame,
-                     vcpus, pae, acpi, store_evtchn, store_mfn) < 0)
+    if ( setup_guest(xc_handle, domid, memsize, image, image_size, &ctxt) < 0 )
     {
         ERROR("Error constructing guest OS");
         goto error_out;
@@ -500,12 +445,7 @@ loadelfimage(
 int xc_hvm_build(int xc_handle,
                  uint32_t domid,
                  int memsize,
-                 const char *image_name,
-                 unsigned int vcpus,
-                 unsigned int pae,
-                 unsigned int acpi,
-                 unsigned int store_evtchn,
-                 unsigned long *store_mfn)
+                 const char *image_name)
 {
     char *image;
     int  sts;
@@ -515,10 +455,7 @@ int xc_hvm_build(int xc_handle,
          ((image = xc_read_image(image_name, &image_size)) == NULL) )
         return -1;
 
-    sts = xc_hvm_build_internal(xc_handle, domid, memsize,
-                                image, image_size,
-                                vcpus, pae, acpi,
-                                store_evtchn, store_mfn);
+    sts = xc_hvm_build_internal(xc_handle, domid, memsize, image, image_size);
 
     free(image);
 
@@ -535,12 +472,7 @@ int xc_hvm_build_mem(int xc_handle,
                      uint32_t domid,
                      int memsize,
                      const char *image_buffer,
-                     unsigned long image_size,
-                     unsigned int vcpus,
-                     unsigned int pae,
-                     unsigned int acpi,
-                     unsigned int store_evtchn,
-                     unsigned long *store_mfn)
+                     unsigned long image_size)
 {
     int           sts;
     unsigned long img_len;
@@ -562,9 +494,7 @@ int xc_hvm_build_mem(int xc_handle,
     }
 
     sts = xc_hvm_build_internal(xc_handle, domid, memsize,
-                                img, img_len,
-                                vcpus, pae, acpi,
-                                store_evtchn, store_mfn);
+                                img, img_len);
 
     /* xc_inflate_buffer may return the original buffer pointer (for
        for already inflated buffers), so exercise some care in freeing */

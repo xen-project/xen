@@ -535,13 +535,19 @@ static struct hvm_info_table *get_hvm_info_table(void)
 int get_vcpu_nr(void)
 {
     struct hvm_info_table *t = get_hvm_info_table();
-    return (t ? t->nr_vcpus : 1); /* default 1 vcpu */
+    return (t ? t->nr_vcpus : 1);
 }
 
 int get_acpi_enabled(void)
 {
     struct hvm_info_table *t = get_hvm_info_table();
-    return (t ? t->acpi_enabled : 0); /* default no acpi */
+    return (t ? t->acpi_enabled : 1);
+}
+
+int get_apic_mode(void)
+{
+    struct hvm_info_table *t = get_hvm_info_table();
+    return (t ? t->apic_mode : 1);
 }
 
 /*

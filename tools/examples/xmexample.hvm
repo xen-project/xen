@@ -39,14 +39,18 @@ name = "ExampleHVMDomain"
 #uuid = "06ed00fe-1162-4fc4-b5d8-11993ee4a8b9"
 
 #-----------------------------------------------------------------------------
-# the number of cpus guest platform has, default=1
+# The number of cpus guest platform has, default=1
 #vcpus=1
 
-# enable/disable HVM guest PAE, default=0 (disabled)
-#pae=0
+# Enable/disable HVM guest PAE, default=1 (enabled)
+#pae=1
 
-# enable/disable HVM guest ACPI, default=0 (disabled)
-#acpi=0
+# Enable/disable HVM guest ACPI, default=1 (enabled)
+#acpi=1
+
+# Enable/disable HVM APIC mode, default=1 (enabled)
+# Note that this option is ignored if vcpus > 1
+#apic=1
 
 # List of which CPUS this domain is allowed to use, default Xen picks
 #cpus = ""         # leave to Xen to pick
