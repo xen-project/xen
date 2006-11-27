@@ -100,7 +100,7 @@ def save(fd, dominfo, network, live, dst):
         dominfo.setName(domain_name)
 
     except Exception, exn:
-        log.exception("Save failed on domain %s (%d).", domain_name,
+        log.exception("Save failed on domain %s (%s).", domain_name,
                       dominfo.getDomid())
         try:
             dominfo.setName(domain_name)
