@@ -462,11 +462,10 @@ fail_nomem1:
 
 void arch_domain_destroy(struct domain *d)
 {
-	BUG_ON(d->arch.mm.pgd != NULL);
+	mm_final_teardown(d);
+
 	if (d->shared_info != NULL)
 	    free_xenheap_pages(d->shared_info, get_order_from_shift(XSI_SHIFT));
-	if (d->arch.shadow_bitmap != NULL)
-		xfree(d->arch.shadow_bitmap);
 
 	tlb_track_destroy(d);
 
@@ -613,14 +612,14 @@ static void relinquish_memory(struct domain *d, struct list_head *list)
 
 void domain_relinquish_resources(struct domain *d)
 {
-    /* Relinquish every page of memory. */
-
-    // relase page traversing d->arch.mm.
-    relinquish_mm(d);
-
+    /* Relinquish guest resources for VT-i domain. */
     if (d->vcpu[0] && VMX_DOMAIN(d->vcpu[0]))
 	    vmx_relinquish_guest_resources(d);
 
+    /* Tear down shadow mode stuff. */
+    mm_teardown(d);
+
+    /* Relinquish every page of memory. */
     relinquish_memory(d, &d->xenpage_list);
     relinquish_memory(d, &d->page_list);
 

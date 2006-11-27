@@ -249,17 +249,21 @@ try_to_clear_PGC_allocate(struct domain* d, struct page_info* page)
 }
 
 static void
-relinquish_pte(struct domain* d, pte_t* pte)
+mm_teardown_pte(struct domain* d, pte_t* pte, unsigned long offset)
 {
-    unsigned long mfn = pte_pfn(*pte);
+    pte_t old_pte;
+    unsigned long mfn;
     struct page_info* page;
 
+    old_pte = ptep_get_and_clear(&d->arch.mm, offset, pte);// acquire semantics
+    
     // vmx domain use bit[58:56] to distinguish io region from memory.
     // see vmx_build_physmap_table() in vmx_init.c
-    if (!pte_mem(*pte))
+    if (!pte_mem(old_pte))
         return;
 
     // domain might map IO space or acpi table pages. check it.
+    mfn = pte_pfn(old_pte);
     if (!mfn_valid(mfn))
         return;
     page = mfn_to_page(mfn);
@@ -272,17 +276,17 @@ relinquish_pte(struct domain* d, pte_t* pte)
         return;
     }
 
-    if (page_get_owner(page) == d) {
+    if (pte_pgc_allocated(old_pte)) {
+        BUG_ON(page_get_owner(page) != d);
         BUG_ON(get_gpfn_from_mfn(mfn) == INVALID_M2P_ENTRY);
         set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY);
+        try_to_clear_PGC_allocate(d, page);
     }
-
-    try_to_clear_PGC_allocate(d, page);
     put_page(page);
 }
 
 static void
-relinquish_pmd(struct domain* d, pmd_t* pmd, unsigned long offset)
+mm_teardown_pmd(struct domain* d, pmd_t* pmd, unsigned long offset)
 {
     unsigned long i;
     pte_t* pte = pte_offset_map(pmd, offset);
@@ -290,14 +294,12 @@ relinquish_pmd(struct domain* d, pmd_t* pmd, unsigned long offset)
     for (i = 0; i < PTRS_PER_PTE; i++, pte++) {
         if (!pte_present(*pte))
             continue;
-
-        relinquish_pte(d, pte);
+        mm_teardown_pte(d, pte, offset + (i << PAGE_SHIFT));
     }
-    pte_free_kernel(pte_offset_map(pmd, offset));
 }
 
 static void
-relinquish_pud(struct domain* d, pud_t *pud, unsigned long offset)
+mm_teardown_pud(struct domain* d, pud_t *pud, unsigned long offset)
 {
     unsigned long i;
     pmd_t *pmd = pmd_offset(pud, offset);
@@ -305,14 +307,12 @@ relinquish_pud(struct domain* d, pud_t *pud, unsigned long offset)
     for (i = 0; i < PTRS_PER_PMD; i++, pmd++) {
         if (!pmd_present(*pmd))
             continue;
-
-        relinquish_pmd(d, pmd, offset + (i << PMD_SHIFT));
+        mm_teardown_pmd(d, pmd, offset + (i << PMD_SHIFT));
     }
-    pmd_free(pmd_offset(pud, offset));
 }
 
 static void
-relinquish_pgd(struct domain* d, pgd_t *pgd, unsigned long offset)
+mm_teardown_pgd(struct domain* d, pgd_t *pgd, unsigned long offset)
 {
     unsigned long i;
     pud_t *pud = pud_offset(pgd, offset);
@@ -320,14 +320,12 @@ relinquish_pgd(struct domain* d, pgd_t *pgd, unsigned long offset)
     for (i = 0; i < PTRS_PER_PUD; i++, pud++) {
         if (!pud_present(*pud))
             continue;
-
-        relinquish_pud(d, pud, offset + (i << PUD_SHIFT));
+        mm_teardown_pud(d, pud, offset + (i << PUD_SHIFT));
     }
-    pud_free(pud_offset(pgd, offset));
 }
 
 void
-relinquish_mm(struct domain* d)
+mm_teardown(struct domain* d)
 {
     struct mm_struct* mm = &d->arch.mm;
     unsigned long i;
@@ -340,11 +338,70 @@ relinquish_mm(struct domain* d)
     for (i = 0; i < PTRS_PER_PGD; i++, pgd++) {
         if (!pgd_present(*pgd))
             continue;
+        mm_teardown_pgd(d, pgd, i << PGDIR_SHIFT);
+    }
+}
 
-        relinquish_pgd(d, pgd, i << PGDIR_SHIFT);
+static void
+mm_p2m_teardown_pmd(struct domain* d, pmd_t* pmd, unsigned long offset)
+{
+    pte_free_kernel(pte_offset_map(pmd, offset));
+}
+
+static void
+mm_p2m_teardown_pud(struct domain* d, pud_t *pud, unsigned long offset)
+{
+    unsigned long i;
+    pmd_t *pmd = pmd_offset(pud, offset);
+
+    for (i = 0; i < PTRS_PER_PMD; i++, pmd++) {
+        if (!pmd_present(*pmd))
+            continue;
+        mm_p2m_teardown_pmd(d, pmd, offset + (i << PMD_SHIFT));
+    }
+    pmd_free(pmd_offset(pud, offset));
+}
+
+static void
+mm_p2m_teardown_pgd(struct domain* d, pgd_t *pgd, unsigned long offset)
+{
+    unsigned long i;
+    pud_t *pud = pud_offset(pgd, offset);
+
+    for (i = 0; i < PTRS_PER_PUD; i++, pud++) {
+        if (!pud_present(*pud))
+            continue;
+        mm_p2m_teardown_pud(d, pud, offset + (i << PUD_SHIFT));
+    }
+    pud_free(pud_offset(pgd, offset));
+}
+
+static void
+mm_p2m_teardown(struct domain* d)
+{
+    struct mm_struct* mm = &d->arch.mm;
+    unsigned long i;
+    pgd_t* pgd;
+
+    BUG_ON(mm->pgd == NULL);
+    pgd = pgd_offset(mm, 0);
+    for (i = 0; i < PTRS_PER_PGD; i++, pgd++) {
+        if (!pgd_present(*pgd))
+            continue;
+        mm_p2m_teardown_pgd(d, pgd, i << PGDIR_SHIFT);
     }
     pgd_free(mm->pgd);
     mm->pgd = NULL;
+}
+
+void
+mm_final_teardown(struct domain* d)
+{
+    if (d->arch.shadow_bitmap != NULL) {
+        xfree(d->arch.shadow_bitmap);
+        d->arch.shadow_bitmap = NULL;
+    }
+    mm_p2m_teardown(d);
 }
 
 // stolen from share_xen_page_with_guest() in xen/arch/x86/mm.c
@@ -400,13 +457,6 @@ gmfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
 {
 	unsigned long pte;
 
-	// This function may be called from __gnttab_copy()
-	// during domain destruction with VNIF copy receiver.
-	// ** FIXME: This is not SMP-safe yet about p2m table. **
-	if (unlikely(d->arch.mm.pgd == NULL)) {
-		BUG();
-		return INVALID_MFN;
-	}
 	pte = lookup_domain_mpa(d,gpfn << PAGE_SHIFT, NULL);
 	if (!pte) {
 		panic("gmfn_to_mfn_foreign: bad gpfn. spinning...\n");
@@ -1308,7 +1358,7 @@ expose_p2m_page(struct domain* d, unsigned long mpaddr, struct page_info* page)
     // pte page is allocated form xen heap.(see pte_alloc_one_kernel().)
     // so that the page has NULL page owner and it's reference count
     // is useless.
-    // see also relinquish_pte()'s page_get_owner() == NULL check.
+    // see also mm_teardown_pte()'s page_get_owner() == NULL check.
     BUG_ON(page_get_owner(page) != NULL);
 
     return __assign_domain_page(d, mpaddr, page_to_maddr(page),
