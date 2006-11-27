@@ -128,7 +128,7 @@ xenoprof_shared_gmfn_with_guest(
     }
 }
 
-static char *alloc_xenoprof_buf(struct domain *d, int npages, uint64_t gmaddr)
+static char *alloc_xenoprof_buf(struct domain *d, int npages)
 {
     char *rawbuf;
     int order;
@@ -146,7 +146,7 @@ static char *alloc_xenoprof_buf(struct domain *d, int npages, uint64_t gmaddr)
 }
 
 static int alloc_xenoprof_struct(
-    struct domain *d, int max_samples, int is_passive, uint64_t gmaddr)
+    struct domain *d, int max_samples, int is_passive)
 {
     struct vcpu *v;
     int nvcpu, npages, bufsize, max_bufsize;
@@ -179,8 +179,7 @@ static int alloc_xenoprof_struct(
         (max_samples - 1) * sizeof(struct event_log);
     npages = (nvcpu * bufsize - 1) / PAGE_SIZE + 1;
     
-    d->xenoprof->rawbuf = alloc_xenoprof_buf(is_passive ? dom0 : d, npages,
-                                             gmaddr);
+    d->xenoprof->rawbuf = alloc_xenoprof_buf(is_passive ? dom0 : d, npages);
 
     if ( d->xenoprof->rawbuf == NULL )
     {
@@ -368,8 +367,7 @@ static int add_passive_list(XEN_GUEST_HANDLE(void) arg)
 
     if ( d->xenoprof == NULL )
     {
-        ret = alloc_xenoprof_struct(
-            d, passive.max_samples, 1, passive.buf_gmaddr);
+        ret = alloc_xenoprof_struct(d, passive.max_samples, 1);
         if ( ret < 0 )
         {
             put_domain(d);
@@ -509,9 +507,7 @@ static int xenoprof_op_get_buffer(XEN_GUEST_HANDLE(void) arg)
      */
     if ( d->xenoprof == NULL )
     {
-        ret = alloc_xenoprof_struct(
-            d, xenoprof_get_buffer.max_samples, 0,
-            xenoprof_get_buffer.buf_gmaddr);
+        ret = alloc_xenoprof_struct(d, xenoprof_get_buffer.max_samples, 0);
         if ( ret < 0 )
             return ret;
     }
