@@ -100,7 +100,7 @@ SUBCOMMAND_HELP = {
                      'Remove a domain from Xend domain management.'),
     'start'       : ('<DomainName>', 'Start a Xend managed domain'),
     'resume'      : ('<DomainName>', 'Resume a Xend managed domain'),
-    'suspend'     : ('<DomainName>', 'Suspend a Xend maanged domain'),
+    'suspend'     : ('<DomainName>', 'Suspend a Xend managed domain'),
 
     # less used commands
 
