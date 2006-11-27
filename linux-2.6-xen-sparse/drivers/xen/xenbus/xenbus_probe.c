@@ -444,27 +444,6 @@ static void xenbus_dev_release(struct device *dev)
 		kfree(to_xenbus_device(dev));
 }
 
-/* Simplified asprintf. */
-char *kasprintf(const char *fmt, ...)
-{
-	va_list ap;
-	unsigned int len;
-	char *p, dummy[1];
-
-	va_start(ap, fmt);
-	/* FIXME: vsnprintf has a bug, NULL should work */
-	len = vsnprintf(dummy, 0, fmt, ap);
-	va_end(ap);
-
-	p = kmalloc(len + 1, GFP_KERNEL);
-	if (!p)
-		return NULL;
-	va_start(ap, fmt);
-	vsprintf(p, fmt, ap);
-	va_end(ap);
-	return p;
-}
-
 static ssize_t xendev_show_nodename(struct device *dev,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,13)
 				    struct device_attribute *attr,
@@ -547,7 +526,7 @@ static int xenbus_probe_frontend(const char *type, const char *name)
 	char *nodename;
 	int err;
 
-	nodename = kasprintf("%s/%s/%s", xenbus_frontend.root, type, name);
+	nodename = kasprintf(GFP_KERNEL, "%s/%s/%s", xenbus_frontend.root, type, name);
 	if (!nodename)
 		return -ENOMEM;
 
@@ -644,7 +623,7 @@ void dev_changed(const char *node, struct xen_bus_type *bus)
 	rootlen = strsep_len(node, '/', bus->levels);
 	if (rootlen < 0)
 		return;
-	root = kasprintf("%.*s", rootlen, node);
+	root = kasprintf(GFP_KERNEL, "%.*s", rootlen, node);
 	if (!root)
 		return;
 

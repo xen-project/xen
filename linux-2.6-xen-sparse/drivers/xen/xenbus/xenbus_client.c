@@ -39,9 +39,6 @@
 #include <xen/platform-compat.h>
 #endif
 
-/* xenbus_probe.c */
-extern char *kasprintf(const char *fmt, ...);
-
 #define DPRINTK(fmt, args...) \
     pr_debug("xenbus_client (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
 
@@ -88,7 +85,7 @@ int xenbus_watch_path2(struct xenbus_device *dev, const char *path,
 					const char **, unsigned int))
 {
 	int err;
-	char *state = kasprintf("%s/%s", path, path2);
+	char *state = kasprintf(GFP_KERNEL, "%s/%s", path, path2);
 	if (!state) {
 		xenbus_dev_fatal(dev, -ENOMEM, "allocating path for watch");
 		return -ENOMEM;
@@ -156,7 +153,7 @@ EXPORT_SYMBOL_GPL(xenbus_frontend_closed);
  */
 static char *error_path(struct xenbus_device *dev)
 {
-	return kasprintf("error/%s", dev->nodename);
+	return kasprintf(GFP_KERNEL, "error/%s", dev->nodename);
 }
 
 

@@ -70,8 +70,5 @@ extern int xenbus_probe_devices(struct xen_bus_type *bus);
 
 extern void dev_changed(const char *node, struct xen_bus_type *bus);
 
-/* Simplified asprintf. Probably belongs in lib */
-extern char *kasprintf(const char *fmt, ...);
-
 #endif
 

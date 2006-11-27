@@ -51,9 +51,6 @@
 #include <xen/platform-compat.h>
 #endif
 
-/* xenbus_probe.c */
-extern char *kasprintf(const char *fmt, ...);
-
 struct xs_stored_msg {
 	struct list_head list;
 
@@ -295,9 +292,9 @@ static char *join(const char *dir, const char *name)
 	char *buffer;
 
 	if (strlen(name) == 0)
-		buffer = kasprintf("%s", dir);
+		buffer = kasprintf(GFP_KERNEL, "%s", dir);
 	else
-		buffer = kasprintf("%s/%s", dir, name);
+		buffer = kasprintf(GFP_KERNEL, "%s/%s", dir, name);
 	return (!buffer) ? ERR_PTR(-ENOMEM) : buffer;
 }
 
