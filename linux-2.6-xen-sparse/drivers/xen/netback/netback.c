@@ -494,7 +494,7 @@ static int netbk_check_gop(int nr_frags, domid_t domid,
 			copy_op = npo->copy + npo->copy_cons++;
 			if (copy_op->status != GNTST_okay) {
 				DPRINTK("Bad status %d from copy to DOM%d.\n",
-					gop->status, domid);
+					copy_op->status, domid);
 				status = NETIF_RSP_ERROR;
 			}
 		} else {
