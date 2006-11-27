@@ -506,13 +506,16 @@ static int mmio_decode(int realmode, unsigned char *opcode,
         GET_OP_SIZE_FOR_NONEBYTE(*op_size);
         return reg_mem(*op_size, opcode, mmio_op, rex);
 
-    case 0x87:  /* xchg {r/m16|r/m32}, {m/r16|m/r32} */
+    case 0x86:  /* xchg m8, r8 */
+        mmio_op->instr = INSTR_XCHG;
+        *op_size = BYTE;
+        GET_OP_SIZE_FOR_BYTE(size_reg);
+        return reg_mem(size_reg, opcode, mmio_op, rex);
+
+    case 0x87:  /* xchg m16/32, r16/32 */
         mmio_op->instr = INSTR_XCHG;
         GET_OP_SIZE_FOR_NONEBYTE(*op_size);
-        if ( ((*(opcode+1)) & 0xc7) == 5 )
-            return reg_mem(*op_size, opcode, mmio_op, rex);
-        else
-            return mem_reg(*op_size, opcode, mmio_op, rex);
+        return reg_mem(*op_size, opcode, mmio_op, rex);
 
     case 0x88: /* mov r8, m8 */
         mmio_op->instr = INSTR_MOV;
@@ -655,14 +658,11 @@ static int mmio_decode(int realmode, unsigned char *opcode,
         mmio_op->operand[1] = mk_operand(*op_size, index, 0, REGISTER);
         return DECODE_success;
 
-    case 0xB7: /* movzx m16/m32, r32/r64 */
+    case 0xB7: /* movzx m16, r32/r64 */
         mmio_op->instr = INSTR_MOVZX;
         GET_OP_SIZE_FOR_NONEBYTE(*op_size);
         index = get_index(opcode + 1, rex);
-        if ( rex & 0x8 )
-            mmio_op->operand[0] = mk_operand(LONG, 0, 0, MEMORY);
-        else
-            mmio_op->operand[0] = mk_operand(WORD, 0, 0, MEMORY);
+        mmio_op->operand[0] = mk_operand(WORD, 0, 0, MEMORY);
         mmio_op->operand[1] = mk_operand(*op_size, index, 0, REGISTER);
         return DECODE_success;
 
