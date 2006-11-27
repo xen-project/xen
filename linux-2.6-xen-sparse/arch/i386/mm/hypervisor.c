@@ -99,18 +99,6 @@ void xen_l4_entry_update(pgd_t *ptr, pgd_t val)
 }
 #endif /* CONFIG_X86_64 */
 
-void xen_machphys_update(unsigned long mfn, unsigned long pfn)
-{
-	mmu_update_t u;
-	if (xen_feature(XENFEAT_auto_translated_physmap)) {
-		BUG_ON(pfn != mfn);
-		return;
-	}
-	u.ptr = ((unsigned long long)mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
-	u.val = pfn;
-	BUG_ON(HYPERVISOR_mmu_update(&u, 1, NULL, DOMID_SELF) < 0);
-}
-
 void xen_pt_switch(unsigned long ptr)
 {
 	struct mmuext_op op;

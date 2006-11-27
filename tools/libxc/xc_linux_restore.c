@@ -265,13 +265,16 @@ int xc_linux_restore(int xc_handle, int io_fd,
     }
     shared_info_frame = domctl.u.getdomaininfo.shared_info_frame;
 
-    if(xc_domain_setmaxmem(xc_handle, dom, PFN_TO_KB(max_pfn)) != 0) {
+    if (xc_domain_setmaxmem(xc_handle, dom, PFN_TO_KB(max_pfn)) != 0) {
         errno = ENOMEM;
         goto out;
     }
 
-    if(xc_domain_memory_increase_reservation(
-           xc_handle, dom, max_pfn, 0, 0, NULL) != 0) {
+    for ( pfn = 0; pfn < max_pfn; pfn++ )
+        p2m[pfn] = pfn;
+
+    if (xc_domain_memory_populate_physmap(xc_handle, dom, max_pfn,
+                                          0, 0, p2m) != 0) {
         ERROR("Failed to increase reservation by %lx KB", PFN_TO_KB(max_pfn));
         errno = ENOMEM;
         goto out;
@@ -279,17 +282,10 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
     DPRINTF("Increased domain reservation by %lx KB\n", PFN_TO_KB(max_pfn));
 
-    /* Build the pfn-to-mfn table. We choose MFN ordering returned by Xen. */
-    if (xc_get_pfn_list(xc_handle, dom, p2m, max_pfn) != max_pfn) {
-        ERROR("Did not read correct number of frame numbers for new dom");
-        goto out;
-    }
-
     if(!(mmu = xc_init_mmu_updates(xc_handle, dom))) {
         ERROR("Could not initialise for MMU updates");
         goto out;
     }
-
 
     DPRINTF("Reloading memory pages:   0%%\n");
 

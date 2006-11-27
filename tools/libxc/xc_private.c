@@ -134,10 +134,7 @@ int xc_memory_op(int xc_handle,
     DECLARE_HYPERCALL;
     struct xen_memory_reservation *reservation = arg;
     struct xen_machphys_mfn_list *xmml = arg;
-    struct xen_translate_gpfn_list *trans = arg;
     xen_pfn_t *extent_start;
-    xen_pfn_t *gpfn_list;
-    xen_pfn_t *mfn_list;
     long ret = -EINVAL;
 
     hypercall.op     = __HYPERVISOR_memory_op;
@@ -186,28 +183,6 @@ int xc_memory_op(int xc_handle,
             goto out1;
         }
         break;
-    case XENMEM_translate_gpfn_list:
-        if ( lock_pages(trans, sizeof(*trans)) != 0 )
-        {
-            PERROR("Could not lock");
-            goto out1;
-        }
-        get_xen_guest_handle(gpfn_list, trans->gpfn_list);
-        if ( lock_pages(gpfn_list, trans->nr_gpfns * sizeof(xen_pfn_t)) != 0 )
-        {
-            PERROR("Could not lock");
-            unlock_pages(trans, sizeof(*trans));
-            goto out1;
-        }
-        get_xen_guest_handle(mfn_list, trans->mfn_list);
-        if ( lock_pages(mfn_list, trans->nr_gpfns * sizeof(xen_pfn_t)) != 0 )
-        {
-            PERROR("Could not lock");
-            unlock_pages(gpfn_list, trans->nr_gpfns * sizeof(xen_pfn_t));
-            unlock_pages(trans, sizeof(*trans));
-            goto out1;
-        }
-        break;
     }
 
     ret = do_xen_hypercall(xc_handle, &hypercall);
@@ -231,13 +206,6 @@ int xc_memory_op(int xc_handle,
         break;
     case XENMEM_add_to_physmap:
         unlock_pages(arg, sizeof(struct xen_add_to_physmap));
-        break;
-    case XENMEM_translate_gpfn_list:
-            get_xen_guest_handle(mfn_list, trans->mfn_list);
-            unlock_pages(mfn_list, trans->nr_gpfns * sizeof(xen_pfn_t));
-            get_xen_guest_handle(gpfn_list, trans->gpfn_list);
-            unlock_pages(gpfn_list, trans->nr_gpfns * sizeof(xen_pfn_t));
-            unlock_pages(trans, sizeof(*trans));
         break;
     }
 

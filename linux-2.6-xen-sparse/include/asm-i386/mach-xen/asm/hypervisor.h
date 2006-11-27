@@ -98,7 +98,6 @@ void xen_pgd_pin(unsigned long ptr);
 void xen_pgd_unpin(unsigned long ptr);
 
 void xen_set_ldt(unsigned long ptr, unsigned long bytes);
-void xen_machphys_update(unsigned long mfn, unsigned long pfn);
 
 #ifdef CONFIG_SMP
 #include <linux/cpumask.h>

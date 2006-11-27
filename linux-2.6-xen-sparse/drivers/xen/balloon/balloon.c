@@ -215,9 +215,7 @@ static int increase_reservation(unsigned long nr_pages)
 		BUG_ON(!xen_feature(XENFEAT_auto_translated_physmap) &&
 		       phys_to_machine_mapping_valid(pfn));
 
-		/* Update P->M and M->P tables. */
 		set_phys_to_machine(pfn, frame_list[i]);
-		xen_machphys_update(frame_list[i], pfn);
 
 		/* Link back into the page tables if not highmem. */
 		if (pfn < max_low_pfn) {

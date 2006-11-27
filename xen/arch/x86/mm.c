@@ -1240,6 +1240,10 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
 
     if ( l1e_get_flags(nl1e) & _PAGE_PRESENT )
     {
+        /* Translate foreign guest addresses. */
+        nl1e = l1e_from_pfn(gmfn_to_mfn(FOREIGNDOM, l1e_get_pfn(nl1e)),
+                            l1e_get_flags(nl1e));
+
         if ( unlikely(l1e_get_flags(nl1e) & L1_DISALLOW_MASK) )
         {
             MEM_LOG("Bad L1 flags %x",
@@ -1814,10 +1818,15 @@ static int set_foreigndom(domid_t domid)
     if ( likely(domid == DOMID_SELF) )
         goto out;
 
-    if ( domid == d->domain_id )
+    if ( unlikely(domid == d->domain_id) )
     {
         MEM_LOG("Dom %u tried to specify itself as foreign domain",
                 d->domain_id);
+        okay = 0;
+    }
+    else if ( unlikely(shadow_mode_translate(d)) )
+    {
+        MEM_LOG("Cannot mix foreign mappings with translated domains");
         okay = 0;
     }
     else if ( !IS_PRIV(d) )
@@ -1855,14 +1864,6 @@ static int set_foreigndom(domid_t domid)
                 break;
             }
         }
-    }
-
-    if ( unlikely(shadow_mode_translate(d)) )
-    {
-        MEM_LOG("%s: can not mix foreign mappings with translated domains",
-                __func__);
-        info->foreign = NULL;
-        okay = 0; 
     }
 
  out:
@@ -2340,13 +2341,15 @@ int do_mmu_update(
                 break;
             }
 
-            if ( shadow_mode_translate(FOREIGNDOM) )
-                shadow_guest_physmap_add_page(FOREIGNDOM, gpfn, mfn);
-            else 
-                set_gpfn_from_mfn(mfn, gpfn);
+            if ( unlikely(shadow_mode_translate(FOREIGNDOM)) )
+            {
+                MEM_LOG("Mach-phys update on shadow-translate guest");
+                break;
+            }
+
+            set_gpfn_from_mfn(mfn, gpfn);
             okay = 1;
 
-            // Mark the new gfn dirty...
             mark_dirty(FOREIGNDOM, mfn);
 
             put_page(mfn_to_page(mfn));
@@ -2557,10 +2560,7 @@ static int destroy_grant_va_mapping(
     }
     ol1e = *pl1e;
 
-    /*
-     * Check that the virtual address supplied is actually mapped to
-     * frame.
-     */
+    /* Check that the virtual address supplied is actually mapped to frame. */
     if ( unlikely(l1e_get_pfn(ol1e) != frame) )
     {
         MEM_LOG("PTE entry %lx for address %lx doesn't match frame %lx",
@@ -2574,7 +2574,7 @@ static int destroy_grant_va_mapping(
     {
         MEM_LOG("Cannot delete PTE entry at %p", (unsigned long *)pl1e);
         rc = GNTST_general_error;
-        goto out; // this is redundant & unnecessary, but informative
+        goto out;
     }
 
  out:

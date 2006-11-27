@@ -245,13 +245,6 @@ static int setup_guest(int xc_handle,
         goto error_out;
     }
 
-    if ( xc_domain_translate_gpfn_list(xc_handle, dom, nr_pages,
-                                       page_array, page_array) )
-    {
-        PERROR("Could not translate addresses of HVM guest.\n");
-        goto error_out;
-    }
-
     loadelfimage(image, xc_handle, dom, page_array, &dsi);
 
     if ( set_hvm_info(xc_handle, dom, page_array, vcpus, acpi) )

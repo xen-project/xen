@@ -509,12 +509,6 @@ static int setup_guest(int xc_handle,
         PERROR("Could not allocate memory for PV guest.\n");
         goto error_out;
     }
-    if ( xc_domain_translate_gpfn_list(xc_handle, dom, nr_pages,
-                                       page_array, page_array) )
-    {
-        PERROR("Could not translate addresses of PV guest.\n");
-        goto error_out;
-    }
 
     dsi.v_start    = round_pgdown(dsi.v_start);
     vinitrd_start  = round_pgup(dsi.v_end);

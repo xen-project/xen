@@ -5787,9 +5787,6 @@ int set_mm_mapping(int xc_handle, uint32_t domid,
                    unsigned long nr_pages, unsigned int address_bits,
                    xen_pfn_t *extent_start)
 {
-#if 0
-    int i;
-#endif
     xc_dominfo_t info;
     int err = 0;
 
@@ -5807,19 +5804,6 @@ int set_mm_mapping(int xc_handle, uint32_t domid,
         fprintf(stderr, "Failed to populate physmap\n");
         return -1;
     }
-
-    err = xc_domain_translate_gpfn_list(xc_handle, domid, nr_pages,
-                                        extent_start, extent_start);
-    if (err) {
-        fprintf(stderr, "Failed to translate gpfn list\n");
-        return -1;
-    }
-
-#if 0 /* Generates lots of log file output - turn on for debugging */
-    for (i = 0; i < nr_pages; i++)
-        fprintf(stderr, "set_map result i %x result %lx\n", i,
-                extent_start[i]);
-#endif
 
     return 0;
 }
@@ -6425,12 +6409,6 @@ int main(int argc, char **argv)
 #if defined(__i386__) || defined(__x86_64__)
     for ( i = 0; i < tmp_nr_pages; i++)
         page_array[i] = i;
-    if (xc_domain_translate_gpfn_list(xc_handle, domid, tmp_nr_pages,
-                                      page_array, page_array)) {
-        fprintf(logfile, "xc_domain_translate_gpfn_list returned error %d\n",
-                errno);
-        exit(-1);
-    }
 
     phys_ram_base = xc_map_foreign_batch(xc_handle, domid,
                                          PROT_READ|PROT_WRITE, page_array,
