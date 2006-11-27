@@ -1203,7 +1203,7 @@ static int vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
          */
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 c->cr3 = %x", c->cr3);
         mfn = get_mfn_from_gpfn(c->cr3 >> PAGE_SHIFT);
-        if ( !VALID_MFN(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
+        if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
             goto bad_cr3;
         old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
         v->arch.guest_table = pagetable_from_pfn(mfn);
@@ -1389,7 +1389,7 @@ static int vmx_set_cr0(unsigned long value)
          * The guest CR3 must be pointing to the guest physical.
          */
         mfn = get_mfn_from_gpfn(v->arch.hvm_vmx.cpu_cr3 >> PAGE_SHIFT);
-        if ( !VALID_MFN(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
+        if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
         {
             gdprintk(XENLOG_ERR, "Invalid CR3 value = %lx (mfn=%lx)\n",
                      v->arch.hvm_vmx.cpu_cr3, mfn);
@@ -1599,7 +1599,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
              */
             HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 value = %lx", value);
             mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
-            if ( !VALID_MFN(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
+            if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
                 goto bad_cr3;
             old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
             v->arch.guest_table = pagetable_from_pfn(mfn);
@@ -1627,7 +1627,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
 #if CONFIG_PAGING_LEVELS >= 3
                 unsigned long mfn, old_base_mfn;
                 mfn = get_mfn_from_gpfn(v->arch.hvm_vmx.cpu_cr3 >> PAGE_SHIFT);
-                if ( !VALID_MFN(mfn) ||
+                if ( !mfn_valid(mfn) ||
                      !get_page(mfn_to_page(mfn), v->domain) )
                     goto bad_cr3;
 

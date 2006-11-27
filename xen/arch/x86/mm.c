@@ -431,7 +431,7 @@ int map_ldt_shadow_page(unsigned int off)
 
     gmfn = l1e_get_pfn(l1e);
     mfn = gmfn_to_mfn(d, gmfn);
-    if ( unlikely(!VALID_MFN(mfn)) )
+    if ( unlikely(!mfn_valid(mfn)) )
         return 0;
 
     okay = get_page_and_type(mfn_to_page(mfn), d, PGT_ldt_page);
@@ -2847,8 +2847,8 @@ long do_update_descriptor(u64 pa, u64 desc)
 
     LOCK_BIGLOCK(dom);
 
-    if ( !VALID_MFN(mfn = gmfn_to_mfn(dom, gmfn)) ||
-         (((unsigned int)pa % sizeof(struct desc_struct)) != 0) ||
+    mfn = gmfn_to_mfn(dom, gmfn);
+    if ( (((unsigned int)pa % sizeof(struct desc_struct)) != 0) ||
          !mfn_valid(mfn) ||
          !check_descriptor(&d) )
     {

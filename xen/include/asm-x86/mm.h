@@ -269,8 +269,6 @@ int check_descriptor(struct desc_struct *d);
 #define gmfn_to_mfn(_d, gpfn)  mfn_x(sh_gfn_to_mfn(_d, gpfn))
 
 #define INVALID_MFN             (~0UL)
-#define VALID_MFN(_mfn)         (!((_mfn) & (1U<<31)))
-
 
 #ifdef MEMORY_GUARD
 void memguard_init(void);

@@ -218,7 +218,7 @@ TYPE_SAFE(unsigned long,mfn)
 static inline int
 valid_mfn(mfn_t m)
 {
-    return VALID_MFN(mfn_x(m));
+    return mfn_valid(mfn_x(m));
 }
 
 static inline mfn_t
@@ -665,7 +665,7 @@ static inline int
 mmio_space(paddr_t gpa)
 {
     unsigned long gfn = gpa >> PAGE_SHIFT;    
-    return !VALID_MFN(mfn_x(sh_gfn_to_mfn_current(gfn)));
+    return !mfn_valid(mfn_x(sh_gfn_to_mfn_current(gfn)));
 }
 
 static inline l1_pgentry_t
