@@ -258,7 +258,10 @@ class PPC_ProseImageHandler(LinuxImageHandler):
         store_evtchn = self.vm.getStorePort()
         console_evtchn = self.vm.getConsolePort()
 
+        mem_mb = self.getRequiredInitialReservation() / 1024
+
         log.debug("dom            = %d", self.vm.getDomid())
+        log.debug("memsize        = %d", mem_mb)
         log.debug("image          = %s", self.kernel)
         log.debug("store_evtchn   = %d", store_evtchn)
         log.debug("console_evtchn = %d", console_evtchn)
