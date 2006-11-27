@@ -145,8 +145,8 @@ static inline u64 hv_is_canonical(u64 addr)
 
 
 unsigned long get_effective_addr_modrm64(struct vmcb_struct *vmcb, 
-        struct cpu_user_regs *regs, const u8 prefix, const u8 *operand, 
-        u8 *size)
+        struct cpu_user_regs *regs, const u8 prefix, int inst_len,
+        const u8 *operand, u8 *size)
 {
     unsigned long effective_addr = (unsigned long) -1;
     u8 length, modrm_mod, modrm_rm;
@@ -191,17 +191,8 @@ unsigned long get_effective_addr_modrm64(struct vmcb_struct *vmcb,
             *size = 1;
             break;
         }
-
-        CHECK_LENGTH64(*size + (u8)sizeof(u32));
-
-        memcpy (&disp, operand + 1, sizeof (u32));
-        *size += sizeof (u32);
-        if (vmcb->cs.attributes.fields.l) // 64-bit mode
-            return vmcb->rip + disp;
-        else
-            return disp;
-
 #if __x86_64__
+        /* FALLTHRU */
     case 0xD:
         if (0 < modrm_mod)
         {
@@ -209,19 +200,20 @@ unsigned long get_effective_addr_modrm64(struct vmcb_struct *vmcb,
             effective_addr = regs->r13;
             break;
         }
+#endif
 
         CHECK_LENGTH64(*size + (u8)sizeof(u32));
 
         memcpy (&disp, operand + 1, sizeof (u32));
         *size += sizeof (u32);
 
+#if __x86_64__
         /* 64-bit mode */
-        if (vmcb->cs.attributes.fields.l)
-            return vmcb->rip + disp;
-        else
-            return disp;
-
+        if (vmcb->cs.attributes.fields.l && (vmcb->efer & EFER_LMA))
+            return vmcb->rip + inst_len + *size + disp;
 #endif
+        return disp;
+
     default:
         effective_addr = DECODE_GPR_VALUE(vmcb, regs, modrm_rm);
 

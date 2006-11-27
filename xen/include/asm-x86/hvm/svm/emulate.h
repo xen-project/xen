@@ -77,8 +77,8 @@ enum instruction_index {
 
 
 extern unsigned long get_effective_addr_modrm64(struct vmcb_struct *vmcb, 
-        struct cpu_user_regs *regs, const u8 prefix, const u8 *operand, 
-        u8 *size);
+        struct cpu_user_regs *regs, const u8 prefix, int inst_len,
+        const u8 *operand, u8 *size);
 extern unsigned long get_effective_addr_sib(struct vmcb_struct *vmcb, 
         struct cpu_user_regs *regs, const u8 prefix, const u8 *operand, 
         u8 *size);

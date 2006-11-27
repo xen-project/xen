@@ -2053,10 +2053,10 @@ void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
 
         /* 
          * Decode memory operand of the instruction including ModRM, SIB, and
-         * displacement to get effecticve address and length in bytes.  Assume
+         * displacement to get effective address and length in bytes.  Assume
          * the system in either 32- or 64-bit mode.
          */
-        g_vaddr = get_effective_addr_modrm64(vmcb, regs, prefix, 
+        g_vaddr = get_effective_addr_modrm64(vmcb, regs, prefix, inst_len,
                                              &opcode[inst_len], &length);
 
         inst_len += length;
