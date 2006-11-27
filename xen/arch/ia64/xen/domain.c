@@ -164,8 +164,11 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 
     local_irq_save(spsr);
 
-    __ia64_save_fpu(prev->arch._thread.fph);
-    __ia64_load_fpu(next->arch._thread.fph);
+    if (!is_idle_domain(prev->domain)) 
+        __ia64_save_fpu(prev->arch._thread.fph);
+    if (!is_idle_domain(next->domain)) 
+        __ia64_load_fpu(next->arch._thread.fph);
+
     if (VMX_DOMAIN(prev)) {
 	vmx_save_state(prev);
 	if (!VMX_DOMAIN(next)) {
