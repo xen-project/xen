@@ -35,6 +35,21 @@ typedef struct _ev_action_t {
 static ev_action_t ev_actions[NR_EVS];
 void default_handler(evtchn_port_t port, struct pt_regs *regs, void *data);
 
+void unbind_all_ports(void)
+{
+    int i;
+
+	for(i=0;i<NR_EVS;i++)
+	{
+		if(ev_actions[i].handler != default_handler)
+		{
+			struct evtchn_close close;
+			mask_evtchn(i);
+			close.port = i;
+			HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);
+		}
+	}
+}
 
 /*
  * Demux events to different handlers.
