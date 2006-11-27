@@ -97,6 +97,7 @@ def save(fd, dominfo, network, live, dst):
         forkHelper(cmd, fd, saveInputHandler, False)
 
         dominfo.destroyDomain()
+        dominfo.setName(domain_name)
 
     except Exception, exn:
         log.exception("Save failed on domain %s (%d).", domain_name,
