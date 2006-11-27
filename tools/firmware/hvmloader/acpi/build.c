@@ -88,14 +88,13 @@ int construct_madt(struct acpi_20_madt *madt)
     io_apic->ioapic_addr = IOAPIC_BASE_ADDRESS;
     offset += sizeof(*io_apic);
 
-    lapic = (struct acpi_20_madt_lapic *)io_apic;
+    lapic = (struct acpi_20_madt_lapic *)(io_apic + 1);
     for ( i = 0; i < get_vcpu_nr(); i++ )
     {
         memset(lapic, 0, sizeof(*lapic));
         lapic->type    = ACPI_PROCESSOR_LOCAL_APIC;
         lapic->length  = sizeof(*lapic);
-        lapic->acpi_processor_id = i;
-        lapic->apic_id = i;
+        lapic->acpi_processor_id = lapic->apic_id = i + 1;
         lapic->flags   = ACPI_LOCAL_APIC_ENABLED;
         offset += sizeof(*lapic);
         lapic++;

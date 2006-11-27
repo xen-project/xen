@@ -240,7 +240,7 @@ static int vlapic_match_dest(struct vcpu *v, struct vlapic *source,
         if ( dest_mode == 0 )
         {
             /* Physical mode. */
-            if ( (dest == 0xFF) || (dest == v->vcpu_id) )
+            if ( (dest == 0xFF) || (dest == VLAPIC_ID(target)) )
                 result = 1;
         }
         else
@@ -900,7 +900,7 @@ static int vlapic_reset(struct vlapic *vlapic)
     struct vcpu *v = vlapic_vcpu(vlapic);
     int i;
 
-    vlapic_set_reg(vlapic, APIC_ID,  v->vcpu_id << 24);
+    vlapic_set_reg(vlapic, APIC_ID,  (v->vcpu_id + 1) << 24);
     vlapic_set_reg(vlapic, APIC_LVR, VLAPIC_VERSION);
 
     for ( i = 0; i < 8; i++ )
