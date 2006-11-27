@@ -1069,7 +1069,7 @@ static void * __init boot_of_devtree(module_t *mod, multiboot_info_t *mbi)
     if (ofd_size(oft) > oft_sz)
          of_panic("Could not fit all devtree fixups\n");
 
-    ofd_walk(oft, OFD_ROOT, /* add_hype_props */ NULL, 2);
+    ofd_walk(oft, __func__, OFD_ROOT, /* add_hype_props */ NULL, 2);
 
     mod->mod_start = (ulong)oft;
     mod->mod_end = mod->mod_start + oft_sz;

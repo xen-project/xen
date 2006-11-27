@@ -427,7 +427,7 @@ int ofd_dom0_fixup(struct domain *d, ulong mem, start_info_t *si)
 
 
 #ifdef DEBUG
-    ofd_walk(m, OFD_ROOT, ofd_dump_props, OFD_DUMP_ALL);
+    ofd_walk(m, __func__, OFD_ROOT, ofd_dump_props, OFD_DUMP_ALL);
 #endif
     return 1;
 }

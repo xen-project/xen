@@ -125,9 +125,17 @@ void noinline __attn(void)
     console_end_sync();
 }
 
-static void hw_probe_attn(unsigned char key, struct cpu_user_regs *regs)
+static void key_hw_probe_attn(unsigned char key)
 {
     __attn();
+}
+
+static void key_ofdump(unsigned char key)
+{
+    printk("ofdump:\n");
+    /* make sure the OF devtree is good */
+    ofd_walk((void *)oftree, "devtree", OFD_ROOT,
+             ofd_dump_props, OFD_DUMP_ALL);
 }
 
 static void percpu_init_areas(void)
@@ -180,7 +188,10 @@ static void __init start_of_day(void)
     /* Register another key that will allow for the the Harware Probe
      * to be contacted, this works with RiscWatch probes and should
      * work with Chronos and FSPs */
-    register_irq_keyhandler('^', hw_probe_attn,   "Trap to Hardware Probe");
+    register_keyhandler('^', key_hw_probe_attn, "Trap to Hardware Probe");
+
+    /* allow the dumping of the devtree */
+    register_keyhandler('D', key_ofdump , "Dump OF Devtree");
 
     timer_init();
     serial_init_postirq();
@@ -318,9 +329,7 @@ static void __init __start_xen(multiboot_info_t *mbi)
     memory_init(mod, mbi->mods_count);
 
 #ifdef OF_DEBUG
-    printk("ofdump:\n");
-    /* make sure the OF devtree is good */
-    ofd_walk((void *)oftree, OFD_ROOT, ofd_dump_props, OFD_DUMP_ALL);
+    key_ofdump(0);
 #endif
     percpu_init_areas();
 

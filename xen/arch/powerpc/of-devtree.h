@@ -115,10 +115,10 @@ extern u32 ofd_io_open(void *mem, ofdn_t n);
 extern void ofd_io_close(void *mem, ofdn_t n);
 
 
-typedef void (*walk_fn)(void *m, ofdn_t p, int arg);
-extern void ofd_dump_props(void *m, ofdn_t p, int dump);
+typedef void (*walk_fn)(void *m, const char *pre, ofdn_t p, int arg);
+extern void ofd_dump_props(void *m, const char *pre, ofdn_t p, int dump);
 
-extern void ofd_walk(void *m, ofdn_t p, walk_fn fn, int arg);
+extern void ofd_walk(void *m, const char *pre, ofdn_t p, walk_fn fn, int arg);
 
 
 /* Recursively look up #address_cells and #size_cells properties */
