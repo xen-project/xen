@@ -685,15 +685,15 @@ class XendConfig(dict):
         # TODO: domid/dom is the same thing but called differently
         #       depending if it is from xenstore or sxpr.
 
-        if domain.getDomid() != None:
+        if domain.getDomid() is not None:
             sxpr.append(['domid', domain.getDomid()])
 
         for cfg, typefunc in ROUNDTRIPPING_CONFIG_ENTRIES:
             if cfg in self:
-                if self[cfg] != None:
+                if self[cfg] is not None:
                     sxpr.append([cfg, self[cfg]])
 
-        if 'image' in self and self['image'] != None:
+        if 'image' in self and self['image'] is not None:
             sxpr.append(['image', self['image']])
         if 'security' in self and self['security']:
             sxpr.append(['security', self['security']])
@@ -714,7 +714,9 @@ class XendConfig(dict):
         else:
             sxpr.append(['status', str(DOM_STATE_HALTED)])
 
-        sxpr.append(['state', self._get_old_state_string()])
+        if domain.getDomid() is not None:
+            sxpr.append(['state', self._get_old_state_string()])
+
         sxpr.append(['memory_dynamic_max', self.get('memory_dynamic_max',
                                                     self['memory'])])
 
