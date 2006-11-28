@@ -37,6 +37,7 @@ def write_exact(fd, buf, errmsg):
     if os.write(fd, buf) != len(buf):
         raise XendError(errmsg)
 
+
 def read_exact(fd, size, errmsg):
     buf  = '' 
     while size != 0: 
@@ -48,7 +49,6 @@ def read_exact(fd, size, errmsg):
         size = size - len(readstr)
         buf  = buf + readstr
     return buf
-
 
 
 def save(fd, dominfo, network, live, dst):
@@ -97,7 +97,14 @@ def save(fd, dominfo, network, live, dst):
         forkHelper(cmd, fd, saveInputHandler, False)
 
         dominfo.destroyDomain()
-        dominfo.setName(domain_name)
+        try:
+            dominfo.setName(domain_name)
+        except VmError:
+            # Ignore this.  The name conflict (hopefully) arises because we
+            # are doing localhost migration; if we are doing a suspend of a
+            # persistent VM, we need the rename, and don't expect the
+            # conflict.  This needs more thought.
+            pass
 
     except Exception, exn:
         log.exception("Save failed on domain %s (%s).", domain_name,
