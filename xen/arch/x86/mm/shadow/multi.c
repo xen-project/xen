@@ -3664,7 +3664,8 @@ int sh_remove_write_access(struct vcpu *v, mfn_t sl1mfn, mfn_t readonly_mfn)
              && (flags & _PAGE_RW) 
              && (mfn_x(shadow_l1e_get_mfn(*sl1e)) == mfn_x(readonly_mfn)) )
         {
-            (void) shadow_set_l1e(v, sl1e, shadow_l1e_empty(), sl1mfn);
+            shadow_l1e_t ro_sl1e = shadow_l1e_remove_flags(*sl1e, _PAGE_RW);
+            (void) shadow_set_l1e(v, sl1e, ro_sl1e, sl1mfn);
 #if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC 
             /* Remember the last shadow that we shot a writeable mapping in */
             v->arch.shadow.last_writeable_pte_smfn = mfn_x(base_sl1mfn);
