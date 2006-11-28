@@ -97,9 +97,9 @@ typedef struct {
 } pending_req_t;
 
 struct blkif_ops {
-	long int (*get_size)(struct blkif *blkif);
-	long int (*get_secsize)(struct blkif *blkif);
-	unsigned (*get_info)(struct blkif *blkif);
+	unsigned long long (*get_size)(struct blkif *blkif);
+	unsigned long (*get_secsize)(struct blkif *blkif);
+	unsigned int (*get_info)(struct blkif *blkif);
 };
 
 typedef struct blkif {
@@ -156,9 +156,9 @@ typedef struct domid_translate {
 } domid_translate_t ;
 
 typedef struct image {
-	long int size;
-	long int secsize;
-	long int info;
+	unsigned long long size;
+	unsigned long secsize;
+	unsigned int info;
 } image_t;
 
 typedef struct msg_hdr {

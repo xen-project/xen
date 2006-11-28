@@ -219,7 +219,7 @@ static void ueblktap_setup(struct xs_handle *h, char *bepath)
 	}
 
 	/* Supply the information about the device to xenstore */
-	er = xs_printf(h, be->backpath, "sectors", "%lu",
+	er = xs_printf(h, be->backpath, "sectors", "%llu",
 			be->blkif->ops->get_size(be->blkif));
 
 	if (er == 0) {

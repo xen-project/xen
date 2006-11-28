@@ -420,7 +420,7 @@ static int read_msg(int fd, int msgtype, void *ptr)
 			image->secsize = img->secsize;
 			image->info = img->info;
 
-			DPRINTF("Received CTLMSG_IMG: %lu, %lu, %lu\n",
+			DPRINTF("Received CTLMSG_IMG: %llu, %lu, %u\n",
 				image->size, image->secsize, image->info);
 			if(msgtype != CTLMSG_IMG) ret = 0;
 			break;
