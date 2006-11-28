@@ -196,7 +196,7 @@ class XendNode:
         return [[k, info[k]] for k in ITEM_ORDER]
 
     def xendinfo(self):
-        return [['xend_config_format',  2]]
+        return [['xend_config_format', 3]]
 
     # dictionary version of *info() functions to get rid of
     # SXPisms.
