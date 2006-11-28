@@ -62,12 +62,13 @@ struct hvm_function_table {
         struct vcpu *v, struct cpu_user_regs *r);
     /*
      * Examine specifics of the guest state:
-     * 1) determine whether the guest is in real or vm8086 mode,
-     * 2) determine whether paging is enabled,
-     * 3) return the current guest control-register value
-     * 4) return the current guest segment descriptor base
+     * 1) determine whether paging is enabled,
+     * 2) determine whether long mode is enabled,
+     * 3) determine whether PAE paging is enabled,
+     * 4) determine the mode the guest is running in,
+     * 5) return the current guest control-register value
+     * 6) return the current guest segment descriptor base
      */
-    int (*realmode)(struct vcpu *v);
     int (*paging_enabled)(struct vcpu *v);
     int (*long_mode_enabled)(struct vcpu *v);
     int (*pae_enabled)(struct vcpu *v);
@@ -128,12 +129,6 @@ hvm_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *r)
 }
 
 static inline int
-hvm_realmode(struct vcpu *v)
-{
-    return hvm_funcs.realmode(v);
-}
-
-static inline int
 hvm_paging_enabled(struct vcpu *v)
 {
     return hvm_funcs.paging_enabled(v);
@@ -157,7 +152,7 @@ hvm_guest_x86_mode(struct vcpu *v)
     return hvm_funcs.guest_x86_mode(v);
 }
 
-int hvm_instruction_length(struct cpu_user_regs *regs, int mode);
+int hvm_instruction_length(unsigned long pc, int mode);
 
 static inline void
 hvm_update_host_cr3(struct vcpu *v)

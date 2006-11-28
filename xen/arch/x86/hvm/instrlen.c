@@ -20,7 +20,6 @@
 #include <xen/config.h>
 #include <xen/sched.h>
 #include <xen/mm.h>
-#include <asm/regs.h>
 #include <asm-x86/x86_emulate.h>
 
 /* read from guest memory */
@@ -121,9 +120,7 @@ static uint8_t opcode_table[256] = {
     ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
     ByteOp|ImplicitOps, ImplicitOps,
     /* 0xB0 - 0xBF */
-    SrcImmByte, SrcImmByte, SrcImmByte, SrcImmByte, 
-    SrcImmByte, SrcImmByte, SrcImmByte, SrcImmByte, 
-    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     /* 0xC0 - 0xC7 */
     ByteOp|DstMem|SrcImm|ModRM, DstMem|SrcImmByte|ModRM, 0, 0,
     0, 0, ByteOp|DstMem|SrcImm|ModRM, DstMem|SrcImm|ModRM,
@@ -195,54 +192,52 @@ static uint8_t twobyte_table[256] = {
 };
 
 /* 
- * insn_fetch - fetch the next 1 to 4 bytes from instruction stream 
- * @_type:   u8, u16, u32, s8, s16, or s32
- * @_size:   1, 2, or 4 bytes
+ * insn_fetch - fetch the next byte from instruction stream
  */
-#define insn_fetch(_type, _size)                                        \
-({ unsigned long _x, _ptr = _regs.eip;                                  \
-   if ( mode == X86EMUL_MODE_REAL ) _ptr += _regs.cs << 4;              \
-   rc = inst_copy_from_guest((unsigned char *)(&(_x)), _ptr, _size);    \
-   if ( rc != _size ) goto done;                                        \
-   _regs.eip += (_size);                                                \
-   length += (_size);                                                   \
-   (_type)_x;                                                           \
+#define insn_fetch()                                                    \
+({ uint8_t _x;                                                          \
+   if ( length >= 15 )                                                  \
+       return -1;                                                       \
+   if ( inst_copy_from_guest(&_x, pc, 1) != 1 ) {                       \
+       gdprintk(XENLOG_WARNING,                                         \
+                "Cannot read from address %lx (eip %lx, mode %d)\n",    \
+                pc, org_pc, mode);                                      \
+       return -1;                                                       \
+   }                                                                    \
+   pc += 1;                                                             \
+   length += 1;                                                         \
+   _x;                                                                  \
 })
 
 /**
  * hvm_instruction_length - returns the current instructions length
  *
- * @regs: guest register state
+ * @org_pc: guest instruction pointer
  * @mode: guest operating mode
  *
  * EXTERNAL this routine calculates the length of the current instruction
- * pointed to by eip.  The guest state is _not_ changed by this routine.
+ * pointed to by org_pc.  The guest state is _not_ changed by this routine.
  */
-int hvm_instruction_length(struct cpu_user_regs *regs, int mode)
+int hvm_instruction_length(unsigned long org_pc, int mode)
 {
-    uint8_t b, d, twobyte = 0, rex_prefix = 0;
-    uint8_t modrm, modrm_mod = 0, modrm_reg = 0, modrm_rm = 0;
-    unsigned int op_bytes, ad_bytes, i;
-    int rc = 0;
+    uint8_t b, d, twobyte = 0, rex_prefix = 0, modrm_reg = 0;
+    unsigned int op_default, op_bytes, ad_default, ad_bytes, tmp;
     int length = 0;
-    unsigned int tmp;
-
-    /* Shadow copy of register state. Committed on successful emulation. */
-    struct cpu_user_regs _regs = *regs;
+    unsigned long pc = org_pc;
 
     switch ( mode )
     {
     case X86EMUL_MODE_REAL:
     case X86EMUL_MODE_PROT16:
-        op_bytes = ad_bytes = 2;
+        op_bytes = op_default = ad_bytes = ad_default = 2;
         break;
     case X86EMUL_MODE_PROT32:
-        op_bytes = ad_bytes = 4;
+        op_bytes = op_default = ad_bytes = ad_default = 4;
         break;
 #ifdef __x86_64__
     case X86EMUL_MODE_PROT64:
-        op_bytes = 4;
-        ad_bytes = 8;
+        op_bytes = op_default = 4;
+        ad_bytes = ad_default = 8;
         break;
 #endif
     default:
@@ -250,18 +245,18 @@ int hvm_instruction_length(struct cpu_user_regs *regs, int mode)
     }
 
     /* Legacy prefixes. */
-    for ( i = 0; i < 8; i++ )
+    for ( ; ; )
     {
-        switch ( b = insn_fetch(uint8_t, 1) )
+        switch ( b = insn_fetch() )
         {
         case 0x66: /* operand-size override */
-            op_bytes ^= 6;      /* switch between 2/4 bytes */
+            op_bytes = op_default ^ 6;      /* switch between 2/4 bytes */
             break;
         case 0x67: /* address-size override */
             if ( mode == X86EMUL_MODE_PROT64 )
-                ad_bytes ^= 12; /* switch between 4/8 bytes */
+                ad_bytes = ad_default ^ 12; /* switch between 4/8 bytes */
             else
-                ad_bytes ^= 6;  /* switch between 2/4 bytes */
+                ad_bytes = ad_default ^ 6;  /* switch between 2/4 bytes */
             break;
         case 0x2e: /* CS override */
         case 0x3e: /* DS override */
@@ -273,22 +268,26 @@ int hvm_instruction_length(struct cpu_user_regs *regs, int mode)
         case 0xf3: /* REP/REPE/REPZ */
         case 0xf2: /* REPNE/REPNZ */
             break;
+#ifdef __x86_64__
+        case 0x40 ... 0x4f:
+            if ( mode == X86EMUL_MODE_PROT64 )
+            {
+                rex_prefix = b;
+                continue;
+            }
+            /* FALLTHRU */
+#endif
         default:
             goto done_prefixes;
         }
+        rex_prefix = 0;
     }
 done_prefixes:
 
     /* REX prefix. */
-    if ( (mode == X86EMUL_MODE_PROT64) && ((b & 0xf0) == 0x40) )
-    {
-        rex_prefix = b;
-        if ( b & 8 )
-            op_bytes = 8;          /* REX.W */
-        modrm_reg = (b & 4) << 1;  /* REX.R */
-        /* REX.B and REX.X do not need to be decoded. */
-        b = insn_fetch(uint8_t, 1);
-    }
+    if ( rex_prefix & 8 )
+        op_bytes = 8;                   /* REX.W */
+    /* REX.B, REX.R, and REX.X do not need to be decoded. */
 
     /* Opcode byte(s). */
     d = opcode_table[b];
@@ -298,7 +297,7 @@ done_prefixes:
         if ( b == 0x0f )
         {
             twobyte = 1;
-            b = insn_fetch(uint8_t, 1);
+            b = insn_fetch();
             d = twobyte_table[b];
         }
 
@@ -310,11 +309,11 @@ done_prefixes:
     /* ModRM and SIB bytes. */
     if ( d & ModRM )
     {
-        modrm = insn_fetch(uint8_t, 1);
-        modrm_mod |= (modrm & 0xc0) >> 6;
-        modrm_reg |= (modrm & 0x38) >> 3;
-        modrm_rm  |= (modrm & 0x07);
+        uint8_t modrm = insn_fetch();
+        uint8_t modrm_mod = (modrm & 0xc0) >> 6;
+        uint8_t modrm_rm  = (modrm & 0x07);
 
+        modrm_reg = (modrm & 0x38) >> 3;
         if ( modrm_mod == 3 )
         {
             gdprintk(XENLOG_WARNING, "Cannot parse ModRM.mod == 3.\n");
@@ -330,16 +329,16 @@ done_prefixes:
                 if ( modrm_rm == 6 ) 
                 {
                     length += 2;
-                    _regs.eip += 2; /* skip disp16 */
+                    pc += 2; /* skip disp16 */
                 }
                 break;
             case 1:
                 length += 1;
-                _regs.eip += 1; /* skip disp8 */
+                pc += 1; /* skip disp8 */
                 break;
             case 2:
                 length += 2;
-                _regs.eip += 2; /* skip disp16 */
+                pc += 2; /* skip disp16 */
                 break;
             }
         }
@@ -350,33 +349,34 @@ done_prefixes:
             {
             case 0:
                 if ( (modrm_rm == 4) && 
-                     (((insn_fetch(uint8_t, 1)) & 7) 
-                        == 5) )
+                     ((insn_fetch() & 7) == 5) )
                 {
                     length += 4;
-                    _regs.eip += 4; /* skip disp32 specified by SIB.base */
+                    pc += 4; /* skip disp32 specified by SIB.base */
                 }
                 else if ( modrm_rm == 5 )
                 {
                     length += 4;
-                    _regs.eip += 4; /* skip disp32 */
+                    pc += 4; /* skip disp32 */
                 }
                 break;
             case 1:
                 if ( modrm_rm == 4 )
                 {
-                    insn_fetch(uint8_t, 1);
+                    length += 1;
+                    pc += 1;
                 }
                 length += 1;
-                _regs.eip += 1; /* skip disp8 */
+                pc += 1; /* skip disp8 */
                 break;
             case 2:
                 if ( modrm_rm == 4 )
                 {
-                    insn_fetch(uint8_t, 1);
+                    length += 1;
+                    pc += 1;
                 }
                 length += 4;
-                _regs.eip += 4; /* skip disp32 */
+                pc += 4; /* skip disp32 */
                 break;
             }
         }
@@ -397,15 +397,12 @@ done_prefixes:
         tmp = (d & ByteOp) ? 1 : op_bytes;
         if ( tmp == 8 ) tmp = 4;
         /* NB. Immediates are sign-extended as necessary. */
-        switch ( tmp )
-        {
-        case 1: insn_fetch(int8_t,  1); break;
-        case 2: insn_fetch(int16_t, 2); break;
-        case 4: insn_fetch(int32_t, 4); break;
-        }
+        length += tmp;
+        pc += tmp;
         break;
     case SrcImmByte:
-        insn_fetch(int8_t,  1);
+        length += 1;
+        pc += 1;
         break;
     }
 
@@ -414,13 +411,9 @@ done_prefixes:
 
     switch ( b )
     {
-    case 0xa0 ... 0xa1: /* mov */
+    case 0xa0 ... 0xa3: /* mov */
         length += ad_bytes;
-        _regs.eip += ad_bytes; /* skip src displacement */
-        break;
-    case 0xa2 ... 0xa3: /* mov */
-        length += ad_bytes;
-        _regs.eip += ad_bytes; /* skip dst displacement */
+        pc += ad_bytes; /* skip src/dst displacement */
         break;
     case 0xf6 ... 0xf7: /* Grp3 */
         switch ( modrm_reg )
@@ -429,23 +422,19 @@ done_prefixes:
             /* Special case in Grp3: test has an immediate source operand. */
             tmp = (d & ByteOp) ? 1 : op_bytes;
             if ( tmp == 8 ) tmp = 4;
-            switch ( tmp )
-            {
-            case 1: insn_fetch(int8_t,  1); break;
-            case 2: insn_fetch(int16_t, 2); break;
-            case 4: insn_fetch(int32_t, 4); break;
-            }
-            goto done;
+            length += tmp;
+            pc += tmp;
+            break;
         }
         break;
     }
 
 done:
-    return length;
+    return length < 16 ? length : -1;
 
 cannot_emulate:
     gdprintk(XENLOG_WARNING,
-            "Cannot emulate %02x at address %lx (eip %lx, mode %d)\n",
-            b, (unsigned long)_regs.eip, (unsigned long)regs->eip, mode);
+            "Cannot emulate %02x at address %lx (%lx, mode %d)\n",
+            b, pc - 1, org_pc, mode);
     return -1;
 }

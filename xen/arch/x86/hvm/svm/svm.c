@@ -511,18 +511,24 @@ unsigned long svm_get_ctrl_reg(struct vcpu *v, unsigned int num)
 
 static unsigned long svm_get_segment_base(struct vcpu *v, enum segment seg)
 {
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    int long_mode = 0;
+
+#ifdef __x86_64__
+    long_mode = vmcb->cs.attributes.fields.l && (vmcb->efer & EFER_LMA);
+#endif
     switch ( seg )
     {
-    case seg_cs: return v->arch.hvm_svm.vmcb->cs.base;
-    case seg_ds: return v->arch.hvm_svm.vmcb->ds.base;
-    case seg_es: return v->arch.hvm_svm.vmcb->es.base;
-    case seg_fs: return v->arch.hvm_svm.vmcb->fs.base;
-    case seg_gs: return v->arch.hvm_svm.vmcb->gs.base;
-    case seg_ss: return v->arch.hvm_svm.vmcb->ss.base;
-    case seg_tr: return v->arch.hvm_svm.vmcb->tr.base;
-    case seg_gdtr: return v->arch.hvm_svm.vmcb->gdtr.base;
-    case seg_idtr: return v->arch.hvm_svm.vmcb->idtr.base;
-    case seg_ldtr: return v->arch.hvm_svm.vmcb->ldtr.base;
+    case seg_cs: return long_mode ? 0 : vmcb->cs.base;
+    case seg_ds: return long_mode ? 0 : vmcb->ds.base;
+    case seg_es: return long_mode ? 0 : vmcb->es.base;
+    case seg_fs: return vmcb->fs.base;
+    case seg_gs: return vmcb->gs.base;
+    case seg_ss: return long_mode ? 0 : vmcb->ss.base;
+    case seg_tr: return vmcb->tr.base;
+    case seg_gdtr: return vmcb->gdtr.base;
+    case seg_idtr: return vmcb->idtr.base;
+    case seg_ldtr: return vmcb->ldtr.base;
     }
     BUG();
     return 0;
@@ -832,7 +838,6 @@ int start_svm(void)
     hvm_funcs.store_cpu_guest_regs = svm_store_cpu_guest_regs;
     hvm_funcs.load_cpu_guest_regs = svm_load_cpu_guest_regs;
 
-    hvm_funcs.realmode = svm_realmode;
     hvm_funcs.paging_enabled = svm_paging_enabled;
     hvm_funcs.long_mode_enabled = svm_long_mode_enabled;
     hvm_funcs.pae_enabled = svm_pae_enabled;
@@ -925,7 +930,7 @@ static void svm_do_general_protection_fault(struct vcpu *v,
         printk("Huh? We got a GP Fault with an invalid IDTR!\n");
         svm_dump_vmcb(__func__, vmcb);
         svm_dump_regs(__func__, regs);
-        svm_dump_inst(vmcb->rip);
+        svm_dump_inst(svm_rip2pointer(vmcb));
         domain_crash(v->domain);
         return;
     }
@@ -1223,22 +1228,21 @@ static void svm_get_prefix_info(
 
 /* Get the address of INS/OUTS instruction */
 static inline int svm_get_io_address(
-    struct vcpu *v, 
-    struct cpu_user_regs *regs, unsigned int dir, 
+    struct vcpu *v, struct cpu_user_regs *regs,
+    unsigned int size, ioio_info_t info,
     unsigned long *count, unsigned long *addr)
 {
     unsigned long        reg;
     unsigned int         asize = 0;
     unsigned int         isize;
-    int                  long_mode;
-    ioio_info_t          info;
+    int                  long_mode = 0;
     segment_selector_t  *seg = NULL;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    info.bytes = vmcb->exitinfo1;
-
+#ifdef __x86_64__
     /* If we're in long mode, we shouldn't check the segment presence & limit */
     long_mode = vmcb->cs.attributes.fields.l && vmcb->efer & EFER_LMA;
+#endif
 
     /* d field of cs.attributes is 1 for 32-bit, 0 for 16 or 64 bit. 
      * l field combined with EFER_LMA -> longmode says whether it's 16 or 64 bit. 
@@ -1256,11 +1260,9 @@ static inline int svm_get_io_address(
         isize --;
 
     if (isize > 1) 
-        svm_get_prefix_info(vmcb, dir, &seg, &asize);
+        svm_get_prefix_info(vmcb, info.fields.type, &seg, &asize);
 
-    ASSERT(dir == IOREQ_READ || dir == IOREQ_WRITE);
-
-    if (dir == IOREQ_WRITE)
+    if (info.fields.type == IOREQ_WRITE)
     {
         reg = regs->esi;
         if (!seg)               /* If no prefix, used DS. */
@@ -1289,6 +1291,8 @@ static inline int svm_get_io_address(
         *addr = reg;
         *count = regs->ecx;
     }
+    if (!info.fields.rep)
+        *count = 1;
 
     if (!long_mode) {
         if (*addr > seg->limit) 
@@ -1301,7 +1305,8 @@ static inline int svm_get_io_address(
             *addr += seg->base;
         }
     }
-    
+    else if (seg == &vmcb->fs || seg == &vmcb->gs)
+        *addr += seg->base;
 
     return 1;
 }
@@ -1351,7 +1356,7 @@ static void svm_io_instruction(struct vcpu *v)
         unsigned long addr, count;
         int sign = regs->eflags & X86_EFLAGS_DF ? -1 : 1;
 
-        if (!svm_get_io_address(v, regs, dir, &count, &addr)) 
+        if (!svm_get_io_address(v, regs, size, info, &count, &addr))
         {
             /* We failed to get a valid address, so don't do the IO operation -
              * it would just get worse if we do! Hopefully the guest is handing
@@ -1364,10 +1369,6 @@ static void svm_io_instruction(struct vcpu *v)
         if (info.fields.rep) 
         {
             pio_opp->flags |= REPZ;
-        }
-        else 
-        {
-            count = 1;
         }
 
         /*

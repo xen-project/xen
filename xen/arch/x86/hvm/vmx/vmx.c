@@ -503,23 +503,32 @@ static unsigned long vmx_get_ctrl_reg(struct vcpu *v, unsigned int num)
 
 static unsigned long vmx_get_segment_base(struct vcpu *v, enum segment seg)
 {
-    unsigned long base;
+    unsigned long base = 0;
+    int long_mode = 0;
 
-    BUG_ON(v != current);
+    ASSERT(v == current);
+
+#ifdef __x86_64__
+    if ( vmx_long_mode_enabled(v) &&
+         (__vmread(GUEST_CS_AR_BYTES) & (1u<<13)) )
+        long_mode = 1;
+#endif
+
     switch ( seg )
     {
-    case seg_cs: base = __vmread(GUEST_CS_BASE); break;
-    case seg_ds: base = __vmread(GUEST_DS_BASE); break;
-    case seg_es: base = __vmread(GUEST_ES_BASE); break;
+    case seg_cs: if ( !long_mode ) base = __vmread(GUEST_CS_BASE); break;
+    case seg_ds: if ( !long_mode ) base = __vmread(GUEST_DS_BASE); break;
+    case seg_es: if ( !long_mode ) base = __vmread(GUEST_ES_BASE); break;
     case seg_fs: base = __vmread(GUEST_FS_BASE); break;
     case seg_gs: base = __vmread(GUEST_GS_BASE); break;
-    case seg_ss: base = __vmread(GUEST_SS_BASE); break;
+    case seg_ss: if ( !long_mode ) base = __vmread(GUEST_SS_BASE); break;
     case seg_tr: base = __vmread(GUEST_TR_BASE); break;
     case seg_gdtr: base = __vmread(GUEST_GDTR_BASE); break;
     case seg_idtr: base = __vmread(GUEST_IDTR_BASE); break;
     case seg_ldtr: base = __vmread(GUEST_LDTR_BASE); break;
-    default: BUG(); base = 0; break;
+    default: BUG(); break;
     }
+
     return base;
 }
 
@@ -635,7 +644,6 @@ static void vmx_setup_hvm_funcs(void)
     hvm_funcs.store_cpu_guest_regs = vmx_store_cpu_guest_regs;
     hvm_funcs.load_cpu_guest_regs = vmx_load_cpu_guest_regs;
 
-    hvm_funcs.realmode = vmx_realmode;
     hvm_funcs.paging_enabled = vmx_paging_enabled;
     hvm_funcs.long_mode_enabled = vmx_long_mode_enabled;
     hvm_funcs.pae_enabled = vmx_pae_enabled;
@@ -949,63 +957,100 @@ static void vmx_do_invlpg(unsigned long va)
 }
 
 
-static int check_for_null_selector(unsigned long eip, int inst_len, int dir)
+static int vmx_check_descriptor(int long_mode, unsigned long eip, int inst_len,
+                                enum segment seg, unsigned long *base)
 {
-    unsigned char inst[MAX_INST_LEN];
-    unsigned long sel;
-    int i;
-    int inst_copy_from_guest(unsigned char *, unsigned long, int);
+    enum vmcs_field ar_field, base_field;
+    u32 ar_bytes;
 
-    /* INS can only use ES segment register, and it can't be overridden */
-    if ( dir == IOREQ_READ )
+    *base = 0;
+    if ( seg != seg_es )
     {
-        sel = __vmread(GUEST_ES_SELECTOR);
-        return sel == 0 ? 1 : 0;
+        unsigned char inst[MAX_INST_LEN];
+        int i;
+        extern int inst_copy_from_guest(unsigned char *, unsigned long, int);
+
+        if ( !long_mode )
+            eip += __vmread(GUEST_CS_BASE);
+        memset(inst, 0, MAX_INST_LEN);
+        if ( inst_copy_from_guest(inst, eip, inst_len) != inst_len )
+        {
+            gdprintk(XENLOG_ERR, "Get guest instruction failed\n");
+            domain_crash(current->domain);
+            return 0;
+        }
+
+        for ( i = 0; i < inst_len; i++ )
+        {
+            switch ( inst[i] )
+            {
+            case 0xf3: /* REPZ */
+            case 0xf2: /* REPNZ */
+            case 0xf0: /* LOCK */
+            case 0x66: /* data32 */
+            case 0x67: /* addr32 */
+#ifdef __x86_64__
+            case 0x40 ... 0x4f: /* REX */
+#endif
+                continue;
+            case 0x2e: /* CS */
+                seg = seg_cs;
+                continue;
+            case 0x36: /* SS */
+                seg = seg_ss;
+                continue;
+            case 0x26: /* ES */
+                seg = seg_es;
+                continue;
+            case 0x64: /* FS */
+                seg = seg_fs;
+                continue;
+            case 0x65: /* GS */
+                seg = seg_gs;
+                continue;
+            case 0x3e: /* DS */
+                seg = seg_ds;
+                continue;
+            }
+        }
     }
 
-    memset(inst, 0, MAX_INST_LEN);
-    if ( inst_copy_from_guest(inst, eip, inst_len) != inst_len )
+    switch ( seg )
     {
-        gdprintk(XENLOG_ERR, "Get guest instruction failed\n");
-        domain_crash(current->domain);
+    case seg_cs:
+        ar_field = GUEST_CS_AR_BYTES;
+        base_field = GUEST_CS_BASE;
+        break;
+    case seg_ds:
+        ar_field = GUEST_DS_AR_BYTES;
+        base_field = GUEST_DS_BASE;
+        break;
+    case seg_es:
+        ar_field = GUEST_ES_AR_BYTES;
+        base_field = GUEST_ES_BASE;
+        break;
+    case seg_fs:
+        ar_field = GUEST_FS_AR_BYTES;
+        base_field = GUEST_FS_BASE;
+        break;
+    case seg_gs:
+        ar_field = GUEST_FS_AR_BYTES;
+        base_field = GUEST_FS_BASE;
+        break;
+    case seg_ss:
+        ar_field = GUEST_GS_AR_BYTES;
+        base_field = GUEST_GS_BASE;
+        break;
+    default:
+        BUG();
         return 0;
     }
 
-    for ( i = 0; i < inst_len; i++ )
-    {
-        switch ( inst[i] )
-        {
-        case 0xf3: /* REPZ */
-        case 0xf2: /* REPNZ */
-        case 0xf0: /* LOCK */
-        case 0x66: /* data32 */
-        case 0x67: /* addr32 */
-            continue;
-        case 0x2e: /* CS */
-            sel = __vmread(GUEST_CS_SELECTOR);
-            break;
-        case 0x36: /* SS */
-            sel = __vmread(GUEST_SS_SELECTOR);
-            break;
-        case 0x26: /* ES */
-            sel = __vmread(GUEST_ES_SELECTOR);
-            break;
-        case 0x64: /* FS */
-            sel = __vmread(GUEST_FS_SELECTOR);
-            break;
-        case 0x65: /* GS */
-            sel = __vmread(GUEST_GS_SELECTOR);
-            break;
-        case 0x3e: /* DS */
-            /* FALLTHROUGH */
-        default:
-            /* DS is the default */
-            sel = __vmread(GUEST_DS_SELECTOR);
-        }
-        return sel == 0 ? 1 : 0;
-    }
+    if ( !long_mode || seg == seg_fs || seg == seg_gs )
+        *base = __vmread(base_field);
+    ar_bytes = __vmread(ar_field);
 
-    return 0;
+    return !(ar_bytes & 0x10000);
 }
 
 static void vmx_io_instruction(unsigned long exit_qualification,
@@ -1013,7 +1058,7 @@ static void vmx_io_instruction(unsigned long exit_qualification,
 {
     struct cpu_user_regs *regs;
     struct hvm_io_op *pio_opp;
-    unsigned long port, size;
+    unsigned int port, size;
     int dir, df, vm86;
 
     pio_opp = &current->arch.hvm_vcpu.io_op;
@@ -1044,21 +1089,32 @@ static void vmx_io_instruction(unsigned long exit_qualification,
     dir = test_bit(3, &exit_qualification); /* direction */
 
     if ( test_bit(4, &exit_qualification) ) { /* string instruction */
-        unsigned long addr, count = 1;
+        unsigned long addr, count = 1, base;
+        u32 ar_bytes;
         int sign = regs->eflags & X86_EFLAGS_DF ? -1 : 1;
+        int long_mode = 0;
 
+        ar_bytes = __vmread(GUEST_CS_AR_BYTES);
+#ifdef __x86_64__
+        if ( vmx_long_mode_enabled(current) && (ar_bytes & (1u<<13)) )
+            long_mode = 1;
+#endif
         addr = __vmread(GUEST_LINEAR_ADDRESS);
 
         /*
          * In protected mode, guest linear address is invalid if the
          * selector is null.
          */
-        if ( !vm86 && check_for_null_selector(regs->eip, inst_len, dir) )
-            addr = dir == IOREQ_WRITE ? regs->esi : regs->edi;
+        if ( !vmx_check_descriptor(long_mode, regs->eip, inst_len,
+                                   dir == IOREQ_WRITE ? seg_ds : seg_es,
+                                   &base) )
+            addr = dir == IOREQ_WRITE ? base + regs->esi : regs->edi;
 
         if ( test_bit(5, &exit_qualification) ) { /* "rep" prefix */
             pio_opp->flags |= REPZ;
-            count = vm86 ? regs->ecx & 0xFFFF : regs->ecx;
+            count = regs->ecx;
+            if ( !long_mode && (vm86 || !(ar_bytes & (1u<<14))) )
+                count &= 0xFFFF;
         }
 
         /*
