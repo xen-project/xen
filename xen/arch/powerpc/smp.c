@@ -97,7 +97,6 @@ int on_selected_cpus(
     call_data.func = func;
     call_data.info = info;
     call_data.wait = wait;
-    call_data.wait = 1;  /* Until we get RCU around call_data.  */
     atomic_set(&call_data.started, 0);
     atomic_set(&call_data.finished, 0);
     mb();
