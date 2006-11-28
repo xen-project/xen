@@ -41,6 +41,7 @@
 # todo Support command-line args.
 
 import fcntl
+import re
 import time
 import signal
 from threading import Thread
@@ -147,6 +148,29 @@ def create():
         path = xroot.get_xend_unix_path()
         log.info('unix path=' + path)
         servers.add(UnixHttpServer(root, path))
+
+    api_cfg = xroot.get_xen_api_server()
+    if api_cfg:
+        try:
+            addrs = [(str(x[0]).split(':'),
+                      len(x) > 1 and x[1] and map(re.compile, x[1].split(" "))
+                      or None)
+                     for x in api_cfg]
+            for addrport, allowed in addrs:
+                if len(addrport) == 1:
+                    if addrport[0] == 'unix':
+                        servers.add(XMLRPCServer(allowed = allowed))
+                    else:
+                        servers.add(XMLRPCServer(True, '', int(addrport[0]),
+                                                 allowed = allowed))
+                else:
+                    addr, port = addrport
+                    servers.add(XMLRPCServer(True, addr, int(port),
+                                             allowed = allowed))
+        except ValueError:
+            log.error('Xen-API server configuration %s is invalid' % api_cfg)
+        except TypeError:
+            log.error('Xen-API server configuration %s is invalid' % api_cfg)
 
     if xroot.get_xend_tcp_xmlrpc_server():
         servers.add(XMLRPCServer(True))

@@ -85,11 +85,12 @@ exclude = ['domain_create', 'domain_restore']
 
 class XMLRPCServer:
     def __init__(self, use_tcp=False, host = "localhost", port = 8006,
-                 path = XML_RPC_SOCKET):
+                 path = XML_RPC_SOCKET, hosts_allowed = None):
         self.use_tcp = use_tcp
         self.port = port
         self.host = host
         self.path = path
+        self.hosts_allowed = hosts_allowed
         
         self.ready = False        
         self.running = True
@@ -97,10 +98,18 @@ class XMLRPCServer:
         
     def run(self):
         if self.use_tcp:
+            log.info("Opening TCP XML-RPC server on %s%d.",
+                     self.host and '%s:' % self.host or
+                     'all interfaces, port ',
+                     self.port)
             self.server = TCPXMLRPCServer((self.host, self.port),
+                                          self.hosts_allowed,
                                           logRequests = False)
         else:
-            self.server = UnixXMLRPCServer(self.path, logRequests = False)
+            log.info("Opening Unix domain socket XML-RPC server on %s:%d.",
+                     self.path)
+            self.server = UnixXMLRPCServer(self.path, self.hosts_allowed,
+                                           logRequests = False)
 
         # Register Xen API Functions
         # -------------------------------------------------------------------
