@@ -908,10 +908,13 @@ class XendDomain:
             if dominfo.state != DOM_STATE_HALTED:
                 raise XendError("Domain is already running")
             
-            dominfo.start(is_managed = True, start_paused = start_paused)
+            dominfo.start(is_managed = True)
             self._add_domain(dominfo)
         finally:
             self.domains_lock.release()
+        dominfo.waitForDevices()
+        if not start_paused:
+            dominfo.unpause()
         
 
     def domain_delete(self, domid):

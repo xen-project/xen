@@ -425,7 +425,7 @@ class XendDomainInfo:
     #
 
 
-    def start(self, is_managed = False, start_paused = True):
+    def start(self, is_managed = False):
         """Attempts to start the VM by do the appropriate
         initialisation if it not started.
         """
@@ -439,8 +439,6 @@ class XendDomainInfo:
                 self._storeDomDetails()
                 self._registerWatches()
                 self.refreshShutdown()
-                if not start_paused:
-                    self.unpause()
 
                 # save running configuration if XendDomains believe domain is
                 # persistent
