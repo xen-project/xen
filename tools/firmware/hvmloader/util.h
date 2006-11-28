@@ -6,6 +6,9 @@
 #undef offsetof
 #define offsetof(t, m) ((unsigned long)&((t *)0)->m)
 
+#undef NULL
+#define NULL ((void*)0)
+
 extern void __assert_failed(char *assertion, char *file, int line)
     __attribute__((noreturn));
 #define ASSERT(p) \

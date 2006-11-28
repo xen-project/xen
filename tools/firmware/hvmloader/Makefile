@@ -40,7 +40,7 @@ OBJCOPY  = objcopy
 CFLAGS  += $(DEFINES) -I. $(XENINC) -fno-builtin -O2 -msoft-float
 LDFLAGS  = -nostdlib -Wl,-N -Wl,-Ttext -Wl,$(LOADADDR)
 
-SRCS = hvmloader.c mp_tables.c util.c smbios.c acpi_utils.c
+SRCS = hvmloader.c mp_tables.c util.c smbios.c
 OBJS = $(patsubst %.c,%.o,$(SRCS))
 
 .PHONY: all
@@ -65,5 +65,5 @@ roms.h:	../rombios/BIOS-bochs-latest ../vgabios/VGABIOS-lgpl-latest.bin ../vgabi
 .PHONY: clean
 clean:
 	rm -f roms.h acpi.h
-	rm -f hvmloader hvmloader.tmp hvmloader.o $(OBJS)
+	rm -f hvmloader hvmloader.tmp *.o
 	$(MAKE) -C acpi clean

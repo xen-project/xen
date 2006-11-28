@@ -30,12 +30,18 @@ IASL_URL = http://developer.intel.com/technology/iapc/acpi/downloads/$(IASL_VER)
 vpath iasl $(PATH)
 all: acpi.a
 
+ssdt_tpm.h: ssdt_tpm.asl
+	$(MAKE) iasl
+	iasl -tc ssdt_tpm.asl
+	mv ssdt_tpm.hex ssdt_tpm.h
+	rm -f *.aml
+
 dsdt.c: dsdt.asl
 	$(MAKE) iasl
 	iasl -tc dsdt.asl
 	mv dsdt.hex dsdt.c
 	echo "int DsdtLen=sizeof(AmlCode);" >> dsdt.c
-	rm *.aml
+	rm -f *.aml
 
 iasl:
 	@echo
