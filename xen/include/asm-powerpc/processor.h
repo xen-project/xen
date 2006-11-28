@@ -152,7 +152,8 @@ static inline ulong mfmsr(void) {
 static inline void nop(void) {
     __asm__ __volatile__ ("nop");
 }
-#define cpu_relax() nop()
+/* will need to address thread priorities when we go SMT */
+#define cpu_relax() barrier()
 
 static inline unsigned int mfpir(void)
 {
