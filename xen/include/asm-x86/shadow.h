@@ -215,12 +215,6 @@ static inline _type _name##_x(_name##_t n) { return n; }
 TYPE_SAFE(unsigned long,mfn)
 #define SH_PRI_mfn "05lx"
 
-static inline int
-valid_mfn(mfn_t m)
-{
-    return mfn_valid(mfn_x(m));
-}
-
 static inline mfn_t
 pagetable_get_mfn(pagetable_t pt)
 {

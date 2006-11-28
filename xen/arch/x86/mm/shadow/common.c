@@ -194,7 +194,7 @@ void shadow_promote(struct vcpu *v, mfn_t gmfn, unsigned int type)
 {
     struct page_info *page = mfn_to_page(gmfn);
 
-    ASSERT(valid_mfn(gmfn));
+    ASSERT(mfn_valid(gmfn));
 
     /* We should never try to promote a gmfn that has writeable mappings */
     ASSERT(shadow_remove_write_access(v, gmfn, 0, 0) == 0);
@@ -967,13 +967,13 @@ shadow_set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
     p2m_entry = p2m_find_entry(table, &gfn_remainder, gfn,
                                0, L1_PAGETABLE_ENTRIES);
     ASSERT(p2m_entry);
-    if ( valid_mfn(mfn) )
+    if ( mfn_valid(mfn) )
         *p2m_entry = l1e_from_pfn(mfn_x(mfn), __PAGE_HYPERVISOR|_PAGE_USER);
     else
         *p2m_entry = l1e_empty();
 
     /* Track the highest gfn for which we have ever had a valid mapping */
-    if ( valid_mfn(mfn) && (gfn > d->arch.max_mapped_pfn) ) 
+    if ( mfn_valid(mfn) && (gfn > d->arch.max_mapped_pfn) ) 
         d->arch.max_mapped_pfn = gfn;
 
     /* The P2M can be shadowed: keep the shadows synced */
@@ -1930,7 +1930,7 @@ static int sh_remove_shadow_via_pointer(struct vcpu *v, mfn_t smfn)
     
     if (sp->up == 0) return 0;
     pmfn = _mfn(sp->up >> PAGE_SHIFT);
-    ASSERT(valid_mfn(pmfn));
+    ASSERT(mfn_valid(pmfn));
     vaddr = sh_map_domain_page(pmfn);
     ASSERT(vaddr);
     vaddr += sp->up & (PAGE_SIZE-1);
@@ -2424,7 +2424,7 @@ void shadow_teardown(struct domain *d)
             if ( shadow_mode_external(d) )
             {
                 mfn = pagetable_get_mfn(v->arch.monitor_table);
-                if ( valid_mfn(mfn) && (mfn_x(mfn) != 0) )
+                if ( mfn_valid(mfn) && (mfn_x(mfn) != 0) )
                     shadow_destroy_monitor_table(v, mfn);
                 v->arch.monitor_table = pagetable_null();
             }
@@ -2755,7 +2755,7 @@ shadow_guest_physmap_add_page(struct domain *d, unsigned long gfn,
     SHADOW_DEBUG(P2M, "adding gfn=%#lx mfn=%#lx\n", gfn, mfn);
 
     omfn = sh_gfn_to_mfn(d, gfn);
-    if ( valid_mfn(omfn) )
+    if ( mfn_valid(omfn) )
     {
         /* Get rid of the old mapping, especially any shadows */
         struct vcpu *v = current;
@@ -2783,7 +2783,7 @@ shadow_guest_physmap_add_page(struct domain *d, unsigned long gfn,
         /* This machine frame is already mapped at another physical address */
         SHADOW_DEBUG(P2M, "aliased! mfn=%#lx, old gfn=%#lx, new gfn=%#lx\n",
                        mfn, ogfn, gfn);
-        if ( valid_mfn(omfn = sh_gfn_to_mfn(d, ogfn)) ) 
+        if ( mfn_valid(omfn = sh_gfn_to_mfn(d, ogfn)) ) 
         {
             SHADOW_DEBUG(P2M, "old gfn=%#lx -> mfn %#lx\n", 
                            ogfn , mfn_x(omfn));
@@ -2888,7 +2888,7 @@ void sh_do_mark_dirty(struct domain *d, mfn_t gmfn)
     ASSERT(shadow_lock_is_acquired(d));
     ASSERT(shadow_mode_log_dirty(d));
 
-    if ( !valid_mfn(gmfn) )
+    if ( !mfn_valid(gmfn) )
         return;
 
     ASSERT(d->arch.shadow.dirty_bitmap != NULL);
@@ -3209,7 +3209,7 @@ void shadow_audit_p2m(struct domain *d)
                         if ( !(l1e_get_flags(l1e[i1]) & _PAGE_PRESENT) )
                             continue;
                         mfn = l1e_get_pfn(l1e[i1]);
-                        ASSERT(valid_mfn(_mfn(mfn)));
+                        ASSERT(mfn_valid(_mfn(mfn)));
                         m2pfn = get_gpfn_from_mfn(mfn);
                         if ( m2pfn != gfn )
                         {

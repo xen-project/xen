@@ -374,7 +374,7 @@ sh_mfn_is_a_page_table(mfn_t gmfn)
     struct domain *owner;
     unsigned long type_info;
 
-    if ( !valid_mfn(gmfn) )
+    if ( !mfn_valid(gmfn) )
         return 0;
 
     owner = page_get_owner(page);
