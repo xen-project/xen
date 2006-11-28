@@ -2582,7 +2582,6 @@ static int sh_page_fault(struct vcpu *v,
     mfn_t gmfn, sl1mfn=_mfn(0);
     shadow_l1e_t sl1e, *ptr_sl1e;
     paddr_t gpa;
-    struct cpu_user_regs emul_regs;
     struct x86_emulate_ctxt emul_ctxt;
     int r, mmio;
     fetch_type_t ft = 0;
@@ -2810,18 +2809,14 @@ static int sh_page_fault(struct vcpu *v,
 
  emulate:
     /* Take the register set we were called with */
-    emul_regs = *regs;
     if ( is_hvm_domain(d) )
-    {
-        /* Add the guest's segment selectors, rip, rsp. rflags */ 
-        hvm_store_cpu_guest_regs(v, &emul_regs, NULL);
-    }
-    emul_ctxt.regs = &emul_regs;
-    emul_ctxt.cr2 = va;
+        hvm_store_cpu_guest_regs(v, regs, NULL);
+    emul_ctxt.regs = regs;
+    emul_ctxt.cr2  = va;
     emul_ctxt.mode = (is_hvm_domain(d) ?
                       hvm_guest_x86_mode(v) : X86EMUL_MODE_HOST);
 
-    SHADOW_PRINTK("emulate: eip=%#lx\n", emul_regs.eip);
+    SHADOW_PRINTK("emulate: eip=%#lx\n", regs->eip);
 
     v->arch.shadow.propagate_fault = 0;
 
@@ -2852,21 +2847,7 @@ static int sh_page_fault(struct vcpu *v,
 
     /* Emulator has changed the user registers: write back */
     if ( is_hvm_domain(d) )
-    {
-        /* Write back the guest's segment selectors, rip, rsp. rflags */ 
-        hvm_load_cpu_guest_regs(v, &emul_regs);
-        /* And don't overwrite those in the caller's regs. */
-        emul_regs.eip = regs->eip;
-        emul_regs.cs = regs->cs;
-        emul_regs.eflags = regs->eflags;
-        emul_regs.esp = regs->esp;
-        emul_regs.ss = regs->ss;
-        emul_regs.es = regs->es;
-        emul_regs.ds = regs->ds;
-        emul_regs.fs = regs->fs;
-        emul_regs.gs = regs->gs;
-    }
-    *regs = emul_regs;
+        hvm_load_cpu_guest_regs(v, regs);
 
     goto done;
 

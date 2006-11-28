@@ -445,6 +445,31 @@ decode_register(
     return p;
 }
 
+static void
+dump_instr(
+    struct x86_emulate_ctxt *ctxt,
+    struct x86_emulate_ops  *ops)
+{
+#ifdef __XEN__
+    int i;
+    unsigned long x, pc;
+
+    pc = ctxt->regs->eip;
+    if ( ctxt->mode == X86EMUL_MODE_REAL )
+        pc += ctxt->regs->cs << 4;
+
+    dprintf("Instr:");
+    for ( i = 0; i < 16; i++, pc++ )
+    {
+        if ( ops->read_std(pc, &x, 1, ctxt) != 0 )
+            printk(" ??");
+        else
+            printk(" %02x", (uint8_t)x);
+    }
+    printk("\n");
+#endif
+}
+
 int
 x86_emulate_memop(
     struct x86_emulate_ctxt *ctxt,
@@ -1192,10 +1217,13 @@ x86_emulate_memop(
 
  cannot_emulate:
     dprintf("Cannot emulate %02x\n", b);
+    dump_instr(ctxt, ops);
     return -1;
 
  bad_ea:
     dprintf("Access faulted on page boundary (cr2=%lx,ea=%lx).\n", cr2, ea);
+    dump_instr(ctxt, ops);
+    show_execution_state(ctxt->regs);
     return -1;
 }
 
