@@ -35,6 +35,14 @@
 #include "xen_string_string_map.h"
 
 
+/*
+ * Whether to ignore missing structure entries.  This is not something we
+ * want to do, once the API has stabilised, as it indicates that the server is
+ * broken, but at the moment, complaining is just slowing development down.
+ */
+#define PERMISSIVE 1
+
+
 static xmlXPathCompExprPtr responsePath = NULL;
 static xmlXPathCompExprPtr faultPath = NULL;
 
@@ -756,6 +764,7 @@ static void parse_into(xen_session *s, xmlNode *value_node,
                 cur = cur->next;
             }
 
+#if !PERMISSIVE
             /* Check that we've filled all fields. */
             for (size_t i = 0; i < member_count; i++)
             {
@@ -780,6 +789,7 @@ static void parse_into(xen_session *s, xmlNode *value_node,
                     return;
                 }
             }
+#endif
 
             free(checklist);
             ((void **)value)[slot] = result;
