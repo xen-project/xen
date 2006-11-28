@@ -90,7 +90,8 @@ int on_selected_cpus(
     int retry,
     int wait)
 {
-    int t, retval = 0, nr_cpus = cpus_weight(selected);
+    int retval = 0, nr_cpus = cpus_weight(selected);
+    unsigned long start, stall = SECONDS(1);
 
     spin_lock(&call_lock);
 
@@ -104,19 +105,21 @@ int on_selected_cpus(
     send_IPI_mask(selected, CALL_FUNCTION_VECTOR);
 
     /* We always wait for an initiation ACK from remote CPU.  */
-    for (t = 0; atomic_read(&call_data.started) != nr_cpus; t++) {
-        if (t && t % timebase_freq == 0) {
+    for (start = NOW(); atomic_read(&call_data.started) != nr_cpus; ) {
+        if (NOW() > start + stall) {
             printk("IPI start stall: %d ACKS to %d SYNS\n", 
                    atomic_read(&call_data.started), nr_cpus);
+	    start = NOW();
         }
     }
 
     /* If told to, we wait for a completion ACK from remote CPU.  */
     if (wait) {
-        for (t = 0; atomic_read(&call_data.finished) != nr_cpus; t++) {
-            if (t > timebase_freq && t % timebase_freq == 0) {
+        for (start = NOW(); atomic_read(&call_data.finished) != nr_cpus; ) {
+            if (NOW() > start + stall) {
                 printk("IPI finish stall: %d ACKS to %d SYNS\n", 
                        atomic_read(&call_data.finished), nr_cpus);
+                start = NOW();
             }
         }
     }
@@ -168,6 +171,11 @@ void smp_message_recv(int msg, struct cpu_user_regs *regs)
 #ifdef DEBUG_IPI
 static void debug_ipi_ack(void *info)
 {
+    if (info) {
+	unsigned long start, stall = SECONDS(5);
+	for (start = NOW(); NOW() < start + stall; );
+	printk("IPI recv on cpu #%d: %s\n", smp_processor_id(), (char *)info);
+    }
     return;
 }
 
@@ -175,12 +183,12 @@ void ipi_torture_test(void)
 {
     int cpu;
     unsigned long before, after, delta;
-    unsigned long min = ~0, max = 0, mean = 0, sum = 0, tick = 0;
+    unsigned long min = ~0, max = 0, mean = 0, sum = 0, trials = 0;
     cpumask_t mask;
 
     cpus_clear(mask);
 
-    while (tick < 1000000) {
+    while (trials < 1000000) {
         for_each_online_cpu(cpu) {
             cpu_set(cpu, mask);
             before = mftb();
@@ -192,12 +200,15 @@ void ipi_torture_test(void)
             if (delta > max) max = delta;
             if (delta < min) min = delta;
             sum += delta;
-            tick++;
+            trials++;
         }
     }
 
-    mean = sum / tick;
+    mean = tb_to_ns(sum / trials);
 
-    printk("IPI tb ticks: min = %ld max = %ld mean = %ld\n", min, max, mean);
+    printk("IPI latency: min = %ld ticks, max = %ld ticks, mean = %ldns\n",
+	   min, max, mean);
+
+    smp_call_function(debug_ipi_ack, "Hi", 0, 1);
 }
 #endif
