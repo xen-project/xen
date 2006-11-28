@@ -30,3 +30,7 @@ types.h			-> linux/include/asm-ia64/types.h
 
 # The files below are from Linux-2.6.16
 iosapic.h		-> linux/include/asm-ia64/iosapic.h
+
+# The files below are from Linux-2.6.16.33
+perfmon.h		-> linux/include/asm-ia64/perfmon.h
+perfmon_default_smpl.h	-> linux/include/asm-ia64/perfmon_default_smpl.h

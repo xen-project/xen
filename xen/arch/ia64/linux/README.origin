@@ -24,3 +24,6 @@ idiv64.S		-> linux/arch/ia64/lib/idiv64.S
 memcpy_mck.S		-> linux/arch/ia64/lib/memcpy_mck.S
 memset.S		-> linux/arch/ia64/lib/memset.S
 strlen.S		-> linux/arch/ia64/lib/strlen.S
+
+# The files below are from Linux-2.6.16.33
+carta_random.S		-> linux/arch/ia64/lib/carta_random.S

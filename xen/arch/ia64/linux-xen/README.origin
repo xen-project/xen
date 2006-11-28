@@ -33,3 +33,11 @@ unwind_i.h		-> linux/arch/ia64/kernel/unwind_i.h
 
 # The files below are from Linux-2.6.16
 iosapic.c		-> linux/arch/ia64/kernel/iosapic.c
+
+# The files below are from Linux-2.6.16.33
+perfmon.c		-> linux/arch/kernel/perfmon.c
+perfmon_default_smpl.c	-> linux/arch/kernel/perfmon_default_smpl.c
+perfmon_generic.h	-> linux/arch/kernel/perfmon_generic.h
+perfmon_itanium.h	-> linux/arch/kernel/perfmon_itanium.h
+perfmon_mckinley.h	-> linux/arch/kernel/perfmon_mckinley.h
+perfmon_montecito.h	-> linux/arch/kernel/perfmon_montecito.h
