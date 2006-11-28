@@ -564,7 +564,7 @@ def parse_doms_info(info):
         return DOM_STATES[t(sxp.child_value(info, n, d))]
     
     return {
-        'domid'    : get_info('domid',        int,   -1),
+        'domid'    : get_info('domid',        str,   ''),
         'name'     : get_info('name',         str,   '??'),
         'mem'      : get_info('memory_dynamic_max', int,   0),
         'vcpus'    : get_info('online_vcpus', int,   0),
@@ -580,7 +580,7 @@ def parse_sedf_info(info):
         return t(sxp.child_value(info, n, d))
 
     return {
-        'domid'    : get_info('domid',        int,   -1),
+        'domid'    : get_info('domid',         int,   -1),
         'period'   : get_info('period',        int,   -1),
         'slice'    : get_info('slice',         int,   -1),
         'latency'  : get_info('latency',       int,   -1),
@@ -592,7 +592,7 @@ def xm_brief_list(doms):
     print '%-40s %3s %5s %5s %10s %9s' % \
           ('Name', 'ID', 'Mem', 'VCPUs', 'State', 'Time(s)')
     
-    format = "%(name)-40s %(domid)3d %(mem)5d %(vcpus)5d %(state)10s " \
+    format = "%(name)-40s %(domid)3s %(mem)5d %(vcpus)5d %(state)10s " \
              "%(cpu_time)8.1f"
     
     for dom in doms:
@@ -604,7 +604,7 @@ def xm_label_list(doms):
           ('Name', 'ID', 'Mem', 'VCPUs', 'State', 'Time(s)', 'Label')
     
     output = []
-    format = '%(name)-32s %(domid)3d %(mem)5d %(vcpus)5d %(state)10s ' \
+    format = '%(name)-32s %(domid)3s %(mem)5d %(vcpus)5d %(state)10s ' \
              '%(cpu_time)8.1f %(seclabel)9s'
     
     for dom in doms:
