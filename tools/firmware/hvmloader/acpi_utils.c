@@ -85,7 +85,8 @@ static void acpi_tpm_tis_probe(unsigned char *acpi_start,
         return;
 
     /* legacy systems need an RSDT entry */
-    acpi_rsdt_add_entry_pointer(acpi_start, addr);
+    if ( acpi_rsdt_add_entry_pointer(acpi_start, addr) != 1 )
+        return;
 
     /* add ACPI TCPA table */
     addr = acpi_xsdt_add_entry(acpi_start, freemem, limit,
@@ -108,7 +109,8 @@ static void acpi_tpm_tis_probe(unsigned char *acpi_start,
                      tcpa->header.length);
     }
 
-    acpi_rsdt_add_entry_pointer(acpi_start, addr);
+    if ( acpi_rsdt_add_entry_pointer(acpi_start, addr) != 1 )
+        return;
 }
 
 
@@ -125,17 +127,51 @@ void acpi_update(unsigned char *acpi_start,
 }
 
 
+/*
+ * Search for the RSDP in memory below the BIOS
+ */
+struct acpi_20_rsdp *acpi_rsdp_get(unsigned char *acpi_start)
+{
+    int offset = 0;
+    int found = 0;
+    static int displayed = 0;
+    struct acpi_20_rsdp *rsdp;
+
+    while ( &acpi_start[offset] < (unsigned char *)0xf0000 )
+    {
+        rsdp = (struct acpi_20_rsdp *)&acpi_start[offset];
+        if ( rsdp->signature == ACPI_2_0_RSDP_SIGNATURE )
+        {
+            found = 1;
+            break;
+        }
+        offset += 0x10;
+    }
+    
+    if ( !found )
+        rsdp = NULL;
+
+    if ( !displayed )
+    {
+        if ( rsdp )
+            printf("Found RSDP at %lx\n",(long)rsdp);
+        else
+            printf("ERROR: RSDP was not found\n");
+        displayed = 1;
+    }
+
+    return rsdp;
+}
+
+
 struct acpi_20_rsdt *acpi_rsdt_get(unsigned char *acpi_start)
 {
     struct acpi_20_rsdp *rsdp;
     struct acpi_20_rsdt *rsdt;
 
-    rsdp = (struct acpi_20_rsdp *)(acpi_start + sizeof(struct acpi_20_facs));
-    if ( rsdp->signature != ACPI_2_0_RSDP_SIGNATURE )
-    {
-        printf("Bad RSDP signature\n");
+    rsdp = acpi_rsdp_get(acpi_start);
+    if (!rsdp)
         return NULL;
-    }
 
     rsdt = (struct acpi_20_rsdt *)
         (acpi_start + rsdp->rsdt_address - ACPI_PHYSICAL_ADDRESS);
@@ -189,12 +225,9 @@ struct acpi_20_xsdt *acpi_xsdt_get(unsigned char *acpi_start)
     struct acpi_20_rsdp *rsdp;
     struct acpi_20_xsdt *xsdt;
 
-    rsdp = (struct acpi_20_rsdp *)(acpi_start + sizeof(struct acpi_20_facs));
-    if ( rsdp->signature != ACPI_2_0_RSDP_SIGNATURE )
-    {
-        printf("Bad RSDP signature\n");
+    rsdp = acpi_rsdp_get(acpi_start);
+    if (!rsdp)
         return NULL;
-    }
 
     xsdt = (struct acpi_20_xsdt *)
         (acpi_start + rsdp->xsdt_address - ACPI_PHYSICAL_ADDRESS);
@@ -272,10 +305,10 @@ static unsigned char *acpi_xsdt_add_entry(unsigned char *acpi_start,
         /* memory below hard limit ? */
         if ( (*freemem + table_size) <= limit )
         {
-            printf("Copying SSDT entry\n");
             addr = *freemem;
             memcpy(addr, table, table_size);
-            *freemem += table_size;
+            printf("Copied dyn. ACPI entry to %lx\n",(long)addr);
+            *freemem += ((table_size + 0xf) & ~0xf);
 
             acpi_xsdt_add_entry_pointer(acpi_start, addr);
         }
