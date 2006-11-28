@@ -35,8 +35,11 @@ from xen.xend.PrettyPrint import prettyprint
 from xen.xend.XendConfig import XendConfig
 from xen.xend.XendError import XendError, XendInvalidDomain, VmError
 from xen.xend.XendLogging import log
+from xen.xend.XendAPIConstants import XEN_API_VM_POWER_STATE
 from xen.xend.XendConstants import XS_VMROOT
-from xen.xend.XendConstants import DOM_STATE_HALTED, DOM_STATE_RUNNING
+from xen.xend.XendConstants import DOM_STATE_HALTED, DOM_STATE_PAUSED
+from xen.xend.XendConstants import DOM_STATE_RUNNING, DOM_STATE_SUSPENDED
+from xen.xend.XendConstants import DOM_STATE_SHUTDOWN, DOM_STATE_UNKNOWN
 from xen.xend.XendDevices import XendDevices
 
 from xen.xend.xenstore.xstransact import xstransact
@@ -54,6 +57,16 @@ CHECK_POINT_FILE = 'checkpoint.chk'
 DOM0_UUID = "00000000-0000-0000-0000-000000000000"
 DOM0_NAME = "Domain-0"
 DOM0_ID   = 0
+
+POWER_STATE_NAMES = dict([(x, XEN_API_VM_POWER_STATE[x])
+                          for x in [DOM_STATE_HALTED,
+                                    DOM_STATE_PAUSED,
+                                    DOM_STATE_RUNNING,
+                                    DOM_STATE_SUSPENDED,
+                                    DOM_STATE_SHUTDOWN,
+                                    DOM_STATE_UNKNOWN]])
+POWER_STATE_ALL = 'all'
+
 
 class XendDomain:
     """Index of all domains. Singleton.
@@ -687,12 +700,18 @@ class XendDomain:
     # ------------------------------------------------------------
     # Xen Legacy API     
 
-    def list(self):
+    def list(self, state = DOM_STATE_RUNNING):
         """Get list of domain objects.
 
+        @param: the state in which the VMs should be -- one of the
+        DOM_STATE_XYZ constants, or the corresponding name, or 'all'.
         @return: domains
         @rtype: list of XendDomainInfo
         """
+        if type(state) == int:
+            state = POWER_STATE_NAMES[state]
+        state = state.lower()
+        
         self.domains_lock.acquire()
         try:
             self._refresh()
@@ -707,28 +726,37 @@ class XendDomain:
                 if dom_uuid not in active_uuids:
                     inactive_domains.append(dom)
 
-            return active_domains + inactive_domains
+            if state == POWER_STATE_ALL:
+                return active_domains + inactive_domains
+            else:
+                return filter(lambda x:
+                                  POWER_STATE_NAMES[x.state].lower() == state,
+                              active_domains + inactive_domains)
         finally:
             self.domains_lock.release()
 
 
-    def list_sorted(self):
+    def list_sorted(self, state = DOM_STATE_RUNNING):
         """Get list of domain objects, sorted by name.
 
+        @param: the state in which the VMs should be -- one of the
+        DOM_STATE_XYZ constants, or the corresponding name, or 'all'.
         @return: domain objects
         @rtype: list of XendDomainInfo
         """
-        doms = self.list()
+        doms = self.list(state)
         doms.sort(lambda x, y: cmp(x.getName(), y.getName()))
         return doms
 
-    def list_names(self):
+    def list_names(self, state = DOM_STATE_RUNNING):
         """Get list of domain names.
 
+        @param: the state in which the VMs should be -- one of the
+        DOM_STATE_XYZ constants, or the corresponding name, or 'all'.
         @return: domain names
         @rtype: list of strings.
         """
-        return [d.getName() for d in self.list_sorted()]
+        return [d.getName() for d in self.list_sorted(state)]
 
     def domain_suspend(self, domname):
         """Suspends a domain that is persistently managed by Xend

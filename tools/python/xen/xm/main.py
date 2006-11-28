@@ -187,8 +187,9 @@ SUBCOMMAND_OPTIONS = {
        ('-c CAP',    '--cap=CAP',       'Cap (int)'),
     ),
     'list': (
-       ('-l', '--long', 'Output all VM details in SXP'),
-       ('', '--label',  'Include security labels'),
+       ('-l', '--long',         'Output all VM details in SXP'),
+       ('', '--label',          'Include security labels'),
+       ('', '--state=<state>',  'Select only VMs with the specified state'),
     ),
     'console': (
        ('-q', '--quiet', 'Do not print an error message if the domain does not exist'),
@@ -513,20 +514,22 @@ def xm_restore(args):
     server.xend.domain.restore(savefile, paused)
 
 
-def getDomains(domain_names, full = 0):
+def getDomains(domain_names, state, full = 0):
     if domain_names:
         return [server.xend.domain(dom, full) for dom in domain_names]
     else:
-        return server.xend.domains(1, full)
+        return server.xend.domains_with_state(True, state, full)
 
 
 def xm_list(args):
     use_long = 0
     show_vcpus = 0
     show_labels = 0
+    state = 'all'
     try:
         (options, params) = getopt.gnu_getopt(args, 'lv',
-                                              ['long','vcpus','label'])
+                                              ['long','vcpus','label',
+                                               'state='])
     except getopt.GetoptError, opterr:
         err(opterr)
         usage('list')
@@ -539,6 +542,12 @@ def xm_list(args):
             show_vcpus = 1
         if k in ['--label']:
             show_labels = 1
+        if k in ['--state']:
+            state = v
+
+    if state != 'all' and len(params) > 0:
+        raise OptionError(
+            "You may specify either a state or a particular VM, but not both")
 
     if show_vcpus:
         print >>sys.stderr, (
@@ -546,7 +555,7 @@ def xm_list(args):
         xm_vcpu_list(params)
         return
 
-    doms = getDomains(params, use_long)
+    doms = getDomains(params, state, use_long)
 
     if use_long:
         map(PrettyPrint.prettyprint, doms)
@@ -941,7 +950,8 @@ def xm_sched_sedf(args):
             opts['weight'] = v
 
     doms = filter(lambda x : domid_match(domid, x),
-                        [parse_doms_info(dom) for dom in getDomains("")])
+                        [parse_doms_info(dom)
+                         for dom in getDomains(None, 'running')])
 
     # print header if we aren't setting any parameters
     if len(opts.keys()) == 0:
@@ -1077,7 +1087,7 @@ def xm_uptime(args):
         if k in ['-s', '--short']:
             short_mode = 1
 
-    doms = getDomains(params)
+    doms = getDomains(params, 'running')
 
     if short_mode == 0:
         print 'Name                              ID Uptime'

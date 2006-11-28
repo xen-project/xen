@@ -23,6 +23,7 @@ from xen.util.xmlrpclib2 import UnixXMLRPCServer, TCPXMLRPCServer
 from xen.xend import XendAPI, XendDomain, XendDomainInfo, XendNode
 from xen.xend import XendLogging, XendDmesg
 from xen.xend.XendClient import XML_RPC_SOCKET
+from xen.xend.XendConstants import DOM_STATE_RUNNING
 from xen.xend.XendLogging import log
 from xen.xend.XendError import XendInvalidDomain
 
@@ -52,12 +53,15 @@ def domain(domid, full = 0):
     info = lookup(domid)
     return fixup_sxpr(info.sxpr(not full))
 
-def domains(detail=1, full = 0):
-    if detail < 1:
-        return XendDomain.instance().list_names()
-    else:
-        domains = XendDomain.instance().list_sorted()
+def domains(detail = True, full = False):
+    return domains_with_state(detail, DOM_STATE_RUNNING, full)
+
+def domains_with_state(detail, state, full):
+    if detail:
+        domains = XendDomain.instance().list_sorted(state)
         return map(lambda dom: fixup_sxpr(dom.sxpr(not full)), domains)
+    else:
+        return XendDomain.instance().list_names(state)
 
 def domain_create(config):
     info = XendDomain.instance().domain_create(config)
@@ -153,6 +157,8 @@ class XMLRPCServer:
         # A few special cases
         self.server.register_function(domain, 'xend.domain')
         self.server.register_function(domains, 'xend.domains')
+        self.server.register_function(domains_with_state,
+                                      'xend.domains_with_state')
         self.server.register_function(get_log, 'xend.node.log')
         self.server.register_function(domain_create, 'xend.domain.create')
         self.server.register_function(domain_restore, 'xend.domain.restore')
