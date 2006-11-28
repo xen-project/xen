@@ -248,8 +248,8 @@ def valid_sr(func):
 # Bridge to Legacy XM API calls
 # -----------------------------
 
-def do_vm_func(fn_name, vm_ref, *args):
-    """Helper wrapper func to abstract away from repeative code.
+def do_vm_func(fn_name, vm_ref, *args, **kwargs):
+    """Helper wrapper func to abstract away from repetitive code.
 
     @param fn_name: function name for XendDomain instance
     @type fn_name: string
@@ -260,7 +260,7 @@ def do_vm_func(fn_name, vm_ref, *args):
     """
     xendom = XendDomain.instance()
     fn = getattr(xendom, fn_name)
-    xendom.do_legacy_api_with_uuid(fn, vm_ref, *args)
+    xendom.do_legacy_api_with_uuid(fn, vm_ref, *args, **kwargs)
     return xen_api_success_void()
 
 
@@ -1027,9 +1027,9 @@ class XendAPI:
     def vm_pause(self, session, vm_ref):
         return do_vm_func("domain_pause", vm_ref)
     def vm_resume(self, session, vm_ref, start_paused):
-        return do_vm_func("domain_resume", vm_ref)    
-    def vm_start(self, session, vm_ref):
-        return do_vm_func("domain_start", vm_ref)
+        return do_vm_func("domain_resume", vm_ref, start_paused = start_paused)    
+    def vm_start(self, session, vm_ref, start_paused):
+        return do_vm_func("domain_start", vm_ref, start_paused = start_paused)
     def vm_suspend(self, session, vm_ref):
         return do_vm_func("domain_suspend", vm_ref)    
     def vm_unpause(self, session, vm_ref):

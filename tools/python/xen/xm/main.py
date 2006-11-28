@@ -207,7 +207,13 @@ SUBCOMMAND_OPTIONS = {
        ('-L', '--live', 'Dump core without pausing the domain'),
        ('-C', '--crash', 'Crash domain after dumping core'),
     ),
-    'restore': (
+    'start': (
+      ('-p', '--paused', 'Do not unpause domain after starting it'),
+    ),
+    'resume': (
+      ('-p', '--paused', 'Do not unpause domain after resuming it'),
+    ),
+   'restore': (
       ('-p', '--paused', 'Do not unpause domain after restoring it'),
     ),
 }
@@ -742,9 +748,26 @@ def xm_vcpu_list(args):
             print format % locals()
 
 def xm_start(args):
-    arg_check(args, "start", 1)
-    dom = args[0]
-    server.xend.domain.start(dom)
+    arg_check(args, "start", 1, 2)
+
+    try:
+        (options, params) = getopt.gnu_getopt(args, 'p', ['paused'])
+    except getopt.GetoptError, opterr:
+        err(opterr)
+        sys.exit(1)
+
+    paused = False
+    for (k, v) in options:
+        if k in ['-p', '--paused']:
+            paused = True
+
+    if len(params) != 1:
+        err("Wrong number of parameters")
+        usage('start')
+        sys.exit(1)
+
+    dom = params[0]
+    server.xend.domain.start(dom, paused)
 
 def xm_delete(args):
     arg_check(args, "delete", 1)
@@ -757,9 +780,26 @@ def xm_suspend(args):
     server.xend.domain.suspend(dom)
 
 def xm_resume(args):
-    arg_check(args, "resume", 1)
-    dom = args[0]
-    server.xend.domain.resume(dom)
+    arg_check(args, "resume", 1, 2)
+
+    try:
+        (options, params) = getopt.gnu_getopt(args, 'p', ['paused'])
+    except getopt.GetoptError, opterr:
+        err(opterr)
+        sys.exit(1)
+
+    paused = False
+    for (k, v) in options:
+        if k in ['-p', '--paused']:
+            paused = True
+
+    if len(params) != 1:
+        err("Wrong number of parameters")
+        usage('resume')
+        sys.exit(1)
+
+    dom = params[0]
+    server.xend.domain.resume(dom, paused)
     
 def xm_reboot(args):
     arg_check(args, "reboot", 1, 3)
