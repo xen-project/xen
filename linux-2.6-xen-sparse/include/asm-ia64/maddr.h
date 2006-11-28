@@ -96,11 +96,6 @@ mfn_to_local_pfn(unsigned long mfn)
 #define virt_to_machine(virt) __pa(virt) // for tpmfront.c
 
 #define set_phys_to_machine(pfn, mfn) do { } while (0)
-#ifdef CONFIG_VMX_GUEST
-extern void xen_machphys_update(unsigned long mfn, unsigned long pfn);
-#else /* CONFIG_VMX_GUEST */
-#define xen_machphys_update(mfn, pfn) do { } while (0)
-#endif /* CONFIG_VMX_GUEST */
 
 typedef unsigned long maddr_t;	// to compile netback, netfront
 

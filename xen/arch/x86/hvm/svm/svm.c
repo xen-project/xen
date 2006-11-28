@@ -277,7 +277,7 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
     struct vcpu *vc = current;
     struct vmcb_struct *vmcb = vc->arch.hvm_svm.vmcb;
 
-    switch (regs->ecx)
+    switch ((u32)regs->ecx)
     {
     case MSR_EFER:
         msr_content = vmcb->efer;
@@ -315,7 +315,7 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
         return 0;
     }
 
-    HVM_DBG_LOG(DBG_LEVEL_2, "mode_do_msr_read: msr_content: %"PRIx64"\n", 
+    HVM_DBG_LOG(DBG_LEVEL_2, "msr_content: %"PRIx64"\n",
                 msr_content);
 
     regs->eax = (u32)(msr_content >>  0);
@@ -329,11 +329,10 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "mode_do_msr_write msr %lx "
-                "msr_content %"PRIx64"\n", 
-                (unsigned long)regs->ecx, msr_content);
+    HVM_DBG_LOG(DBG_LEVEL_1, "msr %x msr_content %"PRIx64"\n",
+                (u32)regs->ecx, msr_content);
 
-    switch ( regs->ecx )
+    switch ( (u32)regs->ecx )
     {
     case MSR_EFER:
 #ifdef __x86_64__
@@ -510,6 +509,30 @@ unsigned long svm_get_ctrl_reg(struct vcpu *v, unsigned int num)
     return 0;                   /* dummy */
 }
 
+static unsigned long svm_get_segment_base(struct vcpu *v, enum segment seg)
+{
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    int long_mode = 0;
+
+#ifdef __x86_64__
+    long_mode = vmcb->cs.attributes.fields.l && (vmcb->efer & EFER_LMA);
+#endif
+    switch ( seg )
+    {
+    case seg_cs: return long_mode ? 0 : vmcb->cs.base;
+    case seg_ds: return long_mode ? 0 : vmcb->ds.base;
+    case seg_es: return long_mode ? 0 : vmcb->es.base;
+    case seg_fs: return vmcb->fs.base;
+    case seg_gs: return vmcb->gs.base;
+    case seg_ss: return long_mode ? 0 : vmcb->ss.base;
+    case seg_tr: return vmcb->tr.base;
+    case seg_gdtr: return vmcb->gdtr.base;
+    case seg_idtr: return vmcb->idtr.base;
+    case seg_ldtr: return vmcb->ldtr.base;
+    }
+    BUG();
+    return 0;
+}
 
 /* Make sure that xen intercepts any FP accesses from current */
 static void svm_stts(struct vcpu *v) 
@@ -815,12 +838,12 @@ int start_svm(void)
     hvm_funcs.store_cpu_guest_regs = svm_store_cpu_guest_regs;
     hvm_funcs.load_cpu_guest_regs = svm_load_cpu_guest_regs;
 
-    hvm_funcs.realmode = svm_realmode;
     hvm_funcs.paging_enabled = svm_paging_enabled;
     hvm_funcs.long_mode_enabled = svm_long_mode_enabled;
     hvm_funcs.pae_enabled = svm_pae_enabled;
     hvm_funcs.guest_x86_mode = svm_guest_x86_mode;
     hvm_funcs.get_guest_ctrl_reg = svm_get_ctrl_reg;
+    hvm_funcs.get_segment_base = svm_get_segment_base;
 
     hvm_funcs.update_host_cr3 = svm_update_host_cr3;
     
@@ -907,7 +930,7 @@ static void svm_do_general_protection_fault(struct vcpu *v,
         printk("Huh? We got a GP Fault with an invalid IDTR!\n");
         svm_dump_vmcb(__func__, vmcb);
         svm_dump_regs(__func__, regs);
-        svm_dump_inst(vmcb->rip);
+        svm_dump_inst(svm_rip2pointer(vmcb));
         domain_crash(v->domain);
         return;
     }
@@ -1205,22 +1228,20 @@ static void svm_get_prefix_info(
 
 /* Get the address of INS/OUTS instruction */
 static inline int svm_get_io_address(
-    struct vcpu *v, 
-    struct cpu_user_regs *regs, unsigned int dir, 
+    struct vcpu *v, struct cpu_user_regs *regs,
+    unsigned int size, ioio_info_t info,
     unsigned long *count, unsigned long *addr)
 {
     unsigned long        reg;
-    unsigned int         asize = 0;
-    unsigned int         isize;
-    int                  long_mode;
-    ioio_info_t          info;
+    unsigned int         asize, isize;
+    int                  long_mode = 0;
     segment_selector_t  *seg = NULL;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    info.bytes = vmcb->exitinfo1;
-
+#ifdef __x86_64__
     /* If we're in long mode, we shouldn't check the segment presence & limit */
     long_mode = vmcb->cs.attributes.fields.l && vmcb->efer & EFER_LMA;
+#endif
 
     /* d field of cs.attributes is 1 for 32-bit, 0 for 16 or 64 bit. 
      * l field combined with EFER_LMA -> longmode says whether it's 16 or 64 bit. 
@@ -1238,26 +1259,32 @@ static inline int svm_get_io_address(
         isize --;
 
     if (isize > 1) 
-        svm_get_prefix_info(vmcb, dir, &seg, &asize);
+        svm_get_prefix_info(vmcb, info.fields.type, &seg, &asize);
 
-    ASSERT(dir == IOREQ_READ || dir == IOREQ_WRITE);
-
-    if (dir == IOREQ_WRITE)
+    if (info.fields.type == IOREQ_WRITE)
     {
         reg = regs->esi;
         if (!seg)               /* If no prefix, used DS. */
             seg = &vmcb->ds;
+        if (!long_mode && (seg->attributes.fields.type & 0xa) == 0x8) {
+            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
+            return 0;
+        }
     }
     else
     {
         reg = regs->edi;
         seg = &vmcb->es;        /* Note: This is ALWAYS ES. */
+        if (!long_mode && (seg->attributes.fields.type & 0xa) != 0x2) {
+            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
+            return 0;
+        }
     }
 
     /* If the segment isn't present, give GP fault! */
     if (!long_mode && !seg->attributes.fields.p) 
     {
-        svm_inject_exception(v, TRAP_gp_fault, 1, seg->sel);
+        svm_inject_exception(v, TRAP_gp_fault, 1, 0);
         return 0;
     }
 
@@ -1271,19 +1298,65 @@ static inline int svm_get_io_address(
         *addr = reg;
         *count = regs->ecx;
     }
+    if (!info.fields.rep)
+        *count = 1;
 
-    if (!long_mode) {
-        if (*addr > seg->limit) 
+    if (!long_mode)
+    {
+        ASSERT(*addr == (u32)*addr);
+        if ((u32)(*addr + size - 1) < (u32)*addr ||
+            (seg->attributes.fields.type & 0xc) != 0x4 ?
+            *addr + size - 1 > seg->limit :
+            *addr <= seg->limit)
         {
-            svm_inject_exception(v, TRAP_gp_fault, 1, seg->sel);
+            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
             return 0;
-        } 
-        else 
-        {
-            *addr += seg->base;
         }
+
+        /* Check the limit for repeated instructions, as above we checked only
+           the first instance. Truncate the count if a limit violation would
+           occur. Note that the checking is not necessary for page granular
+           segments as transfers crossing page boundaries will be broken up
+           anyway. */
+        if (!seg->attributes.fields.g && *count > 1)
+        {
+            if ((seg->attributes.fields.type & 0xc) != 0x4)
+            {
+                /* expand-up */
+                if (!(regs->eflags & EF_DF))
+                {
+                    if (*addr + *count * size - 1 < *addr ||
+                        *addr + *count * size - 1 > seg->limit)
+                        *count = (seg->limit + 1UL - *addr) / size;
+                }
+                else
+                {
+                    if (*count - 1 > *addr / size)
+                        *count = *addr / size + 1;
+                }
+            }
+            else
+            {
+                /* expand-down */
+                if (!(regs->eflags & EF_DF))
+                {
+                    if (*count - 1 > -(s32)*addr / size)
+                        *count = -(s32)*addr / size + 1UL;
+                }
+                else
+                {
+                    if (*addr < (*count - 1) * size ||
+                        *addr - (*count - 1) * size <= seg->limit)
+                        *count = (*addr - seg->limit - 1) / size + 1;
+                }
+            }
+            ASSERT(*count);
+        }
+
+        *addr += seg->base;
     }
-    
+    else if (seg == &vmcb->fs || seg == &vmcb->gs)
+        *addr += seg->base;
 
     return 1;
 }
@@ -1333,7 +1406,7 @@ static void svm_io_instruction(struct vcpu *v)
         unsigned long addr, count;
         int sign = regs->eflags & X86_EFLAGS_DF ? -1 : 1;
 
-        if (!svm_get_io_address(v, regs, dir, &count, &addr)) 
+        if (!svm_get_io_address(v, regs, size, info, &count, &addr))
         {
             /* We failed to get a valid address, so don't do the IO operation -
              * it would just get worse if we do! Hopefully the guest is handing
@@ -1346,10 +1419,6 @@ static void svm_io_instruction(struct vcpu *v)
         if (info.fields.rep) 
         {
             pio_opp->flags |= REPZ;
-        }
-        else 
-        {
-            count = 1;
         }
 
         /*
@@ -1422,7 +1491,7 @@ static int svm_set_cr0(unsigned long value)
     /* We don't want to lose PG.  ET is reserved and should be always be 1*/
     paging_enabled = svm_paging_enabled(v);
     value |= X86_CR0_ET;
-    vmcb->cr0 = value | X86_CR0_PG;
+    vmcb->cr0 = value | X86_CR0_PG | X86_CR0_WP;
     v->arch.hvm_svm.cpu_shadow_cr0 = value;
 
     /* TS cleared? Then initialise FPU now. */
@@ -1438,7 +1507,7 @@ static int svm_set_cr0(unsigned long value)
     {
         /* The guest CR3 must be pointing to the guest physical. */
         mfn = get_mfn_from_gpfn(v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT);
-        if ( !VALID_MFN(mfn) || !get_page(mfn_to_page(mfn), v->domain))
+        if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain))
         {
             gdprintk(XENLOG_ERR, "Invalid CR3 value = %lx (mfn=%lx)\n", 
                      v->arch.hvm_svm.cpu_cr3, mfn);
@@ -1457,10 +1526,9 @@ static int svm_set_cr0(unsigned long value)
 
         if (test_bit(SVM_CPU_STATE_LME_ENABLED, &v->arch.hvm_svm.cpu_state))
         {
-            /* Here the PAE is should to be opened */
             HVM_DBG_LOG(DBG_LEVEL_1, "Enable the Long mode\n");
             set_bit(SVM_CPU_STATE_LMA_ENABLED, &v->arch.hvm_svm.cpu_state);
-            vmcb->efer |= EFER_LMA;
+            vmcb->efer |= EFER_LMA | EFER_LME;
         }
 #endif  /* __x86_64__ */
 
@@ -1623,7 +1691,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
              */
             HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 value = %lx", value);
             mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
-            if ( !VALID_MFN(mfn) || !get_page(mfn_to_page(mfn), v->domain))
+            if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain))
                 goto bad_cr3;
 
             old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
@@ -1653,7 +1721,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
 #if CONFIG_PAGING_LEVELS >= 3
                 unsigned long mfn, old_base_mfn;
                 mfn = get_mfn_from_gpfn(v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT);
-                if ( !VALID_MFN(mfn) || 
+                if ( !mfn_valid(mfn) || 
                      !get_page(mfn_to_page(mfn), v->domain) )
                     goto bad_cr3;
 
@@ -1836,22 +1904,18 @@ static inline void svm_do_msr_access(
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     int  inst_len;
     u64 msr_content=0;
-    u32 eax, edx;
+    u32 ecx = regs->ecx, eax, edx;
 
     ASSERT(vmcb);
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "svm_do_msr_access: ecx=%lx, eax=%lx, edx=%lx, "
-                "exitinfo = %lx", (unsigned long)regs->ecx, 
-                (unsigned long)regs->eax, (unsigned long)regs->edx, 
+    HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%x, eax=%x, edx=%x, exitinfo = %lx",
+                ecx, (u32)regs->eax, (u32)regs->edx,
                 (unsigned long)vmcb->exitinfo1);
 
     /* is it a read? */
     if (vmcb->exitinfo1 == 0)
     {
-        inst_len = __get_instruction_length(vmcb, INSTR_RDMSR, NULL);
-
-        regs->edx = 0;
-        switch (regs->ecx) {
+        switch (ecx) {
         case MSR_IA32_TIME_STAMP_COUNTER:
             msr_content = hvm_get_guest_time(v);
             break;
@@ -1871,25 +1935,30 @@ static inline void svm_do_msr_access(
             if (long_mode_do_msr_read(regs))
                 goto done;
 
-            if ( rdmsr_hypervisor_regs(regs->ecx, &eax, &edx) )
+            if ( rdmsr_hypervisor_regs(ecx, &eax, &edx) ||
+                 rdmsr_safe(ecx, eax, edx) == 0 )
             {
                 regs->eax = eax;
                 regs->edx = edx;
                 goto done;
             }
-
-            rdmsr_safe(regs->ecx, regs->eax, regs->edx);
-            break;
+            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
+            return;
         }
         regs->eax = msr_content & 0xFFFFFFFF;
         regs->edx = msr_content >> 32;
+
+ done:
+        HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%x, eax=%lx, edx=%lx",
+                    ecx, (unsigned long)regs->eax, (unsigned long)regs->edx);
+
+        inst_len = __get_instruction_length(vmcb, INSTR_RDMSR, NULL);
     }
     else
     {
-        inst_len = __get_instruction_length(vmcb, INSTR_WRMSR, NULL);
         msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
 
-        switch (regs->ecx)
+        switch (ecx)
         {
         case MSR_IA32_TIME_STAMP_COUNTER:
             hvm_set_guest_time(v, msr_content);
@@ -1908,17 +1977,12 @@ static inline void svm_do_msr_access(
             break;
         default:
             if ( !long_mode_do_msr_write(regs) )
-                wrmsr_hypervisor_regs(regs->ecx, regs->eax, regs->edx);
+                wrmsr_hypervisor_regs(ecx, regs->eax, regs->edx);
             break;
         }
+
+        inst_len = __get_instruction_length(vmcb, INSTR_WRMSR, NULL);
     }
-
- done:
-
-    HVM_DBG_LOG(DBG_LEVEL_1, "svm_do_msr_access returns: "
-                "ecx=%lx, eax=%lx, edx=%lx",
-                (unsigned long)regs->ecx, (unsigned long)regs->eax,
-                (unsigned long)regs->edx);
 
     __update_guest_eip(vmcb, inst_len);
 }
@@ -2034,10 +2098,10 @@ void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
 
         /* 
          * Decode memory operand of the instruction including ModRM, SIB, and
-         * displacement to get effecticve address and length in bytes.  Assume
+         * displacement to get effective address and length in bytes.  Assume
          * the system in either 32- or 64-bit mode.
          */
-        g_vaddr = get_effective_addr_modrm64(vmcb, regs, prefix, 
+        g_vaddr = get_effective_addr_modrm64(vmcb, regs, prefix, inst_len,
                                              &opcode[inst_len], &length);
 
         inst_len += length;
@@ -2075,7 +2139,7 @@ static int svm_do_vmmcall_reset_to_realmode(struct vcpu *v,
     vmcb->tsc_offset = 0;
 
     /* VMCB State */
-    vmcb->cr0 = X86_CR0_ET | X86_CR0_PG;
+    vmcb->cr0 = X86_CR0_ET | X86_CR0_PG | X86_CR0_WP;
     v->arch.hvm_svm.cpu_shadow_cr0 = X86_CR0_ET;
 
     vmcb->cr2 = 0;

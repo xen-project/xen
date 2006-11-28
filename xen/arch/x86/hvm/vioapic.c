@@ -42,13 +42,12 @@
 
 /* HACK: Route IRQ0 only to VCPU0 to prevent time jumps. */
 #define IRQ0_SPECIAL_ROUTING 1
-#ifdef IRQ0_SPECIAL_ROUTING
-static int redir_warning_done = 0; 
-#endif
 
 #if defined(__ia64__)
 #define opt_hvm_debug_level opt_vmx_debug_level
 #endif
+
+static void vioapic_deliver(struct vioapic *vioapic, int irq);
 
 static unsigned long vioapic_read_indirect(struct vioapic *vioapic,
                                            unsigned long addr,
@@ -122,19 +121,48 @@ static unsigned long vioapic_read(struct vcpu *v,
     return result;
 }
 
-static void vioapic_update_imr(struct vioapic *vioapic, int index)
+static void vioapic_write_redirent(
+    struct vioapic *vioapic, unsigned int idx, int top_word, uint32_t val)
 {
-    if ( vioapic->redirtbl[index].fields.mask )
-        set_bit(index, &vioapic->imr);
+    struct domain *d = vioapic_domain(vioapic);
+    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    union vioapic_redir_entry *pent, ent;
+
+    spin_lock(&hvm_irq->lock);
+
+    pent = &vioapic->redirtbl[idx];
+    ent  = *pent;
+
+    if ( top_word )
+    {
+        /* Contains only the dest_id. */
+        ent.bits = (uint32_t)ent.bits | ((uint64_t)val << 32);
+    }
     else
-        clear_bit(index, &vioapic->imr);
+    {
+        /* Remote IRR and Delivery Status are read-only. */
+        ent.bits = ((ent.bits >> 32) << 32) | val;
+        ent.fields.delivery_status = 0;
+        ent.fields.remote_irr = pent->fields.remote_irr;
+    }
+
+    *pent = ent;
+
+    if ( (ent.fields.trig_mode == VIOAPIC_LEVEL_TRIG) &&
+         !ent.fields.mask &&
+         !ent.fields.remote_irr &&
+         hvm_irq->gsi_assert_count[idx] )
+    {
+        pent->fields.remote_irr = 1;
+        vioapic_deliver(vioapic, idx);
+    }
+
+    spin_unlock(&hvm_irq->lock);
 }
 
-
-static void vioapic_write_indirect(struct vioapic *vioapic,
-                                   unsigned long addr,
-                                   unsigned long length,
-                                   unsigned long val)
+static void vioapic_write_indirect(
+    struct vioapic *vioapic, unsigned long addr,
+    unsigned long length, unsigned long val)
 {
     switch ( vioapic->ioregsel )
     {
@@ -154,7 +182,6 @@ static void vioapic_write_indirect(struct vioapic *vioapic,
     default:
     {
         uint32_t redir_index = (vioapic->ioregsel - 0x10) >> 1;
-        uint64_t redir_content;
 
         HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "vioapic_write_indirect "
                     "change redir index %x val %lx\n",
@@ -167,38 +194,11 @@ static void vioapic_write_indirect(struct vioapic *vioapic,
             break;
         }
 
-        redir_content = vioapic->redirtbl[redir_index].bits;
-
-        if ( vioapic->ioregsel & 0x1 )
-        {
-#ifdef IRQ0_SPECIAL_ROUTING
-            if ( !redir_warning_done && (redir_index == 0) &&
-                 ((val >> 24) != 0) )
-            {
-                /*
-                 * Cannot yet handle delivering PIT interrupts to any VCPU != 
-                 * 0. Needs proper fixing, but for now simply spit a warning 
-                 * that we're going to ignore the target in practice and always
-                 * deliver to VCPU 0.
-                 */
-                printk("IO-APIC: PIT (IRQ0) redirect to VCPU %lx "
-                       "will be ignored.\n", val >> 24); 
-                redir_warning_done = 1;
-            }
-#endif
-            redir_content = (((uint64_t)val & 0xffffffff) << 32) |
-                (redir_content & 0xffffffff);
-        }
-        else
-        {
-            redir_content = ((redir_content >> 32) << 32) |
-                (val & 0xffffffff);
-        }
-        vioapic->redirtbl[redir_index].bits = redir_content;
-        vioapic_update_imr(vioapic, redir_index);
+        vioapic_write_redirent(
+            vioapic, redir_index, vioapic->ioregsel&1, val);
         break;
     }
-    } /* switch */
+    }
 }
 
 static void vioapic_write(struct vcpu *v,
@@ -245,27 +245,13 @@ struct hvm_mmio_handler vioapic_mmio_handler = {
     .write_handler = vioapic_write
 };
 
-static void vioapic_reset(struct vioapic *vioapic)
+static void ioapic_inj_irq(
+    struct vioapic *vioapic,
+    struct vlapic *target,
+    uint8_t vector,
+    uint8_t trig_mode,
+    uint8_t delivery_mode)
 {
-    int i;
-
-    memset(vioapic, 0, sizeof(*vioapic));
-
-    for ( i = 0; i < VIOAPIC_NUM_PINS; i++ )
-    {
-        vioapic->redirtbl[i].fields.mask = 0x1;
-        vioapic_update_imr(vioapic, i);
-    }
-}
-
-static int ioapic_inj_irq(struct vioapic *vioapic,
-                          struct vlapic * target,
-                          uint8_t vector,
-                          uint8_t trig_mode,
-                          uint8_t delivery_mode)
-{
-    int result = 0;
-
     HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic_inj_irq "
                 "irq %d trig %d delive mode %d\n",
                 vector, trig_mode, delivery_mode);
@@ -274,30 +260,23 @@ static int ioapic_inj_irq(struct vioapic *vioapic,
     {
     case dest_Fixed:
     case dest_LowestPrio:
-        if ( vlapic_set_irq(target, vector, trig_mode) && (trig_mode == 1) )
-            gdprintk(XENLOG_WARNING, "level interrupt before cleared\n");
-        result = 1;
+        if ( vlapic_set_irq(target, vector, trig_mode) )
+            vcpu_kick(vlapic_vcpu(target));
         break;
     default:
         gdprintk(XENLOG_WARNING, "error delivery mode %d\n", delivery_mode);
         break;
     }
-
-    return result;
 }
 
-static uint32_t ioapic_get_delivery_bitmask(struct vioapic *vioapic,
-                                            uint16_t dest,
-                                            uint8_t dest_mode,
-                                            uint8_t vector,
-                                            uint8_t delivery_mode)
+static uint32_t ioapic_get_delivery_bitmask(
+    struct vioapic *vioapic, uint16_t dest, uint8_t dest_mode)
 {
     uint32_t mask = 0;
     struct vcpu *v;
 
     HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic_get_delivery_bitmask "
-                "dest %d dest_mode %d vector %d del_mode %d\n",
-                dest, dest_mode, vector, delivery_mode);
+                "dest %d dest_mode %d\n", dest, dest_mode);
 
     if ( dest_mode == 0 ) /* Physical mode. */
     {
@@ -325,12 +304,12 @@ static uint32_t ioapic_get_delivery_bitmask(struct vioapic *vioapic,
     }
 
  out:
-    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic_get_delivery_bitmask "
-                "mask %x\n", mask);
+    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic_get_delivery_bitmask mask %x\n",
+                mask);
     return mask;
 }
 
-static void ioapic_deliver(struct vioapic *vioapic, int irq)
+static void vioapic_deliver(struct vioapic *vioapic, int irq)
 {
     uint16_t dest = vioapic->redirtbl[irq].fields.dest_id;
     uint8_t dest_mode = vioapic->redirtbl[irq].fields.dest_mode;
@@ -341,13 +320,14 @@ static void ioapic_deliver(struct vioapic *vioapic, int irq)
     struct vlapic *target;
     struct vcpu *v;
 
+    ASSERT(spin_is_locked(&vioapic_domain(vioapic)->arch.hvm_domain.irq.lock));
+
     HVM_DBG_LOG(DBG_LEVEL_IOAPIC,
                 "dest=%x dest_mode=%x delivery_mode=%x "
                 "vector=%x trig_mode=%x\n",
                 dest, dest_mode, delivery_mode, vector, trig_mode);
 
-    deliver_bitmask = ioapic_get_delivery_bitmask(
-        vioapic, dest, dest_mode, vector, delivery_mode);
+    deliver_bitmask = ioapic_get_delivery_bitmask(vioapic, dest, dest_mode);
     if ( !deliver_bitmask )
     {
         HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic deliver "
@@ -373,7 +353,6 @@ static void ioapic_deliver(struct vioapic *vioapic, int irq)
         if ( target != NULL )
         {
             ioapic_inj_irq(vioapic, target, vector, trig_mode, delivery_mode);
-            vcpu_kick(vlapic_vcpu(target));
         }
         else
         {
@@ -405,7 +384,6 @@ static void ioapic_deliver(struct vioapic *vioapic, int irq)
                 target = vcpu_vlapic(v);
                 ioapic_inj_irq(vioapic, target, vector,
                                trig_mode, delivery_mode);
-                vcpu_kick(vlapic_vcpu(target));
             }
         }
         break;
@@ -422,98 +400,32 @@ static void ioapic_deliver(struct vioapic *vioapic, int irq)
     }
 }
 
-static int ioapic_get_highest_irq(struct vioapic *vioapic)
-{
-    uint32_t irqs = vioapic->irr | vioapic->irr_xen;
-    irqs &= ~vioapic->isr & ~vioapic->imr;
-    return fls(irqs) - 1;
-}
-
-static void service_ioapic(struct vioapic *vioapic)
-{
-    int irq;
-
-    while ( (irq = ioapic_get_highest_irq(vioapic)) != -1 )
-    {
-        HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "service_ioapic highest irq %x\n", irq);
-
-        if ( !test_bit(irq, &vioapic->imr) )
-            ioapic_deliver(vioapic, irq);
-
-        if ( vioapic->redirtbl[irq].fields.trig_mode == VIOAPIC_LEVEL_TRIG )
-            vioapic->isr |= (1 << irq);
-
-        vioapic->irr     &= ~(1 << irq);
-        vioapic->irr_xen &= ~(1 << irq);
-    }
-}
-
-void vioapic_set_xen_irq(struct domain *d, int irq, int level)
+void vioapic_irq_positive_edge(struct domain *d, unsigned int irq)
 {
     struct vioapic *vioapic = domain_vioapic(d);
+    union vioapic_redir_entry *ent;
 
-    if ( vioapic->redirtbl[irq].fields.mask )
+    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic_irq_positive_edge irq %x", irq);
+
+    ASSERT(irq < VIOAPIC_NUM_PINS);
+    ASSERT(spin_is_locked(&d->arch.hvm_domain.irq.lock));
+
+    ent = &vioapic->redirtbl[irq];
+    if ( ent->fields.mask )
         return;
 
-    if ( vioapic->redirtbl[irq].fields.trig_mode == VIOAPIC_EDGE_TRIG )
-        gdprintk(XENLOG_WARNING, "Forcing edge triggered APIC irq %d?\n", irq);
-
-    if ( level )
-        vioapic->irr_xen |= 1 << irq;
-    else
-        vioapic->irr_xen &= ~(1 << irq);
-
-    service_ioapic(vioapic);
+    if ( ent->fields.trig_mode == VIOAPIC_EDGE_TRIG )
+    {
+        vioapic_deliver(vioapic, irq);
+    }
+    else if ( !ent->fields.remote_irr )
+    {
+        ent->fields.remote_irr = 1;
+        vioapic_deliver(vioapic, irq);
+    }
 }
 
-void vioapic_set_irq(struct domain *d, int irq, int level)
-{
-    struct vioapic *vioapic = domain_vioapic(d);
-    uint32_t bit;
-
-    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic_set_irq irq %x level %x", 
-                irq, level);
-
-    if ( (irq < 0) || (irq >= VIOAPIC_NUM_PINS) )
-        return;
-
-    if ( vioapic->redirtbl[irq].fields.mask )
-        return;
-
-    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "vioapic_set_irq entry %x "
-                "vector %x delivery_mode %x dest_mode %x delivery_status %x "
-                "polarity %x remote_irr %x trig_mode %x mask %x dest_id %x\n",
-                irq,
-                vioapic->redirtbl[irq].fields.vector,
-                vioapic->redirtbl[irq].fields.delivery_mode,
-                vioapic->redirtbl[irq].fields.dest_mode,
-                vioapic->redirtbl[irq].fields.delivery_status,
-                vioapic->redirtbl[irq].fields.polarity,
-                vioapic->redirtbl[irq].fields.remote_irr,
-                vioapic->redirtbl[irq].fields.trig_mode,
-                vioapic->redirtbl[irq].fields.mask,
-                vioapic->redirtbl[irq].fields.dest_id);
-
-    bit = 1 << irq;
-    if ( vioapic->redirtbl[irq].fields.trig_mode == VIOAPIC_LEVEL_TRIG )
-    {
-        if ( level )
-            vioapic->irr |= bit;
-        else
-            vioapic->irr &= ~bit;
-    }
-    else
-    {
-        if ( level )
-            /* XXX No irr clear for edge interrupt */
-            vioapic->irr |= bit;
-    }
-
-    service_ioapic(vioapic);
-}
-
-/* XXX If level interrupt, use vector->irq table for performance */
-static int get_redir_num(struct vioapic *vioapic, int vector)
+static int get_eoi_gsi(struct vioapic *vioapic, int vector)
 {
     int i;
 
@@ -527,29 +439,40 @@ static int get_redir_num(struct vioapic *vioapic, int vector)
 void vioapic_update_EOI(struct domain *d, int vector)
 {
     struct vioapic *vioapic = domain_vioapic(d);
-    int redir_num;
+    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    union vioapic_redir_entry *ent;
+    int gsi;
 
-    if ( (redir_num = get_redir_num(vioapic, vector)) == -1 )
+    spin_lock(&hvm_irq->lock);
+
+    if ( (gsi = get_eoi_gsi(vioapic, vector)) == -1 )
     {
         gdprintk(XENLOG_WARNING, "Can't find redir item for %d EOI\n", vector);
-        return;
+        goto out;
     }
 
-    if ( !test_and_clear_bit(redir_num, &vioapic->isr) )
+    ent = &vioapic->redirtbl[gsi];
+
+    ent->fields.remote_irr = 0;
+    if ( (ent->fields.trig_mode == VIOAPIC_LEVEL_TRIG) &&
+         !ent->fields.mask &&
+         hvm_irq->gsi_assert_count[gsi] )
     {
-        gdprintk(XENLOG_WARNING, "redir %d not set for %d EOI\n",
-                 redir_num, vector);
-        return;
+        ent->fields.remote_irr = 1;
+        vioapic_deliver(vioapic, gsi);
     }
+
+ out:
+    spin_unlock(&hvm_irq->lock);
 }
 
 void vioapic_init(struct domain *d)
 {
     struct vioapic *vioapic = domain_vioapic(d);
+    int i;
 
-    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "vioapic_init\n");
-
-    vioapic_reset(vioapic);
-
+    memset(vioapic, 0, sizeof(*vioapic));
+    for ( i = 0; i < VIOAPIC_NUM_PINS; i++ )
+        vioapic->redirtbl[i].fields.mask = 1;
     vioapic->base_address = VIOAPIC_DEFAULT_BASE_ADDRESS;
 }

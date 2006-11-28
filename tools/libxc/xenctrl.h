@@ -439,12 +439,6 @@ int xc_domain_memory_populate_physmap(int xc_handle,
                                       unsigned int address_bits,
                                       xen_pfn_t *extent_start);
 
-int xc_domain_translate_gpfn_list(int xc_handle,
-                                  uint32_t domid,
-                                  unsigned long nr_gpfns,
-                                  xen_pfn_t *gpfn_list,
-                                  xen_pfn_t *mfn_list);
-
 int xc_domain_ioport_permission(int xc_handle,
                                 uint32_t domid,
                                 uint32_t first_port,
@@ -666,6 +660,16 @@ evtchn_port_t xc_evtchn_pending(int xce_handle);
  */
 int xc_evtchn_unmask(int xce_handle, evtchn_port_t port);
 
-int xc_hvm_set_irq_level(int xce_handle, domid_t dom, int irq, int level);
+int xc_hvm_set_pci_intx_level(
+    int xce_handle, domid_t dom,
+    uint8_t domain, uint8_t bus, uint8_t device, uint8_t intx,
+    unsigned int level);
+int xc_hvm_set_isa_irq_level(
+    int xce_handle, domid_t dom,
+    uint8_t isa_irq,
+    unsigned int level);
+
+int xc_hvm_set_pci_link_route(
+    int xce_handle, domid_t dom, uint8_t link, uint8_t isa_irq);
 
 #endif

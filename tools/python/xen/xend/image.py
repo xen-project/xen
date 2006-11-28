@@ -252,7 +252,6 @@ class HVMImageHandler(ImageHandler):
         ImageHandler.__init__(self, vm, imageConfig, deviceConfig)
         self.shutdownWatch = None
 
-
     def configure(self, imageConfig, deviceConfig):
         ImageHandler.configure(self, imageConfig, deviceConfig)
 
@@ -277,9 +276,9 @@ class HVMImageHandler(ImageHandler):
 
         self.dmargs += self.configVNC(imageConfig)
 
-        self.pae  = int(sxp.child_value(imageConfig, 'pae', 0))
-
-        self.acpi = int(sxp.child_value(imageConfig, 'acpi', 0))
+        self.pae  = int(sxp.child_value(imageConfig, 'pae',  1))
+        self.acpi = int(sxp.child_value(imageConfig, 'acpi', 1))
+        self.apic = int(sxp.child_value(imageConfig, 'apic', 1))
 
     def buildDomain(self):
         store_evtchn = self.vm.getStorePort()
@@ -293,6 +292,7 @@ class HVMImageHandler(ImageHandler):
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
         log.debug("pae            = %d", self.pae)
         log.debug("acpi           = %d", self.acpi)
+        log.debug("apic           = %d", self.apic)
 
         self.register_shutdown_watch()
 
@@ -302,7 +302,8 @@ class HVMImageHandler(ImageHandler):
                             memsize        = mem_mb,
                             vcpus          = self.vm.getVCpuCount(),
                             pae            = self.pae,
-                            acpi           = self.acpi)
+                            acpi           = self.acpi,
+                            apic           = self.apic)
 
     # Return a list of cmd line args to the device models based on the
     # xm config file
@@ -377,8 +378,8 @@ class HVMImageHandler(ImageHandler):
             return ret
 
         if vnc:
-            vncdisplay = sxp.child_value(config, 'vncdisplay',
-                                         int(self.vm.getDomid()))
+            vncdisplay = int(sxp.child_value(config, 'vncdisplay',
+                                             self.vm.getDomid()))
 
             vncunused = sxp.child_value(config, 'vncunused')
             if vncunused:

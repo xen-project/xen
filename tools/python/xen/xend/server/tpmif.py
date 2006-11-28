@@ -25,13 +25,17 @@ from xen.xend import sxp
 from xen.xend import XendRoot
 from xen.xend.XendLogging import log
 from xen.xend.XendError import XendError
-from xen.xend.XendConstants import DEV_MIGRATE_TEST
+from xen.xend.XendConstants import DEV_MIGRATE_TEST, VTPM_DELETE_SCRIPT
 from xen.xend.server.DevController import DevController
 
 import os
 import re
 
 xroot = XendRoot.instance()
+
+def destroy_vtpmstate(name):
+    if os.path.exists(VTPM_DELETE_SCRIPT):
+        os.system(VTPM_DELETE_SCRIPT + " " + name)
 
 class TPMifController(DevController):
     """TPM interface controller. Handles all TPM devices for a domain.
@@ -79,7 +83,7 @@ class TPMifController(DevController):
         if uuid:
             result['uuid'] = uuid
         if type:
-            result['type'] == type
+            result['type'] = type
 
         return result
 

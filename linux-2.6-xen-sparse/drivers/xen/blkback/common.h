@@ -113,7 +113,7 @@ int vbd_create(blkif_t *blkif, blkif_vdev_t vdevice, unsigned major,
 	       unsigned minor, int readonly);
 void vbd_free(struct vbd *vbd);
 
-unsigned long vbd_size(struct vbd *vbd);
+unsigned long long vbd_size(struct vbd *vbd);
 unsigned int vbd_info(struct vbd *vbd);
 unsigned long vbd_secsize(struct vbd *vbd);
 

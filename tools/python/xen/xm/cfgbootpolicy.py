@@ -37,7 +37,7 @@ def help():
     return """
     Adds a 'module' line to the Xen grub configuration file entry
     so that Xen boots with a specific access control policy. If
-    kernelversion is not given, then this script tries to determine
+    boot-title is not given, then this script tries to determine
     it by looking for a title starting with \"XEN\". If there are
     multiple entries matching, then it must be called with the unique
     beginning of the title's name.\n"""
@@ -57,7 +57,7 @@ def strip_title(line):
 def insert_policy(boot_file, alt_boot_file, user_title, policy_name):
     """
     inserts policy binary file as last line of the grub entry
-    matching the kernel_version version
+    matching the user_title or default title
     """
     if user_title:
         #replace "(" by "\(" and ")" by "\)" for matching

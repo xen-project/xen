@@ -20,11 +20,11 @@ import types
 import xmlrpclib
 from xen.util.xmlrpclib2 import UnixXMLRPCServer, TCPXMLRPCServer
 
-from xen.xend import XendDomain, XendDomainInfo, XendNode
+from xen.xend import XendAPI, XendDomain, XendDomainInfo, XendNode
 from xen.xend import XendLogging, XendDmesg
 from xen.xend.XendClient import XML_RPC_SOCKET
+from xen.xend.XendConstants import DOM_STATE_RUNNING
 from xen.xend.XendLogging import log
-from xen.xend.XendAPI import XendAPI
 from xen.xend.XendError import XendInvalidDomain
 
 # vcpu_avail is a long and is not needed by the clients.  It's far easier
@@ -53,19 +53,22 @@ def domain(domid, full = 0):
     info = lookup(domid)
     return fixup_sxpr(info.sxpr(not full))
 
-def domains(detail=1, full = 0):
-    if detail < 1:
-        return XendDomain.instance().list_names()
-    else:
-        domains = XendDomain.instance().list_sorted()
+def domains(detail = True, full = False):
+    return domains_with_state(detail, DOM_STATE_RUNNING, full)
+
+def domains_with_state(detail, state, full):
+    if detail:
+        domains = XendDomain.instance().list_sorted(state)
         return map(lambda dom: fixup_sxpr(dom.sxpr(not full)), domains)
+    else:
+        return XendDomain.instance().list_names(state)
 
 def domain_create(config):
     info = XendDomain.instance().domain_create(config)
     return fixup_sxpr(info.sxpr())
 
-def domain_restore(src):
-    info = XendDomain.instance().domain_restore(src)
+def domain_restore(src, paused=False):
+    info = XendDomain.instance().domain_restore(src, paused)
     return fixup_sxpr(info.sxpr())
 
 def get_log():
@@ -84,23 +87,38 @@ methods = ['device_create', 'device_configure',
 exclude = ['domain_create', 'domain_restore']
 
 class XMLRPCServer:
-    def __init__(self, use_tcp=False, host = "localhost", port = 8006,
-                 path = XML_RPC_SOCKET):
+    def __init__(self, auth, use_tcp=False, host = "localhost", port = 8006,
+                 path = XML_RPC_SOCKET, hosts_allowed = None):
         self.use_tcp = use_tcp
         self.port = port
         self.host = host
         self.path = path
+        self.hosts_allowed = hosts_allowed
         
         self.ready = False        
         self.running = True
-        self.xenapi = XendAPI()
+        self.auth = auth
+        self.xenapi = XendAPI.XendAPI(auth)
         
     def run(self):
+        authmsg = (self.auth == XendAPI.AUTH_NONE and 
+                   "; authentication has been disabled for this server." or
+                   ".")
+
         if self.use_tcp:
+            log.info("Opening TCP XML-RPC server on %s%d%s",
+                     self.host and '%s:' % self.host or
+                     'all interfaces, port ',
+                     self.port, authmsg)
             self.server = TCPXMLRPCServer((self.host, self.port),
+                                          self.hosts_allowed,
                                           logRequests = False)
         else:
-            self.server = UnixXMLRPCServer(self.path, logRequests = False)
+            log.info("Opening Unix domain socket XML-RPC server on %s%s",
+                     self.path, authmsg)
+            self.server = UnixXMLRPCServer(self.path, self.hosts_allowed,
+                                           logRequests = False)
+
 
         # Register Xen API Functions
         # -------------------------------------------------------------------
@@ -139,6 +157,8 @@ class XMLRPCServer:
         # A few special cases
         self.server.register_function(domain, 'xend.domain')
         self.server.register_function(domains, 'xend.domains')
+        self.server.register_function(domains_with_state,
+                                      'xend.domains_with_state')
         self.server.register_function(get_log, 'xend.node.log')
         self.server.register_function(domain_create, 'xend.domain.create')
         self.server.register_function(domain_restore, 'xend.domain.restore')

@@ -71,3 +71,13 @@ class XendDevices:
 
     make_controller = classmethod(make_controller)
 
+    def destroy_device_state(cls, domain):
+        """Destroy the state of (external) devices. This is necessary
+           to do when a VM's configuration is destroyed.
+        
+        @param domain: domain this controller is handling devices for.
+        @type domain: XendDomainInfo
+        """
+        tpmif.destroy_vtpmstate(domain.getName())
+
+    destroy_device_state = classmethod(destroy_device_state)

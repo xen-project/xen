@@ -159,5 +159,9 @@ void start_kernel(start_info_t *si)
 void do_exit(void)
 {
     printk("Do_exit called!\n");
-    for ( ;; ) HYPERVISOR_sched_op(SCHEDOP_shutdown, SHUTDOWN_crash);
+    for( ;; )
+    {
+        struct sched_shutdown sched_shutdown = { .reason = SHUTDOWN_crash };
+        HYPERVISOR_sched_op(SCHEDOP_shutdown, &sched_shutdown);
+    }
 }

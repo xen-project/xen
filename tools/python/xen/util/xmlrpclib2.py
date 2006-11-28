@@ -30,6 +30,7 @@ from SimpleXMLRPCServer import SimpleXMLRPCServer, SimpleXMLRPCRequestHandler
 import SocketServer
 import xmlrpclib, socket, os, stat
 
+from xen.web import connection
 from xen.xend.XendLogging import log
 
 try:
@@ -70,6 +71,11 @@ def stringify(value):
 class XMLRPCRequestHandler(SimpleXMLRPCRequestHandler):
     protocol_version = "HTTP/1.1"
 
+    def __init__(self, hosts_allowed, request, client_address, server):
+        self.hosts_allowed = hosts_allowed
+        SimpleXMLRPCRequestHandler.__init__(self, request, client_address,
+                                            server)
+
     # this is inspired by SimpleXMLRPCRequestHandler's do_POST but differs
     # in a few non-trivial ways
     # 1) we never generate internal server errors.  We let the exception
@@ -77,6 +83,11 @@ class XMLRPCRequestHandler(SimpleXMLRPCRequestHandler):
     # 2) we don't bother checking for a _dispatch function since we don't
     #    use one
     def do_POST(self):
+        addrport = self.client_address
+        if not connection.hostAllowed(addrport, self.hosts_allowed):
+            self.connection.shutdown(1)
+            return
+
         data = self.rfile.read(int(self.headers["content-length"]))
         rsp = self.server._marshaled_dispatch(data)
 
@@ -150,9 +161,14 @@ class ServerProxy(xmlrpclib.ServerProxy):
 class TCPXMLRPCServer(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
     allow_reuse_address = True
 
-    def __init__(self, addr, requestHandler=XMLRPCRequestHandler,
+    def __init__(self, addr, allowed, requestHandler=None,
                  logRequests = 1):
-        SimpleXMLRPCServer.__init__(self, addr, requestHandler, logRequests)
+        if requestHandler is None:
+            requestHandler = XMLRPCRequestHandler
+        SimpleXMLRPCServer.__init__(self, addr,
+                                    (lambda x, y, z:
+                                     requestHandler(allowed, x, y, z)),
+                                    logRequests)
 
         flags = fcntl.fcntl(self.fileno(), fcntl.F_GETFD)
         flags |= fcntl.FD_CLOEXEC
@@ -217,7 +233,7 @@ class UnixXMLRPCRequestHandler(XMLRPCRequestHandler):
 class UnixXMLRPCServer(TCPXMLRPCServer):
     address_family = socket.AF_UNIX
 
-    def __init__(self, addr, logRequests = 1):
+    def __init__(self, addr, allowed, logRequests = 1):
         parent = os.path.dirname(addr)
         if os.path.exists(parent):
             os.chown(parent, os.geteuid(), os.getegid())
@@ -226,5 +242,6 @@ class UnixXMLRPCServer(TCPXMLRPCServer):
                 os.unlink(addr)
         else:
             os.makedirs(parent, stat.S_IRWXU)
-        TCPXMLRPCServer.__init__(self, addr, UnixXMLRPCRequestHandler,
-                                 logRequests)
+
+        TCPXMLRPCServer.__init__(self, addr, allowed,
+                                 UnixXMLRPCRequestHandler, logRequests)

@@ -103,7 +103,7 @@ function handle_iptable()
   if [ "$ip" != "" ]
   then
       local addr
-      for addr in "$ip"
+      for addr in $ip
       do
         frob_iptable -s "$addr"
       done

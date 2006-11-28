@@ -1,8 +1,9 @@
 /*
- * QEMU System Emulator header
+ * i8259 interrupt controller emulation
  * 
  * Copyright (c) 2003 Fabrice Bellard
  * Copyright (c) 2005 Intel Corp
+ * Copyright (c) 2006 Keir Fraser, XenSource Inc.
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -26,49 +27,56 @@
 #ifndef __ASM_X86_HVM_VPIC_H__
 #define __ASM_X86_HVM_VPIC_H__
 
-#define domain_vpic(d) (&(d)->arch.hvm_domain.vpic)
-#define vpic_domain(v) (container_of((v), struct domain, arch.hvm_domain.vpic))
-
-typedef struct PicState {
-    uint8_t last_irr; /* edge detection */
-    uint8_t irr; /* interrupt request register */
-    uint8_t irr_xen; /* interrupts forced on by the hypervisor e.g.
-			the callback irq. */
-    uint8_t imr; /* interrupt mask register */
-    uint8_t isr; /* interrupt service register */
-    uint8_t priority_add; /* highest irq priority */
-    uint8_t irq_base;
-    uint8_t read_reg_select;
-    uint8_t poll;
-    uint8_t special_mask;
-    uint8_t init_state;
-    uint8_t auto_eoi;
-    uint8_t rotate_on_auto_eoi;
-    uint8_t special_fully_nested_mode;
-    uint8_t init4; /* true if 4 byte init */
-    uint8_t elcr; /* PIIX edge/trigger selection*/
-    uint8_t elcr_mask;
-    struct vpic *pics_state;
-} PicState;
-
 struct vpic {
-    /* 0 is master pic, 1 is slave pic */
-    PicState pics[2];
-    void (*irq_request)(void *opaque, int level);
-    void *irq_request_opaque;
-    /* IOAPIC callback support */
-    spinlock_t lock;
+    /* IR line bitmasks. */
+    uint8_t irr, imr, isr;
+
+    /* Line IRx maps to IRQ irq_base+x */
+    uint8_t irq_base;
+
+    /*
+     * Where are we in ICW2-4 initialisation (0 means no init in progress)?
+     * Bits 0-1 (=x): Next write at A=1 sets ICW(x+1).
+     * Bit 2: ICW1.IC4  (1 == ICW4 included in init sequence)
+     * Bit 3: ICW1.SNGL (0 == ICW3 included in init sequence)
+     */
+    uint8_t init_state:4;
+
+    /* IR line with highest priority. */
+    uint8_t priority_add:4;
+
+    /* Reads from A=0 obtain ISR or IRR? */
+    uint8_t readsel_isr:1;
+
+    /* Reads perform a polling read? */
+    uint8_t poll:1;
+
+    /* Automatically clear IRQs from the ISR during INTA? */
+    uint8_t auto_eoi:1;
+
+    /* Automatically rotate IRQ priorities during AEOI? */
+    uint8_t rotate_on_auto_eoi:1;
+
+    /* Exclude slave inputs when considering in-service IRQs? */
+    uint8_t special_fully_nested_mode:1;
+
+    /* Special mask mode excludes masked IRs from AEOI and priority checks. */
+    uint8_t special_mask_mode:1;
+
+    /* Is this a master PIC or slave PIC? (NB. This is not programmable.) */
+    uint8_t is_master:1;
+
+    /* Edge/trigger selection. */
+    uint8_t elcr;
+
+    /* Virtual INT output. */
+    uint8_t int_output;
 };
 
-void pic_set_xen_irq(void *opaque, int irq, int level);
-void pic_set_irq(struct vpic *vpic, int irq, int level);
-void pic_init(struct vpic *vpic,
-              void (*irq_request)(void *, int),
-              void *irq_request_opaque);
-void pic_update_irq(struct vpic *vpic); /* Caller must hold vpic->lock */
-void register_pic_io_hook(struct domain *d);
+void vpic_irq_positive_edge(struct domain *d, int irq);
+void vpic_irq_negative_edge(struct domain *d, int irq);
+void vpic_init(struct domain *d);
 int cpu_get_pic_interrupt(struct vcpu *v, int *type);
 int is_periodic_irq(struct vcpu *v, int irq, int type);
-int is_irq_enabled(struct vcpu *v, int irq);
 
 #endif  /* __ASM_X86_HVM_VPIC_H__ */  

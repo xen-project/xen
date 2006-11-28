@@ -37,6 +37,16 @@ class XendAuthSessions:
     def init(self):
         pass
 
+    def login_unconditionally(self, username):
+        """Returns a session UUID if valid.
+
+        @rtype: string
+        @return: Session UUID
+        """
+        new_session = uuid.createString()
+        self.sessions[new_session] = (username, time.time())
+        return new_session
+
     def login_with_password(self, username, password):
         """Returns a session UUID if valid, otherwise raises an error.
 
@@ -45,9 +55,7 @@ class XendAuthSessions:
         @return: Session UUID
         """
         if self.is_authorized(username, password):
-            new_session = uuid.createString()
-            self.sessions[new_session] = (username, time.time())
-            return new_session
+            return login_unconditionally(username)
 
         raise XendError("Login failed")
 

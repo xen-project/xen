@@ -17,47 +17,8 @@
  */
 
 #include "acpi2_0.h"
+#include "../config.h"
 #include <xen/hvm/ioreq.h>
-
-/*
- * Multiple APIC Description Table (MADT).
- */
-
-struct acpi_20_madt Madt = {
-    .header = {
-        .header = {
-            .signature    = ACPI_2_0_MADT_SIGNATURE,
-            .length       = sizeof(struct acpi_20_madt),
-            .revision     = ACPI_2_0_MADT_REVISION,
-            .oem_id       = ACPI_OEM_ID, 
-            .oem_table_id = ACPI_OEM_TABLE_ID,
-            .oem_revision = ACPI_OEM_REVISION,
-            .creator_id   = ACPI_CREATOR_ID,
-            .creator_revision = ACPI_CREATOR_REVISION
-        },
-        .lapic_addr = 0xFEE00000,
-        .flags      = ACPI_PCAT_COMPAT
-    },
-
-    /* IO APIC */
-    .io_apic = {
-        [0] = {
-            .type        = ACPI_IO_APIC,                         
-            .length      = sizeof(struct acpi_20_madt_ioapic),
-            .ioapic_addr = 0xFEC00000
-        }
-    },
-
-    /* Local APIC entries for up to 32 processors. */
-    .lapic = {
-        [0] = {
-            .type   = ACPI_PROCESSOR_LOCAL_APIC,
-            .length = sizeof(struct acpi_20_madt_lapic),
-            .flags  = 0x00000001
-        }
-    }
-};
-
 
 /*
  * Firmware ACPI Control Structure (FACS).

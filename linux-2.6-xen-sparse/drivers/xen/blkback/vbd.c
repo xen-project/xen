@@ -35,7 +35,7 @@
 #define vbd_sz(_v)   ((_v)->bdev->bd_part ?				\
 	(_v)->bdev->bd_part->nr_sects : (_v)->bdev->bd_disk->capacity)
 
-unsigned long vbd_size(struct vbd *vbd)
+unsigned long long vbd_size(struct vbd *vbd)
 {
 	return vbd_sz(vbd);
 }

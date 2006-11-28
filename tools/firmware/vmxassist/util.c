@@ -62,14 +62,15 @@ dump_regs(struct regs *regs)
 		regs->eax, regs->ecx, regs->edx, regs->ebx);
 	printf("esp    %8x ebp    %8x esi    %8x edi    %8x\n",
 		regs->esp, regs->ebp, regs->esi, regs->edi);
-	printf("eip    %8x eflags %8x cs     %8x ds     %8x\n",
-		regs->eip, regs->eflags, regs->cs, regs->ds);
-	printf("es     %8x fs     %8x uss    %8x uesp   %8x\n",
-		regs->es, regs->fs, regs->uss, regs->uesp);
+	printf("es     %8x ds     %8x fs     %8x gs     %8x\n",
+		regs->es, regs->ds, regs->fs, regs->gs);
+	printf("trapno %8x errno  %8x\n", regs->trapno, regs->errno);
+	printf("eip    %8x cs     %8x eflags %8x\n",
+		regs->eip, regs->cs, regs->eflags);
+	printf("uesp   %8x uss    %8x \n",
+		regs->uesp, regs->uss);
 	printf("ves    %8x vds    %8x vfs    %8x vgs    %8x\n",
 		regs->ves, regs->vds, regs->vfs, regs->vgs);
-	if (regs->trapno != -1 || regs->errno != -1)
-		printf("trapno %8x errno  %8x\n", regs->trapno, regs->errno);
 
 	printf("cr0    %8lx cr2    %8x cr3    %8lx cr4    %8lx\n",
 		(long)oldctx.cr0, get_cr2(),

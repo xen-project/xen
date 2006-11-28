@@ -1,5 +1,4 @@
 /*
- *
  *  Copyright (C) 2001  MandrakeSoft S.A.
  *
  *    MandrakeSoft S.A.
@@ -32,6 +31,9 @@
 
 #ifdef __ia64__
 #define VIOAPIC_IS_IOSAPIC 1
+#define VIOAPIC_NUM_PINS  24
+#else
+#define VIOAPIC_NUM_PINS  48 /* 16 ISA IRQs, 32 non-legacy PCI IRQS. */
 #endif
 
 #if !VIOAPIC_IS_IOSAPIC
@@ -39,8 +41,6 @@
 #else
 #define VIOAPIC_VERSION_ID 0x21 /* IOSAPIC version */
 #endif
-
-#define VIOAPIC_NUM_PINS 24
 
 #define VIOAPIC_EDGE_TRIG  0
 #define VIOAPIC_LEVEL_TRIG 1
@@ -58,9 +58,9 @@
 #define VIOAPIC_REG_VERSION 0x01
 #define VIOAPIC_REG_ARB_ID  0x02 /* x86 IOAPIC only */
 
-#define domain_vioapic(d) (&(d)->arch.hvm_domain.vioapic)
+#define domain_vioapic(d) (&(d)->arch.hvm_domain.irq.vioapic)
 #define vioapic_domain(v) (container_of((v), struct domain, \
-                                        arch.hvm_domain.vioapic))
+                                        arch.hvm_domain.irq.vioapic))
 
 union vioapic_redir_entry
 {
@@ -86,19 +86,13 @@ union vioapic_redir_entry
 };
 
 struct vioapic {
-    uint32_t irr;
-    uint32_t irr_xen; /* interrupts forced on by the hypervisor. */
-    uint32_t isr;     /* This is used for level trigger */
-    uint32_t imr;
-    uint32_t ioregsel;
-    uint32_t id;
+    uint32_t ioregsel, id;
     unsigned long base_address;
     union vioapic_redir_entry redirtbl[VIOAPIC_NUM_PINS];
 };
 
 void vioapic_init(struct domain *d);
-void vioapic_set_xen_irq(struct domain *d, int irq, int level);
-void vioapic_set_irq(struct domain *d, int irq, int level);
+void vioapic_irq_positive_edge(struct domain *d, unsigned int irq);
 void vioapic_update_EOI(struct domain *d, int vector);
 
 #endif /* __ASM_X86_HVM_VIOAPIC_H__ */

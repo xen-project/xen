@@ -87,7 +87,7 @@ struct xenoprof_get_buffer {
     int32_t  max_samples;
     int32_t  nbuf;
     int32_t  bufsize;
-    uint64_t buf_maddr;
+    uint64_t buf_gmaddr;
 };
 typedef struct xenoprof_get_buffer xenoprof_get_buffer_t;
 DEFINE_XEN_GUEST_HANDLE(xenoprof_get_buffer_t);
@@ -110,7 +110,7 @@ typedef struct xenoprof_passive {
     int32_t  max_samples;
     int32_t  nbuf;
     int32_t  bufsize;
-    uint64_t buf_maddr;
+    uint64_t buf_gmaddr;
 } xenoprof_passive_t;
 DEFINE_XEN_GUEST_HANDLE(xenoprof_passive_t);
 

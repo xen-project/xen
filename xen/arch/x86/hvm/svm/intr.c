@@ -65,8 +65,6 @@ asmlinkage void svm_intr_assist(void)
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     struct hvm_domain *plat=&v->domain->arch.hvm_domain;
     struct periodic_time *pt = &plat->pl_time.periodic_tm;
-    struct vpic *pic= &plat->vpic;
-    int callback_irq;
     int intr_type = APIC_DM_EXTINT;
     int intr_vector = -1;
     int re_injecting = 0;
@@ -119,50 +117,44 @@ asmlinkage void svm_intr_assist(void)
     {
         if ( (v->vcpu_id == 0) && pt->enabled && pt->pending_intr_nr )
         {
-            pic_set_irq(pic, pt->irq, 0);
-            pic_set_irq(pic, pt->irq, 1);
+            hvm_isa_irq_deassert(current->domain, pt->irq);
+            hvm_isa_irq_assert(current->domain, pt->irq);
         }
 
-        if ( v->vcpu_id == 0 )
-        {
-            callback_irq =
-                v->domain->arch.hvm_domain.params[HVM_PARAM_CALLBACK_IRQ];
-            if ( callback_irq != 0 )
-                pic_set_xen_irq(pic, callback_irq,
-                                local_events_need_delivery());
-        }
+        hvm_set_callback_irq_level();
 
         if ( cpu_has_pending_irq(v) )
             intr_vector = cpu_get_interrupt(v, &intr_type);
     }
 
     /* have we got an interrupt to inject? */
-    if ( intr_vector >= 0 )
+    if ( intr_vector < 0 )
+        return;
+
+    switch ( intr_type )
     {
-        switch ( intr_type )
-        {
-        case APIC_DM_EXTINT:
-        case APIC_DM_FIXED:
-        case APIC_DM_LOWEST:
-            /* Re-injecting a PIT interruptt? */
-            if ( re_injecting && pt->enabled && 
-                 is_periodic_irq(v, intr_vector, intr_type) )
-                ++pt->pending_intr_nr;
-            /* let's inject this interrupt */
-            TRACE_3D(TRC_VMX_INTR, v->domain->domain_id, intr_vector, 0);
-            svm_inject_extint(v, intr_vector);
-            break;
-        case APIC_DM_SMI:
-        case APIC_DM_NMI:
-        case APIC_DM_INIT:
-        case APIC_DM_STARTUP:
-        default:
-            printk("Unsupported interrupt type: %d\n", intr_type);
-            BUG();
-            break;
-        }
-        hvm_interrupt_post(v, intr_vector, intr_type);
+    case APIC_DM_EXTINT:
+    case APIC_DM_FIXED:
+    case APIC_DM_LOWEST:
+        /* Re-injecting a PIT interruptt? */
+        if ( re_injecting && pt->enabled && 
+             is_periodic_irq(v, intr_vector, intr_type) )
+            ++pt->pending_intr_nr;
+        /* let's inject this interrupt */
+        TRACE_3D(TRC_VMX_INTR, v->domain->domain_id, intr_vector, 0);
+        svm_inject_extint(v, intr_vector);
+        break;
+    case APIC_DM_SMI:
+    case APIC_DM_NMI:
+    case APIC_DM_INIT:
+    case APIC_DM_STARTUP:
+    default:
+        printk("Unsupported interrupt type: %d\n", intr_type);
+        BUG();
+        break;
     }
+
+    hvm_interrupt_post(v, intr_vector, intr_type);
 }
 
 /*

@@ -116,7 +116,7 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
     struct vcpu *v = current;
     struct vmx_msr_state *guest_msr_state = &v->arch.hvm_vmx.msr_state;
 
-    switch ( regs->ecx ) {
+    switch ( (u32)regs->ecx ) {
     case MSR_EFER:
         HVM_DBG_LOG(DBG_LEVEL_2, "EFER msr_content 0x%"PRIx64, msr_content);
         msr_content = guest_msr_state->msrs[VMX_INDEX_MSR_EFER];
@@ -169,10 +169,10 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     struct vmx_msr_state *guest_msr_state = &v->arch.hvm_vmx.msr_state;
     struct vmx_msr_state *host_msr_state = &this_cpu(host_msr_state);
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "msr 0x%lx msr_content 0x%"PRIx64"\n",
-                (unsigned long)regs->ecx, msr_content);
+    HVM_DBG_LOG(DBG_LEVEL_1, "msr 0x%x msr_content 0x%"PRIx64"\n",
+                (u32)regs->ecx, msr_content);
 
-    switch ( regs->ecx ) {
+    switch ( (u32)regs->ecx ) {
     case MSR_EFER:
         /* offending reserved bit will cause #GP */
         if ( msr_content & ~(EFER_LME | EFER_LMA | EFER_NX | EFER_SCE) )
@@ -501,6 +501,37 @@ static unsigned long vmx_get_ctrl_reg(struct vcpu *v, unsigned int num)
     return 0;                   /* dummy */
 }
 
+static unsigned long vmx_get_segment_base(struct vcpu *v, enum segment seg)
+{
+    unsigned long base = 0;
+    int long_mode = 0;
+
+    ASSERT(v == current);
+
+#ifdef __x86_64__
+    if ( vmx_long_mode_enabled(v) &&
+         (__vmread(GUEST_CS_AR_BYTES) & (1u<<13)) )
+        long_mode = 1;
+#endif
+
+    switch ( seg )
+    {
+    case seg_cs: if ( !long_mode ) base = __vmread(GUEST_CS_BASE); break;
+    case seg_ds: if ( !long_mode ) base = __vmread(GUEST_DS_BASE); break;
+    case seg_es: if ( !long_mode ) base = __vmread(GUEST_ES_BASE); break;
+    case seg_fs: base = __vmread(GUEST_FS_BASE); break;
+    case seg_gs: base = __vmread(GUEST_GS_BASE); break;
+    case seg_ss: if ( !long_mode ) base = __vmread(GUEST_SS_BASE); break;
+    case seg_tr: base = __vmread(GUEST_TR_BASE); break;
+    case seg_gdtr: base = __vmread(GUEST_GDTR_BASE); break;
+    case seg_idtr: base = __vmread(GUEST_IDTR_BASE); break;
+    case seg_ldtr: base = __vmread(GUEST_LDTR_BASE); break;
+    default: BUG(); break;
+    }
+
+    return base;
+}
+
 /* Make sure that xen intercepts any FP accesses from current */
 static void vmx_stts(struct vcpu *v)
 {
@@ -613,12 +644,12 @@ static void vmx_setup_hvm_funcs(void)
     hvm_funcs.store_cpu_guest_regs = vmx_store_cpu_guest_regs;
     hvm_funcs.load_cpu_guest_regs = vmx_load_cpu_guest_regs;
 
-    hvm_funcs.realmode = vmx_realmode;
     hvm_funcs.paging_enabled = vmx_paging_enabled;
     hvm_funcs.long_mode_enabled = vmx_long_mode_enabled;
     hvm_funcs.pae_enabled = vmx_pae_enabled;
     hvm_funcs.guest_x86_mode = vmx_guest_x86_mode;
     hvm_funcs.get_guest_ctrl_reg = vmx_get_ctrl_reg;
+    hvm_funcs.get_segment_base = vmx_get_segment_base;
 
     hvm_funcs.update_host_cr3 = vmx_update_host_cr3;
 
@@ -926,63 +957,110 @@ static void vmx_do_invlpg(unsigned long va)
 }
 
 
-static int check_for_null_selector(unsigned long eip, int inst_len, int dir)
+static int vmx_check_descriptor(int long_mode, unsigned long eip, int inst_len,
+                                enum segment seg, unsigned long *base,
+                                u32 *limit, u32 *ar_bytes)
 {
-    unsigned char inst[MAX_INST_LEN];
-    unsigned long sel;
-    int i;
-    int inst_copy_from_guest(unsigned char *, unsigned long, int);
+    enum vmcs_field ar_field, base_field, limit_field;
 
-    /* INS can only use ES segment register, and it can't be overridden */
-    if ( dir == IOREQ_READ )
+    *base = 0;
+    *limit = 0;
+    if ( seg != seg_es )
     {
-        sel = __vmread(GUEST_ES_SELECTOR);
-        return sel == 0 ? 1 : 0;
+        unsigned char inst[MAX_INST_LEN];
+        int i;
+        extern int inst_copy_from_guest(unsigned char *, unsigned long, int);
+
+        if ( !long_mode )
+            eip += __vmread(GUEST_CS_BASE);
+        memset(inst, 0, MAX_INST_LEN);
+        if ( inst_copy_from_guest(inst, eip, inst_len) != inst_len )
+        {
+            gdprintk(XENLOG_ERR, "Get guest instruction failed\n");
+            domain_crash(current->domain);
+            return 0;
+        }
+
+        for ( i = 0; i < inst_len; i++ )
+        {
+            switch ( inst[i] )
+            {
+            case 0xf3: /* REPZ */
+            case 0xf2: /* REPNZ */
+            case 0xf0: /* LOCK */
+            case 0x66: /* data32 */
+            case 0x67: /* addr32 */
+#ifdef __x86_64__
+            case 0x40 ... 0x4f: /* REX */
+#endif
+                continue;
+            case 0x2e: /* CS */
+                seg = seg_cs;
+                continue;
+            case 0x36: /* SS */
+                seg = seg_ss;
+                continue;
+            case 0x26: /* ES */
+                seg = seg_es;
+                continue;
+            case 0x64: /* FS */
+                seg = seg_fs;
+                continue;
+            case 0x65: /* GS */
+                seg = seg_gs;
+                continue;
+            case 0x3e: /* DS */
+                seg = seg_ds;
+                continue;
+            }
+        }
     }
 
-    memset(inst, 0, MAX_INST_LEN);
-    if ( inst_copy_from_guest(inst, eip, inst_len) != inst_len )
+    switch ( seg )
     {
-        gdprintk(XENLOG_ERR, "Get guest instruction failed\n");
-        domain_crash(current->domain);
+    case seg_cs:
+        ar_field = GUEST_CS_AR_BYTES;
+        base_field = GUEST_CS_BASE;
+        limit_field = GUEST_CS_LIMIT;
+        break;
+    case seg_ds:
+        ar_field = GUEST_DS_AR_BYTES;
+        base_field = GUEST_DS_BASE;
+        limit_field = GUEST_DS_LIMIT;
+        break;
+    case seg_es:
+        ar_field = GUEST_ES_AR_BYTES;
+        base_field = GUEST_ES_BASE;
+        limit_field = GUEST_ES_LIMIT;
+        break;
+    case seg_fs:
+        ar_field = GUEST_FS_AR_BYTES;
+        base_field = GUEST_FS_BASE;
+        limit_field = GUEST_FS_LIMIT;
+        break;
+    case seg_gs:
+        ar_field = GUEST_FS_AR_BYTES;
+        base_field = GUEST_FS_BASE;
+        limit_field = GUEST_FS_LIMIT;
+        break;
+    case seg_ss:
+        ar_field = GUEST_GS_AR_BYTES;
+        base_field = GUEST_GS_BASE;
+        limit_field = GUEST_GS_LIMIT;
+        break;
+    default:
+        BUG();
         return 0;
     }
 
-    for ( i = 0; i < inst_len; i++ )
+    if ( !long_mode || seg == seg_fs || seg == seg_gs )
     {
-        switch ( inst[i] )
-        {
-        case 0xf3: /* REPZ */
-        case 0xf2: /* REPNZ */
-        case 0xf0: /* LOCK */
-        case 0x66: /* data32 */
-        case 0x67: /* addr32 */
-            continue;
-        case 0x2e: /* CS */
-            sel = __vmread(GUEST_CS_SELECTOR);
-            break;
-        case 0x36: /* SS */
-            sel = __vmread(GUEST_SS_SELECTOR);
-            break;
-        case 0x26: /* ES */
-            sel = __vmread(GUEST_ES_SELECTOR);
-            break;
-        case 0x64: /* FS */
-            sel = __vmread(GUEST_FS_SELECTOR);
-            break;
-        case 0x65: /* GS */
-            sel = __vmread(GUEST_GS_SELECTOR);
-            break;
-        case 0x3e: /* DS */
-            /* FALLTHROUGH */
-        default:
-            /* DS is the default */
-            sel = __vmread(GUEST_DS_SELECTOR);
-        }
-        return sel == 0 ? 1 : 0;
+        *base = __vmread(base_field);
+        *limit = __vmread(limit_field);
     }
+    *ar_bytes = __vmread(ar_field);
 
-    return 0;
+    return !(*ar_bytes & 0x10000);
 }
 
 static void vmx_io_instruction(unsigned long exit_qualification,
@@ -990,7 +1068,7 @@ static void vmx_io_instruction(unsigned long exit_qualification,
 {
     struct cpu_user_regs *regs;
     struct hvm_io_op *pio_opp;
-    unsigned long port, size;
+    unsigned int port, size;
     int dir, df, vm86;
 
     pio_opp = &current->arch.hvm_vcpu.io_op;
@@ -1021,21 +1099,98 @@ static void vmx_io_instruction(unsigned long exit_qualification,
     dir = test_bit(3, &exit_qualification); /* direction */
 
     if ( test_bit(4, &exit_qualification) ) { /* string instruction */
-        unsigned long addr, count = 1;
+        unsigned long addr, count = 1, base;
+        u32 ar_bytes, limit;
         int sign = regs->eflags & X86_EFLAGS_DF ? -1 : 1;
+        int long_mode = 0;
 
+        ar_bytes = __vmread(GUEST_CS_AR_BYTES);
+#ifdef __x86_64__
+        if ( vmx_long_mode_enabled(current) && (ar_bytes & (1u<<13)) )
+            long_mode = 1;
+#endif
         addr = __vmread(GUEST_LINEAR_ADDRESS);
+
+        if ( test_bit(5, &exit_qualification) ) { /* "rep" prefix */
+            pio_opp->flags |= REPZ;
+            count = regs->ecx;
+            if ( !long_mode && (vm86 || !(ar_bytes & (1u<<14))) )
+                count &= 0xFFFF;
+        }
 
         /*
          * In protected mode, guest linear address is invalid if the
          * selector is null.
          */
-        if ( !vm86 && check_for_null_selector(regs->eip, inst_len, dir) )
-            addr = dir == IOREQ_WRITE ? regs->esi : regs->edi;
+        if ( !vmx_check_descriptor(long_mode, regs->eip, inst_len,
+                                   dir == IOREQ_WRITE ? seg_ds : seg_es,
+                                   &base, &limit, &ar_bytes) ) {
+            if ( !long_mode ) {
+                vmx_inject_hw_exception(current, TRAP_gp_fault, 0);
+                return;
+            }
+            addr = dir == IOREQ_WRITE ? base + regs->esi : regs->edi;
+        }
 
-        if ( test_bit(5, &exit_qualification) ) { /* "rep" prefix */
-            pio_opp->flags |= REPZ;
-            count = vm86 ? regs->ecx & 0xFFFF : regs->ecx;
+        if ( !long_mode ) {
+            unsigned long ea = addr - base;
+
+            /* Segment must be readable for outs and writeable for ins. */
+            if ( dir == IOREQ_WRITE ? (ar_bytes & 0xa) == 0x8
+                                    : (ar_bytes & 0xa) != 0x2 ) {
+                vmx_inject_hw_exception(current, TRAP_gp_fault, 0);
+                return;
+            }
+
+            /* Offset must be within limits. */
+            ASSERT(ea == (u32)ea);
+            if ( (u32)(ea + size - 1) < (u32)ea ||
+                 (ar_bytes & 0xc) != 0x4 ? ea + size - 1 > limit
+                                         : ea <= limit )
+            {
+                vmx_inject_hw_exception(current, TRAP_gp_fault, 0);
+                return;
+            }
+
+            /* Check the limit for repeated instructions, as above we checked
+               only the first instance. Truncate the count if a limit violation
+               would occur. Note that the checking is not necessary for page
+               granular segments as transfers crossing page boundaries will be
+               broken up anyway. */
+            if ( !(ar_bytes & (1u<<15)) && count > 1 )
+            {
+                if ( (ar_bytes & 0xc) != 0x4 )
+                {
+                    /* expand-up */
+                    if ( !df )
+                    {
+                        if ( ea + count * size - 1 < ea ||
+                             ea + count * size - 1 > limit )
+                            count = (limit + 1UL - ea) / size;
+                    }
+                    else
+                    {
+                        if ( count - 1 > ea / size )
+                            count = ea / size + 1;
+                    }
+                }
+                else
+                {
+                    /* expand-down */
+                    if ( !df )
+                    {
+                        if ( count - 1 > -(s32)ea / size )
+                            count = -(s32)ea / size + 1UL;
+                    }
+                    else
+                    {
+                        if ( ea < (count - 1) * size ||
+                             ea - (count - 1) * size <= limit )
+                            count = (ea - limit - 1) / size + 1;
+                    }
+                }
+                ASSERT(count);
+            }
         }
 
         /*
@@ -1180,7 +1335,7 @@ static int vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
          */
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 c->cr3 = %x", c->cr3);
         mfn = get_mfn_from_gpfn(c->cr3 >> PAGE_SHIFT);
-        if ( !VALID_MFN(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
+        if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
             goto bad_cr3;
         old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
         v->arch.guest_table = pagetable_from_pfn(mfn);
@@ -1350,7 +1505,8 @@ static int vmx_set_cr0(unsigned long value)
         __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_NM);
     }
 
-    v->arch.hvm_vmx.cpu_cr0 = value | X86_CR0_PE | X86_CR0_PG | X86_CR0_NE;
+    v->arch.hvm_vmx.cpu_cr0 = (value | X86_CR0_PE | X86_CR0_PG 
+                               | X86_CR0_NE | X86_CR0_WP);
     __vmwrite(GUEST_CR0, v->arch.hvm_vmx.cpu_cr0);
 
     v->arch.hvm_vmx.cpu_shadow_cr0 = value;
@@ -1365,7 +1521,7 @@ static int vmx_set_cr0(unsigned long value)
          * The guest CR3 must be pointing to the guest physical.
          */
         mfn = get_mfn_from_gpfn(v->arch.hvm_vmx.cpu_cr3 >> PAGE_SHIFT);
-        if ( !VALID_MFN(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
+        if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
         {
             gdprintk(XENLOG_ERR, "Invalid CR3 value = %lx (mfn=%lx)\n",
                      v->arch.hvm_vmx.cpu_cr3, mfn);
@@ -1575,7 +1731,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
              */
             HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 value = %lx", value);
             mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
-            if ( !VALID_MFN(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
+            if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
                 goto bad_cr3;
             old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
             v->arch.guest_table = pagetable_from_pfn(mfn);
@@ -1603,7 +1759,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
 #if CONFIG_PAGING_LEVELS >= 3
                 unsigned long mfn, old_base_mfn;
                 mfn = get_mfn_from_gpfn(v->arch.hvm_vmx.cpu_cr3 >> PAGE_SHIFT);
-                if ( !VALID_MFN(mfn) ||
+                if ( !mfn_valid(mfn) ||
                      !get_page(mfn_to_page(mfn), v->domain) )
                     goto bad_cr3;
 
@@ -1766,16 +1922,16 @@ static int vmx_cr_access(unsigned long exit_qualification,
     return 1;
 }
 
-static inline void vmx_do_msr_read(struct cpu_user_regs *regs)
+static inline int vmx_do_msr_read(struct cpu_user_regs *regs)
 {
     u64 msr_content = 0;
-    u32 eax, edx;
+    u32 ecx = regs->ecx, eax, edx;
     struct vcpu *v = current;
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%lx, eax=%lx, edx=%lx",
-                (unsigned long)regs->ecx, (unsigned long)regs->eax,
-                (unsigned long)regs->edx);
-    switch (regs->ecx) {
+    HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%x, eax=%x, edx=%x",
+                ecx, (u32)regs->eax, (u32)regs->edx);
+
+    switch (ecx) {
     case MSR_IA32_TIME_STAMP_COUNTER:
         msr_content = hvm_get_guest_time(v);
         break;
@@ -1793,39 +1949,41 @@ static inline void vmx_do_msr_read(struct cpu_user_regs *regs)
         break;
     default:
         if ( long_mode_do_msr_read(regs) )
-            return;
+            goto done;
 
-        if ( rdmsr_hypervisor_regs(regs->ecx, &eax, &edx) )
+        if ( rdmsr_hypervisor_regs(ecx, &eax, &edx) ||
+             rdmsr_safe(ecx, eax, edx) == 0 )
         {
             regs->eax = eax;
             regs->edx = edx;
-            return;
+            goto done;
         }
-
-        rdmsr_safe(regs->ecx, regs->eax, regs->edx);
-        return;
+        vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
+        return 0;
     }
 
     regs->eax = msr_content & 0xFFFFFFFF;
     regs->edx = msr_content >> 32;
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%lx, eax=%lx, edx=%lx",
-                (unsigned long)regs->ecx, (unsigned long)regs->eax,
+done:
+    HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%x, eax=%lx, edx=%lx",
+                ecx, (unsigned long)regs->eax,
                 (unsigned long)regs->edx);
+    return 1;
 }
 
-static inline void vmx_do_msr_write(struct cpu_user_regs *regs)
+static inline int vmx_do_msr_write(struct cpu_user_regs *regs)
 {
+    u32 ecx = regs->ecx;
     u64 msr_content;
     struct vcpu *v = current;
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%lx, eax=%lx, edx=%lx",
-                (unsigned long)regs->ecx, (unsigned long)regs->eax,
-                (unsigned long)regs->edx);
+    HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%x, eax=%x, edx=%x",
+                ecx, (u32)regs->eax, (u32)regs->edx);
 
     msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
 
-    switch (regs->ecx) {
+    switch (ecx) {
     case MSR_IA32_TIME_STAMP_COUNTER:
         {
             struct periodic_time *pt =
@@ -1850,13 +2008,11 @@ static inline void vmx_do_msr_write(struct cpu_user_regs *regs)
         break;
     default:
         if ( !long_mode_do_msr_write(regs) )
-            wrmsr_hypervisor_regs(regs->ecx, regs->eax, regs->edx);
+            wrmsr_hypervisor_regs(ecx, regs->eax, regs->edx);
         break;
     }
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%lx, eax=%lx, edx=%lx",
-                (unsigned long)regs->ecx, (unsigned long)regs->eax,
-                (unsigned long)regs->edx);
+    return 1;
 }
 
 static void vmx_do_hlt(void)
@@ -2220,16 +2376,16 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
     case EXIT_REASON_MSR_READ:
         inst_len = __get_instruction_length(); /* Safe: RDMSR */
-        __update_guest_eip(inst_len);
-        vmx_do_msr_read(regs);
+        if ( vmx_do_msr_read(regs) )
+            __update_guest_eip(inst_len);
         TRACE_VMEXIT(1, regs->ecx);
         TRACE_VMEXIT(2, regs->eax);
         TRACE_VMEXIT(3, regs->edx);
         break;
     case EXIT_REASON_MSR_WRITE:
         inst_len = __get_instruction_length(); /* Safe: WRMSR */
-        __update_guest_eip(inst_len);
-        vmx_do_msr_write(regs);
+        if ( vmx_do_msr_write(regs) )
+            __update_guest_eip(inst_len);
         TRACE_VMEXIT(1, regs->ecx);
         TRACE_VMEXIT(2, regs->eax);
         TRACE_VMEXIT(3, regs->edx);

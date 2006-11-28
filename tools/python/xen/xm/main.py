@@ -67,7 +67,7 @@ USAGE_FOOTER = '<Domain> can either be the Domain Name or Id.\n' \
 SUBCOMMAND_HELP = {
     # common commands
     
-    'console'     : ('<Domain>',
+    'console'     : ('[-q|--quiet] <Domain>',
                      'Attach to <Domain>\'s console.'),
     'create'      : ('<ConfigFile> [options] [vars]',
                      'Create a domain based on <ConfigFile>.'),
@@ -84,7 +84,7 @@ SUBCOMMAND_HELP = {
                      'Migrate a domain to another machine.'),
     'pause'       : ('<Domain>', 'Pause execution of a domain.'),
     'reboot'      : ('<Domain> [-wa]', 'Reboot a domain.'),
-    'restore'     : ('<CheckpointFile>',
+    'restore'     : ('<CheckpointFile> [-p]',
                      'Restore a domain from a saved state.'),
     'save'        : ('<Domain> <CheckpointFile>',
                      'Save a domain state to restore later.'),
@@ -100,7 +100,7 @@ SUBCOMMAND_HELP = {
                      'Remove a domain from Xend domain management.'),
     'start'       : ('<DomainName>', 'Start a Xend managed domain'),
     'resume'      : ('<DomainName>', 'Resume a Xend managed domain'),
-    'suspend'     : ('<DomainName>', 'Suspend a Xend maanged domain'),
+    'suspend'     : ('<DomainName>', 'Suspend a Xend managed domain'),
 
     # less used commands
 
@@ -158,7 +158,7 @@ SUBCOMMAND_HELP = {
     'dry-run'       :  ('<ConfigFile>',
                         'Test if a domain can access its resources.'),
     'resources'     :  ('', 'Show info for each labeled resource.'),
-    'cfgbootpolicy' :  ('<policy> [kernelversion]',
+    'cfgbootpolicy' :  ('<policy> [boot-title]',
                         'Add policy to boot configuration.'),
     'dumppolicy'    :  ('', 'Print hypervisor ACM state information.'),
     'loadpolicy'    :  ('<policy.bin>', 'Load binary policy into hypervisor.'),
@@ -187,8 +187,12 @@ SUBCOMMAND_OPTIONS = {
        ('-c CAP',    '--cap=CAP',       'Cap (int)'),
     ),
     'list': (
-       ('-l', '--long', 'Output all VM details in SXP'),
-       ('', '--label',  'Include security labels'),
+       ('-l', '--long',         'Output all VM details in SXP'),
+       ('', '--label',          'Include security labels'),
+       ('', '--state=<state>',  'Select only VMs with the specified state'),
+    ),
+    'console': (
+       ('-q', '--quiet', 'Do not print an error message if the domain does not exist'),
     ),
     'dmesg': (
        ('-c', '--clear', 'Clear dmesg buffer'),
@@ -202,6 +206,9 @@ SUBCOMMAND_OPTIONS = {
     'dump-core': (
        ('-L', '--live', 'Dump core without pausing the domain'),
        ('-C', '--crash', 'Crash domain after dumping core'),
+    ),
+    'restore': (
+      ('-p', '--paused', 'Do not unpause domain after restoring it'),
     ),
 }
 
@@ -480,31 +487,49 @@ def xm_save(args):
     server.xend.domain.save(domid, savefile)
     
 def xm_restore(args):
-    arg_check(args, "restore", 1)
+    arg_check(args, "restore", 1, 2)
 
-    savefile = os.path.abspath(args[0])
+    try:
+        (options, params) = getopt.gnu_getopt(args, 'p', ['paused'])
+    except getopt.GetoptError, opterr:
+        err(opterr)
+        sys.exit(1)
+
+    paused = False
+    for (k, v) in options:
+        if k in ['-p', '--paused']:
+            paused = True
+
+    if len(params) != 1:
+        err("Wrong number of parameters")
+        usage('restore')
+        sys.exit(1)
+
+    savefile = os.path.abspath(params[0])
 
     if not os.access(savefile, os.R_OK):
         err("xm restore: Unable to read file %s" % savefile)
         sys.exit(1)
 
-    server.xend.domain.restore(savefile)
+    server.xend.domain.restore(savefile, paused)
 
 
-def getDomains(domain_names, full = 0):
+def getDomains(domain_names, state, full = 0):
     if domain_names:
         return [server.xend.domain(dom, full) for dom in domain_names]
     else:
-        return server.xend.domains(1, full)
+        return server.xend.domains_with_state(True, state, full)
 
 
 def xm_list(args):
     use_long = 0
     show_vcpus = 0
     show_labels = 0
+    state = 'all'
     try:
         (options, params) = getopt.gnu_getopt(args, 'lv',
-                                              ['long','vcpus','label'])
+                                              ['long','vcpus','label',
+                                               'state='])
     except getopt.GetoptError, opterr:
         err(opterr)
         usage('list')
@@ -517,6 +542,12 @@ def xm_list(args):
             show_vcpus = 1
         if k in ['--label']:
             show_labels = 1
+        if k in ['--state']:
+            state = v
+
+    if state != 'all' and len(params) > 0:
+        raise OptionError(
+            "You may specify either a state or a particular VM, but not both")
 
     if show_vcpus:
         print >>sys.stderr, (
@@ -524,7 +555,7 @@ def xm_list(args):
         xm_vcpu_list(params)
         return
 
-    doms = getDomains(params, use_long)
+    doms = getDomains(params, state, use_long)
 
     if use_long:
         map(PrettyPrint.prettyprint, doms)
@@ -542,7 +573,7 @@ def parse_doms_info(info):
         return DOM_STATES[t(sxp.child_value(info, n, d))]
     
     return {
-        'domid'    : get_info('domid',        int,   -1),
+        'domid'    : get_info('domid',        str,   ''),
         'name'     : get_info('name',         str,   '??'),
         'mem'      : get_info('memory_dynamic_max', int,   0),
         'vcpus'    : get_info('online_vcpus', int,   0),
@@ -558,7 +589,7 @@ def parse_sedf_info(info):
         return t(sxp.child_value(info, n, d))
 
     return {
-        'domid'    : get_info('domid',        int,   -1),
+        'domid'    : get_info('domid',         int,   -1),
         'period'   : get_info('period',        int,   -1),
         'slice'    : get_info('slice',         int,   -1),
         'latency'  : get_info('latency',       int,   -1),
@@ -570,7 +601,7 @@ def xm_brief_list(doms):
     print '%-40s %3s %5s %5s %10s %9s' % \
           ('Name', 'ID', 'Mem', 'VCPUs', 'State', 'Time(s)')
     
-    format = "%(name)-40s %(domid)3d %(mem)5d %(vcpus)5d %(state)10s " \
+    format = "%(name)-40s %(domid)3s %(mem)5d %(vcpus)5d %(state)10s " \
              "%(cpu_time)8.1f"
     
     for dom in doms:
@@ -582,7 +613,7 @@ def xm_label_list(doms):
           ('Name', 'ID', 'Mem', 'VCPUs', 'State', 'Time(s)', 'Label')
     
     output = []
-    format = '%(name)-32s %(domid)3d %(mem)5d %(vcpus)5d %(state)10s ' \
+    format = '%(name)-32s %(domid)3s %(mem)5d %(vcpus)5d %(state)10s ' \
              '%(cpu_time)8.1f %(seclabel)9s'
     
     for dom in doms:
@@ -919,7 +950,8 @@ def xm_sched_sedf(args):
             opts['weight'] = v
 
     doms = filter(lambda x : domid_match(domid, x),
-                        [parse_doms_info(dom) for dom in getDomains("")])
+                        [parse_doms_info(dom)
+                         for dom in getDomains(None, 'running')])
 
     # print header if we aren't setting any parameters
     if len(opts.keys()) == 0:
@@ -1002,14 +1034,45 @@ def xm_info(args):
             print "%-23s:" % x[0], x[1]
 
 def xm_console(args):
-    arg_check(args, "console", 1)
+    arg_check(args, "console", 1, 2)
 
-    dom = args[0]
-    info = server.xend.domain(dom)
+    quiet = False;
+
+    try:
+        (options, params) = getopt.gnu_getopt(args, 'q', ['quiet'])
+    except getopt.GetoptError, opterr:
+        err(opterr)
+        sys.exit(1)
+
+    for (k, v) in options:
+        if k in ['-q', '--quiet']:
+            quiet = True
+        else:
+            assert False
+
+    if len(params) != 1:
+        err('No domain given')
+        usage('console')
+        sys.exit(1)
+
+    dom = params[0]
+
+    try:
+        info = server.xend.domain(dom)
+    except:
+        if quiet:
+            sys.exit(1)
+        else:
+            raise
     domid = int(sxp.child_value(info, 'domid', '-1'))
     if domid == -1:
-        raise Exception("Domain is not started")
+        if quiet:
+            sys.exit(1)
+        else:
+            raise Exception("Domain is not started")
+
     console.execConsole(domid)
+
 
 def xm_uptime(args):
     short_mode = 0
@@ -1024,7 +1087,7 @@ def xm_uptime(args):
         if k in ['-s', '--short']:
             short_mode = 1
 
-    doms = getDomains(params)
+    doms = getDomains(params, 'running')
 
     if short_mode == 0:
         print 'Name                              ID Uptime'
@@ -1375,6 +1438,7 @@ commands = {
     "reboot": xm_reboot,    
     "rename": xm_rename,
     "restore": xm_restore,
+    "resume": xm_resume,
     "save": xm_save,
     "shutdown": xm_shutdown,
     "start": xm_start,

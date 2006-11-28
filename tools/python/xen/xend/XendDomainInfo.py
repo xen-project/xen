@@ -1318,7 +1318,7 @@ class XendDomainInfo:
 
             self._createDevices()
 
-            if self.info['bootloader']:
+            if self.info['bootloader'] not in [None, 'kernel_external']:
                 self.image.cleanupBootloading()
 
             self.info['start_time'] = time.time()
@@ -1326,7 +1326,8 @@ class XendDomainInfo:
             self._stateSet(DOM_STATE_RUNNING)
         except RuntimeError, exn:
             log.exception("XendDomainInfo.initDomain: exception occurred")
-            if self.info['bootloader'] and self.image is not None:
+            if self.info['bootloader'] not in [None, 'kernel_external'] \
+                   and self.image is not None:
                 self.image.cleanupBootloading()
             raise VmError(str(exn))
 

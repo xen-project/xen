@@ -174,12 +174,16 @@ gopts.var('cpus', val='CPUS',
           use="CPUS to run the domain on.")
 
 gopts.var('pae', val='PAE',
-          fn=set_int, default=0,
+          fn=set_int, default=1,
           use="Disable or enable PAE of HVM domain.")
 
 gopts.var('acpi', val='ACPI',
-          fn=set_int, default=0,
+          fn=set_int, default=1,
           use="Disable or enable ACPI of HVM domain.")
+
+gopts.var('apic', val='APIC',
+          fn=set_int, default=1,
+          use="Disable or enable APIC mode.")
 
 gopts.var('vcpus', val='VCPUS',
           fn=set_int, default=1,
@@ -664,9 +668,9 @@ def configure_hvm(config_image, vals):
              'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'soundhw',
              'vnc', 'vncdisplay', 'vncunused', 'vncconsole', 'vnclisten',
              'sdl', 'display', 'xauthority',
-             'acpi', 'usb', 'usbdevice', 'keymap' ]
+             'acpi', 'apic', 'usb', 'usbdevice', 'keymap' ]
     for a in args:
-        if (vals.__dict__[a]):
+        if a in vals.__dict__ and vals.__dict__[a] is not None:
             config_image.append([a, vals.__dict__[a]])
     config_image.append(['vncpasswd', vals.vncpasswd])
 

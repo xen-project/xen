@@ -16,7 +16,7 @@ import xen.util.auxbin
 import xen.lowlevel.xc
 
 from xen.xend import balloon, sxp
-from xen.xend.XendError import XendError
+from xen.xend.XendError import XendError, VmError
 from xen.xend.XendLogging import log
 from xen.xend.XendConstants import *
 from xen.xend.XendConfig import XendConfig
@@ -37,6 +37,7 @@ def write_exact(fd, buf, errmsg):
     if os.write(fd, buf) != len(buf):
         raise XendError(errmsg)
 
+
 def read_exact(fd, size, errmsg):
     buf  = '' 
     while size != 0: 
@@ -48,7 +49,6 @@ def read_exact(fd, size, errmsg):
         size = size - len(readstr)
         buf  = buf + readstr
     return buf
-
 
 
 def save(fd, dominfo, network, live, dst):
@@ -97,9 +97,17 @@ def save(fd, dominfo, network, live, dst):
         forkHelper(cmd, fd, saveInputHandler, False)
 
         dominfo.destroyDomain()
+        try:
+            dominfo.setName(domain_name)
+        except VmError:
+            # Ignore this.  The name conflict (hopefully) arises because we
+            # are doing localhost migration; if we are doing a suspend of a
+            # persistent VM, we need the rename, and don't expect the
+            # conflict.  This needs more thought.
+            pass
 
     except Exception, exn:
-        log.exception("Save failed on domain %s (%d).", domain_name,
+        log.exception("Save failed on domain %s (%s).", domain_name,
                       dominfo.getDomid())
         try:
             dominfo.setName(domain_name)
@@ -108,7 +116,7 @@ def save(fd, dominfo, network, live, dst):
         raise Exception, exn
 
 
-def restore(xd, fd, dominfo = None):
+def restore(xd, fd, dominfo = None, paused = False):
     signature = read_exact(fd, len(SIGNATURE),
         "not a valid guest state file: signature read")
     if signature != SIGNATURE:
@@ -164,7 +172,8 @@ def restore(xd, fd, dominfo = None):
 
         os.read(fd, 1)           # Wait for source to close connection
         dominfo.waitForDevices() # Wait for backends to set up
-        dominfo.unpause()
+        if not paused:
+            dominfo.unpause()
         
         dominfo.completeRestore(handler.store_mfn, handler.console_mfn)
         
@@ -234,4 +243,9 @@ def slurp(infile):
         if line == "":
             break
         else:
-            log.error('%s', line.strip())
+            line = line.strip()
+            m = re.match(r"^ERROR: (.*)", line)
+            if m is None:
+                log.info('%s', line)
+            else:
+                log.error('%s', m.group(1))

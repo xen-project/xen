@@ -371,10 +371,9 @@ __gnttab_unmap_grant_ref(
 
     if ( unlikely((rd = find_domain_by_id(dom)) == NULL) )
     {
-        if ( rd != NULL )
-            put_domain(rd);
+        /* This can happen when a grant is implicitly unmapped. */
         gdprintk(XENLOG_INFO, "Could not find domain %d\n", dom);
-        op->status = GNTST_bad_domain;
+        domain_crash(ld); /* naughty... */
         return;
     }
 
@@ -1130,7 +1129,12 @@ gnttab_release_mappings(
                 handle, ref, map->flags, map->domid);
 
         rd = find_domain_by_id(map->domid);
-        BUG_ON(rd == NULL);
+        if ( rd == NULL )
+        {
+            /* Nothing to clear up... */
+            map->flags = 0;
+            continue;
+        }
 
         spin_lock(&rd->grant_table->lock);
 

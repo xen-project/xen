@@ -68,11 +68,6 @@
  */
 #define shadow_mode_trap_reads(_d) ({ (void)(_d); 0; })
 
-// flags used in the return value of the shadow_set_lXe() functions...
-#define SHADOW_SET_CHANGED            0x1
-#define SHADOW_SET_FLUSH              0x2
-#define SHADOW_SET_ERROR              0x4
-
 // How do we tell that we have a 32-bit PV guest in a 64-bit Xen?
 #ifdef __x86_64__
 #define pv_32bit_guest(_v) 0 // not yet supported
@@ -163,8 +158,9 @@ extern int shadow_audit_enable;
 #define SHOPT_EARLY_UNSHADOW      0x02  /* Unshadow l1s on fork or exit */
 #define SHOPT_FAST_FAULT_PATH     0x04  /* Fast-path MMIO and not-present */
 #define SHOPT_PREFETCH            0x08  /* Shadow multiple entries per fault */
+#define SHOPT_LINUX_L3_TOPLEVEL   0x10  /* Pin l3es on early 64bit linux */
 
-#define SHADOW_OPTIMIZATIONS      0x0f
+#define SHADOW_OPTIMIZATIONS      0x1f
 
 
 /* With shadow pagetables, the different kinds of address start 
@@ -218,12 +214,6 @@ static inline _type _name##_x(_name##_t n) { return n; }
 
 TYPE_SAFE(unsigned long,mfn)
 #define SH_PRI_mfn "05lx"
-
-static inline int
-valid_mfn(mfn_t m)
-{
-    return VALID_MFN(mfn_x(m));
-}
 
 static inline mfn_t
 pagetable_get_mfn(pagetable_t pt)
@@ -577,32 +567,6 @@ void
 shadow_guest_physmap_remove_page(struct domain *d, unsigned long gfn,
                                   unsigned long mfn);
 
-/*
- * Definitions for the shadow_flags field in page_info.
- * These flags are stored on *guest* pages...
- * Bits 1-13 are encodings for the shadow types.
- */
-#define PGC_SH_type_to_index(_type) ((_type) >> PGC_SH_type_shift)
-#define SHF_page_type_mask \
-    (((1u << (PGC_SH_type_to_index(PGC_SH_max_shadow) + 1u)) - 1u) - \
-     ((1u << PGC_SH_type_to_index(PGC_SH_min_shadow)) - 1u))
-
-#define SHF_L1_32   (1u << PGC_SH_type_to_index(PGC_SH_l1_32_shadow))
-#define SHF_FL1_32  (1u << PGC_SH_type_to_index(PGC_SH_fl1_32_shadow))
-#define SHF_L2_32   (1u << PGC_SH_type_to_index(PGC_SH_l2_32_shadow))
-#define SHF_L1_PAE  (1u << PGC_SH_type_to_index(PGC_SH_l1_pae_shadow))
-#define SHF_FL1_PAE (1u << PGC_SH_type_to_index(PGC_SH_fl1_pae_shadow))
-#define SHF_L2_PAE  (1u << PGC_SH_type_to_index(PGC_SH_l2_pae_shadow))
-#define SHF_L2H_PAE (1u << PGC_SH_type_to_index(PGC_SH_l2h_pae_shadow))
-#define SHF_L1_64   (1u << PGC_SH_type_to_index(PGC_SH_l1_64_shadow))
-#define SHF_FL1_64  (1u << PGC_SH_type_to_index(PGC_SH_fl1_64_shadow))
-#define SHF_L2_64   (1u << PGC_SH_type_to_index(PGC_SH_l2_64_shadow))
-#define SHF_L3_64   (1u << PGC_SH_type_to_index(PGC_SH_l3_64_shadow))
-#define SHF_L4_64   (1u << PGC_SH_type_to_index(PGC_SH_l4_64_shadow))
-
-/* Used for hysteresis when automatically unhooking mappings on fork/exit */
-#define SHF_unhooked_mappings (1u<<31)
-
 /* 
  * Allocation of shadow pages 
  */
@@ -624,42 +588,6 @@ static inline unsigned int shadow_get_allocation(struct domain *d)
     return ((pg >> (20 - PAGE_SHIFT))
             + ((pg & ((1 << (20 - PAGE_SHIFT)) - 1)) ? 1 : 0));
 }
-
-/*
- * Linked list for chaining entries in the shadow hash table. 
- */
-struct shadow_hash_entry {
-    struct shadow_hash_entry *next;
-    mfn_t smfn;                 /* MFN of the shadow */
-#ifdef _x86_64_ /* Shorten 'n' so we don't waste a whole word on storing 't' */
-    unsigned long n:56;         /* MFN of guest PT or GFN of guest superpage */
-#else
-    unsigned long n;            /* MFN of guest PT or GFN of guest superpage */
-#endif
-    unsigned char t;            /* shadow type bits, or 0 for empty */
-};
-
-#define SHADOW_HASH_BUCKETS 251
-/* Other possibly useful primes are 509, 1021, 2039, 4093, 8191, 16381 */
-
-
-#if SHADOW_OPTIMIZATIONS & SHOPT_CACHE_WALKS
-/* Optimization: cache the results of guest walks.  This helps with MMIO
- * and emulated writes, which tend to issue very similar walk requests
- * repeatedly.  We keep the results of the last few walks, and blow
- * away the cache on guest cr3 write, mode change, or page fault. */
-
-#define SH_WALK_CACHE_ENTRIES 4
-
-/* Rather than cache a guest walk, which would include mapped pointers 
- * to pages, we cache what a TLB would remember about the walk: the 
- * permissions and the l1 gfn */
-struct shadow_walk_cache {
-    unsigned long va;           /* The virtual address (or 0 == unused) */
-    unsigned long gfn;          /* The gfn from the effective l1e   */
-    u32 permissions;            /* The aggregated permission bits   */
-};
-#endif
 
 
 /**************************************************************************/
@@ -731,7 +659,7 @@ static inline int
 mmio_space(paddr_t gpa)
 {
     unsigned long gfn = gpa >> PAGE_SHIFT;    
-    return !VALID_MFN(mfn_x(sh_gfn_to_mfn_current(gfn)));
+    return !mfn_valid(mfn_x(sh_gfn_to_mfn_current(gfn)));
 }
 
 static inline l1_pgentry_t

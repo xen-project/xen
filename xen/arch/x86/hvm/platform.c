@@ -28,6 +28,7 @@
 #include <xen/trace.h>
 #include <xen/sched.h>
 #include <asm/regs.h>
+#include <asm/x86_emulate.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/io.h>
@@ -168,13 +169,15 @@ long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs)
 
 static inline unsigned char *check_prefix(unsigned char *inst,
                                           struct hvm_io_op *mmio_op,
+                                          unsigned char *ad_size,
                                           unsigned char *op_size,
+                                          unsigned char *seg_sel,
                                           unsigned char *rex_p)
 {
     while ( 1 ) {
         switch ( *inst ) {
             /* rex prefix for em64t instructions */
-        case 0x40 ... 0x4e:
+        case 0x40 ... 0x4f:
             *rex_p = *inst;
             break;
         case 0xf3: /* REPZ */
@@ -191,12 +194,13 @@ static inline unsigned char *check_prefix(unsigned char *inst,
         case 0x26: /* ES */
         case 0x64: /* FS */
         case 0x65: /* GS */
-            //mmio_op->seg_sel = *inst;
+            *seg_sel = *inst;
             break;
         case 0x66: /* 32bit->16bit */
             *op_size = WORD;
             break;
         case 0x67:
+            *ad_size = WORD;
             break;
         default:
             return inst;
@@ -205,7 +209,7 @@ static inline unsigned char *check_prefix(unsigned char *inst,
     }
 }
 
-static inline unsigned long get_immediate(int op16, const unsigned char *inst, int op_size)
+static inline unsigned long get_immediate(int ad_size, const unsigned char *inst, int op_size)
 {
     int mod, reg, rm;
     unsigned long val = 0;
@@ -216,16 +220,19 @@ static inline unsigned long get_immediate(int op16, const unsigned char *inst, i
     rm = *inst & 7;
 
     inst++; //skip ModR/M byte
-    if ( mod != 3 && rm == 4 ) {
+    if ( ad_size != WORD && mod != 3 && rm == 4 ) {
+        rm = *inst & 7;
         inst++; //skip SIB byte
     }
 
     switch ( mod ) {
     case 0:
-        if ( rm == 5 || rm == 4 ) {
-            if ( op16 )
+        if ( ad_size == WORD ) {
+            if ( rm == 6 )
                 inst = inst + 2; //disp16, skip 2 bytes
-            else
+        }
+        else {
+            if ( rm == 5 )
                 inst = inst + 4; //disp32, skip 4 bytes
         }
         break;
@@ -233,7 +240,7 @@ static inline unsigned long get_immediate(int op16, const unsigned char *inst, i
         inst++; //disp8, skip 1 byte
         break;
     case 2:
-        if ( op16 )
+        if ( ad_size == WORD )
             inst = inst + 2; //disp16, skip 2 bytes
         else
             inst = inst + 4; //disp32, skip 4 bytes
@@ -276,7 +283,6 @@ static void init_instruction(struct hvm_io_op *mmio_op)
     mmio_op->instr = 0;
 
     mmio_op->flags = 0;
-    //mmio_op->seg_sel = 0;
 
     mmio_op->operand[0] = 0;
     mmio_op->operand[1] = 0;
@@ -346,25 +352,52 @@ static int reg_mem(unsigned char size, unsigned char *opcode,
     return DECODE_success;
 }
 
-static int mmio_decode(int realmode, unsigned char *opcode,
-                      struct hvm_io_op *mmio_op, unsigned char *op_size)
+static int mmio_decode(int mode, unsigned char *opcode,
+                       struct hvm_io_op *mmio_op,
+                       unsigned char *ad_size, unsigned char *op_size,
+                       unsigned char *seg_sel)
 {
     unsigned char size_reg = 0;
     unsigned char rex = 0;
     int index;
 
+    *ad_size = 0;
     *op_size = 0;
+    *seg_sel = 0;
     init_instruction(mmio_op);
 
-    opcode = check_prefix(opcode, mmio_op, op_size, &rex);
+    opcode = check_prefix(opcode, mmio_op, ad_size, op_size, seg_sel, &rex);
 
-    if ( realmode ) { /* meaning is reversed */
+    switch ( mode ) {
+    case X86EMUL_MODE_REAL: /* meaning is reversed */
+    case X86EMUL_MODE_PROT16:
         if ( *op_size == WORD )
             *op_size = LONG;
         else if ( *op_size == LONG )
             *op_size = WORD;
         else if ( *op_size == 0 )
             *op_size = WORD;
+        if ( *ad_size == WORD )
+            *ad_size = LONG;
+        else if ( *ad_size == LONG )
+            *ad_size = WORD;
+        else if ( *ad_size == 0 )
+            *ad_size = WORD;
+        break;
+    case X86EMUL_MODE_PROT32:
+        if ( *op_size == 0 )
+            *op_size = LONG;
+        if ( *ad_size == 0 )
+            *ad_size = LONG;
+        break;
+#ifdef __x86_64__
+    case X86EMUL_MODE_PROT64:
+        if ( *op_size == 0 )
+            *op_size = rex & 0x8 ? QUAD : LONG;
+        if ( *ad_size == 0 )
+            *ad_size = QUAD;
+        break;
+#endif
     }
 
     /* the operands order in comments conforms to AT&T convention */
@@ -471,10 +504,10 @@ static int mmio_decode(int realmode, unsigned char *opcode,
         /* opcode 0x83 always has a single byte operand */
         if ( opcode[0] == 0x83 )
             mmio_op->immediate =
-                (signed char)get_immediate(realmode, opcode + 1, BYTE);
+                (signed char)get_immediate(*ad_size, opcode + 1, BYTE);
         else
             mmio_op->immediate =
-                get_immediate(realmode, opcode + 1, *op_size);
+                get_immediate(*ad_size, opcode + 1, *op_size);
 
         mmio_op->operand[0] = mk_operand(size_reg, 0, 0, IMMEDIATE);
         mmio_op->operand[1] = mk_operand(size_reg, 0, 0, MEMORY);
@@ -506,13 +539,16 @@ static int mmio_decode(int realmode, unsigned char *opcode,
         GET_OP_SIZE_FOR_NONEBYTE(*op_size);
         return reg_mem(*op_size, opcode, mmio_op, rex);
 
-    case 0x87:  /* xchg {r/m16|r/m32}, {m/r16|m/r32} */
+    case 0x86:  /* xchg m8, r8 */
+        mmio_op->instr = INSTR_XCHG;
+        *op_size = BYTE;
+        GET_OP_SIZE_FOR_BYTE(size_reg);
+        return reg_mem(size_reg, opcode, mmio_op, rex);
+
+    case 0x87:  /* xchg m16/32, r16/32 */
         mmio_op->instr = INSTR_XCHG;
         GET_OP_SIZE_FOR_NONEBYTE(*op_size);
-        if ( ((*(opcode+1)) & 0xc7) == 5 )
-            return reg_mem(*op_size, opcode, mmio_op, rex);
-        else
-            return mem_reg(*op_size, opcode, mmio_op, rex);
+        return reg_mem(*op_size, opcode, mmio_op, rex);
 
     case 0x88: /* mov r8, m8 */
         mmio_op->instr = INSTR_MOV;
@@ -595,7 +631,7 @@ static int mmio_decode(int realmode, unsigned char *opcode,
 
             mmio_op->operand[0] = mk_operand(*op_size, 0, 0, IMMEDIATE);
             mmio_op->immediate  =
-                    get_immediate(realmode, opcode + 1, *op_size);
+                    get_immediate(*ad_size, opcode + 1, *op_size);
             mmio_op->operand[1] = mk_operand(*op_size, 0, 0, MEMORY);
 
             return DECODE_success;
@@ -609,7 +645,7 @@ static int mmio_decode(int realmode, unsigned char *opcode,
 
             mmio_op->operand[0] = mk_operand(*op_size, 0, 0, IMMEDIATE);
             mmio_op->immediate =
-                    get_immediate(realmode, opcode + 1, *op_size);
+                    get_immediate(*ad_size, opcode + 1, *op_size);
             mmio_op->operand[1] = mk_operand(*op_size, 0, 0, MEMORY);
 
             return DECODE_success;
@@ -631,7 +667,7 @@ static int mmio_decode(int realmode, unsigned char *opcode,
 
             mmio_op->operand[0] = mk_operand(size_reg, 0, 0, IMMEDIATE);
             mmio_op->immediate =
-                    get_immediate(realmode, opcode + 1, *op_size);
+                    get_immediate(*ad_size, opcode + 1, *op_size);
             mmio_op->operand[1] = mk_operand(size_reg, 0, 0, MEMORY);
 
             return DECODE_success;
@@ -655,14 +691,11 @@ static int mmio_decode(int realmode, unsigned char *opcode,
         mmio_op->operand[1] = mk_operand(*op_size, index, 0, REGISTER);
         return DECODE_success;
 
-    case 0xB7: /* movzx m16/m32, r32/r64 */
+    case 0xB7: /* movzx m16, r32/r64 */
         mmio_op->instr = INSTR_MOVZX;
         GET_OP_SIZE_FOR_NONEBYTE(*op_size);
         index = get_index(opcode + 1, rex);
-        if ( rex & 0x8 )
-            mmio_op->operand[0] = mk_operand(LONG, 0, 0, MEMORY);
-        else
-            mmio_op->operand[0] = mk_operand(WORD, 0, 0, MEMORY);
+        mmio_op->operand[0] = mk_operand(WORD, 0, 0, MEMORY);
         mmio_op->operand[1] = mk_operand(*op_size, index, 0, REGISTER);
         return DECODE_success;
 
@@ -697,7 +730,7 @@ static int mmio_decode(int realmode, unsigned char *opcode,
             GET_OP_SIZE_FOR_NONEBYTE(*op_size);
             mmio_op->operand[0] = mk_operand(BYTE, 0, 0, IMMEDIATE);
             mmio_op->immediate =
-                    (signed char)get_immediate(realmode, opcode + 1, BYTE);
+                    (signed char)get_immediate(*ad_size, opcode + 1, BYTE);
             mmio_op->operand[1] = mk_operand(*op_size, 0, 0, MEMORY);
             return DECODE_success;
         }
@@ -866,15 +899,15 @@ static void mmio_operands(int type, unsigned long gpa,
 }
 
 #define GET_REPEAT_COUNT() \
-     (mmio_op->flags & REPZ ? (realmode ? regs->ecx & 0xFFFF : regs->ecx) : 1)
+     (mmio_op->flags & REPZ ? (ad_size == WORD ? regs->ecx & 0xFFFF : regs->ecx) : 1)
 
 void handle_mmio(unsigned long gpa)
 {
     unsigned long inst_addr;
     struct hvm_io_op *mmio_op;
     struct cpu_user_regs *regs;
-    unsigned char inst[MAX_INST_LEN], op_size;
-    int i, realmode, df, inst_len;
+    unsigned char inst[MAX_INST_LEN], ad_size, op_size, seg_sel;
+    int i, mode, df, inst_len;
     struct vcpu *v = current;
 
     mmio_op = &v->arch.hvm_vcpu.io_op;
@@ -886,18 +919,14 @@ void handle_mmio(unsigned long gpa)
 
     df = regs->eflags & X86_EFLAGS_DF ? 1 : 0;
 
-    inst_len = hvm_instruction_length(regs, hvm_guest_x86_mode(v));
+    mode = hvm_guest_x86_mode(v);
+    inst_addr = hvm_get_segment_base(v, seg_cs) + regs->eip;
+    inst_len = hvm_instruction_length(inst_addr, mode);
     if ( inst_len <= 0 )
     {
         printk("handle_mmio: failed to get instruction length\n");
         domain_crash_synchronous();
     }
-
-    realmode = hvm_realmode(v);
-    if ( realmode )
-        inst_addr = (regs->cs << 4) + regs->eip;
-    else
-        inst_addr = regs->eip;
 
     memset(inst, 0, MAX_INST_LEN);
     if ( inst_copy_from_guest(inst, inst_addr, inst_len) != inst_len ) {
@@ -905,7 +934,8 @@ void handle_mmio(unsigned long gpa)
         domain_crash_synchronous();
     }
 
-    if ( mmio_decode(realmode, inst, mmio_op, &op_size) == DECODE_failure ) {
+    if ( mmio_decode(mode, inst, mmio_op, &ad_size, &op_size, &seg_sel)
+         == DECODE_failure ) {
         printk("handle_mmio: failed to decode instruction\n");
         printk("mmio opcode: gpa 0x%lx, len %d:", gpa, inst_len);
         for ( i = 0; i < inst_len; i++ )
@@ -925,29 +955,39 @@ void handle_mmio(unsigned long gpa)
     {
         unsigned long count = GET_REPEAT_COUNT();
         int sign = regs->eflags & X86_EFLAGS_DF ? -1 : 1;
-        unsigned long addr = 0;
+        unsigned long addr;
         int dir, size = op_size;
 
         ASSERT(count);
 
         /* determine non-MMIO address */
-        if ( realmode ) {
-            if ( ((regs->es << 4) + (regs->edi & 0xFFFF)) == gpa ) {
-                dir = IOREQ_WRITE;
-                addr = (regs->ds << 4) + (regs->esi & 0xFFFF);
-            } else {
-                dir = IOREQ_READ;
-                addr = (regs->es << 4) + (regs->edi & 0xFFFF);
+        addr = regs->edi;
+        if ( ad_size == WORD )
+            addr &= 0xFFFF;
+        addr += hvm_get_segment_base(v, seg_es);
+        if ( addr == gpa )
+        {
+            enum segment seg;
+
+            dir = IOREQ_WRITE;
+            addr = regs->esi;
+            if ( ad_size == WORD )
+                addr &= 0xFFFF;
+            switch ( seg_sel )
+            {
+            case 0x26: seg = seg_es; break;
+            case 0x2e: seg = seg_cs; break;
+            case 0x36: seg = seg_ss; break;
+            case 0:
+            case 0x3e: seg = seg_ds; break;
+            case 0x64: seg = seg_fs; break;
+            case 0x65: seg = seg_gs; break;
+            default: domain_crash_synchronous();
             }
-        } else {
-            if ( gpa == regs->edi ) {
-                dir = IOREQ_WRITE;
-                addr = regs->esi;
-            } else {
-                dir = IOREQ_READ;
-                addr = regs->edi;
-            }
+            addr += hvm_get_segment_base(v, seg);
         }
+        else
+            dir = IOREQ_READ;
 
         if ( addr & (size - 1) )
             gdprintk(XENLOG_WARNING,

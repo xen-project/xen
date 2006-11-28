@@ -1026,8 +1026,6 @@ void host_to_guest_gpr_switch(struct cpu_user_regs *)
     __attribute__((__regparm__(1)));
 unsigned long guest_to_host_gpr_switch(unsigned long)
     __attribute__((__regparm__(1)));
-typedef unsigned long (*io_emul_stub_t)(struct cpu_user_regs *)
-    __attribute__((__regparm__(1)));
 
 /* Instruction fetch with error handling. */
 #define insn_fetch(_type, _size, cs, eip)                                   \
@@ -1048,6 +1046,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     u8 opcode, modrm_reg = 0, modrm_rm = 0, rep_prefix = 0;
     unsigned int port, i, op_bytes = 4, data, rc;
     char io_emul_stub[16];
+    void (*io_emul)(struct cpu_user_regs *) __attribute__((__regparm__(1)));
     u32 l, h;
 
     /* Legacy prefixes. */
@@ -1190,6 +1189,9 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     *(s32 *)&io_emul_stub[9] =
         (char *)guest_to_host_gpr_switch - &io_emul_stub[13];
 
+    /* Handy function-typed pointer to the stub. */
+    io_emul = (void *)io_emul_stub;
+
     /* I/O Port and Interrupt Flag instructions. */
     switch ( opcode )
     {
@@ -1204,22 +1206,20 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         switch ( op_bytes )
         {
         case 1:
-            res = regs->eax & ~0xffUL;
             if ( guest_inb_okay(port, v, regs) )
-                regs->eax = res | (u8)((io_emul_stub_t)io_emul_stub)(regs);
+                io_emul(regs);
             else
-                regs->eax = res | (u8)~0;
+                regs->eax |= (u8)~0;
             break;
         case 2:
-            res = regs->eax & ~0xffffUL;
             if ( guest_inw_okay(port, v, regs) )
-                regs->eax = res | (u16)((io_emul_stub_t)io_emul_stub)(regs);
+                io_emul(regs);
             else
-                regs->eax = res | (u16)~0;
+                regs->eax |= (u16)~0;
             break;
         case 4:
             if ( guest_inl_okay(port, v, regs) )
-                regs->eax = (u32)((io_emul_stub_t)io_emul_stub)(regs);
+                io_emul(regs);
             else
                 regs->eax = (u32)~0;
             break;
@@ -1244,15 +1244,15 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         {
         case 1:
             if ( guest_outb_okay(port, v, regs) )
-                ((io_emul_stub_t)io_emul_stub)(regs);
+                io_emul(regs);
             break;
         case 2:
             if ( guest_outw_okay(port, v, regs) )
-                ((io_emul_stub_t)io_emul_stub)(regs);
+                io_emul(regs);
             break;
         case 4:
             if ( guest_outl_okay(port, v, regs) )
-                ((io_emul_stub_t)io_emul_stub)(regs);
+                io_emul(regs);
             break;
         }
         goto done;

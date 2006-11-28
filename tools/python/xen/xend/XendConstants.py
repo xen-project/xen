@@ -89,6 +89,12 @@ DEV_MIGRATE_STEP2 = 2
 DEV_MIGRATE_STEP3 = 3
 
 #
+# VTPM-related constants
+#
+
+VTPM_DELETE_SCRIPT = '/etc/xen/scripts/vtpm-delete'
+
+#
 # Xenstore Constants
 #
 

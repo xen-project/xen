@@ -114,3 +114,26 @@ void *kzalloc(size_t size, int flags)
 }
 EXPORT_SYMBOL(kzalloc);
 #endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18)
+/* Simplified asprintf. */
+char *kasprintf(gfp_t gfp, const char *fmt, ...)
+{
+	va_list ap;
+	unsigned int len;
+	char *p, dummy[1];
+
+	va_start(ap, fmt);
+	len = vsnprintf(dummy, 0, fmt, ap);
+	va_end(ap);
+
+	p = kmalloc(len + 1, gfp);
+	if (!p)
+		return NULL;
+	va_start(ap, fmt);
+	vsprintf(p, fmt, ap);
+	va_end(ap);
+	return p;
+}
+EXPORT_SYMBOL(kasprintf);
+#endif

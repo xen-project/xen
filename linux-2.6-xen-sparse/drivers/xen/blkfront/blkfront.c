@@ -138,10 +138,10 @@ static int blkfront_resume(struct xenbus_device *dev)
 
 	DPRINTK("blkfront_resume: %s\n", dev->nodename);
 
-	blkif_free(info, 1);
+	blkif_free(info, info->connected == BLKIF_STATE_CONNECTED);
 
 	err = talk_to_backend(dev, info);
-	if (!err)
+	if (info->connected == BLKIF_STATE_SUSPENDED && !err)
 		blkif_recover(info);
 
 	return err;
@@ -298,7 +298,8 @@ static void backend_changed(struct xenbus_device *dev,
  */
 static void connect(struct blkfront_info *info)
 {
-	unsigned long sectors, sector_size;
+	unsigned long long sectors;
+	unsigned long sector_size;
 	unsigned int binfo;
 	int err;
 
@@ -309,7 +310,7 @@ static void connect(struct blkfront_info *info)
 	DPRINTK("blkfront.c:connect:%s.\n", info->xbdev->otherend);
 
 	err = xenbus_gather(XBT_NIL, info->xbdev->otherend,
-			    "sectors", "%lu", &sectors,
+			    "sectors", "%llu", &sectors,
 			    "info", "%u", &binfo,
 			    "sector-size", "%lu", &sector_size,
 			    NULL);

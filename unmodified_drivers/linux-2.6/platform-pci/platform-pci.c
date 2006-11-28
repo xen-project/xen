@@ -179,10 +179,24 @@ static int get_hypercall_stubs(void)
 #define get_hypercall_stubs()	(0)
 #endif
 
+static int get_callback_irq(struct pci_dev *pdev)
+{
+#ifdef __ia64__
+	int irq;
+	for (irq = 0; irq < 16; irq++) {
+		if (isa_irq_to_vector(irq) == pdev->irq)
+			return irq;
+	}
+	return 0;
+#else /* !__ia64__ */
+	return pdev->irq;
+#endif
+}
+
 static int __devinit platform_pci_init(struct pci_dev *pdev,
 				       const struct pci_device_id *ent)
 {
-	int i, ret;
+	int i, ret, callback_irq;
 	long ioaddr, iolen;
 	long mmio_addr, mmio_len;
 
@@ -196,7 +210,9 @@ static int __devinit platform_pci_init(struct pci_dev *pdev,
 	mmio_addr = pci_resource_start(pdev, 1);
 	mmio_len = pci_resource_len(pdev, 1);
 
-	if (mmio_addr == 0 || ioaddr == 0) {
+	callback_irq = get_callback_irq(pdev);
+
+	if (mmio_addr == 0 || ioaddr == 0 || callback_irq == 0) {
 		printk(KERN_WARNING DRV_NAME ":no resources found\n");
 		return -ENOENT;
 	}
@@ -231,7 +247,7 @@ static int __devinit platform_pci_init(struct pci_dev *pdev,
 		goto out;
 	}
 
-	if ((ret = set_callback_irq(pdev->irq)))
+	if ((ret = set_callback_irq(callback_irq)))
 		goto out;
 
  out:

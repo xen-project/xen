@@ -64,4 +64,9 @@ void *kzalloc(size_t size, int flags);
 #define end_that_request_last(req, uptodate) end_that_request_last(req)
 #endif
 
+#if defined(_LINUX_KERNEL_H) && LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18)
+extern char *kasprintf(gfp_t gfp, const char *fmt, ...)
+       __attribute__ ((format (printf, 2, 3)));
+#endif
+
 #endif

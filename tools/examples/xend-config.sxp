@@ -14,6 +14,42 @@
 #(logfile /var/log/xen/xend.log)
 #(loglevel DEBUG)
 
+
+# The Xen-API server configuration.  (Please note that this server is
+# available as an UNSUPPORTED PREVIEW in Xen 3.0.4, and should not be relied
+# upon).
+#
+# This value configures the ports, interfaces, and access controls for the
+# Xen-API server.  Each entry in the list starts with either unix, a port
+# number, or an address:port pair.  If this is "unix", then a UDP socket is
+# opened, and this entry applies to that.  If it is a port, then Xend will
+# listen on all interfaces on that TCP port, and if it is an address:port
+# pair, then Xend will listen on the specified port, using the interface with
+# the specified address.
+#
+# The subsequent string configures the user-based access control for the
+# listener in question.  This can be one of "none" or "pam", indicating either
+# that users should be allowed access unconditionally, or that the local
+# Pluggable Authentication Modules configuration should be used.  If this
+# string is missing or empty, then "pam" is used.
+#
+# The final string gives the host-based access control for that listener. If
+# this is missing or empty, then all connections are accepted.  Otherwise,
+# this should be a space-separated sequence of regular expressions; any host
+# with a fully-qualified domain name or an IP address that matches one of
+# these regular expressions will be accepted.
+#
+# Example: listen on TCP port 9363 on all interfaces, accepting connections
+# only from machines in example.com or localhost, and allow access through
+# the unix domain socket unconditionally:
+#
+#   (xen-api-server ((9363 pam '^localhost$ example\\.com$')
+#                    (unix none)))
+#
+# Default:
+#   (xen-api-server ((unix)))
+
+
 #(xend-http-server no)
 #(xend-unix-server no)
 #(xend-tcp-xmlrpc-server no)

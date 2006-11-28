@@ -389,7 +389,7 @@ again:
 	if (err)
 		goto abort;
 
-	err = xenbus_printf(xbt, dev->nodename, "sectors", "%lu",
+	err = xenbus_printf(xbt, dev->nodename, "sectors", "%llu",
 			    vbd_size(&be->blkif->vbd));
 	if (err) {
 		xenbus_dev_fatal(dev, err, "writing %s/sectors",

@@ -2,6 +2,7 @@
  * vlapic.c: virtualize LAPIC for HVM vcpus.
  *
  * Copyright (c) 2004, Intel Corporation.
+ * Copyright (c) 2006 Keir Fraser, XenSource Inc.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -37,9 +38,6 @@
 
 #define VLAPIC_VERSION                  0x00050014
 #define VLAPIC_LVT_NUM                  6
-
-/* XXX remove this definition after GFW enabled */
-#define VLAPIC_NO_BIOS
 
 extern u32 get_apic_bus_cycle(void);
 
@@ -147,12 +145,11 @@ int vlapic_find_highest_irr(struct vlapic *vlapic)
     return result;
 }
 
-
 int vlapic_set_irq(struct vlapic *vlapic, uint8_t vec, uint8_t trig)
 {
     int ret;
 
-    ret = vlapic_test_and_set_irr(vec, vlapic);
+    ret = !vlapic_test_and_set_irr(vec, vlapic);
     if ( trig )
         vlapic_set_vector(vec, vlapic->regs + APIC_TMR);
 
@@ -243,7 +240,7 @@ static int vlapic_match_dest(struct vcpu *v, struct vlapic *source,
         if ( dest_mode == 0 )
         {
             /* Physical mode. */
-            if ( (dest == 0xFF) || (dest == v->vcpu_id) )
+            if ( (dest == 0xFF) || (dest == VLAPIC_ID(target)) )
                 result = 1;
         }
         else
@@ -371,9 +368,7 @@ struct vlapic *apic_round_robin(
     int next, old;
     struct vlapic *target = NULL;
 
-    spin_lock(&d->arch.hvm_domain.round_robin_lock);
-
-    old = next = d->arch.hvm_domain.round_info[vector];
+    old = next = d->arch.hvm_domain.irq.round_robin_prev_vcpu;
 
     do {
         if ( ++next == MAX_VIRT_CPUS ) 
@@ -386,8 +381,7 @@ struct vlapic *apic_round_robin(
         target = NULL;
     } while ( next != old );
 
-    d->arch.hvm_domain.round_info[vector] = next;
-    spin_unlock(&d->arch.hvm_domain.round_robin_lock);
+    d->arch.hvm_domain.irq.round_robin_prev_vcpu = next;
 
     return target;
 }
@@ -863,7 +857,7 @@ int cpu_has_pending_irq(struct vcpu *v)
     if ( !vlapic_accept_pic_intr(v) )
         return 0;
 
-    return plat->interrupt_request;
+    return plat->irq.vpic[0].int_output;
 }
 
 void vlapic_post_injection(struct vcpu *v, int vector, int deliver_mode)
@@ -906,7 +900,7 @@ static int vlapic_reset(struct vlapic *vlapic)
     struct vcpu *v = vlapic_vcpu(vlapic);
     int i;
 
-    vlapic_set_reg(vlapic, APIC_ID,  v->vcpu_id << 24);
+    vlapic_set_reg(vlapic, APIC_ID,  (v->vcpu_id + 1) << 24);
     vlapic_set_reg(vlapic, APIC_LVR, VLAPIC_VERSION);
 
     for ( i = 0; i < 8; i++ )
@@ -962,15 +956,6 @@ int vlapic_init(struct vcpu *v)
 
     init_timer(&vlapic->vlapic_timer,
                   vlapic_timer_fn, vlapic, v->processor);
-
-#ifdef VLAPIC_NO_BIOS
-    /* According to mp specification, BIOS will enable LVT0/1. */
-    if ( v->vcpu_id == 0 )
-    {
-        vlapic_set_reg(vlapic, APIC_LVT0, APIC_MODE_EXTINT << 8);
-        vlapic_set_reg(vlapic, APIC_LVT1, APIC_MODE_NMI << 8);
-    }
-#endif
 
     return 0;
 }

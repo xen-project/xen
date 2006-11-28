@@ -54,6 +54,9 @@ class XendRoot:
     """Default level of information to be logged."""
     loglevel_default = 'DEBUG'
 
+    """Default Xen-API server configuration. """
+    xen_api_server_default = [['unix']]
+
     """Default for the flag indicating whether xend should run an http server
     (deprecated)."""
     xend_http_server_default = 'no'
@@ -188,6 +191,12 @@ class XendRoot:
             return int(v)
         except Exception:
             raise XendError("invalid xend config %s: expected int: %s" % (name, v))
+
+    def get_xen_api_server(self):
+        """Get the Xen-API server configuration.
+        """
+        return self.get_config_value('xen-api-server',
+                                     self.xen_api_server_default)
 
     def get_xend_http_server(self):
         """Get the flag indicating whether xend should run an http server.

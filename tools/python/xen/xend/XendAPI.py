@@ -27,6 +27,9 @@ from xen.xend.XendLogging import log
 from xen.xend.XendAPIConstants import *
 from xen.util.xmlrpclib2 import stringify
 
+AUTH_NONE = 'none'
+AUTH_PAM = 'pam'
+
 # ------------------------------------------
 # Utility Methods for Xen API Implementation
 # ------------------------------------------
@@ -257,8 +260,8 @@ def do_vm_func(fn_name, vm_ref, *args):
     """
     xendom = XendDomain.instance()
     fn = getattr(xendom, fn_name)
-    return xen_api_success(xendom.do_legacy_api_with_uuid(
-        fn, vm_ref, *args))
+    xendom.do_legacy_api_with_uuid(fn, vm_ref, *args)
+    return xen_api_success_void()
 
 
 class XendAPI:
@@ -275,12 +278,13 @@ class XendAPI:
     is set to the XMLRPC function name which the method implements.
     """
 
-    def __init__(self):
+    def __init__(self, auth):
         """Initialised Xen API wrapper by making sure all functions
         have the correct validation decorators such as L{valid_host}
         and L{session_required}.
         """
-        
+        self.auth = auth
+
         classes = {
             'session': (session_required,),
             'host': (valid_host, session_required),
@@ -388,7 +392,9 @@ class XendAPI:
 
     def session_login_with_password(self, username, password):
         try:
-            session = auth_manager().login_with_password(username, password)
+            session = (self.auth == AUTH_NONE and
+                       auth_manager().login_unconditionally(username) or
+                       auth_manager().login_with_password(username, password))
             return xen_api_success(session)
         except XendError, e:
             return xen_api_error(XEND_ERROR_AUTHENTICATION_FAILED)
@@ -1391,9 +1397,12 @@ class XendAPI:
         xendom = XendDomain.instance()
         if xendom.is_valid_vm(vtpm_struct['VM']):
             dom = xendom.get_vm_by_uuid(vtpm_struct['VM'])
-            vtpm_ref = dom.create_vtpm(vtpm_struct)
-            xendom.managed_config_save(dom)
-            return xen_api_success(vtpm_ref)
+            try:
+                vtpm_ref = dom.create_vtpm(vtpm_struct)
+                xendom.managed_config_save(dom)
+                return xen_api_success(vtpm_ref)
+            except XendError:
+                return xen_api_error(XEND_ERROR_TODO)
         else:
             return xen_api_error(XEND_ERROR_DOMAIN_INVALID)
 

@@ -123,6 +123,7 @@ otherConfig
                                 image.hvm.vncconsole
                                 image.hvm.pae
                                 image.hvm.acpi (also in image.devices)
+                                image.hvm.apic
                                 image.hvm.devices.boot
                                 image.hvm.devices.fda
                                 image.hvm.devices.fdb

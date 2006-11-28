@@ -35,8 +35,12 @@ from xen.xend.PrettyPrint import prettyprint
 from xen.xend.XendConfig import XendConfig
 from xen.xend.XendError import XendError, XendInvalidDomain, VmError
 from xen.xend.XendLogging import log
+from xen.xend.XendAPIConstants import XEN_API_VM_POWER_STATE
 from xen.xend.XendConstants import XS_VMROOT
-from xen.xend.XendConstants import DOM_STATE_HALTED, DOM_STATE_RUNNING
+from xen.xend.XendConstants import DOM_STATE_HALTED, DOM_STATE_PAUSED
+from xen.xend.XendConstants import DOM_STATE_RUNNING, DOM_STATE_SUSPENDED
+from xen.xend.XendConstants import DOM_STATE_SHUTDOWN, DOM_STATE_UNKNOWN
+from xen.xend.XendDevices import XendDevices
 
 from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.xenstore.xswatch import xswatch
@@ -53,6 +57,16 @@ CHECK_POINT_FILE = 'checkpoint.chk'
 DOM0_UUID = "00000000-0000-0000-0000-000000000000"
 DOM0_NAME = "Domain-0"
 DOM0_ID   = 0
+
+POWER_STATE_NAMES = dict([(x, XEN_API_VM_POWER_STATE[x])
+                          for x in [DOM_STATE_HALTED,
+                                    DOM_STATE_PAUSED,
+                                    DOM_STATE_RUNNING,
+                                    DOM_STATE_SUSPENDED,
+                                    DOM_STATE_SHUTDOWN,
+                                    DOM_STATE_UNKNOWN]])
+POWER_STATE_ALL = 'all'
+
 
 class XendDomain:
     """Index of all domains. Singleton.
@@ -563,8 +577,7 @@ class XendDomain:
                         log.debug('Shutting down domain: %s' % dom.getName())
                         dom.shutdown("poweroff")
                     elif shutdownAction == 'suspend':
-                        chkfile = self._managed_check_point_path(dom.getName())
-                        self.domain_save(dom.domid, chkfile)
+                        self.domain_suspend(dom.getName())
         finally:
             self.domains_lock.release()
 
@@ -687,12 +700,18 @@ class XendDomain:
     # ------------------------------------------------------------
     # Xen Legacy API     
 
-    def list(self):
+    def list(self, state = DOM_STATE_RUNNING):
         """Get list of domain objects.
 
+        @param: the state in which the VMs should be -- one of the
+        DOM_STATE_XYZ constants, or the corresponding name, or 'all'.
         @return: domains
         @rtype: list of XendDomainInfo
         """
+        if type(state) == int:
+            state = POWER_STATE_NAMES[state]
+        state = state.lower()
+        
         self.domains_lock.acquire()
         try:
             self._refresh()
@@ -707,28 +726,37 @@ class XendDomain:
                 if dom_uuid not in active_uuids:
                     inactive_domains.append(dom)
 
-            return active_domains + inactive_domains
+            if state == POWER_STATE_ALL:
+                return active_domains + inactive_domains
+            else:
+                return filter(lambda x:
+                                  POWER_STATE_NAMES[x.state].lower() == state,
+                              active_domains + inactive_domains)
         finally:
             self.domains_lock.release()
 
 
-    def list_sorted(self):
+    def list_sorted(self, state = DOM_STATE_RUNNING):
         """Get list of domain objects, sorted by name.
 
+        @param: the state in which the VMs should be -- one of the
+        DOM_STATE_XYZ constants, or the corresponding name, or 'all'.
         @return: domain objects
         @rtype: list of XendDomainInfo
         """
-        doms = self.list()
+        doms = self.list(state)
         doms.sort(lambda x, y: cmp(x.getName(), y.getName()))
         return doms
 
-    def list_names(self):
+    def list_names(self, state = DOM_STATE_RUNNING):
         """Get list of domain names.
 
+        @param: the state in which the VMs should be -- one of the
+        DOM_STATE_XYZ constants, or the corresponding name, or 'all'.
         @return: domain names
         @rtype: list of strings.
         """
-        return [d.getName() for d in self.list_sorted()]
+        return [d.getName() for d in self.list_sorted(state)]
 
     def domain_suspend(self, domname):
         """Suspends a domain that is persistently managed by Xend
@@ -750,11 +778,13 @@ class XendDomain:
             if dominfo.state != DOM_STATE_RUNNING:
                 raise XendError("Cannot suspend domain that is not running.")
 
-            if not os.path.exists(self._managed_config_path(domname)):
+            dom_uuid = dominfo.get_uuid()
+
+            if not os.path.exists(self._managed_config_path(dom_uuid)):
                 raise XendError("Domain is not managed by Xend lifecycle " +
                                 "support.")
-            
-            path = self._managed_check_point_path(domname)
+
+            path = self._managed_check_point_path(dom_uuid)
             fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
             try:
                 # For now we don't support 'live checkpoint' 
@@ -773,36 +803,42 @@ class XendDomain:
         @rtype: None
         @raise XendError: If failed to restore.
         """
+        self.domains_lock.acquire()
         try:
-            dominfo = self.domain_lookup_nr(domname)
-            
-            if not dominfo:
-                raise XendInvalidDomain(domname)
-
-            if dominfo.getDomid() == DOM0_ID:
-                raise XendError("Cannot save privileged domain %s" % domname)
-
-            if dominfo.state != DOM_STATE_HALTED:
-                raise XendError("Cannot suspend domain that is not running.")
-
-            chkpath = self._managed_check_point_path(domname)
-            if not os.path.exists(chkpath):
-                raise XendError("Domain was not suspended by Xend")
-
-            # Restore that replaces the existing XendDomainInfo
             try:
-                log.debug('Current DomainInfo state: %d' % dominfo.state)
-                XendCheckpoint.restore(self,
-                                       os.open(chkpath, os.O_RDONLY),
-                                       dominfo)
-                os.unlink(chkpath)
-            except OSError, ex:
-                raise XendError("Failed to read stored checkpoint file")
-            except IOError, ex:
-                raise XendError("Failed to delete checkpoint file")
-        except Exception, ex:
-            log.exception("Exception occurred when resuming")
-            raise XendError("Error occurred when resuming: %s" % str(ex))
+                dominfo = self.domain_lookup_nr(domname)
+
+                if not dominfo:
+                    raise XendInvalidDomain(domname)
+
+                if dominfo.getDomid() == DOM0_ID:
+                    raise XendError("Cannot save privileged domain %s" % domname)
+
+                if dominfo.state != DOM_STATE_HALTED:
+                    raise XendError("Cannot suspend domain that is not running.")
+
+                dom_uuid = dominfo.get_uuid()
+                chkpath = self._managed_check_point_path(dom_uuid)
+                if not os.path.exists(chkpath):
+                    raise XendError("Domain was not suspended by Xend")
+
+                # Restore that replaces the existing XendDomainInfo
+                try:
+                    log.debug('Current DomainInfo state: %d' % dominfo.state)
+                    XendCheckpoint.restore(self,
+                                           os.open(chkpath, os.O_RDONLY),
+                                           dominfo)
+                    self._add_domain(dominfo)
+                    os.unlink(chkpath)
+                except OSError, ex:
+                    raise XendError("Failed to read stored checkpoint file")
+                except IOError, ex:
+                    raise XendError("Failed to delete checkpoint file")
+            except Exception, ex:
+                log.exception("Exception occurred when resuming")
+                raise XendError("Error occurred when resuming: %s" % str(ex))
+        finally:
+            self.domains_lock.release()
 
 
     def domain_create(self, config):
@@ -898,7 +934,7 @@ class XendDomain:
 
                 self._managed_domain_unregister(dominfo)
                 self._remove_domain(dominfo)
-                
+                XendDevices.destroy_device_state(dominfo)
             except Exception, ex:
                 raise XendError(str(ex))
         finally:
@@ -915,7 +951,7 @@ class XendDomain:
         # !!!
         raise XendError("Unsupported")
 
-    def domain_restore(self, src):
+    def domain_restore(self, src, paused=False):
         """Restore a domain from file.
 
         @param src: filename of checkpoint file to restore from
@@ -927,14 +963,14 @@ class XendDomain:
         try:
             fd = os.open(src, os.O_RDONLY)
             try:
-                return self.domain_restore_fd(fd)
+                return self.domain_restore_fd(fd, paused=paused)
             finally:
                 os.close(fd)
         except OSError, ex:
             raise XendError("can't read guest state file %s: %s" %
                             (src, ex[1]))
 
-    def domain_restore_fd(self, fd):
+    def domain_restore_fd(self, fd, paused=False):
         """Restore a domain from the given file descriptor.
 
         @param fd: file descriptor of the checkpoint file
@@ -944,7 +980,7 @@ class XendDomain:
         """
 
         try:
-            return XendCheckpoint.restore(self, fd)
+            return XendCheckpoint.restore(self, fd, paused=paused)
         except:
             # I don't really want to log this exception here, but the error
             # handling in the relocation-socket handling code (relocate.py) is

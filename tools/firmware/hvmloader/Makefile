@@ -40,25 +40,27 @@ OBJCOPY  = objcopy
 CFLAGS  += $(DEFINES) -I. $(XENINC) -fno-builtin -O2 -msoft-float
 LDFLAGS  = -nostdlib -Wl,-N -Wl,-Ttext -Wl,$(LOADADDR)
 
-SRCS = hvmloader.c acpi_madt.c mp_tables.c util.c smbios.c acpi_utils.c
+SRCS = hvmloader.c mp_tables.c util.c smbios.c acpi_utils.c
 OBJS = $(patsubst %.c,%.o,$(SRCS))
 
 .PHONY: all
 all: hvmloader
 
-hvmloader: roms.h $(SRCS)
+hvmloader: roms.h acpi/acpi.a $(SRCS)
 	$(CC) $(CFLAGS) -c $(SRCS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o hvmloader.tmp $(OBJS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o hvmloader.tmp $(OBJS) acpi/acpi.a
 	$(OBJCOPY) hvmloader.tmp hvmloader
 	rm -f hvmloader.tmp
 
-roms.h:	../rombios/BIOS-bochs-latest ../vgabios/VGABIOS-lgpl-latest.bin ../vgabios/VGABIOS-lgpl-latest.cirrus.bin ../vmxassist/vmxassist.bin
+.PHONY: acpi/acpi.a
+acpi/acpi.a:
 	$(MAKE) -C acpi
+
+roms.h:	../rombios/BIOS-bochs-latest ../vgabios/VGABIOS-lgpl-latest.bin ../vgabios/VGABIOS-lgpl-latest.cirrus.bin ../vmxassist/vmxassist.bin
 	sh ./mkhex rombios ../rombios/BIOS-bochs-latest > roms.h
 	sh ./mkhex vgabios_stdvga ../vgabios/VGABIOS-lgpl-latest.bin >> roms.h
 	sh ./mkhex vgabios_cirrusvga ../vgabios/VGABIOS-lgpl-latest.cirrus.bin >> roms.h
 	sh ./mkhex vmxassist ../vmxassist/vmxassist.bin >> roms.h
-	sh ./mkhex acpi acpi/acpi.bin >> roms.h
 
 .PHONY: clean
 clean:

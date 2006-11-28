@@ -74,9 +74,9 @@ struct td_state {
 	void *ring_info;
 	void *fd_entry;
 	char backing_file[1024]; /*Used by differencing disks, e.g. qcow*/
-	long int   sector_size;
-	uint64_t   size;
-	long int   info;
+	unsigned long      sector_size;
+	unsigned long long size;
+	unsigned int       info;
 };
 
 /* Prototype of the callback to activate as requests complete.              */

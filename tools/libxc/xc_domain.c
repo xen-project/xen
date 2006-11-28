@@ -430,22 +430,6 @@ int xc_domain_memory_populate_physmap(int xc_handle,
     return err;
 }
 
-int xc_domain_translate_gpfn_list(int xc_handle,
-                                  uint32_t domid,
-                                  unsigned long nr_gpfns,
-                                  xen_pfn_t *gpfn_list,
-                                  xen_pfn_t *mfn_list)
-{
-    struct xen_translate_gpfn_list op = {
-        .domid        = domid,
-        .nr_gpfns     = nr_gpfns,
-    };
-    set_xen_guest_handle(op.gpfn_list, gpfn_list);
-    set_xen_guest_handle(op.mfn_list, mfn_list);
-
-    return xc_memory_op(xc_handle, XENMEM_translate_gpfn_list, &op);
-}
-
 int xc_domain_max_vcpus(int xc_handle, uint32_t domid, unsigned int max)
 {
     DECLARE_DOMCTL;

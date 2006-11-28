@@ -3,6 +3,7 @@
 
 HAS_ACPI := y
 HAS_VGA  := y
+xenoprof := y
 
 #
 # If you change any of these configuration options then you must

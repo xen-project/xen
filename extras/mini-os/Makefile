@@ -55,9 +55,10 @@ EXTRA_SRC += arch/$(EXTRA_INC)
 endif
 
 ifeq ($(TARGET_ARCH),ia64)
-CFLAGS += -mfixed-range=f12-f15,f32-f127
-ASFLAGS += -x assembler-with-cpp -ansi -Wall
-ASFLAGS += -mfixed-range=f12-f15,f32-f127
+CFLAGS += -mfixed-range=f2-f5,f12-f15,f32-f127 -mconstant-gp
+ASFLAGS += -x assembler-with-cpp -Wall
+ASFLAGS += -mfixed-range=f2-f5,f12-f15,f32-f127 -fomit-frame-pointer
+ASFLAGS += -fno-builtin -fno-common -fno-strict-aliasing -mconstant-gp
 ARCH_LINKS = IA64_LINKS		# Special link on ia64 needed
 define arch_links
 [ -e include/ia64/asm-xsi-offsets.h ] || ln -sf ../../../../xen/include/asm-ia64/asm-xsi-offsets.h include/ia64/asm-xsi-offsets.h

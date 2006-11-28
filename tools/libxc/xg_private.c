@@ -192,12 +192,7 @@ __attribute__((weak)) int xc_hvm_build(
     int xc_handle,
     uint32_t domid,
     int memsize,
-    const char *image_name,
-    unsigned int vcpus,
-    unsigned int pae,
-    unsigned int acpi,
-    unsigned int store_evtchn,
-    unsigned long *store_mfn)
+    const char *image_name)
 {
     return -ENOSYS;
 }

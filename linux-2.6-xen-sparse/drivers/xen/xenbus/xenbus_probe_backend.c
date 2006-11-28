@@ -188,7 +188,7 @@ static int xenbus_probe_backend_unit(const char *dir,
 	char *nodename;
 	int err;
 
-	nodename = kasprintf("%s/%s", dir, name);
+	nodename = kasprintf(GFP_KERNEL, "%s/%s", dir, name);
 	if (!nodename)
 		return -ENOMEM;
 
@@ -209,7 +209,7 @@ static int xenbus_probe_backend(const char *type, const char *domid)
 
 	DPRINTK("");
 
-	nodename = kasprintf("%s/%s/%s", xenbus_backend.root, type, domid);
+	nodename = kasprintf(GFP_KERNEL, "%s/%s/%s", xenbus_backend.root, type, domid);
 	if (!nodename)
 		return -ENOMEM;
 
