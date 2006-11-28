@@ -116,7 +116,7 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
     struct vcpu *v = current;
     struct vmx_msr_state *guest_msr_state = &v->arch.hvm_vmx.msr_state;
 
-    switch ( regs->ecx ) {
+    switch ( (u32)regs->ecx ) {
     case MSR_EFER:
         HVM_DBG_LOG(DBG_LEVEL_2, "EFER msr_content 0x%"PRIx64, msr_content);
         msr_content = guest_msr_state->msrs[VMX_INDEX_MSR_EFER];
@@ -169,10 +169,10 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     struct vmx_msr_state *guest_msr_state = &v->arch.hvm_vmx.msr_state;
     struct vmx_msr_state *host_msr_state = &this_cpu(host_msr_state);
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "msr 0x%lx msr_content 0x%"PRIx64"\n",
-                (unsigned long)regs->ecx, msr_content);
+    HVM_DBG_LOG(DBG_LEVEL_1, "msr 0x%x msr_content 0x%"PRIx64"\n",
+                (u32)regs->ecx, msr_content);
 
-    switch ( regs->ecx ) {
+    switch ( (u32)regs->ecx ) {
     case MSR_EFER:
         /* offending reserved bit will cause #GP */
         if ( msr_content & ~(EFER_LME | EFER_LMA | EFER_NX | EFER_SCE) )
@@ -1790,16 +1790,16 @@ static int vmx_cr_access(unsigned long exit_qualification,
     return 1;
 }
 
-static inline void vmx_do_msr_read(struct cpu_user_regs *regs)
+static inline int vmx_do_msr_read(struct cpu_user_regs *regs)
 {
     u64 msr_content = 0;
-    u32 eax, edx;
+    u32 ecx = regs->ecx, eax, edx;
     struct vcpu *v = current;
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%lx, eax=%lx, edx=%lx",
-                (unsigned long)regs->ecx, (unsigned long)regs->eax,
-                (unsigned long)regs->edx);
-    switch (regs->ecx) {
+    HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%x, eax=%x, edx=%x",
+                ecx, (u32)regs->eax, (u32)regs->edx);
+
+    switch (ecx) {
     case MSR_IA32_TIME_STAMP_COUNTER:
         msr_content = hvm_get_guest_time(v);
         break;
@@ -1817,39 +1817,41 @@ static inline void vmx_do_msr_read(struct cpu_user_regs *regs)
         break;
     default:
         if ( long_mode_do_msr_read(regs) )
-            return;
+            goto done;
 
-        if ( rdmsr_hypervisor_regs(regs->ecx, &eax, &edx) )
+        if ( rdmsr_hypervisor_regs(ecx, &eax, &edx) ||
+             rdmsr_safe(ecx, eax, edx) == 0 )
         {
             regs->eax = eax;
             regs->edx = edx;
-            return;
+            goto done;
         }
-
-        rdmsr_safe(regs->ecx, regs->eax, regs->edx);
-        return;
+        vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
+        return 0;
     }
 
     regs->eax = msr_content & 0xFFFFFFFF;
     regs->edx = msr_content >> 32;
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%lx, eax=%lx, edx=%lx",
-                (unsigned long)regs->ecx, (unsigned long)regs->eax,
+done:
+    HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%x, eax=%lx, edx=%lx",
+                ecx, (unsigned long)regs->eax,
                 (unsigned long)regs->edx);
+    return 1;
 }
 
-static inline void vmx_do_msr_write(struct cpu_user_regs *regs)
+static inline int vmx_do_msr_write(struct cpu_user_regs *regs)
 {
+    u32 ecx = regs->ecx;
     u64 msr_content;
     struct vcpu *v = current;
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%lx, eax=%lx, edx=%lx",
-                (unsigned long)regs->ecx, (unsigned long)regs->eax,
-                (unsigned long)regs->edx);
+    HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%x, eax=%x, edx=%x",
+                ecx, (u32)regs->eax, (u32)regs->edx);
 
     msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
 
-    switch (regs->ecx) {
+    switch (ecx) {
     case MSR_IA32_TIME_STAMP_COUNTER:
         {
             struct periodic_time *pt =
@@ -1874,13 +1876,11 @@ static inline void vmx_do_msr_write(struct cpu_user_regs *regs)
         break;
     default:
         if ( !long_mode_do_msr_write(regs) )
-            wrmsr_hypervisor_regs(regs->ecx, regs->eax, regs->edx);
+            wrmsr_hypervisor_regs(ecx, regs->eax, regs->edx);
         break;
     }
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%lx, eax=%lx, edx=%lx",
-                (unsigned long)regs->ecx, (unsigned long)regs->eax,
-                (unsigned long)regs->edx);
+    return 1;
 }
 
 static void vmx_do_hlt(void)
@@ -2244,16 +2244,16 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
     case EXIT_REASON_MSR_READ:
         inst_len = __get_instruction_length(); /* Safe: RDMSR */
-        __update_guest_eip(inst_len);
-        vmx_do_msr_read(regs);
+        if ( vmx_do_msr_read(regs) )
+            __update_guest_eip(inst_len);
         TRACE_VMEXIT(1, regs->ecx);
         TRACE_VMEXIT(2, regs->eax);
         TRACE_VMEXIT(3, regs->edx);
         break;
     case EXIT_REASON_MSR_WRITE:
         inst_len = __get_instruction_length(); /* Safe: WRMSR */
-        __update_guest_eip(inst_len);
-        vmx_do_msr_write(regs);
+        if ( vmx_do_msr_write(regs) )
+            __update_guest_eip(inst_len);
         TRACE_VMEXIT(1, regs->ecx);
         TRACE_VMEXIT(2, regs->eax);
         TRACE_VMEXIT(3, regs->edx);

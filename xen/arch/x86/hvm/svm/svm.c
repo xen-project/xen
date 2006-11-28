@@ -277,7 +277,7 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
     struct vcpu *vc = current;
     struct vmcb_struct *vmcb = vc->arch.hvm_svm.vmcb;
 
-    switch (regs->ecx)
+    switch ((u32)regs->ecx)
     {
     case MSR_EFER:
         msr_content = vmcb->efer;
@@ -315,7 +315,7 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
         return 0;
     }
 
-    HVM_DBG_LOG(DBG_LEVEL_2, "mode_do_msr_read: msr_content: %"PRIx64"\n", 
+    HVM_DBG_LOG(DBG_LEVEL_2, "msr_content: %"PRIx64"\n",
                 msr_content);
 
     regs->eax = (u32)(msr_content >>  0);
@@ -329,11 +329,10 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "mode_do_msr_write msr %lx "
-                "msr_content %"PRIx64"\n", 
-                (unsigned long)regs->ecx, msr_content);
+    HVM_DBG_LOG(DBG_LEVEL_1, "msr %x msr_content %"PRIx64"\n",
+                (u32)regs->ecx, msr_content);
 
-    switch ( regs->ecx )
+    switch ( (u32)regs->ecx )
     {
     case MSR_EFER:
 #ifdef __x86_64__
@@ -1855,22 +1854,18 @@ static inline void svm_do_msr_access(
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     int  inst_len;
     u64 msr_content=0;
-    u32 eax, edx;
+    u32 ecx = regs->ecx, eax, edx;
 
     ASSERT(vmcb);
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "svm_do_msr_access: ecx=%lx, eax=%lx, edx=%lx, "
-                "exitinfo = %lx", (unsigned long)regs->ecx, 
-                (unsigned long)regs->eax, (unsigned long)regs->edx, 
+    HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%x, eax=%x, edx=%x, exitinfo = %lx",
+                ecx, (u32)regs->eax, (u32)regs->edx,
                 (unsigned long)vmcb->exitinfo1);
 
     /* is it a read? */
     if (vmcb->exitinfo1 == 0)
     {
-        inst_len = __get_instruction_length(vmcb, INSTR_RDMSR, NULL);
-
-        regs->edx = 0;
-        switch (regs->ecx) {
+        switch (ecx) {
         case MSR_IA32_TIME_STAMP_COUNTER:
             msr_content = hvm_get_guest_time(v);
             break;
@@ -1890,25 +1885,30 @@ static inline void svm_do_msr_access(
             if (long_mode_do_msr_read(regs))
                 goto done;
 
-            if ( rdmsr_hypervisor_regs(regs->ecx, &eax, &edx) )
+            if ( rdmsr_hypervisor_regs(ecx, &eax, &edx) ||
+                 rdmsr_safe(ecx, eax, edx) == 0 )
             {
                 regs->eax = eax;
                 regs->edx = edx;
                 goto done;
             }
-
-            rdmsr_safe(regs->ecx, regs->eax, regs->edx);
-            break;
+            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
+            return;
         }
         regs->eax = msr_content & 0xFFFFFFFF;
         regs->edx = msr_content >> 32;
+
+ done:
+        HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%x, eax=%lx, edx=%lx",
+                    ecx, (unsigned long)regs->eax, (unsigned long)regs->edx);
+
+        inst_len = __get_instruction_length(vmcb, INSTR_RDMSR, NULL);
     }
     else
     {
-        inst_len = __get_instruction_length(vmcb, INSTR_WRMSR, NULL);
         msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
 
-        switch (regs->ecx)
+        switch (ecx)
         {
         case MSR_IA32_TIME_STAMP_COUNTER:
             hvm_set_guest_time(v, msr_content);
@@ -1927,17 +1927,12 @@ static inline void svm_do_msr_access(
             break;
         default:
             if ( !long_mode_do_msr_write(regs) )
-                wrmsr_hypervisor_regs(regs->ecx, regs->eax, regs->edx);
+                wrmsr_hypervisor_regs(ecx, regs->eax, regs->edx);
             break;
         }
+
+        inst_len = __get_instruction_length(vmcb, INSTR_WRMSR, NULL);
     }
-
- done:
-
-    HVM_DBG_LOG(DBG_LEVEL_1, "svm_do_msr_access returns: "
-                "ecx=%lx, eax=%lx, edx=%lx",
-                (unsigned long)regs->ecx, (unsigned long)regs->eax,
-                (unsigned long)regs->edx);
 
     __update_guest_eip(vmcb, inst_len);
 }
