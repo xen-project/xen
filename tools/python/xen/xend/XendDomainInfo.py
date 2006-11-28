@@ -1715,6 +1715,8 @@ class XendDomainInfo:
         return '' # TODO
     def get_platform_std_vga(self):
         return False
+    def get_platform_keymap(self):
+        return ''
     def get_platform_serial(self):
         return '' # TODO
     def get_platform_localtime(self):
