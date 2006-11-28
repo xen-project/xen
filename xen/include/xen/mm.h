@@ -89,6 +89,10 @@ int assign_pages(
 #define MAX_ORDER 20 /* 2^20 contiguous pages */
 #endif
 
+/* DMA heap parameters. */
+extern unsigned int  dma_bitsize;
+extern unsigned long max_dma_mfn;
+
 /* Automatic page scrubbing for dead domains. */
 extern struct list_head page_scrub_list;
 #define page_scrub_schedule_work()              \

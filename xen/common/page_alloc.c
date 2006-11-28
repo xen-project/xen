@@ -46,18 +46,39 @@ static char opt_badpage[100] = "";
 string_param("badpage", opt_badpage);
 
 /*
+ * Bit width of the DMA heap.
+ */
+unsigned int  dma_bitsize = CONFIG_DMA_BITSIZE;
+unsigned long max_dma_mfn = (1UL << (CONFIG_DMA_BITSIZE - PAGE_SHIFT)) - 1;
+static void parse_dma_bits(char *s)
+{
+    unsigned int v = simple_strtol(s, NULL, 0);
+    if ( v >= (sizeof(long)*8 + PAGE_SHIFT) )
+    {
+        dma_bitsize = sizeof(long)*8 + PAGE_SHIFT;
+        max_dma_mfn = ~0UL;
+    }
+    else
+    {
+        dma_bitsize = v;
+        max_dma_mfn = (1UL << (dma_bitsize - PAGE_SHIFT)) - 1;
+    }
+}
+custom_param("dma_bits", parse_dma_bits);
+
+/*
  * Amount of memory to reserve in a low-memory (<4GB) pool for specific
  * allocation requests. Ordinary requests will not fall back to the
  * lowmem emergency pool.
  */
-static unsigned long lowmem_emergency_pool_pages;
-static void parse_lowmem_emergency_pool(char *s)
+static unsigned long dma_emergency_pool_pages;
+static void parse_dma_emergency_pool(char *s)
 {
     unsigned long long bytes;
     bytes = parse_size_and_unit(s, NULL);
-    lowmem_emergency_pool_pages = bytes >> PAGE_SHIFT;
+    dma_emergency_pool_pages = bytes >> PAGE_SHIFT;
 }
-custom_param("lowmem_emergency_pool", parse_lowmem_emergency_pool);
+custom_param("dma_emergency_pool", parse_dma_emergency_pool);
 
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
@@ -248,7 +269,7 @@ unsigned long alloc_boot_pages(unsigned long nr_pfns, unsigned long pfn_align)
 #define NR_ZONES    3
 
 #define pfn_dom_zone_type(_pfn)                                 \
-    (((_pfn) <= MAX_DMADOM_PFN) ? MEMZONE_DMADOM : MEMZONE_DOM)
+    (((_pfn) <= max_dma_mfn) ? MEMZONE_DMADOM : MEMZONE_DOM)
 
 static struct list_head heap[NR_ZONES][MAX_NUMNODES][MAX_ORDER+1];
 
@@ -278,6 +299,8 @@ void end_boot_allocator(void)
         if ( curr_free )
             init_heap_pages(pfn_dom_zone_type(i), mfn_to_page(i), 1);
     }
+
+    printk("Domain heap initialised: DMA width %u bits\n", dma_bitsize);
 }
 
 /* 
@@ -575,13 +598,13 @@ void init_domheap_pages(paddr_t ps, paddr_t pe)
     s_tot = round_pgup(ps) >> PAGE_SHIFT;
     e_tot = round_pgdown(pe) >> PAGE_SHIFT;
 
-    s_dma = min(s_tot, MAX_DMADOM_PFN + 1);
-    e_dma = min(e_tot, MAX_DMADOM_PFN + 1);
+    s_dma = min(s_tot, max_dma_mfn + 1);
+    e_dma = min(e_tot, max_dma_mfn + 1);
     if ( s_dma < e_dma )
         init_heap_pages(MEMZONE_DMADOM, mfn_to_page(s_dma), e_dma - s_dma);
 
-    s_nrm = max(s_tot, MAX_DMADOM_PFN + 1);
-    e_nrm = max(e_tot, MAX_DMADOM_PFN + 1);
+    s_nrm = max(s_tot, max_dma_mfn + 1);
+    e_nrm = max(e_tot, max_dma_mfn + 1);
     if ( s_nrm < e_nrm )
         init_heap_pages(MEMZONE_DOM, mfn_to_page(s_nrm), e_nrm - s_nrm);
 }
@@ -655,7 +678,7 @@ struct page_info *__alloc_domheap_pages(
         if ( unlikely(pg == NULL) &&
              ((order > MAX_ORDER) ||
               (avail_heap_pages(MEMZONE_DMADOM,-1) <
-               (lowmem_emergency_pool_pages + (1UL << order)))) )
+               (dma_emergency_pool_pages + (1UL << order)))) )
             return NULL;
     }
 
@@ -799,8 +822,8 @@ unsigned long avail_domheap_pages(void)
     avail_nrm = avail_heap_pages(MEMZONE_DOM,-1);
 
     avail_dma = avail_heap_pages(MEMZONE_DMADOM,-1);
-    if ( avail_dma > lowmem_emergency_pool_pages )
-        avail_dma -= lowmem_emergency_pool_pages;
+    if ( avail_dma > dma_emergency_pool_pages )
+        avail_dma -= dma_emergency_pool_pages;
     else
         avail_dma = 0;
 
