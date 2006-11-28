@@ -82,7 +82,9 @@
 /* Debug stack is restricted to 8kB by guard pages. */
 #define DEBUG_STACK_SIZE 8192
 
-#define MAX_DMADOM_PFN 0x7FFFFUL /* 31 addressable bits */
+#define MAX_DMADOM_BITS 30
+#define MAX_DMADOM_MASK ((1UL << MAX_DMADOM_BITS) - 1)
+#define MAX_DMADOM_PFN  (MAX_DMADOM_MASK >> PAGE_SHIFT)
 
 #ifndef __ASSEMBLY__
 extern unsigned long _end; /* standard ELF symbol */

@@ -328,7 +328,7 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
          (exch.out.address_bits <
           (get_order_from_pages(max_page) + PAGE_SHIFT)) )
     {
-        if ( exch.out.address_bits < 31 )
+        if ( exch.out.address_bits < MAX_DMADOM_BITS )
         {
             rc = -ENOMEM;
             goto fail_early;
@@ -541,7 +541,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
              (reservation.address_bits <
               (get_order_from_pages(max_page) + PAGE_SHIFT)) )
         {
-            if ( reservation.address_bits < 31 )
+            if ( reservation.address_bits < MAX_DMADOM_BITS )
                 return start_extent;
             args.memflags = MEMF_dma;
         }

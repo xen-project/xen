@@ -47,8 +47,8 @@ EXPORT_SYMBOL(swiotlb);
  */
 #define IO_TLB_SHIFT 11
 
-/* Width of DMA addresses in the IO TLB. 31 bits is an aacraid limitation. */
-#define IO_TLB_DMA_BITS 31
+/* Width of DMA addresses in the IO TLB. 30 bits is a b44 limitation. */
+#define IO_TLB_DMA_BITS 30
 
 static int swiotlb_force;
 static char *iotlb_virt_start;
