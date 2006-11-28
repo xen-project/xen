@@ -1526,10 +1526,9 @@ static int svm_set_cr0(unsigned long value)
 
         if (test_bit(SVM_CPU_STATE_LME_ENABLED, &v->arch.hvm_svm.cpu_state))
         {
-            /* Here the PAE is should to be opened */
             HVM_DBG_LOG(DBG_LEVEL_1, "Enable the Long mode\n");
             set_bit(SVM_CPU_STATE_LMA_ENABLED, &v->arch.hvm_svm.cpu_state);
-            vmcb->efer |= EFER_LMA;
+            vmcb->efer |= EFER_LMA | EFER_LME;
         }
 #endif  /* __x86_64__ */
 
