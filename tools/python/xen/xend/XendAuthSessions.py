@@ -55,7 +55,7 @@ class XendAuthSessions:
         @return: Session UUID
         """
         if self.is_authorized(username, password):
-            return login_unconditionally(username)
+            return self.login_unconditionally(username)
 
         raise XendError("Login failed")
 
