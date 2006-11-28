@@ -20,11 +20,10 @@ import types
 import xmlrpclib
 from xen.util.xmlrpclib2 import UnixXMLRPCServer, TCPXMLRPCServer
 
-from xen.xend import XendDomain, XendDomainInfo, XendNode
+from xen.xend import XendAPI, XendDomain, XendDomainInfo, XendNode
 from xen.xend import XendLogging, XendDmesg
 from xen.xend.XendClient import XML_RPC_SOCKET
 from xen.xend.XendLogging import log
-from xen.xend.XendAPI import XendAPI
 from xen.xend.XendError import XendInvalidDomain
 
 # vcpu_avail is a long and is not needed by the clients.  It's far easier
@@ -84,7 +83,7 @@ methods = ['device_create', 'device_configure',
 exclude = ['domain_create', 'domain_restore']
 
 class XMLRPCServer:
-    def __init__(self, use_tcp=False, host = "localhost", port = 8006,
+    def __init__(self, auth, use_tcp=False, host = "localhost", port = 8006,
                  path = XML_RPC_SOCKET, hosts_allowed = None):
         self.use_tcp = use_tcp
         self.port = port
@@ -94,22 +93,28 @@ class XMLRPCServer:
         
         self.ready = False        
         self.running = True
-        self.xenapi = XendAPI()
+        self.auth = auth
+        self.xenapi = XendAPI.XendAPI(auth)
         
     def run(self):
+        authmsg = (self.auth == XendAPI.AUTH_NONE and 
+                   "; authentication has been disabled for this server." or
+                   ".")
+
         if self.use_tcp:
-            log.info("Opening TCP XML-RPC server on %s%d.",
+            log.info("Opening TCP XML-RPC server on %s%d%s",
                      self.host and '%s:' % self.host or
                      'all interfaces, port ',
-                     self.port)
+                     self.port, authmsg)
             self.server = TCPXMLRPCServer((self.host, self.port),
                                           self.hosts_allowed,
                                           logRequests = False)
         else:
-            log.info("Opening Unix domain socket XML-RPC server on %s.",
-                     self.path)
+            log.info("Opening Unix domain socket XML-RPC server on %s%s",
+                     self.path, authmsg)
             self.server = UnixXMLRPCServer(self.path, self.hosts_allowed,
                                            logRequests = False)
+
 
         # Register Xen API Functions
         # -------------------------------------------------------------------

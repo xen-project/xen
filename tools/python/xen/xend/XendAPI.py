@@ -27,6 +27,9 @@ from xen.xend.XendLogging import log
 from xen.xend.XendAPIConstants import *
 from xen.util.xmlrpclib2 import stringify
 
+AUTH_NONE = 'none'
+AUTH_PAM = 'pam'
+
 # ------------------------------------------
 # Utility Methods for Xen API Implementation
 # ------------------------------------------
@@ -275,12 +278,13 @@ class XendAPI:
     is set to the XMLRPC function name which the method implements.
     """
 
-    def __init__(self):
+    def __init__(self, auth):
         """Initialised Xen API wrapper by making sure all functions
         have the correct validation decorators such as L{valid_host}
         and L{session_required}.
         """
-        
+        self.auth = auth
+
         classes = {
             'session': (session_required,),
             'host': (valid_host, session_required),
@@ -388,7 +392,9 @@ class XendAPI:
 
     def session_login_with_password(self, username, password):
         try:
-            session = auth_manager().login_with_password(username, password)
+            session = (self.auth == AUTH_NONE and
+                       auth_manager().login_unconditionally(username) or
+                       auth_manager().login_with_password(username, password))
             return xen_api_success(session)
         except XendError, e:
             return xen_api_error(XEND_ERROR_AUTHENTICATION_FAILED)

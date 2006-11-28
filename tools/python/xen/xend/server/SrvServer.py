@@ -48,9 +48,10 @@ from threading import Thread
 
 from xen.web.httpserver import HttpServer, UnixHttpServer
 
-from xen.xend import XendRoot
+from xen.xend import XendRoot, XendAPI
 from xen.xend import Vifctl
 from xen.xend.XendLogging import log
+from xen.xend.XendClient import XEN_API_SOCKET
 from xen.web.SrvDir import SrvDir
 
 from SrvRoot import SrvRoot
@@ -153,28 +154,38 @@ def create():
     if api_cfg:
         try:
             addrs = [(str(x[0]).split(':'),
-                      len(x) > 1 and x[1] and map(re.compile, x[1].split(" "))
+                      len(x) > 1 and x[1] or XendAPI.AUTH_NONE,
+                      len(x) > 2 and x[2] and map(re.compile, x[2].split(" "))
                       or None)
                      for x in api_cfg]
-            for addrport, allowed in addrs:
+            for addrport, auth, allowed in addrs:
+                if auth not in [XendAPI.AUTH_PAM, XendAPI.AUTH_NONE]:
+                    log.error('Xen-API server configuration %s is invalid, ' +
+                              'as %s is not a valid authentication type.',
+                              api_cfg, auth)
+                    break
+
                 if len(addrport) == 1:
                     if addrport[0] == 'unix':
-                        servers.add(XMLRPCServer(allowed = allowed))
+                        servers.add(XMLRPCServer(auth,
+                                                 path = XEN_API_SOCKET,
+                                                 hosts_allowed = allowed))
                     else:
-                        servers.add(XMLRPCServer(True, '', int(addrport[0]),
-                                                 allowed = allowed))
+                        servers.add(
+                            XMLRPCServer(auth, True, '', int(addrport[0]),
+                                         hosts_allowed = allowed))
                 else:
                     addr, port = addrport
-                    servers.add(XMLRPCServer(True, addr, int(port),
-                                             allowed = allowed))
-        except ValueError:
-            log.error('Xen-API server configuration %s is invalid' % api_cfg)
-        except TypeError:
-            log.error('Xen-API server configuration %s is invalid' % api_cfg)
+                    servers.add(XMLRPCServer(auth, True, addr, int(port),
+                                             hosts_allowed = allowed))
+        except ValueError, exn:
+            log.error('Xen-API server configuration %s is invalid.', api_cfg)
+        except TypeError, exn:
+            log.error('Xen-API server configuration %s is invalid.', api_cfg)
 
     if xroot.get_xend_tcp_xmlrpc_server():
-        servers.add(XMLRPCServer(True))
+        servers.add(XMLRPCServer(XendAPI.AUTH_PAM, True))
 
     if xroot.get_xend_unix_xmlrpc_server():
-        servers.add(XMLRPCServer())
+        servers.add(XMLRPCServer(XendAPI.AUTH_PAM))
     return servers
