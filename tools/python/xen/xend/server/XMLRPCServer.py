@@ -106,7 +106,7 @@ class XMLRPCServer:
                                           self.hosts_allowed,
                                           logRequests = False)
         else:
-            log.info("Opening Unix domain socket XML-RPC server on %s:%d.",
+            log.info("Opening Unix domain socket XML-RPC server on %s.",
                      self.path)
             self.server = UnixXMLRPCServer(self.path, self.hosts_allowed,
                                            logRequests = False)
