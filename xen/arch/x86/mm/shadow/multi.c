@@ -3294,20 +3294,18 @@ sh_set_toplevel_shadow(struct vcpu *v,
                        unsigned int root_type) 
 {
     mfn_t smfn;
+    pagetable_t old_entry, new_entry;
+
     struct domain *d = v->domain;
     
-    /* Decrement the refcount of the old contents of this slot */
-    smfn = pagetable_get_mfn(v->arch.shadow_table[slot]);
-    if ( mfn_x(smfn) )
-        sh_put_ref(v, smfn, 0);
+    /* Remember the old contents of this slot */
+    old_entry = v->arch.shadow_table[slot];
 
     /* Now figure out the new contents: is this a valid guest MFN? */
     if ( !valid_mfn(gmfn) )
     {
-        SHADOW_PRINTK("%u/%u [%u] invalid gmfn\n",
-                      GUEST_PAGING_LEVELS, SHADOW_PAGING_LEVELS, slot);
-        v->arch.shadow_table[slot] = pagetable_null();
-        return;
+        new_entry = pagetable_null();
+        goto install_new_entry;
     }
 
     /* Guest mfn is valid: shadow it and install the shadow */
@@ -3342,11 +3340,18 @@ sh_set_toplevel_shadow(struct vcpu *v,
         domain_crash(v->domain);
     }
 
+    new_entry = pagetable_from_mfn(smfn);
+
+ install_new_entry:
     /* Done.  Install it */
     SHADOW_PRINTK("%u/%u [%u] gmfn %#"SH_PRI_mfn" smfn %#"SH_PRI_mfn"\n",
                   GUEST_PAGING_LEVELS, SHADOW_PAGING_LEVELS, slot,
-                  mfn_x(gmfn), mfn_x(smfn));
-    v->arch.shadow_table[slot] = pagetable_from_mfn(smfn);
+                  mfn_x(gmfn), mfn_x(pagetable_get_mfn(new_entry)));
+    v->arch.shadow_table[slot] = new_entry;
+
+    /* Decrement the refcount of the old contents of this slot */
+    if ( !pagetable_is_null(old_entry) )
+        sh_put_ref(v, pagetable_get_mfn(old_entry), 0);
 }
 
 
