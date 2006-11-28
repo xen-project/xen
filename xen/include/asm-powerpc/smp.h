@@ -45,7 +45,6 @@ void smp_message_recv(int msg, struct cpu_user_regs *regs);
 void smp_call_function_interrupt(struct cpu_user_regs *regs);
 void smp_event_check_interrupt(void);
 void send_IPI_mask(cpumask_t mask, int vector);
-int vector_is_ipi(int vector);
 
 #undef DEBUG_IPI
 #ifdef DEBUG_IPI

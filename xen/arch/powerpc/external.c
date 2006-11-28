@@ -82,15 +82,13 @@ void do_external(struct cpu_user_regs *regs)
 
     vec = xen_mpic_get_irq(regs);
 
-    if (vector_is_ipi(vec)) {
-        /* do_IRQ is fundamentally broken for reliable IPI delivery.  */
+    if (irq_desc[vec].status & IRQ_PER_CPU) {
+	/* x86 do_IRQ does not respect the per cpu flag.  */
         irq_desc_t *desc = &irq_desc[vec];
         regs->entry_vector = vec;
-        spin_lock(&desc->lock);
         desc->handler->ack(vec);
         desc->action->handler(vector_to_irq(vec), desc->action->dev_id, regs);
         desc->handler->end(vec);
-        spin_unlock(&desc->lock);
     } else if (vec != -1) {
         DBG("EE:0x%lx isrc: %d\n", regs->msr, vec);
         regs->entry_vector = vec;

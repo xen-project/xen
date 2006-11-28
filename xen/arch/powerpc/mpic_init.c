@@ -448,9 +448,3 @@ int xen_mpic_get_irq(struct cpu_user_regs *regs)
 
 	return mpic_get_one_irq(mpic, regs);
 }
-
-int vector_is_ipi(int vector)
-{
-    BUG_ON(!mpic);
-    return (mpic->ipi_offset <= vector) && (vector < mpic->ipi_offset + 4);
-}
