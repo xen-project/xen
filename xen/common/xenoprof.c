@@ -92,19 +92,35 @@ static void xenoprof_reset_buf(struct domain *d)
     }
 }
 
-static void
-share_xenoprof_page_with_guest(struct domain* d, unsigned long mfn, int npages)
+static int
+share_xenoprof_page_with_guest(struct domain *d, unsigned long mfn, int npages)
 {
     int i;
-    
-    for ( i = 0; i < npages; i++ )
-        share_xen_page_with_guest(mfn_to_page(mfn + i), d, XENSHARE_writable);
+
+   /* Check if previous page owner has released the page. */
+   for ( i = 0; i < npages; i++ )
+   {
+       struct page_info *page = mfn_to_page(mfn + i);
+       if ( (page->count_info & (PGC_allocated|PGC_count_mask)) != 0 )
+       {
+           gdprintk(XENLOG_INFO, "mfn 0x%lx page->count_info 0x%x\n",
+                    mfn + i, page->count_info);
+           return -EBUSY;
+       }
+       page_set_owner(page, NULL);
+   }
+
+   for ( i = 0; i < npages; i++ )
+       share_xen_page_with_guest(mfn_to_page(mfn + i), d, XENSHARE_writable);
+
+   return 0;
 }
 
 static void
-unshare_xenoprof_page_with_guest(unsigned long mfn, int npages)
+unshare_xenoprof_page_with_guest(struct xenoprof *x)
 {
-    int i;
+    int i, npages = x->npages;
+    unsigned long mfn = virt_to_mfn(x->rawbuf);
 
     for ( i = 0; i < npages; i++ )
     {
@@ -117,7 +133,7 @@ unshare_xenoprof_page_with_guest(unsigned long mfn, int npages)
 
 static void
 xenoprof_shared_gmfn_with_guest(
-    struct domain* d, unsigned long maddr, unsigned long gmaddr, int npages)
+    struct domain *d, unsigned long maddr, unsigned long gmaddr, int npages)
 {
     int i;
     
@@ -126,23 +142,6 @@ xenoprof_shared_gmfn_with_guest(
         BUG_ON(page_get_owner(maddr_to_page(maddr)) != d);
         xenoprof_shared_gmfn(d, gmaddr, maddr);
     }
-}
-
-static char *alloc_xenoprof_buf(struct domain *d, int npages)
-{
-    char *rawbuf;
-    int order;
-
-    /* allocate pages to store sample buffer shared with domain */
-    order  = get_order_from_pages(npages);
-    rawbuf = alloc_xenheap_pages(order);
-    if ( rawbuf == NULL )
-    {
-        printk("alloc_xenoprof_buf(): memory allocation failed\n");
-        return 0;
-    }
-
-    return rawbuf;
 }
 
 static int alloc_xenoprof_struct(
@@ -157,8 +156,7 @@ static int alloc_xenoprof_struct(
 
     if ( d->xenoprof == NULL )
     {
-        printk ("alloc_xenoprof_struct(): memory "
-                "allocation (xmalloc) failed\n");
+        printk("alloc_xenoprof_struct(): memory allocation failed\n");
         return -ENOMEM;
     }
 
@@ -178,9 +176,8 @@ static int alloc_xenoprof_struct(
     bufsize = sizeof(struct xenoprof_buf) +
         (max_samples - 1) * sizeof(struct event_log);
     npages = (nvcpu * bufsize - 1) / PAGE_SIZE + 1;
-    
-    d->xenoprof->rawbuf = alloc_xenoprof_buf(is_passive ? dom0 : d, npages);
 
+    d->xenoprof->rawbuf = alloc_xenheap_pages(get_order_from_pages(npages));
     if ( d->xenoprof->rawbuf == NULL )
     {
         xfree(d->xenoprof);
@@ -294,14 +291,14 @@ static void reset_passive(struct domain *d)
 {
     struct xenoprof *x;
 
-    if ( d == 0 )
+    if ( d == NULL )
         return;
 
     x = d->xenoprof;
     if ( x == NULL )
         return;
 
-    unshare_xenoprof_page_with_guest(virt_to_mfn(x->rawbuf), x->npages);
+    unshare_xenoprof_page_with_guest(x);
     x->domain_type = XENOPROF_DOMAIN_IGNORED;
 }
 
@@ -375,9 +372,14 @@ static int add_passive_list(XEN_GUEST_HANDLE(void) arg)
         }
     }
 
-    share_xenoprof_page_with_guest(
+    ret = share_xenoprof_page_with_guest(
         current->domain, virt_to_mfn(d->xenoprof->rawbuf),
         d->xenoprof->npages);
+    if ( ret < 0 )
+    {
+        put_domain(d);
+        return ret;
+    }
 
     d->xenoprof->domain_type = XENOPROF_DOMAIN_PASSIVE;
     passive.nbuf = d->xenoprof->nbuf;
@@ -512,8 +514,10 @@ static int xenoprof_op_get_buffer(XEN_GUEST_HANDLE(void) arg)
             return ret;
     }
 
-    share_xenoprof_page_with_guest(
+    ret = share_xenoprof_page_with_guest(
         d, virt_to_mfn(d->xenoprof->rawbuf), d->xenoprof->npages);
+    if ( ret < 0 )
+        return ret;
 
     xenoprof_reset_buf(d);
 
@@ -687,7 +691,7 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
         if ( (ret = reset_active(current->domain)) != 0 )
             break;
         x = current->domain->xenoprof;
-        unshare_xenoprof_page_with_guest(virt_to_mfn(x->rawbuf), x->npages);
+        unshare_xenoprof_page_with_guest(x);
         break;
     }
 
