@@ -958,12 +958,13 @@ static void vmx_do_invlpg(unsigned long va)
 
 
 static int vmx_check_descriptor(int long_mode, unsigned long eip, int inst_len,
-                                enum segment seg, unsigned long *base)
+                                enum segment seg, unsigned long *base,
+                                u32 *limit, u32 *ar_bytes)
 {
-    enum vmcs_field ar_field, base_field;
-    u32 ar_bytes;
+    enum vmcs_field ar_field, base_field, limit_field;
 
     *base = 0;
+    *limit = 0;
     if ( seg != seg_es )
     {
         unsigned char inst[MAX_INST_LEN];
@@ -1020,26 +1021,32 @@ static int vmx_check_descriptor(int long_mode, unsigned long eip, int inst_len,
     case seg_cs:
         ar_field = GUEST_CS_AR_BYTES;
         base_field = GUEST_CS_BASE;
+        limit_field = GUEST_CS_LIMIT;
         break;
     case seg_ds:
         ar_field = GUEST_DS_AR_BYTES;
         base_field = GUEST_DS_BASE;
+        limit_field = GUEST_DS_LIMIT;
         break;
     case seg_es:
         ar_field = GUEST_ES_AR_BYTES;
         base_field = GUEST_ES_BASE;
+        limit_field = GUEST_ES_LIMIT;
         break;
     case seg_fs:
         ar_field = GUEST_FS_AR_BYTES;
         base_field = GUEST_FS_BASE;
+        limit_field = GUEST_FS_LIMIT;
         break;
     case seg_gs:
         ar_field = GUEST_FS_AR_BYTES;
         base_field = GUEST_FS_BASE;
+        limit_field = GUEST_FS_LIMIT;
         break;
     case seg_ss:
         ar_field = GUEST_GS_AR_BYTES;
         base_field = GUEST_GS_BASE;
+        limit_field = GUEST_GS_LIMIT;
         break;
     default:
         BUG();
@@ -1047,10 +1054,13 @@ static int vmx_check_descriptor(int long_mode, unsigned long eip, int inst_len,
     }
 
     if ( !long_mode || seg == seg_fs || seg == seg_gs )
+    {
         *base = __vmread(base_field);
-    ar_bytes = __vmread(ar_field);
+        *limit = __vmread(limit_field);
+    }
+    *ar_bytes = __vmread(ar_field);
 
-    return !(ar_bytes & 0x10000);
+    return !(*ar_bytes & 0x10000);
 }
 
 static void vmx_io_instruction(unsigned long exit_qualification,
@@ -1090,7 +1100,7 @@ static void vmx_io_instruction(unsigned long exit_qualification,
 
     if ( test_bit(4, &exit_qualification) ) { /* string instruction */
         unsigned long addr, count = 1, base;
-        u32 ar_bytes;
+        u32 ar_bytes, limit;
         int sign = regs->eflags & X86_EFLAGS_DF ? -1 : 1;
         int long_mode = 0;
 
@@ -1101,20 +1111,86 @@ static void vmx_io_instruction(unsigned long exit_qualification,
 #endif
         addr = __vmread(GUEST_LINEAR_ADDRESS);
 
+        if ( test_bit(5, &exit_qualification) ) { /* "rep" prefix */
+            pio_opp->flags |= REPZ;
+            count = regs->ecx;
+            if ( !long_mode && (vm86 || !(ar_bytes & (1u<<14))) )
+                count &= 0xFFFF;
+        }
+
         /*
          * In protected mode, guest linear address is invalid if the
          * selector is null.
          */
         if ( !vmx_check_descriptor(long_mode, regs->eip, inst_len,
                                    dir == IOREQ_WRITE ? seg_ds : seg_es,
-                                   &base) )
+                                   &base, &limit, &ar_bytes) ) {
+            if ( !long_mode ) {
+                vmx_inject_hw_exception(current, TRAP_gp_fault, 0);
+                return;
+            }
             addr = dir == IOREQ_WRITE ? base + regs->esi : regs->edi;
+        }
 
-        if ( test_bit(5, &exit_qualification) ) { /* "rep" prefix */
-            pio_opp->flags |= REPZ;
-            count = regs->ecx;
-            if ( !long_mode && (vm86 || !(ar_bytes & (1u<<14))) )
-                count &= 0xFFFF;
+        if ( !long_mode ) {
+            unsigned long ea = addr - base;
+
+            /* Segment must be readable for outs and writeable for ins. */
+            if ( dir == IOREQ_WRITE ? (ar_bytes & 0xa) == 0x8
+                                    : (ar_bytes & 0xa) != 0x2 ) {
+                vmx_inject_hw_exception(current, TRAP_gp_fault, 0);
+                return;
+            }
+
+            /* Offset must be within limits. */
+            ASSERT(ea == (u32)ea);
+            if ( (u32)(ea + size - 1) < (u32)ea ||
+                 (ar_bytes & 0xc) != 0x4 ? ea + size - 1 > limit
+                                         : ea <= limit )
+            {
+                vmx_inject_hw_exception(current, TRAP_gp_fault, 0);
+                return;
+            }
+
+            /* Check the limit for repeated instructions, as above we checked
+               only the first instance. Truncate the count if a limit violation
+               would occur. Note that the checking is not necessary for page
+               granular segments as transfers crossing page boundaries will be
+               broken up anyway. */
+            if ( !(ar_bytes & (1u<<15)) && count > 1 )
+            {
+                if ( (ar_bytes & 0xc) != 0x4 )
+                {
+                    /* expand-up */
+                    if ( !df )
+                    {
+                        if ( ea + count * size - 1 < ea ||
+                             ea + count * size - 1 > limit )
+                            count = (limit + 1UL - ea) / size;
+                    }
+                    else
+                    {
+                        if ( count - 1 > ea / size )
+                            count = ea / size + 1;
+                    }
+                }
+                else
+                {
+                    /* expand-down */
+                    if ( !df )
+                    {
+                        if ( count - 1 > -(s32)ea / size )
+                            count = -(s32)ea / size + 1UL;
+                    }
+                    else
+                    {
+                        if ( ea < (count - 1) * size ||
+                             ea - (count - 1) * size <= limit )
+                            count = (ea - limit - 1) / size + 1;
+                    }
+                }
+                ASSERT(count);
+            }
         }
 
         /*

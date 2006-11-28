@@ -1233,8 +1233,7 @@ static inline int svm_get_io_address(
     unsigned long *count, unsigned long *addr)
 {
     unsigned long        reg;
-    unsigned int         asize = 0;
-    unsigned int         isize;
+    unsigned int         asize, isize;
     int                  long_mode = 0;
     segment_selector_t  *seg = NULL;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
@@ -1267,17 +1266,25 @@ static inline int svm_get_io_address(
         reg = regs->esi;
         if (!seg)               /* If no prefix, used DS. */
             seg = &vmcb->ds;
+        if (!long_mode && (seg->attributes.fields.type & 0xa) == 0x8) {
+            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
+            return 0;
+        }
     }
     else
     {
         reg = regs->edi;
         seg = &vmcb->es;        /* Note: This is ALWAYS ES. */
+        if (!long_mode && (seg->attributes.fields.type & 0xa) != 0x2) {
+            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
+            return 0;
+        }
     }
 
     /* If the segment isn't present, give GP fault! */
     if (!long_mode && !seg->attributes.fields.p) 
     {
-        svm_inject_exception(v, TRAP_gp_fault, 1, seg->sel);
+        svm_inject_exception(v, TRAP_gp_fault, 1, 0);
         return 0;
     }
 
@@ -1294,16 +1301,59 @@ static inline int svm_get_io_address(
     if (!info.fields.rep)
         *count = 1;
 
-    if (!long_mode) {
-        if (*addr > seg->limit) 
+    if (!long_mode)
+    {
+        ASSERT(*addr == (u32)*addr);
+        if ((u32)(*addr + size - 1) < (u32)*addr ||
+            (seg->attributes.fields.type & 0xc) != 0x4 ?
+            *addr + size - 1 > seg->limit :
+            *addr <= seg->limit)
         {
-            svm_inject_exception(v, TRAP_gp_fault, 1, seg->sel);
+            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
             return 0;
-        } 
-        else 
-        {
-            *addr += seg->base;
         }
+
+        /* Check the limit for repeated instructions, as above we checked only
+           the first instance. Truncate the count if a limit violation would
+           occur. Note that the checking is not necessary for page granular
+           segments as transfers crossing page boundaries will be broken up
+           anyway. */
+        if (!seg->attributes.fields.g && *count > 1)
+        {
+            if ((seg->attributes.fields.type & 0xc) != 0x4)
+            {
+                /* expand-up */
+                if (!(regs->eflags & EF_DF))
+                {
+                    if (*addr + *count * size - 1 < *addr ||
+                        *addr + *count * size - 1 > seg->limit)
+                        *count = (seg->limit + 1UL - *addr) / size;
+                }
+                else
+                {
+                    if (*count - 1 > *addr / size)
+                        *count = *addr / size + 1;
+                }
+            }
+            else
+            {
+                /* expand-down */
+                if (!(regs->eflags & EF_DF))
+                {
+                    if (*count - 1 > -(s32)*addr / size)
+                        *count = -(s32)*addr / size + 1UL;
+                }
+                else
+                {
+                    if (*addr < (*count - 1) * size ||
+                        *addr - (*count - 1) * size <= seg->limit)
+                        *count = (*addr - seg->limit - 1) / size + 1;
+                }
+            }
+            ASSERT(*count);
+        }
+
+        *addr += seg->base;
     }
     else if (seg == &vmcb->fs || seg == &vmcb->gs)
         *addr += seg->base;
