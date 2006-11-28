@@ -256,7 +256,7 @@ static int kick_secondary_cpus(int maxcpus)
 }
 
 /* This is the first C code that secondary processors invoke.  */
-int secondary_cpu_init(int cpuid, unsigned long r4)
+void secondary_cpu_init(int cpuid, unsigned long r4)
 {
     struct vcpu *vcpu;
 
@@ -274,7 +274,7 @@ int secondary_cpu_init(int cpuid, unsigned long r4)
     idle_vcpu[cpuid] = current;
     startup_cpu_idle_loop();
 
-    while(1);
+    panic("should never get here\n");
 }
 
 static void __init __start_xen(multiboot_info_t *mbi)
