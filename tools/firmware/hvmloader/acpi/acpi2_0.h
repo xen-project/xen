@@ -119,7 +119,7 @@ struct acpi_20_rsdp {
  */
 struct acpi_20_rsdt {
     struct acpi_header header;
-    uint32_t entry[ACPI_MAX_NUM_TABLES];
+    uint32_t entry[1];
 };
 #define ACPI_2_0_RSDT_REVISION 0x01
 
@@ -128,20 +128,19 @@ struct acpi_20_rsdt {
  */
 struct acpi_20_xsdt {
     struct acpi_header header;
-    uint64_t entry[ACPI_MAX_NUM_TABLES];
+    uint64_t entry[1];
 };
 #define ACPI_2_0_XSDT_REVISION 0x01
 
 /*
  * TCG Hardware Interface Table (TCPA)
  */
-
-typedef struct _ACPI_2_0_TCPA_CLIENT {
+struct acpi_20_tcpa {
     struct acpi_header header;
-    uint16_t PlatformClass;
-    uint32_t LAML;
-    uint64_t LASA;
-} ACPI_2_0_TCPA_CLIENT;
+    uint16_t platform_class;
+    uint32_t laml;
+    uint64_t lasa;
+};
 
 #define ACPI_2_0_TCPA_REVISION 0x02
 #define ACPI_2_0_TCPA_LAML_SIZE (64*1024)

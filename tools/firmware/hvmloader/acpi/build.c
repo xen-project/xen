@@ -17,8 +17,12 @@
  */
 
 #include "acpi2_0.h"
+#include "ssdt_tpm.h"
 #include "../config.h"
 #include "../util.h"
+#include <xen/hvm/e820.h>
+
+#define align16(sz) (((sz) + 15) & ~15)
 
 extern struct acpi_20_rsdp Rsdp;
 extern struct acpi_20_rsdt Rsdt;
@@ -103,39 +107,88 @@ int construct_madt(struct acpi_20_madt *madt)
     madt->header.length = offset;
     set_checksum(madt, offsetof(struct acpi_header, checksum), offset);
 
-    return offset;
+    return align16(offset);
 }
 
-/*
- * Copy all the ACPI table to buffer.
- * Buffer layout: FACS, DSDT, FADT, MADT, XSDT, RSDT, RSDP.
- */
+int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
+{
+    int offset = 0, nr_tables = 0;
+    struct acpi_20_madt *madt;
+    struct acpi_20_tcpa *tcpa;
+    static const uint16_t tis_signature[] = {0x0001, 0x0001, 0x0001};
+    uint16_t *tis_hdr;
+
+    /* MADT. */
+    if ( (get_vcpu_nr() > 1) || get_apic_mode() )
+    {
+        madt = (struct acpi_20_madt *)&buf[offset];
+        offset += construct_madt(madt);
+        table_ptrs[nr_tables++] = (unsigned long)madt;
+    }
+
+    /* TPM TCPA and SSDT. */
+    tis_hdr = (uint16_t *)0xFED40F00;
+    if ( (tis_hdr[0] == tis_signature[0]) &&
+         (tis_hdr[1] == tis_signature[1]) &&
+         (tis_hdr[2] == tis_signature[2]) )
+    {
+        memcpy(&buf[offset], AmlCode_TPM, sizeof(AmlCode_TPM));
+        table_ptrs[nr_tables++] = (unsigned long)&buf[offset];
+        offset += align16(sizeof(AmlCode_TPM));
+
+        tcpa = (struct acpi_20_tcpa *)&buf[offset];
+        memset(tcpa, 0, sizeof(*tcpa));
+        offset += align16(sizeof(*tcpa));
+        table_ptrs[nr_tables++] = (unsigned long)tcpa;
+
+        tcpa->header.signature = ACPI_2_0_TCPA_SIGNATURE;
+        tcpa->header.length    = sizeof(*tcpa);
+        tcpa->header.revision  = ACPI_2_0_TCPA_REVISION;
+        strncpy(tcpa->header.oem_id, "IBM   ", 6);
+        tcpa->header.oem_table_id = ASCII64(' ', ' ', ' ', ' ',
+                                            ' ', 'x', 'e', 'n');
+        tcpa->header.oem_revision = 1;
+        tcpa->header.creator_id   = ASCII32('I', 'B', 'M', ' ');
+        tcpa->header.creator_revision = 1;
+        tcpa->lasa = e820_malloc(
+            ACPI_2_0_TCPA_LAML_SIZE, E820_RESERVED, (uint32_t)~0);
+        if ( tcpa->lasa )
+        {
+            tcpa->laml = ACPI_2_0_TCPA_LAML_SIZE;
+            memset((char *)(unsigned long)tcpa->lasa, 0, tcpa->laml);
+            set_checksum(tcpa,
+                         offsetof(struct acpi_header, checksum),
+                         tcpa->header.length);
+        }
+    }
+
+    table_ptrs[nr_tables] = 0;
+    return align16(offset);
+}
+
+/* Copy all the ACPI table to buffer. */
 int acpi_build_tables(uint8_t *buf)
 {
     struct acpi_20_rsdp *rsdp;
     struct acpi_20_rsdt *rsdt;
     struct acpi_20_xsdt *xsdt;
     struct acpi_20_fadt *fadt;
-    struct acpi_20_madt *madt = 0;
     struct acpi_20_facs *facs;
     unsigned char       *dsdt;
-    int offset = 0, requires_madt;
-
-    requires_madt = ((get_vcpu_nr() > 1) || get_apic_mode());
-
-#define inc_offset(sz)  (offset = (offset + (sz) + 15) & ~15)
+    unsigned long        secondary_tables[16];
+    int                  offset = 0, i;
 
     facs = (struct acpi_20_facs *)&buf[offset];
     memcpy(facs, &Facs, sizeof(struct acpi_20_facs));
-    inc_offset(sizeof(struct acpi_20_facs));
+    offset += align16(sizeof(struct acpi_20_facs));
 
     dsdt = (unsigned char *)&buf[offset];
     memcpy(dsdt, &AmlCode, DsdtLen);
-    inc_offset(DsdtLen);
+    offset += align16(DsdtLen);
 
     fadt = (struct acpi_20_fadt *)&buf[offset];
     memcpy(fadt, &Fadt, sizeof(struct acpi_20_fadt));
-    inc_offset(sizeof(struct acpi_20_fadt));
+    offset += align16(sizeof(struct acpi_20_fadt));
     fadt->dsdt   = (unsigned long)dsdt;
     fadt->x_dsdt = (unsigned long)dsdt;
     fadt->firmware_ctrl   = (unsigned long)facs;
@@ -144,43 +197,33 @@ int acpi_build_tables(uint8_t *buf)
                  offsetof(struct acpi_header, checksum),
                  sizeof(struct acpi_20_fadt));
 
-    if ( requires_madt )
-    {
-        madt = (struct acpi_20_madt *)&buf[offset];
-        inc_offset(construct_madt(madt));
-    }
+    offset += construct_secondary_tables(&buf[offset], secondary_tables);
 
     xsdt = (struct acpi_20_xsdt *)&buf[offset];
-    memcpy(xsdt, &Xsdt, sizeof(struct acpi_20_xsdt));
-    inc_offset(sizeof(struct acpi_20_xsdt));
+    memcpy(xsdt, &Xsdt, sizeof(struct acpi_header));
     xsdt->entry[0] = (unsigned long)fadt;
-    xsdt->header.length = sizeof(struct acpi_header) + sizeof(uint64_t);
-    if ( requires_madt )
-    {
-        xsdt->entry[1] = (unsigned long)madt;
-        xsdt->header.length += sizeof(uint64_t);
-    }
+    for ( i = 0; secondary_tables[i]; i++ )
+        xsdt->entry[i+1] = secondary_tables[i];
+    xsdt->header.length = sizeof(struct acpi_header) + (i+1)*sizeof(uint64_t);
+    offset += align16(xsdt->header.length);
     set_checksum(xsdt,
                  offsetof(struct acpi_header, checksum),
                  xsdt->header.length);
 
     rsdt = (struct acpi_20_rsdt *)&buf[offset];
-    memcpy(rsdt, &Rsdt, sizeof(struct acpi_20_rsdt));
-    inc_offset(sizeof(struct acpi_20_rsdt));
+    memcpy(rsdt, &Rsdt, sizeof(struct acpi_header));
     rsdt->entry[0] = (unsigned long)fadt;
-    rsdt->header.length = sizeof(struct acpi_header) + sizeof(uint32_t);
-    if ( requires_madt )
-    {
-        rsdt->entry[1] = (unsigned long)madt;
-        rsdt->header.length += sizeof(uint32_t);
-    }
+    for ( i = 0; secondary_tables[i]; i++ )
+        rsdt->entry[i+1] = secondary_tables[i];
+    rsdt->header.length = sizeof(struct acpi_header) + (i+1)*sizeof(uint32_t);
+    offset += align16(rsdt->header.length);
     set_checksum(rsdt,
                  offsetof(struct acpi_header, checksum),
                  rsdt->header.length);
 
     rsdp = (struct acpi_20_rsdp *)&buf[offset];
     memcpy(rsdp, &Rsdp, sizeof(struct acpi_20_rsdp));
-    inc_offset(sizeof(struct acpi_20_rsdp));
+    offset += align16(sizeof(struct acpi_20_rsdp));
     rsdp->rsdt_address = (unsigned long)rsdt;
     rsdp->xsdt_address = (unsigned long)xsdt;
     set_checksum(rsdp,
@@ -189,8 +232,6 @@ int acpi_build_tables(uint8_t *buf)
     set_checksum(rsdp,
                  offsetof(struct acpi_20_rsdp, extended_checksum),
                  sizeof(struct acpi_20_rsdp));
-
-#undef inc_offset
 
     return offset;
 }

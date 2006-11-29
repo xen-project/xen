@@ -439,7 +439,6 @@ class XendDomainInfo:
                 self._storeDomDetails()
                 self._registerWatches()
                 self.refreshShutdown()
-                self.unpause()
 
                 # save running configuration if XendDomains believe domain is
                 # persistent
@@ -1715,6 +1714,8 @@ class XendDomainInfo:
         return '' # TODO
     def get_platform_std_vga(self):
         return False
+    def get_platform_keymap(self):
+        return ''
     def get_platform_serial(self):
         return '' # TODO
     def get_platform_localtime(self):

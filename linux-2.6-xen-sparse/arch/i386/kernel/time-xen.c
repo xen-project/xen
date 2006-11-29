@@ -710,6 +710,10 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 					    (cputime_t)delta_cpu);
 	}
 
+	/* Offlined for more than a few seconds? Avoid lockup warnings. */
+	if (stolen > 5*HZ)
+		touch_softlockup_watchdog();
+
 	/* Local timer processing (see update_process_times()). */
 	run_local_timers();
 	if (rcu_pending(cpu))

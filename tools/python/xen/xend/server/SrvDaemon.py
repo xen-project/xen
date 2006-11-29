@@ -6,7 +6,9 @@
 ###########################################################
 
 import os
+import os.path
 import signal
+import stat
 import sys
 import threading
 import time
@@ -102,17 +104,32 @@ class Daemon:
 
         # Detach from standard file descriptors, and redirect them to
         # /dev/null or the log as appropriate.
+        # We open the log file first, so that we can diagnose a failure to do
+        # so _before_ we close stderr.
+        try:
+            parent = os.path.dirname(XEND_DEBUG_LOG)
+            if not os.path.exists(parent):
+                os.makedirs(parent, stat.S_IRWXU)
+            fd = os.open(XEND_DEBUG_LOG, os.O_WRONLY|os.O_CREAT|os.O_APPEND)
+        except Exception, exn:
+            print >>sys.stderr, exn
+            print >>sys.stderr, ("Xend failed to open %s.  Exiting!" %
+                                 XEND_DEBUG_LOG)
+            sys.exit(1)
+
         os.close(0)
         os.close(1)
         os.close(2)
         if XEND_DEBUG:
             os.open('/dev/null', os.O_RDONLY)
-            os.open(XEND_DEBUG_LOG, os.O_WRONLY|os.O_CREAT|os.O_APPEND)
-            os.dup(1)
+            os.dup(fd)
+            os.dup(fd)
         else:
             os.open('/dev/null', os.O_RDWR)
             os.dup(0)
-            os.open(XEND_DEBUG_LOG, os.O_WRONLY|os.O_CREAT|os.O_APPEND)
+            os.dup(fd)
+        os.close(fd)
+
         print >>sys.stderr, ("Xend started at %s." %
                              time.asctime(time.localtime()))
 

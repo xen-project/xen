@@ -615,9 +615,9 @@ x86_emulate_memop(
             }
             switch ( modrm_mod )
             {
-            case 0: if ( modrm_rm == 6 ) ea = insn_fetch(uint16_t); break;
-            case 1: ea += insn_fetch(uint8_t);  break;
-            case 2: ea += insn_fetch(uint16_t); break;
+            case 0: if ( modrm_rm == 6 ) ea = insn_fetch(int16_t); break;
+            case 1: ea += insn_fetch(int8_t);  break;
+            case 2: ea += insn_fetch(int16_t); break;
             }
         }
         else
@@ -632,7 +632,7 @@ x86_emulate_memop(
                     ea = *(long *)decode_register(sib_index, &_regs, 0);
                 ea <<= (sib >> 6) & 3;
                 if ( (modrm_mod == 0) && ((sib_base & 7) == 5) )
-                    ea += insn_fetch(uint32_t);
+                    ea += insn_fetch(int32_t);
                 else
                     ea += *(long *)decode_register(sib_base, &_regs, 0);
             }
@@ -646,13 +646,13 @@ x86_emulate_memop(
             case 0:
                 if ( (modrm_rm & 7) != 5 )
                     break;
-                ea = insn_fetch(uint32_t);
+                ea = insn_fetch(int32_t);
                 if ( mode != X86EMUL_MODE_PROT64 )
                     break;
                 /* Relative to RIP of next instruction. Argh! */
                 ea += _regs.eip;
                 if ( (d & SrcMask) == SrcImm )
-                    ea += (d & ByteOp) ? 1 : op_bytes;
+                    ea += (d & ByteOp) ? 1 : ((op_bytes == 8) ? 4 : op_bytes);
                 else if ( (d & SrcMask) == SrcImmByte )
                     ea += 1;
                 else if ( ((b == 0xf6) || (b == 0xf7)) &&
@@ -661,8 +661,8 @@ x86_emulate_memop(
                     ea += (d & ByteOp) ? 1
                         : ((op_bytes == 8) ? 4 : op_bytes);
                 break;
-            case 1: ea += insn_fetch(uint8_t);  break;
-            case 2: ea += insn_fetch(uint32_t); break;
+            case 1: ea += insn_fetch(int8_t);  break;
+            case 2: ea += insn_fetch(int32_t); break;
             }
         }
 

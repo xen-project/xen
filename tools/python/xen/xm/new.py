@@ -58,6 +58,12 @@ def main(argv):
     if not opts:
         return
 
+    if type(config) == str:
+        try:
+            config = sxp.parse(file(config))[0]
+        except IOError, exn:
+            raise OptionError("Cannot read file %s: %s" % (config, exn[1]))
+
     if opts.vals.dryrun:
         PrettyPrint.prettyprint(config)
     else:

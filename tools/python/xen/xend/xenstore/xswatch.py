@@ -5,6 +5,7 @@
 # Public License.  See the file "COPYING" in the main directory of
 # this archive for more details.
 
+import errno
 import threading
 from xen.xend.xenstore.xsutil import xshandle
 
@@ -65,7 +66,15 @@ def watchMain():
             watch = we[1]
             res = watch.fn(we[0], *watch.args, **watch.kwargs)
             if not res:
-                watch.unwatch()
+                try:
+                    watch.unwatch()
+                except RuntimeError, exn:
+                    if exn.args[0] == errno.ENOENT:
+                        # The watch has already been unregistered -- that's
+                        # fine.
+                        pass
+                    else:
+                        raise
         except:
             log.exception("read_watch failed")
             # Ignore this exception -- there's no point throwing it

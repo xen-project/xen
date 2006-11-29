@@ -647,18 +647,18 @@ class XendDomain:
     def is_valid_dev(self, klass, dev_uuid):
         return (self.get_vm_with_dev_uuid(klass, dev_uuid) != None)
 
-    def do_legacy_api_with_uuid(self, fn, vm_uuid, *args):
+    def do_legacy_api_with_uuid(self, fn, vm_uuid, *args, **kwargs):
         self.domains_lock.acquire()
         try:
             for domid, dom in self.domains.items():
                 if dom.get_uuid == vm_uuid:
-                    return fn(domid, *args)
+                    return fn(domid, *args, **kwargs)
                     
             if vm_uuid in self.managed_domains:
                 domid = self.managed_domains[vm_uuid].getDomid()
                 if domid == None:
                     domid = self.managed_domains[vm_uuid].getName()
-                return fn(domid, *args)
+                return fn(domid, *args, **kwargs)
             
             raise XendInvalidDomain("Domain does not exist")
         finally:
@@ -795,7 +795,7 @@ class XendDomain:
             raise XendError("can't write guest state file %s: %s" %
                             (path, ex[1]))
 
-    def domain_resume(self, domname):
+    def domain_resume(self, domname, start_paused = False):
         """Resumes a domain that is persistently managed by Xend.
 
         @param domname: Domain Name
@@ -827,7 +827,8 @@ class XendDomain:
                     log.debug('Current DomainInfo state: %d' % dominfo.state)
                     XendCheckpoint.restore(self,
                                            os.open(chkpath, os.O_RDONLY),
-                                           dominfo)
+                                           dominfo,
+                                           paused = start_paused)
                     self._add_domain(dominfo)
                     os.unlink(chkpath)
                 except OSError, ex:
@@ -886,7 +887,7 @@ class XendDomain:
         finally:
             self.domains_lock.release()
 
-    def domain_start(self, domid):
+    def domain_start(self, domid, start_paused = True):
         """Start a managed domain
 
         @require: Domain must not be running.
@@ -911,6 +912,9 @@ class XendDomain:
             self._add_domain(dominfo)
         finally:
             self.domains_lock.release()
+        dominfo.waitForDevices()
+        if not start_paused:
+            dominfo.unpause()
         
 
     def domain_delete(self, domid):

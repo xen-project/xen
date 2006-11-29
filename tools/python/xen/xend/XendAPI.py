@@ -248,8 +248,8 @@ def valid_sr(func):
 # Bridge to Legacy XM API calls
 # -----------------------------
 
-def do_vm_func(fn_name, vm_ref, *args):
-    """Helper wrapper func to abstract away from repeative code.
+def do_vm_func(fn_name, vm_ref, *args, **kwargs):
+    """Helper wrapper func to abstract away from repetitive code.
 
     @param fn_name: function name for XendDomain instance
     @type fn_name: string
@@ -260,7 +260,7 @@ def do_vm_func(fn_name, vm_ref, *args):
     """
     xendom = XendDomain.instance()
     fn = getattr(xendom, fn_name)
-    xendom.do_legacy_api_with_uuid(fn, vm_ref, *args)
+    xendom.do_legacy_api_with_uuid(fn, vm_ref, *args, **kwargs)
     return xen_api_success_void()
 
 
@@ -327,7 +327,7 @@ class XendAPI:
 
             # wrap validators around readable class attributes
             for attr_name in ro_attrs + rw_attrs + self.Base_attr_ro:
-                getter_name = '%s_get_%s' % (cls.lower(), attr_name.lower())
+                getter_name = '%s_get_%s' % (cls.lower(), attr_name)
                 try:
                     getter = getattr(XendAPI, getter_name)
                     for validator in validators:
@@ -340,7 +340,7 @@ class XendAPI:
 
             # wrap validators around writable class attrributes
             for attr_name in rw_attrs + self.Base_attr_rw:
-                setter_name = '%s_set_%s' % (cls.lower(), attr_name.lower())
+                setter_name = '%s_set_%s' % (cls.lower(), attr_name)
                 try:
                     setter = getattr(XendAPI, setter_name)
                     for validator in validators:
@@ -353,7 +353,7 @@ class XendAPI:
 
             # wrap validators around methods
             for method_name in methods + self.Base_methods:
-                method_full_name = '%s_%s' % (cls.lower(),method_name.lower())
+                method_full_name = '%s_%s' % (cls.lower(), method_name)
                 try:
                     method = getattr(XendAPI, method_full_name)
                     for validator in validators:
@@ -366,7 +366,7 @@ class XendAPI:
 
             # wrap validators around class functions
             for func_name in funcs + self.Base_funcs:
-                func_full_name = '%s_%s' % (cls.lower(), func_name.lower())
+                func_full_name = '%s_%s' % (cls.lower(), func_name)
                 try:
                     method = getattr(XendAPI, func_full_name)
                     method = session_required(method)
@@ -411,7 +411,7 @@ class XendAPI:
         record = {'this_host': XendNode.instance().uuid,
                   'this_user': auth_manager().get_user(session)}
         return xen_api_success(record)
-    def session_to_xml(self, session):
+    def session_to_XML(self, session):
         return xen_api_todo()
 
     # attributes (ro)
@@ -536,7 +536,7 @@ class XendAPI:
                   'features': node.get_host_cpu_features(host_cpu_ref),
                   'utilisation': node.get_host_cpu_load(host_cpu_ref)}
         return xen_api_success(record)
-    def host_cpu_to_xml(self, session, host_cpu_ref):
+    def host_cpu_to_XML(self, session, host_cpu_ref):
         return xen_api_todo()
 
     # class methods
@@ -586,7 +586,7 @@ class XendAPI:
                   'VCPUs_policy',
                   'VCPUs_params',
                   'VCPUs_features_force_on',
-                  'VCPUS_features_force_off',
+                  'VCPUs_features_force_off',
                   'actions_after_shutdown',
                   'actions_after_reboot',
                   'actions_after_suspend',
@@ -848,19 +848,19 @@ class XendAPI:
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success_void()
     
-    def vm_set_vcpus_policy(self, session, vm_ref):
+    def vm_set_VCPUs_policy(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success_void()
     
-    def vm_set_vcpus_params(self, session, vm_ref):
+    def vm_set_VCPUs_params(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success_void()
     
-    def vm_set_vcpus_features_force_on(self, session, vm_ref):
+    def vm_set_VCPUs_features_force_on(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success_void()
     
-    def vm_set_vcpus_features_force_off(self, session, vm_ref):
+    def vm_set_VCPUs_features_force_off(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success_void()
     
@@ -950,7 +950,7 @@ class XendAPI:
         return xen_api_success(domuuid)
     
     # object methods
-    def vm_to_xml(self, session, vm_ref):
+    def vm_to_XML(self, session, vm_ref):
         return xen_api_todo()
     
     def vm_get_record(self, session, vm_ref):
@@ -1027,9 +1027,9 @@ class XendAPI:
     def vm_pause(self, session, vm_ref):
         return do_vm_func("domain_pause", vm_ref)
     def vm_resume(self, session, vm_ref, start_paused):
-        return do_vm_func("domain_resume", vm_ref)    
-    def vm_start(self, session, vm_ref):
-        return do_vm_func("domain_start", vm_ref)
+        return do_vm_func("domain_resume", vm_ref, start_paused = start_paused)    
+    def vm_start(self, session, vm_ref, start_paused):
+        return do_vm_func("domain_start", vm_ref, start_paused = start_paused)
     def vm_suspend(self, session, vm_ref):
         return do_vm_func("domain_suspend", vm_ref)    
     def vm_unpause(self, session, vm_ref):
@@ -1092,11 +1092,11 @@ class XendAPI:
         return xen_api_success(vbd_ref)
 
     # attributes (rw)
-    def vbd_get_vm(self, session, vbd_ref):
+    def vbd_get_VM(self, session, vbd_ref):
         xendom = XendDomain.instance()
         return xen_api_success(xendom.get_dev_property('vbd', vbd_ref, 'VM'))
     
-    def vbd_get_vdi(self, session, vbd_ref):
+    def vbd_get_VDI(self, session, vbd_ref):
         return xen_api_todo()
     
     def vbd_get_device(self, session, vbd_ref):
@@ -1218,7 +1218,7 @@ class XendAPI:
         image = sr.xen_api_get_by_uuid(vdi_ref)
         return xen_api_success(image.name_description)
 
-    def vdi_get_sr(self, session, vdi_ref):
+    def vdi_get_SR(self, session, vdi_ref):
         sr = XendNode.instance().get_sr()
         return xen_api_success(sr.uuid)
 
@@ -1249,7 +1249,7 @@ class XendAPI:
         image.name_description = value
         return xen_api_success_void()
 
-    def vdi_set_sr(self, session, vdi_ref, value):
+    def vdi_set_SR(self, session, vdi_ref, value):
         return xen_api_error(XEND_ERROR_UNSUPPORTED)
 
     def vdi_set_virtual_size(self, session, vdi_ref, value):
@@ -1269,7 +1269,7 @@ class XendAPI:
         sr.destroy_image(vdi_ref)
         return xen_api_success_void()
 
-    def vdi_to_xml(self, session, vdi_ref):
+    def vdi_to_XML(self, session, vdi_ref):
         return xen_api_todo()
     
     def vdi_get_record(self, session, vdi_ref):
@@ -1451,7 +1451,7 @@ class XendAPI:
     def sr_destroy(self, session, sr_ref):
         return xen_api_error(XEND_ERROR_UNSUPPORTED)
     
-    def sr_to_xml(self, session, sr_ref):
+    def sr_to_XML(self, session, sr_ref):
         return xen_api_todo()
     
     def sr_get_record(self, session, sr_ref):
@@ -1469,7 +1469,7 @@ class XendAPI:
             })
 
     # Attribute acceess
-    def sr_get_vdis(self, session, sr_ref):
+    def sr_get_VDIs(self, session, sr_ref):
         sr = XendNode.instance().get_sr()
         return xen_api_success(sr.list_images())
 

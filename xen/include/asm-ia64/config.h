@@ -41,7 +41,7 @@
 #define CONFIG_IOSAPIC
 #define supervisor_mode_kernel (0)
 
-#define MAX_DMADOM_PFN (0x7FFFFFFFUL >> PAGE_SHIFT) /* 31 addressable bits */
+#define CONFIG_DMA_BITSIZE 30
 
 /* If PERFC is used, include privop maps.  */
 #ifdef PERF_COUNTERS

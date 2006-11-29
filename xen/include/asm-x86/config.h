@@ -82,7 +82,7 @@
 /* Debug stack is restricted to 8kB by guard pages. */
 #define DEBUG_STACK_SIZE 8192
 
-#define MAX_DMADOM_PFN 0x7FFFFUL /* 31 addressable bits */
+#define CONFIG_DMA_BITSIZE 30
 
 #ifndef __ASSEMBLY__
 extern unsigned long _end; /* standard ELF symbol */
