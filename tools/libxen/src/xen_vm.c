@@ -22,6 +22,7 @@
 
 #include "xen_boot_type_internal.h"
 #include "xen_common.h"
+#include "xen_console.h"
 #include "xen_cpu_feature.h"
 #include "xen_cpu_feature_internal.h"
 #include "xen_host.h"
@@ -120,6 +121,9 @@ static const struct_member xen_vm_record_struct_members[] =
         { .key = "actions_after_crash",
           .type = &xen_on_crash_behaviour_abstract_type_,
           .offset = offsetof(xen_vm_record, actions_after_crash) },
+        { .key = "consoles",
+          .type = &abstract_type_ref_set,
+          .offset = offsetof(xen_vm_record, consoles) },
         { .key = "VIFs",
           .type = &abstract_type_ref_set,
           .offset = offsetof(xen_vm_record, vifs) },
@@ -205,6 +209,7 @@ xen_vm_record_free(xen_vm_record *record)
     xen_cpu_feature_set_free(record->vcpus_features_can_use);
     xen_cpu_feature_set_free(record->vcpus_features_force_on);
     xen_cpu_feature_set_free(record->vcpus_features_force_off);
+    xen_console_record_opt_set_free(record->consoles);
     xen_vif_record_opt_set_free(record->vifs);
     xen_vbd_record_opt_set_free(record->vbds);
     xen_vtpm_record_opt_set_free(record->vtpms);
@@ -689,6 +694,23 @@ xen_vm_get_actions_after_crash(xen_session *session, enum xen_on_crash_behaviour
     char *result_str = NULL;
     XEN_CALL_("VM.get_actions_after_crash");
     *result = xen_on_crash_behaviour_from_string(session, result_str);
+    return session->ok;
+}
+
+
+bool
+xen_vm_get_consoles(xen_session *session, struct xen_console_set **result, xen_vm vm)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm }
+        };
+
+    abstract_type result_type = abstract_type_string_set;
+
+    *result = NULL;
+    XEN_CALL_("VM.get_consoles");
     return session->ok;
 }
 

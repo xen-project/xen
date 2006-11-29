@@ -34,6 +34,7 @@ Name & Description \\
 {\tt VDI} & A virtual disk image \\
 {\tt VBD} & A virtual block device \\
 {\tt VTPM} & A virtual TPM device \\
+{\tt console} & A console \\
 {\tt user} & A user of the system \\
 {\tt debug} & A basic class for testing \\
 \hline
@@ -54,6 +55,7 @@ PIF.host & host.PIFs & one-to-many\\
 PIF.network & network.PIFs & one-to-many\\
 SR.VDIs & VDI.SR & many-to-one\\
 VTPM.VM & VM.VTPMs & one-to-many\\
+console.VM & VM.consoles & one-to-many\\
 host.resident\_VMs & VM.resident\_on & many-to-one\\
 host.host\_CPUs & host\_cpu.host & many-to-one\\
 \hline
@@ -96,6 +98,16 @@ Map (a $\rightarrow$ b) & a table mapping values of type a to values of type b \
 \end{tabular}\end{center}
 \subsection{Enumeration types}
 The following enumeration types are used:
+
+\begin{longtable}{|ll|}
+\hline
+{\tt enum console\_protocol} & \\
+\hline
+\hspace{0.5cm}{\tt vt100} & VT100 terminal \\
+\hspace{0.5cm}{\tt rfb} & Remote FrameBuffer protocol (as used in VNC) \\
+\hspace{0.5cm}{\tt rdp} & Remote Desktop Protocol \\
+\hline
+\end{longtable}
 
 \begin{longtable}{|ll|}
 \hline
@@ -947,6 +959,7 @@ $\mathit{RW}$ &  {\tt actions/after\_shutdown} & on\_normal\_exit & action to ta
 $\mathit{RW}$ &  {\tt actions/after\_reboot} & on\_normal\_exit & action to take after the guest has rebooted itself \\
 $\mathit{RW}$ &  {\tt actions/after\_suspend} & on\_normal\_exit & action to take after the guest has suspended itself \\
 $\mathit{RW}$ &  {\tt actions/after\_crash} & on\_crash\_behaviour & action to take if the guest crashes \\
+$\mathit{RO}_\mathit{run}$ &  {\tt consoles} & (console ref) Set & virtual console devices \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VIFs} & (VIF ref) Set & virtual network interfaces \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VBDs} & (VBD ref) Set & virtual block devices \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VTPMs} & (VTPM ref) Set & virtual TPMs \\
@@ -2628,6 +2641,38 @@ void
 
 
 
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_consoles}
+
+{\bf Overview:} 
+Get the consoles field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((console ref) Set) get_consoles (session_id s, VM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & object instance \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(console ref) Set
+}
+
+
+value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -9181,6 +9226,281 @@ VTPM record
 
 
 all fields from the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+
+\vspace{1cm}
+\newpage
+\section{Class: console}
+\subsection{Fields for class: console}
+\begin{longtable}{|lllp{0.38\textwidth}|}
+\hline
+\multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf console} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A console}} \\
+\hline
+Quals & Field & Type & Description \\
+\hline
+$\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
+$\mathit{RO}_\mathit{run}$ &  {\tt protocol} & console\_protocol & the protocol used by this console \\
+$\mathit{RO}_\mathit{run}$ &  {\tt uri} & string & URI for the console service \\
+$\mathit{RO}_\mathit{run}$ &  {\tt VM} & VM ref & VM to which this console is attached \\
+\hline
+\end{longtable}
+\subsection{Additional RPCs associated with class: console}
+\subsubsection{RPC name:~get\_record}
+
+{\bf Overview:} 
+Get the current state of the given console.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (console record) get_record (session_id s, console ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt console ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+console record
+}
+
+
+all fields from the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_by\_uuid}
+
+{\bf Overview:} 
+Get a reference to the object with the specified UUID.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (console ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt string } & uuid & UUID of object to return \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+console ref
+}
+
+
+reference to the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~create}
+
+{\bf Overview:} 
+Create a new console instance, and return its handle.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (console ref) create (session_id s, console record args)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt console record } & args & All constructor arguments \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+console ref
+}
+
+
+reference to the newly created object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~destroy}
+
+{\bf Overview:} 
+Destroy the specified console instance.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void destroy (session_id s, console ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt console ref } & self & object instance \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_uuid}
+
+{\bf Overview:} 
+Get the uuid field of the given console.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_uuid (session_id s, console ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt console ref } & self & object instance \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_protocol}
+
+{\bf Overview:} 
+Get the protocol field of the given console.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (console_protocol) get_protocol (session_id s, console ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt console ref } & self & object instance \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+console\_protocol
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_uri}
+
+{\bf Overview:} 
+Get the uri field of the given console.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_uri (session_id s, console ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt console ref } & self & object instance \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_VM}
+
+{\bf Overview:} 
+Get the VM field of the given console.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (VM ref) get_VM (session_id s, console ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt console ref } & self & object instance \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+VM ref
+}
+
+
+value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}

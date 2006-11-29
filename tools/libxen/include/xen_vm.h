@@ -21,6 +21,7 @@
 
 #include "xen_boot_type.h"
 #include "xen_common.h"
+#include "xen_console_decl.h"
 #include "xen_cpu_feature.h"
 #include "xen_host_decl.h"
 #include "xen_int_float_map.h"
@@ -96,6 +97,7 @@ typedef struct xen_vm_record
     enum xen_on_normal_exit actions_after_reboot;
     enum xen_on_normal_exit actions_after_suspend;
     enum xen_on_crash_behaviour actions_after_crash;
+    struct xen_console_record_opt_set *consoles;
     struct xen_vif_record_opt_set *vifs;
     struct xen_vbd_record_opt_set *vbds;
     struct xen_vtpm_record_opt_set *vtpms;
@@ -398,6 +400,13 @@ xen_vm_get_actions_after_suspend(xen_session *session, enum xen_on_normal_exit *
  */
 extern bool
 xen_vm_get_actions_after_crash(xen_session *session, enum xen_on_crash_behaviour *result, xen_vm vm);
+
+
+/**
+ * Get the consoles field of the given VM.
+ */
+extern bool
+xen_vm_get_consoles(xen_session *session, struct xen_console_set **result, xen_vm vm);
 
 
 /**
