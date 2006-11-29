@@ -878,15 +878,19 @@ static void vmx_do_cpuid(struct cpu_user_regs *regs)
         {
             eax = ebx = ecx = edx = 0x0;
         }
-#ifdef __i386__
         else if ( input == CPUID_LEAF_0x80000001 )
         {
+#if CONFIG_PAGING_LEVELS >= 3
+            if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
+#endif
+                clear_bit(X86_FEATURE_NX & 31, &edx);
+#ifdef __i386__
             clear_bit(X86_FEATURE_LAHF_LM & 31, &ecx);
 
             clear_bit(X86_FEATURE_LM & 31, &edx);
             clear_bit(X86_FEATURE_SYSCALL & 31, &edx);
-        }
 #endif
+        }
     }
 
     regs->eax = (unsigned long) eax;
