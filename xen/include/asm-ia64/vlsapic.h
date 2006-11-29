@@ -23,6 +23,37 @@
 #ifndef _LSAPIC_H
 #define _LSAPIC_H
 #include <xen/sched.h>
+#include <asm/vmx_vcpu.h>
+/*
+ *Delivery mode
+ */
+#define SAPIC_DELIV_SHIFT      8
+#define SAPIC_FIXED            0x0
+#define SAPIC_LOWEST_PRIORITY  0x1
+#define SAPIC_PMI              0x2
+#define SAPIC_NMI              0x4
+#define SAPIC_INIT             0x5
+#define SAPIC_EXTINT           0x7
+
+/*
+ *Interrupt polarity
+ */
+#define SAPIC_POLARITY_SHIFT   13
+#define SAPIC_POL_HIGH         0
+#define SAPIC_POL_LOW          1
+
+/*
+ *Trigger mode
+ */
+#define SAPIC_TRIGGER_SHIFT    15
+#define SAPIC_EDGE             0
+#define SAPIC_LEVEL            1
+
+/*
+ *Mask bit
+ */
+#define SAPIC_MASK_SHIFT       16
+#define SAPIC_MASK             (1 << SAPIC_MASK_SHIFT)
 
 extern void vtm_init(struct vcpu *vcpu);
 extern void vtm_set_itc(struct  vcpu *vcpu, uint64_t new_itc);
@@ -30,5 +61,7 @@ extern void vtm_set_itm(struct vcpu *vcpu, uint64_t val);
 extern void vtm_set_itv(struct vcpu *vcpu, uint64_t val);
 extern void vmx_vexirq(struct vcpu  *vcpu);
 extern void vhpi_detection(struct vcpu *vcpu);
-
+extern int vmx_vcpu_pend_interrupt(VCPU * vcpu, uint8_t vector);
+extern struct vcpu * vlsapic_lid_to_vcpu(struct domain *d, uint16_t dest);
+#define vlsapic_set_irq vmx_vcpu_pend_interrupt
 #endif

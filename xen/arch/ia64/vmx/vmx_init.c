@@ -48,13 +48,12 @@
 #include <asm/processor.h>
 #include <asm/vmx.h>
 #include <xen/mm.h>
-#include <asm/hvm/vioapic.h>
+#include <asm/viosapic.h>
 #include <xen/event.h>
 #include <asm/vlsapic.h>
 
 /* Global flag to identify whether Intel vmx feature is on */
 u32 vmx_enabled = 0;
-unsigned int opt_vmx_debug_level = 0;
 static u32 vm_order;
 static u64 buffer_size;
 static u64 vp_env_info;
@@ -396,11 +395,8 @@ void vmx_setup_platform(struct domain *d)
 	memset(&d->shared_info->evtchn_mask[0], 0xff,
 	       sizeof(d->shared_info->evtchn_mask));
 
-	/* initiate spinlock for pass virq */
-	spin_lock_init(&d->arch.arch_vmx.virq_assist_lock);
-
 	/* Initialize iosapic model within hypervisor */
-	vioapic_init(d);
+	viosapic_init(d);
 }
 
 void vmx_do_launch(struct vcpu *v)

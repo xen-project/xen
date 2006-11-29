@@ -38,7 +38,7 @@
 #include <asm/vmx_pal_vsa.h>
 #include <asm/kregs.h>
 #include <asm/vmx_platform.h>
-#include <asm/hvm/vioapic.h>
+#include <asm/viosapic.h>
 #include <asm/linux/jiffies.h>
 
 //u64  fire_itc;
@@ -330,29 +330,6 @@ void vtm_domain_in(VCPU *vcpu)
 }
  */
 
-#ifdef V_IOSAPIC_READY
-int vlapic_match_logical_addr(struct vlapic *vlapic, uint16_t dest)
-{
-    return (VLAPIC_ID(vlapic) == dest);
-}
-
-struct vlapic* apic_round_robin(struct domain *d,
-				uint8_t vector,
-				uint32_t bitmap)
-{
-    uint8_t bit = 0;
-    
-    if (!bitmap) {
-	printk("<apic_round_robin> no bit on bitmap\n");
-	return NULL;
-    }
-
-    while (!(bitmap & (1 << bit)))
-        bit++;
-
-    return vcpu_vlapic(d->vcpu[bit]);
-}
-#endif
 
 void vlsapic_reset(VCPU *vcpu)
 {
@@ -375,9 +352,6 @@ void vlsapic_reset(VCPU *vcpu)
         VLSAPIC_INSVC(vcpu,i) = 0;
     }
 
-#ifdef V_IOSAPIC_READY
-    vcpu->arch.arch_vmx.vlapic.vcpu = vcpu;
-#endif
     dprintk(XENLOG_INFO, "VLSAPIC inservice base=%p\n", &VLSAPIC_INSVC(vcpu,0) );
 }
 
@@ -667,13 +641,12 @@ void vmx_vexirq(VCPU *vcpu)
     generate_exirq (vcpu);
 }
 
-
-void vmx_vioapic_set_irq(struct domain *d, int irq, int level)
+struct vcpu * vlsapic_lid_to_vcpu(struct domain *d, uint16_t dest)
 {
-    unsigned long flags;
-
-    spin_lock_irqsave(&d->arch.arch_vmx.virq_assist_lock, flags);
-    vioapic_set_irq(d, irq, level);
-    spin_unlock_irqrestore(&d->arch.arch_vmx.virq_assist_lock, flags);
-}
-
+    struct vcpu * v;
+    for_each_vcpu ( d, v ) {
+        if ( (v->arch.privregs->lid >> 16) == dest )
+            return v;
+    }
+    return NULL;
+}                                     

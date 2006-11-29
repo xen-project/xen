@@ -35,6 +35,7 @@
 #include <asm/dom_fw.h>
 #include <xen/domain.h>
 #include <asm/vmx.h> 
+#include <asm/viosapic.h> 
 
 long
 do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
@@ -96,7 +97,7 @@ do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
 
         rc = -EINVAL;
         if (is_hvm_domain(d)) {
-            vmx_vioapic_set_irq(d, op.irq, op.level);
+            viosapic_set_irq(d, op.irq, op.level);
             rc = 0;
         }
 

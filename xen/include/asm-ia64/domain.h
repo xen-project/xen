@@ -124,8 +124,6 @@ struct arch_domain {
 
     struct last_vcpu last_vcpu[NR_CPUS];
 
-    struct arch_vmx_domain arch_vmx; /* Virtual Machine Extensions */
-
 #ifdef CONFIG_XEN_IA64_TLB_TRACK
     struct tlb_track*   tlb_track;
 #endif

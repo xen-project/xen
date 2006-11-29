@@ -33,7 +33,7 @@ CPPFLAGS+= -I$(BASEDIR)/include						\
 	   -I$(BASEDIR)/arch/ia64/linux -I$(BASEDIR)/arch/ia64/linux-xen
 CFLAGS	+= $(CPPFLAGS)
 #CFLAGS  += -Wno-pointer-arith -Wredundant-decls
-CFLAGS	+= -DIA64 -DXEN -DLINUX_2_6 -DV_IOSAPIC_READY
+CFLAGS	+= -DIA64 -DXEN -DLINUX_2_6
 CFLAGS	+= -ffixed-r13 -mfixed-range=f2-f5,f12-f127
 CFLAGS	+= -g
 #CFLAGS  += -DVTI_DEBUG
