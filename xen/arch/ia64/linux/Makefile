@@ -22,6 +22,7 @@ obj-y += __divdi3.o
 obj-y += __udivdi3.o
 obj-y += __moddi3.o
 obj-y += __umoddi3.o
+obj-y += carta_random.o
 
 ## variants of divide/modulo
 ## see files in xen/arch/ia64/linux/lib (linux/arch/ia64/lib)

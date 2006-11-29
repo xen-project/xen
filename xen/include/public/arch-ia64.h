@@ -376,6 +376,9 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 /* expose the p2m table into domain */
 #define IA64_DOM0VP_expose_p2m          7
 
+/* xen perfmon */
+#define IA64_DOM0VP_perfmon             8
+
 // flags for page assignement to pseudo physical address space
 #define _ASSIGN_readonly                0
 #define ASSIGN_readonly                 (1UL << _ASSIGN_readonly)
@@ -462,6 +465,25 @@ struct xen_ia64_boot_param {
   (((unsigned long)(addr) & XENCOMM_INLINE_MASK) == XENCOMM_INLINE_FLAG)
 #define XENCOMM_INLINE_ADDR(addr) \
   ((unsigned long)(addr) & ~XENCOMM_INLINE_MASK)
+
+/* xen perfmon */
+#ifdef XEN
+#ifndef __ASSEMBLY__
+#ifndef _ASM_IA64_PERFMON_H
+
+#include <xen/list.h>   // asm/perfmon.h requires struct list_head
+#include <asm/perfmon.h>
+// for PFM_xxx and pfarg_features_t, pfarg_context_t, pfarg_reg_t, pfarg_load_t
+
+#endif /* _ASM_IA64_PERFMON_H */
+
+DEFINE_XEN_GUEST_HANDLE(pfarg_features_t);
+DEFINE_XEN_GUEST_HANDLE(pfarg_context_t);
+DEFINE_XEN_GUEST_HANDLE(pfarg_reg_t);
+DEFINE_XEN_GUEST_HANDLE(pfarg_load_t);
+#endif /* __ASSEMBLY__ */
+#endif /* XEN */
+
 #endif /* __HYPERVISOR_IF_IA64_H__ */
 
 /*

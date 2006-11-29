@@ -6,6 +6,14 @@
 #ifndef _ASM_IA64_PERFMON_H
 #define _ASM_IA64_PERFMON_H
 
+#ifdef XEN
+#include <asm/config.h>
+#ifndef pt_regs
+#define pt_regs cpu_user_regs
+#endif
+struct cpu_user_regs;
+#endif
+
 /*
  * perfmon comamnds supported on all CPU models
  */

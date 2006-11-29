@@ -3,6 +3,7 @@
 
 HAS_ACPI := y
 HAS_VGA  := y
+xenoprof := y
 VALIDATE_VT	?= n
 no_warns ?= n
 xen_ia64_expose_p2m	?= y

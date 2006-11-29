@@ -17,6 +17,12 @@
  *
  * More information about perfmon available at:
  * 	http://www.hpl.hp.com/research/linux/perfmon
+ *
+ *
+ * For Xen/IA64 xenoprof
+ * Copyright (c) 2006 Isaku Yamahata <yamahata at valinux co jp>
+ *                    VA Linux Systems Japan K.K.
+ *
  */
 
 #include <linux/config.h>
@@ -42,7 +48,11 @@
 #include <linux/rcupdate.h>
 #include <linux/completion.h>
 
+#ifndef XEN
 #include <asm/errno.h>
+#else
+#include <xen/errno.h>
+#endif
 #include <asm/intrinsics.h>
 #include <asm/page.h>
 #include <asm/perfmon.h>
@@ -51,6 +61,15 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 #include <asm/delay.h>
+
+#ifdef XEN
+#include <xen/guest_access.h>
+#include <asm/hw_irq.h>
+#define CONFIG_PERFMON
+#define pid		vcpu_id
+#define thread		arch._thread
+#define task_pt_regs	vcpu_regs
+#endif
 
 #ifdef CONFIG_PERFMON
 /*
@@ -287,7 +306,9 @@ typedef struct pfm_context {
 
 	unsigned long		ctx_ovfl_regs[4];	/* which registers overflowed (notification) */
 
+#ifndef XEN
 	struct completion	ctx_restart_done;  	/* use for blocking notification mode */
+#endif
 
 	unsigned long		ctx_used_pmds[4];	/* bitmask of PMD used            */
 	unsigned long		ctx_all_pmds[4];	/* bitmask of all accessible PMDs */
@@ -320,6 +341,7 @@ typedef struct pfm_context {
 	unsigned long		ctx_smpl_size;		/* size of sampling buffer */
 	void			*ctx_smpl_vaddr;	/* user level virtual address of smpl buffer */
 
+#ifndef XEN
 	wait_queue_head_t 	ctx_msgq_wait;
 	pfm_msg_t		ctx_msgq[PFM_MAX_MSGS];
 	int			ctx_msgq_head;
@@ -327,6 +349,7 @@ typedef struct pfm_context {
 	struct fasync_struct	*ctx_async_queue;
 
 	wait_queue_head_t 	ctx_zombieq;		/* termination cleanup wait queue */
+#endif
 } pfm_context_t;
 
 /*
@@ -371,6 +394,9 @@ typedef struct {
 	unsigned int		pfs_sys_use_dbregs;	   /* incremented when a system wide session uses debug regs */
 	unsigned int		pfs_ptrace_use_dbregs;	   /* incremented when a process uses debug regs */
 	struct task_struct	*pfs_sys_session[NR_CPUS]; /* point to task owning a system-wide session */
+#ifdef XEN
+#define XENOPROF_TASK	((struct task_struct*)1)
+#endif
 } pfm_session_t;
 
 /*
@@ -499,10 +525,14 @@ typedef struct {
 static pfm_stats_t		pfm_stats[NR_CPUS];
 static pfm_session_t		pfm_sessions;	/* global sessions information */
 
+#ifndef XEN
 static DEFINE_SPINLOCK(pfm_alt_install_check);
+#endif
 static pfm_intr_handler_desc_t  *pfm_alt_intr_handler;
 
+#ifndef XEN
 static struct proc_dir_entry 	*perfmon_dir;
+#endif
 static pfm_uuid_t		pfm_null_uuid = {0,};
 
 static spinlock_t		pfm_buffer_fmt_lock;
@@ -514,6 +544,7 @@ static pmu_config_t		*pmu_conf;
 pfm_sysctl_t pfm_sysctl;
 EXPORT_SYMBOL(pfm_sysctl);
 
+#ifndef XEN
 static ctl_table pfm_ctl_table[]={
 	{1, "debug", &pfm_sysctl.debug, sizeof(int), 0666, NULL, &proc_dointvec, NULL,},
 	{2, "debug_ovfl", &pfm_sysctl.debug_ovfl, sizeof(int), 0666, NULL, &proc_dointvec, NULL,},
@@ -533,10 +564,12 @@ static struct ctl_table_header *pfm_sysctl_header;
 
 static int pfm_context_unload(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs);
 static int pfm_flush(struct file *filp);
+#endif
 
 #define pfm_get_cpu_var(v)		__ia64_per_cpu_var(v)
 #define pfm_get_cpu_data(a,b)		per_cpu(a, b)
 
+#ifndef XEN
 static inline void
 pfm_put_task(struct task_struct *task)
 {
@@ -568,6 +601,7 @@ pfm_unreserve_page(unsigned long a)
 {
 	ClearPageReserved(vmalloc_to_page((void*)a));
 }
+#endif
 
 static inline unsigned long
 pfm_protect_ctx_ctxsw(pfm_context_t *x)
@@ -582,6 +616,7 @@ pfm_unprotect_ctx_ctxsw(pfm_context_t *x, unsigned long f)
 	spin_unlock(&(x)->ctx_lock);
 }
 
+#ifndef XEN
 static inline unsigned int
 pfm_do_munmap(struct mm_struct *mm, unsigned long addr, size_t len, int acct)
 {
@@ -606,16 +641,19 @@ static struct file_system_type pfm_fs_type = {
 	.get_sb   = pfmfs_get_sb,
 	.kill_sb  = kill_anon_super,
 };
+#endif
 
 DEFINE_PER_CPU(unsigned long, pfm_syst_info);
 DEFINE_PER_CPU(struct task_struct *, pmu_owner);
 DEFINE_PER_CPU(pfm_context_t  *, pmu_ctx);
 DEFINE_PER_CPU(unsigned long, pmu_activation_number);
+#ifndef XEN
 EXPORT_PER_CPU_SYMBOL_GPL(pfm_syst_info);
 
 
 /* forward declaration */
 static struct file_operations pfm_file_ops;
+#endif
 
 /*
  * forward declarations
@@ -641,7 +679,9 @@ static pmu_config_t *pmu_confs[]={
 };
 
 
+#ifndef XEN
 static int pfm_end_notify_user(pfm_context_t *ctx);
+#endif
 
 static inline void
 pfm_clear_psr_pp(void)
@@ -750,6 +790,7 @@ pfm_write_soft_counter(pfm_context_t *ctx, int i, unsigned long val)
 	ia64_set_pmd(i, val & ovfl_val);
 }
 
+#ifndef XEN
 static pfm_msg_t *
 pfm_get_new_msg(pfm_context_t *ctx)
 {
@@ -837,6 +878,7 @@ pfm_rvfree(void *mem, unsigned long size)
 	}
 	return;
 }
+#endif
 
 static pfm_context_t *
 pfm_context_alloc(void)
@@ -864,6 +906,7 @@ pfm_context_free(pfm_context_t *ctx)
 	}
 }
 
+#ifndef XEN
 static void
 pfm_mask_monitoring(struct task_struct *task)
 {
@@ -1034,6 +1077,7 @@ pfm_restore_monitoring(struct task_struct *task)
 	}
 	pfm_set_psr_l(psr);
 }
+#endif
 
 static inline void
 pfm_save_pmds(unsigned long *pmds, unsigned long mask)
@@ -1047,6 +1091,7 @@ pfm_save_pmds(unsigned long *pmds, unsigned long mask)
 	}
 }
 
+#ifndef XEN
 /*
  * reload from thread state (used for ctxw only)
  */
@@ -1100,7 +1145,37 @@ pfm_copy_pmds(struct task_struct *task, pfm_context_t *ctx)
 			ctx->ctx_pmds[i].val));
 	}
 }
+#else
+static inline void
+xenpfm_restore_pmds(pfm_context_t* ctx)
+{
+	int i;
+	unsigned long ovfl_val = pmu_conf->ovfl_val;
+	unsigned long mask = ctx->ctx_all_pmds[0];
+	unsigned long val;
 
+	for (i = 0; mask; i++, mask >>= 1) {
+		if ((mask & 0x1) == 0)
+			continue;
+
+		val = ctx->ctx_pmds[i].val;
+		/*
+		 * We break up the 64 bit value into 2 pieces
+		 * the lower bits go to the machine state in the
+		 * thread (will be reloaded on ctxsw in).
+		 * The upper part stays in the soft-counter.
+		 */
+		if (PMD_IS_COUNTING(i)) {
+			ctx->ctx_pmds[i].val = val & ~ovfl_val;
+			val &= ovfl_val;
+		}
+		ia64_set_pmd(i, val);		
+	}
+	ia64_srlz_d();
+}
+#endif
+
+#ifndef XEN
 /*
  * propagate PMC from context to thread-state
  */
@@ -1133,6 +1208,23 @@ pfm_restore_pmcs(unsigned long *pmcs, unsigned long mask)
 	}
 	ia64_srlz_d();
 }
+#else
+static inline void
+xenpfm_restore_pmcs(pfm_context_t* ctx)
+{
+	int i;
+	unsigned long mask = ctx->ctx_all_pmcs[0];
+	
+	for (i = 0; mask; i++, mask >>= 1) {
+		if ((mask & 0x1) == 0)
+			continue;
+		ia64_set_pmc(i, ctx->ctx_pmcs[i]);
+		DPRINT(("pmc[%d]=0x%lx\n", i, ctx->ctx_pmcs[i]));
+	}
+	ia64_srlz_d();
+	
+}
+#endif
 
 static inline int
 pfm_uuid_cmp(pfm_uuid_t a, pfm_uuid_t b)
@@ -1305,7 +1397,11 @@ pfm_reserve_session(struct task_struct *task, int is_syswide, unsigned int cpu)
 
 		DPRINT(("reserving system wide session on CPU%u currently on CPU%u\n", cpu, smp_processor_id()));
 
+#ifndef XEN
 		pfm_sessions.pfs_sys_session[cpu] = task;
+#else
+		pfm_sessions.pfs_sys_session[cpu] = XENOPROF_TASK;
+#endif
 
 		pfm_sessions.pfs_sys_sessions++ ;
 
@@ -1332,7 +1428,11 @@ pfm_reserve_session(struct task_struct *task, int is_syswide, unsigned int cpu)
 
 error_conflict:
 	DPRINT(("system wide not possible, conflicting session [%d] on CPU%d\n",
+#ifndef XEN
   		pfm_sessions.pfs_sys_session[cpu]->pid,
+#else
+		-1,
+#endif
 		cpu));
 abort:
 	UNLOCK_PFS(flags);
@@ -1392,6 +1492,7 @@ pfm_unreserve_session(pfm_context_t *ctx, int is_syswide, unsigned int cpu)
 	return 0;
 }
 
+#ifndef XEN
 /*
  * removes virtual mapping of the sampling buffer.
  * IMPORTANT: cannot be called with interrupts disable, e.g. inside
@@ -1428,6 +1529,7 @@ pfm_remove_smpl_mapping(struct task_struct *task, void *vaddr, unsigned long siz
 
 	return 0;
 }
+#endif
 
 /*
  * free actual physical storage used by sampling buffer
@@ -1477,6 +1579,7 @@ pfm_exit_smpl_buffer(pfm_buffer_fmt_t *fmt)
 
 }
 
+#ifndef XEN
 /*
  * pfmfs should _never_ be mounted by userland - too much of security hassle,
  * no real gain from having the whole whorehouse mounted. So we don't need
@@ -1901,6 +2004,7 @@ pfm_flush(struct file *filp)
 
 	return 0;
 }
+#endif
 /*
  * called either on explicit close() or from exit_files(). 
  * Only the LAST user of the file gets to this point, i.e., it is
@@ -1916,19 +2020,27 @@ pfm_flush(struct file *filp)
  * When called from exit_files(), the current task is not yet ZOMBIE but we
  * flush the PMU state to the context. 
  */
+#ifndef XEN
 static int
 pfm_close(struct inode *inode, struct file *filp)
+#else
+static int
+pfm_close(pfm_context_t *ctx)
+#endif
 {
+#ifndef XEN
 	pfm_context_t *ctx;
 	struct task_struct *task;
 	struct pt_regs *regs;
   	DECLARE_WAITQUEUE(wait, current);
 	unsigned long flags;
+#endif
 	unsigned long smpl_buf_size = 0UL;
 	void *smpl_buf_addr = NULL;
 	int free_possible = 1;
 	int state, is_system;
 
+#ifndef XEN
 	DPRINT(("pfm_close called private=%p\n", filp->private_data));
 
 	if (PFM_IS_FILE(filp) == 0) {
@@ -1943,10 +2055,14 @@ pfm_close(struct inode *inode, struct file *filp)
 	}
 
 	PROTECT_CTX(ctx, flags);
+#else
+	BUG_ON(!spin_is_locked(&ctx->ctx_lock));
+#endif
 
 	state     = ctx->ctx_state;
 	is_system = ctx->ctx_fl_system;
 
+#ifndef XEN
 	task = PFM_CTX_TASK(ctx);
 	regs = task_pt_regs(task);
 
@@ -2045,8 +2161,15 @@ pfm_close(struct inode *inode, struct file *filp)
 		pfm_context_unload(ctx, NULL, 0, regs);
 #endif
 	}
+#else
+	/* XXX XEN */
+	/* unload context */
+	BUG_ON(state != PFM_CTX_UNLOADED);
+#endif
 
+#ifndef XEN
 doit:
+#endif
 	/* reload state, may have changed during  opening of critical section */
 	state = ctx->ctx_state;
 
@@ -2087,6 +2210,7 @@ doit:
 		pfm_unreserve_session(ctx, ctx->ctx_fl_system , ctx->ctx_cpu);
 	}
 
+#ifndef XEN
 	/*
 	 * disconnect file descriptor from context must be done
 	 * before we unlock.
@@ -2107,6 +2231,9 @@ doit:
 	 * MUST be done with interrupts ENABLED.
 	 */
 	if (smpl_buf_addr)  pfm_rvfree(smpl_buf_addr, smpl_buf_size);
+#else
+	UNPROTECT_CTX_NOIRQ(ctx);
+#endif
 
 	/*
 	 * return the memory used by the context
@@ -2116,6 +2243,7 @@ doit:
 	return 0;
 }
 
+#ifndef XEN
 static int
 pfm_no_open(struct inode *irrelevant, struct file *dontcare)
 {
@@ -2255,6 +2383,7 @@ pfm_remap_buffer(struct vm_area_struct *vma, unsigned long buf, unsigned long ad
 	}
 	return 0;
 }
+#endif
 
 /*
  * allocate a sampling buffer and remaps it into the user address space of the task
@@ -2262,6 +2391,7 @@ pfm_remap_buffer(struct vm_area_struct *vma, unsigned long buf, unsigned long ad
 static int
 pfm_smpl_buffer_alloc(struct task_struct *task, pfm_context_t *ctx, unsigned long rsize, void **user_vaddr)
 {
+#ifndef XEN
 	struct mm_struct *mm = task->mm;
 	struct vm_area_struct *vma = NULL;
 	unsigned long size;
@@ -2374,8 +2504,13 @@ error_kmem:
 	pfm_rvfree(smpl_buf, size);
 
 	return -ENOMEM;
+#else
+	/* XXX */
+	return 0;
+#endif
 }
 
+#ifndef XEN
 /*
  * XXX: do something better here
  */
@@ -2399,6 +2534,7 @@ pfm_bad_permissions(struct task_struct *task)
 	    || (current->gid != task->sgid)
 	    || (current->gid != task->gid)) && !capable(CAP_SYS_PTRACE);
 }
+#endif
 
 static int
 pfarg_is_sane(struct task_struct *task, pfarg_context_t *pfx)
@@ -2535,6 +2671,7 @@ pfm_reset_pmu_state(pfm_context_t *ctx)
 	ctx->ctx_used_dbrs[0] = 0UL;
 }
 
+#ifndef XEN
 static int
 pfm_ctx_getsize(void *arg, size_t *sz)
 {
@@ -2642,20 +2779,31 @@ pfm_get_task(pfm_context_t *ctx, pid_t pid, struct task_struct **task)
 	}
 	return ret;
 }
+#endif
 
 
-
+#ifndef XEN
 static int
 pfm_context_create(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
+#else
+static pfm_context_t*
+pfm_context_create(pfarg_context_t* req)
+#endif
 {
+#ifndef XEN
 	pfarg_context_t *req = (pfarg_context_t *)arg;
 	struct file *filp;
+#else
+	pfm_context_t *ctx;
+#endif
 	int ctx_flags;
 	int ret;
 
+#ifndef XEN
 	/* let's check the arguments first */
 	ret = pfarg_is_sane(current, req);
 	if (ret < 0) return ret;
+#endif
 
 	ctx_flags = req->ctx_flags;
 
@@ -2664,6 +2812,7 @@ pfm_context_create(pfm_context_t *ctx, void *arg, int count, struct pt_regs *reg
 	ctx = pfm_context_alloc();
 	if (!ctx) goto error;
 
+#ifndef XEN
 	ret = pfm_alloc_fd(&filp);
 	if (ret < 0) goto error_file;
 
@@ -2673,6 +2822,7 @@ pfm_context_create(pfm_context_t *ctx, void *arg, int count, struct pt_regs *reg
 	 * attach context to file
 	 */
 	filp->private_data = ctx;
+#endif
 
 	/*
 	 * does the user want to sample?
@@ -2704,10 +2854,12 @@ pfm_context_create(pfm_context_t *ctx, void *arg, int count, struct pt_regs *reg
 	 * ctx->ctx_fl_excl_idle   = (ctx_flags & PFM_FL_EXCL_IDLE) ? 1: 0;
 	 */
 
+#ifndef XEN
 	/*
 	 * init restart semaphore to locked
 	 */
 	init_completion(&ctx->ctx_restart_done);
+#endif
 
 	/*
 	 * activation is used in SMP only
@@ -2715,12 +2867,14 @@ pfm_context_create(pfm_context_t *ctx, void *arg, int count, struct pt_regs *reg
 	ctx->ctx_last_activation = PFM_INVALID_ACTIVATION;
 	SET_LAST_CPU(ctx, -1);
 
+#ifndef XEN
 	/*
 	 * initialize notification message queue
 	 */
 	ctx->ctx_msgq_head = ctx->ctx_msgq_tail = 0;
 	init_waitqueue_head(&ctx->ctx_msgq_wait);
 	init_waitqueue_head(&ctx->ctx_zombieq);
+#endif
 
 	DPRINT(("ctx=%p flags=0x%x system=%d notify_block=%d excl_idle=%d no_msg=%d ctx_fd=%d \n",
 		ctx,
@@ -2736,19 +2890,35 @@ pfm_context_create(pfm_context_t *ctx, void *arg, int count, struct pt_regs *reg
 	 */
 	pfm_reset_pmu_state(ctx);
 
+#ifndef XEN
 	return 0;
+#else
+	return ctx;
+#endif
 
 buffer_error:
+#ifndef XEN
 	pfm_free_fd(ctx->ctx_fd, filp);
+#endif
 
 	if (ctx->ctx_buf_fmt) {
+#ifndef XEN
 		pfm_buf_fmt_exit(ctx->ctx_buf_fmt, current, NULL, regs);
+#else
+		pfm_buf_fmt_exit(ctx->ctx_buf_fmt, current, NULL, NULL);
+#endif
 	}
+#ifndef XEN
 error_file:
+#endif
 	pfm_context_free(ctx);
 
 error:
+#ifndef XEN
 	return ret;
+#else
+	return NULL;
+#endif
 }
 
 static inline unsigned long
@@ -2860,7 +3030,9 @@ pfm_reset_regs(pfm_context_t *ctx, unsigned long *ovfl_regs, int is_long_reset)
 static int
 pfm_write_pmcs(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 {
+#ifndef XEN
 	struct thread_struct *thread = NULL;
+#endif
 	struct task_struct *task;
 	pfarg_reg_t *req = (pfarg_reg_t *)arg;
 	unsigned long value, pmc_pm;
@@ -2877,9 +3049,14 @@ pfm_write_pmcs(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 	is_system = ctx->ctx_fl_system;
 	task      = ctx->ctx_task;
 	impl_pmds = pmu_conf->impl_pmds[0];
+#ifdef XEN
+	task = NULL;
+	BUG_ON(regs != NULL);
+#endif
 
 	if (state == PFM_CTX_ZOMBIE) return -EINVAL;
 
+#ifndef XEN
 	if (is_loaded) {
 		thread = &task->thread;
 		/*
@@ -2893,6 +3070,13 @@ pfm_write_pmcs(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 		}
 		can_access_pmu = GET_PMU_OWNER() == task || is_system ? 1 : 0;
 	}
+#else
+	/* XXX FIXME */
+	if (state != PFM_CTX_UNLOADED) {
+		return -EBUSY;
+	}
+#endif
+
 	expert_mode = pfm_sysctl.expert_mode; 
 
 	for (i = 0; i < count; i++, req++) {
@@ -3046,6 +3230,7 @@ pfm_write_pmcs(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 		 */
 		ctx->ctx_pmcs[cnum] = value;
 
+#ifndef XEN
 		if (is_loaded) {
 			/*
 			 * write thread state
@@ -3071,6 +3256,7 @@ pfm_write_pmcs(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 			}
 #endif
 		}
+#endif
 
 		DPRINT(("pmc[%u]=0x%lx ld=%d apmu=%d flags=0x%x all_pmcs=0x%lx used_pmds=0x%lx eventid=%ld smpl_pmds=0x%lx reset_pmds=0x%lx reloads_pmcs=0x%lx used_monitors=0x%lx ovfl_regs=0x%lx\n",
 			  cnum,
@@ -3102,7 +3288,9 @@ error:
 static int
 pfm_write_pmds(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 {
+#ifndef XEN
 	struct thread_struct *thread = NULL;
+#endif
 	struct task_struct *task;
 	pfarg_reg_t *req = (pfarg_reg_t *)arg;
 	unsigned long value, hw_value, ovfl_mask;
@@ -3118,9 +3306,14 @@ pfm_write_pmds(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 	is_system = ctx->ctx_fl_system;
 	ovfl_mask = pmu_conf->ovfl_val;
 	task      = ctx->ctx_task;
+#ifdef XEN
+	task = NULL;
+	BUG_ON(regs != NULL);
+#endif
 
 	if (unlikely(state == PFM_CTX_ZOMBIE)) return -EINVAL;
 
+#ifndef XEN
 	/*
 	 * on both UP and SMP, we can only write to the PMC when the task is
 	 * the owner of the local PMU.
@@ -3138,6 +3331,12 @@ pfm_write_pmds(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 		}
 		can_access_pmu = GET_PMU_OWNER() == task || is_system ? 1 : 0;
 	}
+#else
+	/* XXX FIXME */
+	if (state != PFM_CTX_UNLOADED) {
+		return -EBUSY;
+	}
+#endif
 	expert_mode = pfm_sysctl.expert_mode; 
 
 	for (i = 0; i < count; i++, req++) {
@@ -3230,6 +3429,8 @@ pfm_write_pmds(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 			ctx->ctx_ovfl_regs[0] &= ~1UL << cnum;
 		}
 
+		/* XXX FIXME */
+#ifndef XEN
 		if (is_loaded) {
 			/*
 		 	 * write thread state
@@ -3252,6 +3453,7 @@ pfm_write_pmds(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 #endif
 			}
 		}
+#endif
 
 		DPRINT(("pmd[%u]=0x%lx ld=%d apmu=%d, hw_value=0x%lx ctx_pmd=0x%lx  short_reset=0x%lx "
 			  "long_reset=0x%lx notify=%c seed=0x%lx mask=0x%lx used_pmds=0x%lx reset_pmds=0x%lx reload_pmds=0x%lx all_pmds=0x%lx ovfl_regs=0x%lx\n",
@@ -3288,6 +3490,7 @@ abort_mission:
 	return ret;
 }
 
+#ifndef XEN
 /*
  * By the way of PROTECT_CONTEXT(), interrupts are masked while we are in this function.
  * Therefore we know, we do not have to worry about the PMU overflow interrupt. If an
@@ -3471,6 +3674,7 @@ pfm_mod_read_pmds(struct task_struct *task, void *req, unsigned int nreq, struct
 	return pfm_read_pmds(ctx, req, nreq, regs);
 }
 EXPORT_SYMBOL(pfm_mod_read_pmds);
+#endif
 
 /*
  * Only call this function when a process it trying to
@@ -3552,6 +3756,7 @@ pfm_release_debug_registers(struct task_struct *task)
 	return ret;
 }
 
+#ifndef XEN
 static int
 pfm_restart(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 {
@@ -3720,6 +3925,7 @@ pfm_debug(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 	}
 	return 0;
 }
+#endif
 
 /*
  * arg can be NULL and count can be zero for this function
@@ -3727,7 +3933,9 @@ pfm_debug(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 static int
 pfm_write_ibr_dbr(int mode, pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 {
+#ifndef XEN
 	struct thread_struct *thread = NULL;
+#endif
 	struct task_struct *task;
 	pfarg_dbreg_t *req = (pfarg_dbreg_t *)arg;
 	unsigned long flags;
@@ -3744,6 +3952,12 @@ pfm_write_ibr_dbr(int mode, pfm_context_t *ctx, void *arg, int count, struct pt_
 	is_loaded = state == PFM_CTX_LOADED ? 1 : 0;
 	is_system = ctx->ctx_fl_system;
 	task      = ctx->ctx_task;
+#ifdef XEN
+	task = NULL;
+	BUG_ON(regs != NULL);
+	/* currently dbrs, ibrs aren't supported */
+	BUG();
+#endif
 
 	if (state == PFM_CTX_ZOMBIE) return -EINVAL;
 
@@ -3752,6 +3966,10 @@ pfm_write_ibr_dbr(int mode, pfm_context_t *ctx, void *arg, int count, struct pt_
 	 * the owner of the local PMU.
 	 */
 	if (is_loaded) {
+#ifdef XEN
+		/* XXX */
+		return -EBUSY;
+#else
 		thread = &task->thread;
 		/*
 		 * In system wide and when the context is loaded, access can only happen
@@ -3763,6 +3981,7 @@ pfm_write_ibr_dbr(int mode, pfm_context_t *ctx, void *arg, int count, struct pt_
 			return -EBUSY;
 		}
 		can_access_pmu = GET_PMU_OWNER() == task || is_system ? 1 : 0;
+#endif
 	}
 
 	/*
@@ -3777,10 +3996,14 @@ pfm_write_ibr_dbr(int mode, pfm_context_t *ctx, void *arg, int count, struct pt_
 	/*
 	 * don't bother if we are loaded and task is being debugged
 	 */
+#ifndef XEN
 	if (is_loaded && (thread->flags & IA64_THREAD_DBG_VALID) != 0) {
 		DPRINT(("debug registers already in use for [%d]\n", task->pid));
 		return -EBUSY;
 	}
+#else
+	/* Currently no support for is_loaded, see -EBUSY above */
+#endif
 
 	/*
 	 * check for debug registers in system wide mode
@@ -3819,7 +4042,9 @@ pfm_write_ibr_dbr(int mode, pfm_context_t *ctx, void *arg, int count, struct pt_
 	 * is shared by all processes running on it
  	 */
 	if (first_time && can_access_pmu) {
+#ifndef XEN
 		DPRINT(("[%d] clearing ibrs, dbrs\n", task->pid));
+#endif
 		for (i=0; i < pmu_conf->num_ibrs; i++) {
 			ia64_set_ibr(i, 0UL);
 			ia64_dv_serialize_instruction();
@@ -3983,6 +4208,7 @@ pfm_get_features(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 	return 0;
 }
 
+#ifndef XEN
 static int
 pfm_stop(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 {
@@ -4201,12 +4427,15 @@ pfm_check_task_exist(pfm_context_t *ctx)
 
 	return ret;
 }
+#endif
 
 static int
 pfm_context_load(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 {
 	struct task_struct *task;
+#ifndef XEN
 	struct thread_struct *thread;
+#endif
 	struct pfm_context_t *old;
 	unsigned long flags;
 #ifndef CONFIG_SMP
@@ -4220,6 +4449,17 @@ pfm_context_load(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 
 	state     = ctx->ctx_state;
 	is_system = ctx->ctx_fl_system;
+#ifdef XEN
+	task = NULL;
+	old = NULL;
+	pmcs_source = pmds_source = NULL;
+#ifndef CONFIG_SMP
+	owner_task = NULL;
+#endif
+	flags = 0;
+	BUG_ON(count != 0);
+	BUG_ON(regs != NULL);
+#endif
 	/*
 	 * can only load from unloaded or terminated state
 	 */
@@ -4230,6 +4470,7 @@ pfm_context_load(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 		return -EBUSY;
 	}
 
+#ifndef XEN
 	DPRINT(("load_pid [%d] using_dbreg=%d\n", req->load_pid, ctx->ctx_fl_using_dbreg));
 
 	if (CTX_OVFL_NOBLOCK(ctx) == 0 && req->load_pid == current->pid) {
@@ -4255,8 +4496,16 @@ pfm_context_load(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 	}
 
 	thread = &task->thread;
+#else
+	BUG_ON(!spin_is_locked(&ctx->ctx_lock));
+	if (!is_system) {
+		ret = -EINVAL;
+		goto error;
+	}
+#endif
 
 	ret = 0;
+#ifndef XEN
 	/*
 	 * cannot load a context which is using range restrictions,
 	 * into a task that is being debugged.
@@ -4284,6 +4533,9 @@ pfm_context_load(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 
 		if (ret) goto error;
 	}
+#else
+	BUG_ON(ctx->ctx_fl_using_dbreg);
+#endif
 
 	/*
 	 * SMP system-wide monitoring implies self-monitoring.
@@ -4318,6 +4570,7 @@ pfm_context_load(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 	 *
 	 * XXX: needs to be atomic
 	 */
+#ifndef XEN
 	DPRINT(("before cmpxchg() old_ctx=%p new_ctx=%p\n",
 		thread->pfm_context, ctx));
 
@@ -4329,6 +4582,7 @@ pfm_context_load(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 	}
 
 	pfm_reset_msgq(ctx);
+#endif
 
 	ctx->ctx_state = PFM_CTX_LOADED;
 
@@ -4346,9 +4600,14 @@ pfm_context_load(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 
 		if (ctx->ctx_fl_excl_idle) PFM_CPUINFO_SET(PFM_CPUINFO_EXCL_IDLE);
 	} else {
+#ifndef XEN
 		thread->flags |= IA64_THREAD_PM_VALID;
+#else
+		BUG();
+#endif
 	}
 
+#ifndef XEN
 	/*
 	 * propagate into thread-state
 	 */
@@ -4417,12 +4676,29 @@ pfm_context_load(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 		ctx->ctx_saved_psr_up = 0UL;
 		ia64_psr(regs)->up = ia64_psr(regs)->pp = 0;
 	}
+#else
+	BUG_ON(!is_system);
+
+	/* load pmds, pmcs */
+	xenpfm_restore_pmds(ctx);
+	xenpfm_restore_pmcs(ctx);
+
+	ctx->ctx_reload_pmcs[0] = 0UL;
+	ctx->ctx_reload_pmds[0] = 0UL;
+
+	BUG_ON(ctx->ctx_fl_using_dbreg);
+
+	SET_PMU_OWNER(NULL, ctx);
+#endif
 
 	ret = 0;
 
+#ifndef XEN
 error_unres:
 	if (ret) pfm_unreserve_session(ctx, ctx->ctx_fl_system, the_cpu);
+#endif
 error:
+#ifndef XEN
 	/*
 	 * we must undo the dbregs setting (for system-wide)
 	 */
@@ -4445,6 +4721,9 @@ error:
 			}
 		}
 	}
+#else
+	BUG_ON(set_dbregs);
+#endif
 	return ret;
 }
 
@@ -4466,7 +4745,15 @@ pfm_context_unload(pfm_context_t *ctx, void *arg, int count, struct pt_regs *reg
 	int prev_state, is_system;
 	int ret;
 
+#ifndef XEN
 	DPRINT(("ctx_state=%d task [%d]\n", ctx->ctx_state, task ? task->pid : -1));
+#else
+	task = NULL;
+	tregs = NULL;
+	BUG_ON(arg != NULL);
+	BUG_ON(count != 0);
+	BUG_ON(regs != NULL);
+#endif
 
 	prev_state = ctx->ctx_state;
 	is_system  = ctx->ctx_fl_system;
@@ -4482,8 +4769,13 @@ pfm_context_unload(pfm_context_t *ctx, void *arg, int count, struct pt_regs *reg
 	/*
 	 * clear psr and dcr bits
 	 */
+#ifndef XEN
 	ret = pfm_stop(ctx, NULL, 0, regs);
 	if (ret) return ret;
+#else
+	/* caller does it by hand */
+	ret = 0;
+#endif
 
 	ctx->ctx_state = PFM_CTX_UNLOADED;
 
@@ -4515,10 +4807,12 @@ pfm_context_unload(pfm_context_t *ctx, void *arg, int count, struct pt_regs *reg
 		if (prev_state != PFM_CTX_ZOMBIE) 
 			pfm_unreserve_session(ctx, 1 , ctx->ctx_cpu);
 
+#ifndef XEN
 		/*
 		 * disconnect context from task
 		 */
 		task->thread.pfm_context = NULL;
+#endif
 		/*
 		 * disconnect task from context
 		 */
@@ -4530,6 +4824,7 @@ pfm_context_unload(pfm_context_t *ctx, void *arg, int count, struct pt_regs *reg
 		return 0;
 	}
 
+#ifndef XEN
 	/*
 	 * per-task mode
 	 */
@@ -4584,9 +4879,14 @@ pfm_context_unload(pfm_context_t *ctx, void *arg, int count, struct pt_regs *reg
 	DPRINT(("disconnected [%d] from context\n", task->pid));
 
 	return 0;
+#else
+	BUG();
+	return -EINVAL;
+#endif
 }
 
 
+#ifndef XEN
 /*
  * called only from exit_thread(): task == current
  * we come here only if current has a context attached (loaded or masked)
@@ -5210,6 +5510,9 @@ pfm_end_notify_user(pfm_context_t *ctx)
 
 	return pfm_notify_user(ctx, msg);
 }
+#else
+#define pfm_ovfl_notify_user(ctx, ovfl_pmds)	do {} while(0)
+#endif
 
 /*
  * main overflow processing routine.
@@ -5226,6 +5529,9 @@ pfm_overflow_handler(struct task_struct *task, pfm_context_t *ctx, u64 pmc0, str
 	pfm_ovfl_ctrl_t	ovfl_ctrl;
 	unsigned int i, has_smpl;
 	int must_notify = 0;
+#ifdef XEN
+	BUG_ON(task != NULL);
+#endif
 
 	if (unlikely(ctx->ctx_state == PFM_CTX_ZOMBIE)) goto stop_monitoring;
 
@@ -5400,6 +5706,7 @@ pfm_overflow_handler(struct task_struct *task, pfm_context_t *ctx, u64 pmc0, str
 	}
 
 	if (ovfl_notify && ovfl_ctrl.bits.notify_user) {
+#ifndef XEN
 		/*
 		 * keep track of what to reset when unblocking
 		 */
@@ -5428,11 +5735,18 @@ pfm_overflow_handler(struct task_struct *task, pfm_context_t *ctx, u64 pmc0, str
 		 * anyway, so the signal receiver would come spin for nothing.
 		 */
 		must_notify = 1;
+#else
+		gdprintk(XENLOG_INFO, "%s check!\n", __func__);
+#endif
 	}
 
 	DPRINT_ovfl(("owner [%d] pending=%ld reason=%u ovfl_pmds=0x%lx ovfl_notify=0x%lx masked=%d\n",
+#ifndef XEN
 			GET_PMU_OWNER() ? GET_PMU_OWNER()->pid : -1,
 			PFM_GET_WORK_PENDING(task),
+#else
+			-1, 0UL,
+#endif
 			ctx->ctx_fl_trap_reason,
 			ovfl_pmds,
 			ovfl_notify,
@@ -5441,9 +5755,13 @@ pfm_overflow_handler(struct task_struct *task, pfm_context_t *ctx, u64 pmc0, str
 	 * in case monitoring must be stopped, we toggle the psr bits
 	 */
 	if (ovfl_ctrl.bits.mask_monitoring) {
+#ifndef XEN
 		pfm_mask_monitoring(task);
 		ctx->ctx_state = PFM_CTX_MASKED;
 		ctx->ctx_fl_can_restart = 1;
+#else
+		gdprintk(XENLOG_INFO, "%s check!\n", __func__);
+#endif
 	}
 
 	/*
@@ -5513,14 +5831,22 @@ pfm_do_interrupt_handler(int irq, void *arg, struct pt_regs *regs)
 	 */
 	pmc0 = ia64_get_pmc(0);
 
+#ifndef XEN
 	task = GET_PMU_OWNER();
+#else
+	task = NULL;
+#endif
 	ctx  = GET_PMU_CTX();
 
 	/*
 	 * if we have some pending bits set
 	 * assumes : if any PMC0.bit[63-1] is set, then PMC0.fr = 1
 	 */
+#ifndef XEN
 	if (PMC0_HAS_OVFL(pmc0) && task) {
+#else
+	if (PMC0_HAS_OVFL(pmc0)) {
+#endif
 		/*
 		 * we assume that pmc0.fr is always set here
 		 */
@@ -5528,8 +5854,10 @@ pfm_do_interrupt_handler(int irq, void *arg, struct pt_regs *regs)
 		/* sanity check */
 		if (!ctx) goto report_spurious1;
 
+#ifndef XEN
 		if (ctx->ctx_fl_system == 0 && (task->thread.flags & IA64_THREAD_PM_VALID) == 0) 
 			goto report_spurious2;
+#endif
 
 		PROTECT_CTX_NOPRINT(ctx, flags);
 
@@ -5549,16 +5877,20 @@ pfm_do_interrupt_handler(int irq, void *arg, struct pt_regs *regs)
 	return retval;
 
 report_spurious1:
+#ifndef XEN
 	printk(KERN_INFO "perfmon: spurious overflow interrupt on CPU%d: process %d has no PFM context\n",
 		this_cpu, task->pid);
+#endif
 	pfm_unfreeze_pmu();
 	return -1;
+#ifndef XEN  /* XEN path doesn't take this goto */
 report_spurious2:
 	printk(KERN_INFO "perfmon: spurious overflow interrupt on CPU%d: process %d, invalid flag\n", 
 		this_cpu, 
 		task->pid);
 	pfm_unfreeze_pmu();
 	return -1;
+#endif
 }
 
 static irqreturn_t
@@ -5600,6 +5932,7 @@ pfm_interrupt_handler(int irq, void *arg, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
+#ifndef XEN
 /*
  * /proc/perfmon interface, for debug only
  */
@@ -5777,6 +6110,7 @@ pfm_proc_open(struct inode *inode, struct file *file)
 {
 	return seq_open(file, &pfm_seq_ops);
 }
+#endif
 
 
 /*
@@ -5831,6 +6165,7 @@ pfm_syst_wide_update_task(struct task_struct *task, unsigned long info, int is_c
 	}
 }
 
+#ifndef XEN
 #ifdef CONFIG_SMP
 
 static void
@@ -6326,6 +6661,7 @@ pfm_load_regs (struct task_struct *task)
 	if (likely(psr_up)) pfm_set_psr_up();
 }
 #endif /* CONFIG_SMP */
+#endif /* XEN */
 
 /*
  * this function assumes monitoring is stopped
@@ -6333,6 +6669,7 @@ pfm_load_regs (struct task_struct *task)
 static void
 pfm_flush_pmds(struct task_struct *task, pfm_context_t *ctx)
 {
+#ifndef XEN
 	u64 pmc0;
 	unsigned long mask2, val, pmd_val, ovfl_val;
 	int i, can_access_pmu = 0;
@@ -6438,14 +6775,20 @@ pfm_flush_pmds(struct task_struct *task, pfm_context_t *ctx)
 
 		ctx->ctx_pmds[i].val = val;
 	}
+#else
+	/* XXX */
+#endif
 }
 
 static struct irqaction perfmon_irqaction = {
 	.handler = pfm_interrupt_handler,
+#ifndef XEN
 	.flags   = SA_INTERRUPT,
+#endif
 	.name    = "perfmon"
 };
 
+#ifndef XEN
 static void
 pfm_alt_save_pmu_state(void *data)
 {
@@ -6580,11 +6923,16 @@ pfm_remove_alt_pmu_interrupt(pfm_intr_handler_desc_t *hdl)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(pfm_remove_alt_pmu_interrupt);
+#endif
 
 /*
  * perfmon initialization routine, called from the initcall() table
  */
+#ifndef XEN
 static int init_pfm_fs(void);
+#else
+#define init_pfm_fs() do {} while(0)
+#endif
 
 static int __init
 pfm_probe_pmu(void)
@@ -6609,12 +6957,14 @@ found:
 	return 0;
 }
 
+#ifndef XEN
 static struct file_operations pfm_proc_fops = {
 	.open		= pfm_proc_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= seq_release,
 };
+#endif
 
 int __init
 pfm_init(void)
@@ -6684,6 +7034,7 @@ pfm_init(void)
 		return -1;
 	}
 
+#ifndef XEN
 	/*
 	 * create /proc/perfmon (mostly for debugging purposes)
 	 */
@@ -6702,6 +7053,7 @@ pfm_init(void)
 	 * create /proc/sys/kernel/perfmon (for debugging purposes)
 	 */
 	pfm_sysctl_header = register_sysctl_table(pfm_sysctl_root, 0);
+#endif
 
 	/*
 	 * initialize all our spinlocks
@@ -6768,12 +7120,14 @@ dump_pmu_state(const char *from)
 		return;
 	}
 
+#ifndef XEN
 	printk("CPU%d from %s() current [%d] iip=0x%lx %s\n", 
 		this_cpu, 
 		from, 
 		current->pid, 
 		regs->cr_iip,
 		current->comm);
+#endif
 
 	task = GET_PMU_OWNER();
 	ctx  = GET_PMU_CTX();
@@ -6808,6 +7162,7 @@ dump_pmu_state(const char *from)
 	}
 
 	if (ctx) {
+#ifndef XEN
 		printk("->CPU%d ctx_state=%d vaddr=%p addr=%p fd=%d ctx_task=[%d] saved_psr_up=0x%lx\n",
 				this_cpu,
 				ctx->ctx_state,
@@ -6816,10 +7171,19 @@ dump_pmu_state(const char *from)
 				ctx->ctx_msgq_head,
 				ctx->ctx_msgq_tail,
 				ctx->ctx_saved_psr_up);
+#else
+		printk("->CPU%d ctx_state=%d vaddr=%p addr=%p saved_psr_up=0x%lx\n",
+				this_cpu,
+				ctx->ctx_state,
+				ctx->ctx_smpl_vaddr,
+				ctx->ctx_smpl_hdr,
+				ctx->ctx_saved_psr_up);
+#endif
 	}
 	local_irq_restore(flags);
 }
 
+#ifndef XEN
 /*
  * called from process.c:copy_thread(). task is new child.
  */
@@ -6843,6 +7207,7 @@ pfm_inherit(struct task_struct *task, struct pt_regs *regs)
 	 * the psr bits are already set properly in copy_threads()
 	 */
 }
+#endif
 #else  /* !CONFIG_PERFMON */
 asmlinkage long
 sys_perfmonctl (int fd, int cmd, void *arg, int count)
@@ -6850,3 +7215,584 @@ sys_perfmonctl (int fd, int cmd, void *arg, int count)
 	return -ENOSYS;
 }
 #endif /* CONFIG_PERFMON */
+
+
+#ifdef XEN
+static int xenpfm_context_unload(void); 
+static int xenpfm_start_stop_locked(int is_start);
+DEFINE_PER_CPU(pfm_context_t*, xenpfm_context);
+
+/*
+ * note: some functions mask interrupt with this lock held
+ * so that this lock can't be locked from interrupt handler.
+ * lock order domlist_lock => xenpfm_context_lock
+ */
+DEFINE_SPINLOCK(xenpfm_context_lock);
+
+static int
+xenpfm_get_features(XEN_GUEST_HANDLE(pfarg_features_t) req)
+{
+	pfarg_features_t res;
+	if (guest_handle_is_null(req))
+		return -EFAULT;
+
+	memset(&res, 0, sizeof(res));
+	pfm_get_features(NULL, &res, 0, NULL);
+	if (copy_to_guest(req, &res, 1))
+		return -EFAULT;
+	return 0;
+}
+
+static int
+xenpfm_pfarg_is_sane(pfarg_context_t* pfx)
+{
+	int error;
+	int ctx_flags;
+
+	error = pfarg_is_sane(NULL, pfx);
+	if (error)
+		return error;
+
+	ctx_flags = pfx->ctx_flags;
+	if (!(ctx_flags & PFM_FL_SYSTEM_WIDE) ||
+	    ctx_flags & PFM_FL_NOTIFY_BLOCK ||
+	    ctx_flags & PFM_FL_OVFL_NO_MSG)
+		return -EINVAL;
+
+	/* probably more to add here */
+
+	return 0;
+}
+
+static int
+xenpfm_context_create(XEN_GUEST_HANDLE(pfarg_context_t) req)
+{
+	int error;
+	pfarg_context_t kreq;
+
+	int cpu;
+	pfm_context_t* ctx[NR_CPUS] = {[0 ... (NR_CPUS - 1)] = NULL};
+	
+	if (copy_from_guest(&kreq, req, 1)) {
+		error = -EINVAL;
+		goto out;
+	}
+
+	error = xenpfm_pfarg_is_sane(&kreq);
+	if (error)
+		goto out;
+
+	/* XXX fmt */
+	for_each_cpu(cpu) {
+		ctx[cpu] = pfm_context_create(&kreq);
+		if (ctx[cpu] == NULL) {
+			error = -ENOMEM;
+			break;
+		}
+	}
+	if (error)
+		goto out;
+
+	BUG_ON(in_irq());
+	spin_lock(&xenpfm_context_lock);
+	for_each_cpu(cpu) {
+		if (per_cpu(xenpfm_context, cpu) != NULL) {
+			error = -EBUSY;
+			break;
+		}
+	}
+	for_each_cpu(cpu) {
+		per_cpu(xenpfm_context, cpu) = ctx[cpu];
+		ctx[cpu] = NULL;
+	}
+	spin_unlock(&xenpfm_context_lock);
+
+out:
+	for_each_cpu(cpu) {
+		if (ctx[cpu] != NULL)
+			pfm_context_free(ctx[cpu]);
+	}
+	return error;
+}
+
+static int
+xenpfm_context_destroy(void)
+{
+	int cpu;
+	pfm_context_t* ctx;
+	unsigned long flags;
+	unsigned long need_unload;
+	int error = 0;
+
+again:
+	need_unload = 0;
+	BUG_ON(in_irq());
+	spin_lock_irqsave(&xenpfm_context_lock, flags);
+	for_each_cpu(cpu) {
+		ctx = per_cpu(xenpfm_context, cpu);
+		if (ctx == NULL) {
+			error = -EINVAL;
+			break;
+		}
+		PROTECT_CTX_NOIRQ(ctx);
+		if (ctx->ctx_state != PFM_CTX_UNLOADED)
+			need_unload = 1;
+	}
+	if (error) {
+		for_each_cpu(cpu) {
+			ctx = per_cpu(xenpfm_context, cpu);
+			if (ctx == NULL)
+				break;
+			UNPROTECT_CTX_NOIRQ(per_cpu(xenpfm_context, cpu));
+		}
+		goto out;
+	}
+	if (need_unload) {
+		for_each_cpu(cpu)
+			UNPROTECT_CTX_NOIRQ(per_cpu(xenpfm_context, cpu));
+		spin_unlock_irqrestore(&xenpfm_context_lock, flags);
+
+		error = xenpfm_context_unload();
+		if (error)
+			return error;
+		goto again;
+	}
+
+	for_each_cpu(cpu) {
+		pfm_context_t* ctx = per_cpu(xenpfm_context, cpu);
+		per_cpu(xenpfm_context, cpu) = NULL;
+
+		/* pfm_close() unlocks spinlock and free the context. */
+		error |= pfm_close(ctx);
+	}
+out:
+	spin_unlock_irqrestore(&xenpfm_context_lock, flags);
+	return error;
+}
+
+static int
+xenpfm_write_pmcs(XEN_GUEST_HANDLE(pfarg_reg_t) req, unsigned long count)
+{
+	unsigned long i;
+	int error = 0;
+	unsigned long flags;
+
+	for (i = 0; i < count; i++) {
+		pfarg_reg_t kreq;
+		int cpu;
+		if (copy_from_guest_offset(&kreq, req, i, 1)) {
+			error = -EFAULT;
+			goto out;
+		}
+		BUG_ON(in_irq());
+		spin_lock_irqsave(&xenpfm_context_lock, flags);
+		for_each_online_cpu(cpu) {
+			pfm_context_t* ctx = per_cpu(xenpfm_context, cpu);
+			PROTECT_CTX_NOIRQ(ctx);
+			error |= pfm_write_pmcs(ctx, (void *)&kreq, 1, NULL);
+			UNPROTECT_CTX_NOIRQ(ctx);
+		}
+		spin_unlock_irqrestore(&xenpfm_context_lock, flags);
+		if (error)
+			break;
+	}
+	
+	/* XXX if is loaded, change all physical cpus pmcs. */
+	/* Currently results in error */
+out:
+	return error;
+}
+
+static int
+xenpfm_write_pmds(XEN_GUEST_HANDLE(pfarg_reg_t) req, unsigned long count)
+{
+	unsigned long i;
+	int error = 0;
+	
+	for (i = 0; i < count; i++) {
+		pfarg_reg_t kreq;
+		int cpu;
+		unsigned long flags;
+		if (copy_from_guest_offset(&kreq, req, i, 1)) {
+			error = -EFAULT;
+			goto out;
+		}
+		BUG_ON(in_irq());
+		spin_lock_irqsave(&xenpfm_context_lock, flags);
+		for_each_online_cpu(cpu) {
+			pfm_context_t* ctx = per_cpu(xenpfm_context, cpu);
+			PROTECT_CTX_NOIRQ(ctx);
+			error |= pfm_write_pmds(ctx, &kreq, 1, NULL);
+			UNPROTECT_CTX_NOIRQ(ctx);
+		}
+		spin_unlock_irqrestore(&xenpfm_context_lock, flags);
+	}
+	
+	/* XXX if is loaded, change all physical cpus pmds. */
+	/* Currently results in error */
+out:
+	return error;
+}
+
+struct xenpfm_context_load_arg {
+	pfarg_load_t*	req;
+	int		error[NR_CPUS];
+};
+
+static void
+xenpfm_context_load_cpu(void* info)
+{
+	unsigned long flags;
+	struct xenpfm_context_load_arg* arg = (struct xenpfm_context_load_arg*)info;
+	pfm_context_t* ctx = __get_cpu_var(xenpfm_context);
+	PROTECT_CTX(ctx, flags);
+	arg->error[smp_processor_id()] = pfm_context_load(ctx, arg->req, 0, NULL);
+	UNPROTECT_CTX(ctx, flags);
+}
+
+static int
+xenpfm_context_load(XEN_GUEST_HANDLE(pfarg_load_t) req)
+{
+	pfarg_load_t kreq;
+	int cpu;
+	struct xenpfm_context_load_arg arg;
+	int error = 0;
+
+	if (copy_from_guest(&kreq, req, 1))
+		return -EFAULT;
+
+	arg.req = &kreq;
+	for_each_online_cpu(cpu)
+		arg.error[cpu] = 0;
+
+	BUG_ON(in_irq());
+	spin_lock(&xenpfm_context_lock);
+	smp_call_function(&xenpfm_context_load_cpu, &arg, 1, 1);
+	xenpfm_context_load_cpu(&arg);
+	spin_unlock(&xenpfm_context_lock);
+	for_each_online_cpu(cpu) {
+		if (arg.error[cpu]) {
+			gdprintk(XENLOG_INFO, "%s: error %d cpu %d\n",
+				 __func__, error, cpu);
+			error = arg.error[cpu];
+		}
+	}
+	return 0;
+}
+
+
+struct xenpfm_context_unload_arg {
+	int		error[NR_CPUS];
+};
+
+static void
+xenpfm_context_unload_cpu(void* info)
+{
+	unsigned long flags;
+	struct xenpfm_context_unload_arg* arg = (struct xenpfm_context_unload_arg*)info;
+	pfm_context_t* ctx = __get_cpu_var(xenpfm_context);
+	PROTECT_CTX(ctx, flags);
+	arg->error[smp_processor_id()] = pfm_context_unload(ctx, NULL, 0, NULL);
+	UNPROTECT_CTX(ctx, flags);
+}
+
+static int
+xenpfm_context_unload(void)
+{
+	int cpu;
+	struct xenpfm_context_unload_arg arg;
+	int error = 0;
+
+	for_each_online_cpu(cpu)
+		arg.error[cpu] = 0;
+
+	BUG_ON(in_irq());
+	read_lock(&domlist_lock);
+	spin_lock(&xenpfm_context_lock);
+	error = xenpfm_start_stop_locked(0);
+	read_unlock(&domlist_lock);
+	if (error) {
+		spin_unlock(&xenpfm_context_lock);
+		return error;
+	}
+	
+	smp_call_function(&xenpfm_context_unload_cpu, &arg, 1, 1);
+	xenpfm_context_unload_cpu(&arg);
+	spin_unlock(&xenpfm_context_lock);
+	for_each_online_cpu(cpu) {
+		if (arg.error[cpu]) {
+			gdprintk(XENLOG_INFO, "%s: error %d cpu %d\n",
+				 __func__, error, cpu);
+			error = arg.error[cpu];
+		}
+	}
+	return error;
+}
+
+static int
+__xenpfm_start(void)
+{
+	pfm_context_t* ctx = __get_cpu_var(xenpfm_context);
+	int state;
+	int error = 0;
+
+	BUG_ON(local_irq_is_enabled());
+	PROTECT_CTX_NOIRQ(ctx);	
+	state = ctx->ctx_state;
+	if (state != PFM_CTX_LOADED) {
+		error = -EINVAL;
+		goto out;
+	}
+
+	/* now update the local PMU and cpuinfo */
+	PFM_CPUINFO_SET(PFM_CPUINFO_DCR_PP);
+
+	/* start monitoring at kernel level */
+	pfm_set_psr_pp();
+
+	/* start monitoring at kernel level */
+	pfm_set_psr_up();
+
+	/* enable dcr pp */
+	ia64_setreg(_IA64_REG_CR_DCR, ia64_getreg(_IA64_REG_CR_DCR) | IA64_DCR_PP);
+	ia64_srlz_i();
+out:
+	UNPROTECT_CTX_NOIRQ(ctx);
+	return error;
+}
+
+static int
+__xenpfm_stop(void)
+{
+	pfm_context_t* ctx = __get_cpu_var(xenpfm_context);
+	int state;
+	int error = 0;
+
+	BUG_ON(local_irq_is_enabled());
+	PROTECT_CTX_NOIRQ(ctx);	
+	state = ctx->ctx_state;
+	if (state != PFM_CTX_LOADED) {
+		error = -EINVAL;
+		goto out;
+	}
+
+	/*
+	 * Update local PMU first
+	 *
+	 * disable dcr pp
+	 */
+	ia64_setreg(_IA64_REG_CR_DCR, ia64_getreg(_IA64_REG_CR_DCR) & ~IA64_DCR_PP);
+	ia64_srlz_i();
+
+	/* update local cpuinfo */
+	PFM_CPUINFO_CLEAR(PFM_CPUINFO_DCR_PP);
+
+	/* stop monitoring, does srlz.i */
+	pfm_clear_psr_pp();
+
+	/* stop monitoring  at kernel level */
+	pfm_clear_psr_up();
+out:
+	UNPROTECT_CTX_NOIRQ(ctx);
+	return error;
+}
+
+int
+__xenpfm_start_stop(int is_start)
+{
+	if (is_start)
+		return __xenpfm_start();
+	else
+		return __xenpfm_stop();
+}
+
+struct xenpfm_start_arg {
+	int		is_start;
+	atomic_t	started;
+	atomic_t	finished;
+	int		error[NR_CPUS];
+};
+
+static void
+xenpfm_start_stop_cpu(void* info)
+{
+	unsigned long flags;
+	struct xenpfm_start_arg* arg = (struct xenpfm_start_arg*)info;
+
+	local_irq_save(flags);
+	atomic_inc(&arg->started);
+	while (!atomic_read(&arg->finished))
+		cpu_relax();
+
+	arg->error[smp_processor_id()] = __xenpfm_start_stop(arg->is_start);
+
+	atomic_inc(&arg->finished);
+	local_irq_restore(flags);
+}
+
+static void
+xenpfm_start_stop_vcpu(struct vcpu* v, int is_start)
+{
+	struct pt_regs *regs = vcpu_regs(v);
+
+	if (is_start) {
+		/* set user level psr.pp for the caller */
+		ia64_psr(regs)->pp = 1;
+
+		/* activate monitoring at user level */
+		ia64_psr(regs)->up = 1;
+
+		/* don't allow user level control */
+		ia64_psr(regs)->sp = 0;
+	} else {
+		/*
+		 * stop monitoring in the caller
+		 */
+		ia64_psr(regs)->pp = 0;
+		
+		/*
+	 	 * stop monitoring at the user level
+	 	 */
+		ia64_psr(regs)->up = 0;
+
+#if 0
+		/*
+		 * cancel user level control
+		 */
+		ia64_psr(regs)->sp = 1;
+#endif
+	}
+}
+
+static int
+xenpfm_start_stop_locked(int is_start)
+{
+	struct xenpfm_start_arg arg;
+	int cpus = num_online_cpus();
+	int cpu;
+	unsigned long flags;
+	struct domain* d;
+	struct vcpu* v;
+	int error = 0;
+
+	arg.is_start = is_start;
+	atomic_set(&arg.started, 1); /* 1 for this cpu */
+	atomic_set(&arg.finished, 0);
+	for_each_cpu(cpu)
+		arg.error[cpu] = 0;
+
+	BUG_ON(!spin_is_locked(&xenpfm_context_lock));
+	smp_call_function(&xenpfm_start_stop_cpu, &arg, 1, 0);
+	local_irq_save(flags);
+
+	while (atomic_read(&arg.started) != cpus)
+		cpu_relax();
+
+	for_each_domain(d) {
+		for_each_vcpu(d, v)
+			xenpfm_start_stop_vcpu(v, is_start);
+	}
+
+	arg.error[smp_processor_id()] = __xenpfm_start_stop(is_start);
+	atomic_inc(&arg.finished);
+
+	while (atomic_read(&arg.finished) != cpus)
+		cpu_relax();
+	local_irq_restore(flags);
+
+	for_each_online_cpu(cpu) {
+		if (!arg.error[cpu]) {
+			gdprintk(XENLOG_INFO, "%s: cpu %d error %d\n", 
+				__func__, cpu, arg.error[cpu]);
+			error = arg.error[cpu];
+		}
+	}
+	return error;
+}
+
+static int
+xenpfm_start_stop(int is_start)
+{
+	int error;
+	
+	BUG_ON(in_irq());
+	read_lock(&domlist_lock);
+	spin_lock(&xenpfm_context_lock);
+	error =xenpfm_start_stop_locked(is_start);
+	spin_unlock(&xenpfm_context_lock);
+	read_unlock(&domlist_lock);
+
+	return error;
+}
+
+#define NONPRIV_OP(cmd) (((cmd) == PFM_GET_FEATURES))
+
+int
+do_perfmon_op(unsigned long cmd,
+	      XEN_GUEST_HANDLE(void) arg1, unsigned long count)
+{
+	unsigned long error = 0;
+
+	if (!NONPRIV_OP(cmd) && current->domain != xenoprof_primary_profiler) {
+		gdprintk(XENLOG_INFO, "xen perfmon: "
+			 "dom %d denied privileged operation %ld\n",
+			 current->domain->domain_id, cmd);
+		return -EPERM;
+	}
+	switch (cmd) {
+        case PFM_GET_FEATURES:
+		error = xenpfm_get_features(guest_handle_cast(arg1, pfarg_features_t));
+		break;
+
+        case PFM_CREATE_CONTEXT:
+		error = xenpfm_context_create(guest_handle_cast(arg1, pfarg_context_t));
+		break;
+        case PFM_DESTROY_CONTEXT:
+		error = xenpfm_context_destroy();
+		break;
+
+        case PFM_WRITE_PMCS:
+		error = xenpfm_write_pmcs(guest_handle_cast(arg1, pfarg_reg_t), count);
+		break;
+        case PFM_WRITE_PMDS:
+		error = xenpfm_write_pmds(guest_handle_cast(arg1, pfarg_reg_t), count);
+		break;
+        case PFM_READ_PMDS:
+		error = -ENOSYS;
+		break;
+        case PFM_GET_PMC_RESET_VAL:
+		error = -ENOSYS;
+		break;
+
+        case PFM_LOAD_CONTEXT:
+		error = xenpfm_context_load(guest_handle_cast(arg1, pfarg_load_t));
+		break;
+        case PFM_UNLOAD_CONTEXT:
+		error = xenpfm_context_unload();
+		break;
+
+        case PFM_START:
+		error = xenpfm_start_stop(1);
+		break;
+        case PFM_STOP:
+		error = xenpfm_start_stop(0);
+		break;
+        case PFM_RESTART:
+		error = -ENOSYS;
+		break;
+
+        case PFM_DEBUG:
+		error = -ENOSYS;
+		break;
+
+        case PFM_ENABLE:
+        case PFM_DISABLE:
+        case PFM_PROTECT_CONTEXT:
+        case PFM_UNPROTECT_CONTEXT:
+	default:
+		error = -EINVAL;
+		break;
+	}
+	return error;
+}
+#endif

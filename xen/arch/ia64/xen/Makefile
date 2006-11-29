@@ -1,3 +1,5 @@
+subdir-y += oprofile
+
 obj-y += acpi.o
 obj-y += dom0_ops.o
 obj-y += domain.o

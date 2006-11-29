@@ -68,7 +68,7 @@ const hypercall_t ia64_hypercall_table[NR_hypercalls] =
 	(hypercall_t)do_ni_hypercall,		/* do_nmi_op */
 	(hypercall_t)do_sched_op,
 	(hypercall_t)do_callback_op,		/*  */                 /* 30 */
-	(hypercall_t)do_ni_hypercall,		/*  */
+	(hypercall_t)do_xenoprof_op,		/*  */
 	(hypercall_t)do_event_channel_op,
 	(hypercall_t)do_physdev_op,
 	(hypercall_t)do_hvm_op,			/*  */

@@ -125,6 +125,7 @@ extern char _end[]; /* standard ELF symbol */
 // from include/asm-ia64/smp.h
 #define	get_cpu()	smp_processor_id()
 #define put_cpu()	do {} while(0)
+#define put_cpu_no_resched()	do{} while (0)
 
 // needed for common/dom0_ops.c until hyperthreading is supported
 #ifdef CONFIG_SMP
@@ -165,6 +166,8 @@ extern int smp_num_siblings;
 #else
 #define ____cacheline_aligned_in_smp ____cacheline_aligned
 #endif
+
+#define CONFIG_PERFMON
 
 #ifndef __ASSEMBLY__
 #include "asm/types.h"	// for u64

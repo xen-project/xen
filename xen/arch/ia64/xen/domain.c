@@ -48,6 +48,7 @@
 #include <asm/shadow.h>
 #include <xen/guest_access.h>
 #include <asm/tlb_track.h>
+#include <asm/perfmon.h>
 
 unsigned long dom0_size = 512*1024*1024;
 
@@ -231,11 +232,35 @@ void continue_running(struct vcpu *same)
 	/* nothing to do */
 }
 
+#ifdef CONFIG_PERFMON
+static int pal_halt        = 1;
+static int can_do_pal_halt = 1;
+
+static int __init nohalt_setup(char * str)
+{
+       pal_halt = can_do_pal_halt = 0;
+       return 1;
+}
+__setup("nohalt", nohalt_setup);
+
+void
+update_pal_halt_status(int status)
+{
+       can_do_pal_halt = pal_halt && status;
+}
+#else
+#define can_do_pal_halt	(1)
+#endif
+
 static void default_idle(void)
 {
 	local_irq_disable();
-	if ( !softirq_pending(smp_processor_id()) )
-	        safe_halt();
+	if ( !softirq_pending(smp_processor_id()) ) {
+		if (can_do_pal_halt)
+			safe_halt();
+		else
+			cpu_relax();
+	}
 	local_irq_enable();
 }
 
@@ -628,6 +653,9 @@ void domain_relinquish_resources(struct domain *d)
 
     if (d->arch.is_vti && d->arch.sal_data)
 	    xfree(d->arch.sal_data);
+
+    /* Free page used by xen oprofile buffer */
+    free_xenoprof_pages(d);
 }
 
 unsigned long

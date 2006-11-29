@@ -16,9 +16,15 @@
 #include <asm/perfmon.h>
 #include <asm/perfmon_default_smpl.h>
 
+#ifndef XEN
 MODULE_AUTHOR("Stephane Eranian <eranian@hpl.hp.com>");
 MODULE_DESCRIPTION("perfmon default sampling format");
 MODULE_LICENSE("GPL");
+#endif
+
+#ifdef XEN
+#define pid	vcpu_id
+#endif
 
 #define DEFAULT_DEBUG 1
 
@@ -157,7 +163,9 @@ default_handler(struct task_struct *task, void *buf, pfm_ovfl_arg_t *arg, struct
 	 * system-wide:
 	 * 	- this is not necessarily the task controlling the session
 	 */
+#ifndef XEN
 	ent->pid            = current->pid;
+#endif
 	ent->ovfl_pmd  	    = ovfl_pmd;
 	ent->last_reset_val = arg->pmd_last_reset; //pmd[0].reg_last_reset_val;
 
@@ -169,7 +177,9 @@ default_handler(struct task_struct *task, void *buf, pfm_ovfl_arg_t *arg, struct
 	ent->tstamp    = stamp;
 	ent->cpu       = smp_processor_id();
 	ent->set       = arg->active_set;
+#ifndef XEN
 	ent->tgid      = current->tgid;
+#endif
 
 	/*
 	 * selectively store PMDs in increasing index number
@@ -263,6 +273,7 @@ static pfm_buffer_fmt_t default_fmt={
  	.fmt_exit	    = default_exit,
 };
 
+#ifndef XEN
 static int __init
 pfm_default_smpl_init_module(void)
 {
@@ -282,6 +293,7 @@ pfm_default_smpl_init_module(void)
 
 	return ret;
 }
+#endif
 
 static void __exit
 pfm_default_smpl_cleanup_module(void)
@@ -292,6 +304,8 @@ pfm_default_smpl_cleanup_module(void)
 	printk("perfmon_default_smpl: unregister %s=%d\n", default_fmt.fmt_name, ret);
 }
 
+#ifndef XEN
 module_init(pfm_default_smpl_init_module);
 module_exit(pfm_default_smpl_cleanup_module);
+#endif
 
