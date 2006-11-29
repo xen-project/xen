@@ -16,4 +16,12 @@
 #
 #============================================================================
 
+dir=$(dirname "$0")
+. "$dir/xen-script-common.sh"
+
+evalVariables "$@"
+
+netdev=${netdev:-eth${vifnum}}
+
 echo 1 >/proc/sys/net/ipv4/ip_forward
+echo 1 >/proc/sys/net/ipv4/conf/${netdev}/proxy_arp
