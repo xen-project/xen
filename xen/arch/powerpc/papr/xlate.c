@@ -570,7 +570,7 @@ static void h_read(struct cpu_user_regs *regs)
     struct domain_htab *htab = &d->arch.htab;
     union pte volatile *pte;
 
-	if (flags & H_READ_4)
+    if (flags & H_READ_4)
         ptex &= ~0x3UL;
 
     if (ptex > (1UL << htab->log_num_ptes)) {

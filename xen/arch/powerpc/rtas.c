@@ -33,10 +33,10 @@ unsigned long rtas_base;
 unsigned long rtas_end;
 
 struct rtas_args {
-	int ra_token;
-	int ra_nargs;
-	int ra_nrets;
-	int ra_args[10];
+    int ra_token;
+    int ra_nargs;
+    int ra_nrets;
+    int ra_args[10];
 } __attribute__ ((aligned(8)));
 
 static int rtas_call(struct rtas_args *r)
@@ -44,13 +44,13 @@ static int rtas_call(struct rtas_args *r)
     if (rtas_entry == 0)
         return -ENOSYS;
 
-	return prom_call(r, rtas_base, rtas_entry, rtas_msr);
+    return prom_call(r, rtas_base, rtas_entry, rtas_msr);
 }
 
 int __init rtas_init(void *m)
 {
     static const char halt[] = "power-off";
-	static const char reboot[] = "system-reboot";
+    static const char reboot[] = "system-reboot";
     ofdn_t n;
 
     if (rtas_entry == 0)
@@ -89,7 +89,7 @@ rtas_reboot(void)
 {
     struct rtas_args r;
 
-	if (rtas_reboot_token == -1)
+    if (rtas_reboot_token == -1)
         return -ENOSYS;
 
     r.ra_token = rtas_reboot_token;

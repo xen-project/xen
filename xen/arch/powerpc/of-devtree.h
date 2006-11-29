@@ -33,15 +33,15 @@ enum {
 union of_pci_hi {
     u32 word;
     struct {
-        u32	opa_n: 1; /* relocatable */
-        u32	opa_p: 1; /* prefetchable */
-        u32	opa_t: 1; /* aliased */
+        u32 opa_n: 1; /* relocatable */
+        u32 opa_p: 1; /* prefetchable */
+        u32 opa_t: 1; /* aliased */
         u32 _opa_res: 3;
-        u32	opa: 2; /* space code */
+        u32 opa: 2; /* space code */
         u32  opa_b: 8; /* bus number */
-        u32	opa_d: 5; /* device number */
-        u32	opa_f: 3; /* function number */
-        u32	opa_r: 8; /* register number */
+        u32 opa_d: 5; /* device number */
+        u32 opa_f: 3; /* function number */
+        u32 opa_r: 8; /* register number */
     } bits;
 };
 
@@ -79,9 +79,9 @@ struct reg_property32 {
 typedef s32 ofdn_t;
 
 #define OFD_ROOT 1
-#define OFD_DUMP_NAMES	0x1
-#define OFD_DUMP_VALUES	0x2
-#define OFD_DUMP_ALL	(OFD_DUMP_VALUES|OFD_DUMP_NAMES)
+#define OFD_DUMP_NAMES 0x1
+#define OFD_DUMP_VALUES 0x2
+#define OFD_DUMP_ALL (OFD_DUMP_VALUES|OFD_DUMP_NAMES)
 
 extern void *ofd_create(void *mem, size_t sz);
 extern ofdn_t ofd_node_parent(void *mem, ofdn_t n);
@@ -90,9 +90,9 @@ extern ofdn_t ofd_node_child(void *mem, ofdn_t p);
 extern const char *ofd_node_path(void *mem, ofdn_t p);
 extern int ofd_node_to_path(void *mem, ofdn_t p, void *buf, size_t sz);
 extern ofdn_t ofd_node_child_create(void *mem, ofdn_t parent,
-				    const char *path, size_t pathlen);
+                                    const char *path, size_t pathlen);
 extern ofdn_t ofd_node_peer_create(void *mem, ofdn_t sibling,
-				   const char *path, size_t pathlen);
+                                   const char *path, size_t pathlen);
 extern ofdn_t ofd_node_find(void *mem, const char *devspec);
 extern ofdn_t ofd_node_add(void *m, ofdn_t n, const char *path, size_t sz);
 extern int ofd_node_prune(void *m, ofdn_t n);
@@ -102,14 +102,14 @@ extern ofdn_t ofd_node_io(void *mem, ofdn_t n);
 extern ofdn_t ofd_nextprop(void *mem, ofdn_t n, const char *prev, char *name);
 extern ofdn_t ofd_prop_find(void *mem, ofdn_t n, const char *name);
 extern int ofd_getprop(void *mem, ofdn_t n, const char *name,
-			void *buf, size_t sz);
+                       void *buf, size_t sz);
 extern int ofd_getproplen(void *mem, ofdn_t n, const char *name);
 
 extern int ofd_setprop(void *mem, ofdn_t n, const char *name,
-			const void *buf, size_t sz);
+                       const void *buf, size_t sz);
 extern void ofd_prop_remove(void *mem, ofdn_t node, ofdn_t prop);
 extern ofdn_t ofd_prop_add(void *mem, ofdn_t n, const char *name,
-			   const void *buf, size_t sz);
+                           const void *buf, size_t sz);
 extern ofdn_t ofd_io_create(void *m, ofdn_t node, u64 open);
 extern u32 ofd_io_open(void *mem, ofdn_t n);
 extern void ofd_io_close(void *mem, ofdn_t n);
@@ -129,10 +129,10 @@ extern size_t ofd_size(void *mem);
 extern size_t ofd_space(void *mem);
 
 extern void ofd_prop_print(const char *head, const char *path,
-			   const char *name, const char *prop, size_t sz);
+                           const char *name, const char *prop, size_t sz);
 
 extern ofdn_t ofd_node_find_by_prop(void *mem, ofdn_t n, const char *name,
-				    const void *val, size_t sz);
+                                    const void *val, size_t sz);
 extern ofdn_t ofd_node_find_next(void *mem, ofdn_t n);
 extern ofdn_t ofd_node_find_prev(void *mem, ofdn_t n);
 extern void ofd_init(int (*write)(const char *, size_t len));

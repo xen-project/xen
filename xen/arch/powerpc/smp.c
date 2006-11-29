@@ -109,7 +109,7 @@ int on_selected_cpus(
         if (NOW() > start + stall) {
             printk("IPI start stall: %d ACKS to %d SYNS\n", 
                    atomic_read(&call_data.started), nr_cpus);
-	    start = NOW();
+            start = NOW();
         }
     }
 
@@ -172,9 +172,9 @@ void smp_message_recv(int msg, struct cpu_user_regs *regs)
 static void debug_ipi_ack(void *info)
 {
     if (info) {
-	unsigned long start, stall = SECONDS(5);
-	for (start = NOW(); NOW() < start + stall; );
-	printk("IPI recv on cpu #%d: %s\n", smp_processor_id(), (char *)info);
+        unsigned long start, stall = SECONDS(5);
+        for (start = NOW(); NOW() < start + stall; );
+        printk("IPI recv on cpu #%d: %s\n", smp_processor_id(), (char *)info);
     }
     return;
 }
@@ -207,7 +207,7 @@ void ipi_torture_test(void)
     mean = tb_to_ns(sum / trials);
 
     printk("IPI latency: min = %ld ticks, max = %ld ticks, mean = %ldns\n",
-	   min, max, mean);
+           min, max, mean);
 
     smp_call_function(debug_ipi_ack, "Hi", 0, 1);
 }

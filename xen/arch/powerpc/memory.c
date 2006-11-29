@@ -98,11 +98,11 @@ static void heap_init(struct membuf *mb, uint entries)
     ulong start_blk;
     ulong end_blk = 0;
 
-	for (i = 0; i < entries; i++) {
-	    start_blk = mb[i].start;
-	    end_blk = start_blk + mb[i].size;
+    for (i = 0; i < entries; i++) {
+        start_blk = mb[i].start;
+        end_blk = start_blk + mb[i].size;
 
-	    if (start_blk < xenheap_phys_end) {
+        if (start_blk < xenheap_phys_end) {
             if (xenheap_phys_end > end_blk) {
                 panic("xenheap spans LMB\n");
             }
@@ -114,7 +114,7 @@ static void heap_init(struct membuf *mb, uint entries)
 
         init_boot_pages(start_blk, end_blk);
         total_pages += (end_blk - start_blk) >> PAGE_SHIFT;
-	}
+    }
 }
 
 static void ofd_walk_mem(void *m, walk_mem_fn fn)

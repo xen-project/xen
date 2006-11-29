@@ -115,8 +115,8 @@ unsigned int shadow_set_allocation(struct domain *d,
 }
 
 int shadow_domctl(struct domain *d, 
-				  xen_domctl_shadow_op_t *sc,
-				  XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
+                  xen_domctl_shadow_op_t *sc,
+                  XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 {
     if ( unlikely(d == current->domain) )
     {

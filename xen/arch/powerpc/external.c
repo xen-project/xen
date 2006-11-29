@@ -83,7 +83,7 @@ void do_external(struct cpu_user_regs *regs)
     vec = xen_mpic_get_irq(regs);
 
     if (irq_desc[vec].status & IRQ_PER_CPU) {
-	/* x86 do_IRQ does not respect the per cpu flag.  */
+        /* x86 do_IRQ does not respect the per cpu flag.  */
         irq_desc_t *desc = &irq_desc[vec];
         regs->entry_vector = vec;
         desc->handler->ack(vec);

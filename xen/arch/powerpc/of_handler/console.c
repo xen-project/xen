@@ -113,7 +113,7 @@ static s32 ofh_xen_dom0_read(s32 chan, void *buf, u32 count, s32 *actual,
             return ret;
 
         rc = xen_hvcall(XEN_MARK(__HYPERVISOR_console_io), CONSOLEIO_read,
-                count, desc);
+                        count, desc);
         if (rc <= 0) {
             return ret;
         }
@@ -139,7 +139,7 @@ static s32 ofh_xen_dom0_write(s32 chan, const void *buf, u32 count,
             return ret;
 
         rc = xen_hvcall(XEN_MARK(__HYPERVISOR_console_io), CONSOLEIO_write,
-                count, desc);
+                        count, desc);
         if (rc <= 0) {
             return ret;
         }
@@ -157,8 +157,8 @@ static s32 ofh_xen_dom0_write(s32 chan, const void *buf, u32 count,
 static s32 ofh_xen_domu_read(s32 chan, void *buf, u32 count, s32 *actual,
                              ulong b)
 {
-	struct xencons_interface *intf;
-	XENCONS_RING_IDX cons, prod;
+    struct xencons_interface *intf;
+    XENCONS_RING_IDX cons, prod;
     s32 ret;
 
     intf = DRELA(ofh_ihp, b)->ofi_intf;
@@ -180,8 +180,8 @@ static s32 ofh_xen_domu_read(s32 chan, void *buf, u32 count, s32 *actual,
 static s32 ofh_xen_domu_write(s32 chan, const void *buf, u32 count,
                               s32 *actual, ulong b)
 {
-	struct xencons_interface *intf;
-	XENCONS_RING_IDX cons, prod;
+    struct xencons_interface *intf;
+    XENCONS_RING_IDX cons, prod;
     s32 ret;
 
     intf = DRELA(ofh_ihp, b)->ofi_intf;
