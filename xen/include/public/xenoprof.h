@@ -29,6 +29,8 @@
 #ifndef __XEN_PUBLIC_XENOPROF_H__
 #define __XEN_PUBLIC_XENOPROF_H__
 
+#include "xen.h"
+
 /*
  * Commands to HYPERVISOR_xenoprof_op().
  */
