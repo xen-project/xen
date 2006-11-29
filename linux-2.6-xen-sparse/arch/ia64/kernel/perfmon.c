@@ -4151,7 +4151,6 @@ pfm_start(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 	int state, is_system;
 
   	if (is_running_on_xen()) {
-  		XENPERFMON_PRINTD("PFM_START\n");
 		if (is_xenoprof_primary())
 			return HYPERVISOR_perfmon_op(PFM_START, NULL, 0);
 		return 0;
