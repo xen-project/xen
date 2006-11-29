@@ -32,8 +32,6 @@
 #define HVM_DEBUG 1
 #endif
 
-#define hvm_guest(v) ((v)->arch.guest_context.flags & VGCF_HVM_GUEST)
-
 static inline shared_iopage_t *get_sp(struct domain *d)
 {
     return (shared_iopage_t *) d->arch.hvm_domain.shared_page_va;
@@ -96,13 +94,6 @@ enum hval_bitmaps {
 
 #define VMX_DELIVER_NO_ERROR_CODE  -1
 
-/*
- * This works for both 32bit & 64bit eflags filteration
- * done in construct_init_vmc[sb]_guest()
- */
-#define HVM_EFLAGS_RESERVED_0          0xffc08028 /* bitmap for 0 */
-#define HVM_EFLAGS_RESERVED_1          0x00000002 /* bitmap for 1 */
-
 #if HVM_DEBUG
 #define DBG_LEVEL_0                 (1 << 0)
 #define DBG_LEVEL_1                 (1 << 1)
@@ -118,7 +109,7 @@ enum hval_bitmaps {
 extern unsigned int opt_hvm_debug_level;
 #define HVM_DBG_LOG(level, _f, _a...)                                         \
     do {                                                                      \
-        if ( (level) & opt_hvm_debug_level )                                  \
+        if ( unlikely((level) & opt_hvm_debug_level) )                        \
             printk("[HVM:%d.%d] <%s> " _f "\n",                               \
                    current->domain->domain_id, current->vcpu_id, __func__,    \
                    ## _a);                                                    \
@@ -127,29 +118,20 @@ extern unsigned int opt_hvm_debug_level;
 #define HVM_DBG_LOG(level, _f, _a...)
 #endif
 
-#define  __hvm_bug(regs)                                        \
-    do {                                                        \
-        printk("__hvm_bug at %s:%d\n", __FILE__, __LINE__);     \
-        show_execution_state(regs);                             \
-        domain_crash_synchronous();                             \
-    } while (0)
+#define TRACE_VMEXIT(index, value)                              \
+    current->arch.hvm_vcpu.hvm_trace_values[index] = (value)
 
 extern int hvm_enabled;
 
-enum { HVM_COPY_IN = 0, HVM_COPY_OUT };
-extern int hvm_copy(void *buf, unsigned long vaddr, int size, int dir);
+int hvm_copy_to_guest_phys(paddr_t paddr, void *buf, int size);
+int hvm_copy_from_guest_phys(void *buf, paddr_t paddr, int size);
+int hvm_copy_to_guest_virt(unsigned long vaddr, void *buf, int size);
+int hvm_copy_from_guest_virt(void *buf, unsigned long vaddr, int size);
 
-extern void hvm_setup_platform(struct domain* d);
-extern int hvm_mmio_intercept(ioreq_t *p);
-extern int hvm_io_intercept(ioreq_t *p, int type);
-extern int hvm_buffered_io_intercept(ioreq_t *p);
-extern void hvm_hooks_assist(struct vcpu *v);
-extern void hvm_print_line(struct vcpu *v, const char c);
-extern void hlt_timer_fn(void *data);
+void hvm_print_line(struct vcpu *v, const char c);
+void hlt_timer_fn(void *data);
 
 void hvm_do_hypercall(struct cpu_user_regs *pregs);
-
-void hvm_prod_vcpu(struct vcpu *v);
 
 void hvm_hlt(unsigned long rflags);
 

@@ -33,11 +33,12 @@
 #ifndef __HYPERCALL_H__
 #define __HYPERCALL_H__
 
-#include <linux/string.h> /* memcpy() */
-
 #ifndef __HYPERVISOR_H__
 # error "please don't include this file directly"
 #endif
+
+#include <asm/xen/xcom_hcall.h>
+struct xencomm_handle;
 
 /*
  * Assembler stubs for hyper-calls.
@@ -157,157 +158,117 @@
 	(type)__res;                                            \
 })
 
-static inline int
-HYPERVISOR_sched_op_compat(
-    int cmd, unsigned long arg)
-{
-	return _hypercall2(int, sched_op_compat, cmd, arg);
-}
 
 static inline int
-HYPERVISOR_sched_op(
-	int cmd, void *arg)
+xencomm_arch_hypercall_sched_op(int cmd, struct xencomm_handle *arg)
 {
 	return _hypercall2(int, sched_op, cmd, arg);
 }
 
 static inline long
-HYPERVISOR_set_timer_op(
-    u64 timeout)
+HYPERVISOR_set_timer_op(u64 timeout)
 {
-    unsigned long timeout_hi = (unsigned long)(timeout>>32);
-    unsigned long timeout_lo = (unsigned long)timeout;
-    return _hypercall2(long, set_timer_op, timeout_lo, timeout_hi);
+	unsigned long timeout_hi = (unsigned long)(timeout >> 32);
+	unsigned long timeout_lo = (unsigned long)timeout;
+	return _hypercall2(long, set_timer_op, timeout_lo, timeout_hi);
 }
 
 static inline int
-HYPERVISOR_dom0_op(
-    dom0_op_t *dom0_op)
+xencomm_arch_hypercall_dom0_op(struct xencomm_handle *op)
 {
-    dom0_op->interface_version = DOM0_INTERFACE_VERSION;
-    return _hypercall1(int, dom0_op, dom0_op);
+	return _hypercall1(int, dom0_op, op);
 }
 
 static inline int
-HYPERVISOR_multicall(
-    void *call_list, int nr_calls)
+xencomm_arch_hypercall_sysctl(struct xencomm_handle *op)
 {
-    return _hypercall2(int, multicall, call_list, nr_calls);
-}
-
-//XXX xen/ia64 copy_from_guest() is broken.
-//    This is a temporal work around until it is fixed.
-static inline int
-____HYPERVISOR_memory_op(
-    unsigned int cmd, void *arg)
-{
-    return _hypercall2(int, memory_op, cmd, arg);
-}
-
-#include <xen/interface/memory.h>
-#ifdef CONFIG_VMX_GUEST
-# define ia64_xenmem_reservation_op(op, xmr) (0)
-#else
-int ia64_xenmem_reservation_op(unsigned long op,
-		   struct xen_memory_reservation* reservation__);
-#endif
-static inline int
-HYPERVISOR_memory_op(
-    unsigned int cmd, void *arg)
-{
-    switch (cmd) {
-    case XENMEM_increase_reservation:
-    case XENMEM_decrease_reservation:
-    case XENMEM_populate_physmap:
-        return ia64_xenmem_reservation_op(cmd, 
-                                          (struct xen_memory_reservation*)arg);
-    default:
-        return ____HYPERVISOR_memory_op(cmd, arg);
-    }
-    /* NOTREACHED */
+	return _hypercall1(int, sysctl, op);
 }
 
 static inline int
-HYPERVISOR_event_channel_op(
-    int cmd, void *arg)
+xencomm_arch_hypercall_domctl(struct xencomm_handle *op)
 {
-    int rc = _hypercall2(int, event_channel_op, cmd, arg);
-    if (unlikely(rc == -ENOSYS)) {
-        struct evtchn_op op;
-        op.cmd = cmd;
-        memcpy(&op.u, arg, sizeof(op.u));
-        rc = _hypercall1(int, event_channel_op_compat, &op);
-    }
-    return rc;
+	return _hypercall1(int, domctl, op);
 }
 
 static inline int
-HYPERVISOR_acm_op(
-	unsigned int cmd, void *arg)
+xencomm_arch_hypercall_multicall(struct xencomm_handle *call_list,
+				 int nr_calls)
 {
-    return _hypercall2(int, acm_op, cmd, arg);
+	return _hypercall2(int, multicall, call_list, nr_calls);
 }
 
 static inline int
-HYPERVISOR_xen_version(
-    int cmd, void *arg)
+xencomm_arch_hypercall_memory_op(unsigned int cmd, struct xencomm_handle *arg)
 {
-    return _hypercall2(int, xen_version, cmd, arg);
+	return _hypercall2(int, memory_op, cmd, arg);
 }
 
 static inline int
-HYPERVISOR_console_io(
-    int cmd, int count, char *str)
+xencomm_arch_hypercall_event_channel_op(int cmd, struct xencomm_handle *arg)
 {
-    return _hypercall3(int, console_io, cmd, count, str);
+	return _hypercall2(int, event_channel_op, cmd, arg);
 }
 
 static inline int
-HYPERVISOR_physdev_op(
-    int cmd, void *arg)
+xencomm_arch_hypercall_acm_op(unsigned int cmd, struct xencomm_handle *arg)
 {
-    int rc = _hypercall2(int, physdev_op, cmd, arg);
-    if (unlikely(rc == -ENOSYS)) {
-        struct physdev_op op;
-        op.cmd = cmd;
-        memcpy(&op.u, arg, sizeof(op.u));
-        rc = _hypercall1(int, physdev_op_compat, &op);
-    }
-    return rc;
+	return _hypercall2(int, acm_op, cmd, arg);
 }
 
-//XXX __HYPERVISOR_grant_table_op is used for this hypercall constant.
 static inline int
-____HYPERVISOR_grant_table_op(
-    unsigned int cmd, void *uop, unsigned int count,
-    unsigned long pa1, unsigned long pa2)
+xencomm_arch_hypercall_xen_version(int cmd, struct xencomm_handle *arg)
 {
-    return _hypercall5(int, grant_table_op, cmd, uop, count, pa1, pa2);
+	return _hypercall2(int, xen_version, cmd, arg);
+}
+
+static inline int
+xencomm_arch_hypercall_console_io(int cmd, int count,
+                                  struct xencomm_handle *str)
+{
+	return _hypercall3(int, console_io, cmd, count, str);
+}
+
+static inline int
+xencomm_arch_hypercall_physdev_op(int cmd, struct xencomm_handle *arg)
+{
+	return _hypercall2(int, physdev_op, cmd, arg);
+}
+
+static inline int
+xencomm_arch_hypercall_grant_table_op(unsigned int cmd,
+                                      struct xencomm_handle *uop,
+                                      unsigned int count)
+{
+	return _hypercall3(int, grant_table_op, cmd, uop, count);
 }
 
 int HYPERVISOR_grant_table_op(unsigned int cmd, void *uop, unsigned int count);
 
+extern int xencomm_arch_hypercall_suspend(struct xencomm_handle *arg);
+
 static inline int
-HYPERVISOR_vcpu_op(
-	int cmd, int vcpuid, void *extra_args)
+xencomm_arch_hypercall_callback_op(int cmd, struct xencomm_handle *arg)
 {
-    return _hypercall3(int, vcpu_op, cmd, vcpuid, extra_args);
+	return _hypercall2(int, callback_op, cmd, arg);
 }
 
-extern int HYPERVISOR_suspend(unsigned long srec);
-
 static inline unsigned long
-HYPERVISOR_hvm_op(
-	int cmd, void *arg)
+xencomm_arch_hypercall_hvm_op(int cmd, void *arg)
 {
 	return _hypercall2(unsigned long, hvm_op, cmd, arg);
 }
 
 static inline int
-HYPERVISOR_callback_op(
-	int cmd, void *arg)
+HYPERVISOR_physdev_op(int cmd, void *arg)
 {
-	return _hypercall2(int, callback_op, cmd, arg);
+	switch (cmd) {
+	case PHYSDEVOP_eoi:
+		return _hypercall1(int, ia64_fast_eoi,
+		                   ((struct physdev_eoi *)arg)->irq);
+	default:
+		return xencomm_hypercall_physdev_op(cmd, arg);
+	}
 }
 
 extern fastcall unsigned int __do_IRQ(unsigned int irq, struct pt_regs *regs);
@@ -322,6 +283,9 @@ static inline void exit_idle(void) {}
 #ifdef CONFIG_XEN
 #include <asm/xen/privop.h>
 #endif /* CONFIG_XEN */
+#ifdef HAVE_XEN_PLATFORM_COMPAT_H
+#include <xen/platform-compat.h>
+#endif
 
 static inline unsigned long
 __HYPERVISOR_ioremap(unsigned long ioaddr, unsigned long size)
@@ -417,7 +381,42 @@ HYPERVISOR_add_physmap(unsigned long gpfn, unsigned long mfn,
 	return ret;
 }
 
+#ifdef CONFIG_XEN_IA64_EXPOSE_P2M
+static inline unsigned long
+HYPERVISOR_expose_p2m(unsigned long conv_start_gpfn,
+                      unsigned long assign_start_gpfn,
+                      unsigned long expose_size, unsigned long granule_pfn)
+{
+	return _hypercall5(unsigned long, ia64_dom0vp_op,
+	                   IA64_DOM0VP_expose_p2m, conv_start_gpfn,
+	                   assign_start_gpfn, expose_size, granule_pfn);
+}
+#endif
+
 // for balloon driver
 #define HYPERVISOR_update_va_mapping(va, new_val, flags) (0)
+
+/* Use xencomm to do hypercalls.  */
+#ifdef MODULE
+#define HYPERVISOR_sched_op xencomm_mini_hypercall_sched_op
+#define HYPERVISOR_event_channel_op xencomm_mini_hypercall_event_channel_op
+#define HYPERVISOR_callback_op xencomm_mini_hypercall_callback_op
+#define HYPERVISOR_multicall xencomm_mini_hypercall_multicall
+#define HYPERVISOR_xen_version xencomm_mini_hypercall_xen_version
+#define HYPERVISOR_console_io xencomm_mini_hypercall_console_io
+#define HYPERVISOR_hvm_op xencomm_mini_hypercall_hvm_op
+#define HYPERVISOR_memory_op xencomm_mini_hypercall_memory_op
+#else
+#define HYPERVISOR_sched_op xencomm_hypercall_sched_op
+#define HYPERVISOR_event_channel_op xencomm_hypercall_event_channel_op
+#define HYPERVISOR_callback_op xencomm_hypercall_callback_op
+#define HYPERVISOR_multicall xencomm_hypercall_multicall
+#define HYPERVISOR_xen_version xencomm_hypercall_xen_version
+#define HYPERVISOR_console_io xencomm_hypercall_console_io
+#define HYPERVISOR_hvm_op xencomm_hypercall_hvm_op
+#define HYPERVISOR_memory_op xencomm_hypercall_memory_op
+#endif
+
+#define HYPERVISOR_suspend xencomm_hypercall_suspend
 
 #endif /* __HYPERCALL_H__ */

@@ -22,19 +22,20 @@
 """
 
 from xen.xend import sxp
+from xen.xend import XendRoot
 from xen.xend.XendLogging import log
 from xen.xend.XendError import XendError
-from xen.xend import XendRoot
-from xen.xend.XendDomainInfo import DEV_MIGRATE_TEST
-
+from xen.xend.XendConstants import DEV_MIGRATE_TEST, VTPM_DELETE_SCRIPT
 from xen.xend.server.DevController import DevController
 
 import os
 import re
 
-
 xroot = XendRoot.instance()
 
+def destroy_vtpmstate(name):
+    if os.path.exists(VTPM_DELETE_SCRIPT):
+        os.system(VTPM_DELETE_SCRIPT + " " + name)
 
 class TPMifController(DevController):
     """TPM interface controller. Handles all TPM devices for a domain.
@@ -52,22 +53,37 @@ class TPMifController(DevController):
         if inst == -1:
             inst = int(sxp.child_value(config, 'instance' , '0'))
 
-        log.info("The domain has a TPM with instance %d and devid %d.",
+        typ    = sxp.child_value(config, 'type')
+        uuid   = sxp.child_value(config, 'uuid')
+
+        log.info("The domain has a TPM with pref. instance %d and devid %d.",
                  inst, devid)
         back  = { 'pref_instance' : "%i" % inst,
                   'resume'        : "%s" % (self.vm.getResume()) }
+        if typ:
+            back['type'] = typ
+        if uuid:
+            back['uuid'] = uuid
+
         front = { 'handle' : "%i" % devid }
 
         return (devid, back, front)
 
-    def configuration(self, devid):
+    def getDeviceConfiguration(self, devid):
+        """Returns the configuration of a device"""
+        result = DevController.getDeviceConfiguration(self, devid)
 
-        result = DevController.configuration(self, devid)
-
-        instance = self.readBackend(devid, 'instance')
+        (instance, uuid, type) = \
+                           self.readBackend(devid, 'instance',
+                                                   'uuid',
+                                                   'type')
 
         if instance:
-            result.append(['instance', instance])
+            result['instance'] = instance
+        if uuid:
+            result['uuid'] = uuid
+        if type:
+            result['type'] = type
 
         return result
 

@@ -14,7 +14,8 @@
 
 import os, select, errno
 import random
-import sxp
+import shlex
+from xen.xend import sxp
 
 from XendLogging import log
 from XendError import VmError
@@ -37,7 +38,7 @@ def bootloader(blexec, disk, quiet = 0, blargs = None, imgcfg = None):
         raise VmError(msg)
 
     while True:
-        fifo = "/var/lib/xen/xenbl.%s" %(random.randint(0, 32000),)
+        fifo = "/var/lib/xen/xenbl.%s" % random.randint(0, 32000)
         if not os.path.exists(fifo):
             break
     os.mkfifo(fifo, 0600)
@@ -47,9 +48,9 @@ def bootloader(blexec, disk, quiet = 0, blargs = None, imgcfg = None):
         args = [ blexec ]
         if quiet:
             args.append("-q")
-        args.append("--output=%s" %(fifo,))
+        args.append("--output=%s" % fifo)
         if blargs is not None:
-            args.extend(blargs.split())
+            args.extend(shlex.split(blargs))
         args.append(disk)
 
         try:

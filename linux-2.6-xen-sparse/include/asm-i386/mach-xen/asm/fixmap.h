@@ -27,7 +27,6 @@ extern unsigned long __FIXADDR_TOP;
 #include <asm/acpi.h>
 #include <asm/apicdef.h>
 #include <asm/page.h>
-#include <xen/gnttab.h>
 #ifdef CONFIG_HIGHMEM
 #include <linux/threads.h>
 #include <asm/kmap_types.h>
@@ -99,7 +98,7 @@ enum fixed_addresses {
 extern void __set_fixmap(enum fixed_addresses idx,
 					maddr_t phys, pgprot_t flags);
 
-extern void set_fixaddr_top(unsigned long top);
+extern void set_fixaddr_top(void);
 
 #define set_fixmap(idx, phys) \
 		__set_fixmap(idx, phys, PAGE_KERNEL)

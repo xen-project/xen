@@ -81,10 +81,10 @@ typedef union {
 
 #define __UNLOCKED (0U)
 #define __LOCKED (~__UNLOCKED)
-#define SPIN_LOCK_UNLOCKED (spinlock_t) { __UNLOCKED }
+#define SPIN_LOCK_UNLOCKED /*(spinlock_t)*/ { __UNLOCKED }
 static inline void spin_lock_init(spinlock_t *lock)
 {
-    *lock = SPIN_LOCK_UNLOCKED;
+    *lock = (spinlock_t) SPIN_LOCK_UNLOCKED;
 }
 
 static inline int spin_is_locked(spinlock_t *lock)
@@ -103,7 +103,7 @@ static inline void _raw_spin_lock(spinlock_t *lock)
 static inline void _raw_spin_unlock(spinlock_t *lock)
 {
     sync_before_release();
-    *lock = SPIN_LOCK_UNLOCKED;
+    *lock = (spinlock_t) SPIN_LOCK_UNLOCKED;
 }
 
 static inline int _raw_spin_trylock(spinlock_t *lock)
@@ -121,10 +121,10 @@ typedef struct {
     volatile unsigned int lock;
 } rwlock_t;
 
-#define RW_LOCK_UNLOCKED (rwlock_t) { __UNLOCKED }
+#define RW_LOCK_UNLOCKED /*(rwlock_t)*/ { __UNLOCKED }
 static inline void rwlock_init(rwlock_t *lock)
 {
-    *lock = RW_LOCK_UNLOCKED;
+    *lock = (rwlock_t) RW_LOCK_UNLOCKED;
 }
 
 static inline void _raw_read_lock(rwlock_t *lock)
@@ -152,7 +152,7 @@ static inline void _raw_write_lock(rwlock_t *lock)
 static inline void _raw_write_unlock(rwlock_t *lock)
 {
     sync_before_release();
-    *lock = RW_LOCK_UNLOCKED;
+    *lock = (rwlock_t) RW_LOCK_UNLOCKED;
 }
 
 static inline void _raw_read_unlock(rwlock_t *lock)

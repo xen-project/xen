@@ -25,17 +25,16 @@
 #define L4_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 #endif
 
-#ifdef __ia64__
-#define get_tot_pages xc_get_max_pages
-#else
-#define get_tot_pages xc_get_tot_pages
-#endif
-
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
 
 struct initrd_info {
     enum { INITRD_none, INITRD_file, INITRD_mem } type;
+    /*
+     * .len must be filled in by the user for type==INITRD_mem. It is
+     * filled in by load_initrd() for INITRD_file and unused for
+     * INITRD_none.
+     */
     unsigned long len;
     union {
         gzFile file_handle;
@@ -128,36 +127,48 @@ static int probeimageformat(const char *image,
     return 0;
 }
 
-int load_initrd(int xc_handle, domid_t dom,
+static int load_initrd(int xc_handle, domid_t dom,
                 struct initrd_info *initrd,
                 unsigned long physbase,
                 xen_pfn_t *phys_to_mach)
 {
     char page[PAGE_SIZE];
-    unsigned long pfn_start, pfn, nr_pages;
+    unsigned long pfn_start, pfn;
 
     if ( initrd->type == INITRD_none )
         return 0;
 
     pfn_start = physbase >> PAGE_SHIFT;
-    nr_pages  = (initrd->len + PAGE_SIZE - 1) >> PAGE_SHIFT;
 
-    for ( pfn = pfn_start; pfn < (pfn_start + nr_pages); pfn++ )
+    if ( initrd->type == INITRD_mem )
     {
-        if ( initrd->type == INITRD_mem )
+        unsigned long nr_pages  = (initrd->len + PAGE_SIZE - 1) >> PAGE_SHIFT;
+
+        for ( pfn = pfn_start; pfn < (pfn_start + nr_pages); pfn++ )
         {
             xc_copy_to_domain_page(
                 xc_handle, dom, phys_to_mach[pfn],
                 &initrd->u.mem_addr[(pfn - pfn_start) << PAGE_SHIFT]);
         }
-        else
+    }
+    else
+    {
+        int readlen;
+
+        pfn = pfn_start;
+        initrd->len = 0;
+
+        /* gzread returns 0 on EOF */
+        while ( (readlen = gzread(initrd->u.file_handle, page, PAGE_SIZE)) )
         {
-            if ( gzread(initrd->u.file_handle, page, PAGE_SIZE) == -1 )
+            if ( readlen < 0 )
             {
                 PERROR("Error reading initrd image, could not");
                 return -EINVAL;
             }
-            xc_copy_to_domain_page(xc_handle, dom, phys_to_mach[pfn], page);
+
+            initrd->len += readlen;
+            xc_copy_to_domain_page(xc_handle, dom, phys_to_mach[pfn++], page);
         }
     }
 
@@ -446,8 +457,6 @@ static int setup_pg_tables_64(int xc_handle, uint32_t dom,
 #endif
 
 #ifdef __ia64__
-extern unsigned long xc_ia64_fpsr_default(void);
-
 static int setup_guest(int xc_handle,
                        uint32_t dom,
                        const char *image, unsigned long image_size,
@@ -487,11 +496,24 @@ static int setup_guest(int xc_handle,
     if ( rc != 0 )
         goto error_out;
 
-    dsi.v_start      = round_pgdown(dsi.v_start);
-    vinitrd_start    = round_pgup(dsi.v_end);
-    vinitrd_end      = vinitrd_start + initrd->len;
-    v_end            = round_pgup(vinitrd_end);
+    if ( (page_array = malloc(nr_pages * sizeof(xen_pfn_t))) == NULL )
+    {
+        PERROR("Could not allocate memory");
+        goto error_out;
+    }
+    for ( i = 0; i < nr_pages; i++ )
+        page_array[i] = i;
+    if ( xc_domain_memory_populate_physmap(xc_handle, dom, nr_pages,
+                                           0, 0, page_array) )
+    {
+        PERROR("Could not allocate memory for PV guest.\n");
+        goto error_out;
+    }
+
+    dsi.v_start    = round_pgdown(dsi.v_start);
+    vinitrd_start  = round_pgup(dsi.v_end);
     start_info_mpa = (nr_pages - 3) << PAGE_SHIFT;
+    *pvke          = dsi.v_kernentry;
 
     /* Build firmware.  */
     memset(&domctl.u.arch_setup, 0, sizeof(domctl.u.arch_setup));
@@ -504,18 +526,19 @@ static int setup_guest(int xc_handle,
         goto error_out;
 
     start_page = dsi.v_start >> PAGE_SHIFT;
-    pgnr = (v_end - dsi.v_start) >> PAGE_SHIFT;
-    if ( (page_array = malloc(pgnr * sizeof(xen_pfn_t))) == NULL )
-    {
-        PERROR("Could not allocate memory");
+    /* in order to get initrd->len, we need to load initrd image at first */
+    if ( load_initrd(xc_handle, dom, initrd,
+                     vinitrd_start - dsi.v_start, page_array + start_page) )
         goto error_out;
-    }
 
-    if ( xc_ia64_get_pfn_list(xc_handle, dom, page_array,
-                              start_page, pgnr) != pgnr )
+    vinitrd_end    = vinitrd_start + initrd->len;
+    v_end          = round_pgup(vinitrd_end);
+    pgnr = (v_end - dsi.v_start) >> PAGE_SHIFT;
+    if ( pgnr > nr_pages )
     {
-        PERROR("Could not get the page frame list");
-        goto error_out;
+        PERROR("too small memory is specified. "
+               "At least %ld kb is necessary.\n",
+               pgnr << (PAGE_SHIFT - 10));
     }
 
     IPRINTF("VIRTUAL MEMORY ARRANGEMENT:\n"
@@ -527,37 +550,21 @@ static int setup_guest(int xc_handle,
            _p(dsi.v_start),     _p(v_end));
     IPRINTF(" ENTRY ADDRESS: %p\n", _p(dsi.v_kernentry));
 
-    (load_funcs.loadimage)(image, image_size, xc_handle, dom, page_array,
-                           &dsi);
+    (load_funcs.loadimage)(image, image_size, xc_handle, dom,
+                           page_array + start_page, &dsi);
 
-    if ( load_initrd(xc_handle, dom, initrd,
-                     vinitrd_start - dsi.v_start, page_array) )
-        goto error_out;
-
-    *pvke = dsi.v_kernentry;
-
-    /* Now need to retrieve machine pfn for system pages:
-     *  start_info/store/console
-     */
-    pgnr = 3;
-    if ( xc_ia64_get_pfn_list(xc_handle, dom, page_array,
-                              nr_pages - 3, pgnr) != pgnr )
-    {
-        PERROR("Could not get page frame for xenstore");
-        goto error_out;
-    }
-
-    *store_mfn = page_array[1];
-    *console_mfn = page_array[2];
+    *store_mfn = page_array[nr_pages - 2];
+    *console_mfn = page_array[nr_pages - 1];
     IPRINTF("start_info: 0x%lx at 0x%lx, "
            "store_mfn: 0x%lx at 0x%lx, "
            "console_mfn: 0x%lx at 0x%lx\n",
-           page_array[0], nr_pages - 3,
+           page_array[nr_pages - 3], nr_pages - 3,
            *store_mfn,    nr_pages - 2,
            *console_mfn,  nr_pages - 1);
 
     start_info = xc_map_foreign_range(
-        xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE, page_array[0]);
+        xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
+        page_array[nr_pages - 3]);
     memset(start_info, 0, sizeof(*start_info));
     rc = xc_version(xc_handle, XENVER_version, NULL);
     sprintf(start_info->magic, "xen-%i.%i-ia64", rc >> 16, rc & (0xFFFF));
@@ -659,7 +666,6 @@ static int setup_guest(int xc_handle,
     int hypercall_page_defined;
     start_info_t *start_info;
     shared_info_t *shared_info;
-    xc_mmu_t *mmu = NULL;
     const char *p;
     DECLARE_DOMCTL;
     int rc;
@@ -701,7 +707,7 @@ static int setup_guest(int xc_handle,
         goto error_out;
     }
 
-    if (!compat_check(xc_handle, &dsi))
+    if ( !compat_check(xc_handle, &dsi) )
         goto error_out;
 
     /* Parse and validate kernel features. */
@@ -730,6 +736,28 @@ static int setup_guest(int xc_handle,
     shadow_mode_enabled = test_feature_bit(XENFEAT_auto_translated_physmap,
                                            required_features);
 
+    if ( (page_array = malloc(nr_pages * sizeof(unsigned long))) == NULL )
+    {
+        PERROR("Could not allocate memory");
+        goto error_out;
+    }
+
+    for ( i = 0; i < nr_pages; i++ )
+        page_array[i] = i;
+
+    if ( xc_domain_memory_populate_physmap(xc_handle, dom, nr_pages,
+                                           0, 0, page_array) )
+    {
+        PERROR("Could not allocate memory for PV guest.\n");
+        goto error_out;
+    }
+
+    rc = (load_funcs.loadimage)(image, image_size,
+                           xc_handle, dom, page_array,
+                           &dsi);
+    if ( rc != 0 )
+        goto error_out;
+
     /*
      * Why do we need this? The number of page-table frames depends on the
      * size of the bootstrap address space. But the size of the address space
@@ -743,9 +771,14 @@ static int setup_guest(int xc_handle,
         ERROR("End of mapped kernel image too close to end of memory");
         goto error_out;
     }
+
     vinitrd_start = v_end;
+    if ( load_initrd(xc_handle, dom, initrd,
+                     vinitrd_start - dsi.v_start, page_array) )
+        goto error_out;
     if ( !increment_ulong(&v_end, round_pgup(initrd->len)) )
         goto error_out;
+
     vphysmap_start = v_end;
     if ( !increment_ulong(&v_end, round_pgup(nr_pages * sizeof(long))) )
         goto error_out;
@@ -847,31 +880,8 @@ static int setup_guest(int xc_handle,
         goto error_out;
     }
 
-    if ( (page_array = malloc(nr_pages * sizeof(unsigned long))) == NULL )
-    {
-        PERROR("Could not allocate memory");
-        goto error_out;
-    }
-
-    if ( xc_get_pfn_list(xc_handle, dom, page_array, nr_pages) != nr_pages )
-    {
-        PERROR("Could not get the page frame list");
-        goto error_out;
-    }
-
-    rc = (load_funcs.loadimage)(image, image_size,
-                           xc_handle, dom, page_array,
-                           &dsi);
-    if ( rc != 0 )
-        goto error_out;
-
-    if ( load_initrd(xc_handle, dom, initrd,
-                     vinitrd_start - dsi.v_start, page_array) )
-        goto error_out;
-
-    /* setup page tables */
 #if defined(__i386__)
-    if (dsi.pae_kernel != PAEKERN_no)
+    if ( dsi.pae_kernel != PAEKERN_no )
         rc = setup_pg_tables_pae(xc_handle, dom, ctxt,
                                  dsi.v_start, v_end,
                                  page_array, vpt_start, vpt_end,
@@ -888,16 +898,16 @@ static int setup_guest(int xc_handle,
                             page_array, vpt_start, vpt_end,
                             shadow_mode_enabled);
 #endif
-    if (0 != rc)
+    if ( rc != 0 )
         goto error_out;
 
-#if defined(__i386__)
     /*
      * Pin down l2tab addr as page dir page - causes hypervisor to provide
      * correct protection for the page
      */
     if ( !shadow_mode_enabled )
     {
+#if defined(__i386__)
         if ( dsi.pae_kernel != PAEKERN_no )
         {
             if ( pin_table(xc_handle, MMUEXT_PIN_L3_TABLE,
@@ -910,40 +920,24 @@ static int setup_guest(int xc_handle,
                            xen_cr3_to_pfn(ctxt->ctrlreg[3]), dom) )
                 goto error_out;
         }
+#elif defined(__x86_64__)
+        /*
+         * Pin down l4tab addr as page dir page - causes hypervisor to  provide
+         * correct protection for the page
+         */
+        if ( pin_table(xc_handle, MMUEXT_PIN_L4_TABLE,
+                       xen_cr3_to_pfn(ctxt->ctrlreg[3]), dom) )
+            goto error_out;
+#endif
     }
-#endif
 
-#if defined(__x86_64__)
-    /*
-     * Pin down l4tab addr as page dir page - causes hypervisor to  provide
-     * correct protection for the page
-     */
-    if ( pin_table(xc_handle, MMUEXT_PIN_L4_TABLE,
-                   xen_cr3_to_pfn(ctxt->ctrlreg[3]), dom) )
-        goto error_out;
-#endif
-
-    if ( (mmu = xc_init_mmu_updates(xc_handle, dom)) == NULL )
-        goto error_out;
-
-    /* Write the phys->machine and machine->phys table entries. */
+    /* Write the phys->machine table entries (machine->phys already done). */
     physmap_pfn = (vphysmap_start - dsi.v_start) >> PAGE_SHIFT;
     physmap = physmap_e = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
         page_array[physmap_pfn++]);
-
     for ( count = 0; count < nr_pages; count++ )
     {
-        if ( xc_add_mmu_update(
-            xc_handle, mmu,
-            ((uint64_t)page_array[count] << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE,
-            count) )
-        {
-            DPRINTF("m2p update failure p=%lx m=%"PRIx64"\n",
-                    count, (uint64_t)page_array[count]);
-            munmap(physmap, PAGE_SIZE);
-            goto error_out;
-        }
         *physmap_e++ = page_array[count];
         if ( ((unsigned long)physmap_e & (PAGE_SIZE-1)) == 0 )
         {
@@ -954,10 +948,6 @@ static int setup_guest(int xc_handle,
         }
     }
     munmap(physmap, PAGE_SIZE);
-
-    /* Send the page update requests down to the hypervisor. */
-    if ( xc_finish_mmu_updates(xc_handle, mmu) )
-        goto error_out;
 
     if ( shadow_mode_enabled )
     {
@@ -1065,10 +1055,6 @@ static int setup_guest(int xc_handle,
 
     munmap(shared_info, PAGE_SIZE);
 
-    /* Send the page update requests down to the hypervisor. */
-    if ( xc_finish_mmu_updates(xc_handle, mmu) )
-        goto error_out;
-
     hypercall_page = xen_elfnote_numeric(&dsi, XEN_ELFNOTE_HYPERCALL_PAGE,
                                          &hypercall_page_defined);
     if ( hypercall_page_defined )
@@ -1084,7 +1070,6 @@ static int setup_guest(int xc_handle,
             goto error_out;
     }
 
-    free(mmu);
     free(page_array);
 
     *pvsi = vstartinfo_start;
@@ -1094,7 +1079,6 @@ static int setup_guest(int xc_handle,
     return 0;
 
  error_out:
-    free(mmu);
     free(page_array);
     return -1;
 }
@@ -1102,6 +1086,7 @@ static int setup_guest(int xc_handle,
 
 static int xc_linux_build_internal(int xc_handle,
                                    uint32_t domid,
+                                   unsigned int mem_mb,
                                    char *image,
                                    unsigned long image_size,
                                    struct initrd_info *initrd,
@@ -1115,9 +1100,8 @@ static int xc_linux_build_internal(int xc_handle,
 {
     struct xen_domctl launch_domctl;
     DECLARE_DOMCTL;
-    int rc, i;
-    vcpu_guest_context_t st_ctxt, *ctxt = &st_ctxt;
-    unsigned long nr_pages;
+    int rc;
+    struct vcpu_guest_context st_ctxt, *ctxt = &st_ctxt;
     unsigned long vstartinfo_start, vkern_entry, vstack_start;
     uint32_t      features_bitmap[XENFEAT_NR_SUBMAPS] = { 0, };
 
@@ -1130,19 +1114,11 @@ static int xc_linux_build_internal(int xc_handle,
         }
     }
 
-    if ( (nr_pages = get_tot_pages(xc_handle, domid)) < 0 )
-    {
-        PERROR("Could not find total pages for domain");
-        goto error_out;
-    }
+    memset(ctxt, 0, sizeof(*ctxt));
 
-#ifdef VALGRIND
-    memset(&st_ctxt, 0, sizeof(st_ctxt));
-#endif
-
-    if ( mlock(&st_ctxt, sizeof(st_ctxt) ) )
+    if ( lock_pages(ctxt, sizeof(*ctxt) ) )
     {
-        PERROR("%s: ctxt mlock failed", __func__);
+        PERROR("%s: ctxt lock failed", __func__);
         return 1;
     }
 
@@ -1155,11 +1131,9 @@ static int xc_linux_build_internal(int xc_handle,
         goto error_out;
     }
 
-    memset(ctxt, 0, sizeof(*ctxt));
-
     if ( setup_guest(xc_handle, domid, image, image_size,
                      initrd,
-                     nr_pages,
+                     mem_mb << (20 - PAGE_SHIFT),
                      &vstartinfo_start, &vkern_entry,
                      &vstack_start, ctxt, cmdline,
                      domctl.u.getdomaininfo.shared_info_frame,
@@ -1173,12 +1147,9 @@ static int xc_linux_build_internal(int xc_handle,
 
 #ifdef __ia64__
     /* based on new_thread in xen/arch/ia64/domain.c */
-    ctxt->flags = 0;
-    ctxt->user_regs.cr_ipsr = 0; /* all necessary bits filled by hypervisor */
     ctxt->user_regs.cr_iip = vkern_entry;
     ctxt->user_regs.cr_ifs = 1UL << 63;
     ctxt->user_regs.ar_fpsr = xc_ia64_fpsr_default();
-    i = 0; /* silence unused variable warning */
 #else /* x86 */
     /*
      * Initial register values:
@@ -1202,43 +1173,11 @@ static int xc_linux_build_internal(int xc_handle,
 
     ctxt->flags = VGCF_IN_KERNEL;
 
-    /* FPU is set up to default initial state. */
-    memset(&ctxt->fpu_ctxt, 0, sizeof(ctxt->fpu_ctxt));
-
-    /* Virtual IDT is empty at start-of-day. */
-    for ( i = 0; i < 256; i++ )
-    {
-        ctxt->trap_ctxt[i].vector = i;
-        ctxt->trap_ctxt[i].cs     = FLAT_KERNEL_CS;
-    }
-
-    /* No LDT. */
-    ctxt->ldt_ents = 0;
-
-    /* Use the default Xen-provided GDT. */
-    ctxt->gdt_ents = 0;
-
-    /* Ring 1 stack is the initial stack. */
-    ctxt->kernel_ss = FLAT_KERNEL_SS;
-    ctxt->kernel_sp = vstack_start + PAGE_SIZE;
-
-    /* No debugging. */
-    memset(ctxt->debugreg, 0, sizeof(ctxt->debugreg));
-
-    /* No callback handlers. */
-#if defined(__i386__)
-    ctxt->event_callback_cs     = FLAT_KERNEL_CS;
-    ctxt->event_callback_eip    = 0;
-    ctxt->failsafe_callback_cs  = FLAT_KERNEL_CS;
-    ctxt->failsafe_callback_eip = 0;
-#elif defined(__x86_64__)
-    ctxt->event_callback_eip    = 0;
-    ctxt->failsafe_callback_eip = 0;
-    ctxt->syscall_callback_eip  = 0;
-#endif
+    ctxt->kernel_ss = ctxt->user_regs.ss;
+    ctxt->kernel_sp = ctxt->user_regs.esp;
 #endif /* x86 */
 
-    memset( &launch_domctl, 0, sizeof(launch_domctl) );
+    memset(&launch_domctl, 0, sizeof(launch_domctl));
 
     launch_domctl.domain = (domid_t)domid;
     launch_domctl.u.vcpucontext.vcpu   = 0;
@@ -1255,6 +1194,7 @@ static int xc_linux_build_internal(int xc_handle,
 
 int xc_linux_build_mem(int xc_handle,
                        uint32_t domid,
+                       unsigned int mem_mb,
                        const char *image_buffer,
                        unsigned long image_size,
                        const char *initrd,
@@ -1303,7 +1243,7 @@ int xc_linux_build_mem(int xc_handle,
         }
     }
 
-    sts = xc_linux_build_internal(xc_handle, domid, img_buf, img_len,
+    sts = xc_linux_build_internal(xc_handle, domid, mem_mb, img_buf, img_len,
                                   &initrd_info, cmdline, features, flags,
                                   store_evtchn, store_mfn,
                                   console_evtchn, console_mfn);
@@ -1323,6 +1263,7 @@ int xc_linux_build_mem(int xc_handle,
 
 int xc_linux_build(int xc_handle,
                    uint32_t domid,
+                   unsigned int mem_mb,
                    const char *image_name,
                    const char *initrd_name,
                    const char *cmdline,
@@ -1352,7 +1293,6 @@ int xc_linux_build(int xc_handle,
             goto error_out;
         }
 
-        initrd_info.len = xc_get_filesz(fd);
         if ( (initrd_info.u.file_handle = gzdopen(fd, "rb")) == NULL )
         {
             PERROR("Could not allocate decompression state for initrd");
@@ -1360,7 +1300,7 @@ int xc_linux_build(int xc_handle,
         }
     }
 
-    sts = xc_linux_build_internal(xc_handle, domid, image, image_size,
+    sts = xc_linux_build_internal(xc_handle, domid, mem_mb, image, image_size,
                                   &initrd_info, cmdline, features, flags,
                                   store_evtchn, store_mfn,
                                   console_evtchn, console_mfn);

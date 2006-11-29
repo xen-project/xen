@@ -25,11 +25,6 @@
 #include <public/hvm/ioreq.h>
 #include <public/event_channel.h>
 
-#define MAX_OPERAND_NUM 2
-
-#define mk_operand(size_reg, index, seg, flag) \
-    (((size_reg) << 24) | ((index) << 16) | ((seg) << 8) | (flag))
-
 #define operand_size(operand)   \
     ((operand >> 24) & 0xFF)
 
@@ -68,30 +63,26 @@
 #define INSTR_TEST  12
 #define INSTR_BT    13
 #define INSTR_XCHG  14
-
-struct instruction {
-    __s8    instr;        /* instruction type */
-    __s16   op_size;      /* the operand's bit size, e.g. 16-bit or 32-bit */
-    __u64   immediate;
-    __u16   seg_sel;      /* segmentation selector */
-    __u32   operand[MAX_OPERAND_NUM];   /* order is AT&T assembly */
-    __u32   flags;
-};
+#define INSTR_SUB   15
+#define INSTR_ADD   16
 
 #define MAX_INST_LEN      15 /* Maximum instruction length = 15 bytes */
 
 struct hvm_io_op {
-    int                    flags;
-    int                    instr;       /* instruction */
-    unsigned long          operand[2];  /* operands */
-    unsigned long          immediate;   /* immediate portion */
-    struct cpu_user_regs   io_context;  /* current context */
+    unsigned int            instr;      /* instruction */
+    unsigned int            flags;
+    unsigned long           addr;       /* virt addr for overlap PIO/MMIO */
+    struct {
+        unsigned int        operand[2]; /* operands */
+        unsigned long       immediate;  /* immediate portion */
+    };
+    struct cpu_user_regs    io_context; /* current context */
 };
 
 #define MAX_IO_HANDLER              8
 
-#define VMX_PORTIO                  0
-#define VMX_MMIO                    1
+#define HVM_PORTIO                  0
+#define HVM_MMIO                    1
 
 typedef int (*intercept_action_t)(ioreq_t *);
 typedef unsigned long (*hvm_mmio_read_t)(struct vcpu *v,
@@ -125,21 +116,23 @@ struct hvm_mmio_handler {
 
 /* global io interception point in HV */
 extern int hvm_io_intercept(ioreq_t *p, int type);
-extern int register_io_handler(unsigned long addr, unsigned long size,
-                               intercept_action_t action, int type);
+extern int register_io_handler(
+    struct domain *d, unsigned long addr, unsigned long size,
+    intercept_action_t action, int type);
 
 static inline int hvm_portio_intercept(ioreq_t *p)
 {
-    return hvm_io_intercept(p, VMX_PORTIO);
+    return hvm_io_intercept(p, HVM_PORTIO);
 }
 
-int hvm_mmio_intercept(ioreq_t *p);
+extern int hvm_mmio_intercept(ioreq_t *p);
+extern int hvm_buffered_io_intercept(ioreq_t *p);
 
-static inline int register_portio_handler(unsigned long addr,
-                                          unsigned long size,
-                                          intercept_action_t action)
+static inline int register_portio_handler(
+    struct domain *d, unsigned long addr,
+    unsigned long size, intercept_action_t action)
 {
-    return register_io_handler(addr, size, action, VMX_PORTIO);
+    return register_io_handler(d, addr, size, action, HVM_PORTIO);
 }
 
 #if defined(__i386__) || defined(__x86_64__)
@@ -149,17 +142,13 @@ static inline int irq_masked(unsigned long eflags)
 }
 #endif
 
-extern void handle_mmio(unsigned long, unsigned long);
+extern void send_pio_req(unsigned long port, unsigned long count, int size,
+                         long value, int dir, int df, int value_is_ptr);
+extern void handle_mmio(unsigned long gpa);
 extern void hvm_interrupt_post(struct vcpu *v, int vector, int type);
 extern void hvm_io_assist(struct vcpu *v);
-extern void pic_irq_request(void *data, int level);
-extern void hvm_pic_assist(struct vcpu *v);
 extern int cpu_get_interrupt(struct vcpu *v, int *type);
 extern int cpu_has_pending_irq(struct vcpu *v);
-extern void hvm_release_assist_channel(struct vcpu *v);
-
-// XXX - think about this, maybe use bit 30 of the mfn to signify an MMIO frame.
-#define mmio_space(gpa) (!VALID_MFN(get_mfn_from_gpfn((gpa) >> PAGE_SHIFT)))
 
 #endif /* __ASM_X86_HVM_IO_H__ */
 

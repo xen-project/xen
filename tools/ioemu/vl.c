@@ -122,6 +122,7 @@ static DisplayState display_state;
 int nographic;
 int vncviewer;
 int vncunused;
+struct sockaddr_in vnclisten_addr;
 const char* keyboard_layout = NULL;
 int64_t ticks_per_sec;
 char *boot_device = NULL;
@@ -169,6 +170,9 @@ time_t timeoffset = 0;
 
 char domain_name[1024] = { 'H','V', 'M', 'X', 'E', 'N', '-'};
 extern int domid;
+
+char vncpasswd[64];
+unsigned char challenge[AUTHCHALLENGESIZE];
 
 /***********************************************************/
 /* x86 ISA bus support */
@@ -723,6 +727,12 @@ void qemu_del_timer(QEMUTimer *ts)
         }
         pt = &t->next;
     }
+}
+
+void qemu_advance_timer(QEMUTimer *ts, int64_t expire_time)
+{
+    if (ts->expire_time > expire_time || !qemu_timer_pending(ts))
+	qemu_mod_timer(ts, expire_time);
 }
 
 /* modify the current timer so that it will be fired when current_time
@@ -1674,7 +1684,7 @@ static void tty_serial_init(int fd, int speed,
 
     tty.c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP
                           |INLCR|IGNCR|ICRNL|IXON);
-    tty.c_oflag |= OPOST;
+    tty.c_oflag &= ~OPOST; /* no output mangling of raw serial stream */
     tty.c_lflag &= ~(ECHO|ECHONL|ICANON|IEXTEN|ISIG);
     tty.c_cflag &= ~(CSIZE|PARENB|PARODD|CRTSCTS);
     switch(data_bits) {
@@ -2520,6 +2530,7 @@ static CharDriverState *qemu_chr_open_tcp(const char *host_str,
     int is_waitconnect = 1;
     const char *ptr;
     struct sockaddr_in saddr;
+    int opt;
 
     if (parse_host_port(&saddr, host_str) < 0)
         goto fail;
@@ -2588,6 +2599,8 @@ static CharDriverState *qemu_chr_open_tcp(const char *host_str,
             }
         }
         s->fd = fd;
+	opt = 1;
+	setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&opt, sizeof(opt));
         if (s->connected)
             tcp_chr_connect(chr);
         else
@@ -2777,10 +2790,22 @@ fail:
     return -1;
 }
 
+int parse_host(struct sockaddr_in *saddr, const char *buf)
+{
+    struct hostent *he;
+
+    if ((he = gethostbyname(buf)) != NULL) {
+        saddr->sin_addr = *(struct in_addr *)he->h_addr;
+    } else {
+        if (!inet_aton(buf, &saddr->sin_addr))
+            return -1;
+    }
+    return 0;
+}
+
 int parse_host_port(struct sockaddr_in *saddr, const char *str)
 {
     char buf[512];
-    struct hostent *he;
     const char *p, *r;
     int port;
 
@@ -2791,14 +2816,8 @@ int parse_host_port(struct sockaddr_in *saddr, const char *str)
     if (buf[0] == '\0') {
         saddr->sin_addr.s_addr = 0;
     } else {
-        if (isdigit(buf[0])) {
-            if (!inet_aton(buf, &saddr->sin_addr))
-                return -1;
-        } else {
-            if ((he = gethostbyname(buf)) == NULL)
-                return - 1;
-            saddr->sin_addr = *(struct in_addr *)he->h_addr;
-        }
+        if (parse_host(saddr, buf) == -1)
+            return -1;
     }
     port = strtol(p, (char **)&r, 0);
     if (r == p)
@@ -3015,7 +3034,7 @@ void net_slirp_smb(const char *exported_dir)
     }
 
     /* XXX: better tmp dir construction */
-    snprintf(smb_dir, sizeof(smb_dir), "/tmp/qemu-smb.%d", getpid());
+    snprintf(smb_dir, sizeof(smb_dir), "/tmp/qemu-smb.%ld", (long)getpid());
     if (mkdir(smb_dir, 0700) < 0) {
         fprintf(stderr, "qemu: could not create samba server dir '%s'\n", smb_dir);
         exit(1);
@@ -3982,7 +4001,7 @@ static void create_pidfile(const char *filename)
                 perror("Opening pidfile");
                 exit(1);
             }
-            fprintf(f, "%d\n", getpid());
+            fprintf(f, "%ld\n", (long)getpid());
             fclose(f);
             pid_filename = qemu_strdup(filename);
             if (!pid_filename) {
@@ -5346,6 +5365,7 @@ void help(void)
 	   "-vnc display    start a VNC server on display\n"
            "-vncviewer      start a vncviewer process for this domain\n"
            "-vncunused      bind the VNC server to an unused port\n"
+           "-vnclisten      bind the VNC server to this address\n"
            "-timeoffset     time offset (in seconds) from local time\n"
            "-acpi           disable or enable ACPI of HVM domain \n"
            "\n"
@@ -5438,6 +5458,7 @@ enum {
     QEMU_OPTION_acpi,
     QEMU_OPTION_vncviewer,
     QEMU_OPTION_vncunused,
+    QEMU_OPTION_vnclisten,
 };
 
 typedef struct QEMUOption {
@@ -5516,6 +5537,7 @@ const QEMUOption qemu_options[] = {
     { "vnc", HAS_ARG, QEMU_OPTION_vnc },
     { "vncviewer", 0, QEMU_OPTION_vncviewer },
     { "vncunused", 0, QEMU_OPTION_vncunused },
+    { "vnclisten", HAS_ARG, QEMU_OPTION_vnclisten },
     
     /* temporary options */
     { "usb", 0, QEMU_OPTION_usb },
@@ -5765,9 +5787,6 @@ int set_mm_mapping(int xc_handle, uint32_t domid,
                    unsigned long nr_pages, unsigned int address_bits,
                    xen_pfn_t *extent_start)
 {
-#if 0
-    int i;
-#endif
     xc_dominfo_t info;
     int err = 0;
 
@@ -5785,19 +5804,6 @@ int set_mm_mapping(int xc_handle, uint32_t domid,
         fprintf(stderr, "Failed to populate physmap\n");
         return -1;
     }
-
-    err = xc_domain_translate_gpfn_list(xc_handle, domid, nr_pages,
-                                        extent_start, extent_start);
-    if (err) {
-        fprintf(stderr, "Failed to translate gpfn list\n");
-        return -1;
-    }
-
-#if 0 /* Generates lots of log file output - turn on for debugging */
-    for (i = 0; i < nr_pages; i++)
-        fprintf(stderr, "set_map result i %x result %lx\n", i,
-                extent_start[i]);
-#endif
 
     return 0;
 }
@@ -5895,6 +5901,7 @@ int main(int argc, char **argv)
     vncunused = 0;
     kernel_filename = NULL;
     kernel_cmdline = "";
+    *vncpasswd = '\0';
 #ifndef CONFIG_DM
 #ifdef TARGET_PPC
     cdrom_index = 1;
@@ -5922,9 +5929,11 @@ int main(int argc, char **argv)
 
     nb_nics = 0;
     /* default mac address of the first network interface */
+
+    memset(&vnclisten_addr.sin_addr, 0, sizeof(vnclisten_addr.sin_addr));
     
     /* init debug */
-    sprintf(qemu_dm_logfilename, "/var/log/xen/qemu-dm.%d.log", getpid());
+    sprintf(qemu_dm_logfilename, "/var/log/xen/qemu-dm.%ld.log", (long)getpid());
     cpu_set_log_filename(qemu_dm_logfilename);
     cpu_set_log(0);
     
@@ -6304,7 +6313,10 @@ int main(int argc, char **argv)
             case QEMU_OPTION_vncunused:
                 vncunused++;
                 if (vnc_display == -1)
-                    vnc_display = -2;
+                    vnc_display = 0;
+                break;
+            case QEMU_OPTION_vnclisten:
+                parse_host(&vnclisten_addr, optarg);
                 break;
             }
         }
@@ -6365,17 +6377,17 @@ int main(int argc, char **argv)
             exit(1);
     }
 
+#if defined (__ia64__)
+    if (ram_size > MMIO_START)
+        ram_size += 1 * MEM_G; /* skip 3G-4G MMIO, LEGACY_IO_SPACE etc. */
+#endif
+
     /* init the memory */
     phys_ram_size = ram_size + vga_ram_size + bios_size;
 
 #ifdef CONFIG_DM
 
     xc_handle = xc_interface_open();
-
-#if defined (__ia64__)
-    if (ram_size > MMIO_START)
-        ram_size += 1 * MEM_G; /* skip 3G-4G MMIO, LEGACY_IO_SPACE etc. */
-#endif
 
     nr_pages = ram_size/PAGE_SIZE;
     tmp_nr_pages = nr_pages;
@@ -6395,14 +6407,8 @@ int main(int argc, char **argv)
     }
 
 #if defined(__i386__) || defined(__x86_64__)
-    if (xc_get_pfn_list(xc_handle, domid, page_array, nr_pages) != nr_pages) {
-        fprintf(logfile, "xc_get_pfn_list returned error %d\n", errno);
-        exit(-1);
-    }
-
-    if (ram_size > HVM_BELOW_4G_RAM_END)
-        for (i = 0; i < nr_pages - (HVM_BELOW_4G_RAM_END >> PAGE_SHIFT); i++)
-            page_array[tmp_nr_pages - 1 - i] = page_array[nr_pages - 1 - i];
+    for ( i = 0; i < tmp_nr_pages; i++)
+        page_array[i] = i;
 
     phys_ram_base = xc_map_foreign_batch(xc_handle, domid,
                                          PROT_READ|PROT_WRITE, page_array,
@@ -6423,7 +6429,6 @@ int main(int argc, char **argv)
     fprintf(logfile, "shared page at pfn:%lx, mfn: %"PRIx64"\n",
             shared_page_nr, (uint64_t)(page_array[shared_page_nr]));
 
-    /* not yet add for IA64 */
     buffered_io_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
                                             PROT_READ|PROT_WRITE,
                                             page_array[shared_page_nr - 2]);
@@ -6440,7 +6445,7 @@ int main(int argc, char **argv)
 #elif defined(__ia64__)
   
     if (xc_ia64_get_pfn_list(xc_handle, domid, page_array,
-                             IO_PAGE_START >> PAGE_SHIFT, 1) != 1) {
+                             IO_PAGE_START >> PAGE_SHIFT, 3) != 3) {
         fprintf(logfile, "xc_ia64_get_pfn_list returned error %d\n", errno);
         exit(-1);
     }
@@ -6452,6 +6457,12 @@ int main(int argc, char **argv)
     fprintf(logfile, "shared page at pfn:%lx, mfn: %016lx\n",
             IO_PAGE_START >> PAGE_SHIFT, page_array[0]);
 
+    buffered_io_page =xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
+                                       PROT_READ|PROT_WRITE,
+                                       page_array[2]);
+    fprintf(logfile, "Buffered IO page at pfn:%lx, mfn: %016lx\n",
+            BUFFER_IO_PAGE_START >> PAGE_SHIFT, page_array[2]);
+
     if (xc_ia64_get_pfn_list(xc_handle, domid,
                              page_array, 0, nr_pages) != nr_pages) {
         fprintf(logfile, "xc_ia64_get_pfn_list returned error %d\n", errno);
@@ -6459,9 +6470,9 @@ int main(int argc, char **argv)
     }
 
     if (ram_size > MMIO_START) {	
-        for (i = 0 ; i < MEM_G >> PAGE_SHIFT; i++)
-            page_array[MMIO_START >> PAGE_SHIFT + i] =
-                page_array[IO_PAGE_START >> PAGE_SHIFT + 1];
+        for (i = 0 ; i < (MEM_G >> PAGE_SHIFT); i++)
+            page_array[(MMIO_START >> PAGE_SHIFT) + i] =
+                page_array[(IO_PAGE_START >> PAGE_SHIFT) + 1];
     }
 
     phys_ram_base = xc_map_foreign_batch(xc_handle, domid,
@@ -6471,6 +6482,7 @@ int main(int argc, char **argv)
         fprintf(logfile, "xc_map_foreign_batch returned error %d\n", errno);
         exit(-1);
     }
+    free(page_array);
 #endif
 #else  /* !CONFIG_DM */
 
@@ -6538,11 +6550,15 @@ int main(int argc, char **argv)
 
     init_ioports();
 
+    /* read vncpasswd from xenstore */
+    if (0 > xenstore_read_vncpasswd(domid))
+        exit(1);
+
     /* terminal init */
     if (nographic) {
         dumb_display_init(ds);
     } else if (vnc_display != -1) {
-	vnc_display = vnc_display_init(ds, vnc_display, vncunused);
+	vnc_display = vnc_display_init(ds, vnc_display, vncunused, &vnclisten_addr);
 	if (vncviewer)
 	    vnc_start_viewer(vnc_display);
 	xenstore_write_vncport(vnc_display);

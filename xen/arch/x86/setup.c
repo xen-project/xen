@@ -1,4 +1,3 @@
-
 #include <xen/config.h>
 #include <xen/init.h>
 #include <xen/lib.h>
@@ -16,6 +15,8 @@
 #include <xen/gdbstub.h>
 #include <xen/percpu.h>
 #include <xen/hypercall.h>
+#include <xen/keyhandler.h>
+#include <xen/numa.h>
 #include <public/version.h>
 #include <asm/bitops.h>
 #include <asm/smp.h>
@@ -29,6 +30,7 @@
 
 extern void dmi_scan_machine(void);
 extern void generic_apic_probe(void);
+extern void numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn);
 
 /*
  * opt_xenheap_megabytes: Size of Xen heap in megabytes, excluding the
@@ -81,7 +83,6 @@ extern void arch_init_memory(void);
 extern void init_IRQ(void);
 extern void trap_init(void);
 extern void early_time_init(void);
-extern void initialize_keytable(void);
 extern void early_cpu_init(void);
 
 struct tss_struct init_tss[NR_CPUS];
@@ -203,6 +204,44 @@ static void __init percpu_free_unused_areas(void)
 #endif
 }
 
+/* Fetch acm policy module from multiboot modules. */
+static void extract_acm_policy(
+    multiboot_info_t *mbi,
+    unsigned int *initrdidx,
+    char **_policy_start,
+    unsigned long *_policy_len)
+{
+    int i;
+    module_t *mod = (module_t *)__va(mbi->mods_addr);
+    unsigned long start, policy_len;
+    char *policy_start;
+
+    /*
+     * Try all modules and see whichever could be the binary policy.
+     * Adjust the initrdidx if module[1] is the binary policy.
+     */
+    for ( i = mbi->mods_count-1; i >= 1; i-- )
+    {
+        start = initial_images_start + (mod[i].mod_start-mod[0].mod_start);
+#if defined(__i386__)
+        policy_start = (char *)start;
+#elif defined(__x86_64__)
+        policy_start = __va(start);
+#endif
+        policy_len   = mod[i].mod_end - mod[i].mod_start;
+        if ( acm_is_policy(policy_start, policy_len) )
+        {
+            printk("Policy len  0x%lx, start at %p - module %d.\n",
+                   policy_len, policy_start, i);
+            *_policy_start = policy_start;
+            *_policy_len = policy_len;
+            if ( i == 1 )
+                *initrdidx = (mbi->mods_count > 2) ? 2 : 0;
+            break;
+        }
+    }
+}
+
 static void __init init_idle_domain(void)
 {
     struct domain *idle_domain;
@@ -210,7 +249,7 @@ static void __init init_idle_domain(void)
     /* Domain creation requires that scheduler structures are initialised. */
     scheduler_init();
 
-    idle_domain = domain_create(IDLE_DOMAIN_ID);
+    idle_domain = domain_create(IDLE_DOMAIN_ID, 0);
     if ( (idle_domain == NULL) || (alloc_vcpu(idle_domain, 0, 0) == NULL) )
         BUG();
 
@@ -220,11 +259,27 @@ static void __init init_idle_domain(void)
     setup_idle_pagetable();
 }
 
+static void srat_detect_node(int cpu)
+{
+    unsigned node;
+    u8 apicid = x86_cpu_to_apicid[cpu];
+
+    node = apicid_to_node[apicid];
+    if ( node == NUMA_NO_NODE )
+        node = 0;
+    numa_set_node(cpu, node);
+
+    if ( acpi_numa > 0 )
+        printk(KERN_INFO "CPU %d APIC %d -> Node %d\n", cpu, apicid, node);
+}
+
 void __init __start_xen(multiboot_info_t *mbi)
 {
     char __cmdline[] = "", *cmdline = __cmdline;
     unsigned long _initrd_start = 0, _initrd_len = 0;
     unsigned int initrdidx = 1;
+    char *_policy_start = NULL;
+    unsigned long _policy_len = 0;
     module_t *mod = (module_t *)__va(mbi->mods_addr);
     unsigned long nr_pages, modules_length;
     paddr_t s, e;
@@ -257,7 +312,7 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     init_console();
 
-    printf("Command line: %s\n", cmdline);
+    printk("Command line: %s\n", cmdline);
 
     /* Check that we have at least one Multiboot module. */
     if ( !(mbi->flags & MBI_MODULES) || (mbi->mods_count == 0) )
@@ -273,6 +328,13 @@ void __init __start_xen(multiboot_info_t *mbi)
         EARLY_FAIL();
     }
 
+    /*
+     * Since there are some stubs getting built on the stacks which use
+     * direct calls/jumps, the heap must be confined to the lower 2G so
+     * that those branches can reach their targets.
+     */
+    if ( opt_xenheap_megabytes > 2048 )
+        opt_xenheap_megabytes = 2048;
     xenheap_phys_end = opt_xenheap_megabytes << 20;
 
     if ( mbi->flags & MBI_MEMMAP )
@@ -301,7 +363,7 @@ void __init __start_xen(multiboot_info_t *mbi)
             e820_raw[e820_raw_nr].size = 
                 ((u64)map->length_high << 32) | (u64)map->length_low;
             e820_raw[e820_raw_nr].type = 
-                (map->type > E820_SHARED_PAGE) ? E820_RESERVED : map->type;
+                (map->type > E820_NVS) ? E820_RESERVED : map->type;
             e820_raw_nr++;
 
             bytes += map->size + 4;
@@ -439,6 +501,12 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     init_frametable();
 
+    acpi_boot_table_init();
+
+    acpi_numa_init();
+
+    numa_initmem_init(0, max_page);
+
     end_boot_allocator();
 
     /* Initialise the Xen heap, skipping RAM holes. */
@@ -490,8 +558,9 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     generic_apic_probe();
 
-    acpi_boot_table_init();
     acpi_boot_init();
+
+    init_cpu_to_node();
 
     if ( smp_found_config )
         get_smp_config();
@@ -543,6 +612,11 @@ void __init __start_xen(multiboot_info_t *mbi)
             break;
         if ( !cpu_online(i) )
             __cpu_up(i);
+
+        /* Set up cpu_to_node[]. */
+        srat_detect_node(i);
+        /* Set up node_to_cpumask based on cpu_to_node[]. */
+        numa_add_cpu(i);        
     }
 
     printk("Brought up %ld CPUs\n", (long)num_online_cpus());
@@ -559,16 +633,20 @@ void __init __start_xen(multiboot_info_t *mbi)
     if ( opt_watchdog ) 
         watchdog_enable();
 
+    /* Extract policy from multiboot.  */
+    extract_acm_policy(mbi, &initrdidx, &_policy_start, &_policy_len);
+
     /* initialize access control security module */
-    acm_init(&initrdidx, mbi, initial_images_start);
+    acm_init(_policy_start, _policy_len);
 
     /* Create initial domain 0. */
-    dom0 = domain_create(0);
+    dom0 = domain_create(0, 0);
     if ( (dom0 == NULL) || (alloc_vcpu(dom0, 0, 0) == NULL) )
         panic("Error creating domain 0\n");
 
-    set_bit(_DOMF_privileged, &dom0->domain_flags);
-    /* post-create hooks sets security label */
+    dom0->is_privileged = 1;
+
+    /* Post-create hook sets security label. */
     acm_post_domain0_create(dom0->domain_id);
 
     /* Grab the DOM0 command line. */

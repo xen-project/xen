@@ -67,15 +67,12 @@ int run = 1;
 int max_timeout = MAX_TIMEOUT;
 int ctlfd = 0;
 
+int blktap_major;
+
 static int open_ctrl_socket(char *devname);
 static int write_msg(int fd, int msgtype, void *ptr, void *ptr2);
 static int read_msg(int fd, int msgtype, void *ptr);
 static driver_list_entry_t *active_disks[MAX_DISK_TYPES];
-
-void sig_handler(int sig)
-{
-	run = 0;	
-}
 
 static void init_driver_list(void)
 {
@@ -108,7 +105,18 @@ static void make_blktap_dev(char *devname, int major, int minor)
 		if (mknod(devname, S_IFCHR|0600,
                 	makedev(major, minor)) == 0)
 			DPRINTF("Created %s device\n",devname);
-	} else DPRINTF("%s device already exists\n",devname);
+	} else {
+		DPRINTF("%s device already exists\n",devname);
+		/* it already exists, but is it the same major number */
+		if (((st.st_rdev>>8) & 0xff) != major) {
+			DPRINTF("%s has old major %d\n",
+				devname,
+				(unsigned int)((st.st_rdev >> 8) & 0xff));
+			/* only try again if we succed in deleting it */
+			if (!unlink(devname))
+				make_blktap_dev(devname, major, minor);
+		}
+	}
 }
 
 static int get_new_dev(int *major, int *minor, blkif_t *blkif)
@@ -159,13 +167,22 @@ static int get_tapdisk_pid(blkif_t *blkif)
 	return 1;
 }
 
-static blkif_t *test_path(char *path, char **dev, int *type)
+/* Look up the disk specified by path: 
+ *   if found, dev points to the device string in the path
+ *             type is the tapdisk driver type id
+ *             blkif is the existing interface if this is a shared driver
+ *             and NULL otherwise.
+ *   return 0 on success, -1 on error.
+ */
+
+static int test_path(char *path, char **dev, int *type, blkif_t *blkif)
 {
 	char *ptr, handle[10];
-	int i, size;
+	int i, size, found = 0;
 
 	size = sizeof(dtypes)/sizeof(disk_info_t *);
 	*type = MAX_DISK_TYPES + 1;
+        blkif = NULL;
 
 	if ( (ptr = strstr(path, ":"))!=NULL) {
 		memcpy(handle, path, (ptr - path));
@@ -174,103 +191,81 @@ static blkif_t *test_path(char *path, char **dev, int *type)
 		*ptr = '\0';
 		DPRINTF("Detected handle: [%s]\n",handle);
 
-		for (i = 0; i < size; i++) {
-			if (strncmp(handle, dtypes[i]->handle, (ptr - path))
-			    ==0) {
-				*type = dtypes[i]->idnum;
+		for (i = 0; i < size; i++) 
+			if (strncmp(handle, dtypes[i]->handle, 
+                                    (ptr - path)) ==0) {
+                                found = 1;
+                                break;
+                        }
 
-				if (dtypes[i]->single_handler == 1) {
-					/* Check whether tapdisk process 
-					   already exists */
-					if (active_disks[dtypes[i]->idnum] 
-					    == NULL) return NULL;
-					else 
-						return active_disks[dtypes[i]->idnum]->blkif;
-				}
-			}
-		}
-	} else *dev = NULL;
+                if (found) {
+                        *type = dtypes[i]->idnum;
+                        
+                        if (dtypes[i]->single_handler == 1) {
+                                /* Check whether tapdisk process 
+                                   already exists */
+                                if (active_disks[dtypes[i]->idnum] == NULL) 
+                                        blkif = NULL;
+                                else 
+                                        blkif = active_disks[dtypes[i]
+                                                             ->idnum]->blkif;
+                        }
+                        return 0;
+                }
+        }
 
-	return NULL;
+        /* Fall-through case, we didn't find a disk driver. */
+        DPRINTF("Unknown blktap disk type [%s]!\n",handle);
+        *dev = NULL;
+        return -1;
 }
+
 
 static void add_disktype(blkif_t *blkif, int type)
 {
-	driver_list_entry_t *entry, *ptr, *last;
+	driver_list_entry_t *entry, **pprev;
 
-	if (type > MAX_DISK_TYPES) return;
+	if (type > MAX_DISK_TYPES)
+		return;
 
 	entry = malloc(sizeof(driver_list_entry_t));
 	entry->blkif = blkif;
-	entry->next = NULL;
-	ptr = active_disks[type];
+	entry->next  = NULL;
 
-	if (ptr == NULL) {
-		active_disks[type] = entry;
-		entry->prev = NULL;
-		return;
-	}
+	pprev = &active_disks[type];
+	while (*pprev != NULL)
+		pprev = &(*pprev)->next;
 
-	while (ptr != NULL) {
-		last = ptr;
-		ptr = ptr->next;
-	}
-
-	/*We've found the end of the list*/
-        last->next = entry;
-	entry->prev = last;
-	
-	return;
+	*pprev = entry;
+	entry->pprev = pprev;
 }
 
 static int del_disktype(blkif_t *blkif)
 {
-	driver_list_entry_t *ptr, *cur, *last;
+	driver_list_entry_t *entry, **pprev;
 	int type = blkif->drivertype, count = 0, close = 0;
 
-	if (type > MAX_DISK_TYPES) return 1;
+	if (type > MAX_DISK_TYPES)
+		return 1;
 
-	ptr = active_disks[type];
-	last = NULL;
-	while (ptr != NULL) {
-		count++;
-		if (blkif == ptr->blkif) {
-			cur = ptr;
-			if (ptr->next != NULL) {
-				/*There's more later in the chain*/
-				if (!last) {
-					/*We're first in the list*/
-					active_disks[type] = ptr->next;
-					ptr = ptr->next;
-					ptr->prev = NULL;
-				}
-				else {
-					/*We're sandwiched*/
-					last->next = ptr->next;
-					ptr = ptr->next;
-					ptr->prev = last;
-				}
-				
-			} else if (last) {
-				/*There's more earlier in the chain*/
-				last->next = NULL;
-			} else {
-				/*We're the only entry*/
-				active_disks[type] = NULL;
-				if(dtypes[type]->single_handler == 1) 
-					close = 1;
-			}
-			DPRINTF("DEL_DISKTYPE: Freeing entry\n");
-			free(cur);
-			if (dtypes[type]->single_handler == 0) close = 1;
+	pprev = &active_disks[type];
+	while ((*pprev != NULL) && ((*pprev)->blkif != blkif))
+		pprev = &(*pprev)->next;
 
-			return close;
-		}
-		last = ptr;
-		ptr = ptr->next;
+	if ((entry = *pprev) == NULL) {
+		DPRINTF("DEL_DISKTYPE: No match\n");
+		return 1;
 	}
-	DPRINTF("DEL_DISKTYPE: No match\n");
-	return 1;
+
+	*pprev = entry->next;
+	if (entry->next)
+		entry->next->pprev = pprev;
+
+	DPRINTF("DEL_DISKTYPE: Freeing entry\n");
+	free(entry);
+
+	/* Caller should close() if no single controller, or list is empty. */
+	return (!dtypes[type]->single_handler || (active_disks[type] == NULL));
 }
 
 static int write_msg(int fd, int msgtype, void *ptr, void *ptr2)
@@ -425,7 +420,7 @@ static int read_msg(int fd, int msgtype, void *ptr)
 			image->secsize = img->secsize;
 			image->info = img->info;
 
-			DPRINTF("Received CTLMSG_IMG: %lu, %lu, %lu\n",
+			DPRINTF("Received CTLMSG_IMG: %llu, %lu, %u\n",
 				image->size, image->secsize, image->info);
 			if(msgtype != CTLMSG_IMG) ret = 0;
 			break;
@@ -487,7 +482,11 @@ int blktapctrl_new_blkif(blkif_t *blkif)
 		if (get_new_dev(&major, &minor, blkif)<0)
 			return -1;
 
-		exist = test_path(blk->params, &ptr, &type);
+		if (test_path(blk->params, &ptr, &type, exist) != 0) {
+                        DPRINTF("Error in blktap device string(%s).\n",
+                                blk->params);
+                        return -1;
+                }
 		blkif->drivertype = type;
 		blkif->cookie = lrand48() % MAX_RAND_VAL;
 
@@ -584,8 +583,8 @@ int unmap_blktapctrl(blkif_t *blkif)
 	if (del_disktype(blkif)) {
 		close(blkif->fds[WRITE]);
 		close(blkif->fds[READ]);
-
 	}
+
 	return 0;
 }
 
@@ -631,9 +630,11 @@ int main(int argc, char *argv[])
 	struct xs_handle *h;
 	struct pollfd  pfd[NUM_POLL_FDS];
 	pid_t process;
+	char buf[128];
 
 	__init_blkif();
-	openlog("BLKTAPCTRL", LOG_CONS|LOG_ODELAY, LOG_DAEMON);
+	snprintf(buf, sizeof(buf), "BLKTAPCTRL[%d]", getpid());
+	openlog(buf, LOG_CONS|LOG_ODELAY, LOG_DAEMON);
 	daemon(0,0);
 
 	print_drivers();
@@ -644,14 +645,18 @@ int main(int argc, char *argv[])
 	register_new_devmap_hook(map_new_blktapctrl);
 	register_new_unmap_hook(unmap_blktapctrl);
 
-	/*Attach to blktap0 */	
+	/* Attach to blktap0 */
 	asprintf(&devname,"%s/%s0", BLKTAP_DEV_DIR, BLKTAP_DEV_NAME);
-	make_blktap_dev(devname,254,0);
+	if ((ret = xc_find_device_number("blktap0")) < 0)
+		goto open_failed;
+	blktap_major = major(ret);
+	make_blktap_dev(devname,blktap_major,0);
 	ctlfd = open(devname, O_RDWR);
 	if (ctlfd == -1) {
 		DPRINTF("blktap0 open failed\n");
 		goto open_failed;
 	}
+
 
  retry:
 	/* Set up store connection and watch. */
@@ -666,15 +671,11 @@ int main(int argc, char *argv[])
                 } else goto open_failed;
 	}
 	
-	ret = add_blockdevice_probe_watch(h, "Domain-0");
+	ret = setup_probe_watch(h);
 	if (ret != 0) {
 		DPRINTF("Failed adding device probewatch\n");
-                if (count < MAX_ATTEMPTS) {
-                        count++;
-                        sleep(2);
-                        xs_daemon_close(h);
-                        goto retry;
-                } else goto open_failed;
+		xs_daemon_close(h);
+		goto open_failed;
 	}
 
 	ioctl(ctlfd, BLKTAP_IOCTL_SETMODE, BLKTAP_MODE_INTERPOSE );

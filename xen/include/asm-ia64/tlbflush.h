@@ -22,6 +22,15 @@ void domain_flush_vtlb_all (void);
 /* Global range-flush of vTLB.  */
 void domain_flush_vtlb_range (struct domain *d, u64 vadr, u64 addr_range);
 
+#ifdef CONFIG_XEN_IA64_TLB_TRACK
+struct tlb_track_entry;
+void __domain_flush_vtlb_track_entry(struct domain* d,
+                                     const struct tlb_track_entry* entry);
+/* Global entry-flush of vTLB */
+void domain_flush_vtlb_track_entry(struct domain* d,
+                                   const struct tlb_track_entry* entry);
+#endif
+
 /* Flush vhpt and mTLB on every dirty cpus.  */
 void domain_flush_tlb_vhpt(struct domain *d);
 
@@ -31,7 +40,6 @@ void flush_tlb_mask(cpumask_t mask);
 /* Flush local machine TLB.  */
 void local_flush_tlb_all (void);
 
-#define tlbflush_current_time() 0
 #define tlbflush_filter(x,y) ((void)0)
 
 #endif

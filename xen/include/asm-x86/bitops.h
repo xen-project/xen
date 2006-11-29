@@ -14,10 +14,12 @@
 #endif
 
 /*
- * We use the "+m" constraint because the memory operand is both read from
- * and written to. Since the operand is in fact a word array, we also
- * specify "memory" in the clobbers list to indicate that words other than
- * the one directly addressed by the memory operand may be modified.
+ * We specify the memory operand as both input and output because the memory
+ * operand is both read from and written to. Since the operand is in fact a
+ * word array, we also specify "memory" in the clobbers list to indicate that
+ * words other than the one directly addressed by the memory operand may be
+ * modified. We don't use "+m" because the gcc manual says that it should be
+ * used only when the constraint allows the operand to reside in a register.
  */
 
 #define ADDR (*(volatile long *) addr)
@@ -36,8 +38,8 @@ static __inline__ void set_bit(int nr, volatile void * addr)
 {
 	__asm__ __volatile__( LOCK_PREFIX
 		"btsl %1,%0"
-		:"+m" (ADDR)
-		:"dIr" (nr) : "memory");
+		:"=m" (ADDR)
+		:"dIr" (nr), "m" (ADDR) : "memory");
 }
 
 /**
@@ -53,8 +55,8 @@ static __inline__ void __set_bit(int nr, volatile void * addr)
 {
 	__asm__(
 		"btsl %1,%0"
-		:"+m" (ADDR)
-		:"dIr" (nr) : "memory");
+		:"=m" (ADDR)
+		:"dIr" (nr), "m" (ADDR) : "memory");
 }
 
 /**
@@ -71,8 +73,8 @@ static __inline__ void clear_bit(int nr, volatile void * addr)
 {
 	__asm__ __volatile__( LOCK_PREFIX
 		"btrl %1,%0"
-		:"+m" (ADDR)
-		:"dIr" (nr) : "memory");
+		:"=m" (ADDR)
+		:"dIr" (nr), "m" (ADDR) : "memory");
 }
 
 /**
@@ -88,8 +90,8 @@ static __inline__ void __clear_bit(int nr, volatile void * addr)
 {
 	__asm__(
 		"btrl %1,%0"
-		:"+m" (ADDR)
-		:"dIr" (nr) : "memory");
+		:"=m" (ADDR)
+		:"dIr" (nr), "m" (ADDR) : "memory");
 }
 
 #define smp_mb__before_clear_bit()	barrier()
@@ -108,8 +110,8 @@ static __inline__ void __change_bit(int nr, volatile void * addr)
 {
 	__asm__ __volatile__(
 		"btcl %1,%0"
-		:"+m" (ADDR)
-		:"dIr" (nr) : "memory");
+		:"=m" (ADDR)
+		:"dIr" (nr), "m" (ADDR) : "memory");
 }
 
 /**
@@ -125,8 +127,8 @@ static __inline__ void change_bit(int nr, volatile void * addr)
 {
 	__asm__ __volatile__( LOCK_PREFIX
 		"btcl %1,%0"
-		:"+m" (ADDR)
-		:"dIr" (nr) : "memory");
+		:"=m" (ADDR)
+		:"dIr" (nr), "m" (ADDR) : "memory");
 }
 
 /**
@@ -143,8 +145,8 @@ static __inline__ int test_and_set_bit(int nr, volatile void * addr)
 
 	__asm__ __volatile__( LOCK_PREFIX
 		"btsl %2,%1\n\tsbbl %0,%0"
-		:"=r" (oldbit),"+m" (ADDR)
-		:"dIr" (nr) : "memory");
+		:"=r" (oldbit),"=m" (ADDR)
+		:"dIr" (nr), "m" (ADDR) : "memory");
 	return oldbit;
 }
 
@@ -163,8 +165,8 @@ static __inline__ int __test_and_set_bit(int nr, volatile void * addr)
 
 	__asm__(
 		"btsl %2,%1\n\tsbbl %0,%0"
-		:"=r" (oldbit),"+m" (ADDR)
-		:"dIr" (nr) : "memory");
+		:"=r" (oldbit),"=m" (ADDR)
+		:"dIr" (nr), "m" (ADDR) : "memory");
 	return oldbit;
 }
 
@@ -182,8 +184,8 @@ static __inline__ int test_and_clear_bit(int nr, volatile void * addr)
 
 	__asm__ __volatile__( LOCK_PREFIX
 		"btrl %2,%1\n\tsbbl %0,%0"
-		:"=r" (oldbit),"+m" (ADDR)
-		:"dIr" (nr) : "memory");
+		:"=r" (oldbit),"=m" (ADDR)
+		:"dIr" (nr), "m" (ADDR) : "memory");
 	return oldbit;
 }
 
@@ -202,8 +204,8 @@ static __inline__ int __test_and_clear_bit(int nr, volatile void * addr)
 
 	__asm__(
 		"btrl %2,%1\n\tsbbl %0,%0"
-		:"=r" (oldbit),"+m" (ADDR)
-		:"dIr" (nr) : "memory");
+		:"=r" (oldbit),"=m" (ADDR)
+		:"dIr" (nr), "m" (ADDR) : "memory");
 	return oldbit;
 }
 
@@ -214,8 +216,8 @@ static __inline__ int __test_and_change_bit(int nr, volatile void * addr)
 
 	__asm__ __volatile__(
 		"btcl %2,%1\n\tsbbl %0,%0"
-		:"=r" (oldbit),"+m" (ADDR)
-		:"dIr" (nr) : "memory");
+		:"=r" (oldbit),"=m" (ADDR)
+		:"dIr" (nr), "m" (ADDR) : "memory");
 	return oldbit;
 }
 
@@ -233,8 +235,8 @@ static __inline__ int test_and_change_bit(int nr, volatile void * addr)
 
 	__asm__ __volatile__( LOCK_PREFIX
 		"btcl %2,%1\n\tsbbl %0,%0"
-		:"=r" (oldbit),"+m" (ADDR)
-		:"dIr" (nr) : "memory");
+		:"=r" (oldbit),"=m" (ADDR)
+		:"dIr" (nr), "m" (ADDR) : "memory");
 	return oldbit;
 }
 
@@ -244,7 +246,7 @@ static __inline__ int constant_test_bit(int nr, const volatile void * addr)
 	return ((1U << (nr & 31)) & (((const volatile unsigned int *) addr)[nr >> 5])) != 0;
 }
 
-static __inline__ int variable_test_bit(int nr, volatile void * addr)
+static __inline__ int variable_test_bit(int nr, const volatile void * addr)
 {
 	int oldbit;
 

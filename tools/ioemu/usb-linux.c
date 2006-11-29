@@ -26,7 +26,9 @@
 #if defined(__linux__)
 #include <dirent.h>
 #include <sys/ioctl.h>
-#include <linux/compiler.h>
+/* Some versions of usbdevice_fs.h need __user to be defined for them.   */
+/* This may (harmlessly) conflict with a definition in linux/compiler.h. */
+#define __user
 #include <linux/usbdevice_fs.h>
 #include <linux/version.h>
 

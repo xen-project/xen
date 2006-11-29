@@ -1,3 +1,24 @@
+
+/*
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ */
+
 #ifndef __XEN_PUBLIC_HVM_E820_H__
 #define __XEN_PUBLIC_HVM_E820_H__
 
@@ -6,12 +27,6 @@
 #define E820_RESERVED     2
 #define E820_ACPI         3
 #define E820_NVS          4
-
-/* Xen HVM extended E820 types. */
-#define E820_IO          16
-#define E820_SHARED_PAGE 17
-#define E820_XENSTORE    18
-#define E820_BUFFERED_IO 19
 
 /* E820 location in HVM virtual address space. */
 #define E820_MAP_PAGE        0x00090000

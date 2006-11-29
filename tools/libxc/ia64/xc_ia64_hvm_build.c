@@ -551,14 +551,29 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
             char *image, unsigned long image_size, uint32_t vcpus,
             unsigned int store_evtchn, unsigned long *store_mfn)
 {
-    unsigned long page_array[2];
+    unsigned long page_array[3];
     shared_iopage_t *sp;
-    unsigned long dom_memsize = (memsize << 20);
+    void *ioreq_buffer_page;
+    // memsize = required memsize(in configure file) + 16M
+    // dom_memsize will pass to xc_ia64_build_hob(), so must be subbed 16M 
+    unsigned long dom_memsize = ((memsize - 16) << 20);
+    unsigned long nr_pages = (unsigned long)memsize << (20 - PAGE_SHIFT);
+    int rc;
     DECLARE_DOMCTL;
+
+    // ROM size for guest firmware, ioreq page and xenstore page
+    nr_pages += 3; 
 
     if ((image_size > 12 * MEM_M) || (image_size & (PAGE_SIZE - 1))) {
         PERROR("Guest firmware size is incorrect [%ld]?", image_size);
         return -1;
+    }
+
+    rc = xc_domain_memory_increase_reservation(xc_handle, dom, nr_pages,
+                                               0, 0, NULL); 
+    if (rc != 0) {
+        PERROR("Could not allocate memory for HVM guest.\n");
+        goto error_out;
     }
 
     /* This will creates the physmap.  */
@@ -587,7 +602,7 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
 
     /* Retrieve special pages like io, xenstore, etc. */
     if (xc_ia64_get_pfn_list(xc_handle, dom, page_array,
-                             IO_PAGE_START>>PAGE_SHIFT, 2) != 2) {
+                             IO_PAGE_START>>PAGE_SHIFT, 3) != 3) {
         PERROR("Could not get the page frame list");
         goto error_out;
     }
@@ -604,7 +619,10 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
 
     memset(sp, 0, PAGE_SIZE);
     munmap(sp, PAGE_SIZE);
-
+    ioreq_buffer_page = xc_map_foreign_range(xc_handle, dom,
+                               PAGE_SIZE, PROT_READ|PROT_WRITE, page_array[2]); 
+    memset(ioreq_buffer_page,0,PAGE_SIZE);
+    munmap(ioreq_buffer_page, PAGE_SIZE);
     return 0;
 
 error_out:
@@ -614,7 +632,7 @@ error_out:
 int
 xc_hvm_build(int xc_handle, uint32_t domid, int memsize,
              const char *image_name, unsigned int vcpus, unsigned int pae,
-             unsigned int acpi, unsigned int apic, unsigned int store_evtchn,
+             unsigned int acpi, unsigned int store_evtchn,
              unsigned long *store_mfn)
 {
     struct xen_domctl launch_domctl, domctl;

@@ -14,6 +14,7 @@
 #include <asm/processor.h>
 #include <asm/hvm/support.h>
 #include <asm/i387.h>
+#include <asm/asm_defns.h>
 
 void init_fpu(void)
 {
@@ -41,11 +42,11 @@ void save_init_fpu(struct vcpu *v)
 #else /* __x86_64__ */
         /*
          * The only way to force fxsaveq on a wide range of gas versions. On 
-         * older versions the rex64 prefix works only if we force an addressing 
-         * mode that doesn't require extended registers.
+         * older versions the rex64 prefix works only if we force an
+         * addressing mode that doesn't require extended registers.
          */
         __asm__ __volatile__ (
-            "rex64/fxsave (%1)"
+            REX64_PREFIX "fxsave (%1)"
             : "=m" (*fpu_ctxt) : "cdaSDb" (fpu_ctxt) );
 #endif
 
@@ -95,7 +96,7 @@ void restore_fpu(struct vcpu *v)
             "1: fxrstor %0            \n"
 #else /* __x86_64__ */
             /* See above for why the operands/constraints are this way. */
-            "1: rex64/fxrstor (%2)    \n"
+            "1: " REX64_PREFIX "fxrstor (%2)\n"
 #endif
             ".section .fixup,\"ax\"   \n"
             "2: push %%"__OP"ax       \n"

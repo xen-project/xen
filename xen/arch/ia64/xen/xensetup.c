@@ -18,6 +18,7 @@
 #include <xen/domain.h>
 #include <xen/serial.h>
 #include <xen/trace.h>
+#include <xen/keyhandler.h>
 #include <asm/meminit.h>
 #include <asm/page.h>
 #include <asm/setup.h>
@@ -38,7 +39,6 @@ extern unsigned long domain0_ready;
 int find_max_pfn (unsigned long, unsigned long, void *);
 
 /* FIXME: which header these declarations should be there ? */
-extern void initialize_keytable(void);
 extern long is_platform_hp_ski(void);
 extern void early_setup_arch(char **);
 extern void late_setup_arch(char **);
@@ -48,10 +48,7 @@ extern void setup_per_cpu_areas(void);
 extern void mem_init(void);
 extern void init_IRQ(void);
 extern void trap_init(void);
-
-/* opt_dom0_vcpus_pin: If true, dom0 VCPUs are pinned. */
-unsigned int opt_dom0_vcpus_pin = 0;
-boolean_param("dom0_vcpus_pin", opt_dom0_vcpus_pin);
+extern void xen_patch_kernel(void);
 
 /* opt_nosmp: If true, secondary processors are ignored. */
 static int opt_nosmp = 0;
@@ -85,6 +82,7 @@ unsigned int opt_xenheap_megabytes = XENHEAP_DEFAULT_MB;
 unsigned long xenheap_size = XENHEAP_DEFAULT_SIZE;
 extern long running_on_sim;
 unsigned long xen_pstart;
+void *xen_heap_start __read_mostly;
 
 static int
 xen_count_pages(u64 start, u64 end, void *arg)
@@ -188,8 +186,8 @@ efi_print(void)
 
     for (i = 0, p = efi_map_start; p < efi_map_end; ++i, p += efi_desc_size) {
         md = p;
-        printk("mem%02u: type=%u, attr=0x%lx, range=[0x%016lx-0x%016lx) (%luMB)\n",
-               i, md->type, md->attribute, md->phys_addr,
+        printk("mem%02u: type=%2u, attr=0x%016lx, range=[0x%016lx-0x%016lx) "
+               "(%luMB)\n", i, md->type, md->attribute, md->phys_addr,
                md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT),
                md->num_pages >> (20 - EFI_PAGE_SHIFT));
     }
@@ -246,7 +244,6 @@ md_overlaps(efi_memory_desc_t *md, unsigned long phys_addr)
 void start_kernel(void)
 {
     char *cmdline;
-    void *heap_start;
     unsigned long nr_pages;
     unsigned long dom0_memory_start, dom0_memory_size;
     unsigned long dom0_initrd_start, dom0_initrd_size;
@@ -296,6 +293,8 @@ void start_kernel(void)
     xenheap_phys_end = xen_pstart + xenheap_size;
     printk("xen image pstart: 0x%lx, xenheap pend: 0x%lx\n",
            xen_pstart, xenheap_phys_end);
+
+    xen_patch_kernel();
 
     kern_md = md = efi_get_md(xen_pstart);
     md_end = __pa(ia64_imva(&_end));
@@ -390,13 +389,13 @@ void start_kernel(void)
     /* first find highest page frame number */
     max_page = 0;
     efi_memmap_walk(find_max_pfn, &max_page);
-    printf("find_memory: efi_memmap_walk returns max_page=%lx\n",max_page);
+    printk("find_memory: efi_memmap_walk returns max_page=%lx\n",max_page);
     efi_print();
 
-    heap_start = memguard_init(ia64_imva(&_end));
-    printf("Before heap_start: %p\n", heap_start);
-    heap_start = __va(init_boot_allocator(__pa(heap_start)));
-    printf("After heap_start: %p\n", heap_start);
+    xen_heap_start = memguard_init(ia64_imva(&_end));
+    printk("Before xen_heap_start: %p\n", xen_heap_start);
+    xen_heap_start = __va(init_boot_allocator(__pa(xen_heap_start)));
+    printk("After xen_heap_start: %p\n", xen_heap_start);
 
     efi_memmap_walk(filter_rsvd_memory, init_boot_pages);
     efi_memmap_walk(xen_count_pages, &nr_pages);
@@ -414,16 +413,16 @@ void start_kernel(void)
 
     end_boot_allocator();
 
-    init_xenheap_pages(__pa(heap_start), xenheap_phys_end);
+    init_xenheap_pages(__pa(xen_heap_start), xenheap_phys_end);
     printk("Xen heap: %luMB (%lukB)\n",
-	(xenheap_phys_end-__pa(heap_start)) >> 20,
-	(xenheap_phys_end-__pa(heap_start)) >> 10);
+	(xenheap_phys_end-__pa(xen_heap_start)) >> 20,
+	(xenheap_phys_end-__pa(xen_heap_start)) >> 10);
 
     late_setup_arch(&cmdline);
 
     scheduler_init();
     idle_vcpu[0] = (struct vcpu*) ia64_r13;
-    idle_domain = domain_create(IDLE_DOMAIN_ID);
+    idle_domain = domain_create(IDLE_DOMAIN_ID, 0);
     if ( (idle_domain == NULL) || (alloc_vcpu(idle_domain, 0, 0) == NULL) )
         BUG();
 
@@ -500,12 +499,14 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
         efi.hcdp = NULL;
     }
 
+    expose_p2m_init();
+
     /* Create initial domain 0. */
-    dom0 = domain_create(0);
+    dom0 = domain_create(0, 0);
     if ( (dom0 == NULL) || (alloc_vcpu(dom0, 0, 0) == NULL) )
         panic("Error creating domain 0\n");
 
-    set_bit(_DOMF_privileged, &dom0->domain_flags);
+    dom0->is_privileged = 1;
 
     /*
      * We're going to setup domain0 using the module(s) that we stashed safely
@@ -520,10 +521,6 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
                         dom0_initrd_start,dom0_initrd_size,
   			0) != 0)
         panic("Could not set up DOM0 guest OS\n");
-
-    /* PIN domain0 VCPU 0 on CPU 0. */
-    if (opt_dom0_vcpus_pin)
-        dom0->vcpu[0]->cpu_affinity = cpumask_of_cpu(0);
 
     if (!running_on_sim)  // slow on ski and pages are pre-initialized to zero
 	scrub_heap_pages();

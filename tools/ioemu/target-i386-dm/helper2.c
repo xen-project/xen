@@ -193,10 +193,10 @@ void sp_info()
     for (i = 0; i < vcpus; i++) {
         req = &(shared_page->vcpu_iodata[i].vp_ioreq);
         term_printf("vcpu %d: event port %d\n", i, ioreq_local_port[i]);
-        term_printf("  req state: %x, pvalid: %x, addr: %"PRIx64", "
+        term_printf("  req state: %x, ptr: %x, addr: %"PRIx64", "
                     "data: %"PRIx64", count: %"PRIx64", size: %"PRIx64"\n",
-                    req->state, req->pdata_valid, req->addr,
-                    req->u.data, req->count, req->size);
+                    req->state, req->data_is_ptr, req->addr,
+                    req->data, req->count, req->size);
         term_printf("  IO totally occurred on this vcpu: %"PRIx64"\n",
                     req->io_count);
     }
@@ -209,18 +209,19 @@ static ioreq_t *__cpu_get_ioreq(int vcpu)
 
     req = &(shared_page->vcpu_iodata[vcpu].vp_ioreq);
 
-    if (req->state == STATE_IOREQ_READY) {
-        req->state = STATE_IOREQ_INPROCESS;
-        rmb();
-        return req;
+    if (req->state != STATE_IOREQ_READY) {
+        fprintf(logfile, "I/O request not ready: "
+                "%x, ptr: %x, port: %"PRIx64", "
+                "data: %"PRIx64", count: %"PRIx64", size: %"PRIx64"\n",
+                req->state, req->data_is_ptr, req->addr,
+                req->data, req->count, req->size);
+        return NULL;
     }
 
-    fprintf(logfile, "False I/O request ... in-service already: "
-            "%x, pvalid: %x, port: %"PRIx64", "
-            "data: %"PRIx64", count: %"PRIx64", size: %"PRIx64"\n",
-            req->state, req->pdata_valid, req->addr,
-            req->u.data, req->count, req->size);
-    return NULL;
+    rmb(); /* see IOREQ_READY /then/ read contents of ioreq */
+
+    req->state = STATE_IOREQ_INPROCESS;
+    return req;
 }
 
 //use poll to get the port notification
@@ -305,26 +306,26 @@ void cpu_ioreq_pio(CPUState *env, ioreq_t *req)
     sign = req->df ? -1 : 1;
 
     if (req->dir == IOREQ_READ) {
-        if (!req->pdata_valid) {
-            req->u.data = do_inp(env, req->addr, req->size);
+        if (!req->data_is_ptr) {
+            req->data = do_inp(env, req->addr, req->size);
         } else {
             unsigned long tmp;
 
             for (i = 0; i < req->count; i++) {
                 tmp = do_inp(env, req->addr, req->size);
-                write_physical((target_phys_addr_t) req->u.pdata
+                write_physical((target_phys_addr_t) req->data
                   + (sign * i * req->size),
                   req->size, &tmp);
             }
         }
     } else if (req->dir == IOREQ_WRITE) {
-        if (!req->pdata_valid) {
-            do_outp(env, req->addr, req->size, req->u.data);
+        if (!req->data_is_ptr) {
+            do_outp(env, req->addr, req->size, req->data);
         } else {
             for (i = 0; i < req->count; i++) {
                 unsigned long tmp;
 
-                read_physical((target_phys_addr_t) req->u.pdata
+                read_physical((target_phys_addr_t) req->data
                   + (sign * i * req->size),
                   req->size, &tmp);
                 do_outp(env, req->addr, req->size, tmp);
@@ -339,18 +340,18 @@ void cpu_ioreq_move(CPUState *env, ioreq_t *req)
 
     sign = req->df ? -1 : 1;
 
-    if (!req->pdata_valid) {
+    if (!req->data_is_ptr) {
         if (req->dir == IOREQ_READ) {
             for (i = 0; i < req->count; i++) {
                 read_physical(req->addr
                   + (sign * i * req->size),
-                  req->size, &req->u.data);
+                  req->size, &req->data);
             }
         } else if (req->dir == IOREQ_WRITE) {
             for (i = 0; i < req->count; i++) {
                 write_physical(req->addr
                   + (sign * i * req->size),
-                  req->size, &req->u.data);
+                  req->size, &req->data);
             }
         }
     } else {
@@ -361,13 +362,13 @@ void cpu_ioreq_move(CPUState *env, ioreq_t *req)
                 read_physical(req->addr
                   + (sign * i * req->size),
                   req->size, &tmp);
-                write_physical((target_phys_addr_t )req->u.pdata
+                write_physical((target_phys_addr_t )req->data
                   + (sign * i * req->size),
                   req->size, &tmp);
             }
         } else if (req->dir == IOREQ_WRITE) {
             for (i = 0; i < req->count; i++) {
-                read_physical((target_phys_addr_t) req->u.pdata
+                read_physical((target_phys_addr_t) req->data
                   + (sign * i * req->size),
                   req->size, &tmp);
                 write_physical(req->addr
@@ -382,51 +383,66 @@ void cpu_ioreq_and(CPUState *env, ioreq_t *req)
 {
     unsigned long tmp1, tmp2;
 
-    if (req->pdata_valid != 0)
+    if (req->data_is_ptr != 0)
         hw_error("expected scalar value");
 
     read_physical(req->addr, req->size, &tmp1);
     if (req->dir == IOREQ_WRITE) {
-        tmp2 = tmp1 & (unsigned long) req->u.data;
+        tmp2 = tmp1 & (unsigned long) req->data;
         write_physical(req->addr, req->size, &tmp2);
     }
-    req->u.data = tmp1;
+    req->data = tmp1;
+}
+
+void cpu_ioreq_add(CPUState *env, ioreq_t *req)
+{
+    unsigned long tmp1, tmp2;
+
+    if (req->data_is_ptr != 0)
+        hw_error("expected scalar value");
+
+    read_physical(req->addr, req->size, &tmp1);
+    if (req->dir == IOREQ_WRITE) {
+        tmp2 = tmp1 + (unsigned long) req->data;
+        write_physical(req->addr, req->size, &tmp2);
+    }
+    req->data = tmp1;
 }
 
 void cpu_ioreq_or(CPUState *env, ioreq_t *req)
 {
     unsigned long tmp1, tmp2;
 
-    if (req->pdata_valid != 0)
+    if (req->data_is_ptr != 0)
         hw_error("expected scalar value");
 
     read_physical(req->addr, req->size, &tmp1);
     if (req->dir == IOREQ_WRITE) {
-        tmp2 = tmp1 | (unsigned long) req->u.data;
+        tmp2 = tmp1 | (unsigned long) req->data;
         write_physical(req->addr, req->size, &tmp2);
     }
-    req->u.data = tmp1;
+    req->data = tmp1;
 }
 
 void cpu_ioreq_xor(CPUState *env, ioreq_t *req)
 {
     unsigned long tmp1, tmp2;
 
-    if (req->pdata_valid != 0)
+    if (req->data_is_ptr != 0)
         hw_error("expected scalar value");
 
     read_physical(req->addr, req->size, &tmp1);
     if (req->dir == IOREQ_WRITE) {
-        tmp2 = tmp1 ^ (unsigned long) req->u.data;
+        tmp2 = tmp1 ^ (unsigned long) req->data;
         write_physical(req->addr, req->size, &tmp2);
     }
-    req->u.data = tmp1;
+    req->data = tmp1;
 }
 
 void __handle_ioreq(CPUState *env, ioreq_t *req)
 {
-    if (!req->pdata_valid && req->dir == IOREQ_WRITE && req->size != 4)
-	req->u.data &= (1UL << (8 * req->size)) - 1;
+    if (!req->data_is_ptr && req->dir == IOREQ_WRITE && req->size != 4)
+	req->data &= (1UL << (8 * req->size)) - 1;
 
     switch (req->type) {
     case IOREQ_TYPE_PIO:
@@ -437,6 +453,9 @@ void __handle_ioreq(CPUState *env, ioreq_t *req)
         break;
     case IOREQ_TYPE_AND:
         cpu_ioreq_and(env, req);
+        break;
+    case IOREQ_TYPE_ADD:
+        cpu_ioreq_add(env, req);
         break;
     case IOREQ_TYPE_OR:
         cpu_ioreq_or(env, req);
@@ -486,12 +505,19 @@ void cpu_handle_ioreq(void *opaque)
     if (req) {
         __handle_ioreq(env, req);
 
-        /* No state change if state = STATE_IORESP_HOOK */
-        if (req->state == STATE_IOREQ_INPROCESS) {
-            mb();
-            req->state = STATE_IORESP_READY;
+        if (req->state != STATE_IOREQ_INPROCESS) {
+            fprintf(logfile, "Badness in I/O request ... not in service?!: "
+                    "%x, ptr: %x, port: %"PRIx64", "
+                    "data: %"PRIx64", count: %"PRIx64", size: %"PRIx64"\n",
+                    req->state, req->data_is_ptr, req->addr,
+                    req->data, req->count, req->size);
+            destroy_hvm_domain();
+            return;
         }
-        env->send_event = 1;
+
+        wmb(); /* Update ioreq contents /then/ update state. */
+        req->state = STATE_IORESP_READY;
+        xc_evtchn_notify(xce_handle, ioreq_local_port[send_vcpu]);
     }
 }
 
@@ -508,8 +534,6 @@ int main_loop(void)
 
     qemu_set_fd_handler(evtchn_fd, cpu_handle_ioreq, NULL, env);
 
-    env->send_event = 0;
-
     while (1) {
         if (vm_running) {
             if (shutdown_requested)
@@ -522,11 +546,6 @@ int main_loop(void)
 
         /* Wait up to 10 msec. */
         main_loop_wait(10);
-
-        if (env->send_event) {
-            env->send_event = 0;
-            xc_evtchn_notify(xce_handle, ioreq_local_port[send_vcpu]);
-        }
     }
     destroy_hvm_domain();
     return 0;

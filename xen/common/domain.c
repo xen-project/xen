@@ -22,18 +22,24 @@
 #include <xen/delay.h>
 #include <xen/shutdown.h>
 #include <xen/percpu.h>
+#include <xen/multicall.h>
 #include <asm/debugger.h>
 #include <public/sched.h>
 #include <public/vcpu.h>
 
 /* Both these structures are protected by the domlist_lock. */
-rwlock_t domlist_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(domlist_lock);
 struct domain *domain_hash[DOMAIN_HASH_SIZE];
 struct domain *domain_list;
 
 struct domain *dom0;
 
 struct vcpu *idle_vcpu[NR_CPUS] __read_mostly;
+
+int current_domain_id(void)
+{
+    return current->domain->domain_id;
+}
 
 struct domain *alloc_domain(domid_t domid)
 {
@@ -54,21 +60,23 @@ struct domain *alloc_domain(domid_t domid)
     return d;
 }
 
-
 void free_domain(struct domain *d)
 {
     struct vcpu *v;
     int i;
 
-    sched_destroy_domain(d);
-
     for ( i = MAX_VIRT_CPUS-1; i >= 0; i-- )
-        if ( (v = d->vcpu[i]) != NULL )
-            free_vcpu_struct(v);
+    {
+        if ( (v = d->vcpu[i]) == NULL )
+            continue;
+        vcpu_destroy(v);
+        sched_destroy_vcpu(v);
+        free_vcpu_struct(v);
+    }
 
+    sched_destroy_domain(d);
     xfree(d);
 }
-
 
 struct vcpu *alloc_vcpu(
     struct domain *d, unsigned int vcpu_id, unsigned int cpu_id)
@@ -77,17 +85,13 @@ struct vcpu *alloc_vcpu(
 
     BUG_ON(d->vcpu[vcpu_id] != NULL);
 
-    if ( (v = alloc_vcpu_struct(d, vcpu_id)) == NULL )
+    if ( (v = alloc_vcpu_struct()) == NULL )
         return NULL;
 
     v->domain = d;
     v->vcpu_id = vcpu_id;
-    v->processor = cpu_id;
     v->vcpu_info = &d->shared_info->vcpu_info[vcpu_id];
     spin_lock_init(&v->pause_lock);
-
-    v->cpu_affinity = is_idle_domain(d) ?
-        cpumask_of_cpu(cpu_id) : CPU_MASK_ALL;
 
     v->runstate.state = is_idle_vcpu(v) ? RUNSTATE_running : RUNSTATE_offline;
     v->runstate.state_entry_time = NOW();
@@ -95,8 +99,15 @@ struct vcpu *alloc_vcpu(
     if ( (vcpu_id != 0) && !is_idle_domain(d) )
         set_bit(_VCPUF_down, &v->vcpu_flags);
 
-    if ( sched_init_vcpu(v) < 0 )
+    if ( sched_init_vcpu(v, cpu_id) != 0 )
     {
+        free_vcpu_struct(v);
+        return NULL;
+    }
+
+    if ( vcpu_initialise(v) != 0 )
+    {
+        sched_destroy_vcpu(v);
         free_vcpu_struct(v);
         return NULL;
     }
@@ -115,7 +126,7 @@ struct vcpu *alloc_idle_vcpu(unsigned int cpu_id)
     unsigned int vcpu_id = cpu_id % MAX_VIRT_CPUS;
 
     d = (vcpu_id == 0) ?
-        domain_create(IDLE_DOMAIN_ID) :
+        domain_create(IDLE_DOMAIN_ID, 0) :
         idle_vcpu[cpu_id - vcpu_id]->domain;
     BUG_ON(d == NULL);
 
@@ -125,12 +136,15 @@ struct vcpu *alloc_idle_vcpu(unsigned int cpu_id)
     return v;
 }
 
-struct domain *domain_create(domid_t domid)
+struct domain *domain_create(domid_t domid, unsigned int domcr_flags)
 {
     struct domain *d, **pd;
 
     if ( (d = alloc_domain(domid)) == NULL )
         return NULL;
+
+    if ( domcr_flags & DOMCRF_hvm )
+        d->is_hvm = 1;
 
     rangeset_domain_initialise(d);
 
@@ -149,6 +163,9 @@ struct domain *domain_create(domid_t domid)
     d->iomem_caps = rangeset_new(d, "I/O Memory", RANGESETF_prettyprint_hex);
     d->irq_caps   = rangeset_new(d, "Interrupts", 0);
     if ( (d->iomem_caps == NULL) || (d->irq_caps == NULL) )
+        goto fail4;
+
+    if ( sched_init_domain(d) != 0 )
         goto fail4;
 
     if ( !is_idle_domain(d) )
@@ -240,46 +257,24 @@ void __domain_crash(struct domain *d)
 void __domain_crash_synchronous(void)
 {
     __domain_crash(current->domain);
+
+    /*
+     * Flush multicall state before dying if a multicall is in progress.
+     * This shouldn't be necessary, but some architectures are calling
+     * domain_crash_synchronous() when they really shouldn't (i.e., from
+     * within hypercall context).
+     */
+    if ( this_cpu(mc_state).flags != 0 )
+    {
+        dprintk(XENLOG_ERR,
+                "FIXME: synchronous domain crash during a multicall!\n");
+        this_cpu(mc_state).flags = 0;
+    }
+
     for ( ; ; )
         do_softirq();
 }
 
-
-static DEFINE_PER_CPU(struct domain *, domain_shuttingdown);
-
-static void domain_shutdown_finalise(void)
-{
-    struct domain *d;
-    struct vcpu *v;
-
-    d = this_cpu(domain_shuttingdown);
-    this_cpu(domain_shuttingdown) = NULL;
-
-    BUG_ON(d == NULL);
-    BUG_ON(d == current->domain);
-
-    LOCK_BIGLOCK(d);
-
-    /* Make sure that every vcpu is descheduled before we finalise. */
-    for_each_vcpu ( d, v )
-        vcpu_sleep_sync(v);
-    BUG_ON(!cpus_empty(d->domain_dirty_cpumask));
-
-    /* Don't set DOMF_shutdown until execution contexts are sync'ed. */
-    if ( !test_and_set_bit(_DOMF_shutdown, &d->domain_flags) )
-        send_guest_global_virq(dom0, VIRQ_DOM_EXC);
-
-    UNLOCK_BIGLOCK(d);
-
-    put_domain(d);
-}
-
-static __init int domain_shutdown_finaliser_init(void)
-{
-    open_softirq(DOMAIN_SHUTDOWN_FINALISE_SOFTIRQ, domain_shutdown_finalise);
-    return 0;
-}
-__initcall(domain_shutdown_finaliser_init);
 
 void domain_shutdown(struct domain *d, u8 reason)
 {
@@ -288,20 +283,13 @@ void domain_shutdown(struct domain *d, u8 reason)
     if ( d->domain_id == 0 )
         dom0_shutdown(reason);
 
-    /* Mark the domain as shutting down. */
     d->shutdown_code = reason;
+    set_bit(_DOMF_shutdown, &d->domain_flags);
 
-    /* Put every vcpu to sleep, but don't wait (avoids inter-vcpu deadlock). */
-    spin_lock(&d->pause_lock);
-    d->pause_count++;
-    set_bit(_DOMF_paused, &d->domain_flags);
-    spin_unlock(&d->pause_lock);
     for_each_vcpu ( d, v )
         vcpu_sleep_nosync(v);
 
-    get_knownalive_domain(d);
-    this_cpu(domain_shuttingdown) = d;
-    raise_softirq(DOMAIN_SHUTDOWN_FINALISE_SOFTIRQ);
+    send_guest_global_virq(dom0, VIRQ_DOM_EXC);
 }
 
 
@@ -310,12 +298,8 @@ void domain_pause_for_debugger(void)
     struct domain *d = current->domain;
     struct vcpu *v;
 
-    /*
-     * NOTE: This does not synchronously pause the domain. The debugger
-     * must issue a PAUSEDOMAIN command to ensure that all execution
-     * has ceased and guest state is committed to memory.
-     */
     set_bit(_DOMF_ctrl_pause, &d->domain_flags);
+
     for_each_vcpu ( d, v )
         vcpu_sleep_nosync(v);
 

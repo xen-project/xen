@@ -7,10 +7,6 @@ SONAME   = libblktap.so.$(MAJOR)
 
 BLKTAP_INSTALL_DIR = /usr/sbin
 
-INSTALL            = install
-INSTALL_PROG       = $(INSTALL) -m0755
-INSTALL_DIR        = $(INSTALL) -d -m0755
-
 INCLUDES += -I. -I.. -I $(XEN_LIBXC) -I $(XEN_XENSTORE)
 
 LIBS     := -lz
@@ -21,7 +17,6 @@ SRCS     += xenbus.c blkif.c xs_api.c
 CFLAGS   += -Werror
 CFLAGS   += -Wno-unused
 CFLAGS   += -fno-strict-aliasing -fPIC
-CFLAGS   += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
 # get asprintf():
 CFLAGS   += -D _GNU_SOURCE
 
@@ -56,8 +51,8 @@ clean:
 	rm -rf *.a *.so* *.o *.rpm $(LIB) *~ $(DEPS) xen TAGS
 
 libblktap.a: $(OBJS) 
-	$(CC) $(CFLAGS) -Wl,-soname -Wl,$(SONAME) -shared         \
-	      -L$(XEN_XENSTORE) -l xenstore                       \
+	$(CC) $(CFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,$(SONAME) $(SHLIB_CFLAGS) \
+	      -L$(XEN_XENSTORE) -l xenstore                                \
 	      -o libblktap.so.$(MAJOR).$(MINOR) $^ $(LIBS)
 	ln -sf libblktap.so.$(MAJOR).$(MINOR) libblktap.so.$(MAJOR)
 	ln -sf libblktap.so.$(MAJOR) libblktap.so

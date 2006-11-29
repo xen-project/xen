@@ -33,10 +33,18 @@
 #include <asm/irq.h>
 #include <asm/uaccess.h>
 #include <asm/hypervisor.h>
+#include <asm/pgtable.h>
 #include <xen/interface/memory.h>
 #include <xen/features.h>
+#ifdef __ia64__
+#include <asm/xen/xencomm.h>
+#endif
 
 #include "platform-pci.h"
+
+#ifdef HAVE_XEN_PLATFORM_COMPAT_H
+#include <xen/platform-compat.h>
+#endif
 
 #define DRV_NAME    "xen-platform-pci"
 #define DRV_VERSION "0.10"
@@ -58,6 +66,10 @@ static int __init init_xen_info(void)
 	unsigned long shared_info_frame;
 	struct xen_add_to_physmap xatp;
 	extern void *shared_info_area;
+
+#ifdef __ia64__
+	xencomm_init();
+#endif
 
 	setup_xen_features();
 
@@ -167,10 +179,24 @@ static int get_hypercall_stubs(void)
 #define get_hypercall_stubs()	(0)
 #endif
 
+static int get_callback_irq(struct pci_dev *pdev)
+{
+#ifdef __ia64__
+	int irq;
+	for (irq = 0; irq < 16; irq++) {
+		if (isa_irq_to_vector(irq) == pdev->irq)
+			return irq;
+	}
+	return 0;
+#else /* !__ia64__ */
+	return pdev->irq;
+#endif
+}
+
 static int __devinit platform_pci_init(struct pci_dev *pdev,
 				       const struct pci_device_id *ent)
 {
-	int i, ret;
+	int i, ret, callback_irq;
 	long ioaddr, iolen;
 	long mmio_addr, mmio_len;
 
@@ -184,7 +210,9 @@ static int __devinit platform_pci_init(struct pci_dev *pdev,
 	mmio_addr = pci_resource_start(pdev, 1);
 	mmio_len = pci_resource_len(pdev, 1);
 
-	if (mmio_addr == 0 || ioaddr == 0) {
+	callback_irq = get_callback_irq(pdev);
+
+	if (mmio_addr == 0 || ioaddr == 0 || callback_irq == 0) {
 		printk(KERN_WARNING DRV_NAME ":no resources found\n");
 		return -ENOENT;
 	}
@@ -219,7 +247,7 @@ static int __devinit platform_pci_init(struct pci_dev *pdev,
 		goto out;
 	}
 
-	if ((ret = set_callback_irq(pdev->irq)))
+	if ((ret = set_callback_irq(callback_irq)))
 		goto out;
 
  out:
@@ -231,11 +259,13 @@ static int __devinit platform_pci_init(struct pci_dev *pdev,
 	return ret;
 }
 
-#define XEN_PLATFORM_VENDOR_ID 0xfffd
-#define XEN_PLATFORM_DEVICE_ID 0x0101
+#define XEN_PLATFORM_VENDOR_ID 0x5853
+#define XEN_PLATFORM_DEVICE_ID 0x0001
 static struct pci_device_id platform_pci_tbl[] __devinitdata = {
 	{XEN_PLATFORM_VENDOR_ID, XEN_PLATFORM_DEVICE_ID,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	/* Continue to recognise the old ID for now */
+	{0xfffd, 0x0101, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0,}
 };
 

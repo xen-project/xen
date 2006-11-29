@@ -24,7 +24,7 @@ do_multicall(
 
     if ( unlikely(__test_and_set_bit(_MCSF_in_multicall, &mcs->flags)) )
     {
-        DPRINTK("Multicall reentry is disallowed.\n");
+        gdprintk(XENLOG_INFO, "Multicall reentry is disallowed.\n");
         return -EINVAL;
     }
 

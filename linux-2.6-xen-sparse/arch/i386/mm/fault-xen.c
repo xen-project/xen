@@ -282,12 +282,6 @@ static int spurious_fault(struct pt_regs *regs,
 	pmd_t *pmd;
 	pte_t *pte;
 
-#ifdef CONFIG_XEN
-	/* Faults in hypervisor area are never spurious. */
-	if (address >= HYPERVISOR_VIRT_START)
-		return 0;
-#endif
-
 	/* Reserved-bit violation or user access to kernel space? */
 	if (error_code & 0x0c)
 		return 0;
@@ -372,7 +366,7 @@ fastcall void __kprobes do_page_fault(struct pt_regs *regs,
 	if (unlikely(address >= TASK_SIZE)) { 
 #ifdef CONFIG_XEN
 		/* Faults in hypervisor area can never be patched up. */
-		if (address >= HYPERVISOR_VIRT_START)
+		if (address >= hypervisor_virt_start)
 			goto bad_area_nosemaphore;
 #endif
 		if (!(error_code & 5))

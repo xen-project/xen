@@ -147,7 +147,7 @@ static int domain_create_tty(struct domain *dom)
 	int master;
 	bool success;
 
-	if ((master = getpt()) == -1 ||
+	if ((master = open("/dev/ptmx",O_RDWR|O_NOCTTY)) == -1 ||
 	    grantpt(master) == -1 || unlockpt(master) == -1) {
 		dolog(LOG_ERR, "Failed to create tty for domain-%d",
 		      dom->domid);

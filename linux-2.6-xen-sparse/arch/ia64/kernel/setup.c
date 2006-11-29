@@ -63,6 +63,7 @@
 #include <asm/system.h>
 #ifdef CONFIG_XEN
 #include <asm/hypervisor.h>
+#include <asm/xen/xencomm.h>
 #endif
 #include <linux/dma-mapping.h>
 
@@ -433,6 +434,9 @@ setup_arch (char **cmdline_p)
 
 #ifdef CONFIG_XEN
 	if (is_running_on_xen()) {
+		/* Must be done before any hypercall.  */
+		xencomm_init();
+
 		setup_xen_features();
 		/* Register a call for panic conditions. */
 		notifier_chain_register(&panic_notifier_list, &xen_panic_block);

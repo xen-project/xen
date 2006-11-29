@@ -449,36 +449,36 @@ unsigned int xenstat_domain_ssid(xenstat_domain * domain)
 /* Get domain states */
 unsigned int xenstat_domain_dying(xenstat_domain * domain)
 {
-	return (domain->state & DOMFLAGS_DYING) == DOMFLAGS_DYING;
+	return (domain->state & XEN_DOMINF_dying) == XEN_DOMINF_dying;
 }
 
 unsigned int xenstat_domain_crashed(xenstat_domain * domain)
 {
-	return ((domain->state & DOMFLAGS_SHUTDOWN) == DOMFLAGS_SHUTDOWN)
-	    && (((domain->state >> DOMFLAGS_SHUTDOWNSHIFT)
-		 & DOMFLAGS_SHUTDOWNMASK) == SHUTDOWN_crash);
+	return ((domain->state & XEN_DOMINF_shutdown) == XEN_DOMINF_shutdown)
+	    && (((domain->state >> XEN_DOMINF_shutdownshift)
+		 & XEN_DOMINF_shutdownmask) == SHUTDOWN_crash);
 }
 
 unsigned int xenstat_domain_shutdown(xenstat_domain * domain)
 {
-	return ((domain->state & DOMFLAGS_SHUTDOWN) == DOMFLAGS_SHUTDOWN)
-	    && (((domain->state >> DOMFLAGS_SHUTDOWNSHIFT)
-		 & DOMFLAGS_SHUTDOWNMASK) != SHUTDOWN_crash);
+	return ((domain->state & XEN_DOMINF_shutdown) == XEN_DOMINF_shutdown)
+	    && (((domain->state >> XEN_DOMINF_shutdownshift)
+		 & XEN_DOMINF_shutdownmask) != SHUTDOWN_crash);
 }
 
 unsigned int xenstat_domain_paused(xenstat_domain * domain)
 {
-	return (domain->state & DOMFLAGS_PAUSED) == DOMFLAGS_PAUSED;
+	return (domain->state & XEN_DOMINF_paused) == XEN_DOMINF_paused;
 }
 
 unsigned int xenstat_domain_blocked(xenstat_domain * domain)
 {
-	return (domain->state & DOMFLAGS_BLOCKED) == DOMFLAGS_BLOCKED;
+	return (domain->state & XEN_DOMINF_blocked) == XEN_DOMINF_blocked;
 }
 
 unsigned int xenstat_domain_running(xenstat_domain * domain)
 {
-	return (domain->state & DOMFLAGS_RUNNING) == DOMFLAGS_RUNNING;
+	return (domain->state & XEN_DOMINF_running) == XEN_DOMINF_running;
 }
 
 /* Get the number of networks for a given domain */

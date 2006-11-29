@@ -1,6 +1,24 @@
 /******************************************************************************
  * include/public/trace.h
  * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ *
  * Mark Williamson, (C) 2004 Intel Research Cambridge
  * Copyright (C) 2005 Bin Ren
  */
@@ -19,11 +37,11 @@
 
 /* Trace subclasses */
 #define TRC_SUBCLS_SHIFT 12
+
 /* trace subclasses for VMX */
 #define TRC_VMXEXIT  0x00081000   /* VMX exit trace            */
-#define TRC_VMXTIMER 0x00082000   /* VMX timer trace           */
-#define TRC_VMXINT   0x00084000   /* VMX interrupt trace       */
-#define TRC_VMXIO    0x00088000   /* VMX io emulation trace  */
+#define TRC_VMXENTRY 0x00082000   /* VMX exit trace            */
+#define TRC_VMXINTR  0x00084000   /* VMX interrupt trace       */
 
 /* Trace events per class */
 #define TRC_LOST_RECORDS        (TRC_GEN + 1)
@@ -50,11 +68,8 @@
 
 /* trace events per subclass */
 #define TRC_VMX_VMEXIT          (TRC_VMXEXIT + 1)
-#define TRC_VMX_VMENTRY         (TRC_VMXEXIT + 2)
-
-#define TRC_VMX_TIMER_INTR      (TRC_VMXTIMER + 1)
-
-#define TRC_VMX_INT             (TRC_VMXINT + 1)
+#define TRC_VMX_VMENTRY         (TRC_VMXENTRY + 1)
+#define TRC_VMX_INTR            (TRC_VMXINTR + 1)
 
 
 /* This structure represents a single trace buffer record. */

@@ -20,7 +20,7 @@
 import sys
 import traceback
 from xen.util.security import ACMError, err, make_policy
-
+from xen.xm.opts import OptionError
 
 def usage():
     print "\nUsage: xm makepolicy <policy>\n"
@@ -29,22 +29,17 @@ def usage():
     err("Usage")
 
 
-
 def main(argv):
-    try:
-        if len(argv) != 2:
-            usage()
-        make_policy(argv[1])
+    if len(argv) != 2:
+        raise OptionError('No XML policy file specified')
 
-    except ACMError:
-        sys.exit(-1)
-    except:
-        traceback.print_exc(limit=1)
-        sys.exit(-1)
-
-
+    make_policy(argv[1])
 
 if __name__ == '__main__':
-    main(sys.argv)
+    try:
+        main(sys.argv)
+    except Exception, e:
+        sys.stderr.write('Error: %s\n' % str(e))
+        sys.exit(-1)
 
 

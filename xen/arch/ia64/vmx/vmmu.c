@@ -341,9 +341,9 @@ fetch_code(VCPU *vcpu, u64 gip, IA64_BUNDLE *pbundle)
             ia64_ptcl(gip, ARCH_PAGE_SHIFT << 2);
             return IA64_RETRY;
         }
-        mfn = tlb->ppn >> (PAGE_SHIFT - ARCH_PAGE_SHIFT);
         maddr = (tlb->ppn >> (tlb->ps - 12) << tlb->ps) |
                 (gip & (PSIZE(tlb->ps) - 1));
+        mfn = maddr >> PAGE_SHIFT;
     }
 
     page = mfn_to_page(mfn);
@@ -363,7 +363,7 @@ fetch_code(VCPU *vcpu, u64 gip, IA64_BUNDLE *pbundle)
     return IA64_NO_FAULT;
 }
 
-IA64FAULT vmx_vcpu_itc_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
+IA64FAULT vmx_vcpu_itc_i(VCPU *vcpu, u64 pte, u64 itir, u64 ifa)
 {
 #ifdef VTLB_DEBUG
     int slot;
@@ -382,7 +382,7 @@ IA64FAULT vmx_vcpu_itc_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
     return IA64_NO_FAULT;
 }
 
-IA64FAULT vmx_vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
+IA64FAULT vmx_vcpu_itc_d(VCPU *vcpu, u64 pte, u64 itir, u64 ifa)
 {
     u64 gpfn;
 #ifdef VTLB_DEBUG    
@@ -456,7 +456,15 @@ IA64FAULT vmx_vcpu_itr_d(VCPU *vcpu, u64 slot, u64 pte, u64 itir, u64 ifa)
     }
 #endif   
     pte &= ~PAGE_FLAGS_RV_MASK;
-    thash_purge_entries(vcpu, va, ps);
+
+    /* This is a bad workaround
+       In Linux, region 7 use 16M pagesize and is identity mapped.
+       VHPT page size is 16K in XEN.  If purge VHPT while guest insert 16M,
+       it will iteratively purge VHPT 1024 times, which makes XEN/IPF very
+       slow.  XEN doesn't purge VHPT
+    */   
+    if (ps != _PAGE_SIZE_16M)
+        thash_purge_entries(vcpu, va, ps);
     gpfn = (pte & _PAGE_PPN_MASK)>> PAGE_SHIFT;
     if (VMX_DOMAIN(vcpu) && __gpfn_is_io(vcpu->domain, gpfn))
         pte |= VTLB_PTE_IO;
@@ -470,7 +478,7 @@ IA64FAULT vmx_vcpu_itr_d(VCPU *vcpu, u64 slot, u64 pte, u64 itir, u64 ifa)
 
 
 
-IA64FAULT vmx_vcpu_ptr_d(VCPU *vcpu,UINT64 ifa,UINT64 ps)
+IA64FAULT vmx_vcpu_ptr_d(VCPU *vcpu,u64 ifa, u64 ps)
 {
     int index;
     u64 va;
@@ -483,7 +491,7 @@ IA64FAULT vmx_vcpu_ptr_d(VCPU *vcpu,UINT64 ifa,UINT64 ps)
     return IA64_NO_FAULT;
 }
 
-IA64FAULT vmx_vcpu_ptr_i(VCPU *vcpu,UINT64 ifa,UINT64 ps)
+IA64FAULT vmx_vcpu_ptr_i(VCPU *vcpu, u64 ifa, u64 ps)
 {
     int index;
     u64 va;
@@ -496,7 +504,7 @@ IA64FAULT vmx_vcpu_ptr_i(VCPU *vcpu,UINT64 ifa,UINT64 ps)
     return IA64_NO_FAULT;
 }
 
-IA64FAULT vmx_vcpu_ptc_l(VCPU *vcpu, UINT64 va, UINT64 ps)
+IA64FAULT vmx_vcpu_ptc_l(VCPU *vcpu, u64 va, u64 ps)
 {
     va = PAGEALIGN(va, ps);
     thash_purge_entries(vcpu, va, ps);
@@ -504,19 +512,19 @@ IA64FAULT vmx_vcpu_ptc_l(VCPU *vcpu, UINT64 va, UINT64 ps)
 }
 
 
-IA64FAULT vmx_vcpu_ptc_e(VCPU *vcpu, UINT64 va)
+IA64FAULT vmx_vcpu_ptc_e(VCPU *vcpu, u64 va)
 {
     thash_purge_all(vcpu);
     return IA64_NO_FAULT;
 }
 
-IA64FAULT vmx_vcpu_ptc_g(VCPU *vcpu, UINT64 va, UINT64 ps)
+IA64FAULT vmx_vcpu_ptc_g(VCPU *vcpu, u64 va, u64 ps)
 {
     vmx_vcpu_ptc_ga(vcpu, va, ps);
     return IA64_ILLOP_FAULT;
 }
 /*
-IA64FAULT vmx_vcpu_ptc_ga(VCPU *vcpu,UINT64 va,UINT64 ps)
+IA64FAULT vmx_vcpu_ptc_ga(VCPU *vcpu, u64 va, u64 ps)
 {
     vmx_vcpu_ptc_l(vcpu, va, ps);
     return IA64_NO_FAULT;
@@ -554,7 +562,7 @@ static void ptc_ga_remote_func (void *varg)
 }
 
 
-IA64FAULT vmx_vcpu_ptc_ga(VCPU *vcpu,UINT64 va,UINT64 ps)
+IA64FAULT vmx_vcpu_ptc_ga(VCPU *vcpu, u64 va, u64 ps)
 {
 
     struct domain *d = vcpu->domain;
@@ -588,7 +596,7 @@ IA64FAULT vmx_vcpu_ptc_ga(VCPU *vcpu,UINT64 va,UINT64 ps)
 }
 
 
-IA64FAULT vmx_vcpu_thash(VCPU *vcpu, UINT64 vadr, UINT64 *pval)
+IA64FAULT vmx_vcpu_thash(VCPU *vcpu, u64 vadr, u64 *pval)
 {
     PTA vpta;
     ia64_rr vrr;
@@ -608,7 +616,7 @@ IA64FAULT vmx_vcpu_thash(VCPU *vcpu, UINT64 vadr, UINT64 *pval)
 }
 
 
-IA64FAULT vmx_vcpu_ttag(VCPU *vcpu, UINT64 vadr, UINT64 *pval)
+IA64FAULT vmx_vcpu_ttag(VCPU *vcpu, u64 vadr, u64 *pval)
 {
     ia64_rr vrr;
     PTA vpta;
@@ -624,12 +632,12 @@ IA64FAULT vmx_vcpu_ttag(VCPU *vcpu, UINT64 vadr, UINT64 *pval)
 
 
 
-IA64FAULT vmx_vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
+IA64FAULT vmx_vcpu_tpa(VCPU *vcpu, u64 vadr, u64 *padr)
 {
     thash_data_t *data;
     ISR visr,pt_isr;
     REGS *regs;
-    u64 vhpt_adr;
+    u64 vhpt_adr, madr;
     IA64_PSR vpsr;
     regs=vcpu_regs(vcpu);
     pt_isr.val=VMX(vcpu,cr_isr);
@@ -637,42 +645,37 @@ IA64FAULT vmx_vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
     visr.ei=pt_isr.ei;
     visr.ir=pt_isr.ir;
     vpsr.val = VCPU(vcpu, vpsr);
-    if(vpsr.ic==0){
-        visr.ni=1;
-    }
     visr.na=1;
     data = vtlb_lookup(vcpu, vadr, DSIDE_TLB);
     if(data){
         if(data->p==0){
-            visr.na=1;
             vcpu_set_isr(vcpu,visr.val);
-            page_not_present(vcpu, vadr);
+            data_page_not_present(vcpu, vadr);
             return IA64_FAULT;
         }else if(data->ma == VA_MATTR_NATPAGE){
-            visr.na = 1;
             vcpu_set_isr(vcpu, visr.val);
             dnat_page_consumption(vcpu, vadr);
             return IA64_FAULT;
         }else{
             *padr = ((data->ppn >> (data->ps - 12)) << data->ps) |
-                                                (vadr & (PSIZE(data->ps) - 1));
+                    (vadr & (PSIZE(data->ps) - 1));
             return IA64_NO_FAULT;
         }
     }
     data = vhpt_lookup(vadr);
     if(data){
         if(data->p==0){
-            visr.na=1;
             vcpu_set_isr(vcpu,visr.val);
-            page_not_present(vcpu, vadr);
+            data_page_not_present(vcpu, vadr);
             return IA64_FAULT;
         }else if(data->ma == VA_MATTR_NATPAGE){
-            visr.na = 1;
             vcpu_set_isr(vcpu, visr.val);
             dnat_page_consumption(vcpu, vadr);
             return IA64_FAULT;
         }else{
-            *padr = (get_gpfn_from_mfn(arch_to_xen_ppn(data->ppn)) << PAGE_SHIFT) | (vadr & (PAGE_SIZE - 1));
+            madr = (data->ppn >> (data->ps - 12) << data->ps) |
+                   (vadr & (PSIZE(data->ps) - 1));
+            *padr = __mpa_to_gpa(madr);
             return IA64_NO_FAULT;
         }
     }
@@ -717,7 +720,7 @@ IA64FAULT vmx_vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
     }
 }
 
-IA64FAULT vmx_vcpu_tak(VCPU *vcpu, UINT64 vadr, UINT64 *key)
+IA64FAULT vmx_vcpu_tak(VCPU *vcpu, u64 vadr, u64 *key)
 {
     thash_data_t *data;
     PTA vpta;
@@ -733,53 +736,4 @@ IA64FAULT vmx_vcpu_tak(VCPU *vcpu, UINT64 vadr, UINT64 *key)
         *key=data->key;
     }
     return IA64_NO_FAULT;
-}
-
-/*
- * [FIXME] Is there any effective way to move this routine
- * into vmx_uaccess.h? struct exec_domain is incomplete type
- * in that way...
- *
- * This is the interface to lookup virtual TLB, and then
- * return corresponding machine address in 2nd parameter.
- * The 3rd parameter contains how many bytes mapped by
- * matched vTLB entry, thus to allow caller copy more once.
- *
- * If failed to lookup, -EFAULT is returned. Or else reutrn
- * 0. All upper domain access utilities rely on this routine
- * to determine the real machine address. 
- *
- * Yes, put_user and get_user seems to somhow slow upon it.
- * However it's the necessary steps for any vmx domain virtual
- * address, since that's difference address space as HV's one.
- * Later some short-circuit may be created for special case
- */
-long
-__domain_va_to_ma(unsigned long va, unsigned long* ma, unsigned long *len)
-{
-    unsigned long  mpfn, gpfn, m, n = *len;
-    unsigned long  end;   /* end of the area mapped by current entry */
-    thash_data_t   *entry;
-    struct vcpu *v = current;
-
-    entry = vtlb_lookup(v, va, DSIDE_TLB);
-    if (entry == NULL)
-        return -EFAULT;
-
-    gpfn =(entry->ppn>>(PAGE_SHIFT-12));
-    gpfn =PAGEALIGN(gpfn,(entry->ps-PAGE_SHIFT));
-    gpfn = gpfn | POFFSET(va>>PAGE_SHIFT,(entry->ps-PAGE_SHIFT)); 
-
-    mpfn = gmfn_to_mfn(v->domain, gpfn);
-    m = (mpfn<<PAGE_SHIFT) | (va & (PAGE_SIZE - 1));
-    /* machine address may be not continuous */
-    end = PAGEALIGN(m, PAGE_SHIFT) + PAGE_SIZE;
-    /*end = PAGEALIGN(m, entry->ps) + PSIZE(entry->ps);*/
-    /* Current entry can't map all requested area */
-    if ((m + n) > end)
-        n = end - m;
-
-    *ma = m;
-    *len = n;
-    return 0;
 }

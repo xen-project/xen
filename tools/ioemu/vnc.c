@@ -26,11 +26,25 @@
 
 #include "vl.h"
 #include "qemu_socket.h"
+#include <assert.h>
 
-#define VNC_REFRESH_INTERVAL (1000 / 30)
+/* The refresh interval starts at BASE.  If we scan the buffer and
+   find no change, we increase by INC, up to MAX.  If the mouse moves
+   or we get a keypress, the interval is set back to BASE.  If we find
+   an update, halve the interval.
+
+   All times in milliseconds. */
+#define VNC_REFRESH_INTERVAL_BASE 30
+#define VNC_REFRESH_INTERVAL_INC  50
+#define VNC_REFRESH_INTERVAL_MAX  2000
+
+/* Wait at most one second between updates, so that we can detect a
+   minimised vncviewer reasonably quickly. */
+#define VNC_MAX_UPDATE_INTERVAL   5000
 
 #include "vnc_keysym.h"
 #include "keymaps.c"
+#include "d3des.h"
 
 #define XK_MISCELLANY
 #define XK_LATIN1
@@ -64,10 +78,11 @@ typedef void VncSendHextileTile(VncState *vs,
 struct VncState
 {
     QEMUTimer *timer;
+    int timer_interval;
+    int64_t last_update_time;
     int lsock;
     int csock;
     DisplayState *ds;
-    int need_update;
     int width;
     int height;
     uint64_t *dirty_row;	/* screen regions which are possibly dirty */
@@ -98,8 +113,6 @@ struct VncState
     int visible_w;
     int visible_h;
 
-    int slow_client;
-
     int ctl_keys;               /* Ctrl+Alt starts calibration */
 };
 
@@ -125,6 +138,9 @@ static void _vnc_update_client(void *opaque);
 static void vnc_update_client(void *opaque);
 static void vnc_client_read(void *opaque);
 static void framebuffer_set_updated(VncState *vs, int x, int y, int w, int h);
+static int make_challenge(char *random, int size);
+static void set_seed(unsigned int *seedp);
+static void get_random(int len, unsigned char *buf);
 
 #if 0
 static inline void vnc_set_bit(uint32_t *d, int k)
@@ -187,6 +203,8 @@ static void set_bits_in_row(VncState *vs, uint64_t *row,
 	mask = ~(0ULL);
 
     h += y;
+    if (h > vs->ds->height)
+        h = vs->ds->height;
     for (; y < h; y++)
 	row[y] |= mask;
 }
@@ -380,7 +398,7 @@ static void vnc_copy(DisplayState *ds, int src_x, int src_y, int dst_x, int dst_
     int y = 0;
     int pitch = ds->linesize;
     VncState *vs = ds->opaque;
-    int updating_client = !vs->slow_client;
+    int updating_client = 1;
 
     if (src_x < vs->visible_x || src_y < vs->visible_y ||
 	dst_x < vs->visible_x || dst_y < vs->visible_y ||
@@ -390,10 +408,8 @@ static void vnc_copy(DisplayState *ds, int src_x, int src_y, int dst_x, int dst_
 	(dst_y + h) > (vs->visible_y + vs->visible_h))
 	updating_client = 0;
 
-    if (updating_client) {
-	vs->need_update = 1;
+    if (updating_client)
 	_vnc_update_client(vs);
-    }
 
     if (dst_y > src_y) {
 	y = h - 1;
@@ -445,111 +461,149 @@ static int find_update_height(VncState *vs, int y, int maxy, int last_x, int x)
 static void _vnc_update_client(void *opaque)
 {
     VncState *vs = opaque;
-    int64_t now = qemu_get_clock(rt_clock);
+    int64_t now;
+    int y;
+    char *row;
+    char *old_row;
+    uint64_t width_mask;
+    int n_rectangles;
+    int saved_offset;
+    int maxx, maxy;
+    int tile_bytes = vs->depth * DP2X(vs, 1);
 
-    if (vs->need_update && vs->csock != -1) {
-	int y;
-	char *row;
-	char *old_row;
-	uint64_t width_mask;
-	int n_rectangles;
-	int saved_offset;
-	int maxx, maxy;
-	int tile_bytes = vs->depth * DP2X(vs, 1);
+    if (vs->csock == -1)
+	return;
 
-	if (vs->width != DP2X(vs, DIRTY_PIXEL_BITS))
-	    width_mask = (1ULL << X2DP_UP(vs, vs->ds->width)) - 1;
-	else
-	    width_mask = ~(0ULL);
+    now = qemu_get_clock(rt_clock);
 
-	/* Walk through the dirty map and eliminate tiles that
-	   really aren't dirty */
-	row = vs->ds->data;
-	old_row = vs->old_data;
+    if (vs->width != DP2X(vs, DIRTY_PIXEL_BITS))
+	width_mask = (1ULL << X2DP_UP(vs, vs->ds->width)) - 1;
+    else
+	width_mask = ~(0ULL);
 
-	for (y = 0; y < vs->ds->height; y++) {
-	    if (vs->dirty_row[y] & width_mask) {
-		int x;
-		char *ptr, *old_ptr;
+    /* Walk through the dirty map and eliminate tiles that really
+       aren't dirty */
+    row = vs->ds->data;
+    old_row = vs->old_data;
 
-		ptr = row;
-		old_ptr = old_row;
-
-		for (x = 0; x < X2DP_UP(vs, vs->ds->width); x++) {
-		    if (vs->dirty_row[y] & (1ULL << x)) {
-			if (memcmp(old_ptr, ptr, tile_bytes)) {
-			    vs->has_update = 1;
-			    vs->update_row[y] |= (1ULL << x);
-			    memcpy(old_ptr, ptr, tile_bytes);
-			}
-			vs->dirty_row[y] &= ~(1ULL << x);
-		    }
-
-		    ptr += tile_bytes;
-		    old_ptr += tile_bytes;
-		}
-	    }
-
-	    row += vs->ds->linesize;
-	    old_row += vs->ds->linesize;
-	}
-
-	if (!vs->has_update || vs->visible_y >= vs->ds->height ||
-	    vs->visible_x >= vs->ds->width)
-	    goto out;
-
-	/* Count rectangles */
-	n_rectangles = 0;
-	vnc_write_u8(vs, 0);  /* msg id */
-	vnc_write_u8(vs, 0);
-	saved_offset = vs->output.offset;
-	vnc_write_u16(vs, 0);
-
-	maxy = vs->visible_y + vs->visible_h;
-	if (maxy > vs->ds->height)
-	    maxy = vs->ds->height;
-	maxx = vs->visible_x + vs->visible_w;
-	if (maxx > vs->ds->width)
-	    maxx = vs->ds->width;
-
-	for (y = vs->visible_y; y < maxy; y++) {
+    for (y = 0; y < vs->ds->height; y++) {
+	if (vs->dirty_row[y] & width_mask) {
 	    int x;
-	    int last_x = -1;
-	    for (x = X2DP_DOWN(vs, vs->visible_x);
-		 x < X2DP_UP(vs, maxx); x++) {
-		if (vs->update_row[y] & (1ULL << x)) {
-		    if (last_x == -1)
-			last_x = x;
-		    vs->update_row[y] &= ~(1ULL << x);
-		} else {
-		    if (last_x != -1) {
-			int h = find_update_height(vs, y, maxy, last_x, x);
+	    char *ptr, *old_ptr;
+
+	    ptr = row;
+	    old_ptr = old_row;
+
+	    for (x = 0; x < X2DP_UP(vs, vs->ds->width); x++) {
+		if (vs->dirty_row[y] & (1ULL << x)) {
+		    if (memcmp(old_ptr, ptr, tile_bytes)) {
+			vs->has_update = 1;
+			vs->update_row[y] |= (1ULL << x);
+			memcpy(old_ptr, ptr, tile_bytes);
+		    }
+		    vs->dirty_row[y] &= ~(1ULL << x);
+		}
+
+		ptr += tile_bytes;
+		old_ptr += tile_bytes;
+	    }
+	}
+  
+	row += vs->ds->linesize;
+	old_row += vs->ds->linesize;
+    }
+
+    if (!vs->has_update || vs->visible_y >= vs->ds->height ||
+	vs->visible_x >= vs->ds->width)
+	goto backoff;
+
+    /* Count rectangles */
+    n_rectangles = 0;
+    vnc_write_u8(vs, 0);  /* msg id */
+    vnc_write_u8(vs, 0);
+    saved_offset = vs->output.offset;
+    vnc_write_u16(vs, 0);
+    
+    maxy = vs->visible_y + vs->visible_h;
+    if (maxy > vs->ds->height)
+	maxy = vs->ds->height;
+    maxx = vs->visible_x + vs->visible_w;
+    if (maxx > vs->ds->width)
+	maxx = vs->ds->width;
+
+    for (y = vs->visible_y; y < maxy; y++) {
+	int x;
+	int last_x = -1;
+	for (x = X2DP_DOWN(vs, vs->visible_x);
+	     x < X2DP_UP(vs, maxx); x++) {
+	    if (vs->update_row[y] & (1ULL << x)) {
+		if (last_x == -1)
+		    last_x = x;
+		vs->update_row[y] &= ~(1ULL << x);
+	    } else {
+		if (last_x != -1) {
+		    int h = find_update_height(vs, y, maxy, last_x, x);
+		    if (h != 0) {
 			send_framebuffer_update(vs, DP2X(vs, last_x), y,
 						DP2X(vs, (x - last_x)), h);
 			n_rectangles++;
 		    }
-		    last_x = -1;
 		}
+		last_x = -1;
 	    }
-	    if (last_x != -1) {
-		int h = find_update_height(vs, y, maxy, last_x, x);
+	}
+	if (last_x != -1) {
+	    int h = find_update_height(vs, y, maxy, last_x, x);
+	    if (h != 0) {
 		send_framebuffer_update(vs, DP2X(vs, last_x), y,
 					DP2X(vs, (x - last_x)), h);
 		n_rectangles++;
 	    }
 	}
-	vs->output.buffer[saved_offset] = (n_rectangles >> 8) & 0xFF;
-	vs->output.buffer[saved_offset + 1] = n_rectangles & 0xFF;
+    }
+    vs->output.buffer[saved_offset] = (n_rectangles >> 8) & 0xFF;
+    vs->output.buffer[saved_offset + 1] = n_rectangles & 0xFF;
 
-	vs->has_update = 0;
-	vs->need_update = 0;
-	vnc_flush(vs);
-	vs->slow_client = 0;
-    } else
-	vs->slow_client = 1;
+    if (n_rectangles == 0)
+	goto backoff;
 
- out:
-    qemu_mod_timer(vs->timer, now + VNC_REFRESH_INTERVAL);
+    vs->has_update = 0;
+    vnc_flush(vs);
+    vs->last_update_time = now;
+
+    vs->timer_interval /= 2;
+    if (vs->timer_interval < VNC_REFRESH_INTERVAL_BASE)
+	vs->timer_interval = VNC_REFRESH_INTERVAL_BASE;
+
+    return;
+
+ backoff:
+    /* No update -> back off a bit */
+    vs->timer_interval += VNC_REFRESH_INTERVAL_INC;
+    if (vs->timer_interval > VNC_REFRESH_INTERVAL_MAX) {
+	vs->timer_interval = VNC_REFRESH_INTERVAL_MAX;
+	if (now - vs->last_update_time >= VNC_MAX_UPDATE_INTERVAL) {
+	    /* Send a null update.  If the client is no longer
+	       interested (e.g. minimised) it'll ignore this, and we
+	       can stop scanning the buffer until it sends another
+	       update request. */
+	    /* It turns out that there's a bug in realvncviewer 4.1.2
+	       which means that if you send a proper null update (with
+	       no update rectangles), it gets a bit out of sync and
+	       never sends any further requests, regardless of whether
+	       it needs one or not.  Fix this by sending a single 1x1
+	       update rectangle instead. */
+	    vnc_write_u8(vs, 0);
+	    vnc_write_u8(vs, 0);
+	    vnc_write_u16(vs, 1);
+	    send_framebuffer_update(vs, 0, 0, 1, 1);
+	    vnc_flush(vs);
+	    vs->last_update_time = now;
+	    return;
+	}
+    }
+    qemu_mod_timer(vs->timer, now + vs->timer_interval);
+    return;
 }
 
 static void vnc_update_client(void *opaque)
@@ -564,7 +618,7 @@ static void vnc_timer_init(VncState *vs)
 {
     if (vs->timer == NULL) {
 	vs->timer = qemu_new_timer(rt_clock, vnc_update_client, vs);
-	qemu_mod_timer(vs->timer, qemu_get_clock(rt_clock));
+	vs->timer_interval = VNC_REFRESH_INTERVAL_BASE;
     }
 }
 
@@ -625,7 +679,6 @@ static int vnc_client_io_error(VncState *vs, int ret, int last_errno)
 	vs->csock = -1;
 	buffer_reset(&vs->input);
 	buffer_reset(&vs->output);
-	vs->need_update = 0;
 	return 0;
     }
     return ret;
@@ -686,8 +739,10 @@ static void vnc_client_read(void *opaque)
 	    memmove(vs->input.buffer, vs->input.buffer + len,
 		    vs->input.offset - len);
 	    vs->input.offset -= len;
-	} else
+	} else {
+	    assert(ret > vs->read_handler_expect);
 	    vs->read_handler_expect = ret;
+	}
     }
 }
 
@@ -895,13 +950,14 @@ static void framebuffer_update_request(VncState *vs, int incremental,
 				       int x_position, int y_position,
 				       int w, int h)
 {
-    vs->need_update = 1;
     if (!incremental)
 	framebuffer_set_updated(vs, x_position, y_position, w, h);
     vs->visible_x = x_position;
     vs->visible_y = y_position;
     vs->visible_w = w;
     vs->visible_h = h;
+
+    qemu_mod_timer(vs->timer, qemu_get_clock(rt_clock));
 }
 
 static void set_encodings(VncState *vs, int32_t *encodings, size_t n_encodings)
@@ -1016,6 +1072,7 @@ static int protocol_client_msg(VncState *vs, char *data, size_t len)
 {
     int i;
     uint16_t limit;
+    int64_t now;
 
     switch (data[0]) {
     case 0:
@@ -1032,8 +1089,12 @@ static int protocol_client_msg(VncState *vs, char *data, size_t len)
 	if (len == 1)
 	    return 4;
 
-	if (len == 4)
-	    return 4 + (read_u16(data, 2) * 4);
+	if (len == 4) {
+	    uint16_t v;
+	    v = read_u16(data, 2);
+	    if (v)
+		return 4 + v * 4;
+	}
 
 	limit = read_u16(data, 2);
 	for (i = 0; i < limit; i++) {
@@ -1055,20 +1116,30 @@ static int protocol_client_msg(VncState *vs, char *data, size_t len)
 	if (len == 1)
 	    return 8;
 
+	vs->timer_interval = VNC_REFRESH_INTERVAL_BASE;
+	qemu_advance_timer(vs->timer,
+			   qemu_get_clock(rt_clock) + vs->timer_interval);
 	key_event(vs, read_u8(data, 1), read_u32(data, 4));
 	break;
     case 5:
 	if (len == 1)
 	    return 6;
 
+	vs->timer_interval = VNC_REFRESH_INTERVAL_BASE;
+	qemu_advance_timer(vs->timer,
+			   qemu_get_clock(rt_clock) + vs->timer_interval);
 	pointer_event(vs, read_u8(data, 1), read_u16(data, 2), read_u16(data, 4));
 	break;
     case 6:
 	if (len == 1)
 	    return 8;
 
-	if (len == 8)
-	    return 8 + read_u32(data, 4);
+	if (len == 8) {
+	    uint32_t v;
+	    v = read_u32(data, 4);
+	    if (v)
+		return 8 + v;
+	}
 
 	client_cut_text(vs, read_u32(data, 4), data + 8);
 	break;
@@ -1086,6 +1157,8 @@ static int protocol_client_init(VncState *vs, char *data, size_t len)
 {
     size_t l;
     char pad[3] = { 0, 0, 0 };
+
+    vga_hw_update();
 
     vs->width = vs->ds->width;
     vs->height = vs->ds->height;
@@ -1141,23 +1214,92 @@ static int protocol_client_init(VncState *vs, char *data, size_t len)
     return 0;
 }
 
-static int protocol_version(VncState *vs, char *version, size_t len)
+static int protocol_response(VncState *vs, char *client_response, size_t len)
 {
-    char local[13];
-    int maj, min;
+    extern char vncpasswd[64];
+    extern unsigned char challenge[AUTHCHALLENGESIZE];
+    unsigned char cryptchallenge[AUTHCHALLENGESIZE];
+    unsigned char key[8];
+    int passwdlen, i, j;
 
-    memcpy(local, version, 12);
-    local[12] = 0;
+    memcpy(cryptchallenge, challenge, AUTHCHALLENGESIZE);
 
-    if (sscanf(local, "RFB %03d.%03d\n", &maj, &min) != 2) {
+    /* Calculate the sent challenge */
+    passwdlen = strlen(vncpasswd);
+    for (i=0; i<8; i++)
+	key[i] = i<passwdlen ? vncpasswd[i] : 0;
+    deskey(key, EN0);
+    for (j = 0; j < AUTHCHALLENGESIZE; j += 8)
+	des(cryptchallenge+j, cryptchallenge+j);
+
+    /* Check the actual response */
+    if (memcmp(cryptchallenge, client_response, AUTHCHALLENGESIZE) != 0) {
+	/* password error */
+	vnc_write_u32(vs, 1);
+	vnc_write_u32(vs, 22);
+	vnc_write(vs, "Authentication failure", 22);
+	vnc_flush(vs);
+	fprintf(stderr, "VNC Password error.\n");
 	vnc_client_error(vs);
 	return 0;
     }
 
-    vnc_write_u32(vs, 1); /* None */
+    vnc_write_u32(vs, 0);
     vnc_flush(vs);
 
     vnc_read_when(vs, protocol_client_init, 1);
+
+    return 0;
+}
+
+static int protocol_version(VncState *vs, char *version, size_t len)
+{
+    extern char vncpasswd[64];
+    extern unsigned char challenge[AUTHCHALLENGESIZE];
+    char local[13];
+    int  support, maj, min;
+
+    memcpy(local, version, 12);
+    local[12] = 0;
+
+    /* protocol version check */
+    if (sscanf(local, "RFB %03d.%03d\n", &maj, &min) != 2) {
+	fprintf(stderr, "Protocol version error.\n");
+	vnc_client_error(vs);
+	return 0;
+    }
+
+
+    support = 0;
+    if (maj = 3) {
+	if (min == 3 || min ==4) {
+	    support = 1;
+	}
+    }
+
+    if (! support) {
+	fprintf(stderr, "Client uses unsupported protocol version %d.%d.\n",
+		maj, min);
+	vnc_client_error(vs);
+	return 0;
+    }
+
+    if (*vncpasswd == '\0') {
+	/* AuthType is None */
+	vnc_write_u32(vs, 1);
+	vnc_flush(vs);
+	vnc_read_when(vs, protocol_client_init, 1);
+    } else {
+	/* AuthType is VncAuth */
+	vnc_write_u32(vs, 2);
+
+	/* Challenge-Responce authentication */
+	/* Send Challenge */
+	make_challenge(challenge, AUTHCHALLENGESIZE);
+	vnc_write(vs, challenge, AUTHCHALLENGESIZE);
+	vnc_flush(vs);
+	vnc_read_when(vs, protocol_response, AUTHCHALLENGESIZE);
+    }
 
     return 0;
 }
@@ -1183,9 +1325,8 @@ static void vnc_listen_read(void *opaque)
     }
 }
 
-int vnc_display_init(DisplayState *ds, int display, int find_unused)
+int vnc_display_init(DisplayState *ds, int display, int find_unused, struct sockaddr_in *addr)
 {
-    struct sockaddr_in addr;
     int reuse_addr, ret;
     VncState *vs;
 
@@ -1223,11 +1364,10 @@ int vnc_display_init(DisplayState *ds, int display, int find_unused)
     }
 
  retry:
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(5900 + display);
-    memset(&addr.sin_addr, 0, sizeof(addr.sin_addr));
+    addr->sin_family = AF_INET;
+    addr->sin_port = htons(5900 + display);
 
-    if (bind(vs->lsock, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
+    if (bind(vs->lsock, (struct sockaddr *)addr, sizeof(struct sockaddr_in)) == -1) {
 	if (find_unused && errno == EADDRINUSE) {
 	    display++;
 	    goto retry;
@@ -1269,11 +1409,40 @@ int vnc_start_viewer(int port)
 	exit(1);
 
     case 0:	/* child */
-	execlp("vncviewer", "vncviewer", s, 0);
+	execlp("vncviewer", "vncviewer", s, NULL);
 	fprintf(stderr, "vncviewer execlp failed\n");
 	exit(1);
 
     default:
 	return pid;
     }
+}
+
+unsigned int seed;
+
+static int make_challenge(char *random, int size)
+{
+ 
+    set_seed(&seed);
+    get_random(size, random);
+
+    return 0;
+}
+
+static void set_seed(unsigned int *seedp)
+{
+    *seedp += (unsigned int)(time(NULL)+getpid()+getpid()*987654+rand());
+    srand(*seedp);
+
+    return;
+}
+
+static void get_random(int len, unsigned char *buf)
+{
+    int i;
+
+    for (i=0; i<len; i++)
+	buf[i] = (int) (256.0*rand()/(RAND_MAX+1.0));
+
+    return;
 }

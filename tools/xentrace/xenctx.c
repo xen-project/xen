@@ -268,16 +268,68 @@ void print_ctx(vcpu_guest_context_t *ctx1)
 
 }
 #elif defined(__ia64__)
+
+#define PTE_ED_SHIFT              52
+#define PTE_ED_MASK                1
+#define PTE_PPN_SHIFT             12
+#define PTE_PPN_MASK    0x3fffffffff
+#define PTE_AR_SHIFT               9
+#define PTE_AR_MASK                7
+#define PTE_PL_SHIFT               7
+#define PTE_PL_MASK                3
+#define PTE_D_SHIFT                6
+#define PTE_D_MASK                 1
+#define PTE_A_SHIFT                5
+#define PTE_A_MASK                 1
+#define PTE_MA_SHIFT               2
+#define PTE_MA_MASK                7
+#define PTE_P_SHIFT                0
+#define PTE_P_MASK                 1
+#define ITIR_KEY_SHIFT             8
+#define ITIR_KEY_MASK       0xffffff
+#define ITIR_PS_SHIFT              2
+#define ITIR_PS_MASK            0x3f
+#define ITIR_PS_MIN               12
+#define ITIR_PS_MAX               28
+#define RR_RID_SHIFT               8
+#define RR_RID_MASK         0xffffff
+
 void print_ctx(vcpu_guest_context_t *ctx1)
 {
     struct cpu_user_regs *regs = &ctx1->user_regs;
+    struct vcpu_extra_regs *er = &ctx1->extra_regs;
+    int i, ps_val, ma_val;
+    unsigned long pa;
 
-    printf("iip:  %016lx  ", regs->cr_iip);
+    const char ps[][5] = {"  4K", "  8K", " 16K", "    ",
+                          " 64K", "    ", "256K", "    ",
+                          "  1M", "    ", "  4M", "    ",
+                          " 16M", "    ", " 64M", "    ",
+                          "256M"};
+    const char ma[][4] = {"WB ", "   ", "   ", "   ",
+                          "UC ", "UCE", "WC ", "Nat"};
+
+    printf(" iip:               %016lx  ", regs->cr_iip);
     print_symbol(regs->cr_iip);
     printf("\n");
-    printf("psr:  %016lu  ", regs->cr_ipsr);
-    printf(" b0:  %016lx\n", regs->b0);
+    printf(" ipsr:              %016lx  ", regs->cr_ipsr);
+    printf(" b0:                %016lx\n", regs->b0);
+    printf(" b6:                %016lx  ", regs->b6);
+    printf(" b7:                %016lx\n", regs->b7);
+    printf(" cr_ifs:            %016lx  ", regs->cr_ifs);
+    printf(" ar_unat:           %016lx\n", regs->ar_unat);
+    printf(" ar_pfs:            %016lx  ", regs->ar_pfs);
+    printf(" ar_rsc:            %016lx\n", regs->ar_rsc);
+    printf(" ar_rnat:           %016lx  ", regs->ar_rnat);
+    printf(" ar_bspstore:       %016lx\n", regs->ar_bspstore);
+    printf(" ar_fpsr:           %016lx  ", regs->ar_fpsr);
+    printf(" event_callback_ip: %016lx\n", er->event_callback_ip);
+    printf(" pr:                %016lx  ", regs->pr);
+    printf(" loadrs:            %016lx\n", regs->loadrs);
+    printf(" iva:               %016lx  ", er->iva);
+    printf(" dcr:               %016lx\n", er->dcr);
 
+    printf("\n");
     printf(" r1:  %016lx\n", regs->r1);
     printf(" r2:  %016lx  ", regs->r2);
     printf(" r3:  %016lx\n", regs->r3);
@@ -310,6 +362,52 @@ void print_ctx(vcpu_guest_context_t *ctx1)
     printf(" r30: %016lx  ", regs->r30);
     printf(" r31: %016lx\n", regs->r31);
     
+    printf("\n itr: P rid    va               pa            ps      ed pl "
+           "ar a d ma    key\n");
+    for (i = 0; i < 8; i++) {
+        ps_val =  er->itrs[i].itir >> ITIR_PS_SHIFT & ITIR_PS_MASK;
+        ma_val =  er->itrs[i].pte  >> PTE_MA_SHIFT  & PTE_MA_MASK;
+        pa     = (er->itrs[i].pte  >> PTE_PPN_SHIFT & PTE_PPN_MASK) <<
+                 PTE_PPN_SHIFT;
+        pa     = (pa >> ps_val) << ps_val;
+        printf(" [%d]  %ld %06lx %016lx %013lx %02x %s %ld  %ld  %ld  %ld "
+               "%ld %d %s %06lx\n", i,
+               er->itrs[i].pte  >> PTE_P_SHIFT    & PTE_P_MASK,
+               er->itrs[i].rid  >> RR_RID_SHIFT   & RR_RID_MASK,
+               er->itrs[i].vadr, pa, ps_val,
+               ((ps_val >= ITIR_PS_MIN && ps_val <= ITIR_PS_MAX) ?
+                ps[ps_val - ITIR_PS_MIN] : "    "),
+               er->itrs[i].pte  >> PTE_ED_SHIFT   & PTE_ED_MASK,
+               er->itrs[i].pte  >> PTE_PL_SHIFT   & PTE_PL_MASK,
+               er->itrs[i].pte  >> PTE_AR_SHIFT   & PTE_AR_MASK,
+               er->itrs[i].pte  >> PTE_A_SHIFT    & PTE_A_MASK,
+               er->itrs[i].pte  >> PTE_D_SHIFT    & PTE_D_MASK,
+               ma_val, ma[ma_val],
+               er->itrs[i].itir >> ITIR_KEY_SHIFT & ITIR_KEY_MASK);
+    }
+    printf("\n dtr: P rid    va               pa            ps      ed pl "
+           "ar a d ma    key\n");
+    for (i = 0; i < 8; i++) {
+        ps_val =  er->dtrs[i].itir >> ITIR_PS_SHIFT & ITIR_PS_MASK;
+        ma_val =  er->dtrs[i].pte  >> PTE_MA_SHIFT  & PTE_MA_MASK;
+        pa     = (er->dtrs[i].pte  >> PTE_PPN_SHIFT & PTE_PPN_MASK) <<
+                 PTE_PPN_SHIFT;
+        pa     = (pa >> ps_val) << ps_val;
+        printf(" [%d]  %ld %06lx %016lx %013lx %02x %s %ld  %ld  %ld  %ld "
+               "%ld %d %s %06lx\n", i,
+               er->dtrs[i].pte  >> PTE_P_SHIFT    & PTE_P_MASK,
+               er->dtrs[i].rid  >> RR_RID_SHIFT   & RR_RID_MASK,
+               er->dtrs[i].vadr, pa, ps_val,
+               ((ps_val >= ITIR_PS_MIN && ps_val <= ITIR_PS_MAX) ?
+                ps[ps_val - ITIR_PS_MIN] : "    "),
+               er->dtrs[i].pte  >> PTE_ED_SHIFT   & PTE_ED_MASK,
+               er->dtrs[i].pte  >> PTE_PL_SHIFT   & PTE_PL_MASK,
+               er->dtrs[i].pte  >> PTE_AR_SHIFT   & PTE_AR_MASK,
+               er->dtrs[i].pte  >> PTE_A_SHIFT    & PTE_A_MASK,
+               er->dtrs[i].pte  >> PTE_D_SHIFT    & PTE_D_MASK,
+               ma_val, ma[ma_val],
+               er->dtrs[i].itir >> ITIR_KEY_SHIFT & ITIR_KEY_MASK);
+    }
 }
 #endif
 

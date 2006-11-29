@@ -68,7 +68,7 @@ check_sharing()
   local devmm=$(device_major_minor "$dev")
   local file
 
-  if [ "$mode" == 'w' ]
+  if [ "$mode" = 'w' ]
   then
     toskip="^$"
   else
@@ -81,7 +81,7 @@ check_sharing()
     then
       local d=$(device_major_minor "$file")
 
-      if [ "$d" == "$devmm" ]
+      if [ "$d" = "$devmm" ]
       then
         echo 'local'
         return
@@ -96,9 +96,9 @@ check_sharing()
     do
       d=$(xenstore_read_default "$base_path/$dom/$dev/physical-device" "")
 
-      if [ "$d" == "$devmm" ]
+      if [ "$d" = "$devmm" ]
       then
-        if [ "$mode" == 'w' ]
+        if [ "$mode" = 'w' ]
         then
           if ! same_vm $dom
           then
@@ -109,7 +109,7 @@ check_sharing()
           local m=$(xenstore_read "$base_path/$dom/$dev/mode")
           m=$(canonicalise_mode "$m")
 
-          if [ "$m" == 'w' ]
+          if [ "$m" = 'w' ]
           then
             if ! same_vm $dom
             then
@@ -138,7 +138,7 @@ same_vm()
   local othervm=$(xenstore_read_default "/local/domain/$otherdom/vm"         \
                   "$FRONTEND_UUID")
 
-  [ "$FRONTEND_UUID" == "$othervm" ]
+  [ "$FRONTEND_UUID" = "$othervm" ]
 }
 
 
@@ -153,7 +153,7 @@ check_device_sharing()
   local mode=$(canonicalise_mode "$2")
   local result
 
-  if [ "$mode" == '!' ]
+  if [ "x$mode" = 'x!' ]
   then
     return 0
   fi
@@ -202,7 +202,7 @@ do_ebusy()
   local mode="$2"
   local result="$3"
 
-  if [ "$result" == 'guest' ]
+  if [ "$result" = 'guest' ]
   then
     dom='a guest '
     when='now'
@@ -211,7 +211,7 @@ do_ebusy()
     when='by a guest'
   fi
 
-  if [ "$mode" == 'w' ]
+  if [ "$mode" = 'w' ]
   then
     m1=''
     m2=''
@@ -266,7 +266,7 @@ case "$command" in
 
         claim_lock "block"
 
-        if [ "$mode" == 'w' ] && ! stat "$file" -c %A | grep -q w
+        if [ "$mode" = 'w' ] && ! stat "$file" -c %A | grep -q w
         then
           release_lock "block"
           ebusy \
@@ -287,7 +287,7 @@ mount it read-write in a guest domain."
           if [ "$f" ]
           then
             # $dev is in use.  Check sharing.
-            if [ "$mode" == '!' ]
+            if [ "x$mode" = 'x!' ]
             then
               continue
             fi
@@ -307,7 +307,7 @@ mount it read-write in a guest domain."
                 do
                   d=$(xenstore_read_default \
                         "$XENBUS_BASE_PATH/$dom/$domdev/node" "")
-                  if [ "$d" == "$dev" ]
+                  if [ "$d" = "$dev" ]
                   then
                     f=$(xenstore_read "$XENBUS_BASE_PATH/$dom/$domdev/params")
                     found=1
@@ -347,7 +347,7 @@ mount it read-write in a guest domain."
             f=$(readlink -f "$f" || echo $(dirname "$file")/$(basename "$f"))
 
 
-            if [ "$f" == "$file" ]
+            if [ "$f" = "$file" ]
             then
               check_file_sharing "$file" "$dev" "$mode"
             fi
@@ -355,14 +355,14 @@ mount it read-write in a guest domain."
             # $dev is not in use, so we'll remember it for use later; we want
             # to finish the sharing check first.
 
-            if [ "$loopdev" == '' ]
+            if [ "$loopdev" = '' ]
             then
               loopdev="$dev"
             fi
           fi
         done
 
-        if [ "$loopdev" == '' ]
+        if [ "$loopdev" = '' ]
         then
           fatal 'Failed to find an unused loop device'
         fi
@@ -377,7 +377,6 @@ mount it read-write in a guest domain."
       "")
         claim_lock "block"
         success
-        echo happy gun \"$t\" >>/tmp/block.$$
         release_lock "block"
 	;;
     esac

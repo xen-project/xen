@@ -253,7 +253,7 @@ int _packet_write(struct packet *pak,
 			return 0;
 		}
 
-		gnttab_set_map_op(&map_op, MMAP_VADDR(tpmif, i),
+		gnttab_set_map_op(&map_op, idx_to_kaddr(tpmif, i),
 				  GNTMAP_host_map, tx->ref, tpmif->domid);
 
 		if (unlikely(HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref,
@@ -270,7 +270,7 @@ int _packet_write(struct packet *pak,
 
 		tocopy = min_t(size_t, size - offset, PAGE_SIZE);
 
-		if (copy_from_buffer((void *)(MMAP_VADDR(tpmif, i) |
+		if (copy_from_buffer((void *)(idx_to_kaddr(tpmif, i) |
 					      (tx->addr & ~PAGE_MASK)),
 				     &data[offset], tocopy, isuserbuffer)) {
 			tpmif_put(tpmif);
@@ -278,7 +278,7 @@ int _packet_write(struct packet *pak,
 		}
 		tx->size = tocopy;
 
-		gnttab_set_unmap_op(&unmap_op, MMAP_VADDR(tpmif, i),
+		gnttab_set_unmap_op(&unmap_op, idx_to_kaddr(tpmif, i),
 				    GNTMAP_host_map, handle);
 
 		if (unlikely
@@ -391,7 +391,7 @@ static int packet_read_shmem(struct packet *pak,
 
 		tx = &tpmif->tx->ring[i].req;
 
-		gnttab_set_map_op(&map_op, MMAP_VADDR(tpmif, i),
+		gnttab_set_map_op(&map_op, idx_to_kaddr(tpmif, i),
 				  GNTMAP_host_map, tx->ref, tpmif->domid);
 
 		if (unlikely(HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref,
@@ -414,10 +414,10 @@ static int packet_read_shmem(struct packet *pak,
 		}
 
 		DPRINTK("Copying from mapped memory at %08lx\n",
-			(unsigned long)(MMAP_VADDR(tpmif, i) |
+			(unsigned long)(idx_to_kaddr(tpmif, i) |
 					(tx->addr & ~PAGE_MASK)));
 
-		src = (void *)(MMAP_VADDR(tpmif, i) |
+		src = (void *)(idx_to_kaddr(tpmif, i) |
 			       ((tx->addr & ~PAGE_MASK) + pg_offset));
 		if (copy_to_buffer(&buffer[offset],
 				   src, to_copy, isuserbuffer)) {
@@ -428,7 +428,7 @@ static int packet_read_shmem(struct packet *pak,
 			tpmif->domid, buffer[offset], buffer[offset + 1],
 			buffer[offset + 2], buffer[offset + 3]);
 
-		gnttab_set_unmap_op(&unmap_op, MMAP_VADDR(tpmif, i),
+		gnttab_set_unmap_op(&unmap_op, idx_to_kaddr(tpmif, i),
 				    GNTMAP_host_map, handle);
 
 		if (unlikely

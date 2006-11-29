@@ -70,6 +70,8 @@ typedef struct Tunnel {
     struct Tunnel *base;
 } Tunnel;
 
+extern void Tunnel_free(struct Tunnel *tunnel);
+
 /** Decrement the reference count, freeing if zero.
  *
  * @param tunnel tunnel (may be null)
@@ -77,9 +79,7 @@ typedef struct Tunnel {
 static inline void Tunnel_decref(struct Tunnel *tunnel){
     if(!tunnel) return;
     if(atomic_dec_and_test(&tunnel->refcount)){
-        tunnel->type->close(tunnel);
-        Tunnel_decref(tunnel->base);
-        kfree(tunnel);
+        Tunnel_free(tunnel);
     }
 }
 
@@ -87,7 +87,7 @@ static inline void Tunnel_decref(struct Tunnel *tunnel){
  *
  * @param tunnel tunnel (may be null)
  */
-static inline void Tunnel_incref(Tunnel *tunnel){
+static inline void Tunnel_incref(struct Tunnel *tunnel){
     if(!tunnel) return;
     atomic_inc(&tunnel->refcount);
 }

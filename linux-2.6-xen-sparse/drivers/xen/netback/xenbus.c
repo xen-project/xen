@@ -28,29 +28,20 @@
     printk("netback/xenbus (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
 #endif
 
-struct backend_info
-{
+struct backend_info {
 	struct xenbus_device *dev;
 	netif_t *netif;
-	struct xenbus_watch backend_watch;
 	enum xenbus_state frontend_state;
 };
 
 static int connect_rings(struct backend_info *);
 static void connect(struct backend_info *);
-static void maybe_connect(struct backend_info *);
-static void backend_changed(struct xenbus_watch *, const char **,
-			    unsigned int);
+static void backend_create_netif(struct backend_info *be);
 
 static int netback_remove(struct xenbus_device *dev)
 {
 	struct backend_info *be = dev->dev.driver_data;
 
-	if (be->backend_watch.node) {
-		unregister_xenbus_watch(&be->backend_watch);
-		kfree(be->backend_watch.node);
-		be->backend_watch.node = NULL;
-	}
 	if (be->netif) {
 		netif_disconnect(be->netif);
 		be->netif = NULL;
@@ -63,8 +54,7 @@ static int netback_remove(struct xenbus_device *dev)
 
 /**
  * Entry point to this code when a new device is created.  Allocate the basic
- * structures, and watch the store waiting for the hotplug scripts to tell us
- * the device's handle.  Switch to InitWait.
+ * structures and switch to InitWait.
  */
 static int netback_probe(struct xenbus_device *dev,
 			 const struct xenbus_device_id *id)
@@ -82,11 +72,6 @@ static int netback_probe(struct xenbus_device *dev,
 
 	be->dev = dev;
 	dev->dev.driver_data = be;
-
-	err = xenbus_watch_path2(dev, dev->nodename, "handle",
-				 &be->backend_watch, backend_changed);
-	if (err)
-		goto fail;
 
 	do {
 		err = xenbus_transaction_start(&xbt);
@@ -108,9 +93,22 @@ static int netback_probe(struct xenbus_device *dev,
 			goto abort_transaction;
 		}
 
-		err = xenbus_printf(xbt, dev->nodename, "feature-rx-copy", "%d", 1);
+		/* We support rx-copy path. */
+		err = xenbus_printf(xbt, dev->nodename,
+				    "feature-rx-copy", "%d", 1);
 		if (err) {
-			message = "writing feature-copying";
+			message = "writing feature-rx-copy";
+			goto abort_transaction;
+		}
+
+		/*
+		 * We don't support rx-flip path (except old guests who don't
+		 * grok this feature flag).
+		 */
+		err = xenbus_printf(xbt, dev->nodename,
+				    "feature-rx-flip", "%d", 0);
+		if (err) {
+			message = "writing feature-rx-flip";
 			goto abort_transaction;
 		}
 
@@ -123,9 +121,11 @@ static int netback_probe(struct xenbus_device *dev,
 	}
 
 	err = xenbus_switch_state(dev, XenbusStateInitWait);
-	if (err) {
+	if (err)
 		goto fail;
-	}
+
+	/* This kicks hotplug scripts, so do it immediately. */
+	backend_create_netif(be);
 
 	return 0;
 
@@ -175,48 +175,30 @@ static int netback_uevent(struct xenbus_device *xdev, char **envp,
 }
 
 
-/**
- * Callback received when the hotplug scripts have placed the handle node.
- * Read it, and create a netif structure.  If the frontend is ready, connect.
- */
-static void backend_changed(struct xenbus_watch *watch,
-			    const char **vec, unsigned int len)
+static void backend_create_netif(struct backend_info *be)
 {
 	int err;
 	long handle;
-	struct backend_info *be
-		= container_of(watch, struct backend_info, backend_watch);
 	struct xenbus_device *dev = be->dev;
 
-	DPRINTK("");
+	if (be->netif != NULL)
+		return;
 
 	err = xenbus_scanf(XBT_NIL, dev->nodename, "handle", "%li", &handle);
-	if (XENBUS_EXIST_ERR(err)) {
-		/* Since this watch will fire once immediately after it is
-		   registered, we expect this.  Ignore it, and wait for the
-		   hotplug scripts. */
-		return;
-	}
 	if (err != 1) {
 		xenbus_dev_fatal(dev, err, "reading handle");
 		return;
 	}
 
-	if (be->netif == NULL) {
-		u8 be_mac[ETH_ALEN] = { 0, 0, 0, 0, 0, 0 };
-
-		be->netif = netif_alloc(dev->otherend_id, handle, be_mac);
-		if (IS_ERR(be->netif)) {
-			err = PTR_ERR(be->netif);
-			be->netif = NULL;
-			xenbus_dev_fatal(dev, err, "creating interface");
-			return;
-		}
-
-		kobject_uevent(&dev->dev.kobj, KOBJ_ONLINE);
-
-		maybe_connect(be);
+	be->netif = netif_alloc(dev->otherend_id, handle);
+	if (IS_ERR(be->netif)) {
+		err = PTR_ERR(be->netif);
+		be->netif = NULL;
+		xenbus_dev_fatal(dev, err, "creating interface");
+		return;
 	}
+
+	kobject_uevent(&dev->dev.kobj, KOBJ_ONLINE);
 }
 
 
@@ -249,11 +231,9 @@ static void frontend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateConnected:
-		if (!be->netif) {
-			/* reconnect: setup be->netif */
-			backend_changed(&be->backend_watch, NULL, 0);
-		}
-		maybe_connect(be);
+		backend_create_netif(be);
+		if (be->netif)
+			connect(be);
 		break;
 
 	case XenbusStateClosing:
@@ -278,15 +258,6 @@ static void frontend_changed(struct xenbus_device *dev,
 	}
 }
 
-
-/* ** Connection ** */
-
-
-static void maybe_connect(struct backend_info *be)
-{
-	if (be->netif && (be->frontend_state == XenbusStateConnected))
-		connect(be);
-}
 
 static void xen_net_read_rate(struct xenbus_device *dev,
 			      unsigned long *bytes, unsigned long *usec)
@@ -366,6 +337,10 @@ static void connect(struct backend_info *be)
 	be->netif->remaining_credit = be->netif->credit_bytes;
 
 	xenbus_switch_state(dev, XenbusStateConnected);
+
+	/* May not get a kick from the frontend, so start the tx_queue now. */
+	if (!netbk_can_queue(be->netif->dev))
+		netif_wake_queue(be->netif->dev);
 }
 
 
@@ -403,14 +378,16 @@ static int connect_rings(struct backend_info *be)
 	}
 	be->netif->copying_receiver = !!rx_copy;
 
-	if (xenbus_scanf(XBT_NIL, dev->otherend, "feature-rx-notify", "%d",
-			 &val) < 0)
-		val = 0;
-	if (val)
-		be->netif->can_queue = 1;
-	else
-		/* Must be non-zero for pfifo_fast to work. */
-		be->netif->dev->tx_queue_len = 1;
+	if (be->netif->dev->tx_queue_len != 0) {
+		if (xenbus_scanf(XBT_NIL, dev->otherend,
+				 "feature-rx-notify", "%d", &val) < 0)
+			val = 0;
+		if (val)
+			be->netif->can_queue = 1;
+		else
+			/* Must be non-zero for pfifo_fast to work. */
+			be->netif->dev->tx_queue_len = 1;
+	}
 
 	if (xenbus_scanf(XBT_NIL, dev->otherend, "feature-sg", "%d", &val) < 0)
 		val = 0;

@@ -5,6 +5,7 @@
  */
 
 #include "xc_private.h"
+#include <xen/hvm/hvm_op.h>
 
 int xc_readconsolering(int xc_handle,
                        char **pbuffer,
@@ -21,13 +22,13 @@ int xc_readconsolering(int xc_handle,
     sysctl.u.readconsole.count  = nr_chars;
     sysctl.u.readconsole.clear  = clear;
 
-    if ( (ret = mlock(buffer, nr_chars)) != 0 )
+    if ( (ret = lock_pages(buffer, nr_chars)) != 0 )
         return ret;
 
     if ( (ret = do_sysctl(xc_handle, &sysctl)) == 0 )
         *pnr_chars = sysctl.u.readconsole.count;
 
-    safe_munlock(buffer, nr_chars);
+    unlock_pages(buffer, nr_chars);
 
     return ret;
 }
@@ -85,6 +86,97 @@ int xc_perfc_control(int xc_handle,
         *nbr_desc = sysctl.u.perfc_op.nr_counters;
     if (nbr_val)
         *nbr_val = sysctl.u.perfc_op.nr_vals;
+
+    return rc;
+}
+
+int xc_hvm_set_pci_intx_level(
+    int xc_handle, domid_t dom,
+    uint8_t domain, uint8_t bus, uint8_t device, uint8_t intx,
+    unsigned int level)
+{
+    DECLARE_HYPERCALL;
+    struct xen_hvm_set_pci_intx_level arg;
+    int rc;
+
+    hypercall.op     = __HYPERVISOR_hvm_op;
+    hypercall.arg[0] = HVMOP_set_pci_intx_level;
+    hypercall.arg[1] = (unsigned long)&arg;
+
+    arg.domid  = dom;
+    arg.domain = domain;
+    arg.bus    = bus;
+    arg.device = device;
+    arg.intx   = intx;
+    arg.level  = level;
+
+    if ( mlock(&arg, sizeof(arg)) != 0 )
+    {
+        PERROR("Could not lock memory");
+        return -1;
+    }
+
+    rc = do_xen_hypercall(xc_handle, &hypercall);
+
+    safe_munlock(&arg, sizeof(arg));
+
+    return rc;
+}
+
+int xc_hvm_set_isa_irq_level(
+    int xc_handle, domid_t dom,
+    uint8_t isa_irq,
+    unsigned int level)
+{
+    DECLARE_HYPERCALL;
+    struct xen_hvm_set_isa_irq_level arg;
+    int rc;
+
+    hypercall.op     = __HYPERVISOR_hvm_op;
+    hypercall.arg[0] = HVMOP_set_isa_irq_level;
+    hypercall.arg[1] = (unsigned long)&arg;
+
+    arg.domid   = dom;
+    arg.isa_irq = isa_irq;
+    arg.level   = level;
+
+    if ( mlock(&arg, sizeof(arg)) != 0 )
+    {
+        PERROR("Could not lock memory");
+        return -1;
+    }
+
+    rc = do_xen_hypercall(xc_handle, &hypercall);
+
+    safe_munlock(&arg, sizeof(arg));
+
+    return rc;
+}
+
+int xc_hvm_set_pci_link_route(
+    int xc_handle, domid_t dom, uint8_t link, uint8_t isa_irq)
+{
+    DECLARE_HYPERCALL;
+    struct xen_hvm_set_pci_link_route arg;
+    int rc;
+
+    hypercall.op     = __HYPERVISOR_hvm_op;
+    hypercall.arg[0] = HVMOP_set_pci_link_route;
+    hypercall.arg[1] = (unsigned long)&arg;
+
+    arg.domid   = dom;
+    arg.link    = link;
+    arg.isa_irq = isa_irq;
+
+    if ( mlock(&arg, sizeof(arg)) != 0 )
+    {
+        PERROR("Could not lock memory");
+        return -1;
+    }
+
+    rc = do_xen_hypercall(xc_handle, &hypercall);
+
+    safe_munlock(&arg, sizeof(arg));
 
     return rc;
 }

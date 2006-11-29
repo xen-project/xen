@@ -24,13 +24,15 @@
 #include <asm/hvm/vioapic.h>
 struct mmio_list;
 typedef struct virtual_platform_def {
+    unsigned long          buffered_io_va;
+    spinlock_t             buffered_io_lock;
     unsigned long       shared_page_va;
     unsigned long       pib_base;
     unsigned char       xtp;
     unsigned long       params[HVM_NR_PARAMS];
     struct mmio_list    *mmio;
     /* One IOSAPIC now... */
-    struct hvm_vioapic  vioapic;
+    struct vioapic      vioapic;
 } vir_plat_t;
 
 static inline int __fls(uint32_t word)
@@ -53,11 +55,11 @@ typedef struct vlapic {
 extern uint64_t dummy_tmr[];
 #define VLAPIC_ID(l) (uint16_t)(((l)->vcpu->arch.privregs->lid) >> 16)
 #define VLAPIC_IRR(l) ((l)->vcpu->arch.privregs->irr[0])
-struct vlapic* apic_round_robin(struct domain *d, uint8_t dest_mode, uint8_t vector, uint32_t bitmap);
-extern int vmx_vcpu_pend_interrupt(struct vcpu *vcpu, uint8_t vector);
+struct vlapic *apic_round_robin(struct domain *d, uint8_t vector, uint32_t bitmap);
+extern int vmx_vlapic_set_irq(struct vcpu *v, uint8_t vec, uint8_t trig);
 static inline int vlapic_set_irq(struct vlapic *t, uint8_t vec, uint8_t trig)
 {
-    return vmx_vcpu_pend_interrupt(t->vcpu, vec);
+    return vmx_vlapic_set_irq(t->vcpu, vec, trig);
 }
 
 enum ioapic_irq_destination_types {
@@ -71,9 +73,7 @@ enum ioapic_irq_destination_types {
 	dest_ExtINT = 7
 };
 
-/* As long as we register vlsapic to ioapic controller, it's said enabled */
 #define vlapic_enabled(l) 1
-#define hvm_apic_support(d) 1
 
 #define VLAPIC_DELIV_MODE_FIXED		0x0
 #define VLAPIC_DELIV_MODE_REDIR		0x1

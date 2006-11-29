@@ -262,13 +262,15 @@ GLOBAL_ENTRY(ia64_switch_to)
 #endif
 	rsm psr.ic			// interrupts (psr.i) are already disabled here
 	movl r25=PAGE_KERNEL
+	movl r26 = IA64_GRANULE_SHIFT << 2
 	;;
 	srlz.d
 	or r23=r25,r20			// construct PA | page properties
-	mov r25=IA64_GRANULE_SHIFT<<2
+	ptr.d in0, r26			// to purge dtr[IA64_TR_VHPT]
 	;;
-	mov cr.itir=r25
+	mov cr.itir=r26
 	mov cr.ifa=in0			// VA of next task...
+	srlz.d
 	;;
 	mov r25=IA64_TR_CURRENT_STACK
 #ifdef XEN

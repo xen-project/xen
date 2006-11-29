@@ -16,15 +16,14 @@
 #include <xen/lib.h>
 #include <xen/string.h>
 
-/* These will be re-linked against their real values during the second link stage */
-extern unsigned long symbols_addresses[] __attribute__((weak));
-extern unsigned long symbols_num_syms __attribute__((weak,section("data")));
-extern u8 symbols_names[] __attribute__((weak));
+extern unsigned long symbols_addresses[];
+extern unsigned long symbols_num_syms;
+extern u8 symbols_names[];
 
-extern u8 symbols_token_table[] __attribute__((weak));
-extern u16 symbols_token_index[] __attribute__((weak));
+extern u8 symbols_token_table[];
+extern u16 symbols_token_index[];
 
-extern unsigned long symbols_markers[] __attribute__((weak));
+extern unsigned long symbols_markers[];
 
 /* expand a compressed symbol data into the resulting uncompressed string,
    given the offset to where the symbol is in the compressed stream */

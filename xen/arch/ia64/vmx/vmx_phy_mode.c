@@ -100,24 +100,20 @@ int mm_switch_table[8][8] = {
 void
 physical_mode_init(VCPU *vcpu)
 {
-    vcpu->arch.old_rsc = 0;
     vcpu->arch.mode_flags = GUEST_IN_PHY;
 }
 
 extern void vmx_switch_rr7(unsigned long ,shared_info_t*,void *,void *,void *);
 
 void
-physical_tlb_miss(VCPU *vcpu, u64 vadr)
+physical_tlb_miss(VCPU *vcpu, u64 vadr, int type)
 {
     u64 pte;
     ia64_rr rr;
     rr.rrval = ia64_get_rr(vadr);
     pte =  vadr& _PAGE_PPN_MASK;
-    if (vadr >> 63)
-        pte = pte | PHY_PAGE_UC;
-    else
-        pte = pte | PHY_PAGE_WB;
-    thash_vhpt_insert(vcpu, pte, (rr.ps << 2), vadr);
+    pte = pte | PHY_PAGE_WB;
+    thash_vhpt_insert(vcpu, pte, (rr.ps << 2), vadr, type);
     return;
 }
 
@@ -126,10 +122,16 @@ void
 vmx_init_all_rr(VCPU *vcpu)
 {
 	VMX(vcpu, vrr[VRN0]) = 0x38;
+	// enable vhpt in guest physical mode
+	vcpu->arch.metaphysical_rr0 |= 1;
+	vcpu->arch.metaphysical_saved_rr0 = vrrtomrr(vcpu, 0x38);
 	VMX(vcpu, vrr[VRN1]) = 0x38;
 	VMX(vcpu, vrr[VRN2]) = 0x38;
 	VMX(vcpu, vrr[VRN3]) = 0x38;
 	VMX(vcpu, vrr[VRN4]) = 0x38;
+	// enable vhpt in guest physical mode
+	vcpu->arch.metaphysical_rr4 |= 1;
+	vcpu->arch.metaphysical_saved_rr4 = vrrtomrr(vcpu, 0x38);
 	VMX(vcpu, vrr[VRN5]) = 0x38;
 	VMX(vcpu, vrr[VRN6]) = 0x38;
 	VMX(vcpu, vrr[VRN7]) = 0x738;
@@ -141,10 +143,8 @@ void
 vmx_load_all_rr(VCPU *vcpu)
 {
 	unsigned long psr;
-	ia64_rr phy_rr;
 
 	local_irq_save(psr);
-
 
 	/* WARNING: not allow co-exist of both virtual mode and physical
 	 * mode in same region
@@ -154,24 +154,16 @@ vmx_load_all_rr(VCPU *vcpu)
 			panic_domain(vcpu_regs(vcpu),
 			             "Unexpected domain switch in phy emul\n");
 		}
-		phy_rr.rrval = vcpu->arch.metaphysical_rr0;
-		//phy_rr.ps = PAGE_SHIFT;
-		phy_rr.ve = 1;
-
-		ia64_set_rr((VRN0 << VRN_SHIFT), phy_rr.rrval);
+		ia64_set_rr((VRN0 << VRN_SHIFT), vcpu->arch.metaphysical_rr0);
 		ia64_dv_serialize_data();
-		phy_rr.rrval = vcpu->arch.metaphysical_rr4;
-		//phy_rr.ps = PAGE_SHIFT;
-		phy_rr.ve = 1;
-
-		ia64_set_rr((VRN4 << VRN_SHIFT), phy_rr.rrval);
+		ia64_set_rr((VRN4 << VRN_SHIFT), vcpu->arch.metaphysical_rr4);
 		ia64_dv_serialize_data();
 	} else {
 		ia64_set_rr((VRN0 << VRN_SHIFT),
-			     vrrtomrr(vcpu, VMX(vcpu, vrr[VRN0])));
+                            vcpu->arch.metaphysical_saved_rr0);
 		ia64_dv_serialize_data();
 		ia64_set_rr((VRN4 << VRN_SHIFT),
-			     vrrtomrr(vcpu, VMX(vcpu, vrr[VRN4])));
+                            vcpu->arch.metaphysical_saved_rr4);
 		ia64_dv_serialize_data();
 	}
 
@@ -208,22 +200,12 @@ vmx_load_all_rr(VCPU *vcpu)
 void
 switch_to_physical_rid(VCPU *vcpu)
 {
-    UINT64 psr;
-    ia64_rr phy_rr, mrr;
-
+    u64 psr;
     /* Save original virtual mode rr[0] and rr[4] */
     psr=ia64_clear_ic();
-    phy_rr.rrval = vcpu->domain->arch.metaphysical_rr0;
-    mrr.rrval = ia64_get_rr(VRN0 << VRN_SHIFT);
-    phy_rr.ps = mrr.ps;
-    phy_rr.ve = 1;
-    ia64_set_rr(VRN0<<VRN_SHIFT, phy_rr.rrval);
+    ia64_set_rr(VRN0<<VRN_SHIFT, vcpu->arch.metaphysical_rr0);
     ia64_srlz_d();
-    phy_rr.rrval = vcpu->domain->arch.metaphysical_rr4;
-    mrr.rrval = ia64_get_rr(VRN4 << VRN_SHIFT);
-    phy_rr.ps = mrr.ps;
-    phy_rr.ve = 1;
-    ia64_set_rr(VRN4<<VRN_SHIFT, phy_rr.rrval);
+    ia64_set_rr(VRN4<<VRN_SHIFT, vcpu->arch.metaphysical_rr4);
     ia64_srlz_d();
 
     ia64_set_psr(psr);
@@ -235,16 +217,11 @@ switch_to_physical_rid(VCPU *vcpu)
 void
 switch_to_virtual_rid(VCPU *vcpu)
 {
-    UINT64 psr;
-    ia64_rr mrr;
-
+    u64 psr;
     psr=ia64_clear_ic();
-
-    vcpu_get_rr(vcpu,VRN0<<VRN_SHIFT,&mrr.rrval);
-    ia64_set_rr(VRN0<<VRN_SHIFT, vrrtomrr(vcpu, mrr.rrval));
+    ia64_set_rr(VRN0<<VRN_SHIFT, vcpu->arch.metaphysical_saved_rr0);
     ia64_srlz_d();
-    vcpu_get_rr(vcpu,VRN4<<VRN_SHIFT,&mrr.rrval);
-    ia64_set_rr(VRN4<<VRN_SHIFT, vrrtomrr(vcpu, mrr.rrval));
+    ia64_set_rr(VRN4<<VRN_SHIFT, vcpu->arch.metaphysical_saved_rr4);
     ia64_srlz_d();
     ia64_set_psr(psr);
     ia64_srlz_i();
@@ -260,39 +237,35 @@ void
 switch_mm_mode(VCPU *vcpu, IA64_PSR old_psr, IA64_PSR new_psr)
 {
     int act;
-    REGS * regs=vcpu_regs(vcpu);
     act = mm_switch_action(old_psr, new_psr);
     perfc_incra(vmx_switch_mm_mode, act);
     switch (act) {
     case SW_V2P:
-//        printf("V -> P mode transition: (0x%lx -> 0x%lx)\n",
+//        printk("V -> P mode transition: (0x%lx -> 0x%lx)\n",
 //               old_psr.val, new_psr.val);
-        vcpu->arch.old_rsc = regs->ar_rsc;
         switch_to_physical_rid(vcpu);
         /*
          * Set rse to enforced lazy, to prevent active rse save/restor when
          * guest physical mode.
          */
-        regs->ar_rsc &= ~(IA64_RSC_MODE);
         vcpu->arch.mode_flags |= GUEST_IN_PHY;
         break;
     case SW_P2V:
-//        printf("P -> V mode transition: (0x%lx -> 0x%lx)\n",
+//        printk("P -> V mode transition: (0x%lx -> 0x%lx)\n",
 //               old_psr.val, new_psr.val);
         switch_to_virtual_rid(vcpu);
         /*
          * recover old mode which is saved when entering
          * guest physical mode
          */
-        regs->ar_rsc = vcpu->arch.old_rsc;
         vcpu->arch.mode_flags &= ~GUEST_IN_PHY;
         break;
     case SW_SELF:
-        printf("Switch to self-0x%lx!!! MM mode doesn't change...\n",
+        printk("Switch to self-0x%lx!!! MM mode doesn't change...\n",
             old_psr.val);
         break;
     case SW_NOP:
-//        printf("No action required for mode transition: (0x%lx -> 0x%lx)\n",
+//        printk("No action required for mode transition: (0x%lx -> 0x%lx)\n",
 //               old_psr.val, new_psr.val);
         break;
     default:
@@ -366,10 +339,9 @@ prepare_if_physical_mode(VCPU *vcpu)
 void
 recover_if_physical_mode(VCPU *vcpu)
 {
-    if (is_physical_mode(vcpu)) {
-	vcpu->arch.mode_flags &= ~GUEST_PHY_EMUL;
+    if (is_physical_mode(vcpu))
         switch_to_physical_rid(vcpu);
-    }
+    vcpu->arch.mode_flags &= ~GUEST_PHY_EMUL;
     return;
 }
 

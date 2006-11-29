@@ -87,9 +87,6 @@ struct ns16550_defaults ns16550;
 
 extern char __per_cpu_start[], __per_cpu_data_end[], __per_cpu_end[];
 
-/* move us to a header file */
-extern void initialize_keytable(void);
-
 volatile struct processor_area * volatile global_cpu_table[NR_CPUS];
 
 int is_kernel_text(unsigned long addr)
@@ -160,7 +157,7 @@ static void __init start_of_day(void)
     scheduler_init();
 
     /* create idle domain */
-    idle_domain = domain_create(IDLE_DOMAIN_ID);
+    idle_domain = domain_create(IDLE_DOMAIN_ID, 0);
     if ((idle_domain == NULL) || (alloc_vcpu(idle_domain, 0, 0) == NULL))
         BUG();
     set_current(idle_domain->vcpu[0]);
@@ -345,7 +342,7 @@ static void __init __start_xen(multiboot_info_t *mbi)
     start_of_day();
 
     /* Create initial domain 0. */
-    dom0 = domain_create(0);
+    dom0 = domain_create(0, 0);
     if (dom0 == NULL)
         panic("Error creating domain 0\n");
     dom0->max_pages = ~0U;
@@ -358,8 +355,9 @@ static void __init __start_xen(multiboot_info_t *mbi)
      * need to make sure Dom0's vVCPU 0 is pinned to the CPU */
     dom0->vcpu[0]->cpu_affinity = cpumask_of_cpu(0);
 
-    set_bit(_DOMF_privileged, &dom0->domain_flags);
-    /* post-create hooks sets security label */
+    dom0->is_privileged = 1;
+
+    /* Post-create hook sets security label. */
     acm_post_domain0_create(dom0->domain_id);
 
     cmdline = (char *)(mod[0].string ? __va((ulong)mod[0].string) : NULL);

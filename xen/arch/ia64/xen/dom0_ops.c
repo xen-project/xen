@@ -22,8 +22,9 @@
 #include <asm/dom_fw.h>
 #include <xen/iocap.h>
 #include <xen/errno.h>
+#include <xen/nodemask.h>
 
-void build_physmap_table(struct domain *d);
+#define get_xen_guest_handle(val, hnd)  do { val = (hnd).p; } while (0)
 
 extern unsigned long total_pages;
 
@@ -115,7 +116,6 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
                 vmx_setup_platform(d);
             }
             else {
-                build_physmap_table(d);
                 dom_fw_setup(d, ds->bp, ds->maxmem);
                 if (ds->xsi_va)
                     d->arch.shared_info_va = ds->xsi_va;
@@ -171,7 +171,7 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     }
     break;
     default:
-        printf("arch_do_domctl: unrecognized domctl: %d!!!\n",op->cmd);
+        printk("arch_do_domctl: unrecognized domctl: %d!!!\n",op->cmd);
         ret = -ENOSYS;
 
     }
@@ -179,17 +179,26 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     return ret;
 }
 
+/*
+ * Temporarily disable the NUMA PHYSINFO code until the rest of the
+ * changes are upstream.
+ */
+#undef IA64_NUMA_PHYSINFO
+
 long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 {
     long ret = 0;
-
-    if ( !IS_PRIV(current->domain) )
-        return -EPERM;
 
     switch ( op->cmd )
     {
     case XEN_SYSCTL_physinfo:
     {
+#ifdef IA64_NUMA_PHYSINFO
+        int i;
+        node_data_t *chunks;
+        u64 *map, cpu_to_node_map[MAX_NUMNODES];
+#endif
+
         xen_sysctl_physinfo_t *pi = &op->u.physinfo;
 
         pi->threads_per_core =
@@ -198,20 +207,77 @@ long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
             cpus_weight(cpu_core_map[0]) / pi->threads_per_core;
         pi->sockets_per_node = 
             num_online_cpus() / cpus_weight(cpu_core_map[0]);
-        pi->nr_nodes         = 1;
+#ifndef IA64_NUMA_PHYSINFO
+        pi->nr_nodes         = 1; 
+#endif
         pi->total_pages      = total_pages; 
         pi->free_pages       = avail_domheap_pages();
         pi->cpu_khz          = local_cpu_data->proc_freq / 1000;
         memset(pi->hw_cap, 0, sizeof(pi->hw_cap));
         //memcpy(pi->hw_cap, boot_cpu_data.x86_capability, NCAPINTS*4);
         ret = 0;
+
+#ifdef IA64_NUMA_PHYSINFO
+        /* fetch memory_chunk pointer from guest */
+        get_xen_guest_handle(chunks, pi->memory_chunks);
+
+        printk("chunks=%p, num_node_memblks=%u\n", chunks, num_node_memblks);
+        /* if it is set, fill out memory chunk array */
+        if (chunks != NULL) {
+            if (num_node_memblks == 0) {
+                /* Non-NUMA machine.  Put pseudo-values.  */
+                node_data_t data;
+                data.node_start_pfn = 0;
+                data.node_spanned_pages = total_pages;
+                data.node_id = 0;
+                /* copy memory chunk structs to guest */
+                if (copy_to_guest_offset(pi->memory_chunks, 0, &data, 1)) {
+                    ret = -EFAULT;
+                    break;
+                }
+            } else {
+                for (i = 0; i < num_node_memblks && i < PUBLIC_MAXCHUNKS; i++) {
+                    node_data_t data;
+                    data.node_start_pfn = node_memblk[i].start_paddr >>
+                                          PAGE_SHIFT;
+                    data.node_spanned_pages = node_memblk[i].size >> PAGE_SHIFT;
+                    data.node_id = node_memblk[i].nid;
+                    /* copy memory chunk structs to guest */
+                    if (copy_to_guest_offset(pi->memory_chunks, i, &data, 1)) {
+                        ret = -EFAULT;
+                        break;
+                    }
+                }
+            }
+        }
+        /* set number of notes */
+        pi->nr_nodes = num_online_nodes();
+
+        /* fetch cpu_to_node pointer from guest */
+        get_xen_guest_handle(map, pi->cpu_to_node);
+
+        /* if set, fill out cpu_to_node array */
+        if (map != NULL) {
+            /* copy cpu to node mapping to domU */
+            memset(cpu_to_node_map, 0, sizeof(cpu_to_node_map));
+            for (i = 0; i < num_online_cpus(); i++) {
+                cpu_to_node_map[i] = cpu_to_node(i);
+                if (copy_to_guest_offset(pi->cpu_to_node, i,
+                                         &(cpu_to_node_map[i]), 1)) {
+                    ret = -EFAULT;
+                    break;
+                }
+            }
+        }
+#endif
+
         if ( copy_to_guest(u_sysctl, op, 1) )
             ret = -EFAULT;
     }
     break;
 
     default:
-        printf("arch_do_sysctl: unrecognized sysctl: %d!!!\n",op->cmd);
+        printk("arch_do_sysctl: unrecognized sysctl: %d!!!\n",op->cmd);
         ret = -ENOSYS;
 
     }
@@ -252,10 +318,12 @@ do_dom0vp_op(unsigned long cmd,
     case IA64_DOM0VP_phystomach:
         ret = ____lookup_domain_mpa(d, arg0 << PAGE_SHIFT);
         if (ret == INVALID_MFN) {
-            DPRINTK("%s:%d INVALID_MFN ret: 0x%lx\n", __func__, __LINE__, ret);
+            dprintk(XENLOG_INFO, "%s: INVALID_MFN ret: 0x%lx\n",
+                     __func__, ret);
         } else {
             ret = (ret & _PFN_MASK) >> PAGE_SHIFT;//XXX pte_pfn()
         }
+        perfc_incrc(dom0vp_phystomach);
         break;
     case IA64_DOM0VP_machtophys:
         if (!mfn_valid(arg0)) {
@@ -263,6 +331,7 @@ do_dom0vp_op(unsigned long cmd,
             break;
         }
         ret = get_gpfn_from_mfn(arg0);
+        perfc_incrc(dom0vp_machtophys);
         break;
     case IA64_DOM0VP_zap_physmap:
         ret = dom0vp_zap_physmap(d, arg0, (unsigned int)arg1);
@@ -271,9 +340,12 @@ do_dom0vp_op(unsigned long cmd,
         ret = dom0vp_add_physmap(d, arg0, arg1, (unsigned int)arg2,
                                  (domid_t)arg3);
         break;
+    case IA64_DOM0VP_expose_p2m:
+        ret = dom0vp_expose_p2m(d, arg0, arg1, arg2, arg3);
+        break;
     default:
         ret = -1;
-		printf("unknown dom0_vp_op 0x%lx\n", cmd);
+		printk("unknown dom0_vp_op 0x%lx\n", cmd);
         break;
     }
 

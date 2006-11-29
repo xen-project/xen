@@ -383,13 +383,28 @@ dnat_page_consumption (VCPU *vcpu, uint64_t vadr)
 /* Deal with
  *  Page not present vector
  */
-void
-page_not_present(VCPU *vcpu, u64 vadr)
+static void
+__page_not_present(VCPU *vcpu, u64 vadr)
 {
     /* If vPSR.ic, IFA, ITIR */
     set_ifa_itir_iha (vcpu, vadr, 1, 1, 0);
     inject_guest_interruption(vcpu, IA64_PAGE_NOT_PRESENT_VECTOR);
 }
+
+
+void
+data_page_not_present(VCPU *vcpu, u64 vadr)
+{
+    __page_not_present(vcpu, vadr);
+}
+
+
+void
+inst_page_not_present(VCPU *vcpu, u64 vadr)
+{
+    __page_not_present(vcpu, vadr);
+}
+
 
 /* Deal with
  *  Data access rights vector

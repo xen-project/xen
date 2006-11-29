@@ -41,7 +41,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define BLK_RING_SIZE __RING_SIZE((blkif_sring_t *)0, getpagesize())
+#define BLK_RING_SIZE __RING_SIZE((blkif_sring_t *)0, XC_PAGE_SIZE)
 
 /* size of the extra VMA area to map in attached pages. */
 #define BLKTAP_VMA_PAGES BLK_RING_SIZE
@@ -74,14 +74,15 @@ static inline int BLKTAP_MODE_VALID(unsigned long arg)
 		( arg == BLKTAP_MODE_INTERPOSE    ) );
 }
 
-#define MAX_REQUESTS            64
+#define MAX_REQUESTS            BLK_RING_SIZE
 
 #define BLKTAP_IOCTL_KICK 1
-#define MAX_PENDING_REQS 64
+#define MAX_PENDING_REQS	BLK_RING_SIZE
 #define BLKTAP_DEV_DIR   "/dev/xen"
 #define BLKTAP_DEV_NAME  "blktap"
-#define BLKTAP_DEV_MAJOR 254
 #define BLKTAP_DEV_MINOR 0
+
+extern int blktap_major;
 
 #define BLKTAP_RING_PAGES       1 /* Front */
 #define BLKTAP_MMAP_REGION_SIZE (BLKTAP_RING_PAGES + MMAP_PAGES)
@@ -96,9 +97,9 @@ typedef struct {
 } pending_req_t;
 
 struct blkif_ops {
-	long int (*get_size)(struct blkif *blkif);
-	long int (*get_secsize)(struct blkif *blkif);
-	unsigned (*get_info)(struct blkif *blkif);
+	unsigned long long (*get_size)(struct blkif *blkif);
+	unsigned long (*get_secsize)(struct blkif *blkif);
+	unsigned int (*get_info)(struct blkif *blkif);
 };
 
 typedef struct blkif {
@@ -155,9 +156,9 @@ typedef struct domid_translate {
 } domid_translate_t ;
 
 typedef struct image {
-	long int size;
-	long int secsize;
-	long int info;
+	unsigned long long size;
+	unsigned long secsize;
+	unsigned int info;
 } image_t;
 
 typedef struct msg_hdr {
@@ -192,13 +193,12 @@ typedef struct msg_pid {
 #define CTLMSG_PID_RSP     10
 
 /* xenstore/xenbus: */
-extern int add_blockdevice_probe_watch(struct xs_handle *h, 
-                                       const char *domname);
+#define DOMNAME "Domain-0"
+int setup_probe_watch(struct xs_handle *h);
 int xs_fire_next_watch(struct xs_handle *h);
 
 
 /* Abitrary values, must match the underlying driver... */
-#define MAX_PENDING_REQS 64
 #define MAX_TAP_DEV 100
 
 /* Accessing attached data page mappings */

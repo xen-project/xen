@@ -34,6 +34,23 @@
 #include <linux/ethtool.h>
 #include <linux/rtnetlink.h>
 
+/*
+ * Module parameter 'queue_length':
+ * 
+ * Enables queuing in the network stack when a client has run out of receive
+ * descriptors. Although this feature can improve receive bandwidth by avoiding
+ * packet loss, it can also result in packets sitting in the 'tx_queue' for
+ * unbounded time. This is bad if those packets hold onto foreign resources.
+ * For example, consider a packet that holds onto resources belonging to the
+ * guest for which it is queued (e.g., packet received on vif1.0, destined for
+ * vif1.1 which is not activated in the guest): in this situation the guest
+ * will never be destroyed, unless vif1.1 is taken down. To avoid this, we
+ * run a timer (tx_queue_timeout) to drain the queue when the interface is
+ * blocked.
+ */
+static unsigned long netbk_queue_length = 32;
+module_param_named(queue_length, netbk_queue_length, ulong, 0);
+
 static void __netif_up(netif_t *netif)
 {
 	enable_irq(netif->irq);
@@ -107,9 +124,9 @@ static struct ethtool_ops network_ethtool_ops =
 	.get_link = ethtool_op_get_link,
 };
 
-netif_t *netif_alloc(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN])
+netif_t *netif_alloc(domid_t domid, unsigned int handle)
 {
-	int err = 0, i;
+	int err = 0;
 	struct net_device *dev;
 	netif_t *netif;
 	char name[IFNAMSIZ] = {};
@@ -134,6 +151,10 @@ netif_t *netif_alloc(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN])
 	netif->credit_bytes = netif->remaining_credit = ~0UL;
 	netif->credit_usec  = 0UL;
 	init_timer(&netif->credit_timeout);
+	/* Initialize 'expires' now: it's used to track the credit window. */
+	netif->credit_timeout.expires = jiffies;
+
+	init_timer(&netif->tx_queue_timeout);
 
 	dev->hard_start_xmit = netif_be_start_xmit;
 	dev->get_stats       = netif_be_get_stats;
@@ -144,26 +165,16 @@ netif_t *netif_alloc(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN])
 
 	SET_ETHTOOL_OPS(dev, &network_ethtool_ops);
 
-	/*
-	 * Reduce default TX queuelen so that each guest interface only
-	 * allows it to eat around 6.4MB of host memory.
-	 */
-	dev->tx_queue_len = 100;
+	dev->tx_queue_len = netbk_queue_length;
 
-	for (i = 0; i < ETH_ALEN; i++)
-		if (be_mac[i] != 0)
-			break;
-	if (i == ETH_ALEN) {
-		/*
-		 * Initialise a dummy MAC address. We choose the numerically
-		 * largest non-broadcast address to prevent the address getting
-		 * stolen by an Ethernet bridge for STP purposes.
-		 * (FE:FF:FF:FF:FF:FF)
-		 */ 
-		memset(dev->dev_addr, 0xFF, ETH_ALEN);
-		dev->dev_addr[0] &= ~0x01;
-	} else
-		memcpy(dev->dev_addr, be_mac, ETH_ALEN);
+	/*
+	 * Initialise a dummy MAC address. We choose the numerically
+	 * largest non-broadcast address to prevent the address getting
+	 * stolen by an Ethernet bridge for STP purposes.
+	 * (FE:FF:FF:FF:FF:FF)
+	 */ 
+	memset(dev->dev_addr, 0xFF, ETH_ALEN);
+	dev->dev_addr[0] &= ~0x01;
 
 	rtnl_lock();
 	err = register_netdevice(dev);
@@ -306,10 +317,22 @@ err_rx:
 	return err;
 }
 
-static void netif_free(netif_t *netif)
+void netif_disconnect(netif_t *netif)
 {
+	if (netif_carrier_ok(netif->dev)) {
+		rtnl_lock();
+		netif_carrier_off(netif->dev);
+		if (netif_running(netif->dev))
+			__netif_down(netif);
+		rtnl_unlock();
+		netif_put(netif);
+	}
+
 	atomic_dec(&netif->refcnt);
 	wait_event(netif->waiting_to_free, atomic_read(&netif->refcnt) == 0);
+
+	del_timer_sync(&netif->credit_timeout);
+	del_timer_sync(&netif->tx_queue_timeout);
 
 	if (netif->irq)
 		unbind_from_irqhandler(netif->irq, netif);
@@ -323,17 +346,4 @@ static void netif_free(netif_t *netif)
 	}
 
 	free_netdev(netif->dev);
-}
-
-void netif_disconnect(netif_t *netif)
-{
-	if (netif_carrier_ok(netif->dev)) {
-		rtnl_lock();
-		netif_carrier_off(netif->dev);
-		if (netif_running(netif->dev))
-			__netif_down(netif);
-		rtnl_unlock();
-		netif_put(netif);
-	}
-	netif_free(netif);
 }

@@ -23,6 +23,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #include <sys/time.h>
 #include <time.h>
@@ -186,6 +187,8 @@ char prompt_val[PROMPT_VAL_LEN];
 int prompt_val_len = 0;
 void (*prompt_complete_func)(char *);
 
+static WINDOW *cwin;
+
 /*
  * Function definitions
  */
@@ -201,7 +204,7 @@ static void usage(const char *program)
 	       "-V, --version        output version information and exit\n"
 	       "-d, --delay=SECONDS  seconds between updates (default 3)\n"
 	       "-n, --networks       output vif network data\n"
-	       "-b, --vbds           output vbd block device data\n"
+	       "-x, --vbds           output vbd block device data\n"
 	       "-r, --repeat-header  repeat table header before each domain\n"
 	       "-v, --vcpus          output vcpu data\n"
 	       "-b, --batch	     output in batch mode, no user input accepted\n"
@@ -222,7 +225,7 @@ static void version(void)
 /* Clean up any open resources */
 static void cleanup(void)
 {
-	if(!isendwin())
+	if(cwin != NULL && !isendwin())
 		endwin();
 	if(prev_node != NULL)
 		xenstat_free_node(prev_node);
@@ -235,7 +238,7 @@ static void cleanup(void)
 /* Display the given message and gracefully exit */
 static void fail(const char *str)
 {
-	if(!isendwin())
+	if(cwin != NULL && !isendwin())
 		endwin();
 	fprintf(stderr, str);
 	exit(1);
@@ -266,7 +269,7 @@ static void print(const char *fmt, ...)
 	if (!batch) {
 		if((current_row() < lines()-1)) {
 			va_start(args, fmt);
-			vw_printw(stdscr, fmt, args);
+			vwprintw(stdscr, (char *)fmt, args);
 			va_end(args);
 		}
 	} else {
@@ -280,7 +283,7 @@ static void print(const char *fmt, ...)
 static void attr_addstr(int attr, const char *str)
 {
 	attron(attr);
-	addstr(str);
+	addstr((char *)str);
 	attroff(attr);
 }
 
@@ -973,7 +976,7 @@ int main(int argc, char **argv)
 		{ "help",          no_argument,       NULL, 'h' },
 		{ "version",       no_argument,       NULL, 'V' },
 		{ "networks",      no_argument,       NULL, 'n' },
- 		{ "vbds",          no_argument,       NULL, 'x' },
+		{ "vbds",          no_argument,       NULL, 'x' },
 		{ "repeat-header", no_argument,       NULL, 'r' },
 		{ "vcpus",         no_argument,       NULL, 'v' },
 		{ "delay",         required_argument, NULL, 'd' },
@@ -1028,14 +1031,16 @@ int main(int argc, char **argv)
 
 	if (!batch) {
 		/* Begin curses stuff */
-		initscr();
+		cwin = initscr();
 		start_color();
 		cbreak();
 		noecho();
 		nonl();
 		keypad(stdscr, TRUE);
 		halfdelay(5);
+#ifndef __sun__
 		use_default_colors();
+#endif
 		init_pair(1, -1, COLOR_YELLOW);
 
 		do {
@@ -1060,7 +1065,7 @@ int main(int argc, char **argv)
 					break;
 			} while (1);
 	}
-	
+
 	/* Cleanup occurs in cleanup(), so no work to do here. */
 
 	return 0;

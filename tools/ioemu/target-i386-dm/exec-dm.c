@@ -32,6 +32,8 @@
 #include <unistd.h>
 #include <inttypes.h>
 
+#include <xen/hvm/e820.h>
+
 #include "cpu.h"
 #include "exec-all.h"
 
@@ -407,22 +409,36 @@ int iomem_index(target_phys_addr_t addr)
         return 0;
 }
 
+static inline int paddr_is_ram(target_phys_addr_t addr)
+{
+    /* Is this guest physical address RAM-backed? */
+#if defined(CONFIG_DM) && (defined(__i386__) || defined(__x86_64__))
+    if (ram_size <= HVM_BELOW_4G_RAM_END)
+        /* RAM is contiguous */
+        return (addr < ram_size);
+    else
+        /* There is RAM below and above the MMIO hole */
+        return ((addr < HVM_BELOW_4G_MMIO_START) ||
+                ((addr >= HVM_BELOW_4G_MMIO_START + HVM_BELOW_4G_MMIO_LENGTH)
+                 && (addr < ram_size + HVM_BELOW_4G_MMIO_LENGTH)));
+#else
+    return (addr < ram_size);
+#endif
+}
+
 void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf, 
                             int len, int is_write)
 {
     int l, io_index;
     uint8_t *ptr;
     uint32_t val;
-    target_phys_addr_t page;
-    unsigned long pd;
     
     while (len > 0) {
-        page = addr & TARGET_PAGE_MASK;
-        l = (page + TARGET_PAGE_SIZE) - addr;
+        /* How much can we copy before the next page boundary? */
+        l = TARGET_PAGE_SIZE - (addr & ~TARGET_PAGE_MASK); 
         if (l > len)
             l = len;
 	
-        pd = page;
         io_index = iomem_index(addr);
         if (is_write) {
             if (io_index) {
@@ -442,15 +458,11 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
                     io_mem_write[io_index][0](io_mem_opaque[io_index], addr, val);
                     l = 1;
                 }
-            } else {
-                unsigned long addr1;
-
-                addr1 = (pd & TARGET_PAGE_MASK) + (addr & ~TARGET_PAGE_MASK);
-                /* RAM case */
-                ptr = phys_ram_base + addr1;
-                memcpy(ptr, buf, l);
+            } else if (paddr_is_ram(addr)) {
+                /* Reading from RAM */
+                memcpy(phys_ram_base + addr, buf, l);
 #ifdef __ia64__
-                sync_icache((unsigned long)ptr, l);
+                sync_icache((unsigned long)(phys_ram_base + addr), l);
 #endif 
             }
         } else {
@@ -471,14 +483,12 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
                     stb_raw(buf, val);
                     l = 1;
                 }
-            } else if (addr < ram_size) {
-                /* RAM case */
-                ptr = phys_ram_base + (pd & TARGET_PAGE_MASK) + 
-                    (addr & ~TARGET_PAGE_MASK);
-                memcpy(buf, ptr, l);
+            } else if (paddr_is_ram(addr)) {
+                /* Reading from RAM */
+                memcpy(buf, phys_ram_base + addr, l);
             } else {
-                /* unreported MMIO space */
-                memset(buf, 0xff, len);
+                /* Neither RAM nor known MMIO space */
+                memset(buf, 0xff, len); 
             }
         }
         len -= l;

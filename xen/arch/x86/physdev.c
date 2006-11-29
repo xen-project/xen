@@ -125,7 +125,7 @@ long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         if ( copy_from_guest(&set_iobitmap, arg, 1) != 0 )
             break;
         ret = -EINVAL;
-        if ( !access_ok(set_iobitmap.bitmap, IOBMP_BYTES) ||
+        if ( !guest_handle_okay(set_iobitmap.bitmap, IOBMP_BYTES) ||
              (set_iobitmap.nr_ports > 65536) )
             break;
         ret = 0;
@@ -135,7 +135,7 @@ long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
     }
 
     default:
-        ret = -EINVAL;
+        ret = -ENOSYS;
         break;
     }
 

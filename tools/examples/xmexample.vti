@@ -95,6 +95,11 @@ vnc=0
 #vncconsole=0
 
 #----------------------------------------------------------------------------
+# set password for domain's VNC console
+# default is depents on vncpasswd in xend-config.sxp
+vncpasswd=''
+
+#----------------------------------------------------------------------------
 # no graphics, use serial port
 #nographic=0
 
@@ -129,3 +134,7 @@ serial='pty'
 #                 absolute mouse)
 #usbdevice='mouse'
 #usbdevice='tablet'
+
+#-----------------------------------------------------------------------------
+#   Set keyboard layout, default is en-us keyboard.
+#keymap='ja'

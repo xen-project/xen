@@ -2,6 +2,25 @@
  * arch-ia64/hypervisor-if.h
  * 
  * Guest OS interface to IA64 Xen.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ *
  */
 
 #ifndef __HYPERVISOR_IF_IA64_H__
@@ -28,6 +47,7 @@
 __DEFINE_XEN_GUEST_HANDLE(uchar, unsigned char);
 __DEFINE_XEN_GUEST_HANDLE(uint,  unsigned int);
 __DEFINE_XEN_GUEST_HANDLE(ulong, unsigned long);
+__DEFINE_XEN_GUEST_HANDLE(u64,   unsigned long);
 DEFINE_XEN_GUEST_HANDLE(char);
 DEFINE_XEN_GUEST_HANDLE(int);
 DEFINE_XEN_GUEST_HANDLE(long);
@@ -48,18 +68,6 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 
 typedef unsigned long xen_ulong_t;
 
-#define GPFN_MEM          (0UL << 56) /* Guest pfn is normal mem */
-#define GPFN_FRAME_BUFFER (1UL << 56) /* VGA framebuffer */
-#define GPFN_LOW_MMIO     (2UL << 56) /* Low MMIO range */
-#define GPFN_PIB          (3UL << 56) /* PIB base */
-#define GPFN_IOSAPIC      (4UL << 56) /* IOSAPIC base */
-#define GPFN_LEGACY_IO    (5UL << 56) /* Legacy I/O base */
-#define GPFN_GFW          (6UL << 56) /* Guest Firmware */
-#define GPFN_HIGH_MMIO    (7UL << 56) /* High MMIO range */
-
-#define GPFN_IO_MASK     (7UL << 56)  /* Guest pfn is I/O type */
-#define GPFN_INV_MASK    (31UL << 59) /* Guest pfn is invalid */
-
 #define INVALID_MFN       (~0UL)
 
 #define MEM_G   (1UL << 30)
@@ -79,6 +87,9 @@ typedef unsigned long xen_ulong_t;
 
 #define STORE_PAGE_START (IO_PAGE_START + IO_PAGE_SIZE)
 #define STORE_PAGE_SIZE	 PAGE_SIZE
+
+#define BUFFER_IO_PAGE_START (STORE_PAGE_START+PAGE_SIZE)
+#define BUFFER_IO_PAGE_SIZE PAGE_SIZE
 
 #define IO_SAPIC_START   0xfec00000UL
 #define IO_SAPIC_SIZE    0x100000
@@ -336,33 +347,33 @@ struct vcpu_guest_context {
 typedef struct vcpu_guest_context vcpu_guest_context_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 
-// dom0 vp op
+/* dom0 vp op */
 #define __HYPERVISOR_ia64_dom0vp_op     __HYPERVISOR_arch_0
-#define IA64_DOM0VP_ioremap             0       // map io space in machine
-                                                // address to dom0 physical
-                                                // address space.
-                                                // currently physical
-                                                // assignedg address equals to
-                                                // machine address
-#define IA64_DOM0VP_phystomach          1       // convert a pseudo physical
-                                                // page frame number
-                                                // to the corresponding
-                                                // machine page frame number.
-                                                // if no page is assigned,
-                                                // INVALID_MFN or GPFN_INV_MASK
-                                                // is returned depending on
-                                                // domain's non-vti/vti mode.
-#define IA64_DOM0VP_machtophys          3       // convert a machine page
-                                                // frame number
-                                                // to the corresponding
-                                                // pseudo physical page frame
-                                                // number of the caller domain
-#define IA64_DOM0VP_zap_physmap         17      // unmap and free pages
-                                                // contained in the specified
-                                                // pseudo physical region
-#define IA64_DOM0VP_add_physmap         18      // assigne machine page frane
-                                                // to dom0's pseudo physical
-                                                // address space.
+/*  Map io space in machine address to dom0 physical address space.
+    Currently physical assigned address equals to machine address.  */
+#define IA64_DOM0VP_ioremap             0
+
+/* Convert a pseudo physical page frame number to the corresponding
+   machine page frame number. If no page is assigned, INVALID_MFN or
+   GPFN_INV_MASK is returned depending on domain's non-vti/vti mode.  */
+#define IA64_DOM0VP_phystomach          1
+
+/* Convert a machine page frame number to the corresponding pseudo physical
+   page frame number of the caller domain.  */
+#define IA64_DOM0VP_machtophys          3
+
+/* Reserved for future use.  */
+#define IA64_DOM0VP_iounmap             4
+
+/* Unmap and free pages contained in the specified pseudo physical region.  */
+#define IA64_DOM0VP_zap_physmap         5
+
+/* Assign machine page frame to dom0's pseudo physical address space.  */
+#define IA64_DOM0VP_add_physmap         6
+
+/* expose the p2m table into domain */
+#define IA64_DOM0VP_expose_p2m          7
+
 // flags for page assignement to pseudo physical address space
 #define _ASSIGN_readonly                0
 #define ASSIGN_readonly                 (1UL << _ASSIGN_readonly)
@@ -370,6 +381,12 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 /* Internal only: memory attribute must be WC/UC/UCE.  */
 #define _ASSIGN_nocache                 1
 #define ASSIGN_nocache                  (1UL << _ASSIGN_nocache)
+// tlb tracking
+#define _ASSIGN_tlb_track               2
+#define ASSIGN_tlb_track                (1UL << _ASSIGN_tlb_track)
+/* Internal only: associated with PGC_allocated bit */
+#define _ASSIGN_pgc_allocated           3
+#define ASSIGN_pgc_allocated            (1UL << _ASSIGN_pgc_allocated)
 
 /* This structure has the same layout of struct ia64_boot_param, defined in
    <asm/system.h>.  It is redefined here to ease use.  */
@@ -395,15 +412,12 @@ struct xen_ia64_boot_param {
 
 #endif /* !__ASSEMBLY__ */
 
-/* Address of shared_info in domain virtual space.
-   This is the default address, for compatibility only.  */
-#define XSI_BASE			0xf100000000000000
-
 /* Size of the shared_info area (this is not related to page size).  */
 #define XSI_SHIFT			14
 #define XSI_SIZE			(1 << XSI_SHIFT)
 /* Log size of mapped_regs area (64 KB - only 4KB is used).  */
 #define XMAPPEDREGS_SHIFT		12
+#define XMAPPEDREGS_SIZE		(1 << XMAPPEDREGS_SHIFT)
 /* Offset of XASI (Xen arch shared info) wrt XSI_BASE.  */
 #define XMAPPEDREGS_OFS			XSI_SIZE
 
@@ -435,6 +449,17 @@ struct xen_ia64_boot_param {
 #define HYPERPRIVOP_GET_PSR		0x19
 #define HYPERPRIVOP_MAX			0x19
 
+/* Fast and light hypercalls.  */
+#define __HYPERVISOR_ia64_fast_eoi	0x0200
+
+/* Xencomm macros.  */
+#define XENCOMM_INLINE_MASK 0xf800000000000000UL
+#define XENCOMM_INLINE_FLAG 0x8000000000000000UL
+
+#define XENCOMM_IS_INLINE(addr) \
+  (((unsigned long)(addr) & XENCOMM_INLINE_MASK) == XENCOMM_INLINE_FLAG)
+#define XENCOMM_INLINE_ADDR(addr) \
+  ((unsigned long)(addr) & ~XENCOMM_INLINE_MASK)
 #endif /* __HYPERVISOR_IF_IA64_H__ */
 
 /*

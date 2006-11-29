@@ -45,7 +45,7 @@ restore_all_guest:
         addq  $8,%rsp
         popq  %rcx                    # RIP
         popq  %r11                    # CS
-        cmpw  $__GUEST_CS32,%r11
+        cmpw  $FLAT_KERNEL_CS32,%r11
         popq  %r11                    # RFLAGS
         popq  %rsp                    # RSP
         je    1f
@@ -119,7 +119,7 @@ restore_all_xen:
         ALIGN
 ENTRY(syscall_enter)
         sti
-        movl  $__GUEST_SS,24(%rsp)
+        movl  $FLAT_KERNEL_SS,24(%rsp)
         pushq %rcx
         pushq $0
         movl  $TRAP_syscall,4(%rsp)
@@ -152,7 +152,7 @@ ENTRY(syscall_enter)
 #ifndef NDEBUG
         /* Deliberately corrupt parameter regs used by this hypercall. */
         popq  %r10         # Shadow RIP
-        cmpq  %r10,UREGS_rip(%rsp)
+        cmpq  %r10,UREGS_rip+8(%rsp)
         popq  %rcx         # Shadow hypercall index
         jne   skip_clobber /* If RIP has changed then don't clobber. */
         leaq  hypercall_args_table(%rip),%r10
@@ -298,9 +298,9 @@ FLT13:  movq  %rax,(%rsi)               # RCX
         movl  $TRAP_syscall,UREGS_entry_vector+8(%rsp)
         andl  $~(X86_EFLAGS_AC|X86_EFLAGS_VM|X86_EFLAGS_RF|\
                  X86_EFLAGS_NT|X86_EFLAGS_TF),UREGS_eflags+8(%rsp)
-        movq  $__GUEST_SS,UREGS_ss+8(%rsp)
+        movq  $FLAT_KERNEL_SS,UREGS_ss+8(%rsp)
         movq  %rsi,UREGS_rsp+8(%rsp)
-        movq  $__GUEST_CS,UREGS_cs+8(%rsp)
+        movq  $FLAT_KERNEL_CS,UREGS_cs+8(%rsp)
         movq  TRAPBOUNCE_eip(%rdx),%rax
         testq %rax,%rax
         jz    domain_crash_synchronous
@@ -328,7 +328,7 @@ domain_crash_synchronous:
         # printk(domain_crash_synchronous_string)
         leaq  domain_crash_synchronous_string(%rip),%rdi
         xorl  %eax,%eax
-        call  printf
+        call  printk
         jmp  __domain_crash_synchronous
 
         ALIGN
@@ -497,20 +497,6 @@ nmi_in_hypervisor_mode:
         call  do_nmi
         jmp   ret_from_intr
 
-do_arch_sched_op_compat:
-        # Ensure we return success even if we return via schedule_tail()
-        xorl  %eax,%eax
-        GET_GUEST_REGS(%r10)
-        movq  %rax,UREGS_rax(%r10)
-        jmp   do_sched_op_compat
-
-do_arch_sched_op:
-        # Ensure we return success even if we return via schedule_tail()
-        xorl  %eax,%eax
-        GET_GUEST_REGS(%r10)
-        movq  %rax,UREGS_rax(%r10)
-        jmp   do_sched_op
-
 .data
 
 ENTRY(exception_table)
@@ -542,7 +528,7 @@ ENTRY(hypercall_table)
         .quad do_stack_switch
         .quad do_set_callbacks
         .quad do_fpu_taskswitch     /*  5 */
-        .quad do_arch_sched_op_compat
+        .quad do_sched_op_compat
         .quad do_platform_op
         .quad do_set_debugreg
         .quad do_get_debugreg
@@ -565,7 +551,7 @@ ENTRY(hypercall_table)
         .quad do_mmuext_op
         .quad do_acm_op
         .quad do_nmi_op
-        .quad do_arch_sched_op
+        .quad do_sched_op
         .quad do_callback_op        /* 30 */
         .quad do_xenoprof_op
         .quad do_event_channel_op
@@ -584,8 +570,8 @@ ENTRY(hypercall_args_table)
         .byte 2 /* do_stack_switch      */
         .byte 3 /* do_set_callbacks     */
         .byte 1 /* do_fpu_taskswitch    */  /*  5 */
-        .byte 2 /* do_arch_sched_op_compat */
-        .byte 1 /* do_platform_op           */
+        .byte 2 /* do_sched_op_compat   */
+        .byte 1 /* do_platform_op       */
         .byte 2 /* do_set_debugreg      */
         .byte 1 /* do_get_debugreg      */
         .byte 2 /* do_update_descriptor */  /* 10 */
@@ -607,7 +593,7 @@ ENTRY(hypercall_args_table)
         .byte 4 /* do_mmuext_op         */
         .byte 1 /* do_acm_op            */
         .byte 2 /* do_nmi_op            */
-        .byte 2 /* do_arch_sched_op     */
+        .byte 2 /* do_sched_op          */
         .byte 2 /* do_callback_op       */  /* 30 */
         .byte 2 /* do_xenoprof_op       */
         .byte 2 /* do_event_channel_op  */

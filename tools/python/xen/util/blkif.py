@@ -7,7 +7,7 @@ from xen.xend.XendLogging import log
 def expand_dev_name(name):
     if not name:
         return name
-    if re.match( '^/dev/', name ):
+    if re.match( '^/', name ):
         return name
     else:
         return '/dev/' + name
@@ -21,11 +21,17 @@ def blkdev_name_to_number(name):
     try:
         return os.stat(n).st_rdev
     except Exception, ex:
-        log.debug("exception looking up device number for %s: %s", name, ex)
         pass
 
-    if re.match( '/dev/sd[a-p]([1-9]|1[0-5])?', n):
-        return 8 * 256 + 16 * (ord(n[7:8]) - ord('a')) + int(n[8:] or 0)
+    scsi_major = [ 8, 65, 66, 67, 68, 69, 70, 71, 128, 129, 130, 131, 132, 133, 134, 135 ]
+    if re.match( '/dev/sd[a-z]([1-9]|1[0-5])?$', n):
+        major = scsi_major[(ord(n[7:8]) - ord('a')) / 16]
+        minor = ((ord(n[7:8]) - ord('a')) % 16) * 16 + int(n[8:] or 0)
+        return major * 256 + minor
+    if re.match( '/dev/sd[a-i][a-z]([1-9]|1[0-5])?$', n):
+        major = scsi_major[((ord(n[7:8]) - ord('a') + 1) * 26 + (ord(n[8:9]) - ord('a'))) / 16 ]
+        minor = (((ord(n[7:8]) - ord('a') + 1 ) * 26 + (ord(n[8:9]) - ord('a'))) % 16) * 16 + int(n[9:] or 0)
+        return major * 256 + minor
 
     if re.match( '/dev/hd[a-t]([1-9]|[1-5][0-9]|6[0-3])?', n):
         ide_majors = [ 3, 22, 33, 34, 56, 57, 88, 89, 90, 91 ]
@@ -53,7 +59,7 @@ def blkdev_segment(name):
     """
     val = None
     n = blkdev_name_to_number(name)
-    if n:
+    if not n is None:
         val = { 'device'       : n,
                 'start_sector' : long(0),
                 'nr_sectors'   : long(1L<<63),
@@ -64,9 +70,11 @@ def blkdev_uname_to_file(uname):
     """Take a blkdev uname and return the corresponding filename."""
     fn = None
     if uname.find(":") != -1:
-        (typ, fn) = uname.split(":")
-        if typ == "phy" and not fn.startswith("/dev/"):
+        (typ, fn) = uname.split(":", 1)
+        if typ == "phy" and not fn.startswith("/"):
             fn = "/dev/%s" %(fn,)
+        if typ == "tap":
+            (typ, fn) = fn.split(":", 1)
     return fn
 
 def mount_mode(name):

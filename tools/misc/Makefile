@@ -1,7 +1,3 @@
-INSTALL		= install
-INSTALL_PROG	= $(INSTALL) -m0755
-INSTALL_DIR	= $(INSTALL) -d -m0755
-
 XEN_ROOT=../..
 include $(XEN_ROOT)/tools/Rules.mk
 
@@ -24,9 +20,6 @@ all: build
 .PHONY: build
 build: $(TARGETS)
 	$(MAKE) -C miniterm
-ifeq ($(CONFIG_MBOOTPACK),y)
-	$(MAKE) -C mbootpack
-endif
 	$(MAKE) -C lomount
 
 .PHONY: install
@@ -38,14 +31,11 @@ install: build
 	$(MAKE) -C lomount install
 #       No sense in installing miniterm on the Xen box.
 #	$(MAKE) -C miniterm install
-#       Likewise mbootpack
-#	$(MAKE) -C mbootpack install
 
 .PHONY: clean
 clean:
 	$(RM) *.o $(TARGETS) *~
 	$(MAKE) -C miniterm clean
-	$(MAKE) -C mbootpack clean
 	$(MAKE) -C lomount clean
 
 %.o: %.c $(HDRS) Makefile

@@ -3,22 +3,16 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 INCLUDES += -I.. -I../lib
 
-INSTALL      = install
-INSTALL_PROG = $(INSTALL) -m0755
 IBIN         = blktapctrl tapdisk
 QCOW_UTIL    = img2qcow qcow2raw qcow-create
-INSTALL_DIR  = /usr/sbin
+INST_DIR  = /usr/sbin
 LIBAIO_DIR   = ../../libaio/src
 
-CFLAGS   += -fPIC
-CFLAGS   += -Wall
 CFLAGS   += -Werror
 CFLAGS   += -Wno-unused
-CFLAGS   += -g3
 CFLAGS   += -fno-strict-aliasing
 CFLAGS   += -I $(XEN_LIBXC) -I $(LIBAIO_DIR)
 CFLAGS   += $(INCLUDES) -I. -I../../xenstore 
-CFLAGS   += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
 CFLAGS   += -D_GNU_SOURCE
 
 # Get gcc to generate the dependencies for us.
@@ -28,7 +22,7 @@ DEPS     = .*.d
 THREADLIB := -lpthread -lz
 LIBS      := -L. -L.. -L../lib
 LIBS      += -L$(XEN_LIBXC)
-LIBS      += -lblktap
+LIBS      += -lblktap -lxenctrl
 LIBS      += -lcrypto
 LIBS      += -lz
 LIBS      += -L$(XEN_XENSTORE) -lxenstore
@@ -61,7 +55,7 @@ img2qcow qcow2raw qcow-create: %: $(BLK-OBJS)
 	$(CC) $(CFLAGS) -o $* $(BLK-OBJS) $*.c $(AIOLIBS)  $(LIBS)
 
 install: all
-	$(INSTALL_PROG) $(IBIN) $(QCOW_UTIL) $(DESTDIR)$(INSTALL_DIR)
+	$(INSTALL_PROG) $(IBIN) $(QCOW_UTIL) $(DESTDIR)$(INST_DIR)
 
 clean:
 	rm -rf *.o *~ $(DEPS) xen TAGS $(IBIN) $(LIB) $(QCOW_UTIL)

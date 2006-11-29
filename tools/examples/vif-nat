@@ -72,7 +72,7 @@ dotted_quad()
 }
 
 
-if [ "$ip" == "" ]
+if [ "$ip" = "" ]
 then
   ip=$(ip_from_dom)
 fi
@@ -152,7 +152,7 @@ esac
 handle_iptable
 
 log debug "Successful vif-nat $command for $vif."
-if [ "$command" == "online" ]
+if [ "$command" = "online" ]
 then
   success
 fi

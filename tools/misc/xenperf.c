@@ -10,7 +10,6 @@
  * Description: 
  */
 
-
 #include <xenctrl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,14 +17,82 @@
 #include <errno.h>
 #include <string.h>
 
+#define X(name) [__HYPERVISOR_##name] = #name
+const char *hypercall_name_table[64] =
+{
+    X(set_trap_table),
+    X(mmu_update),
+    X(set_gdt),
+    X(stack_switch),
+    X(set_callbacks),
+    X(fpu_taskswitch),
+    X(sched_op_compat),
+    X(platform_op),
+    X(set_debugreg),
+    X(get_debugreg),
+    X(update_descriptor),
+    X(memory_op),
+    X(multicall),
+    X(update_va_mapping),
+    X(set_timer_op),
+    X(event_channel_op_compat),
+    X(xen_version),
+    X(console_io),
+    X(physdev_op_compat),
+    X(grant_table_op),
+    X(vm_assist),
+    X(update_va_mapping_otherdomain),
+    X(iret),
+    X(vcpu_op),
+    X(set_segment_base),
+    X(mmuext_op),
+    X(acm_op),
+    X(nmi_op),
+    X(sched_op),
+    X(callback_op),
+    X(xenoprof_op),
+    X(event_channel_op),
+    X(physdev_op),
+    X(hvm_op),
+    X(sysctl),
+    X(domctl),
+    X(kexec_op),
+    X(arch_0),
+    X(arch_1),
+    X(arch_2),
+    X(arch_3),
+    X(arch_4),
+    X(arch_5),
+    X(arch_6),
+    X(arch_7),
+};
+#undef X
+
+int lock_pages(void *addr, size_t len)
+{
+    int e = 0;
+#ifndef __sun__
+    e = mlock(addr, len);
+#endif
+    return (e);
+}
+
+void unlock_pages(void *addr, size_t len)
+{
+#ifndef __sun__
+    munlock(addr, len);
+#endif
+}
+
 int main(int argc, char *argv[])
 {
     int              i, j, xc_handle;
     xc_perfc_desc_t *pcd;
-	xc_perfc_val_t  *pcv;
-	xc_perfc_val_t  *val;
-	int num_desc, num_val;
-    unsigned int    sum, reset = 0, full = 0;
+    xc_perfc_val_t  *pcv;
+    xc_perfc_val_t  *val;
+    int num_desc, num_val;
+    unsigned int    sum, reset = 0, full = 0, pretty = 0;
+    char hypercall_name[36];
 
     if ( argc > 1 )
     {
@@ -36,6 +103,10 @@ int main(int argc, char *argv[])
             {
             case 'f':
                 full = 1;
+                break;
+            case 'p':
+                full = 1;
+                pretty = 1;
                 break;
             case 'r':
                 reset = 1;
@@ -50,6 +121,7 @@ int main(int argc, char *argv[])
             printf("%s: [-r]\n", argv[0]);
             printf("no args: print digested counters\n");
             printf("    -f : print full arrays/histograms\n");
+            printf("    -p : print full arrays/histograms in pretty format\n");
             printf("    -r : reset counters\n");
             return 0;
         }
@@ -75,39 +147,39 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-	if ( xc_perfc_control(xc_handle, XEN_SYSCTL_PERFCOP_query,
-						  NULL, NULL, &num_desc, &num_val) != 0 )
-        {
-            fprintf(stderr, "Error getting number of perf counters: %d (%s)\n",
-                    errno, strerror(errno));
-            return 1;
-        }
+    if ( xc_perfc_control(xc_handle, XEN_SYSCTL_PERFCOP_query,
+                          NULL, NULL, &num_desc, &num_val) != 0 )
+    {
+        fprintf(stderr, "Error getting number of perf counters: %d (%s)\n",
+                errno, strerror(errno));
+        return 1;
+    }
 
     pcd = malloc(sizeof(*pcd) * num_desc);
-	pcv = malloc(sizeof(*pcv) * num_val);
+    pcv = malloc(sizeof(*pcv) * num_val);
 
     if ( pcd == NULL
-		 || mlock(pcd, sizeof(*pcd) * num_desc) != 0
-		 || pcv == NULL
-		 || mlock(pcd, sizeof(*pcv) * num_val) != 0)
+         || lock_pages(pcd, sizeof(*pcd) * num_desc) != 0
+         || pcv == NULL
+         || lock_pages(pcd, sizeof(*pcv) * num_val) != 0)
     {
-        fprintf(stderr, "Could not alloc or mlock buffers: %d (%s)\n",
+        fprintf(stderr, "Could not alloc or lock buffers: %d (%s)\n",
                 errno, strerror(errno));
         exit(-1);
     }
 
     if ( xc_perfc_control(xc_handle, XEN_SYSCTL_PERFCOP_query,
-						  pcd, pcv, NULL, NULL) != 0 )
+                          pcd, pcv, NULL, NULL) != 0 )
     {
         fprintf(stderr, "Error getting perf counter: %d (%s)\n",
                 errno, strerror(errno));
         return 1;
     }
 
-    munlock(pcd, sizeof(*pcd) * num_desc);
-    munlock(pcv, sizeof(*pcv) * num_val);
+    unlock_pages(pcd, sizeof(*pcd) * num_desc);
+    unlock_pages(pcv, sizeof(*pcv) * num_val);
 
-	val = pcv;
+    val = pcv;
     for ( i = 0; i < num_desc; i++ )
     {
         printf ("%-35s ", pcd[i].name);
@@ -118,11 +190,37 @@ int main(int argc, char *argv[])
         printf ("T=%10u ", (unsigned int)sum);
 
         if ( full || (pcd[i].nr_vals <= 4) )
-            for ( j = 0; j < pcd[i].nr_vals; j++ )
-                printf(" %10u", (unsigned int)val[j]);
+        {
+            if ( pretty && (strcmp(pcd[i].name, "hypercalls") == 0) )
+            {
+                printf("\n");
+                for( j = 0; j < pcd[i].nr_vals; j++ )
+                {
+                    if ( val[j] == 0 )
+                        continue;
+                    if ( (j < 64) && hypercall_name_table[j] )
+                        strncpy(hypercall_name, hypercall_name_table[j],
+                                sizeof(hypercall_name));
+                    else
+                        sprintf(hypercall_name, "[%d]", j);
+                    hypercall_name[sizeof(hypercall_name)-1]='\0';
+                    printf("%-35s ", hypercall_name);
+                    printf("%12u\n", (unsigned int)val[j]);
+                }
+            }
+            else
+            {
+                for ( j = 0; j < pcd[i].nr_vals; j++ )
+                    printf(" %10u", (unsigned int)val[j]);
+                printf("\n");
+            }
+        }
+        else
+        {
+            printf("\n");
+        }
 
-        printf("\n");
-		val += pcd[i].nr_vals;
+        val += pcd[i].nr_vals;
     }
 
     return 0;

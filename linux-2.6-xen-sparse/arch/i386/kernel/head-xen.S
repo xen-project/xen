@@ -9,7 +9,7 @@
 #include <asm/page.h>
 #include <asm/thread_info.h>
 #include <asm/asm-offsets.h>
-#include <xen/interface/arch-x86_32.h>
+#include <xen/interface/xen.h>
 #include <xen/interface/elfnote.h>
 
 /*
@@ -192,6 +192,7 @@ ENTRY(cpu_gdt_table)
 #endif /* !CONFIG_XEN_COMPAT_030002 */
 	ELFNOTE(Xen, XEN_ELFNOTE_ENTRY,          .long,  startup_32)
 	ELFNOTE(Xen, XEN_ELFNOTE_HYPERCALL_PAGE, .long,  hypercall_page)
+	ELFNOTE(Xen, XEN_ELFNOTE_HV_START_LOW,   .long,  HYPERVISOR_VIRT_START)
 	ELFNOTE(Xen, XEN_ELFNOTE_FEATURES,       .asciz, "writable_page_tables|writable_descriptor_tables|auto_translated_physmap|pae_pgdir_above_4gb|supervisor_mode_kernel")
 #ifdef CONFIG_X86_PAE
 	ELFNOTE(Xen, XEN_ELFNOTE_PAE_MODE,       .asciz, "yes")

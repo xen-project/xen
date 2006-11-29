@@ -55,41 +55,27 @@ function evaluate_params()
 {
 	local step host domname typ recover filename func stype
 	stype=""
-	while [ 1 ]; do
-		if [ "$1" == "-step" ]; then
-			shift
-			step=$1
-		elif [ "$1" == "-host" ]; then
-			shift
-			host=$1
-		elif [ "$1" == "-domname" ]; then
-			shift
-			domname=$1
-		elif [ "$1" == "-type" ]; then
-			shift
-			typ=$1
-		elif [ "$1" == "-subtype" ]; then
-			shift
-			stype="_$1"
-		elif [ "$1" == "-recover" ]; then
-			recover=1
-		elif [ "$1" == "-help" ]; then
-			ext_dev_migrate_usage
-			exit
-		else
-			break
-		fi
-		shift
+	while [ $# -ge 1 ]; do
+		case "$1" in
+		-step)		step=$2; shift 2;;
+		-host)		host=$2; shift 2;;
+		-domname)	domname=$2; shift 2;;
+		-type)		type=$2; shift 2;;
+		-subtype)	subtype=$2; shift 2;;
+		-recover)	recover=1; shift;;
+		-help)		ext_dev_migrate_usage; exit 0;;
+		*)		break;;
+		esac
 	done
 
-	if [ "$step"    == "" -o \
-	     "$host"    == "" -o \
-	     "$typ"     == "" -o \
-	     "$domname" == "" ]; then
-	 	echo "Error: Parameter(s) missing (-step/-host/-type/-domname)"
-		echo ""
-		echo "$0 -help for usage."
-		exit
+	if [ "$step"    = "" -o \
+	     "$host"    = "" -o \
+	     "$typ"     = "" -o \
+	     "$domname" = "" ]; then
+	 	echo "Error: Parameter(s) missing (-step/-host/-type/-domname)" 1>&2
+		echo "" 1>&2
+		echo "$0 -help for usage." 1>&2
+		exit 1
 	fi
 
 	filename="$dir/$typ$stype-migration.sh"
@@ -99,7 +85,7 @@ function evaluate_params()
 	fi
 	. "$filename"
 
-	if [ "$recover" == "1" ]; then
+	if [ "$recover" = "1" ]; then
 		func="$typ"_recover
 		eval $func $host $domname $step $*
 	else
@@ -108,4 +94,4 @@ function evaluate_params()
 	fi
 }
 
-evaluate_params $*
+evaluate_params "$@"

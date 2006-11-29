@@ -116,7 +116,6 @@ struct arch_vmx_struct {
 #define VMX_DOMAIN(v)   v->arch.arch_vmx.flags
 
 #define ARCH_VMX_IO_WAIT        3       /* Waiting for I/O completion */
-#define ARCH_VMX_INTR_ASSIST    4       /* Need DM's assist to issue intr */
 #define ARCH_VMX_DOMAIN         5       /* Need it to indicate VTi domain */
 
 
@@ -140,6 +139,7 @@ extern unsigned int opt_vmx_debug_level;
 #define VPD_VPR_START_OFFSET		1432
 #define VPD_VRSE_CFLE_START_OFFSET	1440
 #define VPD_VCR_START_OFFSET		2048
+#define VPD_VTPR_START_OFFSET		2576
 #define VPD_VRR_START_OFFSET		3072
 #define VPD_VMM_VAIL_START_OFFSET	31744
 

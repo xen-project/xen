@@ -4,12 +4,26 @@
 
 dir=$(dirname "$0")
 . "$dir/xen-hotplug-common.sh"
+. "$dir/block-common.sh"
 
 findCommand "$@"
 
-if [ "$command" == 'add' ]
+t=$(xenstore_read_default "$XENBUS_PATH/type" 'MISSING')
+if [ -n "$t" ]
 then
-  success
+    p=$(xenstore_read "$XENBUS_PATH/params")
+    # if we have a ':', chew from head including :
+    if echo $p | grep -q \:
+    then
+        p=${p#*:}
+    fi
+fi
+file=$(readlink -f "$p") || ebusy "$p does not exist."
+
+if [ "$command" = 'add' ]
+then
+    [ -e "$file" ] || { ebusy $file does not exist; }
+    success
 fi
 
 exit 0

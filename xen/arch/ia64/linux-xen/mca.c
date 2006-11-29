@@ -80,6 +80,7 @@
 #ifdef XEN
 #include <xen/symbols.h>
 #include <xen/mm.h>
+#include <xen/console.h>
 #endif
 
 #if defined(IA64_MCA_DEBUG_INFO)
@@ -1219,12 +1220,6 @@ void
 ia64_init_handler (struct pt_regs *pt, struct switch_stack *sw)
 {
 	pal_min_state_area_t *ms;
-#ifdef XEN
-	int cpu = smp_processor_id();
-
-	printk(KERN_INFO "Entered OS INIT handler. PSP=%lx\n",
-	       ia64_sal_to_os_handoff_state[cpu].proc_state_param);
-#endif
 
 #ifndef XEN
 	oops_in_progress = 1;	/* avoid deadlock in printk, but it makes recovery dodgy */
@@ -1240,6 +1235,12 @@ ia64_init_handler (struct pt_regs *pt, struct switch_stack *sw)
 	 */
 	ms = (pal_min_state_area_t *)(ia64_sal_to_os_handoff_state.pal_min_state | (6ul<<61));
 #else
+	int cpu = smp_processor_id();
+
+	console_start_sync();
+	printk(KERN_INFO "Entered OS INIT handler. PSP=%lx\n",
+	       ia64_sal_to_os_handoff_state[cpu].proc_state_param);
+
 	/* Xen virtual address in region 7. */
 	ms = __va((pal_min_state_area_t *)(ia64_sal_to_os_handoff_state[cpu].pal_min_state));
 #endif

@@ -48,6 +48,10 @@
 #include <asm/hypervisor.h>
 #include <asm/maddr.h>
 
+#ifdef HAVE_XEN_PLATFORM_COMPAT_H
+#include <xen/platform-compat.h>
+#endif
+
 #define BLKIF_STATE_DISCONNECTED 0
 #define BLKIF_STATE_CONNECTED    1
 #define BLKIF_STATE_SUSPENDED    2
@@ -134,10 +138,10 @@ static int blkfront_resume(struct xenbus_device *dev)
 
 	DPRINTK("blkfront_resume: %s\n", dev->nodename);
 
-	blkif_free(info, 1);
+	blkif_free(info, info->connected == BLKIF_STATE_CONNECTED);
 
 	err = talk_to_backend(dev, info);
-	if (!err)
+	if (info->connected == BLKIF_STATE_SUSPENDED && !err)
 		blkif_recover(info);
 
 	return err;
@@ -273,7 +277,7 @@ static void backend_changed(struct xenbus_device *dev,
 			xenbus_dev_fatal(dev, -ENODEV, "bdget failed");
 
 		down(&bd->bd_sem);
-		if (info->users > 0 && system_state == SYSTEM_RUNNING)
+		if (info->users > 0)
 			xenbus_dev_error(dev, -EBUSY,
 					 "Device in use; refusing to close");
 		else
@@ -294,7 +298,8 @@ static void backend_changed(struct xenbus_device *dev,
  */
 static void connect(struct blkfront_info *info)
 {
-	unsigned long sectors, sector_size;
+	unsigned long long sectors;
+	unsigned long sector_size;
 	unsigned int binfo;
 	int err;
 
@@ -305,7 +310,7 @@ static void connect(struct blkfront_info *info)
 	DPRINTK("blkfront.c:connect:%s.\n", info->xbdev->otherend);
 
 	err = xenbus_gather(XBT_NIL, info->xbdev->otherend,
-			    "sectors", "%lu", &sectors,
+			    "sectors", "%llu", &sectors,
 			    "info", "%u", &binfo,
 			    "sector-size", "%lu", &sector_size,
 			    NULL);
@@ -315,6 +320,12 @@ static void connect(struct blkfront_info *info)
 				 info->xbdev->otherend);
 		return;
 	}
+
+	err = xenbus_gather(XBT_NIL, info->xbdev->otherend,
+			    "feature-barrier", "%lu", &info->feature_barrier,
+			    NULL);
+	if (err)
+		info->feature_barrier = 0;
 
 	err = xlvbd_add(sectors, info->vdevice, binfo, sector_size, info);
 	if (err) {
@@ -355,8 +366,10 @@ static void blkfront_closing(struct xenbus_device *dev)
 	blk_stop_queue(info->rq);
 	/* No more gnttab callback work. */
 	gnttab_cancel_free_callback(&info->callback);
-	flush_scheduled_work();
 	spin_unlock_irqrestore(&blkif_io_lock, flags);
+
+	/* Flush gnttab callback work. Must be done with no locks held. */
+	flush_scheduled_work();
 
 	xlvbd_del(info);
 
@@ -466,6 +479,27 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
 		      command, (long)argument, inode->i_rdev);
 
 	switch (command) {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,16)
+	case HDIO_GETGEO: {
+		struct block_device *bd = inode->i_bdev;
+		struct hd_geometry geo;
+		int ret;
+
+                if (!argument)
+                        return -EINVAL;
+
+		geo.start = get_start_sect(bd);
+		ret = blkif_getgeo(bd, &geo);
+		if (ret)
+			return ret;
+
+		if (copy_to_user((struct hd_geometry __user *)argument, &geo,
+				 sizeof(geo)))
+                        return -EFAULT;
+
+                return 0;
+	}
+#endif
 	case CDROMMULTISESSION:
 		DPRINTK("FIXME: support multisession CDs later\n");
 		for (i = 0; i < sizeof(struct cdrom_multisession); i++)
@@ -542,10 +576,13 @@ static int blkif_queue_request(struct request *req)
 	info->shadow[id].request = (unsigned long)req;
 
 	ring_req->id = id;
-	ring_req->operation = rq_data_dir(req) ?
-		BLKIF_OP_WRITE : BLKIF_OP_READ;
 	ring_req->sector_number = (blkif_sector_t)req->sector;
 	ring_req->handle = info->handle;
+
+	ring_req->operation = rq_data_dir(req) ?
+		BLKIF_OP_WRITE : BLKIF_OP_READ;
+	if (blk_barrier_rq(req))
+		ring_req->operation = BLKIF_OP_WRITE_BARRIER;
 
 	ring_req->nr_segments = 0;
 	rq_for_each_bio (bio, req) {
@@ -643,6 +680,7 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 	RING_IDX i, rp;
 	unsigned long flags;
 	struct blkfront_info *info = (struct blkfront_info *)dev_id;
+	int uptodate;
 
 	spin_lock_irqsave(&blkif_io_lock, flags);
 
@@ -667,19 +705,27 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 
 		ADD_ID_TO_FREELIST(info, id);
 
+		uptodate = (bret->status == BLKIF_RSP_OKAY);
 		switch (bret->operation) {
+		case BLKIF_OP_WRITE_BARRIER:
+			if (unlikely(bret->status == BLKIF_RSP_EOPNOTSUPP)) {
+				printk("blkfront: %s: write barrier op failed\n",
+				       info->gd->disk_name);
+				uptodate = -EOPNOTSUPP;
+				info->feature_barrier = 0;
+			        xlvbd_barrier(info);
+			}
+			/* fall through */
 		case BLKIF_OP_READ:
 		case BLKIF_OP_WRITE:
 			if (unlikely(bret->status != BLKIF_RSP_OKAY))
 				DPRINTK("Bad return from blkdev data "
 					"request: %x\n", bret->status);
 
-			ret = end_that_request_first(
-				req, (bret->status == BLKIF_RSP_OKAY),
+			ret = end_that_request_first(req, uptodate,
 				req->hard_nr_sectors);
 			BUG_ON(ret);
-			end_that_request_last(
-				req, (bret->status == BLKIF_RSP_OKAY));
+			end_that_request_last(req, uptodate);
 			break;
 		default:
 			BUG();
@@ -714,8 +760,10 @@ static void blkif_free(struct blkfront_info *info, int suspend)
 		blk_stop_queue(info->rq);
 	/* No more gnttab callback work. */
 	gnttab_cancel_free_callback(&info->callback);
-	flush_scheduled_work();
 	spin_unlock_irq(&blkif_io_lock);
+
+	/* Flush gnttab callback work. Must be done with no locks held. */
+	flush_scheduled_work();
 
 	/* Free resources associated with old device channel. */
 	if (info->ring_ref != GRANT_INVALID_REF) {

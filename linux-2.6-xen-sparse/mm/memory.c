@@ -390,7 +390,7 @@ struct page *vm_normal_page(struct vm_area_struct *vma, unsigned long addr, pte_
 
 	if (vma->vm_flags & VM_PFNMAP) {
 		unsigned long off = (addr - vma->vm_start) >> PAGE_SHIFT;
-		if ((pfn == vma->vm_pgoff + off) || !pfn_valid(pfn))
+		if (pfn == vma->vm_pgoff + off)
 			return NULL;
 		if (!is_cow_mapping(vma->vm_flags))
 			return NULL;
@@ -405,7 +405,8 @@ struct page *vm_normal_page(struct vm_area_struct *vma, unsigned long addr, pte_
 	 * Remove this test eventually!
 	 */
 	if (unlikely(!pfn_valid(pfn))) {
-		print_bad_pte(vma, pte, addr);
+		if (!(vma->vm_flags & VM_RESERVED))
+			print_bad_pte(vma, pte, addr);
 		return NULL;
 	}
 
@@ -1534,6 +1535,7 @@ static inline void cow_user_page(struct page *dst, struct page *src, unsigned lo
 		if (__copy_from_user_inatomic(kaddr, uaddr, PAGE_SIZE))
 			memset(kaddr, 0, PAGE_SIZE);
 		kunmap_atomic(kaddr, KM_USER0);
+		flush_dcache_page(dst);
 		return;
 		
 	}

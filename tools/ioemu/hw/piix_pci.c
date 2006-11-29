@@ -338,10 +338,14 @@ static void pci_bios_init_device(PCIDevice *d)
         break;
     case 0x0680:
         if (vendor_id == 0x8086 && device_id == 0x7113) {
-            /* PIIX4 ACPI PM */
-            pci_config_writew(d, 0x20, 0x0000); /* NO smb bus IO enable in PIIX4 */
+            /*
+             * PIIX4 ACPI PM.
+             * Special device with special PCI config space. No ordinary BARs.
+             */
+            pci_config_writew(d, 0x20, 0x0000); // No smb bus IO enable
             pci_config_writew(d, 0x22, 0x0000);
-            goto default_map;
+            pci_config_writew(d, 0x3c, 0x0009); // Hardcoded IRQ9
+            pci_config_writew(d, 0x3d, 0x0001);
         }
         break;
     case 0x0300:
@@ -393,14 +397,6 @@ static void pci_bios_init_device(PCIDevice *d)
         pin = pci_slot_get_pirq(d, pin - 1);
         pic_irq = pci_irqs[pin];
         pci_config_writeb(d, PCI_INTERRUPT_LINE, pic_irq);
-    }
-
-    if (class== 0x0680&& vendor_id == 0x8086 && device_id == 0x7113) {
-         // PIIX4 ACPI PM
-       pci_config_writew(d, 0x20, 0x0000); // NO smb bus IO enable in PIIX4
-       pci_config_writew(d, 0x22, 0x0000);
-       pci_config_writew(d, 0x3c, 0x0009); // Hardcodeed IRQ9
-       pci_config_writew(d, 0x3d, 0x0001);
     }
 }
 

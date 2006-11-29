@@ -1,0 +1,3 @@
+include $(M)/overrides.mk
+
+obj-m := reboot.o

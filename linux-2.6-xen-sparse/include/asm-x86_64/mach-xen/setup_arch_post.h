@@ -15,20 +15,20 @@ extern void nmi(void);
 static void __init machine_specific_arch_setup(void)
 {
 	int ret;
-	struct callback_register event = {
+	static struct callback_register __initdata event = {
 		.type = CALLBACKTYPE_event,
 		.address = (unsigned long) hypervisor_callback,
 	};
-	struct callback_register failsafe = {
+	static struct callback_register __initdata failsafe = {
 		.type = CALLBACKTYPE_failsafe,
 		.address = (unsigned long)failsafe_callback,
 	};
-	struct callback_register syscall = {
+	static struct callback_register __initdata syscall = {
 		.type = CALLBACKTYPE_syscall,
 		.address = (unsigned long)system_call,
 	};
 #ifdef CONFIG_X86_LOCAL_APIC
-	struct callback_register nmi_cb = {
+	static struct callback_register __initdata nmi_cb = {
 		.type = CALLBACKTYPE_nmi,
 		.address = (unsigned long)nmi,
 	};
@@ -39,20 +39,25 @@ static void __init machine_specific_arch_setup(void)
 		ret = HYPERVISOR_callback_op(CALLBACKOP_register, &failsafe);
 	if (ret == 0)
 		ret = HYPERVISOR_callback_op(CALLBACKOP_register, &syscall);
+#ifdef CONFIG_XEN_COMPAT_030002
 	if (ret == -ENOSYS)
 		ret = HYPERVISOR_set_callbacks(
 			event.address,
 			failsafe.address,
 			syscall.address);
+#endif
 	BUG_ON(ret);
 
 #ifdef CONFIG_X86_LOCAL_APIC
 	ret = HYPERVISOR_callback_op(CALLBACKOP_register, &nmi_cb);
+#ifdef CONFIG_XEN_COMPAT_030002
 	if (ret == -ENOSYS) {
-		struct xennmi_callback cb;
+		static struct xennmi_callback __initdata cb = {
+			.handler_address = (unsigned long)nmi
+		};
 
-		cb.handler_address = nmi_cb.address;
 		HYPERVISOR_nmi_op(XENNMI_register_callback, &cb);
 	}
+#endif
 #endif
 }

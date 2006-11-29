@@ -65,15 +65,14 @@ struct shadow_domain {
     struct list_head  freelists[SHADOW_MAX_ORDER + 1]; 
     struct list_head  p2m_freelist;
     struct list_head  p2m_inuse;
-    struct list_head  toplevel_shadows;
+    struct list_head  pinned_shadows;
     unsigned int      total_pages;  /* number of pages allocated */
     unsigned int      free_pages;   /* number of pages on freelists */
     unsigned int      p2m_pages;    /* number of pages in p2m map */
+    unsigned int      opt_flags;    /* runtime tunable optimizations on/off */
 
     /* Shadow hashtable */
-    struct shadow_hash_entry *hash_table;
-    struct shadow_hash_entry *hash_freelist;
-    struct shadow_hash_entry *hash_allocations;
+    struct shadow_page_info **hash_table;
     int hash_walking;  /* Some function is walking the hash table */
 
     /* Shadow log-dirty bitmap */
@@ -111,6 +110,8 @@ struct arch_domain
 
     /* Shadow translated domain: P2M mapping */
     pagetable_t phys_table;
+    /* Highest guest frame that's ever been mapped in the p2m */
+    unsigned long max_mapped_pfn;
 
 } __cacheline_aligned;
 
@@ -134,18 +135,20 @@ struct pae_l3_cache { };
 #endif
 
 struct shadow_vcpu {
+#if CONFIG_PAGING_LEVELS >= 3
+    /* PAE guests: per-vcpu shadow top-level table */
+    l3_pgentry_t l3table[4] __attribute__((__aligned__(32)));
+#endif
     /* Pointers to mode-specific entry points. */
     struct shadow_paging_mode *mode;
     /* Last MFN that we emulated a write to. */
     unsigned long last_emulated_mfn;
+    /* MFN of the last shadow that we shot a writeable mapping in */
+    unsigned long last_writeable_pte_smfn;
     /* HVM guest: paging enabled (CR0.PG)?  */
-    unsigned int hvm_paging_enabled:1;
+    unsigned int translate_enabled:1;
     /* Emulated fault needs to be propagated to guest? */
     unsigned int propagate_fault:1;
-#if CONFIG_PAGING_LEVELS >= 3
-    /* Shadow update requires this PAE cpu to recopy/install its L3 table. */
-    unsigned int pae_flip_pending:1;
-#endif
 };
 
 struct arch_vcpu
@@ -167,7 +170,7 @@ struct arch_vcpu
     struct trap_bounce trap_bounce;
 
     /* I/O-port access bitmap. */
-    u8 *iobmp;        /* Guest kernel virtual address of the bitmap. */
+    XEN_GUEST_HANDLE(uint8_t) iobmp; /* Guest kernel virtual address of the bitmap. */
     int iobmp_limit;  /* Number of ports represented in the bitmap.  */
     int iopl;         /* Current IOPL for this VCPU. */
 
@@ -190,13 +193,12 @@ struct arch_vcpu
     pagetable_t guest_table;            /* (MFN) guest notion of cr3 */
     /* guest_table holds a ref to the page, and also a type-count unless
      * shadow refcounts are in use */
-    pagetable_t shadow_table;           /* (MFN) shadow of guest */
+    pagetable_t shadow_table[4];        /* (MFN) shadow(s) of guest */
     pagetable_t monitor_table;          /* (MFN) hypervisor PT (for HVM) */
     unsigned long cr3;           	    /* (MA) value to install in HW CR3 */
 
-    void *guest_vtable;                 /* virtual address of pagetable */
-    void *shadow_vtable;                /* virtual address of shadow_table */
-    root_pgentry_t *monitor_vtable;		/* virtual address of monitor_table */
+    void *guest_vtable;                 /* virtual addr of pagetable */
+    root_pgentry_t *monitor_vtable;		/* virtual addr of monitor_table */
 
     /* Current LDT details. */
     unsigned long shadow_ldt_mapcnt;

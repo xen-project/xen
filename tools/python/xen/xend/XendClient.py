@@ -22,6 +22,7 @@ import os
 import sys
 
 XML_RPC_SOCKET = "/var/run/xend/xmlrpc.sock"
+XEN_API_SOCKET = "/var/run/xend/xen-api.sock"
 
 ERROR_INTERNAL = 1
 ERROR_GENERIC = 2

@@ -40,8 +40,10 @@
 #include <asm/processor.h>
 #include <asm/types.h>
 #include <asm/msr.h>
+#include <asm/mc146818rtc.h>
 #include <asm/spinlock.h>
 #include <asm/hvm/hvm.h>
+#include <asm/hvm/vpt.h>
 #include <asm/hvm/support.h>
 #include <public/sched.h>
 #include <public/hvm/ioreq.h>
@@ -55,374 +57,350 @@ integer_param("hvm_debug", opt_hvm_debug_level);
 
 struct hvm_function_table hvm_funcs;
 
-static void hvm_zap_mmio_range(
-    struct domain *d, unsigned long pfn, unsigned long nr_pfn)
-{
-    unsigned long i;
-
-    ASSERT(d == current->domain);
-
-    for ( i = 0; i < nr_pfn; i++ )
-    {
-        if ( pfn + i >= 0xfffff )
-            break;
-
-        if ( VALID_MFN(gmfn_to_mfn(d, pfn + i)) )
-            guest_remove_page(d, pfn + i);
-    }
-}
-
-static void e820_zap_iommu_callback(struct domain *d,
-                                    struct e820entry *e,
-                                    void *ign)
-{
-    if ( e->type == E820_IO )
-        hvm_zap_mmio_range(d, e->addr >> PAGE_SHIFT, e->size >> PAGE_SHIFT);
-}
-
-static void e820_foreach(struct domain *d,
-                         void (*cb)(struct domain *d,
-                                    struct e820entry *e,
-                                    void *data),
-                         void *data)
-{
-    int i;
-    unsigned char e820_map_nr;
-    struct e820entry *e820entry;
-    unsigned char *p;
-    unsigned long mfn;
-
-    mfn = gmfn_to_mfn(d, E820_MAP_PAGE >> PAGE_SHIFT);
-    if ( mfn == INVALID_MFN )
-    {
-        printk("Can not find E820 memory map page for HVM domain.\n");
-        domain_crash_synchronous();
-    }
-
-    p = map_domain_page(mfn);
-    if ( p == NULL )
-    {
-        printk("Can not map E820 memory map page for HVM domain.\n");
-        domain_crash_synchronous();
-    }
-
-    e820_map_nr = *(p + E820_MAP_NR_OFFSET);
-    e820entry = (struct e820entry *)(p + E820_MAP_OFFSET);
-
-    for ( i = 0; i < e820_map_nr; i++ )
-        cb(d, e820entry + i, data);
-
-    unmap_domain_page(p);
-}
-
-static void hvm_zap_iommu_pages(struct domain *d)
-{
-    e820_foreach(d, e820_zap_iommu_callback, NULL);
-}
-
-static void e820_map_io_shared_callback(struct domain *d,
-                                        struct e820entry *e,
-                                        void *data)
-{
-    unsigned long *mfn = data;
-    if ( e->type == E820_SHARED_PAGE )
-    {
-        ASSERT(*mfn == INVALID_MFN);
-        *mfn = gmfn_to_mfn(d, e->addr >> PAGE_SHIFT);
-    }
-}
-
-static void e820_map_buffered_io_callback(struct domain *d,
-                                          struct e820entry *e,
-                                          void *data)
-{
-    unsigned long *mfn = data;
-    if ( e->type == E820_BUFFERED_IO ) {
-        ASSERT(*mfn == INVALID_MFN);
-        *mfn = gmfn_to_mfn(d, e->addr >> PAGE_SHIFT);
-    }
-}
-
-void hvm_map_io_shared_pages(struct vcpu *v)
-{
-    unsigned long mfn;
-    void *p;
-    struct domain *d = v->domain;
-
-    if ( d->arch.hvm_domain.shared_page_va ||
-         d->arch.hvm_domain.buffered_io_va )
-        return;
-
-    mfn = INVALID_MFN;
-    e820_foreach(d, e820_map_io_shared_callback, &mfn);
-
-    if ( mfn == INVALID_MFN )
-    {
-        printk("Can not find io request shared page for HVM domain.\n");
-        domain_crash_synchronous();
-    }
-
-    p = map_domain_page_global(mfn);
-    if ( p == NULL )
-    {
-        printk("Can not map io request shared page for HVM domain.\n");
-        domain_crash_synchronous();
-    }
-
-    d->arch.hvm_domain.shared_page_va = (unsigned long)p;
-
-    mfn = INVALID_MFN;
-    e820_foreach(d, e820_map_buffered_io_callback, &mfn);
-    if ( mfn != INVALID_MFN ) {
-        p = map_domain_page_global(mfn);
-        if ( p )
-            d->arch.hvm_domain.buffered_io_va = (unsigned long)p;
-    }
-}
-
-void hvm_create_event_channels(struct vcpu *v)
-{
-    vcpu_iodata_t *p;
-    struct vcpu *o;
-
-    if ( v->vcpu_id == 0 ) {
-        /* Ugly: create event channels for every vcpu when vcpu 0
-           starts, so that they're available for ioemu to bind to. */
-        for_each_vcpu(v->domain, o) {
-            p = get_vio(v->domain, o->vcpu_id);
-            o->arch.hvm_vcpu.xen_port = p->vp_eport =
-                alloc_unbound_xen_event_channel(o, 0);
-            DPRINTK("Allocated port %d for hvm.\n", o->arch.hvm_vcpu.xen_port);
-        }
-    }
-}
-
-
 void hvm_stts(struct vcpu *v)
 {
     /* FPU state already dirty? Then no need to setup_fpu() lazily. */
-    if ( test_bit(_VCPUF_fpu_dirtied, &v->vcpu_flags) )
-        return;
-    
-    hvm_funcs.stts(v);
+    if ( !test_bit(_VCPUF_fpu_dirtied, &v->vcpu_flags) )
+        hvm_funcs.stts(v);
 }
 
 void hvm_set_guest_time(struct vcpu *v, u64 gtime)
 {
     u64 host_tsc;
-   
+
     rdtscll(host_tsc);
-    
+
     v->arch.hvm_vcpu.cache_tsc_offset = gtime - host_tsc;
     hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
+}
+
+u64 hvm_get_guest_time(struct vcpu *v)
+{
+    u64    host_tsc;
+
+    rdtscll(host_tsc);
+    return host_tsc + v->arch.hvm_vcpu.cache_tsc_offset;
+}
+
+void hvm_freeze_time(struct vcpu *v)
+{
+    struct periodic_time *pt=&v->domain->arch.hvm_domain.pl_time.periodic_tm;
+
+    if ( pt->enabled && pt->first_injected
+            && (v->vcpu_id == pt->bind_vcpu)
+            && !v->arch.hvm_vcpu.guest_time ) {
+        v->arch.hvm_vcpu.guest_time = hvm_get_guest_time(v);
+        if ( !test_bit(_VCPUF_blocked, &v->vcpu_flags) )
+        {
+            stop_timer(&pt->timer);
+            rtc_freeze(v);
+        }
+    }
+}
+
+void hvm_migrate_timers(struct vcpu *v)
+{
+    struct periodic_time *pt = &v->domain->arch.hvm_domain.pl_time.periodic_tm;
+    struct PMTState *vpmt = &v->domain->arch.hvm_domain.pl_time.vpmt;
+
+    if ( pt->enabled )
+    {
+        migrate_timer(&pt->timer, v->processor);
+    }
+    migrate_timer(&vcpu_vlapic(v)->vlapic_timer, v->processor);
+    migrate_timer(&vpmt->timer, v->processor);
+    rtc_migrate_timers(v);
 }
 
 void hvm_do_resume(struct vcpu *v)
 {
     ioreq_t *p;
-    struct periodic_time *pt =
-        &v->domain->arch.hvm_domain.pl_time.periodic_tm;
+    struct periodic_time *pt = &v->domain->arch.hvm_domain.pl_time.periodic_tm;
 
     hvm_stts(v);
 
-    /* pick up the elapsed PIT ticks and re-enable pit_timer */
-    if ( pt->enabled && pt->first_injected ) {
-        if ( v->arch.hvm_vcpu.guest_time ) {
+    /* Pick up the elapsed PIT ticks and re-enable pit_timer. */
+    if ( pt->enabled && (v->vcpu_id == pt->bind_vcpu) && pt->first_injected )
+    {
+        if ( v->arch.hvm_vcpu.guest_time )
+        {
             hvm_set_guest_time(v, v->arch.hvm_vcpu.guest_time);
             v->arch.hvm_vcpu.guest_time = 0;
         }
         pickup_deactive_ticks(pt);
     }
 
+    /* Re-enable the RTC timer if needed */
+    rtc_thaw(v);
+
+    /* NB. Optimised for common case (p->state == STATE_IOREQ_NONE). */
     p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;
-    wait_on_xen_event_channel(v->arch.hvm.xen_port,
-                              p->state != STATE_IOREQ_READY &&
-                              p->state != STATE_IOREQ_INPROCESS);
-    if ( p->state == STATE_IORESP_READY )
-        hvm_io_assist(v);
-    if ( p->state != STATE_INVALID ) {
-        printf("Weird HVM iorequest state %d.\n", p->state);
-        domain_crash(v->domain);
+    while ( p->state != STATE_IOREQ_NONE )
+    {
+        switch ( p->state )
+        {
+        case STATE_IORESP_READY: /* IORESP_READY -> NONE */
+            hvm_io_assist(v);
+            break;
+        case STATE_IOREQ_READY:  /* IOREQ_{READY,INPROCESS} -> IORESP_READY */
+        case STATE_IOREQ_INPROCESS:
+            wait_on_xen_event_channel(v->arch.hvm_vcpu.xen_port,
+                                      (p->state != STATE_IOREQ_READY) &&
+                                      (p->state != STATE_IOREQ_INPROCESS));
+            break;
+        default:
+            gdprintk(XENLOG_ERR, "Weird HVM iorequest state %d.\n", p->state);
+            domain_crash_synchronous();
+        }
     }
 }
 
-void hvm_release_assist_channel(struct vcpu *v)
+int hvm_domain_initialise(struct domain *d)
 {
-    free_xen_event_channel(v, v->arch.hvm_vcpu.xen_port);
+    int rc;
+
+    if ( !hvm_enabled )
+    {
+        gdprintk(XENLOG_WARNING, "Attempt to create a HVM guest "
+                 "on a non-VT/AMDV platform.\n");
+        return -EINVAL;
+    }
+
+    spin_lock_init(&d->arch.hvm_domain.pbuf_lock);
+    spin_lock_init(&d->arch.hvm_domain.buffered_io_lock);
+    spin_lock_init(&d->arch.hvm_domain.irq.lock);
+
+    rc = shadow_enable(d, SHM2_refcounts|SHM2_translate|SHM2_external);
+    if ( rc != 0 )
+        return rc;
+
+    vpic_init(d);
+    vioapic_init(d);
+
+    return 0;
 }
 
+void hvm_domain_destroy(struct domain *d)
+{
+    kill_timer(&d->arch.hvm_domain.pl_time.periodic_tm.timer);
+    rtc_deinit(d);
+    pmtimer_deinit(d);
 
-void hvm_setup_platform(struct domain* d)
+    if ( d->arch.hvm_domain.shared_page_va )
+        unmap_domain_page_global(
+            (void *)d->arch.hvm_domain.shared_page_va);
+
+    if ( d->arch.hvm_domain.buffered_io_va )
+        unmap_domain_page_global((void *)d->arch.hvm_domain.buffered_io_va);
+}
+
+int hvm_vcpu_initialise(struct vcpu *v)
 {
     struct hvm_domain *platform;
-    struct vcpu *v=current;
+    int rc;
 
-    if ( !hvm_guest(v) || (v->vcpu_id != 0) )
-        return;
+    if ( (rc = vlapic_init(v)) != 0 )
+        return rc;
 
-    hvm_zap_iommu_pages(d);
-
-    platform = &d->arch.hvm_domain;
-    pic_init(&platform->vpic, pic_irq_request, &platform->interrupt_request);
-    register_pic_io_hook();
-
-    if ( hvm_apic_support(d) )
+    if ( (rc = hvm_funcs.vcpu_initialise(v)) != 0 )
     {
-        spin_lock_init(&d->arch.hvm_domain.round_robin_lock);
-        hvm_vioapic_init(d);
+        vlapic_destroy(v);
+        return rc;
     }
 
-    spin_lock_init(&d->arch.hvm_domain.buffered_io_lock);
+    /* Create ioreq event channel. */
+    v->arch.hvm_vcpu.xen_port = alloc_unbound_xen_event_channel(v, 0);
+    if ( get_sp(v->domain) && get_vio(v->domain, v->vcpu_id) )
+        get_vio(v->domain, v->vcpu_id)->vp_eport =
+            v->arch.hvm_vcpu.xen_port;
+
+    if ( v->vcpu_id != 0 )
+        return 0;
+
+    /* XXX Below should happen in hvm_domain_initialise(). */
+    platform = &v->domain->arch.hvm_domain;
 
     init_timer(&platform->pl_time.periodic_tm.timer,
                pt_timer_fn, v, v->processor);
     pit_init(v, cpu_khz);
+    rtc_init(v, RTC_PORT(0), RTC_IRQ);
+    pmtimer_init(v, ACPI_PM_TMR_BLK_ADDRESS);
+
+    /* Init guest TSC to start from zero. */
+    hvm_set_guest_time(v, 0);
+
+    return 0;
 }
 
-void pic_irq_request(void *data, int level)
+void hvm_vcpu_destroy(struct vcpu *v)
 {
-    int *interrupt_request = data;
-    *interrupt_request = level;
-}
+    vlapic_destroy(v);
+    hvm_funcs.vcpu_destroy(v);
 
-void hvm_pic_assist(struct vcpu *v)
-{
-    global_iodata_t *spg;
-    u16   *virq_line, irqs;
-    struct hvm_virpic *pic = &v->domain->arch.hvm_domain.vpic;
-
-    spg = &get_sp(v->domain)->sp_global;
-    virq_line  = &spg->pic_clear_irr;
-    if ( *virq_line ) {
-        do {
-            irqs = *(volatile u16*)virq_line;
-        } while ( (u16)cmpxchg(virq_line,irqs, 0) != irqs );
-        do_pic_irqs_clear(pic, irqs);
-    }
-    virq_line  = &spg->pic_irr;
-    if ( *virq_line ) {
-        do {
-            irqs = *(volatile u16*)virq_line;
-        } while ( (u16)cmpxchg(virq_line,irqs, 0) != irqs );
-        do_pic_irqs(pic, irqs);
-    }
-}
-
-u64 hvm_get_guest_time(struct vcpu *v)
-{
-    u64    host_tsc;
-    
-    rdtscll(host_tsc);
-    return host_tsc + v->arch.hvm_vcpu.cache_tsc_offset;
+    /* Event channel is already freed by evtchn_destroy(). */
+    /*free_xen_event_channel(v, v->arch.hvm_vcpu.xen_port);*/
 }
 
 int cpu_get_interrupt(struct vcpu *v, int *type)
 {
-    int intno;
-    struct hvm_virpic *s = &v->domain->arch.hvm_domain.vpic;
-    unsigned long flags;
+    int vector;
 
-    if ( (intno = cpu_get_apic_interrupt(v, type)) != -1 ) {
-        /* set irq request if a PIC irq is still pending */
-        /* XXX: improve that */
-        spin_lock_irqsave(&s->lock, flags);
-        pic_update_irq(s);
-        spin_unlock_irqrestore(&s->lock, flags);
-        return intno;
-    }
-    /* read the irq from the PIC */
-    if ( v->vcpu_id == 0 && (intno = cpu_get_pic_interrupt(v, type)) != -1 )
-        return intno;
+    if ( (vector = cpu_get_apic_interrupt(v, type)) != -1 )
+        return vector;
+
+    if ( (v->vcpu_id == 0) &&
+         ((vector = cpu_get_pic_interrupt(v, type)) != -1) )
+        return vector;
 
     return -1;
 }
 
-#include <asm/hvm/vmx/vmx.h>
-void hvm_hlt(unsigned long rflags)
+static void hvm_vcpu_down(void)
 {
     struct vcpu *v = current;
-    struct periodic_time *pt = &v->domain->arch.hvm_domain.pl_time.periodic_tm;
-    s_time_t next_pit = -1, next_wakeup;
+    struct domain *d = v->domain;
+    int online_count = 0;
 
-    /*
-     * Detect machine shutdown.  Only do this for vcpu 0, to avoid potentially 
-     * shutting down the domain early. If we halt with interrupts disabled, 
-     * that's a pretty sure sign that we want to shut down.  In a real 
-     * processor, NMIs are the only way to break out of this.
-     */
-    if ( (v->vcpu_id == 0) && !(rflags & X86_EFLAGS_IF) )
+    gdprintk(XENLOG_INFO, "DOM%d/VCPU%d: going offline.\n",
+           d->domain_id, v->vcpu_id);
+
+    /* Doesn't halt us immediately, but we'll never return to guest context. */
+    set_bit(_VCPUF_down, &v->vcpu_flags);
+    vcpu_sleep_nosync(v);
+
+    /* Any other VCPUs online? ... */
+    LOCK_BIGLOCK(d);
+    for_each_vcpu ( d, v )
+        if ( !test_bit(_VCPUF_down, &v->vcpu_flags) )
+            online_count++;
+    UNLOCK_BIGLOCK(d);
+
+    /* ... Shut down the domain if not. */
+    if ( online_count == 0 )
     {
-        printk("D%d: HLT with interrupts disabled -- shutting down.\n",
-               current->domain->domain_id);
-        domain_shutdown(current->domain, SHUTDOWN_poweroff);
-        return;
+        gdprintk(XENLOG_INFO, "DOM%d: all CPUs offline -- powering off.\n",
+                d->domain_id);
+        domain_shutdown(d, SHUTDOWN_poweroff);
+    }
+}
+
+void hvm_send_assist_req(struct vcpu *v)
+{
+    ioreq_t *p;
+
+    p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;
+    if ( unlikely(p->state != STATE_IOREQ_NONE) )
+    {
+        /* This indicates a bug in the device model.  Crash the domain. */
+        gdprintk(XENLOG_ERR, "Device model set bad IO state %d.\n", p->state);
+        domain_crash_synchronous();
     }
 
-    if ( !v->vcpu_id )
-        next_pit = get_scheduled(v, pt->irq, pt);
-    next_wakeup = get_apictime_scheduled(v);
-    if ( (next_pit != -1 && next_pit < next_wakeup) || next_wakeup == -1 )
-        next_wakeup = next_pit;
-    if ( next_wakeup != - 1 ) 
-        set_timer(&current->arch.hvm_vcpu.hlt_timer, next_wakeup);
+    prepare_wait_on_xen_event_channel(v->arch.hvm_vcpu.xen_port);
+
+    /*
+     * Following happens /after/ blocking and setting up ioreq contents.
+     * prepare_wait_on_xen_event_channel() is an implicit barrier.
+     */
+    p->state = STATE_IOREQ_READY;
+    notify_via_xen_event_channel(v->arch.hvm_vcpu.xen_port);
+}
+
+void hvm_hlt(unsigned long rflags)
+{
+    /*
+     * If we halt with interrupts disabled, that's a pretty sure sign that we
+     * want to shut down. In a real processor, NMIs are the only way to break
+     * out of this.
+     */
+    if ( unlikely(!(rflags & X86_EFLAGS_IF)) )
+        return hvm_vcpu_down();
+
     do_sched_op_compat(SCHEDOP_block, 0);
 }
 
 /*
- * Copy from/to guest virtual.
+ * __hvm_copy():
+ *  @buf  = hypervisor buffer
+ *  @addr = guest address to copy to/from
+ *  @size = number of bytes to copy
+ *  @dir  = copy *to* guest (TRUE) or *from* guest (FALSE)?
+ *  @virt = addr is *virtual* (TRUE) or *guest physical* (FALSE)?
+ * Returns number of bytes failed to copy (0 == complete success).
  */
-int hvm_copy(void *buf, unsigned long vaddr, int size, int dir)
+static int __hvm_copy(void *buf, paddr_t addr, int size, int dir, int virt)
 {
-    struct vcpu *v = current;
-    unsigned long gfn;
     unsigned long mfn;
-    char *addr;
-    int count;
+    char *p;
+    int count, todo;
 
-    while (size > 0) {
-        count = PAGE_SIZE - (vaddr & ~PAGE_MASK);
-        if (count > size)
-            count = size;
+    todo = size;
+    while ( todo > 0 )
+    {
+        count = min_t(int, PAGE_SIZE - (addr & ~PAGE_MASK), todo);
 
-        gfn = shadow_gva_to_gfn(v, vaddr);
-        mfn = mfn_x(sh_vcpu_gfn_to_mfn(v, gfn));
-
-        if (mfn == INVALID_MFN)
-            return 0;
-
-        addr = (char *)map_domain_page(mfn) + (vaddr & ~PAGE_MASK);
-
-        if (dir == HVM_COPY_IN)
-            memcpy(buf, addr, count);
+        if ( virt )
+            mfn = get_mfn_from_gpfn(shadow_gva_to_gfn(current, addr));
         else
-            memcpy(addr, buf, count);
+            mfn = get_mfn_from_gpfn(addr >> PAGE_SHIFT);
 
-        unmap_domain_page(addr);
+        if ( mfn == INVALID_MFN )
+            return todo;
 
-        vaddr += count;
-        buf += count;
-        size -= count;
+        p = (char *)map_domain_page(mfn) + (addr & ~PAGE_MASK);
+
+        if ( dir )
+            memcpy(p, buf, count); /* dir == TRUE:  *to* guest */
+        else
+            memcpy(buf, p, count); /* dir == FALSE: *from guest */
+
+        unmap_domain_page(p);
+
+        addr += count;
+        buf  += count;
+        todo -= count;
     }
 
-    return 1;
+    return 0;
 }
 
-/*
- * HVM specific printbuf. Mostly used for hvmloader chit-chat.
- */
+int hvm_copy_to_guest_phys(paddr_t paddr, void *buf, int size)
+{
+    return __hvm_copy(buf, paddr, size, 1, 0);
+}
+
+int hvm_copy_from_guest_phys(void *buf, paddr_t paddr, int size)
+{
+    return __hvm_copy(buf, paddr, size, 0, 0);
+}
+
+int hvm_copy_to_guest_virt(unsigned long vaddr, void *buf, int size)
+{
+    return __hvm_copy(buf, vaddr, size, 1, 1);
+}
+
+int hvm_copy_from_guest_virt(void *buf, unsigned long vaddr, int size)
+{
+    return __hvm_copy(buf, vaddr, size, 0, 1);
+}
+
+
+/* HVM specific printbuf. Mostly used for hvmloader chit-chat. */
 void hvm_print_line(struct vcpu *v, const char c)
 {
-    int *index = &v->domain->arch.hvm_domain.pbuf_index;
-    char *pbuf = v->domain->arch.hvm_domain.pbuf;
+    struct hvm_domain *hd = &v->domain->arch.hvm_domain;
 
-    if (*index == HVM_PBUF_SIZE-2 || c == '\n') {
-        if (*index == HVM_PBUF_SIZE-2)
-            pbuf[(*index)++] = c;
-        pbuf[*index] = '\0';
-        printk("(GUEST: %u) %s\n", v->domain->domain_id, pbuf);
-        *index = 0;
-    } else
-        pbuf[(*index)++] = c;
+    spin_lock(&hd->pbuf_lock);
+    hd->pbuf[hd->pbuf_idx++] = c;
+    if ( (hd->pbuf_idx == (sizeof(hd->pbuf) - 2)) || (c == '\n') )
+    {
+        if ( c != '\n' )
+            hd->pbuf[hd->pbuf_idx++] = '\n';
+        hd->pbuf[hd->pbuf_idx] = '\0';
+        printk(XENLOG_G_DEBUG "HVM%u: %s", v->domain->domain_id, hd->pbuf);
+        hd->pbuf_idx = 0;
+    }
+    spin_unlock(&hd->pbuf_lock);
 }
 
 typedef unsigned long hvm_hypercall_t(
@@ -435,7 +413,7 @@ typedef unsigned long hvm_hypercall_t(
 
 #if defined(__i386__)
 
-static hvm_hypercall_t *hvm_hypercall_table[] = {
+static hvm_hypercall_t *hvm_hypercall_table[NR_hypercalls] = {
     HYPERCALL(memory_op),
     HYPERCALL(multicall),
     HYPERCALL(xen_version),
@@ -453,7 +431,7 @@ void hvm_do_hypercall(struct cpu_user_regs *pregs)
 
     if ( (pregs->eax >= NR_hypercalls) || !hvm_hypercall_table[pregs->eax] )
     {
-        DPRINTK("HVM vcpu %d:%d did a bad hypercall %d.\n",
+        gdprintk(XENLOG_WARNING, "HVM vcpu %d:%d did a bad hypercall %d.\n",
                 current->domain->domain_id, current->vcpu_id,
                 pregs->eax);
         pregs->eax = -ENOSYS;
@@ -499,7 +477,7 @@ static long do_memory_op_compat32(int cmd, XEN_GUEST_HANDLE(void) arg)
     }
 
     default:
-        DPRINTK("memory_op %d.\n", cmd);
+        gdprintk(XENLOG_WARNING, "memory_op %d.\n", cmd);
         rc = -ENOSYS;
         break;
     }
@@ -532,7 +510,7 @@ void hvm_do_hypercall(struct cpu_user_regs *pregs)
     pregs->rax = (uint32_t)pregs->eax; /* mask in case compat32 caller */
     if ( (pregs->rax >= NR_hypercalls) || !hvm_hypercall64_table[pregs->rax] )
     {
-        DPRINTK("HVM vcpu %d:%d did a bad hypercall %ld.\n",
+        gdprintk(XENLOG_WARNING, "HVM vcpu %d:%d did a bad hypercall %ld.\n",
                 current->domain->domain_id, current->vcpu_id,
                 pregs->rax);
         pregs->rax = -ENOSYS;
@@ -579,21 +557,31 @@ int hvm_bringup_ap(int vcpuid, int trampoline_vector)
     struct vcpu_guest_context *ctxt;
     int rc = 0;
 
-    /* current must be HVM domain BSP */
-    if ( !(hvm_guest(bsp) && bsp->vcpu_id == 0) ) {
-        printk("Not calling hvm_bringup_ap from BSP context.\n");
-        domain_crash_synchronous();
+    BUG_ON(!is_hvm_domain(d));
+
+    if ( bsp->vcpu_id != 0 )
+    {
+        gdprintk(XENLOG_ERR, "Not calling hvm_bringup_ap from BSP context.\n");
+        domain_crash(bsp->domain);
+        return -EINVAL;
     }
 
     if ( (v = d->vcpu[vcpuid]) == NULL )
         return -ENOENT;
 
-    if ( (ctxt = xmalloc(struct vcpu_guest_context)) == NULL ) {
-        printk("Failed to allocate memory in hvm_bringup_ap.\n");
+    if ( (ctxt = xmalloc(struct vcpu_guest_context)) == NULL )
+    {
+        gdprintk(XENLOG_ERR,
+                "Failed to allocate memory in hvm_bringup_ap.\n");
         return -ENOMEM;
     }
 
     hvm_init_ap_context(ctxt, vcpuid, trampoline_vector);
+
+    /* Sync AP's TSC with BSP's. */
+    v->arch.hvm_vcpu.cache_tsc_offset =
+        v->domain->vcpu[0]->arch.hvm_vcpu.cache_tsc_offset;
+    hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
 
     LOCK_BIGLOCK(d);
     rc = -EEXIST;
@@ -602,15 +590,136 @@ int hvm_bringup_ap(int vcpuid, int trampoline_vector)
     UNLOCK_BIGLOCK(d);
 
     if ( rc != 0 )
-        printk("AP %d bringup failed in boot_vcpu %x.\n", vcpuid, rc);
-    else {
-        if ( test_and_clear_bit(_VCPUF_down, &d->vcpu[vcpuid]->vcpu_flags) )
-            vcpu_wake(d->vcpu[vcpuid]);
-        printk("AP %d bringup suceeded.\n", vcpuid);
+    {
+        gdprintk(XENLOG_ERR,
+               "AP %d bringup failed in boot_vcpu %x.\n", vcpuid, rc);
+        goto out;
     }
 
-    xfree(ctxt);
+    if ( test_and_clear_bit(_VCPUF_down, &d->vcpu[vcpuid]->vcpu_flags) )
+        vcpu_wake(d->vcpu[vcpuid]);
+    gdprintk(XENLOG_INFO, "AP %d bringup suceeded.\n", vcpuid);
 
+ out:
+    xfree(ctxt);
+    return rc;
+}
+
+static int hvmop_set_pci_intx_level(
+    XEN_GUEST_HANDLE(xen_hvm_set_pci_intx_level_t) uop)
+{
+    struct xen_hvm_set_pci_intx_level op;
+    struct domain *d;
+    int rc;
+
+    if ( copy_from_guest(&op, uop, 1) )
+        return -EFAULT;
+
+    if ( !IS_PRIV(current->domain) )
+        return -EPERM;
+
+    if ( (op.domain > 0) || (op.bus > 0) || (op.device > 31) || (op.intx > 3) )
+        return -EINVAL;
+
+    d = find_domain_by_id(op.domid);
+    if ( d == NULL )
+        return -ESRCH;
+
+    rc = -EINVAL;
+    if ( !is_hvm_domain(d) )
+        goto out;
+
+    rc = 0;
+    switch ( op.level )
+    {
+    case 0:
+        hvm_pci_intx_deassert(d, op.device, op.intx);
+        break;
+    case 1:
+        hvm_pci_intx_assert(d, op.device, op.intx);
+        break;
+    default:
+        rc = -EINVAL;
+        break;
+    }
+
+ out:
+    put_domain(d);
+    return rc;
+}
+
+static int hvmop_set_isa_irq_level(
+    XEN_GUEST_HANDLE(xen_hvm_set_isa_irq_level_t) uop)
+{
+    struct xen_hvm_set_isa_irq_level op;
+    struct domain *d;
+    int rc;
+
+    if ( copy_from_guest(&op, uop, 1) )
+        return -EFAULT;
+
+    if ( !IS_PRIV(current->domain) )
+        return -EPERM;
+
+    if ( op.isa_irq > 15 )
+        return -EINVAL;
+
+    d = find_domain_by_id(op.domid);
+    if ( d == NULL )
+        return -ESRCH;
+
+    rc = -EINVAL;
+    if ( !is_hvm_domain(d) )
+        goto out;
+
+    rc = 0;
+    switch ( op.level )
+    {
+    case 0:
+        hvm_isa_irq_deassert(d, op.isa_irq);
+        break;
+    case 1:
+        hvm_isa_irq_assert(d, op.isa_irq);
+        break;
+    default:
+        rc = -EINVAL;
+        break;
+    }
+
+ out:
+    put_domain(d);
+    return rc;
+}
+
+static int hvmop_set_pci_link_route(
+    XEN_GUEST_HANDLE(xen_hvm_set_pci_link_route_t) uop)
+{
+    struct xen_hvm_set_pci_link_route op;
+    struct domain *d;
+    int rc;
+
+    if ( copy_from_guest(&op, uop, 1) )
+        return -EFAULT;
+
+    if ( !IS_PRIV(current->domain) )
+        return -EPERM;
+
+    if ( (op.link > 3) || (op.isa_irq > 15) )
+        return -EINVAL;
+
+    d = find_domain_by_id(op.domid);
+    if ( d == NULL )
+        return -ESRCH;
+
+    rc = -EINVAL;
+    if ( !is_hvm_domain(d) )
+        goto out;
+
+    rc = 0;
+    hvm_set_pci_link_route(d, op.link, op.isa_irq);
+
+ out:
+    put_domain(d);
     return rc;
 }
 
@@ -626,6 +735,9 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
     {
         struct xen_hvm_param a;
         struct domain *d;
+        struct vcpu *v;
+        unsigned long mfn;
+        void *p;
 
         if ( copy_from_guest(&a, arg, 1) )
             return -EFAULT;
@@ -649,8 +761,44 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             return -EPERM;
         }
 
+        rc = -EINVAL;
+        if ( !is_hvm_domain(d) )
+            goto param_fail;
+
         if ( op == HVMOP_set_param )
         {
+            switch ( a.index )
+            {
+            case HVM_PARAM_IOREQ_PFN:
+                if ( d->arch.hvm_domain.shared_page_va )
+                    goto param_fail;
+                mfn = gmfn_to_mfn(d, a.value);
+                if ( mfn == INVALID_MFN )
+                    goto param_fail;
+                p = map_domain_page_global(mfn);
+                if ( p == NULL )
+                    goto param_fail;
+                d->arch.hvm_domain.shared_page_va = (unsigned long)p;
+                /* Initialise evtchn port info if VCPUs already created. */
+                for_each_vcpu ( d, v )
+                    get_vio(d, v->vcpu_id)->vp_eport =
+                    v->arch.hvm_vcpu.xen_port;
+                break;
+            case HVM_PARAM_BUFIOREQ_PFN:
+                if ( d->arch.hvm_domain.buffered_io_va )
+                    goto param_fail;
+                mfn = gmfn_to_mfn(d, a.value);
+                if ( mfn == INVALID_MFN )
+                    goto param_fail;
+                p = map_domain_page_global(mfn);
+                if ( p == NULL )
+                    goto param_fail;
+                d->arch.hvm_domain.buffered_io_va = (unsigned long)p;
+                break;
+            case HVM_PARAM_CALLBACK_IRQ:
+                hvm_set_callback_gsi(d, a.value);
+                break;
+            }
             d->arch.hvm_domain.params[a.index] = a.value;
             rc = 0;
         }
@@ -660,13 +808,29 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             rc = copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
         }
 
+    param_fail:
         put_domain(d);
         break;
     }
 
+    case HVMOP_set_pci_intx_level:
+        rc = hvmop_set_pci_intx_level(
+            guest_handle_cast(arg, xen_hvm_set_pci_intx_level_t));
+        break;
+
+    case HVMOP_set_isa_irq_level:
+        rc = hvmop_set_isa_irq_level(
+            guest_handle_cast(arg, xen_hvm_set_isa_irq_level_t));
+        break;
+
+    case HVMOP_set_pci_link_route:
+        rc = hvmop_set_pci_link_route(
+            guest_handle_cast(arg, xen_hvm_set_pci_link_route_t));
+        break;
+
     default:
     {
-        DPRINTK("Bad HVM op %ld.\n", op);
+        gdprintk(XENLOG_WARNING, "Bad HVM op %ld.\n", op);
         rc = -ENOSYS;
         break;
     }

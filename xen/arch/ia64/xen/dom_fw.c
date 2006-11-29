@@ -55,9 +55,9 @@ extern unsigned long running_on_sim;
 		tables->func_ptrs[pfn++] = 0;                     	\
 	} while (0)
 
-// allocate a page for fw
-// build_physmap_table() which is called by new_thread()
-// does for domU.
+/* allocate a page for fw
+ * guest_setup() @ libxc/xc_linux_build.c does for domU
+ */
 static inline void
 assign_new_domain_page_if_dom0(struct domain *d, unsigned long mpaddr)
 {
@@ -204,9 +204,9 @@ print_md(efi_memory_desc_t *md)
 
 	size = md->num_pages << EFI_PAGE_SHIFT;
 	if (size > ONE_MB)
-		printf ("(%luMB)\n", size >> 20);
+		printk ("(%luMB)\n", size >> 20);
 	else
-		printf ("(%luKB)\n", size >> 10);
+		printk ("(%luKB)\n", size >> 10);
 }
 
 static u32 lsapic_nbr;
@@ -574,7 +574,7 @@ complete_dom0_memmap(struct domain *d,
 
 		default:
 			/* Print a warning but continue.  */
-			printf("complete_dom0_memmap: warning: "
+			printk("complete_dom0_memmap: warning: "
 			       "unhandled MDT entry type %u\n", md->type);
 		}
 	}
@@ -634,9 +634,10 @@ complete_dom0_memmap(struct domain *d,
 	sort(tables->efi_memmap, num_mds, sizeof(efi_memory_desc_t),
 	     efi_mdt_cmp, NULL);
 
-	// dom0 doesn't need build_physmap_table()
-	// see arch_set_info_guest()
-	// instead we allocate pages manually.
+	/* setup_guest() @ libxc/xc_linux_build() arranges memory for domU.
+	 * however no one arranges memory for dom0,
+	 * instead we allocate pages manually.
+	 */
 	for (i = 0; i < num_mds; i++) {
 		md = &tables->efi_memmap[i];
 		if (md->phys_addr > maxmem)
@@ -734,47 +735,47 @@ dom_fw_init(struct domain *d,
 		/* Write messages to the console.  */
 		touch_acpi_table();
 
-		printf("Domain0 EFI passthrough:");
+		printk("Domain0 EFI passthrough:");
 		if (efi.mps) {
 			tables->efi_tables[i].guid = MPS_TABLE_GUID;
 			tables->efi_tables[i].table = __pa(efi.mps);
-			printf(" MPS=0x%lx",tables->efi_tables[i].table);
+			printk(" MPS=0x%lx",tables->efi_tables[i].table);
 			i++;
 		}
 
 		if (efi.acpi20) {
 			tables->efi_tables[i].guid = ACPI_20_TABLE_GUID;
 			tables->efi_tables[i].table = __pa(efi.acpi20);
-			printf(" ACPI 2.0=0x%lx",tables->efi_tables[i].table);
+			printk(" ACPI 2.0=0x%lx",tables->efi_tables[i].table);
 			i++;
 		}
 		if (efi.acpi) {
 			tables->efi_tables[i].guid = ACPI_TABLE_GUID;
 			tables->efi_tables[i].table = __pa(efi.acpi);
-			printf(" ACPI=0x%lx",tables->efi_tables[i].table);
+			printk(" ACPI=0x%lx",tables->efi_tables[i].table);
 			i++;
 		}
 		if (efi.smbios) {
 			tables->efi_tables[i].guid = SMBIOS_TABLE_GUID;
 			tables->efi_tables[i].table = __pa(efi.smbios);
-			printf(" SMBIOS=0x%lx",tables->efi_tables[i].table);
+			printk(" SMBIOS=0x%lx",tables->efi_tables[i].table);
 			i++;
 		}
 		if (efi.hcdp) {
 			tables->efi_tables[i].guid = HCDP_TABLE_GUID;
 			tables->efi_tables[i].table = __pa(efi.hcdp);
-			printf(" HCDP=0x%lx",tables->efi_tables[i].table);
+			printk(" HCDP=0x%lx",tables->efi_tables[i].table);
 			i++;
 		}
-		printf("\n");
+		printk("\n");
 	} else {
-		printf("DomainU EFI build up:");
+		printk("DomainU EFI build up:");
 
 		tables->efi_tables[i].guid = ACPI_20_TABLE_GUID;
 		tables->efi_tables[i].table = FW_ACPI_BASE_PADDR;
-		printf(" ACPI 2.0=0x%lx",tables->efi_tables[i].table);
+		printk(" ACPI 2.0=0x%lx",tables->efi_tables[i].table);
 		i++;
-		printf("\n");
+		printk("\n");
 	}
 
 	/* fill in the SAL system table: */

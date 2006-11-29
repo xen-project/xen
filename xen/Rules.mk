@@ -24,9 +24,11 @@ endif
 override COMPILE_SUBARCH := $(XEN_COMPILE_ARCH)
 override TARGET_SUBARCH  := $(XEN_TARGET_ARCH)
 override COMPILE_ARCH    := $(shell echo $(XEN_COMPILE_ARCH) | \
-                              sed -e 's/\(x86\|powerpc\).*/\1/')
+                              sed -e 's/x86.*/x86/' \
+                                  -e 's/powerpc.*/powerpc/')
 override TARGET_ARCH     := $(shell echo $(XEN_TARGET_ARCH) | \
-                              sed -e 's/\(x86\|powerpc\).*/\1/')
+                              sed -e 's/x86.*/x86/' \
+                                  -e 's/powerpc.*/powerpc/')
 
 TARGET := $(BASEDIR)/xen
 
@@ -34,10 +36,6 @@ HDRS := $(wildcard $(BASEDIR)/include/xen/*.h)
 HDRS += $(wildcard $(BASEDIR)/include/public/*.h)
 HDRS += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/*.h)
 HDRS += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/$(TARGET_SUBARCH)/*.h)
-
-INSTALL      := install
-INSTALL_DATA := $(INSTALL) -m0644
-INSTALL_DIR  := $(INSTALL) -d -m0755
 
 include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
 
@@ -65,8 +63,16 @@ endif
 AFLAGS-y               += -D__ASSEMBLY__
 
 ALL_OBJS := $(ALL_OBJS-y)
+
 CFLAGS   := $(strip $(CFLAGS) $(CFLAGS-y))
+
+# Most CFLAGS are safe for assembly files:
+#  -std=gnu{89,99} gets confused by #-prefixed end-of-line comments
 AFLAGS   := $(strip $(AFLAGS) $(AFLAGS-y))
+AFLAGS   += $(patsubst -std=gnu%,,$(CFLAGS))
+
+# LDFLAGS are only passed directly to $(LD)
+LDFLAGS  := $(strip $(LDFLAGS) $(LDFLAGS_DIRECT))
 
 include Makefile
 
@@ -104,10 +110,11 @@ _clean_%/: FORCE
 	$(CC) $(CFLAGS) -c $< -o $@
 
 %.o: %.S $(HDRS) Makefile
-	$(CC) $(CFLAGS) $(AFLAGS) -c $< -o $@
+	$(CC) $(AFLAGS) -c $< -o $@
 
 %.i: %.c $(HDRS) Makefile
 	$(CPP) $(CFLAGS) $< -o $@
 
+# -std=gnu{89,99} gets confused by # as an end-of-line comment marker
 %.s: %.S $(HDRS) Makefile
-	$(CPP) $(CFLAGS) $(AFLAGS) $< -o $@
+	$(CPP) $(AFLAGS) $< -o $@

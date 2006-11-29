@@ -79,31 +79,17 @@ static void unmap_disk(struct td_state *s)
 {
 	tapdev_info_t *info = s->ring_info;
 	struct tap_disk *drv = s->drv;
-	fd_list_entry_t *ptr, *prev;
+	fd_list_entry_t *entry;
 
 	drv->td_close(s);
 
 	if (info != NULL && info->mem > 0)
 	        munmap(info->mem, getpagesize() * BLKTAP_MMAP_REGION_SIZE);
 
-	ptr = s->fd_entry;
-	prev = ptr->prev;
-
-	if (prev) {
-		/*There are entries earlier in the list*/
-		prev->next = ptr->next;
-		if (ptr->next) {
-			ptr = ptr->next;
-			ptr->prev = prev;
-		}
-	} else {
-		/*We are the first entry in list*/
-		if (ptr->next) {
-			ptr = ptr->next;
-			fd_start = ptr;
-			ptr->prev = NULL;
-		} else fd_start = NULL;
-	}
+	entry = s->fd_entry;
+	*entry->pprev = entry->next;
+	if (entry->next)
+		entry->next->pprev = entry->pprev;
 
 	close(info->fd);
 
@@ -144,35 +130,29 @@ static inline int LOCAL_FD_SET(fd_set *readfds)
 	return 0;
 }
 
-static inline fd_list_entry_t *add_fd_entry(int tap_fd, int io_fd[MAX_IOFD], struct td_state *s)
+static inline fd_list_entry_t *add_fd_entry(
+	int tap_fd, int io_fd[MAX_IOFD], struct td_state *s)
 {
-	fd_list_entry_t *ptr, *last, *entry;
+	fd_list_entry_t **pprev, *entry;
 	int i;
+
 	DPRINTF("Adding fd_list_entry\n");
 
 	/*Add to linked list*/
 	s->fd_entry = entry = malloc(sizeof(fd_list_entry_t));
 	entry->tap_fd = tap_fd;
-	for (i = 0; i < MAX_IOFD; i++) entry->io_fd[i] = io_fd[i];
+	for (i = 0; i < MAX_IOFD; i++)
+		entry->io_fd[i] = io_fd[i];
 	entry->s = s;
 	entry->next = NULL;
 
-	ptr = fd_start;
-	if (ptr == NULL) {
-		/*We are the first entry*/
-		fd_start = entry;
-		entry->prev = NULL;
-		goto finish;
-	}
+	pprev = &fd_start;
+	while (*pprev != NULL)
+		pprev = &(*pprev)->next;
 
-	while (ptr != NULL) {
-		last = ptr;
-		ptr = ptr->next;
-	}
-	last->next = entry;
-	entry->prev = last;
+	*pprev = entry;
+	entry->pprev = pprev;
 
- finish:
 	return entry;
 }
 
@@ -271,7 +251,6 @@ static int read_msg(char *buf)
 	int length, len, msglen, tap_fd, *io_fd;
 	char *ptr, *path;
 	image_t *img;
-	struct timeval timeout;
 	msg_hdr_t *msg;
 	msg_newdev_t *msg_dev;
 	msg_pid_t *msg_pid;
@@ -402,7 +381,6 @@ static inline int write_rsp_to_ring(struct td_state *s, blkif_response_t *rsp)
 	
 	rsp_d = RING_GET_RESPONSE(&info->fe_ring, info->fe_ring.rsp_prod_pvt);
 	memcpy(rsp_d, rsp, sizeof(blkif_response_t));
-	wmb();
 	info->fe_ring.rsp_prod_pvt++;
 	
 	return 0;
@@ -579,17 +557,18 @@ int main(int argc, char *argv[])
 {
 	int len, msglen, ret;
 	char *p, *buf;
-	fd_set readfds, writefds;
-	struct timeval timeout;
+	fd_set readfds, writefds;	
 	fd_list_entry_t *ptr;
 	struct tap_disk *drv;
 	struct td_state *s;
+	char openlogbuf[128];
 	
 	if (argc != 3) usage();
 
 	daemonize();
 
-	openlog("TAPDISK", LOG_CONS|LOG_ODELAY, LOG_DAEMON);
+	snprintf(openlogbuf, sizeof(openlogbuf), "TAPDISK[%d]", getpid());
+	openlog(openlogbuf, LOG_CONS|LOG_ODELAY, LOG_DAEMON);
 	/*Setup signal handlers*/
 	signal (SIGBUS, sig_handler);
 	signal (SIGINT, sig_handler);
@@ -622,12 +601,9 @@ int main(int argc, char *argv[])
 		/*Set all tap fds*/
 		LOCAL_FD_SET(&readfds);
 
-		timeout.tv_sec = 0; 
-		timeout.tv_usec = 1000; 
-
 		/*Wait for incoming messages*/
 		ret = select(maxfds + 1, &readfds, (fd_set *) 0, 
-			     (fd_set *) 0, &timeout);
+			     (fd_set *) 0, NULL);
 
 		if (ret > 0) 
 		{

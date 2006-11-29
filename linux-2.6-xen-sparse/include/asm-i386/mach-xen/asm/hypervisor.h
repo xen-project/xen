@@ -56,6 +56,10 @@
 
 extern shared_info_t *HYPERVISOR_shared_info;
 
+#ifdef CONFIG_X86_32
+extern unsigned long hypervisor_virt_start;
+#endif
+
 /* arch/xen/i386/kernel/setup.c */
 extern start_info_t *xen_start_info;
 #ifdef CONFIG_XEN_PRIVILEGED_GUEST
@@ -94,7 +98,6 @@ void xen_pgd_pin(unsigned long ptr);
 void xen_pgd_unpin(unsigned long ptr);
 
 void xen_set_ldt(unsigned long ptr, unsigned long bytes);
-void xen_machphys_update(unsigned long mfn, unsigned long pfn);
 
 #ifdef CONFIG_SMP
 #include <linux/cpumask.h>
@@ -131,8 +134,10 @@ HYPERVISOR_yield(
 {
 	int rc = HYPERVISOR_sched_op(SCHEDOP_yield, NULL);
 
+#ifdef CONFIG_XEN_COMPAT_030002
 	if (rc == -ENOSYS)
 		rc = HYPERVISOR_sched_op_compat(SCHEDOP_yield, 0);
+#endif
 
 	return rc;
 }
@@ -143,8 +148,10 @@ HYPERVISOR_block(
 {
 	int rc = HYPERVISOR_sched_op(SCHEDOP_block, NULL);
 
+#ifdef CONFIG_XEN_COMPAT_030002
 	if (rc == -ENOSYS)
 		rc = HYPERVISOR_sched_op_compat(SCHEDOP_block, 0);
+#endif
 
 	return rc;
 }
@@ -159,8 +166,10 @@ HYPERVISOR_shutdown(
 
 	int rc = HYPERVISOR_sched_op(SCHEDOP_shutdown, &sched_shutdown);
 
+#ifdef CONFIG_XEN_COMPAT_030002
 	if (rc == -ENOSYS)
 		rc = HYPERVISOR_sched_op_compat(SCHEDOP_shutdown, reason);
+#endif
 
 	return rc;
 }
@@ -177,8 +186,10 @@ HYPERVISOR_poll(
 	set_xen_guest_handle(sched_poll.ports, ports);
 
 	rc = HYPERVISOR_sched_op(SCHEDOP_poll, &sched_poll);
+#ifdef CONFIG_XEN_COMPAT_030002
 	if (rc == -ENOSYS)
 		rc = HYPERVISOR_sched_op_compat(SCHEDOP_yield, 0);
+#endif
 
 	return rc;
 }

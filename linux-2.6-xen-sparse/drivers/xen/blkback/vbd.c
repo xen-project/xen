@@ -31,12 +31,11 @@
  */
 
 #include "common.h"
-#include <xen/xenbus.h>
 
 #define vbd_sz(_v)   ((_v)->bdev->bd_part ?				\
 	(_v)->bdev->bd_part->nr_sects : (_v)->bdev->bd_disk->capacity)
 
-unsigned long vbd_size(struct vbd *vbd)
+unsigned long long vbd_size(struct vbd *vbd)
 {
 	return vbd_sz(vbd);
 }
@@ -104,7 +103,7 @@ int vbd_translate(struct phys_req *req, blkif_t *blkif, int operation)
 	struct vbd *vbd = &blkif->vbd;
 	int rc = -EACCES;
 
-	if ((operation == WRITE) && vbd->readonly)
+	if ((operation != READ) && vbd->readonly)
 		goto out;
 
 	if (unlikely((req->sector_number + req->nr_sects) > vbd_sz(vbd)))

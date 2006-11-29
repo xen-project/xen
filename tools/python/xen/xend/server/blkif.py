@@ -16,7 +16,6 @@
 # Copyright (C) 2005, 2006 XenSource Inc.
 #============================================================================
 
-
 import re
 import string
 
@@ -24,9 +23,7 @@ from xen.util import blkif
 from xen.util import security
 from xen.xend import sxp
 from xen.xend.XendError import VmError
-
 from xen.xend.server.DevController import DevController
-
 
 class BlkifController(DevController):
     """Block device interface controller. Handles all block devices
@@ -38,12 +35,10 @@ class BlkifController(DevController):
         """
         DevController.__init__(self, vm)
 
-
     def getDeviceDetails(self, config):
         """@see DevController.getDeviceDetails"""
-        uname = sxp.child_value(config, 'uname')
-
-        dev = sxp.child_value(config, 'dev')
+        uname = sxp.child_value(config, 'uname', '')
+        dev = sxp.child_value(config, 'dev', '')
 
         if 'ioemu:' in dev:
             (_, dev) = string.split(dev, ':', 1)
@@ -74,6 +69,10 @@ class BlkifController(DevController):
                  'mode'   : mode
                }
 
+        uuid = sxp.child_value(config, 'uuid')
+        if uuid:
+            back['uuid'] = uuid
+
         if security.on():
             (label, ssidref, policy) = security.get_res_security_details(uname)
             back.update({'acm_label'  : label,
@@ -81,6 +80,9 @@ class BlkifController(DevController):
                          'acm_policy' : policy})
 
         devid = blkif.blkdev_name_to_number(dev)
+        if devid is None:
+            raise VmError('Unable to find number for device (%s)' % (dev))
+
         front = { 'virtual-device' : "%i" % devid,
                   'device-type' : dev_type
                 }
@@ -105,27 +107,30 @@ class BlkifController(DevController):
                           (self.deviceClass, devid, config))
 
 
-    def configuration(self, devid):
-        """@see DevController.configuration"""
+    def getDeviceConfiguration(self, devid):
+        """Returns the configuration of a device.
 
-        result = DevController.configuration(self, devid)
-
-        (dev, typ, params, mode) = self.readBackend(devid,
-                                                    'dev', 'type', 'params',
-                                                    'mode')
-
+        @note: Similar to L{configuration} except it returns a dict.
+        @return: dict
+        """
+        config = DevController.getDeviceConfiguration(self, devid)
+        devinfo = self.readBackend(devid, 'dev', 'type', 'params', 'mode',
+                                   'uuid')
+        dev, typ, params, mode, uuid = devinfo
+        
         if dev:
-            (dev_type) = self.readFrontend(devid, 'device-type')
+            dev_type = self.readFrontend(devid, 'device-type')
             if dev_type:
-                dev += ":" + dev_type
-            result.append(['dev', dev])
+                dev += ':' + dev_type
+            config['dev'] = dev
         if typ and params:
-            result.append(['uname', typ + ":" + params])
+            config['uname'] = typ +':' + params
         if mode:
-            result.append(['mode', mode])
+            config['mode'] = mode
+        if uuid:
+            config['uuid'] = uuid
 
-        return result
-
+        return config
 
     def destroyDevice(self, devid):
         """@see DevController.destroyDevice"""

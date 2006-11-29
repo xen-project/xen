@@ -22,6 +22,7 @@ reboot
 restore
 save
 sched-credit
+security-acm
 shutdown
 sysrq
 unpause

@@ -24,7 +24,8 @@ all: vnetd
 
 #----------------------------------------------------------------------------
 
-include $(XEN_ROOT)/tools/Rules.mk
+# Comment out when outside xen.
+#include $(XEN_ROOT)/tools/Rules.mk
 
 VNETD_INSTALL_DIR = /usr/sbin
 
@@ -43,6 +44,7 @@ CPPFLAGS += -D USE_GC
 CPPFLAGS += -D __ARCH_I386_ATOMIC__
 
 #----------------------------------------------------------------------------
+CFLAGS += -O3
 CFLAGS += $(INCLUDES) $(LIBS)
 
 LDFLAGS += $(LIBS)
@@ -108,7 +110,7 @@ vnetd: $(VNETD_OBJ)
 .PHONY: install
 install: vnetd
 	mkdir -p $(DESTDIR)$(VNETD_INSTALL_DIR)
-	install -m 0755 vnetd $(DESTDIR)$(VNETD_INSTALL_DIR)
+	$(INSTALL_PROG) vnetd $(DESTDIR)$(VNETD_INSTALL_DIR)
 
 .PHONY: clean
 clean:

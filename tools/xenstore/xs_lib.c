@@ -76,7 +76,14 @@ const char *xs_daemon_socket_ro(void)
 const char *xs_domain_dev(void)
 {
 	char *s = getenv("XENSTORED_PATH");
-	return (s ? s : "/proc/xen/xenbus");
+	if (s)
+		return s;
+
+#ifdef __linux__
+	return "/proc/xen/xenbus";
+#else
+	return "/dev/xen/xenbus";
+#endif
 }
 
 /* Simple routines for writing to sockets, etc. */

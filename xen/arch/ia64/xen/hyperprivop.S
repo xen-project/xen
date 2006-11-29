@@ -203,7 +203,7 @@ END(fast_hyperprivop)
 
 // give up for now if: ipsr.be==1, ipsr.pp==1
 // from reflect_interruption, don't need to:
-//  - printf first extint (debug only)
+//  - printk first extint (debug only)
 //  - check for interrupt collection enabled (routine will force on)
 //  - set ifa (not valid for extint)
 //  - set iha (not valid for extint)

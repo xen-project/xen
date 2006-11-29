@@ -48,8 +48,9 @@ int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
  *
  * @parm xc_handle a handle to an open hypervisor interface
  * @parm domid the id of the domain
- * @param image_name name of the kernel image file
- * @param ramdisk_name name of the ramdisk image file
+ * @parm mem_mb memory size in megabytes
+ * @parm image_name name of the kernel image file
+ * @parm ramdisk_name name of the ramdisk image file
  * @parm cmdline command line string
  * @parm flags domain creation flags
  * @parm store_evtchn the store event channel for this domain to use
@@ -60,6 +61,7 @@ int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
  */
 int xc_linux_build(int xc_handle,
                    uint32_t domid,
+                   unsigned int mem_mb,
                    const char *image_name,
                    const char *ramdisk_name,
                    const char *cmdline,
@@ -74,22 +76,24 @@ int xc_linux_build(int xc_handle,
  * This function will create a domain for a paravirtualized Linux
  * using buffers for kernel and initrd
  *
- * @param xc_handle a handle to an open hypervisor interface
- * @param domid the id of the domain
- * @param image_buffer buffer containing kernel image
- * @param image_size size of the kernel image buffer
- * @param initrd_buffer name of the ramdisk image file
- * @param initrd_size size of the ramdisk buffer
- * @param cmdline command line string
- * @param flags domain creation flags
- * @param store_evtchn the store event channel for this domain to use
- * @param store_mfn returned with the mfn of the store page
- * @param console_evtchn the console event channel for this domain to use
- * @param conole_mfn returned with the mfn of the console page
+ * @parm xc_handle a handle to an open hypervisor interface
+ * @parm domid the id of the domain
+ * @parm mem_mb memory size in megabytes
+ * @parm image_buffer buffer containing kernel image
+ * @parm image_size size of the kernel image buffer
+ * @parm initrd_buffer name of the ramdisk image file
+ * @parm initrd_size size of the ramdisk buffer
+ * @parm cmdline command line string
+ * @parm flags domain creation flags
+ * @parm store_evtchn the store event channel for this domain to use
+ * @parm store_mfn returned with the mfn of the store page
+ * @parm console_evtchn the console event channel for this domain to use
+ * @parm conole_mfn returned with the mfn of the console page
  * @return 0 on success, -1 on failure
  */
 int xc_linux_build_mem(int xc_handle,
                        uint32_t domid,
+                       unsigned int mem_mb,
                        const char *image_buffer,
                        unsigned long image_size,
                        const char *initrd_buffer,
@@ -105,24 +109,17 @@ int xc_linux_build_mem(int xc_handle,
 int xc_hvm_build(int xc_handle,
                  uint32_t domid,
                  int memsize,
-                 const char *image_name,
-                 unsigned int vcpus,
-                 unsigned int pae,
-                 unsigned int acpi,
-                 unsigned int apic,
-                 unsigned int store_evtchn,
-                 unsigned long *store_mfn);
+                 const char *image_name);
 
 int xc_hvm_build_mem(int xc_handle,
                      uint32_t domid,
                      int memsize,
                      const char *image_buffer,
-                     unsigned long image_size,
-                     unsigned int vcpus,
-                     unsigned int pae,
-                     unsigned int acpi,
-                     unsigned int apic,
-                     unsigned int store_evtchn,
-                     unsigned long *store_mfn);
+                     unsigned long image_size);
+
+int xc_set_hvm_param(
+    int handle, domid_t dom, int param, unsigned long value);
+int xc_get_hvm_param(
+    int handle, domid_t dom, int param, unsigned long *value);
 
 #endif /* XENGUEST_H */

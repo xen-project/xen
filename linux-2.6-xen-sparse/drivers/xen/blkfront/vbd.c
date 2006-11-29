@@ -36,6 +36,10 @@
 #include <linux/blkdev.h>
 #include <linux/list.h>
 
+#ifdef HAVE_XEN_PLATFORM_COMPAT_H
+#include <xen/platform-compat.h>
+#endif
+
 #define BLKIF_MAJOR(dev) ((dev)>>8)
 #define BLKIF_MINOR(dev) ((dev) & 0xff)
 
@@ -46,7 +50,7 @@
  */
 
 #define NUM_IDE_MAJORS 10
-#define NUM_SCSI_MAJORS 9
+#define NUM_SCSI_MAJORS 17
 #define NUM_VBD_MAJORS 1
 
 static struct xlbd_type_info xlbd_ide_type = {
@@ -91,7 +95,9 @@ static struct block_device_operations xlvbd_block_fops =
 	.open = blkif_open,
 	.release = blkif_release,
 	.ioctl  = blkif_ioctl,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,16)
 	.getgeo = blkif_getgeo
+#endif
 };
 
 DEFINE_SPINLOCK(blkif_io_lock);
@@ -159,8 +165,11 @@ xlbd_get_major_info(int vdevice)
 	case SCSI_DISK1_MAJOR ... SCSI_DISK7_MAJOR:
 		index = 11 + major - SCSI_DISK1_MAJOR;
 		break;
-	case SCSI_CDROM_MAJOR: index = 18; break;
-	default: index = 19; break;
+        case SCSI_DISK8_MAJOR ... SCSI_DISK15_MAJOR:
+                index = 18 + major - SCSI_DISK8_MAJOR;
+                break;
+        case SCSI_CDROM_MAJOR: index = 26; break;
+        default: index = 27; break;
 	}
 
 	mi = ((major_info[index] != NULL) ? major_info[index] :
@@ -186,7 +195,11 @@ xlvbd_init_blk_queue(struct gendisk *gd, u16 sector_size)
 	if (rq == NULL)
 		return -1;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,10)
 	elevator_init(rq, "noop");
+#else
+	elevator_init(rq, &elevator_noop);
+#endif
 
 	/* Hard sector size and max sectors impersonate the equiv. hardware. */
 	blk_queue_hardsect_size(rq, sector_size);
@@ -217,6 +230,7 @@ xlvbd_alloc_gendisk(int minor, blkif_sector_t capacity, int vdevice,
 	struct xlbd_major_info *mi;
 	int nr_minors = 1;
 	int err = -ENODEV;
+	unsigned int offset;
 
 	BUG_ON(info->gd != NULL);
 	BUG_ON(info->mi != NULL);
@@ -234,15 +248,33 @@ xlvbd_alloc_gendisk(int minor, blkif_sector_t capacity, int vdevice,
 	if (gd == NULL)
 		goto out;
 
-	if (nr_minors > 1)
-		sprintf(gd->disk_name, "%s%c", mi->type->diskname,
-			'a' + mi->index * mi->type->disks_per_major +
-			(minor >> mi->type->partn_shift));
-	else
-		sprintf(gd->disk_name, "%s%c%d", mi->type->diskname,
-			'a' + mi->index * mi->type->disks_per_major +
-			(minor >> mi->type->partn_shift),
-			minor & ((1 << mi->type->partn_shift) - 1));
+	offset =  mi->index * mi->type->disks_per_major +
+			(minor >> mi->type->partn_shift);
+	if (nr_minors > 1) {
+		if (offset < 26) {
+			sprintf(gd->disk_name, "%s%c",
+				 mi->type->diskname, 'a' + offset );
+		}
+		else {
+			sprintf(gd->disk_name, "%s%c%c",
+				mi->type->diskname,
+				'a' + ((offset/26)-1), 'a' + (offset%26) );
+		}
+	}
+	else {
+		if (offset < 26) {
+			sprintf(gd->disk_name, "%s%c%d",
+				mi->type->diskname,
+				'a' + offset,
+				minor & ((1 << mi->type->partn_shift) - 1));
+		}
+		else {
+			sprintf(gd->disk_name, "%s%c%c%d",
+				mi->type->diskname,
+				'a' + ((offset/26)-1), 'a' + (offset%26),
+				minor & ((1 << mi->type->partn_shift) - 1));
+		}
+	}
 
 	gd->major = mi->major;
 	gd->first_minor = minor;
@@ -257,6 +289,10 @@ xlvbd_alloc_gendisk(int minor, blkif_sector_t capacity, int vdevice,
 	}
 
 	info->rq = gd->queue;
+	info->gd = gd;
+
+	if (info->feature_barrier)
+		xlvbd_barrier(info);
 
 	if (vdisk_info & VDISK_READONLY)
 		set_disk_ro(gd, 1);
@@ -266,8 +302,6 @@ xlvbd_alloc_gendisk(int minor, blkif_sector_t capacity, int vdevice,
 
 	if (vdisk_info & VDISK_CDROM)
 		gd->flags |= GENHD_FL_CD;
-
-	info->gd = gd;
 
 	return 0;
 
@@ -316,3 +350,26 @@ xlvbd_del(struct blkfront_info *info)
 	blk_cleanup_queue(info->rq);
 	info->rq = NULL;
 }
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,16)
+int
+xlvbd_barrier(struct blkfront_info *info)
+{
+	int err;
+
+	err = blk_queue_ordered(info->rq,
+		info->feature_barrier ? QUEUE_ORDERED_DRAIN : QUEUE_ORDERED_NONE, NULL);
+	if (err)
+		return err;
+	printk("blkfront: %s: barriers %s\n",
+	       info->gd->disk_name, info->feature_barrier ? "enabled" : "disabled");
+	return 0;
+}
+#else
+int
+xlvbd_barrier(struct blkfront_info *info)
+{
+	printk("blkfront: %s: barriers disabled\n", info->gd->disk_name);
+	return -ENOSYS;
+}
+#endif

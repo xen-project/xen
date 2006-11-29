@@ -35,7 +35,7 @@ void ofd_prop_print(
     if ( path[0] == '/' && path[1] == '\0' ) {
         path = "";
     }
-    printf("%s: %s/%s: 0x%lx\n", head, path,  name, sz);
+    printk("%s: %s/%s: 0x%lx\n", head, path,  name, sz);
 
 #define DEBUG_PROP
 #ifdef DEBUG_PROP
@@ -56,24 +56,24 @@ void ofd_prop_print(
     }
 
     if ( isstr > 0 ) {
-        printf("%s: \t%s\n", head, b);
+        printk("%s: \t%s\n", head, b);
     } else if ( sz != 0 ) {
-        printf("%s: \t0x", head);
+        printk("%s: \t0x", head);
 
         for ( i = 0; i < sz; i++ ) {
             if ( (i % 4) == 0 && i != 0 ) {
                 if ( (i % 16) == 0 && i != 0 ) {
-                    printf("\n%s: \t0x", head);
+                    printk("\n%s: \t0x", head);
                 } else {
-                    printf(" 0x");
+                    printk(" 0x");
                 }
             }
             if (b[i] < 0x10) {
-                printf("0");
+                printk("0");
             }
-            printf("%x", b[i]);
+            printk("%x", b[i]);
         }
-        printf("\n");
+        printk("\n");
     }
 #else
     (void)prop;
@@ -95,7 +95,7 @@ void ofd_dump_props(void *mem, ofdn_t n, int dump)
     }
 
     if (dump & OFD_DUMP_NAMES) {
-        printf("of_walk: %s: phandle 0x%x\n", path, n);
+        printk("of_walk: %s: phandle 0x%x\n", path, n);
     }
 
     p = ofd_nextprop(mem, n, NULL, name);

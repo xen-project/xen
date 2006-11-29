@@ -6,6 +6,16 @@
 #define PAGE_SIZE	(1UL << PAGE_SHIFT)
 #define PAGE_MASK	(~(PAGE_SIZE-1))
 
+#ifdef CONFIG_X86_PAE
+#define __PHYSICAL_MASK_SHIFT	36
+#define __PHYSICAL_MASK		((1ULL << __PHYSICAL_MASK_SHIFT) - 1)
+#define PHYSICAL_PAGE_MASK	(~((1ULL << PAGE_SHIFT) - 1) & __PHYSICAL_MASK)
+#else
+#define __PHYSICAL_MASK_SHIFT	32
+#define __PHYSICAL_MASK		(~0UL)
+#define PHYSICAL_PAGE_MASK	(PAGE_MASK & __PHYSICAL_MASK)
+#endif
+
 #define LARGE_PAGE_MASK (~(LARGE_PAGE_SIZE-1))
 #define LARGE_PAGE_SIZE (1UL << PMD_SHIFT)
 
@@ -85,7 +95,7 @@ static inline unsigned long long pte_val(pte_t x)
 
 	if (x.pte_low) {
 		ret = x.pte_low | (unsigned long long)x.pte_high << 32;
-		ret = machine_to_phys(ret) | 1;
+		ret = pte_machine_to_phys(ret) | 1;
 	} else {
 		ret = 0;
 	}
@@ -94,13 +104,13 @@ static inline unsigned long long pte_val(pte_t x)
 static inline unsigned long long pmd_val(pmd_t x)
 {
 	unsigned long long ret = x.pmd;
-	if (ret) ret = machine_to_phys(ret) | 1;
+	if (ret) ret = pte_machine_to_phys(ret) | 1;
 	return ret;
 }
 static inline unsigned long long pgd_val(pgd_t x)
 {
 	unsigned long long ret = x.pgd;
-	if (ret) ret = machine_to_phys(ret) | 1;
+	if (ret) ret = pte_machine_to_phys(ret) | 1;
 	return ret;
 }
 static inline unsigned long long pte_val_ma(pte_t x)
@@ -115,7 +125,8 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 #define pgprot_val(x)	((x).pgprot)
 #include <asm/maddr.h>
 #define boot_pte_t pte_t /* or would you rather have a typedef */
-#define pte_val(x)	(((x).pte_low & 1) ? machine_to_phys((x).pte_low) : \
+#define pte_val(x)	(((x).pte_low & 1) ? \
+			 pte_machine_to_phys((x).pte_low) : \
 			 (x).pte_low)
 #define pte_val_ma(x)	((x).pte_low)
 #define __pte(x) ({ unsigned long _x = (x); \
@@ -125,7 +136,7 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 static inline unsigned long pgd_val(pgd_t x)
 {
 	unsigned long ret = x.pgd;
-	if (ret) ret = machine_to_phys(ret) | 1;
+	if (ret) ret = pte_machine_to_phys(ret) | 1;
 	return ret;
 }
 #define HPAGE_SHIFT	22

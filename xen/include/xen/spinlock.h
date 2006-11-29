@@ -42,10 +42,10 @@
 
 #if (__GNUC__ > 2)
 typedef struct { } spinlock_t;
-#define SPIN_LOCK_UNLOCKED (spinlock_t) { }
+#define SPIN_LOCK_UNLOCKED /*(spinlock_t)*/ { }
 #else
 typedef struct { int gcc_is_buggy; } spinlock_t;
-#define SPIN_LOCK_UNLOCKED (spinlock_t) { 0 }
+#define SPIN_LOCK_UNLOCKED /*(spinlock_t)*/ { 0 }
 #endif
 
 #define spin_lock_init(lock)             do { } while(0)
@@ -58,10 +58,10 @@ typedef struct { int gcc_is_buggy; } spinlock_t;
 
 #if (__GNUC__ > 2)
 typedef struct { } rwlock_t;
-#define RW_LOCK_UNLOCKED (rwlock_t) { }
+#define RW_LOCK_UNLOCKED /*(rwlock_t)*/ { }
 #else
 typedef struct { int gcc_is_buggy; } rwlock_t;
-#define RW_LOCK_UNLOCKED (rwlock_t) { 0 }
+#define RW_LOCK_UNLOCKED /*(rwlock_t)*/ { 0 }
 #endif
 
 #define rwlock_init(lock)            do { } while(0)

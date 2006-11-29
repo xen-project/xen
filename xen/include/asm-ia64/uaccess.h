@@ -211,30 +211,16 @@ extern void __put_user_unknown (void);
 extern unsigned long __must_check __copy_user (void __user *to, const void __user *from,
 					       unsigned long count);
 
-extern int ia64_map_hypercall_param(void);
-
 static inline unsigned long
 __copy_to_user (void __user *to, const void *from, unsigned long count)
 {
-	unsigned long len;
-	len = __copy_user(to, (void __user *)from, count);
-	if (len == 0)
-		return 0;
-	if (ia64_map_hypercall_param())
-		len = __copy_user(to, (void __user *)from, count); /* retry */
-	return len;
+	return __copy_user(to, (void __user *)from, count);
 }
 
 static inline unsigned long
 __copy_from_user (void *to, const void __user *from, unsigned long count)
 {
-	unsigned long len;
-	len = __copy_user((void __user *)to, from, count);
-	if (len == 0)
-		return 0;
-	if (ia64_map_hypercall_param())
-		len = __copy_user((void __user *) to, from, count); /* retry */
-	return len;
+	return __copy_user((void __user *)to, from, count);
 }
 
 #define __copy_to_user_inatomic		__copy_to_user

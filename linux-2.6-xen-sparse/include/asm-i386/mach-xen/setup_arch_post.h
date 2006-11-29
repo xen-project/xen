@@ -56,15 +56,15 @@ static void __init machine_specific_arch_setup(void)
 	struct xen_machphys_mapping mapping;
 	unsigned long machine_to_phys_nr_ents;
 	struct xen_platform_parameters pp;
-	struct callback_register event = {
+	static struct callback_register __initdata event = {
 		.type = CALLBACKTYPE_event,
 		.address = { __KERNEL_CS, (unsigned long)hypervisor_callback },
 	};
-	struct callback_register failsafe = {
+	static struct callback_register __initdata failsafe = {
 		.type = CALLBACKTYPE_failsafe,
 		.address = { __KERNEL_CS, (unsigned long)failsafe_callback },
 	};
-	struct callback_register nmi_cb = {
+	static struct callback_register __initdata nmi_cb = {
 		.type = CALLBACKTYPE_nmi,
 		.address = { __KERNEL_CS, (unsigned long)nmi },
 	};
@@ -72,23 +72,30 @@ static void __init machine_specific_arch_setup(void)
 	ret = HYPERVISOR_callback_op(CALLBACKOP_register, &event);
 	if (ret == 0)
 		ret = HYPERVISOR_callback_op(CALLBACKOP_register, &failsafe);
+#ifdef CONFIG_XEN_COMPAT_030002
 	if (ret == -ENOSYS)
 		ret = HYPERVISOR_set_callbacks(
 			event.address.cs, event.address.eip,
 			failsafe.address.cs, failsafe.address.eip);
+#endif
 	BUG_ON(ret);
 
 	ret = HYPERVISOR_callback_op(CALLBACKOP_register, &nmi_cb);
+#ifdef CONFIG_XEN_COMPAT_030002
 	if (ret == -ENOSYS) {
-		struct xennmi_callback cb;
+		static struct xennmi_callback __initdata cb = {
+			.handler_address = (unsigned long)nmi
+		};
 
-		cb.handler_address = nmi_cb.address.eip;
 		HYPERVISOR_nmi_op(XENNMI_register_callback, &cb);
 	}
+#endif
 
 	if (HYPERVISOR_xen_version(XENVER_platform_parameters,
-				   &pp) == 0)
-		set_fixaddr_top(pp.virt_start - PAGE_SIZE);
+				   &pp) == 0) {
+		hypervisor_virt_start = pp.virt_start;
+		set_fixaddr_top();
+	}
 
 	machine_to_phys_mapping = (unsigned long *)MACH2PHYS_VIRT_START;
 	machine_to_phys_nr_ents = MACH2PHYS_NR_ENTRIES;

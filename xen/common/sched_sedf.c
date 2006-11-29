@@ -333,14 +333,6 @@ static int sedf_init_vcpu(struct vcpu *v)
 {
     struct sedf_vcpu_info *inf;
 
-    if ( v->domain->sched_priv == NULL )
-    {
-        v->domain->sched_priv = xmalloc(struct sedf_dom_info);
-        if ( v->domain->sched_priv == NULL )
-            return -1;
-        memset(v->domain->sched_priv, 0, sizeof(struct sedf_dom_info));
-    }
-
     if ( (v->sched_priv = xmalloc(struct sedf_vcpu_info)) == NULL )
         return -1;
     memset(v->sched_priv, 0, sizeof(struct sedf_vcpu_info));
@@ -398,15 +390,33 @@ static int sedf_init_vcpu(struct vcpu *v)
     return 0;
 }
 
+static void sedf_destroy_vcpu(struct vcpu *v)
+{
+    xfree(v->sched_priv);
+}
+
+static int sedf_init_domain(struct domain *d)
+{
+    d->sched_priv = xmalloc(struct sedf_dom_info);
+    if ( d->sched_priv == NULL )
+        return -ENOMEM;
+
+    memset(d->sched_priv, 0, sizeof(struct sedf_dom_info));
+
+    return 0;
+}
+
 static void sedf_destroy_domain(struct domain *d)
 {
-    int i;
-
     xfree(d->sched_priv);
- 
-    for ( i = 0; i < MAX_VIRT_CPUS; i++ )
-        if ( d->vcpu[i] )
-            xfree(d->vcpu[i]->sched_priv);
+}
+
+static int sedf_pick_cpu(struct vcpu *v)
+{
+    cpumask_t online_affinity;
+
+    cpus_and(online_affinity, v->cpu_affinity, cpu_online_map);
+    return first_cpu(online_affinity);
 }
 
 /*
@@ -1175,20 +1185,6 @@ void sedf_wake(struct vcpu *d)
 }
 
 
-static int sedf_set_affinity(struct vcpu *v, cpumask_t *affinity)
-{
-    if ( v == current )
-        return cpu_isset(v->processor, *affinity) ? 0 : -EBUSY;
-
-    vcpu_pause(v);
-    v->cpu_affinity = *affinity;
-    v->processor = first_cpu(v->cpu_affinity);
-    vcpu_unpause(v);
-
-    return 0;
-}
-
-
 /* Print a lot of useful information about a domains in the system */
 static void sedf_dump_domain(struct vcpu *d)
 {
@@ -1204,10 +1200,10 @@ static void sedf_dump_domain(struct vcpu *d)
     
 #ifdef SEDF_STATS
     if ( EDOM_INFO(d)->block_time_tot != 0 )
-        printf(" pen=%"PRIu64"%%", (EDOM_INFO(d)->penalty_time_tot * 100) /
+        printk(" pen=%"PRIu64"%%", (EDOM_INFO(d)->penalty_time_tot * 100) /
                EDOM_INFO(d)->block_time_tot);
     if ( EDOM_INFO(d)->block_tot != 0 )
-        printf("\n   blks=%u sh=%u (%u%%) (shc=%u (%u%%) shex=%i "\
+        printk("\n   blks=%u sh=%u (%u%%) (shc=%u (%u%%) shex=%i "\
                "shexsl=%i) l=%u (%u%%) avg: b=%"PRIu64" p=%"PRIu64"",
                EDOM_INFO(d)->block_tot, EDOM_INFO(d)->short_block_tot,
                (EDOM_INFO(d)->short_block_tot * 100) 
@@ -1220,7 +1216,7 @@ static void sedf_dump_domain(struct vcpu *d)
                (EDOM_INFO(d)->block_time_tot) / EDOM_INFO(d)->block_tot,
                (EDOM_INFO(d)->penalty_time_tot) / EDOM_INFO(d)->block_tot);
 #endif
-    printf("\n");
+    printk("\n");
 }
 
 
@@ -1441,15 +1437,18 @@ struct scheduler sched_sedf_def = {
     .opt_name = "sedf",
     .sched_id = XEN_SCHEDULER_SEDF,
     
-    .init_vcpu      = sedf_init_vcpu,
+    .init_domain    = sedf_init_domain,
     .destroy_domain = sedf_destroy_domain,
 
+    .init_vcpu      = sedf_init_vcpu,
+    .destroy_vcpu   = sedf_destroy_vcpu,
+
     .do_schedule    = sedf_do_schedule,
+    .pick_cpu       = sedf_pick_cpu,
     .dump_cpu_state = sedf_dump_cpu_state,
     .sleep          = sedf_sleep,
     .wake           = sedf_wake,
     .adjust         = sedf_adjust,
-    .set_affinity   = sedf_set_affinity
 };
 
 /*

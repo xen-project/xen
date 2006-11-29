@@ -36,8 +36,10 @@ static void keypress_softirq(void)
 {
     keyhandler_t *h;
     unsigned char key = keypress_key;
+    console_start_log_everything();
     if ( (h = key_table[key].u.handler) != NULL )
         (*h)(key);
+    console_end_log_everything();
 }
 
 void handle_keypress(unsigned char key, struct cpu_user_regs *regs)
@@ -46,8 +48,10 @@ void handle_keypress(unsigned char key, struct cpu_user_regs *regs)
 
     if ( key_table[key].flags & KEYHANDLER_IRQ_CALLBACK )
     {
+        console_start_log_everything();
         if ( (h = key_table[key].u.irq_handler) != NULL )
             (*h)(key, regs);
+        console_end_log_everything();
     }
     else
     {
@@ -173,6 +177,7 @@ static void dump_domains(unsigned char key)
             printk("dirty_cpus=%s ", cpuset);
             cpuset_print(cpuset, sizeof(cpuset), v->cpu_affinity);
             printk("cpu_affinity=%s\n", cpuset);
+            arch_dump_vcpu_info(v);
             printk("    Notifying guest (virq %d, port %d, stat %d/%d/%d)\n",
                    VIRQ_DEBUG, v->virq_to_evtchn[VIRQ_DEBUG],
                    test_bit(v->virq_to_evtchn[VIRQ_DEBUG], 

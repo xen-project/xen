@@ -33,7 +33,8 @@
 typedef struct vtime {
     	long        vtm_offset; // guest ITC = host ITC + vtm_offset
     	uint64_t    vtm_local_drift;
-	uint64_t   last_itc;
+	uint64_t    last_itc;
+    	uint64_t    pending;
     	/* 
     	 * Local drift (temporary) after guest suspension
     	 * In case of long jump amount of ITC after suspension, 

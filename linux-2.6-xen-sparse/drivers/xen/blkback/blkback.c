@@ -56,8 +56,6 @@ static int blkif_reqs = 64;
 module_param_named(reqs, blkif_reqs, int, 0);
 MODULE_PARM_DESC(reqs, "Number of blkback requests to allocate");
 
-static int mmap_pages;
-
 /* Run-time switchable: /sys/module/blkback/parameters/ */
 static unsigned int log_stats = 0;
 static unsigned int debug_lvl = 0;
@@ -87,8 +85,7 @@ static DECLARE_WAIT_QUEUE_HEAD(pending_free_wq);
 
 #define BLKBACK_INVALID_HANDLE (~0)
 
-static unsigned long mmap_vstart;
-static unsigned long *pending_vaddrs;
+static struct page **pending_pages;
 static grant_handle_t *pending_grant_handles;
 
 static inline int vaddr_pagenr(pending_req_t *req, int seg)
@@ -98,7 +95,8 @@ static inline int vaddr_pagenr(pending_req_t *req, int seg)
 
 static inline unsigned long vaddr(pending_req_t *req, int seg)
 {
-	return pending_vaddrs[vaddr_pagenr(req, seg)];
+	unsigned long pfn = page_to_pfn(pending_pages[vaddr_pagenr(req, seg)]);
+	return (unsigned long)pfn_to_kaddr(pfn);
 }
 
 #define pending_handle(_req, _seg) \
@@ -191,9 +189,9 @@ static void fast_flush_area(pending_req_t *req)
 
 static void print_stats(blkif_t *blkif)
 {
-	printk(KERN_DEBUG "%s: oo %3d  |  rd %4d  |  wr %4d\n",
+	printk(KERN_DEBUG "%s: oo %3d  |  rd %4d  |  wr %4d  |  br %4d\n",
 	       current->comm, blkif->st_oo_req,
-	       blkif->st_rd_req, blkif->st_wr_req);
+	       blkif->st_rd_req, blkif->st_wr_req, blkif->st_br_req);
 	blkif->st_print = jiffies + msecs_to_jiffies(10 * 1000);
 	blkif->st_rd_req = 0;
 	blkif->st_wr_req = 0;
@@ -243,11 +241,17 @@ int blkif_schedule(void *arg)
  * COMPLETION CALLBACK -- Called as bh->b_end_io()
  */
 
-static void __end_block_io_op(pending_req_t *pending_req, int uptodate)
+static void __end_block_io_op(pending_req_t *pending_req, int error)
 {
 	/* An error fails the entire request. */
-	if (!uptodate) {
-		DPRINTK("Buffer not up-to-date at end of operation\n");
+	if ((pending_req->operation == BLKIF_OP_WRITE_BARRIER) &&
+	    (error == -EOPNOTSUPP)) {
+		DPRINTK("blkback: write barrier op failed, not supported\n");
+		blkback_barrier(XBT_NIL, pending_req->blkif->be, 0);
+		pending_req->status = BLKIF_RSP_EOPNOTSUPP;
+	} else if (error) {
+		DPRINTK("Buffer not up-to-date at end of operation, "
+			"error=%d\n", error);
 		pending_req->status = BLKIF_RSP_ERROR;
 	}
 
@@ -264,7 +268,7 @@ static int end_block_io_op(struct bio *bio, unsigned int done, int error)
 {
 	if (bio->bi_size != 0)
 		return 1;
-	__end_block_io_op(bio->bi_private, !error);
+	__end_block_io_op(bio->bi_private, error);
 	bio_put(bio);
 	return error;
 }
@@ -295,7 +299,7 @@ irqreturn_t blkif_be_int(int irq, void *dev_id, struct pt_regs *regs)
 static int do_block_io_op(blkif_t *blkif)
 {
 	blkif_back_ring_t *blk_ring = &blkif->blk_ring;
-	blkif_request_t *req;
+	blkif_request_t req;
 	pending_req_t *pending_req;
 	RING_IDX rc, rp;
 	int more_to_do = 0;
@@ -313,22 +317,25 @@ static int do_block_io_op(blkif_t *blkif)
 			break;
 		}
 
-		req = RING_GET_REQUEST(blk_ring, rc);
+		memcpy(&req, RING_GET_REQUEST(blk_ring, rc), sizeof(req));
 		blk_ring->req_cons = ++rc; /* before make_response() */
 
-		switch (req->operation) {
+		switch (req.operation) {
 		case BLKIF_OP_READ:
 			blkif->st_rd_req++;
-			dispatch_rw_block_io(blkif, req, pending_req);
+			dispatch_rw_block_io(blkif, &req, pending_req);
 			break;
+		case BLKIF_OP_WRITE_BARRIER:
+			blkif->st_br_req++;
+			/* fall through */
 		case BLKIF_OP_WRITE:
 			blkif->st_wr_req++;
-			dispatch_rw_block_io(blkif, req, pending_req);
+			dispatch_rw_block_io(blkif, &req, pending_req);
 			break;
 		default:
 			DPRINTK("error: unknown block io operation [%d]\n",
-				req->operation);
-			make_response(blkif, req->id, req->operation,
+				req.operation);
+			make_response(blkif, req.id, req.operation,
 				      BLKIF_RSP_ERROR);
 			free_req(pending_req);
 			break;
@@ -342,7 +349,6 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 				 pending_req_t *pending_req)
 {
 	extern void ll_rw_block(int rw, int nr, struct buffer_head * bhs[]);
-	int operation = (req->operation == BLKIF_OP_WRITE) ? WRITE : READ;
 	struct gnttab_map_grant_ref map[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 	struct phys_req preq;
 	struct { 
@@ -351,6 +357,22 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 	unsigned int nseg;
 	struct bio *bio = NULL, *biolist[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 	int ret, i, nbio = 0;
+	int operation;
+
+	switch (req->operation) {
+	case BLKIF_OP_READ:
+		operation = READ;
+		break;
+	case BLKIF_OP_WRITE:
+		operation = WRITE;
+		break;
+	case BLKIF_OP_WRITE_BARRIER:
+		operation = WRITE_BARRIER;
+		break;
+	default:
+		operation = 0; /* make gcc happy */
+		BUG();
+	}
 
 	/* Check that number of segments is sane. */
 	nseg = req->nr_segments;
@@ -366,7 +388,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 
 	pending_req->blkif     = blkif;
 	pending_req->id        = req->id;
-	pending_req->operation = operation;
+	pending_req->operation = req->operation;
 	pending_req->status    = BLKIF_RSP_OKAY;
 	pending_req->nr_pages  = nseg;
 
@@ -377,12 +399,12 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 			req->seg[i].first_sect + 1;
 
 		if ((req->seg[i].last_sect >= (PAGE_SIZE >> 9)) ||
-		    (seg[i].nsec <= 0))
+		    (req->seg[i].last_sect < req->seg[i].first_sect))
 			goto fail_response;
 		preq.nr_sects += seg[i].nsec;
 
 		flags = GNTMAP_host_map;
-		if ( operation == WRITE )
+		if (operation != READ)
 			flags |= GNTMAP_readonly;
 		gnttab_set_map_op(&map[i], vaddr(pending_req, i), flags,
 				  req->seg[i].gref, blkif->domid);
@@ -394,16 +416,24 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 	for (i = 0; i < nseg; i++) {
 		if (unlikely(map[i].status != 0)) {
 			DPRINTK("invalid buffer -- could not remap it\n");
-			goto fail_flush;
+			map[i].handle = BLKBACK_INVALID_HANDLE;
+			ret |= 1;
 		}
 
 		pending_handle(pending_req, i) = map[i].handle;
+
+		if (ret)
+			continue;
+
 		set_phys_to_machine(__pa(vaddr(
 			pending_req, i)) >> PAGE_SHIFT,
 			FOREIGN_FRAME(map[i].dev_bus_addr >> PAGE_SHIFT));
 		seg[i].buf  = map[i].dev_bus_addr | 
 			(req->seg[i].first_sect << 9);
 	}
+
+	if (ret)
+		goto fail_flush;
 
 	if (vbd_translate(&preq, blkif, operation) != 0) {
 		DPRINTK("access denied: %s of [%llu,%llu] on dev=%04x\n", 
@@ -506,52 +536,43 @@ static void make_response(blkif_t *blkif, unsigned long id,
 
 static int __init blkif_init(void)
 {
-	struct page *page;
-	int i;
+	int i, mmap_pages;
 
 	if (!is_running_on_xen())
 		return -ENODEV;
 
-	mmap_pages            = blkif_reqs * BLKIF_MAX_SEGMENTS_PER_REQUEST;
-
-	page = balloon_alloc_empty_page_range(mmap_pages);
-	if (page == NULL)
-		return -ENOMEM;
-	mmap_vstart = (unsigned long)pfn_to_kaddr(page_to_pfn(page));
+	mmap_pages = blkif_reqs * BLKIF_MAX_SEGMENTS_PER_REQUEST;
 
 	pending_reqs          = kmalloc(sizeof(pending_reqs[0]) *
 					blkif_reqs, GFP_KERNEL);
 	pending_grant_handles = kmalloc(sizeof(pending_grant_handles[0]) *
 					mmap_pages, GFP_KERNEL);
-	pending_vaddrs        = kmalloc(sizeof(pending_vaddrs[0]) *
-					mmap_pages, GFP_KERNEL);
-	if (!pending_reqs || !pending_grant_handles || !pending_vaddrs) {
-		kfree(pending_reqs);
-		kfree(pending_grant_handles);
-		kfree(pending_vaddrs);
-		printk("%s: out of memory\n", __FUNCTION__);
-		return -ENOMEM;
-	}
+	pending_pages         = alloc_empty_pages_and_pagevec(mmap_pages);
+
+	if (!pending_reqs || !pending_grant_handles || !pending_pages)
+		goto out_of_memory;
+
+	for (i = 0; i < mmap_pages; i++)
+		pending_grant_handles[i] = BLKBACK_INVALID_HANDLE;
 
 	blkif_interface_init();
-	
-	printk("%s: reqs=%d, pages=%d, mmap_vstart=0x%lx\n",
-	       __FUNCTION__, blkif_reqs, mmap_pages, mmap_vstart);
-	BUG_ON(mmap_vstart == 0);
-	for (i = 0; i < mmap_pages; i++) {
-		pending_vaddrs[i] = mmap_vstart + (i << PAGE_SHIFT);
-		pending_grant_handles[i] = BLKBACK_INVALID_HANDLE;
-	}
 
 	memset(pending_reqs, 0, sizeof(pending_reqs));
 	INIT_LIST_HEAD(&pending_free);
 
 	for (i = 0; i < blkif_reqs; i++)
 		list_add_tail(&pending_reqs[i].free_list, &pending_free);
-    
+
 	blkif_xenbus_init();
 
 	return 0;
+
+ out_of_memory:
+	kfree(pending_reqs);
+	kfree(pending_grant_handles);
+	free_empty_pages_and_pagevec(pending_pages, mmap_pages);
+	printk("%s: out of memory\n", __FUNCTION__);
+	return -ENOMEM;
 }
 
 module_init(blkif_init);

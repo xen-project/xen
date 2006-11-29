@@ -65,7 +65,7 @@ class PciController(DevController):
                     else:
                         return default
 
-                if isinstance(val, types.StringType):
+                if isinstance(val, types.StringTypes):
                     return int(val, 16)
                 else:
                     return val
@@ -79,7 +79,7 @@ class PciController(DevController):
         back = {}
 
         val = sxp.child_value(config, 'dev')
-        if isinstance(val, list):
+        if isinstance(val, (types.ListType, types.TupleType)):
             pcidevid = 0
             for dev_config in sxp.children(config, 'dev'):
                 domain = get_param(dev_config, 'domain', 0)
@@ -89,7 +89,7 @@ class PciController(DevController):
 
                 self.setupDevice(domain, bus, slot, func)
 
-                back['dev-%i'%(pcidevid)]="%04x:%02x:%02x.%02x"% \
+                back['dev-%i' % pcidevid]="%04x:%02x:%02x.%02x"% \
                         (domain, bus, slot, func)
                 pcidevid+=1
             
@@ -109,29 +109,54 @@ class PciController(DevController):
 
         return (0, back, {})
 
-    def configuration(self, devid):
-        """@see DevController.configuration"""
-
-        result = DevController.configuration(self, devid)
-
-        (num_devs) = self.readBackend(devid, 'num_devs')
-
+    def getDeviceConfiguration(self, devid):
+        result = DevController.getDeviceConfiguration(self, devid)
+        num_devs = self.readBackend(devid, 'num_devs')
+        pci_devs = []
+        
         for i in range(int(num_devs)):
-            (dev_config) = self.readBackend(devid, 'dev-%d'%(i))
+            dev_config = self.readBackend(devid, 'dev-%d' % i)
 
-            pci_match = re.match(r"((?P<domain>[0-9a-fA-F]{1,4})[:,])?" + \
-                    r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" + \
-                    r"(?P<slot>[0-9a-fA-F]{1,2})[.,]" + \
-                    r"(?P<func>[0-9a-fA-F]{1,2})", dev_config)
+            pci_match = re.match(r"((?P<domain>[0-9a-fA-F]{1,4})[:,])?" +
+                                 r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" + 
+                                 r"(?P<slot>[0-9a-fA-F]{1,2})[.,]" + 
+                                 r"(?P<func>[0-9a-fA-F]{1,2})", dev_config)
+            
             if pci_match!=None:
-                pci_dev_info = pci_match.groupdict('0')
-                result.append( ['dev', \
-                        ['domain', '0x'+pci_dev_info['domain']], \
-                        ['bus', '0x'+pci_dev_info['bus']], \
-                        ['slot', '0x'+pci_dev_info['slot']], \
-                        ['func', '0x'+pci_dev_info['func']]])
+                pci_dev_info = pci_match.groupdict()
+                pci_devs.append({'domain': '0x%(domain)s' % pci_dev_info,
+                                 'bus': '0x%(bus)s' % pci_dev_info,
+                                 'slot': '0x%(slot)s' % pci_dev_info,
+                                 'func': '0x%(func)s' % pci_dev_info})
 
+        result['dev'] = pci_devs
         return result
+
+    def configuration(self, devid):
+        """Returns SXPR for devices on domain.
+
+        @note: we treat this dict especially to convert to
+        SXP because it is not a straight dict of strings."""
+        
+        configDict = self.getDeviceConfiguration(devid)
+        sxpr = [self.deviceClass]
+
+        # remove devs
+        devs = configDict.pop('dev', [])
+        for dev in devs:
+            dev_sxpr = ['dev']
+            for dev_item in dev.items():
+                dev_sxpr.append(list(dev_item))
+            sxpr.append(dev_sxpr)
+        
+        for key, val in configDict.items():
+            if type(val) == type(list()):
+                for v in val:
+                    sxpr.append([key, v])
+            else:
+                sxpr.append([key, val])
+
+        return sxpr    
 
     def setupDevice(self, domain, bus, slot, func):
         """ Attach I/O resources for device to frontend domain
@@ -155,9 +180,9 @@ class PciController(DevController):
         PCIQuirk(dev.vendor, dev.device, dev.subvendor, dev.subdevice, domain, 
                 bus, slot, func)
 
-	for (start, size) in dev.ioports:
+        for (start, size) in dev.ioports:
             log.debug('pci: enabling ioport 0x%x/0x%x'%(start,size))
-            rc = xc.domain_ioport_permission(dom = fe_domid, first_port = start,
+            rc = xc.domain_ioport_permission(domid = fe_domid, first_port = start,
                     nr_ports = size, allow_access = True)
             if rc<0:
                 raise VmError(('pci: failed to configure I/O ports on device '+
@@ -171,7 +196,7 @@ class PciController(DevController):
 
             log.debug('pci: enabling iomem 0x%x/0x%x pfn 0x%x/0x%x'% \
                     (start,size,start_pfn,nr_pfns))
-            rc = xc.domain_iomem_permission(dom = fe_domid,
+            rc = xc.domain_iomem_permission(domid =  fe_domid,
                     first_pfn = start_pfn,
                     nr_pfns = nr_pfns,
                     allow_access = True)
@@ -181,7 +206,7 @@ class PciController(DevController):
 
         if dev.irq>0:
             log.debug('pci: enabling irq %d'%dev.irq)
-            rc = xc.domain_irq_permission(dom = fe_domid, pirq = dev.irq,
+            rc = xc.domain_irq_permission(domid =  fe_domid, pirq = dev.irq,
                     allow_access = True)
             if rc<0:
                 raise VmError(('pci: failed to configure irq on device '+

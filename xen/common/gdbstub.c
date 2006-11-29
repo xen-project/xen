@@ -53,6 +53,8 @@
 static char opt_gdb[30] = "none";
 string_param("gdb", opt_gdb);
 
+static void gdbstub_console_puts(const char *str);
+
 /* value <-> char (de)serialzers */
 char
 hex2char(unsigned long x)
@@ -357,6 +359,24 @@ gdb_cmd_write_mem(unsigned long addr, unsigned long length,
     gdb_send_packet(ctx);
 }
 
+static void
+gdbstub_attach(struct gdb_context *ctx)
+{
+    if ( ctx->currently_attached )
+        return;    
+    ctx->currently_attached = 1;
+    ctx->console_steal_id = console_steal(ctx->serhnd, gdbstub_console_puts);
+}
+
+static void
+gdbstub_detach(struct gdb_context *ctx)
+{
+    if ( !ctx->currently_attached )
+        return;
+    ctx->currently_attached = 0;
+    console_giveback(ctx->console_steal_id);
+}
+
 /* command dispatcher */
 static int 
 process_command(struct cpu_user_regs *regs, struct gdb_context *ctx)
@@ -427,7 +447,7 @@ process_command(struct cpu_user_regs *regs, struct gdb_context *ctx)
         gdb_arch_read_reg(addr, regs, ctx);
         break;
     case 'D':
-        ctx->currently_attached = 0;
+        gdbstub_detach(ctx);
         gdb_send_reply("OK", ctx);
         /* fall through */
     case 'k':
@@ -444,7 +464,7 @@ process_command(struct cpu_user_regs *regs, struct gdb_context *ctx)
              ctx->in_buf[1] )
             addr = str2ulong(&ctx->in_buf[1], sizeof(unsigned long));
         if ( ctx->in_buf[0] != 'D' )
-            ctx->currently_attached = 1;
+            gdbstub_attach(ctx);
         resume = 1;
         gdb_arch_resume(regs, addr, type, ctx);
         break;
@@ -459,29 +479,40 @@ process_command(struct cpu_user_regs *regs, struct gdb_context *ctx)
 
 static struct gdb_context
 __gdb_ctx = {
-    .serhnd             = -1,
-    .currently_attached = 0,
-    .running            = ATOMIC_INIT(1),
-    .connected          = 0,
-    .signum             = 1,
-    .in_bytes           = 0,
-    .out_offset         = 0,
-    .out_csum           = 0,
+    .serhnd  = -1,
+    .running = ATOMIC_INIT(1),
+    .signum  = 1
 };
 static struct gdb_context *gdb_ctx = &__gdb_ctx;
+
+static void
+gdbstub_console_puts(const char *str)
+{
+    const char *p;
+
+    gdb_start_packet(gdb_ctx);
+    gdb_write_to_packet_char('O', gdb_ctx);
+
+    for ( p = str; *p != '\0'; p++ )
+    {
+        gdb_write_to_packet_char(hex2char((*p>>4) & 0x0f), gdb_ctx );
+        gdb_write_to_packet_char(hex2char((*p) & 0x0f), gdb_ctx );
+    }
+
+    gdb_send_packet(gdb_ctx);
+}
 
 /* trap handler: main entry point */
 int 
 __trap_to_gdb(struct cpu_user_regs *regs, unsigned long cookie)
 {
-    int resume = 0;
-    int r;
+    int rc = 0;
     unsigned long flags;
 
     if ( gdb_ctx->serhnd < 0 )
     {
         dbg_printk("Debugger not ready yet.\n");
-        return 0;
+        return -EBUSY;
     }
 
     /* We rely on our caller to ensure we're only on one processor
@@ -500,7 +531,7 @@ __trap_to_gdb(struct cpu_user_regs *regs, unsigned long cookie)
     {
         printk("WARNING WARNING WARNING: Avoiding recursive gdb.\n");
         atomic_inc(&gdb_ctx->running);
-        return 0;
+        return -EBUSY;
     }
 
     if ( !gdb_ctx->connected )
@@ -525,6 +556,7 @@ __trap_to_gdb(struct cpu_user_regs *regs, unsigned long cookie)
 
     gdb_arch_enter(regs);
     gdb_ctx->signum = gdb_arch_signal_num(regs, cookie);
+
     /* If gdb is already attached, tell it we've stopped again. */
     if ( gdb_ctx->currently_attached )
     {
@@ -532,19 +564,14 @@ __trap_to_gdb(struct cpu_user_regs *regs, unsigned long cookie)
         gdb_cmd_signum(gdb_ctx);
     }
 
-    while ( resume == 0 )
-    {
-        r = receive_command(gdb_ctx);
-        if ( r < 0 )
+    do {
+        if ( receive_command(gdb_ctx) < 0 )
         {
-            dbg_printk("GDB disappeared, trying to resume Xen...\n");
-            resume = 1;
+            dbg_printk("Error in GDB session...\n");
+            rc = -EIO;
+            break;
         }
-        else
-        {
-            resume = process_command(regs, gdb_ctx);
-        }
-    }
+    } while ( process_command(regs, gdb_ctx) == 0 );
 
     gdb_arch_exit(regs);
     console_end_sync();
@@ -553,7 +580,7 @@ __trap_to_gdb(struct cpu_user_regs *regs, unsigned long cookie)
 
     local_irq_restore(flags);
 
-    return 0;
+    return rc;
 }
 
 void

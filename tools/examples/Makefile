@@ -1,11 +1,6 @@
 XEN_ROOT = ../../
 include $(XEN_ROOT)/tools/Rules.mk
 
-INSTALL		= install
-INSTALL_DIR	= $(INSTALL) -d -m0755
-INSTALL_PROG	= $(INSTALL) -m0755
-INSTALL_DATA	= $(INSTALL) -m0644
-
 # Init scripts.
 XEND_INITD = init.d/xend
 XENDOMAINS_INITD = init.d/xendomains

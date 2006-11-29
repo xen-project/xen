@@ -29,79 +29,10 @@
 extern void vmx_asm_vmexit_handler(struct cpu_user_regs);
 extern void vmx_asm_do_vmentry(void);
 extern void vmx_intr_assist(void);
-extern void vmx_migrate_timers(struct vcpu *v);
-extern void arch_vmx_do_launch(struct vcpu *);
 extern void arch_vmx_do_resume(struct vcpu *);
 extern void set_guest_time(struct vcpu *v, u64 gtime);
 
 extern unsigned int cpu_rev;
-
-/*
- * Need fill bits for SENTER
- */
-
-#define MONITOR_PIN_BASED_EXEC_CONTROLS_RESERVED_VALUE  0x00000016
-
-#define MONITOR_PIN_BASED_EXEC_CONTROLS                 \
-    (                                                   \
-    MONITOR_PIN_BASED_EXEC_CONTROLS_RESERVED_VALUE |    \
-    PIN_BASED_EXT_INTR_MASK |                           \
-    PIN_BASED_NMI_EXITING                               \
-    )
-
-#define MONITOR_CPU_BASED_EXEC_CONTROLS_RESERVED_VALUE  0x0401e172
-
-#define _MONITOR_CPU_BASED_EXEC_CONTROLS                \
-    (                                                   \
-    MONITOR_CPU_BASED_EXEC_CONTROLS_RESERVED_VALUE |    \
-    CPU_BASED_HLT_EXITING |                             \
-    CPU_BASED_INVDPG_EXITING |                          \
-    CPU_BASED_MWAIT_EXITING |                           \
-    CPU_BASED_MOV_DR_EXITING |                          \
-    CPU_BASED_ACTIVATE_IO_BITMAP |                      \
-    CPU_BASED_USE_TSC_OFFSETING                         \
-    )
-
-#define MONITOR_CPU_BASED_EXEC_CONTROLS_IA32E_MODE      \
-    (                                                   \
-    CPU_BASED_CR8_LOAD_EXITING |                        \
-    CPU_BASED_CR8_STORE_EXITING                         \
-    )
-
-#define MONITOR_VM_EXIT_CONTROLS_RESERVED_VALUE         0x0003edff
-
-#define MONITOR_VM_EXIT_CONTROLS_IA32E_MODE             0x00000200
-
-#define _MONITOR_VM_EXIT_CONTROLS                       \
-    (                                                   \
-    MONITOR_VM_EXIT_CONTROLS_RESERVED_VALUE |           \
-    VM_EXIT_ACK_INTR_ON_EXIT                            \
-    )
-
-#if defined (__x86_64__)
-#define MONITOR_CPU_BASED_EXEC_CONTROLS                 \
-    (                                                   \
-    _MONITOR_CPU_BASED_EXEC_CONTROLS |                  \
-    MONITOR_CPU_BASED_EXEC_CONTROLS_IA32E_MODE          \
-    )
-#define MONITOR_VM_EXIT_CONTROLS                        \
-    (                                                   \
-    _MONITOR_VM_EXIT_CONTROLS |                         \
-    MONITOR_VM_EXIT_CONTROLS_IA32E_MODE                 \
-    )
-#else
-#define MONITOR_CPU_BASED_EXEC_CONTROLS                 \
-    _MONITOR_CPU_BASED_EXEC_CONTROLS
-
-#define MONITOR_VM_EXIT_CONTROLS                        \
-    _MONITOR_VM_EXIT_CONTROLS
-#endif
-
-#define VM_ENTRY_CONTROLS_RESERVED_VALUE                0x000011ff
-#define VM_ENTRY_CONTROLS_IA32E_MODE                    0x00000200
-
-#define MONITOR_VM_ENTRY_CONTROLS                       \
-    VM_ENTRY_CONTROLS_RESERVED_VALUE
 
 /*
  * Exit Reasons
@@ -161,6 +92,7 @@ extern unsigned int cpu_rev;
 #define INTR_INFO_VALID_MASK            0x80000000      /* 31 */
 
 #define INTR_TYPE_EXT_INTR              (0 << 8)    /* external interrupt */
+#define INTR_TYPE_NMI                   (2 << 8)    /* NMI                */
 #define INTR_TYPE_HW_EXCEPTION          (3 << 8)    /* hardware exception */
 #define INTR_TYPE_SW_EXCEPTION          (6 << 8)    /* software exception */
 
@@ -250,135 +182,55 @@ static inline void __vmpclear(u64 addr)
                            : "memory");
 }
 
-#define __vmread(x, ptr) ___vmread((x), (ptr), sizeof(*(ptr)))
-
-static always_inline int ___vmread(
-    const unsigned long field, void *ptr, const int size)
+static inline unsigned long __vmread(unsigned long field)
 {
-    unsigned long ecx = 0;
-    int rc;
+    unsigned long ecx;
+
+    __asm__ __volatile__ ( VMREAD_OPCODE
+                           MODRM_EAX_ECX
+                           /* CF==1 or ZF==1 --> crash (ud2) */
+                           "ja 1f ; ud2 ; 1:\n"
+                           : "=c" (ecx)
+                           : "a" (field)
+                           : "memory");
+
+    return ecx;
+}
+
+static inline void __vmwrite(unsigned long field, unsigned long value)
+{
+    __asm__ __volatile__ ( VMWRITE_OPCODE
+                           MODRM_EAX_ECX
+                           /* CF==1 or ZF==1 --> crash (ud2) */
+                           "ja 1f ; ud2 ; 1:\n"
+                           : 
+                           : "a" (field) , "c" (value)
+                           : "memory");
+}
+
+static inline unsigned long __vmread_safe(unsigned long field, int *error)
+{
+    unsigned long ecx;
 
     __asm__ __volatile__ ( VMREAD_OPCODE
                            MODRM_EAX_ECX
                            /* CF==1 or ZF==1 --> rc = -1 */
                            "setna %b0 ; neg %0"
-                           : "=q" (rc), "=c" (ecx)
+                           : "=q" (*error), "=c" (ecx)
                            : "0" (0), "a" (field)
                            : "memory");
 
-    switch ( size ) {
-    case 1:
-        *((u8 *) (ptr)) = ecx;
-        break;
-    case 2:
-        *((u16 *) (ptr)) = ecx;
-        break;
-    case 4:
-        *((u32 *) (ptr)) = ecx;
-        break;
-    case 8:
-        *((u64 *) (ptr)) = ecx;
-        break;
-    default:
-        domain_crash_synchronous();
-        break;
-    }
-
-    return rc;
+    return ecx;
 }
 
-
-static always_inline void __vmwrite_vcpu(
-    struct vcpu *v, unsigned long field, unsigned long value)
+static inline void __vm_set_bit(unsigned long field, unsigned long mask)
 {
-    switch ( field ) {
-    case CR0_READ_SHADOW:
-        v->arch.hvm_vmx.cpu_shadow_cr0 = value;
-        break;
-    case GUEST_CR0:
-        v->arch.hvm_vmx.cpu_cr0 = value;
-        break;
-    case CR4_READ_SHADOW:
-        v->arch.hvm_vmx.cpu_shadow_cr4 = value;
-        break;
-    case CPU_BASED_VM_EXEC_CONTROL:
-        v->arch.hvm_vmx.cpu_based_exec_control = value;
-        break;
-    default:
-        printk("__vmwrite_cpu: invalid field %lx\n", field);
-        break;
-    }
+    __vmwrite(field, __vmread(field) | mask);
 }
 
-static always_inline void __vmread_vcpu(
-    struct vcpu *v, unsigned long field, unsigned long *value)
+static inline void __vm_clear_bit(unsigned long field, unsigned long mask)
 {
-    switch ( field ) {
-    case CR0_READ_SHADOW:
-        *value = v->arch.hvm_vmx.cpu_shadow_cr0;
-        break;
-    case GUEST_CR0:
-        *value = v->arch.hvm_vmx.cpu_cr0;
-        break;
-    case CR4_READ_SHADOW:
-        *value = v->arch.hvm_vmx.cpu_shadow_cr4;
-        break;
-    case CPU_BASED_VM_EXEC_CONTROL:
-        *value = v->arch.hvm_vmx.cpu_based_exec_control;
-        break;
-    default:
-        printk("__vmread_vcpu: invalid field %lx\n", field);
-        break;
-    }
-}
-
-static inline int __vmwrite(unsigned long field, unsigned long value)
-{
-    struct vcpu *v = current;
-    int rc;
-
-    __asm__ __volatile__ ( VMWRITE_OPCODE
-                           MODRM_EAX_ECX
-                           /* CF==1 or ZF==1 --> rc = -1 */
-                           "setna %b0 ; neg %0"
-                           : "=q" (rc)
-                           : "0" (0), "a" (field) , "c" (value)
-                           : "memory");
-
-    switch ( field ) {
-    case CR0_READ_SHADOW:
-    case GUEST_CR0:
-    case CR4_READ_SHADOW:
-    case CPU_BASED_VM_EXEC_CONTROL:
-        __vmwrite_vcpu(v, field, value);
-        break;
-    }
-
-    return rc;
-}
-
-static inline int __vm_set_bit(unsigned long field, unsigned long mask)
-{
-    unsigned long tmp;
-    int err = 0;
-
-    err |= __vmread(field, &tmp);
-    tmp |= mask;
-    err |= __vmwrite(field, tmp);
-
-    return err;
-}
-
-static inline int __vm_clear_bit(unsigned long field, unsigned long mask)
-{
-    unsigned long tmp;
-    int err = 0;
-
-    err |= __vmread(field, &tmp);
-    tmp &= ~mask;
-    err |= __vmwrite(field, tmp);
-
-    return err;
+    __vmwrite(field, __vmread(field) & ~mask);
 }
 
 static inline void __vmxoff (void)
@@ -402,30 +254,22 @@ static inline int __vmxon (u64 addr)
     return rc;
 }
 
-/* Works only for vcpu == current */
 static inline int vmx_paging_enabled(struct vcpu *v)
 {
-    unsigned long cr0;
-
-    __vmread_vcpu(v, CR0_READ_SHADOW, &cr0);
-    return (cr0 & X86_CR0_PE) && (cr0 & X86_CR0_PG);
+    unsigned long cr0 = v->arch.hvm_vmx.cpu_shadow_cr0;
+    return ((cr0 & (X86_CR0_PE|X86_CR0_PG)) == (X86_CR0_PE|X86_CR0_PG));
 }
 
-/* Works only for vcpu == current */
 static inline int vmx_long_mode_enabled(struct vcpu *v)
 {
-    ASSERT(v == current);
-    return VMX_LONG_GUEST(current);
+    u64 efer = v->arch.hvm_vmx.msr_state.msrs[VMX_INDEX_MSR_EFER];
+    return efer & EFER_LMA;
 }
 
-/* Works only for vcpu == current */
-static inline int vmx_realmode(struct vcpu *v)
+static inline int vmx_lme_is_set(struct vcpu *v)
 {
-    unsigned long rflags;
-    ASSERT(v == current);
-
-    __vmread(GUEST_RFLAGS, &rflags);
-    return rflags & X86_EFLAGS_VM;
+    u64 efer = v->arch.hvm_vmx.msr_state.msrs[VMX_INDEX_MSR_EFER];
+    return efer & EFER_LME;
 }
 
 /* Works only for vcpu == current */
@@ -435,27 +279,9 @@ static inline void vmx_update_host_cr3(struct vcpu *v)
     __vmwrite(HOST_CR3, v->arch.cr3);
 }
 
-static inline int vmx_guest_x86_mode(struct vcpu *v)
-{
-    unsigned long cs_ar_bytes;
-    ASSERT(v == current);
-
-    if ( vmx_long_mode_enabled(v) )
-    {
-        __vmread(GUEST_CS_AR_BYTES, &cs_ar_bytes);
-        return (cs_ar_bytes & (1u<<13)) ? 8 : 4;
-    }
-    if ( vmx_realmode(v) )
-        return 2;
-    __vmread(GUEST_CS_AR_BYTES, &cs_ar_bytes);
-    return (cs_ar_bytes & (1u<<14)) ? 4 : 2;
-}
-
 static inline int vmx_pgbit_test(struct vcpu *v)
 {
-    unsigned long cr0;
-
-    __vmread_vcpu(v, CR0_READ_SHADOW, &cr0);
+    unsigned long cr0 = v->arch.hvm_vmx.cpu_shadow_cr0;
     return (cr0 & X86_CR0_PG);
 }
 
@@ -469,7 +295,7 @@ static inline void __vmx_inject_exception(struct vcpu *v, int trap, int type,
     if ( error_code != VMX_DELIVER_NO_ERROR_CODE ) {
         __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
         intr_fields |= INTR_INFO_DELIVER_CODE_MASK;
-     }
+    }
 
     if ( ilen )
       __vmwrite(VM_ENTRY_INSTRUCTION_LEN, ilen);
@@ -497,42 +323,6 @@ static inline void vmx_inject_extint(struct vcpu *v, int trap, int error_code)
 {
     __vmx_inject_exception(v, trap, INTR_TYPE_EXT_INTR, error_code, 0);
     __vmwrite(GUEST_INTERRUPTIBILITY_INFO, 0);
-}
-
-static inline void vmx_reflect_exception(struct vcpu *v)
-{
-    int error_code, intr_info, vector;
-
-    __vmread(VM_EXIT_INTR_INFO, &intr_info);
-    vector = intr_info & 0xff;
-    if ( intr_info & INTR_INFO_DELIVER_CODE_MASK )
-        __vmread(VM_EXIT_INTR_ERROR_CODE, &error_code);
-    else
-        error_code = VMX_DELIVER_NO_ERROR_CODE;
-
-#ifndef NDEBUG
-    {
-        unsigned long rip;
-
-        __vmread(GUEST_RIP, &rip);
-        HVM_DBG_LOG(DBG_LEVEL_1, "rip = %lx, error_code = %x",
-                    rip, error_code);
-    }
-#endif /* NDEBUG */
-
-    /* According to Intel Virtualization Technology Specification for
-       the IA-32 Intel Architecture (C97063-002 April 2005), section
-       2.8.3, SW_EXCEPTION should be used for #BP and #OV, and
-       HW_EXCPEPTION used for everything else.  The main difference
-       appears to be that for SW_EXCEPTION, the EIP/RIP is incremented
-       by VM_ENTER_INSTRUCTION_LEN bytes, whereas for HW_EXCEPTION,
-       it is not.  */
-    if ( (intr_info & INTR_INFO_INTR_TYPE_MASK) == INTR_TYPE_SW_EXCEPTION ) {
-        int ilen;
-        __vmread(VM_EXIT_INSTRUCTION_LEN, &ilen);
-        vmx_inject_sw_exception(v, vector, ilen);
-    } else
-        vmx_inject_hw_exception(v, vector, error_code);
 }
 
 #endif /* __ASM_X86_HVM_VMX_VMX_H__ */

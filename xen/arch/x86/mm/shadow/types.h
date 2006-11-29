@@ -205,19 +205,21 @@ static inline shadow_l4e_t shadow_l4e_from_mfn(mfn_t mfn, u32 flags)
     __sh_linear_l1_table; \
 })
 
+// XXX -- these should not be conditional on is_hvm_vcpu(v), but rather on
+//        shadow_mode_external(d)...
+//
 #define sh_linear_l2_table(v) ({ \
     ASSERT(current == (v)); \
     ((shadow_l2e_t *) \
-     (hvm_guest(v) ? __linear_l1_table : __sh_linear_l1_table) + \
+     (is_hvm_vcpu(v) ? __linear_l1_table : __sh_linear_l1_table) + \
      shadow_l1_linear_offset(SH_LINEAR_PT_VIRT_START)); \
 })
 
-// shadow linear L3 and L4 tables only exist in 4 level paging...
-#if SHADOW_PAGING_LEVELS == 4
+#if SHADOW_PAGING_LEVELS >= 4
 #define sh_linear_l3_table(v) ({ \
     ASSERT(current == (v)); \
     ((shadow_l3e_t *) \
-     (hvm_guest(v) ? __linear_l2_table : __sh_linear_l2_table) + \
+     (is_hvm_vcpu(v) ? __linear_l2_table : __sh_linear_l2_table) + \
       shadow_l2_linear_offset(SH_LINEAR_PT_VIRT_START)); \
 })
 
@@ -226,7 +228,7 @@ static inline shadow_l4e_t shadow_l4e_from_mfn(mfn_t mfn, u32 flags)
 #define sh_linear_l4_table(v) ({ \
     ASSERT(current == (v)); \
     ((l4_pgentry_t *) \
-     (hvm_guest(v) ? __linear_l3_table : __sh_linear_l3_table) + \
+     (is_hvm_vcpu(v) ? __linear_l3_table : __sh_linear_l3_table) + \
       shadow_l3_linear_offset(SH_LINEAR_PT_VIRT_START)); \
 })
 #endif
@@ -279,9 +281,9 @@ static inline guest_l2e_t guest_l2e_from_gfn(gfn_t gfn, u32 flags)
 #define guest_l2_table_offset(a) l2_table_offset_32(a)
 
 /* The shadow types needed for the various levels. */
-#define PGC_SH_l1_shadow  PGC_SH_l1_32_shadow
-#define PGC_SH_l2_shadow  PGC_SH_l2_32_shadow
-#define PGC_SH_fl1_shadow PGC_SH_fl1_32_shadow
+#define SH_type_l1_shadow  SH_type_l1_32_shadow
+#define SH_type_l2_shadow  SH_type_l2_32_shadow
+#define SH_type_fl1_shadow SH_type_fl1_32_shadow
 
 #else /* GUEST_PAGING_LEVELS != 2 */
 
@@ -379,17 +381,16 @@ static inline guest_l4e_t guest_l4e_from_gfn(gfn_t gfn, u32 flags)
 
 /* The shadow types needed for the various levels. */
 #if GUEST_PAGING_LEVELS == 3
-#define PGC_SH_l1_shadow  PGC_SH_l1_pae_shadow
-#define PGC_SH_fl1_shadow PGC_SH_fl1_pae_shadow
-#define PGC_SH_l2_shadow  PGC_SH_l2_pae_shadow
-#define PGC_SH_l2h_shadow PGC_SH_l2h_pae_shadow
-#define PGC_SH_l3_shadow  PGC_SH_l3_pae_shadow
+#define SH_type_l1_shadow  SH_type_l1_pae_shadow
+#define SH_type_fl1_shadow SH_type_fl1_pae_shadow
+#define SH_type_l2_shadow  SH_type_l2_pae_shadow
+#define SH_type_l2h_shadow SH_type_l2h_pae_shadow
 #else
-#define PGC_SH_l1_shadow  PGC_SH_l1_64_shadow
-#define PGC_SH_fl1_shadow PGC_SH_fl1_64_shadow
-#define PGC_SH_l2_shadow  PGC_SH_l2_64_shadow
-#define PGC_SH_l3_shadow  PGC_SH_l3_64_shadow
-#define PGC_SH_l4_shadow  PGC_SH_l4_64_shadow
+#define SH_type_l1_shadow  SH_type_l1_64_shadow
+#define SH_type_fl1_shadow SH_type_fl1_64_shadow
+#define SH_type_l2_shadow  SH_type_l2_64_shadow
+#define SH_type_l3_shadow  SH_type_l3_64_shadow
+#define SH_type_l4_shadow  SH_type_l4_64_shadow
 #endif
 
 #endif /* GUEST_PAGING_LEVELS != 2 */
@@ -402,20 +403,21 @@ valid_gfn(gfn_t m)
     return VALID_GFN(gfn_x(m));
 }
 
-#if GUEST_PAGING_LEVELS == 2
-#define PGC_SH_guest_root_type PGC_SH_l2_32_shadow
-#elif GUEST_PAGING_LEVELS == 3
-#define PGC_SH_guest_root_type PGC_SH_l3_pae_shadow
-#else
-#define PGC_SH_guest_root_type PGC_SH_l4_64_shadow
-#endif
-
 /* Translation between mfns and gfns */
+
+// vcpu-specific version of gfn_to_mfn().  This is where we hide the dirty
+// little secret that, for hvm guests with paging disabled, nearly all of the
+// shadow code actually think that the guest is running on *untranslated* page
+// tables (which is actually domain->phys_table).
+//
+
 static inline mfn_t
 vcpu_gfn_to_mfn(struct vcpu *v, gfn_t gfn)
 {
-    return sh_vcpu_gfn_to_mfn(v, gfn_x(gfn));
-} 
+    if ( !shadow_vcpu_mode_translate(v) )
+        return _mfn(gfn_x(gfn));
+    return sh_gfn_to_mfn(v->domain, gfn_x(gfn));
+}
 
 static inline gfn_t
 mfn_to_gfn(struct domain *d, mfn_t mfn)
@@ -487,8 +489,6 @@ struct shadow_walk_t
 #define sh_map_and_validate_gl1e   INTERNAL_NAME(sh_map_and_validate_gl1e)
 #define sh_destroy_l4_shadow       INTERNAL_NAME(sh_destroy_l4_shadow)
 #define sh_destroy_l3_shadow       INTERNAL_NAME(sh_destroy_l3_shadow)
-#define sh_destroy_l3_subshadow    INTERNAL_NAME(sh_destroy_l3_subshadow)
-#define sh_unpin_all_l3_subshadows INTERNAL_NAME(sh_unpin_all_l3_subshadows)
 #define sh_destroy_l2_shadow       INTERNAL_NAME(sh_destroy_l2_shadow)
 #define sh_destroy_l1_shadow       INTERNAL_NAME(sh_destroy_l1_shadow)
 #define sh_unhook_32b_mappings     INTERNAL_NAME(sh_unhook_32b_mappings)
@@ -507,125 +507,28 @@ struct shadow_walk_t
 #define sh_guess_wrmap             INTERNAL_NAME(sh_guess_wrmap)
 #define sh_clear_shadow_entry      INTERNAL_NAME(sh_clear_shadow_entry)
 
+/* The sh_guest_(map|get)_* functions only depends on the number of config
+ * levels
+ */
+#define sh_guest_map_l1e                                       \
+        SHADOW_INTERNAL_NAME(sh_guest_map_l1e,                \
+                              CONFIG_PAGING_LEVELS,             \
+                              CONFIG_PAGING_LEVELS)
+#define sh_guest_get_eff_l1e                                   \
+        SHADOW_INTERNAL_NAME(sh_guest_get_eff_l1e,            \
+                              CONFIG_PAGING_LEVELS,             \
+                              CONFIG_PAGING_LEVELS)
+
 /* sh_make_monitor_table only depends on the number of shadow levels */
-#define sh_make_monitor_table                          \
-        SHADOW_INTERNAL_NAME(sh_make_monitor_table,   \
-                              SHADOW_PAGING_LEVELS,     \
+#define sh_make_monitor_table                                  \
+        SHADOW_INTERNAL_NAME(sh_make_monitor_table,           \
+                              SHADOW_PAGING_LEVELS,             \
                               SHADOW_PAGING_LEVELS)
 #define sh_destroy_monitor_table                               \
         SHADOW_INTERNAL_NAME(sh_destroy_monitor_table,        \
                               SHADOW_PAGING_LEVELS,             \
                               SHADOW_PAGING_LEVELS)
 
-
-#if GUEST_PAGING_LEVELS == 3
-/*
- * Accounting information stored in the shadow of PAE Guest L3 pages.
- * Because these "L3 pages" are only 32-bytes, it is inconvenient to keep
- * various refcounts, etc., on the page_info of their page.  We provide extra
- * bookkeeping space in the shadow itself, and this is the structure
- * definition for that bookkeeping information.
- */
-struct pae_l3_bookkeeping {
-    u32 vcpus;                  /* bitmap of which vcpus are currently storing
-                                 * copies of this 32-byte page */
-    u32 refcount;               /* refcount for this 32-byte page */
-    u8 pinned;                  /* is this 32-byte page pinned or not? */
-};
-
-// Convert a shadow entry pointer into a pae_l3_bookkeeping pointer.
-#define sl3p_to_info(_ptr) ((struct pae_l3_bookkeeping *)         \
-                            (((unsigned long)(_ptr) & ~31) + 32))
-
-static void sh_destroy_l3_subshadow(struct vcpu *v, 
-                                     shadow_l3e_t *sl3e);
-
-/* Increment a subshadow ref
- * Called with a pointer to the subshadow, and the mfn of the
- * *first* page of the overall shadow. */
-static inline void sh_get_ref_l3_subshadow(shadow_l3e_t *sl3e, mfn_t smfn)
-{
-    struct pae_l3_bookkeeping *bk = sl3p_to_info(sl3e);
-
-    /* First ref to the subshadow takes a ref to the full shadow */
-    if ( bk->refcount == 0 ) 
-        sh_get_ref(smfn, 0);
-    if ( unlikely(++(bk->refcount) == 0) )
-    {
-        SHADOW_PRINTK("shadow l3 subshadow ref overflow, smfn=%" SH_PRI_mfn " sh=%p\n", 
-                       mfn_x(smfn), sl3e);
-        domain_crash_synchronous();
-    }
-}
-
-/* Decrement a subshadow ref.
- * Called with a pointer to the subshadow, and the mfn of the
- * *first* page of the overall shadow.  Calling this may cause the 
- * entire shadow to disappear, so the caller must immediately unmap 
- * the pointer after calling. */ 
-static inline void sh_put_ref_l3_subshadow(struct vcpu *v, 
-                                            shadow_l3e_t *sl3e,
-                                            mfn_t smfn)
-{
-    struct pae_l3_bookkeeping *bk;
-
-    bk = sl3p_to_info(sl3e);
-
-    ASSERT(bk->refcount > 0);
-    if ( --(bk->refcount) == 0 )
-    {
-        /* Need to destroy this subshadow */
-        sh_destroy_l3_subshadow(v, sl3e);
-        /* Last ref to the subshadow had a ref to the full shadow */
-        sh_put_ref(v, smfn, 0);
-    }
-}
-
-/* Pin a subshadow 
- * Called with a pointer to the subshadow, and the mfn of the
- * *first* page of the overall shadow. */
-static inline void sh_pin_l3_subshadow(shadow_l3e_t *sl3e, mfn_t smfn)
-{
-    struct pae_l3_bookkeeping *bk = sl3p_to_info(sl3e);
-
-#if 0
-    debugtrace_printk("%s smfn=%05lx offset=%ld\n",
-                      __func__, mfn_x(smfn),
-                      ((unsigned long)sl3e & ~PAGE_MASK) / 64);
-#endif
-
-    if ( !bk->pinned )
-    {
-        bk->pinned = 1;
-        sh_get_ref_l3_subshadow(sl3e, smfn);
-    }
-}
-
-/* Unpin a sub-shadow. 
- * Called with a pointer to the subshadow, and the mfn of the
- * *first* page of the overall shadow.  Calling this may cause the 
- * entire shadow to disappear, so the caller must immediately unmap 
- * the pointer after calling. */ 
-static inline void sh_unpin_l3_subshadow(struct vcpu *v, 
-                                          shadow_l3e_t *sl3e,
-                                          mfn_t smfn)
-{
-    struct pae_l3_bookkeeping *bk = sl3p_to_info(sl3e);
-
-#if 0
-    debugtrace_printk("%s smfn=%05lx offset=%ld\n",
-                      __func__, mfn_x(smfn),
-                      ((unsigned long)sl3e & ~PAGE_MASK) / 64);
-#endif
-
-    if ( bk->pinned )
-    {
-        bk->pinned = 0;
-        sh_put_ref_l3_subshadow(v, sl3e, smfn);
-    }
-}
-
-#endif /* GUEST_PAGING_LEVELS == 3 */
 
 #if SHADOW_PAGING_LEVELS == 3
 #define MFN_FITS_IN_HVM_CR3(_MFN) !(mfn_x(_MFN) >> 20)
@@ -652,7 +555,7 @@ static inline void sh_unpin_l3_subshadow(struct vcpu *v,
 #endif /* GUEST_PAGING_LEVELS >= 3 */
 
 static inline u32
-accumulate_guest_flags(walk_t *gw)
+accumulate_guest_flags(struct vcpu *v, walk_t *gw)
 {
     u32 accumulated_flags;
 
@@ -674,11 +577,88 @@ accumulate_guest_flags(walk_t *gw)
     accumulated_flags &= guest_l4e_get_flags(*gw->l4e) ^ _PAGE_NX_BIT;
 #endif
 
-    // Finally, revert the NX bit back to its original polarity
+    // Revert the NX bit back to its original polarity
     accumulated_flags ^= _PAGE_NX_BIT;
+
+    // In 64-bit PV guests, the _PAGE_USER bit is implied in all guest
+    // entries (since even the guest kernel runs in ring 3).
+    //
+    if ( (GUEST_PAGING_LEVELS == 4) && !is_hvm_vcpu(v) )
+        accumulated_flags |= _PAGE_USER;
 
     return accumulated_flags;
 }
+
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_FAST_FAULT_PATH) && SHADOW_PAGING_LEVELS > 2
+/******************************************************************************
+ * We implement a "fast path" for two special cases: faults that require
+ * MMIO emulation, and faults where the guest PTE is not present.  We
+ * record these as shadow l1 entries that have reserved bits set in
+ * them, so we can spot them immediately in the fault handler and handle
+ * them without needing to hold the shadow lock or walk the guest
+ * pagetables.
+ *
+ * This is only feasible for PAE and 64bit Xen: 32-bit non-PAE PTEs don't
+ * have reserved bits that we can use for this.
+ */
+
+#define SH_L1E_MAGIC 0xffffffff00000000ULL
+static inline int sh_l1e_is_magic(shadow_l1e_t sl1e)
+{
+    return ((sl1e.l1 & SH_L1E_MAGIC) == SH_L1E_MAGIC);
+}
+
+/* Guest not present: a single magic value */
+static inline shadow_l1e_t sh_l1e_gnp(void) 
+{
+    return (shadow_l1e_t){ -1ULL };
+}
+
+static inline int sh_l1e_is_gnp(shadow_l1e_t sl1e) 
+{
+    return (sl1e.l1 == sh_l1e_gnp().l1);
+}
+
+/* MMIO: an invalid PTE that contains the GFN of the equivalent guest l1e.
+ * We store 28 bits of GFN in bits 4:32 of the entry.
+ * The present bit is set, and the U/S and R/W bits are taken from the guest.
+ * Bit 3 is always 0, to differentiate from gnp above.  */
+#define SH_L1E_MMIO_MAGIC       0xffffffff00000001ULL
+#define SH_L1E_MMIO_MAGIC_MASK  0xffffffff00000009ULL
+#define SH_L1E_MMIO_GFN_MASK    0x00000000fffffff0ULL
+#define SH_L1E_MMIO_GFN_SHIFT   4
+
+static inline shadow_l1e_t sh_l1e_mmio(gfn_t gfn, u32 gflags) 
+{
+    return (shadow_l1e_t) { (SH_L1E_MMIO_MAGIC 
+                             | (gfn_x(gfn) << SH_L1E_MMIO_GFN_SHIFT) 
+                             | (gflags & (_PAGE_USER|_PAGE_RW))) };
+}
+
+static inline int sh_l1e_is_mmio(shadow_l1e_t sl1e) 
+{
+    return ((sl1e.l1 & SH_L1E_MMIO_MAGIC_MASK) == SH_L1E_MMIO_MAGIC);
+}
+
+static inline gfn_t sh_l1e_mmio_get_gfn(shadow_l1e_t sl1e) 
+{
+    return _gfn((sl1e.l1 & SH_L1E_MMIO_GFN_MASK) >> SH_L1E_MMIO_GFN_SHIFT);
+}
+
+static inline u32 sh_l1e_mmio_get_flags(shadow_l1e_t sl1e) 
+{
+    return (u32)((sl1e.l1 & (_PAGE_USER|_PAGE_RW)));
+}
+
+#else
+
+#define sh_l1e_gnp() shadow_l1e_empty()
+#define sh_l1e_mmio(_gfn, _flags) shadow_l1e_empty()
+#define sh_l1e_is_magic(_e) (0)
+
+#endif /* SHOPT_FAST_FAULT_PATH */
+
 
 #endif /* _XEN_SHADOW_TYPES_H */
 

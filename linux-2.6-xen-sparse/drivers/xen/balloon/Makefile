@@ -1,2 +1,2 @@
 
-obj-y += balloon.o
+obj-y := balloon.o sysfs.o

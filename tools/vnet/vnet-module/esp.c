@@ -104,7 +104,7 @@ void __exit esp_module_exit(void){
  * @param block size to round to a multiple of
  * @return rounded value
  */
-static inline int roundup(int n, int block){
+static inline int roundupto(int n, int block){
     if(block <= 1) return n;
     block--;
     return (n + block) & ~block;
@@ -312,9 +312,9 @@ static int esp_sa_send(SAState *sa, struct sk_buff *skb, Tunnel *tunnel){
     // header and IP header.
     plaintext_n = skb->len - ETH_HLEN - ip_n;
     // Add size of padding fields.
-    ciphertext_n = roundup(plaintext_n + ESP_PAD_N, esp->cipher.block_n);
+    ciphertext_n = roundupto(plaintext_n + ESP_PAD_N, esp->cipher.block_n);
     if(esp->cipher.pad_n > 0){
-        ciphertext_n = roundup(ciphertext_n, esp->cipher.pad_n);
+        ciphertext_n = roundupto(ciphertext_n, esp->cipher.pad_n);
     }
     extra_n = ciphertext_n - plaintext_n;
     iv_n = esp->cipher.iv_n;
@@ -502,9 +502,9 @@ static u32 esp_sa_size(SAState *sa, int data_n){
     // Have to add some padding for alignment even if pad_n is zero.
     ESPState *esp = sa->data;
     
-    data_n = roundup(data_n + ESP_PAD_N, esp->cipher.block_n);
+    data_n = roundupto(data_n + ESP_PAD_N, esp->cipher.block_n);
     if(esp->cipher.pad_n > 0){
-        data_n = roundup(data_n, esp->cipher.pad_n);
+        data_n = roundupto(data_n, esp->cipher.pad_n);
     }
     data_n += esp->digest.icv_n;
     //data_n += esp->cipher.iv_n;
@@ -607,7 +607,7 @@ static int esp_cipher_init(SAState *sa, ESPState *esp){
         err = -EINVAL;
         goto exit;
     }
-    esp->cipher.key_n = roundup(sa->cipher.bits, 8);
+    esp->cipher.key_n = roundupto(sa->cipher.bits, 8);
     // If cipher is null must use ECB because CBC algo does not support blocksize 1.
     if(strcmp(sa->cipher.name, "cipher_null")){
         cipher_mode = CRYPTO_TFM_MODE_ECB;
@@ -617,7 +617,7 @@ static int esp_cipher_init(SAState *sa, ESPState *esp){
         err = -ENOMEM;
         goto exit;
     }
-    esp->cipher.block_n = roundup(crypto_tfm_alg_blocksize(esp->cipher.tfm), 4);
+    esp->cipher.block_n = roundupto(crypto_tfm_alg_blocksize(esp->cipher.tfm), 4);
     esp->cipher.iv_n = crypto_tfm_alg_ivsize(esp->cipher.tfm);
     esp->cipher.pad_n = 0;
     if(esp->cipher.iv_n){
@@ -643,7 +643,7 @@ static int esp_digest_init(SAState *sa, ESPState *esp){
     
     dprintf(">\n");
     esp->digest.key = sa->digest.key;
-    esp->digest.key_n = bits_to_bytes(roundup(sa->digest.bits, 8));
+    esp->digest.key_n = bits_to_bytes(roundupto(sa->digest.bits, 8));
     esp->digest.tfm = crypto_alloc_tfm(sa->digest.name, 0);
     if(!esp->digest.tfm){
         err = -ENOMEM;

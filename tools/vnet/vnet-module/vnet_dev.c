@@ -49,8 +49,12 @@
 #undef DEBUG
 #include "debug.h"
 
-#ifndef CONFIG_BRIDGE
-#warning Should configure ethernet bridging in kernel Network Options
+#if !defined(CONFIG_BRIDGE) && !defined(CONFIG_BRIDGE_MODULE)
+#warning Should configure Ethernet Bridging in kernel Network Options
+#endif
+
+#ifndef CONFIG_BRIDGE_NETFILTER
+#warning Should configure CONFIG_BRIDGE_NETFILTER in kernel
 #endif
 
 static void vnet_dev_destructor(struct net_device *dev){
@@ -254,7 +258,7 @@ static int vnet_dev_setup(Vnet *vnet, struct net_device *dev){
     return err;
 }
 
-static inline int roundup(int n, int k){
+static inline int roundupto(int n, int k){
     return k * ((n + k - 1) / k);
 }
 
@@ -275,7 +279,7 @@ int vnet_dev_add(Vnet *vnet){
         vnet->header_n += sizeof(struct VnetMsgHdr);
         vnet->header_n += sizeof(struct udphdr);
     }
-    vnet->header_n = roundup(vnet->header_n, 4);
+    vnet->header_n = roundupto(vnet->header_n, 4);
     dev = alloc_netdev(0, vnet->device, vnet_dev_init);
     if(!dev){
         err = -ENOMEM;

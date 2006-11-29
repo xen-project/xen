@@ -9,7 +9,7 @@ from XmTestLib.block_utils import block_detach
 if ENABLE_HVM_SUPPORT:
     SKIP("Block-detach not supported for HVM domains")
 
-config = {"disk":"phy:/dev/ram0,hda1,w"}
+config = {"disk":"phy:/dev/ram0,xvda1,w"}
 domain = XmTestDomain(extraConfig=config)
 
 try:
@@ -21,7 +21,7 @@ except DomainError, e:
 
 try:
     console.setHistorySaveCmds(value=True)
-    run = console.runCmd("cat /proc/partitions | grep hda1")
+    run = console.runCmd("cat /proc/partitions | grep xvda1")
     run2 = console.runCmd("cat /proc/partitions")
 except ConsoleError, e:
     FAIL(str(e))
@@ -29,10 +29,10 @@ except ConsoleError, e:
 if run["return"] != 0:
     FAIL("block device isn't attached; can't detach!")
 
-block_detach(domain, "hda1")
+block_detach(domain, "xvda1")
 try:
 
-    run = console.runCmd("cat /proc/partitions | grep hda1")
+    run = console.runCmd("cat /proc/partitions | grep xvda1")
 except ConsoleError, e:
     saveLog(console.getHistory())
     FAIL(str(e))

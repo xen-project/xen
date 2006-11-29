@@ -57,7 +57,7 @@ int xc_tbuf_get_size(int xc_handle, unsigned long *size)
     return rc;
 }
 
-int xc_tbuf_enable(int xc_handle, size_t cnt, unsigned long *mfn,
+int xc_tbuf_enable(int xc_handle, unsigned long pages, unsigned long *mfn,
                    unsigned long *size)
 {
     DECLARE_SYSCTL;
@@ -68,7 +68,7 @@ int xc_tbuf_enable(int xc_handle, size_t cnt, unsigned long *mfn,
      * set (since trace buffers cannot be reallocated). If we really have no
      * buffers at all then tbuf_enable() will fail, so this is safe.
      */
-    (void)xc_tbuf_set_size(xc_handle, cnt);
+    (void)xc_tbuf_set_size(xc_handle, pages);
 
     if ( tbuf_enable(xc_handle, 1) != 0 )
         return -1;
@@ -104,7 +104,7 @@ int xc_tbuf_set_cpu_mask(int xc_handle, uint32_t mask)
     set_xen_guest_handle(sysctl.u.tbuf_op.cpu_mask.bitmap, (uint8_t *)&mask);
     sysctl.u.tbuf_op.cpu_mask.nr_cpus = sizeof(mask) * 8;
 
-    if ( mlock(&mask, sizeof(mask)) != 0 )
+    if ( lock_pages(&mask, sizeof(mask)) != 0 )
     {
         PERROR("Could not lock memory for Xen hypercall");
         goto out;
@@ -112,7 +112,7 @@ int xc_tbuf_set_cpu_mask(int xc_handle, uint32_t mask)
 
     ret = do_sysctl(xc_handle, &sysctl);
 
-    safe_munlock(&mask, sizeof(mask));
+    unlock_pages(&mask, sizeof(mask));
 
  out:
     return ret;

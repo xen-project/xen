@@ -44,11 +44,11 @@ read_page(int xc_handle, int io_fd, uint32_t dom, unsigned long pfn)
     mem = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
                                PROT_READ|PROT_WRITE, pfn);
     if (mem == NULL) {
-            ERR("cannot map page");
+            ERROR("cannot map page");
 	    return -1;
     }
     if (!read_exact(io_fd, mem, PAGE_SIZE)) {
-            ERR("Error when reading from state file (5)");
+            ERROR("Error when reading from state file (5)");
             return -1;
     }
     munmap(mem, PAGE_SIZE);
@@ -85,17 +85,17 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
 
 
     if (!read_exact(io_fd, &ver, sizeof(unsigned long))) {
-	ERR("Error when reading version");
+	ERROR("Error when reading version");
 	goto out;
     }
     if (ver != 1) {
-	ERR("version of save doesn't match");
+	ERROR("version of save doesn't match");
 	goto out;
     }
 
     if (mlock(&ctxt, sizeof(ctxt))) {
         /* needed for build domctl, but might as well do early */
-        ERR("Unable to mlock ctxt");
+        ERROR("Unable to mlock ctxt");
         return 1;
     }
 
@@ -103,7 +103,7 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
     domctl.cmd = XEN_DOMCTL_getdomaininfo;
     domctl.domain = (domid_t)dom;
     if (xc_domctl(xc_handle, &domctl) < 0) {
-        ERR("Could not get information on new domain");
+        ERROR("Could not get information on new domain");
         goto out;
     }
     shared_info_frame = domctl.u.getdomaininfo.shared_info_frame;
@@ -115,7 +115,7 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
 
     if (xc_domain_memory_increase_reservation(xc_handle, dom, max_pfn,
                                               0, 0, NULL) != 0) {
-        ERR("Failed to increase reservation by %ld KB", PFN_TO_KB(max_pfn));
+        ERROR("Failed to increase reservation by %ld KB", PFN_TO_KB(max_pfn));
         errno = ENOMEM;
         goto out;
     }
@@ -123,7 +123,7 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
     DPRINTF("Increased domain reservation by %ld KB\n", PFN_TO_KB(max_pfn));
 
     if (!read_exact(io_fd, &domctl.u.arch_setup, sizeof(domctl.u.arch_setup))) {
-        ERR("read: domain setup");
+        ERROR("read: domain setup");
         goto out;
     }
 
@@ -141,13 +141,13 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
     /* Get pages.  */
     page_array = malloc(max_pfn * sizeof(unsigned long));
     if (page_array == NULL ) {
-        ERR("Could not allocate memory");
+        ERROR("Could not allocate memory");
         goto out;
     }
 
     if (xc_ia64_get_pfn_list(xc_handle, dom, page_array,
                              0, max_pfn) != max_pfn) {
-        ERR("Could not get the page frame list");
+        ERROR("Could not get the page frame list");
         goto out;
     }
 
@@ -155,7 +155,7 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
 
     while (1) {
         if (!read_exact(io_fd, &mfn, sizeof(unsigned long))) {
-            ERR("Error when reading batch size");
+            ERROR("Error when reading batch size");
             goto out;
         }
 	if (mfn == INVALID_MFN)
@@ -178,18 +178,18 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
         int rc;
 
         if (!read_exact(io_fd, &count, sizeof(count))) {
-            ERR("Error when reading pfn count");
+            ERROR("Error when reading pfn count");
             goto out;
         }
 
         pfntab = malloc(sizeof(unsigned long) * count);
         if (!pfntab) {
-            ERR("Out of memory");
+            ERROR("Out of memory");
             goto out;
         }
 
         if (!read_exact(io_fd, pfntab, sizeof(unsigned long)*count)) {
-            ERR("Error when reading pfntab");
+            ERROR("Error when reading pfntab");
             goto out;
         }
 
@@ -211,7 +211,7 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
             rc = xc_memory_op(xc_handle, XENMEM_decrease_reservation,
                               &reservation);
             if (rc != 1) {
-                ERR("Could not decrease reservation : %d", rc);
+                ERROR("Could not decrease reservation : %d", rc);
                 goto out;
             }
         }
@@ -221,9 +221,12 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
 
 
     if (!read_exact(io_fd, &ctxt, sizeof(ctxt))) {
-        ERR("Error when reading ctxt");
+        ERROR("Error when reading ctxt");
         goto out;
     }
+
+    fprintf(stderr, "ip=%016lx, b0=%016lx\n", ctxt.user_regs.cr_iip,
+            ctxt.user_regs.b0);
 
     /* First to initialize.  */
     domctl.cmd = XEN_DOMCTL_setvcpucontext;
@@ -231,7 +234,7 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
     domctl.u.vcpucontext.vcpu   = 0;
     set_xen_guest_handle(domctl.u.vcpucontext.ctxt, &ctxt);
     if (xc_domctl(xc_handle, &domctl) != 0) {
-	    ERR("Couldn't set vcpu context");
+	    ERROR("Couldn't set vcpu context");
 	    goto out;
     }
 
@@ -242,19 +245,19 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
     domctl.u.vcpucontext.vcpu   = 0;
     set_xen_guest_handle(domctl.u.vcpucontext.ctxt, &ctxt);
     if (xc_domctl(xc_handle, &domctl) != 0) {
-	    ERR("Couldn't set vcpu context");
+	    ERROR("Couldn't set vcpu context");
 	    goto out;
     }
 
     /* Just a check.  */
     if (xc_vcpu_getcontext(xc_handle, dom, 0 /* XXX */, &ctxt)) {
-        ERR("Could not get vcpu context");
+        ERROR("Could not get vcpu context");
 	goto out;
     }
 
     /* Then get privreg page.  */
     if (read_page(xc_handle, io_fd, dom, ctxt.privregs_pfn) < 0) {
-	    ERR("Could not read vcpu privregs");
+	    ERROR("Could not read vcpu privregs");
 	    goto out;
     }
 
@@ -262,11 +265,11 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
     shared_info = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
                                        PROT_READ|PROT_WRITE, shared_info_frame);
     if (shared_info == NULL) {
-            ERR("cannot map page");
+            ERROR("cannot map page");
 	    goto out;
     }
     if (!read_exact(io_fd, shared_info, PAGE_SIZE)) {
-            ERR("Error when reading shared_info page");
+            ERROR("Error when reading shared_info page");
 	    goto out;
     }
 

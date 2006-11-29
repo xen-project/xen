@@ -16,6 +16,9 @@
 #define permit_softint(dpl, v, r) \
     ((dpl) >= (guest_kernel_mode(v, r) ? 1 : 3))
 
+/* Check for null trap callback handler: Is the EIP null? */
+#define null_trap_bounce(tb) ((tb)->eip == 0)
+
 /* Number of bytes of on-stack execution state to be context-switched. */
 /* NB. Segment registers and bases are not saved/restored on x86/64 stack. */
 #define CTXT_SWITCH_STACK_BYTES (offsetof(struct cpu_user_regs, es))

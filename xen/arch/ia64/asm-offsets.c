@@ -37,6 +37,9 @@ void foo(void)
 	DEFINE(IA64_MCA_CPU_INIT_STACK_OFFSET, offsetof (struct ia64_mca_cpu, init_stack));
 
 	BLANK();
+	DEFINE(VCPU_VTM_OFFSET_OFS, offsetof(struct vcpu, arch.arch_vmx.vtm.vtm_offset));
+	DEFINE(VCPU_VTM_LAST_ITC_OFS, offsetof(struct vcpu, arch.arch_vmx.vtm.last_itc));
+	DEFINE(VCPU_VRR0_OFS, offsetof(struct vcpu, arch.arch_vmx.vrr[0]));
 #ifdef   VTI_DEBUG
 	DEFINE(IVT_CUR_OFS, offsetof(struct vcpu, arch.arch_vmx.ivt_current));
 	DEFINE(IVT_DBG_OFS, offsetof(struct vcpu, arch.arch_vmx.ivt_debug));
@@ -139,6 +142,7 @@ void foo(void)
 	DEFINE(SWITCH_MPTA_OFFSET,offsetof(struct vcpu ,arch.arch_vmx.mpta));
 	DEFINE(IA64_PT_REGS_R16_SLOT, (((offsetof(struct pt_regs, r16)-sizeof(struct pt_regs))>>3)&0x3f));
 	DEFINE(IA64_VCPU_FLAGS_OFFSET,offsetof(struct vcpu ,arch.arch_vmx.flags));
+	DEFINE(IA64_VCPU_MODE_FLAGS_OFFSET,offsetof(struct vcpu, arch.mode_flags));
 
 	BLANK();
 

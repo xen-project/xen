@@ -154,6 +154,8 @@ static int chwall_dump_policy(u8 * buf, u32 buf_size)
     ret = ntohl(chwall_buf->chwall_conflict_aggregate_offset) +
         sizeof(domaintype_t) * chwall_bin_pol.max_types;
 
+    ret = (ret + 7) & ~7;
+
     if (buf_size < ret)
         return -EINVAL;
 

@@ -16,3 +16,5 @@ obj-y += tlb.o
 obj-y += unaligned.o
 obj-y += unwind.o
 obj-y += iosapic.o
+obj-y += numa.o
+obj-y += mm_numa.o

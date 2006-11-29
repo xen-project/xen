@@ -19,19 +19,23 @@
 
 """Labeling a domain configuration file or a resoruce.
 """
-import sys, os
+import os
+import sys
+
 from xen.util import dictio
 from xen.util import security
+from xen.xm.opts import OptionError
 
-def usage():
-    print "\nUsage: xm addlabel <label> dom <configfile> [<policy>]"
-    print "       xm addlabel <label> res <resource> [<policy>]\n"
-    print "  This program adds an acm_label entry into the 'configfile'"
-    print "  for a domain or to the global resource label file for a"
-    print "  resource. It derives the policy from the running hypervisor"
-    print "  if it is not given (optional parameter). If a label already"
-    print "  exists for the given domain or resource, then addlabel fails.\n"
-    security.err("Usage")
+def help():
+    return """
+    Format: xm addlabel <label> dom <configfile> [<policy>]
+            xm addlabel <label> res <resource> [<policy>]
+    
+    This program adds an acm_label entry into the 'configfile'
+    for a domain or to the global resource label file for a
+    resource. It derives the policy from the running hypervisor
+    if it is not given (optional parameter). If a label already
+    exists for the given domain or resource, then addlabel fails."""
 
 
 def validate_config_file(configfile):
@@ -68,13 +72,8 @@ def add_resource_label(label, resource, policyref):
     # sanity check: make sure this label can be instantiated later on
     ssidref = security.label2ssidref(label, policyref, 'res')
 
-    # sanity check on resource name
-    (type, file) = resource.split(":")
-    if type == "phy":
-        file = "/dev/" + file
-    if not os.path.exists(file):
-        print "Invalid resource '"+resource+"'"
-        return
+    #build canonical resource name
+    resource = security.unify_resname(resource)
 
     # see if this resource is already in the file
     access_control = {}
@@ -111,44 +110,45 @@ def add_domain_label(label, configfile, policyref):
     config_fd.close()
 
 
-def main (argv):
-    try:
-        policyref = None
-        if len(argv) not in [4,5]:
-            usage()
-            return
+def main(argv):
+    policyref = None
+    if len(argv) not in (4, 5):
+        raise OptionError('Needs either 2 or 3 arguments')
+    
+    label = argv[1]
+    
+    if len(argv) == 5:
+        policyref = argv[4]
+    elif security.on():
+        policyref = security.active_policy
+    else:
+        raise OptionError("No active policy. Must specify policy on the "
+                          "command line.")
 
-        label = argv[1]
-
-        if len(argv) == 5:
-            policyref = argv[4]
-        elif security.on():
-            policyref = security.active_policy
+    if argv[2].lower() == "dom":
+        configfile = argv[3]
+        if configfile[0] != '/':
+            for prefix in [".", "/etc/xen"]:
+                configfile = prefix + "/" + configfile
+                if os.path.isfile(configfile):
+                    break
+        if not validate_config_file(configfile):
+            raise OptionError('Invalid config file')
         else:
-            security.err("No active policy. Policy must be specified in command line.")
-
-        if argv[2].lower() == "dom":
-            configfile = argv[3]
-            if configfile[0] != '/':
-                for prefix in [".", "/etc/xen"]:
-                    configfile = prefix + "/" + configfile
-                    if os.path.isfile(configfile):
-                        break
-            if not validate_config_file(configfile):
-                usage()
-            else:
-                add_domain_label(label, configfile, policyref)
-        elif argv[2].lower() == "res":
-            resource = argv[3]
-            add_resource_label(label, resource, policyref)
-        else:
-            usage()
-
-    except security.ACMError:
-        sys.exit(-1)
-
-
+            add_domain_label(label, configfile, policyref)
+    elif argv[2].lower() == "res":
+        resource = argv[3]
+        add_resource_label(label, resource, policyref)
+    else:
+        raise OptionError('Need to specify either "dom" or "res" as '
+                          'object to add label to.')
+            
 if __name__ == '__main__':
-    main(sys.argv)
+    try:
+        main(sys.argv)
+    except Exception, e:
+        sys.stderr.write('Error: %s\n' % str(e))
+        sys.exit(-1)
+    
 
 

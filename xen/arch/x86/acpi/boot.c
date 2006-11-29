@@ -106,7 +106,7 @@ char *__acpi_map_table(unsigned long phys, unsigned long size)
 	unsigned long base, offset, mapped_size;
 	int idx;
 
-	if (phys + size < 8 * 1024 * 1024) 
+	if (phys + size < 8 * 1024 * 1024)
 		return __va(phys);
 
 	offset = phys & (PAGE_SIZE - 1);
@@ -132,7 +132,7 @@ char *__acpi_map_table(unsigned long phys, unsigned long size)
 #ifdef CONFIG_X86_LOCAL_APIC
 static int __init acpi_parse_madt(unsigned long phys_addr, unsigned long size)
 {
-	struct acpi_table_madt	*madt = NULL;
+	struct acpi_table_madt *madt = NULL;
 
 	if (!phys_addr || !size)
 		return -EINVAL;
@@ -147,18 +147,18 @@ static int __init acpi_parse_madt(unsigned long phys_addr, unsigned long size)
 		acpi_lapic_addr = (u64) madt->lapic_address;
 
 		printk(KERN_DEBUG PREFIX "Local APIC address 0x%08x\n",
-			madt->lapic_address);
+		       madt->lapic_address);
 	}
 
 	acpi_madt_oem_check(madt->header.oem_id, madt->header.oem_table_id);
-	
+
 	return 0;
 }
 
 static int __init
 acpi_parse_lapic(acpi_table_entry_header * header, const unsigned long end)
 {
-	struct acpi_table_lapic	*processor = NULL;
+	struct acpi_table_lapic *processor = NULL;
 
 	processor = (struct acpi_table_lapic *)header;
 
@@ -167,10 +167,17 @@ acpi_parse_lapic(acpi_table_entry_header * header, const unsigned long end)
 
 	acpi_table_print_madt_entry(header);
 
-	/* Register even disabled CPUs for cpu hotplug */
+	/* Record local apic id only when enabled */
+	if (processor->flags.enabled)
+		x86_acpiid_to_apicid[processor->acpi_id] = processor->id;
 
-	x86_acpiid_to_apicid[processor->acpi_id] = processor->id;
-
+	/*
+	 * We need to register disabled CPU as well to permit
+	 * counting disabled CPUs. This allows us to size
+	 * cpus_possible_map more accurately, to permit
+	 * to not preallocating memory for all NR_CPUS
+	 * when we use CPU hotplug.
+	 */
 	mp_register_lapic(processor->id,	/* APIC ID */
 			  processor->flags.enabled);	/* Enabled? */
 
@@ -224,7 +231,7 @@ acpi_parse_ioapic(acpi_table_entry_header * header, const unsigned long end)
 
 	if (BAD_MADT_ENTRY(ioapic, end))
 		return -EINVAL;
- 
+
 	acpi_table_print_madt_entry(header);
 
 	mp_register_ioapic(ioapic->id,
@@ -281,8 +288,8 @@ acpi_parse_nmi_src(acpi_table_entry_header * header, const unsigned long end)
 static unsigned long __init
 acpi_scan_rsdp(unsigned long start, unsigned long length)
 {
-	unsigned long		offset = 0;
-	unsigned long		sig_len = sizeof("RSD PTR ") - 1;
+	unsigned long offset = 0;
+	unsigned long sig_len = sizeof("RSD PTR ") - 1;
 
 	/*
 	 * Scan all 16-byte boundaries of the physical memory region for the
@@ -302,7 +309,7 @@ static int __init acpi_parse_sbf(unsigned long phys_addr, unsigned long size)
 	struct acpi_table_sbf *sb;
 
 	if (!phys_addr || !size)
-	return -EINVAL;
+		return -EINVAL;
 
 	sb = (struct acpi_table_sbf *)__acpi_map_table(phys_addr, size);
 	if (!sb) {
@@ -310,11 +317,10 @@ static int __init acpi_parse_sbf(unsigned long phys_addr, unsigned long size)
 		return -ENODEV;
 	}
 
-	sbf_port = sb->sbf_cmos; /* Save CMOS port */
+	sbf_port = sb->sbf_cmos;	/* Save CMOS port */
 
 	return 0;
 }
-
 
 #ifdef CONFIG_HPET_TIMER
 
@@ -349,7 +355,7 @@ static int __init acpi_parse_hpet(unsigned long phys, unsigned long size)
 
 		hpet_address = hpet_tbl->addr.addrl;
 		printk(KERN_INFO PREFIX "HPET id: %#x base: %#lx\n",
-			hpet_tbl->id, hpet_address);
+		       hpet_tbl->id, hpet_address);
 	}
 #endif	/* X86 */
 
@@ -410,17 +416,16 @@ static int __init acpi_parse_fadt(unsigned long phys, unsigned long size)
 	return 0;
 }
 
-
 unsigned long __init acpi_find_rsdp(void)
 {
-	unsigned long		rsdp_phys = 0;
+	unsigned long rsdp_phys = 0;
 
 #if 0
 	if (efi_enabled) {
-		if (efi.acpi20)
-			return __pa(efi.acpi20);
-		else if (efi.acpi)
-			return __pa(efi.acpi);
+		if (efi.acpi20 != EFI_INVALID_TABLE_ADDR)
+			return efi.acpi20;
+		else if (efi.acpi != EFI_INVALID_TABLE_ADDR)
+			return efi.acpi;
 	}
 #endif
 	/*
@@ -443,6 +448,9 @@ static int __init acpi_parse_madt_lapic_entries(void)
 {
 	int count;
 
+	if (!cpu_has_apic)
+		return -ENODEV;
+
 	/* 
 	 * Note that the LAPIC address is obtained from the MADT (32-bit value)
 	 * and (optionally) overriden by a LAPIC_ADDR_OVR entry (64-bit value).
@@ -460,8 +468,8 @@ static int __init acpi_parse_madt_lapic_entries(void)
 	mp_register_lapic_address(acpi_lapic_addr);
 
 	count = acpi_table_parse_madt(ACPI_MADT_LAPIC, acpi_parse_lapic,
-				       MAX_APICS);
-	if (!count) { 
+				      MAX_APICS);
+	if (!count) {
 		printk(KERN_ERR PREFIX "No LAPIC entries present\n");
 		/* TBD: Cleanup to allow fallback to MPS */
 		return -ENODEV;
@@ -499,14 +507,17 @@ static int __init acpi_parse_madt_ioapic_entries(void)
 	 */
 	if (acpi_disabled || acpi_noirq) {
 		return -ENODEV;
-        }
+	}
+
+	if (!cpu_has_apic)
+		return -ENODEV;
 
 	/*
- 	 * if "noapic" boot option, don't look for IO-APICs
+	 * if "noapic" boot option, don't look for IO-APICs
 	 */
 	if (skip_ioapic_setup) {
 		printk(KERN_INFO PREFIX "Skipping IOAPIC probe "
-			"due to 'noapic' option.\n");
+		       "due to 'noapic' option.\n");
 		return -ENODEV;
 	}
 
@@ -852,7 +863,7 @@ int __init acpi_boot_table_init(void)
 	 * One exception: acpi=ht continues far enough to enumerate LAPICs
 	 */
 	if (acpi_disabled && !acpi_ht)
-		 return 1;
+		return 1;
 
 	/* 
 	 * Initialize the ACPI boot-time table parser.
@@ -884,7 +895,6 @@ int __init acpi_boot_table_init(void)
 	return 0;
 }
 
-
 int __init acpi_boot_init(void)
 {
 	/*
@@ -892,7 +902,7 @@ int __init acpi_boot_init(void)
 	 * One exception: acpi=ht continues far enough to enumerate LAPICs
 	 */
 	if (acpi_disabled && !acpi_ht)
-		 return 1;
+		return 1;
 
 	acpi_table_parse(ACPI_BOOT, acpi_parse_sbf);
 
@@ -910,4 +920,3 @@ int __init acpi_boot_init(void)
 
 	return 0;
 }
-

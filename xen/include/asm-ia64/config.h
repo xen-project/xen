@@ -26,6 +26,12 @@
 #ifdef CONFIG_XEN_SMP
 #define CONFIG_SMP 1
 #define NR_CPUS 64
+#define CONFIG_NUMA
+#define CONFIG_ACPI_NUMA
+#define NODES_SHIFT 3
+#define MAX_NUMNODES (1 << NODES_SHIFT)
+#define NR_NODE_MEMBLKS (MAX_NUMNODES*2)
+#define MAX_PXM_DOMAINS 256
 #else
 #undef CONFIG_SMP
 #define NR_CPUS 1
@@ -162,6 +168,8 @@ extern int smp_num_siblings;
 
 #ifndef __ASSEMBLY__
 #include "asm/types.h"	// for u64
+#include "linux/linkage.h"	// for asmlinkage which is used by
+                                // xen/include/acpi/acpixf.h
 #endif
 
 // warning: unless search_extable is declared, the return value gets
@@ -232,7 +240,7 @@ typedef long clock_t;
 extern unsigned long loops_per_jiffy;
 extern char saved_command_line[];
 struct screen_info { };
-#define seq_printf(a,b...) printf(b)
+#define seq_printf(a,b...) printk(b)
 //#define CONFIG_BLK_DEV_INITRD // needed to reserve memory for domain0
 
 #define CONFIG_SHADOW	1
@@ -265,18 +273,16 @@ struct screen_info { };
 #endif /* __ASSEMBLY__ */
 #endif /* __XEN_IA64_CONFIG_H__ */
 
-#ifndef __ASSEMBLY__
-#include <linux/linkage.h>
-#define FORCE_CRASH()	asm("break.m 0;;");
-#else
-#define FORCE_CRASH	break.m 0;;
-#endif
-
 /* Allow .serialize.data/instruction in asm files.
    Old as doesn't handle this.  */
 #define HAVE_SERIALIZE_DIRECTIVE
 
 /* Define CONFIG_PRIVIFY to support privified OS (deprecated).  */
 #undef CONFIG_PRIVIFY
+
+/* Necessary for hvm_vioapic.c */
+#define vcpu_vlapic(vcpu)   (&(vcpu)->arch.arch_vmx.vlapic)
+#define vlapic_vcpu(vpic)   (container_of((vpic), struct vcpu, \
+                                          arch.arch_vmx.vlapic))
 
 #endif	/* _IA64_CONFIG_H_ */

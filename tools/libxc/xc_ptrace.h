@@ -1,9 +1,6 @@
 #ifndef XC_PTRACE_
 #define XC_PTRACE_
 
-#include <thread_db.h>
-
-#ifdef XC_PTRACE_PRIVATE
 #define X86_CR0_PE              0x00000001 /* Enable Protected Mode    (RW) */
 #define X86_CR0_PG              0x80000000 /* Paging                   (RW) */
 #define BSD_PAGE_MASK (PAGE_SIZE-1)
@@ -159,26 +156,5 @@ struct gdb_regs {
     xc.gs = pt->xgs;                            \
 }
 #endif
-
-#endif
-
-typedef void (*thr_ev_handler_t)(long);
-
-void xc_register_event_handler(
-    thr_ev_handler_t h,
-    td_event_e e);
-
-long xc_ptrace(
-    int xc_handle,
-    enum __ptrace_request request,
-    uint32_t  domid,
-    long addr,
-    long data);
-
-int xc_waitdomain(
-    int xc_handle,
-    int domain,
-    int *status,
-    int options);
 
 #endif /* XC_PTRACE */

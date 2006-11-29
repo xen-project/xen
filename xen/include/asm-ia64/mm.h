@@ -18,6 +18,7 @@
 #include <asm/processor.h>
 #include <asm/atomic.h>
 #include <asm/tlbflush.h>
+#include <asm/flushtlb.h>
 #include <asm/io.h>
 
 #include <public/xen.h>
@@ -103,14 +104,6 @@ struct page_info
 #define _PGT_pinned         27
 #define PGT_pinned          (1U<<_PGT_pinned)
 
- /* The 27 most significant bits of virt address if this is a page table. */
-#define PGT_va_shift        32
-#define PGT_va_mask         ((unsigned long)((1U<<28)-1)<<PGT_va_shift)
- /* Is the back pointer still mutable (i.e. not fixed yet)? */
-#define PGT_va_mutable      ((unsigned long)((1U<<28)-1)<<PGT_va_shift)
- /* Is the back pointer unknown (e.g., p.t. is mapped at multiple VAs)? */
-#define PGT_va_unknown      ((unsigned long)((1U<<28)-2)<<PGT_va_shift)
-
  /* 16-bit count of uses of this frame as its current type. */
 #define PGT_count_mask      ((1U<<16)-1)
 
@@ -125,10 +118,14 @@ struct page_info
 #define IS_XEN_HEAP_FRAME(_pfn) ((page_to_maddr(_pfn) < xenheap_phys_end) \
 				 && (page_to_maddr(_pfn) >= xen_pstart))
 
-static inline struct domain *unpickle_domptr(u32 _d)
-{ return (_d == 0) ? NULL : __va(_d); }
+extern void *xen_heap_start;
+#define __pickle(a)	((unsigned long)a - (unsigned long)xen_heap_start)
+#define __unpickle(a)	(void *)(a + xen_heap_start)
+
+static inline struct domain *unpickle_domptr(u64 _d)
+{ return (_d == 0) ? NULL : __unpickle(_d); }
 static inline u32 pickle_domptr(struct domain *_d)
-{ return (_d == NULL) ? 0 : (u32)__pa(_d); }
+{ return (_d == NULL) ? 0 : (u32)__pickle(_d); }
 
 #define page_get_owner(_p)	(unpickle_domptr((_p)->u.inuse._domain))
 #define page_set_owner(_p, _d)	((_p)->u.inuse._domain = pickle_domptr(_d))
@@ -178,7 +175,7 @@ static inline int get_page(struct page_info *page,
 	    unlikely((nx & PGC_count_mask) == 0) ||	/* Count overflow? */
 	    unlikely((x >> 32) != _domain)) {		/* Wrong owner? */
 
-	    DPRINTK("Error pfn %lx: rd=%p, od=%p, caf=%016lx, taf=%"
+	    gdprintk(XENLOG_INFO, "Error pfn %lx: rd=%p, od=%p, caf=%016lx, taf=%"
 		PRtype_info "\n", page_to_mfn(page), domain,
 		unpickle_domptr(x >> 32), x, page->u.inuse.type_info);
 	    return 0;
@@ -428,7 +425,7 @@ extern void alloc_dom_xen_and_dom_io(void);
 extern void relinquish_mm(struct domain* d);
 extern struct page_info * assign_new_domain_page(struct domain *d, unsigned long mpaddr);
 extern void assign_new_domain0_page(struct domain *d, unsigned long mpaddr);
-extern void __assign_domain_page(struct domain *d, unsigned long mpaddr, unsigned long physaddr, unsigned long flags);
+extern int __assign_domain_page(struct domain *d, unsigned long mpaddr, unsigned long physaddr, unsigned long flags);
 extern void assign_domain_page(struct domain *d, unsigned long mpaddr, unsigned long physaddr);
 extern void assign_domain_io_page(struct domain *d, unsigned long mpaddr, unsigned long flags);
 struct p2m_entry;
@@ -443,6 +440,13 @@ extern unsigned long ____lookup_domain_mpa(struct domain *d, unsigned long mpadd
 extern unsigned long do_dom0vp_op(unsigned long cmd, unsigned long arg0, unsigned long arg1, unsigned long arg2, unsigned long arg3);
 extern unsigned long dom0vp_zap_physmap(struct domain *d, unsigned long gpfn, unsigned int extent_order);
 extern unsigned long dom0vp_add_physmap(struct domain* d, unsigned long gpfn, unsigned long mfn, unsigned long flags, domid_t domid);
+#ifdef CONFIG_XEN_IA64_EXPOSE_P2M
+extern void expose_p2m_init(void);
+extern unsigned long dom0vp_expose_p2m(struct domain* d, unsigned long conv_start_gpfn, unsigned long assign_start_gpfn, unsigned long expose_size, unsigned long granule_pfn);
+#else
+#define expose_p2m_init()       do { } while (0)
+#define dom0vp_expose_p2m(d, conv_start_gpfn, assign_start_gpfn, expose_size, granule_pfn)	(-ENOSYS)
+#endif
 
 extern volatile unsigned long *mpt_table;
 extern unsigned long gmfn_to_mfn_foreign(struct domain *d, unsigned long gpfn);
@@ -492,6 +496,10 @@ extern u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps,
 
 #define __gpa_to_mpa(_d, gpa)   \
     ((gmfn_to_mfn((_d),(gpa)>>PAGE_SHIFT)<<PAGE_SHIFT)|((gpa)&~PAGE_MASK))
+
+#define __mpa_to_gpa(madr) \
+    ((get_gpfn_from_mfn((madr) >> PAGE_SHIFT) << PAGE_SHIFT) | \
+    ((madr) & ~PAGE_MASK))
 
 /* Arch-specific portion of memory_op hypercall. */
 long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg);

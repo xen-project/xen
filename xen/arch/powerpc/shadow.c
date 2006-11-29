@@ -120,14 +120,14 @@ int shadow_domctl(struct domain *d,
 {
     if ( unlikely(d == current->domain) )
     {
-        DPRINTK("Don't try to do a shadow op on yourself!\n");
+        gdprintk(XENLOG_INFO, "Don't try to do a shadow op on yourself!\n");
         return -EINVAL;
     }
 
     switch ( sc->op )
     {
     case XEN_DOMCTL_SHADOW_OP_OFF:
-         DPRINTK("Shadow is mandatory!\n");
+         gdprintk(XENLOG_INFO, "Shadow is mandatory!\n");
          return -EINVAL;
 
     case XEN_DOMCTL_SHADOW_OP_GET_ALLOCATION:

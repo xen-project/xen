@@ -41,6 +41,7 @@
 #include <xen/evtchn.h>
 #include <xen/interface/grant_table.h>
 #include <xen/interface/io/tpmif.h>
+#include <xen/gnttab.h>
 #include <xen/xenbus.h>
 #include "tpm.h"
 #include "tpm_vtpm.h"
@@ -343,6 +344,7 @@ static void backend_changed(struct xenbus_device *dev,
 	case XenbusStateInitialising:
 	case XenbusStateInitWait:
 	case XenbusStateInitialised:
+	case XenbusStateUnknown:
 		break;
 
 	case XenbusStateConnected:
@@ -351,13 +353,14 @@ static void backend_changed(struct xenbus_device *dev,
 
 	case XenbusStateClosing:
 		tpmif_set_connected_state(tp, 0);
+		xenbus_frontend_closed(dev);
 		break;
 
-	case XenbusStateUnknown:
 	case XenbusStateClosed:
+		tpmif_set_connected_state(tp, 0);
 		if (tp->is_suspended == 0)
 			device_unregister(&dev->dev);
-		xenbus_switch_state(dev, XenbusStateClosed);
+		xenbus_frontend_closed(dev);
 		break;
 	}
 }
@@ -419,9 +422,10 @@ static int tpmfront_suspend(struct xenbus_device *dev)
 	mutex_lock(&suspend_lock);
 	tp->is_suspended = 1;
 
-	for (ctr = 0; atomic_read(&tp->tx_busy) && ctr <= 25; ctr++) {
+	for (ctr = 0; atomic_read(&tp->tx_busy) && ctr <= 300; ctr++) {
 		if ((ctr % 10) == 0)
-			printk("TPM-FE [INFO]: Waiting for outstanding request.\n");
+			printk("TPM-FE [INFO]: Waiting for outstanding "
+			       "request.\n");
 		/*
 		 * Wait for a request to be responded to.
 		 */

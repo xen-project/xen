@@ -1,7 +1,7 @@
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2006-08-08 11:24:33.479955101 +0100
-+++ ioemu/Makefile.target	2006-08-08 11:24:39.008338255 +0100
+--- ioemu.orig/Makefile.target	2006-10-24 13:47:23.000000000 +0100
++++ ioemu/Makefile.target	2006-10-24 14:30:56.000000000 +0100
 @@ -62,6 +62,8 @@
  QEMU_SYSTEM=qemu-fast
  endif
@@ -32,8 +32,8 @@ Index: ioemu/Makefile.target
  DEFINES += -DHAS_AUDIO
 Index: ioemu/configure
 ===================================================================
---- ioemu.orig/configure	2006-08-08 11:24:33.480954990 +0100
-+++ ioemu/configure	2006-08-08 11:24:38.122437102 +0100
+--- ioemu.orig/configure	2006-10-24 13:47:23.000000000 +0100
++++ ioemu/configure	2006-10-24 14:29:34.000000000 +0100
 @@ -373,6 +373,8 @@
      if [ "$user" = "yes" ] ; then
          target_list="i386-user arm-user armeb-user sparc-user ppc-user mips-user mipsel-user $target_list"
@@ -45,8 +45,8 @@ Index: ioemu/configure
  fi
 Index: ioemu/monitor.c
 ===================================================================
---- ioemu.orig/monitor.c	2006-08-08 11:24:33.484954543 +0100
-+++ ioemu/monitor.c	2006-08-08 11:24:39.253310921 +0100
+--- ioemu.orig/monitor.c	2006-10-24 13:47:23.000000000 +0100
++++ ioemu/monitor.c	2006-10-24 14:30:56.000000000 +0100
 @@ -1262,6 +1262,10 @@
        "", "show profiling information", },
      { "capture", "", do_info_capture,
@@ -60,8 +60,8 @@ Index: ioemu/monitor.c
  
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-08-08 11:24:33.486954320 +0100
-+++ ioemu/vl.c	2006-08-08 11:24:39.454288496 +0100
+--- ioemu.orig/vl.c	2006-10-24 13:47:23.000000000 +0100
++++ ioemu/vl.c	2006-10-24 14:30:56.000000000 +0100
 @@ -87,7 +87,7 @@
  
  #include "exec-all.h"
@@ -98,8 +98,8 @@ Index: ioemu/vl.c
  {
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-08-08 11:24:31.082222636 +0100
-+++ ioemu/vl.h	2006-08-08 11:24:39.454288496 +0100
+--- ioemu.orig/vl.h	2006-10-24 13:47:23.000000000 +0100
++++ ioemu/vl.h	2006-10-24 14:30:56.000000000 +0100
 @@ -37,6 +37,8 @@
  #include <unistd.h>
  #include <fcntl.h>
@@ -132,7 +132,7 @@ Index: ioemu/vl.h
 Index: ioemu/target-i386-dm/cpu.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/cpu.h	2006-08-08 11:24:39.099328102 +0100
++++ ioemu/target-i386-dm/cpu.h	2006-10-24 14:30:56.000000000 +0100
 @@ -0,0 +1,86 @@
 +/*
 + * i386 virtual CPU header
@@ -223,7 +223,7 @@ Index: ioemu/target-i386-dm/cpu.h
 Index: ioemu/target-i386-dm/exec-dm.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/exec-dm.c	2006-08-08 11:24:39.099328102 +0100
++++ ioemu/target-i386-dm/exec-dm.c	2006-10-24 14:30:56.000000000 +0100
 @@ -0,0 +1,516 @@
 +/*
 + *  virtual page mapping and translated block handling
@@ -744,7 +744,7 @@ Index: ioemu/target-i386-dm/exec-dm.c
 Index: ioemu/target-i386-dm/helper2.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/helper2.c	2006-08-08 11:24:44.888682140 +0100
++++ ioemu/target-i386-dm/helper2.c	2006-10-24 14:31:01.000000000 +0100
 @@ -0,0 +1,469 @@
 +/*
 + *  i386 helpers (without register variable usage)
@@ -1218,7 +1218,7 @@ Index: ioemu/target-i386-dm/helper2.c
 Index: ioemu/target-i386-dm/i8259-dm.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/i8259-dm.c	2006-08-08 11:24:33.505952200 +0100
++++ ioemu/target-i386-dm/i8259-dm.c	2006-10-24 13:47:23.000000000 +0100
 @@ -0,0 +1,107 @@
 +/* Xen 8259 stub for interrupt controller emulation
 + * 
@@ -1330,7 +1330,7 @@ Index: ioemu/target-i386-dm/i8259-dm.c
 Index: ioemu/target-i386-dm/qemu-dm.debug
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/qemu-dm.debug	2006-08-08 11:24:33.505952200 +0100
++++ ioemu/target-i386-dm/qemu-dm.debug	2006-10-24 13:47:23.000000000 +0100
 @@ -0,0 +1,5 @@
 +#!/bin/sh
 +
@@ -1340,7 +1340,7 @@ Index: ioemu/target-i386-dm/qemu-dm.debug
 Index: ioemu/target-i386-dm/qemu-ifup
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/qemu-ifup	2006-08-08 11:24:33.505952200 +0100
++++ ioemu/target-i386-dm/qemu-ifup	2006-10-24 13:47:23.000000000 +0100
 @@ -0,0 +1,10 @@
 +#!/bin/sh
 +

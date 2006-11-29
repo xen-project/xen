@@ -42,11 +42,14 @@
 #include <linux/fcntl.h>
 #include <linux/kthread.h>
 #include <linux/rwsem.h>
+#include <linux/module.h>
+#include <linux/mutex.h>
 #include <xen/xenbus.h>
 #include "xenbus_comms.h"
 
-/* xenbus_probe.c */
-extern char *kasprintf(const char *fmt, ...);
+#ifdef HAVE_XEN_PLATFORM_COMPAT_H
+#include <xen/platform-compat.h>
+#endif
 
 struct xs_stored_msg {
 	struct list_head list;
@@ -289,9 +292,9 @@ static char *join(const char *dir, const char *name)
 	char *buffer;
 
 	if (strlen(name) == 0)
-		buffer = kasprintf("%s", dir);
+		buffer = kasprintf(GFP_KERNEL, "%s", dir);
 	else
-		buffer = kasprintf("%s/%s", dir, name);
+		buffer = kasprintf(GFP_KERNEL, "%s/%s", dir, name);
 	return (!buffer) ? ERR_PTR(-ENOMEM) : buffer;
 }
 

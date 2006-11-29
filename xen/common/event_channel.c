@@ -40,7 +40,8 @@
 
 #define ERROR_EXIT(_errno)                                          \
     do {                                                            \
-        DPRINTK("EVTCHNOP failure: domain %d, error %d, line %d\n", \
+        gdprintk(XENLOG_WARNING,                                    \
+                "EVTCHNOP failure: domain %d, error %d, line %d\n", \
                 current->domain->domain_id, (_errno), __LINE__);    \
         rc = (_errno);                                              \
         goto out;                                                   \

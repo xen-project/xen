@@ -196,7 +196,7 @@ int vnet_dev_add(struct Vnet *vnet){
     if(err){
         wprintf("> Unable to open tap device.\n"
                 "The tun module must be loaded and\n"
-                "the vnet kernel module must not be loaded.");
+                "the vnet kernel module must not be loaded.\n");
         deallocate(dev);
         goto exit;
     }
@@ -764,7 +764,7 @@ static int vnetd_getopts(Vnetd *vnetd, int argc, char *argv[]){
  *
  * @param vnetd vnetd
  */
-int vnetd_init(Vnetd *vnetd, int argc, char *argv[]){
+static int vnetd_init(Vnetd *vnetd, int argc, char *argv[]){
     int err = 0;
 
     // Use etherip-in-udp encapsulation.
@@ -791,7 +791,7 @@ int vnetd_init(Vnetd *vnetd, int argc, char *argv[]){
     return err;
 }
 
-void vnet_select(Vnetd *vnetd, SelectSet *set){
+static void vnet_select(Vnetd *vnetd, SelectSet *set){
     HashTable_for_decl(entry);
 
     HashTable_for_each(entry, vnetd->vnet_table){
@@ -803,7 +803,7 @@ void vnet_select(Vnetd *vnetd, SelectSet *set){
     }
 }
 
-void vnet_handle(Vnetd *vnetd, SelectSet *set){
+static void vnet_handle(Vnetd *vnetd, SelectSet *set){
     HashTable_for_decl(entry);
 
     HashTable_for_each(entry, vnetd->vnet_table){
@@ -820,7 +820,7 @@ void vnet_handle(Vnetd *vnetd, SelectSet *set){
     }
 }
 
-int vnetd_handle_udp(Vnetd *vnetd, struct sockaddr_in *addr, int sock){
+static int vnetd_handle_udp(Vnetd *vnetd, struct sockaddr_in *addr, int sock){
     int err = 0, n = 0;
     struct sockaddr_in peer, dest;
     socklen_t peer_n = sizeof(peer), dest_n = sizeof(dest);
@@ -851,7 +851,7 @@ int vnetd_handle_udp(Vnetd *vnetd, struct sockaddr_in *addr, int sock){
     return err;
 }
 
-int vnetd_handle_etherip(Vnetd *vnetd, struct sockaddr_in *addr, int sock){
+static int vnetd_handle_etherip(Vnetd *vnetd, struct sockaddr_in *addr, int sock){
     int err = 0, n = 0;
     struct sockaddr_in peer, dest;
     socklen_t peer_n = sizeof(peer), dest_n = sizeof(dest);
@@ -883,7 +883,7 @@ typedef struct ConnClient {
     Parser *parser;
 } ConnClient;
 
-int conn_handle_fn(Conn *conn, int mode){
+static int conn_handle_fn(Conn *conn, int mode){
     int err;
     ConnClient *client = conn->data;
     char data[1024] = {};
@@ -923,12 +923,12 @@ int conn_handle_fn(Conn *conn, int mode){
     return (err < 0 ? err : 0);
 }
 
-int vnetd_handle_unix(Vnetd *vnetd, int sock){
+static int vnetd_handle_unix(Vnetd *vnetd, int sock){
     int err;
     ConnClient *client = NULL;
     Conn *conn = NULL;
     struct sockaddr_un peer = {};
-    int peer_n = sizeof(peer);
+    socklen_t peer_n = sizeof(peer);
     int peersock;
 
     peersock = accept(sock, (struct sockaddr *)&peer, &peer_n);
@@ -956,7 +956,7 @@ int vnetd_handle_unix(Vnetd *vnetd, int sock){
     return err;
 }
 
-void vnetd_select(Vnetd *vnetd, SelectSet *set){
+static void vnetd_select(Vnetd *vnetd, SelectSet *set){
     SelectSet_add(set, vnetd->unix_sock, SELECT_READ);
     SelectSet_add(set, vnetd->udp_sock, SELECT_READ);
     SelectSet_add(set, vnetd->mcast_sock, SELECT_READ);
@@ -967,7 +967,7 @@ void vnetd_select(Vnetd *vnetd, SelectSet *set){
     ConnList_select(vnetd->conns, set);
 }
 
-void vnetd_handle(Vnetd *vnetd, SelectSet *set){
+static void vnetd_handle(Vnetd *vnetd, SelectSet *set){
     if(SelectSet_in_read(set, vnetd->unix_sock)){
         vnetd_handle_unix(vnetd, vnetd->unix_sock);
     }
@@ -995,7 +995,7 @@ void vnetd_handle(Vnetd *vnetd, SelectSet *set){
  */
 static unsigned timer_alarms = 0;
 
-int vnetd_main(Vnetd *vnetd){
+static int vnetd_main(Vnetd *vnetd){
     int err = 0;
     SelectSet _set = {}, *set = &_set;
     struct timeval _timeout = {}, *timeout = &_timeout;
@@ -1030,12 +1030,12 @@ int vnetd_main(Vnetd *vnetd){
     return err;
 }
 
-int getsockaddr(int sock, struct sockaddr_in *addr){
+static int getsockaddr(int sock, struct sockaddr_in *addr){
     socklen_t addr_n = sizeof(struct sockaddr_in);
     return getsockname(sock, (struct sockaddr*)addr, &addr_n);
 }
 
-int vnetd_etherip_sock(Vnetd *vnetd){
+static int vnetd_etherip_sock(Vnetd *vnetd){
     int err = 0;
 
     if(!vnetd->etherip) goto exit;
@@ -1051,7 +1051,7 @@ int vnetd_etherip_sock(Vnetd *vnetd){
     return err;
 }
 
-int vnetd_udp_sock(Vnetd *vnetd){
+static int vnetd_udp_sock(Vnetd *vnetd){
     int err;
     uint32_t mcaddr = vnetd_mcast_addr(vnetd);
 
@@ -1087,7 +1087,7 @@ int vnetd_udp_sock(Vnetd *vnetd){
     return err;
 }
 
-int vnetd_raw_sock(Vnetd *vnetd){
+static int vnetd_raw_sock(Vnetd *vnetd){
     int err;
 
     err = vnetd_raw_socket(vnetd, IPPROTO_RAW,
@@ -1101,7 +1101,7 @@ int vnetd_raw_sock(Vnetd *vnetd){
     return err;
 }
 
-int vnetd_unix_sock(Vnetd *vnetd){
+static int vnetd_unix_sock(Vnetd *vnetd){
     int err = 0;
     struct sockaddr_un addr = { .sun_family = AF_UNIX };
     socklen_t addr_n;

@@ -130,7 +130,7 @@ static void __init page_table_range_init (unsigned long start, unsigned long end
 		pud = pud_offset(pgd, vaddr);
 		pmd = pmd_offset(pud, vaddr);
 		for (; (pmd_idx < PTRS_PER_PMD) && (vaddr != end); pmd++, pmd_idx++) {
-			if (vaddr < HYPERVISOR_VIRT_START && pmd_none(*pmd)) 
+			if (vaddr < hypervisor_virt_start && pmd_none(*pmd))
 				one_page_table_init(pmd);
 
 			vaddr += PMD_SIZE;
@@ -187,7 +187,7 @@ static void __init kernel_physical_mapping_init(pgd_t *pgd_base)
 		pmd += pmd_idx;
 		for (; pmd_idx < PTRS_PER_PMD && pfn < max_low_pfn; pmd++, pmd_idx++) {
 			unsigned int address = pfn * PAGE_SIZE + PAGE_OFFSET;
-			if (address >= HYPERVISOR_VIRT_START)
+			if (address >= hypervisor_virt_start)
 				continue;
 
 			/* Map with big pages if possible, otherwise create normal page tables. */
@@ -410,7 +410,7 @@ static void __init pagetable_init (void)
 	 * created - mappings will be set by set_fixmap():
 	 */
 	vaddr = __fix_to_virt(__end_of_fixed_addresses - 1) & PMD_MASK;
-	page_table_range_init(vaddr, 0, pgd_base);
+	page_table_range_init(vaddr, hypervisor_virt_start, pgd_base);
 
 	permanent_kmaps_init(pgd_base);
 }
@@ -663,8 +663,8 @@ void __init mem_init(void)
 	totalram_pages += free_all_bootmem();
 	/* XEN: init and count low-mem pages outside initial allocation. */
 	for (pfn = xen_start_info->nr_pages; pfn < max_low_pfn; pfn++) {
-		ClearPageReserved(&mem_map[pfn]);
-		set_page_count(&mem_map[pfn], 1);
+		ClearPageReserved(pfn_to_page(pfn));
+		set_page_count(pfn_to_page(pfn), 1);
 		totalram_pages++;
 	}
 

@@ -95,6 +95,7 @@
 
 #define VMX_FAULT(n)    \
 vmx_fault_##n:;          \
+    mov r19=n;;          \
     br.sptk.many dispatch_to_fault_handler;         \
     ;;                  \
 
@@ -106,7 +107,7 @@ vmx_fault_##n:;          \
     ;;      \
     tbit.z p6,p7=r29,IA64_PSR_VM_BIT;       \
 (p7)br.sptk.many vmx_dispatch_reflection;        \
-    VMX_FAULT(n);            \
+    br.sptk.many dispatch_to_fault_handler;      \
 
 
 GLOBAL_ENTRY(vmx_panic)
@@ -172,13 +173,17 @@ vmx_itlb_loop:
     ld8 r27 = [r18]
     ld8 r29 = [r28]
     ;;
-    st8 [r16] = r29
-    st8 [r28] = r22
+    st8 [r16] = r29, VLE_ITIR_OFFSET - VLE_TITAG_OFFSET
+    st8 [r28] = r22, VLE_ITIR_OFFSET - VLE_TITAG_OFFSET
     extr.u r19 = r27, 56, 4
     ;;
+    ld8 r29 = [r16]
+    ld8 r22 = [r28]
     dep r27 = r0, r27, 56, 4
     dep r25 = r19, r25, 56, 4
     ;;
+    st8 [r16] = r22
+    st8 [r28] = r29
     st8 [r18] = r25
     st8 [r17] = r27
     ;;
@@ -246,13 +251,17 @@ vmx_dtlb_loop:
     ld8 r27 = [r18]
     ld8 r29 = [r28]
     ;;
-    st8 [r16] = r29
-    st8 [r28] = r22
+    st8 [r16] = r29, VLE_ITIR_OFFSET - VLE_TITAG_OFFSET
+    st8 [r28] = r22, VLE_ITIR_OFFSET - VLE_TITAG_OFFSET
     extr.u r19 = r27, 56, 4
     ;;
+    ld8 r29 = [r16]
+    ld8 r22 = [r28]
     dep r27 = r0, r27, 56, 4
     dep r25 = r19, r25, 56, 4
     ;;
+    st8 [r16] = r22
+    st8 [r28] = r29
     st8 [r18] = r25
     st8 [r17] = r27
     ;;    
@@ -772,12 +781,28 @@ ENTRY(vmx_single_step_trap)
     VMX_REFLECT(36)
 END(vmx_single_step_trap)
 
+    .global vmx_virtualization_fault_back
     .org vmx_ia64_ivt+0x6100
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6100 Entry 37 (size 16 bundles) Virtualization Fault
 ENTRY(vmx_virtualization_fault)
 //    VMX_DBG_FAULT(37)
     mov r31=pr
+    ;;
+    cmp.eq p6,p0=EVENT_MOV_FROM_AR,r24
+    cmp.eq p7,p0=EVENT_MOV_FROM_RR,r24
+    cmp.eq p8,p0=EVENT_MOV_TO_RR,r24
+    cmp.eq p9,p0=EVENT_RSM,r24
+    cmp.eq p10,p0=EVENT_SSM,r24
+    cmp.eq p11,p0=EVENT_MOV_TO_PSR,r24
+    (p6) br.dptk.many vmx_asm_mov_from_ar
+    (p7) br.dptk.many vmx_asm_mov_from_rr
+    (p8) br.dptk.many vmx_asm_mov_to_rr
+    (p9) br.dptk.many vmx_asm_rsm
+    (p10) br.dptk.many vmx_asm_ssm
+    (p11) br.dptk.many vmx_asm_mov_to_psr
+    ;;
+vmx_virtualization_fault_back:
     mov r19=37
     adds r16 = IA64_VCPU_CAUSE_OFFSET,r21
     adds r17 = IA64_VCPU_OPCODE_OFFSET,r21
@@ -1049,7 +1074,7 @@ ENTRY(vmx_dispatch_virtualization_fault)
 END(vmx_dispatch_virtualization_fault)
 
 
-ENTRY(vmx_dispatch_vexirq)
+GLOBAL_ENTRY(vmx_dispatch_vexirq)
     VMX_SAVE_MIN_WITH_COVER_R19
     alloc r14=ar.pfs,0,0,1,0
     mov out0=r13

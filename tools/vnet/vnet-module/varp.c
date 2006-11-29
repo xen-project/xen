@@ -849,6 +849,7 @@ VarpTable * VarpTable_new(void){
     if(!vtable) goto exit;
     vtable->table = HashTable_new(VARP_TABLE_BUCKETS);
     if(!vtable->table) goto exit;
+    vtable->table->key_size = sizeof(VarpKey);
     vtable->table->key_equal_fn = varp_key_equal_fn;
     vtable->table->key_hash_fn = varp_key_hash_fn;
     vtable->table->entry_free_fn = varp_entry_free_fn;
@@ -1529,8 +1530,12 @@ void varp_exit(void){
     dprintf("<\n");
 }
 
+#ifdef MODULE_PARM
 MODULE_PARM(varp_mcaddr, "s");
-MODULE_PARM_DESC(varp_mcaddr, "VARP multicast address");
-
 MODULE_PARM(varp_device, "s");
+#else
+module_param(varp_mcaddr, charp, 0644);
+module_param(varp_device, charp, 0644);
+#endif
+MODULE_PARM_DESC(varp_mcaddr, "VARP multicast address");
 MODULE_PARM_DESC(varp_device, "VARP network device");

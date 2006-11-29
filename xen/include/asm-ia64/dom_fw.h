@@ -39,6 +39,13 @@
 #define FW_HYPERCALL_NUM_MASK_HIGH	~0xffUL
 #define FW_HYPERCALL_NUM_MASK_LOW	 0xffUL
 
+/* Xen hypercalls are 0-63.  */
+#define FW_HYPERCALL_XEN		0x0000UL
+
+/* Define some faster and lighter hypercalls.
+   See definitions in arch-ia64.h */
+#define FW_HYPERCALL_XEN_FAST		0x0200UL
+
 /*
  * PAL can be called in physical or virtual mode simply by
  * branching to pal_entry_point, which is found in one of the
@@ -173,7 +180,7 @@
 
 #define EFI_MEMDESC_VERSION		1
 
-extern struct ia64_pal_retval xen_pal_emulator(UINT64, u64, u64, u64);
+extern struct ia64_pal_retval xen_pal_emulator(u64, u64, u64, u64);
 extern struct sal_ret_values sal_emulator (long index, unsigned long in1, unsigned long in2, unsigned long in3, unsigned long in4, unsigned long in5, unsigned long in6, unsigned long in7);
 extern struct ia64_pal_retval pal_emulator_static (unsigned long);
 extern efi_status_t efi_emulator (struct pt_regs *regs, unsigned long *fault);

@@ -38,7 +38,7 @@
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/support.h>
-#include <asm/hvm/vpit.h>
+#include <asm/hvm/vpt.h>
 #include <asm/current.h>
 
 /* Enable DEBUG_PIT may cause guest calibration inaccuracy */
@@ -49,7 +49,6 @@
 #define RW_STATE_WORD0 3
 #define RW_STATE_WORD1 4
 
-#define ticks_per_sec(v)      (v->domain->arch.hvm_domain.tsc_frequency)
 static int handle_pit_io(ioreq_t *p);
 static int handle_speaker_io(ioreq_t *p);
 
@@ -75,17 +74,6 @@ uint64_t muldiv64(uint64_t a, uint32_t b, uint32_t c)
     res.l.high = rh / c;
     res.l.low = (((rh % c) << 32) + (rl & 0xffffffff)) / c;
     return res.ll;
-}
-
-/*
- * get processor time.
- * unit: TSC
- */
-int64_t hvm_get_clock(struct vcpu *v)
-{
-    uint64_t  gtsc;
-    gtsc = hvm_get_guest_time(v);
-    return gtsc;
 }
 
 static int pit_get_count(PITChannelState *s)
@@ -215,11 +203,11 @@ static inline void pit_load_count(PITChannelState *s, int val)
     switch (s->mode) {
         case 2:
             /* create periodic time */
-            s->pt = create_periodic_time (s, period, 0, 0);
+            s->pt = create_periodic_time (period, 0, 0, pit_time_fired, s);
             break;
         case 1:
             /* create one shot time */
-            s->pt = create_periodic_time (s, period, 0, 1);
+            s->pt = create_periodic_time (period, 0, 1, pit_time_fired, s);
 #ifdef DEBUG_PIT
             printk("HVM_PIT: create one shot time.\n");
 #endif
@@ -386,9 +374,9 @@ void pit_init(struct vcpu *v, unsigned long cpu_khz)
     s++; s->vcpu = v;
     s++; s->vcpu = v;
 
-    register_portio_handler(PIT_BASE, 4, handle_pit_io);
+    register_portio_handler(v->domain, PIT_BASE, 4, handle_pit_io);
     /* register the speaker port */
-    register_portio_handler(0x61, 1, handle_speaker_io);
+    register_portio_handler(v->domain, 0x61, 1, handle_speaker_io);
     ticks_per_sec(v) = cpu_khz * (int64_t)1000;
 #ifdef DEBUG_PIT
     printk("HVM_PIT: guest frequency =%lld\n", (long long)ticks_per_sec(v));
@@ -404,17 +392,17 @@ static int handle_pit_io(ioreq_t *p)
     struct PITState *vpit = &(v->domain->arch.hvm_domain.pl_time.vpit);
 
     if (p->size != 1 ||
-        p->pdata_valid ||
+        p->data_is_ptr ||
         p->type != IOREQ_TYPE_PIO){
         printk("HVM_PIT:wrong PIT IO!\n");
         return 1;
     }
     
     if (p->dir == 0) {/* write */
-        pit_ioport_write(vpit, p->addr, p->u.data);
+        pit_ioport_write(vpit, p->addr, p->data);
     } else if (p->dir == 1) { /* read */
         if ( (p->addr & 3) != 3 ) {
-            p->u.data = pit_ioport_read(vpit, p->addr);
+            p->data = pit_ioport_read(vpit, p->addr);
         } else {
             printk("HVM_PIT: read A1:A0=3!\n");
         }
@@ -446,16 +434,16 @@ static int handle_speaker_io(ioreq_t *p)
     struct PITState *vpit = &(v->domain->arch.hvm_domain.pl_time.vpit);
 
     if (p->size != 1 ||
-        p->pdata_valid ||
+        p->data_is_ptr ||
         p->type != IOREQ_TYPE_PIO){
         printk("HVM_SPEAKER:wrong SPEAKER IO!\n");
         return 1;
     }
     
     if (p->dir == 0) {/* write */
-        speaker_ioport_write(vpit, p->addr, p->u.data);
+        speaker_ioport_write(vpit, p->addr, p->data);
     } else if (p->dir == 1) {/* read */
-        p->u.data = speaker_ioport_read(vpit, p->addr);
+        p->data = speaker_ioport_read(vpit, p->addr);
     }
 
     return 1;

@@ -1,0 +1,346 @@
+/*
+ * Copyright (c) 2004, Intel Corporation.
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms and conditions of the GNU General Public License,
+ * version 2, as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+ * Place - Suite 330, Boston, MA 02111-1307 USA.
+ *
+ */
+#ifndef _ACPI_2_0_H_
+#define _ACPI_2_0_H_
+
+typedef unsigned char  uint8_t;
+typedef   signed char  int8_t;
+typedef unsigned short uint16_t;
+typedef   signed short int16_t;
+typedef unsigned int   uint32_t;
+typedef   signed int   int32_t;
+#ifdef __i386__
+typedef unsigned long long uint64_t;
+typedef   signed long long int64_t;
+#else
+typedef unsigned long uint64_t;
+typedef   signed long int64_t;
+#endif
+
+#include <xen/xen.h>
+
+#define ASCII32(a,b,c,d)         \
+    (((a) <<  0) | ((b) <<  8) | ((c) << 16) | ((d) << 24))
+#define ASCII64(a,b,c,d,e,f,g,h) \
+    (((uint64_t)ASCII32(a,b,c,d)) | (((uint64_t)ASCII32(e,f,g,h)) << 32))
+
+#pragma pack (1)
+
+/*
+ * Common ACPI header.
+ */
+struct acpi_header {
+    uint32_t signature;
+    uint32_t length;
+    uint8_t  revision;
+    uint8_t  checksum;
+    uint8_t  oem_id[6];
+    uint64_t oem_table_id;
+    uint32_t oem_revision;
+    uint32_t creator_id;
+    uint32_t creator_revision;
+};
+
+#define ACPI_OEM_ID             {'I','N','T','E','L',' '}
+#define ACPI_OEM_TABLE_ID       ASCII32(' ','T','B','D')
+#define ACPI_OEM_REVISION       0x00000002
+#define ACPI_CREATOR_ID         0x00       /* TBD */
+#define ACPI_CREATOR_REVISION   0x00000002
+
+/*
+ * ACPI 2.0 Generic Address Space definition.
+ */
+struct acpi_20_generic_address {
+    uint8_t  address_space_id;
+    uint8_t  register_bit_width;
+    uint8_t  register_bit_offset;
+    uint8_t  reserved;
+    uint64_t address;
+};
+
+/*
+ * Generic Address Space Address IDs.
+ */
+#define ACPI_SYSTEM_MEMORY 0
+#define ACPI_SYSTEM_IO 1
+#define ACPI_PCI_CONFIGURATION_SPACE 2
+#define ACPI_EMBEDDED_CONTROLLER 3
+#define ACPI_SMBUS 4
+#define ACPI_FUNCTIONAL_FIXED_HARDWARE 0x7F
+
+/*
+ * Root System Description Pointer Structure in ACPI 1.0.
+ */
+struct acpi_10_rsdp {
+    uint64_t signature;
+    uint8_t  checksum;
+    uint8_t  oem_id[6];
+    uint8_t  reserved;
+    uint32_t rsdt_address;
+};
+
+/*
+ * Root System Description Pointer Structure.
+ */
+struct acpi_20_rsdp {
+    uint64_t signature;
+    uint8_t  checksum;
+    uint8_t  oem_id[6];
+    uint8_t  revision;
+    uint32_t rsdt_address;
+    uint32_t length;
+    uint64_t xsdt_address;
+    uint8_t  extended_checksum;
+    uint8_t  reserved[3];
+};
+
+/*
+ * The maximum number of entrys in RSDT or XSDT.
+ */
+#define ACPI_MAX_NUM_TABLES 5
+
+/*
+ * Root System Description Table (RSDT).
+ */
+struct acpi_20_rsdt {
+    struct acpi_header header;
+    uint32_t entry[ACPI_MAX_NUM_TABLES];
+};
+#define ACPI_2_0_RSDT_REVISION 0x01
+
+/*
+ * Extended System Description Table (XSDT).
+ */
+struct acpi_20_xsdt {
+    struct acpi_header header;
+    uint64_t entry[ACPI_MAX_NUM_TABLES];
+};
+#define ACPI_2_0_XSDT_REVISION 0x01
+
+/*
+ * TCG Hardware Interface Table (TCPA)
+ */
+
+typedef struct _ACPI_2_0_TCPA_CLIENT {
+    struct acpi_header header;
+    uint16_t PlatformClass;
+    uint32_t LAML;
+    uint64_t LASA;
+} ACPI_2_0_TCPA_CLIENT;
+
+#define ACPI_2_0_TCPA_REVISION 0x02
+#define ACPI_2_0_TCPA_LAML_SIZE (64*1024)
+
+/*
+ * Fixed ACPI Description Table Structure (FADT).
+ */
+struct acpi_20_fadt {
+    struct acpi_header header;
+    uint32_t firmware_ctrl;
+    uint32_t dsdt;
+    uint8_t  reserved0;
+    uint8_t  preferred_pm_profile;
+    uint16_t sci_int;
+    uint32_t smi_cmd;
+    uint8_t  acpi_enable;
+    uint8_t  acpi_disable;
+    uint8_t  s4bios_req;
+    uint8_t  pstate_cnt;
+    uint32_t pm1a_evt_blk;
+    uint32_t pm1b_evt_blk;
+    uint32_t pm1a_cnt_blk;
+    uint32_t pm1b_cnt_blk;
+    uint32_t pm2_cnt_blk;
+    uint32_t pm_tmr_blk;
+    uint32_t gpe0_blk;
+    uint32_t gpe1_blk;
+    uint8_t  pm1_evt_len;
+    uint8_t  pm1_cnt_len;
+    uint8_t  pm2_cnt_len;
+    uint8_t  pm_tmr_len;
+    uint8_t  gpe0_blk_len;
+    uint8_t  gpe1_blk_len;
+    uint8_t  gpe1_base;
+    uint8_t  cst_cnt;
+    uint16_t p_lvl2_lat;
+    uint16_t p_lvl3_lat;
+    uint16_t flush_size;
+    uint16_t flush_stride;
+    uint8_t  duty_offset;
+    uint8_t  duty_width;
+    uint8_t  day_alrm;
+    uint8_t  mon_alrm;
+    uint8_t  century;
+    uint16_t iapc_boot_arch;
+    uint8_t  reserved1;
+    uint32_t flags;
+    struct acpi_20_generic_address reset_reg;
+    uint8_t  reset_value;
+    uint8_t  reserved2[3];
+    uint64_t x_firmware_ctrl;
+    uint64_t x_dsdt;
+    struct acpi_20_generic_address x_pm1a_evt_blk;
+    struct acpi_20_generic_address x_pm1b_evt_blk;
+    struct acpi_20_generic_address x_pm1a_cnt_blk;
+    struct acpi_20_generic_address x_pm1b_cnt_blk;
+    struct acpi_20_generic_address x_pm2_cnt_blk;
+    struct acpi_20_generic_address x_pm_tmr_blk;
+    struct acpi_20_generic_address x_gpe0_blk;
+    struct acpi_20_generic_address x_gpe1_blk;
+};
+#define ACPI_2_0_FADT_REVISION 0x03
+
+/*
+ * FADT Boot Architecture Flags.
+ */
+#define ACPI_LEGACY_DEVICES (1 << 0)
+#define ACPI_8042           (1 << 1)
+
+/*
+ * FADT Fixed Feature Flags.
+ */
+#define ACPI_WBINVD         (1 << 0)
+#define ACPI_WBINVD_FLUSH   (1 << 1)
+#define ACPI_PROC_C1        (1 << 2)
+#define ACPI_P_LVL2_UP      (1 << 3)
+#define ACPI_PWR_BUTTON     (1 << 4)
+#define ACPI_SLP_BUTTON     (1 << 5)
+#define ACPI_FIX_RTC        (1 << 6)
+#define ACPI_RTC_S4         (1 << 7)
+#define ACPI_TMR_VAL_EXT    (1 << 8)
+#define ACPI_DCK_CAP        (1 << 9)
+#define ACPI_RESET_REG_SUP  (1 << 10)
+#define ACPI_SEALED_CASE    (1 << 11)
+#define ACPI_HEADLESS       (1 << 12)
+#define ACPI_CPU_SW_SLP     (1 << 13)
+
+/*
+ * Firmware ACPI Control Structure (FACS).
+ */
+struct acpi_20_facs {
+    uint32_t signature;
+    uint32_t length;
+    uint32_t hardware_signature;
+    uint32_t firmware_waking_vector;
+    uint32_t global_lock;
+    uint32_t flags;
+    uint64_t x_firmware_waking_vector;
+    uint8_t  version;
+    uint8_t  reserved[31];
+};
+
+#define ACPI_2_0_FACS_VERSION 0x01
+
+/*
+ * Multiple APIC Description Table header definition (MADT).
+ */
+struct acpi_20_madt {
+    struct acpi_header header;
+    uint32_t lapic_addr;
+    uint32_t flags;
+};
+
+#define ACPI_2_0_MADT_REVISION 0x01
+
+/*
+ * Multiple APIC Flags.
+ */
+#define ACPI_PCAT_COMPAT (1 << 0)
+
+/*
+ * Multiple APIC Description Table APIC structure types.
+ */
+#define ACPI_PROCESSOR_LOCAL_APIC           0x00
+#define ACPI_IO_APIC                        0x01
+#define ACPI_INTERRUPT_SOURCE_OVERRIDE      0x02
+#define ACPI_NON_MASKABLE_INTERRUPT_SOURCE  0x03
+#define ACPI_LOCAL_APIC_NMI                 0x04
+#define ACPI_LOCAL_APIC_ADDRESS_OVERRIDE    0x05
+#define ACPI_IO_SAPIC                       0x06
+#define ACPI_PROCESSOR_LOCAL_SAPIC          0x07
+#define ACPI_PLATFORM_INTERRUPT_SOURCES     0x08
+
+/*
+ * APIC Structure Definitions.
+ */
+
+/*
+ * Processor Local APIC Structure Definition.
+ */
+struct acpi_20_madt_lapic {
+    uint8_t  type;
+    uint8_t  length;
+    uint8_t  acpi_processor_id;
+    uint8_t  apic_id;
+    uint32_t flags;
+};
+
+/*
+ * Local APIC Flags.  All other bits are reserved and must be 0.
+ */
+#define ACPI_LOCAL_APIC_ENABLED (1 << 0)
+
+/*
+ * IO APIC Structure.
+ */
+struct acpi_20_madt_ioapic {
+    uint8_t  type;
+    uint8_t  length;
+    uint8_t  ioapic_id;
+    uint8_t  reserved;
+    uint32_t ioapic_addr;
+    uint32_t gsi_base;
+};
+
+struct acpi_20_madt_intsrcovr {
+    uint8_t  type;
+    uint8_t  length;
+    uint8_t  bus;
+    uint8_t  source;
+    uint32_t gsi;
+    uint16_t flags;
+};
+
+/*
+ * Table Signatures.
+ */
+#define ACPI_2_0_RSDP_SIGNATURE ASCII64('R','S','D',' ','P','T','R',' ')
+#define ACPI_2_0_FACS_SIGNATURE ASCII32('F','A','C','S')
+#define ACPI_2_0_FADT_SIGNATURE ASCII32('F','A','C','P')
+#define ACPI_2_0_MADT_SIGNATURE ASCII32('A','P','I','C')
+#define ACPI_2_0_RSDT_SIGNATURE ASCII32('R','S','D','T')
+#define ACPI_2_0_XSDT_SIGNATURE ASCII32('X','S','D','T')
+#define ACPI_2_0_TCPA_SIGNATURE ASCII32('T','C','P','A')
+
+#pragma pack ()
+
+#define ACPI_PHYSICAL_ADDRESS 0xEA000
+
+int acpi_build_tables(uint8_t *);
+
+#endif /* _ACPI_2_0_H_ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

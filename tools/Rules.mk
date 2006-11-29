@@ -5,8 +5,6 @@ all:
 
 include $(XEN_ROOT)/Config.mk
 
-CONFIG_$(shell uname -s) := y
-
 XEN_XC             = $(XEN_ROOT)/tools/python/xen/lowlevel/xc
 XEN_LIBXC          = $(XEN_ROOT)/tools/libxc
 XEN_XENSTORE       = $(XEN_ROOT)/tools/xenstore
@@ -15,6 +13,11 @@ XEN_LIBXENSTAT     = $(XEN_ROOT)/tools/xenstat/libxenstat/src
 X11_LDPATH = -L/usr/X11R6/$(LIBDIR)
 
 CFLAGS += -D__XEN_TOOLS__
+
+# Enable implicit LFS support *and* explicit LFS names.
+CFLAGS  += $(shell getconf LFS_CFLAGS)
+CFLAGS  += -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
+LDFLAGS += $(shell getconf LFS_LDFLAGS)
 
 %.opic: %.c
 	$(CC) $(CPPFLAGS) -DPIC $(CFLAGS) -fPIC -c -o $@ $<
@@ -25,9 +28,9 @@ CFLAGS += -D__XEN_TOOLS__
 %.o: %.cc
 	$(CC) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
 
-OS = $(shell uname -s)
+.PHONY: mk-symlinks mk-symlinks-xen mk-symlinks-$(XEN_OS)
 
-.PHONY: mk-symlinks mk-symlinks-xen mk-symlinks-$(OS)
+mk-symlinks-SunOS:
 
 mk-symlinks-Linux: LINUX_ROOT=$(XEN_ROOT)/linux-2.6-xen-sparse
 mk-symlinks-Linux:
@@ -44,4 +47,4 @@ mk-symlinks-xen:
 	mkdir -p xen/io
 	( cd xen/io && ln -sf ../../$(XEN_ROOT)/xen/include/public/io/*.h . )
 
-mk-symlinks: mk-symlinks-xen mk-symlinks-$(OS)
+mk-symlinks: mk-symlinks-xen mk-symlinks-$(XEN_OS)

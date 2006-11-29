@@ -295,8 +295,8 @@ void serial_force_unlock(int handle)
     if ( handle == -1 )
         return;
 
-    port->rx_lock = SPIN_LOCK_UNLOCKED;
-    port->tx_lock = SPIN_LOCK_UNLOCKED;
+    spin_lock_init(&port->rx_lock);
+    spin_lock_init(&port->tx_lock);
 
     serial_start_sync(handle);
 }

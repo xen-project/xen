@@ -33,7 +33,6 @@ static unsigned long saved_lvtpc[NR_CPUS];
 #define VIRQ_BITMASK_SIZE (MAX_OPROF_DOMAINS/32 + 1)
 extern int active_domains[MAX_OPROF_DOMAINS];
 extern unsigned int adomains;
-extern struct domain *primary_profiler;
 extern struct domain *adomain_ptrs[MAX_OPROF_DOMAINS];
 extern unsigned long virq_ovf_pending[VIRQ_BITMASK_SIZE];
 extern int is_active(struct domain *d);
@@ -269,8 +268,12 @@ static int __init p4_init(char * cpu_type)
 { 
 	__u8 cpu_model = current_cpu_data.x86_model;
 
-	if ((cpu_model > 6) || (cpu_model == 5))
+	if ((cpu_model > 6) || (cpu_model == 5)) {
+		printk("xenoprof: Initialization failed. "
+		       "Intel processor model %d for pentium 4 family is not "
+		       "supported\n", cpu_model);
 		return 0;
+	}
 
 #ifndef CONFIG_SMP
 	strncpy (cpu_type, "i386/p4", XENOPROF_CPU_TYPE_SIZE - 1);
@@ -301,18 +304,24 @@ static int __init ppro_init(char *cpu_type)
 {
 	__u8 cpu_model = current_cpu_data.x86_model;
 
-	if (cpu_model > 0xd)
+	if (cpu_model > 15) {
+		printk("xenoprof: Initialization failed. "
+		       "Intel processor model %d for P6 class family is not "
+		       "supported\n", cpu_model);
 		return 0;
-
-	if (cpu_model == 9) {
-		strncpy (cpu_type, "i386/p6_mobile", XENOPROF_CPU_TYPE_SIZE - 1);
-	} else if (cpu_model > 5) {
-		strncpy (cpu_type, "i386/piii", XENOPROF_CPU_TYPE_SIZE - 1);
-	} else if (cpu_model > 2) {
-		strncpy (cpu_type, "i386/pii", XENOPROF_CPU_TYPE_SIZE - 1);
-	} else {
-		strncpy (cpu_type, "i386/ppro", XENOPROF_CPU_TYPE_SIZE - 1);
 	}
+	else if (cpu_model == 15)
+		strncpy (cpu_type, "i386/core_2", XENOPROF_CPU_TYPE_SIZE - 1);
+	else if (cpu_model == 14)
+		strncpy (cpu_type, "i386/core", XENOPROF_CPU_TYPE_SIZE - 1);
+	else if (cpu_model == 9)
+		strncpy (cpu_type, "i386/p6_mobile", XENOPROF_CPU_TYPE_SIZE - 1);
+	else if (cpu_model > 5)
+		strncpy (cpu_type, "i386/piii", XENOPROF_CPU_TYPE_SIZE - 1);
+	else if (cpu_model > 2)
+		strncpy (cpu_type, "i386/pii", XENOPROF_CPU_TYPE_SIZE - 1);
+	else
+		strncpy (cpu_type, "i386/ppro", XENOPROF_CPU_TYPE_SIZE - 1);
 
 	model = &op_ppro_spec;
 	return 1;
@@ -324,13 +333,15 @@ int nmi_init(int *num_events, int *is_primary, char *cpu_type)
 	__u8 family = current_cpu_data.x86;
 	int prim = 0;
  
-	if (!cpu_has_apic)
+	if (!cpu_has_apic) {
+		printk("xenoprof: Initialization failed. No apic.\n");
 		return -ENODEV;
+	}
 
-	if (primary_profiler == NULL) {
+	if (xenoprof_primary_profiler == NULL) {
 		/* For now, only dom0 can be the primary profiler */
 		if (current->domain->domain_id == 0) {
-			primary_profiler = current->domain;
+			xenoprof_primary_profiler = current->domain;
 			prim = 1;
 		}
 	}
@@ -344,6 +355,9 @@ int nmi_init(int *num_events, int *is_primary, char *cpu_type)
 
 			switch (family) {
 			default:
+				printk("xenoprof: Initialization failed. "
+				       "AMD processor family %d is not "
+				       "supported\n", family);
 				return -ENODEV;
 			case 6:
 				model = &op_athlon_spec;
@@ -375,11 +389,17 @@ int nmi_init(int *num_events, int *is_primary, char *cpu_type)
 					break;
 
 				default:
+				printk("xenoprof: Initialization failed. "
+				       "Intel processor family %d is not "
+				       "supported\n", family);
 					return -ENODEV;
 			}
 			break;
 
 		default:
+			printk("xenoprof: Initialization failed. "
+			       "Unsupported processor. Unknown vendor %d\n",
+				vendor);
 			return -ENODEV;
 	}
 

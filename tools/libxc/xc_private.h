@@ -30,6 +30,9 @@
 #define DECLARE_SYSCTL struct xen_sysctl sysctl
 #endif
 
+#undef PAGE_SHIFT
+#undef PAGE_SIZE
+#undef PAGE_MASK
 #define PAGE_SHIFT              XC_PAGE_SHIFT
 #define PAGE_SIZE               (1UL << PAGE_SHIFT)
 #define PAGE_MASK               (~(PAGE_SIZE-1))
@@ -56,17 +59,15 @@
 #define PPRINTF(_f, _a...)
 #endif
 
-#define ERR(_f, _a...) do {                     \
-    DPRINTF(_f ": %d\n" , ## _a, errno);        \
-    fflush(stderr); }                           \
-while (0)
-
 #define ERROR(_m, _a...)                        \
 do {                                            \
     int __saved_errno = errno;                  \
     DPRINTF("ERROR: " _m "\n" , ## _a );        \
     errno = __saved_errno;                      \
 } while (0)
+
+int lock_pages(void *addr, size_t len);
+void unlock_pages(void *addr, size_t len);
 
 #define PERROR(_m, _a...)                               \
 do {                                                    \
@@ -106,7 +107,7 @@ static inline int do_domctl(int xc_handle, struct xen_domctl *domctl)
     hypercall.op     = __HYPERVISOR_domctl;
     hypercall.arg[0] = (unsigned long)domctl;
 
-    if ( mlock(domctl, sizeof(*domctl)) != 0 )
+    if ( lock_pages(domctl, sizeof(*domctl)) != 0 )
     {
         PERROR("Could not lock memory for Xen hypercall");
         goto out1;
@@ -119,7 +120,7 @@ static inline int do_domctl(int xc_handle, struct xen_domctl *domctl)
                     " rebuild the user-space tool set?\n");
     }
 
-    safe_munlock(domctl, sizeof(*domctl));
+    unlock_pages(domctl, sizeof(*domctl));
 
  out1:
     return ret;
@@ -135,7 +136,7 @@ static inline int do_sysctl(int xc_handle, struct xen_sysctl *sysctl)
     hypercall.op     = __HYPERVISOR_sysctl;
     hypercall.arg[0] = (unsigned long)sysctl;
 
-    if ( mlock(sysctl, sizeof(*sysctl)) != 0 )
+    if ( lock_pages(sysctl, sizeof(*sysctl)) != 0 )
     {
         PERROR("Could not lock memory for Xen hypercall");
         goto out1;
@@ -148,7 +149,7 @@ static inline int do_sysctl(int xc_handle, struct xen_sysctl *sysctl)
                     " rebuild the user-space tool set?\n");
     }
 
-    safe_munlock(sysctl, sizeof(*sysctl));
+    unlock_pages(sysctl, sizeof(*sysctl));
 
  out1:
     return ret;
@@ -156,5 +157,10 @@ static inline int do_sysctl(int xc_handle, struct xen_sysctl *sysctl)
 
 int xc_map_foreign_ranges(int xc_handle, uint32_t dom,
                           privcmd_mmap_entry_t *entries, int nr);
+
+void *map_domain_va_core(unsigned long domfd, int cpu, void *guest_va,
+                         vcpu_guest_context_t *ctxt);
+int xc_waitdomain_core(int xc_handle, int domain, int *status,
+    int options, vcpu_guest_context_t *ctxt);
 
 #endif /* __XC_PRIVATE_H__ */

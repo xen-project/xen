@@ -174,7 +174,7 @@ static void h_enter(struct cpu_user_regs *regs)
 
     if (mtype == PFN_TYPE_IO) {
         /* only a privilaged dom can access outside IO space */
-        if ( !test_bit(_DOMF_privileged, &d->domain_flags) ) {
+        if ( !d->is_privileged ) {
             regs->gprs[3] =  H_Privilege;
             printk("%s: unprivileged access to physical page: 0x%lx\n",
                    __func__, pfn);

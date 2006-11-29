@@ -76,9 +76,17 @@ runnable_tests() {
     # using the right version
     realrd=$(readlink ramdisk/initrd.img)
     eval $(./lib/XmTestReport/xmtest.py)
-    rrdver="initrd-${XM_TEST_MAJ}.${XM_TEST_MIN}.img"
-    if [ "$realrd" != "$rrdver" ]; then
-	echo "Error: ramdisk/initrd.img is from an old version"
+    ARCH=$(uname -m | sed -e s/i.86/i386/ -e 's/ppc\(64\)*/powerpc/')
+    rrdver="initrd-${XM_TEST_MAJ}.${XM_TEST_MIN}-${ARCH}.img"
+    exp_flag=0
+    realarch=`echo $realrd | awk -F- '{print $3}' | awk -F. '{print $1}'`
+    rrdarch=`echo $rrdver | awk -F- '{print $3}' | awk -F. '{print $1}'`
+    if [ "$realarch" = "i386" -a "$rrdarch" = "x86_64" ]; then
+	exp_flag=1
+    fi
+    if [ $exp_flag -eq 0 -a "$realrd" != "$rrdver" ]; then
+	echo "Error: ramdisk/initrd.img is from an old version, or is not for this "
+        echo "architecture ($ARCH)."
 	echo "You need to build a ramdisk from at least ${XM_TEST_MAJ}.${XM_TEST_MIN}"
 	exit 1
     fi
@@ -133,7 +141,11 @@ get_contact_info() {
 run_tests() {
     groupentered=$1
     output=$2
+    report=$3
+    startfile=${report}.start
+    stopfile=${report}.stop
 
+    date -R > $startfile
     exec <  grouptest/$groupentered
     while read casename testlist; do
        echo Running $casename tests...
@@ -147,6 +159,7 @@ run_tests() {
        fi
 
     done
+    date -R > $stopfile
 
 }
 
@@ -156,7 +169,10 @@ make_text_reports() {
     failures=$2
     output=$3
     reportfile=$4
+    report=$5
     summary=summary.tmp
+    startfile=${report}.start
+    stopfile=${report}.stop
     echo "Making PASS/FAIL report ($passfail)..."
     cat $OUTPUT | egrep '(REASON|PASS|FAIL|XPASS|XFAIL|SKIP)' | perl -pe 's/^(PASS|FAIL|XPASS|XFAIL)(.+)$/$1$2\n/' > $passfail
     
@@ -167,7 +183,12 @@ make_text_reports() {
     NUMFAIL=`grep -c FAIL $output`
     NUMXPASS=`grep -c XPASS $output`
     NUMXFAIL=`grep -c XFAIL $output`
+    START=`cat $startfile`
+    STOP=`cat $stopfile`
     cat > $summary << EOF
+Xm-test timing summary:
+  Run Started : $START
+  Run Stoped  : $STOP
 Xm-test execution summary:
   PASS:  $NUMPASS
   FAIL:  $NUMFAIL
@@ -196,6 +217,11 @@ batch=no
 run=yes
 unsafe=no
 GROUPENTERED=default
+
+if [ -d /etc/xen/acm-security/policies ]; then
+	cp -f tests/security-acm/xm-test-security_policy.xml \
+	      /etc/xen/acm-security/policies
+fi
 
 # Resolve options
 while [ $# -gt 0 ]
@@ -289,8 +315,8 @@ if [ "$run" != "no" ]; then
     if [ "$unsafe" = "no" ]; then
       make_environment_report $OSREPORTTEMP $PROGREPORTTEMP
     fi
-    run_tests $GROUPENTERED $OUTPUT
-    make_text_reports $PASSFAIL $FAILURES $OUTPUT $TXTREPORT
+    run_tests $GROUPENTERED $OUTPUT $REPORT
+    make_text_reports $PASSFAIL $FAILURES $OUTPUT $TXTREPORT $REPORT
     if [ "$unsafe" = "no" ]; then
       make_result_report $OUTPUT $RESULTREPORTTEMP
       cat $OSREPORTTEMP $PROGREPORTTEMP $RESULTREPORTTEMP > $XMLREPORT

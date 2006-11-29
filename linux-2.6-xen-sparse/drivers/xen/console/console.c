@@ -49,6 +49,7 @@
 #include <linux/console.h>
 #include <linux/bootmem.h>
 #include <linux/sysrq.h>
+#include <linux/screen_info.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
@@ -262,6 +263,41 @@ void xencons_force_flush(void)
 		sent = xencons_ring_send(&wbuf[WBUF_MASK(wc)], sz);
 		if (sent > 0)
 			wc += sent;
+	}
+}
+
+
+void dom0_init_screen_info(const struct dom0_vga_console_info *info)
+{
+	switch (info->video_type) {
+	case XEN_VGATYPE_TEXT_MODE_3:
+		screen_info.orig_video_mode = 3;
+		screen_info.orig_video_ega_bx = 3;
+		screen_info.orig_video_isVGA = 1;
+		screen_info.orig_video_lines = info->u.text_mode_3.rows;
+		screen_info.orig_video_cols = info->u.text_mode_3.columns;
+		screen_info.orig_x = info->u.text_mode_3.cursor_x;
+		screen_info.orig_y = info->u.text_mode_3.cursor_y;
+		screen_info.orig_video_points =
+			info->u.text_mode_3.font_height;
+		break;
+	case XEN_VGATYPE_VESA_LFB:
+		screen_info.orig_video_isVGA = VIDEO_TYPE_VLFB;
+		screen_info.lfb_width = info->u.vesa_lfb.width;
+		screen_info.lfb_height = info->u.vesa_lfb.height;
+		screen_info.lfb_depth = info->u.vesa_lfb.bits_per_pixel;
+		screen_info.lfb_base = info->u.vesa_lfb.lfb_base;
+		screen_info.lfb_size = info->u.vesa_lfb.lfb_size;
+		screen_info.lfb_linelength = info->u.vesa_lfb.bytes_per_line;
+		screen_info.red_size = info->u.vesa_lfb.red_size;
+		screen_info.red_pos = info->u.vesa_lfb.red_pos;
+		screen_info.green_size = info->u.vesa_lfb.green_size;
+		screen_info.green_pos = info->u.vesa_lfb.green_pos;
+		screen_info.blue_size = info->u.vesa_lfb.blue_size;
+		screen_info.blue_pos = info->u.vesa_lfb.blue_pos;
+		screen_info.rsvd_size = info->u.vesa_lfb.rsvd_size;
+		screen_info.rsvd_pos = info->u.vesa_lfb.rsvd_pos;
+		break;
 	}
 }
 

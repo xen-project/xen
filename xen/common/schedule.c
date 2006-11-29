@@ -29,6 +29,7 @@
 #include <xen/mm.h>
 #include <xen/errno.h>
 #include <xen/guest_access.h>
+#include <xen/multicall.h>
 #include <public/sched.h>
 
 extern void arch_getdomaininfo_ctxt(struct vcpu *,
@@ -36,6 +37,10 @@ extern void arch_getdomaininfo_ctxt(struct vcpu *,
 /* opt_sched: scheduler - default to credit */
 static char opt_sched[10] = "credit";
 string_param("sched", opt_sched);
+
+/* opt_dom0_vcpus_pin: If true, dom0 VCPUs are pinned. */
+static unsigned int opt_dom0_vcpus_pin;
+boolean_param("dom0_vcpus_pin", opt_dom0_vcpus_pin);
 
 #define TIME_SLOP      (s32)MICROSECS(50)     /* allow time to slip a bit */
 
@@ -55,8 +60,6 @@ static struct scheduler *schedulers[] = {
     &sched_credit_def,
     NULL
 };
-
-static void __enter_scheduler(void);
 
 static struct scheduler ops;
 
@@ -97,13 +100,26 @@ void vcpu_runstate_get(struct vcpu *v, struct vcpu_runstate_info *runstate)
     }
 }
 
-int sched_init_vcpu(struct vcpu *v) 
+int sched_init_vcpu(struct vcpu *v, unsigned int processor) 
 {
+    struct domain *d = v->domain;
+
+    /*
+     * Initialize processor and affinity settings. The idler, and potentially
+     * domain-0 VCPUs, are pinned onto their respective physical CPUs.
+     */
+    v->processor = processor;
+    if ( is_idle_domain(d) || ((d->domain_id == 0) && opt_dom0_vcpus_pin) )
+        v->cpu_affinity = cpumask_of_cpu(processor);
+    else
+        cpus_setall(v->cpu_affinity);
+
     /* Initialise the per-domain timers. */
     init_timer(&v->timer, vcpu_timer_fn, v, v->processor);
     init_timer(&v->poll_timer, poll_timer_fn, v, v->processor);
 
-    if ( is_idle_vcpu(v) )
+    /* Idle VCPUs are scheduled immediately. */
+    if ( is_idle_domain(d) )
     {
         per_cpu(schedule_data, v->processor).curr = v;
         per_cpu(schedule_data, v->processor).idle = v;
@@ -115,17 +131,20 @@ int sched_init_vcpu(struct vcpu *v)
     return SCHED_OP(init_vcpu, v);
 }
 
+void sched_destroy_vcpu(struct vcpu *v)
+{
+    kill_timer(&v->timer);
+    kill_timer(&v->poll_timer);
+    SCHED_OP(destroy_vcpu, v);
+}
+
+int sched_init_domain(struct domain *d)
+{
+    return SCHED_OP(init_domain, d);
+}
+
 void sched_destroy_domain(struct domain *d)
 {
-    struct vcpu *v;
-
-    for_each_vcpu ( d, v )
-    {
-        kill_timer(&v->timer);
-        kill_timer(&v->poll_timer);
-        TRACE_2D(TRC_SCHED_DOM_REM, v->domain->domain_id, v->vcpu_id);
-    }
-
     SCHED_OP(destroy_domain, d);
 }
 
@@ -181,15 +200,57 @@ void vcpu_wake(struct vcpu *v)
     TRACE_2D(TRC_SCHED_WAKE, v->domain->domain_id, v->vcpu_id);
 }
 
+static void vcpu_migrate(struct vcpu *v)
+{
+    unsigned long flags;
+    int old_cpu;
+
+    vcpu_schedule_lock_irqsave(v, flags);
+
+    if ( test_bit(_VCPUF_running, &v->vcpu_flags) ||
+         !test_and_clear_bit(_VCPUF_migrating, &v->vcpu_flags) )
+    {
+        vcpu_schedule_unlock_irqrestore(v, flags);
+        return;
+    }
+
+    /* Switch to new CPU, then unlock old CPU. */
+    old_cpu = v->processor;
+    v->processor = SCHED_OP(pick_cpu, v);
+    spin_unlock_irqrestore(
+        &per_cpu(schedule_data, old_cpu).schedule_lock, flags);
+
+    /* Wake on new CPU. */
+    vcpu_wake(v);
+}
+
 int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity)
 {
     cpumask_t online_affinity;
+    unsigned long flags;
+
+    if ( (v->domain->domain_id == 0) && opt_dom0_vcpus_pin )
+        return -EINVAL;
 
     cpus_and(online_affinity, *affinity, cpu_online_map);
     if ( cpus_empty(online_affinity) )
         return -EINVAL;
 
-    return SCHED_OP(set_affinity, v, affinity);
+    vcpu_schedule_lock_irqsave(v, flags);
+
+    v->cpu_affinity = *affinity;
+    if ( !cpu_isset(v->processor, v->cpu_affinity) )
+        set_bit(_VCPUF_migrating, &v->vcpu_flags);
+
+    vcpu_schedule_unlock_irqrestore(v, flags);
+
+    if ( test_bit(_VCPUF_migrating, &v->vcpu_flags) )
+    {
+        vcpu_sleep_nosync(v);
+        vcpu_migrate(v);
+    }
+
+    return 0;
 }
 
 /* Block the currently-executing domain until a pertinent event occurs. */
@@ -208,7 +269,7 @@ static long do_block(void)
     else
     {
         TRACE_2D(TRC_SCHED_BLOCK, v->domain->domain_id, v->vcpu_id);
-        __enter_scheduler();
+        raise_softirq(SCHEDULE_SOFTIRQ);
     }
 
     return 0;
@@ -253,9 +314,9 @@ static long do_poll(struct sched_poll *sched_poll)
         set_timer(&v->poll_timer, sched_poll->timeout);
 
     TRACE_2D(TRC_SCHED_BLOCK, v->domain->domain_id, v->vcpu_id);
-    __enter_scheduler();
+    raise_softirq(SCHEDULE_SOFTIRQ);
 
-    stop_timer(&v->poll_timer);
+    return 0;
 
  out:
     clear_bit(_VCPUF_polling, &v->vcpu_flags);
@@ -267,7 +328,7 @@ static long do_poll(struct sched_poll *sched_poll)
 static long do_yield(void)
 {
     TRACE_2D(TRC_SCHED_YIELD, current->domain->domain_id, current->vcpu_id);
-    __enter_scheduler();
+    raise_softirq(SCHEDULE_SOFTIRQ);
     return 0;
 }
 
@@ -407,7 +468,7 @@ long do_set_timer_op(s_time_t timeout)
          * timeout in this case can burn a lot of CPU. We therefore go for a
          * reasonable middleground of triggering a timer event in 100ms.
          */
-        DPRINTK("Warning: huge timeout set by domain %d (vcpu %d):"
+        gdprintk(XENLOG_INFO, "Warning: huge timeout set by domain %d (vcpu %d):"
                 " %"PRIx64"\n",
                 v->domain->domain_id, v->vcpu_id, (uint64_t)timeout);
         set_timer(&v->timer, NOW() + MILLISECS(100));
@@ -478,7 +539,7 @@ long sched_adjust(struct domain *d, struct xen_domctl_scheduler_op *op)
  * - deschedule the current domain (scheduler independent).
  * - pick a new domain (scheduler dependent).
  */
-static void __enter_scheduler(void)
+static void schedule(void)
 {
     struct vcpu          *prev = current, *next = NULL;
     s_time_t              now = NOW();
@@ -487,6 +548,7 @@ static void __enter_scheduler(void)
     s32                   r_time;     /* time for new dom to run */
 
     ASSERT(!in_irq());
+    ASSERT(this_cpu(mc_state).flags == 0);
 
     perfc_incrc(sched_run);
 
@@ -555,6 +617,13 @@ static void __enter_scheduler(void)
     context_switch(prev, next);
 }
 
+void context_saved(struct vcpu *prev)
+{
+    clear_bit(_VCPUF_running, &prev->vcpu_flags);
+
+    if ( unlikely(test_bit(_VCPUF_migrating, &prev->vcpu_flags)) )
+        vcpu_migrate(prev);
+}
 
 /****************************************************************************
  * Timers: the scheduler utilises a number of timers
@@ -610,7 +679,7 @@ void __init scheduler_init(void)
 {
     int i;
 
-    open_softirq(SCHEDULE_SOFTIRQ, __enter_scheduler);
+    open_softirq(SCHEDULE_SOFTIRQ, schedule);
 
     for_each_cpu ( i )
     {

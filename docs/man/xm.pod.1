@@ -393,7 +393,9 @@ specified, VCPU information for all domains will be provided.
 
 =item B<vcpu-pin> I<domain-id> I<vcpu> I<cpus>
 
-Pins the the VCPU to only run on the specific CPUs.  
+Pins the the VCPU to only run on the specific CPUs.  The keyword
+I<all> can be used to apply the I<cpus> list to all VCPUs in the
+domain.
 
 Normally VCPUs can float between available CPUs whenever Xen deems a
 different run state is appropriate.  Pinning can be used to restrict
@@ -808,13 +810,13 @@ global policy root directory.
 Loads the binary representation of the I<policy> into Xen. The binary
 representation can be created with the B<makepolicy> subcommand.
 
-=item B<cfgbootpolicy> I<policy> [I<kernelversion>]
+=item B<cfgbootpolicy> I<policy> [I<boot title>]
 
 Configures I<policy> as the boot policy for Xen. It copies the binary
 policy representation into the /boot directory and adds a module line
 specifying the binary policy to the /boot/grub/menu.lst file. If your
 boot configuration includes multiple Xen boot titles, then use the
-I<kernelversion> parameter to select the proper title.
+I<boot title> parameter to specify a unique part of the proper title.
 
 =item B<dumppolicy>
 

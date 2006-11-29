@@ -20,10 +20,11 @@
 import os, string
 import re
 import math
+import signal
 
 import xen.lowlevel.xc
 from xen.xend import sxp
-from xen.xend.XendError import VmError
+from xen.xend.XendError import VmError, XendError
 from xen.xend.XendLogging import log
 from xen.xend.server.netif import randomMAC
 from xen.xend.xenstore.xswatch import xswatch
@@ -151,13 +152,13 @@ class ImageHandler:
         necessary."""
         return mem_kb
 
-    def getRequiredInitialReservation(self, mem_kb):
+    def getRequiredInitialReservation(self):
         """@param mem_kb The configured memory, in KiB.
         @return The corresponding required amount of memory to be free, also
         in KiB. This is normally the same as getRequiredAvailableMemory, but
         architecture- or image-specific code may override this to
         add headroom where necessary."""
-        return self.getRequiredAvailableMemory(mem_kb)
+        return self.getRequiredAvailableMemory(self.vm.getMemoryTarget())
 
     def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
         """@param shadow_mem_kb The configured shadow memory, in KiB.
@@ -188,7 +189,10 @@ class LinuxImageHandler(ImageHandler):
         store_evtchn = self.vm.getStorePort()
         console_evtchn = self.vm.getConsolePort()
 
-        log.debug("dom            = %d", self.vm.getDomid())
+        mem_mb = self.getRequiredInitialReservation() / 1024
+
+        log.debug("domid          = %d", self.vm.getDomid())
+        log.debug("memsize        = %d", mem_mb)
         log.debug("image          = %s", self.kernel)
         log.debug("store_evtchn   = %d", store_evtchn)
         log.debug("console_evtchn = %d", console_evtchn)
@@ -197,7 +201,8 @@ class LinuxImageHandler(ImageHandler):
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
         log.debug("features       = %s", self.vm.getFeatures())
 
-        return xc.linux_build(dom            = self.vm.getDomid(),
+        return xc.linux_build(domid          = self.vm.getDomid(),
+                              memsize        = mem_mb,
                               image          = self.kernel,
                               store_evtchn   = store_evtchn,
                               console_evtchn = console_evtchn,
@@ -217,7 +222,10 @@ class PPC_LinuxImageHandler(LinuxImageHandler):
         store_evtchn = self.vm.getStorePort()
         console_evtchn = self.vm.getConsolePort()
 
-        log.debug("dom            = %d", self.vm.getDomid())
+        mem_mb = self.getRequiredInitialReservation() / 1024
+
+        log.debug("domid          = %d", self.vm.getDomid())
+        log.debug("memsize        = %d", mem_mb)
         log.debug("image          = %s", self.kernel)
         log.debug("store_evtchn   = %d", store_evtchn)
         log.debug("console_evtchn = %d", console_evtchn)
@@ -228,7 +236,8 @@ class PPC_LinuxImageHandler(LinuxImageHandler):
 
         devtree = FlatDeviceTree.build(self)
 
-        return xc.linux_build(dom            = self.vm.getDomid(),
+        return xc.linux_build(domid          = self.vm.getDomid(),
+                              memsize        = mem_mb,
                               image          = self.kernel,
                               store_evtchn   = store_evtchn,
                               console_evtchn = console_evtchn,
@@ -239,12 +248,17 @@ class PPC_LinuxImageHandler(LinuxImageHandler):
 
 class HVMImageHandler(ImageHandler):
 
+    def __init__(self, vm, imageConfig, deviceConfig):
+        ImageHandler.__init__(self, vm, imageConfig, deviceConfig)
+        self.shutdownWatch = None
+
     def configure(self, imageConfig, deviceConfig):
         ImageHandler.configure(self, imageConfig, deviceConfig)
 
         info = xc.xeninfo()
         if not 'hvm' in info['xen_caps']:
-            raise VmError("Not an HVM capable platform, we stop creating!")
+            raise VmError("HVM guest support is unavailable: is VT/AMD-V "
+                          "supported by your CPU and enabled in your BIOS?")
 
         self.dmargs = self.parseDeviceModelArgs(imageConfig, deviceConfig)
         self.device_model = sxp.child_value(imageConfig, 'device_model')
@@ -262,18 +276,19 @@ class HVMImageHandler(ImageHandler):
 
         self.dmargs += self.configVNC(imageConfig)
 
-        self.pae  = int(sxp.child_value(imageConfig, 'pae', 0))
-
-        self.acpi = int(sxp.child_value(imageConfig, 'acpi', 0))
-        self.apic = int(sxp.child_value(imageConfig, 'apic', 0))
+        self.pae  = int(sxp.child_value(imageConfig, 'pae',  1))
+        self.acpi = int(sxp.child_value(imageConfig, 'acpi', 1))
+        self.apic = int(sxp.child_value(imageConfig, 'apic', 1))
 
     def buildDomain(self):
         store_evtchn = self.vm.getStorePort()
 
-        log.debug("dom            = %d", self.vm.getDomid())
+        mem_mb = self.getRequiredInitialReservation() / 1024
+
+        log.debug("domid          = %d", self.vm.getDomid())
         log.debug("image          = %s", self.kernel)
         log.debug("store_evtchn   = %d", store_evtchn)
-        log.debug("memsize        = %d", self.vm.getMemoryTarget() / 1024)
+        log.debug("memsize        = %d", mem_mb)
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
         log.debug("pae            = %d", self.pae)
         log.debug("acpi           = %d", self.acpi)
@@ -281,10 +296,10 @@ class HVMImageHandler(ImageHandler):
 
         self.register_shutdown_watch()
 
-        return xc.hvm_build(dom            = self.vm.getDomid(),
+        return xc.hvm_build(domid          = self.vm.getDomid(),
                             image          = self.kernel,
                             store_evtchn   = store_evtchn,
-                            memsize        = self.vm.getMemoryTarget() / 1024,
+                            memsize        = mem_mb,
                             vcpus          = self.vm.getVCpuCount(),
                             pae            = self.pae,
                             acpi           = self.acpi,
@@ -295,13 +310,14 @@ class HVMImageHandler(ImageHandler):
     def parseDeviceModelArgs(self, imageConfig, deviceConfig):
         dmargs = [ 'boot', 'fda', 'fdb', 'soundhw',
                    'localtime', 'serial', 'stdvga', 'isa', 'vcpus',
-                   'acpi', 'usb', 'usbdevice']
+                   'acpi', 'usb', 'usbdevice', 'keymap' ]
         ret = []
         for a in dmargs:
             v = sxp.child_value(imageConfig, a)
 
             # python doesn't allow '-' in variable names
             if a == 'stdvga': a = 'std-vga'
+            if a == 'keymap': a = 'k'
 
             # Handle booleans gracefully
             if a in ['localtime', 'std-vga', 'isa', 'usb', 'acpi']:
@@ -311,6 +327,11 @@ class HVMImageHandler(ImageHandler):
                 if v:
                     ret.append("-%s" % a)
                     ret.append("%s" % v)
+
+            if a in ['fda', 'fdb' ]:
+                if v:
+                    if not os.path.isabs(v):
+                        raise VmError("Floppy file %s does not exist." % v)
             log.debug("args: %s, val: %s" % (a,v))
 
         # Handle disk/network related options
@@ -340,10 +361,6 @@ class HVMImageHandler(ImageHandler):
                            (nics, mac, model))
                 ret.append("-net")
                 ret.append("tap,vlan=%d,bridge=%s" % (nics, bridge))
-            if name == 'vtpm':
-                instance = sxp.child_value(info, 'pref_instance')
-                ret.append("-instance")
-                ret.append("%s" % instance)
         return ret
 
     def configVNC(self, config):
@@ -352,16 +369,41 @@ class HVMImageHandler(ImageHandler):
         sdl = sxp.child_value(config, 'sdl')
         ret = []
         nographic = sxp.child_value(config, 'nographic')
+
+        # get password from VM config (if password omitted, None)
+        vncpasswd_vmconfig = sxp.child_value(config, 'vncpasswd')
+
         if nographic:
             ret.append('-nographic')
             return ret
+
         if vnc:
-            vncdisplay = sxp.child_value(config, 'vncdisplay',
-                                         int(self.vm.getDomid()))
-            ret = ret + ['-vnc', '%d' % vncdisplay, '-k', 'en-us']
+            vncdisplay = int(sxp.child_value(config, 'vncdisplay',
+                                             self.vm.getDomid()))
+
             vncunused = sxp.child_value(config, 'vncunused')
             if vncunused:
                 ret += ['-vncunused']
+            else:
+                ret += ['-vnc', '%d' % vncdisplay]
+
+            vnclisten = sxp.child_value(config, 'vnclisten')
+            if not(vnclisten):
+                vnclisten = (xen.xend.XendRoot.instance().
+                             get_vnclisten_address())
+            if vnclisten:
+                ret += ['-vnclisten', vnclisten]
+
+            vncpasswd = vncpasswd_vmconfig
+            if vncpasswd is None:
+                vncpasswd = (xen.xend.XendRoot.instance().
+                             get_vncpasswd_default())
+                if vncpasswd is None:
+                    raise VmError('vncpasswd is not set up in ' +
+                                  'VMconfig and xend-config.')
+            if vncpasswd != '':
+                self.vm.storeVm("vncpasswd", vncpasswd)
+
         return ret
 
     def createDeviceModel(self):
@@ -371,7 +413,7 @@ class HVMImageHandler(ImageHandler):
         #todo: Error handling
         args = [self.device_model]
         args = args + ([ "-d",  "%d" % self.vm.getDomid(),
-                  "-m", "%s" % (self.vm.getMemoryTarget() / 1024)])
+                  "-m", "%s" % (self.getRequiredInitialReservation() / 1024)])
         args = args + self.dmargs
         env = dict(os.environ)
         if self.display:
@@ -386,7 +428,6 @@ class HVMImageHandler(ImageHandler):
 
     def destroy(self):
         self.unregister_shutdown_watch();
-        import signal
         if not self.pid:
             return
         os.kill(self.pid, signal.SIGKILL)
@@ -415,14 +456,18 @@ class HVMImageHandler(ImageHandler):
         """ watch call back on node control/shutdown,
             if node changed, this function will be called
         """
-        from xen.xend.XendDomainInfo import shutdown_reasons
+        from xen.xend.XendConstants import DOMAIN_SHUTDOWN_REASONS
         xd = xen.xend.XendDomain.instance()
-        vm = xd.domain_lookup( self.vm.getDomid() )
+        try:
+            vm = xd.domain_lookup( self.vm.getDomid() )
+        except XendError:
+            # domain isn't registered, no need to clean it up.
+            return
 
-        reason = vm.readDom('control/shutdown')
+        reason = vm.getShutdownReason()
         log.debug("hvm_shutdown fired, shutdown reason=%s", reason)
-        for x in shutdown_reasons.keys():
-            if shutdown_reasons[x] == reason:
+        for x in DOMAIN_SHUTDOWN_REASONS.keys():
+            if DOMAIN_SHUTDOWN_REASONS[x] == reason:
                 vm.info['shutdown'] = 1
                 vm.info['shutdown_reason'] = x
                 vm.refreshShutdown(vm.info)
@@ -436,7 +481,7 @@ class IA64_HVM_ImageHandler(HVMImageHandler):
     def getRequiredAvailableMemory(self, mem_kb):
         page_kb = 16
         # ROM size for guest firmware, ioreq page and xenstore page
-        extra_pages = 1024 + 2
+        extra_pages = 1024 + 3
         return mem_kb + extra_pages * page_kb
 
     def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
@@ -449,25 +494,18 @@ class X86_HVM_ImageHandler(HVMImageHandler):
 
     def getRequiredAvailableMemory(self, mem_kb):
         # Add 8 MiB overhead for QEMU's video RAM.
-        return self.getRequiredInitialReservation(mem_kb) + 8192
+        return mem_kb + 8192
 
-    def getRequiredInitialReservation(self, mem_kb):
-        page_kb = 4
-        # This was derived emperically:
-        #   2.4 MB overhead per 1024 MB RAM
-        #   + 4 to avoid low-memory condition
-        extra_mb = (2.4/1024) * (mem_kb/1024.0) + 4;
-        extra_pages = int( math.ceil( extra_mb*1024 / page_kb ))
-        return mem_kb + extra_pages * page_kb
+    def getRequiredInitialReservation(self):
+        return self.vm.getMemoryTarget()
 
     def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
-        # The given value is the configured value -- we need to include the
-        # overhead due to getRequiredInitialReservation.
-        maxmem_kb = self.getRequiredInitialReservation(maxmem_kb)
-
-        # 1MB per vcpu plus 4Kib/Mib of RAM.  This is higher than 
-        # the minimum that Xen would allocate if no value were given.
-        return max(1024 * self.vm.getVCpuCount() + maxmem_kb / 256,
+        # 256 pages (1MB) per vcpu,
+        # plus 1 page per MiB of RAM for the P2M map,
+        # plus 1 page per MiB of RAM to shadow the resident processes.  
+        # This is higher than the minimum that Xen would allocate if no value 
+        # were given (but the Xen minimum is for safety, not performance).
+        return max(4 * (256 * self.vm.getVCpuCount() + 2 * (maxmem_kb / 1024)),
                    shadow_mem_kb)
 
 

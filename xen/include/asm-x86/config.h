@@ -24,6 +24,11 @@
 #define CONFIG_X86_IO_APIC 1
 #define CONFIG_HPET_TIMER 1
 #define CONFIG_X86_MCE_P4THERMAL 1
+#define CONFIG_ACPI_NUMA 1
+#define CONFIG_NUMA 1
+#define CONFIG_ACPI_SRAT 1
+#define CONFIG_DISCONTIGMEM 1
+#define CONFIG_NUMA_EMU 1
 
 /* Intel P4 currently has largest cache line (L2 line size is 128 bytes). */
 #define CONFIG_X86_L1_CACHE_SHIFT 7
@@ -81,13 +86,6 @@
 
 #ifndef __ASSEMBLY__
 extern unsigned long _end; /* standard ELF symbol */
-
-static inline void FORCE_CRASH(void) __attribute__((noreturn,always_inline)); 
-static inline void FORCE_CRASH(void) 
-{
-    __asm__ __volatile__ ( "ud2" );
-    while(1);
-}
 #endif /* __ASSEMBLY__ */
 
 #if defined(__x86_64__)
@@ -195,12 +193,6 @@ static inline void FORCE_CRASH(void)
 #define __HYPERVISOR_DS64 0x0000
 #define __HYPERVISOR_DS32 0xe018
 #define __HYPERVISOR_DS   __HYPERVISOR_DS64
-
-#define __GUEST_CS64      0xe033
-#define __GUEST_CS32      0xe023
-#define __GUEST_CS        __GUEST_CS64
-#define __GUEST_DS        0x0000
-#define __GUEST_SS        0xe02b
 
 /* For generic assembly code: use macros to define operation/operand sizes. */
 #define __OS          "q"  /* Operation Suffix */

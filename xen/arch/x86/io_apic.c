@@ -269,13 +269,10 @@ static void set_ioapic_affinity_irq(unsigned int irq, cpumask_t cpumask)
     int pin;
     struct irq_pin_list *entry = irq_2_pin + irq;
     unsigned int apicid_value;
-    cpumask_t tmp;
-	
-    cpus_and(tmp, cpumask, cpu_online_map);
-    if (cpus_empty(tmp))
-        tmp = TARGET_CPUS;
 
-    cpus_and(cpumask, tmp, CPU_MASK_ALL);
+    cpus_and(cpumask, cpumask, cpu_online_map);
+    if (cpus_empty(cpumask))
+        cpumask = TARGET_CPUS;
 
     apicid_value = cpu_mask_to_apicid(cpumask);
     /* Prepare to do the io_apic_write */
@@ -1143,7 +1140,8 @@ static void __init setup_ioapic_ids_from_mpc(void)
      * Don't check I/O APIC IDs for xAPIC systems. They have
      * no meaning without the serial APIC bus.
      */
-    if (!(boot_cpu_data.x86_vendor == X86_VENDOR_INTEL && boot_cpu_data.x86 < 15))
+    if (!(boot_cpu_data.x86_vendor == X86_VENDOR_INTEL)
+        || APIC_XAPIC(apic_version[boot_cpu_physical_apicid]))
         return;
 
     /*
@@ -1639,6 +1637,8 @@ static inline void unlock_ExtINT_logic(void)
     spin_unlock_irqrestore(&ioapic_lock, flags);
 }
 
+int timer_uses_ioapic_pin_0;
+
 /*
  * This code may look a bit paranoid, but it's supposed to cooperate with
  * a wide range of boards and BIOS bugs.  Fortunately only the timer IRQ
@@ -1677,6 +1677,9 @@ static inline void check_timer(void)
     apic1 = find_isa_irq_apic(0, mp_INT);
     pin2  = ioapic_i8259.pin;
     apic2 = ioapic_i8259.apic;
+
+    if (pin1 == 0)
+        timer_uses_ioapic_pin_0 = 1;
 
     printk(KERN_INFO "..TIMER: vector=0x%02X apic1=%d pin1=%d apic2=%d pin2=%d\n",
            vector, apic1, pin1, apic2, pin2);
@@ -1977,7 +1980,8 @@ int ioapic_guest_read(unsigned long physbase, unsigned int reg, u32 *pval)
 }
 
 #define WARN_BOGUS_WRITE(f, a...)                                       \
-    DPRINTK("\n%s: apic=%d, pin=%d, old_irq=%d, new_irq=%d\n"           \
+    dprintk(XENLOG_INFO, "\n%s: "                                        \
+            "apic=%d, pin=%d, old_irq=%d, new_irq=%d\n"                 \
             "%s: old_entry=%08x, new_entry=%08x\n"                      \
             "%s: " f, __FUNCTION__, apic, pin, old_irq, new_irq,        \
             __FUNCTION__, *(u32 *)&old_rte, *(u32 *)&new_rte,           \

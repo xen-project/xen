@@ -1,3 +1,5 @@
+0x0001f001	CPU%(cpu)d	%(tsc)d		lost_records        0x%(1)08x
+
 0x0002f001	CPU%(cpu)d	%(tsc)d		sched_add_domain	[ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
 0x0002f002	CPU%(cpu)d	%(tsc)d		sched_rem_domain	[ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
 0x0002f003	CPU%(cpu)d	%(tsc)d		domain_sleep		[ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
@@ -12,10 +14,29 @@
 0x0002f00c	CPU%(cpu)d	%(tsc)d		t_timer_fn
 0x0002f00d	CPU%(cpu)d	%(tsc)d		dom_timer_fn
 
-0x00080001	CPU%(cpu)d      %(tsc)d		VMX_VMEXIT		[ domid = 0x%(1)08x, eip = 0x%(2)08x, reason = 0x%(3)08x ]
-0x00080002	CPU%(cpu)d      %(tsc)d		VMX_VECTOR		[ domid = 0x%(1)08x, eip = 0x%(2)08x, vector = 0x%(3)08x ]
-0x00080003	CPU%(cpu)d      %(tsc)d		VMX_INT			[ domid = 0x%(1)08x, trap = 0x%(2)08x, va = 0x%(3)08x ]
+0x00080001	CPU%(cpu)d	%(tsc)d		VMX_VMEXIT		[ domid = 0x%(1)08x, eip = 0x%(2)08x, reason = 0x%(3)08x ]
+0x00084001	CPU%(cpu)d	%(tsc)d		VMX_INTR		[ domid = 0x%(1)08x, trap = 0x%(2)08x, va = 0x%(3)08x ]
 
-0x00081001      CPU%(cpu)d      %(tsc)d         VMEXIT                  0x%(1)08x 0x%(2)08x 0x%(3)08x 
-0x00081002      CPU%(cpu)d      %(tsc)d         VMENTRY                 0x%(1)08x 0x%(2)08x 0x%(3)08x 0x%(4)08x 0x%(5)08x
+0x00081001	CPU%(cpu)d	%(tsc)d		VMEXIT_0		0x%(1)08x 0x%(2)08x 0x%(3)08x
+0x00082001	CPU%(cpu)d	%(tsc)d		VMENTRY_0		0x%(1)08x 0x%(2)08x 0x%(3)08x 0x%(4)08x 0x%(5)08x
 
+0x00081002	CPU%(cpu)d	%(tsc)d		VMEXIT_1		0x%(1)08x 0x%(2)08x 0x%(3)08x
+0x00082002	CPU%(cpu)d	%(tsc)d		VMENTRY_1		0x%(1)08x 0x%(2)08x 0x%(3)08x 0x%(4)08x 0x%(5)08x
+
+0x00081003	CPU%(cpu)d	%(tsc)d		VMEXIT_2		0x%(1)08x 0x%(2)08x 0x%(3)08x
+0x00082003	CPU%(cpu)d	%(tsc)d		VMENTRY_2		0x%(1)08x 0x%(2)08x 0x%(3)08x 0x%(4)08x 0x%(5)08x
+
+0x00081004	CPU%(cpu)d	%(tsc)d		VMEXIT_3		0x%(1)08x 0x%(2)08x 0x%(3)08x
+0x00082004	CPU%(cpu)d	%(tsc)d		VMENTRY_3		0x%(1)08x 0x%(2)08x 0x%(3)08x 0x%(4)08x 0x%(5)08x
+
+0x00081005	CPU%(cpu)d	%(tsc)d		VMEXIT_4		0x%(1)08x 0x%(2)08x 0x%(3)08x
+0x00082005	CPU%(cpu)d	%(tsc)d		VMENTRY_4		0x%(1)08x 0x%(2)08x 0x%(3)08x 0x%(4)08x 0x%(5)08x
+
+0x00081006	CPU%(cpu)d	%(tsc)d		VMEXIT_5		0x%(1)08x 0x%(2)08x 0x%(3)08x
+0x00082006	CPU%(cpu)d	%(tsc)d		VMENTRY_5		0x%(1)08x 0x%(2)08x 0x%(3)08x 0x%(4)08x 0x%(5)08x
+
+0x00081007	CPU%(cpu)d	%(tsc)d		VMEXIT_6		0x%(1)08x 0x%(2)08x 0x%(3)08x
+0x00082007	CPU%(cpu)d	%(tsc)d		VMENTRY_6		0x%(1)08x 0x%(2)08x 0x%(3)08x 0x%(4)08x 0x%(5)08x
+
+0x00081008	CPU%(cpu)d	%(tsc)d		VMEXIT_7		0x%(1)08x 0x%(2)08x 0x%(3)08x
+0x00082008	CPU%(cpu)d	%(tsc)d		VMENTRY_7		0x%(1)08x 0x%(2)08x 0x%(3)08x 0x%(4)08x 0x%(5)08x

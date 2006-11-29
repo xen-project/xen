@@ -49,11 +49,64 @@
  * Update the checked last_itc.
  */
 
-extern void vmx_reflect_interruption(UINT64 ifa,UINT64 isr,UINT64 iim,
-     UINT64 vector,REGS *regs);
+extern void vmx_reflect_interruption(u64 ifa, u64 isr, u64 iim,
+                                     u64 vector, REGS *regs);
 static void update_last_itc(vtime_t *vtm, uint64_t cur_itc)
 {
     vtm->last_itc = cur_itc;
+}
+
+/*
+ * Next for vLSapic
+ */
+
+#define NMI_VECTOR		2
+#define ExtINT_VECTOR		0
+#define NULL_VECTOR		-1
+
+static void update_vhpi(VCPU *vcpu, int vec)
+{
+    u64 vhpi;
+
+    if (vec == NULL_VECTOR)
+        vhpi = 0;
+    else if (vec == NMI_VECTOR)
+        vhpi = 32;
+    else if (vec == ExtINT_VECTOR)
+        vhpi = 16;
+    else
+        vhpi = vec >> 4;
+
+    VCPU(vcpu,vhpi) = vhpi;
+    // TODO: Add support for XENO
+    if (VCPU(vcpu,vac).a_int)
+        ia64_call_vsa(PAL_VPS_SET_PENDING_INTERRUPT, 
+                      (uint64_t)vcpu->arch.privregs, 0, 0, 0, 0, 0, 0);
+}
+
+
+/*
+ * May come from virtualization fault or
+ * nested host interrupt.
+ */
+static int vmx_vcpu_unpend_interrupt(VCPU *vcpu, uint8_t vector)
+{
+    uint64_t spsr;
+    int ret;
+
+    if (vector & ~0xff) {
+        dprintk(XENLOG_WARNING, "vmx_vcpu_pend_interrupt: bad vector\n");
+        return -1;
+    }
+
+    local_irq_save(spsr);
+    ret = test_and_clear_bit(vector, &VCPU(vcpu, irr[0]));
+    local_irq_restore(spsr);
+
+    if (ret)
+        vcpu->arch.irq_new_pending = 1;
+
+    return ret;
 }
 
 /*
@@ -66,14 +119,11 @@ static uint64_t now_itc(vtime_t *vtm)
         if ( vtm->vtm_local_drift ) {
 //          guest_itc -= vtm->vtm_local_drift;
         }       
-        if ( (long)(guest_itc - vtm->last_itc) > 0 ) {
+        if (guest_itc >= vtm->last_itc)
             return guest_itc;
-
-        }
-        else {
+        else
             /* guest ITC backwarded due after LP switch */
             return vtm->last_itc;
-        }
 }
 
 /*
@@ -81,36 +131,42 @@ static uint64_t now_itc(vtime_t *vtm)
  */
 static void vtm_reset(VCPU *vcpu)
 {
-    uint64_t    cur_itc;
-    vtime_t     *vtm;
-    
-    vtm=&(vcpu->arch.arch_vmx.vtm);
-    vtm->vtm_offset = 0;
+    int i;
+    u64 vtm_offset;
+    VCPU *v;
+    struct domain *d = vcpu->domain;
+    vtime_t *vtm = &VMX(vcpu, vtm);
+
+    if (vcpu->vcpu_id == 0) {
+        vtm_offset = 0UL - ia64_get_itc();
+        for (i = MAX_VIRT_CPUS - 1; i >= 0; i--) {
+            if ((v = d->vcpu[i]) != NULL) {
+                VMX(v, vtm).vtm_offset = vtm_offset;
+                VMX(v, vtm).last_itc = 0;
+            }
+        }
+    }
     vtm->vtm_local_drift = 0;
     VCPU(vcpu, itm) = 0;
     VCPU(vcpu, itv) = 0x10000;
-    cur_itc = ia64_get_itc();
-    vtm->last_itc = vtm->vtm_offset + cur_itc;
+    vtm->last_itc = 0;
 }
 
 /* callback function when vtm_timer expires */
 static void vtm_timer_fn(void *data)
 {
-    vtime_t *vtm;
-    VCPU    *vcpu = data;
-    u64	    cur_itc,vitv;
+    VCPU *vcpu = data;
+    vtime_t *vtm = &VMX(vcpu, vtm);
+    u64 vitv;
 
     vitv = VCPU(vcpu, itv);
-    if ( !ITV_IRQ_MASK(vitv) ){
-        vmx_vcpu_pend_interrupt(vcpu, vitv & 0xff);
+    if (!ITV_IRQ_MASK(vitv)) {
+        vmx_vcpu_pend_interrupt(vcpu, ITV_VECTOR(vitv));
         vcpu_unblock(vcpu);
-    }
-    vtm=&(vcpu->arch.arch_vmx.vtm);
-    cur_itc = now_itc(vtm);
- //    vitm =VCPU(vcpu, itm);
- //fire_itc2 = cur_itc;
- //fire_itm2 = vitm;
-    update_last_itc(vtm,cur_itc);  // pseudo read to update vITC
+    } else
+        vtm->pending = 1;
+
+    update_last_itc(vtm, VCPU(vcpu, itm));  // update vITC
 }
 
 void vtm_init(VCPU *vcpu)
@@ -118,7 +174,7 @@ void vtm_init(VCPU *vcpu)
     vtime_t     *vtm;
     uint64_t    itc_freq;
     
-    vtm=&(vcpu->arch.arch_vmx.vtm);
+    vtm = &VMX(vcpu, vtm);
 
     itc_freq = local_cpu_data->itc_freq;
     vtm->cfg_max_jump=itc_freq*MAX_JUMP_STEP/1000;
@@ -132,10 +188,9 @@ void vtm_init(VCPU *vcpu)
  */
 uint64_t vtm_get_itc(VCPU *vcpu)
 {
-    uint64_t    guest_itc;
-    vtime_t    *vtm;
+    uint64_t guest_itc;
+    vtime_t *vtm = &VMX(vcpu, vtm);
 
-    vtm=&(vcpu->arch.arch_vmx.vtm);
     guest_itc = now_itc(vtm);
     return guest_itc;
 }
@@ -143,24 +198,28 @@ uint64_t vtm_get_itc(VCPU *vcpu)
 
 void vtm_set_itc(VCPU *vcpu, uint64_t new_itc)
 {
-    uint64_t    vitm, vitv;
-    vtime_t     *vtm;
-    vitm = VCPU(vcpu,itm);
-    vitv = VCPU(vcpu,itv);
-    vtm=&(vcpu->arch.arch_vmx.vtm);
-    if(vcpu->vcpu_id == 0){
-        vtm->vtm_offset = new_itc - ia64_get_itc();
-        vtm->last_itc = new_itc;
+    int i;
+    uint64_t vitm, vtm_offset;
+    vtime_t *vtm;
+    VCPU *v;
+    struct domain *d = vcpu->domain;
+
+    vitm = VCPU(vcpu, itm);
+    vtm = &VMX(vcpu, vtm);
+    if (vcpu->vcpu_id == 0) {
+        vtm_offset = new_itc - ia64_get_itc();
+        for (i = MAX_VIRT_CPUS - 1; i >= 0; i--) {
+            if ((v = d->vcpu[i]) != NULL) {
+                VMX(v, vtm).vtm_offset = vtm_offset;
+                VMX(v, vtm).last_itc = 0;
+            }
+        }
     }
-    else{
-        vtm->vtm_offset = vcpu->domain->vcpu[0]->arch.arch_vmx.vtm.vtm_offset;
-        new_itc=vtm->vtm_offset + ia64_get_itc();
-        vtm->last_itc = new_itc;
-    }
-    if(vitm < new_itc){
-        clear_bit(ITV_VECTOR(vitv), &VCPU(vcpu, irr[0]));
+    vtm->last_itc = 0;
+    if (vitm <= new_itc)
         stop_timer(&vtm->vtm_timer);
-    }
+    else
+        vtm_set_itm(vcpu, vitm);
 }
 
 
@@ -172,16 +231,16 @@ void vtm_set_itm(VCPU *vcpu, uint64_t val)
 {
     vtime_t *vtm;
     uint64_t   vitv, cur_itc, expires;
+
     vitv = VCPU(vcpu, itv);
-    vtm=&(vcpu->arch.arch_vmx.vtm);
-    // TODO; need to handle VHPI in future
-    clear_bit(ITV_VECTOR(vitv), &VCPU(vcpu, irr[0]));
-    VCPU(vcpu,itm)=val;
-    cur_itc =now_itc(vtm);
-    if(time_before(val, cur_itc))
-        val = cur_itc;
-    if(val >  vtm->last_itc){
+    vtm = &VMX(vcpu, vtm);
+    VCPU(vcpu, itm) = val;
+    if (val > vtm->last_itc) {
+        cur_itc = now_itc(vtm);
+        if (time_before(val, cur_itc))
+            val = cur_itc;
         expires = NOW() + cycle_to_ns(val-cur_itc) + TIMER_SLOP;
+        vmx_vcpu_unpend_interrupt(vcpu, ITV_VECTOR(vitv));
         set_timer(&vtm->vtm_timer, expires);
     }else{
         stop_timer(&vtm->vtm_timer);
@@ -191,14 +250,13 @@ void vtm_set_itm(VCPU *vcpu, uint64_t val)
 
 void vtm_set_itv(VCPU *vcpu, uint64_t val)
 {
-    uint64_t    olditv;
-    olditv = VCPU(vcpu, itv);
+    vtime_t *vtm = &VMX(vcpu, vtm);
+
     VCPU(vcpu, itv) = val;
-    if(ITV_IRQ_MASK(val)){
-        clear_bit(ITV_VECTOR(olditv), &VCPU(vcpu, irr[0]));
-    }else if(ITV_VECTOR(olditv)!=ITV_VECTOR(val)){
-        if(test_and_clear_bit(ITV_VECTOR(olditv), &VCPU(vcpu, irr[0])))
-            set_bit(ITV_VECTOR(val), &VCPU(vcpu, irr[0]));
+
+    if (!ITV_IRQ_MASK(val) && vtm->pending) {
+        vmx_vcpu_pend_interrupt(vcpu, ITV_VECTOR(val));
+        vtm->pending = 0;
     }
 }
 
@@ -272,95 +330,27 @@ void vtm_domain_in(VCPU *vcpu)
 }
  */
 
-/*
- * Next for vLSapic
- */
-
-#define  NMI_VECTOR         2
-#define  ExtINT_VECTOR      0
-#define  NULL_VECTOR        -1
-static void update_vhpi(VCPU *vcpu, int vec)
-{
-    u64     vhpi;
-    if ( vec == NULL_VECTOR ) {
-        vhpi = 0;
-    }
-    else if ( vec == NMI_VECTOR ) { // NMI
-        vhpi = 32;
-    } else if (vec == ExtINT_VECTOR) { //ExtINT
-        vhpi = 16;
-    }
-    else {
-        vhpi = vec >> 4;
-    }
-
-    VCPU(vcpu,vhpi) = vhpi;
-    // TODO: Add support for XENO
-    if ( VCPU(vcpu,vac).a_int ) {
-        ia64_call_vsa ( PAL_VPS_SET_PENDING_INTERRUPT, 
-                (uint64_t) &(vcpu->arch.privregs), 0, 0,0,0,0,0);
-    }
-}
-
 #ifdef V_IOSAPIC_READY
-/* Assist to check virtual interrupt lines */
-void vmx_virq_line_assist(struct vcpu *v)
+int vlapic_match_logical_addr(struct vlapic *vlapic, uint16_t dest)
 {
-    global_iodata_t *spg = &get_sp(v->domain)->sp_global;
-    uint16_t *virq_line, irqs;
-
-    virq_line = &spg->pic_irr;
-    if (*virq_line) {
-	do {
-	    irqs = *(volatile uint16_t*)virq_line;
-	} while ((uint16_t)cmpxchg(virq_line, irqs, 0) != irqs);
-	hvm_vioapic_do_irqs(v->domain, irqs);
-    }
-
-    virq_line = &spg->pic_clear_irr;
-    if (*virq_line) {
-	do {
-	    irqs = *(volatile uint16_t*)virq_line;
-	} while ((uint16_t)cmpxchg(virq_line, irqs, 0) != irqs);
-	hvm_vioapic_do_irqs_clear(v->domain, irqs);
-    }
-}
-
-void vmx_virq_line_init(struct domain *d)
-{
-    global_iodata_t *spg = &get_sp(d)->sp_global;
-
-    spg->pic_elcr = 0xdef8; /* Level/Edge trigger mode */
-    spg->pic_irr = 0;
-    spg->pic_last_irr = 0;
-    spg->pic_clear_irr = 0;
-}
-
-int ioapic_match_logical_addr(hvm_vioapic_t *s, int number, uint16_t dest)
-{
-    return (VLAPIC_ID(s->lapic_info[number]) == dest);
+    return (VLAPIC_ID(vlapic) == dest);
 }
 
 struct vlapic* apic_round_robin(struct domain *d,
-				uint8_t dest_mode,
 				uint8_t vector,
 				uint32_t bitmap)
 {
-    uint8_t bit;
-    hvm_vioapic_t *s;
+    uint8_t bit = 0;
     
     if (!bitmap) {
 	printk("<apic_round_robin> no bit on bitmap\n");
 	return NULL;
     }
 
-    s = &d->arch.vmx_platform.vioapic;
-    for (bit = 0; bit < s->lapic_count; bit++) {
-	if (bitmap & (1 << bit))
-	    return s->lapic_info[bit];
-    }
+    while (!(bitmap & (1 << bit)))
+        bit++;
 
-    return NULL;
+    return vcpu_vlapic(d->vcpu[bit]);
 }
 #endif
 
@@ -387,9 +377,8 @@ void vlsapic_reset(VCPU *vcpu)
 
 #ifdef V_IOSAPIC_READY
     vcpu->arch.arch_vmx.vlapic.vcpu = vcpu;
-    hvm_vioapic_add_lapic(&vcpu->arch.arch_vmx.vlapic, vcpu);
 #endif
-    DPRINTK("VLSAPIC inservice base=%p\n", &VLSAPIC_INSVC(vcpu,0) );
+    dprintk(XENLOG_INFO, "VLSAPIC inservice base=%p\n", &VLSAPIC_INSVC(vcpu,0) );
 }
 
 /*
@@ -518,22 +507,26 @@ int vmx_vcpu_pend_interrupt(VCPU *vcpu, uint8_t vector)
     int ret;
 
     if (vector & ~0xff) {
-        DPRINTK("vmx_vcpu_pend_interrupt: bad vector\n");
+        gdprintk(XENLOG_INFO, "vmx_vcpu_pend_interrupt: bad vector\n");
         return -1;
     }
     local_irq_save(spsr);
     ret = test_and_set_bit(vector, &VCPU(vcpu, irr[0]));
     local_irq_restore(spsr);
-    vcpu->arch.irq_new_pending = 1;
+
+    if (!ret)
+        vcpu->arch.irq_new_pending = 1;
+
     return ret;
 }
+
 
 /*
  * Add batch of pending interrupt.
  * The interrupt source is contained in pend_irr[0-3] with
  * each bits stand for one interrupt.
  */
-void vmx_vcpu_pend_batch_interrupt(VCPU *vcpu, UINT64 *pend_irr)
+void vmx_vcpu_pend_batch_interrupt(VCPU *vcpu, u64 *pend_irr)
 {
     uint64_t    spsr;
     int     i;
@@ -559,14 +552,13 @@ void vmx_vcpu_pend_batch_interrupt(VCPU *vcpu, UINT64 *pend_irr)
  */
 int vmx_check_pending_irq(VCPU *vcpu)
 {
-    uint64_t  spsr, mask;
-    int     h_pending, h_inservice;
-    uint64_t    isr;
-    IA64_PSR    vpsr;
+    int  mask, h_pending, h_inservice;
+    uint64_t isr;
+    IA64_PSR vpsr;
     REGS *regs=vcpu_regs(vcpu);
-    local_irq_save(spsr);
     h_pending = highest_pending_irq(vcpu);
     if ( h_pending == NULL_VECTOR ) {
+        update_vhpi(vcpu, NULL_VECTOR);
         h_pending = SPURIOUS_VECTOR;
         goto chk_irq_exit;
     }
@@ -578,13 +570,11 @@ int vmx_check_pending_irq(VCPU *vcpu)
         isr = vpsr.val & IA64_PSR_RI;
         if ( !vpsr.ic )
             panic_domain(regs,"Interrupt when IC=0\n");
+        update_vhpi(vcpu, h_pending);
+        vmx_reflect_interruption(0, isr, 0, 12, regs); // EXT IRQ
+    } else if (mask == IRQ_MASKED_BY_INSVC) {
         if (VCPU(vcpu, vhpi))
             update_vhpi(vcpu, NULL_VECTOR);
-        vmx_reflect_interruption(0,isr,0, 12, regs ); // EXT IRQ
-    }
-    else if ( mask == IRQ_MASKED_BY_INSVC ) {
-        // cann't inject VHPI
-//        DPRINTK("IRQ masked by higher inservice\n");
     }
     else {
         // masked by vpsr.i or vtpr.
@@ -592,7 +582,6 @@ int vmx_check_pending_irq(VCPU *vcpu)
     }
 
 chk_irq_exit:
-    local_irq_restore(spsr);
     return h_pending;
 }
 
@@ -602,17 +591,13 @@ chk_irq_exit:
 void guest_write_eoi(VCPU *vcpu)
 {
     int vec;
-    uint64_t  spsr;
 
     vec = highest_inservice_irq(vcpu);
     if ( vec == NULL_VECTOR ) 
-	panic_domain(vcpu_regs(vcpu),"Wrong vector to EOI\n");
-    local_irq_save(spsr);
+        panic_domain(vcpu_regs(vcpu), "Wrong vector to EOI\n");
     VLSAPIC_INSVC(vcpu,vec>>6) &= ~(1UL <<(vec&63));
-    local_irq_restore(spsr);
     VCPU(vcpu, eoi)=0;    // overwrite the data
     vcpu->arch.irq_new_pending=1;
-//    vmx_check_pending_irq(vcpu);
 }
 
 int is_unmasked_irq(VCPU *vcpu)
@@ -631,23 +616,21 @@ int is_unmasked_irq(VCPU *vcpu)
 
 uint64_t guest_read_vivr(VCPU *vcpu)
 {
-    int vec, h_inservice;
-    uint64_t  spsr;
-
-    local_irq_save(spsr);
+    int vec, h_inservice, mask;
     vec = highest_pending_irq(vcpu);
     h_inservice = highest_inservice_irq(vcpu);
-    if ( vec == NULL_VECTOR || 
-        irq_masked(vcpu, vec, h_inservice) != IRQ_NO_MASKED ) {
-        local_irq_restore(spsr);
+    mask = irq_masked(vcpu, vec, h_inservice);
+    if (vec == NULL_VECTOR || mask == IRQ_MASKED_BY_INSVC) {
+        if (VCPU(vcpu, vhpi))
+            update_vhpi(vcpu, NULL_VECTOR);
         return IA64_SPURIOUS_INT_VECTOR;
     }
- 
+    if (mask == IRQ_MASKED_BY_VTPR) {
+        update_vhpi(vcpu, vec);
+        return IA64_SPURIOUS_INT_VECTOR;
+    }
     VLSAPIC_INSVC(vcpu,vec>>6) |= (1UL <<(vec&63));
-    VCPU(vcpu, irr[vec>>6]) &= ~(1UL <<(vec&63));
-    if (VCPU(vcpu, vhpi))
-        update_vhpi(vcpu, NULL_VECTOR); // clear VHPI till EOI or IRR write
-    local_irq_restore(spsr);
+    vmx_vcpu_unpend_interrupt(vcpu, vec);
     return (uint64_t)vec;
 }
 
@@ -657,7 +640,6 @@ static void generate_exirq(VCPU *vcpu)
     uint64_t    isr;
     REGS *regs=vcpu_regs(vcpu);
     vpsr.val = VCPU(vcpu, vpsr);
-    update_vhpi(vcpu, NULL_VECTOR);
     isr = vpsr.val & IA64_PSR_RI;
     if ( !vpsr.ic )
         panic_domain(regs,"Interrupt when IC=0\n");
@@ -669,7 +651,6 @@ void vhpi_detection(VCPU *vcpu)
     uint64_t    threshold,vhpi;
     tpr_t       vtpr;
     IA64_PSR    vpsr;
-    
     vpsr.val = VCPU(vcpu, vpsr);
     vtpr.val = VCPU(vcpu, tpr);
 
@@ -683,9 +664,27 @@ void vhpi_detection(VCPU *vcpu)
 
 void vmx_vexirq(VCPU *vcpu)
 {
-    static  uint64_t  vexirq_count=0;
-
-    vexirq_count ++;
-    printk("Virtual ex-irq %ld\n", vexirq_count);
     generate_exirq (vcpu);
+}
+
+
+void vmx_vioapic_set_irq(struct domain *d, int irq, int level)
+{
+    unsigned long flags;
+
+    spin_lock_irqsave(&d->arch.arch_vmx.virq_assist_lock, flags);
+    vioapic_set_irq(d, irq, level);
+    spin_unlock_irqrestore(&d->arch.arch_vmx.virq_assist_lock, flags);
+}
+
+int vmx_vlapic_set_irq(VCPU *v, uint8_t vec, uint8_t trig)
+{
+    int ret;
+    int running = test_bit(_VCPUF_running, &v->vcpu_flags);
+
+    ret = vmx_vcpu_pend_interrupt(v, vec);
+    vcpu_unblock(v);
+    if (running)
+        smp_send_event_check_cpu(v->processor);
+    return ret;
 }

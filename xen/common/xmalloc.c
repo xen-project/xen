@@ -34,15 +34,80 @@
 #include <xen/cache.h>
 #include <xen/prefetch.h>
 
+/*
+ * XMALLOC_DEBUG:
+ *  1. Free data blocks are filled with poison bytes.
+ *  2. In-use data blocks have guard bytes at the start and end.
+ */
+#ifndef NDEBUG
+#define XMALLOC_DEBUG 1
+#endif
+
 static LIST_HEAD(freelist);
 static DEFINE_SPINLOCK(freelist_lock);
 
 struct xmalloc_hdr
 {
-    /* Total including this hdr. */
+    /* Size is total including this header. */
     size_t size;
     struct list_head freelist;
 } __cacheline_aligned;
+
+static void add_to_freelist(struct xmalloc_hdr *hdr)
+{
+#if XMALLOC_DEBUG
+    memset(hdr + 1, 0xa5, hdr->size - sizeof(*hdr));
+#endif
+    list_add(&hdr->freelist, &freelist);
+}
+
+static void del_from_freelist(struct xmalloc_hdr *hdr)
+{
+#if XMALLOC_DEBUG
+    size_t i;
+    unsigned char *data = (unsigned char *)(hdr + 1);
+    for ( i = 0; i < (hdr->size - sizeof(*hdr)); i++ )
+        BUG_ON(data[i] != 0xa5);
+    BUG_ON((hdr->size <= 0) || (hdr->size >= PAGE_SIZE));
+#endif
+    list_del(&hdr->freelist);
+}
+
+static void *data_from_header(struct xmalloc_hdr *hdr)
+{
+#if XMALLOC_DEBUG
+    /* Data block contain SMP_CACHE_BYTES of guard canary. */
+    unsigned char *data = (unsigned char *)(hdr + 1);
+    memset(data, 0x5a, SMP_CACHE_BYTES);
+    memset(data + hdr->size - sizeof(*hdr) - SMP_CACHE_BYTES,
+           0x5a, SMP_CACHE_BYTES);
+    return data + SMP_CACHE_BYTES;
+#else
+    return hdr + 1;
+#endif
+}
+
+static struct xmalloc_hdr *header_from_data(const void *p)
+{
+#if XMALLOC_DEBUG
+    unsigned char *data = (unsigned char *)p - SMP_CACHE_BYTES;
+    struct xmalloc_hdr *hdr = (struct xmalloc_hdr *)data - 1;
+    size_t i;
+
+    /* Check header guard canary. */
+    for ( i = 0; i < SMP_CACHE_BYTES; i++ )
+        BUG_ON(data[i] != 0x5a);
+
+    /* Check footer guard canary. */
+    data += hdr->size - sizeof(*hdr) - SMP_CACHE_BYTES;
+    for ( i = 0; i < SMP_CACHE_BYTES; i++ )
+        BUG_ON(data[i] != 0x5a);
+
+    return hdr;
+#else
+    return (struct xmalloc_hdr *)p - 1;
+#endif
+}
 
 static void maybe_split(struct xmalloc_hdr *hdr, size_t size, size_t block)
 {
@@ -54,7 +119,7 @@ static void maybe_split(struct xmalloc_hdr *hdr, size_t size, size_t block)
     {
         extra = (struct xmalloc_hdr *)((unsigned long)hdr + size);
         extra->size = leftover;
-        list_add(&extra->freelist, &freelist);
+        add_to_freelist(extra);
     }
     else
     {
@@ -79,7 +144,7 @@ static void *xmalloc_new_page(size_t size)
     maybe_split(hdr, size, PAGE_SIZE);
     spin_unlock_irqrestore(&freelist_lock, flags);
 
-    return hdr+1;
+    return data_from_header(hdr);
 }
 
 /* Big object?  Just use the page allocator. */
@@ -96,7 +161,7 @@ static void *xmalloc_whole_pages(size_t size)
     /* Debugging aid. */
     hdr->freelist.next = hdr->freelist.prev = NULL;
 
-    return hdr+1;
+    return data_from_header(hdr);
 }
 
 /* Return size, increased to alignment with align. */
@@ -113,6 +178,11 @@ void *_xmalloc(size_t size, size_t align)
     /* We currently always return cacheline aligned. */
     BUG_ON(align > SMP_CACHE_BYTES);
 
+#if XMALLOC_DEBUG
+    /* Add room for canaries at start and end of data block. */
+    size += 2 * SMP_CACHE_BYTES;
+#endif
+
     /* Add room for header, pad to align next header. */
     size += sizeof(struct xmalloc_hdr);
     size = align_up(size, __alignof__(struct xmalloc_hdr));
@@ -127,10 +197,10 @@ void *_xmalloc(size_t size, size_t align)
     {
         if ( i->size < size )
             continue;
-        list_del(&i->freelist);
+        del_from_freelist(i);
         maybe_split(i, size, i->size);
         spin_unlock_irqrestore(&freelist_lock, flags);
-        return i+1;
+        return data_from_header(i);
     }
     spin_unlock_irqrestore(&freelist_lock, flags);
 
@@ -146,7 +216,7 @@ void xfree(const void *p)
     if ( p == NULL )
         return;
 
-    hdr = (struct xmalloc_hdr *)p - 1;
+    hdr = header_from_data(p);
 
     /* We know hdr will be on same page. */
     BUG_ON(((long)p & PAGE_MASK) != ((long)hdr & PAGE_MASK));
@@ -175,7 +245,7 @@ void xfree(const void *p)
         /* We follow this block?  Swallow it. */
         if ( (_i + i->size) == _hdr )
         {
-            list_del(&i->freelist);
+            del_from_freelist(i);
             i->size += hdr->size;
             hdr = i;
         }
@@ -183,7 +253,7 @@ void xfree(const void *p)
         /* We precede this block? Swallow it. */
         if ( (_hdr + hdr->size) == _i )
         {
-            list_del(&i->freelist);
+            del_from_freelist(i);
             hdr->size += i->size;
         }
     }
@@ -196,7 +266,7 @@ void xfree(const void *p)
     }
     else
     {
-        list_add(&hdr->freelist, &freelist);
+        add_to_freelist(hdr);
     }
 
     spin_unlock_irqrestore(&freelist_lock, flags);

@@ -18,6 +18,7 @@ SUBDIRS-$(VTPM_TOOLS) += vtpm
 SUBDIRS-y += xenstat
 SUBDIRS-y += libaio
 SUBDIRS-y += blktap
+SUBDIRS-y += libfsimage
 
 # These don't cross-compile
 ifeq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
@@ -60,7 +61,7 @@ check_clean:
 	$(MAKE) -C check clean
 
 .PHONY: ioemu ioemuinstall ioemuclean
-ifdef CONFIG_IOEMU
+ifeq ($(CONFIG_IOEMU),y)
 export IOEMU_DIR ?= ioemu
 ioemu ioemuinstall:
 	[ -f $(IOEMU_DIR)/config-host.mak ] || \

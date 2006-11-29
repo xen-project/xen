@@ -42,7 +42,7 @@ if eyecatcher1 != "True":
 	FAIL("Failed to verify that a 128MB domain started")
 
 eyecatcher2 = getDomMem(domain_mem128.getName())
-if eyecatcher2 != 128:
+if eyecatcher2 not in range(126, 129):
 	FAIL("Started domain with 128MB, but it got %i MB" % eyecatcher2)
 
 #stop the domain (nice shutdown)

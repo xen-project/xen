@@ -82,7 +82,10 @@ ENTRY(vmx_asm_vmexit_handler)
         /* selectors are restored/saved by VMX */
         HVM_SAVE_ALL_NOSEGREGS
         call vmx_trace_vmexit
+        movl %esp,%eax
+        push %eax
         call vmx_vmexit_handler
+        addl $4,%esp
         jmp vmx_asm_do_vmentry
 
         ALIGN
@@ -94,9 +97,6 @@ vmx_process_softirqs:
         ALIGN
 ENTRY(vmx_asm_do_vmentry)
         GET_CURRENT(%ebx)
-        pushl %ebx
-        call hvm_do_resume
-        addl $4, %esp
         cli                             # tests must not race interrupts
 
         movl VCPU_processor(%ebx),%eax
@@ -105,7 +105,8 @@ ENTRY(vmx_asm_do_vmentry)
         jnz  vmx_process_softirqs
 
         call vmx_intr_assist
-        call vmx_load_cr2
+        movl VCPU_vmx_cr2(%ebx),%eax
+        movl %eax,%cr2
         call vmx_trace_vmentry
 
         cmpl $0,VCPU_vmx_launched(%ebx)

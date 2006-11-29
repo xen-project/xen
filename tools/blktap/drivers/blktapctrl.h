@@ -30,19 +30,19 @@
  */
 
 
-static inline long int tapdisk_get_size(blkif_t *blkif)
+static inline unsigned long long tapdisk_get_size(blkif_t *blkif)
 {
 	image_t *img = (image_t *)blkif->prv;
 	return img->size;
 }
 
-static inline long int tapdisk_get_secsize(blkif_t *blkif)
+static inline unsigned long tapdisk_get_secsize(blkif_t *blkif)
 {
 	image_t *img = (image_t *)blkif->prv;
 	return img->secsize;
 }
 
-static inline unsigned tapdisk_get_info(blkif_t *blkif)
+static inline unsigned int tapdisk_get_info(blkif_t *blkif)
 {
 	image_t *img = (image_t *)blkif->prv;
 	return img->info;

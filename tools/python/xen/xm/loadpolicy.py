@@ -21,28 +21,22 @@
 import sys
 import traceback
 from xen.util.security import ACMError, err, load_policy
+from xen.xm.opts import OptionError
 
-
-def usage():
-    print "\nUsage: xm loadpolicy <policy>\n"
-    print " Load the compiled binary (.bin) policy"
-    print " into the running hypervisor.\n"
-    err("Usage")
+def help():
+    return """Load the compiled binary (.bin) policy into the running
+    hypervisor."""
 
 def main(argv):
-    try:
-        if len(argv) != 2:
-            usage()
-        load_policy(argv[1])
-
-    except ACMError:
-        sys.exit(-1)
-    except:
-        traceback.print_exc(limit=1)
-        sys.exit(-1)
-
+    if len(argv) != 2:
+        raise OptionError('No policy defined')
+    
+    load_policy(argv[1])
 
 if __name__ == '__main__':
-    main(sys.argv)
-
-
+    try:
+        main(sys.argv)
+    except Exception, e:
+        sys.stderr.write('Error: %s\n' % str(e))
+        sys.exit(-1)
+        

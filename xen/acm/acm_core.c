@@ -60,7 +60,7 @@ struct acm_operations *acm_secondary_ops = NULL;
 /* acm global binary policy (points to 'local' primary and secondary policies */
 struct acm_binary_policy acm_bin_pol;
 /* acm binary policy lock */
-rwlock_t acm_bin_pol_rwlock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(acm_bin_pol_rwlock);
 
 /* until we have endian support in Xen, we discover it at runtime */
 u8 little_endian = 1;
@@ -100,9 +100,11 @@ acm_dump_policy_reference(u8 *buf, u32 buf_size)
     struct acm_policy_reference_buffer *pr_buf = (struct acm_policy_reference_buffer *)buf;
     int ret = sizeof(struct acm_policy_reference_buffer) + strlen(acm_bin_pol.policy_reference_name) + 1;
 
+    ret = (ret + 7) & ~7;
     if (buf_size < ret)
         return -EINVAL;
 
+    memset(buf, 0, ret);
     pr_buf->len = htonl(strlen(acm_bin_pol.policy_reference_name) + 1); /* including stringend '\0' */
     strcpy((char *)(buf + sizeof(struct acm_policy_reference_buffer)),
            acm_bin_pol.policy_reference_name);
@@ -187,85 +189,58 @@ acm_init_binary_policy(u32 policy_code)
     return ret;
 }
 
-static int
-acm_setup(unsigned int *initrdidx,
-          const multiboot_info_t *mbi,
-          unsigned long initial_images_start)
+int
+acm_is_policy(char *buf, unsigned long len)
 {
-    int i;
-    module_t *mod = (module_t *)__va(mbi->mods_addr);
+    struct acm_policy_buffer *pol;
+
+    if (buf == NULL || len < sizeof(struct acm_policy_buffer))
+        return 0;
+
+    pol = (struct acm_policy_buffer *)buf;
+    return ntohl(pol->magic) == ACM_MAGIC;
+}
+
+
+static int
+acm_setup(char *policy_start,
+          unsigned long policy_len)
+{
     int rc = ACM_OK;
+    struct acm_policy_buffer *pol;
 
-    if (mbi->mods_count > 1)
-        *initrdidx = 1;
+    if (policy_start == NULL || policy_len < sizeof(struct acm_policy_buffer))
+        return rc;
 
-    /*
-     * Try all modules and see whichever could be the binary policy.
-     * Adjust the initrdidx if module[1] is the binary policy.
-     */
-    for (i = mbi->mods_count-1; i >= 1; i--)
+    pol = (struct acm_policy_buffer *)policy_start;
+    if (ntohl(pol->magic) != ACM_MAGIC)
+        return rc;
+
+    rc = do_acm_set_policy((void *)policy_start, (u32)policy_len);
+    if (rc == ACM_OK)
     {
-        struct acm_policy_buffer *pol;
-        char *_policy_start;
-        unsigned long _policy_len;
-#if defined(__i386__)
-        _policy_start = (char *)(initial_images_start + (mod[i].mod_start-mod[0].mod_start));
-#elif defined(__x86_64__)
-        _policy_start = __va(initial_images_start + (mod[i].mod_start-mod[0].mod_start));
-#else
-#error Architecture unsupported by sHype
-#endif
-        _policy_len   = mod[i].mod_end - mod[i].mod_start;
-        if (_policy_len < sizeof(struct acm_policy_buffer))
-            continue; /* not a policy */
-
-        pol = (struct acm_policy_buffer *)_policy_start;
-        if (ntohl(pol->magic) == ACM_MAGIC)
-        {
-            rc = do_acm_set_policy((void *)_policy_start,
-                                   (u32)_policy_len);
-            if (rc == ACM_OK)
-            {
-                printkd("Policy len  0x%lx, start at %p.\n",_policy_len,_policy_start);
-                if (i == 1)
-                {
-                    if (mbi->mods_count > 2)
-                    {
-                        *initrdidx = 2;
-                    }
-                    else {
-                        *initrdidx = 0;
-                    }
-                }
-                else
-                {
-                    *initrdidx = 1;
-                }
-                break;
-            }
-            else
-            {
-                printk("Invalid policy. %d.th module line.\n", i+1);
-                /* load default policy later */
-                acm_active_security_policy = ACM_POLICY_UNDEFINED;
-            }
-        } /* end if a binary policy definition, i.e., (ntohl(pol->magic) == ACM_MAGIC ) */
+        printkd("Policy len  0x%lx, start at %p.\n",policy_len,policy_start);
+    }
+    else
+    {
+        printk("Invalid policy.\n");
+        /* load default policy later */
+        acm_active_security_policy = ACM_POLICY_UNDEFINED;
     }
     return rc;
 }
 
 
 int
-acm_init(unsigned int *initrdidx,
-         const multiboot_info_t *mbi,
-         unsigned long initial_images_start)
+acm_init(char *policy_start,
+         unsigned long policy_len)
 {
     int ret = ACM_OK;
 
     acm_set_endian();
 
     /* first try to load the boot policy (uses its own locks) */
-    acm_setup(initrdidx, mbi, initial_images_start);
+    acm_setup(policy_start, policy_len);
 
     if (acm_active_security_policy != ACM_POLICY_UNDEFINED)
     {

@@ -183,7 +183,6 @@ static vpd_t *alloc_vpd(void)
 	mregs->vac.a_cover = 1;
 	mregs->vac.a_bsw = 1;
 	mregs->vac.a_int = 1;
-       
 	mregs->vdc.d_vmsw = 1;
 
 	return vpd;
@@ -276,9 +275,9 @@ static void vmx_create_event_channels(struct vcpu *v)
 		for_each_vcpu(v->domain, o) {
 			p = get_vio(v->domain, o->vcpu_id);
 			o->arch.arch_vmx.xen_port = p->vp_eport =
-			                alloc_unbound_xen_event_channel(o, 0);
-			DPRINTK("Allocated port %d for hvm.\n",
-			        o->arch.arch_vmx.xen_port);
+					alloc_unbound_xen_event_channel(o, 0);
+			gdprintk(XENLOG_INFO, "Allocated port %ld for hvm.\n",
+			         o->arch.arch_vmx.xen_port);
 		}
 	}
 }
@@ -306,8 +305,8 @@ vmx_final_setup_guest(struct vcpu *v)
 	/* Per-domain vTLB and vhpt implementation. Now vmx domain will stick
 	 * to this solution. Maybe it can be deferred until we know created
 	 * one as vmx domain */
-#ifndef HASH_VHPT     
-        init_domain_tlb(v);
+#ifndef HASH_VHPT
+	init_domain_tlb(v);
 #endif
 	vmx_create_event_channels(v);
 
@@ -322,8 +321,6 @@ vmx_final_setup_guest(struct vcpu *v)
 	vlsapic_reset(v);
 	vtm_init(v);
 
-	/* One more step to enable interrupt assist */
-	set_bit(ARCH_VMX_INTR_ASSIST, &v->arch.arch_vmx.flags);
 	/* Set up guest 's indicator for VTi domain*/
 	set_bit(ARCH_VMX_DOMAIN, &v->arch.arch_vmx.flags);
 }
@@ -362,56 +359,58 @@ static const io_range_t io_ranges[] = {
 	{PIB_START, PIB_SIZE, GPFN_PIB},
 };
 
-/* Reseve 1 page for shared I/O and 1 page for xenstore.  */
-#define VMX_SYS_PAGES	(2 + (GFW_SIZE >> PAGE_SHIFT))
-#define VMX_CONFIG_PAGES(d) ((d)->max_pages - VMX_SYS_PAGES)
+/* Reseve 1 page for shared I/O ,1 page for xenstore and 1 page for buffer I/O.  */
+#define VMX_SYS_PAGES	(3 + (GFW_SIZE >> PAGE_SHIFT))
+/* If we support maxmem for domVTi, we should change from tot_page to max_pages.
+ * #define VMX_CONFIG_PAGES(d) ((d)->max_pages - VMX_SYS_PAGES)
+ */
+#define VMX_CONFIG_PAGES(d) ((d)->tot_pages - VMX_SYS_PAGES)
 
 static void vmx_build_physmap_table(struct domain *d)
 {
 	unsigned long i, j, start, tmp, end, mfn;
 	struct list_head *list_ent = d->page_list.next;
 
-	ASSERT(d->max_pages == d->tot_pages);
-
 	/* Mark I/O ranges */
 	for (i = 0; i < (sizeof(io_ranges) / sizeof(io_range_t)); i++) {
-	    for (j = io_ranges[i].start;
-		j < io_ranges[i].start + io_ranges[i].size;
-		j += PAGE_SIZE)
-		__assign_domain_page(d, j, io_ranges[i].type, ASSIGN_writable);
+		for (j = io_ranges[i].start;
+		     j < io_ranges[i].start + io_ranges[i].size; j += PAGE_SIZE)
+			(void)__assign_domain_page(d, j, io_ranges[i].type,
+			                           ASSIGN_writable);
 	}
 
 	/* Map normal memory below 3G */
 	end = VMX_CONFIG_PAGES(d) << PAGE_SHIFT;
 	tmp = end < MMIO_START ? end : MMIO_START;
 	for (i = 0; (i < tmp) && (list_ent != &d->page_list); i += PAGE_SIZE) {
-	    mfn = page_to_mfn(list_entry(list_ent, struct page_info, list));
-	    list_ent = mfn_to_page(mfn)->list.next;
-	    if (VGA_IO_START <= i && i < VGA_IO_START + VGA_IO_SIZE)
-		continue;
-	    assign_domain_page(d, i, mfn << PAGE_SHIFT);
+		mfn = page_to_mfn(list_entry(list_ent, struct page_info, list));
+		list_ent = mfn_to_page(mfn)->list.next;
+		if (VGA_IO_START <= i && i < VGA_IO_START + VGA_IO_SIZE)
+			continue;
+		assign_domain_page(d, i, mfn << PAGE_SHIFT);
 	}
 	ASSERT(list_ent != &d->page_list);
 
 	/* Map normal memory beyond 4G */
 	if (unlikely(end > MMIO_START)) {
-	    start = 4 * MEM_G;
-	    end = start + (end - 3 * MEM_G);
-	    for (i = start;
-	         (i < end) && (list_ent != &d->page_list); i += PAGE_SIZE) {
-		mfn = page_to_mfn(list_entry(list_ent, struct page_info, list));
-		assign_domain_page(d, i, mfn << PAGE_SHIFT);
-		list_ent = mfn_to_page(mfn)->list.next;
-	    }
-	    ASSERT(list_ent != &d->page_list);
+		start = 4 * MEM_G;
+		end = start + (end - 3 * MEM_G);
+		for (i = start;
+		     (i < end) && (list_ent != &d->page_list); i += PAGE_SIZE) {
+			mfn = page_to_mfn(list_entry(list_ent,
+			                             struct page_info, list));
+			assign_domain_page(d, i, mfn << PAGE_SHIFT);
+			list_ent = mfn_to_page(mfn)->list.next;
+		}
+		ASSERT(list_ent != &d->page_list);
 	}
 	 
 	/* Map guest firmware */
 	for (i = GFW_START; (i < GFW_START + GFW_SIZE) &&
-		(list_ent != &d->page_list); i += PAGE_SIZE) {
-	    mfn = page_to_mfn(list_entry(list_ent, struct page_info, list));
-	    assign_domain_page(d, i, mfn << PAGE_SHIFT);
-	    list_ent = mfn_to_page(mfn)->list.next;
+	     (list_ent != &d->page_list); i += PAGE_SIZE) {
+		mfn = page_to_mfn(list_entry(list_ent, struct page_info, list));
+		assign_domain_page(d, i, mfn << PAGE_SHIFT);
+		list_ent = mfn_to_page(mfn)->list.next;
 	}
 	ASSERT(list_ent != &d->page_list);
 
@@ -424,8 +423,12 @@ static void vmx_build_physmap_table(struct domain *d)
 	mfn = page_to_mfn(list_entry(list_ent, struct page_info, list));
 	assign_domain_page(d, STORE_PAGE_START, mfn << PAGE_SHIFT);
 	list_ent = mfn_to_page(mfn)->list.next;
-	ASSERT(list_ent == &d->page_list);
+	ASSERT(list_ent != &d->page_list);
 
+	mfn = page_to_mfn(list_entry(list_ent, struct page_info, list));
+	assign_domain_page(d, BUFFER_IO_PAGE_START, mfn << PAGE_SHIFT);
+	list_ent = mfn_to_page(mfn)->list.next;
+	ASSERT(list_ent == &d->page_list);
 }
 
 void vmx_setup_platform(struct domain *d)
@@ -436,6 +439,10 @@ void vmx_setup_platform(struct domain *d)
 
 	d->arch.vmx_platform.shared_page_va =
 		(unsigned long)__va(__gpa_to_mpa(d, IO_PAGE_START));
+	/* For buffered IO requests. */
+	spin_lock_init(&d->arch.hvm_domain.buffered_io_lock);
+	d->arch.hvm_domain.buffered_io_va =
+		(unsigned long)__va(__gpa_to_mpa(d, BUFFER_IO_PAGE_START));
 	/* TEMP */
 	d->arch.vmx_platform.pib_base = 0xfee00000UL;
 
@@ -443,16 +450,13 @@ void vmx_setup_platform(struct domain *d)
 
 	/* Only open one port for I/O and interrupt emulation */
 	memset(&d->shared_info->evtchn_mask[0], 0xff,
-	    sizeof(d->shared_info->evtchn_mask));
+	       sizeof(d->shared_info->evtchn_mask));
 
 	/* initiate spinlock for pass virq */
 	spin_lock_init(&d->arch.arch_vmx.virq_assist_lock);
 
-	/* Initialize the virtual interrupt lines */
-	vmx_virq_line_init(d);
-
 	/* Initialize iosapic model within hypervisor */
-	hvm_vioapic_init(d);
+	vioapic_init(d);
 }
 
 void vmx_do_launch(struct vcpu *v)

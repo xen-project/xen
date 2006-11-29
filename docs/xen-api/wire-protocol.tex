@@ -1,0 +1,287 @@
+%
+% Copyright (c) 2006 XenSource, Inc.
+%
+% Permission is granted to copy, distribute and/or modify this document under
+% the terms of the GNU Free Documentation License, Version 1.2 or any later
+% version published by the Free Software Foundation; with no Invariant
+% Sections, no Front-Cover Texts and no Back-Cover Texts.  A copy of the
+% license is included in the section entitled
+% "GNU Free Documentation License" or the file fdl.tex.
+%
+% Authors: Ewan Mellor, Richard Sharp, Dave Scott, Jon Harrop.
+%
+
+\section{Wire Protocol for Remote API Calls}
+
+API calls are sent over a network to a Xen-enabled host using
+the XML-RPC protocol. In this Section we describe how the
+higher-level types used in our API Reference are mapped to
+primitive XML-RPC types.
+
+In our API Reference we specify the signatures of API functions in the following
+style:
+\begin{verbatim}
+    (ref_vm Set)   Host.ListAllVMs()
+\end{verbatim}
+This specifies that the function with name {\tt Host.ListAllVMs} takes
+no parameters and returns a Set of {\tt ref\_vm}s.
+These types are mapped onto XML-RPC types in a straight-forward manner:
+\begin{itemize}
+  \item Floats, Bools, DateTimes and Strings map directly to the XML-RPC {\tt
+  double}, {\tt boolean}, {\tt dateTime.iso8601}, and {\tt string} elements.
+
+  \item all our ``{\tt ref\_}'' types (e.g.\ {\tt ref\_vm} in the above
+  example) map to XML-RPC's {\tt String} type.  The string itself is the OSF
+  DCE UUID presentation format (as output by {\tt uuidgen}, etc).
+
+  \item ints are all assumed to be 64-bit in our API and are encoded as a
+  string of decimal digits (rather than using XML-RPC's built-in 32-bit {\tt
+  i4} type).
+
+  \item values of enum types are encoded as strings. For example, a value of
+  {\tt destroy} of type {\tt on\_normal\_exit}, would be conveyed as:
+  \begin{verbatim}
+    <value><string>destroy</string></value>
+  \end{verbatim}
+
+  \item for all our types, {\tt t}, our type {\tt t Set} simply maps to
+  XML-RPC's {\tt Array} type, so for example a value of type {\tt cpu\_feature
+  Set} would be transmitted like this:
+
+  \begin{verbatim}
+<array>
+  <data>
+    <value><string>CX8</string></value>
+    <value><string>PSE36</string></value>
+    <value><string>FPU</string></value>
+  </data>
+</array> 
+  \end{verbatim}
+
+  \item for types {\tt k} and {\tt v}, our type {\tt (k, v) Map} maps onto an
+  XML-RPC struct, with the key as the name of the struct.  Note that the {\tt
+  (k, v) Map} type is only valid when {\tt k} is a {\tt String}, {\tt Ref}, or
+  {\tt Int}, and in each case the keys of the maps are stringified as
+  above. For example, the {\tt (String, double) Map} containing a the mappings
+  Mike $\rightarrow$ 2.3 and John $\rightarrow$ 1.2 would be represented as:
+
+  \begin{verbatim}
+<value>
+  <struct>
+    <member>
+      <name>Mike</name>
+      <value><double>2.3</double></value>
+    </member>
+    <member>
+      <name>John</name>
+      <value><double>1.2</double></value>
+    </member>
+  </struct>
+</value>
+  \end{verbatim}
+
+  \item our {\tt Void} type is transmitted as an empty string.
+
+\end{itemize}
+
+\subsection{Return Values/Status Codes}
+\label{synchronous-result}
+
+The return value of an RPC call is an XML-RPC {\tt Struct}.
+
+\begin{itemize}
+\item The first element of the struct is named {\tt Status}; it
+contains a string value indicating whether the result of the call was
+a ``{\tt Success}'' or a ``{\tt Failure}''.
+\end{itemize}
+
+If {\tt Status} was set to {\tt Success} then the Struct contains a second
+element named {\tt Value}:
+\begin{itemize}
+\item The element of the struct named {\tt Value} contains the function's return value.
+\end{itemize}
+
+In the case where {\tt Status} is set to {\tt Failure} then
+the struct contains a second element named {\tt ErrorDescription}:
+\begin{itemize}
+\item The element of the struct named {\tt ErrorDescription} contains
+an array of string values. The first element of the array represents an error code;
+the remainder of the array represents error parameters relating to that code.
+\end{itemize}
+
+For example, an XML-RPC return value from the {\tt Host.ListAllVMs} function above
+may look like this:
+\begin{verbatim}
+    <struct>
+       <member>
+         <name>Status</name>
+         <value>Success</value>
+       </member>
+       <member>
+          <name>Value</name>
+          <value>
+            <array>
+               <data>
+                 <value>vm-id-1</value>
+                 <value>vm-id-2</value>
+                 <value>vm-id-3</value>
+               </data>
+            </array>
+         </value>
+       </member>
+    </struct>
+\end{verbatim}
+
+\section{Making XML-RPC Calls}
+
+\subsection{Transport Layer}
+
+We ought to support at least
+\begin{itemize}
+\item HTTP/S for remote administration
+\item HTTP over Unix domain sockets for local administration
+\end{itemize}
+
+\subsection{Session Layer}
+
+The XML-RPC interface is session-based; before you can make arbitrary RPC calls
+you must login and initiate a session. For example:
+\begin{verbatim}
+   session_id    Session.login_with_password(string uname, string pwd)
+\end{verbatim}
+Where {\tt uname} and {\tt password} refer to your username and password
+respectively, as defined by the Xen administrator.
+The {\tt session\_id} returned by {\tt Session.Login} is passed to subequent
+RPC calls as an authentication token.
+
+A session can be terminated with the {\tt Session.Logout} function:
+\begin{verbatim}
+   void          Session.Logout(session_id session)
+\end{verbatim}
+
+\subsection{Synchronous and Asynchronous invocation}
+
+Each method call (apart from those on ``Session'' and ``Task'' objects)
+can be made either synchronously or asynchronously.
+A synchronous RPC call blocks until the
+return value is received; the return value of a synchronous RPC call is
+exactly as specified in Section~\ref{synchronous-result}.
+
+Each of the methods specified in the API Reference is synchronous.
+However, although not listed explicitly in this document, each
+method call has an asynchronous analogue in the {\tt Async}
+namespace. For example, synchronous call {\tt VM.Install(...)}
+(described in Chapter~\ref{api-reference})
+has an asynchronous counterpart, {\tt
+Async.VM.Install(...)}, that is non-blocking.
+
+Instead of returning its result directly, an asynchronous RPC call
+returns a {\tt task-id}; this identifier is subsequently used
+to track the status of a running asynchronous RPC. Note that an asychronous
+call may fail immediately, before a {\tt task-id} has even been created---to
+represent this eventuality, the returned {\tt task-id}
+is wrapped in an XML-RPC struct with a {\tt Status}, {\tt ErrorDescription} and
+{\tt Value} fields, exactly as specified in Section~\ref{synchronous-result}.
+
+The {\tt task-id} is provided in the {\tt Value} field if {\tt Status} is set to
+{\tt Success}.
+
+Two special RPC calls are provided to poll the status of
+asynchronous calls:
+\begin{verbatim}
+    Array<task_id>  Async.Task.GetAllTasks (session_id s)
+    task_status     Async.Task.GetStatus   (session_id s, task_id t)
+\end{verbatim}
+
+{\tt Async.Task.GetAllTasks} returns a set of the currently
+executing asynchronous tasks belong to the current user\footnote{
+%
+The current user is determined by the username that was provided
+to {\tt Session.Login}.
+%
+}.
+
+{\tt Async.Task.GetStatus} returns a {\tt task\_status} result.
+This is an XML-RPC struct with three elements:
+\begin{itemize}
+  \item The first element is named {\tt Progress} and contains
+an {\tt Integer} between 0 and 100 representing the estimated percentage of
+the task currently completed.
+  \item The second element is named {\tt ETA} and contains a {\tt DateTime} 
+representing the estimated time the task will be complete.
+  \item The third element is named {\tt Result}. If {\tt Progress}
+is not 100 then {\tt Result} contains the empty string. If {\tt Progress}
+{\em is\/} set to 100, then {\tt Result} contains the function's return
+result (as specified in Section~\ref{synchronous-result})\footnote{
+%
+Recall that this itself is a struct potentially containing status, errorcode,
+value fields etc.
+%
+}.
+\end{itemize}
+
+\section{Example interactive session}
+
+This section describes how an interactive session might look, using the python
+XML-RPC client library. 
+
+First, initialise python and import the library {\tt xmlrpclib}:
+
+\begin{verbatim}
+\$ python2.4
+...
+>>> import xmlrpclib
+\end{verbatim}
+
+Create a python object referencing the remote server:
+
+\begin{verbatim}
+>>> xen = xmlrpclib.Server("http://test:4464")
+\end{verbatim}
+
+Acquire a session token by logging in with a username and password (error-handling ommitted for brevity; the session token is pointed to by the key {\tt 'Value'} in the returned dictionary)
+
+\begin{verbatim}
+>>> session = xen.Session.do_login_with_password("user", "passwd")['Value']
+\end{verbatim}
+
+When serialised, this call looks like the following:
+
+\begin{verbatim}
+<?xml version='1.0'?>
+<methodCall>
+  <methodName>Session.do_login_with_password</methodName>
+  <params>
+    <param>
+      <value><string>user</string></value>
+    </param>
+    <param>
+      <value><string>passwd</string></value>
+    </param>
+  </params>
+</methodCall>
+\end{verbatim}
+
+Next, the user may acquire a list of all the VMs known to the host: (Note the call takes the session token as the only parameter)
+
+\begin{verbatim}
+>>> all_vms = xen.VM.do_list(session)['Value']
+>>> all_vms
+['b7b92d9e-d442-4710-92a5-ab039fd7d89b', '23e1e837-abbf-4675-b077-d4007989b0cc', '2045dbc0-0734-4eea-9cb2-b8218c6b5bf2', '3202ae18-a046-4c32-9fda-e32e9631866e']
+\end{verbatim}
+
+Note the VM references are internally UUIDs. Once a reference to a VM has been acquired a lifecycle operation may be invoked:
+
+\begin{verbatim}
+>>> xen.VM.do_start(session, all_vms[3], False)
+{'Status': 'Failure', 'ErrorDescription': 'Operation not implemented'}
+\end{verbatim}
+
+In this case the {\tt start} message has not been implemented and an error response has been returned. Currently these high-level errors are returned as structured data (rather than as XMLRPC faults), allowing for internationalised errors in future. Finally, here are some examples of using accessors for object fields:
+
+\begin{verbatim}
+>>> xen.VM.getname_label(session, all_vms[3])['Value']
+'SMP'
+>>> xen.VM.getname_description(session, all_vms[3])['Value']
+'Debian for Xen'
+\end{verbatim}

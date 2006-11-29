@@ -4,22 +4,27 @@ subdir-y += linux
 subdir-y += linux-xen
 
 $(TARGET)-syms: linux-xen/head.o $(ALL_OBJS) xen.lds.s
+	$(MAKE) -f $(BASEDIR)/Rules.mk $(BASEDIR)/common/symbols-dummy.o
 	$(LD) $(LDFLAGS) -T xen.lds.s -N \
-		-Map map.out linux-xen/head.o $(ALL_OBJS) -o $@
+		-Map map.out linux-xen/head.o $(ALL_OBJS) \
+		$(BASEDIR)/common/symbols-dummy.o -o $@
 	$(NM) -n $@ | $(BASEDIR)/tools/symbols > $(BASEDIR)/xen-syms.S
 	$(MAKE) -f $(BASEDIR)/Rules.mk $(BASEDIR)/xen-syms.o
 	$(LD) $(LDFLAGS) -T xen.lds.s -N \
-		-Map map.out linux-xen/head.o $(ALL_OBJS) $(BASEDIR)/xen-syms.o -o $@
+		-Map map.out linux-xen/head.o $(ALL_OBJS) \
+		$(BASEDIR)/xen-syms.o -o $@
 	$(NM) -n $@ | $(BASEDIR)/tools/symbols >$(BASEDIR)/xen-syms.S
 	$(MAKE) -f $(BASEDIR)/Rules.mk $(BASEDIR)/xen-syms.o
 	$(LD) $(LDFLAGS) -T xen.lds.s -N \
-		-Map map.out linux-xen/head.o $(ALL_OBJS) $(BASEDIR)/xen-syms.o -o $@
+		-Map map.out linux-xen/head.o $(ALL_OBJS) \
+		$(BASEDIR)/xen-syms.o -o $@
 	rm -f $(BASEDIR)/xen-syms.S $(BASEDIR)/xen-syms.o
 
 $(TARGET): $(TARGET)-syms
 	$(OBJCOPY) -R .note -R .comment -S $(TARGET)-syms $@
-	$(NM) -n $(TARGET)-syms | grep -v '\( [aUw] \)\|\(__crc_\)\|\( \$[adt]\)'\
-		 > $(BASEDIR)/System.map
+	$(NM) -n $(TARGET)-syms | \
+		grep -v '\( [aUw] \)\|\(__crc_\)\|\( \$[adt]\)' \
+		> $(BASEDIR)/System.map
 
 # Headers do not depend on auto-generated header, but object files do.
 HDRS    := $(subst $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h,,$(HDRS))
@@ -54,8 +59,6 @@ $(BASEDIR)/include/asm-ia64/.offsets.h.stamp:
 	[ -e $(BASEDIR)/include/asm-ia64/xen ] \
 	 || ln -sf $(BASEDIR)/include/asm-ia64/linux $(BASEDIR)/include/asm-ia64/xen
 # Link to HVM files in Xen for ia64/vti
-	[ -e $(BASEDIR)/include/asm-ia64/hvm ] \
-	 || mkdir $(BASEDIR)/include/asm-ia64/hvm
 	[ -e $(BASEDIR)/include/asm-ia64/hvm/support.h ] \
 	 || ln -sf ../../../include/asm-x86/hvm/support.h $(BASEDIR)/include/asm-ia64/hvm/support.h
 	[ -e $(BASEDIR)/include/asm-ia64/hvm/io.h ] \
@@ -78,4 +81,7 @@ clean::
 	rm -f asm-xsi-offsets.s $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h
 	rm -f $(BASEDIR)/System.map
 	rm -f vmx/hvm_*.c
-	rm -rf $(BASEDIR)/include/asm-ia64/hvm
+	rm -f $(BASEDIR)/include/asm-ia64/hvm/support.h
+	rm -f $(BASEDIR)/include/asm-ia64/hvm/io.h
+	rm -f $(BASEDIR)/include/asm-ia64/hvm/vpic.h
+	rm -f $(BASEDIR)/include/asm-ia64/hvm/vioapic.h

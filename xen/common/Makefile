@@ -20,14 +20,16 @@ obj-y += softirq.o
 obj-y += string.o
 obj-y += symbols.o
 obj-y += sysctl.o
-obj-y += trace.o
+obj-y += time.o
 obj-y += timer.o
+obj-y += trace.o
 obj-y += version.o
 obj-y += vsprintf.o
 obj-y += xmalloc.o
 
 obj-$(perfc)       += perfc.o
 obj-$(crash_debug) += gdbstub.o
+obj-$(xenoprof)    += xenoprof.o
 
 # Object file contains changeset and compiler information.
 version.o: $(BASEDIR)/include/xen/compile.h

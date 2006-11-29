@@ -20,7 +20,7 @@
 #define _EVENTS_H_
 
 #include<traps.h>
-#include <xen/event_channel.h>
+#include<xen/event_channel.h>
 
 typedef void (*evtchn_handler_t)(evtchn_port_t, struct pt_regs *, void *);
 
@@ -39,10 +39,9 @@ int evtchn_bind_interdomain(domid_t pal, evtchn_port_t remote_port,
 
 static inline int notify_remote_via_evtchn(evtchn_port_t port)
 {
-    evtchn_op_t op;
-    op.cmd = EVTCHNOP_send;
-    op.u.send.port = port;
-    return HYPERVISOR_event_channel_op(&op);
+    evtchn_send_t op;
+    op.port = port;
+    return HYPERVISOR_event_channel_op(EVTCHNOP_send, &op);
 }
 
 

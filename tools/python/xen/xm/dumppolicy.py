@@ -19,27 +19,24 @@
 """
 import sys
 from xen.util.security import ACMError, err, dump_policy
+from xen.xm.opts import OptionError
 
-
-def usage():
-    print "\nUsage: xm dumppolicy\n"
-    print " Retrieve and print currently enforced"
-    print " hypervisor policy information (low-level).\n"
-    err("Usage")
-
+def help():
+    return """
+    Retrieve and print currently enforced hypervisor policy information
+    (low-level)."""
 
 def main(argv):
-    try:
-        if len(argv) != 1:
-            usage()
+    if len(argv) != 1:
+        raise OptionError("No arguments expected.")
 
-        dump_policy()
-
-    except ACMError:
-        sys.exit(-1)
-
+    dump_policy()
 
 if __name__ == '__main__':
-    main(sys.argv)
+    try:
+        main(sys.argv)
+    except Exception, e:
+        sys.stderr.write('Error: %s\n' % str(e))    
+        sys.exit(-1)
 
 

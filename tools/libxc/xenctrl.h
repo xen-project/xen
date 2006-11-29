@@ -16,7 +16,6 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <sys/ptrace.h>
 #include <xen/xen.h>
 #include <xen/domctl.h>
 #include <xen/sysctl.h>
@@ -48,10 +47,9 @@
 #define rmb() __asm__ __volatile__ ( "lfence" : : : "memory")
 #define wmb() __asm__ __volatile__ ( "" : : : "memory")
 #elif defined(__ia64__)
-/* FIXME */
-#define mb()
-#define rmb()
-#define wmb()
+#define mb()   __asm__ __volatile__ ("mf" ::: "memory")
+#define rmb()  __asm__ __volatile__ ("mf" ::: "memory")
+#define wmb()  __asm__ __volatile__ ("mf" ::: "memory")
 #elif defined(__powerpc__)
 /* XXX loosen these up later */
 #define mb()   __asm__ __volatile__ ("sync" : : : "memory")
@@ -92,6 +90,16 @@ int xc_interface_open(void);
 int xc_interface_close(int xc_handle);
 
 /*
+ * KERNEL INTERFACES
+ */
+
+/*
+ * Resolve a kernel device name (e.g., "evtchn", "blktap0") into a kernel
+ * device number. Returns -1 on error (and sets errno).
+ */
+int xc_find_device_number(const char *name);
+
+/*
  * DOMAIN DEBUGGING FUNCTIONS
  */
 
@@ -104,36 +112,45 @@ typedef struct xc_core_header {
     unsigned int xch_pages_offset;
 } xc_core_header_t;
 
-#define XC_CORE_MAGIC 0xF00FEBED
+#define XC_CORE_MAGIC     0xF00FEBED
+#define XC_CORE_MAGIC_HVM 0xF00FEBEE
 
-long xc_ptrace_core(
+#ifdef __linux__
+
+#include <sys/ptrace.h>
+#include <thread_db.h>
+
+typedef void (*thr_ev_handler_t)(long);
+
+void xc_register_event_handler(
+    thr_ev_handler_t h,
+    td_event_e e);
+
+long xc_ptrace(
     int xc_handle,
     enum __ptrace_request request,
-    uint32_t domid,
+    uint32_t  domid,
     long addr,
-    long data,
-    vcpu_guest_context_t *ctxt);
-void * map_domain_va_core(
-    unsigned long domfd,
-    int cpu,
-    void *guest_va,
-    vcpu_guest_context_t *ctxt);
-int xc_waitdomain_core(
+    long data);
+
+int xc_waitdomain(
     int xc_handle,
     int domain,
     int *status,
-    int options,
-    vcpu_guest_context_t *ctxt);
+    int options);
+
+#endif /* __linux__ */
 
 /*
  * DOMAIN MANAGEMENT FUNCTIONS
  */
 
-typedef struct {
+typedef struct xc_dominfo {
     uint32_t      domid;
     uint32_t      ssidref;
     unsigned int  dying:1, crashed:1, shutdown:1,
-                  paused:1, blocked:1, running:1;
+                  paused:1, blocked:1, running:1,
+                  hvm:1;
     unsigned int  shutdown_reason; /* only meaningful if shutdown==1 */
     unsigned long nr_pages;
     unsigned long shared_info_frame;
@@ -148,6 +165,7 @@ typedef xen_domctl_getdomaininfo_t xc_domaininfo_t;
 int xc_domain_create(int xc_handle,
                      uint32_t ssidref,
                      xen_domain_handle_t handle,
+                     uint32_t flags,
                      uint32_t *pdomid);
 
 
@@ -421,12 +439,6 @@ int xc_domain_memory_populate_physmap(int xc_handle,
                                       unsigned int address_bits,
                                       xen_pfn_t *extent_start);
 
-int xc_domain_translate_gpfn_list(int xc_handle,
-                                  uint32_t domid,
-                                  unsigned long nr_gpfns,
-                                  xen_pfn_t *gpfn_list,
-                                  xen_pfn_t *mfn_list);
-
 int xc_domain_ioport_permission(int xc_handle,
                                 uint32_t domid,
                                 uint32_t first_port,
@@ -496,6 +508,8 @@ unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
 int xc_get_pfn_list(int xc_handle, uint32_t domid, xen_pfn_t *pfn_buf,
                     unsigned long max_pfns);
 
+unsigned long xc_ia64_fpsr_default(void);
+
 int xc_ia64_get_pfn_list(int xc_handle, uint32_t domid,
                          xen_pfn_t *pfn_buf,
                          unsigned int start_page, unsigned int nr_pages);
@@ -536,8 +550,8 @@ long xc_get_tot_pages(int xc_handle, uint32_t domid);
  * Gets the machine address of the trace pointer area and the size of the
  * per CPU buffers.
  */
-int xc_tbuf_enable(int xc_handle, size_t cnt, unsigned long *mfn,
-    unsigned long *size);
+int xc_tbuf_enable(int xc_handle, unsigned long pages,
+                   unsigned long *mfn, unsigned long *size);
 
 /*
  * Disable tracing buffers.
@@ -590,7 +604,7 @@ int xc_add_mmu_update(int xc_handle, xc_mmu_t *mmu,
                    unsigned long long ptr, unsigned long long val);
 int xc_finish_mmu_updates(int xc_handle, xc_mmu_t *mmu);
 
-int xc_acm_op(int xc_handle, int cmd, void *arg, size_t arg_size);
+int xc_acm_op(int xc_handle, int cmd, void *arg, unsigned long arg_size);
 
 /*
  * Return a handle to the event channel driver, or -1 on failure, in which case
@@ -645,5 +659,17 @@ evtchn_port_t xc_evtchn_pending(int xce_handle);
  * will be set appropriately.
  */
 int xc_evtchn_unmask(int xce_handle, evtchn_port_t port);
+
+int xc_hvm_set_pci_intx_level(
+    int xce_handle, domid_t dom,
+    uint8_t domain, uint8_t bus, uint8_t device, uint8_t intx,
+    unsigned int level);
+int xc_hvm_set_isa_irq_level(
+    int xce_handle, domid_t dom,
+    uint8_t isa_irq,
+    unsigned int level);
+
+int xc_hvm_set_pci_link_route(
+    int xce_handle, domid_t dom, uint8_t link, uint8_t isa_irq);
 
 #endif

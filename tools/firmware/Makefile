@@ -4,12 +4,11 @@ include $(XEN_ROOT)/tools/Rules.mk
 # hvmloader is a 32-bit protected mode binary.
 # It belongs in /usr/lib, not /usr/lib64.
 TARGET      := hvmloader/hvmloader
-INSTALL_DIR := $(DESTDIR)/usr/lib/xen/boot
+INST_DIR := $(DESTDIR)/usr/lib/xen/boot
 
 SUBDIRS :=
 SUBDIRS += rombios
 SUBDIRS += vgabios
-SUBDIRS += acpi
 SUBDIRS += vmxassist
 SUBDIRS += hvmloader
 
@@ -29,8 +28,8 @@ all:
 
 .PHONY: install
 install: all
-	[ -d $(INSTALL_DIR) ] || install -d -m0755 $(INSTALL_DIR)
-	[ ! -e $(TARGET) ] || install -m0644 $(TARGET) $(INSTALL_DIR)
+	[ -d $(INST_DIR) ] || $(INSTALL_DIR) $(INST_DIR)
+	[ ! -e $(TARGET) ] || $(INSTALL_DATA) $(TARGET) $(INST_DIR)
 
 .PHONY: clean
 clean: 

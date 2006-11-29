@@ -41,19 +41,21 @@
 # todo Support command-line args.
 
 import fcntl
+import re
 import time
+import signal
 from threading import Thread
 
 from xen.web.httpserver import HttpServer, UnixHttpServer
 
-from xen.xend import XendRoot
+from xen.xend import XendRoot, XendAPI
 from xen.xend import Vifctl
 from xen.xend.XendLogging import log
+from xen.xend.XendClient import XEN_API_SOCKET
 from xen.web.SrvDir import SrvDir
 
 from SrvRoot import SrvRoot
 from XMLRPCServer import XMLRPCServer
-
 
 xroot = XendRoot.instance()
 
@@ -62,9 +64,19 @@ class XendServers:
 
     def __init__(self):
         self.servers = []
+        self.cleaningUp = False
 
     def add(self, server):
         self.servers.append(server)
+
+    def cleanup(self, signum = 0, frame = None):
+        log.debug("SrvServer.cleanup()")
+        self.cleaningUp = True
+        for server in self.servers:
+            try:
+                server.shutdown()
+            except:
+                pass
 
     def start(self, status):
         # Running the network script will spawn another process, which takes
@@ -76,7 +88,9 @@ class XendServers:
         Vifctl.network('start')
         threads = []
         for server in self.servers:
-            thread = Thread(target=server.run)
+            thread = Thread(target=server.run, name=server.__class__.__name__)
+            if isinstance(server, HttpServer):
+                thread.setDaemon(True)
             thread.start()
             threads.append(thread)
 
@@ -100,8 +114,28 @@ class XendServers:
             status.write('0')
             status.close()
 
-        for t in threads:
-            t.join()
+        # Prepare to catch SIGTERM (received when 'xend stop' is executed)
+        # and call each server's cleanup if possible
+        signal.signal(signal.SIGTERM, self.cleanup)
+
+        # Interruptible Thread.join - Python Bug #1167930
+        #   Replaces: for t in threads: t.join()
+        #   Reason:   The above will cause python signal handlers to be
+        #             blocked so we're not able to catch SIGTERM in any
+        #             way for cleanup
+        runningThreads = threads
+        while len(runningThreads) > 0:
+            try:
+                for t in threads:
+                    t.join(1.0)
+                runningThreads = [t for t in threads
+                                  if t.isAlive() and not t.isDaemon()]
+                if self.cleaningUp and len(runningThreads) > 0:
+                    log.debug("Waiting for %s." %
+                              [x.getName() for x in runningThreads])
+            except:
+                pass
+
 
 def create():
     root = SrvDir()
@@ -116,9 +150,42 @@ def create():
         log.info('unix path=' + path)
         servers.add(UnixHttpServer(root, path))
 
+    api_cfg = xroot.get_xen_api_server()
+    if api_cfg:
+        try:
+            addrs = [(str(x[0]).split(':'),
+                      len(x) > 1 and x[1] or XendAPI.AUTH_NONE,
+                      len(x) > 2 and x[2] and map(re.compile, x[2].split(" "))
+                      or None)
+                     for x in api_cfg]
+            for addrport, auth, allowed in addrs:
+                if auth not in [XendAPI.AUTH_PAM, XendAPI.AUTH_NONE]:
+                    log.error('Xen-API server configuration %s is invalid, ' +
+                              'as %s is not a valid authentication type.',
+                              api_cfg, auth)
+                    break
+
+                if len(addrport) == 1:
+                    if addrport[0] == 'unix':
+                        servers.add(XMLRPCServer(auth,
+                                                 path = XEN_API_SOCKET,
+                                                 hosts_allowed = allowed))
+                    else:
+                        servers.add(
+                            XMLRPCServer(auth, True, '', int(addrport[0]),
+                                         hosts_allowed = allowed))
+                else:
+                    addr, port = addrport
+                    servers.add(XMLRPCServer(auth, True, addr, int(port),
+                                             hosts_allowed = allowed))
+        except ValueError, exn:
+            log.error('Xen-API server configuration %s is invalid.', api_cfg)
+        except TypeError, exn:
+            log.error('Xen-API server configuration %s is invalid.', api_cfg)
+
     if xroot.get_xend_tcp_xmlrpc_server():
-        servers.add(XMLRPCServer(True))
+        servers.add(XMLRPCServer(XendAPI.AUTH_PAM, True))
 
     if xroot.get_xend_unix_xmlrpc_server():
-        servers.add(XMLRPCServer())
+        servers.add(XMLRPCServer(XendAPI.AUTH_PAM))
     return servers

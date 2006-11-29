@@ -22,6 +22,9 @@
  * THE SOFTWARE.
  */
 #include "vl.h"
+#include <sys/time.h>
+#include <time.h>
+#include <assert.h>
 
 //#define DEBUG_SERIAL
 
@@ -70,6 +73,11 @@
 #define UART_LSR_OE	0x02	/* Overrun error indicator */
 #define UART_LSR_DR	0x01	/* Receiver data ready */
 
+/* Maximum retries for a single byte transmit. */
+#define WRITE_MAX_SINGLE_RETRIES 3
+/* Maximum retries for a sequence of back-to-back unsuccessful transmits. */
+#define WRITE_MAX_TOTAL_RETRIES 10
+
 struct SerialState {
     uint8_t divider;
     uint8_t rbr; /* receive register */
@@ -90,6 +98,19 @@ struct SerialState {
     int last_break_enable;
     target_ulong base;
     int it_shift;
+
+    /*
+     * If a character transmitted via UART cannot be written to its
+     * destination immediately we remember it here and retry a few times via
+     * a polling timer.
+     *  - write_single_retries: Number of write retries for current byte.
+     *  - write_total_retries:  Number of write retries for back-to-back
+     *                          unsuccessful transmits.
+     */
+    int write_single_retries;
+    int write_total_retries;
+    char write_chr;
+    QEMUTimer *write_retry_timer;
 };
 
 static void serial_update_irq(SerialState *s)
@@ -140,10 +161,98 @@ static void serial_update_parameters(SerialState *s)
 #endif
 }
 
+/* Rate limit serial requests so that e.g. grub on a serial console
+   doesn't kill dom0.  Simple token bucket.  If we get some actual
+   data from the user, instantly refil the bucket. */
+
+/* How long it takes to generate a token, in microseconds. */
+#define TOKEN_PERIOD 1000
+/* Maximum and initial size of token bucket */
+#define TOKENS_MAX 100000
+
+static int tokens_avail;
+
+static void serial_get_token(void)
+{
+    static struct timeval last_refil_time;
+    static int started;
+
+    assert(tokens_avail >= 0);
+    if (!tokens_avail) {
+	struct timeval delta, now;
+	int generated;
+
+	if (!started) {
+	    gettimeofday(&last_refil_time, NULL);
+	    tokens_avail = TOKENS_MAX;
+	    started = 1;
+	    return;
+	}
+    retry:
+	gettimeofday(&now, NULL);
+	delta.tv_sec = now.tv_sec - last_refil_time.tv_sec;
+	delta.tv_usec = now.tv_usec - last_refil_time.tv_usec;
+	if (delta.tv_usec < 0) {
+	    delta.tv_usec += 1000000;
+	    delta.tv_sec--;
+	}
+	assert(delta.tv_usec >= 0 && delta.tv_sec >= 0);
+	if (delta.tv_usec < TOKEN_PERIOD) {
+	    struct timespec ts;
+	    /* Wait until at least one token is available. */
+	    ts.tv_sec = TOKEN_PERIOD / 1000000;
+	    ts.tv_nsec = (TOKEN_PERIOD % 1000000) * 1000;
+	    while (nanosleep(&ts, &ts) < 0 && errno == EINTR)
+		;
+	    goto retry;
+	}
+	generated = (delta.tv_sec * 1000000) / TOKEN_PERIOD;
+	generated +=
+	    ((delta.tv_sec * 1000000) % TOKEN_PERIOD + delta.tv_usec) / TOKEN_PERIOD;
+	assert(generated > 0);
+
+	last_refil_time.tv_usec += (generated * TOKEN_PERIOD) % 1000000;
+	last_refil_time.tv_sec  += last_refil_time.tv_usec / 1000000;
+	last_refil_time.tv_usec %= 1000000;
+	last_refil_time.tv_sec  += (generated * TOKEN_PERIOD) / 1000000;
+	if (generated > TOKENS_MAX)
+	    generated = TOKENS_MAX;
+	tokens_avail = generated;
+    }
+    tokens_avail--;
+}
+
+static void serial_chr_write(void *opaque)
+{
+    SerialState *s = opaque;
+
+    /* Cancel any outstanding retry if this is a new byte. */
+    qemu_del_timer(s->write_retry_timer);
+
+    /* Retry every 100ms for 300ms total. */
+    if (qemu_chr_write(s->chr, &s->write_chr, 1) == -1) {
+        s->write_total_retries++; 
+        if (s->write_single_retries++ >= WRITE_MAX_SINGLE_RETRIES)
+            fprintf(stderr, "serial: write error\n");
+        else if (s->write_total_retries <= WRITE_MAX_TOTAL_RETRIES) {
+            qemu_mod_timer(s->write_retry_timer,
+                           qemu_get_clock(vm_clock) + ticks_per_sec / 10);
+            return;
+        }
+    } else {
+        s->write_total_retries = 0;  /* if successful then reset counter */
+    }
+
+    /* Success: Notify guest that THR is empty. */
+    s->thr_ipending = 1;
+    s->lsr |= UART_LSR_THRE;
+    s->lsr |= UART_LSR_TEMT;
+    serial_update_irq(s);
+}
+
 static void serial_ioport_write(void *opaque, uint32_t addr, uint32_t val)
 {
     SerialState *s = opaque;
-    unsigned char ch;
     
     addr &= 7;
 #ifdef DEBUG_SERIAL
@@ -159,12 +268,9 @@ static void serial_ioport_write(void *opaque, uint32_t addr, uint32_t val)
             s->thr_ipending = 0;
             s->lsr &= ~UART_LSR_THRE;
             serial_update_irq(s);
-            ch = val;
-            qemu_chr_write(s->chr, &ch, 1);
-            s->thr_ipending = 1;
-            s->lsr |= UART_LSR_THRE;
-            s->lsr |= UART_LSR_TEMT;
-            serial_update_irq(s);
+            s->write_chr = val;
+            s->write_single_retries = 0;
+            serial_chr_write(s);
         }
         break;
     case 1:
@@ -245,9 +351,11 @@ static uint32_t serial_ioport_read(void *opaque, uint32_t addr)
         ret = s->mcr;
         break;
     case 5:
+	serial_get_token();
         ret = s->lsr;
         break;
     case 6:
+	serial_get_token();
         if (s->mcr & UART_MCR_LOOP) {
             /* in loopback, the modem output pins are connected to the
                inputs */
@@ -296,12 +404,14 @@ static int serial_can_receive1(void *opaque)
 static void serial_receive1(void *opaque, const uint8_t *buf, int size)
 {
     SerialState *s = opaque;
+    tokens_avail = TOKENS_MAX;
     serial_receive_byte(s, buf[0]);
 }
 
 static void serial_event(void *opaque, int event)
 {
     SerialState *s = opaque;
+    tokens_avail = TOKENS_MAX;
     if (event == CHR_EVENT_BREAK)
         serial_receive_break(s);
 }
@@ -356,6 +466,7 @@ SerialState *serial_init(SetIRQFunc *set_irq, void *opaque,
     s->lsr = UART_LSR_TEMT | UART_LSR_THRE;
     s->iir = UART_IIR_NO_INT;
     s->msr = UART_MSR_DCD | UART_MSR_DSR | UART_MSR_CTS;
+    s->write_retry_timer = qemu_new_timer(vm_clock, serial_chr_write, s);
 
     register_savevm("serial", base, 1, serial_save, serial_load, s);
 
@@ -443,6 +554,7 @@ SerialState *serial_mm_init (SetIRQFunc *set_irq, void *opaque,
     s->msr = UART_MSR_DCD | UART_MSR_DSR | UART_MSR_CTS;
     s->base = base;
     s->it_shift = it_shift;
+    s->write_retry_timer = qemu_new_timer(vm_clock, serial_chr_write, s);
 
     register_savevm("serial", base, 1, serial_save, serial_load, s);
 

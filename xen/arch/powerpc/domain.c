@@ -97,44 +97,45 @@ void arch_domain_destroy(struct domain *d)
 
 void machine_halt(void)
 {
-    printf("machine_halt called: spinning....\n");
+    printk("machine_halt called: spinning....\n");
     console_start_sync();
     while(1);
 }
 
 void machine_restart(char * __unused)
 {
-    printf("machine_restart called: spinning....\n");
+    printk("machine_restart called: spinning....\n");
     console_start_sync();
     while(1);
 }
 
-struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
+struct vcpu *alloc_vcpu_struct(void)
 {
     struct vcpu *v;
-
-    if ( (v = xmalloc(struct vcpu)) == NULL )
-        return NULL;
-
-    memset(v, 0, sizeof(*v));
-    v->vcpu_id = vcpu_id;
-
+    if ( (v = xmalloc(struct vcpu)) != NULL )
+        memset(v, 0, sizeof(*v));
     return v;
 }
 
 void free_vcpu_struct(struct vcpu *v)
 {
-    BUG_ON(v->next_in_list != NULL);
-    if ( v->vcpu_id != 0 )
-        v->domain->vcpu[v->vcpu_id - 1]->next_in_list = NULL;
     xfree(v);
+}
+
+int vcpu_initialise(struct vcpu *v)
+{
+    return 0;
+}
+
+void vcpu_destroy(struct vcpu *v)
+{
 }
 
 int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_t *c)
 { 
     memcpy(&v->arch.ctxt, &c->user_regs, sizeof(c->user_regs));
 
-    printf("Domain[%d].%d: initializing\n",
+    printk("Domain[%d].%d: initializing\n",
            v->domain->domain_id, v->vcpu_id);
 
     if (v->domain->arch.htab.order == 0)
@@ -186,7 +187,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     unsigned int cpu = smp_processor_id();
 
 #if 0
-    printf("%s: dom %x to dom %x\n", __func__, prev->domain->domain_id,
+    printk("%s: dom %x to dom %x\n", __func__, prev->domain->domain_id,
             next->domain->domain_id);
 #endif
 
@@ -283,6 +284,10 @@ void domain_relinquish_resources(struct domain *d)
 }
 
 void arch_dump_domain_info(struct domain *d)
+{
+}
+
+void arch_dump_vcpu_info(struct vcpu *v)
 {
 }
 

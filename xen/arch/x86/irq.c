@@ -351,11 +351,15 @@ int pirq_acktype(int irq)
 
     desc = &irq_desc[vector];
 
+    if ( desc->handler == &no_irq_type )
+        return ACKTYPE_NONE;
+
     /*
-     * Edge-triggered IO-APIC interrupts need no final acknowledgement:
-     * we ACK early during interrupt processing.
+     * Edge-triggered IO-APIC and LAPIC interrupts need no final
+     * acknowledgement: we ACK early during interrupt processing.
      */
-    if ( !strcmp(desc->handler->typename, "IO-APIC-edge") )
+    if ( !strcmp(desc->handler->typename, "IO-APIC-edge") ||
+         !strcmp(desc->handler->typename, "local-APIC-edge") )
         return ACKTYPE_NONE;
 
     /*
@@ -376,7 +380,9 @@ int pirq_acktype(int irq)
         return ACKTYPE_NONE; /* edge-triggered => no final EOI */
     }
 
+    printk("Unknown PIC type '%s' for IRQ %d\n", desc->handler->typename, irq);
     BUG();
+
     return 0;
 }
 
@@ -426,7 +432,8 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
     {
         if ( desc->action != NULL )
         {
-            DPRINTK("Cannot bind IRQ %d to guest. In use by '%s'.\n",
+            gdprintk(XENLOG_INFO,
+                    "Cannot bind IRQ %d to guest. In use by '%s'.\n",
                     irq, desc->action->name);
             rc = -EBUSY;
             goto out;
@@ -435,7 +442,9 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
         action = xmalloc(irq_guest_action_t);
         if ( (desc->action = (struct irqaction *)action) == NULL )
         {
-            DPRINTK("Cannot bind IRQ %d to guest. Out of memory.\n", irq);
+            gdprintk(XENLOG_INFO,
+                    "Cannot bind IRQ %d to guest. Out of memory.\n",
+                    irq);
             rc = -ENOMEM;
             goto out;
         }
@@ -444,7 +453,7 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
         action->in_flight   = 0;
         action->shareable   = will_share;
         action->ack_type    = pirq_acktype(irq);
-        action->cpu_eoi_map = CPU_MASK_NONE;
+        cpus_clear(action->cpu_eoi_map);
 
         desc->depth = 0;
         desc->status |= IRQ_GUEST;
@@ -458,7 +467,8 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
     }
     else if ( !will_share || !action->shareable )
     {
-        DPRINTK("Cannot bind IRQ %d to guest. Will not share with others.\n",
+        gdprintk(XENLOG_INFO, "Cannot bind IRQ %d to guest. "
+               "Will not share with others.\n",
                 irq);
         rc = -EBUSY;
         goto out;
@@ -478,7 +488,8 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
 
     if ( action->nr_guests == IRQ_MAX_GUESTS )
     {
-        DPRINTK("Cannot bind IRQ %d to guest. Already at max share.\n", irq);
+        gdprintk(XENLOG_INFO, "Cannot bind IRQ %d to guest. "
+               "Already at max share.\n", irq);
         rc = -EBUSY;
         goto out;
     }

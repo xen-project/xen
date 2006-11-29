@@ -45,7 +45,7 @@ void show_registers(struct cpu_user_regs *regs)
     unsigned long fault_crs[8];
     const char *context;
 
-    if ( hvm_guest(current) && guest_mode(regs) )
+    if ( is_hvm_vcpu(current) && guest_mode(regs) )
     {
         context = "hvm";
         hvm_store_cpu_guest_regs(current, &fault_regs, fault_crs);
@@ -168,16 +168,8 @@ asmlinkage void do_double_fault(void)
     printk("ds: %04x   es: %04x   fs: %04x   gs: %04x   ss: %04x\n",
            tss->ds, tss->es, tss->fs, tss->gs, tss->ss);
     show_stack_overflow(tss->esp);
-    printk("************************************\n");
-    printk("CPU%d DOUBLE FAULT -- system shutdown\n", cpu);
-    printk("System needs manual reset.\n");
-    printk("************************************\n");
 
-    /* Lock up the console to prevent spurious output from other CPUs. */
-    console_force_lock();
-
-    /* Wait for manual reset. */
-    machine_halt();
+    panic("DOUBLE FAULT -- system shutdown\n");
 }
 
 unsigned long do_iret(void)
@@ -187,16 +179,16 @@ unsigned long do_iret(void)
 
     /* Check worst-case stack frame for overlap with Xen protected area. */
     if ( unlikely(!access_ok(regs->esp, 40)) )
-        domain_crash_synchronous();
+        goto exit_and_crash;
 
     /* Pop and restore EAX (clobbered by hypercall). */
     if ( unlikely(__copy_from_user(&regs->eax, (void __user *)regs->esp, 4)) )
-        domain_crash_synchronous();
+        goto exit_and_crash;
     regs->esp += 4;
 
     /* Pop and restore CS and EIP. */
     if ( unlikely(__copy_from_user(&regs->eip, (void __user *)regs->esp, 8)) )
-        domain_crash_synchronous();
+        goto exit_and_crash;
     regs->esp += 8;
 
     /*
@@ -204,7 +196,7 @@ unsigned long do_iret(void)
      * to avoid firing the BUG_ON(IOPL) check in arch_getdomaininfo_ctxt.
      */
     if ( unlikely(__copy_from_user(&eflags, (void __user *)regs->esp, 4)) )
-        domain_crash_synchronous();
+        goto exit_and_crash;
     regs->esp += 4;
     regs->eflags = (eflags & ~X86_EFLAGS_IOPL) | X86_EFLAGS_IF;
 
@@ -212,17 +204,17 @@ unsigned long do_iret(void)
     {
         /* Return to VM86 mode: pop and restore ESP,SS,ES,DS,FS and GS. */
         if ( __copy_from_user(&regs->esp, (void __user *)regs->esp, 24) )
-            domain_crash_synchronous();
+            goto exit_and_crash;
     }
     else if ( unlikely(ring_0(regs)) )
     {
-        domain_crash_synchronous();
+        goto exit_and_crash;
     }
     else if ( !ring_1(regs) )
     {
         /* Return to ring 2/3: pop and restore ESP and SS. */
         if ( __copy_from_user(&regs->esp, (void __user *)regs->esp, 8) )
-            domain_crash_synchronous();
+            goto exit_and_crash;
     }
 
     /* No longer in NMI context. */
@@ -236,6 +228,11 @@ unsigned long do_iret(void)
      * value.
      */
     return regs->eax;
+
+ exit_and_crash:
+    gdprintk(XENLOG_ERR, "Fatal error\n");
+    domain_crash(current->domain);
+    return 0;
 }
 
 #include <asm/asm_defns.h>
@@ -363,7 +360,7 @@ static long register_guest_callback(struct callback_register *reg)
         break;
 
     default:
-        ret = -EINVAL;
+        ret = -ENOSYS;
         break;
     }
 
@@ -376,12 +373,20 @@ static long unregister_guest_callback(struct callback_unregister *unreg)
 
     switch ( unreg->type )
     {
+    case CALLBACKTYPE_event:
+    case CALLBACKTYPE_failsafe:
+#ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL
+    case CALLBACKTYPE_sysenter:
+#endif
+        ret = -EINVAL;
+        break;
+
     case CALLBACKTYPE_nmi:
         ret = unregister_guest_nmi_callback();
         break;
 
     default:
-        ret = -EINVAL;
+        ret = -ENOSYS;
         break;
     }
 
@@ -420,7 +425,7 @@ long do_callback_op(int cmd, XEN_GUEST_HANDLE(void) arg)
     break;
 
     default:
-        ret = -EINVAL;
+        ret = -ENOSYS;
         break;
     }
 
@@ -515,7 +520,7 @@ static void hypercall_page_initialise_ring1_kernel(void *hypercall_page)
 
 void hypercall_page_initialise(struct domain *d, void *hypercall_page)
 {
-    if ( hvm_guest(d->vcpu[0]) )
+    if ( is_hvm_domain(d) )
         hvm_hypercall_page_initialise(d, hypercall_page);
     else if ( supervisor_mode_kernel )
         hypercall_page_initialise_ring0_kernel(hypercall_page);

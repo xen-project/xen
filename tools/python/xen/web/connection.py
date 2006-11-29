@@ -24,6 +24,8 @@ import fcntl
 
 from errno import EAGAIN, EINTR, EWOULDBLOCK
 
+from xen.xend.XendLogging import log
+
 """General classes to support server and client sockets, without
 specifying what kind of socket they are. There are subclasses
 for TCP and unix-domain sockets (see tcp.py and unix.py).
@@ -76,7 +78,7 @@ class SocketListener:
     Accepts connections and runs a thread for each one.
     """
 
-    def __init__(self, protocol_class, hosts_allow = ''):
+    def __init__(self, protocol_class):
         self.protocol_class = protocol_class
         self.sock = self.createSocket()
         threading.Thread(target=self.main).start()
@@ -111,3 +113,15 @@ class SocketListener:
                         break
         finally:
             self.close()
+
+
+def hostAllowed(addrport, hosts_allowed):
+    if hosts_allowed is None:
+        return True
+    else:
+        fqdn = socket.getfqdn(addrport[0])
+        for h in hosts_allowed:
+            if h.match(fqdn) or h.match(addrport[0]):
+                return True
+        log.warn("Rejected connection from %s (%s).", addrport[0], fqdn)
+        return False

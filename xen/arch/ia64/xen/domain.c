@@ -46,26 +46,21 @@
 #include <asm/regionreg.h>
 #include <asm/dom_fw.h>
 #include <asm/shadow.h>
+#include <xen/guest_access.h>
+#include <asm/tlb_track.h>
 
 unsigned long dom0_size = 512*1024*1024;
-unsigned long dom0_align = 64*1024*1024;
 
 /* dom0_max_vcpus: maximum number of VCPUs to create for dom0.  */
 static unsigned int dom0_max_vcpus = 1;
 integer_param("dom0_max_vcpus", dom0_max_vcpus); 
 
-extern int opt_dom0_vcpus_pin;
 extern unsigned long running_on_sim;
 
 extern char dom0_command_line[];
 
-/* FIXME: where these declarations should be there ? */
-extern void serial_input_init(void);
+/* forward declaration */
 static void init_switch_stack(struct vcpu *v);
-extern void vmx_do_launch(struct vcpu *);
-
-/* this belongs in include/asm, but there doesn't seem to be a suitable place */
-extern struct vcpu *ia64_switch_to (struct vcpu *next_task);
 
 /* Address of vpsr.i (in fact evtchn_upcall_mask) of current vcpu.
    This is a Xen virtual address.  */
@@ -74,33 +69,68 @@ DEFINE_PER_CPU(int *, current_psr_ic_addr);
 
 #include <xen/sched-if.h>
 
-static void flush_vtlb_for_context_switch(struct vcpu* vcpu)
+static void
+ia64_disable_vhpt_walker(void)
+{
+	// disable VHPT. ia64_new_rr7() might cause VHPT
+	// fault without this because it flushes dtr[IA64_TR_VHPT]
+	// (VHPT_SIZE_LOG2 << 2) is just for avoid
+	// Reserved Register/Field fault.
+	ia64_set_pta(VHPT_SIZE_LOG2 << 2);
+}
+
+static void flush_vtlb_for_context_switch(struct vcpu* prev, struct vcpu* next)
 {
 	int cpu = smp_processor_id();
-	int last_vcpu_id = vcpu->domain->arch.last_vcpu[cpu].vcpu_id;
-	int last_processor = vcpu->arch.last_processor;
+	int last_vcpu_id, last_processor;
 
-	if (is_idle_domain(vcpu->domain))
+	if (!is_idle_domain(prev->domain))
+		tlbflush_update_time
+			(&prev->domain->arch.last_vcpu[cpu].tlbflush_timestamp,
+			 tlbflush_current_time());
+
+	if (is_idle_domain(next->domain))
 		return;
-	
-	vcpu->domain->arch.last_vcpu[cpu].vcpu_id = vcpu->vcpu_id;
-	vcpu->arch.last_processor = cpu;
 
-	if ((last_vcpu_id != vcpu->vcpu_id &&
+	last_vcpu_id = next->domain->arch.last_vcpu[cpu].vcpu_id;
+	last_processor = next->arch.last_processor;
+
+	next->domain->arch.last_vcpu[cpu].vcpu_id = next->vcpu_id;
+	next->arch.last_processor = cpu;
+
+	if ((last_vcpu_id != next->vcpu_id &&
 	     last_vcpu_id != INVALID_VCPU_ID) ||
-	    (last_vcpu_id == vcpu->vcpu_id &&
+	    (last_vcpu_id == next->vcpu_id &&
 	     last_processor != cpu &&
 	     last_processor != INVALID_PROCESSOR)) {
+#ifdef CONFIG_XEN_IA64_TLBFLUSH_CLOCK
+		u32 last_tlbflush_timestamp =
+			next->domain->arch.last_vcpu[cpu].tlbflush_timestamp;
+#endif
+		int vhpt_is_flushed = 0;
 
 		// if the vTLB implementation was changed,
 		// the followings must be updated either.
-		if (VMX_DOMAIN(vcpu)) {
+		if (VMX_DOMAIN(next)) {
 			// currently vTLB for vt-i domian is per vcpu.
 			// so any flushing isn't needed.
+		} else if (HAS_PERVCPU_VHPT(next->domain)) {
+			// nothing to do
 		} else {
-			vhpt_flush();
+			if (NEED_FLUSH(__get_cpu_var(vhpt_tlbflush_timestamp),
+			               last_tlbflush_timestamp)) {
+				local_vhpt_flush();
+				vhpt_is_flushed = 1;
+			}
 		}
-		local_flush_tlb_all();
+		if (vhpt_is_flushed || NEED_FLUSH(__get_cpu_var(tlbflush_time),
+		                                  last_tlbflush_timestamp)) {
+			local_flush_tlb_all();
+			perfc_incrc(tlbflush_clock_cswitch_purge);
+		} else {
+			perfc_incrc(tlbflush_clock_cswitch_skip);
+		}
+		perfc_incrc(flush_vtlb_for_context_switch);
 	}
 }
 
@@ -109,15 +139,15 @@ void schedule_tail(struct vcpu *prev)
 	extern char ia64_ivt;
 	context_saved(prev);
 
+	ia64_disable_vhpt_walker();
 	if (VMX_DOMAIN(current)) {
 		vmx_do_launch(current);
 		migrate_timer(&current->arch.arch_vmx.vtm.vtm_timer,
 		              current->processor);
 	} else {
 		ia64_set_iva(&ia64_ivt);
-        	ia64_set_pta(VHPT_ADDR | (1 << 8) | (VHPT_SIZE_LOG2 << 2) |
-		        VHPT_ENABLED);
 		load_region_regs(current);
+        	ia64_set_pta(vcpu_pta(current));
 		vcpu_load_kernel_regs(current);
 		__ia64_per_cpu_var(current_psr_i_addr) = &current->domain->
 		  shared_info->vcpu_info[current->vcpu_id].evtchn_upcall_mask;
@@ -125,13 +155,12 @@ void schedule_tail(struct vcpu *prev)
 		  (current->domain->arch.shared_info_va + XSI_PSR_IC_OFS);
 		migrate_timer(&current->arch.hlt_timer, current->processor);
 	}
-	flush_vtlb_for_context_switch(current);
+	flush_vtlb_for_context_switch(prev, current);
 }
 
 void context_switch(struct vcpu *prev, struct vcpu *next)
 {
     uint64_t spsr;
-    uint64_t pta;
 
     local_irq_save(spsr);
 
@@ -149,6 +178,8 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     }
     if (VMX_DOMAIN(next))
 	vmx_load_state(next);
+
+    ia64_disable_vhpt_walker();
     /*ia64_psr(ia64_task_regs(next))->dfh = !ia64_is_local_fpu_owner(next);*/
     prev = ia64_switch_to(next);
 
@@ -168,9 +199,8 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 
 	nd = current->domain;
     	if (!is_idle_domain(nd)) {
-        	ia64_set_pta(VHPT_ADDR | (1 << 8) | (VHPT_SIZE_LOG2 << 2) |
-			     VHPT_ENABLED);
 	    	load_region_regs(current);
+		ia64_set_pta(vcpu_pta(current));
 	    	vcpu_load_kernel_regs(current);
 		vcpu_set_next_timer(current);
 		if (vcpu_timer_expired(current))
@@ -184,14 +214,12 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 		 * walker. Then all accesses happen within idle context will
 		 * be handled by TR mapping and identity mapping.
 		 */
-		pta = ia64_get_pta();
-		ia64_set_pta(pta & ~VHPT_ENABLED);
 		__ia64_per_cpu_var(current_psr_i_addr) = NULL;
 		__ia64_per_cpu_var(current_psr_ic_addr) = NULL;
         }
     }
-    flush_vtlb_for_context_switch(current);
     local_irq_restore(spsr);
+    flush_vtlb_for_context_switch(prev, current);
     context_saved(prev);
 }
 
@@ -247,33 +275,61 @@ void hlt_timer_fn(void *data)
 	vcpu_unblock(v);
 }
 
-struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
+void relinquish_vcpu_resources(struct vcpu *v)
+{
+    if (HAS_PERVCPU_VHPT(v->domain))
+        pervcpu_vhpt_free(v);
+    if (v->arch.privregs != NULL) {
+        free_xenheap_pages(v->arch.privregs,
+                           get_order_from_shift(XMAPPEDREGS_SHIFT));
+        v->arch.privregs = NULL;
+    }
+    kill_timer(&v->arch.hlt_timer);
+}
+
+struct vcpu *alloc_vcpu_struct(void)
 {
 	struct vcpu *v;
 	struct thread_info *ti;
+	static int first_allocation = 1;
 
-	/* Still keep idle vcpu0 static allocated at compilation, due
-	 * to some code from Linux still requires it in early phase.
-	 */
-	if (is_idle_domain(d) && !vcpu_id)
-	    v = idle_vcpu[0];
-	else {
-	    if ((v = alloc_xenheap_pages(KERNEL_STACK_SIZE_ORDER)) == NULL)
-		return NULL;
-	    memset(v, 0, sizeof(*v)); 
-
-	    ti = alloc_thread_info(v);
-	    /* Clear thread_info to clear some important fields, like
-	     * preempt_count
-	     */
-	    memset(ti, 0, sizeof(struct thread_info));
-	    init_switch_stack(v);
+	if (first_allocation) {
+		first_allocation = 0;
+		/* Still keep idle vcpu0 static allocated at compilation, due
+		 * to some code from Linux still requires it in early phase.
+		 */
+		return idle_vcpu[0];
 	}
+
+	if ((v = alloc_xenheap_pages(KERNEL_STACK_SIZE_ORDER)) == NULL)
+		return NULL;
+	memset(v, 0, sizeof(*v)); 
+
+	ti = alloc_thread_info(v);
+	/* Clear thread_info to clear some important fields, like
+	 * preempt_count
+	 */
+	memset(ti, 0, sizeof(struct thread_info));
+	init_switch_stack(v);
+
+	return v;
+}
+
+void free_vcpu_struct(struct vcpu *v)
+{
+	free_xenheap_pages(v, KERNEL_STACK_SIZE_ORDER);
+}
+
+int vcpu_initialise(struct vcpu *v)
+{
+	struct domain *d = v->domain;
+	int rc, order, i;
 
 	if (!is_idle_domain(d)) {
 	    if (!d->arch.is_vti) {
-		int order;
-		int i;
+		if (HAS_PERVCPU_VHPT(d))
+			if ((rc = pervcpu_vhpt_alloc(v)) != 0)
+				return rc;
 
 		/* Create privregs page only if not VTi. */
 		order = get_order_from_shift(XMAPPEDREGS_SHIFT);
@@ -283,6 +339,9 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 		for (i = 0; i < (1 << order); i++)
 		    share_xen_page_with_guest(virt_to_page(v->arch.privregs) +
 		                              i, d, XENSHARE_writable);
+
+		tlbflush_update_time(&v->arch.tlbflush_timestamp,
+		                     tlbflush_current_time());
 	    }
 
 	    v->arch.metaphysical_rr0 = d->arch.metaphysical_rr0;
@@ -306,32 +365,20 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 	    v->arch.breakimm = d->arch.breakimm;
 	    v->arch.last_processor = INVALID_PROCESSOR;
 	}
-	if (!VMX_DOMAIN(v)){
+
+	if (!VMX_DOMAIN(v))
 		init_timer(&v->arch.hlt_timer, hlt_timer_fn, v,
 		           first_cpu(cpu_online_map));
-	}
 
-	return v;
+	return 0;
 }
 
-void relinquish_vcpu_resources(struct vcpu *v)
+void vcpu_destroy(struct vcpu *v)
 {
-    if (v->arch.privregs != NULL) {
-        free_xenheap_pages(v->arch.privregs,
-                           get_order_from_shift(XMAPPEDREGS_SHIFT));
-        v->arch.privregs = NULL;
-    }
-    kill_timer(&v->arch.hlt_timer);
-}
-
-void free_vcpu_struct(struct vcpu *v)
-{
-	if (VMX_DOMAIN(v))
+	if (v->domain->arch.is_vti)
 		vmx_relinquish_vcpu_resources(v);
 	else
 		relinquish_vcpu_resources(v);
-
-	free_xenheap_pages(v, KERNEL_STACK_SIZE_ORDER);
 }
 
 static void init_switch_stack(struct vcpu *v)
@@ -351,6 +398,11 @@ static void init_switch_stack(struct vcpu *v)
 	memset(v->arch._thread.fph,0,sizeof(struct ia64_fpreg)*96);
 }
 
+#ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
+static int opt_pervcpu_vhpt = 1;
+integer_param("pervcpu_vhpt", opt_pervcpu_vhpt);
+#endif
+
 int arch_domain_create(struct domain *d)
 {
 	int i;
@@ -365,6 +417,13 @@ int arch_domain_create(struct domain *d)
 	if (is_idle_domain(d))
 	    return 0;
 
+#ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
+	d->arch.has_pervcpu_vhpt = opt_pervcpu_vhpt;
+	dprintk(XENLOG_WARNING, "%s:%d domain %d pervcpu_vhpt %d\n",
+	        __func__, __LINE__, d->domain_id, d->arch.has_pervcpu_vhpt);
+#endif
+	if (tlb_track_create(d) < 0)
+		goto fail_nomem1;
 	d->shared_info = alloc_xenheap_pages(get_order_from_shift(XSI_SHIFT));
 	if (d->shared_info == NULL)
 	    goto fail_nomem;
@@ -373,7 +432,6 @@ int arch_domain_create(struct domain *d)
 	    share_xen_page_with_guest(virt_to_page((char *)d->shared_info + i),
 	                              d, XENSHARE_writable);
 
-	d->max_pages = (128UL*1024*1024)/PAGE_SIZE; // 128MB default // FIXME
 	/* We may also need emulation rid for region4, though it's unlikely
 	 * to see guest issue uncacheable access in metaphysical mode. But
 	 * keep such info here may be more sane.
@@ -389,10 +447,12 @@ int arch_domain_create(struct domain *d)
 	d->arch.ioport_caps = rangeset_new(d, "I/O Ports",
 	                                   RANGESETF_prettyprint_hex);
 
-	printf ("arch_domain_create: domain=%p\n", d);
+	printk ("arch_domain_create: domain=%p\n", d);
 	return 0;
 
 fail_nomem:
+	tlb_track_destroy(d);
+fail_nomem1:
 	if (d->arch.mm.pgd != NULL)
 	    pgd_free(d->arch.mm.pgd);
 	if (d->shared_info != NULL)
@@ -407,6 +467,8 @@ void arch_domain_destroy(struct domain *d)
 	    free_xenheap_pages(d->shared_info, get_order_from_shift(XSI_SHIFT));
 	if (d->arch.shadow_bitmap != NULL)
 		xfree(d->arch.shadow_bitmap);
+
+	tlb_track_destroy(d);
 
 	/* Clear vTLB for the next domain.  */
 	domain_flush_tlb_vhpt(d);
@@ -566,21 +628,6 @@ void domain_relinquish_resources(struct domain *d)
 	    xfree(d->arch.sal_data);
 }
 
-void build_physmap_table(struct domain *d)
-{
-	struct list_head *list_ent = d->page_list.next;
-	unsigned long mfn, i = 0;
-
-	while(list_ent != &d->page_list) {
-	    mfn = page_to_mfn(list_entry(
-		list_ent, struct page_info, list));
-	    assign_domain_page(d, i << PAGE_SHIFT, mfn << PAGE_SHIFT);
-
-	    i++;
-	    list_ent = mfn_to_page(mfn)->list.next;
-	}
-}
-
 unsigned long
 domain_set_shared_info_va (unsigned long va)
 {
@@ -599,7 +646,7 @@ domain_set_shared_info_va (unsigned long va)
 
 	/* Note: this doesn't work well if other cpus are already running.
 	   However this is part of the spec :-)  */
-	printf ("Domain set shared_info_va to 0x%016lx\n", va);
+	printk ("Domain set shared_info_va to 0x%016lx\n", va);
 	d->arch.shared_info_va = va;
 
 	for_each_vcpu (d, v1) {
@@ -626,7 +673,8 @@ int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc)
 	//struct vcpu *v;
 
 	if (unlikely(d == current->domain)) {
-		DPRINTK("Don't try to do a shadow op on yourself!\n");
+		gdprintk(XENLOG_INFO,
+                        "Don't try to do a shadow op on yourself!\n");
 		return -EINVAL;
 	}   
 
@@ -845,23 +893,6 @@ void alloc_dom0(void)
 			" (try e.g. dom0_mem=256M or dom0_mem=65536K)\n");
 	}
 
-	/* Check dom0 align.  */
-	if ((dom0_align - 1) & dom0_align) { /* not a power of two */
-		panic("dom0_align (%lx) must be power of two, boot aborted"
-		      " (try e.g. dom0_align=256M or dom0_align=65536K)\n",
-		      dom0_align);
-	}
-	if (dom0_align < PAGE_SIZE) {
-		panic("dom0_align must be >= %ld, boot aborted"
-		      " (try e.g. dom0_align=256M or dom0_align=65536K)\n",
-		      PAGE_SIZE);
-	}
-	if (dom0_size % dom0_align) {
-		dom0_size = (dom0_size / dom0_align + 1) * dom0_align;
-		printf("dom0_size rounded up to %ld, due to dom0_align=%lx\n",
-		     dom0_size,dom0_align);
-	}
-
 	if (running_on_sim) {
 		dom0_size = 128*1024*1024; //FIXME: Should be configurable
 	}
@@ -916,7 +947,7 @@ int construct_dom0(struct domain *d,
 	struct page_info *page = NULL;
 #endif
 
-//printf("construct_dom0: starting\n");
+//printk("construct_dom0: starting\n");
 
 	/* Sanity! */
 	BUG_ON(d != dom0);
@@ -1020,13 +1051,10 @@ int construct_dom0(struct domain *d,
 	if (dom0_max_vcpus > MAX_VIRT_CPUS)
 	    dom0_max_vcpus = MAX_VIRT_CPUS;
 	
-	printf ("Dom0 max_vcpus=%d\n", dom0_max_vcpus);
-	for ( i = 1; i < dom0_max_vcpus; i++ ) {
+	printk ("Dom0 max_vcpus=%d\n", dom0_max_vcpus);
+	for ( i = 1; i < dom0_max_vcpus; i++ )
 	    if (alloc_vcpu(d, i, i) == NULL)
-		printf ("Cannot allocate dom0 vcpu %d\n", i);
-	    else if (opt_dom0_vcpus_pin)
-		d->vcpu[i]->cpu_affinity = cpumask_of_cpu(i);
-	}
+		printk ("Cannot allocate dom0 vcpu %d\n", i);
 
 	/* Copy the OS image. */
 	loaddomainelfimage(d,image_start);
@@ -1105,9 +1133,6 @@ int construct_dom0(struct domain *d,
 
 	physdev_init_dom0(d);
 
-	// FIXME: Hack for keyboard input
-	//serial_input_init();
-
 	return 0;
 }
 
@@ -1115,7 +1140,7 @@ void machine_restart(char * __unused)
 {
 	console_start_sync();
 	if (running_on_sim)
-		printf ("machine_restart called.  spinning...\n");
+		printk ("machine_restart called.  spinning...\n");
 	else
 		(*efi.reset_system)(EFI_RESET_WARM,0,0,NULL);
 	while(1);
@@ -1127,7 +1152,7 @@ void machine_halt(void)
 {
 	console_start_sync();
 	if (running_on_sim)
-		printf ("machine_halt called.  spinning...\n");
+		printk ("machine_halt called.  spinning...\n");
 	else
 		cpu_halt();
 	while(1);
@@ -1143,13 +1168,6 @@ void sync_vcpu_execstate(struct vcpu *v)
 
 static void parse_dom0_mem(char *s)
 {
-	dom0_size = parse_size_and_unit(s);
+	dom0_size = parse_size_and_unit(s, NULL);
 }
 custom_param("dom0_mem", parse_dom0_mem);
-
-
-static void parse_dom0_align(char *s)
-{
-	dom0_align = parse_size_and_unit(s);
-}
-custom_param("dom0_align", parse_dom0_align);

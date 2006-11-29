@@ -20,6 +20,19 @@
 #ifndef __ASM_X86_HVM_HVM_H__
 #define __ASM_X86_HVM_HVM_H__
 
+enum segment {
+    seg_cs,
+    seg_ss,
+    seg_ds,
+    seg_es,
+    seg_fs,
+    seg_gs,
+    seg_tr,
+    seg_ldtr,
+    seg_gdtr,
+    seg_idtr
+};
+
 /*
  * The hardware virtual machine (HVM) interface abstracts away from the
  * x86/x86_64 CPU virtualization assist specifics. Currently this interface
@@ -33,10 +46,10 @@ struct hvm_function_table {
     void (*disable)(void);
 
     /*
-     * Initialize/relinguish HVM guest resources
+     * Initialise/destroy HVM VCPU resources
      */
-    int  (*initialize_guest_resources)(struct vcpu *v);
-    void (*relinquish_guest_resources)(struct domain *d);
+    int  (*vcpu_initialise)(struct vcpu *v);
+    void (*vcpu_destroy)(struct vcpu *v);
 
     /*
      * Store and load guest state:
@@ -49,17 +62,19 @@ struct hvm_function_table {
         struct vcpu *v, struct cpu_user_regs *r);
     /*
      * Examine specifics of the guest state:
-     * 1) determine whether the guest is in real or vm8086 mode,
-     * 2) determine whether paging is enabled,
-     * 3) return the length of the instruction that caused an exit.
-     * 4) return the current guest control-register value
+     * 1) determine whether paging is enabled,
+     * 2) determine whether long mode is enabled,
+     * 3) determine whether PAE paging is enabled,
+     * 4) determine the mode the guest is running in,
+     * 5) return the current guest control-register value
+     * 6) return the current guest segment descriptor base
      */
-    int (*realmode)(struct vcpu *v);
     int (*paging_enabled)(struct vcpu *v);
     int (*long_mode_enabled)(struct vcpu *v);
+    int (*pae_enabled)(struct vcpu *v);
     int (*guest_x86_mode)(struct vcpu *v);
-    int (*instruction_length)(struct vcpu *v);
     unsigned long (*get_guest_ctrl_reg)(struct vcpu *v, unsigned int num);
+    unsigned long (*get_segment_base)(struct vcpu *v, enum segment seg);
 
     /* 
      * Re-set the value of CR3 that Xen runs on when handling VM exits
@@ -92,28 +107,13 @@ hvm_disable(void)
         hvm_funcs.disable();
 }
 
-void hvm_create_event_channels(struct vcpu *v);
-void hvm_map_io_shared_pages(struct vcpu *v);
+int hvm_domain_initialise(struct domain *d);
+void hvm_domain_destroy(struct domain *d);
 
-static inline int
-hvm_initialize_guest_resources(struct vcpu *v)
-{
-    int ret = 1;
-    if ( hvm_funcs.initialize_guest_resources )
-        ret = hvm_funcs.initialize_guest_resources(v);
-    if ( ret == 1 ) {
-        hvm_map_io_shared_pages(v);
-        hvm_create_event_channels(v);
-    }
-    return ret;
-}
+int hvm_vcpu_initialise(struct vcpu *v);
+void hvm_vcpu_destroy(struct vcpu *v);
 
-static inline void
-hvm_relinquish_guest_resources(struct domain *d)
-{
-    if (hvm_funcs.relinquish_guest_resources)
-        hvm_funcs.relinquish_guest_resources(d);
-}
+void hvm_send_assist_req(struct vcpu *v);
 
 static inline void
 hvm_store_cpu_guest_regs(
@@ -129,12 +129,6 @@ hvm_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *r)
 }
 
 static inline int
-hvm_realmode(struct vcpu *v)
-{
-    return hvm_funcs.realmode(v);
-}
-
-static inline int
 hvm_paging_enabled(struct vcpu *v)
 {
     return hvm_funcs.paging_enabled(v);
@@ -146,17 +140,19 @@ hvm_long_mode_enabled(struct vcpu *v)
     return hvm_funcs.long_mode_enabled(v);
 }
 
+ static inline int
+hvm_pae_enabled(struct vcpu *v)
+{
+    return hvm_funcs.pae_enabled(v);
+}
+
 static inline int
 hvm_guest_x86_mode(struct vcpu *v)
 {
     return hvm_funcs.guest_x86_mode(v);
 }
 
-static inline int
-hvm_instruction_length(struct vcpu *v)
-{
-    return hvm_funcs.instruction_length(v);
-}
+int hvm_instruction_length(unsigned long pc, int mode);
 
 static inline void
 hvm_update_host_cr3(struct vcpu *v)
@@ -175,9 +171,17 @@ hvm_get_guest_ctrl_reg(struct vcpu *v, unsigned int num)
     return 0;                   /* force to fail */
 }
 
-extern void hvm_stts(struct vcpu *v);
-extern void hvm_set_guest_time(struct vcpu *v, u64 gtime);
-extern void hvm_do_resume(struct vcpu *v);
+static inline unsigned long
+hvm_get_segment_base(struct vcpu *v, enum segment seg)
+{
+    return hvm_funcs.get_segment_base(v, seg);
+}
+
+void hvm_stts(struct vcpu *v);
+void hvm_set_guest_time(struct vcpu *v, u64 gtime);
+void hvm_freeze_time(struct vcpu *v);
+void hvm_migrate_timers(struct vcpu *v);
+void hvm_do_resume(struct vcpu *v);
 
 static inline void
 hvm_init_ap_context(struct vcpu_guest_context *ctxt,
@@ -186,6 +190,6 @@ hvm_init_ap_context(struct vcpu_guest_context *ctxt,
     return hvm_funcs.init_ap_context(ctxt, vcpuid, trampoline_vector);
 }
 
-extern int hvm_bringup_ap(int vcpuid, int trampoline_vector);
+int hvm_bringup_ap(int vcpuid, int trampoline_vector);
 
 #endif /* __ASM_X86_HVM_HVM_H__ */

@@ -23,7 +23,7 @@
 #include <asm/config.h>
 #include <asm/hvm/hvm.h>
 
-extern int start_svm(void);
+int start_svm(void);
 
 /* general 1 intercepts */
 enum GenericIntercept1bits
@@ -310,10 +310,6 @@ enum {
     SVM_CPU_STATE_LMA_ENABLED,
     SVM_CPU_STATE_ASSIST_ENABLED,
 };  
-    
-#define SVM_LONG_GUEST(ed)    \
-  (test_bit(SVM_CPU_STATE_LMA_ENABLED, &ed->arch.hvm_svm.cpu_state))
-
 
 /* 
  * Attribute for segment selector. This is a copy of bit 40:47 & 52:55 of the
@@ -484,6 +480,7 @@ struct arch_svm_struct {
     u32                 *msrpm;
     u64                 vmexit_tsc; /* tsc read at #VMEXIT. for TSC_OFFSET */
     int                 saved_irq_vector;
+    u32                 inject_event;
     u32                 launch_core;
     u32                 asid_core;
     
@@ -495,15 +492,15 @@ struct arch_svm_struct {
     unsigned long       cpu_state;
 };
 
-extern struct vmcb_struct *alloc_vmcb(void);
-extern struct host_save_area *alloc_host_save_area(void);
-extern void free_vmcb(struct vmcb_struct *vmcb);
-extern void free_host_save_area(struct host_save_area *hsa);
+struct vmcb_struct *alloc_vmcb(void);
+struct host_save_area *alloc_host_save_area(void);
+void free_vmcb(struct vmcb_struct *vmcb);
+void free_host_save_area(struct host_save_area *hsa);
 
-extern int  construct_vmcb(struct arch_svm_struct *, struct cpu_user_regs *);
-extern void destroy_vmcb(struct arch_svm_struct *);
+int  svm_create_vmcb(struct vcpu *v);
+void svm_destroy_vmcb(struct vcpu *v);
 
-extern void setup_vmcb_dump(void);
+void setup_vmcb_dump(void);
 
 #define VMCB_USE_HOST_ENV       1
 #define VMCB_USE_SEPARATE_ENV   0

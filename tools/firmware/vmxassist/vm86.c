@@ -52,34 +52,78 @@ char *states[] = {
 static char *rnames[] = { "ax", "cx", "dx", "bx", "sp", "bp", "si", "di" };
 #endif /* DEBUG */
 
+#define PDE_PS           (1 << 7)
 #define PT_ENTRY_PRESENT 0x1
 
-static unsigned
-guest_linear_to_real(unsigned long base, unsigned off)
+/* We only support access to <=4G physical memory due to 1:1 mapping */
+static uint64_t
+guest_linear_to_phys(uint32_t base)
 {
-	unsigned int gcr3 = oldctx.cr3;
-	unsigned int l1_mfn;
-	unsigned int l0_mfn;
+	uint32_t gcr3 = oldctx.cr3;
+	uint64_t l2_mfn;
+	uint64_t l1_mfn;
+	uint64_t l0_mfn;
 
 	if (!(oldctx.cr0 & CR0_PG))
-		return base + off;
+		return base;
 
-	l1_mfn = ((unsigned int *)gcr3)[(base >> 22) & 0x3ff ];
-	if (!(l1_mfn & PT_ENTRY_PRESENT))
-		panic("l2 entry not present\n");
-	l1_mfn = l1_mfn & 0xfffff000 ;
+	if (!(oldctx.cr4 & CR4_PAE)) {
+		l1_mfn = ((uint32_t *)(long)gcr3)[(base >> 22) & 0x3ff];
+		if (!(l1_mfn & PT_ENTRY_PRESENT))
+			panic("l2 entry not present\n");
 
-	l0_mfn = ((unsigned int *)l1_mfn)[(base >> 12) & 0x3ff];
-	if (!(l0_mfn & PT_ENTRY_PRESENT))
-		panic("l1 entry not present\n");
-	l0_mfn = l0_mfn & 0xfffff000;
+		if ((oldctx.cr4 & CR4_PSE) && (l1_mfn & PDE_PS)) {
+			l0_mfn = l1_mfn & 0xffc00000;
+			return l0_mfn + (base & 0x3fffff);
+		}
 
-	return l0_mfn + off + (base & 0xfff);
+		l1_mfn &= 0xfffff000;
+
+		l0_mfn = ((uint32_t *)(long)l1_mfn)[(base >> 12) & 0x3ff];
+		if (!(l0_mfn & PT_ENTRY_PRESENT))
+			panic("l1 entry not present\n");
+		l0_mfn &= 0xfffff000;
+
+		return l0_mfn + (base & 0xfff);
+	} else {
+		l2_mfn = ((uint64_t *)(long)gcr3)[(base >> 30) & 0x3];
+		if (!(l2_mfn & PT_ENTRY_PRESENT))
+			panic("l3 entry not present\n");
+		l2_mfn &= 0xffffff000ULL;
+
+		if (l2_mfn & 0xf00000000ULL) {
+			printf("l2 page above 4G\n");
+			cpuid_addr_value(l2_mfn + 8 * ((base >> 21) & 0x1ff), &l1_mfn);
+		} else
+			l1_mfn = ((uint64_t *)(long)l2_mfn)[(base >> 21) & 0x1ff];
+		if (!(l1_mfn & PT_ENTRY_PRESENT))
+			panic("l2 entry not present\n");
+
+		if (l1_mfn & PDE_PS) { /* CR4.PSE is ignored in PAE mode */
+			l0_mfn = l1_mfn & 0xfffe00000ULL;
+			return l0_mfn + (base & 0x1fffff);
+		}
+
+		l1_mfn &= 0xffffff000ULL;
+
+		if (l1_mfn & 0xf00000000ULL) {
+			printf("l1 page above 4G\n");
+			cpuid_addr_value(l1_mfn + 8 * ((base >> 12) & 0x1ff), &l0_mfn);
+		} else
+			l0_mfn = ((uint64_t *)(long)l1_mfn)[(base >> 12) & 0x1ff];
+		if (!(l0_mfn & PT_ENTRY_PRESENT))
+			panic("l1 entry not present\n");
+
+		l0_mfn &= 0xffffff000ULL;
+
+		return l0_mfn + (base & 0xfff);
+	}
 }
 
 static unsigned
 address(struct regs *regs, unsigned seg, unsigned off)
 {
+	uint64_t gdt_phys_base;
 	unsigned long long entry;
 	unsigned seg_base, seg_limit;
 	unsigned entry_low, entry_high;
@@ -95,7 +139,13 @@ address(struct regs *regs, unsigned seg, unsigned off)
 	    (mode == VM86_REAL_TO_PROTECTED && regs->cs == seg))
 		return ((seg & 0xFFFF) << 4) + off;
 
-	entry = ((unsigned long long *) guest_linear_to_real(oldctx.gdtr_base, 0))[seg >> 3];
+	gdt_phys_base = guest_linear_to_phys(oldctx.gdtr_base);
+	if (gdt_phys_base != (uint32_t)gdt_phys_base) {
+		printf("gdt base address above 4G\n");
+		cpuid_addr_value(gdt_phys_base + 8 * (seg >> 3), &entry);
+	} else
+		entry = ((unsigned long long *)(long)gdt_phys_base)[seg >> 3];
+
 	entry_high = entry >> 32;
 	entry_low = entry & 0xFFFFFFFF;
 
@@ -763,12 +813,63 @@ pop(struct regs *regs, unsigned prefix, unsigned opc)
 	return 1;
 }
 
+static int
+mov_to_seg(struct regs *regs, unsigned prefix, unsigned opc)
+{
+	unsigned modrm = fetch8(regs);
+
+	/* Only need to emulate segment loads in real->protected mode. */
+	if (mode != VM86_REAL_TO_PROTECTED)
+		return 0;
+
+	/* Register source only. */
+	if ((modrm & 0xC0) != 0xC0)
+		goto fail;
+
+	switch ((modrm & 0x38) >> 3) {
+	case 0: /* es */
+		regs->ves = getreg16(regs, modrm);
+		saved_rm_regs.ves = 0;
+		oldctx.es_sel = regs->ves;
+		return 1;
+
+	/* case 1: cs */
+
+	case 2: /* ss */
+		regs->uss = getreg16(regs, modrm);
+		saved_rm_regs.uss = 0;
+		oldctx.ss_sel = regs->uss;
+		return 1;
+	case 3: /* ds */
+		regs->vds = getreg16(regs, modrm);
+		saved_rm_regs.vds = 0;
+		oldctx.ds_sel = regs->vds;
+		return 1;
+	case 4: /* fs */
+		regs->vfs = getreg16(regs, modrm);
+		saved_rm_regs.vfs = 0;
+		oldctx.fs_sel = regs->vfs;
+		return 1;
+	case 5: /* gs */
+		regs->vgs = getreg16(regs, modrm);
+		saved_rm_regs.vgs = 0;
+		oldctx.gs_sel = regs->vgs;
+		return 1;
+	}
+
+ fail:
+	printf("%s:%d: missed opcode %02x %02x\n",
+	       __FUNCTION__, __LINE__, opc, modrm);
+	return 0;
+}
+
 /*
  * Emulate a segment load in protected mode
  */
 static int
 load_seg(unsigned long sel, uint32_t *base, uint32_t *limit, union vmcs_arbytes *arbytes)
 {
+	uint64_t gdt_phys_base;
 	unsigned long long entry;
 
 	/* protected mode: use seg as index into gdt */
@@ -780,7 +881,12 @@ load_seg(unsigned long sel, uint32_t *base, uint32_t *limit, union vmcs_arbytes 
 		return 1;
 	}
 
-	entry = ((unsigned long long *) guest_linear_to_real(oldctx.gdtr_base, 0))[sel >> 3];
+	gdt_phys_base = guest_linear_to_phys(oldctx.gdtr_base);
+	if (gdt_phys_base != (uint32_t)gdt_phys_base) {
+		printf("gdt base address above 4G\n");
+		cpuid_addr_value(gdt_phys_base + 8 * (sel >> 3), &entry);
+	} else
+		entry = ((unsigned long long *)(long)gdt_phys_base)[sel >> 3];
 
 	/* Check the P bit first */
 	if (!((entry >> (15+32)) & 0x1) && sel != 0)
@@ -811,6 +917,18 @@ load_seg(unsigned long sel, uint32_t *base, uint32_t *limit, union vmcs_arbytes 
 }
 
 /*
+ * Emulate a protected mode segment load, falling back to clearing it if
+ * the descriptor was invalid.
+ */
+static void
+load_or_clear_seg(unsigned long sel, uint32_t *base, uint32_t *limit, union vmcs_arbytes *arbytes)
+{
+	if (!load_seg(sel, base, limit, arbytes))
+		load_seg(0, base, limit, arbytes);	    
+}
+
+
+/*
  * Transition to protected mode
  */
 static void
@@ -822,63 +940,22 @@ protected_mode(struct regs *regs)
 	oldctx.esp = regs->uesp;
 	oldctx.eflags = regs->eflags;
 
-	memset(&saved_rm_regs, 0, sizeof(struct regs));
-
 	/* reload all segment registers */
 	if (!load_seg(regs->cs, &oldctx.cs_base,
 				&oldctx.cs_limit, &oldctx.cs_arbytes))
 		panic("Invalid %%cs=0x%x for protected mode\n", regs->cs);
 	oldctx.cs_sel = regs->cs;
 
-	if (load_seg(regs->ves, &oldctx.es_base,
-				&oldctx.es_limit, &oldctx.es_arbytes))
-		oldctx.es_sel = regs->ves;
-	else {
-		load_seg(0, &oldctx.es_base,
-			    &oldctx.es_limit, &oldctx.es_arbytes);
-		oldctx.es_sel = 0;
-		saved_rm_regs.ves = regs->ves;
-	}
-
-	if (load_seg(regs->uss, &oldctx.ss_base,
-				&oldctx.ss_limit, &oldctx.ss_arbytes))
-		oldctx.ss_sel = regs->uss;
-	else {
-		load_seg(0, &oldctx.ss_base,
-			    &oldctx.ss_limit, &oldctx.ss_arbytes);
-		oldctx.ss_sel = 0;
-		saved_rm_regs.uss = regs->uss;
-	}
-
-	if (load_seg(regs->vds, &oldctx.ds_base,
-				&oldctx.ds_limit, &oldctx.ds_arbytes))
-		oldctx.ds_sel = regs->vds;
-	else {
-		load_seg(0, &oldctx.ds_base,
-			    &oldctx.ds_limit, &oldctx.ds_arbytes);
-		oldctx.ds_sel = 0;
-		saved_rm_regs.vds = regs->vds;
-	}
-
-	if (load_seg(regs->vfs, &oldctx.fs_base,
-				&oldctx.fs_limit, &oldctx.fs_arbytes))
-		oldctx.fs_sel = regs->vfs;
-	else {
-		load_seg(0, &oldctx.fs_base,
-			    &oldctx.fs_limit, &oldctx.fs_arbytes);
-		oldctx.fs_sel = 0;
-		saved_rm_regs.vfs = regs->vfs;
-	}
-
-	if (load_seg(regs->vgs, &oldctx.gs_base,
-				&oldctx.gs_limit, &oldctx.gs_arbytes))
-		oldctx.gs_sel = regs->vgs;
-	else {
-		load_seg(0, &oldctx.gs_base,
-			    &oldctx.gs_limit, &oldctx.gs_arbytes);
-		oldctx.gs_sel = 0;
-		saved_rm_regs.vgs = regs->vgs;
-	}
+	load_or_clear_seg(oldctx.es_sel, &oldctx.es_base,
+			  &oldctx.es_limit, &oldctx.es_arbytes);
+	load_or_clear_seg(oldctx.ss_sel, &oldctx.ss_base,
+			  &oldctx.ss_limit, &oldctx.ss_arbytes);
+	load_or_clear_seg(oldctx.ds_sel, &oldctx.ds_base,
+			  &oldctx.ds_limit, &oldctx.ds_arbytes);
+	load_or_clear_seg(oldctx.fs_sel, &oldctx.fs_base,
+			  &oldctx.fs_limit, &oldctx.fs_arbytes);
+	load_or_clear_seg(oldctx.gs_sel, &oldctx.gs_base,
+			  &oldctx.gs_limit, &oldctx.gs_arbytes);
 
 	/* initialize jump environment to warp back to protected mode */
 	regs->cs = CODE_SELECTOR;
@@ -966,6 +1043,16 @@ set_mode(struct regs *regs, enum vm86_mode newmode)
 	case VM86_REAL_TO_PROTECTED:
 		if (mode == VM86_REAL) {
 			regs->eflags |= EFLAGS_TF;
+			saved_rm_regs.vds = regs->vds;
+			saved_rm_regs.ves = regs->ves;
+			saved_rm_regs.vfs = regs->vfs;
+			saved_rm_regs.vgs = regs->vgs;
+			saved_rm_regs.uss = regs->uss;
+			oldctx.ds_sel = 0;
+			oldctx.es_sel = 0;
+			oldctx.fs_sel = 0;
+			oldctx.gs_sel = 0;
+			oldctx.ss_sel = 0;
 			break;
 		} else if (mode == VM86_REAL_TO_PROTECTED) {
 			break;
@@ -1194,6 +1281,18 @@ pushrm(struct regs *regs, int prefix, unsigned modrm)
 
 enum { OPC_INVALID, OPC_EMULATED };
 
+#define rdmsr(msr,val1,val2)				\
+	__asm__ __volatile__(				\
+		"rdmsr"					\
+		: "=a" (val1), "=d" (val2)		\
+		: "c" (msr))
+
+#define wrmsr(msr,val1,val2)				\
+	__asm__ __volatile__(				\
+		"wrmsr"					\
+		: /* no outputs */			\
+		: "c" (msr), "a" (val1), "d" (val2))
+
 /*
  * Emulate a single instruction, including all its prefixes. We only implement
  * a small subset of the opcodes, and not all opcodes are implemented for each
@@ -1208,12 +1307,14 @@ opcode(struct regs *regs)
 
 	for (;;) {
 		switch ((opc = fetch8(regs))) {
-		case 0x07:
-			if (prefix & DATA32)
-				regs->ves = pop32(regs);
-			else
-				regs->ves = pop16(regs);
+		case 0x07: /* pop %es */
+			regs->ves = (prefix & DATA32) ?
+				pop32(regs) : pop16(regs);
 			TRACE((regs, regs->eip - eip, "pop %%es"));
+			if (mode == VM86_REAL_TO_PROTECTED) {
+				saved_rm_regs.ves = 0;
+				oldctx.es_sel = regs->ves;
+			}
 			return OPC_EMULATED;
 
 		case 0x0F: /* two byte opcode */
@@ -1252,10 +1353,26 @@ opcode(struct regs *regs)
 				if (!movcr(regs, prefix, opc))
 					goto invalid;
 				return OPC_EMULATED;
+			case 0x30: /* WRMSR */
+				wrmsr(regs->ecx, regs->eax, regs->edx);
+				return OPC_EMULATED;
+			case 0x32: /* RDMSR */
+				rdmsr(regs->ecx, regs->eax, regs->edx);
+				return OPC_EMULATED;
 			default:
 				goto invalid;
 			}
 			goto invalid;
+
+		case 0x1F: /* pop %ds */
+			regs->vds = (prefix & DATA32) ?
+				pop32(regs) : pop16(regs);
+			TRACE((regs, regs->eip - eip, "pop %%ds"));
+			if (mode == VM86_REAL_TO_PROTECTED) {
+				saved_rm_regs.vds = 0;
+				oldctx.ds_sel = regs->vds;
+			}
+			return OPC_EMULATED;
 
 		case 0x26:
 			TRACE((regs, regs->eip - eip, "%%es:"));
@@ -1343,6 +1460,11 @@ opcode(struct regs *regs)
                                 goto invalid;
                         return OPC_EMULATED;
 
+		case 0x8E: /* mov r16, sreg */
+			if (!mov_to_seg(regs, prefix, opc))
+				goto invalid;
+			return OPC_EMULATED;
+
 		case 0x8F: /* addr32 pop r/m16 */
                         if ((prefix & ADDR32) == 0)
                                 goto invalid;
@@ -1376,12 +1498,14 @@ opcode(struct regs *regs)
 			{
 				int addr, data;
 				int seg = segment(prefix, regs, regs->vds);
+				int offset = prefix & ADDR32? fetch32(regs) : fetch16(regs);
+
 				if (prefix & DATA32) {
-					addr = address(regs, seg, fetch32(regs));
+					addr = address(regs, seg, offset);
 					data = read32(addr);
 					setreg32(regs, 0, data);
 				} else {
-					addr = address(regs, seg, fetch16(regs));
+					addr = address(regs, seg, offset);
 					data = read16(addr);
 					setreg16(regs, 0, data);
 				}

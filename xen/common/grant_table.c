@@ -24,6 +24,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <xen/config.h>
+#include <xen/iocap.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <xen/shadow.h>
@@ -47,7 +49,7 @@ union grant_combo {
 
 #define PIN_FAIL(_lbl, _rc, _f, _a...)          \
     do {                                        \
-        DPRINTK( _f, ## _a );                   \
+        gdprintk(XENLOG_WARNING, _f, ## _a );   \
         rc = (_rc);                             \
         goto _lbl;                              \
     } while ( 0 )
@@ -109,7 +111,8 @@ __gnttab_map_grant_ref(
     if ( unlikely(op->ref >= NR_GRANT_ENTRIES) ||
          unlikely((op->flags & (GNTMAP_device_map|GNTMAP_host_map)) == 0) )
     {
-        DPRINTK("Bad ref (%d) or flags (%x).\n", op->ref, op->flags);
+        gdprintk(XENLOG_INFO, "Bad ref (%d) or flags (%x).\n",
+                op->ref, op->flags);
         op->status = GNTST_bad_gntref;
         return;
     }
@@ -124,7 +127,7 @@ __gnttab_map_grant_ref(
     {
         if ( rd != NULL )
             put_domain(rd);
-        DPRINTK("Could not find domain %d\n", op->dom);
+        gdprintk(XENLOG_INFO, "Could not find domain %d\n", op->dom);
         op->status = GNTST_bad_domain;
         return;
     }
@@ -139,7 +142,7 @@ __gnttab_map_grant_ref(
         if ( (lgt->maptrack_limit << 1) > MAPTRACK_MAX_ENTRIES )
         {
             put_domain(rd);
-            DPRINTK("Maptrack table is at maximum size.\n");
+            gdprintk(XENLOG_INFO, "Maptrack table is at maximum size.\n");
             op->status = GNTST_no_device_space;
             return;
         }
@@ -149,7 +152,7 @@ __gnttab_map_grant_ref(
         if ( new_mt == NULL )
         {
             put_domain(rd);
-            DPRINTK("No more map handles available.\n");
+            gdprintk(XENLOG_INFO, "No more map handles available.\n");
             op->status = GNTST_no_device_space;
             return;
         }
@@ -166,7 +169,7 @@ __gnttab_map_grant_ref(
         lgt->maptrack_order   += 1;
         lgt->maptrack_limit  <<= 1;
 
-        DPRINTK("Doubled maptrack size\n");
+        gdprintk(XENLOG_INFO, "Doubled maptrack size\n");
         handle = get_maptrack_handle(ld->grant_table);
     }
 
@@ -252,8 +255,12 @@ __gnttab_map_grant_ref(
                     get_page(mfn_to_page(frame), rd) :
                     get_page_and_type(mfn_to_page(frame), rd,
                                       PGT_writable_page))) )
-        PIN_FAIL(undo_out, GNTST_general_error,
-                 "Could not pin the granted frame (%lx)!\n", frame);
+    {
+        if ( !test_bit(_DOMF_dying, &rd->domain_flags) )
+            gdprintk(XENLOG_WARNING, "Could not pin grant frame %lx\n", frame);
+        rc = GNTST_general_error;
+        goto undo_out;
+    }
 
     if ( op->flags & GNTMAP_host_map )
     {
@@ -353,7 +360,7 @@ __gnttab_unmap_grant_ref(
     if ( unlikely(op->handle >= ld->grant_table->maptrack_limit) ||
          unlikely(!map->flags) )
     {
-        DPRINTK("Bad handle (%d).\n", op->handle);
+        gdprintk(XENLOG_INFO, "Bad handle (%d).\n", op->handle);
         op->status = GNTST_bad_handle;
         return;
     }
@@ -364,10 +371,9 @@ __gnttab_unmap_grant_ref(
 
     if ( unlikely((rd = find_domain_by_id(dom)) == NULL) )
     {
-        if ( rd != NULL )
-            put_domain(rd);
-        DPRINTK("Could not find domain %d\n", dom);
-        op->status = GNTST_bad_domain;
+        /* This can happen when a grant is implicitly unmapped. */
+        gdprintk(XENLOG_INFO, "Could not find domain %d\n", dom);
+        domain_crash(ld); /* naughty... */
         return;
     }
 
@@ -486,13 +492,14 @@ gnttab_setup_table(
 
     if ( unlikely(copy_from_guest(&op, uop, 1) != 0) )
     {
-        DPRINTK("Fault while reading gnttab_setup_table_t.\n");
+        gdprintk(XENLOG_INFO, "Fault while reading gnttab_setup_table_t.\n");
         return -EFAULT;
     }
 
     if ( unlikely(op.nr_frames > NR_GRANT_FRAMES) )
     {
-        DPRINTK("Xen only supports up to %d grant-table frames per domain.\n",
+        gdprintk(XENLOG_INFO, "Xen only supports up to %d grant-table frames"
+                " per domain.\n",
                 NR_GRANT_FRAMES);
         op.status = GNTST_general_error;
         goto out;
@@ -511,7 +518,7 @@ gnttab_setup_table(
 
     if ( unlikely((d = find_domain_by_id(dom)) == NULL) )
     {
-        DPRINTK("Bad domid %d.\n", dom);
+        gdprintk(XENLOG_INFO, "Bad domid %d.\n", dom);
         op.status = GNTST_bad_domain;
         goto out;
     }
@@ -549,7 +556,7 @@ gnttab_prepare_for_transfer(
     if ( unlikely((rgt = rd->grant_table) == NULL) ||
          unlikely(ref >= NR_GRANT_ENTRIES) )
     {
-        DPRINTK("Dom %d has no g.t., or ref is bad (%d).\n",
+        gdprintk(XENLOG_INFO, "Dom %d has no g.t., or ref is bad (%d).\n",
                 rd->domain_id, ref);
         return 0;
     }
@@ -565,7 +572,8 @@ gnttab_prepare_for_transfer(
         if ( unlikely(scombo.shorts.flags != GTF_accept_transfer) ||
              unlikely(scombo.shorts.domid != ld->domain_id) )
         {
-            DPRINTK("Bad flags (%x) or dom (%d). (NB. expected dom %d)\n",
+            gdprintk(XENLOG_INFO, "Bad flags (%x) or dom (%d). "
+                    "(NB. expected dom %d)\n",
                     scombo.shorts.flags, scombo.shorts.domid,
                     ld->domain_id);
             goto fail;
@@ -581,7 +589,7 @@ gnttab_prepare_for_transfer(
 
         if ( retries++ == 4 )
         {
-            DPRINTK("Shared grant entry is unstable.\n");
+            gdprintk(XENLOG_WARNING, "Shared grant entry is unstable.\n");
             goto fail;
         }
 
@@ -613,7 +621,8 @@ gnttab_transfer(
         /* Read from caller address space. */
         if ( unlikely(__copy_from_guest_offset(&gop, uop, i, 1)) )
         {
-            DPRINTK("gnttab_transfer: error reading req %d/%d\n", i, count);
+            gdprintk(XENLOG_INFO, "gnttab_transfer: error reading req %d/%d\n",
+                    i, count);
             return -EFAULT;
         }
 
@@ -622,7 +631,7 @@ gnttab_transfer(
         /* Check the passed page frame for basic validity. */
         if ( unlikely(!mfn_valid(mfn)) )
         { 
-            DPRINTK("gnttab_transfer: out-of-range %lx\n",
+            gdprintk(XENLOG_INFO, "gnttab_transfer: out-of-range %lx\n",
                     (unsigned long)gop.mfn);
             gop.status = GNTST_bad_page;
             goto copyback;
@@ -631,7 +640,7 @@ gnttab_transfer(
         page = mfn_to_page(mfn);
         if ( unlikely(IS_XEN_HEAP_FRAME(page)) )
         { 
-            DPRINTK("gnttab_transfer: xen frame %lx\n",
+            gdprintk(XENLOG_INFO, "gnttab_transfer: xen frame %lx\n",
                     (unsigned long)gop.mfn);
             gop.status = GNTST_bad_page;
             goto copyback;
@@ -646,7 +655,8 @@ gnttab_transfer(
         /* Find the target domain. */
         if ( unlikely((e = find_domain_by_id(gop.domid)) == NULL) )
         {
-            DPRINTK("gnttab_transfer: can't find domain %d\n", gop.domid);
+            gdprintk(XENLOG_INFO, "gnttab_transfer: can't find domain %d\n",
+                    gop.domid);
             page->count_info &= ~(PGC_count_mask|PGC_allocated);
             free_domheap_page(page);
             gop.status = GNTST_bad_domain;
@@ -665,7 +675,8 @@ gnttab_transfer(
              unlikely(!gnttab_prepare_for_transfer(e, d, gop.ref)) )
         {
             if ( !test_bit(_DOMF_dying, &e->domain_flags) )
-                DPRINTK("gnttab_transfer: Transferee has no reservation "
+                gdprintk(XENLOG_INFO, "gnttab_transfer: "
+                        "Transferee has no reservation "
                         "headroom (%d,%d) or provided a bad grant ref (%08x) "
                         "or is dying (%lx)\n",
                         e->tot_pages, e->max_pages, gop.ref, e->domain_flags);
@@ -701,7 +712,8 @@ gnttab_transfer(
     copyback:
         if ( unlikely(__copy_to_guest_offset(uop, i, &gop, 1)) )
         {
-            DPRINTK("gnttab_transfer: error writing resp %d/%d\n", i, count);
+            gdprintk(XENLOG_INFO, "gnttab_transfer: error writing resp %d/%d\n",
+                    i, count);
             return -EFAULT;
         }
     }
@@ -717,10 +729,6 @@ __release_grant_for_copy(
 {
     grant_entry_t *const sha = &rd->grant_table->shared[gref];
     struct active_grant_entry *const act = &rd->grant_table->active[gref];
-    const unsigned long r_frame = act->frame;
-
-    if ( !readonly )
-        gnttab_mark_dirty(rd, r_frame);
 
     spin_lock(&rd->grant_table->lock);
 
@@ -743,7 +751,8 @@ __release_grant_for_copy(
 
 /* Grab a frame number from a grant entry and update the flags and pin
    count as appropriate.  Note that this does *not* update the page
-   type or reference counts. */
+   type or reference counts, and does not check that the mfn is
+   actually valid. */
 static int
 __acquire_grant_for_copy(
     struct domain *rd, unsigned long gref, int readonly,
@@ -885,9 +894,16 @@ __gnttab_copy(
     {
         s_frame = gmfn_to_mfn(sd, op->source.u.gmfn);
     }
-    if ( !get_page(mfn_to_page(s_frame), sd) )
+    if ( unlikely(!mfn_valid(s_frame)) )
         PIN_FAIL(error_out, GNTST_general_error,
-                 "could not get source frame %lx.\n", s_frame);
+                 "source frame %lx invalid.\n", s_frame);
+    if ( !get_page(mfn_to_page(s_frame), sd) )
+    {
+        if ( !test_bit(_DOMF_dying, &sd->domain_flags) )
+            gdprintk(XENLOG_WARNING, "Could not get src frame %lx\n", s_frame);
+        rc = GNTST_general_error;
+        goto error_out;
+    }
     have_s_ref = 1;
 
     if ( dest_is_gref )
@@ -899,11 +915,18 @@ __gnttab_copy(
     }
     else
     {
-        d_frame = gmfn_to_mfn(sd, op->dest.u.gmfn);
+        d_frame = gmfn_to_mfn(dd, op->dest.u.gmfn);
     }
-    if ( !get_page_and_type(mfn_to_page(d_frame), dd, PGT_writable_page) )
+    if ( unlikely(!mfn_valid(d_frame)) )
         PIN_FAIL(error_out, GNTST_general_error,
-                 "could not get source frame %lx.\n", d_frame);
+                 "destination frame %lx invalid.\n", d_frame);
+    if ( !get_page_and_type(mfn_to_page(d_frame), dd, PGT_writable_page) )
+    {
+        if ( !test_bit(_DOMF_dying, &dd->domain_flags) )
+            gdprintk(XENLOG_WARNING, "Could not get dst frame %lx\n", d_frame);
+        rc = GNTST_general_error;
+        goto error_out;
+    }
 
     sp = map_domain_page(s_frame);
     dp = map_domain_page(d_frame);
@@ -912,6 +935,8 @@ __gnttab_copy(
 
     unmap_domain_page(dp);
     unmap_domain_page(sp);
+
+    gnttab_mark_dirty(dd, d_frame);
 
     put_page_and_type(mfn_to_page(d_frame));
  error_out:
@@ -967,6 +992,9 @@ do_grant_table_op(
             guest_handle_cast(uop, gnttab_map_grant_ref_t);
         if ( unlikely(!guest_handle_okay(map, count)) )
             goto out;
+        rc = -EPERM;
+        if ( unlikely(!grant_operation_permitted(d)) )
+            goto out;
         rc = gnttab_map_grant_ref(map, count);
         break;
     }
@@ -975,6 +1003,9 @@ do_grant_table_op(
         XEN_GUEST_HANDLE(gnttab_unmap_grant_ref_t) unmap =
             guest_handle_cast(uop, gnttab_unmap_grant_ref_t);
         if ( unlikely(!guest_handle_okay(unmap, count)) )
+            goto out;
+        rc = -EPERM;
+        if ( unlikely(!grant_operation_permitted(d)) )
             goto out;
         rc = gnttab_unmap_grant_ref(unmap, count);
         break;
@@ -990,6 +1021,9 @@ do_grant_table_op(
         XEN_GUEST_HANDLE(gnttab_transfer_t) transfer =
             guest_handle_cast(uop, gnttab_transfer_t);
         if ( unlikely(!guest_handle_okay(transfer, count)) )
+            goto out;
+        rc = -EPERM;
+        if ( unlikely(!grant_operation_permitted(d)) )
             goto out;
         rc = gnttab_transfer(transfer, count);
         break;
@@ -1090,11 +1124,17 @@ gnttab_release_mappings(
 
         ref = map->ref;
 
-        DPRINTK("Grant release (%hu) ref:(%hu) flags:(%x) dom:(%hu)\n",
+        gdprintk(XENLOG_INFO, "Grant release (%hu) ref:(%hu) "
+                "flags:(%x) dom:(%hu)\n",
                 handle, ref, map->flags, map->domid);
 
         rd = find_domain_by_id(map->domid);
-        BUG_ON(rd == NULL);
+        if ( rd == NULL )
+        {
+            /* Nothing to clear up... */
+            map->flags = 0;
+            continue;
+        }
 
         spin_lock(&rd->grant_table->lock);
 
@@ -1161,7 +1201,7 @@ grant_table_destroy(
         return;
     
     free_xenheap_pages(t->shared, ORDER_GRANT_FRAMES);
-    free_xenheap_page(t->maptrack);
+    free_xenheap_pages(t->maptrack, t->maptrack_order);
     xfree(t->active);
     xfree(t);
 

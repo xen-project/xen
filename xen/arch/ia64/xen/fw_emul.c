@@ -16,7 +16,6 @@
  *
  */
 #include <xen/config.h>
-#include <xen/console.h>
 #include <asm/system.h>
 #include <asm/pgalloc.h>
 
@@ -27,8 +26,13 @@
 #include <public/sched.h>
 #include "hpsim_ssc.h"
 #include <asm/vcpu.h>
+#include <asm/vmx_vcpu.h>
 #include <asm/dom_fw.h>
 #include <asm/uaccess.h>
+#include <xen/console.h>
+#include <xen/hypercall.h>
+
+static DEFINE_SPINLOCK(efi_time_services_lock);
 
 extern unsigned long running_on_sim;
 
@@ -73,20 +77,20 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 			r9 = value;
 		}
 		else
-		     printf("NON-PRIV DOMAIN CALLED SAL_PCI_CONFIG_READ\n");
+		     printk("NON-PRIV DOMAIN CALLED SAL_PCI_CONFIG_READ\n");
 		break;
 	    case SAL_PCI_CONFIG_WRITE:
 		if (current->domain == dom0) {
 			if (((in1 & ~0xffffffffUL) && (in4 == 0)) ||
 			    (in4 > 1) ||
 			    (in2 > 8) || (in2 & (in2-1)))
-				printf("*** SAL_PCI_CONF_WRITE?!?(adr=0x%lx,typ=0x%lx,sz=0x%lx,val=0x%lx)\n",
+				printk("*** SAL_PCI_CONF_WRITE?!?(adr=0x%lx,typ=0x%lx,sz=0x%lx,val=0x%lx)\n",
 					in1,in4,in2,in3);
 			// note that args are in a different order!!
 			status = ia64_sal_pci_config_write(in1,in4,in2,in3);
 		}
 		else
-		     printf("NON-PRIV DOMAIN CALLED SAL_PCI_CONFIG_WRITE\n");
+		     printk("NON-PRIV DOMAIN CALLED SAL_PCI_CONFIG_WRITE\n");
 		break;
 	    case SAL_SET_VECTORS:
  		if (in1 == SAL_VECTOR_OS_BOOT_RENDEZ) {
@@ -102,7 +106,7 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 			}
  		}
  		else
- 			printf("*** CALLED SAL_SET_VECTORS %lu.  IGNORED...\n",
+ 			printk("*** CALLED SAL_SET_VECTORS %lu.  IGNORED...\n",
  			       in1);
 		break;
 	    case SAL_GET_STATE_INFO:
@@ -119,10 +123,10 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 		/* Noop.  */
 		break;
 	    case SAL_MC_RENDEZ:
-		printf("*** CALLED SAL_MC_RENDEZ.  IGNORED...\n");
+		printk("*** CALLED SAL_MC_RENDEZ.  IGNORED...\n");
 		break;
 	    case SAL_MC_SET_PARAMS:
-		printf("*** CALLED SAL_MC_SET_PARAMS.  IGNORED...\n");
+		printk("*** CALLED SAL_MC_SET_PARAMS.  IGNORED...\n");
 		break;
 	    case SAL_CACHE_FLUSH:
 		if (1) {
@@ -139,13 +143,13 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 		}
 		break;
 	    case SAL_CACHE_INIT:
-		printf("*** CALLED SAL_CACHE_INIT.  IGNORED...\n");
+		printk("*** CALLED SAL_CACHE_INIT.  IGNORED...\n");
 		break;
 	    case SAL_UPDATE_PAL:
-		printf("*** CALLED SAL_UPDATE_PAL.  IGNORED...\n");
+		printk("*** CALLED SAL_UPDATE_PAL.  IGNORED...\n");
 		break;
 	    default:
-		printf("*** CALLED SAL_ WITH UNKNOWN INDEX.  IGNORED...\n");
+		printk("*** CALLED SAL_ WITH UNKNOWN INDEX.  IGNORED...\n");
 		status = -1;
 		break;
 	}
@@ -173,6 +177,10 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 		break;
 	    case PAL_FREQ_BASE:
 		status = ia64_pal_freq_base(&r9);
+		if (status == PAL_STATUS_UNIMPLEMENTED) {
+			status = ia64_sal_freq_base(0, &r9, &r10);
+			r10 = 0;
+		}
 		break;
 	    case PAL_PROC_GET_FEATURES:
 		status = ia64_pal_proc_get_features(&r9,&r10,&r11);
@@ -212,10 +220,22 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 		status = ia64_pal_cache_summary(&r9,&r10);
 		break;
 	    case PAL_VM_SUMMARY:
-	        {
+		if (VMX_DOMAIN(current)) {
+			pal_vm_info_1_u_t v1;
+			pal_vm_info_2_u_t v2;
+			status = ia64_pal_vm_summary((pal_vm_info_1_u_t *)&v1,
+			                             (pal_vm_info_2_u_t *)&v2);
+			v1.pal_vm_info_1_s.max_itr_entry = NITRS - 1;
+			v1.pal_vm_info_1_s.max_dtr_entry = NDTRS - 1;
+			v2.pal_vm_info_2_s.impl_va_msb -= 1;
+			v2.pal_vm_info_2_s.rid_size =
+				current->domain->arch.rid_bits;
+			r9 = v1.pvi1_val;
+			r10 = v2.pvi2_val;
+		} else {
 			/* Use xen-specific values.
 			   hash_tag_id is somewhat random! */
-			const pal_vm_info_1_u_t v1 =
+			static const pal_vm_info_1_u_t v1 =
 				{.pal_vm_info_1_s =
 				 { .vw = 1,
 				   .phys_add_size = 44,
@@ -232,17 +252,22 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 				   .num_tc_levels = 1
 #endif
 				 }};
-			const pal_vm_info_2_u_t v2 =
-				{ .pal_vm_info_2_s =
-				  { .impl_va_msb = 50,
-				    .rid_size = current->domain->arch.rid_bits,
-				    .reserved = 0 }};
+			pal_vm_info_2_u_t v2;
+			v2.pvi2_val = 0;
+			v2.pal_vm_info_2_s.rid_size =
+				current->domain->arch.rid_bits;
+			v2.pal_vm_info_2_s.impl_va_msb = 50;
 			r9 = v1.pvi1_val;
 			r10 = v2.pvi2_val;
 			status = PAL_STATUS_SUCCESS;
 		}
 		break;
 	    case PAL_VM_INFO:
+		if (VMX_DOMAIN(current)) {
+			status = ia64_pal_vm_info(in1, in2, 
+			                          (pal_tc_info_u_t *)&r9, &r10);
+			break;
+		}
 #ifdef VHPT_GLOBAL
 		if (in1 == 0 && in2 == 2) {
 			/* Level 1: VHPT  */
@@ -294,9 +319,20 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 		status = ia64_pal_register_info(in1, &r9, &r10);
 		break;
 	    case PAL_CACHE_FLUSH:
-		/* FIXME */
-		printk("PAL_CACHE_FLUSH NOT IMPLEMENTED!\n");
-		BUG();
+		/* Always call Host Pal in int=0 */
+		in2 &= ~PAL_CACHE_FLUSH_CHK_INTRS;
+
+		/*
+		 * Call Host PAL cache flush
+		 * Clear psr.ic when call PAL_CACHE_FLUSH
+		 */
+		r10 = in3;
+		status = ia64_pal_cache_flush(in1, in2, &r10, &r9);
+
+		if (status != 0)
+			panic_domain(NULL, "PAL_CACHE_FLUSH ERROR, "
+			             "status %lx", status);
+
 		break;
 	    case PAL_PERF_MON_INFO:
 		{
@@ -343,15 +379,26 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 	        }
 		break;
 	    case PAL_HALT:
-		    if (current->domain == dom0) {
-			    printf ("Domain0 halts the machine\n");
-			    console_start_sync();
-			    (*efi.reset_system)(EFI_RESET_SHUTDOWN,0,0,NULL);
-		    }
-		    else
-			    domain_shutdown (current->domain,
-					     SHUTDOWN_poweroff);
-		    break;
+		if (current->domain == dom0) {
+			printk ("Domain0 halts the machine\n");
+			console_start_sync();
+			(*efi.reset_system)(EFI_RESET_SHUTDOWN,0,0,NULL);
+		}
+		else
+			domain_shutdown(current->domain, SHUTDOWN_poweroff);
+		break;
+	    case PAL_HALT_LIGHT:
+		if (VMX_DOMAIN(current)) {
+			/* Called by VTI.  */
+			if (!is_unmasked_irq(current))
+				do_sched_op_compat(SCHEDOP_block, 0);
+			status = PAL_STATUS_SUCCESS;
+		}
+		break;
+	    case PAL_PLATFORM_ADDR:
+		if (VMX_DOMAIN(current))
+			status = PAL_STATUS_SUCCESS;
+		break;
 	    default:
 		printk("xen_pal_emulator: UNIMPLEMENTED PAL CALL %lu!!!!\n",
 				index);
@@ -400,7 +447,6 @@ efi_emulate_get_time(
 	struct page_info *tc_page = NULL;
 	efi_status_t status = 0;
 
-	//printf("efi_get_time(%016lx,%016lx) called\n", tv_addr, tc_addr);
 	tv = efi_translate_domain_addr(tv_addr, fault, &tv_page);
 	if (*fault != IA64_NO_FAULT)
 		goto errout;
@@ -410,9 +456,9 @@ efi_emulate_get_time(
 			goto errout;
 	}
 
-	//printf("efi_get_time(%016lx,%016lx) translated to xen virtual address\n", tv, tc);
+	spin_lock(&efi_time_services_lock);
 	status = (*efi.get_time)((efi_time_t *) tv, (efi_time_cap_t *) tc);
-	//printf("efi_get_time returns %lx\n", status);
+	spin_unlock(&efi_time_services_lock);
 
 errout:
 	if (tc_page != NULL)
@@ -438,7 +484,9 @@ efi_emulate_set_time(
 	if (*fault != IA64_NO_FAULT)
 		goto errout;
 
+	spin_lock(&efi_time_services_lock);
 	status = (*efi.set_time)((efi_time_t *)tv);
+	spin_unlock(&efi_time_services_lock);
 
 errout:
 	if (tv_page != NULL)
@@ -473,9 +521,11 @@ efi_emulate_get_wakeup_time(
 	if (*fault != IA64_NO_FAULT)
 		goto errout;
 
+	spin_lock(&efi_time_services_lock);
 	status = (*efi.get_wakeup_time)((efi_bool_t *)enabled,
 	                                (efi_bool_t *)pending,
 	                                (efi_time_t *)tv);
+	spin_unlock(&efi_time_services_lock);
 
 errout:
 	if (e_page != NULL)
@@ -506,8 +556,10 @@ efi_emulate_set_wakeup_time(
 			goto errout;
 	}
 
+	spin_lock(&efi_time_services_lock);
 	status = (*efi.set_wakeup_time)((efi_bool_t)enabled,
 	                                (efi_time_t *)tv);
+	spin_unlock(&efi_time_services_lock);
 
 errout:
 	if (tv_page != NULL)
@@ -666,14 +718,14 @@ efi_emulate_set_virtual_address_map(
 	fpswa_interface_t *fpswa_inf = d->arch.fpswa_inf;
 
 	if (descriptor_version != EFI_MEMDESC_VERSION) {
-		printf ("efi_emulate_set_virtual_address_map: memory "
+		printk ("efi_emulate_set_virtual_address_map: memory "
 		        "descriptor version unmatched (%d vs %d)\n",
 		        (int)descriptor_version, EFI_MEMDESC_VERSION);
 		return EFI_INVALID_PARAMETER;
 	}
 
 	if (descriptor_size != sizeof(efi_memory_desc_t)) {
-		printf ("efi_emulate_set_virtual_address_map: memory descriptor size unmatched\n");
+		printk ("efi_emulate_set_virtual_address_map: memory descriptor size unmatched\n");
 		return EFI_INVALID_PARAMETER;
 	}
 
@@ -686,7 +738,7 @@ efi_emulate_set_virtual_address_map(
 
 	for (p = efi_map_start; p < efi_map_end; p += efi_desc_size) {
 		if (copy_from_user(&entry, p, sizeof(efi_memory_desc_t))) {
-			printf ("efi_emulate_set_virtual_address_map: copy_from_user() fault. addr=0x%p\n", p);
+			printk ("efi_emulate_set_virtual_address_map: copy_from_user() fault. addr=0x%p\n", p);
 			return EFI_UNSUPPORTED;
 		}
 
@@ -814,7 +866,7 @@ efi_emulator (struct pt_regs *regs, IA64FAULT *fault)
 		status = EFI_UNSUPPORTED;
 		break;
 	    default:
-		printf("unknown ia64 fw hypercall %lx\n", regs->r2);
+		printk("unknown ia64 fw hypercall %lx\n", regs->r2);
 		status = EFI_UNSUPPORTED;
 	}
 
@@ -835,7 +887,7 @@ do_ssc(unsigned long ssc, struct pt_regs *regs)
 	    case SSC_PUTCHAR:
 		buf[0] = arg0;
 		buf[1] = '\0';
-		printf(buf);
+		printk(buf);
 		break;
 	    case SSC_GETCHAR:
 		retval = ia64_ssc(0,0,0,0,ssc);
@@ -848,7 +900,7 @@ do_ssc(unsigned long ssc, struct pt_regs *regs)
 /**/			stat = (struct ssc_disk_stat *)__va(arg0);
 ///**/			if (stat->fd == last_fd) stat->count = last_count;
 /**/			stat->count = last_count;
-//if (last_count >= PAGE_SIZE) printf("ssc_wait: stat->fd=%d,last_fd=%d,last_count=%d\n",stat->fd,last_fd,last_count);
+//if (last_count >= PAGE_SIZE) printk("ssc_wait: stat->fd=%d,last_fd=%d,last_count=%d\n",stat->fd,last_fd,last_count);
 ///**/			retval = ia64_ssc(arg0,0,0,0,ssc);
 /**/			retval = 0;
 		}
@@ -857,7 +909,7 @@ do_ssc(unsigned long ssc, struct pt_regs *regs)
 		break;
 	    case SSC_OPEN:
 		arg1 = vcpu_get_gr(current,33);	// access rights
-if (!running_on_sim) { printf("SSC_OPEN, not implemented on hardware.  (ignoring...)\n"); arg0 = 0; }
+if (!running_on_sim) { printk("SSC_OPEN, not implemented on hardware.  (ignoring...)\n"); arg0 = 0; }
 		if (arg0) {	// metaphysical address
 			arg0 = translate_domain_mpaddr(arg0, NULL);
 			retval = ia64_ssc(arg0,arg1,0,0,ssc);
@@ -867,7 +919,7 @@ if (!running_on_sim) { printf("SSC_OPEN, not implemented on hardware.  (ignoring
 		break;
 	    case SSC_WRITE:
 	    case SSC_READ:
-//if (ssc == SSC_WRITE) printf("DOING AN SSC_WRITE\n");
+//if (ssc == SSC_WRITE) printk("DOING AN SSC_WRITE\n");
 		arg1 = vcpu_get_gr(current,33);
 		arg2 = vcpu_get_gr(current,34);
 		arg3 = vcpu_get_gr(current,35);
@@ -883,7 +935,7 @@ if (!running_on_sim) { printf("SSC_OPEN, not implemented on hardware.  (ignoring
 /**/			last_fd = arg1;
 /**/			last_count = len;
 			mpaddr = req->addr;
-//if (last_count >= PAGE_SIZE) printf("do_ssc: read fd=%d, addr=%p, len=%lx ",last_fd,mpaddr,len);
+//if (last_count >= PAGE_SIZE) printk("do_ssc: read fd=%d, addr=%p, len=%lx ",last_fd,mpaddr,len);
 			retval = 0;
 			if ((mpaddr & PAGE_MASK) != ((mpaddr+len-1) & PAGE_MASK)) {
 				// do partial page first
@@ -894,7 +946,7 @@ if (!running_on_sim) { printf("SSC_OPEN, not implemented on hardware.  (ignoring
 				arg3 += req->len; // file offset
 /**/				last_stat.fd = last_fd;
 /**/				(void)ia64_ssc(__pa(&last_stat),0,0,0,SSC_WAIT_COMPLETION);
-//if (last_count >= PAGE_SIZE) printf("ssc(%p,%lx)[part]=%x ",req->addr,req->len,retval);
+//if (last_count >= PAGE_SIZE) printk("ssc(%p,%lx)[part]=%x ",req->addr,req->len,retval);
 			}
 			if (retval >= 0) while (len > 0) {
 				req->addr = translate_domain_mpaddr(mpaddr, NULL);
@@ -905,27 +957,27 @@ if (!running_on_sim) { printf("SSC_OPEN, not implemented on hardware.  (ignoring
 // TEMP REMOVED AGAIN				arg3 += req->len; // file offset
 /**/				last_stat.fd = last_fd;
 /**/				(void)ia64_ssc(__pa(&last_stat),0,0,0,SSC_WAIT_COMPLETION);
-//if (last_count >= PAGE_SIZE) printf("ssc(%p,%lx)=%x ",req->addr,req->len,retval);
+//if (last_count >= PAGE_SIZE) printk("ssc(%p,%lx)=%x ",req->addr,req->len,retval);
 			}
 			// set it back to the original value
 			req->len = last_count;
 		}
 		else retval = -1L;
 		vcpu_set_gr(current,8,retval,0);
-//if (last_count >= PAGE_SIZE) printf("retval=%x\n",retval);
+//if (last_count >= PAGE_SIZE) printk("retval=%x\n",retval);
 		break;
 	    case SSC_CONNECT_INTERRUPT:
 		arg1 = vcpu_get_gr(current,33);
 		arg2 = vcpu_get_gr(current,34);
 		arg3 = vcpu_get_gr(current,35);
-		if (!running_on_sim) { printf("SSC_CONNECT_INTERRUPT, not implemented on hardware.  (ignoring...)\n"); break; }
+		if (!running_on_sim) { printk("SSC_CONNECT_INTERRUPT, not implemented on hardware.  (ignoring...)\n"); break; }
 		(void)ia64_ssc(arg0,arg1,arg2,arg3,ssc);
 		break;
 	    case SSC_NETDEV_PROBE:
 		vcpu_set_gr(current,8,-1L,0);
 		break;
 	    default:
-		printf("ia64_handle_break: bad ssc code %lx, iip=0x%lx, b0=0x%lx... spinning\n",
+		printk("ia64_handle_break: bad ssc code %lx, iip=0x%lx, b0=0x%lx... spinning\n",
 			ssc, regs->cr_iip, regs->b0);
 		while(1);
 		break;

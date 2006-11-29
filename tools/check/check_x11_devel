@@ -1,0 +1,11 @@
+#!/bin/bash
+# CHECK-BUILD
+
+function error {
+    echo
+    echo "  *** Check for x11 headers FAILED"
+    exit 1
+}
+
+set -e
+[ -e /usr/include/X11/keysymdef.h ] || error

@@ -90,6 +90,11 @@ static Elf32_Shdr out_shdr[] = {
     }
 };
 
+/* Some system header files define these macros and pollute our namespace. */
+#undef swap16
+#undef swap32
+#undef swap64
+
 #define swap16(_v) ((((u16)(_v)>>8)&0xff)|(((u16)(_v)&0xff)<<8))
 #define swap32(_v) (((u32)swap16((u16)(_v))<<16)|(u32)swap16((u32)((_v)>>16)))
 #define swap64(_v) (((u64)swap32((u32)(_v))<<32)|(u64)swap32((u32)((_v)>>32)))

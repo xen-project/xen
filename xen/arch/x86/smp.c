@@ -21,6 +21,7 @@
 #include <asm/smpboot.h>
 #include <asm/hardirq.h>
 #include <asm/ipi.h>
+#include <asm/hvm/hvm.h>
 #include <mach_apic.h>
 
 /*
@@ -306,6 +307,7 @@ static void stop_this_cpu (void *dummy)
 
     local_irq_disable();
     disable_local_APIC();
+    hvm_disable();
 
     for ( ; ; )
         __asm__ __volatile__ ( "hlt" );

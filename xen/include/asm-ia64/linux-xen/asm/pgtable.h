@@ -68,6 +68,42 @@
 #ifdef XEN
 #define _PAGE_VIRT_D		(__IA64_UL(1) << 53)	/* Virtual dirty bit */
 #define _PAGE_PROTNONE		0
+
+#ifdef CONFIG_XEN_IA64_TLB_TRACK
+#define _PAGE_TLB_TRACKING_BIT          54
+#define _PAGE_TLB_INSERTED_BIT          55
+#define _PAGE_TLB_INSERTED_MANY_BIT     56
+
+#define _PAGE_TLB_TRACKING              (1UL << _PAGE_TLB_TRACKING_BIT)
+#define _PAGE_TLB_INSERTED              (1UL << _PAGE_TLB_INSERTED_BIT)
+#define _PAGE_TLB_INSERTED_MANY         (1UL << _PAGE_TLB_INSERTED_MANY_BIT)
+#define _PAGE_TLB_TRACK_MASK            (_PAGE_TLB_TRACKING |		\
+                                         _PAGE_TLB_INSERTED |		\
+                                         _PAGE_TLB_INSERTED_MANY)
+
+#define pte_tlb_tracking(pte)				\
+    ((pte_val(pte) & _PAGE_TLB_TRACKING) != 0)
+#define pte_tlb_inserted(pte)				\
+    ((pte_val(pte) & _PAGE_TLB_INSERTED) != 0)
+#define pte_tlb_inserted_many(pte)			\
+    ((pte_val(pte) & _PAGE_TLB_INSERTED_MANY) != 0)
+#endif // CONFIG_XEN_IA64_TLB_TRACK
+
+#define _PAGE_PGC_ALLOCATED_BIT	59	/* _PGC_allocated */
+#define _PAGE_PGC_ALLOCATED	(__IA64_UL(1) << _PAGE_PGC_ALLOCATED_BIT)
+/* domVTI */
+#define GPFN_MEM		(0UL << 60)	/* Guest pfn is normal mem */
+#define GPFN_FRAME_BUFFER	(1UL << 60)	/* VGA framebuffer */
+#define GPFN_LOW_MMIO		(2UL << 60)	/* Low MMIO range */
+#define GPFN_PIB		(3UL << 60)	/* PIB base */
+#define GPFN_IOSAPIC		(4UL << 60)	/* IOSAPIC base */
+#define GPFN_LEGACY_IO		(5UL << 60)	/* Legacy I/O base */
+#define GPFN_GFW		(6UL << 60)	/* Guest Firmware */
+#define GPFN_HIGH_MMIO		(7UL << 60)	/* High MMIO range */
+
+#define GPFN_IO_MASK		(7UL << 60)	/* Guest pfn is I/O type */
+#define GPFN_INV_MASK		(1UL << 63)	/* Guest pfn is invalid */
+
 #else
 #define _PAGE_PROTNONE		(__IA64_UL(1) << 63)
 #endif
@@ -299,6 +335,7 @@ set_pte_rel(volatile pte_t* ptep, pte_t pteval)
 #define pte_young(pte)		((pte_val(pte) & _PAGE_A) != 0)
 #define pte_file(pte)		((pte_val(pte) & _PAGE_FILE) != 0)
 #ifdef XEN
+#define pte_pgc_allocated(pte)	((pte_val(pte) & _PAGE_PGC_ALLOCATED) != 0)
 #define pte_mem(pte) \
 	(!(pte_val(pte) & (GPFN_IO_MASK | GPFN_INV_MASK)) && !pte_none(pte))
 #endif

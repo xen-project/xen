@@ -51,6 +51,12 @@ rwlock_t tunnel_table_lock = RW_LOCK_UNLOCKED;
 #define tunnel_write_lock(flags)   write_lock_irqsave(&tunnel_table_lock, (flags))
 #define tunnel_write_unlock(flags) write_unlock_irqrestore(&tunnel_table_lock, (flags))
 
+void Tunnel_free(Tunnel *tunnel){
+    tunnel->type->close(tunnel);
+    Tunnel_decref(tunnel->base);
+    kfree(tunnel);
+}
+
 void Tunnel_print(Tunnel *tunnel){
     if(tunnel){
         iprintf("Tunnel<%p base=%p ref=%02d type=%s>\n",
@@ -136,6 +142,7 @@ int Tunnel_init(void){
         goto exit;
     }
     tunnel_table->entry_free_fn = tunnel_table_entry_free_fn;
+    tunnel_table->key_size = sizeof(TunnelKey);
     tunnel_table->key_hash_fn = tunnel_table_key_hash_fn;
     tunnel_table->key_equal_fn = tunnel_table_key_equal_fn;
   exit:

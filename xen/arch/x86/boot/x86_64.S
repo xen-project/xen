@@ -10,6 +10,8 @@
         .text
         .code32
 
+#define SYM_PHYS(sym) (sym - __PAGE_OFFSET)
+
 ENTRY(start)
 ENTRY(stext)
 ENTRY(_stext)
@@ -24,15 +26,14 @@ ENTRY(_stext)
         /* Checksum: must be the negated sum of the first two fields. */
         .long   -0x1BADB005
 
-        .org    0x010
-        .asciz "ERR: Not a 64-bit CPU!"
-        .org    0x028
-        .asciz "ERR: Not a Multiboot bootloader!"
+.Lbad_cpu_msg: .asciz "ERR: Not a 64-bit CPU!"
+.Lbad_ldr_msg: .asciz "ERR: Not a Multiboot bootloader!"
+
 bad_cpu:
-        mov     $0x100010,%esi # Error message
+        mov     $(SYM_PHYS(.Lbad_cpu_msg)),%esi # Error message
         jmp     print_err
 not_multiboot:
-        mov     $0x100028,%esi # Error message
+        mov     $(SYM_PHYS(.Lbad_ldr_msg)),%esi # Error message
 print_err:
         mov     $0xB8000,%edi  # VGA framebuffer
 1:      mov     (%esi),%bl
@@ -55,7 +56,7 @@ __start:
         cli
 
         /* Set up a few descriptors: on entry only CS is guaranteed good. */
-        lgdt    %cs:0x100306        # nopaging_gdt_descr
+        lgdt    %cs:SYM_PHYS(nopaging_gdt_descr)
         mov     $(__HYPERVISOR_DS32),%ecx
         mov     %ecx,%ds
         mov     %ecx,%es
@@ -68,7 +69,7 @@ __start:
         jne     not_multiboot
 
         /* Save the Multiboot info structure for later use. */
-        mov     %ebx,0x100300       # multiboot_ptr
+        mov     %ebx,SYM_PHYS(multiboot_ptr)
 
         /* We begin by interrogating the CPU for the presence of long mode. */
         mov     $0x80000000,%eax
@@ -79,7 +80,7 @@ __start:
         cpuid
         bt      $29,%edx            # Long mode feature?
         jnc     bad_cpu
-        mov     %edx,0x100310       # cpuid_ext_features
+        mov     %edx,SYM_PHYS(cpuid_ext_features)
 skip_boot_checks:
 
         /* Set up FPU. */
@@ -90,7 +91,7 @@ skip_boot_checks:
         mov     %ecx,%cr4
 
         /* Load pagetable base register. */
-        mov     $0x102000,%eax   /* idle_pg_table */
+        mov     $SYM_PHYS(idle_pg_table),%eax
         mov     %eax,%cr3
 
         /* Set up EFER (Extended Feature Enable Register). */
@@ -98,7 +99,7 @@ skip_boot_checks:
         rdmsr
         btsl    $_EFER_LME,%eax /* Long Mode      */
         btsl    $_EFER_SCE,%eax /* SYSCALL/SYSRET */
-        mov     0x100310,%edi
+        mov     SYM_PHYS(cpuid_ext_features),%edi
         btl     $20,%edi        /* CPUID 0x80000001, EDX[20] */
         jnc     1f
         btsl    $_EFER_NX,%eax  /* No-Execute     */
@@ -109,11 +110,10 @@ skip_boot_checks:
         jmp     1f
 
 1:      /* Now in compatibility mode. Long-jump into 64-bit mode. */
-        ljmp    $(__HYPERVISOR_CS64),$0x100200
+        ljmp    $(__HYPERVISOR_CS64),$SYM_PHYS(start64)
         
         .code64
-        .org    0x0200
-
+start64:
         /* Install relocated selectors (FS/GS unused). */
         lgdt    gdt_descr(%rip)
 
@@ -186,39 +186,32 @@ ignore_int:
         cld
         leaq    int_msg(%rip),%rdi
         xorl    %eax,%eax
-        call    printf
+        call    printk
 1:      jmp     1b
 
 
 /*** DESCRIPTOR TABLES ***/
 
-.globl idt
-.globl gdt        
-
-        .org    0x300
-        .code32
-
-multiboot_ptr:        /* 0x300 */
+        .align 8, 0xCC
+multiboot_ptr:
         .long   0
 
         .word   0
-nopaging_gdt_descr:   /* 0x306 */
+nopaging_gdt_descr:
         .word   LAST_RESERVED_GDT_BYTE
         .quad   gdt_table - FIRST_RESERVED_GDT_BYTE - __PAGE_OFFSET
 
-cpuid_ext_features:   /* 0x310 */
+cpuid_ext_features:
         .long   0
         
         .word   0
 gdt_descr:
         .word   LAST_RESERVED_GDT_BYTE
-gdt:
         .quad   gdt_table - FIRST_RESERVED_GDT_BYTE
 
         .word   0,0,0
 idt_descr:
         .word   256*16-1
-idt:
         .quad   idt_table
 
 ENTRY(stack_start)
@@ -227,7 +220,7 @@ ENTRY(stack_start)
 high_start:
         .quad   __high_start
 
-        .org    0x1000
+        .align PAGE_SIZE, 0
 ENTRY(gdt_table)
         .quad 0x0000000000000000     /* unused */
         .quad 0x00cf9a000000ffff     /* 0xe008 ring 0 code, compatibility */
@@ -240,7 +233,7 @@ ENTRY(gdt_table)
         .fill 4*NR_CPUS,8,0          /* space for TSS and LDT per CPU     */
 
 /* Initial PML4 -- level-4 page table. */
-        .org 0x2000
+        .align PAGE_SIZE, 0
 ENTRY(idle_pg_table)
 ENTRY(idle_pg_table_4)
         .quad idle_pg_table_l3 - __PAGE_OFFSET + 7 # PML4[0]
@@ -248,12 +241,12 @@ ENTRY(idle_pg_table_4)
         .quad idle_pg_table_l3 - __PAGE_OFFSET + 7 # PML4[262]
 
 /* Initial PDP -- level-3 page table. */
-        .org 0x3000
+        .align PAGE_SIZE, 0
 ENTRY(idle_pg_table_l3)
         .quad idle_pg_table_l2 - __PAGE_OFFSET + 7
 
 /* Initial PDE -- level-2 page table. Maps first 1GB physical memory. */
-        .org 0x4000
+        .align PAGE_SIZE, 0
 ENTRY(idle_pg_table_l2)
         .macro identmap from=0, count=512
         .if \count-1
@@ -265,8 +258,7 @@ ENTRY(idle_pg_table_l2)
         .endm
         identmap
 
-        .org 0x4000 + PAGE_SIZE
-        .code64
+        .align PAGE_SIZE, 0
 
 .section ".bss.stack_aligned","w"
 ENTRY(cpu0_stack)

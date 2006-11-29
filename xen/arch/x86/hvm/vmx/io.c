@@ -63,11 +63,31 @@ disable_irq_window(struct vcpu *v)
 
 static inline int is_interruptibility_state(void)
 {
-    int  interruptibility;
-    __vmread(GUEST_INTERRUPTIBILITY_INFO, &interruptibility);
-    return interruptibility;
+    return __vmread(GUEST_INTERRUPTIBILITY_INFO);
 }
 
+#ifdef __x86_64__
+static void update_tpr_threshold(struct vlapic *vlapic)
+{
+    int max_irr, tpr;
+
+    /* Clear the work-to-do flag /then/ do the work. */
+    vlapic->flush_tpr_threshold = 0;
+    mb();
+
+    if ( !vlapic_enabled(vlapic) || 
+         ((max_irr = vlapic_find_highest_irr(vlapic)) == -1) )
+    {
+        __vmwrite(TPR_THRESHOLD, 0);
+        return;
+    }
+
+    tpr = vlapic_get_reg(vlapic, APIC_TASKPRI) & 0xF0;
+    __vmwrite(TPR_THRESHOLD, (max_irr > tpr) ? (tpr >> 4) : (max_irr >> 4));
+}
+#else
+#define update_tpr_threshold(v) ((void)0)
+#endif
 
 asmlinkage void vmx_intr_assist(void)
 {
@@ -75,51 +95,50 @@ asmlinkage void vmx_intr_assist(void)
     int highest_vector;
     unsigned long eflags;
     struct vcpu *v = current;
+    struct vlapic *vlapic = vcpu_vlapic(v);
     struct hvm_domain *plat=&v->domain->arch.hvm_domain;
     struct periodic_time *pt = &plat->pl_time.periodic_tm;
-    struct hvm_virpic *pic= &plat->vpic;
-    int callback_irq;
     unsigned int idtv_info_field;
     unsigned long inst_len;
     int    has_ext_irq;
 
-    if ( v->vcpu_id == 0 )
-        hvm_pic_assist(v);
-
-    if ( (v->vcpu_id == 0) && pt->enabled && pt->pending_intr_nr ) {
-        pic_set_irq(pic, pt->irq, 0);
-        pic_set_irq(pic, pt->irq, 1);
+    if ( (v->vcpu_id == 0) && pt->enabled && pt->pending_intr_nr )
+    {
+        hvm_isa_irq_deassert(current->domain, pt->irq);
+        hvm_isa_irq_assert(current->domain, pt->irq);
     }
 
-    callback_irq = v->domain->arch.hvm_domain.params[HVM_PARAM_CALLBACK_IRQ];
-    if ( callback_irq != 0 &&
-         local_events_need_delivery() ) {
-        /*inject para-device call back irq*/
-        v->vcpu_info->evtchn_upcall_mask = 1;
-        pic_set_irq(pic, callback_irq, 0);
-        pic_set_irq(pic, callback_irq, 1);
-    }
+    hvm_set_callback_irq_level();
+
+    if ( vlapic->flush_tpr_threshold )
+        update_tpr_threshold(vlapic);
 
     has_ext_irq = cpu_has_pending_irq(v);
 
-    if (unlikely(v->arch.hvm_vmx.vector_injected)) {
+    if ( unlikely(v->arch.hvm_vmx.vector_injected) )
+    {
         v->arch.hvm_vmx.vector_injected=0;
         if (unlikely(has_ext_irq)) enable_irq_window(v);
         return;
     }
 
-    __vmread(IDT_VECTORING_INFO_FIELD, &idtv_info_field);
-    if (unlikely(idtv_info_field & INTR_INFO_VALID_MASK)) {
+    /* This could be moved earlier in the VMX resume sequence. */
+    idtv_info_field = __vmread(IDT_VECTORING_INFO_FIELD);
+    if ( unlikely(idtv_info_field & INTR_INFO_VALID_MASK) )
+    {
         __vmwrite(VM_ENTRY_INTR_INFO_FIELD, idtv_info_field);
 
-        __vmread(VM_EXIT_INSTRUCTION_LEN, &inst_len);
+        /*
+         * Safe: the length will only be interpreted for software exceptions
+         * and interrupts. If we get here then delivery of some event caused a
+         * fault, and this always results in defined VM_EXIT_INSTRUCTION_LEN.
+         */
+        inst_len = __vmread(VM_EXIT_INSTRUCTION_LEN); /* Safe */
         __vmwrite(VM_ENTRY_INSTRUCTION_LEN, inst_len);
 
-        if (unlikely(idtv_info_field & 0x800)) { /* valid error code */
-            unsigned long error_code;
-            __vmread(IDT_VECTORING_ERROR_CODE, &error_code);
-            __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
-        }
+        if (unlikely(idtv_info_field & 0x800)) /* valid error code */
+            __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE,
+                      __vmread(IDT_VECTORING_ERROR_CODE));
         if (unlikely(has_ext_irq))
             enable_irq_window(v);
 
@@ -128,28 +147,35 @@ asmlinkage void vmx_intr_assist(void)
         return;
     }
 
-    if (likely(!has_ext_irq)) return;
+    if ( likely(!has_ext_irq) )
+        return;
 
-    if (unlikely(is_interruptibility_state())) {    
+    if ( unlikely(is_interruptibility_state()) )
+    {
         /* pre-cleared for emulated instruction */
         enable_irq_window(v);
         HVM_DBG_LOG(DBG_LEVEL_1, "interruptibility");
         return;
     }
 
-    __vmread(GUEST_RFLAGS, &eflags);
-    if (irq_masked(eflags)) {
+    eflags = __vmread(GUEST_RFLAGS);
+    if ( irq_masked(eflags) )
+    {
         enable_irq_window(v);
         return;
     }
 
     highest_vector = cpu_get_interrupt(v, &intr_type);
-    switch (intr_type) {
+    if ( highest_vector < 0 )
+        return;
+
+    switch ( intr_type )
+    {
     case APIC_DM_EXTINT:
     case APIC_DM_FIXED:
     case APIC_DM_LOWEST:
         vmx_inject_extint(v, highest_vector, VMX_DELIVER_NO_ERROR_CODE);
-        TRACE_3D(TRC_VMX_INT, v->domain->domain_id, highest_vector, 0);
+        TRACE_3D(TRC_VMX_INTR, v->domain->domain_id, highest_vector, 0);
         break;
 
     case APIC_DM_SMI:
@@ -163,7 +189,6 @@ asmlinkage void vmx_intr_assist(void)
     }
     
     hvm_interrupt_post(v, highest_vector, intr_type);
-    return;
 }
 
 /*

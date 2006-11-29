@@ -28,8 +28,10 @@
 #include <xen/trace.h>
 #include <xen/sched.h>
 #include <asm/regs.h>
+#include <asm/x86_emulate.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
+#include <asm/hvm/io.h>
 #include <public/hvm/ioreq.h>
 
 #include <xen/lib.h>
@@ -39,10 +41,13 @@
 #define DECODE_success  1
 #define DECODE_failure  0
 
+#define mk_operand(size_reg, index, seg, flag) \
+    (((size_reg) << 24) | ((index) << 16) | ((seg) << 8) | (flag))
+
 #if defined (__x86_64__)
 static inline long __get_reg_value(unsigned long reg, int size)
 {
-    switch(size) {
+    switch ( size ) {
     case BYTE_64:
         return (char)(reg & 0xFF);
     case WORD:
@@ -52,15 +57,15 @@ static inline long __get_reg_value(unsigned long reg, int size)
     case QUAD:
         return (long)(reg);
     default:
-        printf("Error: (__get_reg_value) Invalid reg size\n");
+        printk("Error: (__get_reg_value) Invalid reg size\n");
         domain_crash_synchronous();
     }
 }
 
 long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs)
 {
-    if (size == BYTE) {
-        switch (index) {
+    if ( size == BYTE ) {
+        switch ( index ) {
         case 0: /* %al */
             return (char)(regs->rax & 0xFF);
         case 1: /* %cl */
@@ -78,13 +83,13 @@ long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs)
         case 7: /* %bh */
             return (char)((regs->rbx & 0xFF00) >> 8);
         default:
-            printf("Error: (get_reg_value) Invalid index value\n");
+            printk("Error: (get_reg_value) Invalid index value\n");
             domain_crash_synchronous();
         }
         /* NOTREACHED */
     }
 
-    switch (index) {
+    switch ( index ) {
     case 0: return __get_reg_value(regs->rax, size);
     case 1: return __get_reg_value(regs->rcx, size);
     case 2: return __get_reg_value(regs->rdx, size);
@@ -102,28 +107,28 @@ long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs)
     case 14: return __get_reg_value(regs->r14, size);
     case 15: return __get_reg_value(regs->r15, size);
     default:
-        printf("Error: (get_reg_value) Invalid index value\n");
+        printk("Error: (get_reg_value) Invalid index value\n");
         domain_crash_synchronous();
     }
 }
 #elif defined (__i386__)
 static inline long __get_reg_value(unsigned long reg, int size)
 {
-    switch(size) {
+    switch ( size ) {
     case WORD:
         return (short)(reg & 0xFFFF);
     case LONG:
         return (int)(reg & 0xFFFFFFFF);
     default:
-        printf("Error: (__get_reg_value) Invalid reg size\n");
+        printk("Error: (__get_reg_value) Invalid reg size\n");
         domain_crash_synchronous();
     }
 }
 
 long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs)
 {
-    if (size == BYTE) {
-        switch (index) {
+    if ( size == BYTE ) {
+        switch ( index ) {
         case 0: /* %al */
             return (char)(regs->eax & 0xFF);
         case 1: /* %cl */
@@ -141,12 +146,12 @@ long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs)
         case 7: /* %bh */
             return (char)((regs->ebx & 0xFF00) >> 8);
         default:
-            printf("Error: (get_reg_value) Invalid index value\n");
+            printk("Error: (get_reg_value) Invalid index value\n");
             domain_crash_synchronous();
         }
     }
 
-    switch (index) {
+    switch ( index ) {
     case 0: return __get_reg_value(regs->eax, size);
     case 1: return __get_reg_value(regs->ecx, size);
     case 2: return __get_reg_value(regs->edx, size);
@@ -156,26 +161,30 @@ long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs)
     case 6: return __get_reg_value(regs->esi, size);
     case 7: return __get_reg_value(regs->edi, size);
     default:
-        printf("Error: (get_reg_value) Invalid index value\n");
+        printk("Error: (get_reg_value) Invalid index value\n");
         domain_crash_synchronous();
     }
 }
 #endif
 
 static inline unsigned char *check_prefix(unsigned char *inst,
-                                          struct instruction *thread_inst, unsigned char *rex_p)
+                                          struct hvm_io_op *mmio_op,
+                                          unsigned char *ad_size,
+                                          unsigned char *op_size,
+                                          unsigned char *seg_sel,
+                                          unsigned char *rex_p)
 {
-    while (1) {
-        switch (*inst) {
+    while ( 1 ) {
+        switch ( *inst ) {
             /* rex prefix for em64t instructions */
-        case 0x40 ... 0x4e:
+        case 0x40 ... 0x4f:
             *rex_p = *inst;
             break;
         case 0xf3: /* REPZ */
-            thread_inst->flags = REPZ;
+            mmio_op->flags = REPZ;
             break;
         case 0xf2: /* REPNZ */
-            thread_inst->flags = REPNZ;
+            mmio_op->flags = REPNZ;
             break;
         case 0xf0: /* LOCK */
             break;
@@ -185,12 +194,13 @@ static inline unsigned char *check_prefix(unsigned char *inst,
         case 0x26: /* ES */
         case 0x64: /* FS */
         case 0x65: /* GS */
-            thread_inst->seg_sel = *inst;
+            *seg_sel = *inst;
             break;
         case 0x66: /* 32bit->16bit */
-            thread_inst->op_size = WORD;
+            *op_size = WORD;
             break;
         case 0x67:
+            *ad_size = WORD;
             break;
         default:
             return inst;
@@ -199,7 +209,7 @@ static inline unsigned char *check_prefix(unsigned char *inst,
     }
 }
 
-static inline unsigned long get_immediate(int op16,const unsigned char *inst, int op_size)
+static inline unsigned long get_immediate(int ad_size, const unsigned char *inst, int op_size)
 {
     int mod, reg, rm;
     unsigned long val = 0;
@@ -210,16 +220,19 @@ static inline unsigned long get_immediate(int op16,const unsigned char *inst, in
     rm = *inst & 7;
 
     inst++; //skip ModR/M byte
-    if (mod != 3 && rm == 4) {
+    if ( ad_size != WORD && mod != 3 && rm == 4 ) {
+        rm = *inst & 7;
         inst++; //skip SIB byte
     }
 
-    switch(mod) {
+    switch ( mod ) {
     case 0:
-        if (rm == 5 || rm == 4) {
-            if (op16)
+        if ( ad_size == WORD ) {
+            if ( rm == 6 )
                 inst = inst + 2; //disp16, skip 2 bytes
-            else
+        }
+        else {
+            if ( rm == 5 )
                 inst = inst + 4; //disp32, skip 4 bytes
         }
         break;
@@ -227,17 +240,17 @@ static inline unsigned long get_immediate(int op16,const unsigned char *inst, in
         inst++; //disp8, skip 1 byte
         break;
     case 2:
-        if (op16)
+        if ( ad_size == WORD )
             inst = inst + 2; //disp16, skip 2 bytes
         else
             inst = inst + 4; //disp32, skip 4 bytes
         break;
     }
 
-    if (op_size == QUAD)
+    if ( op_size == QUAD )
         op_size = LONG;
 
-    for (i = 0; i < op_size; i++) {
+    for ( i = 0; i < op_size; i++ ) {
         val |= (*inst++ & 0xff) << (8 * i);
     }
 
@@ -257,7 +270,7 @@ static inline int get_index(const unsigned char *inst, unsigned char rex)
     rex_b = rex & 1;
 
     //Only one operand in the instruction is register
-    if (mod == 3) {
+    if ( mod == 3 ) {
         return (rm + (rex_b << 3));
     } else {
         return (reg + (rex_r << 3));
@@ -265,53 +278,51 @@ static inline int get_index(const unsigned char *inst, unsigned char rex)
     return 0;
 }
 
-static void init_instruction(struct instruction *mmio_inst)
+static void init_instruction(struct hvm_io_op *mmio_op)
 {
-    mmio_inst->instr = 0;
-    mmio_inst->op_size = 0;
-    mmio_inst->immediate = 0;
-    mmio_inst->seg_sel = 0;
+    mmio_op->instr = 0;
 
-    mmio_inst->operand[0] = 0;
-    mmio_inst->operand[1] = 0;
+    mmio_op->flags = 0;
 
-    mmio_inst->flags = 0;
+    mmio_op->operand[0] = 0;
+    mmio_op->operand[1] = 0;
+    mmio_op->immediate = 0;
 }
 
-#define GET_OP_SIZE_FOR_BYTE(op_size)       \
+#define GET_OP_SIZE_FOR_BYTE(size_reg)      \
     do {                                    \
-        if (rex)                            \
-            op_size = BYTE_64;              \
+        if ( rex )                          \
+            (size_reg) = BYTE_64;           \
         else                                \
-            op_size = BYTE;                 \
-    } while(0)
+            (size_reg) = BYTE;              \
+    } while( 0 )
 
 #define GET_OP_SIZE_FOR_NONEBYTE(op_size)   \
     do {                                    \
-        if (rex & 0x8)                      \
-            op_size = QUAD;                 \
-        else if (op_size != WORD)           \
-            op_size = LONG;                 \
-    } while(0)
+        if ( rex & 0x8 )                    \
+            (op_size) = QUAD;               \
+        else if ( (op_size) != WORD )       \
+            (op_size) = LONG;               \
+    } while( 0 )
 
 
 /*
  * Decode mem,accumulator operands (as in <opcode> m8/m16/m32, al,ax,eax)
  */
-static int mem_acc(unsigned char size, struct instruction *instr)
+static inline int mem_acc(unsigned char size, struct hvm_io_op *mmio)
 {
-    instr->operand[0] = mk_operand(size, 0, 0, MEMORY);
-    instr->operand[1] = mk_operand(size, 0, 0, REGISTER);
+    mmio->operand[0] = mk_operand(size, 0, 0, MEMORY);
+    mmio->operand[1] = mk_operand(size, 0, 0, REGISTER);
     return DECODE_success;
 }
 
 /*
  * Decode accumulator,mem operands (as in <opcode> al,ax,eax, m8/m16/m32)
  */
-static int acc_mem(unsigned char size, struct instruction *instr)
+static inline int acc_mem(unsigned char size, struct hvm_io_op *mmio)
 {
-    instr->operand[0] = mk_operand(size, 0, 0, REGISTER);
-    instr->operand[1] = mk_operand(size, 0, 0, MEMORY);
+    mmio->operand[0] = mk_operand(size, 0, 0, REGISTER);
+    mmio->operand[1] = mk_operand(size, 0, 0, MEMORY);
     return DECODE_success;
 }
 
@@ -319,12 +330,12 @@ static int acc_mem(unsigned char size, struct instruction *instr)
  * Decode mem,reg operands (as in <opcode> r32/16, m32/16)
  */
 static int mem_reg(unsigned char size, unsigned char *opcode,
-                   struct instruction *instr, unsigned char rex)
+                   struct hvm_io_op *mmio_op, unsigned char rex)
 {
     int index = get_index(opcode + 1, rex);
 
-    instr->operand[0] = mk_operand(size, 0, 0, MEMORY);
-    instr->operand[1] = mk_operand(size, index, 0, REGISTER);
+    mmio_op->operand[0] = mk_operand(size, 0, 0, MEMORY);
+    mmio_op->operand[1] = mk_operand(size, index, 0, REGISTER);
     return DECODE_success;
 }
 
@@ -332,248 +343,310 @@ static int mem_reg(unsigned char size, unsigned char *opcode,
  * Decode reg,mem operands (as in <opcode> m32/16, r32/16)
  */
 static int reg_mem(unsigned char size, unsigned char *opcode,
-                   struct instruction *instr, unsigned char rex)
+                   struct hvm_io_op *mmio_op, unsigned char rex)
 {
     int index = get_index(opcode + 1, rex);
 
-    instr->operand[0] = mk_operand(size, index, 0, REGISTER);
-    instr->operand[1] = mk_operand(size, 0, 0, MEMORY);
+    mmio_op->operand[0] = mk_operand(size, index, 0, REGISTER);
+    mmio_op->operand[1] = mk_operand(size, 0, 0, MEMORY);
     return DECODE_success;
 }
 
-static int hvm_decode(int realmode, unsigned char *opcode, struct instruction *instr)
+static int mmio_decode(int mode, unsigned char *opcode,
+                       struct hvm_io_op *mmio_op,
+                       unsigned char *ad_size, unsigned char *op_size,
+                       unsigned char *seg_sel)
 {
     unsigned char size_reg = 0;
     unsigned char rex = 0;
     int index;
 
-    init_instruction(instr);
+    *ad_size = 0;
+    *op_size = 0;
+    *seg_sel = 0;
+    init_instruction(mmio_op);
 
-    opcode = check_prefix(opcode, instr, &rex);
+    opcode = check_prefix(opcode, mmio_op, ad_size, op_size, seg_sel, &rex);
 
-    if (realmode) { /* meaning is reversed */
-        if (instr->op_size == WORD)
-            instr->op_size = LONG;
-        else if (instr->op_size == LONG)
-            instr->op_size = WORD;
-        else if (instr->op_size == 0)
-            instr->op_size = WORD;
+    switch ( mode ) {
+    case X86EMUL_MODE_REAL: /* meaning is reversed */
+    case X86EMUL_MODE_PROT16:
+        if ( *op_size == WORD )
+            *op_size = LONG;
+        else if ( *op_size == LONG )
+            *op_size = WORD;
+        else if ( *op_size == 0 )
+            *op_size = WORD;
+        if ( *ad_size == WORD )
+            *ad_size = LONG;
+        else if ( *ad_size == LONG )
+            *ad_size = WORD;
+        else if ( *ad_size == 0 )
+            *ad_size = WORD;
+        break;
+    case X86EMUL_MODE_PROT32:
+        if ( *op_size == 0 )
+            *op_size = LONG;
+        if ( *ad_size == 0 )
+            *ad_size = LONG;
+        break;
+#ifdef __x86_64__
+    case X86EMUL_MODE_PROT64:
+        if ( *op_size == 0 )
+            *op_size = rex & 0x8 ? QUAD : LONG;
+        if ( *ad_size == 0 )
+            *ad_size = QUAD;
+        break;
+#endif
     }
 
-    switch (*opcode) {
-    case 0x0A: /* or r8, m8 */
-        instr->instr = INSTR_OR;
-        instr->op_size = BYTE;
+    /* the operands order in comments conforms to AT&T convention */
+
+    switch ( *opcode ) {
+
+    case 0x00: /* add r8, m8 */
+        mmio_op->instr = INSTR_ADD;
+        *op_size = BYTE;
         GET_OP_SIZE_FOR_BYTE(size_reg);
-        return mem_reg(size_reg, opcode, instr, rex);
+        return reg_mem(size_reg, opcode, mmio_op, rex);
+
+    case 0x0A: /* or m8, r8 */
+        mmio_op->instr = INSTR_OR;
+        *op_size = BYTE;
+        GET_OP_SIZE_FOR_BYTE(size_reg);
+        return mem_reg(size_reg, opcode, mmio_op, rex);
 
     case 0x0B: /* or m32/16, r32/16 */
-        instr->instr = INSTR_OR;
-        GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
-        return mem_reg(instr->op_size, opcode, instr, rex);
+        mmio_op->instr = INSTR_OR;
+        GET_OP_SIZE_FOR_NONEBYTE(*op_size);
+        return mem_reg(*op_size, opcode, mmio_op, rex);
 
     case 0x20: /* and r8, m8 */
-        instr->instr = INSTR_AND;
-        instr->op_size = BYTE;
+        mmio_op->instr = INSTR_AND;
+        *op_size = BYTE;
         GET_OP_SIZE_FOR_BYTE(size_reg);
-        return reg_mem(size_reg, opcode, instr, rex);
+        return reg_mem(size_reg, opcode, mmio_op, rex);
 
     case 0x21: /* and r32/16, m32/16 */
-        instr->instr = INSTR_AND;
-        GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
-        return reg_mem(instr->op_size, opcode, instr, rex);
+        mmio_op->instr = INSTR_AND;
+        GET_OP_SIZE_FOR_NONEBYTE(*op_size);
+        return reg_mem(*op_size, opcode, mmio_op, rex);
 
     case 0x22: /* and m8, r8 */
-        instr->instr = INSTR_AND;
-        instr->op_size = BYTE;
+        mmio_op->instr = INSTR_AND;
+        *op_size = BYTE;
         GET_OP_SIZE_FOR_BYTE(size_reg);
-        return mem_reg(size_reg, opcode, instr, rex);
+        return mem_reg(size_reg, opcode, mmio_op, rex);
 
     case 0x23: /* and m32/16, r32/16 */
-        instr->instr = INSTR_AND;
-        GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
-        return mem_reg(instr->op_size, opcode, instr, rex);
+        mmio_op->instr = INSTR_AND;
+        GET_OP_SIZE_FOR_NONEBYTE(*op_size);
+        return mem_reg(*op_size, opcode, mmio_op, rex);
+
+    case 0x2B: /* sub m32/16, r32/16 */
+        mmio_op->instr = INSTR_SUB;
+        GET_OP_SIZE_FOR_NONEBYTE(*op_size);
+        return mem_reg(*op_size, opcode, mmio_op, rex);
 
     case 0x30: /* xor r8, m8 */
-        instr->instr = INSTR_XOR;
-        instr->op_size = BYTE;
+        mmio_op->instr = INSTR_XOR;
+        *op_size = BYTE;
         GET_OP_SIZE_FOR_BYTE(size_reg);
-        return reg_mem(size_reg, opcode, instr, rex);
+        return reg_mem(size_reg, opcode, mmio_op, rex);
 
     case 0x31: /* xor r32/16, m32/16 */
-        instr->instr = INSTR_XOR;
-        GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
-        return reg_mem(instr->op_size, opcode, instr, rex);
+        mmio_op->instr = INSTR_XOR;
+        GET_OP_SIZE_FOR_NONEBYTE(*op_size);
+        return reg_mem(*op_size, opcode, mmio_op, rex);
 
-    case 0x32: /* xor m8, r8*/
-        instr->instr = INSTR_XOR;
-        instr->op_size = BYTE;
+    case 0x32: /* xor m8, r8 */
+        mmio_op->instr = INSTR_XOR;
+        *op_size = BYTE;
         GET_OP_SIZE_FOR_BYTE(size_reg);
-        return mem_reg(size_reg, opcode, instr, rex);
+        return mem_reg(size_reg, opcode, mmio_op, rex);
+
+    case 0x38: /* cmp r8, m8 */
+        mmio_op->instr = INSTR_CMP;
+        *op_size = BYTE;
+        GET_OP_SIZE_FOR_BYTE(size_reg);
+        return reg_mem(size_reg, opcode, mmio_op, rex);
 
     case 0x39: /* cmp r32/16, m32/16 */
-        instr->instr = INSTR_CMP;
-        GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
-        return reg_mem(instr->op_size, opcode, instr, rex);
+        mmio_op->instr = INSTR_CMP;
+        GET_OP_SIZE_FOR_NONEBYTE(*op_size);
+        return reg_mem(*op_size, opcode, mmio_op, rex);
+
+    case 0x3A: /* cmp m8, r8 */
+        mmio_op->instr = INSTR_CMP;
+        *op_size = BYTE;
+        GET_OP_SIZE_FOR_BYTE(size_reg);
+        return mem_reg(size_reg, opcode, mmio_op, rex);
 
     case 0x3B: /* cmp m32/16, r32/16 */
-        instr->instr = INSTR_CMP;
-        GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
-        return mem_reg(instr->op_size, opcode, instr, rex);
+        mmio_op->instr = INSTR_CMP;
+        GET_OP_SIZE_FOR_NONEBYTE(*op_size);
+        return mem_reg(*op_size, opcode, mmio_op, rex);
 
     case 0x80:
     case 0x81:
     case 0x83:
-        {
-            unsigned char ins_subtype = (opcode[1] >> 3) & 7;
+    {
+        unsigned char ins_subtype = (opcode[1] >> 3) & 7;
 
-            if (opcode[0] == 0x80) {
-                GET_OP_SIZE_FOR_BYTE(size_reg);
-                instr->op_size = BYTE;
-            } else if (opcode[0] == 0x81) {
-                GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
-                size_reg = instr->op_size;
-            } else if (opcode[0] == 0x83) {
-                GET_OP_SIZE_FOR_NONEBYTE(size_reg);
-                instr->op_size = size_reg;
-            }
-           
-            /* opcode 0x83 always has a single byte operand */
-            if (opcode[0] == 0x83)
-                instr->immediate = 
-                    (signed char)get_immediate(realmode, opcode+1, BYTE);
-            else
-                instr->immediate = 
-                    get_immediate(realmode, opcode+1, instr->op_size);
-
-            instr->operand[0] = mk_operand(size_reg, 0, 0, IMMEDIATE);
-            instr->operand[1] = mk_operand(size_reg, 0, 0, MEMORY);
-
-            switch (ins_subtype) {
-                case 7: /* cmp $imm, m32/16 */
-                    instr->instr = INSTR_CMP;
-                    return DECODE_success;
-
-                case 1: /* or $imm, m32/16 */
-                    instr->instr = INSTR_OR;
-                    return DECODE_success;
-
-                default:
-                    printf("%x/%x, This opcode isn't handled yet!\n",
-                           *opcode, ins_subtype);
-                    return DECODE_failure;
-            }
+        if ( opcode[0] == 0x80 ) {
+            *op_size = BYTE;
+            GET_OP_SIZE_FOR_BYTE(size_reg);
+        } else {
+            GET_OP_SIZE_FOR_NONEBYTE(*op_size);
+            size_reg = *op_size;
         }
 
-    case 0x84:  /* test m8, r8 */
-        instr->instr = INSTR_TEST;
-        instr->op_size = BYTE;
-        GET_OP_SIZE_FOR_BYTE(size_reg);
-        return mem_reg(size_reg, opcode, instr, rex);
-
-    case 0x87:  /* xchg {r/m16|r/m32}, {m/r16|m/r32} */
-        instr->instr = INSTR_XCHG;
-        GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
-        if (((*(opcode+1)) & 0xc7) == 5)
-            return reg_mem(instr->op_size, opcode, instr, rex);
+        /* opcode 0x83 always has a single byte operand */
+        if ( opcode[0] == 0x83 )
+            mmio_op->immediate =
+                (signed char)get_immediate(*ad_size, opcode + 1, BYTE);
         else
-            return mem_reg(instr->op_size, opcode, instr, rex);
+            mmio_op->immediate =
+                get_immediate(*ad_size, opcode + 1, *op_size);
+
+        mmio_op->operand[0] = mk_operand(size_reg, 0, 0, IMMEDIATE);
+        mmio_op->operand[1] = mk_operand(size_reg, 0, 0, MEMORY);
+
+        switch ( ins_subtype ) {
+        case 7: /* cmp $imm, m32/16 */
+            mmio_op->instr = INSTR_CMP;
+            return DECODE_success;
+
+        case 1: /* or $imm, m32/16 */
+            mmio_op->instr = INSTR_OR;
+            return DECODE_success;
+
+        default:
+            printk("%x/%x, This opcode isn't handled yet!\n",
+                   *opcode, ins_subtype);
+            return DECODE_failure;
+        }
+    }
+
+    case 0x84:  /* test r8, m8 */
+        mmio_op->instr = INSTR_TEST;
+        *op_size = BYTE;
+        GET_OP_SIZE_FOR_BYTE(size_reg);
+        return reg_mem(size_reg, opcode, mmio_op, rex);
+
+    case 0x85: /* test r16/32, m16/32 */
+        mmio_op->instr = INSTR_TEST;
+        GET_OP_SIZE_FOR_NONEBYTE(*op_size);
+        return reg_mem(*op_size, opcode, mmio_op, rex);
+
+    case 0x86:  /* xchg m8, r8 */
+        mmio_op->instr = INSTR_XCHG;
+        *op_size = BYTE;
+        GET_OP_SIZE_FOR_BYTE(size_reg);
+        return reg_mem(size_reg, opcode, mmio_op, rex);
+
+    case 0x87:  /* xchg m16/32, r16/32 */
+        mmio_op->instr = INSTR_XCHG;
+        GET_OP_SIZE_FOR_NONEBYTE(*op_size);
+        return reg_mem(*op_size, opcode, mmio_op, rex);
 
     case 0x88: /* mov r8, m8 */
-        instr->instr = INSTR_MOV;
-        instr->op_size = BYTE;
+        mmio_op->instr = INSTR_MOV;
+        *op_size = BYTE;
         GET_OP_SIZE_FOR_BYTE(size_reg);
-        return reg_mem(size_reg, opcode, instr, rex);
+        return reg_mem(size_reg, opcode, mmio_op, rex);
 
     case 0x89: /* mov r32/16, m32/16 */
-        instr->instr = INSTR_MOV;
-        GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
-        return reg_mem(instr->op_size, opcode, instr, rex);
+        mmio_op->instr = INSTR_MOV;
+        GET_OP_SIZE_FOR_NONEBYTE(*op_size);
+        return reg_mem(*op_size, opcode, mmio_op, rex);
 
     case 0x8A: /* mov m8, r8 */
-        instr->instr = INSTR_MOV;
-        instr->op_size = BYTE;
+        mmio_op->instr = INSTR_MOV;
+        *op_size = BYTE;
         GET_OP_SIZE_FOR_BYTE(size_reg);
-        return mem_reg(size_reg, opcode, instr, rex);
+        return mem_reg(size_reg, opcode, mmio_op, rex);
 
     case 0x8B: /* mov m32/16, r32/16 */
-        instr->instr = INSTR_MOV;
-        GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
-        return mem_reg(instr->op_size, opcode, instr, rex);
+        mmio_op->instr = INSTR_MOV;
+        GET_OP_SIZE_FOR_NONEBYTE(*op_size);
+        return mem_reg(*op_size, opcode, mmio_op, rex);
 
     case 0xA0: /* mov <addr>, al */
-        instr->instr = INSTR_MOV;
-        instr->op_size = BYTE;
+        mmio_op->instr = INSTR_MOV;
+        *op_size = BYTE;
         GET_OP_SIZE_FOR_BYTE(size_reg);
-        return mem_acc(size_reg, instr);
+        return mem_acc(size_reg, mmio_op);
 
     case 0xA1: /* mov <addr>, ax/eax */
-        instr->instr = INSTR_MOV;
-        GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
-        return mem_acc(instr->op_size, instr);
+        mmio_op->instr = INSTR_MOV;
+        GET_OP_SIZE_FOR_NONEBYTE(*op_size);
+        return mem_acc(*op_size, mmio_op);
 
     case 0xA2: /* mov al, <addr> */
-        instr->instr = INSTR_MOV;
-        instr->op_size = BYTE;
+        mmio_op->instr = INSTR_MOV;
+        *op_size = BYTE;
         GET_OP_SIZE_FOR_BYTE(size_reg);
-        return acc_mem(size_reg, instr);
+        return acc_mem(size_reg, mmio_op);
 
     case 0xA3: /* mov ax/eax, <addr> */
-        instr->instr = INSTR_MOV;
-        GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
-        return acc_mem(instr->op_size, instr);
+        mmio_op->instr = INSTR_MOV;
+        GET_OP_SIZE_FOR_NONEBYTE(*op_size);
+        return acc_mem(*op_size, mmio_op);
 
     case 0xA4: /* movsb */
-        instr->instr = INSTR_MOVS;
-        instr->op_size = BYTE;
+        mmio_op->instr = INSTR_MOVS;
+        *op_size = BYTE;
         return DECODE_success;
 
     case 0xA5: /* movsw/movsl */
-        instr->instr = INSTR_MOVS;
-        GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+        mmio_op->instr = INSTR_MOVS;
+        GET_OP_SIZE_FOR_NONEBYTE(*op_size);
         return DECODE_success;
 
     case 0xAA: /* stosb */
-        instr->instr = INSTR_STOS;
-        instr->op_size = BYTE;
+        mmio_op->instr = INSTR_STOS;
+        *op_size = BYTE;
         return DECODE_success;
 
     case 0xAB: /* stosw/stosl */
-        instr->instr = INSTR_STOS;
-        GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+        mmio_op->instr = INSTR_STOS;
+        GET_OP_SIZE_FOR_NONEBYTE(*op_size);
         return DECODE_success;
 
     case 0xAC: /* lodsb */
-        instr->instr = INSTR_LODS;
-        instr->op_size = BYTE;
+        mmio_op->instr = INSTR_LODS;
+        *op_size = BYTE;
         return DECODE_success;
 
     case 0xAD: /* lodsw/lodsl */
-        instr->instr = INSTR_LODS;
-        GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+        mmio_op->instr = INSTR_LODS;
+        GET_OP_SIZE_FOR_NONEBYTE(*op_size);
         return DECODE_success;
 
     case 0xC6:
-        if (((opcode[1] >> 3) & 7) == 0) { /* mov $imm8, m8 */
-            instr->instr = INSTR_MOV;
-            instr->op_size = BYTE;
+        if ( ((opcode[1] >> 3) & 7) == 0 ) { /* mov $imm8, m8 */
+            mmio_op->instr = INSTR_MOV;
+            *op_size = BYTE;
 
-            instr->operand[0] = mk_operand(instr->op_size, 0, 0, IMMEDIATE);
-            instr->immediate = get_immediate(realmode, opcode+1, instr->op_size);
-            instr->operand[1] = mk_operand(instr->op_size, 0, 0, MEMORY);
+            mmio_op->operand[0] = mk_operand(*op_size, 0, 0, IMMEDIATE);
+            mmio_op->immediate  =
+                    get_immediate(*ad_size, opcode + 1, *op_size);
+            mmio_op->operand[1] = mk_operand(*op_size, 0, 0, MEMORY);
 
             return DECODE_success;
         } else
             return DECODE_failure;
 
     case 0xC7:
-        if (((opcode[1] >> 3) & 7) == 0) { /* mov $imm16/32, m16/32 */
-            instr->instr = INSTR_MOV;
-            GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+        if ( ((opcode[1] >> 3) & 7) == 0 ) { /* mov $imm16/32, m16/32 */
+            mmio_op->instr = INSTR_MOV;
+            GET_OP_SIZE_FOR_NONEBYTE(*op_size);
 
-            instr->operand[0] = mk_operand(instr->op_size, 0, 0, IMMEDIATE);
-            instr->immediate = get_immediate(realmode, opcode+1, instr->op_size);
-            instr->operand[1] = mk_operand(instr->op_size, 0, 0, MEMORY);
+            mmio_op->operand[0] = mk_operand(*op_size, 0, 0, IMMEDIATE);
+            mmio_op->immediate =
+                    get_immediate(*ad_size, opcode + 1, *op_size);
+            mmio_op->operand[1] = mk_operand(*op_size, 0, 0, MEMORY);
 
             return DECODE_success;
         } else
@@ -581,20 +654,21 @@ static int hvm_decode(int realmode, unsigned char *opcode, struct instruction *i
 
     case 0xF6:
     case 0xF7:
-        if (((opcode[1] >> 3) & 7) == 0) { /* test $imm8/16/32, m8/16/32 */
-            instr->instr = INSTR_TEST;
+        if ( ((opcode[1] >> 3) & 7) == 0 ) { /* test $imm8/16/32, m8/16/32 */
+            mmio_op->instr = INSTR_TEST;
 
-            if (opcode[0] == 0xF6) {
+            if ( opcode[0] == 0xF6 ) {
+                *op_size = BYTE;
                 GET_OP_SIZE_FOR_BYTE(size_reg);
-                instr->op_size = BYTE;
             } else {
-                GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
-                size_reg = instr->op_size;
+                GET_OP_SIZE_FOR_NONEBYTE(*op_size);
+                size_reg = *op_size;
             }
 
-            instr->operand[0] = mk_operand(size_reg, 0, 0, IMMEDIATE);
-            instr->immediate = get_immediate(realmode, opcode+1, instr->op_size);
-            instr->operand[1] = mk_operand(size_reg, 0, 0, MEMORY);
+            mmio_op->operand[0] = mk_operand(size_reg, 0, 0, IMMEDIATE);
+            mmio_op->immediate =
+                    get_immediate(*ad_size, opcode + 1, *op_size);
+            mmio_op->operand[1] = mk_operand(size_reg, 0, 0, MEMORY);
 
             return DECODE_success;
         } else
@@ -604,147 +678,130 @@ static int hvm_decode(int realmode, unsigned char *opcode, struct instruction *i
         break;
 
     default:
-        printf("%x, This opcode isn't handled yet!\n", *opcode);
+        printk("%x, This opcode isn't handled yet!\n", *opcode);
         return DECODE_failure;
     }
 
-    switch (*++opcode) {
+    switch ( *++opcode ) {
     case 0xB6: /* movzx m8, r16/r32/r64 */
-        instr->instr = INSTR_MOVZX;
-        GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+        mmio_op->instr = INSTR_MOVZX;
+        GET_OP_SIZE_FOR_NONEBYTE(*op_size);
         index = get_index(opcode + 1, rex);
-        instr->operand[0] = mk_operand(BYTE, 0, 0, MEMORY);
-        instr->operand[1] = mk_operand(instr->op_size, index, 0, REGISTER);
+        mmio_op->operand[0] = mk_operand(BYTE, 0, 0, MEMORY);
+        mmio_op->operand[1] = mk_operand(*op_size, index, 0, REGISTER);
         return DECODE_success;
 
-    case 0xB7: /* movzx m16/m32, r32/r64 */
-        instr->instr = INSTR_MOVZX;
-        GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+    case 0xB7: /* movzx m16, r32/r64 */
+        mmio_op->instr = INSTR_MOVZX;
+        GET_OP_SIZE_FOR_NONEBYTE(*op_size);
         index = get_index(opcode + 1, rex);
-        if (rex & 0x8)
-            instr->operand[0] = mk_operand(LONG, 0, 0, MEMORY);
-        else
-            instr->operand[0] = mk_operand(WORD, 0, 0, MEMORY);
-        instr->operand[1] = mk_operand(instr->op_size, index, 0, REGISTER);
+        mmio_op->operand[0] = mk_operand(WORD, 0, 0, MEMORY);
+        mmio_op->operand[1] = mk_operand(*op_size, index, 0, REGISTER);
         return DECODE_success;
 
     case 0xBE: /* movsx m8, r16/r32/r64 */
-        instr->instr = INSTR_MOVSX;
-        GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+        mmio_op->instr = INSTR_MOVSX;
+        GET_OP_SIZE_FOR_NONEBYTE(*op_size);
         index = get_index(opcode + 1, rex);
-        instr->operand[0] = mk_operand(BYTE, 0, 0, MEMORY);
-        instr->operand[1] = mk_operand(instr->op_size, index, 0, REGISTER);
+        mmio_op->operand[0] = mk_operand(BYTE, 0, 0, MEMORY);
+        mmio_op->operand[1] = mk_operand(*op_size, index, 0, REGISTER);
         return DECODE_success;
 
     case 0xBF: /* movsx m16, r32/r64 */
-        instr->instr = INSTR_MOVSX;
-        GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+        mmio_op->instr = INSTR_MOVSX;
+        GET_OP_SIZE_FOR_NONEBYTE(*op_size);
         index = get_index(opcode + 1, rex);
-        instr->operand[0] = mk_operand(WORD, 0, 0, MEMORY);
-        instr->operand[1] = mk_operand(instr->op_size, index, 0, REGISTER);
+        mmio_op->operand[0] = mk_operand(WORD, 0, 0, MEMORY);
+        mmio_op->operand[1] = mk_operand(*op_size, index, 0, REGISTER);
         return DECODE_success;
 
     case 0xA3: /* bt r32, m32 */
-        instr->instr = INSTR_BT;
+        mmio_op->instr = INSTR_BT;
         index = get_index(opcode + 1, rex);
-        instr->op_size = LONG;
-        instr->operand[0] = mk_operand(instr->op_size, index, 0, REGISTER);
-        instr->operand[1] = mk_operand(instr->op_size, 0, 0, MEMORY);
+        *op_size = LONG;
+        mmio_op->operand[0] = mk_operand(*op_size, index, 0, REGISTER);
+        mmio_op->operand[1] = mk_operand(*op_size, 0, 0, MEMORY);
         return DECODE_success;
 
     case 0xBA:
-        if (((opcode[1] >> 3) & 7) == 4) /* BT $imm8, m16/32/64 */
+        if ( ((opcode[1] >> 3) & 7) == 4 ) /* BT $imm8, m16/32/64 */
         {
-            instr->instr = INSTR_BT;
-            GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
-            instr->immediate =
-                    (signed char)get_immediate(realmode, opcode+1, BYTE);
-            instr->operand[0] = mk_operand(BYTE, 0, 0, IMMEDIATE);
-            instr->operand[1] = mk_operand(instr->op_size, 0, 0, MEMORY);
+            mmio_op->instr = INSTR_BT;
+            GET_OP_SIZE_FOR_NONEBYTE(*op_size);
+            mmio_op->operand[0] = mk_operand(BYTE, 0, 0, IMMEDIATE);
+            mmio_op->immediate =
+                    (signed char)get_immediate(*ad_size, opcode + 1, BYTE);
+            mmio_op->operand[1] = mk_operand(*op_size, 0, 0, MEMORY);
             return DECODE_success;
         }
         else
         {
-            printf("0f %x, This opcode subtype isn't handled yet\n", *opcode);
+            printk("0f %x, This opcode subtype isn't handled yet\n", *opcode);
             return DECODE_failure;
         }
 
     default:
-        printf("0f %x, This opcode isn't handled yet\n", *opcode);
+        printk("0f %x, This opcode isn't handled yet\n", *opcode);
         return DECODE_failure;
     }
 }
 
 int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip, int inst_len)
 {
-    if (inst_len > MAX_INST_LEN || inst_len <= 0)
+    if ( inst_len > MAX_INST_LEN || inst_len <= 0 )
         return 0;
-    if (!hvm_copy(buf, guest_eip, inst_len, HVM_COPY_IN))
+    if ( hvm_copy_from_guest_virt(buf, guest_eip, inst_len) )
         return 0;
     return inst_len;
 }
 
-static void hvm_send_assist_req(struct vcpu *v)
-{
-    ioreq_t *p;
-
-    p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;
-    if ( unlikely(p->state != STATE_INVALID) ) {
-        /* This indicates a bug in the device model.  Crash the
-           domain. */
-        printf("Device model set bad IO state %d.\n", p->state);
-        domain_crash(v->domain);
-        return;
-    }
-    wmb();
-    p->state = STATE_IOREQ_READY;
-    notify_via_xen_event_channel(v->arch.hvm_vcpu.xen_port);
-}
-
-
-/* Wake up a vcpu whihc is waiting for interrupts to come in */
-void hvm_prod_vcpu(struct vcpu *v)
-{
-    vcpu_unblock(v);
-}
-
-void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
-                  unsigned long count, int size, long value, int dir, int pvalid)
+void send_pio_req(unsigned long port, unsigned long count, int size,
+                  long value, int dir, int df, int value_is_ptr)
 {
     struct vcpu *v = current;
     vcpu_iodata_t *vio;
     ioreq_t *p;
 
+    if ( size == 0 || count == 0 ) {
+        printk("null pio request? port %lx, count %lx, "
+               "size %d, value %lx, dir %d, value_is_ptr %d.\n",
+               port, count, size, value, dir, value_is_ptr);
+    }
+
     vio = get_vio(v->domain, v->vcpu_id);
-    if (vio == NULL) {
+    if ( vio == NULL ) {
         printk("bad shared page: %lx\n", (unsigned long) vio);
         domain_crash_synchronous();
     }
 
     p = &vio->vp_ioreq;
-    if ( p->state != STATE_INVALID )
-        printf("WARNING: send pio with something already pending (%d)?\n",
+    if ( p->state != STATE_IOREQ_NONE )
+        printk("WARNING: send pio with something already pending (%d)?\n",
                p->state);
+
     p->dir = dir;
-    p->pdata_valid = pvalid;
+    p->data_is_ptr = value_is_ptr;
 
     p->type = IOREQ_TYPE_PIO;
     p->size = size;
     p->addr = port;
     p->count = count;
-    p->df = regs->eflags & EF_DF ? 1 : 0;
+    p->df = df;
 
     p->io_count++;
 
-    if (pvalid) {
-        if (hvm_paging_enabled(current))
-            p->u.data = shadow_gva_to_gpa(current, value);
+    if ( value_is_ptr )   /* get physical address of data */
+    {
+        if ( hvm_paging_enabled(current) )
+            p->data = shadow_gva_to_gpa(current, value);
         else
-            p->u.pdata = (void *) value; /* guest VA == guest PA */
-    } else
-        p->u.data = value;
+            p->data = value; /* guest VA == guest PA */
+    }
+    else if ( dir == IOREQ_WRITE )
+        p->data = value;
 
-    if (hvm_portio_intercept(p)) {
+    if ( hvm_portio_intercept(p) )
+    {
         p->state = STATE_IORESP_READY;
         hvm_io_assist(v);
         return;
@@ -753,48 +810,54 @@ void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
     hvm_send_assist_req(v);
 }
 
-void send_mmio_req(
-    unsigned char type, unsigned long gpa,
-    unsigned long count, int size, long value, int dir, int pvalid)
+static void send_mmio_req(unsigned char type, unsigned long gpa,
+                          unsigned long count, int size, long value,
+                          int dir, int df, int value_is_ptr)
 {
     struct vcpu *v = current;
     vcpu_iodata_t *vio;
     ioreq_t *p;
-    struct cpu_user_regs *regs;
 
-    regs = &current->arch.hvm_vcpu.io_op.io_context;
+    if ( size == 0 || count == 0 ) {
+        printk("null mmio request? type %d, gpa %lx, "
+               "count %lx, size %d, value %lx, dir %d, value_is_ptr %d.\n",
+               type, gpa, count, size, value, dir, value_is_ptr);
+    }
 
     vio = get_vio(v->domain, v->vcpu_id);
     if (vio == NULL) {
-        printf("bad shared page\n");
+        printk("bad shared page\n");
         domain_crash_synchronous();
     }
 
     p = &vio->vp_ioreq;
 
-    if ( p->state != STATE_INVALID )
-        printf("WARNING: send mmio with something already pending (%d)?\n",
+    if ( p->state != STATE_IOREQ_NONE )
+        printk("WARNING: send mmio with something already pending (%d)?\n",
                p->state);
     p->dir = dir;
-    p->pdata_valid = pvalid;
+    p->data_is_ptr = value_is_ptr;
 
     p->type = type;
     p->size = size;
     p->addr = gpa;
     p->count = count;
-    p->df = regs->eflags & EF_DF ? 1 : 0;
+    p->df = df;
 
     p->io_count++;
 
-    if (pvalid) {
-        if (hvm_paging_enabled(v))
-            p->u.data = shadow_gva_to_gpa(v, value);
+    if ( value_is_ptr )
+    {
+        if ( hvm_paging_enabled(v) )
+            p->data = shadow_gva_to_gpa(v, value);
         else
-            p->u.pdata = (void *) value; /* guest VA == guest PA */
-    } else
-        p->u.data = value;
+            p->data = value; /* guest VA == guest PA */
+    }
+    else
+        p->data = value;
 
-    if ( hvm_mmio_intercept(p) || hvm_buffered_io_intercept(p) ) {
+    if ( hvm_mmio_intercept(p) || hvm_buffered_io_intercept(p) )
+    {
         p->state = STATE_IORESP_READY;
         hvm_io_assist(v);
         return;
@@ -803,164 +866,186 @@ void send_mmio_req(
     hvm_send_assist_req(v);
 }
 
-static void mmio_operands(int type, unsigned long gpa, struct instruction *inst,
-                          struct hvm_io_op *mmio_opp, struct cpu_user_regs *regs)
+static void mmio_operands(int type, unsigned long gpa,
+                          struct hvm_io_op *mmio_op,
+                          unsigned char op_size)
 {
     unsigned long value = 0;
-    int index, size_reg;
+    int df, index, size_reg;
+    struct cpu_user_regs *regs = &mmio_op->io_context;
 
-    size_reg = operand_size(inst->operand[0]);
+    df = regs->eflags & X86_EFLAGS_DF ? 1 : 0;
 
-    mmio_opp->flags = inst->flags;
-    mmio_opp->instr = inst->instr;
-    mmio_opp->operand[0] = inst->operand[0]; /* source */
-    mmio_opp->operand[1] = inst->operand[1]; /* destination */
-    mmio_opp->immediate = inst->immediate;
+    size_reg = operand_size(mmio_op->operand[0]);
 
-    if (inst->operand[0] & REGISTER) { /* dest is memory */
-        index = operand_index(inst->operand[0]);
+    if ( mmio_op->operand[0] & REGISTER ) {            /* dest is memory */
+        index = operand_index(mmio_op->operand[0]);
         value = get_reg_value(size_reg, index, 0, regs);
-        send_mmio_req(type, gpa, 1, inst->op_size, value, IOREQ_WRITE, 0);
-    } else if (inst->operand[0] & IMMEDIATE) { /* dest is memory */
-        value = inst->immediate;
-        send_mmio_req(type, gpa, 1, inst->op_size, value, IOREQ_WRITE, 0);
-    } else if (inst->operand[0] & MEMORY) { /* dest is register */
+        send_mmio_req(type, gpa, 1, op_size, value, IOREQ_WRITE, df, 0);
+    } else if ( mmio_op->operand[0] & IMMEDIATE ) {    /* dest is memory */
+        value = mmio_op->immediate;
+        send_mmio_req(type, gpa, 1, op_size, value, IOREQ_WRITE, df, 0);
+    } else if ( mmio_op->operand[0] & MEMORY ) {       /* dest is register */
         /* send the request and wait for the value */
-        if ( (inst->instr == INSTR_MOVZX) || (inst->instr == INSTR_MOVSX) )
-            send_mmio_req(type, gpa, 1, size_reg, 0, IOREQ_READ, 0);
+        if ( (mmio_op->instr == INSTR_MOVZX) ||
+             (mmio_op->instr == INSTR_MOVSX) )
+            send_mmio_req(type, gpa, 1, size_reg, 0, IOREQ_READ, df, 0);
         else
-            send_mmio_req(type, gpa, 1, inst->op_size, 0, IOREQ_READ, 0);
+            send_mmio_req(type, gpa, 1, op_size, 0, IOREQ_READ, df, 0);
     } else {
-        printf("mmio_operands: invalid operand\n");
+        printk("%s: invalid dest mode.\n", __func__);
         domain_crash_synchronous();
     }
 }
 
 #define GET_REPEAT_COUNT() \
-     (mmio_inst.flags & REPZ ? (realmode ? regs->ecx & 0xFFFF : regs->ecx) : 1)
+     (mmio_op->flags & REPZ ? (ad_size == WORD ? regs->ecx & 0xFFFF : regs->ecx) : 1)
 
-void handle_mmio(unsigned long va, unsigned long gpa)
+void handle_mmio(unsigned long gpa)
 {
     unsigned long inst_addr;
-    struct hvm_io_op *mmio_opp;
+    struct hvm_io_op *mmio_op;
     struct cpu_user_regs *regs;
-    struct instruction mmio_inst;
-    unsigned char inst[MAX_INST_LEN];
-    int i, realmode, ret, inst_len;
+    unsigned char inst[MAX_INST_LEN], ad_size, op_size, seg_sel;
+    int i, mode, df, inst_len;
     struct vcpu *v = current;
 
-    mmio_opp = &v->arch.hvm_vcpu.io_op;
-    regs = &mmio_opp->io_context;
+    mmio_op = &v->arch.hvm_vcpu.io_op;
+    regs = &mmio_op->io_context;
 
     /* Copy current guest state into io instruction state structure. */
     memcpy(regs, guest_cpu_user_regs(), HVM_CONTEXT_STACK_BYTES);
     hvm_store_cpu_guest_regs(v, regs, NULL);
 
-    if ((inst_len = hvm_instruction_length(v)) <= 0) {
-        printf("handle_mmio: failed to get instruction length\n");
+    df = regs->eflags & X86_EFLAGS_DF ? 1 : 0;
+
+    mode = hvm_guest_x86_mode(v);
+    inst_addr = hvm_get_segment_base(v, seg_cs) + regs->eip;
+    inst_len = hvm_instruction_length(inst_addr, mode);
+    if ( inst_len <= 0 )
+    {
+        printk("handle_mmio: failed to get instruction length\n");
         domain_crash_synchronous();
     }
-
-    realmode = hvm_realmode(v);
-    if (realmode)
-        inst_addr = (regs->cs << 4) + regs->eip;
-    else
-        inst_addr = regs->eip;
 
     memset(inst, 0, MAX_INST_LEN);
-    ret = inst_copy_from_guest(inst, inst_addr, inst_len);
-    if (ret != inst_len) {
-        printf("handle_mmio: failed to copy instruction\n");
+    if ( inst_copy_from_guest(inst, inst_addr, inst_len) != inst_len ) {
+        printk("handle_mmio: failed to copy instruction\n");
         domain_crash_synchronous();
     }
 
-    init_instruction(&mmio_inst);
-
-    if (hvm_decode(realmode, inst, &mmio_inst) == DECODE_failure) {
-        printf("handle_mmio: failed to decode instruction\n");
-        printf("mmio opcode: va 0x%lx, gpa 0x%lx, len %d:",
-               va, gpa, inst_len);
-        for (i = 0; i < inst_len; i++)
-            printf(" %02x", inst[i] & 0xFF);
-        printf("\n");
+    if ( mmio_decode(mode, inst, mmio_op, &ad_size, &op_size, &seg_sel)
+         == DECODE_failure ) {
+        printk("handle_mmio: failed to decode instruction\n");
+        printk("mmio opcode: gpa 0x%lx, len %d:", gpa, inst_len);
+        for ( i = 0; i < inst_len; i++ )
+            printk(" %02x", inst[i] & 0xFF);
+        printk("\n");
         domain_crash_synchronous();
     }
 
     regs->eip += inst_len; /* advance %eip */
 
-    switch (mmio_inst.instr) {
+    switch ( mmio_op->instr ) {
     case INSTR_MOV:
-        mmio_operands(IOREQ_TYPE_COPY, gpa, &mmio_inst, mmio_opp, regs);
+        mmio_operands(IOREQ_TYPE_COPY, gpa, mmio_op, op_size);
         break;
 
     case INSTR_MOVS:
     {
         unsigned long count = GET_REPEAT_COUNT();
-        unsigned long size = mmio_inst.op_size;
-        int sign = regs->eflags & EF_DF ? -1 : 1;
-        unsigned long addr = 0;
-        int dir;
+        int sign = regs->eflags & X86_EFLAGS_DF ? -1 : 1;
+        unsigned long addr;
+        int dir, size = op_size;
+
+        ASSERT(count);
 
         /* determine non-MMIO address */
-        if (realmode) {
-            if (((regs->es << 4) + (regs->edi & 0xFFFF)) == va) {
-                dir = IOREQ_WRITE;
-                addr = (regs->ds << 4) + (regs->esi & 0xFFFF);
-            } else {
-                dir = IOREQ_READ;
-                addr = (regs->es << 4) + (regs->edi & 0xFFFF);
-            }
-        } else {
-            if (va == regs->edi) {
-                dir = IOREQ_WRITE;
-                addr = regs->esi;
-            } else {
-                dir = IOREQ_READ;
-                addr = regs->edi;
-            }
-        }
+        addr = regs->edi;
+        if ( ad_size == WORD )
+            addr &= 0xFFFF;
+        addr += hvm_get_segment_base(v, seg_es);
+        if ( addr == gpa )
+        {
+            enum segment seg;
 
-        mmio_opp->flags = mmio_inst.flags;
-        mmio_opp->instr = mmio_inst.instr;
+            dir = IOREQ_WRITE;
+            addr = regs->esi;
+            if ( ad_size == WORD )
+                addr &= 0xFFFF;
+            switch ( seg_sel )
+            {
+            case 0x26: seg = seg_es; break;
+            case 0x2e: seg = seg_cs; break;
+            case 0x36: seg = seg_ss; break;
+            case 0:
+            case 0x3e: seg = seg_ds; break;
+            case 0x64: seg = seg_fs; break;
+            case 0x65: seg = seg_gs; break;
+            default: domain_crash_synchronous();
+            }
+            addr += hvm_get_segment_base(v, seg);
+        }
+        else
+            dir = IOREQ_READ;
+
+        if ( addr & (size - 1) )
+            gdprintk(XENLOG_WARNING,
+                     "Unaligned ioport access: %lx, %d\n", addr, size);
 
         /*
          * In case of a movs spanning multiple pages, we break the accesses
          * up into multiple pages (the device model works with non-continguous
          * physical guest pages). To copy just one page, we adjust %ecx and
-         * do not advance %eip so that the next "rep movs" copies the next page.
+         * do not advance %eip so that the next rep;movs copies the next page.
          * Unaligned accesses, for example movsl starting at PGSZ-2, are
          * turned into a single copy where we handle the overlapping memory
          * copy ourself. After this copy succeeds, "rep movs" is executed
          * again.
          */
-        if ((addr & PAGE_MASK) != ((addr + sign * (size - 1)) & PAGE_MASK)) {
+        if ( (addr & PAGE_MASK) != ((addr + size - 1) & PAGE_MASK) ) {
             unsigned long value = 0;
 
-            mmio_opp->flags |= OVERLAP;
+            gdprintk(XENLOG_WARNING,
+                     "Single io request in a movs crossing page boundary.\n");
+            mmio_op->flags |= OVERLAP;
 
-            regs->eip -= inst_len; /* do not advance %eip */
+            if ( dir == IOREQ_WRITE ) {
+                if ( hvm_paging_enabled(v) )
+                    (void)hvm_copy_from_guest_virt(&value, addr, size);
+                else
+                    (void)hvm_copy_from_guest_phys(&value, addr, size);
+            } else
+                mmio_op->addr = addr;
 
-            if (dir == IOREQ_WRITE)
-                hvm_copy(&value, addr, size, HVM_COPY_IN);
-            send_mmio_req(IOREQ_TYPE_COPY, gpa, 1, size, value, dir, 0);
-        } else {
-            if ((addr & PAGE_MASK) != ((addr + sign * (count * size - 1)) & PAGE_MASK)) {
+            if ( count != 1 )
                 regs->eip -= inst_len; /* do not advance %eip */
 
-                if (sign > 0)
+            send_mmio_req(IOREQ_TYPE_COPY, gpa, 1, size, value, dir, df, 0);
+        } else {
+            unsigned long last_addr = sign > 0 ? addr + count * size - 1
+                                               : addr - (count - 1) * size;
+
+            if ( (addr & PAGE_MASK) != (last_addr & PAGE_MASK) )
+            {
+                regs->eip -= inst_len; /* do not advance %eip */
+
+                if ( sign > 0 )
                     count = (PAGE_SIZE - (addr & ~PAGE_MASK)) / size;
                 else
-                    count = (addr & ~PAGE_MASK) / size;
+                    count = (addr & ~PAGE_MASK) / size + 1;
             }
 
-            send_mmio_req(IOREQ_TYPE_COPY, gpa, count, size, addr, dir, 1);
+            ASSERT(count);
+
+            send_mmio_req(IOREQ_TYPE_COPY, gpa, count, size, addr, dir, df, 1);
         }
         break;
     }
 
     case INSTR_MOVZX:
     case INSTR_MOVSX:
-        mmio_operands(IOREQ_TYPE_COPY, gpa, &mmio_inst, mmio_opp, regs);
+        mmio_operands(IOREQ_TYPE_COPY, gpa, mmio_op, op_size);
         break;
 
     case INSTR_STOS:
@@ -968,10 +1053,8 @@ void handle_mmio(unsigned long va, unsigned long gpa)
          * Since the destination is always in (contiguous) mmio space we don't
          * need to break it up into pages.
          */
-        mmio_opp->flags = mmio_inst.flags;
-        mmio_opp->instr = mmio_inst.instr;
         send_mmio_req(IOREQ_TYPE_COPY, gpa,
-                      GET_REPEAT_COUNT(), mmio_inst.op_size, regs->eax, IOREQ_WRITE, 0);
+                      GET_REPEAT_COUNT(), op_size, regs->eax, IOREQ_WRITE, df, 0);
         break;
 
     case INSTR_LODS:
@@ -979,91 +1062,79 @@ void handle_mmio(unsigned long va, unsigned long gpa)
          * Since the source is always in (contiguous) mmio space we don't
          * need to break it up into pages.
          */
-        mmio_opp->flags = mmio_inst.flags;
-        mmio_opp->instr = mmio_inst.instr;
         send_mmio_req(IOREQ_TYPE_COPY, gpa,
-                      GET_REPEAT_COUNT(), mmio_inst.op_size, 0, IOREQ_READ, 0);
+                      GET_REPEAT_COUNT(), op_size, 0, IOREQ_READ, df, 0);
         break;
 
     case INSTR_OR:
-        mmio_operands(IOREQ_TYPE_OR, gpa, &mmio_inst, mmio_opp, regs);
+        mmio_operands(IOREQ_TYPE_OR, gpa, mmio_op, op_size);
         break;
 
     case INSTR_AND:
-        mmio_operands(IOREQ_TYPE_AND, gpa, &mmio_inst, mmio_opp, regs);
+        mmio_operands(IOREQ_TYPE_AND, gpa, mmio_op, op_size);
+        break;
+
+    case INSTR_ADD:
+        mmio_operands(IOREQ_TYPE_ADD, gpa, mmio_op, op_size);
         break;
 
     case INSTR_XOR:
-        mmio_operands(IOREQ_TYPE_XOR, gpa, &mmio_inst, mmio_opp, regs);
+        mmio_operands(IOREQ_TYPE_XOR, gpa, mmio_op, op_size);
         break;
 
     case INSTR_CMP:        /* Pass through */
     case INSTR_TEST:
-        mmio_opp->flags = mmio_inst.flags;
-        mmio_opp->instr = mmio_inst.instr;
-        mmio_opp->operand[0] = mmio_inst.operand[0]; /* source */
-        mmio_opp->operand[1] = mmio_inst.operand[1]; /* destination */
-        mmio_opp->immediate = mmio_inst.immediate;
-
+    case INSTR_SUB:
         /* send the request and wait for the value */
-        send_mmio_req(IOREQ_TYPE_COPY, gpa, 1,
-                      mmio_inst.op_size, 0, IOREQ_READ, 0);
+        send_mmio_req(IOREQ_TYPE_COPY, gpa, 1, op_size, 0, IOREQ_READ, df, 0);
         break;
 
     case INSTR_BT:
+    {
+        unsigned long value = 0;
+        int index, size;
+
+        if ( mmio_op->operand[0] & REGISTER )
         {
-            unsigned long value = 0;
-            int index, size;
-
-            mmio_opp->instr = mmio_inst.instr;
-            mmio_opp->operand[0] = mmio_inst.operand[0]; /* bit offset */
-            mmio_opp->operand[1] = mmio_inst.operand[1]; /* bit base */
-
-            if ( mmio_inst.operand[0] & REGISTER )
-            { 
-                index = operand_index(mmio_inst.operand[0]);
-                size = operand_size(mmio_inst.operand[0]);
-                value = get_reg_value(size, index, 0, regs);
-            }
-            else if ( mmio_inst.operand[0] & IMMEDIATE )
-            {
-                mmio_opp->immediate = mmio_inst.immediate;
-                value = mmio_inst.immediate;
-            } 
-            send_mmio_req(IOREQ_TYPE_COPY, gpa + (value >> 5), 1,
-                          mmio_inst.op_size, 0, IOREQ_READ, 0);
-            break;
+            index = operand_index(mmio_op->operand[0]);
+            size = operand_size(mmio_op->operand[0]);
+            value = get_reg_value(size, index, 0, regs);
         }
+        else if ( mmio_op->operand[0] & IMMEDIATE )
+        {
+            mmio_op->immediate = mmio_op->immediate;
+            value = mmio_op->immediate;
+        }
+        send_mmio_req(IOREQ_TYPE_COPY, gpa + (value >> 5), 1,
+                      op_size, 0, IOREQ_READ, df, 0);
+        break;
+    }
 
     case INSTR_XCHG:
-        mmio_opp->flags = mmio_inst.flags;
-        mmio_opp->instr = mmio_inst.instr;
-        mmio_opp->operand[0] = mmio_inst.operand[0]; /* source */
-        mmio_opp->operand[1] = mmio_inst.operand[1]; /* destination */
-        if ( mmio_inst.operand[0] & REGISTER ) {
+        if ( mmio_op->operand[0] & REGISTER ) {
             long value;
-            unsigned long operand = mmio_inst.operand[0];
+            unsigned long operand = mmio_op->operand[0];
             value = get_reg_value(operand_size(operand),
                                   operand_index(operand), 0,
                                   regs);
             /* send the request and wait for the value */
             send_mmio_req(IOREQ_TYPE_XCHG, gpa, 1,
-                          mmio_inst.op_size, value, IOREQ_WRITE, 0);
+                          op_size, value, IOREQ_WRITE, df, 0);
         } else {
             /* the destination is a register */
             long value;
-            unsigned long operand = mmio_inst.operand[1];
+            unsigned long operand = mmio_op->operand[1];
             value = get_reg_value(operand_size(operand),
                                   operand_index(operand), 0,
                                   regs);
             /* send the request and wait for the value */
             send_mmio_req(IOREQ_TYPE_XCHG, gpa, 1,
-                          mmio_inst.op_size, value, IOREQ_WRITE, 0);
+                          op_size, value, IOREQ_WRITE, df, 0);
         }
         break;
 
     default:
-        printf("Unhandled MMIO instruction\n");
+        printk("Unhandled MMIO instruction\n");
         domain_crash_synchronous();
     }
 }
@@ -1082,7 +1153,7 @@ unsigned long copy_to_user_hvm(void *to, const void *from, unsigned len)
         return 0;
     }
 
-    return !hvm_copy((void *)from, (unsigned long)to, len, HVM_COPY_OUT);
+    return hvm_copy_to_guest_virt((unsigned long)to, (void *)from, len);
 }
 
 unsigned long copy_from_user_hvm(void *to, const void *from, unsigned len)
@@ -1093,7 +1164,7 @@ unsigned long copy_from_user_hvm(void *to, const void *from, unsigned len)
         return 0;
     }
 
-    return !hvm_copy(to, (unsigned long)from, len, HVM_COPY_IN);
+    return hvm_copy_from_guest_virt(to, (unsigned long)from, len);
 }
 
 /*

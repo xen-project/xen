@@ -9,6 +9,7 @@ import os
 import signal
 import sys
 import threading
+import time
 import linecache
 import pwd
 import re
@@ -17,6 +18,7 @@ import traceback
 import xen.lowlevel.xc
 
 from xen.xend.XendLogging import log
+from xen.xend import osdep
 
 import relocate
 import SrvServer
@@ -105,12 +107,14 @@ class Daemon:
         os.close(2)
         if XEND_DEBUG:
             os.open('/dev/null', os.O_RDONLY)
-            os.open(XEND_DEBUG_LOG, os.O_WRONLY|os.O_CREAT)
+            os.open(XEND_DEBUG_LOG, os.O_WRONLY|os.O_CREAT|os.O_APPEND)
             os.dup(1)
         else:
             os.open('/dev/null', os.O_RDWR)
             os.dup(0)
-            os.open(XEND_DEBUG_LOG, os.O_WRONLY|os.O_CREAT)
+            os.open(XEND_DEBUG_LOG, os.O_WRONLY|os.O_CREAT|os.O_APPEND)
+        print >>sys.stderr, ("Xend started at %s." %
+                             time.asctime(time.localtime()))
 
         
     def start(self, trace=0):
@@ -168,8 +172,14 @@ class Daemon:
             # ready to receive requests.  All subsequent restarts we don't
             # want this behaviour, or the pipe will eventually fill up, so
             # we just pass None into run in subsequent cases (by clearing w
-            # in the parent of the first fork).
+            # in the parent of the first fork).  On some operating systems,
+            # restart is managed externally, so we won't fork, and just exit.
             while True:
+
+                if not osdep.xend_autorestart:
+                    self.run(os.fdopen(w, 'w'))
+                    break
+
                 pid = self.fork_pid()
                 if pid:
                     if w is not None:
@@ -195,6 +205,8 @@ class Daemon:
                                 sig)
                 else:
                     self.run(w and os.fdopen(w, 'w') or None)
+                    # if we reach here, the child should quit.
+                    os._exit(0)
 
         return ret
 
@@ -287,9 +299,17 @@ class Daemon:
             log.info("Xend changeset: %s.", xinfo['xen_changeset'])
             del xc
 
+            try:
+                from xen import VERSION
+                log.info("Xend version: %s", VERSION)
+            except ImportError:
+                log.info("Xend version: Unknown.")
+
             relocate.listenRelocation()
             servers = SrvServer.create()
             servers.start(status)
+            del servers
+            
         except Exception, ex:
             print >>sys.stderr, 'Exception starting xend:', ex
             if XEND_DEBUG:

@@ -39,18 +39,22 @@ void mcheck_init(struct cpuinfo_x86 *c)
 			break;
 
 		case X86_VENDOR_INTEL:
+#ifndef CONFIG_X86_64
 			if (c->x86==5)
 				intel_p5_mcheck_init(c);
 			if (c->x86==6)
 				intel_p6_mcheck_init(c);
+#endif
 			if (c->x86==15)
 				intel_p4_mcheck_init(c);
 			break;
 
+#ifndef CONFIG_X86_64
 		case X86_VENDOR_CENTAUR:
 			if (c->x86==5)
 				winchip_mcheck_init(c);
 			break;
+#endif
 
 		default:
 			break;

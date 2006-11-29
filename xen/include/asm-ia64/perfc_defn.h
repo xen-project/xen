@@ -107,3 +107,68 @@ PERFSTATUS(privop_addr_##name##_overflow, "privop-addrs overflow " #name)
 PERFPRIVOPADDR(get_ifa)
 PERFPRIVOPADDR(thash)
 #endif
+
+// vhpt.c
+PERFCOUNTER_CPU(local_vhpt_flush,               "local_vhpt_flush")
+PERFCOUNTER_CPU(vcpu_vhpt_flush,                "vcpu_vhpt_flush")
+PERFCOUNTER_CPU(vcpu_flush_vtlb_all,            "vcpu_flush_vtlb_all")
+PERFCOUNTER_CPU(domain_flush_vtlb_all,          "domain_flush_vtlb_all")
+PERFCOUNTER_CPU(vcpu_flush_tlb_vhpt_range,      "vcpu_flush_tlb_vhpt_range")
+PERFCOUNTER_CPU(domain_flush_vtlb_track_entry,  "domain_flush_vtlb_track_entry")
+PERFCOUNTER_CPU(domain_flush_vtlb_local,        "domain_flush_vtlb_local")
+PERFCOUNTER_CPU(domain_flush_vtlb_global,       "domain_flush_vtlb_global")
+PERFCOUNTER_CPU(domain_flush_vtlb_range,        "domain_flush_vtlb_range")
+
+// domain.c
+PERFCOUNTER_CPU(flush_vtlb_for_context_switch,  "flush_vtlb_for_context_switch")
+
+// mm.c
+PERFCOUNTER_CPU(assign_domain_page_replace,     "assign_domain_page_replace")
+PERFCOUNTER_CPU(assign_domain_pge_cmpxchg_rel,  "assign_domain_pge_cmpxchg_rel")
+PERFCOUNTER_CPU(zap_dcomain_page_one,           "zap_dcomain_page_one")
+PERFCOUNTER_CPU(dom0vp_zap_physmap,             "dom0vp_zap_physmap")
+PERFCOUNTER_CPU(dom0vp_add_physmap,             "dom0vp_add_physmap")
+PERFCOUNTER_CPU(create_grant_host_mapping,      "create_grant_host_mapping")
+PERFCOUNTER_CPU(destroy_grant_host_mapping,     "destroy_grant_host_mapping")
+PERFCOUNTER_CPU(steal_page_refcount,            "steal_page_refcount")
+PERFCOUNTER_CPU(steal_page,                     "steal_page")
+PERFCOUNTER_CPU(guest_physmap_add_page,         "guest_physmap_add_page")
+PERFCOUNTER_CPU(guest_physmap_remove_page,      "guest_physmap_remove_page")
+PERFCOUNTER_CPU(domain_page_flush_and_put,      "domain_page_flush_and_put")
+
+// dom0vp
+PERFCOUNTER_CPU(dom0vp_phystomach,              "dom0vp_phystomach")
+PERFCOUNTER_CPU(dom0vp_machtophys,              "dom0vp_machtophys")
+
+#ifdef CONFIG_XEN_IA64_TLB_TRACK
+// insert or dirty
+PERFCOUNTER_CPU(tlb_track_iod,                  "tlb_track_iod")
+PERFCOUNTER_CPU(tlb_track_iod_again,            "tlb_track_iod_again")
+PERFCOUNTER_CPU(tlb_track_iod_not_tracked,      "tlb_track_iod_not_tracked")
+PERFCOUNTER_CPU(tlb_track_iod_force_many,       "tlb_track_iod_force_many")
+PERFCOUNTER_CPU(tlb_track_iod_tracked_many,     "tlb_track_iod_tracked_many")
+PERFCOUNTER_CPU(tlb_track_iod_tracked_many_del, "tlb_track_iod_tracked_many_del")
+PERFCOUNTER_CPU(tlb_track_iod_found,            "tlb_track_iod_found")
+PERFCOUNTER_CPU(tlb_track_iod_new_entry,        "tlb_track_iod_new_entry")
+PERFCOUNTER_CPU(tlb_track_iod_new_failed,       "tlb_track_iod_new_failed")
+PERFCOUNTER_CPU(tlb_track_iod_new_many,         "tlb_track_iod_new_many")
+PERFCOUNTER_CPU(tlb_track_iod_insert,           "tlb_track_iod_insert")
+PERFCOUNTER_CPU(tlb_track_iod_dirtied,          "tlb_track_iod_dirtied")
+
+// search and remove
+PERFCOUNTER_CPU(tlb_track_sar,                  "tlb_track_sar")
+PERFCOUNTER_CPU(tlb_track_sar_not_tracked,      "tlb_track_sar_not_tracked")
+PERFCOUNTER_CPU(tlb_track_sar_not_found,        "tlb_track_sar_not_found")
+PERFCOUNTER_CPU(tlb_track_sar_found,            "tlb_track_sar_found")
+PERFCOUNTER_CPU(tlb_track_sar_many,             "tlb_track_sar_many")
+
+// flush
+PERFCOUNTER_CPU(tlb_track_use_rr7,              "tlb_track_use_rr7")
+PERFCOUNTER_CPU(tlb_track_swap_rr0,             "tlb_track_swap_rr0")
+#endif
+
+// tlb flush clock
+#ifdef CONFIG_XEN_IA64_TLBFLUSH_CLOCK
+PERFCOUNTER_CPU(tlbflush_clock_cswitch_purge,  "tlbflush_clock_cswitch_purge")
+PERFCOUNTER_CPU(tlbflush_clock_cswitch_skip,   "tlbflush_clock_cswitch_skip")
+#endif

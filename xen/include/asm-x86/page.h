@@ -25,6 +25,18 @@
 # include <asm/x86_64/page.h>
 #endif
 
+/* Read a pte atomically from memory. */
+#define l1e_read_atomic(l1ep) l1e_from_intpte(pte_read_atomic(l1ep))
+#define l2e_read_atomic(l2ep) l2e_from_intpte(pte_read_atomic(l2ep))
+#define l3e_read_atomic(l3ep) l3e_from_intpte(pte_read_atomic(l3ep))
+#define l4e_read_atomic(l4ep) l4e_from_intpte(pte_read_atomic(l4ep))
+
+/* Write a pte atomically to memory. */
+#define l1e_write_atomic(l1ep, l1e) pte_write_atomic(l1ep, l1e_get_intpte(l1e))
+#define l2e_write_atomic(l2ep, l2e) pte_write_atomic(l2ep, l1e_get_intpte(l2e))
+#define l3e_write_atomic(l3ep, l3e) pte_write_atomic(l3ep, l1e_get_intpte(l3e))
+#define l4e_write_atomic(l4ep, l4e) pte_write_atomic(l4ep, l1e_get_intpte(l4e))
+
 /* Get direct integer representation of a pte's contents (intpte_t). */
 #define l1e_get_intpte(x)          ((x).l1)
 #define l2e_get_intpte(x)          ((x).l2)

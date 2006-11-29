@@ -18,16 +18,16 @@ static int do_evtchn_op(int xc_handle, int cmd, void *arg, size_t arg_size)
     hypercall.arg[0] = cmd;
     hypercall.arg[1] = (unsigned long)arg;
 
-    if ( mlock(arg, arg_size) != 0 )
+    if ( lock_pages(arg, arg_size) != 0 )
     {
-        PERROR("do_evtchn_op: arg mlock failed");
+        PERROR("do_evtchn_op: arg lock failed");
         goto out;
     }
 
     if ((ret = do_xen_hypercall(xc_handle, &hypercall)) < 0)
         ERROR("do_evtchn_op: HYPERVISOR_event_channel_op failed: %d", ret);
 
-    safe_munlock(arg, arg_size);
+    unlock_pages(arg, arg_size);
  out:
     return ret;
 }

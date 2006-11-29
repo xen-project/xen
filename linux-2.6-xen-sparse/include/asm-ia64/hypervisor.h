@@ -75,9 +75,6 @@ HYPERVISOR_yield(
 {
 	int rc = HYPERVISOR_sched_op(SCHEDOP_yield, NULL);
 
-	if (rc == -ENOSYS)
-		rc = HYPERVISOR_sched_op_compat(SCHEDOP_yield, 0);
-
 	return rc;
 }
 
@@ -86,9 +83,6 @@ HYPERVISOR_block(
 	void)
 {
 	int rc = HYPERVISOR_sched_op(SCHEDOP_block, NULL);
-
-	if (rc == -ENOSYS)
-		rc = HYPERVISOR_sched_op_compat(SCHEDOP_block, 0);
 
 	return rc;
 }
@@ -102,9 +96,6 @@ HYPERVISOR_shutdown(
 	};
 
 	int rc = HYPERVISOR_sched_op(SCHEDOP_shutdown, &sched_shutdown);
-
-	if (rc == -ENOSYS)
-		rc = HYPERVISOR_sched_op_compat(SCHEDOP_shutdown, reason);
 
 	return rc;
 }
@@ -122,8 +113,6 @@ HYPERVISOR_poll(
 
 	set_xen_guest_handle(sched_poll.ports, ports);
 	rc = HYPERVISOR_sched_op(SCHEDOP_poll, &sched_poll);
-	if (rc == -ENOSYS)
-		rc = HYPERVISOR_sched_op_compat(SCHEDOP_yield, 0);
 
 	return rc;
 }
@@ -138,6 +127,7 @@ int direct_remap_pfn_range(struct vm_area_struct *vma,
 			   pgprot_t prot,
 			   domid_t  domid);
 struct file;
+int privcmd_enforce_singleshot_mapping(struct vm_area_struct *vma);
 int privcmd_mmap(struct file * file, struct vm_area_struct * vma);
 #define HAVE_ARCH_PRIVCMD_MMAP
 
@@ -200,6 +190,22 @@ MULTI_grant_table_op(multicall_entry_t *mcl, unsigned int cmd,
 	mcl->args[1] = (unsigned long)uop;
 	mcl->args[2] = count;
 }
+
+/*
+ * for blktap.c
+ * int create_lookup_pte_addr(struct mm_struct *mm, 
+ *                            unsigned long address,
+ *                            uint64_t *ptep);
+ */
+#define create_lookup_pte_addr(mm, address, ptep)			\
+	({								\
+		printk(KERN_EMERG					\
+		       "%s:%d "						\
+		       "create_lookup_pte_addr() isn't supported.\n",	\
+		       __func__, __LINE__);				\
+		BUG();							\
+		(-ENOSYS);						\
+	})
 
 // for debug
 asmlinkage int xprintk(const char *fmt, ...);

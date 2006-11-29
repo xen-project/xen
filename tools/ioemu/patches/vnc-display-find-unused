@@ -1,8 +1,8 @@
 Index: ioemu/vnc.c
 ===================================================================
---- ioemu.orig/vnc.c	2006-08-17 19:50:15.956372339 +0100
-+++ ioemu/vnc.c	2006-08-17 19:50:17.083247783 +0100
-@@ -1183,7 +1183,7 @@
+--- ioemu.orig/vnc.c	2006-10-24 14:31:09.000000000 +0100
++++ ioemu/vnc.c	2006-10-24 14:31:36.000000000 +0100
+@@ -1195,7 +1195,7 @@
      }
  }
  
@@ -11,7 +11,7 @@ Index: ioemu/vnc.c
  {
      struct sockaddr_in addr;
      int reuse_addr, ret;
-@@ -1214,10 +1214,6 @@
+@@ -1226,10 +1226,6 @@
  	exit(1);
      }
  
@@ -22,7 +22,7 @@ Index: ioemu/vnc.c
      reuse_addr = 1;
      ret = setsockopt(vs->lsock, SOL_SOCKET, SO_REUSEADDR,
  		     (const char *)&reuse_addr, sizeof(reuse_addr));
-@@ -1226,7 +1222,16 @@
+@@ -1238,7 +1234,16 @@
  	exit(1);
      }
  
@@ -39,7 +39,7 @@ Index: ioemu/vnc.c
  	fprintf(stderr, "bind() failed\n");
  	exit(1);
      }
-@@ -1247,6 +1252,8 @@
+@@ -1259,6 +1264,8 @@
      vs->ds->dpy_refresh = vnc_dpy_refresh;
  
      vnc_dpy_resize(vs->ds, 640, 400);
@@ -50,8 +50,8 @@ Index: ioemu/vnc.c
  int vnc_start_viewer(int port)
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-08-17 19:50:13.152682236 +0100
-+++ ioemu/vl.c	2006-08-17 19:50:17.086247452 +0100
+--- ioemu.orig/vl.c	2006-10-24 14:31:09.000000000 +0100
++++ ioemu/vl.c	2006-10-24 14:31:41.000000000 +0100
 @@ -121,6 +121,7 @@
  static DisplayState display_state;
  int nographic;
@@ -99,7 +99,7 @@ Index: ioemu/vl.c
 +            case QEMU_OPTION_vncunused:
 +                vncunused++;
 +                if (vnc_display == -1)
-+                    vnc_display = -2;
++                    vnc_display = 0;
 +                break;
              }
          }
@@ -115,8 +115,8 @@ Index: ioemu/vl.c
      } else {
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-08-17 19:50:13.153682125 +0100
-+++ ioemu/vl.h	2006-08-17 19:50:17.087247341 +0100
+--- ioemu.orig/vl.h	2006-10-24 14:31:09.000000000 +0100
++++ ioemu/vl.h	2006-10-24 14:31:36.000000000 +0100
 @@ -785,7 +785,7 @@
  void cocoa_display_init(DisplayState *ds, int full_screen);
  

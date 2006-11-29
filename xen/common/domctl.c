@@ -83,7 +83,7 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
 {
     struct vcpu   *v;
     u64 cpu_time = 0;
-    int flags = DOMFLAGS_BLOCKED;
+    int flags = XEN_DOMINF_blocked;
     struct vcpu_runstate_info runstate;
     
     info->domain = d->domain_id;
@@ -93,29 +93,33 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
      * - domain is marked as blocked only if all its vcpus are blocked
      * - domain is marked as running if any of its vcpus is running
      */
-    for_each_vcpu ( d, v ) {
+    for_each_vcpu ( d, v )
+    {
         vcpu_runstate_get(v, &runstate);
         cpu_time += runstate.time[RUNSTATE_running];
         info->max_vcpu_id = v->vcpu_id;
         if ( !test_bit(_VCPUF_down, &v->vcpu_flags) )
         {
             if ( !(v->vcpu_flags & VCPUF_blocked) )
-                flags &= ~DOMFLAGS_BLOCKED;
+                flags &= ~XEN_DOMINF_blocked;
             if ( v->vcpu_flags & VCPUF_running )
-                flags |= DOMFLAGS_RUNNING;
+                flags |= XEN_DOMINF_running;
             info->nr_online_vcpus++;
         }
     }
-    
-    info->cpu_time = cpu_time;
-    
-    info->flags = flags |
-        ((d->domain_flags & DOMF_dying)      ? DOMFLAGS_DYING    : 0) |
-        ((d->domain_flags & DOMF_shutdown)   ? DOMFLAGS_SHUTDOWN : 0) |
-        ((d->domain_flags & DOMF_ctrl_pause) ? DOMFLAGS_PAUSED   : 0) |
-        d->shutdown_code << DOMFLAGS_SHUTDOWNSHIFT;
 
-    if (d->ssid != NULL)
+    info->cpu_time = cpu_time;
+
+    info->flags = flags |
+        ((d->domain_flags & DOMF_dying)      ? XEN_DOMINF_dying    : 0) |
+        ((d->domain_flags & DOMF_shutdown)   ? XEN_DOMINF_shutdown : 0) |
+        ((d->domain_flags & DOMF_ctrl_pause) ? XEN_DOMINF_paused   : 0) |
+        d->shutdown_code << XEN_DOMINF_shutdownshift;
+
+    if ( is_hvm_domain(d) )
+        info->flags |= XEN_DOMINF_hvm_guest;
+
+    if ( d->ssid != NULL )
         info->ssidref = ((struct acm_ssid_domain *)d->ssid)->ssidref;
     else    
         info->ssidref = ACM_DEFAULT_SSID;
@@ -241,12 +245,10 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         struct domain *d;
         domid_t        dom;
         static domid_t rover = 0;
+        unsigned int domcr_flags;
 
-        /*
-         * Running the domain 0 kernel in ring 0 is not compatible
-         * with multiple guests.
-         */
-        if ( supervisor_mode_kernel )
+        if ( supervisor_mode_kernel ||
+             (op->u.createdomain.flags & ~XEN_DOMCTL_CDF_hvm_guest) )
             return -EINVAL;
 
         dom = op->domain;
@@ -273,8 +275,12 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             rover = dom;
         }
 
+        domcr_flags = 0;
+        if ( op->u.createdomain.flags & XEN_DOMCTL_CDF_hvm_guest )
+            domcr_flags |= DOMCRF_hvm;
+
         ret = -ENOMEM;
-        if ( (d = domain_create(dom)) == NULL )
+        if ( (d = domain_create(dom, domcr_flags)) == NULL )
             break;
 
         memcpy(d->handle, op->u.createdomain.handle,
@@ -356,37 +362,20 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         struct vcpu *v;
         cpumask_t new_affinity;
 
+        ret = -ESRCH;
         if ( d == NULL )
-        {
-            ret = -ESRCH;            
             break;
-        }
-        
-        if ( (op->u.vcpuaffinity.vcpu >= MAX_VIRT_CPUS) ||
-             !d->vcpu[op->u.vcpuaffinity.vcpu] )
-        {
-            ret = -EINVAL;
-            put_domain(d);
-            break;
-        }
 
-        v = d->vcpu[op->u.vcpuaffinity.vcpu];
-        if ( v == NULL )
-        {
-            ret = -ESRCH;
-            put_domain(d);
-            break;
-        }
+        ret = -EINVAL;
+        if ( op->u.vcpuaffinity.vcpu >= MAX_VIRT_CPUS )
+            goto vcpuaffinity_out;
+
+        ret = -ESRCH;
+        if ( (v = d->vcpu[op->u.vcpuaffinity.vcpu]) == NULL )
+            goto vcpuaffinity_out;
 
         if ( op->cmd == XEN_DOMCTL_setvcpuaffinity )
         {
-            if ( v == current )
-            {
-                ret = -EINVAL;
-                put_domain(d);
-                break;
-            }
-
             xenctl_cpumap_to_cpumask(
                 &new_affinity, &op->u.vcpuaffinity.cpumap);
             ret = vcpu_set_affinity(v, &new_affinity);
@@ -395,8 +384,10 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         {
             cpumask_to_xenctl_cpumap(
                 &op->u.vcpuaffinity.cpumap, &v->cpu_affinity);
+            ret = 0;
         }
 
+    vcpuaffinity_out:
         put_domain(d);
     }
     break;

@@ -57,20 +57,10 @@ class TCPListener(connection.SocketListener):
 
     def acceptConnection(self, sock, addrport):
         addr = addrport[0]
-        if self.hosts_allow is None:
-                connection.SocketServerConnection(sock, self.protocol_class)
+        if connection.hostAllowed(addrport, self.hosts_allow):
+            connection.SocketServerConnection(sock, self.protocol_class)
         else:
-            fqdn = socket.getfqdn(addr)
-            for h in self.hosts_allow:
-                if h.match(fqdn) or h.match(addr):
-                    log.debug("Match %s %s", fqdn, h.pattern)
-                    connection.SocketServerConnection(sock,
-                                                      self.protocol_class)
-                    return
-
             try:
-                log.warn("Rejected connection from %s:%d (%s) for port %d.",
-                         addr, addrport[1], fqdn, self.port)
                 sock.close()
             except:
                 pass

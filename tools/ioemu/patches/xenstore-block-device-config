@@ -1,7 +1,7 @@
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2006-08-17 19:50:02.405870095 +0100
-+++ ioemu/Makefile.target	2006-08-17 19:50:18.866050726 +0100
+--- ioemu.orig/Makefile.target	2006-10-24 14:31:36.000000000 +0100
++++ ioemu/Makefile.target	2006-10-24 14:33:28.000000000 +0100
 @@ -358,6 +358,7 @@
  VL_OBJS+= cirrus_vga.o mixeng.o parallel.o acpi.o piix_pci.o
  VL_OBJS+= usb-uhci.o
@@ -13,7 +13,7 @@ Index: ioemu/Makefile.target
 Index: ioemu/xenstore.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/xenstore.c	2006-08-17 19:50:18.867050616 +0100
++++ ioemu/xenstore.c	2006-10-24 14:33:28.000000000 +0100
 @@ -0,0 +1,187 @@
 +/*
 + * This file is subject to the terms and conditions of the GNU General
@@ -204,9 +204,9 @@ Index: ioemu/xenstore.c
 +}
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-08-17 19:50:17.086247452 +0100
-+++ ioemu/vl.c	2006-08-17 19:50:18.870050284 +0100
-@@ -5243,9 +5243,11 @@
+--- ioemu.orig/vl.c	2006-10-24 14:33:24.000000000 +0100
++++ ioemu/vl.c	2006-10-24 14:33:28.000000000 +0100
+@@ -5256,9 +5256,11 @@
             "Standard options:\n"
             "-M machine      select emulated machine (-M ? for list)\n"
             "-fda/-fdb file  use 'file' as floppy disk 0/1 image\n"
@@ -218,7 +218,7 @@ Index: ioemu/vl.c
             "-boot [a|c|d]   boot on floppy (a), hard disk (c) or CD-ROM (d)\n"
  	   "-snapshot       write to temporary files instead of disk image files\n"
  #ifdef TARGET_I386
-@@ -5372,11 +5374,13 @@
+@@ -5386,11 +5388,13 @@
      QEMU_OPTION_M,
      QEMU_OPTION_fda,
      QEMU_OPTION_fdb,
@@ -232,7 +232,7 @@ Index: ioemu/vl.c
      QEMU_OPTION_boot,
      QEMU_OPTION_snapshot,
  #ifdef TARGET_I386
-@@ -5448,11 +5452,13 @@
+@@ -5463,11 +5467,13 @@
      { "M", HAS_ARG, QEMU_OPTION_M },
      { "fda", HAS_ARG, QEMU_OPTION_fda },
      { "fdb", HAS_ARG, QEMU_OPTION_fdb },
@@ -246,7 +246,7 @@ Index: ioemu/vl.c
      { "boot", HAS_ARG, QEMU_OPTION_boot },
      { "snapshot", 0, QEMU_OPTION_snapshot },
  #ifdef TARGET_I386
-@@ -5801,10 +5807,16 @@
+@@ -5817,10 +5823,16 @@
  #ifdef CONFIG_GDBSTUB
      int use_gdbstub, gdbstub_port;
  #endif
@@ -265,7 +265,7 @@ Index: ioemu/vl.c
      const char *kernel_filename, *kernel_cmdline;
      DisplayState *ds = &display_state;
      int cyls, heads, secs, translation;
-@@ -5865,8 +5877,10 @@
+@@ -5881,8 +5893,10 @@
      initrd_filename = NULL;
      for(i = 0; i < MAX_FD; i++)
          fd_filename[i] = NULL;
@@ -276,7 +276,7 @@ Index: ioemu/vl.c
      ram_size = DEFAULT_RAM_SIZE * 1024 * 1024;
      vga_ram_size = VGA_RAM_SIZE;
      bios_size = BIOS_SIZE;
-@@ -5880,11 +5894,13 @@
+@@ -5896,11 +5910,13 @@
      vncunused = 0;
      kernel_filename = NULL;
      kernel_cmdline = "";
@@ -290,7 +290,7 @@ Index: ioemu/vl.c
      cyls = heads = secs = 0;
      translation = BIOS_ATA_TRANSLATION_AUTO;
      pstrcpy(monitor_device, sizeof(monitor_device), "vc");
-@@ -5917,7 +5933,11 @@
+@@ -5935,7 +5951,11 @@
              break;
          r = argv[optind];
          if (r[0] != '-') {
@@ -302,7 +302,7 @@ Index: ioemu/vl.c
          } else {
              const QEMUOption *popt;
  
-@@ -5961,6 +5981,7 @@
+@@ -5979,6 +5999,7 @@
              case QEMU_OPTION_initrd:
                  initrd_filename = optarg;
                  break;
@@ -310,7 +310,7 @@ Index: ioemu/vl.c
              case QEMU_OPTION_hda:
              case QEMU_OPTION_hdb:
              case QEMU_OPTION_hdc:
-@@ -5973,6 +5994,7 @@
+@@ -5991,6 +6012,7 @@
                          cdrom_index = -1;
                  }
                  break;
@@ -318,7 +318,7 @@ Index: ioemu/vl.c
              case QEMU_OPTION_snapshot:
                  snapshot = 1;
                  break;
-@@ -6025,11 +6047,13 @@
+@@ -6043,11 +6065,13 @@
              case QEMU_OPTION_append:
                  kernel_cmdline = optarg;
                  break;
@@ -332,7 +332,7 @@ Index: ioemu/vl.c
              case QEMU_OPTION_boot:
                  boot_device = optarg[0];
                  if (boot_device != 'a' && 
-@@ -6284,12 +6308,18 @@
+@@ -6305,12 +6329,18 @@
          }
      }
  
@@ -351,7 +351,7 @@ Index: ioemu/vl.c
      if (!linux_boot && 
          hd_filename[0] == '\0' && 
          (cdrom_index >= 0 && hd_filename[cdrom_index] == '\0') &&
-@@ -6303,6 +6333,7 @@
+@@ -6324,6 +6354,7 @@
          else
              boot_device = 'd';
      }
@@ -359,7 +359,7 @@ Index: ioemu/vl.c
  
      setvbuf(stdout, NULL, _IOLBF, 0);
      
-@@ -6435,6 +6466,7 @@
+@@ -6456,6 +6487,7 @@
  
  #endif /* !CONFIG_DM */
  
@@ -367,7 +367,7 @@ Index: ioemu/vl.c
      /* we always create the cdrom drive, even if no disk is there */
      bdrv_init();
      if (cdrom_index >= 0) {
-@@ -6461,6 +6493,7 @@
+@@ -6482,6 +6514,7 @@
              }
          }
      }
@@ -375,7 +375,7 @@ Index: ioemu/vl.c
  
      /* we always create at least one floppy disk */
      fd_table[0] = bdrv_new("fda");
-@@ -6539,6 +6572,8 @@
+@@ -6560,6 +6593,8 @@
          }
      }
  
@@ -386,8 +386,8 @@ Index: ioemu/vl.c
                    kernel_filename, kernel_cmdline, initrd_filename,
 Index: ioemu/monitor.c
 ===================================================================
---- ioemu.orig/monitor.c	2006-08-17 19:49:44.491850141 +0100
-+++ ioemu/monitor.c	2006-08-17 19:50:18.871050174 +0100
+--- ioemu.orig/monitor.c	2006-10-24 14:31:36.000000000 +0100
++++ ioemu/monitor.c	2006-10-24 14:33:28.000000000 +0100
 @@ -24,6 +24,7 @@
  #include "vl.h"
  #include "disas.h"
@@ -416,8 +416,8 @@ Index: ioemu/monitor.c
      int i;
 Index: ioemu/block.c
 ===================================================================
---- ioemu.orig/block.c	2006-08-17 19:37:35.865578948 +0100
-+++ ioemu/block.c	2006-08-17 19:50:18.872050063 +0100
+--- ioemu.orig/block.c	2006-10-24 14:31:36.000000000 +0100
++++ ioemu/block.c	2006-10-24 14:33:28.000000000 +0100
 @@ -758,6 +758,7 @@
  static void raw_close(BlockDriverState *bs)
  {
@@ -428,9 +428,9 @@ Index: ioemu/block.c
  
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-08-17 19:50:17.087247341 +0100
-+++ ioemu/vl.h	2006-08-17 19:50:18.872050063 +0100
-@@ -1188,6 +1188,8 @@
+--- ioemu.orig/vl.h	2006-10-24 14:33:24.000000000 +0100
++++ ioemu/vl.h	2006-10-24 14:33:28.000000000 +0100
+@@ -1191,6 +1191,8 @@
  void term_print_help(void);
  void monitor_readline(const char *prompt, int is_password,
                        char *buf, int buf_size);
@@ -439,7 +439,7 @@ Index: ioemu/vl.h
  
  /* readline.c */
  typedef void ReadLineFunc(void *opaque, const char *str);
-@@ -1200,6 +1202,13 @@
+@@ -1203,6 +1205,13 @@
  void readline_start(const char *prompt, int is_password,
                      ReadLineFunc *readline_func, void *opaque);
  
@@ -455,8 +455,8 @@ Index: ioemu/vl.h
  extern char domain_name[];
 Index: ioemu/hw/ide.c
 ===================================================================
---- ioemu.orig/hw/ide.c	2006-08-17 19:49:57.830375828 +0100
-+++ ioemu/hw/ide.c	2006-08-17 19:50:18.874049842 +0100
+--- ioemu.orig/hw/ide.c	2006-10-24 14:31:36.000000000 +0100
++++ ioemu/hw/ide.c	2006-10-24 14:33:28.000000000 +0100
 @@ -1158,6 +1158,7 @@
          } else {
              ide_atapi_cmd_error(s, SENSE_NOT_READY, 

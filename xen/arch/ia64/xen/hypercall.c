@@ -32,7 +32,6 @@
 #include <xen/event.h>
 #include <xen/perfc.h>
 
-static long do_physdev_op_compat(XEN_GUEST_HANDLE(physdev_op_t) uop);
 static long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg);
 static long do_callback_op(int cmd, XEN_GUEST_HANDLE(void) arg);
 
@@ -54,10 +53,10 @@ const hypercall_t ia64_hypercall_table[NR_hypercalls] =
 	(hypercall_t)do_multicall,
 	(hypercall_t)do_ni_hypercall,		/* do_update_va_mapping */
 	(hypercall_t)do_ni_hypercall,		/* do_set_timer_op */  /* 15 */
-	(hypercall_t)do_event_channel_op_compat,
+	(hypercall_t)do_ni_hypercall,
 	(hypercall_t)do_xen_version,
 	(hypercall_t)do_console_io,
-	(hypercall_t)do_physdev_op_compat,
+	(hypercall_t)do_ni_hypercall,
 	(hypercall_t)do_grant_table_op,				       /* 20 */
 	(hypercall_t)do_ni_hypercall,		/* do_vm_assist */
 	(hypercall_t)do_ni_hypercall,		/* do_update_va_mapping_othe */
@@ -108,19 +107,6 @@ static IA64FAULT
 xen_hypercall (struct pt_regs *regs)
 {
 	uint32_t cmd = (uint32_t)regs->r2;
-	struct vcpu *v = current;
-
-	if (cmd == __HYPERVISOR_grant_table_op) {
-		XEN_GUEST_HANDLE(void) uop;
-
-		v->arch.hypercall_param.va = regs->r15;
-		v->arch.hypercall_param.pa1 = regs->r17;
-		v->arch.hypercall_param.pa2 = regs->r18;
-		set_xen_guest_handle(uop, (void *)regs->r15);
-		regs->r8 = do_grant_table_op(regs->r14, uop, regs->r16);
-		v->arch.hypercall_param.va = 0;
-		return IA64_NO_FAULT;
-	}
 
 	if (cmd < NR_hypercalls) {
 		perfc_incra(hypercalls, cmd);
@@ -133,7 +119,21 @@ xen_hypercall (struct pt_regs *regs)
 			regs->r19);
 	} else
 		regs->r8 = -ENOSYS;
+	
+	return IA64_NO_FAULT;
+}
 
+static IA64FAULT
+xen_fast_hypercall (struct pt_regs *regs)
+{
+	uint32_t cmd = (uint32_t)regs->r2;
+	switch (cmd) {
+	case __HYPERVISOR_ia64_fast_eoi:
+		regs->r8 = pirq_guest_eoi(current->domain, regs->r14);
+		break;
+	default:
+		regs->r8 = -ENOSYS;
+	}
 	return IA64_NO_FAULT;
 }
 
@@ -163,7 +163,7 @@ fw_hypercall_ipi (struct pt_regs *regs)
 			memset (&c, 0, sizeof (c));
 
 			if (arch_set_info_guest (targ, &c) != 0) {
-				printf ("arch_boot_vcpu: failure\n");
+				printk ("arch_boot_vcpu: failure\n");
 				return;
 			}
 		}
@@ -177,11 +177,11 @@ fw_hypercall_ipi (struct pt_regs *regs)
 		if (test_and_clear_bit(_VCPUF_down,
 				       &targ->vcpu_flags)) {
 			vcpu_wake(targ);
-			printf ("arch_boot_vcpu: vcpu %d awaken\n",
+			printk ("arch_boot_vcpu: vcpu %d awaken\n",
 				targ->vcpu_id);
 		}
 		else
-			printf ("arch_boot_vcpu: huu, already awaken!\n");
+			printk ("arch_boot_vcpu: huu, already awaken!\n");
 	}
 	else {
 		int running = test_bit(_VCPUF_running,
@@ -201,8 +201,8 @@ fw_hypercall_fpswa (struct vcpu *v)
 	return PSCBX(v, fpswa_ret);
 }
 
-static IA64FAULT
-fw_hypercall (struct pt_regs *regs)
+IA64FAULT
+ia64_hypercall(struct pt_regs *regs)
 {
 	struct vcpu *v = current;
 	struct sal_ret_values x;
@@ -213,8 +213,14 @@ fw_hypercall (struct pt_regs *regs)
 
 	perfc_incra(fw_hypercall, index >> 8);
 	switch (index) {
-	    case FW_HYPERCALL_PAL_CALL:
-		//printf("*** PAL hypercall: index=%d\n",regs->r28);
+	case FW_HYPERCALL_XEN:
+		return xen_hypercall(regs);
+
+	case FW_HYPERCALL_XEN_FAST:
+		return xen_fast_hypercall(regs);
+
+	case FW_HYPERCALL_PAL_CALL:
+		//printk("*** PAL hypercall: index=%d\n",regs->r28);
 		//FIXME: This should call a C routine
 #if 0
 		// This is very conservative, but avoids a possible
@@ -229,7 +235,7 @@ fw_hypercall (struct pt_regs *regs)
 				event_pending(v)) {
 				perfc_incrc(idle_when_pending);
 				vcpu_pend_unspecified_interrupt(v);
-//printf("idle w/int#%d pending!\n",pi);
+//printk("idle w/int#%d pending!\n",pi);
 //this shouldn't happen, but it apparently does quite a bit!  so don't
 //allow it to happen... i.e. if a domain has an interrupt pending and
 //it tries to halt itself because it thinks it is idle, just return here
@@ -264,7 +270,7 @@ fw_hypercall (struct pt_regs *regs)
 			regs->r10 = y.v1; regs->r11 = y.v2;
 		}
 		break;
-	    case FW_HYPERCALL_SAL_CALL:
+	case FW_HYPERCALL_SAL_CALL:
 		x = sal_emulator(vcpu_get_gr(v,32),vcpu_get_gr(v,33),
 			vcpu_get_gr(v,34),vcpu_get_gr(v,35),
 			vcpu_get_gr(v,36),vcpu_get_gr(v,37),
@@ -272,44 +278,33 @@ fw_hypercall (struct pt_regs *regs)
 		regs->r8 = x.r8; regs->r9 = x.r9;
 		regs->r10 = x.r10; regs->r11 = x.r11;
 		break;
- 	    case FW_HYPERCALL_SAL_RETURN:
+	case FW_HYPERCALL_SAL_RETURN:
 	        if ( !test_and_set_bit(_VCPUF_down, &v->vcpu_flags) )
 			vcpu_sleep_nosync(v);
 		break;
-	    case FW_HYPERCALL_EFI_CALL:
+	case FW_HYPERCALL_EFI_CALL:
 		efi_ret_value = efi_emulator (regs, &fault);
 		if (fault != IA64_NO_FAULT) return fault;
 		regs->r8 = efi_ret_value;
 		break;
-	    case FW_HYPERCALL_IPI:
+	case FW_HYPERCALL_IPI:
 		fw_hypercall_ipi (regs);
 		break;
-	    case FW_HYPERCALL_SET_SHARED_INFO_VA:
+	case FW_HYPERCALL_SET_SHARED_INFO_VA:
 	        regs->r8 = domain_set_shared_info_va (regs->r28);
 		break;
-	    case FW_HYPERCALL_FPSWA:
+	case FW_HYPERCALL_FPSWA:
 		fpswa_ret = fw_hypercall_fpswa (v);
 		regs->r8  = fpswa_ret.status;
 		regs->r9  = fpswa_ret.err0;
 		regs->r10 = fpswa_ret.err1;
 		regs->r11 = fpswa_ret.err2;
 		break;
-	    default:
-		printf("unknown ia64 fw hypercall %lx\n", regs->r2);
+	default:
+		printk("unknown ia64 fw hypercall %lx\n", regs->r2);
 		regs->r8 = do_ni_hypercall();
 	}
 	return IA64_NO_FAULT;
-}
-
-IA64FAULT
-ia64_hypercall (struct pt_regs *regs)
-{
-	unsigned long index = regs->r2;
-
-	if (index >= FW_HYPERCALL_FIRST_ARCH)
-	    return fw_hypercall (regs);
-	else
-	    return xen_hypercall (regs);
 }
 
 unsigned long hypercall_create_continuation(
@@ -463,28 +458,6 @@ static long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
     }
 
     return ret;
-}
-
-/* Legacy hypercall (as of 0x00030202). */
-static long do_physdev_op_compat(XEN_GUEST_HANDLE(physdev_op_t) uop)
-{
-    struct physdev_op op;
-
-    if ( unlikely(copy_from_guest(&op, uop, 1) != 0) )
-        return -EFAULT;
-
-    return do_physdev_op(op.cmd, guest_handle_from_ptr(&uop.p->u, void));
-}
-
-/* Legacy hypercall (as of 0x00030202). */
-long do_event_channel_op_compat(XEN_GUEST_HANDLE(evtchn_op_t) uop)
-{
-    struct evtchn_op op;
-
-    if ( unlikely(copy_from_guest(&op, uop, 1) != 0) )
-        return -EFAULT;
-
-    return do_event_channel_op(op.cmd, guest_handle_from_ptr(&uop.p->u, void));
 }
 
 static long register_guest_callback(struct callback_register *reg)

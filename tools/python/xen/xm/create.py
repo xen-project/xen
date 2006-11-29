@@ -25,7 +25,6 @@ import sys
 import socket
 import re
 import xmlrpclib
-import traceback
 
 from xen.xend import sxp
 from xen.xend import PrettyPrint
@@ -57,7 +56,8 @@ gopts.opt('help', short='h',
 
 gopts.opt('help_config',
           fn=set_true, default=0,
-          use="Print help for the configuration script.")
+          use="Print the available configuration variables (vars) for the "
+          "configuration script.")
 
 gopts.opt('quiet', short='q',
           fn=set_true, default=0,
@@ -65,35 +65,36 @@ gopts.opt('quiet', short='q',
 
 gopts.opt('path', val='PATH',
           fn=set_value, default='.:/etc/xen',
-          use="""Search path for configuration scripts.
-         The value of PATH is a colon-separated directory list.""")
+          use="Search path for configuration scripts. "
+          "The value of PATH is a colon-separated directory list.")
 
 gopts.opt('defconfig', short='f', val='FILE',
           fn=set_value, default='xmdefconfig',
-          use="""Use the given Python configuration script.
-          The configuration script is loaded after arguments have been processed.
-          Each command-line option sets a configuration variable named after
-          its long option name, and these variables are placed in the
-          environment of the script before it is loaded.
-          Variables for options that may be repeated have list values.
-          Other variables can be set using VAR=VAL on the command line.
-        
-          After the script is loaded, option values that were not set on the
-          command line are replaced by the values set in the script.""")
+          use="Use the given Python configuration script."
+          "The configuration script is loaded after arguments have been "
+          "processed. Each command-line option sets a configuration "
+          "variable named after its long option name, and these "
+          "variables are placed in the environment of the script before "
+          "it is loaded. Variables for options that may be repeated have "
+          "list values. Other variables can be set using VAR=VAL on the "
+          "command line. "     
+          "After the script is loaded, option values that were not set "
+          "on the command line are replaced by the values set in the script.")
 
 gopts.default('defconfig')
 
 gopts.opt('config', short='F', val='FILE',
           fn=set_value, default=None,
-          use="""Domain configuration to use (SXP).
-          SXP is the underlying configuration format used by Xen.
-          SXP configurations can be hand-written or generated from Python configuration
-          scripts, using the -n (dryrun) option to print the configuration.""")
+          use="Domain configuration to use (SXP).\n"
+          "SXP is the underlying configuration format used by Xen.\n"
+          "SXP configurations can be hand-written or generated from Python "
+          "configuration scripts, using the -n (dryrun) option to print "
+          "the configuration.")
 
 gopts.opt('dryrun', short='n',
           fn=set_true, default=0,
-          use="""Dry run - print the configuration but don't create the domain.
-          Loads the configuration script, creates the SXP configuration and prints it.""")
+          use="Dry run - prints the resulting configuration in SXP but "
+          "does not create the domain.")
 
 gopts.opt('paused', short='p',
           fn=set_true, default=0,
@@ -103,20 +104,22 @@ gopts.opt('console_autoconnect', short='c',
           fn=set_true, default=0,
           use="Connect to the console after the domain is created.")
 
+gopts.var('vncpasswd', val='NAME',
+          fn=set_value, default=None,
+          use="Password for VNC console on HVM domain.")
+
 gopts.var('vncviewer', val='no|yes',
           fn=set_bool, default=None,
-          use="""Spawn a vncviewer listening for a vnc server in the domain.
-          The address of the vncviewer is passed to the domain on the kernel command
-          line using 'VNC_SERVER=<host>:<port>'. The port used by vnc is 5500 + DISPLAY.
-          A display value with a free port is chosen if possible.
-          Only valid when vnc=1.
-          """)
+           use="Spawn a vncviewer listening for a vnc server in the domain.\n"
+           "The address of the vncviewer is passed to the domain on the "
+           "kernel command line using 'VNC_SERVER=<host>:<port>'. The port "
+           "used by vnc is 5500 + DISPLAY. A display value with a free port "
+           "is chosen if possible.\nOnly valid when vnc=1.")
 
 gopts.var('vncconsole', val='no|yes',
           fn=set_bool, default=None,
-          use="""Spawn a vncviewer process for the domain's graphical console.
-          Only valid when vnc=1.
-          """)
+          use="Spawn a vncviewer process for the domain's graphical console.\n"
+          "Only valid when vnc=1.")
 
 gopts.var('name', val='NAME',
           fn=set_value, default=None,
@@ -171,25 +174,29 @@ gopts.var('cpus', val='CPUS',
           use="CPUS to run the domain on.")
 
 gopts.var('pae', val='PAE',
-          fn=set_int, default=0,
+          fn=set_int, default=1,
           use="Disable or enable PAE of HVM domain.")
 
 gopts.var('acpi', val='ACPI',
-          fn=set_int, default=0,
+          fn=set_int, default=1,
           use="Disable or enable ACPI of HVM domain.")
 
 gopts.var('apic', val='APIC',
-          fn=set_int, default=0,
-          use="Disable or enable APIC of HVM domain.")
+          fn=set_int, default=1,
+          use="Disable or enable APIC mode.")
 
 gopts.var('vcpus', val='VCPUS',
           fn=set_int, default=1,
           use="# of Virtual CPUS in domain.")
 
+gopts.var('cpu_cap', val='CAP',
+          fn=set_int, default=None,
+          use="""Set the maximum amount of cpu.
+          CAP is a percentage that fixes the maximum amount of cpu.""")
+
 gopts.var('cpu_weight', val='WEIGHT',
-          fn=set_float, default=None,
-          use="""Set the new domain's cpu weight.
-          WEIGHT is a float that controls the domain's share of the cpu.""")
+          fn=set_int, default=None,
+          use="""Set the cpu time ratio to be allocated to the domain.""")
 
 gopts.var('restart', val='onreboot|always|never',
           fn=set_value, default=None,
@@ -292,7 +299,7 @@ gopts.var('vif', val="type=TYPE,mac=MAC,bridge=BRIDGE,ip=IPADDR,script=SCRIPT,ba
           This option may be repeated to add more than one vif.
           Specifying vifs will increase the number of interfaces as needed.""")
 
-gopts.var('vtpm', val="instance=INSTANCE,backend=DOM",
+gopts.var('vtpm', val="instance=INSTANCE,backend=DOM,type=TYPE",
           fn=append_value, default=[],
           use="""Add a TPM interface. On the backend side use the given
           instance as virtual TPM instance. The given number is merely the
@@ -300,7 +307,11 @@ gopts.var('vtpm', val="instance=INSTANCE,backend=DOM",
           which instance number will actually be assigned to the domain.
           The associtation between virtual machine and the TPM instance
           number can be found in /etc/xen/vtpm.db. Use the backend in the
-          given domain.""")
+          given domain.
+          The type parameter can be used to select a specific driver type
+          that the VM can use. To prevent a fully virtualized domain (HVM)
+          from being able to access an emulated device model, you may specify
+          'paravirtualized' here.""")
 
 gopts.var('access_control', val="policy=POLICY,label=LABEL",
           fn=append_value, default=[],
@@ -380,6 +391,10 @@ gopts.var('localtime', val='no|yes',
           fn=set_bool, default=0,
           use="Is RTC set to localtime?")
 
+gopts.var('keymap', val='FILE',
+          fn=set_value, default='',
+          use="Set keyboard layout used")
+
 gopts.var('usb', val='no|yes',
           fn=set_bool, default=0,
           use="Emulate USB devices?")
@@ -416,6 +431,10 @@ gopts.var('vncdisplay', val='',
           fn=set_value, default=None,
           use="""VNC display to use""")
 
+gopts.var('vnclisten', val='',
+          fn=set_value, default=None,
+          use="""Address for VNC server to listen on.""")
+
 gopts.var('vncunused', val='',
           fn=set_bool, default=1,
           use="""Try to find an unused port for the VNC server.
@@ -440,6 +459,17 @@ gopts.var('uuid', val='',
           addresses for virtual network interfaces.  This must be a unique 
           value across the entire cluster.""")
 
+gopts.var('on_xend_start', val='ignore|start',
+          fn=set_value, default='ignore',
+          use='Action to perform when xend starts')
+
+gopts.var('on_xend_stop', val='continue|shutdown|suspend',
+          fn=set_value, default="ignore",
+          use="""Behaviour when Xend stops:
+          - ignore:         Domain continues to run;
+          - shutdown:       Domain is shutdown;
+          - suspend:        Domain is suspended;
+          """)
 
 def err(msg):
     """Print an error to stderr and exit.
@@ -490,7 +520,6 @@ def configure_disks(config_devs, vals):
     """Create the config for disks (virtual block devices).
     """
     for (uname, dev, mode, backend) in vals.disk:
-
         if uname.startswith('tap:'):
             cls = 'tap'
         else:
@@ -576,27 +605,28 @@ def configure_vtpm(config_devs, vals):
     """Create the config for virtual TPM interfaces.
     """
     vtpm = vals.vtpm
-    vtpm_n = 1
-    for idx in range(0, vtpm_n):
-        if idx < len(vtpm):
-            d = vtpm[idx]
-            instance = d.get('instance')
-            if instance == "VTPMD":
-                instance = "0"
-            else:
-                if instance != None:
-                    try:
-                        if int(instance) == 0:
-                            err('VM config error: vTPM instance must not be 0.')
-                    except ValueError:
-                        err('Vm config error: could not parse instance number.')
-            backend = d.get('backend')
-            config_vtpm = ['vtpm']
-            if instance:
-                config_vtpm.append(['pref_instance', instance])
-            if backend:
-                config_vtpm.append(['backend', backend])
-            config_devs.append(['device', config_vtpm])
+    if len(vtpm) > 0:
+        d = vtpm[0]
+        instance = d.get('instance')
+        if instance == "VTPMD":
+            instance = "0"
+        else:
+            if instance != None:
+                try:
+                    if int(instance) == 0:
+                        err('VM config error: vTPM instance must not be 0.')
+                except ValueError:
+                    err('Vm config error: could not parse instance number.')
+        backend = d.get('backend')
+        typ = d.get('type')
+        config_vtpm = ['vtpm']
+        if instance:
+            config_vtpm.append(['pref_instance', instance])
+        if backend:
+            config_vtpm.append(['backend', backend])
+        if typ:
+            config_vtpm.append(['type', type])
+        config_devs.append(['device', config_vtpm])
 
 
 def configure_vifs(config_devs, vals):
@@ -636,11 +666,13 @@ def configure_hvm(config_image, vals):
     """
     args = [ 'device_model', 'pae', 'vcpus', 'boot', 'fda', 'fdb',
              'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'soundhw',
-             'vnc', 'vncdisplay', 'vncunused', 'vncconsole', 'sdl', 'display',
-             'acpi', 'apic', 'xauthority', 'usb', 'usbdevice' ]
+             'vnc', 'vncdisplay', 'vncunused', 'vncconsole', 'vnclisten',
+             'sdl', 'display', 'xauthority',
+             'acpi', 'apic', 'usb', 'usbdevice', 'keymap' ]
     for a in args:
-        if (vals.__dict__[a]):
+        if a in vals.__dict__ and vals.__dict__[a] is not None:
             config_image.append([a, vals.__dict__[a]])
+    config_image.append(['vncpasswd', vals.vncpasswd])
 
 def run_bootloader(vals, config_image):
     if not os.access(vals.bootloader, os.X_OK):
@@ -671,8 +703,9 @@ def make_config(vals):
                 config.append([n, v])
 
     map(add_conf, ['name', 'memory', 'maxmem', 'shadow_memory',
-                   'restart', 'on_poweroff', 'on_reboot', 'on_crash',
-                   'vcpus', 'features'])
+                   'restart', 'on_poweroff',
+                   'on_reboot', 'on_crash', 'vcpus', 'features',
+                   'on_xend_start', 'on_xend_stop'])
 
     if vals.uuid is not None:
         config.append(['uuid', vals.uuid])
@@ -680,6 +713,8 @@ def make_config(vals):
         config.append(['cpu', vals.cpu])
     if vals.cpus is not None:
         config.append(['cpus', vals.cpus])
+    if vals.cpu_cap is not None:
+        config.append(['cpu_cap', vals.cpu_cap])
     if vals.cpu_weight is not None:
         config.append(['cpu_weight', vals.cpu_weight])
     if vals.blkif:
@@ -696,7 +731,7 @@ def make_config(vals):
         config_image = run_bootloader(vals, config_image)
         config.append(['bootloader', vals.bootloader])
         if vals.bootargs:
-            config.append(['bootloader_args'], vals.bootargs)
+            config.append(['bootloader_args', vals.bootargs])
     config.append(['image', config_image])
 
     config_devs = []
@@ -851,7 +886,6 @@ def choose_vnc_display():
         if port in ports: continue
         return d
     return None
-
 vncpid = None
 
 def daemonize(prog, args):
@@ -885,7 +919,6 @@ def daemonize(prog, args):
             w.write(str(pid2 or 0))
             w.close()
             os._exit(0)
-
     os.close(w)
     r = os.fdopen(r)
     daemon_pid = int(r.read())
@@ -904,6 +937,7 @@ def spawn_vnc(display):
     vncpid = daemonize("vncviewer", vncargs)
     if vncpid == 0:
         return 0
+
     return VNC_BASE_PORT + display
 
 def preprocess_vnc(vals):
@@ -1019,11 +1053,10 @@ def get_xauthority():
 def parseCommandLine(argv):
     gopts.reset()
     args = gopts.parse(argv)
-    if gopts.vals.help:
-        gopts.usage()
+
     if gopts.vals.help or gopts.vals.help_config:
-        gopts.load_defconfig(help=1)
-    if gopts.vals.help or gopts.vals.help_config:
+        if gopts.vals.help_config:
+            print gopts.val_usage()
         return (None, None)
 
     if not gopts.vals.display:
@@ -1091,7 +1124,6 @@ def check_domain_label(config, verbose):
 
     return answer
 
-
 def config_security_check(config, verbose):
     """Checks each resource listed in the config to see if the active
        policy will permit creation of a new domain using the config.
@@ -1139,12 +1171,16 @@ def config_security_check(config, verbose):
         except security.ACMError:
             print "   %s: DENIED" % (resource)
             (res_label, res_policy) = security.get_res_label(resource)
-            print "   --> res:"+res_label+" ("+res_policy+")"
-            print "   --> dom:"+domain_label+" ("+domain_policy+")"
+            if not res_label:
+                res_label = ""
+            print "   --> res: %s (%s)" % (str(res_label),
+                                           str(res_policy))
+            print "   --> dom: %s (%s)" % (str(domain_label),
+                                           str(domain_policy))
+
             answer = 0
 
     return answer
-
 
 def create_security_check(config):
     passed = 0
@@ -1158,7 +1194,9 @@ def create_security_check(config):
         sys.exit(-1)
 
     return passed
-
+  
+def help():
+    return str(gopts)
 
 def main(argv):
     try:
@@ -1170,17 +1208,20 @@ def main(argv):
         return
 
     if type(config) == str:
+        try:
             config = sxp.parse(file(config))[0]
+        except IOError, exn:
+            raise OptionError("Cannot read file %s: %s" % (config, exn[1]))
 
     if opts.vals.dryrun:
         PrettyPrint.prettyprint(config)
     else:
         if not create_security_check(config):
-            err("Security configuration prevents domain from starting.")
+            raise security.ACMError('Security Configuration prevents domain from starting')
         else:
             dom = make_domain(opts, config)
             if opts.vals.console_autoconnect:
-                console.execConsole(dom)
-        
+                console.execConsole(dom)        
+             
 if __name__ == '__main__':
     main(sys.argv)

@@ -15,6 +15,7 @@
 #include <asm/current.h>
 #include <asm/flushtlb.h>
 #include <asm/msr.h>
+#include <asm/page.h>
 #include <asm/shadow.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
@@ -41,7 +42,7 @@ void show_registers(struct cpu_user_regs *regs)
     unsigned long fault_crs[8];
     const char *context;
 
-    if ( hvm_guest(current) && guest_mode(regs) )
+    if ( is_hvm_vcpu(current) && guest_mode(regs) )
     {
         context = "hvm";
         hvm_store_cpu_guest_regs(current, &fault_regs, fault_crs);
@@ -171,16 +172,8 @@ asmlinkage void do_double_fault(struct cpu_user_regs *regs)
            regs->r12, regs->r13, regs->r14);
     printk("r15: %016lx\n", regs->r15);
     show_stack_overflow(regs->rsp);
-    printk("************************************\n");
-    printk("CPU%d DOUBLE FAULT -- system shutdown\n", cpu);
-    printk("System needs manual reset.\n");
-    printk("************************************\n");
 
-    /* Lock up the console to prevent spurious output from other CPUs. */
-    console_force_lock();
-
-    /* Wait for manual reset. */
-    machine_halt();
+    panic("DOUBLE FAULT -- system shutdown\n");
 }
 
 void toggle_guest_mode(struct vcpu *v)
@@ -188,7 +181,12 @@ void toggle_guest_mode(struct vcpu *v)
     v->arch.flags ^= TF_kernel_mode;
     __asm__ __volatile__ ( "swapgs" );
     update_cr3(v);
+#ifdef USER_MAPPINGS_ARE_GLOBAL
+    /* Don't flush user global mappings from the TLB. Don't tick TLB clock. */
+    __asm__ __volatile__ ( "mov %0, %%cr3" : : "r" (v->arch.cr3) : "memory" );
+#else
     write_ptbase(v);
+#endif
 }
 
 unsigned long do_iret(void)
@@ -200,8 +198,9 @@ unsigned long do_iret(void)
     if ( unlikely(copy_from_user(&iret_saved, (void *)regs->rsp,
                                  sizeof(iret_saved))) )
     {
-        DPRINTK("Fault while reading IRET context from guest stack\n");
-        domain_crash_synchronous();
+        gdprintk(XENLOG_ERR, "Fault while reading IRET context from "
+                "guest stack\n");
+        goto exit_and_crash;
     }
 
     /* Returning to user mode? */
@@ -209,8 +208,9 @@ unsigned long do_iret(void)
     {
         if ( unlikely(pagetable_is_null(v->arch.guest_table_user)) )
         {
-            DPRINTK("Guest switching to user mode with no user page tables\n");
-            domain_crash_synchronous();
+            gdprintk(XENLOG_ERR, "Guest switching to user mode with no "
+                    "user page tables\n");
+            goto exit_and_crash;
         }
         toggle_guest_mode(v);
     }
@@ -221,7 +221,7 @@ unsigned long do_iret(void)
     regs->rsp    = iret_saved.rsp;
     regs->ss     = iret_saved.ss | 3; /* force guest privilege */
 
-    if ( !(iret_saved.flags & VGCF_IN_SYSCALL) )
+    if ( !(iret_saved.flags & VGCF_in_syscall) )
     {
         regs->entry_vector = 0;
         regs->r11 = iret_saved.r11;
@@ -236,6 +236,11 @@ unsigned long do_iret(void)
 
     /* Saved %rax gets written back to regs->rax in entry.S. */
     return iret_saved.rax;
+
+ exit_and_crash:
+    gdprintk(XENLOG_ERR, "Fatal error\n");
+    domain_crash(v->domain);
+    return 0;
 }
 
 asmlinkage void syscall_enter(void);
@@ -285,9 +290,9 @@ void __init percpu_traps_init(void)
     stack[14] = 0x41;
     stack[15] = 0x53;
 
-    /* pushq $__GUEST_CS64 */
+    /* pushq $FLAT_KERNEL_CS64 */
     stack[16] = 0x68;
-    *(u32 *)&stack[17] = __GUEST_CS64;
+    *(u32 *)&stack[17] = FLAT_KERNEL_CS64;
 
     /* jmp syscall_enter */
     stack[21] = 0xe9;
@@ -317,9 +322,9 @@ void __init percpu_traps_init(void)
     stack[14] = 0x41;
     stack[15] = 0x53;
 
-    /* pushq $__GUEST_CS32 */
+    /* pushq $FLAT_KERNEL_CS32 */
     stack[16] = 0x68;
-    *(u32 *)&stack[17] = __GUEST_CS32;
+    *(u32 *)&stack[17] = FLAT_KERNEL_CS32;
 
     /* jmp syscall_enter */
     stack[21] = 0xe9;
@@ -369,7 +374,7 @@ static long register_guest_callback(struct callback_register *reg)
         break;
 
     default:
-        ret = -EINVAL;
+        ret = -ENOSYS;
         break;
     }
 
@@ -382,12 +387,18 @@ static long unregister_guest_callback(struct callback_unregister *unreg)
 
     switch ( unreg->type )
     {
+    case CALLBACKTYPE_event:
+    case CALLBACKTYPE_failsafe:
+    case CALLBACKTYPE_syscall:
+        ret = -EINVAL;
+        break;
+
     case CALLBACKTYPE_nmi:
         ret = unregister_guest_nmi_callback();
         break;
 
     default:
-        ret = -EINVAL;
+        ret = -ENOSYS;
         break;
     }
 
@@ -426,7 +437,7 @@ long do_callback_op(int cmd, XEN_GUEST_HANDLE(void) arg)
     break;
 
     default:
-        ret = -EINVAL;
+        ret = -ENOSYS;
         break;
     }
 
@@ -492,7 +503,7 @@ static void hypercall_page_initialise_ring3_kernel(void *hypercall_page)
 
 void hypercall_page_initialise(struct domain *d, void *hypercall_page)
 {
-    if ( hvm_guest(d->vcpu[0]) )
+    if ( is_hvm_domain(d) )
         hvm_hypercall_page_initialise(d, hypercall_page);
     else
         hypercall_page_initialise_ring3_kernel(hypercall_page);

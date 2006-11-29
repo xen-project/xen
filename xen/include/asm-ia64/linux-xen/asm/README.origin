@@ -5,7 +5,9 @@
 # (e.g. with #ifdef XEN or XEN in a comment) so that they can be
 # easily updated to future versions of the corresponding Linux files.
 
+acpi.h			-> linux/include/asm-ia64/acpi.h
 asmmacro.h		-> linux/include/asm-ia64/asmmacro.h
+atomic.h		-> linux/include/asm-ia64/atomic.h
 cache.h			-> linux/include/asm-ia64/cache.h
 gcc_intrin.h		-> linux/include/asm-ia64/gcc_intrin.h
 ia64regs.h		-> linux/include/asm-ia64/ia64regs.h
@@ -13,6 +15,7 @@ io.h			-> linux/include/asm-ia64/io.h
 kregs.h			-> linux/include/asm-ia64/kregs.h
 mca_asm.h		-> linux/include/asm-ia64/mca_asm.h
 meminit.h		-> linux/include/asm-ia64/meminit.h
+numa.h			-> linux/include/asm-ia64/numa.h
 page.h			-> linux/include/asm-ia64/page.h
 pal.h			-> linux/include/asm-ia64/pal.h
 pgalloc.h		-> linux/include/asm-ia64/pgalloc.h

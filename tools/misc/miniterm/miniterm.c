@@ -32,10 +32,11 @@
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <string.h>
 
 #define DEFAULT_BAUDRATE   115200
 #define DEFAULT_SERDEVICE  "/dev/ttyS0"
-#define ENDMINITERM        2  /* ctrl-b to quit miniterm */
+#define ENDMINITERM        0x1d
 
 volatile int stop = 0;
 
@@ -76,7 +77,11 @@ int main(int argc, char **argv)
     char            *sername = DEFAULT_SERDEVICE;
     struct termios   oldsertio, newsertio, oldstdtio, newstdtio;
     struct sigaction sa;
- 
+    static char start_str[] = 
+        "************ REMOTE CONSOLE: CTRL-] TO QUIT ********\r\n";
+    static char end_str[] =
+        "\n************ REMOTE CONSOLE EXITED *****************\n";
+
     while ( --argc != 0 )
     {
         char *p = argv[argc];
@@ -121,7 +126,7 @@ int main(int argc, char **argv)
     newsertio.c_iflag = IGNBRK | IGNPAR;
 
     /* Raw output. */
-    newsertio.c_oflag = 0; 
+    newsertio.c_oflag = OPOST;
 
     /* No echo and no signals. */
     newsertio.c_lflag = 0;
@@ -137,7 +142,13 @@ int main(int argc, char **argv)
     /* next stop echo and buffering for stdin */
     tcgetattr(0,&oldstdtio);
     tcgetattr(0,&newstdtio); /* get working stdtio */
-    newstdtio.c_lflag &= ~(ICANON | ECHO);
+    newstdtio.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+    newstdtio.c_oflag &= ~OPOST;
+    newstdtio.c_cflag &= ~(CSIZE | PARENB);
+    newstdtio.c_cflag |= CS8;
+    newstdtio.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
+    newstdtio.c_cc[VMIN]=1;
+    newstdtio.c_cc[VTIME]=0;
     tcsetattr(0,TCSANOW,&newstdtio);
 
     /* Terminal settings done: now enter the main I/O loops. */
@@ -145,7 +156,7 @@ int main(int argc, char **argv)
     {
     case 0:
         close(1); /* stdout not needed */
-        for ( c = getchar(); c != ENDMINITERM ; c = getchar() ) 
+        for ( c = (char)getchar(); c != ENDMINITERM; c = (char)getchar() )
             write(fd,&c,1);
         tcsetattr(fd,TCSANOW,&oldsertio);
         tcsetattr(0,TCSANOW,&oldstdtio);
@@ -158,7 +169,7 @@ int main(int argc, char **argv)
         close(fd);
         exit(-1);
     default:
-        printf("** ctrl-b quits miniterm **\n");
+        write(1, start_str, strlen(start_str));
         close(0); /* stdin not needed */
         sa.sa_handler = child_handler;
         sa.sa_flags = 0;
@@ -166,9 +177,11 @@ int main(int argc, char **argv)
         while ( !stop )
         {
             read(fd,&c,1); /* modem */
+            c = (char)c;
             write(1,&c,1); /* stdout */
         }
         wait(NULL); /* wait for child to die or it will become a zombie */
+        write(1, end_str, strlen(end_str));
         break;
     }
 

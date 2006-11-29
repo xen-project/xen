@@ -34,6 +34,7 @@
 #include <public/version.h>
 #include <asm/dom_fw.h>
 #include <xen/domain.h>
+#include <asm/vmx.h> 
 
 long
 do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
@@ -78,8 +79,33 @@ do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
+    case HVMOP_set_irq_level:
+    {
+        struct xen_hvm_set_irq_level op;
+        struct domain *d;
+
+        if (copy_from_guest(&op, arg, 1))
+            return -EFAULT;
+
+        if (!IS_PRIV(current->domain))
+            return -EPERM;
+
+        d = find_domain_by_id(op.domid);
+        if (d == NULL)
+            return -ESRCH;
+
+        rc = -EINVAL;
+        if (is_hvm_domain(d)) {
+            vmx_vioapic_set_irq(d, op.irq, op.level);
+            rc = 0;
+        }
+
+        put_domain(d);
+        break;
+    }
+
     default:
-        DPRINTK("Bad HVM op %ld.\n", op);
+        gdprintk(XENLOG_INFO, "Bad HVM op %ld.\n", op);
         rc = -ENOSYS;
     }
     return rc;

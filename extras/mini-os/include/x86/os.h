@@ -19,6 +19,8 @@
 #include <types.h>
 #include <hypervisor.h>
 
+#define USED    __attribute__ ((used))
+
 extern void do_exit(void);
 #define BUG do_exit
 
@@ -60,6 +62,11 @@ extern void do_exit(void);
 extern shared_info_t *HYPERVISOR_shared_info;
 
 void trap_init(void);
+
+void arch_init(start_info_t *si);
+void arch_print_info(void);
+
+
 
 
 

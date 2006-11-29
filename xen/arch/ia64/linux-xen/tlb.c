@@ -111,7 +111,10 @@ void
 local_flush_tlb_all (void)
 {
 	unsigned long i, j, flags, count0, count1, stride0, stride1, addr;
-
+#ifdef XEN
+	/* increment flush clock before mTLB flush */
+	u32 flush_time = tlbflush_clock_inc_and_return();
+#endif
 	addr    = local_cpu_data->ptce_base;
 	count0  = local_cpu_data->ptce_count[0];
 	count1  = local_cpu_data->ptce_count[1];
@@ -128,6 +131,10 @@ local_flush_tlb_all (void)
 	}
 	local_irq_restore(flags);
 	ia64_srlz_i();			/* srlz.i implies srlz.d */
+#ifdef XEN
+	/* update after mTLB flush. */
+	tlbflush_update_time(&__get_cpu_var(tlbflush_time), flush_time);
+#endif
 }
 EXPORT_SYMBOL(local_flush_tlb_all);
 

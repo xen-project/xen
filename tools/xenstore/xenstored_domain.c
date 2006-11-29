@@ -501,18 +501,35 @@ int domain_init(void)
 	return xce_handle;
 }
 
-void domain_entry_inc(struct connection *conn)
+void domain_entry_inc(struct connection *conn, struct node *node)
 {
-	if (!conn || !conn->domain)
+	struct domain *d;
+
+	if (!conn)
 		return;
-	conn->domain->nbentry++;
+
+	if (node->perms && node->perms[0].id != conn->id) {
+		d = find_domain_by_domid(node->perms[0].id);
+		if (d)
+			d->nbentry++;
+	}
+	else if (conn->domain) {
+		conn->domain->nbentry++;
+	}
 }
 
-void domain_entry_dec(struct connection *conn)
+void domain_entry_dec(struct connection *conn, struct node *node)
 {
-	if (!conn || !conn->domain)
+	struct domain *d;
+
+	if (!conn)
 		return;
-	if (conn->domain->nbentry)
+
+	if (node->perms && node->perms[0].id != conn->id) {
+		d = find_domain_by_domid(node->perms[0].id);
+		if (d && d->nbentry)
+			d->nbentry--;
+	} else if (conn->domain && conn->domain->nbentry)
 		conn->domain->nbentry--;
 }
 

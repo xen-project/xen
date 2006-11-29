@@ -52,6 +52,70 @@ struct mmio_list *lookup_mmio(u64 gpa, struct mmio_list *mio_base)
 #define PIB_OFST_INTA           0x1E0000
 #define PIB_OFST_XTP            0x1E0008
 
+#define HVM_BUFFERED_IO_RANGE_NR 1
+
+struct hvm_buffered_io_range {
+    unsigned long start_addr;
+    unsigned long length;
+};
+
+static struct hvm_buffered_io_range buffered_stdvga_range = {0xA0000, 0x20000};
+static struct hvm_buffered_io_range
+*hvm_buffered_io_ranges[HVM_BUFFERED_IO_RANGE_NR] =
+{
+    &buffered_stdvga_range
+};
+
+int hvm_buffered_io_intercept(ioreq_t *p)
+{
+    struct vcpu *v = current;
+    spinlock_t  *buffered_io_lock;
+    buffered_iopage_t *buffered_iopage =
+        (buffered_iopage_t *)(v->domain->arch.hvm_domain.buffered_io_va);
+    unsigned long tmp_write_pointer = 0;
+    int i;
+
+    /* ignore READ ioreq_t! */
+    if ( p->dir == IOREQ_READ )
+        return 0;
+
+    for ( i = 0; i < HVM_BUFFERED_IO_RANGE_NR; i++ ) {
+        if ( p->addr >= hvm_buffered_io_ranges[i]->start_addr &&
+             p->addr + p->size - 1 < hvm_buffered_io_ranges[i]->start_addr +
+                                     hvm_buffered_io_ranges[i]->length )
+            break;
+    }
+
+    if ( i == HVM_BUFFERED_IO_RANGE_NR )
+        return 0;
+
+    buffered_io_lock = &v->domain->arch.hvm_domain.buffered_io_lock;
+    spin_lock(buffered_io_lock);
+
+    if ( buffered_iopage->write_pointer - buffered_iopage->read_pointer ==
+         (unsigned long)IOREQ_BUFFER_SLOT_NUM ) {
+        /* the queue is full.
+         * send the iopacket through the normal path.
+         * NOTE: The arithimetic operation could handle the situation for
+         * write_pointer overflow.
+         */
+        spin_unlock(buffered_io_lock);
+        return 0;
+    }
+
+    tmp_write_pointer = buffered_iopage->write_pointer % IOREQ_BUFFER_SLOT_NUM;
+
+    memcpy(&buffered_iopage->ioreq[tmp_write_pointer], p, sizeof(ioreq_t));
+
+    /*make the ioreq_t visible before write_pointer*/
+    wmb();
+    buffered_iopage->write_pointer++;
+
+    spin_unlock(buffered_io_lock);
+
+    return 1;
+}
+
 static void write_ipi (VCPU *vcpu, uint64_t addr, uint64_t value);
 
 static void pib_write(VCPU *vcpu, void *src, uint64_t pib_off, size_t s, int ma)
@@ -80,7 +144,7 @@ static void pib_write(VCPU *vcpu, void *src, uint64_t pib_off, size_t s, int ma)
             }
         }
         else {      // upper half
-            printf("IPI-UHF write %lx\n",pib_off);
+            printk("IPI-UHF write %lx\n",pib_off);
             panic_domain(NULL,"Not support yet for SM-VP\n");
         }
         break;
@@ -114,7 +178,7 @@ static void pib_read(VCPU *vcpu, uint64_t pib_off, void *dest, size_t s, int ma)
             }
             else {
 #ifdef  IPI_DEBUG
-                printf("IPI-LHF read %lx\n",pib_off);
+                printk("IPI-LHF read %lx\n",pib_off);
 #endif
                 *(uint64_t *)dest = 0;  // TODO for SM-VP
             }
@@ -125,7 +189,7 @@ static void pib_read(VCPU *vcpu, uint64_t pib_off, void *dest, size_t s, int ma)
             }
             else {
 #ifdef  IPI_DEBUG
-                printf("IPI-UHF read %lx\n",pib_off);
+                printk("IPI-UHF read %lx\n",pib_off);
 #endif
                 *(uint8_t *)dest = 0;   // TODO for SM-VP
             }
@@ -150,16 +214,20 @@ static void low_mmio_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
     p->count = 1;
     p->dir = dir;
     if(dir==IOREQ_WRITE)     //write;
-        p->u.data = *val;
-    p->pdata_valid = 0;
+        p->data = *val;
+    p->data_is_ptr = 0;
     p->type = 1;
     p->df = 0;
 
     p->io_count++;
-
+    if(hvm_buffered_io_intercept(p)){
+        p->state = STATE_IORESP_READY;
+        vmx_io_assist(v);
+        return ;
+    }else 
     vmx_send_assist_req(v);
     if(dir==IOREQ_READ){ //read
-        *val=p->u.data;
+        *val=p->data;
     }
     return;
 }
@@ -181,8 +249,8 @@ static void legacy_io_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
     p->count = 1;
     p->dir = dir;
     if(dir==IOREQ_WRITE)     //write;
-        p->u.data = *val;
-    p->pdata_valid = 0;
+        p->data = *val;
+    p->data_is_ptr = 0;
     p->type = 0;
     p->df = 0;
 
@@ -190,15 +258,15 @@ static void legacy_io_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
 
     vmx_send_assist_req(v);
     if(dir==IOREQ_READ){ //read
-        *val=p->u.data;
+        *val=p->data;
     }
 #ifdef DEBUG_PCI
     if(dir==IOREQ_WRITE)
         if(p->addr == 0xcf8UL)
-            printk("Write 0xcf8, with val [0x%lx]\n", p->u.data);
+            printk("Write 0xcf8, with val [0x%lx]\n", p->data);
     else
         if(p->addr == 0xcfcUL)
-            printk("Read 0xcfc, with val [0x%lx]\n", p->u.data);
+            printk("Read 0xcfc, with val [0x%lx]\n", p->data);
 #endif //DEBUG_PCI
     return;
 }
@@ -312,6 +380,24 @@ memread_p(VCPU *vcpu, u64 *src, u64 *dest, size_t s)
 }
 */
 
+/*
+ * To inject INIT to guest, we must set the PAL_INIT entry 
+ * and set psr to switch to physical mode
+ */
+#define PAL_INIT_ENTRY 0x80000000ffffffa0
+#define PSR_SET_BITS (IA64_PSR_DT | IA64_PSR_IT | IA64_PSR_RT |	\
+                      IA64_PSR_IC | IA64_PSR_RI)
+
+static void vmx_inject_guest_pal_init(VCPU *vcpu)
+{
+    REGS *regs = vcpu_regs(vcpu);
+    uint64_t psr = vmx_vcpu_get_psr(vcpu);
+
+    regs->cr_iip = PAL_INIT_ENTRY;
+
+    psr = psr & (~PSR_SET_BITS);
+    vmx_vcpu_set_psr(vcpu,psr);
+}
 
 /*
  * Deliver IPI message. (Only U-VP is supported now)
@@ -321,7 +407,7 @@ memread_p(VCPU *vcpu, u64 *src, u64 *dest, size_t s)
 static void deliver_ipi (VCPU *vcpu, uint64_t dm, uint64_t vector)
 {
 #ifdef  IPI_DEBUG
-  printf ("deliver_ipi %lx %lx\n",dm,vector);
+  printk ("deliver_ipi %lx %lx\n",dm,vector);
 #endif
     switch ( dm ) {
     case 0:     // INT
@@ -335,8 +421,7 @@ static void deliver_ipi (VCPU *vcpu, uint64_t dm, uint64_t vector)
         vmx_vcpu_pend_interrupt (vcpu, 2);
         break;
     case 5:     // INIT
-        // TODO -- inject guest INIT
-        panic_domain (NULL, "Inject guest INIT!\n");
+        vmx_inject_guest_pal_init(vcpu);
         break;
     case 7:     // ExtINT
         vmx_vcpu_pend_interrupt (vcpu, 0);
@@ -387,7 +472,7 @@ static void write_ipi (VCPU *vcpu, uint64_t addr, uint64_t value)
         memset (&c, 0, sizeof (c));
 
         if (arch_set_info_guest (targ, &c) != 0) {
-            printf ("arch_boot_vcpu: failure\n");
+            printk ("arch_boot_vcpu: failure\n");
             return;
         }
         /* First or next rendez-vous: set registers.  */
@@ -397,11 +482,11 @@ static void write_ipi (VCPU *vcpu, uint64_t addr, uint64_t value)
 
         if (test_and_clear_bit(_VCPUF_down,&targ->vcpu_flags)) {
             vcpu_wake(targ);
-            printf ("arch_boot_vcpu: vcpu %d awaken %016lx!\n",
+            printk ("arch_boot_vcpu: vcpu %d awaken %016lx!\n",
                     targ->vcpu_id, targ_regs->cr_iip);
         }
         else
-            printf ("arch_boot_vcpu: huu, already awaken!");
+            printk ("arch_boot_vcpu: huu, already awaken!");
     }
     else {
         int running = test_bit(_VCPUF_running,&targ->vcpu_flags);
@@ -428,7 +513,7 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
     IA64_BUNDLE bundle;
     int slot, dir=0, inst_type;
     size_t size;
-    u64 data, value,post_update, slot1a, slot1b, temp;
+    u64 data, post_update, slot1a, slot1b, temp;
     INST64 inst;
     regs=vcpu_regs(vcpu);
     if (IA64_RETRY == __vmx_get_domain_bundle(regs->cr_iip, &bundle)) {
@@ -454,7 +539,6 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
             vcpu_get_gr_nat(vcpu,inst.M4.r2,&data);
         }else if((inst.M1.x6>>2)<0xb){   //  read
             dir=IOREQ_READ;
-            vcpu_get_gr_nat(vcpu,inst.M1.r1,&value);
         }
     }
     // Integer Load + Reg update
@@ -462,7 +546,6 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
         inst_type = SL_INTEGER;
         dir = IOREQ_READ;     //write
         size = (inst.M2.x6&0x3);
-        vcpu_get_gr_nat(vcpu,inst.M2.r1,&value);
         vcpu_get_gr_nat(vcpu,inst.M2.r3,&temp);
         vcpu_get_gr_nat(vcpu,inst.M2.r2,&post_update);
         temp += post_update;
@@ -485,7 +568,6 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
 
         }else if((inst.M3.x6>>2)<0xb){   //  read
             dir=IOREQ_READ;
-            vcpu_get_gr_nat(vcpu,inst.M3.r1,&value);
             vcpu_get_gr_nat(vcpu,inst.M3.r3,&temp);
             post_update = (inst.M3.i<<7)+inst.M3.imm7;
             if(inst.M3.s)
@@ -597,13 +679,6 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
         mmio_access(vcpu, padr, &data, size, ma, dir);
     }else{
         mmio_access(vcpu, padr, &data, size, ma, dir);
-        if(size==1)
-            data = (value & 0xffffffffffffff00U) | (data & 0xffU);
-        else if(size==2)
-            data = (value & 0xffffffffffff0000U) | (data & 0xffffU);
-        else if(size==4)
-            data = (value & 0xffffffff00000000U) | (data & 0xffffffffU);
-
         if(inst_type==SL_INTEGER){       //gp
             vcpu_set_gr(vcpu,inst.M1.r1,data,0);
         }else{

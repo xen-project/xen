@@ -88,9 +88,10 @@ static void ppro_setup_ctrs(struct op_msrs const * const msrs)
 	}
 }
 
-
 extern void xenoprof_log_event(struct vcpu *v, unsigned long eip,
 			       int mode, int event);
+extern int xenoprofile_get_mode(struct vcpu *v,
+				struct cpu_user_regs * const regs);
  
 static int ppro_check_ctrs(unsigned int const cpu,
                            struct op_msrs const * const msrs,
@@ -100,13 +101,8 @@ static int ppro_check_ctrs(unsigned int const cpu,
 	int i;
 	int ovf = 0;
 	unsigned long eip = regs->eip;
-	int mode = 0;
+	int mode = xenoprofile_get_mode(current, regs);
 
-	if ( guest_kernel_mode(current, regs) ) 
-		mode = 1;
-	else if ( ring_0(regs) )
-		mode = 2;
- 
 	for (i = 0 ; i < NUM_COUNTERS; ++i) {
 		CTR_READ(low, high, msrs, i);
 		if (CTR_OVERFLOWED(low)) {

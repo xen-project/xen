@@ -11,7 +11,7 @@ from XmTestLib import *
 if ENABLE_HVM_SUPPORT:
     SKIP("Block-list not supported for HVM domains")
 
-config = {"disk":"phy:/dev/ram0,hda1,w"}
+config = {"disk":"phy:/dev/ram0,xvda1,w"}
 domain = XmTestDomain(extraConfig=config)
 
 try:
@@ -26,14 +26,14 @@ if status != 0:
     FAIL("Fail to list block device")
 
 #Add another virtual block device to the domain
-status, output = traceCommand("xm block-attach %s phy:/dev/ram1 hda2 w" % domain.getId())
+status, output = traceCommand("xm block-attach %s phy:/dev/ram1 xvda2 w" % domain.getId())
 if status != 0:
     FAIL("Fail to attach block device")
 
 #Verify block-list on Domain0
 status, output = traceCommand("xm block-list %s" % domain.getId())
-eyecatcher1 = "769"
-eyecatcher2 = "770"
+eyecatcher1 = "51713"
+eyecatcher2 = "51714"
 where1 = output.find(eyecatcher1)
 where2 = output.find(eyecatcher2)
 if status != 0:
@@ -43,7 +43,7 @@ elif (where1 < 0) and (where2 < 0):
 
 #Verify attached block device on DomainU
 try:
-    run = console.runCmd("cat /proc/partitions | grep hda1;cat /proc/partitions | grep hda2")
+    run = console.runCmd("cat /proc/partitions | grep xvda1;cat /proc/partitions | grep xvda2")
 except ConsoleError, e:
     saveLog(console.getHistory())
     FAIL(str(e))

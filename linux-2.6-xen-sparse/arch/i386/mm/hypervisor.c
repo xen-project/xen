@@ -99,18 +99,6 @@ void xen_l4_entry_update(pgd_t *ptr, pgd_t val)
 }
 #endif /* CONFIG_X86_64 */
 
-void xen_machphys_update(unsigned long mfn, unsigned long pfn)
-{
-	mmu_update_t u;
-	if (xen_feature(XENFEAT_auto_translated_physmap)) {
-		BUG_ON(pfn != mfn);
-		return;
-	}
-	u.ptr = ((unsigned long long)mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
-	u.val = pfn;
-	BUG_ON(HYPERVISOR_mmu_update(&u, 1, NULL, DOMID_SELF) < 0);
-}
-
 void xen_pt_switch(unsigned long ptr)
 {
 	struct mmuext_op op;
@@ -325,6 +313,7 @@ int xen_create_contiguous_region(
 	success = (exchange.nr_exchanged == (1UL << order));
 	BUG_ON(!success && ((exchange.nr_exchanged != 0) || (rc == 0)));
 	BUG_ON(success && (rc != 0));
+#ifdef CONFIG_XEN_COMPAT_030002
 	if (unlikely(rc == -ENOSYS)) {
 		/* Compatibility when XENMEM_exchange is unsupported. */
 		if (HYPERVISOR_memory_op(XENMEM_decrease_reservation,
@@ -341,6 +330,7 @@ int xen_create_contiguous_region(
 				BUG();
 		}
 	}
+#endif
 
 	/* 3. Map the new extent in place of old pages. */
 	for (i = 0; i < (1UL<<order); i++) {
@@ -419,6 +409,7 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 	success = (exchange.nr_exchanged == 1);
 	BUG_ON(!success && ((exchange.nr_exchanged != 0) || (rc == 0)));
 	BUG_ON(success && (rc != 0));
+#ifdef CONFIG_XEN_COMPAT_030002
 	if (unlikely(rc == -ENOSYS)) {
 		/* Compatibility when XENMEM_exchange is unsupported. */
 		if (HYPERVISOR_memory_op(XENMEM_decrease_reservation,
@@ -429,6 +420,7 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 			BUG();
 		success = 1;
 	}
+#endif
 
 	/* 4. Map new pages in place of old pages. */
 	for (i = 0; i < (1UL<<order); i++) {

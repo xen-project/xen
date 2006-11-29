@@ -1,34 +1,33 @@
 
 ##
-# readme.txt <description to the xen access control architecture>
+# readme.txt <description to the sHype/Xen access control architecture>
 #
 # Author:
-# Reiner Sailer 08/15/2005 <sailer@watson.ibm.com>
+# Reiner Sailer 08/30/2006 <sailer@watson.ibm.com>
 #
 #
 # This file is a toc for information regarding
 # the access control policy and tools in Xen.
 ##
 
-1. 'xm' man page
+1. Xen User Guide
+
+   describes how to configure, install, and deploy the sHype Access
+   Control Module in Xen. See chapter "sHype/Xen Access Control".
+
+2. 'xm' man page
 
    describes the commands related to Xen management, including the
    commands to manage security policies and labels. Read the access
-   control subcommand section of the xm manual first. If it is not
-   built by default, check install.txt.
+   control subcommand section of the xm manual first.
 
-2. policy.txt:
+3. policy.txt
 
-   describes the general reasoning and examples for access
-   control policies in Xen
+   describes examples for access control policies in Xen. First read
+   the policy description in the Xen User Guide.
 
 
-3. install.txt
+4. policytools.txt
 
-   describes the activation of the access control framework
-   in Xen
-
-4. example.txt
-
-   describes the available tools for managing security policies
-   in Xen and the tools to label domains
+   describes the available tools for creating and managing security
+   policies in Xen.

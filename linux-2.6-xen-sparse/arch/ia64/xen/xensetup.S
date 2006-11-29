@@ -23,12 +23,11 @@ GLOBAL_ENTRY(early_xen_setup)
 	
 	mov cr.iva=r10
 
-#if XSI_BASE != 0xf100000000000000UL
-	/* Backward compatibility.  */
-(isBP)	mov r2=0x600
+	/* Set xsi base.  */
+#define FW_HYPERCALL_SET_SHARED_INFO_VA			0x600
+(isBP)	mov r2=FW_HYPERCALL_SET_SHARED_INFO_VA
 (isBP)	movl r28=XSI_BASE;;
 (isBP)	break 0x1000;;
-#endif
 
 	br.ret.sptk.many rp
 	;;
@@ -38,18 +37,18 @@ END(early_xen_setup)
 
 /* Stub for suspend.
    Just force the stacked registers to be written in memory.  */	
-GLOBAL_ENTRY(HYPERVISOR_suspend)
+GLOBAL_ENTRY(xencomm_arch_hypercall_suspend)
+	mov r15=r32
+	;; 
 	alloc r20=ar.pfs,0,0,0,0
-	mov r14=2
-	mov r15=r12
-	;;
+	mov r2=__HYPERVISOR_sched_op
+	;; 
 	/* We don't want to deal with RSE.  */
 	flushrs
-	mov r2=__HYPERVISOR_sched_op
-	st4 [r12]=r14
+	mov r14=2 // SCHEDOP_shutdown
 	;;
 	break 0x1000
 	;; 
 	mov ar.pfs=r20
 	br.ret.sptk.many b0
-END(HYPERVISOR_suspend)
+END(xencomm_arch_hypercall_suspend)

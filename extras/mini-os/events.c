@@ -35,6 +35,21 @@ typedef struct _ev_action_t {
 static ev_action_t ev_actions[NR_EVS];
 void default_handler(evtchn_port_t port, struct pt_regs *regs, void *data);
 
+void unbind_all_ports(void)
+{
+    int i;
+
+	for(i=0;i<NR_EVS;i++)
+	{
+		if(ev_actions[i].handler != default_handler)
+		{
+			struct evtchn_close close;
+			mask_evtchn(i);
+			close.port = i;
+			HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);
+		}
+	}
+}
 
 /*
  * Demux events to different handlers.
@@ -88,19 +103,18 @@ void unbind_evtchn(evtchn_port_t port )
 
 int bind_virq(uint32_t virq, evtchn_handler_t handler, void *data)
 {
-	evtchn_op_t op;
+	evtchn_bind_virq_t op;
 
 	/* Try to bind the virq to a port */
-	op.cmd = EVTCHNOP_bind_virq;
-	op.u.bind_virq.virq = virq;
-	op.u.bind_virq.vcpu = smp_processor_id();
+	op.virq = virq;
+	op.vcpu = smp_processor_id();
 
-	if ( HYPERVISOR_event_channel_op(&op) != 0 )
+	if ( HYPERVISOR_event_channel_op(EVTCHNOP_bind_virq, &op) != 0 )
 	{
 		printk("Failed to bind virtual IRQ %d\n", virq);
 		return 1;
     }
-    bind_evtchn(op.u.bind_virq.port, handler, data);
+    bind_evtchn(op.port, handler, data);
 	return 0;
 }
 
@@ -151,14 +165,13 @@ void default_handler(evtchn_port_t port, struct pt_regs *regs, void *ignore)
 int evtchn_alloc_unbound(domid_t pal, evtchn_handler_t handler,
 						 void *data, evtchn_port_t *port)
 {
-    evtchn_op_t op;
-    op.cmd = EVTCHNOP_alloc_unbound;
-    op.u.alloc_unbound.dom = DOMID_SELF;
-    op.u.alloc_unbound.remote_dom = pal;
-    int err = HYPERVISOR_event_channel_op(&op);
+    evtchn_alloc_unbound_t op;
+    op.dom = DOMID_SELF;
+    op.remote_dom = pal;
+    int err = HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound, &op);
     if (err)
 		return err;
-    *port = bind_evtchn(op.u.alloc_unbound.port, handler, data);
+    *port = bind_evtchn(op.port, handler, data);
     return err;
 }
 
@@ -169,14 +182,13 @@ int evtchn_bind_interdomain(domid_t pal, evtchn_port_t remote_port,
 			    evtchn_handler_t handler, void *data,
 			    evtchn_port_t *local_port)
 {
-    evtchn_op_t op;
-    op.cmd = EVTCHNOP_bind_interdomain;
-    op.u.bind_interdomain.remote_dom = pal;
-    op.u.bind_interdomain.remote_port = remote_port;
-    int err = HYPERVISOR_event_channel_op(&op);
+    evtchn_bind_interdomain_t op;
+    op.remote_dom = pal;
+    op.remote_port = remote_port;
+    int err = HYPERVISOR_event_channel_op(EVTCHNOP_bind_interdomain, &op);
     if (err)
 		return err;
-	evtchn_port_t port = op.u.bind_interdomain.local_port;
+	evtchn_port_t port = op.local_port;
     clear_evtchn(port);	      /* Without, handler gets invoked now! */
     *local_port = bind_evtchn(port, handler, data);
     return err;

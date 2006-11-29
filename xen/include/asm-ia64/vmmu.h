@@ -305,7 +305,8 @@ extern void emulate_io_inst(struct vcpu *vcpu, u64 padr, u64 ma);
 extern int vhpt_enabled(struct vcpu *vcpu, uint64_t vadr, vhpt_ref_t ref);
 extern void vtlb_insert(struct vcpu *vcpu, u64 pte, u64 itir, u64 va);
 extern u64 translate_phy_pte(struct vcpu *v, u64 *pte, u64 itir, u64 va);
-extern void thash_vhpt_insert(struct vcpu *v, u64 pte, u64 itir, u64 ifa);
+extern void thash_vhpt_insert(struct vcpu *v, u64 pte, u64 itir, u64 ifa,
+                              int type);
 extern u64 guest_vhpt_lookup(u64 iha, u64 *pte);
 
 static inline void vmx_vcpu_set_tr (thash_data_t *trp, u64 pte, u64 itir, u64 va, u64 rid)

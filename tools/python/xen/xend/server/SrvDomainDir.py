@@ -39,7 +39,7 @@ class SrvDomainDir(SrvDir):
         self.xd = XendDomain.instance()
 
     def domain(self, x):
-        dom = self.xd.domain_lookup_by_name_or_id(x)
+        dom = self.xd.domain_lookup(x)
         if not dom:
             raise XendError('No such domain ' + str(x))
         return SrvDomain(dom)

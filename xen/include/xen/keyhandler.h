@@ -10,6 +10,9 @@
 #ifndef __XEN_KEYHANDLER_H__
 #define __XEN_KEYHANDLER_H__
 
+/* Initialize keytable with default handlers */
+extern void initialize_keytable(void);
+
 /*
  * Register a callback function for key @key. The callback occurs in
  * softirq context with no locks held and interrupts enabled.

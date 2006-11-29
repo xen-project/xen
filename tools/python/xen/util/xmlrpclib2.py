@@ -21,15 +21,16 @@ An enhanced XML-RPC client/server interface for Python.
 """
 
 import string
-import types
 import fcntl
+from types import *
+    
 
 from httplib import HTTPConnection, HTTP
-from xmlrpclib import Transport
 from SimpleXMLRPCServer import SimpleXMLRPCServer, SimpleXMLRPCRequestHandler
 import SocketServer
 import xmlrpclib, socket, os, stat
 
+from xen.web import connection
 from xen.xend.XendLogging import log
 
 try:
@@ -39,6 +40,23 @@ except ImportError:
     # SSHTransport is disabled on Python <2.4, because it uses the subprocess
     # package.
     ssh_enabled = False
+
+#
+# Convert all integers to strings as described in the Xen API
+#
+
+
+def stringify(value):
+    if isinstance(value, IntType) and not isinstance(value, BooleanType):
+        return str(value)
+    elif isinstance(value, DictType):
+        for k, v in value.items():
+            value[k] = stringify(v)
+        return value
+    elif isinstance(value, (TupleType, ListType)):
+        return [stringify(v) for v in value]
+    else:
+        return value
 
 
 # A new ServerProxy that also supports httpu urls.  An http URL comes in the
@@ -53,6 +71,11 @@ except ImportError:
 class XMLRPCRequestHandler(SimpleXMLRPCRequestHandler):
     protocol_version = "HTTP/1.1"
 
+    def __init__(self, hosts_allowed, request, client_address, server):
+        self.hosts_allowed = hosts_allowed
+        SimpleXMLRPCRequestHandler.__init__(self, request, client_address,
+                                            server)
+
     # this is inspired by SimpleXMLRPCRequestHandler's do_POST but differs
     # in a few non-trivial ways
     # 1) we never generate internal server errors.  We let the exception
@@ -60,6 +83,11 @@ class XMLRPCRequestHandler(SimpleXMLRPCRequestHandler):
     # 2) we don't bother checking for a _dispatch function since we don't
     #    use one
     def do_POST(self):
+        addrport = self.client_address
+        if not connection.hostAllowed(addrport, self.hosts_allowed):
+            self.connection.shutdown(1)
+            return
+
         data = self.rfile.read(int(self.headers["content-length"]))
         rsp = self.server._marshaled_dispatch(data)
 
@@ -81,18 +109,18 @@ class HTTPUnixConnection(HTTPConnection):
 class HTTPUnix(HTTP):
     _connection_class = HTTPUnixConnection
 
-class UnixTransport(Transport):
+class UnixTransport(xmlrpclib.Transport):
     def request(self, host, handler, request_body, verbose=0):
         self.__handler = handler
-        return Transport.request(self, host, '/RPC2', request_body, verbose)
+        return xmlrpclib.Transport.request(self, host, '/RPC2',
+                                           request_body, verbose)
     def make_connection(self, host):
         return HTTPUnix(self.__handler)
 
 
 # See _marshalled_dispatch below.
 def conv_string(x):
-    if (isinstance(x, types.StringType) or
-        isinstance(x, unicode)):
+    if isinstance(x, StringTypes):
         s = string.replace(x, "'", r"\047")
         exec "s = '" + s + "'"
         return s
@@ -133,9 +161,14 @@ class ServerProxy(xmlrpclib.ServerProxy):
 class TCPXMLRPCServer(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
     allow_reuse_address = True
 
-    def __init__(self, addr, requestHandler=XMLRPCRequestHandler,
-                 logRequests=1):
-        SimpleXMLRPCServer.__init__(self, addr, requestHandler, logRequests)
+    def __init__(self, addr, allowed, requestHandler=None,
+                 logRequests = 1):
+        if requestHandler is None:
+            requestHandler = XMLRPCRequestHandler
+        SimpleXMLRPCServer.__init__(self, addr,
+                                    (lambda x, y, z:
+                                     requestHandler(allowed, x, y, z)),
+                                    logRequests)
 
         flags = fcntl.fcntl(self.fileno(), fcntl.F_GETFD)
         flags |= fcntl.FD_CLOEXEC
@@ -169,8 +202,7 @@ class TCPXMLRPCServer(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
             # to transmit the string using Python encoding.
             # Thanks to David Mertz <mertz@gnosis.cx> for the trick (buried
             # in xml_pickle.py).
-            if (isinstance(response, types.StringType) or
-                isinstance(response, unicode)):
+            if isinstance(response, StringTypes):
                 response = repr(response)[1:-1]
 
             response = (response,)
@@ -201,7 +233,7 @@ class UnixXMLRPCRequestHandler(XMLRPCRequestHandler):
 class UnixXMLRPCServer(TCPXMLRPCServer):
     address_family = socket.AF_UNIX
 
-    def __init__(self, addr, logRequests):
+    def __init__(self, addr, allowed, logRequests = 1):
         parent = os.path.dirname(addr)
         if os.path.exists(parent):
             os.chown(parent, os.geteuid(), os.getegid())
@@ -210,5 +242,6 @@ class UnixXMLRPCServer(TCPXMLRPCServer):
                 os.unlink(addr)
         else:
             os.makedirs(parent, stat.S_IRWXU)
-        TCPXMLRPCServer.__init__(self, addr, UnixXMLRPCRequestHandler,
-                                 logRequests)
+
+        TCPXMLRPCServer.__init__(self, addr, allowed,
+                                 UnixXMLRPCRequestHandler, logRequests)

@@ -31,6 +31,7 @@ from xen.util import dictio
 policy_dir_prefix = "/etc/xen/acm-security/policies"
 res_label_filename = policy_dir_prefix + "/resource_labels"
 boot_filename = "/boot/grub/menu.lst"
+altboot_filename = "/boot/grub/grub.conf"
 xensec_xml2bin = "/usr/sbin/xensec_xml2bin"
 xensec_tool = "/usr/sbin/xensec_tool"
 
@@ -596,11 +597,48 @@ def get_res_security_details(resource):
     return (label, ssidref, policy)
 
 
+def unify_resname(resource):
+    """Makes all resource locations absolute. In case of physical
+    resources, '/dev/' is added to local file names"""
+
+    if not resource:
+        return resource
+
+    # sanity check on resource name
+    try:
+        (type, resfile) = resource.split(":", 1)
+    except:
+        err("Resource spec '%s' contains no ':' delimiter" % resource)
+
+    if type == "tap":
+        try:
+            (subtype, resfile) = resfile.split(":")
+        except:
+            err("Resource spec '%s' contains no tap subtype" % resource)
+
+    if type in ["phy", "tap"]:
+        if not resfile.startswith("/"):
+            resfile = "/dev/" + resfile
+
+    #file: resources must specified with absolute path
+    if (not resfile.startswith("/")) or (not os.path.exists(resfile)):
+        err("Invalid resource.")
+
+    # from here on absolute file names with resources
+    if type == "tap":
+        type = type + ":" + subtype
+    resource = type + ":" + resfile
+    return resource
+
+
 def res_security_check(resource, domain_label):
     """Checks if the given resource can be used by the given domain
        label.  Returns 1 if the resource can be used, otherwise 0.
     """
     rtnval = 1
+
+    #build canonical resource name
+    resource = unify_resname(resource)
 
     # if security is on, ask the hypervisor for a decision
     if on():

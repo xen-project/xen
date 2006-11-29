@@ -165,6 +165,10 @@ void arch_dump_domain_info(struct domain *d)
 {
 }
 
+void arch_dump_vcpu_info(struct vcpu *v)
+{
+}
+
 void audit_domains_key(unsigned char key)
 {
 }
@@ -175,13 +179,13 @@ void panic_domain(struct pt_regs *regs, const char *fmt, ...)
 	char buf[256];
 	struct vcpu *v = current;
 
-	printf("$$$$$ PANIC in domain %d (k6=0x%lx): ",
+	printk("$$$$$ PANIC in domain %d (k6=0x%lx): ",
 		v->domain->domain_id,
 		__get_cpu_var(cpu_kr)._kr[IA64_KR_CURRENT]);
 	va_start(args, fmt);
 	(void)vsnprintf(buf, sizeof(buf), fmt, args);
 	va_end(args);
-	printf(buf);
+	printk(buf);
 	if (regs) show_registers(regs);
 	if (regs) {
 		debugger_trap_fatal(0 /* don't care */, regs);

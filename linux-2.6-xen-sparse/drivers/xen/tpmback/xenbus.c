@@ -157,10 +157,12 @@ static void frontend_changed(struct xenbus_device *dev,
 
 	case XenbusStateClosing:
 		be->instance = -1;
+		xenbus_switch_state(dev, XenbusStateClosing);
 		break;
 
-	case XenbusStateUnknown:
+	case XenbusStateUnknown: /* keep it here */
 	case XenbusStateClosed:
+		xenbus_switch_state(dev, XenbusStateClosed);
 		device_unregister(&be->dev->dev);
 		tpmback_remove(dev);
 		break;

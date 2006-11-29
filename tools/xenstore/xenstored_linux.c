@@ -67,3 +67,7 @@ void *xenbus_map(void)
 
 	return addr;
 }
+
+void xenbus_notify_running(void)
+{
+}

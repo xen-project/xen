@@ -3,6 +3,24 @@
  * 
  * Guest OS interface to Xen.
  * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ *
  * Copyright (c) 2004, K A Fraser
  */
 
@@ -228,7 +246,7 @@ struct mmuext_op {
         /* SET_LDT */
         unsigned int nr_ents;
         /* TLB_FLUSH_MULTI, INVLPG_MULTI */
-        void *vcpumask;
+        XEN_GUEST_HANDLE_00030205(void) vcpumask;
     } arg2;
 };
 typedef struct mmuext_op mmuext_op_t;
@@ -517,25 +535,37 @@ typedef struct start_info start_info_t;
 #define SIF_INITDOMAIN    (1<<1)  /* Is this the initial control domain? */
 
 typedef struct dom0_vga_console_info {
-    uint8_t video_type;
-    uint8_t txt_points;
-    uint16_t txt_mode;
-    uint16_t txt_x;
-    uint16_t txt_y;
-    uint16_t video_width;
-    uint16_t video_height;
-    uint16_t lfb_linelen;
-    uint16_t lfb_depth;
-    unsigned long lfb_base;
-    unsigned long lfb_size;
-    uint8_t red_pos;
-    uint8_t red_size;
-    uint8_t green_pos;
-    uint8_t green_size;
-    uint8_t blue_pos;
-    uint8_t blue_size;
-    uint8_t rsvd_pos;
-    uint8_t rsvd_size;
+    uint8_t video_type; /* DOM0_VGA_CONSOLE_??? */
+#define XEN_VGATYPE_TEXT_MODE_3 0x03
+#define XEN_VGATYPE_VESA_LFB    0x23
+
+    union {
+        struct {
+            /* Font height, in pixels. */
+            uint16_t font_height;
+            /* Cursor location (column, row). */
+            uint16_t cursor_x, cursor_y;
+            /* Number of rows and columns (dimensions in characters). */
+            uint16_t rows, columns;
+        } text_mode_3;
+
+        struct {
+            /* Width and height, in pixels. */
+            uint16_t width, height;
+            /* Bytes per scan line. */
+            uint16_t bytes_per_line;
+            /* Bits per pixel. */
+            uint16_t bits_per_pixel;
+            /* LFB physical address, and size (in units of 64kB). */
+            uint32_t lfb_base;
+            uint32_t lfb_size;
+            /* RGB mask offsets and sizes, as defined by VBE 1.2+ */
+            uint8_t  red_pos, red_size;
+            uint8_t  green_pos, green_size;
+            uint8_t  blue_pos, blue_size;
+            uint8_t  rsvd_pos, rsvd_size;
+        } vesa_lfb;
+    } u;
 } dom0_vga_console_info_t;
 
 typedef uint8_t xen_domain_handle_t[16];

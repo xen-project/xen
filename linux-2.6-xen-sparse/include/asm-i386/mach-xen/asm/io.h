@@ -54,7 +54,8 @@
  * Convert a physical pointer to a virtual kernel pointer for /dev/mem
  * access
  */
-#define xlate_dev_mem_ptr(p)	__va(p)
+#define xlate_dev_mem_ptr(p, sz)	ioremap(p, sz)
+#define xlate_dev_mem_ptr_unmap(p)	iounmap(p)
 
 /*
  * Convert a virtual cached pointer to an uncached pointer

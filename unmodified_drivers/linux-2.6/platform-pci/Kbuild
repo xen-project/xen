@@ -4,4 +4,9 @@ obj-m := xen-platform-pci.o
 
 EXTRA_CFLAGS += -I$(M)/platform-pci
 
-xen-platform-pci-objs := evtchn.o platform-pci.o gnttab.o xen_support.o features.o
+xen-platform-pci-objs := evtchn.o platform-pci.o gnttab.o xen_support.o features.o platform-compat.o
+
+# Can we do better ?
+ifeq ($(ARCH),ia64)
+  xen-platform-pci-objs += xcom_mini.o xencomm.o
+endif

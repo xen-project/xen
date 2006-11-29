@@ -3,6 +3,24 @@
  * 
  * Guest OS interface to x86 32-bit Xen.
  * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ *
  * Copyright (c) 2004, K A Fraser
  */
 
@@ -172,12 +190,9 @@ struct vcpu_guest_context {
     /* FPU registers come first so they can be aligned for FXSAVE/FXRSTOR. */
     struct { char x[512]; } fpu_ctxt;       /* User-level FPU registers     */
 #define VGCF_I387_VALID                (1<<0)
-#define VGCF_HVM_GUEST                 (1<<1)
 #define VGCF_IN_KERNEL                 (1<<2)
 #define _VGCF_i387_valid               0
 #define VGCF_i387_valid                (1<<_VGCF_i387_valid)
-#define _VGCF_hvm_guest                1
-#define VGCF_hvm_guest                 (1<<_VGCF_hvm_guest)
 #define _VGCF_in_kernel                2
 #define VGCF_in_kernel                 (1<<_VGCF_in_kernel)
 #define _VGCF_failsafe_disables_events 3

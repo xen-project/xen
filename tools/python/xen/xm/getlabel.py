@@ -21,23 +21,27 @@
 import sys, os, re
 from xen.util import dictio
 from xen.util import security
+from xen.xm.opts import OptionError
 
-def usage():
-    print "\nUsage: xm getlabel dom <configfile>"
-    print "       xm getlabel res <resource>\n"
-    print "  This program shows the label for a domain or resource.\n"
-    security.err("Usage")
-
+def help():
+    return """
+    Usage: xm getlabel dom <configfile>
+           xm getlabel res <resource>
+           
+    This program shows the label for a domain or resource."""
 
 def get_resource_label(resource):
     """Gets the resource label
     """
+    #build canonical resource name
+    resource = security.unify_resname(resource)
+
     # read in the resource file
     file = security.res_label_filename
     try:
         access_control = dictio.dict_read("resources", file)
     except:
-        security.err("Resource label file not found")
+        raise OptionError("Resource label file not found")
 
     # get the entry and print label
     if access_control.has_key(resource):
@@ -45,23 +49,22 @@ def get_resource_label(resource):
         label = access_control[resource][1]
         print "policy="+policy+",label="+label
     else:
-        security.err("Resource not labeled")
+        raise security.ACMError("Resource not labeled")
 
 
 def get_domain_label(configfile):
     # open the domain config file
     fd = None
-    file = None
     if configfile[0] == '/':
         fd = open(configfile, "rb")
     else:
         for prefix in [".", "/etc/xen"]:
-            file = prefix + "/" + configfile
-            if os.path.isfile(file):
-                fd = open(file, "rb")
+            abs_file = prefix + "/" + configfile
+            if os.path.isfile(abs_file):
+                fd = open(abs_file, "rb")
                 break
     if not fd:
-        security.err("Configuration file '"+configfile+"' not found.")
+        raise OptionError("Configuration file '%s' not found." % configfile)
 
     # read in the domain config file, finding the label line
     ac_entry_re = re.compile("^access_control\s*=.*", re.IGNORECASE)
@@ -79,7 +82,7 @@ def get_domain_label(configfile):
 
     # send error message if we didn't find anything
     if acline == "":
-        security.err("Domain not labeled")
+        raise security.ACMError("Domain not labeled")
 
     # print out the label
     (title, data) = acline.split("=", 1)
@@ -89,24 +92,25 @@ def get_domain_label(configfile):
     print data
 
 
-def main (argv):
-    try:
-        if len(argv) != 3:
-            usage()
+def main(argv):
+    if len(argv) != 3:
+        raise OptionError('Requires 2 arguments')
 
-        if argv[1].lower() == "dom":
-            configfile = argv[2]
-            get_domain_label(configfile)
-        elif argv[1].lower() == "res":
-            resource = argv[2]
-            get_resource_label(resource)
-        else:
-            usage()
-
-    except security.ACMError:
-        sys.exit(-1)
+    if argv[1].lower() == "dom":
+        configfile = argv[2]
+        get_domain_label(configfile)
+    elif argv[1].lower() == "res":
+        resource = argv[2]
+        get_resource_label(resource)
+    else:
+        raise OptionError('First subcommand argument must be "dom" or "res"')
 
 if __name__ == '__main__':
-    main(sys.argv)
+    try:
+        main(sys.argv)
+    except Exception, e:
+        sys.stderr.write('Error: %s\n' % str(e))
+        sys.exit(-1)
+        
 
 

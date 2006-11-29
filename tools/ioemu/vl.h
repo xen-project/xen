@@ -37,6 +37,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 #include "xenctrl.h"
 #include "xs.h"
 #include <xen/hvm/e820.h>
@@ -405,6 +407,7 @@ QEMUTimer *qemu_new_timer(QEMUClock *clock, QEMUTimerCB *cb, void *opaque);
 void qemu_free_timer(QEMUTimer *ts);
 void qemu_del_timer(QEMUTimer *ts);
 void qemu_mod_timer(QEMUTimer *ts, int64_t expire_time);
+void qemu_advance_timer(QEMUTimer *ts, int64_t expire_time);
 int qemu_timer_pending(QEMUTimer *ts);
 
 extern int64_t ticks_per_sec;
@@ -785,7 +788,7 @@ void sdl_display_init(DisplayState *ds, int full_screen);
 void cocoa_display_init(DisplayState *ds, int full_screen);
 
 /* vnc.c */
-int vnc_display_init(DisplayState *ds, int display, int find_unused);
+int vnc_display_init(DisplayState *ds, int display, int find_unused, struct sockaddr_in *addr);
 int vnc_start_viewer(int port);
 
 /* ide.c */
@@ -925,6 +928,10 @@ int pcspk_audio_init(AudioState *);
 extern int acpi_enabled;
 void piix4_pm_init(PCIBus *bus, int devfn);
 void acpi_bios_init(void);
+
+/* tpm_tis.c */
+int has_tpm_device(void);
+void tpm_tis_init(SetIRQFunc *set_irq, void *irq_opaque, int irq);
 
 /* piix4acpi.c */
 extern void pci_piix4_acpi_init(PCIBus *bus, int devfn);
@@ -1208,6 +1215,26 @@ int xenstore_fd(void);
 void xenstore_process_event(void *opaque);
 void xenstore_check_new_media_present(int timeout);
 void xenstore_write_vncport(int vnc_display);
+int xenstore_read_vncpasswd(int domid);
+
+int xenstore_domain_has_devtype(struct xs_handle *handle,
+                                const char *devtype);
+char **xenstore_domain_get_devices(struct xs_handle *handle,
+                                   const char *devtype, unsigned int *num);
+char *xenstore_read_hotplug_status(struct xs_handle *handle,
+                                   const char *devtype, const char *inst);
+char *xenstore_backend_read_variable(struct xs_handle *,
+                                     const char *devtype, const char *inst,
+                                     const char *var);
+int xenstore_subscribe_to_hotplug_status(struct xs_handle *handle,
+                                         const char *devtype,
+                                         const char *inst,
+                                         const char *token);
+int xenstore_unsubscribe_from_hotplug_status(struct xs_handle *handle,
+                                             const char *devtype,
+                                             const char *inst,
+                                             const char *token);
+
 
 /* xen_platform.c */
 void pci_xen_platform_init(PCIBus *bus);
@@ -1218,5 +1245,8 @@ void kqemu_record_dump(void);
 extern char domain_name[];
 
 void destroy_hvm_domain(void);
+
+/* VNC Authentication */
+#define AUTHCHALLENGESIZE 16
 
 #endif /* VL_H */

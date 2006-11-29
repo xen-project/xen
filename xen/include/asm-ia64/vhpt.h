@@ -18,6 +18,10 @@
 
 #ifndef __ASSEMBLY__
 #include <xen/percpu.h>
+#include <asm/vcpumask.h>
+
+extern void domain_purge_swtc_entries(struct domain *d);
+extern void domain_purge_swtc_entries_vcpu_dirty_mask(struct domain* d, vcpumask_t vcpu_dirty_mask);
 
 //
 // VHPT Long Format Entry (as recognized by hw)
@@ -37,11 +41,48 @@ extern void vhpt_multiple_insert(unsigned long vaddr, unsigned long pte,
 				 unsigned long logps);
 extern void vhpt_insert (unsigned long vadr, unsigned long pte,
 			 unsigned long logps);
-void vhpt_flush(void);
+void local_vhpt_flush(void);
+extern void vcpu_vhpt_flush(struct vcpu* v);
 
 /* Currently the VHPT is allocated per CPU.  */
 DECLARE_PER_CPU (unsigned long, vhpt_paddr);
 DECLARE_PER_CPU (unsigned long, vhpt_pend);
+
+#ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
+#if !VHPT_ENABLED
+#error "VHPT_ENABLED must be set for CONFIG_XEN_IA64_PERVCPU_VHPT"
+#endif
+#endif
+
+#include <xen/sched.h>
+int pervcpu_vhpt_alloc(struct vcpu *v);
+void pervcpu_vhpt_free(struct vcpu *v);
+static inline unsigned long
+vcpu_vhpt_maddr(struct vcpu* v)
+{
+#ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
+    if (HAS_PERVCPU_VHPT(v->domain))
+        return v->arch.vhpt_maddr;
+#endif
+
+#if 0
+    // referencecing v->processor is racy.
+    return per_cpu(vhpt_paddr, v->processor);
+#endif
+    BUG_ON(v != current);
+    return __get_cpu_var(vhpt_paddr);
+}
+
+static inline unsigned long
+vcpu_pta(struct vcpu* v)
+{
+#ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
+    if (HAS_PERVCPU_VHPT(v->domain))
+        return v->arch.pta.val;
+#endif
+    return __va_ul(__get_cpu_var(vhpt_paddr)) | (1 << 8) |
+        (VHPT_SIZE_LOG2 << 2) | VHPT_ENABLED;
+}
 
 #endif /* !__ASSEMBLY */
 #endif

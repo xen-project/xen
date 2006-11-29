@@ -23,7 +23,7 @@ VPATH+=:$(SRC_PATH)/linux-user
 DEFINES+=-I$(SRC_PATH)/linux-user -I$(SRC_PATH)/linux-user/$(TARGET_ARCH)
 endif
 CFLAGS+=-Wall -O2 -g -fno-strict-aliasing
-SSE2 := $(call test-gcc-flag,$(CC),-msse2)
+SSE2 := $(call cc-option,$(CC),-msse2,)
 ifeq ($(SSE2),-msse2)
 CFLAGS += -DUSE_SSE2=1 -msse2
 endif
@@ -177,7 +177,8 @@ endif
 
 #########################################################
 
-DEFINES+=-D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE
+DEFINES+=-D_GNU_SOURCE
+#-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE
 LIBS+=-lm
 LIBS+=-L../../libxc -lxenctrl -lxenguest
 LIBS+=-L../../xenstore -lxenstore
@@ -294,7 +295,11 @@ OBJS+=gdbstub.o
 endif
 
 # qemu-dm objects
+ifeq ($(ARCH),ia64)
 LIBOBJS=helper2.o exec-dm.o i8259-dm.o
+else
+LIBOBJS=helper2.o exec-dm.o i8259-dm.o rtc-dm.o piix_pci-dm.o
+endif
 
 all: $(PROGS)
 
@@ -354,12 +359,17 @@ VL_OBJS+= ne2000.o rtl8139.o pcnet.o
 ifeq ($(TARGET_BASE_ARCH), i386)
 # Hardware support
 VL_OBJS+= ide.o pckbd.o ps2.o vga.o $(SOUND_HW) dma.o $(AUDIODRV)
-VL_OBJS+= fdc.o mc146818rtc.o serial.o pc.o
-VL_OBJS+= cirrus_vga.o mixeng.o parallel.o acpi.o piix_pci.o
+ifeq ($(ARCH),ia64)
+VL_OBJS+= fdc.o mc146818rtc.o serial.o pc.o piix_pci.o
+else
+VL_OBJS+= fdc.o serial.o pc.o
+endif
+VL_OBJS+= cirrus_vga.o mixeng.o parallel.o acpi.o
 VL_OBJS+= usb-uhci.o
 VL_OBJS+= piix4acpi.o
 VL_OBJS+= xenstore.o
 VL_OBJS+= xen_platform.o
+VL_OBJS+= tpm_tis.o
 DEFINES += -DHAS_AUDIO
 endif
 ifeq ($(TARGET_BASE_ARCH), ppc)
@@ -398,6 +408,7 @@ ifdef CONFIG_SDL
 VL_OBJS+=sdl.o
 endif
 VL_OBJS+=vnc.o
+VL_OBJS+=d3des.o
 ifdef CONFIG_COCOA
 VL_OBJS+=cocoa.o
 COCOA_LIBS=-F/System/Library/Frameworks -framework Cocoa -framework IOKit
@@ -456,6 +467,9 @@ sdl.o: sdl.c keymaps.c sdl_keysym.h
 	$(CC) $(CFLAGS) $(DEFINES) $(SDL_CFLAGS) -c -o $@ $<
 
 vnc.o: vnc.c keymaps.c sdl_keysym.h vnchextile.h
+	$(CC) $(CFLAGS) $(DEFINES) -c -o $@ $<
+
+d3des.o: d3des.c d3des.h
 	$(CC) $(CFLAGS) $(DEFINES) -c -o $@ $<
 
 sdlaudio.o: sdlaudio.c
@@ -555,10 +569,10 @@ distclean: clean
 install: all 
 	mkdir -p "$(DESTDIR)$(bindir)" "$(DESTDIR)$(configdir)"
 ifneq ($(PROGS),)
-	$(INSTALL) -m 755 -s $(PROGS) "$(DESTDIR)$(bindir)"
+	$(INSTALL_PROG) $(PROGS) "$(DESTDIR)$(bindir)"
 endif
-	install -m 755 $(TARGET_PATH)/qemu-dm.debug "$(DESTDIR)$(bindir)"
-	install -m 755 $(TARGET_PATH)/qemu-ifup "$(DESTDIR)$(configdir)"
+	$(INSTALL_PROG) $(TARGET_PATH)/qemu-dm.debug "$(DESTDIR)$(bindir)"
+	$(INSTALL_PROG) $(TARGET_PATH)/qemu-ifup "$(DESTDIR)$(configdir)"
 
 ifneq ($(wildcard .depend),)
 include .depend

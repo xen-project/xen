@@ -4,8 +4,6 @@
 # needs to be changed, move it to ../linux-xen and follow
 # the instructions in the README there.
 
-acpi.h			-> linux/include/asm-ia64/acpi.h
-atomic.h		-> linux/include/asm-ia64/atomic.h
 bitops.h		-> linux/include/asm-ia64/bitops.h
 break.h			-> linux/include/asm-ia64/break.h
 byteorder.h		-> linux/include/asm-ia64/byteorder.h
@@ -26,7 +24,7 @@ linkage.h		-> linux/include/asm-ia64/linkage.h
 machvec.h		-> linux/include/asm-ia64/machvec.h
 machvec_hpsim.h		-> linux/include/asm-ia64/machvec_hpsim.h
 mca.h			-> linux/include/asm-ia64/mca.h
-numa.h			-> linux/include/asm-ia64/numa.h
+nodedata.h		-> linux/include/asm-ia64/nodedate.h
 numnodes.h		-> linux/include/asm-ia64/numnodes.h
 param.h			-> linux/include/asm-ia64/param.h
 patch.h			-> linux/include/asm-ia64/patch.h

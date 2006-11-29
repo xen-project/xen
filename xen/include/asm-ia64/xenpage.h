@@ -1,10 +1,6 @@
 #ifndef _ASM_IA64_XENPAGE_H
 #define _ASM_IA64_XENPAGE_H
 
-#ifdef CONFIG_DISCONTIGMEM
-#error "xenpage.h: page macros need to be defined for CONFIG_DISCONTIGMEM"
-#endif
-
 #undef mfn_valid
 #undef page_to_mfn
 #undef mfn_to_page

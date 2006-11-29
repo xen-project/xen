@@ -33,28 +33,45 @@
 extern unsigned long initial_images_nrpages(void);
 extern void discard_initial_images(void);
 
-static long dom0_nrpages;
+static long dom0_nrpages, dom0_min_nrpages, dom0_max_nrpages = LONG_MAX;
 
 /*
- * dom0_mem:
- *  If +ve:
- *   * The specified amount of memory is allocated to domain 0.
- *  If -ve:
- *   * All of memory is allocated to domain 0, minus the specified amount.
- *  If not specified: 
- *   * All of memory is allocated to domain 0, minus 1/16th which is reserved
- *     for uses such as DMA buffers (the reservation is clamped to 128MB).
+ * dom0_mem=[min:<min_amt>,][max:<max_amt>,][<amt>]
+ * 
+ * <min_amt>: The minimum amount of memory which should be allocated for dom0.
+ * <max_amt>: The maximum amount of memory which should be allocated for dom0.
+ * <amt>:     The precise amount of memory to allocate for dom0.
+ * 
+ * Notes:
+ *  1. <amt> is clamped from below by <min_amt> and from above by available
+ *     memory and <max_amt>
+ *  2. <min_amt> is clamped from above by available memory and <max_amt>
+ *  3. <min_amt> is ignored if it is greater than <max_amt>
+ *  4. If <amt> is not specified, it is calculated as follows:
+ *     "All of memory is allocated to domain 0, minus 1/16th which is reserved
+ *      for uses such as DMA buffers (the reservation is clamped to 128MB)."
+ * 
+ * Each value can be specified as positive or negative:
+ *  If +ve: The specified amount is an absolute value.
+ *  If -ve: The specified amount is subtracted from total available memory.
  */
+static long parse_amt(char *s, char **ps)
+{
+    long pages = parse_size_and_unit((*s == '-') ? s+1 : s, ps) >> PAGE_SHIFT;
+    return (*s == '-') ? -pages : pages;
+}
 static void parse_dom0_mem(char *s)
 {
-    unsigned long long bytes;
-    char *t = s;
-    if ( *s == '-' )
-        t++;
-    bytes = parse_size_and_unit(t);
-    dom0_nrpages = bytes >> PAGE_SHIFT;
-    if ( *s == '-' )
-        dom0_nrpages = -dom0_nrpages;
+    do {
+        if ( !strncmp(s, "min:", 4) )
+            dom0_min_nrpages = parse_amt(s+4, &s);
+        else if ( !strncmp(s, "max:", 4) )
+            dom0_max_nrpages = parse_amt(s+4, &s);
+        else
+            dom0_nrpages = parse_amt(s, &s);
+        if ( *s != ',' )
+            break;
+    } while ( *s++ == ',' );
 }
 custom_param("dom0_mem", parse_dom0_mem);
 
@@ -74,10 +91,11 @@ string_param("dom0_ioports_disable", opt_dom0_ioports_disable);
 #define L3_PROT (_PAGE_PRESENT)
 #elif defined(__x86_64__)
 /* Allow ring-3 access in long mode as guest cannot use ring 1. */
-#define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
-#define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
-#define L3_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
-#define L4_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
+#define BASE_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
+#define L1_PROT (BASE_PROT|_PAGE_GUEST_KERNEL)
+#define L2_PROT (BASE_PROT|_PAGE_DIRTY)
+#define L3_PROT (BASE_PROT|_PAGE_DIRTY)
+#define L4_PROT (BASE_PROT|_PAGE_DIRTY)
 #endif
 
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
@@ -100,6 +118,35 @@ static struct page_info *alloc_chunk(struct domain *d, unsigned long max_pages)
         if ( order-- == 0 )
             break;
     return page;
+}
+
+static unsigned long compute_dom0_nr_pages(void)
+{
+    unsigned long avail = avail_domheap_pages() + initial_images_nrpages();
+
+    /*
+     * If domain 0 allocation isn't specified, reserve 1/16th of available
+     * memory for things like DMA buffers. This reservation is clamped to 
+     * a maximum of 128MB.
+     */
+    if ( dom0_nrpages == 0 )
+    {
+        dom0_nrpages = avail;
+        dom0_nrpages = min(dom0_nrpages / 16, 128L << (20 - PAGE_SHIFT));
+        dom0_nrpages = -dom0_nrpages;
+    }
+
+    /* Negative memory specification means "all memory - specified amount". */
+    if ( dom0_nrpages     < 0 ) dom0_nrpages     += avail;
+    if ( dom0_min_nrpages < 0 ) dom0_min_nrpages += avail;
+    if ( dom0_max_nrpages < 0 ) dom0_max_nrpages += avail;
+
+    /* Clamp dom0 memory according to min/max limits and available memory. */
+    dom0_nrpages = max(dom0_nrpages, dom0_min_nrpages);
+    dom0_nrpages = min(dom0_nrpages, dom0_max_nrpages);
+    dom0_nrpages = min(dom0_nrpages, (long)avail);
+
+    return dom0_nrpages;
 }
 
 static void process_dom0_ioports_disable(void)
@@ -202,6 +249,7 @@ int construct_dom0(struct domain *d,
                    char *cmdline)
 {
     int i, rc, dom0_pae, xen_pae, order;
+    struct cpu_user_regs *regs;
     unsigned long pfn, mfn;
     unsigned long nr_pages;
     unsigned long nr_pt_pages;
@@ -268,24 +316,7 @@ int construct_dom0(struct domain *d,
 
     d->max_pages = ~0U;
 
-    /*
-     * If domain 0 allocation isn't specified, reserve 1/16th of available
-     * memory for things like DMA buffers. This reservation is clamped to 
-     * a maximum of 128MB.
-     */
-    if ( dom0_nrpages == 0 )
-    {
-        dom0_nrpages = avail_domheap_pages() + initial_images_nrpages();
-        dom0_nrpages = min(dom0_nrpages / 16, 128L << (20 - PAGE_SHIFT));
-        dom0_nrpages = -dom0_nrpages;
-    }
-
-    /* Negative memory specification means "all memory - specified amount". */
-    if ( dom0_nrpages < 0 )
-        nr_pages = avail_domheap_pages() + initial_images_nrpages() +
-            dom0_nrpages;
-    else
-        nr_pages = dom0_nrpages;
+    nr_pages = compute_dom0_nr_pages();
 
     if ( (rc = parseelfimage(&dsi)) != 0 )
         return rc;
@@ -400,30 +431,18 @@ int construct_dom0(struct domain *d,
            _p(dsi.v_start), _p(v_end));
     printk(" ENTRY ADDRESS: %p\n", _p(dsi.v_kernentry));
 
-    if ( (v_end - dsi.v_start) > (nr_pages * PAGE_SIZE) )
+    if ( ((v_end - dsi.v_start)>>PAGE_SHIFT) > nr_pages )
     {
         printk("Initial guest OS requires too much space\n"
                "(%luMB is greater than %luMB limit)\n",
-               (v_end-dsi.v_start)>>20, (nr_pages<<PAGE_SHIFT)>>20);
+               (v_end-dsi.v_start)>>20, nr_pages>>(20-PAGE_SHIFT));
         return -ENOMEM;
     }
 
     mpt_alloc = (vpt_start - dsi.v_start) + 
         (unsigned long)pfn_to_paddr(alloc_spfn);
 
-    /*
-     * We're basically forcing default RPLs to 1, so that our "what privilege
-     * level are we returning to?" logic works.
-     */
-    v->arch.guest_context.kernel_ss = FLAT_KERNEL_SS;
-    for ( i = 0; i < 256; i++ ) 
-        v->arch.guest_context.trap_ctxt[i].cs = FLAT_KERNEL_CS;
-
 #if defined(__i386__)
-
-    v->arch.guest_context.failsafe_callback_cs = FLAT_KERNEL_CS;
-    v->arch.guest_context.event_callback_cs    = FLAT_KERNEL_CS;
-
     /*
      * Protect the lowest 1GB of memory. We use a temporary mapping there
      * from which we copy the kernel and ramdisk images.
@@ -510,15 +529,13 @@ int construct_dom0(struct domain *d,
         case 1 ... 4:
             page->u.inuse.type_info &= ~PGT_type_mask;
             page->u.inuse.type_info |= PGT_l2_page_table;
-            page->u.inuse.type_info |=
-                (count-1) << PGT_va_shift;
+            if ( count == 4 )
+                page->u.inuse.type_info |= PGT_pae_xen_l2;
             get_page(page, d); /* an extra ref because of readable mapping */
             break;
         default:
             page->u.inuse.type_info &= ~PGT_type_mask;
             page->u.inuse.type_info |= PGT_l1_page_table;
-            page->u.inuse.type_info |= 
-                ((dsi.v_start>>L2_PAGETABLE_SHIFT)+(count-5))<<PGT_va_shift;
             get_page(page, d); /* an extra ref because of readable mapping */
             break;
         }
@@ -544,8 +561,6 @@ int construct_dom0(struct domain *d,
         {
             page->u.inuse.type_info &= ~PGT_type_mask;
             page->u.inuse.type_info |= PGT_l1_page_table;
-            page->u.inuse.type_info |= 
-                ((dsi.v_start>>L2_PAGETABLE_SHIFT)+(count-1))<<PGT_va_shift;
 
             /*
              * No longer writable: decrement the type_count.
@@ -671,6 +686,8 @@ int construct_dom0(struct domain *d,
 
     if ( opt_dom0_max_vcpus == 0 )
         opt_dom0_max_vcpus = num_online_cpus();
+    if ( opt_dom0_max_vcpus > num_online_cpus() )
+        opt_dom0_max_vcpus = num_online_cpus();
     if ( opt_dom0_max_vcpus > MAX_VIRT_CPUS )
         opt_dom0_max_vcpus = MAX_VIRT_CPUS;
     printk("Dom0 has maximum %u VCPUs\n", opt_dom0_max_vcpus);
@@ -788,7 +805,22 @@ int construct_dom0(struct domain *d,
 
     set_bit(_VCPUF_initialised, &v->vcpu_flags);
 
-    new_thread(v, dsi.v_kernentry, vstack_end, vstartinfo_start);
+    /*
+     * Initial register values:
+     *  DS,ES,FS,GS = FLAT_KERNEL_DS
+     *       CS:EIP = FLAT_KERNEL_CS:start_pc
+     *       SS:ESP = FLAT_KERNEL_SS:start_stack
+     *          ESI = start_info
+     *  [EAX,EBX,ECX,EDX,EDI,EBP are zero]
+     */
+    regs = &v->arch.guest_context.user_regs;
+    regs->ds = regs->es = regs->fs = regs->gs = FLAT_KERNEL_DS;
+    regs->ss = FLAT_KERNEL_SS;
+    regs->cs = FLAT_KERNEL_CS;
+    regs->eip = dsi.v_kernentry;
+    regs->esp = vstack_end;
+    regs->esi = vstartinfo_start;
+    regs->eflags = X86_EFLAGS_IF;
 
     if ( opt_dom0_shadow )
         if ( shadow_test_enable(d) == 0 ) 

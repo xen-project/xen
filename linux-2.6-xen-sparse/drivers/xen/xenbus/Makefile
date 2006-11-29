@@ -9,4 +9,5 @@ xenbus-objs += xenbus_client.o
 xenbus-objs += xenbus_comms.o
 xenbus-objs += xenbus_xs.o
 xenbus-objs += xenbus_probe.o
+obj-$(CONFIG_XEN_BACKEND) += xenbus_probe_backend.o
 obj-$(CONFIG_XEN_XENBUS_DEV) += xenbus_dev.o

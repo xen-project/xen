@@ -50,9 +50,6 @@ MODULE_LICENSE("GPL");
 
 /* no concurrent ->write()s are allowed on /dev/cpu/microcode */
 static DECLARE_MUTEX(microcode_sem);
-
-static void __user *user_buffer;	/* user area microcode data buffer */
-static unsigned int user_buffer_size;	/* it's size */
 				
 static int microcode_open (struct inode *unused1, struct file *unused2)
 {
@@ -60,21 +57,26 @@ static int microcode_open (struct inode *unused1, struct file *unused2)
 }
 
 
-static int do_microcode_update (void)
+static int do_microcode_update (const void __user *ubuf, size_t len)
 {
 	int err;
-	dom0_op_t op;
+	void *kbuf;
 
-	err = sys_mlock((unsigned long)user_buffer, user_buffer_size);
-	if (err != 0)
-		return err;
+	kbuf = vmalloc(len);
+	if (!kbuf)
+		return -ENOMEM;
 
-	op.cmd = DOM0_MICROCODE;
-	set_xen_guest_handle(op.u.microcode.data, user_buffer);
-	op.u.microcode.length = user_buffer_size;
-	err = HYPERVISOR_dom0_op(&op);
+	if (copy_from_user(kbuf, ubuf, len) == 0) {
+		dom0_op_t op;
 
-	(void)sys_munlock((unsigned long)user_buffer, user_buffer_size);
+		op.cmd = DOM0_MICROCODE;
+		set_xen_guest_handle(op.u.microcode.data, kbuf);
+		op.u.microcode.length = len;
+		err = HYPERVISOR_dom0_op(&op);
+	} else
+		err = -EFAULT;
+
+	vfree(kbuf);
 
 	return err;
 }
@@ -88,17 +90,9 @@ static ssize_t microcode_write (struct file *file, const char __user *buf, size_
 		return -EINVAL;
 	}
 
-	if ((len >> PAGE_SHIFT) > num_physpages) {
-		printk(KERN_ERR "microcode: too much data (max %ld pages)\n", num_physpages);
-		return -EINVAL;
-	}
-
 	down(&microcode_sem);
 
-	user_buffer = (void __user *) buf;
-	user_buffer_size = (int) len;
-
-	ret = do_microcode_update();
+	ret = do_microcode_update(buf, len);
 	if (!ret)
 		ret = (ssize_t)len;
 

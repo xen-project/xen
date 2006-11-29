@@ -3,6 +3,24 @@
  * 
  * VCPU initialisation, query, and hotplug.
  * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ *
  * Copyright (c) 2005, Keir Fraser <keir@xensource.com>
  */
 
@@ -68,6 +86,7 @@ struct vcpu_runstate_info {
     uint64_t time[4];
 };
 typedef struct vcpu_runstate_info vcpu_runstate_info_t;
+DEFINE_XEN_GUEST_HANDLE(vcpu_runstate_info_t);
 
 /* VCPU is currently running on a physical CPU. */
 #define RUNSTATE_running  0
@@ -90,8 +109,9 @@ typedef struct vcpu_runstate_info vcpu_runstate_info_t;
  * Register a shared memory area from which the guest may obtain its own
  * runstate information without needing to execute a hypercall.
  * Notes:
- *  1. The registered address may be virtual or physical, depending on the
- *     platform. The virtual address should be registered on x86 systems.
+ *  1. The registered address may be virtual or physical or guest handle,
+ *     depending on the platform. Virtual address or guest handle should be
+ *     registered on x86 systems.
  *  2. Only one shared area may be registered per VCPU. The shared area is
  *     updated by the hypervisor each time the VCPU is scheduled. Thus
  *     runstate.state will always be RUNSTATE_running and
@@ -102,6 +122,7 @@ typedef struct vcpu_runstate_info vcpu_runstate_info_t;
 #define VCPUOP_register_runstate_memory_area 5
 struct vcpu_register_runstate_memory_area {
     union {
+        XEN_GUEST_HANDLE(vcpu_runstate_info_t) h;
         struct vcpu_runstate_info *v;
         uint64_t p;
     } addr;

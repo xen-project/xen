@@ -1,7 +1,7 @@
 Index: ioemu/Makefile
 ===================================================================
---- ioemu.orig/Makefile	2006-08-28 20:19:23.000000000 +0100
-+++ ioemu/Makefile	2006-08-28 20:20:08.000000000 +0100
+--- ioemu.orig/Makefile	2006-10-24 14:37:25.000000000 +0100
++++ ioemu/Makefile	2006-10-24 14:37:28.000000000 +0100
 @@ -1,11 +1,14 @@
  # Makefile for QEMU.
  
@@ -85,8 +85,8 @@ Index: ioemu/Makefile
  info: qemu-doc.info qemu-tech.info
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2006-08-28 20:19:23.000000000 +0100
-+++ ioemu/Makefile.target	2006-08-28 20:19:47.000000000 +0100
+--- ioemu.orig/Makefile.target	2006-10-24 14:37:25.000000000 +0100
++++ ioemu/Makefile.target	2006-10-24 14:40:25.000000000 +0100
 @@ -1,5 +1,8 @@
  include config.mak
  
@@ -112,7 +112,7 @@ Index: ioemu/Makefile.target
  endif
 -CFLAGS=-Wall -O2 -g -fno-strict-aliasing
 +CFLAGS+=-Wall -O2 -g -fno-strict-aliasing
-+SSE2 := $(call test-gcc-flag,$(CC),-msse2)
++SSE2 := $(call cc-option,$(CC),-msse2,)
 +ifeq ($(SSE2),-msse2)
 +CFLAGS += -DUSE_SSE2=1 -msse2
 +endif
@@ -149,17 +149,18 @@ Index: ioemu/Makefile.target
  install: all 
 +	mkdir -p "$(DESTDIR)$(bindir)" "$(DESTDIR)$(configdir)"
  ifneq ($(PROGS),)
- 	$(INSTALL) -m 755 -s $(PROGS) "$(DESTDIR)$(bindir)"
+-	$(INSTALL) -m 755 -s $(PROGS) "$(DESTDIR)$(bindir)"
++	$(INSTALL_PROG) $(PROGS) "$(DESTDIR)$(bindir)"
  endif
-+	install -m 755 $(TARGET_PATH)/qemu-dm.debug "$(DESTDIR)$(bindir)"
-+	install -m 755 $(TARGET_PATH)/qemu-ifup "$(DESTDIR)$(configdir)"
++	$(INSTALL_PROG) $(TARGET_PATH)/qemu-dm.debug "$(DESTDIR)$(bindir)"
++	$(INSTALL_PROG) $(TARGET_PATH)/qemu-ifup "$(DESTDIR)$(configdir)"
  
  ifneq ($(wildcard .depend),)
  include .depend
 Index: ioemu/configure
 ===================================================================
---- ioemu.orig/configure	2006-08-28 20:19:23.000000000 +0100
-+++ ioemu/configure	2006-08-28 20:19:47.000000000 +0100
+--- ioemu.orig/configure	2006-10-24 14:37:25.000000000 +0100
++++ ioemu/configure	2006-10-24 14:40:20.000000000 +0100
 @@ -18,8 +18,8 @@
  
  # default parameters

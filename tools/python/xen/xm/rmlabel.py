@@ -21,33 +21,38 @@
 import sys, os, re
 from xen.util import dictio
 from xen.util import security
+from xen.xm.opts import OptionError
 
-def usage():
-    print "\nUsage: xm rmlabel dom <configfile>"
-    print "       xm rmlabel res <resource>\n"
-    print "  This program removes an acm_label entry from the 'configfile'"
-    print "  for a domain or from the global resource label file for a"
-    print "  resource. If the label does not exist for the given domain or"
-    print "  resource, then rmlabel fails.\n"
-    security.err("Usage")
+def help():
+    return """
+    Example: xm rmlabel dom <configfile>
+             xm rmlabel res <resource>
+
+    This program removes an acm_label entry from the 'configfile'
+    for a domain or from the global resource label file for a
+    resource. If the label does not exist for the given domain or
+    resource, then rmlabel fails."""
 
 
 def rm_resource_label(resource):
     """Removes a resource label from the global resource label file.
     """
+    #build canonical resource name
+    resource = security.unify_resname(resource)
+
     # read in the resource file
     file = security.res_label_filename
     try:
         access_control = dictio.dict_read("resources", file)
     except:
-        security.err("Resource file not found, cannot remove label!")
+        raise security.ACMError("Resource file not found, cannot remove label!")
 
     # remove the entry and update file
     if access_control.has_key(resource):
         del access_control[resource]
         dictio.dict_write(access_control, "resources", file)
     else:
-        security.err("Resource not labeled.")
+        raise security.ACMError("Resource not labeled")
 
 
 def rm_domain_label(configfile):
@@ -55,7 +60,8 @@ def rm_domain_label(configfile):
     fd = None
     file = None
     if configfile[0] == '/':
-        fd = open(configfile, "rb")
+        file = configfile
+        fd = open(file, "rb")
     else:
         for prefix in [".", "/etc/xen"]:
             file = prefix + "/" + configfile
@@ -63,8 +69,8 @@ def rm_domain_label(configfile):
                 fd = open(file, "rb")
                 break
     if not fd:
-        security.err("Configuration file '"+configfile+"' not found.")
-
+        raise OptionError("Configuration file '%s' not found." % configfile)
+        
     # read in the domain config file, removing label
     ac_entry_re = re.compile("^access_control\s*=.*", re.IGNORECASE)
     ac_exit_re = re.compile(".*'\].*")
@@ -84,7 +90,7 @@ def rm_domain_label(configfile):
 
     # send error message if we didn't find anything to remove
     if not removed:
-        security.err("Domain not labeled.")
+        raise security.ACMError('Domain not labeled')
 
     # write the data back out to the file
     fd = open(file, "wb")
@@ -93,24 +99,25 @@ def rm_domain_label(configfile):
 
 
 def main (argv):
-    try:
-        if len(argv) != 3:
-            usage()
 
-        if argv[1].lower() == "dom":
-            configfile = argv[2]
-            rm_domain_label(configfile)
-        elif argv[1].lower() == "res":
-            resource = argv[2]
-            rm_resource_label(resource)
-        else:
-            usage()
+    if len(argv) != 3:
+        raise OptionError('Requires 2 arguments')
+    
+    if argv[1].lower() not in ('dom', 'res'):
+        raise OptionError('Unrecognised type argument: %s' % argv[1])
 
-    except security.ACMError:
-        sys.exit(-1)
-
+    if argv[1].lower() == "dom":
+        configfile = argv[2]
+        rm_domain_label(configfile)
+    elif argv[1].lower() == "res":
+        resource = argv[2]
+        rm_resource_label(resource)
 
 if __name__ == '__main__':
-    main(sys.argv)
+    try:
+        main(sys.argv)
+    except Exception, e:
+        sys.stderr.write('Error: %s\n' % str(e))
+        sys.exit(-1)    
 
 

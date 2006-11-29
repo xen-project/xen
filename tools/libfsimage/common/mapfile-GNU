@@ -1,0 +1,37 @@
+VERSION {
+	libfsimage.so.1.1 {
+		global:
+			fsi_open_fsimage;
+			fsi_close_fsimage;
+			fsi_file_exists;
+			fsi_open_file;
+			fsi_close_file;
+			fsi_read_file;
+			fsi_pread_file;
+	
+			fsip_fs_set_data;
+			fsip_fs_free;
+			fsip_file_alloc;
+			fsip_file_free;
+			fsip_fs;
+			fsip_fs_offset;
+			fsip_fs_data;
+			fsip_file_data;
+	
+			fsig_init;
+			fsig_devread;
+			fsig_substring;
+			fsig_fs_buf;
+			fsig_file_alloc;
+			fsig_file_buf;
+			fsig_filepos;
+			fsig_filemax;
+			fsig_int1;
+			fsig_int2;
+			fsig_errnum;
+			fsig_disk_read_junk;
+	
+		local:
+			*;
+	};
+}

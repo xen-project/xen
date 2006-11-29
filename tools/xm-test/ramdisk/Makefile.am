@@ -1,19 +1,39 @@
+#
+# make existing:
+#
+#   Download a pre-built ramdisk.
+#     INITRD = <Directory to download ramdisk from>
+#
+# make initrd.img:
+#
+#   Make a ramdisk from scratch.
+#     BR_URL = <The URL of the Buildroot source code>
+#     BR_SNAPSHOT = 1  Set BR_URL to the upstream Buildroot daily snapshot.
+#     BR_ARCH = <The build architecture for the initrd>
+#
+
 INITRD ?= http://xm-test.xensource.com/ramdisks
 
-EXTRA_DIST = skel configs patches
+BR_ARCH ?= $(shell uname -m | sed -e s/i.86/i386/ -e 's/ppc\(64\)*/powerpc/')
 
-BR_TAR = buildroot-20060606.tar.bz2
-BR_URL = http://buildroot.uclibc.org/downloads/snapshots/$(BR_TAR)
-#BR_URL = http://buildroot.uclibc.org/downloads/snapshots/buildroot-snapshot.tar.bz2
+@MK@ifdef BR_SNAPSHOT
+@MK@  BR_URL = http://buildroot.uclibc.org/downloads/snapshots/buildroot-snapshot.tar.bz2
+@MK@else
+@MK@  BR_URL = http://xm-test.xensource.com/ramdisks/buildroot-20061023.tar.bz2
+@MK@endif
+BR_TAR = $(notdir $(BR_URL))
+
 BR_SRC = buildroot
-BR_IMG = $(BR_SRC)/rootfs.i386.ext2
+BR_IMG = $(BR_SRC)/rootfs.$(BR_ARCH).ext2
 
-BR_ROOT = build_i386/root
+BR_ROOT = build_$(BR_ARCH)/root
+
+EXTRA_DIST = skel configs patches
 
 HVM_SCRIPT = bin/create_disk_image
 
 XMTEST_MAJ_VER = $(shell echo @PACKAGE_VERSION@ | perl -pe 's/(\d+)\.(\d+)\.\d+/\1.\2/')
-XMTEST_VER_IMG = initrd-$(XMTEST_MAJ_VER).img
+XMTEST_VER_IMG = initrd-$(XMTEST_MAJ_VER)-$(BR_ARCH).img
 
 EXTRA_ROOT_DIRS = sys
 
@@ -30,7 +50,7 @@ $(BR_SRC): $(BR_TAR)
 	tar xjf $(BR_TAR)
 
 $(BR_IMG): $(BR_SRC)
-	cp configs/buildroot $(BR_SRC)/.config
+	cp configs/buildroot-$(BR_ARCH) $(BR_SRC)/.config
 	cp configs/busybox $(BR_SRC)/package/busybox/busybox.config
 	cp configs/uClibc $(BR_SRC)/toolchain/uClibc/uClibc.config
 	(for i in patches/buildroot/*.patch; do \
@@ -42,7 +62,7 @@ $(XMTEST_VER_IMG): $(BR_IMG)
 	(cd skel; mkdir -p $(EXTRA_ROOT_DIRS); tar cf - .) \
 		| (cd $(BR_SRC)/$(BR_ROOT); tar xvf -)
 	cd $(BR_SRC) && make
-	cp $(BR_IMG) initrd-$(XMTEST_MAJ_VER).img
+	cp $(BR_IMG) $(XMTEST_VER_IMG)
 
 initrd.img: $(XMTEST_VER_IMG)
 	ln -sf $(XMTEST_VER_IMG) initrd.img
