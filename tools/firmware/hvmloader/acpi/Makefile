@@ -27,6 +27,13 @@ OBJS  = $(patsubst %.c,%.o,$(C_SRC))
 IASL_VER = acpica-unix-20050513
 IASL_URL = http://developer.intel.com/technology/iapc/acpi/downloads/$(IASL_VER).tar.gz
 
+# Disable PIE/SSP if GCC supports them. They can break us.
+CFLAGS  += $(call cc-option,$(CC),-nopie,)
+CFLAGS  += $(call cc-option,$(CC),-fno-stack-protector,)
+CFLAGS  += $(call cc-option,$(CC),-fno-stack-protector-all,)
+
+CFLAGS  += -fno-builtin -O2 -msoft-float
+
 vpath iasl $(PATH)
 all: acpi.a
 

@@ -28,16 +28,13 @@ include $(XEN_ROOT)/Config.mk
 # The HVM loader is started in 32-bit mode at the address below:
 LOADADDR = 0x100000
 
-DEFINES  =-DDEBUG
-XENINC   =-I$(XEN_ROOT)/tools/libxc
-
 # Disable PIE/SSP if GCC supports them. They can break us.
 CFLAGS  += $(call cc-option,$(CC),-nopie,)
 CFLAGS  += $(call cc-option,$(CC),-fno-stack-protector,)
 CFLAGS  += $(call cc-option,$(CC),-fno-stack-protector-all,)
 
 OBJCOPY  = objcopy
-CFLAGS  += $(DEFINES) -I. $(XENINC) -fno-builtin -O2 -msoft-float
+CFLAGS  += -I$(XEN_ROOT)/tools/libxc -I. -fno-builtin -O2 -msoft-float
 LDFLAGS  = -nostdlib -Wl,-N -Wl,-Ttext -Wl,$(LOADADDR)
 
 SRCS = hvmloader.c mp_tables.c util.c smbios.c
