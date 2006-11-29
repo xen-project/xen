@@ -115,7 +115,8 @@ int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
     int offset = 0, nr_tables = 0;
     struct acpi_20_madt *madt;
     struct acpi_20_tcpa *tcpa;
-    static const uint16_t tis_did_vid_rid[] = {0x0001, 0x0001, 0x0001};
+    static const uint16_t tis_signature[] = {0x0001, 0x0001, 0x0001};
+    uint16_t *tis_hdr;
 
     /* MADT. */
     if ( (get_vcpu_nr() > 1) || get_apic_mode() )
@@ -126,8 +127,10 @@ int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
     }
 
     /* TPM TCPA and SSDT. */
-    if ( memcmp((char *)0xFED40F00, tis_did_vid_rid,
-                sizeof(tis_did_vid_rid)) == 0 ) /* Probe for TIS interface. */
+    tis_hdr = (uint16_t *)0xFED40F00;
+    if ( (tis_hdr[0] == tis_signature[0]) &&
+         (tis_hdr[1] == tis_signature[1]) &&
+         (tis_hdr[2] == tis_signature[2]) )
     {
         memcpy(&buf[offset], AmlCode_TPM, sizeof(AmlCode_TPM));
         table_ptrs[nr_tables++] = (unsigned long)&buf[offset];
