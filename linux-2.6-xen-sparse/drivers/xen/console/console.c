@@ -64,7 +64,7 @@
  *  'xencons=off'  [XC_OFF]:     Console is disabled.
  *  'xencons=tty'  [XC_TTY]:     Console attached to '/dev/tty[0-9]+'.
  *  'xencons=ttyS' [XC_SERIAL]:  Console attached to '/dev/ttyS[0-9]+'.
- *  'xencons=xvc'  [XC_SERIAL]:  Console attached to '/dev/xvc0'.
+ *  'xencons=xvc'  [XC_XVC]:     Console attached to '/dev/xvc0'.
  *                 [XC_DEFAULT]: DOM0 -> XC_SERIAL ; all others -> XC_TTY.
  * 
  * NB. In mode XC_TTY, we create dummy consoles for tty2-63. This suppresses
