@@ -11,11 +11,12 @@ from xen.xend.xenstore.xsutil import xshandle
 class xstransact:
 
     def __init__(self, path = ""):
-        assert path is not None
         
         self.in_transaction = False # Set this temporarily -- if this
                                     # constructor fails, then we need to
                                     # protect __del__.
+
+        assert path is not None
         self.path = path.rstrip("/")
         self.transaction = xshandle().transaction_start()
         self.in_transaction = True
