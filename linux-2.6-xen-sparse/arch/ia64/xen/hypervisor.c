@@ -1050,3 +1050,55 @@ EXPORT_SYMBOL_GPL(p2m_convert_max_pfn);
 EXPORT_SYMBOL_GPL(p2m_pte);
 EXPORT_SYMBOL_GPL(p2m_phystomach);
 #endif
+
+///////////////////////////////////////////////////////////////////////////
+// for xenoprof
+
+struct resource*
+xen_ia64_allocate_resource(unsigned long size)
+{
+	struct resource* res;
+	int error;
+	
+	res = kmalloc(sizeof(*res), GFP_KERNEL);
+	if (res == NULL)
+		return ERR_PTR(-ENOMEM);
+
+	res->name = "Xen";
+	res->flags = IORESOURCE_MEM;
+	error = allocate_resource(&iomem_resource, res, PAGE_ALIGN(size),
+	                          privcmd_resource_min, privcmd_resource_max,
+	                          IA64_GRANULE_SIZE, NULL, NULL);
+	if (error) {
+		kfree(res);
+		return ERR_PTR(error);
+	}
+	return res;
+}
+EXPORT_SYMBOL_GPL(xen_ia64_allocate_resource);
+
+void
+xen_ia64_release_resource(struct resource* res)
+{
+	release_resource(res);
+	kfree(res);
+}
+EXPORT_SYMBOL_GPL(xen_ia64_release_resource);
+
+void
+xen_ia64_unmap_resource(struct resource* res)
+{
+	unsigned long gpfn = res->start >> PAGE_SHIFT;
+	unsigned long nr_pages = (res->end - res->start) >> PAGE_SHIFT;
+	unsigned long i;
+	
+	for (i = 0; i < nr_pages; i++) {
+		int error = HYPERVISOR_zap_physmap(gpfn + i, 0);
+		if (error)
+			printk(KERN_ERR
+			       "%s:%d zap_phsymap failed %d gpfn %lx\n",
+			       __func__, __LINE__, error, gpfn + i);
+	}
+	xen_ia64_release_resource(res);
+}
+EXPORT_SYMBOL_GPL(xen_ia64_unmap_resource);

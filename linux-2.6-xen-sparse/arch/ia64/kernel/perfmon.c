@@ -53,6 +53,28 @@
 #include <asm/delay.h>
 
 #ifdef CONFIG_PERFMON
+#ifdef CONFIG_XEN
+//#include <xen/xenoprof.h>
+#include <xen/interface/xenoprof.h>
+
+static int xenoprof_is_primary = 0;
+#define init_xenoprof_primary(is_primary)  (xenoprof_is_primary = (is_primary))
+#define is_xenoprof_primary()	(xenoprof_is_primary)
+#define XEN_NOT_SUPPORTED_YET						\
+	do {								\
+		if (is_running_on_xen()) {				\
+			printk("%s is not supported yet under xen.\n",	\
+			       __func__);				\
+			return -ENOSYS;					\
+		}							\
+	} while (0)
+#else
+#define init_xenoprof_primary(is_primary)	do { } while (0)
+#define is_xenoprof_primary()			(0)
+#define XEN_NOT_SUPPORTED_YET			do { } while (0)
+#define HYPERVISOR_perfmon_op(cmd, arg, count)	do { } while (0)
+#endif
+
 /*
  * perfmon context state
  */
@@ -1515,6 +1537,7 @@ pfm_read(struct file *filp, char __user *buf, size_t size, loff_t *ppos)
 	ssize_t ret;
 	unsigned long flags;
   	DECLARE_WAITQUEUE(wait, current);
+	XEN_NOT_SUPPORTED_YET;
 	if (PFM_IS_FILE(filp) == 0) {
 		printk(KERN_ERR "perfmon: pfm_poll: bad magic [%d]\n", current->pid);
 		return -EINVAL;
@@ -2113,6 +2136,15 @@ doit:
 	 */
 	if (free_possible) pfm_context_free(ctx);
 
+	if (is_running_on_xen()) {
+		if (is_xenoprof_primary()) {
+			int ret = HYPERVISOR_perfmon_op(PFM_DESTROY_CONTEXT,
+			                                NULL, 0);
+			if (ret)
+				printk("%s:%d PFM_DESTROY_CONTEXT hypercall "
+				       "failed\n", __func__, __LINE__);
+		}
+	}
 	return 0;
 }
 
@@ -2736,6 +2768,23 @@ pfm_context_create(pfm_context_t *ctx, void *arg, int count, struct pt_regs *reg
 	 */
 	pfm_reset_pmu_state(ctx);
 
+	if (is_running_on_xen()) {
+		/*
+		 * kludge to get xenoprof.is_primary.
+		 * XENOPROF_init/ia64 is nop. so it is safe to call it here.
+		 */
+		struct xenoprof_init init;
+		ret = HYPERVISOR_xenoprof_op(XENOPROF_init, &init);
+		if (ret)
+			goto buffer_error;
+		init_xenoprof_primary(init.is_primary);
+
+		if (is_xenoprof_primary()) {
+			ret = HYPERVISOR_perfmon_op(PFM_CREATE_CONTEXT, arg, 0);
+			if (ret)
+				goto buffer_error;
+		}
+	}
 	return 0;
 
 buffer_error:
@@ -2872,6 +2921,12 @@ pfm_write_pmcs(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 	pfm_reg_check_t	wr_func;
 #define PFM_CHECK_PMC_PM(x, y, z) ((x)->ctx_fl_system ^ PMC_PM(y, z))
 
+  	if (is_running_on_xen()) {
+		if (is_xenoprof_primary())
+			return HYPERVISOR_perfmon_op(PFM_WRITE_PMCS,
+			                             arg, count);
+		return 0;
+  	}
 	state     = ctx->ctx_state;
 	is_loaded = state == PFM_CTX_LOADED ? 1 : 0;
 	is_system = ctx->ctx_fl_system;
@@ -3112,6 +3167,12 @@ pfm_write_pmds(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 	int ret = -EINVAL;
 	pfm_reg_check_t wr_func;
 
+  	if (is_running_on_xen()) {
+		if (is_xenoprof_primary())
+			return HYPERVISOR_perfmon_op(PFM_WRITE_PMDS,
+			                             arg, count);
+		return 0;
+  	}
 
 	state     = ctx->ctx_state;
 	is_loaded = state == PFM_CTX_LOADED ? 1 : 0;
@@ -3309,6 +3370,7 @@ pfm_read_pmds(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 	int is_loaded, is_system, is_counting, expert_mode;
 	int ret = -EINVAL;
 	pfm_reg_check_t rd_func;
+	XEN_NOT_SUPPORTED_YET;
 
 	/*
 	 * access is possible when loaded only for
@@ -3560,6 +3622,7 @@ pfm_restart(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 	pfm_ovfl_ctrl_t rst_ctrl;
 	int state, is_system;
 	int ret = 0;
+	XEN_NOT_SUPPORTED_YET;
 
 	state     = ctx->ctx_state;
 	fmt       = ctx->ctx_buf_fmt;
@@ -3709,6 +3772,7 @@ static int
 pfm_debug(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 {
 	unsigned int m = *(unsigned int *)arg;
+	XEN_NOT_SUPPORTED_YET;
 
 	pfm_sysctl.debug = m == 0 ? 0 : 1;
 
@@ -3979,6 +4043,8 @@ pfm_get_features(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 {
 	pfarg_features_t *req = (pfarg_features_t *)arg;
 
+	if (is_running_on_xen())
+		return HYPERVISOR_perfmon_op(PFM_GET_FEATURES, &arg, 0);
 	req->ft_version = PFM_VERSION;
 	return 0;
 }
@@ -3989,6 +4055,12 @@ pfm_stop(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 	struct pt_regs *tregs;
 	struct task_struct *task = PFM_CTX_TASK(ctx);
 	int state, is_system;
+
+  	if (is_running_on_xen()) {
+		if (is_xenoprof_primary())
+			return HYPERVISOR_perfmon_op(PFM_STOP, NULL, 0);
+		return 0;
+  	}
 
 	state     = ctx->ctx_state;
 	is_system = ctx->ctx_fl_system;
@@ -4078,6 +4150,12 @@ pfm_start(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 	struct pt_regs *tregs;
 	int state, is_system;
 
+  	if (is_running_on_xen()) {
+  		XENPERFMON_PRINTD("PFM_START\n");
+		if (is_xenoprof_primary())
+			return HYPERVISOR_perfmon_op(PFM_START, NULL, 0);
+		return 0;
+  	}
 	state     = ctx->ctx_state;
 	is_system = ctx->ctx_fl_system;
 
@@ -4160,6 +4238,7 @@ pfm_get_pmc_reset(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs
 	unsigned int cnum;
 	int i;
 	int ret = -EINVAL;
+	XEN_NOT_SUPPORTED_YET;
 
 	for (i = 0; i < count; i++, req++) {
 
@@ -4218,6 +4297,11 @@ pfm_context_load(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 	int ret = 0;
 	int state, is_system, set_dbregs = 0;
 
+  	if (is_running_on_xen()) {
+		if (is_xenoprof_primary())
+			return HYPERVISOR_perfmon_op(PFM_LOAD_CONTEXT, arg, 0);
+		return 0;
+  	}
 	state     = ctx->ctx_state;
 	is_system = ctx->ctx_fl_system;
 	/*
@@ -4466,6 +4550,12 @@ pfm_context_unload(pfm_context_t *ctx, void *arg, int count, struct pt_regs *reg
 	int prev_state, is_system;
 	int ret;
 
+  	if (is_running_on_xen()) {
+		if (is_xenoprof_primary())
+			return HYPERVISOR_perfmon_op(PFM_UNLOAD_CONTEXT,
+			                             NULL, 0);
+		return 0;
+  	}
 	DPRINT(("ctx_state=%d task [%d]\n", ctx->ctx_state, task ? task->pid : -1));
 
 	prev_state = ctx->ctx_state;

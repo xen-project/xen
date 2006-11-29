@@ -14,6 +14,7 @@
 #include <asm/perfmon.h>
 #include <asm/ptrace.h>
 #include <asm/errno.h>
+#include "oprofile_perfmon.h"
 
 static int allow_ints;
 
@@ -34,14 +35,16 @@ perfmon_handler(struct task_struct *task, void *buf, pfm_ovfl_arg_t *arg,
 }
 
 
-static int perfmon_start(void)
+STATIC_IF_NO_XEN
+int perfmon_start(void)
 {
 	allow_ints = 1;
 	return 0;
 }
 
 
-static void perfmon_stop(void)
+STATIC_IF_NO_XEN
+void perfmon_stop(void)
 {
 	allow_ints = 0;
 }
@@ -76,16 +79,35 @@ static char * get_cpu_type(void)
 
 static int using_perfmon;
 
-int perfmon_init(struct oprofile_operations * ops)
+STATIC_IF_NO_XEN
+int __perfmon_init(void)
 {
 	int ret = pfm_register_buffer_fmt(&oprofile_fmt);
+	if (ret)
+		return -ENODEV;
+
+	using_perfmon = 1;
+	return 0;
+}
+
+STATIC_IF_NO_XEN
+void __perfmon_exit(void)
+{
+	if (!using_perfmon)
+		return;
+
+	pfm_unregister_buffer_fmt(oprofile_fmt.fmt_uuid);
+}
+
+int perfmon_init(struct oprofile_operations * ops)
+{
+	int ret = __perfmon_init();
 	if (ret)
 		return -ENODEV;
 
 	ops->cpu_type = get_cpu_type();
 	ops->start = perfmon_start;
 	ops->stop = perfmon_stop;
-	using_perfmon = 1;
 	printk(KERN_INFO "oprofile: using perfmon.\n");
 	return 0;
 }
@@ -93,8 +115,5 @@ int perfmon_init(struct oprofile_operations * ops)
 
 void perfmon_exit(void)
 {
-	if (!using_perfmon)
-		return;
-
-	pfm_unregister_buffer_fmt(oprofile_fmt.fmt_uuid);
+	__perfmon_exit();
 }

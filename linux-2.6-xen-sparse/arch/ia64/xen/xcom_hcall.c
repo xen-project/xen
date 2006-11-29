@@ -32,10 +32,12 @@
 #include <xen/interface/callback.h>
 #include <xen/interface/acm_ops.h>
 #include <xen/interface/hvm/params.h>
+#include <xen/interface/xenoprof.h>
 #include <asm/hypercall.h>
 #include <asm/page.h>
 #include <asm/uaccess.h>
 #include <asm/xen/xencomm.h>
+#include <asm/perfmon.h>
 
 /* Xencomm notes:
  * This file defines hypercalls to be used by xencomm.  The hypercalls simply
@@ -301,3 +303,67 @@ xencomm_hypercall_suspend(unsigned long srec)
 
 	return xencomm_arch_hypercall_suspend(xencomm_create_inline(&arg));
 }
+
+#if defined(CONFIG_OPROFILE) || defined(CONFIG_OPROFILE_MODULE)
+int
+xencomm_hypercall_xenoprof_op(int op, void *arg)
+{
+	switch (op) {
+	case XENOPROF_init:
+	case XENOPROF_set_active:
+	case XENOPROF_set_passive:
+	case XENOPROF_counter:
+	case XENOPROF_get_buffer:
+		break;
+
+	case XENOPROF_reset_active_list:
+	case XENOPROF_reset_passive_list:
+	case XENOPROF_reserve_counters:
+	case XENOPROF_setup_events:
+	case XENOPROF_enable_virq:
+	case XENOPROF_start:
+	case XENOPROF_stop:
+	case XENOPROF_disable_virq:
+	case XENOPROF_release_counters:
+	case XENOPROF_shutdown:
+		return xencomm_arch_hypercall_xenoprof_op(op, arg);
+		break;
+
+	default:
+		printk("%s: op %d isn't supported\n", __func__, op);
+		return -ENOSYS;
+	}
+	return xencomm_arch_hypercall_xenoprof_op(op,
+						  xencomm_create_inline(arg));
+}
+#endif
+
+#ifdef CONFIG_PERFMON
+int
+xencomm_hypercall_perfmon_op(unsigned long cmd, void* arg, unsigned long count)
+{
+	switch (cmd) {
+	case PFM_GET_FEATURES:
+	case PFM_CREATE_CONTEXT:
+	case PFM_WRITE_PMCS:
+	case PFM_WRITE_PMDS:
+	case PFM_LOAD_CONTEXT:
+		break;
+
+	case PFM_DESTROY_CONTEXT:
+	case PFM_UNLOAD_CONTEXT:
+	case PFM_START:
+	case PFM_STOP:
+		return xencomm_arch_hypercall_perfmon_op(cmd, arg, count);
+
+	default:
+		printk("%s:%d cmd %ld isn't supported\n",
+		       __func__,__LINE__, cmd);
+		BUG();
+	}
+
+	return xencomm_arch_hypercall_perfmon_op(cmd,
+	                                         xencomm_create_inline(arg),
+	                                         count);
+}
+#endif

@@ -8,3 +8,7 @@ DRIVER_OBJS := $(addprefix ../../../drivers/oprofile/, \
 
 oprofile-y := $(DRIVER_OBJS) init.o backtrace.o
 oprofile-$(CONFIG_PERFMON) += perfmon.o
+ifeq ($(CONFIG_XEN), y)
+oprofile-$(CONFIG_PERFMON) += xenoprof.o \
+	../../../drivers/xen/xenoprof/xenoprofile.o
+endif
