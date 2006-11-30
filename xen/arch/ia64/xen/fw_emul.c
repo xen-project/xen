@@ -1201,9 +1201,9 @@ if (!running_on_sim) { printk("SSC_OPEN, not implemented on hardware.  (ignoring
 		vcpu_set_gr(current,8,-1L,0);
 		break;
 	    default:
-		printk("ia64_handle_break: bad ssc code %lx, iip=0x%lx, b0=0x%lx... spinning\n",
-			ssc, regs->cr_iip, regs->b0);
-		while(1);
+		panic_domain(regs,
+		             "%s: bad ssc code %lx, iip=0x%lx, b0=0x%lx\n",
+		             __func__, ssc, regs->cr_iip, regs->b0);
 		break;
 	}
 	vcpu_increment_iip(current);

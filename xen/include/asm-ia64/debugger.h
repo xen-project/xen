@@ -23,11 +23,13 @@
 #define __ASM_DEBUGGER_H__
 
 // this number is an arbitary number which is not used for any other purpose
+// __builtin_trap() 0x0
 // ski  0x80001, 0x80002
 // kdb  0x80100, 0x80101
 // kprobe 0x80200, jprobe 0x80300
 // kgdb 0x6665
 // gdb 0x99998 (#define IA64_BREAKPOINT 0x00003333300LL)
+// ltrace 0x80001 (NOTE: this conflicts ski)
 
 // cdb should handle 0 and CDB_BREAK_NUM.
 #define CDB_BREAK_NUM	0x80800
