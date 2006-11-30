@@ -46,14 +46,10 @@ extern unsigned long xencomm_hypercall_hvm_op(int cmd, void *arg);
 
 extern int xencomm_hypercall_suspend(unsigned long srec);
 
-#if defined(CONFIG_OPROFILE) || defined(CONFIG_OPROFILE_MODULE)
 extern int xencomm_hypercall_xenoprof_op(int op, void *arg);
-#endif
 
-#ifdef CONFIG_PERFMON
 extern int xencomm_hypercall_perfmon_op(unsigned long cmd, void* arg,
                                         unsigned long count);
-#endif
 
 /* Using mini xencomm.  */
 extern int xencomm_mini_hypercall_console_io(int cmd, int count, char *str);
@@ -77,14 +73,10 @@ extern int xencomm_mini_hypercall_memory_op(unsigned int cmd, void *arg);
 
 extern unsigned long xencomm_mini_hypercall_hvm_op(int cmd, void *arg);
 
-#if defined(CONFIG_OPROFILE) || defined(CONFIG_OPROFILE_MODULE)
 extern int xencomm_mini_hypercall_xenoprof_op(int op, void *arg);
-#endif
 
-#ifdef CONFIG_PERFMON
 extern int xencomm_mini_hypercall_perfmon_op(unsigned long cmd, void* arg,
                                              unsigned long count);
-#endif
 
 /* For privcmd.  Locally declare argument type to avoid include storm.
    Type coherency will be checked within privcmd.c  */

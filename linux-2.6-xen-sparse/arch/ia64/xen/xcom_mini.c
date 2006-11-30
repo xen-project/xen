@@ -323,7 +323,6 @@ xencomm_mini_hypercall_xen_version(int cmd, void *arg)
 }
 EXPORT_SYMBOL(xencomm_mini_hypercall_xen_version);
 
-#if defined(CONFIG_OPROFILE) || defined(CONFIG_OPROFILE_MODULE)
 int
 xencomm_mini_hypercall_xenoprof_op(int op, void *arg)
 {
@@ -372,9 +371,7 @@ xencomm_mini_hypercall_xenoprof_op(int op, void *arg)
 	return xencomm_arch_hypercall_xenoprof_op(op, desc);
 }
 EXPORT_SYMBOL_GPL(xencomm_mini_hypercall_xenoprof_op);
-#endif
 
-#ifdef CONFIG_PERFMON
 int
 xencomm_mini_hypercall_perfmon_op(unsigned long cmd, void* arg,
                                   unsigned long count)
@@ -418,4 +415,3 @@ xencomm_mini_hypercall_perfmon_op(unsigned long cmd, void* arg,
 	return xencomm_arch_hypercall_perfmon_op(cmd, desc, count);
 }
 EXPORT_SYMBOL_GPL(xencomm_mini_hypercall_perfmon_op);
-#endif

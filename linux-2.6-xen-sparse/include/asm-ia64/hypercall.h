@@ -399,7 +399,6 @@ HYPERVISOR_expose_p2m(unsigned long conv_start_gpfn,
 }
 #endif
 
-#ifdef CONFIG_PERFMON
 static inline int
 xencomm_arch_hypercall_perfmon_op(unsigned long cmd,
                                   struct xencomm_handle *arg,
@@ -408,7 +407,6 @@ xencomm_arch_hypercall_perfmon_op(unsigned long cmd,
 	return _hypercall4(int, ia64_dom0vp_op,
 			   IA64_DOM0VP_perfmon, cmd, arg, count);
 }
-#endif
 
 // for balloon driver
 #define HYPERVISOR_update_va_mapping(va, new_val, flags) (0)

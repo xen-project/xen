@@ -304,7 +304,6 @@ xencomm_hypercall_suspend(unsigned long srec)
 	return xencomm_arch_hypercall_suspend(xencomm_create_inline(&arg));
 }
 
-#if defined(CONFIG_OPROFILE) || defined(CONFIG_OPROFILE_MODULE)
 int
 xencomm_hypercall_xenoprof_op(int op, void *arg)
 {
@@ -336,9 +335,7 @@ xencomm_hypercall_xenoprof_op(int op, void *arg)
 	return xencomm_arch_hypercall_xenoprof_op(op,
 						  xencomm_create_inline(arg));
 }
-#endif
 
-#ifdef CONFIG_PERFMON
 int
 xencomm_hypercall_perfmon_op(unsigned long cmd, void* arg, unsigned long count)
 {
@@ -366,4 +363,3 @@ xencomm_hypercall_perfmon_op(unsigned long cmd, void* arg, unsigned long count)
 	                                         xencomm_create_inline(arg),
 	                                         count);
 }
-#endif
