@@ -32,6 +32,7 @@
 #include <asm/uaccess.h>
 #include <xen/console.h>
 #include <xen/hypercall.h>
+#include <xen/softirq.h>
 
 static DEFINE_SPINLOCK(efi_time_services_lock);
 
@@ -611,8 +612,10 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 	    case PAL_HALT_LIGHT:
 		if (VMX_DOMAIN(current)) {
 			/* Called by VTI.  */
-			if (!is_unmasked_irq(current))
+			if (!is_unmasked_irq(current)) {
 				do_sched_op_compat(SCHEDOP_block, 0);
+				do_softirq();
+			}
 			status = PAL_STATUS_SUCCESS;
 		}
 		break;
