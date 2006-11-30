@@ -650,8 +650,11 @@ typedef struct PCIIORegion {
 #define PCI_MAX_LAT		0x3f	/* 8 bits */
 
 struct PCIDevice {
-    /* PCI config space */
-    uint8_t config[256];
+    /*
+     * PCI config space. The 4 extra bytes are a safety buffer for guest
+     * word/dword writes that can extend past byte 0xff.
+     */
+    uint8_t config[256+4];
 
     /* the following fields are read only */
     PCIBus *bus;
