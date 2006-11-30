@@ -479,8 +479,9 @@ class XendDomainInfo:
         
         if reason not in DOMAIN_SHUTDOWN_REASONS.values():
             raise XendError('Invalid reason: %s' % reason)
+        self._removeVm('xend/previous_restart_time')
         self.storeDom("control/shutdown", reason)
-                
+
     def pause(self):
         """Pause domain
         
@@ -1692,8 +1693,9 @@ class XendDomainInfo:
             raise VmError('Invalid VM Name')
 
         dom =  XendDomain.instance().domain_lookup_nr(name)
-        if dom and dom != self and not dom.info['dying']:
-            raise VmError("VM name '%s' already exists" % name)
+        if dom and dom.info['uuid'] != self.info['uuid']:
+            raise VmError("VM name '%s' already exists as domain %s" %
+                          (name, str(dom.domid)))
         
 
     def update(self, info = None, refresh = True):
