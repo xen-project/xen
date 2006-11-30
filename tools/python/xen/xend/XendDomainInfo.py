@@ -847,7 +847,9 @@ class XendDomainInfo:
 
     def setVCpuCount(self, vcpus):
         self.info['vcpu_avail'] = (1 << vcpus) - 1
+        self.info['vcpus_number'] = vcpus
         self.storeVm('vcpu_avail', self.info['vcpu_avail'])
+        self.storeVm('vcpus', self.info['vcpus_number'])
         self._writeDom(self._vcpuDomDetails())
 
     def getLabel(self):
