@@ -103,8 +103,10 @@ static int vmx_vcpu_unpend_interrupt(VCPU *vcpu, uint8_t vector)
     ret = test_and_clear_bit(vector, &VCPU(vcpu, irr[0]));
     local_irq_restore(spsr);
 
-    if (ret)
+    if (ret) {
         vcpu->arch.irq_new_pending = 1;
+        wmb();
+    }
 
     return ret;
 }
@@ -488,8 +490,10 @@ int vmx_vcpu_pend_interrupt(VCPU *vcpu, uint8_t vector)
     ret = test_and_set_bit(vector, &VCPU(vcpu, irr[0]));
     local_irq_restore(spsr);
 
-    if (!ret)
+    if (!ret) {
         vcpu->arch.irq_new_pending = 1;
+        wmb();
+    }
 
     return ret;
 }
@@ -511,6 +515,7 @@ void vmx_vcpu_pend_batch_interrupt(VCPU *vcpu, u64 *pend_irr)
     }
     local_irq_restore(spsr);
     vcpu->arch.irq_new_pending = 1;
+    wmb();
 }
 
 /*
@@ -572,6 +577,7 @@ void guest_write_eoi(VCPU *vcpu)
     VLSAPIC_INSVC(vcpu,vec>>6) &= ~(1UL <<(vec&63));
     VCPU(vcpu, eoi)=0;    // overwrite the data
     vcpu->arch.irq_new_pending=1;
+    wmb();
 }
 
 int is_unmasked_irq(VCPU *vcpu)

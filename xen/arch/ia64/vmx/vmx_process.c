@@ -225,15 +225,15 @@ void leave_hypervisor_tail(struct pt_regs *regs)
         if (v->vcpu_id == 0) {
             int callback_irq =
                 d->arch.hvm_domain.params[HVM_PARAM_CALLBACK_IRQ];
-            if (callback_irq != 0 && local_events_need_delivery()) {
-                /*inject para-device call back irq*/
-                v->vcpu_info->evtchn_upcall_mask = 1;
-                vmx_vcpu_pend_interrupt(v, callback_irq);
+            if (callback_irq != 0) {
+                /* change level for para-device callback irq */
+                vmx_vioapic_set_irq(d, callback_irq,
+                                    local_events_need_delivery());
             }
         }
 
-        if ( v->arch.irq_new_pending ) {
-            v->arch.irq_new_pending = 0;
+        rmb();
+        if (xchg(&v->arch.irq_new_pending, 0)) {
             v->arch.irq_new_condition = 0;
             vmx_check_pending_irq(v);
             return;
