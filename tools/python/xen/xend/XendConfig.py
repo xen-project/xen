@@ -398,14 +398,14 @@ class XendConfig(dict):
         
         for key in extract_keys:
             val = sxp.child_value(sxp_cfg, key)
-            if val:
+            if val != None:
                 try:
-                    try:
-                        cfg[key] = LEGACY_CFG_TYPES[key](val)
-                    except KeyError:
-                        cfg[key] = val
-                except ValueError:
-                    pass
+                    cfg[key] = LEGACY_CFG_TYPES[key](val)
+                except KeyError:
+                    cfg[key] = val
+                except (TypeError, ValueError), e:
+                    log.warn("Unable to parse key %s: %s: %s" %
+                             (key, str(val), e))
 
         # Parsing the device SXP's. In most cases, the SXP looks
         # like this:
@@ -463,7 +463,7 @@ class XendConfig(dict):
         image_sxp = sxp.child_value(sxp_cfg, 'image', [])
         if image_sxp:
             image_vcpus = sxp.child_value(image_sxp, 'vcpus')
-            if image_vcpus is not None:
+            if image_vcpus != None:
                 try:
                     if 'vcpus_number' not in cfg:
                         cfg['vcpus_number'] = int(image_vcpus)
