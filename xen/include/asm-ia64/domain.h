@@ -42,7 +42,7 @@ extern void panic_domain(struct pt_regs *, const char *, ...)
      __attribute__ ((noreturn, format (printf, 2, 3)));
 
 struct mm_struct {
-	pgd_t * pgd;
+	volatile pgd_t * pgd;
     //	atomic_t mm_users;			/* How many users with user space? */
 };
 

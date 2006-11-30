@@ -35,10 +35,18 @@ static inline void pgd_clear(pgd_t *pgd)	{ }
  */
 #define set_pgd(pgdptr, pgdval)			set_pud((pud_t *)(pgdptr), (pud_t) { pgdval })
 
+#ifndef XEN
 static inline pud_t * pud_offset(pgd_t * pgd, unsigned long address)
 {
 	return (pud_t *)pgd;
 }
+#else
+static inline volatile pud_t *
+pud_offset(volatile pgd_t * pgd, unsigned long address)
+{
+	return (volatile pud_t *)pgd;
+}
+#endif
 
 #define pud_val(x)				(pgd_val((x).pgd))
 #define __pud(x)				((pud_t) { __pgd(x) } )

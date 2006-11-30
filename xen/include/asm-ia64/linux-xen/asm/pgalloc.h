@@ -92,10 +92,17 @@ static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 	return pgtable_quicklist_alloc();
 }
 
+#ifndef XEN
 static inline void pgd_free(pgd_t * pgd)
 {
 	pgtable_quicklist_free(pgd);
 }
+#else
+static inline void pgd_free(volatile pgd_t * pgd)
+{
+	pgtable_quicklist_free((void*)pgd);
+}
+#endif
 
 static inline void
 pud_populate(struct mm_struct *mm, pud_t * pud_entry, pmd_t * pmd)
@@ -105,8 +112,8 @@ pud_populate(struct mm_struct *mm, pud_t * pud_entry, pmd_t * pmd)
 
 #ifdef XEN
 static inline int
-pud_cmpxchg_rel(struct mm_struct *mm, pud_t * pud_entry,
-		pmd_t * old_pmd, pmd_t * new_pmd)
+pud_cmpxchg_rel(struct mm_struct *mm, volatile pud_t * pud_entry,
+                pmd_t * old_pmd, volatile pmd_t * new_pmd)
 {
 #ifdef CONFIG_SMP
 	unsigned long r;
@@ -127,10 +134,17 @@ static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
 	return pgtable_quicklist_alloc();
 }
 
+#ifndef XEN
 static inline void pmd_free(pmd_t * pmd)
 {
 	pgtable_quicklist_free(pmd);
 }
+#else
+static inline void pmd_free(volatile pmd_t * pmd)
+{
+	pgtable_quicklist_free((void*)pmd);
+}
+#endif
 
 #define __pmd_free_tlb(tlb, pmd)	pmd_free(pmd)
 
@@ -150,7 +164,7 @@ pmd_populate_kernel(struct mm_struct *mm, pmd_t * pmd_entry, pte_t * pte)
 
 #ifdef XEN
 static inline int
-pmd_cmpxchg_kernel_rel(struct mm_struct *mm, pmd_t * pmd_entry,
+pmd_cmpxchg_kernel_rel(struct mm_struct *mm, volatile pmd_t * pmd_entry,
 		       pte_t * old_pte, pte_t * new_pte)
 {
 #ifdef CONFIG_SMP
@@ -186,12 +200,17 @@ static inline void pte_free(struct page *pte)
 {
 	pgtable_quicklist_free(page_address(pte));
 }
-#endif
 
 static inline void pte_free_kernel(pte_t * pte)
 {
 	pgtable_quicklist_free(pte);
 }
+#else
+static inline void pte_free_kernel(volatile pte_t * pte)
+{
+	pgtable_quicklist_free((void*)pte);
+}
+#endif
 
 #ifndef XEN
 #define __pte_free_tlb(tlb, pte)	pte_free(pte)

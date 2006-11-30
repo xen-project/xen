@@ -249,7 +249,7 @@ try_to_clear_PGC_allocate(struct domain* d, struct page_info* page)
 }
 
 static void
-mm_teardown_pte(struct domain* d, pte_t* pte, unsigned long offset)
+mm_teardown_pte(struct domain* d, volatile pte_t* pte, unsigned long offset)
 {
     pte_t old_pte;
     unsigned long mfn;
@@ -286,39 +286,39 @@ mm_teardown_pte(struct domain* d, pte_t* pte, unsigned long offset)
 }
 
 static void
-mm_teardown_pmd(struct domain* d, pmd_t* pmd, unsigned long offset)
+mm_teardown_pmd(struct domain* d, volatile pmd_t* pmd, unsigned long offset)
 {
     unsigned long i;
-    pte_t* pte = pte_offset_map(pmd, offset);
+    volatile pte_t* pte = pte_offset_map(pmd, offset);
 
     for (i = 0; i < PTRS_PER_PTE; i++, pte++) {
-        if (!pte_present(*pte))
+        if (!pte_present(*pte)) // acquire semantics
             continue;
         mm_teardown_pte(d, pte, offset + (i << PAGE_SHIFT));
     }
 }
 
 static void
-mm_teardown_pud(struct domain* d, pud_t *pud, unsigned long offset)
+mm_teardown_pud(struct domain* d, volatile pud_t *pud, unsigned long offset)
 {
     unsigned long i;
-    pmd_t *pmd = pmd_offset(pud, offset);
+    volatile pmd_t *pmd = pmd_offset(pud, offset);
 
     for (i = 0; i < PTRS_PER_PMD; i++, pmd++) {
-        if (!pmd_present(*pmd))
+        if (!pmd_present(*pmd)) // acquire semantics
             continue;
         mm_teardown_pmd(d, pmd, offset + (i << PMD_SHIFT));
     }
 }
 
 static void
-mm_teardown_pgd(struct domain* d, pgd_t *pgd, unsigned long offset)
+mm_teardown_pgd(struct domain* d, volatile pgd_t *pgd, unsigned long offset)
 {
     unsigned long i;
-    pud_t *pud = pud_offset(pgd, offset);
+    volatile pud_t *pud = pud_offset(pgd, offset);
 
     for (i = 0; i < PTRS_PER_PUD; i++, pud++) {
-        if (!pud_present(*pud))
+        if (!pud_present(*pud)) // acquire semantics
             continue;
         mm_teardown_pud(d, pud, offset + (i << PUD_SHIFT));
     }
@@ -329,30 +329,32 @@ mm_teardown(struct domain* d)
 {
     struct mm_struct* mm = &d->arch.mm;
     unsigned long i;
-    pgd_t* pgd;
+    volatile pgd_t* pgd;
 
     if (mm->pgd == NULL)
         return;
 
     pgd = pgd_offset(mm, 0);
     for (i = 0; i < PTRS_PER_PGD; i++, pgd++) {
-        if (!pgd_present(*pgd))
+        if (!pgd_present(*pgd)) // acquire semantics
             continue;
         mm_teardown_pgd(d, pgd, i << PGDIR_SHIFT);
     }
 }
 
 static void
-mm_p2m_teardown_pmd(struct domain* d, pmd_t* pmd, unsigned long offset)
+mm_p2m_teardown_pmd(struct domain* d, volatile pmd_t* pmd,
+                    unsigned long offset)
 {
     pte_free_kernel(pte_offset_map(pmd, offset));
 }
 
 static void
-mm_p2m_teardown_pud(struct domain* d, pud_t *pud, unsigned long offset)
+mm_p2m_teardown_pud(struct domain* d, volatile pud_t *pud,
+                    unsigned long offset)
 {
     unsigned long i;
-    pmd_t *pmd = pmd_offset(pud, offset);
+    volatile pmd_t *pmd = pmd_offset(pud, offset);
 
     for (i = 0; i < PTRS_PER_PMD; i++, pmd++) {
         if (!pmd_present(*pmd))
@@ -363,10 +365,11 @@ mm_p2m_teardown_pud(struct domain* d, pud_t *pud, unsigned long offset)
 }
 
 static void
-mm_p2m_teardown_pgd(struct domain* d, pgd_t *pgd, unsigned long offset)
+mm_p2m_teardown_pgd(struct domain* d, volatile pgd_t *pgd,
+                    unsigned long offset)
 {
     unsigned long i;
-    pud_t *pud = pud_offset(pgd, offset);
+    volatile pud_t *pud = pud_offset(pgd, offset);
 
     for (i = 0; i < PTRS_PER_PUD; i++, pud++) {
         if (!pud_present(*pud))
@@ -381,7 +384,7 @@ mm_p2m_teardown(struct domain* d)
 {
     struct mm_struct* mm = &d->arch.mm;
     unsigned long i;
-    pgd_t* pgd;
+    volatile pgd_t* pgd;
 
     BUG_ON(mm->pgd == NULL);
     pgd = pgd_offset(mm, 0);
@@ -565,38 +568,6 @@ unsigned long translate_domain_mpaddr(unsigned long mpaddr,
 }
 
 //XXX !xxx_present() should be used instread of !xxx_none()?
-// __assign_new_domain_page(), assign_new_domain_page() and
-// assign_new_domain0_page() are used only when domain creation.
-// their accesses aren't racy so that returned pte_t doesn't need
-// volatile qualifier
-static pte_t*
-__lookup_alloc_domain_pte(struct domain* d, unsigned long mpaddr)
-{
-    struct mm_struct *mm = &d->arch.mm;
-    pgd_t *pgd;
-    pud_t *pud;
-    pmd_t *pmd;
-
-    BUG_ON(mm->pgd == NULL);
-    pgd = pgd_offset(mm, mpaddr);
-    if (pgd_none(*pgd)) {
-        pgd_populate(mm, pgd, pud_alloc_one(mm,mpaddr));
-    }
-
-    pud = pud_offset(pgd, mpaddr);
-    if (pud_none(*pud)) {
-        pud_populate(mm, pud, pmd_alloc_one(mm,mpaddr));
-    }
-
-    pmd = pmd_offset(pud, mpaddr);
-    if (pmd_none(*pmd)) {
-        pmd_populate_kernel(mm, pmd, pte_alloc_one_kernel(mm, mpaddr));
-    }
-
-    return pte_offset_map(pmd, mpaddr);
-}
-
-//XXX !xxx_present() should be used instread of !xxx_none()?
 // pud, pmd, pte page is zero cleared when they are allocated.
 // Their area must be visible before population so that
 // cmpxchg must have release semantics.
@@ -604,15 +575,15 @@ static volatile pte_t*
 lookup_alloc_domain_pte(struct domain* d, unsigned long mpaddr)
 {
     struct mm_struct *mm = &d->arch.mm;
-    pgd_t *pgd;
-    pud_t *pud;
-    pmd_t *pmd;
+    volatile pgd_t *pgd;
+    volatile pud_t *pud;
+    volatile pmd_t *pmd;
 
     BUG_ON(mm->pgd == NULL);
 
     pgd = pgd_offset(mm, mpaddr);
  again_pgd:
-    if (unlikely(pgd_none(*pgd))) {
+    if (unlikely(pgd_none(*pgd))) { // acquire semantics
         pud_t *old_pud = NULL;
         pud = pud_alloc_one(mm, mpaddr);
         if (unlikely(!pgd_cmpxchg_rel(mm, pgd, old_pud, pud))) {
@@ -623,7 +594,7 @@ lookup_alloc_domain_pte(struct domain* d, unsigned long mpaddr)
 
     pud = pud_offset(pgd, mpaddr);
  again_pud:
-    if (unlikely(pud_none(*pud))) {
+    if (unlikely(pud_none(*pud))) { // acquire semantics
         pmd_t* old_pmd = NULL;
         pmd = pmd_alloc_one(mm, mpaddr);
         if (unlikely(!pud_cmpxchg_rel(mm, pud, old_pmd, pmd))) {
@@ -634,7 +605,7 @@ lookup_alloc_domain_pte(struct domain* d, unsigned long mpaddr)
 
     pmd = pmd_offset(pud, mpaddr);
  again_pmd:
-    if (unlikely(pmd_none(*pmd))) {
+    if (unlikely(pmd_none(*pmd))) { // acquire semantics
         pte_t* old_pte = NULL;
         pte_t* pte = pte_alloc_one_kernel(mm, mpaddr);
         if (unlikely(!pmd_cmpxchg_kernel_rel(mm, pmd, old_pte, pte))) {
@@ -643,7 +614,7 @@ lookup_alloc_domain_pte(struct domain* d, unsigned long mpaddr)
         }
     }
 
-    return (volatile pte_t*)pte_offset_map(pmd, mpaddr);
+    return pte_offset_map(pmd, mpaddr);
 }
 
 //XXX xxx_none() should be used instread of !xxx_present()?
@@ -651,48 +622,48 @@ volatile pte_t*
 lookup_noalloc_domain_pte(struct domain* d, unsigned long mpaddr)
 {
     struct mm_struct *mm = &d->arch.mm;
-    pgd_t *pgd;
-    pud_t *pud;
-    pmd_t *pmd;
+    volatile pgd_t *pgd;
+    volatile pud_t *pud;
+    volatile pmd_t *pmd;
 
     BUG_ON(mm->pgd == NULL);
     pgd = pgd_offset(mm, mpaddr);
-    if (unlikely(!pgd_present(*pgd)))
+    if (unlikely(!pgd_present(*pgd))) // acquire semantics
         return NULL;
 
     pud = pud_offset(pgd, mpaddr);
-    if (unlikely(!pud_present(*pud)))
+    if (unlikely(!pud_present(*pud))) // acquire semantics
         return NULL;
 
     pmd = pmd_offset(pud, mpaddr);
-    if (unlikely(!pmd_present(*pmd)))
+    if (unlikely(!pmd_present(*pmd))) // acquire semantics
         return NULL;
 
-    return (volatile pte_t*)pte_offset_map(pmd, mpaddr);
+    return pte_offset_map(pmd, mpaddr);
 }
 
 static volatile pte_t*
 lookup_noalloc_domain_pte_none(struct domain* d, unsigned long mpaddr)
 {
     struct mm_struct *mm = &d->arch.mm;
-    pgd_t *pgd;
-    pud_t *pud;
-    pmd_t *pmd;
+    volatile pgd_t *pgd;
+    volatile pud_t *pud;
+    volatile pmd_t *pmd;
 
     BUG_ON(mm->pgd == NULL);
     pgd = pgd_offset(mm, mpaddr);
-    if (unlikely(pgd_none(*pgd)))
+    if (unlikely(pgd_none(*pgd))) // acquire semantics
         return NULL;
 
     pud = pud_offset(pgd, mpaddr);
-    if (unlikely(pud_none(*pud)))
+    if (unlikely(pud_none(*pud))) // acquire semantics
         return NULL;
 
     pmd = pmd_offset(pud, mpaddr);
-    if (unlikely(pmd_none(*pmd)))
+    if (unlikely(pmd_none(*pmd))) // acquire semantics
         return NULL;
 
-    return (volatile pte_t*)pte_offset_map(pmd, mpaddr);
+    return pte_offset_map(pmd, mpaddr);
 }
 
 unsigned long
@@ -783,7 +754,8 @@ xencomm_paddr_to_maddr(unsigned long paddr)
 /* Allocate a new page for domain and map it to the specified metaphysical
    address.  */
 static struct page_info *
-__assign_new_domain_page(struct domain *d, unsigned long mpaddr, pte_t* pte)
+__assign_new_domain_page(struct domain *d, unsigned long mpaddr,
+                         volatile pte_t* pte)
 {
     struct page_info *p;
     unsigned long maddr;
@@ -825,7 +797,7 @@ __assign_new_domain_page(struct domain *d, unsigned long mpaddr, pte_t* pte)
 struct page_info *
 assign_new_domain_page(struct domain *d, unsigned long mpaddr)
 {
-    pte_t *pte = __lookup_alloc_domain_pte(d, mpaddr);
+    volatile pte_t *pte = lookup_alloc_domain_pte(d, mpaddr);
 
     if (!pte_none(*pte))
         return NULL;
@@ -836,10 +808,10 @@ assign_new_domain_page(struct domain *d, unsigned long mpaddr)
 void
 assign_new_domain0_page(struct domain *d, unsigned long mpaddr)
 {
-    pte_t *pte;
+    volatile pte_t *pte;
 
     BUG_ON(d != dom0);
-    pte = __lookup_alloc_domain_pte(d, mpaddr);
+    pte = lookup_alloc_domain_pte(d, mpaddr);
     if (pte_none(*pte)) {
         struct page_info *p = __assign_new_domain_page(d, mpaddr, pte);
         if (p == NULL) {
@@ -1816,7 +1788,7 @@ domain_page_mapped(struct domain* d, unsigned long mpaddr)
 void domain_cache_flush (struct domain *d, int sync_only)
 {
     struct mm_struct *mm = &d->arch.mm;
-    pgd_t *pgd = mm->pgd;
+    volatile pgd_t *pgd = mm->pgd;
     unsigned long maddr;
     int i,j,k, l;
     int nbr_page = 0;
@@ -1829,22 +1801,22 @@ void domain_cache_flush (struct domain *d, int sync_only)
         flush_func = &flush_dcache_range;
 
     for (i = 0; i < PTRS_PER_PGD; pgd++, i++) {
-        pud_t *pud;
-        if (!pgd_present(*pgd))
+        volatile pud_t *pud;
+        if (!pgd_present(*pgd)) // acquire semantics
             continue;
         pud = pud_offset(pgd, 0);
         for (j = 0; j < PTRS_PER_PUD; pud++, j++) {
-            pmd_t *pmd;
-            if (!pud_present(*pud))
+            volatile pmd_t *pmd;
+            if (!pud_present(*pud)) // acquire semantics
                 continue;
             pmd = pmd_offset(pud, 0);
             for (k = 0; k < PTRS_PER_PMD; pmd++, k++) {
-                pte_t *pte;
-                if (!pmd_present(*pmd))
+                volatile pte_t *pte;
+                if (!pmd_present(*pmd)) // acquire semantics
                     continue;
                 pte = pte_offset_map(pmd, 0);
                 for (l = 0; l < PTRS_PER_PTE; pte++, l++) {
-                    if (!pte_present(*pte))
+                    if (!pte_present(*pte)) // acquire semantics
                         continue;
                     /* Convert PTE to maddr.  */
                     maddr = __va_ul (pte_val(*pte)
