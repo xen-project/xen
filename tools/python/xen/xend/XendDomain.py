@@ -191,6 +191,8 @@ class XendDomain:
                         # instantiate domain if not started.
                         new_dom = XendDomainInfo.createDormant(dom)
                         self._managed_domain_register(new_dom)
+                    else:
+                        self._managed_domain_register(running_dom)
                 except Exception:
                     log.exception("Failed to create reference to managed "
                                   "domain: %s" % dom_name)
