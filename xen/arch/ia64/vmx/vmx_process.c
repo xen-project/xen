@@ -227,8 +227,7 @@ void leave_hypervisor_tail(struct pt_regs *regs)
                 d->arch.hvm_domain.params[HVM_PARAM_CALLBACK_IRQ];
             if (callback_irq != 0) {
                 /* change level for para-device callback irq */
-                vmx_vioapic_set_irq(d, callback_irq,
-                                    local_events_need_delivery());
+                viosapic_set_irq(d, callback_irq, local_events_need_delivery());
             }
         }
 
