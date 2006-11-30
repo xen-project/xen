@@ -226,6 +226,15 @@ def recreate(info, priv):
         vm._storeVmDetails()
         vm._storeDomDetails()
         
+    if vm.info['image']: # Only dom0 should be without an image entry when
+                         # recreating, but we cope with missing ones
+                         # elsewhere just in case.
+        vm.image = image.create(vm,
+                                vm.info,
+                                vm.info['image'],
+                                vm.info['devices'])
+        vm.image.recreate()
+
     vm._registerWatches()
     vm.refreshShutdown(xeninfo)
     return vm
@@ -470,7 +479,7 @@ class XendDomainInfo:
         
         if reason not in DOMAIN_SHUTDOWN_REASONS.values():
             raise XendError('Invalid reason: %s' % reason)
-        self._storeDom("control/shutdown", reason)
+        self.storeDom("control/shutdown", reason)
                 
     def pause(self):
         """Pause domain
@@ -497,7 +506,7 @@ class XendDomainInfo:
     def send_sysrq(self, key):
         """ Send a Sysrq equivalent key via xenstored."""
         asserts.isCharConvertible(key)
-        self._storeDom("control/sysrq", '%c' % key)
+        self.storeDom("control/sysrq", '%c' % key)
 
     def device_create(self, dev_config):
         """Create a new device.
@@ -581,7 +590,7 @@ class XendDomainInfo:
         
         self.info['memory_static_min'] = target
         self.storeVm("memory", target)
-        self._storeDom("memory/target", target << 10)
+        self.storeDom("memory/target", target << 10)
 
     def getVCPUInfo(self):
         try:
@@ -648,7 +657,7 @@ class XendDomainInfo:
         for devclass in XendDevices.valid_devices():
             devconfig = self.getDeviceController(devclass).configurations()
             if devconfig:
-                devices.extend(map(lambda conf: (devclass, conf), devconfig))
+                devices.extend(devconfig)
 
         if not self.info['devices'] and devices is not None:
             for device in devices:
@@ -677,8 +686,11 @@ class XendDomainInfo:
     # Function to update xenstore /dom/*
     #
 
-    def _readDom(self, *args):
+    def readDom(self, *args):
         return xstransact.Read(self.dompath, *args)
+
+    def gatherDom(self, *args):
+        return xstransact.Gather(self.dompath, *args)
 
     def _writeDom(self, *args):
         return xstransact.Write(self.dompath, *args)
@@ -686,7 +698,7 @@ class XendDomainInfo:
     def _removeDom(self, *args):
         return xstransact.Remove(self.dompath, *args)
 
-    def _storeDom(self, *args):
+    def storeDom(self, *args):
         return xstransact.Store(self.dompath, *args)
 
     def _recreateDom(self):
@@ -787,17 +799,17 @@ class XendDomainInfo:
     def _handleShutdownWatch(self, _):
         log.debug('XendDomainInfo.handleShutdownWatch')
         
-        reason = self._readDom('control/shutdown')
+        reason = self.readDom('control/shutdown')
 
         if reason and reason != 'suspend':
-            sst = self._readDom('xend/shutdown_start_time')
+            sst = self.readDom('xend/shutdown_start_time')
             now = time.time()
             if sst:
                 self.shutdownStartTime = float(sst)
                 timeout = float(sst) + SHUTDOWN_TIMEOUT - now
             else:
                 self.shutdownStartTime = now
-                self._storeDom('xend/shutdown_start_time', now)
+                self.storeDom('xend/shutdown_start_time', now)
                 timeout = SHUTDOWN_TIMEOUT
 
             log.trace(
@@ -828,7 +840,7 @@ class XendDomainInfo:
         return self.dompath
 
     def getShutdownReason(self):
-        return self._readDom('control/shutdown')
+        return self.readDom('control/shutdown')
 
     def getStorePort(self):
         """For use only by image.py and XendCheckpoint.py."""
@@ -914,7 +926,7 @@ class XendDomainInfo:
                 return
 
             elif xeninfo['crashed']:
-                if self._readDom('xend/shutdown_completed'):
+                if self.readDom('xend/shutdown_completed'):
                     # We've seen this shutdown already, but we are preserving
                     # the domain for debugging.  Leave it alone.
                     return
@@ -930,7 +942,7 @@ class XendDomainInfo:
 
             elif xeninfo['shutdown']:
                 self._stateSet(DOM_STATE_SHUTDOWN)
-                if self._readDom('xend/shutdown_completed'):
+                if self.readDom('xend/shutdown_completed'):
                     # We've seen this shutdown already, but we are preserving
                     # the domain for debugging.  Leave it alone.
                     return
@@ -1111,7 +1123,7 @@ class XendDomainInfo:
         log.info("Preserving dead domain %s (%d).", self.info['name_label'],
                  self.domid)
         self._unwatchVm()
-        self._storeDom('xend/shutdown_completed', 'True')
+        self.storeDom('xend/shutdown_completed', 'True')
         self._stateSet(DOM_STATE_HALTED)
 
     #
@@ -1724,7 +1736,7 @@ class XendDomainInfo:
                                    ignore_devices = ignore_store)
 
         if not ignore_store and self.dompath:
-            vnc_port = self._readDom('console/vnc-port')
+            vnc_port = self.readDom('console/vnc-port')
             if vnc_port is not None:
                 result.append(['device',
                                ['console', ['vnc-port', str(vnc_port)]]])

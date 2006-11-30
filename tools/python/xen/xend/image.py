@@ -23,6 +23,7 @@ import math
 import signal
 
 import xen.lowlevel.xc
+from xen.xend.XendConstants import REVERSE_DOMAIN_SHUTDOWN_REASONS
 from xen.xend.XendError import VmError, XendError
 from xen.xend.XendLogging import log
 from xen.xend.server.netif import randomMAC
@@ -165,6 +166,10 @@ class ImageHandler:
         pass
 
 
+    def recreate(self):
+        pass
+
+
 class LinuxImageHandler(ImageHandler):
 
     ostype = "linux"
@@ -232,9 +237,12 @@ class PPC_LinuxImageHandler(LinuxImageHandler):
 
 class HVMImageHandler(ImageHandler):
 
+    ostype = "hvm"
+
     def __init__(self, vm, vmConfig, imageConfig, deviceConfig):
         ImageHandler.__init__(self, vm, vmConfig, imageConfig, deviceConfig)
         self.shutdownWatch = None
+        self.rebootFeatureWatch = None
 
     def configure(self, vmConfig, imageConfig, deviceConfig):
         ImageHandler.configure(self, vmConfig, imageConfig, deviceConfig)
@@ -257,7 +265,7 @@ class HVMImageHandler(ImageHandler):
                         ("image/device-model", self.device_model),
                         ("image/display", self.display))
 
-        self.pid = 0
+        self.pid = None
 
         self.dmargs += self.configVNC(imageConfig)
 
@@ -417,20 +425,30 @@ class HVMImageHandler(ImageHandler):
         log.info("spawning device models: %s %s", self.device_model, args)
         # keep track of pid and spawned options to kill it later
         self.pid = os.spawnve(os.P_NOWAIT, self.device_model, args, env)
+        self.vm.storeDom("image/device-model-pid", self.pid)
         log.info("device model pid: %d", self.pid)
+
+    def recreate(self):
+        self.register_shutdown_watch()
+        self.register_reboot_feature_watch()
+        self.pid = self.vm.gatherDom(('image/device-model-pid', int))
 
     def destroy(self):
         self.unregister_shutdown_watch()
         self.unregister_reboot_feature_watch();
-        if not self.pid:
-            return
-        try:
-            os.kill(self.pid, signal.SIGKILL)
-            os.waitpid(self.pid, 0)
-        except OSError, e:
-            log.warning("Unable to kill device model (pid: %d)" % self.pid)
-            
-        self.pid = 0
+        if self.pid:
+            try:
+                os.kill(self.pid, signal.SIGKILL)
+            except OSError, exn:
+                log.exception(exn)
+            try:
+                os.waitpid(self.pid, 0)
+            except OSError, exn:
+                # This is expected if Xend has been restarted within the
+                # life of this domain.  In this case, we can kill the process,
+                # but we can't wait for it because it's not our child.
+                pass
+            self.pid = None
 
     def register_shutdown_watch(self):
         """ add xen store watch on control/shutdown """
@@ -454,23 +472,22 @@ class HVMImageHandler(ImageHandler):
         """ watch call back on node control/shutdown,
             if node changed, this function will be called
         """
-        from xen.xend.XendConstants import DOMAIN_SHUTDOWN_REASONS
         xd = xen.xend.XendDomain.instance()
         try:
             vm = xd.domain_lookup( self.vm.getDomid() )
         except XendError:
             # domain isn't registered, no need to clean it up.
-            return
+            return False
 
         reason = vm.getShutdownReason()
         log.debug("hvm_shutdown fired, shutdown reason=%s", reason)
-        for x in DOMAIN_SHUTDOWN_REASONS.keys():
-            if DOMAIN_SHUTDOWN_REASONS[x] == reason:
-                vm.info['shutdown'] = 1
-                vm.info['shutdown_reason'] = x
-                vm.refreshShutdown(vm.info)
+        if reason in REVERSE_DOMAIN_SHUTDOWN_REASONS:
+            vm.info['shutdown'] = 1
+            vm.info['shutdown_reason'] = \
+                REVERSE_DOMAIN_SHUTDOWN_REASONS[reason]
+            vm.refreshShutdown(vm.info)
 
-        return 1 # Keep watching
+        return True # Keep watching
 
     def register_reboot_feature_watch(self):
         """ add xen store watch on control/feature-reboot """
@@ -494,20 +511,15 @@ class HVMImageHandler(ImageHandler):
         """ watch call back on node control/feature-reboot,
             if node changed, this function will be called
         """
-        xd = xen.xend.XendDomain.instance()
-        vm = xd.domain_lookup( self.vm.getDomid() )
-
-        status = vm.readDom('control/feature-reboot')
+        status = self.vm.readDom('control/feature-reboot')
         log.debug("hvm_reboot_feature fired, module status=%s", status)
         if status == '1':
             self.unregister_shutdown_watch()
 
-        return 1 # Keep watching
+        return True # Keep watching
 
 
 class IA64_HVM_ImageHandler(HVMImageHandler):
-
-    ostype = "hvm"
 
     def getRequiredAvailableMemory(self, mem_kb):
         page_kb = 16
@@ -520,8 +532,6 @@ class IA64_HVM_ImageHandler(HVMImageHandler):
         return 0
 
 class X86_HVM_ImageHandler(HVMImageHandler):
-
-    ostype = "hvm"
 
     def getRequiredAvailableMemory(self, mem_kb):
         # Add 8 MiB overhead for QEMU's video RAM.

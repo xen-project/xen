@@ -34,6 +34,8 @@ DOMAIN_SHUTDOWN_REASONS = {
     DOMAIN_CRASH   : "crash",
     DOMAIN_HALT    : "halt"
 }
+REVERSE_DOMAIN_SHUTDOWN_REASONS = \
+    dict([(y, x) for x, y in DOMAIN_SHUTDOWN_REASONS.items()])
 
 restart_modes = [
     "restart",

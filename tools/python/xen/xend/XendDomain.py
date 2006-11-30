@@ -421,7 +421,6 @@ class XendDomain:
                 self._remove_domain(dom, domid)
 
 
-
     def _add_domain(self, info):
         """Add a domain to the list of running domains
         
