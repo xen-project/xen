@@ -1,3 +1,5 @@
+obj-y += machine_kexec.o
+obj-y += crash.o
 obj-y += acpi.o
 obj-y += dom0_ops.o
 obj-y += domain.o
