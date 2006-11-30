@@ -433,6 +433,11 @@ class XendDomain:
         """
         log.debug("Adding Domain: %s" % info.getDomid())
         self.domains[info.getDomid()] = info
+        
+        # update the managed domains with a new XendDomainInfo object
+        # if we are keeping track of it.
+        if info.get_uuid() in self.managed_domains:
+            self._managed_domain_register(info)
 
     def _remove_domain(self, info, domid = None):
         """Remove the domain from the list of running domains
@@ -669,7 +674,7 @@ class XendDomain:
         self.domains_lock.acquire()
         try:
             try:
-                xeninfo = XendConfig(xenapi_vm = xenapi_vm)
+                xeninfo = XendConfig(xapi = xenapi_vm)
                 dominfo = XendDomainInfo.createDormant(xeninfo)
                 log.debug("Creating new managed domain: %s: %s" %
                           (dominfo.getName(), dominfo.get_uuid()))
@@ -873,8 +878,8 @@ class XendDomain:
         self.domains_lock.acquire()
         try:
             try:
-                xeninfo = XendConfig(sxp = config)
-                dominfo = XendDomainInfo.createDormant(xeninfo)
+                domconfig = XendConfig(sxp_obj = config)
+                dominfo = XendDomainInfo.createDormant(domconfig)
                 log.debug("Creating new managed domain: %s" %
                           dominfo.getName())
                 self._managed_domain_register(dominfo)

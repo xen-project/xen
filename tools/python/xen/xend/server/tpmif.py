@@ -18,10 +18,8 @@
 # Copyright (C) 2005 XenSource Ltd
 #============================================================================
 
-"""Support for virtual TPM interfaces.
-"""
+"""Support for virtual TPM interfaces."""
 
-from xen.xend import sxp
 from xen.xend import XendRoot
 from xen.xend.XendLogging import log
 from xen.xend.XendError import XendError
@@ -49,12 +47,12 @@ class TPMifController(DevController):
         """@see DevController.getDeviceDetails"""
 
         devid = self.allocateDeviceID()
-        inst = int(sxp.child_value(config, 'pref_instance', '-1'))
+        inst = int(config.get('pref_instance', -1))
         if inst == -1:
-            inst = int(sxp.child_value(config, 'instance' , '0'))
+            inst = int(config.get('instance', 0))
 
-        typ    = sxp.child_value(config, 'type')
-        uuid   = sxp.child_value(config, 'uuid')
+        typ    = config.get('type')
+        uuid   = config.get('uuid')
 
         log.info("The domain has a TPM with pref. instance %d and devid %d.",
                  inst, devid)

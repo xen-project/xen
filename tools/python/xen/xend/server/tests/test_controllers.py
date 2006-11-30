@@ -21,11 +21,11 @@ class test_controllers(unittest.TestCase):
     def testNetif(self):
         controller = self.controllerInstance(netif.NetifController)
 
-        self.assertNetif(controller.getDeviceDetails(['vif']), None)
+        self.assertNetif(controller.getDeviceDetails({}), None)
         self.assertNetif(
-            controller.getDeviceDetails(
-            ['vif', ['mac', 'aa:bb:cc:dd:ee:ff']]),
+            controller.getDeviceDetails({'mac': 'aa:bb:cc:dd:ee:ff'}),
             'aa:bb:cc:dd:ee:ff')
+
 
 
     def assertNetif(self, results, expectedMac):

@@ -23,7 +23,6 @@ import math
 import signal
 
 import xen.lowlevel.xc
-from xen.xend import sxp
 from xen.xend.XendError import VmError, XendError
 from xen.xend.XendLogging import log
 from xen.xend.server.netif import randomMAC
@@ -31,19 +30,18 @@ from xen.xend.xenstore.xswatch import xswatch
 from xen.xend import arch
 from xen.xend import FlatDeviceTree
 
-
 xc = xen.lowlevel.xc.xc()
-
 
 MAX_GUEST_CMDLINE = 1024
 
 
-def create(vm, imageConfig, deviceConfig):
+def create(vm, vmConfig, imageConfig, deviceConfig):
     """Create an image handler for a vm.
 
     @return ImageHandler instance
     """
-    return findImageHandlerClass(imageConfig)(vm, imageConfig, deviceConfig)
+    return findImageHandlerClass(imageConfig)(vm, vmConfig, imageConfig,
+                                              deviceConfig)
 
 
 class ImageHandler:
@@ -66,34 +64,20 @@ class ImageHandler:
     ostype = None
 
 
-    def __init__(self, vm, imageConfig, deviceConfig):
+    def __init__(self, vm, vmConfig, imageConfig, deviceConfig):
         self.vm = vm
 
         self.kernel = None
         self.ramdisk = None
         self.cmdline = None
 
-        self.configure(imageConfig, deviceConfig)
+        self.configure(vmConfig, imageConfig, deviceConfig)
 
-    def configure(self, imageConfig, _):
+    def configure(self, vmConfig, imageConfig, _):
         """Config actions common to all unix-like domains."""
-
-        def get_cfg(name, default = None):
-            return sxp.child_value(imageConfig, name, default)
-
-        self.kernel = get_cfg("kernel")
-        self.cmdline = ""
-        ip = get_cfg("ip")
-        if ip:
-            self.cmdline += " ip=" + ip
-        root = get_cfg("root")
-        if root:
-            self.cmdline += " root=" + root
-        args = get_cfg("args")
-        if args:
-            self.cmdline += " " + args
-        self.ramdisk = get_cfg("ramdisk", '')
-        
+        self.kernel = vmConfig['kernel_kernel']
+        self.cmdline = vmConfig['kernel_args']
+        self.ramdisk = vmConfig['kernel_initrd']
         self.vm.storeVm(("image/ostype", self.ostype),
                         ("image/kernel", self.kernel),
                         ("image/cmdline", self.cmdline),
@@ -214,8 +198,8 @@ class PPC_LinuxImageHandler(LinuxImageHandler):
 
     ostype = "linux"
 
-    def configure(self, imageConfig, deviceConfig):
-        LinuxImageHandler.configure(self, imageConfig, deviceConfig)
+    def configure(self, vmConfig, imageConfig, deviceConfig):
+        LinuxImageHandler.configure(self, vmConfig, imageConfig, deviceConfig)
         self.imageConfig = imageConfig
 
     def buildDomain(self):
@@ -248,25 +232,26 @@ class PPC_LinuxImageHandler(LinuxImageHandler):
 
 class HVMImageHandler(ImageHandler):
 
-    def __init__(self, vm, imageConfig, deviceConfig):
-        ImageHandler.__init__(self, vm, imageConfig, deviceConfig)
+    def __init__(self, vm, vmConfig, imageConfig, deviceConfig):
+        ImageHandler.__init__(self, vm, vmConfig, imageConfig, deviceConfig)
         self.shutdownWatch = None
 
-    def configure(self, imageConfig, deviceConfig):
-        ImageHandler.configure(self, imageConfig, deviceConfig)
+    def configure(self, vmConfig, imageConfig, deviceConfig):
+        ImageHandler.configure(self, vmConfig, imageConfig, deviceConfig)
 
         info = xc.xeninfo()
-        if not 'hvm' in info['xen_caps']:
+        if 'hvm' not in info['xen_caps']:
             raise VmError("HVM guest support is unavailable: is VT/AMD-V "
                           "supported by your CPU and enabled in your BIOS?")
 
         self.dmargs = self.parseDeviceModelArgs(imageConfig, deviceConfig)
-        self.device_model = sxp.child_value(imageConfig, 'device_model')
+        self.device_model = imageConfig['hvm'].get('device_model')
         if not self.device_model:
             raise VmError("hvm: missing device model")
-        self.display = sxp.child_value(imageConfig, 'display')
-        self.xauthority = sxp.child_value(imageConfig, 'xauthority')
-        self.vncconsole = sxp.child_value(imageConfig, 'vncconsole')
+        
+        self.display = imageConfig['hvm'].get('display')
+        self.xauthority = imageConfig['hvm'].get('xauthority')
+        self.vncconsole = imageConfig['hvm'].get('vncconsole')
 
         self.vm.storeVm(("image/dmargs", " ".join(self.dmargs)),
                         ("image/device-model", self.device_model),
@@ -276,9 +261,9 @@ class HVMImageHandler(ImageHandler):
 
         self.dmargs += self.configVNC(imageConfig)
 
-        self.pae  = int(sxp.child_value(imageConfig, 'pae',  1))
-        self.acpi = int(sxp.child_value(imageConfig, 'acpi', 1))
-        self.apic = int(sxp.child_value(imageConfig, 'apic', 1))
+        self.pae  = imageConfig['hvm'].get('pae', 0)
+        self.acpi  = imageConfig['hvm'].get('acpi', 0)
+        self.apic  = imageConfig['hvm'].get('apic', 0)
 
     def buildDomain(self):
         store_evtchn = self.vm.getStorePort()
@@ -312,8 +297,12 @@ class HVMImageHandler(ImageHandler):
                    'localtime', 'serial', 'stdvga', 'isa', 'vcpus',
                    'acpi', 'usb', 'usbdevice', 'keymap' ]
         ret = []
+        hvmDeviceConfig = imageConfig['hvm']['devices']
+        
         for a in dmargs:
-            v = sxp.child_value(imageConfig, a)
+            v = hvmDeviceConfig.get(a)
+            if a == 'vcpus':
+                v = hvmDeviceConfig.get('vcpus_number')
 
             # python doesn't allow '-' in variable names
             if a == 'stdvga': a = 'std-vga'
@@ -328,7 +317,7 @@ class HVMImageHandler(ImageHandler):
                     ret.append("-%s" % a)
                     ret.append("%s" % v)
 
-            if a in ['fda', 'fdb' ]:
+            if a in ['fda', 'fdb']:
                 if v:
                     if not os.path.isabs(v):
                         raise VmError("Floppy file %s does not exist." % v)
@@ -336,26 +325,27 @@ class HVMImageHandler(ImageHandler):
 
         # Handle disk/network related options
         mac = None
-        ret = ret + ["-domain-name", "%s" % self.vm.info['name']]
+        ret = ret + ["-domain-name", str(self.vm.info['name_label'])]
         nics = 0
-        for (name, info) in deviceConfig:
-            if name == 'vbd':
-                uname = sxp.child_value(info, 'uname')
+        
+        for devuuid, (devtype, devinfo) in deviceConfig.items():
+            if devtype == 'vbd':
+                uname = devinfo['uname']
                 if uname is not None and 'file:' in uname:
                     (_, vbdparam) = string.split(uname, ':', 1)
                     if not os.path.isfile(vbdparam):
                         raise VmError('Disk image does not exist: %s' %
                                       vbdparam)
-            if name == 'vif':
-                type = sxp.child_value(info, 'type')
-                if type != 'ioemu':
+            if devtype == 'vif':
+                dtype = devinfo.get('type', 'ioemu')
+                if dtype != 'ioemu':
                     continue
                 nics += 1
-                mac = sxp.child_value(info, 'mac')
+                mac = devinfo.get('mac')
                 if mac == None:
                     mac = randomMAC()
-                bridge = sxp.child_value(info, 'bridge', 'xenbr0')
-                model = sxp.child_value(info, 'model', 'rtl8139')
+                bridge = devinfo.get('bridge', 'xenbr0')
+                model = devinfo.get('model', 'rtl8139')
                 ret.append("-net")
                 ret.append("nic,vlan=%d,macaddr=%s,model=%s" %
                            (nics, mac, model))
@@ -363,31 +353,32 @@ class HVMImageHandler(ImageHandler):
                 ret.append("tap,vlan=%d,bridge=%s" % (nics, bridge))
         return ret
 
-    def configVNC(self, config):
+    def configVNC(self, imageConfig):
         # Handle graphics library related options
-        vnc = sxp.child_value(config, 'vnc')
-        sdl = sxp.child_value(config, 'sdl')
+        vnc = imageConfig.get('vnc')
+        sdl = imageConfig.get('sdl')
         ret = []
-        nographic = sxp.child_value(config, 'nographic')
+        nographic = imageConfig.get('nographic')
 
         # get password from VM config (if password omitted, None)
-        vncpasswd_vmconfig = sxp.child_value(config, 'vncpasswd')
+        vncpasswd_vmconfig = imageConfig.get('vncpasswd')
 
         if nographic:
             ret.append('-nographic')
             return ret
 
         if vnc:
-            vncdisplay = int(sxp.child_value(config, 'vncdisplay',
-                                             self.vm.getDomid()))
+            vncdisplay = imageConfig.get('vncdisplay',
+                                         int(self.vm.getDomid()))
+            vncunused = imageConfig.get('vncunused')
 
-            vncunused = sxp.child_value(config, 'vncunused')
             if vncunused:
                 ret += ['-vncunused']
             else:
                 ret += ['-vnc', '%d' % vncdisplay]
 
-            vnclisten = sxp.child_value(config, 'vnclisten')
+            vnclisten = imageConfig.get('vnclisten')
+
             if not(vnclisten):
                 vnclisten = (xen.xend.XendRoot.instance().
                              get_vnclisten_address())
@@ -423,21 +414,26 @@ class HVMImageHandler(ImageHandler):
         if self.vncconsole:
             args = args + ([ "-vncviewer" ])
         log.info("spawning device models: %s %s", self.device_model, args)
+        # keep track of pid and spawned options to kill it later
         self.pid = os.spawnve(os.P_NOWAIT, self.device_model, args, env)
         log.info("device model pid: %d", self.pid)
 
     def destroy(self):
-        self.unregister_shutdown_watch();
+        self.unregister_shutdown_watch()
         if not self.pid:
             return
-        os.kill(self.pid, signal.SIGKILL)
-        os.waitpid(self.pid, 0)
+        try:
+            os.kill(self.pid, signal.SIGKILL)
+            os.waitpid(self.pid, 0)
+        except OSError, e:
+            log.warning("Unable to kill device model (pid: %d)" % self.pid)
+            
         self.pid = 0
 
     def register_shutdown_watch(self):
         """ add xen store watch on control/shutdown """
-        self.shutdownWatch = xswatch(self.vm.dompath + "/control/shutdown", \
-                                    self.hvm_shutdown)
+        self.shutdownWatch = xswatch(self.vm.dompath + "/control/shutdown",
+                                     self.hvm_shutdown)
         log.debug("hvm shutdown watch registered")
 
     def unregister_shutdown_watch(self):
@@ -529,10 +525,10 @@ def findImageHandlerClass(image):
     @param image config
     @return ImageHandler subclass or None
     """
-    type = sxp.name(image)
-    if type is None:
+    image_type = image['type']
+    if image_type is None:
         raise VmError('missing image type')
     try:
-        return _handlers[arch.type][type]
+        return _handlers[arch.type][image_type]
     except KeyError:
-        raise VmError('unknown image type: ' + type)
+        raise VmError('unknown image type: ' + image_type)

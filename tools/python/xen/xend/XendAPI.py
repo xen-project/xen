@@ -730,11 +730,11 @@ class XendAPI:
     
     def vm_get_memory_dynamic_max(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_todo()
+        return xen_api_success(dom.get_memory_dynamic_max())
 
     def vm_get_memory_dynamic_min(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_todo()    
+        return xen_api_success(dom.get_memory_dynamic_min())        
     
     def vm_get_VCPUs_policy(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
@@ -798,11 +798,11 @@ class XendAPI:
     
     def vm_get_builder(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_todo()
+        return xen_api_success(dom.get_builder())
     
     def vm_get_boot_method(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success('')
+        return xen_api_success(dom.get_boot_method())
     
     def vm_get_kernel_kernel(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
@@ -969,8 +969,8 @@ class XendAPI:
             'resident_on': XendNode.instance().uuid,
             'memory_static_min': xeninfo.get_memory_static_min(),
             'memory_static_max': xeninfo.get_memory_static_max(),
-            'memory_dynamic_min': xeninfo.get_memory_static_min(),
-            'memory_dynamic_max': xeninfo.get_memory_static_max(),
+            'memory_dynamic_min': xeninfo.get_memory_dynamic_min(),
+            'memory_dynamic_max': xeninfo.get_memory_dynamic_max(),
             'memory_actual': xeninfo.get_memory_static_min(),
             'vcpus_policy': xeninfo.get_vcpus_policy(),
             'vcpus_params': xeninfo.get_vcpus_params(),
