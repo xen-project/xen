@@ -154,7 +154,7 @@ def create():
     if api_cfg:
         try:
             addrs = [(str(x[0]).split(':'),
-                      len(x) > 1 and x[1] or XendAPI.AUTH_NONE,
+                      len(x) > 1 and x[1] or XendAPI.AUTH_PAM,
                       len(x) > 2 and x[2] and map(re.compile, x[2].split(" "))
                       or None)
                      for x in api_cfg]
