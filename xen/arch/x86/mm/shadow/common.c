@@ -70,11 +70,14 @@ int _shadow_mode_refcounts(struct domain *d)
  */
 
 static int
-sh_x86_emulate_read_std(unsigned long addr,
-                         unsigned long *val,
-                         unsigned int bytes,
-                         struct x86_emulate_ctxt *ctxt)
+sh_x86_emulate_read(unsigned int seg,
+                    unsigned long offset,
+                    unsigned long *val,
+                    unsigned int bytes,
+                    struct x86_emulate_ctxt *ctxt)
 {
+    unsigned long addr = offset;
+
     *val = 0;
     // XXX -- this is WRONG.
     //        It entirely ignores the permissions in the page tables.
@@ -99,40 +102,15 @@ sh_x86_emulate_read_std(unsigned long addr,
 }
 
 static int
-sh_x86_emulate_write_std(unsigned long addr,
-                          unsigned long val,
-                          unsigned int bytes,
-                          struct x86_emulate_ctxt *ctxt)
-{
-#if 0
-    struct vcpu *v = current;
-    SHADOW_PRINTK("d=%u v=%u a=%#lx v=%#lx bytes=%u\n",
-                  v->domain->domain_id, v->vcpu_id, addr, val, bytes);
-#endif
-
-    // XXX -- this is WRONG.
-    //        It entirely ignores the permissions in the page tables.
-    //        In this case, that includes user vs supervisor, and
-    //        write access.
-    //
-    if ( hvm_copy_to_guest_virt(addr, &val, bytes) == 0 )
-        return X86EMUL_CONTINUE;
-
-    /* If we got here, there was nothing mapped here, or a bad GFN 
-     * was mapped here.  This should never happen: we're here because
-     * of a write fault at the end of the instruction we're emulating,
-     * which should be handled by sh_x86_emulate_write_emulated. */ 
-    SHADOW_PRINTK("write failed to va %#lx\n", addr);
-    return X86EMUL_PROPAGATE_FAULT;
-}
-
-static int
-sh_x86_emulate_write_emulated(unsigned long addr,
-                               unsigned long val,
-                               unsigned int bytes,
-                               struct x86_emulate_ctxt *ctxt)
+sh_x86_emulate_write(unsigned int seg,
+                     unsigned long offset,
+                     unsigned long val,
+                     unsigned int bytes,
+                     struct x86_emulate_ctxt *ctxt)
 {
     struct vcpu *v = current;
+    unsigned long addr = offset;
+
 #if 0
     SHADOW_PRINTK("d=%u v=%u a=%#lx v=%#lx bytes=%u\n",
                   v->domain->domain_id, v->vcpu_id, addr, val, bytes);
@@ -141,13 +119,16 @@ sh_x86_emulate_write_emulated(unsigned long addr,
 }
 
 static int 
-sh_x86_emulate_cmpxchg_emulated(unsigned long addr,
-                                 unsigned long old,
-                                 unsigned long new,
-                                 unsigned int bytes,
-                                 struct x86_emulate_ctxt *ctxt)
+sh_x86_emulate_cmpxchg(unsigned int seg,
+                       unsigned long offset,
+                       unsigned long old,
+                       unsigned long new,
+                       unsigned int bytes,
+                       struct x86_emulate_ctxt *ctxt)
 {
     struct vcpu *v = current;
+    unsigned long addr = offset;
+
 #if 0
     SHADOW_PRINTK("d=%u v=%u a=%#lx o?=%#lx n:=%#lx bytes=%u\n",
                    v->domain->domain_id, v->vcpu_id, addr, old, new, bytes);
@@ -157,14 +138,17 @@ sh_x86_emulate_cmpxchg_emulated(unsigned long addr,
 }
 
 static int 
-sh_x86_emulate_cmpxchg8b_emulated(unsigned long addr,
-                                   unsigned long old_lo,
-                                   unsigned long old_hi,
-                                   unsigned long new_lo,
-                                   unsigned long new_hi,
-                                   struct x86_emulate_ctxt *ctxt)
+sh_x86_emulate_cmpxchg8b(unsigned int seg,
+                         unsigned long offset,
+                         unsigned long old_lo,
+                         unsigned long old_hi,
+                         unsigned long new_lo,
+                         unsigned long new_hi,
+                         struct x86_emulate_ctxt *ctxt)
 {
     struct vcpu *v = current;
+    unsigned long addr = offset;
+
 #if 0
     SHADOW_PRINTK("d=%u v=%u a=%#lx o?=%#lx:%lx n:=%#lx:%lx\n",
                    v->domain->domain_id, v->vcpu_id, addr, old_hi, old_lo,
@@ -176,12 +160,10 @@ sh_x86_emulate_cmpxchg8b_emulated(unsigned long addr,
 
 
 struct x86_emulate_ops shadow_emulator_ops = {
-    .read_std           = sh_x86_emulate_read_std,
-    .write_std          = sh_x86_emulate_write_std,
-    .read_emulated      = sh_x86_emulate_read_std,
-    .write_emulated     = sh_x86_emulate_write_emulated,
-    .cmpxchg_emulated   = sh_x86_emulate_cmpxchg_emulated,
-    .cmpxchg8b_emulated = sh_x86_emulate_cmpxchg8b_emulated,
+    .read      = sh_x86_emulate_read,
+    .write     = sh_x86_emulate_write,
+    .cmpxchg   = sh_x86_emulate_cmpxchg,
+    .cmpxchg8b = sh_x86_emulate_cmpxchg8b,
 };
 
 /**************************************************************************/

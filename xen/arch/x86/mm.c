@@ -3033,12 +3033,39 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
  * Writable Pagetables
  */
 
+struct ptwr_emulate_ctxt {
+    struct x86_emulate_ctxt ctxt;
+    unsigned long cr2;
+    l1_pgentry_t  pte;
+};
+
+static int ptwr_emulated_read(
+    unsigned int seg,
+    unsigned long offset,
+    unsigned long *val,
+    unsigned int bytes,
+    struct x86_emulate_ctxt *ctxt)
+{
+    unsigned int rc;
+    unsigned long addr = offset;
+
+    *val = 0;
+    if ( (rc = copy_from_user((void *)val, (void *)addr, bytes)) != 0 )
+    {
+        propagate_page_fault(addr + bytes - rc, 0); /* read fault */
+        return X86EMUL_PROPAGATE_FAULT;
+    }
+
+    return X86EMUL_CONTINUE;
+}
+
 static int ptwr_emulated_update(
     unsigned long addr,
     paddr_t old,
     paddr_t val,
     unsigned int bytes,
-    unsigned int do_cmpxchg)
+    unsigned int do_cmpxchg,
+    struct ptwr_emulate_ctxt *ptwr_ctxt)
 {
     unsigned long gmfn, mfn;
     struct page_info *page;
@@ -3046,11 +3073,11 @@ static int ptwr_emulated_update(
     struct vcpu *v = current;
     struct domain *d = v->domain;
 
-    /* Aligned access only, thank you. */
-    if ( !access_ok(addr, bytes) || ((addr & (bytes-1)) != 0) )
+    /* Only allow naturally-aligned stores within the original %cr2 page. */
+    if ( unlikely(((addr^ptwr_ctxt->cr2) & PAGE_MASK) || (addr & (bytes-1))) )
     {
-        MEM_LOG("ptwr_emulate: Unaligned or bad size ptwr access (%d, %lx)",
-                bytes, addr);
+        MEM_LOG("Bad ptwr access (cr2=%lx, addr=%lx, bytes=%u)",
+                ptwr_ctxt->cr2, addr, bytes);
         return X86EMUL_UNHANDLEABLE;
     }
 
@@ -3079,17 +3106,9 @@ static int ptwr_emulated_update(
         old  |= full;
     }
 
-    /* Read the PTE that maps the page being updated. */
-    guest_get_eff_l1e(v, addr, &pte);
-    if ( unlikely(!(l1e_get_flags(pte) & _PAGE_PRESENT)) )
-    {
-        MEM_LOG("%s: Cannot get L1 PTE for guest address %lx",
-                __func__, addr);
-        return X86EMUL_UNHANDLEABLE;
-    }
-
-    gmfn  = l1e_get_pfn(pte);
-    mfn = gmfn_to_mfn(d, gmfn);
+    pte  = ptwr_ctxt->pte;
+    gmfn = l1e_get_pfn(pte);
+    mfn  = gmfn_to_mfn(d, gmfn);
     page = mfn_to_page(mfn);
 
     /* We are looking only for read-only mappings of p.t. pages. */
@@ -3164,26 +3183,33 @@ static int ptwr_emulated_update(
 }
 
 static int ptwr_emulated_write(
-    unsigned long addr,
+    unsigned int seg,
+    unsigned long offset,
     unsigned long val,
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
-    return ptwr_emulated_update(addr, 0, val, bytes, 0);
+    return ptwr_emulated_update(
+        offset, 0, val, bytes, 0,
+        container_of(ctxt, struct ptwr_emulate_ctxt, ctxt));
 }
 
 static int ptwr_emulated_cmpxchg(
-    unsigned long addr,
+    unsigned int seg,
+    unsigned long offset,
     unsigned long old,
     unsigned long new,
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
-    return ptwr_emulated_update(addr, old, new, bytes, 1);
+    return ptwr_emulated_update(
+        offset, old, new, bytes, 1,
+        container_of(ctxt, struct ptwr_emulate_ctxt, ctxt));
 }
 
 static int ptwr_emulated_cmpxchg8b(
-    unsigned long addr,
+    unsigned int seg,
+    unsigned long offset,
     unsigned long old,
     unsigned long old_hi,
     unsigned long new,
@@ -3192,18 +3218,16 @@ static int ptwr_emulated_cmpxchg8b(
 {
     if ( CONFIG_PAGING_LEVELS == 2 )
         return X86EMUL_UNHANDLEABLE;
-    else
-        return ptwr_emulated_update(
-            addr, ((u64)old_hi << 32) | old, ((u64)new_hi << 32) | new, 8, 1);
+    return ptwr_emulated_update(
+        offset, ((u64)old_hi << 32) | old, ((u64)new_hi << 32) | new, 8, 1,
+        container_of(ctxt, struct ptwr_emulate_ctxt, ctxt));
 }
 
 static struct x86_emulate_ops ptwr_emulate_ops = {
-    .read_std           = x86_emulate_read_std,
-    .write_std          = x86_emulate_write_std,
-    .read_emulated      = x86_emulate_read_std,
-    .write_emulated     = ptwr_emulated_write,
-    .cmpxchg_emulated   = ptwr_emulated_cmpxchg,
-    .cmpxchg8b_emulated = ptwr_emulated_cmpxchg8b
+    .read      = ptwr_emulated_read,
+    .write     = ptwr_emulated_write,
+    .cmpxchg   = ptwr_emulated_cmpxchg,
+    .cmpxchg8b = ptwr_emulated_cmpxchg8b
 };
 
 /* Write page fault handler: check if guest is trying to modify a PTE. */
@@ -3214,7 +3238,7 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
     unsigned long     pfn;
     struct page_info *page;
     l1_pgentry_t      pte;
-    struct x86_emulate_ctxt emul_ctxt;
+    struct ptwr_emulate_ctxt ptwr_ctxt;
 
     LOCK_BIGLOCK(d);
 
@@ -3235,10 +3259,11 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
          (page_get_owner(page) != d) )
         goto bail;
 
-    emul_ctxt.regs = guest_cpu_user_regs();
-    emul_ctxt.cr2  = addr;
-    emul_ctxt.mode = X86EMUL_MODE_HOST;
-    if ( x86_emulate_memop(&emul_ctxt, &ptwr_emulate_ops) )
+    ptwr_ctxt.ctxt.regs = guest_cpu_user_regs();
+    ptwr_ctxt.ctxt.mode = X86EMUL_MODE_HOST;
+    ptwr_ctxt.cr2       = addr;
+    ptwr_ctxt.pte       = pte;
+    if ( x86_emulate_memop(&ptwr_ctxt.ctxt, &ptwr_emulate_ops) )
         goto bail;
 
     UNLOCK_BIGLOCK(d);

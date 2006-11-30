@@ -2812,7 +2812,6 @@ static int sh_page_fault(struct vcpu *v,
     if ( is_hvm_domain(d) )
         hvm_store_cpu_guest_regs(v, regs, NULL);
     emul_ctxt.regs = regs;
-    emul_ctxt.cr2  = va;
     emul_ctxt.mode = (is_hvm_domain(d) ?
                       hvm_guest_x86_mode(v) : X86EMUL_MODE_HOST);
 
