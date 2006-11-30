@@ -328,9 +328,14 @@ class XendConfig(dict):
                 raise XendConfigError('Invalid event handling mode: ' +
                                       event)
 
+    def _builder_sanity_check(self):
+        if self['builder'] not in ('hvm', 'linux'):
+            raise XendConfigError('Invalid builder configuration')
+
     def validate(self):
         self._memory_sanity_check()
         self._actions_sanity_check()
+        self._builder_sanity_check()
 
     def _dominfo_to_xapi(self, dominfo):
         self['domid'] = dominfo['domid']
@@ -665,7 +670,14 @@ class XendConfig(dict):
         officially supported by the Xen API but is required for
         the rest of Xend to function.
         """
-        pass
+
+        # populate image
+        self['image']['type'] = self['builder']
+        if self['builder'] == 'hvm':
+            self['image']['hvm'] = {}
+            for xapi, cfgapi in XENAPI_HVM_CFG.items():
+                self['image']['hvm'][cfgapi] = self[xapi]
+            
 
     def _get_old_state_string(self):
         """Returns the old xm state string.
@@ -868,13 +880,14 @@ class XendConfig(dict):
             
             elif dev_type in ('vbd', 'tap'):
                 if dev_type == 'vbd':
-                    dev_info['uname'] = cfg_xenapi.get('image', None)
+                    dev_info['uname'] = cfg_xenapi.get('image', '')
                     dev_info['dev'] = '%s:disk' % cfg_xenapi.get('device')
                 elif dev_type == 'tap':
                     dev_info['uname'] = 'tap:qcow:%s' % cfg_xenapi.get('image')
                     dev_info['dev'] = '%s:disk' % cfg_xenapi.get('device')
                     
                 dev_info['driver'] = cfg_xenapi.get('driver')
+                dev_info['VDI'] = cfg_xenapi.get('VDI', '')
                     
                 if cfg_xenapi.get('mode') == 'RW':
                     dev_info['mode'] = 'w'
