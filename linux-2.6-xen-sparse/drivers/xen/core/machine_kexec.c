@@ -20,7 +20,7 @@ void xen_machine_kexec_setup_resources(void)
 {
 	xen_kexec_range_t range;
 	struct resource *res;
-	int k = 0;
+	int err, k = 0;
 
 	if (!is_initial_xendomain())
 		return;
@@ -32,8 +32,16 @@ void xen_machine_kexec_setup_resources(void)
 		range.range = KEXEC_RANGE_MA_CPU;
 		range.nr = k;
 
-		if (HYPERVISOR_kexec_op(KEXEC_CMD_kexec_get_range, &range))
+		/*
+		 * Anything other than EINVAL or success indictates
+		 * that we are not running on a hypervisor which
+		 * supports kexec.
+		 */
+		err = HYPERVISOR_kexec_op(KEXEC_CMD_kexec_get_range, &range);
+		if (err == -EINVAL)
 			break;
+		else if (err)
+			return;
 
 		k++;
 	}
@@ -52,7 +60,8 @@ void xen_machine_kexec_setup_resources(void)
 		range.range = KEXEC_RANGE_MA_CPU;
 		range.nr = k;
 
-		BUG_ON(HYPERVISOR_kexec_op(KEXEC_CMD_kexec_get_range, &range));
+		if (HYPERVISOR_kexec_op(KEXEC_CMD_kexec_get_range, &range))
+			BUG();
 
 		res = xen_phys_cpus + k;
 
@@ -68,7 +77,8 @@ void xen_machine_kexec_setup_resources(void)
 	memset(&range, 0, sizeof(range));
 	range.range = KEXEC_RANGE_MA_XEN;
 
-	BUG_ON(HYPERVISOR_kexec_op(KEXEC_CMD_kexec_get_range, &range));
+	if (HYPERVISOR_kexec_op(KEXEC_CMD_kexec_get_range, &range))
+		BUG();
 
 	xen_hypervisor_res.name = "Hypervisor code and data";
 	xen_hypervisor_res.start = range.start;
@@ -80,7 +90,8 @@ void xen_machine_kexec_setup_resources(void)
 	memset(&range, 0, sizeof(range));
 	range.range = KEXEC_RANGE_MA_CRASH;
 
-	BUG_ON(HYPERVISOR_kexec_op(KEXEC_CMD_kexec_get_range, &range));
+	if (HYPERVISOR_kexec_op(KEXEC_CMD_kexec_get_range, &range))
+		BUG();
 
 	if (range.size) {
 		crashk_res.start = range.start;
