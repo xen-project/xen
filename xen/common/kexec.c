@@ -119,8 +119,6 @@ void machine_crash_kexec(void)
         image = &kexec_image[KEXEC_IMAGE_CRASH_BASE + pos];
         machine_kexec(image); /* Does not return */
     }
-
-    while (1); /* No image available - just spin */
 }
 
 static void do_crashdump_trigger(unsigned char key)
