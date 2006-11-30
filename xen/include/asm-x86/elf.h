@@ -1,21 +1,15 @@
 #ifndef __X86_ELF_H__
 #define __X86_ELF_H__
 
-#include <xen/lib.h>       /* for printk() used in stub */
-
 typedef struct {
-    unsigned long dummy;
-} ELF_Gregset;
-
-typedef struct {
-    unsigned long dummy;
+    unsigned long cr0, cr2, cr3, cr4;
 } crash_xen_core_t;
 
-extern inline void elf_core_save_regs(ELF_Gregset *core_regs, 
-                                      crash_xen_core_t *xen_core_regs)
-{
-    printk("STUB: " __FILE__ ": %s: not implemented\n", __FUNCTION__);
-}
+#ifdef __x86_64__
+#include <asm/x86_64/elf.h>
+#else
+#include <asm/x86_32/elf.h>
+#endif
 
 #endif /* __X86_ELF_H__ */
 

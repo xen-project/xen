@@ -1,4 +1,6 @@
 kexec-generic.patch
+git-2efe55a9cec8418f0e0cde3dc3787a42fddc4411.patch
+git-2a8a3d5b65e86ec1dfef7d268c64a909eab94af7.patch
 blktap-aio-16_03_06.patch
 device_bind.patch
 fix-hz-suspend.patch

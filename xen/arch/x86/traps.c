@@ -45,6 +45,7 @@
 #include <xen/iocap.h>
 #include <xen/nmi.h>
 #include <xen/version.h>
+#include <xen/kexec.h>
 #include <asm/shadow.h>
 #include <asm/system.h>
 #include <asm/io.h>
@@ -1633,6 +1634,7 @@ static void unknown_nmi_error(unsigned char reason)
         printk("Uhhuh. NMI received for unknown reason %02x.\n", reason);
         printk("Dazed and confused, but trying to continue\n");
         printk("Do you have a strange power saving mode enabled?\n");
+        machine_crash_kexec();
     }
 }
 

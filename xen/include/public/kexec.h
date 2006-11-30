@@ -40,6 +40,10 @@
 
 #include "xen.h"
 
+#if defined(__i386__) || defined(__x86_64__)
+#define KEXEC_XEN_NO_PAGES 17
+#endif
+
 /*
  * Prototype for this hypercall is:
  *  int kexec_op(int cmd, void *args)
@@ -72,6 +76,9 @@
  */
  
 typedef struct xen_kexec_image {
+#if defined(__i386__) || defined(__x86_64__)
+    unsigned long page_list[KEXEC_XEN_NO_PAGES];
+#endif
     unsigned long indirection_page;
     unsigned long start_address;
 } xen_kexec_image_t;

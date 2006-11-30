@@ -27,6 +27,7 @@
 #include <asm/shadow.h>
 #include <asm/e820.h>
 #include <acm/acm_hooks.h>
+#include <xen/kexec.h>
 
 extern void dmi_scan_machine(void);
 extern void generic_apic_probe(void);
@@ -273,6 +274,20 @@ static void srat_detect_node(int cpu)
         printk(KERN_INFO "CPU %d APIC %d -> Node %d\n", cpu, apicid, node);
 }
 
+void __init move_memory(unsigned long dst, 
+                          unsigned long src_start, unsigned long src_end)
+{
+#if defined(CONFIG_X86_32)
+    memmove((void *)dst,  /* use low mapping */
+            (void *)src_start,      /* use low mapping */
+            src_end - src_start);
+#elif defined(CONFIG_X86_64)
+    memmove(__va(dst),
+            __va(src_start),
+            src_end - src_start);
+#endif
+}
+
 void __init __start_xen(multiboot_info_t *mbi)
 {
     char __cmdline[] = "", *cmdline = __cmdline;
@@ -284,6 +299,7 @@ void __init __start_xen(multiboot_info_t *mbi)
     unsigned long nr_pages, modules_length;
     paddr_t s, e;
     int i, e820_warn = 0, e820_raw_nr = 0, bytes = 0;
+    xen_kexec_reserve_t crash_area;
     struct ns16550_defaults ns16550 = {
         .data_bits = 8,
         .parity    = 'n',
@@ -415,15 +431,8 @@ void __init __start_xen(multiboot_info_t *mbi)
         initial_images_start = xenheap_phys_end;
     initial_images_end = initial_images_start + modules_length;
 
-#if defined(CONFIG_X86_32)
-    memmove((void *)initial_images_start,  /* use low mapping */
-            (void *)mod[0].mod_start,      /* use low mapping */
-            mod[mbi->mods_count-1].mod_end - mod[0].mod_start);
-#elif defined(CONFIG_X86_64)
-    memmove(__va(initial_images_start),
-            __va(mod[0].mod_start),
-            mod[mbi->mods_count-1].mod_end - mod[0].mod_start);
-#endif
+    move_memory(initial_images_start, 
+                mod[0].mod_start, mod[mbi->mods_count-1].mod_end);
 
     /* Initialise boot-time allocator with all RAM situated after modules. */
     xenheap_phys_start = init_boot_allocator(__pa(&_end));
@@ -470,6 +479,52 @@ void __init __start_xen(multiboot_info_t *mbi)
         }
 #endif
     }
+
+    machine_kexec_reserved(&crash_area);
+    if (crash_area.size > 0) {
+        unsigned long kdump_start, kdump_size, k;
+
+        /* mark images pages as free for now */
+
+        init_boot_pages(initial_images_start, initial_images_end);
+
+        kdump_start = crash_area.start;
+        kdump_size = crash_area.size;
+
+        printk("Kdump: %luMB (%lukB) at 0x%lx\n", 
+               kdump_size >> 20,
+               kdump_size >> 10,
+               kdump_start);
+
+        if ((kdump_start & ~PAGE_MASK) || (kdump_size & ~PAGE_MASK))
+            panic("Kdump parameters not page aligned\n");
+
+        kdump_start >>= PAGE_SHIFT;
+        kdump_size >>= PAGE_SHIFT;
+
+        /* allocate pages for Kdump memory area */
+
+        k = alloc_boot_pages_at(kdump_size, kdump_start);
+
+        if (k != kdump_start)
+            panic("Unable to reserve Kdump memory\n");
+
+        /* allocate pages for relocated initial images */
+
+        k = ((initial_images_end - initial_images_start) & ~PAGE_MASK) ? 1 : 0;
+        k += (initial_images_end - initial_images_start) >> PAGE_SHIFT;
+
+        k = alloc_boot_pages(k, 1);
+
+        if (!k)
+            panic("Unable to allocate initial images memory\n");
+
+        move_memory(k << PAGE_SHIFT, initial_images_start, initial_images_end);
+
+        initial_images_end -= initial_images_start;
+        initial_images_start = k << PAGE_SHIFT;
+        initial_images_end += initial_images_start;
+    }        
 
     memguard_init();
     percpu_guard_areas();

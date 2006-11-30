@@ -6,6 +6,7 @@
 #define __ASM_X86_HYPERCALL_H__
 
 #include <public/physdev.h>
+#include <xen/types.h>
 
 extern long
 do_event_channel_op_compat(
@@ -86,6 +87,10 @@ struct vcpu;
 extern long
 arch_do_vcpu_op(
     int cmd, struct vcpu *v, XEN_GUEST_HANDLE(void) arg);
+
+extern int
+do_kexec(
+    unsigned long op, unsigned arg1, XEN_GUEST_HANDLE(void) uarg);
 
 #ifdef __x86_64__
 

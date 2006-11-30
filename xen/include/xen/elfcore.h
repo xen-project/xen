@@ -108,6 +108,9 @@ typedef struct {
     unsigned long xen_compile_date;
     unsigned long xen_compile_time;
     unsigned long tainted;
+#ifdef CONFIG_X86
+    unsigned long dom0_pfn_to_mfn_frame_list_list;
+#endif
 } crash_xen_info_t;
 
 TYPEDEF_NOTE(crash_note_xen_info_t, XEN_STR_LEN, crash_xen_info_t);
