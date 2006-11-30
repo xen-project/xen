@@ -625,7 +625,7 @@ class XendConfig(dict):
             self['image'] = image
 
             for apikey, imgkey in XENAPI_HVM_CFG.items():
-                val = sxp.child(image_sxp, imgkey, None)
+                val = sxp.child_value(image_sxp, imgkey, None)
                 if val != None:
                     self[apikey] = val
 
@@ -1039,7 +1039,7 @@ class XendConfig(dict):
         self['image'] = image
 
         for apikey, imgkey in XENAPI_HVM_CFG.items():
-            val = sxp.child(image_sxp, imgkey, None)
+            val = sxp.child_value(image_sxp, imgkey, None)
             if val != None:
                 self[apikey] = val        
 
