@@ -138,32 +138,21 @@ __initcall(register_crashdump_trigger);
 
 void machine_kexec_reserved(xen_kexec_reserve_t *reservation)
 {
-    unsigned long val[2];
+    unsigned long start, size;
     char *str = opt_crashkernel;
-    int k = 0;
 
     memset(reservation, 0, sizeof(*reservation));
 
-    while (k < ARRAY_SIZE(val)) {
-        if (*str == '\0') {
-            break;
-        }
-        val[k] = simple_strtoul(str, &str, 0);
-        switch (toupper(*str)) {
-        case 'G': val[k] <<= 10;
-        case 'M': val[k] <<= 10;
-        case 'K': val[k] <<= 10;
-            str++;
-        }
-        if (*str == '@') {
-            str++;
-        }
-        k++;
-    }
+    size = parse_size_and_unit(str, &str);
+    if ( *str == '@' )
+        start = parse_size_and_unit(str+1, NULL);
+    else
+        start = 0;
 
-    if (k == ARRAY_SIZE(val)) {
-        reservation->size = val[0];
-        reservation->start = val[1];
+    if ( start && size )
+    {
+        reservation->start = start;
+        reservation->size = size;
     }
 }
 
