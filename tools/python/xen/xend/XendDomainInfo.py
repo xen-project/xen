@@ -1742,13 +1742,13 @@ class XendDomainInfo:
         return dom_uuid
     
     def get_memory_static_max(self):
-        return self.info['memory_static_max']
+        return self.info.get('memory_static_max')
     def get_memory_static_min(self):
-        return self.info['memory_static_min']
+        return self.info.get('memory_static_min')
     def get_memory_dynamic_max(self):
-        return self.info['memory_dynamic_min']
+        return self.info.get('memory_dynamic_min')
     def get_memory_dynamic_min(self):
-        return self.info['memory_static_min']
+        return self.info.get('memory_dynamic_max')
     
     
     def get_vcpus_policy(self):
@@ -1766,27 +1766,29 @@ class XendDomainInfo:
     def get_bios_boot(self):
         return '' # TODO
     def get_platform_std_vga(self):
-        return False
+        return self.info.get('platform_std_vga', 0)    
     def get_platform_keymap(self):
         return ''
     def get_platform_serial(self):
-        return self.info['platform_serial']
+        return self.info.get('platform_serial', '')
     def get_platform_localtime(self):
-        return self.info['platform_localtime']
+        return self.info.get('platform_localtime', 0)
     def get_platform_clock_offset(self):
-        return self.info['platform_clock_offset']
+        return self.info.get('platform_clock_offset', 0)
     def get_platform_enable_audio(self):
-        return self.info['platform_enable_audio']
+        return self.info.get('platform_enable_audio', 0)
+    def get_platform_keymap(self):
+        return self.info.get('platform_keymap', '')
     def get_builder(self):
-        return self.info['builder']
+        return self.info.get('builder', 0)
     def get_boot_method(self):
-        return self.info['boot_method']
+        return self.info.get('boot_method', '')
     def get_kernel_image(self):
-        return self.info['kernel_kernel']
+        return self.info.get('kernel_kernel', '')
     def get_kernel_initrd(self):
-        return self.info['kernel_initrd']
+        return self.info.get('kernel_initrd', '')
     def get_kernel_args(self):
-        return self.info['kernel_args']
+        return self.info.get('kernel_args', '')
     def get_grub_cmdline(self):
         return '' # TODO
     def get_pci_bus(self):
