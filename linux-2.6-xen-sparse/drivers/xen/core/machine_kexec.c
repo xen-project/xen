@@ -22,6 +22,9 @@ void xen_machine_kexec_setup_resources(void)
 	struct resource *res;
 	int k = 0;
 
+	if (!is_initial_xendomain())
+		return;
+
 	/* determine maximum number of physical cpus */
 
 	while (1) {
