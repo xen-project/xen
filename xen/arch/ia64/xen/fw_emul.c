@@ -214,7 +214,7 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 			struct smp_call_args_t arg;
 
 			spin_lock_irqsave(&sal_queue_lock, flags);
-			if (list_empty(&sal_queue[in1])) {
+			if (!sal_queue || list_empty(&sal_queue[in1])) {
 				sal_log_record_header_t header;
 				XEN_GUEST_HANDLE(void) handle =
 					*(XEN_GUEST_HANDLE(void)*)&in3;

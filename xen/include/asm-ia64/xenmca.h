@@ -21,7 +21,7 @@ typedef struct sal_queue_entry_t {
 	struct list_head list;
 } sal_queue_entry_t;
 
-extern struct list_head sal_queue[];
+extern struct list_head *sal_queue;
 
 struct ia64_mca_tlb_info {
 	u64 cr_lid;

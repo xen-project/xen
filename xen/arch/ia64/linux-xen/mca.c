@@ -206,8 +206,8 @@ static ia64_state_log_t ia64_state_log[IA64_MAX_LOG_TYPES];
 #define IA64_LOG_COUNT(it)         ia64_state_log[it].isl_count
 
 #ifdef XEN
-struct list_head sal_queue[IA64_MAX_LOG_TYPES];
-sal_log_record_header_t *sal_record = NULL;
+struct list_head *sal_queue, sal_log_queues[IA64_MAX_LOG_TYPES];
+sal_log_record_header_t *sal_record;
 DEFINE_SPINLOCK(sal_queue_lock);
 #endif
 
@@ -1606,7 +1606,7 @@ ia64_mca_cpu_init(void *cpu_data)
 		}
 	}
 #ifdef XEN
-	else {
+	else if (sal_queue) {
 		int i;
 		for (i = 0; i < IA64_MAX_LOG_TYPES; i++)
 			ia64_log_queue(i, 0);
@@ -1811,10 +1811,13 @@ ia64_mca_init(void)
 	ia64_log_init(SAL_INFO_TYPE_CPE);
 
 #ifdef XEN
-	INIT_LIST_HEAD(&sal_queue[SAL_INFO_TYPE_MCA]);
-	INIT_LIST_HEAD(&sal_queue[SAL_INFO_TYPE_INIT]);
-	INIT_LIST_HEAD(&sal_queue[SAL_INFO_TYPE_CMC]);
-	INIT_LIST_HEAD(&sal_queue[SAL_INFO_TYPE_CPE]);
+	INIT_LIST_HEAD(&sal_log_queues[SAL_INFO_TYPE_MCA]);
+	INIT_LIST_HEAD(&sal_log_queues[SAL_INFO_TYPE_INIT]);
+	INIT_LIST_HEAD(&sal_log_queues[SAL_INFO_TYPE_CMC]);
+	INIT_LIST_HEAD(&sal_log_queues[SAL_INFO_TYPE_CPE]);
+
+	/* NULL sal_queue used elsewhere to determine MCA init state */
+	sal_queue = sal_log_queues;
 
 	open_softirq(CMC_DISABLE_SOFTIRQ,
 	             (softirq_handler)ia64_mca_cmc_vector_disable);
