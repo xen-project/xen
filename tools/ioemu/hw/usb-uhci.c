@@ -421,7 +421,7 @@ static int uhci_broadcast_packet(UHCIState *s, uint8_t pid,
 static int uhci_handle_td(UHCIState *s, UHCI_TD *td, int *int_mask)
 {
     uint8_t pid;
-    uint8_t buf[1280];
+    uint8_t buf[2048];
     int len, max_len, err, ret;
 
     if (td->ctrl & TD_CTRL_IOC) {
