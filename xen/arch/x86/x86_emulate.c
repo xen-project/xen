@@ -611,8 +611,8 @@ x86_emulate_memop(
             if ( modrm_rm == 4 )
             {
                 sib = insn_fetch(uint8_t);
-                sib_index = ((sib >> 3) & 7) | ((modrm << 2) & 8);
-                sib_base  = (sib & 7) | ((modrm << 3) & 8);
+                sib_index = ((sib >> 3) & 7) | ((rex_prefix << 2) & 8);
+                sib_base  = (sib & 7) | ((rex_prefix << 3) & 8);
                 if ( sib_index != 4 )
                     ea_off = *(long *)decode_register(sib_index, &_regs, 0);
                 ea_off <<= (sib >> 6) & 3;
