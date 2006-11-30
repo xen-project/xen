@@ -25,7 +25,6 @@
 #include <xen/list.h>
 #include <xen/types.h>
 #include <xen/mm.h>
-#include <asm/misc.h>
 #include <asm/system.h>
 #include <asm/flushtlb.h>
 #include <asm/uaccess.h>

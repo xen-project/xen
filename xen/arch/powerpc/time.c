@@ -25,7 +25,7 @@
 #include <xen/sched.h>
 #include <asm/processor.h>
 #include <asm/current.h>
-#include <asm/misc.h>
+#include <asm/debugger.h>
 
 #define Dprintk(x...) printk(x)
 

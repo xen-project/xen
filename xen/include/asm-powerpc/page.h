@@ -28,7 +28,6 @@
 #ifndef __ASSEMBLY__
 
 #include <xen/config.h>
-#include <asm/misc.h>
 #include <asm/cache.h>
 
 #define PFN_DOWN(x)   ((x) >> PAGE_SHIFT)

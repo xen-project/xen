@@ -18,10 +18,10 @@
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
  */
 
-#include <asm/misc.h>
 #include <xen/cpumask.h>
 #include <xen/smp.h>
 #include <asm/flushtlb.h>
+#include <asm/debugger.h>
 
 int smp_num_siblings = 1;
 int smp_num_cpus = 1;

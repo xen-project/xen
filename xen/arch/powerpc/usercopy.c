@@ -23,6 +23,7 @@
 #include <xen/sched.h>
 #include <asm/current.h>
 #include <asm/uaccess.h>
+#include <asm/debugger.h>
 #include <public/xen.h>
 #include <public/xencomm.h>
 

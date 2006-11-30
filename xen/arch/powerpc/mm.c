@@ -25,7 +25,6 @@
 #include <xen/kernel.h>
 #include <xen/sched.h>
 #include <xen/perfc.h>
-#include <asm/misc.h>
 #include <asm/init.h>
 #include <asm/page.h>
 

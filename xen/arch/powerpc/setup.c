@@ -414,7 +414,7 @@ void __init __start_xen_ppc(
 
     } else {
         /* booted by someone else that hopefully has a trap handler */
-        trap();
+        __builtin_trap();
     }
 
     __start_xen(mbi);

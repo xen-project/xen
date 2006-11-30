@@ -30,6 +30,7 @@
 #include <asm/powerpc64/procarea.h>
 #include <asm/powerpc64/processor.h>
 #include <asm/powerpc64/ppc970-hid.h>
+#include "scom.h"
 
 #undef DEBUG
 #undef SERIALIZE

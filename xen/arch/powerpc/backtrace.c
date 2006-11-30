@@ -14,6 +14,7 @@
 #include <xen/console.h>
 #include <xen/sched.h>
 #include <xen/symbols.h>
+#include <asm/debugger.h>
 
 static char namebuf[KSYM_NAME_LEN+1];
 
@@ -192,6 +193,19 @@ void show_backtrace(ulong sp, ulong lr, ulong pc)
     console_end_sync();
 }
 
+void show_backtrace_regs(struct cpu_user_regs *regs)
+{
+    console_start_sync();
+    
+    show_registers(regs);
+    printk("dar 0x%016lx, dsisr 0x%08x\n", mfdar(), mfdsisr());
+    printk("hid4 0x%016lx\n", regs->hid4);
+    printk("---[ backtrace ]---\n");
+    show_backtrace(regs->gprs[1], regs->lr, regs->pc);
+
+    console_end_sync();
+}
+
 void __warn(char *file, int line)
 {
     ulong sp;
@@ -202,9 +216,7 @@ void __warn(char *file, int line)
 
     sp = (ulong)__builtin_frame_address(0);
     lr = (ulong)__builtin_return_address(0);
-
     backtrace(sp, lr, lr);
+
     console_end_sync();
 }
-
-    

@@ -24,7 +24,6 @@
 #include <xen/config.h>
 #include <xen/percpu.h>
 #include <xen/types.h>
-#include <asm/misc.h>
 
 /* The current time as shown by the virtual TLB clock. */
 extern u32 tlbflush_clock;
