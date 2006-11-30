@@ -359,7 +359,7 @@ static void blkfront_closing(struct xenbus_device *dev)
 	DPRINTK("blkfront_closing: %s removed\n", dev->nodename);
 
 	if (info->rq == NULL)
-		return;
+		goto out;
 
 	spin_lock_irqsave(&blkif_io_lock, flags);
 	/* No more blkif_request(). */
@@ -373,6 +373,7 @@ static void blkfront_closing(struct xenbus_device *dev)
 
 	xlvbd_del(info);
 
+ out:
 	xenbus_frontend_closed(dev);
 }
 
