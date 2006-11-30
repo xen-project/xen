@@ -299,7 +299,6 @@ void __init __start_xen(multiboot_info_t *mbi)
     unsigned long nr_pages, modules_length;
     paddr_t s, e;
     int i, e820_warn = 0, e820_raw_nr = 0, bytes = 0;
-    xen_kexec_reserve_t crash_area;
     struct ns16550_defaults ns16550 = {
         .data_bits = 8,
         .parity    = 'n',
@@ -480,8 +479,7 @@ void __init __start_xen(multiboot_info_t *mbi)
 #endif
     }
 
-    machine_kexec_reserved(&crash_area);
-    if ( crash_area.size > 0 )
+    if ( kexec_crash_area.size > 0 )
     {
         unsigned long kdump_start, kdump_size, k;
 
@@ -489,8 +487,8 @@ void __init __start_xen(multiboot_info_t *mbi)
 
         init_boot_pages(initial_images_start, initial_images_end);
 
-        kdump_start = crash_area.start;
-        kdump_size = crash_area.size;
+        kdump_start = kexec_crash_area.start;
+        kdump_size = kexec_crash_area.size;
 
         printk("Kdump: %luMB (%lukB) at 0x%lx\n",
                kdump_size >> 20,

@@ -22,9 +22,6 @@
 #include <xen/version.h>
 #include <public/elfnote.h>
 
-static char opt_crashkernel[32] = "";
-string_param("crashkernel", opt_crashkernel);
-
 DEFINE_PER_CPU (crash_note_t, crash_notes);
 cpumask_t crash_saved_cpus;
 int crashing_cpu;
@@ -38,6 +35,26 @@ xen_kexec_image_t kexec_image[KEXEC_IMAGE_NR];
 unsigned long kexec_flags = 0; /* the lowest bits are for KEXEC_IMAGE... */
 
 spinlock_t kexec_lock = SPIN_LOCK_UNLOCKED;
+
+xen_kexec_reserve_t kexec_crash_area;
+
+static void __init parse_crashkernel(char *str)
+{
+    unsigned long start, size;
+
+    size = parse_size_and_unit(str, &str);
+    if ( *str == '@' )
+        start = parse_size_and_unit(str+1, NULL);
+    else
+        start = 0;
+
+    if ( start && size )
+    {
+        kexec_crash_area.start = start;
+        kexec_crash_area.size = size;
+    }
+}
+custom_param("crashkernel", parse_crashkernel);
 
 static void one_cpu_only(void)
 {
@@ -134,34 +151,10 @@ static __init int register_crashdump_trigger(void)
 }
 __initcall(register_crashdump_trigger);
 
-void machine_kexec_reserved(xen_kexec_reserve_t *reservation)
-{
-    unsigned long start, size;
-    char *str = opt_crashkernel;
-
-    memset(reservation, 0, sizeof(*reservation));
-
-    size = parse_size_and_unit(str, &str);
-    if ( *str == '@' )
-        start = parse_size_and_unit(str+1, NULL);
-    else
-        start = 0;
-
-    if ( start && size )
-    {
-        reservation->start = start;
-        reservation->size = size;
-    }
-}
-
 static int kexec_get_reserve(xen_kexec_range_t *range)
 {
-    xen_kexec_reserve_t reservation;
-
-    machine_kexec_reserved(&reservation);
-
-    range->start = reservation.start;
-    range->size = reservation.size;
+    range->start = kexec_crash_area.start;
+    range->size = kexec_crash_area.size;
     return 0;
 }
 
