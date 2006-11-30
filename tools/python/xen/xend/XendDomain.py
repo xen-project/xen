@@ -184,15 +184,13 @@ class XendDomain:
                 if not dom_uuid:
                     continue
                 
-                dom_name = dom.get('name', 'Domain-%s' % dom_uuid)
+                dom_name = dom.get('name_label', 'Domain-%s' % dom_uuid)
                 try:
                     running_dom = self.domain_lookup_nr(dom_name)
                     if not running_dom:
                         # instantiate domain if not started.
                         new_dom = XendDomainInfo.createDormant(dom)
                         self._managed_domain_register(new_dom)
-                    else:
-                        self._managed_domain_register(running_dom)
                 except Exception:
                     log.exception("Failed to create reference to managed "
                                   "domain: %s" % dom_name)
