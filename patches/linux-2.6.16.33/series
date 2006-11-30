@@ -31,6 +31,7 @@ xen-hotplug.patch
 xenoprof-generic.patch
 x86-put-note-sections-into-a-pt_note-segment-in-vmlinux.patch
 x86_64-put-note-sections-into-a-pt_note-segment-in-vmlinux.patch
+git-dbaab49f92ff6ae6255762a948375e4036cbdbd2.patch
 x86-elfnote-as-preprocessor-macro.patch
 vsnprintf.patch
 kasprintf.patch
