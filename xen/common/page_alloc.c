@@ -237,24 +237,35 @@ void init_boot_pages(paddr_t ps, paddr_t pe)
     }
 }
 
-unsigned long alloc_boot_pages(unsigned long nr_pfns, unsigned long pfn_align)
+unsigned long alloc_boot_pages_at(unsigned long nr_pfns, unsigned long pfn_at)
 {
-    unsigned long pg, i;
+    unsigned long i;
 
-    for ( pg = 0; (pg + nr_pfns) < max_page; pg += pfn_align )
+    for ( i = 0; i < nr_pfns; i++ )
+        if ( allocated_in_map(pfn_at + i) )
+             break;
+
+    if ( i == nr_pfns )
     {
-        for ( i = 0; i < nr_pfns; i++ )
-            if ( allocated_in_map(pg + i) )
-                 break;
-
-        if ( i == nr_pfns )
-        {
-            map_alloc(pg, nr_pfns);
-            return pg;
-        }
+        map_alloc(pfn_at, nr_pfns);
+        return pfn_at;
     }
 
     return 0;
+}
+
+unsigned long alloc_boot_pages(unsigned long nr_pfns, unsigned long pfn_align)
+{
+    unsigned long pg, i = 0;
+
+    for ( pg = 0; (pg + nr_pfns) < max_page; pg += pfn_align )
+    {
+        i = alloc_boot_pages_at(nr_pfns, pg);
+        if (i != 0)
+            break;
+    }
+
+    return i;
 }
 
 

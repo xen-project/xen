@@ -1,3 +1,4 @@
+kexec-generic.patch
 blktap-aio-16_03_06.patch
 device_bind.patch
 fix-hz-suspend.patch

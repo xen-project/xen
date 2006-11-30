@@ -27,6 +27,7 @@
 #include <xen/guest_access.h>
 #include <xen/shutdown.h>
 #include <xen/vga.h>
+#include <xen/kexec.h>
 #include <asm/current.h>
 #include <asm/debugger.h>
 #include <asm/io.h>
@@ -864,6 +865,8 @@ void panic(const char *fmt, ...)
     spin_unlock_irqrestore(&lock, flags);
 
     debugger_trap_immediate();
+
+    machine_crash_kexec();
 
     if ( opt_noreboot )
     {

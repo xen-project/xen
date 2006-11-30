@@ -452,18 +452,12 @@ unsigned int elf_hash(const unsigned char *name);
 /*
  * Note Definitions
  */
-typedef struct {
-	Elf32_Word namesz;
-	Elf32_Word descsz;
-	Elf32_Word type;
-} Elf32_Note;
 
 typedef struct {
-	Elf64_Half namesz;
-	Elf64_Half descsz;
-	Elf64_Half type;
-} Elf64_Note;
-
+	u32 namesz;
+	u32 descsz;
+	u32 type;
+} Elf_Note; /* same format for both 32-bit and 64-bit ELF */
 
 #if defined(ELFSIZE)
 #define CONCAT(x,y)	__CONCAT(x,y)
@@ -486,7 +480,6 @@ typedef struct {
 #define Elf_Addr	Elf32_Addr
 #define Elf_Off		Elf32_Off
 #define Elf_Nhdr	Elf32_Nhdr
-#define Elf_Note	Elf32_Note
 
 #define ELF_R_SYM	ELF32_R_SYM
 #define ELF_R_TYPE	ELF32_R_TYPE
@@ -511,7 +504,6 @@ typedef struct {
 #define Elf_Addr	Elf64_Addr
 #define Elf_Off		Elf64_Off
 #define Elf_Nhdr	Elf64_Nhdr
-#define Elf_Note	Elf64_Note
 
 #define ELF_R_SYM	ELF64_R_SYM
 #define ELF_R_TYPE	ELF64_R_TYPE
