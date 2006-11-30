@@ -581,7 +581,7 @@ guest_index(void *ptr)
     return (u32)((unsigned long)ptr & ~PAGE_MASK) / sizeof(guest_l1e_t);
 }
 
-static inline u32
+static u32
 shadow_l1_index(mfn_t *smfn, u32 guest_index)
 {
 #if (GUEST_PAGING_LEVELS == 2) && (SHADOW_PAGING_LEVELS != 2)
@@ -593,7 +593,7 @@ shadow_l1_index(mfn_t *smfn, u32 guest_index)
 #endif
 }
 
-static inline u32
+static u32
 shadow_l2_index(mfn_t *smfn, u32 guest_index)
 {
 #if (GUEST_PAGING_LEVELS == 2) && (SHADOW_PAGING_LEVELS != 2)
@@ -613,13 +613,13 @@ shadow_l2_index(mfn_t *smfn, u32 guest_index)
 
 #if GUEST_PAGING_LEVELS >= 4
 
-static inline u32
+static u32
 shadow_l3_index(mfn_t *smfn, u32 guest_index)
 {
     return guest_index;
 }
 
-static inline u32
+static u32
 shadow_l4_index(mfn_t *smfn, u32 guest_index)
 {
     return guest_index;

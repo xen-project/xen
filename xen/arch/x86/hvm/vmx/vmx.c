@@ -702,6 +702,13 @@ static int vmx_pae_enabled(struct vcpu *v)
     return (vmx_paging_enabled(v) && (cr4 & X86_CR4_PAE));
 }
 
+/* Works only for vcpu == current */
+static void vmx_update_host_cr3(struct vcpu *v)
+{
+    ASSERT(v == current);
+    __vmwrite(HOST_CR3, v->arch.cr3);
+}
+
 static void vmx_inject_exception(unsigned int trapnr, int errcode)
 {
     vmx_inject_hw_exception(current, trapnr, errcode);
