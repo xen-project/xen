@@ -306,7 +306,7 @@ static int kexec_exec(XEN_GUEST_HANDLE(void) uarg)
     case KEXEC_TYPE_DEFAULT:
         image = &kexec_image[base + pos];
         one_cpu_only();
-        machine_shutdown(image); /* Does not return */
+        machine_reboot_kexec(image); /* Does not return */
         break;
     case KEXEC_TYPE_CRASH:
         machine_crash_kexec(); /* Does not return */

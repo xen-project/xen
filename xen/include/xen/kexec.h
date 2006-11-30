@@ -12,6 +12,8 @@ typedef struct xen_kexec_reserve {
     unsigned long start;
 } xen_kexec_reserve_t;
 
+extern xen_kexec_reserve_t kexec_crash_area;
+
 /* We have space for 4 images to support atomic update
  * of images. This is important for CRASH images since
  * a panic can happen at any time...
@@ -24,7 +26,7 @@ typedef struct xen_kexec_reserve {
 int machine_kexec_load(int type, int slot, xen_kexec_image_t *image);
 void machine_kexec_unload(int type, int slot, xen_kexec_image_t *image);
 void machine_kexec_reserved(xen_kexec_reserve_t *reservation);
-void machine_shutdown(xen_kexec_image_t *image);
+void machine_reboot_kexec(xen_kexec_image_t *image);
 void machine_crash_kexec(void);
 void machine_crash_save_cpu(void);
 crash_xen_info_t *machine_crash_save_info(void);

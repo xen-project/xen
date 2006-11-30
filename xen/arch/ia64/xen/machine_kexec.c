@@ -18,7 +18,7 @@ void machine_kexec(xen_kexec_image_t *image)
     printk("STUB: " __FILE__ ": %s: not implemented\n", __FUNCTION__);
 }
 
-void machine_shutdown(xen_kexec_image_t *image)
+void machine_reboot_kexec(xen_kexec_image_t *image)
 {
     printk("STUB: " __FILE__ ": %s: not implemented\n", __FUNCTION__);
 }

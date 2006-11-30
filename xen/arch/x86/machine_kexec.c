@@ -52,7 +52,7 @@ void machine_kexec_unload(int type, int slot, xen_kexec_image_t *image)
 {
 }
 
-static void __machine_shutdown(void *data)
+static void __machine_reboot_kexec(void *data)
 {
     xen_kexec_image_t *image = (xen_kexec_image_t *)data;
 
@@ -69,7 +69,7 @@ static void __machine_shutdown(void *data)
     machine_kexec(image);
 }
 
-void machine_shutdown(xen_kexec_image_t *image)
+void machine_reboot_kexec(xen_kexec_image_t *image)
 {
     int reboot_cpu_id;
     cpumask_t reboot_cpu;
@@ -83,13 +83,13 @@ void machine_shutdown(xen_kexec_image_t *image)
     {
         cpus_clear(reboot_cpu);
         cpu_set(reboot_cpu_id, reboot_cpu);
-        on_selected_cpus(reboot_cpu, __machine_shutdown, image, 1, 0);
+        on_selected_cpus(reboot_cpu, __machine_reboot_kexec, image, 1, 0);
         for (;;)
                 ; /* nothing */
     }
     else
     {
-        __machine_shutdown(image);
+        __machine_reboot_kexec(image);
     }
     BUG();
 }
