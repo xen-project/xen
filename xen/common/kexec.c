@@ -1,6 +1,6 @@
 /******************************************************************************
  * kexec.c - Achitecture independent kexec code for Xen
- * 
+ *
  * Xen port written by:
  * - Simon 'Horms' Horman <horms@verge.net.au>
  * - Magnus Damm <magnus@valinux.co.jp>
@@ -42,7 +42,7 @@ spinlock_t kexec_lock = SPIN_LOCK_UNLOCKED;
 static void one_cpu_only(void)
 {
    /* Only allow the first cpu to continue - force other cpus to spin */
-    if (test_and_set_bit(KEXEC_FLAG_IN_PROGRESS, &kexec_flags))
+    if ( test_and_set_bit(KEXEC_FLAG_IN_PROGRESS, &kexec_flags) )
     {
         while (1);
     }
@@ -55,7 +55,7 @@ void machine_crash_save_cpu(void)
     int cpu = smp_processor_id();
     crash_note_t *cntp;
 
-    if (!cpu_test_and_set(cpu, crash_saved_cpus))
+    if ( !cpu_test_and_set(cpu, crash_saved_cpus) )
     {
         cntp = &per_cpu(crash_notes, cpu);
         elf_core_save_regs(&cntp->core.desc.desc.pr_reg,
@@ -65,7 +65,7 @@ void machine_crash_save_cpu(void)
         setup_crash_note(cntp, core, CORE_STR, CORE_STR_LEN, NT_PRSTATUS);
 
         /* setup crash note "Xen", XEN_ELFNOTE_CRASH_REGS */
-        setup_crash_note(cntp, xen_regs, XEN_STR, XEN_STR_LEN, 
+        setup_crash_note(cntp, xen_regs, XEN_STR, XEN_STR_LEN,
                          XEN_ELFNOTE_CRASH_REGS);
     }
 }
@@ -83,7 +83,7 @@ crash_xen_info_t *machine_crash_save_info(void)
     cntp = &per_cpu(crash_notes, cpu);
 
     /* setup crash note "Xen", XEN_ELFNOTE_CRASH_INFO */
-    setup_crash_note(cntp, xen_info, XEN_STR, XEN_STR_LEN, 
+    setup_crash_note(cntp, xen_info, XEN_STR, XEN_STR_LEN,
                      XEN_ELFNOTE_CRASH_INFO);
 
     info = &cntp->xen_info.desc.desc;
@@ -106,7 +106,7 @@ void machine_crash_kexec(void)
     xen_kexec_image_t *image;
 
     one_cpu_only();
- 
+
     machine_crash_save_cpu();
     crashing_cpu = smp_processor_id();
 
@@ -114,7 +114,7 @@ void machine_crash_kexec(void)
 
     pos = (test_bit(KEXEC_FLAG_CRASH_POS, &kexec_flags) != 0);
 
-    if (test_bit(KEXEC_IMAGE_CRASH_BASE + pos, &kexec_flags))
+    if ( test_bit(KEXEC_IMAGE_CRASH_BASE + pos, &kexec_flags) )
     {
         image = &kexec_image[KEXEC_IMAGE_CRASH_BASE + pos];
         machine_kexec(image); /* Does not return */
@@ -140,7 +140,7 @@ void machine_kexec_reserved(xen_kexec_reserve_t *reservation)
 {
     unsigned long val[2];
     char *str = opt_crashkernel;
-    int k = 0; 
+    int k = 0;
 
     memset(reservation, 0, sizeof(*reservation));
 
@@ -170,7 +170,7 @@ void machine_kexec_reserved(xen_kexec_reserve_t *reservation)
 static int kexec_get_reserve(xen_kexec_range_t *range)
 {
     xen_kexec_reserve_t reservation;
-    
+
     machine_kexec_reserved(&reservation);
 
     range->start = reservation.start;
@@ -182,7 +182,7 @@ extern unsigned long _text, _end;
 
 static int kexec_get_xen(xen_kexec_range_t *range, int get_ma)
 {
-    if (get_ma)
+    if ( get_ma )
         range->start = virt_to_maddr(&_text);
     else
         range->start = (unsigned long) &_text;
@@ -193,7 +193,7 @@ static int kexec_get_xen(xen_kexec_range_t *range, int get_ma)
 
 static int kexec_get_cpu(xen_kexec_range_t *range)
 {
-    if (range->nr < 0 || range->nr >= num_present_cpus())
+    if ( range->nr < 0 || range->nr >= num_present_cpus() )
         return -EINVAL;
 
     range->start = __pa((unsigned long)&per_cpu(crash_notes, range->nr));
@@ -205,11 +205,11 @@ static int kexec_get_range(XEN_GUEST_HANDLE(void) uarg)
 {
     xen_kexec_range_t range;
     int ret = -EINVAL;
-    
-    if (unlikely(copy_from_guest(&range, uarg, 1)))
+
+    if ( unlikely(copy_from_guest(&range, uarg, 1)) )
         return -EFAULT;
 
-    switch (range.range)
+    switch ( range.range )
     {
     case KEXEC_RANGE_MA_CRASH:
         ret = kexec_get_reserve(&range);
@@ -225,15 +225,15 @@ static int kexec_get_range(XEN_GUEST_HANDLE(void) uarg)
         break;
     }
 
-    if (ret == 0 && unlikely(copy_to_guest(uarg, &range, 1)))
+    if ( ret == 0 && unlikely(copy_to_guest(uarg, &range, 1)) )
         return -EFAULT;
-    
+
     return ret;
 }
 
 static int kexec_load_get_bits(int type, int *base, int *bit)
 {
-    switch (type)
+    switch ( type )
     {
     case KEXEC_TYPE_DEFAULT:
         *base = KEXEC_IMAGE_DEFAULT_BASE;
@@ -256,24 +256,24 @@ static int kexec_load_unload(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
     int base, bit, pos;
     int ret = 0;
 
-    if (unlikely(copy_from_guest(&load, uarg, 1)))
+    if ( unlikely(copy_from_guest(&load, uarg, 1)) )
         return -EFAULT;
 
-    if (kexec_load_get_bits(load.type, &base, &bit))
+    if ( kexec_load_get_bits(load.type, &base, &bit) )
         return -EINVAL;
 
     pos = (test_bit(bit, &kexec_flags) != 0);
 
     /* Load the user data into an unused image */
-    if (op == KEXEC_CMD_kexec_load)
+    if ( op == KEXEC_CMD_kexec_load )
     {
         image = &kexec_image[base + !pos];
 
         BUG_ON(test_bit((base + !pos), &kexec_flags)); /* must be free */
 
         memcpy(image, &load.image, sizeof(*image));
-            
-        if (!(ret = machine_kexec_load(load.type, base + !pos, image)))
+
+        if ( !(ret = machine_kexec_load(load.type, base + !pos, image)) )
         {
             /* Set image present bit */
             set_bit((base + !pos), &kexec_flags);
@@ -284,9 +284,9 @@ static int kexec_load_unload(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
     }
 
     /* Unload the old image if present and load successful */
-    if (ret == 0 && !test_bit(KEXEC_FLAG_IN_PROGRESS, &kexec_flags))
+    if ( ret == 0 && !test_bit(KEXEC_FLAG_IN_PROGRESS, &kexec_flags) )
     {
-        if (test_and_clear_bit((base + pos), &kexec_flags))
+        if ( test_and_clear_bit((base + pos), &kexec_flags) )
         {
             image = &kexec_image[base + pos];
             machine_kexec_unload(load.type, base + pos, image);
@@ -302,16 +302,16 @@ static int kexec_exec(XEN_GUEST_HANDLE(void) uarg)
     xen_kexec_image_t *image;
     int base, bit, pos;
 
-    if (unlikely(copy_from_guest(&exec, uarg, 1)))
+    if ( unlikely(copy_from_guest(&exec, uarg, 1)) )
         return -EFAULT;
 
-    if (kexec_load_get_bits(exec.type, &base, &bit))
+    if ( kexec_load_get_bits(exec.type, &base, &bit) )
         return -EINVAL;
 
     pos = (test_bit(bit, &kexec_flags) != 0);
 
     /* Only allow kexec/kdump into loaded images */
-    if (!test_bit(base + pos, &kexec_flags))
+    if ( !test_bit(base + pos, &kexec_flags) )
         return -ENOENT;
 
     switch (exec.type)
@@ -334,10 +334,10 @@ long do_kexec_op(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
     unsigned long flags;
     int ret = -EINVAL;
 
-    if ( !IS_PRIV(current->domain) )  
+    if ( !IS_PRIV(current->domain) )
         return -EPERM;
 
-    switch (op)
+    switch ( op )
     {
     case KEXEC_CMD_kexec_get_range:
         ret = kexec_get_range(uarg);

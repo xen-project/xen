@@ -1,6 +1,6 @@
 /******************************************************************************
  * machine_kexec.c
- * 
+ *
  * Xen port written by:
  * - Simon 'Horms' Horman <horms@verge.net.au>
  * - Magnus Damm <magnus@valinux.co.jp>
@@ -30,23 +30,28 @@ int machine_kexec_load(int type, int slot, xen_kexec_image_t *image)
      * in every odd index in page_list[].
      */
 
-    for (k = 0; k < KEXEC_XEN_NO_PAGES; k++) {
-        if ((k & 1) == 0) {               /* even pages: machine address */
+    for ( k = 0; k < KEXEC_XEN_NO_PAGES; k++ )
+    {
+        if ( (k & 1) == 0 )
+        {
+            /* Even pages: machine address. */
             prev_ma = image->page_list[k];
         }
-        else {                            /* odd pages: va for previous ma */
+        else
+        {
+            /* Odd pages: va for previous ma. */
             set_fixmap(fix_base + (k >> 1), prev_ma);
             image->page_list[k] = fix_to_virt(fix_base + (k >> 1));
         }
     }
 
-  return 0;
+    return 0;
 }
 
 void machine_kexec_unload(int type, int slot, xen_kexec_image_t *image)
 {
 }
-  
+
 static void __machine_shutdown(void *data)
 {
     xen_kexec_image_t *image = (xen_kexec_image_t *)data;
@@ -63,7 +68,7 @@ static void __machine_shutdown(void *data)
 
     machine_kexec(image);
 }
-  
+
 void machine_shutdown(xen_kexec_image_t *image)
 {
     int reboot_cpu_id;
@@ -71,10 +76,11 @@ void machine_shutdown(xen_kexec_image_t *image)
 
     reboot_cpu_id = 0;
 
-    if (!cpu_isset(reboot_cpu_id, cpu_online_map))
+    if ( !cpu_isset(reboot_cpu_id, cpu_online_map) )
         reboot_cpu_id = smp_processor_id();
-    
-    if (reboot_cpu_id != smp_processor_id()) {
+
+    if ( reboot_cpu_id != smp_processor_id() )
+    {
         cpus_clear(reboot_cpu);
         cpu_set(reboot_cpu_id, reboot_cpu);
         on_selected_cpus(reboot_cpu, __machine_shutdown, image, 1, 0);
@@ -82,7 +88,9 @@ void machine_shutdown(xen_kexec_image_t *image)
                 ; /* nothing */
     }
     else
+    {
         __machine_shutdown(image);
+    }
     BUG();
 }
 

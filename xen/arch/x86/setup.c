@@ -274,11 +274,11 @@ static void srat_detect_node(int cpu)
         printk(KERN_INFO "CPU %d APIC %d -> Node %d\n", cpu, apicid, node);
 }
 
-void __init move_memory(unsigned long dst, 
+void __init move_memory(unsigned long dst,
                           unsigned long src_start, unsigned long src_end)
 {
 #if defined(CONFIG_X86_32)
-    memmove((void *)dst,  /* use low mapping */
+    memmove((void *)dst,            /* use low mapping */
             (void *)src_start,      /* use low mapping */
             src_end - src_start);
 #elif defined(CONFIG_X86_64)
@@ -481,22 +481,23 @@ void __init __start_xen(multiboot_info_t *mbi)
     }
 
     machine_kexec_reserved(&crash_area);
-    if (crash_area.size > 0) {
+    if ( crash_area.size > 0 )
+    {
         unsigned long kdump_start, kdump_size, k;
 
-        /* mark images pages as free for now */
+        /* Mark images pages as free for now. */
 
         init_boot_pages(initial_images_start, initial_images_end);
 
         kdump_start = crash_area.start;
         kdump_size = crash_area.size;
 
-        printk("Kdump: %luMB (%lukB) at 0x%lx\n", 
+        printk("Kdump: %luMB (%lukB) at 0x%lx\n",
                kdump_size >> 20,
                kdump_size >> 10,
                kdump_start);
 
-        if ((kdump_start & ~PAGE_MASK) || (kdump_size & ~PAGE_MASK))
+        if ( (kdump_start & ~PAGE_MASK) || (kdump_size & ~PAGE_MASK) )
             panic("Kdump parameters not page aligned\n");
 
         kdump_start >>= PAGE_SHIFT;
@@ -506,7 +507,7 @@ void __init __start_xen(multiboot_info_t *mbi)
 
         k = alloc_boot_pages_at(kdump_size, kdump_start);
 
-        if (k != kdump_start)
+        if ( k != kdump_start )
             panic("Unable to reserve Kdump memory\n");
 
         /* allocate pages for relocated initial images */
@@ -516,7 +517,7 @@ void __init __start_xen(multiboot_info_t *mbi)
 
         k = alloc_boot_pages(k, 1);
 
-        if (!k)
+        if ( !k )
             panic("Unable to allocate initial images memory\n");
 
         move_memory(k << PAGE_SHIFT, initial_images_start, initial_images_end);
@@ -524,12 +525,12 @@ void __init __start_xen(multiboot_info_t *mbi)
         initial_images_end -= initial_images_start;
         initial_images_start = k << PAGE_SHIFT;
         initial_images_end += initial_images_start;
-    }        
+    }
 
     memguard_init();
     percpu_guard_areas();
 
-    printk("System RAM: %luMB (%lukB)\n", 
+    printk("System RAM: %luMB (%lukB)\n",
            nr_pages >> (20 - PAGE_SHIFT),
            nr_pages << (PAGE_SHIFT - 10));
     total_pages = nr_pages;

@@ -1,6 +1,6 @@
 /******************************************************************************
  * crash.c
- * 
+ *
  * Based heavily on arch/i386/kernel/crash.c from Linux 2.6.16
  *
  * Xen port written by:
@@ -32,23 +32,23 @@ static atomic_t waiting_for_crash_ipi;
 
 static int crash_nmi_callback(struct cpu_user_regs *regs, int cpu)
 {
-	/* Don't do anything if this handler is invoked on crashing cpu.
-	 * Otherwise, system will completely hang. Crashing cpu can get
-	 * an NMI if system was initially booted with nmi_watchdog parameter.
-	 */
-	if (cpu == crashing_cpu)
-		return 1;
-	local_irq_disable();
+    /* Don't do anything if this handler is invoked on crashing cpu.
+     * Otherwise, system will completely hang. Crashing cpu can get
+     * an NMI if system was initially booted with nmi_watchdog parameter.
+     */
+    if ( cpu == crashing_cpu )
+        return 1;
+    local_irq_disable();
 
     machine_crash_save_cpu();
-	disable_local_APIC();
-	atomic_dec(&waiting_for_crash_ipi);
-	hvm_disable();
+    disable_local_APIC();
+    atomic_dec(&waiting_for_crash_ipi);
+    hvm_disable();
 
     for ( ; ; )
         __asm__ __volatile__ ( "hlt" );
 
-	return 1;
+    return 1;
 }
 
 /*
@@ -60,31 +60,32 @@ static void smp_send_nmi_allbutself(void)
 {
     cpumask_t allbutself = cpu_online_map;
 
-   	cpu_clear(smp_processor_id(), allbutself);
+    cpu_clear(smp_processor_id(), allbutself);
     send_IPI_mask(allbutself, APIC_DM_NMI);
 }
 
 static void nmi_shootdown_cpus(void)
 {
-	unsigned long msecs;
+    unsigned long msecs;
 
-	atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
-	/* Would it be better to replace the trap vector here? */
-	set_nmi_callback(crash_nmi_callback);
-	/* Ensure the new callback function is set before sending
-	 * out the NMI
-	 */
-	wmb();
+    atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
+    /* Would it be better to replace the trap vector here? */
+    set_nmi_callback(crash_nmi_callback);
+    /* Ensure the new callback function is set before sending
+     * out the NMI
+     */
+    wmb();
 
-	smp_send_nmi_allbutself();
+    smp_send_nmi_allbutself();
 
-	msecs = 1000; /* Wait at most a second for the other cpus to stop */
-	while ((atomic_read(&waiting_for_crash_ipi) > 0) && msecs) {
-		mdelay(1);
-		msecs--;
-	}
+    msecs = 1000; /* Wait at most a second for the other cpus to stop */
+    while ( (atomic_read(&waiting_for_crash_ipi) > 0) && msecs )
+    {
+        mdelay(1);
+        msecs--;
+    }
 
-	/* Leave the nmi callback set */
+    /* Leave the nmi callback set */
     disable_local_APIC();
 }
 #endif
@@ -101,11 +102,11 @@ static void crash_save_xen_notes(void)
 
 void machine_crash_shutdown(void)
 {
-	printk("machine_crash_shutdown: %d\n", smp_processor_id());
-	local_irq_disable();
+    printk("machine_crash_shutdown: %d\n", smp_processor_id());
+    local_irq_disable();
 
 #ifdef CONFIG_SMP
-	nmi_shootdown_cpus();
+    nmi_shootdown_cpus();
 #endif
 
 #ifdef CONFIG_X86_IO_APIC
@@ -125,4 +126,3 @@ void machine_crash_shutdown(void)
  * indent-tabs-mode: nil
  * End:
  */
-
