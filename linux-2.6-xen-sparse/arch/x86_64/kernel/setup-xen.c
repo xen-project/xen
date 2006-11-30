@@ -80,6 +80,10 @@
 #include <asm/mach-xen/setup_arch_post.h>
 #include <xen/interface/memory.h>
 
+#ifdef CONFIG_XEN
+#include <xen/interface/kexec.h>
+#endif
+
 extern unsigned long start_pfn;
 extern struct edid_info edid_info;
 
@@ -450,6 +454,7 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 		 * after a kernel panic.
 		 */
 		else if (!memcmp(from, "crashkernel=", 12)) {
+#ifndef CONFIG_XEN
 			unsigned long size, base;
 			size = memparse(from+12, &from);
 			if (*from == '@') {
@@ -460,6 +465,10 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 				crashk_res.start = base;
 				crashk_res.end   = base + size - 1;
 			}
+#else
+			printk("Ignoring crashkernel command line, "
+			       "parameter will be supplied by xen\n");
+#endif
 		}
 #endif
 
@@ -812,10 +821,14 @@ void __init setup_arch(char **cmdline_p)
 #endif
 #endif	/* !CONFIG_XEN */
 #ifdef CONFIG_KEXEC
+#ifdef CONFIG_XEN
+	xen_machine_kexec_setup_resources();
+#else
 	if (crashk_res.start != crashk_res.end) {
 		reserve_bootmem(crashk_res.start,
 			crashk_res.end - crashk_res.start + 1);
 	}
+#endif
 #endif
 
 	paging_init();

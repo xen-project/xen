@@ -90,6 +90,8 @@ extern unsigned long profile_pc(struct pt_regs *regs);
 #define profile_pc(regs) instruction_pointer(regs)
 #endif
 
+#include <linux/compiler.h>
+
 void signal_fault(struct pt_regs *regs, void __user *frame, char *where);
 
 struct task_struct;

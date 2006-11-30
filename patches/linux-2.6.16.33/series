@@ -4,6 +4,9 @@ git-2a8a3d5b65e86ec1dfef7d268c64a909eab94af7.patch
 git-3566561bfadffcb5dbc85d576be80c0dbf2cccc9.patch
 linux-2.6.19-rc1-kexec-move_segment_code-i386.patch
 linux-2.6.19-rc1-kexec-xen-i386.patch
+git-4bfaaef01a1badb9e8ffb0c0a37cd2379008d21f.patch
+linux-2.6.19-rc1-kexec-move_segment_code-x86_64.patch
+linux-2.6.19-rc1-kexec-xen-x86_64.patch
 blktap-aio-16_03_06.patch
 device_bind.patch
 fix-hz-suspend.patch
