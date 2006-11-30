@@ -199,8 +199,8 @@ struct operand {
     /* OP_REG: Pointer to register field. */
     unsigned long *reg;
     /* OP_MEM: Segment and offset. */
-    unsigned int  mem_seg;
-    unsigned long mem_off;
+    enum x86_segment mem_seg;
+    unsigned long    mem_off;
 };
 
 /* EFLAGS bit definitions. */
@@ -375,7 +375,7 @@ do{ __asm__ __volatile__ (                                              \
 /* Fetch next part of the instruction being emulated. */
 #define _insn_fetch(_size)                                      \
 ({ unsigned long _x;                                            \
-   rc = ops->read(_regs.cs, _regs.eip, &_x, (_size), ctxt);     \
+   rc = ops->read(x86_seg_cs, _regs.eip, &_x, (_size), ctxt);   \
    if ( rc != 0 )                                               \
        goto done;                                               \
    _regs.eip += (_size);                                        \
@@ -452,7 +452,7 @@ dump_instr(
     dprintf("Instr:");
     for ( i = 0; i < 16; i++, eip++ )
     {
-        if ( ops->read(ctxt->regs->cs, eip, &x, 1, ctxt) != 0 )
+        if ( ops->read(x86_seg_cs, eip, &x, 1, ctxt) != 0 )
             printk(" ??");
         else
             printk(" %02x", (uint8_t)x);
@@ -476,8 +476,8 @@ x86_emulate_memop(
     struct operand src, dst;
     int mode = ctxt->mode;
 
-    unsigned int  ea_seg = X86_SEG_DS;
-    unsigned long ea_off = 0;
+    enum x86_segment ea_seg = x86_seg_ds;
+    unsigned long    ea_off = 0;
 
     switch ( mode )
     {
@@ -513,22 +513,22 @@ x86_emulate_memop(
                 ad_bytes ^= 6;  /* switch between 2/4 bytes */
             break;
         case 0x2e: /* CS override */
-            ea_seg = X86_SEG_CS;
+            ea_seg = x86_seg_cs;
             break;
         case 0x3e: /* DS override */
-            ea_seg = X86_SEG_DS;
+            ea_seg = x86_seg_ds;
             break;
         case 0x26: /* ES override */
-            ea_seg = X86_SEG_ES;
+            ea_seg = x86_seg_es;
             break;
         case 0x64: /* FS override */
-            ea_seg = X86_SEG_FS;
+            ea_seg = x86_seg_fs;
             break;
         case 0x65: /* GS override */
-            ea_seg = X86_SEG_GS;
+            ea_seg = x86_seg_gs;
             break;
         case 0x36: /* SS override */
-            ea_seg = X86_SEG_SS;
+            ea_seg = x86_seg_ss;
             break;
         case 0xf0: /* LOCK */
             lock_prefix = 1;
@@ -860,7 +860,7 @@ x86_emulate_memop(
         /* 64-bit mode: POP always pops a 64-bit operand. */
         if ( mode == X86EMUL_MODE_PROT64 )
             dst.bytes = 8;
-        if ( (rc = ops->read(X86_SEG_SS, truncate_ea(_regs.esp),
+        if ( (rc = ops->read(x86_seg_ss, truncate_ea(_regs.esp),
                              &dst.val, dst.bytes, ctxt)) != 0 )
             goto done;
         register_address_increment(_regs.esp, dst.bytes);
@@ -942,7 +942,7 @@ x86_emulate_memop(
                     goto done;
             }
             register_address_increment(_regs.esp, -dst.bytes);
-            if ( (rc = ops->write(X86_SEG_SS, truncate_ea(_regs.esp),
+            if ( (rc = ops->write(x86_seg_ss, truncate_ea(_regs.esp),
                                   dst.val, dst.bytes, ctxt)) != 0 )
                 goto done;
             dst.val = dst.orig_val; /* skanky: disable writeback */
@@ -1024,7 +1024,7 @@ x86_emulate_memop(
     case 0xa4 ... 0xa5: /* movs */
         dst.type  = OP_MEM;
         dst.bytes = (d & ByteOp) ? 1 : op_bytes;
-        dst.mem_seg = X86_SEG_ES;
+        dst.mem_seg = x86_seg_es;
         dst.mem_off = truncate_ea(_regs.edi);
         if ( (rc = ops->read(ea_seg, truncate_ea(_regs.esi),
                              &dst.val, dst.bytes, ctxt)) != 0 )
@@ -1037,7 +1037,7 @@ x86_emulate_memop(
     case 0xaa ... 0xab: /* stos */
         dst.type  = OP_MEM;
         dst.bytes = (d & ByteOp) ? 1 : op_bytes;
-        dst.mem_seg = X86_SEG_ES;
+        dst.mem_seg = x86_seg_es;
         dst.mem_off = truncate_ea(_regs.edi);
         dst.val   = _regs.eax;
         register_address_increment(

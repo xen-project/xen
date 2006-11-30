@@ -920,7 +920,7 @@ void handle_mmio(unsigned long gpa)
     df = regs->eflags & X86_EFLAGS_DF ? 1 : 0;
 
     mode = hvm_guest_x86_mode(v);
-    inst_addr = hvm_get_segment_base(v, seg_cs) + regs->eip;
+    inst_addr = hvm_get_segment_base(v, x86_seg_cs) + regs->eip;
     inst_len = hvm_instruction_length(inst_addr, mode);
     if ( inst_len <= 0 )
     {
@@ -964,10 +964,10 @@ void handle_mmio(unsigned long gpa)
         addr = regs->edi;
         if ( ad_size == WORD )
             addr &= 0xFFFF;
-        addr += hvm_get_segment_base(v, seg_es);
+        addr += hvm_get_segment_base(v, x86_seg_es);
         if ( addr == gpa )
         {
-            enum segment seg;
+            enum x86_segment seg;
 
             dir = IOREQ_WRITE;
             addr = regs->esi;
@@ -975,13 +975,13 @@ void handle_mmio(unsigned long gpa)
                 addr &= 0xFFFF;
             switch ( seg_sel )
             {
-            case 0x26: seg = seg_es; break;
-            case 0x2e: seg = seg_cs; break;
-            case 0x36: seg = seg_ss; break;
+            case 0x26: seg = x86_seg_es; break;
+            case 0x2e: seg = x86_seg_cs; break;
+            case 0x36: seg = x86_seg_ss; break;
             case 0:
-            case 0x3e: seg = seg_ds; break;
-            case 0x64: seg = seg_fs; break;
-            case 0x65: seg = seg_gs; break;
+            case 0x3e: seg = x86_seg_ds; break;
+            case 0x64: seg = x86_seg_fs; break;
+            case 0x65: seg = x86_seg_gs; break;
             default: domain_crash_synchronous();
             }
             addr += hvm_get_segment_base(v, seg);

@@ -69,14 +69,87 @@ int _shadow_mode_refcounts(struct domain *d)
 /* x86 emulator support for the shadow code
  */
 
+static int hvm_translate_linear_addr(
+    enum x86_segment seg,
+    unsigned long offset,
+    unsigned int bytes,
+    unsigned int is_write,
+    unsigned long *paddr)
+{
+    struct segment_register creg, dreg;
+    unsigned long limit, addr = offset;
+    uint32_t last_byte;
+
+    hvm_get_segment_register(current, x86_seg_cs, &creg);
+    hvm_get_segment_register(current, seg,        &dreg);
+
+    if ( !creg.attr.fields.l || !hvm_long_mode_enabled(current) )
+    {
+        /*
+         * COMPATIBILITY MODE: Apply segment checks and add base.
+         */
+
+        /* If this is a store, is the segment a writable data segment? */
+        if ( is_write && ((dreg.attr.fields.type & 0xa) != 0x2) )
+            goto gpf;
+
+        /* Calculate the segment limit, including granularity flag. */
+        limit = dreg.limit;
+        if ( dreg.attr.fields.g )
+            limit = (limit << 12) | 0xfff;
+
+        last_byte = offset + bytes - 1;
+
+        /* Is this a grows-down data segment? Special limit check if so. */
+        if ( (dreg.attr.fields.type & 0xc) == 0x4 )
+        {
+            /* Is upper limit 0xFFFF or 0xFFFFFFFF? */
+            if ( !dreg.attr.fields.db )
+                last_byte = (uint16_t)last_byte;
+
+            /* Check first byte and last byte against respective bounds. */
+            if ( (offset <= limit) || (last_byte < offset) )
+                goto gpf;
+        }
+        else if ( (last_byte > limit) || (last_byte < offset) )
+            goto gpf; /* last byte is beyond limit or wraps 0xFFFFFFFF */
+
+        /*
+         * Hardware truncates to 32 bits in compatibility mode.
+         * It does not truncate to 16 bits in 16-bit address-size mode.
+         */
+        addr = (uint32_t)(addr + dreg.base);
+    }
+    else if ( (seg == x86_seg_fs) || (seg == x86_seg_gs) )
+    {
+        /*
+         * LONG MODE: FS and GS add a segment base.
+         */
+        addr += dreg.base;
+    }
+
+    *paddr = addr;
+    return 0;    
+
+ gpf:
+    /* Inject #GP(0). */
+    hvm_inject_exception(TRAP_gp_fault, 0);
+    return X86EMUL_PROPAGATE_FAULT;
+}
+
 static int
-sh_x86_emulate_read(unsigned int seg,
+sh_x86_emulate_read(enum x86_segment seg,
                     unsigned long offset,
                     unsigned long *val,
                     unsigned int bytes,
                     struct x86_emulate_ctxt *ctxt)
 {
-    unsigned long addr = offset;
+    unsigned long addr;
+    int rc;
+
+    rc = hvm_translate_linear_addr(seg, offset, bytes, 0, &addr);
+    if ( rc )
+        return rc;
 
     *val = 0;
     // XXX -- this is WRONG.
@@ -102,14 +175,19 @@ sh_x86_emulate_read(unsigned int seg,
 }
 
 static int
-sh_x86_emulate_write(unsigned int seg,
+sh_x86_emulate_write(enum x86_segment seg,
                      unsigned long offset,
                      unsigned long val,
                      unsigned int bytes,
                      struct x86_emulate_ctxt *ctxt)
 {
     struct vcpu *v = current;
-    unsigned long addr = offset;
+    unsigned long addr;
+    int rc;
+
+    rc = hvm_translate_linear_addr(seg, offset, bytes, 1, &addr);
+    if ( rc )
+        return rc;
 
 #if 0
     SHADOW_PRINTK("d=%u v=%u a=%#lx v=%#lx bytes=%u\n",
@@ -119,7 +197,7 @@ sh_x86_emulate_write(unsigned int seg,
 }
 
 static int 
-sh_x86_emulate_cmpxchg(unsigned int seg,
+sh_x86_emulate_cmpxchg(enum x86_segment seg,
                        unsigned long offset,
                        unsigned long old,
                        unsigned long new,
@@ -127,7 +205,12 @@ sh_x86_emulate_cmpxchg(unsigned int seg,
                        struct x86_emulate_ctxt *ctxt)
 {
     struct vcpu *v = current;
-    unsigned long addr = offset;
+    unsigned long addr;
+    int rc;
+
+    rc = hvm_translate_linear_addr(seg, offset, bytes, 1, &addr);
+    if ( rc )
+        return rc;
 
 #if 0
     SHADOW_PRINTK("d=%u v=%u a=%#lx o?=%#lx n:=%#lx bytes=%u\n",
@@ -138,7 +221,7 @@ sh_x86_emulate_cmpxchg(unsigned int seg,
 }
 
 static int 
-sh_x86_emulate_cmpxchg8b(unsigned int seg,
+sh_x86_emulate_cmpxchg8b(enum x86_segment seg,
                          unsigned long offset,
                          unsigned long old_lo,
                          unsigned long old_hi,
@@ -147,7 +230,12 @@ sh_x86_emulate_cmpxchg8b(unsigned int seg,
                          struct x86_emulate_ctxt *ctxt)
 {
     struct vcpu *v = current;
-    unsigned long addr = offset;
+    unsigned long addr;
+    int rc;
+
+    rc = hvm_translate_linear_addr(seg, offset, 8, 1, &addr);
+    if ( rc )
+        return rc;
 
 #if 0
     SHADOW_PRINTK("d=%u v=%u a=%#lx o?=%#lx:%lx n:=%#lx:%lx\n",

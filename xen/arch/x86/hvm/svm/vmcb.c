@@ -90,7 +90,7 @@ static int construct_vmcb(struct vcpu *v)
 {
     struct arch_svm_struct *arch_svm = &v->arch.hvm_svm;
     struct vmcb_struct *vmcb = arch_svm->vmcb;
-    segment_attributes_t attrib;
+    svm_segment_attributes_t attrib;
 
     /* Always flush the TLB on VMRUN. */
     vmcb->tlb_control = 1;
@@ -166,13 +166,13 @@ static int construct_vmcb(struct vcpu *v)
     attrib.fields.p = 1;      /* segment present */
     attrib.fields.db = 1;     /* 32-bit */
     attrib.fields.g = 1;      /* 4K pages in limit */
-    vmcb->es.attributes = attrib;
-    vmcb->ss.attributes = attrib;
-    vmcb->ds.attributes = attrib;
-    vmcb->fs.attributes = attrib;
-    vmcb->gs.attributes = attrib;
+    vmcb->es.attr = attrib;
+    vmcb->ss.attr = attrib;
+    vmcb->ds.attr = attrib;
+    vmcb->fs.attr = attrib;
+    vmcb->gs.attr = attrib;
     attrib.fields.type = 0xb; /* type=0xb -> executable/readable, accessed */
-    vmcb->cs.attributes = attrib;
+    vmcb->cs.attr = attrib;
 
     /* Guest IDT. */
     vmcb->idtr.base = 0;
@@ -186,11 +186,11 @@ static int construct_vmcb(struct vcpu *v)
     vmcb->ldtr.sel = 0;
     vmcb->ldtr.base = 0;
     vmcb->ldtr.limit = 0;
-    vmcb->ldtr.attributes.bytes = 0;
+    vmcb->ldtr.attr.bytes = 0;
 
     /* Guest TSS. */
     attrib.fields.type = 0xb; /* 32-bit TSS (busy) */
-    vmcb->tr.attributes = attrib;
+    vmcb->tr.attr = attrib;
     vmcb->tr.base = 0;
     vmcb->tr.limit = 0xff;
 
@@ -278,10 +278,10 @@ void svm_do_launch(struct vcpu *v)
     v->arch.schedule_tail = arch_svm_do_resume;
 }
 
-static void svm_dump_sel(char *name, segment_selector_t *s)
+static void svm_dump_sel(char *name, svm_segment_register_t *s)
 {
     printk("%s: sel=0x%04x, attr=0x%04x, limit=0x%08x, base=0x%016llx\n", 
-           name, s->sel, s->attributes.bytes, s->limit,
+           name, s->sel, s->attr.bytes, s->limit,
            (unsigned long long)s->base);
 }
 

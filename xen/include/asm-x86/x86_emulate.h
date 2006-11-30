@@ -11,16 +11,26 @@
 
 struct x86_emulate_ctxt;
 
-#define X86_SEG_CS 0
-#define X86_SEG_SS 1
-#define X86_SEG_DS 2
-#define X86_SEG_ES 3
-#define X86_SEG_FS 4
-#define X86_SEG_GS 5
+/*
+ * Comprehensive enumeration of x86 segment registers. Note that the system
+ * registers (TR, LDTR, GDTR, IDTR) are never referenced by the emulator.
+ */
+enum x86_segment {
+    /* General purpose. */
+    x86_seg_cs,
+    x86_seg_ss,
+    x86_seg_ds,
+    x86_seg_es,
+    x86_seg_fs,
+    x86_seg_gs,
+    /* System. */
+    x86_seg_tr,
+    x86_seg_ldtr,
+    x86_seg_gdtr,
+    x86_seg_idtr
+};
 
 /*
- * x86_emulate_ops:
- * 
  * These operations represent the instruction emulator's interface to memory.
  * 
  * NOTES:
@@ -45,7 +55,7 @@ struct x86_emulate_ops
 {
     /*
      * All functions:
-     *  @seg:   [IN ] Segment being dereferenced (specified as X86_SEG_??).
+     *  @seg:   [IN ] Segment being dereferenced (specified as x86_seg_??).
      *  @offset [IN ] Offset within segment.
      */
 
@@ -55,7 +65,7 @@ struct x86_emulate_ops
      *  @bytes: [IN ] Number of bytes to read from memory.
      */
     int (*read)(
-        unsigned int seg,
+        enum x86_segment seg,
         unsigned long offset,
         unsigned long *val,
         unsigned int bytes,
@@ -67,7 +77,7 @@ struct x86_emulate_ops
      *  @bytes: [IN ] Number of bytes to write to memory.
      */
     int (*write)(
-        unsigned int seg,
+        enum x86_segment seg,
         unsigned long offset,
         unsigned long val,
         unsigned int bytes,
@@ -80,7 +90,7 @@ struct x86_emulate_ops
      *  @bytes: [IN ] Number of bytes to access using CMPXCHG.
      */
     int (*cmpxchg)(
-        unsigned int seg,
+        enum x86_segment seg,
         unsigned long offset,
         unsigned long old,
         unsigned long new,
@@ -98,7 +108,7 @@ struct x86_emulate_ops
      *     to defining a function that always returns X86EMUL_UNHANDLEABLE.
      */
     int (*cmpxchg8b)(
-        unsigned int seg,
+        enum x86_segment seg,
         unsigned long offset,
         unsigned long old_lo,
         unsigned long old_hi,

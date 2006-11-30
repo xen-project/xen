@@ -3040,7 +3040,7 @@ struct ptwr_emulate_ctxt {
 };
 
 static int ptwr_emulated_read(
-    unsigned int seg,
+    enum x86_segment seg,
     unsigned long offset,
     unsigned long *val,
     unsigned int bytes,
@@ -3183,7 +3183,7 @@ static int ptwr_emulated_update(
 }
 
 static int ptwr_emulated_write(
-    unsigned int seg,
+    enum x86_segment seg,
     unsigned long offset,
     unsigned long val,
     unsigned int bytes,
@@ -3195,7 +3195,7 @@ static int ptwr_emulated_write(
 }
 
 static int ptwr_emulated_cmpxchg(
-    unsigned int seg,
+    enum x86_segment seg,
     unsigned long offset,
     unsigned long old,
     unsigned long new,
@@ -3208,7 +3208,7 @@ static int ptwr_emulated_cmpxchg(
 }
 
 static int ptwr_emulated_cmpxchg8b(
-    unsigned int seg,
+    enum x86_segment seg,
     unsigned long offset,
     unsigned long old,
     unsigned long old_hi,
