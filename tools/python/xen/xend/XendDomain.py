@@ -929,6 +929,9 @@ class XendDomain:
                 if dominfo.state != DOM_STATE_HALTED:
                     raise XendError("Domain is still running")
 
+                log.info("Domain %s (%s) deleted." %
+                         (dominfo.getName(), dominfo.info.get('uuid')))
+
                 self._managed_domain_unregister(dominfo)
                 self._remove_domain(dominfo)
                 XendDevices.destroy_device_state(dominfo)
