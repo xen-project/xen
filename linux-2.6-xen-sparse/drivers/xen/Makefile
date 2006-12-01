@@ -15,3 +15,5 @@ obj-$(CONFIG_XEN_BLKDEV_FRONTEND)	+= blkfront/
 obj-$(CONFIG_XEN_NETDEV_FRONTEND)	+= netfront/
 obj-$(CONFIG_XEN_PCIDEV_BACKEND)	+= pciback/
 obj-$(CONFIG_XEN_PCIDEV_FRONTEND)	+= pcifront/
+obj-$(CONFIG_XEN_FRAMEBUFFER)		+= fbfront/
+obj-$(CONFIG_XEN_KEYBOARD)		+= fbfront/

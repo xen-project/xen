@@ -172,6 +172,29 @@ config XEN_NETDEV_FRONTEND
 	  dedicated device-driver domain, or your master control domain
 	  (domain 0), then you almost certainly want to say Y here.
 
+config XEN_FRAMEBUFFER
+	tristate "Framebuffer-device frontend driver"
+	depends on XEN && FB
+	select FB_CFB_FILLRECT
+	select FB_CFB_COPYAREA
+	select FB_CFB_IMAGEBLIT
+	default y
+	help
+	  The framebuffer-device frontend drivers allows the kernel to create a
+	  virtual framebuffer.  This framebuffer can be viewed in another
+	  domain.  Unless this domain has access to a real video card, you
+	  probably want to say Y here.
+
+config XEN_KEYBOARD
+	tristate "Keyboard-device frontend driver"
+	depends on XEN && XEN_FRAMEBUFFER && INPUT
+	default y
+	help
+	  The keyboard-device frontend driver allows the kernel to create a
+	  virtual keyboard.  This keyboard can then be driven by another
+	  domain.  If you've said Y to CONFIG_XEN_FRAMEBUFFER, you probably
+	  want to say Y here.
+
 config XEN_SCRUB_PAGES
 	bool "Scrub memory before freeing it to Xen"
 	default y
