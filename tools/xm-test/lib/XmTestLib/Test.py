@@ -33,6 +33,7 @@ import select
 import signal
 import re
 import glob
+import xapi
 
 TEST_PASS = 0
 TEST_FAIL = 255
@@ -133,10 +134,12 @@ def becomeNonRoot():
 
 def FAIL(format, *args):
     print "\nREASON:", (format % args)
+    xapi.vm_destroy_all()
     sys.exit(TEST_FAIL)
 
 def SKIP(format, *args):
     print "\nREASON:", (format % args)
+    xapi.vm_destroy_all()
     sys.exit(TEST_SKIP)
 
 def saveLog(logText, filename=None):
