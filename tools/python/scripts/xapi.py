@@ -438,17 +438,6 @@ def xapi_vtpm_create(*args):
     print "Creating vTPM with cfg = %s" % cfg
     vtpm_uuid = execute(server.VTPM.create, session, cfg)
     print "Done. (%s)" % vtpm_uuid
-    vtpm_id = execute(server.VTPM.get_instance, session, vtpm_uuid)
-    print "Has instance number '%s'" % vtpm_id
-    vtpm_be = execute(server.VTPM.get_backend, session, vtpm_uuid)
-    print "Has backend in '%s'" % vtpm_be
-    driver = execute(server.VTPM.get_driver, session, vtpm_uuid)
-    print "Has driver type '%s'" % driver
-    vtpm_rec = execute(server.VTPM.get_record, session, vtpm_uuid)
-    print "Has vtpm record '%s'" % vtpm_rec
-    vm = execute(server.VTPM.get_VM, session, vtpm_uuid)
-    print "Has VM '%s'" % vm
-
 
 #
 # Command Line Utils

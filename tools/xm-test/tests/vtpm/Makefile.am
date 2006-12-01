@@ -7,7 +7,8 @@ TESTS = 01_vtpm-list_pos.test \
         05_vtpm-loc_migr.test \
         06_vtpm-susp_res_pcrs.test \
         07_vtpm-mig_pcrs.test \
-        08_vtpm-mig_pcrs.test
+        08_vtpm-mig_pcrs.test \
+        09_vtpm-xapi.test
 
 XFAIL_TESTS =
 
