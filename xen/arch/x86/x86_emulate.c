@@ -7,16 +7,14 @@
  */
 
 #ifndef __XEN__
-#include <stdio.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <public/xen.h>
-#define dprintf(_f, _a...) printf( _f , ## _a )
 #else
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/lib.h>
 #include <asm/regs.h>
-#define dprintf(_f, _a...) gdprintk(XENLOG_WARNING, _f , ## _a )
 #undef cmpxchg
 #endif
 #include <asm-x86/x86_emulate.h>
@@ -440,27 +438,6 @@ decode_register(
     return p;
 }
 
-static void
-dump_instr(
-    struct x86_emulate_ctxt *ctxt,
-    struct x86_emulate_ops  *ops)
-{
-#ifdef __XEN__
-    int i;
-    unsigned long x, eip = ctxt->regs->eip;
-
-    dprintf("Instr:");
-    for ( i = 0; i < 16; i++, eip++ )
-    {
-        if ( ops->read(x86_seg_cs, eip, &x, 1, ctxt) != 0 )
-            printk(" ??");
-        else
-            printk(" %02x", (uint8_t)x);
-    }
-    printk("\n");
-#endif
-}
-
 int
 x86_emulate_memop(
     struct x86_emulate_ctxt *ctxt,
@@ -579,10 +556,7 @@ x86_emulate_memop(
         modrm_rm  = modrm & 0x07;
 
         if ( modrm_mod == 3 )
-        {
-            dprintf("Cannot parse ModRM.mod == 3.\n");
             goto cannot_emulate;
-        }
 
         if ( ad_bytes == 2 )
         {
@@ -1206,7 +1180,15 @@ x86_emulate_memop(
     goto writeback;
 
  cannot_emulate:
-    dprintf("Cannot emulate %02x\n", b);
-    dump_instr(ctxt, ops);
+#ifdef __XEN__
+    gdprintk(XENLOG_DEBUG, "Instr:");
+    for ( ea_off = ctxt->regs->eip; ea_off < _regs.eip; ea_off++ )
+    {
+        unsigned long x;
+        ops->read(x86_seg_cs, ea_off, &x, 1, ctxt);
+        printk(" %02x", (uint8_t)x);
+    }
+    printk("\n");
+#endif
     return -1;
 }
