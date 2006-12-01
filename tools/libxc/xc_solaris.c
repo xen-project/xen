@@ -165,6 +165,15 @@ int xc_evtchn_notify(int xce_handle, evtchn_port_t port)
     return ioctl(xce_handle, IOCTL_EVTCHN_NOTIFY, &notify);
 }
 
+evtchn_port_t xc_evtchn_bind_unbound_port(int xce_handle, int domid)
+{
+    struct ioctl_evtchn_bind_unbound_port bind;
+
+    bind.remote_domain = domid;
+
+    return ioctl(xce_handle, IOCTL_EVTCHN_BIND_UNBOUND_PORT, &bind);
+}
+
 evtchn_port_t xc_evtchn_bind_interdomain(int xce_handle, int domid,
     evtchn_port_t remote_port)
 {
