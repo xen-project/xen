@@ -311,12 +311,8 @@ int tdaio_do_callbacks(struct td_state *s, int sid)
 		struct pending_aio *pio;
 		
 		pio = &prv->pending_aio[(long)io->data];
-		
-		if (ep->res != io->u.c.nbytes) {
-			/* TODO: handle this case better. */
-			DPRINTF("AIO did less than I asked it to. \n");
-		}
-		rsp += pio->cb(s, ep->res2, pio->id, pio->private);
+		rsp += pio->cb(s, ep->res == io->u.c.nbytes ? 0 : 1,
+			       pio->id, pio->private);
 
 		prv->iocb_free[prv->iocb_free_count++] = io;
 	}
