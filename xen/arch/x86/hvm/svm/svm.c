@@ -269,13 +269,11 @@ static int svm_long_mode_enabled(struct vcpu *v)
     return test_bit(SVM_CPU_STATE_LMA_ENABLED, &v->arch.hvm_svm.cpu_state);
 }
 
-#define IS_CANO_ADDRESS(add) 1
-
 static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
 {
     u64 msr_content = 0;
-    struct vcpu *vc = current;
-    struct vmcb_struct *vmcb = vc->arch.hvm_svm.vmcb;
+    struct vcpu *v = current;
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
     switch ((u32)regs->ecx)
     {
@@ -284,17 +282,25 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
         msr_content &= ~EFER_SVME;
         break;
 
+#ifdef __x86_64__
     case MSR_FS_BASE:
         msr_content = vmcb->fs.base;
-        break;
+        goto check_long_mode;
 
     case MSR_GS_BASE:
         msr_content = vmcb->gs.base;
-        break;
+        goto check_long_mode;
 
     case MSR_SHADOW_GS_BASE:
         msr_content = vmcb->kerngsbase;
+    check_long_mode:
+        if ( !svm_long_mode_enabled(v) )
+        {
+            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
+            return 0;
+        }
         break;
+#endif
 
     case MSR_STAR:
         msr_content = vmcb->star;
@@ -326,25 +332,25 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
 static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 {
     u64 msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
+    u32 ecx = regs->ecx;
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
     HVM_DBG_LOG(DBG_LEVEL_1, "msr %x msr_content %"PRIx64"\n",
-                (u32)regs->ecx, msr_content);
+                ecx, msr_content);
 
-    switch ( (u32)regs->ecx )
+    switch ( ecx )
     {
     case MSR_EFER:
-#ifdef __x86_64__
         /* offending reserved bit will cause #GP */
         if ( msr_content & ~(EFER_LME | EFER_LMA | EFER_NX | EFER_SCE) )
         {
-            printk("Trying to set reserved bit in EFER: %"PRIx64"\n",
-                   msr_content);
-            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
-            return 0;
+            gdprintk(XENLOG_WARNING, "Trying to set reserved bit in "
+                     "EFER: %"PRIx64"\n", msr_content);
+            goto gp_fault;
         }
 
+#ifdef __x86_64__
         /* LME: 0 -> 1 */
         if ( msr_content & EFER_LME &&
              !test_bit(SVM_CPU_STATE_LME_ENABLED, &v->arch.hvm_svm.cpu_state))
@@ -353,10 +359,9 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
                  !test_bit(SVM_CPU_STATE_PAE_ENABLED,
                            &v->arch.hvm_svm.cpu_state) )
             {
-                printk("Trying to set LME bit when "
-                       "in paging mode or PAE bit is not set\n");
-                svm_inject_exception(v, TRAP_gp_fault, 1, 0);
-                return 0;
+                gdprintk(XENLOG_WARNING, "Trying to set LME bit when "
+                         "in paging mode or PAE bit is not set\n");
+                goto gp_fault;
             }
             set_bit(SVM_CPU_STATE_LME_ENABLED, &v->arch.hvm_svm.cpu_state);
         }
@@ -371,37 +376,38 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
         vmcb->efer = msr_content | EFER_SVME;
         break;
 
+#ifdef __x86_64__
     case MSR_FS_BASE:
     case MSR_GS_BASE:
-        if ( !svm_long_mode_enabled(v) )
-            goto exit_and_crash;
-
-        if (!IS_CANO_ADDRESS(msr_content))
-        {
-            HVM_DBG_LOG(DBG_LEVEL_1, "Not cano address of msr write\n");
-            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
-        }
-
-        if (regs->ecx == MSR_FS_BASE)
-            vmcb->fs.base = msr_content;
-        else 
-            vmcb->gs.base = msr_content;
-        break;
-
     case MSR_SHADOW_GS_BASE:
-        vmcb->kerngsbase = msr_content;
+        if ( !svm_long_mode_enabled(v) )
+            goto gp_fault;
+
+        if ( !is_canonical_address(msr_content) )
+            goto uncanonical_address;
+
+        if ( ecx == MSR_FS_BASE )
+            vmcb->fs.base = msr_content;
+        else if ( ecx == MSR_GS_BASE )
+            vmcb->gs.base = msr_content;
+        else
+            vmcb->kerngsbase = msr_content;
         break;
+#endif
  
     case MSR_STAR:
         vmcb->star = msr_content;
         break;
  
     case MSR_LSTAR:
-        vmcb->lstar = msr_content;
-        break;
- 
     case MSR_CSTAR:
-        vmcb->cstar = msr_content;
+        if ( !is_canonical_address(msr_content) )
+            goto uncanonical_address;
+
+        if ( ecx == MSR_LSTAR )
+            vmcb->lstar = msr_content;
+        else
+            vmcb->cstar = msr_content;
         break;
  
     case MSR_SYSCALL_MASK:
@@ -414,10 +420,11 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 
     return 1;
 
- exit_and_crash:
-    gdprintk(XENLOG_ERR, "Fatal error writing MSR %lx\n", (long)regs->ecx);
-    domain_crash(v->domain);
-    return 1; /* handled */
+ uncanonical_address:
+    HVM_DBG_LOG(DBG_LEVEL_1, "Not cano address of msr write %x\n", ecx);
+ gp_fault:
+    svm_inject_exception(v, TRAP_gp_fault, 1, 0);
+    return 0;
 }
 
 
@@ -1272,7 +1279,7 @@ static inline int svm_get_io_address(
 #endif
 
     /* d field of cs.attr is 1 for 32-bit, 0 for 16 or 64 bit. 
-     * l field combined with EFER_LMA -> longmode says whether it's 16 or 64 bit. 
+     * l field combined with EFER_LMA says whether it's 16 or 64 bit. 
      */
     asize = (long_mode)?64:((vmcb->cs.attr.fields.db)?32:16);
 
@@ -1383,8 +1390,35 @@ static inline int svm_get_io_address(
 
         *addr += seg->base;
     }
-    else if (seg == &vmcb->fs || seg == &vmcb->gs)
-        *addr += seg->base;
+#ifdef __x86_64__
+    else
+    {
+        if (seg == &vmcb->fs || seg == &vmcb->gs)
+            *addr += seg->base;
+
+        if (!is_canonical_address(*addr) ||
+            !is_canonical_address(*addr + size - 1))
+        {
+            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
+            return 0;
+        }
+        if (*count > (1UL << 48) / size)
+            *count = (1UL << 48) / size;
+        if (!(regs->eflags & EF_DF))
+        {
+            if (*addr + *count * size - 1 < *addr ||
+                !is_canonical_address(*addr + *count * size - 1))
+                *count = (*addr & ~((1UL << 48) - 1)) / size;
+        }
+        else
+        {
+            if ((*count - 1) * size > *addr ||
+                !is_canonical_address(*addr + (*count - 1) * size))
+                *count = (*addr & ~((1UL << 48) - 1)) / size + 1;
+        }
+        ASSERT(*count);
+    }
+#endif
 
     return 1;
 }

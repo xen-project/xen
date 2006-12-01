@@ -24,6 +24,8 @@
 #define PADDR_MASK              ((1UL << PADDR_BITS)-1)
 #define VADDR_MASK              ((1UL << VADDR_BITS)-1)
 
+#define is_canonical_address(x) (((long)(x) >> 47) == ((long)(x) >> 63))
+
 #ifndef __ASSEMBLY__
 
 #include <xen/config.h>

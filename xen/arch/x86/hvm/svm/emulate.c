@@ -128,17 +128,6 @@ static inline unsigned long DECODE_GPR_VALUE(struct vmcb_struct *vmcb,
         return (unsigned long) -1; \
     }
 
-#if 0
-/*
- * hv_is_canonical - checks if the given address is canonical
- */
-static inline u64 hv_is_canonical(u64 addr)
-{
-    u64 bits = addr & (u64)0xffff800000000000;
-    return (u64)((bits == (u64)0xffff800000000000) || (bits == (u64)0x0));
-}
-#endif
-
 #define modrm operand [0]
 
 #define sib operand [1]
