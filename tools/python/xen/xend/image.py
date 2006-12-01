@@ -23,7 +23,6 @@ import math
 import signal
 
 import xen.lowlevel.xc
-import xen.util.auxbin
 from xen.xend.XendConstants import REVERSE_DOMAIN_SHUTDOWN_REASONS
 from xen.xend.XendError import VmError, XendError
 from xen.xend.XendLogging import log
@@ -199,72 +198,6 @@ class LinuxImageHandler(ImageHandler):
                               cmdline        = self.cmdline,
                               ramdisk        = self.ramdisk,
                               features       = self.vm.getFeatures())
-
-    def configure(self, imageConfig, deviceConfig):
-        ImageHandler.configure(self, imageConfig, deviceConfig)
-
-        self.pid = 0
-        log.info("configuring linux guest")
-
-        # set up the graphics bits.
-        # FIXME: this is much like what we do for HVM, should it be 
-        # for all image types now?
-        self.display = sxp.child_value(imageConfig, 'display')
-        self.xauthority = sxp.child_value(imageConfig, 'xauthority')
-        self.vncconsole = sxp.child_value(imageConfig, 'vncconsole')
-        vncpasswd = sxp.child_value(imageConfig, 'vncpasswd')
-        self.vncpasswd = vncpasswd
-
-        self.vnc = sxp.child_value(imageConfig, 'vnc')
-        self.sdl = sxp.child_value(imageConfig, 'sdl')
-        if self.vnc:
-            self.vncdisplay = int(sxp.child_value(imageConfig, 'vncdisplay',
-                                                  self.vm.getDomid()))
-            self.vncunused = sxp.child_value(imageConfig, 'vncunused')
-            self.vnclisten = sxp.child_value(imageConfig, 'vnclisten')
-            if not(self.vnclisten):
-                self.vnclisten = xen.xend.XendRoot.instance().get_vnclisten_address()
-
-    def createDeviceModel(self):
-        if self.pid:
-            return
-        # Execute device model (for us, it's just the fb frontend)
-        if not self.vnc and not self.sdl:
-            return
-
-        if self.vnc:
-            args = [xen.util.auxbin.pathTo("xen-vncfb")]
-            if self.vncunused:
-                args += ['--unused']
-            elif self.vncdisplay:
-                args += [ "--vncport", "%d" %(5900 + self.vncdisplay,) ]
-            if self.vnclisten:
-                args += [ "--listen", self.vnclisten ]
-
-            # password check
-            if self.vncpasswd is None:
-                # get password from xend-config(if password omitted, None)
-                self.vncpasswd = xen.xend.XendRoot.instance().get_vncpasswd_default()
-
-                if self.vncpasswd is None:
-                    raise VmError('vncpasswd is not setup in the guest config or xend-config.')
-            if self.vncpasswd != '':
-                self.vm.storeVm("vncpasswd", self.vncpasswd)
-                log.info("vncpassword set to '%s'", self.vncpasswd)
-
-        elif self.sdl:
-            args = [xen.util.auxbin.pathTo("xen-sdlfb")]
-        args = args + [ "--domid", "%d" % self.vm.getDomid(),
-                        "--title", self.vm.info['name'] ]
-
-        env = dict(os.environ)
-        if self.display:
-            env['DISPLAY'] = self.display
-        if self.xauthority:
-            env['XAUTHORITY'] = self.xauthority
-        log.info("spawning video: %s", args)
-        self.pid = os.spawnve(os.P_NOWAIT, args[0], args, env)
-        log.info("device model pid: %d", self.pid)
 
     def destroy(self):
         if not self.pid:
