@@ -66,14 +66,14 @@
  *  'xencons=tty'  [XC_TTY]:     Console attached to '/dev/tty[0-9]+'.
  *  'xencons=ttyS' [XC_SERIAL]:  Console attached to '/dev/ttyS[0-9]+'.
  *  'xencons=xvc'  [XC_XVC]:     Console attached to '/dev/xvc0'.
- *                 [XC_DEFAULT]: DOM0 -> XC_SERIAL ; all others -> XC_TTY.
+ *  default:                     DOM0 -> XC_SERIAL ; all others -> XC_TTY.
  * 
  * NB. In mode XC_TTY, we create dummy consoles for tty2-63. This suppresses
  * warnings from standard distro startup scripts.
  */
 static enum {
-	XC_OFF, XC_DEFAULT, XC_TTY, XC_SERIAL, XC_XVC
-} xc_mode = XC_DEFAULT;
+	XC_OFF, XC_TTY, XC_SERIAL, XC_XVC
+} xc_mode;
 static int xc_num = -1;
 
 /* /dev/xvc0 device number allocated by lanana.org. */
@@ -85,17 +85,32 @@ static unsigned long sysrq_requested;
 extern int sysrq_enabled;
 #endif
 
+void xencons_early_setup(void)
+{
+	extern int console_use_vt;
+
+	if (is_initial_xendomain()) {
+		xc_mode = XC_SERIAL;
+	} else {
+		xc_mode = XC_TTY;
+		console_use_vt = 0;
+	}
+}
+
 static int __init xencons_setup(char *str)
 {
 	char *q;
 	int n;
+	extern int console_use_vt;
 
+	console_use_vt = 1;
 	if (!strncmp(str, "ttyS", 4)) {
 		xc_mode = XC_SERIAL;
 		str += 4;
 	} else if (!strncmp(str, "tty", 3)) {
 		xc_mode = XC_TTY;
 		str += 3;
+		console_use_vt = 0;
 	} else if (!strncmp(str, "xvc", 3)) {
 		xc_mode = XC_XVC;
 		str += 3;
@@ -193,14 +208,10 @@ static int __init xen_console_init(void)
 		goto out;
 
 	if (is_initial_xendomain()) {
-		if (xc_mode == XC_DEFAULT)
-			xc_mode = XC_SERIAL;
 		kcons_info.write = kcons_write_dom0;
 	} else {
 		if (!xen_start_info->console.domU.evtchn)
 			goto out;
-		if (xc_mode == XC_DEFAULT)
-			xc_mode = XC_TTY;
 		kcons_info.write = kcons_write;
 	}
 
@@ -698,15 +709,6 @@ static int __init xencons_init(void)
 
 	printk("Xen virtual console successfully installed as %s%d\n",
 	       DRV(xencons_driver)->name, xc_num);
-
-        /* Check about framebuffer messing up the console */
-        if (!is_initial_xendomain() &&
-	    !xenbus_exists(XBT_NIL, "device", "vfb")) {
-		/* FIXME: this is ugly */
-		unregister_console(&kcons_info);
-		kcons_info.flags |= CON_CONSDEV;
-		register_console(&kcons_info);
-	}
 
 	return 0;
 }

@@ -555,8 +555,10 @@ setup_arch (char **cmdline_p)
 #endif
 		}
 	}
+	xencons_early_setup();
 #endif
 #endif
+
 
 	/* enable IA-64 Machine Check Abort Handling unless disabled */
 	if (!strstr(saved_command_line, "nomca"))
