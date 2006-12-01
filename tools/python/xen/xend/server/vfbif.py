@@ -4,6 +4,14 @@ from xen.xend.XendError import VmError
 import xen.xend
 import os
 
+def spawn_detached(path, args, env):
+    p = os.fork()
+    if p == 0:
+        os.spawnve(os.P_NOWAIT, path, args, env)
+        os._exit(0)
+    else:
+        os.waitpid(p, 0)
+        
 class VfbifController(DevController):
     """Virtual frame buffer controller. Handles all vfb devices for a domain.
     """
@@ -33,7 +41,7 @@ class VfbifController(DevController):
             vnclisten = config.get("vnclisten",
                                    xen.xend.XendRoot.instance().get_vnclisten_address())
             args += [ "--listen", vnclisten ]
-            os.spawnve(os.P_NOWAIT, args[0], args + std_args, os.environ)
+            spawn_detached(args[0], args + std_args, os.environ)
         elif t == "sdl":
             args = [xen.util.auxbin.pathTo("xen-sdlfb")]
             env = dict(os.environ)
@@ -41,7 +49,7 @@ class VfbifController(DevController):
                 env['DISPLAY'] = config["display"]
             if config.has_key("xauthority"):
                 env['XAUTHORITY'] = config["xauthority"]
-            os.spawnve(os.P_NOWAIT, args[0], args + std_args, env)
+            spawn_detached(args[0], args + std_args, env)
         else:
             raise VmError('Unknown vfb type %s (%s)' % (t, repr(config)))
 
