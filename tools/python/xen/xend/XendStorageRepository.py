@@ -19,10 +19,12 @@
 # The default QCOW Xen API Storage Repository
 #
 
-import os
 import commands
+import os
+import stat
 import threading
 
+from xen.util import mkdir
 from xen.xend import uuid
 from xen.xend.XendError import XendError
 from xen.xend.XendVDI import *
@@ -98,10 +100,7 @@ class XendStorageRepository:
         """
         self.lock.acquire()
         try:
-            # create directory if /var/lib/xend/storage does not exist
-            if not os.path.exists(XEND_STORAGE_DIR):
-                os.makedirs(XEND_STORAGE_DIR)
-                os.chmod(XEND_STORAGE_DIR, 0700)
+            mkdir.parents(XEND_STORAGE_DIR, stat.S_IRWXU)
 
             # scan the directory and populate self.images
             total_used = 0

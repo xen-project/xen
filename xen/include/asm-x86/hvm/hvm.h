@@ -157,11 +157,15 @@ hvm_paging_enabled(struct vcpu *v)
     return hvm_funcs.paging_enabled(v);
 }
 
+#ifdef __x86_64__
 static inline int
 hvm_long_mode_enabled(struct vcpu *v)
 {
     return hvm_funcs.long_mode_enabled(v);
 }
+#else
+#define hvm_long_mode_enabled(v) 0
+#endif
 
  static inline int
 hvm_pae_enabled(struct vcpu *v)

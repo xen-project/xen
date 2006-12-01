@@ -54,7 +54,6 @@ struct vlapic {
     uint32_t           timer_divisor;
     struct timer       vlapic_timer;
     int                timer_pending_count;
-    int                flush_tpr_threshold;
     s_time_t           timer_last_update;
     struct page_info   *regs_page;
     void               *regs;

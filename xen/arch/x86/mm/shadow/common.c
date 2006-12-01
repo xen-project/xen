@@ -120,12 +120,17 @@ static int hvm_translate_linear_addr(
          */
         addr = (uint32_t)(addr + dreg.base);
     }
-    else if ( (seg == x86_seg_fs) || (seg == x86_seg_gs) )
+    else
     {
         /*
-         * LONG MODE: FS and GS add a segment base.
+         * LONG MODE: FS and GS add segment base. Addresses must be canonical.
          */
-        addr += dreg.base;
+
+        if ( (seg == x86_seg_fs) || (seg == x86_seg_gs) )
+            addr += dreg.base;
+
+        if ( !is_canonical_address(addr) )
+            goto gpf;
     }
 
     *paddr = addr;
