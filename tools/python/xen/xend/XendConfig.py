@@ -185,7 +185,6 @@ LEGACY_IMAGE_HVM_CFG = [
     ('vncconsole', int),
     ('pae', int),
     ('apic', int),
-    ('acpi', int),
 ]
 
 LEGACY_IMAGE_HVM_DEVICES_CFG = [
@@ -196,7 +195,8 @@ LEGACY_IMAGE_HVM_DEVICES_CFG = [
     ('isa', str),
     ('keymap', str),    
     ('localtime', str),    
-    ('serial', str),    
+    ('serial', str),
+    ('stdvga', int),
     ('soundhw', str),
     ('usb', str),
     ('usbdevice', str),    
@@ -987,12 +987,12 @@ class XendConfig(dict):
 
         if 'hvm' in self['image']:
             for arg, conv in LEGACY_IMAGE_HVM_CFG:
-                if self['image']['hvm'].has_key(arg):
+                if self['image']['hvm'].get(arg):
                     image.append([arg, self['image']['hvm'][arg]])
 
         if 'hvm' in self['image'] and 'devices' in self['image']['hvm']:
             for arg, conv in LEGACY_IMAGE_HVM_DEVICES_CFG:
-                if self['image']['hvm']['devices'].has_key(arg):
+                if self['image']['hvm']['devices'].get(arg):
                     image.append([arg,
                                   self['image']['hvm']['devices'][arg]])
 

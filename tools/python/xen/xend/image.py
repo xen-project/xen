@@ -270,8 +270,9 @@ class HVMImageHandler(ImageHandler):
         self.dmargs += self.configVNC(imageConfig)
 
         self.pae  = imageConfig['hvm'].get('pae', 0)
-        self.acpi  = imageConfig['hvm'].get('acpi', 0)
         self.apic  = imageConfig['hvm'].get('apic', 0)
+        self.acpi  = imageConfig['hvm']['devices'].get('acpi', 0)
+        
 
     def buildDomain(self):
         store_evtchn = self.vm.getStorePort()
@@ -310,8 +311,6 @@ class HVMImageHandler(ImageHandler):
         
         for a in dmargs:
             v = hvmDeviceConfig.get(a)
-            if a == 'vcpus':
-                v = hvmDeviceConfig.get('vcpus_number')
 
             # python doesn't allow '-' in variable names
             if a == 'stdvga': a = 'std-vga'
