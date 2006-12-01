@@ -14,11 +14,13 @@ def spawn_detached(path, args, env):
         
 class VfbifController(DevController):
     """Virtual frame buffer controller. Handles all vfb devices for a domain.
+    Note that we only support a single vfb per domain at the moment.
     """
 
     def __init__(self, vm):
         DevController.__init__(self, vm)
-
+        self.config = {}
+        
     def getDeviceDetails(self, config):
         """@see DevController.getDeviceDetails"""
         devid = 0
@@ -26,8 +28,15 @@ class VfbifController(DevController):
         front = {}
         return (devid, back, front)
 
+    def getDeviceConfiguration(self, devid):
+        r = DevController.getDeviceConfiguration(self, devid)
+        for (k,v) in self.config.iteritems():
+            r[k] = v
+        return r
+    
     def createDevice(self, config):
         DevController.createDevice(self, config)
+        self.config = config
         std_args = [ "--domid", "%d" % self.vm.getDomid(),
                      "--title", self.vm.getName() ]
         t = config.get("type", None)
