@@ -597,7 +597,6 @@ static int xenfb_on_state_change(struct xenfb_device *dev)
 		xenfb_switch_state(dev, state);
 		break;
 	case XenbusStateClosed:
-		xs_unwatch(dev->xenfb->xsh, dev->otherend, "");
 		xenfb_switch_state(dev, state);
 	}
 	return 0;
