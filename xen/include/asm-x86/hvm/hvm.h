@@ -110,7 +110,8 @@ struct hvm_function_table {
     void (*stts)(struct vcpu *v);
     void (*set_tsc_offset)(struct vcpu *v, u64 offset);
 
-    void (*inject_exception)(unsigned int trapnr, int errcode);
+    void (*inject_exception)(unsigned int trapnr, int errcode,
+                             unsigned long cr2);
 
     void (*init_ap_context)(struct vcpu_guest_context *ctxt,
                             int vcpuid, int trampoline_vector);
@@ -225,9 +226,9 @@ hvm_init_ap_context(struct vcpu_guest_context *ctxt,
 }
 
 static inline void
-hvm_inject_exception(unsigned int trapnr, int errcode)
+hvm_inject_exception(unsigned int trapnr, int errcode, unsigned long cr2)
 {
-    hvm_funcs.inject_exception(trapnr, errcode);
+    hvm_funcs.inject_exception(trapnr, errcode, cr2);
 }
 
 int hvm_bringup_ap(int vcpuid, int trampoline_vector);

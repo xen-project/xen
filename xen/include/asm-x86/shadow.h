@@ -246,7 +246,7 @@ shadow_vcpu_mode_translate(struct vcpu *v)
 /**************************************************************************/
 /* Mode-specific entry points into the shadow code */
 
-struct x86_emulate_ctxt;
+struct sh_emulate_ctxt;
 struct shadow_paging_mode {
     int           (*page_fault            )(struct vcpu *v, unsigned long va,
                                             struct cpu_user_regs *regs);
@@ -267,18 +267,18 @@ struct shadow_paging_mode {
     void          (*detach_old_tables     )(struct vcpu *v);
     int           (*x86_emulate_write     )(struct vcpu *v, unsigned long va,
                                             void *src, u32 bytes,
-                                            struct x86_emulate_ctxt *ctxt);
+                                            struct sh_emulate_ctxt *sh_ctxt);
     int           (*x86_emulate_cmpxchg   )(struct vcpu *v, unsigned long va,
                                             unsigned long old, 
                                             unsigned long new,
                                             unsigned int bytes,
-                                            struct x86_emulate_ctxt *ctxt);
+                                            struct sh_emulate_ctxt *sh_ctxt);
     int           (*x86_emulate_cmpxchg8b )(struct vcpu *v, unsigned long va,
                                             unsigned long old_lo, 
                                             unsigned long old_hi, 
                                             unsigned long new_lo,
                                             unsigned long new_hi,
-                                            struct x86_emulate_ctxt *ctxt);
+                                            struct sh_emulate_ctxt *sh_ctxt);
     mfn_t         (*make_monitor_table    )(struct vcpu *v);
     void          (*destroy_monitor_table )(struct vcpu *v, mfn_t mmfn);
     void *        (*guest_map_l1e         )(struct vcpu *v, unsigned long va,

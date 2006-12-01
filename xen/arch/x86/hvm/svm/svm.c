@@ -812,9 +812,13 @@ static void svm_vcpu_destroy(struct vcpu *v)
     svm_destroy_vmcb(v);
 }
 
-static void svm_hvm_inject_exception(unsigned int trapnr, int errcode)
+static void svm_hvm_inject_exception(
+    unsigned int trapnr, int errcode, unsigned long cr2)
 {
-    svm_inject_exception(current, trapnr, (errcode != -1), errcode);
+    struct vcpu *v = current;
+    svm_inject_exception(v, trapnr, (errcode != -1), errcode);
+    if ( trapnr == TRAP_page_fault )
+        v->arch.hvm_svm.vmcb->cr2 = v->arch.hvm_svm.cpu_cr2 = cr2;
 }
 
 int start_svm(void)

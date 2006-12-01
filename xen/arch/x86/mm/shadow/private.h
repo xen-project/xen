@@ -506,6 +506,19 @@ static inline void sh_unpin(struct vcpu *v, mfn_t smfn)
     }
 }
 
+
+/**************************************************************************/
+/* PTE-write emulation. */
+
+struct sh_emulate_ctxt {
+    struct x86_emulate_ctxt ctxt;
+
+    /* Cache of segment registers already gathered for this emulation. */
+    unsigned int valid_seg_regs;
+    struct segment_register seg_reg[6];
+};
+
+
 #endif /* _XEN_SHADOW_PRIVATE_H */
 
 /*

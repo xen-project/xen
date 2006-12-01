@@ -715,9 +715,13 @@ static void vmx_update_host_cr3(struct vcpu *v)
     __vmwrite(HOST_CR3, v->arch.cr3);
 }
 
-static void vmx_inject_exception(unsigned int trapnr, int errcode)
+static void vmx_inject_exception(
+    unsigned int trapnr, int errcode, unsigned long cr2)
 {
-    vmx_inject_hw_exception(current, trapnr, errcode);
+    struct vcpu *v = current;
+    vmx_inject_hw_exception(v, trapnr, errcode);
+    if ( trapnr == TRAP_page_fault )
+        v->arch.hvm_vmx.cpu_cr2 = cr2;
 }
 
 /* Setup HVM interfaces */
