@@ -204,6 +204,7 @@ static int sdl_on_event(struct xenfb *xenfb, SDL_Event *event)
 static struct option options[] = {
 	{ "domid", 1, NULL, 'd' },
 	{ "title", 1, NULL, 't' },
+	{ NULL }
 };
 
 int main(int argc, char **argv)
@@ -220,6 +221,7 @@ int main(int argc, char **argv)
 	int do_quit = 0;
 	int opt;
 	char *endp;
+	int retval;
 
 	while ((opt = getopt_long(argc, argv, "d:t:", options,
 				  NULL)) != -1) {
@@ -234,6 +236,8 @@ int main(int argc, char **argv)
                 case 't':
 			title = strdup(optarg);
 			break;
+		case '?':
+			exit(1);
                 }
         }
         if (optind != argc) {
@@ -323,7 +327,11 @@ int main(int argc, char **argv)
                 if (do_quit)
 			break;
 
-		xenfb_poll(xenfb, &readfds);
+		retval = xenfb_poll(xenfb, &readfds);
+		if (retval == -2)
+		    xenfb_teardown(xenfb);
+		if (retval < 0)
+		    break;
 	}
 
 	xenfb_delete(xenfb);

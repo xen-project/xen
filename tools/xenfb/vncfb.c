@@ -253,6 +253,7 @@ static struct option options[] = {
 	{ "title", 1, NULL, 't' },
 	{ "unused", 0, NULL, 'u' },
 	{ "listen", 1, NULL, 'l' },
+	{ NULL }
 };
 
 int main(int argc, char **argv)
@@ -272,6 +273,7 @@ int main(int argc, char **argv)
 	int nfds;
 	char portstr[10];
 	char *endp;
+	int r;
 
 	while ((opt = getopt_long(argc, argv, "d:p:t:u", options,
 				  NULL)) != -1) {
@@ -301,6 +303,8 @@ int main(int argc, char **argv)
                 case 'l':
 			listen = strdup(optarg);
 			break;
+		case '?':
+			exit(1);
                 }
         }
         if (optind != argc) {
@@ -383,7 +387,11 @@ int main(int argc, char **argv)
 			break;
 		}
 
-		xenfb_poll(xenfb, &readfds);
+		r = xenfb_poll(xenfb, &readfds);
+		if (r == -2)
+		    xenfb_teardown(xenfb);
+		if (r < 0)
+		    break;
 	}
 
 	rfbScreenCleanup(server);

@@ -187,6 +187,17 @@ struct xenfb *xenfb_new(void)
 	return NULL;
 }
 
+/* Remove the backend area in xenbus since the framebuffer really is
+   going away. */
+void xenfb_teardown(struct xenfb *xenfb_pub)
+{
+       struct xenfb_private *xenfb = (struct xenfb_private *)xenfb_pub;
+
+       xs_rm(xenfb->xsh, XBT_NULL, xenfb->fb.nodename);
+       xs_rm(xenfb->xsh, XBT_NULL, xenfb->kbd.nodename);
+}
+
+
 void xenfb_delete(struct xenfb *xenfb_pub)
 {
 	struct xenfb_private *xenfb = (struct xenfb_private *)xenfb_pub;
@@ -564,7 +575,7 @@ static void xenfb_on_kbd_event(struct xenfb_private *xenfb)
 	xc_evtchn_notify(xenfb->evt_xch, xenfb->kbd.port);
 }
 
-static void xenfb_on_state_change(struct xenfb_device *dev)
+static int xenfb_on_state_change(struct xenfb_device *dev)
 {
 	enum xenbus_state state;
 
@@ -572,6 +583,10 @@ static void xenfb_on_state_change(struct xenfb_device *dev)
 
 	switch (state) {
 	case XenbusStateUnknown:
+		/* There was an error reading the frontend state.  The
+		   domain has probably gone away; in any case, there's
+		   not much point in us continuing. */
+		return -1;
 	case XenbusStateInitialising:
 	case XenbusStateInitWait:
 	case XenbusStateInitialised:
@@ -585,14 +600,17 @@ static void xenfb_on_state_change(struct xenfb_device *dev)
 		xs_unwatch(dev->xenfb->xsh, dev->otherend, "");
 		xenfb_switch_state(dev, state);
 	}
+	return 0;
 }
 
+/* Returns 0 normally, -1 on error, or -2 if the domain went away. */
 int xenfb_poll(struct xenfb *xenfb_pub, fd_set *readfds)
 {
 	struct xenfb_private *xenfb = (struct xenfb_private *)xenfb_pub;
 	evtchn_port_t port;
 	unsigned dummy;
 	char **vec;
+	int r;
 
 	if (FD_ISSET(xc_evtchn_fd(xenfb->evt_xch), readfds)) {
 		port = xc_evtchn_pending(xenfb->evt_xch);
@@ -611,8 +629,11 @@ int xenfb_poll(struct xenfb *xenfb_pub, fd_set *readfds)
 	if (FD_ISSET(xs_fileno(xenfb->xsh), readfds)) {
 		vec = xs_read_watch(xenfb->xsh, &dummy);
 		free(vec);
-		xenfb_on_state_change(&xenfb->fb);
-		xenfb_on_state_change(&xenfb->kbd);
+		r = xenfb_on_state_change(&xenfb->fb);
+		if (r == 0)
+			r = xenfb_on_state_change(&xenfb->kbd);
+		if (r == -1)
+			return -2;
 	}
 
 	return 0;
