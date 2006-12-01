@@ -11,7 +11,7 @@ typedef struct {
     unsigned long dummy;
 } crash_xen_core_t;
 
-extern inline void elf_core_save_regs(ELF_Gregset *core_regs, 
+static inline void elf_core_save_regs(ELF_Gregset *core_regs, 
                                       crash_xen_core_t *xen_core_regs)
 {
     printk("STUB: " __FILE__ ": %s: not implemented\n", __FUNCTION__);

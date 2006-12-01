@@ -23,7 +23,7 @@ typedef struct {
     unsigned long ss;
 } ELF_Gregset;
 
-extern inline void elf_core_save_regs(ELF_Gregset *core_regs, 
+static inline void elf_core_save_regs(ELF_Gregset *core_regs, 
                                       crash_xen_core_t *xen_core_regs)
 {
     unsigned long tmp;
