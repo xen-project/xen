@@ -70,13 +70,10 @@ cas_u32(volatile u32 *ptr, u32 oval, u32 nval)
     return tmp;
 }
 
-typedef union {
+typedef struct {
     volatile u32 lock;
-    struct {
-        s8 recurse_cpu;
-        u8 recurse_cnt;
-        s16 lock;
-    } fields;
+	u16 recurse_cpu;
+	u16 recurse_cnt;
 } spinlock_t;
 
 #define __UNLOCKED (0U)
@@ -181,17 +178,17 @@ static inline void _raw_read_unlock(rwlock_t *lock)
 static inline void _raw_spin_unlock_recursive(spinlock_t *lock)
 {
     int cpu = smp_processor_id();
-    if (likely(lock->fields.recurse_cpu != cpu)) {
+    if (likely(lock->recurse_cpu != cpu)) {
         spin_lock(lock);
-        lock->fields.recurse_cpu = cpu;
+        lock->recurse_cpu = cpu;
     }
-    lock->fields.recurse_cnt++;
+    lock->recurse_cnt++;
 }
 
 static inline void _raw_spin_unlock_recursive(spinlock_t *lock)
 {
-    if (likely(--lock->fields.recurse_cnt == 0)) {
-        lock->fields.recurse_cpu = -1;
+    if (likely(--lock->recurse_cnt == 0)) {
+        lock->recurse_cpu = -1;
         spin_unlock(lock);
     }
 }
@@ -200,19 +197,19 @@ static inline void _raw_spin_unlock_recursive(spinlock_t *lock)
 #define _raw_spin_lock_recursive(_lock)            \
     do {                                           \
         int cpu = smp_processor_id();              \
-        if ( likely((_lock)->fields.recurse_cpu != cpu) ) \
+        if ( likely((_lock)->recurse_cpu != cpu) ) \
         {                                          \
             spin_lock(_lock);                      \
-            (_lock)->fields.recurse_cpu = cpu;            \
+            (_lock)->recurse_cpu = cpu;            \
         }                                          \
-        (_lock)->fields.recurse_cnt++;                    \
+        (_lock)->recurse_cnt++;                    \
     } while ( 0 )
 
 #define _raw_spin_unlock_recursive(_lock)          \
     do {                                           \
-        if ( likely(--(_lock)->fields.recurse_cnt == 0) ) \
+        if ( likely(--(_lock)->recurse_cnt == 0) ) \
         {                                          \
-            (_lock)->fields.recurse_cpu = -1;             \
+            (_lock)->recurse_cpu = -1;             \
             spin_unlock(_lock);                    \
         }                                          \
     } while ( 0 )
