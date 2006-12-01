@@ -75,11 +75,11 @@ XENAPI_HVM_CFG = {
 
 XENAPI_CFG_TYPES = {
     'uuid': str,
-    'power_state': int,
+    'power_state': str,
     'name_label': str,
     'name_description': str,
     'user_version': str,
-    'is_a_template': int,
+    'is_a_template': bool0,
     'resident_on': str,
     'memory_static_min': int,
     'memory_static_max': int,
