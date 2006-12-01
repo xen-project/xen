@@ -1,0 +1,21 @@
+#!/bin/sh
+# CHECK-BUILD CHECK-INSTALL
+
+RC=0
+
+SDL_CONFIG="$(which sdl-config)"
+
+if test -z ${SDL_CONFIG}; then 
+    RC=1
+else
+    ${SDL_CONFIG} --libs 2>&1 > /dev/null
+    RC=$?
+fi
+
+if test $RC -ne 0; then
+    echo "FAILED"
+	echo " *** sdl-config is missing. "
+    echo " *** Please install libsdl-dev or sdl."
+fi
+
+exit $RC
