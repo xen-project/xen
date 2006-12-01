@@ -186,19 +186,21 @@ LEGACY_IMAGE_HVM_CFG = [
     ('pae', int),
     ('apic', int),
     ('acpi', int),
-    ('serial', str),
 ]
 
 LEGACY_IMAGE_HVM_DEVICES_CFG = [
+    ('acpi', int),    
     ('boot', str),
     ('fda', str),
     ('fdb', str),
-    ('soundhw', str),
     ('isa', str),
-    ('vcpus', int),
-    ('acpi', int),
+    ('keymap', str),    
+    ('localtime', str),    
+    ('serial', str),    
+    ('soundhw', str),
     ('usb', str),
-    ('usbdevice', str),
+    ('usbdevice', str),    
+    ('vcpus', int),
 ]
 
 
