@@ -23,6 +23,7 @@
 """
 
 import os
+import stat
 import shutil
 import socket
 import threading
@@ -44,7 +45,7 @@ from xen.xend.XendDevices import XendDevices
 
 from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.xenstore.xswatch import xswatch
-from xen.util import security
+from xen.util import mkdir, security
 from xen.xend import uuid
 
 xc = xen.lowlevel.xc.xc()
@@ -99,11 +100,7 @@ class XendDomain:
         """Singleton initialisation function."""
 
         dom_path = self._managed_path()
-        try:
-            os.stat(dom_path)
-        except OSError:
-            log.info("Making %s", dom_path)
-            os.makedirs(dom_path, 0755)
+        mkdir.parents(dom_path, stat.S_IRWXU)
 
         xstransact.Mkdir(XS_VMROOT)
         xstransact.SetPermissions(XS_VMROOT, {'dom': DOM0_ID})
@@ -271,25 +268,17 @@ class XendDomain:
             domains_dir = self._managed_path()
             dom_uuid = dominfo.get_uuid()            
             domain_config_dir = self._managed_path(dom_uuid)
-        
-            # make sure the domain dir exists
-            if not os.path.exists(domains_dir):
-                os.makedirs(domains_dir, 0755)
-            elif not os.path.isdir(domains_dir):
-                log.error("xend_domain_dir is not a directory.")
-                raise XendError("Unable to save managed configuration "
-                                "because %s is not a directory." %
-                                domains_dir)
-            
-            if not os.path.exists(domain_config_dir):
+
+            def make_or_raise(path):
                 try:
-                    os.makedirs(domain_config_dir, 0755)
-                except IOError:
-                    log.exception("Failed to create directory: %s" %
-                                  domain_config_dir)
-                    raise XendError("Failed to create directory: %s" %
-                                    domain_config_dir)
-                
+                    mkdir.parents(path, stat.S_IRWXU)
+                except:
+                    log.exception("%s could not be created." % path)
+                    raise XendError("%s could not be created." % path)
+
+            make_or_raise(domains_dir)
+            make_or_raise(domain_config_dir)
+
             try:
                 sxp_cache_file = open(self._managed_config_path(dom_uuid),'w')
                 prettyprint(dominfo.sxpr(), sxp_cache_file, width = 78)

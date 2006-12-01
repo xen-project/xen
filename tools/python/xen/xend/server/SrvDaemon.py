@@ -21,6 +21,7 @@ import xen.lowlevel.xc
 
 from xen.xend.XendLogging import log
 from xen.xend import osdep
+from xen.util import mkdir
 
 import relocate
 import SrvServer
@@ -108,8 +109,7 @@ class Daemon:
         # so _before_ we close stderr.
         try:
             parent = os.path.dirname(XEND_DEBUG_LOG)
-            if not os.path.exists(parent):
-                os.makedirs(parent, stat.S_IRWXU)
+            mkdir.parents(parent, stat.S_IRWXU)
             fd = os.open(XEND_DEBUG_LOG, os.O_WRONLY|os.O_CREAT|os.O_APPEND)
         except Exception, exn:
             print >>sys.stderr, exn
