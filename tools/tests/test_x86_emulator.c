@@ -304,6 +304,7 @@ int main(int argc, char **argv)
 
     printf("%-40s", "Testing cmpxchg8b (%edi) [failing]...");
     instr[0] = 0x0f; instr[1] = 0xc7; instr[2] = 0x0f;
+    regs.eflags = 0x200;
     regs.eip    = (unsigned long)&instr[0];
     regs.edi    = (unsigned long)res;
     regs.error_code = PFEC_write_access;
@@ -320,6 +321,7 @@ int main(int argc, char **argv)
 
     printf("%-40s", "Testing movsxbd (%%eax),%%ecx...");
     instr[0] = 0x0f; instr[1] = 0xbe; instr[2] = 0x08;
+    regs.eflags = 0x200;
     regs.eip    = (unsigned long)&instr[0];
     regs.ecx    = 0x12345678;
     regs.eax    = (unsigned long)res;
@@ -336,6 +338,7 @@ int main(int argc, char **argv)
 
     printf("%-40s", "Testing movzxwd (%%eax),%%ecx...");
     instr[0] = 0x0f; instr[1] = 0xb7; instr[2] = 0x08;
+    regs.eflags = 0x200;
     regs.eip    = (unsigned long)&instr[0];
     regs.ecx    = 0x12345678;
     regs.eax    = (unsigned long)res;
@@ -347,6 +350,23 @@ int main(int argc, char **argv)
          (regs.ecx != 0xaa82) ||
          ((regs.eflags&0x240) != 0x200) ||
          (regs.eip != (unsigned long)&instr[3]) )
+        goto fail;
+    printf("okay\n");
+
+    printf("%-40s", "Testing xadd %%ax,(%%ecx)...");
+    instr[0] = 0x66; instr[1] = 0x0f; instr[2] = 0xc1; instr[3] = 0x01;
+    regs.eflags = 0x200;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.ecx    = (unsigned long)res;
+    regs.eax    = 0x12345678;
+    *res        = 0x11111111;
+    regs.error_code = 0;
+    rc = x86_emulate_memop(&ctxt, &emulops);
+    if ( (rc != 0) ||
+         (*res != 0x11116789) ||
+         (regs.eax != 0x12341111) ||
+         ((regs.eflags&0x240) != 0x200) ||
+         (regs.eip != (unsigned long)&instr[4]) )
         goto fail;
     printf("okay\n");
 

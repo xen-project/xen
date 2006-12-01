@@ -179,8 +179,11 @@ static uint8_t twobyte_table[256] = {
     /* 0xB8 - 0xBF */
     0, 0, DstBitBase|SrcImmByte|ModRM, DstBitBase|SrcReg|ModRM,
     0, 0, ByteOp|DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem16|ModRM|Mov,
-    /* 0xC0 - 0xCF */
-    0, 0, 0, 0, 0, 0, 0, ImplicitOps|ModRM, 0, 0, 0, 0, 0, 0, 0, 0,
+    /* 0xC0 - 0xC7 */
+    ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM, 0, 0,
+    0, 0, 0, ImplicitOps|ModRM,
+    /* 0xC8 - 0xCF */
+    0, 0, 0, 0, 0, 0, 0, 0,
     /* 0xD0 - 0xDF */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     /* 0xE0 - 0xEF */
@@ -1116,6 +1119,16 @@ x86_emulate_memop(
         dst.bytes = op_bytes;
         dst.val = (d & ByteOp) ? (int8_t)src.val : (int16_t)src.val;
         break;
+    case 0xc0 ... 0xc1: /* xadd */
+        /* Write back the register source. */
+        switch ( dst.bytes )
+        {
+        case 1: *(uint8_t  *)src.reg = (uint8_t)dst.val; break;
+        case 2: *(uint16_t *)src.reg = (uint16_t)dst.val; break;
+        case 4: *src.reg = (uint32_t)dst.val; break; /* 64b reg: zero-extend */
+        case 8: *src.reg = dst.val; break;
+        }
+        goto add;
     }
     goto writeback;
 
