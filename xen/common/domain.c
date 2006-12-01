@@ -283,8 +283,8 @@ void domain_shutdown(struct domain *d, u8 reason)
     if ( d->domain_id == 0 )
         dom0_shutdown(reason);
 
-    d->shutdown_code = reason;
-    set_bit(_DOMF_shutdown, &d->domain_flags);
+    if ( !test_and_set_bit(_DOMF_shutdown, &d->domain_flags) )
+        d->shutdown_code = reason;
 
     for_each_vcpu ( d, v )
         vcpu_sleep_nosync(v);
