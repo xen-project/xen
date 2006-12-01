@@ -580,8 +580,18 @@ class XendDomainInfo:
         return self.getDeviceController(deviceClass).destroyDevice(devid)
 
 
+
     def getDeviceSxprs(self, deviceClass):
-        return self.getDeviceController(deviceClass).sxprs()
+        if self.state == DOM_STATE_RUNNING:
+            return self.getDeviceController(deviceClass).sxprs()
+        else:
+            sxprs = []
+            dev_num = 0
+            for dev_type, dev_info in self.info.all_devices_sxpr():
+                if dev_type == deviceClass:
+                    sxprs.append([dev_num, dev_info])
+                    dev_num += 1
+            return sxprs
 
 
     def setMemoryTarget(self, target):

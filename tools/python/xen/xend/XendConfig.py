@@ -964,7 +964,7 @@ class XendConfig(dict):
         sxprs = []
         pci_devs = []
 
-        if 'devices' in self:
+        if 'devices' not in self:
             return sxprs
         
         for dev_type, dev_info in self['devices'].values():
