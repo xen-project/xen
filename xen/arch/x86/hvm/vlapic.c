@@ -119,19 +119,16 @@ static int vlapic_find_highest_vector(u32 *bitmap)
 
 static int vlapic_test_and_set_irr(int vector, struct vlapic *vlapic)
 {
-    vlapic->flush_tpr_threshold = 1;
     return vlapic_test_and_set_vector(vector, vlapic->regs + APIC_IRR);
 }
 
 static void vlapic_set_irr(int vector, struct vlapic *vlapic)
 {
-    vlapic->flush_tpr_threshold = 1;
     vlapic_set_vector(vector, vlapic->regs + APIC_IRR);
 }
 
 static void vlapic_clear_irr(int vector, struct vlapic *vlapic)
 {
-    vlapic->flush_tpr_threshold = 1;
     vlapic_clear_vector(vector, vlapic->regs + APIC_IRR);
 }
 
@@ -634,7 +631,6 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
     {
     case APIC_TASKPRI:
         vlapic_set_reg(vlapic, APIC_TASKPRI, val & 0xff);
-        vlapic->flush_tpr_threshold = 1;
         break;
 
     case APIC_EOI:
@@ -667,10 +663,7 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
             }
         }
         else
-        {
             vlapic->disabled &= ~VLAPIC_SW_DISABLED;
-            vlapic->flush_tpr_threshold = 1;
-        }
         break;
 
     case APIC_ESR:
@@ -924,8 +917,6 @@ static int vlapic_reset(struct vlapic *vlapic)
 
     vlapic_set_reg(vlapic, APIC_SPIV, 0xff);
     vlapic->disabled |= VLAPIC_SW_DISABLED;
-
-    vlapic->flush_tpr_threshold = 1;
 
     return 1;
 }

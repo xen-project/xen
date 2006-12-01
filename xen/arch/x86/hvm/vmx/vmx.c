@@ -2500,7 +2500,6 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case EXIT_REASON_TPR_BELOW_THRESHOLD:
-        vcpu_vlapic(v)->flush_tpr_threshold = 1;
         break;
 
     default:
