@@ -106,7 +106,7 @@ XENAPI_CFG_TYPES = {
     'platform_clock_offset': bool0,
     'platform_enable_audio': bool0,
     'platform_keymap': str,
-    'boot_method': int,
+    'boot_method': str,
     'builder': str,
     'kernel_kernel': str,
     'kernel_initrd': str,
@@ -263,7 +263,7 @@ class XendConfig(dict):
             self._sxp_to_xapi(sxp_obj)
             self._sxp_to_xapi_unsupported(sxp_obj)
         elif xapi:
-            self.update(xapi)
+            self.update_with_xenapi_config(xapi)
             self._add_xapi_unsupported()
         elif dominfo:
             # output from xc.domain_getinfo
@@ -273,6 +273,21 @@ class XendConfig(dict):
 
         # validators go here
         self.validate()
+
+    """ In time, we should enable this type checking addition. It is great
+        also for tracking bugs and unintended writes to XendDomainInfo.info
+    def __setitem__(self, key, value):
+        type_conv = XENAPI_CFG_TYPES.get(key)
+        if callable(type_conv):
+            try:
+                dict.__setitem__(self, key, type_conv(value))
+            except (ValueError, TypeError):
+                raise XendConfigError("Wrong type for configuration value " +
+                                      "%s. Expected %s" %
+                                      (key, type_conv.__name__))
+        else:
+            dict.__setitem__(self, key, value)
+    """
 
     def _defaults(self):
         defaults = {
@@ -713,6 +728,22 @@ class XendConfig(dict):
         @type dominfo: dict
         """
         self._dominfo_to_xapi(dominfo)
+        self.validate()
+
+    def update_with_xenapi_config(self, xapi):
+        """Update configuration with a Xen API VM struct
+
+        @param xapi: Xen API VM Struct
+        @type xapi: dict
+        """
+        for key, val in xapi.items():
+            key = key.lower()
+            type_conv = XENAPI_CFG_TYPES.get(key)
+            if callable(type_conv):
+                self[key] = type_conv(val)
+            else:
+                self[key] = val
+
         self.validate()
 
     def to_xml(self):
