@@ -29,7 +29,7 @@ from getpass import getpass
 MB = 1024 * 1024
 
 HOST_INFO_FORMAT = '%-20s: %-50s'
-VM_LIST_FORMAT = '%(name_label)-18s %(memory_actual)-5s %(vcpus_number)-5s'\
+VM_LIST_FORMAT = '%(name_label)-18s %(memory_actual)-5s %(VCPUs_number)-5s'\
                  ' %(power_state)-10s %(uuid)-36s'
 SR_LIST_FORMAT = '%(name_label)-18s %(uuid)-36s %(physical_size)-10s' \
                  '%(type)-10s'
@@ -226,7 +226,7 @@ def xapi_vm_list(*args):
     if not is_long:
         print VM_LIST_FORMAT % {'name_label':'Name',
                                 'memory_actual':'Mem',
-                                'vcpus_number': 'VCPUs',
+                                'VCPUs_number': 'VCPUs',
                                 'power_state': 'State',
                                 'uuid': 'UUID'}
 
@@ -286,7 +286,7 @@ def xapi_vm_start(*args):
     server, session = _connect()
     vm_uuid = resolve_vm(server, session, args[0])
     print 'Starting VM %s (%s)' % (args[0], vm_uuid)
-    success = execute(server.VM.start, session, vm_uuid)
+    success = execute(server.VM.start, session, vm_uuid, False)
     print 'Done.'
 
 def xapi_vm_shutdown(*args):
