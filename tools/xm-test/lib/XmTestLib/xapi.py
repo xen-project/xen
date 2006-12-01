@@ -57,7 +57,7 @@ _session = None
 def _connect(*args):
     global _server, _session, _initialised
     if not _initialised:
-        _server = ServerProxy('httpu:///var/run/xend/xmlrpc.sock')
+        _server = ServerProxy('httpu:///var/run/xend/xen-api.sock')
         login = XAPI_DEFAULT_LOGIN
         password = XAPI_DEFAULT_PASSWORD
         creds = (login, password)
