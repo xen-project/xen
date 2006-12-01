@@ -199,13 +199,6 @@ class LinuxImageHandler(ImageHandler):
                               ramdisk        = self.ramdisk,
                               features       = self.vm.getFeatures())
 
-    def destroy(self):
-        if not self.pid:
-            return
-        os.kill(self.pid, signal.SIGKILL)
-        os.waitpid(self.pid, 0)
-        self.pid = 0
-
 class PPC_LinuxImageHandler(LinuxImageHandler):
 
     ostype = "linux"
