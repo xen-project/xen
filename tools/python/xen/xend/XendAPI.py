@@ -931,7 +931,7 @@ class XendAPI:
     
     # class methods
     def VM_get_all(self, session):
-        refs = [d.get_uuid() for d in XendDomain.instance().list()]
+        refs = [d.get_uuid() for d in XendDomain.instance().list('all')]
         return xen_api_success(refs)
     
     def VM_get_by_name_label(self, session, label):
@@ -966,14 +966,14 @@ class XendAPI:
             'memory_dynamic_min': xeninfo.get_memory_dynamic_min(),
             'memory_dynamic_max': xeninfo.get_memory_dynamic_max(),
             'memory_actual': xeninfo.get_memory_static_min(),
-            'vcpus_policy': xeninfo.get_vcpus_policy(),
-            'vcpus_params': xeninfo.get_vcpus_params(),
-            'vcpus_number': xeninfo.getVCpuCount(),
-            'vcpus_utilisation': xeninfo.get_vcpus_util(),
-            'vcpus_features_required': [],
-            'vcpus_features_can_use': [],
-            'vcpus_features_force_on': [],
-            'vcpus_features_force_off': [],
+            'VCPUs_policy': xeninfo.get_vcpus_policy(),
+            'VCPUs_params': xeninfo.get_vcpus_params(),
+            'VCPUs_number': xeninfo.getVCpuCount(),
+            'VCPUs_utilisation': xeninfo.get_vcpus_util(),
+            'VCPUs_features_required': [],
+            'VCPUs_features_can_use': [],
+            'VCPUs_features_force_on': [],
+            'VCPUs_features_force_off': [],
             'actions_after_shutdown': xeninfo.get_on_shutdown(),
             'actions_after_reboot': xeninfo.get_on_reboot(),
             'actions_after_suspend': xeninfo.get_on_suspend(),
