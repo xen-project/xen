@@ -95,13 +95,7 @@ static void vmx_save_host_msrs(void)
         rdmsrl(msr_index[i], host_msr_state->msrs[i]);
 }
 
-#define CASE_READ_MSR(address)                                              \
-    case MSR_ ## address:                                                   \
-        msr_content = guest_msr_state->msrs[VMX_INDEX_MSR_ ## address];     \
-        break
-
-#define CASE_WRITE_MSR(address)                                             \
-    case MSR_ ## address:                                                   \
+#define WRITE_MSR(address)                                                  \
         guest_msr_state->msrs[VMX_INDEX_MSR_ ## address] = msr_content;     \
         if ( !test_bit(VMX_INDEX_MSR_ ## address, &guest_msr_state->flags) )\
             set_bit(VMX_INDEX_MSR_ ## address, &guest_msr_state->flags);    \
@@ -109,7 +103,6 @@ static void vmx_save_host_msrs(void)
         set_bit(VMX_INDEX_MSR_ ## address, &host_msr_state->flags);         \
         break
 
-#define IS_CANO_ADDRESS(add) 1
 static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
 {
     u64 msr_content = 0;
@@ -123,27 +116,38 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
         break;
 
     case MSR_FS_BASE:
-        if ( !(vmx_long_mode_enabled(v)) )
-            goto exit_and_crash;
-
         msr_content = __vmread(GUEST_FS_BASE);
-        break;
+        goto check_long_mode;
 
     case MSR_GS_BASE:
-        if ( !(vmx_long_mode_enabled(v)) )
-            goto exit_and_crash;
-
         msr_content = __vmread(GUEST_GS_BASE);
-        break;
+        goto check_long_mode;
 
     case MSR_SHADOW_GS_BASE:
         msr_content = guest_msr_state->shadow_gs;
+    check_long_mode:
+        if ( !(vmx_long_mode_enabled(v)) )
+        {
+            vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
+            return 0;
+        }
         break;
 
-    CASE_READ_MSR(STAR);
-    CASE_READ_MSR(LSTAR);
-    CASE_READ_MSR(CSTAR);
-    CASE_READ_MSR(SYSCALL_MASK);
+    case MSR_STAR:
+        msr_content = guest_msr_state->msrs[VMX_INDEX_MSR_STAR];
+        break;
+
+    case MSR_LSTAR:
+        msr_content = guest_msr_state->msrs[VMX_INDEX_MSR_LSTAR];
+        break;
+
+    case MSR_CSTAR:
+        msr_content = guest_msr_state->msrs[VMX_INDEX_MSR_CSTAR];
+        break;
+
+    case MSR_SYSCALL_MASK:
+        msr_content = guest_msr_state->msrs[VMX_INDEX_MSR_SYSCALL_MASK];
+        break;
 
     default:
         return 0;
@@ -155,32 +159,28 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
     regs->edx = (u32)(msr_content >> 32);
 
     return 1;
-
- exit_and_crash:
-    gdprintk(XENLOG_ERR, "Fatal error reading MSR %lx\n", (long)regs->ecx);
-    domain_crash(v->domain);
-    return 1; /* handled */
 }
 
 static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 {
     u64 msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
+    u32 ecx = regs->ecx;
     struct vcpu *v = current;
     struct vmx_msr_state *guest_msr_state = &v->arch.hvm_vmx.msr_state;
     struct vmx_msr_state *host_msr_state = &this_cpu(host_msr_state);
 
     HVM_DBG_LOG(DBG_LEVEL_1, "msr 0x%x msr_content 0x%"PRIx64"\n",
-                (u32)regs->ecx, msr_content);
+                ecx, msr_content);
 
-    switch ( (u32)regs->ecx ) {
+    switch ( ecx )
+    {
     case MSR_EFER:
         /* offending reserved bit will cause #GP */
         if ( msr_content & ~(EFER_LME | EFER_LMA | EFER_NX | EFER_SCE) )
         {
-            printk("Trying to set reserved bit in EFER: %"PRIx64"\n",
-                   msr_content);
-            vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
-            return 0;
+            gdprintk(XENLOG_WARNING, "Trying to set reserved bit in "
+                     "EFER: %"PRIx64"\n", msr_content);
+            goto gp_fault;
         }
 
         if ( (msr_content & EFER_LME)
@@ -188,9 +188,9 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
         {
             if ( unlikely(vmx_paging_enabled(v)) )
             {
-                printk("Trying to set EFER.LME with paging enabled\n");
-                vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
-                return 0;
+                gdprintk(XENLOG_WARNING,
+                         "Trying to set EFER.LME with paging enabled\n");
+                goto gp_fault;
             }
         }
         else if ( !(msr_content & EFER_LME)
@@ -198,9 +198,9 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
         {
             if ( unlikely(vmx_paging_enabled(v)) )
             {
-                printk("Trying to clear EFER.LME with paging enabled\n");
-                vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
-                return 0;
+                gdprintk(XENLOG_WARNING,
+                         "Trying to clear EFER.LME with paging enabled\n");
+                goto gp_fault;
             }
         }
 
@@ -209,35 +209,40 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 
     case MSR_FS_BASE:
     case MSR_GS_BASE:
+    case MSR_SHADOW_GS_BASE:
         if ( !vmx_long_mode_enabled(v) )
-            goto exit_and_crash;
+            goto gp_fault;
 
-        if ( !IS_CANO_ADDRESS(msr_content) )
+        if ( !is_canonical_address(msr_content) )
+            goto uncanonical_address;
+
+        if ( ecx == MSR_FS_BASE )
+            __vmwrite(GUEST_FS_BASE, msr_content);
+        else if ( ecx == MSR_GS_BASE )
+            __vmwrite(GUEST_GS_BASE, msr_content);
+        else
         {
-            HVM_DBG_LOG(DBG_LEVEL_1, "Not cano address of msr write\n");
-            vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
-            return 0;
+            v->arch.hvm_vmx.msr_state.shadow_gs = msr_content;
+            wrmsrl(MSR_SHADOW_GS_BASE, msr_content);
         }
 
-        if ( regs->ecx == MSR_FS_BASE )
-            __vmwrite(GUEST_FS_BASE, msr_content);
-        else
-            __vmwrite(GUEST_GS_BASE, msr_content);
-
         break;
 
-    case MSR_SHADOW_GS_BASE:
-        if ( !(vmx_long_mode_enabled(v)) )
-            goto exit_and_crash;
+    case MSR_STAR:
+        WRITE_MSR(STAR);
 
-        v->arch.hvm_vmx.msr_state.shadow_gs = msr_content;
-        wrmsrl(MSR_SHADOW_GS_BASE, msr_content);
-        break;
+    case MSR_LSTAR:
+        if ( !is_canonical_address(msr_content) )
+            goto uncanonical_address;
+        WRITE_MSR(LSTAR);
 
-    CASE_WRITE_MSR(STAR);
-    CASE_WRITE_MSR(LSTAR);
-    CASE_WRITE_MSR(CSTAR);
-    CASE_WRITE_MSR(SYSCALL_MASK);
+    case MSR_CSTAR:
+        if ( !is_canonical_address(msr_content) )
+            goto uncanonical_address;
+        WRITE_MSR(CSTAR);
+
+    case MSR_SYSCALL_MASK:
+        WRITE_MSR(SYSCALL_MASK);
 
     default:
         return 0;
@@ -245,10 +250,11 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 
     return 1;
 
- exit_and_crash:
-    gdprintk(XENLOG_ERR, "Fatal error writing MSR %lx\n", (long)regs->ecx);
-    domain_crash(v->domain);
-    return 1; /* handled */
+ uncanonical_address:
+    HVM_DBG_LOG(DBG_LEVEL_1, "Not cano address of msr write %x\n", ecx);
+ gp_fault:
+    vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
+    return 0;
 }
 
 /*
@@ -1283,6 +1289,32 @@ static void vmx_io_instruction(unsigned long exit_qualification,
                 ASSERT(count);
             }
         }
+#ifdef __x86_64__
+        else
+        {
+            if ( !is_canonical_address(addr) ||
+                 !is_canonical_address(addr + size - 1) )
+            {
+                vmx_inject_hw_exception(current, TRAP_gp_fault, 0);
+                return;
+            }
+            if ( count > (1UL << 48) / size )
+                count = (1UL << 48) / size;
+            if ( !(regs->eflags & EF_DF) )
+            {
+                if ( addr + count * size - 1 < addr ||
+                     !is_canonical_address(addr + count * size - 1) )
+                    count = (addr & ~((1UL << 48) - 1)) / size;
+            }
+            else
+            {
+                if ( (count - 1) * size > addr ||
+                     !is_canonical_address(addr + (count - 1) * size) )
+                    count = (addr & ~((1UL << 48) - 1)) / size + 1;
+            }
+            ASSERT(count);
+        }
+#endif
 
         /*
          * Handle string pio instructions that cross pages or that
