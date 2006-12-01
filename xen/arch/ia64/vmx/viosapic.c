@@ -70,9 +70,12 @@ static void viosapic_deliver(struct viosapic *viosapic, int irq)
 
 static int iosapic_get_highest_irq(struct viosapic *viosapic)
 {
-    uint32_t irqs = viosapic->irr | viosapic->irr_xen;
-    irqs &= ~viosapic->isr & ~viosapic->imr;
-    return fls(irqs) - 1;
+    uint64_t irqs = viosapic->irr & ~viosapic->isr ;
+   
+    if (irqs >> 32)
+        return (fls(irqs >> 32) - 1 + 32);
+    else
+        return fls(irqs) - 1;
 }
 
 
@@ -95,14 +98,12 @@ static void service_iosapic(struct viosapic *viosapic)
 
     while ( (irq = iosapic_get_highest_irq(viosapic)) != -1 )
     {
-        if ( !test_bit(irq, &viosapic->imr) )
-            viosapic_deliver(viosapic, irq);
+        viosapic_deliver(viosapic, irq);
 
         if ( viosapic->redirtbl[irq].trig_mode == SAPIC_LEVEL )
-            viosapic->isr |= (1 << irq);
+            viosapic->isr |= (1UL << irq);
 
-        viosapic->irr &= ~(1 << irq);
-        viosapic->irr_xen &= ~(1 << irq);
+        viosapic->irr &= ~(1UL << irq);
     }
 }
 
@@ -192,15 +193,6 @@ unsigned long viosapic_read(struct vcpu *v,
 }
 
 
-static inline void viosapic_update_imr(struct viosapic *viosapic, int index)
-{
-    if ( viosapic->redirtbl[index].mask )
-        set_bit(index, &viosapic->imr);
-    else
-        clear_bit(index, &viosapic->imr);
-}
-
-
 static void viosapic_write_indirect(struct viosapic *viosapic,
                                     unsigned long addr,
                                     unsigned long length,
@@ -237,7 +229,6 @@ static void viosapic_write_indirect(struct viosapic *viosapic,
                             (val & 0xffffffff);
         }
         viosapic->redirtbl[redir_index].bits = redir_content;
-        viosapic_update_imr(viosapic, redir_index);
         break;
     }
     } /* switch */
@@ -282,39 +273,14 @@ static void viosapic_reset(struct viosapic *viosapic)
     for ( i = 0; i < VIOSAPIC_NUM_PINS; i++ )
     {
         viosapic->redirtbl[i].mask = 0x1;
-        viosapic_update_imr(viosapic, i);
     }
     spin_lock_init(&viosapic->lock);
 }
 
-
-// this is used by VBD/VNIF to inject interrupt for VTI-domain
-void viosapic_set_xen_irq(struct domain *d, int irq, int level)
-{
-    struct viosapic *viosapic = domain_viosapic(d);
-
-    spin_lock(&viosapic->lock);
-    if ( viosapic->redirtbl[irq].mask )
-        goto out;
-
-    if ( viosapic->redirtbl[irq].trig_mode == SAPIC_EDGE)
-        gdprintk(XENLOG_WARNING, "Forcing edge triggered APIC irq %d?\n", irq);
-
-    if ( level )
-        viosapic->irr_xen |= 1 << irq;
-    else
-        viosapic->irr_xen &= ~(1 << irq);
-
-    service_iosapic(viosapic);
-out:
-    spin_unlock(&viosapic->lock);
-}
-
-
 void viosapic_set_irq(struct domain *d, int irq, int level)
 {
     struct viosapic *viosapic = domain_viosapic(d);
-    uint32_t bit;
+    uint64_t bit;
 
     spin_lock(&viosapic->lock);
     if ( (irq < 0) || (irq >= VIOSAPIC_NUM_PINS) )
@@ -323,7 +289,7 @@ void viosapic_set_irq(struct domain *d, int irq, int level)
     if ( viosapic->redirtbl[irq].mask )
         goto out;
 
-    bit = 1 << irq;
+    bit = 1UL << irq;
     if ( viosapic->redirtbl[irq].trig_mode == SAPIC_LEVEL )
     {
         if ( level )
@@ -343,6 +309,17 @@ out:
     spin_unlock(&viosapic->lock);
 }
 
+#define hvm_pci_intx_gsi(dev, intx)  \
+    (((((dev) << 2) + ((dev) >> 3) + (intx)) & 31) + 16)
+        
+
+void viosapic_set_pci_irq(struct domain *d, int device, int intx, int level)
+{
+    int irq;
+    irq = hvm_pci_intx_gsi(device, intx);
+
+    viosapic_set_irq(d, irq, level);
+}
 
 void viosapic_init(struct domain *d)
 {

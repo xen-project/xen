@@ -42,7 +42,7 @@
 
 #define VIOSAPIC_VERSION_ID   0x21 /* IOSAPIC version */
 
-#define VIOSAPIC_NUM_PINS     24
+#define VIOSAPIC_NUM_PINS     48
 
 #define VIOSAPIC_DEFAULT_BASE_ADDRESS  0xfec00000
 #define VIOSAPIC_MEM_LENGTH            0x100
@@ -74,19 +74,17 @@ union viosapic_rte
 };
 
 struct viosapic {
-    uint32_t irr;
-    uint32_t irr_xen; /* interrupts forced on by the hypervisor. */
-    uint32_t isr;     /* This is used for level trigger */
-    uint32_t imr;
+    uint64_t irr;
+    uint64_t isr;     /* This is used for level trigger */
     uint32_t ioregsel;
     spinlock_t lock;
-    unsigned long base_address;
+    uint64_t base_address;
     union viosapic_rte redirtbl[VIOSAPIC_NUM_PINS];
 };
 
 void viosapic_init(struct domain *d);
-void viosapic_set_xen_irq(struct domain *d, int irq, int level);
 void viosapic_set_irq(struct domain *d, int irq, int level);
+void viosapic_set_pci_irq(struct domain *d, int device, int intx, int level);
 void viosapic_write(struct vcpu *v, unsigned long addr,
                     unsigned long length, unsigned long val);
 

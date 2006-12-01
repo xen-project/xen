@@ -296,7 +296,7 @@ endif
 
 # qemu-dm objects
 ifeq ($(ARCH),ia64)
-LIBOBJS=helper2.o exec-dm.o i8259-dm.o
+LIBOBJS=helper2.o exec-dm.o i8259-dm.o piix_pci-dm.o
 else
 LIBOBJS=helper2.o exec-dm.o i8259-dm.o rtc-dm.o piix_pci-dm.o
 endif
@@ -360,7 +360,7 @@ ifeq ($(TARGET_BASE_ARCH), i386)
 # Hardware support
 VL_OBJS+= ide.o pckbd.o ps2.o vga.o $(SOUND_HW) dma.o $(AUDIODRV)
 ifeq ($(ARCH),ia64)
-VL_OBJS+= fdc.o mc146818rtc.o serial.o pc.o piix_pci.o
+VL_OBJS+= fdc.o mc146818rtc.o serial.o pc.o
 else
 VL_OBJS+= fdc.o serial.o pc.o
 endif
