@@ -1008,12 +1008,13 @@ shadow_set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
     void *table = sh_map_domain_page(table_mfn);
     unsigned long gfn_remainder = gfn;
     l1_pgentry_t *p2m_entry;
+    int rv=0;
 
 #if CONFIG_PAGING_LEVELS >= 4
     if ( !p2m_next_level(d, &table_mfn, &table, &gfn_remainder, gfn,
                          L4_PAGETABLE_SHIFT - PAGE_SHIFT,
                          L4_PAGETABLE_ENTRIES, PGT_l3_page_table) )
-        return 0;
+        goto out;
 #endif
 #if CONFIG_PAGING_LEVELS >= 3
     // When using PAE Xen, we only allow 33 bits of pseudo-physical
@@ -1027,12 +1028,12 @@ shadow_set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
                           ? 8
                           : L3_PAGETABLE_ENTRIES),
                          PGT_l2_page_table) )
-        return 0;
+        goto out;
 #endif
     if ( !p2m_next_level(d, &table_mfn, &table, &gfn_remainder, gfn,
                          L2_PAGETABLE_SHIFT - PAGE_SHIFT,
                          L2_PAGETABLE_ENTRIES, PGT_l1_page_table) )
-        return 0;
+        goto out;
 
     p2m_entry = p2m_find_entry(table, &gfn_remainder, gfn,
                                0, L1_PAGETABLE_ENTRIES);
@@ -1051,9 +1052,12 @@ shadow_set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
         (void)__shadow_validate_guest_entry(
             d->vcpu[0], table_mfn, p2m_entry, sizeof(*p2m_entry));
 
+    /* Success */
+    rv = 1;
+ 
+ out:
     sh_unmap_domain_page(table);
-
-    return 1;
+    return rv;
 }
 
 // Allocate a new p2m table for a domain.
