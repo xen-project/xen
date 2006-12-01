@@ -196,6 +196,7 @@ LEGACY_IMAGE_CFG = [
     ('sdl', int),
     ('vncdisplay', int),
     ('vncunused', int),
+    ('vncpasswd', str),    
 ]
 
 LEGACY_IMAGE_HVM_CFG = [
