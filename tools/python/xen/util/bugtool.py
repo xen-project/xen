@@ -43,8 +43,9 @@ TITLE_RE = re.compile(r'<title>(.*)</title>')
 
 FILES_TO_SEND = [ '/var/log/' + x for x in 
                   [ 'syslog', 'messages', 'debug',
-                    'xen/xend.log', 'xen/xend-debug.log', 'xen/xenstored-trace.log',
-                    'xen/xen-hotplug.log' ] ]
+                    'xen/xend-debug.log', 'xen/xenstored-trace.log',
+                    'xen/xen-hotplug.log', 'xen/xend.log' ] +
+                  [ 'xen/xend.log.%d' % z for z in range(1,6) ] ]
 #FILES_TO_SEND = [  ]
 
 
