@@ -554,7 +554,7 @@ class XendConfig(dict):
 
             # attempt to extract extra arguments from SXP config
             arg_ip = sxp.child_value(image_sxp, 'ip')
-            if arg_ip and not re.search(r'ip=[0-9\.]+', kernel_args):
+            if arg_ip and not re.search(r'ip=[^ ]+', kernel_args):
                 kernel_args += ' ip=%s' % arg_ip
             arg_root = sxp.child_value(image_sxp, 'root')
             if arg_root and not re.search(r'root=[^ ]+', kernel_args):
@@ -1019,7 +1019,7 @@ class XendConfig(dict):
         
         # attempt to extract extra arguments from SXP config
         arg_ip = sxp.child_value(image_sxp, 'ip')
-        if arg_ip and not re.search(r'ip=[0-9\.]', kernel_args):
+        if arg_ip and not re.search(r'ip=[^ ]+', kernel_args):
             kernel_args += ' ip=%s' % arg_ip
         arg_root = sxp.child_value(image_sxp, 'root')
         if arg_root and not re.search(r'root=', kernel_args):
