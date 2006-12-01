@@ -44,11 +44,12 @@ The bindings depend upon libxml2, the XML toolkit from the GNOME project; the
 test program depends upon libcurl3 also.  On Debian, you need the packages
 libxml2-dev and libcurl3-dev.
 
-To compile, type make.
+To compile, type make.  To compile the test also, type make
+test/test_bindings, remembering the additional dependency.
 
 To run the test, do
 
-LD_LIBRARY_PATH=src ./test/test_bindings <url> <username> <password>
+LD_LIBRARY_PATH=. ./test/test_bindings <url> <username> <password>
 
 where <url> is the fragment of the server URL that follows the http://, for
 example "localhost:8005/RPC2".
