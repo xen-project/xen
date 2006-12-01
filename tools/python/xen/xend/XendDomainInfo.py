@@ -59,7 +59,7 @@ log = logging.getLogger("xend.XendDomainInfo")
 
 
 def bool0(v):
-    v != "0" and bool(v)
+    return v != "0" and bool(v)
 
 
 ##
