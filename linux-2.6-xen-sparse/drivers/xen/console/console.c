@@ -57,6 +57,7 @@
 #include <xen/interface/event_channel.h>
 #include <asm/hypervisor.h>
 #include <xen/evtchn.h>
+#include <xen/xenbus.h>
 #include <xen/xencons.h>
 
 /*
@@ -697,6 +698,15 @@ static int __init xencons_init(void)
 
 	printk("Xen virtual console successfully installed as %s%d\n",
 	       DRV(xencons_driver)->name, xc_num);
+
+        /* Check about framebuffer messing up the console */
+        if (!is_initial_xendomain() &&
+	    !xenbus_exists(XBT_NIL, "device", "vfb")) {
+		/* FIXME: this is ugly */
+		unregister_console(&kcons_info);
+		kcons_info.flags |= CON_CONSDEV;
+		register_console(&kcons_info);
+	}
 
 	return 0;
 }

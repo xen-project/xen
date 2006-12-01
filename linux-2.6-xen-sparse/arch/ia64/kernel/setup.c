@@ -550,9 +550,9 @@ setup_arch (char **cmdline_p)
 		       xen_start_info->nr_pages, xen_start_info->flags);
 
 		if (!is_initial_xendomain()) {
-			extern int console_use_vt;
+#if !defined(CONFIG_VT) || !defined(CONFIG_DUMMY_CONSOLE)
 			conswitchp = NULL;
-			console_use_vt = 0;
+#endif
 		}
 	}
 #endif

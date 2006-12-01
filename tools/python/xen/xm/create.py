@@ -284,6 +284,14 @@ gopts.var('usbport', val='PATH',
           use="""Add a physical USB port to a domain, as specified by the path
           to that port.  This option may be repeated to add more than one port.""")
 
+gopts.var('vfb', val="no|yes'",
+          fn=set_bool, default=0,
+          use="Make the domain a framebuffer backend.")
+
+gopts.var('vkbd', val="no|yes'",
+          fn=set_bool, default=0,
+          use="Make the domain a keyboard backend.")
+
 gopts.var('vif', val="type=TYPE,mac=MAC,bridge=BRIDGE,ip=IPADDR,script=SCRIPT,backend=DOM,vifname=NAME",
           fn=append_value, default=[],
           use="""Add a network interface with the given MAC address and bridge.
@@ -512,8 +520,10 @@ def configure_image(vals):
         config_image.append(['args', vals.extra])
 
     if vals.builder == 'hvm':
-        configure_hvm(config_image, vals)
-        
+        configure_hvm(config_image, vals) 
+
+    configure_graphics(config_image, vals)        
+       
     return config_image
     
 def configure_disks(config_devs, vals):
@@ -564,6 +574,13 @@ def configure_usb(config_devs, vals):
         config_usb = ['usbport', ['path', path]]
         config_devs.append(['device', config_usb])
 
+def configure_vfbs(config_devs, vals):
+    if vals.vfb:
+        config_devs.append(['device', ['vfb', []]])
+
+def configure_vkbds(config_devs, vals):
+    if vals.vkbd:
+        config_devs.append(['device', ['vkbd', []]])
 
 def configure_security(config, vals):
     """Create the config for ACM security labels.
@@ -661,13 +678,20 @@ def configure_vifs(config_devs, vals):
         config_devs.append(['device', config_vif])
 
 
+def configure_graphics(config_image, vals):
+    """Create the config for graphic consoles.
+    """
+    args = [ 'vnc', 'vncdisplay', 'vncconsole', 'vncunused',
+             'sdl', 'display', 'xauthority', 'vnclisten', 'vncpasswd']
+    for a in args:
+        if (vals.__dict__[a]):
+            config_image.append([a, vals.__dict__[a]])
+
 def configure_hvm(config_image, vals):
     """Create the config for HVM devices.
     """
     args = [ 'device_model', 'pae', 'vcpus', 'boot', 'fda', 'fdb',
              'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'soundhw',
-             'vnc', 'vncdisplay', 'vncunused', 'vncconsole', 'vnclisten',
-             'sdl', 'display', 'xauthority',
              'acpi', 'apic', 'usb', 'usbdevice', 'keymap' ]
     for a in args:
         if a in vals.__dict__ and vals.__dict__[a] is not None:
@@ -742,6 +766,8 @@ def make_config(vals):
     configure_vifs(config_devs, vals)
     configure_usb(config_devs, vals)
     configure_vtpm(config_devs, vals)
+    configure_vfbs(config_devs, vals)
+    configure_vkbds(config_devs, vals)
     configure_security(config, vals)
     config += config_devs
 

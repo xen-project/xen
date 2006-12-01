@@ -458,7 +458,7 @@ class XendDomainInfo:
             try:
                 self._constructDomain()
                 self._storeVmDetails()
-                self._createDevices()
+                self._restoreDomain()
                 self._createChannels()
                 self._storeDomDetails()
                 self._endRestore()
@@ -1386,6 +1386,23 @@ class XendDomainInfo:
                 self.image.cleanupBootloading()
             raise VmError(str(exn))
 
+
+    def _restoreDomain(self):
+        log.debug('XendDomainInfo.restoreDomain: %s %s',
+                  self.domid,
+                  self.info['cpu_weight'])
+
+        if not self.infoIsSet('image'):
+            raise VmError('Missing image in configuration')
+
+        try:
+            self.image = image.create(self,
+                                      self.info['image'],
+                                      self.info['device'])
+
+            self._createDevices()
+        except RuntimeError, exn:
+            raise VmError(str(exn))
 
     def cleanupDomain(self):
         """Cleanup domain resources; release devices.  Idempotent.  Nothrow
