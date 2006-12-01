@@ -39,6 +39,9 @@ def reverse_dict(adict):
     """Return the reverse mapping of a dictionary."""
     return dict([(v, k) for k, v in adict.items()])
 
+def bool0(v):
+    return v != '0' and bool(v)
+
 # Mapping from XendConfig configuration keys to the old
 # legacy configuration keys that map directly.
 
@@ -60,7 +63,7 @@ LEGACY_CFG_TO_XENAPI_CFG = reverse_dict(XENAPI_CFG_TO_LEGACY_CFG)
 # legacy configuration keys that are found in the 'image'
 # SXP object.
 XENAPI_HVM_CFG = {
-    'platform_std_vga': 'std-vga',
+    'platform_std_vga': 'stdvga',
     'platform_serial' : 'serial',
     'platform_localtime': 'localtime',
     'platform_enable_audio': 'soundhw',
@@ -70,33 +73,49 @@ XENAPI_HVM_CFG = {
 # List of XendConfig configuration keys that have no equivalent
 # in the old world.
 
-XENAPI_UNSUPPORTED_BY_LEGACY_CFG = [
-    'name_description',
-    'user_version',
-    'is_a_template',
-    'memory_dynamic_min',
-    'memory_dynamic_max',
-    'memory_actual',
-    'vcpus_policy',
-    'vcpus_params',
-    'vcpus_features_required',
-    'vcpus_features_can_use',
-    'vcpus_features_force_on',
-    'vcpus_features_force_off',
-    'actions_after_suspend',
-    'bios_boot',
-    'platform_std_vga',
-    'platform_serial',
-    'platform_localtime',
-    'platform_clock_offset',
-    'platform_enable_audio',
-    'platform_keymap',
-    'boot_method',
-    'builder',
-    'grub_cmdline',
-    'pci_bus',
-    'otherconfig'
-]
+XENAPI_CFG_TYPES = {
+    'uuid': str,
+    'power_state': int,
+    'name_label': str,
+    'name_description': str,
+    'user_version': str,
+    'is_a_template': int,
+    'resident_on': str,
+    'memory_static_min': int,
+    'memory_static_max': int,
+    'memory_dynamic_min': int,
+    'memory_dynamic_max': int,
+    'memory_actual': int,
+    'vcpus_policy': str,
+    'vcpus_params': str,
+    'vcpus_number': int,
+    'vcpus_features_required': list,
+    'vcpus_features_can_use': list,
+    'vcpus_features_force_on': list, 
+    'vcpus_features_force_off': list,
+    'actions_after_shutdown': str,
+    'actions_after_reboot': str,
+    'actions_after_suspend': str,
+    'actions_after_crash': str,
+    'tpm_instance': int,
+    'tpm_backend': int,    
+    'bios_boot': str,
+    'platform_std_vga': bool0,
+    'platform_serial': str,
+    'platform_localtime': bool0,
+    'platform_clock_offset': bool0,
+    'platform_enable_audio': bool0,
+    'platform_keymap': str,
+    'boot_method': int,
+    'builder': str,
+    'kernel_kernel': str,
+    'kernel_initrd': str,
+    'kernel_args': str,
+    'grub_cmdline': str,
+    'pci_bus': str,
+    'tools_version': dict,
+    'otherconfig': dict,
+}
 
 # List of legacy configuration keys that have no equivalent in the
 # Xen API, but are still stored in XendConfig.
@@ -146,6 +165,7 @@ LEGACY_CFG_TYPES = {
     'on_crash':    str,
     'on_xend_stop': str,
     'on_xend_start': str,
+    'online_vcpus': int,
 }
 
 # Values that should be stored in xenstore's /vm/<uuid> that is used
@@ -202,23 +222,6 @@ LEGACY_IMAGE_HVM_DEVICES_CFG = [
     ('usbdevice', str),    
     ('vcpus', int),
 ]
-
-
-
-# configuration params that need to be converted to ints
-# since the XMLRPC transport for Xen API does not use
-# 32 bit ints but string representation of 64 bit ints.
-XENAPI_INT_CFG = [
-    'user_version',
-    'vcpus_number',
-    'memory_static_min',
-    'memory_static_max',
-    'memory_dynamic_min',
-    'memory_dynamic_max',
-    'memory_actual',
-    'tpm_instance',
-    'tpm_backend',
-]    
 
 ##
 ## Config Choices
@@ -532,7 +535,12 @@ class XendConfig(dict):
         
         for apikey, cfgkey in XENAPI_CFG_TO_LEGACY_CFG.items():
             try:
-                self[apikey] = LEGACY_CFG_TYPES[cfgkey](cfg[cfgkey])
+                type_conv = XENAPI_CFG_TYPES.get(apikey)
+                if callable(type_conv):
+                    self[apikey] = type_conv(cfg[cfgkey])
+                else:
+                    log.warn("Unconverted key: " + apikey)
+                    self[apikey] = cfg[cfgkey]
             except KeyError:
                 pass
 
@@ -555,10 +563,10 @@ class XendConfig(dict):
             self['kernel_args'] = kernel_args
 
         # Convert Legacy HVM parameters to Xen API configuration
-        self['platform_std_vga'] = cfg.get('std-vga', 0)
-        self['platform_serial'] = cfg.get('serial', '')
-        self['platform_localtime'] = cfg.get('localtime', 0)
-        self['platform_enable_audio'] = cfg.get('soundhw', 0)
+        self['platform_std_vga'] = bool0(cfg.get('stdvga', 0))
+        self['platform_serial'] = str(cfg.get('serial', ''))
+        self['platform_localtime'] = bool0(cfg.get('localtime', 0))
+        self['platform_enable_audio'] = bool0(cfg.get('soundhw', 0))
 
         # Convert path to bootloader to boot_method
         if not cfg.get('bootloader'):
@@ -733,7 +741,11 @@ class XendConfig(dict):
 
         for xenapi, legacy in XENAPI_CFG_TO_LEGACY_CFG.items():
             if self.has_key(xenapi) and self[xenapi] not in (None, []):
-                sxpr.append([legacy, self[xenapi]])
+                if type(self[xenapi]) == bool:
+                    # convert booleans to ints before making an sxp item
+                    sxpr.append([legacy, int(self[xenapi])])
+                else:
+                    sxpr.append([legacy, self[xenapi]])
 
         for legacy in LEGACY_UNSUPPORTED_BY_XENAPI_CFG:
             if legacy in ('domid', 'uuid'): # skip these
@@ -1043,7 +1055,11 @@ class XendConfig(dict):
         for apikey, imgkey in XENAPI_HVM_CFG.items():
             val = sxp.child_value(image_sxp, imgkey, None)
             if val != None:
-                self[apikey] = val        
+                type_conv = XENAPI_CFG_TYPES[apikey]
+                if callable(conv):
+                    self[apikey] = type_conv(val)
+                else:
+                    self[apikey] = val
 
         
 #
