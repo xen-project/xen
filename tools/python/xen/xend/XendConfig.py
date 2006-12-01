@@ -945,7 +945,17 @@ class XendConfig(dict):
                 self['devices'][dev_uuid] = (dev_type, dev_info)
                 self['vbd_refs'].append(dev_uuid)                
                 return dev_uuid
-            
+
+            elif dev_type in ('vtpm'):
+                if cfg_xenapi.get('type'):
+                    dev_info['type'] = cfg_xenapi.get('type')
+
+                dev_uuid = cfg_xenapi.get('uuid', uuid.createString())
+                dev_info['uuid'] = dev_uuid
+                self['devices'][dev_uuid] = (dev_type, dev_info)
+                self['vtpm_refs'].append(dev_uuid)
+                return dev_uuid
+
         return ''
 
     def device_update(self, dev_uuid, cfg_sxp):

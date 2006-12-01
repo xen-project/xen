@@ -446,8 +446,6 @@ def xapi_vtpm_create(*args):
     print "Has driver type '%s'" % driver
     vtpm_rec = execute(server.VTPM.get_record, session, vtpm_uuid)
     print "Has vtpm record '%s'" % vtpm_rec
-    vm = execute(server.VTPM.get_VM, session, vtpm_uuid)
-    print "Has VM '%s'" % vm
 
 
 #
