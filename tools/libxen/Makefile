@@ -48,8 +48,8 @@ libxenapi.so.$(MAJOR).$(MINOR): $(LIBXENAPI_OBJS)
 libxenapi.a: $(LIBXENAPI_OBJS)
 	$(AR) rcs libxenapi.a $^
 
-test/test_bindings: test/test_bindings.o src/libxen.so
-	$(CC) $(LDFLAGS) -o $@ $< -L src -lxen
+test/test_bindings: test/test_bindings.o libxenapi.so
+	$(CC) $(LDFLAGS) -o $@ $< -L . -lxenapi
 
 
 .PHONY: install
