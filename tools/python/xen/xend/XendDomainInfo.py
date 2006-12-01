@@ -57,6 +57,11 @@ xroot = XendRoot.instance()
 log = logging.getLogger("xend.XendDomainInfo")
 #log.setLevel(logging.TRACE)
 
+
+def bool0(v):
+    v != "0" and bool(v)
+
+
 ##
 # All parameters of VMs that may be configured on-the-fly, or at start-up.
 # 
@@ -87,7 +92,7 @@ ROUNDTRIPPING_CONFIG_ENTRIES = [
     ('bootloader',      str),
     ('bootloader_args', str),
     ('features',        str),
-    ('localtime',       int),
+    ('localtime',       bool0),
     ]
 
 ROUNDTRIPPING_CONFIG_ENTRIES += VM_CONFIG_PARAMS
@@ -1323,8 +1328,8 @@ class XendDomainInfo:
                                       self.info['image'],
                                       self.info['devices'])
 
-            localtime = self.info.get('localtime', 0)
-            if localtime is not None and localtime == 1:
+            localtime = self.info.get('localtime', False)
+            if localtime:
                 xc.domain_set_time_offset(self.domid)
 
             xc.domain_setcpuweight(self.domid, self.info['cpu_weight'])
@@ -1780,17 +1785,17 @@ class XendDomainInfo:
     def get_bios_boot(self):
         return '' # TODO
     def get_platform_std_vga(self):
-        return self.info.get('platform_std_vga', 0)    
+        return self.info.get('platform_std_vga', False)    
     def get_platform_keymap(self):
         return ''
     def get_platform_serial(self):
         return self.info.get('platform_serial', '')
     def get_platform_localtime(self):
-        return self.info.get('platform_localtime', 0)
+        return self.info.get('platform_localtime', False)
     def get_platform_clock_offset(self):
-        return self.info.get('platform_clock_offset', 0)
+        return self.info.get('platform_clock_offset', False)
     def get_platform_enable_audio(self):
-        return self.info.get('platform_enable_audio', 0)
+        return self.info.get('platform_enable_audio', False)
     def get_platform_keymap(self):
         return self.info.get('platform_keymap', '')
     def get_builder(self):
