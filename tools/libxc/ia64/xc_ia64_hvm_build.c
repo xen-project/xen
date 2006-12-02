@@ -41,7 +41,7 @@ error_out:
     return -1;
 }
 
-static void
+int 
 xc_set_hvm_param(int handle, domid_t dom, int param, unsigned long value)
 {
     DECLARE_HYPERCALL;
@@ -56,15 +56,37 @@ xc_set_hvm_param(int handle, domid_t dom, int param, unsigned long value)
     arg.index = param;
     arg.value = value;
 
-    if (mlock(&arg, sizeof(arg)) != 0) {
-        PERROR("Could not lock memory for set parameter");
-        return;
-    }
+    if (mlock(&arg, sizeof(arg)) != 0)
+        return -1;
 
     rc = do_xen_hypercall(handle, &hypercall);
     safe_munlock(&arg, sizeof(arg));
-    if (rc < 0)
-        PERROR("set HVM parameter failed (%d)", rc);
+
+    return rc;
+}
+
+int 
+xc_get_hvm_param(int handle, domid_t dom, int param, unsigned long *value)
+{
+    DECLARE_HYPERCALL;
+    xen_hvm_param_t arg;
+    int rc;
+
+    hypercall.op = __HYPERVISOR_hvm_op;
+    hypercall.arg[0] = HVMOP_get_param;
+    hypercall.arg[1] = (unsigned long)&arg;
+
+    arg.domid = dom;
+    arg.index = param;
+
+    if (mlock(&arg, sizeof(arg)) != 0)
+        return -1;
+
+    rc = do_xen_hypercall(handle, &hypercall);
+    safe_munlock(&arg, sizeof(arg));
+
+    *value = arg.value;
+    return rc;
 }
 
 #define HOB_SIGNATURE         0x3436474953424f48        // "HOBSIG64"
