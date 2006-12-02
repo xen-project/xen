@@ -193,8 +193,11 @@ void cpu_initialize(int cpuid)
     mtdec(timebase_freq);
     mthdec(timebase_freq);
 
-    hid0.bits.nap = 1;      /* NAP */
+    /* FIXME Do not set the NAP and DPM bits in HID0 until we have had a
+     * chance to audit the safe halt and idle loop code. */
+    hid0.bits.nap = 0;      /* NAP */
     hid0.bits.dpm = 1;      /* Dynamic Power Management */
+
     hid0.bits.nhr = 1;      /* Not Hard Reset */
     hid0.bits.hdice_en = 1; /* enable HDEC */
     hid0.bits.en_therm = 0; /* ! Enable ext thermal ints */
