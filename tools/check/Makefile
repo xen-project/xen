@@ -1,3 +1,5 @@
+XEN_ROOT = ../..
+include $(XEN_ROOT)/tools/Rules.mk
 
 .PHONY: all
 all: build
@@ -5,7 +7,7 @@ all: build
 # Check this machine is OK for building on.
 .PHONY: build
 build:
-	./chk build
+	XENFB_TOOLS=$(XENFB_TOOLS) ./chk build
 
 # Check this machine is OK for installing on.
 # DO NOT use this check from 'make install' in the parent
@@ -13,7 +15,7 @@ build:
 # copy rather than actually installing.
 .PHONY: install
 install:
-	./chk install
+	XENFB_TOOLS=$(XENFB_TOOLS) ./chk install
 
 .PHONY: clean
 clean:

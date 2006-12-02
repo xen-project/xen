@@ -1,6 +1,12 @@
 #!/bin/sh
 # CHECK-BUILD CHECK-INSTALL
 
+if [ ! "$XENFB_TOOLS" = "y" ]
+then
+    echo -n "unused, "
+    exit 0
+fi
+
 RC=0
 
 SDL_CONFIG="$(which sdl-config)"
