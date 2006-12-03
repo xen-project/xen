@@ -165,7 +165,7 @@ hvm_long_mode_enabled(struct vcpu *v)
     return hvm_funcs.long_mode_enabled(v);
 }
 #else
-#define hvm_long_mode_enabled(v) 0
+#define hvm_long_mode_enabled(v) (v,0)
 #endif
 
  static inline int
