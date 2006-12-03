@@ -3224,10 +3224,11 @@ static int ptwr_emulated_cmpxchg8b(
 }
 
 static struct x86_emulate_ops ptwr_emulate_ops = {
-    .read      = ptwr_emulated_read,
-    .write     = ptwr_emulated_write,
-    .cmpxchg   = ptwr_emulated_cmpxchg,
-    .cmpxchg8b = ptwr_emulated_cmpxchg8b
+    .read       = ptwr_emulated_read,
+    .insn_fetch = ptwr_emulated_read,
+    .write      = ptwr_emulated_write,
+    .cmpxchg    = ptwr_emulated_cmpxchg,
+    .cmpxchg8b  = ptwr_emulated_cmpxchg8b
 };
 
 /* Write page fault handler: check if guest is trying to modify a PTE. */

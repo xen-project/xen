@@ -88,7 +88,11 @@ static int cmpxchg8b(
 }
 
 static struct x86_emulate_ops emulops = {
-    read, write, cmpxchg, cmpxchg8b
+    .read       = read,
+    .insn_fetch = read,
+    .write      = write,
+    .cmpxchg    = cmpxchg,
+    .cmpxchg8b  = cmpxchg8b
 };
 
 int main(int argc, char **argv)

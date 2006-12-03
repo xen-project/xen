@@ -2808,24 +2808,20 @@ static int sh_page_fault(struct vcpu *v,
     return EXCRET_fault_fixed;
 
  emulate:
-    if ( !is_hvm_domain(d) )
+    if ( !is_hvm_domain(d) || !guest_mode(regs) )
         goto not_a_shadow_fault;
 
     hvm_store_cpu_guest_regs(v, regs, NULL);
-    emul_ctxt.ctxt.regs = regs;
-    emul_ctxt.ctxt.mode = (is_hvm_domain(d) ?
-                           hvm_guest_x86_mode(v) : X86EMUL_MODE_HOST);
-    emul_ctxt.valid_seg_regs = 0;
-
     SHADOW_PRINTK("emulate: eip=%#lx\n", regs->eip);
+
+    shadow_init_emulation(&emul_ctxt, regs);
 
     /*
      * We do not emulate user writes. Instead we use them as a hint that the
      * page is no longer a page table. This behaviour differs from native, but
      * it seems very unlikely that any OS grants user access to page tables.
-     * We also disallow guest PTE updates from within Xen.
      */
-    if ( (regs->error_code & PFEC_user_mode) || !guest_mode(regs) ||
+    if ( (regs->error_code & PFEC_user_mode) ||
          x86_emulate_memop(&emul_ctxt.ctxt, &shadow_emulator_ops) )
     {
         SHADOW_PRINTK("emulator failure, unshadowing mfn %#lx\n", 

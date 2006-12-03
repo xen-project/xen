@@ -19,11 +19,6 @@
 #endif
 #include <asm-x86/x86_emulate.h>
 
-#ifndef PFEC_write_access
-#define PFEC_write_access (1U<<1)
-#define PFEC_insn_fetch   (1U<<4)
-#endif
-
 /*
  * Opcode effective-address decode tables.
  * Note that we only emulate instructions that have at least one memory
@@ -374,15 +369,15 @@ do{ __asm__ __volatile__ (                                              \
 #endif /* __i386__ */
 
 /* Fetch next part of the instruction being emulated. */
-#define _insn_fetch(_size)                                      \
-({ unsigned long _x;                                            \
-   rc = ops->read(x86_seg_cs, _regs.eip, &_x, (_size), ctxt);   \
-   if ( rc != 0 )                                               \
-       goto done;                                               \
-   _regs.eip += (_size);                                        \
-   _x;                                                          \
+#define insn_fetch_bytes(_size)                                         \
+({ unsigned long _x;                                                    \
+   rc = ops->insn_fetch(x86_seg_cs, _regs.eip, &_x, (_size), ctxt);     \
+   if ( rc != 0 )                                                       \
+       goto done;                                                       \
+   _regs.eip += (_size);                                                \
+   _x;                                                                  \
 })
-#define insn_fetch(_type) ((_type)_insn_fetch(sizeof(_type)))
+#define insn_fetch_type(_type) ((_type)insn_fetch_bytes(sizeof(_type)))
 
 #define truncate_ea(ea)                                 \
 ({  unsigned long __ea = (ea);                          \
@@ -481,7 +476,7 @@ x86_emulate_memop(
     /* Legacy prefixes. */
     for ( i = 0; i < 8; i++ )
     {
-        switch ( b = insn_fetch(uint8_t) )
+        switch ( b = insn_fetch_type(uint8_t) )
         {
         case 0x66: /* operand-size override */
             op_bytes ^= 6;      /* switch between 2/4 bytes */
@@ -530,7 +525,7 @@ x86_emulate_memop(
         rex_prefix = b;
         if ( b & 8 ) /* REX.W */
             op_bytes = 8;
-        b = insn_fetch(uint8_t);
+        b = insn_fetch_type(uint8_t);
     }
 
     /* Opcode byte(s). */
@@ -541,7 +536,7 @@ x86_emulate_memop(
         if ( b == 0x0f )
         {
             twobyte = 1;
-            b = insn_fetch(uint8_t);
+            b = insn_fetch_type(uint8_t);
             d = twobyte_table[b];
         }
 
@@ -553,7 +548,7 @@ x86_emulate_memop(
     /* ModRM and SIB bytes. */
     if ( d & ModRM )
     {
-        modrm = insn_fetch(uint8_t);
+        modrm = insn_fetch_type(uint8_t);
         modrm_mod = (modrm & 0xc0) >> 6;
         modrm_reg = ((rex_prefix & 4) << 1) | ((modrm & 0x38) >> 3);
         modrm_rm  = modrm & 0x07;
@@ -577,9 +572,16 @@ x86_emulate_memop(
             }
             switch ( modrm_mod )
             {
-            case 0: if ( modrm_rm == 6 ) ea_off = insn_fetch(int16_t); break;
-            case 1: ea_off += insn_fetch(int8_t);  break;
-            case 2: ea_off += insn_fetch(int16_t); break;
+            case 0:
+                if ( modrm_rm == 6 )
+                    ea_off = insn_fetch_type(int16_t);
+                break;
+            case 1:
+                ea_off += insn_fetch_type(int8_t);
+                break;
+            case 2:
+                ea_off += insn_fetch_type(int16_t);
+                break;
             }
         }
         else
@@ -587,14 +589,14 @@ x86_emulate_memop(
             /* 32/64-bit ModR/M decode. */
             if ( modrm_rm == 4 )
             {
-                sib = insn_fetch(uint8_t);
+                sib = insn_fetch_type(uint8_t);
                 sib_index = ((sib >> 3) & 7) | ((rex_prefix << 2) & 8);
                 sib_base  = (sib & 7) | ((rex_prefix << 3) & 8);
                 if ( sib_index != 4 )
                     ea_off = *(long *)decode_register(sib_index, &_regs, 0);
                 ea_off <<= (sib >> 6) & 3;
                 if ( (modrm_mod == 0) && ((sib_base & 7) == 5) )
-                    ea_off += insn_fetch(int32_t);
+                    ea_off += insn_fetch_type(int32_t);
                 else
                     ea_off += *(long *)decode_register(sib_base, &_regs, 0);
             }
@@ -608,7 +610,7 @@ x86_emulate_memop(
             case 0:
                 if ( (modrm_rm & 7) != 5 )
                     break;
-                ea_off = insn_fetch(int32_t);
+                ea_off = insn_fetch_type(int32_t);
                 if ( mode != X86EMUL_MODE_PROT64 )
                     break;
                 /* Relative to RIP of next instruction. Argh! */
@@ -624,8 +626,12 @@ x86_emulate_memop(
                     ea_off += (d & ByteOp) ? 1
                         : ((op_bytes == 8) ? 4 : op_bytes);
                 break;
-            case 1: ea_off += insn_fetch(int8_t);  break;
-            case 2: ea_off += insn_fetch(int32_t); break;
+            case 1:
+                ea_off += insn_fetch_type(int8_t);
+                break;
+            case 2:
+                ea_off += insn_fetch_type(int32_t);
+                break;
             }
         }
 
@@ -684,15 +690,15 @@ x86_emulate_memop(
         /* NB. Immediates are sign-extended as necessary. */
         switch ( src.bytes )
         {
-        case 1: src.val = insn_fetch(int8_t);  break;
-        case 2: src.val = insn_fetch(int16_t); break;
-        case 4: src.val = insn_fetch(int32_t); break;
+        case 1: src.val = insn_fetch_type(int8_t);  break;
+        case 2: src.val = insn_fetch_type(int16_t); break;
+        case 4: src.val = insn_fetch_type(int32_t); break;
         }
         break;
     case SrcImmByte:
         src.type  = OP_IMM;
         src.bytes = 1;
-        src.val   = insn_fetch(int8_t);
+        src.val   = insn_fetch_type(int8_t);
         break;
     }
 
@@ -885,9 +891,9 @@ x86_emulate_memop(
             if ( src.bytes == 8 ) src.bytes = 4;
             switch ( src.bytes )
             {
-            case 1: src.val = insn_fetch(int8_t);  break;
-            case 2: src.val = insn_fetch(int16_t); break;
-            case 4: src.val = insn_fetch(int32_t); break;
+            case 1: src.val = insn_fetch_type(int8_t);  break;
+            case 2: src.val = insn_fetch_type(int16_t); break;
+            case 4: src.val = insn_fetch_type(int32_t); break;
             }
             goto test;
         case 2: /* not */
@@ -986,7 +992,7 @@ x86_emulate_memop(
         dst.type  = OP_REG;
         dst.reg   = (unsigned long *)&_regs.eax;
         dst.bytes = (d & ByteOp) ? 1 : op_bytes;
-        if ( (rc = ops->read(ea_seg, _insn_fetch(ad_bytes),
+        if ( (rc = ops->read(ea_seg, insn_fetch_bytes(ad_bytes),
                              &dst.val, dst.bytes, ctxt)) != 0 )
             goto done;
         break;
@@ -994,7 +1000,7 @@ x86_emulate_memop(
         /* Destination EA is not encoded via ModRM. */
         dst.type    = OP_MEM;
         dst.mem_seg = ea_seg;
-        dst.mem_off = _insn_fetch(ad_bytes);
+        dst.mem_off = insn_fetch_bytes(ad_bytes);
         dst.bytes   = (d & ByteOp) ? 1 : op_bytes;
         dst.val     = (unsigned long)_regs.eax;
         break;
@@ -1198,7 +1204,7 @@ x86_emulate_memop(
     for ( ea_off = ctxt->regs->eip; ea_off < _regs.eip; ea_off++ )
     {
         unsigned long x;
-        ops->read(x86_seg_cs, ea_off, &x, 1, ctxt);
+        ops->insn_fetch(x86_seg_cs, ea_off, &x, 1, ctxt);
         printk(" %02x", (uint8_t)x);
     }
     printk("\n");

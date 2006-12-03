@@ -56,7 +56,8 @@ struct x86_emulate_ops
     /*
      * All functions:
      *  @seg:   [IN ] Segment being dereferenced (specified as x86_seg_??).
-     *  @offset [IN ] Offset within segment.
+     *  @offset:[IN ] Offset within segment.
+     *  @ctxt:  [IN ] Emulation context info as passed to the emulator.
      */
 
     /*
@@ -65,6 +66,17 @@ struct x86_emulate_ops
      *  @bytes: [IN ] Number of bytes to read from memory.
      */
     int (*read)(
+        enum x86_segment seg,
+        unsigned long offset,
+        unsigned long *val,
+        unsigned int bytes,
+        struct x86_emulate_ctxt *ctxt);
+
+    /*
+     * insn_fetch: Emulate fetch from instruction byte stream.
+     *  Parameters are same as for 'read'. @seg is always x86_seg_cs.
+     */
+    int (*insn_fetch)(
         enum x86_segment seg,
         unsigned long offset,
         unsigned long *val,

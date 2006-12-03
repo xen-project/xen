@@ -78,43 +78,54 @@ struct segment_register *hvm_get_seg_reg(
     return seg_reg;
 }
 
+enum hvm_access_type {
+    hvm_access_insn_fetch, hvm_access_read, hvm_access_write
+};
+
 static int hvm_translate_linear_addr(
     enum x86_segment seg,
     unsigned long offset,
     unsigned int bytes,
-    unsigned int is_write,
+    enum hvm_access_type access_type,
     struct sh_emulate_ctxt *sh_ctxt,
     unsigned long *paddr)
 {
-    struct segment_register *creg, *dreg;
+    struct segment_register *reg = hvm_get_seg_reg(seg, sh_ctxt);
     unsigned long limit, addr = offset;
     uint32_t last_byte;
 
-    creg = hvm_get_seg_reg(x86_seg_cs, sh_ctxt);
-    dreg = hvm_get_seg_reg(seg,        sh_ctxt);
-
-    if ( !creg->attr.fields.l || !hvm_long_mode_enabled(current) )
+    if ( sh_ctxt->ctxt.mode != X86EMUL_MODE_PROT64 )
     {
         /*
          * COMPATIBILITY MODE: Apply segment checks and add base.
          */
 
-        /* If this is a store, is the segment a writable data segment? */
-        if ( is_write && ((dreg->attr.fields.type & 0xa) != 0x2) )
-            goto gpf;
+        switch ( access_type )
+        {
+        case hvm_access_read:
+            if ( (reg->attr.fields.type & 0xa) == 0x8 )
+                goto gpf; /* execute-only code segment */
+            break;
+        case hvm_access_write:
+            if ( (reg->attr.fields.type & 0xa) != 0x2 )
+                goto gpf; /* not a writable data segment */
+            break;
+        default:
+            break;
+        }
 
         /* Calculate the segment limit, including granularity flag. */
-        limit = dreg->limit;
-        if ( dreg->attr.fields.g )
+        limit = reg->limit;
+        if ( reg->attr.fields.g )
             limit = (limit << 12) | 0xfff;
 
         last_byte = offset + bytes - 1;
 
         /* Is this a grows-down data segment? Special limit check if so. */
-        if ( (dreg->attr.fields.type & 0xc) == 0x4 )
+        if ( (reg->attr.fields.type & 0xc) == 0x4 )
         {
             /* Is upper limit 0xFFFF or 0xFFFFFFFF? */
-            if ( !dreg->attr.fields.db )
+            if ( !reg->attr.fields.db )
                 last_byte = (uint16_t)last_byte;
 
             /* Check first byte and last byte against respective bounds. */
@@ -128,7 +139,7 @@ static int hvm_translate_linear_addr(
          * Hardware truncates to 32 bits in compatibility mode.
          * It does not truncate to 16 bits in 16-bit address-size mode.
          */
-        addr = (uint32_t)(addr + dreg->base);
+        addr = (uint32_t)(addr + reg->base);
     }
     else
     {
@@ -137,7 +148,7 @@ static int hvm_translate_linear_addr(
          */
 
         if ( (seg == x86_seg_fs) || (seg == x86_seg_gs) )
-            addr += dreg->base;
+            addr += reg->base;
 
         if ( !is_canonical_address(addr) )
             goto gpf;
@@ -153,18 +164,18 @@ static int hvm_translate_linear_addr(
 }
 
 static int
-sh_x86_emulate_read(enum x86_segment seg,
-                    unsigned long offset,
-                    unsigned long *val,
-                    unsigned int bytes,
-                    struct x86_emulate_ctxt *ctxt)
+hvm_read(enum x86_segment seg,
+         unsigned long offset,
+         unsigned long *val,
+         unsigned int bytes,
+         enum hvm_access_type access_type,
+         struct sh_emulate_ctxt *sh_ctxt)
 {
-    struct sh_emulate_ctxt *sh_ctxt =
-        container_of(ctxt, struct sh_emulate_ctxt, ctxt);
     unsigned long addr;
     int rc, errcode;
 
-    rc = hvm_translate_linear_addr(seg, offset, bytes, 0, sh_ctxt, &addr);
+    rc = hvm_translate_linear_addr(
+        seg, offset, bytes, access_type, sh_ctxt, &addr);
     if ( rc )
         return rc;
 
@@ -189,8 +200,76 @@ sh_x86_emulate_read(enum x86_segment seg,
      * of a write fault at the end of the instruction we're emulating. */ 
     SHADOW_PRINTK("read failed to va %#lx\n", addr);
     errcode = ring_3(sh_ctxt->ctxt.regs) ? PFEC_user_mode : 0;
+    if ( access_type == hvm_access_insn_fetch )
+        errcode |= PFEC_insn_fetch;
     hvm_inject_exception(TRAP_page_fault, errcode, addr + bytes - rc);
     return X86EMUL_PROPAGATE_FAULT;
+}
+
+void shadow_init_emulation(struct sh_emulate_ctxt *sh_ctxt, 
+                           struct cpu_user_regs *regs)
+{
+    struct segment_register *creg;
+    struct vcpu *v = current;
+    unsigned long addr;
+
+    sh_ctxt->ctxt.regs = regs;
+
+    /* Segment cache initialisation. Primed with CS. */
+    sh_ctxt->valid_seg_regs = 0;
+    creg = hvm_get_seg_reg(x86_seg_cs, sh_ctxt);
+
+    /* Work out the emulation mode. */
+    if ( hvm_long_mode_enabled(v) )
+        sh_ctxt->ctxt.mode = creg->attr.fields.l ?
+            X86EMUL_MODE_PROT64 : X86EMUL_MODE_PROT32;
+    else if ( regs->eflags & X86_EFLAGS_VM )
+        sh_ctxt->ctxt.mode = X86EMUL_MODE_REAL;
+    else
+        sh_ctxt->ctxt.mode = creg->attr.fields.db ?
+            X86EMUL_MODE_PROT32 : X86EMUL_MODE_PROT16;
+
+    /* Attempt to prefetch whole instruction. */
+    sh_ctxt->insn_buf_bytes =
+        (!hvm_translate_linear_addr(
+            x86_seg_cs, regs->eip, sizeof(sh_ctxt->insn_buf),
+            hvm_access_insn_fetch, sh_ctxt, &addr) &&
+         !hvm_copy_from_guest_virt(
+             sh_ctxt->insn_buf, addr, sizeof(sh_ctxt->insn_buf)))
+        ? sizeof(sh_ctxt->insn_buf) : 0;
+}
+
+static int
+sh_x86_emulate_read(enum x86_segment seg,
+                    unsigned long offset,
+                    unsigned long *val,
+                    unsigned int bytes,
+                    struct x86_emulate_ctxt *ctxt)
+{
+    return hvm_read(seg, offset, val, bytes, hvm_access_read,
+                    container_of(ctxt, struct sh_emulate_ctxt, ctxt));
+}
+
+static int
+sh_x86_emulate_insn_fetch(enum x86_segment seg,
+                          unsigned long offset,
+                          unsigned long *val,
+                          unsigned int bytes,
+                          struct x86_emulate_ctxt *ctxt)
+{
+    struct sh_emulate_ctxt *sh_ctxt =
+        container_of(ctxt, struct sh_emulate_ctxt, ctxt);
+    unsigned int insn_off = offset - ctxt->regs->eip;
+
+    /* Fall back if requested bytes are not in the prefetch cache. */
+    if ( unlikely((insn_off + bytes) > sh_ctxt->insn_buf_bytes) )
+        return hvm_read(seg, offset, val, bytes,
+                        hvm_access_insn_fetch, sh_ctxt);
+
+    /* Hit the cache. Simple memcpy. */
+    *val = 0;
+    memcpy(val, &sh_ctxt->insn_buf[insn_off], bytes);
+    return X86EMUL_CONTINUE;
 }
 
 static int
@@ -206,7 +285,8 @@ sh_x86_emulate_write(enum x86_segment seg,
     unsigned long addr;
     int rc;
 
-    rc = hvm_translate_linear_addr(seg, offset, bytes, 1, sh_ctxt, &addr);
+    rc = hvm_translate_linear_addr(
+        seg, offset, bytes, hvm_access_write, sh_ctxt, &addr);
     if ( rc )
         return rc;
 
@@ -232,7 +312,8 @@ sh_x86_emulate_cmpxchg(enum x86_segment seg,
     unsigned long addr;
     int rc;
 
-    rc = hvm_translate_linear_addr(seg, offset, bytes, 1, sh_ctxt, &addr);
+    rc = hvm_translate_linear_addr(
+        seg, offset, bytes, hvm_access_write, sh_ctxt, &addr);
     if ( rc )
         return rc;
 
@@ -259,7 +340,8 @@ sh_x86_emulate_cmpxchg8b(enum x86_segment seg,
     unsigned long addr;
     int rc;
 
-    rc = hvm_translate_linear_addr(seg, offset, 8, 1, sh_ctxt, &addr);
+    rc = hvm_translate_linear_addr(
+        seg, offset, 8, hvm_access_write, sh_ctxt, &addr);
     if ( rc )
         return rc;
 
@@ -274,10 +356,11 @@ sh_x86_emulate_cmpxchg8b(enum x86_segment seg,
 
 
 struct x86_emulate_ops shadow_emulator_ops = {
-    .read      = sh_x86_emulate_read,
-    .write     = sh_x86_emulate_write,
-    .cmpxchg   = sh_x86_emulate_cmpxchg,
-    .cmpxchg8b = sh_x86_emulate_cmpxchg8b,
+    .read       = sh_x86_emulate_read,
+    .insn_fetch = sh_x86_emulate_insn_fetch,
+    .write      = sh_x86_emulate_write,
+    .cmpxchg    = sh_x86_emulate_cmpxchg,
+    .cmpxchg8b  = sh_x86_emulate_cmpxchg8b,
 };
 
 /**************************************************************************/
