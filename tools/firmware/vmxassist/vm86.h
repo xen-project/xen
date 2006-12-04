@@ -34,7 +34,6 @@
 
 struct regs {
 	unsigned	edi, esi, ebp, esp, ebx, edx, ecx, eax;
-	unsigned	es, ds, fs, gs;
 	unsigned	trapno, errno;
 	unsigned	eip, cs, eflags, uesp, uss;
 	unsigned	ves, vds, vfs, vgs;
@@ -55,7 +54,6 @@ enum vm86_mode {
 
 extern enum vm86_mode prevmode, mode;
 extern struct vmx_assist_context oldctx;
-extern struct vmx_assist_context newctx;
 
 extern void emulate(struct regs *);
 extern void dump_regs(struct regs *);

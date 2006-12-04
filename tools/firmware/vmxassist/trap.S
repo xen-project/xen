@@ -100,10 +100,6 @@ trap_handlers:
 	.code32
 	.align	16
 common_trap:				/* common trap handler */
-	pushl	%gs
-	pushl	%fs
-	pushl	%ds
-	pushl	%es
 	pushal
 
 	movl	$(DATA_SELECTOR), %eax	/* make sure these are sane */
@@ -114,17 +110,13 @@ common_trap:				/* common trap handler */
 	movl	%esp, %ebp
 
 	pushl	%ebp
-	pushl	52(%ebp)
-	pushl	48(%ebp)
+	pushl	36(%ebp)
+	pushl	32(%ebp)
 	call	trap			/* trap(trapno, errno, regs) */
 	addl	$12, %esp
 
 trap_return:
 	popal
-	popl	%es
-	popl	%ds
-	popl	%fs
-	popl	%gs
 	addl	$8, %esp		/* skip trapno, errno */
 	iret
 	/* NOT REACHED */
@@ -152,10 +144,6 @@ switch_to_real_mode:
 	pushl	oldctx+VMX_ASSIST_CTX_EIP
 	pushl	$-1			/* trapno, errno */
 	pushl	$-1
-	pushl	%gs
-	pushl	%fs
-	pushl	%ds
-	pushl	%es
 	pushal
 
 	movl	%esp, %ebp

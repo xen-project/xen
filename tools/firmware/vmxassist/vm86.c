@@ -376,9 +376,9 @@ segment(unsigned prefix, struct regs *regs, unsigned seg)
 	if (prefix & SEG_SS)
 		seg = regs->uss;
 	if (prefix & SEG_FS)
-		seg = regs->fs;
+		seg = regs->vfs;
 	if (prefix & SEG_GS)
-		seg = regs->gs;
+		seg = regs->vgs;
 	return seg;
 }
 
@@ -934,6 +934,8 @@ load_or_clear_seg(unsigned long sel, uint32_t *base, uint32_t *limit, union vmcs
 static void
 protected_mode(struct regs *regs)
 {
+	extern char stack_top[];
+
 	regs->eflags &= ~(EFLAGS_TF|EFLAGS_VM);
 
 	oldctx.eip = regs->eip;
@@ -958,12 +960,10 @@ protected_mode(struct regs *regs)
 			  &oldctx.gs_limit, &oldctx.gs_arbytes);
 
 	/* initialize jump environment to warp back to protected mode */
+	regs->uss = DATA_SELECTOR;
+	regs->uesp = stack_top;
 	regs->cs = CODE_SELECTOR;
-	regs->ds = DATA_SELECTOR;
-	regs->es = DATA_SELECTOR;
-	regs->fs = DATA_SELECTOR;
-	regs->gs = DATA_SELECTOR;
-	regs->eip = (unsigned) &switch_to_protected_mode;
+	regs->eip = (unsigned) switch_to_protected_mode;
 
 	/* this should get us into 32-bit mode */
 }
@@ -975,10 +975,6 @@ static void
 real_mode(struct regs *regs)
 {
 	regs->eflags |= EFLAGS_VM | 0x02;
-	regs->ds = DATA_SELECTOR;
-	regs->es = DATA_SELECTOR;
-	regs->fs = DATA_SELECTOR;
-	regs->gs = DATA_SELECTOR;
 
 	/*
 	 * When we transition from protected to real-mode and we
@@ -1070,9 +1066,6 @@ set_mode(struct regs *regs, enum vm86_mode newmode)
 	case VM86_PROTECTED:
 		if (mode == VM86_REAL_TO_PROTECTED) {
 			protected_mode(regs);
-//			printf("<VM86_PROTECTED>\n");
-			mode = newmode;
-			return;
 		} else
 			panic("unexpected protected mode transition");
 		break;
