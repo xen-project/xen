@@ -137,13 +137,13 @@ static kbd_layout_t *parse_keyboard_layout(const char *language,
     }
     fclose(f);
 
-    for (int i = 0; i < MAX_NORMAL_KEYCODE; i++) {
+    for (i = 0; i < MAX_NORMAL_KEYCODE; i++) {
         if (k->keysym2numlock[i] != 1) {
             k->keysym2numlock[i] = -keycode2numlock[k->keysym2keycode[i]];
         }
     }
 
-    for (int i = 0; i < k->extra_count; i++) {
+    for (i = 0; i < k->extra_count; i++) {
         if (k->keysym2keycode_extra[i].numlock != 1) {
             k->keysym2keycode_extra[i].numlock =
                 -keycode2numlock[k->keysym2keycode_extra[i].keycode];
