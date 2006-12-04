@@ -65,6 +65,7 @@ class XendServers:
     def __init__(self):
         self.servers = []
         self.cleaningUp = False
+        self.reloadingConfig = False
 
     def add(self, server):
         self.servers.append(server)
@@ -78,6 +79,11 @@ class XendServers:
             except:
                 pass
 
+    def reloadConfig(self, signum = 0, frame = None):
+        log.debug("SrvServer.reloadConfig()")
+        self.reloadingConfig = True
+        self.cleanup(signum, frame)
+
     def start(self, status):
         # Running the network script will spawn another process, which takes
         # the status fd with it unless we set FD_CLOEXEC.  Failing to do this
@@ -86,61 +92,71 @@ class XendServers:
             fcntl.fcntl(status, fcntl.F_SETFD, fcntl.FD_CLOEXEC)
         
         Vifctl.network('start')
-        threads = []
-        for server in self.servers:
-            thread = Thread(target=server.run, name=server.__class__.__name__)
-            if isinstance(server, HttpServer):
-                thread.setDaemon(True)
-            thread.start()
-            threads.append(thread)
-
-
-        # check for when all threads have initialized themselves and then
-        # close the status pipe
-
-        threads_left = True
-        while threads_left:
-            threads_left = False
-
-            for server in self.servers:
-                if not server.ready:
-                    threads_left = True
-                    break
-
-            if threads_left:
-                time.sleep(.5)
-
-        if status:
-            status.write('0')
-            status.close()
 
         # Prepare to catch SIGTERM (received when 'xend stop' is executed)
         # and call each server's cleanup if possible
         signal.signal(signal.SIGTERM, self.cleanup)
+        signal.signal(signal.SIGHUP, self.reloadConfig)
 
-        # Interruptible Thread.join - Python Bug #1167930
-        #   Replaces: for t in threads: t.join()
-        #   Reason:   The above will cause python signal handlers to be
-        #             blocked so we're not able to catch SIGTERM in any
-        #             way for cleanup
-        runningThreads = threads
-        while len(runningThreads) > 0:
-            try:
-                for t in threads:
-                    t.join(1.0)
-                runningThreads = [t for t in threads
-                                  if t.isAlive() and not t.isDaemon()]
-                if self.cleaningUp and len(runningThreads) > 0:
-                    log.debug("Waiting for %s." %
-                              [x.getName() for x in runningThreads])
-            except:
-                pass
+        while True:
+            threads = []
+            for server in self.servers:
+                thread = Thread(target=server.run, name=server.__class__.__name__)
+                if isinstance(server, HttpServer):
+                    thread.setDaemon(True)
+                thread.start()
+                threads.append(thread)
 
 
-def create():
-    root = SrvDir()
-    root.putChild('xend', SrvRoot())
-    servers = XendServers()
+            # check for when all threads have initialized themselves and then
+            # close the status pipe
+
+            threads_left = True
+            while threads_left:
+                threads_left = False
+
+                for server in self.servers:
+                    if not server.ready:
+                        threads_left = True
+                        break
+
+                if threads_left:
+                    time.sleep(.5)
+
+            if status:
+                status.write('0')
+                status.close()
+                status = None
+
+            # Interruptible Thread.join - Python Bug #1167930
+            #   Replaces: for t in threads: t.join()
+            #   Reason:   The above will cause python signal handlers to be
+            #             blocked so we're not able to catch SIGTERM in any
+            #             way for cleanup
+            runningThreads = threads
+            while len(runningThreads) > 0:
+                try:
+                    for t in threads:
+                        t.join(1.0)
+                    runningThreads = [t for t in threads
+                                      if t.isAlive() and not t.isDaemon()]
+                    if self.cleaningUp and len(runningThreads) > 0:
+                        log.debug("Waiting for %s." %
+                                  [x.getName() for x in runningThreads])
+                except:
+                    pass
+
+            if self.reloadingConfig:
+                log.info("Restarting all servers...")
+                self.cleaningUp = False
+                self.reloadingConfig = False
+                xroot.set_config()
+                self.servers = []
+                _loadConfig(self)
+            else:
+                break
+
+def _loadConfig(servers):
     if xroot.get_xend_http_server():
         servers.add(HttpServer(root,
                                xroot.get_xend_address(),
@@ -188,4 +204,11 @@ def create():
 
     if xroot.get_xend_unix_xmlrpc_server():
         servers.add(XMLRPCServer(XendAPI.AUTH_PAM))
+
+
+def create():
+    root = SrvDir()
+    root.putChild('xend', SrvRoot())
+    servers = XendServers()
+    _loadConfig(servers)
     return servers

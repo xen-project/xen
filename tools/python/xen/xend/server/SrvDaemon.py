@@ -60,6 +60,14 @@ class Daemon:
         return running
 
 
+    def reloadConfig(self):
+        """
+        """
+        pid = read_pid(XEND_PID_FILE)
+        if find_process(pid, XEND_PROCESS_NAME):
+            os.kill(pid, signal.SIGHUP)
+
+
     def status(self):
         """Returns the status of the xend daemon.
         The return value is defined by the LSB:
