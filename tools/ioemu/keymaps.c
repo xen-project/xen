@@ -36,8 +36,10 @@ static int get_keysym(const char *name)
 #define MAX_EXTRA_COUNT 256
 typedef struct {
     uint16_t keysym2keycode[MAX_NORMAL_KEYCODE];
+    int keysym2numlock[MAX_NORMAL_KEYCODE];
     struct {
 	int keysym;
+	int numlock;
 	uint16_t keycode;
     } keysym2keycode_extra[MAX_EXTRA_COUNT];
     int extra_count;
@@ -50,6 +52,8 @@ static kbd_layout_t *parse_keyboard_layout(const char *language,
     char file_name[1024];
     char line[1024];
     int len;
+    int *keycode2numlock;
+    int i;
 
     snprintf(file_name, sizeof(file_name),
              "%s/keymaps/%s", bios_dir, language);
@@ -63,6 +67,15 @@ static kbd_layout_t *parse_keyboard_layout(const char *language,
 		"Could not read keymap file: '%s'\n", file_name);
 	return 0;
     }
+
+    /* Allocate a temporary map tracking which keycodes change when numlock is
+       set.  Keycodes are 16 bit, so 65536 is safe. */
+    keycode2numlock = malloc(65536 * sizeof(int));
+    if (!keycode2numlock) {
+        perror("Could not read keymap file");
+	return 0;
+    }
+
     for(;;) {
 	if (fgets(line, 1024, f) == NULL)
             break;
@@ -86,13 +99,19 @@ static kbd_layout_t *parse_keyboard_layout(const char *language,
 		if (keysym == 0) {
                     //		    fprintf(stderr, "Warning: unknown keysym %s\n", line);
 		} else {
-		    const char *rest = end_of_keysym + 1;
-		    int keycode = strtol(rest, NULL, 0);
+		    char *rest = end_of_keysym + 1;
+		    int keycode = strtol(rest, &rest, 0);
+		    int numlock = (rest != NULL &&
+		                   strstr(rest, "numlock") != NULL);
+
+                    keycode2numlock[keycode] = numlock;
+
 		    /* if(keycode&0x80)
 		       keycode=(keycode<<8)^0x80e0; */
 		    if (keysym < MAX_NORMAL_KEYCODE) {
 			//fprintf(stderr,"Setting keysym %s (%d) to %d\n",line,keysym,keycode);
 			k->keysym2keycode[keysym] = keycode;
+			k->keysym2numlock[keysym] = numlock;
 		    } else {
 			if (k->extra_count >= MAX_EXTRA_COUNT) {
 			    fprintf(stderr,
@@ -107,6 +126,8 @@ static kbd_layout_t *parse_keyboard_layout(const char *language,
 				keysym = keysym;
 			    k->keysym2keycode_extra[k->extra_count].
 				keycode = keycode;
+			    k->keysym2keycode_extra[k->extra_count].
+				numlock = numlock;
 			    k->extra_count++;
 			}
 		    }
@@ -115,6 +136,22 @@ static kbd_layout_t *parse_keyboard_layout(const char *language,
 	}
     }
     fclose(f);
+
+    for (int i = 0; i < MAX_NORMAL_KEYCODE; i++) {
+        if (k->keysym2numlock[i] != 1) {
+            k->keysym2numlock[i] = -keycode2numlock[k->keysym2keycode[i]];
+        }
+    }
+
+    for (int i = 0; i < k->extra_count; i++) {
+        if (k->keysym2keycode_extra[i].numlock != 1) {
+            k->keysym2keycode_extra[i].numlock =
+                -keycode2numlock[k->keysym2keycode_extra[i].keycode];
+        }
+    }
+
+    free(keycode2numlock);
+
     return k;
 }
 
@@ -140,6 +177,28 @@ static int keysym2scancode(void *kbd_layout, int keysym)
 	for (i = 0; i < k->extra_count; i++)
 	    if (k->keysym2keycode_extra[i].keysym == keysym)
 		return k->keysym2keycode_extra[i].keycode;
+    }
+    return 0;
+}
+
+/**
+ * Returns 1 if the given keysym requires numlock to be pressed, -1 if it
+ * requires it to be cleared, and 0 otherwise.
+ */
+static int keysym2numlock(void *kbd_layout, int keysym)
+{
+    kbd_layout_t *k = kbd_layout;
+    if (keysym < MAX_NORMAL_KEYCODE) {
+	return k->keysym2numlock[keysym];
+    } else {
+	int i;
+#ifdef XK_ISO_Left_Tab
+	if (keysym == XK_ISO_Left_Tab)
+	    keysym = XK_Tab;
+#endif
+	for (i = 0; i < k->extra_count; i++)
+	    if (k->keysym2keycode_extra[i].keysym == keysym)
+		return k->keysym2keycode_extra[i].numlock;
     }
     return 0;
 }
