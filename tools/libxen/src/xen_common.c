@@ -518,8 +518,14 @@ static void parse_into(xen_session *s, xmlNode *value_node,
         xmlChar *string = string_from_value(value_node, "string");
         if (string == NULL)
         {
+#if PERMISSIVE
+            fprintf(stderr,
+                    "Expected an Enum from the server, but didn't get one\n");
+            ((int *)value)[slot] = 0;
+#else
             server_error(
                 s, "Expected an Enum from the server, but didn't get one");
+#endif
         }
         else
         {
@@ -567,8 +573,14 @@ static void parse_into(xen_session *s, xmlNode *value_node,
         xmlChar *string = string_from_value(value_node, "boolean");
         if (string == NULL)
         {
+#if PERMISSIVE
+            fprintf(stderr,
+                    "Expected a Bool from the server, but didn't get one\n");
+            ((bool *)value)[slot] = false;
+#else
             server_error(
                 s, "Expected a Bool from the server, but didn't get one");
+#endif
         }
         else
         {
@@ -764,7 +776,6 @@ static void parse_into(xen_session *s, xmlNode *value_node,
                 cur = cur->next;
             }
 
-#if !PERMISSIVE
             /* Check that we've filled all fields. */
             for (size_t i = 0; i < member_count; i++)
             {
@@ -781,15 +792,20 @@ static void parse_into(xen_session *s, xmlNode *value_node,
 
                 if (j == seen_count)
                 {
+#if PERMISSIVE
+                    fprintf(stderr,
+                            "Struct did not contain expected field %s.\n",
+                            mem->key);
+#else
                     server_error_2(s,
                                    "Struct did not contain expected field",
                                    mem->key);
                     free(result);
                     free(checklist);
                     return;
+#endif
                 }
             }
-#endif
 
             free(checklist);
             ((void **)value)[slot] = result;
