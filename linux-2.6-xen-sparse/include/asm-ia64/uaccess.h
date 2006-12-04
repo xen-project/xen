@@ -365,6 +365,7 @@ ia64_done_with_exception (struct pt_regs *regs)
 }
 
 #define ARCH_HAS_TRANSLATE_MEM_PTR	1
+#ifndef CONFIG_XEN
 static __inline__ char *
 xlate_dev_mem_ptr (unsigned long p)
 {
@@ -379,6 +380,25 @@ xlate_dev_mem_ptr (unsigned long p)
 
 	return ptr;
 }
+#else
+static __inline__ char *
+xlate_dev_mem_ptr (unsigned long p, ssize_t sz)
+{
+	unsigned long pfn = p >> PAGE_SHIFT;
+
+	if (pfn_valid(pfn) && !PageUncached(pfn_to_page(pfn)))
+		return __va(p);
+
+	return ioremap(p, sz);
+}
+
+static __inline__ void
+xlate_dev_mem_ptr_unmap (char* v)
+{
+	if (REGION_NUMBER(v) == RGN_UNCACHED)
+		iounmap(v);
+}
+#endif
 
 /*
  * Convert a virtual cached kernel memory pointer to an uncached pointer

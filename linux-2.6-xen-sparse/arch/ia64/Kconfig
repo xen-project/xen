@@ -533,9 +533,6 @@ config XEN_BALLOON
 config XEN_SKBUFF
 	default y
 
-config XEN_DEVMEM
-	default n
-
 config XEN_REBOOT
 	default y
 
