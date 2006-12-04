@@ -260,7 +260,11 @@ void __init e820_reserve_resources(struct e820entry *e820, int nr_map)
 			request_resource(res, &data_resource);
 #endif
 #ifdef CONFIG_KEXEC
-			request_resource(res, &crashk_res);
+			if (crashk_res.start != crashk_res.end)
+				request_resource(res, &crashk_res);
+#ifdef CONFIG_XEN
+			xen_machine_kexec_register_resources(res);
+#endif
 #endif
 		}
 	}

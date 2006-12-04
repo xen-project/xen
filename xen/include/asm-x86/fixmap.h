@@ -16,6 +16,7 @@
 #include <asm/apicdef.h>
 #include <asm/acpi.h>
 #include <asm/page.h>
+#include <xen/kexec.h>
 
 /*
  * Here we define all the compile-time 'special' virtual
@@ -36,6 +37,9 @@ enum fixed_addresses {
     FIX_ACPI_END = FIX_ACPI_BEGIN + FIX_ACPI_PAGES - 1,
     FIX_HPET_BASE,
     FIX_CYCLONE_TIMER,
+    FIX_KEXEC_BASE_0,
+    FIX_KEXEC_BASE_END = FIX_KEXEC_BASE_0 \
+      + ((KEXEC_XEN_NO_PAGES >> 1) * KEXEC_IMAGE_NR) - 1,
     __end_of_fixed_addresses
 };
 

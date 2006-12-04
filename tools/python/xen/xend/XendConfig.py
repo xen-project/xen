@@ -31,143 +31,197 @@ from xen.xend.XendConstants import DOM_STATE_HALTED
 XendConfig API
 
   XendConfig will try to mirror as closely the Xen API VM Struct
-  providing a backwards compatibility mode for SXP dumping, loading.
+  with extra parameters for those options that are not supported.
 
 """
 
+def reverse_dict(adict):
+    """Return the reverse mapping of a dictionary."""
+    return dict([(v, k) for k, v in adict.items()])
 
-LEGACY_CFG_TO_XENAPI_CFG = {
+def bool0(v):
+    return v != '0' and bool(v)
+
+# Mapping from XendConfig configuration keys to the old
+# legacy configuration keys that map directly.
+
+XENAPI_CFG_TO_LEGACY_CFG = {
     'uuid': 'uuid',
-    'vcpus': 'vcpus_number',
-    'maxmem': 'memory_static_max',
-    'memory': 'memory_static_min',
-    'name': 'name_label',
-    'on_poweroff': 'actions_after_shutdown',            
-    'on_reboot': 'actions_after_reboot',
-    'on_crash': 'actions_after_crash',
-    'bootloader': 'boot_method',
-    'kernel_kernel': 'kernel_kernel',
-    'kernel_initrd': 'kernel_initrd',
-    'kernel_args': 'kernel_args',
-    }
+    'vcpus_number': 'vcpus',
+    'memory_static_min': 'memory',
+    'memory_static_max': 'maxmem',
+    'name_label': 'name',
+    'actions_after_shutdown': 'on_poweroff',
+    'actions_after_reboot': 'on_reboot',
+    'actions_after_crash': 'on_crash', 
+    'platform_localtime': 'localtime',
+}
 
-XENAPI_CFG_CUSTOM_TRANSLATE = [
-    'vifs',
-    'vbds',
-    ]
+LEGACY_CFG_TO_XENAPI_CFG = reverse_dict(XENAPI_CFG_TO_LEGACY_CFG)
 
+# Mapping from XendConfig configuration keys to the old
+# legacy configuration keys that are found in the 'image'
+# SXP object.
 XENAPI_HVM_CFG = {
-    'platform_std_vga': 'std-vga',
+    'platform_std_vga': 'stdvga',
     'platform_serial' : 'serial',
     'platform_localtime': 'localtime',
     'platform_enable_audio': 'soundhw',
     'platform_keymap' : 'keymap',
 }    
 
-XENAPI_UNSUPPORTED_IN_LEGACY_CFG = [
-    'name_description',
-    'user_version',
-    'is_a_template',
-    'memory_dynamic_min',
-    'memory_dynamic_max',
-    'memory_actual',
-    'vcpus_policy',
-    'vcpus_params',
-    'vcpus_features_required',
-    'vcpus_features_can_use',
-    'vcpus_features_force_on',
-    'vcpus_features_force_off',
-    'actions_after_suspend',
-    'bios_boot',
-    'platform_std_vga',
-    'platform_serial',
-    'platform_localtime',
-    'platform_clock_offset',
-    'platform_enable_audio',
-    'platform_keymap',
-    'builder',
-    'grub_cmdline',
-    'pci_bus',
-    'otherconfig'
-    ]
+# List of XendConfig configuration keys that have no equivalent
+# in the old world.
 
+XENAPI_CFG_TYPES = {
+    'uuid': str,
+    'power_state': str,
+    'name_label': str,
+    'name_description': str,
+    'user_version': str,
+    'is_a_template': bool0,
+    'resident_on': str,
+    'memory_static_min': int,
+    'memory_static_max': int,
+    'memory_dynamic_min': int,
+    'memory_dynamic_max': int,
+    'memory_actual': int,
+    'vcpus_policy': str,
+    'vcpus_params': str,
+    'vcpus_number': int,
+    'vcpus_features_required': list,
+    'vcpus_features_can_use': list,
+    'vcpus_features_force_on': list, 
+    'vcpus_features_force_off': list,
+    'actions_after_shutdown': str,
+    'actions_after_reboot': str,
+    'actions_after_suspend': str,
+    'actions_after_crash': str,
+    'tpm_instance': int,
+    'tpm_backend': int,    
+    'bios_boot': str,
+    'platform_std_vga': bool0,
+    'platform_serial': str,
+    'platform_localtime': bool0,
+    'platform_clock_offset': bool0,
+    'platform_enable_audio': bool0,
+    'platform_keymap': str,
+    'boot_method': str,
+    'builder': str,
+    'kernel_kernel': str,
+    'kernel_initrd': str,
+    'kernel_args': str,
+    'grub_cmdline': str,
+    'pci_bus': str,
+    'tools_version': dict,
+    'otherconfig': dict,
+}
 
-# configuration params that need to be converted to ints
-# since the XMLRPC transport for Xen API does not use
-# 32 bit ints but string representation of 64 bit ints.
-XENAPI_INT_CFG = [
-    'user_version',
-    'vcpus_number',
-    'memory_static_min',
-    'memory_static_max',
-    'memory_dynamic_min',
-    'memory_dynamic_max',
-    'tpm_instance',
-    'tpm_backend',
-]    
+# List of legacy configuration keys that have no equivalent in the
+# Xen API, but are still stored in XendConfig.
 
-##
-## Xend Configuration Parameters
-##
-
-
-# All parameters of VMs that may be configured on-the-fly, or at start-up.
-VM_CONFIG_ENTRIES = [
-    ('name',        str),
-    ('on_crash',    str),
-    ('on_poweroff', str),
-    ('on_reboot',   str),
-    ('on_xend_start', str),
-    ('on_xend_stop', str),        
+LEGACY_UNSUPPORTED_BY_XENAPI_CFG = [
+    # roundtripped (dynamic, unmodified)
+    'shadow_memory',
+    'security',
+    'vcpu_avail',
+    'cpu_weight',
+    'cpu_cap',
+    'bootloader',
+    'bootloader_args',
+    'features',
+    # read/write
+    'on_xend_start',
+    'on_xend_stop',
+    # read-only
+    'domid',
+    'start_time',
+    'cpu_time',
+    'online_vcpus',
+    # write-once
+    'cpu',
+    'cpus',
 ]
 
-# All entries written to the store.  This is VM_CONFIG_ENTRIES, plus those
-# entries written to the store that cannot be reconfigured on-the-fly.
-VM_STORE_ENTRIES = [
-    ('uuid',       str),
-    ('vcpus',      int),
-    ('vcpu_avail', int),
-    ('memory',     int),
-    ('maxmem',     int),
-    ('start_time', float),
+LEGACY_CFG_TYPES = {
+    'uuid':          str,
+    'name':          str,
+    'vcpus':         int,
+    'vcpu_avail':    int,
+    'memory':        int,
+    'shadow_memory': int,
+    'maxmem':        int,
+    'start_time':    float,
+    'cpu_cap':         int,
+    'cpu_weight':      int,
+    'cpu_time':      float,
+    'bootloader':      str,
+    'bootloader_args': str,
+    'features':        str,
+    'localtime':       int,
+    'name':        str,
+    'on_poweroff': str,
+    'on_reboot':   str,
+    'on_crash':    str,
+    'on_xend_stop': str,
+    'on_xend_start': str,
+    'online_vcpus': int,
+}
+
+# Values that should be stored in xenstore's /vm/<uuid> that is used
+# by Xend. Used in XendDomainInfo to restore running VM state from
+# xenstore.
+LEGACY_XENSTORE_VM_PARAMS = [
+    'uuid',
+    'name',
+    'vcpus',
+    'vcpu_avail',
+    'memory',
+    'shadow_memory',
+    'maxmem',
+    'start_time',
+    'name',
+    'on_poweroff',
+    'on_crash',
+    'on_reboot',
+    'on_xend_start',
+    'on_xend_stop',
 ]
 
-VM_STORED_ENTRIES = VM_CONFIG_ENTRIES + VM_STORE_ENTRIES
-
-# Configuration entries that we expect to round-trip -- be read from the
-# config file or xc, written to save-files (i.e. through sxpr), and reused as
-# config on restart or restore, all without munging.  Some configuration
-# entries are munged for backwards compatibility reasons, or because they
-# don't come out of xc in the same form as they are specified in the config
-# file, so those are handled separately.
-
-ROUNDTRIPPING_CONFIG_ENTRIES = [
-    ('uuid',       str),
-    ('vcpus',      int),
-    ('vcpu_avail', int),
-    ('cpu_cap',    int),
-    ('cpu_weight', int),
-    ('memory',     int),
-    ('shadow_memory', int),
-    ('maxmem',     int),
-    ('bootloader', str),
-    ('bootloader_args', str),
-    ('features', str),
-    ('localtime', int),
-]
-ROUNDTRIPPING_CONFIG_ENTRIES += VM_CONFIG_ENTRIES
-
-## Static Configuration
-
-STATIC_CONFIG_ENTRIES = [
-    ('cpu',      int),
-    ('cpus',     str),
-    ('image',    list),
-    ('security', list), # TODO: what if null?
+LEGACY_IMAGE_CFG = [
+    ('root', str),
+    ('ip', str),
+    ('nographic', int),
+    ('vnc', int),
+    ('sdl', int),
+    ('vncdisplay', int),
+    ('vncunused', int),
+    ('vncpasswd', str),    
 ]
 
-DEPRECATED_ENTRIES = [
-    ('restart', str),
+LEGACY_IMAGE_HVM_CFG = [
+    ('device_model', str),
+    ('display', str),
+    ('xauthority', str),
+    ('vncconsole', int),
+    ('pae', int),
+    ('apic', int),
+]
+
+LEGACY_IMAGE_HVM_DEVICES_CFG = [
+    ('acpi', int),    
+    ('boot', str),
+    ('fda', str),
+    ('fdb', str),
+    ('isa', str),
+    ('keymap', str),    
+    ('localtime', str),    
+    ('serial', str),
+    ('stdvga', int),
+    ('soundhw', str),
+    ('usb', str),
+    ('usbdevice', str),    
+    ('vcpus', int),
 ]
 
 ##
@@ -178,245 +232,172 @@ CONFIG_RESTART_MODES = ('restart', 'destroy', 'preserve', 'rename-restart')
 CONFIG_OLD_DOM_STATES = ('running', 'blocked', 'paused', 'shutdown',
                          'crashed', 'dying')
 
-##
-## Defaults
-##
-
-def DEFAULT_VCPUS(info):
-    if 'max_vcpu_id' in info: return int(info['max_vcpu_id']) + 1
-    else: return 1
-
-DEFAULT_CONFIGURATION = (
-    ('uuid',         lambda info: uuid.createString()),
-    ('name',         lambda info: 'Domain-' + info['uuid']),
-
-    ('on_poweroff',  lambda info: 'destroy'),
-    ('on_reboot',    lambda info: 'restart'),
-    ('on_crash',     lambda info: 'restart'),
-    ('features',     lambda info: ''),
-
-    
-    ('memory',       lambda info: 0),
-    ('shadow_memory',lambda info: 0),
-    ('maxmem',       lambda info: 0),
-    ('bootloader',   lambda info: None),
-    ('bootloader_args', lambda info: None),            
-    ('backend',      lambda info: []),
-    ('device',       lambda info: {}),
-    ('image',        lambda info: None),
-    ('security',     lambda info: []),
-    ('on_xend_start', lambda info: 'ignore'),    
-    ('on_xend_stop', lambda info: 'ignore'),
-
-    ('cpus',         lambda info: []),
-    ('cpu_cap',      lambda info: 0),
-    ('cpu_weight',   lambda info: 256),
-    ('vcpus',        lambda info: DEFAULT_VCPUS(info)),
-    ('online_vcpus', lambda info: info['vcpus']),
-    ('max_vcpu_id',  lambda info: info['vcpus']-1),
-    ('vcpu_avail',   lambda info: (1<<info['vcpus'])-1),
-
-    # New for Xen API
-    ('kernel_kernel', lambda info: ''),
-    ('kernel_initrd', lambda info: ''),
-    ('kernel_args',   lambda info: ''),
-    
-)
-    
 class XendConfigError(VmError):
     def __str__(self):
         return 'Invalid Configuration: %s' % str(self.value)
-
-##
-## XendConfig SXP Config Compat
-##
-
-class XendSXPConfig:
-    def get_domid(self):
-        pass
-    def get_handle(self):
-        return self['uuid']
-        
 
 ##
 ## XendConfig Class (an extended dictionary)
 ##
 
 class XendConfig(dict):
-    """ Generic Configuration Parser accepting SXP, Python or XML.
-    This is a dictionary-like object that is populated.
+    """ The new Xend VM Configuration.
 
-    @ivar legacy: dictionary holding legacy xen domain info
-    @ivar xenapi: dictionary holding xen api config info
+    Stores the configuration in xenapi compatible format but retains
+    import and export functions for SXP.
     """
-
-    def __init__(self, filename = None, fd = None,
-                 sxp = None, xml = None, pycfg = None, xenapi_vm = None,
-                 cfg = {}):
-        """Constructor. Provide either the filename, fd or sxp.
-
-        @keyword filename: filename of an SXP file
-        @keyword fd: file descriptor of an SXP file
-        @keyword sxp: a list of list of a parsed SXP
-        @keyword xml: an XML tree object
-        @keyword xenapi_vm: a struct passed from an XMLRPC call (Xen API)
-        @keyword cfg: a dictionary of configuration (eg. from xc)
-        """
-        format = 'unknown'
-
-        self.xenapi = {}
-
-        if filename and not fd:
-            fd = open(filename, 'r')
-
-        if fd:
-            format = self._detect_format(fd)
+    def __init__(self, filename = None, sxp_obj = None,
+                 xapi = None, dominfo = None):
         
-        if fd:
-            if format == 'sxp':
-                sxp = self._read_sxp(fd)
-            elif format == 'python' and filename != None:
-                pycfg = self._read_python(filename)
-            elif format == 'python' and filename == None:
-                raise XendConfigError("Python files must be passed as a "
-                                      "filename rather than file descriptor.")
-            elif format == 'xml':
-                xml = self._read_xml(fd)
-            else:
-                raise XendConfigError("Unable to determine format of file")
-                
-        if sxp:
-            cfg = self._populate_from_sxp(sxp)
-        if xml:
-            cfg = self._populate_from_xml(xml)
-        if pycfg:
-            cfg = self._populate_from_python_config(pycfg)
-        if xenapi_vm:
-            cfg = self._populate_from_xenapi_vm(xenapi_vm)
-            
-        if cfg:
-            self.update(cfg)
-            
-        if xenapi_vm:
-            self.xenapi.update(xenapi_vm)
+        dict.__init__(self)
+        self.update(self._defaults())
 
-        log.debug('XendConfig: %s' % str(self))
+        if filename:
+            try:
+                sxp_obj = sxp.parse(open(filename,'r'))
+                sxp_obj = sxp_obj[0]
+            except IOError, e:
+                raise XendConfigError("Unable to read file: %s" % filename)
+        
+        if sxp_obj:
+            self._sxp_to_xapi(sxp_obj)
+            self._sxp_to_xapi_unsupported(sxp_obj)
+        elif xapi:
+            self.update_with_xenapi_config(xapi)
+            self._add_xapi_unsupported()
+        elif dominfo:
+            # output from xc.domain_getinfo
+            self._dominfo_to_xapi(dominfo)
+
+        log.debug('XendConfig.init: %s' % self)
+
+        # validators go here
         self.validate()
 
-    #
-    # Xen API Attribute Access
-    #
-
-    def __getattr__(self, name):
-        try:
-            return dict.__getattr__(self, name)
-        except AttributeError:
-            try:
-                return  self.__dict__['xenapi'][name]
-            except KeyError:
-                raise AttributeError("XendConfig Xen API has no attribute "
-                                     "'%s'" % name)
-            
-
-    def __setattr__(self, name, value):
-        try:
-            return dict.__setattr__(self, name, value)
-        except AttributeError:
-            self.xenapi[name] = value
-            #self.set_legacy_api_with_xen_api_value(name, value)
-
-    def __delattr__(self, name):
-        try:
-            dict.__delattr__(self, name)
-        except AttributeError:
-            del self.xenapi[name]
-        #self.del_legacy_api_with_xen_api_key(name)
-
-
-    """
-    #
-    # Legacy API Attribute Access
-    #
-
-    def __getitem__(self, key):
-        try:
-            return self.legacy[key]
-        except KeyError:
-            raise AttributeError, "XendConfig Legacy has no attribute '%s'"\
-                  % key
-
+    """ In time, we should enable this type checking addition. It is great
+        also for tracking bugs and unintended writes to XendDomainInfo.info
     def __setitem__(self, key, value):
-        self.legacy[key] = value
-        self.set_xen_api_with_legacy_api_value(key, value)
-
-    def __delitem__(self, key):
-        del self.legacy[key]
-        self.del_xen_api_with_legacy_api_key(key)
+        type_conv = XENAPI_CFG_TYPES.get(key)
+        if callable(type_conv):
+            try:
+                dict.__setitem__(self, key, type_conv(value))
+            except (ValueError, TypeError):
+                raise XendConfigError("Wrong type for configuration value " +
+                                      "%s. Expected %s" %
+                                      (key, type_conv.__name__))
+        else:
+            dict.__setitem__(self, key, value)
     """
-    
 
-    def _detect_format(self, fd):
-        """Detect the format of the configuration passed.
-
-        @param fd: file descriptor of contents to detect
-        @rtype: string, 'sxp', 'xml', 'python' or 'unknown'
-        """
-        format = 'unknown'
+    def _defaults(self):
+        defaults = {
+            'uuid': uuid.createString(),
+            'name_label': 'Domain-Unnamed',
+            'actions_after_shutdown': 'destroy',
+            'actions_after_reboot': 'restart',
+            'actions_after_crash': 'restart',
+            'actions_after_suspend': '',
+            'features': '',
+            'builder': 'linux',
+            'memory_static_min': 0,
+            'memory_dynamic_min': 0,
+            'shadow_memory': 0,
+            'memory_static_max': 0,
+            'memory_dynamic_max': 0,
+            'memory_actual': 0,
+            'boot_method': None,
+            'bootloader': None,
+            'bootloader_args': None,
+            'devices': {},
+            'image': {},
+            'security': None,
+            'on_xend_start': 'ignore',
+            'on_xend_stop': 'ignore',
+            'cpus': [],
+            'cpu_weight': 256,
+            'cpu_cap': 0,
+            'vcpus_number': 1,
+            'online_vcpus': 1,
+            'max_vcpu_id': 0,
+            'vcpu_avail': 1,
+            'vif_refs': [],
+            'vbd_refs': [],
+            'vtpm_refs': [],
+        }
         
-        fd.seek(0)
-        for line in fd:
-            stripped = line.strip()
-            if stripped:
-                if re.search(r'^\(', stripped): 
-                    format = 'sxp'
-                elif re.search(r'^\<?xml', stripped):
-                    format = 'xml'
-                else:
-                    format = 'python'
-                break
+        defaults['name_label'] = 'Domain-' + defaults['uuid']
+        return defaults
 
-        fd.seek(0)
-        return format
+    def _memory_sanity_check(self):
+        if self['memory_static_min'] == 0:
+            self['memory_static_min'] = self['memory_dynamic_min']
 
-    def _read_sxp(self, fd):
-        """ Read and parse SXP (from SXP to list of lists)
+        # If the static max is not set, let's set it to dynamic max.
+        # If the static max is smaller than static min, then fix it!
+        self['memory_static_max'] = max(self['memory_static_max'],
+                                        self['memory_dynamic_max'],
+                                        self['memory_static_min'])
 
-        @rtype: list of lists.
-        """
-        try:
-            parsed = sxp.parse(fd)[0]
-            return parsed
-        except:
-            raise
-            return None
+        for mem_type in ('memory_static_min', 'memory_static_max'):
+            if self[mem_type] <= 0:
+                raise XendConfigError('Memory value too low for %s: %d' %
+                                      (mem_type, self[mem_type]))
 
-    def _read_xml(self, fd):
-        """TODO: Read and parse XML (from XML to dict)
+    def _actions_sanity_check(self):
+        for event in ['shutdown', 'reboot', 'crash']:
+            if self['actions_after_' + event] not in CONFIG_RESTART_MODES:
+                raise XendConfigError('Invalid event handling mode: ' +
+                                      event)
 
-        @rtype: dict
-        """
-        raise NotImplementedError
+    def _builder_sanity_check(self):
+        if self['builder'] not in ('hvm', 'linux'):
+            raise XendConfigError('Invalid builder configuration')
 
-    def _read_python(self, filename):
-        """Read and parse python module that represents the config.
+    def validate(self):
+        self._memory_sanity_check()
+        self._actions_sanity_check()
+        self._builder_sanity_check()
 
-        @rtype: dict
-        """
-        cfg_globals = {}
-        execfile(filename, cfg_globals, {})
-        return cfg_globals
+    def _dominfo_to_xapi(self, dominfo):
+        self['domid'] = dominfo['domid']
+        self['online_vcpus'] = dominfo['online_vcpus']
+        self['max_vcpu_id'] = dominfo['max_vcpu_id']
+        self['memory_dynamic_min'] = (dominfo['mem_kb'] + 1023)/1024
+        self['memory_dynamic_max'] = (dominfo['maxmem_kb'] + 1023)/1024
+        self['cpu_time'] = dominfo['cpu_time']/1e9
+        # TODO: i don't know what the security stuff expects here
+        if dominfo.get('ssidref'):
+            self['security'] = [['ssidref', dominfo['ssidref']]]
+        self['shutdown_reason'] = dominfo['shutdown_reason']
 
-    def _populate_from_sxp(self, parsed):
+        # parse state into Xen API states
+        self['running'] = dominfo['running']
+        self['crashed'] = dominfo['crashed']
+        self['dying'] = dominfo['dying']
+        self['shutdown'] = dominfo['shutdown']
+        self['paused'] = dominfo['paused']
+        self['blocked'] = dominfo['blocked']
+
+        if 'name' in dominfo:
+            self['name_label'] = dominfo['name']
+
+        if 'handle' in dominfo:
+            self['uuid'] = uuid.toString(dominfo['handle'])
+            
+    def _parse_sxp(self, sxp_cfg):
         """ Populate this XendConfig using the parsed SXP.
 
+        @param sxp_cfg: Parsed SXP Configuration
+        @type sxp_cfg: list of lists
         @rtype: dictionary
+        @return: A dictionary containing the parsed options of the SXP.
         """
         cfg = {}
 
         # First step is to convert deprecated options to
         # current equivalents.
         
-        restart = sxp.child_value(parsed, 'restart')
+        restart = sxp.child_value(sxp_cfg, 'restart')
         if restart:
             if restart == 'onreboot':
                 cfg['on_poweroff'] = 'destroy'
@@ -433,23 +414,19 @@ class XendConfig(dict):
                          'restart = \'%s\'', restart)
 
         # Only extract options we know about.
-        all_params = VM_CONFIG_ENTRIES + ROUNDTRIPPING_CONFIG_ENTRIES + \
-                     STATIC_CONFIG_ENTRIES
-                     
-        for key, typeconv in all_params:
-            val = sxp.child_value(parsed, key)
-            if val:
+        extract_keys = LEGACY_UNSUPPORTED_BY_XENAPI_CFG
+        extract_keys += XENAPI_CFG_TO_LEGACY_CFG.values()
+        
+        for key in extract_keys:
+            val = sxp.child_value(sxp_cfg, key)
+            if val != None:
                 try:
-                    cfg[key] = typeconv(val)
-                except ValueError:
-                    pass
-
-        # Manually extract other complex configuration
-        # options.
-
-        cfg['backend'] = []
-        for c in sxp.children(parsed, 'backend'):
-            cfg['backend'].append(sxp.name(sxp.child0(c)))
+                    cfg[key] = LEGACY_CFG_TYPES[key](val)
+                except KeyError:
+                    cfg[key] = val
+                except (TypeError, ValueError), e:
+                    log.warn("Unable to parse key %s: %s: %s" %
+                             (key, str(val), e))
 
         # Parsing the device SXP's. In most cases, the SXP looks
         # like this:
@@ -472,65 +449,52 @@ class XendConfig(dict):
         # Hence we deal with pci device configurations outside of
         # the regular device parsing.
         
-        cfg['device'] = {}
-        for dev in sxp.children(parsed, 'device'):
+        cfg['devices'] = {}
+        for dev in sxp.children(sxp_cfg, 'device'):
             config = sxp.child0(dev)
             dev_type = sxp.name(config)
             dev_info = {}
             
             if dev_type == 'pci':
-                continue 
-            
-            for opt, val in config[1:]:
-                dev_info[opt] = val
-            log.debug("XendConfig: reading device: %s" % dev_info)
-            # create uuid if it doesn't
-            dev_uuid = dev_info.get('uuid', uuid.createString())
-            dev_info['uuid'] = dev_uuid
-            cfg['device'][dev_uuid] = (dev_type, dev_info)
-
-        # deal with PCI device configurations if they exist
-        for dev in sxp.children(parsed, 'device'):
-            config = sxp.child0(dev)
-            dev_type = sxp.name(config)
-
-            if dev_type != 'pci':
-                continue
-            
-            dev_attr = sxp.child_value(config, 'dev')
-            if isinstance(dev_attr, (types.ListType, types.TupleType)):
+                pci_devs_uuid = sxp.child_value(config, 'uuid',
+                                                uuid.createString())
+                pci_devs = []
                 for pci_dev in sxp.children(config, 'dev'):
-                    dev_info = {}
+                    pci_dev_info = {}
                     for opt, val in pci_dev[1:]:
-                        dev_info[opt] = val
-                    log.debug("XendConfig: reading device: %s" % dev_info)
-                    dev_uuid = dev_info.get('uuid', uuid.createString())
-                    dev_info['uuid'] = dev_uuid
-                    cfg['device'][dev_uuid] = (dev_type, dev_info)
-                    
-            else: # Xen 2.0 PCI device configuration
+                        pci_dev_info[opt] = val
+                    pci_devs.append(pci_dev_info)
+                
+                cfg['devices'][pci_devs_uuid] = (dev_type,
+                                                 {'devs': pci_devs,
+                                                  'uuid': pci_devs_uuid})
+                
+                log.debug("XendConfig: reading device: %s" % pci_devs)
+            else:
                 for opt, val in config[1:]:
                     dev_info[opt] = val
                 log.debug("XendConfig: reading device: %s" % dev_info)
                 # create uuid if it doesn't
                 dev_uuid = dev_info.get('uuid', uuid.createString())
                 dev_info['uuid'] = dev_uuid
-                cfg['device'][dev_uuid] = (dev_type, dev_info)
+                cfg['devices'][dev_uuid] = (dev_type, dev_info)
+
 
         # Extract missing data from configuration entries
-        if 'image' in cfg:
-            image_vcpus = sxp.child_value(cfg['image'], 'vcpus')
-            if image_vcpus is not None:
+        image_sxp = sxp.child_value(sxp_cfg, 'image', [])
+        if image_sxp:
+            image_vcpus = sxp.child_value(image_sxp, 'vcpus')
+            if image_vcpus != None:
                 try:
-                    if 'vcpus' not in cfg:
-                        cfg['vcpus'] = int(image_vcpus)
-                    elif cfg['vcpus'] != int(image_vcpus):
-                        cfg['vcpus'] = int(image_vcpus)
+                    if 'vcpus_number' not in cfg:
+                        cfg['vcpus_number'] = int(image_vcpus)
+                    elif cfg['vcpus_number'] != int(image_vcpus):
+                        cfg['vcpus_number'] = int(image_vcpus)
                         log.warn('Overriding vcpus from %d to %d using image'
-                                 'vcpus value.', cfg['vcpus'])
+                                 'vcpus value.', cfg['vcpus_number'])
                 except ValueError, e:
                     raise XendConfigError('integer expeceted: %s: %s' %
-                                        str(cfg['image']), e)
+                                          image_sxp, e)
 
         # Deprecated cpu configuration
         if 'cpu' in cfg:
@@ -564,101 +528,188 @@ class XendConfig(dict):
         except ValueError, e:
             raise XendConfigError('cpus = %s: %s' % (cfg['cpus'], e))
 
-        # Parse image SXP outside of image.py
-        # - used to be only done in image.py
-        if 'image' in cfg:
-            cfg['kernel_kernel'] = sxp.child_value(cfg['image'], 'kernel','')
-            cfg['kernel_initrd'] = sxp.child_value(cfg['image'], 'ramdisk','')
-            kernel_args = sxp.child_value(cfg['image'], 'args', '')
-
-            # attempt to extract extra arguments from SXP config
-            arg_ip = sxp.child_value(cfg['image'], 'ip')
-            if arg_ip: kernel_args += ' ip=%s' % arg_ip
-            arg_root = sxp.child_value(cfg['image'], 'root')
-            if arg_root: kernel_args += ' root=%s' % arg_root
-            
-            cfg['kernel_args'] = kernel_args
+        if 'security' in cfg and isinstance(cfg['security'], str):
+            cfg['security'] = sxp.from_string(cfg['security'])
 
         # TODO: get states
-        old_state = sxp.child_value(parsed, 'state')
+        old_state = sxp.child_value(sxp_cfg, 'state')
         if old_state:
             for i in range(len(CONFIG_OLD_DOM_STATES)):
                 cfg[CONFIG_OLD_DOM_STATES[i]] = int(old_state[i] != '-')
 
-        # Xen API extra cfgs
-        # ------------------
-        cfg['vif_refs'] = []
-        cfg['vbd_refs'] = []
-        cfg['vtpm_refs'] = []
-        for dev_uuid, (dev_type, dev_info) in cfg['device'].items():
-            if dev_type == 'vif':
-                cfg['vif_refs'].append(dev_uuid)
-            elif dev_type in ('vbd','tap'):
-                cfg['vbd_refs'].append(dev_uuid)
-            elif dev_type == 'vtpm':
-                cfg['vtpm_refs'].append(dev_uuid)
-                
         return cfg
+    
 
+    def _sxp_to_xapi(self, sxp_cfg):
+        """Read in an SXP Configuration object and
+        populate at much of the Xen API with valid values.
+        """
+        cfg = self._parse_sxp(sxp_cfg)
 
-    def _populate_from_xenapi_vm(self, xenapi_vm):
-        cfg = {}
-
-        for cfgkey, apikey in LEGACY_CFG_TO_XENAPI_CFG.items():
+        # Convert parameters that can be directly mapped from
+        # the Legacy Config to Xen API Config
+        
+        for apikey, cfgkey in XENAPI_CFG_TO_LEGACY_CFG.items():
             try:
-                if apikey in XENAPI_INT_CFG:
-                    cfg[cfgkey] = int(xenapi_vm[apikey])
+                type_conv = XENAPI_CFG_TYPES.get(apikey)
+                if callable(type_conv):
+                    self[apikey] = type_conv(cfg[cfgkey])
                 else:
-                    cfg[cfgkey] = xenapi_vm[apikey]                    
+                    log.warn("Unconverted key: " + apikey)
+                    self[apikey] = cfg[cfgkey]
             except KeyError:
                 pass
 
-        # Reconstruct image SXP 
-        # TODO: get rid of SXP altogether from here
-        sxp_image = ['linux']
-        if xenapi_vm['kernel_kernel']:
-            sxp_image.append(['kernel', xenapi_vm['kernel_kernel']])
-        if xenapi_vm['kernel_initrd']:
-            sxp_image.append(['ramdisk', xenapi_vm['kernel_initrd']])
-        if xenapi_vm['kernel_args']:
-            sxp_image.append(['args', xenapi_vm['kernel_args']])
+        # Convert Legacy "image" config to Xen API kernel_*
+        # configuration
+        image_sxp = sxp.child_value(sxp_cfg, 'image', [])
+        if image_sxp:
+            self['kernel_kernel'] = sxp.child_value(image_sxp, 'kernel','')
+            self['kernel_initrd'] = sxp.child_value(image_sxp, 'ramdisk','')
+            kernel_args = sxp.child_value(image_sxp, 'args', '')
 
-        cfg['image'] = prettyprintstring(sxp_image)
+            # attempt to extract extra arguments from SXP config
+            arg_ip = sxp.child_value(image_sxp, 'ip')
+            if arg_ip and not re.search(r'ip=[^ ]+', kernel_args):
+                kernel_args += ' ip=%s' % arg_ip
+            arg_root = sxp.child_value(image_sxp, 'root')
+            if arg_root and not re.search(r'root=[^ ]+', kernel_args):
+                kernel_args += ' root=%s' % arg_root
+            
+            self['kernel_args'] = kernel_args
 
-        # make sure device structures are there.
-        if 'device' not in cfg:
-            cfg['device'] = {}
-        if 'vif_refs' not in cfg:
-            cfg['vif_refs'] = []
-        if 'vbd_refs' not in cfg:
-            cfg['vbd_refs'] = []
-        if 'vtpm_refs' not in cfg:
-            cfg['vtpm_refs'] = []
+        # Convert Legacy HVM parameters to Xen API configuration
+        self['platform_std_vga'] = bool0(cfg.get('stdvga', 0))
+        self['platform_serial'] = str(cfg.get('serial', ''))
+        self['platform_localtime'] = bool0(cfg.get('localtime', 0))
+        self['platform_enable_audio'] = bool0(cfg.get('soundhw', 0))
 
-        return cfg
+        # Convert path to bootloader to boot_method
+        if not cfg.get('bootloader'):
+            if self.get('kernel_kernel','').endswith('hvmloader'):
+                self['boot_method'] = 'bios'
+            else:
+                self['boot_method'] = 'kernel_external'
+        else:
+            self['boot_method'] = 'grub'
 
+        # make sure a sane maximum is set
+        if self['memory_static_max'] <= 0:
+            self['memory_static_max'] = self['memory_static_min']
+            
+        self['memory_dynamic_max'] = self['memory_static_max']
+        self['memory_dynamic_min'] = self['memory_static_min']
 
-    def _sync_xen_api_from_legacy_api(self):
-        """ Sync all the attributes that is supported by the Xen API
-        from the legacy API configuration.
+        # set device references in the configuration
+        self['devices'] = cfg.get('devices', {})
+        
+        self['vif_refs'] = []
+        self['vbd_refs'] = []
+        self['vtpm_refs'] = []
+        for dev_uuid, (dev_type, dev_info) in self['devices'].items():
+            if dev_type == 'vif':
+                self['vif_refs'].append(dev_uuid)
+            elif dev_type in ('vbd','tap'):
+                self['vbd_refs'].append(dev_uuid)
+            elif dev_type in ('vtpm',):
+                self['vtpm_refs'].append(dev_uuid)
+        
+
+    def _sxp_to_xapi_unsupported(self, sxp_cfg):
+        """Read in an SXP configuration object and populate
+        values are that not related directly supported in
+        the Xen API.
         """
-        for cfgkey, apikey in LEGACY_CFG_TO_XENAPI_CFG.items():        
-            if cfgkey in self:
-                self.xenapi[apikey] = self[cfgkey]
 
-    def _sync_legacy_api_from_xen_api(self):
-        for cfgkey, apikey in LEGACY_CFG_TO_XENAPI_CFG.items():
-            if apikey in self.xenapi:
-                self[cfgkey] = self.xenapi[apikey]
+        # Parse and convert parameters used to configure
+        # the image (as well as HVM images)
+        image_sxp = sxp.child_value(sxp_cfg, 'image', [])
+        if image_sxp:
+            image = {}
+            image['type'] = sxp.name(image_sxp)
+            for arg, conv in LEGACY_IMAGE_CFG:
+                val = sxp.child_value(image_sxp, arg, None)
+                if val != None:
+                    image[arg] = conv(val)
 
+            image_hvm = {}
+            for arg, conv in LEGACY_IMAGE_HVM_CFG:
+                val = sxp.child_value(image_sxp, arg, None)
+                if val != None:
+                    image_hvm[arg] = conv(val)
+                    
+            image_hvm_devices = {}
+            for arg, conv in LEGACY_IMAGE_HVM_DEVICES_CFG:
+                val = sxp.child_value(image_sxp, arg, None)
+                if val != None:
+                    image_hvm_devices[arg] = conv(val)
 
-    def _populate_from_xml(self, parsed_xml):
-        raise NotImplementedError
+            if image_hvm or image_hvm_devices:
+                image['hvm'] = image_hvm
+                image['hvm']['devices'] = image_hvm_devices
 
-    def _populate_from_python_config(self, parsed_py):
-        raise NotImplementedError
+            self['image'] = image
+
+            for apikey, imgkey in XENAPI_HVM_CFG.items():
+                val = sxp.child_value(image_sxp, imgkey, None)
+                if val != None:
+                    self[apikey] = val
+
+        # extract backend value
+                    
+        backend = []
+        for c in sxp.children(sxp_cfg, 'backend'):
+            backend.append(sxp.name(sxp.child0(c)))
+        if backend:
+            self['backend'] = backend
+
+        if self['image'].has_key('hvm'):
+            self['builder'] = 'hvm'
+            
+        # Parse and convert other Non Xen API parameters.
+        def _set_cfg_if_exists(sxp_arg):
+            val = sxp.child_value(sxp_cfg, sxp_arg)
+            if val != None:
+                if LEGACY_CFG_TYPES.get(sxp_arg):
+                    self[sxp_arg] = LEGACY_CFG_TYPES[sxp_arg](val)
+                else:
+                    self[sxp_arg] = val
+
+        _set_cfg_if_exists('shadow_memory')
+        _set_cfg_if_exists('security')
+        _set_cfg_if_exists('features')
+        _set_cfg_if_exists('on_xend_stop')
+        _set_cfg_if_exists('on_xend_start')
+        _set_cfg_if_exists('vcpu_avail')
+        _set_cfg_if_exists('max_vcpu_id') # TODO, deprecated?
+        
+        # Parse and store runtime configuration 
+        _set_cfg_if_exists('start_time')
+        _set_cfg_if_exists('online_vcpus')
+        _set_cfg_if_exists('cpu_time')
+        _set_cfg_if_exists('shutdown_reason')
+        _set_cfg_if_exists('up_time')
+        _set_cfg_if_exists('status') # TODO, deprecated  
+
+    def _add_xapi_unsupported(self):
+        """Updates the configuration object with entries that are not
+        officially supported by the Xen API but is required for
+        the rest of Xend to function.
+        """
+
+        # populate image
+        self['image']['type'] = self['builder']
+        if self['builder'] == 'hvm':
+            self['image']['hvm'] = {}
+            for xapi, cfgapi in XENAPI_HVM_CFG.items():
+                self['image']['hvm'][cfgapi] = self[xapi]
+            
 
     def _get_old_state_string(self):
+        """Returns the old xm state string.
+        @rtype: string
+        @return: old state string
+        """
         state_string = ''
         for state_name in CONFIG_OLD_DOM_STATES:
             on_off = self.get(state_name, 0)
@@ -669,8 +720,40 @@ class XendConfig(dict):
 
         return state_string
 
-    def get_sxp(self, domain = None, ignore_devices = False, ignore = []):
+
+    def update_config(self, dominfo):
+        """Update configuration with the output from xc.domain_getinfo().
+
+        @param dominfo: Domain information via xc.domain_getinfo()
+        @type dominfo: dict
+        """
+        self._dominfo_to_xapi(dominfo)
+        self.validate()
+
+    def update_with_xenapi_config(self, xapi):
+        """Update configuration with a Xen API VM struct
+
+        @param xapi: Xen API VM Struct
+        @type xapi: dict
+        """
+        for key, val in xapi.items():
+            key = key.lower()
+            type_conv = XENAPI_CFG_TYPES.get(key)
+            if callable(type_conv):
+                self[key] = type_conv(val)
+            else:
+                self[key] = val
+
+        self.validate()
+
+    def to_xml(self):
+        """Return an XML string representing the configuration."""
+        pass
+
+    def to_sxp(self, domain = None, ignore_devices = False, ignore = []):
         """ Get SXP representation of this config object.
+
+        Incompat: removed store_mfn, console_mfn
 
         @keyword domain: (optional) XendDomainInfo to get extra information
                          from such as domid and running devices.
@@ -688,44 +771,36 @@ class XendConfig(dict):
         if domain.getDomid() is not None:
             sxpr.append(['domid', domain.getDomid()])
 
-        for cfg, typefunc in ROUNDTRIPPING_CONFIG_ENTRIES:
-            if cfg in self:
-                if self[cfg] is not None:
-                    sxpr.append([cfg, self[cfg]])
+        for xenapi, legacy in XENAPI_CFG_TO_LEGACY_CFG.items():
+            if self.has_key(xenapi) and self[xenapi] not in (None, []):
+                if type(self[xenapi]) == bool:
+                    # convert booleans to ints before making an sxp item
+                    sxpr.append([legacy, int(self[xenapi])])
+                else:
+                    sxpr.append([legacy, self[xenapi]])
 
-        if 'image' in self and self['image'] is not None:
-            sxpr.append(['image', self['image']])
-        if 'security' in self and self['security']:
-            sxpr.append(['security', self['security']])
-        if 'shutdown_reason' in self:
-            sxpr.append(['shutdown_reason', self['shutdown_reason']])
-        if 'cpu_time' in self:
-            sxpr.append(['cpu_time', self['cpu_time']/1e9])
+        for legacy in LEGACY_UNSUPPORTED_BY_XENAPI_CFG:
+            if legacy in ('domid', 'uuid'): # skip these
+                continue
+            if self.has_key(legacy) and self[legacy] not in (None, []):
+                sxpr.append([legacy, self[legacy]])
 
-        sxpr.append(['online_vcpus', self['online_vcpus']])
+        if 'image' in self and self['image']:
+            sxpr.append(['image', self.image_sxpr()])
 
-        if 'start_time' in self:
-            uptime = time.time() - self['start_time']
-            sxpr.append(['up_time', str(uptime)])
-            sxpr.append(['start_time', str(self['start_time'])])
-
-        if domain:
-            sxpr.append(['status', str(domain.state)])
-        else:
-            sxpr.append(['status', str(DOM_STATE_HALTED)])
+        sxpr.append(['status', domain.state])
+        sxpr.append(['memory_dynamic_min',  self.get('memory_dynamic_min')])
+        sxpr.append(['memory_dynamic_max',  self.get('memory_dynamic_max')])
 
         if domain.getDomid() is not None:
             sxpr.append(['state', self._get_old_state_string()])
 
-        sxpr.append(['memory_dynamic_max', self.get('memory_dynamic_max',
-                                                    self['memory'])])
-
-        # For save/restore migration
         if domain:
             if domain.store_mfn:
                 sxpr.append(['store_mfn', domain.store_mfn])
             if domain.console_mfn:
                 sxpr.append(['console_mfn', domain.console_mfn])
+
 
         # Marshall devices (running or from configuration)
         if not ignore_devices:
@@ -743,7 +818,7 @@ class XendConfig(dict):
                     except:
                         log.exception("dumping sxp from device controllers")
                         pass
-                        
+                    
                 # if we didn't find that device, check the existing config
                 # for a device in the same class
                 if not found:
@@ -751,58 +826,28 @@ class XendConfig(dict):
                         if dev_type == cls:
                             sxpr.append(['device', dev_info])
 
-        return sxpr
-
-    def validate(self):
-        """ Validate the configuration and fill in missing configuration
-        with defaults.
-        """
-
-        # Fill in default values
-        for key, default_func in DEFAULT_CONFIGURATION:
-            if key not in self or self[key] == None:
-                self[key] = default_func(self)
-
-        # Basic sanity checks
-        if 'image' in self and isinstance(self['image'], str):
-            self['image'] = sxp.from_string(self['image'])
-        if 'security' in self and isinstance(self['security'], str):
-            self['security'] = sxp.from_string(self['security'])
-        if self['memory'] == 0 and 'mem_kb' in self:
-            self['memory'] = (self['mem_kb'] + 1023)/1024
-        if self['memory'] <= 0:
-            raise XendConfigError('Invalid memory size: %s' %
-                                  str(self['memory']))
-
-        self['maxmem'] = max(self['memory'], self['maxmem'])
-
-        # convert mem_kb from domain_getinfo to something more descriptive
-        if 'mem_kb' in self:
-            self['memory_dynamic_max'] = (self['mem_kb'] + 1023)/1024
-
-        # Verify devices
-        for d_uuid, (d_type, d_info) in self['device'].items():
-            if d_type not in XendDevices.valid_devices() and \
-               d_type not in XendDevices.pseudo_devices():
-                raise XendConfigError('Invalid device (%s)' % d_type)
-
-        # Verify restart modes
-        for event in ('on_poweroff', 'on_reboot', 'on_crash'):
-            if self[event] not in CONFIG_RESTART_MODES:
-                raise XendConfigError('Invalid restart event: %s = %s' % \
-                                      (event, str(self[event])))
-
-        # Verify that {vif,vbd}_refs are here too
-        if 'vif_refs' not in self:
-            self['vif_refs'] = []
-        if 'vbd_refs' not in self:
-            self['vbd_refs'] = []
-        if 'vtpm_refs' not in self:
-            self['vtpm_refs'] = []
-
+        return sxpr    
+    
     def device_add(self, dev_type, cfg_sxp = None, cfg_xenapi = None):
+        """Add a device configuration in SXP format or XenAPI struct format.
+
+        For SXP, it could be either:
+
+        [device, [vbd, [uname ...]]
+
+        or:
+
+        [vbd, [uname ..]]
+
+        @type cfg_sxp: list of lists (parsed sxp object)
+        @param cfg_sxp: SXP configuration object
+        @type cfg_xenapi: dict
+        @param cfg_xenapi: A device configuration from Xen API (eg. vbd,vif)
+        @rtype: string
+        @return: Assigned UUID of the device.
+        """
         if dev_type not in XendDevices.valid_devices() and \
-           dev_type not in XendDevices.pseudo_devices():
+           dev_type not in XendDevices.pseudo_devices():        
             raise XendConfigError("XendConfig: %s not a valid device type" %
                             dev_type)
 
@@ -816,22 +861,48 @@ class XendConfig(dict):
             log.debug("XendConfig.device_add: %s" % str(cfg_xenapi))
 
         if cfg_sxp:
+            if sxp.child0(cfg_sxp) == 'device':
+                config = sxp.child0(cfg_sxp)
+            else:
+                config = cfg_sxp
+
+            dev_type = sxp.name(config)
             dev_info = {}
 
             try:
-                for opt, val in cfg_sxp[1:]:
+                for opt, val in config[1:]:
                     dev_info[opt] = val
             except ValueError:
                 pass # SXP has no options for this device
 
+            
+            def _get_config_ipaddr(config):
+                val = []
+                for ipaddr in sxp.children(config, elt='ip'):
+                    val.append(sxp.child0(ipaddr))
+                return val
+
+            if dev_type == 'vif' and 'ip' in dev_info:
+                dev_info['ip'] = _get_config_ipaddr(config)
+
+            if dev_type == 'vbd':
+                if dev_info.get('dev', '').startswith('ioemu:'):
+                    dev_info['driver'] = 'ioemu'
+                else:
+                    dev_info['driver'] = 'paravirtualised'
+                    
+
             # create uuid if it doesn't exist
             dev_uuid = dev_info.get('uuid', uuid.createString())
             dev_info['uuid'] = dev_uuid
-            self['device'][dev_uuid] = (dev_type, dev_info)
-            if dev_type in ('vif', 'vbd'):
+
+            # store dev references by uuid for certain device types
+            self['devices'][dev_uuid] = (dev_type, dev_info)
+            if dev_type in ('vif', 'vbd', 'vtpm'):
                 self['%s_refs' % dev_type].append(dev_uuid)
             elif dev_type in ('tap',):
                 self['vbd_refs'].append(dev_uuid)
+
             return dev_uuid
 
         if cfg_xenapi:
@@ -849,13 +920,21 @@ class XendConfig(dict):
                 
                 dev_uuid = cfg_xenapi.get('uuid', uuid.createString())
                 dev_info['uuid'] = dev_uuid
-                self['device'][dev_uuid] = (dev_type, dev_info)
+                self['devices'][dev_uuid] = (dev_type, dev_info)
                 self['vif_refs'].append(dev_uuid)
                 return dev_uuid
             
-            elif dev_type == 'vbd':
-                dev_info['uname'] = cfg_xenapi.get('image', None)
-                dev_info['dev'] = '%s:disk' % cfg_xenapi.get('device')
+            elif dev_type in ('vbd', 'tap'):
+                if dev_type == 'vbd':
+                    dev_info['uname'] = cfg_xenapi.get('image', '')
+                    dev_info['dev'] = '%s:disk' % cfg_xenapi.get('device')
+                elif dev_type == 'tap':
+                    dev_info['uname'] = 'tap:qcow:%s' % cfg_xenapi.get('image')
+                    dev_info['dev'] = '%s:disk' % cfg_xenapi.get('device')
+                    
+                dev_info['driver'] = cfg_xenapi.get('driver')
+                dev_info['VDI'] = cfg_xenapi.get('VDI', '')
+                    
                 if cfg_xenapi.get('mode') == 'RW':
                     dev_info['mode'] = 'w'
                 else:
@@ -863,35 +942,43 @@ class XendConfig(dict):
 
                 dev_uuid = cfg_xenapi.get('uuid', uuid.createString())
                 dev_info['uuid'] = dev_uuid
-                self['device'][dev_uuid] = (dev_type, dev_info)
+                self['devices'][dev_uuid] = (dev_type, dev_info)
                 self['vbd_refs'].append(dev_uuid)                
                 return dev_uuid
 
-            elif dev_type == 'vtpm':
+            elif dev_type in ('vtpm'):
                 if cfg_xenapi.get('type'):
                     dev_info['type'] = cfg_xenapi.get('type')
+
                 dev_uuid = cfg_xenapi.get('uuid', uuid.createString())
                 dev_info['uuid'] = dev_uuid
-                self['device'][dev_uuid] = (dev_type, dev_info)
+                self['devices'][dev_uuid] = (dev_type, dev_info)
                 self['vtpm_refs'].append(dev_uuid)
                 return dev_uuid
 
-            elif dev_type == 'tap':
-                dev_info['uname'] = 'tap:qcow:%s' % cfg_xenapi.get('image')
-                dev_info['dev'] = '%s:disk' % cfg_xenapi.get('device')
-                
-                if cfg_xenapi.get('mode') == 'RW':
-                    dev_info['mode'] = 'w'
-                else:
-                    dev_info['mode'] = 'r'
-
-                dev_uuid = cfg_xenapi.get('uuid', uuid.createString())
-                dev_info['uuid'] = dev_uuid
-                self['device'][dev_uuid] = (dev_type, dev_info)
-                self['vbd_refs'].append(dev_uuid)                
-                return dev_uuid                
-                
         return ''
+
+    def device_update(self, dev_uuid, cfg_sxp):
+        """Update an existing device with the new configuration.
+
+        @rtype: boolean
+        @return: Returns True if succesfully found and updated a device conf
+        """
+        if dev_uuid in self['devices']:
+            config = sxp.child0(cfg_sxp)
+            dev_type = sxp.name(config)
+            dev_info = {}
+
+            try:
+                for opt, val in config[1:]:
+                    self['devices'][opt] = val
+            except ValueError:
+                pass # SXP has no options for this device
+            
+            return True
+
+        return False
+
 
     def device_sxpr(self, dev_uuid = None, dev_type = None, dev_info = None):
         """Get Device SXPR by either giving the device UUID or (type, config).
@@ -900,8 +987,8 @@ class XendConfig(dict):
         @return: device config sxpr
         """
         sxpr = []
-        if dev_uuid != None and dev_uuid in self['device']:
-            dev_type, dev_info = self['device'][dev_uuid]
+        if dev_uuid != None and dev_uuid in self['devices']:
+            dev_type, dev_info = self['devices'][dev_uuid]
 
         if dev_type == None or dev_info == None:
             raise XendConfigError("Required either UUID or device type and "
@@ -917,27 +1004,106 @@ class XendConfig(dict):
         """Returns the SXPR for all devices in the current configuration."""
         sxprs = []
         pci_devs = []
-        for dev_type, dev_info in self['device'].values():
+
+        if 'devices' not in self:
+            return sxprs
+        
+        for dev_type, dev_info in self['devices'].values():
             if dev_type == 'pci': # special case for pci devices
-                pci_devs.append(dev_info)
+                sxpr = [['uuid', dev_info['uuid']]]
+                for pci_dev_info in dev_info['devs']:
+                    pci_dev_sxpr = ['dev']
+                    for opt, val in pci_dev_info.items():
+                        pci_dev_sxpr.append([opt, val])
+                    sxpr.append(pci_dev_sxpr)
+                sxprs.append((dev_type, sxpr))
             else:
                 sxpr = self.device_sxpr(dev_type = dev_type,
                                         dev_info = dev_info)
                 sxprs.append((dev_type, sxpr))
 
-        # if we have any pci_devs, we parse them differently into
-        # one single pci SXP entry.
-        if pci_devs:
-            sxpr = ['pci',]
-            for dev_info in pci_devs:
-                dev_sxpr = self.device_sxpr(dev_type = 'dev',
-                                            dev_info = dev_info)
-                sxpr.append(dev_sxpr)
-            sxprs.append(('pci', sxpr))
-            
         return sxprs
 
-                     
+    def image_sxpr(self):
+        """Returns a backwards compatible image SXP expression that is
+        used in xenstore's /vm/<uuid>/image value and xm list."""
+        image = [self['image'].get('type', 'linux')]
+        if self.has_key('kernel_kernel'):
+            image.append(['kernel', self['kernel_kernel']])
+        if self.has_key('kernel_initrd') and self['kernel_initrd']:
+            image.append(['ramdisk', self['kernel_initrd']])
+        if self.has_key('kernel_args') and self['kernel_args']:
+            image.append(['args', self['kernel_args']])
+
+        for arg, conv in LEGACY_IMAGE_CFG:
+            if self['image'].has_key(arg):
+                image.append([arg, self['image'][arg]])
+
+        if 'hvm' in self['image']:
+            for arg, conv in LEGACY_IMAGE_HVM_CFG:
+                if self['image']['hvm'].get(arg):
+                    image.append([arg, self['image']['hvm'][arg]])
+
+        if 'hvm' in self['image'] and 'devices' in self['image']['hvm']:
+            for arg, conv in LEGACY_IMAGE_HVM_DEVICES_CFG:
+                if self['image']['hvm']['devices'].get(arg):
+                    image.append([arg,
+                                  self['image']['hvm']['devices'][arg]])
+
+        return image
+
+    def update_with_image_sxp(self, image_sxp):
+        # Convert Legacy "image" config to Xen API kernel_*
+        # configuration
+        self['kernel_kernel'] = sxp.child_value(image_sxp, 'kernel','')
+        self['kernel_initrd'] = sxp.child_value(image_sxp, 'ramdisk','')
+        kernel_args = sxp.child_value(image_sxp, 'args', '')
+        
+        # attempt to extract extra arguments from SXP config
+        arg_ip = sxp.child_value(image_sxp, 'ip')
+        if arg_ip and not re.search(r'ip=[^ ]+', kernel_args):
+            kernel_args += ' ip=%s' % arg_ip
+        arg_root = sxp.child_value(image_sxp, 'root')
+        if arg_root and not re.search(r'root=', kernel_args):
+            kernel_args += ' root=%s' % arg_root
+        self['kernel_args'] = kernel_args
+
+        # Store image SXP in python dictionary format
+        image = {}
+        image['type'] = sxp.name(image_sxp)
+        for arg, conv in LEGACY_IMAGE_CFG:
+            val = sxp.child_value(image_sxp, arg, None)
+            if val != None:
+                image[arg] = conv(val)
+
+        image_hvm = {}
+        for arg, conv in LEGACY_IMAGE_HVM_CFG:
+            val = sxp.child_value(image_sxp, arg, None)
+            if val != None:
+                image_hvm[arg] = conv(val)
+                    
+        image_hvm_devices = {}
+        for arg, conv in LEGACY_IMAGE_HVM_DEVICES_CFG:
+            val = sxp.child_value(image_sxp, arg, None)
+            if val != None:
+                image_hvm_devices[arg] = conv(val)
+
+        if image_hvm or image_hvm_devices:
+            image['hvm'] = image_hvm
+            image['hvm']['devices'] = image_hvm_devices
+
+        self['image'] = image
+
+        for apikey, imgkey in XENAPI_HVM_CFG.items():
+            val = sxp.child_value(image_sxp, imgkey, None)
+            if val != None:
+                type_conv = XENAPI_CFG_TYPES[apikey]
+                if callable(conv):
+                    self[apikey] = type_conv(val)
+                else:
+                    self[apikey] = val
+
+        
 #
 # debugging 
 #

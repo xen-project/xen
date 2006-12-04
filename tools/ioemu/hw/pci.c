@@ -221,23 +221,16 @@ uint32_t pci_default_read_config(PCIDevice *d,
                                  uint32_t address, int len)
 {
     uint32_t val;
-
     switch(len) {
-    default:
-    case 4:
-	if (address <= 0xfc) {
-	    val = le32_to_cpu(*(uint32_t *)(d->config + address));
-	    break;
-	}
-	/* fall through */
-    case 2:
-        if (address <= 0xfe) {
-	    val = le16_to_cpu(*(uint16_t *)(d->config + address));
-	    break;
-	}
-	/* fall through */
     case 1:
         val = d->config[address];
+        break;
+    case 2:
+        val = le16_to_cpu(*(uint16_t *)(d->config + address));
+        break;
+    default:
+    case 4:
+        val = le32_to_cpu(*(uint32_t *)(d->config + address));
         break;
     }
     return val;
@@ -340,8 +333,7 @@ void pci_default_write_config(PCIDevice *d,
 
             d->config[addr] = val;
         }
-        if (++addr > 0xff)
-        	break;
+        addr++;
         val >>= 8;
     }
 

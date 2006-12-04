@@ -23,6 +23,7 @@
 """
 
 import os
+import stat
 import shutil
 import socket
 import threading
@@ -44,7 +45,7 @@ from xen.xend.XendDevices import XendDevices
 
 from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.xenstore.xswatch import xswatch
-from xen.util import security
+from xen.util import mkdir, security
 from xen.xend import uuid
 
 xc = xen.lowlevel.xc.xc()
@@ -99,11 +100,7 @@ class XendDomain:
         """Singleton initialisation function."""
 
         dom_path = self._managed_path()
-        try:
-            os.stat(dom_path)
-        except OSError:
-            log.info("Making %s", dom_path)
-            os.makedirs(dom_path, 0755)
+        mkdir.parents(dom_path, stat.S_IRWXU)
 
         xstransact.Mkdir(XS_VMROOT)
         xstransact.SetPermissions(XS_VMROOT, {'dom': DOM0_ID})
@@ -184,7 +181,7 @@ class XendDomain:
                 if not dom_uuid:
                     continue
                 
-                dom_name = dom.get('name', 'Domain-%s' % dom_uuid)
+                dom_name = dom.get('name_label', 'Domain-%s' % dom_uuid)
                 try:
                     running_dom = self.domain_lookup_nr(dom_name)
                     if not running_dom:
@@ -271,25 +268,17 @@ class XendDomain:
             domains_dir = self._managed_path()
             dom_uuid = dominfo.get_uuid()            
             domain_config_dir = self._managed_path(dom_uuid)
-        
-            # make sure the domain dir exists
-            if not os.path.exists(domains_dir):
-                os.makedirs(domains_dir, 0755)
-            elif not os.path.isdir(domains_dir):
-                log.error("xend_domain_dir is not a directory.")
-                raise XendError("Unable to save managed configuration "
-                                "because %s is not a directory." %
-                                domains_dir)
-            
-            if not os.path.exists(domain_config_dir):
+
+            def make_or_raise(path):
                 try:
-                    os.makedirs(domain_config_dir, 0755)
-                except IOError:
-                    log.exception("Failed to create directory: %s" %
-                                  domain_config_dir)
-                    raise XendError("Failed to create directory: %s" %
-                                    domain_config_dir)
-                
+                    mkdir.parents(path, stat.S_IRWXU)
+                except:
+                    log.exception("%s could not be created." % path)
+                    raise XendError("%s could not be created." % path)
+
+            make_or_raise(domains_dir)
+            make_or_raise(domain_config_dir)
+
             try:
                 sxp_cache_file = open(self._managed_config_path(dom_uuid),'w')
                 prettyprint(dominfo.sxpr(), sxp_cache_file, width = 78)
@@ -423,7 +412,6 @@ class XendDomain:
                 self._remove_domain(dom, domid)
 
 
-
     def _add_domain(self, info):
         """Add a domain to the list of running domains
         
@@ -433,6 +421,11 @@ class XendDomain:
         """
         log.debug("Adding Domain: %s" % info.getDomid())
         self.domains[info.getDomid()] = info
+        
+        # update the managed domains with a new XendDomainInfo object
+        # if we are keeping track of it.
+        if info.get_uuid() in self.managed_domains:
+            self._managed_domain_register(info)
 
     def _remove_domain(self, info, domid = None):
         """Remove the domain from the list of running domains
@@ -669,7 +662,7 @@ class XendDomain:
         self.domains_lock.acquire()
         try:
             try:
-                xeninfo = XendConfig(xenapi_vm = xenapi_vm)
+                xeninfo = XendConfig(xapi = xenapi_vm)
                 dominfo = XendDomainInfo.createDormant(xeninfo)
                 log.debug("Creating new managed domain: %s: %s" %
                           (dominfo.getName(), dominfo.get_uuid()))
@@ -873,8 +866,8 @@ class XendDomain:
         self.domains_lock.acquire()
         try:
             try:
-                xeninfo = XendConfig(sxp = config)
-                dominfo = XendDomainInfo.createDormant(xeninfo)
+                domconfig = XendConfig(sxp_obj = config)
+                dominfo = XendDomainInfo.createDormant(domconfig)
                 log.debug("Creating new managed domain: %s" %
                           dominfo.getName())
                 self._managed_domain_register(dominfo)
@@ -935,6 +928,9 @@ class XendDomain:
 
                 if dominfo.state != DOM_STATE_HALTED:
                     raise XendError("Domain is still running")
+
+                log.info("Domain %s (%s) deleted." %
+                         (dominfo.getName(), dominfo.info.get('uuid')))
 
                 self._managed_domain_unregister(dominfo)
                 self._remove_domain(dominfo)

@@ -30,6 +30,8 @@ from SimpleXMLRPCServer import SimpleXMLRPCServer, SimpleXMLRPCRequestHandler
 import SocketServer
 import xmlrpclib, socket, os, stat
 
+import mkdir
+
 from xen.web import connection
 from xen.xend.XendLogging import log
 
@@ -234,14 +236,9 @@ class UnixXMLRPCServer(TCPXMLRPCServer):
     address_family = socket.AF_UNIX
 
     def __init__(self, addr, allowed, logRequests = 1):
-        parent = os.path.dirname(addr)
-        if os.path.exists(parent):
-            os.chown(parent, os.geteuid(), os.getegid())
-            os.chmod(parent, stat.S_IRWXU)
-            if self.allow_reuse_address and os.path.exists(addr):
-                os.unlink(addr)
-        else:
-            os.makedirs(parent, stat.S_IRWXU)
+        mkdir.parents(os.path.dirname(addr), stat.S_IRWXU, True)
+        if self.allow_reuse_address and os.path.exists(addr):
+            os.unlink(addr)
 
         TCPXMLRPCServer.__init__(self, addr, allowed,
                                  UnixXMLRPCRequestHandler, logRequests)

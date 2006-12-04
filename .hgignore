@@ -158,6 +158,8 @@
 ^tools/xcutils/xc_restore$
 ^tools/xcutils/xc_save$
 ^tools/xcutils/readnotes$
+^tools/xenfb/sdlfb$
+^tools/xenfb/vncfb$
 ^tools/xenmon/xentrace_setmask$
 ^tools/xenmon/xenbaked$
 ^tools/xenstat/xentop/xentop$

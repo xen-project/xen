@@ -22,7 +22,6 @@ import types
 
 import xen.lowlevel.xc
 
-from xen.xend import sxp
 from xen.xend.XendError import VmError
 
 from xen.xend.server.DevController import DevController
@@ -49,13 +48,12 @@ class IOPortsController(DevController):
     def __init__(self, vm):
         DevController.__init__(self, vm)
 
-
     def getDeviceDetails(self, config):
         """@see DevController.getDeviceDetails"""
 
         def get_param(field):
             try:
-                val = sxp.child_value(config, field)
+                val = config.get(field)
 
                 if not val:
                     raise VmError('ioports: Missing %s config setting' % field)

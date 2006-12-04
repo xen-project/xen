@@ -147,8 +147,6 @@ struct shadow_vcpu {
     unsigned long last_writeable_pte_smfn;
     /* HVM guest: paging enabled (CR0.PG)?  */
     unsigned int translate_enabled:1;
-    /* Emulated fault needs to be propagated to guest? */
-    unsigned int propagate_fault:1;
 };
 
 struct arch_vcpu

@@ -17,28 +17,47 @@
  * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston, MA 02111-1307 USA.
  */
+
 #ifndef __ASM_X86_HVM_HVM_H__
 #define __ASM_X86_HVM_HVM_H__
 
-enum segment {
-    seg_cs,
-    seg_ss,
-    seg_ds,
-    seg_es,
-    seg_fs,
-    seg_gs,
-    seg_tr,
-    seg_ldtr,
-    seg_gdtr,
-    seg_idtr
-};
+#include <asm/x86_emulate.h>
+
+/* 
+ * Attribute for segment selector. This is a copy of bit 40:47 & 52:55 of the
+ * segment descriptor. It happens to match the format of an AMD SVM VMCB.
+ */
+typedef union segment_attributes {
+    u16 bytes;
+    struct
+    {
+        u16 type:4;    /* 0;  Bit 40-43 */
+        u16 s:   1;    /* 4;  Bit 44 */
+        u16 dpl: 2;    /* 5;  Bit 45-46 */
+        u16 p:   1;    /* 7;  Bit 47 */
+        u16 avl: 1;    /* 8;  Bit 52 */
+        u16 l:   1;    /* 9;  Bit 53 */
+        u16 db:  1;    /* 10; Bit 54 */
+        u16 g:   1;    /* 11; Bit 55 */
+    } fields;
+} __attribute__ ((packed)) segment_attributes_t;
+
+/*
+ * Full state of a segment register (visible and hidden portions).
+ * Again, this happens to match the format of an AMD SVM VMCB.
+ */
+typedef struct segment_register {
+    u16        sel;
+    segment_attributes_t attr;
+    u32        limit;
+    u64        base;
+} __attribute__ ((packed)) segment_register_t;
 
 /*
  * The hardware virtual machine (HVM) interface abstracts away from the
  * x86/x86_64 CPU virtualization assist specifics. Currently this interface
  * supports Intel's VT-x and AMD's SVM extensions.
  */
-
 struct hvm_function_table {
     /*
      *  Disable HVM functionality
@@ -74,7 +93,9 @@ struct hvm_function_table {
     int (*pae_enabled)(struct vcpu *v);
     int (*guest_x86_mode)(struct vcpu *v);
     unsigned long (*get_guest_ctrl_reg)(struct vcpu *v, unsigned int num);
-    unsigned long (*get_segment_base)(struct vcpu *v, enum segment seg);
+    unsigned long (*get_segment_base)(struct vcpu *v, enum x86_segment seg);
+    void (*get_segment_register)(struct vcpu *v, enum x86_segment seg,
+                                 struct segment_register *reg);
 
     /* 
      * Re-set the value of CR3 that Xen runs on when handling VM exits
@@ -88,6 +109,9 @@ struct hvm_function_table {
      */
     void (*stts)(struct vcpu *v);
     void (*set_tsc_offset)(struct vcpu *v, u64 offset);
+
+    void (*inject_exception)(unsigned int trapnr, int errcode,
+                             unsigned long cr2);
 
     void (*init_ap_context)(struct vcpu_guest_context *ctxt,
                             int vcpuid, int trampoline_vector);
@@ -134,11 +158,15 @@ hvm_paging_enabled(struct vcpu *v)
     return hvm_funcs.paging_enabled(v);
 }
 
+#ifdef __x86_64__
 static inline int
 hvm_long_mode_enabled(struct vcpu *v)
 {
     return hvm_funcs.long_mode_enabled(v);
 }
+#else
+#define hvm_long_mode_enabled(v) (v,0)
+#endif
 
  static inline int
 hvm_pae_enabled(struct vcpu *v)
@@ -172,9 +200,16 @@ hvm_get_guest_ctrl_reg(struct vcpu *v, unsigned int num)
 }
 
 static inline unsigned long
-hvm_get_segment_base(struct vcpu *v, enum segment seg)
+hvm_get_segment_base(struct vcpu *v, enum x86_segment seg)
 {
     return hvm_funcs.get_segment_base(v, seg);
+}
+
+static inline void
+hvm_get_segment_register(struct vcpu *v, enum x86_segment seg,
+                         struct segment_register *reg)
+{
+    hvm_funcs.get_segment_register(v, seg, reg);
 }
 
 void hvm_stts(struct vcpu *v);
@@ -188,6 +223,12 @@ hvm_init_ap_context(struct vcpu_guest_context *ctxt,
                     int vcpuid, int trampoline_vector)
 {
     return hvm_funcs.init_ap_context(ctxt, vcpuid, trampoline_vector);
+}
+
+static inline void
+hvm_inject_exception(unsigned int trapnr, int errcode, unsigned long cr2)
+{
+    hvm_funcs.inject_exception(trapnr, errcode, cr2);
 }
 
 int hvm_bringup_ap(int vcpuid, int trampoline_vector);

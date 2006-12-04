@@ -128,17 +128,6 @@ static inline unsigned long DECODE_GPR_VALUE(struct vmcb_struct *vmcb,
         return (unsigned long) -1; \
     }
 
-#if 0
-/*
- * hv_is_canonical - checks if the given address is canonical
- */
-static inline u64 hv_is_canonical(u64 addr)
-{
-    u64 bits = addr & (u64)0xffff800000000000;
-    return (u64)((bits == (u64)0xffff800000000000) || (bits == (u64)0x0));
-}
-#endif
-
 #define modrm operand [0]
 
 #define sib operand [1]
@@ -209,7 +198,7 @@ unsigned long get_effective_addr_modrm64(struct vmcb_struct *vmcb,
 
 #if __x86_64__
         /* 64-bit mode */
-        if (vmcb->cs.attributes.fields.l && (vmcb->efer & EFER_LMA))
+        if (vmcb->cs.attr.fields.l && (vmcb->efer & EFER_LMA))
             return vmcb->rip + inst_len + *size + disp;
 #endif
         return disp;
@@ -334,7 +323,7 @@ unsigned long svm_rip2pointer(struct vmcb_struct *vmcb)
      * no matter what kind of addressing is used.
      */
     unsigned long p = vmcb->cs.base + vmcb->rip;
-    if (!(vmcb->cs.attributes.fields.l && vmcb->efer & EFER_LMA))
+    if (!(vmcb->cs.attr.fields.l && vmcb->efer & EFER_LMA))
         return (u32)p; /* mask to 32 bits */
     /* NB. Should mask to 16 bits if in real mode or 16-bit protected mode. */
     return p;

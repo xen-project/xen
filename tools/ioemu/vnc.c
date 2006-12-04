@@ -114,6 +114,7 @@ struct VncState
     int visible_h;
 
     int ctl_keys;               /* Ctrl+Alt starts calibration */
+    int shift_keys;             /* Shift / CapsLock keys */
 };
 
 #define DIRTY_PIXEL_BITS 64
@@ -870,9 +871,12 @@ static void do_key_event(VncState *vs, int down, uint32_t sym)
     } else if (down) {
 	int qemu_keysym = 0;
 
-	if (sym <= 128) /* normal ascii */
+	if (sym <= 128) { /* normal ascii */
+	    int shifted = vs->shift_keys == 1 || vs->shift_keys == 2;
 	    qemu_keysym = sym;
-	else {
+	    if (sym >= 'a' && sym <= 'z' && shifted)
+	        qemu_keysym -= 'a' - 'A';
+	} else {
 	    switch (sym) {
 	    case XK_Up: qemu_keysym = QEMU_KEY_UP; break;
 	    case XK_Down: qemu_keysym = QEMU_KEY_DOWN; break;
@@ -903,6 +907,10 @@ static void do_key_event(VncState *vs, int down, uint32_t sym)
 	    vs->ctl_keys |= 2;
 	    break;
 
+	case XK_Shift_L:
+	    vs->shift_keys |= 1;
+	    break;
+
 	default:
 	    break;
 	}
@@ -914,6 +922,14 @@ static void do_key_event(VncState *vs, int down, uint32_t sym)
 
 	case XK_Alt_L:
 	    vs->ctl_keys &= ~2;
+	    break;
+
+	case XK_Shift_L:
+	    vs->shift_keys &= ~1;
+	    break;
+
+	case XK_Caps_Lock:
+	    vs->shift_keys ^= 2;
 	    break;
 
 	case XK_1 ... XK_9:

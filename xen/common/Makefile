@@ -7,6 +7,7 @@ obj-y += event_channel.o
 obj-y += grant_table.o
 obj-y += kernel.o
 obj-y += keyhandler.o
+obj-y += kexec.o
 obj-y += lib.o
 obj-y += memory.o
 obj-y += multicall.o

@@ -22,6 +22,8 @@ import os.path
 import socket
 import stat
 
+from xen.util import mkdir
+
 import connection
 
 
@@ -30,13 +32,9 @@ def bind(path):
 created such that only the current user may access it."""
 
     parent = os.path.dirname(path)
-    if os.path.exists(parent):
-        os.chown(parent, os.geteuid(), os.getegid())
-        os.chmod(parent, stat.S_IRWXU)
-        if os.path.exists(path):
-            os.unlink(path)
-    else:
-        os.makedirs(parent, stat.S_IRWXU)
+    mkdir.parents(parent, stat.S_IRWXU, True)
+    if os.path.exists(path):
+        os.unlink(path)
 
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     sock.bind(path)

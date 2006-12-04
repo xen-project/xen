@@ -7,6 +7,8 @@
 #define VADDR_BITS              32
 #define VADDR_MASK              (~0UL)
 
+#define is_canonical_address(x) 1
+
 #include <xen/config.h>
 #ifdef CONFIG_X86_PAE
 # include <asm/x86_32/page-3level.h>

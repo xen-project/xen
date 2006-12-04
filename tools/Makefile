@@ -19,6 +19,7 @@ SUBDIRS-y += xenstat
 SUBDIRS-y += libaio
 SUBDIRS-y += blktap
 SUBDIRS-y += libfsimage
+SUBDIRS-$(XENFB_TOOLS) += xenfb
 SUBDIRS-$(LIBXENAPI_BINDINGS) += libxen
 
 # These don't cross-compile

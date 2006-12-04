@@ -392,7 +392,7 @@ static PyObject *pyxc_hvm_build(XcObject *self,
         return PyErr_SetFromErrno(xc_error);
 
     /* Set up the HVM info table. */
-    va_map = xc_map_foreign_range(self->xc_handle, dom, PAGE_SIZE,
+    va_map = xc_map_foreign_range(self->xc_handle, dom, XC_PAGE_SIZE,
                                   PROT_READ | PROT_WRITE,
                                   HVM_INFO_PFN);
     if ( va_map == NULL )
@@ -407,7 +407,7 @@ static PyObject *pyxc_hvm_build(XcObject *self,
     for ( i = 0, sum = 0; i < va_hvm->length; i++ )
         sum += ((uint8_t *)va_hvm)[i];
     va_hvm->checksum = -sum;
-    munmap(va_map, PAGE_SIZE);
+    munmap(va_map, XC_PAGE_SIZE);
 
     xc_get_hvm_param(self->xc_handle, dom, HVM_PARAM_STORE_PFN, &store_mfn);
     xc_set_hvm_param(self->xc_handle, dom, HVM_PARAM_PAE_ENABLED, pae);

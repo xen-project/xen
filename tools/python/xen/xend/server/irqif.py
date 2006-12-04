@@ -45,7 +45,7 @@ class IRQController(DevController):
 
         def get_param(field):
             try:
-                val = sxp.child_value(config, field)
+                val = config.get(field)
 
                 if not val:
                     raise VmError('irq: Missing %s config setting' % field)

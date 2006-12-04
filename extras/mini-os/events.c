@@ -31,26 +31,27 @@ typedef struct _ev_action_t {
     u32 count;
 } ev_action_t;
 
-
 static ev_action_t ev_actions[NR_EVS];
 void default_handler(evtchn_port_t port, struct pt_regs *regs, void *data);
+
+static unsigned long bound_ports[NR_EVS/(8*sizeof(unsigned long))];
 
 void unbind_all_ports(void)
 {
     int i;
 
-	for(i=0;i<NR_EVS;i++)
-	{
-		if(ev_actions[i].handler != default_handler)
-		{
-			struct evtchn_close close;
-			mask_evtchn(i);
-			close.port = i;
-			HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);
-		}
-	}
+    for (i = 0; i < NR_EVS; i++)
+    {
+        if (test_and_clear_bit(i, bound_ports))
+        {
+            struct evtchn_close close;
+            mask_evtchn(i);
+            close.port = i;
+            HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);
+        }
+    }
 }
-
+  
 /*
  * Demux events to different handlers.
  */
@@ -114,6 +115,7 @@ int bind_virq(uint32_t virq, evtchn_handler_t handler, void *data)
 		printk("Failed to bind virtual IRQ %d\n", virq);
 		return 1;
     }
+    set_bit(op.port,bound_ports);
     bind_evtchn(op.port, handler, data);
 	return 0;
 }
@@ -188,6 +190,7 @@ int evtchn_bind_interdomain(domid_t pal, evtchn_port_t remote_port,
     int err = HYPERVISOR_event_channel_op(EVTCHNOP_bind_interdomain, &op);
     if (err)
 		return err;
+    set_bit(op.local_port,bound_ports);
 	evtchn_port_t port = op.local_port;
     clear_evtchn(port);	      /* Without, handler gets invoked now! */
     *local_port = bind_evtchn(port, handler, data);

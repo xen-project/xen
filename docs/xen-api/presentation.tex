@@ -131,9 +131,6 @@ of that class that has the specified {\tt uuid}.
 ``{\tt get\_by\_name\_label(name)}'' RPC that returns a set of objects of that
 class that have the specified {\tt label}.
 
-\item Each class has a ``{\tt to\_XML()}'' RPC that serialises the
-state of all fields as an XML string.
-
 \item Each class has a ``{\tt destroy(Ref x)}'' RPC that explicitly deletes
 the persistent object specified by {\tt x} from the system.  This is a
 non-cascading delete -- if the object being removed is referenced by another
@@ -144,6 +141,6 @@ object then the {\tt destroy} call will fail.
 \subsection{Additional RPCs}
 
 As well as the RPCs enumerated above, some classes have additional RPCs
-associated with them. For example, the {\tt VM} class have RPCs for cloning,
+associated with them. For example, the {\tt VM} class has RPCs for cloning,
 suspending, starting etc. Such additional RPCs are described explicitly
 in the API reference.

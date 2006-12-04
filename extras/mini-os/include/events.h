@@ -36,6 +36,7 @@ int evtchn_alloc_unbound(domid_t pal, evtchn_handler_t handler,
 int evtchn_bind_interdomain(domid_t pal, evtchn_port_t remote_port,
 							evtchn_handler_t handler, void *data,
 							evtchn_port_t *local_port);
+void unbind_all_ports(void);
 
 static inline int notify_remote_via_evtchn(evtchn_port_t port)
 {

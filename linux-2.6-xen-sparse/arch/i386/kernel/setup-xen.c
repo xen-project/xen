@@ -69,6 +69,10 @@
 #include "setup_arch_pre.h"
 #include <bios_ebda.h>
 
+#ifdef CONFIG_XEN
+#include <xen/interface/kexec.h>
+#endif
+
 /* Forward Declaration. */
 void __init find_max_pfn(void);
 
@@ -943,6 +947,7 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 		 * after a kernel panic.
 		 */
 		else if (!memcmp(from, "crashkernel=", 12)) {
+#ifndef CONFIG_XEN
 			unsigned long size, base;
 			size = memparse(from+12, &from);
 			if (*from == '@') {
@@ -953,6 +958,10 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 				crashk_res.start = base;
 				crashk_res.end   = base + size - 1;
 			}
+#else
+			printk("Ignoring crashkernel command line, "
+			       "parameter will be supplied by xen\n");
+#endif
 		}
 #endif
 #ifdef CONFIG_PROC_VMCORE
@@ -1322,9 +1331,13 @@ void __init setup_bootmem_allocator(void)
 	}
 #endif
 #ifdef CONFIG_KEXEC
+#ifdef CONFIG_XEN
+	xen_machine_kexec_setup_resources();
+#else
 	if (crashk_res.start != crashk_res.end)
 		reserve_bootmem(crashk_res.start,
 			crashk_res.end - crashk_res.start + 1);
+#endif
 #endif
 
 	if (!xen_feature(XENFEAT_auto_translated_physmap))
@@ -1389,7 +1402,11 @@ legacy_init_iomem_resources(struct e820entry *e820, int nr_map,
 			request_resource(res, data_resource);
 #endif
 #ifdef CONFIG_KEXEC
-			request_resource(res, &crashk_res);
+			if (crashk_res.start != crashk_res.end)
+			     request_resource(res, &crashk_res);
+#ifdef CONFIG_XEN
+			xen_machine_kexec_register_resources(res);
+#endif
 #endif
 		}
 	}
@@ -1850,9 +1867,11 @@ void __init setup_arch(char **cmdline_p)
 #endif
 #endif
 	} else {
-		extern int console_use_vt;
-		console_use_vt = 0;
+#if defined(CONFIG_VT) && defined(CONFIG_DUMMY_CONSOLE)
+		conswitchp = &dummy_con;
+#endif
 	}
+	xencons_early_setup();
 }
 
 static int

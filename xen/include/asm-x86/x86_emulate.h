@@ -12,34 +12,36 @@
 struct x86_emulate_ctxt;
 
 /*
- * x86_emulate_ops:
- * 
+ * Comprehensive enumeration of x86 segment registers. Note that the system
+ * registers (TR, LDTR, GDTR, IDTR) are never referenced by the emulator.
+ */
+enum x86_segment {
+    /* General purpose. */
+    x86_seg_cs,
+    x86_seg_ss,
+    x86_seg_ds,
+    x86_seg_es,
+    x86_seg_fs,
+    x86_seg_gs,
+    /* System. */
+    x86_seg_tr,
+    x86_seg_ldtr,
+    x86_seg_gdtr,
+    x86_seg_idtr
+};
+
+/*
  * These operations represent the instruction emulator's interface to memory.
- * There are two categories of operation: those that act on ordinary memory
- * regions (*_std), and those that act on memory regions known to require
- * special treatment or emulation (*_emulated).
- * 
- * The emulator assumes that an instruction accesses only one 'emulated memory'
- * location, that this location is the given linear faulting address (cr2), and
- * that this is one of the instruction's data operands. Instruction fetches and
- * stack operations are assumed never to access emulated memory. The emulator
- * automatically deduces which operand of a string-move operation is accessing
- * emulated memory, and assumes that the other operand accesses normal memory.
  * 
  * NOTES:
- *  1. The emulator isn't very smart about emulated vs. standard memory.
- *     'Emulated memory' access addresses should be checked for sanity.
- *     'Normal memory' accesses may fault, and the caller must arrange to
- *     detect and handle reentrancy into the emulator via recursive faults.
- *     Accesses may be unaligned and may cross page boundaries.
- *  2. If the access fails (cannot emulate, or a standard access faults) then
+ *  1. If the access fails (cannot emulate, or a standard access faults) then
  *     it is up to the memop to propagate the fault to the guest VM via
  *     some out-of-band mechanism, unknown to the emulator. The memop signals
  *     failure by returning X86EMUL_PROPAGATE_FAULT to the emulator, which will
  *     then immediately bail.
- *  3. Valid access sizes are 1, 2, 4 and 8 bytes. On x86/32 systems only
+ *  2. Valid access sizes are 1, 2, 4 and 8 bytes. On x86/32 systems only
  *     cmpxchg8b_emulated need support 8-byte accesses.
- *  4. The emulator cannot handle 64-bit mode emulation on an x86/32 system.
+ *  3. The emulator cannot handle 64-bit mode emulation on an x86/32 system.
  */
 /* Access completed successfully: continue emulation as normal. */
 #define X86EMUL_CONTINUE        0
@@ -52,74 +54,63 @@ struct x86_emulate_ctxt;
 struct x86_emulate_ops
 {
     /*
-     * read_std: Read bytes of standard (non-emulated/special) memory.
-     *           Used for instruction fetch, stack operations, and others.
-     *  @addr:  [IN ] Linear address from which to read.
-     *  @val:   [OUT] Value read from memory, zero-extended to 'u_long'.
+     * All functions:
+     *  @seg:   [IN ] Segment being dereferenced (specified as x86_seg_??).
+     *  @offset:[IN ] Offset within segment.
+     *  @ctxt:  [IN ] Emulation context info as passed to the emulator.
+     */
+
+    /*
+     * read: Emulate a memory read.
+     *  @val:   [OUT] Value read from memory, zero-extended to 'ulong'.
      *  @bytes: [IN ] Number of bytes to read from memory.
      */
-    int (*read_std)(
-        unsigned long addr,
+    int (*read)(
+        enum x86_segment seg,
+        unsigned long offset,
         unsigned long *val,
         unsigned int bytes,
         struct x86_emulate_ctxt *ctxt);
 
     /*
-     * write_std: Write bytes of standard (non-emulated/special) memory.
-     *            Used for stack operations, and others.
-     *  @addr:  [IN ] Linear address to which to write.
-     *  @val:   [IN ] Value to write to memory (low-order bytes used as req'd).
-     *  @bytes: [IN ] Number of bytes to write to memory.
+     * insn_fetch: Emulate fetch from instruction byte stream.
+     *  Parameters are same as for 'read'. @seg is always x86_seg_cs.
      */
-    int (*write_std)(
-        unsigned long addr,
-        unsigned long val,
-        unsigned int bytes,
-        struct x86_emulate_ctxt *ctxt);
-
-    /*
-     * read_emulated: Read bytes from emulated/special memory area.
-     *  @addr:  [IN ] Linear address from which to read.
-     *  @val:   [OUT] Value read from memory, zero-extended to 'u_long'.
-     *  @bytes: [IN ] Number of bytes to read from memory.
-     */
-    int (*read_emulated)(
-        unsigned long addr,
+    int (*insn_fetch)(
+        enum x86_segment seg,
+        unsigned long offset,
         unsigned long *val,
         unsigned int bytes,
         struct x86_emulate_ctxt *ctxt);
 
     /*
-     * write_emulated: Read bytes from emulated/special memory area.
-     *  @addr:  [IN ] Linear address to which to write.
+     * write: Emulate a memory write.
      *  @val:   [IN ] Value to write to memory (low-order bytes used as req'd).
      *  @bytes: [IN ] Number of bytes to write to memory.
      */
-    int (*write_emulated)(
-        unsigned long addr,
+    int (*write)(
+        enum x86_segment seg,
+        unsigned long offset,
         unsigned long val,
         unsigned int bytes,
         struct x86_emulate_ctxt *ctxt);
 
     /*
-     * cmpxchg_emulated: Emulate an atomic (LOCKed) CMPXCHG operation on an
-     *                   emulated/special memory area.
-     *  @addr:  [IN ] Linear address to access.
+     * cmpxchg: Emulate an atomic (LOCKed) CMPXCHG operation.
      *  @old:   [IN ] Value expected to be current at @addr.
      *  @new:   [IN ] Value to write to @addr.
      *  @bytes: [IN ] Number of bytes to access using CMPXCHG.
      */
-    int (*cmpxchg_emulated)(
-        unsigned long addr,
+    int (*cmpxchg)(
+        enum x86_segment seg,
+        unsigned long offset,
         unsigned long old,
         unsigned long new,
         unsigned int bytes,
         struct x86_emulate_ctxt *ctxt);
 
     /*
-     * cmpxchg8b_emulated: Emulate an atomic (LOCKed) CMPXCHG8B operation on an
-     *                     emulated/special memory area.
-     *  @addr:  [IN ] Linear address to access.
+     * cmpxchg8b: Emulate an atomic (LOCKed) CMPXCHG8B operation.
      *  @old:   [IN ] Value expected to be current at @addr.
      *  @new:   [IN ] Value to write to @addr.
      * NOTES:
@@ -128,8 +119,9 @@ struct x86_emulate_ops
      *  2. Not defining this function (i.e., specifying NULL) is equivalent
      *     to defining a function that always returns X86EMUL_UNHANDLEABLE.
      */
-    int (*cmpxchg8b_emulated)(
-        unsigned long addr,
+    int (*cmpxchg8b)(
+        enum x86_segment seg,
+        unsigned long offset,
         unsigned long old_lo,
         unsigned long old_hi,
         unsigned long new_lo,
@@ -137,29 +129,12 @@ struct x86_emulate_ops
         struct x86_emulate_ctxt *ctxt);
 };
 
-/* Standard reader/writer functions that callers may wish to use. */
-extern int
-x86_emulate_read_std(
-    unsigned long addr,
-    unsigned long *val,
-    unsigned int bytes,
-    struct x86_emulate_ctxt *ctxt);
-extern int
-x86_emulate_write_std(
-    unsigned long addr,
-    unsigned long val,
-    unsigned int bytes,
-    struct x86_emulate_ctxt *ctxt);
-
 struct cpu_user_regs;
 
 struct x86_emulate_ctxt
 {
     /* Register state before/after emulation. */
     struct cpu_user_regs   *regs;
-
-    /* Linear faulting address (if emulating a page-faulting instruction). */
-    unsigned long           cr2;
 
     /* Emulated execution mode, represented by an X86EMUL_MODE value. */
     int                     mode;
