@@ -111,6 +111,7 @@ class XendServers:
             # check for when all threads have initialized themselves and then
             # close the status pipe
 
+            retryCount = 0
             threads_left = True
             while threads_left:
                 threads_left = False
@@ -122,6 +123,14 @@ class XendServers:
 
                 if threads_left:
                     time.sleep(.5)
+                    retryCount += 1
+                    if retryCount > 60:
+                        for server in self.servers:
+                            if not server.ready:
+                                log.error("Server " +
+                                          server.__class__.__name__ +
+                                          " did not initialise!")
+                        break
 
             if status:
                 status.write('0')
