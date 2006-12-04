@@ -71,8 +71,8 @@ typedef struct
  *   That requires infrastructure. Let's not.
  */
 
-#define ALIGN(x, n) ((x + ((1 << n) - 1)) / (1 << n))
-#define PAD32(x) u32 pad_data[ALIGN(x, 2)]
+#define NOTE_ALIGN(x, n) ((x + ((1 << n) - 1)) / (1 << n))
+#define PAD32(x) u32 pad_data[NOTE_ALIGN(x, 2)]
 
 #define TYPEDEF_NOTE(type, strlen, desctype)    \
     typedef struct {                            \
