@@ -106,7 +106,7 @@ void xen_machine_kexec_register_resources(struct resource *res)
 	request_resource(res, &xen_hypervisor_res);
 
 	for (k = 0; k < xen_max_nr_phys_cpus; k++)
-		request_resource(res, xen_phys_cpus + k);
+		request_resource(&xen_hypervisor_res, xen_phys_cpus + k);
 
 }
 
