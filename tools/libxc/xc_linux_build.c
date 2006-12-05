@@ -481,7 +481,9 @@ static int setup_guest(int xc_handle,
     start_info_t *start_info;
     unsigned long start_info_mpa;
     struct xen_ia64_boot_param *bp;
+#if 0 // see comment below
     shared_info_t *shared_info;
+#endif
     int i;
     DECLARE_DOMCTL;
     int rc;
@@ -553,8 +555,8 @@ static int setup_guest(int xc_handle,
     (load_funcs.loadimage)(image, image_size, xc_handle, dom,
                            page_array + start_page, &dsi);
 
-    *store_mfn = page_array[nr_pages - 2];
-    *console_mfn = page_array[nr_pages - 1];
+    *store_mfn = page_array[nr_pages - 2]; //XXX
+    *console_mfn = page_array[nr_pages - 1]; //XXX
     IPRINTF("start_info: 0x%lx at 0x%lx, "
            "store_mfn: 0x%lx at 0x%lx, "
            "console_mfn: 0x%lx at 0x%lx\n",
@@ -593,6 +595,14 @@ static int setup_guest(int xc_handle,
     ctxt->user_regs.r28 = start_info_mpa + sizeof (start_info_t);
     munmap(start_info, PAGE_SIZE);
 
+#if 0
+    /*
+     * XXX FIXME:
+     * The follwoing initialization is done by XEN_DOMCTL_arch_setup as
+     * work around.
+     * Should XENMEM_add_to_physmap with XENMAPSPACE_shared_info be used?
+     */
+
     /* shared_info page starts its life empty. */
     shared_info = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE, shared_info_frame);
@@ -605,7 +615,7 @@ static int setup_guest(int xc_handle,
     shared_info->arch.start_info_pfn = nr_pages - 3;
 
     munmap(shared_info, PAGE_SIZE);
-
+#endif
     free(page_array);
     return 0;
 

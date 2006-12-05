@@ -125,6 +125,19 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
                     for_each_vcpu (d, v)
                         v->arch.breakimm = d->arch.breakimm;
                 }
+#if 1
+                /*
+                 * XXX FIXME 
+                 * see comment around shared_info in setup_guest() in 
+                 * libxc/xc_linux_build.c
+                 */
+                {
+                    int i;
+                    d->shared_info->arch.start_info_pfn = ds->maxmem >> PAGE_SHIFT;
+                    for_each_cpu(i)
+                        d->shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
+                }
+#endif
             }
         }
 
@@ -339,6 +352,10 @@ do_dom0vp_op(unsigned long cmd,
     case IA64_DOM0VP_add_physmap:
         ret = dom0vp_add_physmap(d, arg0, arg1, (unsigned int)arg2,
                                  (domid_t)arg3);
+        break;
+    case IA64_DOM0VP_add_physmap_with_gmfn:
+        ret = dom0vp_add_physmap_with_gmfn(d, arg0, arg1, (unsigned int)arg2,
+                                           (domid_t)arg3);
         break;
     case IA64_DOM0VP_expose_p2m:
         ret = dom0vp_expose_p2m(d, arg0, arg1, arg2, arg3);

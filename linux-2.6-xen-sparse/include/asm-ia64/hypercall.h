@@ -387,6 +387,28 @@ HYPERVISOR_add_physmap(unsigned long gpfn, unsigned long mfn,
 	return ret;
 }
 
+static inline unsigned long
+__HYPERVISOR_add_physmap_with_gmfn(unsigned long gpfn, unsigned long gmfn,
+                                   unsigned long flags, domid_t domid)
+{
+	return _hypercall5(unsigned long, ia64_dom0vp_op,
+	                   IA64_DOM0VP_add_physmap_with_gmfn,
+	                   gpfn, gmfn, flags, domid);
+}
+
+static inline unsigned long
+HYPERVISOR_add_physmap_with_gmfn(unsigned long gpfn, unsigned long gmfn,
+				 unsigned long flags, domid_t domid)
+{
+	unsigned long ret = 0;
+	BUG_ON(!is_running_on_xen());//XXX
+	if (is_running_on_xen()) {
+		ret = __HYPERVISOR_add_physmap_with_gmfn(gpfn, gmfn,
+		                                         flags, domid);
+	}
+	return ret;
+}
+
 #ifdef CONFIG_XEN_IA64_EXPOSE_P2M
 static inline unsigned long
 HYPERVISOR_expose_p2m(unsigned long conv_start_gpfn,

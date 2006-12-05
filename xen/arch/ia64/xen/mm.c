@@ -1261,12 +1261,14 @@ dom0vp_zap_physmap(struct domain *d, unsigned long gpfn,
     return 0;
 }
 
-unsigned long
-dom0vp_add_physmap(struct domain* d, unsigned long gpfn, unsigned long mfn,
-                   unsigned long flags, domid_t domid)
+static unsigned long
+__dom0vp_add_physmap(struct domain* d, unsigned long gpfn,
+                     unsigned long mfn_or_gmfn,
+                     unsigned long flags, domid_t domid, int is_gmfn)
 {
-    int error = 0;
+    int error = -EINVAL;
     struct domain* rd;
+    unsigned long mfn;
 
     /* Not allowed by a domain.  */
     if (flags & (ASSIGN_nocache | ASSIGN_pgc_allocated))
@@ -1283,22 +1285,26 @@ dom0vp_add_physmap(struct domain* d, unsigned long gpfn, unsigned long mfn,
             break;
         default:
             gdprintk(XENLOG_INFO, "d 0x%p domid %d "
-                    "pgfn 0x%lx mfn 0x%lx flags 0x%lx domid %d\n",
-                    d, d->domain_id, gpfn, mfn, flags, domid);
+                    "pgfn 0x%lx mfn_or_gmfn 0x%lx flags 0x%lx domid %d\n",
+                    d, d->domain_id, gpfn, mfn_or_gmfn, flags, domid);
             return -ESRCH;
         }
         BUG_ON(rd == NULL);
         get_knownalive_domain(rd);
     }
 
-    if (unlikely(rd == d || !mfn_valid(mfn))) {
-        error = -EINVAL;
+    if (unlikely(rd == d))
         goto out1;
-    }
-    if (unlikely(get_page(mfn_to_page(mfn), rd) == 0)) {
-        error = -EINVAL;
+    if (is_gmfn) {
+        if (domid == DOMID_XEN || domid == DOMID_IO)
+            goto out1;
+        mfn = gmfn_to_mfn(rd, mfn_or_gmfn);
+    } else 
+        mfn = mfn_or_gmfn;
+    if (unlikely(!mfn_valid(mfn) || get_page(mfn_to_page(mfn), rd) == 0))
         goto out1;
-    }
+
+    error = 0;
     BUG_ON(page_get_owner(mfn_to_page(mfn)) == d &&
            get_gpfn_from_mfn(mfn) != INVALID_M2P_ENTRY);
     assign_domain_page_replace(d, gpfn << PAGE_SHIFT, mfn, flags);
@@ -1307,6 +1313,21 @@ dom0vp_add_physmap(struct domain* d, unsigned long gpfn, unsigned long mfn,
 out1:
     put_domain(rd);
     return error;
+}
+
+unsigned long
+dom0vp_add_physmap(struct domain* d, unsigned long gpfn, unsigned long mfn,
+                   unsigned long flags, domid_t domid)
+{
+    return __dom0vp_add_physmap(d, gpfn, mfn, flags, domid, 0);
+}
+
+unsigned long
+dom0vp_add_physmap_with_gmfn(struct domain* d, unsigned long gpfn,
+                             unsigned long gmfn, unsigned long flags,
+                             domid_t domid)
+{
+    return __dom0vp_add_physmap(d, gpfn, gmfn, flags, domid, 1);
 }
 
 #ifdef CONFIG_XEN_IA64_EXPOSE_P2M

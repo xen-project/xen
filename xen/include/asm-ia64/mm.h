@@ -441,6 +441,7 @@ extern unsigned long ____lookup_domain_mpa(struct domain *d, unsigned long mpadd
 extern unsigned long do_dom0vp_op(unsigned long cmd, unsigned long arg0, unsigned long arg1, unsigned long arg2, unsigned long arg3);
 extern unsigned long dom0vp_zap_physmap(struct domain *d, unsigned long gpfn, unsigned int extent_order);
 extern unsigned long dom0vp_add_physmap(struct domain* d, unsigned long gpfn, unsigned long mfn, unsigned long flags, domid_t domid);
+extern unsigned long dom0vp_add_physmap_with_gmfn(struct domain* d, unsigned long gpfn, unsigned long gmfn, unsigned long flags, domid_t domid);
 #ifdef CONFIG_XEN_IA64_EXPOSE_P2M
 extern void expose_p2m_init(void);
 extern unsigned long dom0vp_expose_p2m(struct domain* d, unsigned long conv_start_gpfn, unsigned long assign_start_gpfn, unsigned long expose_size, unsigned long granule_pfn);
