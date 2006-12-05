@@ -591,6 +591,7 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
     unsigned long dom_memsize = ((memsize - 16) << 20);
     unsigned long nr_pages = (unsigned long)memsize << (20 - PAGE_SHIFT);
     unsigned long normal_pages = nr_pages - GFW_PAGES;
+    unsigned long vcpus;
     int rc;
     long i, j;
     DECLARE_DOMCTL;
@@ -668,7 +669,6 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
     if (xc_domctl(xc_handle, &domctl))
         goto error_out;
 
-
     // Load guest firmware 
     if (xc_ia64_copy_to_domain_pages(xc_handle, dom, image,
                             (GFW_START + GFW_SIZE - image_size) >> PAGE_SHIFT,
@@ -677,15 +677,17 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
         goto error_out;
     }
 
+    // Get number of vcpus, stored by pyxc_hvm_build()
+    xc_get_hvm_param(xc_handle, dom, HVM_PARAM_VCPUS, &vcpus);
+
     // Hand-off state passed to guest firmware 
-    if (xc_ia64_build_hob(xc_handle, dom, dom_memsize,
-                          (unsigned long)vcpus) < 0) {
+    if (xc_ia64_build_hob(xc_handle, dom, dom_memsize, vcpus) < 0) {
         PERROR("Could not build hob\n");
         goto error_out;
     }
 
     xc_set_hvm_param(xc_handle, dom,
-                     HVM_PARAM_STORE_PFN, STORE_PAGE_START>>PAGE_SHIFT);
+                     HVM_PARAM_STORE_PFN, pfn_list[nr_pages - 2]);
 
     // Retrieve special pages like io, xenstore, etc. 
     sp = (shared_iopage_t *)xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,

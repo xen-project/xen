@@ -374,10 +374,13 @@ static PyObject *pyxc_hvm_build(XcObject *self,
                                 PyObject *kwds)
 {
     uint32_t dom;
+#if !defined(__ia64__)
     struct hvm_info_table *va_hvm;
     uint8_t *va_map, sum;
+    int i;
+#endif
     char *image;
-    int i, store_evtchn, memsize, vcpus = 1, pae = 0, acpi = 0, apic = 1;
+    int store_evtchn, memsize, vcpus = 1, pae = 0, acpi = 0, apic = 1;
     unsigned long store_mfn;
 
     static char *kwd_list[] = { "domid", "store_evtchn",
@@ -388,9 +391,14 @@ static PyObject *pyxc_hvm_build(XcObject *self,
                                       &image, &vcpus, &pae, &acpi, &apic) )
         return NULL;
 
+#if defined(__ia64__)
+    /* Set vcpus to later be retrieved in setup_guest() */
+    xc_set_hvm_param(self->xc_handle, dom, HVM_PARAM_VCPUS, vcpus);
+#endif
     if ( xc_hvm_build(self->xc_handle, dom, memsize, image) != 0 )
         return PyErr_SetFromErrno(xc_error);
 
+#if !defined(__ia64__)
     /* Set up the HVM info table. */
     va_map = xc_map_foreign_range(self->xc_handle, dom, XC_PAGE_SIZE,
                                   PROT_READ | PROT_WRITE,
@@ -408,9 +416,12 @@ static PyObject *pyxc_hvm_build(XcObject *self,
         sum += ((uint8_t *)va_hvm)[i];
     va_hvm->checksum = -sum;
     munmap(va_map, XC_PAGE_SIZE);
+#endif
 
     xc_get_hvm_param(self->xc_handle, dom, HVM_PARAM_STORE_PFN, &store_mfn);
+#if !defined(__ia64__)
     xc_set_hvm_param(self->xc_handle, dom, HVM_PARAM_PAE_ENABLED, pae);
+#endif
     xc_set_hvm_param(self->xc_handle, dom, HVM_PARAM_STORE_EVTCHN,
                      store_evtchn);
 
