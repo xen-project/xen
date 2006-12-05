@@ -581,8 +581,7 @@ add_pal_hob(void* hob_buf)
  */
 static int
 setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
-            char *image, unsigned long image_size, uint32_t vcpus,
-            unsigned int store_evtchn, unsigned long *store_mfn)
+            char *image, unsigned long image_size, vcpu_guest_context_t *ctxt)
 {
     xen_pfn_t *pfn_list;
     shared_iopage_t *sp;
@@ -669,11 +668,6 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
     if (xc_domctl(xc_handle, &domctl))
         goto error_out;
 
-    if (xc_domain_translate_gpfn_list(xc_handle, dom, nr_pages,
-                                      pfn_list, pfn_list)) {
-        PERROR("Could not translate addresses of HVM guest.\n");
-        goto error_out;
-    }
 
     // Load guest firmware 
     if (xc_ia64_copy_to_domain_pages(xc_handle, dom, image,
@@ -692,10 +686,8 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
 
     xc_set_hvm_param(xc_handle, dom,
                      HVM_PARAM_STORE_PFN, STORE_PAGE_START>>PAGE_SHIFT);
-    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_EVTCHN, store_evtchn);
 
     // Retrieve special pages like io, xenstore, etc. 
-    *store_mfn = pfn_list[nr_pages - 2];
     sp = (shared_iopage_t *)xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
                                                  PROT_READ | PROT_WRITE,
                                                  pfn_list[nr_pages - 3]);
@@ -717,12 +709,9 @@ error_out:
 }
 
 int
-xc_hvm_build(int xc_handle, uint32_t domid, int memsize,
-             const char *image_name, unsigned int vcpus, unsigned int pae,
-             unsigned int acpi, unsigned int store_evtchn,
-             unsigned long *store_mfn)
+xc_hvm_build(int xc_handle, uint32_t domid, int memsize, const char *image_name)
 {
-    struct xen_domctl launch_domctl, domctl;
+    struct xen_domctl launch_domctl;
     int rc;
     vcpu_guest_context_t st_ctxt, *ctxt = &st_ctxt;
     char *image = NULL;
@@ -748,18 +737,10 @@ xc_hvm_build(int xc_handle, uint32_t domid, int memsize,
         return 1;
     }
 
-    domctl.cmd = XEN_DOMCTL_getdomaininfo;
-    domctl.domain = (domid_t)domid;
-    if (do_domctl(xc_handle, &domctl) < 0 ||
-        (uint16_t)domctl.domain != domid) {
-        PERROR("Could not get info on domain");
-        goto error_out;
-    }
-
     memset(ctxt, 0, sizeof(*ctxt));
 
     if (setup_guest(xc_handle, domid, (unsigned long)memsize, image,
-                    image_size, vcpus, store_evtchn, store_mfn) < 0) {
+                    image_size, ctxt) < 0) {
         ERROR("Error constructing guest OS");
         goto error_out;
     }

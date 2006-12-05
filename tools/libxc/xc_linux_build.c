@@ -565,6 +565,9 @@ static int setup_guest(int xc_handle,
     start_info = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
         page_array[nr_pages - 3]);
+    if ( start_info == NULL )
+        goto error_out;
+
     memset(start_info, 0, sizeof(*start_info));
     rc = xc_version(xc_handle, XENVER_version, NULL);
     sprintf(start_info->magic, "xen-%i.%i-ia64", rc >> 16, rc & (0xFFFF));
