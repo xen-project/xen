@@ -36,7 +36,10 @@ case "$1" in
   status)
 	xend status
 	;;
-  restart|reload|force-reload)
+  reload)
+        xend reload
+        ;;
+  restart|force-reload)
 	xend restart
 	await_daemons_up
 	;;

@@ -16,6 +16,8 @@
 # Copyright (C) 2006 XenSource Ltd.
 #============================================================================
 
+import errno
+import socket
 import types
 import xmlrpclib
 from xen.util.xmlrpclib2 import UnixXMLRPCServer, TCPXMLRPCServer
@@ -105,20 +107,25 @@ class XMLRPCServer:
                    "; authentication has been disabled for this server." or
                    ".")
 
-        if self.use_tcp:
-            log.info("Opening TCP XML-RPC server on %s%d%s",
-                     self.host and '%s:' % self.host or
-                     'all interfaces, port ',
-                     self.port, authmsg)
-            self.server = TCPXMLRPCServer((self.host, self.port),
-                                          self.hosts_allowed,
-                                          logRequests = False)
-        else:
-            log.info("Opening Unix domain socket XML-RPC server on %s%s",
-                     self.path, authmsg)
-            self.server = UnixXMLRPCServer(self.path, self.hosts_allowed,
-                                           logRequests = False)
-
+        try:
+            if self.use_tcp:
+                log.info("Opening TCP XML-RPC server on %s%d%s",
+                         self.host and '%s:' % self.host or
+                         'all interfaces, port ',
+                         self.port, authmsg)
+                self.server = TCPXMLRPCServer((self.host, self.port),
+                                              self.hosts_allowed,
+                                              logRequests = False)
+            else:
+                log.info("Opening Unix domain socket XML-RPC server on %s%s",
+                         self.path, authmsg)
+                self.server = UnixXMLRPCServer(self.path, self.hosts_allowed,
+                                               logRequests = False)
+        except socket.error, exn:
+            log.error('Cannot start server: %s!', exn.args[1])
+            ready = True
+            running = False
+            return
 
         # Register Xen API Functions
         # -------------------------------------------------------------------
@@ -177,6 +184,11 @@ class XMLRPCServer:
 
     def cleanup(self):
         log.debug("XMLRPCServer.cleanup()")
+        try:
+            self.server.socket.close()
+        except Exception, exn:
+            log.exception(exn)
+            pass
 
     def shutdown(self):
         self.running = False

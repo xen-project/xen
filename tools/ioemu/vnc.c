@@ -115,6 +115,7 @@ struct VncState
 
     int ctl_keys;               /* Ctrl+Alt starts calibration */
     int shift_keys;             /* Shift / CapsLock keys */
+    int numlock;
 };
 
 #define DIRTY_PIXEL_BITS 64
@@ -854,14 +855,40 @@ static void pointer_event(VncState *vs, int button_mask, int x, int y)
     }
 }
 
+static void press_key(VncState *vs, int keycode)
+{
+    kbd_put_keycode(keysym2scancode(vs->kbd_layout, keycode) & 0x7f);
+    kbd_put_keycode(keysym2scancode(vs->kbd_layout, keycode) | 0x80);
+}
+
 static void do_key_event(VncState *vs, int down, uint32_t sym)
 {
     sym &= 0xFFFF;
 
     if (is_graphic_console()) {
 	int keycode;
+	int numlock;
 
 	keycode = keysym2scancode(vs->kbd_layout, sym);
+	numlock = keysym2numlock(vs->kbd_layout, sym);
+
+        /* If the numlock state needs to change then simulate an additional
+           keypress before sending this one.  This will happen if the user
+           toggles numlock away from the VNC window.
+        */
+	if (numlock == 1) {
+	    if (!vs->numlock) {
+		vs->numlock = 1;
+		press_key(vs, XK_Num_Lock);
+	    }
+	}
+	else if (numlock == -1) {
+	    if (vs->numlock) {
+		vs->numlock = 0;
+		press_key(vs, XK_Num_Lock);
+	    }
+        }
+
 	if (keycode & 0x80)
 	    kbd_put_keycode(0xe0);
 	if (down)
@@ -930,6 +957,10 @@ static void do_key_event(VncState *vs, int down, uint32_t sym)
 
 	case XK_Caps_Lock:
 	    vs->shift_keys ^= 2;
+	    break;
+
+	case XK_Num_Lock:
+	    vs->numlock = !vs->numlock;
 	    break;
 
 	case XK_1 ... XK_9:
@@ -1355,6 +1386,7 @@ int vnc_display_init(DisplayState *ds, int display, int find_unused, struct sock
     vs->lsock = -1;
     vs->csock = -1;
     vs->depth = 4;
+    vs->numlock = 0;
 
     vs->ds = ds;
 

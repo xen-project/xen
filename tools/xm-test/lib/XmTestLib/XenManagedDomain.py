@@ -94,12 +94,13 @@ class XenManagedDomain(XenDomain):
         #Only support PV for now.
         self.type = "PV"
 
-    def start(self, noConsole=False):
+    def start(self, noConsole=False, startpaused=False):
         #start the VM
         server = self.server
         if self.vm_uuid:
             try:
-                xapi.execute(server.VM.start, self.session, self.vm_uuid)
+                xapi.execute(server.VM.start, self.session, self.vm_uuid,
+                             startpaused)
             except:
                 raise DomainError("Could not start domain")
         else:

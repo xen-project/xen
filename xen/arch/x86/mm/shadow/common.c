@@ -1246,7 +1246,7 @@ sh_gfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
 /* Read another domain's p2m entries */
 {
     mfn_t mfn;
-    unsigned long addr = gpfn << PAGE_SHIFT;
+    paddr_t addr = ((paddr_t)gpfn) << PAGE_SHIFT;
     l2_pgentry_t *l2e;
     l1_pgentry_t *l1e;
     
@@ -1274,7 +1274,16 @@ sh_gfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
 #if CONFIG_PAGING_LEVELS >= 3
     {
         l3_pgentry_t *l3e = sh_map_domain_page(mfn);
-        l3e += l3_table_offset(addr);
+#if CONFIG_PAGING_LEVELS == 3
+        /* On PAE hosts the p2m has eight l3 entries, not four (see
+         * shadow_set_p2m_entry()) so we can't use l3_table_offset.
+         * Instead, just count the number of l3es from zero.  It's safe
+         * to do this because we already checked that the gfn is within
+         * the bounds of the p2m. */
+        l3e += (((addr) & VADDR_MASK) >> L3_PAGETABLE_SHIFT);
+#else
+        l3e += l3_table_offset(addr);        
+#endif
         if ( (l3e_get_flags(*l3e) & _PAGE_PRESENT) == 0 )
         {
             sh_unmap_domain_page(l3e);
