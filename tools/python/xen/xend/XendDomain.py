@@ -808,7 +808,7 @@ class XendDomain:
                     raise XendError("Cannot save privileged domain %s" % domname)
 
                 if dominfo.state != DOM_STATE_HALTED:
-                    raise XendError("Cannot suspend domain that is not running.")
+                    raise XendError("Cannot resume domain that is not halted.")
 
                 dom_uuid = dominfo.get_uuid()
                 chkpath = self._managed_check_point_path(dom_uuid)
