@@ -266,6 +266,16 @@ The following enumeration types are used:
 \vspace{1cm}
 \begin{longtable}{|ll|}
 \hline
+{\tt enum vbd\_type} & \\
+\hline
+\hspace{0.5cm}{\tt CD} & VBD will appear to guest as CD \\
+\hspace{0.5cm}{\tt Disk} & VBD will appear to guest as disk \\
+\hline
+\end{longtable}
+
+\vspace{1cm}
+\begin{longtable}{|ll|}
+\hline
 {\tt enum driver\_type} & \\
 \hline
 \hspace{0.5cm}{\tt ioemu} & use hardware emulation \\
@@ -8635,6 +8645,7 @@ $\mathit{RW}$ &  {\tt VM} & VM ref & the virtual machine \\
 $\mathit{RW}$ &  {\tt VDI} & VDI ref & the virtual disk \\
 $\mathit{RW}$ &  {\tt device} & string & device seen by the guest e.g. hda1 \\
 $\mathit{RW}$ &  {\tt mode} & vbd\_mode & the mode the disk should be mounted with \\
+$\mathit{RW}$ &  {\tt type} & vbd\_type & how the VBD will appear to the guest (e.g. disk or CD) \\
 $\mathit{RW}$ &  {\tt driver} & driver\_type & the style of driver \\
 $\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB/s) \\
@@ -8956,6 +8967,72 @@ Set the mode field of the given VBD.
 {\tt VBD ref } & self & reference to the object \\ \hline 
 
 {\tt vbd\_mode } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_type}
+
+{\bf Overview:} 
+Get the type field of the given VBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (vbd_type) get_type (session_id s, VBD ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+vbd\_type
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_type}
+
+{\bf Overview:} 
+Set the type field of the given VBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_type (session_id s, VBD ref self, vbd_type value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & reference to the object \\ \hline 
+
+{\tt vbd\_type } & value & New value to set \\ \hline 
 
 \end{tabular}
 
