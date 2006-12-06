@@ -1182,6 +1182,7 @@ $\mathit{RW}$ &  {\tt name/label} & string & a human-readable name \\
 $\mathit{RW}$ &  {\tt name/description} & string & a notes field containg human-readable description \\
 $\mathit{RW}$ &  {\tt user\_version} & int & a user version number for this machine \\
 $\mathit{RW}$ &  {\tt is\_a\_template} & bool & true if this is a template. Template VMs can never be started, they are used only for cloning other VMs \\
+$\mathit{RW}$ &  {\tt auto\_power\_on} & bool & true if this VM should be started automatically after host boot \\
 $\mathit{RO}_\mathit{run}$ &  {\tt resident\_on} & host ref & the host the VM is currently resident on \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt memory/static\_max} & int & Statically-set (i.e. absolute) maximum (bytes) \\
 $\mathit{RW}$ &  {\tt memory/dynamic\_max} & int & Dynamic maximum (bytes) \\
@@ -1874,6 +1875,72 @@ Set the is\_a\_template field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_is_a_template (session_id s, VM ref self, bool value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+{\tt bool } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_auto\_power\_on}
+
+{\bf Overview:} 
+Get the auto\_power\_on field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} bool get_auto_power_on (session_id s, VM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+bool
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_auto\_power\_on}
+
+{\bf Overview:} 
+Set the auto\_power\_on field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_auto_power_on (session_id s, VM ref self, bool value)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
