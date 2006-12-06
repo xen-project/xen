@@ -1201,7 +1201,7 @@ $\mathit{RW}$ &  {\tt memory/dynamic\_min} & int & Dynamic minimum (bytes) \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt memory/static\_min} & int & Statically-set (i.e. absolute) mininum (bytes) \\
 $\mathit{RW}$ &  {\tt VCPUs/policy} & string & the name of the VCPU scheduling policy to be applied \\
 $\mathit{RW}$ &  {\tt VCPUs/params} & string & string-encoded parameters passed to selected VCPU policy \\
-$\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/number} & int & Current number of VCPUs \\
+$\mathit{RW}$ &  {\tt VCPUs/number} & int & Current number of VCPUs \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/utilisation} & (int $\rightarrow$ float) Map & Utilisation for all of guest's current VCPUs \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt VCPUs/features/required} & (cpu\_feature) Set & CPU features the guest demands the host supports \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt VCPUs/features/can\_use} & (cpu\_feature) Set & CPU features the guest can use if available \\
@@ -2399,6 +2399,40 @@ int
 
 
 value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_VCPUs\_number}
+
+{\bf Overview:} 
+Set the VCPUs/number field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_VCPUs_number (session_id s, VM ref self, int value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+{\tt int } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
