@@ -1280,7 +1280,7 @@ sh_gfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
          * Instead, just count the number of l3es from zero.  It's safe
          * to do this because we already checked that the gfn is within
          * the bounds of the p2m. */
-        l3e += (((addr) & VADDR_MASK) >> L3_PAGETABLE_SHIFT);
+        l3e += (addr >> L3_PAGETABLE_SHIFT);
 #else
         l3e += l3_table_offset(addr);        
 #endif
