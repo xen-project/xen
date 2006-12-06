@@ -2433,11 +2433,10 @@ void sh_update_paging_modes(struct vcpu *v)
                 }
         }
 
-        if ( pagetable_get_pfn(v->arch.monitor_table) == 0 )
+        if ( pagetable_is_null(v->arch.monitor_table) )
         {
             mfn_t mmfn = shadow_make_monitor_table(v);
             v->arch.monitor_table = pagetable_from_mfn(mmfn);
-            v->arch.monitor_vtable = sh_map_domain_page(mmfn);
         } 
 
         if ( v->arch.shadow.mode != old_mode )
@@ -2467,12 +2466,10 @@ void sh_update_paging_modes(struct vcpu *v)
                     return;
                 }
 
-                sh_unmap_domain_page(v->arch.monitor_vtable);
                 old_mfn = pagetable_get_mfn(v->arch.monitor_table);
                 v->arch.monitor_table = pagetable_null();
                 new_mfn = v->arch.shadow.mode->make_monitor_table(v);            
                 v->arch.monitor_table = pagetable_from_mfn(new_mfn);
-                v->arch.monitor_vtable = sh_map_domain_page(new_mfn);
                 SHADOW_PRINTK("new monitor table %"SH_PRI_mfn "\n",
                                mfn_x(new_mfn));
 
@@ -3272,7 +3269,8 @@ void shadow_audit_p2m(struct domain *d)
 
     //SHADOW_PRINTK("p2m audit starts\n");
 
-    test_linear = ( (d == current->domain) && current->arch.monitor_vtable );
+    test_linear = ( (d == current->domain) 
+                    && !pagetable_is_null(current->arch.monitor_table) );
     if ( test_linear )
         local_flush_tlb(); 
 

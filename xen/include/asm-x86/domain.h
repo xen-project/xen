@@ -196,7 +196,6 @@ struct arch_vcpu
     unsigned long cr3;           	    /* (MA) value to install in HW CR3 */
 
     void *guest_vtable;                 /* virtual addr of pagetable */
-    root_pgentry_t *monitor_vtable;		/* virtual addr of monitor_table */
 
     /* Current LDT details. */
     unsigned long shadow_ldt_mapcnt;
