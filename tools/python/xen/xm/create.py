@@ -29,13 +29,13 @@ import xmlrpclib
 from xen.xend import sxp
 from xen.xend import PrettyPrint
 import xen.xend.XendClient
-from xen.xend.XendClient import server
 from xen.xend.XendBootloader import bootloader
 from xen.util import blkif
 from xen.util import security
 
 from xen.xm.opts import *
 
+from main import server
 import console
 
 

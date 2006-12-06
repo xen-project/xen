@@ -21,6 +21,7 @@
 
 """Grand unified management application for Xen.
 """
+import atexit
 import os
 import sys
 import re
@@ -31,6 +32,7 @@ import xmlrpclib
 import traceback
 import datetime
 from select import select
+import xml.dom.minidom
 
 import warnings
 warnings.filterwarnings('ignore', category=FutureWarning)
@@ -38,18 +40,26 @@ warnings.filterwarnings('ignore', category=FutureWarning)
 from xen.xend import PrettyPrint
 from xen.xend import sxp
 from xen.xend import XendClient
-from xen.xend.XendClient import server
 from xen.xend.XendConstants import *
 
 from xen.xm.opts import OptionError, Opts, wrap, set_true
 from xen.xm import console
 from xen.util import security
+from xen.util.xmlrpclib2 import ServerProxy
+
+import XenAPI
 
 # getopt.gnu_getopt is better, but only exists in Python 2.3+.  Use
 # getopt.getopt if gnu_getopt is not available.  This will mean that options
 # may only be specified before positional arguments.
 if not hasattr(getopt, 'gnu_getopt'):
     getopt.gnu_getopt = getopt.getopt
+
+XM_CONFIG_FILE = '/etc/xen/xm-config.xml'
+
+# Supported types of server
+SERVER_LEGACY_XMLRPC = 'LegacyXMLRPC'
+SERVER_XEN_API = 'Xen-API'
 
 # General help message
 
@@ -319,6 +329,35 @@ acm_commands = [
 all_commands = (domain_commands + host_commands + scheduler_commands +
                 device_commands + vnet_commands + acm_commands)
 
+
+##
+# Configuration File Parsing
+##
+
+if os.path.isfile(XM_CONFIG_FILE):
+    config = xml.dom.minidom.parse(XM_CONFIG_FILE)
+else:
+    config = None
+
+def parseServer():
+    if config:
+        server = config.getElementsByTagName('server')
+        if server:
+            st = server[0].getAttribute('type')
+            if st != SERVER_XEN_API:
+                st = SERVER_LEGACY_XMLRPC
+            return (st, server[0].getAttribute('uri'))
+
+    return SERVER_LEGACY_XMLRPC, XendClient.uri
+
+def parseAuthentication():
+    server = config.getElementsByTagName('server')[0]
+    return (server.getAttribute('username'),
+            server.getAttribute('password'))
+
+serverType, serverURI = parseServer()
+
+
 ####################################################################
 #
 #  Help/usage printing functions
@@ -467,6 +506,16 @@ def int_unit(str, dest):
 
 def err(msg):
     print >>sys.stderr, "Error:", msg
+
+
+def get_single_vm(dom):
+    uuids = server.xenapi.VM.get_by_name_label(dom)
+    n = len(uuids)
+    if n == 1:
+        return uuids[0]
+    else:
+        dominfo = server.xend.domain(dom, False)
+        return dominfo['uuid']
 
 
 #########################################################################
@@ -767,17 +816,26 @@ def xm_start(args):
         sys.exit(1)
 
     dom = params[0]
-    server.xend.domain.start(dom, paused)
+    if serverType == SERVER_XEN_API:
+        server.xenapi.VM.start(get_single_vm(dom), paused)
+    else:
+        server.xend.domain.start(dom, paused)
 
 def xm_delete(args):
     arg_check(args, "delete", 1)
     dom = args[0]
-    server.xend.domain.delete(dom)
+    if serverType == SERVER_XEN_API:
+        server.xenapi.VM.destroy(dom)
+    else:
+        server.xend.domain.delete(dom)
 
 def xm_suspend(args):
     arg_check(args, "suspend", 1)
     dom = args[0]
-    server.xend.domain.suspend(dom)
+    if serverType == SERVER_XEN_API:
+        server.xenapi.VM.suspend(get_single_vm(dom))
+    else:
+        server.xend.domain.suspend(dom)
 
 def xm_resume(args):
     arg_check(args, "resume", 1, 2)
@@ -799,7 +857,10 @@ def xm_resume(args):
         sys.exit(1)
 
     dom = params[0]
-    server.xend.domain.resume(dom, paused)
+    if serverType == SERVER_XEN_API:
+        server.xenapi.VM.resume(dom, paused)
+    else:
+        server.xend.domain.resume(dom, paused)
     
 def xm_reboot(args):
     arg_check(args, "reboot", 1, 3)
@@ -1577,6 +1638,8 @@ def deprecated(old,new):
         "Command %s is deprecated.  Please use xm %s instead." % (old, new))
 
 def main(argv=sys.argv):
+    global server
+
     if len(argv) < 2:
         usage()
 
@@ -1595,6 +1658,19 @@ def main(argv=sys.argv):
     args = argv[2:]
     if cmd:
         try:
+            if serverType == SERVER_XEN_API:
+                server = XenAPI.Session(serverURI)
+                username, password = parseAuthentication()
+                server.login_with_password(username, password)
+                def logout():
+                    try:
+                        server.xenapi.session.logout()
+                    except:
+                        pass
+                atexit.register(logout)
+            else:
+                server = ServerProxy(serverURI)
+
             rc = cmd(args)
             if rc:
                 usage()
@@ -1614,6 +1690,9 @@ def main(argv=sys.argv):
                 err("Unable to connect to xend: %s." % ex[1])
             sys.exit(1)
         except SystemExit:
+            sys.exit(1)
+        except XenAPI.Failure, exn:
+            err(str(exn))
             sys.exit(1)
         except xmlrpclib.Fault, ex:
             if ex.faultCode == XendClient.ERROR_INVALID_DOMAIN:

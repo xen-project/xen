@@ -19,9 +19,9 @@
 """
 import time
 
-from xen.xend.XendClient import server
 from xen.xend import sxp
-from xen.xm.opts import *
+from opts import *
+from main import server
 
 gopts = Opts(use="""[options] [DOM]
 
