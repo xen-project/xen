@@ -2564,6 +2564,40 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~set\_VCPUs\_features\_force\_on}
+
+{\bf Overview:} 
+Set the VCPUs/features/force\_on field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_VCPUs_features_force_on (session_id s, VM ref self, (cpu_feature) Set value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+{\tt (cpu\_feature) Set } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~add\_VCPUs\_features\_force\_on}
 
 {\bf Overview:} 
@@ -2661,6 +2695,40 @@ Get the VCPUs/features/force\_off field of the given VM.
 
 
 value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_VCPUs\_features\_force\_off}
+
+{\bf Overview:} 
+Set the VCPUs/features/force\_off field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_VCPUs_features_force_off (session_id s, VM ref self, (cpu_feature) Set value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+{\tt (cpu\_feature) Set } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -4009,6 +4077,40 @@ Get the otherConfig field of the given VM.
 
 
 value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_otherConfig}
+
+{\bf Overview:} 
+Set the otherConfig field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_otherConfig (session_id s, VM ref self, (string -> string) Map value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+{\tt (string $\rightarrow$ string) Map } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
