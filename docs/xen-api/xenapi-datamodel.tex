@@ -1183,11 +1183,11 @@ $\mathit{RW}$ &  {\tt name/description} & string & a notes field containg human-
 $\mathit{RW}$ &  {\tt user\_version} & int & a user version number for this machine \\
 $\mathit{RW}$ &  {\tt is\_a\_template} & bool & true if this is a template. Template VMs can never be started, they are used only for cloning other VMs \\
 $\mathit{RO}_\mathit{run}$ &  {\tt resident\_on} & host ref & the host the VM is currently resident on \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt memory/static\_max} & int & Statically-set (i.e. absolute) maximum \\
-$\mathit{RW}$ &  {\tt memory/dynamic\_max} & int & Dynamic maximum \\
-$\mathit{RO}_\mathit{run}$ &  {\tt memory/actual} & int & Guest's actual usage \\
-$\mathit{RW}$ &  {\tt memory/dynamic\_min} & int & Dynamic minimum \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt memory/static\_min} & int & Statically-set (i.e. absolute) mininum \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt memory/static\_max} & int & Statically-set (i.e. absolute) maximum (bytes) \\
+$\mathit{RW}$ &  {\tt memory/dynamic\_max} & int & Dynamic maximum (bytes) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt memory/actual} & int & Guest's actual usage (bytes) \\
+$\mathit{RW}$ &  {\tt memory/dynamic\_min} & int & Dynamic minimum (bytes) \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt memory/static\_min} & int & Statically-set (i.e. absolute) mininum (bytes) \\
 $\mathit{RW}$ &  {\tt VCPUs/policy} & string & the name of the VCPU scheduling policy to be applied \\
 $\mathit{RW}$ &  {\tt VCPUs/params} & string & string-encoded parameters passed to selected VCPU policy \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/number} & int & Current number of VCPUs \\
