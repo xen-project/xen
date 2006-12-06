@@ -825,7 +825,7 @@ def xm_delete(args):
     arg_check(args, "delete", 1)
     dom = args[0]
     if serverType == SERVER_XEN_API:
-        server.xenapi.VM.destroy(dom)
+        server.xenapi.VM.destroy(get_single_vm(dom))
     else:
         server.xend.domain.delete(dom)
 
@@ -858,7 +858,7 @@ def xm_resume(args):
 
     dom = params[0]
     if serverType == SERVER_XEN_API:
-        server.xenapi.VM.resume(dom, paused)
+        server.xenapi.VM.resume(get_single_vm(dom), paused)
     else:
         server.xend.domain.resume(dom, paused)
     
@@ -876,13 +876,19 @@ def xm_pause(args):
     arg_check(args, "pause", 1)
     dom = args[0]
 
-    server.xend.domain.pause(dom)
+    if serverType == SERVER_XEN_API:
+        server.xenapi.VM.pause(get_single_vm(dom))
+    else:
+        server.xend.domain.pause(dom)
 
 def xm_unpause(args):
     arg_check(args, "unpause", 1)
     dom = args[0]
 
-    server.xend.domain.unpause(dom)
+    if serverType == SERVER_XEN_API:
+        server.xenapi.VM.unpause(get_single_vm(dom))
+    else:
+        server.xend.domain.unpause(dom)
 
 def xm_dump_core(args):
     live = False
@@ -923,7 +929,10 @@ def xm_dump_core(args):
 def xm_rename(args):
     arg_check(args, "rename", 2)
         
-    server.xend.domain.setName(args[0], args[1])
+    if serverType == SERVER_XEN_API:
+        server.xenapi.VM.set_name_label(get_single_vm(args[0]), args[1])
+    else:
+        server.xend.domain.setName(args[0], args[1])
 
 def xm_importcommand(command, args):
     cmd = __import__(command, globals(), locals(), 'xen.xm')
@@ -981,7 +990,12 @@ def xm_vcpu_set(args):
 
 def xm_destroy(args):
     arg_check(args, "destroy", 1)
-    server.xend.domain.destroy(args[0])
+
+    dom = args[0]
+    if serverType == SERVER_XEN_API:
+        server.xenapi.VM.hard_shutdown(get_single_vm(dom))
+    else:
+        server.xend.domain.destroy(dom)
 
 
 def xm_domid(args):
