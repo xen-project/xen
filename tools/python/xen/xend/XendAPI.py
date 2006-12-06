@@ -821,8 +821,9 @@ class XendAPI:
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_todo()
     
-    def VM_set_name_label(self, session, vm_ref):
+    def VM_set_name_label(self, session, vm_ref, label):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
+        dom.setName(label)
         return xen_api_success_void()
     
     def VM_set_name_description(self, session, vm_ref):
