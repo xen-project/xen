@@ -165,7 +165,7 @@ class XendServers:
             else:
                 break
 
-def _loadConfig(servers):
+def _loadConfig(servers, root):
     if xroot.get_xend_http_server():
         servers.add(HttpServer(root,
                                xroot.get_xend_address(),
@@ -219,5 +219,5 @@ def create():
     root = SrvDir()
     root.putChild('xend', SrvRoot())
     servers = XendServers()
-    _loadConfig(servers)
+    _loadConfig(servers, root)
     return servers
