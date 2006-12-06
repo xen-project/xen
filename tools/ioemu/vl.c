@@ -6378,6 +6378,10 @@ int main(int argc, char **argv)
     }
 
 #if defined (__ia64__)
+    /* ram_size passed from xend has added on GFW memory,
+       so we must subtract it here */
+    ram_size -= 16 * MEM_M;
+
     if (ram_size > MMIO_START)
         ram_size += 1 * MEM_G; /* skip 3G-4G MMIO, LEGACY_IO_SPACE etc. */
 #endif
@@ -6443,36 +6447,24 @@ int main(int argc, char **argv)
     free(page_array);
 
 #elif defined(__ia64__)
-  
-    if (xc_ia64_get_pfn_list(xc_handle, domid, page_array,
-                             IO_PAGE_START >> PAGE_SHIFT, 3) != 3) {
-        fprintf(logfile, "xc_ia64_get_pfn_list returned error %d\n", errno);
-        exit(-1);
-    }
 
     shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
                                        PROT_READ|PROT_WRITE,
-                                       page_array[0]);
-
-    fprintf(logfile, "shared page at pfn:%lx, mfn: %016lx\n",
-            IO_PAGE_START >> PAGE_SHIFT, page_array[0]);
+                                       IO_PAGE_START >> PAGE_SHIFT);
 
     buffered_io_page =xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
                                        PROT_READ|PROT_WRITE,
-                                       page_array[2]);
-    fprintf(logfile, "Buffered IO page at pfn:%lx, mfn: %016lx\n",
-            BUFFER_IO_PAGE_START >> PAGE_SHIFT, page_array[2]);
+                                       BUFFER_IO_PAGE_START >> PAGE_SHIFT);
 
-    if (xc_ia64_get_pfn_list(xc_handle, domid,
-                             page_array, 0, nr_pages) != nr_pages) {
-        fprintf(logfile, "xc_ia64_get_pfn_list returned error %d\n", errno);
-        exit(-1);
-    }
-
+    for (i = 0; i < tmp_nr_pages; i++)
+        page_array[i] = i;
+	
+    /* VTI will not use memory between 3G~4G, so we just pass a legal pfn
+       to make QEMU map continuous virtual memory space */
     if (ram_size > MMIO_START) {	
         for (i = 0 ; i < (MEM_G >> PAGE_SHIFT); i++)
             page_array[(MMIO_START >> PAGE_SHIFT) + i] =
-                page_array[(IO_PAGE_START >> PAGE_SHIFT) + 1];
+                (STORE_PAGE_START >> PAGE_SHIFT); 
     }
 
     phys_ram_base = xc_map_foreign_batch(xc_handle, domid,

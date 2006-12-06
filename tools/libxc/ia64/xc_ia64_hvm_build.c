@@ -13,32 +13,15 @@ xc_ia64_copy_to_domain_pages(int xc_handle, uint32_t domid, void* src_page,
                              unsigned long dst_pfn, int nr_pages)
 {
     // N.B. gva should be page aligned
-
-    xen_pfn_t *page_array = NULL;
     int i;
 
-    page_array = malloc(nr_pages * sizeof(xen_pfn_t));
-    if (page_array == NULL) {
-        PERROR("Could not allocate memory");
-        goto error_out;
-    }
-    if (xc_ia64_get_pfn_list(xc_handle, domid, page_array,
-                             dst_pfn, nr_pages) != nr_pages) {
-        PERROR("Could not get the page frame list");
-        goto error_out;
-    }
-
     for (i = 0; i < nr_pages; i++) {
-        if (xc_copy_to_domain_page(xc_handle, domid, page_array[i],
+        if (xc_copy_to_domain_page(xc_handle, domid, dst_pfn + i,
                                    src_page + (i << PAGE_SHIFT)))
-            goto error_out;
+            return -1;
     }
-    free(page_array);
-    return 0;
 
-error_out:
-    free(page_array);
-    return -1;
+    return 0;
 }
 
 int 
@@ -657,7 +640,7 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
     rc = xc_domain_memory_populate_physmap(xc_handle, dom, 3,
                                            0, 0, &pfn_list[nr_pages - 3]);
     if (rc != 0) {
-        PERROR("Could not allocate GFW memory for Vti guest.\n");
+        PERROR("Could not allocate IO page or store page or buffer io page.\n");
         goto error_out;
     }
 
