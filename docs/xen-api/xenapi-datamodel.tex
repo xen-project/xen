@@ -109,6 +109,7 @@ The following enumeration types are used:
 \hline
 \end{longtable}
 
+\vspace{1cm}
 \begin{longtable}{|ll|}
 \hline
 {\tt enum vdi\_type} & \\
@@ -130,6 +131,17 @@ The following enumeration types are used:
 \hspace{0.5cm}{\tt Suspended} & Suspended \\
 \hspace{0.5cm}{\tt ShuttingDown} & Shutting Down \\
 \hspace{0.5cm}{\tt Unknown} & Some other unknown state \\
+\hline
+\end{longtable}
+
+\vspace{1cm}
+\begin{longtable}{|ll|}
+\hline
+{\tt enum task\_status\_type} & \\
+\hline
+\hspace{0.5cm}{\tt pending} & task is in progress \\
+\hspace{0.5cm}{\tt success} & task was completed successfully \\
+\hspace{0.5cm}{\tt failure} & task has failed \\
 \hline
 \end{longtable}
 
@@ -273,6 +285,7 @@ The following enumeration types are used:
 \hline
 Quals & Field & Type & Description \\
 \hline
+$\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt this\_host} & host ref & Currently connected host \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt this\_user} & user ref & Currently connected user \\
 \hline
@@ -330,6 +343,38 @@ void
 
 
 
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_uuid}
+
+{\bf Overview:} 
+Get the uuid field of the given session.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_uuid (session_id s, session ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt session ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -540,48 +585,23 @@ Quals & Field & Type & Description \\
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
 $\mathit{RW}$ &  {\tt name/label} & string & a human-readable name \\
 $\mathit{RW}$ &  {\tt name/description} & string & a notes field containg human-readable description \\
+$\mathit{RO}_\mathit{run}$ &  {\tt status} & task\_status\_type & current status of the task \\
+$\mathit{RO}_\mathit{run}$ &  {\tt progress} & int & if the task is still pending, this field contains the estimated percentage complete (0-100). If task has completed (successfully or unsuccessfully) this should be 100. \\
+$\mathit{RO}_\mathit{run}$ &  {\tt eta} & datetime & if the task is still pending, this field contains the estimated completion time. If the task has finished (successfully or not) it contains the time the task finished. \\
+$\mathit{RO}_\mathit{run}$ &  {\tt type} & string & if the task has completed successfully, this field contains the type of the encoded result (i.e. name of the class whose reference is in the result field). Undefined otherwise. \\
+$\mathit{RO}_\mathit{run}$ &  {\tt result} & string & if the task has completed successfully, this field contains the result value (either Void or an object reference). Undefined otherwise. \\
+$\mathit{RO}_\mathit{run}$ &  {\tt error\_code} & int & if the task has failed, this field contains the error code. Undefined otherwise. \\
+$\mathit{RO}_\mathit{run}$ &  {\tt error\_info} & string Set & if the task has failed, this field contains the set of associated error strings. Undefined otherwise. \\
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: task}
-\subsubsection{RPC name:~get\_status}
+\subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
-Poll a running asynchronous RPC invocation and query its status
+Return a list of all the tasks known to the system
 
  \noindent {\bf Signature:} 
-\begin{verbatim} (uuid ref) get_status (session_id s, task ref task)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt task ref } & task & The ID of the RPC call to poll \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-uuid ref
-}
-
-
-String describing status of specified asynchronous RPC invocation, including estimated completion time
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_all\_tasks}
-
-{\bf Overview:} 
-List all asynchronous RPC calls currently executing
-
- \noindent {\bf Signature:} 
-\begin{verbatim} ((task ref) Set) get_all_tasks (session_id s)\end{verbatim}
+\begin{verbatim} ((task ref) Set) get_all (session_id s)\end{verbatim}
 
 
 \vspace{0.3cm}
@@ -592,10 +612,7 @@ List all asynchronous RPC calls currently executing
 }
 
 
-A list of tasks currently executing. Note that
-tasks are associated with users rather than sessions. Thus, if you logout and
-login again with a different session but the same user, this function will still
-return the user's running tasks.
+references to all objects
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -760,6 +777,230 @@ void
 
 
 
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_status}
+
+{\bf Overview:} 
+Get the status field of the given task.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (task_status_type) get_status (session_id s, task ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt task ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+task\_status\_type
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_progress}
+
+{\bf Overview:} 
+Get the progress field of the given task.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_progress (session_id s, task ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt task ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_eta}
+
+{\bf Overview:} 
+Get the eta field of the given task.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} datetime get_eta (session_id s, task ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt task ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+datetime
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_type}
+
+{\bf Overview:} 
+Get the type field of the given task.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_type (session_id s, task ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt task ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_result}
+
+{\bf Overview:} 
+Get the result field of the given task.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_result (session_id s, task ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt task ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_error\_code}
+
+{\bf Overview:} 
+Get the error\_code field of the given task.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_error_code (session_id s, task ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt task ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_error\_info}
+
+{\bf Overview:} 
+Get the error\_info field of the given task.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (string Set) get_error_info (session_id s, task ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt task ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string Set
+}
+
+
+value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
