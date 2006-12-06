@@ -400,7 +400,7 @@ value of the field
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
-constructor for class session
+Create a new session instance, and return its handle.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (session ref) create (session_id s, session record args)\end{verbatim}
@@ -432,7 +432,7 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-destructor for class session
+Destroy the specified session instance.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, session ref self)\end{verbatim}
@@ -766,7 +766,7 @@ void
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
-constructor for class task
+Create a new task instance, and return its handle.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (task ref) create (session_id s, task record args)\end{verbatim}
@@ -798,7 +798,7 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-destructor for class task
+Destroy the specified task instance.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, task ref self)\end{verbatim}
@@ -3733,7 +3733,7 @@ void
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
-constructor for class VM
+Create a new VM instance, and return its handle.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VM ref) create (session_id s, VM record args)\end{verbatim}
@@ -3765,7 +3765,7 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-destructor for class VM
+Destroy the specified VM instance.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, VM ref self)\end{verbatim}
@@ -4356,7 +4356,7 @@ value of the field
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
-constructor for class host
+Create a new host instance, and return its handle.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (host ref) create (session_id s, host record args)\end{verbatim}
@@ -4388,7 +4388,7 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-destructor for class host
+Destroy the specified host instance.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, host ref self)\end{verbatim}
@@ -4795,7 +4795,7 @@ value of the field
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
-constructor for class host\_cpu
+Create a new host\_cpu instance, and return its handle.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (host_cpu ref) create (session_id s, host_cpu record args)\end{verbatim}
@@ -4827,7 +4827,7 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-destructor for class host\_cpu
+Destroy the specified host\_cpu instance.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, host_cpu ref self)\end{verbatim}
@@ -5326,7 +5326,7 @@ void
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
-constructor for class network
+Create a new network instance, and return its handle.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (network ref) create (session_id s, network record args)\end{verbatim}
@@ -5358,7 +5358,7 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-destructor for class network
+Destroy the specified network instance.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, network ref self)\end{verbatim}
@@ -6069,7 +6069,7 @@ value of the field
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
-constructor for class VIF
+Create a new VIF instance, and return its handle.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VIF ref) create (session_id s, VIF record args)\end{verbatim}
@@ -6101,7 +6101,7 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-destructor for class VIF
+Destroy the specified VIF instance.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, VIF ref self)\end{verbatim}
@@ -6713,7 +6713,7 @@ value of the field
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
-constructor for class PIF
+Create a new PIF instance, and return its handle.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (PIF ref) create (session_id s, PIF record args)\end{verbatim}
@@ -6745,7 +6745,7 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-destructor for class PIF
+Destroy the specified PIF instance.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, PIF ref self)\end{verbatim}
@@ -7279,7 +7279,7 @@ value of the field
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
-constructor for class SR
+Create a new SR instance, and return its handle.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (SR ref) create (session_id s, SR record args)\end{verbatim}
@@ -7311,7 +7311,7 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-destructor for class SR
+Destroy the specified SR instance.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, SR ref self)\end{verbatim}
@@ -8153,7 +8153,7 @@ void
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
-constructor for class VDI
+Create a new VDI instance, and return its handle.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VDI ref) create (session_id s, VDI record args)\end{verbatim}
@@ -8185,7 +8185,7 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-destructor for class VDI
+Destroy the specified VDI instance.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, VDI ref self)\end{verbatim}
@@ -8796,7 +8796,7 @@ value of the field
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
-constructor for class VBD
+Create a new VBD instance, and return its handle.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VBD ref) create (session_id s, VBD record args)\end{verbatim}
@@ -8828,7 +8828,7 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-destructor for class VBD
+Destroy the specified VBD instance.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, VBD ref self)\end{verbatim}
@@ -9104,7 +9104,7 @@ value of the field
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
-constructor for class VTPM
+Create a new VTPM instance, and return its handle.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VTPM ref) create (session_id s, VTPM record args)\end{verbatim}
@@ -9136,7 +9136,7 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-destructor for class VTPM
+Destroy the specified VTPM instance.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, VTPM ref self)\end{verbatim}
@@ -9655,7 +9655,7 @@ void
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
-constructor for class user
+Create a new user instance, and return its handle.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (user ref) create (session_id s, user record args)\end{verbatim}
@@ -9687,7 +9687,7 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-destructor for class user
+Destroy the specified user instance.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, user ref self)\end{verbatim}
@@ -9832,7 +9832,7 @@ void
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
-constructor for class debug
+Create a new debug instance, and return its handle.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (debug ref) create (session_id s, debug record args)\end{verbatim}
@@ -9864,7 +9864,7 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-destructor for class debug
+Destroy the specified debug instance.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, debug ref self)\end{verbatim}
