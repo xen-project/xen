@@ -4073,7 +4073,7 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-Destroy the specified VM instance.
+Destroy the specified VM.  The VM is completely removed from the system.  This function can only be called when the VM is in the Halted State.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, VM ref self)\end{verbatim}
