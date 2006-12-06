@@ -464,7 +464,7 @@ void
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
-returns the session instance with a particular uuid
+Get a reference to the session instance with the specified UUID.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (session ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
@@ -496,7 +496,7 @@ reference to the object
 \subsubsection{RPC name:~get\_record}
 
 {\bf Overview:} 
-returns a record containing the state of an instance of class session
+Get a record containing the current state of the given session.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (session record) get_record (session_id s, session ref self)\end{verbatim}
@@ -830,7 +830,7 @@ void
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
-returns the task instance with a particular uuid
+Get a reference to the task instance with the specified UUID.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (task ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
@@ -862,7 +862,7 @@ reference to the object
 \subsubsection{RPC name:~get\_record}
 
 {\bf Overview:} 
-returns a record containing the state of an instance of class task
+Get a record containing the current state of the given task.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (task record) get_record (session_id s, task ref self)\end{verbatim}
@@ -3797,7 +3797,7 @@ void
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
-returns the VM instance with a particular uuid
+Get a reference to the VM instance with the specified UUID.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VM ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
@@ -3829,7 +3829,7 @@ reference to the object
 \subsubsection{RPC name:~get\_record}
 
 {\bf Overview:} 
-returns a record containing the state of an instance of class VM
+Get a record containing the current state of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VM record) get_record (session_id s, VM ref self)\end{verbatim}
@@ -4420,7 +4420,7 @@ void
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
-returns the host instance with a particular uuid
+Get a reference to the host instance with the specified UUID.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (host ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
@@ -4452,7 +4452,7 @@ reference to the object
 \subsubsection{RPC name:~get\_record}
 
 {\bf Overview:} 
-returns a record containing the state of an instance of class host
+Get a record containing the current state of the given host.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (host record) get_record (session_id s, host ref self)\end{verbatim}
@@ -4859,7 +4859,7 @@ void
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
-returns the host\_cpu instance with a particular uuid
+Get a reference to the host\_cpu instance with the specified UUID.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (host_cpu ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
@@ -4891,7 +4891,7 @@ reference to the object
 \subsubsection{RPC name:~get\_record}
 
 {\bf Overview:} 
-returns a record containing the state of an instance of class host\_cpu
+Get a record containing the current state of the given host\_cpu.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (host_cpu record) get_record (session_id s, host_cpu ref self)\end{verbatim}
@@ -5390,7 +5390,7 @@ void
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
-returns the network instance with a particular uuid
+Get a reference to the network instance with the specified UUID.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (network ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
@@ -5422,7 +5422,7 @@ reference to the object
 \subsubsection{RPC name:~get\_record}
 
 {\bf Overview:} 
-returns a record containing the state of an instance of class network
+Get a record containing the current state of the given network.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (network record) get_record (session_id s, network ref self)\end{verbatim}
@@ -6133,7 +6133,7 @@ void
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
-returns the VIF instance with a particular uuid
+Get a reference to the VIF instance with the specified UUID.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VIF ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
@@ -6165,7 +6165,7 @@ reference to the object
 \subsubsection{RPC name:~get\_record}
 
 {\bf Overview:} 
-returns a record containing the state of an instance of class VIF
+Get a record containing the current state of the given VIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VIF record) get_record (session_id s, VIF ref self)\end{verbatim}
@@ -6777,7 +6777,7 @@ void
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
-returns the PIF instance with a particular uuid
+Get a reference to the PIF instance with the specified UUID.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (PIF ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
@@ -6809,7 +6809,7 @@ reference to the object
 \subsubsection{RPC name:~get\_record}
 
 {\bf Overview:} 
-returns a record containing the state of an instance of class PIF
+Get a record containing the current state of the given PIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (PIF record) get_record (session_id s, PIF ref self)\end{verbatim}
@@ -7343,7 +7343,7 @@ void
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
-returns the SR instance with a particular uuid
+Get a reference to the SR instance with the specified UUID.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (SR ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
@@ -7375,7 +7375,7 @@ reference to the object
 \subsubsection{RPC name:~get\_record}
 
 {\bf Overview:} 
-returns a record containing the state of an instance of class SR
+Get a record containing the current state of the given SR.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (SR record) get_record (session_id s, SR ref self)\end{verbatim}
@@ -8217,7 +8217,7 @@ void
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
-returns the VDI instance with a particular uuid
+Get a reference to the VDI instance with the specified UUID.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VDI ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
@@ -8249,7 +8249,7 @@ reference to the object
 \subsubsection{RPC name:~get\_record}
 
 {\bf Overview:} 
-returns a record containing the state of an instance of class VDI
+Get a record containing the current state of the given VDI.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VDI record) get_record (session_id s, VDI ref self)\end{verbatim}
@@ -8860,7 +8860,7 @@ void
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
-returns the VBD instance with a particular uuid
+Get a reference to the VBD instance with the specified UUID.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VBD ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
@@ -8892,7 +8892,7 @@ reference to the object
 \subsubsection{RPC name:~get\_record}
 
 {\bf Overview:} 
-returns a record containing the state of an instance of class VBD
+Get a record containing the current state of the given VBD.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VBD record) get_record (session_id s, VBD ref self)\end{verbatim}
@@ -9168,7 +9168,7 @@ void
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
-returns the VTPM instance with a particular uuid
+Get a reference to the VTPM instance with the specified UUID.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VTPM ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
@@ -9200,7 +9200,7 @@ reference to the object
 \subsubsection{RPC name:~get\_record}
 
 {\bf Overview:} 
-returns a record containing the state of an instance of class VTPM
+Get a record containing the current state of the given VTPM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VTPM record) get_record (session_id s, VTPM ref self)\end{verbatim}
@@ -9719,7 +9719,7 @@ void
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
-returns the user instance with a particular uuid
+Get a reference to the user instance with the specified UUID.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (user ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
@@ -9751,7 +9751,7 @@ reference to the object
 \subsubsection{RPC name:~get\_record}
 
 {\bf Overview:} 
-returns a record containing the state of an instance of class user
+Get a record containing the current state of the given user.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (user record) get_record (session_id s, user ref self)\end{verbatim}
@@ -9896,7 +9896,7 @@ void
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
-returns the debug instance with a particular uuid
+Get a reference to the debug instance with the specified UUID.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (debug ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
@@ -9928,7 +9928,7 @@ reference to the object
 \subsubsection{RPC name:~get\_record}
 
 {\bf Overview:} 
-returns a record containing the state of an instance of class debug
+Get a record containing the current state of the given debug.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (debug record) get_record (session_id s, debug ref self)\end{verbatim}
