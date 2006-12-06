@@ -641,17 +641,22 @@ class XendDomain:
         return (self.get_vm_with_dev_uuid(klass, dev_uuid) != None)
 
     def do_legacy_api_with_uuid(self, fn, vm_uuid, *args, **kwargs):
+        dom = self.uuid_to_dom(vm_uuid)
+        fn(dom, *args, **kwargs)
+
+    def uuid_to_dom(self, vm_uuid):
         self.domains_lock.acquire()
         try:
             for domid, dom in self.domains.items():
-                if dom.get_uuid == vm_uuid:
-                    return fn(domid, *args, **kwargs)
+                if dom.get_uuid() == vm_uuid:
+                    return domid
                     
             if vm_uuid in self.managed_domains:
                 domid = self.managed_domains[vm_uuid].getDomid()
-                if domid == None:
-                    domid = self.managed_domains[vm_uuid].getName()
-                return fn(domid, *args, **kwargs)
+                if domid is None:
+                    return self.managed_domains[vm_uuid].getName()
+                else:
+                    return domid
             
             raise XendInvalidDomain("Domain does not exist")
         finally:
