@@ -107,7 +107,7 @@ void *map_domain_page(unsigned long mfn)
 
     spin_unlock(&cache->lock);
 
-    cache->l1tab[idx] = l1e_from_pfn(mfn, __PAGE_HYPERVISOR);
+    l1e_write(&cache->l1tab[idx], l1e_from_pfn(mfn, __PAGE_HYPERVISOR));
 
  out:
     va = MAPCACHE_VIRT_START + (idx << PAGE_SHIFT);
@@ -147,7 +147,7 @@ void unmap_domain_page(void *va)
         {
             /* /First/, zap the PTE. */
             ASSERT(l1e_get_pfn(cache->l1tab[hashent->idx]) == hashent->mfn);
-            cache->l1tab[hashent->idx] = l1e_empty();
+            l1e_write(&cache->l1tab[hashent->idx], l1e_empty());
             /* /Second/, mark as garbage. */
             set_bit(hashent->idx, cache->garbage);
         }
@@ -159,7 +159,7 @@ void unmap_domain_page(void *va)
     else
     {
         /* /First/, zap the PTE. */
-        cache->l1tab[idx] = l1e_empty();
+        l1e_write(&cache->l1tab[idx], l1e_empty());
         /* /Second/, mark as garbage. */
         set_bit(idx, cache->garbage);
     }
@@ -229,7 +229,7 @@ void *map_domain_page_global(unsigned long mfn)
 
     pl2e = virt_to_xen_l2e(va);
     pl1e = l2e_to_l1e(*pl2e) + l1_table_offset(va);
-    *pl1e = l1e_from_pfn(mfn, __PAGE_HYPERVISOR);
+    l1e_write(pl1e, l1e_from_pfn(mfn, __PAGE_HYPERVISOR));
 
     return (void *)va;
 }
@@ -246,7 +246,7 @@ void unmap_domain_page_global(void *va)
     /* /First/, we zap the PTE. */
     pl2e = virt_to_xen_l2e(__va);
     pl1e = l2e_to_l1e(*pl2e) + l1_table_offset(__va);
-    *pl1e = l1e_empty();
+    l1e_write(pl1e, l1e_empty());
 
     /* /Second/, we add to the garbage map. */
     idx = (__va - IOREMAP_VIRT_START) >> PAGE_SHIFT;

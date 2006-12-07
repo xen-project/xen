@@ -99,11 +99,12 @@ void __init paging_init(void)
     {
         if ( (pg = alloc_domheap_pages(NULL, PAGETABLE_ORDER, 0)) == NULL )
             panic("Not enough memory to bootstrap Xen.\n");
-        idle_pg_table_l2[l2_linear_offset(RDWR_MPT_VIRT_START) + i] =
-            l2e_from_page(pg, PAGE_HYPERVISOR | _PAGE_PSE);
+        l2e_write(&idle_pg_table_l2[l2_linear_offset(RDWR_MPT_VIRT_START) + i],
+                  l2e_from_page(pg, PAGE_HYPERVISOR | _PAGE_PSE));
         /* NB. Cannot be GLOBAL as shadow_mode_translate reuses this area. */
-        idle_pg_table_l2[l2_linear_offset(RO_MPT_VIRT_START) + i] =
-            l2e_from_page(pg, (__PAGE_HYPERVISOR | _PAGE_PSE) & ~_PAGE_RW);
+        l2e_write(&idle_pg_table_l2[l2_linear_offset(RO_MPT_VIRT_START) + i],
+                  l2e_from_page(
+                      pg, (__PAGE_HYPERVISOR | _PAGE_PSE) & ~_PAGE_RW));
     }
 
     /* Fill with an obvious debug pattern. */
@@ -115,8 +116,8 @@ void __init paging_init(void)
     {
         ioremap_pt = alloc_xenheap_page();
         clear_page(ioremap_pt);
-        idle_pg_table_l2[l2_linear_offset(IOREMAP_VIRT_START) + i] =
-            l2e_from_page(virt_to_page(ioremap_pt), __PAGE_HYPERVISOR);
+        l2e_write(&idle_pg_table_l2[l2_linear_offset(IOREMAP_VIRT_START) + i],
+                  l2e_from_page(virt_to_page(ioremap_pt), __PAGE_HYPERVISOR));
     }
 }
 
@@ -125,10 +126,10 @@ void __init setup_idle_pagetable(void)
     int i;
 
     for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
-        idle_pg_table_l2[l2_linear_offset(PERDOMAIN_VIRT_START) + i] =
-            l2e_from_page(virt_to_page(idle_vcpu[0]->domain->
-                                       arch.mm_perdomain_pt) + i,
-                          __PAGE_HYPERVISOR);
+        l2e_write(&idle_pg_table_l2[l2_linear_offset(PERDOMAIN_VIRT_START)+i],
+                  l2e_from_page(virt_to_page(idle_vcpu[0]->domain->
+                                             arch.mm_perdomain_pt) + i,
+                                __PAGE_HYPERVISOR));
 }
 
 void __init zap_low_mappings(l2_pgentry_t *base)
@@ -136,14 +137,16 @@ void __init zap_low_mappings(l2_pgentry_t *base)
     int i;
     u32 addr;
 
-    for (i = 0; ; i++) {
-        addr = (i << L2_PAGETABLE_SHIFT);
-        if (addr >= HYPERVISOR_VIRT_START)
+    for ( i = 0; ; i++ )
+    {
+        addr = i << L2_PAGETABLE_SHIFT;
+        if ( addr >= HYPERVISOR_VIRT_START )
             break;
-        if (l2e_get_paddr(base[i]) != addr)
+        if ( l2e_get_paddr(base[i]) != addr )
             continue;
-        base[i] = l2e_empty();
+        l2e_write(&base[i], l2e_empty());
     }
+
     flush_tlb_all_pge();
 }
 

@@ -851,7 +851,9 @@ static inline void safe_write_entry(void *dst, void *src)
      * then writing the high word before the low word. */
     BUILD_BUG_ON(sizeof (shadow_l1e_t) != 2 * sizeof (unsigned long));
     d[0] = 0;
+    wmb();
     d[1] = s[1];
+    wmb();
     d[0] = s[0];
 #else
     /* In 32-bit and 64-bit, sizeof(pte) == sizeof(ulong) == 1 word,
