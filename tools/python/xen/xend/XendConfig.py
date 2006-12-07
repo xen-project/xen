@@ -353,10 +353,15 @@ class XendConfig(dict):
         if self['builder'] not in ('hvm', 'linux'):
             raise XendConfigError('Invalid builder configuration')
 
+    def _vcpus_sanity_check(self):
+        if self.get('vcpus_number') != None:
+            self['vcpu_avail'] = (1 << self['vcpus_number']) - 1
+
     def validate(self):
         self._memory_sanity_check()
         self._actions_sanity_check()
         self._builder_sanity_check()
+        self._vcpus_sanity_check()
 
     def _dominfo_to_xapi(self, dominfo):
         self['domid'] = dominfo['domid']
