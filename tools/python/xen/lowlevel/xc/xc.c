@@ -46,7 +46,10 @@ static PyObject *pyxc_error_to_exception(void)
     const xc_error const *err = xc_get_last_error();
     const char *desc = xc_error_code_to_desc(err->code);
 
-    if (err->message[1])
+    if (err->code == XC_ERROR_NONE)
+        return PyErr_SetFromErrno(xc_error_obj);
+
+    if (err->message[0] != '\0')
 	pyerr = Py_BuildValue("(iss)", err->code, desc, err->message);
     else
 	pyerr = Py_BuildValue("(is)", err->code, desc);
