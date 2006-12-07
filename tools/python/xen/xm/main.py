@@ -335,17 +335,22 @@ all_commands = (domain_commands + host_commands + scheduler_commands +
 # Configuration File Parsing
 ##
 
+config = None
 if os.path.isfile(XM_CONFIG_FILE):
-    config = xml.dom.minidom.parse(XM_CONFIG_FILE)
-else:
-    config = None
+    try:
+        config = xml.dom.minidom.parse(XM_CONFIG_FILE)
+    except:
+        print >>sys.stderr, ('Ignoring invalid configuration file %s.' %
+                             XM_CONFIG_FILE)
 
 def parseServer():
     if config:
         server = config.getElementsByTagName('server')
         if server:
             st = server[0].getAttribute('type')
-            if st != SERVER_XEN_API:
+            if st != SERVER_XEN_API and st != SERVER_LEGACY_XMLRPC:
+                print >>sys.stderr, ('Invalid server type %s; using %s.' %
+                                     (st, SERVER_LEGACY_XMLRPC))
                 st = SERVER_LEGACY_XMLRPC
             return (st, server[0].getAttribute('uri'))
 
