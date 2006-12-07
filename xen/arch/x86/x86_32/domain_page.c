@@ -252,29 +252,3 @@ void unmap_domain_page_global(void *va)
     idx = (__va - IOREMAP_VIRT_START) >> PAGE_SHIFT;
     set_bit(idx, garbage);
 }
-
-paddr_t maddr_from_mapped_domain_page(void *va) 
-{
-    unsigned long __va = (unsigned long)va;
-    l2_pgentry_t *pl2e;
-    l1_pgentry_t *pl1e;
-    unsigned int idx;
-    struct mapcache *cache;
-    unsigned long mfn;
-
-    if ( (__va >= MAPCACHE_VIRT_START) && (__va < MAPCACHE_VIRT_END) )
-    {
-        cache = &mapcache_current_vcpu()->domain->arch.mapcache;
-        idx = ((unsigned long)va - MAPCACHE_VIRT_START) >> PAGE_SHIFT;
-        mfn = l1e_get_pfn(cache->l1tab[idx]);
-    }
-    else
-    {
-        ASSERT(__va >= IOREMAP_VIRT_START);
-        pl2e = virt_to_xen_l2e(__va);
-        pl1e = l2e_to_l1e(*pl2e) + l1_table_offset(__va);
-        mfn = l1e_get_pfn(*pl1e);
-    }
-    
-    return ((paddr_t)mfn << PAGE_SHIFT) | ((unsigned long)va & ~PAGE_MASK);
-}
