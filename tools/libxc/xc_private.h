@@ -59,23 +59,14 @@
 #define PPRINTF(_f, _a...)
 #endif
 
-#define ERROR(_m, _a...)                        \
-do {                                            \
-    int __saved_errno = errno;                  \
-    DPRINTF("ERROR: " _m "\n" , ## _a );        \
-    errno = __saved_errno;                      \
-} while (0)
+void xc_set_error(int code, const char *fmt, ...);
+
+#define ERROR(_m, _a...)  xc_set_error(XC_INTERNAL_ERROR, _m , ## _a )
+#define PERROR(_m, _a...) xc_set_error(XC_INTERNAL_ERROR, _m " (%d = %s)", \
+                                       _m , ## _a , errno, strerror(errno))
 
 int lock_pages(void *addr, size_t len);
 void unlock_pages(void *addr, size_t len);
-
-#define PERROR(_m, _a...)                               \
-do {                                                    \
-    int __saved_errno = errno;                          \
-    DPRINTF("ERROR: " _m " (%d = %s)\n" , ## _a ,       \
-            __saved_errno, strerror(__saved_errno));    \
-    errno = __saved_errno;                              \
-} while (0)
 
 static inline void safe_munlock(const void *addr, size_t len)
 {

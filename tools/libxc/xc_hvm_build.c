@@ -285,7 +285,6 @@ static int xc_hvm_build_internal(int xc_handle,
 
     if ( setup_guest(xc_handle, domid, memsize, image, image_size, &ctxt) < 0 )
     {
-        ERROR("Error constructing guest OS");
         goto error_out;
     }
 
@@ -329,26 +328,30 @@ static int parseelfimage(char *elfbase,
 
     if ( !IS_ELF(*ehdr) )
     {
-        ERROR("Kernel image does not have an ELF header.");
+        xc_set_error(XC_INVALID_KERNEL,
+                     "Kernel image does not have an ELF header.");
         return -EINVAL;
     }
 
     if ( (ehdr->e_phoff + (ehdr->e_phnum * ehdr->e_phentsize)) > elfsize )
     {
-        ERROR("ELF program headers extend beyond end of image.");
+        xc_set_error(XC_INVALID_KERNEL,
+                     "ELF program headers extend beyond end of image.");
         return -EINVAL;
     }
 
     if ( (ehdr->e_shoff + (ehdr->e_shnum * ehdr->e_shentsize)) > elfsize )
     {
-        ERROR("ELF section headers extend beyond end of image.");
+        xc_set_error(XC_INVALID_KERNEL,
+                     "ELF section headers extend beyond end of image.");
         return -EINVAL;
     }
 
     /* Find the section-header strings table. */
     if ( ehdr->e_shstrndx == SHN_UNDEF )
     {
-        ERROR("ELF image has no section-header strings table (shstrtab).");
+        xc_set_error(XC_INVALID_KERNEL,
+                     "ELF image has no section-header strings table (shstrtab).");
         return -EINVAL;
     }
     shdr = (Elf32_Shdr *)(elfbase + ehdr->e_shoff +
@@ -370,7 +373,8 @@ static int parseelfimage(char *elfbase,
          (ehdr->e_entry < kernstart) ||
          (ehdr->e_entry > kernend) )
     {
-        ERROR("Malformed ELF image.");
+        xc_set_error(XC_INVALID_KERNEL,
+                     "Malformed ELF image.");
         return -EINVAL;
     }
 

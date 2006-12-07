@@ -124,6 +124,8 @@ class BlkifController(DevController):
             config['dev'] = dev
         if typ and params:
             config['uname'] = typ +':' + params
+        else:
+            config['uname'] = None
         if mode:
             config['mode'] = mode
         if uuid:
