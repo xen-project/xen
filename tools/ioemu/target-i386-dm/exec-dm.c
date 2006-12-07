@@ -36,6 +36,7 @@
 
 #include "cpu.h"
 #include "exec-all.h"
+#include "vl.h"
 
 //#define DEBUG_TB_INVALIDATE
 //#define DEBUG_FLUSH
@@ -426,6 +427,12 @@ static inline int paddr_is_ram(target_phys_addr_t addr)
 #endif
 }
 
+#if defined(__i386__) || defined(__x86_64__)
+#define phys_ram_addr(x) (qemu_map_cache(x))
+#elif defined(__ia64__)
+#define phys_ram_addr(x) (phys_ram_base + (x))
+#endif
+
 void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf, 
                             int len, int is_write)
 {
@@ -438,7 +445,7 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
         l = TARGET_PAGE_SIZE - (addr & ~TARGET_PAGE_MASK); 
         if (l > len)
             l = len;
-	
+
         io_index = iomem_index(addr);
         if (is_write) {
             if (io_index) {
@@ -460,9 +467,10 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
                 }
             } else if (paddr_is_ram(addr)) {
                 /* Reading from RAM */
-                memcpy(phys_ram_base + addr, buf, l);
+                ptr = phys_ram_addr(addr);
+                memcpy(ptr, buf, l);
 #ifdef __ia64__
-                sync_icache((unsigned long)(phys_ram_base + addr), l);
+                sync_icache(ptr, l);
 #endif 
             }
         } else {
@@ -485,7 +493,8 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
                 }
             } else if (paddr_is_ram(addr)) {
                 /* Reading from RAM */
-                memcpy(buf, phys_ram_base + addr, l);
+                ptr = phys_ram_addr(addr);
+                memcpy(buf, ptr, l);
             } else {
                 /* Neither RAM nor known MMIO space */
                 memset(buf, 0xff, len); 

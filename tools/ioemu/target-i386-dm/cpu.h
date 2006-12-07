@@ -25,7 +25,8 @@
 #ifdef TARGET_X86_64
 #define TARGET_LONG_BITS 64
 #else
-#define TARGET_LONG_BITS 32
+/* #define TARGET_LONG_BITS 32 */
+#define TARGET_LONG_BITS 64 /* for Qemu map cache */
 #endif
 
 /* target supports implicit self modifying code */
