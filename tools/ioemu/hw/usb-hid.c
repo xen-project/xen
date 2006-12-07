@@ -39,6 +39,7 @@ typedef struct USBMouseState {
     int x, y;
     int kind;
     int mouse_grabbed;
+    int status_changed;
 } USBMouseState;
 
 /* mostly the same values as the Bochs USB Mouse device */
@@ -231,6 +232,7 @@ static void usb_mouse_event(void *opaque,
     s->dy += dy1;
     s->dz += dz1;
     s->buttons_state = buttons_state;
+    s->status_changed = 1;
 }
 
 static void usb_tablet_event(void *opaque,
@@ -242,6 +244,7 @@ static void usb_tablet_event(void *opaque,
     s->y = y;
     s->dz += dz;
     s->buttons_state = buttons_state;
+    s->status_changed = 1;
 }
 
 static inline int int_clamp(int val, int vmin, int vmax)
@@ -483,10 +486,16 @@ static int usb_mouse_handle_data(USBDevice *dev, int pid,
     switch(pid) {
     case USB_TOKEN_IN:
         if (devep == 1) {
-	    if (s->kind == USB_MOUSE)
-		ret = usb_mouse_poll(s, data, len);
-	    else if (s->kind == USB_TABLET)
-		ret = usb_tablet_poll(s, data, len);
+            if (s->kind == USB_MOUSE)
+                ret = usb_mouse_poll(s, data, len);
+            else if (s->kind == USB_TABLET)
+                ret = usb_tablet_poll(s, data, len);
+
+            if (!s->status_changed)
+                ret = USB_RET_NAK;
+            else
+                s->status_changed = 0;
+
         } else {
             goto fail;
         }
@@ -523,6 +532,7 @@ USBDevice *usb_tablet_init(void)
     s->dev.handle_data = usb_mouse_handle_data;
     s->dev.handle_destroy = usb_mouse_handle_destroy;
     s->kind = USB_TABLET;
+    s->status_changed = 0;
 
     pstrcpy(s->dev.devname, sizeof(s->dev.devname), "QEMU USB Tablet");
 
@@ -544,6 +554,7 @@ USBDevice *usb_mouse_init(void)
     s->dev.handle_data = usb_mouse_handle_data;
     s->dev.handle_destroy = usb_mouse_handle_destroy;
     s->kind = USB_MOUSE;
+    s->status_changed = 0;
 
     pstrcpy(s->dev.devname, sizeof(s->dev.devname), "QEMU USB Mouse");
 
