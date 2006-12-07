@@ -165,10 +165,9 @@ class SrvDomainDir(SrvDir):
             req.write('<ul>')
             for d in domains:
                 req.write(
-                    '<li><a href="%s%s">Domain %s</a>: id = %s, memory = %d, '
-                    'ssidref = %d.'
+                    '<li><a href="%s%s">Domain %s</a>: id = %s, memory = %d'
                     % (url, d.getName(), d.getName(), d.getDomid(),
-                       d.getMemoryTarget(), d.getSsidref()))
+                       d.getMemoryTarget()))
                 req.write('</li>')
             req.write('</ul>')
 
