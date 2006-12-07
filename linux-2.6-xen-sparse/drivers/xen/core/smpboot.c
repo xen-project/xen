@@ -33,7 +33,7 @@
 extern irqreturn_t smp_reschedule_interrupt(int, void *, struct pt_regs *);
 extern irqreturn_t smp_call_function_interrupt(int, void *, struct pt_regs *);
 
-extern void local_setup_timer(unsigned int cpu);
+extern int local_setup_timer(unsigned int cpu);
 extern void local_teardown_timer(unsigned int cpu);
 
 extern void hypervisor_callback(void);
@@ -110,32 +110,45 @@ set_cpu_sibling_map(int cpu)
 	cpu_data[cpu].booted_cores = 1;
 }
 
-static void xen_smp_intr_init(unsigned int cpu)
+static int xen_smp_intr_init(unsigned int cpu)
 {
+	int rc;
+
+	per_cpu(resched_irq, cpu) = per_cpu(callfunc_irq, cpu) = -1;
+
 	sprintf(resched_name[cpu], "resched%d", cpu);
-	per_cpu(resched_irq, cpu) =
-		bind_ipi_to_irqhandler(
-			RESCHEDULE_VECTOR,
-			cpu,
-			smp_reschedule_interrupt,
-			SA_INTERRUPT,
-			resched_name[cpu],
-			NULL);
-	BUG_ON(per_cpu(resched_irq, cpu) < 0);
+	rc = bind_ipi_to_irqhandler(RESCHEDULE_VECTOR,
+				    cpu,
+				    smp_reschedule_interrupt,
+				    SA_INTERRUPT,
+				    resched_name[cpu],
+				    NULL);
+	if (rc < 0)
+		goto fail;
+	per_cpu(resched_irq, cpu) = rc;
 
 	sprintf(callfunc_name[cpu], "callfunc%d", cpu);
-	per_cpu(callfunc_irq, cpu) =
-		bind_ipi_to_irqhandler(
-			CALL_FUNCTION_VECTOR,
-			cpu,
-			smp_call_function_interrupt,
-			SA_INTERRUPT,
-			callfunc_name[cpu],
-			NULL);
-	BUG_ON(per_cpu(callfunc_irq, cpu) < 0);
+	rc = bind_ipi_to_irqhandler(CALL_FUNCTION_VECTOR,
+				    cpu,
+				    smp_call_function_interrupt,
+				    SA_INTERRUPT,
+				    callfunc_name[cpu],
+				    NULL);
+	if (rc < 0)
+		goto fail;
+	per_cpu(callfunc_irq, cpu) = rc;
 
-	if (cpu != 0)
-		local_setup_timer(cpu);
+	if ((cpu != 0) && ((rc = local_setup_timer(cpu)) != 0))
+		goto fail;
+
+	return 0;
+
+ fail:
+	if (per_cpu(resched_irq, cpu) >= 0)
+		unbind_from_irqhandler(per_cpu(resched_irq, cpu), NULL);
+	if (per_cpu(callfunc_irq, cpu) >= 0)
+		unbind_from_irqhandler(per_cpu(callfunc_irq, cpu), NULL);
+	return rc;
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
@@ -253,7 +266,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 
 	set_cpu_sibling_map(0);
 
-	xen_smp_intr_init(0);
+	if (xen_smp_intr_init(0))
+		BUG();
 
 	/* Restrict the possible_map according to max_cpus. */
 	while ((num_possible_cpus() > 1) && (num_possible_cpus() > max_cpus)) {
@@ -419,7 +433,13 @@ int __devinit __cpu_up(unsigned int cpu)
 	set_cpu_sibling_map(cpu);
 	wmb();
 
-	xen_smp_intr_init(cpu);
+
+	rc = xen_smp_intr_init(cpu);
+	if (rc) {
+		remove_siblinginfo(cpu);
+		return rc;
+	}
+
 	cpu_set(cpu, cpu_online_map);
 
 	rc = HYPERVISOR_vcpu_op(VCPUOP_up, cpu, NULL);
