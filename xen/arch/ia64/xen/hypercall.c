@@ -472,7 +472,12 @@ static long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             vector > IA64_LAST_DEVICE_VECTOR)
             break;
         
-        free_irq_vector(vector);
+        /* XXX This should be called, but causes a NAT consumption via the
+	 * reboot notifier_call_chain in dom0 if a device is hidden for
+	 * a driver domain using pciback.hide= (specifically, hiding function
+	 * 1 of a 2 port e1000 card).
+	 * free_irq_vector(vector);
+	 */
         ret = 0;
         break;
     }
