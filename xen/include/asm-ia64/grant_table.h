@@ -23,8 +23,16 @@ void guest_physmap_add_page(struct domain *d, unsigned long gpfn, unsigned long 
     } while (0)
 
 
+/* XXX
+ * somewhere appropriate
+ * those constand shouldn't be pre-defined and
+ * those area should be reserved by EFI MD.
+ */
+/* Guest phsyical address of shared_info */
+#define IA64_SHARED_INFO_PADDR	(1UL << 40)
+
 /* Guest physical address of the grant table.  */
-#define IA64_GRANT_TABLE_PADDR (1UL << 40)
+#define IA64_GRANT_TABLE_PADDR  (IA64_SHARED_INFO_PADDR + XSI_SIZE)
 
 #define gnttab_shared_maddr(d, t, i)                        \
     virt_to_maddr((char*)(t)->shared + ((i) << PAGE_SHIFT))

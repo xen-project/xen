@@ -481,9 +481,7 @@ static int setup_guest(int xc_handle,
     start_info_t *start_info;
     unsigned long start_info_mpa;
     struct xen_ia64_boot_param *bp;
-#if 0 // see comment below
     shared_info_t *shared_info;
-#endif
     int i;
     DECLARE_DOMCTL;
     int rc;
@@ -595,13 +593,20 @@ static int setup_guest(int xc_handle,
     ctxt->user_regs.r28 = start_info_mpa + sizeof (start_info_t);
     munmap(start_info, PAGE_SIZE);
 
-#if 0
     /*
-     * XXX FIXME:
-     * The follwoing initialization is done by XEN_DOMCTL_arch_setup as
-     * work around.
-     * Should XENMEM_add_to_physmap with XENMAPSPACE_shared_info be used?
+     * shared_info is assiged into guest pseudo physical address space
+     * by XEN_DOMCTL_arch_setup. shared_info_frame is stale value until that.
+     * So passed shared_info_frame is stale. obtain the right value here.
      */
+    domctl.cmd = XEN_DOMCTL_getdomaininfo;
+    domctl.domain = (domid_t)dom;
+    if ( (xc_domctl(xc_handle, &domctl) < 0) ||
+         ((uint16_t)domctl.domain != dom) )
+    {
+        PERROR("Could not get info on domain");
+        goto error_out;
+    }
+    shared_info_frame = domctl.u.getdomaininfo.shared_info_frame;
 
     /* shared_info page starts its life empty. */
     shared_info = xc_map_foreign_range(
@@ -615,7 +620,6 @@ static int setup_guest(int xc_handle,
     shared_info->arch.start_info_pfn = nr_pages - 3;
 
     munmap(shared_info, PAGE_SIZE);
-#endif
     free(page_array);
     return 0;
 

@@ -125,19 +125,19 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
                     for_each_vcpu (d, v)
                         v->arch.breakimm = d->arch.breakimm;
                 }
-#if 1
-                /*
-                 * XXX FIXME 
-                 * see comment around shared_info in setup_guest() in 
-                 * libxc/xc_linux_build.c
-                 */
                 {
-                    int i;
-                    d->shared_info->arch.start_info_pfn = ds->maxmem >> PAGE_SHIFT;
-                    for_each_cpu(i)
-                        d->shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
+                    /*
+                     * XXX IA64_SHARED_INFO_PADDR
+                     * assign these pages into guest psudo physical address
+                     * space for dom0 to map this page by gmfn.
+                     * this is necessary for domain build, save, restore and 
+                     * dump-core.
+                     */
+                    unsigned long i;
+                    for (i = 0; i < XSI_SIZE; i += PAGE_SIZE)
+                        assign_domain_page(d, IA64_SHARED_INFO_PADDR + i,
+                                           virt_to_maddr(d->shared_info + i));
                 }
-#endif
             }
         }
 
