@@ -206,28 +206,14 @@ void leave_hypervisor_tail(struct pt_regs *regs)
         do_softirq();
         local_irq_disable();
 
-//        if (user_regs != regs)
-//            printk("WARNING: checking pending interrupt in nested interrupt!!!\n");
-
-        /* FIXME: Check event pending indicator, and set
-         * pending bit if necessary to inject back to guest.
-         * Should be careful about window between this check
-         * and above assist, since IOPACKET_PORT shouldn't be
-         * injected into vmx domain.
-         *
-         * Now hardcode the vector as 0x10 temporarily
-         */
-//       if (event_pending(v)&&(!(VLSAPIC_INSVC(v,0)&(1UL<<0x10)))) {
-//           VCPU(v, irr[0]) |= 1UL << 0x10;
-//           v->arch.irq_new_pending = 1;
-//       }
-
         if (v->vcpu_id == 0) {
             int callback_irq =
                 d->arch.hvm_domain.params[HVM_PARAM_CALLBACK_IRQ];
-            if (callback_irq != 0) {
+            if (callback_irq != 0 && local_events_need_delivery()) {
                 /* change level for para-device callback irq */
-                viosapic_set_irq(d, callback_irq, local_events_need_delivery());
+                /* use level irq to send discrete event */
+                viosapic_set_irq(d, callback_irq, 1);
+                viosapic_set_irq(d, callback_irq, 0);
             }
         }
 
