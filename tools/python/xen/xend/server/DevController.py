@@ -226,9 +226,11 @@ class DevController:
         for key, val in configDict.items():
             if isinstance(val, (types.ListType, types.TupleType)):
                 for v in val:
-                    sxpr.append([key, v])
+                    if v != None:
+                        sxpr.append([key, v])
             else:
-                sxpr.append([key, val])
+                if val != None:
+                    sxpr.append([key, val])
         return sxpr
 
     def sxprs(self):
