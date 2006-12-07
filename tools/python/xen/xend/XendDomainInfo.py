@@ -1784,9 +1784,9 @@ class XendDomainInfo:
     def get_memory_static_min(self):
         return self.info.get('memory_static_min', 0)
     def get_memory_dynamic_max(self):
-        return self.info.get('memory_dynamic_min', 0)
-    def get_memory_dynamic_min(self):
         return self.info.get('memory_dynamic_max', 0)
+    def get_memory_dynamic_min(self):
+        return self.info.get('memory_dynamic_min', 0)
     
     
     def get_vcpus_policy(self):
