@@ -509,14 +509,8 @@ class XendConfig(dict):
                 
                 log.debug("XendConfig: reading device: %s" % pci_devs)
             else:
-                for opt, val in config[1:]:
-                    dev_info[opt] = val
+                self.device_add(dev_type, cfg_sxp = config, target = cfg)
                 log.debug("XendConfig: reading device: %s" % scrub_password(dev_info))
-                # create uuid if it doesn't
-                dev_uuid = dev_info.get('uuid', uuid.createString())
-                dev_info['uuid'] = dev_uuid
-                cfg['devices'][dev_uuid] = (dev_type, dev_info)
-
 
         # Extract missing data from configuration entries
         image_sxp = sxp.child_value(sxp_cfg, 'image', [])
@@ -867,7 +861,8 @@ class XendConfig(dict):
 
         return sxpr    
     
-    def device_add(self, dev_type, cfg_sxp = None, cfg_xenapi = None):
+    def device_add(self, dev_type, cfg_sxp = None, cfg_xenapi = None,
+                   target = None):
         """Add a device configuration in SXP format or XenAPI struct format.
 
         For SXP, it could be either:
@@ -882,9 +877,14 @@ class XendConfig(dict):
         @param cfg_sxp: SXP configuration object
         @type cfg_xenapi: dict
         @param cfg_xenapi: A device configuration from Xen API (eg. vbd,vif)
+        @param target: write device information to
+        @type target: None or a dictionary
         @rtype: string
         @return: Assigned UUID of the device.
         """
+        if target == None:
+            target = self
+        
         if dev_type not in XendDevices.valid_devices() and \
            dev_type not in XendDevices.pseudo_devices():        
             raise XendConfigError("XendConfig: %s not a valid device type" %
@@ -914,15 +914,18 @@ class XendConfig(dict):
             except ValueError:
                 pass # SXP has no options for this device
 
-            
-            def _get_config_ipaddr(config):
+
+            # Special handling for certain device parameters.
+
+            def _get_config_ipaddr(cfg):
                 val = []
-                for ipaddr in sxp.children(config, elt='ip'):
+                for ipaddr in sxp.children(cfg, elt='ip'):
                     val.append(sxp.child0(ipaddr))
                 return val
 
             if dev_type == 'vif' and 'ip' in dev_info:
                 dev_info['ip'] = _get_config_ipaddr(config)
+                log.debug('XendConfig: IP Address: %s' % dev_info['ip'])
 
             if dev_type == 'vbd':
                 if dev_info.get('dev', '').startswith('ioemu:'):
@@ -936,11 +939,18 @@ class XendConfig(dict):
             dev_info['uuid'] = dev_uuid
 
             # store dev references by uuid for certain device types
-            self['devices'][dev_uuid] = (dev_type, dev_info)
+            target['devices'][dev_uuid] = (dev_type, dev_info)
             if dev_type in ('vif', 'vbd', 'vtpm'):
-                self['%s_refs' % dev_type].append(dev_uuid)
+                param = '%s_refs' % dev_type
+                if param not in target:
+                    target[param] = []
+                if dev_uuid in target[param]:
+                    target[param].append(dev_uuid)
             elif dev_type in ('tap',):
-                self['vbd_refs'].append(dev_uuid)
+                if 'vbd_refs' not in target:
+                    target['vbd_refs'] = []
+                if dev_uuid in target['vbd_refs']:
+                    target['vbd_refs'].append(dev_uuid)
 
             return dev_uuid
 
