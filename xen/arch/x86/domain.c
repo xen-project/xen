@@ -134,6 +134,8 @@ int vcpu_initialise(struct vcpu *v)
 
     v->arch.flags = TF_kernel_mode;
 
+    pae_l3_cache_init(&v->arch.pae_l3_cache);
+
     if ( is_hvm_domain(d) )
     {
         if ( (rc = hvm_vcpu_initialise(v)) != 0 )
@@ -154,8 +156,6 @@ int vcpu_initialise(struct vcpu *v)
 
     v->arch.perdomain_ptes =
         d->arch.mm_perdomain_pt + (v->vcpu_id << GDT_LDT_VCPU_SHIFT);
-
-    pae_l3_cache_init(&v->arch.pae_l3_cache);
 
     return 0;
 }
