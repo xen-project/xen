@@ -63,7 +63,7 @@ void xc_set_error(int code, const char *fmt, ...);
 
 #define ERROR(_m, _a...)  xc_set_error(XC_INTERNAL_ERROR, _m , ## _a )
 #define PERROR(_m, _a...) xc_set_error(XC_INTERNAL_ERROR, _m " (%d = %s)", \
-                                       _m , ## _a , errno, strerror(errno))
+                                       ## _a , errno, strerror(errno))
 
 int lock_pages(void *addr, size_t len);
 void unlock_pages(void *addr, size_t len);
