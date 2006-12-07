@@ -454,6 +454,29 @@ static long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
+    case PHYSDEVOP_free_irq_vector: {
+        struct physdev_irq irq_op;
+        int vector;
+
+        ret = -EFAULT;
+        if ( copy_from_guest(&irq_op, arg, 1) != 0 )
+            break;
+
+        ret = -EPERM;
+        if ( !IS_PRIV(current->domain) )
+            break;
+
+        ret = -EINVAL;
+        vector = irq_op.vector;
+        if (vector < IA64_FIRST_DEVICE_VECTOR ||
+            vector > IA64_LAST_DEVICE_VECTOR)
+            break;
+        
+        free_irq_vector(vector);
+        ret = 0;
+        break;
+    }
+
     default:
         ret = -ENOSYS;
         break;

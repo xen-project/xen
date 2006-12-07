@@ -152,6 +152,7 @@ DEFINE_XEN_GUEST_HANDLE(physdev_op_t);
 #define PHYSDEVOP_APIC_READ              PHYSDEVOP_apic_read
 #define PHYSDEVOP_APIC_WRITE             PHYSDEVOP_apic_write
 #define PHYSDEVOP_ASSIGN_VECTOR          PHYSDEVOP_alloc_irq_vector
+#define PHYSDEVOP_FREE_VECTOR            PHYSDEVOP_free_irq_vector
 #define PHYSDEVOP_IRQ_NEEDS_UNMASK_NOTIFY XENIRQSTAT_needs_eoi
 #define PHYSDEVOP_IRQ_SHARED             XENIRQSTAT_shared
 

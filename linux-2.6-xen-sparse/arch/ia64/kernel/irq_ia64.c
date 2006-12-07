@@ -94,6 +94,13 @@ free_irq_vector (int vector)
 	if (vector < IA64_FIRST_DEVICE_VECTOR || vector > IA64_LAST_DEVICE_VECTOR)
 		return;
 
+#ifdef CONFIG_XEN
+	if (is_running_on_xen()) {
+		extern void xen_free_irq_vector(int);
+		xen_free_irq_vector(vector);
+		return;
+	}
+#endif
 	pos = vector - IA64_FIRST_DEVICE_VECTOR;
 	if (!test_and_clear_bit(pos, ia64_vector_mask))
 		printk(KERN_WARNING "%s: double free!\n", __FUNCTION__);
