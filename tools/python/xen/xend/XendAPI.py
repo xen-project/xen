@@ -1036,8 +1036,8 @@ class XendAPI:
     #       regular xm created VBDs
 
     VBD_attr_ro = ['image',
-                   'IO_bandwidth_incoming_kbs',
-                   'IO_bandwidth_outgoing_kbs']
+                   'io_read_kbs',
+                   'io_write_kbs']
     VBD_attr_rw = ['VM',
                    'VDI',
                    'device',
@@ -1113,10 +1113,8 @@ class XendAPI:
     # Xen API: Class VIF
     # ----------------------------------------------------------------
 
-    VIF_attr_ro = ['network_read_kbs',
-                   'network_write_kbs',
-                   'IO_bandwidth_incoming_kbs',
-                   'IO_bandwidth_outgoing_kbs']
+    VIF_attr_ro = ['io_read_kbs',
+                   'io_write_kbs']
     VIF_attr_rw = ['name',
                    'type',
                    'device',
@@ -1138,6 +1136,7 @@ class XendAPI:
             return xen_api_error(XEND_ERROR_VIF_INVALID)
         valid_vif_keys = self.VIF_attr_ro + self.VIF_attr_rw + \
                          self.Base_attr_ro + self.Base_attr_rw
+
         for k in cfg.keys():
             if k not in valid_vif_keys:
                 del cfg[k]

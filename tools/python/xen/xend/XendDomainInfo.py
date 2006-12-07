@@ -1780,13 +1780,13 @@ class XendDomainInfo:
         return dom_uuid
     
     def get_memory_static_max(self):
-        return self.info.get('memory_static_max')
+        return self.info.get('memory_static_max', 0)
     def get_memory_static_min(self):
-        return self.info.get('memory_static_min')
+        return self.info.get('memory_static_min', 0)
     def get_memory_dynamic_max(self):
-        return self.info.get('memory_dynamic_min')
+        return self.info.get('memory_dynamic_min', 0)
     def get_memory_dynamic_min(self):
-        return self.info.get('memory_dynamic_max')
+        return self.info.get('memory_dynamic_max', 0)
     
     
     def get_vcpus_policy(self):
@@ -1820,7 +1820,7 @@ class XendDomainInfo:
     def get_builder(self):
         return self.info.get('builder', 0)
     def get_boot_method(self):
-        return self.info.get('boot_method', '')
+        return self.info.get('boot_method', XEN_API_BOOT_TYPE[2])
     def get_kernel_image(self):
         return self.info.get('kernel_kernel', '')
     def get_kernel_initrd(self):
@@ -1830,7 +1830,7 @@ class XendDomainInfo:
     def get_grub_cmdline(self):
         return '' # TODO
     def get_pci_bus(self):
-        return 0 # TODO
+        return '' # TODO
     def get_tools_version(self):
         return {} # TODO
     def get_other_config(self):
@@ -1925,18 +1925,16 @@ class XendDomainInfo:
                     
             config['network'] = '' # Invalid for Xend
             config['MTU'] = 1500 # TODO
-            config['network_read_kbs'] = 0.0
-            config['network_write_kbs'] = 0.0
-            config['IO_bandwidth_incoming_kbs'] = 0.0
-            config['IO_bandwidth_outgoing_kbs'] = 0.0
+            config['io_read_kbs'] = 0.0
+            config['io_write_kbs'] = 0.0
 
         if dev_class == 'vbd':
-            config['VDI'] = '' # TODO
+            config['VDI'] = config.get('VDI', '')
             config['device'] = config.get('dev', '')
             config['driver'] = 'paravirtualised' # TODO
             config['image'] = config.get('uname', '')
-            config['IO_bandwidth_incoming_kbs'] = 0.0
-            config['IO_bandwidth_outgoing_kbs'] = 0.0
+            config['io_read_kbs'] = 0.0
+            config['io_write_kbs'] = 0.0
             if config['mode'] == 'r':
                 config['mode'] = 'RO'
             else:
@@ -2050,27 +2048,7 @@ class XendDomainInfo:
         return dev_uuid
 
     def has_device(self, dev_class, dev_uuid):
-        return (dev_uuid in self.info['%s_refs' % dev_class])
-
-    """
-        def stateChar(name):
-            if name in self.info:
-                if self.info[name]:
-                    return name[0]
-                else:
-                    return '-'
-            else:
-                return '?'
-
-        state = reduce(lambda x, y: x + y, map(stateChar, DOM_STATES_OLD))
-
-        sxpr.append(['state', state])
-
-        if self.store_mfn:
-            sxpr.append(['store_mfn', self.store_mfn])
-        if self.console_mfn:
-            sxpr.append(['console_mfn', self.console_mfn])
-    """
+        return (dev_uuid in self.info['%s_refs' % dev_class.lower()])
 
     def __str__(self):
         return '<domain id=%s name=%s memory=%s state=%s>' % \

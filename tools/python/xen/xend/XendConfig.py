@@ -925,7 +925,6 @@ class XendConfig(dict):
 
             if dev_type == 'vif' and 'ip' in dev_info:
                 dev_info['ip'] = _get_config_ipaddr(config)
-                log.debug('XendConfig: IP Address: %s' % dev_info['ip'])
 
             if dev_type == 'vbd':
                 if dev_info.get('dev', '').startswith('ioemu:'):
@@ -944,12 +943,12 @@ class XendConfig(dict):
                 param = '%s_refs' % dev_type
                 if param not in target:
                     target[param] = []
-                if dev_uuid in target[param]:
+                if dev_uuid not in target[param]:
                     target[param].append(dev_uuid)
             elif dev_type in ('tap',):
                 if 'vbd_refs' not in target:
                     target['vbd_refs'] = []
-                if dev_uuid in target['vbd_refs']:
+                if dev_uuid not in target['vbd_refs']:
                     target['vbd_refs'].append(dev_uuid)
 
             return dev_uuid
