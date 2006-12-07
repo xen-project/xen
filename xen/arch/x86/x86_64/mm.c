@@ -59,7 +59,7 @@ l2_pgentry_t *virt_to_xen_l2e(unsigned long v)
     {
         pl3e = page_to_virt(alloc_xen_pagetable());
         clear_page(pl3e);
-        *pl4e = l4e_from_paddr(__pa(pl3e), __PAGE_HYPERVISOR);
+        l4e_write(pl4e, l4e_from_paddr(__pa(pl3e), __PAGE_HYPERVISOR));
     }
     
     pl3e = l4e_to_l3e(*pl4e) + l3_table_offset(v);
@@ -67,7 +67,7 @@ l2_pgentry_t *virt_to_xen_l2e(unsigned long v)
     {
         pl2e = page_to_virt(alloc_xen_pagetable());
         clear_page(pl2e);
-        *pl3e = l3e_from_paddr(__pa(pl2e), __PAGE_HYPERVISOR);
+        l3e_write(pl3e, l3e_from_paddr(__pa(pl2e), __PAGE_HYPERVISOR));
     }
     
     pl2e = l3e_to_l2e(*pl3e) + l2_table_offset(v);
@@ -85,8 +85,8 @@ void __init paging_init(void)
     if ( (l2_pg = alloc_domheap_page(NULL)) == NULL )
         goto nomem;
     l3_ro_mpt = clear_page(page_to_virt(l2_pg));
-    idle_pg_table[l4_table_offset(RO_MPT_VIRT_START)] =
-        l4e_from_page(l2_pg, __PAGE_HYPERVISOR | _PAGE_USER);
+    l4e_write(&idle_pg_table[l4_table_offset(RO_MPT_VIRT_START)],
+              l4e_from_page(l2_pg, __PAGE_HYPERVISOR | _PAGE_USER));
 
     /*
      * Allocate and map the machine-to-phys table.
@@ -111,18 +111,19 @@ void __init paging_init(void)
                 goto nomem;
             va = RO_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT);
             l2_ro_mpt = clear_page(page_to_virt(l2_pg));
-            l3_ro_mpt[l3_table_offset(va)] =
-                l3e_from_page(l2_pg, __PAGE_HYPERVISOR | _PAGE_USER);
+            l3e_write(&l3_ro_mpt[l3_table_offset(va)],
+                      l3e_from_page(l2_pg, __PAGE_HYPERVISOR | _PAGE_USER));
             l2_ro_mpt += l2_table_offset(va);
         }
         /* NB. Cannot be GLOBAL as shadow_mode_translate reuses this area. */
-        *l2_ro_mpt++ = l2e_from_page(
-            l1_pg, /*_PAGE_GLOBAL|*/_PAGE_PSE|_PAGE_USER|_PAGE_PRESENT);
+        l2e_write(l2_ro_mpt, l2e_from_page(
+            l1_pg, /*_PAGE_GLOBAL|*/_PAGE_PSE|_PAGE_USER|_PAGE_PRESENT));
+        l2_ro_mpt++;
     }
 
     /* Set up linear page table mapping. */
-    idle_pg_table[l4_table_offset(LINEAR_PT_VIRT_START)] =
-        l4e_from_paddr(__pa(idle_pg_table), __PAGE_HYPERVISOR);
+    l4e_write(&idle_pg_table[l4_table_offset(LINEAR_PT_VIRT_START)],
+              l4e_from_paddr(__pa(idle_pg_table), __PAGE_HYPERVISOR));
     return;
 
  nomem:
@@ -132,15 +133,15 @@ void __init paging_init(void)
 void __init setup_idle_pagetable(void)
 {
     /* Install per-domain mappings for idle domain. */
-    idle_pg_table[l4_table_offset(PERDOMAIN_VIRT_START)] =
-        l4e_from_page(
-            virt_to_page(idle_vcpu[0]->domain->arch.mm_perdomain_l3),
-            __PAGE_HYPERVISOR);
+    l4e_write(&idle_pg_table[l4_table_offset(PERDOMAIN_VIRT_START)],
+              l4e_from_page(
+                  virt_to_page(idle_vcpu[0]->domain->arch.mm_perdomain_l3),
+                  __PAGE_HYPERVISOR));
 }
 
 void __init zap_low_mappings(void)
 {
-    idle_pg_table[0] = l4e_empty();
+    l4e_write(&idle_pg_table[0], l4e_empty());
     flush_tlb_all_pge();
 }
 
