@@ -160,13 +160,9 @@ static int kexec_get_reserve(xen_kexec_range_t *range)
 
 extern unsigned long _text;
 
-static int kexec_get_xen(xen_kexec_range_t *range, int get_ma)
+static int kexec_get_xen(xen_kexec_range_t *range)
 {
-    if ( get_ma )
-        range->start = virt_to_maddr(&_text);
-    else
-        range->start = (unsigned long) &_text;
-
+    range->start = virt_to_maddr(&_text);
     range->size = (unsigned long)&_end - (unsigned long)&_text;
     return 0;
 }
@@ -195,10 +191,7 @@ static int kexec_get_range(XEN_GUEST_HANDLE(void) uarg)
         ret = kexec_get_reserve(&range);
         break;
     case KEXEC_RANGE_MA_XEN:
-        ret = kexec_get_xen(&range, 1);
-        break;
-    case KEXEC_RANGE_VA_XEN:
-        ret = kexec_get_xen(&range, 0);
+        ret = kexec_get_xen(&range);
         break;
     case KEXEC_RANGE_MA_CPU:
         ret = kexec_get_cpu(&range);
