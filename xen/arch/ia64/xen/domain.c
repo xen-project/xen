@@ -308,6 +308,16 @@ void relinquish_vcpu_resources(struct vcpu *v)
     if (HAS_PERVCPU_VHPT(v->domain))
         pervcpu_vhpt_free(v);
     if (v->arch.privregs != NULL) {
+        // this might be called by arch_do_domctl() with XEN_DOMCTL_arch_setup()
+        // for domVTi.
+        if (!(atomic_read(&v->domain->refcnt) & DOMAIN_DESTROYED)) {
+            unsigned long i;
+            for (i = 0; i < XMAPPEDREGS_SIZE; i += PAGE_SIZE)
+                guest_physmap_remove_page(v->domain,
+                    IA64_XMAPPEDREGS_PADDR(v->vcpu_id) + i,
+                    virt_to_maddr(v->arch.privregs + i));
+        }
+
         free_xenheap_pages(v->arch.privregs,
                            get_order_from_shift(XMAPPEDREGS_SHIFT));
         v->arch.privregs = NULL;
@@ -367,6 +377,15 @@ int vcpu_initialise(struct vcpu *v)
 		for (i = 0; i < (1 << order); i++)
 		    share_xen_page_with_guest(virt_to_page(v->arch.privregs) +
 		                              i, d, XENSHARE_writable);
+		/*
+		 * XXX IA64_XMAPPEDREGS_PADDR
+		 * assign these pages into guest pseudo physical address
+		 * space for dom0 to map this page by gmfn.
+		 * this is necessary for domain save, restore and dump-core.
+		 */
+		for (i = 0; i < XMAPPEDREGS_SIZE; i += PAGE_SIZE)
+		    assign_domain_page(d, IA64_XMAPPEDREGS_PADDR(v->vcpu_id) + i,
+                                      virt_to_maddr(v->arch.privregs + i));
 
 		tlbflush_update_time(&v->arch.tlbflush_timestamp,
 		                     tlbflush_current_time());
@@ -509,7 +528,8 @@ void arch_getdomaininfo_ctxt(struct vcpu *v, struct vcpu_guest_context *c)
 	struct vcpu_extra_regs *er = &c->extra_regs;
 
 	c->user_regs = *vcpu_regs (v);
- 	c->privregs_pfn = virt_to_maddr(v->arch.privregs) >> PAGE_SHIFT;
+ 	c->privregs_pfn = get_gpfn_from_mfn(virt_to_maddr(v->arch.privregs) >>
+                                           PAGE_SHIFT);
 
 	/* Fill extra regs.  */
 	for (i = 0; i < 8; i++) {

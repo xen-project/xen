@@ -30,9 +30,14 @@ void guest_physmap_add_page(struct domain *d, unsigned long gpfn, unsigned long 
  */
 /* Guest phsyical address of shared_info */
 #define IA64_SHARED_INFO_PADDR	(1UL << 40)
+/* Guest phsyical address of mapped_regs */
+#define IA64_XMAPPEDREGS_BASE_PADDR     (IA64_SHARED_INFO_PADDR + XSI_SIZE)
+#define IA64_XMAPPEDREGS_PADDR(vcpu_id)             \
+    (IA64_XMAPPEDREGS_BASE_PADDR +                  \
+     (vcpu_id) * max_t(unsigned long, PAGE_SIZE, XMAPPEDREGS_SIZE))
 
 /* Guest physical address of the grant table.  */
-#define IA64_GRANT_TABLE_PADDR  (IA64_SHARED_INFO_PADDR + XSI_SIZE)
+#define IA64_GRANT_TABLE_PADDR  IA64_XMAPPEDREGS_PADDR(NR_CPUS)
 
 #define gnttab_shared_maddr(d, t, i)                        \
     virt_to_maddr((char*)(t)->shared + ((i) << PAGE_SHIFT))
