@@ -682,4 +682,46 @@ int xc_hvm_set_isa_irq_level(
 int xc_hvm_set_pci_link_route(
     int xc_handle, domid_t dom, uint8_t link, uint8_t isa_irq);
 
+
+typedef enum {
+  XC_ERROR_NONE = 0,
+  XC_INTERNAL_ERROR = 1,
+  XC_INVALID_KERNEL = 2,
+} xc_error_code;
+
+#define XC_MAX_ERROR_MSG_LEN 1024
+typedef struct {
+  int code;
+  char message[XC_MAX_ERROR_MSG_LEN];
+} xc_error;
+
+/*
+ * Return a pointer to the last error. This pointer and the
+ * data pointed to are only valid until the next call to
+ * libxc.
+ */
+const xc_error const *xc_get_last_error(void);
+
+/*
+ * Clear the last error
+ */
+void xc_clear_last_error(void);
+
+typedef void (*xc_error_handler)(const xc_error const* err);
+
+/*
+ * The default error handler which prints to stderr
+ */
+void xc_default_error_handler(const xc_error const* err);
+
+/*
+ * Convert an error code into a text description
+ */
+const char *xc_error_code_to_desc(int code);
+
+/*
+ * Registers a callback to handle errors
+ */
+xc_error_handler xc_set_error_handler(xc_error_handler handler);
+
 #endif
