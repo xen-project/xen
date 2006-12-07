@@ -40,6 +40,7 @@ from xen.util import security
 from xen.xend import balloon, sxp, uuid, image, arch
 from xen.xend import XendRoot, XendNode, XendConfig
 
+from xen.xend.XendConfig import scrub_password
 from xen.xend.XendBootloader import bootloader
 from xen.xend.XendError import XendError, VmError
 from xen.xend.XendDevices import XendDevices
@@ -148,7 +149,7 @@ def create(config):
     @raise VmError: Invalid configuration or failure to start.
     """
 
-    log.debug("XendDomainInfo.create(%s)", config)
+    log.debug("XendDomainInfo.create(%s)", scrub_password(config))
     vm = XendDomainInfo(XendConfig.XendConfig(sxp_obj = config))
     try:
         vm.start()
@@ -175,7 +176,7 @@ def recreate(info, priv):
     @raise XendError: Errors with configuration.
     """
 
-    log.debug("XendDomainInfo.recreate(%s)", info)
+    log.debug("XendDomainInfo.recreate(%s)", scrub_password(info))
 
     assert not info['dying']
 
@@ -257,7 +258,7 @@ def restore(config):
     @raise XendError: Errors with configuration.
     """
 
-    log.debug("XendDomainInfo.restore(%s)", config)
+    log.debug("XendDomainInfo.restore(%s)", scrub_password(config))
     vm = XendDomainInfo(XendConfig.XendConfig(sxp_obj = config),
                         resume = True)
     try:
@@ -280,7 +281,7 @@ def createDormant(domconfig):
     @raise XendError: Errors with configuration.    
     """
     
-    log.debug("XendDomainInfo.createDormant(%s)", domconfig)
+    log.debug("XendDomainInfo.createDormant(%s)", scrub_password(domconfig))
     
     # domid does not make sense for non-running domains.
     domconfig.pop('domid', None)
@@ -520,11 +521,11 @@ class XendDomainInfo:
         @param dev_config: device configuration
         @type  dev_config: SXP object (parsed config)
         """
-        log.debug("XendDomainInfo.device_create: %s" % dev_config)
+        log.debug("XendDomainInfo.device_create: %s" % scrub_password(dev_config))
         dev_type = sxp.name(dev_config)
         dev_uuid = self.info.device_add(dev_type, cfg_sxp = dev_config)
         dev_config_dict = self.info['devices'][dev_uuid][1]
-        log.debug("XendDomainInfo.device_create: %s" % dev_config_dict)
+        log.debug("XendDomainInfo.device_create: %s" % scrub_password(dev_config_dict))
         devid = self._createDevice(dev_type, dev_config_dict)
         self._waitForDevice(dev_type, devid)
         return self.getDeviceController(dev_type).sxpr(devid)
@@ -746,7 +747,7 @@ class XendDomainInfo:
 
         to_store.update(self._vcpuDomDetails())
 
-        log.debug("Storing domain details: %s", to_store)
+        log.debug("Storing domain details: %s", scrub_password(to_store))
 
         self._writeDom(to_store)
 
@@ -1188,7 +1189,7 @@ class XendDomainInfo:
         """
         for (devclass, config) in self.info.get('devices', {}).values():
             if devclass in XendDevices.valid_devices():            
-                log.info("createDevice: %s : %s" % (devclass, config))
+                log.info("createDevice: %s : %s" % (devclass, scrub_password(config)))
                 self._createDevice(devclass, config)
 
         if self.image:
@@ -1667,7 +1668,7 @@ class XendDomainInfo:
         if not self._readVm('xend/restart_count'):
             to_store['xend/restart_count'] = str(0)
 
-        log.debug("Storing VM details: %s", to_store)
+        log.debug("Storing VM details: %s", scrub_password(to_store))
 
         self._writeVm(to_store)
         self._setVmPermissions()

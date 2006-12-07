@@ -704,8 +704,10 @@ def configure_hvm(config_image, vals):
     config_image.append(['vncpasswd', vals.vncpasswd])
 
 def run_bootloader(vals, config_image):
+    if not os.access(vals.bootloader, os.F_OK):
+        err("Bootloader '%s' does not exist" % vals.bootloader)
     if not os.access(vals.bootloader, os.X_OK):
-        err("Bootloader isn't executable")
+        err("Bootloader '%s' isn't executable" % vals.bootloader)
     if len(vals.disk) < 1:
         err("No disks configured and boot loader requested")
     (uname, dev, mode, backend) = vals.disk[0]
