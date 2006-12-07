@@ -680,6 +680,7 @@ class XendConfig(dict):
                 else:
                     self[sxp_arg] = val
 
+        _set_cfg_if_exists('bootloader')
         _set_cfg_if_exists('shadow_memory')
         _set_cfg_if_exists('security')
         _set_cfg_if_exists('features')

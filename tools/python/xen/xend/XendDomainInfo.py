@@ -1326,7 +1326,7 @@ class XendDomainInfo:
 
         # if we have a boot loader but no image, then we need to set things
         # up by running the boot loader non-interactively
-        if self.info.get('bootloader') and self.info.get('image'):
+        if self.info.get('bootloader'):
             self._configureBootloader()
 
         if not self._infoIsSet('image'):
@@ -1532,11 +1532,17 @@ class XendDomainInfo:
         if not self.info.get('bootloader'):
             return
         blcfg = None
+
         # FIXME: this assumes that we want to use the first disk device
-        for devuuid, (devtype, devinfo) in self.info.all_devices_sxpr():
+        for (devtype, devinfo) in self.info.all_devices_sxpr():
             if not devtype or not devinfo or devtype not in ('vbd', 'tap'):
                 continue
-            disk = devinfo.get('uname')
+            disk = None
+            for param in devinfo:
+                if param[0] == 'uname':
+                    disk = param[1]
+                    break
+
             if disk is None:
                 continue
             fn = blkdev_uname_to_file(disk)
