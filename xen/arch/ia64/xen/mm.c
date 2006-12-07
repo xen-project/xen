@@ -1295,11 +1295,13 @@ __dom0vp_add_physmap(struct domain* d, unsigned long gpfn,
 
     if (unlikely(rd == d))
         goto out1;
-    if (is_gmfn) {
-        if (domid == DOMID_XEN || domid == DOMID_IO)
-            goto out1;
+    /*
+     * DOMID_XEN and DOMID_IO don't have their own p2m table.
+     * It can be considered that their p2m conversion is p==m.
+     */
+    if (likely(is_gmfn && domid != DOMID_XEN && domid != DOMID_IO))
         mfn = gmfn_to_mfn(rd, mfn_or_gmfn);
-    } else 
+    else 
         mfn = mfn_or_gmfn;
     if (unlikely(!mfn_valid(mfn) || get_page(mfn_to_page(mfn), rd) == 0))
         goto out1;
