@@ -30,6 +30,7 @@ import socket
 import traceback
 import xmlrpclib
 import traceback
+import time
 import datetime
 from select import select
 import xml.dom.minidom
@@ -626,7 +627,13 @@ def parse_doms_info(info):
 
     def get_status(n, t, d):
         return DOM_STATES[t(sxp.child_value(info, n, d))]
-    
+
+    start_time = get_info('start_time', float, -1)
+    if start_time == -1:
+        up_time = float(-1)
+    else:
+        up_time = time.time() - start_time
+
     return {
         'domid'    : get_info('domid',        str,   ''),
         'name'     : get_info('name',         str,   '??'),
@@ -634,7 +641,7 @@ def parse_doms_info(info):
         'vcpus'    : get_info('vcpus',        int,   0),
         'state'    : get_info('state',        str,    ''),
         'cpu_time' : get_info('cpu_time',     float, 0),
-        'up_time'  : get_info('up_time',      float, -1),
+        'up_time'  : up_time,
         'seclabel' : security.get_security_printlabel(info),
         }
 
@@ -1209,7 +1216,7 @@ def xm_uptime(args):
 
     for dom in doms:
         d = parse_doms_info(dom)
-        if d['domid'] > 0:
+        if int(d['domid']) > 0:
             uptime = int(round(d['up_time']))
         else:
             f=open('/proc/uptime', 'r')
@@ -1236,10 +1243,10 @@ def xm_uptime(args):
         if short_mode:
             now = datetime.datetime.now()
             upstring = now.strftime(" %H:%M:%S") + " up " + upstring
-            upstring += ", " + d['name'] + " (" + str(d['domid']) + ")"
+            upstring += ", " + d['name'] + " (" + d['domid'] + ")"
         else:
             upstring += ':%(seconds)02d' % vars()
-            upstring = ("%(name)-32s %(domid)3d " % d) + upstring
+            upstring = ("%(name)-32s %(domid)3s " % d) + upstring
 
         print upstring
 
