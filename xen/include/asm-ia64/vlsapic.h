@@ -50,10 +50,19 @@
 #define SAPIC_LEVEL            1
 
 /*
+ * LSAPIC OFFSET
+ */
+#define PIB_LOW_HALF(ofst)     !(ofst & (1 << 20))
+#define PIB_OFST_INTA          0x1E0000
+#define PIB_OFST_XTP           0x1E0008
+
+/*
  *Mask bit
  */
 #define SAPIC_MASK_SHIFT       16
 #define SAPIC_MASK             (1 << SAPIC_MASK_SHIFT)
+
+#define VLSAPIC_XTP(_v)        VMX(_v, xtp)
 
 extern void vtm_init(struct vcpu *vcpu);
 extern void vtm_set_itc(struct  vcpu *vcpu, uint64_t new_itc);
@@ -63,5 +72,7 @@ extern void vmx_vexirq(struct vcpu  *vcpu);
 extern void vhpi_detection(struct vcpu *vcpu);
 extern int vmx_vcpu_pend_interrupt(VCPU * vcpu, uint8_t vector);
 extern struct vcpu * vlsapic_lid_to_vcpu(struct domain *d, uint16_t dest);
+extern uint64_t vlsapic_read(struct vcpu *v, uint64_t addr, uint64_t s);
+extern void vlsapic_write(struct vcpu *v, uint64_t addr, uint64_t s, uint64_t val);
 #define vlsapic_set_irq vmx_vcpu_pend_interrupt
 #endif

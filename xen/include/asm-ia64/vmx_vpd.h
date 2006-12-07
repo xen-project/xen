@@ -96,9 +96,9 @@ struct arch_vmx_struct {
 //    unsigned long   rfi_iip;
 //    unsigned long   rfi_ipsr;
 //    unsigned long   rfi_ifs;
-//	unsigned long	in_service[4];	// vLsapic inservice IRQ bits
     unsigned long   flags;
     unsigned long   xen_port;
+    unsigned char   xtp;
 #ifdef VTI_DEBUG
     unsigned long  ivt_current;
     struct ivt_debug ivt_debug[IVT_DEBUG_MAX];

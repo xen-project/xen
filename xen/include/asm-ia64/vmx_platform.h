@@ -28,7 +28,6 @@ typedef struct virtual_platform_def {
     spinlock_t             buffered_io_lock;
     unsigned long       shared_page_va;
     unsigned long       pib_base;
-    unsigned char       xtp;
     unsigned long       params[HVM_NR_PARAMS];
     struct mmio_list    *mmio;
     /* One IOSAPIC now... */

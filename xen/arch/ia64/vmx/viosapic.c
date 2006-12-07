@@ -31,7 +31,6 @@
 #include <xen/xmalloc.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
-#include <xen/sched.h>
 #include <public/hvm/ioreq.h>
 #include <asm/vlsapic.h>
 #include <asm/viosapic.h>
@@ -47,11 +46,18 @@ static void viosapic_deliver(struct viosapic *viosapic, int irq)
 
     switch ( delivery_mode )
     {
-    // don't support interrupt direct currently
     case SAPIC_FIXED:
+    {
+        v = vlsapic_lid_to_vcpu(viosapic_domain(viosapic), dest);
+        vlsapic_set_irq(v, vector);
+        vcpu_kick(v);
+        break;
+    }
     case SAPIC_LOWEST_PRIORITY:
     {
         v = vlsapic_lid_to_vcpu(viosapic_domain(viosapic), dest);
+        if (viosapic->lowest_vcpu)
+            v = viosapic->lowest_vcpu;
         vlsapic_set_irq(v, vector);
         vcpu_kick(v);
         break;
@@ -72,10 +78,10 @@ static int iosapic_get_highest_irq(struct viosapic *viosapic)
 {
     uint64_t irqs = viosapic->irr & ~viosapic->isr ;
    
-    if (irqs >> 32)
-        return (fls(irqs >> 32) - 1 + 32);
-    else
-        return fls(irqs) - 1;
+    if (irqs)
+        return ia64_fls(irqs);
+
+    return -1;
 }
 
 
@@ -327,5 +333,7 @@ void viosapic_init(struct domain *d)
 
     viosapic_reset(viosapic);
 
+    viosapic->lowest_vcpu = NULL;
+    
     viosapic->base_address = VIOSAPIC_DEFAULT_BASE_ADDRESS;
 }

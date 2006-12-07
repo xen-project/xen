@@ -78,6 +78,7 @@ struct viosapic {
     uint64_t isr;     /* This is used for level trigger */
     uint32_t ioregsel;
     spinlock_t lock;
+    struct vcpu * lowest_vcpu;
     uint64_t base_address;
     union viosapic_rte redirtbl[VIOSAPIC_NUM_PINS];
 };
