@@ -338,7 +338,7 @@ class HVMImageHandler(ImageHandler):
         
         for devuuid, (devtype, devinfo) in deviceConfig.items():
             if devtype == 'vbd':
-                uname = devinfo['uname']
+                uname = devinfo.get('uname')
                 if uname is not None and 'file:' in uname:
                     (_, vbdparam) = string.split(uname, ':', 1)
                     if not os.path.isfile(vbdparam):
