@@ -107,8 +107,7 @@ typedef struct xen_kexec_load {
 
 #define KEXEC_RANGE_MA_CRASH 0   /* machine address and size of crash area */
 #define KEXEC_RANGE_MA_XEN   1   /* machine address and size of Xen itself */
-#define KEXEC_RANGE_VA_XEN   2   /* virtual adrress and size of Xen itself */
-#define KEXEC_RANGE_MA_CPU   3   /* machine address and size of a CPU note */
+#define KEXEC_RANGE_MA_CPU   2   /* machine address and size of a CPU note */
 
 /*
  * Find the address and size of certain memory areas
