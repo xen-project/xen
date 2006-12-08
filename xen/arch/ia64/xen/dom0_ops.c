@@ -109,6 +109,7 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
                         BUG_ON(v->arch.privregs == NULL);
                         free_domheap_pages(virt_to_page(v->arch.privregs),
                                       get_order_from_shift(XMAPPEDREGS_SHIFT));
+                        v->arch.privregs = NULL;
                         relinquish_vcpu_resources(v);
                     }
                 }
