@@ -198,14 +198,14 @@ xen_vm_record_opt_set_free(xen_vm_record_opt_set *set);
 
 
 /**
- * Get the current state of the given VM.  !!!
+ * Get a record containing the current state of the given VM.
  */
 extern bool
 xen_vm_get_record(xen_session *session, xen_vm_record **result, xen_vm vm);
 
 
 /**
- * Get a reference to the object with the specified UUID.  !!!
+ * Get a reference to the VM instance with the specified UUID.
  */
 extern bool
 xen_vm_get_by_uuid(xen_session *session, xen_vm *result, char *uuid);
