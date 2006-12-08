@@ -79,6 +79,7 @@ typedef struct xen_vm_record
     char *name_description;
     int64_t user_version;
     bool is_a_template;
+    bool auto_power_on;
     struct xen_host_record_opt *resident_on;
     int64_t memory_static_max;
     int64_t memory_dynamic_max;
@@ -274,6 +275,13 @@ xen_vm_get_user_version(xen_session *session, int64_t *result, xen_vm vm);
  */
 extern bool
 xen_vm_get_is_a_template(xen_session *session, bool *result, xen_vm vm);
+
+
+/**
+ * Get the auto_power_on field of the given VM.
+ */
+extern bool
+xen_vm_get_auto_power_on(xen_session *session, bool *result, xen_vm vm);
 
 
 /**
@@ -561,6 +569,13 @@ xen_vm_set_user_version(xen_session *session, xen_vm vm, int64_t user_version);
  */
 extern bool
 xen_vm_set_is_a_template(xen_session *session, xen_vm vm, bool is_a_template);
+
+
+/**
+ * Set the auto_power_on field of the given VM.
+ */
+extern bool
+xen_vm_set_auto_power_on(xen_session *session, xen_vm vm, bool auto_power_on);
 
 
 /**

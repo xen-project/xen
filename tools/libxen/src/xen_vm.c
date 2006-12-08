@@ -67,6 +67,9 @@ static const struct_member xen_vm_record_struct_members[] =
         { .key = "is_a_template",
           .type = &abstract_type_bool,
           .offset = offsetof(xen_vm_record, is_a_template) },
+        { .key = "auto_power_on",
+          .type = &abstract_type_bool,
+          .offset = offsetof(xen_vm_record, auto_power_on) },
         { .key = "resident_on",
           .type = &abstract_type_ref,
           .offset = offsetof(xen_vm_record, resident_on) },
@@ -394,6 +397,22 @@ xen_vm_get_is_a_template(xen_session *session, bool *result, xen_vm vm)
     abstract_type result_type = abstract_type_bool;
 
     XEN_CALL_("VM.get_is_a_template");
+    return session->ok;
+}
+
+
+bool
+xen_vm_get_auto_power_on(xen_session *session, bool *result, xen_vm vm)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm }
+        };
+
+    abstract_type result_type = abstract_type_bool;
+
+    XEN_CALL_("VM.get_auto_power_on");
     return session->ok;
 }
 
@@ -1077,6 +1096,22 @@ xen_vm_set_is_a_template(xen_session *session, xen_vm vm, bool is_a_template)
         };
 
     xen_call_(session, "VM.set_is_a_template", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vm_set_auto_power_on(xen_session *session, xen_vm vm, bool auto_power_on)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+            { .type = &abstract_type_bool,
+              .u.bool_val = auto_power_on }
+        };
+
+    xen_call_(session, "VM.set_auto_power_on", param_values, 2, NULL, NULL);
     return session->ok;
 }
 
