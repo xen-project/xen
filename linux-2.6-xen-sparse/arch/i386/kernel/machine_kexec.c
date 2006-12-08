@@ -19,6 +19,10 @@
 #include <asm/desc.h>
 #include <asm/system.h>
 
+#ifdef CONFIG_XEN
+#include <xen/interface/kexec.h>
+#endif
+
 #define PAGE_ALIGNED __attribute__ ((__aligned__(PAGE_SIZE)))
 static u32 kexec_pgd[1024] PAGE_ALIGNED;
 #ifdef CONFIG_X86_PAE
@@ -27,6 +31,40 @@ static u32 kexec_pmd1[1024] PAGE_ALIGNED;
 #endif
 static u32 kexec_pte0[1024] PAGE_ALIGNED;
 static u32 kexec_pte1[1024] PAGE_ALIGNED;
+
+#ifdef CONFIG_XEN
+
+#define __ma(x) (pfn_to_mfn(__pa((x)) >> PAGE_SHIFT) << PAGE_SHIFT)
+
+#if PAGES_NR > KEXEC_XEN_NO_PAGES
+#error PAGES_NR is greater than KEXEC_XEN_NO_PAGES - Xen support will break
+#endif
+
+#if PA_CONTROL_PAGE != 0
+#error PA_CONTROL_PAGE is non zero - Xen support will break
+#endif
+
+void machine_kexec_setup_load_arg(xen_kexec_image_t *xki, struct kimage *image)
+{
+	void *control_page;
+
+	memset(xki->page_list, 0, sizeof(xki->page_list));
+
+	control_page = page_address(image->control_code_page);
+	memcpy(control_page, relocate_kernel, PAGE_SIZE);
+
+	xki->page_list[PA_CONTROL_PAGE] = __ma(control_page);
+	xki->page_list[PA_PGD] = __ma(kexec_pgd);
+#ifdef CONFIG_X86_PAE
+	xki->page_list[PA_PMD_0] = __ma(kexec_pmd0);
+	xki->page_list[PA_PMD_1] = __ma(kexec_pmd1);
+#endif
+	xki->page_list[PA_PTE_0] = __ma(kexec_pte0);
+	xki->page_list[PA_PTE_1] = __ma(kexec_pte1);
+
+}
+
+#endif /* CONFIG_XEN */
 
 /*
  * A architecture hook called to validate the

@@ -91,6 +91,19 @@ relocate_kernel(unsigned long indirection_page,
 		unsigned long page_list,
 		unsigned long start_address) ATTRIB_NORET;
 
+/* Under Xen we need to work with machine addresses. These macros give the
+ * machine address of a certain page to the generic kexec code instead of 
+ * the pseudo physical address which would be given by the default macros.
+ */
+
+#ifdef CONFIG_XEN
+#define KEXEC_ARCH_HAS_PAGE_MACROS
+#define kexec_page_to_pfn(page)  pfn_to_mfn(page_to_pfn(page))
+#define kexec_pfn_to_page(pfn)   pfn_to_page(mfn_to_pfn(pfn))
+#define kexec_virt_to_phys(addr) virt_to_machine(addr)
+#define kexec_phys_to_virt(addr) phys_to_virt(machine_to_phys(addr))
+#endif
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* _X86_64_KEXEC_H */

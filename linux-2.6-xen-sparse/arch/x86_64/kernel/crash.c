@@ -92,6 +92,7 @@ static void crash_save_self(struct pt_regs *regs)
 	crash_save_this_cpu(regs, cpu);
 }
 
+#ifndef CONFIG_XEN
 #ifdef CONFIG_SMP
 static atomic_t waiting_for_crash_ipi;
 
@@ -156,6 +157,7 @@ static void nmi_shootdown_cpus(void)
 	/* There are no cpus to shootdown */
 }
 #endif
+#endif /* CONFIG_XEN */
 
 void machine_crash_shutdown(struct pt_regs *regs)
 {
@@ -173,6 +175,8 @@ void machine_crash_shutdown(struct pt_regs *regs)
 
 	/* Make a note of crashing cpu. Will be used in NMI callback.*/
 	crashing_cpu = smp_processor_id();
+
+#ifndef CONFIG_XEN
 	nmi_shootdown_cpus();
 
 	if(cpu_has_apic)
@@ -181,6 +185,6 @@ void machine_crash_shutdown(struct pt_regs *regs)
 #if defined(CONFIG_X86_IO_APIC)
 	disable_IO_APIC();
 #endif
-
+#endif /* CONFIG_XEN */
 	crash_save_self(regs);
 }
