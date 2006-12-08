@@ -138,9 +138,9 @@ SUBCOMMAND_HELP = {
 
     # device commands
 
-    'block-attach'  :  ('<Domain> <BackDev> <FrontDev> <Mode>',
+    'block-attach'  :  ('<Domain> <BackDev> <FrontDev> <Mode> [BackDomain]',
                         'Create a new virtual block device.'),
-    'block-configure': ('<Domain> <BackDev> <FrontDev> <Mode> [BackDomId]',
+    'block-configure': ('<Domain> <BackDev> <FrontDev> <Mode> [BackDomain]',
                         'Change block device configuration'),
     'block-detach'  :  ('<Domain> <DevId>',
                         'Destroy a domain\'s virtual block device.'),
