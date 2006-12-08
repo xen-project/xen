@@ -1303,7 +1303,7 @@ xen_vm_set_platform_std_vga(xen_session *session, xen_vm vm, bool std_vga)
               .u.bool_val = std_vga }
         };
 
-    xen_call_(session, "VM.set_platform_std_vga", param_values, 2, NULL, NULL);
+    xen_call_(session, "VM.set_platform_std_VGA", param_values, 2, NULL, NULL);
     return session->ok;
 }
 
@@ -1479,7 +1479,7 @@ xen_vm_set_otherconfig(xen_session *session, xen_vm vm, xen_string_string_map *o
               .u.set_val = (arbitrary_set *)otherconfig }
         };
 
-    xen_call_(session, "VM.set_otherconfig", param_values, 2, NULL, NULL);
+    xen_call_(session, "VM.set_otherConfig", param_values, 2, NULL, NULL);
     return session->ok;
 }
 
