@@ -55,7 +55,7 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             pte = (pte_t *)lookup_noalloc_domain_pte(d,
                                                (start_page + i) << PAGE_SHIFT);
             if (pte && pte_present(*pte))
-                mfn = pte_pfn(*pte);
+                mfn = start_page + i;
             else
                 mfn = INVALID_MFN;
 
