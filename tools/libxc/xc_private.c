@@ -7,8 +7,8 @@
 #include <inttypes.h>
 #include "xc_private.h"
 #include "xg_private.h"
-
 #include <stdarg.h>
+#include <pthread.h>
 
 static __thread xc_error last_error = { XC_ERROR_NONE, ""};
 #if DEBUG
@@ -486,14 +486,20 @@ unsigned long xc_make_page_below_4G(
 char *safe_strerror(int errcode)
 {
     static __thread char errbuf[32];
-#ifdef __GLIBC__
-    /* Broken GNU definition of strerror_r may not use our supplied buffer. */
-    return strerror_r(errcode, errbuf, sizeof(errbuf));
-#else
-    /* Assume we have the POSIX definition of strerror_r. */
-    strerror_r(errcode, errbuf, sizeof(errbuf));
+    static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+    char *strerror_str;
+
+    /*
+     * Thread-unsafe strerror() is protected by a local mutex. We copy
+     * the string to a thread-private buffer before releasing the mutex.
+     */
+    pthread_mutex_lock(&mutex);
+    strerror_str = strerror(errcode);
+    strncpy(errbuf, strerror_str, sizeof(errbuf));
+    errbuf[sizeof(errbuf)-1] = '\0';
+    pthread_mutex_unlock(&mutex);
+
     return errbuf;
-#endif
 }
 
 /*
