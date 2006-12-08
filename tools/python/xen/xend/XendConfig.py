@@ -632,6 +632,9 @@ class XendConfig(dict):
         self['memory_dynamic_max'] = self['memory_static_max']
         self['memory_dynamic_min'] = self['memory_static_min']
 
+        # make sure max_vcpu_id is set correctly
+        self['max_vcpu_id'] = self['vcpus_number'] - 1
+
         # set device references in the configuration
         self['devices'] = cfg.get('devices', {})
         
@@ -714,7 +717,7 @@ class XendConfig(dict):
         _set_cfg_if_exists('on_xend_stop')
         _set_cfg_if_exists('on_xend_start')
         _set_cfg_if_exists('vcpu_avail')
-        _set_cfg_if_exists('max_vcpu_id') # TODO, deprecated?
+        _set_cfg_if_exists('max_vcpu_id') # needed for vcpuDomDetails
         
         # Parse and store runtime configuration 
         _set_cfg_if_exists('start_time')

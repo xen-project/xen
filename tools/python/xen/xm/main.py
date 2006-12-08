@@ -643,7 +643,7 @@ def parse_doms_info(info):
         'domid'    : get_info('domid',        str,   ''),
         'name'     : get_info('name',         str,   '??'),
         'mem'      : get_info('memory_dynamic_min', int,   0),
-        'vcpus'    : get_info('vcpus',        int,   0),
+        'vcpus'    : get_info('online_vcpus',        int,   0),
         'state'    : get_info('state',        str,    ''),
         'cpu_time' : get_info('cpu_time',     float, 0),
         'up_time'  : up_time,
