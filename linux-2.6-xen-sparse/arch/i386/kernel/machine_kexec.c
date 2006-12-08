@@ -92,6 +92,7 @@ void machine_kexec_cleanup(struct kimage *image)
 {
 }
 
+#ifndef CONFIG_XEN
 /*
  * Do not allocate memory (or fail in any way) in machine_kexec().
  * We are past the point of no return, committed to rebooting now.
@@ -125,3 +126,4 @@ NORET_TYPE void machine_kexec(struct kimage *image)
 	relocate_kernel((unsigned long)image->head, (unsigned long)page_list,
 			image->start, cpu_has_pae);
 }
+#endif

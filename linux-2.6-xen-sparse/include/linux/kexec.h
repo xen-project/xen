@@ -101,7 +101,6 @@ extern void machine_kexec_cleanup(struct kimage *image);
 #ifdef CONFIG_XEN
 extern int xen_machine_kexec_load(struct kimage *image);
 extern void xen_machine_kexec_unload(struct kimage *image);
-extern NORET_TYPE void xen_machine_kexec(struct kimage *image) ATTRIB_NORET;
 extern void xen_machine_kexec_setup_resources(void);
 extern void xen_machine_kexec_register_resources(struct resource *res);
 #endif

@@ -1085,11 +1085,7 @@ void crash_kexec(struct pt_regs *regs)
 			struct pt_regs fixed_regs;
 			crash_setup_regs(&fixed_regs, regs);
 			machine_crash_shutdown(&fixed_regs);
-#ifdef CONFIG_XEN
-			xen_machine_kexec(image);
-#else
 			machine_kexec(image);
-#endif
 		}
 		xchg(&kexec_lock, 0);
 	}
