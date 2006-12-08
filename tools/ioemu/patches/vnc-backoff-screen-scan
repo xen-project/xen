@@ -1,7 +1,7 @@
 Index: ioemu/vnc.c
 ===================================================================
---- ioemu.orig/vnc.c	2006-10-24 14:33:17.000000000 +0100
-+++ ioemu/vnc.c	2006-10-24 14:33:24.000000000 +0100
+--- ioemu.orig/vnc.c	2006-12-06 23:46:12.000000000 +0000
++++ ioemu/vnc.c	2006-12-06 23:46:12.000000000 +0000
 @@ -28,7 +28,19 @@
  #include "qemu_socket.h"
  #include <assert.h>
@@ -45,7 +45,7 @@ Index: ioemu/vnc.c
      int ctl_keys;               /* Ctrl+Alt starts calibration */
  };
  
-@@ -381,7 +392,7 @@
+@@ -383,7 +394,7 @@
      int y = 0;
      int pitch = ds->linesize;
      VncState *vs = ds->opaque;
@@ -54,7 +54,7 @@ Index: ioemu/vnc.c
  
      if (src_x < vs->visible_x || src_y < vs->visible_y ||
  	dst_x < vs->visible_x || dst_y < vs->visible_y ||
-@@ -391,10 +402,8 @@
+@@ -393,10 +404,8 @@
  	(dst_y + h) > (vs->visible_y + vs->visible_h))
  	updating_client = 0;
  
@@ -66,7 +66,7 @@ Index: ioemu/vnc.c
  
      if (dst_y > src_y) {
  	y = h - 1;
-@@ -446,110 +455,149 @@
+@@ -448,110 +457,149 @@
  static void _vnc_update_client(void *opaque)
  {
      VncState *vs = opaque;
@@ -299,7 +299,7 @@ Index: ioemu/vnc.c
  }
  
  static void vnc_update_client(void *opaque)
-@@ -562,8 +610,10 @@
+@@ -564,8 +612,10 @@
  
  static void vnc_timer_init(VncState *vs)
  {
@@ -311,7 +311,7 @@ Index: ioemu/vnc.c
  }
  
  static void vnc_dpy_refresh(DisplayState *ds)
-@@ -623,7 +673,6 @@
+@@ -625,7 +675,6 @@
  	vs->csock = -1;
  	buffer_reset(&vs->input);
  	buffer_reset(&vs->output);
@@ -319,7 +319,7 @@ Index: ioemu/vnc.c
  	return 0;
      }
      return ret;
-@@ -895,7 +944,6 @@
+@@ -897,7 +946,6 @@
  				       int x_position, int y_position,
  				       int w, int h)
  {
@@ -327,7 +327,7 @@ Index: ioemu/vnc.c
      if (!incremental)
  	framebuffer_set_updated(vs, x_position, y_position, w, h);
      vs->visible_x = x_position;
-@@ -1018,6 +1066,7 @@
+@@ -1020,6 +1068,7 @@
  {
      int i;
      uint16_t limit;
@@ -335,7 +335,7 @@ Index: ioemu/vnc.c
  
      switch (data[0]) {
      case 0:
-@@ -1061,12 +1110,18 @@
+@@ -1063,12 +1112,18 @@
  	if (len == 1)
  	    return 8;
  
@@ -356,8 +356,8 @@ Index: ioemu/vnc.c
      case 6:
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-10-24 14:33:17.000000000 +0100
-+++ ioemu/vl.c	2006-10-24 14:33:24.000000000 +0100
+--- ioemu.orig/vl.c	2006-12-06 23:46:12.000000000 +0000
++++ ioemu/vl.c	2006-12-06 23:46:12.000000000 +0000
 @@ -726,6 +726,12 @@
      }
  }
@@ -373,8 +373,8 @@ Index: ioemu/vl.c
  void qemu_mod_timer(QEMUTimer *ts, int64_t expire_time)
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-10-24 14:33:17.000000000 +0100
-+++ ioemu/vl.h	2006-10-24 14:33:24.000000000 +0100
+--- ioemu.orig/vl.h	2006-12-06 23:46:12.000000000 +0000
++++ ioemu/vl.h	2006-12-06 23:46:12.000000000 +0000
 @@ -407,6 +407,7 @@
  void qemu_free_timer(QEMUTimer *ts);
  void qemu_del_timer(QEMUTimer *ts);

@@ -1,0 +1,39 @@
+# HG changeset patch
+# User kasai.takanori@jp.fujitsu.com
+# Node ID ea1ffa51b4121d36cffdc90276378a6ed334c2cc
+# Parent  edd592c823a520d4072a95ac39beb2012c05321e
+Add the Japanese keymap for VNC Server.
+
+Signed-off-by: Takanori Kasai < kasai.takanori@jp.fujitsu.com >
+
+Index: ioemu/keymaps/ja
+===================================================================
+--- ioemu.orig/keymaps/ja	2006-12-08 18:21:36.000000000 +0000
++++ ioemu/keymaps/ja	2006-12-08 18:21:56.000000000 +0000
+@@ -102,3 +102,6 @@
+ Henkan_Mode 0x79
+ Katakana 0x70
+ Muhenkan 0x7b
++Henkan_Mode_Real 0x79
++Henkan_Mode_Ultra 0x79
++backslash_ja 0x73
+Index: ioemu/vnc_keysym.h
+===================================================================
+--- ioemu.orig/vnc_keysym.h	2006-12-08 18:21:36.000000000 +0000
++++ ioemu/vnc_keysym.h	2006-12-08 18:21:56.000000000 +0000
+@@ -271,5 +271,15 @@
+ {"Num_Lock", 0xff7f},    /* XK_Num_Lock */
+ {"Pause", 0xff13},       /* XK_Pause */
+ {"Escape", 0xff1b},      /* XK_Escape */
++
++    /* localized keys */
++{"BackApostrophe", 0xff21},
++{"Muhenkan", 0xff22},
++{"Katakana", 0xff25},
++{"Zenkaku_Hankaku", 0xff29},
++{"Henkan_Mode_Real", 0xff23},
++{"Henkan_Mode_Ultra", 0xff3e},
++{"backslash_ja", 0xffa5},
++
+ {0,0},
+ };

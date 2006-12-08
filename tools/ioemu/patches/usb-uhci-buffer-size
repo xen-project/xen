@@ -1,0 +1,25 @@
+# HG changeset patch
+# User kfraser@localhost.localdomain
+# Node ID f19ddc0ee3e68d5d8a250ba0a20ab7d90ae9a36a
+# Parent  f66f7c3a82a7420d80714b0d349ee9a24b50ec28
+[QEMU] usb-uhci: Data buffer is too small
+
+The data buffer is only 1280 bytes long but the user-supplied length
+can be as large as 0x7ff.  This patch extends the buffer to 2048
+bytes.
+
+Signed-off-by: Herbert Xu <herbert@gondor.apana.org.au>
+
+Index: ioemu/hw/usb-uhci.c
+===================================================================
+--- ioemu.orig/hw/usb-uhci.c	2006-12-08 18:21:36.000000000 +0000
++++ ioemu/hw/usb-uhci.c	2006-12-08 18:23:06.000000000 +0000
+@@ -421,7 +421,7 @@
+ static int uhci_handle_td(UHCIState *s, UHCI_TD *td, int *int_mask)
+ {
+     uint8_t pid;
+-    uint8_t buf[1280];
++    uint8_t buf[2048];
+     int len, max_len, err, ret;
+ 
+     if (td->ctrl & TD_CTRL_IOC) {
