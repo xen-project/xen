@@ -2762,6 +2762,7 @@ static int sh_page_fault(struct vcpu *v,
          * shadow_set_l*e(), which will have crashed the guest.  
          * Get out of the fault handler immediately. */
         ASSERT(test_bit(_DOMF_dying, &d->domain_flags));
+        unmap_walk(v, &gw); 
         shadow_unlock(d);
         return 0;
     }
