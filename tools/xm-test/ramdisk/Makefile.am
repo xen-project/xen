@@ -34,6 +34,7 @@ HVM_SCRIPT = bin/create_disk_image
 
 XMTEST_MAJ_VER = $(shell echo @PACKAGE_VERSION@ | perl -pe 's/(\d+)\.(\d+)\.\d+/\1.\2/')
 XMTEST_VER_IMG = initrd-$(XMTEST_MAJ_VER)-$(BR_ARCH).img
+XMTEST_DL_IMG = $(shell echo $(XMTEST_VER_IMG) | sed -e 's/x86_64/i386/g')
 
 EXTRA_ROOT_DIRS = sys
 
@@ -83,7 +84,12 @@ disk.img: existing
 
 existing:
 	@if [ -n "$(INITRD)" ] && [ ! -f $(XMTEST_VER_IMG) ] ; then \
-		wget $(INITRD)/$(XMTEST_VER_IMG); \
+                if [ ! -f $(XMTEST_DL_IMG) ] ; then \
+		        wget $(INITRD)/$(XMTEST_DL_IMG); \
+                fi; \
+                if [ "$(XMTEST_DL_IMG)" != "$(XMTEST_VER_IMG)" ] ; then \
+                        ln -s $(XMTEST_DL_IMG) $(XMTEST_VER_IMG); \
+                fi \
 	fi
 	@if [ -f $(XMTEST_VER_IMG) ] ; then \
 		ln -sf $(XMTEST_VER_IMG) initrd.img; \
