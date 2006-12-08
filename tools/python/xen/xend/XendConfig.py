@@ -922,24 +922,11 @@ class XendConfig(dict):
             except ValueError:
                 pass # SXP has no options for this device
 
-
-            # Special handling for certain device parameters.
-
-            def _get_config_ipaddr(cfg):
-                val = []
-                for ipaddr in sxp.children(cfg, elt='ip'):
-                    val.append(sxp.child0(ipaddr))
-                return val
-
-            if dev_type == 'vif' and 'ip' in dev_info:
-                dev_info['ip'] = _get_config_ipaddr(config)
-
             if dev_type == 'vbd':
                 if dev_info.get('dev', '').startswith('ioemu:'):
                     dev_info['driver'] = 'ioemu'
                 else:
                     dev_info['driver'] = 'paravirtualised'
-                    
 
             # create uuid if it doesn't exist
             dev_uuid = dev_info.get('uuid', uuid.createString())
