@@ -2978,9 +2978,54 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
+    case XENMEM_set_memory_map:
+    {
+        struct xen_foreign_memory_map fmap;
+        struct domain *d;
+        int rc;
+
+        if ( copy_from_guest(&fmap, arg, 1) )
+            return -EFAULT;
+
+        if ( fmap.map.nr_entries > ARRAY_SIZE(d->arch.e820) )
+            return -EINVAL;
+
+        if ( fmap.domid == DOMID_SELF )
+        {
+            d = current->domain;
+            get_knownalive_domain(d);
+        }
+        else if ( !IS_PRIV(current->domain) )
+            return -EPERM;
+        else if ( (d = find_domain_by_id(fmap.domid)) == NULL )
+            return -ESRCH;
+
+        rc = copy_from_guest(&d->arch.e820[0], fmap.map.buffer,
+                             fmap.map.nr_entries) ? -EFAULT : 0;
+        d->arch.nr_e820 = fmap.map.nr_entries;
+
+        put_domain(d);
+        return rc;
+    }
+
     case XENMEM_memory_map:
     {
-        return -ENOSYS;
+        struct xen_memory_map map;
+        struct domain *d = current->domain;
+
+        /* Backwards compatibility. */
+        if ( d->arch.nr_e820 == 0 )
+            return -ENOSYS;
+
+        if ( copy_from_guest(&map, arg, 1) )
+            return -EFAULT;
+
+        map.nr_entries = min(map.nr_entries, d->arch.nr_e820);
+        if ( copy_to_guest(map.buffer, &d->arch.e820[0], map.nr_entries) ||
+             copy_to_guest(arg, &map, 1) )
+            return -EFAULT;
+
+        return 0;
     }
 
     case XENMEM_machine_memory_map:

@@ -758,6 +758,21 @@ static PyObject *pyxc_domain_setmaxmem(XcObject *self, PyObject *args)
     return zero;
 }
 
+static PyObject *pyxc_domain_set_memmap_limit(XcObject *self, PyObject *args)
+{
+    uint32_t dom;
+    unsigned int maplimit_kb;
+
+    if ( !PyArg_ParseTuple(args, "ii", &dom, &maplimit_kb) )
+        return NULL;
+
+    if ( xc_domain_set_memmap_limit(self->xc_handle, dom, maplimit_kb) != 0 )
+        return pyxc_error_to_exception();
+    
+    Py_INCREF(zero);
+    return zero;
+}
+
 static PyObject *pyxc_domain_memory_increase_reservation(XcObject *self,
                                                          PyObject *args,
                                                          PyObject *kwds)
@@ -1139,6 +1154,14 @@ static PyMethodDef pyxc_methods[] = {
       "Set a domain's memory limit\n"
       " dom [int]: Identifier of domain.\n"
       " maxmem_kb [int]: .\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "domain_set_memmap_limit", 
+      (PyCFunction)pyxc_domain_set_memmap_limit, 
+      METH_VARARGS, "\n"
+      "Set a domain's physical memory mappping limit\n"
+      " dom [int]: Identifier of domain.\n"
+      " map_limitkb [int]: .\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "domain_memory_increase_reservation", 
