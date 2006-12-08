@@ -244,24 +244,22 @@ asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
 
 static int find_unbound_irq(void)
 {
-	int irq;
+	static int warned;
+	int dynirq, irq;
 
-	/* Only allocate from dynirq range */
-	for (irq = DYNIRQ_BASE; irq < NR_IRQS; irq++)
+	for (dynirq = 0; dynirq < NR_DYNIRQS; dynirq++) {
+		irq = dynirq_to_irq(dynirq);
 		if (irq_bindcount[irq] == 0)
-			break;
-
-	if (irq == NR_IRQS) {
-		static int warned;
-		if (!warned) {
-			warned = 1;
-			printk(KERN_WARNING "No available IRQ to bind to: "
-			       "increase NR_IRQS!\n");
-		}
-		return -ENOSPC;
+			return irq;
 	}
 
-	return irq;
+	if (!warned) {
+		warned = 1;
+		printk(KERN_WARNING "No available IRQ to bind to: "
+		       "increase NR_DYNIRQS.\n");
+	}
+
+	return -ENOSPC;
 }
 
 static int bind_evtchn_to_irq(unsigned int evtchn)
