@@ -156,14 +156,14 @@ xen_vif_record_opt_set_free(xen_vif_record_opt_set *set);
 
 
 /**
- * Get the current state of the given VIF.  !!!
+ * Get a record containing the current state of the given VIF.
  */
 extern bool
 xen_vif_get_record(xen_session *session, xen_vif_record **result, xen_vif vif);
 
 
 /**
- * Get a reference to the object with the specified UUID.  !!!
+ * Get a reference to the VIF instance with the specified UUID.
  */
 extern bool
 xen_vif_get_by_uuid(xen_session *session, xen_vif *result, char *uuid);

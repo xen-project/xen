@@ -151,14 +151,14 @@ xen_vtpm_record_opt_set_free(xen_vtpm_record_opt_set *set);
 
 
 /**
- * Get the current state of the given VTPM.  !!!
+ * Get a record containing the current state of the given VTPM.
  */
 extern bool
 xen_vtpm_get_record(xen_session *session, xen_vtpm_record **result, xen_vtpm vtpm);
 
 
 /**
- * Get a reference to the object with the specified UUID.  !!!
+ * Get a reference to the VTPM instance with the specified UUID.
  */
 extern bool
 xen_vtpm_get_by_uuid(xen_session *session, xen_vtpm *result, char *uuid);

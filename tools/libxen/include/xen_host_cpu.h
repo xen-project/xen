@@ -153,14 +153,14 @@ xen_host_cpu_record_opt_set_free(xen_host_cpu_record_opt_set *set);
 
 
 /**
- * Get the current state of the given host_cpu.  !!!
+ * Get a record containing the current state of the given host_cpu.
  */
 extern bool
 xen_host_cpu_get_record(xen_session *session, xen_host_cpu_record **result, xen_host_cpu host_cpu);
 
 
 /**
- * Get a reference to the object with the specified UUID.  !!!
+ * Get a reference to the host_cpu instance with the specified UUID.
  */
 extern bool
 xen_host_cpu_get_by_uuid(xen_session *session, xen_host_cpu *result, char *uuid);

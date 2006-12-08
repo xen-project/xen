@@ -149,14 +149,14 @@ xen_console_record_opt_set_free(xen_console_record_opt_set *set);
 
 
 /**
- * Get the current state of the given console.
+ * Get a record containing the current state of the given console.
  */
 extern bool
 xen_console_get_record(xen_session *session, xen_console_record **result, xen_console console);
 
 
 /**
- * Get a reference to the object with the specified UUID.
+ * Get a reference to the console instance with the specified UUID.
  */
 extern bool
 xen_console_get_by_uuid(xen_session *session, xen_console *result, char *uuid);

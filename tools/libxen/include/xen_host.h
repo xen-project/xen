@@ -154,14 +154,14 @@ xen_host_record_opt_set_free(xen_host_record_opt_set *set);
 
 
 /**
- * Get the current state of the given host.  !!!
+ * Get a record containing the current state of the given host.
  */
 extern bool
 xen_host_get_record(xen_session *session, xen_host_record **result, xen_host host);
 
 
 /**
- * Get a reference to the object with the specified UUID.  !!!
+ * Get a reference to the host instance with the specified UUID.
  */
 extern bool
 xen_host_get_by_uuid(xen_session *session, xen_host *result, char *uuid);
