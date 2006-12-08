@@ -483,6 +483,19 @@ unsigned long xc_make_page_below_4G(
     return new_mfn;
 }
 
+char *safe_strerror(int errcode)
+{
+    static __thread char errbuf[32];
+#ifdef __GLIBC__
+    /* Broken GNU definition of strerror_r may not use our supplied buffer. */
+    return strerror_r(errcode, errbuf, sizeof(errbuf));
+#else
+    /* Assume we have the POSIX definition of strerror_r. */
+    strerror_r(errcode, errbuf, sizeof(errbuf));
+    return errbuf;
+#endif
+}
+
 /*
  * Local variables:
  * mode: C

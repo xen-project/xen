@@ -593,8 +593,8 @@ static int setup_guest(int xc_handle,
     /* shared_info page starts its life empty. */
     shared_info = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE, shared_info_frame);
-    printf("shared_info = %p, err=%s frame=%lx\n",
-           shared_info, strerror (errno), shared_info_frame);
+    printf("shared_info = %p frame=%lx\n",
+           shared_info, shared_info_frame);
     //memset(shared_info, 0, PAGE_SIZE);
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
