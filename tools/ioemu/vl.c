@@ -5808,6 +5808,92 @@ int set_mm_mapping(int xc_handle, uint32_t domid,
     return 0;
 }
 
+#if defined(__i386__) || defined(__x86_64__)
+static struct map_cache *mapcache_entry;
+static unsigned long nr_buckets;
+
+static int qemu_map_cache_init(unsigned long nr_pages)
+{
+    unsigned long max_pages = MAX_MCACHE_SIZE >> PAGE_SHIFT;
+    int i;
+
+    if (nr_pages < max_pages)
+        max_pages = nr_pages;
+
+    nr_buckets = (max_pages << PAGE_SHIFT) >> MCACHE_BUCKET_SHIFT;
+
+    fprintf(logfile, "qemu_map_cache_init nr_buckets = %lx\n", nr_buckets);
+
+    mapcache_entry = malloc(nr_buckets * sizeof(struct map_cache));
+    if (mapcache_entry == NULL) {
+        errno = ENOMEM;
+        return -1;
+    }
+
+    memset(mapcache_entry, 0, nr_buckets * sizeof(struct map_cache));
+
+    /*
+     * To avoid ENOMEM from xc_map_foreign_batch() at runtime, we
+     * pre-fill all the map caches in advance.
+     */
+    for (i = 0; i < nr_buckets; i++)
+       (void)qemu_map_cache(((target_phys_addr_t)i) << MCACHE_BUCKET_SHIFT);
+
+    return 0;
+}
+
+uint8_t *qemu_map_cache(target_phys_addr_t phys_addr)
+{
+    struct map_cache *entry;
+    unsigned long address_index  = phys_addr >> MCACHE_BUCKET_SHIFT;
+    unsigned long address_offset = phys_addr & (MCACHE_BUCKET_SIZE-1);
+
+    /* For most cases (>99.9%), the page address is the same. */
+    static unsigned long last_address_index = ~0UL;
+    static uint8_t      *last_address_vaddr;
+
+    if (address_index == last_address_index)
+        return last_address_vaddr + address_offset;
+
+    entry = &mapcache_entry[address_index % nr_buckets];
+
+    if (entry->vaddr_base == NULL || entry->paddr_index != address_index)
+    { 
+        /* We need to remap a bucket. */
+        uint8_t *vaddr_base;
+        unsigned long pfns[MCACHE_BUCKET_SIZE >> PAGE_SHIFT];
+        unsigned int i;
+
+        if (entry->vaddr_base != NULL) {
+            errno = munmap(entry->vaddr_base, MCACHE_BUCKET_SIZE);
+            if (errno) {
+                fprintf(logfile, "unmap fails %d\n", errno);
+                exit(-1);
+            }
+        }
+
+        for (i = 0; i < MCACHE_BUCKET_SIZE >> PAGE_SHIFT; i++)
+            pfns[i] = (address_index << (MCACHE_BUCKET_SHIFT-PAGE_SHIFT)) + i;
+
+        vaddr_base = xc_map_foreign_batch(
+            xc_handle, domid, PROT_READ|PROT_WRITE,
+            pfns, MCACHE_BUCKET_SIZE >> PAGE_SHIFT);
+        if (vaddr_base == NULL) {
+            fprintf(logfile, "xc_map_foreign_batch error %d\n", errno);
+            exit(-1);
+        }
+
+        entry->vaddr_base  = vaddr_base;
+        entry->paddr_index = address_index;;
+    }
+
+    last_address_index = address_index;
+    last_address_vaddr = entry->vaddr_base;
+
+    return last_address_vaddr + address_offset;
+}
+#endif
+
 int main(int argc, char **argv)
 {
 #ifdef CONFIG_GDBSTUB
@@ -6130,6 +6216,7 @@ int main(int argc, char **argv)
                 break;
             case QEMU_OPTION_m:
                 ram_size = atol(optarg) * 1024 * 1024;
+                ram_size = (uint64_t)atol(optarg) * 1024 * 1024;
                 if (ram_size <= 0)
                     help();
 #ifndef CONFIG_DM
@@ -6404,49 +6491,40 @@ int main(int argc, char **argv)
         shared_page_nr = nr_pages - 1;
 #endif
 
-    page_array = (xen_pfn_t *)malloc(tmp_nr_pages * sizeof(xen_pfn_t));
-    if (page_array == NULL) {
-        fprintf(logfile, "malloc returned error %d\n", errno);
-        exit(-1);
-    }
-
 #if defined(__i386__) || defined(__x86_64__)
-    for ( i = 0; i < tmp_nr_pages; i++)
-        page_array[i] = i;
 
-    phys_ram_base = xc_map_foreign_batch(xc_handle, domid,
-                                         PROT_READ|PROT_WRITE, page_array,
-                                         tmp_nr_pages);
-    if (phys_ram_base == NULL) {
-        fprintf(logfile, "batch map guest memory returned error %d\n", errno);
+    if ( qemu_map_cache_init(tmp_nr_pages) )
+    {
+        fprintf(logfile, "qemu_map_cache_init returned: error %d\n", errno);
         exit(-1);
     }
 
     shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
-                                       PROT_READ|PROT_WRITE,
-                                       page_array[shared_page_nr]);
+                                       PROT_READ|PROT_WRITE, shared_page_nr);
     if (shared_page == NULL) {
         fprintf(logfile, "map shared IO page returned error %d\n", errno);
         exit(-1);
     }
 
-    fprintf(logfile, "shared page at pfn:%lx, mfn: %"PRIx64"\n",
-            shared_page_nr, (uint64_t)(page_array[shared_page_nr]));
+    fprintf(logfile, "shared page at pfn:%lx\n", shared_page_nr);
 
     buffered_io_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
                                             PROT_READ|PROT_WRITE,
-                                            page_array[shared_page_nr - 2]);
+                                            shared_page_nr - 2);
     if (buffered_io_page == NULL) {
         fprintf(logfile, "map buffered IO page returned error %d\n", errno);
         exit(-1);
     }
 
-    fprintf(logfile, "buffered io page at pfn:%lx, mfn: %"PRIx64"\n",
-            shared_page_nr - 2, (uint64_t)(page_array[shared_page_nr - 2]));
-
-    free(page_array);
+    fprintf(logfile, "buffered io page at pfn:%lx\n", shared_page_nr - 2);
 
 #elif defined(__ia64__)
+
+    page_array = (xen_pfn_t *)malloc(tmp_nr_pages * sizeof(xen_pfn_t));
+    if (page_array == NULL) {
+        fprintf(logfile, "malloc returned error %d\n", errno);
+        exit(-1);
+    }
 
     shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
                                        PROT_READ|PROT_WRITE,

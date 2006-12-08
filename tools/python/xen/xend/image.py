@@ -338,7 +338,7 @@ class HVMImageHandler(ImageHandler):
         
         for devuuid, (devtype, devinfo) in deviceConfig.items():
             if devtype == 'vbd':
-                uname = devinfo['uname']
+                uname = devinfo.get('uname')
                 if uname is not None and 'file:' in uname:
                     (_, vbdparam) = string.split(uname, ':', 1)
                     if not os.path.isfile(vbdparam):
@@ -548,6 +548,14 @@ class X86_HVM_ImageHandler(HVMImageHandler):
         return max(4 * (256 * self.vm.getVCpuCount() + 2 * (maxmem_kb / 1024)),
                    shadow_mem_kb)
 
+class X86_Linux_ImageHandler(LinuxImageHandler):
+
+    def buildDomain(self):
+        # set physical mapping limit
+        # add an 8MB slack to balance backend allocations.
+        mem_kb = self.getRequiredInitialReservation() + (8 * 1024)
+        xc.domain_set_memmap_limit(self.vm.getDomid(), mem_kb)
+        return LinuxImageHandler.buildDomain(self)
 
 _handlers = {
     "powerpc": {
@@ -558,7 +566,7 @@ _handlers = {
         "hvm": IA64_HVM_ImageHandler,
     },
     "x86": {
-        "linux": LinuxImageHandler,
+        "linux": X86_Linux_ImageHandler,
         "hvm": X86_HVM_ImageHandler,
     },
 }

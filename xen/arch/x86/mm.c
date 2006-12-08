@@ -335,7 +335,7 @@ void make_cr3(struct vcpu *v, unsigned long mfn)
     cache->high_mfn   = mfn;
 
     /* Map the guest L3 table and copy to the chosen low-memory cache. */
-    *(fix_pae_highmem_pl1e - cpu) = l1e_from_pfn(mfn, __PAGE_HYPERVISOR);
+    l1e_write(fix_pae_highmem_pl1e-cpu, l1e_from_pfn(mfn, __PAGE_HYPERVISOR));
     /* First check the previous high mapping can't be in the TLB. 
      * (i.e. have we loaded CR3 since we last did this?) */
     if ( unlikely(this_cpu(make_cr3_timestamp) == this_cpu(tlbflush_time)) )
@@ -343,7 +343,7 @@ void make_cr3(struct vcpu *v, unsigned long mfn)
     highmem_l3tab = (l3_pgentry_t *)fix_to_virt(FIX_PAE_HIGHMEM_0 + cpu);
     lowmem_l3tab  = cache->table[cache->inuse_idx];
     memcpy(lowmem_l3tab, highmem_l3tab, sizeof(cache->table[0]));
-    *(fix_pae_highmem_pl1e - cpu) = l1e_empty();
+    l1e_write(fix_pae_highmem_pl1e-cpu, l1e_empty());
     this_cpu(make_cr3_timestamp) = this_cpu(tlbflush_time);
 
     v->arch.cr3 = __pa(lowmem_l3tab);
@@ -380,7 +380,7 @@ void invalidate_shadow_ldt(struct vcpu *v)
     {
         pfn = l1e_get_pfn(v->arch.perdomain_ptes[i]);
         if ( pfn == 0 ) continue;
-        v->arch.perdomain_ptes[i] = l1e_empty();
+        l1e_write(&v->arch.perdomain_ptes[i], l1e_empty());
         page = mfn_to_page(pfn);
         ASSERT_PAGE_IS_TYPE(page, PGT_ldt_page);
         ASSERT_PAGE_IS_DOMAIN(page, v->domain);
@@ -449,7 +449,7 @@ int map_ldt_shadow_page(unsigned int off)
 
     nl1e = l1e_from_pfn(mfn, l1e_get_flags(l1e) | _PAGE_RW);
 
-    v->arch.perdomain_ptes[off + 16] = nl1e;
+    l1e_write(&v->arch.perdomain_ptes[off + 16], nl1e);
     v->arch.shadow_ldt_mapcnt++;
 
     return 1;
@@ -851,7 +851,7 @@ static int alloc_l1_table(struct page_info *page)
 static int create_pae_xen_mappings(l3_pgentry_t *pl3e)
 {
     struct page_info *page;
-    l2_pgentry_t    *pl2e;
+    l2_pgentry_t    *pl2e, l2e;
     l3_pgentry_t     l3e3;
     int              i;
 
@@ -892,15 +892,19 @@ static int create_pae_xen_mappings(l3_pgentry_t *pl3e)
            &idle_pg_table_l2[L2_PAGETABLE_FIRST_XEN_SLOT],
            L2_PAGETABLE_XEN_SLOTS * sizeof(l2_pgentry_t));
     for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
-        pl2e[l2_table_offset(PERDOMAIN_VIRT_START) + i] =
-            l2e_from_page(
-                virt_to_page(page_get_owner(page)->arch.mm_perdomain_pt) + i,
-                __PAGE_HYPERVISOR);
+    {
+        l2e = l2e_from_page(
+            virt_to_page(page_get_owner(page)->arch.mm_perdomain_pt) + i,
+            __PAGE_HYPERVISOR);
+        l2e_write(&pl2e[l2_table_offset(PERDOMAIN_VIRT_START) + i], l2e);
+    }
     for ( i = 0; i < (LINEARPT_MBYTES >> (L2_PAGETABLE_SHIFT - 20)); i++ )
-        pl2e[l2_table_offset(LINEAR_PT_VIRT_START) + i] =
-            (l3e_get_flags(pl3e[i]) & _PAGE_PRESENT) ?
-            l2e_from_pfn(l3e_get_pfn(pl3e[i]), __PAGE_HYPERVISOR) :
-        l2e_empty();
+    {
+        l2e = l2e_empty();
+        if ( l3e_get_flags(pl3e[i]) & _PAGE_PRESENT )
+            l2e = l2e_from_pfn(l3e_get_pfn(pl3e[i]), __PAGE_HYPERVISOR);
+        l2e_write(&pl2e[l2_table_offset(LINEAR_PT_VIRT_START) + i], l2e);
+    }
     unmap_domain_page(pl2e);
 
     return 1;
@@ -2760,7 +2764,7 @@ void destroy_gdt(struct vcpu *v)
     {
         if ( (pfn = l1e_get_pfn(v->arch.perdomain_ptes[i])) != 0 )
             put_page_and_type(mfn_to_page(pfn));
-        v->arch.perdomain_ptes[i] = l1e_empty();
+        l1e_write(&v->arch.perdomain_ptes[i], l1e_empty());
         v->arch.guest_context.gdt_frames[i] = 0;
     }
 }
@@ -2794,8 +2798,8 @@ long set_gdt(struct vcpu *v,
     for ( i = 0; i < nr_pages; i++ )
     {
         v->arch.guest_context.gdt_frames[i] = frames[i];
-        v->arch.perdomain_ptes[i] =
-            l1e_from_pfn(frames[i], __PAGE_HYPERVISOR);
+        l1e_write(&v->arch.perdomain_ptes[i],
+                  l1e_from_pfn(frames[i], __PAGE_HYPERVISOR));
     }
 
     return 0;
@@ -2974,9 +2978,54 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
+    case XENMEM_set_memory_map:
+    {
+        struct xen_foreign_memory_map fmap;
+        struct domain *d;
+        int rc;
+
+        if ( copy_from_guest(&fmap, arg, 1) )
+            return -EFAULT;
+
+        if ( fmap.map.nr_entries > ARRAY_SIZE(d->arch.e820) )
+            return -EINVAL;
+
+        if ( fmap.domid == DOMID_SELF )
+        {
+            d = current->domain;
+            get_knownalive_domain(d);
+        }
+        else if ( !IS_PRIV(current->domain) )
+            return -EPERM;
+        else if ( (d = find_domain_by_id(fmap.domid)) == NULL )
+            return -ESRCH;
+
+        rc = copy_from_guest(&d->arch.e820[0], fmap.map.buffer,
+                             fmap.map.nr_entries) ? -EFAULT : 0;
+        d->arch.nr_e820 = fmap.map.nr_entries;
+
+        put_domain(d);
+        return rc;
+    }
+
     case XENMEM_memory_map:
     {
-        return -ENOSYS;
+        struct xen_memory_map map;
+        struct domain *d = current->domain;
+
+        /* Backwards compatibility. */
+        if ( d->arch.nr_e820 == 0 )
+            return -ENOSYS;
+
+        if ( copy_from_guest(&map, arg, 1) )
+            return -EFAULT;
+
+        map.nr_entries = min(map.nr_entries, d->arch.nr_e820);
+        if ( copy_to_guest(map.buffer, &d->arch.e820[0], map.nr_entries) ||
+             copy_to_guest(arg, &map, 1) )
+            return -EFAULT;
+
+        return 0;
     }
 
     case XENMEM_machine_memory_map:
@@ -3298,8 +3347,8 @@ int map_pages_to_xen(
              !map_small_pages )
         {
             /* Super-page mapping. */
-            ol2e  = *pl2e;
-            *pl2e = l2e_from_pfn(mfn, flags|_PAGE_PSE);
+            ol2e = *pl2e;
+            l2e_write(pl2e, l2e_from_pfn(mfn, flags|_PAGE_PSE));
 
             if ( (l2e_get_flags(ol2e) & _PAGE_PRESENT) )
             {
@@ -3319,22 +3368,24 @@ int map_pages_to_xen(
             {
                 pl1e = page_to_virt(alloc_xen_pagetable());
                 clear_page(pl1e);
-                *pl2e = l2e_from_page(virt_to_page(pl1e), __PAGE_HYPERVISOR);
+                l2e_write(pl2e, l2e_from_page(virt_to_page(pl1e),
+                                              __PAGE_HYPERVISOR));
             }
             else if ( l2e_get_flags(*pl2e) & _PAGE_PSE )
             {
                 pl1e = page_to_virt(alloc_xen_pagetable());
                 for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
-                    pl1e[i] = l1e_from_pfn(
-                        l2e_get_pfn(*pl2e) + i,
-                        l2e_get_flags(*pl2e) & ~_PAGE_PSE);
-                *pl2e = l2e_from_page(virt_to_page(pl1e), __PAGE_HYPERVISOR);
+                    l1e_write(&pl1e[i],
+                              l1e_from_pfn(l2e_get_pfn(*pl2e) + i,
+                                           l2e_get_flags(*pl2e) & ~_PAGE_PSE));
+                l2e_write(pl2e, l2e_from_page(virt_to_page(pl1e),
+                                              __PAGE_HYPERVISOR));
                 local_flush_tlb_pge();
             }
 
             pl1e  = l2e_to_l1e(*pl2e) + l1_table_offset(virt);
             ol1e  = *pl1e;
-            *pl1e = l1e_from_pfn(mfn, flags);
+            l1e_write(pl1e, l1e_from_pfn(mfn, flags));
             if ( (l1e_get_flags(ol1e) & _PAGE_PRESENT) )
                 local_flush_tlb_one(virt);
 

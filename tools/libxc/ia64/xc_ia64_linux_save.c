@@ -353,7 +353,7 @@ xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                    It will be remarked dirty.
                    FIXME: to be tracked.  */
                 fprintf(stderr, "cannot map page %lx: %s\n",
-                        page_array[N], strerror (errno));
+                        page_array[N], safe_strerror(errno));
                 continue;
             }
 

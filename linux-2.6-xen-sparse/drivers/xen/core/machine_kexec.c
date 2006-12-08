@@ -20,7 +20,7 @@ void xen_machine_kexec_setup_resources(void)
 {
 	xen_kexec_range_t range;
 	struct resource *res;
-	int err, k = 0;
+	int k = 0;
 
 	if (!is_initial_xendomain())
 		return;
@@ -32,26 +32,21 @@ void xen_machine_kexec_setup_resources(void)
 		range.range = KEXEC_RANGE_MA_CPU;
 		range.nr = k;
 
-		/*
-		 * Anything other than EINVAL or success indictates
-		 * that we are not running on a hypervisor which
-		 * supports kexec.
-		 */
-		err = HYPERVISOR_kexec_op(KEXEC_CMD_kexec_get_range, &range);
-		if (err == -EINVAL)
+		if(HYPERVISOR_kexec_op(KEXEC_CMD_kexec_get_range, &range))
 			break;
-		else if (err)
-			return;
 
 		k++;
 	}
+
+	if (k == 0)
+		return;
 
 	xen_max_nr_phys_cpus = k;
 
 	/* allocate xen_phys_cpus */
 
 	xen_phys_cpus = alloc_bootmem_low(k * sizeof(struct resource));
-	BUG_ON(!xen_phys_cpus);
+	BUG_ON(xen_phys_cpus == NULL);
 
 	/* fill in xen_phys_cpus with per-cpu crash note information */
 
@@ -61,7 +56,7 @@ void xen_machine_kexec_setup_resources(void)
 		range.nr = k;
 
 		if (HYPERVISOR_kexec_op(KEXEC_CMD_kexec_get_range, &range))
-			BUG();
+			goto err;
 
 		res = xen_phys_cpus + k;
 
@@ -78,7 +73,7 @@ void xen_machine_kexec_setup_resources(void)
 	range.range = KEXEC_RANGE_MA_XEN;
 
 	if (HYPERVISOR_kexec_op(KEXEC_CMD_kexec_get_range, &range))
-		BUG();
+		goto err;
 
 	xen_hypervisor_res.name = "Hypervisor code and data";
 	xen_hypervisor_res.start = range.start;
@@ -91,12 +86,23 @@ void xen_machine_kexec_setup_resources(void)
 	range.range = KEXEC_RANGE_MA_CRASH;
 
 	if (HYPERVISOR_kexec_op(KEXEC_CMD_kexec_get_range, &range))
-		BUG();
+		return;
 
 	if (range.size) {
 		crashk_res.start = range.start;
 		crashk_res.end = range.start + range.size - 1;
 	}
+
+	return;
+
+ err:
+	/*
+	 * It isn't possible to free xen_phys_cpus this early in the
+	 * boot. Since failure at this stage is unexpected and the
+	 * amount is small we leak the memory.
+         */
+	xen_max_nr_phys_cpus = 0;
+	return;
 }
 
 void xen_machine_kexec_register_resources(struct resource *res)
@@ -106,7 +112,7 @@ void xen_machine_kexec_register_resources(struct resource *res)
 	request_resource(res, &xen_hypervisor_res);
 
 	for (k = 0; k < xen_max_nr_phys_cpus; k++)
-		request_resource(res, xen_phys_cpus + k);
+		request_resource(&xen_hypervisor_res, xen_phys_cpus + k);
 
 }
 
@@ -157,7 +163,7 @@ void xen_machine_kexec_unload(struct kimage *image)
  * stop all CPUs and kexec. That is it combines machine_shutdown()
  * and machine_kexec() in Linux kexec terms.
  */
-NORET_TYPE void xen_machine_kexec(struct kimage *image)
+NORET_TYPE void machine_kexec(struct kimage *image)
 {
 	xen_kexec_exec_t xke;
 

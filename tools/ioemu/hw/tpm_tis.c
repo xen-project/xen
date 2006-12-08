@@ -132,7 +132,7 @@ typedef struct TPMState {
 
 
 /* local prototypes */
-static int TPM_Send(tpmState *s, tpmBuffer *buffer, char *msg);
+static int TPM_Send(tpmState *s, tpmBuffer *buffer, uint8_t locty, char *msg);
 static int TPM_Receive(tpmState *s, tpmBuffer *buffer);
 static uint32_t vtpm_instance_from_xenstore(void);
 static void tis_poll_timer(void *opaque);
@@ -271,6 +271,8 @@ static int create_local_socket(tpmState *s, uint32_t vtpm_instance)
 /*
  * the 'write' method for sending requests to the vTPM
  * four bytes with the vTPM instance number are prepended to each request
+ * the locality in which the command was sent is transmitted in the
+ * highest 3 bits
  */
 static int write_local_socket(tpmState *s, const tpmBuffer *buffer)
 {
@@ -608,7 +610,7 @@ static void tis_mem_writel(void *opaque, target_phys_addr_t addr, uint32_t val)
             }
         }
         if (val & STS_TPM_GO) {
-            n = TPM_Send(s, &s->buffer,"tpm_data_write");
+            n = TPM_Send(s, &s->buffer, locty, "tpm_data_write");
             if (n > 0) {
                 /* sending of data was successful */
                 s->offset = 0;
@@ -915,7 +917,7 @@ const static unsigned char tpm_failure[] = {
 /*
  * Send a TPM request.
  */
-static int TPM_Send(tpmState *s, tpmBuffer *buffer, char *msg)
+static int TPM_Send(tpmState *s, tpmBuffer *buffer, uint8_t locty, char *msg)
 {
     int len;
     uint32_t size = tpm_get_size_from_buffer(buffer->buf);
@@ -944,6 +946,10 @@ static int TPM_Send(tpmState *s, tpmBuffer *buffer, char *msg)
 #ifdef DEBUG_TPM
     showBuff(buffer->buf, "To TPM");
 #endif
+
+    /* transmit the locality in the highest 3 bits */
+    buffer->instance[0] &= 0x1f;
+    buffer->instance[0] |= (locty << 5);
 
     len = vTPMTransmit[s->Transmitlayer].write(s, buffer);
     if (len < 0) {

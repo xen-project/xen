@@ -5,6 +5,7 @@
 #include <xen/mm.h>
 #include <asm/hvm/vcpu.h>
 #include <asm/hvm/domain.h>
+#include <asm/e820.h>
 
 struct trap_bounce {
     unsigned long  error_code;
@@ -100,11 +101,7 @@ struct arch_domain
     /* I/O-port admin-specified access capabilities. */
     struct rangeset *ioport_caps;
 
-    /* HVM stuff */
-    struct hvm_domain   hvm_domain;
-
-    /* Shadow-translated guest: Pseudophys base address of reserved area. */
-    unsigned long first_reserved_pfn;
+    struct hvm_domain hvm_domain;
 
     struct shadow_domain shadow;
 
@@ -113,6 +110,9 @@ struct arch_domain
     /* Highest guest frame that's ever been mapped in the p2m */
     unsigned long max_mapped_pfn;
 
+    /* Pseudophysical e820 map (XENMEM_memory_map).  */
+    struct e820entry e820[3];
+    unsigned int nr_e820;
 } __cacheline_aligned;
 
 #ifdef CONFIG_X86_PAE
@@ -196,7 +196,6 @@ struct arch_vcpu
     unsigned long cr3;           	    /* (MA) value to install in HW CR3 */
 
     void *guest_vtable;                 /* virtual addr of pagetable */
-    root_pgentry_t *monitor_vtable;		/* virtual addr of monitor_table */
 
     /* Current LDT details. */
     unsigned long shadow_ldt_mapcnt;

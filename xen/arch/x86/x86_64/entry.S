@@ -478,6 +478,12 @@ ENTRY(double_fault)
         call  do_double_fault
         ud2
 
+ENTRY(early_page_fault)
+        SAVE_ALL
+        movq  %rsp,%rdi
+        call  do_early_page_fault
+        jmp   restore_all_xen
+
 ENTRY(nmi)
         pushq $0
         SAVE_ALL

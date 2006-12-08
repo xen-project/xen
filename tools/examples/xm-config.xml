@@ -1,0 +1,43 @@
+<!--
+
+Copyright (C) 2006 XenSource Inc.
+
+This library is free software; you can redistribute it and/or
+modify it under the terms of version 2.1 of the GNU Lesser General Public
+License as published by the Free Software Foundation.
+
+This library is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public
+License along with this library; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+-->
+
+<!--
+
+This is a configuration file for xm; it should be placed in
+/etc/xen/xm-config.xml.  If this file is missing, then xm will fall back to
+the normal behaviour that's in Xen 3.0.4 and below.  The settings here are
+most useful for experimenting with the Xen-API preview in Xen 3.0.4.
+
+-->
+
+<xm>
+  <!-- The server element describes how to talk to Xend.  The type may be 
+       Xen-API or LegacyXMLRPC (the default).  The URI is that of the
+       server; you might try http://server:9363/ or
+       httpu:///var/run/xend/xen-api.sock for the Xen-API, or
+       httpu:///var/run/xend/xmlrpc.sock for the legacy server.
+
+       The username and password attributes will be used to log in if Xen-API
+       is being used.
+    -->
+  <server type='Xen-API'
+          uri='http://localhost:9363/'
+          username='me'
+          password='mypassword' />
+</xm>

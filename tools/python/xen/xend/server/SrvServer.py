@@ -62,8 +62,9 @@ xroot = XendRoot.instance()
 
 class XendServers:
 
-    def __init__(self):
+    def __init__(self, root):
         self.servers = []
+        self.root = root
         self.cleaningUp = False
         self.reloadingConfig = False
 
@@ -101,6 +102,9 @@ class XendServers:
         while True:
             threads = []
             for server in self.servers:
+                if server.ready:
+                    continue
+
                 thread = Thread(target=server.run, name=server.__class__.__name__)
                 if isinstance(server, HttpServer):
                     thread.setDaemon(True)
@@ -156,21 +160,23 @@ class XendServers:
                     pass
 
             if self.reloadingConfig:
-                log.info("Restarting all servers...")
+                log.info("Restarting all XML-RPC and Xen-API servers...")
                 self.cleaningUp = False
                 self.reloadingConfig = False
                 xroot.set_config()
-                self.servers = []
-                _loadConfig(self)
+                new_servers = [x for x in self.servers
+                               if isinstance(x, HttpServer)]
+                self.servers = new_servers
+                _loadConfig(self, self.root, True)
             else:
                 break
 
-def _loadConfig(servers):
-    if xroot.get_xend_http_server():
+def _loadConfig(servers, root, reload):
+    if not reload and xroot.get_xend_http_server():
         servers.add(HttpServer(root,
                                xroot.get_xend_address(),
                                xroot.get_xend_port()))
-    if xroot.get_xend_unix_server():
+    if not reload and xroot.get_xend_unix_server():
         path = xroot.get_xend_unix_path()
         log.info('unix path=' + path)
         servers.add(UnixHttpServer(root, path))
@@ -218,6 +224,6 @@ def _loadConfig(servers):
 def create():
     root = SrvDir()
     root.putChild('xend', SrvRoot())
-    servers = XendServers()
-    _loadConfig(servers)
+    servers = XendServers(root)
+    _loadConfig(servers, root, False)
     return servers

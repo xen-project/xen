@@ -34,7 +34,7 @@
 #ifndef _XENBUS_PROBE_H
 #define _XENBUS_PROBE_H
 
-#ifdef CONFIG_XEN_BACKEND
+#if defined(CONFIG_XEN_BACKEND) || defined(CONFIG_XEN_BACKEND_MODULE)
 extern void xenbus_backend_suspend(int (*fn)(struct device *, void *));
 extern void xenbus_backend_resume(int (*fn)(struct device *, void *));
 extern void xenbus_backend_probe_and_watch(void);

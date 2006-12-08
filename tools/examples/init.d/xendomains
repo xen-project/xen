@@ -204,12 +204,14 @@ start()
 	return; 
     fi
 
+    saved_domains=" "
     if [ "$XENDOMAINS_RESTORE" = "true" ] &&
        contains_something "$XENDOMAINS_SAVE"
     then
         mkdir -p $(dirname "$LOCKFILE")
 	touch $LOCKFILE
 	echo -n "Restoring Xen domains:"
+	saved_domains=`ls $XENDOMAINS_SAVE`
 	for dom in $XENDOMAINS_SAVE/*; do
 	    echo -n " ${dom##*/}"
 	    xm restore $dom
@@ -234,9 +236,14 @@ start()
 	# Create all domains with config files in XENDOMAINS_AUTO.
 	# TODO: We should record which domain name belongs 
 	# so we have the option to selectively shut down / migrate later
+	# If a domain statefile from $XENDOMAINS_SAVE matches a domain name
+	# in $XENDOMAINS_AUTO, do not try to start that domain; if it didn't 
+	# restore correctly it requires administrative attention.
 	for dom in $XENDOMAINS_AUTO/*; do
 	    echo -n " ${dom##*/}"
-	    if is_running $dom; then
+	    shortdom=$(echo $dom | sed -n 's/^.*\/\(.*\)$/\1/p')
+	    echo $saved_domains | grep -w $shortdom > /dev/null
+	    if [ $? -eq 0 ] || is_running $dom; then
 		echo -n "(skip)"
 	    else
 		xm create --quiet --defconfig $dom

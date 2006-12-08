@@ -1047,9 +1047,9 @@ void time_resume(void)
 #ifdef CONFIG_SMP
 static char timer_name[NR_CPUS][15];
 
-void local_setup_timer(unsigned int cpu)
+int local_setup_timer(unsigned int cpu)
 {
-	int seq;
+	int seq, irq;
 
 	BUG_ON(cpu == 0);
 
@@ -1062,15 +1062,17 @@ void local_setup_timer(unsigned int cpu)
 	} while (read_seqretry(&xtime_lock, seq));
 
 	sprintf(timer_name[cpu], "timer%d", cpu);
-	per_cpu(timer_irq, cpu) =
-		bind_virq_to_irqhandler(
-			VIRQ_TIMER,
-			cpu,
-			timer_interrupt,
-			SA_INTERRUPT,
-			timer_name[cpu],
-			NULL);
-	BUG_ON(per_cpu(timer_irq, cpu) < 0);
+	irq = bind_virq_to_irqhandler(VIRQ_TIMER,
+				      cpu,
+				      timer_interrupt,
+				      SA_INTERRUPT,
+				      timer_name[cpu],
+				      NULL);
+	if (irq < 0)
+		return irq;
+	per_cpu(timer_irq, cpu) = irq;
+
+	return 0;
 }
 
 void local_teardown_timer(unsigned int cpu)

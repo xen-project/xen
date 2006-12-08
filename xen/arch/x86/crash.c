@@ -27,7 +27,6 @@
 #include <public/xen.h>
 #include <asm/hvm/hvm.h>
 
-#ifdef CONFIG_SMP
 static atomic_t waiting_for_crash_ipi;
 
 static int crash_nmi_callback(struct cpu_user_regs *regs, int cpu)
@@ -71,9 +70,7 @@ static void nmi_shootdown_cpus(void)
     atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
     /* Would it be better to replace the trap vector here? */
     set_nmi_callback(crash_nmi_callback);
-    /* Ensure the new callback function is set before sending
-     * out the NMI
-     */
+    /* Ensure the new callback function is set before sending out the NMI. */
     wmb();
 
     smp_send_nmi_allbutself();
@@ -88,7 +85,6 @@ static void nmi_shootdown_cpus(void)
     /* Leave the nmi callback set */
     disable_local_APIC();
 }
-#endif
 
 static void crash_save_xen_notes(void)
 {
@@ -102,16 +98,12 @@ static void crash_save_xen_notes(void)
 
 void machine_crash_shutdown(void)
 {
-    printk("machine_crash_shutdown: %d\n", smp_processor_id());
     local_irq_disable();
 
-#ifdef CONFIG_SMP
     nmi_shootdown_cpus();
-#endif
 
-#ifdef CONFIG_X86_IO_APIC
     disable_IO_APIC();
-#endif
+
     hvm_disable();
 
     crash_save_xen_notes();

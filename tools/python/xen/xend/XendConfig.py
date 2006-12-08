@@ -42,6 +42,39 @@ def reverse_dict(adict):
 def bool0(v):
     return v != '0' and bool(v)
 
+# Recursively copy a data struct, scrubbing out VNC passwords.
+# Will scrub any dict entry with a key of 'vncpasswd' or any
+# 2-element list whose first member is 'vncpasswd'. It will
+# also scrub a string matching '(vncpasswd XYZ)'. Everything
+# else is no-op passthrough
+def scrub_password(data):
+    if type(data) == dict or type(data) == XendConfig:
+        scrubbed = {}
+        for key in data.keys():
+            if key == "vncpasswd":
+                scrubbed[key] = "XXXXXXXX"
+            else:
+                scrubbed[key] = scrub_password(data[key])
+        return scrubbed
+    elif type(data) == list:
+        if len(data) == 2 and type(data[0]) == str and data[0] == 'vncpasswd':
+            return ['vncpasswd', 'XXXXXXXX']
+        else:
+            scrubbed = []
+            for entry in data:
+                scrubbed.append(scrub_password(entry))
+            return scrubbed
+    elif type(data) == tuple:
+        scrubbed = []
+        for entry in data:
+            scrubbed.append(scrub_password(entry))
+        return tuple(scrubbed)
+    elif type(data) == str:
+        return re.sub(r'\(vncpasswd\s+[^\)]+\)','(vncpasswd XXXXXX)', data)
+    else:
+        return data
+
+
 # Mapping from XendConfig configuration keys to the old
 # legacy configuration keys that map directly.
 
@@ -269,7 +302,7 @@ class XendConfig(dict):
             # output from xc.domain_getinfo
             self._dominfo_to_xapi(dominfo)
 
-        log.debug('XendConfig.init: %s' % self)
+        log.debug('XendConfig.init: %s' % scrub_password(self))
 
         # validators go here
         self.validate()
@@ -353,10 +386,15 @@ class XendConfig(dict):
         if self['builder'] not in ('hvm', 'linux'):
             raise XendConfigError('Invalid builder configuration')
 
+    def _vcpus_sanity_check(self):
+        if self.get('vcpus_number') != None:
+            self['vcpu_avail'] = (1 << self['vcpus_number']) - 1
+
     def validate(self):
         self._memory_sanity_check()
         self._actions_sanity_check()
         self._builder_sanity_check()
+        self._vcpus_sanity_check()
 
     def _dominfo_to_xapi(self, dominfo):
         self['domid'] = dominfo['domid']
@@ -471,14 +509,8 @@ class XendConfig(dict):
                 
                 log.debug("XendConfig: reading device: %s" % pci_devs)
             else:
-                for opt, val in config[1:]:
-                    dev_info[opt] = val
-                log.debug("XendConfig: reading device: %s" % dev_info)
-                # create uuid if it doesn't
-                dev_uuid = dev_info.get('uuid', uuid.createString())
-                dev_info['uuid'] = dev_uuid
-                cfg['devices'][dev_uuid] = (dev_type, dev_info)
-
+                self.device_add(dev_type, cfg_sxp = config, target = cfg)
+                log.debug("XendConfig: reading device: %s" % scrub_password(dev_info))
 
         # Extract missing data from configuration entries
         image_sxp = sxp.child_value(sxp_cfg, 'image', [])
@@ -600,6 +632,9 @@ class XendConfig(dict):
         self['memory_dynamic_max'] = self['memory_static_max']
         self['memory_dynamic_min'] = self['memory_static_min']
 
+        # make sure max_vcpu_id is set correctly
+        self['max_vcpu_id'] = self['vcpus_number'] - 1
+
         # set device references in the configuration
         self['devices'] = cfg.get('devices', {})
         
@@ -675,13 +710,14 @@ class XendConfig(dict):
                 else:
                     self[sxp_arg] = val
 
+        _set_cfg_if_exists('bootloader')
         _set_cfg_if_exists('shadow_memory')
         _set_cfg_if_exists('security')
         _set_cfg_if_exists('features')
         _set_cfg_if_exists('on_xend_stop')
         _set_cfg_if_exists('on_xend_start')
         _set_cfg_if_exists('vcpu_avail')
-        _set_cfg_if_exists('max_vcpu_id') # TODO, deprecated?
+        _set_cfg_if_exists('max_vcpu_id') # needed for vcpuDomDetails
         
         # Parse and store runtime configuration 
         _set_cfg_if_exists('start_time')
@@ -828,7 +864,8 @@ class XendConfig(dict):
 
         return sxpr    
     
-    def device_add(self, dev_type, cfg_sxp = None, cfg_xenapi = None):
+    def device_add(self, dev_type, cfg_sxp = None, cfg_xenapi = None,
+                   target = None):
         """Add a device configuration in SXP format or XenAPI struct format.
 
         For SXP, it could be either:
@@ -843,9 +880,14 @@ class XendConfig(dict):
         @param cfg_sxp: SXP configuration object
         @type cfg_xenapi: dict
         @param cfg_xenapi: A device configuration from Xen API (eg. vbd,vif)
+        @param target: write device information to
+        @type target: None or a dictionary
         @rtype: string
         @return: Assigned UUID of the device.
         """
+        if target == None:
+            target = self
+        
         if dev_type not in XendDevices.valid_devices() and \
            dev_type not in XendDevices.pseudo_devices():        
             raise XendConfigError("XendConfig: %s not a valid device type" %
@@ -875,10 +917,12 @@ class XendConfig(dict):
             except ValueError:
                 pass # SXP has no options for this device
 
-            
-            def _get_config_ipaddr(config):
+
+            # Special handling for certain device parameters.
+
+            def _get_config_ipaddr(cfg):
                 val = []
-                for ipaddr in sxp.children(config, elt='ip'):
+                for ipaddr in sxp.children(cfg, elt='ip'):
                     val.append(sxp.child0(ipaddr))
                 return val
 
@@ -897,11 +941,18 @@ class XendConfig(dict):
             dev_info['uuid'] = dev_uuid
 
             # store dev references by uuid for certain device types
-            self['devices'][dev_uuid] = (dev_type, dev_info)
+            target['devices'][dev_uuid] = (dev_type, dev_info)
             if dev_type in ('vif', 'vbd', 'vtpm'):
-                self['%s_refs' % dev_type].append(dev_uuid)
+                param = '%s_refs' % dev_type
+                if param not in target:
+                    target[param] = []
+                if dev_uuid not in target[param]:
+                    target[param].append(dev_uuid)
             elif dev_type in ('tap',):
-                self['vbd_refs'].append(dev_uuid)
+                if 'vbd_refs' not in target:
+                    target['vbd_refs'] = []
+                if dev_uuid not in target['vbd_refs']:
+                    target['vbd_refs'].append(dev_uuid)
 
             return dev_uuid
 

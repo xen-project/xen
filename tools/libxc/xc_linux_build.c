@@ -120,7 +120,7 @@ static int probeimageformat(const char *image,
     if ( probe_elf(image, image_size, load_funcs) &&
          probe_bin(image, image_size, load_funcs) )
     {
-        ERROR( "Unrecognized image format" );
+        xc_set_error(XC_INVALID_KERNEL, "Not a valid ELF or raw kernel image");
         return -EINVAL;
     }
 
@@ -606,8 +606,8 @@ static int setup_guest(int xc_handle,
     /* shared_info page starts its life empty. */
     shared_info = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE, shared_info_frame);
-    printf("shared_info = %p, err=%s frame=%lx\n",
-           shared_info, strerror (errno), shared_info_frame);
+    printf("shared_info = %p frame=%lx\n",
+           shared_info, shared_info_frame);
     //memset(shared_info, 0, PAGE_SIZE);
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
@@ -631,17 +631,20 @@ static int compat_check(int xc_handle, struct domain_setup_info *dsi)
     xen_capabilities_info_t xen_caps = "";
 
     if (xc_version(xc_handle, XENVER_capabilities, &xen_caps) != 0) {
-        ERROR("Cannot determine host capabilities.");
+        xc_set_error(XC_INVALID_KERNEL,
+                     "Cannot determine host capabilities.");
         return 0;
     }
 
     if (strstr(xen_caps, "xen-3.0-x86_32p")) {
         if (dsi->pae_kernel == PAEKERN_no) {
-            ERROR("Non PAE-kernel on PAE host.");
+            xc_set_error(XC_INVALID_KERNEL,
+                         "Non PAE-kernel on PAE host.");
             return 0;
         }
     } else if (dsi->pae_kernel != PAEKERN_no) {
-        ERROR("PAE-kernel on non-PAE host.");
+        xc_set_error(XC_INVALID_KERNEL,
+                     "PAE-kernel on non-PAE host.");
         return 0;
     }
 
@@ -1154,7 +1157,6 @@ static int xc_linux_build_internal(int xc_handle,
                      console_evtchn, console_mfn,
                      features_bitmap) < 0 )
     {
-        ERROR("Error constructing guest OS");
         goto error_out;
     }
 

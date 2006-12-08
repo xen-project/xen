@@ -222,7 +222,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_translate_gpfn_list_t);
 
 /*
  * Returns the pseudo-physical memory map as it was when the domain
- * was started.
+ * was started (specified by XENMEM_set_memory_map).
+ * arg == addr of xen_memory_map_t.
  */
 #define XENMEM_memory_map           9
 struct xen_memory_map {
@@ -245,8 +246,22 @@ DEFINE_XEN_GUEST_HANDLE(xen_memory_map_t);
 /*
  * Returns the real physical memory map. Passes the same structure as
  * XENMEM_memory_map.
+ * arg == addr of xen_memory_map_t.
  */
 #define XENMEM_machine_memory_map	10
+
+/*
+ * Set the pseudo-physical memory map of a domain, as returned by
+ * XENMEM_memory_map.
+ * arg == addr of xen_foreign_memory_map_t.
+ */
+#define XENMEM_set_memory_map       13
+struct xen_foreign_memory_map {
+    domid_t domid;
+    struct xen_memory_map map;
+};
+typedef struct xen_foreign_memory_map xen_foreign_memory_map_t;
+DEFINE_XEN_GUEST_HANDLE(xen_foreign_memory_map_t);
 
 #endif /* __XEN_PUBLIC_MEMORY_H__ */
 

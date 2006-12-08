@@ -125,7 +125,7 @@ setup_gdt(void)
 	/* setup task state segment */
 	memset(&tss, 0, sizeof(tss));
 	tss.ss0 = DATA_SELECTOR;
-	tss.esp0 = (unsigned) stack_top - 4*4;
+	tss.esp0 = (unsigned) stack_top;
 	tss.iomap_base = offsetof(struct tss, iomap);
 
 	/* initialize gdt's tss selector */
@@ -258,7 +258,7 @@ setup_ctx(void)
 
 	memset(c, 0, sizeof(*c));
 	c->eip = (unsigned long) switch_to_real_mode;
-	c->esp = (unsigned) stack_top - 4*4;
+	c->esp = (unsigned) stack_top;
 	c->eflags = 0x2; /* no interrupts, please */
 
 	/*
