@@ -1,0 +1,110 @@
+# HG changeset patch
+# User kfraser@localhost.localdomain
+# Node ID fd28a1b139dea91b8bfcf06dd233dbdda8f51ff1
+# Parent  d8befb109c394c2c2d3e1870a500107d461724ef
+[QEMU] Error reporting in IDE device model.
+
+Following on from my patch to make blktap report I/O errors back to
+guest OS, a similar problem exists in the QEMU codebase. The IDE
+driver never reports I/O errors during read/write operations back to
+the guest OS. Instead all I/O operations are reported as
+succesfull. If, for example, the host FS holding the disk image fills
+up, then writes may fail due to lack of space. Since the guest OS
+never sees these failures, it assumes all is well & will continue
+writing. Eventually this can lead to severe & unrecoverable filesystem
+corruption.
+
+The attached patch fixes QEMU ide driver such that any failure of a
+read or write operation sets the appropriate IDE status/error
+registers. Having read the ATA-6 spec I think the most compliant
+behaviour is to set the status register to 'READY_STAT | ERR_STAT',
+and the error register to ABRT_ERR. There is already a convenience
+function ide_abort_command() in the QEMU codebase which does just
+this, so the attached patch simply calls that function.
+
+With this patch the guest OS sees the I/O failure & the kernel logs
+IDE errors and then retries the operation. This at least ensures that
+the guest can be shutdown the out of space issue in the host corrected
+and the guest restarted, without any serious filesystem damage having
+occurred.
+
+From: Daniel Berrange <berrange@redhat.com>
+Signed-off-by: Keir Fraser <keir@xensource.com>
+
+Index: ioemu/hw/ide.c
+===================================================================
+--- ioemu.orig/hw/ide.c	2006-12-08 18:21:36.000000000 +0000
++++ ioemu/hw/ide.c	2006-12-08 18:23:18.000000000 +0000
+@@ -680,7 +680,7 @@
+ static void ide_sector_read(IDEState *s)
+ {
+     int64_t sector_num;
+-    int ret, n;
++    int n;
+ 
+     s->status = READY_STAT | SEEK_STAT;
+     s->error = 0; /* not needed by IDE spec, but needed by Windows */
+@@ -695,7 +695,11 @@
+ #endif
+         if (n > s->req_nb_sectors)
+             n = s->req_nb_sectors;
+-        ret = bdrv_read(s->bs, sector_num, s->io_buffer, n);
++        if (bdrv_read(s->bs, sector_num, s->io_buffer, n) != 0) {
++            ide_abort_command(s);
++            ide_set_irq(s);
++            return;
++        }
+         ide_transfer_start(s, s->io_buffer, 512 * n, ide_sector_read);
+         ide_set_irq(s);
+         ide_set_sector(s, sector_num + n);
+@@ -721,7 +725,11 @@
+             if (n > MAX_MULT_SECTORS)
+                 n = MAX_MULT_SECTORS;
+             sector_num = ide_get_sector(s);
+-            bdrv_read(s->bs, sector_num, s->io_buffer, n);
++            if (bdrv_read(s->bs, sector_num, s->io_buffer, n) != 0) {
++                ide_abort_command(s);
++                ide_set_irq(s);
++                return 0;
++            }
+             s->io_buffer_index = 0;
+             s->io_buffer_size = n * 512;
+             len = s->io_buffer_size;
+@@ -767,7 +775,7 @@
+ static void ide_sector_write(IDEState *s)
+ {
+     int64_t sector_num;
+-    int ret, n, n1;
++    int n, n1;
+ 
+     s->status = READY_STAT | SEEK_STAT;
+     sector_num = ide_get_sector(s);
+@@ -777,7 +785,11 @@
+     n = s->nsector;
+     if (n > s->req_nb_sectors)
+         n = s->req_nb_sectors;
+-    ret = bdrv_write(s->bs, sector_num, s->io_buffer, n);
++    if (bdrv_write(s->bs, sector_num, s->io_buffer, n) != 0) {
++        ide_abort_command(s);
++        ide_set_irq(s);
++        return;
++    }
+     s->nsector -= n;
+     if (s->nsector == 0) {
+         /* no more sector to write */
+@@ -823,8 +835,13 @@
+         if (len == 0) {
+             n = s->io_buffer_size >> 9;
+             sector_num = ide_get_sector(s);
+-            bdrv_write(s->bs, sector_num, s->io_buffer, 
+-                       s->io_buffer_size >> 9);
++            if (bdrv_write(s->bs, sector_num, s->io_buffer, 
++                	   s->io_buffer_size >> 9) != 0) {
++                ide_abort_command(s);
++                ide_set_irq(s);
++                return 0;
++            }
++
+             sector_num += n;
+             ide_set_sector(s, sector_num);
+             s->nsector -= n;

@@ -1,0 +1,29 @@
+# HG changeset patch
+# User PeterJohnston <peter.johnston@xensource.com>
+# Node ID b8cc9ffda0a3dc449b026c72c97f78dea2e6f114
+# Parent  a8d2b1393b769048c7b62822e45bef27eef80fb6
+[QEMU] Add TCP_NODELAY to tcp connections exporting serial ports.
+
+Signed-off-by: Steven Smith <sos22@cam.ac.uk>
+
+Index: ioemu/vl.c
+===================================================================
+--- ioemu.orig/vl.c	2006-12-08 18:21:56.000000000 +0000
++++ ioemu/vl.c	2006-12-08 18:22:42.000000000 +0000
+@@ -2530,6 +2530,7 @@
+     int is_waitconnect = 1;
+     const char *ptr;
+     struct sockaddr_in saddr;
++    int opt;
+ 
+     if (parse_host_port(&saddr, host_str) < 0)
+         goto fail;
+@@ -2598,6 +2599,8 @@
+             }
+         }
+         s->fd = fd;
++	opt = 1;
++	setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&opt, sizeof(opt));
+         if (s->connected)
+             tcp_chr_connect(chr);
+         else

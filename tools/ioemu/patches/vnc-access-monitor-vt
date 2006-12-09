@@ -1,7 +1,7 @@
 Index: ioemu/vnc.c
 ===================================================================
---- ioemu.orig/vnc.c	2006-10-24 14:33:46.000000000 +0100
-+++ ioemu/vnc.c	2006-10-24 14:33:46.000000000 +0100
+--- ioemu.orig/vnc.c	2006-12-06 23:46:11.000000000 +0000
++++ ioemu/vnc.c	2006-12-06 23:46:11.000000000 +0000
 @@ -33,6 +33,10 @@
  #include "vnc_keysym.h"
  #include "keymaps.c"
@@ -22,7 +22,7 @@ Index: ioemu/vnc.c
  };
  
  #define DIRTY_PIXEL_BITS 64
-@@ -794,16 +800,80 @@
+@@ -796,16 +802,80 @@
  
  static void do_key_event(VncState *vs, int down, uint32_t sym)
  {

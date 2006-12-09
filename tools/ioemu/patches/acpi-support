@@ -1,8 +1,8 @@
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2006-08-17 19:49:50.228216099 +0100
-+++ ioemu/Makefile.target	2006-08-17 19:50:02.405870095 +0100
-@@ -357,6 +357,7 @@
+--- ioemu.orig/Makefile.target	2006-12-08 02:00:40.000000000 +0000
++++ ioemu/Makefile.target	2006-12-08 02:00:40.000000000 +0000
+@@ -358,6 +358,7 @@
  VL_OBJS+= fdc.o mc146818rtc.o serial.o pc.o
  VL_OBJS+= cirrus_vga.o mixeng.o parallel.o acpi.o piix_pci.o
  VL_OBJS+= usb-uhci.o
@@ -12,8 +12,8 @@ Index: ioemu/Makefile.target
  ifeq ($(TARGET_BASE_ARCH), ppc)
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2006-08-17 19:49:59.312212039 +0100
-+++ ioemu/hw/pc.c	2006-08-17 19:50:02.406869984 +0100
+--- ioemu.orig/hw/pc.c	2006-12-08 02:00:40.000000000 +0000
++++ ioemu/hw/pc.c	2006-12-08 02:00:40.000000000 +0000
 @@ -874,13 +874,19 @@
  
      cmos_init(ram_size, boot_device, bs_table, timeoffset);
@@ -49,8 +49,8 @@ Index: ioemu/hw/pc.c
 Index: ioemu/hw/piix4acpi.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/hw/piix4acpi.c	2006-08-17 19:50:02.407869874 +0100
-@@ -0,0 +1,388 @@
++++ ioemu/hw/piix4acpi.c	2006-12-08 02:00:40.000000000 +0000
+@@ -0,0 +1,396 @@
 +/*
 + * PIIX4 ACPI controller emulation
 + *
@@ -434,15 +434,23 @@ Index: ioemu/hw/piix4acpi.c
 +    pci_conf[0x0e] = 0x00;
 +    pci_conf[0x3d] = 0x01;  /* Hardwired to PIRQA is used */
 +
-+    pci_register_io_region((PCIDevice *)d, 4, 0x10,
-+                           PCI_ADDRESS_SPACE_IO, acpi_map);
 +
-+    acpi_reset (d);
++    /* PMBA POWER MANAGEMENT BASE ADDRESS, hardcoded to 0x1f40 
++     * to make shutdown work for IPF, due to IPF Guest Firmware 
++     * will enumerate pci devices. 
++     *
++     * TODO:  if Guest Firmware or Guest OS will change this PMBA,
++     * More logic will be added.
++     */
++    pci_conf[0x40] = 0x41; /* Special device-specific BAR at 0x40 */
++    pci_conf[0x41] = 0x1f;
++    acpi_map(d, 0, 0x1f40, 0x10, PCI_ADDRESS_SPACE_IO);
++    acpi_reset(d);
 +}
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-08-17 19:49:59.315211708 +0100
-+++ ioemu/vl.c	2006-08-17 19:50:02.410869542 +0100
+--- ioemu.orig/vl.c	2006-12-08 02:00:40.000000000 +0000
++++ ioemu/vl.c	2006-12-08 02:00:40.000000000 +0000
 @@ -156,7 +156,7 @@
  #else
  #define MAX_CPUS 1
@@ -476,7 +484,7 @@ Index: ioemu/vl.c
      { NULL },
  };
  
-@@ -6256,6 +6259,9 @@
+@@ -6240,6 +6243,9 @@
              case QEMU_OPTION_timeoffset:
                  timeoffset = strtol(optarg, NULL, 0);
                  break;
@@ -488,8 +496,8 @@ Index: ioemu/vl.c
      }
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-08-17 19:49:59.316211597 +0100
-+++ ioemu/vl.h	2006-08-17 19:50:02.411869432 +0100
+--- ioemu.orig/vl.h	2006-12-08 02:00:40.000000000 +0000
++++ ioemu/vl.h	2006-12-08 02:00:40.000000000 +0000
 @@ -168,6 +168,7 @@
  extern int kqemu_allowed;
  extern int win2k_install_hack;
@@ -510,8 +518,8 @@ Index: ioemu/vl.h
  extern QEMUMachine isapc_machine;
 Index: ioemu/hw/piix_pci.c
 ===================================================================
---- ioemu.orig/hw/piix_pci.c	2006-08-17 19:38:05.806252180 +0100
-+++ ioemu/hw/piix_pci.c	2006-08-17 19:50:02.411869432 +0100
+--- ioemu.orig/hw/piix_pci.c	2006-12-08 02:00:39.000000000 +0000
++++ ioemu/hw/piix_pci.c	2006-12-08 02:00:40.000000000 +0000
 @@ -241,7 +241,7 @@
  static uint32_t pci_bios_io_addr;
  static uint32_t pci_bios_mem_addr;
@@ -521,33 +529,22 @@ Index: ioemu/hw/piix_pci.c
  
  static void pci_config_writel(PCIDevice *d, uint32_t addr, uint32_t val)
  {
-@@ -336,6 +336,14 @@
+@@ -336,6 +336,18 @@
              pci_set_io_region_addr(d, 3, 0x374);
          }
          break;
 +    case 0x0680:
 +        if (vendor_id == 0x8086 && device_id == 0x7113) {
-+            /* PIIX4 ACPI PM */
-+            pci_config_writew(d, 0x20, 0x0000); /* NO smb bus IO enable in PIIX4 */
++            /*
++             * PIIX4 ACPI PM.
++             * Special device with special PCI config space. No ordinary BARs.
++             */
++            pci_config_writew(d, 0x20, 0x0000); // No smb bus IO enable
 +            pci_config_writew(d, 0x22, 0x0000);
-+            goto default_map;
++            pci_config_writew(d, 0x3c, 0x0009); // Hardcoded IRQ9
++            pci_config_writew(d, 0x3d, 0x0001);
 +        }
 +        break;
      case 0x0300:
          if (vendor_id != 0x1234)
              goto default_map;
-@@ -386,6 +394,14 @@
-         pic_irq = pci_irqs[pin];
-         pci_config_writeb(d, PCI_INTERRUPT_LINE, pic_irq);
-     }
-+
-+    if (class== 0x0680&& vendor_id == 0x8086 && device_id == 0x7113) {
-+         // PIIX4 ACPI PM
-+       pci_config_writew(d, 0x20, 0x0000); // NO smb bus IO enable in PIIX4
-+       pci_config_writew(d, 0x22, 0x0000);
-+       pci_config_writew(d, 0x3c, 0x0009); // Hardcodeed IRQ9
-+       pci_config_writew(d, 0x3d, 0x0001);
-+    }
- }
- 
- /*

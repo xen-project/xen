@@ -1,8 +1,8 @@
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2006-08-06 02:21:42.270461924 +0100
-+++ ioemu/Makefile.target	2006-08-06 02:22:26.380544784 +0100
-@@ -355,7 +355,7 @@
+--- ioemu.orig/Makefile.target	2006-12-08 01:41:11.000000000 +0000
++++ ioemu/Makefile.target	2006-12-08 01:41:12.000000000 +0000
+@@ -356,7 +356,7 @@
  # Hardware support
  VL_OBJS+= ide.o pckbd.o ps2.o vga.o $(SOUND_HW) dma.o $(AUDIODRV)
  VL_OBJS+= fdc.o mc146818rtc.o serial.o i8254.o pcspk.o pc.o
@@ -13,8 +13,8 @@ Index: ioemu/Makefile.target
  endif
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2006-08-06 02:22:01.524315611 +0100
-+++ ioemu/hw/pc.c	2006-08-06 02:22:11.875161758 +0100
+--- ioemu.orig/hw/pc.c	2006-12-08 01:41:12.000000000 +0000
++++ ioemu/hw/pc.c	2006-12-08 01:41:12.000000000 +0000
 @@ -39,7 +39,9 @@
  static fdctrl_t *floppy_controller;
  static RTCState *rtc_state;

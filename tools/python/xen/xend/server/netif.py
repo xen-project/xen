@@ -164,7 +164,7 @@ class NetifController(DevController):
             front = { 'handle' : "%i" % devid,
                       'mac'    : mac }
         if ipaddr:
-            back['ip'] = ' '.join(ipaddr)
+            back['ip'] = ipaddr
         if bridge:
             back['bridge'] = bridge
         if vifname:
@@ -189,7 +189,7 @@ class NetifController(DevController):
             network_script_dir = xroot.network_script_dir + os.sep
             result['script'] = script.replace(network_script_dir, "")
         if ip:
-            result['ip'] = ip.split(" ")
+            result['ip'] = ip
         if bridge:
             result['bridge'] = bridge
         if mac:

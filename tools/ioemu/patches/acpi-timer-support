@@ -1,7 +1,7 @@
 Index: ioemu/hw/piix4acpi.c
 ===================================================================
---- ioemu.orig/hw/piix4acpi.c	2006-08-17 19:50:02.407869874 +0100
-+++ ioemu/hw/piix4acpi.c	2006-08-17 19:50:05.060576667 +0100
+--- ioemu.orig/hw/piix4acpi.c	2006-12-08 01:35:52.000000000 +0000
++++ ioemu/hw/piix4acpi.c	2006-12-08 01:35:59.000000000 +0000
 @@ -24,31 +24,30 @@
   */
  
@@ -186,10 +186,3 @@ Index: ioemu/hw/piix4acpi.c
  
  /* PIIX4 acpi pci configuration space, func 2 */
  void pci_piix4_acpi_init(PCIBus *bus, int devfn)
-@@ -384,5 +383,5 @@
-     pci_register_io_region((PCIDevice *)d, 4, 0x10,
-                            PCI_ADDRESS_SPACE_IO, acpi_map);
- 
--    acpi_reset (d);
-+    acpi_reset(d);
- }
