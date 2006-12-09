@@ -2585,6 +2585,7 @@ static int sh_page_fault(struct vcpu *v,
     shadow_l1e_t sl1e, *ptr_sl1e;
     paddr_t gpa;
     struct sh_emulate_ctxt emul_ctxt;
+    struct x86_emulate_ops *emul_ops;
     int r, mmio;
     fetch_type_t ft = 0;
 
@@ -2811,13 +2812,14 @@ static int sh_page_fault(struct vcpu *v,
     return EXCRET_fault_fixed;
 
  emulate:
-    if ( !is_hvm_domain(d) || !guest_mode(regs) )
+    if ( !shadow_mode_refcounts(d) || !guest_mode(regs) )
         goto not_a_shadow_fault;
 
-    hvm_store_cpu_guest_regs(v, regs, NULL);
+    if ( is_hvm_domain(d) )
+        hvm_store_cpu_guest_regs(v, regs, NULL);
     SHADOW_PRINTK("emulate: eip=%#lx\n", regs->eip);
 
-    shadow_init_emulation(&emul_ctxt, regs);
+    emul_ops = shadow_init_emulation(&emul_ctxt, regs);
 
     /*
      * We do not emulate user writes. Instead we use them as a hint that the
@@ -2825,7 +2827,7 @@ static int sh_page_fault(struct vcpu *v,
      * it seems very unlikely that any OS grants user access to page tables.
      */
     if ( (regs->error_code & PFEC_user_mode) ||
-         x86_emulate_memop(&emul_ctxt.ctxt, &shadow_emulator_ops) )
+         x86_emulate_memop(&emul_ctxt.ctxt, emul_ops) )
     {
         SHADOW_PRINTK("emulator failure, unshadowing mfn %#lx\n", 
                        mfn_x(gmfn));
@@ -2837,7 +2839,8 @@ static int sh_page_fault(struct vcpu *v,
     }
 
     /* Emulator has changed the user registers: write back */
-    hvm_load_cpu_guest_regs(v, regs);
+    if ( is_hvm_domain(d) )
+        hvm_load_cpu_guest_regs(v, regs);
     goto done;
 
  mmio:
@@ -3814,9 +3817,10 @@ static inline void * emulate_map_dest(struct vcpu *v,
 
  page_fault:
     errcode |= PFEC_write_access;
-    if ( ring_3(sh_ctxt->ctxt.regs) )
-        errcode |= PFEC_user_mode;
-    hvm_inject_exception(TRAP_page_fault, errcode, vaddr);
+    if ( is_hvm_vcpu(v) )
+        hvm_inject_exception(TRAP_page_fault, errcode, vaddr);
+    else
+        propagate_page_fault(vaddr, errcode);
     return NULL;
 }
 

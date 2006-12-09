@@ -185,15 +185,7 @@ hvm_read(enum x86_segment seg,
     //        In this case, that is only a user vs supervisor access check.
     //
     if ( (rc = hvm_copy_from_guest_virt(val, addr, bytes)) == 0 )
-    {
-#if 0
-        struct vcpu *v = current;
-        SHADOW_PRINTK("d=%u v=%u a=%#lx v=%#lx bytes=%u\n",
-                       v->domain->domain_id, v->vcpu_id, 
-                       addr, *val, bytes);
-#endif
         return X86EMUL_CONTINUE;
-    }
 
     /* If we got here, there was nothing mapped here, or a bad GFN 
      * was mapped here.  This should never happen: we're here because
@@ -206,14 +198,202 @@ hvm_read(enum x86_segment seg,
     return X86EMUL_PROPAGATE_FAULT;
 }
 
-void shadow_init_emulation(struct sh_emulate_ctxt *sh_ctxt, 
-                           struct cpu_user_regs *regs)
+static int
+hvm_emulate_read(enum x86_segment seg,
+                 unsigned long offset,
+                 unsigned long *val,
+                 unsigned int bytes,
+                 struct x86_emulate_ctxt *ctxt)
+{
+    return hvm_read(seg, offset, val, bytes, hvm_access_read,
+                    container_of(ctxt, struct sh_emulate_ctxt, ctxt));
+}
+
+static int
+hvm_emulate_insn_fetch(enum x86_segment seg,
+                       unsigned long offset,
+                       unsigned long *val,
+                       unsigned int bytes,
+                       struct x86_emulate_ctxt *ctxt)
+{
+    struct sh_emulate_ctxt *sh_ctxt =
+        container_of(ctxt, struct sh_emulate_ctxt, ctxt);
+    unsigned int insn_off = offset - ctxt->regs->eip;
+
+    /* Fall back if requested bytes are not in the prefetch cache. */
+    if ( unlikely((insn_off + bytes) > sh_ctxt->insn_buf_bytes) )
+        return hvm_read(seg, offset, val, bytes,
+                        hvm_access_insn_fetch, sh_ctxt);
+
+    /* Hit the cache. Simple memcpy. */
+    *val = 0;
+    memcpy(val, &sh_ctxt->insn_buf[insn_off], bytes);
+    return X86EMUL_CONTINUE;
+}
+
+static int
+hvm_emulate_write(enum x86_segment seg,
+                  unsigned long offset,
+                  unsigned long val,
+                  unsigned int bytes,
+                  struct x86_emulate_ctxt *ctxt)
+{
+    struct sh_emulate_ctxt *sh_ctxt =
+        container_of(ctxt, struct sh_emulate_ctxt, ctxt);
+    struct vcpu *v = current;
+    unsigned long addr;
+    int rc;
+
+    rc = hvm_translate_linear_addr(
+        seg, offset, bytes, hvm_access_write, sh_ctxt, &addr);
+    if ( rc )
+        return rc;
+
+    return v->arch.shadow.mode->x86_emulate_write(
+        v, addr, &val, bytes, sh_ctxt);
+}
+
+static int 
+hvm_emulate_cmpxchg(enum x86_segment seg,
+                    unsigned long offset,
+                    unsigned long old,
+                    unsigned long new,
+                    unsigned int bytes,
+                    struct x86_emulate_ctxt *ctxt)
+{
+    struct sh_emulate_ctxt *sh_ctxt =
+        container_of(ctxt, struct sh_emulate_ctxt, ctxt);
+    struct vcpu *v = current;
+    unsigned long addr;
+    int rc;
+
+    rc = hvm_translate_linear_addr(
+        seg, offset, bytes, hvm_access_write, sh_ctxt, &addr);
+    if ( rc )
+        return rc;
+
+    return v->arch.shadow.mode->x86_emulate_cmpxchg(
+        v, addr, old, new, bytes, sh_ctxt);
+}
+
+static int 
+hvm_emulate_cmpxchg8b(enum x86_segment seg,
+                      unsigned long offset,
+                      unsigned long old_lo,
+                      unsigned long old_hi,
+                      unsigned long new_lo,
+                      unsigned long new_hi,
+                      struct x86_emulate_ctxt *ctxt)
+{
+    struct sh_emulate_ctxt *sh_ctxt =
+        container_of(ctxt, struct sh_emulate_ctxt, ctxt);
+    struct vcpu *v = current;
+    unsigned long addr;
+    int rc;
+
+    rc = hvm_translate_linear_addr(
+        seg, offset, 8, hvm_access_write, sh_ctxt, &addr);
+    if ( rc )
+        return rc;
+
+    return v->arch.shadow.mode->x86_emulate_cmpxchg8b(
+        v, addr, old_lo, old_hi, new_lo, new_hi, sh_ctxt);
+}
+
+static struct x86_emulate_ops hvm_shadow_emulator_ops = {
+    .read       = hvm_emulate_read,
+    .insn_fetch = hvm_emulate_insn_fetch,
+    .write      = hvm_emulate_write,
+    .cmpxchg    = hvm_emulate_cmpxchg,
+    .cmpxchg8b  = hvm_emulate_cmpxchg8b,
+};
+
+static int
+pv_emulate_read(enum x86_segment seg,
+                unsigned long offset,
+                unsigned long *val,
+                unsigned int bytes,
+                struct x86_emulate_ctxt *ctxt)
+{
+    unsigned int rc;
+
+    *val = 0;
+    if ( (rc = copy_from_user((void *)val, (void *)offset, bytes)) != 0 )
+    {
+        propagate_page_fault(offset + bytes - rc, 0); /* read fault */
+        return X86EMUL_PROPAGATE_FAULT;
+    }
+
+    return X86EMUL_CONTINUE;
+}
+
+static int
+pv_emulate_write(enum x86_segment seg,
+                 unsigned long offset,
+                 unsigned long val,
+                 unsigned int bytes,
+                 struct x86_emulate_ctxt *ctxt)
+{
+    struct sh_emulate_ctxt *sh_ctxt =
+        container_of(ctxt, struct sh_emulate_ctxt, ctxt);
+    struct vcpu *v = current;
+    return v->arch.shadow.mode->x86_emulate_write(
+        v, offset, &val, bytes, sh_ctxt);
+}
+
+static int 
+pv_emulate_cmpxchg(enum x86_segment seg,
+                   unsigned long offset,
+                   unsigned long old,
+                   unsigned long new,
+                   unsigned int bytes,
+                   struct x86_emulate_ctxt *ctxt)
+{
+    struct sh_emulate_ctxt *sh_ctxt =
+        container_of(ctxt, struct sh_emulate_ctxt, ctxt);
+    struct vcpu *v = current;
+    return v->arch.shadow.mode->x86_emulate_cmpxchg(
+        v, offset, old, new, bytes, sh_ctxt);
+}
+
+static int 
+pv_emulate_cmpxchg8b(enum x86_segment seg,
+                     unsigned long offset,
+                     unsigned long old_lo,
+                     unsigned long old_hi,
+                     unsigned long new_lo,
+                     unsigned long new_hi,
+                     struct x86_emulate_ctxt *ctxt)
+{
+    struct sh_emulate_ctxt *sh_ctxt =
+        container_of(ctxt, struct sh_emulate_ctxt, ctxt);
+    struct vcpu *v = current;
+    return v->arch.shadow.mode->x86_emulate_cmpxchg8b(
+        v, offset, old_lo, old_hi, new_lo, new_hi, sh_ctxt);
+}
+
+static struct x86_emulate_ops pv_shadow_emulator_ops = {
+    .read       = pv_emulate_read,
+    .insn_fetch = pv_emulate_read,
+    .write      = pv_emulate_write,
+    .cmpxchg    = pv_emulate_cmpxchg,
+    .cmpxchg8b  = pv_emulate_cmpxchg8b,
+};
+
+struct x86_emulate_ops *shadow_init_emulation(
+    struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs)
 {
     struct segment_register *creg;
     struct vcpu *v = current;
     unsigned long addr;
 
     sh_ctxt->ctxt.regs = regs;
+
+    if ( !is_hvm_vcpu(v) )
+    {
+        sh_ctxt->ctxt.mode = X86EMUL_MODE_HOST;
+        return &pv_shadow_emulator_ops;
+    }
 
     /* Segment cache initialisation. Primed with CS. */
     sh_ctxt->valid_seg_regs = 0;
@@ -237,131 +417,9 @@ void shadow_init_emulation(struct sh_emulate_ctxt *sh_ctxt,
          !hvm_copy_from_guest_virt(
              sh_ctxt->insn_buf, addr, sizeof(sh_ctxt->insn_buf)))
         ? sizeof(sh_ctxt->insn_buf) : 0;
+
+    return &hvm_shadow_emulator_ops;
 }
-
-static int
-sh_x86_emulate_read(enum x86_segment seg,
-                    unsigned long offset,
-                    unsigned long *val,
-                    unsigned int bytes,
-                    struct x86_emulate_ctxt *ctxt)
-{
-    return hvm_read(seg, offset, val, bytes, hvm_access_read,
-                    container_of(ctxt, struct sh_emulate_ctxt, ctxt));
-}
-
-static int
-sh_x86_emulate_insn_fetch(enum x86_segment seg,
-                          unsigned long offset,
-                          unsigned long *val,
-                          unsigned int bytes,
-                          struct x86_emulate_ctxt *ctxt)
-{
-    struct sh_emulate_ctxt *sh_ctxt =
-        container_of(ctxt, struct sh_emulate_ctxt, ctxt);
-    unsigned int insn_off = offset - ctxt->regs->eip;
-
-    /* Fall back if requested bytes are not in the prefetch cache. */
-    if ( unlikely((insn_off + bytes) > sh_ctxt->insn_buf_bytes) )
-        return hvm_read(seg, offset, val, bytes,
-                        hvm_access_insn_fetch, sh_ctxt);
-
-    /* Hit the cache. Simple memcpy. */
-    *val = 0;
-    memcpy(val, &sh_ctxt->insn_buf[insn_off], bytes);
-    return X86EMUL_CONTINUE;
-}
-
-static int
-sh_x86_emulate_write(enum x86_segment seg,
-                     unsigned long offset,
-                     unsigned long val,
-                     unsigned int bytes,
-                     struct x86_emulate_ctxt *ctxt)
-{
-    struct sh_emulate_ctxt *sh_ctxt =
-        container_of(ctxt, struct sh_emulate_ctxt, ctxt);
-    struct vcpu *v = current;
-    unsigned long addr;
-    int rc;
-
-    rc = hvm_translate_linear_addr(
-        seg, offset, bytes, hvm_access_write, sh_ctxt, &addr);
-    if ( rc )
-        return rc;
-
-#if 0
-    SHADOW_PRINTK("d=%u v=%u a=%#lx v=%#lx bytes=%u\n",
-                  v->domain->domain_id, v->vcpu_id, addr, val, bytes);
-#endif
-    return v->arch.shadow.mode->x86_emulate_write(
-        v, addr, &val, bytes, sh_ctxt);
-}
-
-static int 
-sh_x86_emulate_cmpxchg(enum x86_segment seg,
-                       unsigned long offset,
-                       unsigned long old,
-                       unsigned long new,
-                       unsigned int bytes,
-                       struct x86_emulate_ctxt *ctxt)
-{
-    struct sh_emulate_ctxt *sh_ctxt =
-        container_of(ctxt, struct sh_emulate_ctxt, ctxt);
-    struct vcpu *v = current;
-    unsigned long addr;
-    int rc;
-
-    rc = hvm_translate_linear_addr(
-        seg, offset, bytes, hvm_access_write, sh_ctxt, &addr);
-    if ( rc )
-        return rc;
-
-#if 0
-    SHADOW_PRINTK("d=%u v=%u a=%#lx o?=%#lx n:=%#lx bytes=%u\n",
-                   v->domain->domain_id, v->vcpu_id, addr, old, new, bytes);
-#endif
-    return v->arch.shadow.mode->x86_emulate_cmpxchg(
-        v, addr, old, new, bytes, sh_ctxt);
-}
-
-static int 
-sh_x86_emulate_cmpxchg8b(enum x86_segment seg,
-                         unsigned long offset,
-                         unsigned long old_lo,
-                         unsigned long old_hi,
-                         unsigned long new_lo,
-                         unsigned long new_hi,
-                         struct x86_emulate_ctxt *ctxt)
-{
-    struct sh_emulate_ctxt *sh_ctxt =
-        container_of(ctxt, struct sh_emulate_ctxt, ctxt);
-    struct vcpu *v = current;
-    unsigned long addr;
-    int rc;
-
-    rc = hvm_translate_linear_addr(
-        seg, offset, 8, hvm_access_write, sh_ctxt, &addr);
-    if ( rc )
-        return rc;
-
-#if 0
-    SHADOW_PRINTK("d=%u v=%u a=%#lx o?=%#lx:%lx n:=%#lx:%lx\n",
-                   v->domain->domain_id, v->vcpu_id, addr, old_hi, old_lo,
-                   new_hi, new_lo, ctxt);
-#endif
-    return v->arch.shadow.mode->x86_emulate_cmpxchg8b(
-        v, addr, old_lo, old_hi, new_lo, new_hi, sh_ctxt);
-}
-
-
-struct x86_emulate_ops shadow_emulator_ops = {
-    .read       = sh_x86_emulate_read,
-    .insn_fetch = sh_x86_emulate_insn_fetch,
-    .write      = sh_x86_emulate_write,
-    .cmpxchg    = sh_x86_emulate_cmpxchg,
-    .cmpxchg8b  = sh_x86_emulate_cmpxchg8b,
-};
 
 /**************************************************************************/
 /* Code for "promoting" a guest page to the point where the shadow code is
