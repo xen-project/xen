@@ -1741,7 +1741,7 @@ class XendDomainInfo:
             raise VmError("VM name '%s' already exists%s" %
                           (name,
                            dom.domid is not None and
-                           ("as domain %s" % str(dom.domid)) or ""))
+                           (" as domain %s" % str(dom.domid)) or ""))
         
 
     def update(self, info = None, refresh = True):
