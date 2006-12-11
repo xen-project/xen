@@ -591,7 +591,9 @@ class XendDomain:
         try:
             self.domains_lock.acquire()
             result = [d.get_uuid() for d in self.domains.values()]
-            result += self.managed_domains.keys()
+            for d in self.managed_domains.keys():
+                if d not in result:
+                    result.append(d)
             return result
         finally:
             self.domains_lock.release()
