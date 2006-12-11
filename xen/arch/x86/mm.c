@@ -435,15 +435,6 @@ int map_ldt_shadow_page(unsigned int off)
         return 0;
 
     okay = get_page_and_type(mfn_to_page(mfn), d, PGT_ldt_page);
-
-    if ( !okay && unlikely(shadow_mode_refcounts(d)) )
-    {
-        shadow_lock(d);
-        shadow_remove_write_access(d->vcpu[0], _mfn(mfn), 0, 0);
-        okay = get_page_and_type(mfn_to_page(mfn), d, PGT_ldt_page);
-        shadow_unlock(d);
-    }
-
     if ( unlikely(!okay) )
         return 0;
 
@@ -508,8 +499,6 @@ get_linear_pagetable(
     unsigned long x, y;
     struct page_info *page;
     unsigned long pfn;
-
-    ASSERT( !shadow_mode_refcounts(d) );
 
     if ( (root_get_flags(re) & _PAGE_RW) )
     {
@@ -821,8 +810,6 @@ static int alloc_l1_table(struct page_info *page)
     l1_pgentry_t  *pl1e;
     int            i;
 
-    ASSERT(!shadow_mode_refcounts(d));
-
     pl1e = map_domain_page(pfn);
 
     for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
@@ -873,8 +860,6 @@ static int create_pae_xen_mappings(l3_pgentry_t *pl3e)
      *  2. Cannot appear in another page table's L3:
      *     a. alloc_l3_table() calls this function and this check will fail
      *     b. mod_l3_entry() disallows updates to slot 3 in an existing table
-     *
-     * XXX -- this needs revisiting for shadow_mode_refcount()==true...
      */
     page = l3e_get_page(l3e3);
     BUG_ON(page->u.inuse.type_info & PGT_pinned);
@@ -959,8 +944,6 @@ static int alloc_l2_table(struct page_info *page, unsigned long type)
     l2_pgentry_t  *pl2e;
     int            i;
 
-    ASSERT(!shadow_mode_refcounts(d));
-    
     pl2e = map_domain_page(pfn);
 
     for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
@@ -1007,8 +990,6 @@ static int alloc_l3_table(struct page_info *page)
     unsigned long  pfn = page_to_mfn(page);
     l3_pgentry_t  *pl3e;
     int            i;
-
-    ASSERT(!shadow_mode_refcounts(d));
 
 #ifdef CONFIG_X86_PAE
     /*
@@ -1074,8 +1055,6 @@ static int alloc_l4_table(struct page_info *page)
     unsigned long  pfn = page_to_mfn(page);
     l4_pgentry_t  *pl4e = page_to_virt(page);
     int            i;
-
-    ASSERT(!shadow_mode_refcounts(d));
 
     for ( i = 0; i < L4_PAGETABLE_ENTRIES; i++ )
     {
