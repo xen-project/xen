@@ -48,6 +48,13 @@ typedef l3_pgentry_t root_pgentry_t;
     while ( (__npte = cmpxchg((intpte_t *)(ptep), __pte, (pte))) != __pte ) \
         __pte = __npte;                                                     \
 } while ( 0 )
+#define pte_write(ptep, pte) do {               \
+    *((u32 *)(ptep)+0) = 0;                     \
+    wmb();                                      \
+    *((u32 *)(ptep)+1) = (pte) >> 32;           \
+    wmb();                                      \
+    *((u32 *)(ptep)+0) = (pte) >>  0;           \
+} while ( 0 )
 
 /* root table */
 #define root_get_pfn              l3e_get_pfn

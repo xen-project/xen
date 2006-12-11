@@ -18,3 +18,5 @@ obj-y += unwind.o
 obj-y += iosapic.o
 obj-y += numa.o
 obj-y += mm_numa.o
+obj-y += perfmon.o
+obj-y += perfmon_default_smpl.o

@@ -58,17 +58,6 @@ $(BASEDIR)/include/asm-ia64/.offsets.h.stamp:
 	 || ln -sf $(BASEDIR)/include/xen $(BASEDIR)/include/linux
 	[ -e $(BASEDIR)/include/asm-ia64/xen ] \
 	 || ln -sf $(BASEDIR)/include/asm-ia64/linux $(BASEDIR)/include/asm-ia64/xen
-# Link to HVM files in Xen for ia64/vti
-	[ -e $(BASEDIR)/include/asm-ia64/hvm/support.h ] \
-	 || ln -sf ../../../include/asm-x86/hvm/support.h $(BASEDIR)/include/asm-ia64/hvm/support.h
-	[ -e $(BASEDIR)/include/asm-ia64/hvm/io.h ] \
-	 || ln -sf ../../../include/asm-x86/hvm/io.h $(BASEDIR)/include/asm-ia64/hvm/io.h
-	[ -e $(BASEDIR)/include/asm-ia64/hvm/vpic.h ] \
-	 || ln -sf ../../../include/asm-x86/hvm/vpic.h $(BASEDIR)/include/asm-ia64/hvm/vpic.h
-	[ -e $(BASEDIR)/include/asm-ia64/hvm/vioapic.h ] \
-	 || ln -sf ../../../include/asm-x86/hvm/vioapic.h $(BASEDIR)/include/asm-ia64/hvm/vioapic.h
-	[ -e $(BASEDIR)/arch/ia64/vmx/hvm_vioapic.c ] \
-	 || ln -sf ../../../arch/x86/hvm/vioapic.c $(BASEDIR)/arch/ia64/vmx/hvm_vioapic.c
 
 # I'm sure a Makefile wizard would know a better way to do this
 xen.lds.s: xen/xen.lds.S
@@ -80,8 +69,3 @@ clean::
 	rm -f *.o *~ core  xen.lds.s $(BASEDIR)/include/asm-ia64/.offsets.h.stamp asm-offsets.s map.out
 	rm -f asm-xsi-offsets.s $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h
 	rm -f $(BASEDIR)/System.map
-	rm -f vmx/hvm_*.c
-	rm -f $(BASEDIR)/include/asm-ia64/hvm/support.h
-	rm -f $(BASEDIR)/include/asm-ia64/hvm/io.h
-	rm -f $(BASEDIR)/include/asm-ia64/hvm/vpic.h
-	rm -f $(BASEDIR)/include/asm-ia64/hvm/vioapic.h

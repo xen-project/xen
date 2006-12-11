@@ -197,6 +197,16 @@ int xen_assign_irq_vector(int irq)
 
 	return irq_op.vector;
 }
+
+void xen_free_irq_vector(int vector)
+{
+	struct physdev_irq irq_op;
+
+	irq_op.vector = vector;
+	if (HYPERVISOR_physdev_op(PHYSDEVOP_free_irq_vector, &irq_op))
+		printk(KERN_WARNING "%s: xen_free_irq_vecotr fail vector=%d\n",
+		       __FUNCTION__, vector);
+}
 #endif /* XEN */
 
 /*

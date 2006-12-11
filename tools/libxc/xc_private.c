@@ -7,6 +7,82 @@
 #include <inttypes.h>
 #include "xc_private.h"
 #include "xg_private.h"
+#include <stdarg.h>
+#include <pthread.h>
+
+static __thread xc_error last_error = { XC_ERROR_NONE, ""};
+#if DEBUG
+static xc_error_handler error_handler = xc_default_error_handler;
+#else
+static xc_error_handler error_handler = NULL;
+#endif
+
+void xc_default_error_handler(const xc_error const *err)
+{
+    const char *desc = xc_error_code_to_desc(err->code);
+    fprintf(stderr, "ERROR %s: %s\n", desc, err->message);
+}
+
+const xc_error const *xc_get_last_error(void)
+{
+    return &last_error;
+}
+
+void xc_clear_last_error(void)
+{
+    last_error.code = XC_ERROR_NONE;
+    last_error.message[0] = '\0';
+}
+
+const char *xc_error_code_to_desc(int code)
+{
+    /* Sync to members of xc_error_code enumeration in xenctrl.h */
+    switch ( code )
+    {
+    case XC_ERROR_NONE:
+        return "No error details";
+    case XC_INTERNAL_ERROR:
+        return "Internal error";
+    case XC_INVALID_KERNEL:
+        return "Invalid kernel";
+    }
+
+    return "Unknown error code";
+}
+
+xc_error_handler xc_set_error_handler(xc_error_handler handler)
+{
+    xc_error_handler old = error_handler;
+    error_handler = handler;
+    return old;
+}
+
+
+static void _xc_set_error(int code, const char *msg)
+{
+    last_error.code = code;
+    strncpy(last_error.message, msg, XC_MAX_ERROR_MSG_LEN - 1);
+    last_error.message[XC_MAX_ERROR_MSG_LEN-1] = '\0';
+}
+
+void xc_set_error(int code, const char *fmt, ...)
+{
+    int saved_errno = errno;
+    char msg[XC_MAX_ERROR_MSG_LEN];
+    va_list args;
+
+    va_start(args, fmt);
+    vsnprintf(msg, XC_MAX_ERROR_MSG_LEN-1, fmt, args);
+    msg[XC_MAX_ERROR_MSG_LEN-1] = '\0';
+    va_end(args);
+
+    _xc_set_error(code, msg);
+
+    errno = saved_errno;
+
+    if ( error_handler != NULL )
+        error_handler(&last_error);
+}
 
 int lock_pages(void *addr, size_t len)
 {
@@ -405,6 +481,25 @@ unsigned long xc_make_page_below_4G(
     }
 
     return new_mfn;
+}
+
+char *safe_strerror(int errcode)
+{
+    static __thread char errbuf[32];
+    static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+    char *strerror_str;
+
+    /*
+     * Thread-unsafe strerror() is protected by a local mutex. We copy
+     * the string to a thread-private buffer before releasing the mutex.
+     */
+    pthread_mutex_lock(&mutex);
+    strerror_str = strerror(errcode);
+    strncpy(errbuf, strerror_str, sizeof(errbuf));
+    errbuf[sizeof(errbuf)-1] = '\0';
+    pthread_mutex_unlock(&mutex);
+
+    return errbuf;
 }
 
 /*

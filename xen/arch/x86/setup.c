@@ -305,6 +305,9 @@ void __init __start_xen(multiboot_info_t *mbi)
         .stop_bits = 1
     };
 
+    extern void early_page_fault(void);
+    set_intr_gate(TRAP_page_fault, &early_page_fault);
+
     /* Parse the command-line options. */
     if ( (mbi->flags & MBI_CMDLINE) && (mbi->cmdline != 0) )
         cmdline = __va(mbi->cmdline);
@@ -501,21 +504,19 @@ void __init __start_xen(multiboot_info_t *mbi)
         kdump_start >>= PAGE_SHIFT;
         kdump_size >>= PAGE_SHIFT;
 
-        /* allocate pages for Kdump memory area */
+        /* Allocate pages for Kdump memory area. */
 
         k = alloc_boot_pages_at(kdump_size, kdump_start);
-
         if ( k != kdump_start )
             panic("Unable to reserve Kdump memory\n");
 
-        /* allocate pages for relocated initial images */
+        /* Allocate pages for relocated initial images. */
 
         k = ((initial_images_end - initial_images_start) & ~PAGE_MASK) ? 1 : 0;
         k += (initial_images_end - initial_images_start) >> PAGE_SHIFT;
 
         k = alloc_boot_pages(k, 1);
-
-        if ( !k )
+        if ( k == 0 )
             panic("Unable to allocate initial images memory\n");
 
         move_memory(k << PAGE_SHIFT, initial_images_start, initial_images_end);

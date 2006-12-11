@@ -238,7 +238,11 @@ void domain_kill(struct domain *d)
 
 void __domain_crash(struct domain *d)
 {
-    if ( d == current->domain )
+    if ( test_bit(_DOMF_shutdown, &d->domain_flags) )
+    {
+        /* Print nothing: the domain is already shutting down. */
+    }
+    else if ( d == current->domain )
     {
         printk("Domain %d (vcpu#%d) crashed on cpu#%d:\n",
                d->domain_id, current->vcpu_id, smp_processor_id());

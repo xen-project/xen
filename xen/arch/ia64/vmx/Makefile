@@ -1,4 +1,4 @@
-obj-y += hvm_vioapic.o
+obj-y += viosapic.o
 #obj-y += mm.o
 obj-y += mmio.o
 obj-y += pal_emul.o

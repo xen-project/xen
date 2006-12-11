@@ -278,6 +278,8 @@ class Daemon:
             modulename = m.group(1)
             if re.search('sxp.py', modulename):
                 return None
+            if re.search('SrvServer.py', modulename):
+                return None
             self.traceindent += 1
             self.print_trace("> %s:%s\n"
                              % (modulename, code.co_name))

@@ -347,13 +347,13 @@ xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                         page_array[N], N, max_pfn);
 
             mem = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                       PROT_READ|PROT_WRITE, page_array[N]);
+                                       PROT_READ|PROT_WRITE, N);
             if (mem == NULL) {
                 /* The page may have move.
                    It will be remarked dirty.
                    FIXME: to be tracked.  */
-                fprintf(stderr, "cannot map page %lx: %s\n",
-                        page_array[N], strerror (errno));
+                fprintf(stderr, "cannot map mfn page %lx gpfn %lx: %s\n",
+                        page_array[N], N, safe_strerror(errno));
                 continue;
             }
 

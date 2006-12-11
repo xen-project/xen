@@ -63,7 +63,7 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
 {
     DECLARE_DOMCTL;
     int rc = 1, i;
-    unsigned long mfn, pfn;
+    unsigned long gmfn;
     unsigned long ver;
 
     /* The new domain's shared-info frame number. */
@@ -99,28 +99,29 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
         return 1;
     }
 
-    /* Get the domain's shared-info frame. */
-    domctl.cmd = XEN_DOMCTL_getdomaininfo;
-    domctl.domain = (domid_t)dom;
-    if (xc_domctl(xc_handle, &domctl) < 0) {
-        ERROR("Could not get information on new domain");
-        goto out;
-    }
-    shared_info_frame = domctl.u.getdomaininfo.shared_info_frame;
-
     if (xc_domain_setmaxmem(xc_handle, dom, PFN_TO_KB(max_pfn)) != 0) {
         errno = ENOMEM;
         goto out;
     }
 
-    if (xc_domain_memory_increase_reservation(xc_handle, dom, max_pfn,
-                                              0, 0, NULL) != 0) {
-        ERROR("Failed to increase reservation by %ld KB", PFN_TO_KB(max_pfn));
-        errno = ENOMEM;
+    /* Get pages.  */
+    page_array = malloc(max_pfn * sizeof(unsigned long));
+    if (page_array == NULL) {
+        ERROR("Could not allocate memory");
         goto out;
     }
 
-    DPRINTF("Increased domain reservation by %ld KB\n", PFN_TO_KB(max_pfn));
+    for ( i = 0; i < max_pfn; i++ )
+        page_array[i] = i;
+
+    if ( xc_domain_memory_populate_physmap(xc_handle, dom, max_pfn,
+                                           0, 0, page_array) )
+    {
+        ERROR("Failed to allocate memory for %ld KB to dom %d.\n",
+              PFN_TO_KB(max_pfn), dom);
+        goto out;
+    }
+    DPRINTF("Allocated memory by %ld KB\n", PFN_TO_KB(max_pfn));
 
     if (!read_exact(io_fd, &domctl.u.arch_setup, sizeof(domctl.u.arch_setup))) {
         ERROR("read: domain setup");
@@ -138,34 +139,28 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
     if (xc_domctl(xc_handle, &domctl))
         goto out;
 
-    /* Get pages.  */
-    page_array = malloc(max_pfn * sizeof(unsigned long));
-    if (page_array == NULL ) {
-        ERROR("Could not allocate memory");
+    /* Get the domain's shared-info frame. */
+    domctl.cmd = XEN_DOMCTL_getdomaininfo;
+    domctl.domain = (domid_t)dom;
+    if (xc_domctl(xc_handle, &domctl) < 0) {
+        ERROR("Could not get information on new domain");
         goto out;
     }
-
-    if (xc_ia64_get_pfn_list(xc_handle, dom, page_array,
-                             0, max_pfn) != max_pfn) {
-        ERROR("Could not get the page frame list");
-        goto out;
-    }
+    shared_info_frame = domctl.u.getdomaininfo.shared_info_frame;
 
     DPRINTF("Reloading memory pages:   0%%\n");
 
     while (1) {
-        if (!read_exact(io_fd, &mfn, sizeof(unsigned long))) {
+        if (!read_exact(io_fd, &gmfn, sizeof(unsigned long))) {
             ERROR("Error when reading batch size");
             goto out;
         }
-	if (mfn == INVALID_MFN)
+	if (gmfn == INVALID_MFN)
 		break;
 
-	pfn = page_array[mfn];
+       //DPRINTF("xc_linux_restore: page %lu/%lu at %lx\n", gmfn, max_pfn, pfn);
 
-        //DPRINTF("xc_linux_restore: page %lu/%lu at %lx\n", mfn, max_pfn, pfn);
-
-	if (read_page(xc_handle, io_fd, dom, page_array[mfn]) < 0)
+	if (read_page(xc_handle, io_fd, dom, gmfn) < 0)
 		goto out;
     }
 
@@ -279,19 +274,19 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
     for (i = 0; i < MAX_VIRT_CPUS; i++)
         shared_info->vcpu_info[i].evtchn_pending_sel = 0;
 
-    mfn = page_array[shared_info->arch.start_info_pfn];
+    gmfn = shared_info->arch.start_info_pfn;
 
     munmap (shared_info, PAGE_SIZE);
 
     /* Uncanonicalise the suspend-record frame number and poke resume rec. */
     start_info = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                      PROT_READ | PROT_WRITE, mfn);
+                                      PROT_READ | PROT_WRITE, gmfn);
     start_info->nr_pages = max_pfn;
     start_info->shared_info = shared_info_frame << PAGE_SHIFT;
     start_info->flags = 0;
-    *store_mfn = page_array[start_info->store_mfn];
+    *store_mfn = start_info->store_mfn;
     start_info->store_evtchn = store_evtchn;
-    *console_mfn = page_array[start_info->console.domU.mfn];
+    *console_mfn = start_info->console.domU.mfn;
     start_info->console.domU.evtchn = console_evtchn;
     munmap(start_info, PAGE_SIZE);
 
@@ -315,7 +310,8 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
     if ((rc != 0) && (dom != 0))
         xc_domain_destroy(xc_handle, dom);
 
-    free (page_array);
+    if (page_array != NULL)
+	    free(page_array);
 
     DPRINTF("Restore exit with rc=%d\n", rc);
 

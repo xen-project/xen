@@ -821,8 +821,9 @@ class XendAPI:
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_todo()
     
-    def VM_set_name_label(self, session, vm_ref):
+    def VM_set_name_label(self, session, vm_ref, label):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
+        dom.setName(label)
         return xen_api_success_void()
     
     def VM_set_name_description(self, session, vm_ref):
@@ -1035,8 +1036,8 @@ class XendAPI:
     #       regular xm created VBDs
 
     VBD_attr_ro = ['image',
-                   'IO_bandwidth_incoming_kbs',
-                   'IO_bandwidth_outgoing_kbs']
+                   'io_read_kbs',
+                   'io_write_kbs']
     VBD_attr_rw = ['VM',
                    'VDI',
                    'device',
@@ -1056,7 +1057,16 @@ class XendAPI:
         cfg = vm.get_dev_xenapi_config('vbd', vbd_ref)
         if not cfg:
             return xen_api_error(XEND_ERROR_VBD_INVALID)
-        return xen_api_success(cfg)
+
+        valid_vbd_keys = self.VBD_attr_ro + self.VBD_attr_rw + \
+                         self.Base_attr_ro + self.Base_attr_rw
+
+        return_cfg = {}
+        for k in cfg.keys():
+            if k in valid_vbd_keys:
+                return_cfg[k] = cfg[k]
+                
+        return xen_api_success(return_cfg)
 
     def VBD_media_change(self, session, vbd_ref, vdi_ref):
         return xen_api_error(XEND_ERROR_UNSUPPORTED)
@@ -1112,10 +1122,8 @@ class XendAPI:
     # Xen API: Class VIF
     # ----------------------------------------------------------------
 
-    VIF_attr_ro = ['network_read_kbs',
-                   'network_write_kbs',
-                   'IO_bandwidth_incoming_kbs',
-                   'IO_bandwidth_outgoing_kbs']
+    VIF_attr_ro = ['io_read_kbs',
+                   'io_write_kbs']
     VIF_attr_rw = ['name',
                    'type',
                    'device',
@@ -1135,13 +1143,16 @@ class XendAPI:
         cfg = vm.get_dev_xenapi_config('vif', vif_ref)
         if not cfg:
             return xen_api_error(XEND_ERROR_VIF_INVALID)
+        
         valid_vif_keys = self.VIF_attr_ro + self.VIF_attr_rw + \
                          self.Base_attr_ro + self.Base_attr_rw
+
+        return_cfg = {}
         for k in cfg.keys():
-            if k not in valid_vif_keys:
-                del cfg[k]
+            if k in valid_vif_keys:
+                return_cfg[k] = cfg[k]
             
-        return xen_api_success(cfg)
+        return xen_api_success(return_cfg)
 
     # class methods
     def VIF_create(self, session, vif_struct):

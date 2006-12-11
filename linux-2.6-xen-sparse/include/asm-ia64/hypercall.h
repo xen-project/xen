@@ -271,6 +271,12 @@ HYPERVISOR_physdev_op(int cmd, void *arg)
 	}
 }
 
+static inline int
+xencomm_arch_hypercall_xenoprof_op(int op, struct xencomm_handle *arg)
+{
+	return _hypercall2(int, xenoprof_op, op, arg);
+}
+
 extern fastcall unsigned int __do_IRQ(unsigned int irq, struct pt_regs *regs);
 static inline void exit_idle(void) {}
 #define do_IRQ(irq, regs) ({			\
@@ -381,6 +387,28 @@ HYPERVISOR_add_physmap(unsigned long gpfn, unsigned long mfn,
 	return ret;
 }
 
+static inline unsigned long
+__HYPERVISOR_add_physmap_with_gmfn(unsigned long gpfn, unsigned long gmfn,
+                                   unsigned long flags, domid_t domid)
+{
+	return _hypercall5(unsigned long, ia64_dom0vp_op,
+	                   IA64_DOM0VP_add_physmap_with_gmfn,
+	                   gpfn, gmfn, flags, domid);
+}
+
+static inline unsigned long
+HYPERVISOR_add_physmap_with_gmfn(unsigned long gpfn, unsigned long gmfn,
+				 unsigned long flags, domid_t domid)
+{
+	unsigned long ret = 0;
+	BUG_ON(!is_running_on_xen());//XXX
+	if (is_running_on_xen()) {
+		ret = __HYPERVISOR_add_physmap_with_gmfn(gpfn, gmfn,
+		                                         flags, domid);
+	}
+	return ret;
+}
+
 #ifdef CONFIG_XEN_IA64_EXPOSE_P2M
 static inline unsigned long
 HYPERVISOR_expose_p2m(unsigned long conv_start_gpfn,
@@ -392,6 +420,15 @@ HYPERVISOR_expose_p2m(unsigned long conv_start_gpfn,
 	                   assign_start_gpfn, expose_size, granule_pfn);
 }
 #endif
+
+static inline int
+xencomm_arch_hypercall_perfmon_op(unsigned long cmd,
+                                  struct xencomm_handle *arg,
+                                  unsigned long count)
+{
+	return _hypercall4(int, ia64_dom0vp_op,
+			   IA64_DOM0VP_perfmon, cmd, arg, count);
+}
 
 // for balloon driver
 #define HYPERVISOR_update_va_mapping(va, new_val, flags) (0)
@@ -406,6 +443,8 @@ HYPERVISOR_expose_p2m(unsigned long conv_start_gpfn,
 #define HYPERVISOR_console_io xencomm_mini_hypercall_console_io
 #define HYPERVISOR_hvm_op xencomm_mini_hypercall_hvm_op
 #define HYPERVISOR_memory_op xencomm_mini_hypercall_memory_op
+#define HYPERVISOR_xenoprof_op xencomm_mini_hypercall_xenoprof_op
+#define HYPERVISOR_perfmon_op xencomm_mini_hypercall_perfmon_op
 #else
 #define HYPERVISOR_sched_op xencomm_hypercall_sched_op
 #define HYPERVISOR_event_channel_op xencomm_hypercall_event_channel_op
@@ -415,6 +454,8 @@ HYPERVISOR_expose_p2m(unsigned long conv_start_gpfn,
 #define HYPERVISOR_console_io xencomm_hypercall_console_io
 #define HYPERVISOR_hvm_op xencomm_hypercall_hvm_op
 #define HYPERVISOR_memory_op xencomm_hypercall_memory_op
+#define HYPERVISOR_xenoprof_op xencomm_hypercall_xenoprof_op
+#define HYPERVISOR_perfmon_op xencomm_hypercall_perfmon_op
 #endif
 
 #define HYPERVISOR_suspend xencomm_hypercall_suspend

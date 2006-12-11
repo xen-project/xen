@@ -12,11 +12,11 @@ build:
 ifndef XEN_PYTHON_NATIVE_INSTALL
 install: all
 	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py install --home="$(DESTDIR)/usr" --prefix=""
-	$(INSTALL_DIR) -p $(DESTDIR)/var/lib/xen
+	$(INSTALL_DIR) -p $(DESTDIR)/var/run/xend/boot
 else
 install: all
 	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py install --root="$(DESTDIR)"
-	$(INSTALL_DIR) -p $(DESTDIR)/var/lib/xen
+	$(INSTALL_DIR) -p $(DESTDIR)/var/run/xend/boot
 endif
 
 .PHONY: clean

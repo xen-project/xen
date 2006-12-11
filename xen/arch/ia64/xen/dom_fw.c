@@ -240,6 +240,23 @@ acpi_update_lsapic (acpi_table_entry_header *header, const unsigned long end)
 	return 0;
 }
 
+static int __init
+acpi_patch_plat_int_src (
+	acpi_table_entry_header *header, const unsigned long end)
+{
+	struct acpi_table_plat_int_src *plintsrc;
+
+	plintsrc = (struct acpi_table_plat_int_src *)header;
+	if (!plintsrc)
+		return -EINVAL;
+
+	if (plintsrc->type == ACPI_INTERRUPT_CPEI) {
+		printk("ACPI_INTERRUPT_CPEI disabled for Domain0\n");
+		plintsrc->type = -1;
+	}
+	return 0;
+}
+
 static u8
 generate_acpi_checksum(void *tbl, unsigned long len)
 {
@@ -271,7 +288,11 @@ static void touch_acpi_table(void)
 {
 	lsapic_nbr = 0;
 	if (acpi_table_parse_madt(ACPI_MADT_LSAPIC, acpi_update_lsapic, 0) < 0)
-		printk("Error parsing MADT - no LAPIC entires\n");
+		printk("Error parsing MADT - no LAPIC entries\n");
+	if (acpi_table_parse_madt(ACPI_MADT_PLAT_INT_SRC,
+	                          acpi_patch_plat_int_src, 0) < 0)
+		printk("Error parsing MADT - no PLAT_INT_SRC entries\n");
+
 	acpi_table_parse(ACPI_APIC, acpi_update_madt_checksum);
 
 	return;

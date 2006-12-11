@@ -244,17 +244,22 @@ asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
 
 static int find_unbound_irq(void)
 {
-	int irq;
+	static int warned;
+	int dynirq, irq;
 
-	/* Only allocate from dynirq range */
-	for (irq = DYNIRQ_BASE; irq < NR_IRQS; irq++)
+	for (dynirq = 0; dynirq < NR_DYNIRQS; dynirq++) {
+		irq = dynirq_to_irq(dynirq);
 		if (irq_bindcount[irq] == 0)
-			break;
+			return irq;
+	}
 
-	if (irq == NR_IRQS)
-		panic("No available IRQ to bind to: increase NR_IRQS!\n");
+	if (!warned) {
+		warned = 1;
+		printk(KERN_WARNING "No available IRQ to bind to: "
+		       "increase NR_DYNIRQS.\n");
+	}
 
-	return irq;
+	return -ENOSPC;
 }
 
 static int bind_evtchn_to_irq(unsigned int evtchn)
@@ -264,15 +269,17 @@ static int bind_evtchn_to_irq(unsigned int evtchn)
 	spin_lock(&irq_mapping_update_lock);
 
 	if ((irq = evtchn_to_irq[evtchn]) == -1) {
-		irq = find_unbound_irq();
+		if ((irq = find_unbound_irq()) < 0)
+			goto out;
+
 		evtchn_to_irq[evtchn] = irq;
 		irq_info[irq] = mk_irq_info(IRQT_EVTCHN, 0, evtchn);
 	}
 
 	irq_bindcount[irq]++;
 
+ out:
 	spin_unlock(&irq_mapping_update_lock);
-
 	return irq;
 }
 
@@ -284,6 +291,9 @@ static int bind_virq_to_irq(unsigned int virq, unsigned int cpu)
 	spin_lock(&irq_mapping_update_lock);
 
 	if ((irq = per_cpu(virq_to_irq, cpu)[virq]) == -1) {
+		if ((irq = find_unbound_irq()) < 0)
+			goto out;
+
 		bind_virq.virq = virq;
 		bind_virq.vcpu = cpu;
 		if (HYPERVISOR_event_channel_op(EVTCHNOP_bind_virq,
@@ -291,7 +301,6 @@ static int bind_virq_to_irq(unsigned int virq, unsigned int cpu)
 			BUG();
 		evtchn = bind_virq.port;
 
-		irq = find_unbound_irq();
 		evtchn_to_irq[evtchn] = irq;
 		irq_info[irq] = mk_irq_info(IRQT_VIRQ, virq, evtchn);
 
@@ -302,8 +311,8 @@ static int bind_virq_to_irq(unsigned int virq, unsigned int cpu)
 
 	irq_bindcount[irq]++;
 
+ out:
 	spin_unlock(&irq_mapping_update_lock);
-
 	return irq;
 }
 
@@ -315,13 +324,15 @@ static int bind_ipi_to_irq(unsigned int ipi, unsigned int cpu)
 	spin_lock(&irq_mapping_update_lock);
 
 	if ((irq = per_cpu(ipi_to_irq, cpu)[ipi]) == -1) {
+		if ((irq = find_unbound_irq()) < 0)
+			goto out;
+
 		bind_ipi.vcpu = cpu;
 		if (HYPERVISOR_event_channel_op(EVTCHNOP_bind_ipi,
 						&bind_ipi) != 0)
 			BUG();
 		evtchn = bind_ipi.port;
 
-		irq = find_unbound_irq();
 		evtchn_to_irq[evtchn] = irq;
 		irq_info[irq] = mk_irq_info(IRQT_IPI, ipi, evtchn);
 
@@ -332,8 +343,8 @@ static int bind_ipi_to_irq(unsigned int ipi, unsigned int cpu)
 
 	irq_bindcount[irq]++;
 
+ out:
 	spin_unlock(&irq_mapping_update_lock);
-
 	return irq;
 }
 
@@ -383,6 +394,9 @@ int bind_evtchn_to_irqhandler(
 	int retval;
 
 	irq = bind_evtchn_to_irq(evtchn);
+	if (irq < 0)
+		return irq;
+
 	retval = request_irq(irq, handler, irqflags, devname, dev_id);
 	if (retval != 0) {
 		unbind_from_irq(irq);
@@ -405,6 +419,9 @@ int bind_virq_to_irqhandler(
 	int retval;
 
 	irq = bind_virq_to_irq(virq, cpu);
+	if (irq < 0)
+		return irq;
+
 	retval = request_irq(irq, handler, irqflags, devname, dev_id);
 	if (retval != 0) {
 		unbind_from_irq(irq);
@@ -427,6 +444,9 @@ int bind_ipi_to_irqhandler(
 	int retval;
 
 	irq = bind_ipi_to_irq(ipi, cpu);
+	if (irq < 0)
+		return irq;
+
 	retval = request_irq(irq, handler, irqflags, devname, dev_id);
 	if (retval != 0) {
 		unbind_from_irq(irq);

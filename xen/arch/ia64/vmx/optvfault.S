@@ -209,7 +209,10 @@ GLOBAL_ENTRY(vmx_asm_rsm)
     dep.z r28=4,61,3
     ;;
     mov rr[r0]=r26
+    ;;
     mov rr[r28]=r27
+    ;;
+    srlz.d
     br.many vmx_resume_to_guest
 END(vmx_asm_rsm)
 
@@ -260,9 +263,10 @@ GLOBAL_ENTRY(vmx_asm_ssm)
     dep.z r28=4,61,3
     ;;
     mov rr[r0]=r26
+    ;;
     mov rr[r28]=r27
     ;;
-    srlz.i
+    srlz.d
     ;;
 vmx_asm_ssm_1:
     tbit.nz p6,p0=r29,IA64_PSR_I_BIT
@@ -341,9 +345,10 @@ vmx_asm_mov_to_psr_back:
     dep.z r28=4,61,3
     ;;
     mov rr[r0]=r26
+    ;;
     mov rr[r28]=r27
     ;;
-    srlz.i
+    srlz.d
     ;;
 vmx_asm_mov_to_psr_1:
     mov r20=cr.ipsr

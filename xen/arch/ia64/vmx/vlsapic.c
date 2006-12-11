@@ -25,10 +25,8 @@
 #include <asm/ia64_int.h>
 #include <asm/vcpu.h>
 #include <asm/regionreg.h>
-#include <asm/tlb.h>
 #include <asm/processor.h>
 #include <asm/delay.h>
-#include <asm/vmx_vcpu.h>
 #include <asm/vmx_vcpu.h>
 #include <asm/regs.h>
 #include <asm/gcc_intrin.h>
@@ -38,8 +36,16 @@
 #include <asm/vmx_pal_vsa.h>
 #include <asm/kregs.h>
 #include <asm/vmx_platform.h>
-#include <asm/hvm/vioapic.h>
+#include <asm/viosapic.h>
+#include <asm/vlsapic.h>
 #include <asm/linux/jiffies.h>
+#include <xen/domain.h>
+
+#ifdef IPI_DEBUG
+#define IPI_DPRINTK(x...) printk(x)
+#else
+#define IPI_DPRINTK(x...)
+#endif
 
 //u64  fire_itc;
 //u64  fire_itc2;
@@ -103,8 +109,10 @@ static int vmx_vcpu_unpend_interrupt(VCPU *vcpu, uint8_t vector)
     ret = test_and_clear_bit(vector, &VCPU(vcpu, irr[0]));
     local_irq_restore(spsr);
 
-    if (ret)
+    if (ret) {
         vcpu->arch.irq_new_pending = 1;
+        wmb();
+    }
 
     return ret;
 }
@@ -114,16 +122,13 @@ static int vmx_vcpu_unpend_interrupt(VCPU *vcpu, uint8_t vector)
  */
 static uint64_t now_itc(vtime_t *vtm)
 {
-        uint64_t guest_itc=vtm->vtm_offset+ia64_get_itc();
-        
-        if ( vtm->vtm_local_drift ) {
-//          guest_itc -= vtm->vtm_local_drift;
-        }       
-        if (guest_itc >= vtm->last_itc)
-            return guest_itc;
-        else
-            /* guest ITC backwarded due after LP switch */
-            return vtm->last_itc;
+    uint64_t guest_itc = vtm->vtm_offset + ia64_get_itc();
+
+    if (guest_itc >= vtm->last_itc)
+        return guest_itc;
+    else
+        /* guest ITC went backward due to LP switch */
+        return vtm->last_itc;
 }
 
 /*
@@ -173,7 +178,7 @@ void vtm_init(VCPU *vcpu)
 {
     vtime_t     *vtm;
     uint64_t    itc_freq;
-    
+
     vtm = &VMX(vcpu, vtm);
 
     itc_freq = local_cpu_data->itc_freq;
@@ -261,99 +266,6 @@ void vtm_set_itv(VCPU *vcpu, uint64_t val)
 }
 
 
-/*
- * Update interrupt or hook the vtm timer for fire
- * At this point vtm_timer should be removed if itv is masked.
- */
-/* Interrupt must be disabled at this point */
-/*
-void vtm_interruption_update(VCPU *vcpu, vtime_t* vtm)
-{
-    uint64_t    cur_itc,vitm,vitv;
-    uint64_t    expires;
-    long        diff_now, diff_last;
-    uint64_t    spsr;
-    
-    vitv = VCPU(vcpu, itv);
-    if ( ITV_IRQ_MASK(vitv) ) {
-        return;
-    }
-    
-    vitm =VCPU(vcpu, itm);
-    local_irq_save(spsr);
-    cur_itc =now_itc(vtm);
-    diff_last = vtm->last_itc - vitm;
-    diff_now = cur_itc - vitm;
-
-    if ( diff_last >= 0 ) {
-        // interrupt already fired.
-        stop_timer(&vtm->vtm_timer);
-    }
-    else if ( diff_now >= 0 ) {
-        // ITV is fired.
-        vmx_vcpu_pend_interrupt(vcpu, vitv&0xff);
-    }
-*/
-    /* Both last_itc & cur_itc < itm, wait for fire condition */
-/*    else {
-        expires = NOW() + cycle_to_ns(0-diff_now) + TIMER_SLOP;
-        set_timer(&vtm->vtm_timer, expires);
-    }
-    local_irq_restore(spsr);
-}
- */
-
-/*
- * Action for vtm when the domain is scheduled out.
- * Remove the timer for vtm.
- */
-/*
-void vtm_domain_out(VCPU *vcpu)
-{
-    if(!is_idle_domain(vcpu->domain))
-	stop_timer(&vcpu->arch.arch_vmx.vtm.vtm_timer);
-}
- */
-/*
- * Action for vtm when the domain is scheduled in.
- * Fire vtm IRQ or add the timer for vtm.
- */
-/*
-void vtm_domain_in(VCPU *vcpu)
-{
-    vtime_t     *vtm;
-
-    if(!is_idle_domain(vcpu->domain)) {
-	vtm=&(vcpu->arch.arch_vmx.vtm);
-	vtm_interruption_update(vcpu, vtm);
-    }
-}
- */
-
-#ifdef V_IOSAPIC_READY
-int vlapic_match_logical_addr(struct vlapic *vlapic, uint16_t dest)
-{
-    return (VLAPIC_ID(vlapic) == dest);
-}
-
-struct vlapic* apic_round_robin(struct domain *d,
-				uint8_t vector,
-				uint32_t bitmap)
-{
-    uint8_t bit = 0;
-    
-    if (!bitmap) {
-	printk("<apic_round_robin> no bit on bitmap\n");
-	return NULL;
-    }
-
-    while (!(bitmap & (1 << bit)))
-        bit++;
-
-    return vcpu_vlapic(d->vcpu[bit]);
-}
-#endif
-
 void vlsapic_reset(VCPU *vcpu)
 {
     int     i;
@@ -371,13 +283,11 @@ void vlsapic_reset(VCPU *vcpu)
     VCPU(vcpu, lrr0) = 0x10000;   // default reset value?
     VCPU(vcpu, lrr1) = 0x10000;   // default reset value?
     update_vhpi(vcpu, NULL_VECTOR);
+    VLSAPIC_XTP(vcpu) = 0x80;   // disabled
     for ( i=0; i<4; i++) {
         VLSAPIC_INSVC(vcpu,i) = 0;
     }
 
-#ifdef V_IOSAPIC_READY
-    vcpu->arch.arch_vmx.vlapic.vcpu = vcpu;
-#endif
     dprintk(XENLOG_INFO, "VLSAPIC inservice base=%p\n", &VLSAPIC_INSVC(vcpu,0) );
 }
 
@@ -391,7 +301,7 @@ static __inline__ int highest_bits(uint64_t *dat)
 {
     uint64_t  bits, bitnum;
     int i;
-    
+
     /* loop for all 256 bits */
     for ( i=3; i >= 0 ; i -- ) {
         bits = dat[i];
@@ -435,12 +345,6 @@ static int is_higher_class(int pending, int mic)
 {
     return ( (pending >> 4) > mic );
 }
-#if 0
-static int is_invalid_irq(int vec)
-{
-    return (vec == 1 || ((vec <= 14 && vec >= 3)));
-}
-#endif //shadow it due to no use currently
 
 #define   IRQ_NO_MASKED         0
 #define   IRQ_MASKED_BY_VTPR    1
@@ -451,7 +355,7 @@ static int
 _xirq_masked(VCPU *vcpu, int h_pending, int h_inservice)
 {
     tpr_t    vtpr;
-    
+
     vtpr.val = VCPU(vcpu, tpr);
 
     if ( h_inservice == NMI_VECTOR ) {
@@ -491,7 +395,7 @@ _xirq_masked(VCPU *vcpu, int h_pending, int h_inservice)
 static int irq_masked(VCPU *vcpu, int h_pending, int h_inservice)
 {
     int mask;
-    
+
     mask = _xirq_masked(vcpu, h_pending, h_inservice);
     return mask;
 }
@@ -514,8 +418,10 @@ int vmx_vcpu_pend_interrupt(VCPU *vcpu, uint8_t vector)
     ret = test_and_set_bit(vector, &VCPU(vcpu, irr[0]));
     local_irq_restore(spsr);
 
-    if (!ret)
+    if (!ret) {
         vcpu->arch.irq_new_pending = 1;
+        wmb();
+    }
 
     return ret;
 }
@@ -537,6 +443,7 @@ void vmx_vcpu_pend_batch_interrupt(VCPU *vcpu, u64 *pend_irr)
     }
     local_irq_restore(spsr);
     vcpu->arch.irq_new_pending = 1;
+    wmb();
 }
 
 /*
@@ -598,6 +505,7 @@ void guest_write_eoi(VCPU *vcpu)
     VLSAPIC_INSVC(vcpu,vec>>6) &= ~(1UL <<(vec&63));
     VCPU(vcpu, eoi)=0;    // overwrite the data
     vcpu->arch.irq_new_pending=1;
+    wmb();
 }
 
 int is_unmasked_irq(VCPU *vcpu)
@@ -667,24 +575,221 @@ void vmx_vexirq(VCPU *vcpu)
     generate_exirq (vcpu);
 }
 
-
-void vmx_vioapic_set_irq(struct domain *d, int irq, int level)
+struct vcpu * vlsapic_lid_to_vcpu(struct domain *d, uint16_t dest)
 {
-    unsigned long flags;
-
-    spin_lock_irqsave(&d->arch.arch_vmx.virq_assist_lock, flags);
-    vioapic_set_irq(d, irq, level);
-    spin_unlock_irqrestore(&d->arch.arch_vmx.virq_assist_lock, flags);
+    struct vcpu * v;
+    for_each_vcpu ( d, v ) {
+        if ( (v->arch.privregs->lid >> 16) == dest )
+            return v;
+    }
+    return NULL;
 }
 
-int vmx_vlapic_set_irq(VCPU *v, uint8_t vec, uint8_t trig)
-{
-    int ret;
-    int running = test_bit(_VCPUF_running, &v->vcpu_flags);
 
-    ret = vmx_vcpu_pend_interrupt(v, vec);
-    vcpu_unblock(v);
-    if (running)
-        smp_send_event_check_cpu(v->processor);
-    return ret;
+/*
+ * To inject INIT to guest, we must set the PAL_INIT entry 
+ * and set psr to switch to physical mode
+ */
+#define PAL_INIT_ENTRY 0x80000000ffffffa0
+#define PSR_SET_BITS (IA64_PSR_DT | IA64_PSR_IT | IA64_PSR_RT | \
+                      IA64_PSR_IC | IA64_PSR_RI)
+
+static void vmx_inject_guest_pal_init(VCPU *vcpu)
+{
+    REGS *regs = vcpu_regs(vcpu);
+    uint64_t psr = vmx_vcpu_get_psr(vcpu);
+
+    regs->cr_iip = PAL_INIT_ENTRY;
+
+    psr = psr & ~PSR_SET_BITS;
+    vmx_vcpu_set_psr(vcpu, psr);
 }
+
+
+/*
+ * Deliver IPI message. (Only U-VP is supported now)
+ *  offset: address offset to IPI space.
+ *  value:  deliver value.
+ */
+static void vlsapic_deliver_ipi(VCPU *vcpu, uint64_t dm, uint64_t vector)
+{
+    IPI_DPRINTK("deliver_ipi %lx %lx\n", dm, vector);
+
+    switch (dm) {
+    case SAPIC_FIXED:     // INT
+        vmx_vcpu_pend_interrupt(vcpu, vector);
+        break;
+    case SAPIC_PMI:
+        // TODO -- inject guest PMI
+        panic_domain(NULL, "Inject guest PMI!\n");
+        break;
+    case SAPIC_NMI:
+        vmx_vcpu_pend_interrupt(vcpu, 2);
+        break;
+    case SAPIC_INIT:
+        vmx_inject_guest_pal_init(vcpu);
+        break;
+    case SAPIC_EXTINT:     // ExtINT
+        vmx_vcpu_pend_interrupt(vcpu, 0);
+        break;
+    default:
+        panic_domain(NULL, "Deliver reserved IPI!\n");
+        break;
+    }
+}
+
+/*
+ * TODO: Use hash table for the lookup.
+ */
+static inline VCPU *lid_to_vcpu(struct domain *d, uint8_t id, uint8_t eid)
+{
+    VCPU  *v;
+    LID   lid; 
+
+    for_each_vcpu(d, v) {
+        lid.val = VCPU_LID(v);
+        if (lid.id == id && lid.eid == eid)
+            return v;
+    }
+    return NULL;
+}
+
+
+/*
+ * execute write IPI op.
+ */
+static void vlsapic_write_ipi(VCPU *vcpu, uint64_t addr, uint64_t value)
+{
+    VCPU   *targ;
+    struct domain *d = vcpu->domain; 
+
+    targ = lid_to_vcpu(vcpu->domain, ((ipi_a_t)addr).id, ((ipi_a_t)addr).eid);
+    if (targ == NULL)
+        panic_domain(NULL, "Unknown IPI cpu\n");
+
+    if (!test_bit(_VCPUF_initialised, &targ->vcpu_flags)) {
+        struct pt_regs *targ_regs = vcpu_regs(targ);
+        struct vcpu_guest_context c;
+
+        memset (&c, 0, sizeof(c));
+
+        if (arch_set_info_guest(targ, &c) != 0) {
+            printk("arch_boot_vcpu: failure\n");
+            return;
+        }
+        /* First or next rendez-vous: set registers. */
+        vcpu_init_regs(targ);
+        targ_regs->cr_iip = d->arch.sal_data->boot_rdv_ip;
+        targ_regs->r1 = d->arch.sal_data->boot_rdv_r1;
+
+        if (test_and_clear_bit(_VCPUF_down,&targ->vcpu_flags)) {
+            vcpu_wake(targ);
+            printk("arch_boot_vcpu: vcpu %d awaken %016lx!\n",
+                   targ->vcpu_id, targ_regs->cr_iip);
+        } else {
+            printk("arch_boot_vcpu: huh, already awake!");
+        }
+    } else {
+        int running = test_bit(_VCPUF_running, &targ->vcpu_flags);
+        vlsapic_deliver_ipi(targ, ((ipi_d_t)value).dm, 
+                            ((ipi_d_t)value).vector);
+        vcpu_unblock(targ);
+        if (running)
+            smp_send_event_check_cpu(targ->processor);
+    }
+    return;
+}
+
+
+unsigned long vlsapic_read(struct vcpu *v,
+                           unsigned long addr,
+                           unsigned long length)
+{
+    uint64_t result = 0;
+
+    addr &= (PIB_SIZE - 1);
+
+    switch (addr) {
+    case PIB_OFST_INTA:
+        if (length == 1) // 1 byte load
+            ; // There is no i8259, there is no INTA access
+        else
+            panic_domain(NULL,"Undefined read on PIB INTA\n");
+
+        break;
+    case PIB_OFST_XTP:
+        if (length == 1) {
+            result = VLSAPIC_XTP(v);
+            // printk("read xtp %lx\n", result);
+        } else {
+            panic_domain(NULL, "Undefined read on PIB XTP\n");
+        }
+        break;
+    default:
+        if (PIB_LOW_HALF(addr)) {  // lower half
+            if (length != 8 )
+                panic_domain(NULL, "Undefined IPI-LHF read!\n");
+            else
+                IPI_DPRINTK("IPI-LHF read %lx\n", pib_off);
+        } else {  // upper half
+            IPI_DPRINTK("IPI-UHF read %lx\n", addr);
+        }
+        break;
+    }
+    return result;
+}
+
+static void vlsapic_write_xtp(struct vcpu *v, uint8_t val)
+{
+    struct viosapic * viosapic;
+    struct vcpu *lvcpu, *vcpu;
+    viosapic = vcpu_viosapic(v); 
+    lvcpu = viosapic->lowest_vcpu;
+    VLSAPIC_XTP(v) = val;
+    
+    for_each_vcpu(v->domain, vcpu) {
+        if (VLSAPIC_XTP(lvcpu) > VLSAPIC_XTP(vcpu))
+            lvcpu = vcpu;
+    }
+        
+    if (VLSAPIC_XTP(lvcpu) & 0x80)  // Disabled
+        lvcpu = NULL;
+
+    viosapic->lowest_vcpu = lvcpu;
+}
+
+void vlsapic_write(struct vcpu *v,
+                      unsigned long addr,
+                      unsigned long length,
+                      unsigned long val)
+{
+    addr &= (PIB_SIZE - 1);
+
+    switch (addr) {
+    case PIB_OFST_INTA:
+        panic_domain(NULL, "Undefined write on PIB INTA\n");
+        break;
+    case PIB_OFST_XTP:
+        if (length == 1) {
+            // printk("write xtp %lx\n", val);
+            vlsapic_write_xtp(v, val);
+        } else {
+            panic_domain(NULL, "Undefined write on PIB XTP\n");
+        }
+        break;
+    default:
+        if (PIB_LOW_HALF(addr)) {   // lower half
+            if (length != 8)
+                panic_domain(NULL, "Undefined IPI-LHF write with size %ld!\n",
+                             length);
+            else
+                vlsapic_write_ipi(v, addr, val);
+        }
+        else {   // upper half
+            // printk("IPI-UHF write %lx\n",addr);
+            panic_domain(NULL, "No support for SM-VP yet\n");
+        }
+        break;
+    }
+}
+

@@ -536,6 +536,14 @@ ENTRY(spurious_interrupt_bug)
         pushl $TRAP_spurious_int<<16
         jmp   handle_exception
 
+ENTRY(early_page_fault)
+        SAVE_ALL_NOSEGREGS(a)
+        movl  %esp,%edx
+        pushl %edx
+        call  do_early_page_fault
+        addl  $4,%esp
+        jmp   restore_all_xen
+
 ENTRY(nmi)
 #ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL
         # NMI entry protocol is incompatible with guest kernel in ring 0.

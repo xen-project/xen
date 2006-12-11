@@ -74,14 +74,9 @@ struct ivt_debug{
 #define IVT_DEBUG_MAX 128
 #endif
 
-struct arch_vmx_domain {
-    spinlock_t virq_assist_lock; /* spinlock for pass virq */
-};
-
 struct arch_vmx_struct {
 //	vpd_t       *vpd;
     vtime_t	    vtm;
-    struct vlapic   vlapic;
     unsigned long   vrr[8];
     /* if the corresponding bit is 1, then this page size is
        used in this region */
@@ -101,9 +96,9 @@ struct arch_vmx_struct {
 //    unsigned long   rfi_iip;
 //    unsigned long   rfi_ipsr;
 //    unsigned long   rfi_ifs;
-//	unsigned long	in_service[4];	// vLsapic inservice IRQ bits
     unsigned long   flags;
     unsigned long   xen_port;
+    unsigned char   xtp;
 #ifdef VTI_DEBUG
     unsigned long  ivt_current;
     struct ivt_debug ivt_debug[IVT_DEBUG_MAX];
@@ -118,12 +113,6 @@ struct arch_vmx_struct {
 #define ARCH_VMX_IO_WAIT        3       /* Waiting for I/O completion */
 #define ARCH_VMX_DOMAIN         5       /* Need it to indicate VTi domain */
 
-
-#define VMX_DEBUG 1
-#if VMX_DEBUG
-
-extern unsigned int opt_vmx_debug_level;
-#endif
 #endif //__ASSEMBLY__
 
 // VPD field offset

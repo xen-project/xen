@@ -524,7 +524,9 @@ ia64_handle_break(unsigned long ifa, struct pt_regs *regs, unsigned long isr,
 	struct vcpu *v = current;
 	IA64FAULT vector;
 
-	if (iim == 0x80001 || iim == 0x80002) { //FIXME: don't hardcode constant
+	/* FIXME: don't hardcode constant */
+	if ((iim == 0x80001 || iim == 0x80002)
+	    && ia64_get_cpl(regs->cr_ipsr) == 2) {
 		do_ssc(vcpu_get_gr(current, 36), regs);
 	}
 #ifdef CRASH_DEBUG

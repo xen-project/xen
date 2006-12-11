@@ -9,3 +9,6 @@ efi.h			-> linux/include/linux/efi.h
 gfp.h	 		-> linux/include/linux/gfp.h
 hardirq.h 		-> linux/include/linux/hardirq.h
 interrupt.h 		-> linux/include/linux/interrupt.h
+
+# The files below are from Linux-2.6.16.33
+oprofile.h		-> linux/include/linux/oprofile.h

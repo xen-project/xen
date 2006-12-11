@@ -59,8 +59,8 @@
 
 #ifdef XEN
 #define GET_THIS_PADDR(reg, var)		\
-	movl	reg = THIS_CPU(var)		\
-	tpa	reg = reg
+	mov	reg = IA64_KR(PER_CPU_DATA);;	\
+	addl	reg = THIS_CPU(var) - PERCPU_ADDR, reg
 #else
 #define GET_THIS_PADDR(reg, var)		\
 	mov	reg = IA64_KR(PER_CPU_DATA);;	\

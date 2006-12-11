@@ -13,35 +13,18 @@ xc_ia64_copy_to_domain_pages(int xc_handle, uint32_t domid, void* src_page,
                              unsigned long dst_pfn, int nr_pages)
 {
     // N.B. gva should be page aligned
-
-    xen_pfn_t *page_array = NULL;
     int i;
 
-    page_array = malloc(nr_pages * sizeof(xen_pfn_t));
-    if (page_array == NULL) {
-        PERROR("Could not allocate memory");
-        goto error_out;
-    }
-    if (xc_ia64_get_pfn_list(xc_handle, domid, page_array,
-                             dst_pfn, nr_pages) != nr_pages) {
-        PERROR("Could not get the page frame list");
-        goto error_out;
-    }
-
     for (i = 0; i < nr_pages; i++) {
-        if (xc_copy_to_domain_page(xc_handle, domid, page_array[i],
+        if (xc_copy_to_domain_page(xc_handle, domid, dst_pfn + i,
                                    src_page + (i << PAGE_SHIFT)))
-            goto error_out;
+            return -1;
     }
-    free(page_array);
-    return 0;
 
-error_out:
-    free(page_array);
-    return -1;
+    return 0;
 }
 
-static void
+int 
 xc_set_hvm_param(int handle, domid_t dom, int param, unsigned long value)
 {
     DECLARE_HYPERCALL;
@@ -56,15 +39,37 @@ xc_set_hvm_param(int handle, domid_t dom, int param, unsigned long value)
     arg.index = param;
     arg.value = value;
 
-    if (mlock(&arg, sizeof(arg)) != 0) {
-        PERROR("Could not lock memory for set parameter");
-        return;
-    }
+    if (mlock(&arg, sizeof(arg)) != 0)
+        return -1;
 
     rc = do_xen_hypercall(handle, &hypercall);
     safe_munlock(&arg, sizeof(arg));
-    if (rc < 0)
-        PERROR("set HVM parameter failed (%d)", rc);
+
+    return rc;
+}
+
+int 
+xc_get_hvm_param(int handle, domid_t dom, int param, unsigned long *value)
+{
+    DECLARE_HYPERCALL;
+    xen_hvm_param_t arg;
+    int rc;
+
+    hypercall.op = __HYPERVISOR_hvm_op;
+    hypercall.arg[0] = HVMOP_get_param;
+    hypercall.arg[1] = (unsigned long)&arg;
+
+    arg.domid = dom;
+    arg.index = param;
+
+    if (mlock(&arg, sizeof(arg)) != 0)
+        return -1;
+
+    rc = do_xen_hypercall(handle, &hypercall);
+    safe_munlock(&arg, sizeof(arg));
+
+    *value = arg.value;
+    return rc;
 }
 
 #define HOB_SIGNATURE         0x3436474953424f48        // "HOBSIG64"
@@ -546,19 +551,32 @@ add_pal_hob(void* hob_buf)
     return 0;
 }
 
+#define GFW_PAGES (GFW_SIZE >> PAGE_SHIFT)
+#define VGA_START_PAGE (VGA_IO_START >> PAGE_SHIFT)
+#define VGA_END_PAGE ((VGA_IO_START + VGA_IO_SIZE) >> PAGE_SHIFT)
+/*
+ * In this function, we will allocate memory and build P2M/M2P table for VTI
+ * guest.  Frist, a pfn list will be initialized discontiguous, normal memory
+ * begins with 0, GFW memory and other three pages at their place defined in
+ * xen/include/public/arch-ia64.h xc_domain_memory_populate_physmap() called
+ * three times, to set parameter 'extent_order' to different value, this is
+ * convenient to allocate discontiguous memory with different size.
+ */
 static int
 setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
-            char *image, unsigned long image_size, uint32_t vcpus,
-            unsigned int store_evtchn, unsigned long *store_mfn)
+            char *image, unsigned long image_size, vcpu_guest_context_t *ctxt)
 {
-    unsigned long page_array[3];
+    xen_pfn_t *pfn_list;
     shared_iopage_t *sp;
     void *ioreq_buffer_page;
-    // memsize = required memsize(in configure file) + 16M
+    // memsize equal to normal memory size(in configure file) + 16M
     // dom_memsize will pass to xc_ia64_build_hob(), so must be subbed 16M 
     unsigned long dom_memsize = ((memsize - 16) << 20);
     unsigned long nr_pages = (unsigned long)memsize << (20 - PAGE_SHIFT);
+    unsigned long normal_pages = nr_pages - GFW_PAGES;
+    unsigned long vcpus;
     int rc;
+    long i, j;
     DECLARE_DOMCTL;
 
     // ROM size for guest firmware, ioreq page and xenstore page
@@ -569,14 +587,63 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
         return -1;
     }
 
-    rc = xc_domain_memory_increase_reservation(xc_handle, dom, nr_pages,
-                                               0, 0, NULL); 
+    pfn_list = malloc(nr_pages * sizeof(xen_pfn_t));
+    if (pfn_list == NULL) {
+        PERROR("Could not allocate memory.\n");
+        return -1;
+    }
+
+    // Allocate pfn for normal memory
+    for (i = 0; i < dom_memsize >> PAGE_SHIFT; i++)
+        pfn_list[i] = i;
+
+    // If normal memory > 3G. Reserve 3G ~ 4G for MMIO, GFW and others.
+    for (j = (MMIO_START >> PAGE_SHIFT); j < (dom_memsize >> PAGE_SHIFT); j++)
+        pfn_list[j] += ((1 * MEM_G) >> PAGE_SHIFT);
+
+    // Allocate memory for VTI guest, up to VGA hole from 0xA0000-0xC0000. 
+    rc = xc_domain_memory_populate_physmap(xc_handle, dom,
+                                           (normal_pages > VGA_START_PAGE) ?
+                                           VGA_START_PAGE : normal_pages,
+                                           0, 0, &pfn_list[0]);
+
+    // We're not likely to attempt to create a domain with less than
+    // 640k of memory, but test for completeness
+    if (rc == 0 && nr_pages > VGA_END_PAGE)
+        rc = xc_domain_memory_populate_physmap(xc_handle, dom,
+                                               normal_pages - VGA_END_PAGE,
+                                               0, 0, &pfn_list[VGA_END_PAGE]);
     if (rc != 0) {
-        PERROR("Could not allocate memory for HVM guest.\n");
+        PERROR("Could not allocate normal memory for Vti guest.\n");
         goto error_out;
     }
 
-    /* This will creates the physmap.  */
+    // We allocate additional pfn for GFW and other three pages, so
+    // the pfn_list is not contiguous.  Due to this we must support
+    // old interface xc_ia64_get_pfn_list().
+    // Here i = (dom_memsize >> PAGE_SHIFT)
+    for (j = 0; i < nr_pages - 3; i++, j++) 
+        pfn_list[i] = (GFW_START >> PAGE_SHIFT) + j;
+
+    rc = xc_domain_memory_populate_physmap(xc_handle, dom, GFW_PAGES,
+                                           0, 0, &pfn_list[normal_pages]);
+    if (rc != 0) {
+        PERROR("Could not allocate GFW memory for Vti guest.\n");
+        goto error_out;
+    }
+
+    // Here i = (dom_memsize >> PAGE_SHIFT) + GFW_PAGES
+    pfn_list[i] = IO_PAGE_START >> PAGE_SHIFT;
+    pfn_list[i+1] = STORE_PAGE_START >> PAGE_SHIFT;
+    pfn_list[i+2] = BUFFER_IO_PAGE_START >> PAGE_SHIFT; 
+
+    rc = xc_domain_memory_populate_physmap(xc_handle, dom, 3,
+                                           0, 0, &pfn_list[nr_pages - 3]);
+    if (rc != 0) {
+        PERROR("Could not allocate IO page or store page or buffer io page.\n");
+        goto error_out;
+    }
+
     domctl.u.arch_setup.flags = XEN_DOMAINSETUP_hvm_guest;
     domctl.u.arch_setup.bp = 0;
     domctl.u.arch_setup.maxmem = 0;
@@ -585,7 +652,7 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
     if (xc_domctl(xc_handle, &domctl))
         goto error_out;
 
-    /* Load guest firmware */
+    // Load guest firmware 
     if (xc_ia64_copy_to_domain_pages(xc_handle, dom, image,
                             (GFW_START + GFW_SIZE - image_size) >> PAGE_SHIFT,
                             image_size >> PAGE_SHIFT)) {
@@ -593,36 +660,33 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
         goto error_out;
     }
 
-    /* Hand-off state passed to guest firmware */
-    if (xc_ia64_build_hob(xc_handle, dom, dom_memsize,
-                          (unsigned long)vcpus) < 0) {
+    // Get number of vcpus, stored by pyxc_hvm_build()
+    xc_get_hvm_param(xc_handle, dom, HVM_PARAM_VCPUS, &vcpus);
+
+    // Hand-off state passed to guest firmware 
+    if (xc_ia64_build_hob(xc_handle, dom, dom_memsize, vcpus) < 0) {
         PERROR("Could not build hob\n");
         goto error_out;
     }
 
-    /* Retrieve special pages like io, xenstore, etc. */
-    if (xc_ia64_get_pfn_list(xc_handle, dom, page_array,
-                             IO_PAGE_START>>PAGE_SHIFT, 3) != 3) {
-        PERROR("Could not get the page frame list");
-        goto error_out;
-    }
-
     xc_set_hvm_param(xc_handle, dom,
-                     HVM_PARAM_STORE_PFN, STORE_PAGE_START>>PAGE_SHIFT);
-    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_EVTCHN, store_evtchn);
+                     HVM_PARAM_STORE_PFN, pfn_list[nr_pages - 2]);
 
-    *store_mfn = page_array[1];
-    sp = (shared_iopage_t *)xc_map_foreign_range(xc_handle, dom,
-                               PAGE_SIZE, PROT_READ|PROT_WRITE, page_array[0]);
+    // Retrieve special pages like io, xenstore, etc. 
+    sp = (shared_iopage_t *)xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+                                                 PROT_READ | PROT_WRITE,
+                                                 pfn_list[nr_pages - 3]);
     if (sp == 0)
         goto error_out;
 
     memset(sp, 0, PAGE_SIZE);
     munmap(sp, PAGE_SIZE);
-    ioreq_buffer_page = xc_map_foreign_range(xc_handle, dom,
-                               PAGE_SIZE, PROT_READ|PROT_WRITE, page_array[2]); 
+    ioreq_buffer_page = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+                                             PROT_READ | PROT_WRITE,
+                                             pfn_list[nr_pages - 1]); 
     memset(ioreq_buffer_page,0,PAGE_SIZE);
     munmap(ioreq_buffer_page, PAGE_SIZE);
+    free(pfn_list);
     return 0;
 
 error_out:
@@ -630,12 +694,9 @@ error_out:
 }
 
 int
-xc_hvm_build(int xc_handle, uint32_t domid, int memsize,
-             const char *image_name, unsigned int vcpus, unsigned int pae,
-             unsigned int acpi, unsigned int store_evtchn,
-             unsigned long *store_mfn)
+xc_hvm_build(int xc_handle, uint32_t domid, int memsize, const char *image_name)
 {
-    struct xen_domctl launch_domctl, domctl;
+    struct xen_domctl launch_domctl;
     int rc;
     vcpu_guest_context_t st_ctxt, *ctxt = &st_ctxt;
     char *image = NULL;
@@ -661,18 +722,10 @@ xc_hvm_build(int xc_handle, uint32_t domid, int memsize,
         return 1;
     }
 
-    domctl.cmd = XEN_DOMCTL_getdomaininfo;
-    domctl.domain = (domid_t)domid;
-    if (do_domctl(xc_handle, &domctl) < 0 ||
-        (uint16_t)domctl.domain != domid) {
-        PERROR("Could not get info on domain");
-        goto error_out;
-    }
-
     memset(ctxt, 0, sizeof(*ctxt));
 
     if (setup_guest(xc_handle, domid, (unsigned long)memsize, image,
-                    image_size, vcpus, store_evtchn, store_mfn) < 0) {
+                    image_size, ctxt) < 0) {
         ERROR("Error constructing guest OS");
         goto error_out;
     }

@@ -18,15 +18,29 @@
 #ifndef __MULTIBOOT_H__
 #define __MULTIBOOT_H__
 
+
+/*
+ * Multiboot header structure.
+ */
+#define MULTIBOOT_HEADER_MAGIC         0x1BADB002
+#define MULTIBOOT_HEADER_MODS_ALIGNED  0x00000001
+#define MULTIBOOT_HEADER_WANT_MEMORY   0x00000002
+#define MULTIBOOT_HEADER_HAS_VBE       0x00000004
+#define MULTIBOOT_HEADER_HAS_ADDR      0x00010000
+
 /* The magic number passed by a Multiboot-compliant boot loader. */
-#define MULTIBOOT_BOOTLOADER_MAGIC 0x2BADB002
+#define MULTIBOOT_BOOTLOADER_MAGIC     0x2BADB002
 
 #define MBI_MEMLIMITS  (1<<0)
 #define MBI_DRIVES     (1<<1)
 #define MBI_CMDLINE    (1<<2)
 #define MBI_MODULES    (1<<3)
+#define MBI_AOUT_SYMS  (1<<4)
+#define MBI_ELF_SYMS   (1<<5)
 #define MBI_MEMMAP     (1<<6)
 #define MBI_LOADERNAME (1<<9)
+
+#ifndef __ASSEMBLY__
 
 /* The symbol table for a.out.  */
 typedef struct {
@@ -47,16 +61,28 @@ typedef struct {
 /* The Multiboot information.  */
 typedef struct {
     u32 flags;
+
+    /* Valid if flags sets MBI_MEMLIMITS */
     u32 mem_lower;
     u32 mem_upper;
+
+    /* Valid if flags sets MBI_DRIVES */
     u32 boot_device;
+
+    /* Valid if flags sets MBI_CMDLINE */
     u32 cmdline;
+
+    /* Valid if flags sets MBI_MODULES */
     u32 mods_count;
     u32 mods_addr;
+
+    /* Valid if flags sets ... */
     union {
-        aout_symbol_table_t aout_sym;
-        elf_section_header_table_t elf_sec;
+        aout_symbol_table_t aout_sym;        /* ... MBI_AOUT_SYMS */
+        elf_section_header_table_t elf_sec;  /* ... MBI_ELF_SYMS */
     } u;
+
+    /* Valid if flags sets MBI_MEMMAP */
     u32 mmap_length;
     u32 mmap_addr;
 } multiboot_info_t;
@@ -79,5 +105,8 @@ typedef struct {
     u32 length_high;
     u32 type;
 } memory_map_t;
+
+
+#endif /* __ASSEMBLY__ */
 
 #endif /* __MULTIBOOT_H__ */

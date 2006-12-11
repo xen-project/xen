@@ -1,3 +1,5 @@
+subdir-y += oprofile
+
 obj-y += machine_kexec.o
 obj-y += crash.o
 obj-y += acpi.o

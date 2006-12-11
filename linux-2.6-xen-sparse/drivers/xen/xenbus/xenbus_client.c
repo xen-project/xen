@@ -289,6 +289,7 @@ int xenbus_free_evtchn(struct xenbus_device *dev, int port)
 
 	return err;
 }
+EXPORT_SYMBOL_GPL(xenbus_free_evtchn);
 
 
 enum xenbus_state xenbus_read_driver_state(const char *path)

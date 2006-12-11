@@ -295,6 +295,7 @@ extern void xen_ptcga(unsigned long addr, unsigned long size);
 #define	ia64_leave_kernel		xen_leave_kernel
 #define	ia64_leave_syscall		xen_leave_syscall
 #define	ia64_trace_syscall		xen_trace_syscall
+#define	ia64_ret_from_clone		xen_ret_from_clone
 #define	ia64_switch_to			xen_switch_to
 #define	ia64_pal_call_static		xen_pal_call_static
 

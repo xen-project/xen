@@ -137,7 +137,6 @@ def restore(xd, fd, dominfo = None, paused = False):
     vmconfig = p.get_val()
 
     if dominfo:
-        dominfo.update(XendConfig(sxp_obj = vmconfig), refresh = False)
         dominfo.resume()
     else:
         dominfo = xd.restore_(vmconfig)

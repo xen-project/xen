@@ -42,7 +42,7 @@ extern void panic_domain(struct pt_regs *, const char *, ...)
      __attribute__ ((noreturn, format (printf, 2, 3)));
 
 struct mm_struct {
-	pgd_t * pgd;
+	volatile pgd_t * pgd;
     //	atomic_t mm_users;			/* How many users with user space? */
 };
 
@@ -123,8 +123,6 @@ struct arch_domain {
     atomic64_t shadow_fault_count;
 
     struct last_vcpu last_vcpu[NR_CPUS];
-
-    struct arch_vmx_domain arch_vmx; /* Virtual Machine Extensions */
 
 #ifdef CONFIG_XEN_IA64_TLB_TRACK
     struct tlb_track*   tlb_track;
@@ -210,6 +208,10 @@ struct arch_vcpu {
 /* Guest physical address of IO ports space.  */
 #define IO_PORTS_PADDR          0x00000ffffc000000UL
 #define IO_PORTS_SIZE           0x0000000004000000UL
+
+int
+do_perfmon_op(unsigned long cmd,
+              XEN_GUEST_HANDLE(void) arg1, unsigned long arg2);
 
 #endif /* __ASM_DOMAIN_H__ */
 

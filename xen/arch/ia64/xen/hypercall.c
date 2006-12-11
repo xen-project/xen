@@ -68,7 +68,7 @@ const hypercall_t ia64_hypercall_table[NR_hypercalls] =
 	(hypercall_t)do_ni_hypercall,		/* do_nmi_op */
 	(hypercall_t)do_sched_op,
 	(hypercall_t)do_callback_op,		/*  */                 /* 30 */
-	(hypercall_t)do_ni_hypercall,		/*  */
+	(hypercall_t)do_xenoprof_op,		/*  */
 	(hypercall_t)do_event_channel_op,
 	(hypercall_t)do_physdev_op,
 	(hypercall_t)do_hvm_op,			/*  */
@@ -248,6 +248,8 @@ ia64_hypercall(struct pt_regs *regs)
 				set_timer(&v->arch.hlt_timer,
 				          vcpu_get_next_timer_ns(v));
 				do_sched_op_compat(SCHEDOP_block, 0);
+				/* do_block only pends a softirq */
+				do_softirq();
 				stop_timer(&v->arch.hlt_timer);
 			}
 			regs->r8 = 0;
@@ -452,8 +454,36 @@ static long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
-    default:
+    case PHYSDEVOP_free_irq_vector: {
+        struct physdev_irq irq_op;
+        int vector;
+
+        ret = -EFAULT;
+        if ( copy_from_guest(&irq_op, arg, 1) != 0 )
+            break;
+
+        ret = -EPERM;
+        if ( !IS_PRIV(current->domain) )
+            break;
+
         ret = -EINVAL;
+        vector = irq_op.vector;
+        if (vector < IA64_FIRST_DEVICE_VECTOR ||
+            vector > IA64_LAST_DEVICE_VECTOR)
+            break;
+        
+        /* XXX This should be called, but causes a NAT consumption via the
+	 * reboot notifier_call_chain in dom0 if a device is hidden for
+	 * a driver domain using pciback.hide= (specifically, hiding function
+	 * 1 of a 2 port e1000 card).
+	 * free_irq_vector(vector);
+	 */
+        ret = 0;
+        break;
+    }
+
+    default:
+        ret = -ENOSYS;
         break;
     }
 
@@ -479,7 +509,7 @@ static long register_guest_callback(struct callback_register *reg)
         break;
 
     default:
-        ret = -EINVAL;
+        ret = -ENOSYS;
         break;
     }
 
@@ -488,7 +518,7 @@ static long register_guest_callback(struct callback_register *reg)
 
 static long unregister_guest_callback(struct callback_unregister *unreg)
 {
-    return -EINVAL ;
+    return -EINVAL;
 }
 
 /* First time to add callback to xen/ia64, so let's just stick to
@@ -525,7 +555,7 @@ static long do_callback_op(int cmd, XEN_GUEST_HANDLE(void) arg)
     break;
 
     default:
-        ret = -EINVAL;
+        ret = -ENOSYS;
         break;
     }
 

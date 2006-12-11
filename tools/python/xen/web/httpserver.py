@@ -264,7 +264,32 @@ class HttpServerRequest(http.HttpRequest):
             s += x + "/"
             self.write(' <a href="%s">%s</a>/' % (s, x))
         self.write("</h1>")
-        
+
+class HttpServerClient:
+
+    def __init__(self, server, sock, addr):
+        self.server = server
+        self.sock = sock
+        self.addr = addr
+
+    def process(self):
+        thread = threading.Thread(target=self.doProcess)
+        thread.setDaemon(True)
+        thread.start()
+
+    def doProcess(self):
+        try:
+            rp = RequestProcessor(self.server, self.sock, self.addr)
+            rp.process()
+        except SystemExit:
+            raise
+        except Exception, ex:
+            print 'HttpServer>processRequest> exception: ', ex
+            try:
+                self.sock.close()
+            except:
+                pass
+
 class HttpServer:
 
     backlog = 5
@@ -286,8 +311,8 @@ class HttpServer:
 
         while not self.closed:
             (sock, addr) = self.accept()
-            self.processRequest(sock, addr)
-
+            cl = HttpServerClient(self, sock, addr)
+            cl.process()
 
     def stop(self):
         self.close()
@@ -313,19 +338,6 @@ class HttpServer:
             self.socket.close()
         except:
             pass
-
-    def processRequest(self, sock, addr):
-        try:
-            rp = RequestProcessor(self, sock, addr)
-            rp.process()
-        except SystemExit:
-            raise
-        except Exception, ex:
-            print 'HttpServer>processRequest> exception: ', ex
-            try:
-                sock.close()
-            except:
-                pass
 
     def getServerAddr(self):
         return (socket.gethostname(), self.port)

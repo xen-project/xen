@@ -23,7 +23,6 @@
 
 #include <linux/sched.h>
 #include <xen/mm.h>
-#include <asm/tlb.h>
 #include <asm/vmx_mm_def.h>
 #include <asm/gcc_intrin.h>
 #include <linux/interrupt.h>
@@ -36,21 +35,8 @@
 #include <public/xen.h>
 #include <linux/event.h>
 #include <xen/domain.h>
-/*
-struct mmio_list *lookup_mmio(u64 gpa, struct mmio_list *mio_base)
-{
-    int     i;
-    for (i=0; mio_base[i].iot != NOT_IO; i++ ) {
-        if ( gpa >= mio_base[i].start && gpa <= mio_base[i].end )
-            return &mio_base[i];
-    }
-    return NULL;
-}
-*/
-
-#define	PIB_LOW_HALF(ofst)	!(ofst&(1<<20))
-#define PIB_OFST_INTA           0x1E0000
-#define PIB_OFST_XTP            0x1E0008
+#include <asm/viosapic.h>
+#include <asm/vlsapic.h>
 
 #define HVM_BUFFERED_IO_RANGE_NR 1
 
@@ -116,87 +102,6 @@ int hvm_buffered_io_intercept(ioreq_t *p)
     return 1;
 }
 
-static void write_ipi (VCPU *vcpu, uint64_t addr, uint64_t value);
-
-static void pib_write(VCPU *vcpu, void *src, uint64_t pib_off, size_t s, int ma)
-{
-    switch (pib_off) {
-    case PIB_OFST_INTA:
-        panic_domain(NULL,"Undefined write on PIB INTA\n");
-        break;
-    case PIB_OFST_XTP:
-        if ( s == 1 && ma == 4 /* UC */) {
-            vmx_vcpu_get_plat(vcpu)->xtp = *(uint8_t *)src;
-        }
-        else {
-            panic_domain(NULL,"Undefined write on PIB XTP\n");
-        }
-        break;
-    default:
-        if ( PIB_LOW_HALF(pib_off) ) {   // lower half
-            if ( s != 8 || ma != 0x4 /* UC */ ) {
-                panic_domain
-		  (NULL,"Undefined IPI-LHF write with s %ld, ma %d!\n", s, ma);
-            }
-            else {
-                write_ipi(vcpu, pib_off, *(uint64_t *)src);
-                // TODO for SM-VP
-            }
-        }
-        else {      // upper half
-            printk("IPI-UHF write %lx\n",pib_off);
-            panic_domain(NULL,"Not support yet for SM-VP\n");
-        }
-        break;
-    }
-}
-
-static void pib_read(VCPU *vcpu, uint64_t pib_off, void *dest, size_t s, int ma)
-{
-    switch (pib_off) {
-    case PIB_OFST_INTA:
-        // todo --- emit on processor system bus.
-        if ( s == 1 && ma == 4) { // 1 byte load
-            // TODO: INTA read from IOSAPIC
-        }
-        else {
-            panic_domain(NULL,"Undefined read on PIB INTA\n");
-        }
-        break;
-    case PIB_OFST_XTP:
-        if ( s == 1 && ma == 4) {
-            *((uint8_t*)dest) = vmx_vcpu_get_plat(vcpu)->xtp;
-        }
-        else {
-            panic_domain(NULL,"Undefined read on PIB XTP\n");
-        }
-        break;
-    default:
-        if ( PIB_LOW_HALF(pib_off) ) {   // lower half
-            if ( s != 8 || ma != 4 ) {
-                panic_domain(NULL,"Undefined IPI-LHF read!\n");
-            }
-            else {
-#ifdef  IPI_DEBUG
-                printk("IPI-LHF read %lx\n",pib_off);
-#endif
-                *(uint64_t *)dest = 0;  // TODO for SM-VP
-            }
-        }
-        else {      // upper half
-            if ( s != 1 || ma != 4 ) {
-                panic_domain(NULL,"Undefined PIB-UHF read!\n");
-            }
-            else {
-#ifdef  IPI_DEBUG
-                printk("IPI-UHF read %lx\n",pib_off);
-#endif
-                *(uint8_t *)dest = 0;   // TODO for SM-VP
-            }
-        }
-        break;
-    }
-}
 
 static void low_mmio_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
 {
@@ -271,31 +176,32 @@ static void legacy_io_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
     return;
 }
 
-extern struct vmx_mmio_handler vioapic_mmio_handler;
 static void mmio_access(VCPU *vcpu, u64 src_pa, u64 *dest, size_t s, int ma, int dir)
 {
     struct virtual_platform_def *v_plat;
     //mmio_type_t iot;
     unsigned long iot;
-    struct vmx_mmio_handler *vioapic_handler = &vioapic_mmio_handler;
     iot=__gpfn_is_io(vcpu->domain, src_pa>>PAGE_SHIFT);
     v_plat = vmx_vcpu_get_plat(vcpu);
 
     perfc_incra(vmx_mmio_access, iot >> 56);
     switch (iot) {
-    case GPFN_PIB:
-        if(!dir)
-            pib_write(vcpu, dest, src_pa - v_plat->pib_base, s, ma);
+    case GPFN_PIB:       
+        if (ma != 4)
+            panic_domain(NULL, "Access PIB not with UC attribute\n");
+
+        if (!dir)
+            vlsapic_write(vcpu, src_pa, s, *dest);
         else
-            pib_read(vcpu, src_pa - v_plat->pib_base, dest, s, ma);
+            *dest = vlsapic_read(vcpu, src_pa, s);
         break;
     case GPFN_GFW:
         break;
     case GPFN_IOSAPIC:
 	if (!dir)
-	    vioapic_handler->write_handler(vcpu, src_pa, s, *dest);
+	    viosapic_write(vcpu, src_pa, s, *dest);
 	else
-	    *dest = vioapic_handler->read_handler(vcpu, src_pa, s);
+	    *dest = viosapic_read(vcpu, src_pa, s);
 	break;
     case GPFN_FRAME_BUFFER:
     case GPFN_LOW_MMIO:
@@ -310,195 +216,6 @@ static void mmio_access(VCPU *vcpu, u64 src_pa, u64 *dest, size_t s, int ma, int
     }
     return;
 }
-
-/*
- * Read or write data in guest virtual address mode.
- */
-/*
-void
-memwrite_v(VCPU *vcpu, thash_data_t *vtlb, u64 *src, u64 *dest, size_t s)
-{
-    uint64_t pa;
-
-    if (!vtlb->nomap)
-        panic("Normal memory write shouldn't go to this point!");
-    pa = PPN_2_PA(vtlb->ppn);
-    pa += POFFSET((u64)dest, vtlb->ps);
-    mmio_write (vcpu, src, pa, s, vtlb->ma);
-}
-
-
-void
-memwrite_p(VCPU *vcpu, u64 *src, u64 *dest, size_t s)
-{
-    uint64_t pa = (uint64_t)dest;
-    int    ma;
-
-    if ( pa & (1UL <<63) ) {
-        // UC
-        ma = 4;
-        pa <<=1;
-        pa >>=1;
-    }
-    else {
-        // WBL
-        ma = 0;     // using WB for WBL
-    }
-    mmio_write (vcpu, src, pa, s, ma);
-}
-
-void
-memread_v(VCPU *vcpu, thash_data_t *vtlb, u64 *src, u64 *dest, size_t s)
-{
-    uint64_t pa;
-
-    if (!vtlb->nomap)
-        panic_domain(NULL,"Normal memory write shouldn't go to this point!");
-    pa = PPN_2_PA(vtlb->ppn);
-    pa += POFFSET((u64)src, vtlb->ps);
-
-    mmio_read(vcpu, pa, dest, s, vtlb->ma);
-}
-
-void
-memread_p(VCPU *vcpu, u64 *src, u64 *dest, size_t s)
-{
-    uint64_t pa = (uint64_t)src;
-    int    ma;
-
-    if ( pa & (1UL <<63) ) {
-        // UC
-        ma = 4;
-        pa <<=1;
-        pa >>=1;
-    }
-    else {
-        // WBL
-        ma = 0;     // using WB for WBL
-    }
-    mmio_read(vcpu, pa, dest, s, ma);
-}
-*/
-
-/*
- * To inject INIT to guest, we must set the PAL_INIT entry 
- * and set psr to switch to physical mode
- */
-#define PAL_INIT_ENTRY 0x80000000ffffffa0
-#define PSR_SET_BITS (IA64_PSR_DT | IA64_PSR_IT | IA64_PSR_RT |	\
-                      IA64_PSR_IC | IA64_PSR_RI)
-
-static void vmx_inject_guest_pal_init(VCPU *vcpu)
-{
-    REGS *regs = vcpu_regs(vcpu);
-    uint64_t psr = vmx_vcpu_get_psr(vcpu);
-
-    regs->cr_iip = PAL_INIT_ENTRY;
-
-    psr = psr & (~PSR_SET_BITS);
-    vmx_vcpu_set_psr(vcpu,psr);
-}
-
-/*
- * Deliver IPI message. (Only U-VP is supported now)
- *  offset: address offset to IPI space.
- *  value:  deliver value.
- */
-static void deliver_ipi (VCPU *vcpu, uint64_t dm, uint64_t vector)
-{
-#ifdef  IPI_DEBUG
-  printk ("deliver_ipi %lx %lx\n",dm,vector);
-#endif
-    switch ( dm ) {
-    case 0:     // INT
-        vmx_vcpu_pend_interrupt (vcpu, vector);
-        break;
-    case 2:     // PMI
-        // TODO -- inject guest PMI
-        panic_domain (NULL, "Inject guest PMI!\n");
-        break;
-    case 4:     // NMI
-        vmx_vcpu_pend_interrupt (vcpu, 2);
-        break;
-    case 5:     // INIT
-        vmx_inject_guest_pal_init(vcpu);
-        break;
-    case 7:     // ExtINT
-        vmx_vcpu_pend_interrupt (vcpu, 0);
-        break;
-    case 1:
-    case 3:
-    case 6:
-    default:
-        panic_domain (NULL, "Deliver reserved IPI!\n");
-        break;
-    }
-}
-
-/*
- * TODO: Use hash table for the lookup.
- */
-static inline VCPU *lid_2_vcpu (struct domain *d, u64 id, u64 eid)
-{
-    int   i;
-    VCPU  *vcpu;
-    LID   lid;
-    for (i=0; i<MAX_VIRT_CPUS; i++) {
-        vcpu = d->vcpu[i];
-        if (!vcpu)
-            continue;
-        lid.val = VCPU_LID(vcpu);
-        if ( lid.id == id && lid.eid == eid )
-            return vcpu;
-    }
-    return NULL;
-}
-
-/*
- * execute write IPI op.
- */
-static void write_ipi (VCPU *vcpu, uint64_t addr, uint64_t value)
-{
-    VCPU   *targ;
-    struct domain *d=vcpu->domain; 
-    targ = lid_2_vcpu(vcpu->domain, 
-           ((ipi_a_t)addr).id, ((ipi_a_t)addr).eid);
-    if ( targ == NULL ) panic_domain (NULL,"Unknown IPI cpu\n");
-
-    if (!test_bit(_VCPUF_initialised, &targ->vcpu_flags)) {
-        struct pt_regs *targ_regs = vcpu_regs (targ);
-        struct vcpu_guest_context c;
-
-        memset (&c, 0, sizeof (c));
-
-        if (arch_set_info_guest (targ, &c) != 0) {
-            printk ("arch_boot_vcpu: failure\n");
-            return;
-        }
-        /* First or next rendez-vous: set registers.  */
-        vcpu_init_regs (targ);
-        targ_regs->cr_iip = d->arch.sal_data->boot_rdv_ip;
-        targ_regs->r1 = d->arch.sal_data->boot_rdv_r1;
-
-        if (test_and_clear_bit(_VCPUF_down,&targ->vcpu_flags)) {
-            vcpu_wake(targ);
-            printk ("arch_boot_vcpu: vcpu %d awaken %016lx!\n",
-                    targ->vcpu_id, targ_regs->cr_iip);
-        }
-        else
-            printk ("arch_boot_vcpu: huu, already awaken!");
-    }
-    else {
-        int running = test_bit(_VCPUF_running,&targ->vcpu_flags);
-        deliver_ipi (targ, ((ipi_d_t)value).dm, 
-                    ((ipi_d_t)value).vector);
-        vcpu_unblock(targ);
-        if (running)
-            smp_send_event_check_cpu(targ->processor);
-    }
-    return;
-}
-
 
 /*
    dir 1: read 0:write

@@ -1,4 +1,5 @@
 #include <xen/config.h>
+#include <xen/multiboot.h>
 #include <public/xen.h>
 #include <asm/asm_defns.h>
 #include <asm/desc.h>
@@ -19,12 +20,14 @@ ENTRY(_stext)
 
         .org    0x004
 /*** MULTIBOOT HEADER ****/
+#define MULTIBOOT_HEADER_FLAGS (MULTIBOOT_HEADER_MODS_ALIGNED | \
+                                MULTIBOOT_HEADER_WANT_MEMORY)
         /* Magic number indicating a Multiboot header. */
-        .long   0x1BADB002
+        .long   MULTIBOOT_HEADER_MAGIC
         /* Flags to bootloader (see Multiboot spec). */
-        .long   0x00000003
+        .long   MULTIBOOT_HEADER_FLAGS
         /* Checksum: must be the negated sum of the first two fields. */
-        .long   -0x1BADB005
+        .long   -(MULTIBOOT_HEADER_MAGIC + MULTIBOOT_HEADER_FLAGS)
 
 .Lbad_cpu_msg: .asciz "ERR: Not a 64-bit CPU!"
 .Lbad_ldr_msg: .asciz "ERR: Not a Multiboot bootloader!"

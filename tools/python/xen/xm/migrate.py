@@ -21,8 +21,9 @@
 
 import sys
 
-from xen.xend.XendClient import server
 from xen.xm.opts import *
+
+from main import server
 
 gopts = Opts(use="""[options] DOM HOST
 

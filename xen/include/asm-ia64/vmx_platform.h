@@ -21,18 +21,17 @@
 
 #include <public/xen.h>
 #include <public/hvm/params.h>
-#include <asm/hvm/vioapic.h>
+#include <asm/viosapic.h>
 struct mmio_list;
 typedef struct virtual_platform_def {
     unsigned long          buffered_io_va;
     spinlock_t             buffered_io_lock;
     unsigned long       shared_page_va;
     unsigned long       pib_base;
-    unsigned char       xtp;
     unsigned long       params[HVM_NR_PARAMS];
     struct mmio_list    *mmio;
     /* One IOSAPIC now... */
-    struct vioapic      vioapic;
+    struct viosapic     viosapic;
 } vir_plat_t;
 
 static inline int __fls(uint32_t word)
@@ -43,47 +42,4 @@ static inline int __fls(uint32_t word)
     __asm__ __volatile__ ("getf.exp %0=%1" : "=r"(exp) : "f"(d));
     return word ? (exp - 0xffff) : -1;
 }
-
-/* This is a connect structure between vIOSAPIC model and vLSAPIC model.
- * vlapic is required by vIOSAPIC model to manipulate pending bits, and
- * we just map them into vpd here
- */
-typedef struct vlapic {
-    struct vcpu	*vcpu;	/* Link to current vcpu */
-} vlapic_t;
-
-extern uint64_t dummy_tmr[];
-#define VLAPIC_ID(l) (uint16_t)(((l)->vcpu->arch.privregs->lid) >> 16)
-#define VLAPIC_IRR(l) ((l)->vcpu->arch.privregs->irr[0])
-struct vlapic *apic_round_robin(struct domain *d, uint8_t vector, uint32_t bitmap);
-extern int vmx_vlapic_set_irq(struct vcpu *v, uint8_t vec, uint8_t trig);
-static inline int vlapic_set_irq(struct vlapic *t, uint8_t vec, uint8_t trig)
-{
-    return vmx_vlapic_set_irq(t->vcpu, vec, trig);
-}
-
-enum ioapic_irq_destination_types {
-	dest_Fixed = 0,
-	dest_LowestPrio = 1,
-	dest_SMI = 2,
-	dest__reserved_1 = 3,
-	dest_NMI = 4,
-	dest_INIT = 5,
-	dest__reserved_2 = 6,
-	dest_ExtINT = 7
-};
-
-#define vlapic_enabled(l) 1
-
-#define VLAPIC_DELIV_MODE_FIXED		0x0
-#define VLAPIC_DELIV_MODE_REDIR		0x1
-#define VLAPIC_DELIV_MODE_LPRI		VLAPIC_DELIV_MODE_REDIR
-#define VLAPIC_DELIV_MODE_PMI		0x2
-#define VLAPIC_DELIV_MODE_SMI		0x2 /* For IA32 */
-#define VLAPIC_DELIV_MODE_RESERVED	0x3
-#define VLAPIC_DELIV_MODE_NMI		0x4
-#define VLAPIC_DELIV_MODE_INIT		0x5
-#define VLAPIC_DELIV_MODE_STARTUP	0x6 /* For IA32 */
-#define VLAPIC_DELIV_MODE_EXT		0x7
-
 #endif
