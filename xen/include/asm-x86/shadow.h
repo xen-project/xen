@@ -540,6 +540,9 @@ extern int shadow_remove_write_access(struct vcpu *v, mfn_t readonly_mfn,
  * Returns non-zero if we need to flush TLBs. */
 extern int shadow_remove_all_mappings(struct vcpu *v, mfn_t target_mfn);
 
+/* Remove all mappings from the shadows. */
+extern void shadow_blow_tables(struct domain *d);
+
 void
 shadow_remove_all_shadows_and_parents(struct vcpu *v, mfn_t gmfn);
 /* This is a HVM page that we thing is no longer a pagetable.
