@@ -431,19 +431,8 @@ static void boot_of_alloc_init(int m, uint addr_cells, uint size_cells)
         }
     }
 
-    /* FW is incorrect in that the space below our image is not safe
-     * either */
-    start = (ulong)_start >> PAGE_SHIFT;
-    pg = 0;
-    DBG("%s: marking 0x%x - 0x%lx\n", __func__,
-        pg << PAGE_SHIFT, start);
-    while (pg < start - 1) {
-        set_bit(pg, mem_available_pages);
-        ++pg;
-    }
-        
     /* Now make sure we mark our own memory */
-    pg = start;
+    pg =  (ulong)_start >> PAGE_SHIFT;
     start = (ulong)_end >> PAGE_SHIFT;
 
     DBG("%s: marking 0x%x - 0x%lx\n", __func__,
@@ -521,11 +510,8 @@ static ulong boot_of_alloc(ulong size)
         /* find a set that fits */
         DBG("%s: checking for 0x%lx bits: 0x%lx\n", __func__, bits, pos);
 
-        i = 1;
-        while (i < bits && !test_bit(pos + i, mem_available_pages))
-            ++i;
-
-        if (i == bits) {
+        i = find_next_bit(mem_available_pages, MEM_AVAILABLE_PAGES, pos);  
+        if (i - pos >= bits) {
             uint addr = pos << PAGE_SHIFT;
 
             /* make sure OF is happy with our choice */
@@ -1073,7 +1059,7 @@ static void * __init boot_of_devtree(module_t *mod, multiboot_info_t *mbi)
 
     mod->mod_start = (ulong)oft;
     mod->mod_end = mod->mod_start + oft_sz;
-    of_printf("%s: devtree mod @ 0x%016x[0x%x]\n", __func__,
+    of_printf("%s: devtree mod @ 0x%016x - 0x%016x\n", __func__,
               mod->mod_start, mod->mod_end);
 
     return oft;
@@ -1152,7 +1138,6 @@ static void * __init boot_of_module(ulong r3, ulong r4, multiboot_info_t *mbi)
         ++mod;
 
     oft = boot_of_devtree(&mods[mod], mbi);
-    of_printf("hello\n");
     if (oft == NULL)
         of_panic("%s: boot_of_devtree failed\n", __func__);
 
