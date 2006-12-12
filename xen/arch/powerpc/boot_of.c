@@ -608,7 +608,7 @@ static ulong boot_of_mem_init(void)
                 if (size_cells == 2 && (r < l) )
                     size = (size << 32) | reg[r++];
                 
-                if (r >= l)
+                if (r > l)
                     break;  /* partial line.  Skip */
 
                 boot_of_alloc_init(p, addr_cells, size_cells);
@@ -1290,6 +1290,7 @@ multiboot_info_t __init *boot_of_init(
 {
     static multiboot_info_t mbi;
     void *oft;
+    int r;
 
     of_vec = vec;
     of_msr = orig_msr;
@@ -1316,7 +1317,9 @@ multiboot_info_t __init *boot_of_init(
     of_printf("%s: _start %p _end %p 0x%lx\n", __func__, _start, _end, r6);
 
     boot_of_fix_maple();
-    boot_of_mem_init();
+    r = boot_of_mem_init();
+    if (r == 0)
+        of_panic("failure to initialize memory allocator");
     boot_of_bootargs(&mbi);
     oft = boot_of_module(r3, r4, &mbi);
     boot_of_cpus();
