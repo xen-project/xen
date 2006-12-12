@@ -1070,10 +1070,11 @@ static void * __init boot_of_module(ulong r3, ulong r4, multiboot_info_t *mbi)
     static module_t mods[4];
     ulong mod0_start;
     ulong mod0_size;
-    static const char sepr[] = " -- ";
+    static const char * sepr[] = {" -- ", " || "};
+    int sepr_index;
     extern char dom0_start[] __attribute__ ((weak));
     extern char dom0_size[] __attribute__ ((weak));
-    const char *p;
+    const char *p = NULL;
     int mod;
     void *oft;
 
@@ -1124,11 +1125,18 @@ static void * __init boot_of_module(ulong r3, ulong r4, multiboot_info_t *mbi)
 
     of_printf("%s: dom0 mod @ 0x%016x[0x%x]\n", __func__,
               mods[mod].mod_start, mods[mod].mod_end);
-    p = strstr((char *)(ulong)mbi->cmdline, sepr);
+
+    /* look for delimiter: "--" or "||" */
+    for (sepr_index = 0; sepr_index < ARRAY_SIZE(sepr); sepr_index++){
+        p = strstr((char *)(ulong)mbi->cmdline, sepr[sepr_index]);
+        if (p != NULL)
+            break;
+    }
+
     if (p != NULL) {
         /* Xen proper should never know about the dom0 args.  */
         *(char *)p = '\0';
-        p += sizeof (sepr) - 1;
+        p += strlen(sepr[sepr_index]);
         mods[mod].string = (u32)(ulong)p;
         of_printf("%s: dom0 mod string: %s\n", __func__, p);
     }
