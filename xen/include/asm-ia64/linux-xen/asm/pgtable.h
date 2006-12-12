@@ -502,7 +502,7 @@ ptep_cmpxchg_rel(struct mm_struct *mm, unsigned long addr,
 #else
 	pte_t pte = *ptep;
 	if (pte_val(pte) == pte_val(old_pte)) {
-		set_pte(ptep, npte);
+		set_pte(ptep, new_pte);
 	}
 	return pte;
 #endif
