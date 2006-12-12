@@ -178,7 +178,7 @@ long pte_enter(ulong flags, ulong ptex, ulong vsid, ulong rpn)
         return H_Parameter;
     }
 
-    if (mtype == PFN_TYPE_IO &&!test_bit(_DOMF_privileged, &d->domain_flags)) {
+    if (mtype == PFN_TYPE_IO && !d->is_privileged) {
         /* only a privilaged dom can access outside IO space */
         DBG("%s: unprivileged access to physical page: 0x%lx\n",
             __func__, pfn);

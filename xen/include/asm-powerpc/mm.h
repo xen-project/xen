@@ -28,7 +28,7 @@
 #include <xen/mm.h>
 #include <asm/system.h>
 #include <asm/flushtlb.h>
-#include <asm/uaccess.h>
+#include <asm/page.h>
 #include <asm/debugger.h>
 
 #define memguard_guard_range(_p,_l)    ((void)0)
@@ -87,7 +87,6 @@ struct page_extents {
     /* page extent */
     struct page_info *pg;
     uint order;
-    ulong pfn;
 };
 
  /* The following page types are MUTUALLY EXCLUSIVE. */
@@ -273,72 +272,20 @@ extern int update_grant_va_mapping(unsigned long va,
                                    struct domain *,
                                    struct vcpu *);
 
-#define INVALID_MFN (~0UL)
-#define PFN_TYPE_NONE 0
-#define PFN_TYPE_RMA 1
-#define PFN_TYPE_LOGICAL 2
-#define PFN_TYPE_IO 3
-#define PFN_TYPE_FOREIGN 4
-
-extern ulong pfn2mfn(struct domain *d, ulong pfn, int *type);
-
 /* Arch-specific portion of memory_op hypercall. */
 long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg);
-
-/* XXX implement me? */
-#define set_gpfn_from_mfn(mfn, pfn) do { } while (0)
-/* XXX only used for debug print right now... */
-#define get_gpfn_from_mfn(mfn) (mfn)
-
-static inline unsigned long gmfn_to_mfn(struct domain *d, unsigned long gmfn)
-{
-    int mtype;
-    ulong mfn;
-    
-    mfn = pfn2mfn(d, gmfn, &mtype);
-    if (mfn != INVALID_MFN) {
-        switch (mtype) {
-        case PFN_TYPE_RMA:
-        case PFN_TYPE_LOGICAL:
-            break;
-        default:
-            WARN();
-            mfn = INVALID_MFN;
-            break;
-        }
-    }
-    return mfn;
-}
-
-#define mfn_to_gmfn(_d, mfn) (mfn)
 
 extern int allocate_rma(struct domain *d, unsigned int order_pages);
 extern uint allocate_extents(struct domain *d, uint nrpages, uint rma_nrpages);
 extern void free_extents(struct domain *d);
 
+extern int arch_domain_add_extent(struct domain *d, struct page_info *page,
+        int order);
+
 extern int steal_page(struct domain *d, struct page_info *page,
                         unsigned int memflags);
 
-static inline unsigned long gmfn_to_mfn(struct domain *d, unsigned long gmfn)
-{
-    int mtype;
-    ulong mfn;
-    
-    mfn = pfn2mfn(d, gmfn, &mtype);
-    if (mfn != INVALID_MFN) {
-        switch (mtype) {
-        case PFN_TYPE_RMA:
-        case PFN_TYPE_LOGICAL:
-            break;
-        default:
-            WARN();
-            mfn = INVALID_MFN;
-            break;
-        }
-    }
-    return mfn;
-}
-
-#define mfn_to_gmfn(_d, mfn) (mfn)
-
+/* XXX these just exist until we can stop #including x86 code */
+#define access_ok(addr,size) 1
+#define array_access_ok(addr,count,size) 1
 #endif

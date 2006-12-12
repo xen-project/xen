@@ -230,6 +230,7 @@ static void free_page_array(xen_pfn_t *page_array)
 
 int xc_prose_build(int xc_handle,
                    uint32_t domid,
+                   unsigned int mem_mb,
                    const char *image_name,
                    const char *initrd_name,
                    const char *cmdline,
@@ -257,8 +258,7 @@ int xc_prose_build(int xc_handle,
 
     DPRINTF("cmdline=%s\n", cmdline);
 
-    DPRINTF("xc_get_tot_pages\n");
-    nr_pages = xc_get_tot_pages(xc_handle, domid);
+    nr_pages = mem_mb << (20 - PAGE_SHIFT);
     DPRINTF("nr_pages 0x%lx\n", nr_pages);
 
     rma_pages = get_rma_pages(devtree);

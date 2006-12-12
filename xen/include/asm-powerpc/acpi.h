@@ -1,0 +1,2 @@
+#define MAX_LOCAL_APIC 256
+

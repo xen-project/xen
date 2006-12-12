@@ -246,6 +246,15 @@ class PPC_LinuxImageHandler(LinuxImageHandler):
                               features       = self.vm.getFeatures(),
                               arch_args      = devtree.to_bin())
 
+    def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
+        """@param shadow_mem_kb The configured shadow memory, in KiB.
+        @param maxmem_kb The configured maxmem, in KiB.
+        @return The corresponding required amount of shadow memory, also in
+        KiB.
+        PowerPC currently uses "shadow memory" to refer to the hash table."""
+        return max(maxmem_kb / 64, shadow_mem_kb)
+
+
 class PPC_ProseImageHandler(LinuxImageHandler):
 
     ostype = "prose"
@@ -273,6 +282,7 @@ class PPC_ProseImageHandler(LinuxImageHandler):
         devtree = FlatDeviceTree.build(self)
 
         return xc.prose_build(dom            = self.vm.getDomid(),
+                              memsize        = mem_mb,
                               image          = self.kernel,
                               store_evtchn   = store_evtchn,
                               console_evtchn = console_evtchn,

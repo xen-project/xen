@@ -27,6 +27,7 @@ obj-y += memory.o
 obj-y += mm.o
 obj-y += mpic.o
 obj-y += mpic_init.o
+obj-y += numa.o
 obj-y += of-devtree.o
 obj-y += of-devwalk.o
 obj-y += ofd_fixup.o
@@ -36,6 +37,7 @@ obj-y += rtas.o
 obj-y += setup.o
 obj-y += shadow.o
 obj-y += smp.o
+obj-y += smpboot.o
 obj-y += smp-tbsync.o
 obj-y += sysctl.o
 obj-y += time.o
@@ -73,6 +75,7 @@ firmware_image.bin: firmware
 #
 irq.o: ../x86/irq.c
 physdev.o: ../x86/physdev.c
+numa.o: ../x86/numa.c
 
 HDRS += $(wildcard *.h)
 

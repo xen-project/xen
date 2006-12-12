@@ -50,6 +50,7 @@ extern char __bss_start[];
 #define CONFIG_GDB 1
 #define CONFIG_SMP 1
 #define CONFIG_PCI 1
+#define CONFIG_NUMA 1
 #define CONFIG_CMDLINE_SIZE 512
 #define NR_CPUS 16
 

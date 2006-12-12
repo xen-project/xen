@@ -20,6 +20,7 @@
  */
 #include <xen/sched.h>
 #include <xen/mm.h>
+#include <xen/numa.h>
 #include "of-devtree.h"
 #include "oftree.h"
 #include "rtas.h"
@@ -238,6 +239,9 @@ void memory_init(module_t *mod, int mcount)
     DBG("total_pages: 0x%016lx\n", total_pages);
 
     init_frametable();
+
+    numa_initmem_init(0, max_page);
+
     end_boot_allocator();
 
     /* Add memory between the beginning of the heap and the beginning

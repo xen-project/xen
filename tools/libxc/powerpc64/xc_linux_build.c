@@ -89,7 +89,7 @@ static int load_devtree(
     start_info_t *start_info __attribute__((unused)),
     unsigned long start_info_addr)
 {
-    uint32_t start_info[4] = {0, start_info_addr, 0, 0x1000};
+    uint32_t si[4] = {0, start_info_addr, 0, 0x1000};
     struct boot_param_header *header;
     void *chosen;
     void *xen;
@@ -127,8 +127,14 @@ static int load_devtree(
         return rc;
     }
 
+    rc = ft_set_rsvmap(devtree, 1, initrd_base, initrd_len);
+    if (rc < 0) {
+        DPRINTF("couldn't set initrd reservation\n");
+        return ~0UL;
+    }
+
     /* start-info (XXX being removed soon) */
-    rc = ft_set_prop(&devtree, xen, "start-info", start_info, sizeof(start_info));
+    rc = ft_set_prop(&devtree, xen, "start-info", si, sizeof(si));
     if (rc < 0) {
         DPRINTF("couldn't set /xen/start-info\n");
         return rc;
@@ -136,6 +142,15 @@ static int load_devtree(
 
     header = devtree;
     devtree_size = header->totalsize;
+    {
+        static const char dtb[] = "/tmp/xc_domU.dtb";
+        int dfd = creat(dtb, 0666);
+        if (dfd != -1) {
+            write(dfd, devtree, devtree_size);
+            close(dfd);
+        } else
+            DPRINTF("could not open(\"%s\")\n", dtb);
+    }
 
     DPRINTF("copying device tree to 0x%lx[0x%x]\n", DEVTREE_ADDR, devtree_size);
     return install_image(xc_handle, domid, page_array, devtree, DEVTREE_ADDR,
@@ -172,22 +187,35 @@ out:
 }
 
 static unsigned long create_start_info(
-	start_info_t *start_info,
+	void *devtree, start_info_t *start_info,
         unsigned int console_evtchn, unsigned int store_evtchn,
 	unsigned long nr_pages, unsigned long rma_pages)
 {
     unsigned long start_info_addr;
+    uint64_t rma_top;
+    int rc;
 
     memset(start_info, 0, sizeof(*start_info));
-    snprintf(start_info->magic, sizeof(start_info->magic), "xen-%d.%d-powerpc64HV", 3, 0);
+    snprintf(start_info->magic, sizeof(start_info->magic),
+             "xen-%d.%d-powerpc64HV", 3, 0);
+
+    rma_top = rma_pages << PAGE_SHIFT;
+    DPRINTF("RMA top = 0x%"PRIX64"\n", rma_top);
 
     start_info->nr_pages = nr_pages;
-    start_info->shared_info = (nr_pages - 1) << PAGE_SHIFT;
-    start_info->store_mfn = start_info->nr_pages - 2;
+    start_info->shared_info = rma_top - PAGE_SIZE;
+    start_info->store_mfn = (rma_top >> PAGE_SHIFT) - 2;
     start_info->store_evtchn = store_evtchn;
-    start_info->console.domU.mfn = start_info->nr_pages - 3;
+    start_info->console.domU.mfn = (rma_top >> PAGE_SHIFT) - 3;
     start_info->console.domU.evtchn = console_evtchn;
-    start_info_addr = (start_info->nr_pages - 4) << PAGE_SHIFT;
+    start_info_addr = rma_top - 4*PAGE_SIZE;
+
+    rc = ft_set_rsvmap(devtree, 0, start_info_addr, 4*PAGE_SIZE);
+    if (rc < 0) {
+        DPRINTF("couldn't set start_info reservation\n");
+        return ~0UL;
+    }
+
 
     return start_info_addr;
 }
@@ -201,6 +229,7 @@ static void free_page_array(xen_pfn_t *page_array)
 
 int xc_linux_build(int xc_handle,
                    uint32_t domid,
+                   unsigned int mem_mb,
                    const char *image_name,
                    const char *initrd_name,
                    const char *cmdline,
@@ -226,8 +255,7 @@ int xc_linux_build(int xc_handle,
 
     DPRINTF("%s\n", __func__);
 
-    DPRINTF("xc_get_tot_pages\n");
-    nr_pages = xc_get_tot_pages(xc_handle, domid);
+    nr_pages = mem_mb << (20 - PAGE_SHIFT);
     DPRINTF("nr_pages 0x%lx\n", nr_pages);
 
     rma_pages = get_rma_pages(devtree);
@@ -258,7 +286,7 @@ int xc_linux_build(int xc_handle,
     }
 
     /* start_info stuff: about to be removed  */
-    start_info_addr = create_start_info(&start_info, console_evtchn,
+    start_info_addr = create_start_info(devtree, &start_info, console_evtchn,
                                         store_evtchn, nr_pages, rma_pages);
     *console_mfn = page_array[start_info.console.domU.mfn];
     *store_mfn = page_array[start_info.store_mfn];

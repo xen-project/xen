@@ -25,6 +25,12 @@
 #include <xen/cpumask.h>
 #include <xen/init.h>
 #include <asm/current.h>
+
+/* crap to make x86 "common code" happy */
+#define BAD_APICID 0xFFu
+extern u8 x86_cpu_to_apicid[];
+
+
 extern int smp_num_siblings;
 
 /* revisit when we support SMP */

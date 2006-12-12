@@ -101,9 +101,6 @@ unsigned int shadow_set_allocation(struct domain *d,
 
     addr = htab_alloc(d, order);
 
-    printk("%s: ibm,fpt-size should be: 0x%x\n", __func__,
-           d->arch.htab.log_num_ptes + LOG_PTE_SIZE);
-
     if (addr == 0)
         return -ENOMEM;
 

@@ -35,6 +35,7 @@
 #include <xen/gdbstub.h>
 #include <xen/symbols.h>
 #include <xen/keyhandler.h>
+#include <xen/numa.h>
 #include <acm/acm_hooks.h>
 #include <public/version.h>
 #include <asm/mpic.h>
@@ -77,10 +78,7 @@ ulong oftree_len;
 ulong oftree_end;
 
 uint cpu_hard_id[NR_CPUS] __initdata;
-cpumask_t cpu_sibling_map[NR_CPUS] __read_mostly;
-cpumask_t cpu_online_map; /* missing ifdef in schedule.c */
 cpumask_t cpu_present_map;
-cpumask_t cpu_possible_map;
 
 /* XXX get this from ISA node in device tree */
 char *vgabase;
@@ -210,6 +208,15 @@ void startup_cpu_idle_loop(void)
     reset_stack_and_jump(idle_loop);
 }
 
+/* The boot_pa is enough "parea" for the boot CPU to get thru
+ * initialization, it will ultimately get replaced later */
+static __init void init_boot_cpu(void)
+{
+    static struct processor_area boot_pa;
+    boot_pa.whoami = 0;
+    parea = &boot_pa;
+}    
+
 static void init_parea(int cpuid)
 {
     /* Be careful not to shadow the global variable.  */
@@ -250,6 +257,9 @@ static int kick_secondary_cpus(int maxcpus)
         /* wait for it */
         while (!cpu_online(cpuid))
             cpu_relax();
+
+        numa_set_node(cpuid, 0);
+        numa_add_cpu(cpuid);
     }
 
     return 0;
@@ -292,6 +302,9 @@ static void __init __start_xen(multiboot_info_t *mbi)
     /* Parse the command-line options. */
     if ((mbi->flags & MBI_CMDLINE) && (mbi->cmdline != 0))
         cmdline_parse(__va((ulong)mbi->cmdline));
+
+    /* we need to be able to identify this CPU early on */
+    init_boot_cpu();
 
     /* We initialise the serial devices very early so we can get debugging. */
     ns16550.io_base = 0x3f8;

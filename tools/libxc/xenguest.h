@@ -124,6 +124,7 @@ int xc_get_hvm_param(
 
 int xc_prose_build(int xc_handle,
                    uint32_t domid,
+                   unsigned int mem_mb,
                    const char *image_name,
                    const char *ramdisk_name,
                    const char *cmdline,

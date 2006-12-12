@@ -284,21 +284,21 @@ extern void copy_page(void *dp, void *sp)
     }
 }
 
+/* XXX should probably replace with faster data structure */
 static uint add_extent(struct domain *d, struct page_info *pg, uint order)
 {
     struct page_extents *pe;
 
     pe = xmalloc(struct page_extents);
     if (pe == NULL)
-        return 0;
+        return -ENOMEM;
 
     pe->pg = pg;
     pe->order = order;
-    pe->pfn = page_to_mfn(pg);
 
     list_add_tail(&pe->pe_list, &d->arch.extent_list);
 
-    return pe->pfn;
+    return 0;
 }
 
 void free_extents(struct domain *d)
@@ -337,7 +337,7 @@ uint allocate_extents(struct domain *d, uint nrpages, uint rma_nrpages)
         if (pg == NULL)
             return total_nrpages;
 
-        if (add_extent(d, pg, ext_order) == 0) {
+        if (add_extent(d, pg, ext_order) < 0) {
             free_domheap_pages(pg, ext_order);
             return total_nrpages;
         }
@@ -390,13 +390,13 @@ int allocate_rma(struct domain *d, unsigned int order)
 
     return 0;
 }
+
 void free_rma_check(struct page_info *page)
 {
     if (test_bit(_PGC_page_RMA, &page->count_info) &&
         !test_bit(_DOMF_dying, &page_get_owner(page)->domain_flags))
         panic("Attempt to free an RMA page: 0x%lx\n", page_to_mfn(page));
 }
-
 
 ulong pfn2mfn(struct domain *d, ulong pfn, int *type)
 {
@@ -415,8 +415,7 @@ ulong pfn2mfn(struct domain *d, ulong pfn, int *type)
         /* Its a grant table access */
         t = PFN_TYPE_GNTTAB;
         mfn = gnttab_shared_mfn(d, d->grant_table, (pfn - max_page));
-    } else if (test_bit(_DOMF_privileged, &d->domain_flags) &&
-               cpu_io_mfn(pfn)) {
+    } else if (d->is_privileged && cpu_io_mfn(pfn)) {
         t = PFN_TYPE_IO;
         mfn = pfn;
     } else {
@@ -424,14 +423,18 @@ ulong pfn2mfn(struct domain *d, ulong pfn, int *type)
             t = PFN_TYPE_RMA;
             mfn = pfn + rma_base_mfn;
         } else {
-            list_for_each_entry (pe, &d->arch.extent_list, pe_list) {
-                uint end_pfn = pe->pfn + (1 << pe->order);
+            ulong cur_pfn = rma_size_mfn;
 
-                if (pfn >= pe->pfn && pfn < end_pfn) {
+            list_for_each_entry (pe, &d->arch.extent_list, pe_list) {
+                uint pe_pages = 1UL << pe->order;
+                uint end_pfn = cur_pfn + pe_pages;
+
+                if (pfn >= cur_pfn && pfn < end_pfn) {
                     t = PFN_TYPE_LOGICAL;
-                    mfn = page_to_mfn(pe->pg) + (pfn - pe->pfn);
+                    mfn = page_to_mfn(pe->pg) + (pfn - cur_pfn);
                     break;
                 }
+                cur_pfn += pe_pages;
             }
         }
 #ifdef DEBUG
@@ -492,8 +495,7 @@ unsigned long mfn_to_gmfn(struct domain *d, unsigned long mfn)
         return max_page + (mfn - gnttab_mfn);
 
     /* IO? */
-    if (test_bit(_DOMF_privileged, &d->domain_flags) &&
-        cpu_io_mfn(mfn))
+    if (d->is_privileged && cpu_io_mfn(mfn))
         return mfn;
 
     rma_mfn = page_to_mfn(d->arch.rma_page);
@@ -529,4 +531,11 @@ void guest_physmap_remove_page(
 void shadow_drop_references(
     struct domain *d, struct page_info *page)
 {
+}
+
+int arch_domain_add_extent(struct domain *d, struct page_info *page, int order)
+{
+    if (add_extent(d, page, order) < 0)
+        return -ENOMEM;
+    return 0;
 }

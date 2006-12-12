@@ -72,13 +72,13 @@ cas_u32(volatile u32 *ptr, u32 oval, u32 nval)
 
 typedef struct {
     volatile u32 lock;
-	u16 recurse_cpu;
-	u16 recurse_cnt;
+    s16 recurse_cpu;
+    u16 recurse_cnt;
 } spinlock_t;
 
 #define __UNLOCKED (0U)
 #define __LOCKED (~__UNLOCKED)
-#define SPIN_LOCK_UNLOCKED /*(spinlock_t)*/ { __UNLOCKED }
+#define SPIN_LOCK_UNLOCKED /*(spinlock_t)*/ { __UNLOCKED, -1, 0 }
 static inline void spin_lock_init(spinlock_t *lock)
 {
     *lock = (spinlock_t) SPIN_LOCK_UNLOCKED;
