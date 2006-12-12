@@ -385,6 +385,13 @@ struct xen_domctl_settimeoffset {
 typedef struct xen_domctl_settimeoffset xen_domctl_settimeoffset_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_settimeoffset_t);
 
+#define XEN_DOMCTL_real_mode_area     26
+struct xen_domctl_real_mode_area {
+    uint32_t log; /* log2 of Real Mode Area size */
+};
+typedef struct xen_domctl_real_mode_area xen_domctl_real_mode_area_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_real_mode_area_t);
+
 struct xen_domctl {
     uint32_t cmd;
     uint32_t interface_version; /* XEN_DOMCTL_INTERFACE_VERSION */
@@ -410,6 +417,7 @@ struct xen_domctl {
         struct xen_domctl_hypercall_init    hypercall_init;
         struct xen_domctl_arch_setup        arch_setup;
         struct xen_domctl_settimeoffset     settimeoffset;
+        struct xen_domctl_real_mode_area    real_mode_area;
         uint8_t                             pad[128];
     } u;
 };
