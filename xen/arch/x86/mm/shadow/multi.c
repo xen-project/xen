@@ -3488,6 +3488,9 @@ sh_update_cr3(struct vcpu *v)
                                        ? SH_type_l2h_shadow 
                                        : SH_type_l2_shadow);
             }
+            else
+                /* The guest is not present: clear out the shadow. */
+                sh_set_toplevel_shadow(v, i, _mfn(INVALID_MFN), 0); 
         }
     }
 #elif GUEST_PAGING_LEVELS == 4
