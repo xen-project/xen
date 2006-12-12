@@ -21,6 +21,7 @@ from xen.web import http
 from xen.xend import sxp
 from xen.xend import XendDomain
 from xen.xend.Args import FormFn
+from xen.xend.XendLogging import log
 
 from xen.web.SrvDir import SrvDir
 
@@ -62,6 +63,18 @@ class SrvDomain(SrvDir):
     def op_shutdown(self, _, req):
         self.acceptCommand(req)
         return self.dom.shutdown(req.args['reason'][0])
+
+    def op_delete(self, _, req):
+        self.acceptCommand(req)
+        return self.xd.domain_delete(self.dom.getName())
+
+    def op_start(self, _, req):
+        self.acceptCommand(req)
+        paused = False
+        if 'paused' in req.args and req.args['paused'] == [1]:
+            paused = True
+        log.debug("Starting domain " + self.dom.getName() + " " + str(paused))
+        return self.xd.domain_start(self.dom.getName(), paused)
 
     def op_sysrq(self, _, req):
         self.acceptCommand(req)

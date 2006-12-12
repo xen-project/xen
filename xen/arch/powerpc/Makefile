@@ -42,6 +42,8 @@ obj-y += smp-tbsync.o
 obj-y += sysctl.o
 obj-y += time.o
 obj-y += usercopy.o
+obj-y += machine_kexec.o
+obj-y += crash.o
 
 obj-$(debug) += 0opt.o
 obj-$(crash_debug) += gdbstub.o

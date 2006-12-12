@@ -53,60 +53,29 @@ class PciController(DevController):
 
     def getDeviceDetails(self, config):
         """@see DevController.getDeviceDetails"""
-        #log.debug('pci config='+sxp.to_string(config))
-
-        def get_param(config, field, default=None):
+        def parse_hex(val):
             try:
-                val = sxp.child_value(config, field)
-
-                if not val:
-                    if default==None:
-                        raise VmError('pci: Missing %s config setting' % field)
-                    else:
-                        return default
-
                 if isinstance(val, types.StringTypes):
                     return int(val, 16)
                 else:
                     return val
-            except:
-                if default==None:
-                    raise VmError('pci: Invalid config setting %s: %s' %
-                              (field, val))
-                else:
-                    return default
-        
-        back = {}
-
-        val = sxp.child_value(config, 'dev')
-        if isinstance(val, (types.ListType, types.TupleType)):
-            pcidevid = 0
-            for dev_config in sxp.children(config, 'dev'):
-                domain = get_param(dev_config, 'domain', 0)
-                bus = get_param(dev_config,'bus')
-                slot = get_param(dev_config,'slot')
-                func = get_param(dev_config,'func')
-
-                self.setupDevice(domain, bus, slot, func)
-
-                back['dev-%i' % pcidevid]="%04x:%02x:%02x.%02x"% \
-                        (domain, bus, slot, func)
-                pcidevid+=1
+            except ValueError:
+                return None
             
-            back['num_devs']=str(pcidevid)
-
-        else:
-            # Xen 2.0 configuration compatibility
-            domain = get_param(config, 'domain', 0)
-            bus  = get_param(config, 'bus')
-            slot = get_param(config, 'dev')
-            func = get_param(config, 'func')
-
+        back = {}
+        pcidevid = 0
+        for pci_config in config.get('devs', []):
+            domain = parse_hex(pci_config.get('domain', 0))
+            bus = parse_hex(pci_config.get('bus', 0))
+            slot = parse_hex(pci_config.get('slot', 0))
+            func = parse_hex(pci_config.get('func', 0))            
             self.setupDevice(domain, bus, slot, func)
+            back['dev-%i' % pcidevid] = "%04x:%02x:%02x.%02x" % \
+                                        (domain, bus, slot, func)
+            pcidevid += 1
 
-            back['dev-0']="%04x:%02x:%02x.%02x"%(domain, bus, slot, func)
-            back['num_devs']=str(1)
-
+        back['num_devs']=str(pcidevid)
+        back['uuid'] = config.get('uuid','')
         return (0, back, {})
 
     def getDeviceConfiguration(self, devid):
@@ -129,7 +98,8 @@ class PciController(DevController):
                                  'slot': '0x%(slot)s' % pci_dev_info,
                                  'func': '0x%(func)s' % pci_dev_info})
 
-        result['dev'] = pci_devs
+        result['devs'] = pci_devs
+        result['uuid'] = self.readBackend(devid, 'uuid')
         return result
 
     def configuration(self, devid):
@@ -142,7 +112,8 @@ class PciController(DevController):
         sxpr = [self.deviceClass]
 
         # remove devs
-        devs = configDict.pop('dev', [])
+        devs = configDict.pop('devs', [])
+        
         for dev in devs:
             dev_sxpr = ['dev']
             for dev_item in dev.items():

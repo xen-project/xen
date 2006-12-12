@@ -581,7 +581,7 @@ guest_index(void *ptr)
     return (u32)((unsigned long)ptr & ~PAGE_MASK) / sizeof(guest_l1e_t);
 }
 
-static inline u32
+static u32
 shadow_l1_index(mfn_t *smfn, u32 guest_index)
 {
 #if (GUEST_PAGING_LEVELS == 2) && (SHADOW_PAGING_LEVELS != 2)
@@ -593,7 +593,7 @@ shadow_l1_index(mfn_t *smfn, u32 guest_index)
 #endif
 }
 
-static inline u32
+static u32
 shadow_l2_index(mfn_t *smfn, u32 guest_index)
 {
 #if (GUEST_PAGING_LEVELS == 2) && (SHADOW_PAGING_LEVELS != 2)
@@ -613,13 +613,13 @@ shadow_l2_index(mfn_t *smfn, u32 guest_index)
 
 #if GUEST_PAGING_LEVELS >= 4
 
-static inline u32
+static u32
 shadow_l3_index(mfn_t *smfn, u32 guest_index)
 {
     return guest_index;
 }
 
-static inline u32
+static u32
 shadow_l4_index(mfn_t *smfn, u32 guest_index)
 {
     return guest_index;
@@ -851,7 +851,9 @@ static inline void safe_write_entry(void *dst, void *src)
      * then writing the high word before the low word. */
     BUILD_BUG_ON(sizeof (shadow_l1e_t) != 2 * sizeof (unsigned long));
     d[0] = 0;
+    wmb();
     d[1] = s[1];
+    wmb();
     d[0] = s[0];
 #else
     /* In 32-bit and 64-bit, sizeof(pte) == sizeof(ulong) == 1 word,
@@ -2582,7 +2584,8 @@ static int sh_page_fault(struct vcpu *v,
     mfn_t gmfn, sl1mfn=_mfn(0);
     shadow_l1e_t sl1e, *ptr_sl1e;
     paddr_t gpa;
-    struct x86_emulate_ctxt emul_ctxt;
+    struct sh_emulate_ctxt emul_ctxt;
+    struct x86_emulate_ops *emul_ops;
     int r, mmio;
     fetch_type_t ft = 0;
 
@@ -2760,6 +2763,7 @@ static int sh_page_fault(struct vcpu *v,
          * shadow_set_l*e(), which will have crashed the guest.  
          * Get out of the fault handler immediately. */
         ASSERT(test_bit(_DOMF_dying, &d->domain_flags));
+        unmap_walk(v, &gw); 
         shadow_unlock(d);
         return 0;
     }
@@ -2808,26 +2812,22 @@ static int sh_page_fault(struct vcpu *v,
     return EXCRET_fault_fixed;
 
  emulate:
-    /* Take the register set we were called with */
+    if ( !shadow_mode_refcounts(d) || !guest_mode(regs) )
+        goto not_a_shadow_fault;
+
     if ( is_hvm_domain(d) )
         hvm_store_cpu_guest_regs(v, regs, NULL);
-    emul_ctxt.regs = regs;
-    emul_ctxt.cr2  = va;
-    emul_ctxt.mode = (is_hvm_domain(d) ?
-                      hvm_guest_x86_mode(v) : X86EMUL_MODE_HOST);
-
     SHADOW_PRINTK("emulate: eip=%#lx\n", regs->eip);
 
-    v->arch.shadow.propagate_fault = 0;
+    emul_ops = shadow_init_emulation(&emul_ctxt, regs);
 
     /*
      * We do not emulate user writes. Instead we use them as a hint that the
      * page is no longer a page table. This behaviour differs from native, but
      * it seems very unlikely that any OS grants user access to page tables.
-     * We also disallow guest PTE updates from within Xen.
      */
-    if ( (regs->error_code & PFEC_user_mode) || !guest_mode(regs) ||
-         x86_emulate_memop(&emul_ctxt, &shadow_emulator_ops) )
+    if ( (regs->error_code & PFEC_user_mode) ||
+         x86_emulate_memop(&emul_ctxt.ctxt, emul_ops) )
     {
         SHADOW_PRINTK("emulator failure, unshadowing mfn %#lx\n", 
                        mfn_x(gmfn));
@@ -2836,19 +2836,11 @@ static int sh_page_fault(struct vcpu *v,
          * to support more operations in the emulator.  More likely, 
          * though, this is a hint that this page should not be shadowed. */
         shadow_remove_all_shadows(v, gmfn);
-        /* This means that actual missing operations will cause the 
-         * guest to loop on the same page fault. */
-        goto done;
     }
-
-    /* Emulation triggered another page fault? */
-    if ( v->arch.shadow.propagate_fault )
-        goto not_a_shadow_fault;
 
     /* Emulator has changed the user registers: write back */
     if ( is_hvm_domain(d) )
         hvm_load_cpu_guest_regs(v, regs);
-
     goto done;
 
  mmio:
@@ -3787,11 +3779,11 @@ int sh_remove_l3_shadow(struct vcpu *v, mfn_t sl4mfn, mfn_t sl3mfn)
  * or NULL for error. */
 static inline void * emulate_map_dest(struct vcpu *v,
                                       unsigned long vaddr,
-                                      struct x86_emulate_ctxt *ctxt,
+                                      struct sh_emulate_ctxt *sh_ctxt,
                                       mfn_t *mfnp)
 {
     walk_t gw;
-    u32 flags;
+    u32 flags, errcode;
     gfn_t gfn;
     mfn_t mfn;
 
@@ -3802,13 +3794,17 @@ static inline void * emulate_map_dest(struct vcpu *v,
     sh_audit_gw(v, &gw);
     unmap_walk(v, &gw);
 
-    if ( !(flags & _PAGE_PRESENT) 
-         || !(flags & _PAGE_RW) 
-         || (!(flags & _PAGE_USER) && ring_3(ctxt->regs)) )
+    if ( !(flags & _PAGE_PRESENT) )
     {
-        /* This write would have faulted even on bare metal */
-        v->arch.shadow.propagate_fault = 1;
-        return NULL;
+        errcode = 0;
+        goto page_fault;
+    }
+
+    if ( !(flags & _PAGE_RW) ||
+         (!(flags & _PAGE_USER) && ring_3(sh_ctxt->ctxt.regs)) )
+    {
+        errcode = PFEC_page_present;
+        goto page_fault;
     }
 
     /* Attempted a write to a bad gfn? This should never happen:
@@ -3818,11 +3814,19 @@ static inline void * emulate_map_dest(struct vcpu *v,
     ASSERT(sh_mfn_is_a_page_table(mfn));
     *mfnp = mfn;
     return sh_map_domain_page(mfn) + (vaddr & ~PAGE_MASK);
+
+ page_fault:
+    errcode |= PFEC_write_access;
+    if ( is_hvm_vcpu(v) )
+        hvm_inject_exception(TRAP_page_fault, errcode, vaddr);
+    else
+        propagate_page_fault(vaddr, errcode);
+    return NULL;
 }
 
 int
 sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
-                      u32 bytes, struct x86_emulate_ctxt *ctxt)
+                      u32 bytes, struct sh_emulate_ctxt *sh_ctxt)
 {
     mfn_t mfn;
     void *addr;
@@ -3833,7 +3837,7 @@ sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
     ASSERT(shadow_lock_is_acquired(v->domain));
     ASSERT(((vaddr & ~PAGE_MASK) + bytes) <= PAGE_SIZE);
 
-    if ( (addr = emulate_map_dest(v, vaddr, ctxt, &mfn)) == NULL )
+    if ( (addr = emulate_map_dest(v, vaddr, sh_ctxt, &mfn)) == NULL )
         return X86EMUL_PROPAGATE_FAULT;
 
     memcpy(addr, src, bytes);
@@ -3851,7 +3855,7 @@ sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
 int
 sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr, 
                         unsigned long old, unsigned long new,
-                        unsigned int bytes, struct x86_emulate_ctxt *ctxt)
+                        unsigned int bytes, struct sh_emulate_ctxt *sh_ctxt)
 {
     mfn_t mfn;
     void *addr;
@@ -3864,7 +3868,7 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
     if ( vaddr & (bytes-1) )
         return X86EMUL_UNHANDLEABLE;
 
-    if ( (addr = emulate_map_dest(v, vaddr, ctxt, &mfn)) == NULL )
+    if ( (addr = emulate_map_dest(v, vaddr, sh_ctxt, &mfn)) == NULL )
         return X86EMUL_PROPAGATE_FAULT;
 
     switch ( bytes )
@@ -3900,7 +3904,7 @@ int
 sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr, 
                           unsigned long old_lo, unsigned long old_hi,
                           unsigned long new_lo, unsigned long new_hi,
-                          struct x86_emulate_ctxt *ctxt)
+                          struct sh_emulate_ctxt *sh_ctxt)
 {
     mfn_t mfn;
     void *addr;
@@ -3912,7 +3916,7 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
     if ( vaddr & 7 )
         return X86EMUL_UNHANDLEABLE;
 
-    if ( (addr = emulate_map_dest(v, vaddr, ctxt, &mfn)) == NULL )
+    if ( (addr = emulate_map_dest(v, vaddr, sh_ctxt, &mfn)) == NULL )
         return X86EMUL_PROPAGATE_FAULT;
 
     old = (((u64) old_hi) << 32) | (u64) old_lo;

@@ -478,6 +478,12 @@ ENTRY(double_fault)
         call  do_double_fault
         ud2
 
+ENTRY(early_page_fault)
+        SAVE_ALL
+        movq  %rsp,%rdi
+        call  do_early_page_fault
+        jmp   restore_all_xen
+
 ENTRY(nmi)
         pushq $0
         SAVE_ALL
@@ -559,6 +565,7 @@ ENTRY(hypercall_table)
         .quad do_hvm_op
         .quad do_sysctl             /* 35 */
         .quad do_domctl
+        .quad do_kexec_op
         .rept NR_hypercalls-((.-hypercall_table)/8)
         .quad do_ni_hypercall
         .endr
@@ -601,6 +608,7 @@ ENTRY(hypercall_args_table)
         .byte 2 /* do_hvm_op            */
         .byte 1 /* do_sysctl            */  /* 35 */
         .byte 1 /* do_domctl            */
+        .byte 2 /* do_kexec             */
         .rept NR_hypercalls-(.-hypercall_args_table)
         .byte 0 /* do_ni_hypercall      */
         .endr

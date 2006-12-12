@@ -9,7 +9,6 @@ ide_iops.h		-> linux/include/asm-generic/ide_iops.h
 iomap.h			-> linux/include/asm-generic/iomap.h
 pci.h			-> linux/include/asm-generic/pci.h
 pgtable.h		-> linux/include/asm-generic/pgtable.h
-pgtable-nopud.h		-> linux/include/asm-generic/pgtable-nopud.h
 sections.h		-> linux/include/asm-generic/sections.h
 topology.h		-> linux/include/asm-generic/topology.h
 unaligned.h		-> linux/include/asm-generic/unaligned.h

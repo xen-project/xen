@@ -257,9 +257,6 @@ static inline int sh_type_is_pinnable(struct vcpu *v, unsigned int t)
  * Various function declarations 
  */
 
-/* x86 emulator support */
-extern struct x86_emulate_ops shadow_emulator_ops;
-
 /* Hash table functions */
 mfn_t shadow_hash_lookup(struct vcpu *v, unsigned long n, unsigned int t);
 void  shadow_hash_insert(struct vcpu *v, 
@@ -505,6 +502,25 @@ static inline void sh_unpin(struct vcpu *v, mfn_t smfn)
         sh_put_ref(v, smfn, 0);
     }
 }
+
+
+/**************************************************************************/
+/* PTE-write emulation. */
+
+struct sh_emulate_ctxt {
+    struct x86_emulate_ctxt ctxt;
+
+    /* [HVM] Cache of up to 15 bytes of instruction. */
+    uint8_t insn_buf[15];
+    uint8_t insn_buf_bytes;
+
+    /* [HVM] Cache of segment registers already gathered for this emulation. */
+    unsigned int valid_seg_regs;
+    struct segment_register seg_reg[6];
+};
+
+struct x86_emulate_ops *shadow_init_emulation(
+    struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs);
 
 #endif /* _XEN_SHADOW_PRIVATE_H */
 

@@ -21,7 +21,6 @@ import string
 
 from xen.util import blkif
 from xen.util import security
-from xen.xend import sxp
 from xen.xend.XendError import VmError
 from xen.xend.server.DevController import DevController
 
@@ -37,9 +36,9 @@ class BlkifController(DevController):
 
     def getDeviceDetails(self, config):
         """@see DevController.getDeviceDetails"""
-        uname = sxp.child_value(config, 'uname', '')
-        dev = sxp.child_value(config, 'dev', '')
-
+        uname = config.get('uname', '')
+        dev = config.get('dev', '')
+        
         if 'ioemu:' in dev:
             (_, dev) = string.split(dev, ':', 1)
         try:
@@ -59,17 +58,17 @@ class BlkifController(DevController):
             except ValueError:
                 (typ, params) = ("", "")
 
-        mode = sxp.child_value(config, 'mode', 'r')
+        mode = config.get('mode', 'r')
         if mode not in ('r', 'w', 'w!'):
             raise VmError('Invalid mode')
 
-        back = { 'dev'    : dev,
-                 'type'   : typ,
-                 'params' : params,
-                 'mode'   : mode
-               }
+        back = {'dev'    : dev,
+                'type'   : typ,
+                'params' : params,
+                'mode'   : mode,
+                }
 
-        uuid = sxp.child_value(config, 'uuid')
+        uuid = config.get('uuid')
         if uuid:
             back['uuid'] = uuid
 
@@ -125,6 +124,8 @@ class BlkifController(DevController):
             config['dev'] = dev
         if typ and params:
             config['uname'] = typ +':' + params
+        else:
+            config['uname'] = None
         if mode:
             config['mode'] = mode
         if uuid:

@@ -23,7 +23,7 @@ The following classes are defined:
 Name & Description \\
 \hline
 {\tt session} & A session \\
-{\tt task} & A longrunning asynchronous task \\
+{\tt task} & A long-running asynchronous task \\
 {\tt VM} & A virtual machine (or 'guest') \\
 {\tt host} & A physical host \\
 {\tt host\_cpu} & A physical CPU \\
@@ -34,6 +34,7 @@ Name & Description \\
 {\tt VDI} & A virtual disk image \\
 {\tt VBD} & A virtual block device \\
 {\tt VTPM} & A virtual TPM device \\
+{\tt console} & A console \\
 {\tt user} & A user of the system \\
 {\tt debug} & A basic class for testing \\
 \hline
@@ -54,6 +55,7 @@ PIF.host & host.PIFs & one-to-many\\
 PIF.network & network.PIFs & one-to-many\\
 SR.VDIs & VDI.SR & many-to-one\\
 VTPM.VM & VM.VTPMs & one-to-many\\
+console.VM & VM.consoles & one-to-many\\
 host.resident\_VMs & VM.resident\_on & many-to-one\\
 host.host\_CPUs & host\_cpu.host & many-to-one\\
 \hline
@@ -99,6 +101,17 @@ The following enumeration types are used:
 
 \begin{longtable}{|ll|}
 \hline
+{\tt enum console\_protocol} & \\
+\hline
+\hspace{0.5cm}{\tt vt100} & VT100 terminal \\
+\hspace{0.5cm}{\tt rfb} & Remote FrameBuffer protocol (as used in VNC) \\
+\hspace{0.5cm}{\tt rdp} & Remote Desktop Protocol \\
+\hline
+\end{longtable}
+
+\vspace{1cm}
+\begin{longtable}{|ll|}
+\hline
 {\tt enum vdi\_type} & \\
 \hline
 \hspace{0.5cm}{\tt system} & a disk that may be replaced on upgrade \\
@@ -118,6 +131,17 @@ The following enumeration types are used:
 \hspace{0.5cm}{\tt Suspended} & Suspended \\
 \hspace{0.5cm}{\tt ShuttingDown} & Shutting Down \\
 \hspace{0.5cm}{\tt Unknown} & Some other unknown state \\
+\hline
+\end{longtable}
+
+\vspace{1cm}
+\begin{longtable}{|ll|}
+\hline
+{\tt enum task\_status\_type} & \\
+\hline
+\hspace{0.5cm}{\tt pending} & task is in progress \\
+\hspace{0.5cm}{\tt success} & task was completed successfully \\
+\hspace{0.5cm}{\tt failure} & task has failed \\
 \hline
 \end{longtable}
 
@@ -242,6 +266,16 @@ The following enumeration types are used:
 \vspace{1cm}
 \begin{longtable}{|ll|}
 \hline
+{\tt enum vbd\_type} & \\
+\hline
+\hspace{0.5cm}{\tt CD} & VBD will appear to guest as CD \\
+\hspace{0.5cm}{\tt Disk} & VBD will appear to guest as disk \\
+\hline
+\end{longtable}
+
+\vspace{1cm}
+\begin{longtable}{|ll|}
+\hline
 {\tt enum driver\_type} & \\
 \hline
 \hspace{0.5cm}{\tt ioemu} & use hardware emulation \\
@@ -261,6 +295,7 @@ The following enumeration types are used:
 \hline
 Quals & Field & Type & Description \\
 \hline
+$\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt this\_host} & host ref & Currently connected host \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt this\_user} & user ref & Currently connected user \\
 \hline
@@ -321,10 +356,42 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~get\_uuid}
+
+{\bf Overview:} 
+Get the uuid field of the given session.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_uuid (session_id s, session ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt session ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_this\_host}
 
 {\bf Overview:} 
-get accessor message derived from field this\_host of object session
+Get the this\_host field of the given session.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (host ref) get_this_host (session_id s, session ref self)\end{verbatim}
@@ -337,7 +404,7 @@ get accessor message derived from field this\_host of object session
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt session ref } & self & object instance \\ \hline 
+{\tt session ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -356,7 +423,7 @@ value of the field
 \subsubsection{RPC name:~get\_this\_user}
 
 {\bf Overview:} 
-get accessor message derived from field this\_user of object session
+Get the this\_user field of the given session.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (user ref) get_this_user (session_id s, session ref self)\end{verbatim}
@@ -369,7 +436,7 @@ get accessor message derived from field this\_user of object session
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt session ref } & self & object instance \\ \hline 
+{\tt session ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -388,7 +455,7 @@ value of the field
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
-constructor for class session
+Create a new session instance, and return its handle.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (session ref) create (session_id s, session record args)\end{verbatim}
@@ -420,7 +487,7 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-destructor for class session
+Destroy the specified session instance.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, session ref self)\end{verbatim}
@@ -433,7 +500,7 @@ destructor for class session
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt session ref } & self & object instance \\ \hline 
+{\tt session ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -452,7 +519,7 @@ void
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
-returns the session instance with a particular uuid
+Get a reference to the session instance with the specified UUID.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (session ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
@@ -484,7 +551,7 @@ reference to the object
 \subsubsection{RPC name:~get\_record}
 
 {\bf Overview:} 
-returns a record containing the state of an instance of class session
+Get a record containing the current state of the given session.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (session record) get_record (session_id s, session ref self)\end{verbatim}
@@ -521,55 +588,30 @@ all fields from the object
 \begin{longtable}{|lllp{0.38\textwidth}|}
 \hline
 \multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf task} \\
-\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A longrunning asynchronous task}} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A long-running asynchronous task}} \\
 \hline
 Quals & Field & Type & Description \\
 \hline
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
 $\mathit{RW}$ &  {\tt name/label} & string & a human-readable name \\
 $\mathit{RW}$ &  {\tt name/description} & string & a notes field containg human-readable description \\
+$\mathit{RO}_\mathit{run}$ &  {\tt status} & task\_status\_type & current status of the task \\
+$\mathit{RO}_\mathit{run}$ &  {\tt progress} & int & if the task is still pending, this field contains the estimated percentage complete (0-100). If task has completed (successfully or unsuccessfully) this should be 100. \\
+$\mathit{RO}_\mathit{run}$ &  {\tt eta} & datetime & if the task is still pending, this field contains the estimated completion time. If the task has finished (successfully or not) it contains the time the task finished. \\
+$\mathit{RO}_\mathit{run}$ &  {\tt type} & string & if the task has completed successfully, this field contains the type of the encoded result (i.e. name of the class whose reference is in the result field). Undefined otherwise. \\
+$\mathit{RO}_\mathit{run}$ &  {\tt result} & string & if the task has completed successfully, this field contains the result value (either Void or an object reference). Undefined otherwise. \\
+$\mathit{RO}_\mathit{run}$ &  {\tt error\_code} & int & if the task has failed, this field contains the error code. Undefined otherwise. \\
+$\mathit{RO}_\mathit{run}$ &  {\tt error\_info} & string Set & if the task has failed, this field contains the set of associated error strings. Undefined otherwise. \\
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: task}
-\subsubsection{RPC name:~get\_status}
+\subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
-Poll a running asynchronous RPC invocation and query its status
+Return a list of all the tasks known to the system
 
  \noindent {\bf Signature:} 
-\begin{verbatim} (uuid ref) get_status (session_id s, task ref task)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt task ref } & task & The ID of the RPC call to poll \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-uuid ref
-}
-
-
-String describing status of specified asynchronous RPC invocation, including estimated completion time
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_all\_tasks}
-
-{\bf Overview:} 
-List all asynchronous RPC calls currently executing
-
- \noindent {\bf Signature:} 
-\begin{verbatim} ((task ref) Set) get_all_tasks (session_id s)\end{verbatim}
+\begin{verbatim} ((task ref) Set) get_all (session_id s)\end{verbatim}
 
 
 \vspace{0.3cm}
@@ -580,17 +622,14 @@ List all asynchronous RPC calls currently executing
 }
 
 
-A list of tasks currently executing. Note that
-tasks are associated with users rather than sessions. Thus, if you logout and
-login again with a different session but the same user, this function will still
-return the user's running tasks.
+references to all objects
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
-get accessor message derived from field uuid of object task
+Get the uuid field of the given task.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_uuid (session_id s, task ref self)\end{verbatim}
@@ -603,7 +642,7 @@ get accessor message derived from field uuid of object task
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt task ref } & self & object instance \\ \hline 
+{\tt task ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -622,7 +661,7 @@ value of the field
 \subsubsection{RPC name:~get\_name\_label}
 
 {\bf Overview:} 
-get accessor message derived from field name/label of object task
+Get the name/label field of the given task.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_name_label (session_id s, task ref self)\end{verbatim}
@@ -635,7 +674,7 @@ get accessor message derived from field name/label of object task
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt task ref } & self & object instance \\ \hline 
+{\tt task ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -654,7 +693,7 @@ value of the field
 \subsubsection{RPC name:~set\_name\_label}
 
 {\bf Overview:} 
-set accessor message derived from field name/label of object task
+Set the name/label field of the given task.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_name_label (session_id s, task ref self, string value)\end{verbatim}
@@ -667,7 +706,7 @@ set accessor message derived from field name/label of object task
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt task ref } & self & object instance \\ \hline 
+{\tt task ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -688,7 +727,7 @@ void
 \subsubsection{RPC name:~get\_name\_description}
 
 {\bf Overview:} 
-get accessor message derived from field name/description of object task
+Get the name/description field of the given task.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_name_description (session_id s, task ref self)\end{verbatim}
@@ -701,7 +740,7 @@ get accessor message derived from field name/description of object task
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt task ref } & self & object instance \\ \hline 
+{\tt task ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -720,7 +759,7 @@ value of the field
 \subsubsection{RPC name:~set\_name\_description}
 
 {\bf Overview:} 
-set accessor message derived from field name/description of object task
+Set the name/description field of the given task.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_name_description (session_id s, task ref self, string value)\end{verbatim}
@@ -733,7 +772,7 @@ set accessor message derived from field name/description of object task
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt task ref } & self & object instance \\ \hline 
+{\tt task ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -751,10 +790,234 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~get\_status}
+
+{\bf Overview:} 
+Get the status field of the given task.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (task_status_type) get_status (session_id s, task ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt task ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+task\_status\_type
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_progress}
+
+{\bf Overview:} 
+Get the progress field of the given task.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_progress (session_id s, task ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt task ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_eta}
+
+{\bf Overview:} 
+Get the eta field of the given task.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} datetime get_eta (session_id s, task ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt task ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+datetime
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_type}
+
+{\bf Overview:} 
+Get the type field of the given task.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_type (session_id s, task ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt task ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_result}
+
+{\bf Overview:} 
+Get the result field of the given task.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_result (session_id s, task ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt task ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_error\_code}
+
+{\bf Overview:} 
+Get the error\_code field of the given task.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_error_code (session_id s, task ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt task ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_error\_info}
+
+{\bf Overview:} 
+Get the error\_info field of the given task.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (string Set) get_error_info (session_id s, task ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt task ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string Set
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
-constructor for class task
+Create a new task instance, and return its handle.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (task ref) create (session_id s, task record args)\end{verbatim}
@@ -786,7 +1049,7 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-destructor for class task
+Destroy the specified task instance.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, task ref self)\end{verbatim}
@@ -799,7 +1062,7 @@ destructor for class task
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt task ref } & self & object instance \\ \hline 
+{\tt task ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -818,7 +1081,7 @@ void
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
-returns the task instance with a particular uuid
+Get a reference to the task instance with the specified UUID.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (task ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
@@ -850,7 +1113,7 @@ reference to the object
 \subsubsection{RPC name:~get\_record}
 
 {\bf Overview:} 
-returns a record containing the state of an instance of class task
+Get a record containing the current state of the given task.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (task record) get_record (session_id s, task ref self)\end{verbatim}
@@ -882,7 +1145,7 @@ all fields from the object
 \subsubsection{RPC name:~get\_by\_name\_label}
 
 {\bf Overview:} 
-returns the task instance with a particular name label
+Get all the task instances with the given label.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((task ref) Set) get_by_name_label (session_id s, string label)\end{verbatim}
@@ -929,15 +1192,16 @@ $\mathit{RW}$ &  {\tt name/label} & string & a human-readable name \\
 $\mathit{RW}$ &  {\tt name/description} & string & a notes field containg human-readable description \\
 $\mathit{RW}$ &  {\tt user\_version} & int & a user version number for this machine \\
 $\mathit{RW}$ &  {\tt is\_a\_template} & bool & true if this is a template. Template VMs can never be started, they are used only for cloning other VMs \\
+$\mathit{RW}$ &  {\tt auto\_power\_on} & bool & true if this VM should be started automatically after host boot \\
 $\mathit{RO}_\mathit{run}$ &  {\tt resident\_on} & host ref & the host the VM is currently resident on \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt memory/static\_max} & int & Statically-set (i.e. absolute) maximum \\
-$\mathit{RW}$ &  {\tt memory/dynamic\_max} & int & Dynamic maximum \\
-$\mathit{RO}_\mathit{run}$ &  {\tt memory/actual} & int & Guest's actual usage \\
-$\mathit{RW}$ &  {\tt memory/dynamic\_min} & int & Dynamic minimum \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt memory/static\_min} & int & Statically-set (i.e. absolute) mininum \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt memory/static\_max} & int & Statically-set (i.e. absolute) maximum (bytes) \\
+$\mathit{RW}$ &  {\tt memory/dynamic\_max} & int & Dynamic maximum (bytes) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt memory/actual} & int & Guest's actual usage (bytes) \\
+$\mathit{RW}$ &  {\tt memory/dynamic\_min} & int & Dynamic minimum (bytes) \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt memory/static\_min} & int & Statically-set (i.e. absolute) mininum (bytes) \\
 $\mathit{RW}$ &  {\tt VCPUs/policy} & string & the name of the VCPU scheduling policy to be applied \\
 $\mathit{RW}$ &  {\tt VCPUs/params} & string & string-encoded parameters passed to selected VCPU policy \\
-$\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/number} & int & Current number of VCPUs \\
+$\mathit{RW}$ &  {\tt VCPUs/number} & int & Current number of VCPUs \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/utilisation} & (int $\rightarrow$ float) Map & Utilisation for all of guest's current VCPUs \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt VCPUs/features/required} & (cpu\_feature) Set & CPU features the guest demands the host supports \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt VCPUs/features/can\_use} & (cpu\_feature) Set & CPU features the guest can use if available \\
@@ -947,6 +1211,7 @@ $\mathit{RW}$ &  {\tt actions/after\_shutdown} & on\_normal\_exit & action to ta
 $\mathit{RW}$ &  {\tt actions/after\_reboot} & on\_normal\_exit & action to take after the guest has rebooted itself \\
 $\mathit{RW}$ &  {\tt actions/after\_suspend} & on\_normal\_exit & action to take after the guest has suspended itself \\
 $\mathit{RW}$ &  {\tt actions/after\_crash} & on\_crash\_behaviour & action to take if the guest crashes \\
+$\mathit{RO}_\mathit{run}$ &  {\tt consoles} & (console ref) Set & virtual console devices \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VIFs} & (VIF ref) Set & virtual network interfaces \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VBDs} & (VBD ref) Set & virtual block devices \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VTPMs} & (VTPM ref) Set & virtual TPMs \\
@@ -1322,7 +1587,7 @@ A list of all the IDs of all the VMs
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
-get accessor message derived from field uuid of object VM
+Get the uuid field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_uuid (session_id s, VM ref self)\end{verbatim}
@@ -1335,7 +1600,7 @@ get accessor message derived from field uuid of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -1354,7 +1619,7 @@ value of the field
 \subsubsection{RPC name:~get\_power\_state}
 
 {\bf Overview:} 
-get accessor message derived from field power\_state of object VM
+Get the power\_state field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (vm_power_state) get_power_state (session_id s, VM ref self)\end{verbatim}
@@ -1367,7 +1632,7 @@ get accessor message derived from field power\_state of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -1386,7 +1651,7 @@ value of the field
 \subsubsection{RPC name:~get\_name\_label}
 
 {\bf Overview:} 
-get accessor message derived from field name/label of object VM
+Get the name/label field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_name_label (session_id s, VM ref self)\end{verbatim}
@@ -1399,7 +1664,7 @@ get accessor message derived from field name/label of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -1418,7 +1683,7 @@ value of the field
 \subsubsection{RPC name:~set\_name\_label}
 
 {\bf Overview:} 
-set accessor message derived from field name/label of object VM
+Set the name/label field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_name_label (session_id s, VM ref self, string value)\end{verbatim}
@@ -1431,7 +1696,7 @@ set accessor message derived from field name/label of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -1452,7 +1717,7 @@ void
 \subsubsection{RPC name:~get\_name\_description}
 
 {\bf Overview:} 
-get accessor message derived from field name/description of object VM
+Get the name/description field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_name_description (session_id s, VM ref self)\end{verbatim}
@@ -1465,7 +1730,7 @@ get accessor message derived from field name/description of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -1484,7 +1749,7 @@ value of the field
 \subsubsection{RPC name:~set\_name\_description}
 
 {\bf Overview:} 
-set accessor message derived from field name/description of object VM
+Set the name/description field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_name_description (session_id s, VM ref self, string value)\end{verbatim}
@@ -1497,7 +1762,7 @@ set accessor message derived from field name/description of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -1518,7 +1783,7 @@ void
 \subsubsection{RPC name:~get\_user\_version}
 
 {\bf Overview:} 
-get accessor message derived from field user\_version of object VM
+Get the user\_version field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} int get_user_version (session_id s, VM ref self)\end{verbatim}
@@ -1531,7 +1796,7 @@ get accessor message derived from field user\_version of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -1550,7 +1815,7 @@ value of the field
 \subsubsection{RPC name:~set\_user\_version}
 
 {\bf Overview:} 
-set accessor message derived from field user\_version of object VM
+Set the user\_version field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_user_version (session_id s, VM ref self, int value)\end{verbatim}
@@ -1563,7 +1828,7 @@ set accessor message derived from field user\_version of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt int } & value & New value to set \\ \hline 
 
@@ -1584,7 +1849,7 @@ void
 \subsubsection{RPC name:~get\_is\_a\_template}
 
 {\bf Overview:} 
-get accessor message derived from field is\_a\_template of object VM
+Get the is\_a\_template field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} bool get_is_a_template (session_id s, VM ref self)\end{verbatim}
@@ -1597,7 +1862,7 @@ get accessor message derived from field is\_a\_template of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -1616,7 +1881,7 @@ value of the field
 \subsubsection{RPC name:~set\_is\_a\_template}
 
 {\bf Overview:} 
-set accessor message derived from field is\_a\_template of object VM
+Set the is\_a\_template field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_is_a_template (session_id s, VM ref self, bool value)\end{verbatim}
@@ -1629,7 +1894,73 @@ set accessor message derived from field is\_a\_template of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+{\tt bool } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_auto\_power\_on}
+
+{\bf Overview:} 
+Get the auto\_power\_on field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} bool get_auto_power_on (session_id s, VM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+bool
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_auto\_power\_on}
+
+{\bf Overview:} 
+Set the auto\_power\_on field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_auto_power_on (session_id s, VM ref self, bool value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt bool } & value & New value to set \\ \hline 
 
@@ -1650,7 +1981,7 @@ void
 \subsubsection{RPC name:~get\_resident\_on}
 
 {\bf Overview:} 
-get accessor message derived from field resident\_on of object VM
+Get the resident\_on field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (host ref) get_resident_on (session_id s, VM ref self)\end{verbatim}
@@ -1663,7 +1994,7 @@ get accessor message derived from field resident\_on of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -1682,7 +2013,7 @@ value of the field
 \subsubsection{RPC name:~get\_memory\_static\_max}
 
 {\bf Overview:} 
-get accessor message derived from field memory/static\_max of object VM
+Get the memory/static\_max field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} int get_memory_static_max (session_id s, VM ref self)\end{verbatim}
@@ -1695,7 +2026,7 @@ get accessor message derived from field memory/static\_max of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -1714,7 +2045,7 @@ value of the field
 \subsubsection{RPC name:~get\_memory\_dynamic\_max}
 
 {\bf Overview:} 
-get accessor message derived from field memory/dynamic\_max of object VM
+Get the memory/dynamic\_max field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} int get_memory_dynamic_max (session_id s, VM ref self)\end{verbatim}
@@ -1727,7 +2058,7 @@ get accessor message derived from field memory/dynamic\_max of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -1746,7 +2077,7 @@ value of the field
 \subsubsection{RPC name:~set\_memory\_dynamic\_max}
 
 {\bf Overview:} 
-set accessor message derived from field memory/dynamic\_max of object VM
+Set the memory/dynamic\_max field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_memory_dynamic_max (session_id s, VM ref self, int value)\end{verbatim}
@@ -1759,7 +2090,7 @@ set accessor message derived from field memory/dynamic\_max of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt int } & value & New value to set \\ \hline 
 
@@ -1780,7 +2111,7 @@ void
 \subsubsection{RPC name:~get\_memory\_actual}
 
 {\bf Overview:} 
-get accessor message derived from field memory/actual of object VM
+Get the memory/actual field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} int get_memory_actual (session_id s, VM ref self)\end{verbatim}
@@ -1793,7 +2124,7 @@ get accessor message derived from field memory/actual of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -1812,7 +2143,7 @@ value of the field
 \subsubsection{RPC name:~get\_memory\_dynamic\_min}
 
 {\bf Overview:} 
-get accessor message derived from field memory/dynamic\_min of object VM
+Get the memory/dynamic\_min field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} int get_memory_dynamic_min (session_id s, VM ref self)\end{verbatim}
@@ -1825,7 +2156,7 @@ get accessor message derived from field memory/dynamic\_min of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -1844,7 +2175,7 @@ value of the field
 \subsubsection{RPC name:~set\_memory\_dynamic\_min}
 
 {\bf Overview:} 
-set accessor message derived from field memory/dynamic\_min of object VM
+Set the memory/dynamic\_min field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_memory_dynamic_min (session_id s, VM ref self, int value)\end{verbatim}
@@ -1857,7 +2188,7 @@ set accessor message derived from field memory/dynamic\_min of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt int } & value & New value to set \\ \hline 
 
@@ -1878,7 +2209,7 @@ void
 \subsubsection{RPC name:~get\_memory\_static\_min}
 
 {\bf Overview:} 
-get accessor message derived from field memory/static\_min of object VM
+Get the memory/static\_min field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} int get_memory_static_min (session_id s, VM ref self)\end{verbatim}
@@ -1891,7 +2222,7 @@ get accessor message derived from field memory/static\_min of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -1910,7 +2241,7 @@ value of the field
 \subsubsection{RPC name:~get\_VCPUs\_policy}
 
 {\bf Overview:} 
-get accessor message derived from field VCPUs/policy of object VM
+Get the VCPUs/policy field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_VCPUs_policy (session_id s, VM ref self)\end{verbatim}
@@ -1923,7 +2254,7 @@ get accessor message derived from field VCPUs/policy of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -1942,7 +2273,7 @@ value of the field
 \subsubsection{RPC name:~set\_VCPUs\_policy}
 
 {\bf Overview:} 
-set accessor message derived from field VCPUs/policy of object VM
+Set the VCPUs/policy field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_VCPUs_policy (session_id s, VM ref self, string value)\end{verbatim}
@@ -1955,7 +2286,7 @@ set accessor message derived from field VCPUs/policy of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -1976,7 +2307,7 @@ void
 \subsubsection{RPC name:~get\_VCPUs\_params}
 
 {\bf Overview:} 
-get accessor message derived from field VCPUs/params of object VM
+Get the VCPUs/params field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_VCPUs_params (session_id s, VM ref self)\end{verbatim}
@@ -1989,7 +2320,7 @@ get accessor message derived from field VCPUs/params of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -2008,7 +2339,7 @@ value of the field
 \subsubsection{RPC name:~set\_VCPUs\_params}
 
 {\bf Overview:} 
-set accessor message derived from field VCPUs/params of object VM
+Set the VCPUs/params field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_VCPUs_params (session_id s, VM ref self, string value)\end{verbatim}
@@ -2021,7 +2352,7 @@ set accessor message derived from field VCPUs/params of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -2042,7 +2373,7 @@ void
 \subsubsection{RPC name:~get\_VCPUs\_number}
 
 {\bf Overview:} 
-get accessor message derived from field VCPUs/number of object VM
+Get the VCPUs/number field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} int get_VCPUs_number (session_id s, VM ref self)\end{verbatim}
@@ -2055,7 +2386,7 @@ get accessor message derived from field VCPUs/number of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -2071,10 +2402,44 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~set\_VCPUs\_number}
+
+{\bf Overview:} 
+Set the VCPUs/number field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_VCPUs_number (session_id s, VM ref self, int value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+{\tt int } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_VCPUs\_utilisation}
 
 {\bf Overview:} 
-get accessor message derived from field VCPUs/utilisation of object VM
+Get the VCPUs/utilisation field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((int -> float) Map) get_VCPUs_utilisation (session_id s, VM ref self)\end{verbatim}
@@ -2087,7 +2452,7 @@ get accessor message derived from field VCPUs/utilisation of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -2106,7 +2471,7 @@ value of the field
 \subsubsection{RPC name:~get\_VCPUs\_features\_required}
 
 {\bf Overview:} 
-get accessor message derived from field VCPUs/features/required of object VM
+Get the VCPUs/features/required field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((cpu_feature) Set) get_VCPUs_features_required (session_id s, VM ref self)\end{verbatim}
@@ -2119,7 +2484,7 @@ get accessor message derived from field VCPUs/features/required of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -2138,7 +2503,7 @@ value of the field
 \subsubsection{RPC name:~get\_VCPUs\_features\_can\_use}
 
 {\bf Overview:} 
-get accessor message derived from field VCPUs/features/can\_use of object VM
+Get the VCPUs/features/can\_use field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((cpu_feature) Set) get_VCPUs_features_can_use (session_id s, VM ref self)\end{verbatim}
@@ -2151,7 +2516,7 @@ get accessor message derived from field VCPUs/features/can\_use of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -2170,7 +2535,7 @@ value of the field
 \subsubsection{RPC name:~get\_VCPUs\_features\_force\_on}
 
 {\bf Overview:} 
-get accessor message derived from field VCPUs/features/force\_on of object VM
+Get the VCPUs/features/force\_on field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((cpu_feature) Set) get_VCPUs_features_force_on (session_id s, VM ref self)\end{verbatim}
@@ -2183,7 +2548,7 @@ get accessor message derived from field VCPUs/features/force\_on of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -2196,6 +2561,40 @@ get accessor message derived from field VCPUs/features/force\_on of object VM
 
 
 value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_VCPUs\_features\_force\_on}
+
+{\bf Overview:} 
+Set the VCPUs/features/force\_on field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_VCPUs_features_force_on (session_id s, VM ref self, (cpu_feature) Set value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+{\tt (cpu\_feature) Set } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -2215,7 +2614,7 @@ set add message derived from field VCPUs/features/force\_on of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt cpu\_feature } & value & New value to add \\ \hline 
 
@@ -2249,7 +2648,7 @@ set remove message derived from field VCPUs/features/force\_on of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt cpu\_feature } & value & Value to remove \\ \hline 
 
@@ -2270,7 +2669,7 @@ void
 \subsubsection{RPC name:~get\_VCPUs\_features\_force\_off}
 
 {\bf Overview:} 
-get accessor message derived from field VCPUs/features/force\_off of object VM
+Get the VCPUs/features/force\_off field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((cpu_feature) Set) get_VCPUs_features_force_off (session_id s, VM ref self)\end{verbatim}
@@ -2283,7 +2682,7 @@ get accessor message derived from field VCPUs/features/force\_off of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -2296,6 +2695,40 @@ get accessor message derived from field VCPUs/features/force\_off of object VM
 
 
 value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_VCPUs\_features\_force\_off}
+
+{\bf Overview:} 
+Set the VCPUs/features/force\_off field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_VCPUs_features_force_off (session_id s, VM ref self, (cpu_feature) Set value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+{\tt (cpu\_feature) Set } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -2315,7 +2748,7 @@ set add message derived from field VCPUs/features/force\_off of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt cpu\_feature } & value & New value to add \\ \hline 
 
@@ -2349,7 +2782,7 @@ set remove message derived from field VCPUs/features/force\_off of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt cpu\_feature } & value & Value to remove \\ \hline 
 
@@ -2370,7 +2803,7 @@ void
 \subsubsection{RPC name:~get\_actions\_after\_shutdown}
 
 {\bf Overview:} 
-get accessor message derived from field actions/after\_shutdown of object VM
+Get the actions/after\_shutdown field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (on_normal_exit) get_actions_after_shutdown (session_id s, VM ref self)\end{verbatim}
@@ -2383,7 +2816,7 @@ get accessor message derived from field actions/after\_shutdown of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -2402,7 +2835,7 @@ value of the field
 \subsubsection{RPC name:~set\_actions\_after\_shutdown}
 
 {\bf Overview:} 
-set accessor message derived from field actions/after\_shutdown of object VM
+Set the actions/after\_shutdown field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_actions_after_shutdown (session_id s, VM ref self, on_normal_exit value)\end{verbatim}
@@ -2415,7 +2848,7 @@ set accessor message derived from field actions/after\_shutdown of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt on\_normal\_exit } & value & New value to set \\ \hline 
 
@@ -2436,7 +2869,7 @@ void
 \subsubsection{RPC name:~get\_actions\_after\_reboot}
 
 {\bf Overview:} 
-get accessor message derived from field actions/after\_reboot of object VM
+Get the actions/after\_reboot field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (on_normal_exit) get_actions_after_reboot (session_id s, VM ref self)\end{verbatim}
@@ -2449,7 +2882,7 @@ get accessor message derived from field actions/after\_reboot of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -2468,7 +2901,7 @@ value of the field
 \subsubsection{RPC name:~set\_actions\_after\_reboot}
 
 {\bf Overview:} 
-set accessor message derived from field actions/after\_reboot of object VM
+Set the actions/after\_reboot field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_actions_after_reboot (session_id s, VM ref self, on_normal_exit value)\end{verbatim}
@@ -2481,7 +2914,7 @@ set accessor message derived from field actions/after\_reboot of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt on\_normal\_exit } & value & New value to set \\ \hline 
 
@@ -2502,7 +2935,7 @@ void
 \subsubsection{RPC name:~get\_actions\_after\_suspend}
 
 {\bf Overview:} 
-get accessor message derived from field actions/after\_suspend of object VM
+Get the actions/after\_suspend field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (on_normal_exit) get_actions_after_suspend (session_id s, VM ref self)\end{verbatim}
@@ -2515,7 +2948,7 @@ get accessor message derived from field actions/after\_suspend of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -2534,7 +2967,7 @@ value of the field
 \subsubsection{RPC name:~set\_actions\_after\_suspend}
 
 {\bf Overview:} 
-set accessor message derived from field actions/after\_suspend of object VM
+Set the actions/after\_suspend field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_actions_after_suspend (session_id s, VM ref self, on_normal_exit value)\end{verbatim}
@@ -2547,7 +2980,7 @@ set accessor message derived from field actions/after\_suspend of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt on\_normal\_exit } & value & New value to set \\ \hline 
 
@@ -2568,7 +3001,7 @@ void
 \subsubsection{RPC name:~get\_actions\_after\_crash}
 
 {\bf Overview:} 
-get accessor message derived from field actions/after\_crash of object VM
+Get the actions/after\_crash field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (on_crash_behaviour) get_actions_after_crash (session_id s, VM ref self)\end{verbatim}
@@ -2581,7 +3014,7 @@ get accessor message derived from field actions/after\_crash of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -2600,7 +3033,7 @@ value of the field
 \subsubsection{RPC name:~set\_actions\_after\_crash}
 
 {\bf Overview:} 
-set accessor message derived from field actions/after\_crash of object VM
+Set the actions/after\_crash field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_actions_after_crash (session_id s, VM ref self, on_crash_behaviour value)\end{verbatim}
@@ -2613,7 +3046,7 @@ set accessor message derived from field actions/after\_crash of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt on\_crash\_behaviour } & value & New value to set \\ \hline 
 
@@ -2631,10 +3064,42 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~get\_consoles}
+
+{\bf Overview:} 
+Get the consoles field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((console ref) Set) get_consoles (session_id s, VM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(console ref) Set
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_VIFs}
 
 {\bf Overview:} 
-get accessor message derived from field VIFs of object VM
+Get the VIFs field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((VIF ref) Set) get_VIFs (session_id s, VM ref self)\end{verbatim}
@@ -2647,7 +3112,7 @@ get accessor message derived from field VIFs of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -2666,7 +3131,7 @@ value of the field
 \subsubsection{RPC name:~get\_VBDs}
 
 {\bf Overview:} 
-get accessor message derived from field VBDs of object VM
+Get the VBDs field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((VBD ref) Set) get_VBDs (session_id s, VM ref self)\end{verbatim}
@@ -2679,7 +3144,7 @@ get accessor message derived from field VBDs of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -2698,7 +3163,7 @@ value of the field
 \subsubsection{RPC name:~get\_VTPMs}
 
 {\bf Overview:} 
-get accessor message derived from field VTPMs of object VM
+Get the VTPMs field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((VTPM ref) Set) get_VTPMs (session_id s, VM ref self)\end{verbatim}
@@ -2711,7 +3176,7 @@ get accessor message derived from field VTPMs of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -2730,7 +3195,7 @@ value of the field
 \subsubsection{RPC name:~get\_bios\_boot}
 
 {\bf Overview:} 
-get accessor message derived from field bios/boot of object VM
+Get the bios/boot field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_bios_boot (session_id s, VM ref self)\end{verbatim}
@@ -2743,7 +3208,7 @@ get accessor message derived from field bios/boot of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -2762,7 +3227,7 @@ value of the field
 \subsubsection{RPC name:~set\_bios\_boot}
 
 {\bf Overview:} 
-set accessor message derived from field bios/boot of object VM
+Set the bios/boot field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_bios_boot (session_id s, VM ref self, string value)\end{verbatim}
@@ -2775,7 +3240,7 @@ set accessor message derived from field bios/boot of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -2796,7 +3261,7 @@ void
 \subsubsection{RPC name:~get\_platform\_std\_VGA}
 
 {\bf Overview:} 
-get accessor message derived from field platform/std\_VGA of object VM
+Get the platform/std\_VGA field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} bool get_platform_std_VGA (session_id s, VM ref self)\end{verbatim}
@@ -2809,7 +3274,7 @@ get accessor message derived from field platform/std\_VGA of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -2828,7 +3293,7 @@ value of the field
 \subsubsection{RPC name:~set\_platform\_std\_VGA}
 
 {\bf Overview:} 
-set accessor message derived from field platform/std\_VGA of object VM
+Set the platform/std\_VGA field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_platform_std_VGA (session_id s, VM ref self, bool value)\end{verbatim}
@@ -2841,7 +3306,7 @@ set accessor message derived from field platform/std\_VGA of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt bool } & value & New value to set \\ \hline 
 
@@ -2862,7 +3327,7 @@ void
 \subsubsection{RPC name:~get\_platform\_serial}
 
 {\bf Overview:} 
-get accessor message derived from field platform/serial of object VM
+Get the platform/serial field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_platform_serial (session_id s, VM ref self)\end{verbatim}
@@ -2875,7 +3340,7 @@ get accessor message derived from field platform/serial of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -2894,7 +3359,7 @@ value of the field
 \subsubsection{RPC name:~set\_platform\_serial}
 
 {\bf Overview:} 
-set accessor message derived from field platform/serial of object VM
+Set the platform/serial field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_platform_serial (session_id s, VM ref self, string value)\end{verbatim}
@@ -2907,7 +3372,7 @@ set accessor message derived from field platform/serial of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -2928,7 +3393,7 @@ void
 \subsubsection{RPC name:~get\_platform\_localtime}
 
 {\bf Overview:} 
-get accessor message derived from field platform/localtime of object VM
+Get the platform/localtime field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} bool get_platform_localtime (session_id s, VM ref self)\end{verbatim}
@@ -2941,7 +3406,7 @@ get accessor message derived from field platform/localtime of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -2960,7 +3425,7 @@ value of the field
 \subsubsection{RPC name:~set\_platform\_localtime}
 
 {\bf Overview:} 
-set accessor message derived from field platform/localtime of object VM
+Set the platform/localtime field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_platform_localtime (session_id s, VM ref self, bool value)\end{verbatim}
@@ -2973,7 +3438,7 @@ set accessor message derived from field platform/localtime of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt bool } & value & New value to set \\ \hline 
 
@@ -2994,7 +3459,7 @@ void
 \subsubsection{RPC name:~get\_platform\_clock\_offset}
 
 {\bf Overview:} 
-get accessor message derived from field platform/clock\_offset of object VM
+Get the platform/clock\_offset field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} bool get_platform_clock_offset (session_id s, VM ref self)\end{verbatim}
@@ -3007,7 +3472,7 @@ get accessor message derived from field platform/clock\_offset of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -3026,7 +3491,7 @@ value of the field
 \subsubsection{RPC name:~set\_platform\_clock\_offset}
 
 {\bf Overview:} 
-set accessor message derived from field platform/clock\_offset of object VM
+Set the platform/clock\_offset field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_platform_clock_offset (session_id s, VM ref self, bool value)\end{verbatim}
@@ -3039,7 +3504,7 @@ set accessor message derived from field platform/clock\_offset of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt bool } & value & New value to set \\ \hline 
 
@@ -3060,7 +3525,7 @@ void
 \subsubsection{RPC name:~get\_platform\_enable\_audio}
 
 {\bf Overview:} 
-get accessor message derived from field platform/enable\_audio of object VM
+Get the platform/enable\_audio field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} bool get_platform_enable_audio (session_id s, VM ref self)\end{verbatim}
@@ -3073,7 +3538,7 @@ get accessor message derived from field platform/enable\_audio of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -3092,7 +3557,7 @@ value of the field
 \subsubsection{RPC name:~set\_platform\_enable\_audio}
 
 {\bf Overview:} 
-set accessor message derived from field platform/enable\_audio of object VM
+Set the platform/enable\_audio field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_platform_enable_audio (session_id s, VM ref self, bool value)\end{verbatim}
@@ -3105,7 +3570,7 @@ set accessor message derived from field platform/enable\_audio of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt bool } & value & New value to set \\ \hline 
 
@@ -3126,7 +3591,7 @@ void
 \subsubsection{RPC name:~get\_builder}
 
 {\bf Overview:} 
-get accessor message derived from field builder of object VM
+Get the builder field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_builder (session_id s, VM ref self)\end{verbatim}
@@ -3139,7 +3604,7 @@ get accessor message derived from field builder of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -3158,7 +3623,7 @@ value of the field
 \subsubsection{RPC name:~set\_builder}
 
 {\bf Overview:} 
-set accessor message derived from field builder of object VM
+Set the builder field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_builder (session_id s, VM ref self, string value)\end{verbatim}
@@ -3171,7 +3636,7 @@ set accessor message derived from field builder of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -3192,7 +3657,7 @@ void
 \subsubsection{RPC name:~get\_boot\_method}
 
 {\bf Overview:} 
-get accessor message derived from field boot\_method of object VM
+Get the boot\_method field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (boot_type) get_boot_method (session_id s, VM ref self)\end{verbatim}
@@ -3205,7 +3670,7 @@ get accessor message derived from field boot\_method of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -3224,7 +3689,7 @@ value of the field
 \subsubsection{RPC name:~set\_boot\_method}
 
 {\bf Overview:} 
-set accessor message derived from field boot\_method of object VM
+Set the boot\_method field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_boot_method (session_id s, VM ref self, boot_type value)\end{verbatim}
@@ -3237,7 +3702,7 @@ set accessor message derived from field boot\_method of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt boot\_type } & value & New value to set \\ \hline 
 
@@ -3258,7 +3723,7 @@ void
 \subsubsection{RPC name:~get\_kernel\_kernel}
 
 {\bf Overview:} 
-get accessor message derived from field kernel/kernel of object VM
+Get the kernel/kernel field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_kernel_kernel (session_id s, VM ref self)\end{verbatim}
@@ -3271,7 +3736,7 @@ get accessor message derived from field kernel/kernel of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -3290,7 +3755,7 @@ value of the field
 \subsubsection{RPC name:~set\_kernel\_kernel}
 
 {\bf Overview:} 
-set accessor message derived from field kernel/kernel of object VM
+Set the kernel/kernel field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_kernel_kernel (session_id s, VM ref self, string value)\end{verbatim}
@@ -3303,7 +3768,7 @@ set accessor message derived from field kernel/kernel of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -3324,7 +3789,7 @@ void
 \subsubsection{RPC name:~get\_kernel\_initrd}
 
 {\bf Overview:} 
-get accessor message derived from field kernel/initrd of object VM
+Get the kernel/initrd field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_kernel_initrd (session_id s, VM ref self)\end{verbatim}
@@ -3337,7 +3802,7 @@ get accessor message derived from field kernel/initrd of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -3356,7 +3821,7 @@ value of the field
 \subsubsection{RPC name:~set\_kernel\_initrd}
 
 {\bf Overview:} 
-set accessor message derived from field kernel/initrd of object VM
+Set the kernel/initrd field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_kernel_initrd (session_id s, VM ref self, string value)\end{verbatim}
@@ -3369,7 +3834,7 @@ set accessor message derived from field kernel/initrd of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -3390,7 +3855,7 @@ void
 \subsubsection{RPC name:~get\_kernel\_args}
 
 {\bf Overview:} 
-get accessor message derived from field kernel/args of object VM
+Get the kernel/args field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_kernel_args (session_id s, VM ref self)\end{verbatim}
@@ -3403,7 +3868,7 @@ get accessor message derived from field kernel/args of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -3422,7 +3887,7 @@ value of the field
 \subsubsection{RPC name:~set\_kernel\_args}
 
 {\bf Overview:} 
-set accessor message derived from field kernel/args of object VM
+Set the kernel/args field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_kernel_args (session_id s, VM ref self, string value)\end{verbatim}
@@ -3435,7 +3900,7 @@ set accessor message derived from field kernel/args of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -3456,7 +3921,7 @@ void
 \subsubsection{RPC name:~get\_grub\_cmdline}
 
 {\bf Overview:} 
-get accessor message derived from field grub/cmdline of object VM
+Get the grub/cmdline field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_grub_cmdline (session_id s, VM ref self)\end{verbatim}
@@ -3469,7 +3934,7 @@ get accessor message derived from field grub/cmdline of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -3488,7 +3953,7 @@ value of the field
 \subsubsection{RPC name:~set\_grub\_cmdline}
 
 {\bf Overview:} 
-set accessor message derived from field grub/cmdline of object VM
+Set the grub/cmdline field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_grub_cmdline (session_id s, VM ref self, string value)\end{verbatim}
@@ -3501,7 +3966,7 @@ set accessor message derived from field grub/cmdline of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -3522,7 +3987,7 @@ void
 \subsubsection{RPC name:~get\_PCI\_bus}
 
 {\bf Overview:} 
-get accessor message derived from field PCI\_bus of object VM
+Get the PCI\_bus field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_PCI_bus (session_id s, VM ref self)\end{verbatim}
@@ -3535,7 +4000,7 @@ get accessor message derived from field PCI\_bus of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -3554,7 +4019,7 @@ value of the field
 \subsubsection{RPC name:~get\_tools\_version}
 
 {\bf Overview:} 
-get accessor message derived from field tools\_version of object VM
+Get the tools\_version field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((string -> string) Map) get_tools_version (session_id s, VM ref self)\end{verbatim}
@@ -3567,7 +4032,7 @@ get accessor message derived from field tools\_version of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -3586,7 +4051,7 @@ value of the field
 \subsubsection{RPC name:~get\_otherConfig}
 
 {\bf Overview:} 
-get accessor message derived from field otherConfig of object VM
+Get the otherConfig field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((string -> string) Map) get_otherConfig (session_id s, VM ref self)\end{verbatim}
@@ -3599,7 +4064,7 @@ get accessor message derived from field otherConfig of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -3612,6 +4077,40 @@ get accessor message derived from field otherConfig of object VM
 
 
 value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_otherConfig}
+
+{\bf Overview:} 
+Set the otherConfig field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_otherConfig (session_id s, VM ref self, (string -> string) Map value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+{\tt (string $\rightarrow$ string) Map } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -3631,7 +4130,7 @@ map add message derived from field otherConfig of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt string } & key & Key to add \\ \hline 
 
@@ -3667,7 +4166,7 @@ map remove message derived from field otherConfig of object VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt string } & key & Key to remove \\ \hline 
 
@@ -3688,7 +4187,7 @@ void
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
-constructor for class VM
+Create a new VM instance, and return its handle.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VM ref) create (session_id s, VM record args)\end{verbatim}
@@ -3720,7 +4219,7 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-destructor for class VM
+Destroy the specified VM.  The VM is completely removed from the system.  This function can only be called when the VM is in the Halted State.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, VM ref self)\end{verbatim}
@@ -3733,7 +4232,7 @@ destructor for class VM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & object instance \\ \hline 
+{\tt VM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -3752,7 +4251,7 @@ void
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
-returns the VM instance with a particular uuid
+Get a reference to the VM instance with the specified UUID.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VM ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
@@ -3784,7 +4283,7 @@ reference to the object
 \subsubsection{RPC name:~get\_record}
 
 {\bf Overview:} 
-returns a record containing the state of an instance of class VM
+Get a record containing the current state of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VM record) get_record (session_id s, VM ref self)\end{verbatim}
@@ -3816,7 +4315,7 @@ all fields from the object
 \subsubsection{RPC name:~get\_by\_name\_label}
 
 {\bf Overview:} 
-returns the VM instance with a particular name label
+Get all the VM instances with the given label.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((VM ref) Set) get_by_name_label (session_id s, string label)\end{verbatim}
@@ -4019,7 +4518,7 @@ A list of all the IDs of all the hosts
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
-get accessor message derived from field uuid of object host
+Get the uuid field of the given host.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_uuid (session_id s, host ref self)\end{verbatim}
@@ -4032,7 +4531,7 @@ get accessor message derived from field uuid of object host
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt host ref } & self & object instance \\ \hline 
+{\tt host ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -4051,7 +4550,7 @@ value of the field
 \subsubsection{RPC name:~get\_name\_label}
 
 {\bf Overview:} 
-get accessor message derived from field name/label of object host
+Get the name/label field of the given host.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_name_label (session_id s, host ref self)\end{verbatim}
@@ -4064,7 +4563,7 @@ get accessor message derived from field name/label of object host
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt host ref } & self & object instance \\ \hline 
+{\tt host ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -4083,7 +4582,7 @@ value of the field
 \subsubsection{RPC name:~set\_name\_label}
 
 {\bf Overview:} 
-set accessor message derived from field name/label of object host
+Set the name/label field of the given host.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_name_label (session_id s, host ref self, string value)\end{verbatim}
@@ -4096,7 +4595,7 @@ set accessor message derived from field name/label of object host
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt host ref } & self & object instance \\ \hline 
+{\tt host ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -4117,7 +4616,7 @@ void
 \subsubsection{RPC name:~get\_name\_description}
 
 {\bf Overview:} 
-get accessor message derived from field name/description of object host
+Get the name/description field of the given host.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_name_description (session_id s, host ref self)\end{verbatim}
@@ -4130,7 +4629,7 @@ get accessor message derived from field name/description of object host
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt host ref } & self & object instance \\ \hline 
+{\tt host ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -4149,7 +4648,7 @@ value of the field
 \subsubsection{RPC name:~set\_name\_description}
 
 {\bf Overview:} 
-set accessor message derived from field name/description of object host
+Set the name/description field of the given host.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_name_description (session_id s, host ref self, string value)\end{verbatim}
@@ -4162,7 +4661,7 @@ set accessor message derived from field name/description of object host
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt host ref } & self & object instance \\ \hline 
+{\tt host ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -4183,7 +4682,7 @@ void
 \subsubsection{RPC name:~get\_software\_version}
 
 {\bf Overview:} 
-get accessor message derived from field software\_version of object host
+Get the software\_version field of the given host.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((string -> string) Map) get_software_version (session_id s, host ref self)\end{verbatim}
@@ -4196,7 +4695,7 @@ get accessor message derived from field software\_version of object host
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt host ref } & self & object instance \\ \hline 
+{\tt host ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -4215,7 +4714,7 @@ value of the field
 \subsubsection{RPC name:~get\_resident\_VMs}
 
 {\bf Overview:} 
-get accessor message derived from field resident\_VMs of object host
+Get the resident\_VMs field of the given host.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((VM ref) Set) get_resident_VMs (session_id s, host ref self)\end{verbatim}
@@ -4228,7 +4727,7 @@ get accessor message derived from field resident\_VMs of object host
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt host ref } & self & object instance \\ \hline 
+{\tt host ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -4247,7 +4746,7 @@ value of the field
 \subsubsection{RPC name:~get\_PIFs}
 
 {\bf Overview:} 
-get accessor message derived from field PIFs of object host
+Get the PIFs field of the given host.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((PIF ref) Set) get_PIFs (session_id s, host ref self)\end{verbatim}
@@ -4260,7 +4759,7 @@ get accessor message derived from field PIFs of object host
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt host ref } & self & object instance \\ \hline 
+{\tt host ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -4279,7 +4778,7 @@ value of the field
 \subsubsection{RPC name:~get\_host\_CPUs}
 
 {\bf Overview:} 
-get accessor message derived from field host\_CPUs of object host
+Get the host\_CPUs field of the given host.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((host_cpu ref) Set) get_host_CPUs (session_id s, host ref self)\end{verbatim}
@@ -4292,7 +4791,7 @@ get accessor message derived from field host\_CPUs of object host
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt host ref } & self & object instance \\ \hline 
+{\tt host ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -4311,7 +4810,7 @@ value of the field
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
-constructor for class host
+Create a new host instance, and return its handle.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (host ref) create (session_id s, host record args)\end{verbatim}
@@ -4343,7 +4842,7 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-destructor for class host
+Destroy the specified host instance.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, host ref self)\end{verbatim}
@@ -4356,7 +4855,7 @@ destructor for class host
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt host ref } & self & object instance \\ \hline 
+{\tt host ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -4375,7 +4874,7 @@ void
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
-returns the host instance with a particular uuid
+Get a reference to the host instance with the specified UUID.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (host ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
@@ -4407,7 +4906,7 @@ reference to the object
 \subsubsection{RPC name:~get\_record}
 
 {\bf Overview:} 
-returns a record containing the state of an instance of class host
+Get a record containing the current state of the given host.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (host record) get_record (session_id s, host ref self)\end{verbatim}
@@ -4439,7 +4938,7 @@ all fields from the object
 \subsubsection{RPC name:~get\_by\_name\_label}
 
 {\bf Overview:} 
-returns the host instance with a particular name label
+Get all the host instances with the given label.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((host ref) Set) get_by_name_label (session_id s, string label)\end{verbatim}
@@ -4494,7 +4993,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt utilisation} & float & the current CPU utilis
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
-get accessor message derived from field uuid of object host\_cpu
+Get the uuid field of the given host\_cpu.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_uuid (session_id s, host_cpu ref self)\end{verbatim}
@@ -4507,7 +5006,7 @@ get accessor message derived from field uuid of object host\_cpu
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt host\_cpu ref } & self & object instance \\ \hline 
+{\tt host\_cpu ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -4526,7 +5025,7 @@ value of the field
 \subsubsection{RPC name:~get\_host}
 
 {\bf Overview:} 
-get accessor message derived from field host of object host\_cpu
+Get the host field of the given host\_cpu.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (host ref) get_host (session_id s, host_cpu ref self)\end{verbatim}
@@ -4539,7 +5038,7 @@ get accessor message derived from field host of object host\_cpu
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt host\_cpu ref } & self & object instance \\ \hline 
+{\tt host\_cpu ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -4558,7 +5057,7 @@ value of the field
 \subsubsection{RPC name:~get\_number}
 
 {\bf Overview:} 
-get accessor message derived from field number of object host\_cpu
+Get the number field of the given host\_cpu.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} int get_number (session_id s, host_cpu ref self)\end{verbatim}
@@ -4571,7 +5070,7 @@ get accessor message derived from field number of object host\_cpu
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt host\_cpu ref } & self & object instance \\ \hline 
+{\tt host\_cpu ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -4590,7 +5089,7 @@ value of the field
 \subsubsection{RPC name:~get\_vendor}
 
 {\bf Overview:} 
-get accessor message derived from field vendor of object host\_cpu
+Get the vendor field of the given host\_cpu.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_vendor (session_id s, host_cpu ref self)\end{verbatim}
@@ -4603,7 +5102,7 @@ get accessor message derived from field vendor of object host\_cpu
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt host\_cpu ref } & self & object instance \\ \hline 
+{\tt host\_cpu ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -4622,7 +5121,7 @@ value of the field
 \subsubsection{RPC name:~get\_speed}
 
 {\bf Overview:} 
-get accessor message derived from field speed of object host\_cpu
+Get the speed field of the given host\_cpu.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} int get_speed (session_id s, host_cpu ref self)\end{verbatim}
@@ -4635,7 +5134,7 @@ get accessor message derived from field speed of object host\_cpu
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt host\_cpu ref } & self & object instance \\ \hline 
+{\tt host\_cpu ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -4654,7 +5153,7 @@ value of the field
 \subsubsection{RPC name:~get\_modelname}
 
 {\bf Overview:} 
-get accessor message derived from field modelname of object host\_cpu
+Get the modelname field of the given host\_cpu.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_modelname (session_id s, host_cpu ref self)\end{verbatim}
@@ -4667,7 +5166,7 @@ get accessor message derived from field modelname of object host\_cpu
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt host\_cpu ref } & self & object instance \\ \hline 
+{\tt host\_cpu ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -4686,7 +5185,7 @@ value of the field
 \subsubsection{RPC name:~get\_features}
 
 {\bf Overview:} 
-get accessor message derived from field features of object host\_cpu
+Get the features field of the given host\_cpu.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((cpu_feature) Set) get_features (session_id s, host_cpu ref self)\end{verbatim}
@@ -4699,7 +5198,7 @@ get accessor message derived from field features of object host\_cpu
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt host\_cpu ref } & self & object instance \\ \hline 
+{\tt host\_cpu ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -4718,7 +5217,7 @@ value of the field
 \subsubsection{RPC name:~get\_utilisation}
 
 {\bf Overview:} 
-get accessor message derived from field utilisation of object host\_cpu
+Get the utilisation field of the given host\_cpu.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} float get_utilisation (session_id s, host_cpu ref self)\end{verbatim}
@@ -4731,7 +5230,7 @@ get accessor message derived from field utilisation of object host\_cpu
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt host\_cpu ref } & self & object instance \\ \hline 
+{\tt host\_cpu ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -4750,7 +5249,7 @@ value of the field
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
-constructor for class host\_cpu
+Create a new host\_cpu instance, and return its handle.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (host_cpu ref) create (session_id s, host_cpu record args)\end{verbatim}
@@ -4782,7 +5281,7 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-destructor for class host\_cpu
+Destroy the specified host\_cpu instance.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, host_cpu ref self)\end{verbatim}
@@ -4795,7 +5294,7 @@ destructor for class host\_cpu
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt host\_cpu ref } & self & object instance \\ \hline 
+{\tt host\_cpu ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -4814,7 +5313,7 @@ void
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
-returns the host\_cpu instance with a particular uuid
+Get a reference to the host\_cpu instance with the specified UUID.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (host_cpu ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
@@ -4846,7 +5345,7 @@ reference to the object
 \subsubsection{RPC name:~get\_record}
 
 {\bf Overview:} 
-returns a record containing the state of an instance of class host\_cpu
+Get a record containing the current state of the given host\_cpu.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (host_cpu record) get_record (session_id s, host_cpu ref self)\end{verbatim}
@@ -4921,7 +5420,7 @@ A list of all the IDs of all the networks
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
-get accessor message derived from field uuid of object network
+Get the uuid field of the given network.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_uuid (session_id s, network ref self)\end{verbatim}
@@ -4934,7 +5433,7 @@ get accessor message derived from field uuid of object network
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt network ref } & self & object instance \\ \hline 
+{\tt network ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -4953,7 +5452,7 @@ value of the field
 \subsubsection{RPC name:~get\_name\_label}
 
 {\bf Overview:} 
-get accessor message derived from field name/label of object network
+Get the name/label field of the given network.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_name_label (session_id s, network ref self)\end{verbatim}
@@ -4966,7 +5465,7 @@ get accessor message derived from field name/label of object network
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt network ref } & self & object instance \\ \hline 
+{\tt network ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -4985,7 +5484,7 @@ value of the field
 \subsubsection{RPC name:~set\_name\_label}
 
 {\bf Overview:} 
-set accessor message derived from field name/label of object network
+Set the name/label field of the given network.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_name_label (session_id s, network ref self, string value)\end{verbatim}
@@ -4998,7 +5497,7 @@ set accessor message derived from field name/label of object network
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt network ref } & self & object instance \\ \hline 
+{\tt network ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -5019,7 +5518,7 @@ void
 \subsubsection{RPC name:~get\_name\_description}
 
 {\bf Overview:} 
-get accessor message derived from field name/description of object network
+Get the name/description field of the given network.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_name_description (session_id s, network ref self)\end{verbatim}
@@ -5032,7 +5531,7 @@ get accessor message derived from field name/description of object network
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt network ref } & self & object instance \\ \hline 
+{\tt network ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -5051,7 +5550,7 @@ value of the field
 \subsubsection{RPC name:~set\_name\_description}
 
 {\bf Overview:} 
-set accessor message derived from field name/description of object network
+Set the name/description field of the given network.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_name_description (session_id s, network ref self, string value)\end{verbatim}
@@ -5064,7 +5563,7 @@ set accessor message derived from field name/description of object network
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt network ref } & self & object instance \\ \hline 
+{\tt network ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -5085,7 +5584,7 @@ void
 \subsubsection{RPC name:~get\_VIFs}
 
 {\bf Overview:} 
-get accessor message derived from field VIFs of object network
+Get the VIFs field of the given network.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((VIF ref) Set) get_VIFs (session_id s, network ref self)\end{verbatim}
@@ -5098,7 +5597,7 @@ get accessor message derived from field VIFs of object network
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt network ref } & self & object instance \\ \hline 
+{\tt network ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -5117,7 +5616,7 @@ value of the field
 \subsubsection{RPC name:~get\_PIFs}
 
 {\bf Overview:} 
-get accessor message derived from field PIFs of object network
+Get the PIFs field of the given network.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((PIF ref) Set) get_PIFs (session_id s, network ref self)\end{verbatim}
@@ -5130,7 +5629,7 @@ get accessor message derived from field PIFs of object network
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt network ref } & self & object instance \\ \hline 
+{\tt network ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -5149,7 +5648,7 @@ value of the field
 \subsubsection{RPC name:~get\_default\_gateway}
 
 {\bf Overview:} 
-get accessor message derived from field default\_gateway of object network
+Get the default\_gateway field of the given network.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_default_gateway (session_id s, network ref self)\end{verbatim}
@@ -5162,7 +5661,7 @@ get accessor message derived from field default\_gateway of object network
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt network ref } & self & object instance \\ \hline 
+{\tt network ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -5181,7 +5680,7 @@ value of the field
 \subsubsection{RPC name:~set\_default\_gateway}
 
 {\bf Overview:} 
-set accessor message derived from field default\_gateway of object network
+Set the default\_gateway field of the given network.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_default_gateway (session_id s, network ref self, string value)\end{verbatim}
@@ -5194,7 +5693,7 @@ set accessor message derived from field default\_gateway of object network
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt network ref } & self & object instance \\ \hline 
+{\tt network ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -5215,7 +5714,7 @@ void
 \subsubsection{RPC name:~get\_default\_netmask}
 
 {\bf Overview:} 
-get accessor message derived from field default\_netmask of object network
+Get the default\_netmask field of the given network.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_default_netmask (session_id s, network ref self)\end{verbatim}
@@ -5228,7 +5727,7 @@ get accessor message derived from field default\_netmask of object network
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt network ref } & self & object instance \\ \hline 
+{\tt network ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -5247,7 +5746,7 @@ value of the field
 \subsubsection{RPC name:~set\_default\_netmask}
 
 {\bf Overview:} 
-set accessor message derived from field default\_netmask of object network
+Set the default\_netmask field of the given network.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_default_netmask (session_id s, network ref self, string value)\end{verbatim}
@@ -5260,7 +5759,7 @@ set accessor message derived from field default\_netmask of object network
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt network ref } & self & object instance \\ \hline 
+{\tt network ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -5281,7 +5780,7 @@ void
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
-constructor for class network
+Create a new network instance, and return its handle.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (network ref) create (session_id s, network record args)\end{verbatim}
@@ -5313,7 +5812,7 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-destructor for class network
+Destroy the specified network instance.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, network ref self)\end{verbatim}
@@ -5326,7 +5825,7 @@ destructor for class network
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt network ref } & self & object instance \\ \hline 
+{\tt network ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -5345,7 +5844,7 @@ void
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
-returns the network instance with a particular uuid
+Get a reference to the network instance with the specified UUID.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (network ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
@@ -5377,7 +5876,7 @@ reference to the object
 \subsubsection{RPC name:~get\_record}
 
 {\bf Overview:} 
-returns a record containing the state of an instance of class network
+Get a record containing the current state of the given network.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (network record) get_record (session_id s, network ref self)\end{verbatim}
@@ -5409,7 +5908,7 @@ all fields from the object
 \subsubsection{RPC name:~get\_by\_name\_label}
 
 {\bf Overview:} 
-returns the network instance with a particular name label
+Get all the network instances with the given label.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((network ref) Set) get_by_name_label (session_id s, string label)\end{verbatim}
@@ -5466,7 +5965,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
-get accessor message derived from field uuid of object VIF
+Get the uuid field of the given VIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_uuid (session_id s, VIF ref self)\end{verbatim}
@@ -5479,7 +5978,7 @@ get accessor message derived from field uuid of object VIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VIF ref } & self & object instance \\ \hline 
+{\tt VIF ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -5498,7 +5997,7 @@ value of the field
 \subsubsection{RPC name:~get\_name}
 
 {\bf Overview:} 
-get accessor message derived from field name of object VIF
+Get the name field of the given VIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_name (session_id s, VIF ref self)\end{verbatim}
@@ -5511,7 +6010,7 @@ get accessor message derived from field name of object VIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VIF ref } & self & object instance \\ \hline 
+{\tt VIF ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -5530,7 +6029,7 @@ value of the field
 \subsubsection{RPC name:~set\_name}
 
 {\bf Overview:} 
-set accessor message derived from field name of object VIF
+Set the name field of the given VIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_name (session_id s, VIF ref self, string value)\end{verbatim}
@@ -5543,7 +6042,7 @@ set accessor message derived from field name of object VIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VIF ref } & self & object instance \\ \hline 
+{\tt VIF ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -5564,7 +6063,7 @@ void
 \subsubsection{RPC name:~get\_type}
 
 {\bf Overview:} 
-get accessor message derived from field type of object VIF
+Get the type field of the given VIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (driver_type) get_type (session_id s, VIF ref self)\end{verbatim}
@@ -5577,7 +6076,7 @@ get accessor message derived from field type of object VIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VIF ref } & self & object instance \\ \hline 
+{\tt VIF ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -5596,7 +6095,7 @@ value of the field
 \subsubsection{RPC name:~set\_type}
 
 {\bf Overview:} 
-set accessor message derived from field type of object VIF
+Set the type field of the given VIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_type (session_id s, VIF ref self, driver_type value)\end{verbatim}
@@ -5609,7 +6108,7 @@ set accessor message derived from field type of object VIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VIF ref } & self & object instance \\ \hline 
+{\tt VIF ref } & self & reference to the object \\ \hline 
 
 {\tt driver\_type } & value & New value to set \\ \hline 
 
@@ -5630,7 +6129,7 @@ void
 \subsubsection{RPC name:~get\_device}
 
 {\bf Overview:} 
-get accessor message derived from field device of object VIF
+Get the device field of the given VIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_device (session_id s, VIF ref self)\end{verbatim}
@@ -5643,7 +6142,7 @@ get accessor message derived from field device of object VIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VIF ref } & self & object instance \\ \hline 
+{\tt VIF ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -5662,7 +6161,7 @@ value of the field
 \subsubsection{RPC name:~set\_device}
 
 {\bf Overview:} 
-set accessor message derived from field device of object VIF
+Set the device field of the given VIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_device (session_id s, VIF ref self, string value)\end{verbatim}
@@ -5675,7 +6174,7 @@ set accessor message derived from field device of object VIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VIF ref } & self & object instance \\ \hline 
+{\tt VIF ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -5696,7 +6195,7 @@ void
 \subsubsection{RPC name:~get\_network}
 
 {\bf Overview:} 
-get accessor message derived from field network of object VIF
+Get the network field of the given VIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (network ref) get_network (session_id s, VIF ref self)\end{verbatim}
@@ -5709,7 +6208,7 @@ get accessor message derived from field network of object VIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VIF ref } & self & object instance \\ \hline 
+{\tt VIF ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -5728,7 +6227,7 @@ value of the field
 \subsubsection{RPC name:~set\_network}
 
 {\bf Overview:} 
-set accessor message derived from field network of object VIF
+Set the network field of the given VIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_network (session_id s, VIF ref self, network ref value)\end{verbatim}
@@ -5741,7 +6240,7 @@ set accessor message derived from field network of object VIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VIF ref } & self & object instance \\ \hline 
+{\tt VIF ref } & self & reference to the object \\ \hline 
 
 {\tt network ref } & value & New value to set \\ \hline 
 
@@ -5762,7 +6261,7 @@ void
 \subsubsection{RPC name:~get\_VM}
 
 {\bf Overview:} 
-get accessor message derived from field VM of object VIF
+Get the VM field of the given VIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VM ref) get_VM (session_id s, VIF ref self)\end{verbatim}
@@ -5775,7 +6274,7 @@ get accessor message derived from field VM of object VIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VIF ref } & self & object instance \\ \hline 
+{\tt VIF ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -5794,7 +6293,7 @@ value of the field
 \subsubsection{RPC name:~set\_VM}
 
 {\bf Overview:} 
-set accessor message derived from field VM of object VIF
+Set the VM field of the given VIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_VM (session_id s, VIF ref self, VM ref value)\end{verbatim}
@@ -5807,7 +6306,7 @@ set accessor message derived from field VM of object VIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VIF ref } & self & object instance \\ \hline 
+{\tt VIF ref } & self & reference to the object \\ \hline 
 
 {\tt VM ref } & value & New value to set \\ \hline 
 
@@ -5828,7 +6327,7 @@ void
 \subsubsection{RPC name:~get\_MAC}
 
 {\bf Overview:} 
-get accessor message derived from field MAC of object VIF
+Get the MAC field of the given VIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_MAC (session_id s, VIF ref self)\end{verbatim}
@@ -5841,7 +6340,7 @@ get accessor message derived from field MAC of object VIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VIF ref } & self & object instance \\ \hline 
+{\tt VIF ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -5860,7 +6359,7 @@ value of the field
 \subsubsection{RPC name:~set\_MAC}
 
 {\bf Overview:} 
-set accessor message derived from field MAC of object VIF
+Set the MAC field of the given VIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_MAC (session_id s, VIF ref self, string value)\end{verbatim}
@@ -5873,7 +6372,7 @@ set accessor message derived from field MAC of object VIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VIF ref } & self & object instance \\ \hline 
+{\tt VIF ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -5894,7 +6393,7 @@ void
 \subsubsection{RPC name:~get\_MTU}
 
 {\bf Overview:} 
-get accessor message derived from field MTU of object VIF
+Get the MTU field of the given VIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} int get_MTU (session_id s, VIF ref self)\end{verbatim}
@@ -5907,7 +6406,7 @@ get accessor message derived from field MTU of object VIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VIF ref } & self & object instance \\ \hline 
+{\tt VIF ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -5926,7 +6425,7 @@ value of the field
 \subsubsection{RPC name:~set\_MTU}
 
 {\bf Overview:} 
-set accessor message derived from field MTU of object VIF
+Set the MTU field of the given VIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_MTU (session_id s, VIF ref self, int value)\end{verbatim}
@@ -5939,7 +6438,7 @@ set accessor message derived from field MTU of object VIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VIF ref } & self & object instance \\ \hline 
+{\tt VIF ref } & self & reference to the object \\ \hline 
 
 {\tt int } & value & New value to set \\ \hline 
 
@@ -5960,7 +6459,7 @@ void
 \subsubsection{RPC name:~get\_io\_read\_kbs}
 
 {\bf Overview:} 
-get accessor message derived from field io/read\_kbs of object VIF
+Get the io/read\_kbs field of the given VIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} float get_io_read_kbs (session_id s, VIF ref self)\end{verbatim}
@@ -5973,7 +6472,7 @@ get accessor message derived from field io/read\_kbs of object VIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VIF ref } & self & object instance \\ \hline 
+{\tt VIF ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -5992,7 +6491,7 @@ value of the field
 \subsubsection{RPC name:~get\_io\_write\_kbs}
 
 {\bf Overview:} 
-get accessor message derived from field io/write\_kbs of object VIF
+Get the io/write\_kbs field of the given VIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} float get_io_write_kbs (session_id s, VIF ref self)\end{verbatim}
@@ -6005,7 +6504,7 @@ get accessor message derived from field io/write\_kbs of object VIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VIF ref } & self & object instance \\ \hline 
+{\tt VIF ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -6024,7 +6523,7 @@ value of the field
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
-constructor for class VIF
+Create a new VIF instance, and return its handle.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VIF ref) create (session_id s, VIF record args)\end{verbatim}
@@ -6056,7 +6555,7 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-destructor for class VIF
+Destroy the specified VIF instance.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, VIF ref self)\end{verbatim}
@@ -6069,7 +6568,7 @@ destructor for class VIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VIF ref } & self & object instance \\ \hline 
+{\tt VIF ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -6088,7 +6587,7 @@ void
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
-returns the VIF instance with a particular uuid
+Get a reference to the VIF instance with the specified UUID.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VIF ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
@@ -6120,7 +6619,7 @@ reference to the object
 \subsubsection{RPC name:~get\_record}
 
 {\bf Overview:} 
-returns a record containing the state of an instance of class VIF
+Get a record containing the current state of the given VIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VIF record) get_record (session_id s, VIF ref self)\end{verbatim}
@@ -6176,7 +6675,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
-get accessor message derived from field uuid of object PIF
+Get the uuid field of the given PIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_uuid (session_id s, PIF ref self)\end{verbatim}
@@ -6189,7 +6688,7 @@ get accessor message derived from field uuid of object PIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt PIF ref } & self & object instance \\ \hline 
+{\tt PIF ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -6208,7 +6707,7 @@ value of the field
 \subsubsection{RPC name:~get\_name}
 
 {\bf Overview:} 
-get accessor message derived from field name of object PIF
+Get the name field of the given PIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_name (session_id s, PIF ref self)\end{verbatim}
@@ -6221,7 +6720,7 @@ get accessor message derived from field name of object PIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt PIF ref } & self & object instance \\ \hline 
+{\tt PIF ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -6240,7 +6739,7 @@ value of the field
 \subsubsection{RPC name:~set\_name}
 
 {\bf Overview:} 
-set accessor message derived from field name of object PIF
+Set the name field of the given PIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_name (session_id s, PIF ref self, string value)\end{verbatim}
@@ -6253,7 +6752,7 @@ set accessor message derived from field name of object PIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt PIF ref } & self & object instance \\ \hline 
+{\tt PIF ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -6274,7 +6773,7 @@ void
 \subsubsection{RPC name:~get\_network}
 
 {\bf Overview:} 
-get accessor message derived from field network of object PIF
+Get the network field of the given PIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (network ref) get_network (session_id s, PIF ref self)\end{verbatim}
@@ -6287,7 +6786,7 @@ get accessor message derived from field network of object PIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt PIF ref } & self & object instance \\ \hline 
+{\tt PIF ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -6306,7 +6805,7 @@ value of the field
 \subsubsection{RPC name:~set\_network}
 
 {\bf Overview:} 
-set accessor message derived from field network of object PIF
+Set the network field of the given PIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_network (session_id s, PIF ref self, network ref value)\end{verbatim}
@@ -6319,7 +6818,7 @@ set accessor message derived from field network of object PIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt PIF ref } & self & object instance \\ \hline 
+{\tt PIF ref } & self & reference to the object \\ \hline 
 
 {\tt network ref } & value & New value to set \\ \hline 
 
@@ -6340,7 +6839,7 @@ void
 \subsubsection{RPC name:~get\_host}
 
 {\bf Overview:} 
-get accessor message derived from field host of object PIF
+Get the host field of the given PIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (host ref) get_host (session_id s, PIF ref self)\end{verbatim}
@@ -6353,7 +6852,7 @@ get accessor message derived from field host of object PIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt PIF ref } & self & object instance \\ \hline 
+{\tt PIF ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -6372,7 +6871,7 @@ value of the field
 \subsubsection{RPC name:~set\_host}
 
 {\bf Overview:} 
-set accessor message derived from field host of object PIF
+Set the host field of the given PIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_host (session_id s, PIF ref self, host ref value)\end{verbatim}
@@ -6385,7 +6884,7 @@ set accessor message derived from field host of object PIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt PIF ref } & self & object instance \\ \hline 
+{\tt PIF ref } & self & reference to the object \\ \hline 
 
 {\tt host ref } & value & New value to set \\ \hline 
 
@@ -6406,7 +6905,7 @@ void
 \subsubsection{RPC name:~get\_MAC}
 
 {\bf Overview:} 
-get accessor message derived from field MAC of object PIF
+Get the MAC field of the given PIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_MAC (session_id s, PIF ref self)\end{verbatim}
@@ -6419,7 +6918,7 @@ get accessor message derived from field MAC of object PIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt PIF ref } & self & object instance \\ \hline 
+{\tt PIF ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -6438,7 +6937,7 @@ value of the field
 \subsubsection{RPC name:~set\_MAC}
 
 {\bf Overview:} 
-set accessor message derived from field MAC of object PIF
+Set the MAC field of the given PIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_MAC (session_id s, PIF ref self, string value)\end{verbatim}
@@ -6451,7 +6950,7 @@ set accessor message derived from field MAC of object PIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt PIF ref } & self & object instance \\ \hline 
+{\tt PIF ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -6472,7 +6971,7 @@ void
 \subsubsection{RPC name:~get\_MTU}
 
 {\bf Overview:} 
-get accessor message derived from field MTU of object PIF
+Get the MTU field of the given PIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} int get_MTU (session_id s, PIF ref self)\end{verbatim}
@@ -6485,7 +6984,7 @@ get accessor message derived from field MTU of object PIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt PIF ref } & self & object instance \\ \hline 
+{\tt PIF ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -6504,7 +7003,7 @@ value of the field
 \subsubsection{RPC name:~set\_MTU}
 
 {\bf Overview:} 
-set accessor message derived from field MTU of object PIF
+Set the MTU field of the given PIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_MTU (session_id s, PIF ref self, int value)\end{verbatim}
@@ -6517,7 +7016,7 @@ set accessor message derived from field MTU of object PIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt PIF ref } & self & object instance \\ \hline 
+{\tt PIF ref } & self & reference to the object \\ \hline 
 
 {\tt int } & value & New value to set \\ \hline 
 
@@ -6538,7 +7037,7 @@ void
 \subsubsection{RPC name:~get\_VLAN}
 
 {\bf Overview:} 
-get accessor message derived from field VLAN of object PIF
+Get the VLAN field of the given PIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_VLAN (session_id s, PIF ref self)\end{verbatim}
@@ -6551,7 +7050,7 @@ get accessor message derived from field VLAN of object PIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt PIF ref } & self & object instance \\ \hline 
+{\tt PIF ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -6570,7 +7069,7 @@ value of the field
 \subsubsection{RPC name:~set\_VLAN}
 
 {\bf Overview:} 
-set accessor message derived from field VLAN of object PIF
+Set the VLAN field of the given PIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_VLAN (session_id s, PIF ref self, string value)\end{verbatim}
@@ -6583,7 +7082,7 @@ set accessor message derived from field VLAN of object PIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt PIF ref } & self & object instance \\ \hline 
+{\tt PIF ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -6604,7 +7103,7 @@ void
 \subsubsection{RPC name:~get\_io\_read\_kbs}
 
 {\bf Overview:} 
-get accessor message derived from field io/read\_kbs of object PIF
+Get the io/read\_kbs field of the given PIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} float get_io_read_kbs (session_id s, PIF ref self)\end{verbatim}
@@ -6617,7 +7116,7 @@ get accessor message derived from field io/read\_kbs of object PIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt PIF ref } & self & object instance \\ \hline 
+{\tt PIF ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -6636,7 +7135,7 @@ value of the field
 \subsubsection{RPC name:~get\_io\_write\_kbs}
 
 {\bf Overview:} 
-get accessor message derived from field io/write\_kbs of object PIF
+Get the io/write\_kbs field of the given PIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} float get_io_write_kbs (session_id s, PIF ref self)\end{verbatim}
@@ -6649,7 +7148,7 @@ get accessor message derived from field io/write\_kbs of object PIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt PIF ref } & self & object instance \\ \hline 
+{\tt PIF ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -6668,7 +7167,7 @@ value of the field
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
-constructor for class PIF
+Create a new PIF instance, and return its handle.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (PIF ref) create (session_id s, PIF record args)\end{verbatim}
@@ -6700,7 +7199,7 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-destructor for class PIF
+Destroy the specified PIF instance.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, PIF ref self)\end{verbatim}
@@ -6713,7 +7212,7 @@ destructor for class PIF
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt PIF ref } & self & object instance \\ \hline 
+{\tt PIF ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -6732,7 +7231,7 @@ void
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
-returns the PIF instance with a particular uuid
+Get a reference to the PIF instance with the specified UUID.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (PIF ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
@@ -6764,7 +7263,7 @@ reference to the object
 \subsubsection{RPC name:~get\_record}
 
 {\bf Overview:} 
-returns a record containing the state of an instance of class PIF
+Get a record containing the current state of the given PIF.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (PIF record) get_record (session_id s, PIF ref self)\end{verbatim}
@@ -6878,7 +7377,7 @@ A list of all the IDs of all the Storage Repositories
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
-get accessor message derived from field uuid of object SR
+Get the uuid field of the given SR.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_uuid (session_id s, SR ref self)\end{verbatim}
@@ -6891,7 +7390,7 @@ get accessor message derived from field uuid of object SR
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt SR ref } & self & object instance \\ \hline 
+{\tt SR ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -6910,7 +7409,7 @@ value of the field
 \subsubsection{RPC name:~get\_name\_label}
 
 {\bf Overview:} 
-get accessor message derived from field name/label of object SR
+Get the name/label field of the given SR.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_name_label (session_id s, SR ref self)\end{verbatim}
@@ -6923,7 +7422,7 @@ get accessor message derived from field name/label of object SR
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt SR ref } & self & object instance \\ \hline 
+{\tt SR ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -6942,7 +7441,7 @@ value of the field
 \subsubsection{RPC name:~set\_name\_label}
 
 {\bf Overview:} 
-set accessor message derived from field name/label of object SR
+Set the name/label field of the given SR.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_name_label (session_id s, SR ref self, string value)\end{verbatim}
@@ -6955,7 +7454,7 @@ set accessor message derived from field name/label of object SR
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt SR ref } & self & object instance \\ \hline 
+{\tt SR ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -6976,7 +7475,7 @@ void
 \subsubsection{RPC name:~get\_name\_description}
 
 {\bf Overview:} 
-get accessor message derived from field name/description of object SR
+Get the name/description field of the given SR.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_name_description (session_id s, SR ref self)\end{verbatim}
@@ -6989,7 +7488,7 @@ get accessor message derived from field name/description of object SR
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt SR ref } & self & object instance \\ \hline 
+{\tt SR ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -7008,7 +7507,7 @@ value of the field
 \subsubsection{RPC name:~set\_name\_description}
 
 {\bf Overview:} 
-set accessor message derived from field name/description of object SR
+Set the name/description field of the given SR.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_name_description (session_id s, SR ref self, string value)\end{verbatim}
@@ -7021,7 +7520,7 @@ set accessor message derived from field name/description of object SR
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt SR ref } & self & object instance \\ \hline 
+{\tt SR ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -7042,7 +7541,7 @@ void
 \subsubsection{RPC name:~get\_VDIs}
 
 {\bf Overview:} 
-get accessor message derived from field VDIs of object SR
+Get the VDIs field of the given SR.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((VDI ref) Set) get_VDIs (session_id s, SR ref self)\end{verbatim}
@@ -7055,7 +7554,7 @@ get accessor message derived from field VDIs of object SR
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt SR ref } & self & object instance \\ \hline 
+{\tt SR ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -7074,7 +7573,7 @@ value of the field
 \subsubsection{RPC name:~get\_virtual\_allocation}
 
 {\bf Overview:} 
-get accessor message derived from field virtual\_allocation of object SR
+Get the virtual\_allocation field of the given SR.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} int get_virtual_allocation (session_id s, SR ref self)\end{verbatim}
@@ -7087,7 +7586,7 @@ get accessor message derived from field virtual\_allocation of object SR
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt SR ref } & self & object instance \\ \hline 
+{\tt SR ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -7106,7 +7605,7 @@ value of the field
 \subsubsection{RPC name:~get\_physical\_utilisation}
 
 {\bf Overview:} 
-get accessor message derived from field physical\_utilisation of object SR
+Get the physical\_utilisation field of the given SR.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} int get_physical_utilisation (session_id s, SR ref self)\end{verbatim}
@@ -7119,7 +7618,7 @@ get accessor message derived from field physical\_utilisation of object SR
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt SR ref } & self & object instance \\ \hline 
+{\tt SR ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -7138,7 +7637,7 @@ value of the field
 \subsubsection{RPC name:~get\_physical\_size}
 
 {\bf Overview:} 
-get accessor message derived from field physical\_size of object SR
+Get the physical\_size field of the given SR.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} int get_physical_size (session_id s, SR ref self)\end{verbatim}
@@ -7151,7 +7650,7 @@ get accessor message derived from field physical\_size of object SR
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt SR ref } & self & object instance \\ \hline 
+{\tt SR ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -7170,7 +7669,7 @@ value of the field
 \subsubsection{RPC name:~get\_type}
 
 {\bf Overview:} 
-get accessor message derived from field type of object SR
+Get the type field of the given SR.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_type (session_id s, SR ref self)\end{verbatim}
@@ -7183,7 +7682,7 @@ get accessor message derived from field type of object SR
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt SR ref } & self & object instance \\ \hline 
+{\tt SR ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -7202,7 +7701,7 @@ value of the field
 \subsubsection{RPC name:~get\_location}
 
 {\bf Overview:} 
-get accessor message derived from field location of object SR
+Get the location field of the given SR.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_location (session_id s, SR ref self)\end{verbatim}
@@ -7215,7 +7714,7 @@ get accessor message derived from field location of object SR
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt SR ref } & self & object instance \\ \hline 
+{\tt SR ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -7234,7 +7733,7 @@ value of the field
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
-constructor for class SR
+Create a new SR instance, and return its handle.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (SR ref) create (session_id s, SR record args)\end{verbatim}
@@ -7266,7 +7765,7 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-destructor for class SR
+Destroy the specified SR instance.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, SR ref self)\end{verbatim}
@@ -7279,7 +7778,7 @@ destructor for class SR
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt SR ref } & self & object instance \\ \hline 
+{\tt SR ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -7298,7 +7797,7 @@ void
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
-returns the SR instance with a particular uuid
+Get a reference to the SR instance with the specified UUID.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (SR ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
@@ -7330,7 +7829,7 @@ reference to the object
 \subsubsection{RPC name:~get\_record}
 
 {\bf Overview:} 
-returns a record containing the state of an instance of class SR
+Get a record containing the current state of the given SR.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (SR record) get_record (session_id s, SR ref self)\end{verbatim}
@@ -7362,7 +7861,7 @@ all fields from the object
 \subsubsection{RPC name:~get\_by\_name\_label}
 
 {\bf Overview:} 
-returns the SR instance with a particular name label
+Get all the SR instances with the given label.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((SR ref) Set) get_by_name_label (session_id s, string label)\end{verbatim}
@@ -7488,7 +7987,7 @@ void
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
-get accessor message derived from field uuid of object VDI
+Get the uuid field of the given VDI.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_uuid (session_id s, VDI ref self)\end{verbatim}
@@ -7501,7 +8000,7 @@ get accessor message derived from field uuid of object VDI
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VDI ref } & self & object instance \\ \hline 
+{\tt VDI ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -7520,7 +8019,7 @@ value of the field
 \subsubsection{RPC name:~get\_name\_label}
 
 {\bf Overview:} 
-get accessor message derived from field name/label of object VDI
+Get the name/label field of the given VDI.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_name_label (session_id s, VDI ref self)\end{verbatim}
@@ -7533,7 +8032,7 @@ get accessor message derived from field name/label of object VDI
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VDI ref } & self & object instance \\ \hline 
+{\tt VDI ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -7552,7 +8051,7 @@ value of the field
 \subsubsection{RPC name:~set\_name\_label}
 
 {\bf Overview:} 
-set accessor message derived from field name/label of object VDI
+Set the name/label field of the given VDI.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_name_label (session_id s, VDI ref self, string value)\end{verbatim}
@@ -7565,7 +8064,7 @@ set accessor message derived from field name/label of object VDI
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VDI ref } & self & object instance \\ \hline 
+{\tt VDI ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -7586,7 +8085,7 @@ void
 \subsubsection{RPC name:~get\_name\_description}
 
 {\bf Overview:} 
-get accessor message derived from field name/description of object VDI
+Get the name/description field of the given VDI.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_name_description (session_id s, VDI ref self)\end{verbatim}
@@ -7599,7 +8098,7 @@ get accessor message derived from field name/description of object VDI
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VDI ref } & self & object instance \\ \hline 
+{\tt VDI ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -7618,7 +8117,7 @@ value of the field
 \subsubsection{RPC name:~set\_name\_description}
 
 {\bf Overview:} 
-set accessor message derived from field name/description of object VDI
+Set the name/description field of the given VDI.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_name_description (session_id s, VDI ref self, string value)\end{verbatim}
@@ -7631,7 +8130,7 @@ set accessor message derived from field name/description of object VDI
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VDI ref } & self & object instance \\ \hline 
+{\tt VDI ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -7652,7 +8151,7 @@ void
 \subsubsection{RPC name:~get\_SR}
 
 {\bf Overview:} 
-get accessor message derived from field SR of object VDI
+Get the SR field of the given VDI.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (SR ref) get_SR (session_id s, VDI ref self)\end{verbatim}
@@ -7665,7 +8164,7 @@ get accessor message derived from field SR of object VDI
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VDI ref } & self & object instance \\ \hline 
+{\tt VDI ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -7684,7 +8183,7 @@ value of the field
 \subsubsection{RPC name:~set\_SR}
 
 {\bf Overview:} 
-set accessor message derived from field SR of object VDI
+Set the SR field of the given VDI.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_SR (session_id s, VDI ref self, SR ref value)\end{verbatim}
@@ -7697,7 +8196,7 @@ set accessor message derived from field SR of object VDI
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VDI ref } & self & object instance \\ \hline 
+{\tt VDI ref } & self & reference to the object \\ \hline 
 
 {\tt SR ref } & value & New value to set \\ \hline 
 
@@ -7718,7 +8217,7 @@ void
 \subsubsection{RPC name:~get\_VBDs}
 
 {\bf Overview:} 
-get accessor message derived from field VBDs of object VDI
+Get the VBDs field of the given VDI.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((VBD ref) Set) get_VBDs (session_id s, VDI ref self)\end{verbatim}
@@ -7731,7 +8230,7 @@ get accessor message derived from field VBDs of object VDI
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VDI ref } & self & object instance \\ \hline 
+{\tt VDI ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -7750,7 +8249,7 @@ value of the field
 \subsubsection{RPC name:~get\_virtual\_size}
 
 {\bf Overview:} 
-get accessor message derived from field virtual\_size of object VDI
+Get the virtual\_size field of the given VDI.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} int get_virtual_size (session_id s, VDI ref self)\end{verbatim}
@@ -7763,7 +8262,7 @@ get accessor message derived from field virtual\_size of object VDI
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VDI ref } & self & object instance \\ \hline 
+{\tt VDI ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -7782,7 +8281,7 @@ value of the field
 \subsubsection{RPC name:~set\_virtual\_size}
 
 {\bf Overview:} 
-set accessor message derived from field virtual\_size of object VDI
+Set the virtual\_size field of the given VDI.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_virtual_size (session_id s, VDI ref self, int value)\end{verbatim}
@@ -7795,7 +8294,7 @@ set accessor message derived from field virtual\_size of object VDI
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VDI ref } & self & object instance \\ \hline 
+{\tt VDI ref } & self & reference to the object \\ \hline 
 
 {\tt int } & value & New value to set \\ \hline 
 
@@ -7816,7 +8315,7 @@ void
 \subsubsection{RPC name:~get\_physical\_utilisation}
 
 {\bf Overview:} 
-get accessor message derived from field physical\_utilisation of object VDI
+Get the physical\_utilisation field of the given VDI.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} int get_physical_utilisation (session_id s, VDI ref self)\end{verbatim}
@@ -7829,7 +8328,7 @@ get accessor message derived from field physical\_utilisation of object VDI
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VDI ref } & self & object instance \\ \hline 
+{\tt VDI ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -7848,7 +8347,7 @@ value of the field
 \subsubsection{RPC name:~get\_sector\_size}
 
 {\bf Overview:} 
-get accessor message derived from field sector\_size of object VDI
+Get the sector\_size field of the given VDI.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} int get_sector_size (session_id s, VDI ref self)\end{verbatim}
@@ -7861,7 +8360,7 @@ get accessor message derived from field sector\_size of object VDI
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VDI ref } & self & object instance \\ \hline 
+{\tt VDI ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -7880,7 +8379,7 @@ value of the field
 \subsubsection{RPC name:~get\_type}
 
 {\bf Overview:} 
-get accessor message derived from field type of object VDI
+Get the type field of the given VDI.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (vdi_type) get_type (session_id s, VDI ref self)\end{verbatim}
@@ -7893,7 +8392,7 @@ get accessor message derived from field type of object VDI
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VDI ref } & self & object instance \\ \hline 
+{\tt VDI ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -7912,7 +8411,7 @@ value of the field
 \subsubsection{RPC name:~get\_parent}
 
 {\bf Overview:} 
-get accessor message derived from field parent of object VDI
+Get the parent field of the given VDI.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VDI ref) get_parent (session_id s, VDI ref self)\end{verbatim}
@@ -7925,7 +8424,7 @@ get accessor message derived from field parent of object VDI
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VDI ref } & self & object instance \\ \hline 
+{\tt VDI ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -7944,7 +8443,7 @@ value of the field
 \subsubsection{RPC name:~get\_children}
 
 {\bf Overview:} 
-get accessor message derived from field children of object VDI
+Get the children field of the given VDI.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((VDI ref) Set) get_children (session_id s, VDI ref self)\end{verbatim}
@@ -7957,7 +8456,7 @@ get accessor message derived from field children of object VDI
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VDI ref } & self & object instance \\ \hline 
+{\tt VDI ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -7976,7 +8475,7 @@ value of the field
 \subsubsection{RPC name:~get\_sharable}
 
 {\bf Overview:} 
-get accessor message derived from field sharable of object VDI
+Get the sharable field of the given VDI.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} bool get_sharable (session_id s, VDI ref self)\end{verbatim}
@@ -7989,7 +8488,7 @@ get accessor message derived from field sharable of object VDI
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VDI ref } & self & object instance \\ \hline 
+{\tt VDI ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -8008,7 +8507,7 @@ value of the field
 \subsubsection{RPC name:~set\_sharable}
 
 {\bf Overview:} 
-set accessor message derived from field sharable of object VDI
+Set the sharable field of the given VDI.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_sharable (session_id s, VDI ref self, bool value)\end{verbatim}
@@ -8021,7 +8520,7 @@ set accessor message derived from field sharable of object VDI
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VDI ref } & self & object instance \\ \hline 
+{\tt VDI ref } & self & reference to the object \\ \hline 
 
 {\tt bool } & value & New value to set \\ \hline 
 
@@ -8042,7 +8541,7 @@ void
 \subsubsection{RPC name:~get\_read\_only}
 
 {\bf Overview:} 
-get accessor message derived from field read\_only of object VDI
+Get the read\_only field of the given VDI.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} bool get_read_only (session_id s, VDI ref self)\end{verbatim}
@@ -8055,7 +8554,7 @@ get accessor message derived from field read\_only of object VDI
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VDI ref } & self & object instance \\ \hline 
+{\tt VDI ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -8074,7 +8573,7 @@ value of the field
 \subsubsection{RPC name:~set\_read\_only}
 
 {\bf Overview:} 
-set accessor message derived from field read\_only of object VDI
+Set the read\_only field of the given VDI.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_read_only (session_id s, VDI ref self, bool value)\end{verbatim}
@@ -8087,7 +8586,7 @@ set accessor message derived from field read\_only of object VDI
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VDI ref } & self & object instance \\ \hline 
+{\tt VDI ref } & self & reference to the object \\ \hline 
 
 {\tt bool } & value & New value to set \\ \hline 
 
@@ -8108,7 +8607,7 @@ void
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
-constructor for class VDI
+Create a new VDI instance, and return its handle.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VDI ref) create (session_id s, VDI record args)\end{verbatim}
@@ -8140,7 +8639,7 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-destructor for class VDI
+Destroy the specified VDI instance.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, VDI ref self)\end{verbatim}
@@ -8153,7 +8652,7 @@ destructor for class VDI
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VDI ref } & self & object instance \\ \hline 
+{\tt VDI ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -8172,7 +8671,7 @@ void
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
-returns the VDI instance with a particular uuid
+Get a reference to the VDI instance with the specified UUID.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VDI ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
@@ -8204,7 +8703,7 @@ reference to the object
 \subsubsection{RPC name:~get\_record}
 
 {\bf Overview:} 
-returns a record containing the state of an instance of class VDI
+Get a record containing the current state of the given VDI.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VDI record) get_record (session_id s, VDI ref self)\end{verbatim}
@@ -8236,7 +8735,7 @@ all fields from the object
 \subsubsection{RPC name:~get\_by\_name\_label}
 
 {\bf Overview:} 
-returns the VDI instance with a particular name label
+Get all the VDI instances with the given label.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((VDI ref) Set) get_by_name_label (session_id s, string label)\end{verbatim}
@@ -8282,6 +8781,7 @@ $\mathit{RW}$ &  {\tt VM} & VM ref & the virtual machine \\
 $\mathit{RW}$ &  {\tt VDI} & VDI ref & the virtual disk \\
 $\mathit{RW}$ &  {\tt device} & string & device seen by the guest e.g. hda1 \\
 $\mathit{RW}$ &  {\tt mode} & vbd\_mode & the mode the disk should be mounted with \\
+$\mathit{RW}$ &  {\tt type} & vbd\_type & how the VBD will appear to the guest (e.g. disk or CD) \\
 $\mathit{RW}$ &  {\tt driver} & driver\_type & the style of driver \\
 $\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB/s) \\
@@ -8325,7 +8825,7 @@ void
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
-get accessor message derived from field uuid of object VBD
+Get the uuid field of the given VBD.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_uuid (session_id s, VBD ref self)\end{verbatim}
@@ -8338,7 +8838,7 @@ get accessor message derived from field uuid of object VBD
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VBD ref } & self & object instance \\ \hline 
+{\tt VBD ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -8357,7 +8857,7 @@ value of the field
 \subsubsection{RPC name:~get\_VM}
 
 {\bf Overview:} 
-get accessor message derived from field VM of object VBD
+Get the VM field of the given VBD.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VM ref) get_VM (session_id s, VBD ref self)\end{verbatim}
@@ -8370,7 +8870,7 @@ get accessor message derived from field VM of object VBD
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VBD ref } & self & object instance \\ \hline 
+{\tt VBD ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -8389,7 +8889,7 @@ value of the field
 \subsubsection{RPC name:~set\_VM}
 
 {\bf Overview:} 
-set accessor message derived from field VM of object VBD
+Set the VM field of the given VBD.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_VM (session_id s, VBD ref self, VM ref value)\end{verbatim}
@@ -8402,7 +8902,7 @@ set accessor message derived from field VM of object VBD
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VBD ref } & self & object instance \\ \hline 
+{\tt VBD ref } & self & reference to the object \\ \hline 
 
 {\tt VM ref } & value & New value to set \\ \hline 
 
@@ -8423,7 +8923,7 @@ void
 \subsubsection{RPC name:~get\_VDI}
 
 {\bf Overview:} 
-get accessor message derived from field VDI of object VBD
+Get the VDI field of the given VBD.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VDI ref) get_VDI (session_id s, VBD ref self)\end{verbatim}
@@ -8436,7 +8936,7 @@ get accessor message derived from field VDI of object VBD
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VBD ref } & self & object instance \\ \hline 
+{\tt VBD ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -8455,7 +8955,7 @@ value of the field
 \subsubsection{RPC name:~set\_VDI}
 
 {\bf Overview:} 
-set accessor message derived from field VDI of object VBD
+Set the VDI field of the given VBD.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_VDI (session_id s, VBD ref self, VDI ref value)\end{verbatim}
@@ -8468,7 +8968,7 @@ set accessor message derived from field VDI of object VBD
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VBD ref } & self & object instance \\ \hline 
+{\tt VBD ref } & self & reference to the object \\ \hline 
 
 {\tt VDI ref } & value & New value to set \\ \hline 
 
@@ -8489,7 +8989,7 @@ void
 \subsubsection{RPC name:~get\_device}
 
 {\bf Overview:} 
-get accessor message derived from field device of object VBD
+Get the device field of the given VBD.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_device (session_id s, VBD ref self)\end{verbatim}
@@ -8502,7 +9002,7 @@ get accessor message derived from field device of object VBD
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VBD ref } & self & object instance \\ \hline 
+{\tt VBD ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -8521,7 +9021,7 @@ value of the field
 \subsubsection{RPC name:~set\_device}
 
 {\bf Overview:} 
-set accessor message derived from field device of object VBD
+Set the device field of the given VBD.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_device (session_id s, VBD ref self, string value)\end{verbatim}
@@ -8534,7 +9034,7 @@ set accessor message derived from field device of object VBD
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VBD ref } & self & object instance \\ \hline 
+{\tt VBD ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -8555,7 +9055,7 @@ void
 \subsubsection{RPC name:~get\_mode}
 
 {\bf Overview:} 
-get accessor message derived from field mode of object VBD
+Get the mode field of the given VBD.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (vbd_mode) get_mode (session_id s, VBD ref self)\end{verbatim}
@@ -8568,7 +9068,7 @@ get accessor message derived from field mode of object VBD
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VBD ref } & self & object instance \\ \hline 
+{\tt VBD ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -8587,7 +9087,7 @@ value of the field
 \subsubsection{RPC name:~set\_mode}
 
 {\bf Overview:} 
-set accessor message derived from field mode of object VBD
+Set the mode field of the given VBD.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_mode (session_id s, VBD ref self, vbd_mode value)\end{verbatim}
@@ -8600,9 +9100,75 @@ set accessor message derived from field mode of object VBD
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VBD ref } & self & object instance \\ \hline 
+{\tt VBD ref } & self & reference to the object \\ \hline 
 
 {\tt vbd\_mode } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_type}
+
+{\bf Overview:} 
+Get the type field of the given VBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (vbd_type) get_type (session_id s, VBD ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+vbd\_type
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_type}
+
+{\bf Overview:} 
+Set the type field of the given VBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_type (session_id s, VBD ref self, vbd_type value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & reference to the object \\ \hline 
+
+{\tt vbd\_type } & value & New value to set \\ \hline 
 
 \end{tabular}
 
@@ -8621,7 +9187,7 @@ void
 \subsubsection{RPC name:~get\_driver}
 
 {\bf Overview:} 
-get accessor message derived from field driver of object VBD
+Get the driver field of the given VBD.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (driver_type) get_driver (session_id s, VBD ref self)\end{verbatim}
@@ -8634,7 +9200,7 @@ get accessor message derived from field driver of object VBD
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VBD ref } & self & object instance \\ \hline 
+{\tt VBD ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -8653,7 +9219,7 @@ value of the field
 \subsubsection{RPC name:~set\_driver}
 
 {\bf Overview:} 
-set accessor message derived from field driver of object VBD
+Set the driver field of the given VBD.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_driver (session_id s, VBD ref self, driver_type value)\end{verbatim}
@@ -8666,7 +9232,7 @@ set accessor message derived from field driver of object VBD
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VBD ref } & self & object instance \\ \hline 
+{\tt VBD ref } & self & reference to the object \\ \hline 
 
 {\tt driver\_type } & value & New value to set \\ \hline 
 
@@ -8687,7 +9253,7 @@ void
 \subsubsection{RPC name:~get\_io\_read\_kbs}
 
 {\bf Overview:} 
-get accessor message derived from field io/read\_kbs of object VBD
+Get the io/read\_kbs field of the given VBD.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} float get_io_read_kbs (session_id s, VBD ref self)\end{verbatim}
@@ -8700,7 +9266,7 @@ get accessor message derived from field io/read\_kbs of object VBD
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VBD ref } & self & object instance \\ \hline 
+{\tt VBD ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -8719,7 +9285,7 @@ value of the field
 \subsubsection{RPC name:~get\_io\_write\_kbs}
 
 {\bf Overview:} 
-get accessor message derived from field io/write\_kbs of object VBD
+Get the io/write\_kbs field of the given VBD.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} float get_io_write_kbs (session_id s, VBD ref self)\end{verbatim}
@@ -8732,7 +9298,7 @@ get accessor message derived from field io/write\_kbs of object VBD
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VBD ref } & self & object instance \\ \hline 
+{\tt VBD ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -8751,7 +9317,7 @@ value of the field
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
-constructor for class VBD
+Create a new VBD instance, and return its handle.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VBD ref) create (session_id s, VBD record args)\end{verbatim}
@@ -8783,7 +9349,7 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-destructor for class VBD
+Destroy the specified VBD instance.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, VBD ref self)\end{verbatim}
@@ -8796,7 +9362,7 @@ destructor for class VBD
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VBD ref } & self & object instance \\ \hline 
+{\tt VBD ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -8815,7 +9381,7 @@ void
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
-returns the VBD instance with a particular uuid
+Get a reference to the VBD instance with the specified UUID.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VBD ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
@@ -8847,7 +9413,7 @@ reference to the object
 \subsubsection{RPC name:~get\_record}
 
 {\bf Overview:} 
-returns a record containing the state of an instance of class VBD
+Get a record containing the current state of the given VBD.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VBD record) get_record (session_id s, VBD ref self)\end{verbatim}
@@ -8899,7 +9465,7 @@ $\mathit{RO}_\mathit{ins}$ &  {\tt instance} & int & the instance number the vir
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
-get accessor message derived from field uuid of object VTPM
+Get the uuid field of the given VTPM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_uuid (session_id s, VTPM ref self)\end{verbatim}
@@ -8912,7 +9478,7 @@ get accessor message derived from field uuid of object VTPM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VTPM ref } & self & object instance \\ \hline 
+{\tt VTPM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -8931,7 +9497,7 @@ value of the field
 \subsubsection{RPC name:~get\_VM}
 
 {\bf Overview:} 
-get accessor message derived from field VM of object VTPM
+Get the VM field of the given VTPM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VM ref) get_VM (session_id s, VTPM ref self)\end{verbatim}
@@ -8944,7 +9510,7 @@ get accessor message derived from field VM of object VTPM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VTPM ref } & self & object instance \\ \hline 
+{\tt VTPM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -8963,7 +9529,7 @@ value of the field
 \subsubsection{RPC name:~get\_backend}
 
 {\bf Overview:} 
-get accessor message derived from field backend of object VTPM
+Get the backend field of the given VTPM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VM ref) get_backend (session_id s, VTPM ref self)\end{verbatim}
@@ -8976,7 +9542,7 @@ get accessor message derived from field backend of object VTPM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VTPM ref } & self & object instance \\ \hline 
+{\tt VTPM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -8995,7 +9561,7 @@ value of the field
 \subsubsection{RPC name:~get\_driver}
 
 {\bf Overview:} 
-get accessor message derived from field driver of object VTPM
+Get the driver field of the given VTPM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (driver_type) get_driver (session_id s, VTPM ref self)\end{verbatim}
@@ -9008,7 +9574,7 @@ get accessor message derived from field driver of object VTPM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VTPM ref } & self & object instance \\ \hline 
+{\tt VTPM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -9027,7 +9593,7 @@ value of the field
 \subsubsection{RPC name:~get\_instance}
 
 {\bf Overview:} 
-get accessor message derived from field instance of object VTPM
+Get the instance field of the given VTPM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} int get_instance (session_id s, VTPM ref self)\end{verbatim}
@@ -9040,7 +9606,7 @@ get accessor message derived from field instance of object VTPM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VTPM ref } & self & object instance \\ \hline 
+{\tt VTPM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -9059,7 +9625,7 @@ value of the field
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
-constructor for class VTPM
+Create a new VTPM instance, and return its handle.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VTPM ref) create (session_id s, VTPM record args)\end{verbatim}
@@ -9091,7 +9657,7 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-destructor for class VTPM
+Destroy the specified VTPM instance.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, VTPM ref self)\end{verbatim}
@@ -9104,7 +9670,7 @@ destructor for class VTPM
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VTPM ref } & self & object instance \\ \hline 
+{\tt VTPM ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -9123,7 +9689,7 @@ void
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
-returns the VTPM instance with a particular uuid
+Get a reference to the VTPM instance with the specified UUID.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VTPM ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
@@ -9155,7 +9721,7 @@ reference to the object
 \subsubsection{RPC name:~get\_record}
 
 {\bf Overview:} 
-returns a record containing the state of an instance of class VTPM
+Get a record containing the current state of the given VTPM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VTPM record) get_record (session_id s, VTPM ref self)\end{verbatim}
@@ -9187,6 +9753,281 @@ all fields from the object
 
 \vspace{1cm}
 \newpage
+\section{Class: console}
+\subsection{Fields for class: console}
+\begin{longtable}{|lllp{0.38\textwidth}|}
+\hline
+\multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf console} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A console}} \\
+\hline
+Quals & Field & Type & Description \\
+\hline
+$\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
+$\mathit{RO}_\mathit{run}$ &  {\tt protocol} & console\_protocol & the protocol used by this console \\
+$\mathit{RO}_\mathit{run}$ &  {\tt uri} & string & URI for the console service \\
+$\mathit{RO}_\mathit{run}$ &  {\tt VM} & VM ref & VM to which this console is attached \\
+\hline
+\end{longtable}
+\subsection{Additional RPCs associated with class: console}
+\subsubsection{RPC name:~get\_record}
+
+{\bf Overview:} 
+Get the current state of the given console.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (console record) get_record (session_id s, console ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt console ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+console record
+}
+
+
+all fields from the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_by\_uuid}
+
+{\bf Overview:} 
+Get a reference to the object with the specified UUID.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (console ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt string } & uuid & UUID of object to return \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+console ref
+}
+
+
+reference to the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~create}
+
+{\bf Overview:} 
+Create a new console instance, and return its handle.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (console ref) create (session_id s, console record args)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt console record } & args & All constructor arguments \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+console ref
+}
+
+
+reference to the newly created object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~destroy}
+
+{\bf Overview:} 
+Destroy the specified console instance.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void destroy (session_id s, console ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt console ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_uuid}
+
+{\bf Overview:} 
+Get the uuid field of the given console.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_uuid (session_id s, console ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt console ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_protocol}
+
+{\bf Overview:} 
+Get the protocol field of the given console.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (console_protocol) get_protocol (session_id s, console ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt console ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+console\_protocol
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_uri}
+
+{\bf Overview:} 
+Get the uri field of the given console.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_uri (session_id s, console ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt console ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_VM}
+
+{\bf Overview:} 
+Get the VM field of the given console.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (VM ref) get_VM (session_id s, console ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt console ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+VM ref
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+
+\vspace{1cm}
+\newpage
 \section{Class: user}
 \subsection{Fields for class: user}
 \begin{longtable}{|lllp{0.38\textwidth}|}
@@ -9205,7 +10046,7 @@ $\mathit{RW}$ &  {\tt fullname} & string & full name \\
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
-get accessor message derived from field uuid of object user
+Get the uuid field of the given user.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_uuid (session_id s, user ref self)\end{verbatim}
@@ -9218,7 +10059,7 @@ get accessor message derived from field uuid of object user
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt user ref } & self & object instance \\ \hline 
+{\tt user ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -9237,7 +10078,7 @@ value of the field
 \subsubsection{RPC name:~get\_short\_name}
 
 {\bf Overview:} 
-get accessor message derived from field short\_name of object user
+Get the short\_name field of the given user.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_short_name (session_id s, user ref self)\end{verbatim}
@@ -9250,7 +10091,7 @@ get accessor message derived from field short\_name of object user
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt user ref } & self & object instance \\ \hline 
+{\tt user ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -9269,7 +10110,7 @@ value of the field
 \subsubsection{RPC name:~get\_fullname}
 
 {\bf Overview:} 
-get accessor message derived from field fullname of object user
+Get the fullname field of the given user.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_fullname (session_id s, user ref self)\end{verbatim}
@@ -9282,7 +10123,7 @@ get accessor message derived from field fullname of object user
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt user ref } & self & object instance \\ \hline 
+{\tt user ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -9301,7 +10142,7 @@ value of the field
 \subsubsection{RPC name:~set\_fullname}
 
 {\bf Overview:} 
-set accessor message derived from field fullname of object user
+Set the fullname field of the given user.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_fullname (session_id s, user ref self, string value)\end{verbatim}
@@ -9314,7 +10155,7 @@ set accessor message derived from field fullname of object user
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt user ref } & self & object instance \\ \hline 
+{\tt user ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
 
@@ -9335,7 +10176,7 @@ void
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
-constructor for class user
+Create a new user instance, and return its handle.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (user ref) create (session_id s, user record args)\end{verbatim}
@@ -9367,7 +10208,7 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-destructor for class user
+Destroy the specified user instance.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, user ref self)\end{verbatim}
@@ -9380,7 +10221,7 @@ destructor for class user
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt user ref } & self & object instance \\ \hline 
+{\tt user ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -9399,7 +10240,7 @@ void
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
-returns the user instance with a particular uuid
+Get a reference to the user instance with the specified UUID.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (user ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
@@ -9431,7 +10272,7 @@ reference to the object
 \subsubsection{RPC name:~get\_record}
 
 {\bf Overview:} 
-returns a record containing the state of an instance of class user
+Get a record containing the current state of the given user.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (user record) get_record (session_id s, user ref self)\end{verbatim}
@@ -9512,7 +10353,7 @@ void
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
-constructor for class debug
+Create a new debug instance, and return its handle.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (debug ref) create (session_id s, debug record args)\end{verbatim}
@@ -9544,7 +10385,7 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-destructor for class debug
+Destroy the specified debug instance.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, debug ref self)\end{verbatim}
@@ -9557,7 +10398,7 @@ destructor for class debug
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt debug ref } & self & object instance \\ \hline 
+{\tt debug ref } & self & reference to the object \\ \hline 
 
 \end{tabular}
 
@@ -9576,7 +10417,7 @@ void
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
-returns the debug instance with a particular uuid
+Get a reference to the debug instance with the specified UUID.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (debug ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
@@ -9608,7 +10449,7 @@ reference to the object
 \subsubsection{RPC name:~get\_record}
 
 {\bf Overview:} 
-returns a record containing the state of an instance of class debug
+Get a record containing the current state of the given debug.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (debug record) get_record (session_id s, debug ref self)\end{verbatim}

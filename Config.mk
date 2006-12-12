@@ -69,7 +69,8 @@ ACM_DEFAULT_SECURITY_POLICY ?= ACM_NULL_POLICY
 
 # Optional components
 XENSTAT_XENTOP ?= y
-
 VTPM_TOOLS ?= n
+LIBXENAPI_BINDINGS ?= n
+XENFB_TOOLS ?= n
 
 -include $(XEN_ROOT)/.config

@@ -12,11 +12,12 @@
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #
 
-import os, select, errno
+import os, select, errno, stat
 import random
 import shlex
 from xen.xend import sxp
 
+from xen.util import mkdir
 from XendLogging import log
 from XendError import VmError
 
@@ -37,11 +38,16 @@ def bootloader(blexec, disk, quiet = 0, blargs = None, imgcfg = None):
         log.error(msg)
         raise VmError(msg)
 
+    mkdir.parents("/var/run/xend/boot/", stat.S_IRWXU)
+
     while True:
-        fifo = "/var/lib/xen/xenbl.%s" % random.randint(0, 32000)
-        if not os.path.exists(fifo):
-            break
-    os.mkfifo(fifo, 0600)
+        fifo = "/var/run/xend/boot/xenbl.%s" %(random.randint(0, 32000),)
+        try:
+            os.mkfifo(fifo, 0600)
+        except OSError, e:
+            if (e.errno != errno.EEXIST):
+                raise
+        break
 
     child = os.fork()
     if (not child):

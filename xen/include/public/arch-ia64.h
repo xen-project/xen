@@ -59,10 +59,19 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 
 /* Arch specific VIRQs definition */
 #define VIRQ_ITC        VIRQ_ARCH_0 /* V. Virtual itc timer */
+#define VIRQ_MCA_CMC    VIRQ_ARCH_1 /* MCA cmc interrupt */
+#define VIRQ_MCA_CPE    VIRQ_ARCH_2 /* MCA cpe interrupt */
 
 /* Maximum number of virtual CPUs in multi-processor guests. */
 /* WARNING: before changing this, check that shared_info fits on a page */
 #define MAX_VIRT_CPUS 64
+
+/*
+ * HVM_PARAM_PAE_ENABLED is meaningless on ia64, so we overload this
+ * entry to store the number of vCPUs.  XXX Need arch-specific extentions
+ * for xc_get/set_hvm_param().
+ */
+#define HVM_PARAM_VCPUS    HVM_PARAM_PAE_ENABLED
 
 #ifndef __ASSEMBLY__
 
@@ -374,6 +383,12 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 /* expose the p2m table into domain */
 #define IA64_DOM0VP_expose_p2m          7
 
+/* xen perfmon */
+#define IA64_DOM0VP_perfmon             8
+
+/* gmfn version of IA64_DOM0VP_add_physmap */
+#define IA64_DOM0VP_add_physmap_with_gmfn       9
+
 // flags for page assignement to pseudo physical address space
 #define _ASSIGN_readonly                0
 #define ASSIGN_readonly                 (1UL << _ASSIGN_readonly)
@@ -460,6 +475,25 @@ struct xen_ia64_boot_param {
   (((unsigned long)(addr) & XENCOMM_INLINE_MASK) == XENCOMM_INLINE_FLAG)
 #define XENCOMM_INLINE_ADDR(addr) \
   ((unsigned long)(addr) & ~XENCOMM_INLINE_MASK)
+
+/* xen perfmon */
+#ifdef XEN
+#ifndef __ASSEMBLY__
+#ifndef _ASM_IA64_PERFMON_H
+
+#include <xen/list.h>   // asm/perfmon.h requires struct list_head
+#include <asm/perfmon.h>
+// for PFM_xxx and pfarg_features_t, pfarg_context_t, pfarg_reg_t, pfarg_load_t
+
+#endif /* _ASM_IA64_PERFMON_H */
+
+DEFINE_XEN_GUEST_HANDLE(pfarg_features_t);
+DEFINE_XEN_GUEST_HANDLE(pfarg_context_t);
+DEFINE_XEN_GUEST_HANDLE(pfarg_reg_t);
+DEFINE_XEN_GUEST_HANDLE(pfarg_load_t);
+#endif /* __ASSEMBLY__ */
+#endif /* XEN */
+
 #endif /* __HYPERVISOR_IF_IA64_H__ */
 
 /*

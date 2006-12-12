@@ -156,6 +156,26 @@ extern void *shared_vram;
 
 extern FILE *logfile;
 
+
+#if defined(__i386__) || defined(__x86_64__)
+#if defined(__i386__) 
+#define MAX_MCACHE_SIZE    0x40000000 /* 1GB max for x86 */
+#define MCACHE_BUCKET_SHIFT 16
+#elif defined(__x86_64__)
+#define MAX_MCACHE_SIZE    0x1000000000 /* 64GB max for x86_64 */
+#define MCACHE_BUCKET_SHIFT 20
+#endif
+
+#define MCACHE_BUCKET_SIZE (1UL << MCACHE_BUCKET_SHIFT)
+
+struct map_cache {
+    unsigned long paddr_index;
+    uint8_t      *vaddr_base;
+};
+
+uint8_t *qemu_map_cache(target_phys_addr_t phys_addr);
+#endif
+
 extern int xc_handle;
 extern int domid;
 
@@ -650,8 +670,11 @@ typedef struct PCIIORegion {
 #define PCI_MAX_LAT		0x3f	/* 8 bits */
 
 struct PCIDevice {
-    /* PCI config space */
-    uint8_t config[256];
+    /*
+     * PCI config space. The 4 extra bytes are a safety buffer for guest
+     * word/dword writes that can extend past byte 0xff.
+     */
+    uint8_t config[256+4];
 
     /* the following fields are read only */
     PCIBus *bus;

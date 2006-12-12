@@ -22,6 +22,7 @@
 
 #include "xen_boot_type_internal.h"
 #include "xen_common.h"
+#include "xen_console.h"
 #include "xen_cpu_feature.h"
 #include "xen_cpu_feature_internal.h"
 #include "xen_host.h"
@@ -84,28 +85,28 @@ static const struct_member xen_vm_record_struct_members[] =
         { .key = "memory_static_min",
           .type = &abstract_type_int,
           .offset = offsetof(xen_vm_record, memory_static_min) },
-        { .key = "vcpus_policy",
+        { .key = "VCPUs_policy",
           .type = &abstract_type_string,
           .offset = offsetof(xen_vm_record, vcpus_policy) },
-        { .key = "vcpus_params",
+        { .key = "VCPUs_params",
           .type = &abstract_type_string,
           .offset = offsetof(xen_vm_record, vcpus_params) },
-        { .key = "vcpus_number",
+        { .key = "VCPUs_number",
           .type = &abstract_type_int,
           .offset = offsetof(xen_vm_record, vcpus_number) },
-        { .key = "vcpus_utilisation",
+        { .key = "VCPUs_utilisation",
           .type = &abstract_type_int_float_map,
           .offset = offsetof(xen_vm_record, vcpus_utilisation) },
-        { .key = "vcpus_features_required",
+        { .key = "VCPUs_features_required",
           .type = &xen_cpu_feature_set_abstract_type_,
           .offset = offsetof(xen_vm_record, vcpus_features_required) },
-        { .key = "vcpus_features_can_use",
+        { .key = "VCPUs_features_can_use",
           .type = &xen_cpu_feature_set_abstract_type_,
           .offset = offsetof(xen_vm_record, vcpus_features_can_use) },
-        { .key = "vcpus_features_force_on",
+        { .key = "VCPUs_features_force_on",
           .type = &xen_cpu_feature_set_abstract_type_,
           .offset = offsetof(xen_vm_record, vcpus_features_force_on) },
-        { .key = "vcpus_features_force_off",
+        { .key = "VCPUs_features_force_off",
           .type = &xen_cpu_feature_set_abstract_type_,
           .offset = offsetof(xen_vm_record, vcpus_features_force_off) },
         { .key = "actions_after_shutdown",
@@ -120,6 +121,9 @@ static const struct_member xen_vm_record_struct_members[] =
         { .key = "actions_after_crash",
           .type = &xen_on_crash_behaviour_abstract_type_,
           .offset = offsetof(xen_vm_record, actions_after_crash) },
+        { .key = "consoles",
+          .type = &abstract_type_ref_set,
+          .offset = offsetof(xen_vm_record, consoles) },
         { .key = "VIFs",
           .type = &abstract_type_ref_set,
           .offset = offsetof(xen_vm_record, vifs) },
@@ -205,6 +209,7 @@ xen_vm_record_free(xen_vm_record *record)
     xen_cpu_feature_set_free(record->vcpus_features_can_use);
     xen_cpu_feature_set_free(record->vcpus_features_force_on);
     xen_cpu_feature_set_free(record->vcpus_features_force_off);
+    xen_console_record_opt_set_free(record->consoles);
     xen_vif_record_opt_set_free(record->vifs);
     xen_vbd_record_opt_set_free(record->vbds);
     xen_vtpm_record_opt_set_free(record->vtpms);
@@ -694,6 +699,23 @@ xen_vm_get_actions_after_crash(xen_session *session, enum xen_on_crash_behaviour
 
 
 bool
+xen_vm_get_consoles(xen_session *session, struct xen_console_set **result, xen_vm vm)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm }
+        };
+
+    abstract_type result_type = abstract_type_string_set;
+
+    *result = NULL;
+    XEN_CALL_("VM.get_consoles");
+    return session->ok;
+}
+
+
+bool
 xen_vm_get_vifs(xen_session *session, struct xen_vif_set **result, xen_vm vm)
 {
     abstract_value param_values[] =
@@ -1102,7 +1124,7 @@ xen_vm_set_vcpus_policy(xen_session *session, xen_vm vm, char *policy)
               .u.string_val = policy }
         };
 
-    xen_call_(session, "VM.set_vcpus_policy", param_values, 2, NULL, NULL);
+    xen_call_(session, "VM.set_VCPUs_policy", param_values, 2, NULL, NULL);
     return session->ok;
 }
 
@@ -1118,7 +1140,7 @@ xen_vm_set_vcpus_params(xen_session *session, xen_vm vm, char *params)
               .u.string_val = params }
         };
 
-    xen_call_(session, "VM.set_vcpus_params", param_values, 2, NULL, NULL);
+    xen_call_(session, "VM.set_VCPUs_params", param_values, 2, NULL, NULL);
     return session->ok;
 }
 
@@ -1134,7 +1156,7 @@ xen_vm_set_vcpus_features_force_on(xen_session *session, xen_vm vm, struct xen_c
               .u.set_val = (arbitrary_set *)force_on }
         };
 
-    xen_call_(session, "VM.set_vcpus_features_force_on", param_values, 2, NULL, NULL);
+    xen_call_(session, "VM.set_VCPUs_features_force_on", param_values, 2, NULL, NULL);
     return session->ok;
 }
 
@@ -1150,7 +1172,7 @@ xen_vm_set_vcpus_features_force_off(xen_session *session, xen_vm vm, struct xen_
               .u.set_val = (arbitrary_set *)force_off }
         };
 
-    xen_call_(session, "VM.set_vcpus_features_force_off", param_values, 2, NULL, NULL);
+    xen_call_(session, "VM.set_VCPUs_features_force_off", param_values, 2, NULL, NULL);
     return session->ok;
 }
 

@@ -28,7 +28,6 @@
  * Place - Suite 330, Boston, MA 02111-1307 USA.
  */
 
-#include <acpi_utils.h>
 #include "config.h"
 
 /* FIXME find a header that already has types defined!!! */

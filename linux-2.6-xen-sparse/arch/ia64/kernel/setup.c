@@ -550,13 +550,15 @@ setup_arch (char **cmdline_p)
 		       xen_start_info->nr_pages, xen_start_info->flags);
 
 		if (!is_initial_xendomain()) {
-			extern int console_use_vt;
+#if !defined(CONFIG_VT) || !defined(CONFIG_DUMMY_CONSOLE)
 			conswitchp = NULL;
-			console_use_vt = 0;
+#endif
 		}
 	}
+	xencons_early_setup();
 #endif
 #endif
+
 
 	/* enable IA-64 Machine Check Abort Handling unless disabled */
 	if (!strstr(saved_command_line, "nomca"))

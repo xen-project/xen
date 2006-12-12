@@ -1,0 +1,60 @@
+# HG changeset patch
+# User kfraser@localhost.localdomain
+# Node ID 582d21e2d3cd12a13ad4debee9af8bb0f1be413a
+# Parent  b7095209e31ae1f52cd4b196225a360543e37a80
+[QEMU] Do shift-key processing in QEMU monitor terminal when connected via VNC.
+Signed-off-by: Daniel P. Berrange <berrange@redhat.com>
+
+Index: ioemu/vnc.c
+===================================================================
+--- ioemu.orig/vnc.c	2006-12-08 18:21:36.000000000 +0000
++++ ioemu/vnc.c	2006-12-08 18:23:12.000000000 +0000
+@@ -114,6 +114,7 @@
+     int visible_h;
+ 
+     int ctl_keys;               /* Ctrl+Alt starts calibration */
++    int shift_keys;             /* Shift / CapsLock keys */
+ };
+ 
+ #define DIRTY_PIXEL_BITS 64
+@@ -870,9 +871,12 @@
+     } else if (down) {
+ 	int qemu_keysym = 0;
+ 
+-	if (sym <= 128) /* normal ascii */
++	if (sym <= 128) { /* normal ascii */
++	    int shifted = vs->shift_keys == 1 || vs->shift_keys == 2;
+ 	    qemu_keysym = sym;
+-	else {
++	    if (sym >= 'a' && sym <= 'z' && shifted)
++	        qemu_keysym -= 'a' - 'A';
++	} else {
+ 	    switch (sym) {
+ 	    case XK_Up: qemu_keysym = QEMU_KEY_UP; break;
+ 	    case XK_Down: qemu_keysym = QEMU_KEY_DOWN; break;
+@@ -903,6 +907,10 @@
+ 	    vs->ctl_keys |= 2;
+ 	    break;
+ 
++	case XK_Shift_L:
++	    vs->shift_keys |= 1;
++	    break;
++
+ 	default:
+ 	    break;
+ 	}
+@@ -916,6 +924,14 @@
+ 	    vs->ctl_keys &= ~2;
+ 	    break;
+ 
++	case XK_Shift_L:
++	    vs->shift_keys &= ~1;
++	    break;
++
++	case XK_Caps_Lock:
++	    vs->shift_keys ^= 2;
++	    break;
++
+ 	case XK_1 ... XK_9:
+ 	    if ((vs->ctl_keys & 3) != 3)
+ 		break;

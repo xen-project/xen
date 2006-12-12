@@ -57,6 +57,7 @@
 #include <xen/interface/event_channel.h>
 #include <asm/hypervisor.h>
 #include <xen/evtchn.h>
+#include <xen/xenbus.h>
 #include <xen/xencons.h>
 
 /*
@@ -64,45 +65,63 @@
  *  'xencons=off'  [XC_OFF]:     Console is disabled.
  *  'xencons=tty'  [XC_TTY]:     Console attached to '/dev/tty[0-9]+'.
  *  'xencons=ttyS' [XC_SERIAL]:  Console attached to '/dev/ttyS[0-9]+'.
- *                 [XC_DEFAULT]: DOM0 -> XC_SERIAL ; all others -> XC_TTY.
+ *  'xencons=xvc'  [XC_XVC]:     Console attached to '/dev/xvc0'.
+ *  default:                     DOM0 -> XC_SERIAL ; all others -> XC_TTY.
  * 
  * NB. In mode XC_TTY, we create dummy consoles for tty2-63. This suppresses
  * warnings from standard distro startup scripts.
  */
-static enum { XC_OFF, XC_DEFAULT, XC_TTY, XC_SERIAL } xc_mode = XC_DEFAULT;
+static enum {
+	XC_OFF, XC_TTY, XC_SERIAL, XC_XVC
+} xc_mode;
 static int xc_num = -1;
+
+/* /dev/xvc0 device number allocated by lanana.org. */
+#define XEN_XVC_MAJOR 204
+#define XEN_XVC_MINOR 191
 
 #ifdef CONFIG_MAGIC_SYSRQ
 static unsigned long sysrq_requested;
 extern int sysrq_enabled;
 #endif
 
+void xencons_early_setup(void)
+{
+	extern int console_use_vt;
+
+	if (is_initial_xendomain()) {
+		xc_mode = XC_SERIAL;
+	} else {
+		xc_mode = XC_TTY;
+		console_use_vt = 0;
+	}
+}
+
 static int __init xencons_setup(char *str)
 {
 	char *q;
 	int n;
+	extern int console_use_vt;
 
-	if (!strncmp(str, "ttyS", 4))
+	console_use_vt = 1;
+	if (!strncmp(str, "ttyS", 4)) {
 		xc_mode = XC_SERIAL;
-	else if (!strncmp(str, "tty", 3))
+		str += 4;
+	} else if (!strncmp(str, "tty", 3)) {
 		xc_mode = XC_TTY;
-	else if (!strncmp(str, "off", 3))
+		str += 3;
+		console_use_vt = 0;
+	} else if (!strncmp(str, "xvc", 3)) {
+		xc_mode = XC_XVC;
+		str += 3;
+	} else if (!strncmp(str, "off", 3)) {
 		xc_mode = XC_OFF;
-
-	switch (xc_mode) {
-	case XC_SERIAL:
-		n = simple_strtol(str+4, &q, 10);
-		if (q > (str + 4))
-			xc_num = n;
-		break;
-	case XC_TTY:
-		n = simple_strtol(str+3, &q, 10);
-		if (q > (str + 3))
-			xc_num = n;
-		break;
-	default:
-		break;
+		str += 3;
 	}
+
+	n = simple_strtol(str, &q, 10);
+	if (q != str)
+		xc_num = n;
 
 	return 1;
 }
@@ -189,18 +208,20 @@ static int __init xen_console_init(void)
 		goto out;
 
 	if (is_initial_xendomain()) {
-		if (xc_mode == XC_DEFAULT)
-			xc_mode = XC_SERIAL;
 		kcons_info.write = kcons_write_dom0;
 	} else {
 		if (!xen_start_info->console.domU.evtchn)
 			goto out;
-		if (xc_mode == XC_DEFAULT)
-			xc_mode = XC_TTY;
 		kcons_info.write = kcons_write;
 	}
 
 	switch (xc_mode) {
+	case XC_XVC:
+		strcpy(kcons_info.name, "xvc");
+		if (xc_num == -1)
+			xc_num = 0;
+		break;
+
 	case XC_SERIAL:
 		strcpy(kcons_info.name, "ttyS");
 		if (xc_num == -1)
@@ -305,7 +326,7 @@ void dom0_init_screen_info(const struct dom0_vga_console_info *info)
 /******************** User-space console driver (/dev/console) ************/
 
 #define DRV(_d)         (_d)
-#define DUMMY_TTY(_tty) ((xc_mode != XC_SERIAL) &&		\
+#define DUMMY_TTY(_tty) ((xc_mode == XC_TTY) &&		\
 			 ((_tty)->index != (xc_num - 1)))
 
 static struct termios *xencons_termios[MAX_NR_CONSOLES];
@@ -628,8 +649,8 @@ static int __init xencons_init(void)
 			return rc;
 	}
 
-	xencons_driver = alloc_tty_driver((xc_mode == XC_SERIAL) ?
-					  1 : MAX_NR_CONSOLES);
+	xencons_driver = alloc_tty_driver((xc_mode == XC_TTY) ?
+					  MAX_NR_CONSOLES : 1);
 	if (xencons_driver == NULL)
 		return -ENOMEM;
 
@@ -644,14 +665,23 @@ static int __init xencons_init(void)
 	DRV(xencons_driver)->termios         = xencons_termios;
 	DRV(xencons_driver)->termios_locked  = xencons_termios_locked;
 
-	if (xc_mode == XC_SERIAL) {
+	switch (xc_mode) {
+	case XC_XVC:
+		DRV(xencons_driver)->name        = "xvc";
+		DRV(xencons_driver)->major       = XEN_XVC_MAJOR;
+		DRV(xencons_driver)->minor_start = XEN_XVC_MINOR;
+		DRV(xencons_driver)->name_base   = xc_num;
+		break;
+	case XC_SERIAL:
 		DRV(xencons_driver)->name        = "ttyS";
 		DRV(xencons_driver)->minor_start = 64 + xc_num;
-		DRV(xencons_driver)->name_base   = 0 + xc_num;
-	} else {
+		DRV(xencons_driver)->name_base   = xc_num;
+		break;
+	default:
 		DRV(xencons_driver)->name        = "tty";
 		DRV(xencons_driver)->minor_start = 1;
 		DRV(xencons_driver)->name_base   = 1;
+		break;
 	}
 
 	tty_set_operations(xencons_driver, &xencons_ops);

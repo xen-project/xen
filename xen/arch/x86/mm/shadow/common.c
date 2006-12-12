@@ -69,120 +69,357 @@ int _shadow_mode_refcounts(struct domain *d)
 /* x86 emulator support for the shadow code
  */
 
-static int
-sh_x86_emulate_read_std(unsigned long addr,
-                         unsigned long *val,
-                         unsigned int bytes,
-                         struct x86_emulate_ctxt *ctxt)
+struct segment_register *hvm_get_seg_reg(
+    enum x86_segment seg, struct sh_emulate_ctxt *sh_ctxt)
 {
+    struct segment_register *seg_reg = &sh_ctxt->seg_reg[seg];
+    if ( !__test_and_set_bit(seg, &sh_ctxt->valid_seg_regs) )
+        hvm_get_segment_register(current, seg, seg_reg);
+    return seg_reg;
+}
+
+enum hvm_access_type {
+    hvm_access_insn_fetch, hvm_access_read, hvm_access_write
+};
+
+static int hvm_translate_linear_addr(
+    enum x86_segment seg,
+    unsigned long offset,
+    unsigned int bytes,
+    enum hvm_access_type access_type,
+    struct sh_emulate_ctxt *sh_ctxt,
+    unsigned long *paddr)
+{
+    struct segment_register *reg = hvm_get_seg_reg(seg, sh_ctxt);
+    unsigned long limit, addr = offset;
+    uint32_t last_byte;
+
+    if ( sh_ctxt->ctxt.mode != X86EMUL_MODE_PROT64 )
+    {
+        /*
+         * COMPATIBILITY MODE: Apply segment checks and add base.
+         */
+
+        switch ( access_type )
+        {
+        case hvm_access_read:
+            if ( (reg->attr.fields.type & 0xa) == 0x8 )
+                goto gpf; /* execute-only code segment */
+            break;
+        case hvm_access_write:
+            if ( (reg->attr.fields.type & 0xa) != 0x2 )
+                goto gpf; /* not a writable data segment */
+            break;
+        default:
+            break;
+        }
+
+        /* Calculate the segment limit, including granularity flag. */
+        limit = reg->limit;
+        if ( reg->attr.fields.g )
+            limit = (limit << 12) | 0xfff;
+
+        last_byte = offset + bytes - 1;
+
+        /* Is this a grows-down data segment? Special limit check if so. */
+        if ( (reg->attr.fields.type & 0xc) == 0x4 )
+        {
+            /* Is upper limit 0xFFFF or 0xFFFFFFFF? */
+            if ( !reg->attr.fields.db )
+                last_byte = (uint16_t)last_byte;
+
+            /* Check first byte and last byte against respective bounds. */
+            if ( (offset <= limit) || (last_byte < offset) )
+                goto gpf;
+        }
+        else if ( (last_byte > limit) || (last_byte < offset) )
+            goto gpf; /* last byte is beyond limit or wraps 0xFFFFFFFF */
+
+        /*
+         * Hardware truncates to 32 bits in compatibility mode.
+         * It does not truncate to 16 bits in 16-bit address-size mode.
+         */
+        addr = (uint32_t)(addr + reg->base);
+    }
+    else
+    {
+        /*
+         * LONG MODE: FS and GS add segment base. Addresses must be canonical.
+         */
+
+        if ( (seg == x86_seg_fs) || (seg == x86_seg_gs) )
+            addr += reg->base;
+
+        if ( !is_canonical_address(addr) )
+            goto gpf;
+    }
+
+    *paddr = addr;
+    return 0;    
+
+ gpf:
+    /* Inject #GP(0). */
+    hvm_inject_exception(TRAP_gp_fault, 0, 0);
+    return X86EMUL_PROPAGATE_FAULT;
+}
+
+static int
+hvm_read(enum x86_segment seg,
+         unsigned long offset,
+         unsigned long *val,
+         unsigned int bytes,
+         enum hvm_access_type access_type,
+         struct sh_emulate_ctxt *sh_ctxt)
+{
+    unsigned long addr;
+    int rc, errcode;
+
+    rc = hvm_translate_linear_addr(
+        seg, offset, bytes, access_type, sh_ctxt, &addr);
+    if ( rc )
+        return rc;
+
     *val = 0;
     // XXX -- this is WRONG.
     //        It entirely ignores the permissions in the page tables.
     //        In this case, that is only a user vs supervisor access check.
     //
-    if ( hvm_copy_from_guest_virt(val, addr, bytes) == 0 )
-    {
-#if 0
-        struct vcpu *v = current;
-        SHADOW_PRINTK("d=%u v=%u a=%#lx v=%#lx bytes=%u\n",
-                       v->domain->domain_id, v->vcpu_id, 
-                       addr, *val, bytes);
-#endif
+    if ( (rc = hvm_copy_from_guest_virt(val, addr, bytes)) == 0 )
         return X86EMUL_CONTINUE;
-    }
 
     /* If we got here, there was nothing mapped here, or a bad GFN 
      * was mapped here.  This should never happen: we're here because
      * of a write fault at the end of the instruction we're emulating. */ 
     SHADOW_PRINTK("read failed to va %#lx\n", addr);
+    errcode = ring_3(sh_ctxt->ctxt.regs) ? PFEC_user_mode : 0;
+    if ( access_type == hvm_access_insn_fetch )
+        errcode |= PFEC_insn_fetch;
+    hvm_inject_exception(TRAP_page_fault, errcode, addr + bytes - rc);
     return X86EMUL_PROPAGATE_FAULT;
 }
 
 static int
-sh_x86_emulate_write_std(unsigned long addr,
-                          unsigned long val,
-                          unsigned int bytes,
-                          struct x86_emulate_ctxt *ctxt)
+hvm_emulate_read(enum x86_segment seg,
+                 unsigned long offset,
+                 unsigned long *val,
+                 unsigned int bytes,
+                 struct x86_emulate_ctxt *ctxt)
 {
-#if 0
-    struct vcpu *v = current;
-    SHADOW_PRINTK("d=%u v=%u a=%#lx v=%#lx bytes=%u\n",
-                  v->domain->domain_id, v->vcpu_id, addr, val, bytes);
-#endif
-
-    // XXX -- this is WRONG.
-    //        It entirely ignores the permissions in the page tables.
-    //        In this case, that includes user vs supervisor, and
-    //        write access.
-    //
-    if ( hvm_copy_to_guest_virt(addr, &val, bytes) == 0 )
-        return X86EMUL_CONTINUE;
-
-    /* If we got here, there was nothing mapped here, or a bad GFN 
-     * was mapped here.  This should never happen: we're here because
-     * of a write fault at the end of the instruction we're emulating,
-     * which should be handled by sh_x86_emulate_write_emulated. */ 
-    SHADOW_PRINTK("write failed to va %#lx\n", addr);
-    return X86EMUL_PROPAGATE_FAULT;
+    return hvm_read(seg, offset, val, bytes, hvm_access_read,
+                    container_of(ctxt, struct sh_emulate_ctxt, ctxt));
 }
 
 static int
-sh_x86_emulate_write_emulated(unsigned long addr,
-                               unsigned long val,
-                               unsigned int bytes,
-                               struct x86_emulate_ctxt *ctxt)
+hvm_emulate_insn_fetch(enum x86_segment seg,
+                       unsigned long offset,
+                       unsigned long *val,
+                       unsigned int bytes,
+                       struct x86_emulate_ctxt *ctxt)
 {
+    struct sh_emulate_ctxt *sh_ctxt =
+        container_of(ctxt, struct sh_emulate_ctxt, ctxt);
+    unsigned int insn_off = offset - ctxt->regs->eip;
+
+    /* Fall back if requested bytes are not in the prefetch cache. */
+    if ( unlikely((insn_off + bytes) > sh_ctxt->insn_buf_bytes) )
+        return hvm_read(seg, offset, val, bytes,
+                        hvm_access_insn_fetch, sh_ctxt);
+
+    /* Hit the cache. Simple memcpy. */
+    *val = 0;
+    memcpy(val, &sh_ctxt->insn_buf[insn_off], bytes);
+    return X86EMUL_CONTINUE;
+}
+
+static int
+hvm_emulate_write(enum x86_segment seg,
+                  unsigned long offset,
+                  unsigned long val,
+                  unsigned int bytes,
+                  struct x86_emulate_ctxt *ctxt)
+{
+    struct sh_emulate_ctxt *sh_ctxt =
+        container_of(ctxt, struct sh_emulate_ctxt, ctxt);
     struct vcpu *v = current;
-#if 0
-    SHADOW_PRINTK("d=%u v=%u a=%#lx v=%#lx bytes=%u\n",
-                  v->domain->domain_id, v->vcpu_id, addr, val, bytes);
-#endif
-    return v->arch.shadow.mode->x86_emulate_write(v, addr, &val, bytes, ctxt);
+    unsigned long addr;
+    int rc;
+
+    rc = hvm_translate_linear_addr(
+        seg, offset, bytes, hvm_access_write, sh_ctxt, &addr);
+    if ( rc )
+        return rc;
+
+    return v->arch.shadow.mode->x86_emulate_write(
+        v, addr, &val, bytes, sh_ctxt);
 }
 
 static int 
-sh_x86_emulate_cmpxchg_emulated(unsigned long addr,
-                                 unsigned long old,
-                                 unsigned long new,
-                                 unsigned int bytes,
-                                 struct x86_emulate_ctxt *ctxt)
+hvm_emulate_cmpxchg(enum x86_segment seg,
+                    unsigned long offset,
+                    unsigned long old,
+                    unsigned long new,
+                    unsigned int bytes,
+                    struct x86_emulate_ctxt *ctxt)
 {
+    struct sh_emulate_ctxt *sh_ctxt =
+        container_of(ctxt, struct sh_emulate_ctxt, ctxt);
     struct vcpu *v = current;
-#if 0
-    SHADOW_PRINTK("d=%u v=%u a=%#lx o?=%#lx n:=%#lx bytes=%u\n",
-                   v->domain->domain_id, v->vcpu_id, addr, old, new, bytes);
-#endif
-    return v->arch.shadow.mode->x86_emulate_cmpxchg(v, addr, old, new,
-                                                     bytes, ctxt);
+    unsigned long addr;
+    int rc;
+
+    rc = hvm_translate_linear_addr(
+        seg, offset, bytes, hvm_access_write, sh_ctxt, &addr);
+    if ( rc )
+        return rc;
+
+    return v->arch.shadow.mode->x86_emulate_cmpxchg(
+        v, addr, old, new, bytes, sh_ctxt);
 }
 
 static int 
-sh_x86_emulate_cmpxchg8b_emulated(unsigned long addr,
-                                   unsigned long old_lo,
-                                   unsigned long old_hi,
-                                   unsigned long new_lo,
-                                   unsigned long new_hi,
-                                   struct x86_emulate_ctxt *ctxt)
+hvm_emulate_cmpxchg8b(enum x86_segment seg,
+                      unsigned long offset,
+                      unsigned long old_lo,
+                      unsigned long old_hi,
+                      unsigned long new_lo,
+                      unsigned long new_hi,
+                      struct x86_emulate_ctxt *ctxt)
 {
+    struct sh_emulate_ctxt *sh_ctxt =
+        container_of(ctxt, struct sh_emulate_ctxt, ctxt);
     struct vcpu *v = current;
-#if 0
-    SHADOW_PRINTK("d=%u v=%u a=%#lx o?=%#lx:%lx n:=%#lx:%lx\n",
-                   v->domain->domain_id, v->vcpu_id, addr, old_hi, old_lo,
-                   new_hi, new_lo, ctxt);
-#endif
-    return v->arch.shadow.mode->x86_emulate_cmpxchg8b(v, addr, old_lo, old_hi,
-                                                       new_lo, new_hi, ctxt);
+    unsigned long addr;
+    int rc;
+
+    rc = hvm_translate_linear_addr(
+        seg, offset, 8, hvm_access_write, sh_ctxt, &addr);
+    if ( rc )
+        return rc;
+
+    return v->arch.shadow.mode->x86_emulate_cmpxchg8b(
+        v, addr, old_lo, old_hi, new_lo, new_hi, sh_ctxt);
 }
 
-
-struct x86_emulate_ops shadow_emulator_ops = {
-    .read_std           = sh_x86_emulate_read_std,
-    .write_std          = sh_x86_emulate_write_std,
-    .read_emulated      = sh_x86_emulate_read_std,
-    .write_emulated     = sh_x86_emulate_write_emulated,
-    .cmpxchg_emulated   = sh_x86_emulate_cmpxchg_emulated,
-    .cmpxchg8b_emulated = sh_x86_emulate_cmpxchg8b_emulated,
+static struct x86_emulate_ops hvm_shadow_emulator_ops = {
+    .read       = hvm_emulate_read,
+    .insn_fetch = hvm_emulate_insn_fetch,
+    .write      = hvm_emulate_write,
+    .cmpxchg    = hvm_emulate_cmpxchg,
+    .cmpxchg8b  = hvm_emulate_cmpxchg8b,
 };
+
+static int
+pv_emulate_read(enum x86_segment seg,
+                unsigned long offset,
+                unsigned long *val,
+                unsigned int bytes,
+                struct x86_emulate_ctxt *ctxt)
+{
+    unsigned int rc;
+
+    *val = 0;
+    if ( (rc = copy_from_user((void *)val, (void *)offset, bytes)) != 0 )
+    {
+        propagate_page_fault(offset + bytes - rc, 0); /* read fault */
+        return X86EMUL_PROPAGATE_FAULT;
+    }
+
+    return X86EMUL_CONTINUE;
+}
+
+static int
+pv_emulate_write(enum x86_segment seg,
+                 unsigned long offset,
+                 unsigned long val,
+                 unsigned int bytes,
+                 struct x86_emulate_ctxt *ctxt)
+{
+    struct sh_emulate_ctxt *sh_ctxt =
+        container_of(ctxt, struct sh_emulate_ctxt, ctxt);
+    struct vcpu *v = current;
+    return v->arch.shadow.mode->x86_emulate_write(
+        v, offset, &val, bytes, sh_ctxt);
+}
+
+static int 
+pv_emulate_cmpxchg(enum x86_segment seg,
+                   unsigned long offset,
+                   unsigned long old,
+                   unsigned long new,
+                   unsigned int bytes,
+                   struct x86_emulate_ctxt *ctxt)
+{
+    struct sh_emulate_ctxt *sh_ctxt =
+        container_of(ctxt, struct sh_emulate_ctxt, ctxt);
+    struct vcpu *v = current;
+    return v->arch.shadow.mode->x86_emulate_cmpxchg(
+        v, offset, old, new, bytes, sh_ctxt);
+}
+
+static int 
+pv_emulate_cmpxchg8b(enum x86_segment seg,
+                     unsigned long offset,
+                     unsigned long old_lo,
+                     unsigned long old_hi,
+                     unsigned long new_lo,
+                     unsigned long new_hi,
+                     struct x86_emulate_ctxt *ctxt)
+{
+    struct sh_emulate_ctxt *sh_ctxt =
+        container_of(ctxt, struct sh_emulate_ctxt, ctxt);
+    struct vcpu *v = current;
+    return v->arch.shadow.mode->x86_emulate_cmpxchg8b(
+        v, offset, old_lo, old_hi, new_lo, new_hi, sh_ctxt);
+}
+
+static struct x86_emulate_ops pv_shadow_emulator_ops = {
+    .read       = pv_emulate_read,
+    .insn_fetch = pv_emulate_read,
+    .write      = pv_emulate_write,
+    .cmpxchg    = pv_emulate_cmpxchg,
+    .cmpxchg8b  = pv_emulate_cmpxchg8b,
+};
+
+struct x86_emulate_ops *shadow_init_emulation(
+    struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs)
+{
+    struct segment_register *creg;
+    struct vcpu *v = current;
+    unsigned long addr;
+
+    sh_ctxt->ctxt.regs = regs;
+
+    if ( !is_hvm_vcpu(v) )
+    {
+        sh_ctxt->ctxt.mode = X86EMUL_MODE_HOST;
+        return &pv_shadow_emulator_ops;
+    }
+
+    /* Segment cache initialisation. Primed with CS. */
+    sh_ctxt->valid_seg_regs = 0;
+    creg = hvm_get_seg_reg(x86_seg_cs, sh_ctxt);
+
+    /* Work out the emulation mode. */
+    if ( hvm_long_mode_enabled(v) )
+        sh_ctxt->ctxt.mode = creg->attr.fields.l ?
+            X86EMUL_MODE_PROT64 : X86EMUL_MODE_PROT32;
+    else if ( regs->eflags & X86_EFLAGS_VM )
+        sh_ctxt->ctxt.mode = X86EMUL_MODE_REAL;
+    else
+        sh_ctxt->ctxt.mode = creg->attr.fields.db ?
+            X86EMUL_MODE_PROT32 : X86EMUL_MODE_PROT16;
+
+    /* Attempt to prefetch whole instruction. */
+    sh_ctxt->insn_buf_bytes =
+        (!hvm_translate_linear_addr(
+            x86_seg_cs, regs->eip, sizeof(sh_ctxt->insn_buf),
+            hvm_access_insn_fetch, sh_ctxt, &addr) &&
+         !hvm_copy_from_guest_virt(
+             sh_ctxt->insn_buf, addr, sizeof(sh_ctxt->insn_buf)))
+        ? sizeof(sh_ctxt->insn_buf) : 0;
+
+    return &hvm_shadow_emulator_ops;
+}
 
 /**************************************************************************/
 /* Code for "promoting" a guest page to the point where the shadow code is
@@ -938,12 +1175,13 @@ shadow_set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
     void *table = sh_map_domain_page(table_mfn);
     unsigned long gfn_remainder = gfn;
     l1_pgentry_t *p2m_entry;
+    int rv=0;
 
 #if CONFIG_PAGING_LEVELS >= 4
     if ( !p2m_next_level(d, &table_mfn, &table, &gfn_remainder, gfn,
                          L4_PAGETABLE_SHIFT - PAGE_SHIFT,
                          L4_PAGETABLE_ENTRIES, PGT_l3_page_table) )
-        return 0;
+        goto out;
 #endif
 #if CONFIG_PAGING_LEVELS >= 3
     // When using PAE Xen, we only allow 33 bits of pseudo-physical
@@ -957,12 +1195,12 @@ shadow_set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
                           ? 8
                           : L3_PAGETABLE_ENTRIES),
                          PGT_l2_page_table) )
-        return 0;
+        goto out;
 #endif
     if ( !p2m_next_level(d, &table_mfn, &table, &gfn_remainder, gfn,
                          L2_PAGETABLE_SHIFT - PAGE_SHIFT,
                          L2_PAGETABLE_ENTRIES, PGT_l1_page_table) )
-        return 0;
+        goto out;
 
     p2m_entry = p2m_find_entry(table, &gfn_remainder, gfn,
                                0, L1_PAGETABLE_ENTRIES);
@@ -981,9 +1219,12 @@ shadow_set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
         (void)__shadow_validate_guest_entry(
             d->vcpu[0], table_mfn, p2m_entry, sizeof(*p2m_entry));
 
+    /* Success */
+    rv = 1;
+ 
+ out:
     sh_unmap_domain_page(table);
-
-    return 1;
+    return rv;
 }
 
 // Allocate a new p2m table for a domain.
@@ -1063,7 +1304,7 @@ sh_gfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
 /* Read another domain's p2m entries */
 {
     mfn_t mfn;
-    unsigned long addr = gpfn << PAGE_SHIFT;
+    paddr_t addr = ((paddr_t)gpfn) << PAGE_SHIFT;
     l2_pgentry_t *l2e;
     l1_pgentry_t *l1e;
     
@@ -1091,7 +1332,16 @@ sh_gfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
 #if CONFIG_PAGING_LEVELS >= 3
     {
         l3_pgentry_t *l3e = sh_map_domain_page(mfn);
-        l3e += l3_table_offset(addr);
+#if CONFIG_PAGING_LEVELS == 3
+        /* On PAE hosts the p2m has eight l3 entries, not four (see
+         * shadow_set_p2m_entry()) so we can't use l3_table_offset.
+         * Instead, just count the number of l3es from zero.  It's safe
+         * to do this because we already checked that the gfn is within
+         * the bounds of the p2m. */
+        l3e += (addr >> L3_PAGETABLE_SHIFT);
+#else
+        l3e += l3_table_offset(addr);        
+#endif
         if ( (l3e_get_flags(*l3e) & _PAGE_PRESENT) == 0 )
         {
             sh_unmap_domain_page(l3e);
@@ -2241,11 +2491,10 @@ void sh_update_paging_modes(struct vcpu *v)
                 }
         }
 
-        if ( pagetable_get_pfn(v->arch.monitor_table) == 0 )
+        if ( pagetable_is_null(v->arch.monitor_table) )
         {
             mfn_t mmfn = shadow_make_monitor_table(v);
             v->arch.monitor_table = pagetable_from_mfn(mmfn);
-            v->arch.monitor_vtable = sh_map_domain_page(mmfn);
         } 
 
         if ( v->arch.shadow.mode != old_mode )
@@ -2275,12 +2524,10 @@ void sh_update_paging_modes(struct vcpu *v)
                     return;
                 }
 
-                sh_unmap_domain_page(v->arch.monitor_vtable);
                 old_mfn = pagetable_get_mfn(v->arch.monitor_table);
                 v->arch.monitor_table = pagetable_null();
                 new_mfn = v->arch.shadow.mode->make_monitor_table(v);            
                 v->arch.monitor_table = pagetable_from_mfn(new_mfn);
-                v->arch.monitor_vtable = sh_map_domain_page(new_mfn);
                 SHADOW_PRINTK("new monitor table %"SH_PRI_mfn "\n",
                                mfn_x(new_mfn));
 
@@ -3080,7 +3327,8 @@ void shadow_audit_p2m(struct domain *d)
 
     //SHADOW_PRINTK("p2m audit starts\n");
 
-    test_linear = ( (d == current->domain) && current->arch.monitor_vtable );
+    test_linear = ( (d == current->domain) 
+                    && !pagetable_is_null(current->arch.monitor_table) );
     if ( test_linear )
         local_flush_tlb(); 
 

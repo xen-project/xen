@@ -24,7 +24,6 @@ import os
 import random
 import re
 
-from xen.xend import sxp
 from xen.xend import XendRoot
 from xen.xend.server.DevController import DevController
 
@@ -139,22 +138,15 @@ class NetifController(DevController):
     def getDeviceDetails(self, config):
         """@see DevController.getDeviceDetails"""
 
-        def _get_config_ipaddr(config):
-            val = []
-            for ipaddr in sxp.children(config, elt='ip'):
-                val.append(sxp.child0(ipaddr))
-            return val
-
         script = os.path.join(xroot.network_script_dir,
-                              sxp.child_value(config, 'script',
-                                              xroot.get_vif_script()))
-        typ = sxp.child_value(config, 'type')
-        bridge  = sxp.child_value(config, 'bridge')
-        mac     = sxp.child_value(config, 'mac')
-        vifname = sxp.child_value(config, 'vifname')
-        rate    = sxp.child_value(config, 'rate')
-        uuid    = sxp.child_value(config, 'uuid')
-        ipaddr  = _get_config_ipaddr(config)
+                              config.get('script', xroot.get_vif_script()))
+        typ = config.get('type')
+        bridge  = config.get('bridge')
+        mac     = config.get('mac')
+        vifname = config.get('vifname')
+        rate    = config.get('rate')
+        uuid    = config.get('uuid')
+        ipaddr  = config.get('ip')
 
         devid = self.allocateDeviceID()
 
@@ -172,7 +164,7 @@ class NetifController(DevController):
             front = { 'handle' : "%i" % devid,
                       'mac'    : mac }
         if ipaddr:
-            back['ip'] = ' '.join(ipaddr)
+            back['ip'] = ipaddr
         if bridge:
             back['bridge'] = bridge
         if vifname:
@@ -197,7 +189,7 @@ class NetifController(DevController):
             network_script_dir = xroot.network_script_dir + os.sep
             result['script'] = script.replace(network_script_dir, "")
         if ip:
-            result['ip'] = ip.split(" ")
+            result['ip'] = ip
         if bridge:
             result['bridge'] = bridge
         if mac:

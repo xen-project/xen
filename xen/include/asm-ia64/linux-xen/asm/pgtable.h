@@ -380,7 +380,11 @@ pgd_index (unsigned long address)
 
 /* The offset in the 1-level directory is given by the 3 region bits
    (61..63) and the level-1 bits.  */
+#ifndef XEN
 static inline pgd_t*
+#else
+static inline volatile pgd_t*
+#endif
 pgd_offset (struct mm_struct *mm, unsigned long address)
 {
 	return mm->pgd + pgd_index(address);
@@ -397,15 +401,24 @@ pgd_offset (struct mm_struct *mm, unsigned long address)
 #define pgd_offset_gate(mm, addr)	pgd_offset_k(addr)
 
 /* Find an entry in the second-level page table.. */
+#ifndef XEN
 #define pmd_offset(dir,addr) \
 	((pmd_t *) pud_page(*(dir)) + (((addr) >> PMD_SHIFT) & (PTRS_PER_PMD - 1)))
+#else
+#define pmd_offset(dir,addr) \
+	((volatile pmd_t *) pud_page(*(dir)) + (((addr) >> PMD_SHIFT) & (PTRS_PER_PMD - 1)))
+#endif
 
 /*
  * Find an entry in the third-level page table.  This looks more complicated than it
  * should be because some platforms place page tables in high memory.
  */
 #define pte_index(addr)	 	(((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
+#ifndef XEN
 #define pte_offset_kernel(dir,addr)	((pte_t *) pmd_page_kernel(*(dir)) + pte_index(addr))
+#else
+#define pte_offset_kernel(dir,addr)	((volatile pte_t *) pmd_page_kernel(*(dir)) + pte_index(addr))
+#endif
 #define pte_offset_map(dir,addr)	pte_offset_kernel(dir, addr)
 #define pte_offset_map_nested(dir,addr)	pte_offset_map(dir, addr)
 #define pte_unmap(pte)			do { } while (0)

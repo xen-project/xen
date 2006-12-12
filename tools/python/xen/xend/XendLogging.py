@@ -16,13 +16,15 @@
 # Copyright (C) 2005, 2006 XenSource Ltd.
 #============================================================================
 
-
+import os
+import stat
 import tempfile
 import types
 import logging
 import logging.handlers
 import fcntl
 
+from xen.util import mkdir
 from xen.xend.server import params
 
 
@@ -80,6 +82,7 @@ def init(filename, level):
     global logfilename
 
     def openFileHandler(fname):
+        mkdir.parents(os.path.dirname(fname), stat.S_IRWXU)
         return XendRotatingFileHandler(fname, mode = 'a',
                                        maxBytes = MAX_BYTES,
                                        backupCount = BACKUP_COUNT)

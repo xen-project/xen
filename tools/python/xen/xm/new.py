@@ -21,10 +21,9 @@ import xmlrpclib
 from xen.xend import PrettyPrint
 from xen.xend import sxp
 from xen.xend import XendClient
-from xen.xend.XendClient import server
 
-from xen.xm.opts import *
-from xen.xm.create import *
+from opts import *
+from create import *
 
 def make_unstarted_domain(opts, config):
     """Create an unstarted domain.
@@ -57,6 +56,12 @@ def main(argv):
 
     if not opts:
         return
+
+    if type(config) == str:
+        try:
+            config = sxp.parse(file(config))[0]
+        except IOError, exn:
+            raise OptionError("Cannot read file %s: %s" % (config, exn[1]))
 
     if opts.vals.dryrun:
         PrettyPrint.prettyprint(config)

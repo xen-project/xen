@@ -130,7 +130,7 @@ _start:
 	clts
 
 	/* setup my own stack */
-	movl	$stack_top - 4*4, %esp
+	movl	$stack_top, %esp
 	movl	%esp, %ebp
 
 	/* go ... */

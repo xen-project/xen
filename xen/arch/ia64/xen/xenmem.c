@@ -181,6 +181,23 @@ void init_virtual_frametable(void)
 	printk("virtual machine to physical table: %p size: %lukB\n"
 	       "max_page: 0x%lx\n",
 	       mpt_table, ((table_size << PAGE_SHIFT) >> 10), max_page);
+
+	/*
+	 * XXX work around for translate_domain_pte().
+	 * It returns mfn=0 when the machine page isn't present.  This
+	 * behavior is a work around for memory mapped I/O where no device
+	 * is assigned.  Xen might access page_info of mfn=0, so it must
+	 * be guaranteed that it exists.  Otherwise xen panics with tlb miss
+	 * fault in xen's virtual address area.
+	 *
+	 * Once translate_domain_pte() is fixed correctly, this will
+	 * be removed.
+	 */
+	if (!mfn_valid(0)) {
+		printk("allocating frame table/mpt table at mfn 0.\n");
+		create_frametable_page_table(0, PAGE_SIZE, NULL);
+		create_mpttable_page_table(0, PAGE_SIZE, NULL);
+	}
 }
 
 int

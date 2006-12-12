@@ -316,6 +316,52 @@ int xc_domain_setmaxmem(int xc_handle,
     return do_domctl(xc_handle, &domctl);
 }
 
+#if defined(__i386__) || defined(__x86_64__)
+#include <xen/hvm/e820.h>
+int xc_domain_set_memmap_limit(int xc_handle,
+                               uint32_t domid,
+                               unsigned long map_limitkb)
+{
+    int rc;
+
+    struct xen_foreign_memory_map fmap = {
+        .domid = domid,
+        .map = { .nr_entries = 1 }
+    };
+
+    struct e820entry e820 = {
+        .addr = 0,
+        .size = (uint64_t)map_limitkb << 10,
+        .type = E820_RAM
+    };
+
+    set_xen_guest_handle(fmap.map.buffer, &e820);
+
+    if ( lock_pages(&fmap, sizeof(fmap)) || lock_pages(&e820, sizeof(e820)) )
+    {
+        PERROR("Could not lock memory for Xen hypercall");
+        rc = -1;
+        goto out;
+    }
+
+    rc = xc_memory_op(xc_handle, XENMEM_set_memory_map, &fmap);
+
+ out:
+    unlock_pages(&fmap, sizeof(fmap));
+    unlock_pages(&e820, sizeof(e820));
+    return rc;
+}
+#else
+int xc_domain_set_memmap_limit(int xc_handle,
+                               uint32_t domid,
+                               unsigned long map_limitkb)
+{
+    PERROR("Function not implemented");
+    errno = ENOSYS;
+    return -1;
+}
+#endif
+
 int xc_domain_set_time_offset(int xc_handle,
                               uint32_t domid,
                               int32_t time_offset_seconds)

@@ -396,4 +396,11 @@ HYPERVISOR_xenoprof_op(
 	return _hypercall2(int, xenoprof_op, op, arg);
 }
 
+static inline int
+HYPERVISOR_kexec_op(
+	unsigned long op, void *args)
+{
+	return _hypercall2(int, kexec_op, op, args);
+}
+
 #endif /* __HYPERCALL_H__ */

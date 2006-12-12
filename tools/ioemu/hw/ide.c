@@ -680,7 +680,7 @@ static void ide_set_sector(IDEState *s, int64_t sector_num)
 static void ide_sector_read(IDEState *s)
 {
     int64_t sector_num;
-    int ret, n;
+    int n;
 
     s->status = READY_STAT | SEEK_STAT;
     s->error = 0; /* not needed by IDE spec, but needed by Windows */
@@ -695,7 +695,11 @@ static void ide_sector_read(IDEState *s)
 #endif
         if (n > s->req_nb_sectors)
             n = s->req_nb_sectors;
-        ret = bdrv_read(s->bs, sector_num, s->io_buffer, n);
+        if (bdrv_read(s->bs, sector_num, s->io_buffer, n) != 0) {
+            ide_abort_command(s);
+            ide_set_irq(s);
+            return;
+        }
         ide_transfer_start(s, s->io_buffer, 512 * n, ide_sector_read);
         ide_set_irq(s);
         ide_set_sector(s, sector_num + n);
@@ -721,7 +725,11 @@ static int ide_read_dma_cb(IDEState *s,
             if (n > MAX_MULT_SECTORS)
                 n = MAX_MULT_SECTORS;
             sector_num = ide_get_sector(s);
-            bdrv_read(s->bs, sector_num, s->io_buffer, n);
+            if (bdrv_read(s->bs, sector_num, s->io_buffer, n) != 0) {
+                ide_abort_command(s);
+                ide_set_irq(s);
+                return 0;
+            }
             s->io_buffer_index = 0;
             s->io_buffer_size = n * 512;
             len = s->io_buffer_size;
@@ -767,7 +775,7 @@ static void ide_sector_write_timer_cb(void *opaque)
 static void ide_sector_write(IDEState *s)
 {
     int64_t sector_num;
-    int ret, n, n1;
+    int n, n1;
 
     s->status = READY_STAT | SEEK_STAT;
     sector_num = ide_get_sector(s);
@@ -777,7 +785,11 @@ static void ide_sector_write(IDEState *s)
     n = s->nsector;
     if (n > s->req_nb_sectors)
         n = s->req_nb_sectors;
-    ret = bdrv_write(s->bs, sector_num, s->io_buffer, n);
+    if (bdrv_write(s->bs, sector_num, s->io_buffer, n) != 0) {
+        ide_abort_command(s);
+        ide_set_irq(s);
+        return;
+    }
     s->nsector -= n;
     if (s->nsector == 0) {
         /* no more sector to write */
@@ -823,8 +835,13 @@ static int ide_write_dma_cb(IDEState *s,
         if (len == 0) {
             n = s->io_buffer_size >> 9;
             sector_num = ide_get_sector(s);
-            bdrv_write(s->bs, sector_num, s->io_buffer, 
-                       s->io_buffer_size >> 9);
+            if (bdrv_write(s->bs, sector_num, s->io_buffer, 
+                	   s->io_buffer_size >> 9) != 0) {
+                ide_abort_command(s);
+                ide_set_irq(s);
+                return 0;
+            }
+
             sector_num += n;
             ide_set_sector(s, sector_num);
             s->nsector -= n;

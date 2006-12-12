@@ -71,10 +71,6 @@ static void update_tpr_threshold(struct vlapic *vlapic)
 {
     int max_irr, tpr;
 
-    /* Clear the work-to-do flag /then/ do the work. */
-    vlapic->flush_tpr_threshold = 0;
-    mb();
-
     if ( !vlapic_enabled(vlapic) || 
          ((max_irr = vlapic_find_highest_irr(vlapic)) == -1) )
     {
@@ -95,7 +91,6 @@ asmlinkage void vmx_intr_assist(void)
     int highest_vector;
     unsigned long eflags;
     struct vcpu *v = current;
-    struct vlapic *vlapic = vcpu_vlapic(v);
     struct hvm_domain *plat=&v->domain->arch.hvm_domain;
     struct periodic_time *pt = &plat->pl_time.periodic_tm;
     unsigned int idtv_info_field;
@@ -110,8 +105,7 @@ asmlinkage void vmx_intr_assist(void)
 
     hvm_set_callback_irq_level();
 
-    if ( vlapic->flush_tpr_threshold )
-        update_tpr_threshold(vlapic);
+    update_tpr_threshold(vcpu_vlapic(v));
 
     has_ext_irq = cpu_has_pending_irq(v);
 

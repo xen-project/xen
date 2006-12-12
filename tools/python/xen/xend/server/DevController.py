@@ -17,6 +17,7 @@
 #============================================================================
 
 from threading import Event
+import types
 
 from xen.xend import sxp
 from xen.xend.XendError import VmError
@@ -86,7 +87,7 @@ class DevController:
 
         import xen.xend.XendDomain
         xd = xen.xend.XendDomain.instance()
-        backdom_name = sxp.child_value(config, 'backend')
+        backdom_name = config.get('backend')
         if backdom_name is None:
             backdom = xen.xend.XendDomain.DOM0_ID
         else:
@@ -223,11 +224,13 @@ class DevController:
         configDict = self.getDeviceConfiguration(devid)
         sxpr = [self.deviceClass]
         for key, val in configDict.items():
-            if type(val) == type(list()):
+            if isinstance(val, (types.ListType, types.TupleType)):
                 for v in val:
-                    sxpr.append([key, v])
+                    if v != None:
+                        sxpr.append([key, v])
             else:
-                sxpr.append([key, val])
+                if val != None:
+                    sxpr.append([key, val])
         return sxpr
 
     def sxprs(self):
@@ -405,7 +408,7 @@ class DevController:
         import xen.xend.XendDomain
         xd = xen.xend.XendDomain.instance()
 
-        backdom_name = sxp.child_value(config, 'backend')
+        backdom_name = config.get('backend')
         if backdom_name:
             backdom = xd.domain_lookup_nr(backdom_name)
         else:

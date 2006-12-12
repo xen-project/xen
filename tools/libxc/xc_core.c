@@ -140,7 +140,7 @@ static int local_file_dump(void *args, char *buffer, unsigned int length)
         bytes = write(da->fd, &buffer[offset], length-offset);
         if ( bytes <= 0 )
         {
-            PERROR("Failed to write buffer: %s", strerror(errno));
+            PERROR("Failed to write buffer");
             return -errno;
         }
     }
@@ -158,7 +158,7 @@ xc_domain_dumpcore(int xc_handle,
 
     if ( (da.fd = open(corename, O_CREAT|O_RDWR, S_IWUSR|S_IRUSR)) < 0 )
     {
-        PERROR("Could not open corefile %s: %s", corename, strerror(errno));
+        PERROR("Could not open corefile %s", corename);
         return -errno;
     }
 

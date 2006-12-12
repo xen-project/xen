@@ -95,13 +95,7 @@ static void vmx_save_host_msrs(void)
         rdmsrl(msr_index[i], host_msr_state->msrs[i]);
 }
 
-#define CASE_READ_MSR(address)                                              \
-    case MSR_ ## address:                                                   \
-        msr_content = guest_msr_state->msrs[VMX_INDEX_MSR_ ## address];     \
-        break
-
-#define CASE_WRITE_MSR(address)                                             \
-    case MSR_ ## address:                                                   \
+#define WRITE_MSR(address)                                                  \
         guest_msr_state->msrs[VMX_INDEX_MSR_ ## address] = msr_content;     \
         if ( !test_bit(VMX_INDEX_MSR_ ## address, &guest_msr_state->flags) )\
             set_bit(VMX_INDEX_MSR_ ## address, &guest_msr_state->flags);    \
@@ -109,7 +103,6 @@ static void vmx_save_host_msrs(void)
         set_bit(VMX_INDEX_MSR_ ## address, &host_msr_state->flags);         \
         break
 
-#define IS_CANO_ADDRESS(add) 1
 static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
 {
     u64 msr_content = 0;
@@ -123,27 +116,38 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
         break;
 
     case MSR_FS_BASE:
-        if ( !(vmx_long_mode_enabled(v)) )
-            goto exit_and_crash;
-
         msr_content = __vmread(GUEST_FS_BASE);
-        break;
+        goto check_long_mode;
 
     case MSR_GS_BASE:
-        if ( !(vmx_long_mode_enabled(v)) )
-            goto exit_and_crash;
-
         msr_content = __vmread(GUEST_GS_BASE);
-        break;
+        goto check_long_mode;
 
     case MSR_SHADOW_GS_BASE:
         msr_content = guest_msr_state->shadow_gs;
+    check_long_mode:
+        if ( !(vmx_long_mode_enabled(v)) )
+        {
+            vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
+            return 0;
+        }
         break;
 
-    CASE_READ_MSR(STAR);
-    CASE_READ_MSR(LSTAR);
-    CASE_READ_MSR(CSTAR);
-    CASE_READ_MSR(SYSCALL_MASK);
+    case MSR_STAR:
+        msr_content = guest_msr_state->msrs[VMX_INDEX_MSR_STAR];
+        break;
+
+    case MSR_LSTAR:
+        msr_content = guest_msr_state->msrs[VMX_INDEX_MSR_LSTAR];
+        break;
+
+    case MSR_CSTAR:
+        msr_content = guest_msr_state->msrs[VMX_INDEX_MSR_CSTAR];
+        break;
+
+    case MSR_SYSCALL_MASK:
+        msr_content = guest_msr_state->msrs[VMX_INDEX_MSR_SYSCALL_MASK];
+        break;
 
     default:
         return 0;
@@ -155,32 +159,28 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
     regs->edx = (u32)(msr_content >> 32);
 
     return 1;
-
- exit_and_crash:
-    gdprintk(XENLOG_ERR, "Fatal error reading MSR %lx\n", (long)regs->ecx);
-    domain_crash(v->domain);
-    return 1; /* handled */
 }
 
 static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 {
     u64 msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
+    u32 ecx = regs->ecx;
     struct vcpu *v = current;
     struct vmx_msr_state *guest_msr_state = &v->arch.hvm_vmx.msr_state;
     struct vmx_msr_state *host_msr_state = &this_cpu(host_msr_state);
 
     HVM_DBG_LOG(DBG_LEVEL_1, "msr 0x%x msr_content 0x%"PRIx64"\n",
-                (u32)regs->ecx, msr_content);
+                ecx, msr_content);
 
-    switch ( (u32)regs->ecx ) {
+    switch ( ecx )
+    {
     case MSR_EFER:
         /* offending reserved bit will cause #GP */
         if ( msr_content & ~(EFER_LME | EFER_LMA | EFER_NX | EFER_SCE) )
         {
-            printk("Trying to set reserved bit in EFER: %"PRIx64"\n",
-                   msr_content);
-            vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
-            return 0;
+            gdprintk(XENLOG_WARNING, "Trying to set reserved bit in "
+                     "EFER: %"PRIx64"\n", msr_content);
+            goto gp_fault;
         }
 
         if ( (msr_content & EFER_LME)
@@ -188,9 +188,9 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
         {
             if ( unlikely(vmx_paging_enabled(v)) )
             {
-                printk("Trying to set EFER.LME with paging enabled\n");
-                vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
-                return 0;
+                gdprintk(XENLOG_WARNING,
+                         "Trying to set EFER.LME with paging enabled\n");
+                goto gp_fault;
             }
         }
         else if ( !(msr_content & EFER_LME)
@@ -198,9 +198,9 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
         {
             if ( unlikely(vmx_paging_enabled(v)) )
             {
-                printk("Trying to clear EFER.LME with paging enabled\n");
-                vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
-                return 0;
+                gdprintk(XENLOG_WARNING,
+                         "Trying to clear EFER.LME with paging enabled\n");
+                goto gp_fault;
             }
         }
 
@@ -209,35 +209,40 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 
     case MSR_FS_BASE:
     case MSR_GS_BASE:
+    case MSR_SHADOW_GS_BASE:
         if ( !vmx_long_mode_enabled(v) )
-            goto exit_and_crash;
+            goto gp_fault;
 
-        if ( !IS_CANO_ADDRESS(msr_content) )
+        if ( !is_canonical_address(msr_content) )
+            goto uncanonical_address;
+
+        if ( ecx == MSR_FS_BASE )
+            __vmwrite(GUEST_FS_BASE, msr_content);
+        else if ( ecx == MSR_GS_BASE )
+            __vmwrite(GUEST_GS_BASE, msr_content);
+        else
         {
-            HVM_DBG_LOG(DBG_LEVEL_1, "Not cano address of msr write\n");
-            vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
-            return 0;
+            v->arch.hvm_vmx.msr_state.shadow_gs = msr_content;
+            wrmsrl(MSR_SHADOW_GS_BASE, msr_content);
         }
 
-        if ( regs->ecx == MSR_FS_BASE )
-            __vmwrite(GUEST_FS_BASE, msr_content);
-        else
-            __vmwrite(GUEST_GS_BASE, msr_content);
-
         break;
 
-    case MSR_SHADOW_GS_BASE:
-        if ( !(vmx_long_mode_enabled(v)) )
-            goto exit_and_crash;
+    case MSR_STAR:
+        WRITE_MSR(STAR);
 
-        v->arch.hvm_vmx.msr_state.shadow_gs = msr_content;
-        wrmsrl(MSR_SHADOW_GS_BASE, msr_content);
-        break;
+    case MSR_LSTAR:
+        if ( !is_canonical_address(msr_content) )
+            goto uncanonical_address;
+        WRITE_MSR(LSTAR);
 
-    CASE_WRITE_MSR(STAR);
-    CASE_WRITE_MSR(LSTAR);
-    CASE_WRITE_MSR(CSTAR);
-    CASE_WRITE_MSR(SYSCALL_MASK);
+    case MSR_CSTAR:
+        if ( !is_canonical_address(msr_content) )
+            goto uncanonical_address;
+        WRITE_MSR(CSTAR);
+
+    case MSR_SYSCALL_MASK:
+        WRITE_MSR(SYSCALL_MASK);
 
     default:
         return 0;
@@ -245,10 +250,11 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 
     return 1;
 
- exit_and_crash:
-    gdprintk(XENLOG_ERR, "Fatal error writing MSR %lx\n", (long)regs->ecx);
-    domain_crash(v->domain);
-    return 1; /* handled */
+ uncanonical_address:
+    HVM_DBG_LOG(DBG_LEVEL_1, "Not cano address of msr write %x\n", ecx);
+ gp_fault:
+    vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
+    return 0;
 }
 
 /*
@@ -501,7 +507,7 @@ static unsigned long vmx_get_ctrl_reg(struct vcpu *v, unsigned int num)
     return 0;                   /* dummy */
 }
 
-static unsigned long vmx_get_segment_base(struct vcpu *v, enum segment seg)
+static unsigned long vmx_get_segment_base(struct vcpu *v, enum x86_segment seg)
 {
     unsigned long base = 0;
     int long_mode = 0;
@@ -516,20 +522,92 @@ static unsigned long vmx_get_segment_base(struct vcpu *v, enum segment seg)
 
     switch ( seg )
     {
-    case seg_cs: if ( !long_mode ) base = __vmread(GUEST_CS_BASE); break;
-    case seg_ds: if ( !long_mode ) base = __vmread(GUEST_DS_BASE); break;
-    case seg_es: if ( !long_mode ) base = __vmread(GUEST_ES_BASE); break;
-    case seg_fs: base = __vmread(GUEST_FS_BASE); break;
-    case seg_gs: base = __vmread(GUEST_GS_BASE); break;
-    case seg_ss: if ( !long_mode ) base = __vmread(GUEST_SS_BASE); break;
-    case seg_tr: base = __vmread(GUEST_TR_BASE); break;
-    case seg_gdtr: base = __vmread(GUEST_GDTR_BASE); break;
-    case seg_idtr: base = __vmread(GUEST_IDTR_BASE); break;
-    case seg_ldtr: base = __vmread(GUEST_LDTR_BASE); break;
+    case x86_seg_cs: if ( !long_mode ) base = __vmread(GUEST_CS_BASE); break;
+    case x86_seg_ds: if ( !long_mode ) base = __vmread(GUEST_DS_BASE); break;
+    case x86_seg_es: if ( !long_mode ) base = __vmread(GUEST_ES_BASE); break;
+    case x86_seg_fs: base = __vmread(GUEST_FS_BASE); break;
+    case x86_seg_gs: base = __vmread(GUEST_GS_BASE); break;
+    case x86_seg_ss: if ( !long_mode ) base = __vmread(GUEST_SS_BASE); break;
+    case x86_seg_tr: base = __vmread(GUEST_TR_BASE); break;
+    case x86_seg_gdtr: base = __vmread(GUEST_GDTR_BASE); break;
+    case x86_seg_idtr: base = __vmread(GUEST_IDTR_BASE); break;
+    case x86_seg_ldtr: base = __vmread(GUEST_LDTR_BASE); break;
     default: BUG(); break;
     }
 
     return base;
+}
+
+static void vmx_get_segment_register(struct vcpu *v, enum x86_segment seg,
+                                     struct segment_register *reg)
+{
+    u16 attr = 0;
+
+    ASSERT(v == current);
+
+    switch ( seg )
+    {
+    case x86_seg_cs:
+        reg->sel   = __vmread(GUEST_CS_SELECTOR);
+        reg->limit = __vmread(GUEST_CS_LIMIT);
+        reg->base  = __vmread(GUEST_CS_BASE);
+        attr       = __vmread(GUEST_CS_AR_BYTES);
+        break;
+    case x86_seg_ds:
+        reg->sel   = __vmread(GUEST_DS_SELECTOR);
+        reg->limit = __vmread(GUEST_DS_LIMIT);
+        reg->base  = __vmread(GUEST_DS_BASE);
+        attr       = __vmread(GUEST_DS_AR_BYTES);
+        break;
+    case x86_seg_es:
+        reg->sel   = __vmread(GUEST_ES_SELECTOR);
+        reg->limit = __vmread(GUEST_ES_LIMIT);
+        reg->base  = __vmread(GUEST_ES_BASE);
+        attr       = __vmread(GUEST_ES_AR_BYTES);
+        break;
+    case x86_seg_fs:
+        reg->sel   = __vmread(GUEST_FS_SELECTOR);
+        reg->limit = __vmread(GUEST_FS_LIMIT);
+        reg->base  = __vmread(GUEST_FS_BASE);
+        attr       = __vmread(GUEST_FS_AR_BYTES);
+        break;
+    case x86_seg_gs:
+        reg->sel   = __vmread(GUEST_GS_SELECTOR);
+        reg->limit = __vmread(GUEST_GS_LIMIT);
+        reg->base  = __vmread(GUEST_GS_BASE);
+        attr       = __vmread(GUEST_GS_AR_BYTES);
+        break;
+    case x86_seg_ss:
+        reg->sel   = __vmread(GUEST_SS_SELECTOR);
+        reg->limit = __vmread(GUEST_SS_LIMIT);
+        reg->base  = __vmread(GUEST_SS_BASE);
+        attr       = __vmread(GUEST_SS_AR_BYTES);
+        break;
+    case x86_seg_tr:
+        reg->sel   = __vmread(GUEST_TR_SELECTOR);
+        reg->limit = __vmread(GUEST_TR_LIMIT);
+        reg->base  = __vmread(GUEST_TR_BASE);
+        attr       = __vmread(GUEST_TR_AR_BYTES);
+        break;
+    case x86_seg_gdtr:
+        reg->limit = __vmread(GUEST_GDTR_LIMIT);
+        reg->base  = __vmread(GUEST_GDTR_BASE);
+        break;
+    case x86_seg_idtr:
+        reg->limit = __vmread(GUEST_IDTR_LIMIT);
+        reg->base  = __vmread(GUEST_IDTR_BASE);
+        break;
+    case x86_seg_ldtr:
+        reg->sel   = __vmread(GUEST_LDTR_SELECTOR);
+        reg->limit = __vmread(GUEST_LDTR_LIMIT);
+        reg->base  = __vmread(GUEST_LDTR_BASE);
+        attr       = __vmread(GUEST_LDTR_AR_BYTES);
+        break;
+    default:
+        BUG();
+    }
+
+    reg->attr.bytes = (attr & 0xff) | ((attr >> 4) & 0xf00);
 }
 
 /* Make sure that xen intercepts any FP accesses from current */
@@ -630,6 +708,22 @@ static int vmx_pae_enabled(struct vcpu *v)
     return (vmx_paging_enabled(v) && (cr4 & X86_CR4_PAE));
 }
 
+/* Works only for vcpu == current */
+static void vmx_update_host_cr3(struct vcpu *v)
+{
+    ASSERT(v == current);
+    __vmwrite(HOST_CR3, v->arch.cr3);
+}
+
+static void vmx_inject_exception(
+    unsigned int trapnr, int errcode, unsigned long cr2)
+{
+    struct vcpu *v = current;
+    vmx_inject_hw_exception(v, trapnr, errcode);
+    if ( trapnr == TRAP_page_fault )
+        v->arch.hvm_vmx.cpu_cr2 = cr2;
+}
+
 /* Setup HVM interfaces */
 static void vmx_setup_hvm_funcs(void)
 {
@@ -650,11 +744,14 @@ static void vmx_setup_hvm_funcs(void)
     hvm_funcs.guest_x86_mode = vmx_guest_x86_mode;
     hvm_funcs.get_guest_ctrl_reg = vmx_get_ctrl_reg;
     hvm_funcs.get_segment_base = vmx_get_segment_base;
+    hvm_funcs.get_segment_register = vmx_get_segment_register;
 
     hvm_funcs.update_host_cr3 = vmx_update_host_cr3;
 
     hvm_funcs.stts = vmx_stts;
     hvm_funcs.set_tsc_offset = vmx_set_tsc_offset;
+
+    hvm_funcs.inject_exception = vmx_inject_exception;
 
     hvm_funcs.init_ap_context = vmx_init_ap_context;
 
@@ -878,15 +975,19 @@ static void vmx_do_cpuid(struct cpu_user_regs *regs)
         {
             eax = ebx = ecx = edx = 0x0;
         }
-#ifdef __i386__
         else if ( input == CPUID_LEAF_0x80000001 )
         {
+#if CONFIG_PAGING_LEVELS >= 3
+            if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
+#endif
+                clear_bit(X86_FEATURE_NX & 31, &edx);
+#ifdef __i386__
             clear_bit(X86_FEATURE_LAHF_LM & 31, &ecx);
 
             clear_bit(X86_FEATURE_LM & 31, &edx);
             clear_bit(X86_FEATURE_SYSCALL & 31, &edx);
-        }
 #endif
+        }
     }
 
     regs->eax = (unsigned long) eax;
@@ -958,14 +1059,14 @@ static void vmx_do_invlpg(unsigned long va)
 
 
 static int vmx_check_descriptor(int long_mode, unsigned long eip, int inst_len,
-                                enum segment seg, unsigned long *base,
+                                enum x86_segment seg, unsigned long *base,
                                 u32 *limit, u32 *ar_bytes)
 {
     enum vmcs_field ar_field, base_field, limit_field;
 
     *base = 0;
     *limit = 0;
-    if ( seg != seg_es )
+    if ( seg != x86_seg_es )
     {
         unsigned char inst[MAX_INST_LEN];
         int i;
@@ -995,22 +1096,22 @@ static int vmx_check_descriptor(int long_mode, unsigned long eip, int inst_len,
 #endif
                 continue;
             case 0x2e: /* CS */
-                seg = seg_cs;
+                seg = x86_seg_cs;
                 continue;
             case 0x36: /* SS */
-                seg = seg_ss;
+                seg = x86_seg_ss;
                 continue;
             case 0x26: /* ES */
-                seg = seg_es;
+                seg = x86_seg_es;
                 continue;
             case 0x64: /* FS */
-                seg = seg_fs;
+                seg = x86_seg_fs;
                 continue;
             case 0x65: /* GS */
-                seg = seg_gs;
+                seg = x86_seg_gs;
                 continue;
             case 0x3e: /* DS */
-                seg = seg_ds;
+                seg = x86_seg_ds;
                 continue;
             }
         }
@@ -1018,32 +1119,32 @@ static int vmx_check_descriptor(int long_mode, unsigned long eip, int inst_len,
 
     switch ( seg )
     {
-    case seg_cs:
+    case x86_seg_cs:
         ar_field = GUEST_CS_AR_BYTES;
         base_field = GUEST_CS_BASE;
         limit_field = GUEST_CS_LIMIT;
         break;
-    case seg_ds:
+    case x86_seg_ds:
         ar_field = GUEST_DS_AR_BYTES;
         base_field = GUEST_DS_BASE;
         limit_field = GUEST_DS_LIMIT;
         break;
-    case seg_es:
+    case x86_seg_es:
         ar_field = GUEST_ES_AR_BYTES;
         base_field = GUEST_ES_BASE;
         limit_field = GUEST_ES_LIMIT;
         break;
-    case seg_fs:
+    case x86_seg_fs:
         ar_field = GUEST_FS_AR_BYTES;
         base_field = GUEST_FS_BASE;
         limit_field = GUEST_FS_LIMIT;
         break;
-    case seg_gs:
+    case x86_seg_gs:
         ar_field = GUEST_FS_AR_BYTES;
         base_field = GUEST_FS_BASE;
         limit_field = GUEST_FS_LIMIT;
         break;
-    case seg_ss:
+    case x86_seg_ss:
         ar_field = GUEST_GS_AR_BYTES;
         base_field = GUEST_GS_BASE;
         limit_field = GUEST_GS_LIMIT;
@@ -1053,7 +1154,7 @@ static int vmx_check_descriptor(int long_mode, unsigned long eip, int inst_len,
         return 0;
     }
 
-    if ( !long_mode || seg == seg_fs || seg == seg_gs )
+    if ( !long_mode || seg == x86_seg_fs || seg == x86_seg_gs )
     {
         *base = __vmread(base_field);
         *limit = __vmread(limit_field);
@@ -1123,7 +1224,7 @@ static void vmx_io_instruction(unsigned long exit_qualification,
          * selector is null.
          */
         if ( !vmx_check_descriptor(long_mode, regs->eip, inst_len,
-                                   dir == IOREQ_WRITE ? seg_ds : seg_es,
+                                   dir==IOREQ_WRITE ? x86_seg_ds : x86_seg_es,
                                    &base, &limit, &ar_bytes) ) {
             if ( !long_mode ) {
                 vmx_inject_hw_exception(current, TRAP_gp_fault, 0);
@@ -1192,6 +1293,32 @@ static void vmx_io_instruction(unsigned long exit_qualification,
                 ASSERT(count);
             }
         }
+#ifdef __x86_64__
+        else
+        {
+            if ( !is_canonical_address(addr) ||
+                 !is_canonical_address(addr + size - 1) )
+            {
+                vmx_inject_hw_exception(current, TRAP_gp_fault, 0);
+                return;
+            }
+            if ( count > (1UL << 48) / size )
+                count = (1UL << 48) / size;
+            if ( !(regs->eflags & EF_DF) )
+            {
+                if ( addr + count * size - 1 < addr ||
+                     !is_canonical_address(addr + count * size - 1) )
+                    count = (addr & ~((1UL << 48) - 1)) / size;
+            }
+            else
+            {
+                if ( (count - 1) * size > addr ||
+                     !is_canonical_address(addr + (count - 1) * size) )
+                    count = (addr & ~((1UL << 48) - 1)) / size + 1;
+            }
+            ASSERT(count);
+        }
+#endif
 
         /*
          * Handle string pio instructions that cross pages or that
@@ -2409,7 +2536,6 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case EXIT_REASON_TPR_BELOW_THRESHOLD:
-        vcpu_vlapic(v)->flush_tpr_threshold = 1;
         break;
 
     default:

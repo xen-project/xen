@@ -129,6 +129,11 @@ extern int valid_mmap_phys_addr_range (unsigned long addr, size_t *count);
 	(((bvec_to_bus((vec1)) + (vec1)->bv_len) == bvec_to_bus((vec2))) && \
 	 ((bvec_to_pseudophys((vec1)) + (vec1)->bv_len) ==		\
 	  bvec_to_pseudophys((vec2))))
+
+/* We will be supplying our own /dev/mem implementation */
+#define ARCH_HAS_DEV_MEM
+#define ARCH_HAS_DEV_MEM_MMAP_MEM
+int xen_mmap_mem(struct file * file, struct vm_area_struct * vma);
 #endif /* CONFIG_XEN */
 
 # endif /* KERNEL */
@@ -458,6 +463,8 @@ static inline void __iomem *
 ioremap (unsigned long offset, unsigned long size)
 {
 	offset = HYPERVISOR_ioremap(offset, size);
+	if (IS_ERR_VALUE(offset))
+		return (void __iomem*)offset;
 	return (void __iomem *) (__IA64_UNCACHED_OFFSET | (offset));
 }
 

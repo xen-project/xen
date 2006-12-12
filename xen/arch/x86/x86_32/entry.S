@@ -536,6 +536,14 @@ ENTRY(spurious_interrupt_bug)
         pushl $TRAP_spurious_int<<16
         jmp   handle_exception
 
+ENTRY(early_page_fault)
+        SAVE_ALL_NOSEGREGS(a)
+        movl  %esp,%edx
+        pushl %edx
+        call  do_early_page_fault
+        addl  $4,%esp
+        jmp   restore_all_xen
+
 ENTRY(nmi)
 #ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL
         # NMI entry protocol is incompatible with guest kernel in ring 0.
@@ -659,6 +667,7 @@ ENTRY(hypercall_table)
         .long do_hvm_op
         .long do_sysctl             /* 35 */
         .long do_domctl
+        .long do_kexec_op
         .rept NR_hypercalls-((.-hypercall_table)/4)
         .long do_ni_hypercall
         .endr
@@ -701,6 +710,7 @@ ENTRY(hypercall_args_table)
         .byte 2 /* do_hvm_op            */
         .byte 1 /* do_sysctl            */  /* 35 */
         .byte 1 /* do_domctl            */
+        .byte 2 /* do_kexec_op          */
         .rept NR_hypercalls-(.-hypercall_args_table)
         .byte 0 /* do_ni_hypercall      */
         .endr

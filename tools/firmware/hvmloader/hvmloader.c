@@ -23,7 +23,6 @@
 #include "acpi/acpi2_0.h"  /* for ACPI_PHYSICAL_ADDRESS */
 #include "hypercall.h"
 #include "util.h"
-#include "acpi_utils.h"
 #include "smbios.h"
 #include "config.h"
 #include "apic_regs.h"
@@ -283,7 +282,6 @@ static void pci_setup(void)
 int main(void)
 {
     int acpi_sz;
-    uint8_t *freemem;
 
     printf("HVM Loader\n");
 
@@ -318,12 +316,7 @@ int main(void)
     {
         printf("Loading ACPI ...\n");
         acpi_sz = acpi_build_tables((uint8_t *)ACPI_PHYSICAL_ADDRESS);
-        freemem = (uint8_t *)ACPI_PHYSICAL_ADDRESS + acpi_sz;
-        ASSERT(freemem <= (uint8_t *)0xF0000);
-        acpi_update((unsigned char *)ACPI_PHYSICAL_ADDRESS,
-                    freemem - (uint8_t *)ACPI_PHYSICAL_ADDRESS,
-                    (unsigned char *)0xF0000,
-                    &freemem);
+        ASSERT((ACPI_PHYSICAL_ADDRESS + acpi_sz) <= 0xF0000);
     }
 
     if ( check_amd() )

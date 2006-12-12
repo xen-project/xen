@@ -15,25 +15,24 @@ class PCIQuirk:
         self.device = device
         self.subvendor = subvendor
         self.subdevice = subdevice
-	self.domain = domain
-	self.bus = bus
-	self.slot = slot
-	self.func = func
+        self.domain = domain
+        self.bus = bus
+        self.slot = slot
+        self.func = func
 
         self.devid = "%04x:%04x:%04x:%04x" % (vendor, device, subvendor, subdevice)
-	self.pciid = "%04x:%02x:%02x.%01x" % (domain, bus, slot, func)
+        self.pciid = "%04x:%02x:%02x.%01x" % (domain, bus, slot, func)
+        self.quirks = self.__getQuirksByID()
 
-        self.quirks = self.__getQuirksByID( )
-
-	self.__sendQuirks( )
-	self.__sendPermDevs( )
+        self.__sendQuirks()
+        self.__sendPermDevs()
 
     def __matchPCIdev( self, list ):
         ret = False
         if list == None:
             return False
         for id in list:
-            if id.startswith( self.devid[:9] ): # id's vendor and device ID match
+            if id.startswith(self.devid[:9]): # id's vendor and device ID match
                 skey = id.split(':')
                 size = len(skey)
                 if (size == 2):		# subvendor/subdevice not suplied
@@ -41,13 +40,13 @@ class PCIQuirk:
                     break
                 elif (size == 4):	# check subvendor/subdevice
                     # check subvendor
-		    subven = '%04x' % self.subvendor
+                    subven = '%04x' % self.subvendor
                     if ((skey[2] != 'FFFF') and 
                         (skey[2] != 'ffff') and 
                         (skey[2] != subven)):
                             continue
                     # check subdevice
-		    subdev = '%04x' % self.subdevice
+                    subdev = '%04x' % self.subdevice
                     if ((skey[3] != 'FFFF') and 
                         (skey[3] != 'ffff') and 
                         (skey[3] != subdev)):
@@ -101,8 +100,8 @@ class PCIQuirk:
 			self.slot, self.func, quirk) )
                 f.close()
             except Exception, e:
-                raise VmError("pci: failed to open/write/close quirks sysfs " + \
-			"node - " + str(e))
+                raise VmError("pci: failed to open/write/close quirks " +
+                              "sysfs node - " + str(e))
 
     def __devIsUnconstrained( self ):
         if os.path.exists(PERMISSIVE_CONFIG_FILE):
@@ -126,20 +125,22 @@ class PCIQuirk:
 
         devices = child_at(child(pci_perm_dev_config, 'unconstrained_dev_ids'),0)
 	if self.__matchPCIdev( devices ):
-            log.debug("Permissive mode enabled for PCI device [%s]" % self.devid)
+            log.debug("Permissive mode enabled for PCI device [%s]" %
+                      self.devid)
             return True
-        log.debug("Permissive mode NOT enabled for PCI device [%s]" % self.devid)
+        log.debug("Permissive mode NOT enabled for PCI device [%s]" %
+                  self.devid)
         return False
 
     def __sendPermDevs(self):
 	if self.__devIsUnconstrained( ):
-            log.debug("Unconstrained device: %04x:%02x:%02x.%1x" % (self.domain,
-		    self.bus, self.slot, self.func))
+            log.debug("Unconstrained device: %04x:%02x:%02x.%1x" %
+                      (self.domain, self.bus, self.slot, self.func))
             try:
                 f = file(PERMISSIVE_SYSFS_NODE ,"w")
                 f.write( "%04x:%02x:%02x.%1x" % (self.domain, self.bus,
-			self.slot, self.func) )
+                                                 self.slot, self.func))
                 f.close()
             except Exception, e:
-                raise VmError("pci: failed to open/write/close permissive " + \
-		"sysfs node: " + str(e))
+                raise VmError("pci: failed to open/write/close permissive " +
+                              "sysfs node: " + str(e))

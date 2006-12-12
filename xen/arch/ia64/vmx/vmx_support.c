@@ -76,11 +76,6 @@ void vmx_send_assist_req(struct vcpu *v)
     p->state = STATE_IOREQ_READY;
     notify_via_xen_event_channel(v->arch.arch_vmx.xen_port);
 
-    /*
-     * Waiting for MMIO completion
-     *   like the wait_on_xen_event_channel() macro like...
-     *   but, we can't call do_softirq() at this point..
-     */
     for (;;) {
         if (p->state != STATE_IOREQ_READY &&
             p->state != STATE_IOREQ_INPROCESS)
@@ -96,6 +91,7 @@ void vmx_send_assist_req(struct vcpu *v)
         }
 
         raise_softirq(SCHEDULE_SOFTIRQ);
+        do_softirq();
         mb();
     }
 

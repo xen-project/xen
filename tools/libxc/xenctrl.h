@@ -382,6 +382,10 @@ int xc_sched_credit_domain_get(int xc_handle,
  * This function allocates an unbound port.  Ports are named endpoints used for
  * interdomain communication.  This function is most useful in opening a
  * well-known port within a domain to receive events on.
+ * 
+ * NOTE: If you are allocating a *local* unbound port, you probably want to
+ * use xc_evtchn_bind_unbound_port(). This function is intended for allocating
+ * ports *only* during domain creation.
  *
  * @parm xc_handle a handle to an open hypervisor interface
  * @parm dom the ID of the local domain (the 'allocatee')
@@ -414,6 +418,10 @@ int xc_sched_id(int xc_handle,
 int xc_domain_setmaxmem(int xc_handle,
                         uint32_t domid,
                         unsigned int max_memkb);
+
+int xc_domain_set_memmap_limit(int xc_handle,
+                               uint32_t domid,
+                               unsigned long map_limitkb);
 
 int xc_domain_set_time_offset(int xc_handle,
                               uint32_t domid,
@@ -634,6 +642,12 @@ int xc_evtchn_fd(int xce_handle);
 int xc_evtchn_notify(int xce_handle, evtchn_port_t port);
 
 /*
+ * Returns a new event port awaiting interdomain connection from the given
+ * domain ID, or -1 on failure, in which case errno will be set appropriately.
+ */
+evtchn_port_t xc_evtchn_bind_unbound_port(int xce_handle, int domid);
+
+/*
  * Returns a new event port bound to the remote port for the given domain ID,
  * or -1 on failure, in which case errno will be set appropriately.
  */
@@ -665,15 +679,57 @@ evtchn_port_t xc_evtchn_pending(int xce_handle);
 int xc_evtchn_unmask(int xce_handle, evtchn_port_t port);
 
 int xc_hvm_set_pci_intx_level(
-    int xce_handle, domid_t dom,
+    int xc_handle, domid_t dom,
     uint8_t domain, uint8_t bus, uint8_t device, uint8_t intx,
     unsigned int level);
 int xc_hvm_set_isa_irq_level(
-    int xce_handle, domid_t dom,
+    int xc_handle, domid_t dom,
     uint8_t isa_irq,
     unsigned int level);
 
 int xc_hvm_set_pci_link_route(
-    int xce_handle, domid_t dom, uint8_t link, uint8_t isa_irq);
+    int xc_handle, domid_t dom, uint8_t link, uint8_t isa_irq);
+
+
+typedef enum {
+  XC_ERROR_NONE = 0,
+  XC_INTERNAL_ERROR = 1,
+  XC_INVALID_KERNEL = 2,
+} xc_error_code;
+
+#define XC_MAX_ERROR_MSG_LEN 1024
+typedef struct {
+  int code;
+  char message[XC_MAX_ERROR_MSG_LEN];
+} xc_error;
+
+/*
+ * Return a pointer to the last error. This pointer and the
+ * data pointed to are only valid until the next call to
+ * libxc.
+ */
+const xc_error const *xc_get_last_error(void);
+
+/*
+ * Clear the last error
+ */
+void xc_clear_last_error(void);
+
+typedef void (*xc_error_handler)(const xc_error const* err);
+
+/*
+ * The default error handler which prints to stderr
+ */
+void xc_default_error_handler(const xc_error const* err);
+
+/*
+ * Convert an error code into a text description
+ */
+const char *xc_error_code_to_desc(int code);
+
+/*
+ * Registers a callback to handle errors
+ */
+xc_error_handler xc_set_error_handler(xc_error_handler handler);
 
 #endif

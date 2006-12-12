@@ -43,6 +43,8 @@ obj-y += trampoline.o
 obj-y += traps.o
 obj-y += usercopy.o
 obj-y += x86_emulate.o
+obj-y += machine_kexec.o
+obj-y += crash.o
 
 obj-$(crash_debug) += gdbstub.o
 

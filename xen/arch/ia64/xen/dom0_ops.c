@@ -55,7 +55,7 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             pte = (pte_t *)lookup_noalloc_domain_pte(d,
                                                (start_page + i) << PAGE_SHIFT);
             if (pte && pte_present(*pte))
-                mfn = pte_pfn(*pte);
+                mfn = start_page + i;
             else
                 mfn = INVALID_MFN;
 
@@ -109,6 +109,7 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
                         BUG_ON(v->arch.privregs == NULL);
                         free_domheap_pages(virt_to_page(v->arch.privregs),
                                       get_order_from_shift(XMAPPEDREGS_SHIFT));
+                        v->arch.privregs = NULL;
                         relinquish_vcpu_resources(v);
                     }
                 }
@@ -124,6 +125,19 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
                     d->arch.breakimm = ds->hypercall_imm;
                     for_each_vcpu (d, v)
                         v->arch.breakimm = d->arch.breakimm;
+                }
+                {
+                    /*
+                     * XXX IA64_SHARED_INFO_PADDR
+                     * assign these pages into guest psudo physical address
+                     * space for dom0 to map this page by gmfn.
+                     * this is necessary for domain build, save, restore and 
+                     * dump-core.
+                     */
+                    unsigned long i;
+                    for (i = 0; i < XSI_SIZE; i += PAGE_SIZE)
+                        assign_domain_page(d, IA64_SHARED_INFO_PADDR + i,
+                                           virt_to_maddr(d->shared_info + i));
                 }
             }
         }
@@ -340,9 +354,19 @@ do_dom0vp_op(unsigned long cmd,
         ret = dom0vp_add_physmap(d, arg0, arg1, (unsigned int)arg2,
                                  (domid_t)arg3);
         break;
+    case IA64_DOM0VP_add_physmap_with_gmfn:
+        ret = dom0vp_add_physmap_with_gmfn(d, arg0, arg1, (unsigned int)arg2,
+                                           (domid_t)arg3);
+        break;
     case IA64_DOM0VP_expose_p2m:
         ret = dom0vp_expose_p2m(d, arg0, arg1, arg2, arg3);
         break;
+    case IA64_DOM0VP_perfmon: {
+        XEN_GUEST_HANDLE(void) hnd;
+        set_xen_guest_handle(hnd, (void*)arg1);
+        ret = do_perfmon_op(arg0, hnd, arg2);
+        break;
+    }
     default:
         ret = -1;
 		printk("unknown dom0_vp_op 0x%lx\n", cmd);

@@ -28,12 +28,14 @@
 #include <xen/interface/physdev.h>
 #include <xen/interface/grant_table.h>
 #include <xen/interface/hvm/params.h>
+#include <xen/interface/xenoprof.h>
 #ifdef CONFIG_VMX_GUEST
 #include <asm/hypervisor.h>
 #else
 #include <asm/hypercall.h>
 #endif
 #include <asm/xen/xencomm.h>
+#include <asm/perfmon.h>
 
 int
 xencomm_mini_hypercall_event_channel_op(int cmd, void *op)
@@ -92,6 +94,9 @@ xencommize_mini_grant_table_op(struct xencomm_mini *xc_area, int *nbr_area,
 		break;
 	case GNTTABOP_transfer:
 		argsize = sizeof(struct gnttab_transfer);
+		break;
+	case GNTTABOP_copy:
+		argsize = sizeof(struct gnttab_copy);
 		break;
 	default:
 		printk("%s: unknown mini grant table op %d\n", __func__, cmd);
@@ -317,3 +322,96 @@ xencomm_mini_hypercall_xen_version(int cmd, void *arg)
 	return xencomm_arch_hypercall_xen_version(cmd, desc);
 }
 EXPORT_SYMBOL(xencomm_mini_hypercall_xen_version);
+
+int
+xencomm_mini_hypercall_xenoprof_op(int op, void *arg)
+{
+	unsigned int argsize;
+	struct xencomm_mini xc_area[2];
+	int nbr_area = 2;
+	struct xencomm_handle *desc;
+	int rc;
+
+	switch (op) {
+	case XENOPROF_init:
+		argsize = sizeof(xenoprof_init_t);
+		break;
+	case XENOPROF_set_active:
+		argsize = sizeof(domid_t);
+		break;
+	case XENOPROF_set_passive:
+		argsize = sizeof(xenoprof_passive_t);
+		break;
+	case XENOPROF_counter:
+		argsize = sizeof(xenoprof_counter_t);
+		break;
+	case XENOPROF_get_buffer:
+		argsize = sizeof(xenoprof_get_buffer_t);
+		break;
+
+	case XENOPROF_reset_active_list:
+	case XENOPROF_reset_passive_list:
+	case XENOPROF_reserve_counters:
+	case XENOPROF_setup_events:
+	case XENOPROF_enable_virq:
+	case XENOPROF_start:
+	case XENOPROF_stop:
+	case XENOPROF_disable_virq:
+	case XENOPROF_release_counters:
+	case XENOPROF_shutdown:
+		return xencomm_arch_hypercall_xenoprof_op(op, arg);
+
+	default:
+		printk("%s: op %d isn't supported\n", __func__, op);
+		return -ENOSYS;
+	}
+	rc = xencomm_create_mini(xc_area, &nbr_area, arg, argsize, &desc);
+	if (rc)
+		return rc;
+	return xencomm_arch_hypercall_xenoprof_op(op, desc);
+}
+EXPORT_SYMBOL_GPL(xencomm_mini_hypercall_xenoprof_op);
+
+int
+xencomm_mini_hypercall_perfmon_op(unsigned long cmd, void* arg,
+                                  unsigned long count)
+{
+	unsigned int argsize;
+	struct xencomm_mini xc_area[2];
+	int nbr_area = 2;
+	struct xencomm_handle *desc;
+	int rc;
+
+	switch (cmd) {
+	case PFM_GET_FEATURES:
+		argsize = sizeof(pfarg_features_t);
+		break;
+	case PFM_CREATE_CONTEXT:
+		argsize = sizeof(pfarg_context_t);
+		break;
+	case PFM_LOAD_CONTEXT:
+		argsize = sizeof(pfarg_load_t);
+		break;
+	case PFM_WRITE_PMCS:
+	case PFM_WRITE_PMDS:
+		argsize = sizeof(pfarg_reg_t) * count;
+		break;
+
+	case PFM_DESTROY_CONTEXT:
+	case PFM_UNLOAD_CONTEXT:
+	case PFM_START:
+	case PFM_STOP:
+		return xencomm_arch_hypercall_perfmon_op(cmd, arg, count);
+
+	default:
+		printk("%s:%d cmd %ld isn't supported\n",
+		       __func__, __LINE__, cmd);
+		BUG();
+	}
+
+	rc = xencomm_create_mini(xc_area, &nbr_area, arg, argsize, &desc);
+	if (rc)
+		return rc;
+	return xencomm_arch_hypercall_perfmon_op(cmd, desc, count);
+}
+EXPORT_SYMBOL_GPL(xencomm_mini_hypercall_perfmon_op);

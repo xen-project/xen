@@ -1,8 +1,8 @@
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2006-08-06 02:14:04.797460093 +0100
-+++ ioemu/Makefile.target	2006-08-06 02:14:09.794902973 +0100
-@@ -302,7 +302,7 @@
+--- ioemu.orig/Makefile.target	2006-12-08 01:41:05.000000000 +0000
++++ ioemu/Makefile.target	2006-12-08 01:41:10.000000000 +0000
+@@ -303,7 +303,7 @@
  endif
  
  # must use static linking to avoid leaving stuff in virtual address space
@@ -13,8 +13,8 @@ Index: ioemu/Makefile.target
  VL_OBJS+=tap-win32.o
 Index: ioemu/configure
 ===================================================================
---- ioemu.orig/configure	2006-08-06 02:14:04.797460093 +0100
-+++ ioemu/configure	2006-08-06 02:14:09.795902861 +0100
+--- ioemu.orig/configure	2006-12-08 01:40:58.000000000 +0000
++++ ioemu/configure	2006-12-08 01:41:10.000000000 +0000
 @@ -75,8 +75,8 @@
  bigendian="no"
  mingw32="no"
@@ -37,8 +37,8 @@ Index: ioemu/configure
    target_user_only="yes"
 Index: ioemu/cpu-all.h
 ===================================================================
---- ioemu.orig/cpu-all.h	2006-08-06 02:14:04.797460093 +0100
-+++ ioemu/cpu-all.h	2006-08-06 02:14:09.796902750 +0100
+--- ioemu.orig/cpu-all.h	2006-12-08 01:40:58.000000000 +0000
++++ ioemu/cpu-all.h	2006-12-08 01:41:10.000000000 +0000
 @@ -690,7 +690,9 @@
  void page_set_flags(target_ulong start, target_ulong end, int flags);
  void page_unprotect_range(target_ulong data, target_ulong data_size);
@@ -64,8 +64,8 @@ Index: ioemu/cpu-all.h
  void cpu_dump_state(CPUState *env, FILE *f, 
 Index: ioemu/disas.h
 ===================================================================
---- ioemu.orig/disas.h	2006-08-06 02:14:04.797460093 +0100
-+++ ioemu/disas.h	2006-08-06 02:14:09.796902750 +0100
+--- ioemu.orig/disas.h	2006-12-08 01:40:58.000000000 +0000
++++ ioemu/disas.h	2006-12-08 01:41:10.000000000 +0000
 @@ -1,6 +1,7 @@
  #ifndef _QEMU_DISAS_H
  #define _QEMU_DISAS_H
@@ -83,8 +83,8 @@ Index: ioemu/disas.h
  #endif /* _QEMU_DISAS_H */
 Index: ioemu/exec-all.h
 ===================================================================
---- ioemu.orig/exec-all.h	2006-08-06 02:14:04.798459982 +0100
-+++ ioemu/exec-all.h	2006-08-06 02:14:09.796902750 +0100
+--- ioemu.orig/exec-all.h	2006-12-08 01:40:58.000000000 +0000
++++ ioemu/exec-all.h	2006-12-08 01:41:10.000000000 +0000
 @@ -509,7 +509,7 @@
  
  extern int tb_invalidated_flag;
@@ -105,8 +105,8 @@ Index: ioemu/exec-all.h
      return addr;
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2006-08-06 02:14:04.797460093 +0100
-+++ ioemu/hw/pc.c	2006-08-06 02:14:09.797902638 +0100
+--- ioemu.orig/hw/pc.c	2006-12-08 01:40:58.000000000 +0000
++++ ioemu/hw/pc.c	2006-12-08 01:41:10.000000000 +0000
 @@ -73,6 +73,7 @@
      }
  }
@@ -184,8 +184,8 @@ Index: ioemu/hw/pc.c
          if (serial_hds[i]) {
 Index: ioemu/hw/vga_int.h
 ===================================================================
---- ioemu.orig/hw/vga_int.h	2006-08-06 02:14:04.797460093 +0100
-+++ ioemu/hw/vga_int.h	2006-08-06 02:14:09.797902638 +0100
+--- ioemu.orig/hw/vga_int.h	2006-12-08 01:40:58.000000000 +0000
++++ ioemu/hw/vga_int.h	2006-12-08 01:41:10.000000000 +0000
 @@ -28,7 +28,7 @@
  #define ST01_DISP_ENABLE    0x01
  
@@ -197,8 +197,8 @@ Index: ioemu/hw/vga_int.h
  #define VBE_DISPI_MAX_YRES              1200
 Index: ioemu/monitor.c
 ===================================================================
---- ioemu.orig/monitor.c	2006-08-06 02:14:04.798459982 +0100
-+++ ioemu/monitor.c	2006-08-06 02:14:49.574468309 +0100
+--- ioemu.orig/monitor.c	2006-12-08 01:40:58.000000000 +0000
++++ ioemu/monitor.c	2006-12-08 01:41:10.000000000 +0000
 @@ -68,6 +68,12 @@
  
  void term_flush(void)
@@ -429,8 +429,8 @@ Index: ioemu/monitor.c
  {
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-08-06 02:14:04.797460093 +0100
-+++ ioemu/vl.c	2006-08-06 02:14:09.802902081 +0100
+--- ioemu.orig/vl.c	2006-12-08 01:40:58.000000000 +0000
++++ ioemu/vl.c	2006-12-08 01:41:10.000000000 +0000
 @@ -422,12 +422,15 @@
  void hw_error(const char *fmt, ...)
  {

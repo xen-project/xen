@@ -109,7 +109,7 @@ def main():
     
     daemon = SrvDaemon.instance()
     if not sys.argv[1:]:
-        print 'usage: %s {start|stop|restart}' % sys.argv[0]
+        print 'usage: %s {start|stop|reload|restart}' % sys.argv[0]
     elif sys.argv[1] == 'start':
         if os.uname()[0] != "SunOS":
             start_xenstored()
@@ -123,6 +123,8 @@ def main():
         return daemon.start(trace=1)
     elif sys.argv[1] == 'stop':
         return daemon.stop()
+    elif sys.argv[1] == 'reload':
+        return daemon.reloadConfig()
     elif sys.argv[1] == 'restart':
         start_xenstored()
         start_consoled()

@@ -1145,13 +1145,6 @@ int tdqcow_do_callbacks(struct td_state *s, int sid)
 
                 pio = &prv->pending_aio[(long)io->data];
 
-                if (ep->res != io->u.c.nbytes) {
-                        /* TODO: handle this case better. */
-			ptr = (int *)&ep->res;
-                        DPRINTF("AIO did less than I asked it to "
-				"[%lu,%lu,%d]\n", 
-				ep->res, io->u.c.nbytes, *ptr);
-                }
 		aio_unlock(prv, pio->sector);
 		if (pio->id >= 0) {
 			if (prv->crypt_method)
@@ -1162,7 +1155,7 @@ int tdqcow_do_callbacks(struct td_state *s, int sid)
 						&prv->aes_decrypt_key);
 			prv->nr_reqs[pio->qcow_idx]--;
 			if (prv->nr_reqs[pio->qcow_idx] == 0) 
-				rsp += pio->cb(s, ep->res2, pio->id, 
+			        rsp += pio->cb(s, ep->res == io->u.c.nbytes ? 0 : 1, pio->id, 
 					       pio->private);
 		} else if (pio->id == -2) free(pio->buf);
 

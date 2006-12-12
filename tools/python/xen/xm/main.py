@@ -21,6 +21,7 @@
 
 """Grand unified management application for Xen.
 """
+import atexit
 import os
 import sys
 import re
@@ -29,8 +30,10 @@ import socket
 import traceback
 import xmlrpclib
 import traceback
+import time
 import datetime
 from select import select
+import xml.dom.minidom
 
 import warnings
 warnings.filterwarnings('ignore', category=FutureWarning)
@@ -38,18 +41,26 @@ warnings.filterwarnings('ignore', category=FutureWarning)
 from xen.xend import PrettyPrint
 from xen.xend import sxp
 from xen.xend import XendClient
-from xen.xend.XendClient import server
 from xen.xend.XendConstants import *
 
 from xen.xm.opts import OptionError, Opts, wrap, set_true
 from xen.xm import console
 from xen.util import security
+from xen.util.xmlrpclib2 import ServerProxy
+
+import XenAPI
 
 # getopt.gnu_getopt is better, but only exists in Python 2.3+.  Use
 # getopt.getopt if gnu_getopt is not available.  This will mean that options
 # may only be specified before positional arguments.
 if not hasattr(getopt, 'gnu_getopt'):
     getopt.gnu_getopt = getopt.getopt
+
+XM_CONFIG_FILE = '/etc/xen/xm-config.xml'
+
+# Supported types of server
+SERVER_LEGACY_XMLRPC = 'LegacyXMLRPC'
+SERVER_XEN_API = 'Xen-API'
 
 # General help message
 
@@ -127,9 +138,9 @@ SUBCOMMAND_HELP = {
 
     # device commands
 
-    'block-attach'  :  ('<Domain> <BackDev> <FrontDev> <Mode>',
+    'block-attach'  :  ('<Domain> <BackDev> <FrontDev> <Mode> [BackDomain]',
                         'Create a new virtual block device.'),
-    'block-configure': ('<Domain> <BackDev> <FrontDev> <Mode> [BackDomId]',
+    'block-configure': ('<Domain> <BackDev> <FrontDev> <Mode> [BackDomain]',
                         'Change block device configuration'),
     'block-detach'  :  ('<Domain> <DevId>',
                         'Destroy a domain\'s virtual block device.'),
@@ -207,7 +218,13 @@ SUBCOMMAND_OPTIONS = {
        ('-L', '--live', 'Dump core without pausing the domain'),
        ('-C', '--crash', 'Crash domain after dumping core'),
     ),
-    'restore': (
+    'start': (
+      ('-p', '--paused', 'Do not unpause domain after starting it'),
+    ),
+    'resume': (
+      ('-p', '--paused', 'Do not unpause domain after resuming it'),
+    ),
+   'restore': (
       ('-p', '--paused', 'Do not unpause domain after restoring it'),
     ),
 }
@@ -312,6 +329,40 @@ acm_commands = [
 
 all_commands = (domain_commands + host_commands + scheduler_commands +
                 device_commands + vnet_commands + acm_commands)
+
+
+##
+# Configuration File Parsing
+##
+
+config = None
+if os.path.isfile(XM_CONFIG_FILE):
+    try:
+        config = xml.dom.minidom.parse(XM_CONFIG_FILE)
+    except:
+        print >>sys.stderr, ('Ignoring invalid configuration file %s.' %
+                             XM_CONFIG_FILE)
+
+def parseServer():
+    if config:
+        server = config.getElementsByTagName('server')
+        if server:
+            st = server[0].getAttribute('type')
+            if st != SERVER_XEN_API and st != SERVER_LEGACY_XMLRPC:
+                print >>sys.stderr, ('Invalid server type %s; using %s.' %
+                                     (st, SERVER_LEGACY_XMLRPC))
+                st = SERVER_LEGACY_XMLRPC
+            return (st, server[0].getAttribute('uri'))
+
+    return SERVER_LEGACY_XMLRPC, XendClient.uri
+
+def parseAuthentication():
+    server = config.getElementsByTagName('server')[0]
+    return (server.getAttribute('username'),
+            server.getAttribute('password'))
+
+serverType, serverURI = parseServer()
+
 
 ####################################################################
 #
@@ -463,6 +514,16 @@ def err(msg):
     print >>sys.stderr, "Error:", msg
 
 
+def get_single_vm(dom):
+    uuids = server.xenapi.VM.get_by_name_label(dom)
+    n = len(uuids)
+    if n == 1:
+        return uuids[0]
+    else:
+        dominfo = server.xend.domain(dom, False)
+        return dominfo['uuid']
+
+
 #########################################################################
 #
 #  Main xm functions
@@ -571,15 +632,21 @@ def parse_doms_info(info):
 
     def get_status(n, t, d):
         return DOM_STATES[t(sxp.child_value(info, n, d))]
-    
+
+    start_time = get_info('start_time', float, -1)
+    if start_time == -1:
+        up_time = float(-1)
+    else:
+        up_time = time.time() - start_time
+
     return {
         'domid'    : get_info('domid',        str,   ''),
         'name'     : get_info('name',         str,   '??'),
-        'mem'      : get_info('memory_dynamic_max', int,   0),
-        'vcpus'    : get_info('online_vcpus', int,   0),
+        'mem'      : get_info('memory_dynamic_min', int,   0),
+        'vcpus'    : get_info('online_vcpus',        int,   0),
         'state'    : get_info('state',        str,    ''),
         'cpu_time' : get_info('cpu_time',     float, 0),
-        'up_time'  : get_info('up_time',      float, -1),
+        'up_time'  : up_time,
         'seclabel' : security.get_security_printlabel(info),
         }
 
@@ -742,24 +809,70 @@ def xm_vcpu_list(args):
             print format % locals()
 
 def xm_start(args):
-    arg_check(args, "start", 1)
-    dom = args[0]
-    server.xend.domain.start(dom)
+    arg_check(args, "start", 1, 2)
+
+    try:
+        (options, params) = getopt.gnu_getopt(args, 'p', ['paused'])
+    except getopt.GetoptError, opterr:
+        err(opterr)
+        sys.exit(1)
+
+    paused = False
+    for (k, v) in options:
+        if k in ['-p', '--paused']:
+            paused = True
+
+    if len(params) != 1:
+        err("Wrong number of parameters")
+        usage('start')
+        sys.exit(1)
+
+    dom = params[0]
+    if serverType == SERVER_XEN_API:
+        server.xenapi.VM.start(get_single_vm(dom), paused)
+    else:
+        server.xend.domain.start(dom, paused)
 
 def xm_delete(args):
     arg_check(args, "delete", 1)
     dom = args[0]
-    server.xend.domain.delete(dom)
+    if serverType == SERVER_XEN_API:
+        server.xenapi.VM.destroy(get_single_vm(dom))
+    else:
+        server.xend.domain.delete(dom)
 
 def xm_suspend(args):
     arg_check(args, "suspend", 1)
     dom = args[0]
-    server.xend.domain.suspend(dom)
+    if serverType == SERVER_XEN_API:
+        server.xenapi.VM.suspend(get_single_vm(dom))
+    else:
+        server.xend.domain.suspend(dom)
 
 def xm_resume(args):
-    arg_check(args, "resume", 1)
-    dom = args[0]
-    server.xend.domain.resume(dom)
+    arg_check(args, "resume", 1, 2)
+
+    try:
+        (options, params) = getopt.gnu_getopt(args, 'p', ['paused'])
+    except getopt.GetoptError, opterr:
+        err(opterr)
+        sys.exit(1)
+
+    paused = False
+    for (k, v) in options:
+        if k in ['-p', '--paused']:
+            paused = True
+
+    if len(params) != 1:
+        err("Wrong number of parameters")
+        usage('resume')
+        sys.exit(1)
+
+    dom = params[0]
+    if serverType == SERVER_XEN_API:
+        server.xenapi.VM.resume(get_single_vm(dom), paused)
+    else:
+        server.xend.domain.resume(dom, paused)
     
 def xm_reboot(args):
     arg_check(args, "reboot", 1, 3)
@@ -775,13 +888,19 @@ def xm_pause(args):
     arg_check(args, "pause", 1)
     dom = args[0]
 
-    server.xend.domain.pause(dom)
+    if serverType == SERVER_XEN_API:
+        server.xenapi.VM.pause(get_single_vm(dom))
+    else:
+        server.xend.domain.pause(dom)
 
 def xm_unpause(args):
     arg_check(args, "unpause", 1)
     dom = args[0]
 
-    server.xend.domain.unpause(dom)
+    if serverType == SERVER_XEN_API:
+        server.xenapi.VM.unpause(get_single_vm(dom))
+    else:
+        server.xend.domain.unpause(dom)
 
 def xm_dump_core(args):
     live = False
@@ -822,7 +941,10 @@ def xm_dump_core(args):
 def xm_rename(args):
     arg_check(args, "rename", 2)
         
-    server.xend.domain.setName(args[0], args[1])
+    if serverType == SERVER_XEN_API:
+        server.xenapi.VM.set_name_label(get_single_vm(args[0]), args[1])
+    else:
+        server.xend.domain.setName(args[0], args[1])
 
 def xm_importcommand(command, args):
     cmd = __import__(command, globals(), locals(), 'xen.xm')
@@ -880,7 +1002,12 @@ def xm_vcpu_set(args):
 
 def xm_destroy(args):
     arg_check(args, "destroy", 1)
-    server.xend.domain.destroy(args[0])
+
+    dom = args[0]
+    if serverType == SERVER_XEN_API:
+        server.xenapi.VM.hard_shutdown(get_single_vm(dom))
+    else:
+        server.xend.domain.destroy(dom)
 
 
 def xm_domid(args):
@@ -1094,7 +1221,7 @@ def xm_uptime(args):
 
     for dom in doms:
         d = parse_doms_info(dom)
-        if d['domid'] > 0:
+        if int(d['domid']) > 0:
             uptime = int(round(d['up_time']))
         else:
             f=open('/proc/uptime', 'r')
@@ -1121,10 +1248,10 @@ def xm_uptime(args):
         if short_mode:
             now = datetime.datetime.now()
             upstring = now.strftime(" %H:%M:%S") + " up " + upstring
-            upstring += ", " + d['name'] + " (" + str(d['domid']) + ")"
+            upstring += ", " + d['name'] + " (" + d['domid'] + ")"
         else:
             upstring += ':%(seconds)02d' % vars()
-            upstring = ("%(name)-32s %(domid)3d " % d) + upstring
+            upstring = ("%(name)-32s %(domid)3s " % d) + upstring
 
         print upstring
 
@@ -1537,6 +1664,8 @@ def deprecated(old,new):
         "Command %s is deprecated.  Please use xm %s instead." % (old, new))
 
 def main(argv=sys.argv):
+    global server
+
     if len(argv) < 2:
         usage()
 
@@ -1555,6 +1684,19 @@ def main(argv=sys.argv):
     args = argv[2:]
     if cmd:
         try:
+            if serverType == SERVER_XEN_API:
+                server = XenAPI.Session(serverURI)
+                username, password = parseAuthentication()
+                server.login_with_password(username, password)
+                def logout():
+                    try:
+                        server.xenapi.session.logout()
+                    except:
+                        pass
+                atexit.register(logout)
+            else:
+                server = ServerProxy(serverURI)
+
             rc = cmd(args)
             if rc:
                 usage()
@@ -1574,6 +1716,9 @@ def main(argv=sys.argv):
                 err("Unable to connect to xend: %s." % ex[1])
             sys.exit(1)
         except SystemExit:
+            sys.exit(1)
+        except XenAPI.Failure, exn:
+            err(str(exn))
             sys.exit(1)
         except xmlrpclib.Fault, ex:
             if ex.faultCode == XendClient.ERROR_INVALID_DOMAIN:

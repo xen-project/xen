@@ -14,4 +14,6 @@ void xencons_tx(void);
 int xencons_ring_init(void);
 int xencons_ring_send(const char *data, unsigned len);
 
+void xencons_early_setup(void);
+
 #endif /* __ASM_XENCONS_H__ */

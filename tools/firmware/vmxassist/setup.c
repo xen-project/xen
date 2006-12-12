@@ -66,7 +66,7 @@ struct vmx_assist_context newctx;
 unsigned long memory_size;
 int initialize_real_mode;
 
-extern char stack[], stack_top[];
+extern char stack_top[];
 extern unsigned trap_handlers[];
 
 void
@@ -125,7 +125,7 @@ setup_gdt(void)
 	/* setup task state segment */
 	memset(&tss, 0, sizeof(tss));
 	tss.ss0 = DATA_SELECTOR;
-	tss.esp0 = (unsigned) stack_top - 4*4;
+	tss.esp0 = (unsigned) stack_top;
 	tss.iomap_base = offsetof(struct tss, iomap);
 
 	/* initialize gdt's tss selector */
@@ -201,7 +201,7 @@ void
 enter_real_mode(struct regs *regs)
 {
 	/* mask off TSS busy bit */
-        gdt[TSS_SELECTOR / sizeof(gdt[0])] &= ~0x0000020000000000ULL;
+	gdt[TSS_SELECTOR / sizeof(gdt[0])] &= ~0x0000020000000000ULL;
 
 	/* start 8086 emulation of BIOS */
 	if (initialize_real_mode) {
@@ -219,8 +219,10 @@ enter_real_mode(struct regs *regs)
 			regs->cs = booting_vector << 8; /* AP entry point */
 			regs->eip = 0;
 		}
-		regs->uesp = 0;
-		regs->uss = 0;
+
+		regs->uesp = regs->uss = 0;
+		regs->eax = regs->ecx = regs->edx = regs->ebx = 0;
+		regs->esp = regs->ebp = regs->esi = regs->edi = 0;
 
 		/* intercept accesses to the PIC */
 		setiomap(PIC_MASTER+PIC_CMD);
@@ -236,14 +238,12 @@ enter_real_mode(struct regs *regs)
 
 		/* this should get us into 16-bit mode */
 		return;
-	} else {
-		/* go from protected to real mode */
-		regs->eflags |= EFLAGS_VM;
-
-		set_mode(regs, VM86_PROTECTED_TO_REAL);
-
-		emulate(regs);
 	}
+
+	/* go from protected to real mode */
+	regs->eflags |= EFLAGS_VM;
+	set_mode(regs, VM86_PROTECTED_TO_REAL);
+	emulate(regs);
 }
 
 /*
@@ -258,7 +258,7 @@ setup_ctx(void)
 
 	memset(c, 0, sizeof(*c));
 	c->eip = (unsigned long) switch_to_real_mode;
-	c->esp = (unsigned) stack_top - 4*4;
+	c->esp = (unsigned) stack_top;
 	c->eflags = 0x2; /* no interrupts, please */
 
 	/*

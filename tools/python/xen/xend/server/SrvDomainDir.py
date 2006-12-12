@@ -25,6 +25,8 @@ from xen.xend import XendDomain
 from xen.xend.XendDomainInfo import XendDomainInfo
 from xen.xend.Args import FormFn
 from xen.xend.XendError import XendError
+from xen.xend.XendLogging import log
+from xen.xend.XendConstants import DOM_STATE_RUNNING
 
 from xen.web.SrvDir import SrvDir
 from SrvDomain import SrvDomain
@@ -101,6 +103,35 @@ class SrvDomainDir(SrvDir):
             out.close()
             return val
 
+    def op_new(self, _, req):
+        """Define a new domain.
+        Expects the domain config in request parameter 'config' in SXP format.
+        """
+        ok = 0
+        errmsg = ''
+        try:
+            configstring = req.args.get('config')[0]
+            #print 'op_create>', 'config:', configstring
+            pin = sxp.Parser()
+            pin.input(configstring)
+            pin.input_eof()
+            config = pin.get_val()
+            ok = 1
+        except sxp.ParseError, ex:
+            errmsg = 'Invalid configuration ' + str(ex)
+        except Exception, ex:
+            print 'op_create> Exception in config', ex
+            traceback.print_exc()
+            errmsg = 'Configuration error ' + str(ex)
+        if not ok:
+            raise XendError(errmsg)
+        try:
+            self.xd.domain_new(config)
+        except Exception, ex:
+            print 'op_create> Exception creating domain:'
+            traceback.print_exc()
+            raise XendError("Error creating domain: " + str(ex))
+
     def op_restore(self, op, req):
         """Restore a domain from file.
 
@@ -159,16 +190,19 @@ class SrvDomainDir(SrvDir):
             if detail:
                 sxp.show(map(XendDomainInfo.sxpr, self.xd.list()), out=req)
             else:
-                sxp.show(self.xd.list_names(), out=req)
+                state = DOM_STATE_RUNNING
+                if 'state' in req.args and len(req.args['state']) > 0:
+                    state = req.args['state'][0]
+                log.debug("Listing domains in state " + str(state))
+                sxp.show(self.xd.list_names(state), out=req)
         else:
             domains = self.xd.list_sorted()
             req.write('<ul>')
             for d in domains:
                 req.write(
-                    '<li><a href="%s%s">Domain %s</a>: id = %s, memory = %d, '
-                    'ssidref = %d.'
+                    '<li><a href="%s%s">Domain %s</a>: id = %s, memory = %d'
                     % (url, d.getName(), d.getName(), d.getDomid(),
-                       d.getMemoryTarget(), d.getSsidref()))
+                       d.getMemoryTarget()))
                 req.write('</li>')
             req.write('</ul>')
 

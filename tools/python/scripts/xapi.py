@@ -29,17 +29,20 @@ from getpass import getpass
 MB = 1024 * 1024
 
 HOST_INFO_FORMAT = '%-20s: %-50s'
-VM_LIST_FORMAT = '%(name_label)-18s %(memory_actual)-5s %(vcpus_number)-5s'\
+VM_LIST_FORMAT = '%(name_label)-18s %(memory_actual)-5s %(VCPUs_number)-5s'\
                  ' %(power_state)-10s %(uuid)-36s'
 SR_LIST_FORMAT = '%(name_label)-18s %(uuid)-36s %(physical_size)-10s' \
                  '%(type)-10s'
 VDI_LIST_FORMAT = '%(name_label)-18s %(uuid)-36s %(virtual_size)-8s '\
                   '%(sector_size)-8s'
+VBD_LIST_FORMAT = '%(name_label)-18s %(uuid)-36s %(VDI)-8s '\
+                  '%(image)-8s'
 
 COMMANDS = {
     'host-info': ('', 'Get Xen Host Info'),
     'host-set-name': ('', 'Set host name'),
     'sr-list':   ('', 'List all SRs'),
+    'vbd-list':  ('', 'List all VBDs'),
     'vbd-create': ('<domname> <pycfg> [opts]',
                    'Create VBD attached to domname'),
     'vdi-create': ('<pycfg> [opts]', 'Create a VDI'),
@@ -165,6 +168,13 @@ def resolve_vm(server, session, vm_name):
     else:
         return vm_uuid[0]
 
+def resolve_vdi(server, session, vdi_name):
+    vdi_uuid = execute(server.VDI.get_by_name_label, session, vdi_name)
+    if not vdi_uuid:
+        return None
+    else:
+        return vdi_uuid[0]
+
 #
 # Actual commands
 #
@@ -216,16 +226,16 @@ def xapi_vm_list(*args):
     if not is_long:
         print VM_LIST_FORMAT % {'name_label':'Name',
                                 'memory_actual':'Mem',
-                                'vcpus_number': 'VCPUs',
+                                'VCPUs_number': 'VCPUs',
                                 'power_state': 'State',
                                 'uuid': 'UUID'}
 
     for uuid in vm_uuids:
         vm_info = execute(server.VM.get_record, session, uuid)
         if is_long:
-            vbds = vm_info['vbds']
-            vifs = vm_info['vifs']
-            vtpms = vm_info['vtpms']
+            vbds = vm_info['VBDs']
+            vifs = vm_info['VIFs']
+            vtpms = vm_info['VTPMs']
             vif_infos = []
             vbd_infos = []
             vtpm_infos = []
@@ -238,9 +248,9 @@ def xapi_vm_list(*args):
             for vtpm in vtpms:
                 vtpm_info = execute(server.VTPM.get_record, session, vtpm)
                 vtpm_infos.append(vtpm_info)
-            vm_info['vbds'] = vbd_infos
-            vm_info['vifs'] = vif_infos
-            vm_info['vtpms'] = vtpm_infos
+            vm_info['VBDs'] = vbd_infos
+            vm_info['VIFs'] = vif_infos
+            vm_info['VTPMs'] = vtpm_infos
             pprint(vm_info)
         else:
             print VM_LIST_FORMAT % _stringify(vm_info)
@@ -276,7 +286,7 @@ def xapi_vm_start(*args):
     server, session = _connect()
     vm_uuid = resolve_vm(server, session, args[0])
     print 'Starting VM %s (%s)' % (args[0], vm_uuid)
-    success = execute(server.VM.start, session, vm_uuid)
+    success = execute(server.VM.start, session, vm_uuid, False)
     print 'Done.'
 
 def xapi_vm_shutdown(*args):
@@ -333,6 +343,22 @@ def xapi_vif_create(*args):
     cfg['VM'] = vm_uuid
     vif_uuid = execute(server.VIF.create, session, cfg)
     print 'Done. (%s)' % vif_uuid
+
+def xapi_vbd_list(*args):
+    server, session = _connect()
+    domname = args[0]
+    
+    dom_uuid = resolve_vm(server, session, domname)
+    vbds = execute(server.VM.get_VBDs, session, dom_uuid)
+    
+    print VBD_LIST_FORMAT % {'name_label': 'VDI Label',
+                             'uuid' : 'UUID',
+                             'VDI': 'VDI',
+                             'image': 'Image'}
+    
+    for vbd in vbds:
+        vbd_struct = execute(server.VBD.get_record, session, vbd)
+        print VBD_LIST_FORMAT % vbd_struct
 
 def xapi_vdi_list(*args):
     server, session = _connect()
@@ -420,8 +446,6 @@ def xapi_vtpm_create(*args):
     print "Has driver type '%s'" % driver
     vtpm_rec = execute(server.VTPM.get_record, session, vtpm_uuid)
     print "Has vtpm record '%s'" % vtpm_rec
-    vm = execute(server.VTPM.get_VM, session, vtpm_uuid)
-    print "Has VM '%s'" % vm
 
 
 #

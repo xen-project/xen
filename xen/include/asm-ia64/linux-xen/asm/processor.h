@@ -28,8 +28,18 @@
  * Limits for PMC and PMD are set to less than maximum architected values
  * but should be sufficient for a while
  */
+#ifdef XEN
+/*
+ * These are increased in linux-2.6.16. Montecito requires 35PMDs.
+ * This ifdef will become unnecessary when this header file is
+ * upgraded to 2.6.16 or newer.
+ */
+#define IA64_NUM_PMC_REGS	64
+#define IA64_NUM_PMD_REGS	64
+#else
 #define IA64_NUM_PMC_REGS	32
 #define IA64_NUM_PMD_REGS	32
+#endif
 
 #define DEFAULT_MAP_BASE	__IA64_UL_CONST(0x2000000000000000)
 #define DEFAULT_TASK_SIZE	__IA64_UL_CONST(0xa000000000000000)

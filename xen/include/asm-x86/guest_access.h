@@ -34,7 +34,7 @@
 #define copy_to_guest_offset(hnd, off, ptr, nr) ({      \
     const typeof(ptr) _x = (hnd).p;                     \
     const typeof(ptr) _y = (ptr);                       \
-    shadow_mode_translate(current->domain) ?            \
+    is_hvm_vcpu(current) ?                              \
     copy_to_user_hvm(_x+(off), _y, sizeof(*_x)*(nr)) :  \
     copy_to_user(_x+(off), _y, sizeof(*_x)*(nr));       \
 })
@@ -46,7 +46,7 @@
 #define copy_from_guest_offset(ptr, hnd, off, nr) ({    \
     const typeof(ptr) _x = (hnd).p;                     \
     const typeof(ptr) _y = (ptr);                       \
-    shadow_mode_translate(current->domain) ?            \
+    is_hvm_vcpu(current) ?                              \
     copy_from_user_hvm(_y, _x+(off), sizeof(*_x)*(nr)) :\
     copy_from_user(_y, _x+(off), sizeof(*_x)*(nr));     \
 })
@@ -55,7 +55,7 @@
 #define copy_field_to_guest(hnd, ptr, field) ({         \
     const typeof(&(ptr)->field) _x = &(hnd).p->field;   \
     const typeof(&(ptr)->field) _y = &(ptr)->field;     \
-    shadow_mode_translate(current->domain) ?            \
+    is_hvm_vcpu(current) ?                              \
     copy_to_user_hvm(_x, _y, sizeof(*_x)) :             \
     copy_to_user(_x, _y, sizeof(*_x));                  \
 })
@@ -64,7 +64,7 @@
 #define copy_field_from_guest(ptr, hnd, field) ({       \
     const typeof(&(ptr)->field) _x = &(hnd).p->field;   \
     const typeof(&(ptr)->field) _y = &(ptr)->field;     \
-    shadow_mode_translate(current->domain) ?            \
+    is_hvm_vcpu(current) ?                              \
     copy_from_user_hvm(_y, _x, sizeof(*_x)) :           \
     copy_from_user(_y, _x, sizeof(*_x));                \
 })
@@ -80,7 +80,7 @@
 #define __copy_to_guest_offset(hnd, off, ptr, nr) ({    \
     const typeof(ptr) _x = (hnd).p;                     \
     const typeof(ptr) _y = (ptr);                       \
-    shadow_mode_translate(current->domain) ?            \
+    is_hvm_vcpu(current) ?                              \
     copy_to_user_hvm(_x+(off), _y, sizeof(*_x)*(nr)) :  \
     __copy_to_user(_x+(off), _y, sizeof(*_x)*(nr));     \
 })
@@ -88,7 +88,7 @@
 #define __copy_from_guest_offset(ptr, hnd, off, nr) ({  \
     const typeof(ptr) _x = (hnd).p;                     \
     const typeof(ptr) _y = (ptr);                       \
-    shadow_mode_translate(current->domain) ?            \
+    is_hvm_vcpu(current) ?                              \
     copy_from_user_hvm(_y, _x+(off),sizeof(*_x)*(nr)) : \
     __copy_from_user(_y, _x+(off), sizeof(*_x)*(nr));   \
 })
@@ -96,7 +96,7 @@
 #define __copy_field_to_guest(hnd, ptr, field) ({       \
     const typeof(&(ptr)->field) _x = &(hnd).p->field;   \
     const typeof(&(ptr)->field) _y = &(ptr)->field;     \
-    shadow_mode_translate(current->domain) ?            \
+    is_hvm_vcpu(current) ?                              \
     copy_to_user_hvm(_x, _y, sizeof(*_x)) :             \
     __copy_to_user(_x, _y, sizeof(*_x));                \
 })
@@ -104,7 +104,7 @@
 #define __copy_field_from_guest(ptr, hnd, field) ({     \
     const typeof(&(ptr)->field) _x = &(hnd).p->field;   \
     const typeof(&(ptr)->field) _y = &(ptr)->field;     \
-    shadow_mode_translate(current->domain) ?            \
+    is_hvm_vcpu(current) ?                              \
     copy_from_user_hvm(_x, _y, sizeof(*_x)) :           \
     __copy_from_user(_y, _x, sizeof(*_x));              \
 })

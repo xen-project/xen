@@ -93,7 +93,7 @@ struct xen_domctl_getdomaininfo {
     uint32_t flags;              /* XEN_DOMINF_* */
     uint64_t tot_pages;
     uint64_t max_pages;
-    uint64_t shared_info_frame;  /* MFN of shared_info struct */
+    uint64_t shared_info_frame;  /* GMFN of shared_info struct */
     uint64_t cpu_time;
     uint32_t nr_online_vcpus;    /* Number of VCPUs currently online. */
     uint32_t max_vcpu_id;        /* Maximum VCPUID in use by this domain. */

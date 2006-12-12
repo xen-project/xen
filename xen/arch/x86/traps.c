@@ -45,6 +45,7 @@
 #include <xen/iocap.h>
 #include <xen/nmi.h>
 #include <xen/version.h>
+#include <xen/kexec.h>
 #include <asm/shadow.h>
 #include <asm/system.h>
 #include <asm/io.h>
@@ -934,6 +935,37 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
     return 0;
 }
 
+/*
+ * Early handler to deal with spurious page faults. For example, consider a 
+ * routine that uses a mapping immediately after installing it (making it 
+ * present). The CPU may speculatively execute the memory access before 
+ * executing the PTE write. The instruction will then be marked to cause a 
+ * page fault when it is retired, despite the fact that the PTE is present and 
+ * correct at that point in time.
+ */
+asmlinkage int do_early_page_fault(struct cpu_user_regs *regs)
+{
+    static int stuck;
+    static unsigned long prev_eip, prev_cr2;
+    unsigned long cr2 = read_cr2();
+
+    BUG_ON(smp_processor_id() != 0);
+
+    if ( (regs->eip != prev_eip) || (cr2 != prev_cr2) )
+    {
+        prev_eip = regs->eip;
+        prev_cr2 = cr2;
+        stuck    = 0;
+        return EXCRET_not_a_fault;
+    }
+
+    if ( stuck++ == 1000 )
+        panic("Early fatal page fault at %04x:%p (cr2=%p, ec=%04x)\n", 
+              regs->cs, _p(regs->eip), _p(cr2), regs->error_code);
+
+    return EXCRET_not_a_fault;
+}
+
 long do_fpu_taskswitch(int set)
 {
     struct vcpu *v = current;
@@ -1633,6 +1665,7 @@ static void unknown_nmi_error(unsigned char reason)
         printk("Uhhuh. NMI received for unknown reason %02x.\n", reason);
         printk("Dazed and confused, but trying to continue\n");
         printk("Do you have a strange power saving mode enabled?\n");
+        machine_crash_kexec();
     }
 }
 

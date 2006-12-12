@@ -424,8 +424,7 @@ int send_responses(struct td_state *s, int res, int idx, void *private)
 	}
 	
 	if (res != 0) {
-		DPRINTF("*** request error %d! \n", res);
-		return 0;
+	        blkif->pending_list[idx].status = BLKIF_RSP_ERROR;
 	}
 
 	blkif->pending_list[idx].count--;

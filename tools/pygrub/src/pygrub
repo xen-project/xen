@@ -514,14 +514,16 @@ if __name__ == "__main__":
     fs = fsimage.open(file, offset)
 
     kernel = fs.open_file(img.kernel[1],).read()
-    (tfd, fn) = tempfile.mkstemp(prefix="vmlinuz.", dir="/var/lib/xen")
+    (tfd, fn) = tempfile.mkstemp(prefix="boot_kernel.",
+        dir="/var/run/xend/boot")
     os.write(tfd, kernel)
     os.close(tfd)
     sxp = "linux (kernel %s)" %(fn,)
 
     if img.initrd:
         initrd = fs.open_file(img.initrd[1],).read()
-        (tfd, fn) = tempfile.mkstemp(prefix="initrd.", dir="/var/lib/xen")
+        (tfd, fn) = tempfile.mkstemp(prefix="boot_ramdisk.",
+            dir="/var/run/xend/boot")
         os.write(tfd, initrd)
         os.close(tfd)
         sxp += "(ramdisk %s)" %(fn,)

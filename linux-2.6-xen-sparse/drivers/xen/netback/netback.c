@@ -183,7 +183,7 @@ static struct sk_buff *netbk_copy_skb(struct sk_buff *skb)
 
 	BUG_ON(skb_shinfo(skb)->frag_list != NULL);
 
-	nskb = alloc_skb(SKB_MAX_HEAD(0), GFP_ATOMIC);
+	nskb = alloc_skb(SKB_MAX_HEAD(0), GFP_ATOMIC | __GFP_NOWARN);
 	if (unlikely(!nskb))
 		goto err;
 
@@ -1224,7 +1224,8 @@ static void net_tx_action(unsigned long unused)
 			    ret < MAX_SKB_FRAGS) ?
 			PKT_PROT_LEN : txreq.size;
 
-		skb = alloc_skb(data_len + 16 + NET_IP_ALIGN, GFP_ATOMIC);
+		skb = alloc_skb(data_len + 16 + NET_IP_ALIGN,
+				GFP_ATOMIC | __GFP_NOWARN);
 		if (unlikely(skb == NULL)) {
 			DPRINTK("Can't allocate a skb in start_xmit.\n");
 			netbk_tx_err(netif, &txreq, i);
@@ -1506,13 +1507,12 @@ static int __init netback_init(void)
 	netif_xenbus_init();
 
 #ifdef NETBE_DEBUG_INTERRUPT
-	(void)bind_virq_to_irqhandler(
-		VIRQ_DEBUG,
-		0,
-		netif_be_dbg,
-		SA_SHIRQ, 
-		"net-be-dbg",
-		&netif_be_dbg);
+	(void)bind_virq_to_irqhandler(VIRQ_DEBUG,
+				      0,
+				      netif_be_dbg,
+				      SA_SHIRQ, 
+				      "net-be-dbg",
+				      &netif_be_dbg);
 #endif
 
 	return 0;

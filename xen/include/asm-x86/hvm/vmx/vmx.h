@@ -272,13 +272,6 @@ static inline int vmx_lme_is_set(struct vcpu *v)
     return efer & EFER_LME;
 }
 
-/* Works only for vcpu == current */
-static inline void vmx_update_host_cr3(struct vcpu *v)
-{
-    ASSERT(v == current);
-    __vmwrite(HOST_CR3, v->arch.cr3);
-}
-
 static inline int vmx_pgbit_test(struct vcpu *v)
 {
     unsigned long cr0 = v->arch.hvm_vmx.cpu_shadow_cr0;

@@ -1,0 +1,27 @@
+#!/bin/sh
+# CHECK-BUILD CHECK-INSTALL
+
+if [ ! "$XENFB_TOOLS" = "y" ]
+then
+    echo -n "unused, "
+    exit 0
+fi
+
+RC=0
+
+LIBVNCSERVER_CONFIG="$(which libvncserver-config)"
+
+if test -z ${LIBVNCSERVER_CONFIG}; then 
+    RC=1
+else
+    ${LIBVNCSERVER_CONFIG} --libs 2>&1 > /dev/null
+    RC=$?
+fi
+
+if test $RC -ne 0; then
+    echo "FAILED"
+	echo " *** libvncserver-config is missing. "
+    echo " *** Please install libvncserver."
+fi
+
+exit $RC

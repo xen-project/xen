@@ -29,20 +29,46 @@ loadelfsymtab(
  */
 #if defined(__ia64__)
 #define ELFCLASS   ELFCLASS64
+#define ELFCLASS_DESC "64-bit"
+
 #define ELFDATA    ELFDATA2LSB
+#define ELFDATA_DESC "Little-Endian"
+
 #define ELFMACHINE EM_IA_64
+#define ELFMACHINE_DESC "ia64"
+
+
 #elif defined(__i386__)
 #define ELFCLASS   ELFCLASS32
+#define ELFCLASS_DESC "32-bit"
+
 #define ELFDATA    ELFDATA2LSB
+#define ELFDATA_DESC "Little-Endian"
+
 #define ELFMACHINE EM_386
+#define ELFMACHINE_DESC "i386"
+
+
 #elif defined(__x86_64__)
 #define ELFCLASS   ELFCLASS64
+#define ELFCLASS_DESC "64-bit"
+
 #define ELFDATA    ELFDATA2LSB
+#define ELFDATA_DESC "Little-Endian"
+
 #define ELFMACHINE EM_X86_64
+#define ELFMACHINE_DESC "x86_64"
+
+
 #elif defined(__powerpc__)
 #define ELFCLASS   ELFCLASS64
+#define ELFCLASS_DESC "64-bit"
+
 #define ELFDATA    ELFDATA2MSB
+#define ELFDATA_DESC "Big-Endian"
+
 #define ELFMACHINE EM_PPC64
+#define ELFMACHINE_DESC "ppc64"
 #endif
 
 int probe_elf(const char *image,
@@ -231,7 +257,8 @@ unsigned long long xen_elfnote_numeric(struct domain_setup_info *dsi,
         *defined = 1;
         return *(uint64_t*)ELFNOTE_DESC(note);
     default:
-        ERROR("elfnotes: unknown data size %#x for numeric type note %#x\n",
+        xc_set_error(XC_INVALID_KERNEL,
+                     "elfnotes: unknown data size %#x for numeric type note %#x\n",
               note->descsz, type);
         return 0;
     }
@@ -250,35 +277,59 @@ static int parseelfimage(const char *image,
 
     if ( !IS_ELF(*ehdr) )
     {
-        ERROR("Kernel image does not have an ELF header.");
+        xc_set_error(XC_INVALID_KERNEL,
+                     "Kernel image does not have an ELF header.");
         return -EINVAL;
     }
 
-    if ( (ehdr->e_ident[EI_CLASS] != ELFCLASS) ||
-         (ehdr->e_machine != ELFMACHINE) ||
-         (ehdr->e_ident[EI_DATA] != ELFDATA) ||
-         (ehdr->e_type != ET_EXEC) )
+    if (ehdr->e_machine != ELFMACHINE)
     {
-        ERROR("Kernel not a Xen-compatible Elf image.");
+        xc_set_error(XC_INVALID_KERNEL,
+                     "Kernel ELF architecture '%d' does not match Xen architecture '%d' (%s)",
+                     ehdr->e_machine, ELFMACHINE, ELFMACHINE_DESC);
+        return -EINVAL;
+    }
+    if (ehdr->e_ident[EI_CLASS] != ELFCLASS)
+    {
+        xc_set_error(XC_INVALID_KERNEL,
+                     "Kernel ELF wordsize '%d' does not match Xen wordsize '%d' (%s)",
+                     ehdr->e_ident[EI_CLASS], ELFCLASS, ELFCLASS_DESC);
+        return -EINVAL;
+    }
+    if (ehdr->e_ident[EI_DATA] != ELFDATA)
+    {
+        xc_set_error(XC_INVALID_KERNEL,
+                     "Kernel ELF endianness '%d' does not match Xen endianness '%d' (%s)",
+                     ehdr->e_ident[EI_DATA], ELFDATA, ELFDATA_DESC);
+        return -EINVAL;
+    }
+    if (ehdr->e_type != ET_EXEC)
+    {
+        xc_set_error(XC_INVALID_KERNEL,
+                     "Kernel ELF type '%d' does not match Xen type '%d'",
+                     ehdr->e_type, ET_EXEC);
         return -EINVAL;
     }
 
     if ( (ehdr->e_phoff + (ehdr->e_phnum*ehdr->e_phentsize)) > image_len )
     {
-        ERROR("ELF program headers extend beyond end of image.");
+        xc_set_error(XC_INVALID_KERNEL,
+                     "ELF program headers extend beyond end of image.");
         return -EINVAL;
     }
 
     if ( (ehdr->e_shoff + (ehdr->e_shnum*ehdr->e_shentsize)) > image_len )
     {
-        ERROR("ELF section headers extend beyond end of image.");
+        xc_set_error(XC_INVALID_KERNEL,
+                     "ELF section headers extend beyond end of image.");
         return -EINVAL;
     }
 
     /* Find the section-header strings table. */
     if ( ehdr->e_shstrndx == SHN_UNDEF )
     {
-        ERROR("ELF image has no section-header strings table (shstrtab).");
+        xc_set_error(XC_INVALID_KERNEL,
+                     "ELF image has no section-header strings table (shstrtab).");
         return -EINVAL;
     }
     shdr = (Elf_Shdr *)(image + ehdr->e_shoff +
@@ -325,22 +376,25 @@ static int parseelfimage(const char *image,
         if ( ( loader == NULL || strncmp(loader, "generic", 7) ) &&
              ( guest_os == NULL || strncmp(guest_os, "linux", 5) ) )
         {
-            ERROR("Will only load images built for the generic loader "
-                  "or Linux images");
+            xc_set_error(XC_INVALID_KERNEL,
+                         "Will only load images built for the generic loader "
+                         "or Linux images");
             return -EINVAL;
         }
 
         if ( xen_version == NULL || strncmp(xen_version, "xen-3.0", 7) )
         {
-            ERROR("Will only load images built for Xen v3.0");
+            xc_set_error(XC_INVALID_KERNEL,
+                         "Will only load images built for Xen v3.0");
             return -EINVAL;
         }
     }
     else
     {
 #if defined(__x86_64__) || defined(__i386__)
-        ERROR("Not a Xen-ELF image: "
-              "No ELF notes or '__xen_guest' section found.");
+        xc_set_error(XC_INVALID_KERNEL,
+                     "Not a Xen-ELF image: "
+                     "No ELF notes or '__xen_guest' section found.");
         return -EINVAL;
 #endif
     }
@@ -396,8 +450,9 @@ static int parseelfimage(const char *image,
 
     if ( elf_pa_off_defined && !virt_base_defined )
     {
-        ERROR("Neither ELF_PADDR_OFFSET nor VIRT_BASE found in ELF "
-              " notes or __xen_guest section.");
+        xc_set_error(XC_INVALID_KERNEL,
+                     "Neither ELF_PADDR_OFFSET nor VIRT_BASE found in ELF "
+                     " notes or __xen_guest section.");
         return -EINVAL;
     }
 
@@ -409,7 +464,8 @@ static int parseelfimage(const char *image,
         vaddr = phdr->p_paddr - dsi->elf_paddr_offset + dsi->v_start;
         if ( (vaddr + phdr->p_memsz) < vaddr )
         {
-            ERROR("ELF program header %d is too large.", h);
+            xc_set_error(XC_INVALID_KERNEL,
+                         "ELF program header %d is too large.", h);
             return -EINVAL;
         }
 
@@ -431,7 +487,8 @@ static int parseelfimage(const char *image,
          (dsi->v_kernentry > kernend) ||
          (dsi->v_start > kernstart) )
     {
-        ERROR("ELF start or entries are out of bounds.");
+        xc_set_error(XC_INVALID_KERNEL,
+                     "ELF start or entries are out of bounds.");
         return -EINVAL;
     }
 

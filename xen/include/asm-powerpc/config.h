@@ -72,7 +72,7 @@ extern char __bss_start[];
 
 #define supervisor_mode_kernel (0)
 
-#define MAX_DMADOM_PFN (~0UL)
+#define CONFIG_DMA_BITSIZE 64
 
 #include <asm/powerpc64/config.h>
 

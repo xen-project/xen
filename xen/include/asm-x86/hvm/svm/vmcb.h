@@ -311,33 +311,9 @@ enum {
     SVM_CPU_STATE_ASSIST_ENABLED,
 };  
 
-/* 
- * Attribute for segment selector. This is a copy of bit 40:47 & 52:55 of the
- * segment descriptor. 
- */
-typedef union
-{
-    u16 bytes;
-    struct
-    {
-        u16 type:4;    /* 0;  Bit 40-43 */
-        u16 s:   1;    /* 4;  Bit 44 */
-        u16 dpl: 2;    /* 5;  Bit 45-46 */
-        u16 p:   1;    /* 7;  Bit 47 */
-        u16 avl: 1;    /* 8;  Bit 52 */
-        u16 l:   1;    /* 9;  Bit 53 */
-        u16 db:  1;    /* 10; Bit 54 */
-        u16 g:   1;    /* 11; Bit 55 */
-    } fields;
-} __attribute__ ((packed)) segment_attributes_t;
-
-typedef struct 
-{
-    u16        sel;
-    segment_attributes_t attributes;
-    u32        limit;
-    u64        base;
-} __attribute__ ((packed)) segment_selector_t;
+/* Definitions of segment state are borrowed by the generic HVM code. */
+typedef segment_attributes_t svm_segment_attributes_t;
+typedef segment_register_t svm_segment_register_t;
 
 typedef union 
 {
@@ -426,16 +402,16 @@ struct vmcb_struct {
     u64 h_cr3;                  /* offset 0xB0 */
     u64 res09[105];             /* offset 0xB8 pad to save area */
 
-    segment_selector_t es;      /* offset 1024 */
-    segment_selector_t cs;
-    segment_selector_t ss;
-    segment_selector_t ds;
-    segment_selector_t fs;
-    segment_selector_t gs;
-    segment_selector_t gdtr;
-    segment_selector_t ldtr;
-    segment_selector_t idtr;
-    segment_selector_t tr;
+    svm_segment_register_t es;      /* offset 1024 */
+    svm_segment_register_t cs;
+    svm_segment_register_t ss;
+    svm_segment_register_t ds;
+    svm_segment_register_t fs;
+    svm_segment_register_t gs;
+    svm_segment_register_t gdtr;
+    svm_segment_register_t ldtr;
+    svm_segment_register_t idtr;
+    svm_segment_register_t tr;
     u64 res10[5];
     u8 res11[3];
     u8 cpl;

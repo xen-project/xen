@@ -497,7 +497,7 @@ xen_ia64_privcmd_entry_mmap(struct vm_area_struct* vma,
 			    unsigned long addr,
 			    struct xen_ia64_privcmd_range* privcmd_range,
 			    int i,
-			    unsigned long mfn,
+			    unsigned long gmfn,
 			    pgprot_t prot,
 			    domid_t domid)
 {
@@ -506,7 +506,7 @@ xen_ia64_privcmd_entry_mmap(struct vm_area_struct* vma,
 	unsigned long gpfn;
 	unsigned long flags;
 
-	if ((addr & ~PAGE_MASK) != 0 || mfn == INVALID_MFN) {
+	if ((addr & ~PAGE_MASK) != 0 || gmfn == INVALID_MFN) {
 		error = -EINVAL;
 		goto out;
 	}
@@ -521,7 +521,7 @@ xen_ia64_privcmd_entry_mmap(struct vm_area_struct* vma,
 	if (pgprot_val(prot) == PROT_READ) {
 		flags = ASSIGN_readonly;
 	}
-	error = HYPERVISOR_add_physmap(gpfn, mfn, flags, domid);
+	error = HYPERVISOR_add_physmap_with_gmfn(gpfn, gmfn, flags, domid);
 	if (error != 0) {
 		goto out;
 	}
@@ -732,7 +732,7 @@ out_enomem0:
 int
 direct_remap_pfn_range(struct vm_area_struct *vma,
 		       unsigned long address,	// process virtual address
-		       unsigned long mfn,	// mfn, mfn + 1, ... mfn + size/PAGE_SIZE
+		       unsigned long gmfn,	// gmfn, gmfn + 1, ... gmfn + size/PAGE_SIZE
 		       unsigned long size,
 		       pgprot_t prot,
 		       domid_t  domid)		// target domain
@@ -755,13 +755,13 @@ direct_remap_pfn_range(struct vm_area_struct *vma,
 
 	i = (address - vma->vm_start) >> PAGE_SHIFT;
 	for (offset = 0; offset < size; offset += PAGE_SIZE) {
-		error = xen_ia64_privcmd_entry_mmap(vma, (address + offset) & PAGE_MASK, privcmd_range, entry_offset + i, mfn, prot, domid);
+		error = xen_ia64_privcmd_entry_mmap(vma, (address + offset) & PAGE_MASK, privcmd_range, entry_offset + i, gmfn, prot, domid);
 		if (error != 0) {
 			break;
 		}
 
 		i++;
-		mfn++;
+		gmfn++;
         }
 
 	return error;
@@ -1050,3 +1050,55 @@ EXPORT_SYMBOL_GPL(p2m_convert_max_pfn);
 EXPORT_SYMBOL_GPL(p2m_pte);
 EXPORT_SYMBOL_GPL(p2m_phystomach);
 #endif
+
+///////////////////////////////////////////////////////////////////////////
+// for xenoprof
+
+struct resource*
+xen_ia64_allocate_resource(unsigned long size)
+{
+	struct resource* res;
+	int error;
+	
+	res = kmalloc(sizeof(*res), GFP_KERNEL);
+	if (res == NULL)
+		return ERR_PTR(-ENOMEM);
+
+	res->name = "Xen";
+	res->flags = IORESOURCE_MEM;
+	error = allocate_resource(&iomem_resource, res, PAGE_ALIGN(size),
+	                          privcmd_resource_min, privcmd_resource_max,
+	                          IA64_GRANULE_SIZE, NULL, NULL);
+	if (error) {
+		kfree(res);
+		return ERR_PTR(error);
+	}
+	return res;
+}
+EXPORT_SYMBOL_GPL(xen_ia64_allocate_resource);
+
+void
+xen_ia64_release_resource(struct resource* res)
+{
+	release_resource(res);
+	kfree(res);
+}
+EXPORT_SYMBOL_GPL(xen_ia64_release_resource);
+
+void
+xen_ia64_unmap_resource(struct resource* res)
+{
+	unsigned long gpfn = res->start >> PAGE_SHIFT;
+	unsigned long nr_pages = (res->end - res->start) >> PAGE_SHIFT;
+	unsigned long i;
+	
+	for (i = 0; i < nr_pages; i++) {
+		int error = HYPERVISOR_zap_physmap(gpfn + i, 0);
+		if (error)
+			printk(KERN_ERR
+			       "%s:%d zap_phsymap failed %d gpfn %lx\n",
+			       __func__, __LINE__, error, gpfn + i);
+	}
+	xen_ia64_release_resource(res);
+}
+EXPORT_SYMBOL_GPL(xen_ia64_unmap_resource);

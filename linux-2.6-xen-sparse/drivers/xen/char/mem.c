@@ -147,7 +147,7 @@ static inline int uncached_access(struct file *file)
 	return 0;
 }
 
-static int mmap_mem(struct file * file, struct vm_area_struct * vma)
+static int xen_mmap_mem(struct file * file, struct vm_area_struct * vma)
 {
 	size_t size = vma->vm_end - vma->vm_start;
 
@@ -200,6 +200,6 @@ struct file_operations mem_fops = {
 	.llseek		= memory_lseek,
 	.read		= read_mem,
 	.write		= write_mem,
-	.mmap		= mmap_mem,
+	.mmap		= xen_mmap_mem,
 	.open		= open_mem,
 };

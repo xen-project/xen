@@ -29,13 +29,13 @@ import xmlrpclib
 from xen.xend import sxp
 from xen.xend import PrettyPrint
 import xen.xend.XendClient
-from xen.xend.XendClient import server
 from xen.xend.XendBootloader import bootloader
 from xen.util import blkif
 from xen.util import security
 
 from xen.xm.opts import *
 
+from main import server
 import console
 
 
@@ -284,6 +284,18 @@ gopts.var('usbport', val='PATH',
           use="""Add a physical USB port to a domain, as specified by the path
           to that port.  This option may be repeated to add more than one port.""")
 
+gopts.var('vfb', val="type={vnc,sdl},vncunused=1,vncdisplay=N,vnclisten=ADDR,display=DISPLAY,xauthority=XAUTHORITY",
+          fn=append_value, default=[],
+          use="""Make the domain a framebuffer backend.
+          The backend type should be either sdl or vnc.
+          For type=vnc, connect an external vncviewer.  The server will listen
+          on ADDR (default 127.0.0.1) on port N+5900.  N defaults to the
+          domain id.  If vncunused=1, the server will try to find an arbitrary
+          unused port above 5900.
+          For type=sdl, a viewer will be started automatically using the
+          given DISPLAY and XAUTHORITY, which default to the current user's
+          ones.""")
+
 gopts.var('vif', val="type=TYPE,mac=MAC,bridge=BRIDGE,ip=IPADDR,script=SCRIPT,backend=DOM,vifname=NAME",
           fn=append_value, default=[],
           use="""Add a network interface with the given MAC address and bridge.
@@ -512,8 +524,8 @@ def configure_image(vals):
         config_image.append(['args', vals.extra])
 
     if vals.builder == 'hvm':
-        configure_hvm(config_image, vals)
-        
+        configure_hvm(config_image, vals) 
+       
     return config_image
     
 def configure_disks(config_devs, vals):
@@ -564,6 +576,23 @@ def configure_usb(config_devs, vals):
         config_usb = ['usbport', ['path', path]]
         config_devs.append(['device', config_usb])
 
+def configure_vfbs(config_devs, vals):
+    for f in vals.vfb:
+        d = comma_sep_kv_to_dict(f)
+        config = ['vfb']
+        if not d.has_key("type"):
+            d['type'] = 'sdl'
+        for (k,v) in d.iteritems():
+            if not k in [ 'vnclisten', 'vncunused', 'vncdisplay', 'display',
+                          'xauthority', 'type' ]:
+                err("configuration option %s unknown to vfbs" % k)
+            config.append([k,v])
+        if not d.has_key("display") and os.environ.has_key("DISPLAY"):
+            config.append(["display", os.environ['DISPLAY']])
+        if not d.has_key("xauthority"):
+            config.append(["xauthority", get_xauthority()])
+        config_devs.append(['device', ['vkbd']])
+        config_devs.append(['device', config])
 
 def configure_security(config, vals):
     """Create the config for ACM security labels.
@@ -675,8 +704,10 @@ def configure_hvm(config_image, vals):
     config_image.append(['vncpasswd', vals.vncpasswd])
 
 def run_bootloader(vals, config_image):
+    if not os.access(vals.bootloader, os.F_OK):
+        err("Bootloader '%s' does not exist" % vals.bootloader)
     if not os.access(vals.bootloader, os.X_OK):
-        err("Bootloader isn't executable")
+        err("Bootloader '%s' isn't executable" % vals.bootloader)
     if len(vals.disk) < 1:
         err("No disks configured and boot loader requested")
     (uname, dev, mode, backend) = vals.disk[0]
@@ -742,6 +773,7 @@ def make_config(vals):
     configure_vifs(config_devs, vals)
     configure_usb(config_devs, vals)
     configure_vtpm(config_devs, vals)
+    configure_vfbs(config_devs, vals)
     configure_security(config, vals)
     config += config_devs
 

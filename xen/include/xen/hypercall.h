@@ -102,4 +102,10 @@ do_hvm_op(
     unsigned long op,
     XEN_GUEST_HANDLE(void) arg);
 
+extern long
+do_kexec_op(
+    unsigned long op,
+    int arg1,
+    XEN_GUEST_HANDLE(void) arg);
+
 #endif /* __XEN_HYPERCALL_H__ */

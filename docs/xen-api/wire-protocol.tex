@@ -21,9 +21,9 @@ primitive XML-RPC types.
 In our API Reference we specify the signatures of API functions in the following
 style:
 \begin{verbatim}
-    (ref_vm Set)   Host.ListAllVMs()
+    (ref_vm Set)   VM.get_all()
 \end{verbatim}
-This specifies that the function with name {\tt Host.ListAllVMs} takes
+This specifies that the function with name {\tt VM.get\_all} takes
 no parameters and returns a Set of {\tt ref\_vm}s.
 These types are mapped onto XML-RPC types in a straight-forward manner:
 \begin{itemize}
@@ -105,8 +105,8 @@ In the case where {\tt Status} is set to {\tt Failure} then
 the struct contains a second element named {\tt ErrorDescription}:
 \begin{itemize}
 \item The element of the struct named {\tt ErrorDescription} contains
-an array of string values. The first element of the array represents an error code;
-the remainder of the array represents error parameters relating to that code.
+an array of string values. The first element of the array is an XML-RPC 32-bit {\tt i4} and represents an error code;
+the remainder of the array are strings representing error parameters relating to that code.
 \end{itemize}
 
 For example, an XML-RPC return value from the {\tt Host.ListAllVMs} function above
@@ -161,19 +161,19 @@ A session can be terminated with the {\tt Session.Logout} function:
 
 \subsection{Synchronous and Asynchronous invocation}
 
-Each method call (apart from those on ``Session'' and ``Task'' objects)
+Each method call (apart from methods on ``Session'' and ``Task'' objects 
+and ``getters'' and ``setters'' derived from fields)
 can be made either synchronously or asynchronously.
 A synchronous RPC call blocks until the
 return value is received; the return value of a synchronous RPC call is
 exactly as specified in Section~\ref{synchronous-result}.
 
-Each of the methods specified in the API Reference is synchronous.
-However, although not listed explicitly in this document, each
-method call has an asynchronous analogue in the {\tt Async}
-namespace. For example, synchronous call {\tt VM.Install(...)}
+Only synchronous API calls are listed explicitly in this document. 
+All asynchronous versions are in the special {\tt Async} namespace.
+For example, synchronous call {\tt VM.clone(...)}
 (described in Chapter~\ref{api-reference})
 has an asynchronous counterpart, {\tt
-Async.VM.Install(...)}, that is non-blocking.
+Async.VM.clone(...)}, that is non-blocking.
 
 Instead of returning its result directly, an asynchronous RPC call
 returns a {\tt task-id}; this identifier is subsequently used
@@ -186,39 +186,14 @@ is wrapped in an XML-RPC struct with a {\tt Status}, {\tt ErrorDescription} and
 The {\tt task-id} is provided in the {\tt Value} field if {\tt Status} is set to
 {\tt Success}.
 
-Two special RPC calls are provided to poll the status of
-asynchronous calls:
+The RPC call
 \begin{verbatim}
-    Array<task_id>  Async.Task.GetAllTasks (session_id s)
-    task_status     Async.Task.GetStatus   (session_id s, task_id t)
-\end{verbatim}
-
-{\tt Async.Task.GetAllTasks} returns a set of the currently
-executing asynchronous tasks belong to the current user\footnote{
-%
-The current user is determined by the username that was provided
-to {\tt Session.Login}.
-%
-}.
-
-{\tt Async.Task.GetStatus} returns a {\tt task\_status} result.
-This is an XML-RPC struct with three elements:
-\begin{itemize}
-  \item The first element is named {\tt Progress} and contains
-an {\tt Integer} between 0 and 100 representing the estimated percentage of
-the task currently completed.
-  \item The second element is named {\tt ETA} and contains a {\tt DateTime} 
-representing the estimated time the task will be complete.
-  \item The third element is named {\tt Result}. If {\tt Progress}
-is not 100 then {\tt Result} contains the empty string. If {\tt Progress}
-{\em is\/} set to 100, then {\tt Result} contains the function's return
-result (as specified in Section~\ref{synchronous-result})\footnote{
-%
-Recall that this itself is a struct potentially containing status, errorcode,
-value fields etc.
-%
-}.
-\end{itemize}
+    (ref_task Set)   Task.get_all(session_id s)
+\end{verbatim} 
+returns a set of all task IDs known to the system. The status (including any
+returned result and error codes) of these tasks
+can then be queried by accessing the fields of the Task object in the usual way. 
+Note that, in order to get a consistent snapshot of a task's state, it is advisable to call the ``get\_record'' function.
 
 \section{Example interactive session}
 
@@ -267,7 +242,8 @@ Next, the user may acquire a list of all the VMs known to the host: (Note the ca
 \begin{verbatim}
 >>> all_vms = xen.VM.do_list(session)['Value']
 >>> all_vms
-['b7b92d9e-d442-4710-92a5-ab039fd7d89b', '23e1e837-abbf-4675-b077-d4007989b0cc', '2045dbc0-0734-4eea-9cb2-b8218c6b5bf2', '3202ae18-a046-4c32-9fda-e32e9631866e']
+['b7b92d9e-d442-4710-92a5-ab039fd7d89b', '23e1e837-abbf-4675-b077-d4007989b0cc',
+  '2045dbc0-0734-4eea-9cb2-b8218c6b5bf2', '3202ae18-a046-4c32-9fda-e32e9631866e']
 \end{verbatim}
 
 Note the VM references are internally UUIDs. Once a reference to a VM has been acquired a lifecycle operation may be invoked:

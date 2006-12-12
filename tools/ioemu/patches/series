@@ -53,3 +53,19 @@ serial-port-rate-limit
 hypervisor-rtc
 ide-cd-dma
 vnc-password
+ne2000-bounds-checks
+xenstore-device-info-functions
+tpm-tis-device
+qemu-serial-fixes
+vnc-japan-keymap
+rtl8139-bound-chaining
+fix-interrupt-routing
+nodelay-serial-over-tcp
+remove-pci-bridge-setup
+limit-fdc-sector-size-to-16K
+usb-uhci-buffer-size
+vnc-monitor-shift-key-processing
+ide-error-reporting
+vnc-numpad-handling
+xen-mapcache -p3
+usb-mouse-tablet-status-check -p3

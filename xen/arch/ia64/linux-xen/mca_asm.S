@@ -24,6 +24,9 @@
 #include <asm/processor.h>
 #include <asm/mca_asm.h>
 #include <asm/mca.h>
+#ifdef XEN
+#include <asm/vhpt.h>
+#endif
 
 /*
  * When we get a machine check, the kernel stack pointer is no longer
@@ -50,8 +53,7 @@
  */
 #ifdef XEN
 #define SAL_TO_OS_MCA_HANDOFF_STATE_SAVE(_tmp)		\
-	movl	_tmp=THIS_CPU(ia64_sal_to_os_handoff_state_addr);;	\
-	tpa	_tmp=_tmp;;				\
+	GET_THIS_PADDR(_tmp, ia64_sal_to_os_handoff_state_addr);;	\
 	ld8	_tmp=[_tmp];;				\
 	st8	[_tmp]=r1,0x08;;			\
 	st8	[_tmp]=r8,0x08;;			\
@@ -72,6 +74,7 @@
 	st8	[_tmp]=r12,0x08;;			\
 	st8	[_tmp]=r17,0x08;;			\
 	st8	[_tmp]=r18,0x08
+#endif /* XEN */
 
 /*
  * OS_MCA_TO_SAL_HANDOFF_STATE (SAL 3.0 spec)
@@ -101,6 +104,24 @@
  *	imots_sal_check_ra=Return address to location within SAL_CHECK
  *
  */
+#ifdef XEN
+#define COLD_BOOT_HANDOFF_STATE(sal_to_os_handoff,os_to_sal_handoff,tmp)\
+	movl	tmp=IA64_MCA_COLD_BOOT;					\
+	GET_THIS_PADDR(r2,ia64_sal_to_os_handoff_state_addr);;		\
+	ld8	sal_to_os_handoff=[sal_to_os_handoff];;			\
+	movl	os_to_sal_handoff=ia64_os_to_sal_handoff_state;;	\
+	dep	os_to_sal_handoff = 0, os_to_sal_handoff, 60, 4;;	\
+	/*DATA_VA_TO_PA(os_to_sal_handoff);;*/				\
+	st8	[os_to_sal_handoff]=tmp,8;;				\
+	ld8	tmp=[sal_to_os_handoff],48;;				\
+	st8	[os_to_sal_handoff]=tmp,8;;				\
+	movl	tmp=IA64_MCA_SAME_CONTEXT;;				\
+	st8	[os_to_sal_handoff]=tmp,8;;				\
+	ld8	tmp=[sal_to_os_handoff],-8;;				\
+	st8     [os_to_sal_handoff]=tmp,8;;				\
+	ld8	tmp=[sal_to_os_handoff];;				\
+	st8     [os_to_sal_handoff]=tmp;;
+#else	/* XEN */
 #define COLD_BOOT_HANDOFF_STATE(sal_to_os_handoff,os_to_sal_handoff,tmp)\
 	movl	tmp=IA64_MCA_COLD_BOOT;					\
 	movl	sal_to_os_handoff=__pa(ia64_sal_to_os_handoff_state);	\
@@ -114,13 +135,13 @@
 	st8     [os_to_sal_handoff]=tmp,8;;				\
 	ld8	tmp=[sal_to_os_handoff];;				\
 	st8     [os_to_sal_handoff]=tmp;;
+#endif	/* XEN */
 
 #define GET_IA64_MCA_DATA(reg)						\
 	GET_THIS_PADDR(reg, ia64_mca_data)				\
 	;;								\
 	ld8 reg=[reg]
 
-#endif /* XEN */
 	.global ia64_os_mca_dispatch
 	.global ia64_os_mca_dispatch_end
 #ifndef XEN
@@ -132,7 +153,40 @@
 	.text
 	.align 16
 
-#ifndef XEN
+#ifdef	XEN
+/*
+ * void set_per_cpu_data(void)
+ * {
+ *   int i;
+ *   for (i = 0; i < 64; i++) {
+ *     if (ia64_mca_tlb_list[i].cr_lid == ia64_getreg(_IA64_REG_CR_LID)) {
+ *       ia64_set_kr(IA64_KR_PER_CPU_DATA, ia64_mca_tlb_list[i].percpu_paddr);
+ *       return;
+ *     }
+ *   }
+ *   while(1);	// Endless loop on error
+ * }
+ */
+#define SET_PER_CPU_DATA()					\
+	LOAD_PHYSICAL(p0,r2,ia64_mca_tlb_list);;		\
+	mov r7 = r0;						\
+	mov r6 = r0;;						\
+	adds r3 = IA64_MCA_PERCPU_OFFSET, r2;			\
+1:	add r4 = r6, r2;					\
+	mov r5=cr.lid;;						\
+	adds r7 = 1, r7;					\
+	ld8 r4 = [r4];;						\
+	cmp.ne p6, p7 = r5, r4;					\
+	cmp4.lt p8, p9 = NR_CPUS-1, r7;				\
+(p7)	br.cond.dpnt 3f;					\
+	adds r6 = 16, r6;					\
+(p9) 	br.cond.sptk 1b;					\
+2:	br 2b;;			/* Endless loop on error */	\
+3:	add r4 = r6, r3;;					\
+	ld8 r4 = [r4];;						\
+	mov ar.k3=r4
+#endif	/* XEN */
+
 /*
  * Just the TLB purge part is moved to a separate function
  * so we can re-use the code for cpu hotplug code as well
@@ -221,6 +275,44 @@ ia64_do_tlb_purge:
 	;;
 	srlz.i
 	;;
+#ifdef XEN
+	// 5. VHPT
+#if VHPT_ENABLED
+	// r25 = __va_ul(vcpu_vhpt_maddr(v));
+	GET_THIS_PADDR(r2,cpu_kr);;
+	add r2=IA64_KR_CURRENT_OFFSET,r2;;
+	ld8 r2=[r2];;
+#ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
+#define HAS_PERVCPU_VHPT_MASK	0x2
+	dep r3=0,r2,60,4;;			// virtual to physical
+	add r3=IA64_VCPU_DOMAIN_OFFSET,r3;;
+	ld8 r3=[r3];; 
+	dep r3=0,r3,60,4;;			// virtual to physical
+	add r3=IA64_DOMAIN_FLAGS_OFFSET,r3;;
+	ld8 r3=[r3];; 
+	and r3=HAS_PERVCPU_VHPT_MASK,r3;;
+	cmp.eq p6,p0=r3,r0;;
+(p6)	br.cond.sptk	.not_pervcpu_vhpt
+	add r2=IA64_VCPU_VHPT_MADDR_OFFSET,r2;;
+	dep r2=0,r2,60,4;;			// virtual to physical
+	ld8 r2=[r2];; 
+	dep r25=-1,r2,60,4;;			// physical to virtual
+	br.sptk		.percpu_vhpt_done
+#endif
+.not_pervcpu_vhpt:
+	GET_THIS_PADDR(r2, vhpt_paddr);; 
+	ld8 r2=[r2];; 
+	dep r25=-1,r2,60,4;;			// physical to virtual
+.percpu_vhpt_done:
+	dep r20=0,r25,0,IA64_GRANULE_SHIFT
+	mov r24=IA64_GRANULE_SHIFT<<2
+	;;
+	ptr.d r20,r24
+	;;
+	srlz.d
+	;;
+#endif
+#endif
 	// Now branch away to caller.
 	br.sptk.many b1
 	;;
@@ -235,6 +327,9 @@ ia64_os_mca_spin:
 	cmp.ne	p6,p0=r4,r0
 (p6)	br ia64_os_mca_spin
 
+#ifdef XEN
+	SET_PER_CPU_DATA();;
+#endif
 	// Save the SAL to OS MCA handoff state as defined
 	// by SAL SPEC 3.0
 	// NOTE : The order in which the state gets saved
@@ -250,7 +345,19 @@ begin_os_mca_dump:
 
 ia64_os_mca_done_dump:
 
+#ifdef XEN
+	// Set current to ar.k6
+	GET_THIS_PADDR(r2,cpu_kr);;
+	add r2=IA64_KR_CURRENT_OFFSET,r2;;
+	ld8 r2=[r2];;
+	mov ar.k6=r2;;
+
+	GET_THIS_PADDR(r2,ia64_sal_to_os_handoff_state_addr);;
+	ld8 r2=[r2];;
+	adds r16=56,r2
+#else
 	LOAD_PHYSICAL(p0,r16,ia64_sal_to_os_handoff_state+56)
+#endif
 	;;
 	ld8 r18=[r16]		// Get processor state parameter on existing PALE_CHECK.
 	;;
@@ -342,6 +449,28 @@ ia64_reload_tr:
 	;;
 	srlz.d
 	;;
+#ifdef XEN
+	// 5. VHPT
+#if VHPT_ENABLED
+	// r25 = __va_ul(vcpu_vhpt_maddr(v));
+	dep r20=0,r25,0,IA64_GRANULE_SHIFT
+	movl r26=PAGE_KERNEL
+	;;
+	mov r21=IA64_TR_VHPT
+	dep r22=0,r20,60,4		// physical address of
+	                                // va_vhpt & ~(IA64_GRANULE_SIZE - 1)
+	mov r24=IA64_GRANULE_SHIFT<<2
+	;;
+	or r23=r22,r26			// construct PA | page properties
+	mov cr.itir=r24
+	mov cr.ifa=r20
+	;;
+	itr.d dtr[r21]=r23		// wire in new mapping...
+	;;
+	srlz.d
+	;;
+#endif
+#endif
 	br.sptk.many done_tlb_purge_and_reload
 err:
 	COLD_BOOT_HANDOFF_STATE(r20,r21,r22)
@@ -874,12 +1003,6 @@ end_os_mca_restore:
 	br	ia64_os_mca_done_restore;;
 
 //EndStub//////////////////////////////////////////////////////////////////////
-#else
-ia64_os_mca_dispatch:
-1:
-	br.sptk 1b
-ia64_os_mca_dispatch_end:
-#endif /* !XEN */
 
 
 // ok, the issue here is that we need to save state information so
@@ -911,6 +1034,15 @@ ia64_os_mca_dispatch_end:
 
 GLOBAL_ENTRY(ia64_monarch_init_handler)
 	.prologue
+#ifdef XEN	/* Need in ia64_monarch_init_handler? */
+	SET_PER_CPU_DATA();;
+
+	// Set current to ar.k6
+	GET_THIS_PADDR(r2,cpu_kr);;
+	add r2=IA64_KR_CURRENT_OFFSET,r2;;
+	ld8 r2=[r2];;
+	mov ar.k6=r2;;
+#endif
 	// stash the information the SAL passed to os
 	SAL_TO_OS_MCA_HANDOFF_STATE_SAVE(r2)
 	;;

@@ -18,18 +18,13 @@
 # Place - Suite 330, Boston, MA 02111-1307 USA.
 #
 
-# External CFLAGS can do more harm than good.
-CFLAGS :=
-
 override XEN_TARGET_ARCH = x86_32
 XEN_ROOT = ../../..
-include $(XEN_ROOT)/Config.mk
+CFLAGS := -I$(XEN_ROOT)/tools/libxc -I.
+include $(XEN_ROOT)/tools/Rules.mk
 
 # The HVM loader is started in 32-bit mode at the address below:
 LOADADDR = 0x100000
-
-DEFINES  =-DDEBUG
-XENINC   =-I$(XEN_ROOT)/tools/libxc
 
 # Disable PIE/SSP if GCC supports them. They can break us.
 CFLAGS  += $(call cc-option,$(CC),-nopie,)
@@ -37,10 +32,10 @@ CFLAGS  += $(call cc-option,$(CC),-fno-stack-protector,)
 CFLAGS  += $(call cc-option,$(CC),-fno-stack-protector-all,)
 
 OBJCOPY  = objcopy
-CFLAGS  += $(DEFINES) -I. $(XENINC) -fno-builtin -O2 -msoft-float
+CFLAGS  += -fno-builtin -O2 -msoft-float
 LDFLAGS  = -nostdlib -Wl,-N -Wl,-Ttext -Wl,$(LOADADDR)
 
-SRCS = hvmloader.c mp_tables.c util.c smbios.c acpi_utils.c
+SRCS = hvmloader.c mp_tables.c util.c smbios.c
 OBJS = $(patsubst %.c,%.o,$(SRCS))
 
 .PHONY: all
@@ -65,5 +60,5 @@ roms.h:	../rombios/BIOS-bochs-latest ../vgabios/VGABIOS-lgpl-latest.bin ../vgabi
 .PHONY: clean
 clean:
 	rm -f roms.h acpi.h
-	rm -f hvmloader hvmloader.tmp hvmloader.o $(OBJS)
+	rm -f hvmloader hvmloader.tmp *.o
 	$(MAKE) -C acpi clean
