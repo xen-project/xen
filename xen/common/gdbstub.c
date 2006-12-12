@@ -42,6 +42,7 @@
 #include <xen/init.h>
 #include <xen/smp.h>
 #include <xen/console.h>
+#include <xen/errno.h>
 
 /* Printk isn't particularly safe just after we've trapped to the
    debugger. so avoid it. */
