@@ -140,13 +140,21 @@ void machine_crash_kexec(void)
 
 static void do_crashdump_trigger(unsigned char key)
 {
-	printk("triggering crashdump\n");
-	machine_crash_kexec();
+    int pos = (test_bit(KEXEC_FLAG_CRASH_POS, &kexec_flags) != 0);
+    if ( test_bit(KEXEC_IMAGE_CRASH_BASE + pos, &kexec_flags) )
+    {
+        printk("'%c' pressed -> triggering crashdump\n", key);
+        machine_crash_kexec();
+    }
+    else
+    {
+        printk("'%c' pressed -> no crash kernel loaded -- not triggering crashdump\n", key);
+    }
 }
 
 static __init int register_crashdump_trigger(void)
 {
-	register_keyhandler('c', do_crashdump_trigger, "trigger a crashdump");
+	register_keyhandler('C', do_crashdump_trigger, "trigger a crashdump");
 	return 0;
 }
 __initcall(register_crashdump_trigger);
