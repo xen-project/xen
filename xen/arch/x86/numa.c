@@ -214,7 +214,7 @@ void __init numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
 
 __cpuinit void numa_add_cpu(int cpu)
 {
-	set_bit(cpu, node_to_cpumask[cpu_to_node(cpu)].bits);
+	cpu_set(cpu, node_to_cpumask[cpu_to_node(cpu)]);
 } 
 
 void __cpuinit numa_set_node(int cpu, int node)
