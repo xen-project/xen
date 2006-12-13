@@ -41,3 +41,6 @@ topology.h		-> linux/include/asm-ia64/topology.h
 unaligned.h		-> linux/include/asm-ia64/unaligned.h
 unistd.h		-> linux/include/asm-ia64/unistd.h
 unwind.h		-> linux/include/asm-ia64/unwind.h
+
+# The files below are from Linux-2.6.19
+machvec_init.h		-> linux/include/asm-ia64/machvec_init.h

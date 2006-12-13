@@ -12,3 +12,8 @@ interrupt.h 		-> linux/include/linux/interrupt.h
 
 # The files below are from Linux-2.6.16.33
 oprofile.h		-> linux/include/linux/oprofile.h
+
+# The files below are from Linux-2.6.19
+pci.h			-> linux/include/linux/pci.h
+kobject.h		-> linux/include/linux/kobject.h
+device.h		-> linux/include/linux/device.h
