@@ -56,8 +56,18 @@ enum xenbus_state {
      */
     XenbusStateClosing       = 5,
 
-    XenbusStateClosed	     = 6
+    XenbusStateClosed        = 6
 };
 typedef enum xenbus_state XenbusState;
 
 #endif /* _XEN_PUBLIC_IO_XENBUS_H */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

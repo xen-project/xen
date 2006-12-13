@@ -119,7 +119,7 @@ struct xen_sysctl_perfc_op {
     uint32_t       cmd;                /*  XEN_SYSCTL_PERFCOP_??? */
     /* OUT variables. */
     uint32_t       nr_counters;       /*  number of counters description  */
-    uint32_t       nr_vals;			  /*  number of values  */
+    uint32_t       nr_vals;           /*  number of values  */
     /* counter information (or NULL) */
     XEN_GUEST_HANDLE(xen_sysctl_perfc_desc_t) desc;
     /* counter values (or NULL) */
