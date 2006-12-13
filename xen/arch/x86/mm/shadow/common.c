@@ -3123,7 +3123,7 @@ static int shadow_log_dirty_op(
  out:
     shadow_unlock(d);
     domain_unpause(d);
-    return 0;
+    return rv;
 }
 
 
