@@ -145,6 +145,14 @@ class ImageHandler:
         add headroom where necessary."""
         return self.getRequiredAvailableMemory(self.vm.getMemoryTarget())
 
+    def getRequiredMaximumReservation(self):
+        """@param mem_kb The maximum possible memory, in KiB.
+        @return The corresponding required amount of memory to be free, also
+        in KiB. This is normally the same as getRequiredAvailableMemory, but
+        architecture- or image-specific code may override this to
+        add headroom where necessary."""
+        return self.getRequiredAvailableMemory(self.vm.getMemoryMaximum())
+
     def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
         """@param shadow_mem_kb The configured shadow memory, in KiB.
         @param maxmem_kb The configured maxmem, in KiB.
@@ -593,6 +601,9 @@ class X86_HVM_ImageHandler(HVMImageHandler):
     def getRequiredInitialReservation(self):
         return self.vm.getMemoryTarget()
 
+    def getRequiredMaximumReservation(self):
+        return self.vm.getMemoryMaximum()
+
     def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
         # 256 pages (1MB) per vcpu,
         # plus 1 page per MiB of RAM for the P2M map,
@@ -607,7 +618,7 @@ class X86_Linux_ImageHandler(LinuxImageHandler):
     def buildDomain(self):
         # set physical mapping limit
         # add an 8MB slack to balance backend allocations.
-        mem_kb = self.getRequiredInitialReservation() + (8 * 1024)
+        mem_kb = self.getRequiredMaximumReservation() + (8 * 1024)
         xc.domain_set_memmap_limit(self.vm.getDomid(), mem_kb)
         return LinuxImageHandler.buildDomain(self)
 

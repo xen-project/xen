@@ -896,6 +896,10 @@ class XendDomainInfo:
         """Get this domain's target memory size, in KB."""
         return self.info['memory_static_min'] * 1024
 
+    def getMemoryMaximum(self):
+        """Get this domain's maximum memory size, in KB."""
+        return self.info['memory_static_max'] * 1024
+
     def getResume(self):
         return str(self._resume)
 
@@ -1363,9 +1367,9 @@ class XendDomainInfo:
             # Use architecture- and image-specific calculations to determine
             # the various headrooms necessary, given the raw configured
             # values. maxmem, memory, and shadow are all in KiB.
-            maxmem = self.image.getRequiredAvailableMemory(
-                self.info['memory_static_min'] * 1024)
             memory = self.image.getRequiredAvailableMemory(
+                self.info['memory_static_min'] * 1024)
+            maxmem = self.image.getRequiredAvailableMemory(
                 self.info['memory_static_max'] * 1024)
             shadow = self.image.getRequiredShadowMemory(
                 self.info['shadow_memory'] * 1024,
