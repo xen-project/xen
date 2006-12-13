@@ -56,7 +56,12 @@
 #define CSCHED_PRI_TS_UNDER     -1      /* time-share w/ credits */
 #define CSCHED_PRI_TS_OVER      -2      /* time-share w/o credits */
 #define CSCHED_PRI_IDLE         -64     /* idle */
-#define CSCHED_PRI_TS_PARKED    -65     /* time-share w/ capped credits */
+
+
+/*
+ * Flags
+ */
+#define CSCHED_FLAG_VCPU_PARKED 0x0001  /* VCPU over capped credits */
 
 
 /*
@@ -100,6 +105,8 @@
     _MACRO(vcpu_wake_onrunq)                \
     _MACRO(vcpu_wake_runnable)              \
     _MACRO(vcpu_wake_not_runnable)          \
+    _MACRO(vcpu_park)                       \
+    _MACRO(vcpu_unpark)                     \
     _MACRO(tickle_local_idler)              \
     _MACRO(tickle_local_over)               \
     _MACRO(tickle_local_under)              \
@@ -190,6 +197,7 @@ struct csched_vcpu {
     struct csched_dom *sdom;
     struct vcpu *vcpu;
     atomic_t credit;
+    uint16_t flags;
     int16_t pri;
 #ifdef CSCHED_STATS
     struct {
@@ -579,11 +587,10 @@ csched_vcpu_init(struct vcpu *vc)
     svc->sdom = sdom;
     svc->vcpu = vc;
     atomic_set(&svc->credit, 0);
+    svc->flags = 0U;
     svc->pri = is_idle_domain(dom) ? CSCHED_PRI_IDLE : CSCHED_PRI_TS_UNDER;
     CSCHED_VCPU_STATS_RESET(svc);
     vc->sched_priv = svc;
-
-    CSCHED_VCPU_CHECK(vc);
 
     /* Allocate per-PCPU info */
     if ( unlikely(!CSCHED_PCPU(vc->processor)) )
@@ -593,7 +600,6 @@ csched_vcpu_init(struct vcpu *vc)
     }
 
     CSCHED_VCPU_CHECK(vc);
-
     return 0;
 }
 
@@ -673,9 +679,16 @@ csched_vcpu_wake(struct vcpu *vc)
      * This allows wake-to-run latency sensitive VCPUs to preempt
      * more CPU resource intensive VCPUs without impacting overall 
      * system fairness.
+     *
+     * The one exception is for VCPUs of capped domains unpausing
+     * after earning credits they had overspent. We don't boost
+     * those.
      */
-    if ( svc->pri == CSCHED_PRI_TS_UNDER )
+    if ( svc->pri == CSCHED_PRI_TS_UNDER &&
+         !(svc->flags & CSCHED_FLAG_VCPU_PARKED) )
+    {
         svc->pri = CSCHED_PRI_TS_BOOST;
+    }
 
     /* Put the VCPU on the runq and tickle CPUs */
     __runq_insert(cpu, svc);
@@ -749,11 +762,8 @@ csched_dom_init(struct domain *dom)
 static void
 csched_dom_destroy(struct domain *dom)
 {
-    struct csched_dom * const sdom = CSCHED_DOM(dom);
-
     CSCHED_STAT_CRANK(dom_destroy);
-
-    xfree(sdom);
+    xfree(CSCHED_DOM(dom));
 }
 
 /*
@@ -942,11 +952,19 @@ csched_acct(void)
              */
             if ( credit < 0 )
             {
-                if ( sdom->cap != 0U && credit < -credit_cap )
-                    svc->pri = CSCHED_PRI_TS_PARKED;
-                else
-                    svc->pri = CSCHED_PRI_TS_OVER;
+                svc->pri = CSCHED_PRI_TS_OVER;
 
+                /* Park running VCPUs of capped-out domains */
+                if ( sdom->cap != 0U &&
+                     credit < -credit_cap &&
+                     !(svc->flags & CSCHED_FLAG_VCPU_PARKED) )
+                {
+                    CSCHED_STAT_CRANK(vcpu_park);
+                    vcpu_pause_nosync(svc->vcpu);
+                    svc->flags |= CSCHED_FLAG_VCPU_PARKED;
+                }
+
+                /* Lower bound on credits */
                 if ( credit < -CSCHED_CREDITS_PER_TSLICE )
                 {
                     CSCHED_STAT_CRANK(acct_min_credit);
@@ -958,6 +976,20 @@ csched_acct(void)
             {
                 svc->pri = CSCHED_PRI_TS_UNDER;
 
+                /* Unpark any capped domains whose credits go positive */
+                if ( svc->flags & CSCHED_FLAG_VCPU_PARKED)
+                {
+                    /*
+                     * It's important to unset the flag AFTER the unpause()
+                     * call to make sure the VCPU's priority is not boosted
+                     * if it is woken up here.
+                     */
+                    CSCHED_STAT_CRANK(vcpu_unpark);
+                    vcpu_unpause(svc->vcpu);
+                    svc->flags &= ~CSCHED_FLAG_VCPU_PARKED;
+                }
+
+                /* Upper bound on credits means VCPU stops earning */
                 if ( credit > CSCHED_CREDITS_PER_TSLICE )
                 {
                     __csched_vcpu_acct_stop_locked(svc);
@@ -1031,10 +1063,10 @@ csched_runq_steal(int peer_cpu, int cpu, int pri)
             speer = __runq_elem(iter);
 
             /*
-             * If next available VCPU here is not of higher priority
-             * than ours, this PCPU is useless to us.
+             * If next available VCPU here is not of strictly higher
+             * priority than ours, this PCPU is useless to us.
              */
-            if ( speer->pri <= CSCHED_PRI_IDLE || speer->pri <= pri )
+            if ( speer->pri <= pri )
                 break;
 
             /* Is this VCPU is runnable on our PCPU? */
@@ -1181,10 +1213,11 @@ csched_dump_vcpu(struct csched_vcpu *svc)
 {
     struct csched_dom * const sdom = svc->sdom;
 
-    printk("[%i.%i] pri=%i cpu=%i",
+    printk("[%i.%i] pri=%i flags=%x cpu=%i",
             svc->vcpu->domain->domain_id,
             svc->vcpu->vcpu_id,
             svc->pri,
+            svc->flags,
             svc->vcpu->processor);
 
     if ( sdom )

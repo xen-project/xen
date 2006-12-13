@@ -437,6 +437,7 @@ static inline int vcpu_runnable(struct vcpu *v)
 }
 
 void vcpu_pause(struct vcpu *v);
+void vcpu_pause_nosync(struct vcpu *v);
 void domain_pause(struct domain *d);
 void vcpu_unpause(struct vcpu *v);
 void domain_unpause(struct domain *d);

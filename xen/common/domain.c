@@ -350,16 +350,25 @@ void domain_destroy(struct domain *d)
     send_guest_global_virq(dom0, VIRQ_DOM_EXC);
 }
 
-void vcpu_pause(struct vcpu *v)
+static void vcpu_pause_setup(struct vcpu *v)
 {
-    ASSERT(v != current);
-
     spin_lock(&v->pause_lock);
     if ( v->pause_count++ == 0 )
         set_bit(_VCPUF_paused, &v->vcpu_flags);
     spin_unlock(&v->pause_lock);
+}
 
+void vcpu_pause(struct vcpu *v)
+{
+    ASSERT(v != current);
+    vcpu_pause_setup(v);
     vcpu_sleep_sync(v);
+}
+
+void vcpu_pause_nosync(struct vcpu *v)
+{
+    vcpu_pause_setup(v);
+    vcpu_sleep_nosync(v);
 }
 
 void vcpu_unpause(struct vcpu *v)
