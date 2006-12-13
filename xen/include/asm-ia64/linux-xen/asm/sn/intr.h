@@ -9,7 +9,11 @@
 #ifndef _ASM_IA64_SN_INTR_H
 #define _ASM_IA64_SN_INTR_H
 
+#ifndef XEN
 #include <linux/rcupdate.h>
+#else
+#include <linux/list.h>
+#endif
 #include <asm/sn/types.h>
 
 #define SGI_UART_VECTOR		0xe9
@@ -51,7 +55,9 @@ struct sn_irq_info {
 	int		irq_flags;	/* flags */
 	int		irq_share_cnt;	/* num devices sharing IRQ   */
 	struct list_head	list;	/* list of sn_irq_info structs */
+#ifndef XEN
 	struct rcu_head		rcu;	/* rcu callback list */
+#endif
 };
 
 extern void sn_send_IPI_phys(int, long, int, int);

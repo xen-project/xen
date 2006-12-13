@@ -13,7 +13,9 @@
 #include <asm/irq.h>
 #include <asm/sn/arch.h>
 #include <asm/sn/intr.h>
+#ifndef XEN
 #include <asm/sn/bte.h>
+#endif
 
 /*
  * NUMA Node-Specific Data structures are defined in this file.
@@ -38,12 +40,14 @@ struct phys_cpuid {
 struct nodepda_s {
 	void 		*pdinfo;	/* Platform-dependent per-node info */
 
+#ifndef XEN
 	/*
 	 * The BTEs on this node are shared by the local cpus
 	 */
 	struct bteinfo_s	bte_if[MAX_BTES_PER_NODE];	/* Virtual Interface */
 	struct timer_list	bte_recovery_timer;
 	spinlock_t		bte_recovery_lock;
+#endif
 
 	/* 
 	 * Array of pointers to the nodepdas for each node.
