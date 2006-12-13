@@ -53,6 +53,8 @@
 ^docs/user/labels\.pl$
 ^docs/user/user\.css$
 ^docs/user/user\.html$
+^docs/xen-api/vm_lifecycle.eps$
+^docs/xen-api/xenapi-datamodel-graph.eps$
 ^extras/mini-os/h/hypervisor-ifs$
 ^extras/mini-os/h/xen-public$
 ^extras/mini-os/mini-os\..*$
@@ -98,17 +100,15 @@
 ^tools/firmware/.*\.bin$
 ^tools/firmware/.*\.sym$
 ^tools/firmware/.*bios/.*bios.*\.txt$
+^tools/firmware/hvmloader/acpi/acpigen$
 ^tools/firmware/hvmloader/hvmloader$
 ^tools/firmware/hvmloader/roms\.h$
 ^tools/firmware/rombios/BIOS-bochs-[^/]*$
 ^tools/firmware/rombios/_rombios[^/]*_\.c$
 ^tools/firmware/rombios/rombios[^/]*\.s$
-^tools/firmware/vmxassist/acpi\.h$
 ^tools/firmware/vmxassist/gen$
 ^tools/firmware/vmxassist/offsets\.h$
-^tools/firmware/vmxassist/roms\.h$
 ^tools/firmware/vmxassist/vmxassist$
-^tools/firmware/vmxassist/vmxloader$
 ^tools/ioemu/\.pc/.*$
 ^tools/ioemu/config-host\.h$
 ^tools/ioemu/config-host\.mak$
