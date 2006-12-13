@@ -1,3 +1,5 @@
+subdir-y += sn
+
 obj-y += efi.o
 obj-y += entry.o
 obj-y += irq_ia64.o

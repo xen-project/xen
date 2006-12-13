@@ -1,3 +1,7 @@
+subdir-y += dig
+subdir-y += hp
+subdir-y += sn
+
 obj-y += bitop.o
 obj-y += clear_page.o
 obj-y += cmdline.o
