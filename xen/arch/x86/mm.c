@@ -2951,7 +2951,17 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         guest_physmap_add_page(d, xatp.gpfn, mfn);
 
         UNLOCK_BIGLOCK(d);
-        
+
+        /* If we're doing FAST_FAULT_PATH, then shadow mode may have
+           cached the fact that this is an mmio region in the shadow
+           page tables.  Blow the tables away to remove the cache.
+           This is pretty heavy handed, but this is a rare operation
+           (it might happen a dozen times during boot and then never
+           again), so it doesn't matter too much. */
+        shadow_lock(d);
+        shadow_blow_tables(d);
+        shadow_unlock(d);
+
         put_domain(d);
 
         break;

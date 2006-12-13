@@ -58,9 +58,9 @@ static int crash_nmi_callback(struct cpu_user_regs *regs, int cpu)
 static void smp_send_nmi_allbutself(void)
 {
     cpumask_t allbutself = cpu_online_map;
-
     cpu_clear(smp_processor_id(), allbutself);
-    send_IPI_mask(allbutself, APIC_DM_NMI);
+    if ( !cpus_empty(allbutself) )
+        send_IPI_mask(allbutself, APIC_DM_NMI);
 }
 
 static void nmi_shootdown_cpus(void)
