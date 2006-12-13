@@ -167,7 +167,7 @@ def recreate(info, priv):
 
     @param xeninfo: Parsed configuration
     @type  xeninfo: Dictionary
-    @param priv: TODO, unknown, something to do with memory
+    @param priv: Is a privileged domain (Dom 0)
     @type  priv: bool
 
     @rtype:  XendDomainInfo
@@ -381,7 +381,7 @@ class XendDomainInfo:
         @type    dompath: string
         @keyword augment: Augment given info with xenstored VM info
         @type    augment: bool
-        @keyword priv: Is a privledged domain (Dom 0) (TODO: really?)
+        @keyword priv: Is a privileged domain (Dom 0)
         @type    priv: bool
         @keyword resume: Is this domain being resumed?
         @type    resume: bool
@@ -647,6 +647,8 @@ class XendDomainInfo:
         if priv:
             augment_entries.remove('memory')
             augment_entries.remove('maxmem')
+            augment_entries.remove('vcpus')
+            augment_entries.remove('vcpu_avail')
 
         vm_config = self._readVMDetails([(k, XendConfig.LEGACY_CFG_TYPES[k])
                                          for k in augment_entries])
@@ -663,6 +665,14 @@ class XendDomainInfo:
                     self.info[xapiarg] = val
                 else:
                     self.info[arg] = val
+
+        # For dom0, we ignore any stored value for the vcpus fields, and
+        # read the current value from Xen instead.  This allows boot-time
+        # settings to take precedence over any entries in the store.
+        if priv:
+            xeninfo = dom_get(self.domid)
+            self.info['vcpus_number'] = xeninfo['online_vcpus']
+            self.info['vcpu_avail'] = (1 << xeninfo['online_vcpus']) - 1
 
         # read image value
         image_sxp = self._readVm('image')
