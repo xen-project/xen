@@ -270,15 +270,15 @@ class PPC_ProseImageHandler(LinuxImageHandler):
 
         devtree = FlatDeviceTree.build(self)
 
-        return xc.prose_build(dom            = self.vm.getDomid(),
-                              memsize        = mem_mb,
-                              image          = self.kernel,
-                              store_evtchn   = store_evtchn,
-                              console_evtchn = console_evtchn,
-                              cmdline        = self.cmdline,
-                              ramdisk        = self.ramdisk,
-                              features       = self.vm.getFeatures(),
-                              arch_args      = devtree.to_bin())
+        return xc.arch_prose_build(dom            = self.vm.getDomid(),
+                                   memsize        = mem_mb,
+                                   image          = self.kernel,
+                                   store_evtchn   = store_evtchn,
+                                   console_evtchn = console_evtchn,
+                                   cmdline        = self.cmdline,
+                                   ramdisk        = self.ramdisk,
+                                   features       = self.vm.getFeatures(),
+                                   arch_args      = devtree.to_bin())
 
     def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
         """@param shadow_mem_kb The configured shadow memory, in KiB.

@@ -447,10 +447,6 @@ int xc_domain_memory_populate_physmap(int xc_handle,
                                       unsigned int address_bits,
                                       xen_pfn_t *extent_start);
 
-int xc_alloc_real_mode_area(int xc_handle,
-                            uint32_t domid,
-                            unsigned int log);
-
 int xc_domain_ioport_permission(int xc_handle,
                                 uint32_t domid,
                                 uint32_t first_port,
@@ -732,4 +728,8 @@ const char *xc_error_code_to_desc(int code);
  */
 xc_error_handler xc_set_error_handler(xc_error_handler handler);
 
+/* PowerPC specific. */
+int xc_alloc_real_mode_area(int xc_handle,
+                            uint32_t domid,
+                            unsigned int log);
 #endif
