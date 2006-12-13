@@ -136,7 +136,7 @@
  */
 #define TO_PHYS(x)		(TO_PHYS_MASK & (x))
 #define TO_CAC(x)		(CAC_BASE     | TO_PHYS(x))
-#ifdef CONFIG_SGI_SN
+#if defined(CONFIG_SGI_SN) || defined(XEN)
 #define TO_AMO(x)		(AMO_BASE     | TO_PHYS(x))
 #define TO_GET(x)		(GET_BASE     | TO_PHYS(x))
 #else

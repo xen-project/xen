@@ -11,10 +11,12 @@
 #ifndef _ASM_IA64_SN_ARCH_H
 #define _ASM_IA64_SN_ARCH_H
 
+#ifndef XEN
 #include <linux/numa.h>
 #include <asm/types.h>
 #include <asm/percpu.h>
 #include <asm/sn/types.h>
+#endif
 #include <asm/sn/sn_cpuid.h>
 
 /*
@@ -58,8 +60,13 @@ struct sn_hub_info_s {
 };
 DECLARE_PER_CPU(struct sn_hub_info_s, __sn_hub_info);
 #define sn_hub_info 	(&__get_cpu_var(__sn_hub_info))
+#ifndef XEN
 #define is_shub2()	(sn_hub_info->shub2)
 #define is_shub1()	(sn_hub_info->shub2 == 0)
+#else
+#define is_shub2()	0
+#define is_shub1()	1
+#endif
 
 /*
  * Use this macro to test if shub 1.1 wars should be enabled
@@ -74,12 +81,12 @@ DECLARE_PER_CPU(struct sn_hub_info_s, __sn_hub_info);
 DECLARE_PER_CPU(short, __sn_cnodeid_to_nasid[MAX_COMPACT_NODES]);
 #define sn_cnodeid_to_nasid	(&__get_cpu_var(__sn_cnodeid_to_nasid[0]))
 
-
+#ifndef XEN
 extern u8 sn_partition_id;
 extern u8 sn_system_size;
 extern u8 sn_sharing_domain_size;
 extern u8 sn_region_size;
 
 extern void sn_flush_all_caches(long addr, long bytes);
-
+#endif
 #endif /* _ASM_IA64_SN_ARCH_H */

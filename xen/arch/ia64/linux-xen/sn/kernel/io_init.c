@@ -8,6 +8,9 @@
 
 #include <linux/bootmem.h>
 #include <linux/nodemask.h>
+#ifdef XEN
+#include <linux/init.h>
+#endif
 #include <asm/sn/types.h>
 #include <asm/sn/addrs.h>
 #include <asm/sn/sn_feature_sets.h>
@@ -17,17 +20,29 @@
 #include <asm/sn/module.h>
 #include <asm/sn/pcibr_provider.h>
 #include <asm/sn/pcibus_provider_defs.h>
+#ifndef XEN
 #include <asm/sn/pcidev.h>
+#endif
 #include <asm/sn/simulator.h>
 #include <asm/sn/sn_sal.h>
+#ifndef XEN
 #include <asm/sn/tioca_provider.h>
 #include <asm/sn/tioce_provider.h>
+#endif
+#ifdef XEN
+#include "asm/sn/hubdev.h"
+#include "asm/sn/xwidgetdev.h"
+#else
 #include "xtalk/hubdev.h"
 #include "xtalk/xwidgetdev.h"
+#endif
 
 
 extern void sn_init_cpei_timer(void);
 extern void register_sn_procfs(void);
+#ifdef XEN
+extern void sn_irq_lh_init(void);
+#endif
 
 static struct list_head sn_sysdata_list;
 
@@ -50,6 +65,7 @@ int sn_ioif_inited;		/* SN I/O infrastructure initialized? */
 
 struct sn_pcibus_provider *sn_pci_provider[PCIIO_ASIC_MAX_TYPES];	/* indexed by asic type */
 
+#ifndef XEN
 static int max_segment_number;		 /* Default highest segment number */
 static int max_pcibus_number = 255;	/* Default highest pci bus number */
 
@@ -81,6 +97,7 @@ static struct sn_pcibus_provider sn_pci_default_provider = {
 	.dma_unmap = sn_default_pci_unmap,
 	.bus_fixup = sn_default_pci_bus_fixup,
 };
+#endif
 
 /*
  * Retrieve the DMA Flush List given nasid, widget, and device.
@@ -131,6 +148,7 @@ static inline u64 sal_get_pcibus_info(u64 segment, u64 busnum, u64 address)
 	return ret_stuff.v0;
 }
 
+#ifndef XEN
 /*
  * Retrieve the pci device information given the bus and device|function number.
  */
@@ -281,9 +299,13 @@ static void __init sn_fixup_ionodes(void)
 						     nasid, widget, device,
 						     (u64)(dev_entry->common));
 				else
+#ifdef XEN
+					BUG();
+#else
 					status = sn_device_fixup_war(nasid,
 						     widget, device,
 						     dev_entry->common);
+#endif
 				if (status != SALRET_OK)
 					panic("SAL call failed: %s\n",
 					      ia64_sal_strerror(status));
@@ -614,6 +636,7 @@ void sn_bus_free_sysdata(void)
 	}
 	return;
 }
+#endif
 
 /*
  * Ugly hack to get PCI setup until we have a proper ACPI namespace.
@@ -629,6 +652,7 @@ static int __init sn_pci_init(void)
 	if (!ia64_platform_is("sn2") || IS_RUNNING_ON_FAKE_PROM())
 		return 0;
 
+#ifndef XEN
 	/*
 	 * prime sn_pci_provider[].  Individial provider init routines will
 	 * override their respective default entries.
@@ -640,14 +664,18 @@ static int __init sn_pci_init(void)
 	pcibr_init_provider();
 	tioca_init_provider();
 	tioce_init_provider();
+#endif
 
 	/*
 	 * This is needed to avoid bounce limit checks in the blk layer
 	 */
 	ia64_max_iommu_merge_mask = ~PAGE_MASK;
+#ifndef XEN
 	sn_fixup_ionodes();
+#endif
 	sn_irq_lh_init();
 	INIT_LIST_HEAD(&sn_sysdata_list);
+#ifndef XEN
 	sn_init_cpei_timer();
 
 #ifdef CONFIG_PROC_FS
@@ -668,6 +696,7 @@ static int __init sn_pci_init(void)
 	while ((pci_dev =
 		pci_get_device(PCI_ANY_ID, PCI_ANY_ID, pci_dev)) != NULL)
 		sn_pci_fixup_slot(pci_dev);
+#endif
 
 	sn_ioif_inited = 1;	/* sn I/O infrastructure now initialized */
 
@@ -682,7 +711,11 @@ void hubdev_init_node(nodepda_t * npda, cnodeid_t node)
 {
 	struct hubdev_info *hubdev_info;
 	int size;
+#ifndef XEN
 	pg_data_t *pg;
+#else
+	struct pglist_data *pg;
+#endif
 
 	size = sizeof(struct hubdev_info);
 
@@ -705,6 +738,7 @@ cnodeid_get_geoid(cnodeid_t cnode)
 	return hubdev->hdi_geoid;
 }
 
+#ifndef XEN
 void sn_generate_path(struct pci_bus *pci_bus, char *address)
 {
 	nasid_t nasid;
@@ -730,11 +764,18 @@ void sn_generate_path(struct pci_bus *pci_bus, char *address)
 	    (bricktype == L1_BRICKTYPE_1932))
 			sprintf(address, "%s^%d", address, geo_slot(geoid));
 }
+#endif
 
+#ifdef XEN
+__initcall(sn_pci_init);
+#else
 subsys_initcall(sn_pci_init);
+#endif
+#ifndef XEN
 EXPORT_SYMBOL(sn_pci_fixup_slot);
 EXPORT_SYMBOL(sn_pci_unfixup_slot);
 EXPORT_SYMBOL(sn_pci_controller_fixup);
 EXPORT_SYMBOL(sn_bus_store_sysdata);
 EXPORT_SYMBOL(sn_bus_free_sysdata);
 EXPORT_SYMBOL(sn_generate_path);
+#endif

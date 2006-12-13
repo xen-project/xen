@@ -48,6 +48,13 @@
 #include <xen/event.h>
 #define apicid_to_phys_cpu_present(x)	1
 
+#ifdef CONFIG_IA64_GENERIC
+unsigned int __ia64_local_vector_to_irq (ia64_vector vec)
+{
+	return (unsigned int) vec;
+}
+#endif
+
 /*
  * Linux has a controller-independent x86 interrupt architecture.
  * every controller has a 'controller-template', that is used

@@ -22,6 +22,9 @@
 
 /* Include the ID list */
 #include <linux/pci_ids.h>
+#ifdef XEN
+#include <asm/processor.h>
+#endif
 
 /*
  * The PCI interface treats multi-function devices as independent

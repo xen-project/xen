@@ -66,9 +66,11 @@ extern ia64_mv_dma_sync_single_for_device sn_dma_sync_single_for_device;
 extern ia64_mv_dma_sync_sg_for_device	sn_dma_sync_sg_for_device;
 extern ia64_mv_dma_mapping_error	sn_dma_mapping_error;
 extern ia64_mv_dma_supported		sn_dma_supported;
+#ifndef XEN
 extern ia64_mv_migrate_t		sn_migrate;
 extern ia64_mv_setup_msi_irq_t		sn_setup_msi_irq;
 extern ia64_mv_teardown_msi_irq_t	sn_teardown_msi_irq;
+#endif
 
 
 /*
@@ -83,9 +85,13 @@ extern ia64_mv_teardown_msi_irq_t	sn_teardown_msi_irq;
 #define platform_cpu_init		sn_cpu_init
 #define platform_irq_init		sn_irq_init
 #define platform_send_ipi		sn2_send_IPI
+#ifndef XEN
 #define platform_timer_interrupt	sn_timer_interrupt
+#endif
 #define platform_global_tlb_purge       sn2_global_tlb_purge
+#ifndef XEN
 #define platform_tlb_migrate_finish	sn_tlb_migrate_finish
+#endif
 #define platform_pci_fixup		sn_pci_fixup
 #define platform_inb			__sn_inb
 #define platform_inw			__sn_inw
@@ -103,10 +109,30 @@ extern ia64_mv_teardown_msi_irq_t	sn_teardown_msi_irq;
 #define platform_readl_relaxed		__sn_readl_relaxed
 #define platform_readq_relaxed		__sn_readq_relaxed
 #define platform_local_vector_to_irq	sn_local_vector_to_irq
+#ifdef XEN
+#define platform_pci_get_legacy_mem	machvec_noop
+#define platform_pci_legacy_read	machvec_noop
+#define platform_pci_legacy_write	machvec_noop
+#else
 #define platform_pci_get_legacy_mem	sn_pci_get_legacy_mem
 #define platform_pci_legacy_read	sn_pci_legacy_read
 #define platform_pci_legacy_write	sn_pci_legacy_write
+#endif
 #define platform_dma_init		machvec_noop
+#ifdef XEN
+#define platform_dma_alloc_coherent	machvec_noop
+#define platform_dma_free_coherent	machvec_noop
+#define platform_dma_map_single		machvec_noop
+#define platform_dma_unmap_single	machvec_noop
+#define platform_dma_map_sg		machvec_noop
+#define platform_dma_unmap_sg		machvec_noop
+#define platform_dma_sync_single_for_cpu machvec_noop
+#define platform_dma_sync_sg_for_cpu	machvec_noop
+#define platform_dma_sync_single_for_device machvec_noop
+#define platform_dma_sync_sg_for_device	machvec_noop
+#define platform_dma_mapping_error	machvec_noop
+#define platform_dma_supported		machvec_noop
+#else
 #define platform_dma_alloc_coherent	sn_dma_alloc_coherent
 #define platform_dma_free_coherent	sn_dma_free_coherent
 #define platform_dma_map_single		sn_dma_map_single
@@ -120,12 +146,16 @@ extern ia64_mv_teardown_msi_irq_t	sn_teardown_msi_irq;
 #define platform_dma_mapping_error		sn_dma_mapping_error
 #define platform_dma_supported		sn_dma_supported
 #define platform_migrate		sn_migrate
+#endif
+
+#ifndef XEN
 #ifdef CONFIG_PCI_MSI
 #define platform_setup_msi_irq		sn_setup_msi_irq
 #define platform_teardown_msi_irq	sn_teardown_msi_irq
 #else
 #define platform_setup_msi_irq		((ia64_mv_setup_msi_irq_t*)NULL)
 #define platform_teardown_msi_irq	((ia64_mv_teardown_msi_irq_t*)NULL)
+#endif
 #endif
 
 #include <asm/sn/io.h>

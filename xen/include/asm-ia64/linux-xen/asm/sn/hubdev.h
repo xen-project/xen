@@ -8,7 +8,11 @@
 #ifndef _ASM_IA64_SN_XTALK_HUBDEV_H
 #define _ASM_IA64_SN_XTALK_HUBDEV_H
 
+#ifndef XEN
 #include "xtalk/xwidgetdev.h"
+#else
+#include <asm/sn/xwidgetdev.h>
+#endif
 
 #define HUB_WIDGET_ID_MAX 0xf
 #define DEV_PER_WIDGET (2*2*8)

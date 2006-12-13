@@ -34,6 +34,9 @@
 #include <asm/numa.h>
 #include <asm/hw_irq.h>
 #include <asm/current.h>
+#ifdef XEN
+#include <asm/sn/arch.h>
+#endif
 #include <asm/sn/sn_cpuid.h>
 #include <asm/sn/sn_sal.h>
 #include <asm/sn/addrs.h>
@@ -63,7 +66,11 @@ sn2_ptc_deadlock_recovery(short *, short, short, int,
 #define local_node_uses_ptc_ga(sh1)	((sh1) ? 1 : 0)
 #define max_active_pio(sh1)		((sh1) ? 32 : 7)
 #define reset_max_active_on_deadlock()	1
+#ifndef XEN
 #define PTC_LOCK(sh1)			((sh1) ? &sn2_global_ptc_lock : &sn_nodepda->ptc_lock)
+#else
+#define PTC_LOCK(sh1)			&sn2_global_ptc_lock
+#endif
 
 struct ptc_stats {
 	unsigned long ptc_l;
@@ -93,6 +100,7 @@ static inline unsigned long wait_piowc(void)
 	return (ws & SH_PIO_WRITE_STATUS_WRITE_DEADLOCK_MASK) != 0;
 }
 
+#ifndef XEN  /* No idea if Xen will ever support this */
 /**
  * sn_migrate - SN-specific task migration actions
  * @task: Task being migrated to new CPU
@@ -117,9 +125,14 @@ void sn_migrate(struct task_struct *task)
 void sn_tlb_migrate_finish(struct mm_struct *mm)
 {
 	/* flush_tlb_mm is inefficient if more than 1 users of mm */
+#ifndef XEN
 	if (mm == current->mm && mm && atomic_read(&mm->mm_users) == 1)
+#else
+	if (mm == &current->arch.mm && mm && atomic_read(&mm->mm_users) == 1)
+#endif
 		flush_tlb_mm(mm);
 }
+#endif
 
 /**
  * sn2_global_tlb_purge - globally purge translation cache of virtual address range
@@ -143,12 +156,25 @@ void sn_tlb_migrate_finish(struct mm_struct *mm)
  *	  done with ptc.g/MMRs under protection of the global ptc_lock.
  */
 
+#ifdef XEN  /* Xen is soooooooo stupid! */
+static cpumask_t mask_all = CPU_MASK_ALL;
+#endif
+
 void
+#ifndef XEN
 sn2_global_tlb_purge(struct mm_struct *mm, unsigned long start,
+#else
+sn2_global_tlb_purge(unsigned long start,
+#endif
 		     unsigned long end, unsigned long nbits)
 {
 	int i, ibegin, shub1, cnode, mynasid, cpu, lcpu = 0, nasid;
+#ifndef XEN
 	int mymm = (mm == current->active_mm && mm == current->mm);
+#else
+	struct mm_struct *mm;
+	int mymm = 1;
+#endif
 	int use_cpu_ptcga;
 	volatile unsigned long *ptc0, *ptc1;
 	unsigned long itc, itc2, flags, data0 = 0, data1 = 0, rr_value, old_rr = 0;
@@ -159,12 +185,21 @@ sn2_global_tlb_purge(struct mm_struct *mm, unsigned long start,
 	nodes_clear(nodes_flushed);
 	i = 0;
 
+#ifndef XEN  /* One day Xen will grow up! */
 	for_each_cpu_mask(cpu, mm->cpu_vm_mask) {
 		cnode = cpu_to_node(cpu);
 		node_set(cnode, nodes_flushed);
 		lcpu = cpu;
 		i++;
 	}
+#else
+	for_each_cpu(cpu) {
+		cnode = cpu_to_node(cpu);
+		node_set(cnode, nodes_flushed);
+		lcpu = cpu;
+		i++;
+	}
+#endif
 
 	if (i == 0)
 		return;
@@ -182,19 +217,29 @@ sn2_global_tlb_purge(struct mm_struct *mm, unsigned long start,
 		return;
 	}
 
+#ifndef XEN
 	if (atomic_read(&mm->mm_users) == 1 && mymm) {
+#ifndef XEN  /* I hate Xen! */
 		flush_tlb_mm(mm);
+#else
+		flush_tlb_mask(mask_all);
+#endif
 		__get_cpu_var(ptcstats).change_rid++;
 		preempt_enable();
 		return;
 	}
+#endif
 
 	itc = ia64_get_itc();
 	nix = 0;
 	for_each_node_mask(cnode, nodes_flushed)
 		nasids[nix++] = cnodeid_to_nasid(cnode);
 
+#ifndef XEN
 	rr_value = (mm->context << 3) | REGION_NUMBER(start);
+#else
+	rr_value = REGION_NUMBER(start);
+#endif
 
 	shub1 = is_shub1();
 	if (shub1) {
@@ -202,13 +247,22 @@ sn2_global_tlb_purge(struct mm_struct *mm, unsigned long start,
 		    	(nbits << SH1_PTC_0_PS_SHFT) |
 			(rr_value << SH1_PTC_0_RID_SHFT) |
 		    	(1UL << SH1_PTC_0_START_SHFT);
+#ifndef XEN
 		ptc0 = (long *)GLOBAL_MMR_PHYS_ADDR(0, SH1_PTC_0);
 		ptc1 = (long *)GLOBAL_MMR_PHYS_ADDR(0, SH1_PTC_1);
+#else
+		ptc0 = (unsigned long *)GLOBAL_MMR_PHYS_ADDR(0, SH1_PTC_0);
+		ptc1 = (unsigned long *)GLOBAL_MMR_PHYS_ADDR(0, SH1_PTC_1);
+#endif
 	} else {
 		data0 = (1UL << SH2_PTC_A_SHFT) |
 			(nbits << SH2_PTC_PS_SHFT) |
 		    	(1UL << SH2_PTC_START_SHFT);
+#ifndef XEN
 		ptc0 = (long *)GLOBAL_MMR_PHYS_ADDR(0, SH2_PTC + 
+#else
+		ptc0 = (unsigned long *)GLOBAL_MMR_PHYS_ADDR(0, SH2_PTC + 
+#endif
 			(rr_value << SH2_PTC_RID_SHFT));
 		ptc1 = NULL;
 	}
@@ -390,7 +444,7 @@ void sn2_send_IPI(int cpuid, int vector, int delivery_mode, int redirect)
 	if (unlikely(nasid == -1))
 		ia64_sn_get_sapic_info(physid, &nasid, NULL, NULL);
 
-	sn_send_IPI_phys(nasid, physid, vector, delivery_mode);
+ 	sn_send_IPI_phys(nasid, physid, vector, delivery_mode);
 }
 
 #ifdef CONFIG_PROC_FS

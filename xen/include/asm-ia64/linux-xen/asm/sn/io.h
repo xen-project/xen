@@ -18,7 +18,14 @@ extern int num_cnodes;
 
 #define __sn_mf_a()   ia64_mfa()
 
+#ifdef XEN
+/*
+ * Xen doesn't deal with any PIC devices directly, it's all handled in dom0
+ */
+#define sn_dma_flush(foo)		do {} while(0)
+#else
 extern void sn_dma_flush(unsigned long);
+#endif
 
 #define __sn_inb ___sn_inb
 #define __sn_inw ___sn_inw

@@ -9,7 +9,9 @@
 #include <linux/module.h>
 #include <asm/io.h>
 #include <asm/delay.h>
+#ifndef XEN
 #include <asm/vga.h>
+#endif
 #include <asm/sn/nodepda.h>
 #include <asm/sn/simulator.h>
 #include <asm/sn/pda.h>
@@ -18,6 +20,10 @@
 
 #define IS_LEGACY_VGA_IOPORT(p) \
 	(((p) >= 0x3b0 && (p) <= 0x3bb) || ((p) >= 0x3c0 && (p) <= 0x3df))
+
+#ifdef XEN
+#define vga_console_iobase	0
+#endif
 
 /**
  * sn_io_addr - convert an in/out port to an i/o address

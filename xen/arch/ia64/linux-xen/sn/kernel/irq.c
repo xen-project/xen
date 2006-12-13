@@ -11,14 +11,24 @@
 #include <linux/irq.h>
 #include <linux/spinlock.h>
 #include <linux/init.h>
+#ifdef XEN
+#include <linux/pci.h>
+#include <asm/hw_irq.h>
+#endif
 #include <asm/sn/addrs.h>
 #include <asm/sn/arch.h>
 #include <asm/sn/intr.h>
 #include <asm/sn/pcibr_provider.h>
 #include <asm/sn/pcibus_provider_defs.h>
+#ifndef XEN
 #include <asm/sn/pcidev.h>
+#endif
 #include <asm/sn/shub_mmr.h>
 #include <asm/sn/sn_sal.h>
+
+#ifdef XEN
+#define move_native_irq(foo)	do {} while(0)
+#endif
 
 static void force_interrupt(int irq);
 static void register_intr_pda(struct sn_irq_info *sn_irq_info);
@@ -111,6 +121,7 @@ static void sn_end_irq(unsigned int irq)
 		force_interrupt(irq);
 }
 
+#ifndef XEN
 static void sn_irq_info_free(struct rcu_head *head);
 
 struct sn_irq_info *sn_retarget_vector(struct sn_irq_info *sn_irq_info,
@@ -175,9 +186,15 @@ struct sn_irq_info *sn_retarget_vector(struct sn_irq_info *sn_irq_info,
 		(pci_provider->target_interrupt)(new_irq_info);
 
 	spin_lock(&sn_irq_info_lock);
+#ifdef XEN
+	list_replace(&sn_irq_info->list, &new_irq_info->list);
+#else
 	list_replace_rcu(&sn_irq_info->list, &new_irq_info->list);
+#endif
 	spin_unlock(&sn_irq_info_lock);
+#ifndef XEN
 	call_rcu(&sn_irq_info->rcu, sn_irq_info_free);
+#endif
 
 #ifdef CONFIG_SMP
 	set_irq_affinity_info((vector & 0xff), cpuphys, 0);
@@ -199,16 +216,21 @@ static void sn_set_affinity_irq(unsigned int irq, cpumask_t mask)
 				 sn_irq_lh[irq], list)
 		(void)sn_retarget_vector(sn_irq_info, nasid, slice);
 }
+#endif
 
 struct hw_interrupt_type irq_type_sn = {
+#ifndef XEN
 	.name		= "SN hub",
+#endif
 	.startup	= sn_startup_irq,
 	.shutdown	= sn_shutdown_irq,
 	.enable		= sn_enable_irq,
 	.disable	= sn_disable_irq,
 	.ack		= sn_ack_irq,
 	.end		= sn_end_irq,
+#ifndef XEN
 	.set_affinity	= sn_set_affinity_irq
+#endif
 };
 
 unsigned int sn_local_vector_to_irq(u8 vector)
@@ -221,6 +243,7 @@ void sn_irq_init(void)
 	int i;
 	irq_desc_t *base_desc = irq_desc;
 
+#ifndef XEN
 	ia64_first_device_vector = IA64_SN2_FIRST_DEVICE_VECTOR;
 	ia64_last_device_vector = IA64_SN2_LAST_DEVICE_VECTOR;
 
@@ -229,6 +252,7 @@ void sn_irq_init(void)
 			base_desc[i].chip = &irq_type_sn;
 		}
 	}
+#endif
 }
 
 static void register_intr_pda(struct sn_irq_info *sn_irq_info)
@@ -251,14 +275,24 @@ static void unregister_intr_pda(struct sn_irq_info *sn_irq_info)
 	struct sn_irq_info *tmp_irq_info;
 	int i, foundmatch;
 
+#ifndef XEN
 	rcu_read_lock();
+#else
+	spin_lock(&sn_irq_info_lock);
+#endif
 	if (pdacpu(cpu)->sn_last_irq == irq) {
 		foundmatch = 0;
 		for (i = pdacpu(cpu)->sn_last_irq - 1;
 		     i && !foundmatch; i--) {
+#ifdef XEN
+			list_for_each_entry(tmp_irq_info,
+						sn_irq_lh[i],
+						list) {
+#else
 			list_for_each_entry_rcu(tmp_irq_info,
 						sn_irq_lh[i],
 						list) {
+#endif
 				if (tmp_irq_info->irq_cpuid == cpu) {
 					foundmatch = 1;
 					break;
@@ -272,9 +306,15 @@ static void unregister_intr_pda(struct sn_irq_info *sn_irq_info)
 		foundmatch = 0;
 		for (i = pdacpu(cpu)->sn_first_irq + 1;
 		     i < NR_IRQS && !foundmatch; i++) {
+#ifdef XEN
+			list_for_each_entry(tmp_irq_info,
+						sn_irq_lh[i],
+						list) {
+#else
 			list_for_each_entry_rcu(tmp_irq_info,
 						sn_irq_lh[i],
 						list) {
+#endif
 				if (tmp_irq_info->irq_cpuid == cpu) {
 					foundmatch = 1;
 					break;
@@ -283,9 +323,14 @@ static void unregister_intr_pda(struct sn_irq_info *sn_irq_info)
 		}
 		pdacpu(cpu)->sn_first_irq = ((i == NR_IRQS) ? 0 : i);
 	}
+#ifndef XEN
 	rcu_read_unlock();
+#else
+	spin_unlock(&sn_irq_info_lock);
+#endif
 }
 
+#ifndef XEN
 static void sn_irq_info_free(struct rcu_head *head)
 {
 	struct sn_irq_info *sn_irq_info;
@@ -293,7 +338,9 @@ static void sn_irq_info_free(struct rcu_head *head)
 	sn_irq_info = container_of(head, struct sn_irq_info, rcu);
 	kfree(sn_irq_info);
 }
+#endif
 
+#ifndef XEN
 void sn_irq_fixup(struct pci_dev *pci_dev, struct sn_irq_info *sn_irq_info)
 {
 	nasid_t nasid = sn_irq_info->irq_nasid;
@@ -306,8 +353,14 @@ void sn_irq_fixup(struct pci_dev *pci_dev, struct sn_irq_info *sn_irq_info)
 
 	/* link it into the sn_irq[irq] list */
 	spin_lock(&sn_irq_info_lock);
+#ifdef XEN
+	list_add(&sn_irq_info->list, sn_irq_lh[sn_irq_info->irq_irq]);
+#else
 	list_add_rcu(&sn_irq_info->list, sn_irq_lh[sn_irq_info->irq_irq]);
+#endif
+#ifndef XEN
 	reserve_irq_vector(sn_irq_info->irq_irq);
+#endif
 	spin_unlock(&sn_irq_info_lock);
 
 	register_intr_pda(sn_irq_info);
@@ -331,14 +384,21 @@ void sn_irq_unfixup(struct pci_dev *pci_dev)
 
 	unregister_intr_pda(sn_irq_info);
 	spin_lock(&sn_irq_info_lock);
+#ifdef XEN
+	list_del(&sn_irq_info->list);
+#else
 	list_del_rcu(&sn_irq_info->list);
+#endif
 	spin_unlock(&sn_irq_info_lock);
 	if (list_empty(sn_irq_lh[sn_irq_info->irq_irq]))
 		free_irq_vector(sn_irq_info->irq_irq);
+#ifndef XEN
 	call_rcu(&sn_irq_info->rcu, sn_irq_info_free);
+#endif
 	pci_dev_put(pci_dev);
 
 }
+#endif
 
 static inline void
 sn_call_force_intr_provider(struct sn_irq_info *sn_irq_info)
@@ -354,16 +414,31 @@ static void force_interrupt(int irq)
 {
 	struct sn_irq_info *sn_irq_info;
 
+#ifndef XEN
 	if (!sn_ioif_inited)
 		return;
+#endif
 
+#ifdef XEN
+	spin_lock(&sn_irq_info_lock);
+#else
 	rcu_read_lock();
+#endif
+#ifdef XEN
+	list_for_each_entry(sn_irq_info, sn_irq_lh[irq], list)
+#else
 	list_for_each_entry_rcu(sn_irq_info, sn_irq_lh[irq], list)
+#endif
 		sn_call_force_intr_provider(sn_irq_info);
 
+#ifdef XEN
+	spin_unlock(&sn_irq_info_lock);
+#else
 	rcu_read_unlock();
+#endif
 }
 
+#ifndef XEN
 /*
  * Check for lost interrupts.  If the PIC int_status reg. says that
  * an interrupt has been sent, but not handled, and the interrupt
@@ -408,22 +483,41 @@ static void sn_check_intr(int irq, struct sn_irq_info *sn_irq_info)
 	}
 	sn_irq_info->irq_last_intr = regval;
 }
+#endif
 
 void sn_lb_int_war_check(void)
 {
 	struct sn_irq_info *sn_irq_info;
 	int i;
 
+#ifndef XEN
+#ifdef XEN
+	if (pda->sn_first_irq == 0)
+#else
 	if (!sn_ioif_inited || pda->sn_first_irq == 0)
+#endif
 		return;
 
+#ifdef XEN
+	spin_lock(&sn_irq_info_lock);
+#else
 	rcu_read_lock();
+#endif
 	for (i = pda->sn_first_irq; i <= pda->sn_last_irq; i++) {
+#ifdef XEN
+		list_for_each_entry(sn_irq_info, sn_irq_lh[i], list) {
+#else
 		list_for_each_entry_rcu(sn_irq_info, sn_irq_lh[i], list) {
+#endif
 			sn_check_intr(i, sn_irq_info);
 		}
 	}
+#ifdef XEN
+	spin_unlock(&sn_irq_info_lock);
+#else
 	rcu_read_unlock();
+#endif
+#endif
 }
 
 void __init sn_irq_lh_init(void)

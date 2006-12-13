@@ -8,6 +8,10 @@
 #ifndef _ASM_IA64_SN_PCI_PCIBR_PROVIDER_H
 #define _ASM_IA64_SN_PCI_PCIBR_PROVIDER_H
 
+#ifdef XEN
+#include <linux/spinlock.h>
+#include <linux/pci.h>
+#endif
 #include <asm/sn/intr.h>
 #include <asm/sn/pcibus_provider_defs.h>
 

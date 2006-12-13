@@ -10,9 +10,13 @@
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/kernel.h>
+#ifndef XEN
 #include <linux/kdev_t.h>
+#endif
 #include <linux/string.h>
+#ifndef XEN
 #include <linux/screen_info.h>
+#endif
 #include <linux/console.h>
 #include <linux/timex.h>
 #include <linux/sched.h>
@@ -26,7 +30,9 @@
 #include <linux/acpi.h>
 #include <linux/compiler.h>
 #include <linux/sched.h>
+#ifndef XEN
 #include <linux/root_dev.h>
+#endif
 #include <linux/nodemask.h>
 #include <linux/pm.h>
 #include <linux/efi.h>
@@ -36,7 +42,9 @@
 #include <asm/machvec.h>
 #include <asm/system.h>
 #include <asm/processor.h>
+#ifndef XEN
 #include <asm/vga.h>
+#endif
 #include <asm/sn/arch.h>
 #include <asm/sn/addrs.h>
 #include <asm/sn/pda.h>
@@ -44,15 +52,32 @@
 #include <asm/sn/sn_cpuid.h>
 #include <asm/sn/simulator.h>
 #include <asm/sn/leds.h>
+#ifndef XEN
 #include <asm/sn/bte.h>
+#endif
 #include <asm/sn/shub_mmr.h>
+#ifndef XEN
 #include <asm/sn/clksupport.h>
+#endif
 #include <asm/sn/sn_sal.h>
 #include <asm/sn/geo.h>
 #include <asm/sn/sn_feature_sets.h>
+#ifndef XEN
 #include "xtalk/xwidgetdev.h"
 #include "xtalk/hubdev.h"
+#else
+#include "asm/sn/xwidgetdev.h"
+#include "asm/sn/hubdev.h"
+#endif
 #include <asm/sn/klconfig.h>
+#ifdef XEN
+#include <asm/sn/shubio.h>
+
+/* Xen has no clue about NUMA ....  grrrr */
+#define pxm_to_node(foo)		0
+#define node_to_pxm(foo)		0
+#define numa_node_id()			0
+#endif
 
 
 DEFINE_PER_CPU(struct pda_s, pda_percpu);
@@ -107,6 +132,7 @@ static void build_cnode_tables(void);
 
 static nodepda_t *nodepdaindr[MAX_COMPACT_NODES];
 
+#ifndef XEN
 /*
  * The format of "screen_info" is strange, and due to early i386-setup
  * code. This is just enough to make the console code think we're on a
@@ -122,6 +148,7 @@ struct screen_info sn_screen_info = {
 	.orig_video_isVGA = 1,
 	.orig_video_points = 16
 };
+#endif
 
 /*
  * This routine can only be used during init, since
@@ -228,6 +255,7 @@ static void __init sn_check_for_wars(void)
 	}
 }
 
+#ifndef XEN
 /*
  * Scan the EFI PCDP table (if it exists) for an acceptable VGA console
  * output device.  If one exists, pick it and set sn_legacy_{io,mem} to
@@ -369,6 +397,7 @@ static unsigned long long ia64_sn2_printk_clock(void)
 	return (rtc_now - sn2_rtc_initial) *
 		(1000000000 / sn_rtc_cycles_per_second);
 }
+#endif
 
 /**
  * sn_setup - SN platform setup routine
@@ -378,10 +407,15 @@ static unsigned long long ia64_sn2_printk_clock(void)
  * the RTC frequency (via a SAL call), initializing secondary CPUs, and
  * setting up per-node data areas.  The console is also initialized here.
  */
+#ifdef XEN
+void __cpuinit sn_cpu_init(void);
+#endif
+
 void __init sn_setup(char **cmdline_p)
 {
 	long status, ticks_per_sec, drift;
 	u32 version = sn_sal_rev();
+#ifndef XEN
 	extern void sn_cpu_init(void);
 
 	sn2_rtc_initial = rtc_time();
@@ -430,6 +464,7 @@ void __init sn_setup(char **cmdline_p)
 #endif				/* def(CONFIG_VT) && def(CONFIG_VGA_CONSOLE) */
 
 	MAX_DMA_ADDRESS = PAGE_OFFSET + MAX_PHYS_MEMORY;
+#endif
 
 	/*
 	 * Build the tables for managing cnodes.
@@ -446,10 +481,12 @@ void __init sn_setup(char **cmdline_p)
 		sn_rtc_cycles_per_second = 1000000000000UL / 30000UL;
 	} else
 		sn_rtc_cycles_per_second = ticks_per_sec;
+#ifndef XEN
 
 	platform_intr_list[ACPI_INTERRUPT_CPEI] = IA64_CPE_VECTOR;
 
 	ia64_printk_clock = ia64_sn2_printk_clock;
+#endif
 
 	printk("SGI SAL version %x.%02x\n", version >> 8, version & 0x00FF);
 
@@ -457,14 +494,18 @@ void __init sn_setup(char **cmdline_p)
 	 * we set the default root device to /dev/hda
 	 * to make simulation easy
 	 */
+#ifndef XEN
 	ROOT_DEV = Root_HDA1;
+#endif
 
 	/*
 	 * Create the PDAs and NODEPDAs for all the cpus.
 	 */
 	sn_init_pdas(cmdline_p);
 
+#ifndef XEN
 	ia64_mark_idle = &snidle;
+#endif
 
 	/*
 	 * For the bootcpu, we do this here. All other cpus will make the
@@ -472,6 +513,7 @@ void __init sn_setup(char **cmdline_p)
 	 */
 	sn_cpu_init();
 
+#ifndef XEN
 #ifdef CONFIG_SMP
 	init_smp_config();
 #endif
@@ -487,6 +529,7 @@ void __init sn_setup(char **cmdline_p)
 	 */
 	pm_power_off = ia64_sn_power_down;
 	current->thread.flags |= IA64_THREAD_MIGRATION;
+#endif
 }
 
 /**
@@ -526,6 +569,7 @@ static void __init sn_init_pdas(char **cmdline_p)
 		memcpy(nodepdaindr[cnode]->pernode_pdaindr, nodepdaindr,
 		       sizeof(nodepdaindr));
 
+#ifndef XEN
 	/*
 	 * Set up IO related platform-dependent nodepda fields.
 	 * The following routine actually sets up the hubinfo struct
@@ -542,6 +586,7 @@ static void __init sn_init_pdas(char **cmdline_p)
 	for (cnode = 0; cnode < num_cnodes; cnode++) {
 		hubdev_init_node(nodepdaindr[cnode], cnode);
 	}
+#endif
 }
 
 /**
@@ -565,6 +610,7 @@ void __cpuinit sn_cpu_init(void)
 	static int wars_have_been_checked;
 
 	cpuid = smp_processor_id();
+#ifndef XEN
 	if (cpuid == 0 && IS_MEDUSA()) {
 		if (ia64_sn_is_fake_prom())
 			sn_prom_type = 2;
@@ -573,6 +619,7 @@ void __cpuinit sn_cpu_init(void)
 		printk(KERN_INFO "Running on medusa with %s PROM\n",
 		       (sn_prom_type == 1) ? "real" : "fake");
 	}
+#endif
 
 	memset(pda, 0, sizeof(pda));
 	if (ia64_sn_get_sn_info(0, &sn_hub_info->shub2,
@@ -660,6 +707,7 @@ void __cpuinit sn_cpu_init(void)
 		pda->pio_write_status_val = is_shub1() ? SH_PIO_WRITE_STATUS_PENDING_WRITE_COUNT_MASK : 0;
 	}
 
+#ifndef XEN  /* local_node_data is not allocated .... yet */
 	/*
 	 * WAR addresses for SHUB 1.x.
 	 */
@@ -672,6 +720,7 @@ void __cpuinit sn_cpu_init(void)
 		    (volatile unsigned long *)GLOBAL_MMR_ADDR(nasid,
 							      SH1_PI_CAM_CONTROL);
 	}
+#endif
 }
 
 /*

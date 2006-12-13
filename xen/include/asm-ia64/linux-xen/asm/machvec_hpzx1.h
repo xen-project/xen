@@ -19,6 +19,30 @@ extern ia64_mv_dma_mapping_error	sba_dma_mapping_error;
  * the macros are used directly.
  */
 #define platform_name				"hpzx1"
+#ifdef XEN
+extern ia64_mv_setup_t hpsim_setup;
+extern ia64_mv_irq_init_t hpsim_irq_init;
+#define platform_setup				hpsim_setup
+#define platform_irq_init			hpsim_irq_init
+
+#define platform_dma_init			machvec_noop
+#define platform_dma_alloc_coherent		machvec_noop
+#define platform_dma_free_coherent		machvec_noop
+#define platform_dma_map_single			machvec_noop
+#define platform_dma_unmap_single		machvec_noop
+#define platform_dma_map_sg			machvec_noop
+#define platform_dma_unmap_sg			machvec_noop
+#define platform_dma_sync_single_for_cpu	machvec_noop
+#define platform_dma_sync_sg_for_cpu		machvec_noop
+#define platform_dma_sync_single_for_device	machvec_noop
+#define platform_dma_sync_sg_for_device		machvec_noop
+#define platform_dma_mapping_error		machvec_noop
+#define platform_dma_supported			machvec_noop
+
+#define platform_pci_get_legacy_mem		machvec_noop
+#define platform_pci_legacy_read		machvec_noop
+#define platform_pci_legacy_write		machvec_noop
+#else
 #define platform_setup				dig_setup
 #define platform_dma_init			machvec_noop
 #define platform_dma_alloc_coherent		sba_alloc_coherent
@@ -33,5 +57,6 @@ extern ia64_mv_dma_mapping_error	sba_dma_mapping_error;
 #define platform_dma_sync_sg_for_device		machvec_dma_sync_sg
 #define platform_dma_supported			sba_dma_supported
 #define platform_dma_mapping_error		sba_dma_mapping_error
+#endif
 
 #endif /* _ASM_IA64_MACHVEC_HPZX1_h */

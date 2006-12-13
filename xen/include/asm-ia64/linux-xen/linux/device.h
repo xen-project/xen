@@ -78,7 +78,9 @@ int __must_check bus_for_each_drv(struct bus_type *bus,
 /* driverfs interface for exporting bus attributes */
 
 struct bus_attribute {
+#ifndef XEN
 	struct attribute	attr;
+#endif
 	ssize_t (*show)(struct bus_type *, char * buf);
 	ssize_t (*store)(struct bus_type *, const char * buf, size_t count);
 };
@@ -122,7 +124,9 @@ extern int driver_probe_done(void);
 /* driverfs interface for exporting driver attributes */
 
 struct driver_attribute {
+#ifndef XEN
 	struct attribute	attr;
+#endif
 	ssize_t (*show)(struct device_driver *, char * buf);
 	ssize_t (*store)(struct device_driver *, const char * buf, size_t count);
 };
@@ -152,7 +156,11 @@ struct class {
 	struct list_head	children;
 	struct list_head	devices;
 	struct list_head	interfaces;
+#ifdef XEN
+	spinlock_t		sem;
+#else
 	struct semaphore	sem;	/* locks both the children and interfaces lists */
+#endif
 
 	struct kobject		*virtual_dir;
 
@@ -178,7 +186,9 @@ extern void class_unregister(struct class *);
 
 
 struct class_attribute {
+#ifndef XEN
 	struct attribute	attr;
+#endif
 	ssize_t (*show)(struct class *, char * buf);
 	ssize_t (*store)(struct class *, const char * buf, size_t count);
 };
@@ -191,7 +201,9 @@ extern int __must_check class_create_file(struct class *,
 extern void class_remove_file(struct class *, const struct class_attribute *);
 
 struct class_device_attribute {
+#ifndef XEN
 	struct attribute	attr;
+#endif
 	ssize_t (*show)(struct class_device *, char * buf);
 	ssize_t (*store)(struct class_device *, const char * buf, size_t count);
 };
@@ -333,9 +345,13 @@ struct device {
 	struct device_attribute uevent_attr;
 	struct device_attribute *devt_attr;
 
+#ifdef XEN
+	spinlock_t		sem;
+#else
 	struct semaphore	sem;	/* semaphore to synchronize calls to
 					 * its driver.
 					 */
+#endif
 
 	struct bus_type	* bus;		/* type of bus device is on */
 	struct device_driver *driver;	/* which driver has allocated this

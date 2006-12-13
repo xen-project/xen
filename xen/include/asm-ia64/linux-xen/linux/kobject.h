@@ -169,7 +169,9 @@ extern struct kobject * kset_find_obj(struct kset *, const char *);
 
 struct subsystem {
 	struct kset		kset;
+#ifndef XEN
 	struct rw_semaphore	rwsem;
+#endif
 };
 
 #define decl_subsys(_name,_type,_uevent_ops) \
@@ -254,7 +256,9 @@ static inline void subsys_put(struct subsystem * s)
 }
 
 struct subsys_attribute {
+#ifndef XEN
 	struct attribute attr;
+#endif
 	ssize_t (*show)(struct subsystem *, char *);
 	ssize_t (*store)(struct subsystem *, const char *, size_t); 
 };
