@@ -459,6 +459,8 @@ static int dom0_init(void)
 		return -1;
 
 	dom0 = new_domain(NULL, 0, port); 
+	if (dom0 == NULL)
+		return -1;
 
 	dom0->interface = xenbus_map();
 	if (dom0->interface == NULL)
