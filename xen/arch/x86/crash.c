@@ -28,6 +28,7 @@
 #include <asm/hvm/hvm.h>
 
 static atomic_t waiting_for_crash_ipi;
+static unsigned int crashing_cpu;
 
 static int crash_nmi_callback(struct cpu_user_regs *regs, int cpu)
 {
@@ -39,7 +40,7 @@ static int crash_nmi_callback(struct cpu_user_regs *regs, int cpu)
         return 1;
     local_irq_disable();
 
-    machine_crash_save_cpu();
+    kexec_crash_save_cpu();
     disable_local_APIC();
     atomic_dec(&waiting_for_crash_ipi);
     hvm_disable();
@@ -67,6 +68,8 @@ static void nmi_shootdown_cpus(void)
 {
     unsigned long msecs;
 
+    crashing_cpu = smp_processor_id();
+
     atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
     /* Would it be better to replace the trap vector here? */
     set_nmi_callback(crash_nmi_callback);
@@ -86,18 +89,10 @@ static void nmi_shootdown_cpus(void)
     disable_local_APIC();
 }
 
-static void crash_save_xen_notes(void)
+void machine_crash_shutdown(void)
 {
     crash_xen_info_t *info;
 
-    info = machine_crash_save_info();
-
-    info->dom0_pfn_to_mfn_frame_list_list = \
-        dom0->shared_info->arch.pfn_to_mfn_frame_list_list;
-}
-
-void machine_crash_shutdown(void)
-{
     local_irq_disable();
 
     nmi_shootdown_cpus();
@@ -106,7 +101,9 @@ void machine_crash_shutdown(void)
 
     hvm_disable();
 
-    crash_save_xen_notes();
+    info = kexec_crash_save_info();
+    info->dom0_pfn_to_mfn_frame_list_list =
+        dom0->shared_info->arch.pfn_to_mfn_frame_list_list;
 }
 
 /*

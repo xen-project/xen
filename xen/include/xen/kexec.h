@@ -5,8 +5,6 @@
 #include <asm/percpu.h>
 #include <xen/elfcore.h>
 
-extern int crashing_cpu;
-
 typedef struct xen_kexec_reserve {
     unsigned long size;
     unsigned long start;
@@ -27,9 +25,9 @@ int machine_kexec_load(int type, int slot, xen_kexec_image_t *image);
 void machine_kexec_unload(int type, int slot, xen_kexec_image_t *image);
 void machine_kexec_reserved(xen_kexec_reserve_t *reservation);
 void machine_reboot_kexec(xen_kexec_image_t *image);
-void machine_crash_kexec(void);
-void machine_crash_save_cpu(void);
-crash_xen_info_t *machine_crash_save_info(void);
+void kexec_crash(void);
+void kexec_crash_save_cpu(void);
+crash_xen_info_t *kexec_crash_save_info(void);
 void machine_crash_shutdown(void);
 
 #endif /* __XEN_KEXEC_H__ */

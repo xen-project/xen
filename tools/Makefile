@@ -36,7 +36,7 @@ all: check
 	$(MAKE) ioemu
 
 .PHONY: install
-install: check
+install: check_install
 	@set -e; for subdir in $(SUBDIRS-y); do \
 		$(MAKE) -C $$subdir $@; \
 	done
@@ -57,6 +57,10 @@ distclean: clean
 .PHONY: check
 check:
 	$(MAKE) -C check
+
+.PHONY: check_install
+check_install: check
+	$(MAKE) -C check install
 
 .PHONY: check_clean
 check_clean:

@@ -441,7 +441,7 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
     uint32_t val;
 
 #if defined(__i386__) || defined(__x86_64__)
-    static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+    static pthread_mutex_t mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
     pthread_mutex_lock(&mutex);
 #endif
 

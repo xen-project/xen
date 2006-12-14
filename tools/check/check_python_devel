@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # CHECK-BUILD
 
 function error {
@@ -7,10 +7,19 @@ function error {
     exit 1
 }
 
+RC=0
+
 python -c '
 import os.path, sys
 for p in sys.path:
 	if os.path.exists(p + "/config/Makefile"):
 		sys.exit(0)
 sys.exit(1)
-' || error
+' || RC=1 
+
+if test ${RC} -ne 0; then
+	echo
+	echo " *** Check for python development environment FAILED"
+fi
+
+exit ${RC}

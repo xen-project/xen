@@ -222,7 +222,6 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
     init_timer(&platform->pl_time.periodic_tm.timer,
                pt_timer_fn, v, v->processor);
-    pit_init(v, cpu_khz);
     rtc_init(v, RTC_PORT(0), RTC_IRQ);
     pmtimer_init(v, ACPI_PM_TMR_BLK_ADDRESS);
 

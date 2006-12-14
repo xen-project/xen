@@ -54,7 +54,6 @@ typedef struct PITChannelState {
 typedef struct PITState {
     PITChannelState channels[3];
     int speaker_data_on;
-    int dummy_refresh_clock;
 } PITState;
 
 #define RTC_SIZE 14
@@ -125,6 +124,7 @@ extern void pickup_deactive_ticks(struct periodic_time *vpit);
 extern struct periodic_time *create_periodic_time(
     u32 period, char irq, char one_shot, time_cb *cb, void *data);
 extern void destroy_periodic_time(struct periodic_time *pt);
+int pv_pit_handler(int port, int data, int write);
 void pit_init(struct vcpu *v, unsigned long cpu_khz);
 void rtc_init(struct vcpu *v, int base, int irq);
 void rtc_deinit(struct domain *d);

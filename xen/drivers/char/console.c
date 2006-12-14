@@ -866,7 +866,7 @@ void panic(const char *fmt, ...)
 
     debugger_trap_immediate();
 
-    machine_crash_kexec();
+    kexec_crash();
 
     if ( opt_noreboot )
     {

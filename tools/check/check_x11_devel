@@ -1,11 +1,15 @@
-#!/bin/bash
+#!/bin/sh
 # CHECK-BUILD
 
-function error {
-    echo
-    echo "  *** Check for x11 headers FAILED"
-    exit 1
-}
+RC=0
 
 set -e
-[ -e /usr/include/X11/keysymdef.h ] || error
+test -r /usr/include/X11/keysymdef.h || \
+test -r /usr/X11R6/include/X11/keysymdef.h || RC=1
+
+if test ${RC} -ne 0; then
+	echo
+	echo " *** Check for x11 headers FAILED"
+fi
+
+exit ${RC}
