@@ -155,13 +155,13 @@ class DevController:
         status = self.waitForBackend(devid)
 
         if status == Timeout:
-            self.destroyDevice(devid)
+            self.destroyDevice(devid, False)
             raise VmError("Device %s (%s) could not be connected. "
                           "Hotplug scripts not working." %
                           (devid, self.deviceClass))
 
         elif status == Error:
-            self.destroyDevice(devid)
+            self.destroyDevice(devid, False)
             raise VmError("Device %s (%s) could not be connected. "
                           "Backend device not found." %
                           (devid, self.deviceClass))
@@ -180,7 +180,7 @@ class DevController:
             if not err:
                 err = "Busy."
                 
-            self.destroyDevice(devid)
+            self.destroyDevice(devid, False)
             raise VmError("Device %s (%s) could not be connected.\n%s" %
                           (devid, self.deviceClass, err))
 
