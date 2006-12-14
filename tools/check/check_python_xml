@@ -1,19 +1,8 @@
-#!/bin/bash
+#!/bin/sh
 # CHECK-INSTALL
 
-RC=0
-
-python -c '
-import os.path, sys
-for p in sys.path:
-	if os.path.exists(p + "/xml/dom/minidom.py"):
-		sys.exit(0)
-sys.exit(1)
-' || RC=1
-
-if test ${RC} -ne 0; then
+python -c 'import xml.dom.minidom' 2>/dev/null || {
     echo
     echo "  *** Check for python-xml package FAILED"
-fi
-
-exit ${RC}
+    exit 1
+}
