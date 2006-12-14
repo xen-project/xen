@@ -532,6 +532,7 @@ config XEN_BALLOON
 
 config XEN_SKBUFF
 	default y
+	depends on NET
 
 config XEN_REBOOT
 	default y
