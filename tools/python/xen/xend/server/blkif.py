@@ -133,7 +133,7 @@ class BlkifController(DevController):
 
         return config
 
-    def destroyDevice(self, devid):
+    def destroyDevice(self, devid, force):
         """@see DevController.destroyDevice"""
 
         # If we are given a device name, then look up the device ID from it,
@@ -142,13 +142,13 @@ class BlkifController(DevController):
         # superclass's method.
 
         try:
-            DevController.destroyDevice(self, int(devid))
+            DevController.destroyDevice(self, int(devid), force)
         except ValueError:
             devid_end = type(devid) is str and devid.split('/')[-1] or None
 
             for i in self.deviceIDs():
                 d = self.readBackend(i, 'dev')
                 if d == devid or (devid_end and d == devid_end):
-                    DevController.destroyDevice(self, i)
+                    DevController.destroyDevice(self, i, force)
                     return
             raise VmError("Device %s not connected" % devid)

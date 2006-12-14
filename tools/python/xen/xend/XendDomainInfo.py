@@ -563,7 +563,7 @@ class XendDomainInfo:
         for devclass in XendDevices.valid_devices():
             self.getDeviceController(devclass).waitForDevices()
 
-    def destroyDevice(self, deviceClass, devid):
+    def destroyDevice(self, deviceClass, devid, force=None):
         try:
             devid = int(devid)
         except ValueError:
@@ -578,7 +578,7 @@ class XendDomainInfo:
                     devid = entry
                     break
                 
-        return self.getDeviceController(deviceClass).destroyDevice(devid)
+        return self.getDeviceController(deviceClass).destroyDevice(devid, force)
 
 
 

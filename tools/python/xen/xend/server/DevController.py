@@ -195,7 +195,7 @@ class DevController:
         raise VmError('%s devices may not be reconfigured' % self.deviceClass)
 
 
-    def destroyDevice(self, devid):
+    def destroyDevice(self, devid, force):
         """Destroy the specified device.
 
         @param devid The device ID, or something device-specific from which
@@ -215,6 +215,13 @@ class DevController:
         # drivers, so this ordering avoids a race).
         self.writeBackend(devid, 'online', "0")
         self.writeBackend(devid, 'state', str(xenbusState['Closing']))
+
+        if force:
+            frontpath = self.frontendPath(devid)
+            backpath = xstransact.Read(frontpath, "backend")
+            if backpath:
+                xstransact.Remove(backpath)
+            xstransact.Remove(frontpath)
 
 
     def configurations(self):
