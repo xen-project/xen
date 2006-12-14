@@ -110,9 +110,9 @@ extern ia64_mv_teardown_msi_irq_t	sn_teardown_msi_irq;
 #define platform_readq_relaxed		__sn_readq_relaxed
 #define platform_local_vector_to_irq	sn_local_vector_to_irq
 #ifdef XEN
-#define platform_pci_get_legacy_mem	machvec_noop
-#define platform_pci_legacy_read	machvec_noop
-#define platform_pci_legacy_write	machvec_noop
+#define platform_pci_get_legacy_mem	machvec_noop_pci_get_legacy_mem
+#define platform_pci_legacy_read	machvec_noop_pci_legacy_read
+#define platform_pci_legacy_write	machvec_noop_pci_legacy_write
 #else
 #define platform_pci_get_legacy_mem	sn_pci_get_legacy_mem
 #define platform_pci_legacy_read	sn_pci_legacy_read
@@ -120,18 +120,21 @@ extern ia64_mv_teardown_msi_irq_t	sn_teardown_msi_irq;
 #endif
 #define platform_dma_init		machvec_noop
 #ifdef XEN
-#define platform_dma_alloc_coherent	machvec_noop
-#define platform_dma_free_coherent	machvec_noop
-#define platform_dma_map_single		machvec_noop
-#define platform_dma_unmap_single	machvec_noop
-#define platform_dma_map_sg		machvec_noop
-#define platform_dma_unmap_sg		machvec_noop
-#define platform_dma_sync_single_for_cpu machvec_noop
-#define platform_dma_sync_sg_for_cpu	machvec_noop
-#define platform_dma_sync_single_for_device machvec_noop
-#define platform_dma_sync_sg_for_device	machvec_noop
-#define platform_dma_mapping_error	machvec_noop
-#define platform_dma_supported		machvec_noop
+#define platform_dma_alloc_coherent	machvec_noop_dma_alloc_coherent
+#define platform_dma_free_coherent	machvec_noop_dma_free_coherent
+#define platform_dma_map_single		machvec_noop_dma_map_single
+#define platform_dma_unmap_single	machvec_noop_dma_unmap_single
+#define platform_dma_map_sg		machvec_noop_dma_map_sg
+#define platform_dma_unmap_sg		machvec_noop_dma_unmap_sg
+#define platform_dma_sync_single_for_cpu	\
+	machvec_noop_dma_sync_single_for_cpu
+#define platform_dma_sync_sg_for_cpu		\
+	machvec_noop_dma_sync_sg_for_cpu
+#define platform_dma_sync_single_for_device	\
+	machvec_noop_dma_sync_single_for_device
+#define platform_dma_sync_sg_for_device	machvec_noop_dma_sync_sg_for_device
+#define platform_dma_mapping_error	machvec_noop_dma_mapping_error
+#define platform_dma_supported		machvec_noop_dma_supported
 #else
 #define platform_dma_alloc_coherent	sn_dma_alloc_coherent
 #define platform_dma_free_coherent	sn_dma_free_coherent
