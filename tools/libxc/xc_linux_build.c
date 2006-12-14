@@ -596,15 +596,21 @@ static int compat_check(int xc_handle, struct domain_setup_info *dsi)
     }
 
     if (strstr(xen_caps, "xen-3.0-x86_32p")) {
-        if (dsi->pae_kernel == PAEKERN_no) {
+        if (dsi->pae_kernel == PAEKERN_bimodal) {
+            dsi->pae_kernel = PAEKERN_extended_cr3;
+        } else if (dsi->pae_kernel == PAEKERN_no) {
             xc_set_error(XC_INVALID_KERNEL,
                          "Non PAE-kernel on PAE host.");
             return 0;
         }
-    } else if (dsi->pae_kernel != PAEKERN_no) {
-        xc_set_error(XC_INVALID_KERNEL,
-                     "PAE-kernel on non-PAE host.");
-        return 0;
+    } else {
+        if (dsi->pae_kernel == PAEKERN_bimodal) {
+            dsi->pae_kernel = PAEKERN_no;
+        } else if (dsi->pae_kernel != PAEKERN_no) {
+            xc_set_error(XC_INVALID_KERNEL,
+                         "PAE-kernel on non-PAE host.");
+            return 0;
+        }
     }
 
     return 1;
