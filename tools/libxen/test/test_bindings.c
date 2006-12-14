@@ -294,12 +294,12 @@ static void create_new_vm(xen_session *session)
             .actions_after_reboot = XEN_ON_NORMAL_EXIT_RESTART,
             .actions_after_suspend = XEN_ON_NORMAL_EXIT_DESTROY,
             .actions_after_crash = XEN_ON_CRASH_BEHAVIOUR_PRESERVE,
-            .bios_boot = "hd(0,0)",
-            .builder = "Linux",
-            .boot_method = XEN_BOOT_TYPE_KERNEL_EXTERNAL,
-            .kernel_kernel = "vmlinuz",
-            .kernel_initrd = "initrd.img",
-            .kernel_args = ""
+            .hvm_boot = "",
+            .pv_bootloader = "pygrub",
+            .pv_kernel = "/boot/vmlinuz-2.6.16.33-xen",
+            .pv_ramdisk = "",
+            .pv_args = "",
+            .pv_bootloader_args = ""
         };
 
 
@@ -370,7 +370,7 @@ static void create_new_vm(xen_session *session)
         {
             .vm = &vm_record_opt,
             .vdi = &vdi0_record_opt,
-            .device = "sda1",
+            .device = "xvda1",
             .mode = XEN_VBD_MODE_RW,
             .driver = XEN_DRIVER_TYPE_PARAVIRTUALISED
         };
