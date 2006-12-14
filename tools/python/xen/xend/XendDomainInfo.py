@@ -1927,6 +1927,9 @@ class XendDomainInfo:
                 
         return vcpu_util
 
+    def get_consoles(self):
+        return self.info.get('console_refs', [])
+
     def get_vifs(self):
         return self.info.get('vif_refs', [])
 

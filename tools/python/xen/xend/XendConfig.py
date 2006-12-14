@@ -353,6 +353,7 @@ class XendConfig(dict):
             'online_vcpus': 1,
             'max_vcpu_id': 0,
             'vcpu_avail': 1,
+            'console_refs': [],
             'vif_refs': [],
             'vbd_refs': [],
             'vtpm_refs': [],
@@ -643,6 +644,7 @@ class XendConfig(dict):
         # set device references in the configuration
         self['devices'] = cfg.get('devices', {})
         
+        self['console_refs'] = []
         self['vif_refs'] = []
         self['vbd_refs'] = []
         self['vtpm_refs'] = []
