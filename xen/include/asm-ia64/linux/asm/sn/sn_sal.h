@@ -148,7 +148,6 @@
 
 #define SN_SAL_FAKE_PROM			   0x02009999
 
-#ifndef XEN
 /**
   * sn_sal_revision - get the SGI SAL revision number
   *
@@ -222,7 +221,6 @@ ia64_sn_get_klconfig_addr(nasid_t nasid)
 	SAL_CALL(ret_stuff, SN_SAL_GET_KLCONFIG_ADDR, (u64)nasid, 0, 0, 0, 0, 0, 0);
 	return ret_stuff.v0 ? __va(ret_stuff.v0) : NULL;
 }
-#endif /* !XEN */
 
 /*
  * Returns the next console character.
@@ -301,7 +299,6 @@ ia64_sn_console_putb(const char *buf, int len)
 	return (u64)0;
 }
 
-#ifndef XEN
 /*
  * Print a platform error record
  */
@@ -1086,7 +1083,6 @@ ia64_sn_hwperf_op(nasid_t nasid, u64 opcode, u64 a0, u64 a1, u64 a2,
 		*v0 = (int) rv.v0;
 	return (int) rv.status;
 }
-#endif /* !XEN */
 
 static inline int
 ia64_sn_ioif_get_pci_topology(u64 buf, u64 len)
