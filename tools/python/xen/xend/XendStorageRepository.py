@@ -93,7 +93,7 @@ class XendStorageRepository:
                 open(uuid_file, 'w').write(new_uuid + '\n')
                 return new_uuid
         except IOError:
-            log.exception()
+            log.exception("Failed to determine SR UUID")
 
         return uuid.createString()
 
@@ -232,7 +232,7 @@ class XendStorageRepository:
                     if cfg_path and os.path.exists(cfg_path):
                         os.unlink(cfg_path)
                 except OSError:
-                    log.exception()
+                    log.exception("Failed to destroy image")
                 del self.images[image_uuid]
                 return True
         finally:
