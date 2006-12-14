@@ -1,11 +1,14 @@
-#!/bin/bash
+#!/bin/sh
 # CHECK-BUILD CHECK-INSTALL
 
-function error {
-    echo
-    echo "  *** Check for crypto library FAILED"
-    exit 1
-}
+RC=0
 
 set -e
-ldconfig -p | grep -q libcrypto.so || error
+ldconfig -v 2>&1 | grep -q libcrypto.so || RC=1
+
+if test ${RC} -ne 0; then
+        echo
+        echo " *** Check for crypto library FAILED"
+fi
+
+exit ${RC}
