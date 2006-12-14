@@ -709,7 +709,7 @@ def xm_vcpu_list(args):
         dominfo = map(server.xend.domain.getVCPUInfo, doms)
 
     print '%-32s %3s %5s %5s %5s %9s %s' % \
-          ('Name', 'ID', 'VCPUs', 'CPU', 'State', 'Time(s)', 'CPU Affinity')
+          ('Name', 'ID', 'VCPU', 'CPU', 'State', 'Time(s)', 'CPU Affinity')
 
     format = '%(name)-32s %(domid)3d %(number)5d %(c)5s %(s)5s ' \
              ' %(cpu_time)8.1f %(cpumap)s'
