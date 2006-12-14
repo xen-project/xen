@@ -295,7 +295,7 @@ static DEFINE_SPINLOCK(heap_lock);
 void end_boot_allocator(void)
 {
     unsigned long i, j, k;
-    int curr_free = 0, next_free = 0;
+    int curr_free, next_free;
 
     memset(avail, 0, sizeof(avail));
 
@@ -305,6 +305,8 @@ void end_boot_allocator(void)
                 INIT_LIST_HEAD(&heap[i][j][k]);
 
     /* Pages that are free now go to the domain sub-allocator. */
+    if ( (curr_free = next_free = !allocated_in_map(first_valid_mfn)) )
+        map_alloc(first_valid_mfn, 1);
     for ( i = first_valid_mfn; i < max_page; i++ )
     {
         curr_free = next_free;
