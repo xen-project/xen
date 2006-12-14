@@ -19,12 +19,14 @@
 from threading import Event
 import types
 
-from xen.xend import sxp
+from xen.xend import sxp, XendRoot
 from xen.xend.XendError import VmError
 from xen.xend.XendLogging import log
 
 from xen.xend.xenstore.xstransact import xstransact, complete
 from xen.xend.xenstore.xswatch import xswatch
+
+import os
 
 DEVICE_CREATE_TIMEOUT = 100
 HOTPLUG_STATUS_NODE = "hotplug-status"
@@ -47,6 +49,8 @@ xenbusState = {
     'Closing'      : 5,
     'Closed'       : 6,
     }
+
+xroot = XendRoot.instance()
 
 xenbusState.update(dict(zip(xenbusState.values(), xenbusState.keys())))
 
@@ -313,6 +317,16 @@ class DevController:
                       Make sure that the migration has finished and only
                       then return from the call.
         """
+        tool = xroot.get_external_migration_tool()
+        if tool:
+            log.info("Calling external migration tool for step %d" % step)
+            fd = os.popen("%s -type %s -step %d -host %s -domname %s" %
+                          (tool, self.deviceClass, step, dst, domName))
+            for line in fd:
+                log.info(line.rstrip())
+            rc = fd.close()
+            if rc:
+                raise VmError('Migration tool returned %d' % (rc >> 8))
         return 0
 
 
@@ -320,6 +334,16 @@ class DevController:
         """ Recover from device migration. The given step was the
             last one that was successfully executed.
         """
+        tool = xroot.get_external_migration_tool()
+        if tool:
+            log.info("Calling external migration tool")
+            fd = os.popen("%s -type %s -step %d -host %s -domname %s -recover" %
+                          (tool, self.deviceClass, step, dst, domName))
+            for line in fd:
+                log.info(line.rstrip())
+            rc = fd.close()
+            if rc:
+                raise VmError('Migration tool returned %d' % (rc >> 8))
         return 0
 
 
