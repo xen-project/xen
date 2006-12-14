@@ -339,7 +339,7 @@ static void create_new_vm(xen_session *session)
             .name_label = "MyRootFS",
             .name_description = "MyRootFS description",
             .sr = &sr_record,
-            .virtual_size = (1 << 20) / 512,
+            .virtual_size = (1 << 21),  // 1GiB / 512 bytes/sector
             .sector_size = 512,
             .type = XEN_VDI_TYPE_SYSTEM,
             .sharable = false,
