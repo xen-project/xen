@@ -3,7 +3,10 @@
 
 RC=0
 
-python -V 2>&1 | cut -d ' ' -f 2 | grep -q '^2.[2345]' || RC=1
+python -c '
+import sys
+sys.exit(sys.version_info[0] < 2 or sys.version_info[1] < 2)
+' || RC=1
 
 if test ${RC} -ne 0; then
 	echo
