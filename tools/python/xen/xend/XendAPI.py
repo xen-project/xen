@@ -669,7 +669,7 @@ class XendAPI:
     # attributes (ro)
     def VM_get_power_state(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success(dom.state)
+        return xen_api_success(dom.get_power_state())
     
     def VM_get_resident_on(self, session, vm_ref):
         return xen_api_success(XendNode.instance().uuid)

@@ -324,9 +324,7 @@ xen_vm_get_power_state(xen_session *session, enum xen_vm_power_state *result, xe
         };
 
     abstract_type result_type = xen_vm_power_state_abstract_type_;
-    char *result_str = NULL;
     XEN_CALL_("VM.get_power_state");
-    *result = xen_vm_power_state_from_string(session, result_str);
     return session->ok;
 }
 
