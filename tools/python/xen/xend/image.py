@@ -68,6 +68,7 @@ class ImageHandler:
     def __init__(self, vm, vmConfig, imageConfig, deviceConfig):
         self.vm = vm
 
+        self.bootloader = None
         self.kernel = None
         self.ramdisk = None
         self.cmdline = None
@@ -76,9 +77,10 @@ class ImageHandler:
 
     def configure(self, vmConfig, imageConfig, _):
         """Config actions common to all unix-like domains."""
-        self.kernel = vmConfig['kernel_kernel']
-        self.cmdline = vmConfig['kernel_args']
-        self.ramdisk = vmConfig['kernel_initrd']
+        self.bootloader = vmConfig['PV_bootloader']
+        self.kernel = vmConfig['PV_kernel']
+        self.cmdline = vmConfig['PV_args']
+        self.ramdisk = vmConfig['PV_ramdisk']
         self.vm.storeVm(("image/ostype", self.ostype),
                         ("image/kernel", self.kernel),
                         ("image/cmdline", self.cmdline),
@@ -86,8 +88,9 @@ class ImageHandler:
 
 
     def cleanupBootloading(self):
-        self.unlink(self.kernel)
-        self.unlink(self.ramdisk)
+        if self.bootloader:
+            self.unlink(self.kernel)
+            self.unlink(self.ramdisk)
 
 
     def unlink(self, f):

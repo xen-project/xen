@@ -21,7 +21,8 @@ from xen.util import mkdir
 from XendLogging import log
 from XendError import VmError
 
-def bootloader(blexec, disk, quiet = 0, blargs = None, imgcfg = None):
+def bootloader(blexec, disk, quiet = False, blargs = '', kernel = '',
+               ramdisk = '', kernel_args = ''):
     """Run the boot loader executable on the given disk and return a
     config image.
     @param blexec  Binary to use as the boot loader
@@ -55,18 +56,19 @@ def bootloader(blexec, disk, quiet = 0, blargs = None, imgcfg = None):
         if quiet:
             args.append("-q")
         args.append("--output=%s" % fifo)
-        if blargs is not None:
+        if blargs:
             args.extend(shlex.split(blargs))
         args.append(disk)
 
         try:
+            log.debug("Launching bootloader as %s." % str(args))
             os.execvp(args[0], args)
         except OSError, e:
             print e
             pass
         os._exit(1)
 
-    while 1:
+    while True:
         try:
             r = os.open(fifo, os.O_RDONLY)
         except OSError, e:
@@ -74,7 +76,7 @@ def bootloader(blexec, disk, quiet = 0, blargs = None, imgcfg = None):
                 continue
         break
     ret = ""
-    while 1:
+    while True:
         select.select([r], [], [])
         s = os.read(r, 1024)
         ret = ret + s
@@ -94,9 +96,4 @@ def bootloader(blexec, disk, quiet = 0, blargs = None, imgcfg = None):
     pin.input(ret)
     pin.input_eof()
     blcfg = pin.val
-
-    if imgcfg is None:
-        return blcfg
-    else:
-        c = sxp.merge(blcfg, imgcfg)
-        return c
+    return blcfg
