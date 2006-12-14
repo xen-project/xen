@@ -153,14 +153,14 @@ xen_sr_record_opt_set_free(xen_sr_record_opt_set *set);
 
 
 /**
- * Get the current state of the given SR.  !!!
+ * Get a record containing the current state of the given SR.
  */
 extern bool
 xen_sr_get_record(xen_session *session, xen_sr_record **result, xen_sr sr);
 
 
 /**
- * Get a reference to the object with the specified UUID.  !!!
+ * Get a reference to the SR instance with the specified UUID.
  */
 extern bool
 xen_sr_get_by_uuid(xen_session *session, xen_sr *result, char *uuid);

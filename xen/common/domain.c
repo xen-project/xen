@@ -238,7 +238,11 @@ void domain_kill(struct domain *d)
 
 void __domain_crash(struct domain *d)
 {
-    if ( d == current->domain )
+    if ( test_bit(_DOMF_shutdown, &d->domain_flags) )
+    {
+        /* Print nothing: the domain is already shutting down. */
+    }
+    else if ( d == current->domain )
     {
         printk("Domain %d (vcpu#%d) crashed on cpu#%d:\n",
                d->domain_id, current->vcpu_id, smp_processor_id());
@@ -346,16 +350,25 @@ void domain_destroy(struct domain *d)
     send_guest_global_virq(dom0, VIRQ_DOM_EXC);
 }
 
-void vcpu_pause(struct vcpu *v)
+static void vcpu_pause_setup(struct vcpu *v)
 {
-    ASSERT(v != current);
-
     spin_lock(&v->pause_lock);
     if ( v->pause_count++ == 0 )
         set_bit(_VCPUF_paused, &v->vcpu_flags);
     spin_unlock(&v->pause_lock);
+}
 
+void vcpu_pause(struct vcpu *v)
+{
+    ASSERT(v != current);
+    vcpu_pause_setup(v);
     vcpu_sleep_sync(v);
+}
+
+void vcpu_pause_nosync(struct vcpu *v)
+{
+    vcpu_pause_setup(v);
+    vcpu_sleep_nosync(v);
 }
 
 void vcpu_unpause(struct vcpu *v)

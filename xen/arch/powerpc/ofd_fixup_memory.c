@@ -68,6 +68,8 @@ static ofdn_t ofd_memory_node_create(
     reg.sz = size;
     ofd_prop_add(m, n, "reg", &reg, sizeof (reg));
 
+    printk("Dom0: %s: %016lx, %016lx\n", path, start, size);
+
     return n;
 }
 
@@ -86,17 +88,19 @@ static void ofd_memory_extent_nodes(void *m, struct domain *d)
     ulong size;
     ofdn_t n;
     struct page_extents *pe;
+    ulong cur_pfn = 1UL << d->arch.rma_order;
 
+    start = cur_pfn << PAGE_SHIFT;
+    size = 0;
     list_for_each_entry (pe, &d->arch.extent_list, pe_list) {
 
-        start = pe->pfn << PAGE_SHIFT;
-        size = 1UL << (pe->order + PAGE_SHIFT);
-
-        n = ofd_memory_node_create(m, OFD_ROOT, "", memory, memory,
-                                    start, size);
-
-        BUG_ON(n <= 0);
+        size += 1UL << (pe->order + PAGE_SHIFT);
+        if (pe->order != cpu_extent_order())
+            panic("we don't handle this yet\n");
     }
+    n = ofd_memory_node_create(m, OFD_ROOT, "", memory, memory,
+                               start, size);
+    BUG_ON(n <= 0);
 }
 
 void ofd_memory_props(void *m, struct domain *d)

@@ -110,6 +110,18 @@ set_cpu_sibling_map(int cpu)
 	cpu_data[cpu].booted_cores = 1;
 }
 
+static void
+remove_siblinginfo(int cpu)
+{
+	phys_proc_id[cpu] = BAD_APICID;
+	cpu_core_id[cpu]  = BAD_APICID;
+
+	cpus_clear(cpu_sibling_map[cpu]);
+	cpus_clear(cpu_core_map[cpu]);
+
+	cpu_data[cpu].booted_cores = 0;
+}
+
 static int xen_smp_intr_init(unsigned int cpu)
 {
 	int rc;
@@ -358,18 +370,6 @@ static int __init initialize_cpu_present_map(void)
 }
 core_initcall(initialize_cpu_present_map);
 
-static void
-remove_siblinginfo(int cpu)
-{
-	phys_proc_id[cpu] = BAD_APICID;
-	cpu_core_id[cpu]  = BAD_APICID;
-
-	cpus_clear(cpu_sibling_map[cpu]);
-	cpus_clear(cpu_core_map[cpu]);
-
-	cpu_data[cpu].booted_cores = 0;
-}
-
 int __cpu_disable(void)
 {
 	cpumask_t map = cpu_online_map;
@@ -432,7 +432,6 @@ int __devinit __cpu_up(unsigned int cpu)
 	/* This must be done before setting cpu_online_map */
 	set_cpu_sibling_map(cpu);
 	wmb();
-
 
 	rc = xen_smp_intr_init(cpu);
 	if (rc) {

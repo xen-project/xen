@@ -167,7 +167,7 @@ def recreate(info, priv):
 
     @param xeninfo: Parsed configuration
     @type  xeninfo: Dictionary
-    @param priv: TODO, unknown, something to do with memory
+    @param priv: Is a privileged domain (Dom 0)
     @type  priv: bool
 
     @rtype:  XendDomainInfo
@@ -381,7 +381,7 @@ class XendDomainInfo:
         @type    dompath: string
         @keyword augment: Augment given info with xenstored VM info
         @type    augment: bool
-        @keyword priv: Is a privledged domain (Dom 0) (TODO: really?)
+        @keyword priv: Is a privileged domain (Dom 0)
         @type    priv: bool
         @keyword resume: Is this domain being resumed?
         @type    resume: bool
@@ -563,7 +563,7 @@ class XendDomainInfo:
         for devclass in XendDevices.valid_devices():
             self.getDeviceController(devclass).waitForDevices()
 
-    def destroyDevice(self, deviceClass, devid):
+    def destroyDevice(self, deviceClass, devid, force=None):
         try:
             devid = int(devid)
         except ValueError:
@@ -578,7 +578,7 @@ class XendDomainInfo:
                     devid = entry
                     break
                 
-        return self.getDeviceController(deviceClass).destroyDevice(devid)
+        return self.getDeviceController(deviceClass).destroyDevice(devid, force)
 
 
 
@@ -647,6 +647,8 @@ class XendDomainInfo:
         if priv:
             augment_entries.remove('memory')
             augment_entries.remove('maxmem')
+            augment_entries.remove('vcpus')
+            augment_entries.remove('vcpu_avail')
 
         vm_config = self._readVMDetails([(k, XendConfig.LEGACY_CFG_TYPES[k])
                                          for k in augment_entries])
@@ -663,6 +665,14 @@ class XendDomainInfo:
                     self.info[xapiarg] = val
                 else:
                     self.info[arg] = val
+
+        # For dom0, we ignore any stored value for the vcpus fields, and
+        # read the current value from Xen instead.  This allows boot-time
+        # settings to take precedence over any entries in the store.
+        if priv:
+            xeninfo = dom_get(self.domid)
+            self.info['vcpus_number'] = xeninfo['online_vcpus']
+            self.info['vcpu_avail'] = (1 << xeninfo['online_vcpus']) - 1
 
         # read image value
         image_sxp = self._readVm('image')
@@ -895,6 +905,10 @@ class XendDomainInfo:
     def getMemoryTarget(self):
         """Get this domain's target memory size, in KB."""
         return self.info['memory_static_min'] * 1024
+
+    def getMemoryMaximum(self):
+        """Get this domain's maximum memory size, in KB."""
+        return self.info['memory_static_max'] * 1024
 
     def getResume(self):
         return str(self._resume)
@@ -1363,9 +1377,9 @@ class XendDomainInfo:
             # Use architecture- and image-specific calculations to determine
             # the various headrooms necessary, given the raw configured
             # values. maxmem, memory, and shadow are all in KiB.
-            maxmem = self.image.getRequiredAvailableMemory(
-                self.info['memory_static_min'] * 1024)
             memory = self.image.getRequiredAvailableMemory(
+                self.info['memory_static_min'] * 1024)
+            maxmem = self.image.getRequiredAvailableMemory(
                 self.info['memory_static_max'] * 1024)
             shadow = self.image.getRequiredShadowMemory(
                 self.info['shadow_memory'] * 1024,
@@ -1727,7 +1741,7 @@ class XendDomainInfo:
             raise VmError("VM name '%s' already exists%s" %
                           (name,
                            dom.domid is not None and
-                           ("as domain %s" % str(dom.domid)) or ""))
+                           (" as domain %s" % str(dom.domid)) or ""))
         
 
     def update(self, info = None, refresh = True):
@@ -2031,7 +2045,7 @@ class XendDomainInfo:
         if not dev_uuid:
             raise XendError('Failed to create device')
         
-        if self.state in (DOM_STATE_HALTED,):
+        if self.state in (XEN_API_VM_POWER_STATE_RUNNING,):
             sxpr = self.info.device_sxpr(dev_uuid)
             devid = self.getDeviceController('vif').createDevice(sxpr)
             raise XendError("Device creation failed")

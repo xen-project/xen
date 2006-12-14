@@ -51,9 +51,9 @@
 #define MSR_RI      ULL(0x0000000000000002)
 #define MSR_LE      ULL(0x0000000000000001)
 
-/* MSR bits set on the Mambo simulator */
+/* MSR bits set on the systemsim simulator */
 #define MSR_SIM     ULL(0x0000000020000000)
-#define MSR_MAMBO   ULL(0x0000000010000000)
+#define MSR_SYSTEMSIM ULL(0x0000000010000000)
 
 /* On a trap, srr1's copy of msr defines some bits as follows: */
 #define MSR_TRAP_FE     ULL(0x0000000000100000) /* Floating Point Exception */

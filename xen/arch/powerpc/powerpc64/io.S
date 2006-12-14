@@ -23,6 +23,11 @@
 #include <asm/processor.h>
 #include <asm/percpu.h>
 
+/* There is no reason why I can't use a tlbie, which should be less
+ * "destructive" but useing SLBIE proves to be more stable result.
+ */
+#define INVALIDATE_ERAT_WITH_SLBIE
+
 /* Xen runs in real mode (i.e. untranslated, MMU disabled). This avoids TLB
  * flushes and also makes it easy to access all domains' memory. However, on
  * PowerPC real mode accesses are cacheable, which is good for general
@@ -34,12 +39,14 @@
  * make the access, then re-enable it...
  */
 
+#ifdef INVALIDATE_ERAT_WITH_SLBIE
 /* Not all useful assemblers understand 'tlbiel'.
  * 'addr' is a GPR containing the address being accessed.
  */
 .macro tlbiel addr
 	.long 0x7c000224 | (\addr << 11)
 .endm
+#endif
 
 .macro DISABLE_DCACHE addr
 	mfmsr r8
@@ -48,29 +55,53 @@
 	ori r6, r6, MSR_EE
 	andc r5, r8, r6
 	mtmsr r5
+	sync
 
-	/* set HID4.RM_CI */
+#ifdef INVALIDATE_ERAT_WITH_SLBIE 
+	/* create an slbie entry for the io setting a high order bit
+	 * to avoid any important SLBs */
+	extldi r0, \addr, 36, 0 
+#endif
+	/* setup HID4.RM_CI */
 	mfspr r9, SPRN_HID4
 	li r6, 0x100
 	sldi r6, r6, 32
-	or r5, r9, r6
-	tlbiel \addr /* invalidate the ERAT entry */
-	sync
-	mtspr SPRN_HID4, r5
-	isync
+	or r10, r9, r6
 
 	/* Mark the processor as "in CI mode" */
+	li r7,0
 	mfspr r5, SPRN_PIR
 	li r6, MCK_CPU_STAT_CI
+	/* store that we are in a CI routine */
 	stb r6, MCK_CPU_STAT_BASE(r5)
-	sync
+	/* r7 = MCK_CPU_STAT_CI IO in progress */
+	mr r7, r5
+	lwsync
+
+	/* switch modes */
+	mtspr SPRN_HID4, r10
+	/* invalidate the ERAT entry */
+#ifdef INVALIDATE_ERAT_WITH_SLBIE
+	slbie r0
+#else
+	tlbiel \addr
+#endif
+	isync
+
 .endm
 
 .macro ENABLE_DCACHE addr
-	/* re-zero HID4.RM_CI */
-	tlbiel \addr /* invalidate the ERAT entry */
-	sync
+	/* r7 = 0, IO is complete */
+	li r7, 0
+	lwsync
+	/* restore HID4.RM_CI */
 	mtspr SPRN_HID4, r9
+	/* invalidate the ERAT entry */
+#ifdef INVALIDATE_ERAT_WITH_SLBIE
+	slbie r0
+#else
+	tlbiel \addr /* invalidate the ERAT entry */
+#endif
 	isync
 
 	/* Mark the processor as "out of CI mode" */
@@ -83,9 +114,13 @@
 	mtmsr r8
 .endm
 
-/* The following assembly cannot use r8 or r9 since they hold original
- * values of msr and hid4 repectively
+/* The following assembly cannot use some registers since they hold original
+ * values of we need to keep
  */
+#undef r0
+#define r0 do_not_use_r0
+#undef r7
+#define r7 do_not_use_r7
 #undef r8
 #define r8 do_not_use_r8
 #undef r9

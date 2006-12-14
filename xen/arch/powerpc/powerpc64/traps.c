@@ -48,7 +48,3 @@ void show_registers(struct cpu_user_regs *regs)
     console_end_sync();
 }
 
-void show_execution_state(struct cpu_user_regs *regs)
-{
-    show_registers(regs);
-}

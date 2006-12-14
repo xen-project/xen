@@ -146,14 +146,14 @@ xen_user_record_opt_set_free(xen_user_record_opt_set *set);
 
 
 /**
- * Get the current state of the given user.  !!!
+ * Get a record containing the current state of the given user.
  */
 extern bool
 xen_user_get_record(xen_session *session, xen_user_record **result, xen_user user);
 
 
 /**
- * Get a reference to the object with the specified UUID.  !!!
+ * Get a reference to the user instance with the specified UUID.
  */
 extern bool
 xen_user_get_by_uuid(xen_session *session, xen_user *result, char *uuid);

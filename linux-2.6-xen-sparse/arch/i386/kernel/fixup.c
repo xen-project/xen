@@ -43,17 +43,17 @@ fastcall void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
 	char info[100];
 	int i;
 
-	if (test_and_set_bit(0, &printed))
+	/* Ignore statically-linked init. */
+	if (current->tgid == 1)
 		return;
-
-        if (current->tgid == 1) /* Ignore statically linked init */
-                return; 
             
 	HYPERVISOR_vm_assist(
 		VMASST_CMD_disable, VMASST_TYPE_4gb_segments_notify);
 
-	sprintf(info, "%s (pid=%d)", current->comm, current->tgid);
+	if (test_and_set_bit(0, &printed))
+		return;
 
+	sprintf(info, "%s (pid=%d)", current->comm, current->tgid);
 
 	DP("");
 	DP("***************************************************************");

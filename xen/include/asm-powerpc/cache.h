@@ -70,4 +70,5 @@ struct cpu_caches {
     u32 ilines_per_page;
 };
 extern struct cpu_caches cpu_caches;
+extern void cpu_flush_icache(void);
 #endif

@@ -159,14 +159,14 @@ xen_vdi_record_opt_set_free(xen_vdi_record_opt_set *set);
 
 
 /**
- * Get the current state of the given VDI.  !!!
+ * Get a record containing the current state of the given VDI.
  */
 extern bool
 xen_vdi_get_record(xen_session *session, xen_vdi_record **result, xen_vdi vdi);
 
 
 /**
- * Get a reference to the object with the specified UUID.  !!!
+ * Get a reference to the VDI instance with the specified UUID.
  */
 extern bool
 xen_vdi_get_by_uuid(xen_session *session, xen_vdi *result, char *uuid);

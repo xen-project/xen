@@ -152,14 +152,14 @@ xen_network_record_opt_set_free(xen_network_record_opt_set *set);
 
 
 /**
- * Get the current state of the given network.  !!!
+ * Get a record containing the current state of the given network.
  */
 extern bool
 xen_network_get_record(xen_session *session, xen_network_record **result, xen_network network);
 
 
 /**
- * Get a reference to the object with the specified UUID.  !!!
+ * Get a reference to the network instance with the specified UUID.
  */
 extern bool
 xen_network_get_by_uuid(xen_session *session, xen_network *result, char *uuid);

@@ -791,7 +791,7 @@ void shadow_prealloc(struct domain *d, unsigned int order)
 
 /* Deliberately free all the memory we can: this will tear down all of
  * this domain's shadows */
-static void shadow_blow_tables(struct domain *d) 
+void shadow_blow_tables(struct domain *d) 
 {
     struct list_head *l, *t;
     struct shadow_page_info *sp;
@@ -3123,7 +3123,7 @@ static int shadow_log_dirty_op(
  out:
     shadow_unlock(d);
     domain_unpause(d);
-    return 0;
+    return rv;
 }
 
 

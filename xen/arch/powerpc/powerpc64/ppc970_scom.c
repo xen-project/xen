@@ -22,33 +22,17 @@
 #include <xen/types.h>
 #include <xen/lib.h>
 #include <xen/console.h>
+#include <xen/errno.h>
+#include <asm/delay.h>
+#include <asm/processor.h>
+#include "scom.h"
+
+#undef CONFIG_SCOM
 
 #define SPRN_SCOMC 276
 #define SPRN_SCOMD 277
-
-static inline void mtscomc(ulong scomc)
-{
-    __asm__ __volatile__ ("mtspr %1, %0" : : "r" (scomc), "i"(SPRN_SCOMC));
-}
-
-static inline ulong mfscomc(void)
-{
-    ulong scomc;
-    __asm__ __volatile__ ("mfspr %0, %1" : "=r" (scomc): "i"(SPRN_SCOMC));
-    return scomc;
-}
-
-static inline void mtscomd(ulong scomd)
-{
-    __asm__ __volatile__ ("mtspr %1, %0" : : "r" (scomd), "i"(SPRN_SCOMD));
-}
-
-static inline ulong mfscomd(void)
-{
-    ulong scomd;
-    __asm__ __volatile__ ("mfspr %0, %1" : "=r" (scomd): "i"(SPRN_SCOMD));
-    return scomd;
-}
+#define SCOMC_READ 1
+#define SCOMC_WRITE (!(SCOMC_READ))
 
 union scomc {
     struct scomc_bits {
@@ -68,50 +52,133 @@ union scomc {
 };
 
 
-static inline ulong read_scom(ulong addr)
+int cpu_scom_read(uint addr, ulong *d)
 {
     union scomc c;
-    ulong d;
+    ulong flags;
 
-    c.word = 0;
-    c.bits.addr = addr;
-    c.bits.RW = 0;
+    /* drop the low 8bits (including parity) */
+    addr >>= 8;
 
-    mtscomc(c.word);
-    d = mfscomd();
-    c.word = mfscomc();
-    if (c.bits.failure)
-        panic("scom status: 0x%016lx\n", c.word);
+    /* these give iface errors because the addresses are not software
+     * accessible */
+    BUG_ON(addr & 0x8000);
 
-    return d;
+    for (;;) {
+        c.word = 0;
+        c.bits.addr = addr;
+        c.bits.RW = SCOMC_READ;
+
+        local_irq_save(flags);
+        asm volatile (
+            "sync         \n\t"
+            "mtspr %2, %0 \n\t"
+            "isync        \n\t"
+            "mfspr %1, %3 \n\t"
+            "isync        \n\t"
+            "mfspr %0, %2 \n\t"
+            "isync        \n\t"
+            : "+r" (c.word), "=r" (*d)
+            : "i"(SPRN_SCOMC), "i"(SPRN_SCOMD));
+
+        local_irq_restore(flags);
+        /* WARNING! older 970s (pre FX) shift the bits right 1 position */
+
+        if (!c.bits.failure)
+            return 0;
+
+        /* deal with errors */
+        /* has SCOM been disabled? */
+        if (c.bits.disabled)
+            return -ENOSYS;
+
+        /* we were passed a bad addr return -1 */
+        if (c.bits.addr_error)
+            return -EINVAL;
+
+        /* this is way bad and we will checkstop soon */
+        BUG_ON(c.bits.proto_error);
+
+        if (c.bits.iface_error)
+            udelay(10);
+    }
 }
 
-static inline void write_scom(ulong addr, ulong val)
+int cpu_scom_write(uint addr, ulong d)
 {
     union scomc c;
+    ulong flags;
 
-    c.word = 0;
-    c.bits.addr = addr;
-    c.bits.RW = 1;
+    /* drop the low 8bits (including parity) */
+    addr >>= 8;
 
-    mtscomd(val);
-    mtscomc(c.word);
-    c.word = mfscomc();
-    if (c.bits.failure)
-        panic("scom status: 0x%016lx\n", c.word);
+    /* these give iface errors because the addresses are not software
+     * accessible */
+    BUG_ON(addr & 0x8000);
+
+    for (;;) {
+        c.word = 0;
+        c.bits.addr = addr;
+        c.bits.RW = SCOMC_WRITE;
+
+        local_irq_save(flags);
+        asm volatile(
+            "sync         \n\t"
+            "mtspr %3, %1 \n\t"
+            "isync        \n\t"
+            "mtspr %2, %0 \n\t"
+            "isync        \n\t"
+            "mfspr %0, %2 \n\t"
+            "isync        \n\t"
+            : "+r" (c.word)
+            : "r" (d), "i"(SPRN_SCOMC), "i"(SPRN_SCOMD));
+        local_irq_restore(flags);
+
+        if (!c.bits.failure)
+            return 0;
+
+        /* has SCOM been disabled? */
+        if (c.bits.disabled)
+            return -ENOSYS;
+
+        /* we were passed a bad addr return -1 */
+        if (c.bits.addr_error)
+            return -EINVAL;
+
+        /* this is way bad and we will checkstop soon */
+        BUG_ON(c.bits.proto_error);
+
+        /* check for iface and retry */
+        if (c.bits.iface_error)
+            udelay(10);
+    }
 }
-
-#define SCOM_AMCS_REG      0x022601
-#define SCOM_AMCS_AND_MASK 0x022700
-#define SCOM_AMCS_OR_MASK  0x022800
-#define SCOM_CMCE          0x030901
-#define SCOM_PMCR          0x400801
 
 void cpu_scom_init(void)
 {
-#ifdef not_yet
-    console_start_sync();
-    printk("scom PMCR: 0x%016lx\n", read_scom(SCOM_PMCR));
-    console_end_sync();
+#ifdef CONFIG_SCOM
+    ulong val;
+    if (PVR_REV(mfpvr()) == 0x0300) {
+        /* these address are only good for 970FX */
+        console_start_sync();
+        if (!cpu_scom_read(SCOM_PTSR, &val))
+            printk("SCOM PTSR: 0x%016lx\n", val);
+
+        console_end_sync();
+    }
 #endif
 }
+
+void cpu_scom_AMCR(void)
+{
+#ifdef CONFIG_SCOM
+    ulong val;
+
+    if (PVR_REV(mfpvr()) == 0x0300) {
+        /* these address are only good for 970FX */
+        cpu_scom_read(SCOM_AMC_REG, &val);
+        printk("SCOM AMCR: 0x%016lx\n", val);
+    }
+#endif
+}
+

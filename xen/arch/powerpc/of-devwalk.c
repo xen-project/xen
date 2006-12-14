@@ -80,7 +80,7 @@ void ofd_prop_print(
 #endif
 }
 
-void ofd_dump_props(void *mem, ofdn_t n, int dump)
+void ofd_dump_props(void *mem, const char *pre, ofdn_t n, int dump)
 {
     ofdn_t p;
     char name[128];
@@ -95,7 +95,7 @@ void ofd_dump_props(void *mem, ofdn_t n, int dump)
     }
 
     if (dump & OFD_DUMP_NAMES) {
-        printk("of_walk: %s: phandle 0x%x\n", path, n);
+        printk("%s: %s: phandle 0x%x\n", pre, path, n);
     }
 
     p = ofd_nextprop(mem, n, NULL, name);
@@ -106,30 +106,30 @@ void ofd_dump_props(void *mem, ofdn_t n, int dump)
         }
 
         if ( dump & OFD_DUMP_VALUES ) {
-            ofd_prop_print("of_walk", path, name, prop, sz);
+            ofd_prop_print(pre, path, name, prop, sz);
         }
 
         p = ofd_nextprop(mem, n, name, name);
     }
 }
 
-void ofd_walk(void *m, ofdn_t p, walk_fn fn, int arg)
+void ofd_walk(void *m, const char *pre, ofdn_t p, walk_fn fn, int arg)
 {
     ofdn_t n;
 
     if ( fn != NULL ) {
-        (*fn)(m, p, arg);
+        (*fn)(m, pre, p, arg);
     }
 
     /* child */
     n = ofd_node_child(m, p);
     if ( n != 0 ) {
-        ofd_walk(m, n, fn, arg);
+        ofd_walk(m, pre, n, fn, arg);
     }
 
     /* peer */
     n = ofd_node_peer(m, p);
     if ( n != 0 ) {
-        ofd_walk(m, n, fn, arg);
+        ofd_walk(m, pre, n, fn, arg);
     }
 }

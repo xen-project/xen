@@ -13,13 +13,68 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005
+ * Copyright (C) IBM Corp. 2005, 2006
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
+ *          Jimi Xenidis <jimix@watson.ibm.com>
  */
 
 #ifndef _ASM_DEBUGGER_H_
 #define _ASM_DEBUGGER_H_
+
+#include <public/xen.h>
+
+extern void show_backtrace_regs(struct cpu_user_regs *);
+extern void show_backtrace(ulong sp, ulong lr, ulong pc);
+
+static inline void show_execution_state(struct cpu_user_regs *regs)
+{
+    show_registers(regs);
+}
+
+extern void dump_execution_state(void);
+
+static inline void dump_all_execution_state(void)
+{
+    ulong sp;
+    ulong lr;
+
+    dump_execution_state();
+    sp = (ulong)__builtin_frame_address(0);
+    lr = (ulong)__builtin_return_address(0);
+
+    show_backtrace(sp, lr, lr);
+}
+
+static inline void __force_crash(void)
+{
+    dump_all_execution_state();
+    __builtin_trap();
+}
+
+static inline void debugger_trap_immediate(void)
+{
+    dump_all_execution_state();
+#ifdef CRASH_DEBUG
+    __builtin_trap();
+#endif
+}
+
+static inline void unimplemented(void)
+{
+#ifdef VERBOSE
+    dump_all_execution_state();
+#endif
+}
+
+extern void __warn(char *file, int line);
+#define WARN() __warn(__FILE__, __LINE__)
+#define WARN_ON(_p) do { if (_p) WARN(); } while ( 0 )
+
+extern void __attn(void);
+#define ATTN() __attn();
+
+#define FORCE_CRASH() __force_crash()
 
 #ifdef CRASH_DEBUG
 
@@ -32,8 +87,6 @@ static inline int debugger_trap_fatal(
     return vector;
 }
 
-#define debugger_trap_immediate() __asm__ __volatile__ ("trap");
-
 #else /* CRASH_DEBUG */
 
 static inline int debugger_trap_fatal(
@@ -41,17 +94,6 @@ static inline int debugger_trap_fatal(
 {
     show_backtrace(regs->gprs[1], regs->lr, regs->pc);
     return vector;
-}
-
-static inline void debugger_trap_immediate(void)
-{
-    ulong sp;
-    ulong lr;
-
-    sp = (ulong)__builtin_frame_address(0);
-    lr = (ulong)__builtin_return_address(0);
-
-    show_backtrace(sp, lr, lr);
 }
 
 #endif /* CRASH_DEBUG */

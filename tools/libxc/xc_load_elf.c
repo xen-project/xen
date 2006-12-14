@@ -325,17 +325,6 @@ static int parseelfimage(const char *image,
         return -EINVAL;
     }
 
-    /* Find the section-header strings table. */
-    if ( ehdr->e_shstrndx == SHN_UNDEF )
-    {
-        xc_set_error(XC_INVALID_KERNEL,
-                     "ELF image has no section-header strings table (shstrtab).");
-        return -EINVAL;
-    }
-    shdr = (Elf_Shdr *)(image + ehdr->e_shoff +
-                        (ehdr->e_shstrndx*ehdr->e_shentsize));
-    shstrtab = image + shdr->sh_offset;
-
     dsi->__elfnote_section = NULL;
     dsi->__xen_guest_string = NULL;
 
@@ -354,6 +343,17 @@ static int parseelfimage(const char *image,
     /* Fall back to looking for the special '__xen_guest' section. */
     if ( dsi->__elfnote_section == NULL )
     {
+        /* Find the section-header strings table. */
+        if ( ehdr->e_shstrndx == SHN_UNDEF )
+        {
+            xc_set_error(XC_INVALID_KERNEL,
+                         "ELF image has no section-header strings table.");
+            return -EINVAL;
+        }
+        shdr = (Elf_Shdr *)(image + ehdr->e_shoff +
+                            (ehdr->e_shstrndx*ehdr->e_shentsize));
+        shstrtab = image + shdr->sh_offset;
+
         for ( h = 0; h < ehdr->e_shnum; h++ )
         {
             shdr = (Elf_Shdr *)(image + ehdr->e_shoff + (h*ehdr->e_shentsize));
@@ -400,6 +400,8 @@ static int parseelfimage(const char *image,
     }
 
     /*
+     * A "bimodal" ELF note indicates the kernel will adjust to the
+     * current paging mode, including handling extended cr3 syntax.
      * If we have ELF notes then PAE=yes implies that we must support
      * the extended cr3 syntax. Otherwise we need to find the
      * [extended-cr3] syntax in the __xen_guest string.
@@ -408,7 +410,9 @@ static int parseelfimage(const char *image,
     if ( dsi->__elfnote_section )
     {
         p = xen_elfnote_string(dsi, XEN_ELFNOTE_PAE_MODE);
-        if ( p != NULL && strncmp(p, "yes", 3) == 0 )
+        if ( p != NULL && strncmp(p, "bimodal", 7) == 0 )
+            dsi->pae_kernel = PAEKERN_bimodal;
+        else if ( p != NULL && strncmp(p, "yes", 3) == 0 )
             dsi->pae_kernel = PAEKERN_extended_cr3;
 
     }

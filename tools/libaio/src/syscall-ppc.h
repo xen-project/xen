@@ -1,3 +1,6 @@
+#include <asm/unistd.h>
+#include <errno.h>
+
 #define __NR_io_setup		227
 #define __NR_io_destroy		228
 #define __NR_io_getevents	229
@@ -9,7 +12,7 @@
  * "sc; bnslr" sequence) and CR (where only CR0.SO is clobbered to signal
  * an error return status).
  */
-
+#ifndef __syscall_nr
 #define __syscall_nr(nr, type, name, args...)				\
 	unsigned long __sc_ret, __sc_err;				\
 	{								\
@@ -37,6 +40,7 @@
 	}								\
 	if (__sc_err & 0x10000000) return -((int)__sc_ret);		\
 	return (type) __sc_ret
+#endif
 
 #define __sc_loadargs_0(name, dummy...)					\
 	__sc_0 = __NR_##name

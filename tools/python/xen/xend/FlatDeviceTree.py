@@ -22,6 +22,10 @@ import sys
 import struct
 import stat
 import re
+import glob
+import math
+
+_host_devtree_root = '/proc/device-tree'
 
 _OF_DT_HEADER = int("d00dfeed", 16) # avoid signed/unsigned FutureWarning
 _OF_DT_BEGIN_NODE = 0x1
@@ -33,8 +37,10 @@ def _bincat(seq, separator=''):
     '''Concatenate the contents of seq into a bytestream.'''
     strs = []
     for item in seq:
-        if type(item) == type(0):
+        if isinstance(item, int):
             strs.append(struct.pack(">I", item))
+        elif isinstance(item, long):
+            strs.append(struct.pack(">Q", item))
         else:
             try:
                 strs.append(item.to_bin())
@@ -231,37 +237,50 @@ class Tree(_Node):
         header.totalsize = len(payload) + _alignup(len(header.to_bin()), 8)
         return _pad(header.to_bin(), 8) + payload
 
-_host_devtree_root = '/proc/device-tree'
-def _getprop(propname):
-    '''Extract a property from the system's device tree.'''
-    f = file(os.path.join(_host_devtree_root, propname), 'r')
+def _readfile(fullpath):
+    '''Return full contents of a file.'''
+    f = file(fullpath, 'r')
     data = f.read()
     f.close()
     return data
 
+def _find_first_cpu(dirpath):
+    '''Find the first node of type 'cpu' in a directory tree.'''
+    cpulist = glob.glob(os.path.join(dirpath, 'cpus', '*'))
+    for node in cpulist:
+        try:
+            data = _readfile(os.path.join(node, 'device_type'))
+        except IOError:
+            continue
+        if 'cpu' in data:
+            return node
+    raise IOError("couldn't find any CPU nodes under " + dirpath)
+
 def _copynode(node, dirpath, propfilter):
-    '''Extract all properties from a node in the system's device tree.'''
+    '''Copy all properties and children nodes from a directory tree.'''
     dirents = os.listdir(dirpath)
     for dirent in dirents:
         fullpath = os.path.join(dirpath, dirent)
         st = os.lstat(fullpath)
         if stat.S_ISDIR(st.st_mode):
             child = node.addnode(dirent)
-            _copytree(child, fullpath, propfilter)
+            _copynode(child, fullpath, propfilter)
         elif stat.S_ISREG(st.st_mode) and propfilter(fullpath):
-            node.addprop(dirent, _getprop(fullpath))
-
-def _copytree(node, dirpath, propfilter):
-    path = os.path.join(_host_devtree_root, dirpath)
-    _copynode(node, path, propfilter)
+            node.addprop(dirent, _readfile(fullpath))
 
 def build(imghandler):
     '''Construct a device tree by combining the domain's configuration and
     the host's device tree.'''
     root = Tree()
 
-    # 4 pages: start_info, console, store, shared_info
+    # 1st reseravtion entry used for start_info, console, store, shared_info
     root.reserve(0x3ffc000, 0x4000)
+
+    # 2nd reservation enrty used for initrd, later on when we load the
+    # initrd we may fill this in with zeroes which signifies the end
+    # of the reservation map.  So as to avoid adding a zero map now we
+    # put some bogus yet sensible numbers here.
+    root.reserve(0x1000000, 0x1000)
 
     root.addprop('device_type', 'chrp-but-not-really\0')
     root.addprop('#size-cells', 2)
@@ -270,35 +289,52 @@ def build(imghandler):
     root.addprop('compatible', 'Momentum,Maple\0')
 
     xen = root.addnode('xen')
-    xen.addprop('start-info', 0, 0x3ffc000, 0, 0x1000)
+    xen.addprop('start-info', long(0x3ffc000), long(0x1000))
     xen.addprop('version', 'Xen-3.0-unstable\0')
-    xen.addprop('reg', 0, imghandler.vm.domid, 0, 0)
+    xen.addprop('reg', long(imghandler.vm.domid), long(0))
     xen.addprop('domain-name', imghandler.vm.getName() + '\0')
     xencons = xen.addnode('console')
     xencons.addprop('interrupts', 1, 0)
 
-    # XXX split out RMA node
-    mem = root.addnode('memory@0')
+    # add memory nodes
     totalmem = imghandler.vm.getMemoryTarget() * 1024
-    mem.addprop('reg', 0, 0, 0, totalmem)
-    mem.addprop('device_type', 'memory\0')
+    rma_log = 26 ### imghandler.vm.info.get('powerpc_rma_log')
+    rma_bytes = 1 << rma_log
 
+    # RMA node
+    rma = root.addnode('memory@0')
+    rma.addprop('reg', long(0), long(rma_bytes))
+    rma.addprop('device_type', 'memory\0')
+
+    # all the rest in a single node
+    remaining = totalmem - rma_bytes
+    if remaining > 0:
+        mem = root.addnode('memory@1')
+        mem.addprop('reg', long(rma_bytes), long(remaining))
+        mem.addprop('device_type', 'memory\0')
+
+    # add CPU nodes
     cpus = root.addnode('cpus')
     cpus.addprop('smp-enabled')
     cpus.addprop('#size-cells', 0)
     cpus.addprop('#address-cells', 1)
 
     # Copy all properties the system firmware gave us, except for 'linux,'
-    # properties, from 'cpus/@0', once for every vcpu. Hopefully all cpus are
-    # identical...
+    # properties, from the first CPU node in the device tree. Do this once for
+    # every vcpu. Hopefully all cpus are identical...
     cpu0 = None
+    cpu0path = _find_first_cpu(_host_devtree_root)
     def _nolinuxprops(fullpath):
         return not os.path.basename(fullpath).startswith('linux,')
     for i in range(imghandler.vm.getVCpuCount()):
-        cpu = cpus.addnode('PowerPC,970@0')
-        _copytree(cpu, 'cpus/PowerPC,970@0', _nolinuxprops)
-        # and then overwrite what we need to
-        pft_size = imghandler.vm.info.get('pft-size', 0x14)
+        # create new node and copy all properties
+        cpu = cpus.addnode('PowerPC,970@%d' % i)
+        _copynode(cpu, cpu0path, _nolinuxprops)
+
+        # overwrite what we need to
+        shadow_mb = imghandler.vm.info.get('shadow_memory', 1)
+        shadow_mb_log = int(math.log(shadow_mb, 2))
+        pft_size = shadow_mb_log + 20
         cpu.setprop('ibm,pft-size', 0, pft_size)
 
         # set default CPU
@@ -307,13 +343,13 @@ def build(imghandler):
 
     chosen = root.addnode('chosen')
     chosen.addprop('cpu', cpu0.get_phandle())
-    chosen.addprop('memory', mem.get_phandle())
+    chosen.addprop('memory', rma.get_phandle())
     chosen.addprop('linux,stdout-path', '/xen/console\0')
     chosen.addprop('interrupt-controller', xen.get_phandle())
     chosen.addprop('bootargs', imghandler.cmdline + '\0')
     # xc_linux_load.c will overwrite these 64-bit properties later
-    chosen.addprop('linux,initrd-start', 0, 0)
-    chosen.addprop('linux,initrd-end', 0, 0)
+    chosen.addprop('linux,initrd-start', long(0))
+    chosen.addprop('linux,initrd-end', long(0))
 
     if 1:
         f = file('/tmp/domU.dtb', 'w')

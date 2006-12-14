@@ -728,4 +728,8 @@ const char *xc_error_code_to_desc(int code);
  */
 xc_error_handler xc_set_error_handler(xc_error_handler handler);
 
+/* PowerPC specific. */
+int xc_alloc_real_mode_area(int xc_handle,
+                            uint32_t domid,
+                            unsigned int log);
 #endif

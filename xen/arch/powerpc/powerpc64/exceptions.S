@@ -564,6 +564,22 @@ _GLOBAL(sleep)
  */	
     .globl spin_start
 spin_start:
+    /* We discovered by experiment that the ERAT must be flushed early.  */
+    isync
+    slbia
+    isync
+	
+    /* Do a cache flush for our text, in case the loader didn't */
+    LOADADDR(r9, _start)
+    LOADADDR(r8, _etext)
+4:  dcbf r0,r9
+    icbi r0,r9
+    addi r9,r9,0x20		/* up to a 4 way set per line */
+    cmpld cr0,r9,r8
+    blt	4b
+    sync
+    isync
+
     /* Write our processor number as an acknowledgment that we're alive.  */
     LOADADDR(r14, __spin_ack)
     stw r3, 0(r14)
@@ -575,7 +591,7 @@ spin_start:
     b .
     /* Find our index in the array of processor_area struct pointers.  */
 2:  LOADADDR(r14, global_cpu_table)
-    muli r15, r3, 8
+    mulli r15, r3, 8
     add r14, r14, r15
     /* Spin until the pointer for our processor goes valid.  */
 1:  ld r15, 0(r14)

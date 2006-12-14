@@ -1,5 +1,6 @@
 #include <xen/lib.h>       /* for printk() used in stub */
 #include <xen/types.h>
+#include <xen/kexec.h>
 #include <public/kexec.h>
 
 void machine_crash_shutdown(void)

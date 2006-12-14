@@ -25,6 +25,7 @@
 #include <asm/msr.h>
 #include <asm/bitops.h>
 #include <asm/cache.h>
+#include <asm/debugger.h>
 #include <asm/processor.h>
 
 asm(".globl trap_instruction\n"

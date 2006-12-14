@@ -142,14 +142,14 @@ SUBCOMMAND_HELP = {
                         'Create a new virtual block device.'),
     'block-configure': ('<Domain> <BackDev> <FrontDev> <Mode> [BackDomain]',
                         'Change block device configuration'),
-    'block-detach'  :  ('<Domain> <DevId>',
+    'block-detach'  :  ('<Domain> <DevId> [-f|--force]',
                         'Destroy a domain\'s virtual block device.'),
     'block-list'    :  ('<Domain> [--long]',
                         'List virtual block devices for a domain.'),
     'network-attach':  ('<Domain> [--script=<script>] [--ip=<ip>] '
                         '[--mac=<mac>]',
                         'Create a new virtual network device.'),
-    'network-detach':  ('<Domain> <DevId>',
+    'network-detach':  ('<Domain> <DevId> [-f|--force]',
                         'Destroy a domain\'s virtual network device.'),
     'network-list'  :  ('<Domain> [--long]',
                         'List virtual network interfaces for a domain.'),
@@ -1493,16 +1493,24 @@ def xm_network_attach(args):
 
 
 def detach(args, command, deviceClass):
-    arg_check(args, command, 2)
+    arg_check(args, command, 2, 3)
 
     dom = args[0]
     dev = args[1]
+    try:
+        force = args[2]
+        if (force != "--force") and (force != "-f"):
+            print "Ignoring option %s"%(force)
+            force = None
+    except IndexError:
+        force = None
 
-    server.xend.domain.destroyDevice(dom, deviceClass, dev)
+    server.xend.domain.destroyDevice(dom, deviceClass, dev, force)
 
 
 def xm_block_detach(args):
     detach(args, 'block-detach', 'vbd')
+    detach(args, 'block-detach', 'tap')
 
 
 def xm_network_detach(args):

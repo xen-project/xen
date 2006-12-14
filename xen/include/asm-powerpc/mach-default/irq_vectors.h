@@ -37,26 +37,10 @@
 #define FAST_TRAP -1 /* 0x80 */
 #define FIRST_SYSTEM_VECTOR	-1
 
+#define CALL_FUNCTION_VECTOR	0x0
+#define EVENT_CHECK_VECTOR	0x1
+
 #if 0
-
-/*
- * Vectors 0-16 in some cases are used for ISA interrupts.
- */
-
-/*
- * Special IRQ vectors used by the SMP architecture, 0xf0-0xff
- *
- *  some of the following vectors are 'rare', they are merged
- *  into a single vector (CALL_FUNCTION_VECTOR) to save vector space.
- *  TLB, reschedule and local APIC vectors are performance-critical.
- *
- *  Vectors 0xf0-0xfa are free (reserved for future Linux use).
- */
-#define SPURIOUS_APIC_VECTOR	0xff
-#define ERROR_APIC_VECTOR	0xfe
-#define INVALIDATE_TLB_VECTOR	0xfd
-#define EVENT_CHECK_VECTOR	0xfc
-#define CALL_FUNCTION_VECTOR	0xfb
 
 #define THERMAL_APIC_VECTOR	0xf0
 /*

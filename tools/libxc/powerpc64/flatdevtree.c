@@ -220,6 +220,29 @@ void ft_add_rsvmap(struct ft_cxt *cxt, u64 physaddr, u64 size)
 	cxt->p_anchor = cxt->pres + 16;	/* over the terminator */
 }
 
+int ft_set_rsvmap(void *bphp, int m, u64 physaddr, u64 size)
+{
+	const struct boot_param_header *bph = bphp;
+	u64 *p_rsvmap = (u64 *)
+		((char *)bph + be32_to_cpu(bph->off_mem_rsvmap));
+	u32 i;
+
+	for (i = 0;; i++) {
+		u64 addr, sz;
+
+		addr = be64_to_cpu(p_rsvmap[i * 2]);
+		sz = be64_to_cpu(p_rsvmap[i * 2 + 1]);
+		if (addr == 0 && size == 0)
+			break;
+		if (m == i) {
+			p_rsvmap[i * 2] = cpu_to_be64(physaddr);
+			p_rsvmap[i * 2 + 1] = cpu_to_be64(size);
+			return 0;
+		}
+	}
+	return -1;
+}
+
 void ft_begin_tree(struct ft_cxt *cxt)
 {
 	cxt->p_begin = cxt->p_anchor;

@@ -5820,8 +5820,8 @@ static int qemu_map_cache_init(unsigned long nr_pages)
     if (nr_pages < max_pages)
         max_pages = nr_pages;
 
-    nr_buckets = (max_pages << PAGE_SHIFT) >> MCACHE_BUCKET_SHIFT;
-
+    nr_buckets   = max_pages + (1UL << (MCACHE_BUCKET_SHIFT - PAGE_SHIFT)) - 1;
+    nr_buckets >>= (MCACHE_BUCKET_SHIFT - PAGE_SHIFT);
     fprintf(logfile, "qemu_map_cache_init nr_buckets = %lx\n", nr_buckets);
 
     mapcache_entry = malloc(nr_buckets * sizeof(struct map_cache));
@@ -5857,8 +5857,7 @@ uint8_t *qemu_map_cache(target_phys_addr_t phys_addr)
 
     entry = &mapcache_entry[address_index % nr_buckets];
 
-    if (entry->vaddr_base == NULL || entry->paddr_index != address_index)
-    { 
+    if (entry->vaddr_base == NULL || entry->paddr_index != address_index) {
         /* We need to remap a bucket. */
         uint8_t *vaddr_base;
         unsigned long pfns[MCACHE_BUCKET_SIZE >> PAGE_SHIFT];

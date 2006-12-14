@@ -919,6 +919,68 @@ static PyObject *dom_op(XcObject *self, PyObject *args,
     return zero;
 }
 
+#ifdef __powerpc__
+static PyObject *pyxc_alloc_real_mode_area(XcObject *self,
+                                           PyObject *args,
+                                           PyObject *kwds)
+{
+    uint32_t dom;
+    unsigned int log;
+
+    static char *kwd_list[] = { "dom", "log", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii", kwd_list, 
+                                      &dom, &log) )
+        return NULL;
+
+    if ( xc_alloc_real_mode_area(self->xc_handle, dom, log) )
+        return PyErr_SetFromErrno(xc_error);
+
+    Py_INCREF(zero);
+    return zero;
+}
+
+static PyObject *pyxc_prose_build(XcObject *self,
+                                  PyObject *args,
+                                  PyObject *kwds)
+{
+    uint32_t dom;
+    char *image, *ramdisk = NULL, *cmdline = "", *features = NULL;
+    int flags = 0;
+    int store_evtchn, console_evtchn;
+    unsigned long store_mfn = 0;
+    unsigned long console_mfn = 0;
+    void *arch_args = NULL;
+    int unused;
+
+    static char *kwd_list[] = { "dom", "store_evtchn",
+                                "console_evtchn", "image",
+                                /* optional */
+                                "ramdisk", "cmdline", "flags",
+                                "features", "arch_args", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiis|ssiss#", kwd_list,
+                                      &dom, &store_evtchn,
+                                      &console_evtchn, &image,
+                                      /* optional */
+                                      &ramdisk, &cmdline, &flags,
+                                      &features, &arch_args, &unused) )
+        return NULL;
+
+    if ( xc_prose_build(self->xc_handle, dom, image,
+                        ramdisk, cmdline, features, flags,
+                        store_evtchn, &store_mfn,
+                        console_evtchn, &console_mfn,
+                        arch_args) != 0 ) {
+        if (!errno)
+             errno = EINVAL;
+        return PyErr_SetFromErrno(xc_error);
+    }
+    return Py_BuildValue("{s:i,s:i}", 
+                         "store_mfn", store_mfn,
+                         "console_mfn", console_mfn);
+}
+#endif /* powerpc */
 
 static PyMethodDef pyxc_methods[] = {
     { "handle",
@@ -1224,6 +1286,27 @@ static PyMethodDef pyxc_methods[] = {
       "Set a domain's time offset to Dom0's localtime\n"
       " dom        [int]: Domain whose time offset is being set.\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
+
+#ifdef __powerpc__
+    { "arch_alloc_real_mode_area", 
+      (PyCFunction)pyxc_alloc_real_mode_area, 
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Allocate a domain's real mode area.\n"
+      " dom [int]: Identifier of domain.\n"
+      " log [int]: Specifies the area's size.\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "arch_prose_build", 
+      (PyCFunction)pyxc_prose_build, 
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Build a new Linux guest OS.\n"
+      " dom     [int]:      Identifier of domain to build into.\n"
+      " image   [str]:      Name of kernel image file. May be gzipped.\n"
+      " ramdisk [str, n/a]: Name of ramdisk file, if any.\n"
+      " cmdline [str, n/a]: Kernel parameters, if any.\n\n"
+      " vcpus   [int, 1]:   Number of Virtual CPUS in domain.\n\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+#endif /* __powerpc */
 
     { NULL, NULL, 0, NULL }
 };

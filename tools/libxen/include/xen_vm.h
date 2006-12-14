@@ -79,6 +79,7 @@ typedef struct xen_vm_record
     char *name_description;
     int64_t user_version;
     bool is_a_template;
+    bool auto_power_on;
     struct xen_host_record_opt *resident_on;
     int64_t memory_static_max;
     int64_t memory_dynamic_max;
@@ -198,14 +199,14 @@ xen_vm_record_opt_set_free(xen_vm_record_opt_set *set);
 
 
 /**
- * Get the current state of the given VM.  !!!
+ * Get a record containing the current state of the given VM.
  */
 extern bool
 xen_vm_get_record(xen_session *session, xen_vm_record **result, xen_vm vm);
 
 
 /**
- * Get a reference to the object with the specified UUID.  !!!
+ * Get a reference to the VM instance with the specified UUID.
  */
 extern bool
 xen_vm_get_by_uuid(xen_session *session, xen_vm *result, char *uuid);
@@ -274,6 +275,13 @@ xen_vm_get_user_version(xen_session *session, int64_t *result, xen_vm vm);
  */
 extern bool
 xen_vm_get_is_a_template(xen_session *session, bool *result, xen_vm vm);
+
+
+/**
+ * Get the auto_power_on field of the given VM.
+ */
+extern bool
+xen_vm_get_auto_power_on(xen_session *session, bool *result, xen_vm vm);
 
 
 /**
@@ -564,6 +572,13 @@ xen_vm_set_is_a_template(xen_session *session, xen_vm vm, bool is_a_template);
 
 
 /**
+ * Set the auto_power_on field of the given VM.
+ */
+extern bool
+xen_vm_set_auto_power_on(xen_session *session, xen_vm vm, bool auto_power_on);
+
+
+/**
  * Set the memory/dynamic_max field of the given VM.
  */
 extern bool
@@ -592,6 +607,13 @@ xen_vm_set_vcpus_params(xen_session *session, xen_vm vm, char *params);
 
 
 /**
+ * Set the VCPUs/number field of the given VM.
+ */
+extern bool
+xen_vm_set_vcpus_number(xen_session *session, xen_vm vm, int64_t number);
+
+
+/**
  * Set the VCPUs/features/force_on field of the given VM.
  */
 extern bool
@@ -599,10 +621,42 @@ xen_vm_set_vcpus_features_force_on(xen_session *session, xen_vm vm, struct xen_c
 
 
 /**
+ * Add the given value to the VCPUs/features/force_on field of the
+ * given VM.  If the value is already in that Set, then do nothing.
+ */
+extern bool
+xen_vm_add_vcpus_features_force_on(xen_session *session, xen_vm vm, enum xen_cpu_feature value);
+
+
+/**
+ * Remove the given value from the VCPUs/features/force_on field of the
+ * given VM.  If the value is not in that Set, then do nothing.
+ */
+extern bool
+xen_vm_remove_vcpus_features_force_on(xen_session *session, xen_vm vm, enum xen_cpu_feature value);
+
+
+/**
  * Set the VCPUs/features/force_off field of the given VM.
  */
 extern bool
 xen_vm_set_vcpus_features_force_off(xen_session *session, xen_vm vm, struct xen_cpu_feature_set *force_off);
+
+
+/**
+ * Add the given value to the VCPUs/features/force_off field of the
+ * given VM.  If the value is already in that Set, then do nothing.
+ */
+extern bool
+xen_vm_add_vcpus_features_force_off(xen_session *session, xen_vm vm, enum xen_cpu_feature value);
+
+
+/**
+ * Remove the given value from the VCPUs/features/force_off field of
+ * the given VM.  If the value is not in that Set, then do nothing.
+ */
+extern bool
+xen_vm_remove_vcpus_features_force_off(xen_session *session, xen_vm vm, enum xen_cpu_feature value);
 
 
 /**
@@ -815,14 +869,6 @@ xen_vm_resume(xen_session *session, xen_vm vm, bool start_paused);
  */
 extern bool
 xen_vm_get_all(xen_session *session, struct xen_vm_set **result);
-
-
-/**
- * Destroy the specified VM.  The VM is completely removed from the system.
- * This function can only be called when the VM is in the Halted State.
- */
-extern bool
-xen_vm_destroy(xen_session *session, xen_vm vm);
 
 
 #endif

@@ -25,6 +25,7 @@
 #include <public/xen.h>
 #include "of-devtree.h"
 #include "oftree.h"
+#include "rtas.h"
 
 #undef RTAS
 
@@ -347,6 +348,15 @@ static ofdn_t ofd_xen_props(void *m, struct domain *d, start_info_t *si)
         val[0] =  rma_size(d->arch.rma_order) - val[1];
         ofd_prop_add(m, n, "reserved", val, sizeof (val));
 
+        /* tell dom0 that Xen depends on it to have power control */
+        if (!rtas_entry)
+            ofd_prop_add(m, n, "power-control", NULL, 0);
+
+        /* tell dom0 where ranted pages go in the linear map */
+        val[0] = cpu_foreign_map_order();
+        val[1] = d->arch.foreign_mfn_count;
+        ofd_prop_add(m, n, "foreign-map", val, sizeof (val));
+
         n = ofd_node_add(m, n, console, sizeof (console));
         if (n > 0) {
             val[0] = 0;
@@ -417,7 +427,7 @@ int ofd_dom0_fixup(struct domain *d, ulong mem, start_info_t *si)
 
 
 #ifdef DEBUG
-    ofd_walk(m, OFD_ROOT, ofd_dump_props, OFD_DUMP_ALL);
+    ofd_walk(m, __func__, OFD_ROOT, ofd_dump_props, OFD_DUMP_ALL);
 #endif
     return 1;
 }

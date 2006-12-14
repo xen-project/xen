@@ -38,22 +38,23 @@ typedef l3_pgentry_t root_pgentry_t;
 
 #endif /* !__ASSEMBLY__ */
 
-#define pte_read_atomic(ptep) ({                                            \
-    intpte_t __pte = *(intpte_t *)(ptep), __npte;                           \
-    while ( (__npte = cmpxchg((intpte_t *)(ptep), __pte, __pte)) != __pte ) \
-        __pte = __npte;                                                     \
+#define pte_read_atomic(ptep) ({                              \
+    intpte_t __pte = *(ptep), __npte;                         \
+    while ( (__npte = cmpxchg(ptep, __pte, __pte)) != __pte ) \
+        __pte = __npte;                                       \
     __pte; })
-#define pte_write_atomic(ptep, pte) do {                                    \
-    intpte_t __pte = *(intpte_t *)(ptep), __npte;                           \
-    while ( (__npte = cmpxchg((intpte_t *)(ptep), __pte, (pte))) != __pte ) \
-        __pte = __npte;                                                     \
+#define pte_write_atomic(ptep, pte) do {                      \
+    intpte_t __pte = *(ptep), __npte;                         \
+    while ( (__npte = cmpxchg(ptep, __pte, (pte))) != __pte ) \
+        __pte = __npte;                                       \
 } while ( 0 )
-#define pte_write(ptep, pte) do {               \
-    *((u32 *)(ptep)+0) = 0;                     \
-    wmb();                                      \
-    *((u32 *)(ptep)+1) = (pte) >> 32;           \
-    wmb();                                      \
-    *((u32 *)(ptep)+0) = (pte) >>  0;           \
+#define pte_write(ptep, pte) do {                             \
+    u32 *__ptep_words = (u32 *)(ptep);                        \
+    __ptep_words[0] = 0;                                      \
+    wmb();                                                    \
+    __ptep_words[1] = (pte) >> 32;                            \
+    wmb();                                                    \
+    __ptep_words[0] = (pte) >>  0;                            \
 } while ( 0 )
 
 /* root table */

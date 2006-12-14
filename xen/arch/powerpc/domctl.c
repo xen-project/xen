@@ -96,14 +96,14 @@ long arch_do_domctl(struct xen_domctl *domctl,
     case XEN_DOMCTL_real_mode_area:
     {
         struct domain *d;
-        unsigned int log = domctl->u.real_mode_area.log;
+        unsigned int order = domctl->u.real_mode_area.log - PAGE_SHIFT;
 
         ret = -ESRCH;
         d = find_domain_by_id(domctl->domain);
         if (d != NULL) {
             ret = -EINVAL;
-            if (cpu_rma_valid(log))
-                ret = allocate_rma(d, log - PAGE_SHIFT);
+            if (cpu_rma_valid(order))
+                ret = allocate_rma(d, order);
             put_domain(d);
         }
     }

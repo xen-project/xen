@@ -87,7 +87,7 @@ typedef struct
             desctype desc;                      \
             PAD32(sizeof(desctype));            \
         } desc;                                 \
-    } __attribute__ ((packed)) type
+    } type
 
 #define CORE_STR                "CORE"
 #define CORE_STR_LEN            5 /* including terminating zero */
@@ -119,7 +119,7 @@ typedef struct {
     crash_note_core_t core;
     crash_note_xen_core_t xen_regs;
     crash_note_xen_info_t xen_info;
-} __attribute__ ((packed)) crash_note_t;
+} crash_note_t;
 
 #define setup_crash_note(np, member, str, str_len, id) \
   np->member.note.note.note.namesz = str_len; \
