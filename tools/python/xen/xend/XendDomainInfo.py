@@ -59,65 +59,6 @@ log = logging.getLogger("xend.XendDomainInfo")
 #log.setLevel(logging.TRACE)
 
 
-def bool0(v):
-    return v != "0" and bool(v)
-
-
-##
-# All parameters of VMs that may be configured on-the-fly, or at start-up.
-# 
-VM_CONFIG_PARAMS = [
-    ('name',        str),
-    ('on_poweroff', str),
-    ('on_reboot',   str),
-    ('on_crash',    str),
-    ]
-
-
-##
-# Configuration entries that we expect to round-trip -- be read from the
-# config file or xc, written to save-files (i.e. through sxpr), and reused as
-# config on restart or restore, all without munging.  Some configuration
-# entries are munged for backwards compatibility reasons, or because they
-# don't come out of xc in the same form as they are specified in the config
-# file, so those are handled separately.
-ROUNDTRIPPING_CONFIG_ENTRIES = [
-    ('uuid',            str),
-    ('vcpus',           int),
-    ('vcpu_avail',      int),
-    ('cpu_cap',         int),
-    ('cpu_weight',      int),
-    ('memory',          int),
-    ('shadow_memory',   int),
-    ('maxmem',          int),
-    ('bootloader',      str),
-    ('bootloader_args', str),
-    ('features',        str),
-    ('localtime',       bool0),
-    ]
-
-ROUNDTRIPPING_CONFIG_ENTRIES += VM_CONFIG_PARAMS
-
-
-##
-# All entries written to the store.  This is VM_CONFIG_PARAMS, plus those
-# entries written to the store that cannot be reconfigured on-the-fly.
-#
-VM_STORE_ENTRIES = [
-    ('uuid',          str),
-    ('vcpus',         int),
-    ('vcpu_avail',    int),
-    ('memory',        int),
-    ('shadow_memory', int),
-    ('maxmem',        int),
-    ('start_time',    float),
-    ('on_xend_start', str),
-    ('on_xend_stop', str),
-    ]
-
-VM_STORE_ENTRIES += VM_CONFIG_PARAMS
-
-
 #
 # There are a number of CPU-related fields:
 #
