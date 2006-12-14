@@ -408,10 +408,6 @@ static PyObject *pyxc_hvm_build(XcObject *self,
                                       &image, &vcpus, &pae, &acpi, &apic) )
         return NULL;
 
-#if defined(__ia64__)
-    /* Set vcpus to later be retrieved in setup_guest() */
-    xc_set_hvm_param(self->xc_handle, dom, HVM_PARAM_VCPUS, vcpus);
-#endif
     if ( xc_hvm_build(self->xc_handle, dom, memsize, image) != 0 )
         return pyxc_error_to_exception();
 

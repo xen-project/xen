@@ -66,13 +66,6 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 /* WARNING: before changing this, check that shared_info fits on a page */
 #define MAX_VIRT_CPUS 64
 
-/*
- * HVM_PARAM_PAE_ENABLED is meaningless on ia64, so we overload this
- * entry to store the number of vCPUs.  XXX Need arch-specific extentions
- * for xc_get/set_hvm_param().
- */
-#define HVM_PARAM_VCPUS    HVM_PARAM_PAE_ENABLED
-
 #ifndef __ASSEMBLY__
 
 typedef unsigned long xen_ulong_t;
