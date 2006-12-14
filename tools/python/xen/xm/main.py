@@ -22,7 +22,10 @@
 """Grand unified management application for Xen.
 """
 import atexit
+import cmd
 import os
+import pprint
+import shlex
 import sys
 import re
 import getopt
@@ -77,6 +80,8 @@ USAGE_FOOTER = '<Domain> can either be the Domain Name or Id.\n' \
 
 SUBCOMMAND_HELP = {
     # common commands
+
+    'shell'       : ('', 'Launch an interactive shell.'),
     
     'console'     : ('[-q|--quiet] <Domain>',
                      'Attach to <Domain>\'s console.'),
@@ -245,6 +250,7 @@ common_commands = [
     "restore",
     "resume",
     "save",
+    "shell",
     "shutdown",
     "start",
     "suspend",
@@ -328,7 +334,7 @@ acm_commands = [
     ]
 
 all_commands = (domain_commands + host_commands + scheduler_commands +
-                device_commands + vnet_commands + acm_commands)
+                device_commands + vnet_commands + acm_commands + ['shell'])
 
 
 ##
@@ -362,6 +368,7 @@ def parseAuthentication():
             server.getAttribute('password'))
 
 serverType, serverURI = parseServer()
+server = None
 
 
 ####################################################################
@@ -455,12 +462,16 @@ def longHelp():
     print
     print USAGE_FOOTER        
 
-def usage(cmd = None):
-    """ Print help usage information and exits """
+def _usage(cmd):
+    """ Print help usage information """
     if cmd:
         cmdHelp(cmd)
     else:
         shortHelp()
+
+def usage(cmd = None):
+    """ Print help usage information and exits """
+    _usage(cmd)
     sys.exit(1)
 
 
@@ -522,6 +533,49 @@ def get_single_vm(dom):
     else:
         dominfo = server.xend.domain(dom, False)
         return dominfo['uuid']
+
+##
+#
+# Xen-API Shell
+#
+##
+
+class Shell(cmd.Cmd):
+    def __init__(self):
+        cmd.Cmd.__init__(self)
+        self.prompt = "xm> "
+
+    def default(self, line):
+        words = shlex.split(line)
+        if len(words) > 0 and words[0] == 'xm':
+            words = words[1:]
+        if len(words) > 0:
+            cmd = xm_lookup_cmd(words[0])
+            if cmd:
+                _run_cmd(cmd, words[0], words[1:])
+            elif serverType == SERVER_XEN_API:
+                ok, res = _run_cmd(lambda x: server.xenapi_request(words[0],
+                                                                   tuple(x)),
+                                   words[0], words[1:])
+                if ok and res != '':
+                    pprint.pprint(res)
+            else:
+                print '*** Unknown command: %s' % words[0]
+        return False
+
+    def emptyline(self):
+        pass
+
+    def do_EOF(self, line):
+        print
+        sys.exit(0)
+
+    def do_help(self, line):
+        _usage(line)
+
+
+def xm_shell(args):
+    Shell().cmdloop('The Xen Master. Type "help" for a list of functions.')
 
 
 #########################################################################
@@ -1560,6 +1614,7 @@ def xm_vnet_delete(args):
     server.xend_vnet_delete(vnet)
 
 commands = {
+    "shell": xm_shell,
     # console commands
     "console": xm_console,
     # xenstat commands
@@ -1663,17 +1718,13 @@ def xm_lookup_cmd(cmd):
             # only execute if there is only 1 match
             if len(same_prefix_cmds) == 1:
                 return same_prefix_cmds[0]
-            
-        err('Sub Command %s not found!' % cmd)
-        usage()
+        return None
 
 def deprecated(old,new):
     print >>sys.stderr, (
         "Command %s is deprecated.  Please use xm %s instead." % (old, new))
 
 def main(argv=sys.argv):
-    global server
-
     if len(argv) < 2:
         usage()
 
@@ -1682,16 +1733,26 @@ def main(argv=sys.argv):
         if help in argv[1:]:
             if help == argv[1]:
                 longHelp()
+                sys.exit(0)
             else:
                 usage(argv[1])
-            sys.exit(0)
 
-    cmd = xm_lookup_cmd(argv[1])
-
-    # strip off prog name and subcmd
-    args = argv[2:]
+    cmd_name = argv[1]
+    cmd = xm_lookup_cmd(cmd_name)
     if cmd:
-        try:
+        # strip off prog name and subcmd
+        args = argv[2:]
+        _, rc = _run_cmd(cmd, cmd_name, args)
+        if rc:
+            usage(cmd_name)
+    else:
+        usage()
+
+def _run_cmd(cmd, cmd_name, args):
+    global server
+
+    try:
+        if server is None:
             if serverType == SERVER_XEN_API:
                 server = XenAPI.Session(serverURI)
                 username, password = parseAuthentication()
@@ -1705,66 +1766,55 @@ def main(argv=sys.argv):
             else:
                 server = ServerProxy(serverURI)
 
-            rc = cmd(args)
-            if rc:
-                usage()
-        except socket.error, ex:
-            if os.geteuid() != 0:
-                err("Most commands need root access. Please try again as root.")
-            else:
-                err("Unable to connect to xend: %s. Is xend running?" % ex[1])
-            sys.exit(1)
-        except KeyboardInterrupt:
-            print "Interrupted."
-            sys.exit(1)
-        except IOError, ex:
-            if os.geteuid() != 0:
-                err("Most commands need root access.  Please try again as root.")
-            else:
-                err("Unable to connect to xend: %s." % ex[1])
-            sys.exit(1)
-        except SystemExit:
-            sys.exit(1)
-        except XenAPI.Failure, exn:
-            err(str(exn))
-            sys.exit(1)
-        except xmlrpclib.Fault, ex:
-            if ex.faultCode == XendClient.ERROR_INVALID_DOMAIN:
-                err("Domain '%s' does not exist." % ex.faultString)
-            else:
-                err(ex.faultString)
-            usage(argv[1])
-            sys.exit(1)
-        except xmlrpclib.ProtocolError, ex:
-            if ex.errcode == -1:
-                print  >>sys.stderr, (
-                    "Xend has probably crashed!  Invalid or missing HTTP "
-                    "status code.")
-            else:
-                print  >>sys.stderr, (
-                    "Xend has probably crashed!  ProtocolError(%d, %s)." %
-                    (ex.errcode, ex.errmsg))
-            sys.exit(1)
-        except (ValueError, OverflowError):
-            err("Invalid argument.")
-            usage(argv[1])
-            sys.exit(1)
-        except OptionError, e:
-            err(str(e))
-            usage(argv[1])
-            print e.usage()
-            sys.exit(1)
-        except security.ACMError, e:
-            err(str(e))
-            sys.exit(1)
-        except:
-            print "Unexpected error:", sys.exc_info()[0]
-            print
-            print "Please report to xen-devel@lists.xensource.com"
-            raise
-                
-    else:
-        usage()
+        return True, cmd(args)
+    except socket.error, ex:
+        if os.geteuid() != 0:
+            err("Most commands need root access. Please try again as root.")
+        else:
+            err("Unable to connect to xend: %s. Is xend running?" % ex[1])
+    except KeyboardInterrupt:
+        print "Interrupted."
+        return True, ''
+    except IOError, ex:
+        if os.geteuid() != 0:
+            err("Most commands need root access.  Please try again as root.")
+        else:
+            err("Unable to connect to xend: %s." % ex[1])
+    except SystemExit:
+        return True, ''
+    except XenAPI.Failure, exn:
+        err(str(exn))
+    except xmlrpclib.Fault, ex:
+        if ex.faultCode == XendClient.ERROR_INVALID_DOMAIN:
+            err("Domain '%s' does not exist." % ex.faultString)
+        else:
+            err(ex.faultString)
+        _usage(cmd_name)
+    except xmlrpclib.ProtocolError, ex:
+        if ex.errcode == -1:
+            print  >>sys.stderr, (
+                "Xend has probably crashed!  Invalid or missing HTTP "
+                "status code.")
+        else:
+            print  >>sys.stderr, (
+                "Xend has probably crashed!  ProtocolError(%d, %s)." %
+                (ex.errcode, ex.errmsg))
+    except (ValueError, OverflowError):
+        err("Invalid argument.")
+        _usage(cmd_name)
+    except OptionError, e:
+        err(str(e))
+        _usage(cmd_name)
+        print e.usage()
+    except security.ACMError, e:
+        err(str(e))
+    except:
+        print "Unexpected error:", sys.exc_info()[0]
+        print
+        print "Please report to xen-devel@lists.xensource.com"
+        raise
+
+    return False, 1
 
 if __name__ == "__main__":
     main()
