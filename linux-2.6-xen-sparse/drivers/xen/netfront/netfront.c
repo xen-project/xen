@@ -525,6 +525,8 @@ static void backend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateInitWait:
+		if (dev->state != XenbusStateInitialising)
+			break;
 		if (network_connect(netdev) != 0)
 			break;
 		xenbus_switch_state(dev, XenbusStateConnected);
@@ -532,6 +534,8 @@ static void backend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateClosing:
+		if (dev->state == XenbusStateClosed)
+			break;
 		netfront_closing(dev);
 		break;
 	}
