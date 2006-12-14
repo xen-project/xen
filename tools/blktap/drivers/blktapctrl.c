@@ -629,6 +629,7 @@ static void write_pidfile(long pid)
 	char buf[100];
 	int len;
 	int fd;
+	int flags;
 
 	fd = open(PIDFILE, O_RDWR | O_CREAT, 0600);
 	if (fd == -1) {
@@ -639,6 +640,18 @@ static void write_pidfile(long pid)
 	/* We exit silently if daemon already running. */
 	if (lockf(fd, F_TLOCK, 0) == -1)
 		exit(0);
+
+	/* Set FD_CLOEXEC, so that tapdisk doesn't get this file
+	   descriptor. */
+	if ((flags = fcntl(fd, F_GETFD)) == -1) {
+		DPRINTF("F_GETFD failed (%d)\n", errno);
+		exit(1);
+	}
+	flags |= FD_CLOEXEC;
+	if (fcntl(fd, F_SETFD, flags) == -1) {
+		DPRINTF("F_SETFD failed (%d)\n", errno);
+		exit(1);
+	}
 
 	len = sprintf(buf, "%ld\n", pid);
 	if (write(fd, buf, len) != len) {
