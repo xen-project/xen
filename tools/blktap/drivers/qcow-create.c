@@ -47,32 +47,69 @@
 #define DFPRINTF(_f, _a...) ((void)0)
 #endif
 
+#define QCOW_NONSPARSE_FILE 0x00
+#define QCOW_SPARSE_FILE 0x02
+#define MAX_NAME_LEN 1000
+
+void help(void)
+{
+	fprintf(stderr, "Qcow-utils: v1.0.0\n");
+	fprintf(stderr, 
+		"usage: qcow-create [-h help] [-p reserve] <SIZE(MB)> <FILENAME> "
+		"[<BACKING_FILENAME>]\n"); 
+	exit(-1);
+}
 
 int main(int argc, char *argv[])
 {
-	int ret = -1;
+	int ret = -1, c, backed = 0;
+	int flags =  QCOW_SPARSE_FILE;
 	uint64_t size;
+	char filename[MAX_NAME_LEN], bfilename[MAX_NAME_LEN];
 
-	if ( (argc < 3) || (argc > 4) ) {
-		fprintf(stderr, "Qcow-utils: v1.0.0\n");
-		fprintf(stderr, 
-			"usage: %s <SIZE(MB)> <FILENAME> "
-			"[<BACKING_FILENAME>]\n", 
-			argv[0]);
+        for(;;) {
+                c = getopt(argc, argv, "hp");
+                if (c == -1)
+                        break;
+                switch(c) {
+                case 'h':
+                        help();
+                        exit(0);
+                        break;
+                case 'p':
+			flags = QCOW_NONSPARSE_FILE;
+			break;
+		}
+	}
+
+	printf("Optind %d, argc %d\n", optind, argc);
+	if ( !(optind == (argc - 2) || optind == (argc - 3)) )
+		help();
+
+	size = atoi(argv[optind++]);
+	size = size << 20;
+
+	if (snprintf(filename, MAX_NAME_LEN, "%s",argv[optind++]) >=
+		MAX_NAME_LEN) {
+		fprintf(stderr,"Device name too long\n");
 		exit(-1);
 	}
 
-	size = atoi(argv[1]);
-	size = size << 20;
-	DFPRINTF("Creating file size %llu\n",(long long unsigned)size);
-	switch(argc) {
-	case 3: 
-		ret = qcow_create(argv[2],size,NULL,0);
-		break;
-	case 4:
-		ret = qcow_create(argv[2],size,argv[3],0);
-		break;		
+	if (optind != argc) {
+		backed = 1;
+		if (snprintf(bfilename, MAX_NAME_LEN, "%s",argv[optind++]) >=
+			MAX_NAME_LEN) {
+			fprintf(stderr,"Device name too long\n");
+			exit(-1);
+		}
 	}
+
+	DFPRINTF("Creating file size %llu, name %s\n",(long long unsigned)size, filename);
+	if (!backed)
+		ret = qcow_create(filename,size,NULL,flags);
+	else
+		ret = qcow_create(filename,size,bfilename,flags);
+
 	if (ret < 0) DPRINTF("Unable to create QCOW file\n");
 	else DPRINTF("QCOW file successfully created\n");
 
