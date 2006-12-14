@@ -31,8 +31,10 @@
 #endif
 
 static void force_interrupt(int irq);
+#ifndef XEN
 static void register_intr_pda(struct sn_irq_info *sn_irq_info);
 static void unregister_intr_pda(struct sn_irq_info *sn_irq_info);
+#endif
 
 int sn_force_interrupt_flag = 1;
 extern int sn_ioif_inited;
@@ -240,10 +242,10 @@ unsigned int sn_local_vector_to_irq(u8 vector)
 
 void sn_irq_init(void)
 {
+#ifndef XEN
 	int i;
 	irq_desc_t *base_desc = irq_desc;
 
-#ifndef XEN
 	ia64_first_device_vector = IA64_SN2_FIRST_DEVICE_VECTOR;
 	ia64_last_device_vector = IA64_SN2_LAST_DEVICE_VECTOR;
 
@@ -255,6 +257,7 @@ void sn_irq_init(void)
 #endif
 }
 
+#ifndef XEN
 static void register_intr_pda(struct sn_irq_info *sn_irq_info)
 {
 	int irq = sn_irq_info->irq_irq;
@@ -329,6 +332,7 @@ static void unregister_intr_pda(struct sn_irq_info *sn_irq_info)
 	spin_unlock(&sn_irq_info_lock);
 #endif
 }
+#endif /* XEN */
 
 #ifndef XEN
 static void sn_irq_info_free(struct rcu_head *head)
@@ -487,10 +491,10 @@ static void sn_check_intr(int irq, struct sn_irq_info *sn_irq_info)
 
 void sn_lb_int_war_check(void)
 {
+#ifndef XEN
 	struct sn_irq_info *sn_irq_info;
 	int i;
 
-#ifndef XEN
 #ifdef XEN
 	if (pda->sn_first_irq == 0)
 #else

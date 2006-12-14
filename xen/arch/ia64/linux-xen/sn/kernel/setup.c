@@ -413,7 +413,11 @@ void __cpuinit sn_cpu_init(void);
 
 void __init sn_setup(char **cmdline_p)
 {
+#ifndef XEN
 	long status, ticks_per_sec, drift;
+#else
+	unsigned long status, ticks_per_sec, drift;
+#endif
 	u32 version = sn_sal_rev();
 #ifndef XEN
 	extern void sn_cpu_init(void);

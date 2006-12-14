@@ -646,8 +646,10 @@ void sn_bus_free_sysdata(void)
 
 static int __init sn_pci_init(void)
 {
+#ifndef XEN
 	int i, j;
 	struct pci_dev *pci_dev = NULL;
+#endif
 
 	if (!ia64_platform_is("sn2") || IS_RUNNING_ON_FAKE_PROM())
 		return 0;

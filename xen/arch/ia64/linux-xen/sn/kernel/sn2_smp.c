@@ -157,7 +157,7 @@ void sn_tlb_migrate_finish(struct mm_struct *mm)
  */
 
 #ifdef XEN  /* Xen is soooooooo stupid! */
-static cpumask_t mask_all = CPU_MASK_ALL;
+// static cpumask_t mask_all = CPU_MASK_ALL;
 #endif
 
 void
@@ -172,7 +172,7 @@ sn2_global_tlb_purge(unsigned long start,
 #ifndef XEN
 	int mymm = (mm == current->active_mm && mm == current->mm);
 #else
-	struct mm_struct *mm;
+	// struct mm_struct *mm;
 	int mymm = 1;
 #endif
 	int use_cpu_ptcga;
