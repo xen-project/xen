@@ -184,12 +184,18 @@ void pit_time_fired(struct vcpu *v, void *priv)
 
 static inline void pit_load_count(PITChannelState *s, int val)
 {
-    u32   period;
+    u32 period;
+    PITChannelState *ch0 =
+        &current->domain->arch.hvm_domain.pl_time.vpit.channels[0];
+
     if (val == 0)
         val = 0x10000;
     s->count_load_time = hvm_get_clock(s->vcpu);
     s->count = val;
     period = DIV_ROUND((val * 1000000000ULL), PIT_FREQ);
+
+    if (s != ch0)
+        return;
 
 #ifdef DEBUG_PIT
     printk("HVM_PIT: pit-load-counter(%p), count=0x%x, period=%uns mode=%d, load_time=%lld\n",
@@ -419,13 +425,12 @@ static void speaker_ioport_write(void *opaque, uint32_t addr, uint32_t val)
 
 static uint32_t speaker_ioport_read(void *opaque, uint32_t addr)
 {
-    int out;
     PITState *pit = opaque;
-    out = pit_get_out(pit, 2, hvm_get_clock(pit->channels[2].vcpu));
-    pit->dummy_refresh_clock ^= 1;
-
-    return (pit->speaker_data_on << 1) | pit_get_gate(pit, 2) | (out << 5) |
-      (pit->dummy_refresh_clock << 4);
+    int out = pit_get_out(pit, 2, hvm_get_clock(pit->channels[2].vcpu));
+    /* Refresh clock toggles at about 15us. We approximate as 2^14ns. */
+    unsigned int refresh_clock = ((unsigned int)NOW() >> 14) & 1;
+    return ((pit->speaker_data_on << 1) | pit_get_gate(pit, 2) |
+            (out << 5) | refresh_clock << 4);
 }
 
 static int handle_speaker_io(ioreq_t *p)
@@ -439,7 +444,7 @@ static int handle_speaker_io(ioreq_t *p)
         printk("HVM_SPEAKER:wrong SPEAKER IO!\n");
         return 1;
     }
-    
+
     if (p->dir == 0) {/* write */
         speaker_ioport_write(vpit, p->addr, p->data);
     } else if (p->dir == 1) {/* read */
@@ -447,4 +452,22 @@ static int handle_speaker_io(ioreq_t *p)
     }
 
     return 1;
+}
+
+int pv_pit_handler(int port, int data, int write)
+{
+    ioreq_t ioreq = {
+        .size = 1,
+        .type = IOREQ_TYPE_PIO,
+        .addr = port,
+        .dir  = write ? 0 : 1,
+        .data = write ? data : 0,
+    };
+
+    if (port == 0x61)
+        handle_speaker_io(&ioreq);
+    else
+        handle_pit_io(&ioreq);
+
+    return !write ? ioreq.data : 0;
 }

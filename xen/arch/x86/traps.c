@@ -59,6 +59,7 @@
 #include <asm/debugger.h>
 #include <asm/msr.h>
 #include <asm/x86_emulate.h>
+#include <asm/hvm/vpt.h>
 
 /*
  * opt_nmi: one of 'ignore', 'dom0', or 'fatal'.
@@ -1035,18 +1036,7 @@ static inline int admin_io_okay(
     return ioports_access_permitted(v->domain, port, port + bytes - 1);
 }
 
-static inline int guest_inb_okay(
-    unsigned int port, struct vcpu *v, struct cpu_user_regs *regs)
-{
-    /*
-     * Allow read access to port 0x61. Bit 4 oscillates with period 30us, and
-     * so it is often used for timing loops in BIOS code. This hack can go
-     * away when we have separate read/write permission rangesets.
-     * Note that we could emulate bit 4 instead of directly reading port 0x61,
-     * but there's not really a good reason to do so.
-     */
-    return (admin_io_okay(port, 1, v, regs) || (port == 0x61));
-}
+#define guest_inb_okay(_p, _d, _r) admin_io_okay(_p, 1, _d, _r)
 #define guest_inw_okay(_p, _d, _r) admin_io_okay(_p, 2, _d, _r)
 #define guest_inl_okay(_p, _d, _r) admin_io_okay(_p, 4, _d, _r)
 #define guest_outb_okay(_p, _d, _r) admin_io_okay(_p, 1, _d, _r)
@@ -1141,7 +1131,10 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             switch ( op_bytes )
             {
             case 1:
-                data = (u8)(guest_inb_okay(port, v, regs) ? inb(port) : ~0);
+                /* emulate PIT counter 2 */
+                data = (u8)(guest_inb_okay(port, v, regs) ? inb(port) : 
+                       ((port == 0x42 || port == 0x43 || port == 0x61) ?
+                       pv_pit_handler(port, 0, 0) : ~0)); 
                 break;
             case 2:
                 data = (u16)(guest_inw_okay(port, v, regs) ? inw(port) : ~0);
@@ -1176,6 +1169,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             case 1:
                 if ( guest_outb_okay(port, v, regs) )
                     outb((u8)data, port);
+                else if ( port == 0x42 || port == 0x43 || port == 0x61 )
+                    pv_pit_handler(port, data, 1);
                 break;
             case 2:
                 if ( guest_outw_okay(port, v, regs) )
@@ -1240,6 +1235,11 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case 1:
             if ( guest_inb_okay(port, v, regs) )
                 io_emul(regs);
+            else if ( port == 0x42 || port == 0x43 || port == 0x61 )
+            {
+                regs->eax &= ~0xffUL;
+                regs->eax |= pv_pit_handler(port, 0, 0);
+            } 
             else
                 regs->eax |= (u8)~0;
             break;
@@ -1277,6 +1277,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case 1:
             if ( guest_outb_okay(port, v, regs) )
                 io_emul(regs);
+            else if ( port == 0x42 || port == 0x43 || port == 0x61 )
+                pv_pit_handler(port, regs->eax, 1);
             break;
         case 2:
             if ( guest_outw_okay(port, v, regs) )

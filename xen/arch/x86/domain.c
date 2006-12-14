@@ -136,6 +136,10 @@ int vcpu_initialise(struct vcpu *v)
 
     pae_l3_cache_init(&v->arch.pae_l3_cache);
 
+    /* This should move to arch_domain_create(). */
+    if ( !is_idle_domain(d) && (v->vcpu_id == 0) )
+        pit_init(v, cpu_khz);
+
     if ( is_hvm_domain(d) )
     {
         if ( (rc = hvm_vcpu_initialise(v)) != 0 )
