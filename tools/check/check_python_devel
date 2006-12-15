@@ -1,12 +1,6 @@
 #!/bin/sh
 # CHECK-BUILD
 
-function error {
-    echo
-    echo "  *** Check for python development environment FAILED"
-    exit 1
-}
-
 RC=0
 
 python -c '
