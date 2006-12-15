@@ -58,7 +58,8 @@ typedef struct
 } xen_comms;
 
 
-static void create_new_vm(xen_session *session);
+static xen_vm create_new_vm(xen_session *session);
+static void print_vm_power_state(xen_session *session, xen_vm vm);
 
 
 static size_t
@@ -244,7 +245,7 @@ int main(int argc, char **argv)
     xen_string_string_map_free(versions);
 
 
-    create_new_vm(session);
+    xen_vm new_vm = create_new_vm(session);
     if (!session->ok)
     {
         /* Error has been logged, just clean up. */
@@ -252,6 +253,16 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    print_vm_power_state(session, new_vm);
+    if (!session->ok)
+    {
+        /* Error has been logged, just clean up. */
+        xen_vm_free(new_vm);
+        CLEANUP;
+        return 1;
+    }
+
+    xen_vm_free(new_vm);
     CLEANUP;
 
     return 0;
@@ -264,7 +275,7 @@ int main(int argc, char **argv)
  * allocation patterns can be used, as long as the allocation and free are
  * paired correctly.
  */
-static void create_new_vm(xen_session *session)
+static xen_vm create_new_vm(xen_session *session)
 {
     xen_cpu_feature_set *empty_cpu_feature_set =
         xen_cpu_feature_set_alloc(0);
@@ -313,7 +324,7 @@ static void create_new_vm(xen_session *session)
     {
         fprintf(stderr, "VM creation failed.\n");
         print_error(session);
-        return;
+        return NULL;
     }
 
 
@@ -327,7 +338,7 @@ static void create_new_vm(xen_session *session)
         fprintf(stderr, "SR lookup failed.\n");
         print_error(session);
         xen_vm_free(vm);
-        return;
+        return NULL;
     }
 
     xen_sr_record_opt sr_record =
@@ -354,7 +365,7 @@ static void create_new_vm(xen_session *session)
 
         xen_sr_set_free(srs);
         xen_vm_free(vm);
-        return;
+        return NULL;
     }
 
 
@@ -384,7 +395,7 @@ static void create_new_vm(xen_session *session)
         xen_vdi_free(vdi0);
         xen_sr_set_free(srs);
         xen_vm_free(vm);
-        return;
+        return NULL;
     }
 
     char *vm_uuid;
@@ -407,7 +418,7 @@ static void create_new_vm(xen_session *session)
         xen_vdi_free(vdi0);
         xen_sr_set_free(srs);
         xen_vm_free(vm);
-        return;
+        return NULL;
     }
 
     fprintf(stderr,
@@ -420,5 +431,34 @@ static void create_new_vm(xen_session *session)
     xen_vbd_free(vbd0);
     xen_vdi_free(vdi0);
     xen_sr_set_free(srs);
-    xen_vm_free(vm);
+
+    return vm;
+}
+
+
+/**
+ * Print the power state for the given VM.
+ */
+static void print_vm_power_state(xen_session *session, xen_vm vm)
+{
+    char *vm_uuid;
+    enum xen_vm_power_state power_state;
+
+    if (!xen_vm_get_uuid(session, &vm_uuid, vm))
+    {
+        print_error(session);
+        return;
+    }
+
+    if (!xen_vm_get_power_state(session, &power_state, vm))
+    {
+        xen_uuid_free(vm_uuid);
+        print_error(session);
+        return;
+    }
+
+    printf("VM %s power state is %s.\n", vm_uuid,
+           xen_vm_power_state_to_string(power_state));
+
+    xen_uuid_free(vm_uuid);
 }
