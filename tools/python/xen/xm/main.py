@@ -1737,6 +1737,7 @@ def main(argv=sys.argv):
         _, rc = _run_cmd(cmd, cmd_name, args)
         sys.exit(rc)
     else:
+        err('Subcommand %s not found!' % cmd_name)
         usage()
 
 def _run_cmd(cmd, cmd_name, args):
