@@ -151,8 +151,9 @@ SUBCOMMAND_HELP = {
                         'Destroy a domain\'s virtual block device.'),
     'block-list'    :  ('<Domain> [--long]',
                         'List virtual block devices for a domain.'),
-    'network-attach':  ('<Domain> [--script=<script>] [--ip=<ip>] '
-                        '[--mac=<mac>]',
+    'network-attach':  ('<Domain> [type=<type>] [mac=<mac>] [bridge=<bridge>] '
+                        '[ip=<ip>] [script=<script>] [backend=<BackDomain>] '
+                        '[vifname=<name>]',
                         'Create a new virtual network device.'),
     'network-detach':  ('<Domain> <DevId> [-f|--force]',
                         'Destroy a domain\'s virtual network device.'),
