@@ -536,6 +536,12 @@ void hvm_do_hypercall(struct cpu_user_regs *pregs)
 
 #endif /* defined(__x86_64__) */
 
+void hvm_update_guest_cr3(struct vcpu *v, unsigned long guest_cr3)
+{
+    v->arch.hvm_vcpu.hw_cr3 = guest_cr3;
+    hvm_funcs.update_guest_cr3(v);
+}
+
 /* Initialise a hypercall transfer page for a VMX domain using
    paravirtualised drivers. */
 void hvm_hypercall_page_initialise(struct domain *d,

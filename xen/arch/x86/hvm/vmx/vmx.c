@@ -708,12 +708,22 @@ static int vmx_pae_enabled(struct vcpu *v)
     return (vmx_paging_enabled(v) && (cr4 & X86_CR4_PAE));
 }
 
-/* Works only for vcpu == current */
 static void vmx_update_host_cr3(struct vcpu *v)
 {
-    ASSERT(v == current);
+    ASSERT( (v == current) || !vcpu_runnable(v) );
+    vmx_vmcs_enter(v);
     __vmwrite(HOST_CR3, v->arch.cr3);
+    vmx_vmcs_exit(v);
 }
+
+static void vmx_update_guest_cr3(struct vcpu *v)
+{
+    ASSERT( (v == current) || !vcpu_runnable(v) );
+    vmx_vmcs_enter(v);
+    __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr3);
+    vmx_vmcs_exit(v);
+}
+
 
 static void vmx_inject_exception(
     unsigned int trapnr, int errcode, unsigned long cr2)
@@ -747,6 +757,7 @@ static void vmx_setup_hvm_funcs(void)
     hvm_funcs.get_segment_register = vmx_get_segment_register;
 
     hvm_funcs.update_host_cr3 = vmx_update_host_cr3;
+    hvm_funcs.update_guest_cr3 = vmx_update_guest_cr3;
 
     hvm_funcs.stts = vmx_stts;
     hvm_funcs.set_tsc_offset = vmx_set_tsc_offset;
@@ -1531,7 +1542,6 @@ static int vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
     __vmwrite(GUEST_LDTR_AR_BYTES, c->ldtr_arbytes.bytes);
 
     shadow_update_paging_modes(v);
-    __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr3);
     return 0;
 
  bad_cr3:
@@ -1689,7 +1699,6 @@ static int vmx_set_cr0(unsigned long value)
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx",
                     (unsigned long) (mfn << PAGE_SHIFT));
 
-        __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr3);
         /*
          * arch->shadow_table should hold the next CR3 for shadow
          */
@@ -1761,7 +1770,6 @@ static int vmx_set_cr0(unsigned long value)
             __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
         }
         shadow_update_paging_modes(v);
-        __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr3);
     }
 
     return 1;
@@ -1869,9 +1877,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
              */
             v->arch.hvm_vmx.cpu_cr3 = value;
             update_cr3(v);
-            HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx",
-                        value);
-            __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr3);
+            HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx", value);
         }
         break;
 
@@ -1902,13 +1908,11 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
                 HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx",
                             (unsigned long) (mfn << PAGE_SHIFT));
 
-                __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr3);
-
                 /*
                  * arch->shadow_table should hold the next CR3 for shadow
                  */
-
-                HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx, mfn = %lx",
+                HVM_DBG_LOG(DBG_LEVEL_VMMU, 
+                            "Update CR3 value = %lx, mfn = %lx",
                             v->arch.hvm_vmx.cpu_cr3, mfn);
 #endif
             }

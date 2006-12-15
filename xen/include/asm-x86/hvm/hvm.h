@@ -103,6 +103,11 @@ struct hvm_function_table {
     void (*update_host_cr3)(struct vcpu *v);
 
     /*
+     * Called to inform HVM layer that a guest cr3 has changed
+     */
+    void (*update_guest_cr3)(struct vcpu *v);
+
+    /*
      * Update specifics of the guest state:
      * 1) TS bit in guest cr0 
      * 2) TSC offset in guest
@@ -187,6 +192,8 @@ hvm_update_host_cr3(struct vcpu *v)
 {
     hvm_funcs.update_host_cr3(v);
 }
+
+void hvm_update_guest_cr3(struct vcpu *v, unsigned long guest_cr3);
 
 void hvm_hypercall_page_initialise(struct domain *d,
                                    void *hypercall_page);

@@ -2495,7 +2495,9 @@ void sh_update_paging_modes(struct vcpu *v)
         {
             mfn_t mmfn = shadow_make_monitor_table(v);
             v->arch.monitor_table = pagetable_from_mfn(mmfn);
-        } 
+            make_cr3(v, mfn_x(mmfn));
+            hvm_update_host_cr3(v);
+        }
 
         if ( v->arch.shadow.mode != old_mode )
         {

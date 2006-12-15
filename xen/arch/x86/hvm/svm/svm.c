@@ -498,6 +498,11 @@ void svm_update_host_cr3(struct vcpu *v)
     /* SVM doesn't have a HOST_CR3 equivalent to update. */
 }
 
+void svm_update_guest_cr3(struct vcpu *v)
+{
+    v->arch.hvm_svm.vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3; 
+}
+
 unsigned long svm_get_ctrl_reg(struct vcpu *v, unsigned int num)
 {
     switch ( num )
@@ -883,6 +888,7 @@ int start_svm(void)
     hvm_funcs.get_segment_register = svm_get_segment_register;
 
     hvm_funcs.update_host_cr3 = svm_update_host_cr3;
+    hvm_funcs.update_guest_cr3 = svm_update_guest_cr3;
     
     hvm_funcs.stts = svm_stts;
     hvm_funcs.set_tsc_offset = svm_set_tsc_offset;
@@ -1608,7 +1614,6 @@ static int svm_set_cr0(unsigned long value)
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx", 
                     (unsigned long) (mfn << PAGE_SHIFT));
 
-        vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3; 
         set_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
     }
 
@@ -1630,7 +1635,6 @@ static int svm_set_cr0(unsigned long value)
             return 0;
         }
         shadow_update_paging_modes(v);
-        vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3;
         set_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
     }
     else if ( (value & (X86_CR0_PE | X86_CR0_PG)) == X86_CR0_PE )
@@ -1642,7 +1646,6 @@ static int svm_set_cr0(unsigned long value)
         }
         /* we should take care of this kind of situation */
         shadow_update_paging_modes(v);
-        vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3;
         set_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
     }
 
@@ -1768,7 +1771,6 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
 
             v->arch.hvm_svm.cpu_cr3 = value;
             update_cr3(v);
-            vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3; 
             HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx", value);
         }
         break;
@@ -1803,8 +1805,6 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
 
                 HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx",
                             (unsigned long) (mfn << PAGE_SHIFT));
-
-                vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3; 
 
                 HVM_DBG_LOG(DBG_LEVEL_VMMU, 
                             "Update CR3 value = %lx, mfn = %lx",
