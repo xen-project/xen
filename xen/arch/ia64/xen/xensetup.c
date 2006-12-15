@@ -51,7 +51,7 @@ extern void trap_init(void);
 extern void xen_patch_kernel(void);
 
 /* opt_nosmp: If true, secondary processors are ignored. */
-static int opt_nosmp = 0;
+static int opt_nosmp;
 boolean_param("nosmp", opt_nosmp);
 
 /* maxcpus: maximum number of CPUs to activate. */
@@ -65,7 +65,7 @@ static int opt_xencons = 1;
 integer_param("xencons", opt_xencons);
 
 /* Toggle to allow non-legacy xencons UARTs to run in polling mode */
-static int opt_xencons_poll = 0;
+static int opt_xencons_poll;
 boolean_param("xencons_poll", opt_xencons_poll);
 
 /*
@@ -163,7 +163,7 @@ struct ns16550_defaults ns16550_com2 = {
 };
 
 /* efi_print: print efi table at boot */
-static int opt_efi_print = 0;
+static int opt_efi_print;
 boolean_param("efi_print", opt_efi_print);
 
 /* print EFI memory map: */
