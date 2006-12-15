@@ -608,7 +608,7 @@ def xm_restore(args):
         (options, params) = getopt.gnu_getopt(args, 'p', ['paused'])
     except getopt.GetoptError, opterr:
         err(opterr)
-        sys.exit(1)
+        usage('restore')
 
     paused = False
     for (k, v) in options:
@@ -618,7 +618,6 @@ def xm_restore(args):
     if len(params) != 1:
         err("Wrong number of parameters")
         usage('restore')
-        sys.exit(1)
 
     savefile = os.path.abspath(params[0])
 
@@ -648,7 +647,6 @@ def xm_list(args):
     except getopt.GetoptError, opterr:
         err(opterr)
         usage('list')
-        sys.exit(1)
     
     for (k, v) in options:
         if k in ['-l', '--long']:
@@ -869,7 +867,7 @@ def xm_start(args):
         (options, params) = getopt.gnu_getopt(args, 'p', ['paused'])
     except getopt.GetoptError, opterr:
         err(opterr)
-        sys.exit(1)
+        usage('start')
 
     paused = False
     for (k, v) in options:
@@ -879,7 +877,6 @@ def xm_start(args):
     if len(params) != 1:
         err("Wrong number of parameters")
         usage('start')
-        sys.exit(1)
 
     dom = params[0]
     if serverType == SERVER_XEN_API:
@@ -910,7 +907,7 @@ def xm_resume(args):
         (options, params) = getopt.gnu_getopt(args, 'p', ['paused'])
     except getopt.GetoptError, opterr:
         err(opterr)
-        sys.exit(1)
+        usage('resume')
 
     paused = False
     for (k, v) in options:
@@ -920,7 +917,6 @@ def xm_resume(args):
     if len(params) != 1:
         err("Wrong number of parameters")
         usage('resume')
-        sys.exit(1)
 
     dom = params[0]
     if serverType == SERVER_XEN_API:
@@ -1115,7 +1111,7 @@ def xm_sched_sedf(args):
             ['period=', 'slice=', 'latency=', 'extratime=', 'weight='])
     except getopt.GetoptError, opterr:
         err(opterr)
-        sys.exit(1)
+        usage('sched-sedf')
     
     # convert to nanoseconds if needed 
     for (k, v) in options:
@@ -1176,7 +1172,6 @@ def xm_sched_credit(args):
     except getopt.GetoptError, opterr:
         err(opterr)
         usage('sched-credit')
-        sys.exit(1)
 
     domain = None
     weight = None
@@ -1194,7 +1189,6 @@ def xm_sched_credit(args):
         # place holder for system-wide scheduler parameters
         err("No domain given.")
         usage('sched-credit')
-        sys.exit(1)
 
     if weight is None and cap is None:
         print server.xend.domain.sched_credit_get(domain)
@@ -1223,7 +1217,7 @@ def xm_console(args):
         (options, params) = getopt.gnu_getopt(args, 'q', ['quiet'])
     except getopt.GetoptError, opterr:
         err(opterr)
-        sys.exit(1)
+        usage('console')
 
     for (k, v) in options:
         if k in ['-q', '--quiet']:
@@ -1234,7 +1228,6 @@ def xm_console(args):
     if len(params) != 1:
         err('No domain given')
         usage('console')
-        sys.exit(1)
 
     dom = params[0]
 
@@ -1262,7 +1255,7 @@ def xm_uptime(args):
         (options, params) = getopt.gnu_getopt(args, 's', ['short'])
     except getopt.GetoptError, opterr:
         err(opterr)
-        sys.exit(1)
+        usage('uptime')
 
     for (k, v) in options:
         if k in ['-s', '--short']:
@@ -1327,7 +1320,7 @@ def xm_dmesg(args):
         (options, params) = getopt.gnu_getopt(args, 'c', ['clear'])
     except getopt.GetoptError, opterr:
         err(opterr)
-        sys.exit(1)
+        usage('dmesg')
     
     use_clear = 0
     for (k, v) in options:
@@ -1337,7 +1330,6 @@ def xm_dmesg(args):
     if len(params) :
         err("No parameter required")
         usage('dmesg')
-        sys.exit(1)
 
     if not use_clear:
         print server.xend.node.dmesg.info()
@@ -1576,7 +1568,7 @@ def xm_vnet_list(args):
         (options, params) = getopt.gnu_getopt(args, 'l', ['long'])
     except getopt.GetoptError, opterr:
         err(opterr)
-        sys.exit(1)
+        usage('vnet-list')
     
     use_long = 0
     for (k, v) in options:
@@ -1743,8 +1735,7 @@ def main(argv=sys.argv):
         # strip off prog name and subcmd
         args = argv[2:]
         _, rc = _run_cmd(cmd, cmd_name, args)
-        if rc:
-            usage(cmd_name)
+        sys.exit(rc)
     else:
         usage()
 
@@ -1780,8 +1771,8 @@ def _run_cmd(cmd, cmd_name, args):
             err("Most commands need root access.  Please try again as root.")
         else:
             err("Unable to connect to xend: %s." % ex[1])
-    except SystemExit:
-        return True, ''
+    except SystemExit, code:
+        return code == 0, code
     except XenAPI.Failure, exn:
         err(str(exn))
     except xmlrpclib.Fault, ex:
