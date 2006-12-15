@@ -558,7 +558,7 @@ class Shell(cmd.Cmd):
                 ok, res = _run_cmd(lambda x: server.xenapi_request(words[0],
                                                                    tuple(x)),
                                    words[0], words[1:])
-                if ok and res != '':
+                if ok and res is not None and res != '':
                     pprint.pprint(res)
             else:
                 print '*** Unknown command: %s' % words[0]
