@@ -1,4 +1,5 @@
 from xen.xend.server.DevController import DevController
+from xen.xend.XendLogging import log
 
 from xen.xend.XendError import VmError
 import xen.xend
@@ -41,6 +42,17 @@ class VfbifController(DevController):
                      "--title", self.vm.getName() ]
         t = config.get("type", None)
         if t == "vnc":
+            passwd = None
+            if config.has_key("vncpasswd"):
+                passwd = config["vncpasswd"]
+            else:
+                passwd = xen.xend.XendRoot.instance().get_vncpasswd_default()
+            if not(passwd is None or passwd == ""):
+                self.vm.storeVm("vncpasswd", passwd)
+                log.debug("Stored a VNC password for vfb access")
+            else:
+                log.debug("No VNC passwd configured for vfb access")
+
             # Try to start the vnc backend
             args = [xen.util.auxbin.pathTo("xen-vncfb")]
             if config.has_key("vncunused"):
