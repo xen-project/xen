@@ -148,6 +148,10 @@ static int xk2linux[0x10000] = {
 	[XK_plus] = KEY_EQUAL,
 };
 
+static int btnmap[] = {
+	BTN_LEFT, BTN_MIDDLE, BTN_RIGHT, BTN_FORWARD, BTN_BACK
+};
+
 static void on_kbd_event(rfbBool down, rfbKeySym keycode, rfbClientPtr cl)
 {
 	/*
@@ -184,8 +188,11 @@ static void on_ptr_event(int buttonMask, int x, int y, rfbClientPtr cl)
 		down = buttonMask & (1 << i);
 		if (down == last_down)
 			continue;
-		/* FIXME this assumes buttons are numbered the same; verify they are */
-		if (xenfb_send_key(xenfb, down != 0, BTN_MOUSE + i) < 0)
+		if (i >= sizeof(btnmap) / sizeof(*btnmap))
+			break;
+		if (btnmap[i] == 0)
+			break;
+		if (xenfb_send_key(xenfb, down != 0, btnmap[i]) < 0)
 			fprintf(stderr, "Button %d %s lost (%s)\n",
 				i, down ? "down" : "up", strerror(errno));
 	}
