@@ -1329,7 +1329,7 @@ int qcow_create(const char *filename, uint64_t total_size,
 		/*Filesize is length + 	l1_size * (1 << s->l2_bits) + (size*512)*/
 		total_length = length + (l1_size * (1 << 9)) + (size * 512);
 		qtruncate(fd, total_length, 0);
-		printf("File truncated to length %llu\n",total_length);
+		printf("File truncated to length %"PRIu64"\n",total_length);
 	}
 	exthdr.flags = cpu_to_be32(flags);
 	
