@@ -1339,11 +1339,7 @@ class XendDomain:
         dominfo = self.domain_lookup_nr(domid)
         if not dominfo:
             raise XendInvalidDomain(str(domid))
-        maxmem = int(mem) * 1024
-        try:
-            return xc.domain_setmaxmem(dominfo.getDomid(), maxmem)
-        except Exception, ex:
-            raise XendError(str(ex))
+        dominfo.setMemoryMaximum(mem)
 
     def domain_ioport_range_enable(self, domid, first, last):
         """Enable access to a range of IO ports for a domain

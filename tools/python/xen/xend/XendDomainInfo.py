@@ -551,8 +551,34 @@ class XendDomainInfo:
             raise XendError('Invalid memory size')
         
         self.info['memory_static_min'] = target
-        self.storeVm("memory", target)
-        self.storeDom("memory/target", target << 10)
+        if self.domid >= 0:
+            self.storeVm("memory", target)
+            self.storeDom("memory/target", target << 10)
+        else:
+            self.info['memory_dynamic_min'] = target
+            xen.xend.XendDomain.instance().managed_config_save(self)
+
+    def setMemoryMaximum(self, limit):
+        """Set the maximum memory limit of this domain
+        @param limit: In MiB.
+        """
+        log.debug("Setting memory maximum of domain %s (%d) to %d MiB.",
+                  self.info['name_label'], self.domid, limit)
+
+        if limit <= 0:
+            raise XendError('Invalid memory size')
+
+        self.info['memory_static_max'] = limit
+        if self.domid >= 0:
+            maxmem = int(limit) * 1024
+            try:
+                return xc.domain_setmaxmem(self.domid, maxmem)
+            except Exception, ex:
+                raise XendError(str(ex))
+        else:
+            self.info['memory_dynamic_max'] = limit
+            xen.xend.XendDomain.instance().managed_config_save(self)
+
 
     def getVCPUInfo(self):
         try:
@@ -831,18 +857,23 @@ class XendDomainInfo:
 
     def setVCpuCount(self, vcpus):
         self.info['vcpu_avail'] = (1 << vcpus) - 1
-        self.storeVm('vcpu_avail', self.info['vcpu_avail'])
-        # update dom differently depending on whether we are adjusting
-        # vcpu number up or down, otherwise _vcpuDomDetails does not
-        # disable the vcpus
-        if self.info['vcpus_number'] > vcpus:
-            # decreasing
-            self._writeDom(self._vcpuDomDetails())
-            self.info['vcpus_number'] = vcpus
+        if self.domid >= 0:
+            self.storeVm('vcpu_avail', self.info['vcpu_avail'])
+            # update dom differently depending on whether we are adjusting
+            # vcpu number up or down, otherwise _vcpuDomDetails does not
+            # disable the vcpus
+            if self.info['vcpus_number'] > vcpus:
+                # decreasing
+                self._writeDom(self._vcpuDomDetails())
+                self.info['vcpus_number'] = vcpus
+            else:
+                # same or increasing
+                self.info['vcpus_number'] = vcpus
+                self._writeDom(self._vcpuDomDetails())
         else:
-            # same or increasing
             self.info['vcpus_number'] = vcpus
-            self._writeDom(self._vcpuDomDetails())
+            self.info['online_vcpus'] = vcpus
+            xen.xend.XendDomain.instance().managed_config_save(self)
 
     def getLabel(self):
         return security.get_security_info(self.info, 'label')
