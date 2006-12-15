@@ -173,7 +173,7 @@ sn2_global_tlb_purge(unsigned long start,
 	int mymm = (mm == current->active_mm && mm == current->mm);
 #else
 	// struct mm_struct *mm;
-	int mymm = 1;
+	int mymm = 0;
 #endif
 	int use_cpu_ptcga;
 	volatile unsigned long *ptc0, *ptc1;
