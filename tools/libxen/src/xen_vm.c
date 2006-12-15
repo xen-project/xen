@@ -653,9 +653,7 @@ xen_vm_get_actions_after_shutdown(xen_session *session, enum xen_on_normal_exit 
         };
 
     abstract_type result_type = xen_on_normal_exit_abstract_type_;
-    char *result_str = NULL;
     XEN_CALL_("VM.get_actions_after_shutdown");
-    *result = xen_on_normal_exit_from_string(session, result_str);
     return session->ok;
 }
 
@@ -670,9 +668,7 @@ xen_vm_get_actions_after_reboot(xen_session *session, enum xen_on_normal_exit *r
         };
 
     abstract_type result_type = xen_on_normal_exit_abstract_type_;
-    char *result_str = NULL;
     XEN_CALL_("VM.get_actions_after_reboot");
-    *result = xen_on_normal_exit_from_string(session, result_str);
     return session->ok;
 }
 
@@ -687,9 +683,7 @@ xen_vm_get_actions_after_suspend(xen_session *session, enum xen_on_normal_exit *
         };
 
     abstract_type result_type = xen_on_normal_exit_abstract_type_;
-    char *result_str = NULL;
     XEN_CALL_("VM.get_actions_after_suspend");
-    *result = xen_on_normal_exit_from_string(session, result_str);
     return session->ok;
 }
 
@@ -704,9 +698,7 @@ xen_vm_get_actions_after_crash(xen_session *session, enum xen_on_crash_behaviour
         };
 
     abstract_type result_type = xen_on_crash_behaviour_abstract_type_;
-    char *result_str = NULL;
     XEN_CALL_("VM.get_actions_after_crash");
-    *result = xen_on_crash_behaviour_from_string(session, result_str);
     return session->ok;
 }
 

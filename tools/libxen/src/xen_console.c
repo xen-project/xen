@@ -158,9 +158,7 @@ xen_console_get_protocol(xen_session *session, enum xen_console_protocol *result
         };
 
     abstract_type result_type = xen_console_protocol_abstract_type_;
-    char *result_str = NULL;
     XEN_CALL_("console.get_protocol");
-    *result = xen_console_protocol_from_string(session, result_str);
     return session->ok;
 }
 
