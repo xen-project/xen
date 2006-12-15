@@ -2817,7 +2817,7 @@ static int sh_page_fault(struct vcpu *v,
 
     if ( is_hvm_domain(d) )
         hvm_store_cpu_guest_regs(v, regs, NULL);
-    SHADOW_PRINTK("emulate: eip=%#lx\n", regs->eip);
+    SHADOW_PRINTK("emulate: eip=%#lx\n", (unsigned long)regs->eip);
 
     emul_ops = shadow_init_emulation(&emul_ctxt, regs);
 
@@ -3488,6 +3488,9 @@ sh_update_cr3(struct vcpu *v)
                                        ? SH_type_l2h_shadow 
                                        : SH_type_l2_shadow);
             }
+            else
+                /* The guest is not present: clear out the shadow. */
+                sh_set_toplevel_shadow(v, i, _mfn(INVALID_MFN), 0); 
         }
     }
 #elif GUEST_PAGING_LEVELS == 4
@@ -3558,10 +3561,10 @@ sh_update_cr3(struct vcpu *v)
         ASSERT(is_hvm_domain(d));
 #if SHADOW_PAGING_LEVELS == 3
         /* 2-on-3 or 3-on-3: Use the PAE shadow l3 table we just fabricated */
-        v->arch.hvm_vcpu.hw_cr3 = virt_to_maddr(&v->arch.shadow.l3table);
+        hvm_update_guest_cr3(v, virt_to_maddr(&v->arch.shadow.l3table));
 #else
         /* 2-on-2 or 4-on-4: Just use the shadow top-level directly */
-        v->arch.hvm_vcpu.hw_cr3 = pagetable_get_paddr(v->arch.shadow_table[0]);
+        hvm_update_guest_cr3(v, pagetable_get_paddr(v->arch.shadow_table[0]));
 #endif
     }
 

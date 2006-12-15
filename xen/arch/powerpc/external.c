@@ -82,7 +82,14 @@ void do_external(struct cpu_user_regs *regs)
 
     vec = xen_mpic_get_irq(regs);
 
-    if (vec != -1) {
+    if (irq_desc[vec].status & IRQ_PER_CPU) {
+        /* x86 do_IRQ does not respect the per cpu flag.  */
+        irq_desc_t *desc = &irq_desc[vec];
+        regs->entry_vector = vec;
+        desc->handler->ack(vec);
+        desc->action->handler(vector_to_irq(vec), desc->action->dev_id, regs);
+        desc->handler->end(vec);
+    } else if (vec != -1) {
         DBG("EE:0x%lx isrc: %d\n", regs->msr, vec);
         regs->entry_vector = vec;
         do_IRQ(regs);
@@ -252,4 +259,25 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
 {
     BUG_ON(val != val);
     return 0;
+}
+
+void send_IPI_mask(cpumask_t mask, int vector)
+{
+    unsigned int cpus;
+    int const bits = 8 * sizeof(cpus);
+
+    switch(vector) {
+    case CALL_FUNCTION_VECTOR:
+    case EVENT_CHECK_VECTOR:
+        break;
+    default:
+        BUG();
+        return;
+    }
+
+    BUG_ON(NR_CPUS > bits);
+    BUG_ON(fls(mask.bits[0]) > bits);
+
+    cpus = mask.bits[0];
+    mpic_send_ipi(vector, cpus);
 }

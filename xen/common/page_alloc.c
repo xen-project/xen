@@ -136,7 +136,6 @@ static void map_alloc(unsigned long first_page, unsigned long nr_pages)
     }
 }
 
-
 static void map_free(unsigned long first_page, unsigned long nr_pages)
 {
     unsigned long start_off, end_off, curr_idx, end_idx;
@@ -171,6 +170,8 @@ static void map_free(unsigned long first_page, unsigned long nr_pages)
  * BOOT-TIME ALLOCATOR
  */
 
+static unsigned long first_valid_mfn = ~0UL;
+
 /* Initialise allocator to handle up to @max_page pages. */
 paddr_t init_boot_allocator(paddr_t bitmap_start)
 {
@@ -202,6 +203,8 @@ void init_boot_pages(paddr_t ps, paddr_t pe)
     pe = round_pgdown(pe);
     if ( pe <= ps )
         return;
+
+    first_valid_mfn = min_t(unsigned long, ps >> PAGE_SHIFT, first_valid_mfn);
 
     map_free(ps >> PAGE_SHIFT, (pe - ps) >> PAGE_SHIFT);
 
@@ -256,16 +259,17 @@ unsigned long alloc_boot_pages_at(unsigned long nr_pfns, unsigned long pfn_at)
 
 unsigned long alloc_boot_pages(unsigned long nr_pfns, unsigned long pfn_align)
 {
-    unsigned long pg, i = 0;
+    unsigned long pg;
 
-    for ( pg = 0; (pg + nr_pfns) < max_page; pg += pfn_align )
+    pg = first_valid_mfn & ~(pfn_align-1);
+    while ( (pg + nr_pfns) < max_page )
     {
-        i = alloc_boot_pages_at(nr_pfns, pg);
-        if (i != 0)
+        if ( alloc_boot_pages_at(nr_pfns, pg) != 0 )
             break;
+        pg += pfn_align;
     }
 
-    return i;
+    return pg;
 }
 
 
@@ -291,7 +295,7 @@ static DEFINE_SPINLOCK(heap_lock);
 void end_boot_allocator(void)
 {
     unsigned long i, j, k;
-    int curr_free = 0, next_free = 0;
+    int curr_free, next_free;
 
     memset(avail, 0, sizeof(avail));
 
@@ -301,7 +305,9 @@ void end_boot_allocator(void)
                 INIT_LIST_HEAD(&heap[i][j][k]);
 
     /* Pages that are free now go to the domain sub-allocator. */
-    for ( i = 0; i < max_page; i++ )
+    if ( (curr_free = next_free = !allocated_in_map(first_valid_mfn)) )
+        map_alloc(first_valid_mfn, 1);
+    for ( i = first_valid_mfn; i < max_page; i++ )
     {
         curr_free = next_free;
         next_free = !allocated_in_map(i+1);
@@ -324,7 +330,7 @@ void end_boot_allocator(void)
 void init_heap_pages(
     unsigned int zone, struct page_info *pg, unsigned long nr_pages)
 {
-    unsigned int nid_curr,nid_prev;
+    unsigned int nid_curr, nid_prev;
     unsigned long i;
 
     ASSERT(zone < NR_ZONES);
@@ -478,37 +484,37 @@ void free_heap_pages(
 void scrub_heap_pages(void)
 {
     void *p;
-    unsigned long pfn;
+    unsigned long mfn;
 
     printk("Scrubbing Free RAM: ");
 
-    for ( pfn = 0; pfn < max_page; pfn++ )
+    for ( mfn = first_valid_mfn; mfn < max_page; mfn++ )
     {
         /* Every 100MB, print a progress dot. */
-        if ( (pfn % ((100*1024*1024)/PAGE_SIZE)) == 0 )
+        if ( (mfn % ((100*1024*1024)/PAGE_SIZE)) == 0 )
             printk(".");
 
         process_pending_timers();
 
         /* Quick lock-free check. */
-        if ( allocated_in_map(pfn) )
+        if ( allocated_in_map(mfn) )
             continue;
 
         spin_lock_irq(&heap_lock);
 
         /* Re-check page status with lock held. */
-        if ( !allocated_in_map(pfn) )
+        if ( !allocated_in_map(mfn) )
         {
-            if ( IS_XEN_HEAP_FRAME(mfn_to_page(pfn)) )
+            if ( IS_XEN_HEAP_FRAME(mfn_to_page(mfn)) )
             {
-                p = page_to_virt(mfn_to_page(pfn));
+                p = page_to_virt(mfn_to_page(mfn));
                 memguard_unguard_range(p, PAGE_SIZE);
                 clear_page(p);
                 memguard_guard_range(p, PAGE_SIZE);
             }
             else
             {
-                p = map_domain_page(pfn);
+                p = map_domain_page(mfn);
                 clear_page(p);
                 unmap_domain_page(p);
             }

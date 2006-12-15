@@ -12,12 +12,12 @@ SEARCH_DIR("=/usr/local/lib64"); SEARCH_DIR("=/lib64"); SEARCH_DIR("=/usr/lib64"
    __DYNAMIC = 0;    */
 PHDRS
 {
-  text PT_LOAD FILEHDR PHDRS;
+  text PT_LOAD;
 }   
 SECTIONS
 {
+  . = 0x00400000;
   /* Read-only sections, merged into text segment: */
-  PROVIDE (__executable_start = 0x10000000); . = 0x10000000 + SIZEOF_HEADERS;
   .interp         : { *(.interp) } :text
   .hash           : { *(.hash) }
   .dynsym         : { *(.dynsym) }
@@ -111,8 +111,6 @@ SECTIONS
     SORT(CONSTRUCTORS)
   }
 
-  /* Xen addition */
-
   . = ALIGN(32);
   __setup_start = .;
   .setup.init : { *(.setup.init) }
@@ -130,8 +128,6 @@ SECTIONS
   . = __per_cpu_start + (NR_CPUS << PERCPU_SHIFT);
   . = ALIGN(STACK_SIZE);
   __per_cpu_end = .;
-
-  /* end Xen addition */
 
   .data1          : { *(.data1) }
   .tdata	  : { *(.tdata .tdata.* .gnu.linkonce.td.*) }

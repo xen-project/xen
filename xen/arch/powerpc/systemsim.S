@@ -19,33 +19,46 @@
 
 #include <asm/config.h>
 #include <asm/processor.h>
-#include <asm/page.h>
 
-    .globl _start
-_start:
-    /* load up the stack */
-    SET_REG_TO_LABEL(r1, cpu0_stack)
+_GLOBAL(systemsim_callthru)
+	.long 0x000eaeb0
+	blr
 
-    /* call the init function */
-    LOADADDR(r21,__start_xen_ppc)
+_GLOBAL(systemsim_write)
+	mr	r5, r4
+	mr	r4, r3
+	li	r3, 0		# Write console code
+	
+	li	r6, 0
+	/* need to fix return value */
+	mflr	r7
+	bl	_ENTRY(systemsim_callthru)
+	mtlr	r7
+	mr	r3, r5
+	blr
 
-#ifdef __PPC64__
-    ld r2, 8(r21)
-    ld r21, 0(r21)
-#endif
-    mtctr r21
-    bctrl
-    /* should never return */
-    trap
+_GLOBAL(systemsim_memset)
+	mr	r6, r5
+	mr	r5, r4
+	mr	r4, r3
+	li	r3, 0x47	# memset
+	/* need to fix return value */
+	mflr	r7
+	bl	_ENTRY(systemsim_callthru)
+	mtlr	r7
+	mr	r3, r4
+	blr
 
-    /* Note! GDB 6.3 makes the very stupid assumption that PC > SP means we are
-     * in a Linux signal trampoline, and it begins groping for a struct
-     * rt_sigframe on the stack. Naturally, this fails miserably for our
-     * backtrace. To work around this behavior, we must make certain that our
-     * stack is always above our text, e.g. in the data section. */
-    .data /* DO NOT REMOVE; see GDB note above */
-    .align 4
-cpu0_stack_bottom:
-    .space STACK_SIZE
-cpu0_stack:
-    .space STACK_FRAME_OVERHEAD
+_GLOBAL(systemsim_memcpy)
+	mr	r6, r5
+	mr	r5, r4
+	mr	r4, r3
+	li	r3, 0x45 # memcpy
+	/* need to fix return value */
+	mflr	r7
+	bl	_ENTRY(systemsim_callthru)
+	mtlr	r7
+	mr	r3, r4
+	blr
+
+	

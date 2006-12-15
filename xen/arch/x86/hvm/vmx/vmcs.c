@@ -430,11 +430,9 @@ static void construct_vmcs(struct vcpu *v)
     __vmwrite(GUEST_TR_BASE, 0);
     __vmwrite(GUEST_TR_LIMIT, 0xff);
 
-    shadow_update_paging_modes(v);
-    __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr3);
-    __vmwrite(HOST_CR3, v->arch.cr3);
-
     vmx_vmcs_exit(v);
+
+    shadow_update_paging_modes(v); /* will update HOST & GUEST_CR3 as reqd */
 }
 
 int vmx_create_vmcs(struct vcpu *v)

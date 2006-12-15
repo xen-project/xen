@@ -57,6 +57,8 @@
 #include "blktapctrl.h"
 #include "tapdisk.h"
 
+#define PIDFILE "/var/run/blktapctrl.pid"
+
 #define NUM_POLL_FDS 2
 #define MSG_SIZE 4096
 #define MAX_TIMEOUT 10
@@ -622,6 +624,42 @@ static void print_drivers(void)
 		DPRINTF("Found driver: [%s]\n",dtypes[i]->name);
 } 
 
+static void write_pidfile(long pid)
+{
+	char buf[100];
+	int len;
+	int fd;
+	int flags;
+
+	fd = open(PIDFILE, O_RDWR | O_CREAT, 0600);
+	if (fd == -1) {
+		DPRINTF("Opening pid file failed (%d)\n", errno);
+		exit(1);
+	}
+
+	/* We exit silently if daemon already running. */
+	if (lockf(fd, F_TLOCK, 0) == -1)
+		exit(0);
+
+	/* Set FD_CLOEXEC, so that tapdisk doesn't get this file
+	   descriptor. */
+	if ((flags = fcntl(fd, F_GETFD)) == -1) {
+		DPRINTF("F_GETFD failed (%d)\n", errno);
+		exit(1);
+	}
+	flags |= FD_CLOEXEC;
+	if (fcntl(fd, F_SETFD, flags) == -1) {
+		DPRINTF("F_SETFD failed (%d)\n", errno);
+		exit(1);
+	}
+
+	len = sprintf(buf, "%ld\n", pid);
+	if (write(fd, buf, len) != len) {
+		DPRINTF("Writing pid file failed (%d)\n", errno);
+		exit(1);
+	}
+}
+
 int main(int argc, char *argv[])
 {
 	char *devname;
@@ -681,6 +719,7 @@ int main(int argc, char *argv[])
 	ioctl(ctlfd, BLKTAP_IOCTL_SETMODE, BLKTAP_MODE_INTERPOSE );
 
 	process = getpid();
+	write_pidfile(process);
 	ret = ioctl(ctlfd, BLKTAP_IOCTL_SENDPID, process );
 
 	/*Static pollhooks*/
@@ -716,3 +755,13 @@ int main(int argc, char *argv[])
 	closelog();
 	return -1;
 }
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

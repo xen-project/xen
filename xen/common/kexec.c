@@ -24,7 +24,6 @@
 
 DEFINE_PER_CPU (crash_note_t, crash_notes);
 cpumask_t crash_saved_cpus;
-int crashing_cpu;
 
 xen_kexec_image_t kexec_image[KEXEC_IMAGE_NR];
 
@@ -58,38 +57,34 @@ custom_param("crashkernel", parse_crashkernel);
 
 static void one_cpu_only(void)
 {
-   /* Only allow the first cpu to continue - force other cpus to spin */
+    /* Only allow the first cpu to continue - force other cpus to spin */
     if ( test_and_set_bit(KEXEC_FLAG_IN_PROGRESS, &kexec_flags) )
-    {
-        while (1);
-    }
+        for ( ; ; ) ;
 }
 
-/* Save the registers in the per-cpu crash note buffer */
-
-void machine_crash_save_cpu(void)
+/* Save the registers in the per-cpu crash note buffer. */
+void kexec_crash_save_cpu(void)
 {
     int cpu = smp_processor_id();
     crash_note_t *cntp;
 
-    if ( !cpu_test_and_set(cpu, crash_saved_cpus) )
-    {
-        cntp = &per_cpu(crash_notes, cpu);
-        elf_core_save_regs(&cntp->core.desc.desc.pr_reg,
-                           &cntp->xen_regs.desc.desc);
+    if ( cpu_test_and_set(cpu, crash_saved_cpus) )
+        return;
 
-        /* setup crash "CORE" note */
-        setup_crash_note(cntp, core, CORE_STR, CORE_STR_LEN, NT_PRSTATUS);
+    cntp = &per_cpu(crash_notes, cpu);
+    elf_core_save_regs(&cntp->core.desc.desc.pr_reg,
+                       &cntp->xen_regs.desc.desc);
 
-        /* setup crash note "Xen", XEN_ELFNOTE_CRASH_REGS */
-        setup_crash_note(cntp, xen_regs, XEN_STR, XEN_STR_LEN,
-                         XEN_ELFNOTE_CRASH_REGS);
-    }
+    /* Set up crash "CORE" note. */
+    setup_crash_note(cntp, core, CORE_STR, CORE_STR_LEN, NT_PRSTATUS);
+
+    /* Set up crash note "Xen", XEN_ELFNOTE_CRASH_REGS. */
+    setup_crash_note(cntp, xen_regs, XEN_STR, XEN_STR_LEN,
+                     XEN_ELFNOTE_CRASH_REGS);
 }
 
-/* Setup the single Xen specific info crash note */
-
-crash_xen_info_t *machine_crash_save_info(void)
+/* Set up the single Xen-specific-info crash note. */
+crash_xen_info_t *kexec_crash_save_info(void)
 {
     int cpu = smp_processor_id();
     crash_note_t *cntp;
@@ -99,7 +94,7 @@ crash_xen_info_t *machine_crash_save_info(void)
 
     cntp = &per_cpu(crash_notes, cpu);
 
-    /* setup crash note "Xen", XEN_ELFNOTE_CRASH_INFO */
+    /* Set up crash note "Xen", XEN_ELFNOTE_CRASH_INFO. */
     setup_crash_note(cntp, xen_info, XEN_STR, XEN_STR_LEN,
                      XEN_ELFNOTE_CRASH_INFO);
 
@@ -117,37 +112,34 @@ crash_xen_info_t *machine_crash_save_info(void)
     return info;
 }
 
-void machine_crash_kexec(void)
+void kexec_crash(void)
 {
     int pos;
-    xen_kexec_image_t *image;
-
-    one_cpu_only();
-
-    machine_crash_save_cpu();
-    crashing_cpu = smp_processor_id();
-
-    machine_crash_shutdown();
 
     pos = (test_bit(KEXEC_FLAG_CRASH_POS, &kexec_flags) != 0);
+    if ( !test_bit(KEXEC_IMAGE_CRASH_BASE + pos, &kexec_flags) )
+        return;
 
-    if ( test_bit(KEXEC_IMAGE_CRASH_BASE + pos, &kexec_flags) )
-    {
-        image = &kexec_image[KEXEC_IMAGE_CRASH_BASE + pos];
-        machine_kexec(image); /* Does not return */
-    }
+    one_cpu_only();
+    kexec_crash_save_cpu();
+    machine_crash_shutdown();
+
+    machine_kexec(&kexec_image[KEXEC_IMAGE_CRASH_BASE + pos]);
+
+    BUG();
 }
 
 static void do_crashdump_trigger(unsigned char key)
 {
-	printk("triggering crashdump\n");
-	machine_crash_kexec();
+    printk("'%c' pressed -> triggering crashdump\n", key);
+    kexec_crash();
+    printk(" * no crash kernel loaded!\n");
 }
 
 static __init int register_crashdump_trigger(void)
 {
-	register_keyhandler('c', do_crashdump_trigger, "trigger a crashdump");
-	return 0;
+    register_keyhandler('C', do_crashdump_trigger, "trigger a crashdump");
+    return 0;
 }
 __initcall(register_crashdump_trigger);
 
@@ -295,7 +287,7 @@ static int kexec_exec(XEN_GUEST_HANDLE(void) uarg)
         machine_reboot_kexec(image); /* Does not return */
         break;
     case KEXEC_TYPE_CRASH:
-        machine_crash_kexec(); /* Does not return */
+        kexec_crash(); /* Does not return */
         break;
     }
 

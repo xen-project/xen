@@ -197,9 +197,7 @@ xen_vif_get_type(xen_session *session, enum xen_driver_type *result, xen_vif vif
         };
 
     abstract_type result_type = xen_driver_type_abstract_type_;
-    char *result_str = NULL;
     XEN_CALL_("VIF.get_type");
-    *result = xen_driver_type_from_string(session, result_str);
     return session->ok;
 }
 

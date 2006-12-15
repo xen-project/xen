@@ -19,7 +19,6 @@
 #ifndef XEN_VM_H
 #define XEN_VM_H
 
-#include "xen_boot_type.h"
 #include "xen_common.h"
 #include "xen_console_decl.h"
 #include "xen_cpu_feature.h"
@@ -36,9 +35,36 @@
 
 
 /*
- * The VM class. 
- *  
+ * The VM class.
+ * 
  * A virtual machine (or 'guest').
+ * 
+ * VM booting is controlled by setting one of the two mutually exclusive
+ * groups: "PV", and "HVM".  If HVM.boot is the empty string, then paravirtual
+ * domain building and booting will be used; otherwise the VM will be loaded
+ * as an HVM domain, and booted using an emulated BIOS.
+ * 
+ * When paravirtual booting is in use, the PV/bootloader field indicates the
+ * bootloader to use.  It may be "pygrub", in which case the platform's
+ * default installation of pygrub will be used, or a full path within the
+ * control domain to some other bootloader.  The other fields, PV/kernel,
+ * PV/ramdisk, PV/args and PV/bootloader_args will be passed to the bootloader
+ * unmodified, and interpretation of those fields is then specific to the
+ * bootloader itself, including the possibility that the bootloader will
+ * ignore some or all of those given values.
+ * 
+ * If the bootloader is pygrub, then the menu.lst is parsed if present in the
+ * guest's filesystem, otherwise the specified kernel and ramdisk are used, or
+ * an autodetected kernel is used if nothing is specified and autodetection is
+ * possible.  PV/args is appended to the kernel command line, no matter which
+ * mechanism is used for finding the kernel.
+ * 
+ * If PV/bootloader is empty but PV/kernel is specified, then the kernel and
+ * ramdisk values will be treated as paths within the control domain.  If both
+ * PV/bootloader and PV/kernel are empty, then the behaviour is as if
+ * PV/bootloader was specified as "pygrub".
+ * 
+ * When using HVM booting, HVM/boot specifies the order of the boot devices.
  */
 
 
@@ -79,6 +105,7 @@ typedef struct xen_vm_record
     char *name_description;
     int64_t user_version;
     bool is_a_template;
+    bool auto_power_on;
     struct xen_host_record_opt *resident_on;
     int64_t memory_static_max;
     int64_t memory_dynamic_max;
@@ -101,18 +128,17 @@ typedef struct xen_vm_record
     struct xen_vif_record_opt_set *vifs;
     struct xen_vbd_record_opt_set *vbds;
     struct xen_vtpm_record_opt_set *vtpms;
-    char *bios_boot;
+    char *pv_bootloader;
+    char *pv_kernel;
+    char *pv_ramdisk;
+    char *pv_args;
+    char *pv_bootloader_args;
+    char *hvm_boot;
     bool platform_std_vga;
     char *platform_serial;
     bool platform_localtime;
     bool platform_clock_offset;
     bool platform_enable_audio;
-    char *builder;
-    enum xen_boot_type boot_method;
-    char *kernel_kernel;
-    char *kernel_initrd;
-    char *kernel_args;
-    char *grub_cmdline;
     char *pci_bus;
     xen_string_string_map *tools_version;
     xen_string_string_map *otherconfig;
@@ -198,14 +224,14 @@ xen_vm_record_opt_set_free(xen_vm_record_opt_set *set);
 
 
 /**
- * Get the current state of the given VM.  !!!
+ * Get a record containing the current state of the given VM.
  */
 extern bool
 xen_vm_get_record(xen_session *session, xen_vm_record **result, xen_vm vm);
 
 
 /**
- * Get a reference to the object with the specified UUID.  !!!
+ * Get a reference to the VM instance with the specified UUID.
  */
 extern bool
 xen_vm_get_by_uuid(xen_session *session, xen_vm *result, char *uuid);
@@ -274,6 +300,13 @@ xen_vm_get_user_version(xen_session *session, int64_t *result, xen_vm vm);
  */
 extern bool
 xen_vm_get_is_a_template(xen_session *session, bool *result, xen_vm vm);
+
+
+/**
+ * Get the auto_power_on field of the given VM.
+ */
+extern bool
+xen_vm_get_auto_power_on(xen_session *session, bool *result, xen_vm vm);
 
 
 /**
@@ -431,10 +464,45 @@ xen_vm_get_vtpms(xen_session *session, struct xen_vtpm_set **result, xen_vm vm);
 
 
 /**
- * Get the bios/boot field of the given VM.
+ * Get the PV/bootloader field of the given VM.
  */
 extern bool
-xen_vm_get_bios_boot(xen_session *session, char **result, xen_vm vm);
+xen_vm_get_pv_bootloader(xen_session *session, char **result, xen_vm vm);
+
+
+/**
+ * Get the PV/kernel field of the given VM.
+ */
+extern bool
+xen_vm_get_pv_kernel(xen_session *session, char **result, xen_vm vm);
+
+
+/**
+ * Get the PV/ramdisk field of the given VM.
+ */
+extern bool
+xen_vm_get_pv_ramdisk(xen_session *session, char **result, xen_vm vm);
+
+
+/**
+ * Get the PV/args field of the given VM.
+ */
+extern bool
+xen_vm_get_pv_args(xen_session *session, char **result, xen_vm vm);
+
+
+/**
+ * Get the PV/bootloader_args field of the given VM.
+ */
+extern bool
+xen_vm_get_pv_bootloader_args(xen_session *session, char **result, xen_vm vm);
+
+
+/**
+ * Get the HVM/boot field of the given VM.
+ */
+extern bool
+xen_vm_get_hvm_boot(xen_session *session, char **result, xen_vm vm);
 
 
 /**
@@ -470,48 +538,6 @@ xen_vm_get_platform_clock_offset(xen_session *session, bool *result, xen_vm vm);
  */
 extern bool
 xen_vm_get_platform_enable_audio(xen_session *session, bool *result, xen_vm vm);
-
-
-/**
- * Get the builder field of the given VM.
- */
-extern bool
-xen_vm_get_builder(xen_session *session, char **result, xen_vm vm);
-
-
-/**
- * Get the boot_method field of the given VM.
- */
-extern bool
-xen_vm_get_boot_method(xen_session *session, enum xen_boot_type *result, xen_vm vm);
-
-
-/**
- * Get the kernel/kernel field of the given VM.
- */
-extern bool
-xen_vm_get_kernel_kernel(xen_session *session, char **result, xen_vm vm);
-
-
-/**
- * Get the kernel/initrd field of the given VM.
- */
-extern bool
-xen_vm_get_kernel_initrd(xen_session *session, char **result, xen_vm vm);
-
-
-/**
- * Get the kernel/args field of the given VM.
- */
-extern bool
-xen_vm_get_kernel_args(xen_session *session, char **result, xen_vm vm);
-
-
-/**
- * Get the grub/cmdline field of the given VM.
- */
-extern bool
-xen_vm_get_grub_cmdline(xen_session *session, char **result, xen_vm vm);
 
 
 /**
@@ -564,6 +590,13 @@ xen_vm_set_is_a_template(xen_session *session, xen_vm vm, bool is_a_template);
 
 
 /**
+ * Set the auto_power_on field of the given VM.
+ */
+extern bool
+xen_vm_set_auto_power_on(xen_session *session, xen_vm vm, bool auto_power_on);
+
+
+/**
  * Set the memory/dynamic_max field of the given VM.
  */
 extern bool
@@ -592,6 +625,13 @@ xen_vm_set_vcpus_params(xen_session *session, xen_vm vm, char *params);
 
 
 /**
+ * Set the VCPUs/number field of the given VM.
+ */
+extern bool
+xen_vm_set_vcpus_number(xen_session *session, xen_vm vm, int64_t number);
+
+
+/**
  * Set the VCPUs/features/force_on field of the given VM.
  */
 extern bool
@@ -599,10 +639,42 @@ xen_vm_set_vcpus_features_force_on(xen_session *session, xen_vm vm, struct xen_c
 
 
 /**
+ * Add the given value to the VCPUs/features/force_on field of the
+ * given VM.  If the value is already in that Set, then do nothing.
+ */
+extern bool
+xen_vm_add_vcpus_features_force_on(xen_session *session, xen_vm vm, enum xen_cpu_feature value);
+
+
+/**
+ * Remove the given value from the VCPUs/features/force_on field of the
+ * given VM.  If the value is not in that Set, then do nothing.
+ */
+extern bool
+xen_vm_remove_vcpus_features_force_on(xen_session *session, xen_vm vm, enum xen_cpu_feature value);
+
+
+/**
  * Set the VCPUs/features/force_off field of the given VM.
  */
 extern bool
 xen_vm_set_vcpus_features_force_off(xen_session *session, xen_vm vm, struct xen_cpu_feature_set *force_off);
+
+
+/**
+ * Add the given value to the VCPUs/features/force_off field of the
+ * given VM.  If the value is already in that Set, then do nothing.
+ */
+extern bool
+xen_vm_add_vcpus_features_force_off(xen_session *session, xen_vm vm, enum xen_cpu_feature value);
+
+
+/**
+ * Remove the given value from the VCPUs/features/force_off field of
+ * the given VM.  If the value is not in that Set, then do nothing.
+ */
+extern bool
+xen_vm_remove_vcpus_features_force_off(xen_session *session, xen_vm vm, enum xen_cpu_feature value);
 
 
 /**
@@ -634,10 +706,45 @@ xen_vm_set_actions_after_crash(xen_session *session, xen_vm vm, enum xen_on_cras
 
 
 /**
- * Set the bios/boot field of the given VM.
+ * Set the PV/bootloader field of the given VM.
  */
 extern bool
-xen_vm_set_bios_boot(xen_session *session, xen_vm vm, char *boot);
+xen_vm_set_pv_bootloader(xen_session *session, xen_vm vm, char *bootloader);
+
+
+/**
+ * Set the PV/kernel field of the given VM.
+ */
+extern bool
+xen_vm_set_pv_kernel(xen_session *session, xen_vm vm, char *kernel);
+
+
+/**
+ * Set the PV/ramdisk field of the given VM.
+ */
+extern bool
+xen_vm_set_pv_ramdisk(xen_session *session, xen_vm vm, char *ramdisk);
+
+
+/**
+ * Set the PV/args field of the given VM.
+ */
+extern bool
+xen_vm_set_pv_args(xen_session *session, xen_vm vm, char *args);
+
+
+/**
+ * Set the PV/bootloader_args field of the given VM.
+ */
+extern bool
+xen_vm_set_pv_bootloader_args(xen_session *session, xen_vm vm, char *bootloader_args);
+
+
+/**
+ * Set the HVM/boot field of the given VM.
+ */
+extern bool
+xen_vm_set_hvm_boot(xen_session *session, xen_vm vm, char *boot);
 
 
 /**
@@ -673,48 +780,6 @@ xen_vm_set_platform_clock_offset(xen_session *session, xen_vm vm, bool clock_off
  */
 extern bool
 xen_vm_set_platform_enable_audio(xen_session *session, xen_vm vm, bool enable_audio);
-
-
-/**
- * Set the builder field of the given VM.
- */
-extern bool
-xen_vm_set_builder(xen_session *session, xen_vm vm, char *builder);
-
-
-/**
- * Set the boot_method field of the given VM.
- */
-extern bool
-xen_vm_set_boot_method(xen_session *session, xen_vm vm, enum xen_boot_type boot_method);
-
-
-/**
- * Set the kernel/kernel field of the given VM.
- */
-extern bool
-xen_vm_set_kernel_kernel(xen_session *session, xen_vm vm, char *kernel);
-
-
-/**
- * Set the kernel/initrd field of the given VM.
- */
-extern bool
-xen_vm_set_kernel_initrd(xen_session *session, xen_vm vm, char *initrd);
-
-
-/**
- * Set the kernel/args field of the given VM.
- */
-extern bool
-xen_vm_set_kernel_args(xen_session *session, xen_vm vm, char *args);
-
-
-/**
- * Set the grub/cmdline field of the given VM.
- */
-extern bool
-xen_vm_set_grub_cmdline(xen_session *session, xen_vm vm, char *cmdline);
 
 
 /**
@@ -760,8 +825,8 @@ xen_vm_unpause(xen_session *session, xen_vm vm);
 
 /**
  * Attempt to cleanly shutdown the specified VM. (Note: this may not be
- * supported---e.g. if a guest agent is not installed). 
- *  
+ * supported---e.g. if a guest agent is not installed).
+ * 
  * Once shutdown has been completed perform poweroff action specified in guest
  * configuration.
  */
@@ -771,8 +836,8 @@ xen_vm_clean_shutdown(xen_session *session, xen_vm vm);
 
 /**
  * Attempt to cleanly shutdown the specified VM (Note: this may not be
- * supported---e.g. if a guest agent is not installed). 
- *  
+ * supported---e.g. if a guest agent is not installed).
+ * 
  * Once shutdown has been completed perform reboot action specified in guest
  * configuration.
  */
@@ -815,14 +880,6 @@ xen_vm_resume(xen_session *session, xen_vm vm, bool start_paused);
  */
 extern bool
 xen_vm_get_all(xen_session *session, struct xen_vm_set **result);
-
-
-/**
- * Destroy the specified VM.  The VM is completely removed from the system.
- * This function can only be called when the VM is in the Halted State.
- */
-extern bool
-xen_vm_destroy(xen_session *session, xen_vm vm);
 
 
 #endif

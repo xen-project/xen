@@ -1,16 +1,34 @@
-#!/bin/bash
+#!/bin/sh
 # CHECK-INSTALL
 
-function error {
-   echo
-   echo '  *** Check for udev/hotplug FAILED'
-   exit 1
-}
-[ -x "$(which udevinfo)" ] && \
-  UDEV_VERSION=$(udevinfo -V | sed -e 's/^[^0-9]* \([0-9]\{1,\}\)[^0-9]\{0,\}/\1/')
+RC=0
 
-if [ -n "$UDEV_VERSION" ] && [ $UDEV_VERSION -ge 059 ]; then
-  exit 0
+case ${OS} in
+OpenBSD|NetBSD|FreeBSD)
+	TOOL="vnconfig"
+	which ${TOOL} 1>/dev/null 2>&1 || RC=1
+	;;
+Linux)
+	TOOL="udevinfo"
+	UDEV_VERSION="0"
+	test -x "$(which ${TOOL})" && \
+		UDEV_VERSION=$(${TOOL} -V | sed -e 's/^[^0-9]* \([0-9]\{1,\}\)[^0-9]\{0,\}/\1/')
+	if test "${UDEV_VERSION}" -ge 059; then
+		RC=0
+	else
+		TOOL="hotplug"
+		which ${TOOL} 1>/dev/null 2>&1 || RC=1
+	fi
+	;;
+*)
+	TOOL=""
+	echo "Unknown OS" && RC=1
+	;;
+esac
+
+if test ${RC} -ne 0; then
+	echo
+	echo ' *** Check for ${TOOL} FAILED'
 fi
 
-which hotplug 1>/dev/null 2>&1 || error
+exit ${RC}

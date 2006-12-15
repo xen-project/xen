@@ -52,7 +52,7 @@
 #define XENOPROF_last_op            14
 
 #define MAX_OPROF_EVENTS    32
-#define MAX_OPROF_DOMAINS   25	
+#define MAX_OPROF_DOMAINS   25
 #define XENOPROF_CPU_TYPE_SIZE 64
 
 /* Xenoprof performance events (not Xen events) */

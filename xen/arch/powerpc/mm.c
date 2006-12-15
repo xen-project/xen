@@ -25,9 +25,9 @@
 #include <xen/kernel.h>
 #include <xen/sched.h>
 #include <xen/perfc.h>
-#include <asm/misc.h>
 #include <asm/init.h>
 #include <asm/page.h>
+#include <asm/string.h>
 
 #ifdef VERBOSE
 #define MEM_LOG(_f, _a...)                                  \
@@ -42,18 +42,129 @@ struct page_info *frame_table;
 unsigned long max_page;
 unsigned long total_pages;
 
+void __init init_frametable(void)
+{
+    unsigned long p;
+    unsigned long nr_pages;
+    int i;
+
+    nr_pages = PFN_UP(max_page * sizeof(struct page_info));
+
+    p = alloc_boot_pages(nr_pages, 1);
+    if (p == 0)
+        panic("Not enough memory for frame table\n");
+
+    frame_table = (struct page_info *)(p << PAGE_SHIFT);
+    for (i = 0; i < nr_pages; i += 1)
+        clear_page((void *)((p + i) << PAGE_SHIFT));
+}
+
+void share_xen_page_with_guest(
+    struct page_info *page, struct domain *d, int readonly)
+{
+    if ( page_get_owner(page) == d )
+        return;
+
+    /* this causes us to leak pages in the Domain and reuslts in
+     * Zombie domains, I think we are missing a piece, until we find
+     * it we disable the following code */
+    set_gpfn_from_mfn(page_to_mfn(page), INVALID_M2P_ENTRY);
+
+    spin_lock(&d->page_alloc_lock);
+
+    /* The incremented type count pins as writable or read-only. */
+    page->u.inuse.type_info  = (readonly ? PGT_none : PGT_writable_page);
+    page->u.inuse.type_info |= PGT_validated | 1;
+
+    page_set_owner(page, d);
+    wmb(); /* install valid domain ptr before updating refcnt. */
+    ASSERT(page->count_info == 0);
+    page->count_info |= PGC_allocated | 1;
+
+    if ( unlikely(d->xenheap_pages++ == 0) )
+        get_knownalive_domain(d);
+    list_add_tail(&page->list, &d->xenpage_list);
+
+    spin_unlock(&d->page_alloc_lock);
+}
+
+void share_xen_page_with_privileged_guests(
+    struct page_info *page, int readonly)
+{
+        unimplemented();
+}
+
+static ulong foreign_to_mfn(struct domain *d, ulong pfn)
+{
+
+    pfn -= 1UL << cpu_foreign_map_order();
+
+    BUG_ON(pfn >= d->arch.foreign_mfn_count);
+
+    return d->arch.foreign_mfns[pfn];
+}
+
+static int set_foreign(struct domain *d, ulong pfn, ulong mfn)
+{
+    pfn -= 1UL << cpu_foreign_map_order();
+
+    BUG_ON(pfn >= d->arch.foreign_mfn_count);
+    d->arch.foreign_mfns[pfn] = mfn;
+
+    return 0;
+}
+
+static int create_grant_va_mapping(
+    unsigned long va, unsigned long frame, struct vcpu *v)
+{
+    if (v->domain->domain_id != 0) {
+        printk("only Dom0 can map a grant entry\n");
+        BUG();
+        return GNTST_permission_denied;
+    }
+    set_foreign(v->domain, va >> PAGE_SHIFT, frame);
+    return GNTST_okay;
+}
+
+static int destroy_grant_va_mapping(
+    unsigned long addr, unsigned long frame, struct domain *d)
+{
+    if (d->domain_id != 0) {
+        printk("only Dom0 can map a grant entry\n");
+        BUG();
+        return GNTST_permission_denied;
+    }
+    set_foreign(d, addr >> PAGE_SHIFT, ~0UL);
+    return GNTST_okay;
+}
+
 int create_grant_host_mapping(
     unsigned long addr, unsigned long frame, unsigned int flags)
 {
-    panic("%s called\n", __func__);
-    return 1;
+    if (flags & GNTMAP_application_map) {
+        printk("%s: GNTMAP_application_map not supported\n", __func__);
+        BUG();
+        return GNTST_general_error;
+    }
+    if (flags & GNTMAP_contains_pte) {
+        printk("%s: GNTMAP_contains_pte not supported\n", __func__);
+        BUG();
+        return GNTST_general_error;
+    }
+    return create_grant_va_mapping(addr, frame, current);
 }
 
 int destroy_grant_host_mapping(
     unsigned long addr, unsigned long frame, unsigned int flags)
 {
-    panic("%s called\n", __func__);
-    return 1;
+    if (flags & GNTMAP_contains_pte) {
+        printk("%s: GNTMAP_contains_pte not supported\n", __func__);
+        BUG();
+        return GNTST_general_error;
+    }
+
+    /* may have force the remove here */
+    return destroy_grant_va_mapping(addr, frame, current->domain);
 }
 
 int steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
@@ -139,7 +250,7 @@ int get_page_type(struct page_info *page, unsigned long type)
         {
             return 0;
         }
-        if ( unlikely(!(x & PGT_validated)) )
+        else if ( unlikely(!(x & PGT_validated)) )
         {
             /* Someone else is updating validation of this page. Wait... */
             while ( (y = page->u.inuse.type_info) == x )
@@ -158,25 +269,6 @@ int get_page_type(struct page_info *page, unsigned long type)
     return 1;
 }
 
-void __init init_frametable(void)
-{
-    unsigned long p;
-    unsigned long nr_pages;
-    int i;
-
-    nr_pages = PFN_UP(max_page * sizeof(struct page_info));
-    nr_pages = min(nr_pages, (4UL << (20 - PAGE_SHIFT)));
-    
-
-    p = alloc_boot_pages(nr_pages, 1);
-    if (p == 0)
-        panic("Not enough memory for frame table\n");
-
-    frame_table = (struct page_info *)(p << PAGE_SHIFT);
-    for (i = 0; i < nr_pages; i += 1)
-        clear_page((void *)((p + i) << PAGE_SHIFT));
-}
-
 long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 {
     printk("%s: no PPC specific memory ops\n", __func__);
@@ -185,29 +277,28 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
 extern void copy_page(void *dp, void *sp)
 {
-    if (on_mambo()) {
-        extern void *mambo_memcpy(void *,const void *,__kernel_size_t);
-        mambo_memcpy(dp, sp, PAGE_SIZE);
+    if (on_systemsim()) {
+        systemsim_memcpy(dp, sp, PAGE_SIZE);
     } else {
         memcpy(dp, sp, PAGE_SIZE);
     }
 }
 
+/* XXX should probably replace with faster data structure */
 static uint add_extent(struct domain *d, struct page_info *pg, uint order)
 {
     struct page_extents *pe;
 
     pe = xmalloc(struct page_extents);
     if (pe == NULL)
-        return 0;
+        return -ENOMEM;
 
     pe->pg = pg;
     pe->order = order;
-    pe->pfn = page_to_mfn(pg);
 
     list_add_tail(&pe->pe_list, &d->arch.extent_list);
 
-    return pe->pfn;
+    return 0;
 }
 
 void free_extents(struct domain *d)
@@ -246,7 +337,7 @@ uint allocate_extents(struct domain *d, uint nrpages, uint rma_nrpages)
         if (pg == NULL)
             return total_nrpages;
 
-        if (add_extent(d, pg, ext_order) == 0) {
+        if (add_extent(d, pg, ext_order) < 0) {
             free_domheap_pages(pg, ext_order);
             return total_nrpages;
         }
@@ -299,13 +390,13 @@ int allocate_rma(struct domain *d, unsigned int order)
 
     return 0;
 }
+
 void free_rma_check(struct page_info *page)
 {
     if (test_bit(_PGC_page_RMA, &page->count_info) &&
         !test_bit(_DOMF_dying, &page_get_owner(page)->domain_flags))
         panic("Attempt to free an RMA page: 0x%lx\n", page_to_mfn(page));
 }
-
 
 ulong pfn2mfn(struct domain *d, ulong pfn, int *type)
 {
@@ -314,9 +405,17 @@ ulong pfn2mfn(struct domain *d, ulong pfn, int *type)
     struct page_extents *pe;
     ulong mfn = INVALID_MFN;
     int t = PFN_TYPE_NONE;
+    ulong foreign_map_pfn = 1UL << cpu_foreign_map_order();
 
     /* quick tests first */
-    if (d->is_privileged && cpu_io_mfn(pfn)) {
+    if (pfn & foreign_map_pfn) {
+        t = PFN_TYPE_FOREIGN;
+        mfn = foreign_to_mfn(d, pfn);
+    } else if (pfn >= max_page && pfn < (max_page + NR_GRANT_FRAMES)) {
+        /* Its a grant table access */
+        t = PFN_TYPE_GNTTAB;
+        mfn = gnttab_shared_mfn(d, d->grant_table, (pfn - max_page));
+    } else if (d->is_privileged && cpu_io_mfn(pfn)) {
         t = PFN_TYPE_IO;
         mfn = pfn;
     } else {
@@ -324,17 +423,32 @@ ulong pfn2mfn(struct domain *d, ulong pfn, int *type)
             t = PFN_TYPE_RMA;
             mfn = pfn + rma_base_mfn;
         } else {
-            list_for_each_entry (pe, &d->arch.extent_list, pe_list) {
-                uint end_pfn = pe->pfn + (1 << pe->order);
+            ulong cur_pfn = rma_size_mfn;
 
-                if (pfn >= pe->pfn && pfn < end_pfn) {
+            list_for_each_entry (pe, &d->arch.extent_list, pe_list) {
+                uint pe_pages = 1UL << pe->order;
+                uint end_pfn = cur_pfn + pe_pages;
+
+                if (pfn >= cur_pfn && pfn < end_pfn) {
                     t = PFN_TYPE_LOGICAL;
-                    mfn = page_to_mfn(pe->pg) + (pfn - pe->pfn);
+                    mfn = page_to_mfn(pe->pg) + (pfn - cur_pfn);
                     break;
                 }
+                cur_pfn += pe_pages;
             }
         }
-        BUG_ON(t != PFN_TYPE_NONE && page_get_owner(mfn_to_page(mfn)) != d);
+#ifdef DEBUG
+        if (t != PFN_TYPE_NONE &&
+            (d->domain_flags & DOMF_dying) &&
+            page_get_owner(mfn_to_page(mfn)) != d) {
+            printk("%s: page type: %d owner Dom[%d]:%p expected Dom[%d]:%p\n",
+                   __func__, t,
+                   page_get_owner(mfn_to_page(mfn))->domain_id,
+                   page_get_owner(mfn_to_page(mfn)),
+                   d->domain_id, d);
+            BUG();
+        }
+#endif
     }
 
     if (t == PFN_TYPE_NONE) {
@@ -368,6 +482,42 @@ ulong pfn2mfn(struct domain *d, ulong pfn, int *type)
     return mfn;
 }
 
+unsigned long mfn_to_gmfn(struct domain *d, unsigned long mfn)
+{
+    struct page_extents *pe;
+    ulong cur_pfn;
+    ulong gnttab_mfn;
+    ulong rma_mfn;
+
+    /* grant? */
+    gnttab_mfn = gnttab_shared_mfn(d, d->grant_table, 0);
+    if (mfn >= gnttab_mfn && mfn < (gnttab_mfn + NR_GRANT_FRAMES))
+        return max_page + (mfn - gnttab_mfn);
+
+    /* IO? */
+    if (d->is_privileged && cpu_io_mfn(mfn))
+        return mfn;
+
+    rma_mfn = page_to_mfn(d->arch.rma_page);
+    if (mfn >= rma_mfn &&
+        mfn < (rma_mfn + (1 << d->arch.rma_order)))
+        return mfn - rma_mfn;
+
+    /* Extent? */
+    cur_pfn = 1UL << d->arch.rma_order;
+    list_for_each_entry (pe, &d->arch.extent_list, pe_list) {
+        uint pe_pages = 1UL << pe->order;
+        uint b_mfn = page_to_mfn(pe->pg);
+        uint e_mfn = b_mfn + pe_pages;
+
+        if (mfn >= b_mfn && mfn < e_mfn) {
+            return cur_pfn + (mfn - b_mfn);
+        }
+        cur_pfn += pe_pages;
+    }
+    return INVALID_M2P_ENTRY;
+}
+
 void guest_physmap_add_page(
     struct domain *d, unsigned long gpfn, unsigned long mfn)
 {
@@ -381,4 +531,11 @@ void guest_physmap_remove_page(
 void shadow_drop_references(
     struct domain *d, struct page_info *page)
 {
+}
+
+int arch_domain_add_extent(struct domain *d, struct page_info *page, int order)
+{
+    if (add_extent(d, page, order) < 0)
+        return -ENOMEM;
+    return 0;
 }

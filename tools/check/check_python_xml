@@ -1,0 +1,8 @@
+#!/bin/sh
+# CHECK-INSTALL
+
+python -c 'import xml.dom.minidom' 2>/dev/null || {
+    echo
+    echo "  *** Check for python-xml package FAILED"
+    exit 1
+}

@@ -13,25 +13,12 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005
+ * Copyright (C) IBM Corp. 2006
  *
- * Authors: Jimi Xenidis <jimix@watson.ibm.com>
+ * Authors: Hollis Blanchard <hollisb@us.ibm.com>
  */
 
-#include <xen/config.h>
-#include <xen/delay.h>
-#include <xen/time.h>
-#include <asm/processor.h>
+#include <asm/config.h>
 
-void udelay(unsigned long usecs)
-{
-    ulong ticks = usecs * ticks_per_usec;
-    ulong s;
-    ulong e;
-
-    s = get_timebase();
-    do {
-        asm volatile("or 1,1,1"); /* also puts the thread to low priority */
-        e = get_timebase();
-    } while ((e-s) < ticks);
-}
+char builtin_cmdline[CONFIG_CMDLINE_SIZE] 
+        __attribute__((section("__builtin_cmdline"))) = CMDLINE;

@@ -20,6 +20,7 @@
 #
 
 import commands
+import logging
 import os
 import stat
 import threading
@@ -33,9 +34,12 @@ XEND_STORAGE_MAX_IGNORE = -1
 XEND_STORAGE_DIR = "/var/lib/xend/storage/"
 XEND_STORAGE_QCOW_FILENAME = "%s.qcow"
 XEND_STORAGE_VDICFG_FILENAME = "%s.vdi.xml"
-QCOW_CREATE_COMMAND = "/usr/sbin/qcow-create %d %s"
+QCOW_CREATE_COMMAND = "/usr/sbin/qcow-create -p %d %s"
 
-MB = 1024 *1024
+MB = 1024 * 1024
+
+log = logging.getLogger("xend.XendStorageRepository")
+
 
 class DeviceInvalidError(Exception):
     pass
@@ -89,8 +93,7 @@ class XendStorageRepository:
                 open(uuid_file, 'w').write(new_uuid + '\n')
                 return new_uuid
         except IOError:
-            # TODO: log warning
-            pass
+            log.exception("Failed to determine SR UUID")
 
         return uuid.createString()
 
@@ -229,8 +232,7 @@ class XendStorageRepository:
                     if cfg_path and os.path.exists(cfg_path):
                         os.unlink(cfg_path)
                 except OSError:
-                    # TODO: log warning
-                    pass
+                    log.exception("Failed to destroy image")
                 del self.images[image_uuid]
                 return True
         finally:

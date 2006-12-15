@@ -13,9 +13,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005
+ * Copyright (C) IBM Corp. 2005, 2006
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
+ *          Jimi Xenidis <jimix@watson.ibm.com>
  */
 
 #ifndef _ASM_PAGE_H
@@ -28,7 +29,6 @@
 #ifndef __ASSEMBLY__
 
 #include <xen/config.h>
-#include <asm/misc.h>
 #include <asm/cache.h>
 
 #define PFN_DOWN(x)   ((x) >> PAGE_SHIFT)
@@ -129,5 +129,6 @@ static inline int get_order_from_pages(unsigned long nr_pages)
 #define _PAGE_PAT      0x080UL
 #define _PAGE_PSE      0x080UL
 #define _PAGE_GLOBAL   0x100UL
+
 #endif  /* ! __ASSEMBLY__ */
 #endif

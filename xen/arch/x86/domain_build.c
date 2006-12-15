@@ -321,8 +321,11 @@ int construct_dom0(struct domain *d,
     if ( (rc = parseelfimage(&dsi)) != 0 )
         return rc;
 
-    dom0_pae = (dsi.pae_kernel != PAEKERN_no);
     xen_pae  = (CONFIG_PAGING_LEVELS == 3);
+    if (dsi.pae_kernel == PAEKERN_bimodal)
+        dom0_pae = xen_pae; 
+    else
+        dom0_pae = (dsi.pae_kernel != PAEKERN_no);
     if ( dom0_pae != xen_pae )
     {
         printk("PAE mode mismatch between Xen and DOM0 (xen=%s, dom0=%s)\n",
@@ -330,7 +333,8 @@ int construct_dom0(struct domain *d,
         return -EINVAL;
     }
 
-    if ( xen_pae && dsi.pae_kernel == PAEKERN_extended_cr3 )
+    if ( xen_pae && (dsi.pae_kernel == PAEKERN_extended_cr3 ||
+            dsi.pae_kernel == PAEKERN_bimodal) )
             set_bit(VMASST_TYPE_pae_extended_cr3, &d->vm_assist);
 
     if ( (p = xen_elfnote_string(&dsi, XEN_ELFNOTE_FEATURES)) != NULL )

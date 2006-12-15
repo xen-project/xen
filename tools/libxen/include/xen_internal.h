@@ -128,7 +128,6 @@ xen_enum_lookup_(xen_session *session, const char *str,
     xen_enum_lookup_(session__, str__, lookup_table__,  \
                      sizeof(lookup_table__) /           \
                      sizeof(lookup_table__[0]))         \
-                                                        \
 
 #define XEN_ALLOC(type__)                       \
 type__ *                                        \

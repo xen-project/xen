@@ -51,71 +51,13 @@ from xen.xend.XendConstants import *
 from xen.xend.XendAPIConstants import *
 
 MIGRATE_TIMEOUT = 30.0
+BOOTLOADER_LOOPBACK_DEVICE = '/dev/xvdp'
 
 xc = xen.lowlevel.xc.xc()
 xroot = XendRoot.instance()
 
 log = logging.getLogger("xend.XendDomainInfo")
 #log.setLevel(logging.TRACE)
-
-
-def bool0(v):
-    return v != "0" and bool(v)
-
-
-##
-# All parameters of VMs that may be configured on-the-fly, or at start-up.
-# 
-VM_CONFIG_PARAMS = [
-    ('name',        str),
-    ('on_poweroff', str),
-    ('on_reboot',   str),
-    ('on_crash',    str),
-    ]
-
-
-##
-# Configuration entries that we expect to round-trip -- be read from the
-# config file or xc, written to save-files (i.e. through sxpr), and reused as
-# config on restart or restore, all without munging.  Some configuration
-# entries are munged for backwards compatibility reasons, or because they
-# don't come out of xc in the same form as they are specified in the config
-# file, so those are handled separately.
-ROUNDTRIPPING_CONFIG_ENTRIES = [
-    ('uuid',            str),
-    ('vcpus',           int),
-    ('vcpu_avail',      int),
-    ('cpu_cap',         int),
-    ('cpu_weight',      int),
-    ('memory',          int),
-    ('shadow_memory',   int),
-    ('maxmem',          int),
-    ('bootloader',      str),
-    ('bootloader_args', str),
-    ('features',        str),
-    ('localtime',       bool0),
-    ]
-
-ROUNDTRIPPING_CONFIG_ENTRIES += VM_CONFIG_PARAMS
-
-
-##
-# All entries written to the store.  This is VM_CONFIG_PARAMS, plus those
-# entries written to the store that cannot be reconfigured on-the-fly.
-#
-VM_STORE_ENTRIES = [
-    ('uuid',          str),
-    ('vcpus',         int),
-    ('vcpu_avail',    int),
-    ('memory',        int),
-    ('shadow_memory', int),
-    ('maxmem',        int),
-    ('start_time',    float),
-    ('on_xend_start', str),
-    ('on_xend_stop', str),
-    ]
-
-VM_STORE_ENTRIES += VM_CONFIG_PARAMS
 
 
 #
@@ -167,7 +109,7 @@ def recreate(info, priv):
 
     @param xeninfo: Parsed configuration
     @type  xeninfo: Dictionary
-    @param priv: TODO, unknown, something to do with memory
+    @param priv: Is a privileged domain (Dom 0)
     @type  priv: bool
 
     @rtype:  XendDomainInfo
@@ -381,7 +323,7 @@ class XendDomainInfo:
         @type    dompath: string
         @keyword augment: Augment given info with xenstored VM info
         @type    augment: bool
-        @keyword priv: Is a privledged domain (Dom 0) (TODO: really?)
+        @keyword priv: Is a privileged domain (Dom 0)
         @type    priv: bool
         @keyword resume: Is this domain being resumed?
         @type    resume: bool
@@ -497,6 +439,7 @@ class XendDomainInfo:
             xc.domain_pause(self.domid)
             self._stateSet(DOM_STATE_PAUSED)
         except Exception, ex:
+            log.exception(ex)
             raise XendError("Domain unable to be paused: %s" % str(ex))
 
     def unpause(self):
@@ -508,6 +451,7 @@ class XendDomainInfo:
             xc.domain_unpause(self.domid)
             self._stateSet(DOM_STATE_RUNNING)
         except Exception, ex:
+            log.exception(ex)
             raise XendError("Domain unable to be unpaused: %s" % str(ex))
 
     def send_sysrq(self, key):
@@ -526,7 +470,8 @@ class XendDomainInfo:
         dev_uuid = self.info.device_add(dev_type, cfg_sxp = dev_config)
         dev_config_dict = self.info['devices'][dev_uuid][1]
         log.debug("XendDomainInfo.device_create: %s" % scrub_password(dev_config_dict))
-        devid = self._createDevice(dev_type, dev_config_dict)
+        dev_config_dict['devid'] = devid = \
+             self._createDevice(dev_type, dev_config_dict)
         self._waitForDevice(dev_type, devid)
         return self.getDeviceController(dev_type).sxpr(devid)
 
@@ -563,7 +508,7 @@ class XendDomainInfo:
         for devclass in XendDevices.valid_devices():
             self.getDeviceController(devclass).waitForDevices()
 
-    def destroyDevice(self, deviceClass, devid):
+    def destroyDevice(self, deviceClass, devid, force = False):
         try:
             devid = int(devid)
         except ValueError:
@@ -578,7 +523,7 @@ class XendDomainInfo:
                     devid = entry
                     break
                 
-        return self.getDeviceController(deviceClass).destroyDevice(devid)
+        return self.getDeviceController(deviceClass).destroyDevice(devid, force)
 
 
 
@@ -606,8 +551,34 @@ class XendDomainInfo:
             raise XendError('Invalid memory size')
         
         self.info['memory_static_min'] = target
-        self.storeVm("memory", target)
-        self.storeDom("memory/target", target << 10)
+        if self.domid >= 0:
+            self.storeVm("memory", target)
+            self.storeDom("memory/target", target << 10)
+        else:
+            self.info['memory_dynamic_min'] = target
+            xen.xend.XendDomain.instance().managed_config_save(self)
+
+    def setMemoryMaximum(self, limit):
+        """Set the maximum memory limit of this domain
+        @param limit: In MiB.
+        """
+        log.debug("Setting memory maximum of domain %s (%d) to %d MiB.",
+                  self.info['name_label'], self.domid, limit)
+
+        if limit <= 0:
+            raise XendError('Invalid memory size')
+
+        self.info['memory_static_max'] = limit
+        if self.domid >= 0:
+            maxmem = int(limit) * 1024
+            try:
+                return xc.domain_setmaxmem(self.domid, maxmem)
+            except Exception, ex:
+                raise XendError(str(ex))
+        else:
+            self.info['memory_dynamic_max'] = limit
+            xen.xend.XendDomain.instance().managed_config_save(self)
+
 
     def getVCPUInfo(self):
         try:
@@ -647,6 +618,8 @@ class XendDomainInfo:
         if priv:
             augment_entries.remove('memory')
             augment_entries.remove('maxmem')
+            augment_entries.remove('vcpus')
+            augment_entries.remove('vcpu_avail')
 
         vm_config = self._readVMDetails([(k, XendConfig.LEGACY_CFG_TYPES[k])
                                          for k in augment_entries])
@@ -663,6 +636,14 @@ class XendDomainInfo:
                     self.info[xapiarg] = val
                 else:
                     self.info[arg] = val
+
+        # For dom0, we ignore any stored value for the vcpus fields, and
+        # read the current value from Xen instead.  This allows boot-time
+        # settings to take precedence over any entries in the store.
+        if priv:
+            xeninfo = dom_get(self.domid)
+            self.info['vcpus_number'] = xeninfo['online_vcpus']
+            self.info['vcpu_avail'] = (1 << xeninfo['online_vcpus']) - 1
 
         # read image value
         image_sxp = self._readVm('image')
@@ -876,18 +857,23 @@ class XendDomainInfo:
 
     def setVCpuCount(self, vcpus):
         self.info['vcpu_avail'] = (1 << vcpus) - 1
-        self.storeVm('vcpu_avail', self.info['vcpu_avail'])
-        # update dom differently depending on whether we are adjusting
-        # vcpu number up or down, otherwise _vcpuDomDetails does not
-        # disable the vcpus
-        if self.info['vcpus_number'] > vcpus:
-            # decreasing
-            self._writeDom(self._vcpuDomDetails())
-            self.info['vcpus_number'] = vcpus
+        if self.domid >= 0:
+            self.storeVm('vcpu_avail', self.info['vcpu_avail'])
+            # update dom differently depending on whether we are adjusting
+            # vcpu number up or down, otherwise _vcpuDomDetails does not
+            # disable the vcpus
+            if self.info['vcpus_number'] > vcpus:
+                # decreasing
+                self._writeDom(self._vcpuDomDetails())
+                self.info['vcpus_number'] = vcpus
+            else:
+                # same or increasing
+                self.info['vcpus_number'] = vcpus
+                self._writeDom(self._vcpuDomDetails())
         else:
-            # same or increasing
             self.info['vcpus_number'] = vcpus
-            self._writeDom(self._vcpuDomDetails())
+            self.info['online_vcpus'] = vcpus
+            xen.xend.XendDomain.instance().managed_config_save(self)
 
     def getLabel(self):
         return security.get_security_info(self.info, 'label')
@@ -895,6 +881,10 @@ class XendDomainInfo:
     def getMemoryTarget(self):
         """Get this domain's target memory size, in KB."""
         return self.info['memory_static_min'] * 1024
+
+    def getMemoryMaximum(self):
+        """Get this domain's maximum memory size, in KB."""
+        return self.info['memory_static_max'] * 1024
 
     def getResume(self):
         return str(self._resume)
@@ -1017,7 +1007,8 @@ class XendDomainInfo:
             self.refresh_shutdown_lock.release()
 
         if restart_reason:
-            self._maybeRestart(restart_reason)
+            threading.Thread(target = self._maybeRestart,
+                             args = (restart_reason,)).start()
 
 
     #
@@ -1060,7 +1051,6 @@ class XendDomainInfo:
         """
         from xen.xend import XendDomain
         
-        self._configureBootloader()
         config = self.sxpr()
 
         if self._infoIsSet('cpus') and len(self.info['cpus']) != 0:
@@ -1186,6 +1176,10 @@ class XendDomainInfo:
     def _waitForDevice(self, deviceClass, devid):
         return self.getDeviceController(deviceClass).waitForDevice(devid)
 
+    def _waitForDeviceUUID(self, dev_uuid):
+        deviceClass, config = self.info['devices'].get(dev_uuid)
+        self._waitForDevice(deviceClass, config['devid'])
+
     def _reconfigureDevice(self, deviceClass, devid, devconfig):
         return self.getDeviceController(deviceClass).reconfigureDevice(
             devid, devconfig)
@@ -1289,6 +1283,8 @@ class XendDomainInfo:
 
         log.debug('XendDomainInfo.constructDomain')
 
+        self.shutdownStartTime = None
+
         image_cfg = self.info.get('image', {})
         hvm = image_cfg.has_key('hvm')
 
@@ -1333,10 +1329,7 @@ class XendDomainInfo:
                   self.domid,
                   self.info['cpu_weight'])
 
-        # if we have a boot loader but no image, then we need to set things
-        # up by running the boot loader non-interactively
-        if self.info.get('bootloader'):
-            self._configureBootloader()
+        self._configureBootloader()
 
         if not self._infoIsSet('image'):
             raise VmError('Missing image in configuration')
@@ -1363,9 +1356,9 @@ class XendDomainInfo:
             # Use architecture- and image-specific calculations to determine
             # the various headrooms necessary, given the raw configured
             # values. maxmem, memory, and shadow are all in KiB.
-            maxmem = self.image.getRequiredAvailableMemory(
-                self.info['memory_static_min'] * 1024)
             memory = self.image.getRequiredAvailableMemory(
+                self.info['memory_static_min'] * 1024)
+            maxmem = self.image.getRequiredAvailableMemory(
                 self.info['memory_static_max'] * 1024)
             shadow = self.image.getRequiredShadowMemory(
                 self.info['shadow_memory'] * 1024,
@@ -1397,17 +1390,14 @@ class XendDomainInfo:
 
             self._createDevices()
 
-            if self.info['bootloader']:
-                self.image.cleanupBootloading()
+            self.image.cleanupBootloading()
 
             self.info['start_time'] = time.time()
 
             self._stateSet(DOM_STATE_RUNNING)
         except RuntimeError, exn:
             log.exception("XendDomainInfo.initDomain: exception occurred")
-            if self.info['bootloader'] not in (None, 'kernel_external') \
-                   and self.image is not None:
-                self.image.cleanupBootloading()
+            self.image.cleanupBootloading()
             raise VmError(str(exn))
 
 
@@ -1538,33 +1528,78 @@ class XendDomainInfo:
 
     def _configureBootloader(self):
         """Run the bootloader if we're configured to do so."""
-        if not self.info.get('bootloader'):
-            return
-        blcfg = None
 
-        # FIXME: this assumes that we want to use the first disk device
-        for (devtype, devinfo) in self.info.all_devices_sxpr():
-            if not devtype or not devinfo or devtype not in ('vbd', 'tap'):
-                continue
-            disk = None
-            for param in devinfo:
-                if param[0] == 'uname':
-                    disk = param[1]
-                    break
+        blexec          = self.info['PV_bootloader']
+        bootloader_args = self.info['PV_bootloader_args']
+        kernel          = self.info['PV_kernel']
+        ramdisk         = self.info['PV_ramdisk']
+        args            = self.info['PV_args']
+        boot            = self.info['HVM_boot']
 
-            if disk is None:
-                continue
-            fn = blkdev_uname_to_file(disk)
-            blcfg = bootloader(self.info['bootloader'], fn, 1,
-                               self.info['bootloader_args'],
-                               self.info['image'])
-            break
-        if blcfg is None:
-            msg = "Had a bootloader specified, but can't find disk"
-            log.error(msg)
-            raise VmError(msg)
+        if boot:
+            # HVM booting.
+            self.info['image']['type'] = 'hvm'
+            self.info['image']['devices']['boot'] = boot
+        elif not blexec and kernel:
+            # Boot from dom0.  Nothing left to do -- the kernel and ramdisk
+            # will be picked up by image.py.
+            pass
+        else:
+            # Boot using bootloader
+            if not blexec or blexec == 'pygrub':
+                blexec = '/usr/bin/pygrub'
+
+            blcfg = None
+            for (devtype, devinfo) in self.info.all_devices_sxpr():
+                if not devtype or not devinfo or devtype not in ('vbd', 'tap'):
+                    continue
+                disk = None
+                for param in devinfo:
+                    if param[0] == 'uname':
+                        disk = param[1]
+                        break
+
+                if disk is None:
+                    continue
+                fn = blkdev_uname_to_file(disk)
+                mounted = devtype == 'tap' and not os.stat(fn).st_rdev
+                if mounted:
+                    # This is a file, not a device.  pygrub can cope with a
+                    # file if it's raw, but if it's QCOW or other such formats
+                    # used through blktap, then we need to mount it first.
+
+                    log.info("Mounting %s on %s." %
+                             (fn, BOOTLOADER_LOOPBACK_DEVICE))
+
+                    vbd = {
+                        'mode': 'RO',
+                        'device': BOOTLOADER_LOOPBACK_DEVICE,
+                        }
+
+                    from xen.xend import XendDomain
+                    dom0 = XendDomain.instance().privilegedDomain()
+                    dom0._waitForDeviceUUID(dom0.create_vbd_with_vdi(vbd, fn))
+                    fn = BOOTLOADER_LOOPBACK_DEVICE
+
+                try:
+                    blcfg = bootloader(blexec, fn, True,
+                                       bootloader_args, kernel, ramdisk, args)
+                finally:
+                    if mounted:
+                        log.info("Unmounting %s from %s." %
+                                 (fn, BOOTLOADER_LOOPBACK_DEVICE))
+
+                        dom0.destroyDevice('tap', '/dev/xvdp')
+
+                break
+
+            if blcfg is None:
+                msg = "Had a bootloader specified, but can't find disk"
+                log.error(msg)
+                raise VmError(msg)
         
-        self.info.update_with_image_sxp(blcfg)
+            self.info.update_with_image_sxp(blcfg)
+
 
     # 
     # VM Functions
@@ -1727,7 +1762,7 @@ class XendDomainInfo:
             raise VmError("VM name '%s' already exists%s" %
                           (name,
                            dom.domid is not None and
-                           ("as domain %s" % str(dom.domid)) or ""))
+                           (" as domain %s" % str(dom.domid)) or ""))
         
 
     def update(self, info = None, refresh = True):
@@ -1809,8 +1844,6 @@ class XendDomainInfo:
         return '' # TODO
     def get_power_state(self):
         return XEN_API_VM_POWER_STATE[self.state]
-    def get_bios_boot(self):
-        return '' # TODO
     def get_platform_std_vga(self):
         return self.info.get('platform_std_vga', False)    
     def get_platform_keymap(self):
@@ -1825,18 +1858,6 @@ class XendDomainInfo:
         return self.info.get('platform_enable_audio', False)
     def get_platform_keymap(self):
         return self.info.get('platform_keymap', '')
-    def get_builder(self):
-        return self.info.get('builder', 0)
-    def get_boot_method(self):
-        return self.info.get('boot_method', XEN_API_BOOT_TYPE[2])
-    def get_kernel_image(self):
-        return self.info.get('kernel_kernel', '')
-    def get_kernel_initrd(self):
-        return self.info.get('kernel_initrd', '')
-    def get_kernel_args(self):
-        return self.info.get('kernel_args', '')
-    def get_grub_cmdline(self):
-        return '' # TODO
     def get_pci_bus(self):
         return '' # TODO
     def get_tools_version(self):
@@ -1972,6 +1993,9 @@ class XendDomainInfo:
                 
         return vcpu_util
 
+    def get_consoles(self):
+        return self.info.get('console_refs', [])
+
     def get_vifs(self):
         return self.info.get('vif_refs', [])
 
@@ -1992,10 +2016,9 @@ class XendDomainInfo:
         if not dev_uuid:
             raise XendError('Failed to create device')
         
-        if self.state in (XEN_API_VM_POWER_STATE_RUNNING,):
-            sxpr = self.info.device_sxpr(dev_uuid)
-            devid = self.getDeviceController('vbd').createDevice(sxpr)
-            raise XendError("Device creation failed")
+        if self.state == XEN_API_VM_POWER_STATE_RUNNING:
+            _, config = self.info['devices'][dev_uuid]
+            config['devid'] = self.getDeviceController('vbd').createDevice(config)
 
         return dev_uuid
 
@@ -2013,10 +2036,9 @@ class XendDomainInfo:
         if not dev_uuid:
             raise XendError('Failed to create device')
 
-        if self.state in (XEN_API_VM_POWER_STATE_RUNNING,):
-            sxpr = self.info.device_sxpr(dev_uuid)
-            devid = self.getDeviceController('tap').createDevice(sxpr)
-            raise XendError("Device creation failed")
+        if self.state == XEN_API_VM_POWER_STATE_RUNNING:
+            _, config = self.info['devices'][dev_uuid]
+            config['devid'] = self.getDeviceController('tap').createDevice(config)
 
         return dev_uuid
 
@@ -2031,10 +2053,9 @@ class XendDomainInfo:
         if not dev_uuid:
             raise XendError('Failed to create device')
         
-        if self.state in (DOM_STATE_HALTED,):
-            sxpr = self.info.device_sxpr(dev_uuid)
-            devid = self.getDeviceController('vif').createDevice(sxpr)
-            raise XendError("Device creation failed")
+        if self.state == XEN_API_VM_POWER_STATE_RUNNING:
+            _, config = self.info['devices'][dev_uuid]
+            config['devid'] = self.getDeviceController('vif').createDevice(config)
 
         return dev_uuid
 

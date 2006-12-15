@@ -16,6 +16,7 @@
  * Copyright (C) IBM Corp. 2005, 2006
  *
  * Authors: Jimi Xenidis <jimix@watson.ibm.com>
+ *          Hollis Blanchard <hollisb@us.ibm.com>
  */
 
 #include <xen/config.h>
@@ -32,6 +33,7 @@
 #include "exceptions.h"
 #include "of-devtree.h"
 #include "oftree.h"
+#include "rtas.h"
 
 /* Secondary processors use this for handshaking with main processor.  */
 volatile unsigned int __spin_ack;
@@ -39,20 +41,27 @@ volatile unsigned int __spin_ack;
 static ulong of_vec;
 static ulong of_msr;
 static int of_out;
-static char bootargs[256];
+static ulong eomem;
 
-#define COMMAND_LINE_SIZE 512
-static char builtin_cmdline[COMMAND_LINE_SIZE]
-    __attribute__((section("__builtin_cmdline"))) = CMDLINE;
+#define MEM_AVAILABLE_PAGES ((32 << 20) >> PAGE_SHIFT)
+static DECLARE_BITMAP(mem_available_pages, MEM_AVAILABLE_PAGES);
 
+extern char builtin_cmdline[];
 extern struct ns16550_defaults ns16550;
 
 #undef OF_DEBUG
+#undef OF_DEBUG_LOW
 
 #ifdef OF_DEBUG
 #define DBG(args...) of_printf(args)
 #else
 #define DBG(args...)
+#endif
+
+#ifdef OF_DEBUG_LOW
+#define DBG_LOW(args...) of_printf(args)
+#else
+#define DBG_LOW(args...)
 #endif
 
 #define of_panic(MSG...) \
@@ -68,7 +77,6 @@ struct of_service {
 static int bof_chosen;
 
 static struct of_service s;
-extern s32 prom_call(void *arg, ulong rtas_base, ulong func, ulong msr);
 
 static int __init of_call(
     const char *service, u32 nargs, u32 nrets, s32 rets[], ...)
@@ -78,7 +86,6 @@ static int __init of_call(
     if (of_vec != 0) {
         va_list args;
         int i;
-
         memset(&s, 0, sizeof (s));
         s.ofs_service = (ulong)service;
         s.ofs_nargs = nargs;
@@ -189,7 +196,7 @@ static int __init of_finddevice(const char *devspec)
         DBG("finddevice %s -> FAILURE %d\n",devspec,rets[0]);
         return OF_FAILURE;
     }
-    DBG("finddevice %s -> %d\n",devspec, rets[0]);
+    DBG_LOW("finddevice %s -> %d\n",devspec, rets[0]);
     return rets[0];
 }
 
@@ -200,11 +207,11 @@ static int __init of_getprop(int ph, const char *name, void *buf, u32 buflen)
     of_call("getprop", 4, 1, rets, ph, name, buf, buflen);
 
     if (rets[0] == OF_FAILURE) {
-        DBG("getprop 0x%x %s -> FAILURE\n", ph, name);
+        DBG_LOW("getprop 0x%x %s -> FAILURE\n", ph, name);
         return OF_FAILURE;
     }
 
-    DBG("getprop 0x%x %s -> 0x%x (%s)\n", ph, name, rets[0], (char *)buf);
+    DBG_LOW("getprop 0x%x %s -> 0x%x (%s)\n", ph, name, rets[0], (char *)buf);
     return rets[0];
 }
 
@@ -220,7 +227,7 @@ static int __init of_setprop(
         return OF_FAILURE;
     }
 
-    DBG("setprop 0x%x %s -> %s\n", ph, name, (char *)buf);
+    DBG_LOW("setprop 0x%x %s -> %s\n", ph, name, (char *)buf);
     return rets[0];
 }
 
@@ -232,7 +239,7 @@ static int __init of_getchild(int ph)
     int rets[1] = { OF_FAILURE };
 
     of_call("child", 1, 1, rets, ph);
-    DBG("getchild 0x%x -> 0x%x\n", ph, rets[0]);
+    DBG_LOW("getchild 0x%x -> 0x%x\n", ph, rets[0]);
 
     return rets[0];
 }
@@ -245,7 +252,7 @@ static int __init of_getpeer(int ph)
     int rets[1] = { OF_FAILURE };
 
     of_call("peer", 1, 1, rets, ph);
-    DBG("getpeer 0x%x -> 0x%x\n", ph, rets[0]);
+    DBG_LOW("getpeer 0x%x -> 0x%x\n", ph, rets[0]);
 
     return rets[0];
 }
@@ -259,7 +266,7 @@ static int __init of_getproplen(int ph, const char *name)
         DBG("getproplen 0x%x %s -> FAILURE\n", ph, name);
         return OF_FAILURE;
     }
-    DBG("getproplen 0x%x %s -> 0x%x\n", ph, name, rets[0]);
+    DBG_LOW("getproplen 0x%x %s -> 0x%x\n", ph, name, rets[0]);
     return rets[0];
 }
 
@@ -272,7 +279,7 @@ static int __init of_package_to_path(int ph, char *buffer, u32 buflen)
         DBG("%s 0x%x -> FAILURE\n", __func__, ph);
         return OF_FAILURE;
     }
-    DBG("%s 0x%x %s -> 0x%x\n", __func__, ph, buffer, rets[0]);
+    DBG_LOW("%s 0x%x %s -> 0x%x\n", __func__, ph, buffer, rets[0]);
     if (rets[0] <= buflen)
         buffer[rets[0]] = '\0';
     return rets[0];
@@ -289,7 +296,7 @@ static int __init of_nextprop(int ph, const char *name, void *buf)
         return OF_FAILURE;
     }
 
-    DBG("nextprop 0x%x %s -> %s\n", ph, name, (char *)buf);
+    DBG_LOW("nextprop 0x%x %s -> %s\n", ph, name, (char *)buf);
     return rets[0];
 }
 
@@ -336,7 +343,7 @@ static int __init of_claim(u32 virt, u32 size, u32 align)
         return OF_FAILURE;
     }
 
-    DBG("%s 0x%08x 0x%08x  0x%08x -> 0x%08x\n", __func__, virt, size, align,
+    DBG_LOW("%s 0x%08x 0x%08x  0x%08x -> 0x%08x\n", __func__, virt, size, align,
         rets[0]);
     return rets[0];
 }
@@ -358,29 +365,194 @@ static int __init of_getparent(int ph)
 
     of_call("parent", 1, 1, rets, ph);
 
-    DBG("getparent 0x%x -> 0x%x\n", ph, rets[0]);
+    DBG_LOW("getparent 0x%x -> 0x%x\n", ph, rets[0]);
     return rets[0];
 }
 
-static void boot_of_probemem(multiboot_info_t *mbi)
+static int __init of_open(const char *devspec)
+{
+    int rets[1] = { OF_FAILURE };
+
+    of_call("open", 1, 1, rets, devspec);
+    return rets[0];
+}
+
+static void boot_of_alloc_init(int m, uint addr_cells, uint size_cells)
+{
+    int rc;
+    uint pg;
+    uint a[64];
+    int tst;
+    u64 start;
+    u64 size;
+
+    rc = of_getprop(m, "available", a, sizeof (a));
+    if (rc > 0) {
+        int l =  rc / sizeof(a[0]);
+        int r = 0;
+
+#ifdef OF_DEBUG
+        { 
+            int i;
+            of_printf("avail:\n");
+            for (i = 0; i < l; i += 4)
+                of_printf("  0x%x%x, 0x%x%x\n",
+                          a[i], a[i + 1],
+                          a[i + 2] ,a[i + 3]);
+        }
+#endif
+            
+        pg = 0;
+        while (pg < MEM_AVAILABLE_PAGES && r < l) {
+            ulong end;
+
+            start = a[r++];
+            if (addr_cells == 2 && (r < l) )
+                start = (start << 32) | a[r++];
+            
+            size = a[r++];
+            if (size_cells == 2 && (r < l) )
+                size = (size << 32) | a[r++];
+                
+            end = ALIGN_DOWN(start + size, PAGE_SIZE);
+
+            start = ALIGN_UP(start, PAGE_SIZE);
+
+            DBG("%s: marking 0x%x - 0x%lx\n", __func__,
+                pg << PAGE_SHIFT, start);
+
+            start >>= PAGE_SHIFT;
+            while (pg < MEM_AVAILABLE_PAGES && pg < start) {
+                set_bit(pg, mem_available_pages);
+                pg++;
+            }
+
+            pg = end  >> PAGE_SHIFT;
+        }
+    }
+
+    /* Now make sure we mark our own memory */
+    pg =  (ulong)_start >> PAGE_SHIFT;
+    start = (ulong)_end >> PAGE_SHIFT;
+
+    DBG("%s: marking 0x%x - 0x%lx\n", __func__,
+        pg << PAGE_SHIFT, start << PAGE_SHIFT);
+
+    /* Lets try and detect if our image has stepped on something. It
+     * is possible that FW has already subtracted our image from
+     * available memory so we must make sure that the previous bits
+     * are the same for the whole image */
+    tst = test_and_set_bit(pg, mem_available_pages);
+    ++pg;
+    while (pg <= start) {
+        if (test_and_set_bit(pg, mem_available_pages) != tst)
+            of_panic("%s: pg :0x%x of our image is different\n",
+                     __func__, pg);
+        ++pg;
+    }
+
+    DBG("%s: marking 0x%x - 0x%x\n", __func__,
+        0 << PAGE_SHIFT, 3 << PAGE_SHIFT);
+    /* First for pages (where the vectors are) should be left alone as well */
+    set_bit(0, mem_available_pages);
+    set_bit(1, mem_available_pages);
+    set_bit(2, mem_available_pages);
+    set_bit(3, mem_available_pages);
+}
+
+#ifdef BOOT_OF_FREE
+/* this is here in case we ever need a free call at a later date */
+static void boot_of_free(ulong addr, ulong size)
+{
+    ulong bits;
+    ulong pos;
+    ulong i;
+
+    size = ALIGN_UP(size, PAGE_SIZE);
+    bits = size >> PAGE_SHIFT;
+    pos = addr >> PAGE_SHIFT;
+
+    for (i = 0; i < bits; i++) {
+        if (!test_and_clear_bit(pos + i, mem_available_pages))
+            of_panic("%s: pg :0x%lx was never allocated\n",
+                     __func__, pos + i);
+    }
+}
+#endif
+
+static ulong boot_of_alloc(ulong size)
+{
+    ulong bits;
+    ulong pos;
+
+    if (size == 0)
+        return 0;
+
+    DBG("%s(0x%lx)\n", __func__, size);
+
+    size = ALIGN_UP(size, PAGE_SIZE);
+    bits = size >> PAGE_SHIFT;
+    pos = 0;
+    for (;;) {
+        ulong i;
+
+        pos = find_next_zero_bit(mem_available_pages,
+                                 MEM_AVAILABLE_PAGES, pos);
+        DBG("%s: found start bit at: 0x%lx\n", __func__, pos);
+
+        /* found nothing */
+        if ((pos + bits) > MEM_AVAILABLE_PAGES) {
+            of_printf("%s: allocation of size: 0x%lx failed\n",
+                     __func__, size);
+            return 0;
+        }
+
+        /* find a set that fits */
+        DBG("%s: checking for 0x%lx bits: 0x%lx\n", __func__, bits, pos);
+
+        i = find_next_bit(mem_available_pages, MEM_AVAILABLE_PAGES, pos);  
+        if (i - pos >= bits) {
+            uint addr = pos << PAGE_SHIFT;
+
+            /* make sure OF is happy with our choice */
+            if (of_claim(addr, size, 0) != OF_FAILURE) {
+                for (i = 0; i < bits; i++)
+                    set_bit(pos + i, mem_available_pages);
+
+                DBG("%s: 0x%lx is good returning 0x%x\n",
+                    __func__, pos, addr);
+                return addr;
+            }
+            /* if OF did not like the address then simply start from
+             * the next bit */
+            i = 1;
+        }
+
+        pos = pos + i;
+    }
+}
+
+static ulong boot_of_mem_init(void)
 {
     int root;
     int p;
-    u32 addr_cells = 1;
-    u32 size_cells = 1;
     int rc;
-    int mcount = 0;
-    static memory_map_t mmap[16];
+    uint addr_cells;
+    uint size_cells;
 
     root = of_finddevice("/");
     p = of_getchild(root);
 
     /* code is writen to assume sizes of 1 */
-    of_getprop(root, "#address-cells", &addr_cells, sizeof (addr_cells));
-    of_getprop(root, "#size-cells", &size_cells, sizeof (size_cells));
+    of_getprop(root, "#address-cells", &addr_cells,
+               sizeof (addr_cells));
+    of_getprop(root, "#size-cells", &size_cells,
+               sizeof (size_cells));
     DBG("%s: address_cells=%d  size_cells=%d\n",
                     __func__, addr_cells, size_cells);
-    
+
+    /* We do ream memory discovery later, for now we only want to find
+     * the first LMB */
     do {
         const char memory[] = "memory";
         char type[32];
@@ -389,82 +561,69 @@ static void boot_of_probemem(multiboot_info_t *mbi)
 
         of_getprop(p, "device_type", type, sizeof (type));
         if (strncmp(type, memory, sizeof (memory)) == 0) {
-            u32 reg[48];  
-            u32 al, ah, ll, lh;
+            uint reg[48];  
+            u64 start;
+            u64 size;
             int r;
+            int l;
 
             rc = of_getprop(p, "reg", reg, sizeof (reg));
             if (rc == OF_FAILURE) {
                 of_panic("no reg property for memory node: 0x%x.\n", p);
             }
-            int l = rc/sizeof(u32); /* number reg element */
+
+            l = rc / sizeof(reg[0]); /* number reg element */
             DBG("%s: number of bytes in property 'reg' %d\n",
                             __func__, rc);
             
             r = 0;
             while (r < l) {
-                al = ah = ll = lh = 0;
-                if (addr_cells == 2) {
-                    ah = reg[r++];
-                    if (r >= l)
-                        break;  /* partial line.  Skip  */
-                    al = reg[r++];
-                    if (r >= l)
-                        break;  /* partial line.  Skip */
-                } else {
-                    al = reg[r++];
-                    if (r >= l)
-                        break;  /* partial line.  Skip */
-                }
-                if (size_cells == 2) {
-                    lh = reg[r++];
-                    if (r >= l)
-                        break;  /* partial line.  Skip */
-                    ll = reg[r++];
-                } else {
-                    ll = reg[r++];
+                start = reg[r++];
+                if (addr_cells == 2 && (r < l) )
+                    start = (start << 32) | reg[r++];
+
+                if (r >= l)
+                    break;  /* partial line.  Skip */
+
+                if (start > 0) {
+                    /* this is not the first LMB so we skip it */
+                    break;
                 }
 
-                if ((ll != 0) || (lh != 0)) {
-                    mmap[mcount].size = 20; /* - size field */
-                    mmap[mcount].type = 1; /* Regular ram */
-                    mmap[mcount].length_high = lh;
-                    mmap[mcount].length_low = ll;
-                    mmap[mcount].base_addr_high = ah;
-                    mmap[mcount].base_addr_low = al;
-                    of_printf("%s: memory 0x%016lx[0x%08lx]\n",
-                      __func__,
-                      (u64)(((u64)mmap[mcount].base_addr_high << 32)
-                            | mmap[mcount].base_addr_low),
-                      (u64)(((u64)mmap[mcount].length_high << 32)
-                            | mmap[mcount].length_low));
-                    ++mcount;
-                }
+                size = reg[r++];
+                if (size_cells == 2 && (r < l) )
+                    size = (size << 32) | reg[r++];
+                
+                if (r > l)
+                    break;  /* partial line.  Skip */
+
+                boot_of_alloc_init(p, addr_cells, size_cells);
+                
+                eomem = size;
+                return size;
             }
         }
         p = of_getpeer(p);
     } while (p != OF_FAILURE && p != 0);
 
-    if (mcount > 0) {
-        mbi->flags |= MBI_MEMMAP;
-        mbi->mmap_length = sizeof (mmap[0]) * mcount;
-        mbi->mmap_addr = (ulong)mmap;
-    }
+    return 0;
 }
 
 static void boot_of_bootargs(multiboot_info_t *mbi)
 {
     int rc;
 
-    rc = of_getprop(bof_chosen, "bootargs", &bootargs, sizeof (bootargs));
-    if (rc == OF_FAILURE || bootargs[0] == '\0') {
-        strlcpy(bootargs, builtin_cmdline, sizeof(bootargs));
+    if (builtin_cmdline[0] == '\0') {
+        rc = of_getprop(bof_chosen, "bootargs", builtin_cmdline,
+                CONFIG_CMDLINE_SIZE);
+        if (rc > CONFIG_CMDLINE_SIZE)
+            of_panic("bootargs[] not big enough for /chosen/bootargs\n");
     }
 
     mbi->flags |= MBI_CMDLINE;
-    mbi->cmdline = (u32)bootargs;
+    mbi->cmdline = (ulong)builtin_cmdline;
 
-    of_printf("bootargs = %s\n", bootargs);
+    of_printf("bootargs = %s\n", builtin_cmdline);
 }
 
 static int save_props(void *m, ofdn_t n, int pkg)
@@ -500,7 +659,8 @@ static int save_props(void *m, ofdn_t n, int pkg)
                     of_panic("obj array not big enough for 0x%x\n", sz);
                 }
                 actual = of_getprop(pkg, name, obj, sz);
-                if (actual > sz) of_panic("obj too small");
+                if (actual > sz)
+                    of_panic("obj too small");
             }
 
             if (strncmp(name, name_str, sizeof(name_str)) == 0) {
@@ -512,7 +672,8 @@ static int save_props(void *m, ofdn_t n, int pkg)
             }
 
             pos = ofd_prop_add(m, n, name, obj, actual);
-            if (pos == 0) of_panic("prop_create");
+            if (pos == 0)
+                of_panic("prop_create");
         }
 
         result = of_nextprop(pkg, name, name);
@@ -536,10 +697,12 @@ retry:
 
     if (pnext != 0) {
         sz = of_package_to_path(pnext, path, psz);
-        if (sz == OF_FAILURE) of_panic("bad path\n");
+        if (sz == OF_FAILURE)
+            of_panic("bad path\n");
 
         nnext = ofd_node_child_create(m, n, path, sz);
-        if (nnext == 0) of_panic("out of mem\n");
+        if (nnext == 0)
+            of_panic("out of mem\n");
 
         do_pkg(m, nnext, pnext, path, psz);
     }
@@ -551,7 +714,8 @@ retry:
         sz = of_package_to_path(pnext, path, psz);
 
         nnext = ofd_node_peer_create(m, n, path, sz);
-        if (nnext <= 0) of_panic("out of space in OFD tree.\n");
+        if (nnext <= 0)
+            of_panic("out of space in OFD tree.\n");
 
         n = nnext;
         p = pnext;
@@ -559,7 +723,7 @@ retry:
     }
 }
 
-static int pkg_save(void *mem)
+static long pkg_save(void *mem)
 {
     int root;
     char path[256];
@@ -570,11 +734,12 @@ static int pkg_save(void *mem)
 
     /* get root */
     root = of_getpeer(0);
-    if (root == OF_FAILURE) of_panic("no root package\n");
+    if (root == OF_FAILURE)
+        of_panic("no root package\n");
 
     do_pkg(mem, OFD_ROOT, root, path, sizeof(path));
 
-    r = (((ofdn_t *)mem)[1] + 1) * sizeof (u64);
+    r = ofd_size(mem);
 
     of_printf("%s: saved device tree in 0x%x bytes\n", __func__, r);
 
@@ -604,7 +769,8 @@ static int boot_of_fixup_refs(void *mem)
             char ofpath[256];
 
             path = ofd_node_path(mem, c);
-            if (path == NULL) of_panic("no path to found prop: %s\n", name);
+            if (path == NULL)
+                of_panic("no path to found prop: %s\n", name);
 
             rp = of_finddevice(path);
             if (rp == OF_FAILURE)
@@ -629,13 +795,15 @@ static int boot_of_fixup_refs(void *mem)
                          "ref 0x%x\n", name, path, rp, ref);
 
             dp = ofd_node_find(mem, ofpath);
-            if (dp <= 0) of_panic("no ofd node for OF node[0x%x]: %s\n",
-                                  ref, ofpath);
+            if (dp <= 0)
+                of_panic("no ofd node for OF node[0x%x]: %s\n",
+                         ref, ofpath);
 
             ref = dp;
 
             upd = ofd_prop_add(mem, c, name, &ref, sizeof(ref));
-            if (upd <= 0) of_panic("update failed: %s\n", name);
+            if (upd <= 0)
+                of_panic("update failed: %s\n", name);
 
 #ifdef DEBUG
             of_printf("%s: %s/%s -> %s\n", __func__,
@@ -658,7 +826,8 @@ static int boot_of_fixup_chosen(void *mem)
     char ofpath[256];
 
     ch = of_finddevice("/chosen");
-    if (ch == OF_FAILURE) of_panic("/chosen not found\n");
+    if (ch == OF_FAILURE)
+        of_panic("/chosen not found\n");
 
     rc = of_getprop(ch, "cpu", &val, sizeof (val));
 
@@ -667,16 +836,19 @@ static int boot_of_fixup_chosen(void *mem)
 
         if (rc > 0) {
             dn = ofd_node_find(mem, ofpath);
-            if (dn <= 0) of_panic("no node for: %s\n", ofpath);
+            if (dn <= 0)
+                of_panic("no node for: %s\n", ofpath);
 
             ofd_boot_cpu = dn;
             val = dn;
 
             dn = ofd_node_find(mem, "/chosen");
-            if (dn <= 0) of_panic("no /chosen node\n");
+            if (dn <= 0)
+                of_panic("no /chosen node\n");
 
             dc = ofd_prop_add(mem, dn, "cpu", &val, sizeof (val));
-            if (dc <= 0) of_panic("could not fix /chosen/cpu\n");
+            if (dc <= 0)
+                of_panic("could not fix /chosen/cpu\n");
             rc = 1;
         } else {
             of_printf("*** can't find path to booting cpu, "
@@ -685,56 +857,6 @@ static int boot_of_fixup_chosen(void *mem)
         }
     }
     return rc;
-}
-
-static ulong space_base;
-
-/*
- * The following function is necessary because we cannot depend on all
- * FW to actually allocate us any space, so we look for it _hoping_
- * that at least is will fail if we try to claim something that
- * belongs to FW.  This hope does not seem to be true on some version
- * of PIBS.
- */
-static ulong find_space(u32 size, u32 align, multiboot_info_t *mbi)
-{
-    memory_map_t *map = (memory_map_t *)((ulong)mbi->mmap_addr);
-    ulong eomem = ((u64)map->length_high << 32) | (u64)map->length_low;
-    ulong base;
-
-    if (size == 0)
-        return 0;
-
-    if (align == 0)
-        of_panic("cannot call %s() with align of 0\n", __func__);
-
-#ifdef BROKEN_CLAIM_WORKAROUND
-    {
-        static int broken_claim;
-        if (!broken_claim) {
-            /* just try and claim it to the FW chosen address */
-            base = of_claim(0, size, align);
-            if (base != OF_FAILURE)
-                return base;
-            of_printf("%s: Firmware does not allocate memory for you\n",
-                      __func__);
-            broken_claim = 1;
-        }
-    }
-#endif
-
-    of_printf("%s base=0x%016lx  eomem=0x%016lx  size=0x%08x  align=0x%x\n",
-                    __func__, space_base, eomem, size, align);
-    base = ALIGN_UP(space_base, PAGE_SIZE);
-
-    while ((base + size) < rma_size(cpu_default_rma_order_pages())) {
-        if (of_claim(base, size, 0) != OF_FAILURE) {
-            space_base = base + size;
-            return base;
-        }
-        base += (PAGE_SIZE >  align) ? PAGE_SIZE : align;
-    }
-    of_panic("Cannot find memory in the RMA\n");
 }
 
 /* PIBS Version 1.05.0000 04/26/2005 has an incorrect /ht/isa/ranges
@@ -798,8 +920,10 @@ static int __init boot_of_serial(void *oft)
             of_panic("package-to-path failed\n");
 
         rc = of_getprop(p, "device_type", type, sizeof (type));
-        if (rc == OF_FAILURE)
-            of_panic("fetching device type failed\n");
+        if (rc == OF_FAILURE) {
+            of_printf("%s: fetching type of `%s' failed\n", __func__, buf);
+            continue;
+        }
 
         if (strcmp(type, "serial") != 0)
             continue;
@@ -855,17 +979,104 @@ static int __init boot_of_serial(void *oft)
     return 1;
 }
 
-static void boot_of_module(ulong r3, ulong r4, multiboot_info_t *mbi)
+static int __init boot_of_rtas(module_t *mod, multiboot_info_t *mbi)
 {
-    static module_t mods[3];
+    int rtas_node;
+    int rtas_instance;
+    uint size = 0;
+    int res[2];
+    int mem;
+    int ret;
+
+    rtas_node = of_finddevice("/rtas");
+
+    if (rtas_node <= 0) {
+        of_printf("No RTAS, Xen has no power control\n");
+        return 0;
+    }
+    of_getprop(rtas_node, "rtas-size", &size, sizeof (size));
+    if (size == 0) {
+        of_printf("RTAS, has no size\n");
+        return 0;
+    }
+
+    rtas_instance = of_open("/rtas");
+    if (rtas_instance == OF_FAILURE) {
+        of_printf("RTAS, could not open\n");
+        return 0;
+    }
+
+    size = ALIGN_UP(size, PAGE_SIZE);
+    
+    mem = boot_of_alloc(size);
+    if (mem == 0)
+        of_panic("Could not allocate RTAS tree\n");
+
+    of_printf("instantiating RTAS at: 0x%x\n", mem);
+
+    ret = of_call("call-method", 3, 2, res,
+                  "instantiate-rtas", rtas_instance, mem);
+    if (ret == OF_FAILURE) {
+        of_printf("RTAS, could not open\n");
+        return 0;
+    }
+    
+    rtas_entry = res[1];
+    rtas_base = mem;
+    rtas_end = mem + size;
+    rtas_msr = of_msr;
+
+    mod->mod_start = rtas_base;
+    mod->mod_end = rtas_end;
+    return 1;
+}
+
+static void * __init boot_of_devtree(module_t *mod, multiboot_info_t *mbi)
+{
     void *oft;
     ulong oft_sz = 48 * PAGE_SIZE;
+
+    /* snapshot the tree */
+    oft = (void *)boot_of_alloc(oft_sz);
+    if (oft == NULL)
+        of_panic("Could not allocate OFD tree\n");
+
+    of_printf("creating oftree at: 0x%p\n", oft);
+    of_test("package-to-path");
+    oft = ofd_create(oft, oft_sz);
+    pkg_save(oft);
+
+    if (ofd_size(oft) > oft_sz)
+         of_panic("Could not fit all of native devtree\n");
+
+    boot_of_fixup_refs(oft);
+    boot_of_fixup_chosen(oft);
+
+    if (ofd_size(oft) > oft_sz)
+         of_panic("Could not fit all devtree fixups\n");
+
+    ofd_walk(oft, __func__, OFD_ROOT, /* add_hype_props */ NULL, 2);
+
+    mod->mod_start = (ulong)oft;
+    mod->mod_end = mod->mod_start + oft_sz;
+    of_printf("%s: devtree mod @ 0x%016x - 0x%016x\n", __func__,
+              mod->mod_start, mod->mod_end);
+
+    return oft;
+}
+
+static void * __init boot_of_module(ulong r3, ulong r4, multiboot_info_t *mbi)
+{
+    static module_t mods[4];
     ulong mod0_start;
     ulong mod0_size;
-    static const char sepr[] = " -- ";
+    static const char * sepr[] = {" -- ", " || "};
+    int sepr_index;
     extern char dom0_start[] __attribute__ ((weak));
     extern char dom0_size[] __attribute__ ((weak));
-    const char *p;
+    const char *p = NULL;
+    int mod;
+    void *oft;
 
     if ((r3 > 0) && (r4 > 0)) {
         /* was it handed to us in registers ? */
@@ -908,57 +1119,50 @@ static void boot_of_module(ulong r3, ulong r4, multiboot_info_t *mbi)
         of_printf("mod0: %o %c %c %c\n", c[0], c[1], c[2], c[3]);
     }
 
-    space_base = (ulong)_end;
-    mods[0].mod_start = mod0_start;
-    mods[0].mod_end = mod0_start + mod0_size;
+    mod = 0;
+    mods[mod].mod_start = mod0_start;
+    mods[mod].mod_end = mod0_start + mod0_size;
 
-    of_printf("%s: mod[0] @ 0x%016x[0x%x]\n", __func__,
-              mods[0].mod_start, mods[0].mod_end);
-    p = strstr((char *)(ulong)mbi->cmdline, sepr);
-    if (p != NULL) {
-        p += sizeof (sepr) - 1;
-        mods[0].string = (u32)(ulong)p;
-        of_printf("%s: mod[0].string: %s\n", __func__, p);
+    of_printf("%s: dom0 mod @ 0x%016x[0x%x]\n", __func__,
+              mods[mod].mod_start, mods[mod].mod_end);
+
+    /* look for delimiter: "--" or "||" */
+    for (sepr_index = 0; sepr_index < ARRAY_SIZE(sepr); sepr_index++){
+        p = strstr((char *)(ulong)mbi->cmdline, sepr[sepr_index]);
+        if (p != NULL)
+            break;
     }
 
-    /* snapshot the tree */
-    oft = (void*)find_space(oft_sz, PAGE_SIZE, mbi);
-    if (oft == 0)
-        of_panic("Could not allocate OFD tree\n");
+    if (p != NULL) {
+        /* Xen proper should never know about the dom0 args.  */
+        *(char *)p = '\0';
+        p += strlen(sepr[sepr_index]);
+        mods[mod].string = (u32)(ulong)p;
+        of_printf("%s: dom0 mod string: %s\n", __func__, p);
+    }
 
-    of_printf("creating oft\n");
-    of_test("package-to-path");
-    oft = ofd_create(oft, oft_sz);
-    pkg_save(oft);
+    ++mod;
+    if (boot_of_rtas(&mods[mod], mbi))
+        ++mod;
 
-    if (ofd_size(oft) > oft_sz)
-         of_panic("Could not fit all of native devtree\n");
+    oft = boot_of_devtree(&mods[mod], mbi);
+    if (oft == NULL)
+        of_panic("%s: boot_of_devtree failed\n", __func__);
 
-    boot_of_fixup_refs(oft);
-    boot_of_fixup_chosen(oft);
-
-    if (ofd_size(oft) > oft_sz)
-         of_panic("Could not fit all devtree fixups\n");
-
-    ofd_walk(oft, OFD_ROOT, /* add_hype_props */ NULL, 2);
-
-    mods[1].mod_start = (ulong)oft;
-    mods[1].mod_end = mods[1].mod_start + oft_sz;
-    of_printf("%s: mod[1] @ 0x%016x[0x%x]\n", __func__,
-              mods[1].mod_start, mods[1].mod_end);
-
+    ++mod;
 
     mbi->flags |= MBI_MODULES;
-    mbi->mods_count = 2;
+    mbi->mods_count = mod;
     mbi->mods_addr = (u32)mods;
 
-    boot_of_serial(oft);
+    return oft;
 }
 
 static int __init boot_of_cpus(void)
 {
-    int cpus_node;
-    int cpu_node, bootcpu_node, logical;
+    int cpus_node, cpu_node;
+    int bootcpu_instance, bootcpu_node;
+    int logical;
     int result;
     s32 cpuid;
     u32 cpu_clock[2];
@@ -967,9 +1171,13 @@ static int __init boot_of_cpus(void)
     /* Look up which CPU we are running on right now and get all info
      * from there */
     result = of_getprop(bof_chosen, "cpu",
-                        &bootcpu_node, sizeof (bootcpu_node));
+                        &bootcpu_instance, sizeof (bootcpu_instance));
     if (result == OF_FAILURE)
-        of_panic("Failed to look up boot cpu\n");
+        of_panic("Failed to look up boot cpu instance\n");
+
+    bootcpu_node = of_instance_to_package(bootcpu_instance);
+    if (result == OF_FAILURE)
+        of_panic("Failed to look up boot cpu package\n");
 
     cpu_node = bootcpu_node;
 
@@ -1070,15 +1278,12 @@ static int __init boot_of_cpus(void)
     return 1;
 }
 
-static int __init boot_of_rtas(void)
-{
-    return 1;
-}
-
 multiboot_info_t __init *boot_of_init(
         ulong r3, ulong r4, ulong vec, ulong r6, ulong r7, ulong orig_msr)
 {
     static multiboot_info_t mbi;
+    void *oft;
+    int r;
 
     of_vec = vec;
     of_msr = orig_msr;
@@ -1098,18 +1303,20 @@ multiboot_info_t __init *boot_of_init(
             r3, r4, vec, r6, r7, orig_msr);
 
     if ((vec >= (ulong)_start) && (vec <= (ulong)_end)) {
-        of_printf("Hmm.. OF[0x%lx] seems to have stepped on our image "
-                "that ranges: %p .. %p.\n HANG!\n",
+        of_panic("Hmm.. OF[0x%lx] seems to have stepped on our image "
+                "that ranges: %p .. %p.\n",
                 vec, _start, _end);
     }
     of_printf("%s: _start %p _end %p 0x%lx\n", __func__, _start, _end, r6);
 
     boot_of_fix_maple();
-    boot_of_probemem(&mbi);
+    r = boot_of_mem_init();
+    if (r == 0)
+        of_panic("failure to initialize memory allocator");
     boot_of_bootargs(&mbi);
-    boot_of_module(r3, r4, &mbi);
+    oft = boot_of_module(r3, r4, &mbi);
     boot_of_cpus();
-    boot_of_rtas();
+    boot_of_serial(oft);
 
     /* end of OF */
     of_printf("Quiescing Open Firmware ...\n");

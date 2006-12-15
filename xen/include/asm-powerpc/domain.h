@@ -41,6 +41,9 @@ struct arch_domain {
     /* list of extents beyond RMA */
     struct list_head extent_list;
 
+    uint foreign_mfn_count;
+    uint *foreign_mfns;
+
     /* I/O-port access bitmap mask. */
     u8 *iobmp_mask;       /* Address of IO bitmap mask, or NULL.      */
 
@@ -86,7 +89,7 @@ struct arch_vcpu {
     struct slb_entry slb_entries[NUM_SLB_ENTRIES];
 
     /* I/O-port access bitmap. */
-    u8 *iobmp;        /* Guest kernel virtual address of the bitmap. */
+    XEN_GUEST_HANDLE(uint8_t) iobmp; /* Guest kernel virtual address of the bitmap. */
     int iobmp_limit;  /* Number of ports represented in the bitmap.  */
     int iopl;         /* Current IOPL for this VCPU. */
 

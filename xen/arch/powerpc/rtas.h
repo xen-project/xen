@@ -15,24 +15,20 @@
  *
  * Copyright (C) IBM Corp. 2006
  *
- * Authors: Hollis Blanchard <hollisb@us.ibm.com>
+ * Authors: Jimi Xenidis <jimix@us.ibm.com>
  */
 
-#ifndef __PPC_UACCESS_H__
-#define __PPC_UACCESS_H__
+#ifndef _ARCH_POWERPC_RTAS_H_
+#define _ARCH_POWERPC_RTAS_H_
 
-#include <xen/errno.h>
-#include <asm/page.h>
-#include <asm/guest_access.h>
+extern int rtas_entry;
+extern unsigned long rtas_msr;
+extern unsigned long rtas_base;
+extern unsigned long rtas_end;
 
-/* since we run in real mode, we can safely access all addresses.
- * XXX well, except IO. should we check for that here? */
-#define access_ok(addr,size) 1
-#define array_access_ok(addr,count,size) 1
-
-#define __copy_to_user copy_to_user
-#define __copy_from_user copy_from_user
-#define copy_to_user(to,from,len) xencomm_copy_to_guest(to,from,len,0)
-#define copy_from_user(to,from,len) xencomm_copy_from_guest(to,from,len,0)
-
-#endif /* __PPC_UACCESS_H__ */
+extern int prom_call(void *arg, unsigned base,
+                     unsigned long func, unsigned long msr);
+extern int rtas_init(void *);
+extern int rtas_halt(void);
+extern int rtas_reboot(void);
+#endif

@@ -24,6 +24,8 @@
 #include <public/xen.h>
 #include <asm/processor.h>
 #include <asm/percpu.h>
+#include <asm/debugger.h>
+#include "scom.h"
 
 #define MCK_SRR1_INSN_FETCH_UNIT    0x0000000000200000 /* 42 */
 #define MCK_SRR1_LOAD_STORE         0x0000000000100000 /* 43 */
@@ -54,6 +56,8 @@ int cpu_machinecheck(struct cpu_user_regs *regs)
     if (mck_cpu_stats[mfpir()] != 0)
         printk("While in CI IO\n");
 
+    show_backtrace_regs(regs);
+
     printk("SRR1: 0x%016lx\n", regs->msr);
     if (regs->msr & MCK_SRR1_INSN_FETCH_UNIT)
         printk("42: Exception caused by Instruction Fetch Unit (IFU)\n"
@@ -67,6 +71,7 @@ int cpu_machinecheck(struct cpu_user_regs *regs)
     case 0:
         printk("0b00: Likely caused by an asynchronous machine check,\n"
                "      see SCOM Asynchronous Machine Check Register\n");
+        cpu_scom_AMCR();
         break;
     case MCK_SRR1_CAUSE_SLB_PAR:
         printk("0b01: Exception caused by an SLB parity error detected\n"
@@ -116,5 +121,5 @@ int cpu_machinecheck(struct cpu_user_regs *regs)
         dump_segments(0);
     }
 
-    return 0; /* for now lets not recover; */
+    return 0; /* for now lets not recover */
 }

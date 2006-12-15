@@ -73,6 +73,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 
 #ifndef __ASSEMBLY__
 
+#define XENCOMM_INLINE_FLAG (1UL << 63)
+
 typedef uint64_t xen_ulong_t;
 
 /* User-accessible registers: need to be saved/restored for every nested Xen

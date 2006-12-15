@@ -439,7 +439,12 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
     int l, io_index;
     uint8_t *ptr;
     uint32_t val;
-    
+
+#if defined(__i386__) || defined(__x86_64__)
+    static pthread_mutex_t mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+    pthread_mutex_lock(&mutex);
+#endif
+
     while (len > 0) {
         /* How much can we copy before the next page boundary? */
         l = TARGET_PAGE_SIZE - (addr & ~TARGET_PAGE_MASK); 
@@ -504,6 +509,10 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
         buf += l;
         addr += l;
     }
+
+#if defined(__i386__) || defined(__x86_64__)
+    pthread_mutex_unlock(&mutex);
+#endif
 }
 #endif
 

@@ -37,4 +37,7 @@ extern void * memmove(void *,const void *,__kernel_size_t);
 extern int memcmp(const void *,const void *,__kernel_size_t);
 extern void * memchr(const void *,int,__kernel_size_t);
 
+extern void *systemsim_memset(void *, int, ulong);
+extern void *systemsim_memcpy(void *, const void *, ulong);
+
 #endif

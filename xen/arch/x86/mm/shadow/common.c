@@ -791,7 +791,7 @@ void shadow_prealloc(struct domain *d, unsigned int order)
 
 /* Deliberately free all the memory we can: this will tear down all of
  * this domain's shadows */
-static void shadow_blow_tables(struct domain *d) 
+void shadow_blow_tables(struct domain *d) 
 {
     struct list_head *l, *t;
     struct shadow_page_info *sp;
@@ -2495,7 +2495,9 @@ void sh_update_paging_modes(struct vcpu *v)
         {
             mfn_t mmfn = shadow_make_monitor_table(v);
             v->arch.monitor_table = pagetable_from_mfn(mmfn);
-        } 
+            make_cr3(v, mfn_x(mmfn));
+            hvm_update_host_cr3(v);
+        }
 
         if ( v->arch.shadow.mode != old_mode )
         {
@@ -3123,7 +3125,7 @@ static int shadow_log_dirty_op(
  out:
     shadow_unlock(d);
     domain_unpause(d);
-    return 0;
+    return rv;
 }
 
 

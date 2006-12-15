@@ -32,5 +32,7 @@ obj-$(perfc)       += perfc.o
 obj-$(crash_debug) += gdbstub.o
 obj-$(xenoprof)    += xenoprof.o
 
+obj-$(CONFIG_XENCOMM) += xencomm.o
+
 # Object file contains changeset and compiler information.
 version.o: $(BASEDIR)/include/xen/compile.h

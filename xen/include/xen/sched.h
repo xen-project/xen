@@ -188,6 +188,7 @@ struct domain_setup_info
 #define PAEKERN_no           0
 #define PAEKERN_yes          1
 #define PAEKERN_extended_cr3 2
+#define PAEKERN_bimodal      3
     unsigned int  pae_kernel;
     /* Initialised by loader: Private. */
     unsigned long elf_paddr_offset;
@@ -437,6 +438,7 @@ static inline int vcpu_runnable(struct vcpu *v)
 }
 
 void vcpu_pause(struct vcpu *v);
+void vcpu_pause_nosync(struct vcpu *v);
 void domain_pause(struct domain *d);
 void vcpu_unpause(struct vcpu *v);
 void domain_unpause(struct domain *d);

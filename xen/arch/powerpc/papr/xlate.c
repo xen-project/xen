@@ -19,7 +19,7 @@
  */
 
 #undef DEBUG
-#undef DEBUG_FAIL
+#undef DEBUG_LOW
 
 #include <xen/config.h>
 #include <xen/types.h>
@@ -29,6 +29,17 @@
 #include <asm/current.h>
 #include <asm/papr.h>
 #include <asm/hcalls.h>
+
+#ifdef DEBUG
+#define DBG(fmt...) printk(fmt)
+#else
+#define DBG(fmt...)
+#endif
+#ifdef DEBUG_LOW
+#define DBG_LOW(fmt...) printk(fmt)
+#else
+#define DBG_LOW(fmt...)
+#endif
 
 #ifdef USE_PTE_INSERT
 static inline void pte_insert(union pte volatile *pte,
@@ -106,11 +117,8 @@ static void pte_tlbie(union pte volatile *pte, ulong ptex)
 
 }
 
-static void h_enter(struct cpu_user_regs *regs)
+long pte_enter(ulong flags, ulong ptex, ulong vsid, ulong rpn)
 {
-    ulong flags = regs->gprs[4];
-    ulong ptex = regs->gprs[5];
-
     union pte pte;
     union pte volatile *ppte;
     struct domain_htab *htab;
@@ -129,14 +137,13 @@ static void h_enter(struct cpu_user_regs *regs)
 
     htab = &d->arch.htab;
     if (ptex > (1UL << htab->log_num_ptes)) {
-        regs->gprs[3] = H_Parameter;
-        printk("%s: bad ptex: 0x%lx\n", __func__, ptex);
-        return;
+        DBG("%s: bad ptex: 0x%lx\n", __func__, ptex);
+        return H_Parameter;
     }
 
     /* use local HPTE to avoid manual shifting & masking */
-    pte.words.vsid = regs->gprs[6];
-    pte.words.rpn = regs->gprs[7];
+    pte.words.vsid = vsid;
+    pte.words.rpn = rpn;
 
     if ( pte.bits.l ) {        /* large page? */
         /* figure out the page size for the selected large page */
@@ -150,10 +157,9 @@ static void h_enter(struct cpu_user_regs *regs)
         }
 
         if ( lp_size >= d->arch.large_page_sizes ) {
-            printk("%s: attempt to use unsupported lp_size %d\n",
-                   __func__, lp_size);
-            regs->gprs[3] = H_Parameter;
-            return;
+            DBG("%s: attempt to use unsupported lp_size %d\n",
+                __func__, lp_size);
+            return H_Parameter;
         }
 
         /* get correct pgshift value */
@@ -168,31 +174,32 @@ static void h_enter(struct cpu_user_regs *regs)
 
     mfn = pfn2mfn(d, pfn, &mtype);
     if (mfn == INVALID_MFN) {
-        regs->gprs[3] =  H_Parameter;
-        return;
+        DBG("%s: Bad PFN: 0x%lx\n", __func__, pfn);
+        return H_Parameter;
     }
 
-    if (mtype == PFN_TYPE_IO) {
+    if (mtype == PFN_TYPE_IO && !d->is_privileged) {
         /* only a privilaged dom can access outside IO space */
-        if ( !d->is_privileged ) {
-            regs->gprs[3] =  H_Privilege;
-            printk("%s: unprivileged access to physical page: 0x%lx\n",
-                   __func__, pfn);
-            return;
-        }
-
+        DBG("%s: unprivileged access to physical page: 0x%lx\n",
+            __func__, pfn);
+        return H_Privilege;
+    }
+    if (mtype == PFN_TYPE_IO) {
         if ( !((pte.bits.w == 0)
              && (pte.bits.i == 1)
              && (pte.bits.g == 1)) ) {
-#ifdef DEBUG_FAIL
-            printk("%s: expecting an IO WIMG "
-                   "w=%x i=%d m=%d, g=%d\n word 0x%lx\n", __func__,
-                   pte.bits.w, pte.bits.i, pte.bits.m, pte.bits.g,
-                   pte.words.rpn);
-#endif
-            regs->gprs[3] =  H_Parameter;
-            return;
+            DBG("%s: expecting an IO WIMG "
+                "w=%x i=%d m=%d, g=%d\n word 0x%lx\n", __func__,
+                pte.bits.w, pte.bits.i, pte.bits.m, pte.bits.g,
+                pte.words.rpn);
+            return H_Parameter;
         }
+    }
+    if (mtype == PFN_TYPE_GNTTAB) {
+        DBG("%s: Dom[%d] mapping grant table: 0x%lx\n",
+            __func__, d->domain_id, pfn << PAGE_SHIFT);
+        pte.bits.i = 0;
+        pte.bits.g = 0;
     }
     /* fixup the RPN field of our local PTE copy */
     pte.bits.rpn = mfn | lp_bits;
@@ -213,13 +220,13 @@ static void h_enter(struct cpu_user_regs *regs)
         BUG_ON(f == d);
 
         if (unlikely(!get_domain(f))) {
-            regs->gprs[3] = H_Rescinded;
-            return;
+            DBG("%s: Rescinded, no domain: 0x%lx\n",  __func__, pfn);
+            return H_Rescinded;
         }
         if (unlikely(!get_page(pg, f))) {
             put_domain(f);
-            regs->gprs[3] = H_Rescinded;
-            return;
+            DBG("%s: Rescinded, no page: 0x%lx\n",  __func__, pfn);
+            return H_Rescinded;
         }
     }
 
@@ -276,17 +283,12 @@ static void h_enter(struct cpu_user_regs *regs)
                 : "b" (ppte), "r" (pte.words.rpn), "r" (pte.words.vsid)
                 : "memory");
 
-            regs->gprs[3] = H_Success;
-            regs->gprs[4] = idx;
-
-            return;
+            return idx;
         }
     }
 
-#ifdef DEBUG
     /* If the PTEG is full then no additional values are returned. */
-    printk("%s: PTEG FULL\n", __func__);
-#endif
+    DBG("%s: PTEG FULL\n", __func__);
 
     if (pg != NULL)
         put_page(pg);
@@ -294,7 +296,24 @@ static void h_enter(struct cpu_user_regs *regs)
     if (f != NULL)
         put_domain(f);
 
-    regs->gprs[3] = H_PTEG_Full;
+    return H_PTEG_Full;
+}
+
+static void h_enter(struct cpu_user_regs *regs)
+{
+    ulong flags = regs->gprs[4];
+    ulong ptex = regs->gprs[5];
+    ulong vsid = regs->gprs[6];
+    ulong rpn = regs->gprs[7];
+    long ret;
+
+    ret = pte_enter(flags, ptex, vsid, rpn);
+
+    if (ret >= 0) {
+        regs->gprs[3] = H_Success;
+        regs->gprs[4] = ret;
+    } else
+        regs->gprs[3] = ret;
 }
 
 static void h_protect(struct cpu_user_regs *regs)
@@ -308,13 +327,11 @@ static void h_protect(struct cpu_user_regs *regs)
     union pte volatile *ppte;
     union pte lpte;
 
-#ifdef DEBUG
-    printk("%s: flags: 0x%lx ptex: 0x%lx avpn: 0x%lx\n", __func__,
-           flags, ptex, avpn);
-#endif
+    DBG_LOW("%s: flags: 0x%lx ptex: 0x%lx avpn: 0x%lx\n", __func__,
+            flags, ptex, avpn);
     if ( ptex > (1UL << htab->log_num_ptes) ) {
+        DBG("%s: bad ptex: 0x%lx\n", __func__, ptex);
         regs->gprs[3] = H_Parameter;
-        printk("%s: bad ptex: 0x%lx\n", __func__, ptex);
         return;
     }
     ppte = &htab->map[ptex];
@@ -324,10 +341,8 @@ static void h_protect(struct cpu_user_regs *regs)
 
     /* the AVPN param occupies the bit-space of the word */
     if ( (flags & H_AVPN) && lpte.bits.avpn != avpn >> 7 ) {
-#ifdef DEBUG_FAIL
-        printk("%s: %p: AVPN check failed: 0x%lx, 0x%lx\n", __func__,
-                ppte, lpte.words.vsid, lpte.words.rpn);
-#endif
+        DBG_LOW("%s: %p: AVPN check failed: 0x%lx, 0x%lx\n", __func__,
+            ppte, lpte.words.vsid, lpte.words.rpn);
         regs->gprs[3] = H_Not_Found;
         return;
     }
@@ -337,9 +352,7 @@ static void h_protect(struct cpu_user_regs *regs)
          * we invalidate entires where the PAPR says to 0 the whole hi
          * dword, so the AVPN should catch this first */
 
-#ifdef DEBUG_FAIL
-        printk("%s: pte invalid\n", __func__);
-#endif
+        DBG("%s: pte invalid\n", __func__);
         regs->gprs[3] =  H_Not_Found;
         return;
     }
@@ -374,7 +387,6 @@ static void h_protect(struct cpu_user_regs *regs)
 
 static void h_clear_ref(struct cpu_user_regs *regs)
 {
-    ulong flags = regs->gprs[4];
     ulong ptex = regs->gprs[5];
     struct vcpu *v = get_current();
     struct domain *d = v->domain;
@@ -382,20 +394,20 @@ static void h_clear_ref(struct cpu_user_regs *regs)
     union pte volatile *pte;
     union pte lpte;
 
+    DBG_LOW("%s: flags: 0x%lx ptex: 0x%lx\n", __func__,
+            regs->gprs[4], ptex);
+
 #ifdef DEBUG
-    printk("%s: flags: 0x%lx ptex: 0x%lx\n", __func__,
-           flags, ptex);
+    if (regs->gprs[4] != 0) {
+        DBG("WARNING: %s: "
+            "flags are undefined and should be 0: 0x%lx\n",
+            __func__, regs->gprs[4]);
+    }
 #endif
 
-    if (flags != 0) {
-        printk("WARNING: %s: "
-                "flags are undefined and should be 0: 0x%lx\n",
-                __func__, flags);
-    }
-
     if (ptex > (1UL << htab->log_num_ptes)) {
+        DBG("%s: bad ptex: 0x%lx\n", __func__, ptex);
         regs->gprs[3] = H_Parameter;
-        printk("%s: bad ptex: 0x%lx\n", __func__, ptex);
         return;
     }
     pte = &htab->map[ptex];
@@ -417,7 +429,6 @@ static void h_clear_ref(struct cpu_user_regs *regs)
 
 static void h_clear_mod(struct cpu_user_regs *regs)
 {
-    ulong flags = regs->gprs[4];
     ulong ptex = regs->gprs[5];
     struct vcpu *v = get_current();
     struct domain *d = v->domain;
@@ -425,19 +436,20 @@ static void h_clear_mod(struct cpu_user_regs *regs)
     union pte volatile *pte;
     union pte lpte;
 
+    DBG_LOW("%s: flags: 0x%lx ptex: 0x%lx\n", __func__,
+          regs->gprs[4], ptex);
+
 #ifdef DEBUG
-    printk("%s: flags: 0x%lx ptex: 0x%lx\n", __func__,
-           flags, ptex);
-#endif
-    if (flags != 0) {
-        printk("WARNING: %s: "
-                "flags are undefined and should be 0: 0x%lx\n",
-                __func__, flags);
+    if (regs->gprs[4] != 0) {
+        DBG("WARNING: %s: "
+            "flags are undefined and should be 0: 0x%lx\n",
+            __func__, regs->gprs[4]);
     }
-    
+#endif
+
     if (ptex > (1UL << htab->log_num_ptes)) {
+        DBG("%s: bad ptex: 0x%lx\n", __func__, ptex);
         regs->gprs[3] = H_Parameter;
-        printk("%s: bad ptex: 0x%lx\n", __func__, ptex);
         return;
     }
     pte = &htab->map[ptex];
@@ -466,63 +478,53 @@ static void h_clear_mod(struct cpu_user_regs *regs)
     }
 }
 
-static void h_remove(struct cpu_user_regs *regs)
+long pte_remove(ulong flags, ulong ptex, ulong avpn, ulong *hi, ulong *lo)
 {
-    ulong flags = regs->gprs[4];
-    ulong ptex = regs->gprs[5];
-    ulong avpn = regs->gprs[6];
     struct vcpu *v = get_current();
     struct domain *d = v->domain;
     struct domain_htab *htab = &d->arch.htab;
     union pte volatile *pte;
     union pte lpte;
 
-#ifdef DEBUG
-    printk("%s: flags: 0x%lx ptex: 0x%lx avpn: 0x%lx\n", __func__,
-           flags, ptex, avpn);
-#endif
+    DBG_LOW("%s: flags: 0x%lx ptex: 0x%lx avpn: 0x%lx\n", __func__,
+            flags, ptex, avpn);
+
     if ( ptex > (1UL << htab->log_num_ptes) ) {
-        regs->gprs[3] = H_Parameter;
-        printk("%s: bad ptex: 0x%lx\n", __func__, ptex);
-        return;
+        DBG("%s: bad ptex: 0x%lx\n", __func__, ptex);
+        return H_Parameter;
     }
     pte = &htab->map[ptex];
     lpte.words.vsid = pte->words.vsid;
     lpte.words.rpn = pte->words.rpn;
 
     if ((flags & H_AVPN) && lpte.bits.avpn != (avpn >> 7)) {
-#ifdef DEBUG_FAIL
-        printk("%s: avpn doesn not match\n", __func__);
-#endif
-        regs->gprs[3] = H_Not_Found;
-        return;
+        DBG_LOW("%s: AVPN does not match\n", __func__);
+        return H_Not_Found;
     }
 
     if ((flags & H_ANDCOND) && ((avpn & pte->words.vsid) != 0)) {
-#ifdef DEBUG_FAIL
-        printk("%s: andcond does not match\n", __func__);
-#endif
-        regs->gprs[3] = H_Not_Found;
-        return;
+        DBG("%s: andcond does not match\n", __func__);
+        return H_Not_Found;
     }
 
-    regs->gprs[3] = H_Success;
     /* return old PTE in regs 4 and 5 */
-    regs->gprs[4] = lpte.words.vsid;
-    regs->gprs[5] = lpte.words.rpn;
+    *hi = lpte.words.vsid;
+    *lo = lpte.words.rpn;
 
+#ifdef DEBUG_LOW
     /* XXX - I'm very skeptical of doing ANYTHING if not bits.v */
     /* XXX - I think the spec should be questioned in this case (MFM) */
     if (lpte.bits.v == 0) {
-        printk("%s: removing invalid entry\n", __func__);
+        DBG_LOW("%s: removing invalid entry\n", __func__);
     }
+#endif
 
     if (lpte.bits.v) {
         ulong mfn = lpte.bits.rpn;
         if (!cpu_io_mfn(mfn)) {
             struct page_info *pg = mfn_to_page(mfn);
             struct domain *f = page_get_owner(pg);
-
+            
             if (f != d) {
                 put_domain(f);
                 put_page(pg);
@@ -536,6 +538,27 @@ static void h_remove(struct cpu_user_regs *regs)
             : "memory");
 
     pte_tlbie(&lpte, ptex);
+
+    return H_Success;
+}
+
+static void h_remove(struct cpu_user_regs *regs)
+{
+    ulong flags = regs->gprs[4];
+    ulong ptex = regs->gprs[5];
+    ulong avpn = regs->gprs[6];
+    ulong hi, lo;
+    long ret;
+
+    ret = pte_remove(flags, ptex, avpn, &hi, &lo);
+
+    regs->gprs[3] = ret;
+
+    if (ret == H_Success) {
+        regs->gprs[4] = hi;
+        regs->gprs[5] = lo;
+    }
+    return;
 }
 
 static void h_read(struct cpu_user_regs *regs)
@@ -547,12 +570,12 @@ static void h_read(struct cpu_user_regs *regs)
     struct domain_htab *htab = &d->arch.htab;
     union pte volatile *pte;
 
-	if (flags & H_READ_4)
+    if (flags & H_READ_4)
         ptex &= ~0x3UL;
 
     if (ptex > (1UL << htab->log_num_ptes)) {
+        DBG("%s: bad ptex: 0x%lx\n", __func__, ptex);
         regs->gprs[3] = H_Parameter;
-        printk("%s: bad ptex: 0x%lx\n", __func__, ptex);
         return;
     }
     pte = &htab->map[ptex];

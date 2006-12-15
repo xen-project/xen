@@ -74,8 +74,9 @@ struct pending_aio {
 #define XEN_MAGIC  (('X' << 24) | ('E' << 16) | ('N' << 8) | 0xfb)
 #define QCOW_VERSION 1
 
-#define QCOW_CRYPT_NONE 0
-#define QCOW_CRYPT_AES  1
+#define QCOW_CRYPT_NONE 0x00
+#define QCOW_CRYPT_AES  0x01
+#define QCOW_SPARSE_FILE 0x02
 
 #define QCOW_OFLAG_COMPRESSED (1LL << 63)
 
@@ -101,6 +102,7 @@ typedef struct QCowHeader_ext {
         uint32_t xmagic;
         uint32_t cksum;
         uint32_t min_cluster_alloc;
+        uint32_t flags;
 } QCowHeader_ext;
 
 #define L2_CACHE_SIZE 16  /*Fixed allocation in Qemu*/
@@ -119,6 +121,7 @@ struct tdqcow_state {
 	int cluster_alloc;             /*Blktap fix for allocating full 
 					*extents*/
 	int min_cluster_alloc;         /*Blktap historical extent alloc*/
+	int sparse;                    /*Indicates whether to preserve sparseness*/
 	int l2_bits;                   /*Size of L2 table entry*/
 	int l2_size;                   /*Full table size*/
 	int l1_size;                   /*L1 table size*/
@@ -413,6 +416,37 @@ static void encrypt_sectors(struct tdqcow_state *s, int64_t sector_num,
 	}
 }
 
+static int qtruncate(int fd, off_t length, int sparse)
+{
+	int current, ret, i; 
+	int sectors = length/DEFAULT_SECTOR_SIZE;
+	struct stat st;
+	char buf[DEFAULT_SECTOR_SIZE];
+
+	/* If length is greater than the current file len
+	 * we synchronously write zeroes to the end of the 
+	 * file, otherwise we truncate the length down
+	 */
+	memset(buf, 0x00, DEFAULT_SECTOR_SIZE);
+	ret = fstat(fd, &st);
+	if((ret == -1) || S_ISBLK(st.st_mode))
+		return -1;
+
+	if(st.st_size < length) {
+		/*We are extending the file*/
+		lseek(fd, 0, SEEK_END);
+		for (i = 0; i < sectors; i++ ) {
+			ret = write(fd, buf, DEFAULT_SECTOR_SIZE);
+			if (ret != DEFAULT_SECTOR_SIZE)
+				return -1;
+		}
+		
+	} else if(sparse && (st.st_size > length))
+		ftruncate(fd, length);
+
+	return 1;
+}
+
 
 /* 'allocate' is:
  *
@@ -463,8 +497,8 @@ static uint64_t get_cluster_offset(struct td_state *bs,
 		
 		/*Truncate file for L2 table 
 		 *(initialised to zero in case we crash)*/
-		ftruncate(s->fd, l2_offset + (s->l2_size * sizeof(uint64_t)));
-		s->fd_end += (s->l2_size * sizeof(uint64_t));
+		qtruncate(s->fd, l2_offset + (s->l2_size * sizeof(uint64_t)), s->sparse);
+		s->fd_end = l2_offset + (s->l2_size * sizeof(uint64_t));
 
 		/*Update the L1 table entry on disk
                  * (for O_DIRECT we write 4KByte blocks)*/
@@ -483,7 +517,7 @@ static uint64_t get_cluster_offset(struct td_state *bs,
 		 */
 		lseek(s->fd, s->l1_table_offset + (l1_sector << 12), SEEK_SET);
 		if (write(s->fd, tmp_ptr, 4096) != 4096)
-			return 0;
+		 	return 0;
 		free(tmp_ptr);
 
 		new_l2_table = 1;
@@ -530,8 +564,8 @@ cache_miss:
 				(s->l2_size * sizeof(uint64_t));
 			cluster_offset = (cluster_offset + s->cluster_size - 1)
 				& ~(s->cluster_size - 1);
-			ftruncate(s->fd, cluster_offset + 
-				  (s->cluster_size * s->l2_size));
+			qtruncate(s->fd, cluster_offset + 
+				  (s->cluster_size * s->l2_size), s->sparse);
 			s->fd_end = cluster_offset + 
 				(s->cluster_size * s->l2_size);
 			for (i = 0; i < s->l2_size; i++) {
@@ -542,7 +576,7 @@ cache_miss:
 
 		lseek(s->fd, l2_offset, SEEK_SET);
 		if (write(s->fd, l2_table, s->l2_size * sizeof(uint64_t)) !=
-		    s->l2_size * sizeof(uint64_t))
+		   s->l2_size * sizeof(uint64_t))
 			return 0;
 	} else {
 		lseek(s->fd, l2_offset, SEEK_SET);
@@ -573,7 +607,7 @@ found:
 			   overwritten */
 			if (decompress_cluster(s, cluster_offset) < 0)
 				return 0;
-			cluster_offset = lseek(s->fd, 0, SEEK_END);
+			cluster_offset = lseek(s->fd, s->fd_end, SEEK_SET);
 			cluster_offset = (cluster_offset + s->cluster_size - 1)
 				& ~(s->cluster_size - 1);
 			/* write the cluster content - not asynchronous */
@@ -583,14 +617,15 @@ found:
 			    return -1;
 		} else {
 			/* allocate a new cluster */
-			cluster_offset = lseek(s->fd, 0, SEEK_END);
+			cluster_offset = lseek(s->fd, s->fd_end, SEEK_SET);
 			if (allocate == 1) {
 				/* round to cluster size */
 				cluster_offset = 
 					(cluster_offset + s->cluster_size - 1) 
 					& ~(s->cluster_size - 1);
-				ftruncate(s->fd, cluster_offset + 
-					  s->cluster_size);
+				qtruncate(s->fd, cluster_offset + 
+					  s->cluster_size, s->sparse);
+				s->fd_end = (cluster_offset + s->cluster_size);
 				/* if encrypted, we must initialize the cluster
 				   content which won't be written */
 				if (s->crypt_method && 
@@ -633,9 +668,9 @@ found:
 			DPRINTF("ERROR allocating memory for L1 table\n");
 		}
 		memcpy(tmp_ptr2, l2_ptr, 4096);
-		aio_lock(s, offset >> 9);
-		async_write(s, s->fd, 4096, l2_offset + (l2_sector << 12), 
-			    tmp_ptr2, 0, -2, offset >> 9, 0, NULL);
+		lseek(s->fd, l2_offset + (l2_sector << 12), SEEK_SET);
+		write(s->fd, tmp_ptr2, 4096);
+		free(tmp_ptr2);
 	}
 	return cluster_offset;
 }
@@ -733,6 +768,7 @@ int tdqcow_open (struct td_state *bs, const char *name)
 	QCowHeader *header;
 	QCowHeader_ext *exthdr;
 	uint32_t cksum;
+	uint64_t final_cluster = 0;
 
  	DPRINTF("QCOW: Opening %s\n",name);
 	/* set up a pipe so that we can hand back a poll fd that won't fire.*/
@@ -766,7 +802,7 @@ int tdqcow_open (struct td_state *bs, const char *name)
 	be64_to_cpus(&header->size);
 	be32_to_cpus(&header->crypt_method);
 	be64_to_cpus(&header->l1_table_offset);
-   
+
 	if (header->magic != QCOW_MAGIC || header->version > QCOW_VERSION)
 		goto fail;
 	if (header->size <= 1 || header->cluster_bits < 9)
@@ -798,6 +834,7 @@ int tdqcow_open (struct td_state *bs, const char *name)
 	}
 	ret = posix_memalign((void **)&s->l1_table, 4096, l1_table_size);
 	if (ret != 0) goto fail;
+
 	memset(s->l1_table, 0x00, l1_table_size);
 
 	DPRINTF("L1 Table offset detected: %llu, size %d (%d)\n",
@@ -808,10 +845,13 @@ int tdqcow_open (struct td_state *bs, const char *name)
 	lseek(fd, s->l1_table_offset, SEEK_SET);
 	if (read(fd, s->l1_table, l1_table_size) != l1_table_size)
 		goto fail;
-/*	for(i = 0;i < s->l1_size; i++) {
+
+	for(i = 0;i < s->l1_size; i++) {
 		//be64_to_cpus(&s->l1_table[i]);
-		DPRINTF("L1[%d] => %llu\n", i, s->l1_table[i]);
-		}*/
+		//DPRINTF("L1[%d] => %llu\n", i, s->l1_table[i]);
+		if (s->l1_table[i] > final_cluster)
+			final_cluster = s->l1_table[i];
+	}
 
 	/* alloc L2 cache */
 	size = s->l2_size * L2_CACHE_SIZE * sizeof(uint64_t);
@@ -870,10 +910,14 @@ int tdqcow_open (struct td_state *bs, const char *name)
 		/*Finally check the L1 table cksum*/
 		be32_to_cpus(&exthdr->cksum);
 		cksum = gen_cksum((char *)s->l1_table, s->l1_size * sizeof(uint64_t));
-		if(exthdr->cksum != cksum)
+		if(exthdr->cksum != cksum) {
 			goto end_xenhdr;
+		}
 			
 		be32_to_cpus(&exthdr->min_cluster_alloc);
+		be32_to_cpus(&exthdr->flags);
+		if (exthdr->flags & QCOW_SPARSE_FILE)
+			s->sparse = 1;
 		s->min_cluster_alloc = exthdr->min_cluster_alloc; 
 	}
 
@@ -882,7 +926,8 @@ int tdqcow_open (struct td_state *bs, const char *name)
 		DPRINTF("Unable to initialise AIO state\n");
 		goto fail;
 	}
-	s->fd_end = lseek(s->fd, 0, SEEK_END);
+	s->fd_end = (final_cluster == 0 ? (s->l1_table_offset + l1_table_size) : 
+				(final_cluster + s->cluster_size));
 
 	return 0;
 	
@@ -1172,7 +1217,7 @@ int qcow_create(const char *filename, uint64_t total_size,
 	QCowHeader header;
 	QCowHeader_ext exthdr;
 	char backing_filename[1024], *ptr;
-	uint64_t tmp, size;
+	uint64_t tmp, size, total_length;
 	struct stat st;
 
 	DPRINTF("Qcow_create: size %llu\n",(long long unsigned)total_size);
@@ -1260,7 +1305,7 @@ int qcow_create(const char *filename, uint64_t total_size,
 	DPRINTF("L1 Table offset: %d, size %d\n",
 		header_size,
 		(int)(l1_size * sizeof(uint64_t)));
-	if (flags) {
+	if (flags & QCOW_CRYPT_AES) {
 		header.crypt_method = cpu_to_be32(QCOW_CRYPT_AES);
 	} else {
 		header.crypt_method = cpu_to_be32(QCOW_CRYPT_NONE);
@@ -1270,8 +1315,26 @@ int qcow_create(const char *filename, uint64_t total_size,
 	exthdr.cksum = cpu_to_be32(gen_cksum(ptr, l1_size * sizeof(uint64_t)));
 	printf("Created cksum: %d\n",exthdr.cksum);
 	free(ptr);
+
+	/*adjust file length to 4 KByte boundary*/
+	length = header_size + l1_size * sizeof(uint64_t);
+	if (length % 4096 > 0) {
+		length = ((length >> 12) + 1) << 12;
+		qtruncate(fd, length, 0);
+		DPRINTF("Adjusted filelength to %d for 4 "
+			"Kbyte alignment\n",length);
+	}
+
+	if (!(flags & QCOW_SPARSE_FILE)) {
+		/*Filesize is length + 	l1_size * (1 << s->l2_bits) + (size*512)*/
+		total_length = length + (l1_size * (1 << 9)) + (size * 512);
+		qtruncate(fd, total_length, 0);
+		printf("File truncated to length %"PRIu64"\n",total_length);
+	}
+	exthdr.flags = cpu_to_be32(flags);
 	
 	/* write all the data */
+	lseek(fd, 0, SEEK_SET);
 	ret += write(fd, &header, sizeof(header));
 	ret += write(fd, &exthdr, sizeof(exthdr));
 	if (backing_file) {
@@ -1281,15 +1344,6 @@ int qcow_create(const char *filename, uint64_t total_size,
 	tmp = 0;
 	for (i = 0;i < l1_size; i++) {
 		ret += write(fd, &tmp, sizeof(tmp));
-	}
-
-	/*adjust file length to 4 KByte boundary*/
-	length = header_size + l1_size * sizeof(uint64_t);
-	if (length % 4096 > 0) {
-		length = ((length >> 12) + 1) << 12;
-		ftruncate(fd, length);
-		DPRINTF("Adjusted filelength to %d for 4 "
-			"Kbyte alignment\n",length);
 	}
 
 	close(fd);
@@ -1306,7 +1360,7 @@ int qcow_make_empty(struct td_state *bs)
 	lseek(s->fd, s->l1_table_offset, SEEK_SET);
 	if (write(s->fd, s->l1_table, l1_length) < 0)
 		return -1;
-	ftruncate(s->fd, s->l1_table_offset + l1_length);
+	qtruncate(s->fd, s->l1_table_offset + l1_length, s->sparse);
 
 	memset(s->l2_cache, 0, s->l2_size * L2_CACHE_SIZE * sizeof(uint64_t));
 	memset(s->l2_cache_offsets, 0, L2_CACHE_SIZE * sizeof(uint64_t));

@@ -660,8 +660,14 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
         goto error_out;
     }
 
-    // Get number of vcpus, stored by pyxc_hvm_build()
-    xc_get_hvm_param(xc_handle, dom, HVM_PARAM_VCPUS, &vcpus);
+    domctl.cmd = XEN_DOMCTL_getdomaininfo;
+    domctl.domain = (domid_t)dom;
+    if (xc_domctl(xc_handle, &domctl) < 0) {
+        PERROR("Could not get info on domain");
+        goto error_out;
+    }
+
+    vcpus = domctl.u.getdomaininfo.max_vcpu_id + 1;
 
     // Hand-off state passed to guest firmware 
     if (xc_ia64_build_hob(xc_handle, dom, dom_memsize, vcpus) < 0) {

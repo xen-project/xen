@@ -22,7 +22,10 @@
 """Grand unified management application for Xen.
 """
 import atexit
+import cmd
 import os
+import pprint
+import shlex
 import sys
 import re
 import getopt
@@ -77,6 +80,8 @@ USAGE_FOOTER = '<Domain> can either be the Domain Name or Id.\n' \
 
 SUBCOMMAND_HELP = {
     # common commands
+
+    'shell'       : ('', 'Launch an interactive shell.'),
     
     'console'     : ('[-q|--quiet] <Domain>',
                      'Attach to <Domain>\'s console.'),
@@ -142,14 +147,15 @@ SUBCOMMAND_HELP = {
                         'Create a new virtual block device.'),
     'block-configure': ('<Domain> <BackDev> <FrontDev> <Mode> [BackDomain]',
                         'Change block device configuration'),
-    'block-detach'  :  ('<Domain> <DevId>',
+    'block-detach'  :  ('<Domain> <DevId> [-f|--force]',
                         'Destroy a domain\'s virtual block device.'),
     'block-list'    :  ('<Domain> [--long]',
                         'List virtual block devices for a domain.'),
-    'network-attach':  ('<Domain> [--script=<script>] [--ip=<ip>] '
-                        '[--mac=<mac>]',
+    'network-attach':  ('<Domain> [type=<type>] [mac=<mac>] [bridge=<bridge>] '
+                        '[ip=<ip>] [script=<script>] [backend=<BackDomain>] '
+                        '[vifname=<name>]',
                         'Create a new virtual network device.'),
-    'network-detach':  ('<Domain> <DevId>',
+    'network-detach':  ('<Domain> <DevId> [-f|--force]',
                         'Destroy a domain\'s virtual network device.'),
     'network-list'  :  ('<Domain> [--long]',
                         'List virtual network interfaces for a domain.'),
@@ -245,6 +251,7 @@ common_commands = [
     "restore",
     "resume",
     "save",
+    "shell",
     "shutdown",
     "start",
     "suspend",
@@ -328,7 +335,7 @@ acm_commands = [
     ]
 
 all_commands = (domain_commands + host_commands + scheduler_commands +
-                device_commands + vnet_commands + acm_commands)
+                device_commands + vnet_commands + acm_commands + ['shell'])
 
 
 ##
@@ -362,6 +369,7 @@ def parseAuthentication():
             server.getAttribute('password'))
 
 serverType, serverURI = parseServer()
+server = None
 
 
 ####################################################################
@@ -455,12 +463,16 @@ def longHelp():
     print
     print USAGE_FOOTER        
 
-def usage(cmd = None):
-    """ Print help usage information and exits """
+def _usage(cmd):
+    """ Print help usage information """
     if cmd:
         cmdHelp(cmd)
     else:
         shortHelp()
+
+def usage(cmd = None):
+    """ Print help usage information and exits """
+    _usage(cmd)
     sys.exit(1)
 
 
@@ -523,6 +535,49 @@ def get_single_vm(dom):
         dominfo = server.xend.domain(dom, False)
         return dominfo['uuid']
 
+##
+#
+# Xen-API Shell
+#
+##
+
+class Shell(cmd.Cmd):
+    def __init__(self):
+        cmd.Cmd.__init__(self)
+        self.prompt = "xm> "
+
+    def default(self, line):
+        words = shlex.split(line)
+        if len(words) > 0 and words[0] == 'xm':
+            words = words[1:]
+        if len(words) > 0:
+            cmd = xm_lookup_cmd(words[0])
+            if cmd:
+                _run_cmd(cmd, words[0], words[1:])
+            elif serverType == SERVER_XEN_API:
+                ok, res = _run_cmd(lambda x: server.xenapi_request(words[0],
+                                                                   tuple(x)),
+                                   words[0], words[1:])
+                if ok and res != '':
+                    pprint.pprint(res)
+            else:
+                print '*** Unknown command: %s' % words[0]
+        return False
+
+    def emptyline(self):
+        pass
+
+    def do_EOF(self, line):
+        print
+        sys.exit(0)
+
+    def do_help(self, line):
+        _usage(line)
+
+
+def xm_shell(args):
+    Shell().cmdloop('The Xen Master. Type "help" for a list of functions.')
+
 
 #########################################################################
 #
@@ -554,7 +609,7 @@ def xm_restore(args):
         (options, params) = getopt.gnu_getopt(args, 'p', ['paused'])
     except getopt.GetoptError, opterr:
         err(opterr)
-        sys.exit(1)
+        usage('restore')
 
     paused = False
     for (k, v) in options:
@@ -564,7 +619,6 @@ def xm_restore(args):
     if len(params) != 1:
         err("Wrong number of parameters")
         usage('restore')
-        sys.exit(1)
 
     savefile = os.path.abspath(params[0])
 
@@ -594,7 +648,6 @@ def xm_list(args):
     except getopt.GetoptError, opterr:
         err(opterr)
         usage('list')
-        sys.exit(1)
     
     for (k, v) in options:
         if k in ['-l', '--long']:
@@ -709,7 +762,7 @@ def xm_vcpu_list(args):
         dominfo = map(server.xend.domain.getVCPUInfo, doms)
 
     print '%-32s %3s %5s %5s %5s %9s %s' % \
-          ('Name', 'ID', 'VCPUs', 'CPU', 'State', 'Time(s)', 'CPU Affinity')
+          ('Name', 'ID', 'VCPU', 'CPU', 'State', 'Time(s)', 'CPU Affinity')
 
     format = '%(name)-32s %(domid)3d %(number)5d %(c)5s %(s)5s ' \
              ' %(cpu_time)8.1f %(cpumap)s'
@@ -815,7 +868,7 @@ def xm_start(args):
         (options, params) = getopt.gnu_getopt(args, 'p', ['paused'])
     except getopt.GetoptError, opterr:
         err(opterr)
-        sys.exit(1)
+        usage('start')
 
     paused = False
     for (k, v) in options:
@@ -825,7 +878,6 @@ def xm_start(args):
     if len(params) != 1:
         err("Wrong number of parameters")
         usage('start')
-        sys.exit(1)
 
     dom = params[0]
     if serverType == SERVER_XEN_API:
@@ -856,7 +908,7 @@ def xm_resume(args):
         (options, params) = getopt.gnu_getopt(args, 'p', ['paused'])
     except getopt.GetoptError, opterr:
         err(opterr)
-        sys.exit(1)
+        usage('resume')
 
     paused = False
     for (k, v) in options:
@@ -866,7 +918,6 @@ def xm_resume(args):
     if len(params) != 1:
         err("Wrong number of parameters")
         usage('resume')
-        sys.exit(1)
 
     dom = params[0]
     if serverType == SERVER_XEN_API:
@@ -1061,7 +1112,7 @@ def xm_sched_sedf(args):
             ['period=', 'slice=', 'latency=', 'extratime=', 'weight='])
     except getopt.GetoptError, opterr:
         err(opterr)
-        sys.exit(1)
+        usage('sched-sedf')
     
     # convert to nanoseconds if needed 
     for (k, v) in options:
@@ -1122,7 +1173,6 @@ def xm_sched_credit(args):
     except getopt.GetoptError, opterr:
         err(opterr)
         usage('sched-credit')
-        sys.exit(1)
 
     domain = None
     weight = None
@@ -1140,7 +1190,6 @@ def xm_sched_credit(args):
         # place holder for system-wide scheduler parameters
         err("No domain given.")
         usage('sched-credit')
-        sys.exit(1)
 
     if weight is None and cap is None:
         print server.xend.domain.sched_credit_get(domain)
@@ -1169,7 +1218,7 @@ def xm_console(args):
         (options, params) = getopt.gnu_getopt(args, 'q', ['quiet'])
     except getopt.GetoptError, opterr:
         err(opterr)
-        sys.exit(1)
+        usage('console')
 
     for (k, v) in options:
         if k in ['-q', '--quiet']:
@@ -1180,7 +1229,6 @@ def xm_console(args):
     if len(params) != 1:
         err('No domain given')
         usage('console')
-        sys.exit(1)
 
     dom = params[0]
 
@@ -1208,7 +1256,7 @@ def xm_uptime(args):
         (options, params) = getopt.gnu_getopt(args, 's', ['short'])
     except getopt.GetoptError, opterr:
         err(opterr)
-        sys.exit(1)
+        usage('uptime')
 
     for (k, v) in options:
         if k in ['-s', '--short']:
@@ -1273,7 +1321,7 @@ def xm_dmesg(args):
         (options, params) = getopt.gnu_getopt(args, 'c', ['clear'])
     except getopt.GetoptError, opterr:
         err(opterr)
-        sys.exit(1)
+        usage('dmesg')
     
     use_clear = 0
     for (k, v) in options:
@@ -1283,7 +1331,6 @@ def xm_dmesg(args):
     if len(params) :
         err("No parameter required")
         usage('dmesg')
-        sys.exit(1)
 
     if not use_clear:
         print server.xend.node.dmesg.info()
@@ -1493,16 +1540,24 @@ def xm_network_attach(args):
 
 
 def detach(args, command, deviceClass):
-    arg_check(args, command, 2)
+    arg_check(args, command, 2, 3)
 
     dom = args[0]
     dev = args[1]
+    try:
+        force = args[2]
+        if (force != "--force") and (force != "-f"):
+            print "Ignoring option %s"%(force)
+            force = None
+    except IndexError:
+        force = None
 
-    server.xend.domain.destroyDevice(dom, deviceClass, dev)
+    server.xend.domain.destroyDevice(dom, deviceClass, dev, force)
 
 
 def xm_block_detach(args):
     detach(args, 'block-detach', 'vbd')
+    detach(args, 'block-detach', 'tap')
 
 
 def xm_network_detach(args):
@@ -1514,7 +1569,7 @@ def xm_vnet_list(args):
         (options, params) = getopt.gnu_getopt(args, 'l', ['long'])
     except getopt.GetoptError, opterr:
         err(opterr)
-        sys.exit(1)
+        usage('vnet-list')
     
     use_long = 0
     for (k, v) in options:
@@ -1552,6 +1607,7 @@ def xm_vnet_delete(args):
     server.xend_vnet_delete(vnet)
 
 commands = {
+    "shell": xm_shell,
     # console commands
     "console": xm_console,
     # xenstat commands
@@ -1655,17 +1711,13 @@ def xm_lookup_cmd(cmd):
             # only execute if there is only 1 match
             if len(same_prefix_cmds) == 1:
                 return same_prefix_cmds[0]
-            
-        err('Sub Command %s not found!' % cmd)
-        usage()
+        return None
 
 def deprecated(old,new):
     print >>sys.stderr, (
         "Command %s is deprecated.  Please use xm %s instead." % (old, new))
 
 def main(argv=sys.argv):
-    global server
-
     if len(argv) < 2:
         usage()
 
@@ -1674,16 +1726,26 @@ def main(argv=sys.argv):
         if help in argv[1:]:
             if help == argv[1]:
                 longHelp()
+                sys.exit(0)
             else:
                 usage(argv[1])
-            sys.exit(0)
 
-    cmd = xm_lookup_cmd(argv[1])
-
-    # strip off prog name and subcmd
-    args = argv[2:]
+    cmd_name = argv[1]
+    cmd = xm_lookup_cmd(cmd_name)
     if cmd:
-        try:
+        # strip off prog name and subcmd
+        args = argv[2:]
+        _, rc = _run_cmd(cmd, cmd_name, args)
+        sys.exit(rc)
+    else:
+        err('Subcommand %s not found!' % cmd_name)
+        usage()
+
+def _run_cmd(cmd, cmd_name, args):
+    global server
+
+    try:
+        if server is None:
             if serverType == SERVER_XEN_API:
                 server = XenAPI.Session(serverURI)
                 username, password = parseAuthentication()
@@ -1697,66 +1759,55 @@ def main(argv=sys.argv):
             else:
                 server = ServerProxy(serverURI)
 
-            rc = cmd(args)
-            if rc:
-                usage()
-        except socket.error, ex:
-            if os.geteuid() != 0:
-                err("Most commands need root access. Please try again as root.")
-            else:
-                err("Unable to connect to xend: %s. Is xend running?" % ex[1])
-            sys.exit(1)
-        except KeyboardInterrupt:
-            print "Interrupted."
-            sys.exit(1)
-        except IOError, ex:
-            if os.geteuid() != 0:
-                err("Most commands need root access.  Please try again as root.")
-            else:
-                err("Unable to connect to xend: %s." % ex[1])
-            sys.exit(1)
-        except SystemExit:
-            sys.exit(1)
-        except XenAPI.Failure, exn:
-            err(str(exn))
-            sys.exit(1)
-        except xmlrpclib.Fault, ex:
-            if ex.faultCode == XendClient.ERROR_INVALID_DOMAIN:
-                err("Domain '%s' does not exist." % ex.faultString)
-            else:
-                err(ex.faultString)
-            usage(argv[1])
-            sys.exit(1)
-        except xmlrpclib.ProtocolError, ex:
-            if ex.errcode == -1:
-                print  >>sys.stderr, (
-                    "Xend has probably crashed!  Invalid or missing HTTP "
-                    "status code.")
-            else:
-                print  >>sys.stderr, (
-                    "Xend has probably crashed!  ProtocolError(%d, %s)." %
-                    (ex.errcode, ex.errmsg))
-            sys.exit(1)
-        except (ValueError, OverflowError):
-            err("Invalid argument.")
-            usage(argv[1])
-            sys.exit(1)
-        except OptionError, e:
-            err(str(e))
-            usage(argv[1])
-            print e.usage()
-            sys.exit(1)
-        except security.ACMError, e:
-            err(str(e))
-            sys.exit(1)
-        except:
-            print "Unexpected error:", sys.exc_info()[0]
-            print
-            print "Please report to xen-devel@lists.xensource.com"
-            raise
-                
-    else:
-        usage()
+        return True, cmd(args)
+    except socket.error, ex:
+        if os.geteuid() != 0:
+            err("Most commands need root access. Please try again as root.")
+        else:
+            err("Unable to connect to xend: %s. Is xend running?" % ex[1])
+    except KeyboardInterrupt:
+        print "Interrupted."
+        return True, ''
+    except IOError, ex:
+        if os.geteuid() != 0:
+            err("Most commands need root access.  Please try again as root.")
+        else:
+            err("Unable to connect to xend: %s." % ex[1])
+    except SystemExit, code:
+        return code == 0, code
+    except XenAPI.Failure, exn:
+        err(str(exn))
+    except xmlrpclib.Fault, ex:
+        if ex.faultCode == XendClient.ERROR_INVALID_DOMAIN:
+            err("Domain '%s' does not exist." % ex.faultString)
+        else:
+            err(ex.faultString)
+        _usage(cmd_name)
+    except xmlrpclib.ProtocolError, ex:
+        if ex.errcode == -1:
+            print  >>sys.stderr, (
+                "Xend has probably crashed!  Invalid or missing HTTP "
+                "status code.")
+        else:
+            print  >>sys.stderr, (
+                "Xend has probably crashed!  ProtocolError(%d, %s)." %
+                (ex.errcode, ex.errmsg))
+    except (ValueError, OverflowError):
+        err("Invalid argument.")
+        _usage(cmd_name)
+    except OptionError, e:
+        err(str(e))
+        _usage(cmd_name)
+        print e.usage()
+    except security.ACMError, e:
+        err(str(e))
+    except:
+        print "Unexpected error:", sys.exc_info()[0]
+        print
+        print "Please report to xen-devel@lists.xensource.com"
+        raise
+
+    return False, 1
 
 if __name__ == "__main__":
     main()

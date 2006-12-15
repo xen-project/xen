@@ -1,18 +1,30 @@
 /*
  * fbif.h -- Xen virtual frame buffer device
  *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ *
  * Copyright (C) 2005 Anthony Liguori <aliguori@us.ibm.com>
  * Copyright (C) 2006 Red Hat, Inc., Markus Armbruster <armbru@redhat.com>
- *
- *  This file is subject to the terms and conditions of the GNU General Public
- *  License. See the file COPYING in the main directory of this archive for
- *  more details.
  */
 
 #ifndef __XEN_PUBLIC_IO_FBIF_H__
 #define __XEN_PUBLIC_IO_FBIF_H__
-
-#include <asm/types.h>
 
 /* Out events (frontend -> backend) */
 
@@ -31,20 +43,20 @@
 
 struct xenfb_update
 {
-	__u8 type;		/* XENFB_TYPE_UPDATE */
-	__s32 x;		/* source x */
-	__s32 y;		/* source y */
-	__s32 width;		/* rect width */
-	__s32 height;		/* rect height */
+    uint8_t type;    /* XENFB_TYPE_UPDATE */
+    int32_t x;      /* source x */
+    int32_t y;      /* source y */
+    int32_t width;  /* rect width */
+    int32_t height; /* rect height */
 };
 
 #define XENFB_OUT_EVENT_SIZE 40
 
 union xenfb_out_event
 {
-	__u8 type;
-	struct xenfb_update update;
-	char pad[XENFB_OUT_EVENT_SIZE];
+    uint8_t type;
+    struct xenfb_update update;
+    char pad[XENFB_OUT_EVENT_SIZE];
 };
 
 /* In events (backend -> frontend) */
@@ -58,8 +70,8 @@ union xenfb_out_event
 
 union xenfb_in_event
 {
-	__u8 type;
-	char pad[XENFB_IN_EVENT_SIZE];
+    uint8_t type;
+    char pad[XENFB_IN_EVENT_SIZE];
 };
 
 /* shared page */
@@ -82,25 +94,25 @@ union xenfb_in_event
 
 struct xenfb_page
 {
-	__u32 in_cons, in_prod;
-	__u32 out_cons, out_prod;
+    uint32_t in_cons, in_prod;
+    uint32_t out_cons, out_prod;
 
-	__s32 width;         /* the width of the framebuffer (in pixels) */
-	__s32 height;        /* the height of the framebuffer (in pixels) */
-	__u32 line_length;   /* the length of a row of pixels (in bytes) */
-	__u32 mem_length;    /* the length of the framebuffer (in bytes) */
-	__u8 depth;          /* the depth of a pixel (in bits) */
+    int32_t width;          /* the width of the framebuffer (in pixels) */
+    int32_t height;         /* the height of the framebuffer (in pixels) */
+    uint32_t line_length;   /* the length of a row of pixels (in bytes) */
+    uint32_t mem_length;    /* the length of the framebuffer (in bytes) */
+    uint8_t depth;          /* the depth of a pixel (in bits) */
 
-	/*
-	 * Framebuffer page directory
-	 *
-	 * Each directory page holds PAGE_SIZE / sizeof(*pd)
-	 * framebuffer pages, and can thus map up to PAGE_SIZE *
-	 * PAGE_SIZE / sizeof(*pd) bytes.  With PAGE_SIZE == 4096 and
-	 * sizeof(unsigned long) == 4, that's 4 Megs.  Two directory
-	 * pages should be enough for a while.
-	 */
-	unsigned long pd[2];
+    /*
+     * Framebuffer page directory
+     *
+     * Each directory page holds PAGE_SIZE / sizeof(*pd)
+     * framebuffer pages, and can thus map up to PAGE_SIZE *
+     * PAGE_SIZE / sizeof(*pd) bytes.  With PAGE_SIZE == 4096 and
+     * sizeof(unsigned long) == 4, that's 4 Megs.  Two directory
+     * pages should be enough for a while.
+     */
+    unsigned long pd[2];
 };
 
 /*
@@ -114,3 +126,13 @@ struct xenfb_page
 #endif
 
 #endif
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

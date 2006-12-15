@@ -32,7 +32,7 @@
 #define TRC_SCHED   0x0002f000    /* Xen Scheduler trace      */
 #define TRC_DOM0OP  0x0004f000    /* Xen DOM0 operation trace */
 #define TRC_VMX     0x0008f000    /* Xen VMX trace            */
-#define TRC_MEM     0x000af000    /* Xen memory trace         */
+#define TRC_MEM     0x0010f000    /* Xen memory trace         */
 #define TRC_ALL     0xfffff000
 
 /* Trace subclasses */

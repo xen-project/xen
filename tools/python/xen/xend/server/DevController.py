@@ -19,12 +19,14 @@
 from threading import Event
 import types
 
-from xen.xend import sxp
+from xen.xend import sxp, XendRoot
 from xen.xend.XendError import VmError
 from xen.xend.XendLogging import log
 
 from xen.xend.xenstore.xstransact import xstransact, complete
 from xen.xend.xenstore.xswatch import xswatch
+
+import os
 
 DEVICE_CREATE_TIMEOUT = 100
 HOTPLUG_STATUS_NODE = "hotplug-status"
@@ -47,6 +49,8 @@ xenbusState = {
     'Closing'      : 5,
     'Closed'       : 6,
     }
+
+xroot = XendRoot.instance()
 
 xenbusState.update(dict(zip(xenbusState.values(), xenbusState.keys())))
 
@@ -151,13 +155,13 @@ class DevController:
         status = self.waitForBackend(devid)
 
         if status == Timeout:
-            self.destroyDevice(devid)
+            self.destroyDevice(devid, False)
             raise VmError("Device %s (%s) could not be connected. "
                           "Hotplug scripts not working." %
                           (devid, self.deviceClass))
 
         elif status == Error:
-            self.destroyDevice(devid)
+            self.destroyDevice(devid, False)
             raise VmError("Device %s (%s) could not be connected. "
                           "Backend device not found." %
                           (devid, self.deviceClass))
@@ -176,7 +180,7 @@ class DevController:
             if not err:
                 err = "Busy."
                 
-            self.destroyDevice(devid)
+            self.destroyDevice(devid, False)
             raise VmError("Device %s (%s) could not be connected.\n%s" %
                           (devid, self.deviceClass, err))
 
@@ -191,7 +195,7 @@ class DevController:
         raise VmError('%s devices may not be reconfigured' % self.deviceClass)
 
 
-    def destroyDevice(self, devid):
+    def destroyDevice(self, devid, force):
         """Destroy the specified device.
 
         @param devid The device ID, or something device-specific from which
@@ -211,6 +215,13 @@ class DevController:
         # drivers, so this ordering avoids a race).
         self.writeBackend(devid, 'online', "0")
         self.writeBackend(devid, 'state', str(xenbusState['Closing']))
+
+        if force:
+            frontpath = self.frontendPath(devid)
+            backpath = xstransact.Read(frontpath, "backend")
+            if backpath:
+                xstransact.Remove(backpath)
+            xstransact.Remove(frontpath)
 
 
     def configurations(self):
@@ -313,6 +324,16 @@ class DevController:
                       Make sure that the migration has finished and only
                       then return from the call.
         """
+        tool = xroot.get_external_migration_tool()
+        if tool:
+            log.info("Calling external migration tool for step %d" % step)
+            fd = os.popen("%s -type %s -step %d -host %s -domname %s" %
+                          (tool, self.deviceClass, step, dst, domName))
+            for line in fd:
+                log.info(line.rstrip())
+            rc = fd.close()
+            if rc:
+                raise VmError('Migration tool returned %d' % (rc >> 8))
         return 0
 
 
@@ -320,6 +341,16 @@ class DevController:
         """ Recover from device migration. The given step was the
             last one that was successfully executed.
         """
+        tool = xroot.get_external_migration_tool()
+        if tool:
+            log.info("Calling external migration tool")
+            fd = os.popen("%s -type %s -step %d -host %s -domname %s -recover" %
+                          (tool, self.deviceClass, step, dst, domName))
+            for line in fd:
+                log.info(line.rstrip())
+            rc = fd.close()
+            if rc:
+                raise VmError('Migration tool returned %d' % (rc >> 8))
         return 0
 
 

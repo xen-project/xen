@@ -103,7 +103,7 @@ XENAPI_HVM_CFG = {
     'platform_keymap' : 'keymap',
 }    
 
-# List of XendConfig configuration keys that have no equivalent
+# List of XendConfig configuration keys that have no direct equivalent
 # in the old world.
 
 XENAPI_CFG_TYPES = {
@@ -132,19 +132,18 @@ XENAPI_CFG_TYPES = {
     'actions_after_crash': str,
     'tpm_instance': int,
     'tpm_backend': int,    
-    'bios_boot': str,
+    'PV_bootloader': str,
+    'PV_kernel': str,
+    'PV_initrd': str,
+    'PV_args': str,
+    'PV_bootloader_args': str,
+    'HVM_boot': str,
     'platform_std_vga': bool0,
     'platform_serial': str,
     'platform_localtime': bool0,
     'platform_clock_offset': bool0,
     'platform_enable_audio': bool0,
     'platform_keymap': str,
-    'boot_method': str,
-    'builder': str,
-    'kernel_kernel': str,
-    'kernel_initrd': str,
-    'kernel_args': str,
-    'grub_cmdline': str,
     'pci_bus': str,
     'tools_version': dict,
     'otherconfig': dict,
@@ -160,8 +159,6 @@ LEGACY_UNSUPPORTED_BY_XENAPI_CFG = [
     'vcpu_avail',
     'cpu_weight',
     'cpu_cap',
-    'bootloader',
-    'bootloader_args',
     'features',
     # read/write
     'on_xend_start',
@@ -188,8 +185,6 @@ LEGACY_CFG_TYPES = {
     'cpu_cap':         int,
     'cpu_weight':      int,
     'cpu_time':      float,
-    'bootloader':      str,
-    'bootloader_args': str,
     'features':        str,
     'localtime':       int,
     'name':        str,
@@ -331,16 +326,18 @@ class XendConfig(dict):
             'actions_after_crash': 'restart',
             'actions_after_suspend': '',
             'features': '',
-            'builder': 'linux',
+            'PV_bootloader': '',
+            'PV_kernel': '',
+            'PV_ramdisk': '',
+            'PV_args': '',
+            'PV_bootloader_args': '',
+            'HVM_boot': '',
             'memory_static_min': 0,
             'memory_dynamic_min': 0,
             'shadow_memory': 0,
             'memory_static_max': 0,
             'memory_dynamic_max': 0,
             'memory_actual': 0,
-            'boot_method': None,
-            'bootloader': None,
-            'bootloader_args': None,
             'devices': {},
             'image': {},
             'security': None,
@@ -353,6 +350,7 @@ class XendConfig(dict):
             'online_vcpus': 1,
             'max_vcpu_id': 0,
             'vcpu_avail': 1,
+            'console_refs': [],
             'vif_refs': [],
             'vbd_refs': [],
             'vtpm_refs': [],
@@ -382,10 +380,6 @@ class XendConfig(dict):
                 raise XendConfigError('Invalid event handling mode: ' +
                                       event)
 
-    def _builder_sanity_check(self):
-        if self['builder'] not in ('hvm', 'linux'):
-            raise XendConfigError('Invalid builder configuration')
-
     def _vcpus_sanity_check(self):
         if self.get('vcpus_number') != None:
             self['vcpu_avail'] = (1 << self['vcpus_number']) - 1
@@ -397,7 +391,6 @@ class XendConfig(dict):
     def validate(self):
         self._memory_sanity_check()
         self._actions_sanity_check()
-        self._builder_sanity_check()
         self._vcpus_sanity_check()
         self._uuid_sanity_check()
 
@@ -597,38 +590,18 @@ class XendConfig(dict):
             except KeyError:
                 pass
 
-        # Convert Legacy "image" config to Xen API kernel_*
-        # configuration
+        self['PV_bootloader']      = cfg.get('bootloader',      '')
+        self['PV_bootloader_args'] = cfg.get('bootloader_args', '')
+        
         image_sxp = sxp.child_value(sxp_cfg, 'image', [])
         if image_sxp:
-            self['kernel_kernel'] = sxp.child_value(image_sxp, 'kernel','')
-            self['kernel_initrd'] = sxp.child_value(image_sxp, 'ramdisk','')
-            kernel_args = sxp.child_value(image_sxp, 'args', '')
-
-            # attempt to extract extra arguments from SXP config
-            arg_ip = sxp.child_value(image_sxp, 'ip')
-            if arg_ip and not re.search(r'ip=[^ ]+', kernel_args):
-                kernel_args += ' ip=%s' % arg_ip
-            arg_root = sxp.child_value(image_sxp, 'root')
-            if arg_root and not re.search(r'root=[^ ]+', kernel_args):
-                kernel_args += ' root=%s' % arg_root
-            
-            self['kernel_args'] = kernel_args
+            self.update_with_image_sxp(image_sxp)
 
         # Convert Legacy HVM parameters to Xen API configuration
         self['platform_std_vga'] = bool0(cfg.get('stdvga', 0))
         self['platform_serial'] = str(cfg.get('serial', ''))
         self['platform_localtime'] = bool0(cfg.get('localtime', 0))
         self['platform_enable_audio'] = bool0(cfg.get('soundhw', 0))
-
-        # Convert path to bootloader to boot_method
-        if not cfg.get('bootloader'):
-            if self.get('kernel_kernel','').endswith('hvmloader'):
-                self['boot_method'] = 'bios'
-            else:
-                self['boot_method'] = 'kernel_external'
-        else:
-            self['boot_method'] = 'grub'
 
         # make sure a sane maximum is set
         if self['memory_static_max'] <= 0:
@@ -643,6 +616,7 @@ class XendConfig(dict):
         # set device references in the configuration
         self['devices'] = cfg.get('devices', {})
         
+        self['console_refs'] = []
         self['vif_refs'] = []
         self['vbd_refs'] = []
         self['vtpm_refs'] = []
@@ -703,9 +677,6 @@ class XendConfig(dict):
         if backend:
             self['backend'] = backend
 
-        if self['image'].has_key('hvm'):
-            self['builder'] = 'hvm'
-            
         # Parse and convert other Non Xen API parameters.
         def _set_cfg_if_exists(sxp_arg):
             val = sxp.child_value(sxp_cfg, sxp_arg)
@@ -715,7 +686,6 @@ class XendConfig(dict):
                 else:
                     self[sxp_arg] = val
 
-        _set_cfg_if_exists('bootloader')
         _set_cfg_if_exists('shadow_memory')
         _set_cfg_if_exists('security')
         _set_cfg_if_exists('features')
@@ -739,8 +709,9 @@ class XendConfig(dict):
         """
 
         # populate image
-        self['image']['type'] = self['builder']
-        if self['builder'] == 'hvm':
+        hvm = self['HVM_boot'] != ''
+        self['image']['type'] = hvm and 'hvm' or 'linux'
+        if hvm:
             self['image']['hvm'] = {}
             for xapi, cfgapi in XENAPI_HVM_CFG.items():
                 self['image']['hvm'][cfgapi] = self[xapi]
@@ -778,8 +749,10 @@ class XendConfig(dict):
         @type xapi: dict
         """
         for key, val in xapi.items():
-            key = key.lower()
             type_conv = XENAPI_CFG_TYPES.get(key)
+            if type_conv is None:
+                key = key.lower()
+                type_conv = XENAPI_CFG_TYPES.get(key)
             if callable(type_conv):
                 self[key] = type_conv(val)
             else:
@@ -1098,8 +1071,8 @@ class XendConfig(dict):
     def update_with_image_sxp(self, image_sxp):
         # Convert Legacy "image" config to Xen API kernel_*
         # configuration
-        self['kernel_kernel'] = sxp.child_value(image_sxp, 'kernel','')
-        self['kernel_initrd'] = sxp.child_value(image_sxp, 'ramdisk','')
+        self['PV_kernel'] = sxp.child_value(image_sxp, 'kernel','')
+        self['PV_ramdisk'] = sxp.child_value(image_sxp, 'ramdisk','')
         kernel_args = sxp.child_value(image_sxp, 'args', '')
         
         # attempt to extract extra arguments from SXP config
@@ -1109,7 +1082,7 @@ class XendConfig(dict):
         arg_root = sxp.child_value(image_sxp, 'root')
         if arg_root and not re.search(r'root=', kernel_args):
             kernel_args += ' root=%s' % arg_root
-        self['kernel_args'] = kernel_args
+        self['PV_args'] = kernel_args
 
         # Store image SXP in python dictionary format
         image = {}

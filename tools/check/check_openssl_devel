@@ -1,11 +1,14 @@
-#!/bin/bash
+#!/bin/sh
 # CHECK-BUILD
 
-function error {
-    echo
-    echo "  *** Check for openssl headers FAILED"
-    exit 1
-}
+RC=0
 
 set -e
-[ -e /usr/include/openssl/md5.h ] || error
+test -r /usr/include/openssl/md5.h || RC=1 
+
+if test ${RC} -ne 0; then
+	echo
+	echo " *** Check for openssl headers FAILED"
+fi
+
+exit ${RC}

@@ -68,6 +68,7 @@ class ImageHandler:
     def __init__(self, vm, vmConfig, imageConfig, deviceConfig):
         self.vm = vm
 
+        self.bootloader = None
         self.kernel = None
         self.ramdisk = None
         self.cmdline = None
@@ -76,9 +77,10 @@ class ImageHandler:
 
     def configure(self, vmConfig, imageConfig, _):
         """Config actions common to all unix-like domains."""
-        self.kernel = vmConfig['kernel_kernel']
-        self.cmdline = vmConfig['kernel_args']
-        self.ramdisk = vmConfig['kernel_initrd']
+        self.bootloader = vmConfig['PV_bootloader']
+        self.kernel = vmConfig['PV_kernel']
+        self.cmdline = vmConfig['PV_args']
+        self.ramdisk = vmConfig['PV_ramdisk']
         self.vm.storeVm(("image/ostype", self.ostype),
                         ("image/kernel", self.kernel),
                         ("image/cmdline", self.cmdline),
@@ -86,8 +88,9 @@ class ImageHandler:
 
 
     def cleanupBootloading(self):
-        self.unlink(self.kernel)
-        self.unlink(self.ramdisk)
+        if self.bootloader:
+            self.unlink(self.kernel)
+            self.unlink(self.ramdisk)
 
 
     def unlink(self, f):
@@ -144,6 +147,14 @@ class ImageHandler:
         architecture- or image-specific code may override this to
         add headroom where necessary."""
         return self.getRequiredAvailableMemory(self.vm.getMemoryTarget())
+
+    def getRequiredMaximumReservation(self):
+        """@param mem_kb The maximum possible memory, in KiB.
+        @return The corresponding required amount of memory to be free, also
+        in KiB. This is normally the same as getRequiredAvailableMemory, but
+        architecture- or image-specific code may override this to
+        add headroom where necessary."""
+        return self.getRequiredAvailableMemory(self.vm.getMemoryMaximum())
 
     def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
         """@param shadow_mem_kb The configured shadow memory, in KiB.
@@ -234,6 +245,60 @@ class PPC_LinuxImageHandler(LinuxImageHandler):
                               ramdisk        = self.ramdisk,
                               features       = self.vm.getFeatures(),
                               arch_args      = devtree.to_bin())
+
+    def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
+        """@param shadow_mem_kb The configured shadow memory, in KiB.
+        @param maxmem_kb The configured maxmem, in KiB.
+        @return The corresponding required amount of shadow memory, also in
+        KiB.
+        PowerPC currently uses "shadow memory" to refer to the hash table."""
+        return max(maxmem_kb / 64, shadow_mem_kb)
+
+
+class PPC_ProseImageHandler(LinuxImageHandler):
+
+    ostype = "prose"
+
+    def configure(self, imageConfig, deviceConfig):
+        LinuxImageHandler.configure(self, imageConfig, deviceConfig)
+        self.imageConfig = imageConfig
+
+    def buildDomain(self):
+        store_evtchn = self.vm.getStorePort()
+        console_evtchn = self.vm.getConsolePort()
+
+        mem_mb = self.getRequiredInitialReservation() / 1024
+
+        log.debug("dom            = %d", self.vm.getDomid())
+        log.debug("memsize        = %d", mem_mb)
+        log.debug("image          = %s", self.kernel)
+        log.debug("store_evtchn   = %d", store_evtchn)
+        log.debug("console_evtchn = %d", console_evtchn)
+        log.debug("cmdline        = %s", self.cmdline)
+        log.debug("ramdisk        = %s", self.ramdisk)
+        log.debug("vcpus          = %d", self.vm.getVCpuCount())
+        log.debug("features       = %s", self.vm.getFeatures())
+
+        devtree = FlatDeviceTree.build(self)
+
+        return xc.arch_prose_build(dom            = self.vm.getDomid(),
+                                   memsize        = mem_mb,
+                                   image          = self.kernel,
+                                   store_evtchn   = store_evtchn,
+                                   console_evtchn = console_evtchn,
+                                   cmdline        = self.cmdline,
+                                   ramdisk        = self.ramdisk,
+                                   features       = self.vm.getFeatures(),
+                                   arch_args      = devtree.to_bin())
+
+    def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
+        """@param shadow_mem_kb The configured shadow memory, in KiB.
+        @param maxmem_kb The configured maxmem, in KiB.
+        @return The corresponding required amount of shadow memory, also in
+        KiB.
+        PowerPC currently uses "shadow memory" to refer to the hash table."""
+        return max(maxmem_kb / 64, shadow_mem_kb)
+
 
 class HVMImageHandler(ImageHandler):
 
@@ -539,6 +604,9 @@ class X86_HVM_ImageHandler(HVMImageHandler):
     def getRequiredInitialReservation(self):
         return self.vm.getMemoryTarget()
 
+    def getRequiredMaximumReservation(self):
+        return self.vm.getMemoryMaximum()
+
     def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
         # 256 pages (1MB) per vcpu,
         # plus 1 page per MiB of RAM for the P2M map,
@@ -553,13 +621,14 @@ class X86_Linux_ImageHandler(LinuxImageHandler):
     def buildDomain(self):
         # set physical mapping limit
         # add an 8MB slack to balance backend allocations.
-        mem_kb = self.getRequiredInitialReservation() + (8 * 1024)
+        mem_kb = self.getRequiredMaximumReservation() + (8 * 1024)
         xc.domain_set_memmap_limit(self.vm.getDomid(), mem_kb)
         return LinuxImageHandler.buildDomain(self)
 
 _handlers = {
     "powerpc": {
         "linux": PPC_LinuxImageHandler,
+        "prose": PPC_ProseImageHandler,
     },
     "ia64": {
         "linux": LinuxImageHandler,

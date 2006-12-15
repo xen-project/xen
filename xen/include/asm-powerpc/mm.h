@@ -13,9 +13,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005
+ * Copyright (C) IBM Corp. 2005, 2006
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
+ *          Jimi Xenidis <jimix@watson.ibm.com>
  */
 
 #ifndef _ASM_MM_H_
@@ -25,10 +26,10 @@
 #include <xen/list.h>
 #include <xen/types.h>
 #include <xen/mm.h>
-#include <asm/misc.h>
 #include <asm/system.h>
 #include <asm/flushtlb.h>
-#include <asm/uaccess.h>
+#include <asm/page.h>
+#include <asm/debugger.h>
 
 #define memguard_guard_range(_p,_l)    ((void)0)
 #define memguard_unguard_range(_p,_l)    ((void)0)
@@ -86,39 +87,38 @@ struct page_extents {
     /* page extent */
     struct page_info *pg;
     uint order;
-    ulong pfn;
 };
 
  /* The following page types are MUTUALLY EXCLUSIVE. */
-#define PGT_none            (0<<29) /* no special uses of this page */
-#define PGT_RMA             (1<<29) /* This page is an RMA page? */
-#define PGT_writable_page   (7<<29) /* has writable mappings of this page? */
-#define PGT_type_mask       (7<<29) /* Bits 29-31. */
+#define PGT_none            (0UL<<29) /* no special uses of this page */
+#define PGT_RMA             (1UL<<29) /* This page is an RMA page? */
+#define PGT_writable_page   (7UL<<29) /* has writable mappings of this page? */
+#define PGT_type_mask       (7UL<<29) /* Bits 29-31. */
 
  /* Owning guest has pinned this page to its current type? */
 #define _PGT_pinned         28
-#define PGT_pinned          (1U<<_PGT_pinned)
+#define PGT_pinned          (1UL<<_PGT_pinned)
  /* Has this page been validated for use as its current type? */
 #define _PGT_validated      27
-#define PGT_validated       (1U<<_PGT_validated)
+#define PGT_validated       (1UL<<_PGT_validated)
 
  /* 16-bit count of uses of this frame as its current type. */
-#define PGT_count_mask      ((1U<<16)-1)
+#define PGT_count_mask      ((1UL<<16)-1)
 
  /* Cleared when the owning guest 'frees' this page. */
 #define _PGC_allocated      31
-#define PGC_allocated       (1U<<_PGC_allocated)
+#define PGC_allocated       (1UL<<_PGC_allocated)
  /* Set on a *guest* page to mark it out-of-sync with its shadow */
 #define _PGC_out_of_sync     30
-#define PGC_out_of_sync     (1U<<_PGC_out_of_sync)
+#define PGC_out_of_sync     (1UL<<_PGC_out_of_sync)
  /* Set when is using a page as a page table */
 #define _PGC_page_table      29
-#define PGC_page_table      (1U<<_PGC_page_table)
+#define PGC_page_table      (1UL<<_PGC_page_table)
 /* Set when using page for RMA */
 #define _PGC_page_RMA      28
-#define PGC_page_RMA      (1U<<_PGC_page_RMA)
+#define PGC_page_RMA      (1UL<<_PGC_page_RMA)
  /* 29-bit count of references to this frame. */
-#define PGC_count_mask      ((1U<<28)-1)
+#define PGC_count_mask      ((1UL<<28)-1)
 
 #define IS_XEN_HEAP_FRAME(_pfn) (page_to_maddr(_pfn) < xenheap_phys_end)
 
@@ -132,6 +132,13 @@ static inline u32 pickle_domptr(struct domain *domain)
 
 #define page_get_owner(_p)    (unpickle_domptr((_p)->u.inuse._domain))
 #define page_set_owner(_p,_d) ((_p)->u.inuse._domain = pickle_domptr(_d))
+
+#define XENSHARE_writable 0
+#define XENSHARE_readonly 1
+extern void share_xen_page_with_guest(
+    struct page_info *page, struct domain *d, int readonly);
+extern void share_xen_page_with_privileged_guests(
+    struct page_info *page, int readonly);
 
 extern struct page_info *frame_table;
 extern unsigned long max_page;
@@ -218,16 +225,18 @@ typedef struct {
 } vm_assist_info_t;
 extern vm_assist_info_t vm_assist_info[];
 
-#define share_xen_page_with_guest(p, d, r) do { } while (0)
-#define share_xen_page_with_privileged_guests(p, r) do { } while (0)
 
 /* hope that accesses to this will fail spectacularly */
-#define machine_to_phys_mapping ((u32 *)-1UL)
+#undef machine_to_phys_mapping
+#define INVALID_M2P_ENTRY        (~0UL)
 
-extern int update_grant_va_mapping(unsigned long va,
-                                   unsigned long val,
-                                   struct domain *,
-                                   struct vcpu *);
+/* do nothing, its all calculated */
+#define set_gpfn_from_mfn(mfn, pfn) do { } while (0)
+#define get_gpfn_from_mfn(mfn) (mfn)
+
+extern unsigned long mfn_to_gmfn(struct domain *d, unsigned long mfn);
+
+extern unsigned long paddr_to_maddr(unsigned long paddr);
 
 #define INVALID_MFN (~0UL)
 #define PFN_TYPE_NONE 0
@@ -235,29 +244,48 @@ extern int update_grant_va_mapping(unsigned long va,
 #define PFN_TYPE_LOGICAL 2
 #define PFN_TYPE_IO 3
 #define PFN_TYPE_FOREIGN 4
+#define PFN_TYPE_GNTTAB 5
 
 extern ulong pfn2mfn(struct domain *d, ulong pfn, int *type);
+static inline unsigned long gmfn_to_mfn(struct domain *d, unsigned long gmfn)
+{
+    int mtype;
+    ulong mfn;
+    
+    mfn = pfn2mfn(d, gmfn, &mtype);
+    if (mfn != INVALID_MFN) {
+        switch (mtype) {
+        case PFN_TYPE_RMA:
+        case PFN_TYPE_LOGICAL:
+            break;
+        default:
+            WARN();
+            mfn = INVALID_MFN;
+            break;
+        }
+    }
+    return mfn;
+}
+
+extern int update_grant_va_mapping(unsigned long va,
+                                   unsigned long val,
+                                   struct domain *,
+                                   struct vcpu *);
 
 /* Arch-specific portion of memory_op hypercall. */
 long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg);
-
-/* XXX implement me? */
-#define set_gpfn_from_mfn(mfn, pfn) do { } while (0)
-/* XXX only used for debug print right now... */
-#define get_gpfn_from_mfn(mfn) (mfn)
-
-static inline unsigned long gmfn_to_mfn(struct domain *d, unsigned long gmfn)
-{
-	return pfn2mfn(d, gmfn, NULL);
-}
-
-#define mfn_to_gmfn(_d, mfn) (mfn)
 
 extern int allocate_rma(struct domain *d, unsigned int order_pages);
 extern uint allocate_extents(struct domain *d, uint nrpages, uint rma_nrpages);
 extern void free_extents(struct domain *d);
 
+extern int arch_domain_add_extent(struct domain *d, struct page_info *page,
+        int order);
+
 extern int steal_page(struct domain *d, struct page_info *page,
                         unsigned int memflags);
 
+/* XXX these just exist until we can stop #including x86 code */
+#define access_ok(addr,size) 1
+#define array_access_ok(addr,count,size) 1
 #endif

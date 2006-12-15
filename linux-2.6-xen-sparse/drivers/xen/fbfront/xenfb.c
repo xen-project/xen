@@ -105,7 +105,6 @@ static int xenfb_queue_full(struct xenfb_info *info)
 
 static void xenfb_update_screen(struct xenfb_info *info)
 {
-	unsigned long flags;
 	int y1, y2, x1, x2;
 	struct xenfb_mapping *map;
 
@@ -114,7 +113,7 @@ static void xenfb_update_screen(struct xenfb_info *info)
 	if (xenfb_queue_full(info))
 		return;
 
-	spin_lock_irqsave(&info->mm_lock, flags);
+	spin_lock(&info->mm_lock);
 
 	y1 = info->y1;
 	y2 = info->y2;
@@ -131,7 +130,7 @@ static void xenfb_update_screen(struct xenfb_info *info)
 		map->faults = 0;
 	}
 
-	spin_unlock_irqrestore(&info->mm_lock, flags);
+	spin_unlock(&info->mm_lock);
 
 	xenfb_do_update(info, x1, y1, x2 - x1, y2 - y1);
 }
@@ -214,11 +213,9 @@ static void __xenfb_refresh(struct xenfb_info *info,
 static void xenfb_refresh(struct xenfb_info *info,
 			  int x1, int y1, int w, int h)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&info->mm_lock, flags);
+	spin_lock(&info->mm_lock);
 	__xenfb_refresh(info, x1, y1, w, h);
-	spin_unlock_irqrestore(&info->mm_lock, flags);
+	spin_unlock(&info->mm_lock);
 }
 
 static void xenfb_fillrect(struct fb_info *p, const struct fb_fillrect *rect)
@@ -255,14 +252,13 @@ static void xenfb_vm_close(struct vm_area_struct *vma)
 {
 	struct xenfb_mapping *map = vma->vm_private_data;
 	struct xenfb_info *info = map->info;
-	unsigned long flags;
 
-	spin_lock_irqsave(&info->mm_lock, flags);
+	spin_lock(&info->mm_lock);
 	if (atomic_dec_and_test(&map->map_refs)) {
 		list_del(&map->link);
 		kfree(map);
 	}
-	spin_unlock_irqrestore(&info->mm_lock, flags);
+	spin_unlock(&info->mm_lock);
 }
 
 static struct page *xenfb_vm_nopage(struct vm_area_struct *vma,
@@ -271,14 +267,13 @@ static struct page *xenfb_vm_nopage(struct vm_area_struct *vma,
 	struct xenfb_mapping *map = vma->vm_private_data;
 	struct xenfb_info *info = map->info;
 	int pgnr = (vaddr - vma->vm_start) >> PAGE_SHIFT;
-	unsigned long flags;
 	struct page *page;
 	int y1, y2;
 
 	if (pgnr >= info->nr_pages)
 		return NOPAGE_SIGBUS;
 
-	spin_lock_irqsave(&info->mm_lock, flags);
+	spin_lock(&info->mm_lock);
 	page = info->pages[pgnr];
 	get_page(page);
 	map->faults++;
@@ -288,7 +283,7 @@ static struct page *xenfb_vm_nopage(struct vm_area_struct *vma,
 	if (y2 > info->fb_info->var.yres)
 		y2 = info->fb_info->var.yres;
 	__xenfb_refresh(info, 0, y1, info->fb_info->var.xres, y2 - y1);
-	spin_unlock_irqrestore(&info->mm_lock, flags);
+	spin_unlock(&info->mm_lock);
 
 	if (type)
 		*type = VM_FAULT_MINOR;
@@ -305,7 +300,6 @@ static struct vm_operations_struct xenfb_vm_ops = {
 static int xenfb_mmap(struct fb_info *fb_info, struct vm_area_struct *vma)
 {
 	struct xenfb_info *info = fb_info->par;
-	unsigned long flags;
 	struct xenfb_mapping *map;
 	int map_pages;
 
@@ -329,9 +323,9 @@ static int xenfb_mmap(struct fb_info *fb_info, struct vm_area_struct *vma)
 	map->info = info;
 	atomic_set(&map->map_refs, 1);
 
-	spin_lock_irqsave(&info->mm_lock, flags);
+	spin_lock(&info->mm_lock);
 	list_add(&map->link, &info->mappings);
-	spin_unlock_irqrestore(&info->mm_lock, flags);
+	spin_unlock(&info->mm_lock);
 
 	vma->vm_ops = &xenfb_vm_ops;
 	vma->vm_flags |= (VM_DONTEXPAND | VM_RESERVED);

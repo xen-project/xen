@@ -160,12 +160,9 @@ class SrvDomain(SrvDir):
         return val
 
     def op_maxmem_set(self, _, req):
-        fn = FormFn(self.xd.domain_maxmem_set,
-                    [['dom',    'int'],
-                     ['memory', 'int']])
-        val = fn(req.args, {'dom': self.dom.domid})
-        return val
-
+        return self.call(self.dom.setMemoryMaximum,
+                         [['memory', 'int']],
+                         req)
     
     def call(self, fn, args, req):
         return FormFn(fn, args)(req.args)

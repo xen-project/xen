@@ -487,6 +487,8 @@ int xenbus_probe_node(struct xen_bus_type *bus,
 	if (!xendev)
 		return -ENOMEM;
 
+	xendev->state = XenbusStateInitialising;
+
 	/* Copy the strings into the extra space. */
 
 	tmpstring = (char *)(xendev + 1);

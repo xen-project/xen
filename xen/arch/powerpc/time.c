@@ -25,7 +25,7 @@
 #include <xen/sched.h>
 #include <asm/processor.h>
 #include <asm/current.h>
-#include <asm/misc.h>
+#include <asm/debugger.h>
 
 #define Dprintk(x...) printk(x)
 
@@ -93,5 +93,4 @@ void do_settime(unsigned long secs, unsigned long usecs, u64 system_time_base)
 
 void update_vcpu_system_time(struct vcpu *v)
 {
-    unimplemented();
 }

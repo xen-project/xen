@@ -37,7 +37,7 @@ extern void __init init_cpu_to_node(void);
 
 static inline void clear_node_cpumask(int cpu)
 {
-	clear_bit(cpu, &node_to_cpumask[cpu_to_node(cpu)]);
+	cpu_clear(cpu, node_to_cpumask[cpu_to_node(cpu)]);
 }
 
 /* Simple perfect hash to map physical addresses to node numbers */

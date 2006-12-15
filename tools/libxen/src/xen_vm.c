@@ -20,7 +20,6 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-#include "xen_boot_type_internal.h"
 #include "xen_common.h"
 #include "xen_console.h"
 #include "xen_cpu_feature.h"
@@ -67,6 +66,9 @@ static const struct_member xen_vm_record_struct_members[] =
         { .key = "is_a_template",
           .type = &abstract_type_bool,
           .offset = offsetof(xen_vm_record, is_a_template) },
+        { .key = "auto_power_on",
+          .type = &abstract_type_bool,
+          .offset = offsetof(xen_vm_record, auto_power_on) },
         { .key = "resident_on",
           .type = &abstract_type_ref,
           .offset = offsetof(xen_vm_record, resident_on) },
@@ -133,9 +135,24 @@ static const struct_member xen_vm_record_struct_members[] =
         { .key = "VTPMs",
           .type = &abstract_type_ref_set,
           .offset = offsetof(xen_vm_record, vtpms) },
-        { .key = "bios_boot",
+        { .key = "PV_bootloader",
           .type = &abstract_type_string,
-          .offset = offsetof(xen_vm_record, bios_boot) },
+          .offset = offsetof(xen_vm_record, pv_bootloader) },
+        { .key = "PV_kernel",
+          .type = &abstract_type_string,
+          .offset = offsetof(xen_vm_record, pv_kernel) },
+        { .key = "PV_ramdisk",
+          .type = &abstract_type_string,
+          .offset = offsetof(xen_vm_record, pv_ramdisk) },
+        { .key = "PV_args",
+          .type = &abstract_type_string,
+          .offset = offsetof(xen_vm_record, pv_args) },
+        { .key = "PV_bootloader_args",
+          .type = &abstract_type_string,
+          .offset = offsetof(xen_vm_record, pv_bootloader_args) },
+        { .key = "HVM_boot",
+          .type = &abstract_type_string,
+          .offset = offsetof(xen_vm_record, hvm_boot) },
         { .key = "platform_std_VGA",
           .type = &abstract_type_bool,
           .offset = offsetof(xen_vm_record, platform_std_vga) },
@@ -151,24 +168,6 @@ static const struct_member xen_vm_record_struct_members[] =
         { .key = "platform_enable_audio",
           .type = &abstract_type_bool,
           .offset = offsetof(xen_vm_record, platform_enable_audio) },
-        { .key = "builder",
-          .type = &abstract_type_string,
-          .offset = offsetof(xen_vm_record, builder) },
-        { .key = "boot_method",
-          .type = &xen_boot_type_abstract_type_,
-          .offset = offsetof(xen_vm_record, boot_method) },
-        { .key = "kernel_kernel",
-          .type = &abstract_type_string,
-          .offset = offsetof(xen_vm_record, kernel_kernel) },
-        { .key = "kernel_initrd",
-          .type = &abstract_type_string,
-          .offset = offsetof(xen_vm_record, kernel_initrd) },
-        { .key = "kernel_args",
-          .type = &abstract_type_string,
-          .offset = offsetof(xen_vm_record, kernel_args) },
-        { .key = "grub_cmdline",
-          .type = &abstract_type_string,
-          .offset = offsetof(xen_vm_record, grub_cmdline) },
         { .key = "PCI_bus",
           .type = &abstract_type_string,
           .offset = offsetof(xen_vm_record, pci_bus) },
@@ -213,13 +212,13 @@ xen_vm_record_free(xen_vm_record *record)
     xen_vif_record_opt_set_free(record->vifs);
     xen_vbd_record_opt_set_free(record->vbds);
     xen_vtpm_record_opt_set_free(record->vtpms);
-    free(record->bios_boot);
+    free(record->pv_bootloader);
+    free(record->pv_kernel);
+    free(record->pv_ramdisk);
+    free(record->pv_args);
+    free(record->pv_bootloader_args);
+    free(record->hvm_boot);
     free(record->platform_serial);
-    free(record->builder);
-    free(record->kernel_kernel);
-    free(record->kernel_initrd);
-    free(record->kernel_args);
-    free(record->grub_cmdline);
     free(record->pci_bus);
     xen_string_string_map_free(record->tools_version);
     xen_string_string_map_free(record->otherconfig);
@@ -325,9 +324,7 @@ xen_vm_get_power_state(xen_session *session, enum xen_vm_power_state *result, xe
         };
 
     abstract_type result_type = xen_vm_power_state_abstract_type_;
-    char *result_str = NULL;
     XEN_CALL_("VM.get_power_state");
-    *result = xen_vm_power_state_from_string(session, result_str);
     return session->ok;
 }
 
@@ -394,6 +391,22 @@ xen_vm_get_is_a_template(xen_session *session, bool *result, xen_vm vm)
     abstract_type result_type = abstract_type_bool;
 
     XEN_CALL_("VM.get_is_a_template");
+    return session->ok;
+}
+
+
+bool
+xen_vm_get_auto_power_on(xen_session *session, bool *result, xen_vm vm)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm }
+        };
+
+    abstract_type result_type = abstract_type_bool;
+
+    XEN_CALL_("VM.get_auto_power_on");
     return session->ok;
 }
 
@@ -640,9 +653,7 @@ xen_vm_get_actions_after_shutdown(xen_session *session, enum xen_on_normal_exit 
         };
 
     abstract_type result_type = xen_on_normal_exit_abstract_type_;
-    char *result_str = NULL;
     XEN_CALL_("VM.get_actions_after_shutdown");
-    *result = xen_on_normal_exit_from_string(session, result_str);
     return session->ok;
 }
 
@@ -657,9 +668,7 @@ xen_vm_get_actions_after_reboot(xen_session *session, enum xen_on_normal_exit *r
         };
 
     abstract_type result_type = xen_on_normal_exit_abstract_type_;
-    char *result_str = NULL;
     XEN_CALL_("VM.get_actions_after_reboot");
-    *result = xen_on_normal_exit_from_string(session, result_str);
     return session->ok;
 }
 
@@ -674,9 +683,7 @@ xen_vm_get_actions_after_suspend(xen_session *session, enum xen_on_normal_exit *
         };
 
     abstract_type result_type = xen_on_normal_exit_abstract_type_;
-    char *result_str = NULL;
     XEN_CALL_("VM.get_actions_after_suspend");
-    *result = xen_on_normal_exit_from_string(session, result_str);
     return session->ok;
 }
 
@@ -691,9 +698,7 @@ xen_vm_get_actions_after_crash(xen_session *session, enum xen_on_crash_behaviour
         };
 
     abstract_type result_type = xen_on_crash_behaviour_abstract_type_;
-    char *result_str = NULL;
     XEN_CALL_("VM.get_actions_after_crash");
-    *result = xen_on_crash_behaviour_from_string(session, result_str);
     return session->ok;
 }
 
@@ -767,7 +772,7 @@ xen_vm_get_vtpms(xen_session *session, struct xen_vtpm_set **result, xen_vm vm)
 
 
 bool
-xen_vm_get_bios_boot(xen_session *session, char **result, xen_vm vm)
+xen_vm_get_pv_bootloader(xen_session *session, char **result, xen_vm vm)
 {
     abstract_value param_values[] =
         {
@@ -778,7 +783,92 @@ xen_vm_get_bios_boot(xen_session *session, char **result, xen_vm vm)
     abstract_type result_type = abstract_type_string;
 
     *result = NULL;
-    XEN_CALL_("VM.get_bios_boot");
+    XEN_CALL_("VM.get_PV_bootloader");
+    return session->ok;
+}
+
+
+bool
+xen_vm_get_pv_kernel(xen_session *session, char **result, xen_vm vm)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("VM.get_PV_kernel");
+    return session->ok;
+}
+
+
+bool
+xen_vm_get_pv_ramdisk(xen_session *session, char **result, xen_vm vm)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("VM.get_PV_ramdisk");
+    return session->ok;
+}
+
+
+bool
+xen_vm_get_pv_args(xen_session *session, char **result, xen_vm vm)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("VM.get_PV_args");
+    return session->ok;
+}
+
+
+bool
+xen_vm_get_pv_bootloader_args(xen_session *session, char **result, xen_vm vm)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("VM.get_PV_bootloader_args");
+    return session->ok;
+}
+
+
+bool
+xen_vm_get_hvm_boot(xen_session *session, char **result, xen_vm vm)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("VM.get_HVM_boot");
     return session->ok;
 }
 
@@ -860,108 +950,6 @@ xen_vm_get_platform_enable_audio(xen_session *session, bool *result, xen_vm vm)
     abstract_type result_type = abstract_type_bool;
 
     XEN_CALL_("VM.get_platform_enable_audio");
-    return session->ok;
-}
-
-
-bool
-xen_vm_get_builder(xen_session *session, char **result, xen_vm vm)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm }
-        };
-
-    abstract_type result_type = abstract_type_string;
-
-    *result = NULL;
-    XEN_CALL_("VM.get_builder");
-    return session->ok;
-}
-
-
-bool
-xen_vm_get_boot_method(xen_session *session, enum xen_boot_type *result, xen_vm vm)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm }
-        };
-
-    abstract_type result_type = xen_boot_type_abstract_type_;
-    char *result_str = NULL;
-    XEN_CALL_("VM.get_boot_method");
-    *result = xen_boot_type_from_string(session, result_str);
-    return session->ok;
-}
-
-
-bool
-xen_vm_get_kernel_kernel(xen_session *session, char **result, xen_vm vm)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm }
-        };
-
-    abstract_type result_type = abstract_type_string;
-
-    *result = NULL;
-    XEN_CALL_("VM.get_kernel_kernel");
-    return session->ok;
-}
-
-
-bool
-xen_vm_get_kernel_initrd(xen_session *session, char **result, xen_vm vm)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm }
-        };
-
-    abstract_type result_type = abstract_type_string;
-
-    *result = NULL;
-    XEN_CALL_("VM.get_kernel_initrd");
-    return session->ok;
-}
-
-
-bool
-xen_vm_get_kernel_args(xen_session *session, char **result, xen_vm vm)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm }
-        };
-
-    abstract_type result_type = abstract_type_string;
-
-    *result = NULL;
-    XEN_CALL_("VM.get_kernel_args");
-    return session->ok;
-}
-
-
-bool
-xen_vm_get_grub_cmdline(xen_session *session, char **result, xen_vm vm)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm }
-        };
-
-    abstract_type result_type = abstract_type_string;
-
-    *result = NULL;
-    XEN_CALL_("VM.get_grub_cmdline");
     return session->ok;
 }
 
@@ -1082,6 +1070,22 @@ xen_vm_set_is_a_template(xen_session *session, xen_vm vm, bool is_a_template)
 
 
 bool
+xen_vm_set_auto_power_on(xen_session *session, xen_vm vm, bool auto_power_on)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+            { .type = &abstract_type_bool,
+              .u.bool_val = auto_power_on }
+        };
+
+    xen_call_(session, "VM.set_auto_power_on", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
 xen_vm_set_memory_dynamic_max(xen_session *session, xen_vm vm, int64_t dynamic_max)
 {
     abstract_value param_values[] =
@@ -1146,6 +1150,22 @@ xen_vm_set_vcpus_params(xen_session *session, xen_vm vm, char *params)
 
 
 bool
+xen_vm_set_vcpus_number(xen_session *session, xen_vm vm, int64_t number)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+            { .type = &abstract_type_int,
+              .u.int_val = number }
+        };
+
+    xen_call_(session, "VM.set_VCPUs_number", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
 xen_vm_set_vcpus_features_force_on(xen_session *session, xen_vm vm, struct xen_cpu_feature_set *force_on)
 {
     abstract_value param_values[] =
@@ -1162,6 +1182,38 @@ xen_vm_set_vcpus_features_force_on(xen_session *session, xen_vm vm, struct xen_c
 
 
 bool
+xen_vm_add_vcpus_features_force_on(xen_session *session, xen_vm vm, enum xen_cpu_feature value)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+            { .type = &xen_cpu_feature_abstract_type_,
+              .u.string_val = xen_cpu_feature_to_string(value) }
+        };
+
+    xen_call_(session, "VM.add_VCPUs_features_force_on", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vm_remove_vcpus_features_force_on(xen_session *session, xen_vm vm, enum xen_cpu_feature value)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+            { .type = &xen_cpu_feature_abstract_type_,
+              .u.string_val = xen_cpu_feature_to_string(value) }
+        };
+
+    xen_call_(session, "VM.remove_VCPUs_features_force_on", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
 xen_vm_set_vcpus_features_force_off(xen_session *session, xen_vm vm, struct xen_cpu_feature_set *force_off)
 {
     abstract_value param_values[] =
@@ -1173,6 +1225,38 @@ xen_vm_set_vcpus_features_force_off(xen_session *session, xen_vm vm, struct xen_
         };
 
     xen_call_(session, "VM.set_VCPUs_features_force_off", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vm_add_vcpus_features_force_off(xen_session *session, xen_vm vm, enum xen_cpu_feature value)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+            { .type = &xen_cpu_feature_abstract_type_,
+              .u.string_val = xen_cpu_feature_to_string(value) }
+        };
+
+    xen_call_(session, "VM.add_VCPUs_features_force_off", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vm_remove_vcpus_features_force_off(xen_session *session, xen_vm vm, enum xen_cpu_feature value)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+            { .type = &xen_cpu_feature_abstract_type_,
+              .u.string_val = xen_cpu_feature_to_string(value) }
+        };
+
+    xen_call_(session, "VM.remove_VCPUs_features_force_off", param_values, 2, NULL, NULL);
     return session->ok;
 }
 
@@ -1242,7 +1326,87 @@ xen_vm_set_actions_after_crash(xen_session *session, xen_vm vm, enum xen_on_cras
 
 
 bool
-xen_vm_set_bios_boot(xen_session *session, xen_vm vm, char *boot)
+xen_vm_set_pv_bootloader(xen_session *session, xen_vm vm, char *bootloader)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+            { .type = &abstract_type_string,
+              .u.string_val = bootloader }
+        };
+
+    xen_call_(session, "VM.set_PV_bootloader", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vm_set_pv_kernel(xen_session *session, xen_vm vm, char *kernel)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+            { .type = &abstract_type_string,
+              .u.string_val = kernel }
+        };
+
+    xen_call_(session, "VM.set_PV_kernel", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vm_set_pv_ramdisk(xen_session *session, xen_vm vm, char *ramdisk)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+            { .type = &abstract_type_string,
+              .u.string_val = ramdisk }
+        };
+
+    xen_call_(session, "VM.set_PV_ramdisk", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vm_set_pv_args(xen_session *session, xen_vm vm, char *args)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+            { .type = &abstract_type_string,
+              .u.string_val = args }
+        };
+
+    xen_call_(session, "VM.set_PV_args", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vm_set_pv_bootloader_args(xen_session *session, xen_vm vm, char *bootloader_args)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+            { .type = &abstract_type_string,
+              .u.string_val = bootloader_args }
+        };
+
+    xen_call_(session, "VM.set_PV_bootloader_args", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vm_set_hvm_boot(xen_session *session, xen_vm vm, char *boot)
 {
     abstract_value param_values[] =
         {
@@ -1252,7 +1416,7 @@ xen_vm_set_bios_boot(xen_session *session, xen_vm vm, char *boot)
               .u.string_val = boot }
         };
 
-    xen_call_(session, "VM.set_bios_boot", param_values, 2, NULL, NULL);
+    xen_call_(session, "VM.set_HVM_boot", param_values, 2, NULL, NULL);
     return session->ok;
 }
 
@@ -1268,7 +1432,7 @@ xen_vm_set_platform_std_vga(xen_session *session, xen_vm vm, bool std_vga)
               .u.bool_val = std_vga }
         };
 
-    xen_call_(session, "VM.set_platform_std_vga", param_values, 2, NULL, NULL);
+    xen_call_(session, "VM.set_platform_std_VGA", param_values, 2, NULL, NULL);
     return session->ok;
 }
 
@@ -1338,102 +1502,6 @@ xen_vm_set_platform_enable_audio(xen_session *session, xen_vm vm, bool enable_au
 
 
 bool
-xen_vm_set_builder(xen_session *session, xen_vm vm, char *builder)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm },
-            { .type = &abstract_type_string,
-              .u.string_val = builder }
-        };
-
-    xen_call_(session, "VM.set_builder", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_vm_set_boot_method(xen_session *session, xen_vm vm, enum xen_boot_type boot_method)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm },
-            { .type = &xen_boot_type_abstract_type_,
-              .u.string_val = xen_boot_type_to_string(boot_method) }
-        };
-
-    xen_call_(session, "VM.set_boot_method", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_vm_set_kernel_kernel(xen_session *session, xen_vm vm, char *kernel)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm },
-            { .type = &abstract_type_string,
-              .u.string_val = kernel }
-        };
-
-    xen_call_(session, "VM.set_kernel_kernel", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_vm_set_kernel_initrd(xen_session *session, xen_vm vm, char *initrd)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm },
-            { .type = &abstract_type_string,
-              .u.string_val = initrd }
-        };
-
-    xen_call_(session, "VM.set_kernel_initrd", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_vm_set_kernel_args(xen_session *session, xen_vm vm, char *args)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm },
-            { .type = &abstract_type_string,
-              .u.string_val = args }
-        };
-
-    xen_call_(session, "VM.set_kernel_args", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_vm_set_grub_cmdline(xen_session *session, xen_vm vm, char *cmdline)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm },
-            { .type = &abstract_type_string,
-              .u.string_val = cmdline }
-        };
-
-    xen_call_(session, "VM.set_grub_cmdline", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
 xen_vm_set_otherconfig(xen_session *session, xen_vm vm, xen_string_string_map *otherconfig)
 {
     abstract_value param_values[] =
@@ -1444,7 +1512,7 @@ xen_vm_set_otherconfig(xen_session *session, xen_vm vm, xen_string_string_map *o
               .u.set_val = (arbitrary_set *)otherconfig }
         };
 
-    xen_call_(session, "VM.set_otherconfig", param_values, 2, NULL, NULL);
+    xen_call_(session, "VM.set_otherConfig", param_values, 2, NULL, NULL);
     return session->ok;
 }
 

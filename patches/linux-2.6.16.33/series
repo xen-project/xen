@@ -17,6 +17,7 @@ net-gso-2-checksum-fix.patch
 net-gso-3-fix-errorcheck.patch
 net-gso-4-kill-warnon.patch
 net-gso-5-rcv-mss.patch
+net-gso-6-linear-segmentation.patch
 pci-mmconfig-fix-from-2.6.17.patch
 pmd-shared.patch
 rcu_needs_cpu.patch

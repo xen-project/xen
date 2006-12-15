@@ -66,8 +66,10 @@ void ft_prop_str(struct ft_cxt *cxt, const char *name, const char *str);
 void ft_prop_int(struct ft_cxt *cxt, const char *name, unsigned int val);
 void ft_begin(struct ft_cxt *cxt, void *blob, unsigned int max_size);
 void ft_add_rsvmap(struct ft_cxt *cxt, u64 physaddr, u64 size);
+int ft_set_rsvmap(void *bphp, int m, u64 physaddr, u64 size);
 
 void ft_dump_blob(const void *bphp);
+void ft_backtrack_node(struct ft_cxt *cxt);
 void ft_merge_blob(struct ft_cxt *cxt, void *blob);
 
 void *ft_find_node(const void *bphp, const char *srch_path);

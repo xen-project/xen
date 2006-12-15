@@ -1,8 +1,8 @@
 /*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of the
+ * License, or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -35,8 +35,10 @@
 #include <xen/gdbstub.h>
 #include <xen/symbols.h>
 #include <xen/keyhandler.h>
+#include <xen/numa.h>
 #include <acm/acm_hooks.h>
 #include <public/version.h>
+#include <asm/mpic.h>
 #include <asm/processor.h>
 #include <asm/desc.h>
 #include <asm/cache.h>
@@ -47,6 +49,7 @@
 #include "exceptions.h"
 #include "of-devtree.h"
 #include "oftree.h"
+#include "rtas.h"
 
 #define DEBUG
 
@@ -75,10 +78,7 @@ ulong oftree_len;
 ulong oftree_end;
 
 uint cpu_hard_id[NR_CPUS] __initdata;
-cpumask_t cpu_sibling_map[NR_CPUS] __read_mostly;
-cpumask_t cpu_online_map; /* missing ifdef in schedule.c */
 cpumask_t cpu_present_map;
-cpumask_t cpu_possible_map;
 
 /* XXX get this from ISA node in device tree */
 char *vgabase;
@@ -86,6 +86,8 @@ ulong isa_io_base;
 struct ns16550_defaults ns16550;
 
 extern char __per_cpu_start[], __per_cpu_data_end[], __per_cpu_end[];
+
+static struct domain *idle_domain;
 
 volatile struct processor_area * volatile global_cpu_table[NR_CPUS];
 
@@ -110,12 +112,28 @@ static void __init do_initcalls(void)
     }
 }
 
-static void hw_probe_attn(unsigned char key, struct cpu_user_regs *regs)
+
+void noinline __attn(void)
 {
     /* To continue the probe will step over the ATTN instruction.  The
      * NOP is there to make sure there is something sane to "step
      * over" to. */
-    asm volatile(".long 0x00000200; nop");
+    console_start_sync();
+    asm volatile(".long 0x200;nop");
+    console_end_sync();
+}
+
+static void key_hw_probe_attn(unsigned char key)
+{
+    __attn();
+}
+
+static void key_ofdump(unsigned char key)
+{
+    printk("ofdump:\n");
+    /* make sure the OF devtree is good */
+    ofd_walk((void *)oftree, "devtree", OFD_ROOT,
+             ofd_dump_props, OFD_DUMP_ALL);
 }
 
 static void percpu_init_areas(void)
@@ -150,8 +168,6 @@ static void percpu_free_unused_areas(void)
 
 static void __init start_of_day(void)
 {
-    struct domain *idle_domain;
-
     init_IRQ();
 
     scheduler_init();
@@ -166,36 +182,19 @@ static void __init start_of_day(void)
     /* for some reason we need to set our own bit in the thread map */
     cpu_set(0, cpu_sibling_map[0]);
 
-    percpu_free_unused_areas();
-
-    {
-        /* FIXME: Xen assumes that an online CPU is a schedualable
-         * CPU, but we just are not there yet. Remove this fragment when
-         * scheduling processors actually works. */
-        int cpuid;
-
-        printk("WARNING!: Taking all secondary CPUs offline\n");
-
-        for_each_online_cpu(cpuid) {
-            if (cpuid == 0)
-                continue;
-            cpu_clear(cpuid, cpu_online_map);
-        }
-    }
-
     initialize_keytable();
     /* Register another key that will allow for the the Harware Probe
      * to be contacted, this works with RiscWatch probes and should
      * work with Chronos and FSPs */
-    register_irq_keyhandler('^', hw_probe_attn,   "Trap to Hardware Probe");
+    register_keyhandler('^', key_hw_probe_attn, "Trap to Hardware Probe");
+
+    /* allow the dumping of the devtree */
+    register_keyhandler('D', key_ofdump , "Dump OF Devtree");
 
     timer_init();
     serial_init_postirq();
     do_initcalls();
-    schedulers_start();
 }
-
-extern void idle_loop(void);
 
 void startup_cpu_idle_loop(void)
 {
@@ -208,6 +207,15 @@ void startup_cpu_idle_loop(void)
     /* Finally get off the boot stack. */
     reset_stack_and_jump(idle_loop);
 }
+
+/* The boot_pa is enough "parea" for the boot CPU to get thru
+ * initialization, it will ultimately get replaced later */
+static __init void init_boot_cpu(void)
+{
+    static struct processor_area boot_pa;
+    boot_pa.whoami = 0;
+    parea = &boot_pa;
+}    
 
 static void init_parea(int cpuid)
 {
@@ -227,6 +235,7 @@ static void init_parea(int cpuid)
     pa->whoami = cpuid;
     pa->hard_id = cpu_hard_id[cpuid];
     pa->hyp_stack_base = (void *)((ulong)stack + STACK_SIZE);
+    mb();
 
     /* This store has the effect of invoking secondary_cpu_init.  */
     global_cpu_table[cpuid] = pa;
@@ -248,18 +257,34 @@ static int kick_secondary_cpus(int maxcpus)
         /* wait for it */
         while (!cpu_online(cpuid))
             cpu_relax();
+
+        numa_set_node(cpuid, 0);
+        numa_add_cpu(cpuid);
     }
 
     return 0;
 }
 
 /* This is the first C code that secondary processors invoke.  */
-int secondary_cpu_init(int cpuid, unsigned long r4)
+void secondary_cpu_init(int cpuid, unsigned long r4)
 {
+    struct vcpu *vcpu;
+
     cpu_initialize(cpuid);
     smp_generic_take_timebase();
+
+    /* If we are online, we must be able to ACK IPIs.  */
+    mpic_setup_this_cpu();
     cpu_set(cpuid, cpu_online_map);
-    while(1);
+
+    vcpu = alloc_vcpu(idle_domain, cpuid, cpuid);
+    BUG_ON(vcpu == NULL);
+
+    set_current(idle_domain->vcpu[cpuid]);
+    idle_vcpu[cpuid] = current;
+    startup_cpu_idle_loop();
+
+    panic("should never get here\n");
 }
 
 static void __init __start_xen(multiboot_info_t *mbi)
@@ -278,6 +303,9 @@ static void __init __start_xen(multiboot_info_t *mbi)
     if ((mbi->flags & MBI_CMDLINE) && (mbi->cmdline != 0))
         cmdline_parse(__va((ulong)mbi->cmdline));
 
+    /* we need to be able to identify this CPU early on */
+    init_boot_cpu();
+
     /* We initialise the serial devices very early so we can get debugging. */
     ns16550.io_base = 0x3f8;
     ns16550_init(0, &ns16550);
@@ -286,20 +314,12 @@ static void __init __start_xen(multiboot_info_t *mbi)
     serial_init_preirq();
 
     init_console();
-#ifdef CONSOLE_SYNC
+    /* let synchronize until we really get going */
     console_start_sync();
-#endif
-
-    /* we give the first RMA to the hypervisor */
-    xenheap_phys_end = rma_size(cpu_default_rma_order_pages());
 
     /* Check that we have at least one Multiboot module. */
     if (!(mbi->flags & MBI_MODULES) || (mbi->mods_count == 0)) {
         panic("FATAL ERROR: Require at least one Multiboot module.\n");
-    }
-
-    if (!(mbi->flags & MBI_MEMMAP)) {
-        panic("FATAL ERROR: Bootloader provided no memory information.\n");
     }
 
     /* OF dev tree is the last module */
@@ -312,14 +332,18 @@ static void __init __start_xen(multiboot_info_t *mbi)
     mod[mbi->mods_count-1].mod_end = 0;
     --mbi->mods_count;
 
+    if (rtas_entry) {
+        rtas_init((void *)oftree);
+        /* remove rtas module from consideration */
+        mod[mbi->mods_count-1].mod_start = 0;
+        mod[mbi->mods_count-1].mod_end = 0;
+        --mbi->mods_count;
+    }
     memory_init(mod, mbi->mods_count);
 
 #ifdef OF_DEBUG
-    printk("ofdump:\n");
-    /* make sure the OF devtree is good */
-    ofd_walk((void *)oftree, OFD_ROOT, ofd_dump_props, OFD_DUMP_ALL);
+    key_ofdump(0);
 #endif
-
     percpu_init_areas();
 
     init_parea(0);
@@ -331,6 +355,10 @@ static void __init __start_xen(multiboot_info_t *mbi)
         debugger_trap_immediate();
 #endif
 
+    start_of_day();
+
+    mpic_setup_this_cpu();
+
     /* Deal with secondary processors.  */
     if (opt_nosmp || ofd_boot_cpu == -1) {
         printk("nosmp: leaving secondary processors spinning forever\n");
@@ -339,7 +367,11 @@ static void __init __start_xen(multiboot_info_t *mbi)
         kick_secondary_cpus(max_cpus);
     }
 
-    start_of_day();
+    /* Secondary processors must be online before we call this.  */
+    schedulers_start();
+
+    /* This cannot be called before secondary cpus are marked online.  */
+    percpu_free_unused_areas();
 
     /* Create initial domain 0. */
     dom0 = domain_create(0, 0);
@@ -383,10 +415,10 @@ static void __init __start_xen(multiboot_info_t *mbi)
     }
 
     init_xenheap_pages(ALIGN_UP(dom0_start, PAGE_SIZE),
-                 ALIGN_DOWN(dom0_start + dom0_len, PAGE_SIZE));
+                       ALIGN_DOWN(dom0_start + dom0_len, PAGE_SIZE));
     if (initrd_start)
         init_xenheap_pages(ALIGN_UP(initrd_start, PAGE_SIZE),
-                     ALIGN_DOWN(initrd_start + initrd_len, PAGE_SIZE));
+                           ALIGN_DOWN(initrd_start + initrd_len, PAGE_SIZE));
 
     init_trace_bufs();
 
@@ -395,8 +427,12 @@ static void __init __start_xen(multiboot_info_t *mbi)
     /* Hide UART from DOM0 if we're using it */
     serial_endboot();
 
-    domain_unpause_by_systemcontroller(dom0);
+    console_end_sync();
 
+    domain_unpause_by_systemcontroller(dom0);
+#ifdef DEBUG_IPI
+    ipi_torture_test();
+#endif
     startup_cpu_idle_loop();
 }
 
@@ -414,7 +450,7 @@ void __init __start_xen_ppc(
 
     } else {
         /* booted by someone else that hopefully has a trap handler */
-        trap();
+        __builtin_trap();
     }
 
     __start_xen(mbi);

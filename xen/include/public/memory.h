@@ -248,7 +248,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_memory_map_t);
  * XENMEM_memory_map.
  * arg == addr of xen_memory_map_t.
  */
-#define XENMEM_machine_memory_map	10
+#define XENMEM_machine_memory_map   10
 
 /*
  * Set the pseudo-physical memory map of a domain, as returned by

@@ -118,11 +118,16 @@ def valid_vm(func):
     @param func: function with params: (self, session, vm_ref)
     @rtype: callable object
     """    
-    def check_vm_ref(self, session, vm_ref, *args, **kwargs):
+    def check_vm_ref(self, session, *args, **kwargs):
+        if len(args) == 0:
+            return {'Status': 'Failure',
+                    'ErrorDescription': XEND_ERROR_VM_INVALID}
+
+        vm_ref = args[0]
         xendom = XendDomain.instance()
         if type(vm_ref) == type(str()) and \
                xendom.is_valid_vm(vm_ref):
-            return func(self, session, vm_ref, *args, **kwargs)
+            return func(self, session, *args, **kwargs)
         else:
             return {'Status': 'Failure',
                     'ErrorDescription': XEND_ERROR_VM_INVALID}
@@ -567,6 +572,7 @@ class XendAPI:
                   'VCPUs_utilisation',
                   'VCPUs_features_required',
                   'VCPUs_can_use',
+                  'consoles',
                   'VIFs',
                   'VBDs',
                   'VTPMs',
@@ -578,6 +584,7 @@ class XendAPI:
                   'name_description',
                   'user_version',
                   'is_a_template',
+                  'auto_power_on',
                   'memory_dynamic_max',
                   'memory_dynamic_min',
                   'VCPUs_policy',
@@ -588,19 +595,18 @@ class XendAPI:
                   'actions_after_reboot',
                   'actions_after_suspend',
                   'actions_after_crash',
-                  'bios_boot',
+                  'PV_bootloader',
+                  'PV_kernel',
+                  'PV_ramdisk',
+                  'PV_args',
+                  'PV_bootloader_args',
+                  'HVM_boot',
                   'platform_std_VGA',
                   'platform_serial',
                   'platform_localtime',
                   'platform_clock_offset',
                   'platform_enable_audio',
                   'platform_keymap',
-                  'builder',
-                  'boot_method',
-                  'kernel_kernel',
-                  'kernel_initrd',
-                  'kernel_args',
-                  'grub_cmdline',
                   'otherConfig']
 
     VM_methods = ['clone',
@@ -636,26 +642,34 @@ class XendAPI:
         'actions_after_reboot',
         'actions_after_suspend',
         'actions_after_crash',
-        'bios_boot',
+        'PV_bootloader',
+        'PV_kernel',
+        'PV_ramdisk',
+        'PV_args',
+        'PV_bootloader_args',
+        'HVM_boot',
         'platform_std_VGA',
         'platform_serial',
         'platform_localtime',
         'platform_clock_offset',
         'platform_enable_audio',
         'platform_keymap',
-        'builder',
-        'boot_method',
-        'kernel_kernel',
-        'kernel_initrd',
-        'kernel_args',
         'grub_cmdline',
         'PCI_bus',
         'otherConfig']
         
+    def VM_get(self, name, session, vm_ref):
+        return xen_api_success(
+            XendDomain.instance().get_vm_by_uuid(vm_ref).info[name])
+
+    def VM_set(self, name, session, vm_ref, value):
+        XendDomain.instance().get_vm_by_uuid(vm_ref).info[name] = value
+        return xen_api_success_void()
+
     # attributes (ro)
     def VM_get_power_state(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success(dom.state)
+        return xen_api_success(dom.get_power_state())
     
     def VM_get_resident_on(self, session, vm_ref):
         return xen_api_success(XendNode.instance().uuid)
@@ -765,9 +779,23 @@ class XendAPI:
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success(dom.get_on_crash())
     
-    def VM_get_bios_boot(self, session, vm_ref):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success(dom.get_bios_boot())
+    def VM_get_PV_bootloader(self, session, vm_ref):
+        return self.VM_get('PV_bootloader', session, vm_ref)
+    
+    def VM_get_PV_kernel(self, session, vm_ref):
+        return self.VM_get('PV_kernel', session, vm_ref)
+    
+    def VM_get_PV_ramdisk(self, session, vm_ref):
+        return self.VM_get('PV_ramdisk', session, vm_ref)
+    
+    def VM_get_PV_args(self, session, vm_ref):
+        return self.VM_get('PV_args', session, vm_ref)
+
+    def VM_get_PV_bootloader_args(self, session, vm_ref):
+        return self.VM_get('PV_bootloader_args', session, vm_ref)
+
+    def VM_get_HVM_boot(self, session, vm_ref):
+        return self.VM_get('HVM_boot', session, vm_ref)
     
     def VM_get_platform_std_VGA(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
@@ -793,34 +821,10 @@ class XendAPI:
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_todo()
     
-    def VM_get_builder(self, session, vm_ref):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success(dom.get_builder())
-    
-    def VM_get_boot_method(self, session, vm_ref):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success(dom.get_boot_method())
-    
-    def VM_get_kernel_kernel(self, session, vm_ref):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success('')
-    
-    def VM_get_kernel_initrd(self, session, vm_ref):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success('')
-    
-    def VM_get_kernel_args(self, session, vm_ref):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success('')
-    
-    def VM_get_grub_cmdline(self, session, vm_ref):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success('')
-    
     def VM_get_otherConfig(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_todo()
-    
+
     def VM_set_name_label(self, session, vm_ref, label):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         dom.setName(label)
@@ -877,11 +881,25 @@ class XendAPI:
     def VM_set_actions_after_crash(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success_void()
-    
-    def VM_set_bios_boot(self, session, vm_ref):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
-    
+
+    def VM_set_HVM_boot(self, session, vm_ref, value):
+        return self.VM_set('HVM_boot', session, vm_ref, value)
+
+    def VM_set_PV_bootloader(self, session, vm_ref, value):
+        return self.VM_set('PV_bootloader', session, vm_ref, value)
+
+    def VM_set_PV_kernel(self, session, vm_ref, value):
+        return self.VM_set('PV_kernel', session, vm_ref, value)
+
+    def VM_set_PV_ramdisk(self, session, vm_ref, value):
+        return self.VM_set('PV_ramdisk', session, vm_ref, value)
+
+    def VM_set_PV_args(self, session, vm_ref, value):
+        return self.VM_set('PV_args', session, vm_ref, value)
+
+    def VM_set_PV_bootloader_args(self, session, vm_ref, value):
+        return self.VM_set('PV_bootloader_args', session, vm_ref, value)
+
     def VM_set_platform_std_VGA(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success_void()
@@ -899,30 +917,6 @@ class XendAPI:
         return xen_api_success_void()
     
     def VM_set_platform_enable_audio(self, session, vm_ref):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
-    
-    def VM_set_builder(self, session, vm_ref):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
-    
-    def VM_set_boot_method(self, session, vm_ref):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
-    
-    def VM_set_kernel_kernel(self, session, vm_ref):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
-    
-    def VM_set_kernel_initrd(self, session, vm_ref):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
-    
-    def VM_set_kernel_args(self, session, vm_ref):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
-    
-    def VM_set_grub_cmdline(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success_void()
     
@@ -961,6 +955,7 @@ class XendAPI:
             'name_description': xeninfo.getName(),
             'user_version': 1,
             'is_a_template': False,
+            'auto_power_on': False,
             'resident_on': XendNode.instance().uuid,
             'memory_static_min': xeninfo.get_memory_static_min(),
             'memory_static_max': xeninfo.get_memory_static_max(),
@@ -979,22 +974,22 @@ class XendAPI:
             'actions_after_reboot': xeninfo.get_on_reboot(),
             'actions_after_suspend': xeninfo.get_on_suspend(),
             'actions_after_crash': xeninfo.get_on_crash(),
+            'consoles': xeninfo.get_consoles(),
             'VIFs': xeninfo.get_vifs(),
             'VBDs': xeninfo.get_vbds(),
             'VTPMs': xeninfo.get_vtpms(),
-            'bios_boot': xeninfo.get_bios_boot(),
+            'PV_bootloader': xeninfo.info.get('PV_bootloader'),
+            'PV_kernel': xeninfo.info.get('PV_kernel'),
+            'PV_ramdisk': xeninfo.info.get('PV_ramdisk'),
+            'PV_args': xeninfo.info.get('PV_args'),
+            'PV_bootloader_args': xeninfo.info.get('PV_bootloader_args'),
+            'HVM_boot': xeninfo.info.get('HVM_boot'),
             'platform_std_VGA': xeninfo.get_platform_std_vga(),
             'platform_serial': xeninfo.get_platform_serial(),
             'platform_localtime': xeninfo.get_platform_localtime(),
             'platform_clock_offset': xeninfo.get_platform_clock_offset(),
             'platform_enable_audio': xeninfo.get_platform_enable_audio(),
             'platform_keymap': xeninfo.get_platform_keymap(),
-            'builder': xeninfo.get_builder(),
-            'boot_method': xeninfo.get_boot_method(),
-            'kernel_kernel': xeninfo.get_kernel_image(),
-            'kernel_initrd': xeninfo.get_kernel_initrd(),
-            'kernel_args': xeninfo.get_kernel_args(),
-            'grub_cmdline': xeninfo.get_grub_cmdline(),
             'PCI_bus': xeninfo.get_pci_bus(),
             'tools_version': xeninfo.get_tools_version(),
             'otherConfig': xeninfo.get_other_config()

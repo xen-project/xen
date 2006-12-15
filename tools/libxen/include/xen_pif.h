@@ -155,14 +155,14 @@ xen_pif_record_opt_set_free(xen_pif_record_opt_set *set);
 
 
 /**
- * Get the current state of the given PIF.  !!!
+ * Get a record containing the current state of the given PIF.
  */
 extern bool
 xen_pif_get_record(xen_session *session, xen_pif_record **result, xen_pif pif);
 
 
 /**
- * Get a reference to the object with the specified UUID.  !!!
+ * Get a reference to the PIF instance with the specified UUID.
  */
 extern bool
 xen_pif_get_by_uuid(xen_session *session, xen_pif *result, char *uuid);

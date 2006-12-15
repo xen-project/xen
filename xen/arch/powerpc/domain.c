@@ -33,6 +33,8 @@
 #include <asm/htab.h>
 #include <asm/current.h>
 #include <asm/hcalls.h>
+#include "rtas.h"
+#include "exceptions.h"
 
 #define next_arg(fmt, args) ({                                              \
     unsigned long __arg;                                                    \
@@ -46,7 +48,6 @@
     }                                                                       \
     __arg;                                                                  \
 })
-extern void idle_loop(void);
 
 unsigned long hypercall_create_continuation(unsigned int op,
         const char *format, ...)
@@ -87,26 +88,44 @@ int arch_domain_create(struct domain *d)
 
     INIT_LIST_HEAD(&d->arch.extent_list);
 
+    d->arch.foreign_mfn_count = 1024;
+    d->arch.foreign_mfns = xmalloc_array(uint, d->arch.foreign_mfn_count);
+    BUG_ON(d->arch.foreign_mfns == NULL);
+
+    memset(d->arch.foreign_mfns, -1, d->arch.foreign_mfn_count * sizeof(uint));
+
     return 0;
 }
 
 void arch_domain_destroy(struct domain *d)
 {
     shadow_teardown(d);
+    /* shared_info is part of the RMA so no need to release it */
 }
 
+static void machine_fail(const char *s)
+{
+    printk("%s failed, manual powercycle required!\n", s);
+    for (;;)
+        sleep();
+}
 void machine_halt(void)
 {
     printk("machine_halt called: spinning....\n");
     console_start_sync();
-    while(1);
+    printk("%s called\n", __func__);
+    rtas_halt();
+
+    machine_fail(__func__);
 }
 
 void machine_restart(char * __unused)
 {
     printk("machine_restart called: spinning....\n");
     console_start_sync();
-    while(1);
+    printk("%s called\n", __func__);
+    rtas_reboot();
+    machine_fail(__func__);
 }
 
 struct vcpu *alloc_vcpu_struct(void)
@@ -222,6 +241,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 
     mtsdr1(next->domain->arch.htab.sdr1);
     local_flush_tlb(); /* XXX maybe flush_tlb_mask? */
+    cpu_flush_icache();
 
     if (is_idle_vcpu(next)) {
         reset_stack_and_jump(idle_loop);
@@ -278,8 +298,10 @@ static void relinquish_memory(struct domain *d, struct list_head *list)
 
 void domain_relinquish_resources(struct domain *d)
 {
+    relinquish_memory(d, &d->xenpage_list);
     relinquish_memory(d, &d->page_list);
     free_extents(d);
+    xfree(d->arch.foreign_mfns);
     return;
 }
 
@@ -291,7 +313,6 @@ void arch_dump_vcpu_info(struct vcpu *v)
 {
 }
 
-extern void sleep(void);
 static void safe_halt(void)
 {
     int cpu = smp_processor_id();
