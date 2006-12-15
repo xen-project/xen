@@ -10,9 +10,10 @@ OpenBSD|NetBSD|FreeBSD)
 	;;
 Linux)
 	TOOL="udevinfo"
+	UDEV_VERSION="0"
 	test -x "$(which ${TOOL})" && \
 		UDEV_VERSION=$(${TOOL} -V | sed -e 's/^[^0-9]* \([0-9]\{1,\}\)[^0-9]\{0,\}/\1/')
-	if test -n "${UDEV_VERSION}" -a ${UDEV_VERSION} -ge 059; then
+	if test "${UDEV_VERSION}" -ge 059; then
 		RC=0
 	else
 		TOOL="hotplug"
