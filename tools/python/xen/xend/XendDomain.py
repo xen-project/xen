@@ -284,7 +284,8 @@ class XendDomain:
                 fd, fn = tempfile.mkstemp()
                 f = os.fdopen(fd, 'w+b')
                 try:
-                    prettyprint(dominfo.sxpr(), f, width = 78)
+                    prettyprint(dominfo.sxpr(legacy_only = False), f,
+                                width = 78)
                 finally:
                     f.close()
                 try:

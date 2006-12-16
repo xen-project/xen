@@ -430,8 +430,12 @@ class XendConfig(dict):
         """
         cfg = {}
 
-        # First step is to convert deprecated options to
-        # current equivalents.
+        for key, typ in XENAPI_CFG_TYPES.items():
+            val = sxp.child_value(sxp_cfg, key)
+            if val is not None:
+                cfg[key] = typ(val)
+
+        # Convert deprecated options to current equivalents.
         
         restart = sxp.child_value(sxp_cfg, 'restart')
         if restart:
@@ -576,6 +580,11 @@ class XendConfig(dict):
         """
         cfg = self._parse_sxp(sxp_cfg)
 
+        for key, typ in XENAPI_CFG_TYPES.items():
+            val = cfg.get(key)
+            if val is not None:
+                self[key] = typ(val)
+
         # Convert parameters that can be directly mapped from
         # the Legacy Config to Xen API Config
         
@@ -590,9 +599,13 @@ class XendConfig(dict):
             except KeyError:
                 pass
 
-        self['PV_bootloader']      = cfg.get('bootloader',      '')
-        self['PV_bootloader_args'] = cfg.get('bootloader_args', '')
-        
+        def update_with(n, o):
+            if not self.get(n):
+                self[n] = cfg.get(o, '')
+
+        update_with('PV_bootloader',      'bootloader')
+        update_with('PV_bootloader_args', 'bootloader_args')
+
         image_sxp = sxp.child_value(sxp_cfg, 'image', [])
         if image_sxp:
             self.update_with_image_sxp(image_sxp)
@@ -760,11 +773,8 @@ class XendConfig(dict):
 
         self.validate()
 
-    def to_xml(self):
-        """Return an XML string representing the configuration."""
-        pass
-
-    def to_sxp(self, domain = None, ignore_devices = False, ignore = []):
+    def to_sxp(self, domain = None, ignore_devices = False, ignore = [],
+               legacy_only = True):
         """ Get SXP representation of this config object.
 
         Incompat: removed store_mfn, console_mfn
@@ -784,6 +794,11 @@ class XendConfig(dict):
 
         if domain.getDomid() is not None:
             sxpr.append(['domid', domain.getDomid()])
+
+        if not legacy_only:
+            for name in XENAPI_CFG_TYPES.keys():
+                if name in self and self[name] not in (None, []):
+                    sxpr.append([name, str(self[name])])
 
         for xenapi, legacy in XENAPI_CFG_TO_LEGACY_CFG.items():
             if self.has_key(xenapi) and self[xenapi] not in (None, []):
