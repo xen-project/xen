@@ -1556,7 +1556,11 @@ def detach(args, command, deviceClass):
 
 
 def xm_block_detach(args):
-    detach(args, 'block-detach', 'vbd')
+    try:
+        detach(args, 'block-detach', 'vbd')
+        return
+    except:
+        pass
     detach(args, 'block-detach', 'tap')
 
 
