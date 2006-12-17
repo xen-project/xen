@@ -41,9 +41,13 @@ long arch_do_sysctl(struct xen_sysctl *sysctl,
     {
         xen_sysctl_physinfo_t *pi = &sysctl->u.physinfo;
 
-        pi->threads_per_core = 1;
-        pi->cores_per_socket = 1;
-        pi->sockets_per_node = 1;
+        pi->threads_per_core =
+            cpus_weight(cpu_sibling_map[0]);
+        pi->cores_per_socket =
+            cpus_weight(cpu_core_map[0]) / pi->threads_per_core;
+        pi->sockets_per_node = 
+            num_online_cpus() / cpus_weight(cpu_core_map[0]);
+
         pi->nr_nodes         = 1;
         pi->total_pages      = total_pages;
         pi->free_pages       = avail_domheap_pages();

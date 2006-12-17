@@ -129,7 +129,6 @@ unsigned int cpu_extent_order(void)
     return log_large_page_sizes[0] - PAGE_SHIFT;
 }
 
-
 /* This is more a platform thing than a CPU thing, but we only have
  * one platform now */
 int cpu_io_mfn(ulong mfn)
@@ -141,6 +140,12 @@ int cpu_io_mfn(ulong mfn)
 
     return 0;
 }
+
+int cpu_threads(int cpuid)
+{
+    return 1;
+}
+
 
 static u64 cpu0_hids[6];
 static u64 cpu0_hior;

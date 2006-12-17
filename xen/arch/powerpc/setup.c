@@ -179,9 +179,6 @@ static void __init start_of_day(void)
     set_current(idle_domain->vcpu[0]);
     idle_vcpu[0] = current;
 
-    /* for some reason we need to set our own bit in the thread map */
-    cpu_set(0, cpu_sibling_map[0]);
-
     initialize_keytable();
     /* Register another key that will allow for the the Harware Probe
      * to be contacted, this works with RiscWatch probes and should
@@ -247,6 +244,19 @@ static int kick_secondary_cpus(int maxcpus)
     int cpuid;
 
     for_each_present_cpu(cpuid) {
+        int threads;
+        int i;
+        
+        threads = cpu_threads(cpuid);
+        for (i = 0; i < threads; i++)
+            cpu_set(i, cpu_sibling_map[cpuid]);
+
+        /* For now everything is single core */
+        cpu_set(0, cpu_core_map[cpuid]);
+
+        numa_set_node(cpuid, 0);
+        numa_add_cpu(cpuid);
+
         if (cpuid == 0)
             continue;
         if (cpuid >= maxcpus)
@@ -257,9 +267,6 @@ static int kick_secondary_cpus(int maxcpus)
         /* wait for it */
         while (!cpu_online(cpuid))
             cpu_relax();
-
-        numa_set_node(cpuid, 0);
-        numa_add_cpu(cpuid);
     }
 
     return 0;
