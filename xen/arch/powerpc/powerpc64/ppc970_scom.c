@@ -158,7 +158,7 @@ void cpu_scom_init(void)
 {
 #ifdef CONFIG_SCOM
     ulong val;
-    if (PVR_REV(mfpvr()) == 0x0300) {
+    if (PVR_REV(mfpvr()) == PV_970FX) {
         /* these address are only good for 970FX */
         console_start_sync();
         if (!cpu_scom_read(SCOM_PTSR, &val))
@@ -174,7 +174,7 @@ void cpu_scom_AMCR(void)
 #ifdef CONFIG_SCOM
     ulong val;
 
-    if (PVR_REV(mfpvr()) == 0x0300) {
+    if (PVR_REV(mfpvr()) == PV_970FX) {
         /* these address are only good for 970FX */
         cpu_scom_read(SCOM_AMC_REG, &val);
         printk("SCOM AMCR: 0x%016lx\n", val);
