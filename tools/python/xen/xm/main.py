@@ -1802,7 +1802,7 @@ def _run_cmd(cmd, cmd_name, args):
     except OptionError, e:
         err(str(e))
         _usage(cmd_name)
-        print e.usage()
+        print e.usage
     except security.ACMError, e:
         err(str(e))
     except:
