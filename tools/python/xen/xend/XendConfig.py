@@ -15,6 +15,7 @@
 # Copyright (C) 2006 XenSource Ltd
 #============================================================================
 
+import logging
 import re
 import time
 import types
@@ -23,9 +24,12 @@ from xen.xend import sxp
 from xen.xend import uuid
 from xen.xend.XendError import VmError
 from xen.xend.XendDevices import XendDevices
-from xen.xend.XendLogging import log
 from xen.xend.PrettyPrint import prettyprintstring
 from xen.xend.XendConstants import DOM_STATE_HALTED
+
+log = logging.getLogger("xend.XendConfig")
+log.setLevel(logging.WARN)
+
 
 """
 XendConfig API
@@ -182,18 +186,18 @@ LEGACY_CFG_TYPES = {
     'shadow_memory': int,
     'maxmem':        int,
     'start_time':    float,
-    'cpu_cap':         int,
-    'cpu_weight':      int,
+    'cpu_cap':       int,
+    'cpu_weight':    int,
     'cpu_time':      float,
-    'features':        str,
-    'localtime':       int,
-    'name':        str,
-    'on_poweroff': str,
-    'on_reboot':   str,
-    'on_crash':    str,
-    'on_xend_stop': str,
+    'features':      str,
+    'localtime':     int,
+    'name':          str,
+    'on_poweroff':   str,
+    'on_reboot':     str,
+    'on_crash':      str,
+    'on_xend_stop':  str,
     'on_xend_start': str,
-    'online_vcpus': int,
+    'online_vcpus':  int,
 }
 
 # Values that should be stored in xenstore's /vm/<uuid> that is used
@@ -578,6 +582,8 @@ class XendConfig(dict):
         """Read in an SXP Configuration object and
         populate at much of the Xen API with valid values.
         """
+        log.debug('_sxp_to_xapi(%s)' % scrub_password(sxp_cfg))
+
         cfg = self._parse_sxp(sxp_cfg)
 
         for key, typ in XENAPI_CFG_TYPES.items():
@@ -647,6 +653,8 @@ class XendConfig(dict):
         values are that not related directly supported in
         the Xen API.
         """
+
+        log.debug('_sxp_to_xapi_unsupported(%s)' % scrub_password(sxp_cfg))
 
         # Parse and convert parameters used to configure
         # the image (as well as HVM images)
@@ -761,6 +769,9 @@ class XendConfig(dict):
         @param xapi: Xen API VM Struct
         @type xapi: dict
         """
+
+        log.debug('update_with_xenapi_config: %s' % scrub_password(xapi))
+
         for key, val in xapi.items():
             type_conv = XENAPI_CFG_TYPES.get(key)
             if type_conv is None:
@@ -1059,12 +1070,12 @@ class XendConfig(dict):
         """Returns a backwards compatible image SXP expression that is
         used in xenstore's /vm/<uuid>/image value and xm list."""
         image = [self['image'].get('type', 'linux')]
-        if self.has_key('kernel_kernel'):
-            image.append(['kernel', self['kernel_kernel']])
-        if self.has_key('kernel_initrd') and self['kernel_initrd']:
-            image.append(['ramdisk', self['kernel_initrd']])
-        if self.has_key('kernel_args') and self['kernel_args']:
-            image.append(['args', self['kernel_args']])
+        if self.has_key('PV_kernel'):
+            image.append(['kernel', self['PV_kernel']])
+        if self.has_key('PV_ramdisk') and self['PV_ramdisk']:
+            image.append(['ramdisk', self['PV_ramdisk']])
+        if self.has_key('PV_args') and self['PV_args']:
+            image.append(['args', self['PV_args']])
 
         for arg, conv in LEGACY_IMAGE_CFG:
             if self['image'].has_key(arg):
@@ -1084,8 +1095,10 @@ class XendConfig(dict):
         return image
 
     def update_with_image_sxp(self, image_sxp):
-        # Convert Legacy "image" config to Xen API kernel_*
+        # Convert Legacy "image" config to Xen API PV_*
         # configuration
+        log.debug("update_with_image_sxp(%s)" % scrub_password(image_sxp))
+
         self['PV_kernel'] = sxp.child_value(image_sxp, 'kernel','')
         self['PV_ramdisk'] = sxp.child_value(image_sxp, 'ramdisk','')
         kernel_args = sxp.child_value(image_sxp, 'args', '')
