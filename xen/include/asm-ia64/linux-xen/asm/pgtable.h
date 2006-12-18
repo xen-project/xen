@@ -39,6 +39,11 @@
 #define _PAGE_P			(1 << _PAGE_P_BIT)	/* page present bit */
 #define _PAGE_MA_WB		(0x0 <<  2)	/* write back memory attribute */
 #ifdef XEN
+#define _PAGE_RV1_BIT		1
+#define _PAGE_RV2_BIT		50
+#define _PAGE_RV1		(__IA64_UL(1) << _PAGE_RV1_BIT)	/* reserved bit */
+#define _PAGE_RV2		(__IA64_UL(3) << _PAGE_RV2_BIT)	/* reserved bits */
+
 #define _PAGE_MA_ST		(0x1 <<  2)	/* is reserved for software use */
 #endif
 #define _PAGE_MA_UC		(0x4 <<  2)	/* uncacheable memory attribute */

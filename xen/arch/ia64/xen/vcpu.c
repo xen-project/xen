@@ -2162,6 +2162,7 @@ vcpu_itc_no_srlz(VCPU * vcpu, u64 IorD, u64 vaddr, u64 pte,
 	BUG_ON(logps > PAGE_SHIFT);
 	vcpu_tlb_track_insert_or_dirty(vcpu, vaddr, entry);
 	psr = ia64_clear_ic();
+	pte &= ~(_PAGE_RV2 | _PAGE_RV1);	// Mask out the reserved bits.
 	ia64_itc(IorD, vaddr, pte, ps);	// FIXME: look for bigger mappings
 	ia64_set_psr(psr);
 	// ia64_srlz_i(); // no srls req'd, will rfi later
