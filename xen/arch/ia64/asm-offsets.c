@@ -41,6 +41,8 @@ void foo(void)
 	DEFINE(VCPU_VTM_OFFSET_OFS, offsetof(struct vcpu, arch.arch_vmx.vtm.vtm_offset));
 	DEFINE(VCPU_VTM_LAST_ITC_OFS, offsetof(struct vcpu, arch.arch_vmx.vtm.last_itc));
 	DEFINE(VCPU_VRR0_OFS, offsetof(struct vcpu, arch.arch_vmx.vrr[0]));
+	DEFINE(VCPU_ITR0_OFS, offsetof(struct vcpu, arch.itrs[0]));
+	DEFINE(VCPU_CALLBACK_OFS, offsetof(struct vcpu, arch.event_callback_ip));
 #ifdef   VTI_DEBUG
 	DEFINE(IVT_CUR_OFS, offsetof(struct vcpu, arch.arch_vmx.ivt_current));
 	DEFINE(IVT_DBG_OFS, offsetof(struct vcpu, arch.arch_vmx.ivt_debug));

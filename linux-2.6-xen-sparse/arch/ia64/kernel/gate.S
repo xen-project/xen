@@ -128,9 +128,9 @@ GLOBAL_ENTRY(__kernel_syscall_via_epc)
 	;;
 #ifdef CONFIG_XEN_IA64_VDSO_PARAVIRT
 	// r20 = 1
-	// r22 = &vcpu->evtchn_mask
+	// r22 = &vcpu->vcpu_info->evtchn_upcall_mask
 	// r23 = &vpsr.ic
-	// r24 = &vcpu->pending_interruption
+	// r24 = &vcpu->vcpu_info->evtchn_upcall_pending
 	// r25 = tmp
 	// r28 = &running_on_xen
 	// r30 = running_on_xen
@@ -144,8 +144,11 @@ GLOBAL_ENTRY(__kernel_syscall_via_epc)
 #define isRaw	p13
 	LOAD_RUNNING_ON_XEN(r28)
 	movl r22=XSI_PSR_I_ADDR
+	;;
+	ld8 r22=[r22]
+	;;
 	movl r23=XSI_PSR_IC
-	movl r24=XSI_PSR_I_ADDR+(XSI_PEND_OFS-XSI_PSR_I_ADDR_OFS)
+	adds r24=-1,r22
 	mov r20=1
 	;;
 	ld4 r30=[r28]

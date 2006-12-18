@@ -737,10 +737,10 @@ xen_page_fault:
 	;;
 (p15)	ld8 r3=[r3]
 	;;
-(p15)	st1 [r3]=r0,XSI_PEND_OFS-XSI_PSR_I_ADDR_OFS	// if (p15) vpsr.i = 1
+(p15)	st1 [r3]=r0,-1	// if (p15) vpsr.i = 1
 	mov r14=r0
 	;;
-(p15)	ld4 r14=[r3]				// if (pending_interrupts)
+(p15)	ld1 r14=[r3]				// if (pending_events)
 	adds r3=8,r2				// re-set up second base pointer
 	;;
 (p15)	cmp.ne	p15,p0=r14,r0
@@ -1170,10 +1170,10 @@ ENTRY(break_fault)
 #ifdef CONFIG_XEN
 (p15)	ld8 r16=[r16]				// vpsr.i
 	;;
-(p15)	st1 [r16]=r0,XSI_PEND_OFS-XSI_PSR_I_ADDR_OFS	// if (p15) vpsr.i = 1
+(p15)	st1 [r16]=r0,-1		// if (p15) vpsr.i = 1
 	mov r2=r0
 	;;
-(p15)	ld4 r2=[r16]				// if (pending_interrupts)
+(p15)	ld1 r2=[r16]				// if (pending_events)
 	;;
 	cmp.ne	p6,p0=r2,r0
 	;;
@@ -2159,13 +2159,22 @@ GLOBAL_ENTRY(xen_event_callback)
 	;;
 	SAVE_REST
 	;;
+1:
 	alloc r14=ar.pfs,0,0,1,0 // must be first in an insn group
 	add out0=16,sp		// pass pointer to pt_regs as first arg
 	;;
-	srlz.d			// make sure we see the effect of cr.ivr
-	movl r14=ia64_leave_kernel
+	br.call.sptk.many b0=evtchn_do_upcall
 	;;
-	mov rp=r14
-	br.call.sptk.many b6=evtchn_do_upcall
+	movl r20=XSI_PSR_I_ADDR
+	;;
+	ld8 r20=[r20]
+	;;
+	adds r20=-1,r20		// vcpu_info->evtchn_upcall_pending
+	;;
+	ld1 r20=[r20]
+	;;
+	cmp.ne p6,p0=r20,r0	// if there are pending events, 
+	(p6) br.spnt.few 1b	// call evtchn_do_upcall again.
+	br.sptk.many ia64_leave_kernel   
 END(xen_event_callback)
 #endif
