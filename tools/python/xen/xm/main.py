@@ -558,7 +558,7 @@ class Shell(cmd.Cmd):
                 ok, res = _run_cmd(lambda x: server.xenapi_request(words[0],
                                                                    tuple(x)),
                                    words[0], words[1:])
-                if ok and res != '':
+                if ok and res is not None and res != '':
                     pprint.pprint(res)
             else:
                 print '*** Unknown command: %s' % words[0]
@@ -1556,7 +1556,11 @@ def detach(args, command, deviceClass):
 
 
 def xm_block_detach(args):
-    detach(args, 'block-detach', 'vbd')
+    try:
+        detach(args, 'block-detach', 'vbd')
+        return
+    except:
+        pass
     detach(args, 'block-detach', 'tap')
 
 
@@ -1798,7 +1802,7 @@ def _run_cmd(cmd, cmd_name, args):
     except OptionError, e:
         err(str(e))
         _usage(cmd_name)
-        print e.usage()
+        print e.usage
     except security.ACMError, e:
         err(str(e))
     except:

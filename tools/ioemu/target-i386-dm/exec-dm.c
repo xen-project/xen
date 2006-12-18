@@ -128,10 +128,28 @@ char *logfilename = "/tmp/qemu.log";
 FILE *logfile;
 int loglevel;
 
+
+#if defined(__i386__) || defined(__x86_64__)
+#define MAPCACHE
+#endif
+
+#ifdef MAPCACHE
+static pthread_mutex_t mapcache_mutex;
+#define mapcache_lock() pthread_mutex_lock(&mapcache_mutex)
+#define mapcache_unlock() pthread_mutex_unlock(&mapcache_mutex)
+#else 
+#define mapcache_lock() ( (void)0 )
+#define mapcache_unlock() ( (void)0 )
+#endif
+
+
 void cpu_exec_init(CPUState *env)
 {
     CPUState **penv;
     int cpu_index;
+#ifdef MAPCACHE
+    pthread_mutexattr_t mxattr; 
+#endif
 
     env->next_cpu = NULL;
     penv = &first_cpu;
@@ -145,6 +163,14 @@ void cpu_exec_init(CPUState *env)
 
     /* alloc dirty bits array */
     phys_ram_dirty = qemu_malloc(phys_ram_size >> TARGET_PAGE_BITS);
+
+#ifdef MAPCACHE
+    /* setup memory access mutex to protect mapcache */
+    pthread_mutexattr_init(&mxattr); 
+    pthread_mutexattr_settype(&mxattr, PTHREAD_MUTEX_RECURSIVE);
+    pthread_mutex_init(&mapcache_mutex, &mxattr); 
+    pthread_mutexattr_destroy(&mxattr); 
+#endif
 }
 
 /* enable or disable low levels log */
@@ -440,10 +466,7 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
     uint8_t *ptr;
     uint32_t val;
 
-#if defined(__i386__) || defined(__x86_64__)
-    static pthread_mutex_t mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
-    pthread_mutex_lock(&mutex);
-#endif
+    mapcache_lock();
 
     while (len > 0) {
         /* How much can we copy before the next page boundary? */
@@ -510,9 +533,7 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
         addr += l;
     }
 
-#if defined(__i386__) || defined(__x86_64__)
-    pthread_mutex_unlock(&mutex);
-#endif
+    mapcache_unlock();
 }
 #endif
 

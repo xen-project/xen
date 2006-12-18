@@ -49,8 +49,9 @@ struct xenfb_info
 	struct timer_list	refresh;
 	int			dirty;
 	int			x1, y1, x2, y2;	/* dirty rectangle,
-						   protected by mm_lock */
-	spinlock_t		mm_lock;
+						   protected by dirty_lock */
+	spinlock_t		dirty_lock;
+	struct mutex		mm_lock;
 	int			nr_pages;
 	struct page		**pages;
 	struct list_head	mappings; /* protected by mm_lock */
@@ -63,6 +64,70 @@ struct xenfb_info
 
 	struct xenbus_device	*xbdev;
 };
+
+/*
+ * How the locks work together
+ *
+ * There are two locks: spinlock dirty_lock protecting the dirty
+ * rectangle, and mutex mm_lock protecting mappings.
+ *
+ * The problem is that dirty rectangle and mappings aren't
+ * independent: the dirty rectangle must cover all faulted pages in
+ * mappings.  We need to prove that our locking maintains this
+ * invariant.
+ *
+ * There are several kinds of critical regions:
+ *
+ * 1. Holding only dirty_lock: xenfb_refresh().  May run in
+ *    interrupts.  Extends the dirty rectangle.  Trivially preserves
+ *    invariant.
+ *
+ * 2. Holding only mm_lock: xenfb_mmap() and xenfb_vm_close().  Touch
+ *    only mappings.  The former creates unfaulted pages.  Preserves
+ *    invariant.  The latter removes pages.  Preserves invariant.
+ *
+ * 3. Holding both locks: xenfb_vm_nopage().  Extends the dirty
+ *    rectangle and updates mappings consistently.  Preserves
+ *    invariant.
+ *
+ * 4. The ugliest one: xenfb_update_screen().  Clear the dirty
+ *    rectangle and update mappings consistently.
+ *
+ *    We can't simply hold both locks, because zap_page_range() cannot
+ *    be called with a spinlock held.
+ *
+ *    Therefore, we first clear the dirty rectangle with both locks
+ *    held.  Then we unlock dirty_lock and update the mappings.
+ *    Critical regions that hold only dirty_lock may interfere with
+ *    that.  This can only be region 1: xenfb_refresh().  But that
+ *    just extends the dirty rectangle, which can't harm the
+ *    invariant.
+ *
+ * But FIXME: the invariant is too weak.  It misses that the fault
+ * record in mappings must be consistent with the mapping of pages in
+ * the associated address space!  do_no_page() updates the PTE after
+ * xenfb_vm_nopage() returns, i.e. outside the critical region.  This
+ * allows the following race:
+ *
+ * X writes to some address in the Xen frame buffer
+ * Fault - call do_no_page()
+ *     call xenfb_vm_nopage()
+ *         grab mm_lock
+ *         map->faults++;
+ *         release mm_lock
+ *     return back to do_no_page()
+ * (preempted, or SMP)
+ * Xen worker thread runs.
+ *      grab mm_lock
+ *      look at mappings
+ *          find this mapping, zaps its pages (but page not in pte yet)
+ *          clear map->faults
+ *      releases mm_lock
+ * (back to X process)
+ *     put page in X's pte
+ *
+ * Oh well, we wont be updating the writes to this page anytime soon.
+ */
 
 static int xenfb_fps = 20;
 static unsigned long xenfb_mem_len = XENFB_WIDTH * XENFB_HEIGHT * XENFB_DEPTH / 8;
@@ -105,6 +170,7 @@ static int xenfb_queue_full(struct xenfb_info *info)
 
 static void xenfb_update_screen(struct xenfb_info *info)
 {
+	unsigned long flags;
 	int y1, y2, x1, x2;
 	struct xenfb_mapping *map;
 
@@ -113,14 +179,16 @@ static void xenfb_update_screen(struct xenfb_info *info)
 	if (xenfb_queue_full(info))
 		return;
 
-	spin_lock(&info->mm_lock);
+	mutex_lock(&info->mm_lock);
 
+	spin_lock_irqsave(&info->dirty_lock, flags);
 	y1 = info->y1;
 	y2 = info->y2;
 	x1 = info->x1;
 	x2 = info->x2;
 	info->x1 = info->y1 = INT_MAX;
 	info->x2 = info->y2 = 0;
+	spin_unlock_irqrestore(&info->dirty_lock, flags);
 
 	list_for_each_entry(map, &info->mappings, link) {
 		if (!map->faults)
@@ -130,7 +198,7 @@ static void xenfb_update_screen(struct xenfb_info *info)
 		map->faults = 0;
 	}
 
-	spin_unlock(&info->mm_lock);
+	mutex_unlock(&info->mm_lock);
 
 	xenfb_do_update(info, x1, y1, x2 - x1, y2 - y1);
 }
@@ -213,9 +281,11 @@ static void __xenfb_refresh(struct xenfb_info *info,
 static void xenfb_refresh(struct xenfb_info *info,
 			  int x1, int y1, int w, int h)
 {
-	spin_lock(&info->mm_lock);
+	unsigned long flags;
+
+	spin_lock_irqsave(&info->dirty_lock, flags);
 	__xenfb_refresh(info, x1, y1, w, h);
-	spin_unlock(&info->mm_lock);
+	spin_unlock_irqrestore(&info->dirty_lock, flags);
 }
 
 static void xenfb_fillrect(struct fb_info *p, const struct fb_fillrect *rect)
@@ -253,12 +323,12 @@ static void xenfb_vm_close(struct vm_area_struct *vma)
 	struct xenfb_mapping *map = vma->vm_private_data;
 	struct xenfb_info *info = map->info;
 
-	spin_lock(&info->mm_lock);
+	mutex_lock(&info->mm_lock);
 	if (atomic_dec_and_test(&map->map_refs)) {
 		list_del(&map->link);
 		kfree(map);
 	}
-	spin_unlock(&info->mm_lock);
+	mutex_unlock(&info->mm_lock);
 }
 
 static struct page *xenfb_vm_nopage(struct vm_area_struct *vma,
@@ -267,13 +337,15 @@ static struct page *xenfb_vm_nopage(struct vm_area_struct *vma,
 	struct xenfb_mapping *map = vma->vm_private_data;
 	struct xenfb_info *info = map->info;
 	int pgnr = (vaddr - vma->vm_start) >> PAGE_SHIFT;
+	unsigned long flags;
 	struct page *page;
 	int y1, y2;
 
 	if (pgnr >= info->nr_pages)
 		return NOPAGE_SIGBUS;
 
-	spin_lock(&info->mm_lock);
+	mutex_lock(&info->mm_lock);
+	spin_lock_irqsave(&info->dirty_lock, flags);
 	page = info->pages[pgnr];
 	get_page(page);
 	map->faults++;
@@ -283,7 +355,8 @@ static struct page *xenfb_vm_nopage(struct vm_area_struct *vma,
 	if (y2 > info->fb_info->var.yres)
 		y2 = info->fb_info->var.yres;
 	__xenfb_refresh(info, 0, y1, info->fb_info->var.xres, y2 - y1);
-	spin_unlock(&info->mm_lock);
+	spin_unlock_irqrestore(&info->dirty_lock, flags);
+	mutex_unlock(&info->mm_lock);
 
 	if (type)
 		*type = VM_FAULT_MINOR;
@@ -323,9 +396,9 @@ static int xenfb_mmap(struct fb_info *fb_info, struct vm_area_struct *vma)
 	map->info = info;
 	atomic_set(&map->map_refs, 1);
 
-	spin_lock(&info->mm_lock);
+	mutex_lock(&info->mm_lock);
 	list_add(&map->link, &info->mappings);
-	spin_unlock(&info->mm_lock);
+	mutex_unlock(&info->mm_lock);
 
 	vma->vm_ops = &xenfb_vm_ops;
 	vma->vm_flags |= (VM_DONTEXPAND | VM_RESERVED);
@@ -382,7 +455,8 @@ static int __devinit xenfb_probe(struct xenbus_device *dev,
 	info->xbdev = dev;
 	info->irq = -1;
 	info->x1 = info->y1 = INT_MAX;
-	spin_lock_init(&info->mm_lock);
+	spin_lock_init(&info->dirty_lock);
+	mutex_init(&info->mm_lock);
 	init_waitqueue_head(&info->wq);
 	init_timer(&info->refresh);
 	info->refresh.function = xenfb_timer;

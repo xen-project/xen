@@ -218,18 +218,17 @@ def forkHelper(cmd, fd, inputHandler, closeToChild):
                     log.debug('%s', line)
                     inputHandler(line, child.tochild)
 
-            thread.join()
-
         except IOError, exn:
             raise XendError('Error reading from child process for %s: %s' %
                             (cmd, exn))
     finally:
         child.fromchild.close()
-        child.childerr.close()
         if not closeToChild:
             child.tochild.close()
+        thread.join()
+        child.childerr.close()
+        status = child.wait()
 
-    status = child.wait()
     if status >> 8 == 127:
         raise XendError("%s failed: popen failed" % string.join(cmd))
     elif status != 0:

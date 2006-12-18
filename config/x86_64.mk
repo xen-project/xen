@@ -1,4 +1,5 @@
 CONFIG_X86 := y
+CONFIG_X86_64 := y
 CONFIG_X86_$(XEN_OS) := y
 
 CONFIG_HVM := y

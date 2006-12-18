@@ -148,6 +148,10 @@ static int xk2linux[0x10000] = {
 	[XK_plus] = KEY_EQUAL,
 };
 
+static int btnmap[] = {
+	BTN_LEFT, BTN_MIDDLE, BTN_RIGHT, BTN_FORWARD, BTN_BACK
+};
+
 static void on_kbd_event(rfbBool down, rfbKeySym keycode, rfbClientPtr cl)
 {
 	/*
@@ -184,8 +188,11 @@ static void on_ptr_event(int buttonMask, int x, int y, rfbClientPtr cl)
 		down = buttonMask & (1 << i);
 		if (down == last_down)
 			continue;
-		/* FIXME this assumes buttons are numbered the same; verify they are */
-		if (xenfb_send_key(xenfb, down != 0, BTN_MOUSE + i) < 0)
+		if (i >= sizeof(btnmap) / sizeof(*btnmap))
+			break;
+		if (btnmap[i] == 0)
+			break;
+		if (xenfb_send_key(xenfb, down != 0, btnmap[i]) < 0)
 			fprintf(stderr, "Button %d %s lost (%s)\n",
 				i, down ? "down" : "up", strerror(errno));
 	}
@@ -205,15 +212,10 @@ static void on_ptr_event(int buttonMask, int x, int y, rfbClientPtr cl)
 	last_y = y;
 }
 
-static void xenstore_write_vncport(int port, int domid)
+static void xenstore_write_vncport(struct xs_handle *xsh, int port, int domid)
 {
-	char *buf = NULL, *path;
+	char *buf, *path;
 	char portstr[10];
-	struct xs_handle *xsh = NULL;
-
-	xsh = xs_daemon_open();
-	if (xsh == NULL)
-		return;
 
 	path = xs_get_domain_path(xsh, domid);
 	if (path == NULL) {
@@ -240,6 +242,56 @@ static void xenstore_write_vncport(int port, int domid)
 	free(buf);
 }
 
+
+static int xenstore_read_vncpasswd(struct xs_handle *xsh, int domid, char *pwbuf, int pwbuflen)
+{
+	char buf[256], *path, *uuid = NULL, *passwd = NULL;
+	unsigned int len, rc = 0;
+
+	if (xsh == NULL) {
+		return -1;
+	}
+
+	path = xs_get_domain_path(xsh, domid);
+	if (path == NULL) {
+		fprintf(stderr, "xs_get_domain_path() error\n");
+		return -1;
+	}
+
+	snprintf(buf, 256, "%s/vm", path);
+	uuid = xs_read(xsh, XBT_NULL, buf, &len);
+	if (uuid == NULL) {
+		fprintf(stderr, "xs_read(): uuid get error\n");
+		free(path);
+		return -1;
+	}
+
+	snprintf(buf, 256, "%s/vncpasswd", uuid);
+	passwd = xs_read(xsh, XBT_NULL, buf, &len);
+	if (passwd == NULL) {
+		free(uuid);
+		free(path);
+		return rc;
+	}
+
+	strncpy(pwbuf, passwd, pwbuflen-1);
+	pwbuf[pwbuflen-1] = '\0';
+
+	fprintf(stderr, "Got a VNC password read from XenStore\n");
+
+	passwd[0] = '\0';
+	snprintf(buf, 256, "%s/vncpasswd", uuid);
+	if (xs_write(xsh, XBT_NULL, buf, passwd, len) == 0) {
+		fprintf(stderr, "xs_write() vncpasswd failed\n");
+		rc = -1;
+	}
+
+	free(passwd);
+	free(uuid);
+	free(path);
+
+	return rc;
+}
 
 static void vnc_update(struct xenfb *xenfb, int x, int y, int w, int h)
 {
@@ -274,6 +326,10 @@ int main(int argc, char **argv)
 	char portstr[10];
 	char *endp;
 	int r;
+	struct xs_handle *xsh;
+	char vncpasswd[1024];
+
+	vncpasswd[0] = '\0';
 
 	while ((opt = getopt_long(argc, argv, "d:p:t:u", options,
 				  NULL)) != -1) {
@@ -346,6 +402,19 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
+	xsh = xs_daemon_open();
+	if (xsh == NULL) {
+	        fprintf(stderr, "cannot open connection to xenstore\n");
+		exit(1);
+	}
+
+
+	if (xenstore_read_vncpasswd(xsh, domid, vncpasswd, sizeof(vncpasswd)/sizeof(char)) < 0) {
+		fprintf(stderr, "cannot read VNC password from xenstore\n");
+		exit(1);
+	}
+	  
+
 	server = rfbGetScreen(&fake_argc, fake_argv, 
 			      xenfb->width, xenfb->height,
 			      8, 3, xenfb->depth / 8);
@@ -360,6 +429,21 @@ int main(int argc, char **argv)
         if (unused)
 		server->autoPort = true;
 
+	if (vncpasswd[0]) {
+		char **passwds = malloc(sizeof(char**)*2);
+		if (!passwds) {
+			fprintf(stderr, "cannot allocate memory (%s)\n", strerror(errno));
+			exit(1);
+		}
+		fprintf(stderr, "Registered password\n");
+		passwds[0] = vncpasswd;
+		passwds[1] = NULL;
+
+		server->authPasswdData = passwds;
+		server->passwordCheck = rfbCheckPasswordByList;
+	} else {
+		fprintf(stderr, "Running with no password\n");
+	}
 	server->serverFormat.redShift = 16;
 	server->serverFormat.greenShift = 8;
 	server->serverFormat.blueShift = 0;
@@ -372,7 +456,7 @@ int main(int argc, char **argv)
 
 	rfbRunEventLoop(server, -1, true);
 
-        xenstore_write_vncport(server->port, domid);
+        xenstore_write_vncport(xsh, server->port, domid);
 
 	for (;;) {
 		FD_ZERO(&readfds);

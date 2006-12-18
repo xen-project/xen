@@ -284,7 +284,7 @@ gopts.var('usbport', val='PATH',
           use="""Add a physical USB port to a domain, as specified by the path
           to that port.  This option may be repeated to add more than one port.""")
 
-gopts.var('vfb', val="type={vnc,sdl},vncunused=1,vncdisplay=N,vnclisten=ADDR,display=DISPLAY,xauthority=XAUTHORITY",
+gopts.var('vfb', val="type={vnc,sdl},vncunused=1,vncdisplay=N,vnclisten=ADDR,display=DISPLAY,xauthority=XAUTHORITY,vncpasswd=PASSWORD",
           fn=append_value, default=[],
           use="""Make the domain a framebuffer backend.
           The backend type should be either sdl or vnc.
@@ -584,7 +584,7 @@ def configure_vfbs(config_devs, vals):
             d['type'] = 'sdl'
         for (k,v) in d.iteritems():
             if not k in [ 'vnclisten', 'vncunused', 'vncdisplay', 'display',
-                          'xauthority', 'type' ]:
+                          'xauthority', 'type', 'vncpasswd' ]:
                 err("configuration option %s unknown to vfbs" % k)
             config.append([k,v])
         if not d.has_key("display") and os.environ.has_key("DISPLAY"):
