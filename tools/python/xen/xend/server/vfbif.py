@@ -13,6 +13,9 @@ def spawn_detached(path, args, env):
     else:
         os.waitpid(p, 0)
         
+CONFIG_ENTRIES = ['type', 'vncdisplay', 'vnclisten', 'vncpasswd', 'vncunused',
+                  'display', 'xauthority']
+
 class VfbifController(DevController):
     """Virtual frame buffer controller. Handles all vfb devices for a domain.
     Note that we only support a single vfb per domain at the moment.
@@ -20,24 +23,27 @@ class VfbifController(DevController):
 
     def __init__(self, vm):
         DevController.__init__(self, vm)
-        self.config = {}
         
     def getDeviceDetails(self, config):
         """@see DevController.getDeviceDetails"""
-        devid = 0
-        back = {}
-        front = {}
-        return (devid, back, front)
+
+        back = dict([(k, config[k]) for k in CONFIG_ENTRIES
+                     if config.has_key(k)])
+
+        return (0, back, {})
+
 
     def getDeviceConfiguration(self, devid):
-        r = DevController.getDeviceConfiguration(self, devid)
-        for (k,v) in self.config.iteritems():
-            r[k] = v
-        return r
-    
+        result = DevController.getDeviceConfiguration(self, devid)
+
+        devinfo = self.readBackend(devid, *CONFIG_ENTRIES)
+        return dict([(CONFIG_ENTRIES[i], devinfo[i])
+                     for i in range(len(CONFIG_ENTRIES))
+                     if devinfo[i] is not None])
+
+
     def createDevice(self, config):
         DevController.createDevice(self, config)
-        self.config = config
         std_args = [ "--domid", "%d" % self.vm.getDomid(),
                      "--title", self.vm.getName() ]
         t = config.get("type", None)
@@ -47,7 +53,7 @@ class VfbifController(DevController):
                 passwd = config["vncpasswd"]
             else:
                 passwd = xen.xend.XendRoot.instance().get_vncpasswd_default()
-            if not(passwd is None or passwd == ""):
+            if passwd:
                 self.vm.storeVm("vncpasswd", passwd)
                 log.debug("Stored a VNC password for vfb access")
             else:
