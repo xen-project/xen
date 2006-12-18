@@ -1737,6 +1737,8 @@ ENTRY(general_exception)
 #ifdef XEN
 	cmp4.ge p6,p0=0x20,r16
 (p6)	br.sptk.many dispatch_privop_fault
+	;;
+	FAULT_OR_REFLECT(24)
 #else
 	cmp4.eq p6,p0=0,r16
 (p6)	br.sptk.many dispatch_illegal_op_fault

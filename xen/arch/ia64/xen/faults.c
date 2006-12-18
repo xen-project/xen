@@ -605,6 +605,9 @@ ia64_handle_reflection(unsigned long ifa, struct pt_regs *regs,
 		check_lazy_cover = 1;
 		vector = IA64_DATA_ACCESS_RIGHTS_VECTOR;
 		break;
+	case 24:
+		vector = IA64_GENEX_VECTOR;
+		break;
 	case 25:
 		vector = IA64_DISABLED_FPREG_VECTOR;
 		break;
