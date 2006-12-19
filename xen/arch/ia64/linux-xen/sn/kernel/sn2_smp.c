@@ -438,6 +438,11 @@ void sn2_send_IPI(int cpuid, int vector, int delivery_mode, int redirect)
 	int nasid;
 
 	physid = cpu_physical_id(cpuid);
+#ifdef XEN
+	if (!sn_nodepda) {
+		ia64_sn_get_sapic_info(physid, &nasid, NULL, NULL);
+	} else
+#endif
 	nasid = cpuid_to_nasid(cpuid);
 
 	/* the following is used only when starting cpus at boot time */
