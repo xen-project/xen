@@ -85,12 +85,6 @@ void send_timer_event(struct vcpu *v)
     vcpu_unblock(v);
 }
 
-/* Set clock to <secs,usecs> after 00:00:00 UTC, 1 January, 1970. */
-void do_settime(unsigned long secs, unsigned long usecs, u64 system_time_base)
-{
-    unimplemented();
-}
-
 void update_vcpu_system_time(struct vcpu *v)
 {
 }

@@ -152,17 +152,20 @@ void vcpu_destroy(struct vcpu *v)
 
 int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_t *c)
 { 
+    struct domain *d = v->domain;
+
     memcpy(&v->arch.ctxt, &c->user_regs, sizeof(c->user_regs));
 
-    printk("Domain[%d].%d: initializing\n",
-           v->domain->domain_id, v->vcpu_id);
+    printk("Domain[%d].%d: initializing\n", d->domain_id, v->vcpu_id);
 
-    if (v->domain->arch.htab.order == 0)
-        panic("Page table never allocated for Domain: %d\n",
-              v->domain->domain_id);
-    if (v->domain->arch.rma_order == 0)
-        panic("RMA never allocated for Domain: %d\n",
-              v->domain->domain_id);
+    if (d->arch.htab.order == 0)
+        panic("Page table never allocated for Domain: %d\n", d->domain_id);
+    if (d->arch.rma_order == 0)
+        panic("RMA never allocated for Domain: %d\n", d->domain_id);
+
+    d->shared_info->wc_sec = dom0->shared_info->wc_sec;
+    d->shared_info->wc_nsec = dom0->shared_info->wc_nsec;
+    d->shared_info->arch.boot_timebase = dom0->shared_info->arch.boot_timebase;
 
     set_bit(_VCPUF_initialised, &v->vcpu_flags);
 
