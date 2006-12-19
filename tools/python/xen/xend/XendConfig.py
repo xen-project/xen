@@ -85,6 +85,7 @@ def scrub_password(data):
 XENAPI_CFG_TO_LEGACY_CFG = {
     'uuid': 'uuid',
     'vcpus_number': 'vcpus',
+    'cpus': 'cpus',
     'memory_static_min': 'memory',
     'memory_static_max': 'maxmem',
     'name_label': 'name',
