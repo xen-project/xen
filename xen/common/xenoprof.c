@@ -384,7 +384,7 @@ static int add_passive_list(XEN_GUEST_HANDLE(void) arg)
     d->xenoprof->domain_type = XENOPROF_DOMAIN_PASSIVE;
     passive.nbuf = d->xenoprof->nbuf;
     passive.bufsize = d->xenoprof->bufsize;
-    if ( !shadow_mode_translate(d) )
+    if ( !shadow_mode_translate(current->domain) )
         passive.buf_gmaddr = __pa(d->xenoprof->rawbuf);
     else
         xenoprof_shared_gmfn_with_guest(
