@@ -356,8 +356,6 @@ END(xen_send_ipi)
 // Those are vdso specialized.
 // In fsys mode, call, ret can't be used.
 GLOBAL_ENTRY(xen_rsm_be_i)
-	ld8 r22=[r22]
-	;; 
 	st1 [r22]=r20
 	st4 [r23]=r0
 	XEN_HYPER_RSM_BE
@@ -380,23 +378,23 @@ GLOBAL_ENTRY(xen_get_psr)
 END(xen_get_psr)
 
 	// see xen_ssm_i() in privop.h
-	// r22 = &vcpu->evtchn_mask
+	// r22 = &vcpu->vcpu_info->evtchn_upcall_mask
 	// r23 = &vpsr.ic
-	// r24 = &vcpu->pending_interruption
+	// r24 = &vcpu->vcpu_info->evtchn_upcall_pending
 	// r25 = tmp
 	// r31 = tmp
 	// p11 = tmp
 	// p14 = tmp
 #define XEN_SET_PSR_I			\
-	ld4 r31=[r22];			\
-	ld4 r25=[r24];			\
+	ld1 r31=[r22];			\
+	ld1 r25=[r24];			\
 	;;				\
-	st4 [r22]=r0;			\
+	st1 [r22]=r0;			\
 	cmp.ne.unc p14,p0=r0,r31;	\
 	;;				\
 (p14)	cmp.ne.unc p11,p0=r0,r25;	\
 	;;				\
-(p11)	st4 [r22]=r20;			\
+(p11)	st1 [r22]=r20;			\
 (p11)	st4 [r23]=r0;			\
 (p11)	XEN_HYPER_SSM_I;
 		

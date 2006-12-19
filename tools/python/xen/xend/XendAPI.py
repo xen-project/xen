@@ -663,7 +663,10 @@ class XendAPI:
             XendDomain.instance().get_vm_by_uuid(vm_ref).info[name])
 
     def VM_set(self, name, session, vm_ref, value):
-        XendDomain.instance().get_vm_by_uuid(vm_ref).info[name] = value
+        xd = XendDomain.instance()
+        dominfo = xd.get_vm_by_uuid(vm_ref)
+        dominfo.info[name] = value
+        xd.managed_config_save(dominfo)
         return xen_api_success_void()
 
     # attributes (ro)

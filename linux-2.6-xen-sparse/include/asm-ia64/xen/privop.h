@@ -113,7 +113,8 @@ extern void xen_set_eflag(unsigned long);	/* see xen_ia64_setreg */
 	({ XSI_PSR_I = (uint8_t)(_val) ? 0 : 1; })
 #define xen_set_virtual_psr_ic(_val)	\
 	({ XEN_MAPPEDREGS->interrupt_collection_enabled = _val ? 1 : 0; })
-#define xen_get_virtual_pend()		(XEN_MAPPEDREGS->pending_interruption)
+#define xen_get_virtual_pend()		\
+	(*(((uint8_t *)XEN_MAPPEDREGS->interrupt_mask_addr) - 1))
 
 /* Hyperprivops are "break" instructions with a well-defined API.
  * In particular, the virtual psr.ic bit must be off; in this way

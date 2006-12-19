@@ -37,8 +37,10 @@
 # define FAST_BREAK
 # undef FAST_ACCESS_REFLECT 	//XXX TODO fast_access_reflect
                             	//    doesn't support dom0 vp yet.
-# define FAST_RFI
-# define FAST_SSM_I
+//# define FAST_RFI
+// TODO: Since we use callback to deliver interrupt, 
+//       FAST_SSM_I needs to be rewritten.
+//# define FAST_SSM_I
 # define FAST_PTC_GA
 # undef RFI_TO_INTERRUPT // not working yet
 #endif
@@ -87,29 +89,13 @@ GLOBAL_ENTRY(fast_hyperprivop)
 	cmp.eq p7,p6=HYPERPRIVOP_SSM_I,r17
 (p7)	br.sptk.many hyper_ssm_i;;
 
-	// FIXME. This algorithm gives up (goes to the slow path) if there
-	// are ANY interrupts pending, even if they are currently
-	// undeliverable.  This should be improved later...
-	adds r20=XSI_PEND_OFS-XSI_PSR_IC_OFS,r18 ;;
-	ld4 r20=[r20] ;;
-	cmp.eq p7,p0=r0,r20
-(p7)	br.cond.sptk.many 1f
-	movl r20=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
-	ld8 r20=[r20];;
-	adds r21=IA64_VCPU_IRR0_OFFSET,r20;
-	adds r22=IA64_VCPU_IRR0_OFFSET+8,r20;;
-	ld8 r23=[r21],16; ld8 r24=[r22],16;;
-	ld8 r21=[r21]; ld8 r22=[r22];;
-	or r23=r23,r24; or r21=r21,r22;;
-	or r20=r23,r21;;
-1:	// when we get to here r20=~=interrupts pending
 	// Check pending event indication
-(p7)	movl r20=THIS_CPU(current_psr_i_addr);;
-(p7)	ld8 r20=[r20]
+	adds r20=XSI_PSR_I_ADDR_OFS-XSI_PSR_IC_OFS, r18;;
+	ld8 r20=[r20]
 	;;
-(p7)	adds r20=-1,r20				// evtchn_upcall_pending
+	ld1 r22=[r20],-1	// evtchn_upcall_mask
 	;;
-(p7)	ld1 r20=[r20]
+	ld1 r20=[r20]		// evtchn_upcall_pending
 	;;
 
 	// HYPERPRIVOP_RFI?
@@ -117,12 +103,10 @@ GLOBAL_ENTRY(fast_hyperprivop)
 (p7)	br.sptk.many hyper_rfi
 	;;
 
-	// HYPERPRIVOP_GET_IVR?
-	cmp.eq p7,p6=HYPERPRIVOP_GET_IVR,r17
-(p7)	br.sptk.many hyper_get_ivr
-	;;
-
+	// if event enabled and there are pending events
 	cmp.ne p7,p0=r20,r0
+	;;
+	cmp.eq.and p7,p0=r22,r0
 (p7)	br.spnt.many dispatch_break_fault
 	;;
 
@@ -139,21 +123,6 @@ GLOBAL_ENTRY(fast_hyperprivop)
 	// HYPERPRIVOP_RSM_DT?
 	cmp.eq p7,p6=HYPERPRIVOP_RSM_DT,r17
 (p7)	br.sptk.many hyper_rsm_dt
-	;;
-
-	// HYPERPRIVOP_GET_TPR?
-	cmp.eq p7,p6=HYPERPRIVOP_GET_TPR,r17
-(p7)	br.sptk.many hyper_get_tpr
-	;;
-
-	// HYPERPRIVOP_SET_TPR?
-	cmp.eq p7,p6=HYPERPRIVOP_SET_TPR,r17
-(p7)	br.sptk.many hyper_set_tpr
-	;;
-
-	// HYPERPRIVOP_EOI?
-	cmp.eq p7,p6=HYPERPRIVOP_EOI,r17
-(p7)	br.sptk.many hyper_eoi
 	;;
 
 	// HYPERPRIVOP_SET_ITM?
@@ -425,10 +394,11 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	ld8 r23=[r21];;
 	or r22=r22,r23;;
 	st8 [r21]=r22;;
-	// set PSCB(pending_interruption)!
-	adds r20=XSI_PEND_OFS-XSI_PSR_IC_OFS,r18 ;;
-	st4 [r20]=r25;;
-	
+	// set evtchn_upcall_pending!
+	adds r20=XSI_PSR_I_ADDR_OFS-XSI_PSR_IC_OFS,r18;;
+	ld8 r20=[r20];;
+	adds r20=-1,r20;;		// evtchn_upcall_pending
+	st1 [r20]=r25;;
 	// if interrupted at pl0, we're done
 	extr.u r16=r17,IA64_PSR_CPL0_BIT,2;;
 	cmp.eq p6,p0=r16,r0;;
@@ -1464,236 +1434,6 @@ ENTRY(hyper_rsm_dt)
 	rfi
 	;;
 END(hyper_rsm_dt)
-
-ENTRY(hyper_get_tpr)
-#ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=FAST_HYPERPRIVOP_PERFC(HYPERPRIVOP_GET_TPR);;
-	ld4 r21=[r20];;
-	adds r21=1,r21;;
-	st4 [r20]=r21;;
-#endif
-	mov r24=cr.ipsr
-	mov r25=cr.iip;;
-	adds r20=XSI_TPR_OFS-XSI_PSR_IC_OFS,r18 ;;
-	ld8 r8=[r20];;
-	extr.u r26=r24,41,2 ;;
-	cmp.eq p6,p7=2,r26 ;;
-(p6)	mov r26=0
-(p6)	adds r25=16,r25
-(p7)	adds r26=1,r26
-	;;
-	dep r24=r26,r24,41,2
-	;;
-	mov cr.ipsr=r24
-	mov cr.iip=r25
-	mov pr=r31,-1 ;;
-	rfi
-	;;
-END(hyper_get_tpr)
-
-// if we get to here, there are no interrupts pending so we
-// can change virtual tpr to any value without fear of provoking
-// (or accidentally missing) delivering an interrupt
-ENTRY(hyper_set_tpr)
-#ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=FAST_HYPERPRIVOP_PERFC(HYPERPRIVOP_SET_TPR);;
-	ld4 r21=[r20];;
-	adds r21=1,r21;;
-	st4 [r20]=r21;;
-#endif
-	mov r24=cr.ipsr
-	mov r25=cr.iip;;
-	movl r27=0xff00;;
-	adds r20=XSI_TPR_OFS-XSI_PSR_IC_OFS,r18 ;;
-	andcm r8=r8,r27;;
-	st8 [r20]=r8;;
-	extr.u r26=r24,41,2 ;;
-	cmp.eq p6,p7=2,r26 ;;
-(p6)	mov r26=0
-(p6)	adds r25=16,r25
-(p7)	adds r26=1,r26
-	;;
-	dep r24=r26,r24,41,2
-	;;
-	mov cr.ipsr=r24
-	mov cr.iip=r25
-	mov pr=r31,-1 ;;
-	rfi
-	;;
-END(hyper_set_tpr)
-
-ENTRY(hyper_get_ivr)
-#ifdef FAST_HYPERPRIVOP_CNT
-	movl r22=FAST_HYPERPRIVOP_PERFC(HYPERPRIVOP_GET_IVR);;
-	ld4 r21=[r22];;
-	adds r21=1,r21;;
-	st4 [r22]=r21;;
-#endif
-	mov r8=15;;
-	// when we get to here r20=~=interrupts pending
-	cmp.eq p7,p0=r20,r0;;
-(p7)	adds r20=XSI_PEND_OFS-XSI_PSR_IC_OFS,r18 ;;
-(p7)	st4 [r20]=r0;;
-(p7)	br.spnt.many 1f ;;
-	movl r30=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
-	ld8 r30=[r30];;
-	adds r24=IA64_VCPU_INSVC3_OFFSET,r30;;
-	mov r25=192
-	adds r22=IA64_VCPU_IRR3_OFFSET,r30;;
-	ld8 r23=[r22];;
-	cmp.eq p6,p0=r23,r0;;
-(p6)	adds r22=-8,r22;;
-(p6)	adds r24=-8,r24;;
-(p6)	adds r25=-64,r25;;
-(p6)	ld8 r23=[r22];;
-(p6)	cmp.eq p6,p0=r23,r0;;
-(p6)	adds r22=-8,r22;;
-(p6)	adds r24=-8,r24;;
-(p6)	adds r25=-64,r25;;
-(p6)	ld8 r23=[r22];;
-(p6)	cmp.eq p6,p0=r23,r0;;
-(p6)	adds r22=-8,r22;;
-(p6)	adds r24=-8,r24;;
-(p6)	adds r25=-64,r25;;
-(p6)	ld8 r23=[r22];;
-(p6)	cmp.eq p6,p0=r23,r0;;
-	cmp.eq p6,p0=r23,r0
-(p6)	br.cond.spnt.few 1f;	// this is actually an error
-	// r22 points to non-zero element of irr, r23 has value
-	// r24 points to corr element of insvc, r25 has elt*64
-	ld8 r26=[r24];;
-	cmp.geu p6,p0=r26,r23
-(p6)	br.cond.spnt.many 1f;
-	// not masked by insvc, get vector number
-	shr.u r26=r23,1;;
-	or r26=r23,r26;;
-	shr.u r27=r26,2;;
-	or r26=r26,r27;;
-	shr.u r27=r26,4;;
-	or r26=r26,r27;;
-	shr.u r27=r26,8;;
-	or r26=r26,r27;;
-	shr.u r27=r26,16;;
-	or r26=r26,r27;;
-	shr.u r27=r26,32;;
-	or r26=r26,r27;;
-	andcm r26=0xffffffffffffffff,r26;;
-	popcnt r26=r26;;
-	sub r26=63,r26;;
-	// r26 now contains the bit index (mod 64)
-	mov r27=1;;
-	shl r27=r27,r26;;
-	// r27 now contains the (within the proper word) bit mask 
-	add r26=r25,r26
-	// r26 now contains the vector [0..255]
-	adds r20=XSI_TPR_OFS-XSI_PSR_IC_OFS,r18 ;;
-	ld8 r20=[r20] ;;
-	extr.u r28=r20,16,1
-	extr.u r29=r20,4,4 ;;
-	cmp.ne p6,p0=r28,r0	// if tpr.mmi is set, return SPURIOUS
-(p6)	br.cond.spnt.few 1f;
-	shl r29=r29,4;;
-	adds r29=15,r29;;
-	cmp.ge p6,p0=r29,r26
-(p6)	br.cond.spnt.few 1f;
-	// OK, have an unmasked vector to process/return
-	ld8 r25=[r24];;
-	or r25=r25,r27;;
-	st8 [r24]=r25;;
-	ld8 r25=[r22];;
-	andcm r25=r25,r27;;
-	st8 [r22]=r25;;
-	mov r8=r26;;
-	// if its a clock tick, remember itm to avoid delivering it twice
-	adds r20=XSI_ITV_OFS-XSI_PSR_IC_OFS,r18 ;;
-	ld8 r20=[r20];;
-	extr.u r20=r20,0,8;;
-	cmp.eq p6,p0=r20,r8
-	adds r22=IA64_VCPU_DOMAIN_ITM_LAST_OFFSET,r30
-	adds r23=IA64_VCPU_DOMAIN_ITM_OFFSET,r30;;
-	ld8 r23=[r23];;
-(p6)	st8 [r22]=r23;;
-	// all done
-1:	mov r24=cr.ipsr
-	mov r25=cr.iip;;
-	extr.u r26=r24,41,2 ;;
-	cmp.eq p6,p7=2,r26 ;;
-(p6)	mov r26=0
-(p6)	adds r25=16,r25
-(p7)	adds r26=1,r26
-	;;
-	dep r24=r26,r24,41,2
-	;;
-	mov cr.ipsr=r24
-	mov cr.iip=r25
-	mov pr=r31,-1 ;;
-	rfi
-	;;
-END(hyper_get_ivr)
-
-ENTRY(hyper_eoi)
-	// when we get to here r20=~=interrupts pending
-	cmp.ne p7,p0=r20,r0
-(p7)	br.spnt.many dispatch_break_fault ;;
-#ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=FAST_HYPERPRIVOP_PERFC(HYPERPRIVOP_EOI);;
-	ld4 r21=[r20];;
-	adds r21=1,r21;;
-	st4 [r20]=r21;;
-#endif
-	movl r22=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
-	ld8 r22=[r22];;
-	adds r22=IA64_VCPU_INSVC3_OFFSET,r22;;
-	ld8 r23=[r22];;
-	cmp.eq p6,p0=r23,r0;;
-(p6)	adds r22=-8,r22;;
-(p6)	ld8 r23=[r22];;
-(p6)	cmp.eq p6,p0=r23,r0;;
-(p6)	adds r22=-8,r22;;
-(p6)	ld8 r23=[r22];;
-(p6)	cmp.eq p6,p0=r23,r0;;
-(p6)	adds r22=-8,r22;;
-(p6)	ld8 r23=[r22];;
-(p6)	cmp.eq p6,p0=r23,r0;;
-	cmp.eq p6,p0=r23,r0
-(p6)	br.cond.spnt.few 1f;	// this is actually an error
-	// r22 points to non-zero element of insvc, r23 has value
-	shr.u r24=r23,1;;
-	or r24=r23,r24;;
-	shr.u r25=r24,2;;
-	or r24=r24,r25;;
-	shr.u r25=r24,4;;
-	or r24=r24,r25;;
-	shr.u r25=r24,8;;
-	or r24=r24,r25;;
-	shr.u r25=r24,16;;
-	or r24=r24,r25;;
-	shr.u r25=r24,32;;
-	or r24=r24,r25;;
-	andcm r24=0xffffffffffffffff,r24;;
-	popcnt r24=r24;;
-	sub r24=63,r24;;
-	// r24 now contains the bit index
-	mov r25=1;;
-	shl r25=r25,r24;;
-	andcm r23=r23,r25;;
-	st8 [r22]=r23;;
-1:	mov r24=cr.ipsr
-	mov r25=cr.iip;;
-	extr.u r26=r24,41,2 ;;
-	cmp.eq p6,p7=2,r26 ;;
-(p6)	mov r26=0
-(p6)	adds r25=16,r25
-(p7)	adds r26=1,r26
-	;;
-	dep r24=r26,r24,41,2
-	;;
-	mov cr.ipsr=r24
-	mov cr.iip=r25
-	mov pr=r31,-1 ;;
-	rfi
-	;;
-END(hyper_eoi)
 
 ENTRY(hyper_set_itm)
 	// when we get to here r20=~=interrupts pending

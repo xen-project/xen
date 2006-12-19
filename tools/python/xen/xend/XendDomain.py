@@ -26,6 +26,7 @@ import os
 import stat
 import shutil
 import socket
+import tempfile
 import threading
 
 import xen.lowlevel.xc
@@ -280,16 +281,21 @@ class XendDomain:
             make_or_raise(domain_config_dir)
 
             try:
-                sxp_cache_file = open(self._managed_config_path(dom_uuid),'w')
-                prettyprint(dominfo.sxpr(), sxp_cache_file, width = 78)
-                sxp_cache_file.close()
+                fd, fn = tempfile.mkstemp()
+                f = os.fdopen(fd, 'w+b')
+                try:
+                    prettyprint(dominfo.sxpr(legacy_only = False), f,
+                                width = 78)
+                finally:
+                    f.close()
+                try:
+                    os.rename(fn, self._managed_config_path(dom_uuid))
+                except:
+                    log.exception("Renaming %s" % fn)
+                    os.remove(fn)
             except:
                 log.exception("Error occurred saving configuration file " +
                               "to %s" % domain_config_dir)
-                try:
-                    self._managed_domain_remove(dom_uuid)
-                except:
-                    pass
                 raise XendError("Failed to save configuration file to: %s" %
                                 domain_config_dir)
         else:

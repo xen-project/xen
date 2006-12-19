@@ -1800,9 +1800,10 @@ class XendDomainInfo:
         log.trace("XendDomainInfo.update done on domain %s: %s",
                   str(self.domid), self.info)
 
-    def sxpr(self, ignore_store = False):
+    def sxpr(self, ignore_store = False, legacy_only = True):
         result = self.info.to_sxp(domain = self,
-                                   ignore_devices = ignore_store)
+                                  ignore_devices = ignore_store,
+                                  legacy_only = legacy_only)
 
         if not ignore_store and self.dompath:
             vnc_port = self.readDom('console/vnc-port')

@@ -62,7 +62,6 @@ void foo(void)
 	DEFINE_MAPPED_REG_OFS(XSI_ITV_OFS, itv);
 	DEFINE_MAPPED_REG_OFS(XSI_PTA_OFS, pta);
 	DEFINE_MAPPED_REG_OFS(XSI_PSR_IC_OFS, interrupt_collection_enabled);
-	DEFINE_MAPPED_REG_OFS(XSI_PEND_OFS, pending_interruption);
 	DEFINE_MAPPED_REG_OFS(XSI_INCOMPL_REGFR_OFS, incomplete_regframe);
 	DEFINE_MAPPED_REG_OFS(XSI_METAPHYS_OFS, metaphysical_mode);
 	DEFINE_MAPPED_REG_OFS(XSI_BANKNUM_OFS, banknum);

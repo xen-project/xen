@@ -490,15 +490,15 @@ void scrub_heap_pages(void)
 
     for ( mfn = first_valid_mfn; mfn < max_page; mfn++ )
     {
-        /* Every 100MB, print a progress dot. */
-        if ( (mfn % ((100*1024*1024)/PAGE_SIZE)) == 0 )
-            printk(".");
-
         process_pending_timers();
 
         /* Quick lock-free check. */
         if ( allocated_in_map(mfn) )
             continue;
+
+        /* Every 100MB, print a progress dot. */
+        if ( (mfn % ((100*1024*1024)/PAGE_SIZE)) == 0 )
+            printk(".");
 
         spin_lock_irq(&heap_lock);
 

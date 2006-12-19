@@ -60,7 +60,7 @@ void
 contiguous_bitmap_init(unsigned long end_pfn)
 {
 	unsigned long size = (end_pfn + 2 * BITS_PER_LONG) >> 3;
-	contiguous_bitmap = alloc_bootmem_low_pages(size);
+	contiguous_bitmap = alloc_bootmem_pages(size);
 	BUG_ON(!contiguous_bitmap);
 	memset(contiguous_bitmap, 0, size);
 }

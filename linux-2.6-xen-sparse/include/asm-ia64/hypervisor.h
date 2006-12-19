@@ -215,7 +215,8 @@ asmlinkage int xprintk(const char *fmt, ...);
 #endif /* CONFIG_XEN || CONFIG_VMX_GUEST */
 
 #ifdef CONFIG_XEN_PRIVILEGED_GUEST
-#define is_initial_xendomain() (xen_start_info->flags & SIF_INITDOMAIN)
+#define is_initial_xendomain()						\
+	(is_running_on_xen() ? xen_start_info->flags & SIF_INITDOMAIN : 0)
 #else
 #define is_initial_xendomain() 0
 #endif

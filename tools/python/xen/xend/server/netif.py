@@ -140,7 +140,7 @@ class NetifController(DevController):
 
         script = os.path.join(xroot.network_script_dir,
                               config.get('script', xroot.get_vif_script()))
-        typ = config.get('type')
+        typ     = config.get('type')
         bridge  = config.get('bridge')
         mac     = config.get('mac')
         vifname = config.get('vifname')

@@ -57,6 +57,8 @@ def ACMLabelResources(resources):
 
 # Applications may label resources explicitly by calling this function
 def ACMLabelResource(resource, label='red'):
+    if not isACMEnabled():
+        return
     if acm_verbose:
         print "labeling resource %s with label %s" % (resource, label)
     if not ACM_LABEL_RESOURCES:
