@@ -34,7 +34,7 @@ XEND_STORAGE_MAX_IGNORE = -1
 XEND_STORAGE_DIR = "/var/lib/xend/storage/"
 XEND_STORAGE_QCOW_FILENAME = "%s.qcow"
 XEND_STORAGE_VDICFG_FILENAME = "%s.vdi.xml"
-QCOW_CREATE_COMMAND = "/usr/sbin/qcow-create -p %d %s"
+QCOW_CREATE_COMMAND = "/usr/sbin/qcow-create -r %d %s"
 
 MB = 1024 * 1024
 
