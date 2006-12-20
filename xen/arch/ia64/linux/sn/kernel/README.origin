@@ -1,0 +1,9 @@
+Source files in this directory are identical copies of linux-2.6.19 files:
+
+NOTE: DO NOT commit changes to these files!   If a file
+needs to be changed, move it to ../linux-xen and follow
+the instructions in the README there.
+
+machvec.c		-> linux/arch/ia64/sn/kernel/machvec.c
+pio_phys.S		-> linux/arch/ia64/sn/kernel/pio_phys.S
+ptc_deadlock.S		-> linux/arch/ia64/sn/kernel/sn2/ptc_deadlock.S

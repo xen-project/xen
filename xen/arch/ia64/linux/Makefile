@@ -1,3 +1,7 @@
+subdir-y += dig
+subdir-y += hp
+subdir-y += sn
+
 obj-y += bitop.o
 obj-y += clear_page.o
 obj-y += cmdline.o
@@ -23,6 +27,7 @@ obj-y += __udivdi3.o
 obj-y += __moddi3.o
 obj-y += __umoddi3.o
 obj-y += carta_random.o
+obj-y += io.o
 
 ## variants of divide/modulo
 ## see files in xen/arch/ia64/linux/lib (linux/arch/ia64/lib)

@@ -34,3 +34,10 @@ iosapic.h		-> linux/include/asm-ia64/iosapic.h
 # The files below are from Linux-2.6.16.33
 perfmon.h		-> linux/include/asm-ia64/perfmon.h
 perfmon_default_smpl.h	-> linux/include/asm-ia64/perfmon_default_smpl.h
+
+# The files below are from Linux-2.6.19
+machvec.h		-> linux/include/asm-ia64/machvec.h
+machvec_dig.h		-> linux/include/asm-ia64/machvec_dig.h
+machvec_sn2.h		-> linux/include/asm-ia64/machvec_sn2.h
+machvec_hpzx1.h		-> linux/include/asm-ia64/machvec_hpzx1.h
+machvec_pci.h		-> linux/include/asm-ia64/pci.h

@@ -85,6 +85,114 @@ machvec_noop_mm (struct mm_struct *mm)
 {
 }
 
+#ifdef XEN
+#include <xen/lib.h>
+/*
+ * These should never get called, they just fill out the machine
+ * vectors and make the compiler happy.
+ */
+static inline void*
+machvec_noop_dma_alloc_coherent (struct device *dev, size_t size,
+                                 dma_addr_t *addr, int dir)
+{
+	panic("%s() called", __FUNCTION__);
+	return (void *)0;
+}
+
+static inline void
+machvec_noop_dma_free_coherent (struct device *dev, size_t size,
+                                void *vaddr, dma_addr_t handle)
+{
+	panic("%s() called", __FUNCTION__);
+}
+
+static inline dma_addr_t
+machvec_noop_dma_map_single (struct device *dev, void *addr,
+                             size_t size, int dir)
+{
+	panic("%s() called", __FUNCTION__);
+	return (dma_addr_t)0;
+}
+
+static inline void
+machvec_noop_dma_unmap_single (struct device *dev, dma_addr_t vaddr,
+                               size_t size, int dir)
+{
+	panic("%s() called", __FUNCTION__);
+}
+
+static inline int
+machvec_noop_dma_map_sg (struct device *dev, struct scatterlist *sglist,
+                         int nents, int dir)
+{
+	panic("%s() called", __FUNCTION__);
+	return 0;
+}
+
+static inline void
+machvec_noop_dma_unmap_sg (struct device *dev, struct scatterlist *sglist,
+                           int nents, int dir)
+{
+	panic("%s() called", __FUNCTION__);
+}
+
+static inline void
+machvec_noop_dma_sync_single_for_cpu (struct device *dev, dma_addr_t vaddr,
+                                      size_t size, int dir)
+{
+	panic("%s() called", __FUNCTION__);
+}
+
+#define machvec_noop_dma_sync_single_for_device		\
+	machvec_noop_dma_sync_single_for_cpu
+
+static inline void
+machvec_noop_dma_sync_sg_for_cpu (struct device *dev,
+                                  struct scatterlist *sglist,
+                                  int nents, int dir)
+{
+	panic("%s() called", __FUNCTION__);
+}
+
+#define machvec_noop_dma_sync_sg_for_device		\
+	machvec_noop_dma_sync_sg_for_cpu
+
+static inline int
+machvec_noop_dma_mapping_error (dma_addr_t dma_addr)
+{
+	panic("%s() called", __FUNCTION__);
+	return 1;
+}
+
+static inline int
+machvec_noop_dma_supported (struct device *dev, u64 mask)
+{
+	panic("%s() called", __FUNCTION__);
+	return 0;
+}
+
+static inline char*
+machvec_noop_pci_get_legacy_mem (struct pci_bus *bus)
+{
+	panic("%s() called", __FUNCTION__);
+	return 0;
+}
+
+static inline int
+machvec_noop_pci_legacy_read (struct pci_bus *bus, u16 port, u32 *val, u8 size)
+{
+	panic("%s() called", __FUNCTION__);
+	return 0;
+}
+
+static inline int
+machvec_noop_pci_legacy_write (struct pci_bus *bus, u16 port, u32 val, u8 size)
+{
+	panic("%s() called", __FUNCTION__);
+	return 0;
+}
+#endif
+
 extern void machvec_setup (char **);
 extern void machvec_timer_interrupt (int, void *, struct pt_regs *);
 extern void machvec_dma_sync_single (struct device *, dma_addr_t, size_t, int);

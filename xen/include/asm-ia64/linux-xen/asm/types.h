@@ -74,6 +74,14 @@ typedef unsigned short kmem_bufctl_t;
 
 #ifdef XEN
 #include <asm/xentypes.h>
+
+#ifndef __ASSEMBLY__
+typedef unsigned int gfp_t;
+typedef u64 resource_size_t;
+typedef u32 dev_t;
+typedef unsigned int mode_t;
+#define THIS_MODULE	NULL
+#endif
 #endif
 
 #endif /* _ASM_IA64_TYPES_H */
