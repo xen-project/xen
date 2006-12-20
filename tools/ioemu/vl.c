@@ -6153,7 +6153,7 @@ int main(int argc, char **argv)
             case QEMU_OPTION_boot:
                 boot_device = strdup(optarg);
                 if (strspn(boot_device, "acd"
-#ifdef TARGET_SPARC
+#if defined(TARGET_SPARC) || defined(TARGET_I386)
                            "n"
 #endif
                         ) != strlen(boot_device)) {
