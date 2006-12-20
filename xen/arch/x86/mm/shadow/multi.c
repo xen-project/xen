@@ -2645,14 +2645,11 @@ static int sh_page_fault(struct vcpu *v,
         else
         {
             /* This should be exceptionally rare: another vcpu has fixed
-             * the tables between the fault and our reading the l1e.
-             * Fall through to the normal fault handing logic */
+             * the tables between the fault and our reading the l1e. 
+             * Retry and let the hardware give us the right fault next time. */
             perfc_incrc(shadow_fault_fast_fail);
-            SHADOW_PRINTK("fast path false alarm!\n");
-            /* Don't pass the reserved-bit bit: if we look at the fault 
-             * below and decide to pass it to the guest, the reserved-bit
-             * bit won't make sense there. */
-            regs->error_code &= ~PFEC_reserved_bit;
+            SHADOW_PRINTK("fast path false alarm!\n");            
+            return EXCRET_fault_fixed;
         }
     }
 #endif /* SHOPT_FAST_FAULT_PATH */
