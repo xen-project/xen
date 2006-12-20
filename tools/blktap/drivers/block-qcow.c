@@ -1352,8 +1352,9 @@ int qcow_create(const char *filename, uint64_t total_size,
 	printf("Created cksum: %d\n",exthdr.cksum);
 	free(ptr);
 
-	/*adjust file length to 4 KByte boundary*/
-	length = ROUNDUP(header_size + (l1_size * sizeof(uint64_t)),PAGE_SIZE);
+	/*adjust file length to system page size boundary*/
+	length = ROUNDUP(header_size + (l1_size * sizeof(uint64_t)),
+		getpagesize());
 	if (qtruncate(fd, length, 0)!=0) {
 		DPRINTF("ERROR truncating file\n");
 		return -1;
