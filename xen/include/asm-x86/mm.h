@@ -307,7 +307,7 @@ void audit_domains(void);
 
 int new_guest_cr3(unsigned long pfn);
 void make_cr3(struct vcpu *v, unsigned long mfn);
-
+void update_cr3(struct vcpu *v);
 void propagate_page_fault(unsigned long addr, u16 error_code);
 
 int __sync_lazy_execstate(void);

@@ -243,7 +243,7 @@ guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw, int guest_op)
     gw->l3mfn = vcpu_gfn_to_mfn(v, guest_l4e_get_gfn(*gw->l4e));
     if ( !mfn_valid(gw->l3mfn) ) return 1;
     /* This mfn is a pagetable: make sure the guest can't write to it. */
-    if ( guest_op && shadow_remove_write_access(v, gw->l3mfn, 3, va) != 0 )
+    if ( guest_op && sh_remove_write_access(v, gw->l3mfn, 3, va) != 0 )
         flush_tlb_mask(v->domain->domain_dirty_cpumask); 
     gw->l3e = ((guest_l3e_t *)sh_map_domain_page(gw->l3mfn))
         + guest_l3_table_offset(va);
@@ -257,7 +257,7 @@ guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw, int guest_op)
     gw->l2mfn = vcpu_gfn_to_mfn(v, guest_l3e_get_gfn(*gw->l3e));
     if ( !mfn_valid(gw->l2mfn) ) return 1;
     /* This mfn is a pagetable: make sure the guest can't write to it. */
-    if ( guest_op && shadow_remove_write_access(v, gw->l2mfn, 2, va) != 0 )
+    if ( guest_op && sh_remove_write_access(v, gw->l2mfn, 2, va) != 0 )
         flush_tlb_mask(v->domain->domain_dirty_cpumask); 
     gw->l2e = ((guest_l2e_t *)sh_map_domain_page(gw->l2mfn))
         + guest_l2_table_offset(va);
@@ -299,7 +299,7 @@ guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw, int guest_op)
         if ( !mfn_valid(gw->l1mfn) ) return 1;
         /* This mfn is a pagetable: make sure the guest can't write to it. */
         if ( guest_op 
-             && shadow_remove_write_access(v, gw->l1mfn, 1, va) != 0 )
+             && sh_remove_write_access(v, gw->l1mfn, 1, va) != 0 )
             flush_tlb_mask(v->domain->domain_dirty_cpumask); 
         gw->l1e = ((guest_l1e_t *)sh_map_domain_page(gw->l1mfn))
             + guest_l1_table_offset(va);
@@ -492,7 +492,7 @@ static u32 guest_set_ad_bits(struct vcpu *v,
         u32 shflags = mfn_to_page(gmfn)->shadow_flags & SHF_page_type_mask;
         /* More than one type bit set in shadow-flags? */
         if ( shflags & ~(1UL << find_first_set_bit(shflags)) )
-            res = __shadow_validate_guest_entry(v, gmfn, ep, sizeof(*ep));
+            res = sh_validate_guest_entry(v, gmfn, ep, sizeof (*ep));
     }
 
     /* We should never need to flush the TLB or recopy PAE entries */
@@ -2847,7 +2847,7 @@ static int sh_page_fault(struct vcpu *v,
         /* If this is actually a page table, then we have a bug, and need 
          * to support more operations in the emulator.  More likely, 
          * though, this is a hint that this page should not be shadowed. */
-        shadow_remove_all_shadows(v, gmfn);
+        sh_remove_shadows(v, gmfn, 0 /* thorough */, 1 /* must succeed */);
     }
 
     /* Emulator has changed the user registers: write back */
@@ -3080,7 +3080,7 @@ sh_update_linear_entries(struct vcpu *v)
             sh_unmap_domain_page(ml4e);
         }
 
-        /* Shadow l3 tables are made up by update_cr3 */
+        /* Shadow l3 tables are made up by sh_update_cr3 */
         sl3e = v->arch.shadow.l3table;
 
         for ( i = 0; i < SHADOW_L3_PAGETABLE_ENTRIES; i++ )
@@ -3118,7 +3118,7 @@ sh_update_linear_entries(struct vcpu *v)
         int unmap_l2e = 0;
 
 #if GUEST_PAGING_LEVELS == 2
-        /* Shadow l3 tables were built by update_cr3 */
+        /* Shadow l3 tables were built by sh_update_cr3 */
         if ( shadow_mode_external(d) )
             shadow_l3e = (shadow_l3e_t *)&v->arch.shadow.l3table;
         else
@@ -3341,12 +3341,15 @@ sh_set_toplevel_shadow(struct vcpu *v,
 
 
 static void
-sh_update_cr3(struct vcpu *v)
+sh_update_cr3(struct vcpu *v, int do_locking)
 /* Updates vcpu->arch.cr3 after the guest has changed CR3.
  * Paravirtual guests should set v->arch.guest_table (and guest_table_user,
  * if appropriate).
  * HVM guests should also make sure hvm_get_guest_cntl_reg(v, 3) works,
  * and read vcpu->arch.hvm_vcpu.hw_cr3 afterwards.
+ * If do_locking != 0, assume we are being called from outside the 
+ * shadow code, and must take and release the shadow lock; otherwise 
+ * that is the caller's respnsibility.
  */
 {
     struct domain *d = v->domain;
@@ -3354,6 +3357,15 @@ sh_update_cr3(struct vcpu *v)
 #if GUEST_PAGING_LEVELS == 3
     u32 guest_idx=0;
 #endif
+
+    /* Don't do anything on an uninitialised vcpu */
+    if ( !is_hvm_domain(d) && !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+    {
+        ASSERT(v->arch.cr3 == 0);
+        return;
+    }
+
+    if ( do_locking ) shadow_lock(v->domain);
 
     ASSERT(shadow_locked_by_me(v->domain));
     ASSERT(v->arch.shadow.mode);
@@ -3400,11 +3412,6 @@ sh_update_cr3(struct vcpu *v)
 #endif
         gmfn = pagetable_get_mfn(v->arch.guest_table);
 
-    if ( !is_hvm_domain(d) && !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
-    {
-        ASSERT(v->arch.cr3 == 0);
-        return;
-    }
 
     ////
     //// vcpu->arch.guest_vtable
@@ -3466,7 +3473,7 @@ sh_update_cr3(struct vcpu *v)
      * replace the old shadow pagetable(s), so that we can safely use the 
      * (old) shadow linear maps in the writeable mapping heuristics. */
 #if GUEST_PAGING_LEVELS == 2
-    if ( shadow_remove_write_access(v, gmfn, 2, 0) != 0 )
+    if ( sh_remove_write_access(v, gmfn, 2, 0) != 0 )
         flush_tlb_mask(v->domain->domain_dirty_cpumask); 
     sh_set_toplevel_shadow(v, 0, gmfn, SH_type_l2_shadow);
 #elif GUEST_PAGING_LEVELS == 3
@@ -3484,7 +3491,7 @@ sh_update_cr3(struct vcpu *v)
             {
                 gl2gfn = guest_l3e_get_gfn(gl3e[i]);
                 gl2mfn = vcpu_gfn_to_mfn(v, gl2gfn);
-                flush |= shadow_remove_write_access(v, gl2mfn, 2, 0); 
+                flush |= sh_remove_write_access(v, gl2mfn, 2, 0); 
             }
         }
         if ( flush ) 
@@ -3506,7 +3513,7 @@ sh_update_cr3(struct vcpu *v)
         }
     }
 #elif GUEST_PAGING_LEVELS == 4
-    if ( shadow_remove_write_access(v, gmfn, 4, 0) != 0 )
+    if ( sh_remove_write_access(v, gmfn, 4, 0) != 0 )
         flush_tlb_mask(v->domain->domain_dirty_cpumask);
     sh_set_toplevel_shadow(v, 0, gmfn, SH_type_l4_shadow);
 #else
@@ -3582,6 +3589,9 @@ sh_update_cr3(struct vcpu *v)
 
     /* Fix up the linear pagetable mappings */
     sh_update_linear_entries(v);
+
+    /* Release the lock, if we took it (otherwise it's the caller's problem) */
+    if ( do_locking ) shadow_unlock(v->domain);
 }
 
 
@@ -3637,7 +3647,8 @@ static int sh_guess_wrmap(struct vcpu *v, unsigned long vaddr, mfn_t gmfn)
 }
 #endif
 
-int sh_remove_write_access(struct vcpu *v, mfn_t sl1mfn, mfn_t readonly_mfn)
+int sh_rm_write_access_from_l1(struct vcpu *v, mfn_t sl1mfn,
+                               mfn_t readonly_mfn)
 /* Excises all writeable mappings to readonly_mfn from this l1 shadow table */
 {
     shadow_l1e_t *sl1e;
@@ -3668,7 +3679,7 @@ int sh_remove_write_access(struct vcpu *v, mfn_t sl1mfn, mfn_t readonly_mfn)
 }
 
 
-int sh_remove_all_mappings(struct vcpu *v, mfn_t sl1mfn, mfn_t target_mfn)
+int sh_rm_mappings_from_l1(struct vcpu *v, mfn_t sl1mfn, mfn_t target_mfn)
 /* Excises all mappings to guest frame from this shadow l1 table */
 {
     shadow_l1e_t *sl1e;
@@ -3888,7 +3899,7 @@ sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
 
     skip = safe_not_to_verify_write(mfn, addr, src, bytes);
     memcpy(addr, src, bytes);
-    if ( !skip ) shadow_validate_guest_pt_write(v, mfn, addr, bytes);
+    if ( !skip ) sh_validate_guest_pt_write(v, mfn, addr, bytes);
 
     /* If we are writing zeros to this page, might want to unshadow */
     if ( likely(bytes >= 4) && (*(u32 *)addr == 0) )
@@ -3933,7 +3944,7 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
 
     if ( prev == old )
     {
-        if ( !skip ) shadow_validate_guest_pt_write(v, mfn, addr, bytes);
+        if ( !skip ) sh_validate_guest_pt_write(v, mfn, addr, bytes);
     }
     else
         rv = X86EMUL_CMPXCHG_FAILED;
@@ -3977,7 +3988,7 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
 
     if ( prev == old )
     {
-        if ( !skip ) shadow_validate_guest_pt_write(v, mfn, addr, 8);
+        if ( !skip ) sh_validate_guest_pt_write(v, mfn, addr, 8);
     }
     else
         rv = X86EMUL_CMPXCHG_FAILED;

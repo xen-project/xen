@@ -33,8 +33,43 @@
 
 
 /******************************************************************************
+ * Levels of self-test and paranoia
+ */
+
+#define SHADOW_AUDIT_HASH           0x01  /* Check current hash bucket */
+#define SHADOW_AUDIT_HASH_FULL      0x02  /* Check every hash bucket */
+#define SHADOW_AUDIT_ENTRIES        0x04  /* Check this walk's shadows */
+#define SHADOW_AUDIT_ENTRIES_FULL   0x08  /* Check every shadow */
+#define SHADOW_AUDIT_ENTRIES_MFNS   0x10  /* Check gfn-mfn map in shadows */
+#define SHADOW_AUDIT_P2M            0x20  /* Check the p2m table */
+
+#ifdef NDEBUG
+#define SHADOW_AUDIT                   0
+#define SHADOW_AUDIT_ENABLE            0
+#else
+#define SHADOW_AUDIT                0x15  /* Basic audit of all except p2m. */
+#define SHADOW_AUDIT_ENABLE         shadow_audit_enable
+extern int shadow_audit_enable;
+#endif
+
+/******************************************************************************
+ * Levels of optimization
+ */
+
+#define SHOPT_WRITABLE_HEURISTIC  0x01  /* Guess at RW PTEs via linear maps */
+#define SHOPT_EARLY_UNSHADOW      0x02  /* Unshadow l1s on fork or exit */
+#define SHOPT_FAST_FAULT_PATH     0x04  /* Fast-path MMIO and not-present */
+#define SHOPT_PREFETCH            0x08  /* Shadow multiple entries per fault */
+#define SHOPT_LINUX_L3_TOPLEVEL   0x10  /* Pin l3es on early 64bit linux */
+#define SHOPT_SKIP_VERIFY         0x20  /* Skip PTE v'fy when safe to do so */
+
+#define SHADOW_OPTIMIZATIONS      0x3f
+
+
+/******************************************************************************
  * Debug and error-message output
  */
+
 #define SHADOW_PRINTK(_f, _a...)                                     \
     debugtrace_printk("sh: %s(): " _f, __func__, ##_a)
 #define SHADOW_ERROR(_f, _a...)                                      \
@@ -53,6 +88,58 @@
 #define SHADOW_DEBUG_A_AND_D           1
 #define SHADOW_DEBUG_EMULATE           1
 #define SHADOW_DEBUG_LOGDIRTY          0
+
+/******************************************************************************
+ * The shadow lock.
+ *
+ * This lock is per-domain.  It is intended to allow us to make atomic
+ * updates to the software TLB that the shadow tables provide.
+ * 
+ * Specifically, it protects:
+ *   - all changes to shadow page table pages
+ *   - the shadow hash table
+ *   - the shadow page allocator 
+ *   - all changes to guest page table pages
+ *   - all changes to the page_info->tlbflush_timestamp
+ *   - the page_info->count fields on shadow pages
+ *   - the shadow dirty bit array and count
+ */
+#ifndef CONFIG_SMP
+#error shadow.h currently requires CONFIG_SMP
+#endif
+
+#define shadow_lock_init(_d)                            \
+    do {                                                \
+        spin_lock_init(&(_d)->arch.shadow.lock);        \
+        (_d)->arch.shadow.locker = -1;                  \
+        (_d)->arch.shadow.locker_function = "nobody";   \
+    } while (0)
+
+#define shadow_locked_by_me(_d)                     \
+    (current->processor == (_d)->arch.shadow.locker)
+
+#define shadow_lock(_d)                                                 \
+    do {                                                                \
+        if ( unlikely((_d)->arch.shadow.locker == current->processor) ) \
+        {                                                               \
+            printk("Error: shadow lock held by %s\n",                   \
+                   (_d)->arch.shadow.locker_function);                  \
+            BUG();                                                      \
+        }                                                               \
+        spin_lock(&(_d)->arch.shadow.lock);                             \
+        ASSERT((_d)->arch.shadow.locker == -1);                         \
+        (_d)->arch.shadow.locker = current->processor;                  \
+        (_d)->arch.shadow.locker_function = __func__;                   \
+    } while (0)
+
+#define shadow_unlock(_d)                                       \
+    do {                                                        \
+        ASSERT((_d)->arch.shadow.locker == current->processor); \
+        (_d)->arch.shadow.locker = -1;                          \
+        (_d)->arch.shadow.locker_function = "nobody";           \
+        spin_unlock(&(_d)->arch.shadow.lock);                   \
+    } while (0)
+
 
 
 /******************************************************************************
@@ -291,6 +378,21 @@ void sh_install_xen_entries_in_l4(struct vcpu *v, mfn_t gl4mfn, mfn_t sl4mfn);
 void sh_install_xen_entries_in_l2h(struct vcpu *v, mfn_t sl2hmfn);
 void sh_install_xen_entries_in_l2(struct vcpu *v, mfn_t gl2mfn, mfn_t sl2mfn);
 
+/* Update the shadows in response to a pagetable write from Xen */
+extern int sh_validate_guest_entry(struct vcpu *v, mfn_t gmfn, 
+                                   void *entry, u32 size);
+
+/* Update the shadows in response to a pagetable write from a HVM guest */
+extern void sh_validate_guest_pt_write(struct vcpu *v, mfn_t gmfn, 
+                                       void *entry, u32 size);
+
+/* Remove all writeable mappings of a guest frame from the shadows.
+ * Returns non-zero if we need to flush TLBs. 
+ * level and fault_addr desribe how we found this to be a pagetable;
+ * level==0 means we have some other reason for revoking write access. */
+extern int sh_remove_write_access(struct vcpu *v, mfn_t readonly_mfn,
+                                  unsigned int level,
+                                  unsigned long fault_addr);
 
 /******************************************************************************
  * Flags used in the return value of the shadow_set_lXe() functions...
@@ -325,6 +427,26 @@ void sh_install_xen_entries_in_l2(struct vcpu *v, mfn_t gl2mfn, mfn_t sl2mfn);
 #undef mfn_valid
 #define mfn_valid(_mfn) (mfn_x(_mfn) < max_page)
 
+
+static inline int
+sh_mfn_is_a_page_table(mfn_t gmfn)
+{
+    struct page_info *page = mfn_to_page(gmfn);
+    struct domain *owner;
+    unsigned long type_info;
+
+    if ( !mfn_valid(gmfn) )
+        return 0;
+
+    owner = page_get_owner(page);
+    if ( owner && shadow_mode_refcounts(owner) 
+         && (page->count_info & PGC_page_table) )
+        return 1; 
+
+    type_info = page->u.inuse.type_info & PGT_type_mask;
+    return type_info && (type_info <= PGT_l4_page_table);
+}
+
 // Provide mfn_t-aware versions of common xen functions
 static inline void *
 sh_map_domain_page(mfn_t mfn)
@@ -350,6 +472,25 @@ sh_unmap_domain_page_global(void *p)
     unmap_domain_page_global(p);
 }
 
+static inline mfn_t
+pagetable_get_mfn(pagetable_t pt)
+{
+    return _mfn(pagetable_get_pfn(pt));
+}
+
+static inline pagetable_t
+pagetable_from_mfn(mfn_t mfn)
+{
+    return pagetable_from_pfn(mfn_x(mfn));
+}
+
+
+/******************************************************************************
+ * Log-dirty mode bitmap handling
+ */
+
+extern void sh_mark_dirty(struct domain *d, mfn_t gmfn);
+
 static inline int
 sh_mfn_is_dirty(struct domain *d, mfn_t gmfn)
 /* Is this guest page dirty?  Call only in log-dirty mode. */
@@ -366,25 +507,6 @@ sh_mfn_is_dirty(struct domain *d, mfn_t gmfn)
         return 1;
 
     return 0;
-}
-
-static inline int
-sh_mfn_is_a_page_table(mfn_t gmfn)
-{
-    struct page_info *page = mfn_to_page(gmfn);
-    struct domain *owner;
-    unsigned long type_info;
-
-    if ( !mfn_valid(gmfn) )
-        return 0;
-
-    owner = page_get_owner(page);
-    if ( owner && shadow_mode_refcounts(owner) 
-         && (page->count_info & PGC_page_table) )
-        return 1; 
-
-    type_info = page->u.inuse.type_info & PGT_type_mask;
-    return type_info && (type_info <= PGT_l4_page_table);
 }
 
 

@@ -172,10 +172,11 @@ int arch_domain_create(struct domain *d)
 {
 #ifdef __x86_64__
     struct page_info *pg;
+    int i;
 #endif
     l1_pgentry_t gdt_l1e;
     int vcpuid, pdpt_order;
-    int i, rc = -ENOMEM;
+    int rc = -ENOMEM;
 
     pdpt_order = get_order_from_bytes(PDPT_L1_ENTRIES * sizeof(l1_pgentry_t));
     d->arch.mm_perdomain_pt = alloc_xenheap_pages(pdpt_order);
@@ -218,12 +219,7 @@ int arch_domain_create(struct domain *d)
 
 #endif /* __x86_64__ */
 
-    shadow_lock_init(d);
-    for ( i = 0; i <= SHADOW_MAX_ORDER; i++ )
-        INIT_LIST_HEAD(&d->arch.shadow.freelists[i]);
-    INIT_LIST_HEAD(&d->arch.shadow.p2m_freelist);
-    INIT_LIST_HEAD(&d->arch.shadow.p2m_inuse);
-    INIT_LIST_HEAD(&d->arch.shadow.pinned_shadows);
+    shadow_domain_init(d);
 
     if ( !is_idle_domain(d) )
     {
@@ -365,15 +361,6 @@ int arch_set_info_guest(
 
         v->arch.guest_table = pagetable_from_pfn(cr3_pfn);
     }    
-
-    /* Shadow: make sure the domain has enough shadow memory to
-     * boot another vcpu */
-    if ( shadow_mode_enabled(d) 
-         && d->arch.shadow.total_pages < shadow_min_acceptable_pages(d) )
-    {
-        destroy_gdt(v);
-        return -ENOMEM;
-    }
 
     if ( v->vcpu_id == 0 )
         update_domain_wallclock_time(d);

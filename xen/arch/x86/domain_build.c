@@ -827,7 +827,7 @@ int construct_dom0(struct domain *d,
     regs->eflags = X86_EFLAGS_IF;
 
     if ( opt_dom0_shadow )
-        if ( shadow_test_enable(d) == 0 ) 
+        if ( shadow_enable(d, SHM2_enable) == 0 ) 
             shadow_update_paging_modes(v);
 
     if ( supervisor_mode_kernel )
