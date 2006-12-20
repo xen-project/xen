@@ -208,38 +208,51 @@ void force_evtchn_callback(void)
 /* Not a GPL symbol: used in ubiquitous macros, so too restrictive. */
 EXPORT_SYMBOL(force_evtchn_callback);
 
+static DEFINE_PER_CPU(unsigned int, upcall_count) = { 0 };
+
 /* NB. Interrupts are disabled on entry. */
 asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
 {
 	unsigned long  l1, l2;
-	unsigned int   l1i, l2i, port;
+	unsigned int   l1i, l2i, port, count;
 	int            irq, cpu = smp_processor_id();
 	shared_info_t *s = HYPERVISOR_shared_info;
 	vcpu_info_t   *vcpu_info = &s->vcpu_info[cpu];
 
-	vcpu_info->evtchn_upcall_pending = 0;
+	do {
+		/* Avoid a callback storm when we reenable delivery. */
+		vcpu_info->evtchn_upcall_pending = 0;
+
+		/* Nested invocations bail immediately. */
+		if (unlikely(per_cpu(upcall_count, cpu)++))
+			return;
 
 #ifndef CONFIG_X86 /* No need for a barrier -- XCHG is a barrier on x86. */
-	/* Clear master pending flag /before/ clearing selector flag. */
-	rmb();
+		/* Clear master flag /before/ clearing selector flag. */
+		rmb();
 #endif
-	l1 = xchg(&vcpu_info->evtchn_pending_sel, 0);
-	while (l1 != 0) {
-		l1i = __ffs(l1);
-		l1 &= ~(1UL << l1i);
+		l1 = xchg(&vcpu_info->evtchn_pending_sel, 0);
+		while (l1 != 0) {
+			l1i = __ffs(l1);
+			l1 &= ~(1UL << l1i);
 
-		while ((l2 = active_evtchns(cpu, s, l1i)) != 0) {
-			l2i = __ffs(l2);
+			while ((l2 = active_evtchns(cpu, s, l1i)) != 0) {
+				l2i = __ffs(l2);
 
-			port = (l1i * BITS_PER_LONG) + l2i;
-			if ((irq = evtchn_to_irq[port]) != -1)
-				do_IRQ(irq, regs);
-			else {
-				exit_idle();
-				evtchn_device_upcall(port);
+				port = (l1i * BITS_PER_LONG) + l2i;
+				if ((irq = evtchn_to_irq[port]) != -1)
+					do_IRQ(irq, regs);
+				else {
+					exit_idle();
+					evtchn_device_upcall(port);
+				}
 			}
 		}
-	}
+
+		/* If there were nested callbacks then we have more to do. */
+		count = per_cpu(upcall_count, cpu);
+		per_cpu(upcall_count, cpu) = 0;
+	} while (unlikely(count != 1));
 }
 
 static int find_unbound_irq(void)
