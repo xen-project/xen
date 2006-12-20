@@ -87,7 +87,8 @@ void hvm_migrate_timers(struct vcpu *v)
     pit_migrate_timers(v);
     rtc_migrate_timers(v);
     pmtimer_migrate_timers(v);
-    migrate_timer(&vcpu_vlapic(v)->vlapic_timer, v->processor);
+    if ( vcpu_vlapic(v)->pt.enabled )
+        migrate_timer(&vcpu_vlapic(v)->pt.timer, v->processor);
 }
 
 void hvm_do_resume(struct vcpu *v)

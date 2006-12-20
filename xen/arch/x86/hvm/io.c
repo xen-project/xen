@@ -689,21 +689,6 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
     }
 }
 
-void hvm_interrupt_post(struct vcpu *v, int vector, int type)
-{
-    pt_intr_post(v, vector, type);
-    
-    switch(type) {
-    case APIC_DM_EXTINT:
-        break;
-            
-    default:
-        vlapic_post_injection(v, vector, type);
-        break;
-    }
-}
-
-
 void hvm_io_assist(struct vcpu *v)
 {
     vcpu_iodata_t *vio;

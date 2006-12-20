@@ -175,8 +175,8 @@ asmlinkage void vmx_intr_assist(void)
         BUG();
         break;
     }
-    
-    hvm_interrupt_post(v, highest_vector, intr_type);
+
+    pt_intr_post(v, highest_vector, intr_type);
 }
 
 /*

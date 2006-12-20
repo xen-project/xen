@@ -42,10 +42,10 @@ struct periodic_time {
     struct list_head list;
     char enabled;
     char one_shot;              /* one shot time */
-    int irq;
+    u8 irq;
     struct vcpu *vcpu;          /* vcpu timer interrupt delivers to */
     u32 pending_intr_nr;        /* the couner for pending timer interrupts */
-    u32 period;                 /* frequency in ns */
+    u64 period;                 /* frequency in ns */
     u64 period_cycles;          /* frequency in cpu cycles */
     s_time_t scheduled;         /* scheduled timer interrupt */
     u64 last_plt_gtime;         /* platform time when last IRQ is injected */
@@ -115,8 +115,8 @@ void pt_update_irq(struct vcpu *v);
 struct periodic_time *is_pt_irq(struct vcpu *v, int vector, int type);
 void pt_intr_post(struct vcpu *v, int vector, int type);
 void pt_reset(struct vcpu *v);
-void create_periodic_time(struct periodic_time *pt, u32 period, char irq, 
-                          char one_shot, time_cb *cb, void *data);
+void create_periodic_time(struct periodic_time *pt, uint64_t period,
+                          uint8_t irq, char one_shot, time_cb *cb, void *data);
 void destroy_periodic_time(struct periodic_time *pt);
 
 int pv_pit_handler(int port, int data, int write);

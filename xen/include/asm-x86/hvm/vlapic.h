@@ -23,6 +23,7 @@
 
 #include <asm/msr.h>
 #include <public/hvm/ioreq.h>
+#include <asm/hvm/vpt.h>
 
 #define MAX_VECTOR      256
 
@@ -49,14 +50,14 @@
 #define vlapic_enabled(vlapic)      (!vlapic_disabled(vlapic))
 
 struct vlapic {
-    uint64_t           apic_base_msr;
-    uint32_t           disabled; /* VLAPIC_xx_DISABLED */
-    uint32_t           timer_divisor;
-    struct timer       vlapic_timer;
-    int                timer_pending_count;
-    s_time_t           timer_last_update;
-    struct page_info   *regs_page;
-    void               *regs;
+    uint64_t             apic_base_msr;
+    uint32_t             disabled; /* VLAPIC_xx_DISABLED */
+    uint32_t             timer_divisor;
+    struct periodic_time pt;
+    int                  timer_pending_count;
+    s_time_t             timer_last_update;
+    struct page_info     *regs_page;
+    void                 *regs;
 };
 
 static inline uint32_t vlapic_get_reg(struct vlapic *vlapic, uint32_t reg)
@@ -70,13 +71,11 @@ static inline void vlapic_set_reg(
     *((uint32_t *)(vlapic->regs + reg)) = val;
 }
 
-
 int vlapic_set_irq(struct vlapic *vlapic, uint8_t vec, uint8_t trig);
-
-void vlapic_post_injection(struct vcpu *v, int vector, int deliver_mode);
 
 int vlapic_find_highest_irr(struct vlapic *vlapic);
 
+int vlapic_has_interrupt(struct vcpu *v);
 int cpu_get_apic_interrupt(struct vcpu *v, int *mode);
 
 int  vlapic_init(struct vcpu *v);
@@ -90,5 +89,8 @@ struct vlapic *apic_round_robin(
     struct domain *d, uint8_t vector, uint32_t bitmap);
 
 int vlapic_match_logical_addr(struct vlapic *vlapic, uint8_t mda);
+
+int is_lvtt(struct vcpu *v, int vector);
+int is_lvtt_enabled(struct vcpu *v);
 
 #endif /* __ASM_X86_HVM_VLAPIC_H__ */

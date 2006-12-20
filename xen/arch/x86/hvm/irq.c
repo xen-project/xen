@@ -229,10 +229,9 @@ void hvm_set_callback_gsi(struct domain *d, unsigned int gsi)
 int cpu_has_pending_irq(struct vcpu *v)
 {
     struct hvm_domain *plat = &v->domain->arch.hvm_domain;
-    int dummy;
 
     /* APIC */
-    if ( cpu_get_apic_interrupt(v, &dummy) != -1 )
+    if ( vlapic_has_interrupt(v) != -1 )
         return 1;
 
     /* PIC */
@@ -267,6 +266,9 @@ int get_intr_vector(struct vcpu* v, int irq, int type)
 
 int is_irq_masked(struct vcpu *v, int irq)
 {
+    if ( is_lvtt(v, irq) )
+        return !is_lvtt_enabled(v);
+
     if ( v->domain->arch.hvm_domain.irq.vpic[irq >> 3].imr & (1 << (irq & 7))
             && domain_vioapic(v->domain)->redirtbl[irq].fields.mask )
         return 1;

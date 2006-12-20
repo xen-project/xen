@@ -141,7 +141,7 @@ asmlinkage void svm_intr_assist(void)
         break;
     }
 
-    hvm_interrupt_post(v, intr_vector, intr_type);
+    pt_intr_post(v, intr_vector, intr_type);
 }
 
 /*
