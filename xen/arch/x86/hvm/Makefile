@@ -10,6 +10,7 @@ obj-y += irq.o
 obj-y += platform.o
 obj-y += pmtimer.o
 obj-y += rtc.o
+obj-y += vpt.o
 obj-y += vioapic.o
 obj-y += vlapic.o
 obj-y += vpic.o

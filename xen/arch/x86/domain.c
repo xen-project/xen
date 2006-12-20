@@ -726,6 +726,9 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 
     local_irq_disable();
 
+    if ( is_hvm_vcpu(prev) )
+        pt_freeze_time(prev);
+
     set_current(next);
 
     if ( (per_cpu(curr_vcpu, cpu) == next) || is_idle_vcpu(next) )

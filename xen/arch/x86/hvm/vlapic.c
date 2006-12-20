@@ -154,16 +154,6 @@ int vlapic_set_irq(struct vlapic *vlapic, uint8_t vec, uint8_t trig)
     return ret;
 }
 
-s_time_t get_apictime_scheduled(struct vcpu *v)
-{
-    struct vlapic *vlapic = vcpu_vlapic(v);
-
-    if ( !vlapic_lvt_enabled(vlapic, APIC_LVTT) )
-        return -1;
-
-    return vlapic->vlapic_timer.expires;
-}
-
 int vlapic_find_highest_isr(struct vlapic *vlapic)
 {
     int result;
@@ -834,23 +824,6 @@ int cpu_get_apic_interrupt(struct vcpu *v, int *mode)
 
     *mode = APIC_DM_FIXED;
     return highest_irr;
-}
-
-/* check to see if there is pending interrupt  */
-int cpu_has_pending_irq(struct vcpu *v)
-{
-    struct hvm_domain *plat = &v->domain->arch.hvm_domain;
-    int dummy;
-
-    /* APIC */
-    if ( cpu_get_apic_interrupt(v, &dummy) != -1 )
-        return 1;
-
-    /* PIC */
-    if ( !vlapic_accept_pic_intr(v) )
-        return 0;
-
-    return plat->irq.vpic[0].int_output;
 }
 
 void vlapic_post_injection(struct vcpu *v, int vector, int deliver_mode)

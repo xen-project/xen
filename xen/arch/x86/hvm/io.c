@@ -691,25 +691,7 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
 
 void hvm_interrupt_post(struct vcpu *v, int vector, int type)
 {
-    struct  periodic_time *pt = 
-        &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
-
-    if ( pt->enabled && v->vcpu_id == pt->bind_vcpu 
-            && is_periodic_irq(v, vector, type) ) {
-        if ( !pt->first_injected ) {
-            pt->pending_intr_nr = 0;
-            pt->last_plt_gtime = hvm_get_guest_time(v);
-            pt->scheduled = NOW() + pt->period;
-            set_timer(&pt->timer, pt->scheduled);
-            pt->first_injected = 1;
-        } else {
-            pt->pending_intr_nr--;
-            pt->last_plt_gtime += pt->period_cycles;
-            hvm_set_guest_time(v, pt->last_plt_gtime);
-        }
-        if (pt->cb)
-            pt->cb(v, pt->priv);
-    }
+    pt_intr_post(v, vector, type);
     
     switch(type) {
     case APIC_DM_EXTINT:

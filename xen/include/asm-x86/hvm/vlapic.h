@@ -89,8 +89,6 @@ int vlapic_accept_pic_intr(struct vcpu *v);
 struct vlapic *apic_round_robin(
     struct domain *d, uint8_t vector, uint32_t bitmap);
 
-s_time_t get_apictime_scheduled(struct vcpu *v);
-
 int vlapic_match_logical_addr(struct vlapic *vlapic, uint8_t mda);
 
 #endif /* __ASM_X86_HVM_VLAPIC_H__ */

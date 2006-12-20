@@ -63,8 +63,7 @@ asmlinkage void svm_intr_assist(void)
 {
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    struct hvm_domain *plat=&v->domain->arch.hvm_domain;
-    struct periodic_time *pt = &plat->pl_time.periodic_tm;
+    struct periodic_time *pt;
     int intr_type = APIC_DM_EXTINT;
     int intr_vector = -1;
     int re_injecting = 0;
@@ -95,11 +94,7 @@ asmlinkage void svm_intr_assist(void)
     /* Now let's check for newer interrrupts  */
     else
     {
-        if ( (v->vcpu_id == 0) && pt->enabled && pt->pending_intr_nr )
-        {
-            hvm_isa_irq_deassert(current->domain, pt->irq);
-            hvm_isa_irq_assert(current->domain, pt->irq);
-        }
+        pt_update_irq(v);
 
         hvm_set_callback_irq_level();
 
@@ -130,8 +125,7 @@ asmlinkage void svm_intr_assist(void)
     case APIC_DM_FIXED:
     case APIC_DM_LOWEST:
         /* Re-injecting a PIT interruptt? */
-        if ( re_injecting && pt->enabled && 
-             is_periodic_irq(v, intr_vector, intr_type) )
+        if ( re_injecting && (pt = is_pt_irq(v, intr_vector, intr_type)) )
             ++pt->pending_intr_nr;
         /* let's inject this interrupt */
         TRACE_3D(TRC_VMX_INTR, v->domain->domain_id, intr_vector, 0);

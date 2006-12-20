@@ -82,56 +82,21 @@ u64 hvm_get_guest_time(struct vcpu *v)
     return host_tsc + v->arch.hvm_vcpu.cache_tsc_offset;
 }
 
-void hvm_freeze_time(struct vcpu *v)
-{
-    struct periodic_time *pt=&v->domain->arch.hvm_domain.pl_time.periodic_tm;
-
-    if ( pt->enabled && pt->first_injected
-            && (v->vcpu_id == pt->bind_vcpu)
-            && !v->arch.hvm_vcpu.guest_time ) {
-        v->arch.hvm_vcpu.guest_time = hvm_get_guest_time(v);
-        if ( !test_bit(_VCPUF_blocked, &v->vcpu_flags) )
-        {
-            stop_timer(&pt->timer);
-            rtc_freeze(v);
-        }
-    }
-}
-
 void hvm_migrate_timers(struct vcpu *v)
 {
-    struct periodic_time *pt = &v->domain->arch.hvm_domain.pl_time.periodic_tm;
-    struct PMTState *vpmt = &v->domain->arch.hvm_domain.pl_time.vpmt;
-
-    if ( pt->enabled )
-    {
-        migrate_timer(&pt->timer, v->processor);
-    }
-    migrate_timer(&vcpu_vlapic(v)->vlapic_timer, v->processor);
-    migrate_timer(&vpmt->timer, v->processor);
+    pit_migrate_timers(v);
     rtc_migrate_timers(v);
+    pmtimer_migrate_timers(v);
+    migrate_timer(&vcpu_vlapic(v)->vlapic_timer, v->processor);
 }
 
 void hvm_do_resume(struct vcpu *v)
 {
     ioreq_t *p;
-    struct periodic_time *pt = &v->domain->arch.hvm_domain.pl_time.periodic_tm;
 
     hvm_stts(v);
 
-    /* Pick up the elapsed PIT ticks and re-enable pit_timer. */
-    if ( pt->enabled && (v->vcpu_id == pt->bind_vcpu) && pt->first_injected )
-    {
-        if ( v->arch.hvm_vcpu.guest_time )
-        {
-            hvm_set_guest_time(v, v->arch.hvm_vcpu.guest_time);
-            v->arch.hvm_vcpu.guest_time = 0;
-        }
-        pickup_deactive_ticks(pt);
-    }
-
-    /* Re-enable the RTC timer if needed */
-    rtc_thaw(v);
+    pt_thaw_time(v);
 
     /* NB. Optimised for common case (p->state == STATE_IOREQ_NONE). */
     p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;
@@ -182,7 +147,7 @@ int hvm_domain_initialise(struct domain *d)
 
 void hvm_domain_destroy(struct domain *d)
 {
-    kill_timer(&d->arch.hvm_domain.pl_time.periodic_tm.timer);
+    pit_deinit(d);
     rtc_deinit(d);
     pmtimer_deinit(d);
 
@@ -196,7 +161,6 @@ void hvm_domain_destroy(struct domain *d)
 
 int hvm_vcpu_initialise(struct vcpu *v)
 {
-    struct hvm_domain *platform;
     int rc;
 
     if ( (rc = vlapic_init(v)) != 0 )
@@ -214,14 +178,11 @@ int hvm_vcpu_initialise(struct vcpu *v)
         get_vio(v->domain, v->vcpu_id)->vp_eport =
             v->arch.hvm_vcpu.xen_port;
 
+    INIT_LIST_HEAD(&v->arch.hvm_vcpu.tm_list);
+
     if ( v->vcpu_id != 0 )
         return 0;
 
-    /* XXX Below should happen in hvm_domain_initialise(). */
-    platform = &v->domain->arch.hvm_domain;
-
-    init_timer(&platform->pl_time.periodic_tm.timer,
-               pt_timer_fn, v, v->processor);
     rtc_init(v, RTC_PORT(0), RTC_IRQ);
     pmtimer_init(v, ACPI_PM_TMR_BLK_ADDRESS);
 
@@ -238,20 +199,6 @@ void hvm_vcpu_destroy(struct vcpu *v)
 
     /* Event channel is already freed by evtchn_destroy(). */
     /*free_xen_event_channel(v, v->arch.hvm_vcpu.xen_port);*/
-}
-
-int cpu_get_interrupt(struct vcpu *v, int *type)
-{
-    int vector;
-
-    if ( (vector = cpu_get_apic_interrupt(v, type)) != -1 )
-        return vector;
-
-    if ( (v->vcpu_id == 0) &&
-         ((vector = cpu_get_pic_interrupt(v, type)) != -1) )
-        return vector;
-
-    return -1;
 }
 
 static void hvm_vcpu_down(void)

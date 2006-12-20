@@ -46,6 +46,7 @@
 #include <asm/hvm/vpic.h>
 #include <asm/hvm/vlapic.h>
 #include <asm/x86_emulate.h>
+#include <asm/hvm/vpt.h>
 
 static void vmx_ctxt_switch_from(struct vcpu *v);
 static void vmx_ctxt_switch_to(struct vcpu *v);
@@ -372,8 +373,6 @@ static inline void vmx_restore_dr(struct vcpu *v)
 
 static void vmx_ctxt_switch_from(struct vcpu *v)
 {
-    hvm_freeze_time(v);
-
     /* NB. MSR_SHADOW_GS_BASE may be changed by swapgs instrucion in guest,
      * so we must save it. */
     rdmsrl(MSR_SHADOW_GS_BASE, v->arch.hvm_vmx.msr_state.shadow_gs);
@@ -2072,13 +2071,7 @@ static inline int vmx_do_msr_write(struct cpu_user_regs *regs)
 
     switch (ecx) {
     case MSR_IA32_TIME_STAMP_COUNTER:
-        {
-            struct periodic_time *pt =
-                &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
-            if ( pt->enabled && pt->first_injected
-                    && v->vcpu_id == pt->bind_vcpu )
-                pt->first_injected = 0;
-        }
+        pt_reset(v);
         hvm_set_guest_time(v, msr_content);
         break;
     case MSR_IA32_SYSENTER_CS:

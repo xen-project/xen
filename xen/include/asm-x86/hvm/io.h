@@ -147,8 +147,6 @@ extern void send_pio_req(unsigned long port, unsigned long count, int size,
 extern void handle_mmio(unsigned long gpa);
 extern void hvm_interrupt_post(struct vcpu *v, int vector, int type);
 extern void hvm_io_assist(struct vcpu *v);
-extern int cpu_get_interrupt(struct vcpu *v, int *type);
-extern int cpu_has_pending_irq(struct vcpu *v);
 
 #endif /* __ASM_X86_HVM_IO_H__ */
 

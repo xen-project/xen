@@ -30,17 +30,18 @@
 
 /* #define DEBUG_RTC */
 
-/* Callback that fires the RTC's periodic interrupt */
-void rtc_pie_callback(void *opaque)
+void rtc_periodic_cb(struct vcpu *v, void *opaque)
 {
     RTCState *s = opaque;
-    /* Record that we have fired */
-    s->cmos_data[RTC_REG_C] |= (RTC_IRQF|RTC_PF); /* 0xc0 */
-    /* Fire */
-    hvm_isa_irq_assert(s->vcpu->domain, s->irq);
-    /* Remember to fire again */
-    s->next_pie = NOW() + s->period;
-    set_timer(&s->pie_timer, s->next_pie);
+    s->cmos_data[RTC_REG_C] |= 0xc0;
+}
+
+int is_rtc_periodic_irq(void *opaque)
+{
+    RTCState *s = opaque;
+
+    return !(s->cmos_data[RTC_REG_C] & RTC_AF || 
+           s->cmos_data[RTC_REG_C] & RTC_UF);
 }
 
 /* Enable/configure/disable the periodic timer based on the RTC_PIE and
@@ -58,17 +59,13 @@ static void rtc_timer_update(RTCState *s)
         
         period = 1 << (period_code - 1); /* period in 32 Khz cycles */
         period = DIV_ROUND((period * 1000000000ULL), 32768); /* period in ns */
-        s->period = period;
 #ifdef DEBUG_RTC
         printk("HVM_RTC: period = %uns\n", period);
 #endif
-        s->next_pie = NOW() + s->period;
-        set_timer(&s->pie_timer, s->next_pie);
-    }
+        create_periodic_time(&s->pt, period, RTC_IRQ, 0, rtc_periodic_cb, s);
+    } 
     else
-    {
-        stop_timer(&s->pie_timer);
-    }
+        destroy_periodic_time(&s->pt);
 }
 
 static void rtc_set_time(RTCState *s);
@@ -292,8 +289,8 @@ static void rtc_update_second2(void *opaque)
               s->current_tm.tm_hour) )
         {
             s->cmos_data[RTC_REG_C] |= 0xa0; 
-            hvm_isa_irq_deassert(s->vcpu->domain, s->irq);
-            hvm_isa_irq_assert(s->vcpu->domain, s->irq);
+            hvm_isa_irq_deassert(s->pt.vcpu->domain, s->irq);
+            hvm_isa_irq_assert(s->pt.vcpu->domain, s->irq);
         }
     }
 
@@ -301,8 +298,8 @@ static void rtc_update_second2(void *opaque)
     if ( s->cmos_data[RTC_REG_B] & RTC_UIE )
     {
         s->cmos_data[RTC_REG_C] |= 0x90; 
-        hvm_isa_irq_deassert(s->vcpu->domain, s->irq);
-        hvm_isa_irq_assert(s->vcpu->domain, s->irq);
+        hvm_isa_irq_deassert(s->pt.vcpu->domain, s->irq);
+        hvm_isa_irq_assert(s->pt.vcpu->domain, s->irq);
     }
 
     /* clear update in progress bit */
@@ -336,7 +333,7 @@ static uint32_t rtc_ioport_read(void *opaque, uint32_t addr)
         break;
     case RTC_REG_C:
         ret = s->cmos_data[s->cmos_index];
-        hvm_isa_irq_deassert(s->vcpu->domain, s->irq);
+        hvm_isa_irq_deassert(s->pt.vcpu->domain, s->irq);
         s->cmos_data[RTC_REG_C] = 0x00; 
         break;
     default:
@@ -377,36 +374,25 @@ static int handle_rtc_io(ioreq_t *p)
     return 0;
 }
 
-/* Stop the periodic interrupts from this RTC */
-void rtc_freeze(struct vcpu *v)
-{
-    RTCState *s = &v->domain->arch.hvm_domain.pl_time.vrtc;
-    stop_timer(&s->pie_timer);
-}
-
-/* Start them again */
-void rtc_thaw(struct vcpu *v)
-{
-    RTCState *s = &v->domain->arch.hvm_domain.pl_time.vrtc;
-    if ( (s->cmos_data[RTC_REG_A] & RTC_RATE_SELECT) /* Period is not zero */
-         && (s->cmos_data[RTC_REG_B] & RTC_PIE) ) 
-        set_timer(&s->pie_timer, s->next_pie);
-}
-
 /* Move the RTC timers on to this vcpu's current cpu */
 void rtc_migrate_timers(struct vcpu *v)
 {
     RTCState *s = &v->domain->arch.hvm_domain.pl_time.vrtc;
-    migrate_timer(&s->second_timer, v->processor);
-    migrate_timer(&s->second_timer2, v->processor);
-    migrate_timer(&s->pie_timer, v->processor);
+
+    if ( s->pt.vcpu == v )
+    {
+        if ( s->pt.enabled )
+            migrate_timer(&s->pt.timer, v->processor);
+        migrate_timer(&s->second_timer, v->processor);
+        migrate_timer(&s->second_timer2, v->processor);
+    }
 }
 
 void rtc_init(struct vcpu *v, int base, int irq)
 {
     RTCState *s = &v->domain->arch.hvm_domain.pl_time.vrtc;
 
-    s->vcpu = v;
+    s->pt.vcpu = v;
     s->irq = irq;
     s->cmos_data[RTC_REG_A] = RTC_REF_CLCK_32KHZ | 6; /* ~1kHz */
     s->cmos_data[RTC_REG_B] = RTC_24H;
@@ -416,9 +402,9 @@ void rtc_init(struct vcpu *v, int base, int irq)
     s->current_tm = gmtime(get_localtime(v->domain));
     rtc_copy_date(s);
 
+    init_timer(&s->pt.timer, pt_timer_fn, &s->pt, v->processor);
     init_timer(&s->second_timer, rtc_update_second, s, v->processor);
     init_timer(&s->second_timer2, rtc_update_second2, s, v->processor);
-    init_timer(&s->pie_timer, rtc_pie_callback, s, v->processor);
 
     s->next_second_time = NOW() + 1000000000ULL;
     set_timer(&s->second_timer2, s->next_second_time);
@@ -430,7 +416,7 @@ void rtc_deinit(struct domain *d)
 {
     RTCState *s = &d->arch.hvm_domain.pl_time.vrtc;
 
+    kill_timer(&s->pt.timer);
     kill_timer(&s->second_timer);
     kill_timer(&s->second_timer2);
-    kill_timer(&s->pie_timer);
 }

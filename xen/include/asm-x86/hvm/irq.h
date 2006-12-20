@@ -104,4 +104,9 @@ void hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq);
 void hvm_set_callback_irq_level(void);
 void hvm_set_callback_gsi(struct domain *d, unsigned int gsi);
 
+int cpu_get_interrupt(struct vcpu *v, int *type);
+int cpu_has_pending_irq(struct vcpu *v);
+int get_intr_vector(struct vcpu* vcpu, int irq, int type);
+int is_irq_masked(struct vcpu *v, int irq);
+
 #endif /* __ASM_X86_HVM_IRQ_H__ */

@@ -225,3 +225,51 @@ void hvm_set_callback_gsi(struct domain *d, unsigned int gsi)
     dprintk(XENLOG_G_INFO, "Dom%u callback GSI changed %u -> %u\n",
             d->domain_id, old_gsi, gsi);
 }
+
+int cpu_has_pending_irq(struct vcpu *v)
+{
+    struct hvm_domain *plat = &v->domain->arch.hvm_domain;
+    int dummy;
+
+    /* APIC */
+    if ( cpu_get_apic_interrupt(v, &dummy) != -1 )
+        return 1;
+
+    /* PIC */
+    if ( !vlapic_accept_pic_intr(v) )
+        return 0;
+
+    return plat->irq.vpic[0].int_output;
+}
+
+int cpu_get_interrupt(struct vcpu *v, int *type)
+{
+    int vector;
+
+    if ( (vector = cpu_get_apic_interrupt(v, type)) != -1 )
+        return vector;
+
+    if ( (v->vcpu_id == 0) &&
+         ((vector = cpu_get_pic_interrupt(v, type)) != -1) )
+        return vector;
+
+    return -1;
+}
+
+int get_intr_vector(struct vcpu* v, int irq, int type)
+{
+    if ( type == APIC_DM_EXTINT )
+        return v->domain->arch.hvm_domain.irq.vpic[irq >> 3].irq_base
+                + (irq & 0x7);
+
+    return domain_vioapic(v->domain)->redirtbl[irq].fields.vector;
+}
+
+int is_irq_masked(struct vcpu *v, int irq)
+{
+    if ( v->domain->arch.hvm_domain.irq.vpic[irq >> 3].imr & (1 << (irq & 7))
+            && domain_vioapic(v->domain)->redirtbl[irq].fields.mask )
+        return 1;
+
+    return 0;
+}

@@ -46,6 +46,7 @@
 #include <asm/hvm/svm/intr.h>
 #include <asm/x86_emulate.h>
 #include <public/sched.h>
+#include <asm/hvm/vpt.h>
 
 #define SVM_EXTRA_DEBUG
 
@@ -770,7 +771,6 @@ static void arch_svm_do_launch(struct vcpu *v)
 
 static void svm_ctxt_switch_from(struct vcpu *v)
 {
-    hvm_freeze_time(v);
     svm_save_dr(v);
 }
 
@@ -1994,6 +1994,7 @@ static inline void svm_do_msr_access(
         switch (ecx)
         {
         case MSR_IA32_TIME_STAMP_COUNTER:
+            pt_reset(v);
             hvm_set_guest_time(v, msr_content);
             break;
         case MSR_IA32_SYSENTER_CS:
