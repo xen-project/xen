@@ -249,6 +249,10 @@ static inline int sh_type_is_pinnable(struct vcpu *v, unsigned int t)
 #define SHF_L3_64   (1u << SH_type_l3_64_shadow)
 #define SHF_L4_64   (1u << SH_type_l4_64_shadow)
 
+#define SHF_32  (SHF_L1_32|SHF_FL1_32|SHF_L2_32)
+#define SHF_PAE (SHF_L1_PAE|SHF_FL1_PAE|SHF_L2_PAE|SHF_L2H_PAE)
+#define SHF_64  (SHF_L1_64|SHF_FL1_64|SHF_L2_64|SHF_L3_64|SHF_L4_64)
+
 /* Used for hysteresis when automatically unhooking mappings on fork/exit */
 #define SHF_unhooked_mappings (1u<<31)
 

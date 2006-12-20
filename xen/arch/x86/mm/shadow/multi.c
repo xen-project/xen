@@ -3839,12 +3839,43 @@ static inline void * emulate_map_dest(struct vcpu *v,
     return NULL;
 }
 
+static int safe_not_to_verify_write(mfn_t gmfn, void *dst, void *src, 
+                                    int bytes)
+{
+#if (SHADOW_OPTIMIZATIONS & SHOPT_SKIP_VERIFY)
+    struct page_info *pg = mfn_to_page(gmfn);
+    if ( !(pg->shadow_flags & SHF_32) 
+         && bytes == 4 
+         && ((unsigned long)dst & 3) == 0 )
+    {
+        /* Not shadowed 32-bit: aligned 64-bit writes that leave the
+         * present bit unset are safe to ignore. */
+        if ( (*(u64*)src & _PAGE_PRESENT) == 0 
+             && (*(u64*)dst & _PAGE_PRESENT) == 0 )
+            return 1;
+    }
+    else if ( !(pg->shadow_flags & (SHF_PAE|SHF_64)) 
+              && bytes == 8 
+              && ((unsigned long)dst & 7) == 0 )
+    {
+        /* Not shadowed PAE/64-bit: aligned 32-bit writes that leave the
+         * present bit unset are safe to ignore. */
+        if ( (*(u32*)src & _PAGE_PRESENT) == 0 
+             && (*(u32*)dst & _PAGE_PRESENT) == 0 )
+            return 1;        
+    }
+#endif
+    return 0;
+}
+
+
 int
 sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
                       u32 bytes, struct sh_emulate_ctxt *sh_ctxt)
 {
     mfn_t mfn;
     void *addr;
+    int skip;
 
     if ( vaddr & (bytes-1) )
         return X86EMUL_UNHANDLEABLE;
@@ -3855,8 +3886,9 @@ sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
     if ( (addr = emulate_map_dest(v, vaddr, sh_ctxt, &mfn)) == NULL )
         return X86EMUL_PROPAGATE_FAULT;
 
+    skip = safe_not_to_verify_write(mfn, addr, src, bytes);
     memcpy(addr, src, bytes);
-    shadow_validate_guest_pt_write(v, mfn, addr, bytes);
+    if ( !skip ) shadow_validate_guest_pt_write(v, mfn, addr, bytes);
 
     /* If we are writing zeros to this page, might want to unshadow */
     if ( likely(bytes >= 4) && (*(u32 *)addr == 0) )
@@ -3875,7 +3907,7 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
     mfn_t mfn;
     void *addr;
     unsigned long prev;
-    int rv = X86EMUL_CONTINUE;
+    int rv = X86EMUL_CONTINUE, skip;
 
     ASSERT(shadow_locked_by_me(v->domain));
     ASSERT(bytes <= sizeof(unsigned long));
@@ -3885,6 +3917,8 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
 
     if ( (addr = emulate_map_dest(v, vaddr, sh_ctxt, &mfn)) == NULL )
         return X86EMUL_PROPAGATE_FAULT;
+
+    skip = safe_not_to_verify_write(mfn, &new, &old, bytes);
 
     switch ( bytes )
     {
@@ -3898,7 +3932,9 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
     }
 
     if ( prev == old )
-        shadow_validate_guest_pt_write(v, mfn, addr, bytes);
+    {
+        if ( !skip ) shadow_validate_guest_pt_write(v, mfn, addr, bytes);
+    }
     else
         rv = X86EMUL_CMPXCHG_FAILED;
 
@@ -3924,7 +3960,7 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
     mfn_t mfn;
     void *addr;
     u64 old, new, prev;
-    int rv = X86EMUL_CONTINUE;
+    int rv = X86EMUL_CONTINUE, skip;
 
     ASSERT(shadow_locked_by_me(v->domain));
 
@@ -3936,10 +3972,13 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
 
     old = (((u64) old_hi) << 32) | (u64) old_lo;
     new = (((u64) new_hi) << 32) | (u64) new_lo;
+    skip = safe_not_to_verify_write(mfn, &new, &old, 8);
     prev = cmpxchg(((u64 *)addr), old, new);
 
     if ( prev == old )
-        shadow_validate_guest_pt_write(v, mfn, addr, 8);
+    {
+        if ( !skip ) shadow_validate_guest_pt_write(v, mfn, addr, 8);
+    }
     else
         rv = X86EMUL_CMPXCHG_FAILED;
 

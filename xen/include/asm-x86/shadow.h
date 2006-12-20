@@ -159,8 +159,9 @@ extern int shadow_audit_enable;
 #define SHOPT_FAST_FAULT_PATH     0x04  /* Fast-path MMIO and not-present */
 #define SHOPT_PREFETCH            0x08  /* Shadow multiple entries per fault */
 #define SHOPT_LINUX_L3_TOPLEVEL   0x10  /* Pin l3es on early 64bit linux */
+#define SHOPT_SKIP_VERIFY         0x20  /* Skip PTE v'fy when safe to do so */
 
-#define SHADOW_OPTIMIZATIONS      0x1f
+#define SHADOW_OPTIMIZATIONS      0x3f
 
 
 /* With shadow pagetables, the different kinds of address start 
