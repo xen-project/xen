@@ -34,6 +34,7 @@
 /* memory map */
 #define HYPERCALL_PHYSICAL_ADDRESS    0x00080000
 #define VGABIOS_PHYSICAL_ADDRESS      0x000C0000
+#define ETHERBOOT_PHYSICAL_ADDRESS    0x000C8000
 #define VMXASSIST_PHYSICAL_ADDRESS    0x000D0000
 #define ROMBIOS_PHYSICAL_ADDRESS      0x000F0000
 
@@ -279,6 +280,27 @@ static void pci_setup(void)
     }
 }
 
+static 
+int must_load_nic(void) 
+{
+    /* If the network card is in the boot order, load the Etherboot 
+     * option ROM.  Read the boot order bytes from CMOS and check 
+     * if any of them are 0x4. */
+    uint8_t boot_order;
+
+    /* Read CMOS register 0x3d (boot choices 0 and 1) */
+    outb(0x70, 0x3d);
+    boot_order = inb(0x71);
+    if ( (boot_order & 0xf) == 0x4 || (boot_order & 0xf0) == 0x40 ) 
+        return 1;
+    /* Read CMOS register 0x38 (boot choice 2 and FDD test flag) */
+    outb(0x70, 0x38);
+    boot_order = inb(0x71);
+    if ( (boot_order & 0xf0) == 0x40 ) 
+        return 1;
+    return 0;
+}
+
 int main(void)
 {
     int acpi_sz;
@@ -310,6 +332,13 @@ int main(void)
         printf("Loading Standard VGABIOS ...\n");
         memcpy((void *)VGABIOS_PHYSICAL_ADDRESS,
                vgabios_stdvga, sizeof(vgabios_stdvga));
+    }
+
+    if ( must_load_nic() )
+    {
+        printf("Loading ETHERBOOT ...\n");
+        memcpy((void *)ETHERBOOT_PHYSICAL_ADDRESS,
+               etherboot, sizeof(etherboot));
     }
 
     if ( get_acpi_enabled() != 0 )
