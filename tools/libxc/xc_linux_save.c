@@ -1052,7 +1052,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             DPRINTF("(of which %ld were fixups)\n", needed_to_fix  );
         }
 
-        if (last_iter && debug){
+        if (last_iter && debug) {
             int minusone = -1;
             memset(to_send, 0xff, BITMAP_SIZE);
             debug = 0;
@@ -1068,17 +1068,14 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             continue;
         }
 
-        if (last_iter) break;
+        if (last_iter)
+            break;
 
         if (live) {
-
-
-            if(
-                ((sent_this_iter > sent_last_iter) && RATE_IS_MAX()) ||
+            if (((sent_this_iter > sent_last_iter) && RATE_IS_MAX()) ||
                 (iter >= max_iters) ||
                 (sent_this_iter+skip_this_iter < 50) ||
-                (total_sent > max_pfn*max_factor) ) {
-
+                (total_sent > max_pfn*max_factor)) {
                 DPRINTF("Start last iteration\n");
                 last_iter = 1;
 
@@ -1106,8 +1103,6 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             print_stats(xc_handle, dom, sent_this_iter, &stats, 1);
 
         }
-
-
     } /* end of while 1 */
 
     DPRINTF("All memory is saved\n");
@@ -1159,7 +1154,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     }
 
     /* Canonicalise each GDT frame number. */
-    for ( i = 0; i < ctxt.gdt_ents; i += 512 ) {
+    for ( i = 0; (512*i) < ctxt.gdt_ents; i++ ) {
         if ( !translate_mfn_to_pfn(&ctxt.gdt_frames[i]) ) {
             ERROR("GDT frame is not in range of pseudophys map");
             goto out;

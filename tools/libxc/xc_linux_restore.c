@@ -709,7 +709,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
         goto out;
     }
 
-    for (i = 0; i < ctxt.gdt_ents; i += 512) {
+    for (i = 0; (512*i) < ctxt.gdt_ents; i++) {
         pfn = ctxt.gdt_frames[i];
         if ((pfn >= max_pfn) || (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB)) {
             ERROR("GDT frame number is bad");
