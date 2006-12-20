@@ -227,7 +227,7 @@ guest_supports_nx(struct vcpu *v)
 static inline int 
 guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw, int guest_op)
 {
-    ASSERT(!guest_op || shadow_lock_is_acquired(v->domain));
+    ASSERT(!guest_op || shadow_locked_by_me(v->domain));
 
     perfc_incrc(shadow_guest_walk);
     memset(gw, 0, sizeof(*gw));
@@ -442,7 +442,7 @@ static u32 guest_set_ad_bits(struct vcpu *v,
 
     ASSERT(ep && !(((unsigned long)ep) & ((sizeof *ep) - 1)));
     ASSERT(level <= GUEST_PAGING_LEVELS);
-    ASSERT(shadow_lock_is_acquired(v->domain));
+    ASSERT(shadow_locked_by_me(v->domain));
 
     flags = guest_l1e_get_flags(*ep);
 
@@ -2657,6 +2657,18 @@ static int sh_page_fault(struct vcpu *v,
     }
 #endif /* SHOPT_FAST_FAULT_PATH */
 
+    /* Detect if this page fault happened while we were already in Xen
+     * doing a shadow operation.  If that happens, the only thing we can
+     * do is let Xen's normal fault handlers try to fix it.  In any case, 
+     * a diagnostic trace of the fault will be more useful than 
+     * a BUG() when we try to take the lock again. */
+    if ( unlikely(shadow_locked_by_me(d)) )
+    {
+        SHADOW_ERROR("Recursive shadow fault: lock was taken by %s\n",
+                     d->arch.shadow.locker_function);
+        return 0;
+    }
+
     shadow_lock(d);
     
     shadow_audit_tables(v);
@@ -3343,7 +3355,7 @@ sh_update_cr3(struct vcpu *v)
     u32 guest_idx=0;
 #endif
 
-    ASSERT(shadow_lock_is_acquired(v->domain));
+    ASSERT(shadow_locked_by_me(v->domain));
     ASSERT(v->arch.shadow.mode);
 
     ////
@@ -3837,7 +3849,7 @@ sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
     if ( vaddr & (bytes-1) )
         return X86EMUL_UNHANDLEABLE;
 
-    ASSERT(shadow_lock_is_acquired(v->domain));
+    ASSERT(shadow_locked_by_me(v->domain));
     ASSERT(((vaddr & ~PAGE_MASK) + bytes) <= PAGE_SIZE);
 
     if ( (addr = emulate_map_dest(v, vaddr, sh_ctxt, &mfn)) == NULL )
@@ -3865,7 +3877,7 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
     unsigned long prev;
     int rv = X86EMUL_CONTINUE;
 
-    ASSERT(shadow_lock_is_acquired(v->domain));
+    ASSERT(shadow_locked_by_me(v->domain));
     ASSERT(bytes <= sizeof(unsigned long));
 
     if ( vaddr & (bytes-1) )
@@ -3914,7 +3926,7 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
     u64 old, new, prev;
     int rv = X86EMUL_CONTINUE;
 
-    ASSERT(shadow_lock_is_acquired(v->domain));
+    ASSERT(shadow_locked_by_me(v->domain));
 
     if ( vaddr & 7 )
         return X86EMUL_UNHANDLEABLE;

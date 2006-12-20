@@ -105,7 +105,7 @@
         (_d)->arch.shadow.locker_function = "nobody";   \
     } while (0)
 
-#define shadow_lock_is_acquired(_d)                     \
+#define shadow_locked_by_me(_d)                     \
     (current->processor == (_d)->arch.shadow.locker)
 
 #define shadow_lock(_d)                                                 \
@@ -337,7 +337,7 @@ static inline void mark_dirty(struct domain *d, unsigned long gmfn)
 /* Internal version, for when the shadow lock is already held */
 static inline void sh_mark_dirty(struct domain *d, mfn_t gmfn)
 {
-    ASSERT(shadow_lock_is_acquired(d));
+    ASSERT(shadow_locked_by_me(d));
     if ( unlikely(shadow_mode_log_dirty(d)) )
         sh_do_mark_dirty(d, gmfn);
 }
@@ -552,7 +552,7 @@ shadow_remove_all_shadows_and_parents(struct vcpu *v, mfn_t gmfn);
 extern void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all);
 static inline void shadow_remove_all_shadows(struct vcpu *v, mfn_t gmfn)
 {
-    int was_locked = shadow_lock_is_acquired(v->domain);
+    int was_locked = shadow_locked_by_me(v->domain);
     if ( !was_locked )
         shadow_lock(v->domain);
     sh_remove_shadows(v, gmfn, 0, 1);

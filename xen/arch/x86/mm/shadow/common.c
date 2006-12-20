@@ -553,7 +553,7 @@ shadow_validate_guest_entry(struct vcpu *v, mfn_t gmfn, void *entry)
 {
     int rc;
 
-    ASSERT(shadow_lock_is_acquired(v->domain));
+    ASSERT(shadow_locked_by_me(v->domain));
     rc = __shadow_validate_guest_entry(v, gmfn, entry, sizeof(l1_pgentry_t));
     shadow_audit_tables(v);
     return rc;
@@ -569,7 +569,7 @@ shadow_validate_guest_pt_write(struct vcpu *v, mfn_t gmfn,
     struct domain *d = v->domain;
     int rc;
 
-    ASSERT(shadow_lock_is_acquired(v->domain));
+    ASSERT(shadow_locked_by_me(v->domain));
     rc = __shadow_validate_guest_entry(v, gmfn, entry, size);
     if ( rc & SHADOW_SET_FLUSH )
         /* Need to flush TLBs to pick up shadow PT changes */
@@ -858,7 +858,7 @@ mfn_t shadow_alloc(struct domain *d,
     void *p;
     int i;
 
-    ASSERT(shadow_lock_is_acquired(d));
+    ASSERT(shadow_locked_by_me(d));
     ASSERT(order <= SHADOW_MAX_ORDER);
     ASSERT(shadow_type != SH_type_none);
     perfc_incrc(shadow_alloc);
@@ -928,7 +928,7 @@ void shadow_free(struct domain *d, mfn_t smfn)
     unsigned long mask;
     int i;
 
-    ASSERT(shadow_lock_is_acquired(d));
+    ASSERT(shadow_locked_by_me(d));
     perfc_incrc(shadow_free);
 
     shadow_type = sp->type;
@@ -997,7 +997,7 @@ shadow_alloc_p2m_pages(struct domain *d)
 {
     struct page_info *pg;
     u32 i;
-    ASSERT(shadow_lock_is_acquired(d));
+    ASSERT(shadow_locked_by_me(d));
     
     if ( d->arch.shadow.total_pages 
          < (shadow_min_acceptable_pages(d) + (1<<SHADOW_MAX_ORDER)) )
@@ -1143,7 +1143,7 @@ p2m_next_level(struct domain *d, mfn_t *table_mfn, void **table,
             p2m_install_entry_in_monitors(d, (l3_pgentry_t *)p2m_entry);
             /* Also, any vcpus running on shadows of the p2m need to 
              * reload their CR3s so the change propagates to the shadow */
-            ASSERT(shadow_lock_is_acquired(d));
+            ASSERT(shadow_locked_by_me(d));
             for_each_vcpu(d, v) 
             {
                 if ( pagetable_get_pfn(v->arch.guest_table) 
@@ -1435,7 +1435,7 @@ static unsigned int set_sh_allocation(struct domain *d,
     unsigned int lower_bound;
     int j;
 
-    ASSERT(shadow_lock_is_acquired(d));
+    ASSERT(shadow_locked_by_me(d));
     
     /* Don't allocate less than the minimum acceptable, plus one page per
      * megabyte of RAM (for the p2m table) */
@@ -1614,7 +1614,7 @@ static int shadow_hash_alloc(struct domain *d)
 {
     struct shadow_page_info **table;
 
-    ASSERT(shadow_lock_is_acquired(d));
+    ASSERT(shadow_locked_by_me(d));
     ASSERT(!d->arch.shadow.hash_table);
 
     table = xmalloc_array(struct shadow_page_info *, SHADOW_HASH_BUCKETS);
@@ -1629,7 +1629,7 @@ static int shadow_hash_alloc(struct domain *d)
  * This function does not care whether the table is populated. */
 static void shadow_hash_teardown(struct domain *d)
 {
-    ASSERT(shadow_lock_is_acquired(d));
+    ASSERT(shadow_locked_by_me(d));
     ASSERT(d->arch.shadow.hash_table);
 
     xfree(d->arch.shadow.hash_table);
@@ -1645,7 +1645,7 @@ mfn_t shadow_hash_lookup(struct vcpu *v, unsigned long n, unsigned int t)
     struct shadow_page_info *sp, *prev;
     key_t key;
 
-    ASSERT(shadow_lock_is_acquired(d));
+    ASSERT(shadow_locked_by_me(d));
     ASSERT(d->arch.shadow.hash_table);
     ASSERT(t);
 
@@ -1699,7 +1699,7 @@ void shadow_hash_insert(struct vcpu *v, unsigned long n, unsigned int t,
     struct shadow_page_info *sp;
     key_t key;
     
-    ASSERT(shadow_lock_is_acquired(d));
+    ASSERT(shadow_locked_by_me(d));
     ASSERT(d->arch.shadow.hash_table);
     ASSERT(t);
 
@@ -1725,7 +1725,7 @@ void shadow_hash_delete(struct vcpu *v, unsigned long n, unsigned int t,
     struct shadow_page_info *sp, *x;
     key_t key;
 
-    ASSERT(shadow_lock_is_acquired(d));
+    ASSERT(shadow_locked_by_me(d));
     ASSERT(d->arch.shadow.hash_table);
     ASSERT(t);
 
@@ -1780,7 +1780,7 @@ static void hash_foreach(struct vcpu *v,
     struct shadow_page_info *x;
 
     /* Say we're here, to stop hash-lookups reordering the chains */
-    ASSERT(shadow_lock_is_acquired(d));
+    ASSERT(shadow_locked_by_me(d));
     ASSERT(d->arch.shadow.hash_walking == 0);
     d->arch.shadow.hash_walking = 1;
 
@@ -1937,7 +1937,7 @@ int shadow_remove_write_access(struct vcpu *v, mfn_t gmfn,
         ;
     struct page_info *pg = mfn_to_page(gmfn);
 
-    ASSERT(shadow_lock_is_acquired(v->domain));
+    ASSERT(shadow_locked_by_me(v->domain));
 
     /* Only remove writable mappings if we are doing shadow refcounts.
      * In guest refcounting, we trust Xen to already be restricting
@@ -2129,7 +2129,7 @@ int shadow_remove_all_mappings(struct vcpu *v, mfn_t gmfn)
     if ( (page->count_info & PGC_count_mask) == 0 )
         return 0;
 
-    ASSERT(shadow_lock_is_acquired(v->domain));
+    ASSERT(shadow_locked_by_me(v->domain));
 
     /* XXX TODO: 
      * Heuristics for finding the (probably) single mapping of this gmfn */
@@ -2296,7 +2296,7 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
         0  /* unused  */
     };
 
-    ASSERT(shadow_lock_is_acquired(v->domain));
+    ASSERT(shadow_locked_by_me(v->domain));
     ASSERT(!(all && fast));
 
     pg = mfn_to_page(gmfn);
@@ -2382,7 +2382,7 @@ void sh_update_paging_modes(struct vcpu *v)
     struct shadow_paging_mode *old_mode = v->arch.shadow.mode;
     mfn_t old_guest_table;
 
-    ASSERT(shadow_lock_is_acquired(d));
+    ASSERT(shadow_locked_by_me(d));
 
     // Valid transitions handled by this function:
     // - For PV guests:
@@ -2560,7 +2560,7 @@ static void sh_new_mode(struct domain *d, u32 new_mode)
 {
     struct vcpu *v;
 
-    ASSERT(shadow_lock_is_acquired(d));
+    ASSERT(shadow_locked_by_me(d));
     ASSERT(d != current->domain);
     d->arch.shadow.mode = new_mode;
     if ( new_mode & SHM2_translate ) 
@@ -2661,7 +2661,7 @@ void shadow_teardown(struct domain *d)
     ASSERT(test_bit(_DOMF_dying, &d->domain_flags));
     ASSERT(d != current->domain);
 
-    if ( !shadow_lock_is_acquired(d) )
+    if ( !shadow_locked_by_me(d) )
         shadow_lock(d); /* Keep various asserts happy */
 
     if ( shadow_mode_enabled(d) )
@@ -2744,7 +2744,7 @@ void shadow_final_teardown(struct domain *d)
 static int shadow_one_bit_enable(struct domain *d, u32 mode)
 /* Turn on a single shadow mode feature */
 {
-    ASSERT(shadow_lock_is_acquired(d));
+    ASSERT(shadow_locked_by_me(d));
 
     /* Sanity check the call */
     if ( d == current->domain || (d->arch.shadow.mode & mode) )
@@ -2773,7 +2773,7 @@ static int shadow_one_bit_disable(struct domain *d, u32 mode)
 /* Turn off a single shadow mode feature */
 {
     struct vcpu *v;
-    ASSERT(shadow_lock_is_acquired(d));
+    ASSERT(shadow_locked_by_me(d));
 
     /* Sanity check the call */
     if ( d == current->domain || !(d->arch.shadow.mode & mode) )
@@ -3134,7 +3134,7 @@ void sh_do_mark_dirty(struct domain *d, mfn_t gmfn)
 {
     unsigned long pfn;
 
-    ASSERT(shadow_lock_is_acquired(d));
+    ASSERT(shadow_locked_by_me(d));
     ASSERT(shadow_mode_log_dirty(d));
 
     if ( !mfn_valid(gmfn) )
