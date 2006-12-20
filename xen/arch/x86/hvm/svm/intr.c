@@ -78,26 +78,6 @@ asmlinkage void svm_intr_assist(void)
         re_injecting = 1;
     }
 
-    /*
-     * If event requires injecting then do not inject int.
-     */
-    if ( unlikely(v->arch.hvm_svm.inject_event) )
-    {
-        v->arch.hvm_svm.inject_event = 0;
-        return;
-    }
-
-    /*
-     * Create a 'fake' virtual interrupt on to intercept as soon
-     * as the guest _can_ take interrupts.
-     */
-    if ( irq_masked(vmcb->rflags) || vmcb->interrupt_shadow )
-    {
-        vmcb->general1_intercepts |= GENERAL1_INTERCEPT_VINTR;
-        svm_inject_extint(v, 0x0); /* actual vector doesn't really matter */
-        return;
-    }
-
     /* Previous interrupt still pending? */
     if ( vmcb->vintr.fields.irq )
     {
@@ -124,7 +104,20 @@ asmlinkage void svm_intr_assist(void)
         hvm_set_callback_irq_level();
 
         if ( cpu_has_pending_irq(v) )
+        {
+            /*
+             * Create a 'fake' virtual interrupt on to intercept as soon
+             * as the guest _can_ take interrupts.  Do not obtain the next
+             * interrupt from the vlapic/pic if unable to inject.
+             */
+            if ( irq_masked(vmcb->rflags) || vmcb->interrupt_shadow )  
+            {
+                vmcb->general1_intercepts |= GENERAL1_INTERCEPT_VINTR;
+                svm_inject_extint(v, 0x0); /* actual vector doesn't really matter */
+                return;
+            }
             intr_vector = cpu_get_interrupt(v, &intr_type);
+        }
     }
 
     /* have we got an interrupt to inject? */

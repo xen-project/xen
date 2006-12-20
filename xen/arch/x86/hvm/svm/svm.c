@@ -191,7 +191,6 @@ static inline void svm_inject_exception(struct vcpu *v, int trap,
     ASSERT(vmcb->eventinj.fields.v == 0);
     
     vmcb->eventinj = event;
-    v->arch.hvm_svm.inject_event=1;
 }
 
 static void stop_svm(void)
@@ -2564,8 +2563,6 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     exit_reason = vmcb->exitcode;
     save_svm_cpu_user_regs(v, regs);
 
-    v->arch.hvm_svm.inject_event = 0;
-
     if (exit_reason == VMEXIT_INVALID)
     {
         svm_dump_vmcb(__func__, vmcb);
@@ -2933,7 +2930,7 @@ asmlinkage void svm_asid(void)
         clear_bit( ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags );
     }
 }
-
+  
 /*
  * Local variables:
  * mode: C
