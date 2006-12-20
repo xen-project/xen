@@ -15,6 +15,7 @@
 #include <linux/version.h>
 #include <asm/io.h>
 #include <xen/balloon.h>
+#include <asm/swiotlb.h>
 #include <asm/tlbflush.h>
 #include <asm-i386/mach-xen/asm/swiotlb.h>
 #include <asm/bug.h>
@@ -183,8 +184,8 @@ void *dma_alloc_coherent(struct device *dev, size_t size,
 	ret = (void *)vstart;
 
 	if (ret != NULL) {
-		/* NB. Hardcode 31 address bits for now: aacraid limitation. */
-		if (xen_create_contiguous_region(vstart, order, 31) != 0) {
+		if (xen_create_contiguous_region(vstart, order,
+						 dma_bits) != 0) {
 			free_pages(vstart, order);
 			return NULL;
 		}
