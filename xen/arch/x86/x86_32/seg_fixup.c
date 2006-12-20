@@ -268,7 +268,7 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
     struct trap_info   *ti;
     struct trap_bounce *tb;
     u8            modrm, mod, reg, rm, decode;
-    void         *memreg, *regreg;
+    void         *memreg;
     unsigned long offset;
     u8            disp8;
     u32           disp32 = 0;
@@ -384,8 +384,7 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
         goto fixme;
     }
 
-    /* Decode Reg and R/M fields. */
-    regreg = decode_register(reg, regs, 0);
+    /* Decode R/M field. */
     memreg = decode_register(rm,  regs, 0);
 
     /* Decode Mod field. */
