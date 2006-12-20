@@ -212,8 +212,17 @@ void leave_hypervisor_tail(struct pt_regs *regs)
             if (callback_irq != 0 && local_events_need_delivery()) {
                 /* change level for para-device callback irq */
                 /* use level irq to send discrete event */
-                viosapic_set_irq(d, callback_irq, 1);
-                viosapic_set_irq(d, callback_irq, 0);
+                if (callback_irq & HVM_PARAM_CALLBACK_IRQ_RID) {
+                    /* case of using Requester-ID as callback irq */
+                    /* RID: '<#bus(8)><#dev(5)><#func(3)>' */
+                    int dev = (callback_irq >> 3) & 0x1f;
+                    viosapic_set_pci_irq(d, dev, 0, 1);
+                    viosapic_set_pci_irq(d, dev, 0, 0);
+                } else {
+                    /* case of using GSI as callback irq */
+                    viosapic_set_irq(d, callback_irq, 1);
+                    viosapic_set_irq(d, callback_irq, 0);
+                }
             }
         }
 

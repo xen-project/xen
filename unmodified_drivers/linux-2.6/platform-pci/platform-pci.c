@@ -182,12 +182,17 @@ static int get_hypercall_stubs(void)
 static int get_callback_irq(struct pci_dev *pdev)
 {
 #ifdef __ia64__
-	int irq;
+	int irq, rid;
 	for (irq = 0; irq < 16; irq++) {
 		if (isa_irq_to_vector(irq) == pdev->irq)
 			return irq;
 	}
-	return 0;
+	/* use Requester-ID as callback_irq */
+	/* RID: '<#bus(8)><#dev(5)><#func(3)>' (cf. PCI-Express spec) */
+	rid = ((pdev->bus->number & 0xff) << 8) | pdev->devfn;
+	printk(KERN_INFO DRV_NAME ":use Requester-ID(%04x) as callback irq\n",
+	       rid);
+	return rid | HVM_PARAM_CALLBACK_IRQ_RID;
 #else /* !__ia64__ */
 	return pdev->irq;
 #endif
