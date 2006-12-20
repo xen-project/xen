@@ -899,24 +899,14 @@ static void vmx_do_no_device_fault(void)
     }
 }
 
-#define bitmaskof(idx) (1U << ((idx)&31))
+#define bitmaskof(idx)  (1U << ((idx) & 31))
 static void vmx_do_cpuid(struct cpu_user_regs *regs)
 {
     unsigned int input = (unsigned int)regs->eax;
     unsigned int count = (unsigned int)regs->ecx;
     unsigned int eax, ebx, ecx, edx;
-    unsigned long eip;
-    struct vcpu *v = current;
 
-    eip = __vmread(GUEST_RIP);
-
-    HVM_DBG_LOG(DBG_LEVEL_3, "(eax) 0x%08lx, (ebx) 0x%08lx, "
-                "(ecx) 0x%08lx, (edx) 0x%08lx, (esi) 0x%08lx, (edi) 0x%08lx",
-                (unsigned long)regs->eax, (unsigned long)regs->ebx,
-                (unsigned long)regs->ecx, (unsigned long)regs->edx,
-                (unsigned long)regs->esi, (unsigned long)regs->edi);
-
-    if ( input == CPUID_LEAF_0x4 )
+    if ( input == 0x00000004 )
     {
         cpuid_count(input, count, &eax, &ebx, &ecx, &edx);
         eax &= NUM_CORES_RESET_MASK;
@@ -929,6 +919,7 @@ static void vmx_do_cpuid(struct cpu_user_regs *regs)
          */
         u64 value = ((u64)regs->edx << 32) | (u32)regs->ecx;
         unsigned long mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
+        struct vcpu *v = current;
         char *p;
 
         gdprintk(XENLOG_INFO, "Input address is 0x%"PRIx64".\n", value);
@@ -946,72 +937,37 @@ static void vmx_do_cpuid(struct cpu_user_regs *regs)
         unmap_domain_page(p);
 
         gdprintk(XENLOG_INFO, "Output value is 0x%"PRIx64".\n", value);
-        ecx = (u32)(value >>  0);
+        ecx = (u32)value;
         edx = (u32)(value >> 32);
-    }
-    else if ( !cpuid_hypervisor_leaves(input, &eax, &ebx, &ecx, &edx) )
-    {
-        cpuid(input, &eax, &ebx, &ecx, &edx);
+    } else {
+        hvm_cpuid(input, &eax, &ebx, &ecx, &edx);
 
-        if ( input == CPUID_LEAF_0x1 )
+        if ( input == 0x00000001 )
         {
             /* Mask off reserved bits. */
             ecx &= ~VMX_VCPU_CPUID_L1_ECX_RESERVED;
 
-            if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
-                clear_bit(X86_FEATURE_APIC, &edx);
-
-#if CONFIG_PAGING_LEVELS >= 3
-            if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
-#endif
-                clear_bit(X86_FEATURE_PAE, &edx);
-            clear_bit(X86_FEATURE_PSE36, &edx);
-
             ebx &= NUM_THREADS_RESET_MASK;
 
             /* Unsupportable for virtualised CPUs. */
-            ecx &= ~(bitmaskof(X86_FEATURE_VMXE)  |
-                     bitmaskof(X86_FEATURE_EST)   |
-                     bitmaskof(X86_FEATURE_TM2)   |
-                     bitmaskof(X86_FEATURE_CID)   |
-                     bitmaskof(X86_FEATURE_MWAIT) );
+            ecx &= ~(bitmaskof(X86_FEATURE_VMXE) |
+                     bitmaskof(X86_FEATURE_EST)  |
+                     bitmaskof(X86_FEATURE_TM2)  |
+                     bitmaskof(X86_FEATURE_CID));
 
-            edx &= ~( bitmaskof(X86_FEATURE_HT)   |
-                     bitmaskof(X86_FEATURE_ACPI)  |
-                     bitmaskof(X86_FEATURE_ACC) );
+            edx &= ~(bitmaskof(X86_FEATURE_HT)   |
+                     bitmaskof(X86_FEATURE_ACPI) |
+                     bitmaskof(X86_FEATURE_ACC));
         }
-        else if (  ( input == CPUID_LEAF_0x6 )
-                || ( input == CPUID_LEAF_0x9 )
-                || ( input == CPUID_LEAF_0xA ))
-        {
+
+        if ( input == 0x00000006 || input == 0x00000009 || input == 0x0000000A )
             eax = ebx = ecx = edx = 0x0;
-        }
-        else if ( input == CPUID_LEAF_0x80000001 )
-        {
-#if CONFIG_PAGING_LEVELS >= 3
-            if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
-#endif
-                clear_bit(X86_FEATURE_NX & 31, &edx);
-#ifdef __i386__
-            clear_bit(X86_FEATURE_LAHF_LM & 31, &ecx);
-
-            clear_bit(X86_FEATURE_LM & 31, &edx);
-            clear_bit(X86_FEATURE_SYSCALL & 31, &edx);
-#endif
-        }
     }
 
-    regs->eax = (unsigned long) eax;
-    regs->ebx = (unsigned long) ebx;
-    regs->ecx = (unsigned long) ecx;
-    regs->edx = (unsigned long) edx;
-
-    HVM_DBG_LOG(DBG_LEVEL_3, "eip@%lx, input: 0x%lx, "
-                "output: eax = 0x%08lx, ebx = 0x%08lx, "
-                "ecx = 0x%08lx, edx = 0x%08lx",
-                (unsigned long)eip, (unsigned long)input,
-                (unsigned long)eax, (unsigned long)ebx,
-                (unsigned long)ecx, (unsigned long)edx);
+    regs->eax = (unsigned long)eax;
+    regs->ebx = (unsigned long)ebx;
+    regs->ecx = (unsigned long)ecx;
+    regs->edx = (unsigned long)edx;
 }
 
 #define CASE_GET_REG_P(REG, reg)    \

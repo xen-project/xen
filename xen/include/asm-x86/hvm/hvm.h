@@ -219,6 +219,8 @@ hvm_get_segment_register(struct vcpu *v, enum x86_segment seg,
     hvm_funcs.get_segment_register(v, seg, reg);
 }
 
+void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
+                                   unsigned int *ecx, unsigned int *edx);
 void hvm_stts(struct vcpu *v);
 void hvm_set_guest_time(struct vcpu *v, u64 gtime);
 void hvm_freeze_time(struct vcpu *v);

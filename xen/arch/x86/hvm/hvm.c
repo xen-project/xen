@@ -402,6 +402,47 @@ void hvm_print_line(struct vcpu *v, const char c)
     spin_unlock(&hd->pbuf_lock);
 }
 
+void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
+                                   unsigned int *ecx, unsigned int *edx)
+{
+    if ( !cpuid_hypervisor_leaves(input, eax, ebx, ecx, edx) )
+    {
+        cpuid(input, eax, ebx, ecx, edx);
+
+        if ( input == 0x00000001 )
+        {
+            struct vcpu *v = current;
+
+            clear_bit(X86_FEATURE_MWAIT & 31, ecx);
+
+            if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
+                clear_bit(X86_FEATURE_APIC & 31, edx);
+
+#if CONFIG_PAGING_LEVELS >= 3
+            if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
+#endif
+                clear_bit(X86_FEATURE_PAE & 31, edx);
+
+            clear_bit(X86_FEATURE_PSE36 & 31, edx);
+        }
+        else if ( input == 0x80000001 )
+        {
+#if CONFIG_PAGING_LEVELS >= 3
+            struct vcpu *v = current;
+            if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
+#endif
+                clear_bit(X86_FEATURE_NX & 31, edx);
+#ifdef __i386__
+            /* Mask feature for Intel ia32e or AMD long mode. */
+            clear_bit(X86_FEATURE_LAHF_LM & 31, ecx);
+
+            clear_bit(X86_FEATURE_LM & 31, edx);
+            clear_bit(X86_FEATURE_SYSCALL & 31, edx);
+#endif
+        }
+    }
+}
+
 typedef unsigned long hvm_hypercall_t(
     unsigned long, unsigned long, unsigned long, unsigned long, unsigned long);
 
