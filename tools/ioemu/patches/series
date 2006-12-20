@@ -67,5 +67,5 @@ usb-uhci-buffer-size
 vnc-monitor-shift-key-processing
 ide-error-reporting
 vnc-numpad-handling
-xen-mapcache -p3
+xen-mapcache
 usb-mouse-tablet-status-check -p3

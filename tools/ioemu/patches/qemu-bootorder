@@ -1,7 +1,7 @@
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-12-08 02:02:38.000000000 +0000
-+++ ioemu/vl.c	2006-12-08 02:02:38.000000000 +0000
+--- ioemu.orig/vl.c	2006-12-20 15:12:08.000000000 +0000
++++ ioemu/vl.c	2006-12-20 15:21:19.000000000 +0000
 @@ -125,7 +125,7 @@
  struct sockaddr_in vnclisten_addr;
  const char* keyboard_layout = NULL;
@@ -17,15 +17,17 @@ Index: ioemu/vl.c
              case QEMU_OPTION_boot:
 -                boot_device = optarg[0];
 -                if (boot_device != 'a' && 
-+                boot_device = strdup(optarg);
-+                if (strspn(boot_device, "acd"
- #ifdef TARGET_SPARC
+-#ifdef TARGET_SPARC
 -		    // Network boot
 -		    boot_device != 'n' &&
-+                           "n"
- #endif
+-#endif
 -                    boot_device != 'c' && boot_device != 'd') {
 -                    fprintf(stderr, "qemu: invalid boot device '%c'\n", boot_device);
++                boot_device = strdup(optarg);
++                if (strspn(boot_device, "acd"
++#if defined(TARGET_SPARC) || defined(TARGET_I386)
++                           "n"
++#endif
 +                        ) != strlen(boot_device)) {
 +                    fprintf(stderr, "qemu: invalid boot device in '%s'\n",
 +                            boot_device);
@@ -48,7 +50,7 @@ Index: ioemu/vl.c
  #endif /* !CONFIG_DM */
  
      setvbuf(stdout, NULL, _IOLBF, 0);
-@@ -6598,6 +6600,7 @@
+@@ -6590,6 +6592,7 @@
                    ds, fd_filename, snapshot,
                    kernel_filename, kernel_cmdline, initrd_filename,
                    timeoffset);
@@ -58,8 +60,8 @@ Index: ioemu/vl.c
      if (usb_enabled) {
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-12-08 02:02:38.000000000 +0000
-+++ ioemu/vl.h	2006-12-08 02:02:38.000000000 +0000
+--- ioemu.orig/vl.h	2006-12-20 15:12:08.000000000 +0000
++++ ioemu/vl.h	2006-12-20 15:21:14.000000000 +0000
 @@ -578,7 +578,7 @@
  #ifndef QEMU_TOOL
  
@@ -80,9 +82,9 @@ Index: ioemu/vl.h
                            uint32_t initrd_image, uint32_t initrd_size,
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2006-12-08 02:02:38.000000000 +0000
-+++ ioemu/hw/pc.c	2006-12-08 02:02:38.000000000 +0000
-@@ -158,8 +158,23 @@
+--- ioemu.orig/hw/pc.c	2006-12-20 15:12:08.000000000 +0000
++++ ioemu/hw/pc.c	2006-12-20 15:21:19.000000000 +0000
+@@ -158,8 +158,25 @@
      rtc_set_memory(s, info_ofs + 8, sectors);
  }
  
@@ -96,6 +98,8 @@ Index: ioemu/hw/pc.c
 +            return 0x02;            /* hard drive */
 +        case 'd':
 +            return 0x03;            /* cdrom */
++        case 'n':
++            return 0x04;            /* network */
 +        }
 +    }
 +    return 0x00;                /* no device */
@@ -107,7 +111,7 @@ Index: ioemu/hw/pc.c
  {
      RTCState *s = rtc_state;
      int val;
-@@ -205,21 +220,14 @@
+@@ -205,21 +222,14 @@
      rtc_set_memory(s, 0x34, val);
      rtc_set_memory(s, 0x35, val >> 8);
      
@@ -137,7 +141,7 @@ Index: ioemu/hw/pc.c
  
      /* floppy type */
  
-@@ -617,7 +625,7 @@
+@@ -617,7 +627,7 @@
  #define NOBIOS 1
  
  /* PC hardware initialisation */
@@ -146,7 +150,7 @@ Index: ioemu/hw/pc.c
                       DisplayState *ds, const char **fd_filename, int snapshot,
                       const char *kernel_filename, const char *kernel_cmdline,
                       const char *initrd_filename, time_t timeoffset,
-@@ -919,7 +927,7 @@
+@@ -919,7 +929,7 @@
      }
  }
  
@@ -155,7 +159,7 @@ Index: ioemu/hw/pc.c
                          DisplayState *ds, const char **fd_filename, 
                          int snapshot, 
                          const char *kernel_filename, 
-@@ -933,7 +941,7 @@
+@@ -933,7 +943,7 @@
               initrd_filename, timeoffset, 1);
  }
  
