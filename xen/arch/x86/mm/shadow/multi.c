@@ -3342,11 +3342,12 @@ sh_update_cr3(struct vcpu *v, int do_locking)
 /* Updates vcpu->arch.cr3 after the guest has changed CR3.
  * Paravirtual guests should set v->arch.guest_table (and guest_table_user,
  * if appropriate).
- * HVM guests should also make sure hvm_get_guest_cntl_reg(v, 3) works,
- * and read vcpu->arch.hvm_vcpu.hw_cr3 afterwards.
+ * HVM guests should also make sure hvm_get_guest_cntl_reg(v, 3) works;
+ * this function will call hvm_update_guest_cr3() to tell them where the 
+ * shadow tables are.
  * If do_locking != 0, assume we are being called from outside the 
  * shadow code, and must take and release the shadow lock; otherwise 
- * that is the caller's respnsibility.
+ * that is the caller's responsibility.
  */
 {
     struct domain *d = v->domain;

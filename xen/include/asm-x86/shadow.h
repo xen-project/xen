@@ -248,11 +248,9 @@ static inline unsigned long shadow_gva_to_gfn(struct vcpu *v, unsigned long va)
     return v->arch.shadow.mode->gva_to_gfn(v, va);
 }
 
-/* Update all the things that are derived from the guest's CR3. 
- * Called when the guest changes CR3; the caller can then use 
- * v->arch.cr3 as the value to load into the host CR3 to schedule this vcpu
- * and v->arch.hvm_vcpu.hw_cr3 as the value to put in the vmcb/vmcs when 
- * entering the HVM guest. */
+/* Update all the things that are derived from the guest's CR3.  
+ * Called when the guest changes CR3; the caller can then use v->arch.cr3 
+ * as the value to load into the host CR3 to schedule this vcpu */
 static inline void shadow_update_cr3(struct vcpu *v)
 {
     v->arch.shadow.mode->update_cr3(v, 1);
