@@ -715,6 +715,8 @@ class XendConfig(dict):
         _set_cfg_if_exists('on_xend_start')
         _set_cfg_if_exists('vcpu_avail')
         _set_cfg_if_exists('max_vcpu_id') # needed for vcpuDomDetails
+        _set_cfg_if_exists('cpu_weight')
+        _set_cfg_if_exists('cpu_cap')
         
         # Parse and store runtime configuration 
         _set_cfg_if_exists('start_time')
