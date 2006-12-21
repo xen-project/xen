@@ -50,5 +50,7 @@ mk-symlinks-xen:
 	( cd xen/hvm && ln -sf ../../$(XEN_ROOT)/xen/include/public/hvm/*.h . )
 	mkdir -p xen/io
 	( cd xen/io && ln -sf ../../$(XEN_ROOT)/xen/include/public/io/*.h . )
+	mkdir -p xen/arch-x86
+	( cd xen/arch-x86 && ln -sf ../../$(XEN_ROOT)/xen/include/public/arch-x86/*.h . )
 
 mk-symlinks: mk-symlinks-xen mk-symlinks-$(XEN_OS)

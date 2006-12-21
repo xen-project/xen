@@ -29,10 +29,8 @@
 
 #include "xen-compat.h"
 
-#if defined(__i386__)
-#include "arch-x86_32.h"
-#elif defined(__x86_64__)
-#include "arch-x86_64.h"
+#if defined(__i386__) || defined(__x86_64__)
+#include "arch-x86/xen.h"
 #elif defined(__ia64__)
 #include "arch-ia64.h"
 #elif defined(__powerpc__)
