@@ -1244,7 +1244,7 @@ def xm_console(args):
         if quiet:
             sys.exit(1)
         else:
-            raise Exception("Domain is not started")
+            raise xmlrpclib.Fault(0, "Domain '%s' is not started" % dom)
 
     console.execConsole(domid)
 
