@@ -277,6 +277,12 @@ static void vmx_restore_host_msrs(void)
     }
 }
 
+static void vmx_save_guest_msrs(struct vcpu *v)
+{
+    /* MSR_SHADOW_GS_BASE may have been changed by swapgs instruction. */
+    rdmsrl(MSR_SHADOW_GS_BASE, v->arch.hvm_vmx.msr_state.shadow_gs);
+}
+
 static void vmx_restore_guest_msrs(struct vcpu *v)
 {
     struct vmx_msr_state *guest_msr_state, *host_msr_state;
@@ -308,6 +314,7 @@ static void vmx_restore_guest_msrs(struct vcpu *v)
 
 #define vmx_save_host_msrs()        ((void)0)
 #define vmx_restore_host_msrs()     ((void)0)
+#define vmx_save_guest_msrs(v)      ((void)0)
 #define vmx_restore_guest_msrs(v)   ((void)0)
 
 static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
@@ -373,10 +380,7 @@ static inline void vmx_restore_dr(struct vcpu *v)
 
 static void vmx_ctxt_switch_from(struct vcpu *v)
 {
-    /* NB. MSR_SHADOW_GS_BASE may be changed by swapgs instrucion in guest,
-     * so we must save it. */
-    rdmsrl(MSR_SHADOW_GS_BASE, v->arch.hvm_vmx.msr_state.shadow_gs);
-
+    vmx_save_guest_msrs(v);
     vmx_restore_host_msrs();
     vmx_save_dr(v);
 }
